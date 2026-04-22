@@ -59,7 +59,7 @@
 | W2.1 | Solver architectural fixes — B1, B2, B3, B4, B5 | ✓ | 28db1913 |
 | W2.2 | Control-flow fixes — C1, C2, C3, D1, H1, H2 | ✓ | 7dadd629 |
 | W2.3 | `InitMode` string deletion (production + harness) | ✓ | ab8552e4 |
-| W2.4 | Aggressive I1 test regeneration | ✓ | d24840ec |
+| W2.4 | Aggressive I1 test regeneration | ✓ | d24840ec + 24440b4a |
 | W3 | Wrap-up — convergence harness run + user review | — | — |
 
 Legend: `—` = not started, `▶` = in progress, `✓` = complete.
