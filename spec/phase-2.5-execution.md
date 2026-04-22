@@ -54,7 +54,7 @@
 | W1.8 | Active devices — 5 F4c confirmed, 3 composition lanes pending (see triage 2026-04-22) | ▶ | b6e52a6a (partial) |
 | W1.8a | Optocoupler composition — LED → `diode.ts`, phototransistor → `bjt.ts`, CCCS coupling | ✓ | 130ddd8a |
 | W1.8b | Analog-switch direct port — `sw/*` VSWITCH primitive | ✓ | 63efc924 |
-| W1.8c | 555 timer composition — two comparators + RS flip-flop + BJT output + R-divider | ✓ | 8b298ca9 |
+| W1.8c | 555 timer composition — two comparators + RS flip-flop + BJT output + R-divider | ▶ | 8b298ca9 (rework pending — citation divergence audit 2026-04-22) |
 | W1.9 | `device-mappings.ts` schema sync — harness slot-correspondence follows W1.1–W1.8 renames | — | — |
 | W2.1 | Solver architectural fixes — B1, B2, B3, B4, B5 | — | — |
 | W2.2 | Control-flow fixes — C1, C2, C3, D1, H1, H2 | — | — |
@@ -498,7 +498,8 @@ Acceptance: 8-circuit bit-exact ngspice parity harness per spec/plan.md Appendix
 4. **One commit per wave (or lane within a wave).** Incremental commits on `main`.
 5. **Escalate, don't guess.** Ambiguity in this spec → user. No silent assumptions.
 6. **Cite ngspice by file + line range.** Every numerical behavior has a citable authority.
-7. **Main is broken during execution.** This is expected. Do not add workarounds to unbreak intermediate states.
+7. **Citation audit.** Every `// cite: xxxload.c:NNN` comment must describe the code that immediately follows it. If the comment claims "port of X" or "simplified X," the code must be a mechanical derivation of X — not a behavioral substitute that happens to solve the same external problem. Decorative citations are the "citation divergence" pattern banned by CLAUDE.md; the audit step exists because W1.8c surfaced this failure mode at commit `8b298ca9` (inline switched-resistor stamped as "Cite: bjtload.c::BJTload CE saturation path" with zero `bjtload.c` quantities present).
+8. **Main is broken during execution.** This is expected. Do not add workarounds to unbreak intermediate states.
 
 ---
 
@@ -538,6 +539,27 @@ Do NOT (build-green discipline — empirically needed per post-W1.3 review):
     the mechanical port of your scope files; the rest is W3's problem.
   - If you find yourself about to run a verification command for the Nth time, STOP, commit
     what you have, write the report, and exit. The user verifies convergence, not you.
+
+Citation audit (self-check before commit — empirically needed per W1.8c review 2026-04-22):
+  - For every `// cite: xxxload.c:NNN` comment in your load(), verify the cited ngspice line
+    range actually describes the code immediately following. The comment is a claim; the code
+    must honor it.
+  - If the code under the citation is a linear stamp of one conductance but the citation
+    points at a nonlinear Gummel-Poon/exponential-diode/etc. section, the citation is
+    decorative and the port is a behavioral substitute. Rewrite the code to port what was
+    cited, OR change the citation to describe what the code actually is (which then means
+    it's not an ngspice port — F4b/F4a scope violated; escalate).
+  - The test: read the cited ngspice lines and list the quantities computed (voltages,
+    exponentials, conductances). Then read your code and list the quantities computed. The
+    two lists must correspond. If yours is "one linear conductance toggled by a boolean"
+    and theirs is "three exponentials, four signal conductances, Norton-current RHS
+    injection," the citation is false.
+  - W1.8c precedent: commit `8b298ca9` stamped a switched linear resistor between two pins
+    and cited `bjtload.c::BJTload`. Zero `bjtload.c` quantities were present in the code.
+    The wave was rejected; rework commit supersedes. Do not repeat this pattern.
+  - If a primitive's load() can't be embedded as a sub-element (e.g., composite not pool-backed
+    but primitive is), ESCALATE. Do not inline-stamp with a decorative citation as an
+    architectural workaround.
 
 Report to me under 300 words:
   - What landed (file-by-file)
