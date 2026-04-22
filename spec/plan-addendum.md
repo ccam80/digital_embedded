@@ -88,6 +88,8 @@ Not part of the original plan. Executes the full Track A umbrella as a single at
 - H2 `addDiagonalGmin` ownership into solver
 - I1 enumerate + remove suppression patterns (save/restore pairs, silent catches, "spurious"/"expected" gates)
 
+Harness-infrastructure sync is handled by the `W1.9 — device-mappings.ts schema sync` lane at the end of the W1 block (see `spec/phase-2.5-execution.md §4 W1.9`). W1.9 is not a Track A item; it is the terminal W1 lane that resolves slot-name drift accumulated by the per-device W1.1–W1.8 lanes so the harness slot-correspondence table matches the post-port schemas.
+
 See `spec/architectural-alignment.md` for the authoritative task list. Test-handling rule per A1: per-component tests whose expected values were hand-computed and inspect A1-deleted slots are deleted during execution (not fixed). Parameter plumbing / F4c self-compare / interface-contract tests survive, clearly labelled.
 
 ### Phase 3 — F2 (NR reorder gate + per-device initPred predictor)

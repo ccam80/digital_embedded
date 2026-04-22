@@ -597,6 +597,20 @@ is self-compare only.
 with a predefined parameter block. Removes the duplicate state schema
 and makes per-NR comparison possible.
 
+**Scope clarification (2026-04-22):** F2 targets the invented
+*simulation* surface only — `varactor.ts`'s duplicate state schema,
+load path, and `SLOT_CAP_GEQ`/`SLOT_IEQ` cross-method slots. The
+user-facing palette symbol (`VaractorElement` visual class,
+`VaractorDefinition` palette entry) is retained; factory routes
+placements to `createDiodeElement` with varactor-specific params (same
+pattern as `schottky.ts`, which is a diode variant with its own palette
+symbol and zero bespoke simulation code). This matches ngspice's own
+architecture: ngspice has no varactor *device* — a varactor is a diode
+with specific model params. Retention of the palette symbol is not a
+shim: no type assertions, no compatibility re-exports, no
+cross-method slots survive. If any of those patterns appear in a
+claimed F2 landing, the port has introduced a shim and is rejected.
+
 ### F3. Triode (vacuum tube)
 
 **Source IDs:** C-AUD-15. Files:
