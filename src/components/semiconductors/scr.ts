@@ -134,12 +134,12 @@ export function createScrElement(
   let vcrit = nVt * Math.log(nVt / (p.iS * Math.SQRT2));
   let vcritGate = nVt * Math.log(nVt / (p.iS * Math.SQRT2));
 
-  // Pool binding — set by initState
-  let s0: Float64Array;
-  let base: number;
+  // Pool reference — set by initState. State arrays accessed via pool.states[N]
+  // at call time. No cached Float64Array refs.
   let pool: StatePoolRef;
+  let base: number;
 
-  // Ephemeral per-iteration pnjlim limiting flag (ngspice icheck, SCRload sets CKTnoncon++)
+  // Ephemeral per-iteration pnjlim limiting flag
   let pnjlimLimited = false;
 
   // One-shot cold-start seeds from dcopInitJct. Non-null only between
@@ -158,7 +158,7 @@ export function createScrElement(
     return Math.min(raw, ALPHA_MAX);
   }
 
-  function computeOperatingPoint(vak: number, vgk: number): void {
+  function computeOperatingPoint(s0: Float64Array, vak: number, vgk: number): void {
     // Gate current through a small forward-biased junction (simplified model)
     const iGate = p.iS * (Math.exp(vgk / nVt) - 1) + GMIN * vgk;
 
@@ -185,10 +185,10 @@ export function createScrElement(
       if (iAk < p.iH && vak >= 0) {
         s0[base + SLOT_LATCHED] = 0.0;
         // Re-compute in blocking mode
-        computeBlockingMode(vak, alphaSum);
+        computeBlockingMode(s0, vak, alphaSum);
       }
     } else {
-      computeBlockingMode(vak, alphaSum);
+      computeBlockingMode(s0, vak, alphaSum);
     }
 
     // Gate junction model: forward-biased diode linearized at the (already
@@ -201,7 +201,7 @@ export function createScrElement(
     s0[base + SLOT_IGK] = iGateCurrent;
   }
 
-  function computeBlockingMode(vak: number, _alphaSum: number): void {
+  function computeBlockingMode(s0: Float64Array, vak: number, _alphaSum: number): void {
     if (vak >= 0) {
       // Forward blocking: high-resistance path
       s0[base + SLOT_GEQ] = GMIN;
@@ -230,16 +230,14 @@ export function createScrElement(
 
     initState(poolRef: StatePoolRef): void {
       pool = poolRef;
-      s0 = pool.state0;
       base = this.stateBaseOffset;
       applyInitialValues(SCR_STATE_SCHEMA, pool, base, {});
     },
 
-    refreshSubElementRefs(newS0: Float64Array, _newS1: Float64Array, _newS2: Float64Array, _newS3: Float64Array, _newS4: Float64Array, _newS5: Float64Array, _newS6: Float64Array, _newS7: Float64Array): void {
-      s0 = newS0;
-    },
-
     load(ctx: LoadContext): void {
+      // Access state arrays at call time — no cached Float64Array refs.
+      const s0 = pool.states[0];
+
       const voltages = ctx.voltages;
       let vakRaw: number;
       let vgkRaw: number;
@@ -264,7 +262,7 @@ export function createScrElement(
       let vakLimited: number;
       let vgkLimited: number;
       if (ctx.cktMode & MODEINITJCT) {
-        // dioload.c:130-136: MODEINITJCT sets vd directly — no pnjlim
+        // MODEINITJCT: use raw voltages directly without pnjlim on cold start.
         vakLimited = vakRaw;
         vgkLimited = vgkRaw;
         pnjlimLimited = false;
@@ -305,7 +303,7 @@ export function createScrElement(
       s0[base + SLOT_VAK] = vakLimited;
       s0[base + SLOT_VGK] = vgkLimited;
 
-      computeOperatingPoint(vakLimited, vgkLimited);
+      computeOperatingPoint(s0, vakLimited, vgkLimited);
 
       const solver = ctx.solver;
       const geq      = s0[base + SLOT_GEQ];
@@ -331,16 +329,16 @@ export function createScrElement(
     },
 
     checkConvergence(ctx: LoadContext): boolean {
-      // ngspice icheck gate: if voltage was limited in load(),
-      // declare non-convergence immediately (SCRload sets CKTnoncon++)
+      // If voltage was limited in load(), declare non-convergence immediately.
       if (pnjlimLimited) return false;
 
+      const s0 = pool.states[0];
       const voltages = ctx.voltages;
       const vA = nodeA > 0 ? voltages[nodeA - 1] : 0;
       const vK = nodeK > 0 ? voltages[nodeK - 1] : 0;
       const vG = nodeG > 0 ? voltages[nodeG - 1] : 0;
 
-      // ngspice DIOconvTest on J1 (anode-cathode)
+      // Current-prediction convergence test on anode-cathode junction
       const vakRaw = vA - vK;
       const delvak = vakRaw - s0[base + SLOT_VAK];
       const iak = s0[base + SLOT_IAK];
@@ -348,7 +346,7 @@ export function createScrElement(
       const cakhat = iak + gak * delvak;
       const tolAK = ctx.reltol * Math.max(Math.abs(cakhat), Math.abs(iak)) + ctx.iabstol;
 
-      // ngspice DIOconvTest on J2 (gate-cathode)
+      // Current-prediction convergence test on gate-cathode junction
       const vgkRaw = vG - vK;
       const delvgk = vgkRaw - s0[base + SLOT_VGK];
       const igk = s0[base + SLOT_IGK];
@@ -361,6 +359,7 @@ export function createScrElement(
 
     getPinCurrents(voltages: Float64Array): number[] {
       // pinLayout order: [A(0), K(1), G(2)]
+      const s0 = pool.states[0];
       const vA = nodeA > 0 ? voltages[nodeA - 1] : 0;
       const vK = nodeK > 0 ? voltages[nodeK - 1] : 0;
       const vG = nodeG > 0 ? voltages[nodeG - 1] : 0;
@@ -377,9 +376,9 @@ export function createScrElement(
     },
 
     primeJunctions(): void {
-      // dioload.c:135-136: MODEINITJCT sets vd = tVcrit
-      primedVak = vcrit;   // forward junction seed
-      primedVgk = 0;       // gate initially unbiased
+      // SCR MODEINITJCT seed: prime anode-cathode to vcrit, gate unbiased.
+      primedVak = vcrit;
+      primedVgk = 0;
     },
 
     setParam(key: string, value: number): void {
@@ -395,7 +394,7 @@ export function createScrElement(
 
     // Expose latch state for testing
     get _latchedState(): boolean {
-      return s0[base + SLOT_LATCHED] !== 0.0;
+      return pool.states[0][base + SLOT_LATCHED] !== 0.0;
     },
   } as PoolBackedAnalogElementCore & { _latchedState: boolean };
 }

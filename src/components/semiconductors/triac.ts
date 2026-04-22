@@ -135,18 +135,12 @@ export function createTriacElement(
   let vcritMain = nVt * Math.log(nVt / (p.iS * Math.SQRT2));
   let vcritGate = nVt * Math.log(nVt / (p.iS * Math.SQRT2));
 
-  // Pool binding — set by initState
-  let s0: Float64Array;
-  let s1: Float64Array;
-  let s2: Float64Array;
-  let s3: Float64Array;
-  let s4: Float64Array;
-  let s5: Float64Array;
-  let s6: Float64Array;
-  let s7: Float64Array;
+  // Pool reference — set by initState. State arrays accessed via pool.states[N]
+  // at call time inside load(). No cached Float64Array refs.
+  let pool: StatePoolRef;
   let base: number;
 
-  // Ephemeral per-iteration pnjlim limiting flag (ngspice icheck, TRIACload sets CKTnoncon++)
+  // Ephemeral per-iteration pnjlim limiting flag
   let pnjlimLimited = false;
 
   function recomputeDerivedConstants(): void {
@@ -160,19 +154,19 @@ export function createTriacElement(
     return Math.min(raw, ALPHA_MAX);
   }
 
-  function computeOnState(vmt: number): void {
+  function computeOnState(s0: Float64Array, vmt: number): void {
     const gOn = 1.0 / p.rOn;
     const iOn = (vmt - p.vOn) / p.rOn;
     s0[base + SLOT_GEQ] = gOn + GMIN;
     s0[base + SLOT_IEQ] = iOn - s0[base + SLOT_GEQ] * vmt;
   }
 
-  function computeBlockingState(): void {
+  function computeBlockingState(s0: Float64Array): void {
     s0[base + SLOT_GEQ] = GMIN;
     s0[base + SLOT_IEQ] = 0;
   }
 
-  function computeOperatingPoint(vmt: number, vg1: number): void {
+  function computeOperatingPoint(s0: Float64Array, vmt: number, vg1: number): void {
     // Gate current (forward-biased gate-MT1 junction)
     const iGate = p.iS * (Math.exp(vg1 / nVt) - 1) + GMIN * vg1;
 
@@ -190,16 +184,16 @@ export function createTriacElement(
         s0[base + SLOT_LATCHED] = 1.0;
       }
       if (s0[base + SLOT_LATCHED] === 1.0) {
-        computeOnState(vmt);
+        computeOnState(s0, vmt);
         const iMt = s0[base + SLOT_GEQ] * vmt + s0[base + SLOT_IEQ];
         s0[base + SLOT_IAK] = iMt;
         if (iMt < p.iH) {
           s0[base + SLOT_LATCHED] = 0.0;
-          computeBlockingState();
+          computeBlockingState(s0);
           s0[base + SLOT_IAK] = GMIN * vmt;
         }
       } else {
-        computeBlockingState();
+        computeBlockingState(s0);
         s0[base + SLOT_IAK] = GMIN * vmt;
       }
       // Reset reverse latch when polarity changes
@@ -221,11 +215,11 @@ export function createTriacElement(
         s0[base + SLOT_IAK] = iMt;
         if (iMt > -p.iH) {
           s0[base + SLOT_LATCHED] = 0.0;
-          computeBlockingState();
+          computeBlockingState(s0);
           s0[base + SLOT_IAK] = GMIN * vmt;
         }
       } else {
-        computeBlockingState();
+        computeBlockingState(s0);
         s0[base + SLOT_IAK] = GMIN * vmt;
       }
       // Reset forward latch when polarity changes
@@ -251,42 +245,17 @@ export function createTriacElement(
     stateSize: 9,
     stateSchema: TRIAC_STATE_SCHEMA,
     stateBaseOffset: -1,
-    s0: new Float64Array(0),
-    s1: new Float64Array(0),
-    s2: new Float64Array(0),
-    s3: new Float64Array(0),
-    s4: new Float64Array(0),
-    s5: new Float64Array(0),
-    s6: new Float64Array(0),
-    s7: new Float64Array(0),
 
-    initState(pool: StatePoolRef): void {
-      s0 = pool.state0;
-      s1 = pool.state1;
-      s2 = pool.state2;
-      s3 = pool.state3;
-      s4 = pool.state4;
-      s5 = pool.state5;
-      s6 = pool.state6;
-      s7 = pool.state7;
-      this.s0 = s0; this.s1 = s1; this.s2 = s2; this.s3 = s3;
-      this.s4 = s4; this.s5 = s5; this.s6 = s6; this.s7 = s7;
+    initState(poolRef: StatePoolRef): void {
+      pool = poolRef;
       base = this.stateBaseOffset;
       applyInitialValues(TRIAC_STATE_SCHEMA, pool, base, {});
     },
 
-    refreshSubElementRefs(newS0: Float64Array, newS1: Float64Array, newS2: Float64Array, newS3: Float64Array, newS4: Float64Array, newS5: Float64Array, newS6: Float64Array, newS7: Float64Array): void {
-      s0 = newS0;
-      s1 = newS1;
-      s2 = newS2;
-      s3 = newS3;
-      s4 = newS4;
-      s5 = newS5;
-      s6 = newS6;
-      s7 = newS7;
-    },
-
     load(ctx: LoadContext): void {
+      // Access state arrays at call time — no cached Float64Array refs.
+      const s0 = pool.states[0];
+
       const voltages = ctx.voltages;
       const v1 = nodeMT1 > 0 ? voltages[nodeMT1 - 1] : 0;
       const v2 = nodeMT2 > 0 ? voltages[nodeMT2 - 1] : 0;
@@ -300,7 +269,8 @@ export function createTriacElement(
       let vmtWasLimited = false;
       let vg1WasLimited = false;
       if (ctx.cktMode & MODEINITJCT) {
-        // dioload.c:130-136: seed junction voltages directly from vcrit without pnjlim
+        // Triac MODEINITJCT: seed junction voltages from vcrit — standard
+        // thyristor initialization, avoids pnjlim on cold start.
         vmtLimited = vcritMain;
         vg1Limited = vcritGate;
         pnjlimLimited = false;
@@ -339,7 +309,7 @@ export function createTriacElement(
       s0[base + SLOT_VAK] = vmtLimited;
       s0[base + SLOT_VGK] = vg1Limited;
 
-      computeOperatingPoint(vmtLimited, vg1Limited);
+      computeOperatingPoint(s0, vmtLimited, vg1Limited);
 
       const solver = ctx.solver;
       const geq      = s0[base + SLOT_GEQ];
@@ -365,16 +335,16 @@ export function createTriacElement(
     },
 
     checkConvergence(ctx: LoadContext): boolean {
-      // ngspice icheck gate: if voltage was limited in load(),
-      // declare non-convergence immediately (TRIACload sets CKTnoncon++)
+      // If voltage was limited in load(), declare non-convergence immediately.
       if (pnjlimLimited) return false;
 
+      const s0 = pool.states[0];
       const voltages = ctx.voltages;
       const v1 = nodeMT1 > 0 ? voltages[nodeMT1 - 1] : 0;
       const v2 = nodeMT2 > 0 ? voltages[nodeMT2 - 1] : 0;
       const vG = nodeG   > 0 ? voltages[nodeG   - 1] : 0;
 
-      // ngspice DIOconvTest on J1 (MT2-MT1)
+      // Current-prediction convergence test on MT2-MT1 junction
       const vmtRaw = v2 - v1;
       const delvmt = vmtRaw - s0[base + SLOT_VAK];
       const imt = s0[base + SLOT_IAK];
@@ -382,7 +352,7 @@ export function createTriacElement(
       const cmthat = imt + gmt * delvmt;
       const tolMT = ctx.reltol * Math.max(Math.abs(cmthat), Math.abs(imt)) + ctx.iabstol;
 
-      // ngspice DIOconvTest on J2 (gate-MT1)
+      // Current-prediction convergence test on gate-MT1 junction
       const vg1Raw = vG - v1;
       const delvg1 = vg1Raw - s0[base + SLOT_VGK];
       const ig1 = s0[base + SLOT_IGK];
@@ -395,6 +365,7 @@ export function createTriacElement(
 
     getPinCurrents(voltages: Float64Array): number[] {
       // pinLayout order: [MT2(0), MT1(1), G(2)]
+      const s0 = pool.states[0];
       const v1 = nodeMT1 > 0 ? voltages[nodeMT1 - 1] : 0;
       const v2 = nodeMT2 > 0 ? voltages[nodeMT2 - 1] : 0;
       const vG = nodeG   > 0 ? voltages[nodeG   - 1] : 0;

@@ -207,19 +207,12 @@ export function createTunnelDiodeElement(
 
   const hasCapacitance = params.CJO > 0 || params.TT > 0;
 
-  // Pool binding — set by initState
-  let s0: Float64Array;
-  let s1: Float64Array;
-  let s2: Float64Array;
-  let s3: Float64Array;
-  let s4: Float64Array;
-  let s5: Float64Array;
-  let s6: Float64Array;
-  let s7: Float64Array;
-  let base: number;
+  // Pool reference — set by initState. State arrays accessed via pool.states[N]
+  // at call time. No cached Float64Array refs.
   let pool: StatePoolRef;
+  let base: number;
 
-  function recompute(v: number): void {
+  function recompute(s0: Float64Array, v: number): void {
     const { i, dIdV } = tunnelDiodeIV(v, params.IP, params.VP, params.IV, params.VV, params.IS, params.N);
     // dIdV already includes GMIN from tunnelDiodeIV; add GMIN*v to current (DD5)
     s0[base + SLOT_ID] = i + GMIN * v;
@@ -239,56 +232,27 @@ export function createTunnelDiodeElement(
     stateSize: hasCapacitance ? 9 : 4,
     stateSchema: hasCapacitance ? TUNNEL_DIODE_CAP_STATE_SCHEMA : TUNNEL_DIODE_STATE_SCHEMA,
     stateBaseOffset: -1,
-    s0: new Float64Array(0),
-    s1: new Float64Array(0),
-    s2: new Float64Array(0),
-    s3: new Float64Array(0),
-    s4: new Float64Array(0),
-    s5: new Float64Array(0),
-    s6: new Float64Array(0),
-    s7: new Float64Array(0),
 
     initState(poolRef: StatePoolRef): void {
       pool = poolRef;
-      s0 = pool.state0;
-      s1 = pool.state1;
-      s2 = pool.state2;
-      s3 = pool.state3;
-      s4 = pool.state4;
-      s5 = pool.state5;
-      s6 = pool.state6;
-      s7 = pool.state7;
-      this.s0 = s0;
-      this.s1 = s1;
-      this.s2 = s2;
-      this.s3 = s3;
-      this.s4 = s4;
-      this.s5 = s5;
-      this.s6 = s6;
-      this.s7 = s7;
       base = this.stateBaseOffset;
       applyInitialValues(this.stateSchema, pool, base, params);
     },
 
-    refreshSubElementRefs(newS0: Float64Array, newS1: Float64Array, newS2: Float64Array, newS3: Float64Array, newS4: Float64Array, newS5: Float64Array, newS6: Float64Array, newS7: Float64Array): void {
-      s0 = newS0;
-      s1 = newS1;
-      s2 = newS2;
-      s3 = newS3;
-      s4 = newS4;
-      s5 = newS5;
-      s6 = newS6;
-      s7 = newS7;
-    },
-
     load(ctx: LoadContext): void {
+      // Access state arrays at call time — no cached Float64Array refs.
+      const s0 = pool.states[0];
+      const s1 = pool.states[1];
+      const s2 = pool.states[2];
+      const s3 = pool.states[3];
+
       const voltages = ctx.voltages;
       const vA = nodeAnode   > 0 ? voltages[nodeAnode   - 1] : 0;
       const vC = nodeCathode > 0 ? voltages[nodeCathode - 1] : 0;
       const vdRaw = vA - vC;
 
-      // Voltage limiting in or near NDR region: clamp step to NDR_VSTEP_MAX
-      // This prevents NR from jumping across the negative-resistance valley.
+      // Voltage limiting in or near NDR region: clamp step to NDR_VSTEP_MAX.
+      // Prevents NR from jumping across the negative-resistance valley.
       const vdOld = s0[base + SLOT_VD];
       let vdNew: number;
       let limited = false;
@@ -307,7 +271,7 @@ export function createTunnelDiodeElement(
       if (limited) ctx.noncon.value++;
 
       s0[base + SLOT_VD] = vdNew;
-      recompute(vdNew);
+      recompute(s0, vdNew);
 
       const geq = s0[base + SLOT_GEQ];
       const ieq = s0[base + SLOT_IEQ];
@@ -333,7 +297,6 @@ export function createTunnelDiodeElement(
         const q1 = s1[base + SLOT_Q];
         const q2 = s2[base + SLOT_Q];
         const q3 = s3[base + SLOT_Q];
-        // NIintegrate via shared helper (niinteg.c:17-80).
         const ag = ctx.ag;
         const ccapPrev = s1[base + SLOT_CCAP];
         const { ccap, geq: capGeq } = niIntegrate(
@@ -364,13 +327,14 @@ export function createTunnelDiodeElement(
     },
 
     checkConvergence(ctx: LoadContext): boolean {
+      const s0 = pool.states[0];
       const voltages = ctx.voltages;
       const vA = nodeAnode   > 0 ? voltages[nodeAnode   - 1] : 0;
       const vC = nodeCathode > 0 ? voltages[nodeCathode - 1] : 0;
       const vdRaw = vA - vC;
 
-      // ngspice DIOconvTest: current-prediction convergence
-      // GEQ can be negative in the NDR region; the formula self-scales via max(|cdhat|, |id|)
+      // Current-prediction convergence test.
+      // GEQ can be negative in the NDR region; max(|cdhat|, |id|) self-scales.
       const delvd = vdRaw - s0[base + SLOT_VD];
       const id = s0[base + SLOT_ID];
       const gd = s0[base + SLOT_GEQ];
@@ -382,7 +346,7 @@ export function createTunnelDiodeElement(
     getPinCurrents(_voltages: Float64Array): number[] {
       // pinLayout order: [A (anode), K (cathode)]
       // Positive = current flowing INTO element at that pin.
-      const id = s0[base + SLOT_ID];
+      const id = pool.states[0][base + SLOT_ID];
       return [id, -id];
     },
 
@@ -400,12 +364,12 @@ export function createTunnelDiodeElement(
       method: IntegrationMethod,
       lteParams: LteParams,
     ): number {
-      const _q0 = s0[base + SLOT_Q];
-      const _q1 = s1[base + SLOT_Q];
-      const _q2 = s2[base + SLOT_Q];
-      const _q3 = s3[base + SLOT_Q];
-      const ccap0 = s0[base + SLOT_CCAP];
-      const ccap1 = s1[base + SLOT_CCAP];
+      const _q0 = pool.states[0][base + SLOT_Q];
+      const _q1 = pool.states[1][base + SLOT_Q];
+      const _q2 = pool.states[2][base + SLOT_Q];
+      const _q3 = pool.states[3][base + SLOT_Q];
+      const ccap0 = pool.states[0][base + SLOT_CCAP];
+      const ccap1 = pool.states[1][base + SLOT_CCAP];
       return cktTerr(dt, deltaOld, order, method, _q0, _q1, _q2, _q3, ccap0, ccap1, lteParams);
     };
   }
