@@ -54,7 +54,7 @@
 | W1.8 | Active devices — 5 F4c confirmed, 3 composition lanes pending (see triage 2026-04-22) | ▶ | b6e52a6a (partial) |
 | W1.8a | Optocoupler composition — LED → `diode.ts`, phototransistor → `bjt.ts`, CCCS coupling | ✓ | 130ddd8a |
 | W1.8b | Analog-switch direct port — `sw/*` VSWITCH primitive | — | — |
-| W1.8c | 555 timer composition — two comparators + RS flip-flop + BJT output + R-divider | — | — |
+| W1.8c | 555 timer composition — two comparators + RS flip-flop + BJT output + R-divider | ✓ | 8b298ca9 |
 | W1.9 | `device-mappings.ts` schema sync — harness slot-correspondence follows W1.1–W1.8 renames | — | — |
 | W2.1 | Solver architectural fixes — B1, B2, B3, B4, B5 | — | — |
 | W2.2 | Control-flow fixes — C1, C2, C3, D1, H1, H2 | — | — |
