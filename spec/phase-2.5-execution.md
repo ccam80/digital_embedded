@@ -49,7 +49,7 @@
 | W1.3 | MOSFET (L1) + G1 sign convention | ✓ | 2b2b58a9 |
 | W1.4 | JFET (N + P + fet-base collapse) | ✓ | b62d6148 |
 | W1.5 | Reactive passives (capacitor, polarized-cap, inductor, transformer, tapped-transformer) | ✓ | 781b1943 |
-| W1.6 | F4c digiTS-only semiconductors (triac, scr, diac, tunnel-diode, triode, LED) | — | — |
+| W1.6 | F4c digiTS-only semiconductors (triac, scr, diac, tunnel-diode, triode, LED) | ✓ | 46e1dae7 |
 | W1.7 | F4c digiTS-only passives / sensors (crystal, transmission-line, memristor, analog-fuse, ntc-thermistor, spark-gap) | — | — |
 | W1.8 | Active F4b composites (real-opamp, comparator, ota, schmitt-trigger, analog-switch, optocoupler, timer-555, opamp) | — | — |
 | W1.9 | `device-mappings.ts` schema sync — harness slot-correspondence follows W1.1–W1.8 renames | — | — |
