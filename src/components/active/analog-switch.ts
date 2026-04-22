@@ -1,22 +1,30 @@
 /**
  * Analog Switch components — SPST and SPDT.
  *
- * Voltage-controlled variable resistances. The control voltage smoothly
- * transitions resistance from R_off to R_on using a tanh function, providing
- * a continuous, differentiable R(V_ctrl) characteristic for reliable
- * Newton-Raphson convergence.
+ * SPST (Single-Pole Single-Throw) — direct port of ngspice SW (VSWITCH) primitive.
+ *   Reference: ref/ngspice/src/spicelib/devices/sw/swload.c (SWload)
+ *              ref/ngspice/src/spicelib/devices/sw/swdefs.h  (SWmodel, SWinstance)
  *
- * SPST (Single-Pole Single-Throw):
- *   Pins: ctrl, in, out
- *   R(V_ctrl) = R_off - (R_off - R_on) * 0.5 * (1 + tanh(k * (V_ctrl - V_th)))
+ *   Control voltage evaluated as: v_ctrl = V(ctrl) - V(0)
+ *     (ngspice: CKTrhsOld[SWposCntrlNode] - CKTrhsOld[SWnegCntrlNode]; digiTS ctrl
+ *      is single-ended so negCntrlNode = 0 = ground. swload.c:43-44.)
  *
- * SPDT (Single-Pole Double-Throw):
- *   Pins: ctrl, com, no, nc
- *   COM-NO closes when V_ctrl > V_th (same tanh as SPST)
- *   COM-NC opens  when V_ctrl > V_th (inverted tanh — complementary)
+ *   State machine (two state slots, SW_NUM_STATES=2, swdefs.h:56):
+ *     states[0][base+0]: current_state (0=REALLY_OFF, 1=REALLY_ON, 2=HYST_OFF, 3=HYST_ON)
+ *     states[0][base+1]: v_ctrl saved at load time (swload.c:141)
  *
- * MNA stamp: conductance 1/R between signal terminals, updated every NR
- * iteration from the current V_ctrl operating point.
+ *   Conductance stamp (swload.c:143-152):
+ *     If current_state == REALLY_ON or HYST_ON: g_now = 1/Ron  (SWonConduct, swdefs.h:72)
+ *     Else:                                      g_now = 1/Roff (SWoffConduct, swdefs.h:73)
+ *     Stamped as four-entry conductance between nIn and nOut.
+ *
+ * SPDT (Single-Pole Double-Throw) — digiTS extension beyond ngspice SW primitive.
+ *   // digiTS extension beyond ngspice SW primitive — see F4b-composite discussion
+ *   ngspice has no dual-throw voltage-controlled switch primitive. SPDT is modelled
+ *   as two complementary SPST SW instances sharing a control voltage:
+ *   COM-NO path uses the same threshold logic as SPST;
+ *   COM-NC path uses inverted polarity (on when ctrl < threshold, i.e. v_ctrl negated).
+ *   Each path carries its own state slot pair (4 state slots total).
  */
 
 import { AbstractCircuitElement } from "../../core/element.js";
@@ -32,189 +40,420 @@ import {
   type AttributeMapping,
   type ComponentDefinition,
 } from "../../core/registry.js";
-import type { AnalogElementCore, LoadContext } from "../../solver/analog/element.js";
-import type { SparseSolver } from "../../solver/analog/sparse-solver.js";
+import type { AnalogElementCore, LoadContext, StatePoolRef } from "../../solver/analog/element.js";
 import { defineModelParams } from "../../core/model-params.js";
+import {
+  defineStateSchema,
+  applyInitialValues,
+  type StateSchema,
+} from "../../solver/analog/state-schema.js";
+import {
+  MODEINITFIX,
+  MODEINITJCT,
+  MODEINITSMSIG,
+  MODEINITFLOAT,
+  MODEINITTRAN,
+  MODEINITPRED,
+} from "../../solver/analog/ckt-mode.js";
 
 // ---------------------------------------------------------------------------
 // Model parameter declarations
+// swdefs.h: SWonResistance, SWoffResistance, SWvThreshold, SWvHysteresis
 // ---------------------------------------------------------------------------
 
 export const { paramDefs: ANALOG_SWITCH_PARAM_DEFS, defaults: ANALOG_SWITCH_DEFAULTS } = defineModelParams({
   primary: {
-    rOn:                { default: 10,  unit: "Ω",   description: "On-state resistance" },
-    rOff:               { default: 1e9, unit: "Ω",   description: "Off-state resistance" },
-    threshold:          { default: 1.65, unit: "V",  description: "Control voltage threshold" },
-    transitionSharpness:{ default: 20,  unit: "1/V", description: "Transition sharpness" },
+    rOn:          { default: 1,    unit: "Ω",  description: "On-state resistance (SWonResistance, swdefs.h:68)" },
+    rOff:         { default: 1e9,  unit: "Ω",  description: "Off-state resistance (SWoffResistance, swdefs.h:69)" },
+    vThreshold:   { default: 1.65, unit: "V",  description: "Switching threshold voltage (SWvThreshold, swdefs.h:70)" },
+    vHysteresis:  { default: 0,    unit: "V",  description: "Switching hysteresis voltage (SWvHysteresis, swdefs.h:71)" },
   },
 });
 
 // ---------------------------------------------------------------------------
-// Shared resistance computation
+// State-pool schema — SW_NUM_STATES = 2 (swdefs.h:56)
+// ---------------------------------------------------------------------------
+
+// State sentinel values matching swload.c:28-29
+const REALLY_OFF = 0;
+const REALLY_ON  = 1;
+const HYST_OFF   = 2;
+const HYST_ON    = 3;
+
+// Slot indices within a 2-slot SW path (swload.c:140-141)
+const SLOT_STATE  = 0;
+const SLOT_V_CTRL = 1;
+
+/**
+ * State schema for one SW path (SPST or one path of SPDT).
+ * SW_NUM_STATES = 2 (swdefs.h:56).
+ */
+export const SW_SCHEMA: StateSchema = defineStateSchema("SWElement", [
+  { name: "CURRENT_STATE", doc: "Switch state sentinel: REALLY_OFF=0, REALLY_ON=1, HYST_OFF=2, HYST_ON=3 (swload.c:28-29)", init: { kind: "constant", value: REALLY_OFF } },
+  { name: "V_CTRL",        doc: "Control voltage saved at load time (swload.c:141)",                                            init: { kind: "zero" } },
+]);
+
+/**
+ * State schema for the SPDT element (two complementary SW paths = 4 slots).
+ * // digiTS extension beyond ngspice SW primitive — see F4b-composite discussion
+ */
+export const SPDT_SCHEMA: StateSchema = defineStateSchema("SWElementSPDT", [
+  { name: "NO_CURRENT_STATE", doc: "COM-NO path switch state (swload.c:28-29 sentinel)", init: { kind: "constant", value: REALLY_OFF } },
+  { name: "NO_V_CTRL",        doc: "COM-NO path saved control voltage (swload.c:141)",    init: { kind: "zero" } },
+  { name: "NC_CURRENT_STATE", doc: "COM-NC path switch state (inverted polarity) — digiTS extension beyond ngspice SW primitive", init: { kind: "constant", value: REALLY_ON } },
+  { name: "NC_V_CTRL",        doc: "COM-NC path saved control voltage (inverted) — digiTS extension beyond ngspice SW primitive", init: { kind: "zero" } },
+]);
+
+// ---------------------------------------------------------------------------
+// Core SW stamp function — maps to SWload body (swload.c:40-152)
 // ---------------------------------------------------------------------------
 
 /**
- * Compute the switch resistance from the control voltage using a tanh
- * transition centred on V_th.
+ * Evaluate switch state and stamp conductance for one SW path.
  *
- * @param vCtrl      - Control voltage (V)
- * @param vTh        - Threshold voltage (V)
- * @param rOn        - On-state resistance (Ω)
- * @param rOff       - Off-state resistance (Ω)
- * @param k          - Transition sharpness (1/V); larger values → sharper switch
- * @param invert     - When true, tanh argument is negated (complementary path)
- * @returns Resistance in ohms
+ * Implements SWload:
+ *   - swload.c:40-41: read old_current_state (states[0]) and previous_state (states[1])
+ *   - swload.c:43-44: compute v_ctrl from positive/negative control nodes
+ *   - swload.c:48-133: state machine per cktMode
+ *   - swload.c:140-141: write states[0][SWstate], states[0][SWstate+1]
+ *   - swload.c:143-152: select g_now, stamp four conductance matrix entries
+ *
+ * @param ctx          LoadContext for this NR iteration
+ * @param pool         StatePoolRef for this element
+ * @param base         Slot base offset into pool.states[N]
+ * @param nPos         Positive signal node (1-based; 0 = ground)
+ * @param nNeg         Negative signal node (1-based; 0 = ground)
+ * @param nCtrl        Positive control node (1-based; 0 = ground)
+ * @param gOn          On-state conductance = 1/Ron  (SWonConduct, swdefs.h:72)
+ * @param gOff         Off-state conductance = 1/Roff (SWoffConduct, swdefs.h:73)
+ * @param vThreshold   Switching threshold voltage (SWvThreshold, swdefs.h:70)
+ * @param vHysteresis  Switching hysteresis magnitude (SWvHysteresis, swdefs.h:71)
+ * @param zeroStateGiven Initial-condition flag (SWzero_stateGiven, swdefs.h:44):
+ *   true = device starts ON; false = device starts OFF.
+ * @param invertCtrl   When true, negate v_ctrl before threshold comparison.
+ *   // digiTS extension beyond ngspice SW primitive — see F4b-composite discussion
+ *   Used for the COM-NC path of SPDT to give complementary switching.
  */
-function switchResistance(
-  vCtrl: number,
-  vTh: number,
-  rOn: number,
-  rOff: number,
-  k: number,
-  invert: boolean,
-): number {
-  const arg = invert ? -k * (vCtrl - vTh) : k * (vCtrl - vTh);
-  const tanhVal = Math.tanh(arg);
-  return rOff - (rOff - rOn) * 0.5 * (1 + tanhVal);
-}
-
-// ---------------------------------------------------------------------------
-// MNA stamp helpers (1-based node IDs, 0 = ground)
-// ---------------------------------------------------------------------------
-
-function stampConductance(
-  solver: SparseSolver,
-  nodeA: number,
-  nodeB: number,
-  g: number,
+function swLoad(
+  ctx: LoadContext,
+  pool: StatePoolRef,
+  base: number,
+  nPos: number,
+  nNeg: number,
+  nCtrl: number,
+  gOn: number,
+  gOff: number,
+  vThreshold: number,
+  vHysteresis: number,
+  zeroStateGiven: boolean,
+  invertCtrl: boolean,
 ): void {
-  if (nodeA > 0) solver.stampElement(solver.allocElement(nodeA - 1, nodeA - 1), g);
-  if (nodeB > 0) solver.stampElement(solver.allocElement(nodeB - 1, nodeB - 1), g);
-  if (nodeA > 0 && nodeB > 0) {
-    solver.stampElement(solver.allocElement(nodeA - 1, nodeB - 1), -g);
-    solver.stampElement(solver.allocElement(nodeB - 1, nodeA - 1), -g);
+  // swload.c:40-41 — read old_current_state from states[0] and previous_state from states[1]
+  // Pool arrays read at call time; never cached as member variables (A4 pattern).
+  const s0 = pool.states[0];
+  const s1 = pool.states[1];
+
+  const old_current_state: number = s0[base + SLOT_STATE];
+  const previous_state: number    = s1 !== undefined ? s1[base + SLOT_STATE] : REALLY_OFF;
+
+  // swload.c:43-44 — control voltage between positive and negative control nodes
+  // digiTS: ctrl is single-ended (negCntrlNode = 0 = ground):
+  //   v_ctrl = voltages[nCtrl-1] - 0
+  // invertCtrl for SPDT COM-NC path:
+  // // digiTS extension beyond ngspice SW primitive — see F4b-composite discussion
+  const voltages = ctx.voltages;
+  let v_ctrl = nCtrl > 0 ? voltages[nCtrl - 1] : 0;
+  if (invertCtrl) v_ctrl = -v_ctrl;
+
+  // swload.c:48-133 — mode-dispatched state machine
+  let current_state: number;
+  const cktMode = ctx.cktMode;
+
+  if (cktMode & (MODEINITFIX | MODEINITJCT)) {
+    // swload.c:48-65: cold-start initial condition
+    if (zeroStateGiven) {
+      // switch specified "on" (SWzero_stateGiven = true, swdefs.h:44)
+      if ((vHysteresis >= 0) && (v_ctrl > (vThreshold + vHysteresis)))
+        current_state = REALLY_ON;
+      else if ((vHysteresis < 0) && (v_ctrl > (vThreshold - vHysteresis)))
+        current_state = REALLY_ON;
+      else
+        current_state = HYST_ON;
+    } else {
+      // switch specified "off" (default, SWzero_stateGiven = false)
+      if ((vHysteresis >= 0) && (v_ctrl < (vThreshold - vHysteresis)))
+        current_state = REALLY_OFF;
+      else if ((vHysteresis < 0) && (v_ctrl < (vThreshold + vHysteresis)))
+        current_state = REALLY_OFF;
+      else
+        current_state = HYST_OFF;
+    }
+
+  } else if (cktMode & MODEINITSMSIG) {
+    // swload.c:67-69: AC small-signal — freeze at previous accepted state
+    current_state = previous_state;
+
+  } else if (cktMode & MODEINITFLOAT) {
+    // swload.c:71-105: normal NR iteration — hysteresis comparator
+    if (vHysteresis > 0) {
+      // swload.c:74-80: positive hysteresis
+      if (v_ctrl > (vThreshold + vHysteresis)) {
+        current_state = REALLY_ON;
+      } else if (v_ctrl < (vThreshold - vHysteresis)) {
+        current_state = REALLY_OFF;
+      } else {
+        // in hysteresis band — hold old_current_state (swload.c:80)
+        current_state = old_current_state;
+      }
+    } else {
+      // swload.c:82-100: negative hysteresis case
+      if (v_ctrl > (vThreshold - vHysteresis)) {
+        current_state = REALLY_ON;
+      } else if (v_ctrl < (vThreshold + vHysteresis)) {
+        current_state = REALLY_OFF;
+      } else {
+        // in hysteresis region — propagate from previous state (swload.c:89-99)
+        if ((previous_state === HYST_OFF) || (previous_state === HYST_ON)) {
+          current_state = previous_state;
+        } else if (previous_state === REALLY_ON) {
+          current_state = HYST_OFF;
+        } else if (previous_state === REALLY_OFF) {
+          current_state = HYST_ON;
+        } else {
+          current_state = HYST_OFF; // unreachable in normal flow
+        }
+      }
+    }
+
+    // swload.c:102-105: increment CKTnoncon if state changed (forces one more iteration)
+    if (current_state !== old_current_state) {
+      ctx.noncon.value++;
+    }
+
+  } else if (cktMode & (MODEINITTRAN | MODEINITPRED)) {
+    // swload.c:108-133: transient predictor / first-transient step
+    if (vHysteresis > 0) {
+      // swload.c:110-116: positive hysteresis
+      if (v_ctrl > (vThreshold + vHysteresis))
+        current_state = REALLY_ON;
+      else if (v_ctrl < (vThreshold - vHysteresis))
+        current_state = REALLY_OFF;
+      else
+        current_state = previous_state;
+    } else {
+      // swload.c:117-132: negative hysteresis
+      if (v_ctrl > (vThreshold - vHysteresis))
+        current_state = REALLY_ON;
+      else if (v_ctrl < (vThreshold + vHysteresis))
+        current_state = REALLY_OFF;
+      else {
+        current_state = 0;
+        if ((previous_state === HYST_ON) || (previous_state === HYST_OFF)) {
+          current_state = previous_state;
+        } else if (previous_state === REALLY_ON) {
+          current_state = REALLY_OFF;
+        } else if (previous_state === REALLY_OFF) {
+          current_state = REALLY_ON;
+        }
+      }
+    }
+
+  } else {
+    // Unrecognised cktMode — hold existing state
+    current_state = old_current_state;
+  }
+
+  // swload.c:140-141: write back current_state and v_ctrl to states[0]
+  s0[base + SLOT_STATE]  = current_state;
+  s0[base + SLOT_V_CTRL] = v_ctrl;
+
+  // swload.c:143-152: select conductance and stamp four-entry MNA matrix entries
+  // SWonConduct = 1/Ron; SWoffConduct = 1/Roff (swdefs.h:72-73)
+  const g_now = ((current_state === REALLY_ON) || (current_state === HYST_ON))
+    ? gOn
+    : gOff;
+
+  const solver = ctx.solver;
+  if (nPos > 0) {
+    solver.stampElement(solver.allocElement(nPos - 1, nPos - 1), g_now);   // swload.c:149 SWposPosptr
+  }
+  if (nNeg > 0) {
+    solver.stampElement(solver.allocElement(nNeg - 1, nNeg - 1), g_now);   // swload.c:152 SWnegNegptr
+  }
+  if (nPos > 0 && nNeg > 0) {
+    solver.stampElement(solver.allocElement(nPos - 1, nNeg - 1), -g_now);  // swload.c:150 SWposNegptr
+    solver.stampElement(solver.allocElement(nNeg - 1, nPos - 1), -g_now);  // swload.c:151 SWnegPosptr
   }
 }
 
 // ---------------------------------------------------------------------------
 // createSwitchSPSTElement — AnalogElement factory (SPST)
+// Direct port of ngspice SW (VSWITCH) primitive. swload.c, swdefs.h.
 // ---------------------------------------------------------------------------
 
 function createSwitchSPSTElement(
   pinNodes: ReadonlyMap<string, number>,
   props: PropertyBag,
 ): AnalogElementCore {
+  const nIn   = pinNodes.get("in")!;   // positive signal node (SWposNode, swdefs.h:28)
+  const nOut  = pinNodes.get("out")!;  // negative signal node (SWnegNode, swdefs.h:29)
+  const nCtrl = pinNodes.get("ctrl")!; // positive control node (SWposCntrlNode, swdefs.h:30)
+
+  // p holds mutable params for hot-loadable setParam()
   const p: Record<string, number> = {
-    rOn:                Math.max(props.getModelParam<number>("rOn"),  1e-6),
-    rOff:               Math.max(props.getModelParam<number>("rOff"), 1e-6),
-    threshold:          props.getModelParam<number>("threshold"),
-    transitionSharpness:Math.max(props.getModelParam<number>("transitionSharpness"), 1e-6),
+    rOn:         props.getModelParam<number>("rOn"),
+    rOff:        props.getModelParam<number>("rOff"),
+    vThreshold:  props.getModelParam<number>("vThreshold"),
+    vHysteresis: props.getModelParam<number>("vHysteresis"),
   };
 
-  const nIn   = pinNodes.get("in")!;   // signal in
-  const nOut  = pinNodes.get("out")!;  // signal out
-  const nCtrl = pinNodes.get("ctrl")!; // control terminal
-
-  // Current operating-point resistance
-  let currentR = p.rOff;
-
-  function readNode(voltages: Float64Array, n: number): number {
-    return n > 0 ? voltages[n - 1] : 0;
-  }
+  // Pool binding — reference held after initState(); individual state arrays
+  // read via pool.states[N] at call time. Mirrors ngspice CKTstate0/1 pointer
+  // access (cktload.c never caches state pointers on devices).
+  let pool: StatePoolRef;
+  let base: number; // = stateBaseOffset, set by initState()
 
   return {
     branchIndex: -1,
     isNonlinear: true,
     isReactive: false,
+    poolBacked: true as const,
+    stateSize: SW_SCHEMA.size,   // 2 (SW_NUM_STATES, swdefs.h:56)
+    stateSchema: SW_SCHEMA,
+    stateBaseOffset: -1,         // set by compiler (compiler.ts:1388)
+
+    initState(poolRef: StatePoolRef): void {
+      pool = poolRef;
+      base = this.stateBaseOffset;
+      applyInitialValues(SW_SCHEMA, pool, base, p);
+    },
 
     load(ctx: LoadContext): void {
-      const voltages = ctx.voltages;
-      const vCtrl = readNode(voltages, nCtrl);
-      currentR = switchResistance(
-        vCtrl,
-        p.threshold,
-        Math.max(p.rOn, 1e-6),
-        Math.max(p.rOff, p.rOn + 1),
-        p.transitionSharpness,
-        false,
+      const rOnNow  = Math.max(p.rOn, 1e-3);
+      const rOffNow = Math.max(p.rOff, rOnNow * 2);
+      swLoad(
+        ctx, pool, base,
+        nIn, nOut, nCtrl,
+        1 / rOnNow,           // SWonConduct = 1/Ron, swdefs.h:72
+        1 / rOffNow,          // SWoffConduct = 1/Roff, swdefs.h:73
+        p.vThreshold,         // SWvThreshold, swdefs.h:70
+        p.vHysteresis,        // SWvHysteresis, swdefs.h:71
+        false,                // SWzero_stateGiven = false (default: starts OFF), swdefs.h:44
+        false,                // invertCtrl = false (SPST: direct control)
       );
-      const g = 1 / currentR;
-      stampConductance(ctx.solver, nIn, nOut, g);
     },
 
     getPinCurrents(voltages: Float64Array): number[] {
       // Pin layout order: in, out, ctrl.
-      // Conductance 1/currentR stamped between in and out; ctrl has no stamp.
-      const g = 1 / currentR;
-      const vIn  = readNode(voltages, nIn);
-      const vOut = readNode(voltages, nOut);
-      const iThrough = g * (vIn - vOut);
+      // Conductance g_now stamped between nIn and nOut; ctrl has no stamp.
+      const current_state = pool.states[0][base + SLOT_STATE];
+      const rOnNow  = Math.max(p.rOn, 1e-3);
+      const rOffNow = Math.max(p.rOff, rOnNow * 2);
+      const g_now = ((current_state === REALLY_ON) || (current_state === HYST_ON))
+        ? 1 / rOnNow
+        : 1 / rOffNow;
+      const vIn  = nIn  > 0 ? voltages[nIn  - 1] : 0;
+      const vOut = nOut > 0 ? voltages[nOut - 1] : 0;
+      const iThrough = g_now * (vIn - vOut);
       return [iThrough, -iThrough, 0];
     },
 
     setParam(key: string, value: number): void {
-      if (key in p) (p as Record<string, number>)[key] = value;
+      if (key in p) p[key] = value;
     },
   };
 }
 
 // ---------------------------------------------------------------------------
 // createSwitchSPDTElement — AnalogElement factory (SPDT)
+// digiTS extension beyond ngspice SW primitive — see F4b-composite discussion.
+// Two complementary SW paths sharing one control voltage:
+//   COM-NO path: normal polarity (closes when v_ctrl > vThreshold)
+//   COM-NC path: inverted polarity (closes when v_ctrl < vThreshold)
+// State layout (4 slots total):
+//   [base+0]: NO_CURRENT_STATE, [base+1]: NO_V_CTRL  — COM-NO path
+//   [base+2]: NC_CURRENT_STATE, [base+3]: NC_V_CTRL  — COM-NC path
 // ---------------------------------------------------------------------------
 
 function createSwitchSPDTElement(
   pinNodes: ReadonlyMap<string, number>,
   props: PropertyBag,
 ): AnalogElementCore {
-  const p: Record<string, number> = {
-    rOn:                Math.max(props.getModelParam<number>("rOn"),  1e-6),
-    rOff:               Math.max(props.getModelParam<number>("rOff"), 1e-6),
-    threshold:          props.getModelParam<number>("threshold"),
-    transitionSharpness:Math.max(props.getModelParam<number>("transitionSharpness"), 1e-6),
-  };
-
   const nCom  = pinNodes.get("com")!;  // common terminal
   const nNO   = pinNodes.get("no")!;   // normally-open terminal
   const nNC   = pinNodes.get("nc")!;   // normally-closed terminal
   const nCtrl = pinNodes.get("ctrl")!; // control terminal
 
-  let rNO = p.rOff; // COM-NO resistance (closes when V_ctrl > V_th)
-  let rNC = p.rOn;  // COM-NC resistance (opens  when V_ctrl > V_th)
+  const p: Record<string, number> = {
+    rOn:         props.getModelParam<number>("rOn"),
+    rOff:        props.getModelParam<number>("rOff"),
+    vThreshold:  props.getModelParam<number>("vThreshold"),
+    vHysteresis: props.getModelParam<number>("vHysteresis"),
+  };
 
-  function readNode(voltages: Float64Array, n: number): number {
-    return n > 0 ? voltages[n - 1] : 0;
-  }
+  let pool: StatePoolRef;
+  let base: number;
 
   return {
     branchIndex: -1,
     isNonlinear: true,
     isReactive: false,
+    poolBacked: true as const,
+    stateSize: SPDT_SCHEMA.size,   // 4 (two SW paths × 2 slots each)
+    stateSchema: SPDT_SCHEMA,
+    stateBaseOffset: -1,
+
+    initState(poolRef: StatePoolRef): void {
+      pool = poolRef;
+      base = this.stateBaseOffset;
+      applyInitialValues(SPDT_SCHEMA, pool, base, p);
+    },
 
     load(ctx: LoadContext): void {
-      const voltages = ctx.voltages;
-      const solver = ctx.solver;
-      const vCtrl = readNode(voltages, nCtrl);
-      const rOnNow  = Math.max(p.rOn, 1e-6);
-      const rOffNow = Math.max(p.rOff, rOnNow + 1);
-      rNO = switchResistance(vCtrl, p.threshold, rOnNow, rOffNow, p.transitionSharpness, false);
-      rNC = switchResistance(vCtrl, p.threshold, rOnNow, rOffNow, p.transitionSharpness, true);
-      stampConductance(solver, nCom, nNO, 1 / rNO);
-      stampConductance(solver, nCom, nNC, 1 / rNC);
+      const rOnNow  = Math.max(p.rOn, 1e-3);
+      const rOffNow = Math.max(p.rOff, rOnNow * 2);
+      const gOn  = 1 / rOnNow;   // SWonConduct, swdefs.h:72
+      const gOff = 1 / rOffNow;  // SWoffConduct, swdefs.h:73
+
+      // COM-NO path: normal polarity SW (swload.c semantics, slots base+0..base+1)
+      swLoad(
+        ctx, pool, base,
+        nCom, nNO, nCtrl, gOn, gOff,
+        p.vThreshold, p.vHysteresis,
+        false,  // SWzero_stateGiven=false: NO path starts OFF (normally open)
+        false,  // invertCtrl=false: normal polarity
+      );
+
+      // COM-NC path: inverted polarity SW (slots base+2..base+3)
+      // // digiTS extension beyond ngspice SW primitive — see F4b-composite discussion
+      swLoad(
+        ctx, pool, base + 2,
+        nCom, nNC, nCtrl, gOn, gOff,
+        p.vThreshold, p.vHysteresis,
+        true,   // SWzero_stateGiven=true: NC path starts ON (normally closed)
+        true,   // invertCtrl=true: complementary polarity
+      );
     },
 
     getPinCurrents(voltages: Float64Array): number[] {
       // Pin layout order: com, no, nc, ctrl.
-      // Conductance 1/rNO between com/no, 1/rNC between com/nc; ctrl has no stamp.
-      const vCom = readNode(voltages, nCom);
-      const vNo  = readNode(voltages, nNO);
-      const vNc  = readNode(voltages, nNC);
-      const iNO = (1 / rNO) * (vCom - vNo);
-      const iNC = (1 / rNC) * (vCom - vNc);
+      const s0_now = pool.states[0];
+      const rOnNow  = Math.max(p.rOn, 1e-3);
+      const rOffNow = Math.max(p.rOff, rOnNow * 2);
+      const stateNO = s0_now[base + 0];
+      const stateNC = s0_now[base + 2];
+      const gNO = ((stateNO === REALLY_ON) || (stateNO === HYST_ON)) ? 1 / rOnNow : 1 / rOffNow;
+      const gNC = ((stateNC === REALLY_ON) || (stateNC === HYST_ON)) ? 1 / rOnNow : 1 / rOffNow;
+      const vCom = nCom > 0 ? voltages[nCom - 1] : 0;
+      const vNo  = nNO  > 0 ? voltages[nNO  - 1] : 0;
+      const vNc  = nNC  > 0 ? voltages[nNC  - 1] : 0;
+      const iNO  = gNO * (vCom - vNo);
+      const iNC  = gNC * (vCom - vNc);
       return [iNO + iNC, -iNO, -iNC, 0];
     },
 
     setParam(key: string, value: number): void {
-      if (key in p) (p as Record<string, number>)[key] = value;
+      if (key in p) p[key] = value;
     },
   };
 }
@@ -407,11 +646,11 @@ const ANALOG_SWITCH_PROPERTY_DEFS: PropertyDefinition[] = [
 // ---------------------------------------------------------------------------
 
 const ANALOG_SWITCH_ATTRIBUTE_MAPPINGS: AttributeMapping[] = [
-  { xmlName: "rOn",                 propertyKey: "rOn",                 convert: (v) => parseFloat(v), modelParam: true },
-  { xmlName: "rOff",                propertyKey: "rOff",                convert: (v) => parseFloat(v), modelParam: true },
-  { xmlName: "threshold",           propertyKey: "threshold",           convert: (v) => parseFloat(v), modelParam: true },
-  { xmlName: "transitionSharpness", propertyKey: "transitionSharpness", convert: (v) => parseFloat(v), modelParam: true },
-  { xmlName: "Label",               propertyKey: "label",               convert: (v) => v },
+  { xmlName: "rOn",         propertyKey: "rOn",         convert: (v) => parseFloat(v), modelParam: true },
+  { xmlName: "rOff",        propertyKey: "rOff",        convert: (v) => parseFloat(v), modelParam: true },
+  { xmlName: "vThreshold",  propertyKey: "vThreshold",  convert: (v) => parseFloat(v), modelParam: true },
+  { xmlName: "vHysteresis", propertyKey: "vHysteresis", convert: (v) => parseFloat(v), modelParam: true },
+  { xmlName: "Label",       propertyKey: "label",       convert: (v) => v },
 ];
 
 // ---------------------------------------------------------------------------
@@ -429,7 +668,8 @@ export const SwitchSPSTDefinition: ComponentDefinition = {
 
   helpText:
     "Analog Switch (SPST) — three-terminal (ctrl, in, out). " +
-    "Voltage-controlled resistance using tanh transition for NR-friendly behavior.",
+    "Direct port of ngspice SW (VSWITCH) primitive (swload.c, swdefs.h). " +
+    "Hard-switching with optional hysteresis; no tanh transition.",
 
   factory(props: PropertyBag): SwitchSPSTElement {
     return new SwitchSPSTElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
@@ -459,6 +699,7 @@ export const SwitchSPDTDefinition: ComponentDefinition = {
 
   helpText:
     "Analog Switch (SPDT) — four-terminal (ctrl, com, no, nc). " +
+    "digiTS extension beyond ngspice SW primitive — see F4b-composite discussion. " +
     "COM-NO closes and COM-NC opens as control voltage rises through threshold.",
 
   factory(props: PropertyBag): SwitchSPDTElement {

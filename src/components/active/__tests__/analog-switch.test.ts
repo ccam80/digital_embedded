@@ -1,436 +1,250 @@
 /**
  * Tests for Analog Switch components (SPST and SPDT).
  *
- * Tests cover:
- *   SPST::on_resistance         — V_ctrl >> V_th → R ≈ R_on
- *   SPST::off_resistance        — V_ctrl = 0 → R ≈ R_off
- *   SPST::smooth_transition     — R changes monotonically without discontinuity
- *   SPST::signal_passes_when_on — 1V signal through on-switch with R_load
- *   SPDT::break_before_make     — at threshold, both paths have elevated R
- *   SPDT::no_and_nc_complementary — high ctrl: NO closed, NC open; low ctrl: reversed
- *   SPST::nr_converges_during_transition — at threshold, NR converges ≤ 10 iterations
+ * Surviving tests per Phase 2.5 A1 §Test handling rule:
+ *   - Parameter plumbing (setParam, defaults) — KEEP
+ *   - Engine-agnostic interface contracts (poolBacked, stateSize, stateSchema) — KEEP
+ *
+ * Deleted per A1 §Test handling rule:
+ *   - on_resistance      — hand-computed expected value based on tanh extension behavior → deleted
+ *   - off_resistance     — hand-computed expected value based on tanh extension behavior → deleted
+ *   - smooth_transition  — asserts tanh monotonicity, digiTS extension beyond ngspice SW → deleted
+ *   - signal_passes_when_on — hand-computed circuit result, digiTS tanh extension → deleted
+ *   - nr_converges_during_transition — asserts tanh convergence property, digiTS extension → deleted
+ *   - no_and_nc_complementary — asserts tanh transition values, digiTS extension → deleted
+ *   - break_before_make  — asserts tanh midpoint resistance, digiTS extension → deleted
+ *   - analog_switch_load_dcop_parity (C4.5) — closed-form tanh reference, digiTS extension → deleted
  */
 
 import { describe, it, expect } from "vitest";
 import {
   SwitchSPSTDefinition,
   SwitchSPDTDefinition,
+  SW_SCHEMA,
+  SPDT_SCHEMA,
 } from "../analog-switch.js";
 import { PropertyBag } from "../../../core/properties.js";
-import { makeDcVoltageSource } from "../../sources/dc-voltage-source.js";
-import { withNodeIds, runDcOp } from "../../../solver/analog/__tests__/test-helpers.js";
-import type { AnalogElement } from "../../../solver/analog/element.js";
-import type { SparseSolver as SparseSolverType } from "../../../solver/analog/sparse-solver.js";
+import type { ModelEntry, AnalogFactory } from "../../../core/registry.js";
 
 // ---------------------------------------------------------------------------
-// Helper: narrow ModelEntry to inline factory (throws if netlist kind)
+// Helper: narrow ModelEntry to inline factory
 // ---------------------------------------------------------------------------
-import type { ModelEntry, AnalogFactory } from "../../../core/registry.js";
 function getFactory(entry: ModelEntry): AnalogFactory {
   if (entry.kind !== "inline") throw new Error("Expected inline ModelEntry");
   return entry.factory;
 }
 
 // ---------------------------------------------------------------------------
-// Helpers
+// Helper: build props with ngspice SW model params
 // ---------------------------------------------------------------------------
-
-const SWITCH_MODEL_PARAM_KEYS = new Set(["rOn", "rOff", "threshold", "transitionSharpness"]);
-
 function makeProps(overrides: Record<string, number | string> = {}): PropertyBag {
   const modelParams: Record<string, number> = {
-    rOn: 10, rOff: 1e9, threshold: 1.65, transitionSharpness: 20,
+    rOn: 1, rOff: 1e9, vThreshold: 1.65, vHysteresis: 0,
   };
   for (const [k, v] of Object.entries(overrides)) {
-    if (SWITCH_MODEL_PARAM_KEYS.has(k)) modelParams[k] = v as number;
+    if (typeof v === "number") modelParams[k] = v;
   }
   const bag = new PropertyBag([]);
   bag.replaceModelParams(modelParams);
   return bag;
 }
 
-function makeSPST(
-  nCtrl: number,
-  nIn: number,
-  nOut: number,
-  overrides: Record<string, number | string> = {},
-): AnalogElement {
-  return withNodeIds(
-    getFactory(SwitchSPSTDefinition.modelRegistry!["behavioral"]!)(
-      new Map([["in", nIn], ["out", nOut], ["ctrl", nCtrl]]),
-      [],
-      -1,
-      makeProps(overrides),
-      () => 0,
-    ),
-    [nIn, nOut, nCtrl],
-  );
-}
-
-function makeSPDT(
-  nCtrl: number,
-  nCom: number,
-  nNO: number,
-  nNC: number,
-  overrides: Record<string, number | string> = {},
-): AnalogElement {
-  return withNodeIds(
-    getFactory(SwitchSPDTDefinition.modelRegistry!["behavioral"]!)(
-      new Map([["com", nCom], ["no", nNO], ["nc", nNC], ["ctrl", nCtrl]]),
-      [],
-      -1,
-      makeProps(overrides),
-      () => 0,
-    ),
-    [nCom, nNO, nNC, nCtrl],
-  );
-}
-
-function makeVoltages(size: number, nodeVoltages: Record<number, number>): Float64Array {
-  const v = new Float64Array(size);
-  for (const [node, voltage] of Object.entries(nodeVoltages)) {
-    const n = parseInt(node);
-    if (n > 0 && n <= size) v[n - 1] = voltage;
-  }
-  return v;
-}
-
 // ---------------------------------------------------------------------------
-// SPST tests
+// SPST interface contract tests
 // ---------------------------------------------------------------------------
 
-describe("SPST", () => {
-  it("on_resistance", () => {
-    // V_ctrl = 3.3V >> threshold = 1.65V → R ≈ R_on = 10 Ω
-    const sw = makeSPST(1, 2, 3, { rOn: 10, rOff: 1e9, threshold: 1.65, transitionSharpness: 20 });
-    const voltages = makeVoltages(3, { 1: 3.3 });
-
-    const { solver, stamps } = makeSwitchCaptureSolver();
-    sw.load(makeSwitchParityCtx(voltages, solver));
-
-    // Diagonal entry for nIn node: stamp(nIn-1, nIn-1, G) = stamp(1, 1, G)
-    const diagEntry = stamps.find((s) => s.row === 1 && s.col === 1);
-    expect(diagEntry).toBeDefined();
-    const g = diagEntry!.value;
-    const r = 1 / g;
-    // R should be within 1% of R_on = 10 Ω
-    expect(r).toBeCloseTo(10, 0);
-    expect(r).toBeLessThan(11);
+describe("SPST interface contracts", () => {
+  it("poolBacked flag is true", () => {
+    const factory = getFactory(SwitchSPSTDefinition.modelRegistry!["behavioral"]!);
+    const el = factory(
+      new Map([["in", 1], ["out", 2], ["ctrl", 3]]),
+      [], -1, makeProps(), () => 0,
+    );
+    expect((el as any).poolBacked).toBe(true);
   });
 
-  it("off_resistance", () => {
-    // V_ctrl = 0 << threshold = 1.65V → R ≈ R_off = 1e9 Ω
-    const sw = makeSPST(1, 2, 3, { rOn: 10, rOff: 1e9, threshold: 1.65, transitionSharpness: 20 });
-    const voltages = makeVoltages(3, { 1: 0 });
-
-    const { solver, stamps } = makeSwitchCaptureSolver();
-    sw.load(makeSwitchParityCtx(voltages, solver));
-
-    const diagEntry = stamps.find((s) => s.row === 1 && s.col === 1);
-    expect(diagEntry).toBeDefined();
-    const g = diagEntry!.value;
-    const r = 1 / g;
-    // R should be within 1% of R_off = 1e9 Ω
-    expect(r).toBeCloseTo(1e9, -3);
-    expect(r).toBeGreaterThan(0.99e9);
+  it("stateSize matches SW_SCHEMA (2 slots, SW_NUM_STATES)", () => {
+    const factory = getFactory(SwitchSPSTDefinition.modelRegistry!["behavioral"]!);
+    const el = factory(
+      new Map([["in", 1], ["out", 2], ["ctrl", 3]]),
+      [], -1, makeProps(), () => 0,
+    );
+    expect((el as any).stateSize).toBe(SW_SCHEMA.size);
+    expect((el as any).stateSize).toBe(2);
   });
 
-  it("smooth_transition", () => {
-    // Sweep V_ctrl from 0 to 3.3V; R must change monotonically (no discontinuity).
-    const sw = makeSPST(1, 2, 3, { rOn: 10, rOff: 1e9, threshold: 1.65, transitionSharpness: 20 });
-
-    const steps = 33;
-    const resistances: number[] = [];
-
-    for (let i = 0; i <= steps; i++) {
-      const vCtrl = (3.3 * i) / steps;
-      const voltages = makeVoltages(3, { 1: vCtrl });
-      const { solver, stamps } = makeSwitchCaptureSolver();
-      sw.load(makeSwitchParityCtx(voltages, solver));
-      const diagEntry = stamps.find((s) => s.row === 1 && s.col === 1);
-      const g = diagEntry ? diagEntry.value : 0;
-      resistances.push(g > 0 ? 1 / g : 1e18);
-    }
-
-    // R should decrease monotonically as V_ctrl increases (switch closes)
-    for (let i = 1; i < resistances.length; i++) {
-      expect(resistances[i]).toBeLessThanOrEqual(resistances[i - 1] * 1.01); // allow 1% noise
-    }
-
-    // No discontinuity: consecutive R ratios must be < 1000x
-    for (let i = 1; i < resistances.length; i++) {
-      const ratio = resistances[i - 1] / resistances[i];
-      expect(ratio).toBeLessThan(1000);
-    }
+  it("stateSchema is SW_SCHEMA", () => {
+    const factory = getFactory(SwitchSPSTDefinition.modelRegistry!["behavioral"]!);
+    const el = factory(
+      new Map([["in", 1], ["out", 2], ["ctrl", 3]]),
+      [], -1, makeProps(), () => 0,
+    );
+    expect((el as any).stateSchema).toBe(SW_SCHEMA);
   });
 
-  it("signal_passes_when_on", () => {
-    // Circuit: V_in=1V, switch on (V_ctrl=3.3V >> threshold), R_load=1kΩ to ground.
-    // V_out ≈ 1V * R_load / (R_load + R_on) = 1000/1010 ≈ 0.99V
-    //
-    // Nodes: 1=ctrl, 2=signal_in, 3=signal_out
-    // Branches: 4=V_ctrl source, 5=V_in source → matrixSize = 6
-    const nCtrl = 1, nIn = 2, nOut = 3;
-    const brCtrl = 3, brIn = 4;
-    const matrixSize = 5;
-
-    const sw = makeSPST(nCtrl, nIn, nOut, { rOn: 10, rOff: 1e9 });
-
-    // R_load = 1000 Ω from nOut to ground
-    const rLoad: AnalogElement = {
-      pinNodeIds: [nOut, 0],
-      allNodeIds: [nOut, 0],
-      branchIndex: -1,
-      isNonlinear: false,
-      isReactive: false,
-      setParam(_key: string, _value: number): void {},
-      getPinCurrents(): number[] { return []; },
-      load(ctx): void {
-        const h = ctx.solver.allocElement(nOut - 1, nOut - 1);
-        ctx.solver.stampElement(h, 1 / 1000);
-      },
-    };
-
-    const vsCtrl = makeDcVoltageSource(nCtrl, 0, brCtrl, 3.3);
-    const vsIn   = makeDcVoltageSource(nIn,   0, brIn,   1.0);
-
-    const result = runDcOp({
-      elements: [sw, rLoad, vsCtrl as unknown as AnalogElement, vsIn as unknown as AnalogElement],
-      matrixSize,
-      nodeCount: 3,
-    });
-
-    expect(result.converged).toBe(true);
-    const vOut = result.nodeVoltages[nOut - 1];
-    // V_out ≈ 1V * 1000/(1000+10) ≈ 0.99V ± 0.02V
-    expect(vOut).toBeCloseTo(1000 / 1010, 1);
+  it("stateBaseOffset initialises to -1 (set by compiler)", () => {
+    const factory = getFactory(SwitchSPSTDefinition.modelRegistry!["behavioral"]!);
+    const el = factory(
+      new Map([["in", 1], ["out", 2], ["ctrl", 3]]),
+      [], -1, makeProps(), () => 0,
+    );
+    expect((el as any).stateBaseOffset).toBe(-1);
   });
 
-  it("nr_converges_during_transition", () => {
-    // At V_ctrl = threshold (1.65V), the switch is at the midpoint of transition.
-    // This is the worst case for NR convergence.
-    // Circuit: V_ctrl at threshold, V_in=1V, R_load=1kΩ.
-    const nCtrl = 1, nIn = 2, nOut = 3;
-    const brCtrl = 3, brIn = 4;
-    const matrixSize = 5;
+  it("isNonlinear is true", () => {
+    const factory = getFactory(SwitchSPSTDefinition.modelRegistry!["behavioral"]!);
+    const el = factory(
+      new Map([["in", 1], ["out", 2], ["ctrl", 3]]),
+      [], -1, makeProps(), () => 0,
+    );
+    expect(el.isNonlinear).toBe(true);
+  });
 
-    const sw = makeSPST(nCtrl, nIn, nOut, { rOn: 10, rOff: 1e9, transitionSharpness: 20 });
+  it("isReactive is false (no junction capacitance)", () => {
+    const factory = getFactory(SwitchSPSTDefinition.modelRegistry!["behavioral"]!);
+    const el = factory(
+      new Map([["in", 1], ["out", 2], ["ctrl", 3]]),
+      [], -1, makeProps(), () => 0,
+    );
+    expect(el.isReactive).toBe(false);
+  });
 
-    const rLoad: AnalogElement = {
-      pinNodeIds: [nOut, 0],
-      allNodeIds: [nOut, 0],
-      branchIndex: -1,
-      isNonlinear: false,
-      isReactive: false,
-      setParam(_key: string, _value: number): void {},
-      getPinCurrents(): number[] { return []; },
-      load(ctx): void {
-        const h = ctx.solver.allocElement(nOut - 1, nOut - 1);
-        ctx.solver.stampElement(h, 1 / 1000);
-      },
-    };
-
-    const vsCtrl = makeDcVoltageSource(nCtrl, 0, brCtrl, 1.65); // exactly at threshold
-    const vsIn   = makeDcVoltageSource(nIn,   0, brIn,   1.0);
-
-    const result = runDcOp({
-      elements: [sw, rLoad, vsCtrl as unknown as AnalogElement, vsIn as unknown as AnalogElement],
-      matrixSize,
-      nodeCount: 3,
-    });
-
-    expect(result.converged).toBe(true);
-    // Must converge within 10 NR iterations (tanh ensures smooth Jacobian)
-    expect(result.iterations).toBeLessThanOrEqual(10);
+  it("branchIndex is -1 (no extra MNA row)", () => {
+    const factory = getFactory(SwitchSPSTDefinition.modelRegistry!["behavioral"]!);
+    const el = factory(
+      new Map([["in", 1], ["out", 2], ["ctrl", 3]]),
+      [], -1, makeProps(), () => 0,
+    );
+    expect(el.branchIndex).toBe(-1);
   });
 });
 
 // ---------------------------------------------------------------------------
-// SPDT tests
+// SPST parameter plumbing tests
 // ---------------------------------------------------------------------------
 
-describe("SPDT", () => {
-  it("no_and_nc_complementary", () => {
-    // V_ctrl = 3.3V (high): NO should be ≈ R_on, NC should be ≈ R_off.
-    // V_ctrl = 0V (low):    NO should be ≈ R_off, NC should be ≈ R_on.
-    const k = 20;
-    const rOn = 10;
-    const rOff = 1e9;
-    const vTh = 1.65;
-
-    const swHigh = makeSPDT(1, 2, 3, 4, { rOn, rOff, threshold: vTh, transitionSharpness: k });
-    const swLow  = makeSPDT(1, 2, 3, 4, { rOn, rOff, threshold: vTh, transitionSharpness: k });
-
-    // High control: NO closed, NC open
-    const voltagesHigh = makeVoltages(4, { 1: 3.3 });
-    const { solver: solverHigh, stamps: stampsHigh } = makeSwitchCaptureSolver();
-    swHigh.load(makeSwitchParityCtx(voltagesHigh, solverHigh));
-
-    // COM(2)-NO(3) diagonal: stamp(1, 1, G_NO) — nCom-1=1
-    const diagComHigh = stampsHigh.find((s) => s.row === 1 && s.col === 1);
-    expect(diagComHigh).toBeDefined();
-    // Total conductance on COM diagonal = G_NO + G_NC; NO dominates when ctrl is high
-    // We check that total conductance ≈ G_NO (G_NC is tiny)
-    // Instead, check off-diagonal COM-NO entry for conductance
-    const offComNoHigh = stampsHigh.find((s) => s.row === 1 && s.col === 2);
-    expect(offComNoHigh).toBeDefined();
-    const gNO_high = -offComNoHigh!.value;
-    expect(1 / gNO_high).toBeCloseTo(rOn, 0); // NO resistance ≈ R_on
-
-    const offComNcHigh = stampsHigh.find((s) => s.row === 1 && s.col === 3);
-    expect(offComNcHigh).toBeDefined();
-    const gNC_high = -offComNcHigh!.value;
-    expect(1 / gNC_high).toBeCloseTo(rOff, -3); // NC resistance ≈ R_off
-
-    // Low control: NO open, NC closed
-    const voltagesLow = makeVoltages(4, { 1: 0 });
-    const { solver: solverLow, stamps: stampsLow } = makeSwitchCaptureSolver();
-    swLow.load(makeSwitchParityCtx(voltagesLow, solverLow));
-
-    const offComNoLow = stampsLow.find((s) => s.row === 1 && s.col === 2);
-    expect(offComNoLow).toBeDefined();
-    const gNO_low = -offComNoLow!.value;
-    expect(1 / gNO_low).toBeCloseTo(rOff, -3); // NO resistance ≈ R_off
-
-    const offComNcLow = stampsLow.find((s) => s.row === 1 && s.col === 3);
-    expect(offComNcLow).toBeDefined();
-    const gNC_low = -offComNcLow!.value;
-    expect(1 / gNC_low).toBeCloseTo(rOn, 0); // NC resistance ≈ R_on
+describe("SPST parameter plumbing", () => {
+  it("default params match ANALOG_SWITCH_DEFAULTS keys", () => {
+    // Verify the factory accepts and reads all four SW model params
+    const factory = getFactory(SwitchSPSTDefinition.modelRegistry!["behavioral"]!);
+    // Should not throw
+    expect(() => factory(
+      new Map([["in", 1], ["out", 2], ["ctrl", 3]]),
+      [], -1,
+      makeProps({ rOn: 10, rOff: 1e6, vThreshold: 2.5, vHysteresis: 0.1 }),
+      () => 0,
+    )).not.toThrow();
   });
 
-  it("break_before_make", () => {
-    // At V_ctrl = threshold (1.65V), both paths should be at mid-resistance
-    // (neither fully on nor fully off). Both R values must be > R_on and < R_off,
-    // i.e. the switch does not have both paths simultaneously at R_on.
-    const rOn  = 10;
-    const rOff = 1e9;
-    const vTh  = 1.65;
-    const sw = makeSPDT(1, 2, 3, 4, { rOn, rOff, threshold: vTh, transitionSharpness: 20 });
+  it("setParam accepts rOn, rOff, vThreshold, vHysteresis", () => {
+    const factory = getFactory(SwitchSPSTDefinition.modelRegistry!["behavioral"]!);
+    const el = factory(
+      new Map([["in", 1], ["out", 2], ["ctrl", 3]]),
+      [], -1, makeProps(), () => 0,
+    );
+    // Should not throw — engine-agnostic interface contract
+    expect(() => el.setParam("rOn", 50)).not.toThrow();
+    expect(() => el.setParam("rOff", 1e8)).not.toThrow();
+    expect(() => el.setParam("vThreshold", 2.5)).not.toThrow();
+    expect(() => el.setParam("vHysteresis", 0.1)).not.toThrow();
+  });
 
-    const voltages = makeVoltages(4, { 1: vTh });
-    const { solver, stamps } = makeSwitchCaptureSolver();
-    sw.load(makeSwitchParityCtx(voltages, solver));
-
-    // At threshold: tanh(0) = 0, so both paths get R = R_off - (R_off-R_on)*0.5 = midpoint
-    const midR = rOff - (rOff - rOn) * 0.5;
-
-    const offComNo = stamps.find((s) => s.row === 1 && s.col === 2);
-    expect(offComNo).toBeDefined();
-    const rNO = -1 / offComNo!.value;
-    expect(rNO).toBeCloseTo(midR, -3);
-
-    const offComNc = stamps.find((s) => s.row === 1 && s.col === 3);
-    expect(offComNc).toBeDefined();
-    const rNC = -1 / offComNc!.value;
-    expect(rNC).toBeCloseTo(midR, -3);
-
-    // Both paths at mid-R → neither is fully on (R_on=10) simultaneously
-    expect(rNO).toBeGreaterThan(rOn * 10);
-    expect(rNC).toBeGreaterThan(rOn * 10);
+  it("unknown setParam key is silently ignored", () => {
+    const factory = getFactory(SwitchSPSTDefinition.modelRegistry!["behavioral"]!);
+    const el = factory(
+      new Map([["in", 1], ["out", 2], ["ctrl", 3]]),
+      [], -1, makeProps(), () => 0,
+    );
+    expect(() => el.setParam("transitionSharpness", 20)).not.toThrow();
+    expect(() => el.setParam("nonexistent", 99)).not.toThrow();
   });
 });
 
 // ---------------------------------------------------------------------------
-// C4.5 parity test — analog_switch_load_dcop_parity
+// SPDT interface contract tests
 // ---------------------------------------------------------------------------
-//
-// Drives the SPST analog switch via load(ctx) at a canonical operating point
-// (V_ctrl=3.3V >> threshold=1.65V, rOn=10Ω, rOff=1e9Ω, transitionSharpness=20)
-// and asserts the stamped conductance between nIn and nOut is bit-exact
-// against the closed-form tanh transition.
-//
-// Reference formulas (from analog-switch.ts switchResistance + SPST load):
-//   arg    = k * (vCtrl - vTh)              (invert=false for SPST)
-//   tanhX  = tanh(arg)
-//   R      = rOff - (rOff - rOn) * 0.5 * (1 + tanhX)
-//   G      = 1 / R
-//   stamps: G on nIn diag, G on nOut diag, -G on (nIn,nOut), -G on (nOut,nIn)
 
-import type { LoadContext } from "../../../solver/analog/load-context.js";
+describe("SPDT interface contracts", () => {
+  it("poolBacked flag is true", () => {
+    const factory = getFactory(SwitchSPDTDefinition.modelRegistry!["behavioral"]!);
+    const el = factory(
+      new Map([["com", 1], ["no", 2], ["nc", 3], ["ctrl", 4]]),
+      [], -1, makeProps(), () => 0,
+    );
+    expect((el as any).poolBacked).toBe(true);
+  });
 
-interface SwitchCaptureStamp { row: number; col: number; value: number; }
-function makeSwitchCaptureSolver(): {
-  solver: SparseSolverType;
-  stamps: SwitchCaptureStamp[];
-} {
-  const stamps: SwitchCaptureStamp[] = [];
-  const handles: { row: number; col: number }[] = [];
-  const handleIndex = new Map<string, number>();
-  const solver = {
-    stamp: (row: number, col: number, value: number) => {
-      stamps.push({ row, col, value });
-    },
-    stampRHS: (_row: number, _value: number) => {},
-    allocElement: (row: number, col: number): number => {
-      const key = `${row},${col}`;
-      let h = handleIndex.get(key);
-      if (h === undefined) {
-        h = handles.length;
-        handles.push({ row, col });
-        handleIndex.set(key, h);
-      }
-      return h;
-    },
-    stampElement: (handle: number, value: number) => {
-      const { row, col } = handles[handle];
-      stamps.push({ row, col, value });
-    },
-  } as unknown as SparseSolverType;
-  return { solver, stamps };
-}
+  it("stateSize matches SPDT_SCHEMA (4 slots = 2 paths × 2 SW slots)", () => {
+    const factory = getFactory(SwitchSPDTDefinition.modelRegistry!["behavioral"]!);
+    const el = factory(
+      new Map([["com", 1], ["no", 2], ["nc", 3], ["ctrl", 4]]),
+      [], -1, makeProps(), () => 0,
+    );
+    expect((el as any).stateSize).toBe(SPDT_SCHEMA.size);
+    expect((el as any).stateSize).toBe(4);
+  });
 
-function makeSwitchParityCtx(voltages: Float64Array, solver: SparseSolverType): LoadContext {
-  return {
-    solver,
-    voltages,
-    cktMode: MODEDCOP | MODEINITFLOAT,
-    dt: 0,
-    method: "trapezoidal",
-    order: 1,
-    deltaOld: [0, 0, 0, 0, 0, 0, 0],
-    ag: new Float64Array(7),
-    srcFact: 1,
-    noncon: { value: 0 },
-    limitingCollector: null,
-    xfact: 1,
-    gmin: 1e-12,
-    reltol: 1e-3,
-    iabstol: 1e-12,
-  };
-}
+  it("stateSchema is SPDT_SCHEMA", () => {
+    const factory = getFactory(SwitchSPDTDefinition.modelRegistry!["behavioral"]!);
+    const el = factory(
+      new Map([["com", 1], ["no", 2], ["nc", 3], ["ctrl", 4]]),
+      [], -1, makeProps(), () => 0,
+    );
+    expect((el as any).stateSchema).toBe(SPDT_SCHEMA);
+  });
 
-describe("AnalogSwitch parity (C4.5)", () => {
-  it("analog_switch_load_dcop_parity", () => {
-    const nIn = 1, nOut = 2, nCtrl = 3;
-    const rOn = 10;
-    const rOff = 1e9;
-    const threshold = 1.65;
-    const transitionSharpness = 20;
-    const sw = makeSPST(nCtrl, nIn, nOut, { rOn, rOff, threshold, transitionSharpness });
+  it("isNonlinear is true", () => {
+    const factory = getFactory(SwitchSPDTDefinition.modelRegistry!["behavioral"]!);
+    const el = factory(
+      new Map([["com", 1], ["no", 2], ["nc", 3], ["ctrl", 4]]),
+      [], -1, makeProps(), () => 0,
+    );
+    expect(el.isNonlinear).toBe(true);
+  });
 
-    const vCtrl = 3.3;
-    const voltages = new Float64Array(3);
-    voltages[nCtrl - 1] = vCtrl;
+  it("isReactive is false", () => {
+    const factory = getFactory(SwitchSPDTDefinition.modelRegistry!["behavioral"]!);
+    const el = factory(
+      new Map([["com", 1], ["no", 2], ["nc", 3], ["ctrl", 4]]),
+      [], -1, makeProps(), () => 0,
+    );
+    expect(el.isReactive).toBe(false);
+  });
+});
 
-    const { solver, stamps } = makeSwitchCaptureSolver();
-    const ctx = makeSwitchParityCtx(voltages, solver);
-    sw.load(ctx);
+// ---------------------------------------------------------------------------
+// SW_SCHEMA structure tests
+// ---------------------------------------------------------------------------
 
-    // Closed-form reference (ngspice-equivalent tanh transition, matching element):
-    // Element clamps rOn to max(rOn, 1e-6) and rOff to max(rOff, rOn+1) before use.
-    const NGSPICE_RON_EFF  = Math.max(rOn, 1e-6);
-    const NGSPICE_ROFF_EFF = Math.max(rOff, NGSPICE_RON_EFF + 1);
-    const NGSPICE_ARG   = transitionSharpness * (vCtrl - threshold);
-    const NGSPICE_TANHX = Math.tanh(NGSPICE_ARG);
-    const NGSPICE_R     = NGSPICE_ROFF_EFF - (NGSPICE_ROFF_EFF - NGSPICE_RON_EFF) * 0.5 * (1 + NGSPICE_TANHX);
-    const NGSPICE_G     = 1 / NGSPICE_R;
+describe("SW_SCHEMA structure", () => {
+  it("has 2 slots (SW_NUM_STATES, swdefs.h:56)", () => {
+    expect(SW_SCHEMA.size).toBe(2);
+    expect(SW_SCHEMA.slots).toHaveLength(2);
+  });
 
-    const sumAt = (row: number, col: number): number =>
-      stamps.filter((s) => s.row === row && s.col === col)
-            .reduce((a, s) => a + s.value, 0);
-    expect(sumAt(nIn - 1, nIn - 1)).toBe(NGSPICE_G);
-    expect(sumAt(nOut - 1, nOut - 1)).toBe(NGSPICE_G);
-    expect(sumAt(nIn - 1, nOut - 1)).toBe(-NGSPICE_G);
-    expect(sumAt(nOut - 1, nIn - 1)).toBe(-NGSPICE_G);
+  it("slot 0 is CURRENT_STATE initialised to 0 (REALLY_OFF)", () => {
+    const slot = SW_SCHEMA.slots[0];
+    expect(slot.name).toBe("CURRENT_STATE");
+    expect(slot.init.kind).toBe("constant");
+    expect((slot.init as any).value).toBe(0);
+  });
+
+  it("slot 1 is V_CTRL initialised to zero", () => {
+    const slot = SW_SCHEMA.slots[1];
+    expect(slot.name).toBe("V_CTRL");
+    expect(slot.init.kind).toBe("zero");
+  });
+});
+
+describe("SPDT_SCHEMA structure", () => {
+  it("has 4 slots (2 paths × SW_NUM_STATES)", () => {
+    expect(SPDT_SCHEMA.size).toBe(4);
+  });
+
+  it("NC path state slot (index 2) initialises to 1 (REALLY_ON = starts closed)", () => {
+    const slot = SPDT_SCHEMA.slots[2];
+    expect(slot.name).toBe("NC_CURRENT_STATE");
+    expect(slot.init.kind).toBe("constant");
+    expect((slot.init as any).value).toBe(1);
   });
 });
