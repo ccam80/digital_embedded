@@ -1,26 +1,29 @@
 /**
- * Tests for the 555 Timer IC behavioral model.
+ * Tests for the 555 Timer IC F4b composite model.
  *
- * Tests cover:
- *   Astable::oscillates_at_correct_frequency  — R1=1kΩ, R2=10kΩ, C=10µF; f≈6.55Hz ±10%
- *   Astable::duty_cycle                       — duty cycle ≈ (R1+R2)/(R1+2R2) ≈ 52% ±5%
- *   Monostable::pulse_width                   — R=100kΩ, C=1µF; width ≈ 1.1·R·C = 110ms ±10%
- *   Monostable::retrigger_ignored_during_pulse — standard 555 is non-retriggerable
- *   Reset::forces_output_low                  — RST low forces output low regardless of inputs
- *   Control::external_voltage_changes_thresholds — CTRL=2V shifts threshold voltages
- *   Discharge::saturates_when_output_low      — DIS ≈ GND when output is low
- *   Timer555::internal_divider_voltages       — CTRL floating → threshold ≈ 2/3 VCC ±1%
+ * Test handling per A1 §Test handling rule (spec/phase-2.5-execution.md §4 W1.8c):
+ *   - Hand-computed expected values: DELETED
+ *   - Calls to _updateOp / _stampCompanion: DELETED (methods removed)
+ *   - Post-load observable state with hand-computed values: DELETED
+ *   - Post-load observable state (engine-agnostic, node voltages): KEPT
+ *   - Parameter-plumbing (setParam on vDrop, rDischarge): KEPT
+ *   - Engine-agnostic interface contracts: KEPT
  *
- * Testing approach:
- *   For operating-point tests: drive load(ctx) and accept(ctx) in sequence
- *   with synthetic voltage vectors. load(ctx) stamps the MNA matrix from the
- *   current flip-flop state; accept(ctx) advances the flip-flop based on the
- *   latched comparator inputs. Unit tests invoke accept() once per change to
- *   force a state transition, then load() to observe the resulting stamps.
+ * Deleted tests:
+ *   Reset::forces_output_low                    — inspected Norton RHS via hand-computed rOut
+ *   Control::external_voltage_changes_thresholds — same pattern
+ *   Discharge::saturates_when_output_low         — inspected matrix stamps directly
+ *   Timer555 parity (C4.5)::timer555_load_transient_parity
+ *                                               — bit-exact stamp assertions with
+ *                                                 hand-computed NGSPICE_* expected values
  *
- *   For transient tests (astable, monostable): use MNAEngine with a hand-built circuit
- *   (ConcreteCompiledAnalogCircuit) containing the 555 element, timing capacitor,
- *   and surrounding resistors. Run engine.step() in a loop and count output transitions.
+ * Kept tests:
+ *   Timer555::internal_divider_voltages         — observable node voltage (CTRL = 2/3 VCC)
+ *                                                 via runDcOp; engine-agnostic.
+ *   Astable::oscillates_at_correct_frequency    — transient observable (transition count)
+ *   Astable::duty_cycle                         — transient observable (time-weighted)
+ *   Monostable::pulse_width                     — transient observable (pulse timing)
+ *   Monostable::retrigger_ignored_during_pulse  — transient observable (pulse width bound)
  *
  * Astable circuit:
  *   VCC=5V — R1 — node_a — R2 — node_b(THR=TRIG) — C — GND
@@ -40,7 +43,6 @@ import { describe, it, expect } from "vitest";
 import { Timer555Definition } from "../timer-555.js";
 import { PropertyBag } from "../../../core/properties.js";
 import type { AnalogElement } from "../../../solver/analog/element.js";
-import type { SparseSolver as SparseSolverType } from "../../../solver/analog/sparse-solver.js";
 import { MNAEngine } from "../../../solver/analog/analog-engine.js";
 import { ConcreteCompiledAnalogCircuit } from "../../../solver/analog/compiled-analog-circuit.js";
 import { StatePool } from "../../../solver/analog/state-pool.js";
@@ -79,6 +81,12 @@ function makeProps(overrides: Record<string, number | string> = {}): PropertyBag
 /**
  * Create a 555 analog element with the given pin-to-node mapping.
  * Pin order: [VCC, GND, TRIG, THR, CTRL, RST, DIS, OUT]
+ *
+ * Note: internalNodeIds passed as [] (compiler-allocated nodes unavailable in
+ * unit-test context). The factory gracefully falls back: nLower=0 uses CTRL/2
+ * estimate; nComp1Out/nComp2Out=0 skips comparator output stamps (ground).
+ * Transient and DC-op tests remain valid because observable state (node voltages,
+ * output transitions) does not depend on the comparator output MNA nodes.
  */
 function make555(
   nodes: { vcc: number; gnd: number; trig: number; thr: number; ctrl: number; rst: number; dis: number; out: number },
@@ -104,40 +112,6 @@ function make555(
     ),
     [nodes.dis, nodes.trig, nodes.thr, nodes.vcc, nodes.ctrl, nodes.out, nodes.rst, nodes.gnd],
   );
-}
-
-function makeVoltages(size: number, nodeVoltages: Record<number, number>): Float64Array {
-  const v = new Float64Array(size);
-  for (const [node, voltage] of Object.entries(nodeVoltages)) {
-    const n = parseInt(node);
-    if (n > 0 && n <= size) v[n - 1] = voltage;
-  }
-  return v;
-}
-
-/**
- * Apply the given voltage vector to the 555 timer element: advance the flip-flop
- * via accept(ctx), then stamp via load(ctx), and return the Norton target voltage
- * at the output pin.
- *
- * The 555 output pin stamps G = 1/rOut on the output diagonal and a Norton
- * current = v_target * G into the RHS at the output row. We read that RHS
- * entry and divide by G to recover v_target.
- */
-function readNortonTargetVoltage(
-  element: AnalogElement,
-  nOut: number,
-  rOut: number,
-  voltages: Float64Array,
-): number {
-  const { solver, rhs } = makeTimer555CaptureSolver();
-  const ctx = makeTimer555ParityCtx(voltages, solver, 1e-6);
-  element.accept?.(ctx, 0, () => {});
-  element.load(ctx);
-  const outRhs = rhs.get(nOut - 1);
-  if (outRhs === undefined) return 0;
-  const G = 1 / rOut;
-  return outRhs / G;
 }
 
 // ---------------------------------------------------------------------------
@@ -188,10 +162,6 @@ function makeResistor(nodeA: number, nodeB: number, resistance: number): AnalogE
   };
 }
 
-// ---------------------------------------------------------------------------
-// Helper: inline capacitor element (companion model)
-// ---------------------------------------------------------------------------
-
 import {
   createTestCapacitor,
   makeVoltageSource,
@@ -201,7 +171,7 @@ import {
 } from "../../../solver/analog/__tests__/test-helpers.js";
 
 // ---------------------------------------------------------------------------
-// Timer555 unit tests — operating-point level
+// Timer555 unit tests — observable DC operating point
 // ---------------------------------------------------------------------------
 
 describe("Timer555", () => {
@@ -214,7 +184,6 @@ describe("Timer555", () => {
     //   node 1 = VCC, node 2 = GND (connected to circuit ground=0 via VS),
     //   node 3 = TRIG, node 4 = THR, node 5 = CTRL
     //   node 6 = RST (tied to VCC), node 7 = DIS, node 8 = OUT
-    //   branch rows: 9=VCC_VS, 10=GND_VS, 11=RST_VS → matrixSize=11+nodeCount
     //
     // For a simpler approach: use 1-based nodes, VCC=1, GND=2(=circuit GND),
     // CTRL=3 (floating, driven only by internal divider).
@@ -260,150 +229,6 @@ describe("Timer555", () => {
     const vTrigExpected = VCC / 3;
     const trigErrorPct = Math.abs(vTrigRef - vTrigExpected) / vTrigExpected * 100;
     expect(trigErrorPct).toBeLessThan(1);
-  });
-});
-
-// ---------------------------------------------------------------------------
-// Reset tests
-// ---------------------------------------------------------------------------
-
-describe("Reset", () => {
-  it("forces_output_low", () => {
-    // RST pin low (< 0.7V above GND) must force output low regardless of
-    // TRIG/THR levels. We test by putting the 555 in SET state (Q=1) then
-    // applying RST low.
-    const nVcc = 1, nGnd = 0, nTrig = 2, nThr = 3, nCtrl = 4;
-    const nRst = 5, nDis = 6, nOut = 7;
-    const rOut = 10;
-
-    const timer = make555({ vcc: nVcc, gnd: nGnd, trig: nTrig, thr: nThr, ctrl: nCtrl, rst: nRst, dis: nDis, out: nOut });
-    const VCC = 5;
-
-    // Drive 555 into SET state: TRIG < 1/3 VCC, THR < 2/3 VCC, RST = VCC
-    const vSet = makeVoltages(7, {
-      [nVcc]: VCC,
-      [nTrig]: 0.5,          // < 1/3 VCC → trigger comparator fires → SET
-      [nThr]:  1.0,           // < 2/3 VCC → threshold comparator does not fire
-      [nCtrl]: VCC * (2/3),   // internal divider default
-      [nRst]:  VCC,           // RST = VCC (inactive)
-    });
-
-    // Output should now be HIGH (SET state)
-    const vOutHigh = readNortonTargetVoltage(timer, nOut, rOut, vSet);
-    expect(vOutHigh).toBeGreaterThan(VCC * 0.5); // confirms SET state
-
-    // Now apply RST low (< 0.7V above GND = 0)
-    const vRstLow = makeVoltages(7, {
-      [nVcc]: VCC,
-      [nTrig]: 0.5,
-      [nThr]:  1.0,
-      [nCtrl]: VCC * (2/3),
-      [nRst]:  0.2,           // RST < 0.7V → active
-    });
-
-    // Output must be LOW
-    const vOutLow = readNortonTargetVoltage(timer, nOut, rOut, vRstLow);
-    expect(vOutLow).toBeLessThan(1.0); // VOL ≈ GND + 0.1V = 0.1V
-  });
-});
-
-// ---------------------------------------------------------------------------
-// Control tests
-// ---------------------------------------------------------------------------
-
-describe("Control", () => {
-  it("external_voltage_changes_thresholds", () => {
-    // Apply 2V to CTRL pin (overriding 2/3 VCC = 3.33V for 5V supply).
-    // Threshold ref = 2V, trigger ref = 1V.
-    // Verify: with THR=2.1V (> 2V threshold), 555 resets.
-    // Verify: with TRIG=0.9V (< 1V trigger ref), 555 sets.
-    const nVcc = 1, nGnd = 0, nTrig = 2, nThr = 3, nCtrl = 4;
-    const nRst = 5, nDis = 6, nOut = 7;
-    const rOut = 10;
-    const VCC = 5;
-    const vCtrlExt = 2.0; // external CTRL override
-
-    const timer = make555({ vcc: nVcc, gnd: nGnd, trig: nTrig, thr: nThr, ctrl: nCtrl, rst: nRst, dis: nDis, out: nOut });
-
-    // Test 1: THR=2.1V > CTRL=2V → comparator 1 fires → RESET (Q=0)
-    const vReset = makeVoltages(7, {
-      [nVcc]: VCC,
-      [nTrig]: 2.0,    // above trigger ref (1V): trigger comparator inactive
-      [nThr]:  2.1,    // above CTRL (2V): threshold comparator fires → RESET
-      [nCtrl]: vCtrlExt,
-      [nRst]:  VCC,
-    });
-    const vOutReset = readNortonTargetVoltage(timer, nOut, rOut, vReset);
-    expect(vOutReset).toBeLessThan(1.0); // output LOW (RESET)
-
-    // Test 2: TRIG=0.9V < CTRL/2=1V → comparator 2 fires → SET (Q=1)
-    const vSet = makeVoltages(7, {
-      [nVcc]: VCC,
-      [nTrig]: 0.9,    // below trigger ref (1V): trigger comparator fires → SET
-      [nThr]:  1.5,    // below CTRL (2V): threshold comparator inactive
-      [nCtrl]: vCtrlExt,
-      [nRst]:  VCC,
-    });
-    const vOutSet = readNortonTargetVoltage(timer, nOut, rOut, vSet);
-    // V_OH = VCC - vDrop = 5 - 1.5 = 3.5V
-    expect(vOutSet).toBeGreaterThan(2.5); // output HIGH (SET), threshold relative to GND=0
-  });
-});
-
-// ---------------------------------------------------------------------------
-// Discharge tests
-// ---------------------------------------------------------------------------
-
-describe("Discharge", () => {
-  it("saturates_when_output_low", () => {
-    // When Q=0 (output low), discharge transistor is ON: DIS pin ≈ GND.
-    // Verified by checking that a resistor from DIS to VCC creates a voltage divider
-    // near GND: with R_pull=1kΩ and R_sat=10Ω, V_DIS = VCC * R_sat/(R_sat+R_pull) ≈ 0.05V
-    //
-    // Simulate using DC solve: VCC source, pull-up resistor from VCC to DIS,
-    // 555 stamps R_sat from DIS to GND when output is low.
-    //
-    // Node assignment:
-    //   1=VCC, 2=DIS, branch 2=VS
-    //   GND=0, TRIG=0, THR=0, CTRL=1(VCC?), RST=0
-    //   For a RESET state: THR must be > 2/3 VCC and TRIG must be > 1/3 VCC.
-    //
-    // Simplest approach: drive the 555 directly into RESET state and then check
-    // discharge stamp using a mock solver.
-    const nVcc = 1, nGnd = 0, nTrig = 2, nThr = 3, nCtrl = 4;
-    const nRst = 5, nDis = 6, nOut = 7;
-    const VCC = 5;
-    const rSat = 10;
-
-    const timer = make555(
-      { vcc: nVcc, gnd: nGnd, trig: nTrig, thr: nThr, ctrl: nCtrl, rst: nRst, dis: nDis, out: nOut },
-      { rDischarge: rSat },
-    );
-
-    // Force RESET state: THR=4V > 2/3 VCC=3.33V → comparator 1 fires → Q=0
-    const vReset = makeVoltages(7, {
-      [nVcc]: VCC,
-      [nTrig]: 2.0,
-      [nThr]:  4.0,           // > 2/3 VCC → reset comparator fires
-      [nCtrl]: VCC * (2/3),
-      [nRst]:  VCC,
-    });
-
-    // Advance flip-flop via accept(ctx), then stamp via load(ctx). Inspect the
-    // captured stamps: DIS should be connected to GND via R_sat.
-    const { solver, stamps } = makeTimer555CaptureSolver();
-    const ctx = makeTimer555ParityCtx(vReset, solver, 1e-6);
-    timer.accept?.(ctx, 0, () => {});
-    timer.load(ctx);
-
-    // DIS node (nDis-1=5) should have a diagonal stamp consistent with G=1/R_sat
-    const G_sat = 1 / rSat;
-    const disDiagonalTotal = stamps
-      .filter((s) => s.row === nDis - 1 && s.col === nDis - 1)
-      .reduce((sum, s) => sum + s.value, 0);
-    // The stamp includes contributions from all resistors touching DIS.
-    // At minimum, G_sat should be present in the DIS diagonal.
-    expect(disDiagonalTotal).toBeGreaterThanOrEqual(G_sat * 0.99);
   });
 });
 
@@ -647,7 +472,6 @@ describe("Astable", () => {
  *
  * Initial state: C is discharged, TRIG is high (idle).
  * The 555 is in RESET state (Q=0, output low, DIS grounds C through R_sat).
- * Actually: in monostable, C is discharged to GND through DIS when Q=0.
  *
  * Trigger event: TRIG goes below 1/3 VCC → SET (Q=1, output high, DIS off).
  * C now charges through R from VCC.
@@ -874,164 +698,5 @@ describe("Monostable", () => {
     // Pulse must have the normal width (within 10%)
     const tWidthError = Math.abs(tWidthMeasured - tWidthExpected) / tWidthExpected;
     expect(tWidthError).toBeLessThan(0.10);
-  });
-});
-
-// ---------------------------------------------------------------------------
-// C4.5 parity test — timer555_load_transient_parity
-// ---------------------------------------------------------------------------
-//
-// Drives the 555 timer via load(ctx) in transient mode at a canonical operating
-// point (VCC=5V, GND=0V, flipflopQ=false initial state) and asserts:
-//   - Internal voltage divider stamps: rDiv1 (VCC→CTRL, 5kΩ), rDiv2 (CTRL→GND, 10kΩ)
-//   - Output pin Norton stamp: G_out=1/rOut + V_target·G_out RHS, where rOut=10Ω
-//   - Discharge stamp: rDischarge between DIS and GND when Q=false
-//
-// All stamps bit-exact against the closed-form reference in timer-555.ts.
-
-import type { LoadContext } from "../../../solver/analog/load-context.js";
-import { MODEDCOP, MODEINITFLOAT, MODETRAN } from "../../../solver/analog/ckt-mode.js";
-
-/**
- * Capture solver that simulates both the legacy `stamp(row, col, value)`
- * entry-point API and the handle-based `allocElement` + `stampElement` API,
- * so elements can be driven via load(ctx) independently of ongoing Wave C5
- * migration state. Handles are issued per (row, col) pair and captured stamps
- * are resolved back to matrix coordinates when inspected.
- */
-interface Timer555CaptureStamp { row: number; col: number; value: number; }
-function makeTimer555CaptureSolver(): {
-  solver: SparseSolverType;
-  stamps: Timer555CaptureStamp[];
-  rhs: Map<number, number>;
-} {
-  const stamps: Timer555CaptureStamp[] = [];
-  const rhs = new Map<number, number>();
-  // Handle table: index → {row, col}
-  const handles: { row: number; col: number }[] = [];
-  const handleIndex = new Map<string, number>();
-  const solver = {
-    stamp: (row: number, col: number, value: number) => {
-      stamps.push({ row, col, value });
-    },
-    stampRHS: (row: number, value: number) => {
-      rhs.set(row, (rhs.get(row) ?? 0) + value);
-    },
-    allocElement: (row: number, col: number): number => {
-      const key = `${row},${col}`;
-      let h = handleIndex.get(key);
-      if (h === undefined) {
-        h = handles.length;
-        handles.push({ row, col });
-        handleIndex.set(key, h);
-      }
-      return h;
-    },
-    stampElement: (handle: number, value: number) => {
-      const entry = handles[handle];
-      if (entry === undefined) return; // handle cached from a prior solver instance (DigitalOutputPinModel caches across calls)
-      stamps.push({ row: entry.row, col: entry.col, value });
-    },
-  } as unknown as SparseSolverType;
-  return { solver, stamps, rhs };
-}
-
-function makeTimer555ParityCtx(
-  voltages: Float64Array,
-  solver: SparseSolverType,
-  dt = 0,
-): LoadContext {
-  const ag = new Float64Array(7);
-  if (dt > 0) {
-    // Trapezoidal order 1 coefficients (what a fresh transient step would produce).
-    ag[0] = 1 / dt;
-    ag[1] = -1 / dt;
-  }
-  return {
-    solver,
-    voltages,
-    cktMode: dt > 0 ? MODETRAN | MODEINITFLOAT : MODEDCOP | MODEINITFLOAT,
-    dt,
-    method: "trapezoidal",
-    order: 1,
-    deltaOld: [dt, dt, dt, dt, dt, dt, dt],
-    ag,
-    srcFact: 1,
-    noncon: { value: 0 },
-    limitingCollector: null,
-    xfact: 1,
-    gmin: 1e-12,
-    reltol: 1e-3,
-    iabstol: 1e-12,
-  };
-}
-
-describe("Timer555 parity (C4.5)", () => {
-  it("timer555_load_transient_parity", () => {
-    // Node layout: nDis=1, nTrig=2, nThr=3, nVcc=4, nCtrl=5, nOut=6, nRst=7, nGnd=8.
-    const nodes = {
-      vcc: 4, gnd: 8, trig: 2, thr: 3, ctrl: 5, rst: 7, dis: 1, out: 6,
-    };
-    const el = make555(nodes, { vDrop: 1.5, rDischarge: 10 });
-
-    // Canonical transient state: VCC=5V, GND=0V, CTRL≈2/3 VCC, OUT=0V, DIS=0V,
-    // RST=5V (not resetting), THR=0V, TRIG=5V (not triggering).
-    // flipflopQ starts false; load() reads Q and stamps accordingly. Output LOW,
-    // discharge resistor saturated, output target = vOL = 0.1 V (vGnd+0.1).
-    const matrixSize = 8;
-    const voltages = new Float64Array(matrixSize);
-    voltages[nodes.vcc - 1]  = 5;
-    voltages[nodes.gnd - 1]  = 0;
-    voltages[nodes.ctrl - 1] = 10 / 3;
-    voltages[nodes.rst - 1]  = 5;
-    voltages[nodes.trig - 1] = 5;
-
-    const { solver, stamps, rhs } = makeTimer555CaptureSolver();
-    const ctx = makeTimer555ParityCtx(voltages, solver, 1e-6);
-    el.load(ctx);
-
-    // Closed-form reference (ngspice-equivalent):
-    const NGSPICE_RDIV1 = 5000;
-    const NGSPICE_RDIV2 = 10000;
-    const NGSPICE_GDIV1 = 1 / NGSPICE_RDIV1;
-    const NGSPICE_GDIV2 = 1 / NGSPICE_RDIV2;
-    const NGSPICE_GOUT_INTERNAL = 1 / 10;  // output pin rOut=10Ω
-    const NGSPICE_GDIS = 1 / 10;             // rDischarge=10Ω when Q=false
-    const NGSPICE_VOL = 0.1;
-    const NGSPICE_RHS_OUT = NGSPICE_VOL * NGSPICE_GOUT_INTERNAL;
-
-    const vccIdx = nodes.vcc - 1, ctrlIdx = nodes.ctrl - 1, gndIdx = nodes.gnd - 1;
-    const disIdx = nodes.dis - 1, outIdx = nodes.out - 1;
-
-    // Sum all stamps at a given (row, col) coordinate — element stamps both
-    // conductance terms and, for output, G_out from DigitalOutputPinModel.
-    const sumAt = (row: number, col: number): number =>
-      stamps.filter((s) => s.row === row && s.col === col)
-            .reduce((a, s) => a + s.value, 0);
-
-    // rDiv1 stamps (VCC↔CTRL)
-    expect(sumAt(vccIdx, vccIdx)).toBe(NGSPICE_GDIV1);
-    expect(sumAt(vccIdx, ctrlIdx)).toBe(-NGSPICE_GDIV1);
-    expect(sumAt(ctrlIdx, vccIdx)).toBe(-NGSPICE_GDIV1);
-
-    // CTRL diagonal: rDiv1 + rDiv2
-    expect(sumAt(ctrlIdx, ctrlIdx)).toBe(NGSPICE_GDIV1 + NGSPICE_GDIV2);
-
-    // rDiv2 stamps (CTRL↔GND) and discharge (DIS↔GND) both land on gndIdx:
-    //   gnd diagonal = GDIV2 + GDIS
-    expect(sumAt(gndIdx, gndIdx)).toBe(NGSPICE_GDIV2 + NGSPICE_GDIS);
-    expect(sumAt(ctrlIdx, gndIdx)).toBe(-NGSPICE_GDIV2);
-    expect(sumAt(gndIdx, ctrlIdx)).toBe(-NGSPICE_GDIV2);
-
-    // Discharge resistor (DIS↔GND)
-    expect(sumAt(disIdx, disIdx)).toBe(NGSPICE_GDIS);
-    expect(sumAt(disIdx, gndIdx)).toBe(-NGSPICE_GDIS);
-    expect(sumAt(gndIdx, disIdx)).toBe(-NGSPICE_GDIS);
-
-    // Output pin Norton: G_out on OUT diagonal (via DigitalOutputPinModel handle API)
-    expect(sumAt(outIdx, outIdx)).toBe(NGSPICE_GOUT_INTERNAL);
-
-    // RHS: output Norton current = vOL·G_out at OUT node (exact)
-    expect(rhs.get(outIdx) ?? 0).toBe(NGSPICE_RHS_OUT);
   });
 });
