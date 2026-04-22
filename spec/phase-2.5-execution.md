@@ -446,25 +446,76 @@ Parallelizable with W1.x once W0 lands (different files).
 
 ---
 
-## 6. Wave W3 — Wrap-up
+## 6. Wave W3 — Post-A1 static audit (revised 2026-04-22)
 
-Not an executor task. User-driven.
+**Superseded design:** original W3 was "run strict harness, classify red output." Premise broken — strict-by-default plus non-convergent BJT/MOSFET/JFET produces 15+ minute timeouts and no signal. Full convergence verification is deferred to Phase 9 acceptance (plan.md Appendix A 8-circuit harness) after Phase 3+ re-authoring lands. See §6.8.
 
-**Checklist:**
-1. Run full ngspice-comparison harness suite (`npm run test:q -- src/solver/analog/__tests__/harness src/solver/analog/__tests__/ngspice-parity`) strict-by-default.
-2. Review the unfiltered red output. This is the post-A1 reality.
-3. For each failing test, classify:
-   - **Convergence failure** (device doesn't solve to the right fixed point): becomes a post-A1 PARITY item against the new `load()` structure. Example: the D-8 canary measurement happens here.
-   - **Suppression residue**: a test that's failing because an I1 suppression was removed and the underlying bug surfaces. Usually means a real bug; becomes PARITY.
-   - **Test deletion missed**: a test that should have been deleted per the §Test handling rule but survived. Delete it.
-4. **Known pre-flagged watch items** — classify under the scheme in (3) during W3; do not let these silently pass:
-   - `mna-end-to-end::rl_dc_steady_state_tight_tolerance` — observed 97.56 vs expected `<0.1` at W2.1 close. Originally framed as §B5 100 kV RL overshoot on `tmp-hang-circuits/rl-step.dts`; current symptom shape differs. Could be pre-existing, could be a fresh regression from a W1.x or W2.x port. Per §1 principle 4 not investigated at the wave that surfaced it; W3 owns the classification.
-5. **Verify the unmapped digiTS-only integration slots** flagged at W1.9 close (diode `CCAP`, inductor `CCAP`, and any peer slots the W1.5 port introduces under the same pattern). For each such slot, trace the write/read lifetime:
-   - Written once per call-frame and read only within the same call-frame → cross-method transfer slot that escaped A1. Open a post-A1 PARITY item to excise.
-   - Written at timestep N and read at timestep N+1 (or later) → genuine per-device state with no ngspice counterpart. Add to `spec/architectural-alignment.md` §I2 as a documented digiTS-only slot category with a one-line note on why no ngspice offset exists.
-   Do not add a `slotToNgspice` entry for either case — unmapped is the correct harness stance.
-6. Append the remaining PARITY list to a new `spec/post-a1-parity.md` — the new work list for Phase 3 onwards.
-7. Commit: "Phase 2.5 complete — Track A landed, post-A1 PARITY list captured."
+**Revised W3:** five parallel static-audit lane types, producing `spec/post-a1-parity.md` as handoff to Phase 3+. Agents find divergences; user consolidates findings into the parity list. No harness run.
+
+Collapsed classification: every finding is **PARITY** (divergence from ngspice / architectural-alignment.md, fix bit-exact in Phase 3+) or **PAPERING-RESIDUE** (violates F4c constraint or I1 policy, fix before Phase 3+). The original convergence / suppression / test-deletion triad was a distinction without difference at the work-item level — every divergence cashes out as "align to ngspice or to spec, bit-exact."
+
+### 6.1 L1a — Small-device parity audit (7 sonnet lanes, parallel)
+
+Devices: diode, zener, capacitor, polarized-cap, inductor, transformer, tapped-transformer. These finished in W1.1 + W1.5 and have no downstream plan.md phase to revisit them. Last-chance parity audit: line-by-line semantic comparison of our ported `load()` against the cited ngspice load function. Output per lane: structured findings table. Severity: CRITICAL / HIGH / MEDIUM / LOW.
+
+**Folds in watch item from prior §6.5:** unmapped digiTS-only integration slots (diode `CCAP`, inductor `CCAP`, peer W1.5 slots). L1a lanes trace the write/read lifetime for each such slot. Within-frame write-then-read → cross-method transfer slot that escaped A1 → PARITY item to excise. Cross-timestep write/read → genuine per-device state → flag for `architectural-alignment.md` §I2 note (no `slotToNgspice` entry added — unmapped is the correct harness stance).
+
+### 6.2 L1b — BJT / MOSFET / JFET port-integrity audit (3 sonnet lanes, parallel)
+
+Devices: BJT (W1.2), MOSFET (W1.3), JFET (W1.4). Narrower scope than L1a — Phase 5/6/7 do full parity via REWRITE tasks. L1b looks only for **transcription errors** introduced during the W1.2/W1.3/W1.4 ports (sign flips, wrong constants, missing branches, copy-paste regressions). Cross-reference filter: if a finding matches a row in `spec/plan-addendum.md` Phase 5/6/7 REWRITE list, skip — it's enumerated. Only unenumerated findings become W3 signal.
+
+### 6.3 L1c — F4c constraint audit (~12 haiku lanes, parallel)
+
+Devices: triac, scr, diac, tunnel-diode, triode, LED, crystal, transmission-line, memristor, analog-fuse, ntc-thermistor, spark-gap. F4c APPROVED ACCEPT devices may not cite ngspice (per `architectural-alignment.md` §F4c §3). E-1 triac was the prototype papering case.
+
+Per-device checklist:
+1. Grep device file for ngspice citations (`dioload.c`, `bjtload.c`, `mos1load.c`, `jfetload.c`, `capload.c`, `indload.c`). Any finding = papering residue.
+2. Check `load()` mechanically folds pre-A1 `_updateOp` + `_stampCompanion` body without semantic ngspice-ported claims in comments.
+3. Verify self-compare snapshot file (if present) has date ≥ W1.6 / W1.7 commit.
+
+### 6.4 L2 — Test sweep (1 haiku lane, PROPOSAL ONLY)
+
+Walks every test file under `src/**/__tests__/`. Per test, flag for deletion if any of:
+
+- References `_updateOp`, `_stampCompanion`, `refreshElementRefs`, `InitMode`, `pool.uic`, `pool.analysisMode`, `poolBackedElements`
+- References deleted slots: `SLOT_CAP_GEQ*`, `SLOT_IEQ*`, `L1_SLOT_CAP_GEQ_*`, `L1_SLOT_IEQ_*`, `SLOT_CAP_GEQ_GS/_GD/_DB/_SB/_GB`, `SLOT_IEQ_GS/_GD/_DB/_SB/_GB`, `SLOT_Q_GS/_GD/_GB/_DB/_SB`, `SLOT_GD_JUNCTION`, `SLOT_ID_JUNCTION`
+- `toBeCloseTo` / `toBe` with hand-computed numeric and no `// from ngspice harness run <cite>` provenance
+- Asserts method call counts of `_updateOp` / `_stampCompanion`
+- References `TUNNEL_DIODE_MAPPING`, `VARACTOR_MAPPING`, `derivedNgspiceSlots`, `VSB`/`VBD` old MOSFET names
+
+Survivors (per `architectural-alignment.md` §A1 Test handling): parameter plumbing, F4c self-compares with fresh reference, engine-agnostic interface contracts.
+
+Output: proposed deletion list (file → reason). **No deletions executed.** User reviews before a separate L2-execute commit.
+
+**Watch item fold:** `mna-end-to-end::rl_dc_steady_state_tight_tolerance` (observed 97.56 vs expected `<0.1` at W2.1 close). L2 flags test for review. If assertion is hand-computed: delete. If traceable to ngspice harness: keep and classify underlying divergence as PARITY item under L1a inductor / W2.1 B5 RL-step handling.
+
+### 6.5 L3 — Suppression residue sweep (1 haiku lane)
+
+Walks `spec/i1-suppression-backlog.md`. For each concrete site + the `toBeCloseTo` sweep category, verifies current-main status — `DONE` if removed, `RESIDUE` with file:line + removal approach if still present.
+
+### 6.6 `post-a1-parity.md` structure
+
+```
+# Post-A1 Parity List
+Generated: <date> | Input: W3 L1a + L1b + L1c + L2 + L3 audit outputs
+
+## §1. Device parity findings (L1a + L1b)
+## §2. F4c papering residue (L1c)
+## §3. Suppression residue (L3)
+## §4. Deleted-test manifest (L2, after execution)
+## §5. Carry-forwards from reconciliation-notes.md §5
+## §6. Handoff pointer to spec/phase-3-onwards.md
+```
+
+### 6.7 Commits
+
+- `Phase 2.5 W3 — static audit consolidated, post-a1-parity.md landed`
+- `Phase 2.5 W3 L2 — stale test deletion per user-approved list` (separate, after review)
+- `Phase 2.5 complete — Track A landed, post-A1 PARITY list captured`
+
+### 6.8 Why not run the harness
+
+Convergence verification is a Phase 9 acceptance concern. Running the harness now produces timeouts, not signal — BJT/MOSFET/JFET cannot converge until Phases 5/6/7 re-author their surviving REWRITE tasks against post-A1 `load()`. The 8-circuit bit-exact harness (plan.md Appendix A) is the right and only place for convergence proof, after Phase 3+ lands. The original W3 design conflated that acceptance gate with the post-Phase-2.5 handoff.
 
 ---
 
