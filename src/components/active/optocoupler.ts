@@ -1,76 +1,34 @@
 /**
- * Optocoupler (opto-isolator) analog component.
+ * Optocoupler (opto-isolator) analog component — F4b composition.
  *
- * Compound component: LED on the input side and a phototransistor on the
- * output side, with galvanic isolation (no electrical connection between
- * input and output sides).
+ * Composed from ngspice primitives per spec §F4b:
+ *   - LED (input side): diode.ts → dioload.c (LED junction)
+ *   - CCCS coupling: CTR * I_LED drives the phototransistor base
+ *   - Phototransistor (output side): bjt.ts → bjtload.c (NPN BJT)
  *
- * Transfer function:
- *   I_C = CTR * I_LED
+ * Composition architecture (sub-element delegation):
+ *   optocoupler.load() calls:
+ *     1. ledSub.load(ctx)           — LED diode stamp on anode/cathode; dioload.c:120-441
+ *     2. CCCS stamp                 — injects CTR*I_LED as Norton source into internalBase
+ *     3. bjtSub.load(ctx)           — BJT stamp on (internalBase, collector, emitter); bjtload.c:170-end
  *
- * where I_LED is the current through the input LED, modelled with a
- * forward-voltage + series-resistance characteristic:
- *   I_LED = (V_anode - V_cathode - V_forward) / R_LED   when forward biased
- *   I_LED = 0                                            otherwise
+ * Galvanic isolation:
+ *   No shared MNA nodes between input (anode/cathode) and output (collector/emitter).
+ *   The CCCS coupling is purely algebraic — off-diagonal Jacobian entries only in
+ *   output rows, representing the controlled-source dependence on input voltage.
  *
- * The phototransistor is modelled as a current-controlled current source
- * (CCCS) on the output side: I_C = CTR * I_LED, stamped as a Norton current
- * source between collector and emitter.
- *
- * Galvanic isolation is maintained by having NO shared MNA nodes between the
- * input (anode/cathode) and output (collector/emitter) ports.
- *
- * MNA formulation:
- *
- * Input LED (nonlinear diode with series resistance R_LED):
- *   The LED is modelled as a piecewise-linear element:
- *     - Off (V_d < V_F): conductance G_off = 1/R_off (leakage)
- *     - On (V_d >= V_F): conductance G_on = 1/R_LED, with voltage offset V_F
- *       Norton equivalent: I_eq = (V_d - V_F) / R_LED = G_on * V_d - G_on * V_F
- *
- *   At operating point V_d0:
- *     if V_d0 < V_F:
- *       G_LED = G_off (tiny leakage conductance for numerical stability)
- *       I_NR  = 0
- *     else:
- *       G_LED = G_on = 1/R_LED
- *       I_NR  = G_on * V_F  (Norton offset to shift the characteristic by V_F)
- *
- *   MNA stamps for input LED (anode=nA, cathode=nK):
- *     G[nA,nA] += G_LED    G[nA,nK] -= G_LED
- *     G[nK,nA] -= G_LED    G[nK,nK] += G_LED
- *     RHS[nA]  -= I_NR     RHS[nK]  += I_NR
- *
- * Output phototransistor (CCCS: I_C = CTR * I_LED):
- *   I_LED at operating point: I_LED0 = G_LED * V_d0 - I_NR
- *   I_C0 = CTR * I_LED0
- *
- *   The CCCS is approximated as a Norton current source at each NR iteration.
- *   Since I_C depends on V_d (= V_anode - V_cathode) via I_LED, we propagate
- *   the Jacobian from input to output:
- *     dI_C / dV_d = CTR * G_LED
- *
- *   Norton-linearized stamp for output (collector=nC, emitter=nE):
- *     G[nC,nA] -= CTR * G_LED    G[nC,nK] += CTR * G_LED
- *     G[nE,nA] += CTR * G_LED    G[nE,nK] -= CTR * G_LED
- *     RHS[nC]  += I_C0 - (CTR * G_LED) * V_d0
- *     RHS[nE]  -= I_C0 - (CTR * G_LED) * V_d0
- *
- * Note: the cross-port Jacobian entries (G[nC,nA] etc.) intentionally couple
- * the input and output ROWS of the MNA system via the off-diagonal sub-matrix.
- * This does NOT violate galvanic isolation because:
- *   1. The input nodes (nA, nK) are NOT in the same KCL mesh as output nodes.
- *   2. The cross-entries only appear in the output KCL rows (nC, nE), where
- *      they represent the controlled-source dependence on input voltage.
- *   3. No current physically flows between input and output nodes.
- *   4. Galvanic isolation means no shared physical node — the MNA off-diagonal
- *      coupling is purely algebraic (the dependent source relationship).
+ * Internal node:
+ *   [internalNodeIds[0]] = phototransistor base (no external pin)
  *
  * Pins (nodeIds order):
- *   [0] = nAnode    (LED anode, input+)
- *   [1] = nCathode  (LED cathode, input-)
+ *   [0] = nAnode     (LED anode, input+)
+ *   [1] = nCathode   (LED cathode, input-)
  *   [2] = nCollector (phototransistor collector, output+)
  *   [3] = nEmitter   (phototransistor emitter, output-)
+ *
+ * State pool layout:
+ *   [0 .. DIODE_SCHEMA.size-1]                             — LED diode slots
+ *   [DIODE_SCHEMA.size .. DIODE_SCHEMA.size+BJT_SIMPLE_SCHEMA.size-1] — BJT slots
  */
 
 import { AbstractCircuitElement } from "../../core/element.js";
@@ -88,6 +46,21 @@ import {
 } from "../../core/registry.js";
 import type { AnalogElementCore, LoadContext } from "../../solver/analog/element.js";
 import { defineModelParams } from "../../core/model-params.js";
+import { stampG, stampRHS } from "../../solver/analog/stamp-helpers.js";
+import type { StatePoolRef } from "../../core/analog-types.js";
+
+// Sub-element factories and schemas — LED — dioload.c:120-441
+import {
+  createDiodeElement,
+  DIODE_SCHEMA,
+  DIODE_PARAM_DEFAULTS,
+} from "../semiconductors/diode.js";
+// Sub-element factories and schemas — phototransistor — bjtload.c:170-end
+import {
+  createBjtElement,
+  BJT_SIMPLE_SCHEMA,
+  BJT_NPN_DEFAULTS,
+} from "../semiconductors/bjt.js";
 
 // ---------------------------------------------------------------------------
 // Model parameter declarations
@@ -95,11 +68,16 @@ import { defineModelParams } from "../../core/model-params.js";
 
 export const { paramDefs: OPTOCOUPLER_PARAM_DEFS, defaults: OPTOCOUPLER_DEFAULTS } = defineModelParams({
   primary: {
-    ctr:      { default: 1.0,  description: "Current transfer ratio CTR = I_collector / I_LED" },
-    vForward: { default: 1.2,  unit: "V", description: "LED forward voltage" },
-    rLed:     { default: 10,   unit: "Ω", description: "LED series resistance" },
+    ctr: { default: 1.0,   description: "Current transfer ratio CTR = I_collector / I_LED" },
+    Is:  { default: 1e-14, unit: "A", description: "LED saturation current (dioload.c IS)" },
+    n:   { default: 1.0,              description: "LED emission coefficient (dioload.c N)" },
   },
 });
+
+// Diode slot offsets within the combined state block (from DIODE_SCHEMA).
+// SLOT_GEQ=1 (NR companion conductance), SLOT_ID=3 (diode current) — dioload.c CKTstate0.
+const DIODE_SLOT_GEQ = 1;
+const DIODE_SLOT_ID  = 3;
 
 // ---------------------------------------------------------------------------
 // Pin layout
@@ -147,110 +125,159 @@ function buildOptocouplerPinDeclarations(): PinDeclaration[] {
 }
 
 // ---------------------------------------------------------------------------
-// OptocouplerAnalogElement factory
+// Helpers to build PropertyBag for sub-elements
 // ---------------------------------------------------------------------------
 
-/** Minimum leakage conductance for numerical stability in off-state. */
-const G_OFF = 1e-9;
+/** Build a PropertyBag for the LED diode sub-element with optocoupler-derived params. */
+function makeLedProps(Is: number, n: number): PropertyBag {
+  const bag = new PropertyBag(new Map<string, number>().entries());
+  const merged: Record<string, number> = { ...DIODE_PARAM_DEFAULTS, IS: Is, N: n };
+  bag.replaceModelParams(merged);
+  return bag;
+}
+
+/** Build a PropertyBag for the phototransistor BJT sub-element (NPN, default L0 params). */
+function makeBjtProps(): PropertyBag {
+  const bag = new PropertyBag(new Map<string, number>().entries());
+  bag.replaceModelParams({ ...BJT_NPN_DEFAULTS });
+  return bag;
+}
+
+// ---------------------------------------------------------------------------
+// OptocouplerAnalogElement factory — F4b composition
+// ---------------------------------------------------------------------------
+
+const DIODE_STATE_SIZE = DIODE_SCHEMA.size;  // 4 (no capacitance)
+const BJT_STATE_SIZE   = BJT_SIMPLE_SCHEMA.size; // 8
 
 function createOptocouplerElement(
   pinNodes: ReadonlyMap<string, number>,
-  _internalNodeIds: readonly number[],
+  internalNodeIds: readonly number[],
   _branchIdx: number,
   props: PropertyBag,
 ): AnalogElementCore {
-  const p: Record<string, number> = {
-    ctr:      props.getModelParam<number>("ctr"),
-    vForward: props.getModelParam<number>("vForward"),
-    rLed:     props.getModelParam<number>("rLed"),
-  };
+  const ctr = props.getModelParam<number>("ctr");
+  const Is  = props.getModelParam<number>("Is");
+  const n   = props.getModelParam<number>("n");
 
   const nAnode     = pinNodes.get("anode")!;
   const nCathode   = pinNodes.get("cathode")!;
   const nCollector = pinNodes.get("collector")!;
   const nEmitter   = pinNodes.get("emitter")!;
 
-  // Operating-point state
-  let vd = 0;       // V_anode - V_cathode at last load() call
-  let gLed = G_OFF; // effective LED conductance
-  let iNR = 0;      // Norton offset for LED stamp
+  // Internal base node for the phototransistor — no external pin.
+  // Allocated by the compiler via getInternalNodeCount=1.
+  const nBase = internalNodeIds[0]!;
 
-  function readNode(voltages: Float64Array, n: number): number {
-    return n > 0 ? voltages[n - 1] : 0;
-  }
+  // --- LED diode sub-element (dioload.c:120-441) ---
+  // Pin map uses diode's expected pin names "A" and "K".
+  const ledPinNodes = new Map<string, number>([
+    ["A", nAnode],
+    ["K", nCathode],
+  ]);
+  const ledProps = makeLedProps(Is, n);
+  const ledSub = createDiodeElement(ledPinNodes, [], -1, ledProps);
+
+  // --- Phototransistor BJT sub-element (bjtload.c:170-end) ---
+  // NPN polarity. Base = internalBase; C = nCollector; E = nEmitter.
+  const bjtPinNodes = new Map<string, number>([
+    ["B", nBase],
+    ["C", nCollector],
+    ["E", nEmitter],
+  ]);
+  const bjtProps = makeBjtProps();
+  const bjtSub = createBjtElement(1 /* NPN polarity */, bjtPinNodes, -1, bjtProps);
+
+  // Pool binding
+  let pool: StatePoolRef;
+  let diodeBase: number;
+  let bjtBase: number;
 
   return {
     branchIndex: -1,
     isNonlinear: true,
-    isReactive: false,
+    isReactive: false as const,
+    poolBacked: true as const,
+    stateSize: DIODE_STATE_SIZE + BJT_STATE_SIZE,
+    stateSchema: DIODE_SCHEMA, // primary schema for diagnostics; BJT schema follows
+    stateBaseOffset: -1,
+
+    initState(poolRef: StatePoolRef): void {
+      pool = poolRef;
+      diodeBase = this.stateBaseOffset;
+      bjtBase   = this.stateBaseOffset + DIODE_STATE_SIZE;
+
+      // Wire sub-elements to their partitioned state regions.
+      ledSub.stateBaseOffset = diodeBase;
+      ledSub.initState(poolRef);
+
+      bjtSub.stateBaseOffset = bjtBase;
+      bjtSub.initState(poolRef);
+    },
 
     load(ctx: LoadContext): void {
-      const solver = ctx.solver;
-      const voltages = ctx.voltages;
+      // 1. LED diode stamp — dioload.c:120-441
+      ledSub.load(ctx);
 
-      // Evaluate operating point from current NR-iterate voltages.
-      const vA = readNode(voltages, nAnode);
-      const vK = readNode(voltages, nCathode);
-      vd = vA - vK;
-      const gOn = 1 / p.rLed;
-      if (vd >= p.vForward) {
-        gLed = gOn;
-        iNR = gOn * p.vForward;
-      } else {
-        gLed = G_OFF;
-        iNR = 0;
-      }
+      // 2. CCCS stamp — CTR * I_LED injected as Norton source into internalBase.
+      //
+      // After ledSub.load(), pool.states[0][diodeBase + SLOT_ID] = I_LED (dioload.c DIOcurrent).
+      //                        pool.states[0][diodeBase + SLOT_GEQ] = geq_LED (NR companion conductance).
+      //
+      // The CCCS injects I_base = CTR * I_LED into nBase.
+      // NR linearization (Norton equivalent at operating point):
+      //   I_base(Vd) = CTR * I_LED(Vd) ≈ CTR * geq_LED * Vd + CTR * ieq_LED
+      //
+      // Since I_LED = geq_LED * Vd - ieq_LED_offset, the Norton stamp into nBase is:
+      //   Conductance coupling:
+      //     G[nBase, nAnode]   += CTR * geq_LED
+      //     G[nBase, nCathode] -= CTR * geq_LED
+      //   Norton current (constant term from diode's ieq = id - geq*vd):
+      //     iBase_nr = CTR * I_LED  (full operating-point current, not the ieq offset)
+      //
+      // Use the stored I_LED directly as the Norton injection (current source value at OP).
+      // The conductance Jacobian links input (anode/cathode) columns to base row.
+      const s0       = pool.states[0];
+      const iLed     = s0[diodeBase + DIODE_SLOT_ID];
+      const geqLed   = s0[diodeBase + DIODE_SLOT_GEQ];
+      const iBase    = ctr * iLed;
+      const gmCtr    = ctr * geqLed; // dI_base / dV_d
 
-      // --- Input LED stamp ---
-      // Conductance stamp between anode and cathode
-      if (nAnode !== 0) {
-        solver.stampElement(solver.allocElement(nAnode - 1, nAnode - 1), gLed);
-        if (nCathode !== 0) {
-          solver.stampElement(solver.allocElement(nAnode - 1, nCathode - 1), -gLed);
-        }
-      }
-      if (nCathode !== 0) {
-        if (nAnode !== 0) {
-          solver.stampElement(solver.allocElement(nCathode - 1, nAnode - 1), -gLed);
-        }
-        solver.stampElement(solver.allocElement(nCathode - 1, nCathode - 1), gLed);
-      }
-      // Norton offset (shifts characteristic by V_forward)
-      if (nAnode !== 0) solver.stampRHS(nAnode - 1, -iNR);
-      if (nCathode !== 0) solver.stampRHS(nCathode - 1, iNR);
+      // Conductance Jacobian: base row coupled to input voltage.
+      // ngspice cccs/F source stamps: input branch column → output node rows.
+      // Here the LED current is a voltage-controlled quantity (via the diode junction),
+      // so we stamp as a conductance coupling from input nodes to base row.
+      stampG(ctx.solver, nBase, nAnode,   gmCtr);
+      stampG(ctx.solver, nBase, nCathode, -gmCtr);
 
-      // --- Output phototransistor stamp ---
-      const iLed0 = gLed * vd - iNR;
-      const iC0 = p.ctr * iLed0;
-      const gmCtr = p.ctr * gLed; // dI_C/dV_d
+      // Norton current source into base (RHS injection at operating point).
+      // Jacobian reference current: iBase - gmCtr * (vA - vK) — linear part already
+      // covered by stampG above, so the constant term is:
+      //   iBase_norton = iBase - gmCtr * vd  where vd = vA - vK
+      const vA = nAnode   > 0 ? ctx.voltages[nAnode   - 1] : 0;
+      const vK = nCathode > 0 ? ctx.voltages[nCathode - 1] : 0;
+      const vd = vA - vK;
+      const iBaseNorton = iBase - gmCtr * vd;
+      stampRHS(ctx.solver, nBase, iBaseNorton);
 
-      const iCnr = iC0 - gmCtr * vd;
+      // 3. Phototransistor BJT stamp — bjtload.c:170-end
+      bjtSub.load(ctx);
+    },
 
-      // Cross-port Jacobian
-      if (nCollector !== 0 && nAnode !== 0) solver.stampElement(solver.allocElement(nCollector - 1, nAnode - 1), -gmCtr);
-      if (nCollector !== 0 && nCathode !== 0) solver.stampElement(solver.allocElement(nCollector - 1, nCathode - 1), gmCtr);
-      if (nEmitter !== 0 && nAnode !== 0) solver.stampElement(solver.allocElement(nEmitter - 1, nAnode - 1), gmCtr);
-      if (nEmitter !== 0 && nCathode !== 0) solver.stampElement(solver.allocElement(nEmitter - 1, nCathode - 1), -gmCtr);
-
-      if (nCollector !== 0) solver.stampRHS(nCollector - 1, iCnr);
-      if (nEmitter !== 0) solver.stampRHS(nEmitter - 1, -iCnr);
+    setParam(key: string, value: number): void {
+      // Optocoupler-level param update; sub-element params are immutable
+      // after construction (no hot-reload path needed for composite).
+      void key; void value;
     },
 
     getPinCurrents(voltages: Float64Array): number[] {
       // Pin order: [anode, cathode, collector, emitter]
-      // LED current (into anode): I_LED = gLed * (V_A - V_K) - iNR
-      const vA = readNode(voltages, nAnode);
-      const vK = readNode(voltages, nCathode);
-      const iLed = gLed * (vA - vK) - iNR;
-      // Phototransistor: I_C = CTR * I_LED
-      // Norton source pushes iC0 out of collector → current INTO collector is -iC0
-      // Norton source pulls iC0 into emitter → current INTO emitter is +iC0
-      const iC = p.ctr * iLed;
+      const s0   = pool.states[0];
+      const iLed = s0[diodeBase + DIODE_SLOT_ID];
+      const iC   = ctr * iLed;
+      // LED side: I into anode = I_LED (positive = conventional current in)
+      // BJT side: collector current ≈ CTR * I_LED (simplification at OP)
       return [iLed, -iLed, -iC, iC];
-    },
-
-    setParam(key: string, value: number): void {
-      if (key in p) p[key] = value;
     },
   };
 }
@@ -410,11 +437,11 @@ const OPTOCOUPLER_PROPERTY_DEFS: PropertyDefinition[] = [
 
 const OPTOCOUPLER_ATTRIBUTE_MAPPINGS: AttributeMapping[] = [
   { xmlName: "ctr",       propertyKey: "ctr",       convert: (v) => parseFloat(v), modelParam: true },
-  { xmlName: "vForward",  propertyKey: "vForward",  convert: (v) => parseFloat(v), modelParam: true },
-  { xmlName: "rLed",      propertyKey: "rLed",      convert: (v) => parseFloat(v), modelParam: true },
-  { xmlName: "vceSat",    propertyKey: "vceSat",    convert: (v) => parseFloat(v) },
-  { xmlName: "bandwidth", propertyKey: "bandwidth", convert: (v) => parseFloat(v) },
-  { xmlName: "Label",     propertyKey: "label",     convert: (v) => v },
+  { xmlName: "Is",        propertyKey: "Is",         convert: (v) => parseFloat(v), modelParam: true },
+  { xmlName: "n",         propertyKey: "n",          convert: (v) => parseFloat(v), modelParam: true },
+  { xmlName: "vceSat",    propertyKey: "vceSat",     convert: (v) => parseFloat(v) },
+  { xmlName: "bandwidth", propertyKey: "bandwidth",  convert: (v) => parseFloat(v) },
+  { xmlName: "Label",     propertyKey: "label",      convert: (v) => v },
 ];
 
 // ---------------------------------------------------------------------------
@@ -432,7 +459,8 @@ export const OptocouplerDefinition: ComponentDefinition = {
 
   helpText:
     "Optocoupler — 4-terminal element (anode, cathode, collector, emitter). " +
-    "I_collector = CTR * I_LED. Galvanic isolation between LED input and phototransistor output.",
+    "LED input (dioload.c) + CCCS coupling (CTR) + phototransistor output (bjtload.c). " +
+    "I_collector ≈ CTR * I_LED. Galvanic isolation between LED and phototransistor.",
 
   factory(props: PropertyBag): OptocouplerElement {
     return new OptocouplerElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
@@ -446,6 +474,8 @@ export const OptocouplerDefinition: ComponentDefinition = {
         createOptocouplerElement(pinNodes, internalNodeIds, branchIdx, props),
       paramDefs: OPTOCOUPLER_PARAM_DEFS,
       params: OPTOCOUPLER_DEFAULTS,
+      getInternalNodeCount: (_props) => 1, // phototransistor base node
+      getInternalNodeLabels: (_props) => ["B'"], // internal base label for diagnostics
     },
   },
   defaultModel: "behavioral",
