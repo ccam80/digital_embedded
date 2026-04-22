@@ -290,7 +290,7 @@ export class AnalogTransformerElement implements ReactiveAnalogElement {
    */
   load(ctx: LoadContext): void {
     const solver = ctx.solver;
-    const [p1, p2, s1, s2] = this.pinNodeIds;
+    const [p1, p2, sec1, sec2] = this.pinNodeIds;
     const b1 = this.branchIndex;
     const b2 = this._branch2;
     const L1 = this._pair.l1;
@@ -309,25 +309,25 @@ export class AnalogTransformerElement implements ReactiveAnalogElement {
     }
     if (this._rSec > 0) {
       const gSec = 1 / this._rSec;
-      if (s1 !== 0) solver.stampElement(solver.allocElement(s1 - 1, s1 - 1), gSec);
-      if (s2 !== 0) solver.stampElement(solver.allocElement(s2 - 1, s2 - 1), gSec);
-      if (s1 !== 0 && s2 !== 0) {
-        solver.stampElement(solver.allocElement(s1 - 1, s2 - 1), -gSec);
-        solver.stampElement(solver.allocElement(s2 - 1, s1 - 1), -gSec);
+      if (sec1 !== 0) solver.stampElement(solver.allocElement(sec1 - 1, sec1 - 1), gSec);
+      if (sec2 !== 0) solver.stampElement(solver.allocElement(sec2 - 1, sec2 - 1), gSec);
+      if (sec1 !== 0 && sec2 !== 0) {
+        solver.stampElement(solver.allocElement(sec1 - 1, sec2 - 1), -gSec);
+        solver.stampElement(solver.allocElement(sec2 - 1, sec1 - 1), -gSec);
       }
     }
 
     // B sub-matrix: branch current incidence in KCL node rows.
     if (p1 !== 0) solver.stampElement(solver.allocElement(p1 - 1, b1), 1);
     if (p2 !== 0) solver.stampElement(solver.allocElement(p2 - 1, b1), -1);
-    if (s1 !== 0) solver.stampElement(solver.allocElement(s1 - 1, b2), 1);
-    if (s2 !== 0) solver.stampElement(solver.allocElement(s2 - 1, b2), -1);
+    if (sec1 !== 0) solver.stampElement(solver.allocElement(sec1 - 1, b2), 1);
+    if (sec2 !== 0) solver.stampElement(solver.allocElement(sec2 - 1, b2), -1);
 
     // C sub-matrix: KVL voltage incidence (topology-constant ±1 entries).
     if (p1 !== 0) solver.stampElement(solver.allocElement(b1, p1 - 1), 1);
     if (p2 !== 0) solver.stampElement(solver.allocElement(b1, p2 - 1), -1);
-    if (s1 !== 0) solver.stampElement(solver.allocElement(b2, s1 - 1), 1);
-    if (s2 !== 0) solver.stampElement(solver.allocElement(b2, s2 - 1), -1);
+    if (sec1 !== 0) solver.stampElement(solver.allocElement(b2, sec1 - 1), 1);
+    if (sec2 !== 0) solver.stampElement(solver.allocElement(b2, sec2 - 1), -1);
 
     // Unified compute-then-stamp for branch block — matches indload.c:88-123
     // applied per winding, plus mutload.c:64-75 pattern for off-diagonal mutual
