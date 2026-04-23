@@ -1,8 +1,7 @@
 /**
  * BJT component tests — post-W1.2 port.
  *
- * Test handling per `spec/architectural-alignment.md` §A1 and
- * `spec/phase-2.5-execution.md` §4: all assertions whose expected values were
+ * Test handling per `spec/architectural-alignment.md` §A1: all assertions whose expected values were
  * hand-computed from the Gummel-Poon equations or inspected
  * `_updateOp`/`_stampCompanion` intermediate state have been deleted. Only
  * parameter-plumbing tests (setParam propagation, default values),

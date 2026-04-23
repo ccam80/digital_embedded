@@ -3,9 +3,9 @@
 **Date:** 2026-04-24
 **Precondition:** Phase 2.5 complete at commit `438de273` (tracker hygiene) / `653340ac` (W4 closure).
 **Status:** W5 deliverable. Authored against the post-A1 codebase landed by Phase 2.5.
-**Input docs:** `spec/architectural-alignment.md` (Track A canonical rulings), `spec/phase-2.5-execution.md` (Phase 2.5 wave-level execution record).
+**Input doc:** `spec/architectural-alignment.md` (Track A canonical rulings).
 
-**Absorbed inputs (deleted 2026-04-24 per "only keep current references" cleanup — git history preserves):** original `plan.md`, `plan-addendum.md` (task classification bridge), `post-a1-parity.md` (Phase 2.5 W3 findings — all closed or carried forward into this plan), `ngspice-alignment-F*.md` per-phase specs (absorbed into each Phase section below).
+**Absorbed and deleted in the 2026-04-24 cleanup (git history preserves):** `plan.md`, `plan-addendum.md` (task classification bridge), `post-a1-parity.md` (Phase 2.5 W3 findings — all closed or carried forward into this plan), `phase-2.5-execution.md` (Phase 2.5 wave-level execution record — all waves ✓), `ngspice-alignment-F*.md` per-phase specs (absorbed into each Phase section below), plus forensic/reconciliation artefacts.
 
 ---
 

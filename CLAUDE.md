@@ -55,7 +55,7 @@ When comparing digiTS against ngspice, the following words are banned as closing
 
 **Remedy when you would have used one of these words:** STOP and escalate. The item belongs in `spec/architectural-alignment.md` (architectural divergence) or `spec/fix-list-phase-2-audit.md` (numerical bug). Agents do not add items to `architectural-alignment.md` — that is a user action. Your escalation report includes: the cited ngspice file, the digiTS file, the specific quantities that differ, why you think it's architectural rather than numerical, and the user prompt needed to resolve it.
 
-Rationale: `spec/parity-forcing-function-plan.md` §1 documents how these words, used as closing verdicts, raised the tolerance floor across the project and sheltered real numerical bugs. Banning them at the vocabulary level prevents the drift.
+Rationale: these words, used as closing verdicts, raised the tolerance floor across the project and sheltered real numerical bugs. Banning them at the vocabulary level prevents the drift.
 
 ### ngspice Comparison Harness — First Tool for Numerical Issues
 

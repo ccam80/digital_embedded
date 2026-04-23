@@ -171,8 +171,8 @@ export function validateManifest(
     // Test data parsing
     if (step.testData) {
       // validateTestDataSyntax appends to `diagnostics` directly; it does
-      // not throw on malformed input. Per spec/i1-suppression-backlog.md
-      // §4.2 the prior try/catch hid real bugs.
+      // not throw on malformed input. Per spec/architectural-alignment.md
+      // §I1 the prior try/catch hid real bugs.
       validateTestDataSyntax(step.testData, step.id, diagnostics);
     }
 

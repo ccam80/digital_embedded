@@ -301,8 +301,8 @@ describe("harness integration", () => {
 
   // Three tests that verified the papering removed by commit dcf56e23 have
   // been deleted here (MOSFET VSB null + derivedNgspiceSlots.VSB, JFET null
-  // slots, tunnel-diode/varactor mapping existence). Route:
-  // spec/parity-forcing-function-plan.md and spec/baseline-reality.md §2.1.
+  // slots, tunnel-diode/varactor mapping existence). See commit dcf56e23
+  // message for the full reasoning.
 
   it("step capture hook supports retry tracking via beginAttempt/endAttempt", () => {
     const { circuit, pool } = makeHWR();

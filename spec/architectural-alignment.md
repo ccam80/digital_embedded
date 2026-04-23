@@ -7,13 +7,12 @@ Doc is now the single source of truth for digiTS vs ngspice architectural
 alignment. Moves from design to execution: each APPROVED FIX item
 becomes an execution track; each APPROVED ACCEPT item becomes a harness
 constraint.
-**Feeder docs:** `baseline-reality.md` (post-papering-removal state),
-`parity-forcing-function-plan.md` (why this doc exists). The
-`audit-papered-divergences.md` source doc was absorbed into §A/B/C/D
-item bodies and deleted 2026-04-24; git history preserves it.
-The `ngspice-alignment-divergences.md` + `ngspice-alignment-
-verification.md` docs this file originally superseded were also
-deleted in the 2026-04-24 cleanup.
+**Authoring history:** the pre-Track-A forensics (`audit-papered-
+divergences.md`, `baseline-reality.md`, `parity-forcing-function-
+plan.md`) and the two docs this one originally superseded (`ngspice-
+alignment-divergences.md`, `ngspice-alignment-verification.md`) were
+absorbed into §A/B/C/D item bodies and deleted in the 2026-04-24
+cleanup. Git history preserves them.
 
 ---
 
@@ -144,7 +143,7 @@ moves from design to execution. Undecided items: none.
 | I2 | Untrusted ngspice citations in code comments | **APPROVED POLICY** (2026-04-21) |
 | I3 | Alignment specs half-implemented | **APPROVED POLICY** (2026-04-21) |
 
-**BLOCKERs routed from Step 1 (baseline-reality.md §2.1):**
+**BLOCKERs routed from pre-Track-A Step-1 baseline analysis:**
 - MOSFET `GEQ`-family slot mapping gap → symptom of **A1**.
 - JFET `CAP_GEQ` slot mapping gap → symptom of **A1**.
 - Tunnel-diode / varactor mapping existence → **F1**, **F2**.
@@ -264,11 +263,10 @@ can ever be bit-exact with ngspice. Every other A/B/C item below is
 downstream of it — accepting A1 makes the whole forcing-function
 exercise a bookkeeping task around a foundational divergence.
 
-**Relationship to "Track B":** this WAS Track B in
-`parity-forcing-function-plan.md §5`. Folding it back into Track A as
-item A1 because the plan as written split "architectural alignment"
-from "the single biggest architectural item", which made no sense once
-drafted.
+**Historical note:** this item WAS originally scoped as a separate
+"Track B" in the pre-Track-A forensics plan. It was folded back into
+Track A as item A1 because splitting "architectural alignment" from
+"the single biggest architectural item" made no sense once drafted.
 
 ### A2. `pool.uic` duplicate of `cktMode & MODEUIC`
 

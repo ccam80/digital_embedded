@@ -469,7 +469,7 @@ export class PaletteUI {
     } catch (e) {
       // Surface icon-rendering failure so a broken component doesn't
       // produce a silent blank-tile palette. Per
-      // spec/i1-suppression-backlog.md §4.2 replaced prior silent swallow.
+      // spec/architectural-alignment.md §I1 replaced prior silent swallow.
       console.warn(`[palette-ui] Failed to render palette icon for "${def.name}".`, e);
     }
 

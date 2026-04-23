@@ -1,7 +1,7 @@
 /**
  * Tests for the 555 Timer IC F4b composite model.
  *
- * Test handling per A1 §Test handling rule (spec/phase-2.5-execution.md §4 W1.8c):
+ * Test handling per A1 §Test handling rule (spec/architectural-alignment.md §A1):
  *   - Hand-computed expected values: DELETED
  *   - Calls to _updateOp / _stampCompanion: DELETED (methods removed)
  *   - Post-load observable state with hand-computed values: DELETED

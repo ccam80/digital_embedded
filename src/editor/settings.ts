@@ -117,7 +117,7 @@ export class AppSettings {
       }
     } catch (e) {
       // Corrupted localStorage entry — surface the anomaly and fall back to
-      // defaults. Per spec/i1-suppression-backlog.md §4.2 the prior silent
+      // defaults. Per spec/architectural-alignment.md §I1 the prior silent
       // swallow hid real parse/quota errors.
       console.warn(`[settings] Failed to parse stored settings; using defaults.`, e);
     }

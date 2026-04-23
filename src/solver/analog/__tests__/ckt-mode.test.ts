@@ -1,9 +1,9 @@
 /**
  * Unit tests for the ckt-mode bitfield helpers.
  *
- * Focus: `bitsToName()` — the diagnostic decoder added in Phase 2.5 W2.3 as
- * the replacement for the deleted `InitMode` string union. See
- * `spec/phase-2.5-execution.md` §5 W2.3.
+ * Focus: `bitsToName()` — the diagnostic decoder replacing the deleted
+ * `InitMode` string union (landed in Phase 2.5). Canonical policy for the
+ * `cktMode` bitfield is `spec/architectural-alignment.md` §C2.
  */
 
 import { describe, it, expect } from "vitest";

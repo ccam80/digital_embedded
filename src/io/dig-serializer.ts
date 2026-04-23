@@ -65,7 +65,7 @@ function propertyValueToXml(xmlName: string, value: PropertyValue): string {
       } catch (err) {
         console.warn('[dig-serializer] InverterConfig JSON parse failed; using raw string', err);
         // Dual-format fallback (JSON-encoded vs raw string). Per
-        // spec/i1-suppression-backlog.md §4.2 retain-with-reason.
+        // spec/architectural-alignment.md §I1 retain-with-reason.
         return `<string>${escapeXml(value)}</string>`;
       }
     }
@@ -77,7 +77,7 @@ function propertyValueToXml(xmlName: string, value: PropertyValue): string {
       } catch (err) {
         console.warn('[dig-serializer] Color JSON parse failed; using raw string', err);
         // Dual-format fallback (JSON-encoded vs raw string). Per
-        // spec/i1-suppression-backlog.md §4.2 retain-with-reason.
+        // spec/architectural-alignment.md §I1 retain-with-reason.
         return `<string>${escapeXml(value)}</string>`;
       }
     }
@@ -92,7 +92,7 @@ function propertyValueToXml(xmlName: string, value: PropertyValue): string {
       } catch (err) {
         console.warn('[dig-serializer] InDefault JSON parse failed; using raw string', err);
         // Dual-format fallback (JSON-encoded vs raw string). Per
-        // spec/i1-suppression-backlog.md §4.2 retain-with-reason.
+        // spec/architectural-alignment.md §I1 retain-with-reason.
         return `<string>${escapeXml(value)}</string>`;
       }
     }
@@ -119,7 +119,7 @@ function propertyValueToXml(xmlName: string, value: PropertyValue): string {
     } catch (err) {
       console.warn('[dig-serializer] JSON.stringify failed (circular object?)', err);
       // JSON.stringify throws on circular objects. The serializer must emit
-      // valid XML regardless. Per spec/i1-suppression-backlog.md §4.2
+      // valid XML regardless. Per spec/architectural-alignment.md §I1
       // retain-with-reason.
       return `<string>[unserializable]</string>`;
     }

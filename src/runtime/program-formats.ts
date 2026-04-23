@@ -53,7 +53,7 @@ export function detectFormatFromContent(content: string, filename?: string): Pro
       return detectFormatFromExtension(filename);
     } catch {
       // Dual-detector fallback: unknown extension → content heuristic.
-      // Per spec/i1-suppression-backlog.md §4.2 retain-with-reason.
+      // Per spec/architectural-alignment.md §I1 retain-with-reason.
     }
   }
 

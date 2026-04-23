@@ -285,7 +285,7 @@ describe("DigitalOutputPinModel", () => {
     } catch {
       // Test accepts both strict-mode TypeError and non-strict silent
       // ignore. The catch is part of the assertion. Per
-      // spec/i1-suppression-backlog.md §4.2 retain-with-reason.
+      // spec/architectural-alignment.md §I1 retain-with-reason.
     }
     expect(pin.loaded).toBe(false);
   });

@@ -17,7 +17,7 @@
  *   - Rotation × mirror pin transform audit (all 8 combinations)
  *   - Uncovered components get sanity checks (factory, draw, bbox, pins)
  *
- * Silent-catch policy (per spec/i1-suppression-backlog.md §4.2
+ * Silent-catch policy (per spec/architectural-alignment.md §I1
  * retain-with-reason): the factory/draw/bbox try/catch blocks in this
  * suite DO NOT suppress anomalies — they record FACTORY_ERROR /
  * DRAW_ERROR / bboxOverflow=-1 audit rows in the results array, which is
