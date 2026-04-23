@@ -11,10 +11,10 @@
  *   CKTrhs      -> rhs
  *   CKTrhsOld   -> rhsOld (prior NR iterate)
  *   CKTtime     -> time
- *   CKTdelta    -> delta (alias: dt)
+ *   CKTdelta    -> dt
  *   CKTintegrateMethod -> method
  *   CKTorder    -> order
- *   CKTag[]     -> agVector (alias: ag) — integration coefficients
+ *   CKTag[]     -> ag — integration coefficients
  *   CKTdeltaOld -> deltaOld
  *   CKTsrcFact  -> srcFact
  *   CKTnoncon   -> noncon.value
@@ -85,12 +85,6 @@ export interface LoadContext {
   /** Current timestep in seconds (ngspice CKTdelta). 0 during DC-OP. */
   dt: number;
   /**
-   * Alias for `dt`, provided to match the ngspice CKTdelta field name.
-   * Element ports from ngspice that read CKTdelta bind to ctx.delta; the
-   * value is identical to ctx.dt.
-   */
-  delta: number;
-  /**
    * Active numerical integration method. 0 = Trapezoidal, 1 = Gear per
    * ngspice cktdefs.h. The string form is retained for backwards compatibility
    * with existing IntegrationMethod consumers; use numeric 0/1 when porting
@@ -103,8 +97,6 @@ export interface LoadContext {
   deltaOld: readonly number[];
   /** Integration coefficients computed by NIcomCof (CKTag[]). Length 7. */
   ag: Float64Array;
-  /** Alias for `ag` to match ngspice CKTag[] field name. Same Float64Array. */
-  agVector: Float64Array;
   /** Source stepping scale factor (CKTsrcFact). */
   srcFact: number;
   /** Mutable non-convergence counter (CKTnoncon). Incremented by elements on limiting. */
