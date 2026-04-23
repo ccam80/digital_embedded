@@ -3,7 +3,9 @@
 **Date:** 2026-04-24
 **Precondition:** Phase 2.5 complete at commit `438de273` (tracker hygiene) / `653340ac` (W4 closure).
 **Status:** W5 deliverable. Authored against the post-A1 codebase landed by Phase 2.5.
-**Input docs:** `spec/plan.md` (original Phase 3–9 plan), `spec/plan-addendum.md` (REWRITE / CARRY / OBSOLETE classification), `spec/post-a1-parity.md` (D-8 carry-forward), `spec/architectural-alignment.md` (Track A rulings), `spec/phase-2.5-execution.md` (Phase 2.5 closure — §7 flow diagram).
+**Input docs:** `spec/architectural-alignment.md` (Track A canonical rulings), `spec/phase-2.5-execution.md` (Phase 2.5 wave-level execution record).
+
+**Absorbed inputs (deleted 2026-04-24 per "only keep current references" cleanup — git history preserves):** original `plan.md`, `plan-addendum.md` (task classification bridge), `post-a1-parity.md` (Phase 2.5 W3 findings — all closed or carried forward into this plan), `ngspice-alignment-F*.md` per-phase specs (absorbed into each Phase section below).
 
 ---
 
@@ -121,7 +123,7 @@ Verify Phase 2.5's dead-code removal is complete. Delete any residue. This will 
 ## Phase 3: F2 — NR Reorder Gate + Per-Device xfact Predictor (diode + BJT)
 **Depends on:** Phase 0
 
-Spec: `spec/ngspice-alignment-F2-nr-reorder-predictor.md`. Targeted tests: `newton-raphson`, `analog-engine`, `diode`, `bjt` unit/integration suites under `src/solver/analog/__tests__/` and `src/components/semiconductors/__tests__/`; ngspice comparison harness for per-NR parity on diode / BJT transients.
+Targeted tests: `newton-raphson`, `analog-engine`, `diode`, `bjt` unit/integration suites under `src/solver/analog/__tests__/` and `src/components/semiconductors/__tests__/`; ngspice comparison harness for per-NR parity on diode / BJT transients.
 
 **Scope narrowing post-A1:** xfact predictor lives inside each device's unified `load()`. References to line numbers against the old `_updateOp` split are replaced with references to the device's post-A1 `load()` body. MOSFET and JFET xfact are in Phases 6 / 7 respectively (device-specific).
 
@@ -149,7 +151,7 @@ Spec: `spec/ngspice-alignment-F2-nr-reorder-predictor.md`. Targeted tests: `newt
 ## Phase 4: F5 — Residual Limiting Primitives
 **Depends on:** Phase 3
 
-Spec: `spec/ngspice-alignment-F5-limiting.md`. Most of F5 was absorbed by Phase 2.5 (D4 pnjlim Gillespie branch, H1 limitingCollector sync, LoadContext `cktFixLimit` field, Zener `tBV` pulled forward into W4.B.2). What remains are three small fixes. Targeted tests: `npx vitest run src/solver/analog/__tests__/harness/stream-verification.test.ts`.
+Most of F5 was absorbed by Phase 2.5 (D4 pnjlim Gillespie branch, H1 limitingCollector sync, LoadContext `cktFixLimit` field, Zener `tBV` pulled forward into W4.B.2). What remains are three small fixes. Targeted tests: `npx vitest run src/solver/analog/__tests__/harness/stream-verification.test.ts`.
 
 ### Wave 4.1: Primitive fix
 
@@ -174,7 +176,7 @@ Spec: `spec/ngspice-alignment-F5-limiting.md`. Most of F5 was absorbed by Phase 
 **Depends on:** Phase 4
 **Parallel with:** Phase 6, Phase 7
 
-Spec: `spec/ngspice-alignment-F-bjt.md`. Targeted tests: BJT suites under `src/components/semiconductors/__tests__/`; ngspice harness for BJT common-emitter + diode bridge.
+Targeted tests: BJT suites under `src/components/semiconductors/__tests__/`; ngspice harness for BJT common-emitter + diode bridge.
 
 **Post-A1 re-expression:** every task operates inside the unified `load()` methods of `createBjtElement` (L0) and `createSpiceL1BjtElement` (L1). No references to deleted `L1_SLOT_CAP_GEQ_*` / `_IEQ_*` slots — those values are locals in `load()`.
 
@@ -217,7 +219,7 @@ Spec: `spec/ngspice-alignment-F-bjt.md`. Targeted tests: BJT suites under `src/c
 **Depends on:** Phase 4
 **Parallel with:** Phase 5, Phase 7
 
-Spec: `spec/ngspice-alignment-F-mos.md`. Targeted tests: MOSFET vitest suites; ngspice harness for MOSFET inverter.
+Targeted tests: MOSFET vitest suites; ngspice harness for MOSFET inverter.
 
 **Post-A1 re-expression:** every task operates inside the unified `load()` method of `mosfet.ts`. The 11 deleted MOSFET cross-method slots (`SLOT_CAP_GEQ_GS/_GD/_DB/_SB/_GB`, `SLOT_IEQ_*`, `SLOT_Q_*`) are locals in `load()`; Meyer charges and cap companions compute and stamp in a single pass. G1 (MOSFET VBS / VBD sign convention) was landed in Phase 2.5. M-W3-4 was closed as a spec citation error (2026-04-24); `params.GAMMA` already matches `model->MOS1gamma` semantics and requires no edit.
 
@@ -260,7 +262,7 @@ Spec: `spec/ngspice-alignment-F-mos.md`. Targeted tests: MOSFET vitest suites; n
 **Depends on:** Phase 4
 **Parallel with:** Phase 5, Phase 6
 
-Spec: `spec/ngspice-alignment-F5ext-jfet.md`. Subsumes F5-D (Vds-clamp removal, done in Phase 0 equivalent) + F5-E (pnjlim on vgd). Targeted tests: `src/components/semiconductors/__tests__/jfet.test.ts`; ngspice harness for JFET circuits.
+Subsumes F5-D (Vds-clamp removal, done pre-Phase-2.5) + F5-E (pnjlim on vgd). Targeted tests: `src/components/semiconductors/__tests__/jfet.test.ts`; ngspice harness for JFET circuits.
 
 **Post-A1 re-expression:** every task operates inside the unified `load()` method of `njfet.ts` (and `pjfet.ts` delegates to a polarity-aware version). The deleted cross-method `SLOT_CAP_GEQ_GS` / `_GD` / `SLOT_IEQ_GS` / `_GD` slots are locals in `load()`. `fet-base.ts` was removed in Phase 2.5 — NJFET and PJFET are self-contained.
 
@@ -297,7 +299,7 @@ Spec: `spec/ngspice-alignment-F5ext-jfet.md`. Subsumes F5-D (Vds-clamp removal, 
 ## Phase 8: F6 — Documentation & Citation Audit
 **Depends on:** Phase 5, Phase 6, Phase 7
 
-Spec: `spec/ngspice-alignment-F6-docs-citations.md`. Pure documentation / comment-only edits. No runtime behavior change.
+Pure documentation / comment-only edits. No runtime behavior change.
 
 ### Wave 8.1: Spec artifact
 
@@ -399,7 +401,7 @@ Final acceptance gate. Plan.md Appendix A's 8 circuits must produce IEEE-754 bit
 
 ## Appendix C: Dropped tasks (SATISFIED-BY Track A — landed in Phase 2.5)
 
-For traceability — tasks from plan.md Phases 3–9 that were absorbed by Track A and are NOT in this plan. Counts and references per `plan-addendum.md` §Summary counts.
+For traceability — tasks from the original plan.md Phases 3–9 that were absorbed by Track A (Phase 2.5) and are NOT in this plan. (plan.md and plan-addendum.md deleted 2026-04-24; per-task classifications are preserved in git history.)
 
 - **Wave 2.1.1–2.1.4** (ckt-mode.ts + LoadContext migration + CKTCircuitContext bitfield + noncon dual-storage) — SATISFIED-BY A2/A3/A4 + C2/C3.
 - **Wave 2.2.1** (cktLoad rewrite) — SATISFIED-BY C3.
@@ -415,9 +417,9 @@ For traceability — tasks from plan.md Phases 3–9 that were absorbed by Track
 
 ## Appendix D: §I2 architectural notes (spec update — user action)
 
-The following genuine cross-timestep integration-history slots were surfaced by Phase 2.5 W3 as undocumented-but-legitimate (not cross-method transfer slots excised by A1). Per `post-a1-parity.md` §1.1 D-W3-8, §1.5 I-W3-6, they need `architectural-alignment.md §I2` entries documenting them as digiTS-externalised NIintegrate history. User action, no code change; separate from this plan's implementer tasks.
+The following genuine cross-timestep integration-history slots were surfaced by Phase 2.5 W3 as undocumented-but-legitimate (not cross-method transfer slots excised by A1). They are now recorded in `architectural-alignment.md §I2.1` as digiTS-externalised NIintegrate history (landed 2026-04-24). No further action required from this plan — listed here as context for why the slots survive post-A1 grep sweeps:
 
 - `diode.ts` — `SLOT_CCAP` (maps to ngspice `CKTstate1 + DIOcapCurrent` implicit in NIintegrate).
 - `inductor.ts` — `SLOT_CCAP` (maps to ngspice `CKTstate1 + INDflux` implicit in NIintegrate).
 
-Post-Phase-2.5 discovery (`post-a1-parity.md` §1.6 extra observation): `src/components/passives/coupled-inductor.ts::CoupledInductorState` + `createState()` may have been cleaned up in W4.B.5's bundle — Phase 0 Wave 0.1.2 verifies.
+Phase 2.5 also surfaced `src/components/passives/coupled-inductor.ts::CoupledInductorState` + `createState()` as dead code that may have been cleaned up in W4.B.5's bundle. Phase 0 Wave 0.1.2 verifies.

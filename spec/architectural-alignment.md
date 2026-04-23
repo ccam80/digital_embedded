@@ -7,11 +7,13 @@ Doc is now the single source of truth for digiTS vs ngspice architectural
 alignment. Moves from design to execution: each APPROVED FIX item
 becomes an execution track; each APPROVED ACCEPT item becomes a harness
 constraint.
-**Supersedes:** `ngspice-alignment-divergences.md` + `ngspice-alignment-
-verification.md` once every item here reaches an APPROVED state.
-**Feeder docs:** `audit-papered-divergences.md` (source of the ~38 items
-below), `baseline-reality.md` (post-papering-removal state),
-`parity-forcing-function-plan.md` (why this doc exists).
+**Feeder docs:** `baseline-reality.md` (post-papering-removal state),
+`parity-forcing-function-plan.md` (why this doc exists). The
+`audit-papered-divergences.md` source doc was absorbed into §A/B/C/D
+item bodies and deleted 2026-04-24; git history preserves it.
+The `ngspice-alignment-divergences.md` + `ngspice-alignment-
+verification.md` docs this file originally superseded were also
+deleted in the 2026-04-24 cleanup.
 
 ---
 
@@ -889,12 +891,12 @@ mirroring an ngspice `CKTstate1 + <offset>` field.
   the junction capacitance companion. Maps to ngspice `CKTstate1 +
   DIOcapCurrent` implicit in `dioload.c`'s NIintegrate dispatch.
   Written in `load()` at timestep N, read from `s1` at timestep N+1.
-  Source: `spec/post-a1-parity.md §1.1` D-W3-8 (2026-04-22).
+  Surfaced in Phase 2.5 W3 static audit (2026-04-22).
 
 - **`inductor.ts` `SLOT_CCAP`** — cross-timestep integration history for
   the flux/branch-current companion. Maps to ngspice `CKTstate1 +
-  INDflux` implicit in `indload.c`'s NIintegrate dispatch. Source:
-  `spec/post-a1-parity.md §1.5` I-W3-6 (2026-04-22).
+  INDflux` implicit in `indload.c`'s NIintegrate dispatch. Surfaced
+  in Phase 2.5 W3 static audit (2026-04-22).
 
 **Protocol for adding future entries:** any post-A1 audit that surfaces
 an unmapped slot and can demonstrate (a) it is written at timestep N
