@@ -364,7 +364,8 @@ describe("Relay", () => {
     function makeTransientCtx(v: Float64Array): import("../load-context.js").LoadContext {
       return {
         solver: solver as any,
-        voltages: v,
+        rhsOld: v,
+        rhs: v,
         cktMode: MODETRAN | MODEINITFLOAT,
         dt,
         method: "trapezoidal" as const,

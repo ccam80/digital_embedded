@@ -120,7 +120,7 @@ export class BehavioralCounterElement implements AnalogElementCore {
    * voltages.
    */
   accept(ctx: LoadContext, _simTime: number, _addBreakpoint: (t: number) => void): void {
-    const voltages = ctx.voltages;
+    const voltages = ctx.rhs;
 
     const currentClockV = readMnaVoltage(this._clockPin.nodeId, voltages);
 
@@ -278,7 +278,7 @@ export class BehavioralRegisterElement implements AnalogElementCore {
    * solution voltages.
    */
   accept(ctx: LoadContext, _simTime: number, _addBreakpoint: (t: number) => void): void {
-    const voltages = ctx.voltages;
+    const voltages = ctx.rhs;
 
     const currentClockV = readMnaVoltage(this._clockPin.nodeId, voltages);
 
@@ -502,7 +502,7 @@ export class BehavioralCounterPresetElement implements AnalogElementCore {
   }
 
   load(ctx: LoadContext): void {
-    const voltages = ctx.voltages;
+    const voltages = ctx.rhsOld;
 
     this._enPin.load(ctx);
     this._clockPin.load(ctx);
@@ -538,7 +538,7 @@ export class BehavioralCounterPresetElement implements AnalogElementCore {
    * accepted solution voltages.
    */
   accept(ctx: LoadContext, _simTime: number, _addBreakpoint: (t: number) => void): void {
-    const voltages = ctx.voltages;
+    const voltages = ctx.rhs;
 
     const currentClockV = readMnaVoltage(this._clockPin.nodeId, voltages);
 

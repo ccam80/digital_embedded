@@ -99,7 +99,8 @@ function buildUnitCtx(
 ): LoadContext {
   return {
     solver,
-    voltages,
+    rhsOld: voltages,
+    rhs: voltages,
     cktMode: MODEDCOP | MODEINITFLOAT,
     dt: 0,
     method: "trapezoidal",
@@ -228,7 +229,7 @@ describe("Diode", () => {
       matrixSize: 2,
       nodeCount: 2,
     });
-    jumpCtx.loadCtx.voltages = voltages;
+    jumpCtx.loadCtx.rhsOld = voltages;
     element.load(jumpCtx.loadCtx);
 
     // Voltages array must be unchanged — no write-back
@@ -764,7 +765,8 @@ describe("AREA scaling", () => {
     function makeCtxForSolver(solver: SparseSolverType) {
       return {
         solver,
-        voltages: new Float64Array(10),
+        rhsOld: new Float64Array(10),
+        rhs: new Float64Array(10),
         cktMode: MODEDCOP | MODEINITFLOAT,
         dt: 0,
         method: "trapezoidal" as const,
@@ -927,7 +929,8 @@ function makeParityCtx(
 ) {
   return {
     solver,
-    voltages,
+    rhsOld: voltages,
+    rhs: voltages,
     cktMode: opts.cktMode ?? (MODEDCOP | MODEINITFLOAT),
     dt: opts.dt ?? 0,
     method: "trapezoidal" as const,
@@ -1163,7 +1166,8 @@ describe("diode MODEINITSMSIG seeding (dioload.c:126-127)", () => {
 
     core.load({
       solver,
-      voltages: new Float64Array([5.0, 0]), // large jump — would limit if not SMSIG
+      rhsOld: new Float64Array([5.0, 0]), // large jump — would limit if not SMSIG
+      rhs: new Float64Array([5.0, 0]),
       cktMode: MODEDCOP | MODEINITSMSIG,
       dt: 0,
       method: "trapezoidal" as const,
@@ -1202,7 +1206,8 @@ describe("diode MODEINITSMSIG seeding (dioload.c:126-127)", () => {
 
     core.load({
       solver,
-      voltages: new Float64Array([0.3, 0]),
+      rhsOld: new Float64Array([0.3, 0]),
+      rhs: new Float64Array([0.3, 0]),
       cktMode: MODEAC | MODEINITSMSIG,
       dt: 1e-9,
       method: "trapezoidal" as const,
@@ -1243,7 +1248,8 @@ describe("diode MODEINITSMSIG seeding (dioload.c:126-127)", () => {
 
     core.load({
       solver,
-      voltages: new Float64Array([0.3, 0]),
+      rhsOld: new Float64Array([0.3, 0]),
+      rhs: new Float64Array([0.3, 0]),
       cktMode: MODETRANOP | MODEUIC | MODEINITJCT,
       dt: 1e-9,
       method: "trapezoidal" as const,
@@ -1279,7 +1285,8 @@ describe("diode MODEINITSMSIG seeding (dioload.c:126-127)", () => {
 
     core.load({
       solver,
-      voltages: new Float64Array([0.3, 0]),
+      rhsOld: new Float64Array([0.3, 0]),
+      rhs: new Float64Array([0.3, 0]),
       cktMode: MODEDCOP | MODEINITFLOAT,
       dt: 0,
       method: "trapezoidal" as const,

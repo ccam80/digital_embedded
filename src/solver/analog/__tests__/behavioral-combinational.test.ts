@@ -438,7 +438,8 @@ describe("Task 6.4.3 — combinational pin loading propagates", () => {
     const ag = new Float64Array(7);
     const ctx: LoadContext = {
       solver: solver as any,
-      voltages: new Float64Array(16),
+      rhsOld: new Float64Array(16),
+      rhs: new Float64Array(16),
       cktMode: MODETRAN | MODEINITFLOAT,
       dt: 0,
       method: "trapezoidal" as const,

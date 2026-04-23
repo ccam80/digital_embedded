@@ -98,7 +98,7 @@ export class BehavioralJKAsyncFlipflopElement implements AnalogElementCore {
    * accepted solution voltages.
    */
   accept(ctx: LoadContext, _simTime: number, _addBreakpoint: (t: number) => void): void {
-    const voltages = ctx.voltages;
+    const voltages = ctx.rhs;
 
     const currentClockV = readMnaVoltage(this._clockPin.nodeId, voltages);
 

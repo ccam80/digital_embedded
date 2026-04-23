@@ -225,7 +225,7 @@ export function createOpenCollectorComparatorElement(
 
     load(ctx: LoadContext): void {
       const solver = ctx.solver;
-      const voltages = ctx.voltages;
+      const voltages = ctx.rhsOld;
 
       // Hysteresis state update from current NR-iterate voltages.
       const vInp = readNode(voltages, nInp);
@@ -327,7 +327,7 @@ function createPushPullComparatorElement(
 
     load(ctx: LoadContext): void {
       const solver = ctx.solver;
-      const voltages = ctx.voltages;
+      const voltages = ctx.rhsOld;
 
       const vInp = readNode(voltages, nInp);
       const vInn = readNode(voltages, nInn);

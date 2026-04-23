@@ -339,11 +339,11 @@ export function makeDiode(
     setParam(_key: string, _value: number): void {},
 
     load(ctx: LoadContext): void {
-      const { solver, voltages, noncon } = ctx;
+      const { solver, rhsOld, noncon } = ctx;
 
-      // Update operating point: read voltages, limit, compute Shockley model.
-      const va = nodeAnode > 0 ? voltages[nodeAnode - 1] : 0;
-      const vc = nodeCathode > 0 ? voltages[nodeCathode - 1] : 0;
+      // Update operating point: read rhsOld (prior NR iterate), limit, compute Shockley model.
+      const va = nodeAnode > 0 ? rhsOld[nodeAnode - 1] : 0;
+      const vc = nodeCathode > 0 ? rhsOld[nodeCathode - 1] : 0;
       const vdRaw = va - vc;
       const vdOld = s0[base + SLOT_VD];
       const limResult = pnjlim(vdRaw, vdOld, nVt, vcrit);
@@ -370,9 +370,9 @@ export function makeDiode(
     },
 
     checkConvergence(ctx: LoadContext): boolean {
-      const { voltages } = ctx;
-      const va = nodeAnode > 0 ? voltages[nodeAnode - 1] : 0;
-      const vc = nodeCathode > 0 ? voltages[nodeCathode - 1] : 0;
+      const { rhsOld } = ctx;
+      const va = nodeAnode > 0 ? rhsOld[nodeAnode - 1] : 0;
+      const vc = nodeCathode > 0 ? rhsOld[nodeCathode - 1] : 0;
       const vdRaw = va - vc;
       const vdLim = s0[base + SLOT_VD];
       return Math.abs(vdLim - vdRaw) <= 2 * nVt;
@@ -438,13 +438,13 @@ export function makeCapacitor(
     setParam(_key: string, _value: number): void {},
 
     load(ctx: LoadContext): void {
-      const { solver, voltages, ag } = ctx;
+      const { solver, rhsOld, ag } = ctx;
       const mode = ctx.cktMode;
 
       if (!(mode & MODETRAN)) return;
 
-      const vA = nodeA > 0 ? voltages[nodeA - 1] : 0;
-      const vB = nodeB > 0 ? voltages[nodeB - 1] : 0;
+      const vA = nodeA > 0 ? rhsOld[nodeA - 1] : 0;
+      const vB = nodeB > 0 ? rhsOld[nodeB - 1] : 0;
       const vcap = vA - vB;
 
       if (mode & MODEINITPRED) {
@@ -484,9 +484,9 @@ export function makeCapacitor(
     accept(ctx: LoadContext): void {
       // Advance history: q2 becomes q3, q1 becomes q2, current q0 becomes q1.
       // Also roll ccap into ccapPrev so TRAP order 2 recursion (niinteg.c:32) works.
-      const { voltages } = ctx;
-      const vA = nodeA > 0 ? voltages[nodeA - 1] : 0;
-      const vB = nodeB > 0 ? voltages[nodeB - 1] : 0;
+      const { rhs } = ctx;
+      const vA = nodeA > 0 ? rhs[nodeA - 1] : 0;
+      const vB = nodeB > 0 ? rhs[nodeB - 1] : 0;
       q3 = q2;
       q2 = q1;
       q1 = capacitance * (vA - vB);
@@ -559,7 +559,7 @@ export function makeInductor(
     setParam(_key: string, _value: number): void {},
 
     load(ctx: LoadContext): void {
-      const { solver, voltages, ag } = ctx;
+      const { solver, rhsOld, ag } = ctx;
       const mode = ctx.cktMode;
       const k = branchIdx;
 
@@ -568,7 +568,7 @@ export function makeInductor(
       if (nodeB !== 0) S(solver, nodeB - 1, k, -1);
 
       if (mode & MODETRAN) {
-        const iNow = voltages[k];
+        const iNow = rhsOld[k];
 
         if (mode & MODEINITPRED) {
           phi0 = phi1;
@@ -604,8 +604,8 @@ export function makeInductor(
     },
 
     accept(ctx: LoadContext): void {
-      const { voltages } = ctx;
-      const iNow = voltages[branchIdx];
+      const { rhs } = ctx;
+      const iNow = rhs[branchIdx];
       phi2 = phi1;
       phi1 = inductance * iNow;
       companionActive = true;

@@ -161,7 +161,7 @@ function swLoad(
   //   v_ctrl = voltages[nCtrl-1] - 0
   // invertCtrl for SPDT COM-NC path:
   // // digiTS extension beyond ngspice SW primitive — see F4b-composite discussion
-  const voltages = ctx.voltages;
+  const voltages = ctx.rhsOld;
   let v_ctrl = nCtrl > 0 ? voltages[nCtrl - 1] : 0;
   if (invertCtrl) v_ctrl = -v_ctrl;
 

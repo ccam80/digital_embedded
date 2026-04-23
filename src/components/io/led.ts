@@ -243,7 +243,7 @@ function createLedAnalogElement(
       const s2 = pool.states[2];
       const s3 = pool.states[3];
 
-      const voltages = ctx.voltages;
+      const voltages = ctx.rhsOld;
       const nVt = params.N * LED_VT;
       const vcrit = nVt * Math.log(nVt / (params.IS * Math.SQRT2));
 
@@ -340,7 +340,7 @@ function createLedAnalogElement(
       if (pnjlimLimited) return false;
 
       const s0 = pool.states[0];
-      const voltages = ctx.voltages;
+      const voltages = ctx.rhsOld;
       const va = nodeAnode > 0 ? voltages[nodeAnode - 1] : 0;
       const vc = nodeCathode > 0 ? voltages[nodeCathode - 1] : 0;
       const vdRaw = va - vc;

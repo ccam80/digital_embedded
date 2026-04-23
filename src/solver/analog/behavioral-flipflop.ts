@@ -148,7 +148,7 @@ export class BehavioralDFlipflopElement implements AnalogElementCore {
    *   6. Delegate companion updates to pin models.
    */
   accept(ctx: LoadContext, _simTime: number, _addBreakpoint: (t: number) => void): void {
-    const voltages = ctx.voltages;
+    const voltages = ctx.rhs;
 
     const clockNodeId = this._clockPin.nodeId;
     const dNodeId = this._dPin.nodeId;

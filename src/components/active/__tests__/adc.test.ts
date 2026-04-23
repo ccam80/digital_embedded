@@ -132,7 +132,7 @@ function makeAcceptCtx(voltages: Float64Array, dt: number): LoadContext {
     branchCount: 0,
   }) as unknown as LoadContext;
   // Mutate fields that makeSimpleCtx's default values leave at DC-OP settings.
-  (ctx as { voltages: Float64Array }).voltages = voltages;
+  ctx.rhs = voltages;
   (ctx as { dt: number }).dt = dt;
   (ctx as { cktMode: number }).cktMode = MODETRAN | MODEINITFLOAT;
   return ctx;

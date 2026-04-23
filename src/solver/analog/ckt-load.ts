@@ -52,7 +52,6 @@ export function cktLoad(ctx: CKTCircuitContext): void {
   ctx.solver.beginAssembly(ctx.matrixSize);
 
   // Step 2: propagate per-call context scalars to loadCtx.
-  ctx.loadCtx.voltages = ctx.rhsOld;
   ctx.loadCtx.cktMode  = ctx.cktMode;   // single source of truth (F3/F4).
   ctx.loadCtx.srcFact  = ctx.srcFact;
   ctx.loadCtx.gmin     = ctx.diagonalGmin;

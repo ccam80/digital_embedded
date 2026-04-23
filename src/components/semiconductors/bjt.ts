@@ -808,7 +808,7 @@ export function createBjtElement(
       const s0 = pool.states[0];
       const s1 = pool.states[1];
       const mode = ctx.cktMode;
-      const voltages = ctx.voltages;
+      const voltages = ctx.rhsOld;
 
       // bjtload.c:236-322: linearization voltage dispatch per cktMode.
       let vbeRaw: number;
@@ -963,7 +963,7 @@ export function createBjtElement(
       const s0 = pool.states[0];
       if (params.OFF && (ctx.cktMode & (MODEINITFIX | MODEINITSMSIG))) return true;
 
-      const voltages = ctx.voltages;
+      const voltages = ctx.rhsOld;
       const vB = nodeB > 0 ? voltages[nodeB - 1] : 0;
       const vC = nodeC > 0 ? voltages[nodeC - 1] : 0;
       const vE = nodeE > 0 ? voltages[nodeE - 1] : 0;
@@ -1213,7 +1213,7 @@ export function createSpiceL1BjtElement(
       const s1 = pool.states[1];
       const s2 = pool.states[2];
       const s3 = pool.states[3];
-      const voltages = ctx.voltages;
+      const voltages = ctx.rhsOld;
       const solver = ctx.solver;
       const mode = ctx.cktMode;
       const m = params.M;
@@ -1766,7 +1766,7 @@ export function createSpiceL1BjtElement(
       const s0 = pool.states[0];
       if (params.OFF && (ctx.cktMode & (MODEINITFIX | MODEINITSMSIG))) return true;
 
-      const voltages = ctx.voltages;
+      const voltages = ctx.rhsOld;
       const vBi = nodeB_int > 0 ? voltages[nodeB_int - 1] : 0;
       const vCi = nodeC_int > 0 ? voltages[nodeC_int - 1] : 0;
       const vEi = nodeE_int > 0 ? voltages[nodeE_int - 1] : 0;

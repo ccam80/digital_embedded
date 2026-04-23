@@ -122,8 +122,8 @@ function computeIp(vpk: number, vgk: number, props?: PropertyBag): number {
   // with incrementing voltages converge the internal (vgk, vpk, op) state.
   const steps = 20;
   for (let i = 1; i <= steps; i++) {
-    ctx.loadCtx.voltages[0] = vpk * i / steps;
-    ctx.loadCtx.voltages[1] = vgk * i / steps;
+    ctx.loadCtx.rhsOld[0] = vpk * i / steps;
+    ctx.loadCtx.rhsOld[1] = vgk * i / steps;
     elem.load(ctx.loadCtx);
   }
 
@@ -250,8 +250,8 @@ describe("Triode", () => {
         matrixSize: 2,
         nodeCount: 2,
       });
-      ctx.loadCtx.voltages[0] = 100; // V_P
-      ctx.loadCtx.voltages[1] = 1.0; // V_G (V_GK = 1V since K=ground)
+      ctx.loadCtx.rhsOld[0] = 100; // V_P
+      ctx.loadCtx.rhsOld[1] = 1.0; // V_G (V_GK = 1V since K=ground)
 
       // Converge operating point via repeated load() calls (triode's load
       // clamps per-iteration V_GK step internally).
@@ -288,8 +288,8 @@ describe("Triode", () => {
         matrixSize: 2,
         nodeCount: 2,
       });
-      ctx.loadCtx.voltages[0] = 100;
-      ctx.loadCtx.voltages[1] = 1.0; // V_GK = 1V > 0
+      ctx.loadCtx.rhsOld[0] = 100;
+      ctx.loadCtx.rhsOld[1] = 1.0; // V_GK = 1V > 0
 
       for (let i = 0; i < 5; i++) {
         elem.load(ctx.loadCtx);
@@ -333,8 +333,8 @@ describe("Triode", () => {
 
         // Move toward target (simulate NR update: converging from 0 to target)
         const alpha = (iter + 1) / maxIter;
-        ctx.loadCtx.voltages[0] = targetVpk * alpha;
-        ctx.loadCtx.voltages[1] = targetVgk * alpha;
+        ctx.loadCtx.rhsOld[0] = targetVpk * alpha;
+        ctx.loadCtx.rhsOld[1] = targetVgk * alpha;
 
         elem.load(ctx.loadCtx);
 

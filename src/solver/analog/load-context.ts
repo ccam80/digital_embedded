@@ -9,7 +9,7 @@
  *   CKTmode     -> cktMode
  *   CKTmatrix   -> solver (the SparseSolver owns the MNA matrix)
  *   CKTrhs      -> rhs
- *   CKTrhsOld   -> rhsOld (alias: voltages — NR iterate)
+ *   CKTrhsOld   -> rhsOld (prior NR iterate)
  *   CKTtime     -> time
  *   CKTdelta    -> delta (alias: dt)
  *   CKTintegrateMethod -> method
@@ -76,15 +76,9 @@ export interface LoadContext {
    * value is identical to ctx.solver (same SparseSolver instance).
    */
   matrix: SparseSolver;
-  /**
-   * Previous NR iteration voltages (ngspice CKTrhsOld).
-   * Kept as `voltages` historically; element code reads through this alias
-   * and/or `rhsOld` — both point at the same Float64Array on the ckt.
-   */
-  voltages: Float64Array;
-  /** Current NR iteration voltages (ngspice CKTrhs). */
+  /** Current NR solution vector (ngspice CKTrhs). Read inside accept() methods. */
   rhs: Float64Array;
-  /** Previous NR iteration voltages (ngspice CKTrhsOld). Alias for `voltages`. */
+  /** Previous NR iteration voltages / prior iterate (ngspice CKTrhsOld). Read inside load() methods. */
   rhsOld: Float64Array;
   /** Current simulation time in seconds (ngspice CKTtime). */
   time: number;

@@ -106,9 +106,9 @@ function driveToOp(element: AnalogElement, vA: number, vB: number, iterations = 
       matrixSize: 2,
       nodeCount: 2,
     });
-    // ctx.voltages is the rhsOld buffer; overwrite it so the diac sees (vA, vB).
-    ctx.loadCtx.voltages[0] = vA;
-    ctx.loadCtx.voltages[1] = vB;
+    // ctx.rhsOld is the load-phase voltage buffer; overwrite it so the diac sees (vA, vB).
+    ctx.loadCtx.rhsOld[0] = vA;
+    ctx.loadCtx.rhsOld[1] = vB;
     element.load(ctx.loadCtx);
     voltages[0] = vA;
     voltages[1] = vB;
@@ -131,8 +131,8 @@ function getCurrentAtV(element: AnalogElement, v: number): number {
     matrixSize: 2,
     nodeCount: 2,
   });
-  ctx.loadCtx.voltages[0] = v;
-  ctx.loadCtx.voltages[1] = 0;
+  ctx.loadCtx.rhsOld[0] = v;
+  ctx.loadCtx.rhsOld[1] = 0;
   element.load(ctx.loadCtx);
 
   // geq is the (0,0) diagonal entry, ieq = RHS[0] (negated)
@@ -242,18 +242,18 @@ describe("Diac", () => {
       nodeCount: 3,
     });
     for (let i = 0; i < 200; i++) {
-      drivingCtx.loadCtx.voltages[0] = 0;    // MT1
-      drivingCtx.loadCtx.voltages[1] = 100;  // MT2 (100V positive)
-      drivingCtx.loadCtx.voltages[2] = 0.65; // Gate (forward-biased, simulating diac delivery)
+      drivingCtx.loadCtx.rhsOld[0] = 0;    // MT1
+      drivingCtx.loadCtx.rhsOld[1] = 100;  // MT2 (100V positive)
+      drivingCtx.loadCtx.rhsOld[2] = 0.65; // Gate (forward-biased, simulating diac delivery)
       triacEl.load(drivingCtx.loadCtx);
     }
 
     // Verify triac is now conducting (high conductance) via a fresh capture.
     const { solver: readoutSolver, stamps } = makeCaptureSolver();
     drivingCtx.loadCtx.solver = readoutSolver;
-    drivingCtx.loadCtx.voltages[0] = 0;
-    drivingCtx.loadCtx.voltages[1] = 100;
-    drivingCtx.loadCtx.voltages[2] = 0.65;
+    drivingCtx.loadCtx.rhsOld[0] = 0;
+    drivingCtx.loadCtx.rhsOld[1] = 100;
+    drivingCtx.loadCtx.rhsOld[2] = 0.65;
     triacEl.load(drivingCtx.loadCtx);
 
     const diagMT = stamps.filter((s) => s.row === s.col && s.row < 2);

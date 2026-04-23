@@ -1009,7 +1009,7 @@ export function createMosfetElement(
       const s1 = pool.states[1];
       const s2 = pool.states[2];
       const mode = ctx.cktMode;
-      const voltages = ctx.voltages;
+      const voltages = ctx.rhsOld;
       const solver = ctx.solver;
 
       // mos1load.c:107: vt = CONSTKoverQ * MOS1temp — device-level thermal voltage.
@@ -1636,7 +1636,7 @@ export function createMosfetElement(
       // mos1conv.c: MOS1convTest early-return on INITFIX/INITSMSIG w/ OFF.
       if (params.OFF && (ctx.cktMode & (MODEINITFIX | MODEINITSMSIG))) return true;
 
-      const voltages = ctx.voltages;
+      const voltages = ctx.rhsOld;
       const vB = nodeB > 0 ? voltages[nodeB - 1] : 0;
       const vS_v = nodeS > 0 ? voltages[nodeS - 1] : 0;
       const vG_v = nodeG > 0 ? voltages[nodeG - 1] : 0;

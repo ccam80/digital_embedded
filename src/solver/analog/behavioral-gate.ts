@@ -95,7 +95,7 @@ export class BehavioralGateElement implements AnalogElementCore {
   }
 
   load(ctx: LoadContext): void {
-    const voltages = ctx.voltages;
+    const voltages = ctx.rhsOld;
 
     // Evaluate each input's logic level from the current NR iterate, latching
     // on indeterminate to prevent oscillation as inputs traverse the threshold.
@@ -120,7 +120,7 @@ export class BehavioralGateElement implements AnalogElementCore {
 
   accept(ctx: LoadContext, _simTime: number, _addBreakpoint: (t: number) => void): void {
     if (ctx.dt <= 0) return;
-    const voltages = ctx.voltages;
+    const voltages = ctx.rhs;
     for (const inp of this._inputs) {
       const v = readMnaVoltage(inp.nodeId, voltages);
       inp.accept(ctx, v);

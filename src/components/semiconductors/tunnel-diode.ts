@@ -246,7 +246,7 @@ export function createTunnelDiodeElement(
       const s2 = pool.states[2];
       const s3 = pool.states[3];
 
-      const voltages = ctx.voltages;
+      const voltages = ctx.rhsOld;
       const vA = nodeAnode   > 0 ? voltages[nodeAnode   - 1] : 0;
       const vC = nodeCathode > 0 ? voltages[nodeCathode - 1] : 0;
       const vdRaw = vA - vC;
@@ -328,7 +328,7 @@ export function createTunnelDiodeElement(
 
     checkConvergence(ctx: LoadContext): boolean {
       const s0 = pool.states[0];
-      const voltages = ctx.voltages;
+      const voltages = ctx.rhsOld;
       const vA = nodeAnode   > 0 ? voltages[nodeAnode   - 1] : 0;
       const vC = nodeCathode > 0 ? voltages[nodeCathode - 1] : 0;
       const vdRaw = vA - vC;

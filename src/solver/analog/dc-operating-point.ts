@@ -236,8 +236,8 @@ function dcopFinalize(
   // dcop.c:127 — flip INITF bits to MODEINITSMSIG; analysis bits stay as set
   // by the caller (MODEDCOP for standalone .OP).
   ctx.cktMode = setInitf(ctx.cktMode, MODEINITSMSIG);
-  // Elements read voltages via loadCtx.voltages — cktLoad sets that to
-  // ctx.rhsOld each call. Seed the converged solution.
+  // Elements read prior-iterate voltages via loadCtx.rhsOld. Seed with the
+  // converged solution so the final CKTload call sees the correct node voltages.
   ctx.rhsOld.set(voltages);
   // dcop.c:153 — one CKTload call. No factor, no solve, no iteration.
   cktLoad(ctx);

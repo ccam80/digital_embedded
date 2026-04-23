@@ -235,7 +235,7 @@ export function createZenerElement(
       const s0 = pool.states[0];
       const s1 = pool.states[1];
 
-      const voltages = ctx.voltages;
+      const voltages = ctx.rhsOld;
       const mode = ctx.cktMode;
 
       // -----------------------------------------------------------------------
@@ -402,7 +402,7 @@ export function createZenerElement(
       // dioload.c:411-416: CKTnoncon bump on pnjlim → non-convergence
       if (pnjlimLimited) return false;
 
-      const voltages = ctx.voltages;
+      const voltages = ctx.rhsOld;
       const va = nodeAnode > 0 ? voltages[nodeAnode - 1] : 0;
       const vc = nodeCathode > 0 ? voltages[nodeCathode - 1] : 0;
       const vdRaw = va - vc;

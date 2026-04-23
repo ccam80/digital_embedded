@@ -153,7 +153,7 @@ export function createDiacElement(
     isReactive: false,
 
     load(ctx: LoadContext): void {
-      const voltages = ctx.voltages;
+      const voltages = ctx.rhsOld;
       const vA = nodeA > 0 ? voltages[nodeA - 1] : 0;
       const vB = nodeB > 0 ? voltages[nodeB - 1] : 0;
       _v = vA - vB;
@@ -169,7 +169,7 @@ export function createDiacElement(
     },
 
     checkConvergence(ctx: LoadContext): boolean {
-      const voltages = ctx.voltages;
+      const voltages = ctx.rhsOld;
       const vA = nodeA > 0 ? voltages[nodeA - 1] : 0;
       const vB = nodeB > 0 ? voltages[nodeB - 1] : 0;
       const vRaw = vA - vB;

@@ -274,8 +274,8 @@ export class AnalogInductorElement implements ReactiveAnalogElementCore {
     // I-W3-1/I-W3-2: removed spurious (MODEDC & MODEINITJCT) arm from cond1;
     // UIC path moved inside the !(MODEDC|MODEINITPRED) gate per indload.c:44-46.
     // voltages[b] is ctx.rhsOld[b] (prior NR iterate branch current) — correct,
-    // matching CKTrhsOld + INDbrEq. The read is safe: cktLoad assigns
-    // loadCtx.voltages = ctx.rhsOld before every load() call (ckt-load.ts:55).
+    // matching CKTrhsOld + INDbrEq. loadCtx.rhsOld points at ctx.rhsOld
+    // (set at construction time in ckt-context.ts and never swung).
     if (!(mode & (MODEDC | MODEINITPRED))) {
       // indload.c:44-46: UIC path seeds flux from IC param.
       if ((mode & MODEUIC) && (mode & MODEINITTRAN) && !isNaN(this._IC)) {

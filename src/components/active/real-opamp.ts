@@ -424,7 +424,7 @@ export function createRealOpAmpElement(
 
     load(ctx: LoadContext): void {
       const solver = ctx.solver;
-      const voltages = ctx.voltages;
+      const voltages = ctx.rhsOld;
       const scale = ctx.srcFact;
       lastSrcFact = scale;
       const G_in   = 1 / Math.max(p.rIn,  1e-9);
@@ -549,7 +549,7 @@ export function createRealOpAmpElement(
       // Record the accepted-timestep vInt and output voltage so the next
       // step's BDF-1 history term uses the converged state.
       vIntPrev = vInt;
-      _vOutPrev = readNode(ctx.voltages, nOut);
+      _vOutPrev = readNode(ctx.rhs, nOut);
     },
 
     getPinCurrents(_voltages: Float64Array): number[] {

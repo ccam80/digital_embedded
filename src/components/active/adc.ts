@@ -383,7 +383,7 @@ function createADCElement(
     },
 
     accept(ctx: LoadContext, _simTime: number, _addBreakpoint: (t: number) => void): void {
-      const voltages = ctx.voltages;
+      const voltages = ctx.rhs;
       const dt = ctx.dt;
       const clkVoltage = readVoltage(voltages, nClk);
       const risingEdge = prevClkVoltage < p.vIH && clkVoltage >= p.vIH;

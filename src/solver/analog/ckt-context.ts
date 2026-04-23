@@ -557,7 +557,6 @@ export class CKTCircuitContext {
       cktMode: MODEDCOP | MODEINITFLOAT,
       solver: this._solver,
       matrix: this._solver,
-      voltages: this.rhsOld,
       rhs: this.rhs,
       rhsOld: this.rhsOld,
       time: 0,

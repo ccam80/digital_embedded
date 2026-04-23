@@ -256,7 +256,7 @@ export function createTriacElement(
       // Access state arrays at call time — no cached Float64Array refs.
       const s0 = pool.states[0];
 
-      const voltages = ctx.voltages;
+      const voltages = ctx.rhsOld;
       const v1 = nodeMT1 > 0 ? voltages[nodeMT1 - 1] : 0;
       const v2 = nodeMT2 > 0 ? voltages[nodeMT2 - 1] : 0;
       const vG = nodeG   > 0 ? voltages[nodeG   - 1] : 0;
@@ -339,7 +339,7 @@ export function createTriacElement(
       if (pnjlimLimited) return false;
 
       const s0 = pool.states[0];
-      const voltages = ctx.voltages;
+      const voltages = ctx.rhsOld;
       const v1 = nodeMT1 > 0 ? voltages[nodeMT1 - 1] : 0;
       const v2 = nodeMT2 > 0 ? voltages[nodeMT2 - 1] : 0;
       const vG = nodeG   > 0 ? voltages[nodeG   - 1] : 0;

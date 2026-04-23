@@ -193,7 +193,7 @@ export class SparkGapElement implements AnalogElementCore {
   }
 
   accept(ctx: LoadContext, _simTime: number, _addBreakpoint: (t: number) => void): void {
-    const voltages = ctx.voltages;
+    const voltages = ctx.rhs;
     const nPos = this.pinNodeIds[0];
     const nNeg = this.pinNodeIds[1];
     const vPos = nPos > 0 ? voltages[nPos - 1] : 0;

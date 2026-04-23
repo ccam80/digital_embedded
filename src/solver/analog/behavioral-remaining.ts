@@ -133,7 +133,7 @@ export function createDriverAnalogElement(
     isReactive: true,
 
     load(ctx: LoadContext): void {
-      const v = ctx.voltages;
+      const v = ctx.rhsOld;
 
       inputPin.load(ctx);
       selPin.load(ctx);
@@ -153,7 +153,7 @@ export function createDriverAnalogElement(
     },
 
     accept(ctx: LoadContext, _simTime: number, _addBreakpoint: (t: number) => void): void {
-      const v = ctx.voltages;
+      const v = ctx.rhs;
       inputPin.accept(ctx, readMnaVoltage(nodeIn, v));
       selPin.accept(ctx, readMnaVoltage(nodeSel, v));
       outputPin.accept(ctx, readMnaVoltage(nodeOut, v));
@@ -227,7 +227,7 @@ export function createDriverInvAnalogElement(
     isReactive: true,
 
     load(ctx: LoadContext): void {
-      const v = ctx.voltages;
+      const v = ctx.rhsOld;
 
       inputPin.load(ctx);
       selPin.load(ctx);
@@ -248,7 +248,7 @@ export function createDriverInvAnalogElement(
     },
 
     accept(ctx: LoadContext, _simTime: number, _addBreakpoint: (t: number) => void): void {
-      const v = ctx.voltages;
+      const v = ctx.rhs;
       inputPin.accept(ctx, readMnaVoltage(nodeIn, v));
       selPin.accept(ctx, readMnaVoltage(nodeSel, v));
       outputPin.accept(ctx, readMnaVoltage(nodeOut, v));
@@ -334,7 +334,7 @@ export function createSplitterAnalogElement(
     isReactive: true,
 
     load(ctx: LoadContext): void {
-      const v = ctx.voltages;
+      const v = ctx.rhsOld;
 
       for (const p of inputPins) p.load(ctx);
 
@@ -351,7 +351,7 @@ export function createSplitterAnalogElement(
     },
 
     accept(ctx: LoadContext, _simTime: number, _addBreakpoint: (t: number) => void): void {
-      const v = ctx.voltages;
+      const v = ctx.rhs;
       for (const p of inputPins) {
         p.accept(ctx, readMnaVoltage(p.nodeId, v));
       }
@@ -421,7 +421,7 @@ function createSegmentDiodeElement(
 
     load(ctx: LoadContext): void {
       const s = ctx.solver;
-      const voltages = ctx.voltages;
+      const voltages = ctx.rhsOld;
       const va = nodeAnode > 0 ? voltages[nodeAnode - 1] : 0;
       const vc = nodeCathode > 0 ? voltages[nodeCathode - 1] : 0;
       const vd = va - vc;
@@ -441,7 +441,7 @@ function createSegmentDiodeElement(
     },
 
     checkConvergence(ctx: LoadContext): boolean {
-      const voltages = ctx.voltages;
+      const voltages = ctx.rhsOld;
       const va = nodeAnode > 0 ? voltages[nodeAnode - 1] : 0;
       const vc = nodeCathode > 0 ? voltages[nodeCathode - 1] : 0;
       const vdRaw = va - vc;
@@ -578,7 +578,7 @@ export function createRelayAnalogElement(
 
     load(ctx: LoadContext): void {
       const s = ctx.solver;
-      const voltages = ctx.voltages;
+      const voltages = ctx.rhsOld;
 
       // Coil DC resistance stamps between coil1 and coil2
       stampG(s, nodeCoil1, nodeCoil2, 1 / rCoil);
@@ -606,7 +606,7 @@ export function createRelayAnalogElement(
     },
 
     accept(ctx: LoadContext, _simTime: number, _addBreakpoint: (t: number) => void): void {
-      const voltages = ctx.voltages;
+      const voltages = ctx.rhs;
       // Update inductor current from accepted solution
       if (L > 0 && ctx.dt > 0) {
         const vCoil1 = nodeCoil1 > 0 ? voltages[nodeCoil1 - 1] : 0;
@@ -688,7 +688,7 @@ export function createRelayDTAnalogElement(
 
     load(ctx: LoadContext): void {
       const s = ctx.solver;
-      const voltages = ctx.voltages;
+      const voltages = ctx.rhsOld;
 
       stampG(s, nodeCoil1, nodeCoil2, 1 / rCoil);
       stampG(s, nodeCommon, nodeThrow, gThrow());
@@ -708,7 +708,7 @@ export function createRelayDTAnalogElement(
     },
 
     accept(ctx: LoadContext, _simTime: number, _addBreakpoint: (t: number) => void): void {
-      const voltages = ctx.voltages;
+      const voltages = ctx.rhs;
       if (L > 0 && ctx.dt > 0) {
         const vCoil1 = nodeCoil1 > 0 ? voltages[nodeCoil1 - 1] : 0;
         const vCoil2 = nodeCoil2 > 0 ? voltages[nodeCoil2 - 1] : 0;

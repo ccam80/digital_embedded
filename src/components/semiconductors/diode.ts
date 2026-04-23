@@ -492,7 +492,7 @@ export function createDiodeElement(
       const s2 = pool.states[2];
       const s3 = pool.states[3];
 
-      const voltages = ctx.voltages;
+      const voltages = ctx.rhsOld;
       const mode = ctx.cktMode;   // F4: bitfield (ckt-mode.ts)
 
       // Select linearization voltage according to ngspice dioload.c:126-155.
@@ -777,7 +777,7 @@ export function createDiodeElement(
       // dioload.c:411-416: CKTnoncon bump on pnjlim → non-convergence
       if (pnjlimLimited) return false;
 
-      const voltages = ctx.voltages;
+      const voltages = ctx.rhsOld;
       const va = nodeJunction > 0 ? voltages[nodeJunction - 1] : 0;
       const vc = nodeCathode > 0 ? voltages[nodeCathode - 1] : 0;
       const vdRaw = va - vc;

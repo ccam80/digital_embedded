@@ -622,10 +622,9 @@ export class MNAEngine implements AnalogEngine {
 
     // Post-acceptance: notify elements (companion state, flux/charge history).
     // Matches ngspice DEVaccept — called once per accepted step.
-    // Point loadCtx.voltages at the accepted solution, and set dt to the
-    // accepted timestep, before calling accept().
+    // ctx.loadCtx.rhs already points at ctx.rhs (set at construction time in
+    // ckt-context.ts). Set dt to the accepted timestep before calling accept().
     const addBP = ctx.addBreakpointBound;
-    ctx.loadCtx.voltages = ctx.rhs;
     ctx.loadCtx.dt = this._lastDt;
     for (const el of elements) {
       if (el.accept) {

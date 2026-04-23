@@ -329,7 +329,7 @@ export class AnalogTransformerElement implements ReactiveAnalogElement {
     // Mutual factor scales by m too: MUTfactor = k*sqrt(L1_raw*L2_raw)/m = M_raw/m.
     const Mcoup = this._pair.m / m;
 
-    const voltages = ctx.voltages;
+    const voltages = ctx.rhsOld;
     const base = this.stateBaseOffset;
     const s0 = this._pool.states[0];
     const s1 = this._pool.states[1];

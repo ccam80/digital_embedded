@@ -320,7 +320,7 @@ function createDACElement(
 
     load(ctx: LoadContext): void {
       const solver = ctx.solver;
-      const voltages = ctx.voltages;
+      const voltages = ctx.rhsOld;
 
       _vOut = computeOutputVoltage(voltages);
 
@@ -340,7 +340,7 @@ function createDACElement(
 
     accept(ctx: LoadContext, _simTime: number, _addBreakpoint: (t: number) => void): void {
       if (ctx.dt <= 0) return;
-      const voltages = ctx.voltages;
+      const voltages = ctx.rhs;
       for (let i = 0; i < bits; i++) {
         const nD = nDigitalBits[i];
         if (nD > 0) {

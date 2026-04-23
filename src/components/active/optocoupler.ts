@@ -254,8 +254,8 @@ function createOptocouplerElement(
       // Jacobian reference current: iBase - gmCtr * (vA - vK) — linear part already
       // covered by stampG above, so the constant term is:
       //   iBase_norton = iBase - gmCtr * vd  where vd = vA - vK
-      const vA = nAnode   > 0 ? ctx.voltages[nAnode   - 1] : 0;
-      const vK = nCathode > 0 ? ctx.voltages[nCathode - 1] : 0;
+      const vA = nAnode   > 0 ? ctx.rhsOld[nAnode   - 1] : 0;
+      const vK = nCathode > 0 ? ctx.rhsOld[nCathode - 1] : 0;
       const vd = vA - vK;
       const iBaseNorton = iBase - gmCtr * vd;
       stampRHS(ctx.solver, nBase, iBaseNorton);

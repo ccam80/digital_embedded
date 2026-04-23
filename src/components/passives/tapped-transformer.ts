@@ -389,7 +389,7 @@ export class AnalogTappedTransformerElement implements ReactiveAnalogElement {
     if (ct !== 0) solver.stampElement(solver.allocElement(b3, ct - 1), 1);
     if (sec2 !== 0) solver.stampElement(solver.allocElement(b3, sec2 - 1), -1);
 
-    const voltages = ctx.voltages;
+    const voltages = ctx.rhsOld;
     const i1Now = voltages[b1];
     const i2Now = voltages[b2];
     const i3Now = voltages[b3];

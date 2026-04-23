@@ -123,7 +123,7 @@ export interface AnalogElementCore {
   /**
    * Primary hot-path method. Called every NR iteration.
    *
-   * Reads terminal voltages from ctx.voltages, evaluates device equations,
+   * Reads terminal voltages from ctx.rhsOld, evaluates device equations,
    * and stamps conductance and RHS contributions into ctx.solver. For reactive
    * elements, also integrates charge/flux inline using ctx.ag[]. Matches
    * ngspice DEVload.

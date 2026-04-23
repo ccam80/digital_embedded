@@ -202,7 +202,7 @@ function createOpAmpElement(
 
     load(ctx: LoadContext): void {
       const solver = ctx.solver;
-      const voltages = ctx.voltages;
+      const voltages = ctx.rhsOld;
       const scale = ctx.srcFact;
       lastSrcFact = scale;
       const G_out = 1 / Math.max(p.rOut, 1e-9);

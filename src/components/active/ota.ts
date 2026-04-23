@@ -175,7 +175,7 @@ function createOTAElement(
 
     load(ctx: LoadContext): void {
       const solver = ctx.solver;
-      const voltages = ctx.voltages;
+      const voltages = ctx.rhsOld;
       const twoVt = 2 * p.vt;
 
       // Read operating-point voltages

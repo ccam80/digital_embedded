@@ -238,7 +238,7 @@ export function createScrElement(
       // Access state arrays at call time — no cached Float64Array refs.
       const s0 = pool.states[0];
 
-      const voltages = ctx.voltages;
+      const voltages = ctx.rhsOld;
       let vakRaw: number;
       let vgkRaw: number;
       if (primedVak !== null) {
@@ -333,7 +333,7 @@ export function createScrElement(
       if (pnjlimLimited) return false;
 
       const s0 = pool.states[0];
-      const voltages = ctx.voltages;
+      const voltages = ctx.rhsOld;
       const vA = nodeA > 0 ? voltages[nodeA - 1] : 0;
       const vK = nodeK > 0 ? voltages[nodeK - 1] : 0;
       const vG = nodeG > 0 ? voltages[nodeG - 1] : 0;

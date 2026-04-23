@@ -510,7 +510,7 @@ function createTimer555Element(
     },
 
     load(ctx: LoadContext): void {
-      const voltages = ctx.voltages;
+      const voltages = ctx.rhsOld;
 
       // ---------------------------------------------------------------
       // Update output pin voltage levels from current rail voltages.
@@ -612,8 +612,8 @@ function createTimer555Element(
     },
 
     accept(ctx: LoadContext, _simTime: number, _addBreakpoint: (t: number) => void): void {
-      updateOutputPinLevels(ctx.voltages);
-      advanceFlipflop(ctx.voltages);
+      updateOutputPinLevels(ctx.rhs);
+      advanceFlipflop(ctx.rhs);
       // Forward accept() to comparator sub-elements for responseTime integration
       comp1Sub.accept?.(ctx, _simTime, _addBreakpoint);
       comp2Sub.accept?.(ctx, _simTime, _addBreakpoint);

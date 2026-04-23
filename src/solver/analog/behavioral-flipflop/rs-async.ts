@@ -85,7 +85,7 @@ export class BehavioralRSAsyncLatchElement implements AnalogElementCore {
    * accepted timestep with the accepted solution voltages.
    */
   accept(ctx: LoadContext, _simTime: number, _addBreakpoint: (t: number) => void): void {
-    const voltages = ctx.voltages;
+    const voltages = ctx.rhs;
 
     const sV = readMnaVoltage(this._sPin.nodeId, voltages);
     const rV = readMnaVoltage(this._rPin.nodeId, voltages);

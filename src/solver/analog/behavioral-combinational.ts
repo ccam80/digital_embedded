@@ -86,7 +86,7 @@ export class BehavioralMuxElement implements AnalogElementCore {
   }
 
   load(ctx: LoadContext): void {
-    const voltages = ctx.voltages;
+    const voltages = ctx.rhsOld;
 
     // Decode selector bits into an integer
     let sel = 0;
@@ -122,7 +122,7 @@ export class BehavioralMuxElement implements AnalogElementCore {
 
   accept(ctx: LoadContext, _simTime: number, _addBreakpoint: (t: number) => void): void {
     if (ctx.dt <= 0) return;
-    const voltages = ctx.voltages;
+    const voltages = ctx.rhs;
     for (const p of this._selPins) {
       p.accept(ctx, readMnaVoltage(p.nodeId, voltages));
     }
@@ -211,7 +211,7 @@ export class BehavioralDemuxElement implements AnalogElementCore {
   }
 
   load(ctx: LoadContext): void {
-    const voltages = ctx.voltages;
+    const voltages = ctx.rhsOld;
 
     // Decode selector
     let sel = 0;
@@ -243,7 +243,7 @@ export class BehavioralDemuxElement implements AnalogElementCore {
 
   accept(ctx: LoadContext, _simTime: number, _addBreakpoint: (t: number) => void): void {
     if (ctx.dt <= 0) return;
-    const voltages = ctx.voltages;
+    const voltages = ctx.rhs;
     for (const p of this._selPins) {
       p.accept(ctx, readMnaVoltage(p.nodeId, voltages));
     }
@@ -320,7 +320,7 @@ export class BehavioralDecoderElement implements AnalogElementCore {
   }
 
   load(ctx: LoadContext): void {
-    const voltages = ctx.voltages;
+    const voltages = ctx.rhsOld;
 
     // Decode selector
     let sel = 0;
@@ -346,7 +346,7 @@ export class BehavioralDecoderElement implements AnalogElementCore {
 
   accept(ctx: LoadContext, _simTime: number, _addBreakpoint: (t: number) => void): void {
     if (ctx.dt <= 0) return;
-    const voltages = ctx.voltages;
+    const voltages = ctx.rhs;
     for (const p of this._selPins) {
       p.accept(ctx, readMnaVoltage(p.nodeId, voltages));
     }

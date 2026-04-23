@@ -133,7 +133,7 @@ export abstract class ControlledSourceElement implements AnalogElementCore {
    * Matches ngspice DEVload one-call-per-iteration dispatch.
    */
   load(ctx: LoadContext): void {
-    this._bindContext(ctx.voltages);
+    this._bindContext(ctx.rhsOld);
     this._stampLinear(ctx.solver);
     const value = this._compiledExpr(this._ctx);
     const deriv = this._compiledDeriv(this._ctx);

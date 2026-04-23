@@ -123,7 +123,7 @@ export class BridgeOutputAdapter implements AnalogElement {
   accept(ctx: LoadContext, _simTime: number, _addBreakpoint: (t: number) => void): void {
     if (!this._pinModel.loaded || this._pinModel.capacitance <= 0) return;
     if (!(ctx.cktMode & MODETRAN)) return;
-    const v = readMnaVoltage(this._pinModel.nodeId, ctx.voltages);
+    const v = readMnaVoltage(this._pinModel.nodeId, ctx.rhs);
     this._pinModel.accept(ctx, v);
   }
 
@@ -218,7 +218,7 @@ export class BridgeInputAdapter implements AnalogElement {
   accept(ctx: LoadContext, _simTime: number, _addBreakpoint: (t: number) => void): void {
     if (!this._pinModel.loaded || this._pinModel.capacitance <= 0) return;
     if (!(ctx.cktMode & MODETRAN)) return;
-    const v = readMnaVoltage(this._pinModel.nodeId, ctx.voltages);
+    const v = readMnaVoltage(this._pinModel.nodeId, ctx.rhs);
     this._pinModel.accept(ctx, v);
   }
 

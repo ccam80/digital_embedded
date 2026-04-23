@@ -190,7 +190,7 @@ export function createTriodeElement(
     isReactive: false,
 
     load(ctx: LoadContext): void {
-      const voltages = ctx.voltages;
+      const voltages = ctx.rhsOld;
       const vP = nodeP > 0 ? voltages[nodeP - 1] : 0;
       const vG = nodeG > 0 ? voltages[nodeG - 1] : 0;
       const vK = nodeK > 0 ? voltages[nodeK - 1] : 0;
@@ -268,7 +268,7 @@ export function createTriodeElement(
     },
 
     checkConvergence(ctx: LoadContext): boolean {
-      const voltages = ctx.voltages;
+      const voltages = ctx.rhsOld;
       const vP = nodeP > 0 ? voltages[nodeP - 1] : 0;
       const vG = nodeG > 0 ? voltages[nodeG - 1] : 0;
       const vK = nodeK > 0 ? voltages[nodeK - 1] : 0;

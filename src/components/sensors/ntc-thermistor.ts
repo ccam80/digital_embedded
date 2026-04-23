@@ -219,7 +219,7 @@ export class NTCThermistorElement implements AnalogElementCore {
     if (!this._selfHeating) return;
 
     const dt = ctx.dt;
-    const voltages = ctx.voltages;
+    const voltages = ctx.rhs;
     const nPos = this.pinNodeIds[0];
     const nNeg = this.pinNodeIds[1];
     const vPos = nPos > 0 ? voltages[nPos - 1] : 0;

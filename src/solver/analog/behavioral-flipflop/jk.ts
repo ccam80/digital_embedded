@@ -90,7 +90,7 @@ export class BehavioralJKFlipflopElement implements AnalogElementCore {
    * — called once per accepted timestep with the accepted solution voltages.
    */
   accept(ctx: LoadContext, _simTime: number, _addBreakpoint: (t: number) => void): void {
-    const voltages = ctx.voltages;
+    const voltages = ctx.rhs;
 
     const currentClockV = readMnaVoltage(this._clockPin.nodeId, voltages);
 

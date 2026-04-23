@@ -145,7 +145,7 @@ export class MemristorElement implements AnalogElementCore {
   /**
    * Euler forward integration of the state variable w once per accepted timestep.
    * The engine calls accept() exactly once per accepted step with the converged
-   * terminal voltages on ctx.voltages.
+   * terminal voltages on ctx.rhs.
    *
    *   dw/dt = µ_v · R_on / D² · i(t) · f_p(w)
    *   f_p(w) = 1 − (2w − 1)^(2p)
@@ -153,7 +153,7 @@ export class MemristorElement implements AnalogElementCore {
   accept(ctx: LoadContext, _simTime: number, _addBreakpoint: (t: number) => void): void {
     const nA = this.pinNodeIds[0];
     const nB = this.pinNodeIds[1];
-    const voltages = ctx.voltages;
+    const voltages = ctx.rhs;
     const vA = nA > 0 ? voltages[nA - 1] : 0;
     const vB = nB > 0 ? voltages[nB - 1] : 0;
     const vAB = vA - vB;

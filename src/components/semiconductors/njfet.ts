@@ -339,7 +339,7 @@ export function createNJfetElement(
       const s1 = pool.states[1];
       const s2 = pool.states[2];
       const mode = ctx.cktMode;
-      const voltages = ctx.voltages;
+      const voltages = ctx.rhsOld;
       const solver = ctx.solver;
       const m = params.M;
 

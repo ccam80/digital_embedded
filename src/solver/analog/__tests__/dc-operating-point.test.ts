@@ -75,8 +75,8 @@ function makeGminDependentElement(nodeA: number, nodeB: number = 0): AnalogEleme
 
     load(ctx: import("../load-context.js").LoadContext): void {
       const { solver } = ctx;
-      const vA = nodeA === 0 ? 0 : ctx.voltages[nodeA - 1];
-      const vB = nodeB === 0 ? 0 : ctx.voltages[nodeB - 1];
+      const vA = nodeA === 0 ? 0 : ctx.rhsOld[nodeA - 1];
+      const vB = nodeB === 0 ? 0 : ctx.rhsOld[nodeB - 1];
       const v = vA - vB;
       // Shockley diode residual — ill-conditioned at diagonalGmin=0, solvable
       // once ctx.diagonalGmin > 0 (stamped atomically inside SparseSolver.factor).
@@ -141,8 +141,8 @@ function makeSrcSteppingRequiredElement(nodeA: number, nodeB: number = 0): Analo
 
     load(ctx: import("../load-context.js").LoadContext): void {
       const { solver } = ctx;
-      const vA = nodeA === 0 ? 0 : ctx.voltages[nodeA - 1];
-      const vB = nodeB === 0 ? 0 : ctx.voltages[nodeB - 1];
+      const vA = nodeA === 0 ? 0 : ctx.rhsOld[nodeA - 1];
+      const vB = nodeB === 0 ? 0 : ctx.rhsOld[nodeB - 1];
       const v = vA - vB;
       // Pathological Shockley residual scaled by source-stepping factor
       // (ctx.srcFact == ngspice CKTsrcFact). Large Is_scaled at full scale

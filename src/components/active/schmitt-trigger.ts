@@ -153,7 +153,7 @@ function createSchmittTriggerElement(
     isReactive: true,
 
     load(ctx: LoadContext): void {
-      const voltages = ctx.voltages;
+      const voltages = ctx.rhsOld;
       const vIn = readNode(voltages, nIn);
 
       // Apply hysteresis state machine
@@ -172,7 +172,7 @@ function createSchmittTriggerElement(
 
     accept(ctx: LoadContext, _simTime: number, _addBreakpoint: (t: number) => void): void {
       if (ctx.dt <= 0) return;
-      const voltages = ctx.voltages;
+      const voltages = ctx.rhs;
       if (nOut > 0) {
         outModel.accept(ctx, readNode(voltages, nOut));
       }

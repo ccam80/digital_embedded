@@ -362,7 +362,7 @@ class SegmentInductorElement implements ReactiveAnalogElement {
     const s1 = this._pool.states[1];
     const s2 = this._pool.states[2];
     const s3 = this._pool.states[3];
-    const iNow = ctx.voltages[b];
+    const iNow = ctx.rhsOld[b];
 
     // Flux update guard mirrors !(MODEDC|MODEINITPRED) from indload.c:43.
     const mode = ctx.cktMode;
@@ -461,7 +461,7 @@ class SegmentCapacitorElement implements ReactiveAnalogElement {
     if (!(mode & (MODETRAN | MODETRANOP))) return;
     const solver = ctx.solver;
     const n0 = this.pinNodeIds[0];
-    const vNow = n0 > 0 ? ctx.voltages[n0 - 1] : 0;
+    const vNow = n0 > 0 ? ctx.rhsOld[n0 - 1] : 0;
     const C = this.C;
     const base = this.stateBaseOffset;
     const s0 = this._pool.states[0];
@@ -572,7 +572,7 @@ class CombinedRLElement implements ReactiveAnalogElement {
     const s1 = this._pool.states[1];
     const s2 = this._pool.states[2];
     const s3 = this._pool.states[3];
-    const iNow = ctx.voltages[b];
+    const iNow = ctx.rhsOld[b];
 
     // Flux update guard mirrors !(MODEDC|MODEINITPRED) from indload.c:43.
     const mode = ctx.cktMode;
