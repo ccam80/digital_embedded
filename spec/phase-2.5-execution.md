@@ -62,23 +62,25 @@
 | W2.4 | Aggressive I1 test regeneration | ✓ | d24840ec + 24440b4a |
 | W3 | Post-A1 static audit — 24 parallel lanes → `spec/post-a1-parity.md` | ✓ | 42f9b5dd |
 | W4.A | A1 gate — stamp-semantics verify + LoadContext field audit | ✓ | d23f3ebd |
-| W4.B.1 | Diode — W3 findings D-W3-1..7 (IKF/IKR, MODEINITPRED cascade, SLOT_V verify, BV_given, sidewall, tunnel) | — | — |
-| W4.B.2 | Zener — W3 findings Z-W3-1..9 (three-region + tBV pulled forward from 4.3.3) | — | — |
-| W4.B.3 | Polarized-cap — W3 findings PC-W3-1..6 (clamp diode + F4b parity test) | — | — |
-| W4.B.4 | Inductor — W3 findings I-W3-1/2/3/5 (rhsOld + alias verification + SLOT_VOLT) | — | — |
-| W4.B.5 | Transformer — W3 findings T-W3-1..6 (branchCount + NIintegrate + UIC) | — | — |
-| W4.B.6 | Tapped-transformer — W3 findings TT-W3-1..6 (branchCount + two-pass flux + SLOT_VOLT) | — | — |
-| W4.B.7 | Capacitor — W3 findings C-W3-2, C-W3-3 (m-at-stamp + niIntegrate validation) | — | — |
-| W4.B.8 | MOSFET — W3 findings M-W3-1..6 (cktFixLimit + icheckLimited + tGamma + noncon) | — | — |
-| W4.B.9 | BJT — W3 findings B-W3-1..5 (AREA + evsub clamp + Phase-5 cross-refs pulled forward) | — | — |
-| W4.B.10 | JFET — W3 findings J-W3-1..3 (SMSIG return + noncon gate + RD/RS stamps) | — | — |
-| W4.C.1 | F4c ngspice framing strip — NTC + spark-gap (4 files) | — | — |
-| W4.C.2 | L3 DLL hard-fail gates — buckbjt smoke + convergence tests | — | — |
-| W4.C.3 | L3 silent I/O catches → logged warnings — 29 sites / 9 files | — | — |
-| W4.C.4 | L2 stale test deletions — 5 approved line ranges (polarized-cap, capacitor, crystal) | — | — |
-| W4.D | C-4 lifecycle verifier — `initVoltages` caller-chain + behavioral-* audit | — | — |
-| W4.close | Phase 2.5 closure commit — post-a1-parity.md §§5–6 updated, D-8 canary resolved | — | — |
+| W4.B.1 | Diode — W3 findings D-W3-1..7 | ✓ | 0a339e17 + 9a87d910 + 4331f406 + 16147871 (bundled; per-finding verified) |
+| W4.B.2 | Zener — W3 findings Z-W3-1..9 | ✓ | 4331f406 + 16147871 (bundled; per-finding verified) |
+| W4.B.3 | Polarized-cap — W3 findings PC-W3-1..6 | ✓ | 2947096e |
+| W4.B.4 | Inductor — W3 findings I-W3-1/2/3/5 + architectural alias delete | ✓ | 4331f406 (I-W3-2/3/5) + a029864f (voltages→rhsOld/rhs; closes I-W3-1 at architectural level) + 2f51a96e (delta/agVector dead-alias hygiene) |
+| W4.B.5 | Transformer — W3 findings T-W3-1..6 | ✓ | 9a87d910 + 4331f406 + 16147871 (bundled; per-finding verified) |
+| W4.B.6 | Tapped-transformer — W3 findings TT-W3-1..6 | ✓ | 9a87d910 + 4331f406 (bundled; per-finding verified) |
+| W4.B.7 | Capacitor — W3 findings C-W3-2, C-W3-3 | ✓ | 0a339e17 + 9a87d910 + 54340d3e (follow-up: _computeEffectiveC deleted per user Option A) |
+| W4.B.8 | MOSFET — W3 findings M-W3-1..6 | ✓ | 4331f406 + 2d503294 (M-W3-4 spec citation error, params.GAMMA is ngspice-correct; D-8 carried forward) |
+| W4.B.9 | BJT — W3 findings B-W3-1..5 | ✓ | 4331f406 |
+| W4.B.10 | JFET — W3 findings J-W3-1..3 (N+P) | ✓ | 9a87d910 (njfet) + 4331f406 (pjfet) |
+| W4.C.1 | F4c ngspice framing strip — NTC + spark-gap | ✓ | 0a339e17 |
+| W4.C.2 | L3 DLL hard-fail gates | ✓ | 9a87d910 |
+| W4.C.3 | L3 silent I/O catches → logged warnings | ✓ | 4331f406 |
+| W4.C.4 | L2 stale test deletions | ✓ | 7218f0ee |
+| W4.D | C-4 lifecycle verifier — `initVoltages` caller-chain | ✓ | 4331f406 (bundled) |
+| W4.close | Phase 2.5 closure commit — post-a1-parity.md §§5–6 updated, D-8 carried forward | — | — |
 | W5 | `spec/phase-3-onwards.md` — re-author 77 surviving plan.md Phase 3–9 tasks | — | — |
+
+**W4 attribution note (2026-04-24):** parallel execution of the 15 W4 lanes on a shared working tree caused `git add`-scope collisions — multiple agents staged each other's in-progress edits, so several W4.B.* device-port changes landed inside commits labelled W4.C.*. Per-finding correctness verified by the W4 verifier pass; authoritative attribution table lives in `spec/post-a1-parity.md §6 (W4 closure)`.
 
 Legend: `—` = not started, `▶` = in progress, `✓` = complete.
 

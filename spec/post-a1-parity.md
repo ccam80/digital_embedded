@@ -306,7 +306,7 @@ The original 7 post-A1 deferrals:
 |---|---|---|---|
 | A-1 | njfet.ts banned `Math.min(expArg, 80)` clamp removal | Grep `Math\.min\([^)]*80\)` in `njfet.ts` → 0 hits | **CLOSED** |
 | A-2 | pjfet.ts same banned clamp | Grep same in `pjfet.ts` → 0 hits | **CLOSED** |
-| C-4 | `behavioral-flipflop.ts` `_prevClockVoltage` seeded by a new `initState()` method | W4.D verified: `analog-engine.ts:_seedFromDcop` (lines 1172–1176) calls `initVoltages(ctx.rhs)` on every element after `ctx.rhs.set(result.nodeVoltages)` and before the mode bits flip to `MODETRAN\|MODEINITTRAN`. Sequence is correct. Audit of `_prev[A-Z]` across all `behavioral-flipflop/` subdirectory classes found 5 classes with `_prevClockVoltage = 0` and no `initVoltages`: `BehavioralJKFlipflopElement`, `BehavioralRSFlipflopElement`, `BehavioralTFlipflopElement`, `BehavioralDAsyncFlipflopElement`, `BehavioralJKAsyncFlipflopElement`. `initVoltages(rhs)` added to all five (commit: Phase 2.5 W4.D). `BehavioralRSAsyncLatchElement` has no clock pin and no `_prevClockVoltage` — N/A. | **CLOSED** — W4.D commit. |
+| C-4 | `behavioral-flipflop.ts` `_prevClockVoltage` seeded by a new `initState()` method | W4.D verified: `analog-engine.ts:_seedFromDcop` (lines 1172–1176) calls `initVoltages(ctx.rhs)` on every element after `ctx.rhs.set(result.nodeVoltages)` and before the mode bits flip to `MODETRAN\|MODEINITTRAN`. Sequence is correct. Initialiser audit across `behavioral-flipflop/*.ts` + root `behavioral-flipflop.ts` + `behavioral-sequential.ts`: the base `behavioral-flipflop.ts` class initialises `_prevClockVoltage = NaN` (suppresses first-call edge via `Number.isNaN` guard); the 5 subclass files (`jk.ts`, `rs.ts`, `t.ts`, `d-async.ts`, `jk-async.ts`) and 3 `behavioral-sequential.ts` instances initialised `_prevClockVoltage = 0`, relying on DC-OP clock voltage being below `vIH` — fragile. `initVoltages(rhs)` added to all 5 subclasses (commit `4331f406` bundle) so each seeds the field from the DC-OP solution before first transient step. `behavioral-sequential.ts` already had `initVoltages` × 3 (lines 97, 256, 500). `BehavioralRSAsyncLatchElement` has no clock pin and no `_prevClockVoltage` — N/A. | **CLOSED** — commit `4331f406` (bundled under W4.C.3 by parallel-execution collision; attribution per W4.close table in §6). |
 | C-5 | `ckt-mode.ts::isDcop()` helper uses `MODEDC` mask (0x70), not `MODEDCOP` (standalone) | `ckt-mode.ts:106-108`: `export function isDcop(mode: number): boolean { return (mode & MODEDC) !== 0; }` — CORRECT | **CLOSED** |
 | D-1 | diode.ts banned `Math.min(vd/nVt, 700)` clamp removal | Grep `Math\.min\([^)]*700\)` in `diode.ts` → 0 hits | **CLOSED** |
 | D-8 | MOSFET `cgs_cgd_transient_matches_ngspice_mos1` regression (-3.5e-12 delta) | Slot `SLOT_CAP_IEQ_DB` that held the value excised by A1; quantity now embedded in `niIntegrate` output at `mosfet.ts:1340–1388`. Static analysis cannot resolve. No harness run performed during W4.B.8 (user ruling 2026-04-24 defers to Phase 6 measurement pass). | **CARRIED FORWARD to Phase 6 as PARITY ticket.** Measurement task: post-Phase-6 harness comparison of MOSFET `cgs_cgd_transient` test against ngspice bit-exact. If zero delta: item closes. If non-zero: file PARITY ticket against the Phase-6 MOSFET `load()`. |
@@ -361,13 +361,36 @@ Next document: **`spec/phase-3-onwards.md`**. Re-authors surviving plan.md Phase
 - `spec/plan-addendum.md` (87 surviving post-A1 tasks across Phases 3–9)
 - `spec/architectural-alignment.md` (30 approved items)
 
+### W4 closure attribution table (2026-04-24)
+
+Parallel execution of the 15 W4 lanes on a shared working tree caused `git add`-scope collisions: multiple agents staged each other's in-progress edits, so several W4.B.* device-port changes landed inside commits labelled W4.C.*. Code correctness verified per-finding by the W4 verifier pass; attribution here is authoritative.
+
+| Lane | Findings | Landing commit(s) | Verifier verdict |
+|---|---|---|---|
+| W4.B.1 diode | D-W3-1..7 | `0a339e17` (partial), `9a87d910` (partial), `4331f406` (partial), `16147871` (tail) | PASS |
+| W4.B.2 zener | Z-W3-1..9 | `4331f406` (bundle), `16147871` (tail) | PASS |
+| W4.B.3 polarized-cap | PC-W3-1..6 | `2947096e` | PASS |
+| W4.B.4 inductor | I-W3-1/2/3/5 + architectural fix | `4331f406` (I-W3-2/3/5), `a029864f` (alias delete — I-W3-1 closed via voltages→rhsOld/rhs naming, removes invariant dependency), `2f51a96e` (delta/agVector dead-alias hygiene) | PASS (after architectural fix) |
+| W4.B.5 transformer | T-W3-1..6 + coupled-inductor dead-code | `9a87d910` (partial), `4331f406` (partial), `16147871` (tail) | PASS |
+| W4.B.6 tapped-transformer | TT-W3-1..6 | `9a87d910`, `4331f406` | PASS |
+| W4.B.7 capacitor | C-W3-2, C-W3-3 | `0a339e17` (partial), `9a87d910` (ni-integrate.ts throws), `54340d3e` (_computeEffectiveC delete per user Option A) | PASS (after follow-up) |
+| W4.B.8 MOSFET | M-W3-1..6 + M-W3-4 closed as spec citation error | `4331f406`, `2d503294` (spec patch) | PASS (5 findings VERIFIED; M-W3-4 closed — params.GAMMA is ngspice-correct; D-8 carried forward) |
+| W4.B.9 BJT | B-W3-1..5 | `4331f406` | PASS |
+| W4.B.10 JFET | J-W3-1/2/3 (N + P) | `9a87d910` (njfet), `4331f406` (pjfet) | PASS |
+| W4.C.1 F4c framing strip | ntc-thermistor, spark-gap | `0a339e17` | PASS |
+| W4.C.2 DLL hard-fail gates | buckbjt smoke + convergence | `9a87d910` | PASS |
+| W4.C.3 L3 silent I/O catches | 29 sites / 9 files | `4331f406` | PASS |
+| W4.C.4 L2 stale test deletions | polarized-cap, capacitor, crystal | `7218f0ee` | PASS |
+| W4.D C-4 lifecycle verifier | 5 behavioral-flipflop initVoltages | `4331f406` (bundle) | PASS (code correct; commit attribution bundled) |
+| Architectural follow-up | voltages alias delete, delta/agVector hygiene | `a029864f`, `2f51a96e` | PASS (replaces the cosmetic-rename outcome with an architectural rename that removes the trap class) |
+
 ### Phase 2.5 completion gate
 
-Four items before Phase 2.5 can be declared complete and Phase 3+ can open:
+1. ~~User review of CRITICAL items~~ — DONE 2026-04-22/24 (user rulings per spec §6.9).
+2. ~~L3 follow-up lane commits its residue table~~ — DONE via W4.C.1..3.
+3. ~~L2 partial-deletion commit lands~~ — DONE via W4.C.4 (`7218f0ee`).
+4. `spec/phase-3-onwards.md` drafted and committed — W5 work, opens now.
 
-1. User review of CRITICAL items (decide fix-now-standalone vs bundle-into-Phase-3+, per-item).
-2. L3 follow-up lane commits its residue table, §3 of this file updates.
-3. L2 partial-deletion commit lands after user approval.
-4. `spec/phase-3-onwards.md` drafted and committed.
+All §§1–4 findings resolved (CLOSED or carried forward explicitly). D-8 is the only carry-forward, converted to a Phase 6 PARITY ticket per user ruling 2026-04-24.
 
-Once all four land: `Phase 2.5 complete — Track A landed, post-A1 PARITY list captured` commit. Phase 3+ opens.
+**Phase 2.5 complete.** Phase 3+ authoring (W5) opens.
