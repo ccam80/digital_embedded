@@ -60,7 +60,25 @@
 | W2.2 | Control-flow fixes — C1, C2, C3, D1, H1, H2 | ✓ | 7dadd629 |
 | W2.3 | `InitMode` string deletion (production + harness) | ✓ | ab8552e4 |
 | W2.4 | Aggressive I1 test regeneration | ✓ | d24840ec + 24440b4a |
-| W3 | Wrap-up — convergence harness run + user review | — | — |
+| W3 | Post-A1 static audit — 24 parallel lanes → `spec/post-a1-parity.md` | ✓ | 42f9b5dd |
+| W4.A | A1 gate — stamp-semantics verify + LoadContext field audit | ✓ | d23f3ebd |
+| W4.B.1 | Diode — W3 findings D-W3-1..7 (IKF/IKR, MODEINITPRED cascade, SLOT_V verify, BV_given, sidewall, tunnel) | — | — |
+| W4.B.2 | Zener — W3 findings Z-W3-1..9 (three-region + tBV pulled forward from 4.3.3) | — | — |
+| W4.B.3 | Polarized-cap — W3 findings PC-W3-1..6 (clamp diode + F4b parity test) | — | — |
+| W4.B.4 | Inductor — W3 findings I-W3-1/2/3/5 (rhsOld + alias verification + SLOT_VOLT) | — | — |
+| W4.B.5 | Transformer — W3 findings T-W3-1..6 (branchCount + NIintegrate + UIC) | — | — |
+| W4.B.6 | Tapped-transformer — W3 findings TT-W3-1..6 (branchCount + two-pass flux + SLOT_VOLT) | — | — |
+| W4.B.7 | Capacitor — W3 findings C-W3-2, C-W3-3 (m-at-stamp + niIntegrate validation) | — | — |
+| W4.B.8 | MOSFET — W3 findings M-W3-1..6 (cktFixLimit + icheckLimited + tGamma + noncon) | — | — |
+| W4.B.9 | BJT — W3 findings B-W3-1..5 (AREA + evsub clamp + Phase-5 cross-refs pulled forward) | — | — |
+| W4.B.10 | JFET — W3 findings J-W3-1..3 (SMSIG return + noncon gate + RD/RS stamps) | — | — |
+| W4.C.1 | F4c ngspice framing strip — NTC + spark-gap (4 files) | — | — |
+| W4.C.2 | L3 DLL hard-fail gates — buckbjt smoke + convergence tests | — | — |
+| W4.C.3 | L3 silent I/O catches → logged warnings — 29 sites / 9 files | — | — |
+| W4.C.4 | L2 stale test deletions — 5 approved line ranges (polarized-cap, capacitor, crystal) | — | — |
+| W4.D | C-4 lifecycle verifier — `initVoltages` caller-chain + behavioral-* audit | — | — |
+| W4.close | Phase 2.5 closure commit — post-a1-parity.md §§5–6 updated, D-8 canary resolved | — | — |
+| W5 | `spec/phase-3-onwards.md` — re-author 77 surviving plan.md Phase 3–9 tasks | — | — |
 
 Legend: `—` = not started, `▶` = in progress, `✓` = complete.
 
@@ -516,6 +534,321 @@ Generated: <date> | Input: W3 L1a + L1b + L1c + L2 + L3 audit outputs
 ### 6.8 Why not run the harness
 
 Convergence verification is a Phase 9 acceptance concern. Running the harness now produces timeouts, not signal — BJT/MOSFET/JFET cannot converge until Phases 5/6/7 re-author their surviving REWRITE tasks against post-A1 `load()`. The 8-circuit bit-exact harness (plan.md Appendix A) is the right and only place for convergence proof, after Phase 3+ lands. The original W3 design conflated that acceptance gate with the post-Phase-2.5 handoff.
+
+### 6.9 W4 — post-a1-parity.md closure (15 parallel lanes)
+
+**Precondition:** W3 static audit complete (commit `42f9b5dd` — `spec/post-a1-parity.md` landed). A1 gate commit `d23f3ebd` verified:
+- `stampElement` / `stampRHS` semantics are **ADDITIVE** (matches ngspice `*ptr += val`). Documented at `src/solver/analog/sparse-solver.ts:62`.
+- `LoadContext.rhsOld` already present; `LoadContext.cktFixLimit` added at every construction site. Engine site at `ckt-context.ts:556-582` threads real Float64Arrays. 35 test-fixture sites default-filled `cktFixLimit: false`.
+- Verdict: **GO** for all W4.B / W4.C / W4.D lanes.
+
+**User rulings (2026-04-22):** every ambiguity in `spec/post-a1-parity.md` resolves to **match ngspice**. No items deferred. Specifically:
+
+1. PC-W3-1 clamp-diode node choice: **nPos / nNeg** (ngspice has no ESR internal node).
+2. TT-W3-5 flux expression: **two-pass self + mutual** (ngspice structure).
+3. C-W3-2 multiplicity `m`: **apply at stamp time** (ngspice structure; removes hot-reload footgun).
+4. D-W3-4 vestigial SLOT_V: **grep-verify reads outside `load()` + harness; delete if unused** (no ngspice analog).
+5. D-W3-5 BV_given flag: **add** (ngspice uses `DIObreakdownVoltageGiven`).
+6. D-W3-6 / D-W3-7 sidewall + tunnel current: **port verbatim from `dioload.c:209-285`**.
+7. Z-W3-5 tBV temperature scaling: **pulled forward into W4.B.2** (was plan-addendum 4.3.3).
+8. B-W3-3 / B-W3-4 / B-W3-5 BJT Phase-5 cross-refs: **pulled forward into W4.B.9**.
+9. C-4 lifecycle verifier (D1): **spawn now (W4.D)**.
+
+**Spawning protocol:** A1 gate (W4.A) is landed. All W4.B.x + W4.C.x + W4.D lanes may spawn in parallel. Each lane owns its file surface — no merge contention. One commit per lane, per §1 principle 6. Expected fleet: 10 sonnet device lanes + 3 haiku support lanes + 1 haiku L2-deletion lane + 1 sonnet verifier = 15 parallel agents.
+
+**Per-lane common rules (in addition to §1 and §8):**
+- Banned closing verdicts: *mapping*, *tolerance*, *close enough*, *equivalent to*, *pre-existing*, *intentional divergence*, *citation divergence*, *partial*. Escalate to user instead.
+- No self-correction for convergence. If a port does not converge, surface and stop.
+- Cite ngspice by file:line in every numerical change.
+- Use `Grep` / `Glob` / `Read` / `Edit` — never bash `grep` / `find` / `rg`.
+- A1 gate verdict is binding: stamps are additive. Do not re-verify.
+- Tests may fail during and after the wave. Delete per A1 §Test handling rule; do not modify code to chase a test.
+- Each lane reads `spec/post-a1-parity.md §<device-section>` for the authoritative finding list + remedies + verify-greps. This spec references them by ID; `post-a1-parity.md` is the full row detail.
+
+---
+
+#### W4.A — A1 gate (landed)
+
+**Commit:** `d23f3ebd` (2026-04-22). Stamp semantics ADDITIVE; LoadContext fields wired. GO for downstream.
+
+---
+
+#### W4.B device re-port lanes (sonnet, fully parallel)
+
+Each lane owns one device file surface. Bundles every `post-a1-parity.md §1.<device>` finding — CRITICAL through LOW — into one commit.
+
+##### W4.B.1 — Diode
+
+**Files:** `src/components/semiconductors/diode.ts`, `src/components/semiconductors/__tests__/diode.test.ts`
+**Findings (`post-a1-parity.md §1.1`):** D-W3-1, D-W3-2, D-W3-3, D-W3-4, D-W3-5, D-W3-6, D-W3-7
+**Source:** `ref/ngspice/src/spicelib/devices/dio/dioload.c` (full `DIOload`, lines 21–445)
+**Scope:**
+- IKF/IKR Norton-pair re-derivation per `dioload.c:292-312` (D-W3-1, D-W3-2)
+- MODEINITPRED cascade cleanup per `dioload.c:141-149` (D-W3-3)
+- Grep-verify SLOT_V reads outside `load()` + harness mappings; delete slot + write if zero hits (D-W3-4)
+- Add `BV_given` flag mirroring ngspice `DIObreakdownVoltageGiven` (D-W3-5)
+- Port sidewall current block verbatim from `dioload.c:209-243` — `csatsw`, `cdsw`, `gdsw`, `DIOswEmissionCoeff` + schema additions (D-W3-6)
+- Port tunnel current block verbatim from `dioload.c:267-285` — `DIOtunSatSWCur`, `DIOtunSatCur` + schema additions (D-W3-7)
+
+**Commit:** `Phase 2.5 W4.B.1 — diode W3 findings + sidewall/tunnel port`
+
+##### W4.B.2 — Zener
+
+**Files:** `src/components/semiconductors/zener.ts`, `src/components/semiconductors/__tests__/zener.test.ts`
+**Findings (`post-a1-parity.md §1.2`):** Z-W3-1 through Z-W3-9 (all)
+**Source:** `dioload.c:126-312`, `dio/diosetup.c` (temperature scaling)
+**Scope:**
+- Three-region structure (forward / reverse-cubic / breakdown) per `dioload.c:245-265` (Z-W3-1, Z-W3-2)
+- GMIN Norton pair per `dioload.c:297-299` (Z-W3-3)
+- 4-branch MODEINITJCT dispatch per `dioload.c:130-138` mirroring post-W1.1 diode (Z-W3-4)
+- **Pulled forward from plan-addendum 4.3.3:** tBV temperature scaling from `dio/diosetup.c` — replace every `params.BV` with `tBV` in breakdown paths (Z-W3-5)
+- Breakdown pnjlim `vcrit` using `nbvVt` per `dioload.c:189-190` (Z-W3-6)
+- state0 GMIN-adjusted writes per `dioload.c:417-419` (Z-W3-7)
+- MODEINITSMSIG branch per `dioload.c:126-128` (Z-W3-8)
+- MODEINITTRAN state1 seed per `dioload.c:128-129` (Z-W3-9)
+
+**Commit:** `Phase 2.5 W4.B.2 — zener three-region + tBV + SMSIG/INITTRAN branches`
+
+##### W4.B.3 — Polarized-cap
+
+**Files:** `src/components/passives/polarized-cap.ts`, `src/components/passives/__tests__/polarized-cap.test.ts`
+**Findings (`post-a1-parity.md §1.4`):** PC-W3-1 through PC-W3-6 (PC-W3-2 / PC-W3-3 already scoped with gate fixes; do them in this lane)
+**Source:** `cap/capload.c`, `dio/dioload.c:245-265`
+**User ruling:** clamp-diode nodes = **nPos / nNeg** (full terminal).
+**Scope:**
+- Inline reverse-bias clamp diode between nPos / nNeg, Shockley forward/reverse per `dioload.c:245-265` (PC-W3-1)
+- Outer gate add `MODEAC` per `capload.c:30` (PC-W3-2)
+- Inner fork add `MODEAC` per `capload.c:52` (PC-W3-3)
+- F4b parity harness test — compare matrix entries for cap-body + clamp diode against ngspice bit-exact (PC-W3-4)
+- `IC` (alias `initCond`) param, default 0 (PC-W3-5)
+- `M` multiplicity param — apply at stamp time per user ruling 3 (PC-W3-6)
+
+**Commit:** `Phase 2.5 W4.B.3 — polarized-cap clamp diode + F4b completion`
+
+##### W4.B.4 — Inductor
+
+**Files:** `src/components/passives/inductor.ts`, `src/components/passives/__tests__/inductor.test.ts`
+**Findings (`post-a1-parity.md §1.5`):** I-W3-1, I-W3-2, I-W3-3, I-W3-5
+**Source:** `ind/indload.c:41-123`
+
+**CRITICAL ALIAS CHECK — read before patching I-W3-1:** `src/solver/analog/load-context.ts:80-88` documents `voltages` and `rhsOld` as **aliases for the same Float64Array** ("both point at the same Float64Array on the ckt"). If runtime confirms this aliasing, the I-W3-1 remedy (`voltages[b]` → `ctx.rhsOld[b]`) is a cosmetic rename and the real bug is elsewhere — re-diagnose by reading the NR swap logic in `src/solver/analog/newton-raphson.ts` and `src/solver/analog/ckt-context.ts`. Candidates: reading `ctx.rhs[b]` (current iterate) when `ctx.rhsOld[b]` (prior accepted) is intended; or swap ordering where the prior-accepted solution is overwritten before the flux write reads it. **Escalate if the real fix does not land at `inductor.ts:285-289`** — do not close the item with a cosmetic rename.
+
+**Scope:**
+- I-W3-1: verify aliasing, then apply real fix (aligned with `indload.c:43-51`)
+- Remove spurious `MODEDC & MODEINITJCT` arm per `indload.c:43-44` (I-W3-2)
+- Add SLOT_VOLT s0→s1 copy on MODEINITTRAN per `indload.c:114-117` (I-W3-3)
+- Restructure state-copy ordering to mirror ngspice per `indload.c:88-123` (I-W3-5)
+
+**Commit:** `Phase 2.5 W4.B.4 — inductor rhsOld fix + state-copy ordering`
+
+##### W4.B.5 — Transformer
+
+**Files:** `src/components/passives/transformer.ts`, `src/components/passives/coupled-inductor.ts` (dead-code cleanup), `src/components/passives/__tests__/transformer.test.ts`
+**Findings (`post-a1-parity.md §1.6`):** T-W3-1, T-W3-2, T-W3-3, T-W3-4, T-W3-5, T-W3-6
+**Source:** `ind/indload.c:41-123` (inline MUTUAL block)
+**Scope:**
+- `branchCount: 1 → 2` at modelRegistry entry (T-W3-1)
+- Integration gate `!(MODEDC)` per `indload.c:88` (T-W3-2)
+- Replace manual ag-expansion with SLOT_CCAP1 / SLOT_CCAP2 + two `niIntegrate()` calls; mutual companion `g12 = ag[0] * M` per `indload.c:74-75, 108` (T-W3-3)
+- `IC1` / `IC2` params + MODEUIC flux seed per `indload.c:44-46` (T-W3-4)
+- `M` multiplicity param — apply at stamp time per user ruling 3 (T-W3-5)
+- SLOT_VOLT1 / SLOT_VOLT2 + MODEINITTRAN copy per `indload.c:114-116` (T-W3-6)
+- Delete `coupled-inductor.ts::CoupledInductorState` + `createState()` (dead code flagged in `post-a1-parity.md §1.6` extra observation)
+
+**Commit:** `Phase 2.5 W4.B.5 — transformer NIintegrate + UIC + branchCount`
+
+##### W4.B.6 — Tapped-transformer
+
+**Files:** `src/components/passives/tapped-transformer.ts`, `src/components/passives/__tests__/tapped-transformer.test.ts`
+**Findings (`post-a1-parity.md §1.7`):** TT-W3-1, TT-W3-2, TT-W3-3, TT-W3-4, TT-W3-5, TT-W3-6
+**Source:** `ind/indload.c:41-123`
+**User ruling:** TT-W3-5 flux = **two-pass** (self-loop + mutual-loop per ngspice).
+**Scope:**
+- `branchCount: 1 → 3` (TT-W3-1)
+- MODEINITTRAN flux-copy ordering restructure (copy happens after NIintegrate) per `indload.c` (TT-W3-2)
+- Integration gate `!(MODEDC)` (TT-W3-3)
+- SLOT_VOLT1/2/3 slots + MODEINITTRAN copy per `indload.c:114-116` (TT-W3-4)
+- Split combined flux into two-pass (TT-W3-5)
+- `setParam` closure-override warning comment (TT-W3-6)
+
+**Commit:** `Phase 2.5 W4.B.6 — tapped-transformer two-pass flux + branchCount + SLOT_VOLT`
+
+##### W4.B.7 — Capacitor
+
+**Files:** `src/components/passives/capacitor.ts`, `src/components/passives/__tests__/capacitor.test.ts`, `src/solver/analog/ni-integrate.ts`
+**Findings (`post-a1-parity.md §1.3`):** C-W3-2, C-W3-3 (C-W3-1 closed by W4.A gate — stamps are additive)
+**Source:** `cap/capload.c:30-77`
+**User ruling:** C-W3-2 = **Option A** (apply `m` at stamp time).
+**Scope:**
+- Apply `m` at stamp sites per `capload.c:44` — pass `m * geq`, `m * ceq` to `solver.stampElement` / `stampRHS`. Remove `_computeEffectiveC()` fold; `C` is param-raw throughout (C-W3-2)
+- Add `throw` in `ni-integrate.ts` GEAR branch for unsupported order / method per `capload.c:69` error path (C-W3-3)
+
+**Commit:** `Phase 2.5 W4.B.7 — capacitor m-at-stamp + niIntegrate order validation`
+
+##### W4.B.8 — MOSFET
+
+**Files:** `src/components/semiconductors/mosfet.ts`, `src/components/semiconductors/__tests__/mosfet.test.ts`
+**Findings (`post-a1-parity.md §1.9`):** M-W3-1, M-W3-2, M-W3-3, M-W3-4, M-W3-5, M-W3-6
+**Source:** `mos1/mos1load.c` full `MOS1load`, `mos1/mos1temp.c:167`
+
+**Sequencing within lane:** M-W3-2 (declare `icheckLimited` as local, reset per call) MUST land before M-W3-6 (gate bump on it). Otherwise M-W3-6 gates on stale closure state.
+
+**Scope:**
+- `cktFixLimit` guard on reverse `limvds` per `mos1load.c:385` (M-W3-1; LoadContext field already wired by W4.A)
+- `icheckLimited` local reset per `load()` call per `mos1load.c:108` (M-W3-2)
+- MODEINITSMSIG **included** in limiting per `mos1load.c:354-406` — remove MODEINITSMSIG from skip-set guard (M-W3-3)
+- `von` gamma temperature-correction — read `computeTempParams`; add `tGamma` per `mos1temp.c:167` if absent; use it in `von` formula per `mos1load.c:507` (M-W3-4)
+- CQGS/CQGD/CQGB zero-outs into MODETRAN `else` branch per `mos1load.c:875-877` (M-W3-5)
+- noncon gate per `mos1load.c:739-743` — `if (params.OFF === 0 || !(mode & (MODEINITFIX | MODEINITSMSIG)))` (M-W3-6; must follow M-W3-2)
+
+**Commit:** `Phase 2.5 W4.B.8 — MOSFET icheckLimited + tGamma + noncon gate`
+
+##### W4.B.9 — BJT
+
+**Files:** `src/components/semiconductors/bjt.ts`, `src/components/semiconductors/__tests__/bjt.test.ts`
+**Findings (`post-a1-parity.md §1.8`):** B-W3-1, B-W3-2, B-W3-3, B-W3-4, B-W3-5 (B-W3-3..5 pulled forward from Phase 5 per user ruling 8)
+**Source:** `bjt/bjtload.c:488, 525, 583-585, 749, 780`
+**Scope:**
+- `czsub = tp.tSubcap * params.AREA` per `bjtload.c:583-585` (B-W3-1)
+- `evsub` exp-arg clamp to `MAX_EXP_ARG=709` per `bjtload.c:488` (B-W3-2; ngspice-source clamp — NOT a banned per-junction clamp à la D-1, the guard is literally in ngspice)
+- Remove `ctx.delta > 0` conjunction from excess-phase gate per `bjtload.c:525` (B-W3-3; from plan-addendum 5.2.10)
+- `noncon++` gate on `!(MODEINITFIX && BJToff)` per `bjtload.c:749` (B-W3-4; from plan-addendum 5.1.4 / 5.2.4)
+- Add `GX` slot to BJT_SIMPLE_SCHEMA, write `s0[SLOT_GX]=0` in L0 `load()` per `bjtload.c:780` (B-W3-5)
+
+**Commit:** `Phase 2.5 W4.B.9 — BJT AREA + evsub clamp + Phase-5 cross-refs pulled forward`
+
+##### W4.B.10 — JFET
+
+**Files:** `src/components/semiconductors/njfet.ts`, `src/components/semiconductors/pjfet.ts`, `src/components/semiconductors/__tests__/jfet.test.ts`
+**Findings (`post-a1-parity.md §1.10`):** J-W3-1, J-W3-2, J-W3-3 (both N and P variants)
+**Source:** `jfet/jfetload.c:463-466, 498-508, 536-539`
+**Scope:**
+- Add `return` after `s0[SLOT_QGS/QGD]` writes under MODEINITSMSIG per `jfetload.c:463-466` — skip stamps. Both files. (J-W3-1)
+- noncon gate `if (!(mode & MODEINITFIX) | !(mode & MODEUIC))` per `jfetload.c:498-508` — **bitwise-OR (`|`), not logical-OR (`||`)** — replicate the ngspice quirk exactly. Both files. (J-W3-2)
+- Stamp `gdpr` / `gspr` — for collapsed prime↔external nodes, 2 self-stamps: `if (gdpr > 0) stampG(nodeD, nodeD, +gdpr); if (gspr > 0) stampG(nodeS, nodeS, +gspr)`. Per `jfetload.c:536-539`. Both files. (J-W3-3)
+
+**Commit:** `Phase 2.5 W4.B.10 — JFET SMSIG return + noncon gate + RD/RS stamps`
+
+---
+
+#### W4.C support commits
+
+##### W4.C.1 — F4c ngspice framing strip (haiku)
+
+**Files:**
+- `src/components/sensors/ntc-thermistor.ts:20` — strip `(matches ngspice DEVload)` from comment
+- `src/components/sensors/__tests__/ntc-thermistor.test.ts:328, 362, 364` — strip NGSPICE-reference comments; rename `NGSPICE_G_REF` → `EXPECTED_G`
+- `src/components/sensors/spark-gap.ts:29` — same comment strip as NTC
+- `src/components/sensors/__tests__/spark-gap.test.ts:375, 407, 418, 422, 426, 429, 432` — strip NGSPICE-reference comments; rename `NGSPICE_G_REF` → `EXPECTED_G`
+
+**Rationale:** NTC + spark-gap are F4c APPROVED ACCEPT devices; citing ngspice's `resload.c` or `DEVload` frames them as ngspice ports, which violates `architectural-alignment.md §F4c §3`.
+
+**Commit:** `Phase 2.5 W4.C.1 — strip F4c ngspice framing from NTC + spark-gap`
+
+##### W4.C.2 — L3 DLL hard-fail gates (haiku)
+
+**Files:**
+- `src/solver/analog/__tests__/buckbjt-smoke.test.ts:19` — replace `catch { console.warn(...) }` with `throw new Error('ngspice DLL required for buckbjt smoke test')`
+- `src/solver/analog/__tests__/buckbjt-convergence.test.ts:53` — replace `describe.skip` with `throw new Error('ngspice DLL required for buckbjt convergence test')`
+
+**Rationale:** I1 policy — no silent suppression. Missing DLL in a harness test is a hard error, not a silent skip.
+
+**Commit:** `Phase 2.5 W4.C.2 — L3 DLL hard-fail gates`
+
+##### W4.C.3 — L3 silent I/O catches → logged warnings (haiku)
+
+**Files (29 sites across 9 files):**
+- `src/components/memory/rom.ts:118` — `catch (err) { console.warn('ROM serialized data corrupt', err); return null; }`
+- `src/components/memory/ram.ts:215` — same pattern
+- `src/components/memory/eeprom.ts:103` — same pattern
+- `src/fixtures/__tests__/shape-audit.test.ts:175` — add element-type + property-key context to the warn
+- `src/io/file-resolver.ts:230, 242, 267, 273` (4 sites) — `console.warn` with path + error
+- `src/io/ctz-parser.ts:68` — warn citing which deflate format was tried/succeeded
+- `src/io/dig-serializer.ts:65, 74, 86, 110` (4 sites) — warn on JSON parse/stringify fallback
+- `src/fixtures/__tests__/shape-render-audit.test.ts:217, 241, 301, 392, 416, 457, 878` (7 sites) — consolidate into single factory-error reporter logging element type + error
+- `src/fixtures/__tests__/analog-shape-render-audit.test.ts:248, 262, 293, 387, 395, 415, 786` (7 sites) — share reporter with shape-render-audit
+
+**Rationale:** I1 policy — no silent suppression. Each catch becomes a context-rich `console.warn` or an explicit throw. Per `post-a1-parity.md §3.3`.
+
+**Commit:** `Phase 2.5 W4.C.3 — L3 silent I/O catches converted to logged warnings`
+
+##### W4.C.4 — L2 stale test deletions (haiku — APPROVED 2026-04-23)
+
+**User-approved sites** (exact locations per `post-a1-parity.md §4`):
+
+- `src/components/passives/__tests__/polarized-cap.test.ts:492-494` — 3 assertions reading `pool.state0[0/1/2]` with hand-computed `GEQ/IEQ/V_PREV` expected values (A1-deleted slots)
+- `src/components/passives/__tests__/polarized-cap.test.ts:661-662` — 2 assertions on `SLOT_GEQ_PC` / `SLOT_IEQ_PC` direct `toBe()` (A1-deleted slots)
+- `src/components/passives/__tests__/capacitor.test.ts:569` — 1 assertion `expect(q0_actual).toBe(1e-12)` (hand-computed, no ngspice provenance)
+- `src/components/passives/__tests__/crystal.test.ts` — 2 pool state0 assertions (locate exact lines by `Grep "pool.state0\[" src/components/passives/__tests__/crystal.test.ts` at execution time)
+
+**Post-deletion check per file:** if the enclosing `it(...)` / `describe(...)` block becomes empty of assertions, delete the block. If the file becomes empty, delete the file.
+
+**Commit:** `Phase 2.5 W4.C.4 — L2 stale test deletions`
+
+---
+
+#### W4.D — C-4 lifecycle verifier (sonnet)
+
+**Task:** verify that `initVoltages(rhs)` on `behavioral-flipflop.ts:119` is called between DC-OP convergence and the first transient `load()` call. If not wired: patch.
+
+**Steps:**
+1. `Grep "initVoltages" src/solver/analog/` to enumerate callers.
+2. Read each caller; trace the call path back to the analog engine / coordinator.
+3. Confirm sequence: DC-OP runs → DC-OP converges → `initVoltages(rhs)` called on every behavioral element → first transient NR step begins.
+4. If sequence broken: patch `analog-engine.ts` / coordinator to wire the call at the correct position.
+5. Audit similar `_prev<X>Voltage` / `_prev<X>` fields across `behavioral-*.ts` — each needs an `initVoltages` / `initState` analog wired in the same position. `Grep "_prev[A-Z]" src/solver/analog/behavioral-*.ts`.
+
+**Closes:** `post-a1-parity.md §5 C-4` (currently PARTIAL).
+
+**Commit:** `Phase 2.5 W4.D — C-4 lifecycle verifier + behavioral-* initVoltages audit`
+
+---
+
+### 6.10 Phase 2.5 closure commit (W4.close)
+
+After all W4.B.x + W4.C.x + W4.D lanes land (13 parallel commits):
+
+1. Verify `spec/post-a1-parity.md §§1–4` all resolved: every CRITICAL / HIGH / MEDIUM / LOW finding has a closing commit referenced in the row.
+2. Update `post-a1-parity.md §5` with final carry-forward status — close C-4 if W4.D wired the call; close D-8 canary only if W4.B.8 landed bit-exact, else convert to Phase 6 PARITY ticket against new MOSFET `load()`.
+3. Update `post-a1-parity.md §6 CRITICAL / HIGH / MEDIUM tables` with per-row commit hashes.
+4. Commit: `Phase 2.5 complete — Track A landed, post-A1 PARITY list closed`.
+
+This single closure commit marks Phase 2.5 complete and opens Phase 3+ authoring (W5).
+
+---
+
+### 6.11 Agent prompt template for W4 lanes
+
+```
+You are executing Phase 2.5 W4.<lane-id> per spec/phase-2.5-execution.md §6.9.
+
+Before you start, read:
+  1. spec/phase-2.5-execution.md §1 (principles), §6.9 (W4 rules + your lane's sub-section), §8 (hard rules)
+  2. spec/post-a1-parity.md §<section for your device / support area> — authoritative finding list + remedies + verify-greps
+  3. spec/architectural-alignment.md §A1, §F4a/§F4b/§F4c, §I1, §I2 — policy context
+  4. CLAUDE.md — banned closing verdicts and Bash-hook prohibitions
+  5. The ngspice source file(s) cited in your lane's Scope block, at the specific line ranges listed.
+
+Deliverables:
+  - All findings for your device / lane landed in one commit on main
+  - Commit message per §6.9's commit template for your lane
+
+Hard rules (non-negotiable):
+  - A1 verdict is binding: stamps are additive. Do not re-verify.
+  - Mechanical port to ngspice source. No improvisation.
+  - Tests WILL fail. Do not modify code to make tests pass. Delete per A1 §Test handling rule.
+  - No self-correction for convergence. If a port does not converge, note in report and stop.
+  - Banned vocabulary: mapping, tolerance, close enough, equivalent to, pre-existing, partial, intentional divergence, citation divergence.
+  - Escalate ambiguity to user. Do not guess.
+  - Use built-in Grep/Glob/Read/Edit — never bash grep/find/rg.
+
+Report to me under 300 words:
+  - What landed (file-by-file, finding ID-by-finding ID)
+  - What tests were deleted and why (per A1 §Test handling rule)
+  - Any convergence failures observed (listed, not fixed)
+  - Any ambiguity that required a judgment call (listed for my review)
+  - Commit hash
+```
 
 ---
 

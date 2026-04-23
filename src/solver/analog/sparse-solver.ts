@@ -389,11 +389,16 @@ export class SparseSolver {
    * Accumulate value onto the element at handle. O(1) unconditional.
    * Called in the NR hot path.
    * ngspice: *ElementPtr += value
+   *
+   * Additive per ngspice spfactor.c (every stamp is *(ptr) += val). Verified A1 C-W3-1 2026-04-22.
    */
   stampElement(handle: number, value: number): void {
     this._elVal[handle] += value;
   }
 
+  /**
+   * Additive per ngspice spfactor.c (every stamp is *(ptr) += val). Verified A1 C-W3-1 2026-04-22.
+   */
   stampRHS(row: number, value: number): void {
     this._rhs[row] += value;
   }

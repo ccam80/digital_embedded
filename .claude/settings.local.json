@@ -113,7 +113,8 @@
       "mcp__circuit-simulator__server_restart",
       "mcp__circuit-simulator__server_reset",
       "mcp__mermaid-mcp__validate_and_render_mermaid_diagram",
-      "PowerShell(if \\(Test-Path 'C:\\\\local_working_projects\\\\digital_in_browser\\\\.tsc-out.txt'\\) { $len = \\(Get-Item 'C:\\\\local_working_projects\\\\digital_in_browser\\\\.tsc-out.txt'\\).Length; \"size=$len\"; Get-Content 'C:\\\\local_working_projects\\\\digital_in_browser\\\\.tsc-out.txt' -TotalCount 200 } else { 'MISSING' })"
+      "PowerShell(if \\(Test-Path 'C:\\\\local_working_projects\\\\digital_in_browser\\\\.tsc-out.txt'\\) { $len = \\(Get-Item 'C:\\\\local_working_projects\\\\digital_in_browser\\\\.tsc-out.txt'\\).Length; \"size=$len\"; Get-Content 'C:\\\\local_working_projects\\\\digital_in_browser\\\\.tsc-out.txt' -TotalCount 200 } else { 'MISSING' })",
+      "PowerShell(Out-File *)"
     ]
   },
   "enableAllProjectMcpServers": true,

@@ -1,63 +1,27 @@
 {
   "summary": {
-    "passed": 247,
-    "failed": 6,
-    "skipped": 11,
-    "totalFiles": 28,
-    "durationSeconds": 6.3
+    "passed": 11,
+    "failed": 2,
+    "skipped": 0,
+    "totalFiles": 1,
+    "durationSeconds": 1.7
   },
   "failures": [
     {
-      "message": "MODEINITTRAN is not defined",
-      "count": 4,
+      "message": "Transform failed with 2 errors:",
+      "count": 2,
       "locations": [
         {
-          "file": "src\\solver\\analog\\fet-base.ts",
-          "test": "transient: CCAP in capacitor and BJT junctions over first steps/retries",
-          "line": 567,
-          "column": 29
+          "file": "src\\editor\\__tests__\\wire-current-resolver.test.ts",
+          "test": "cross-component current equality through real compiled lrctest.dig",
+          "line": null,
+          "column": null
         },
         {
-          "file": "src\\solver\\analog\\fet-base.ts",
-          "test": "transient: inductor current divergence over iterations in step 1",
-          "line": 567,
-          "column": 29
-        },
-        {
-          "file": "src\\solver\\analog\\fet-base.ts",
-          "test": "transient: PNP BJT internal node agreement in step 1",
-          "line": 567,
-          "column": 29
-        },
-        {
-          "file": "src\\solver\\analog\\fet-base.ts",
-          "test": "8. per-element convergence: our engine reports failures",
-          "line": 567,
-          "column": 29
-        }
-      ]
-    },
-    {
-      "message": "expected false to be true // Object.is equality",
-      "count": 1,
-      "locations": [
-        {
-          "file": "src\\solver\\analog\\__tests__\\harness\\stream-verification.test.ts",
-          "test": "10. limiting events: our engine captures events (Item 9)",
-          "line": 230,
-          "column": 27
-        }
-      ]
-    },
-    {
-      "message": "expected -1 to be greater than or equal to 0",
-      "count": 1,
-      "locations": [
-        {
-          "file": "src\\solver\\analog\\__tests__\\harness\\stream-verification.test.ts",
-          "test": "14. limiting comparison: sign is postLimit - preLimit",
-          "line": 331,
-          "column": 24
+          "file": "src\\editor\\__tests__\\wire-current-resolver.test.ts",
+          "test": "component-as-node KCL: wire at pin A ≈ wire at pin B ≈ body current",
+          "line": null,
+          "column": null
         }
       ]
     }
