@@ -415,9 +415,10 @@ export function createDiodeElement(
   // D-W3-6: NSW defaults to N when not explicitly given (mirrors DIOswEmissionCoeff default)
   if (isNaN(params.NSW)) params.NSW = params.N;
 
-  // D-W3-5: BV_given flag mirroring ngspice DIObreakdownVoltageGiven (dioload.c:183).
-  // True when BV was set to a finite value (not the Infinity default).
-  const BV_given = isFinite(params.BV);
+  // D-W3-5: BV_given semantics mirror ngspice DIObreakdownVoltageGiven (dioload.c:183).
+  // Evaluated inline in load() as `isFinite(params.BV)` so setParam("BV", ...) is live.
+  // ngspice DIObreakdownVoltageGiven is a model parse-time flag; here we mirror its
+  // semantics: true iff BV is a finite value.
 
   // Area scaling — applied once at construction
   params.IS  *= params.AREA;
@@ -540,8 +541,8 @@ export function createDiodeElement(
         // dioload.c:126-138: these phases set vd directly — no pnjlim.
         vdLimited = vdRaw;
         pnjlimLimited = false;
-      } else if (BV_given && vdRaw < Math.min(0, -tBV + 10 * vtebrk)) {
-        // D-W3-5: use BV_given flag mirroring DIObreakdownVoltageGiven.
+      } else if (isFinite(params.BV) && vdRaw < Math.min(0, -tBV + 10 * vtebrk)) {
+        // D-W3-5: use isFinite(params.BV) flag mirroring DIObreakdownVoltageGiven.
         // dioload.c:183-195: breakdown path — pnjlim in reflected domain.
         let vdtemp = -(vdRaw + tBV);
         const vdtempOld = -(vdOld + tBV);
@@ -586,7 +587,7 @@ export function createDiodeElement(
             const evd = Math.exp(vdLimited / vtesw);
             cdsw = csatsw * (evd - 1);
             gdsw = csatsw * evd / vtesw;
-          } else if (!BV_given || vdLimited >= -tBV) {
+          } else if (!isFinite(params.BV) || vdLimited >= -tBV) {
             // cite: dioload.c:221-228: reverse sidewall (cubic approximation)
             const argsw3 = 3 * vtesw / (vdLimited * Math.E);
             const argsw = argsw3 * argsw3 * argsw3;
@@ -734,7 +735,7 @@ export function createDiodeElement(
           ccapPrev,
         );
         const capIeq = ccap - capGeq * vdLimited;
-        s0[base + SLOT_V] = vdLimited;
+        // D-W3-4: SLOT_V write removed — vestigial, zero reads outside load().
         s0[base + SLOT_Q] = q0;
         s0[base + SLOT_CCAP] = ccap;
 

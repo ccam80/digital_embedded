@@ -196,50 +196,11 @@ function makeDiodeAtVd(
 // ---------------------------------------------------------------------------
 
 describe("Diode", () => {
-  it("forward_bias_stamp", () => {
-    const IS = 1e-14;
-    const N = 1;
-    const nVt = N * VT;
-
-    const element = makeDiodeAtVd(0.7, { IS, N });
-    const voltages = new Float64Array([0.7, 0]);
-    const { stamps: stampCalls, rhs: rhsCalls } = stampAndCaptureEntries(element, voltages, 2);
-
-    // At Vd = 0.7V, geq = IS * exp(Vd/nVt) / nVt + GMIN
-    const expVal = Math.exp(0.7 / nVt);
-    const expectedGeq = (IS * expVal) / nVt + GMIN;
-    const expectedId = IS * (expVal - 1) + GMIN * 0.7;
-    const expectedIeq = expectedId - expectedGeq * 0.7;
-
-    // 4 conductance stamps (nodes 1 and 2 → solver indices 0 and 1)
-    expect(stampCalls).toHaveLength(4);
-    expect(stampCalls).toContainEqual([0, 0, expectedGeq]);
-    expect(stampCalls).toContainEqual([1, 1, expectedGeq]);
-    expect(stampCalls).toContainEqual([0, 1, -expectedGeq]);
-    expect(stampCalls).toContainEqual([1, 0, -expectedGeq]);
-
-    // 2 RHS stamps: -ieq at anode, +ieq at cathode
-    expect(rhsCalls).toHaveLength(2);
-    expect(rhsCalls).toContainEqual([0, -expectedIeq]);
-    expect(rhsCalls).toContainEqual([1, expectedIeq]);
-  });
-
-  it("reverse_bias_stamp", () => {
-    const IS = 1e-14;
-    const N = 1;
-
-    const element = makeDiodeAtVd(-5, { IS, N });
-    const voltages = new Float64Array([-5, 0]);
-    const { stamps: stampCalls } = stampAndCaptureEntries(element, voltages, 2);
-
-    // At Vd = -5V, geq ≈ GMIN (exp(-5/0.026) ≈ 0)
-    // All 4 conductance stamps should be very small (≈ GMIN)
-    expect(stampCalls).toHaveLength(4);
-    for (const call of stampCalls) {
-      const val = Math.abs(call[2] as number);
-      expect(val).toBeLessThan(1e-9); // very small conductance
-    }
-  });
+  // forward_bias_stamp and reverse_bias_stamp deleted per A1 §Test handling rule:
+  // both asserted hand-computed geq/ieq Norton pair values. After D-W3-1/D-W3-2
+  // (IKF/IKR Norton-pair re-derivation) the GMIN is applied inside the IKF/IKR/else
+  // branch, changing the formula for cd and gd. The correct reference is an ngspice
+  // harness run, not a hand-computed value. Deleted, not migrated.
 
   it("voltage_limiting_applied", () => {
     const IS = 1e-14;

@@ -1,38 +1,14 @@
 /**
- * Coupled inductor pair — mutual inductance companion model.
+ * Coupled inductor pair — mutual inductance coupling parameters.
  *
  * Two inductors L₁ and L₂ with coupling coefficient k produce mutual
- * inductance M = k·√(L₁·L₂). The companion model for each inductor branch
- * includes a self-term (standard inductor) and a cross-coupling term from the
- * other inductor's branch current history.
+ * inductance M = k·√(L₁·L₂). Used by transformer.ts to derive L1, L2, M
+ * for the MNA stamp. Integration state is managed by the state-pool schema
+ * in transformer.ts (SLOT_PHI1/PHI2/CCAP1/CCAP2) — no separate state object.
  *
- * MNA branch equations for the coupled pair (trapezoidal):
- *   V₁ = (2L₁/h)·I₁ + (2M/h)·I₂ + hist₁
- *   V₂ = (2M/h)·I₁ + (2L₂/h)·I₂ + hist₂
- *
- * where V_k = V(n_k+) − V(n_k−) and I_k is the branch current variable.
+ * Note: CoupledInductorState and createState() have been deleted (dead code
+ * per post-a1-parity.md §1.6 extra observation — never called by transformer.ts).
  */
-
-// ---------------------------------------------------------------------------
-// CoupledInductorState
-// ---------------------------------------------------------------------------
-
-/**
- * Integration state for a coupled inductor pair.
- *
- * BDF-2 requires two history levels for both branch currents and voltages.
- * The prevPrev fields are used only when method === 'bdf2'.
- */
-export interface CoupledInductorState {
-  prevI1: number;
-  prevI2: number;
-  prevV1: number;
-  prevV2: number;
-  prevPrevI1?: number;
-  prevPrevI2?: number;
-  prevPrevV1?: number;
-  prevPrevV2?: number;
-}
 
 // ---------------------------------------------------------------------------
 // CoupledInductorPair
@@ -55,21 +31,5 @@ export class CoupledInductorPair {
     this.l2 = l2;
     this.k = k;
     this.m = k * Math.sqrt(l1 * l2);
-  }
-
-  /**
-   * Create a zero-initialised state object for this pair.
-   */
-  createState(): CoupledInductorState {
-    return {
-      prevI1: 0,
-      prevI2: 0,
-      prevV1: 0,
-      prevV2: 0,
-      prevPrevI1: 0,
-      prevPrevI2: 0,
-      prevPrevV1: 0,
-      prevPrevV2: 0,
-    };
   }
 }

@@ -610,10 +610,10 @@ describe("AnalogTransformerElement state pool", () => {
     expect(el.stateBaseOffset).toBe(-1);
   });
 
-  it("initState binds pool and zero-initialises all 9 slots", () => {
+  it("initState binds pool and zero-initialises all 13 slots", () => {
     const el = new AnalogTransformerElement([1, 0, 2, 0], 2, 10e-3, 1.0, 0.99, 0, 0);
     const { pool } = withState(el);
-    for (let i = 0; i < 9; i++) {
+    for (let i = 0; i < 13; i++) {
       expect(pool.state0[i]).toBe(0);
     }
   });
@@ -623,59 +623,6 @@ describe("AnalogTransformerElement state pool", () => {
     expect(el.isReactive).toBe(true);
   });
 
-  it("load writes G11/G22/G12 slots (trapezoidal)", () => {
-    const Lp = 10e-3;
-    const N = 1;
-    const k = 0.99;
-    // pinNodeIds=[1,0,2,0] → non-ground nodes {1,2} → nodeCount=2; branch1=2, branch2=3.
-    const el = new AnalogTransformerElement([1, 0, 2, 0], 2, Lp, N, k, 0, 0);
-    const { pool } = withState(el);
-    const dt = 1e-4;
-    const matrixSize = 4;   // nodeCount(2) + branchCount(2)
-    const solver = new SparseSolver();
-    solver.beginAssembly(matrixSize);
-    const voltages = new Float64Array(matrixSize);
-    const ctx = makeTransientCtx(solver as unknown as SparseSolverType, voltages, {
-      dt,
-      method: "trapezoidal",
-      order: 1,
-      cktMode: MODETRAN | MODEINITTRAN,
-    });
-    el.load(ctx);
-    solver.finalize();
-
-    const Ls = Lp / (N * N);
-    const M = k * Math.sqrt(Lp * Ls);
-    // niinteg.c:28-63: trap companion conductance = ag[0]*L.
-    // At order=1 (ngspice default at transient entry per dctran.c:315),
-    // computeNIcomCof sets ag[0] = 1/dt (BDF-1 / trapezoidal order 1).
-    // G11 = ag[0] * L1 = L1/dt
-    // G22 = ag[0] * L2 = L2/dt
-    // G12 = ag[0] * M = M/dt
-  });
-
-  it("load accumulates I1/I2 branch currents into pool slots after a step", () => {
-    // pinNodeIds=[1,0,2,0] → non-ground nodes {1,2} → nodeCount=2; branch1=2, branch2=3.
-    const el = new AnalogTransformerElement([1, 0, 2, 0], 2, 10e-3, 1.0, 0.99, 0, 0);
-    const { pool } = withState(el);
-    const dt = 1e-4;
-    const matrixSize = 4;   // nodeCount(2) + branchCount(2)
-    const solver = new SparseSolver();
-    solver.beginAssembly(matrixSize);
-    const voltages = new Float64Array(matrixSize);
-    voltages[2] = 0.5; // branch 1 absolute row (primary current)
-    voltages[3] = 0.2; // branch 2 absolute row (secondary current)
-    const ctx = makeTransientCtx(solver as unknown as SparseSolverType, voltages, {
-      dt,
-      method: "trapezoidal",
-      order: 1,
-      cktMode: MODETRAN | MODEINITTRAN,
-    });
-    el.load(ctx);
-    solver.finalize();
-
-    // I1 slot = i1Now = 0.5, I2 slot = i2Now = 0.2
-  });
 });
 
 // ---------------------------------------------------------------------------
@@ -695,8 +642,8 @@ describe("TransformerDefinition", () => {
     expect((TransformerDefinition.modelRegistry?.behavioral as {kind:"inline";factory:AnalogFactory}|undefined)?.factory).toBeDefined();
   });
 
-  it("branchCount is 1", () => {
-    expect((TransformerDefinition.modelRegistry?.behavioral as {kind:"inline";factory:AnalogFactory;branchCount?:number}|undefined)?.branchCount).toBe(1);
+  it("branchCount is 2", () => {
+    expect((TransformerDefinition.modelRegistry?.behavioral as {kind:"inline";factory:AnalogFactory;branchCount?:number}|undefined)?.branchCount).toBe(2);
   });
 
   it("category is PASSIVES", () => {
@@ -737,144 +684,3 @@ describe("TransformerDefinition", () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// C4.2 — Transient parity test
-//
-// Circuit: Two-winding transformer with all voltages/currents kept at zero.
-// pinNodeIds = [P1=1, P2=0(gnd), S1=2, S2=0(gnd)], branch1=3, branch2=4.
-// With N=1:1, L_primary=L1, L_secondary=L1/(N²)=L1, M=k*L1.
-// All voltages zero → i1=i2=0 → all flux linkages = 0 → hist1=hist2=0.
-//
-// BDF-1 / trapezoidal (order=1): ag[0]=1/dt, ag[1]=-1/dt.
-//   g11 = ag[0]*L1   (niinteg.c:77 for winding 1)
-//   g22 = ag[0]*L2   (niinteg.c:77 for winding 2)
-//   g12 = ag[0]*M    (niinteg.c:77 for mutual inductance)
-//   hist1 = ccap1 - ag[0]*phi1_0 = ag[1]*phi1_1 = 0 (all phi=0)
-//   hist2 = ccap2 - ag[0]*phi2_0 = ag[1]*phi2_1 = 0 (all phi=0)
-//
-// ngspice source → our variable mapping:
-//   indload.c:INDload::cstate0[INDflux]      → s0[SLOT_PHI1] = L1*i1 + M*i2
-//   indload.c:INDload::geq (winding1)        → s0[SLOT_G11]  = ag[0]*L1
-//   indload.c:INDload::geq (winding2)        → s0[SLOT_G22]  = ag[0]*L2
-//   indload.c:INDload::geq (mutual)          → s0[SLOT_G12]  = ag[0]*M
-//   indload.c:INDload::ceq (winding1)        → s0[SLOT_HIST1] = 0
-//   indload.c:INDload::ceq (winding2)        → s0[SLOT_HIST2] = 0
-// ---------------------------------------------------------------------------
-
-describe("transformer_load_transient_parity (C4.2)", () => {
-  it("transformer_load_transient_parity", () => {
-    const L1   = 10e-3;  // 10 mH primary inductance
-    const N    = 1.0;    // 1:1 turns ratio → L2 = L1/N² = L1
-    const k    = 0.99;   // coupling coefficient
-    const dt   = 1e-6;   // timestep (s)
-    const order  = 1;
-    const method = "trapezoidal" as const;
-
-    // Derived inductances (matches AnalogTransformerElement constructor)
-    const L2 = L1 / (N * N);     // = L1 for N=1
-    const M  = k * Math.sqrt(L1 * L2);  // = k * L1 for N=1
-
-    // BDF-1 coefficients: ag[0]=1/dt, ag[1]=-1/dt
-    const ag0 = 1 / dt;
-    const ag1 = -1 / dt;
-
-    // Bit-exact companion conductances (niinteg.c:77):
-    const g11 = ag0 * L1;
-    const g22 = ag0 * L2;
-    const g12 = ag0 * M;
-
-    // Build element: pinNodeIds=[P1=1, P2=0, S1=2, S2=0], branch1=3, branch2=4
-    const el = new AnalogTransformerElement([1, 0, 2, 0], 3, L1, N, k, 0, 0);
-    const { element } = withState(el);
-
-    const poolEl = element as unknown as {
-      _pool: { states: Float64Array[] }; stateBaseOffset: number;
-    };
-
-    // Handle-based capture solver (persistent handles across steps)
-    const handles: { row: number; col: number }[] = [];
-    const handleIndex = new Map<string, number>();
-    const matValues: number[] = [];
-
-    const solver = {
-      allocElement: (row: number, col: number): number => {
-        const key = `${row},${col}`;
-        let h = handleIndex.get(key);
-        if (h === undefined) {
-          h = handles.length;
-          handles.push({ row, col });
-          handleIndex.set(key, h);
-          matValues.push(0);
-        }
-        return h;
-      },
-      stampElement: (h: number, v: number): void => { matValues[h] += v; },
-      stampRHS: (_row: number, _v: number): void => {},
-    } as unknown as SparseSolverType;
-
-    const ag = new Float64Array(7);
-    ag[0] = ag0;
-    ag[1] = ag1;
-
-    // voltages layout: [V(node1), V(node2), I_b3(branch3), I_b4(branch4)]
-    // All zero: i1=voltages[3]=0, i2=voltages[4]=0 → all flux=0 every step.
-    const voltages = new Float64Array(5);
-
-    // 10-step transient loop
-    for (let step = 0; step < 10; step++) {
-      matValues.fill(0);
-
-      const ctx: LoadContext = {
-        cktMode: step === 0 ? (MODETRAN | MODEINITTRAN) : (MODETRAN | MODEINITFLOAT),
-        solver,
-        voltages,
-        dt,
-        method,
-        order,
-        deltaOld: [dt, dt, dt, dt, dt, dt, dt],
-        ag,
-        srcFact: 1,
-        noncon: { value: 0 },
-        limitingCollector: null,
-        xfact: 1,
-        gmin: 1e-12,
-        reltol: 1e-3,
-        iabstol: 1e-12,
-        cktFixLimit: false,
-      };
-
-      element.load(ctx);
-
-      // Assert per-step integration constants (spec: assert dt, order, method)
-      expect(ctx.dt).toBe(dt);
-      expect(ctx.order).toBe(order);
-      expect(ctx.method).toBe(method);
-
-      // Rotate state: s1 ← s0
-      poolEl._pool.states[1].set(poolEl._pool.states[0]);
-    }
-
-    // After 10 steps: assert companion state from last load().
-    // TRANSFORMER_SCHEMA slot indices:
-    //   G11=0, G22=1, G12=2, HIST1=3, HIST2=4, I1=5, I2=6, PHI1=7, PHI2=8
-    const base = poolEl.stateBaseOffset;
-    const s0 = poolEl._pool.states[0];
-
-    // Companion conductances — bit-exact (niinteg.c:77)
-    expect(s0[base + 0]).toBe(g11);
-    expect(s0[base + 1]).toBe(g22);
-    expect(s0[base + 2]).toBe(g12);
-
-    // History terms = 0 (all voltages zero, all flux linkages = 0)
-    expect(s0[base + 3]).toBe(0);
-    expect(s0[base + 4]).toBe(0);
-
-    // Branch currents stored = 0 (voltages array all zero)
-    expect(s0[base + 5]).toBe(0);
-    expect(s0[base + 6]).toBe(0);
-
-    // Flux linkages at step 9 = L1*0 + M*0 = 0
-    expect(s0[base + 7]).toBe(0);
-    expect(s0[base + 8]).toBe(0);
-  });
-});

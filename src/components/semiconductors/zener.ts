@@ -278,16 +278,17 @@ export function createZenerElement(
         // Z-W3-9: MODEINITTRAN seeds vd from state1  cite: dioload.c:128-129
         vdRaw = s1[base + SLOT_VD];
       } else if ((mode & MODEINITJCT) && (mode & MODETRANOP) && (mode & MODEUIC)) {
-        // dioload.c:130-132: MODEINITJCT && MODETRANOP && MODEUIC → IC param
-        vdRaw = isFinite(params.IC ?? NaN) ? (params.IC ?? 0) : 0;
-      } else if ((mode & MODEINITJCT) && params.OFF) {
-        // dioload.c:133-134: MODEINITJCT && OFF → vd = 0
+        // dioload.c:130-132: MODEINITJCT && MODETRANOP && MODEUIC → DIOinitCond
+        // Simplified model has no IC param; fall back to 0  (DIOinitCond default).
+        vdRaw = 0;
+      } else if ((mode & MODEINITJCT) && (params.OFF !== undefined && params.OFF !== 0)) {
+        // dioload.c:133-134: MODEINITJCT && DIOoff → vd = 0
         vdRaw = 0;
       } else if (mode & MODEINITJCT) {
         // dioload.c:135-136: MODEINITJCT else → vd = tVcrit
         vdRaw = tVcrit;
-      } else if ((mode & MODEINITFIX) && params.OFF) {
-        // dioload.c:137-138: MODEINITFIX && OFF → vd = 0
+      } else if ((mode & MODEINITFIX) && (params.OFF !== undefined && params.OFF !== 0)) {
+        // dioload.c:137-138: MODEINITFIX && DIOoff → vd = 0
         vdRaw = 0;
       } else {
         // dioload.c:151-152: vd from rhsOld (current NR iterate voltages)

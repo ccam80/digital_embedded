@@ -541,8 +541,11 @@ function buildTransformerElement(
   couplingCoefficient: number,
   primaryResistance: number,
   secondaryResistance: number,
+  IC1: number = NaN,
+  IC2: number = NaN,
+  M: number = 1,
 ): AnalogElementCore {
-  const p = { primaryInductance, turnsRatio, couplingCoefficient, primaryResistance, secondaryResistance };
+  const p = { primaryInductance, turnsRatio, couplingCoefficient, primaryResistance, secondaryResistance, IC1, IC2, M };
   const el = new AnalogTransformerElement(
     [pinNodes.get("P1")!, pinNodes.get("P2")!, pinNodes.get("S1")!, pinNodes.get("S2")!],
     branchIdx,
@@ -551,6 +554,9 @@ function buildTransformerElement(
     p.couplingCoefficient,
     p.primaryResistance,
     p.secondaryResistance,
+    p.IC1,
+    p.IC2,
+    p.M,
   );
   (el as AnalogElementCore).setParam = function(key: string, value: number): void {
     if (key in p) {
@@ -561,6 +567,9 @@ function buildTransformerElement(
         p.couplingCoefficient,
         p.primaryResistance,
         p.secondaryResistance,
+        p.IC1,
+        p.IC2,
+        p.M,
       );
     }
   };
@@ -581,6 +590,9 @@ function createTransformerElement(
     props.getModelParam<number>("couplingCoefficient"),
     props.getModelParam<number>("primaryResistance"),
     props.getModelParam<number>("secondaryResistance"),
+    props.hasModelParam("IC1") ? props.getModelParam<number>("IC1") : NaN,
+    props.hasModelParam("IC2") ? props.getModelParam<number>("IC2") : NaN,
+    props.hasModelParam("M") ? props.getModelParam<number>("M") : 1,
   );
 }
 
@@ -673,7 +685,7 @@ export const TransformerDefinition: ComponentDefinition = {
       factory: createTransformerElement,
       paramDefs: TRANSFORMER_PARAM_DEFS,
       params: TRANSFORMER_DEFAULTS,
-      branchCount: 1,
+      branchCount: 2,
     },
   },
   defaultModel: "behavioral",
