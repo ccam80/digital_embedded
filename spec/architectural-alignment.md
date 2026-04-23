@@ -866,6 +866,51 @@ not use comment citations as authoritative — they must re-verify
 against the cited ngspice file. Wave 2.4 ("F6 citation audit") did a
 first pass; ongoing.
 
+#### I2.1 Documented legitimate cross-timestep integration-history slots — **RECORDED** (2026-04-24)
+
+Not every surviving slot that lacks a direct `slotToNgspice` mapping is a
+papering residue. Some are digiTS-externalised NIintegrate history —
+values ngspice keeps implicit inside its own NIintegrate routine (held in
+`CKTstate1 + <offset>`), but which digiTS materializes as explicit pool
+slots because our NIintegrate is structured differently. These slots are
+architecturally legitimate and must NOT be excised by any future sweep
+modelled on the A1 cross-method-transfer deletion pattern.
+
+**Test to distinguish:** a cross-method transfer slot is written in one
+method of a device and read by another method *within the same NR
+iteration* (the pattern A1 deleted). A legitimate integration-history
+slot is written during one timestep's `load()` and read from `s1` on
+the *next* timestep's `load()` — it carries genuine state across time,
+mirroring an ngspice `CKTstate1 + <offset>` field.
+
+**Recorded slots (as of 2026-04-24):**
+
+- **`diode.ts` `SLOT_CCAP`** — cross-timestep integration history for
+  the junction capacitance companion. Maps to ngspice `CKTstate1 +
+  DIOcapCurrent` implicit in `dioload.c`'s NIintegrate dispatch.
+  Written in `load()` at timestep N, read from `s1` at timestep N+1.
+  Source: `spec/post-a1-parity.md §1.1` D-W3-8 (2026-04-22).
+
+- **`inductor.ts` `SLOT_CCAP`** — cross-timestep integration history for
+  the flux/branch-current companion. Maps to ngspice `CKTstate1 +
+  INDflux` implicit in `indload.c`'s NIintegrate dispatch. Source:
+  `spec/post-a1-parity.md §1.5` I-W3-6 (2026-04-22).
+
+**Protocol for adding future entries:** any post-A1 audit that surfaces
+an unmapped slot and can demonstrate (a) it is written at timestep N
+and read from `s1` at timestep N+1 (not cross-method same-iteration),
+and (b) its value corresponds to an ngspice `CKTstate1 + <field>`
+offset that NIintegrate uses internally, may propose addition to this
+list. Additions are a user action, not an agent action (matching the
+§0 rule that agents do not add items to this doc).
+
+**Relationship to harness stance:** these slots are intentionally
+unmapped in `src/solver/analog/__tests__/harness/device-mappings.ts` —
+their ngspice counterparts are implicit inside NIintegrate, not
+addressable as top-level `CKTstate0[<offset>]` entries. The correct
+harness stance is "not directly comparable"; adding a mapping would be
+the papering pattern (synthesizing an equivalent from our state).
+
 ### I3. Alignment specs half-implemented
 
 **Source IDs:** DIV-15. Named instance: `spec/phase-4-dcop-alignment.md`
