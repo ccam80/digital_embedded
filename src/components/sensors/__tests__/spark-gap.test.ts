@@ -372,7 +372,7 @@ describe("SparkGap", () => {
 //   R ≈ rOff = 1e10
 // G = 1 / max(R, 1e-12).
 //
-// NGSPICE reference: ngspice resload.c stamps G=1/R using a single division.
+// Expected: G = 1/R using a single division.
 // The test inlines the same firingResistance computation as SparkGapElement.load().
 // Nodes: pos=1 → idx 0, neg=2 → idx 1. matrixSize=2, nodeCount=2.
 // ---------------------------------------------------------------------------
@@ -415,20 +415,20 @@ describe("spark_gap_load_dcop_parity", () => {
     const blend = 0.5 * (1 + Math.tanh((absV - vBreakdown) / w));
     const R_REF = rOff + (rOn - rOff) * blend;
     const MIN_RESISTANCE = 1e-12;
-    const NGSPICE_G_REF = 1 / Math.max(R_REF, MIN_RESISTANCE);
+    const EXPECTED_G = 1 / Math.max(R_REF, MIN_RESISTANCE);
 
     const e00 = stamps.find((e) => e.row === 0 && e.col === 0);
     expect(e00).toBeDefined();
-    expect(e00!.value).toBe(NGSPICE_G_REF);
+    expect(e00!.value).toBe(EXPECTED_G);
 
     const e11 = stamps.find((e) => e.row === 1 && e.col === 1);
     expect(e11).toBeDefined();
-    expect(e11!.value).toBe(NGSPICE_G_REF);
+    expect(e11!.value).toBe(EXPECTED_G);
 
     const e01 = stamps.find((e) => e.row === 0 && e.col === 1);
-    expect(e01!.value).toBe(-NGSPICE_G_REF);
+    expect(e01!.value).toBe(-EXPECTED_G);
 
     const e10 = stamps.find((e) => e.row === 1 && e.col === 0);
-    expect(e10!.value).toBe(-NGSPICE_G_REF);
+    expect(e10!.value).toBe(-EXPECTED_G);
   });
 });

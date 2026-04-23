@@ -325,8 +325,7 @@ describe("NTC", () => {
 // At T = T₀: R = r0 · exp(beta · (1/T - 1/T₀)) = 10000 · exp(0) = 10000 Ω.
 // G = 1 / R = 1 / 10000.
 //
-// NGSPICE reference: ngspice resload.c stamps G=1/R. For a linear resistor at
-// T=T₀ the B-parameter exponent is zero, so G = 1/r0 exactly.
+// Expected: G = 1/r0 = 1/10000.
 // Nodes: pos=1 → idx 0, neg=2 → idx 1. matrixSize=2, nodeCount=2.
 // ---------------------------------------------------------------------------
 
@@ -359,22 +358,22 @@ describe("ntc_load_dcop_parity", () => {
     stampCtx.solver.finalize();
     const stamps = stampCtx.solver.getCSCNonZeros();
 
-    // NGSPICE ref: G = 1/r0 when T == T₀ (exponent = 0, exp(0) = 1).
+    // Expected: G = 1/r0 when T == T₀ (exponent = 0, exp(0) = 1).
     // Single IEEE-754 division: 1 / 10000.
-    const NGSPICE_G_REF = 1 / NTC_DEFAULTS.r0;
+    const EXPECTED_G = 1 / NTC_DEFAULTS.r0;
 
     const e00 = stamps.find((e) => e.row === 0 && e.col === 0);
     expect(e00).toBeDefined();
-    expect(e00!.value).toBe(NGSPICE_G_REF);
+    expect(e00!.value).toBe(EXPECTED_G);
 
     const e11 = stamps.find((e) => e.row === 1 && e.col === 1);
     expect(e11).toBeDefined();
-    expect(e11!.value).toBe(NGSPICE_G_REF);
+    expect(e11!.value).toBe(EXPECTED_G);
 
     const e01 = stamps.find((e) => e.row === 0 && e.col === 1);
-    expect(e01!.value).toBe(-NGSPICE_G_REF);
+    expect(e01!.value).toBe(-EXPECTED_G);
 
     const e10 = stamps.find((e) => e.row === 1 && e.col === 0);
-    expect(e10!.value).toBe(-NGSPICE_G_REF);
+    expect(e10!.value).toBe(-EXPECTED_G);
   });
 });

@@ -17,7 +17,7 @@
  *   pinNodeIds[1] = n_neg
  *   branchIndex    = -1
  *
- * Unified load() pipeline (matches ngspice DEVload):
+ * Unified load() pipeline:
  *   load(ctx)  — stamps conductance 1/R(T) between terminals every NR iteration
  *   accept(ctx, ...) — integrates thermal ODE after an accepted timestep when selfHeating
  */

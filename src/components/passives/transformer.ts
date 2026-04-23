@@ -28,7 +28,8 @@ import {
   type ComponentDefinition,
 } from "../../core/registry.js";
 import type { AnalogElementCore, ReactiveAnalogElement, IntegrationMethod, LoadContext } from "../../solver/analog/element.js";
-import { MODEDC, MODEINITPRED, MODEINITTRAN, MODETRAN } from "../../solver/analog/ckt-mode.js";
+import { niIntegrate } from "../../solver/analog/ni-integrate.js";
+import { MODEDC, MODEINITPRED, MODEINITTRAN, MODEUIC } from "../../solver/analog/ckt-mode.js";
 import { CoupledInductorPair } from "../../solver/analog/coupled-inductor.js";
 import { defineModelParams } from "../../core/model-params.js";
 import type { StatePoolRef } from "../../core/analog-types.js";

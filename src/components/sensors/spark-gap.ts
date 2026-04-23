@@ -26,7 +26,7 @@
  *   pinNodeIds[1] = n_neg
  *   branchIndex    = -1
  *
- * Unified load() pipeline (matches ngspice DEVload):
+ * Unified load() pipeline:
  *   load(ctx)       — stamps linearized conductance at the current operating point
  *                     every NR iteration; resistance is computed from the hysteretic
  *                     _conducting state and the last accepted-step terminal voltage

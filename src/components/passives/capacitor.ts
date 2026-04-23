@@ -198,10 +198,13 @@ export class AnalogCapacitorElement implements ReactiveAnalogElementCore {
   }
 
   private _computeEffectiveC(): number {
+    // capload.c:44 — CAPm is applied at stamp time, not folded into CAPcapac.
+    // C here is the raw per-instance capacitance (TC + SCALE applied); M is
+    // kept separate and multiplied onto geq/ceq at every stamp site below.
     const T = this._pool?.temperature ?? 300.15;
     const dT = T - this._TNOM;
     const factor = 1 + this._TC1 * dT + this._TC2 * dT * dT;
-    return this._nominalC * factor * this._SCALE * this._M;
+    return this._nominalC * factor * this._SCALE;
   }
 
   initState(pool: StatePoolRef): void {
@@ -245,6 +248,8 @@ export class AnalogCapacitorElement implements ReactiveAnalogElementCore {
     const n0 = this.pinNodeIds[0];
     const n1 = this.pinNodeIds[1];
     const C = this.C;
+    // capload.c:44 — m = CAPm; applied at every stamp site, not folded into C.
+    const m = this._M;
     const base = this.stateBaseOffset;
     // pool.states[N] accessed at call time — no cached Float64Array refs (A4).
     const s0 = this._pool.states[0];
@@ -322,15 +327,15 @@ export class AnalogCapacitorElement implements ReactiveAnalogElementCore {
         this._handlesInit = true;
       }
 
-      // Stamp companion model (capload.c:74-79).
-      if (n0 !== 0) solver.stampElement(this._hAA, geq);
-      if (n1 !== 0) solver.stampElement(this._hBB, geq);
+      // Stamp companion model (capload.c:74-79 — all entries scaled by m = CAPm).
+      if (n0 !== 0) solver.stampElement(this._hAA, m * geq);
+      if (n1 !== 0) solver.stampElement(this._hBB, m * geq);
       if (n0 !== 0 && n1 !== 0) {
-        solver.stampElement(this._hAB, -geq);
-        solver.stampElement(this._hBA, -geq);
+        solver.stampElement(this._hAB, -m * geq);
+        solver.stampElement(this._hBA, -m * geq);
       }
-      if (n0 !== 0) solver.stampRHS(n0 - 1, -ceq);
-      if (n1 !== 0) solver.stampRHS(n1 - 1, ceq);
+      if (n0 !== 0) solver.stampRHS(n0 - 1, -m * ceq);
+      if (n1 !== 0) solver.stampRHS(n1 - 1, m * ceq);
     } else {
       // DC operating point: just store charge, no matrix stamp (capload.c:84).
       s0[base + SLOT_Q] = C * vcap;

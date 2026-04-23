@@ -72,8 +72,9 @@ const GMIN = 1e-12;
 const SLOT_VD = 0, SLOT_GEQ = 1, SLOT_IEQ = 2, SLOT_ID = 3;
 // SLOT_CAP_CURRENT dual semantics (dioload.c:363): under MODETRAN holds iqcap (A);
 // under MODEINITSMSIG holds capd (F) = raw total capacitance.
-const SLOT_CAP_CURRENT = 4, SLOT_V = 5, SLOT_Q = 6;
-const SLOT_CCAP = 7;
+// D-W3-4: SLOT_V (vestigial junction-voltage copy) deleted — zero reads outside load().
+const SLOT_CAP_CURRENT = 4, SLOT_Q = 5;
+const SLOT_CCAP = 6;
 
 /** Schema for resistive diode (no junction capacitance): 4 slots. */
 export const DIODE_SCHEMA: StateSchema = defineStateSchema("DiodeElement", [
@@ -83,14 +84,15 @@ export const DIODE_SCHEMA: StateSchema = defineStateSchema("DiodeElement", [
   { name: "ID",          doc: "Diode current at operating point",                 init: { kind: "zero" } },
 ]);
 
-/** Schema for capacitive diode (CJO > 0 or TT > 0): 8 slots. */
+/** Schema for capacitive diode (CJO > 0 or TT > 0): 7 slots.
+ *  D-W3-4: SLOT_V (was slot 5) removed — it was a vestigial copy of vdLimited
+ *  with no reads outside load(). ngspice has no corresponding state offset. */
 export const DIODE_CAP_SCHEMA: StateSchema = defineStateSchema("DiodeElement_cap", [
   { name: "VD",          doc: "pnjlim-limited junction voltage",                  init: { kind: "zero" } },
   { name: "GEQ",         doc: "NR companion conductance",                         init: { kind: "constant", value: GMIN } },
   { name: "IEQ",         doc: "NR companion Norton current",                      init: { kind: "zero" } },
   { name: "ID",          doc: "Diode current at operating point",                 init: { kind: "zero" } },
   { name: "CAP_CURRENT", doc: "MODETRAN: iqcap (A); MODEINITSMSIG: capd (F) — dioload.c:363 DIOcapCurrent", init: { kind: "zero" } },
-  { name: "V",           doc: "Junction voltage at current step (for companion)", init: { kind: "zero" } },
   { name: "Q",           doc: "Junction charge at current step (DIOcapCharge)",  init: { kind: "zero" } },
   { name: "CCAP",        doc: "Companion current (NIintegrate)",                  init: { kind: "zero" } },
 ]);

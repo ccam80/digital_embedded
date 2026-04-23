@@ -283,16 +283,184 @@
   },
   "hotPaths": [
     {
+      "path": "spec\\phase-2.5-execution.md",
+      "accessCount": 37,
+      "lastAccessed": 1776974647698,
+      "type": "file"
+    },
+    {
+      "path": "spec\\architectural-alignment.md",
+      "accessCount": 19,
+      "lastAccessed": 1776974600628,
+      "type": "file"
+    },
+    {
+      "path": "spec\\post-a1-parity.md",
+      "accessCount": 18,
+      "lastAccessed": 1776974648625,
+      "type": "file"
+    },
+    {
+      "path": "src\\components\\semiconductors\\diode.ts",
+      "accessCount": 12,
+      "lastAccessed": 1776974643402,
+      "type": "file"
+    },
+    {
+      "path": "ref\\ngspice\\src\\spicelib\\devices\\dio\\dioload.c",
+      "accessCount": 6,
+      "lastAccessed": 1776974554506,
+      "type": "file"
+    },
+    {
+      "path": "src\\components\\semiconductors\\mosfet.ts",
+      "accessCount": 6,
+      "lastAccessed": 1776974649547,
+      "type": "file"
+    },
+    {
+      "path": "src\\solver\\analog\\newton-raphson.ts",
+      "accessCount": 5,
+      "lastAccessed": 1776974584953,
+      "type": "file"
+    },
+    {
+      "path": "ref\\ngspice\\src\\spicelib\\devices\\bjt\\bjtload.c",
+      "accessCount": 5,
+      "lastAccessed": 1776974641700,
+      "type": "file"
+    },
+    {
+      "path": "src\\components\\passives\\__tests__\\polarized-cap.test.ts",
+      "accessCount": 5,
+      "lastAccessed": 1776974648225,
+      "type": "file"
+    },
+    {
+      "path": "ref\\ngspice\\src\\spicelib\\devices\\dio\\diosetup.c",
+      "accessCount": 4,
+      "lastAccessed": 1776974584264,
+      "type": "directory"
+    },
+    {
+      "path": "src\\components\\semiconductors\\__tests__\\diode.test.ts",
+      "accessCount": 4,
+      "lastAccessed": 1776974585542,
+      "type": "file"
+    },
+    {
+      "path": "src\\components\\sensors\\__tests__\\ntc-thermistor.test.ts",
+      "accessCount": 4,
+      "lastAccessed": 1776974646361,
+      "type": "file"
+    },
+    {
+      "path": "src\\solver\\analog\\load-context.ts",
+      "accessCount": 4,
+      "lastAccessed": 1776974649195,
+      "type": "file"
+    },
+    {
       "path": "src",
       "accessCount": 3,
       "lastAccessed": 1776905591300,
       "type": "directory"
     },
     {
+      "path": "ref\\ngspice\\src\\spicelib\\devices\\ind\\indload.c",
+      "accessCount": 3,
+      "lastAccessed": 1776974550233,
+      "type": "file"
+    },
+    {
+      "path": "src\\solver\\analog\\ckt-context.ts",
+      "accessCount": 3,
+      "lastAccessed": 1776974563970,
+      "type": "file"
+    },
+    {
+      "path": "src\\solver\\analog",
+      "accessCount": 3,
+      "lastAccessed": 1776974585342,
+      "type": "directory"
+    },
+    {
+      "path": "src\\components\\passives\\inductor.ts",
+      "accessCount": 3,
+      "lastAccessed": 1776974631183,
+      "type": "file"
+    },
+    {
+      "path": "spec\\plan-addendum.md",
+      "accessCount": 3,
+      "lastAccessed": 1776974632103,
+      "type": "file"
+    },
+    {
+      "path": "src\\components\\sensors\\__tests__\\spark-gap.test.ts",
+      "accessCount": 3,
+      "lastAccessed": 1776974637491,
+      "type": "file"
+    },
+    {
+      "path": "src\\components\\passives\\capacitor.ts",
+      "accessCount": 3,
+      "lastAccessed": 1776974646138,
+      "type": "file"
+    },
+    {
+      "path": "src\\components\\passives\\__tests__\\inductor.test.ts",
+      "accessCount": 3,
+      "lastAccessed": 1776974649632,
+      "type": "file"
+    },
+    {
       "path": "src/components/switching/switch.ts",
       "accessCount": 2,
       "lastAccessed": 1776905259029,
       "type": "directory"
+    },
+    {
+      "path": "ref\\ngspice\\src\\spicelib\\devices\\cap\\capload.c",
+      "accessCount": 2,
+      "lastAccessed": 1776974557535,
+      "type": "file"
+    },
+    {
+      "path": "src\\components\\active\\optocoupler.ts",
+      "accessCount": 2,
+      "lastAccessed": 1776974576451,
+      "type": "file"
+    },
+    {
+      "path": "src\\solver\\analog\\ni-integrate.ts",
+      "accessCount": 2,
+      "lastAccessed": 1776974600419,
+      "type": "file"
+    },
+    {
+      "path": "src\\solver\\analog\\ckt-mode.ts",
+      "accessCount": 2,
+      "lastAccessed": 1776974630684,
+      "type": "directory"
+    },
+    {
+      "path": "ref\\ngspice\\src\\spicelib\\devices\\jfet\\jfetload.c",
+      "accessCount": 2,
+      "lastAccessed": 1776974637789,
+      "type": "file"
+    },
+    {
+      "path": "src\\components\\passives\\transformer.ts",
+      "accessCount": 2,
+      "lastAccessed": 1776974642421,
+      "type": "file"
+    },
+    {
+      "path": "src\\components\\passives\\__tests__\\capacitor.test.ts",
+      "accessCount": 2,
+      "lastAccessed": 1776974643010,
+      "type": "file"
     },
     {
       "path": "src/solver/digital/compiler.ts",
@@ -322,6 +490,96 @@
       "path": "src\\components\\switching\\switch.ts",
       "accessCount": 1,
       "lastAccessed": 1776905568696,
+      "type": "file"
+    },
+    {
+      "path": "src\\components\\passives\\polarized-cap.ts",
+      "accessCount": 1,
+      "lastAccessed": 1776974538079,
+      "type": "file"
+    },
+    {
+      "path": "src\\components\\semiconductors\\zener.ts",
+      "accessCount": 1,
+      "lastAccessed": 1776974555923,
+      "type": "file"
+    },
+    {
+      "path": "src\\components\\passives\\tapped-transformer.ts",
+      "accessCount": 1,
+      "lastAccessed": 1776974558622,
+      "type": "file"
+    },
+    {
+      "path": "src\\components\\semiconductors\\__tests__\\zener.test.ts",
+      "accessCount": 1,
+      "lastAccessed": 1776974564146,
+      "type": "file"
+    },
+    {
+      "path": "src\\components\\passives\\__tests__\\transformer.test.ts",
+      "accessCount": 1,
+      "lastAccessed": 1776974565898,
+      "type": "file"
+    },
+    {
+      "path": "src\\components\\passives\\__tests__\\tapped-transformer.test.ts",
+      "accessCount": 1,
+      "lastAccessed": 1776974566073,
+      "type": "file"
+    },
+    {
+      "path": "src\\solver\\analog\\__tests__\\harness\\device-mappings.ts",
+      "accessCount": 1,
+      "lastAccessed": 1776974567169,
+      "type": "directory"
+    },
+    {
+      "path": "ref\\ngspice\\src\\spicelib\\devices\\dio",
+      "accessCount": 1,
+      "lastAccessed": 1776974584618,
+      "type": "directory"
+    },
+    {
+      "path": "src\\solver\\analog\\stamp-helpers.ts",
+      "accessCount": 1,
+      "lastAccessed": 1776974584973,
+      "type": "file"
+    },
+    {
+      "path": "src\\solver\\analog\\coupled-inductor.ts",
+      "accessCount": 1,
+      "lastAccessed": 1776974632204,
+      "type": "file"
+    },
+    {
+      "path": "src\\components\\sensors\\spark-gap.ts",
+      "accessCount": 1,
+      "lastAccessed": 1776974633536,
+      "type": "file"
+    },
+    {
+      "path": "src\\components\\memory",
+      "accessCount": 1,
+      "lastAccessed": 1776974634572,
+      "type": "directory"
+    },
+    {
+      "path": "src\\fixtures\\__tests__",
+      "accessCount": 1,
+      "lastAccessed": 1776974635581,
+      "type": "directory"
+    },
+    {
+      "path": "src\\io",
+      "accessCount": 1,
+      "lastAccessed": 1776974636080,
+      "type": "directory"
+    },
+    {
+      "path": "src\\components\\semiconductors\\njfet.ts",
+      "accessCount": 1,
+      "lastAccessed": 1776974639140,
       "type": "file"
     }
   ],
