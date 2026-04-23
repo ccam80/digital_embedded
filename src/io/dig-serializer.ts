@@ -62,7 +62,8 @@ function propertyValueToXml(xmlName: string, value: PropertyValue): string {
         const labels: string[] = JSON.parse(value);
         const inner = labels.map((l) => `<string>${escapeXml(l)}</string>`).join("");
         return `<inverterConfig>${inner}</inverterConfig>`;
-      } catch {
+      } catch (err) {
+        console.warn('[dig-serializer] InverterConfig JSON parse failed; using raw string', err);
         // Dual-format fallback (JSON-encoded vs raw string). Per
         // spec/i1-suppression-backlog.md §4.2 retain-with-reason.
         return `<string>${escapeXml(value)}</string>`;
@@ -73,7 +74,8 @@ function propertyValueToXml(xmlName: string, value: PropertyValue): string {
       try {
         const c = JSON.parse(value) as { r: number; g: number; b: number; a: number };
         return `<awt-color>\n            <red>${c.r}</red>\n            <green>${c.g}</green>\n            <blue>${c.b}</blue>\n            <alpha>${c.a}</alpha>\n          </awt-color>`;
-      } catch {
+      } catch (err) {
+        console.warn('[dig-serializer] Color JSON parse failed; using raw string', err);
         // Dual-format fallback (JSON-encoded vs raw string). Per
         // spec/i1-suppression-backlog.md §4.2 retain-with-reason.
         return `<string>${escapeXml(value)}</string>`;
@@ -87,7 +89,8 @@ function propertyValueToXml(xmlName: string, value: PropertyValue): string {
       try {
         const iv = JSON.parse(value) as { value: string; highZ: boolean };
         return `<value v="${iv.value}" z="${iv.highZ}"/>`;
-      } catch {
+      } catch (err) {
+        console.warn('[dig-serializer] InDefault JSON parse failed; using raw string', err);
         // Dual-format fallback (JSON-encoded vs raw string). Per
         // spec/i1-suppression-backlog.md §4.2 retain-with-reason.
         return `<string>${escapeXml(value)}</string>`;
@@ -113,7 +116,8 @@ function propertyValueToXml(xmlName: string, value: PropertyValue): string {
   if (typeof value === "object" && value !== null) {
     try {
       return `<string>${escapeXml(JSON.stringify(value))}</string>`;
-    } catch {
+    } catch (err) {
+      console.warn('[dig-serializer] JSON.stringify failed (circular object?)', err);
       // JSON.stringify throws on circular objects. The serializer must emit
       // valid XML regardless. Per spec/i1-suppression-backlog.md §4.2
       // retain-with-reason.

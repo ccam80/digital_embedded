@@ -100,7 +100,7 @@ const SHARED_ATTRIBUTE_MAPPINGS: AttributeMapping[] = [
   { xmlName: "Label", propertyKey: "label", convert: (v) => v },
   { xmlName: "isProgramMemory", propertyKey: "isProgramMemory", convert: (v) => v === "true" },
   { xmlName: "Data", propertyKey: "data", convert: (v) => {
-    try { const p = JSON.parse(v); if (Array.isArray(p)) return p.map(Number); } catch { /* ignore */ }
+    try { const p = JSON.parse(v); if (Array.isArray(p)) return p.map(Number); } catch (err) { console.warn('[eeprom] Serialized data corrupt, falling back to hex parse', err); }
     if (v.trim() === '') return [];
     return v.trim().split(/[\s,]+/).map((s: string) => parseInt(s, 16));
   }},

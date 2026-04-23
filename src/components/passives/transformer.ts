@@ -50,6 +50,9 @@ export const { paramDefs: TRANSFORMER_PARAM_DEFS, defaults: TRANSFORMER_DEFAULTS
   secondary: {
     primaryResistance:   { default: 1.0,   unit: "Ω", description: "Primary winding series resistance in ohms", min: 0 },
     secondaryResistance: { default: 1.0,   unit: "Ω", description: "Secondary winding series resistance in ohms", min: 0 },
+    IC1:  { default: NaN, unit: "A", description: "Initial condition current for primary winding (UIC)" },
+    IC2:  { default: NaN, unit: "A", description: "Initial condition current for secondary winding (UIC)" },
+    M:    { default: 1,               description: "Parallel multiplicity factor (applied at stamp time per indload.c:41,107)" },
   },
 });
 
@@ -57,18 +60,22 @@ export const { paramDefs: TRANSFORMER_PARAM_DEFS, defaults: TRANSFORMER_DEFAULTS
 // State pool schema — 13 slots
 // ---------------------------------------------------------------------------
 
-// Slot layout — 9 slots total. Previous values are read from s1/s2/s3
+// Slot layout — 13 slots total. Previous values are read from s1/s2/s3
 // at the same offsets (pointer-rotation history).
 const TRANSFORMER_SCHEMA: StateSchema = defineStateSchema("AnalogLinearTransformerElement", [
-  { name: "G11",   doc: "Companion conductance self-1",         init: { kind: "zero" } },
-  { name: "G22",   doc: "Companion conductance self-2",         init: { kind: "zero" } },
-  { name: "G12",   doc: "Companion mutual conductance",         init: { kind: "zero" } },
-  { name: "HIST1", doc: "History voltage source winding 1",     init: { kind: "zero" } },
-  { name: "HIST2", doc: "History voltage source winding 2",     init: { kind: "zero" } },
-  { name: "I1",    doc: "Winding 1 branch current this step",   init: { kind: "zero" } },
-  { name: "I2",    doc: "Winding 2 branch current this step",   init: { kind: "zero" } },
-  { name: "PHI1",  doc: "Total flux linkage winding 1",         init: { kind: "zero" } },
-  { name: "PHI2",  doc: "Total flux linkage winding 2",         init: { kind: "zero" } },
+  { name: "G11",   doc: "Companion conductance self-1",                               init: { kind: "zero" } },
+  { name: "G22",   doc: "Companion conductance self-2",                               init: { kind: "zero" } },
+  { name: "G12",   doc: "Companion mutual conductance",                               init: { kind: "zero" } },
+  { name: "HIST1", doc: "History voltage source winding 1",                           init: { kind: "zero" } },
+  { name: "HIST2", doc: "History voltage source winding 2",                           init: { kind: "zero" } },
+  { name: "I1",    doc: "Winding 1 branch current this step",                         init: { kind: "zero" } },
+  { name: "I2",    doc: "Winding 2 branch current this step",                         init: { kind: "zero" } },
+  { name: "PHI1",  doc: "Total flux linkage winding 1",                               init: { kind: "zero" } },
+  { name: "PHI2",  doc: "Total flux linkage winding 2",                               init: { kind: "zero" } },
+  { name: "CCAP1", doc: "NIintegrate ccap history winding 1 (maps to CKTstate1+INDflux implicit)", init: { kind: "zero" } },
+  { name: "CCAP2", doc: "NIintegrate ccap history winding 2 (maps to CKTstate1+INDflux implicit)", init: { kind: "zero" } },
+  { name: "VOLT1", doc: "Winding 1 terminal voltage (indload.c:114-116 INDvolt)",     init: { kind: "zero" } },
+  { name: "VOLT2", doc: "Winding 2 terminal voltage (indload.c:114-116 INDvolt)",     init: { kind: "zero" } },
 ]);
 
 const SLOT_G11   = 0;
@@ -80,6 +87,10 @@ const SLOT_I1    = 5;
 const SLOT_I2    = 6;
 const SLOT_PHI1  = 7;
 const SLOT_PHI2  = 8;
+const SLOT_CCAP1 = 9;
+const SLOT_CCAP2 = 10;
+const SLOT_VOLT1 = 11;
+const SLOT_VOLT2 = 12;
 
 // ---------------------------------------------------------------------------
 // Pin layout
@@ -236,6 +247,9 @@ export class AnalogTransformerElement implements ReactiveAnalogElement {
   private readonly _branch2: number;
   private _rPri: number;
   private _rSec: number;
+  private _IC1: number;
+  private _IC2: number;
+  private _M: number;
   private _pool!: StatePoolRef;
 
   constructor(
@@ -246,6 +260,9 @@ export class AnalogTransformerElement implements ReactiveAnalogElement {
     k: number,
     rPri: number,
     rSec: number,
+    IC1: number = NaN,
+    IC2: number = NaN,
+    multiplicity: number = 1,
   ) {
     this.pinNodeIds = pinNodeIds;
     this.allNodeIds = pinNodeIds;
@@ -257,6 +274,9 @@ export class AnalogTransformerElement implements ReactiveAnalogElement {
     this._pair = new CoupledInductorPair(lPrimary, lSecondary, k);
     this._rPri = rPri;
     this._rSec = rSec;
+    this._IC1 = IC1;
+    this._IC2 = IC2;
+    this._M = multiplicity;
   }
 
   initState(pool: StatePoolRef): void {

@@ -284,8 +284,8 @@
   "hotPaths": [
     {
       "path": "spec\\phase-2.5-execution.md",
-      "accessCount": 37,
-      "lastAccessed": 1776974647698,
+      "accessCount": 41,
+      "lastAccessed": 1776974690456,
       "type": "file"
     },
     {
@@ -302,8 +302,20 @@
     },
     {
       "path": "src\\components\\semiconductors\\diode.ts",
-      "accessCount": 12,
-      "lastAccessed": 1776974643402,
+      "accessCount": 15,
+      "lastAccessed": 1776974696791,
+      "type": "file"
+    },
+    {
+      "path": "src\\solver\\analog",
+      "accessCount": 9,
+      "lastAccessed": 1776974694346,
+      "type": "directory"
+    },
+    {
+      "path": "src\\components\\passives\\__tests__\\polarized-cap.test.ts",
+      "accessCount": 8,
+      "lastAccessed": 1776974665691,
       "type": "file"
     },
     {
@@ -319,6 +331,12 @@
       "type": "file"
     },
     {
+      "path": "src\\components\\passives\\__tests__\\capacitor.test.ts",
+      "accessCount": 6,
+      "lastAccessed": 1776974690248,
+      "type": "file"
+    },
+    {
       "path": "src\\solver\\analog\\newton-raphson.ts",
       "accessCount": 5,
       "lastAccessed": 1776974584953,
@@ -331,9 +349,9 @@
       "type": "file"
     },
     {
-      "path": "src\\components\\passives\\__tests__\\polarized-cap.test.ts",
+      "path": "src\\components\\passives\\transformer.ts",
       "accessCount": 5,
-      "lastAccessed": 1776974648225,
+      "lastAccessed": 1776974693377,
       "type": "file"
     },
     {
@@ -362,9 +380,15 @@
     },
     {
       "path": "src",
-      "accessCount": 3,
-      "lastAccessed": 1776905591300,
+      "accessCount": 4,
+      "lastAccessed": 1776974663135,
       "type": "directory"
+    },
+    {
+      "path": "src\\components\\semiconductors\\njfet.ts",
+      "accessCount": 4,
+      "lastAccessed": 1776974696284,
+      "type": "file"
     },
     {
       "path": "ref\\ngspice\\src\\spicelib\\devices\\ind\\indload.c",
@@ -377,12 +401,6 @@
       "accessCount": 3,
       "lastAccessed": 1776974563970,
       "type": "file"
-    },
-    {
-      "path": "src\\solver\\analog",
-      "accessCount": 3,
-      "lastAccessed": 1776974585342,
-      "type": "directory"
     },
     {
       "path": "src\\components\\passives\\inductor.ts",
@@ -415,6 +433,18 @@
       "type": "file"
     },
     {
+      "path": "src\\solver\\analog\\ni-integrate.ts",
+      "accessCount": 3,
+      "lastAccessed": 1776974661245,
+      "type": "file"
+    },
+    {
+      "path": "src\\components\\passives\\tapped-transformer.ts",
+      "accessCount": 3,
+      "lastAccessed": 1776974671024,
+      "type": "file"
+    },
+    {
       "path": "src/components/switching/switch.ts",
       "accessCount": 2,
       "lastAccessed": 1776905259029,
@@ -433,12 +463,6 @@
       "type": "file"
     },
     {
-      "path": "src\\solver\\analog\\ni-integrate.ts",
-      "accessCount": 2,
-      "lastAccessed": 1776974600419,
-      "type": "file"
-    },
-    {
       "path": "src\\solver\\analog\\ckt-mode.ts",
       "accessCount": 2,
       "lastAccessed": 1776974630684,
@@ -448,18 +472,6 @@
       "path": "ref\\ngspice\\src\\spicelib\\devices\\jfet\\jfetload.c",
       "accessCount": 2,
       "lastAccessed": 1776974637789,
-      "type": "file"
-    },
-    {
-      "path": "src\\components\\passives\\transformer.ts",
-      "accessCount": 2,
-      "lastAccessed": 1776974642421,
-      "type": "file"
-    },
-    {
-      "path": "src\\components\\passives\\__tests__\\capacitor.test.ts",
-      "accessCount": 2,
-      "lastAccessed": 1776974643010,
       "type": "file"
     },
     {
@@ -502,12 +514,6 @@
       "path": "src\\components\\semiconductors\\zener.ts",
       "accessCount": 1,
       "lastAccessed": 1776974555923,
-      "type": "file"
-    },
-    {
-      "path": "src\\components\\passives\\tapped-transformer.ts",
-      "accessCount": 1,
-      "lastAccessed": 1776974558622,
       "type": "file"
     },
     {
@@ -575,12 +581,6 @@
       "accessCount": 1,
       "lastAccessed": 1776974636080,
       "type": "directory"
-    },
-    {
-      "path": "src\\components\\semiconductors\\njfet.ts",
-      "accessCount": 1,
-      "lastAccessed": 1776974639140,
-      "type": "file"
     }
   ],
   "userDirectives": []

@@ -16,9 +16,9 @@ const DLL_PATH = resolve(
 );
 
 let dllAvailable = false;
-try { accessSync(DLL_PATH); dllAvailable = true; } catch { console.warn(`ngspice DLL not found: ${DLL_PATH} — harness tests will be skipped`); }
+try { accessSync(DLL_PATH); dllAvailable = true; } catch { throw new Error('ngspice DLL required for buckbjt smoke test'); }
 
-const describeIfDll = dllAvailable ? describe : describe.skip;
+const describeIfDll = describe;
 
 describeIfDll("ComparisonSession — buckbjt smoke test", () => {
   it("transient: CCAP in capacitor and BJT junctions over first steps/retries", async () => {

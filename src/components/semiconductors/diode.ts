@@ -126,6 +126,13 @@ export const { paramDefs: DIODE_PARAM_DEFS, defaults: DIODE_PARAM_DEFAULTS } = d
     TNOM: { default: REFTEMP, unit: "K", description: "Parameter measurement temperature" },
     OFF: { default: 0,                description: "Initial condition: device off (0=false, 1=true)" },
     IC:  { default: NaN,   unit: "V",  description: "Initial condition: junction voltage for UIC" },
+    // D-W3-6: sidewall saturation current params — dioload.c:209-243
+    ISW:   { default: 0,    unit: "A",  description: "Sidewall saturation current (DIOsatSWCur)" },
+    NSW:   { default: NaN,             description: "Sidewall emission coefficient (DIOswEmissionCoeff; default=N)" },
+    // D-W3-7: tunnel current params — dioload.c:267-285
+    IBEQ:  { default: 0,    unit: "A",  description: "Tunnel bottom saturation current (DIOtunSatCur)" },
+    IBSW:  { default: 0,    unit: "A",  description: "Tunnel sidewall saturation current (DIOtunSatSWCur)" },
+    NB:    { default: 1,               description: "Tunnel emission coefficient (DIOtunEmissionCoeff)" },
   },
 });
 
@@ -393,10 +400,24 @@ export function createDiodeElement(
     TNOM: props.getModelParam<number>("TNOM"),
     OFF:  props.getModelParam<number>("OFF"),
     IC:   props.getModelParam<number>("IC"),
+    // D-W3-6: sidewall current params (dioload.c:209-243)
+    ISW:  props.getModelParam<number>("ISW"),
+    NSW:  props.getModelParam<number>("NSW"),
+    // D-W3-7: tunnel current params (dioload.c:267-285)
+    IBEQ: props.getModelParam<number>("IBEQ"),
+    IBSW: props.getModelParam<number>("IBSW"),
+    NB:   props.getModelParam<number>("NB"),
   };
 
   // diosetup.c:93-95: NBV defaults to N when not explicitly given
   if (isNaN(params.NBV)) params.NBV = params.N;
+
+  // D-W3-6: NSW defaults to N when not explicitly given (mirrors DIOswEmissionCoeff default)
+  if (isNaN(params.NSW)) params.NSW = params.N;
+
+  // D-W3-5: BV_given flag mirroring ngspice DIObreakdownVoltageGiven (dioload.c:183).
+  // True when BV was set to a finite value (not the Infinity default).
+  const BV_given = isFinite(params.BV);
 
   // Area scaling — applied once at construction
   params.IS  *= params.AREA;
@@ -452,7 +473,7 @@ export function createDiodeElement(
     isNonlinear: true,
     isReactive: hasCapacitance,
     poolBacked: true as const,
-    stateSize: hasCapacitance ? 8 : 4,
+    stateSize: hasCapacitance ? 7 : 4,
     stateSchema: hasCapacitance ? DIODE_CAP_SCHEMA : DIODE_SCHEMA,
     stateBaseOffset: -1,
 

@@ -227,7 +227,8 @@ export class NodeResolver implements FileResolver {
     // Try base directory first
     try {
       return await this._readFileFn(`${this._basePath}${fileName}`);
-    } catch {
+    } catch (err) {
+      console.warn(`[file-resolver] Failed to read "${this._basePath}${fileName}"`, err);
       // Multi-candidate resolver control flow (matches Digital's subcircuit
       // search). Per spec/i1-suppression-backlog.md §4.2 retain-with-reason.
     }
@@ -240,7 +241,8 @@ export class NodeResolver implements FileResolver {
       for (const subdir of this._subdirs) {
         try {
           return await this._readFileFn(`${this._basePath}${subdir}/${fileName}`);
-        } catch {
+        } catch (err) {
+          console.warn(`[file-resolver] Failed to read "${this._basePath}${subdir}/${fileName}"`, err);
           // Multi-candidate resolver control flow — try next subdir. Per
           // spec/i1-suppression-backlog.md §4.2 retain-with-reason.
           continue;
@@ -267,7 +269,8 @@ export class NodeResolver implements FileResolver {
           try {
             await this._readdirFn(`${this._basePath}${entry}`);
             dirs.push(entry);
-          } catch {
+          } catch (err) {
+            console.warn(`[file-resolver] Entry "${this._basePath}${entry}" is not a directory`, err);
             // Probe-as-directory heuristic — failure means entry is a file,
             // not a directory. Per spec/i1-suppression-backlog.md §4.2
             // retain-with-reason (load-bearing control flow).

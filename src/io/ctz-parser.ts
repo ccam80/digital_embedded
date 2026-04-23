@@ -65,7 +65,8 @@ async function decompressRawDeflate(compressed: Uint8Array): Promise<string> {
   let ds: DecompressionStream;
   try {
     ds = new DecompressionStream("deflate-raw");
-  } catch {
+  } catch (err) {
+    console.warn('[ctz-parser] deflate-raw not supported; trying deflate fallback', err);
     // Dual-format fallback: polyfill environments only support zlib-wrapped
     // deflate. Per spec/i1-suppression-backlog.md §4.2 retain-with-reason.
     ds = new DecompressionStream("deflate");

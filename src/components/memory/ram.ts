@@ -212,7 +212,9 @@ const SHARED_ATTRIBUTE_MAPPINGS: AttributeMapping[] = [
     try {
       const parsed = JSON.parse(v);
       if (Array.isArray(parsed)) return parsed.map(Number);
-    } catch { /* ignore */ }
+    } catch (err) {
+      console.warn('[ram] Serialized data corrupt, falling back to hex parse', err);
+    }
     if (v.trim() === '') return [];
     return v.trim().split(/[\s,]+/).map((s: string) => parseInt(s, 16));
   }},

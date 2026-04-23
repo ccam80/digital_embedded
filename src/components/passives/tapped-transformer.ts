@@ -66,10 +66,11 @@ export const { paramDefs: TAPPED_TRANSFORMER_PARAM_DEFS, defaults: TAPPED_TRANSF
 });
 
 // ---------------------------------------------------------------------------
-// State-pool schema — 12 slots: 9 companion matrix coefficients + 3 current history
+// State-pool schema — 18 slots: 9 companion matrix coefficients + 3 current
+// history + 3 flux linkage + 3 voltage history (indload.c:114-116 SLOT_VOLT)
 // ---------------------------------------------------------------------------
 
-// Slot layout — 15 slots total. Previous values are read from s1/s2/s3
+// Slot layout — 18 slots total. Previous values are read from s1/s2/s3
 // at the same offsets (pointer-rotation history).
 const TAPPED_TRANSFORMER_SCHEMA: StateSchema = defineStateSchema("AnalogTappedTransformerElement", [
   { name: "G11",   doc: "Primary self-conductance companion coefficient",          init: { kind: "zero" } },
@@ -87,23 +88,30 @@ const TAPPED_TRANSFORMER_SCHEMA: StateSchema = defineStateSchema("AnalogTappedTr
   { name: "PHI1",  doc: "Total flux linkage winding 1 this step",                  init: { kind: "zero" } },
   { name: "PHI2",  doc: "Total flux linkage winding 2 this step",                  init: { kind: "zero" } },
   { name: "PHI3",  doc: "Total flux linkage winding 3 this step",                  init: { kind: "zero" } },
+  // TT-W3-4: voltage-state slots per indload.c:114-116 (INDvolt history copy on MODEINITTRAN)
+  { name: "VOLT1", doc: "Primary winding terminal voltage (indload.c:INDvolt winding 1)",     init: { kind: "zero" } },
+  { name: "VOLT2", doc: "Secondary half-1 terminal voltage (indload.c:INDvolt winding 2)",   init: { kind: "zero" } },
+  { name: "VOLT3", doc: "Secondary half-2 terminal voltage (indload.c:INDvolt winding 3)",   init: { kind: "zero" } },
 ]);
 
-const SLOT_G11   = 0;
-const SLOT_G22   = 1;
-const SLOT_G33   = 2;
-const SLOT_G12   = 3;
-const SLOT_G13   = 4;
-const SLOT_G23   = 5;
-const SLOT_HIST1 = 6;
-const SLOT_HIST2 = 7;
-const SLOT_HIST3 = 8;
-const SLOT_I1    = 9;
-const SLOT_I2    = 10;
-const SLOT_I3    = 11;
-const SLOT_PHI1  = 12;
-const SLOT_PHI2  = 13;
-const SLOT_PHI3  = 14;
+const SLOT_G11    = 0;
+const SLOT_G22    = 1;
+const SLOT_G33    = 2;
+const SLOT_G12    = 3;
+const SLOT_G13    = 4;
+const SLOT_G23    = 5;
+const SLOT_HIST1  = 6;
+const SLOT_HIST2  = 7;
+const SLOT_HIST3  = 8;
+const SLOT_I1     = 9;
+const SLOT_I2     = 10;
+const SLOT_I3     = 11;
+const SLOT_PHI1   = 12;
+const SLOT_PHI2   = 13;
+const SLOT_PHI3   = 14;
+const SLOT_VOLT1  = 15;
+const SLOT_VOLT2  = 16;
+const SLOT_VOLT3  = 17;
 
 // ---------------------------------------------------------------------------
 // Pin layout
@@ -251,6 +259,12 @@ export class AnalogTappedTransformerElement implements ReactiveAnalogElement {
   readonly stateSchema = TAPPED_TRANSFORMER_SCHEMA;
   readonly stateSize = TAPPED_TRANSFORMER_SCHEMA.size;
   stateBaseOffset = -1;
+  // TT-W3-6: class-body setParam is intentionally a no-op. The real setParam is
+  // wired by the buildTappedTransformerElement closure, which overrides this method
+  // on the returned AnalogElementCore. Any consumer that constructs
+  // AnalogTappedTransformerElement directly (bypassing buildTappedTransformerElement)
+  // will get this no-op and hot-reload calls will silently drop. Always route
+  // construction through buildTappedTransformerElement.
   setParam(_key: string, _value: number): void {}
 
   private readonly _b2: number;

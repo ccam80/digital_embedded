@@ -50,8 +50,8 @@ const DLL_PATH = resolve(
   'ref/ngspice/visualc-shared/x64/Release/bin/spice.dll',
 );
 let dllAvailable = false;
-try { accessSync(DLL_PATH); dllAvailable = true; } catch { console.warn(`ngspice DLL not found: ${DLL_PATH} — harness tests will be skipped`); }
-const describeIfDll = dllAvailable ? describe : describe.skip;
+try { accessSync(DLL_PATH); dllAvailable = true; } catch { throw new Error('ngspice DLL required for buckbjt convergence test'); }
+const describeIfDll = describe;
 
 // Phases whose phaseParameter carries diagGmin (ngspice CKTdiagGmin).
 const GMIN_PHASES: ReadonlySet<NRPhase> = new Set([
