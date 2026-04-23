@@ -409,8 +409,10 @@ describe("TappedTransformerDefinition", () => {
     expect((TappedTransformerDefinition.modelRegistry?.behavioral as {kind:"inline";factory:AnalogFactory}|undefined)?.factory).toBeDefined();
   });
 
-  it("branchCount is 1", () => {
-    expect((TappedTransformerDefinition.modelRegistry?.behavioral as {kind:"inline";factory:AnalogFactory;branchCount?:number}|undefined)?.branchCount).toBe(1);
+  it("branchCount is 3", () => {
+    // TT-W3-1: three branch rows required (primary + sec-half-1 + sec-half-2).
+    // Old value of 1 caused b2 and b3 to alias unrelated matrix rows.
+    expect((TappedTransformerDefinition.modelRegistry?.behavioral as {kind:"inline";factory:AnalogFactory;branchCount?:number}|undefined)?.branchCount).toBe(3);
   });
 
   it("category is PASSIVES", () => {

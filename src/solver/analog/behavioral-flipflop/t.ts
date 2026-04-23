@@ -67,6 +67,10 @@ export class BehavioralTFlipflopElement implements AnalogElementCore {
     delegatePinSetParam(this._pinModelsByLabel, key, value);
   }
 
+  initVoltages(rhs: Float64Array): void {
+    this._prevClockVoltage = readMnaVoltage(this._clockPin.nodeId, rhs);
+  }
+
   load(ctx: LoadContext): void {
     // Delegate input stamping to pin models
     if (this._tPin !== null) this._tPin.load(ctx);

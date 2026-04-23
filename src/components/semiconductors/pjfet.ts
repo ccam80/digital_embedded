@@ -634,9 +634,11 @@ export function createPJfetElement(
         // jfetload.c:461-493: store + NIintegrate (skipped for UIC TRANOP).
         if (!((mode & MODETRANOP) && (mode & MODEUIC))) {
           if (mode & MODEINITSMSIG) {
-            // jfetload.c:463-466: store raw caps and continue.
+            // jfetload.c:463-466: store raw caps and continue
+            // (ngspice `continue` skips all stamps — replicated as return).
             s0[base + SLOT_QGS] = capgs;
             s0[base + SLOT_QGD] = capgd;
+            return; // J-W3-1: skip all state-write + stamp blocks per jfetload.c:466
           } else {
             // jfetload.c:471-476: MODEINITTRAN copies state0 → state1.
             if (mode & MODEINITTRAN) {
@@ -696,7 +698,10 @@ export function createPJfetElement(
       }
 
       // jfetload.c:498-508: CKTnoncon increment on icheck failure.
-      if (icheckLimited) ctx.noncon.value++;
+      // Gate: `!(MODEINITFIX) | !(MODEUIC)` — bitwise-OR (|), NOT logical-OR
+      // (||). This is an intentional ngspice quirk that makes the condition
+      // always-true when only one bit is set; replicated exactly per J-W3-2.
+      if ((!(mode & MODEINITFIX) | !(mode & MODEUIC)) && icheckLimited) ctx.noncon.value++;
 
       // jfetload.c:509-517: write accepted state back to state0.
       s0[base + SLOT_VGS] = vgs;
@@ -719,6 +724,7 @@ export function createPJfetElement(
       stampRHS(solver, nodeS, m * (cdreq + ceqgs));
 
       // jfetload.c:534-550: Y-matrix stamps.
+      // jfetload.c:536-544: off-diagonal + prime-node stamps (cross terms).
       stampG(solver, nodeG, nodeG, m * (ggd + ggs));
       stampG(solver, nodeG, nodeD, m * (-ggd));
       stampG(solver, nodeG, nodeS, m * (-ggs));
@@ -728,6 +734,11 @@ export function createPJfetElement(
       stampG(solver, nodeS, nodeG, m * (-ggs - gm));
       stampG(solver, nodeS, nodeD, m * (-gds));
       stampG(solver, nodeS, nodeS, m * (gspr + gds + gm + ggs));
+      // jfetload.c:546,548: external drain/source self-stamps (gdpr/gspr).
+      // J-W3-3: collapsed prime↔external nodes → 2 additional self-stamps.
+      // ngspice: JFETdrainDrainPtr += m*(gdpr); JFETsourceSourcePtr += m*(gspr).
+      if (gdpr > 0) stampG(solver, nodeD, nodeD, m * gdpr);
+      if (gspr > 0) stampG(solver, nodeS, nodeS, m * gspr);
     },
 
     primeJunctions(): void {

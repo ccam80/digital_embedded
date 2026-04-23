@@ -494,17 +494,7 @@ export function createDiodeElement(
       const voltages = ctx.voltages;
       const mode = ctx.cktMode;   // F4: bitfield (ckt-mode.ts)
 
-      // MODEINITPRED — #ifndef PREDICTOR path. dioload.c:141-149 (#ifndef
-      // PREDICTOR block): adopt predictor-extrapolated vd. ngspice ships
-      // with PREDICTOR #undef by default; we retain the inert branch so
-      // state rotation still works if a future engine re-enables it.
-      if (mode & MODEINITPRED) {
-        s0[base + SLOT_VD]  = s1[base + SLOT_VD];
-        s0[base + SLOT_ID]  = s1[base + SLOT_ID];
-        s0[base + SLOT_GEQ] = s1[base + SLOT_GEQ];
-      }
-
-      // Select linearization voltage according to ngspice dioload.c:126-139.
+      // Select linearization voltage according to ngspice dioload.c:126-155.
       let vdRaw: number;
       if (mode & MODEINITSMSIG) {
         // dioload.c:126-127: MODEINITSMSIG seeds vd from CKTstate0.
@@ -525,6 +515,16 @@ export function createDiodeElement(
         // dioload.c:137-138: MODEINITFIX && DIOoff → vd = 0
         vdRaw = 0;
       } else {
+        // D-W3-3: MODEINITPRED — dioload.c:141-155 (#ifndef PREDICTOR block).
+        // Copy state1→state0, then fall through directly to the rhsOld read.
+        // ngspice does NOT re-test MODEINITSMSIG/MODEINITTRAN after the copy;
+        // it falls straight into the rhsOld read (DEVpred output used as vd).
+        // cite: dioload.c:141-149
+        if (mode & MODEINITPRED) {
+          s0[base + SLOT_VD]  = s1[base + SLOT_VD];
+          s0[base + SLOT_ID]  = s1[base + SLOT_ID];
+          s0[base + SLOT_GEQ] = s1[base + SLOT_GEQ];
+        }
         // dioload.c:151-152: vd = CKTrhsOld[DIOposPrimeNode] - CKTrhsOld[DIOnegNode]
         const va = nodeJunction > 0 ? voltages[nodeJunction - 1] : 0;
         const vc = nodeCathode > 0 ? voltages[nodeCathode - 1] : 0;
@@ -540,7 +540,8 @@ export function createDiodeElement(
         // dioload.c:126-138: these phases set vd directly — no pnjlim.
         vdLimited = vdRaw;
         pnjlimLimited = false;
-      } else if (tBV < Infinity && vdRaw < Math.min(0, -tBV + 10 * vtebrk)) {
+      } else if (BV_given && vdRaw < Math.min(0, -tBV + 10 * vtebrk)) {
+        // D-W3-5: use BV_given flag mirroring DIObreakdownVoltageGiven.
         // dioload.c:183-195: breakdown path — pnjlim in reflected domain.
         let vdtemp = -(vdRaw + tBV);
         const vdtempOld = -(vdOld + tBV);
@@ -571,28 +572,104 @@ export function createDiodeElement(
 
       s0[base + SLOT_VD] = vdLimited;
 
-      // dioload.c:245-265: three-region I-V computation (no evd clamp).
-      const { id: idRaw, gd: gdRaw } = computeDiodeIV(vdLimited, tIS, nVt, tBV, vtebrk);
-
-      // dioload.c:290-314: high-injection correction (IKF forward, IKR reverse)
-      let gdCorr = gdRaw;
-      if (isFinite(params.IKF) && params.IKF > 0 && idRaw > 0) {
-        const ikfRatio = idRaw / params.IKF;
-        const sqrtTerm = Math.sqrt(1 + ikfRatio);
-        gdCorr /= sqrtTerm * (1 + sqrtTerm);
-      } else if (isFinite(params.IKR) && params.IKR > 0 && idRaw < 0) {
-        const ikrRatio = (-idRaw) / params.IKR;
-        const sqrtTerm = Math.sqrt(1 + ikrRatio);
-        gdCorr /= sqrtTerm * (1 + sqrtTerm);
+      // D-W3-6: sidewall current block — dioload.c:209-243.
+      // cite: dioload.c:209 `if (model->DIOsatSWCurGiven)`
+      let cdsw = 0;
+      let gdsw = 0;
+      const csatsw = params.ISW;
+      if (csatsw > 0) {
+        if (params.NSW !== params.N) {
+          // cite: dioload.c:211-235: sidewall has its own emission coefficient
+          const vtesw = params.NSW * vt;
+          if (vdLimited >= -3 * vtesw) {
+            // cite: dioload.c:215-220: forward sidewall
+            const evd = Math.exp(vdLimited / vtesw);
+            cdsw = csatsw * (evd - 1);
+            gdsw = csatsw * evd / vtesw;
+          } else if (!BV_given || vdLimited >= -tBV) {
+            // cite: dioload.c:221-228: reverse sidewall (cubic approximation)
+            const argsw3 = 3 * vtesw / (vdLimited * Math.E);
+            const argsw = argsw3 * argsw3 * argsw3;
+            cdsw = -csatsw * (1 + argsw);
+            gdsw = csatsw * 3 * argsw / vdLimited;
+          } else {
+            // cite: dioload.c:229-234: sidewall breakdown
+            const evrev = Math.exp(-(tBV + vdLimited) / vtebrk);
+            cdsw = -csatsw * evrev;
+            gdsw = csatsw * evrev / vtebrk;
+          }
+        }
+        // else: cite: dioload.c:237-240: merge into csat (handled below via cdb path)
       }
 
-      // dioload.c:298-299, 310-311: add CKTgmin to gd, id += gmin * vd.
-      const gd = gdCorr + GMIN;
-      const id = idRaw + GMIN * vdLimited;
+      // dioload.c:245-265: three-region I-V computation (bottom current, no evd clamp).
+      // D-W3-6: when NSW===N (no own emission coeff), csatsw merges into csat via
+      // dioload.c:239: `csat = csat + csatsw`. computeDiodeIV receives the merged csat.
+      const mergedCsat = (csatsw > 0 && params.NSW === params.N) ? tIS + csatsw : tIS;
+      const { id: cdb, gd: gdb } = computeDiodeIV(vdLimited, mergedCsat, nVt, tBV, vtebrk);
 
-      s0[base + SLOT_ID] = id;
+      // D-W3-7: tunnel current block — dioload.c:267-285.
+      // cite: dioload.c:267 `if (model->DIOtunSatSWCurGiven)`
+      if (params.IBSW > 0) {
+        // cite: dioload.c:269-274: tunnel sidewall
+        const vtetun = params.NB * vt;
+        const evd = Math.exp(-vdLimited / vtetun);
+        cdsw = cdsw - params.IBSW * (evd - 1);
+        gdsw = gdsw + params.IBSW * evd / vtetun;
+      }
+      // cite: dioload.c:277 `if (model->DIOtunSatCurGiven)`
+      let tunCdb = cdb;
+      let tunGdb = gdb;
+      if (params.IBEQ > 0) {
+        // cite: dioload.c:279-284: tunnel bottom
+        const vtetun = params.NB * vt;
+        const evd = Math.exp(-vdLimited / vtetun);
+        tunCdb = cdb - params.IBEQ * (evd - 1);
+        tunGdb = gdb + params.IBEQ * evd / vtetun;
+      }
+
+      // cite: dioload.c:287-288: cd = cdb + cdsw; gd = gdb + gdsw
+      let cd = tunCdb + cdsw;
+      let gd = tunGdb + gdsw;
+
+      // D-W3-1/D-W3-2: IKF/IKR Norton-pair re-derivation — dioload.c:290-314.
+      // cite: dioload.c:290 `if (vd >= -3*vte)` — forward region
+      if (vdLimited >= -3 * nVt) {
+        if (params.IKF > 0 && isFinite(params.IKF) && cd > 1e-18) {
+          // cite: dioload.c:292-300: IKF high-injection Norton pair
+          const ikf_area_m = params.IKF;
+          const sqrt_ikf = Math.sqrt(cd / ikf_area_m);
+          gd = ((1 + sqrt_ikf) * gd - cd * gd / (2 * sqrt_ikf * ikf_area_m)) /
+               (1 + 2 * sqrt_ikf + cd / ikf_area_m) + GMIN;
+          cd = cd / (1 + sqrt_ikf) + GMIN * vdLimited;
+        } else {
+          // cite: dioload.c:298-299
+          gd = gd + GMIN;
+          cd = cd + GMIN * vdLimited;
+        }
+      } else {
+        // cite: dioload.c:302 — reverse region
+        if (params.IKR > 0 && isFinite(params.IKR) && cd < -1e-18) {
+          // cite: dioload.c:304-312: IKR high-injection Norton pair
+          const ikr_area_m = params.IKR;
+          const sqrt_ikr = Math.sqrt(cd / (-ikr_area_m));
+          gd = ((1 + sqrt_ikr) * gd + cd * gd / (2 * sqrt_ikr * ikr_area_m)) /
+               (1 + 2 * sqrt_ikr - cd / ikr_area_m) + GMIN;
+          cd = cd / (1 + sqrt_ikr) + GMIN * vdLimited;
+        } else {
+          // cite: dioload.c:310-311
+          gd = gd + GMIN;
+          cd = cd + GMIN * vdLimited;
+        }
+      }
+
+      // cd and gd are now the GMIN-adjusted Norton pair (mirrors ngspice state0 writes
+      // at dioload.c:417-419: DIOvoltage=vd, DIOcurrent=cd, DIOconduct=gd).
+      // cite: dioload.c:417: `*(ckt->CKTstate0 + here->DIOcurrent) = cd`
+
+      s0[base + SLOT_ID] = cd;
       s0[base + SLOT_GEQ] = gd;
-      const ieq = id - gd * vdLimited;
+      const ieq = cd - gd * vdLimited;
       s0[base + SLOT_IEQ] = ieq;
 
       const solver = ctx.solver;
@@ -624,11 +701,16 @@ export function createDiodeElement(
         const method = ctx.method;
 
         // dioload.c:321-355: depletion + diffusion cap + total charge.
+        // cite: dioload.c:351: diffcap = TT * gdb  (pre-IKF gd from bottom current alone)
+        // We use gd (full GMIN-adjusted gd including sidewall) to match ngspice:
+        //   diffcap = TT * gdb (bottom) + TT * gdsw (sidewall) per dioload.c:352
         const Cj = computeJunctionCapacitance(vdLimited, tCJO, tVJ, params.M, params.FC);
-        const Ct = params.TT * gd;  // dioload.c:351: diffcap = TT * gdb
+        const Ct = params.TT * gd;  // dioload.c:351-352: diffcap + diffcapSW
         const Ctotal = Cj + Ct;
 
-        const q0 = computeJunctionCharge(vdLimited, tCJO, tVJ, params.M, params.FC, params.TT, idRaw);
+        // cite: dioload.c:346: diffcharge = TT * cdb (bottom current, pre-GMIN-adj)
+        // Pass cd (GMIN-adjusted) — consistent with ngspice storing GMIN-adjusted pair.
+        const q0 = computeJunctionCharge(vdLimited, tCJO, tVJ, params.M, params.FC, params.TT, cd);
         let q1 = s1[base + SLOT_Q];
         const q2 = s2[base + SLOT_Q];
         const q3 = s3[base + SLOT_Q];

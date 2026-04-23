@@ -286,11 +286,14 @@ export class AnalogTransformerElement implements ReactiveAnalogElement {
 
   setParam(_key: string, _value: number): void {}
 
-  updateDerivedParams(lPrimary: number, turnsRatio: number, k: number, rPri: number, rSec: number): void {
+  updateDerivedParams(lPrimary: number, turnsRatio: number, k: number, rPri: number, rSec: number, IC1: number = NaN, IC2: number = NaN, multiplicity: number = 1): void {
     const lSecondary = lPrimary / (turnsRatio * turnsRatio);
     this._pair = new CoupledInductorPair(lPrimary, lSecondary, k);
     this._rPri = rPri;
     this._rSec = rSec;
+    this._IC1 = IC1;
+    this._IC2 = IC2;
+    this._M = multiplicity;
     if (!this._pool) {
       throw new Error("AnalogTransformerElement.updateDerivedParams called before initState");
     }
@@ -300,23 +303,38 @@ export class AnalogTransformerElement implements ReactiveAnalogElement {
   /**
    * Unified load() — two-winding coupled inductor transformer.
    *
-   * Always stamps: winding resistances, branch B/C incidence.
-   * Reactive: inline NIintegrate on flux linkages φ1 = L1·I1 + M·I2,
-   *                                          φ2 = L2·I2 + M·I1.
-   * Under NIintegrate (ngspice niinteg.c), the branch equation is:
-   *   V_1 = dφ_1/dt ⇒ ag[0]·φ_1(n) + Σ_{j≥1} ag[j]·φ_1(n-j) = V_1(n)
-   * substituting φ_1(n) = L1·I1(n) + M·I2(n):
-   *   ag[0]·L1·I1 + ag[0]·M·I2 + hist_φ1 = V_1
-   *   ⇒ branch row: V(P1)−V(P2) − (ag[0]·L1)·I1 − (ag[0]·M)·I2 = hist_φ1
+   * Mirrors indload.c:INDload for each winding plus the inline MUTUAL block
+   * (indload.c:52-77) for off-diagonal coupling stamps.
+   *
+   * T-W3-2: Integration gate is !(MODEDC) per indload.c:88, not MODETRAN.
+   * T-W3-3: Two niIntegrate() calls (one per winding); SLOT_CCAP1/CCAP2 tracked.
+   *         Mutual companion: g12 = ag[0] * M per indload.c:74-75.
+   * T-W3-4: UIC flux seed per indload.c:44-46 (IC1/IC2 params).
+   * T-W3-5: M (multiplicity) applied at stamp time per indload.c:41,107 (user ruling 3).
+   * T-W3-6: SLOT_VOLT1/VOLT2 + MODEINITTRAN copy per indload.c:114-116.
    */
   load(ctx: LoadContext): void {
     const solver = ctx.solver;
     const [p1, p2, sec1, sec2] = this.pinNodeIds;
     const b1 = this.branchIndex;
     const b2 = this._branch2;
-    const L1 = this._pair.l1;
-    const L2 = this._pair.l2;
-    const M = this._pair.m;
+    const mode = ctx.cktMode;
+    const ag = ctx.ag;
+
+    // T-W3-5: multiplicity factor m per indload.c:41 (m = INDm).
+    // Applied at stamp time: newmind = L/m (indload.c:107).
+    const m = this._M;
+    const L1 = this._pair.l1 / m;
+    const L2 = this._pair.l2 / m;
+    // Mutual factor scales by m too: MUTfactor = k*sqrt(L1_raw*L2_raw)/m = M_raw/m.
+    const Mcoup = this._pair.m / m;
+
+    const voltages = ctx.voltages;
+    const base = this.stateBaseOffset;
+    const s0 = this._pool.states[0];
+    const s1 = this._pool.states[1];
+    const s2 = this._pool.states[2];
+    const s3 = this._pool.states[3];
 
     // Winding resistances (topology-constant, always stamped).
     if (this._rPri > 0) {
@@ -350,24 +368,20 @@ export class AnalogTransformerElement implements ReactiveAnalogElement {
     if (sec1 !== 0) solver.stampElement(solver.allocElement(b2, sec1 - 1), 1);
     if (sec2 !== 0) solver.stampElement(solver.allocElement(b2, sec2 - 1), -1);
 
-    // Unified compute-then-stamp for branch block — matches indload.c:88-123
-    // applied per winding, plus mutload.c:64-75 pattern for off-diagonal mutual
-    // coupling. In DC (MODEDC) all scalars are zero (indload.c:88-90); in TRAN
-    // they come from niIntegrate on the coupled flux linkages. The 2×2 stamp
-    // pattern is mode-invariant (structural nonzero preserved via handle table).
-    const voltages = ctx.voltages;
-    const i1Now = voltages[b1];
-    const i2Now = voltages[b2];
-    const base = this.stateBaseOffset;
-    const s0 = this._pool.states[0];
-    const s1 = this._pool.states[1];
-    const s2 = this._pool.states[2];
+    // T-W3-4: UIC branch current override for flux seeding — indload.c:44-46.
+    // Applied only when (MODEUIC && MODEINITTRAN) and IC is finite.
+    let i1Now = voltages[b1];
+    let i2Now = voltages[b2];
+    if ((mode & MODEUIC) && (mode & MODEINITTRAN)) {
+      if (isFinite(this._IC1)) i1Now = this._IC1;
+      if (isFinite(this._IC2)) i2Now = this._IC2;
+    }
 
-    // Flux update guard mirrors !(MODEDC|MODEINITPRED) from indload.c:43.
-    const mode = ctx.cktMode;
+    // Flux-state update gated on !(MODEDC | MODEINITPRED), per indload.c:43.
+    // T-W3-4: UIC path seeds phi1 = L1*IC1 (indload.c:45-46 flux = L/m * initCond).
     if (!(mode & (MODEDC | MODEINITPRED))) {
-      s0[base + SLOT_PHI1] = L1 * i1Now + M * i2Now;
-      s0[base + SLOT_PHI2] = L2 * i2Now + M * i1Now;
+      s0[base + SLOT_PHI1] = L1 * i1Now + Mcoup * i2Now;
+      s0[base + SLOT_PHI2] = L2 * i2Now + Mcoup * i1Now;
       if (mode & MODEINITTRAN) {
         s1[base + SLOT_PHI1] = s0[base + SLOT_PHI1];
         s1[base + SLOT_PHI2] = s0[base + SLOT_PHI2];
@@ -377,36 +391,54 @@ export class AnalogTransformerElement implements ReactiveAnalogElement {
       s0[base + SLOT_PHI2] = s1[base + SLOT_PHI2];
     }
 
-    // Companion coefficients — zero at DC, niIntegrate-derived during TRAN.
+    // Companion coefficients — zero at DC; niIntegrate-derived otherwise.
+    // T-W3-2: gate is !(MODEDC) per indload.c:88, not MODETRAN.
+    // T-W3-3: two niIntegrate() calls per winding; SLOT_CCAP1/CCAP2 tracked.
+    //         Mutual companion g12 = ag[0]*M per indload.c:74-75.
     let g11 = 0, g22 = 0, g12 = 0, hist1 = 0, hist2 = 0;
-    if (mode & MODETRAN) {
-      const ag = ctx.ag;
+    if (!(mode & MODEDC)) {
       const phi1_0 = s0[base + SLOT_PHI1];
       const phi2_0 = s0[base + SLOT_PHI2];
       const phi1_1 = s1[base + SLOT_PHI1];
       const phi2_1 = s1[base + SLOT_PHI2];
+      const phi1_2 = s2[base + SLOT_PHI1];
+      const phi2_2 = s2[base + SLOT_PHI2];
+      const phi1_3 = s3[base + SLOT_PHI1];
+      const phi2_3 = s3[base + SLOT_PHI2];
+      const ccap1Prev = s1[base + SLOT_CCAP1];
+      const ccap2Prev = s1[base + SLOT_CCAP2];
 
-      let ccap1: number;
-      let ccap2: number;
-      if (ctx.order >= 2 && ag.length > 2) {
-        const phi1_2 = s2[base + SLOT_PHI1];
-        const phi2_2 = s2[base + SLOT_PHI2];
-        ccap1 = ag[0] * phi1_0 + ag[1] * phi1_1 + ag[2] * phi1_2;
-        ccap2 = ag[0] * phi2_0 + ag[1] * phi2_1 + ag[2] * phi2_2;
-      } else {
-        ccap1 = ag[0] * phi1_0 + ag[1] * phi1_1;
-        ccap2 = ag[0] * phi2_0 + ag[1] * phi2_1;
+      const ni1 = niIntegrate(
+        ctx.method, ctx.order, L1, ag,
+        phi1_0, phi1_1,
+        [phi1_2, phi1_3, 0, 0, 0],
+        ccap1Prev,
+      );
+      const ni2 = niIntegrate(
+        ctx.method, ctx.order, L2, ag,
+        phi2_0, phi2_1,
+        [phi2_2, phi2_3, 0, 0, 0],
+        ccap2Prev,
+      );
+
+      s0[base + SLOT_CCAP1] = ni1.ccap;
+      s0[base + SLOT_CCAP2] = ni2.ccap;
+      // T-W3-3: MODEINITTRAN seeds ccap history per indload.c:114-116 pattern
+      // (state1 ← state0 for the integration history slot).
+      if (mode & MODEINITTRAN) {
+        s1[base + SLOT_CCAP1] = ni1.ccap;
+        s1[base + SLOT_CCAP2] = ni2.ccap;
       }
 
-      g11 = ag[0] * L1;
-      g22 = ag[0] * L2;
-      g12 = ag[0] * M;  // mutload.c:74-75: MUTbr1br2 -= MUTfactor*ag[0], MUTfactor = M.
-      hist1 = ccap1 - ag[0] * phi1_0;
-      hist2 = ccap2 - ag[0] * phi2_0;
+      g11  = ni1.geq;                // ag[0] * L1
+      g22  = ni2.geq;                // ag[0] * L2
+      g12  = ag[0] * Mcoup;          // indload.c:74-75: MUTbr1br2 -= MUTfactor*ag[0]
+      hist1 = ni1.ceq;
+      hist2 = ni2.ceq;
     }
 
     // Unconditional 2×2 branch block stamp — matches indload.c:119-123 twice
-    // (self-inductance diagonals) plus mutload.c:74-75 (mutual off-diagonals).
+    // (self-inductance diagonals) plus indload.c:74-75 (mutual off-diagonals).
     // Pattern is stable across modes; allocElement handle table is idempotent.
     solver.stampElement(solver.allocElement(b1, b1), -g11);
     solver.stampElement(solver.allocElement(b1, b2), -g12);
@@ -414,6 +446,17 @@ export class AnalogTransformerElement implements ReactiveAnalogElement {
     solver.stampElement(solver.allocElement(b2, b2), -g22);
     solver.stampRHS(b1, hist1);
     solver.stampRHS(b2, hist2);
+
+    // T-W3-6: SLOT_VOLT1/VOLT2 — terminal voltage state, MODEINITTRAN copy
+    // per indload.c:114-116 (state1[INDvolt] = state0[INDvolt]).
+    const v1Now = (p1 !== 0 ? voltages[p1 - 1] : 0) - (p2 !== 0 ? voltages[p2 - 1] : 0);
+    const v2Now = (sec1 !== 0 ? voltages[sec1 - 1] : 0) - (sec2 !== 0 ? voltages[sec2 - 1] : 0);
+    s0[base + SLOT_VOLT1] = v1Now;
+    s0[base + SLOT_VOLT2] = v2Now;
+    if (mode & MODEINITTRAN) {
+      s1[base + SLOT_VOLT1] = v1Now;
+      s1[base + SLOT_VOLT2] = v2Now;
+    }
 
     // Diagnostic cache (mode-invariant bookkeeping).
     s0[base + SLOT_G11]   = g11;
@@ -437,18 +480,22 @@ export class AnalogTransformerElement implements ReactiveAnalogElement {
     const s1 = this._pool.states[1];
     const s2 = this._pool.states[2];
     const s3 = this._pool.states[3];
-    // Winding 1 flux (inductor pattern: pass 0,0 for ccap)
+    // Winding 1 flux — mirrors inductor.ts getLteTimestep pattern with ccap history.
     const phi1_0 = s0[base + SLOT_PHI1];
     const phi1_1 = s1[base + SLOT_PHI1];
     const phi1_2 = s2[base + SLOT_PHI1];
     const phi1_3 = s3[base + SLOT_PHI1];
-    const dt1 = cktTerr(dt, deltaOld, order, method, phi1_0, phi1_1, phi1_2, phi1_3, 0, 0, lteParams);
-    // Winding 2 flux (inductor pattern: pass 0,0 for ccap)
+    const ccap1_0 = s0[base + SLOT_CCAP1];
+    const ccap1_1 = s1[base + SLOT_CCAP1];
+    const dt1 = cktTerr(dt, deltaOld, order, method, phi1_0, phi1_1, phi1_2, phi1_3, ccap1_0, ccap1_1, lteParams);
+    // Winding 2 flux.
     const phi2_0 = s0[base + SLOT_PHI2];
     const phi2_1 = s1[base + SLOT_PHI2];
     const phi2_2 = s2[base + SLOT_PHI2];
     const phi2_3 = s3[base + SLOT_PHI2];
-    const dt2 = cktTerr(dt, deltaOld, order, method, phi2_0, phi2_1, phi2_2, phi2_3, 0, 0, lteParams);
+    const ccap2_0 = s0[base + SLOT_CCAP2];
+    const ccap2_1 = s1[base + SLOT_CCAP2];
+    const dt2 = cktTerr(dt, deltaOld, order, method, phi2_0, phi2_1, phi2_2, phi2_3, ccap2_0, ccap2_1, lteParams);
     return Math.min(dt1, dt2);
   }
 

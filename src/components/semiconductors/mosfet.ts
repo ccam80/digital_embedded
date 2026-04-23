@@ -972,9 +972,6 @@ export function createMosfetElement(
   let pool: StatePoolRef;
   let base: number;
 
-  // Ephemeral per-iteration icheck flag (mos1load.c:739-742 CKTnoncon bump).
-  let icheckLimited = false;
-
   // One-shot cold-start seed flag from primeJunctions(); consumed by next load().
   let primedFromJct = false;
 
@@ -1005,6 +1002,9 @@ export function createMosfetElement(
      * ceqgs/ceqgd/ceqgb RHS terms. No cross-method cap+Q slots.
      */
     load(ctx: LoadContext): void {
+      // mos1load.c:108: Check=1 — reset per call, not per-closure.
+      let icheckLimited = true;
+
       const s0 = pool.states[0];
       const s1 = pool.states[1];
       const s2 = pool.states[2];
@@ -1089,7 +1089,7 @@ export function createMosfetElement(
         // Skip during init dispatch cases (predictor & smsig handle their own
         // state seed; hand-stored predictor-vbs value is considered a
         // clean predictor estimate without pnjlim).
-        if ((mode & (MODEINITPRED | MODEINITSMSIG | MODEINITTRAN)) === 0) {
+        if ((mode & (MODEINITPRED | MODEINITTRAN)) === 0) {
           // mos1load.c:356: von = MOS1type * here->MOS1von.
           const vonStored = s0[base + SLOT_VON];
           const vonForLim = vonStored !== 0 ? vonStored : tp.tVto;
@@ -1129,7 +1129,10 @@ export function createMosfetElement(
             vgd = fetlim(vgd, vgdOldStored, vonForLim);
             vds = vgs - vgd;
             const vdsBefore = vds;
-            vds = -limvds(-vds, -vdsOldStored);
+            // mos1load.c:385: if(!(ckt->CKTfixLimit)) { vds = -DEVlimvds(-vds,...) }
+            if (!ctx.cktFixLimit) {
+              vds = -limvds(-vds, -vdsOldStored);
+            }
             vgs = vgd + vds;
 
             if (ctx.limitingCollector) {
@@ -1460,11 +1463,12 @@ export function createMosfetElement(
         gcgs = 0; ceqgs = 0;
         gcgd = 0; ceqgd = 0;
         gcgb = 0; ceqgb = 0;
-        // mos1load.c:875-877: zero cqgs/gd/gb when corresponding capgs/gd/gb = 0.
+      } else {
+        // mos1load.c:875-877: zero cqgs/gd/gb when corresponding cap = 0.
+        // These are in the MODETRAN else branch in ngspice, before NIintegrate.
         if (capgs === 0) s0[base + SLOT_CQGS] = 0;
         if (capgd === 0) s0[base + SLOT_CQGD] = 0;
         if (capgb === 0) s0[base + SLOT_CQGB] = 0;
-      } else {
         // mos1load.c:878-894: MODETRAN-only path. NIintegrate the three caps.
         const ag = ctx.ag;
         // Gate-source cap companion.
@@ -1621,15 +1625,16 @@ export function createMosfetElement(
       stampG(solver, nodeS, nodeB, -gbs - (xnrm - xrev) * gmbsNR);
       stampG(solver, nodeS, nodeD, -gdsNR - xrev * (gmNR + gmbsNR));
 
-      if (icheckLimited) ctx.noncon.value++;
+      // mos1load.c:737-743: noncon gated on OFF==0 || !(MODEINITFIX|MODEINITSMSIG).
+      if (icheckLimited && (params.OFF === 0 || !(mode & (MODEINITFIX | MODEINITSMSIG)))) {
+        ctx.noncon.value++;
+      }
     },
 
     checkConvergence(ctx: LoadContext): boolean {
       const s0 = pool.states[0];
       // mos1conv.c: MOS1convTest early-return on INITFIX/INITSMSIG w/ OFF.
       if (params.OFF && (ctx.cktMode & (MODEINITFIX | MODEINITSMSIG))) return true;
-      // Limiting flag → non-convergence.
-      if (icheckLimited) return false;
 
       const voltages = ctx.voltages;
       const vB = nodeB > 0 ? voltages[nodeB - 1] : 0;

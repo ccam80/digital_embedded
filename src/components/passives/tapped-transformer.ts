@@ -42,7 +42,8 @@ import {
   type ComponentDefinition,
 } from "../../core/registry.js";
 import type { AnalogElementCore, ReactiveAnalogElement, IntegrationMethod, LoadContext } from "../../solver/analog/element.js";
-import { MODEDC, MODEINITPRED, MODEINITTRAN, MODETRAN } from "../../solver/analog/ckt-mode.js";
+import { MODEDC, MODEINITPRED, MODEINITTRAN } from "../../solver/analog/ckt-mode.js";
+import { niIntegrate } from "../../solver/analog/ni-integrate.js";
 import { defineModelParams } from "../../core/model-params.js";
 import type { StatePoolRef } from "../../core/analog-types.js";
 import { defineStateSchema, applyInitialValues } from "../../solver/analog/state-schema.js";
@@ -330,11 +331,13 @@ export class AnalogTappedTransformerElement implements ReactiveAnalogElement {
   /**
    * Unified load() — three-winding tapped transformer.
    *
-   * Stamps winding resistances, branch incidence, and inline NIintegrate on the
-   * 3×3 flux linkage matrix using ctx.ag[]:
-   *   φ1 = L1·I1 + M12·I2 + M13·I3
-   *   φ2 = L2·I2 + M12·I1 + M23·I3
-   *   φ3 = L3·I3 + M13·I1 + M23·I2
+   * Mirrors ngspice indload.c INDload structure (two-pass per user ruling TT-W3-5):
+   *   Pass 1 — self-loop (three inductors, indload.c:43-109):
+   *     flux write, MODEINITPRED copy, NIintegrate per winding
+   *   Pass 2 — mutual-loop (three MUT pairs, indload.c:65-75):
+   *     mutual flux accumulation and mutual companion stamp
+   *
+   * indload.c:114-116 SLOT_VOLT copy on MODEINITTRAN done after pass 1+2.
    */
   load(ctx: LoadContext): void {
     const solver = ctx.solver;
@@ -386,10 +389,6 @@ export class AnalogTappedTransformerElement implements ReactiveAnalogElement {
     if (ct !== 0) solver.stampElement(solver.allocElement(b3, ct - 1), 1);
     if (sec2 !== 0) solver.stampElement(solver.allocElement(b3, sec2 - 1), -1);
 
-    // Unified compute-then-stamp for 3×3 branch block — ngspice indload.c applied
-    // per winding + mutload.c:64-75 for each of the three mutual pairs. DC sets
-    // all scalars to zero (indload.c:88-90); TRAN uses niIntegrate on coupled
-    // fluxes. Matrix pattern is mode-invariant (handle table preserves nonzeros).
     const voltages = ctx.voltages;
     const i1Now = voltages[b1];
     const i2Now = voltages[b2];
@@ -397,66 +396,119 @@ export class AnalogTappedTransformerElement implements ReactiveAnalogElement {
     const s0 = this._pool.states[0];
     const s1 = this._pool.states[1];
     const s2 = this._pool.states[2];
-    const sRef = s0;
     const base = this.stateBaseOffset;
-
-    // Flux update guard mirrors !(MODEDC|MODEINITPRED) from indload.c:43.
     const mode = ctx.cktMode;
+
+    // -----------------------------------------------------------------------
+    // Pass 1 — self-loop: three inductors, one per winding.
+    // Mirrors indload.c:43-109 applied three times (b1/L1, b2/L2, b3/L3).
+    //
+    // TT-W3-5 (user ruling): two-pass structure matching ngspice indload.c.
+    // TT-W3-3: integration gate is !(MODEDC) per indload.c:88, not MODETRAN.
+    // TT-W3-2: MODEINITTRAN flux copy happens AFTER NIintegrate writes s0[PHI],
+    //          matching indload.c:100-102 + 114-116 ordering.
+    // -----------------------------------------------------------------------
+
+    // indload.c:43-51 — flux-from-current write, gated !(MODEDC|MODEINITPRED).
+    // TT-W3-5 pass-1 self-flux: each winding sees only its own current here;
+    // mutual contributions are added in pass 2 below.
     if (!(mode & (MODEDC | MODEINITPRED))) {
-      sRef[base + SLOT_PHI1] = this._l1 * i1Now + this._m12 * i2Now + this._m13 * i3Now;
-      sRef[base + SLOT_PHI2] = this._l2 * i2Now + this._m12 * i1Now + this._m23 * i3Now;
-      sRef[base + SLOT_PHI3] = this._l3 * i3Now + this._m13 * i1Now + this._m23 * i2Now;
-      if (mode & MODEINITTRAN) {
-        s1[base + SLOT_PHI1] = sRef[base + SLOT_PHI1];
-        s1[base + SLOT_PHI2] = sRef[base + SLOT_PHI2];
-        s1[base + SLOT_PHI3] = sRef[base + SLOT_PHI3];
-      }
+      // cite: indload.c:48-49 — state0[INDflux] = INDinduct * rhsOld[INDbrEq]
+      // (self-flux only; mutual accumulated in pass 2 per indload.c:65-67)
+      s0[base + SLOT_PHI1] = this._l1 * i1Now;
+      s0[base + SLOT_PHI2] = this._l2 * i2Now;
+      s0[base + SLOT_PHI3] = this._l3 * i3Now;
     } else if (mode & MODEINITPRED) {
-      sRef[base + SLOT_PHI1] = s1[base + SLOT_PHI1];
-      sRef[base + SLOT_PHI2] = s1[base + SLOT_PHI2];
-      sRef[base + SLOT_PHI3] = s1[base + SLOT_PHI3];
+      // cite: indload.c:95-97 — MODEINITPRED: state0[INDflux] = state1[INDflux]
+      s0[base + SLOT_PHI1] = s1[base + SLOT_PHI1];
+      s0[base + SLOT_PHI2] = s1[base + SLOT_PHI2];
+      s0[base + SLOT_PHI3] = s1[base + SLOT_PHI3];
     }
 
-    // Companion coefficients — zero at DC, niIntegrate during TRAN.
+    // -----------------------------------------------------------------------
+    // Pass 2 — mutual-loop: three MUT instances (12, 13, 23).
+    // Mirrors indload.c:65-75 — accumulate mutual flux into state0[INDflux]
+    // for each pair, then stamp off-diagonal companion conductance.
+    // TT-W3-5: mutual flux += MUTfactor * rhsOld[partner_brEq]
+    // -----------------------------------------------------------------------
+
+    // cite: indload.c:65-67 — state0[ind1.INDflux] += MUTfactor * rhsOld[ind2.INDbrEq]
+    //                          state0[ind2.INDflux] += MUTfactor * rhsOld[ind1.INDbrEq]
+    if (!(mode & (MODEDC | MODEINITPRED))) {
+      // Pair (1,2): M12
+      s0[base + SLOT_PHI1] += this._m12 * i2Now;
+      s0[base + SLOT_PHI2] += this._m12 * i1Now;
+      // Pair (1,3): M13
+      s0[base + SLOT_PHI1] += this._m13 * i3Now;
+      s0[base + SLOT_PHI3] += this._m13 * i1Now;
+      // Pair (2,3): M23
+      s0[base + SLOT_PHI2] += this._m23 * i3Now;
+      s0[base + SLOT_PHI3] += this._m23 * i2Now;
+    }
+
+    // -----------------------------------------------------------------------
+    // Integration — self companion (req/veq) per winding.
+    // TT-W3-3: gate is !(MODEDC) per indload.c:88, not MODETRAN.
+    // TT-W3-2: MODEINITTRAN s1←s0 copy happens here AFTER flux is written,
+    //          per indload.c:100-102 (copy before NIintegrate restores s1 first).
+    // -----------------------------------------------------------------------
+
     let g11 = 0, g22 = 0, g33 = 0, g12 = 0, g13 = 0, g23 = 0;
     let hist1 = 0, hist2 = 0, hist3 = 0;
-    if (mode & MODETRAN) {
-      const ag = ctx.ag;
-      const phi1_0 = sRef[base + SLOT_PHI1];
-      const phi2_0 = sRef[base + SLOT_PHI2];
-      const phi3_0 = sRef[base + SLOT_PHI3];
-      const phi1_1 = s1[base + SLOT_PHI1];
-      const phi2_1 = s1[base + SLOT_PHI2];
-      const phi3_1 = s1[base + SLOT_PHI3];
-      let ccap1: number;
-      let ccap2: number;
-      let ccap3: number;
-      if (ctx.order >= 2 && ag.length > 2) {
-        const phi1_2 = s2[base + SLOT_PHI1];
-        const phi2_2 = s2[base + SLOT_PHI2];
-        const phi3_2 = s2[base + SLOT_PHI3];
-        ccap1 = ag[0] * phi1_0 + ag[1] * phi1_1 + ag[2] * phi1_2;
-        ccap2 = ag[0] * phi2_0 + ag[1] * phi2_1 + ag[2] * phi2_2;
-        ccap3 = ag[0] * phi3_0 + ag[1] * phi3_1 + ag[2] * phi3_2;
-      } else {
-        ccap1 = ag[0] * phi1_0 + ag[1] * phi1_1;
-        ccap2 = ag[0] * phi2_0 + ag[1] * phi2_1;
-        ccap3 = ag[0] * phi3_0 + ag[1] * phi3_1;
+
+    if (!(mode & MODEDC)) {
+      // cite: indload.c:94-102 — MODEINITPRED copies s1→s0 (already done above);
+      //        else: MODEINITTRAN copies s0→s1 before NIintegrate
+      if (mode & MODEINITTRAN) {
+        // cite: indload.c:100-102 — state1[INDflux] = state0[INDflux] (copy after flux write)
+        s1[base + SLOT_PHI1] = s0[base + SLOT_PHI1];
+        s1[base + SLOT_PHI2] = s0[base + SLOT_PHI2];
+        s1[base + SLOT_PHI3] = s0[base + SLOT_PHI3];
       }
 
-      g11 = ag[0] * this._l1;
-      g22 = ag[0] * this._l2;
-      g33 = ag[0] * this._l3;
-      g12 = ag[0] * this._m12;  // mutload.c:74-75 for each mutual pair
+      const ag = ctx.ag;
+      const method = ctx.method;
+      const order = ctx.order;
+
+      // cite: indload.c:108 — NIintegrate(ckt, &req, &veq, INDinduct/m, INDflux)
+      // Winding 1 (primary, L1)
+      {
+        const q0 = s0[base + SLOT_PHI1];
+        const q1 = s1[base + SLOT_PHI1];
+        const q2 = s2[base + SLOT_PHI1];
+        const r1 = niIntegrate(method, order, this._l1, ag, q0, q1, [q2, 0, 0, 0, 0], 0);
+        g11 = r1.geq;
+        hist1 = r1.ceq;
+      }
+      // Winding 2 (secondary half-1, L2)
+      {
+        const q0 = s0[base + SLOT_PHI2];
+        const q1 = s1[base + SLOT_PHI2];
+        const q2 = s2[base + SLOT_PHI2];
+        const r2 = niIntegrate(method, order, this._l2, ag, q0, q1, [q2, 0, 0, 0, 0], 0);
+        g22 = r2.geq;
+        hist2 = r2.ceq;
+      }
+      // Winding 3 (secondary half-2, L3)
+      {
+        const q0 = s0[base + SLOT_PHI3];
+        const q1 = s1[base + SLOT_PHI3];
+        const q2 = s2[base + SLOT_PHI3];
+        const r3 = niIntegrate(method, order, this._l3, ag, q0, q1, [q2, 0, 0, 0, 0], 0);
+        g33 = r3.geq;
+        hist3 = r3.ceq;
+      }
+
+      // cite: indload.c:74-75 — mutual off-diagonal companion conductance:
+      //   *(MUTbr1br2) -= MUTfactor * CKTag[0]
+      //   *(MUTbr2br1) -= MUTfactor * CKTag[0]
+      g12 = ag[0] * this._m12;
       g13 = ag[0] * this._m13;
       g23 = ag[0] * this._m23;
-      hist1 = ccap1 - ag[0] * phi1_0;
-      hist2 = ccap2 - ag[0] * phi2_0;
-      hist3 = ccap3 - ag[0] * phi3_0;
     }
 
-    // Unconditional 3×3 branch block — indload.c:119-123 per winding plus
-    // mutload.c:64-75 for the three mutual pairs. Structurally stable.
+    // cite: indload.c:119-123 — self diagonal: *(INDibrIbrptr) -= req
+    // cite: indload.c:74-75   — mutual off-diagonal: *(MUTbr1br2) -= MUTfactor*ag[0]
     solver.stampElement(solver.allocElement(b1, b1), -g11);
     solver.stampElement(solver.allocElement(b1, b2), -g12);
     solver.stampElement(solver.allocElement(b1, b3), -g13);
@@ -466,22 +518,39 @@ export class AnalogTappedTransformerElement implements ReactiveAnalogElement {
     solver.stampElement(solver.allocElement(b3, b1), -g13);
     solver.stampElement(solver.allocElement(b3, b2), -g23);
     solver.stampElement(solver.allocElement(b3, b3), -g33);
+    // cite: indload.c:112 — *(CKTrhs + INDbrEq) += veq
     solver.stampRHS(b1, hist1);
     solver.stampRHS(b2, hist2);
     solver.stampRHS(b3, hist3);
 
-    sRef[base + SLOT_G11] = g11;
-    sRef[base + SLOT_G22] = g22;
-    sRef[base + SLOT_G33] = g33;
-    sRef[base + SLOT_G12] = g12;
-    sRef[base + SLOT_G13] = g13;
-    sRef[base + SLOT_G23] = g23;
-    sRef[base + SLOT_HIST1] = hist1;
-    sRef[base + SLOT_HIST2] = hist2;
-    sRef[base + SLOT_HIST3] = hist3;
-    sRef[base + SLOT_I1] = i1Now;
-    sRef[base + SLOT_I2] = i2Now;
-    sRef[base + SLOT_I3] = i3Now;
+    // TT-W3-4: SLOT_VOLT — winding terminal voltage, copied s0→s1 on MODEINITTRAN.
+    // cite: indload.c:114-116 — state1[INDvolt] = state0[INDvolt] on MODEINITTRAN.
+    // Terminal voltages: V_winding = V_pos - V_neg for each winding.
+    const vWind1 = (p1 !== 0 ? voltages[p1 - 1] : 0) - (p2 !== 0 ? voltages[p2 - 1] : 0);
+    const vWind2 = (sec1 !== 0 ? voltages[sec1 - 1] : 0) - (ct !== 0 ? voltages[ct - 1] : 0);
+    const vWind3 = (ct !== 0 ? voltages[ct - 1] : 0) - (sec2 !== 0 ? voltages[sec2 - 1] : 0);
+    s0[base + SLOT_VOLT1] = vWind1;
+    s0[base + SLOT_VOLT2] = vWind2;
+    s0[base + SLOT_VOLT3] = vWind3;
+    if (mode & MODEINITTRAN) {
+      // cite: indload.c:115-116 — state1[INDvolt] = state0[INDvolt]
+      s1[base + SLOT_VOLT1] = vWind1;
+      s1[base + SLOT_VOLT2] = vWind2;
+      s1[base + SLOT_VOLT3] = vWind3;
+    }
+
+    s0[base + SLOT_G11]   = g11;
+    s0[base + SLOT_G22]   = g22;
+    s0[base + SLOT_G33]   = g33;
+    s0[base + SLOT_G12]   = g12;
+    s0[base + SLOT_G13]   = g13;
+    s0[base + SLOT_G23]   = g23;
+    s0[base + SLOT_HIST1] = hist1;
+    s0[base + SLOT_HIST2] = hist2;
+    s0[base + SLOT_HIST3] = hist3;
+    s0[base + SLOT_I1]    = i1Now;
+    s0[base + SLOT_I2]    = i2Now;
+    s0[base + SLOT_I3]    = i3Now;
   }
 
   getLteTimestep(
@@ -694,7 +763,7 @@ export const TappedTransformerDefinition: ComponentDefinition = {
       factory: createTappedTransformerElement,
       paramDefs: TAPPED_TRANSFORMER_PARAM_DEFS,
       params: TAPPED_TRANSFORMER_DEFAULTS,
-      branchCount: 1,
+      branchCount: 3,  // TT-W3-1: three branch rows (b1=primary, b2=sec-half-1, b3=sec-half-2)
     },
   },
   defaultModel: "behavioral",

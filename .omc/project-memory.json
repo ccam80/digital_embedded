@@ -284,32 +284,44 @@
   "hotPaths": [
     {
       "path": "spec\\phase-2.5-execution.md",
-      "accessCount": 41,
-      "lastAccessed": 1776974690456,
+      "accessCount": 43,
+      "lastAccessed": 1776974723057,
       "type": "file"
     },
     {
       "path": "spec\\architectural-alignment.md",
-      "accessCount": 19,
-      "lastAccessed": 1776974600628,
+      "accessCount": 22,
+      "lastAccessed": 1776974723219,
       "type": "file"
     },
     {
       "path": "spec\\post-a1-parity.md",
-      "accessCount": 18,
-      "lastAccessed": 1776974648625,
+      "accessCount": 21,
+      "lastAccessed": 1776974793495,
       "type": "file"
     },
     {
       "path": "src\\components\\semiconductors\\diode.ts",
-      "accessCount": 15,
-      "lastAccessed": 1776974696791,
+      "accessCount": 21,
+      "lastAccessed": 1776974814395,
+      "type": "file"
+    },
+    {
+      "path": "src\\components\\semiconductors\\mosfet.ts",
+      "accessCount": 16,
+      "lastAccessed": 1776974805260,
+      "type": "file"
+    },
+    {
+      "path": "src\\components\\passives\\inductor.ts",
+      "accessCount": 11,
+      "lastAccessed": 1776974800240,
       "type": "file"
     },
     {
       "path": "src\\solver\\analog",
-      "accessCount": 9,
-      "lastAccessed": 1776974694346,
+      "accessCount": 10,
+      "lastAccessed": 1776974708250,
       "type": "directory"
     },
     {
@@ -319,21 +331,33 @@
       "type": "file"
     },
     {
+      "path": "src\\components\\passives\\transformer.ts",
+      "accessCount": 8,
+      "lastAccessed": 1776974803989,
+      "type": "file"
+    },
+    {
+      "path": "src\\components\\passives\\tapped-transformer.ts",
+      "accessCount": 7,
+      "lastAccessed": 1776974814506,
+      "type": "file"
+    },
+    {
       "path": "ref\\ngspice\\src\\spicelib\\devices\\dio\\dioload.c",
       "accessCount": 6,
       "lastAccessed": 1776974554506,
       "type": "file"
     },
     {
-      "path": "src\\components\\semiconductors\\mosfet.ts",
-      "accessCount": 6,
-      "lastAccessed": 1776974649547,
-      "type": "file"
-    },
-    {
       "path": "src\\components\\passives\\__tests__\\capacitor.test.ts",
       "accessCount": 6,
       "lastAccessed": 1776974690248,
+      "type": "file"
+    },
+    {
+      "path": "src\\solver\\analog\\ni-integrate.ts",
+      "accessCount": 6,
+      "lastAccessed": 1776974764699,
       "type": "file"
     },
     {
@@ -349,9 +373,21 @@
       "type": "file"
     },
     {
-      "path": "src\\components\\passives\\transformer.ts",
+      "path": "src",
       "accessCount": 5,
-      "lastAccessed": 1776974693377,
+      "lastAccessed": 1776974702318,
+      "type": "directory"
+    },
+    {
+      "path": "src\\components\\passives\\capacitor.ts",
+      "accessCount": 5,
+      "lastAccessed": 1776974763795,
+      "type": "file"
+    },
+    {
+      "path": "src\\components\\semiconductors\\njfet.ts",
+      "accessCount": 5,
+      "lastAccessed": 1776974787654,
       "type": "file"
     },
     {
@@ -379,15 +415,9 @@
       "type": "file"
     },
     {
-      "path": "src",
+      "path": "src\\components\\passives\\__tests__\\inductor.test.ts",
       "accessCount": 4,
-      "lastAccessed": 1776974663135,
-      "type": "directory"
-    },
-    {
-      "path": "src\\components\\semiconductors\\njfet.ts",
-      "accessCount": 4,
-      "lastAccessed": 1776974696284,
+      "lastAccessed": 1776974806219,
       "type": "file"
     },
     {
@@ -403,12 +433,6 @@
       "type": "file"
     },
     {
-      "path": "src\\components\\passives\\inductor.ts",
-      "accessCount": 3,
-      "lastAccessed": 1776974631183,
-      "type": "file"
-    },
-    {
       "path": "spec\\plan-addendum.md",
       "accessCount": 3,
       "lastAccessed": 1776974632103,
@@ -418,30 +442,6 @@
       "path": "src\\components\\sensors\\__tests__\\spark-gap.test.ts",
       "accessCount": 3,
       "lastAccessed": 1776974637491,
-      "type": "file"
-    },
-    {
-      "path": "src\\components\\passives\\capacitor.ts",
-      "accessCount": 3,
-      "lastAccessed": 1776974646138,
-      "type": "file"
-    },
-    {
-      "path": "src\\components\\passives\\__tests__\\inductor.test.ts",
-      "accessCount": 3,
-      "lastAccessed": 1776974649632,
-      "type": "file"
-    },
-    {
-      "path": "src\\solver\\analog\\ni-integrate.ts",
-      "accessCount": 3,
-      "lastAccessed": 1776974661245,
-      "type": "file"
-    },
-    {
-      "path": "src\\components\\passives\\tapped-transformer.ts",
-      "accessCount": 3,
-      "lastAccessed": 1776974671024,
       "type": "file"
     },
     {
@@ -472,6 +472,24 @@
       "path": "ref\\ngspice\\src\\spicelib\\devices\\jfet\\jfetload.c",
       "accessCount": 2,
       "lastAccessed": 1776974637789,
+      "type": "file"
+    },
+    {
+      "path": "src\\components\\semiconductors\\zener.ts",
+      "accessCount": 2,
+      "lastAccessed": 1776974773914,
+      "type": "file"
+    },
+    {
+      "path": "src\\components\\passives\\__tests__\\tapped-transformer.test.ts",
+      "accessCount": 2,
+      "lastAccessed": 1776974790559,
+      "type": "file"
+    },
+    {
+      "path": "src\\components\\semiconductors\\__tests__\\zener.test.ts",
+      "accessCount": 2,
+      "lastAccessed": 1776974814253,
       "type": "file"
     },
     {
@@ -511,27 +529,9 @@
       "type": "file"
     },
     {
-      "path": "src\\components\\semiconductors\\zener.ts",
-      "accessCount": 1,
-      "lastAccessed": 1776974555923,
-      "type": "file"
-    },
-    {
-      "path": "src\\components\\semiconductors\\__tests__\\zener.test.ts",
-      "accessCount": 1,
-      "lastAccessed": 1776974564146,
-      "type": "file"
-    },
-    {
       "path": "src\\components\\passives\\__tests__\\transformer.test.ts",
       "accessCount": 1,
       "lastAccessed": 1776974565898,
-      "type": "file"
-    },
-    {
-      "path": "src\\components\\passives\\__tests__\\tapped-transformer.test.ts",
-      "accessCount": 1,
-      "lastAccessed": 1776974566073,
       "type": "file"
     },
     {

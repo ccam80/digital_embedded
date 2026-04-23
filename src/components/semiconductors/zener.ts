@@ -2,10 +2,13 @@
  * Zener diode analog component — Shockley equation with reverse breakdown.
  *
  * Extends the standard diode with a reverse breakdown region:
- *   When Vd < -BV: Id = -IS * exp(-(Vd + BV) / (N*Vt))
+ *   When Vd < -tBV: Id = -IS * exp(-(Vd + tBV) / (NBV*Vt))
  *
  * The breakdown region produces a sharply increasing reverse current at
- * Vd = -BV, modeling the Zener/avalanche effect.
+ * Vd = -tBV, modeling the Zener/avalanche effect.
+ *
+ * cite: ref/ngspice/src/spicelib/devices/dio/dioload.c (DIOload)
+ * cite: ref/ngspice/src/spicelib/devices/dio/diotemp.c (DIOtemp — tBV derivation)
  */
 
 import { AbstractCircuitElement } from "../../core/element.js";
@@ -22,20 +25,29 @@ import {
   type ComponentDefinition,
 } from "../../core/registry.js";
 import type { PoolBackedAnalogElementCore, LoadContext } from "../../solver/analog/element.js";
-import { MODEINITJCT } from "../../solver/analog/ckt-mode.js";
+import {
+  MODEINITJCT,
+  MODEINITFIX,
+  MODEINITSMSIG,
+  MODEINITTRAN,
+  MODETRANOP,
+  MODEUIC,
+} from "../../solver/analog/ckt-mode.js";
 import { stampG, stampRHS } from "../../solver/analog/stamp-helpers.js";
 import { pnjlim } from "../../solver/analog/newton-raphson.js";
 import { defineModelParams } from "../../core/model-params.js";
-import { VT } from "../../core/constants.js";
 import { createDiodeElement, getDiodeInternalNodeCount, getDiodeInternalNodeLabels } from "./diode.js";
 import type { StatePoolRef } from "../../core/analog-types.js";
 import { defineStateSchema, applyInitialValues } from "../../solver/analog/state-schema.js";
 
 // ---------------------------------------------------------------------------
-// Physical constants
+// Physical constants (ngspice ngspice.h / const.h values)
 // ---------------------------------------------------------------------------
 
-// VT (thermal voltage) imported from ../../core/constants.js
+const CONSTboltz = 1.3806226e-23;
+const CHARGE = 1.6021918e-19;
+const CONSTe = Math.E;          // used in cubic approximation (dioload.c:254)
+const REFTEMP = 300.15;         // 27 °C reference temperature
 
 /** Minimum conductance for numerical stability (GMIN). */
 const GMIN = 1e-12;
@@ -50,6 +62,9 @@ export const { paramDefs: ZENER_PARAM_DEFS, defaults: ZENER_PARAM_DEFAULTS } = d
     N:   { default: 1,                description: "Emission coefficient" },
     BV:  { default: 5.1,  unit: "V", description: "Reverse breakdown voltage" },
     NBV: { default: NaN,              description: "Breakdown emission coefficient (defaults to N)" },
+    IBV: { default: 1e-3, unit: "A", description: "Current at breakdown voltage" },
+    TCV: { default: 0,    unit: "V/°C", description: "Breakdown voltage temperature coefficient" },
+    TNOM:{ default: 300.15, unit: "K",  description: "Parameter measurement temperature" },
   },
 });
 
@@ -80,11 +95,61 @@ export const { paramDefs: ZENER_SPICE_L1_PARAM_DEFS, defaults: ZENER_SPICE_L1_DE
 // ---------------------------------------------------------------------------
 
 const ZENER_STATE_SCHEMA = defineStateSchema("ZenerElement", [
-  { name: "VD", doc: "Diode junction voltage (V)", init: { kind: "zero" } },
-  { name: "GEQ", doc: "Linearized junction conductance (S)", init: { kind: "constant", value: 1e-12 } },
-  { name: "IEQ", doc: "Linearized current source (A)", init: { kind: "zero" } },
-  { name: "ID", doc: "Diode current (A)", init: { kind: "zero" } },
+  { name: "VD",  doc: "Diode junction voltage (V)",              init: { kind: "zero" } },
+  { name: "GEQ", doc: "GMIN-adjusted junction conductance (S)",  init: { kind: "constant", value: 1e-12 } },
+  { name: "IEQ", doc: "Linearized current source (A)",            init: { kind: "zero" } },
+  { name: "ID",  doc: "GMIN-adjusted diode current (A)",          init: { kind: "zero" } },
 ]);
+
+// ---------------------------------------------------------------------------
+// Temperature scaling — tBV derivation (cite: diotemp.c:206-244)
+// ---------------------------------------------------------------------------
+
+/**
+ * Compute the temperature-scaled breakdown voltage (DIOtBrkdwnV) from BV and IBV.
+ *
+ * cite: diotemp.c:208-244 — temperature-adjusts BV using DIOtcv (tlev==0 path),
+ * then iterates xbv to find the intersection of the forward and reverse diode
+ * characteristics at the breakdown current cbv.
+ *
+ * @param BV    Room-temperature breakdown voltage
+ * @param IBV   Breakdown current (DIObreakdownCurrent)
+ * @param NBV   Breakdown emission coefficient (DIObrkdEmissionCoeff)
+ * @param IS    Temperature-scaled saturation current (DIOtSatCur)
+ * @param vt    Thermal voltage at circuit temperature
+ * @param TCV   Voltage temperature coefficient (DIOtcv), default 0
+ * @param dt    Temperature deviation from TNOM in °C (T - TNOM)
+ */
+function computeTBV(
+  BV: number,
+  IBV: number,
+  NBV: number,
+  IS: number,
+  vt: number,
+  TCV: number,
+  dt: number,
+): number {
+  if (!isFinite(BV) || BV >= 1e99) return Infinity;
+
+  // cite: diotemp.c:209-210 (DIOtlev==0 path)
+  const tBreakdownVoltage = BV - TCV * dt;
+
+  let cbv = IBV;
+  // cite: diotemp.c:219-220: ensure cbv is not unreasonably small
+  if (cbv < IS * tBreakdownVoltage / vt) {
+    cbv = IS * tBreakdownVoltage / vt;
+  }
+
+  // cite: diotemp.c:229-244: iterative xbv refinement
+  const tol = 1e-3 * cbv;  // CKTreltol * cbv (using 1e-3 = default reltol)
+  let xbv = tBreakdownVoltage - NBV * vt * Math.log(1 + cbv / IS);
+  for (let iter = 0; iter < 25; iter++) {
+    xbv = tBreakdownVoltage - NBV * vt * Math.log(cbv / IS + 1 - xbv / vt);
+    const xcbv = IS * (Math.exp((tBreakdownVoltage - xbv) / (NBV * vt)) - 1 + xbv / vt);
+    if (Math.abs(xcbv - cbv) <= tol) break;
+  }
+  return xbv;
+}
 
 // ---------------------------------------------------------------------------
 // createZenerElement — AnalogElement factory
@@ -103,8 +168,31 @@ export function createZenerElement(
   for (const key of props.getModelParamKeys()) {
     params[key] = props.getModelParam<number>(key);
   }
-  // NBV defaults to N when not explicitly given (diosetup.c:93-95)
+  // diosetup.c:93-95: NBV (DIObrkdEmissionCoeff) defaults to N (DIOemissionCoeff)
   if (isNaN(params.NBV)) params.NBV = params.N;
+
+  // Compute temperature-derived working values.
+  // cite: diotemp.c — DIOtemp function
+  // We run at REFTEMP (27°C); dt = REFTEMP - TNOM
+  const circuitTemp = REFTEMP;
+  const dt = circuitTemp - (isFinite(params.TNOM) ? params.TNOM : REFTEMP);
+  const vt = (CONSTboltz * circuitTemp) / CHARGE;
+  const nVt = params.N * vt;
+  const nbvVt = params.NBV * vt;
+
+  // tVcrit: DIOtVcrit = vt * ln(vt / (IS * sqrt(2)))  cite: diotemp.c
+  const tVcrit = nVt * Math.log(nVt / (params.IS * Math.SQRT2));
+
+  // vcritBrk: pnjlim vcrit for breakdown domain using nbvVt  cite: dioload.c:189-190
+  // When NBV === N, this equals tVcrit; when NBV !== N, it differs.
+  const vcritBrk = nbvVt * Math.log(nbvVt / (params.IS * Math.SQRT2));
+
+  // tBV: temperature-scaled breakdown voltage  cite: diotemp.c:208-244
+  const tBV = computeTBV(
+    params.BV, params.IBV, params.NBV, params.IS, vt,
+    isFinite(params.TCV) ? params.TCV : 0,
+    dt,
+  );
 
   // State pool slot indices
   const SLOT_VD = 0, SLOT_GEQ = 1, SLOT_IEQ = 2, SLOT_ID = 3;
@@ -116,12 +204,8 @@ export function createZenerElement(
   let pool: StatePoolRef;
   let base: number;
 
-  // Ephemeral per-iteration pnjlim limiting flag (ngspice icheck, DIOload sets CKTnoncon++)
+  // Ephemeral per-iteration pnjlim limiting flag (ngspice Check / DIOload → CKTnoncon++)
   let pnjlimLimited = false;
-
-  // One-shot cold-start seed from dcopInitJct. Non-null only between
-  // primeJunctions() and the next load() call.
-  let primedVd: number | null = null;
 
   return {
     branchIndex: -1,
@@ -149,40 +233,90 @@ export function createZenerElement(
     load(ctx: LoadContext): void {
       // Direct state-array access per call — no cached Float64Array refs.
       const s0 = pool.states[0];
+      const s1 = pool.states[1];
 
       const voltages = ctx.voltages;
+      const mode = ctx.cktMode;
+
+      // -----------------------------------------------------------------------
+      // Z-W3-8: MODEINITSMSIG branch  cite: dioload.c:126-128
+      // -----------------------------------------------------------------------
+      if (mode & MODEINITSMSIG) {
+        // Read vd from state0 (DC operating point voltage), compute OP values,
+        // skip pnjlim and stamps, then return.
+        const vdOp = s0[base + SLOT_VD];
+        // compute conductance at OP point (for AC small-signal analysis)
+        // three-region eval at vdOp  cite: dioload.c:245-265
+        let gdOp: number;
+        if (vdOp >= -3 * nVt) {
+          // forward
+          const evd = Math.exp(vdOp / nVt);
+          gdOp = params.IS * evd / nVt;
+        } else if (!isFinite(tBV) || vdOp >= -tBV) {
+          // reverse-cubic  cite: dioload.c:251-257
+          const arg = 3 * nVt / (vdOp * CONSTe);
+          const arg3 = arg * arg * arg;
+          gdOp = params.IS * 3 * arg3 / (-vdOp);
+        } else {
+          // breakdown  cite: dioload.c:261-263
+          const evrev = Math.exp(-(tBV + vdOp) / nbvVt);
+          gdOp = params.IS * evrev / nbvVt;
+        }
+        // store capd (small-signal conductance) — dioload.c:363 stores capd here;
+        // for a resistive zener (no cap), we store gd for any bypass/convergence use.
+        s0[base + SLOT_GEQ] = gdOp + GMIN;
+        // cite: dioload.c:374: continue (skip stamps)
+        return;
+      }
+
+      // -----------------------------------------------------------------------
+      // Z-W3-4: 4-branch MODEINITJCT dispatch  cite: dioload.c:130-138
+      // Mirrors post-W1.1 diode.ts dispatch verbatim.
+      // -----------------------------------------------------------------------
       let vdRaw: number;
-      if (primedVd !== null) {
-        vdRaw = primedVd;
-        primedVd = null;
+      if (mode & MODEINITTRAN) {
+        // Z-W3-9: MODEINITTRAN seeds vd from state1  cite: dioload.c:128-129
+        vdRaw = s1[base + SLOT_VD];
+      } else if ((mode & MODEINITJCT) && (mode & MODETRANOP) && (mode & MODEUIC)) {
+        // dioload.c:130-132: MODEINITJCT && MODETRANOP && MODEUIC → IC param
+        vdRaw = isFinite(params.IC ?? NaN) ? (params.IC ?? 0) : 0;
+      } else if ((mode & MODEINITJCT) && params.OFF) {
+        // dioload.c:133-134: MODEINITJCT && OFF → vd = 0
+        vdRaw = 0;
+      } else if (mode & MODEINITJCT) {
+        // dioload.c:135-136: MODEINITJCT else → vd = tVcrit
+        vdRaw = tVcrit;
+      } else if ((mode & MODEINITFIX) && params.OFF) {
+        // dioload.c:137-138: MODEINITFIX && OFF → vd = 0
+        vdRaw = 0;
       } else {
+        // dioload.c:151-152: vd from rhsOld (current NR iterate voltages)
         const va = nodeAnode > 0 ? voltages[nodeAnode - 1] : 0;
         const vc = nodeCathode > 0 ? voltages[nodeCathode - 1] : 0;
         vdRaw = va - vc;
       }
 
-      // Recompute derived values from mutable params
-      const nVt = params.N * VT;
-      const vcrit = nVt * Math.log(nVt / (params.IS * Math.SQRT2));
-      const nbvVt = params.NBV * VT;
-
+      // -----------------------------------------------------------------------
+      // Apply pnjlim  cite: dioload.c:180-204
+      // -----------------------------------------------------------------------
       const vdOld = s0[base + SLOT_VD];
       let vdLimited: number;
 
-      if (ctx.cktMode & MODEINITJCT) {
-        // dioload.c:130-136: MODEINITJCT sets vd directly — no pnjlim
+      if (mode & (MODEINITJCT | MODEINITTRAN)) {
+        // These phases set vd directly — no pnjlim  cite: dioload.c:126-138
         vdLimited = vdRaw;
         pnjlimLimited = false;
-      } else if (vdRaw < Math.min(0, -params.BV + 10 * nbvVt)) {
+      } else if (isFinite(tBV) && vdRaw < Math.min(0, -tBV + 10 * nbvVt)) {
         // dioload.c:183-195: breakdown path — pnjlim in reflected domain.
-        const vdtemp = -(vdRaw + params.BV);
-        const vdtempOld = -(vdOld + params.BV);
-        const reflResult = pnjlim(vdtemp, vdtempOld, nbvVt, vcrit);
+        // Z-W3-6: use vcritBrk (computed from nbvVt) not tVcrit  cite: dioload.c:189-190
+        const vdtemp = -(vdRaw + tBV);
+        const vdtempOld = -(vdOld + tBV);
+        const reflResult = pnjlim(vdtemp, vdtempOld, nbvVt, vcritBrk);
         pnjlimLimited = reflResult.limited;
-        vdLimited = -(reflResult.value + params.BV);
+        vdLimited = -(reflResult.value + tBV);
       } else {
-        // dioload.c:196-204: standard pnjlim.
-        const vdResult = pnjlim(vdRaw, vdOld, nVt, vcrit);
+        // dioload.c:196-204: standard pnjlim for forward/normal-reverse.
+        const vdResult = pnjlim(vdRaw, vdOld, nVt, tVcrit);
         vdLimited = vdResult.value;
         pnjlimLimited = vdResult.limited;
       }
@@ -201,36 +335,63 @@ export function createZenerElement(
         });
       }
 
-      s0[base + SLOT_VD] = vdLimited;
+      // -----------------------------------------------------------------------
+      // Z-W3-1/Z-W3-2: Three-region I-V structure  cite: dioload.c:245-265
+      // Z-W3-5: use tBV (temperature-scaled) throughout  cite: diotemp.c:244
+      // -----------------------------------------------------------------------
+      let cdb: number;
+      let gdb: number;
 
-      let geq: number;
-      let ieq: number;
-      if (vdLimited >= -params.BV) {
-        // Forward region and normal reverse region (dioload.c:247-249 forward
-        // branch): Id = IS * (exp(vd/nVt) - 1)
-        const expVal = Math.exp(vdLimited / nVt);
-        const id = params.IS * (expVal - 1);
-        geq = (params.IS * expVal) / nVt + GMIN;
-        ieq = id - geq * vdLimited;
-        s0[base + SLOT_ID] = id;
+      if (vdLimited >= -3 * nVt) {
+        // Forward region  cite: dioload.c:245-249
+        const evd = Math.exp(vdLimited / nVt);
+        cdb = params.IS * (evd - 1);
+        gdb = params.IS * evd / nVt;
+      } else if (!isFinite(tBV) || vdLimited >= -tBV) {
+        // Reverse-cubic region  cite: dioload.c:251-258
+        // arg = 3*vte / (vd * CONSTe); cdb = -IS*(1+arg^3); gdb = IS*3*arg^3/(-vd)
+        const arg = 3 * nVt / (vdLimited * CONSTe);
+        const arg3 = arg * arg * arg;
+        cdb = -params.IS * (1 + arg3);
+        gdb = params.IS * 3 * arg3 / (-vdLimited);
       } else {
-        // Breakdown region (dioload.c:261-263):
-        //   Id = -IS * exp(-(Vd + BV) / (NBV*Vt))
-        const bdExpVal = Math.exp(-(vdLimited + params.BV) / nbvVt);
-        const id = -params.IS * bdExpVal;
-        geq = (params.IS * bdExpVal) / nbvVt + GMIN;
-        ieq = id - geq * vdLimited;
-        s0[base + SLOT_ID] = id;
+        // Breakdown region  cite: dioload.c:259-264
+        // cdb = -IS * exp(-(tBV+vd)/vtebrk); gdb = IS * exp(...)/vtebrk
+        const evrev = Math.exp(-(tBV + vdLimited) / nbvVt);
+        cdb = -params.IS * evrev;
+        gdb = params.IS * evrev / nbvVt;
       }
-      s0[base + SLOT_GEQ] = geq;
+
+      // cd / gd = intrinsic junction values (no sidewall/tunnel for simplified model)
+      let cd = cdb;
+      let gd = gdb;
+
+      // -----------------------------------------------------------------------
+      // Z-W3-3: GMIN as Norton pair  cite: dioload.c:297-299, 310-311
+      // Add GMIN to both gd and cd before ieq computation.
+      // -----------------------------------------------------------------------
+      gd += GMIN;       // cite: dioload.c:298 (else branch: gd += CKTgmin)
+      cd += GMIN * vdLimited;  // cite: dioload.c:299: cd += CKTgmin*vd
+
+      // -----------------------------------------------------------------------
+      // Z-W3-7: state0 writes — store GMIN-adjusted pair  cite: dioload.c:417-419
+      // ngspice writes the post-GMIN cd and gd to CKTstate0.
+      // -----------------------------------------------------------------------
+      s0[base + SLOT_VD]  = vdLimited;
+      s0[base + SLOT_ID]  = cd;           // GMIN-adjusted (matches dioload.c:418)
+      s0[base + SLOT_GEQ] = gd;           // GMIN-adjusted (matches dioload.c:419)
+
+      const ieq = cd - gd * vdLimited;
       s0[base + SLOT_IEQ] = ieq;
 
-      // dioload.c:429-441: load current vector + junction conductance stamps.
+      // -----------------------------------------------------------------------
+      // Stamp Norton companion  cite: dioload.c:429-441
+      // -----------------------------------------------------------------------
       const solver = ctx.solver;
-      stampG(solver, nodeAnode, nodeAnode, geq);
-      stampG(solver, nodeAnode, nodeCathode, -geq);
-      stampG(solver, nodeCathode, nodeAnode, -geq);
-      stampG(solver, nodeCathode, nodeCathode, geq);
+      stampG(solver, nodeAnode, nodeAnode, gd);
+      stampG(solver, nodeAnode, nodeCathode, -gd);
+      stampG(solver, nodeCathode, nodeAnode, -gd);
+      stampG(solver, nodeCathode, nodeCathode, gd);
       stampRHS(solver, nodeAnode, -ieq);
       stampRHS(solver, nodeCathode, ieq);
     },
@@ -247,8 +408,8 @@ export function createZenerElement(
 
       // dioconv.c DIOconvTest: current-prediction convergence
       const delvd = vdRaw - s0[base + SLOT_VD];
-      const id = s0[base + SLOT_ID];
-      const gd = s0[base + SLOT_GEQ];
+      const id = s0[base + SLOT_ID];   // GMIN-adjusted
+      const gd = s0[base + SLOT_GEQ]; // GMIN-adjusted
       const cdhat = id + gd * delvd;
       const tol = ctx.reltol * Math.max(Math.abs(cdhat), Math.abs(id)) + ctx.iabstol;
       return Math.abs(cdhat - id) <= tol;
@@ -263,9 +424,7 @@ export function createZenerElement(
 
     primeJunctions(): void {
       // dioload.c:135-136: MODEINITJCT sets vd = tVcrit
-      const nVt = params.N * VT;
-      const vcrit = nVt * Math.log(nVt / (params.IS * Math.SQRT2));
-      primedVd = vcrit;
+      pool.states[0][base + SLOT_VD] = tVcrit;
     },
 
     setParam(key: string, value: number): void {
@@ -438,9 +597,10 @@ export const ZenerDiodeDefinition: ComponentDefinition = {
   attributeMap: ZENER_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.SEMICONDUCTORS,
   helpText:
-    "Zener Diode — Shockley diode with reverse breakdown at BV.\n" +
+    "Zener Diode — Shockley diode with reverse breakdown at tBV.\n" +
     "Forward: Id = IS * (exp(Vd/(N*Vt)) - 1)\n" +
-    "Reverse breakdown (Vd < -BV): Id = -IS * exp(-(Vd+BV)/(N*Vt))",
+    "Reverse-cubic: Id = -IS*(1 + (3*nVt/(vd*e))^3)\n" +
+    "Breakdown (Vd < -tBV): Id = -IS * exp(-(Vd+tBV)/(NBV*Vt))",
   models: {},
   modelRegistry: {
     "spice": {

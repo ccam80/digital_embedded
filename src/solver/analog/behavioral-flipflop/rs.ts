@@ -74,6 +74,10 @@ export class BehavioralRSFlipflopElement implements AnalogElementCore {
     delegatePinSetParam(this._pinModelsByLabel, key, value);
   }
 
+  initVoltages(rhs: Float64Array): void {
+    this._prevClockVoltage = readMnaVoltage(this._clockPin.nodeId, rhs);
+  }
+
   getDiagnostics(): Diagnostic[] {
     return this._diagnostics;
   }

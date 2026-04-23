@@ -306,13 +306,13 @@ The original 7 post-A1 deferrals:
 |---|---|---|---|
 | A-1 | njfet.ts banned `Math.min(expArg, 80)` clamp removal | Grep `Math\.min\([^)]*80\)` in `njfet.ts` → 0 hits | **CLOSED** |
 | A-2 | pjfet.ts same banned clamp | Grep same in `pjfet.ts` → 0 hits | **CLOSED** |
-| C-4 | `behavioral-flipflop.ts` `_prevClockVoltage` seeded by a new `initState()` method | Method named `initVoltages(rhs: Float64Array)` at line 119 primes `_prevClockVoltage` from `readMnaVoltage(clockPin.nodeId, rhs)`. Method exists; lifecycle wiring (is it called between DC-OP convergence and first transient step?) NOT VERIFIED in W3. | **PARTIAL — open for Phase 3+.** Verification task: `Grep "initVoltages" src/solver/analog/` to find the caller chain. Confirm `initVoltages` is invoked after DC-OP convergence, before first transient `load()`. If not called: wire it in analog-engine.ts / coordinator. If called: item closes. Audit similar fields across `behavioral-*.ts` via `Grep "_prev[A-Z]" src/solver/analog/behavioral-*.ts`. |
+| C-4 | `behavioral-flipflop.ts` `_prevClockVoltage` seeded by a new `initState()` method | W4.D verified: `analog-engine.ts:_seedFromDcop` (lines 1172–1176) calls `initVoltages(ctx.rhs)` on every element after `ctx.rhs.set(result.nodeVoltages)` and before the mode bits flip to `MODETRAN\|MODEINITTRAN`. Sequence is correct. Audit of `_prev[A-Z]` across all `behavioral-flipflop/` subdirectory classes found 5 classes with `_prevClockVoltage = 0` and no `initVoltages`: `BehavioralJKFlipflopElement`, `BehavioralRSFlipflopElement`, `BehavioralTFlipflopElement`, `BehavioralDAsyncFlipflopElement`, `BehavioralJKAsyncFlipflopElement`. `initVoltages(rhs)` added to all five (commit: Phase 2.5 W4.D). `BehavioralRSAsyncLatchElement` has no clock pin and no `_prevClockVoltage` — N/A. | **CLOSED** — W4.D commit. |
 | C-5 | `ckt-mode.ts::isDcop()` helper uses `MODEDC` mask (0x70), not `MODEDCOP` (standalone) | `ckt-mode.ts:106-108`: `export function isDcop(mode: number): boolean { return (mode & MODEDC) !== 0; }` — CORRECT | **CLOSED** |
 | D-1 | diode.ts banned `Math.min(vd/nVt, 700)` clamp removal | Grep `Math\.min\([^)]*700\)` in `diode.ts` → 0 hits | **CLOSED** |
 | D-8 | MOSFET `cgs_cgd_transient_matches_ngspice_mos1` regression (-3.5e-12 delta) | Slot `SLOT_CAP_IEQ_DB` that held the value excised by A1; quantity now embedded in `niIntegrate` output at `mosfet.ts:1340–1388`. Static analysis cannot resolve. | **INCONCLUSIVE — open for Phase 6+.** Measurement task: post-Phase-6 harness comparison of MOSFET `cgs_cgd_transient` test. If bit-exact against ngspice: item closes. If non-zero delta: PARITY ticket against the new MOSFET `load()`. |
 | D-15 | Capacitor default `_IC = 0.0` + unconditional cond1 use | `CAPACITOR_DEFAULTS._IC = 0.0` confirmed; cond1 branch uses `this._IC` unconditionally (no `isNaN` guard) | **CLOSED** |
 
-**Net remaining carry-forwards:** 2 items (C-4 partial, D-8 inconclusive). 5 items closed.
+**Net remaining carry-forwards:** 1 item (D-8 inconclusive). 6 items closed.
 
 ---
 

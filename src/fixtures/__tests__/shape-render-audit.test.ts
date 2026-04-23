@@ -221,7 +221,8 @@ describe("shape render audit — pixel + text comparison vs Java Digital", () =>
       let element: CircuitElement;
       try {
         element = def.factory(props);
-      } catch {
+      } catch (err) {
+        console.warn(`[shape-render-audit] Factory error for element type "${tsName}"`, err);
         results.push({
           typeId: tsName,
           pixelDice: -1,
@@ -245,7 +246,8 @@ describe("shape render audit — pixel + text comparison vs Java Digital", () =>
       const ctx = new MockRenderContext();
       try {
         element.draw(ctx);
-      } catch {
+      } catch (err) {
+        console.warn(`[shape-render-audit] Draw error for element type "${tsName}"`, err);
         results.push({
           typeId: tsName,
           pixelDice: -1,
@@ -305,7 +307,8 @@ describe("shape render audit — pixel + text comparison vs Java Digital", () =>
           tsBounds.maxX - bx1, // draw extends past bbox right
           tsBounds.maxY - by1, // draw extends past bbox bottom
         );
-      } catch {
+      } catch (err) {
+        console.warn(`[shape-render-audit] Bbox overflow calculation error for element type "${tsName}"`, err);
         bboxOverflow = -1;
       }
 
@@ -396,7 +399,8 @@ describe("shape render audit — pixel + text comparison vs Java Digital", () =>
       let element: CircuitElement;
       try {
         element = def.factory(props);
-      } catch {
+      } catch (err) {
+        console.warn(`[shape-render-audit] Factory error for element type "${tsName}" (uncovered)`, err);
         results.push({
           typeId: tsName,
           pixelDice: NaN,
@@ -420,7 +424,8 @@ describe("shape render audit — pixel + text comparison vs Java Digital", () =>
       const ctx = new MockRenderContext();
       try {
         element.draw(ctx);
-      } catch {
+      } catch (err) {
+        console.warn(`[shape-render-audit] Draw error for element type "${tsName}" (uncovered)`, err);
         results.push({
           typeId: tsName,
           pixelDice: NaN,
@@ -461,7 +466,8 @@ describe("shape render audit — pixel + text comparison vs Java Digital", () =>
           tsBounds.maxX - bx1,
           tsBounds.maxY - by1,
         );
-      } catch {
+      } catch (err) {
+        console.warn(`[shape-render-audit] Bbox overflow calculation error for element type "${tsName}" (uncovered)`, err);
         bboxOverflow = -1;
       }
 
@@ -882,7 +888,8 @@ describe("pin transform audit — rotation × mirror correctness", () => {
       let element: CircuitElement;
       try {
         element = def.factory(props);
-      } catch {
+      } catch (err) {
+        console.warn(`[shape-render-audit] Factory error for element type "${tsName}" (pin audit)`, err);
         return;
       }
 

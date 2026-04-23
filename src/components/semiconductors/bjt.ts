@@ -706,6 +706,7 @@ export const BJT_SIMPLE_SCHEMA: StateSchema = defineStateSchema("BjtSimpleElemen
   { name: "GMU", doc: "bjtdefs.h BJTgmu", init: { kind: "zero" } },
   { name: "GM",  doc: "bjtdefs.h BJTgm",  init: { kind: "zero" } },
   { name: "GO",  doc: "bjtdefs.h BJTgo",  init: { kind: "zero" } },
+  { name: "GX",  doc: "bjtdefs.h BJTgx=16 (base-resistance cond); L0 always 0 — no RB", init: { kind: "zero" } },
 ]);
 
 // ---------------------------------------------------------------------------
@@ -771,6 +772,7 @@ export function createBjtElement(
   const SLOT_GMU = 5;
   const SLOT_GM  = 6;
   const SLOT_GO  = 7;
+  const SLOT_GX  = 8; // bjtdefs.h BJTgx=16; L0 always writes 0 (bjtload.c:780)
 
   // Pool binding — only the pool reference is retained. Individual state
   // arrays are NOT cached as member variables: every access inside load()
@@ -868,7 +870,8 @@ export function createBjtElement(
       }
       icheckLimited = vbeLimFlag || vbcLimFlag;
 
-      if (icheckLimited) ctx.noncon.value++;
+      // bjtload.c:749-754: skip noncon++ when MODEINITFIX && BJToff.
+      if (icheckLimited && (params.OFF === 0 || !(mode & MODEINITFIX))) ctx.noncon.value++;
 
       if (ctx.limitingCollector) {
         ctx.limitingCollector.push({
@@ -910,6 +913,7 @@ export function createBjtElement(
       s0[base + SLOT_GMU] = op.gmu;
       s0[base + SLOT_GM]  = op.gm;
       s0[base + SLOT_GO]  = op.go;
+      s0[base + SLOT_GX]  = 0; // bjtload.c:780 — L0 has no RB so gx=0
 
       // bjtload.c:749-754: CKTnoncon++ when icheck set.
       // (Already handled above via ctx.noncon.value increment.)
@@ -1317,8 +1321,8 @@ export function createSpiceL1BjtElement(
       }
       icheckLimited = vbeLimFlag || vbcLimFlag || vsubLimFlag;
 
-      // bjtload.c:749-754: CKTnoncon++.
-      if (icheckLimited) ctx.noncon.value++;
+      // bjtload.c:749-754: CKTnoncon++; skip when MODEINITFIX && BJToff.
+      if (icheckLimited && (params.OFF === 0 || !(mode & MODEINITFIX))) ctx.noncon.value++;
 
       if (ctx.limitingCollector) {
         ctx.limitingCollector.push({
@@ -1365,7 +1369,10 @@ export function createSpiceL1BjtElement(
           gdsub = csubsat * 3 * a / vsubLimited + GMIN;
           cdsub = -csubsat * (1 + a) + GMIN * vsubLimited;
         } else {
-          const evsub = Math.exp(vsubLimited / vts);
+          // bjtload.c:488: exp arg clamped to MAX_EXP_ARG to prevent overflow
+          // on paths (MODEINITSMSIG/MODEINITTRAN) that bypass pnjlim.
+          const MAX_EXP_ARG = 709;
+          const evsub = Math.exp(Math.min(MAX_EXP_ARG, vsubLimited / vts));
           gdsub = csubsat * evsub / vts + GMIN;
           cdsub = csubsat * (evsub - 1) + GMIN * vsubLimited;
         }
@@ -1382,7 +1389,8 @@ export function createSpiceL1BjtElement(
       let cex = cbe;
       let gex = gbe;
       let cexbc_now = 0;
-      if ((mode & (MODETRAN | MODEAC)) !== 0 && td !== 0 && ctx.delta > 0) {
+      // bjtload.c:525: gate is (MODETRAN|MODEAC) && td!=0 only — no ctx.delta guard.
+      if ((mode & (MODETRAN | MODEAC)) !== 0 && td !== 0) {
         const arg1a = ctx.delta / td;
         const arg2 = 3 * arg1a;
         const arg1 = arg2 * arg1a;
@@ -1453,7 +1461,7 @@ export function createSpiceL1BjtElement(
         const pc = tp.tBCpot;
         const xmc = tp.tjunctionExpBC;
         const fcpe = tp.tDepCap;
-        const czsub = tp.tSubcap;
+        const czsub = tp.tSubcap * params.AREA; // bjtload.c:583-585: BJTtSubcap*BJTareac
         const ps = tp.tSubpot;
         const xms = tp.tjunctionExpSub;
         const xtf = params.XTF;

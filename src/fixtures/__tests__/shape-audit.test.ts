@@ -172,7 +172,9 @@ describe("property-diversity pin audit — non-default props from fixtures", () 
               try {
                 const v = bag.getOrDefault(key, undefined);
                 if (v !== undefined) props[key] = v;
-              } catch { /* ignore */ }
+              } catch (err) {
+                console.warn(`[shape-audit] Failed to extract property "${key}" from element type "${el.typeId}"`, err);
+              }
             }
           }
         }

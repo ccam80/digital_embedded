@@ -252,7 +252,8 @@ describe("analog shape render audit — pixel comparison vs Falstad/CircuitJS1",
       let element: CircuitElement;
       try {
         element = def.factory(props);
-      } catch {
+      } catch (err) {
+        console.warn(`[analog-shape-render-audit] Factory error for element type "${typeName}"`, err);
         results.push(errorResult(typeName, "FACTORY_ERROR", true));
         return;
       }
@@ -266,7 +267,8 @@ describe("analog shape render audit — pixel comparison vs Falstad/CircuitJS1",
       const tsCtx = new MockRenderContext();
       try {
         element.draw(tsCtx);
-      } catch {
+      } catch (err) {
+        console.warn(`[analog-shape-render-audit] Draw error for element type "${typeName}"`, err);
         results.push(errorResult(typeName, "DRAW_ERROR", true));
         return;
       }
@@ -297,7 +299,8 @@ describe("analog shape render audit — pixel comparison vs Falstad/CircuitJS1",
           tsBounds.maxX - (bbox.x + bbox.width),
           tsBounds.maxY - (bbox.y + bbox.height),
         );
-      } catch {
+      } catch (err) {
+        console.warn(`[analog-shape-render-audit] Bbox overflow calculation error for element type "${typeName}"`, err);
         bboxOverflow = -1;
       }
 
@@ -391,7 +394,8 @@ describe("analog shape render audit — pixel comparison vs Falstad/CircuitJS1",
       let element: CircuitElement;
       try {
         element = def.factory(props);
-      } catch {
+      } catch (err) {
+        console.warn(`[analog-shape-render-audit] Factory error for element type "${typeName}" (uncovered)`, err);
         results.push(errorResult(typeName, "FACTORY_ERROR", false));
         return;
       }
@@ -399,7 +403,8 @@ describe("analog shape render audit — pixel comparison vs Falstad/CircuitJS1",
       const ctx = new MockRenderContext();
       try {
         element.draw(ctx);
-      } catch {
+      } catch (err) {
+        console.warn(`[analog-shape-render-audit] Draw error for element type "${typeName}" (uncovered)`, err);
         results.push(errorResult(typeName, "DRAW_ERROR", false));
         return;
       }
@@ -419,7 +424,8 @@ describe("analog shape render audit — pixel comparison vs Falstad/CircuitJS1",
           tsBounds.maxX - (bbox.x + bbox.width),
           tsBounds.maxY - (bbox.y + bbox.height),
         );
-      } catch {
+      } catch (err) {
+        console.warn(`[analog-shape-render-audit] Bbox overflow calculation error for element type "${typeName}" (uncovered)`, err);
         bboxOverflow = -1;
       }
 
@@ -790,7 +796,8 @@ describe("analog pin transform audit — rotation × mirror correctness", () => 
       let element: CircuitElement;
       try {
         element = def.factory(props);
-      } catch {
+      } catch (err) {
+        console.warn(`[analog-shape-render-audit] Factory error for element type "${typeName}" (pin audit)`, err);
         return;
       }
 
