@@ -77,7 +77,7 @@
 | W4.C.3 | L3 silent I/O catches → logged warnings | ✓ | 4331f406 |
 | W4.C.4 | L2 stale test deletions | ✓ | 7218f0ee |
 | W4.D | C-4 lifecycle verifier — `initVoltages` caller-chain | ✓ | 4331f406 (bundled) |
-| W4.close | Phase 2.5 closure commit — post-a1-parity.md §§5–6 updated, D-8 carried forward | — | — |
+| W4.close | Phase 2.5 closure commit — post-a1-parity.md §§5–6 updated, D-8 carried forward | ✓ | 653340ac |
 | W5 | `spec/phase-3-onwards.md` — re-author 77 surviving plan.md Phase 3–9 tasks | — | — |
 
 **W4 attribution note (2026-04-24):** parallel execution of the 15 W4 lanes on a shared working tree caused `git add`-scope collisions — multiple agents staged each other's in-progress edits, so several W4.B.* device-port changes landed inside commits labelled W4.C.*. Per-finding correctness verified by the W4 verifier pass; authoritative attribution table lives in `spec/post-a1-parity.md §6 (W4 closure)`.
