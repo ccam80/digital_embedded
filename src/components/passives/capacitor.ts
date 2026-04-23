@@ -194,17 +194,11 @@ export class AnalogCapacitorElement implements ReactiveAnalogElementCore {
     this._TNOM = TNOM;
     this._SCALE = SCALE;
     this._M = M;
-    this.C = this._computeEffectiveC();
-  }
-
-  private _computeEffectiveC(): number {
     // capload.c:44 — CAPm is applied at stamp time, not folded into CAPcapac.
-    // C here is the raw per-instance capacitance (TC + SCALE applied); M is
-    // kept separate and multiplied onto geq/ceq at every stamp site below.
-    const T = this._pool?.temperature ?? 300.15;
-    const dT = T - this._TNOM;
-    const factor = 1 + this._TC1 * dT + this._TC2 * dT * dT;
-    return this._nominalC * factor * this._SCALE;
+    // C is raw per-instance capacitance (TC + SCALE applied); M kept separate.
+    // _pool not yet set in constructor; temperature defaults to TNOM → dT = 0.
+    const _dT0 = 300.15 - this._TNOM;
+    this.C = this._nominalC * (1 + this._TC1 * _dT0 + this._TC2 * _dT0 * _dT0) * this._SCALE;
   }
 
   initState(pool: StatePoolRef): void {
@@ -215,24 +209,29 @@ export class AnalogCapacitorElement implements ReactiveAnalogElementCore {
   setParam(key: string, value: number): void {
     if (key === "capacitance") {
       this._nominalC = value;
-      this.C = this._computeEffectiveC();
+      const dT = 300.15 - this._TNOM;
+      this.C = this._nominalC * (1 + this._TC1 * dT + this._TC2 * dT * dT) * this._SCALE;
     } else if (key === "IC") {
       this._IC = value;
     } else if (key === "TC1") {
       this._TC1 = value;
-      this.C = this._computeEffectiveC();
+      const dT = 300.15 - this._TNOM;
+      this.C = this._nominalC * (1 + this._TC1 * dT + this._TC2 * dT * dT) * this._SCALE;
     } else if (key === "TC2") {
       this._TC2 = value;
-      this.C = this._computeEffectiveC();
+      const dT = 300.15 - this._TNOM;
+      this.C = this._nominalC * (1 + this._TC1 * dT + this._TC2 * dT * dT) * this._SCALE;
     } else if (key === "TNOM") {
       this._TNOM = value;
-      this.C = this._computeEffectiveC();
+      const dT = 300.15 - this._TNOM;
+      this.C = this._nominalC * (1 + this._TC1 * dT + this._TC2 * dT * dT) * this._SCALE;
     } else if (key === "SCALE") {
       this._SCALE = value;
-      this.C = this._computeEffectiveC();
+      const dT = 300.15 - this._TNOM;
+      this.C = this._nominalC * (1 + this._TC1 * dT + this._TC2 * dT * dT) * this._SCALE;
     } else if (key === "M") {
+      // capload.c:44 — M is applied at stamp time; C is not recomputed when M changes.
       this._M = value;
-      this.C = this._computeEffectiveC();
     }
   }
 
