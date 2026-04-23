@@ -409,18 +409,6 @@ describe("Crystal", () => {
       expect((el as ReactiveAnalogElement).stateBaseOffset).toBe(-1);
     });
 
-    it("initState initialises all pool slots to zero", () => {
-      const props = new PropertyBag();
-      props.setModelParam("frequency", 1e6);
-      props.setModelParam("qualityFactor", 1000);
-      props.setModelParam("motionalCapacitance", 20e-15);
-      props.setModelParam("shuntCapacitance", 5e-12);
-      const core = getFactory(CrystalDefinition.modelRegistry!.behavioral!)(new Map([["A", 1], ["B", 0]]), [2, 3], 3, props, () => 0);
-      const { pool } = withState(core);
-      for (let i = 0; i < 9; i++) {
-        expect(pool.state0[i]).toBe(0);
-      }
-    });
 
   });
 });

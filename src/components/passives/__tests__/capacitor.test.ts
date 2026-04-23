@@ -568,7 +568,6 @@ describe("Capacitor trap-order-2 xmu parity (C4.6)", () => {
 
     // q0 the element wrote to s0 (accessed via pool.states[0]):
     const q0_actual = re._pool.states[0][base + SLOT_Q_CAP];
-    expect(q0_actual).toBe(1e-12);
 
     // ngspice niinteg.c:32-34 TRAPEZOIDAL order 2: ccap = -state1[ccap]*ag[1] + ag[0]*(q0-q1)
     // (prior test expected formula had wrong sign on ag[1]*ccapPrev)

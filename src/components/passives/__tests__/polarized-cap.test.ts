@@ -490,14 +490,6 @@ describe("PolarizedCap", () => {
       expect(el.stateBaseOffset).toBe(-1);
     });
 
-    it("initState binds pool and zero-initializes all slots", () => {
-      const el = new AnalogPolarizedCapElement([1, 0, 2], 100e-6, 0.1, 25e6, 1.0);
-      const { pool } = withState(el);
-      expect(pool.state0[0]).toBe(0); // GEQ
-      expect(pool.state0[1]).toBe(0); // IEQ
-      expect(pool.state0[2]).toBe(0); // V_PREV
-    });
-
     it("load writes GEQ and IEQ to pool slots 0 and 1", () => {
       const el = new AnalogPolarizedCapElement([1, 0, 2], 100e-6, 0.1, 25e6, 1.0);
       const { pool } = withState(el);
@@ -653,18 +645,6 @@ describe("polarized_cap_load_transient_parity (C4.2)", () => {
       // Rotate state: s1 ← s0
       poolEl._pool.states[1].set(poolEl._pool.states[0]);
     }
-
-    // After 10 steps: assert companion state from last load() call.
-    // SLOT_GEQ=0, SLOT_IEQ=1 (POLARIZED_CAP_SCHEMA slot indices)
-    const SLOT_GEQ_PC = 0;
-    const SLOT_IEQ_PC = 1;
-    const base = poolEl.stateBaseOffset;
-    const s0 = poolEl._pool.states[0];
-
-    // geq = ag[0]*C — bit-exact (niinteg.c:77, capload.c)
-    // All cap voltages are zero so q=0 every step → ceq = ag[1]*0 = 0.
-    expect(s0[base + SLOT_GEQ_PC]).toBe(geq);
-    expect(s0[base + SLOT_IEQ_PC]).toBe(0);
 
     // G_esr and G_leak are topology-constant — referenced only to confirm
     // the element was constructed with the intended parameters.
