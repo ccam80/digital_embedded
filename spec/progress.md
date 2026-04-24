@@ -1128,3 +1128,15 @@ Previously-confirmed-patched files regression check: load-context.ts, ckt-contex
 - **Citation count by status**: unverified=1271, stale=11, missing=2, verified=0; Total=1284 rows
 - **Stale rows (11)**: dc-operating-point.ts lines 253,451 (cktop.c:546 → cktncdump.c:1); dc-operating-point.ts lines 529,701,709,718,747 (cktop.c off-by-one corrections); newton-raphson.ts lines 66,289,514,600 (devsup/niiter line-range corrections)
 - **Notes**: JSON is regenerated from src/**/*.ts at build time via spec/.tmp-build-json.mjs; the everyCitationCovered test scans live files so JSON must match the current file state; tests passed 8/8 at submission time
+
+## Task 8.1.1 fix-pass — mosfet rows regenerated
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: none
+- **Files modified**: spec/ngspice-citation-audit.json
+- **Tests**: 8/8 passing (citation-audit.test.ts)
+- **Row count change**: before=1284, after=1284 (same total — old mosfet.ts:117 + mosfet.test.ts:11 + bjt.test.ts:54 = 182 rows replaced with correctly-scanned 182 rows)
+- **Root cause**: The previous implementer's rows for mosfet.ts, mosfet.test.ts, and bjt.test.ts had sourceLine values that were off by ~1-6 lines from the actual citation positions in the source files. The test key is `sourceFile|sourceLine|ngspiceRef` so any off-by-one causes a miss.
+- **Fix**: Re-scanned all three files using the same citationRe + commentLineRe as the test, built replacement rows with exact sourceLine values, inserted them at the same positions in the array (replacing old rows one-for-one), then re-numbered all C-NNN IDs continuously. Total row count stayed at 1284.
+- **Non-mosfet rows**: untouched — all other files' rows preserved exactly.
+- **MD Priority sub-table**: IDs C-0989 through C-1065 still correctly reference dc-operating-point.ts and newton-raphson.ts rows — no renumbering impact.

@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "generatedAt": "2026-04-24T23:06:26.057Z",
+  "generatedAt": "2026-04-24T23:15:41.439Z",
   "statusDefinitions": {
     "verified": "cited range inspected against ref/ngspice/ AND the content at those lines matches the claim keyword",
     "stale": "cited range resolves to content that does NOT match the claim; notes contain a proposed corrected citation",
@@ -5102,1291 +5102,1291 @@
       "notes": ""
     },
     {
-      "id": "C-0464",
       "sourceFile": "src/components/semiconductors/mosfet.ts",
       "sourceLine": 6,
       "ngspiceRef": "mos1load.c:900",
       "ngspicePath": "ref/ngspice/src/spicelib/devices/mos1/mos1load.c",
-      "claim": "Cap companions lump inline into the gpi/gmu-analog MOS stamps per `-end`.",
+      "claim": "* Cap companions lump inline into the gpi/gmu-analog MOS stamps per `-end`.",
       "claimKeyword": "",
       "status": "unverified",
-      "notes": ""
+      "notes": "",
+      "id": "C-0464"
     },
     {
-      "id": "C-0465",
       "sourceFile": "src/components/semiconductors/mosfet.ts",
       "sourceLine": 10,
       "ngspiceRef": "mos1defs.h:269-291",
       "ngspicePath": "ref/ngspice/src/spicelib/devices/mos1/mos1defs.h",
-      "claim": "correspondence in `` survive.",
+      "claim": "* correspondence in `` survive.",
       "claimKeyword": "",
       "status": "unverified",
-      "notes": ""
+      "notes": "",
+      "id": "C-0465"
     },
     {
-      "id": "C-0466",
       "sourceFile": "src/components/semiconductors/mosfet.ts",
       "sourceLine": 16,
       "ngspiceRef": "mos1load.c:150-250",
       "ngspicePath": "ref/ngspice/src/spicelib/devices/mos1/mos1load.c",
-      "claim": "`` verbatim with the ngspice convention.",
+      "claim": "* `` verbatim with the ngspice convention.",
       "claimKeyword": "",
       "status": "unverified",
-      "notes": ""
+      "notes": "",
+      "id": "C-0466"
     },
     {
-      "id": "C-0467",
       "sourceFile": "src/components/semiconductors/mosfet.ts",
       "sourceLine": 20,
       "ngspiceRef": "mos1load.c:231-239",
       "ngspicePath": "ref/ngspice/src/spicelib/devices/mos1/mos1load.c",
-      "claim": "() and un-polarity-signed at the stamp site.",
+      "claim": "* () and un-polarity-signed at the stamp site.",
       "claimKeyword": "",
       "status": "unverified",
-      "notes": ""
+      "notes": "",
+      "id": "C-0467"
     },
     {
-      "id": "C-0468",
       "sourceFile": "src/components/semiconductors/mosfet.ts",
       "sourceLine": 72,
       "ngspiceRef": "defines.h:35",
-      "ngspicePath": "ref/ngspice/src/include/ngspice/defines.h",
-      "claim": "Exponential-argument ceiling ( MAX_EXP_ARG). */",
+      "ngspicePath": "ref/ngspice/src/include/defines.h",
+      "claim": "/** Exponential-argument ceiling ( MAX_EXP_ARG). */",
       "claimKeyword": "",
       "status": "unverified",
-      "notes": ""
+      "notes": "",
+      "id": "C-0468"
     },
     {
-      "id": "C-0469",
       "sourceFile": "src/components/semiconductors/mosfet.ts",
       "sourceLine": 393,
       "ngspiceRef": "mos1temp.c:44-289",
       "ngspicePath": "ref/ngspice/src/spicelib/devices/mos1/mos1temp.c",
-      "claim": "computeTempParams — ngspice port",
+      "claim": "// computeTempParams — ngspice  port",
       "claimKeyword": "",
       "status": "unverified",
-      "notes": ""
+      "notes": "",
+      "id": "C-0469"
     },
     {
-      "id": "C-0470",
       "sourceFile": "src/components/semiconductors/mosfet.ts",
       "sourceLine": 397,
       "ngspiceRef": "mos1load.c:107",
       "ngspicePath": "ref/ngspice/src/spicelib/devices/mos1/mos1load.c",
-      "claim": "vt: number; // : p.TEMP * KoverQ",
+      "claim": "vt: number;                  // : p.TEMP * KoverQ",
       "claimKeyword": "",
       "status": "unverified",
-      "notes": ""
+      "notes": "",
+      "id": "C-0470"
     },
     {
-      "id": "C-0471",
       "sourceFile": "src/components/semiconductors/mosfet.ts",
       "sourceLine": 398,
       "ngspiceRef": "mos1temp.c:165-166",
       "ngspicePath": "ref/ngspice/src/spicelib/devices/mos1/mos1temp.c",
-      "claim": "tTransconductance: number; //",
+      "claim": "tTransconductance: number;  //",
       "claimKeyword": "",
       "status": "unverified",
-      "notes": ""
+      "notes": "",
+      "id": "C-0471"
     },
     {
-      "id": "C-0472",
       "sourceFile": "src/components/semiconductors/mosfet.ts",
       "sourceLine": 399,
       "ngspiceRef": "mos1temp.c:168-169",
       "ngspicePath": "ref/ngspice/src/spicelib/devices/mos1/mos1temp.c",
-      "claim": "tPhi: number; //",
+      "claim": "tPhi: number;               //",
       "claimKeyword": "",
       "status": "unverified",
-      "notes": ""
+      "notes": "",
+      "id": "C-0472"
     },
     {
-      "id": "C-0473",
       "sourceFile": "src/components/semiconductors/mosfet.ts",
       "sourceLine": 400,
       "ngspiceRef": "mos1temp.c:170-174",
       "ngspicePath": "ref/ngspice/src/spicelib/devices/mos1/mos1temp.c",
-      "claim": "tVbi: number; //",
+      "claim": "tVbi: number;               //",
       "claimKeyword": "",
       "status": "unverified",
-      "notes": ""
+      "notes": "",
+      "id": "C-0473"
     },
     {
-      "id": "C-0474",
       "sourceFile": "src/components/semiconductors/mosfet.ts",
       "sourceLine": 401,
       "ngspiceRef": "mos1temp.c:175",
       "ngspicePath": "ref/ngspice/src/spicelib/devices/mos1/mos1temp.c",
-      "claim": "tVto: number; //",
+      "claim": "tVto: number;               //",
       "claimKeyword": "",
       "status": "unverified",
-      "notes": ""
+      "notes": "",
+      "id": "C-0474"
     },
     {
-      "id": "C-0475",
       "sourceFile": "src/components/semiconductors/mosfet.ts",
       "sourceLine": 402,
       "ngspiceRef": "mos1temp.c:177",
       "ngspicePath": "ref/ngspice/src/spicelib/devices/mos1/mos1temp.c",
-      "claim": "tSatCur: number; //",
+      "claim": "tSatCur: number;            //",
       "claimKeyword": "",
       "status": "unverified",
-      "notes": ""
+      "notes": "",
+      "id": "C-0475"
     },
     {
-      "id": "C-0476",
       "sourceFile": "src/components/semiconductors/mosfet.ts",
       "sourceLine": 403,
       "ngspiceRef": "mos1temp.c:178",
       "ngspicePath": "ref/ngspice/src/spicelib/devices/mos1/mos1temp.c",
-      "claim": "tSatCurDens: number; //",
+      "claim": "tSatCurDens: number;        //",
       "claimKeyword": "",
       "status": "unverified",
-      "notes": ""
+      "notes": "",
+      "id": "C-0476"
     },
     {
-      "id": "C-0477",
       "sourceFile": "src/components/semiconductors/mosfet.ts",
       "sourceLine": 404,
       "ngspiceRef": "mos1temp.c:190",
       "ngspicePath": "ref/ngspice/src/spicelib/devices/mos1/mos1temp.c",
-      "claim": "tBulkPot: number; //",
+      "claim": "tBulkPot: number;           //",
       "claimKeyword": "",
       "status": "unverified",
-      "notes": ""
+      "notes": "",
+      "id": "C-0477"
     },
     {
-      "id": "C-0478",
       "sourceFile": "src/components/semiconductors/mosfet.ts",
       "sourceLine": 405,
       "ngspiceRef": "mos1temp.c:200",
       "ngspicePath": "ref/ngspice/src/spicelib/devices/mos1/mos1temp.c",
-      "claim": "tDepCap: number; //",
+      "claim": "tDepCap: number;            //",
       "claimKeyword": "",
       "status": "unverified",
-      "notes": ""
+      "notes": "",
+      "id": "C-0478"
     },
     {
-      "id": "C-0479",
       "sourceFile": "src/components/semiconductors/mosfet.ts",
       "sourceLine": 410,
       "ngspiceRef": "mos1load.c:131-141",
       "ngspicePath": "ref/ngspice/src/spicelib/devices/mos1/mos1load.c",
-      "claim": "drainSatCur: number; //",
+      "claim": "drainSatCur: number;        //",
       "claimKeyword": "",
       "status": "unverified",
-      "notes": ""
+      "notes": "",
+      "id": "C-0479"
     },
     {
-      "id": "C-0480",
       "sourceFile": "src/components/semiconductors/mosfet.ts",
       "sourceLine": 411,
       "ngspiceRef": "mos1load.c:131-141",
       "ngspicePath": "ref/ngspice/src/spicelib/devices/mos1/mos1load.c",
-      "claim": "sourceSatCur: number; //",
+      "claim": "sourceSatCur: number;       //",
       "claimKeyword": "",
       "status": "unverified",
-      "notes": ""
+      "notes": "",
+      "id": "C-0480"
     },
     {
-      "id": "C-0481",
       "sourceFile": "src/components/semiconductors/mosfet.ts",
       "sourceLine": 412,
       "ngspiceRef": "mos1temp.c:202-216",
       "ngspicePath": "ref/ngspice/src/spicelib/devices/mos1/mos1temp.c",
-      "claim": "drainVcrit: number; //",
+      "claim": "drainVcrit: number;         //",
       "claimKeyword": "",
       "status": "unverified",
-      "notes": ""
+      "notes": "",
+      "id": "C-0481"
     },
     {
-      "id": "C-0482",
       "sourceFile": "src/components/semiconductors/mosfet.ts",
       "sourceLine": 414,
       "ngspiceRef": "mos1temp.c:218-289",
       "ngspicePath": "ref/ngspice/src/spicelib/devices/mos1/mos1temp.c",
-      "claim": "Junction cap f2/f3/f4 linearization coefficients ()",
+      "claim": "// Junction cap f2/f3/f4 linearization coefficients ()",
       "claimKeyword": "",
       "status": "unverified",
-      "notes": ""
+      "notes": "",
+      "id": "C-0482"
     },
     {
-      "id": "C-0483",
       "sourceFile": "src/components/semiconductors/mosfet.ts",
       "sourceLine": 421,
       "ngspiceRef": "mos1temp.c:45-51",
       "ngspicePath": "ref/ngspice/src/spicelib/devices/mos1/mos1temp.c",
-      "claim": "--- Model-level () ---",
+      "claim": "// --- Model-level () ---",
       "claimKeyword": "",
       "status": "unverified",
-      "notes": ""
+      "notes": "",
+      "id": "C-0483"
     },
     {
-      "id": "C-0484",
       "sourceFile": "src/components/semiconductors/mosfet.ts",
       "sourceLine": 429,
       "ngspiceRef": "mos1temp.c:135-200",
       "ngspicePath": "ref/ngspice/src/spicelib/devices/mos1/mos1temp.c",
-      "claim": "--- Instance-level (); circuit temp = p.TEMP ---",
+      "claim": "// --- Instance-level (); circuit temp = p.TEMP ---",
       "claimKeyword": "",
       "status": "unverified",
-      "notes": ""
+      "notes": "",
+      "id": "C-0484"
     },
     {
-      "id": "C-0485",
       "sourceFile": "src/components/semiconductors/mosfet.ts",
       "sourceLine": 439,
       "ngspiceRef": "mos1temp.c:165-166",
       "ngspicePath": "ref/ngspice/src/spicelib/devices/mos1/mos1temp.c",
-      "claim": "citation",
+      "claim": "//",
       "claimKeyword": "",
       "status": "unverified",
-      "notes": ""
+      "notes": "",
+      "id": "C-0485"
     },
     {
-      "id": "C-0486",
       "sourceFile": "src/components/semiconductors/mosfet.ts",
       "sourceLine": 443,
       "ngspiceRef": "mos1temp.c:168-169",
       "ngspicePath": "ref/ngspice/src/spicelib/devices/mos1/mos1temp.c",
-      "claim": "citation",
+      "claim": "//",
       "claimKeyword": "",
       "status": "unverified",
-      "notes": ""
+      "notes": "",
+      "id": "C-0486"
     },
     {
-      "id": "C-0487",
       "sourceFile": "src/components/semiconductors/mosfet.ts",
       "sourceLine": 447,
       "ngspiceRef": "mos1temp.c:170-175",
       "ngspicePath": "ref/ngspice/src/spicelib/devices/mos1/mos1temp.c",
-      "claim": "citation",
+      "claim": "//",
       "claimKeyword": "",
       "status": "unverified",
-      "notes": ""
+      "notes": "",
+      "id": "C-0487"
     },
     {
-      "id": "C-0488",
       "sourceFile": "src/components/semiconductors/mosfet.ts",
       "sourceLine": 453,
       "ngspiceRef": "mos1temp.c:177-178",
       "ngspicePath": "ref/ngspice/src/spicelib/devices/mos1/mos1temp.c",
-      "claim": "citation",
+      "claim": "//",
       "claimKeyword": "",
       "status": "unverified",
-      "notes": ""
+      "notes": "",
+      "id": "C-0488"
     },
     {
-      "id": "C-0489",
       "sourceFile": "src/components/semiconductors/mosfet.ts",
       "sourceLine": 458,
       "ngspiceRef": "mos1temp.c:181-200",
       "ngspicePath": "ref/ngspice/src/spicelib/devices/mos1/mos1temp.c",
-      "claim": "citation",
+      "claim": "//",
       "claimKeyword": "",
       "status": "unverified",
-      "notes": ""
+      "notes": "",
+      "id": "C-0489"
     },
     {
-      "id": "C-0490",
       "sourceFile": "src/components/semiconductors/mosfet.ts",
       "sourceLine": 477,
       "ngspiceRef": "mos1load.c:131-141",
       "ngspicePath": "ref/ngspice/src/spicelib/devices/mos1/mos1load.c",
-      "claim": ": drain/source saturation currents scaled by M",
+      "claim": "// : drain/source saturation currents scaled by M",
       "claimKeyword": "",
       "status": "unverified",
-      "notes": ""
+      "notes": "",
+      "id": "C-0490"
     },
     {
-      "id": "C-0491",
       "sourceFile": "src/components/semiconductors/mosfet.ts",
       "sourceLine": 489,
       "ngspiceRef": "mos1temp.c:202-216",
       "ngspicePath": "ref/ngspice/src/spicelib/devices/mos1/mos1temp.c",
-      "claim": ": drain/source vcrit",
+      "claim": "// : drain/source vcrit",
       "claimKeyword": "",
       "status": "unverified",
-      "notes": ""
+      "notes": "",
+      "id": "C-0491"
     },
     {
-      "id": "C-0492",
       "sourceFile": "src/components/semiconductors/mosfet.ts",
       "sourceLine": 498,
       "ngspiceRef": "mos1temp.c:218-289",
       "ngspicePath": "ref/ngspice/src/spicelib/devices/mos1/mos1temp.c",
-      "claim": "--- Junction cap f2/f3/f4 coefficients () ---",
+      "claim": "// --- Junction cap f2/f3/f4 coefficients () ---",
       "claimKeyword": "",
       "status": "unverified",
-      "notes": ""
+      "notes": "",
+      "id": "C-0492"
     },
     {
-      "id": "C-0493",
       "sourceFile": "src/components/semiconductors/mosfet.ts",
       "sourceLine": 503,
       "ngspiceRef": "mos1temp.c:218-253",
       "ngspicePath": "ref/ngspice/src/spicelib/devices/mos1/mos1temp.c",
-      "claim": "Drain side ()",
+      "claim": "// Drain side ()",
       "claimKeyword": "",
       "status": "unverified",
-      "notes": ""
+      "notes": "",
+      "id": "C-0493"
     },
     {
-      "id": "C-0494",
       "sourceFile": "src/components/semiconductors/mosfet.ts",
       "sourceLine": 523,
       "ngspiceRef": "mos1temp.c:254-289",
       "ngspicePath": "ref/ngspice/src/spicelib/devices/mos1/mos1temp.c",
-      "claim": "Source side ()",
+      "claim": "// Source side ()",
       "claimKeyword": "",
       "status": "unverified",
-      "notes": ""
+      "notes": "",
+      "id": "C-0494"
     },
     {
-      "id": "C-0495",
       "sourceFile": "src/components/semiconductors/mosfet.ts",
       "sourceLine": 551,
       "ngspiceRef": "mos1load.c:363-406",
       "ngspicePath": "ref/ngspice/src/spicelib/devices/mos1/mos1load.c",
-      "claim": "Apply SPICE3f5 fetlim+limvds limiting algorithm ().",
+      "claim": "* Apply SPICE3f5 fetlim+limvds limiting algorithm ().",
       "claimKeyword": "",
       "status": "unverified",
-      "notes": ""
+      "notes": "",
+      "id": "C-0495"
     },
     {
-      "id": "C-0496",
       "sourceFile": "src/components/semiconductors/mosfet.ts",
       "sourceLine": 594,
       "ngspiceRef": "devsup.c:625-689",
       "ngspicePath": "ref/ngspice/src/spicelib/devices/devsup.c",
-      "claim": "devQmeyer — Meyer gate capacitance model ( port)",
+      "claim": "// devQmeyer — Meyer gate capacitance model ( port)",
       "claimKeyword": "",
       "status": "unverified",
-      "notes": ""
+      "notes": "",
+      "id": "C-0496"
     },
     {
-      "id": "C-0497",
       "sourceFile": "src/components/semiconductors/mosfet.ts",
       "sourceLine": 600,
       "ngspiceRef": "mos1load.c:789-806",
       "ngspicePath": "ref/ngspice/src/spicelib/devices/mos1/mos1load.c",
-      "claim": "(normal MODETRAN integration, ).",
+      "claim": "* (normal MODETRAN integration, ).",
       "claimKeyword": "",
       "status": "unverified",
-      "notes": ""
+      "notes": "",
+      "id": "C-0497"
     },
     {
-      "id": "C-0498",
       "sourceFile": "src/components/semiconductors/mosfet.ts",
       "sourceLine": 651,
       "ngspiceRef": "mos1defs.h:269-291",
       "ngspicePath": "ref/ngspice/src/spicelib/devices/mos1/mos1defs.h",
-      "claim": "Only slots with direct correspondence in `` MOS1state<n>",
+      "claim": "// Only slots with direct correspondence in `` MOS1state<n>",
       "claimKeyword": "",
       "status": "unverified",
-      "notes": ""
+      "notes": "",
+      "id": "C-0498"
     },
     {
-      "id": "C-0499",
       "sourceFile": "src/components/semiconductors/mosfet.ts",
       "sourceLine": 656,
       "ngspiceRef": "mos1load.c:900",
       "ngspicePath": "ref/ngspice/src/spicelib/devices/mos1/mos1load.c",
-      "claim": "the gate-stamp matrix/RHS entries per `-end`.",
+      "claim": "// the gate-stamp matrix/RHS entries per `-end`.",
       "claimKeyword": "",
       "status": "unverified",
-      "notes": ""
+      "notes": "",
+      "id": "C-0499"
     },
     {
-      "id": "C-0500",
       "sourceFile": "src/components/semiconductors/mosfet.ts",
       "sourceLine": 659,
       "ngspiceRef": "mos1load.c:930",
       "ngspicePath": "ref/ngspice/src/spicelib/devices/mos1/mos1load.c",
-      "claim": "1. CAP_GEQ_GS (fet-base.ts SLOT 6) — lumped inline per ,942",
+      "claim": "//   1. CAP_GEQ_GS   (fet-base.ts SLOT 6)  — lumped inline per ,942",
       "claimKeyword": "",
       "status": "unverified",
-      "notes": ""
+      "notes": "",
+      "id": "C-0500"
     },
     {
-      "id": "C-0501",
       "sourceFile": "src/components/semiconductors/mosfet.ts",
       "sourceLine": 661,
       "ngspiceRef": "mos1load.c:941",
       "ngspicePath": "ref/ngspice/src/spicelib/devices/mos1/mos1load.c",
-      "claim": "3. CAP_GEQ_GD (fet-base.ts SLOT 8) — lumped inline per",
+      "claim": "//   3. CAP_GEQ_GD   (fet-base.ts SLOT 8)  — lumped inline per",
       "claimKeyword": "",
       "status": "unverified",
-      "notes": ""
+      "notes": "",
+      "id": "C-0501"
     },
     {
-      "id": "C-0502",
       "sourceFile": "src/components/semiconductors/mosfet.ts",
       "sourceLine": 663,
       "ngspiceRef": "mos1load.c:930",
       "ngspicePath": "ref/ngspice/src/spicelib/devices/mos1/mos1load.c",
-      "claim": "5. CAP_GEQ_GB (fet-base.ts SLOT 18) — lumped inline per ,940",
+      "claim": "//   5. CAP_GEQ_GB   (fet-base.ts SLOT 18) — lumped inline per ,940",
       "claimKeyword": "",
       "status": "unverified",
-      "notes": ""
+      "notes": "",
+      "id": "C-0502"
     },
     {
-      "id": "C-0503",
       "sourceFile": "src/components/semiconductors/mosfet.ts",
       "sourceLine": 665,
       "ngspiceRef": "mos1load.c:717",
       "ngspicePath": "ref/ngspice/src/spicelib/devices/mos1/mos1load.c",
-      "claim": "7. CAP_GEQ_DB (fet-base.ts SLOT 12) — lumped into gbd per",
+      "claim": "//   7. CAP_GEQ_DB   (fet-base.ts SLOT 12) — lumped into gbd per",
       "claimKeyword": "",
       "status": "unverified",
-      "notes": ""
+      "notes": "",
+      "id": "C-0503"
     },
     {
-      "id": "C-0504",
       "sourceFile": "src/components/semiconductors/mosfet.ts",
       "sourceLine": 666,
       "ngspiceRef": "mos1load.c:718-719",
       "ngspicePath": "ref/ngspice/src/spicelib/devices/mos1/mos1load.c",
-      "claim": "8. CAP_IEQ_DB (fet-base.ts SLOT 13) — lumped into cbd per",
+      "claim": "//   8. CAP_IEQ_DB   (fet-base.ts SLOT 13) — lumped into cbd per",
       "claimKeyword": "",
       "status": "unverified",
-      "notes": ""
+      "notes": "",
+      "id": "C-0504"
     },
     {
-      "id": "C-0505",
       "sourceFile": "src/components/semiconductors/mosfet.ts",
       "sourceLine": 667,
       "ngspiceRef": "mos1load.c:723",
       "ngspicePath": "ref/ngspice/src/spicelib/devices/mos1/mos1load.c",
-      "claim": "9. CAP_GEQ_SB (fet-base.ts SLOT 14) — lumped into gbs per",
+      "claim": "//   9. CAP_GEQ_SB   (fet-base.ts SLOT 14) — lumped into gbs per",
       "claimKeyword": "",
       "status": "unverified",
-      "notes": ""
+      "notes": "",
+      "id": "C-0505"
     },
     {
-      "id": "C-0506",
       "sourceFile": "src/components/semiconductors/mosfet.ts",
       "sourceLine": 668,
       "ngspiceRef": "mos1load.c:724",
       "ngspicePath": "ref/ngspice/src/spicelib/devices/mos1/mos1load.c",
-      "claim": "10. CAP_IEQ_SB (fet-base.ts SLOT 15) — lumped into cbs per",
+      "claim": "//  10. CAP_IEQ_SB   (fet-base.ts SLOT 15) — lumped into cbs per",
       "claimKeyword": "",
       "status": "unverified",
-      "notes": ""
+      "notes": "",
+      "id": "C-0506"
     },
     {
-      "id": "C-0507",
       "sourceFile": "src/components/semiconductors/mosfet.ts",
       "sourceLine": 670,
       "ngspiceRef": "mos1load.c:800-806",
       "ngspicePath": "ref/ngspice/src/spicelib/devices/mos1/mos1load.c",
-      "claim": "averaging (), not a separate half-cap stash",
+      "claim": "//                   averaging (), not a separate half-cap stash",
       "claimKeyword": "",
       "status": "unverified",
-      "notes": ""
+      "notes": "",
+      "id": "C-0507"
     },
     {
-      "id": "C-0508",
       "sourceFile": "src/components/semiconductors/mosfet.ts",
       "sourceLine": 842,
       "ngspiceRef": "mos1temp.c:170-176",
       "ngspicePath": "ref/ngspice/src/spicelib/devices/mos1/mos1temp.c",
-      "claim": "polarity at the tVbi/tVto evaluation sites per .",
+      "claim": "// polarity at the tVbi/tVto evaluation sites per .",
       "claimKeyword": "",
       "status": "unverified",
-      "notes": ""
+      "notes": "",
+      "id": "C-0508"
     },
     {
-      "id": "C-0509",
       "sourceFile": "src/components/semiconductors/mosfet.ts",
       "sourceLine": 881,
       "ngspiceRef": "mos1load.c:231-247",
       "ngspicePath": "ref/ngspice/src/spicelib/devices/mos1/mos1load.c",
-      "claim": "`vbd = vb - vd` (). Legacy digiTS VSB = -VBS; every",
+      "claim": "* `vbd = vb - vd` ().",
       "claimKeyword": "",
       "status": "unverified",
-      "notes": ""
+      "notes": "",
+      "id": "C-0509"
     },
     {
-      "id": "C-0510",
       "sourceFile": "src/components/semiconductors/mosfet.ts",
-      "sourceLine": 884,
+      "sourceLine": 883,
       "ngspiceRef": "mos1load.c:900",
       "ngspicePath": "ref/ngspice/src/spicelib/devices/mos1/mos1load.c",
-      "claim": "Cap companion lumping (-end): geq contributions fold into",
+      "claim": "* Cap companion lumping (-end): geq contributions fold into",
       "claimKeyword": "",
       "status": "unverified",
-      "notes": ""
+      "notes": "",
+      "id": "C-0510"
     },
     {
-      "id": "C-0511",
       "sourceFile": "src/components/semiconductors/mosfet.ts",
-      "sourceLine": 889,
+      "sourceLine": 888,
       "ngspiceRef": "mos1load.c:108",
       "ngspicePath": "ref/ngspice/src/spicelib/devices/mos1/mos1load.c",
-      "claim": ": Check=0 — false initially; set true only if pnjlim fires.",
+      "claim": "// : Check=0 — false initially; set true only if pnjlim fires.",
       "claimKeyword": "",
       "status": "unverified",
-      "notes": ""
+      "notes": "",
+      "id": "C-0511"
     },
     {
-      "id": "C-0512",
       "sourceFile": "src/components/semiconductors/mosfet.ts",
-      "sourceLine": 899,
+      "sourceLine": 898,
       "ngspiceRef": "mos1load.c:107",
       "ngspicePath": "ref/ngspice/src/spicelib/devices/mos1/mos1load.c",
-      "claim": ": vt = CONSTKoverQ * MOS1temp — per-instance thermal voltage.",
+      "claim": "// : vt = CONSTKoverQ * MOS1temp — per-instance thermal voltage.",
       "claimKeyword": "",
       "status": "unverified",
-      "notes": ""
+      "notes": "",
+      "id": "C-0512"
     },
     {
-      "id": "C-0513",
       "sourceFile": "src/components/semiconductors/mosfet.ts",
-      "sourceLine": 902,
+      "sourceLine": 901,
       "ngspiceRef": "mos1load.c:130-147",
       "ngspicePath": "ref/ngspice/src/spicelib/devices/mos1/mos1load.c",
-      "claim": ": precomputed operation-point constants.",
+      "claim": "// : precomputed operation-point constants.",
       "claimKeyword": "",
       "status": "unverified",
-      "notes": ""
+      "notes": "",
+      "id": "C-0513"
     },
     {
-      "id": "C-0514",
       "sourceFile": "src/components/semiconductors/mosfet.ts",
-      "sourceLine": 913,
+      "sourceLine": 912,
       "ngspiceRef": "mos1load.c:200-204",
       "ngspicePath": "ref/ngspice/src/spicelib/devices/mos1/mos1load.c",
-      "claim": ": MODEINITFLOAT | MODEINITPRED | MODEINITSMSIG | MODEINITTRAN",
+      "claim": "// : MODEINITFLOAT | MODEINITPRED | MODEINITSMSIG | MODEINITTRAN",
       "claimKeyword": "",
       "status": "unverified",
-      "notes": ""
+      "notes": "",
+      "id": "C-0514"
     },
     {
-      "id": "C-0515",
       "sourceFile": "src/components/semiconductors/mosfet.ts",
-      "sourceLine": 916,
+      "sourceLine": 915,
       "ngspiceRef": "mos1load.c:412-434",
       "ngspicePath": "ref/ngspice/src/spicelib/devices/mos1/mos1load.c",
-      "claim": "Else () → MODEINITJCT / MODEINITFIX+OFF / default-zero.",
+      "claim": "// Else () → MODEINITJCT / MODEINITFIX+OFF / default-zero.",
       "claimKeyword": "",
       "status": "unverified",
-      "notes": ""
+      "notes": "",
+      "id": "C-0515"
     },
     {
-      "id": "C-0516",
       "sourceFile": "src/components/semiconductors/mosfet.ts",
-      "sourceLine": 923,
+      "sourceLine": 922,
       "ngspiceRef": "mos1load.c:329-338",
       "ngspicePath": "ref/ngspice/src/spicelib/devices/mos1/mos1load.c",
-      "claim": "MODETRAN|MODETRANOP per ).",
+      "claim": "// MODETRAN|MODETRANOP per ).",
       "claimKeyword": "",
       "status": "unverified",
-      "notes": ""
+      "notes": "",
+      "id": "C-0516"
     },
     {
-      "id": "C-0517",
       "sourceFile": "src/components/semiconductors/mosfet.ts",
-      "sourceLine": 926,
+      "sourceLine": 925,
       "ngspiceRef": "mos1load.c:201-203",
       "ngspicePath": "ref/ngspice/src/spicelib/devices/mos1/mos1load.c",
-      "claim": ": gate bits for \"simple/general iteration\" dispatch.",
+      "claim": "// : gate bits for \"simple/general iteration\" dispatch.",
       "claimKeyword": "",
       "status": "unverified",
-      "notes": ""
+      "notes": "",
+      "id": "C-0517"
     },
     {
-      "id": "C-0518",
       "sourceFile": "src/components/semiconductors/mosfet.ts",
-      "sourceLine": 930,
+      "sourceLine": 929,
       "ngspiceRef": "mos1load.c:202-204",
       "ngspicePath": "ref/ngspice/src/spicelib/devices/mos1/mos1load.c",
-      "claim": "cite: , 226-240, 565, 789, 862",
+      "claim": "// cite: , 226-240, 565, 789, 862",
       "claimKeyword": "",
       "status": "unverified",
-      "notes": ""
+      "notes": "",
+      "id": "C-0518"
     },
     {
-      "id": "C-0519",
       "sourceFile": "src/components/semiconductors/mosfet.ts",
-      "sourceLine": 934,
+      "sourceLine": 933,
       "ngspiceRef": "mos1load.c:202-204",
       "ngspicePath": "ref/ngspice/src/spicelib/devices/mos1/mos1load.c",
-      "claim": "ngspice gates SMSIG into the simple block; line 226",
+      "claim": "// ngspice  gates SMSIG into the simple block; line 226",
       "claimKeyword": "",
       "status": "unverified",
-      "notes": ""
+      "notes": "",
+      "id": "C-0519"
     },
     {
-      "id": "C-0520",
       "sourceFile": "src/components/semiconductors/mosfet.ts",
-      "sourceLine": 939,
+      "sourceLine": 938,
       "ngspiceRef": "mos1load.c:205-225",
       "ngspicePath": "ref/ngspice/src/spicelib/devices/mos1/mos1load.c",
-      "claim": ": predictor step (#ifndef PREDICTOR).",
+      "claim": "// : predictor step (#ifndef PREDICTOR).",
       "claimKeyword": "",
       "status": "unverified",
-      "notes": ""
+      "notes": "",
+      "id": "C-0520"
     },
     {
-      "id": "C-0521",
       "sourceFile": "src/components/semiconductors/mosfet.ts",
-      "sourceLine": 940,
+      "sourceLine": 939,
       "ngspiceRef": "mos1load.c:211-225",
       "ngspicePath": "ref/ngspice/src/spicelib/devices/mos1/mos1load.c",
-      "claim": "cite:",
+      "claim": "// cite:",
       "claimKeyword": "",
       "status": "unverified",
-      "notes": ""
+      "notes": "",
+      "id": "C-0521"
     },
     {
-      "id": "C-0522",
       "sourceFile": "src/components/semiconductors/mosfet.ts",
-      "sourceLine": 954,
+      "sourceLine": 953,
       "ngspiceRef": "mos1load.c:226-240",
       "ngspicePath": "ref/ngspice/src/spicelib/devices/mos1/mos1load.c",
-      "claim": ": general iteration path (MODEINITFLOAT, MODEINITSMSIG,",
+      "claim": "// : general iteration path (MODEINITFLOAT, MODEINITSMSIG,",
       "claimKeyword": "",
       "status": "unverified",
-      "notes": ""
+      "notes": "",
+      "id": "C-0522"
     },
     {
-      "id": "C-0523",
       "sourceFile": "src/components/semiconductors/mosfet.ts",
-      "sourceLine": 960,
+      "sourceLine": 959,
       "ngspiceRef": "mos1load.c:231-239",
       "ngspicePath": "ref/ngspice/src/spicelib/devices/mos1/mos1load.c",
-      "claim": "— G1: ngspice computes vbs = B - S, vgs = G - S,",
+      "claim": "//  — G1: ngspice computes vbs = B - S, vgs = G - S,",
       "claimKeyword": "",
       "status": "unverified",
-      "notes": ""
+      "notes": "",
+      "id": "C-0523"
     },
     {
-      "id": "C-0524",
       "sourceFile": "src/components/semiconductors/mosfet.ts",
-      "sourceLine": 967,
+      "sourceLine": 966,
       "ngspiceRef": "mos1load.c:246-254",
       "ngspicePath": "ref/ngspice/src/spicelib/devices/mos1/mos1load.c",
-      "claim": ": now some common crunching.",
+      "claim": "// : now some common crunching.",
       "claimKeyword": "",
       "status": "unverified",
-      "notes": ""
+      "notes": "",
+      "id": "C-0524"
     },
     {
-      "id": "C-0525",
       "sourceFile": "src/components/semiconductors/mosfet.ts",
-      "sourceLine": 976,
+      "sourceLine": 975,
       "ngspiceRef": "mos1load.c:258-348",
       "ngspicePath": "ref/ngspice/src/spicelib/devices/mos1/mos1load.c",
-      "claim": "cite: — NOBYPASS bypass gate runs BEFORE limiting.",
+      "claim": "// cite:  — NOBYPASS bypass gate runs BEFORE limiting.",
       "claimKeyword": "",
       "status": "unverified",
-      "notes": ""
+      "notes": "",
+      "id": "C-0525"
     },
     {
-      "id": "C-0526",
+      "sourceFile": "src/components/semiconductors/mosfet.ts",
+      "sourceLine": 977,
+      "ngspiceRef": "mos1load.c:356-406",
+      "ngspicePath": "ref/ngspice/src/spicelib/devices/mos1/mos1load.c",
+      "claim": "// (3) if !bypass, run limiting (). The bypass path",
+      "claimKeyword": "",
+      "status": "unverified",
+      "notes": "",
+      "id": "C-0526"
+    },
+    {
       "sourceFile": "src/components/semiconductors/mosfet.ts",
       "sourceLine": 978,
-      "ngspiceRef": "mos1load.c:356-406",
-      "ngspicePath": "ref/ngspice/src/spicelib/devices/mos1/mos1load.c",
-      "claim": "(3) if !bypass, run limiting (). The bypass path",
-      "claimKeyword": "",
-      "status": "unverified",
-      "notes": ""
-    },
-    {
-      "id": "C-0527",
-      "sourceFile": "src/components/semiconductors/mosfet.ts",
-      "sourceLine": 979,
       "ngspiceRef": "mos1load.c:346",
       "ngspicePath": "ref/ngspice/src/spicelib/devices/mos1/mos1load.c",
-      "claim": "`goto bypass;` at skips limiting entirely — so no",
+      "claim": "// `goto bypass;` at  skips limiting entirely — so no",
       "claimKeyword": "",
       "status": "unverified",
-      "notes": ""
+      "notes": "",
+      "id": "C-0527"
     },
     {
-      "id": "C-0528",
       "sourceFile": "src/components/semiconductors/mosfet.ts",
-      "sourceLine": 1004,
+      "sourceLine": 1003,
       "ngspiceRef": "mos1load.c:258-264",
       "ngspicePath": "ref/ngspice/src/spicelib/devices/mos1/mos1load.c",
-      "claim": "cite: — normal-mode cdhat uses delvgs/delvds/",
+      "claim": "// cite:  — normal-mode cdhat uses delvgs/delvds/",
       "claimKeyword": "",
       "status": "unverified",
-      "notes": ""
+      "notes": "",
+      "id": "C-0528"
     },
     {
-      "id": "C-0529",
       "sourceFile": "src/components/semiconductors/mosfet.ts",
-      "sourceLine": 1008,
+      "sourceLine": 1007,
       "ngspiceRef": "mos1load.c:265-272",
       "ngspicePath": "ref/ngspice/src/spicelib/devices/mos1/mos1load.c",
-      "claim": "cite: — reverse-mode cdhat uses delvgd.",
+      "claim": "// cite:  — reverse-mode cdhat uses delvgd.",
       "claimKeyword": "",
       "status": "unverified",
-      "notes": ""
+      "notes": "",
+      "id": "C-0529"
     },
     {
-      "id": "C-0530",
       "sourceFile": "src/components/semiconductors/mosfet.ts",
-      "sourceLine": 1024,
+      "sourceLine": 1023,
       "ngspiceRef": "mos1load.c:322-347",
       "ngspicePath": "ref/ngspice/src/spicelib/devices/mos1/mos1load.c",
-      "claim": "cite: — bypass: reload voltages from state0,",
+      "claim": "// cite:  — bypass: reload voltages from state0,",
       "claimKeyword": "",
       "status": "unverified",
-      "notes": ""
+      "notes": "",
+      "id": "C-0530"
     },
     {
-      "id": "C-0531",
+      "sourceFile": "src/components/semiconductors/mosfet.ts",
+      "sourceLine": 1039,
+      "ngspiceRef": "mos1load.c:356-406",
+      "ngspicePath": "ref/ngspice/src/spicelib/devices/mos1/mos1load.c",
+      "claim": "//  — voltage limiting (NODELIMITING is undef).",
+      "claimKeyword": "",
+      "status": "unverified",
+      "notes": "",
+      "id": "C-0531"
+    },
+    {
       "sourceFile": "src/components/semiconductors/mosfet.ts",
       "sourceLine": 1040,
-      "ngspiceRef": "mos1load.c:356-406",
-      "ngspicePath": "ref/ngspice/src/spicelib/devices/mos1/mos1load.c",
-      "claim": "— voltage limiting (NODELIMITING is undef).",
-      "claimKeyword": "",
-      "status": "unverified",
-      "notes": ""
-    },
-    {
-      "id": "C-0532",
-      "sourceFile": "src/components/semiconductors/mosfet.ts",
-      "sourceLine": 1041,
       "ngspiceRef": "mos1load.c:370",
       "ngspicePath": "ref/ngspice/src/spicelib/devices/mos1/mos1load.c",
-      "claim": "cite: , 376, 382, 387, 395, 401",
+      "claim": "// cite: , 376, 382, 387, 395, 401",
       "claimKeyword": "",
       "status": "unverified",
-      "notes": ""
+      "notes": "",
+      "id": "C-0532"
     },
     {
-      "id": "C-0533",
       "sourceFile": "src/components/semiconductors/mosfet.ts",
-      "sourceLine": 1044,
+      "sourceLine": 1043,
       "ngspiceRef": "mos1load.c:356-406",
       "ngspicePath": "ref/ngspice/src/spicelib/devices/mos1/mos1load.c",
-      "claim": "pass through fetlim/limvds/pnjlim per , but MODE",
+      "claim": "// pass through fetlim/limvds/pnjlim per , but MODE",
       "claimKeyword": "",
       "status": "unverified",
-      "notes": ""
+      "notes": "",
+      "id": "C-0533"
     },
     {
-      "id": "C-0534",
       "sourceFile": "src/components/semiconductors/mosfet.ts",
-      "sourceLine": 1047,
+      "sourceLine": 1046,
       "ngspiceRef": "mos1load.c:356",
       "ngspicePath": "ref/ngspice/src/spicelib/devices/mos1/mos1load.c",
-      "claim": ": von = MOS1type * here->MOS1von.",
+      "claim": "// : von = MOS1type * here->MOS1von.",
       "claimKeyword": "",
       "status": "unverified",
-      "notes": ""
+      "notes": "",
+      "id": "C-0534"
     },
     {
-      "id": "C-0535",
       "sourceFile": "src/components/semiconductors/mosfet.ts",
-      "sourceLine": 1055,
+      "sourceLine": 1054,
       "ngspiceRef": "mos1load.c:368-378",
       "ngspicePath": "ref/ngspice/src/spicelib/devices/mos1/mos1load.c",
-      "claim": ": forward — fetlim vgs, derive vds, limvds.",
+      "claim": "// : forward — fetlim vgs, derive vds, limvds.",
       "claimKeyword": "",
       "status": "unverified",
-      "notes": ""
+      "notes": "",
+      "id": "C-0535"
     },
     {
-      "id": "C-0536",
       "sourceFile": "src/components/semiconductors/mosfet.ts",
-      "sourceLine": 1080,
+      "sourceLine": 1079,
       "ngspiceRef": "mos1load.c:380-392",
       "ngspicePath": "ref/ngspice/src/spicelib/devices/mos1/mos1load.c",
-      "claim": ": reverse — fetlim vgd, derive vds, neg limvds.",
+      "claim": "// : reverse — fetlim vgd, derive vds, neg limvds.",
       "claimKeyword": "",
       "status": "unverified",
-      "notes": ""
+      "notes": "",
+      "id": "C-0536"
     },
     {
-      "id": "C-0537",
       "sourceFile": "src/components/semiconductors/mosfet.ts",
-      "sourceLine": 1086,
+      "sourceLine": 1085,
       "ngspiceRef": "mos1load.c:385",
       "ngspicePath": "ref/ngspice/src/spicelib/devices/mos1/mos1load.c",
-      "claim": ": if(!(ckt->CKTfixLimit)) { vds = -DEVlimvds(-vds,...) }",
+      "claim": "// : if(!(ckt->CKTfixLimit)) { vds = -DEVlimvds(-vds,...) }",
       "claimKeyword": "",
       "status": "unverified",
-      "notes": ""
+      "notes": "",
+      "id": "C-0537"
     },
     {
-      "id": "C-0538",
       "sourceFile": "src/components/semiconductors/mosfet.ts",
-      "sourceLine": 1110,
+      "sourceLine": 1109,
       "ngspiceRef": "mos1load.c:393-406",
       "ngspicePath": "ref/ngspice/src/spicelib/devices/mos1/mos1load.c",
-      "claim": ": pnjlim on bulk junctions — vds sign-based dispatch.",
+      "claim": "// : pnjlim on bulk junctions — vds sign-based dispatch.",
       "claimKeyword": "",
       "status": "unverified",
-      "notes": ""
+      "notes": "",
+      "id": "C-0538"
     },
     {
-      "id": "C-0539",
       "sourceFile": "src/components/semiconductors/mosfet.ts",
-      "sourceLine": 1111,
+      "sourceLine": 1110,
       "ngspiceRef": "devsup.c:50-58",
       "ngspicePath": "ref/ngspice/src/spicelib/devices/devsup.c",
-      "claim": "Only pnjlim mutates icheckLimited (); fetlim/limvds do not.",
+      "claim": "// Only pnjlim mutates icheckLimited (); fetlim/limvds do not.",
       "claimKeyword": "",
       "status": "unverified",
-      "notes": ""
+      "notes": "",
+      "id": "C-0539"
     },
     {
-      "id": "C-0540",
       "sourceFile": "src/components/semiconductors/mosfet.ts",
-      "sourceLine": 1151,
+      "sourceLine": 1150,
       "ngspiceRef": "mos1load.c:412-434",
       "ngspicePath": "ref/ngspice/src/spicelib/devices/mos1/mos1load.c",
-      "claim": ": not one of the simple cases — MODEINITJCT /",
+      "claim": "// : not one of the simple cases — MODEINITJCT /",
       "claimKeyword": "",
       "status": "unverified",
-      "notes": ""
+      "notes": "",
+      "id": "C-0540"
     },
     {
-      "id": "C-0541",
       "sourceFile": "src/components/semiconductors/mosfet.ts",
-      "sourceLine": 1154,
+      "sourceLine": 1153,
       "ngspiceRef": "mos1load.c:419-430",
       "ngspicePath": "ref/ngspice/src/spicelib/devices/mos1/mos1load.c",
-      "claim": "cite:",
+      "claim": "// cite:",
       "claimKeyword": "",
       "status": "unverified",
-      "notes": ""
+      "notes": "",
+      "id": "C-0541"
     },
     {
-      "id": "C-0542",
       "sourceFile": "src/components/semiconductors/mosfet.ts",
-      "sourceLine": 1172,
+      "sourceLine": 1171,
       "ngspiceRef": "mos1load.c:431-433",
       "ngspicePath": "ref/ngspice/src/spicelib/devices/mos1/mos1load.c",
-      "claim": "— default-zero path: (MODEINITFIX && OFF) OR the",
+      "claim": "//  — default-zero path: (MODEINITFIX && OFF) OR the",
       "claimKeyword": "",
       "status": "unverified",
-      "notes": ""
+      "notes": "",
+      "id": "C-0542"
     },
     {
-      "id": "C-0543",
       "sourceFile": "src/components/semiconductors/mosfet.ts",
-      "sourceLine": 1175,
+      "sourceLine": 1174,
       "ngspiceRef": "mos1load.c:204",
       "ngspicePath": "ref/ngspice/src/spicelib/devices/mos1/mos1load.c",
-      "claim": "lands here. Matches which gates on `!MOS1off` for INITFIX.",
+      "claim": "// lands here. Matches  which gates on `!MOS1off` for INITFIX.",
       "claimKeyword": "",
       "status": "unverified",
-      "notes": ""
+      "notes": "",
+      "id": "C-0543"
     },
     {
-      "id": "C-0544",
       "sourceFile": "src/components/semiconductors/mosfet.ts",
-      "sourceLine": 1183,
+      "sourceLine": 1182,
       "ngspiceRef": "mos1load.c:443-445",
       "ngspicePath": "ref/ngspice/src/spicelib/devices/mos1/mos1load.c",
-      "claim": ": recompute common quantities post-limiting.",
+      "claim": "// : recompute common quantities post-limiting.",
       "claimKeyword": "",
       "status": "unverified",
-      "notes": ""
+      "notes": "",
+      "id": "C-0544"
     },
     {
-      "id": "C-0545",
       "sourceFile": "src/components/semiconductors/mosfet.ts",
-      "sourceLine": 1191,
+      "sourceLine": 1190,
       "ngspiceRef": "mos1load.c:472-478",
       "ngspicePath": "ref/ngspice/src/spicelib/devices/mos1/mos1load.c",
-      "claim": ": device mode (normal/inverse) from vds sign.",
+      "claim": "// : device mode (normal/inverse) from vds sign.",
       "claimKeyword": "",
       "status": "unverified",
-      "notes": ""
+      "notes": "",
+      "id": "C-0545"
     },
     {
-      "id": "C-0546",
       "sourceFile": "src/components/semiconductors/mosfet.ts",
-      "sourceLine": 1198,
+      "sourceLine": 1197,
       "ngspiceRef": "mos1load.c:322-340",
       "ngspicePath": "ref/ngspice/src/spicelib/devices/mos1/mos1load.c",
-      "claim": "state0 on bypass per .",
+      "claim": "// state0 on bypass per .",
       "claimKeyword": "",
       "status": "unverified",
-      "notes": ""
+      "notes": "",
+      "id": "C-0546"
     },
     {
-      "id": "C-0547",
       "sourceFile": "src/components/semiconductors/mosfet.ts",
-      "sourceLine": 1209,
+      "sourceLine": 1208,
       "ngspiceRef": "mos1load.c:322-340",
       "ngspicePath": "ref/ngspice/src/spicelib/devices/mos1/mos1load.c",
-      "claim": "cite: — bypass path: reload conductances from state0.",
+      "claim": "// cite:  — bypass path: reload conductances from state0.",
       "claimKeyword": "",
       "status": "unverified",
-      "notes": ""
+      "notes": "",
+      "id": "C-0547"
     },
     {
-      "id": "C-0548",
       "sourceFile": "src/components/semiconductors/mosfet.ts",
-      "sourceLine": 1218,
+      "sourceLine": 1217,
       "ngspiceRef": "mos1load.c:472-478",
       "ngspicePath": "ref/ngspice/src/spicelib/devices/mos1/mos1load.c",
-      "claim": "cite: — Reconstruct cdrain from cd:",
+      "claim": "// cite:  — Reconstruct cdrain from cd:",
       "claimKeyword": "",
       "status": "unverified",
-      "notes": ""
+      "notes": "",
+      "id": "C-0548"
     },
     {
-      "id": "C-0549",
       "sourceFile": "src/components/semiconductors/mosfet.ts",
-      "sourceLine": 1229,
+      "sourceLine": 1228,
       "ngspiceRef": "mos1load.c:453-468",
       "ngspicePath": "ref/ngspice/src/spicelib/devices/mos1/mos1load.c",
-      "claim": ": bulk-source and bulk-drain junction currents.",
+      "claim": "// : bulk-source and bulk-drain junction currents.",
       "claimKeyword": "",
       "status": "unverified",
-      "notes": ""
+      "notes": "",
+      "id": "C-0549"
     },
     {
-      "id": "C-0550",
       "sourceFile": "src/components/semiconductors/mosfet.ts",
-      "sourceLine": 1247,
+      "sourceLine": 1246,
       "ngspiceRef": "mos1load.c:483-546",
       "ngspicePath": "ref/ngspice/src/spicelib/devices/mos1/mos1load.c",
-      "claim": ": Shichman-Hodges drain current evaluation.",
+      "claim": "// : Shichman-Hodges drain current evaluation.",
       "claimKeyword": "",
       "status": "unverified",
-      "notes": ""
+      "notes": "",
+      "id": "C-0550"
     },
     {
-      "id": "C-0551",
       "sourceFile": "src/components/semiconductors/mosfet.ts",
-      "sourceLine": 1258,
+      "sourceLine": 1257,
       "ngspiceRef": "mos1load.c:507",
       "ngspicePath": "ref/ngspice/src/spicelib/devices/mos1/mos1load.c",
-      "claim": ": von = tVbi * MOS1type + gamma * sarg.",
+      "claim": "// : von = tVbi * MOS1type + gamma * sarg.",
       "claimKeyword": "",
       "status": "unverified",
-      "notes": ""
+      "notes": "",
+      "id": "C-0551"
     },
     {
-      "id": "C-0552",
       "sourceFile": "src/components/semiconductors/mosfet.ts",
-      "sourceLine": 1269,
+      "sourceLine": 1268,
       "ngspiceRef": "mos1load.c:515-522",
       "ngspicePath": "ref/ngspice/src/spicelib/devices/mos1/mos1load.c",
-      "claim": "cutoff region ()",
+      "claim": "// cutoff region ()",
       "claimKeyword": "",
       "status": "unverified",
-      "notes": ""
+      "notes": "",
+      "id": "C-0552"
     },
     {
-      "id": "C-0553",
       "sourceFile": "src/components/semiconductors/mosfet.ts",
-      "sourceLine": 1274,
+      "sourceLine": 1273,
       "ngspiceRef": "mos1load.c:527-532",
       "ngspicePath": "ref/ngspice/src/spicelib/devices/mos1/mos1load.c",
-      "claim": "saturation ()",
+      "claim": "// saturation ()",
       "claimKeyword": "",
       "status": "unverified",
-      "notes": ""
+      "notes": "",
+      "id": "C-0553"
     },
     {
-      "id": "C-0554",
       "sourceFile": "src/components/semiconductors/mosfet.ts",
-      "sourceLine": 1280,
+      "sourceLine": 1279,
       "ngspiceRef": "mos1load.c:533-545",
       "ngspicePath": "ref/ngspice/src/spicelib/devices/mos1/mos1load.c",
-      "claim": "linear/triode ()",
+      "claim": "// linear/triode ()",
       "claimKeyword": "",
       "status": "unverified",
-      "notes": ""
+      "notes": "",
+      "id": "C-0554"
     },
     {
-      "id": "C-0555",
       "sourceFile": "src/components/semiconductors/mosfet.ts",
-      "sourceLine": 1290,
+      "sourceLine": 1289,
       "ngspiceRef": "mos1load.c:557-563",
       "ngspicePath": "ref/ngspice/src/spicelib/devices/mos1/mos1load.c",
-      "claim": ": von, vdsat, cd write-back with polarity.",
+      "claim": "// : von, vdsat, cd write-back with polarity.",
       "claimKeyword": "",
       "status": "unverified",
-      "notes": ""
+      "notes": "",
+      "id": "C-0555"
     },
     {
-      "id": "C-0556",
       "sourceFile": "src/components/semiconductors/mosfet.ts",
-      "sourceLine": 1296,
+      "sourceLine": 1295,
       "ngspiceRef": "mos1load.c:565-725",
       "ngspicePath": "ref/ngspice/src/spicelib/devices/mos1/mos1load.c",
-      "claim": ": cap + charge block.",
+      "claim": "// : cap + charge block.",
       "claimKeyword": "",
       "status": "unverified",
-      "notes": ""
+      "notes": "",
+      "id": "C-0556"
     },
     {
-      "id": "C-0557",
       "sourceFile": "src/components/semiconductors/mosfet.ts",
-      "sourceLine": 1302,
+      "sourceLine": 1301,
       "ngspiceRef": "mos1load.c:586-638",
       "ngspicePath": "ref/ngspice/src/spicelib/devices/mos1/mos1load.c",
-      "claim": ": bulk-source depletion cap + charge.",
+      "claim": "// : bulk-source depletion cap + charge.",
       "claimKeyword": "",
       "status": "unverified",
-      "notes": ""
+      "notes": "",
+      "id": "C-0557"
     },
     {
-      "id": "C-0558",
       "sourceFile": "src/components/semiconductors/mosfet.ts",
-      "sourceLine": 1321,
+      "sourceLine": 1320,
       "ngspiceRef": "mos1load.c:641-694",
       "ngspicePath": "ref/ngspice/src/spicelib/devices/mos1/mos1load.c",
-      "claim": ": bulk-drain depletion cap + charge.",
+      "claim": "// : bulk-drain depletion cap + charge.",
       "claimKeyword": "",
       "status": "unverified",
-      "notes": ""
+      "notes": "",
+      "id": "C-0558"
     },
     {
-      "id": "C-0559",
       "sourceFile": "src/components/semiconductors/mosfet.ts",
-      "sourceLine": 1340,
+      "sourceLine": 1339,
       "ngspiceRef": "mos1load.c:701-725",
       "ngspicePath": "ref/ngspice/src/spicelib/devices/mos1/mos1load.c",
-      "claim": ": NIintegrate bulk junctions into gbd/gbs",
+      "claim": "// : NIintegrate bulk junctions into gbd/gbs",
       "claimKeyword": "",
       "status": "unverified",
-      "notes": ""
+      "notes": "",
+      "id": "C-0559"
     },
     {
-      "id": "C-0560",
       "sourceFile": "src/components/semiconductors/mosfet.ts",
-      "sourceLine": 1346,
+      "sourceLine": 1345,
       "ngspiceRef": "mos1load.c:714-719",
       "ngspicePath": "ref/ngspice/src/spicelib/devices/mos1/mos1load.c",
-      "claim": ": BD junction integrate, lump into gbd & cbd.",
+      "claim": "// : BD junction integrate, lump into gbd & cbd.",
       "claimKeyword": "",
       "status": "unverified",
-      "notes": ""
+      "notes": "",
+      "id": "C-0560"
     },
     {
-      "id": "C-0561",
       "sourceFile": "src/components/semiconductors/mosfet.ts",
-      "sourceLine": 1366,
+      "sourceLine": 1365,
       "ngspiceRef": "mos1load.c:717-719",
       "ngspicePath": "ref/ngspice/src/spicelib/devices/mos1/mos1load.c",
-      "claim": ": gbd += geq; cbd += CKTstate0[cqbd]; cd -= CKTstate0[cqbd].",
+      "claim": "// : gbd += geq; cbd += CKTstate0[cqbd]; cd -= CKTstate0[cqbd].",
       "claimKeyword": "",
       "status": "unverified",
-      "notes": ""
+      "notes": "",
+      "id": "C-0561"
     },
     {
-      "id": "C-0562",
       "sourceFile": "src/components/semiconductors/mosfet.ts",
-      "sourceLine": 1372,
+      "sourceLine": 1371,
       "ngspiceRef": "mos1load.c:720-724",
       "ngspicePath": "ref/ngspice/src/spicelib/devices/mos1/mos1load.c",
-      "claim": ": BS junction integrate, lump into gbs & cbs.",
+      "claim": "// : BS junction integrate, lump into gbs & cbs.",
       "claimKeyword": "",
       "status": "unverified",
-      "notes": ""
+      "notes": "",
+      "id": "C-0562"
     },
     {
-      "id": "C-0563",
       "sourceFile": "src/components/semiconductors/mosfet.ts",
-      "sourceLine": 1398,
+      "sourceLine": 1397,
       "ngspiceRef": "mos1load.c:750-753",
       "ngspicePath": "ref/ngspice/src/spicelib/devices/mos1/mos1load.c",
-      "claim": ": save vbs, vbd, vgs, vds back to state0.",
+      "claim": "// : save vbs, vbd, vgs, vds back to state0.",
       "claimKeyword": "",
       "status": "unverified",
-      "notes": ""
+      "notes": "",
+      "id": "C-0563"
     },
     {
-      "id": "C-0564",
       "sourceFile": "src/components/semiconductors/mosfet.ts",
-      "sourceLine": 1404,
+      "sourceLine": 1403,
       "ngspiceRef": "mos1load.c:759-856",
       "ngspicePath": "ref/ngspice/src/spicelib/devices/mos1/mos1load.c",
-      "claim": ": Meyer capacitance + overlap + NIintegrate.",
+      "claim": "// : Meyer capacitance + overlap + NIintegrate.",
       "claimKeyword": "",
       "status": "unverified",
-      "notes": ""
+      "notes": "",
+      "id": "C-0564"
     },
     {
-      "id": "C-0565",
       "sourceFile": "src/components/semiconductors/mosfet.ts",
-      "sourceLine": 1406,
+      "sourceLine": 1405,
       "ngspiceRef": "mos1load.c:773-785",
       "ngspicePath": "ref/ngspice/src/spicelib/devices/mos1/mos1load.c",
-      "claim": ": DEVqmeyer — mode-dependent vgs/vgd swap.",
+      "claim": "// : DEVqmeyer — mode-dependent vgs/vgd swap.",
       "claimKeyword": "",
       "status": "unverified",
-      "notes": ""
+      "notes": "",
+      "id": "C-0565"
     },
     {
-      "id": "C-0566",
       "sourceFile": "src/components/semiconductors/mosfet.ts",
-      "sourceLine": 1413,
+      "sourceLine": 1412,
       "ngspiceRef": "mos1load.c:780-784",
       "ngspicePath": "ref/ngspice/src/spicelib/devices/mos1/mos1load.c",
-      "claim": "Reverse mode: swap vgs<->vgd and capgs<->capgd per .",
+      "claim": "// Reverse mode: swap vgs<->vgd and capgs<->capgd per .",
       "claimKeyword": "",
       "status": "unverified",
-      "notes": ""
+      "notes": "",
+      "id": "C-0566"
     },
     {
-      "id": "C-0567",
       "sourceFile": "src/components/semiconductors/mosfet.ts",
-      "sourceLine": 1418,
+      "sourceLine": 1417,
       "ngspiceRef": "mos1load.c:787-806",
       "ngspicePath": "ref/ngspice/src/spicelib/devices/mos1/mos1load.c",
-      "claim": ": cap averaging.",
+      "claim": "// : cap averaging.",
       "claimKeyword": "",
       "status": "unverified",
-      "notes": ""
+      "notes": "",
+      "id": "C-0567"
     },
     {
-      "id": "C-0568",
       "sourceFile": "src/components/semiconductors/mosfet.ts",
-      "sourceLine": 1433,
+      "sourceLine": 1432,
       "ngspiceRef": "mos1load.c:827-855",
       "ngspicePath": "ref/ngspice/src/spicelib/devices/mos1/mos1load.c",
-      "claim": ": update charges (MODETRAN → incremental,",
+      "claim": "// : update charges (MODETRAN → incremental,",
       "claimKeyword": "",
       "status": "unverified",
-      "notes": ""
+      "notes": "",
+      "id": "C-0568"
     },
     {
-      "id": "C-0569",
       "sourceFile": "src/components/semiconductors/mosfet.ts",
-      "sourceLine": 1439,
+      "sourceLine": 1438,
       "ngspiceRef": "mos1load.c:828-836",
       "ngspicePath": "ref/ngspice/src/spicelib/devices/mos1/mos1load.c",
-      "claim": ": predictor extrapolation using xfact.",
+      "claim": "// : predictor extrapolation using xfact.",
       "claimKeyword": "",
       "status": "unverified",
-      "notes": ""
+      "notes": "",
+      "id": "C-0569"
     },
     {
-      "id": "C-0570",
       "sourceFile": "src/components/semiconductors/mosfet.ts",
-      "sourceLine": 1448,
+      "sourceLine": 1447,
       "ngspiceRef": "mos1load.c:840-846",
       "ngspicePath": "ref/ngspice/src/spicelib/devices/mos1/mos1load.c",
-      "claim": ": incremental charge.",
+      "claim": "// : incremental charge.",
       "claimKeyword": "",
       "status": "unverified",
-      "notes": ""
+      "notes": "",
+      "id": "C-0570"
     },
     {
-      "id": "C-0571",
       "sourceFile": "src/components/semiconductors/mosfet.ts",
-      "sourceLine": 1453,
+      "sourceLine": 1452,
       "ngspiceRef": "mos1load.c:847-852",
       "ngspicePath": "ref/ngspice/src/spicelib/devices/mos1/mos1load.c",
-      "claim": "TRANOP / SMSIG (): q = c * v.",
+      "claim": "// TRANOP / SMSIG (): q = c * v.",
       "claimKeyword": "",
       "status": "unverified",
-      "notes": ""
+      "notes": "",
+      "id": "C-0571"
     },
     {
-      "id": "C-0572",
       "sourceFile": "src/components/semiconductors/mosfet.ts",
-      "sourceLine": 1460,
+      "sourceLine": 1459,
       "ngspiceRef": "mos1load.c:860-894",
       "ngspicePath": "ref/ngspice/src/spicelib/devices/mos1/mos1load.c",
-      "claim": ": NIintegrate the three gate caps, fold companion",
+      "claim": "// : NIintegrate the three gate caps, fold companion",
       "claimKeyword": "",
       "status": "unverified",
-      "notes": ""
+      "notes": "",
+      "id": "C-0572"
     },
     {
-      "id": "C-0573",
       "sourceFile": "src/components/semiconductors/mosfet.ts",
-      "sourceLine": 1464,
+      "sourceLine": 1463,
       "ngspiceRef": "mos1load.c:862-873",
       "ngspicePath": "ref/ngspice/src/spicelib/devices/mos1/mos1load.c",
-      "claim": ": MODEINITTRAN or not-in-TRAN → zero companions.",
+      "claim": "// : MODEINITTRAN or not-in-TRAN → zero companions.",
       "claimKeyword": "",
       "status": "unverified",
-      "notes": ""
+      "notes": "",
+      "id": "C-0573"
     },
     {
-      "id": "C-0574",
       "sourceFile": "src/components/semiconductors/mosfet.ts",
-      "sourceLine": 1469,
+      "sourceLine": 1468,
       "ngspiceRef": "mos1load.c:875-877",
       "ngspicePath": "ref/ngspice/src/spicelib/devices/mos1/mos1load.c",
-      "claim": ": zero cqgs/gd/gb when corresponding cap = 0.",
+      "claim": "// : zero cqgs/gd/gb when corresponding cap = 0.",
       "claimKeyword": "",
       "status": "unverified",
-      "notes": ""
+      "notes": "",
+      "id": "C-0574"
     },
     {
-      "id": "C-0575",
       "sourceFile": "src/components/semiconductors/mosfet.ts",
-      "sourceLine": 1473,
+      "sourceLine": 1472,
       "ngspiceRef": "mos1load.c:878-894",
       "ngspicePath": "ref/ngspice/src/spicelib/devices/mos1/mos1load.c",
-      "claim": ": MODETRAN-only path. NIintegrate the three caps.",
+      "claim": "// : MODETRAN-only path. NIintegrate the three caps.",
       "claimKeyword": "",
       "status": "unverified",
-      "notes": ""
+      "notes": "",
+      "id": "C-0575"
     },
     {
-      "id": "C-0576",
       "sourceFile": "src/components/semiconductors/mosfet.ts",
-      "sourceLine": 1545,
+      "sourceLine": 1544,
       "ngspiceRef": "mos1load.c:902-916",
       "ngspicePath": "ref/ngspice/src/spicelib/devices/mos1/mos1load.c",
-      "claim": ": ceqbs, ceqbd, cdreq RHS terms.",
+      "claim": "// : ceqbs, ceqbd, cdreq RHS terms.",
       "claimKeyword": "",
       "status": "unverified",
-      "notes": ""
+      "notes": "",
+      "id": "C-0576"
     },
     {
-      "id": "C-0577",
       "sourceFile": "src/components/semiconductors/mosfet.ts",
-      "sourceLine": 1567,
+      "sourceLine": 1566,
       "ngspiceRef": "mos1load.c:917-924",
       "ngspicePath": "ref/ngspice/src/spicelib/devices/mos1/mos1load.c",
-      "claim": ": RHS stamps.",
+      "claim": "// : RHS stamps.",
       "claimKeyword": "",
       "status": "unverified",
-      "notes": ""
+      "notes": "",
+      "id": "C-0577"
     },
     {
-      "id": "C-0578",
       "sourceFile": "src/components/semiconductors/mosfet.ts",
-      "sourceLine": 1592,
+      "sourceLine": 1591,
       "ngspiceRef": "mos1load.c:929-956",
       "ngspicePath": "ref/ngspice/src/spicelib/devices/mos1/mos1load.c",
-      "claim": ": Y-matrix stamps.",
+      "claim": "// : Y-matrix stamps.",
       "claimKeyword": "",
       "status": "unverified",
-      "notes": ""
+      "notes": "",
+      "id": "C-0578"
     },
     {
-      "id": "C-0579",
       "sourceFile": "src/components/semiconductors/mosfet.ts",
-      "sourceLine": 1629,
+      "sourceLine": 1628,
       "ngspiceRef": "mos1load.c:737-743",
       "ngspicePath": "ref/ngspice/src/spicelib/devices/mos1/mos1load.c",
-      "claim": ": noncon gated on OFF==0 || !(MODEINITFIX|MODEINITSMSIG).",
+      "claim": "// : noncon gated on OFF==0 || !(MODEINITFIX|MODEINITSMSIG).",
       "claimKeyword": "",
       "status": "unverified",
-      "notes": ""
+      "notes": "",
+      "id": "C-0579"
     },
     {
-      "id": "C-0580",
       "sourceFile": "src/components/semiconductors/mosfet.ts",
-      "sourceLine": 1687,
+      "sourceLine": 1686,
       "ngspiceRef": "mos1load.c:563",
       "ngspicePath": "ref/ngspice/src/spicelib/devices/mos1/mos1load.c",
-      "claim": "Drain current: polarity * cd per .",
+      "claim": "// Drain current: polarity * cd per .",
       "claimKeyword": "",
       "status": "unverified",
-      "notes": ""
+      "notes": "",
+      "id": "C-0580"
     },
     {
       "id": "C-0581",
@@ -8050,598 +8050,598 @@
       "notes": ""
     },
     {
-      "id": "C-0732",
       "sourceFile": "src/components/semiconductors/__tests__/bjt.test.ts",
-      "sourceLine": 470,
+      "sourceLine": 476,
       "ngspiceRef": "bjtload.c:288-303",
       "ngspicePath": "ref/ngspice/src/spicelib/devices/bjt/bjtload.c",
-      "claim": ": all 9 L0 op-state slots copied from state1 to state0.",
+      "claim": "// : all 9 L0 op-state slots copied from state1 to state0.",
       "claimKeyword": "",
       "status": "unverified",
-      "notes": ""
+      "notes": "",
+      "id": "C-0732"
     },
     {
-      "id": "C-0733",
       "sourceFile": "src/components/semiconductors/__tests__/bjt.test.ts",
-      "sourceLine": 558,
+      "sourceLine": 564,
       "ngspiceRef": "bjtload.c:288-303",
       "ngspicePath": "ref/ngspice/src/spicelib/devices/bjt/bjtload.c",
-      "claim": "Now run MODEINITPRED: must copy all 9 slots s1 → s0,",
+      "claim": "// Now run MODEINITPRED:  must copy all 9 slots s1 → s0,",
       "claimKeyword": "",
       "status": "unverified",
-      "notes": ""
+      "notes": "",
+      "id": "C-0733"
     },
     {
-      "id": "C-0734",
       "sourceFile": "src/components/semiconductors/__tests__/bjt.test.ts",
-      "sourceLine": 653,
+      "sourceLine": 659,
       "ngspiceRef": "bjtload.c:258-264",
       "ngspicePath": "ref/ngspice/src/spicelib/devices/bjt/bjtload.c",
-      "claim": ", :265-269, :270-275 citation refresh + path-selection tests.",
+      "claim": "// , :265-269, :270-275 citation refresh + path-selection tests.",
       "claimKeyword": "",
       "status": "unverified",
-      "notes": ""
+      "notes": "",
+      "id": "C-0734"
     },
     {
-      "id": "C-0735",
       "sourceFile": "src/components/semiconductors/__tests__/bjt.test.ts",
-      "sourceLine": 661,
+      "sourceLine": 667,
       "ngspiceRef": "bjtload.c:258-264",
       "ngspicePath": "ref/ngspice/src/spicelib/devices/bjt/bjtload.c",
-      "claim": "cite: — MODEINITJCT+MODETRANOP+MODEUIC seeds from IC* params.",
+      "claim": "// cite:  — MODEINITJCT+MODETRANOP+MODEUIC seeds from IC* params.",
       "claimKeyword": "",
       "status": "unverified",
-      "notes": ""
+      "notes": "",
+      "id": "C-0735"
     },
     {
-      "id": "C-0736",
       "sourceFile": "src/components/semiconductors/__tests__/bjt.test.ts",
-      "sourceLine": 676,
+      "sourceLine": 682,
       "ngspiceRef": "bjtload.c:265-269",
       "ngspicePath": "ref/ngspice/src/spicelib/devices/bjt/bjtload.c",
-      "claim": "cite: — MODEINITJCT, OFF=0: vbe=tVcrit, vbc=0.",
+      "claim": "// cite:  — MODEINITJCT, OFF=0: vbe=tVcrit, vbc=0.",
       "claimKeyword": "",
       "status": "unverified",
-      "notes": ""
+      "notes": "",
+      "id": "C-0736"
     },
     {
-      "id": "C-0737",
       "sourceFile": "src/components/semiconductors/__tests__/bjt.test.ts",
-      "sourceLine": 691,
+      "sourceLine": 697,
       "ngspiceRef": "bjtload.c:270-275",
       "ngspicePath": "ref/ngspice/src/spicelib/devices/bjt/bjtload.c",
-      "claim": "cite: — MODEINITJCT+OFF: vbe=vbc=0 → near-zero downstream op.",
+      "claim": "// cite:  — MODEINITJCT+OFF: vbe=vbc=0 → near-zero downstream op.",
       "claimKeyword": "",
       "status": "unverified",
-      "notes": ""
+      "notes": "",
+      "id": "C-0737"
     },
     {
-      "id": "C-0738",
       "sourceFile": "src/components/semiconductors/__tests__/bjt.test.ts",
-      "sourceLine": 702,
+      "sourceLine": 708,
       "ngspiceRef": "bjtload.c:338-381",
       "ngspicePath": "ref/ngspice/src/spicelib/devices/bjt/bjtload.c",
-      "claim": ": 4-tolerance gate skips recompute when tolerances met.",
+      "claim": "// : 4-tolerance gate skips recompute when tolerances met.",
       "claimKeyword": "",
       "status": "unverified",
-      "notes": ""
+      "notes": "",
+      "id": "C-0738"
     },
     {
-      "id": "C-0739",
       "sourceFile": "src/components/semiconductors/__tests__/bjt.test.ts",
-      "sourceLine": 784,
+      "sourceLine": 790,
       "ngspiceRef": "bjtload.c:338",
       "ngspicePath": "ref/ngspice/src/spicelib/devices/bjt/bjtload.c",
-      "claim": "cite: — bypass gate requires ctx.bypass=true; both calls must compute.",
+      "claim": "// cite:  — bypass gate requires ctx.bypass=true; both calls must compute.",
       "claimKeyword": "",
       "status": "unverified",
-      "notes": ""
+      "notes": "",
+      "id": "C-0739"
     },
     {
-      "id": "C-0740",
       "sourceFile": "src/components/semiconductors/__tests__/bjt.test.ts",
-      "sourceLine": 820,
+      "sourceLine": 826,
       "ngspiceRef": "bjtload.c:338-381",
       "ngspicePath": "ref/ngspice/src/spicelib/devices/bjt/bjtload.c",
-      "claim": "cite: — bypass fires when ctx.bypass=true and all 4 tolerances pass.",
+      "claim": "// cite:  — bypass fires when ctx.bypass=true and all 4 tolerances pass.",
       "claimKeyword": "",
       "status": "unverified",
-      "notes": ""
+      "notes": "",
+      "id": "C-0740"
     },
     {
-      "id": "C-0741",
       "sourceFile": "src/components/semiconductors/__tests__/bjt.test.ts",
-      "sourceLine": 926,
+      "sourceLine": 932,
       "ngspiceRef": "bjtload.c:347",
       "ngspicePath": "ref/ngspice/src/spicelib/devices/bjt/bjtload.c",
-      "claim": "cite: — !(MODEINITPRED) is part of the bypass gate.",
+      "claim": "// cite:  — !(MODEINITPRED) is part of the bypass gate.",
       "claimKeyword": "",
       "status": "unverified",
-      "notes": ""
+      "notes": "",
+      "id": "C-0741"
     },
     {
-      "id": "C-0742",
       "sourceFile": "src/components/semiconductors/__tests__/bjt.test.ts",
-      "sourceLine": 1005,
+      "sourceLine": 1011,
       "ngspiceRef": "bjtload.c:749-754",
       "ngspicePath": "ref/ngspice/src/spicelib/devices/bjt/bjtload.c",
-      "claim": ": icheck++ unless MODEINITFIX && OFF.",
+      "claim": "// : icheck++ unless MODEINITFIX && OFF.",
       "claimKeyword": "",
       "status": "unverified",
-      "notes": ""
+      "notes": "",
+      "id": "C-0742"
     },
     {
-      "id": "C-0743",
       "sourceFile": "src/components/semiconductors/__tests__/bjt.test.ts",
-      "sourceLine": 1052,
+      "sourceLine": 1058,
       "ngspiceRef": "bjtload.c:749-754",
       "ngspicePath": "ref/ngspice/src/spicelib/devices/bjt/bjtload.c",
-      "claim": "cite: — icheck++ unless MODEINITFIX && OFF.",
+      "claim": "// cite:  — icheck++ unless MODEINITFIX && OFF.",
       "claimKeyword": "",
       "status": "unverified",
-      "notes": ""
+      "notes": "",
+      "id": "C-0743"
     },
     {
-      "id": "C-0744",
       "sourceFile": "src/components/semiconductors/__tests__/bjt.test.ts",
-      "sourceLine": 1060,
+      "sourceLine": 1066,
       "ngspiceRef": "bjtload.c:749-754",
       "ngspicePath": "ref/ngspice/src/spicelib/devices/bjt/bjtload.c",
-      "claim": "cite: — OFF=0, MODEINITFIX: OFF===0 is true → bump permitted.",
+      "claim": "// cite:  — OFF=0, MODEINITFIX: OFF===0 is true → bump permitted.",
       "claimKeyword": "",
       "status": "unverified",
-      "notes": ""
+      "notes": "",
+      "id": "C-0744"
     },
     {
-      "id": "C-0745",
       "sourceFile": "src/components/semiconductors/__tests__/bjt.test.ts",
-      "sourceLine": 1068,
+      "sourceLine": 1074,
       "ngspiceRef": "bjtload.c:749-754",
       "ngspicePath": "ref/ngspice/src/spicelib/devices/bjt/bjtload.c",
-      "claim": "cite: — OFF=1, cktMode=MODEDCOP (no INITFIX): !(INITFIX) is true → bump.",
+      "claim": "// cite:  — OFF=1, cktMode=MODEDCOP (no INITFIX): !(INITFIX) is true → bump.",
       "claimKeyword": "",
       "status": "unverified",
-      "notes": ""
+      "notes": "",
+      "id": "C-0745"
     },
     {
-      "id": "C-0746",
       "sourceFile": "src/components/semiconductors/__tests__/bjt.test.ts",
-      "sourceLine": 1166,
+      "sourceLine": 1172,
       "ngspiceRef": "bjtload.c:676",
       "ngspicePath": "ref/ngspice/src/spicelib/devices/bjt/bjtload.c",
-      "claim": "cite: ,703 — MODEINITSMSIG stores op state, skips stamps via early return.",
+      "claim": "// cite: ,703 — MODEINITSMSIG stores op state, skips stamps via early return.",
       "claimKeyword": "",
       "status": "unverified",
-      "notes": ""
+      "notes": "",
+      "id": "C-0746"
     },
     {
-      "id": "C-0747",
       "sourceFile": "src/components/semiconductors/__tests__/bjt.test.ts",
-      "sourceLine": 1191,
+      "sourceLine": 1197,
       "ngspiceRef": "bjtload.c:676",
       "ngspicePath": "ref/ngspice/src/spicelib/devices/bjt/bjtload.c",
-      "claim": "cite: ,703 — MODEINITSMSIG reads s0 and runs computeBjtOp, writing back op sl...",
+      "claim": "// cite: ,703 — MODEINITSMSIG reads s0 and runs computeBjtOp, writing back op slots.",
       "claimKeyword": "",
       "status": "unverified",
-      "notes": ""
+      "notes": "",
+      "id": "C-0747"
     },
     {
-      "id": "C-0748",
       "sourceFile": "src/components/semiconductors/__tests__/bjt.test.ts",
-      "sourceLine": 1220,
+      "sourceLine": 1226,
       "ngspiceRef": "bjtload.c:236-257",
       "ngspicePath": "ref/ngspice/src/spicelib/devices/bjt/bjtload.c",
-      "claim": "cite: — MODEINITTRAN seeds state1 from the initial voltage read",
+      "claim": "// cite:  — MODEINITTRAN seeds state1 from the initial voltage read",
       "claimKeyword": "",
       "status": "unverified",
-      "notes": ""
+      "notes": "",
+      "id": "C-0748"
     },
     {
-      "id": "C-0749",
       "sourceFile": "src/components/semiconductors/__tests__/bjt.test.ts",
-      "sourceLine": 1264,
+      "sourceLine": 1270,
       "ngspiceRef": "bjtload.c:674-703",
       "ngspicePath": "ref/ngspice/src/spicelib/devices/bjt/bjtload.c",
-      "claim": ": stores caps+op into state0, skips NIintegrate + stamps.",
+      "claim": "// : stores caps+op into state0, skips NIintegrate + stamps.",
       "claimKeyword": "",
       "status": "unverified",
-      "notes": ""
+      "notes": "",
+      "id": "C-0749"
     },
     {
-      "id": "C-0750",
       "sourceFile": "src/components/semiconductors/__tests__/bjt.test.ts",
-      "sourceLine": 1322,
+      "sourceLine": 1328,
       "ngspiceRef": "bjtload.c:674-703",
       "ngspicePath": "ref/ngspice/src/spicelib/devices/bjt/bjtload.c",
-      "claim": "cite: — MODEINITSMSIG stores caps+op and returns before stamps.",
+      "claim": "// cite:  — MODEINITSMSIG stores caps+op and returns before stamps.",
       "claimKeyword": "",
       "status": "unverified",
-      "notes": ""
+      "notes": "",
+      "id": "C-0750"
     },
     {
-      "id": "C-0751",
       "sourceFile": "src/components/semiconductors/__tests__/bjt.test.ts",
-      "sourceLine": 1343,
+      "sourceLine": 1349,
       "ngspiceRef": "bjtload.c:674-703",
       "ngspicePath": "ref/ngspice/src/spicelib/devices/bjt/bjtload.c",
-      "claim": "cite: — MODEINITSMSIG stores capbe/capbc/capsub/capbx into s0.",
+      "claim": "// cite:  — MODEINITSMSIG stores capbe/capbc/capsub/capbx into s0.",
       "claimKeyword": "",
       "status": "unverified",
-      "notes": ""
+      "notes": "",
+      "id": "C-0751"
     },
     {
-      "id": "C-0752",
       "sourceFile": "src/components/semiconductors/__tests__/bjt.test.ts",
-      "sourceLine": 1362,
+      "sourceLine": 1368,
       "ngspiceRef": "bjtload.c:674-703",
       "ngspicePath": "ref/ngspice/src/spicelib/devices/bjt/bjtload.c",
-      "claim": "cite: — s0[CEXBC] = geqcb and s0[GEQCB] = geqcb (same value).",
+      "claim": "// cite:  — s0[CEXBC] = geqcb and s0[GEQCB] = geqcb (same value).",
       "claimKeyword": "",
       "status": "unverified",
-      "notes": ""
+      "notes": "",
+      "id": "C-0752"
     },
     {
-      "id": "C-0753",
       "sourceFile": "src/components/semiconductors/__tests__/bjt.test.ts",
-      "sourceLine": 1373,
+      "sourceLine": 1379,
       "ngspiceRef": "bjtload.c:288-303",
       "ngspicePath": "ref/ngspice/src/spicelib/devices/bjt/bjtload.c",
-      "claim": ": all 10 L1 op-state slots copied from state1 to state0.",
+      "claim": "// : all 10 L1 op-state slots copied from state1 to state0.",
       "claimKeyword": "",
       "status": "unverified",
-      "notes": ""
+      "notes": "",
+      "id": "C-0753"
     },
     {
-      "id": "C-0754",
       "sourceFile": "src/components/semiconductors/__tests__/bjt.test.ts",
-      "sourceLine": 1464,
+      "sourceLine": 1470,
       "ngspiceRef": "bjtload.c:288-303",
       "ngspicePath": "ref/ngspice/src/spicelib/devices/bjt/bjtload.c",
-      "claim": "Run MODEINITPRED: must copy all 10 slots s1→s0.",
+      "claim": "// Run MODEINITPRED:  must copy all 10 slots s1→s0.",
       "claimKeyword": "",
       "status": "unverified",
-      "notes": ""
+      "notes": "",
+      "id": "C-0754"
     },
     {
-      "id": "C-0755",
       "sourceFile": "src/components/semiconductors/__tests__/bjt.test.ts",
-      "sourceLine": 1517,
+      "sourceLine": 1523,
       "ngspiceRef": "bjtload.c:338-381",
       "ngspicePath": "ref/ngspice/src/spicelib/devices/bjt/bjtload.c",
-      "claim": ": 4-tolerance gate + 15-slot restore on L1.",
+      "claim": "// : 4-tolerance gate + 15-slot restore on L1.",
       "claimKeyword": "",
       "status": "unverified",
-      "notes": ""
+      "notes": "",
+      "id": "C-0755"
     },
     {
-      "id": "C-0756",
       "sourceFile": "src/components/semiconductors/__tests__/bjt.test.ts",
-      "sourceLine": 1585,
+      "sourceLine": 1591,
       "ngspiceRef": "bjtload.c:338",
       "ngspicePath": "ref/ngspice/src/spicelib/devices/bjt/bjtload.c",
-      "claim": "cite: — bypass=false means gate never fires; compute always runs.",
+      "claim": "// cite:  — bypass=false means gate never fires; compute always runs.",
       "claimKeyword": "",
       "status": "unverified",
-      "notes": ""
+      "notes": "",
+      "id": "C-0756"
     },
     {
-      "id": "C-0757",
       "sourceFile": "src/components/semiconductors/__tests__/bjt.test.ts",
-      "sourceLine": 1616,
+      "sourceLine": 1622,
       "ngspiceRef": "bjtload.c:338-381",
       "ngspicePath": "ref/ngspice/src/spicelib/devices/bjt/bjtload.c",
-      "claim": "cite: — bypass fires when ctx.bypass=true and tolerances met.",
+      "claim": "// cite:  — bypass fires when ctx.bypass=true and tolerances met.",
       "claimKeyword": "",
       "status": "unverified",
-      "notes": ""
+      "notes": "",
+      "id": "C-0757"
     },
     {
-      "id": "C-0758",
       "sourceFile": "src/components/semiconductors/__tests__/bjt.test.ts",
-      "sourceLine": 1698,
+      "sourceLine": 1704,
       "ngspiceRef": "bjtload.c:347",
       "ngspicePath": "ref/ngspice/src/spicelib/devices/bjt/bjtload.c",
-      "claim": "cite: — !(MODEINITPRED) is part of the bypass gate; MODEINITPRED disables it.",
+      "claim": "// cite:  — !(MODEINITPRED) is part of the bypass gate; MODEINITPRED disables it.",
       "claimKeyword": "",
       "status": "unverified",
-      "notes": ""
+      "notes": "",
+      "id": "C-0758"
     },
     {
-      "id": "C-0759",
       "sourceFile": "src/components/semiconductors/__tests__/bjt.test.ts",
-      "sourceLine": 1752,
+      "sourceLine": 1758,
       "ngspiceRef": "bjtload.c:749-754",
       "ngspicePath": "ref/ngspice/src/spicelib/devices/bjt/bjtload.c",
-      "claim": "cite: — icheck++ unless MODEINITFIX && OFF",
+      "claim": "// cite:  — icheck++ unless MODEINITFIX && OFF",
       "claimKeyword": "",
       "status": "unverified",
-      "notes": ""
+      "notes": "",
+      "id": "C-0759"
     },
     {
-      "id": "C-0760",
       "sourceFile": "src/components/semiconductors/__tests__/bjt.test.ts",
-      "sourceLine": 1784,
+      "sourceLine": 1790,
       "ngspiceRef": "bjtload.c:749-754",
       "ngspicePath": "ref/ngspice/src/spicelib/devices/bjt/bjtload.c",
-      "claim": "cite: — OFF=1 + MODEINITFIX: noncon must not increment.",
+      "claim": "// cite:  — OFF=1 + MODEINITFIX: noncon must not increment.",
       "claimKeyword": "",
       "status": "unverified",
-      "notes": ""
+      "notes": "",
+      "id": "C-0760"
     },
     {
-      "id": "C-0761",
       "sourceFile": "src/components/semiconductors/__tests__/bjt.test.ts",
-      "sourceLine": 1791,
+      "sourceLine": 1797,
       "ngspiceRef": "bjtload.c:749-754",
       "ngspicePath": "ref/ngspice/src/spicelib/devices/bjt/bjtload.c",
-      "claim": "cite: — OFF=0 + MODEINITFIX: noncon increments when pnjlim fires.",
+      "claim": "// cite:  — OFF=0 + MODEINITFIX: noncon increments when pnjlim fires.",
       "claimKeyword": "",
       "status": "unverified",
-      "notes": ""
+      "notes": "",
+      "id": "C-0761"
     },
     {
-      "id": "C-0762",
       "sourceFile": "src/components/semiconductors/__tests__/bjt.test.ts",
-      "sourceLine": 1798,
+      "sourceLine": 1804,
       "ngspiceRef": "bjtload.c:749-754",
       "ngspicePath": "ref/ngspice/src/spicelib/devices/bjt/bjtload.c",
-      "claim": "cite: — OFF=1 + MODEDCOP (no MODEINITFIX): noncon increments.",
+      "claim": "// cite:  — OFF=1 + MODEDCOP (no MODEINITFIX): noncon increments.",
       "claimKeyword": "",
       "status": "unverified",
-      "notes": ""
+      "notes": "",
+      "id": "C-0762"
     },
     {
-      "id": "C-0763",
       "sourceFile": "src/components/semiconductors/__tests__/bjt.test.ts",
-      "sourceLine": 1807,
+      "sourceLine": 1813,
       "ngspiceRef": "bjtload.c:617",
       "ngspicePath": "ref/ngspice/src/spicelib/devices/bjt/bjtload.c",
-      "claim": "cite: , :625 — capbe = tf*gbeMod + ...; gbeMod derived from op.gbe.",
+      "claim": "// cite: , :625 — capbe = tf*gbeMod + ...; gbeMod derived from op.gbe.",
       "claimKeyword": "",
       "status": "unverified",
-      "notes": ""
+      "notes": "",
+      "id": "C-0763"
     },
     {
-      "id": "C-0764",
       "sourceFile": "src/components/semiconductors/__tests__/bjt.test.ts",
-      "sourceLine": 1814,
+      "sourceLine": 1820,
       "ngspiceRef": "bjtload.c:617",
       "ngspicePath": "ref/ngspice/src/spicelib/devices/bjt/bjtload.c",
-      "claim": "cite: — capbe uses gbeMod which derives from gbe (not gm).",
+      "claim": "// cite:  — capbe uses gbeMod which derives from gbe (not gm).",
       "claimKeyword": "",
       "status": "unverified",
-      "notes": ""
+      "notes": "",
+      "id": "C-0764"
     },
     {
-      "id": "C-0765",
       "sourceFile": "src/components/semiconductors/__tests__/bjt.test.ts",
-      "sourceLine": 1882,
+      "sourceLine": 1888,
       "ngspiceRef": "bjtload.c:841-842",
       "ngspicePath": "ref/ngspice/src/spicelib/devices/bjt/bjtload.c",
-      "claim": "cite: — geqbx stamps to (nodeB_ext, nodeC_int), NOT nodeC_ext.",
+      "claim": "// cite:  — geqbx stamps to (nodeB_ext, nodeC_int), NOT nodeC_ext.",
       "claimKeyword": "",
       "status": "unverified",
-      "notes": ""
+      "notes": "",
+      "id": "C-0765"
     },
     {
-      "id": "C-0766",
       "sourceFile": "src/components/semiconductors/__tests__/bjt.test.ts",
-      "sourceLine": 1887,
+      "sourceLine": 1893,
       "ngspiceRef": "bjtload.c:841-842",
       "ngspicePath": "ref/ngspice/src/spicelib/devices/bjt/bjtload.c",
-      "claim": "cite: — BJTbaseColPrimePtr targets nodeC_int (colPrime), not nodeC_ext.",
+      "claim": "// cite:  — BJTbaseColPrimePtr targets nodeC_int (colPrime), not nodeC_ext.",
       "claimKeyword": "",
       "status": "unverified",
-      "notes": ""
+      "notes": "",
+      "id": "C-0766"
     },
     {
-      "id": "C-0767",
       "sourceFile": "src/components/semiconductors/__tests__/bjt.test.ts",
-      "sourceLine": 1972,
+      "sourceLine": 1978,
       "ngspiceRef": "bjtload.c:184-187",
       "ngspicePath": "ref/ngspice/src/spicelib/devices/bjt/bjtload.c",
-      "claim": "cite: — SUBS: 1=VERTICAL, 0=LATERAL",
+      "claim": "// cite:  — SUBS: 1=VERTICAL, 0=LATERAL",
       "claimKeyword": "",
       "status": "unverified",
-      "notes": ""
+      "notes": "",
+      "id": "C-0767"
     },
     {
-      "id": "C-0768",
       "sourceFile": "src/components/semiconductors/__tests__/bjt.test.ts",
-      "sourceLine": 2015,
+      "sourceLine": 2021,
       "ngspiceRef": "bjtload.c:184-187",
       "ngspicePath": "ref/ngspice/src/spicelib/devices/bjt/bjtload.c",
-      "claim": "cite: , 573-576, 582-585",
+      "claim": "// cite: , 573-576, 582-585",
       "claimKeyword": "",
       "status": "unverified",
-      "notes": ""
+      "notes": "",
+      "id": "C-0768"
     },
     {
-      "id": "C-0769",
       "sourceFile": "src/components/semiconductors/__tests__/bjt.test.ts",
-      "sourceLine": 2125,
+      "sourceLine": 2131,
       "ngspiceRef": "bjtload.c:715-724",
       "ngspicePath": "ref/ngspice/src/spicelib/devices/bjt/bjtload.c",
-      "claim": "cite: , 735-740, 764-769",
+      "claim": "// cite: , 735-740, 764-769",
       "claimKeyword": "",
       "status": "unverified",
-      "notes": ""
+      "notes": "",
+      "id": "C-0769"
     },
     {
-      "id": "C-0770",
       "sourceFile": "src/components/semiconductors/__tests__/bjt.test.ts",
-      "sourceLine": 2195,
+      "sourceLine": 2201,
       "ngspiceRef": "bjtload.c:531-535",
       "ngspicePath": "ref/ngspice/src/spicelib/devices/bjt/bjtload.c",
-      "claim": "cite: , 536-539",
+      "claim": "// cite: , 536-539",
       "claimKeyword": "",
       "status": "unverified",
-      "notes": ""
+      "notes": "",
+      "id": "C-0770"
     },
     {
-      "id": "C-0771",
       "sourceFile": "src/components/semiconductors/__tests__/bjt.test.ts",
-      "sourceLine": 2231,
+      "sourceLine": 2237,
       "ngspiceRef": "bjtload.c:531-535",
       "ngspicePath": "ref/ngspice/src/spicelib/devices/bjt/bjtload.c",
-      "claim": "cite: — INITTRAN seeds state1+state2 cexbc to cbe/qb.",
+      "claim": "// cite:  — INITTRAN seeds state1+state2 cexbc to cbe/qb.",
       "claimKeyword": "",
       "status": "unverified",
-      "notes": ""
+      "notes": "",
+      "id": "C-0771"
     },
     {
-      "id": "C-0772",
       "sourceFile": "src/components/semiconductors/__tests__/bjt.test.ts",
-      "sourceLine": 2256,
+      "sourceLine": 2262,
       "ngspiceRef": "bjtload.c:536-539",
       "ngspicePath": "ref/ngspice/src/spicelib/devices/bjt/bjtload.c",
-      "claim": "cite: — IIR denom uses deltaOld[1] directly ( seeds).",
+      "claim": "// cite:  — IIR denom uses deltaOld[1] directly (dctran.c:317 seeds).",
       "claimKeyword": "",
       "status": "unverified",
-      "notes": ""
+      "notes": "",
+      "id": "C-0772"
     },
     {
-      "id": "C-0773",
       "sourceFile": "src/components/semiconductors/__tests__/bjt.test.ts",
-      "sourceLine": 2256,
+      "sourceLine": 2262,
       "ngspiceRef": "dctran.c:317",
-      "ngspicePath": "ref/ngspice/src/spicelib/analysis/dctran.c",
-      "claim": "cite: — IIR denom uses deltaOld[1] directly ( seeds).",
+      "ngspicePath": "ref/ngspice/src/analysis/dctran.c",
+      "claim": "// cite: bjtload.c:536-539 — IIR denom uses deltaOld[1] directly ( seeds).",
       "claimKeyword": "",
       "status": "unverified",
-      "notes": ""
+      "notes": "",
+      "id": "C-0773"
     },
     {
-      "id": "C-0774",
       "sourceFile": "src/components/semiconductors/__tests__/bjt.test.ts",
-      "sourceLine": 2300,
+      "sourceLine": 2306,
       "ngspiceRef": "bjtload.c:522-524",
       "ngspicePath": "ref/ngspice/src/spicelib/devices/bjt/bjtload.c",
-      "claim": "cite:",
+      "claim": "// cite:",
       "claimKeyword": "",
       "status": "unverified",
-      "notes": ""
+      "notes": "",
+      "id": "C-0774"
     },
     {
-      "id": "C-0775",
       "sourceFile": "src/components/semiconductors/__tests__/bjt.test.ts",
-      "sourceLine": 2304,
+      "sourceLine": 2310,
       "ngspiceRef": "bjtload.c:522-524",
       "ngspicePath": "ref/ngspice/src/spicelib/devices/bjt/bjtload.c",
-      "claim": "cite: — cex/gex seeded from raw cbe/gbe BEFORE XTF modification.",
+      "claim": "// cite:  — cex/gex seeded from raw cbe/gbe BEFORE XTF modification.",
       "claimKeyword": "",
       "status": "unverified",
-      "notes": ""
+      "notes": "",
+      "id": "C-0775"
     },
     {
-      "id": "C-0776",
       "sourceFile": "src/components/semiconductors/__tests__/bjt.test.ts",
-      "sourceLine": 2319,
+      "sourceLine": 2325,
       "ngspiceRef": "bjtload.c:591-610",
       "ngspicePath": "ref/ngspice/src/spicelib/devices/bjt/bjtload.c",
-      "claim": "cite:",
+      "claim": "// cite:",
       "claimKeyword": "",
       "status": "unverified",
-      "notes": ""
+      "notes": "",
+      "id": "C-0776"
     },
     {
-      "id": "C-0777",
       "sourceFile": "src/components/semiconductors/__tests__/bjt.test.ts",
-      "sourceLine": 2353,
+      "sourceLine": 2359,
       "ngspiceRef": "bjtload.c:591-610",
       "ngspicePath": "ref/ngspice/src/spicelib/devices/bjt/bjtload.c",
-      "claim": "cite: — when tf>0 && vbe>0, cbeMod block runs.",
+      "claim": "// cite:  — when tf>0 && vbe>0, cbeMod block runs.",
       "claimKeyword": "",
       "status": "unverified",
-      "notes": ""
+      "notes": "",
+      "id": "C-0777"
     },
     {
-      "id": "C-0778",
       "sourceFile": "src/components/semiconductors/__tests__/bjt.test.ts",
-      "sourceLine": 2387,
+      "sourceLine": 2393,
       "ngspiceRef": "bjtload.c:591-610",
       "ngspicePath": "ref/ngspice/src/spicelib/devices/bjt/bjtload.c",
-      "claim": "cite: — when tf=0, cbeMod block is skipped entirely.",
+      "claim": "// cite:  — when tf=0, cbeMod block is skipped entirely.",
       "claimKeyword": "",
       "status": "unverified",
-      "notes": ""
+      "notes": "",
+      "id": "C-0778"
     },
     {
-      "id": "C-0779",
       "sourceFile": "src/components/semiconductors/__tests__/bjt.test.ts",
-      "sourceLine": 2414,
+      "sourceLine": 2420,
       "ngspiceRef": "bjtload.c:798-800",
       "ngspicePath": "ref/ngspice/src/spicelib/devices/bjt/bjtload.c",
-      "claim": "cite: , 823",
+      "claim": "// cite: , 823",
       "claimKeyword": "",
       "status": "unverified",
-      "notes": ""
+      "notes": "",
+      "id": "C-0779"
     },
     {
-      "id": "C-0780",
       "sourceFile": "src/components/semiconductors/__tests__/bjt.test.ts",
-      "sourceLine": 2421,
+      "sourceLine": 2427,
       "ngspiceRef": "bjtload.c:798-800",
       "ngspicePath": "ref/ngspice/src/spicelib/devices/bjt/bjtload.c",
-      "claim": "cite: — geqsub = gcsub + gdsub; all substrate stamps use geqsub.",
+      "claim": "// cite:  — geqsub = gcsub + gdsub; all substrate stamps use geqsub.",
       "claimKeyword": "",
       "status": "unverified",
-      "notes": ""
+      "notes": "",
+      "id": "C-0780"
     },
     {
-      "id": "C-0781",
       "sourceFile": "src/components/semiconductors/__tests__/bjt.test.ts",
-      "sourceLine": 2462,
+      "sourceLine": 2468,
       "ngspiceRef": "bjtload.c:561-563",
       "ngspicePath": "ref/ngspice/src/spicelib/devices/bjt/bjtload.c",
-      "claim": "cite:",
+      "claim": "// cite:",
       "claimKeyword": "",
       "status": "unverified",
-      "notes": ""
+      "notes": "",
+      "id": "C-0781"
     },
     {
-      "id": "C-0782",
       "sourceFile": "src/components/semiconductors/__tests__/bjt.test.ts",
-      "sourceLine": 2498,
+      "sourceLine": 2504,
       "ngspiceRef": "bjtload.c:561-563",
       "ngspicePath": "ref/ngspice/src/spicelib/devices/bjt/bjtload.c",
-      "claim": "cite: — cap block gate excludes pure DCOP.",
+      "claim": "// cite:  — cap block gate excludes pure DCOP.",
       "claimKeyword": "",
       "status": "unverified",
-      "notes": ""
+      "notes": "",
+      "id": "C-0782"
     },
     {
-      "id": "C-0783",
       "sourceFile": "src/components/semiconductors/__tests__/bjt.test.ts",
-      "sourceLine": 2506,
+      "sourceLine": 2512,
       "ngspiceRef": "bjtload.c:561-563",
       "ngspicePath": "ref/ngspice/src/spicelib/devices/bjt/bjtload.c",
-      "claim": "cite: — MODETRAN bit opens cap block.",
+      "claim": "// cite:  — MODETRAN bit opens cap block.",
       "claimKeyword": "",
       "status": "unverified",
-      "notes": ""
+      "notes": "",
+      "id": "C-0783"
     },
     {
-      "id": "C-0784",
       "sourceFile": "src/components/semiconductors/__tests__/bjt.test.ts",
-      "sourceLine": 2513,
+      "sourceLine": 2519,
       "ngspiceRef": "bjtload.c:562",
       "ngspicePath": "ref/ngspice/src/spicelib/devices/bjt/bjtload.c",
-      "claim": "cite: — (MODETRANOP && MODEUIC) opens cap block.",
+      "claim": "// cite:  — (MODETRANOP && MODEUIC) opens cap block.",
       "claimKeyword": "",
       "status": "unverified",
-      "notes": ""
+      "notes": "",
+      "id": "C-0784"
     },
     {
-      "id": "C-0785",
       "sourceFile": "src/components/semiconductors/__tests__/bjt.test.ts",
-      "sourceLine": 2520,
+      "sourceLine": 2526,
       "ngspiceRef": "bjtload.c:563",
       "ngspicePath": "ref/ngspice/src/spicelib/devices/bjt/bjtload.c",
-      "claim": "cite: — MODEINITSMSIG opens cap block; stores cap values in s0.",
+      "claim": "// cite:  — MODEINITSMSIG opens cap block; stores cap values in s0.",
       "claimKeyword": "",
       "status": "unverified",
-      "notes": ""
+      "notes": "",
+      "id": "C-0785"
     },
     {
       "id": "C-0786",
@@ -8831,125 +8831,125 @@
       "notes": ""
     },
     {
-      "id": "C-0803",
       "sourceFile": "src/components/semiconductors/__tests__/mosfet.test.ts",
       "sourceLine": 305,
       "ngspiceRef": "cktinit.c:75",
       "ngspicePath": "ref/ngspice/src/spicelib/devices/cktinit.c",
-      "claim": "ngspice parity: CKTsrcFact defaults to 1 (). Omitting ctx.srcFact",
+      "claim": "// ngspice parity: CKTsrcFact defaults to 1 (). Omitting ctx.srcFact",
       "claimKeyword": "",
       "status": "unverified",
-      "notes": ""
+      "notes": "",
+      "id": "C-0803"
     },
     {
-      "id": "C-0804",
       "sourceFile": "src/components/semiconductors/__tests__/mosfet.test.ts",
       "sourceLine": 804,
       "ngspiceRef": "niinteg.c:28-63",
       "ngspicePath": "ref/ngspice/src/maths/ni/niinteg.c",
-      "claim": "ngspice NIintegrate mapping ():",
+      "claim": "// ngspice NIintegrate mapping ():",
       "claimKeyword": "",
       "status": "unverified",
-      "notes": ""
+      "notes": "",
+      "id": "C-0804"
     },
     {
-      "id": "C-0805",
       "sourceFile": "src/components/semiconductors/__tests__/mosfet.test.ts",
-      "sourceLine": 1101,
-      "ngspiceRef": "devsup.c:113-118",
-      "ngspicePath": "ref/ngspice/src/spicelib/devices/devsup.c",
-      "claim": "fetlim zone 3 (OFF, increasing): vnew > vto+0.5 → clamp",
+      "sourceLine": 1100,
+      "ngspiceRef": "mos1load.c:211-213",
+      "ngspicePath": "ref/ngspice/src/spicelib/devices/mos1/mos1load.c",
+      "claim": "//  writes s0[VGS] = s1[VGS] BEFORE limiting reads it, so",
       "claimKeyword": "",
       "status": "unverified",
-      "notes": ""
+      "notes": "",
+      "id": "C-0805"
     },
     {
-      "id": "C-0806",
       "sourceFile": "src/components/semiconductors/__tests__/mosfet.test.ts",
-      "sourceLine": 1129,
+      "sourceLine": 1126,
       "ngspiceRef": "mos1load.c:368-378",
       "ngspicePath": "ref/ngspice/src/spicelib/devices/mos1/mos1load.c",
-      "claim": ": forward branch pushes DEVfetlim(vgs,...) once.",
+      "claim": "// : forward branch pushes DEVfetlim(vgs,...) once.",
       "claimKeyword": "",
       "status": "unverified",
-      "notes": ""
+      "notes": "",
+      "id": "C-0806"
     },
     {
-      "id": "C-0807",
       "sourceFile": "src/components/semiconductors/__tests__/mosfet.test.ts",
-      "sourceLine": 1172,
+      "sourceLine": 1139,
+      "ngspiceRef": "mos1load.c:211-214",
+      "ngspicePath": "ref/ngspice/src/spicelib/devices/mos1/mos1load.c",
+      "claim": "//  writes s0[VBS] = s1[VBS] BEFORE limiting reads it, so",
+      "claimKeyword": "",
+      "status": "unverified",
+      "notes": "",
+      "id": "C-0807"
+    },
+    {
+      "sourceFile": "src/components/semiconductors/__tests__/mosfet.test.ts",
+      "sourceLine": 1168,
       "ngspiceRef": "mos1load.c:393-406",
       "ngspicePath": "ref/ngspice/src/spicelib/devices/mos1/mos1load.c",
-      "claim": ": forward path pushes DEVpnjlim(vbs,...) once.",
+      "claim": "// : forward path pushes DEVpnjlim(vbs,...) once.",
       "claimKeyword": "",
       "status": "unverified",
-      "notes": ""
+      "notes": "",
+      "id": "C-0808"
     },
     {
-      "id": "C-0808",
       "sourceFile": "src/components/semiconductors/__tests__/mosfet.test.ts",
-      "sourceLine": 1180,
-      "ngspiceRef": "devsup.c:56-61",
-      "ngspicePath": "ref/ngspice/src/spicelib/devices/devsup.c",
-      "claim": "Gillespie / forward-limit bound: vold>0 forward formula from",
-      "claimKeyword": "",
-      "status": "unverified",
-      "notes": ""
-    },
-    {
-      "id": "C-0809",
-      "sourceFile": "src/components/semiconductors/__tests__/mosfet.test.ts",
-      "sourceLine": 1182,
+      "sourceLine": 1176,
       "ngspiceRef": "devsup.c:62-64",
       "ngspicePath": "ref/ngspice/src/spicelib/devices/devsup.c",
-      "claim": "Here vold=0, so the vold<=0 branch () applies:",
+      "claim": "// pnjlim forward-limit formula  (vold<=0 branch):",
       "claimKeyword": "",
       "status": "unverified",
-      "notes": ""
+      "notes": "",
+      "id": "C-0809"
     },
     {
-      "id": "C-0810",
       "sourceFile": "src/components/semiconductors/__tests__/mosfet.test.ts",
-      "sourceLine": 1209,
+      "sourceLine": 1201,
       "ngspiceRef": "mos1load.c:226-240",
       "ngspicePath": "ref/ngspice/src/spicelib/devices/mos1/mos1load.c",
-      "claim": "and different state0 seeds. If load() reads from rhsOld (",
+      "claim": "// and different state0 seeds. If load() reads from rhsOld (",
       "claimKeyword": "",
       "status": "unverified",
-      "notes": ""
+      "notes": "",
+      "id": "C-0810"
     },
     {
-      "id": "C-0811",
       "sourceFile": "src/components/semiconductors/__tests__/mosfet.test.ts",
-      "sourceLine": 1602,
+      "sourceLine": 1597,
       "ngspiceRef": "mos1load.c:738",
       "ngspicePath": "ref/ngspice/src/spicelib/devices/mos1/mos1load.c",
-      "claim": "noncon gate runs after bypass per (after `bypass:` label).",
+      "claim": "// noncon gate runs after bypass per  (after `bypass:` label).",
       "claimKeyword": "",
       "status": "unverified",
-      "notes": ""
+      "notes": "",
+      "id": "C-0811"
     },
     {
-      "id": "C-0812",
       "sourceFile": "src/components/semiconductors/__tests__/mosfet.test.ts",
-      "sourceLine": 1750,
+      "sourceLine": 1745,
       "ngspiceRef": "mos1load.c:737-743",
       "ngspicePath": "ref/ngspice/src/spicelib/devices/mos1/mos1load.c",
-      "claim": ": noncon gate fires only when OFF=0 or not INITFIX/SMSIG.",
+      "claim": "// : noncon gate fires only when OFF=0 or not INITFIX/SMSIG.",
       "claimKeyword": "",
       "status": "unverified",
-      "notes": ""
+      "notes": "",
+      "id": "C-0812"
     },
     {
-      "id": "C-0813",
       "sourceFile": "src/components/semiconductors/__tests__/mosfet.test.ts",
-      "sourceLine": 1921,
+      "sourceLine": 1916,
       "ngspiceRef": "mos1load.c:218",
       "ngspicePath": "ref/ngspice/src/spicelib/devices/mos1/mos1load.c",
-      "claim": ": s0[VGS] = s1[VGS] (not the extrapolated, just the copy).",
+      "claim": "// : s0[VGS] = s1[VGS] (not the extrapolated, just the copy).",
       "claimKeyword": "",
       "status": "unverified",
-      "notes": ""
+      "notes": "",
+      "id": "C-0813"
     },
     {
       "id": "C-0814",
