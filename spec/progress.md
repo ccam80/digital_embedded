@@ -290,3 +290,27 @@
   - `scripts/`: zero hits
   - `src/io/`: zero hits
   - `src/app/`: zero hits
+
+---
+## Phase 3 Complete
+- **Batches**: 3 (batch-p3-w3.1 Wave 3.1 NR reorder; batch-p3-w3.2 Wave 3.2 diode+BJT xfact; batch-p3-w3.3 Wave 3.3 IntegrationMethod alignment)
+- **Tasks**: 14 (3.1.1, 3.1.2, 3.2.1, 3.2.2, 3.2.3, 3.2.4, 3.2.5, 3.3.1, 3.3.2, 3.3.3, 3.3.4, 3.3.5, 3.3.6, 3.3.7)
+- **All verified**: yes (group_status for every task_group in every batch is "passed")
+- **Recovery events**: 1 clarification stop (Task 3.1.2 DC-OP cktop.c citation portion stricken per 2026-04-24 user clarification — presumed call site does not exist in digiTS and presumed ngspice analog does not exist in ngspice); 4 dead implementers (3.1 retry, 3.2.bjt first pass, 3.3.collapse first pass, 3.3.audit first pass — each recovered via mark-dead-implementer.sh + retry implementer).
+- **Verification cycles**: batch-p3-w3.1 had 1 FAIL (test-split + call-site discrimination fixes); batch-p3-w3.2 had 1 FAIL (missing pnjlim exact-count assertions, weak `>= 1` tightened to `=== 3`, missing skip-mask sub-case tests added). All FAILs converted to PASS after fix-implementer retries.
+- **Artifacts landed**:
+  - `src/solver/analog/__tests__/phase-3-nr-reorder.test.ts` — 7 tests guarding the NR loop-top NISHOULDREORDER gate + E_SINGULAR retry citation.
+  - `src/components/semiconductors/__tests__/phase-3-xfact-predictor.test.ts` — 17 tests covering diode + BJT L0 + BJT L1 xfact extrapolation, state-copy, pnjlim under MODEINITPRED (exact counts), VSUB state-copy regression guard.
+  - `src/solver/analog/__tests__/phase-3-xfact-scope-audit.test.ts` — 3 tests asserting every ctx.xfact read is MODEINITPRED-guarded.
+  - `src/solver/analog/__tests__/phase-3-relay-composite.test.ts` — 2 tests asserting SPDT/DPDT relays expose coil inductor as composite child.
+  - Phase 0 identifier audit manifest extended with 3 banned-literal rules (bdf1-literal, bdf2-literal, integrationMethod-auto); matching rows in `spec/phase-0-audit-report.md`.
+  - Compile-time assertion `_AssertPublicInternalEq` in `src/core/analog-engine-interface.ts` locks SimulationParams.integrationMethod === IntegrationMethod at tsc time.
+- **Production code deltas**:
+  - `diode.ts`, `bjt.ts` — MODEINITPRED branch rewritten to copy s1->s0 and extrapolate via `(1 + ctx.xfact) * s1 - ctx.xfact * s2` per dioload.c:141-152 and bjtload.c:278-330; pnjlim skip masks stripped of MODEINITPRED so pnjlim runs on the extrapolated voltages per bjtload.c:386-414.
+  - `bjt.ts` L1 VSUB: extrapolated, then re-read from rhsOld per bjtload.c:328-330 verbatim port of the ngspice vbx/vsub unconditional rewrite.
+  - `analog-types.ts` IntegrationMethod narrowed to "trapezoidal" | "gear" per cktdefs.h:107-108.
+  - `integration.ts` bdf-two branch deleted; order-1 gear via inline trap-1 per nicomcof.c:40-41; order >= 2 gear via solveGearVandermonde.
+  - `analog-engine-interface.ts` SimulationParams.integrationMethod narrowed; default = "trapezoidal" per cktntask.c:99; no "auto" coercion shim.
+  - `behavioral-remaining.ts` SPDT and DPDT relay factories rewritten to delegate coil integration to a child AnalogInductorElement via the Phase 0 composite-child pattern; hand-rolled method-dispatched companion deleted.
+  - `timestep.ts`, `convergence-log-panel.ts`, `ni-pred.ts`, `ni-integrate.ts`, `ckt-terr.ts`, `analog-engine.ts` — residual bdf1/bdf2 cleanup; `load-context.ts` "backwards compatibility" block deleted.
+- **Follow-through**: Phase 4 (F5 residual limiting primitives) is the next batch; its batch-p4-w4.1 entry is already planned in `.hybrid-state.json`. Phase 4 depends on Phase 3 per plan.md serialization.
