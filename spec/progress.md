@@ -180,3 +180,11 @@
   - L0 `createBjtElement::load()`: added `s2 = pool.states[2]` declaration; added probe writes `__phase3ProbeVbeRaw` / `__phase3ProbeVbcRaw` in both MODEINITPRED branch and rhsOld else branch.
   - L1 `createSpiceL1BjtElement::load()`: rewrote MODEINITPRED branch — state-copy for VBE/VBC/VSUB, xfact extrapolation for all three, `__phase3ProbeVsubExtrap` immediately after extrapolation, vbxRaw rhsOld read (bjtload.c:325-327), vsubRaw rhsOld re-read (bjtload.c:328-330), final probes `__phase3ProbeVbeRaw` / `__phase3ProbeVbcRaw` / `__phase3ProbeVsubFinal`; probe writes added to rhsOld else branch; pnjlim skip mask changed from `(MODEINITJCT | MODEINITSMSIG | MODEINITTRAN | MODEINITPRED)` to `(MODEINITJCT | MODEINITSMSIG | MODEINITTRAN)`.
   - Test file: updated imports to include `createBjtElement`, `createSpiceL1BjtElement`, `BJT_NPN_DEFAULTS`, `BJT_SPICE_L1_NPN_DEFAULTS`; appended Task 3.2.2 describe block (5 tests), Task 3.2.3 describe block (6 tests), Task 3.2.4 describe block (1 test).
+
+## Task 3.2.2 / 3.2.3 / 3.2.4: Post-verifier test fix — BJT xfact predictor tests
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: none
+- **Files modified**:
+  - `src/components/semiconductors/__tests__/phase-3-xfact-predictor.test.ts` — post-verifier fix: added missing pnjlim-calls-under-MODEINITPRED assertions (exact counts: 2 for L0, 3 for L1), added pnjlim-skipped under MODEINITJCT/SMSIG/TRAN tests for both levels, added s1→s0 three-way copy verification for L1, merged split tests to match spec names (vbeRaw+vbcRaw combined for L0 and L1, vsubExtrap+vsubFinal combined for L1), tightened weak `>= 1` assertion to exact `=== 3`, added MODEDCOP/MODEINITJCT/MODEINITSMSIG/MODEINITTRAN imports, removed obsolete probe-writes-defined weak coverage test
+- **Tests**: 17/17 passing

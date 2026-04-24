@@ -17,8 +17,12 @@ import { PropertyBag } from "../../../core/properties.js";
 import { StatePool } from "../../../solver/analog/state-pool.js";
 import {
   MODETRAN,
+  MODEDCOP,
   MODEINITPRED,
   MODEINITFLOAT,
+  MODEINITJCT,
+  MODEINITSMSIG,
+  MODEINITTRAN,
 } from "../../../solver/analog/ckt-mode.js";
 import { SparseSolver } from "../../../solver/analog/sparse-solver.js";
 import type { LoadContext } from "../../../solver/analog/load-context.js";
@@ -322,37 +326,25 @@ const BJT_SLOT_VSUB = 21;
 // ---------------------------------------------------------------------------
 
 describe("Task 3.2.2 — BJT L0 MODEINITPRED xfact", () => {
-  it("extrapolates vbeRaw as (1+xfact)*s1[VBE] - xfact*s2[VBE]", () => {
+  it("extrapolates vbeRaw and vbcRaw as (1+xfact)*s1 - xfact*s2", () => {
     const element = makeBjtL0();
     const pool = initBjtPool(element);
 
-    // Seed s1[VBE]=0.65, s2[VBE]=0.60
-    pool.states[1][BJT_SLOT_VBE] = 0.65;
-    pool.states[2][BJT_SLOT_VBE] = 0.60;
-    pool.states[1][BJT_SLOT_VBC] = -0.1;
-    pool.states[2][BJT_SLOT_VBC] = -0.1;
+    // Seed s1[VBE]=0.72, s2[VBE]=0.70, s1[VBC]=-0.3, s2[VBC]=-0.28
+    pool.states[1][BJT_SLOT_VBE] = 0.72;
+    pool.states[2][BJT_SLOT_VBE] = 0.70;
+    pool.states[1][BJT_SLOT_VBC] = -0.3;
+    pool.states[2][BJT_SLOT_VBC] = -0.28;
 
-    const ctx = buildBjtCtx(pool, MODETRAN | MODEINITPRED, 0.5);
+    const ctx = buildBjtCtx(pool, MODETRAN | MODEINITPRED, 0.25);
     element.load(ctx);
 
-    const expected = (1 + 0.5) * 0.65 - 0.5 * 0.60;
-    expect((ctx as any).__phase3ProbeVbeRaw).toBe(expected);
-  });
-
-  it("extrapolates vbcRaw as (1+xfact)*s1[VBC] - xfact*s2[VBC]", () => {
-    const element = makeBjtL0();
-    const pool = initBjtPool(element);
-
-    pool.states[1][BJT_SLOT_VBE] = 0.65;
-    pool.states[2][BJT_SLOT_VBE] = 0.60;
-    pool.states[1][BJT_SLOT_VBC] = -0.10;
-    pool.states[2][BJT_SLOT_VBC] = -0.08;
-
-    const ctx = buildBjtCtx(pool, MODETRAN | MODEINITPRED, 0.5);
-    element.load(ctx);
-
-    const expected = (1 + 0.5) * (-0.10) - 0.5 * (-0.08);
-    expect((ctx as any).__phase3ProbeVbcRaw).toBe(expected);
+    // (1+0.25)*0.72 - 0.25*0.70 = 0.74 exactly
+    const expectedVbe = (1 + 0.25) * 0.72 - 0.25 * 0.70;
+    // (1+0.25)*(-0.3) - 0.25*(-0.28) = -0.305 exactly
+    const expectedVbc = (1 + 0.25) * (-0.3) - 0.25 * (-0.28);
+    expect((ctx as any).__phase3ProbeVbeRaw).toBe(expectedVbe);
+    expect((ctx as any).__phase3ProbeVbcRaw).toBe(expectedVbc);
   });
 
   it("copies s1→s0 for VBE and VBC before extrapolation (verified via pnjlim vold)", () => {
@@ -379,6 +371,61 @@ describe("Task 3.2.2 — BJT L0 MODEINITPRED xfact", () => {
     pnjlimSpy.mockRestore();
   });
 
+  it("runs pnjlim under MODEINITPRED", () => {
+    // xfact=2: vbeRaw = (1+2)*0.9 - 2*0.85 = 1.0 (above tVcrit ~0.65)
+    // The pnjlim skip mask is (MODEINITJCT | MODEINITSMSIG | MODEINITTRAN) — MODEINITPRED
+    // is absent, so pnjlim runs for both BE and BC junctions.
+    const pnjlimSpy = vi.spyOn(NewtonRaphsonModule, "pnjlim");
+
+    const element = makeBjtL0();
+    const pool = initBjtPool(element);
+
+    pool.states[1][BJT_SLOT_VBE] = 0.9;
+    pool.states[2][BJT_SLOT_VBE] = 0.85;
+    pool.states[1][BJT_SLOT_VBC] = -0.1;
+    pool.states[2][BJT_SLOT_VBC] = -0.08;
+
+    const ctx = buildBjtCtx(pool, MODETRAN | MODEINITPRED, 2.0);
+    element.load(ctx);
+
+    // Exactly 2 calls: once for BE, once for BC — this is the key ngspice-alignment assertion.
+    expect(pnjlimSpy.mock.calls.length).toBe(2);
+
+    pnjlimSpy.mockRestore();
+  });
+
+  it("skips pnjlim under MODEINITJCT / MODEINITSMSIG / MODEINITTRAN", () => {
+    const element = makeBjtL0();
+    const pool = initBjtPool(element);
+
+    // Sub-case 1: MODEINITJCT
+    {
+      const pnjlimSpy = vi.spyOn(NewtonRaphsonModule, "pnjlim");
+      const ctx = buildBjtCtx(pool, MODETRAN | MODEINITJCT, 0.0);
+      element.load(ctx);
+      expect(pnjlimSpy.mock.calls.length).toBe(0);
+      pnjlimSpy.mockRestore();
+    }
+
+    // Sub-case 2: MODEINITSMSIG
+    {
+      const pnjlimSpy = vi.spyOn(NewtonRaphsonModule, "pnjlim");
+      const ctx = buildBjtCtx(pool, MODETRAN | MODEINITSMSIG, 0.0);
+      element.load(ctx);
+      expect(pnjlimSpy.mock.calls.length).toBe(0);
+      pnjlimSpy.mockRestore();
+    }
+
+    // Sub-case 3: MODEINITTRAN
+    {
+      const pnjlimSpy = vi.spyOn(NewtonRaphsonModule, "pnjlim");
+      const ctx = buildBjtCtx(pool, MODETRAN | MODEINITTRAN, 0.0);
+      element.load(ctx);
+      expect(pnjlimSpy.mock.calls.length).toBe(0);
+      pnjlimSpy.mockRestore();
+    }
+  });
+
   it("falls through to rhsOld when MODEINITPRED is not set", () => {
     const element = makeBjtL0();
     const pool = initBjtPool(element);
@@ -392,26 +439,6 @@ describe("Task 3.2.2 — BJT L0 MODEINITPRED xfact", () => {
     expect((ctx as any).__phase3ProbeVbeRaw).toBe(0.7);
   });
 
-  it("probe writes appear in both MODEINITPRED and rhsOld branches", () => {
-    const element = makeBjtL0();
-    const pool = initBjtPool(element);
-
-    pool.states[1][BJT_SLOT_VBE] = 0.65;
-    pool.states[2][BJT_SLOT_VBE] = 0.60;
-    pool.states[1][BJT_SLOT_VBC] = -0.10;
-    pool.states[2][BJT_SLOT_VBC] = -0.08;
-
-    const ctxPred = buildBjtCtx(pool, MODETRAN | MODEINITPRED, 0.5);
-    element.load(ctxPred);
-    expect((ctxPred as any).__phase3ProbeVbeRaw).toBeDefined();
-    expect((ctxPred as any).__phase3ProbeVbcRaw).toBeDefined();
-
-    const rhsOld = new Float64Array([0.7, 0.0, 0.0, 0.0]);
-    const ctxNr = buildBjtCtx(pool, MODETRAN | MODEINITFLOAT, 0.0, rhsOld);
-    element.load(ctxNr);
-    expect((ctxNr as any).__phase3ProbeVbeRaw).toBeDefined();
-    expect((ctxNr as any).__phase3ProbeVbcRaw).toBeDefined();
-  });
 });
 
 // ---------------------------------------------------------------------------
@@ -419,66 +446,77 @@ describe("Task 3.2.2 — BJT L0 MODEINITPRED xfact", () => {
 // ---------------------------------------------------------------------------
 
 describe("Task 3.2.3 — BJT L1 MODEINITPRED xfact", () => {
-  it("extrapolates vbeRaw as (1+xfact)*s1[VBE] - xfact*s2[VBE]", () => {
+  it("extrapolates vbeRaw and vbcRaw via xfact", () => {
     const element = makeBjtL1();
     const pool = initBjtPool(element);
 
-    pool.states[1][BJT_SLOT_VBE] = 0.65;
-    pool.states[2][BJT_SLOT_VBE] = 0.60;
+    // Seed s1[VBE]=0.72, s2[VBE]=0.70, s1[VBC]=-0.3, s2[VBC]=-0.28
+    pool.states[1][BJT_SLOT_VBE] = 0.72;
+    pool.states[2][BJT_SLOT_VBE] = 0.70;
+    pool.states[1][BJT_SLOT_VBC] = -0.3;
+    pool.states[2][BJT_SLOT_VBC] = -0.28;
 
-    const ctx = buildBjtCtx(pool, MODETRAN | MODEINITPRED, 0.5);
+    const ctx = buildBjtCtx(pool, MODETRAN | MODEINITPRED, 0.25);
     element.load(ctx);
 
-    const expected = (1 + 0.5) * 0.65 - 0.5 * 0.60;
-    expect((ctx as any).__phase3ProbeVbeRaw).toBe(expected);
+    const expectedVbe = (1 + 0.25) * 0.72 - 0.25 * 0.70;
+    const expectedVbc = (1 + 0.25) * (-0.3) - 0.25 * (-0.28);
+    expect((ctx as any).__phase3ProbeVbeRaw).toBe(expectedVbe);
+    expect((ctx as any).__phase3ProbeVbcRaw).toBe(expectedVbc);
   });
 
-  it("extrapolates vbcRaw as (1+xfact)*s1[VBC] - xfact*s2[VBC]", () => {
+  it("writes extrapolated vsubRaw then overwrites with rhsOld per bjtload.c:328-330", () => {
     const element = makeBjtL1();
     const pool = initBjtPool(element);
 
-    pool.states[1][BJT_SLOT_VBC] = -0.10;
-    pool.states[2][BJT_SLOT_VBC] = -0.08;
+    // Seed s1[VSUB]=0.01, s2[VSUB]=0.005; all nodes at 0V so rhsOld re-read gives 0.
+    pool.states[1][BJT_SLOT_VSUB] = 0.01;
+    pool.states[2][BJT_SLOT_VSUB] = 0.005;
 
-    const ctx = buildBjtCtx(pool, MODETRAN | MODEINITPRED, 0.5);
+    const ctx = buildBjtCtx(pool, MODETRAN | MODEINITPRED, 0.25);
     element.load(ctx);
 
-    const expected = (1 + 0.5) * (-0.10) - 0.5 * (-0.08);
-    expect((ctx as any).__phase3ProbeVbcRaw).toBe(expected);
-  });
-
-  it("extrapolates vsub and writes __phase3ProbeVsubExtrap before rhsOld re-read", () => {
-    const element = makeBjtL1();
-    const pool = initBjtPool(element);
-
-    pool.states[1][BJT_SLOT_VSUB] = 0.30;
-    pool.states[2][BJT_SLOT_VSUB] = 0.25;
-
-    const ctx = buildBjtCtx(pool, MODETRAN | MODEINITPRED, 0.5);
-    element.load(ctx);
-
-    const expectedExtrap = (1 + 0.5) * 0.30 - 0.5 * 0.25;
+    // Extrapolated: (1+0.25)*0.01 - 0.25*0.005 = 0.0125 - 0.00125 = 0.01125
+    const expectedExtrap = (1 + 0.25) * 0.01 - 0.25 * 0.005;
     expect((ctx as any).__phase3ProbeVsubExtrap).toBe(expectedExtrap);
-  });
-
-  it("overwrites vsubRaw with rhsOld read (bjtload.c:328-330) as __phase3ProbeVsubFinal", () => {
-    const element = makeBjtL1();
-    const pool = initBjtPool(element);
-
-    // With all nodes at 0V, vsubRaw = polarity(1) * subs(1) * (0 - vSubCon(0)) = 0
-    pool.states[1][BJT_SLOT_VSUB] = 0.30;
-    pool.states[2][BJT_SLOT_VSUB] = 0.25;
-
-    const ctx = buildBjtCtx(pool, MODETRAN | MODEINITPRED, 0.5);
-    element.load(ctx);
-
-    // Final vsub must be the rhsOld re-read, not the extrapolated value
+    // Final: rhsOld re-read overwrites extrapolation → 0 (all nodes at 0V)
     expect((ctx as any).__phase3ProbeVsubFinal).toBe(0);
-    // And it must differ from extrap (which was 0.325)
+    // The two values must differ — both the extrapolation and the re-read are required.
     expect((ctx as any).__phase3ProbeVsubExtrap).not.toBe((ctx as any).__phase3ProbeVsubFinal);
   });
 
-  it("pnjlim IS called under MODEINITPRED (mask does not skip it)", () => {
+  it("copies s1→s0 for VBE, VBC, VSUB at the start of the PRED branch", () => {
+    // Verify the three state-slot copies via pnjlim's second arg (vold = s0[slot] after copy).
+    // First pnjlim call: BE → vold = s0[VBE] = s1[VBE].
+    // Second call: BC → vold = s0[VBC] = s1[VBC].
+    // Third call: VSUB → vold = s0[VSUB] = s1[VSUB].
+    const pnjlimSpy = vi.spyOn(NewtonRaphsonModule, "pnjlim");
+
+    const element = makeBjtL1();
+    const pool = initBjtPool(element);
+
+    pool.states[1][BJT_SLOT_VBE]  = 0.72;
+    pool.states[1][BJT_SLOT_VBC]  = -0.3;
+    pool.states[1][BJT_SLOT_VSUB] = 0.01;
+    // s0 sentinels differ from s1 to confirm copy happened
+    pool.states[0][BJT_SLOT_VBE]  = 0.0;
+    pool.states[0][BJT_SLOT_VBC]  = 0.0;
+    pool.states[0][BJT_SLOT_VSUB] = 0.0;
+
+    const ctx = buildBjtCtx(pool, MODETRAN | MODEINITPRED, 0.25);
+    element.load(ctx);
+
+    const calls = pnjlimSpy.mock.calls;
+    // Three pnjlim calls in order: BE, BC, VSUB.
+    // Second argument (vold) of each must equal the corresponding s1 value after copy.
+    expect(calls[0][1]).toBe(0.72);   // VBE: s0[VBE] after copy = s1[VBE]
+    expect(calls[1][1]).toBe(-0.3);   // VBC: s0[VBC] after copy = s1[VBC]
+    expect(calls[2][1]).toBe(0.01);   // VSUB: s0[VSUB] after copy = s1[VSUB]
+
+    pnjlimSpy.mockRestore();
+  });
+
+  it("runs pnjlim on all three junctions under MODEINITPRED", () => {
     const pnjlimSpy = vi.spyOn(NewtonRaphsonModule, "pnjlim");
 
     const element = makeBjtL1();
@@ -490,9 +528,42 @@ describe("Task 3.2.3 — BJT L1 MODEINITPRED xfact", () => {
     const ctx = buildBjtCtx(pool, MODETRAN | MODEINITPRED, 0.5);
     element.load(ctx);
 
-    expect(pnjlimSpy.mock.calls.length).toBeGreaterThanOrEqual(1);
+    // Exactly 3 calls: BE, BC, substrate — this is the key ngspice-alignment assertion.
+    expect(pnjlimSpy.mock.calls.length).toBe(3);
 
     pnjlimSpy.mockRestore();
+  });
+
+  it("skips pnjlim under MODEINITJCT / MODEINITSMSIG / MODEINITTRAN", () => {
+    const element = makeBjtL1();
+    const pool = initBjtPool(element);
+
+    // Sub-case 1: MODEINITJCT
+    {
+      const pnjlimSpy = vi.spyOn(NewtonRaphsonModule, "pnjlim");
+      const ctx = buildBjtCtx(pool, MODETRAN | MODEINITJCT, 0.0);
+      element.load(ctx);
+      expect(pnjlimSpy.mock.calls.length).toBe(0);
+      pnjlimSpy.mockRestore();
+    }
+
+    // Sub-case 2: MODEINITSMSIG
+    {
+      const pnjlimSpy = vi.spyOn(NewtonRaphsonModule, "pnjlim");
+      const ctx = buildBjtCtx(pool, MODETRAN | MODEINITSMSIG, 0.0);
+      element.load(ctx);
+      expect(pnjlimSpy.mock.calls.length).toBe(0);
+      pnjlimSpy.mockRestore();
+    }
+
+    // Sub-case 3: MODEINITTRAN
+    {
+      const pnjlimSpy = vi.spyOn(NewtonRaphsonModule, "pnjlim");
+      const ctx = buildBjtCtx(pool, MODETRAN | MODEINITTRAN, 0.0);
+      element.load(ctx);
+      expect(pnjlimSpy.mock.calls.length).toBe(0);
+      pnjlimSpy.mockRestore();
+    }
   });
 
   it("falls through to rhsOld when MODEINITPRED is not set", () => {
