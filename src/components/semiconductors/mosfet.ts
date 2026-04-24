@@ -102,7 +102,7 @@ interface MosfetParams {
   TEMP?: number;
 }
 
-interface ResolvedMosfetParams {
+export interface ResolvedMosfetParams {
   VTO: number; KP: number; LAMBDA: number; PHI: number; GAMMA: number;
   W: number; L: number;
   CBD: number; CBS: number; CGDO: number; CGSO: number; CGBO: number;
@@ -393,7 +393,7 @@ function resolveParams(raw: MosfetParams, kpDefault: number): ResolvedMosfetPara
 // computeTempParams — ngspice mos1temp.c:44-289 port
 // ---------------------------------------------------------------------------
 
-interface MosfetTempParams {
+export interface MosfetTempParams {
   vt: number;                  // mos1load.c:107: p.TEMP * KoverQ
   tTransconductance: number;  // mos1temp.c:165-166
   tPhi: number;               // mos1temp.c:168-169
@@ -417,7 +417,7 @@ interface MosfetTempParams {
   f2s: number; f3s: number; f4s: number;
 }
 
-function computeTempParams(p: ResolvedMosfetParams, polarity: 1 | -1): MosfetTempParams {
+export function computeTempParams(p: ResolvedMosfetParams, polarity: 1 | -1): MosfetTempParams {
   // --- Model-level (mos1temp.c:45-51) ---
   const fact1 = p.TNOM / REFTEMP;
   const vtnom = p.TNOM * KoverQ;
@@ -974,13 +974,9 @@ export function createMosfetElement(
   };
 
   const params = resolveParams(rawParams, kpDefault);
-  // DIVERGENCE - NOT "INTENTIONAL": THESE SIGN FLIPS ARE DEFINITELY NOT APPROVED
-  // BY THE AUTHOR.
-  // For PMOS, VTO is stored as magnitude and type sign is applied via polarity
-  // at use sites. ngspice mos1temp.c stores signed VTO directly.
-  if (polarity === -1) {
-    params.VTO = Math.abs(params.VTO);
-  }
+  // VTO is used signed (ngspice mos1temp.c stores signed MOS1vt0 directly).
+  // For PMOS, VTO is typically negative (e.g., -1.0). computeTempParams applies
+  // polarity at the tVbi/tVto evaluation sites per mos1temp.c:170-176.
 
   let tp = computeTempParams(params, polarity);
   // Thread temp-corrected values into params for standalone helper functions.

@@ -72,6 +72,7 @@ export const { paramDefs: BJT_PARAM_DEFS, defaults: BJT_NPN_DEFAULTS } = defineM
     AREA: { default: 1,     description: "Device area factor" },
     M:   { default: 1,      description: "Parallel device multiplier" },
     TNOM: { default: 300.15, unit: "K", description: "Nominal temperature" },
+    TEMP: { default: 300.15, unit: "K", description: "Per-instance operating temperature" },
     OFF:   { default: 0,    description: "Initial condition: device off (0=false, 1=true)" },
     ICVBE: { default: NaN,  unit: "V",  description: "Initial condition: B-E voltage for UIC" },
     ICVCE: { default: NaN,  unit: "V",  description: "Initial condition: C-E voltage for UIC" },
@@ -98,6 +99,7 @@ export const { defaults: BJT_PNP_DEFAULTS } = defineModelParams({
     AREA: { default: 1,     description: "Device area factor" },
     M:   { default: 1,      description: "Parallel device multiplier" },
     TNOM: { default: 300.15, unit: "K", description: "Nominal temperature" },
+    TEMP: { default: 300.15, unit: "K", description: "Per-instance operating temperature" },
     OFF:   { default: 0,    description: "Initial condition: device off (0=false, 1=true)" },
     ICVBE: { default: NaN,  unit: "V",  description: "Initial condition: B-E voltage for UIC" },
     ICVCE: { default: NaN,  unit: "V",  description: "Initial condition: C-E voltage for UIC" },
@@ -160,6 +162,7 @@ export const { paramDefs: BJT_SPICE_L1_PARAM_DEFS, defaults: BJT_SPICE_L1_NPN_DE
     AREAC: { default: 1,    description: "Collector-area factor" },
     M:   { default: 1,      description: "Parallel device multiplier" },
     TNOM: { default: 300.15, unit: "K", description: "Nominal temperature" },
+    TEMP: { default: 300.15, unit: "K", description: "Per-instance operating temperature" },
     OFF:   { default: 0,    description: "Initial condition: device off (0=false, 1=true)" },
     ICVBE: { default: NaN,  unit: "V",  description: "Initial condition: B-E voltage for UIC" },
     ICVCE: { default: NaN,  unit: "V",  description: "Initial condition: C-E voltage for UIC" },
@@ -219,6 +222,7 @@ export const { defaults: BJT_SPICE_L1_PNP_DEFAULTS } = defineModelParams({
     AREAC: { default: 1,    description: "Collector-area factor" },
     M:   { default: 1,      description: "Parallel device multiplier" },
     TNOM: { default: 300.15, unit: "K", description: "Nominal temperature" },
+    TEMP: { default: 300.15, unit: "K", description: "Per-instance operating temperature" },
     OFF:   { default: 0,    description: "Initial condition: device off (0=false, 1=true)" },
     ICVBE: { default: NaN,  unit: "V",  description: "Initial condition: B-E voltage for UIC" },
     ICVCE: { default: NaN,  unit: "V",  description: "Initial condition: C-E voltage for UIC" },
@@ -340,8 +344,8 @@ function computeBjtTempParams(p: {
   FC: number; AREA: number; TNOM: number;
   VAF: number; VAR: number;
   PTF: number; TF: number; TR: number;
-  ISS: number;
-}, T: number = 300.15): BjtTempParams {
+  ISS: number; TEMP: number;
+}, T: number): BjtTempParams {
   const REFTEMP = 300.15;
   const k = 1.3806226e-23;
   const q_charge = 1.6021918e-19;
@@ -751,6 +755,7 @@ export function createBjtElement(
     AREA: props.getModelParam<number>("AREA"),
     M: props.getModelParam<number>("M"),
     TNOM: props.getModelParam<number>("TNOM"),
+    TEMP: props.getModelParam<number>("TEMP"),
     OFF: props.getModelParam<number>("OFF"),
     ICVBE: props.getModelParam<number>("ICVBE"),
     ICVCE: props.getModelParam<number>("ICVCE"),
@@ -769,8 +774,8 @@ export function createBjtElement(
       FC: 0.5, AREA: params.AREA, TNOM: params.TNOM,
       VAF: params.VAF, VAR: params.VAR,
       PTF: 0, TF: 0, TR: 0,
-      ISS: 0,
-    });
+      ISS: 0, TEMP: params.TEMP,
+    }, params.TEMP);
   }
   let tp = makeTp();
 
@@ -1181,6 +1186,7 @@ export function createSpiceL1BjtElement(
     AREAC: props.getModelParam<number>("AREAC"),
     M: props.getModelParam<number>("M"),
     TNOM: props.getModelParam<number>("TNOM"),
+    TEMP: props.getModelParam<number>("TEMP"),
     OFF: props.getModelParam<number>("OFF"),
     ICVBE: props.getModelParam<number>("ICVBE"),
     ICVCE: props.getModelParam<number>("ICVCE"),
@@ -1200,8 +1206,8 @@ export function createSpiceL1BjtElement(
       FC: params.FC, AREA: params.AREA, TNOM: params.TNOM,
       VAF: params.VAF, VAR: params.VAR,
       PTF: params.PTF, TF: params.TF, TR: params.TR,
-      ISS: params.ISS,
-    });
+      ISS: params.ISS, TEMP: params.TEMP,
+    }, params.TEMP);
   }
   let tp = makeTp();
 

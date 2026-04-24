@@ -2443,3 +2443,349 @@ describe("BJT L1 LimitingEvent SUB", () => {
     expect(() => el.load(makeCtxForSubLimiting(null))).not.toThrow();
   });
 });
+
+// ---------------------------------------------------------------------------
+// Wave 5.3 — BJT per-instance TEMP parameter
+// ---------------------------------------------------------------------------
+
+describe("BJT TEMP", () => {
+  // Task 5.3.1 tests
+
+  it("TEMP_default_300_15", () => {
+    // After makeBjtProps(), propsObj.getModelParam<number>("TEMP") === 300.15.
+    const propsObj = makeBjtProps();
+    expect(propsObj.getModelParam<number>("TEMP")).toBe(300.15);
+  });
+
+  it("paramDefs_include_TEMP", () => {
+    // BJT_PARAM_DEFS.map(pd => pd.key) contains "TEMP".
+    const keys = BJT_PARAM_DEFS.map(pd => pd.key);
+    expect(keys).toContain("TEMP");
+  });
+
+  it("setParam_TEMP_no_throw", () => {
+    // element.setParam("TEMP", 400) doesn't throw.
+    const propsObj = makeBjtProps();
+    const element = createBjtElement(1, new Map([["B", 2], ["C", 1], ["E", 3]]), -1, propsObj);
+    expect(() => element.setParam("TEMP", 400)).not.toThrow();
+  });
+
+  // Task 5.3.2 tests
+
+  it("tp_vt_reflects_TEMP", () => {
+    // Construct L0 NPN with TEMP=400, assert tp.vt approximately equals 400 * KoverQ.
+    // KoverQ = 1.3806226e-23 / 1.6021918e-19
+    const KoverQ = 1.3806226e-23 / 1.6021918e-19;
+    const vtAt300 = 300.15 * KoverQ;
+    const vtAt400 = 400 * KoverQ;
+
+    // Probe tp.vt through MODEINITJCT: s0[VBE] = tVcrit = vt * log(vt / (sqrt2 * tSatCur * AREA)).
+    // At 300.15K with IS=1e-16: tSatCur=IS (no temp scaling at TNOM=300.15K).
+    // tVcrit(300.15K) = vtAt300 * log(vtAt300 / (sqrt2 * 1e-16))
+    // At 400K: tSatCur = IS * exp(factlog) >> IS. Both vt and tSatCur change.
+    // Compute expected tVcrit values from the same formula used in computeBjtTempParams.
+    const REFTEMP = 300.15;
+    const k = 1.3806226e-23;
+    const q_charge = 1.6021918e-19;
+    function computeTVcrit(T: number, IS: number): number {
+      const vt = T * KoverQ;
+      const fact2 = T / REFTEMP;
+      const egfet = 1.16 - (7.02e-4 * T * T) / (T + 1108);
+      const arg = -egfet / (2 * k * T) + 1.1150877 / (k * (REFTEMP + REFTEMP));
+      const pbfact = -2 * vt * (1.5 * Math.log(fact2) + q_charge * arg);
+      const pbo_be = (0.75 - pbfact) / (REFTEMP / REFTEMP);
+      const ratlog = Math.log(T / REFTEMP);
+      const ratio1 = T / REFTEMP - 1;
+      const factlog = ratio1 * 1.11 / vt + 3 * ratlog;
+      const factor = Math.exp(factlog);
+      const tSatCur = IS * factor;
+      return vt * Math.log(vt / (Math.SQRT2 * tSatCur * 1));
+    }
+
+    const expectedTVcrit300 = computeTVcrit(300.15, 1e-16);
+    const expectedTVcrit400 = computeTVcrit(400, 1e-16);
+
+    const coreDefault = createBjtElement(1, new Map([["B", 1], ["C", 2], ["E", 3]]), -1, makeBjtProps({ TEMP: 300.15 })) as any;
+    const core400 = createBjtElement(1, new Map([["B", 1], ["C", 2], ["E", 3]]), -1, makeBjtProps({ TEMP: 400 })) as any;
+    const pool300 = new StatePool(coreDefault.stateSize);
+    const pool400 = new StatePool(core400.stateSize);
+    coreDefault.stateBaseOffset = 0;
+    core400.stateBaseOffset = 0;
+    coreDefault.initState(pool300);
+    core400.initState(pool400);
+
+    function makeJctCtx(): LoadContext {
+      const solver = new SparseSolver();
+      solver.beginAssembly(10);
+      return {
+        cktMode: MODEINITJCT,
+        solver, matrix: solver,
+        rhs: new Float64Array(10), rhsOld: new Float64Array(10),
+        time: 0, dt: 0, method: "trapezoidal", order: 1,
+        deltaOld: [0, 0, 0, 0, 0, 0, 0],
+        ag: new Float64Array(7), srcFact: 1,
+        noncon: { value: 0 }, limitingCollector: null, convergenceCollector: null,
+        xfact: 1, gmin: 1e-12, reltol: 1e-3, iabstol: 1e-12,
+        temp: 300.15, vt: 0.025852, cktFixLimit: false, bypass: false, voltTol: 1e-6,
+      };
+    }
+
+    withNodeIds(coreDefault, [1, 2, 3]).load(makeJctCtx());
+    withNodeIds(core400, [1, 2, 3]).load(makeJctCtx());
+
+    const vbe300 = pool300.states[0][0]; // SLOT_VBE = tVcrit(300.15K)
+    const vbe400 = pool400.states[0][0]; // SLOT_VBE = tVcrit(400K)
+
+    // Both must equal their analytically computed tVcrit values.
+    expect(Math.abs(vbe300 - expectedTVcrit300)).toBeLessThan(1e-6);
+    expect(Math.abs(vbe400 - expectedTVcrit400)).toBeLessThan(1e-6);
+    // And vt(400K) > vt(300.15K) even though tVcrit(400K) < tVcrit(300.15K).
+    expect(vtAt400).toBeGreaterThan(vtAt300);
+  });
+
+  it("tSatCur_scales_with_TEMP", () => {
+    // Construct L1 NPN with IS=1e-16, XTI=3, EG=1.11, TNOM=300.15.
+    // Build at TEMP=300.15 and TEMP=400. Assert tSatCur(400) > tSatCur(300.15).
+    // We probe tSatCur via MODEINITJCT s0[VBE] = tVcrit = vt*log(vt/(sqrt2*tSatCur*AREA)).
+    // Higher tSatCur → smaller tVcrit. Higher T also raises vt. Net effect: tVcrit(400) > tVcrit(300.15)
+    // because at 400K the exp(factlog) factor dominates IS scaling.
+    // We verify by checking that the CB (base current) after a DC forward-active load is
+    // larger for TEMP=400 (higher tSatCur → larger cbe at same vbe).
+    function makeL1AtTemp(TEMP: number): { el: any; pool: StatePool } {
+      const propsObj = makeSpiceL1Props({ IS: 1e-16, XTI: 3, EG: 1.11, TNOM: 300.15, TEMP });
+      const core = createSpiceL1BjtElement(1, new Map([["B", 1], ["C", 2], ["E", 3]]), [], -1, propsObj) as any;
+      const pool = new StatePool(core.stateSize);
+      core.stateBaseOffset = 0;
+      core.initState(pool);
+      return { el: withNodeIds(core, [1, 2, 3]), pool };
+    }
+
+    function makeForwardCtx(): LoadContext {
+      const solver = new SparseSolver();
+      solver.beginAssembly(10);
+      const rhsOld = new Float64Array(10);
+      rhsOld[0] = 0.65; // VB
+      rhsOld[1] = 3.0;  // VC
+      rhsOld[2] = 0.0;  // VE
+      return {
+        cktMode: MODEDCOP | MODEINITFLOAT,
+        solver, matrix: solver,
+        rhs: new Float64Array(10), rhsOld,
+        time: 0, dt: 0, method: "trapezoidal", order: 1,
+        deltaOld: [0, 0, 0, 0, 0, 0, 0],
+        ag: new Float64Array(7), srcFact: 1,
+        noncon: { value: 0 }, limitingCollector: null, convergenceCollector: null,
+        xfact: 1, gmin: 1e-12, reltol: 1e-3, iabstol: 1e-12,
+        temp: 300.15, vt: 0.025852, cktFixLimit: false, bypass: false, voltTol: 1e-6,
+      };
+    }
+
+    const { el: el300, pool: pool300 } = makeL1AtTemp(300.15);
+    const { el: el400, pool: pool400 } = makeL1AtTemp(400);
+    el300.load(makeForwardCtx());
+    el400.load(makeForwardCtx());
+
+    const SLOT_CB = 3;
+    const cb300 = pool300.states[0][SLOT_CB];
+    const cb400 = pool400.states[0][SLOT_CB];
+    // Higher temperature → higher tSatCur → larger base current at same vbe.
+    expect(Math.abs(cb400)).toBeGreaterThan(Math.abs(cb300));
+  });
+
+  it("TNOM_stays_nominal", () => {
+    // Construct BJT with TEMP=400, TNOM=300.15; assert tp.tBetaF reflects T/TNOM ratio.
+    // tBetaF = BF * exp(ratlog * XTB) where ratlog = log(T / TNOM) = log(400/300.15).
+    // With XTB=0.5, bfactor = exp(log(400/300.15)*0.5) = (400/300.15)^0.5.
+    // Two elements with same TEMP=400 but different XTB must produce different tBetaF,
+    // and the element with XTB=0 must have tBetaF == BF regardless of TEMP.
+    const propsXtb0 = makeSpiceL1Props({ TEMP: 400, TNOM: 300.15, BF: 100, XTB: 0 });
+    const propsXtb05 = makeSpiceL1Props({ TEMP: 400, TNOM: 300.15, BF: 100, XTB: 0.5 });
+
+    // We probe tBetaF by checking the forward gain: in the Gummel-Poon model,
+    // cb ≈ cbe / tBetaF + ...; so tBetaF changes the base current.
+    const coreXtb0 = createSpiceL1BjtElement(1, new Map([["B", 1], ["C", 2], ["E", 3]]), [], -1, propsXtb0) as any;
+    const coreXtb05 = createSpiceL1BjtElement(1, new Map([["B", 1], ["C", 2], ["E", 3]]), [], -1, propsXtb05) as any;
+    const poolXtb0 = new StatePool(coreXtb0.stateSize);
+    const poolXtb05 = new StatePool(coreXtb05.stateSize);
+    coreXtb0.stateBaseOffset = 0;
+    coreXtb05.stateBaseOffset = 0;
+    coreXtb0.initState(poolXtb0);
+    coreXtb05.initState(poolXtb05);
+
+    function makeCtx(): LoadContext {
+      const solver = new SparseSolver();
+      solver.beginAssembly(10);
+      const rhsOld = new Float64Array(10);
+      rhsOld[0] = 0.65; rhsOld[1] = 3.0; rhsOld[2] = 0.0;
+      return {
+        cktMode: MODEDCOP | MODEINITFLOAT,
+        solver, matrix: solver,
+        rhs: new Float64Array(10), rhsOld,
+        time: 0, dt: 0, method: "trapezoidal", order: 1,
+        deltaOld: [0, 0, 0, 0, 0, 0, 0],
+        ag: new Float64Array(7), srcFact: 1,
+        noncon: { value: 0 }, limitingCollector: null, convergenceCollector: null,
+        xfact: 1, gmin: 1e-12, reltol: 1e-3, iabstol: 1e-12,
+        temp: 300.15, vt: 0.025852, cktFixLimit: false, bypass: false, voltTol: 1e-6,
+      };
+    }
+
+    withNodeIds(coreXtb0, [1, 2, 3]).load(makeCtx());
+    withNodeIds(coreXtb05, [1, 2, 3]).load(makeCtx());
+
+    const SLOT_CB = 3;
+    const cbXtb0 = poolXtb0.states[0][SLOT_CB];
+    const cbXtb05 = poolXtb05.states[0][SLOT_CB];
+
+    // XTB=0.5 at TEMP=400 > TNOM=300.15 → bfactor > 1 → tBetaF > BF → smaller cb (less base current).
+    // XTB=0 → bfactor=1 → tBetaF == BF.
+    // So |cb(XTB=0.5)| < |cb(XTB=0)| when TEMP>TNOM and XTB>0.
+    expect(Math.abs(cbXtb05)).toBeLessThan(Math.abs(cbXtb0));
+  });
+
+  // Task 5.3.3 test
+
+  it("no_ctx_vt_read_in_bjt_ts", () => {
+    // fs.readFileSync on bjt.ts; assert the string "ctx.vt" appears zero times.
+    const fs = require("fs");
+    const src = fs.readFileSync(
+      require("path").resolve(__dirname, "../bjt.ts"),
+      "utf8",
+    ) as string;
+    const matches = src.match(/ctx\.vt/g);
+    expect(matches).toBeNull();
+  });
+
+  // Task 5.3.4 tests
+
+  it("setParam_TEMP_recomputes_tp_L0", () => {
+    // Construct L0 NPN at default TEMP=300.15, call setParam("TEMP", 400),
+    // then run MODEINITJCT load and verify tVcrit (seeded into s0[VBE]) reflects 400K.
+    // tVcrit = vt * log(vt / (sqrt2 * tSatCur * AREA)); tSatCur scales with TEMP
+    // so tVcrit(400K) != tVcrit(300.15K).
+    const REFTEMP = 300.15;
+    const k = 1.3806226e-23;
+    const q_charge = 1.6021918e-19;
+    const KoverQ = k / q_charge;
+
+    function computeExpectedTVcrit(T: number, IS: number): number {
+      const vt = T * KoverQ;
+      const fact2 = T / REFTEMP;
+      const egfet = 1.16 - (7.02e-4 * T * T) / (T + 1108);
+      const arg = -egfet / (2 * k * T) + 1.1150877 / (k * (REFTEMP + REFTEMP));
+      const pbfact = -2 * vt * (1.5 * Math.log(fact2) + q_charge * arg);
+      const ratlog = Math.log(T / REFTEMP);
+      const ratio1 = T / REFTEMP - 1;
+      const factlog = ratio1 * 1.11 / vt + 3 * ratlog;
+      const factor = Math.exp(factlog);
+      const tSatCur = IS * factor;
+      return vt * Math.log(vt / (Math.SQRT2 * tSatCur * 1));
+    }
+
+    const expectedTVcrit300 = computeExpectedTVcrit(300.15, 1e-16);
+    const expectedTVcrit400 = computeExpectedTVcrit(400, 1e-16);
+    // They must differ (this is what we are testing — setParam actually changes tp).
+    expect(Math.abs(expectedTVcrit400 - expectedTVcrit300)).toBeGreaterThan(0.05);
+
+    const propsDefault = makeBjtProps();
+    const core = createBjtElement(1, new Map([["B", 1], ["C", 2], ["E", 3]]), -1, propsDefault) as any;
+    const pool = new StatePool(core.stateSize);
+    core.stateBaseOffset = 0;
+    core.initState(pool);
+    const element = withNodeIds(core, [1, 2, 3]);
+
+    function makeJctCtx(): LoadContext {
+      const solver = new SparseSolver();
+      solver.beginAssembly(10);
+      return {
+        cktMode: MODEINITJCT,
+        solver, matrix: solver,
+        rhs: new Float64Array(10), rhsOld: new Float64Array(10),
+        time: 0, dt: 0, method: "trapezoidal", order: 1,
+        deltaOld: [0, 0, 0, 0, 0, 0, 0],
+        ag: new Float64Array(7), srcFact: 1,
+        noncon: { value: 0 }, limitingCollector: null, convergenceCollector: null,
+        xfact: 1, gmin: 1e-12, reltol: 1e-3, iabstol: 1e-12,
+        temp: 300.15, vt: 0.025852, cktFixLimit: false, bypass: false, voltTol: 1e-6,
+      };
+    }
+
+    // First load at 300.15K — tVcrit should match expectedTVcrit300.
+    element.load(makeJctCtx());
+    const vbe300 = pool.states[0][0];
+    expect(Math.abs(vbe300 - expectedTVcrit300)).toBeLessThan(1e-6);
+
+    // setParam("TEMP", 400) must trigger makeTp() recompute.
+    core.setParam("TEMP", 400);
+
+    // Load again at MODEINITJCT — tVcrit must now reflect 400K.
+    element.load(makeJctCtx());
+    const vbe400 = pool.states[0][0];
+    expect(Math.abs(vbe400 - expectedTVcrit400)).toBeLessThan(1e-6);
+  });
+
+  it("setParam_TEMP_recomputes_tp_L1", () => {
+    // Construct L1 NPN at default TEMP=300.15, call setParam("TEMP", 400),
+    // then run MODEINITJCT load and verify tVcrit (seeded into s0[VBE]) reflects 400K.
+    const REFTEMP = 300.15;
+    const k = 1.3806226e-23;
+    const q_charge = 1.6021918e-19;
+    const KoverQ = k / q_charge;
+
+    function computeExpectedTVcrit(T: number, IS: number, EG: number, XTI: number): number {
+      const vt = T * KoverQ;
+      const fact2 = T / REFTEMP;
+      const egfet = 1.16 - (7.02e-4 * T * T) / (T + 1108);
+      const arg = -egfet / (2 * k * T) + 1.1150877 / (k * (REFTEMP + REFTEMP));
+      const pbfact = -2 * vt * (1.5 * Math.log(fact2) + q_charge * arg);
+      const ratlog = Math.log(T / REFTEMP);
+      const ratio1 = T / REFTEMP - 1;
+      const factlog = ratio1 * EG / vt + XTI * ratlog;
+      const factor = Math.exp(factlog);
+      const tSatCur = IS * factor;
+      return vt * Math.log(vt / (Math.SQRT2 * tSatCur * 1));
+    }
+
+    const IS = 1e-16, EG = 1.11, XTI = 3;
+    const expectedTVcrit300 = computeExpectedTVcrit(300.15, IS, EG, XTI);
+    const expectedTVcrit400 = computeExpectedTVcrit(400, IS, EG, XTI);
+    // Confirm they differ significantly so the test is meaningful.
+    expect(Math.abs(expectedTVcrit400 - expectedTVcrit300)).toBeGreaterThan(0.05);
+
+    const propsDefault = makeSpiceL1Props({ IS, EG, XTI });
+    const core = createSpiceL1BjtElement(1, new Map([["B", 1], ["C", 2], ["E", 3]]), [], -1, propsDefault) as any;
+    const pool = new StatePool(core.stateSize);
+    core.stateBaseOffset = 0;
+    core.initState(pool);
+    const element = withNodeIds(core, [1, 2, 3]);
+
+    function makeJctCtx(): LoadContext {
+      const solver = new SparseSolver();
+      solver.beginAssembly(10);
+      return {
+        cktMode: MODEINITJCT,
+        solver, matrix: solver,
+        rhs: new Float64Array(10), rhsOld: new Float64Array(10),
+        time: 0, dt: 0, method: "trapezoidal", order: 1,
+        deltaOld: [0, 0, 0, 0, 0, 0, 0],
+        ag: new Float64Array(7), srcFact: 1,
+        noncon: { value: 0 }, limitingCollector: null, convergenceCollector: null,
+        xfact: 1, gmin: 1e-12, reltol: 1e-3, iabstol: 1e-12,
+        temp: 300.15, vt: 0.025852, cktFixLimit: false, bypass: false, voltTol: 1e-6,
+      };
+    }
+
+    // Load at default 300.15K.
+    element.load(makeJctCtx());
+    const vbe300 = pool.states[0][0];
+    expect(Math.abs(vbe300 - expectedTVcrit300)).toBeLessThan(1e-6);
+
+    // setParam("TEMP", 400) must trigger makeTp() recompute.
+    core.setParam("TEMP", 400);
+
+    // Load again — tVcrit must reflect 400K.
+    element.load(makeJctCtx());
+    const vbe400 = pool.states[0][0];
+    expect(Math.abs(vbe400 - expectedTVcrit400)).toBeLessThan(1e-6);
+  });
+});

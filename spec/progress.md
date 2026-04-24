@@ -1037,3 +1037,51 @@ Previously-confirmed-patched files regression check: load-context.ts, ckt-contex
 - `bjt.ts` was NOT touched. The c4 branching (bjt.ts:1289) and IIR formula (bjt.ts:1540-1541) are unchanged.
 
 ### Final test count: 37/37 passing
+
+## Task 6.3.1: PMOS tVbi sign audit (#25)
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**:
+  - `src/solver/analog/__tests__/harness/tVbi-pmos.test.ts` — 4 tests verifying PMOS tVbi is bit-exact with ngspice mos1temp.c:170-174
+- **Files modified**:
+  - `src/components/semiconductors/mosfet.ts`:
+    - Removed `Math.abs(params.VTO)` call for PMOS (lines 977-983 old) — the bug where digiTS stripped the sign from VTO before computeTempParams, causing tVbi to diverge from ngspice by 2*|VTO|.
+    - Exported `computeTempParams` function and `MosfetTempParams` + `ResolvedMosfetParams` interfaces so the audit test can call them directly.
+    - Replaced the "DIVERGENCE - NOT INTENTIONAL" comment block with a correct explanation of ngspice's signed-VTO convention.
+- **Tests**: 4/4 passing (tVbi-pmos.test.ts); 74/74 passing (mosfet.test.ts)
+- **Audit result**: DIVERGENCE FOUND AND FIXED. The `Math.abs(params.VTO)` call for PMOS was causing tVbi to diverge from ngspice by exactly `2 * |VTO|` for any PMOS device. For VTO=-1.0 at TEMP=TNOM: digiTS computed tVbi ≈ +1.387 while ngspice computes tVbi ≈ -0.613, a difference of 2.0V. The fix removes the `Math.abs` call so ngspice's signed VTO convention is preserved throughout. All 4 audit tests pass bit-exact after the fix; all 74 pre-existing mosfet tests continue to pass.
+
+## Task 5.3.1: Add TEMP to BJT_PARAM_DEFS (NPN + PNP)
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: none
+- **Files modified**:
+  - `src/components/semiconductors/bjt.ts` — added `TEMP: { default: 300.15, unit: "K", description: "Per-instance operating temperature" }` to `secondary` group in `BJT_PARAM_DEFS` (NPN) and `BJT_PNP_DEFAULTS`, and to `BJT_SPICE_L1_PARAM_DEFS` (NPN and PNP)
+  - `src/components/semiconductors/__tests__/bjt.test.ts` — added `BJT TEMP` describe block with `TEMP_default_300_15`, `paramDefs_include_TEMP`, `setParam_TEMP_no_throw` tests
+- **Tests**: 3/3 passing (Wave 5.3.1 tests). 3 pre-existing failures unrelated to this task in `BJT simple LimitingEvent instrumentation` / `BJT L1 LimitingEvent instrumentation` (makeDcOpCtx missing rhsOld/matrix).
+
+## Task 5.3.2: Thread TEMP through computeBjtTempParams
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: none
+- **Files modified**:
+  - `src/components/semiconductors/bjt.ts` — dropped `T: number = 300.15` default from `computeBjtTempParams` signature (now required positional); added `TEMP: number` to the `p` parameter shape; added `TEMP: props.getModelParam<number>("TEMP")` to L0 and L1 `params` objects; updated both L0 and L1 `makeTp()` calls to pass `TEMP: params.TEMP` in the object and `params.TEMP` as the `T` argument
+  - `src/components/semiconductors/__tests__/bjt.test.ts` — added `tp_vt_reflects_TEMP`, `tSatCur_scales_with_TEMP`, `TNOM_stays_nominal` tests
+- **Tests**: 3/3 passing (Wave 5.3.2 tests).
+
+## Task 5.3.3: ctx.vt audit
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: none
+- **Files modified**:
+  - `src/components/semiconductors/__tests__/bjt.test.ts` — added `no_ctx_vt_read_in_bjt_ts` test using `require("fs").readFileSync` to assert zero `ctx.vt` occurrences in `bjt.ts`
+- **Tests**: 1/1 passing.
+
+## Task 5.3.4: setParam('TEMP', …) recomputes tp
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: none
+- **Files modified**:
+  - `src/components/semiconductors/bjt.ts` — no new changes needed; L0 and L1 `setParam` already route through `makeTp()` for all keys in `params`. Adding `TEMP` to `params` means `setParam("TEMP", newT)` triggers `makeTp()` automatically.
+  - `src/components/semiconductors/__tests__/bjt.test.ts` — added `setParam_TEMP_recomputes_tp_L0` and `setParam_TEMP_recomputes_tp_L1` tests
+- **Tests**: 2/2 passing.
