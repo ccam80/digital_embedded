@@ -535,6 +535,7 @@ describe("Task 3.2.3 — BJT L1 MODEINITPRED xfact", () => {
   });
 
   it("writes extrapolated vsubRaw then overwrites with rhsOld per bjtload.c:328-330", () => {
+    const pnjlimSpy = vi.spyOn(NewtonRaphsonModule, "pnjlim");
     const element = makeBjtL1();
     const pool = initBjtPool(element);
 
@@ -545,13 +546,47 @@ describe("Task 3.2.3 — BJT L1 MODEINITPRED xfact", () => {
     const ctx = buildBjtCtx(pool, MODETRAN | MODEINITPRED, 0.25);
     element.load(ctx);
 
-    // Extrapolated: (1+0.25)*0.01 - 0.25*0.005 = 0.0125 - 0.00125 = 0.01125
-    const expectedExtrap = (1 + 0.25) * 0.01 - 0.25 * 0.005;
-    expect((ctx as any).__phase3ProbeVsubExtrap).toBe(expectedExtrap);
-    // Final: rhsOld re-read overwrites extrapolation → 0 (all nodes at 0V)
-    expect((ctx as any).__phase3ProbeVsubFinal).toBe(0);
-    // The two values must differ — both the extrapolation and the re-read are required.
-    expect((ctx as any).__phase3ProbeVsubExtrap).not.toBe((ctx as any).__phase3ProbeVsubFinal);
+    // Runtime assertions. The intermediate extrapolation is overwritten before any
+    // observable exit point, so we assert (a) the post-overwrite value pnjlim sees,
+    // and (b) the state-copy that precedes the extrapolation.
+    //
+    // Order under L1 MODEINITPRED: BE, BC, substrate.
+    expect(pnjlimSpy.mock.calls.length).toBe(3);
+    // Substrate pnjlim first arg = vsubRaw AFTER the rhsOld re-read → 0 (all nodes 0V).
+    expect(pnjlimSpy.mock.calls[2][0]).toBe(0);
+    // Substrate pnjlim second arg = s0[VSUB] AFTER the s1→s0 copy → s1[VSUB] = 0.01.
+    expect(pnjlimSpy.mock.calls[2][1]).toBe(0.01);
+
+    // Source-text guard. The runtime path cannot observe the intermediate extrapolated
+    // value (it is overwritten). To guarantee the ngspice verbatim port of
+    // bjtload.c:304-305 (extrapolation) + :328-330 (unconditional rhsOld re-read), read
+    // bjt.ts and assert both operations are present in the L1 MODEINITPRED branch with
+    // the re-read AFTER the extrapolation.
+    const fs = require("fs");
+    const path = require("path");
+    const bjtSource: string = fs.readFileSync(
+      path.resolve(__dirname, "../bjt.ts"),
+      "utf8",
+    );
+    const predMarker = "} else if (mode & MODEINITPRED) {";
+    const firstPred = bjtSource.indexOf(predMarker);
+    expect(firstPred).toBeGreaterThan(-1);
+    const l1PredStart = bjtSource.indexOf(predMarker, firstPred + 1);
+    expect(l1PredStart).toBeGreaterThan(firstPred);
+    const predBodyEnd = bjtSource.indexOf("} else {", l1PredStart);
+    expect(predBodyEnd).toBeGreaterThan(l1PredStart);
+    const l1PredBody = bjtSource.slice(l1PredStart, predBodyEnd);
+
+    // Extrapolation line for VSUB
+    const extrapRegex = /\(1\s*\+\s*ctx\.xfact\)\s*\*\s*s1\[[^\]]*SLOT_VSUB\]\s*-\s*ctx\.xfact\s*\*\s*s2\[[^\]]*SLOT_VSUB\]/;
+    const extrapIdx = l1PredBody.search(extrapRegex);
+    expect(extrapIdx).toBeGreaterThan(-1);
+
+    // Final vsubRaw re-read (from rhsOld / polarity*subs*(...)) must follow the extrapolation.
+    const lastVsubAssign = l1PredBody.lastIndexOf("vsubRaw =");
+    expect(lastVsubAssign).toBeGreaterThan(extrapIdx);
+
+    pnjlimSpy.mockRestore();
   });
 
   it("copies s1→s0 for VBE, VBC, VSUB at the start of the PRED branch", () => {
@@ -636,6 +671,7 @@ describe("Task 3.2.3 — BJT L1 MODEINITPRED xfact", () => {
   });
 
   it("falls through to rhsOld when MODEINITPRED is not set", () => {
+    const pnjlimSpy = vi.spyOn(NewtonRaphsonModule, "pnjlim");
     const element = makeBjtL1();
     const pool = initBjtPool(element);
 
@@ -645,7 +681,12 @@ describe("Task 3.2.3 — BJT L1 MODEINITPRED xfact", () => {
     const ctx = buildBjtCtx(pool, MODETRAN | MODEINITFLOAT, 0.5, rhsOld);
     element.load(ctx);
 
-    expect((ctx as any).__phase3ProbeVbeRaw).toBe(0.7);
+    // pnjlim's first call (BE junction) receives vbeRaw — must equal the rhsOld-derived value.
+    // L1 rhsOld path calls pnjlim three times (BE + BC + substrate).
+    expect(pnjlimSpy.mock.calls.length).toBe(3);
+    expect(pnjlimSpy.mock.calls[0][0]).toBe(0.7);
+
+    pnjlimSpy.mockRestore();
   });
 });
 

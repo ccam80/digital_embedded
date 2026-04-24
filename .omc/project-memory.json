@@ -43,7 +43,7 @@
   },
   "build": {
     "buildCommand": "cd \"C:/local_working_projects/digital_in_browser\" && npx tsc --noEmit -p . 2>&1 | head -20",
-    "testCommand": "cd \"C:/local_working_projects/digital_in_browser\" && npx vitest run --testTimeout=120000 \"src/components/semiconductors/__tests__/scr.test.ts\" 2>&1 | head -80",
+    "testCommand": "cd \"C:/local_working_projects/digital_in_browser\" && npx vitest run --testTimeout=120000 src/components/semiconductors/__tests__/phase-3-xfact-predictor.test.ts src/solver/analog/__tests__/phase-3-nr-reorder.test.ts src/solver/analog/__tests__/phase-3-relay-composite.test.ts src/solver/analog/__tests__/phase-0-identifier-audit.test.ts src/solver/analog/__tests__/newton-raphson-limiting.test.ts src/components/io/__tests__/led.test.ts src/components/semiconductors/__tests__/bjt-l0-scope-comment.test.ts 2>&1 | tail -80",
     "lintCommand": "npm run lint",
     "devCommand": "npm run dev",
     "scripts": {
@@ -321,8 +321,8 @@
     },
     {
       "path": "src\\components\\io\\led.ts",
-      "accessCount": 48,
-      "lastAccessed": 1777026127018,
+      "accessCount": 49,
+      "lastAccessed": 1777026480312,
       "type": "file"
     },
     {

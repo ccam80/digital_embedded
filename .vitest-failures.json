@@ -1,10 +1,23 @@
 {
   "summary": {
-    "passed": 19,
-    "failed": 0,
+    "passed": 133,
+    "failed": 1,
     "skipped": 0,
-    "totalFiles": 1,
-    "durationSeconds": 0.6
+    "totalFiles": 7,
+    "durationSeconds": 10.1
   },
-  "failures": []
+  "failures": [
+    {
+      "message": "Cannot read properties of undefined (reading '0')",
+      "count": 1,
+      "locations": [
+        {
+          "file": "src\\components\\io\\led.ts",
+          "test": "junction_cap_transient_matches_ngspice",
+          "line": 267,
+          "column": 36
+        }
+      ]
+    }
+  ]
 }
