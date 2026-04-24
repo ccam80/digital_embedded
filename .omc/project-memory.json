@@ -43,7 +43,7 @@
   },
   "build": {
     "buildCommand": "cd \"C:/local_working_projects/digital_in_browser\" && npx tsc --noEmit 2>&1 | tail -20",
-    "testCommand": "cd \"C:/local_working_projects/digital_in_browser\" && npx vitest run --testTimeout=120000 \"src/solver/analog/__tests__/ckt-context.test.ts\" 2>&1 | tail -60",
+    "testCommand": "cd \"C:/local_working_projects/digital_in_browser\" && npx vitest run --testTimeout=120000 \"src/solver/analog/__tests__/ckt-context.test.ts\" 2>&1 | tail -30",
     "lintCommand": "npm run lint",
     "devCommand": "npm run dev",
     "scripts": {
@@ -291,14 +291,14 @@
     },
     {
       "path": "src",
-      "accessCount": 99,
-      "lastAccessed": 1777027468534,
+      "accessCount": 115,
+      "lastAccessed": 1777027999601,
       "type": "directory"
     },
     {
       "path": "spec\\progress.md",
-      "accessCount": 97,
-      "lastAccessed": 1777027426063,
+      "accessCount": 103,
+      "lastAccessed": 1777028089555,
       "type": "file"
     },
     {
@@ -309,20 +309,20 @@
     },
     {
       "path": "spec\\.context\\rules.md",
-      "accessCount": 67,
-      "lastAccessed": 1777027417775,
+      "accessCount": 69,
+      "lastAccessed": 1777027742321,
+      "type": "file"
+    },
+    {
+      "path": "spec\\test-baseline.md",
+      "accessCount": 64,
+      "lastAccessed": 1777027938439,
       "type": "file"
     },
     {
       "path": "src\\components\\io\\__tests__\\led.test.ts",
       "accessCount": 63,
       "lastAccessed": 1777027459495,
-      "type": "file"
-    },
-    {
-      "path": "spec\\test-baseline.md",
-      "accessCount": 62,
-      "lastAccessed": 1777027422341,
       "type": "file"
     },
     {
@@ -339,8 +339,8 @@
     },
     {
       "path": "spec\\.context\\lock-protocol.md",
-      "accessCount": 39,
-      "lastAccessed": 1777026958910,
+      "accessCount": 40,
+      "lastAccessed": 1777027742634,
       "type": "file"
     },
     {
@@ -369,8 +369,8 @@
     },
     {
       "path": "",
-      "accessCount": 23,
-      "lastAccessed": 1777025817709,
+      "accessCount": 25,
+      "lastAccessed": 1777027934766,
       "type": "directory"
     },
     {

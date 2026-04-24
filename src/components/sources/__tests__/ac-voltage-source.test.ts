@@ -76,6 +76,8 @@ function makeMinimalCtx(solver: unknown, _time = 0, srcFact = 1) {
     gmin: 1e-12,
     reltol: 1e-3,
     iabstol: 1e-12,
+    bypass: false,
+    voltTol: 1e-6,
   };
 }
 
@@ -425,6 +427,8 @@ describe("ac_vsource_load_srcfact_parity", () => {
       gmin: 1e-12,
       reltol: 1e-3,
       iabstol: 1e-12,
+      bypass: false,
+      voltTol: 1e-6,
     };
 
     el.load(ctx);
@@ -460,6 +464,8 @@ describe("ac_vsource_load_srcfact_parity", () => {
       gmin: 1e-12,
       reltol: 1e-3,
       iabstol: 1e-12,
+      bypass: false,
+      voltTol: 1e-6,
     };
 
     el.load(ctx);
@@ -493,6 +499,8 @@ describe("ac_vsource_load_srcfact_parity", () => {
       gmin: 1e-12,
       reltol: 1e-3,
       iabstol: 1e-12,
+      bypass: false,
+      voltTol: 1e-6,
     };
 
     el.load(ctx);

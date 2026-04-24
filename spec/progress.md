@@ -593,3 +593,27 @@
   - scr/dcop-init-jct/adc/spark-gap/ntc-thermistor: 54/75 (21 pre-existing engine crashes)
   - tunnel-diode: 10/13 (3 pre-existing engine crashes in tunnel-diode.ts:257)
   - diode/led/inductor: 163/167 (4 pre-existing failures)
+
+## Task 5.0.1: LoadContext literals — FINAL FIX PASS (5.0.loadctx round 3)
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: none
+- **Files modified**:
+  - `src/components/sources/__tests__/variable-rail.test.ts` — added `bypass: false, voltTol: 1e-6` to `makeCtx` helper literal (1 site near line 195)
+  - `src/components/sources/__tests__/ground.test.ts` — added `bypass: false, voltTol: 1e-6` to `makeLoadCtx` helper literal (1 site near line 47)
+  - `src/components/sources/__tests__/dc-voltage-source.test.ts` — added `bypass: false, voltTol: 1e-6` to `makeMinimalCtx` helper and 3 inline `ctx` literals (4 sites near lines 55, 196, 231, 264)
+  - `src/components/sources/__tests__/current-source.test.ts` — added `bypass: false, voltTol: 1e-6` to `makeMinimalCtx` helper and 3 inline `ctx` literals (4 sites near lines 55, 179, 215, 244)
+  - `src/components/sources/__tests__/ac-voltage-source.test.ts` — added `bypass: false, voltTol: 1e-6` to `makeMinimalCtx` helper and 3 inline `ctx` literals (4 sites near lines 70, 419, 454, 487)
+  - `src/components/io/__tests__/probe.test.ts` — added `bypass: false, voltTol: 1e-6` to inline `ctx` literal (1 site near line 385)
+  - `src/components/io/__tests__/analog-clock.test.ts` — added `bypass: false, voltTol: 1e-6` to inline literal in `stamp_produces_incidence_entries` test and `makeCtx` helper in `clock_load_srcfact_parity` describe (2 sites near lines 165, 205)
+  - `src/solver/analog/__tests__/behavioral-flipflop.test.ts` — added `bypass: false, voltTol: 1e-6` to `makeMinimalFlipflopCtx` helper literal (1 site, surfaced during comprehensive sweep)
+- **Tests**:
+  - `ckt-context.test.ts`: 8/9 — 1 pre-existing failure `loadCtx_fields_populated` (expects `lc.voltages` as Float64Array, but LoadContext interface has `rhsOld`/`rhs` not `voltages`; unrelated to bypass/voltTol fields; `bypass_defaults_to_false` and `voltTol_defaults_to_1e_minus_6` both PASS)
+
+### Final sweep proof
+
+Comprehensive pattern search performed after all edits. Pattern `iabstol: 1e-12,` followed by `};` on the next line across `src/` — **zero files found**. Pattern `iabstol: 1e-12,` followed by `} as LoadContext` — **zero files found**. Pattern `iabstol: 1e-12,` followed by `}` followed by `,`, `;`, or `)` — **zero files found**.
+
+All 48 files with `deltaOld: [` verified to have both `bypass: false` and `voltTol: 1e-6` in each LoadContext literal. The `iabstol: 1e-12` count (94 occurrences, 50 files) exceeds the `deltaOld: [` count because several files (`behavioral-gate.test.ts`, `behavioral-combinational.test.ts`, `behavioral-remaining.test.ts`, `polarized-cap.test.ts`, `transmission-line.test.ts`, `transformer.test.ts`) use `iabstol: 1e-12` inside NR_OPTS configuration objects (not LoadContext literals). Confirmed by inspection that all NR_OPTS usages have no `bypass`/`voltTol` requirement and no LoadContext literal in those files is unpatched.
+
+Previously-confirmed-patched files regression check: load-context.ts, ckt-context.ts (interface + defaults), ckt-context.test.ts, scr.test.ts, tunnel-diode.test.ts, dcop-init-jct.test.ts, adc.test.ts, spark-gap.test.ts, ntc-thermistor.test.ts, diode.test.ts, led.test.ts, inductor.test.ts, phase-3-relay-composite.test.ts, sparse-solver.test.ts — all confirmed still patched (zero `iabstol: 1e-12,` immediately-followed-by-closing-brace pattern match across entire src/).

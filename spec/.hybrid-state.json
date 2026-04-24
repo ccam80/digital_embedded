@@ -382,10 +382,10 @@
           "7.5.5.1"
         ]
       ],
-      "spawned": 9,
-      "completed": 9,
+      "spawned": 10,
+      "completed": 10,
       "verifications_passed": 6,
-      "verifications_failed": 2,
+      "verifications_failed": 3,
       "stops_for_clarification": 0,
       "dead_implementers": 0,
       "dead_verifiers": 0,
@@ -748,5 +748,5 @@
       "user_acks": {}
     }
   ],
-  "last_updated": "2026-04-24T10:45:47.978Z"
+  "last_updated": "2026-04-24T10:54:57.881Z"
 }

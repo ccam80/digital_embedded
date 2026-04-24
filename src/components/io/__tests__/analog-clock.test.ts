@@ -171,6 +171,8 @@ describe("AnalogClock", () => {
       gmin: 1e-12,
       reltol: 1e-3,
       iabstol: 1e-12,
+      bypass: false,
+      voltTol: 1e-6,
     });
     // nodePos=1, nodeNeg=0 (ground), branchIdx=1
     // B[1,1] = allocElement(0, 1) → stampElement(h, 1)
@@ -211,6 +213,8 @@ describe("clock_load_srcfact_parity", () => {
       gmin: 1e-12,
       reltol: 1e-3,
       iabstol: 1e-12,
+      bypass: false,
+      voltTol: 1e-6,
     };
   }
 

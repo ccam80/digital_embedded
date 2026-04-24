@@ -53,6 +53,8 @@ function makeLoadCtx(solver: SparseSolverType): LoadContext {
     gmin: 1e-12,
     reltol: 1e-3,
     iabstol: 1e-12,
+    bypass: false,
+    voltTol: 1e-6,
   };
 }
 

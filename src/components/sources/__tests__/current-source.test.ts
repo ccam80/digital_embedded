@@ -61,6 +61,8 @@ function makeMinimalCtx(solver: unknown) {
     gmin: 1e-12,
     reltol: 1e-3,
     iabstol: 1e-12,
+    bypass: false,
+    voltTol: 1e-6,
   };
 }
 
@@ -185,6 +187,8 @@ describe("isource_load_srcfact_parity", () => {
       gmin: 1e-12,
       reltol: 1e-3,
       iabstol: 1e-12,
+      bypass: false,
+      voltTol: 1e-6,
     };
 
     src.load(ctx);
@@ -221,6 +225,8 @@ describe("isource_load_srcfact_parity", () => {
       gmin: 1e-12,
       reltol: 1e-3,
       iabstol: 1e-12,
+      bypass: false,
+      voltTol: 1e-6,
     };
 
     src.load(ctx);
@@ -250,6 +256,8 @@ describe("isource_load_srcfact_parity", () => {
       gmin: 1e-12,
       reltol: 1e-3,
       iabstol: 1e-12,
+      bypass: false,
+      voltTol: 1e-6,
     };
 
     src.load(ctx);
