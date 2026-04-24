@@ -46,12 +46,18 @@ import {
   type ComponentDefinition,
 } from "../../core/registry.js";
 import { defineModelParams } from "../../core/model-params.js";
-import type { AnalogElementCore, LoadContext } from "../../solver/analog/element.js";
+import type { AnalogElementCore, LoadContext, StatePoolRef } from "../../solver/analog/element.js";
 import {
+  collectPinModelChildren,
   DigitalInputPinModel,
   DigitalOutputPinModel,
 } from "../../solver/analog/digital-pin-model.js";
 import type { ResolvedPinElectrical } from "../../core/pin-electrical.js";
+import { defineStateSchema } from "../../solver/analog/state-schema.js";
+import type { StateSchema } from "../../solver/analog/state-schema.js";
+import type { AnalogCapacitorElement } from "../passives/capacitor.js";
+
+const ADC_COMPOSITE_SCHEMA: StateSchema = defineStateSchema("ADCComposite", []);
 
 // ---------------------------------------------------------------------------
 // Model parameter declarations
@@ -365,10 +371,28 @@ function createADCElement(
     return Math.min(maxCode, Math.max(0, Math.floor(normalised * (1 << bits))));
   }
 
+  const allPins = [vinPin, clkPin, eocPin, ...digitalPins];
+  const childElements: readonly AnalogCapacitorElement[] = collectPinModelChildren(allPins);
+  const stateSize = childElements.reduce((s, c) => s + c.stateSize, 0);
+
   return {
     branchIndex: -1,
     isNonlinear: true,
-    isReactive: true,
+    get isReactive(): boolean { return childElements.length > 0; },
+
+    poolBacked: true as const,
+    stateSchema: ADC_COMPOSITE_SCHEMA,
+    stateSize,
+    stateBaseOffset: -1,
+
+    initState(_pool: StatePoolRef): void {
+      let offset = (this as { stateBaseOffset: number }).stateBaseOffset;
+      for (const child of childElements) {
+        child.stateBaseOffset = offset;
+        child.initState(_pool);
+        offset += child.stateSize;
+      }
+    },
 
     load(ctx: LoadContext): void {
       // Input loading — VIN and CLK pins
@@ -380,11 +404,12 @@ function createADCElement(
       for (let i = 0; i < bits; i++) {
         if (nDigital[i] > 0) digitalPins[i].load(ctx);
       }
+
+      for (const child of childElements) { child.load(ctx); }
     },
 
     accept(ctx: LoadContext, _simTime: number, _addBreakpoint: (t: number) => void): void {
       const voltages = ctx.rhs;
-      const dt = ctx.dt;
       const clkVoltage = readVoltage(voltages, nClk);
       const risingEdge = prevClkVoltage < p.vIH && clkVoltage >= p.vIH;
       prevClkVoltage = clkVoltage;
@@ -409,17 +434,6 @@ function createADCElement(
               eocPin.setLogicLevel(true);
             }
           }
-        }
-      }
-
-      // Update companion model state for accepted timestep
-      if (dt > 0) {
-        if (nVin > 0) vinPin.accept(ctx, readVoltage(voltages, nVin));
-        if (nClk > 0) clkPin.accept(ctx, clkVoltage);
-        if (nEoc > 0) eocPin.accept(ctx, readVoltage(voltages, nEoc));
-        for (let i = 0; i < bits; i++) {
-          const n = nDigital[i];
-          if (n > 0) digitalPins[i].accept(ctx, readVoltage(voltages, n));
         }
       }
     },

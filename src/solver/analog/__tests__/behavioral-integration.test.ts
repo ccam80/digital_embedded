@@ -49,8 +49,34 @@ import {
 } from "../digital-pin-model.js";
 import type { ResolvedPinElectrical } from "../../../core/pin-electrical.js";
 import type { AnalogElement } from "../element.js";
+import { isPoolBacked } from "../element.js";
 import { PropertyBag } from "../../../core/properties.js";
 import { MODETRAN, MODEINITFLOAT } from "../ckt-mode.js";
+
+/**
+ * Allocate a StatePool sized for all pool-backed elements in the array,
+ * assign stateBaseOffset to each, and call initState. Mirrors the compiler's
+ * state-pool allocation loop so integration tests that build circuits manually
+ * produce valid CompiledAnalogCircuit objects.
+ */
+function makeStatePool(elements: AnalogElement[]): StatePool {
+  let totalSize = 0;
+  for (const el of elements) {
+    if (isPoolBacked(el)) {
+      totalSize += el.stateSize;
+    }
+  }
+  const pool = new StatePool(totalSize);
+  let offset = 0;
+  for (const el of elements) {
+    if (isPoolBacked(el)) {
+      el.stateBaseOffset = offset;
+      el.initState(pool);
+      offset += el.stateSize;
+    }
+  }
+  return pool;
+}
 
 // ---------------------------------------------------------------------------
 // Shared electrical constants
@@ -142,7 +168,7 @@ function buildAndGateCircuit(
     matrixSize: 5,
     elements,
     labelToNodeId: new Map([["out", 3]]),
-    statePool: new StatePool(0),
+    statePool: makeStatePool(elements),
   };
 }
 
@@ -203,7 +229,7 @@ function buildHighImpedanceSourceCircuit(): ConcreteCompiledAnalogCircuit {
     matrixSize: 6,
     elements,
     labelToNodeId: new Map(),
-    statePool: new StatePool(0),
+    statePool: makeStatePool(elements),
   };
 }
 
@@ -269,7 +295,7 @@ function buildDffToggleCircuit(): {
     matrixSize: 4,
     elements,
     labelToNodeId: new Map([["Q", 3], ["QB", 4]]),
-    statePool: new StatePool(0),
+    statePool: makeStatePool(elements),
   };
 
   return { circuit, clockPin, dPin, qPin, qBarPin, element };
@@ -421,15 +447,16 @@ describe("Integration", () => {
     const vsB = makeVoltageSource(2, 0, 4, 3.3);
     const rLoad = makeResistor(3, 0, LOAD_R);
 
+    const elements = [vsA, vsB, rLoad, withNodeIds(andGate, [1, 2, 3])];
     const circuit: ConcreteCompiledAnalogCircuit = {
       netCount: 3,
       componentCount: 4,
       nodeCount: 3,
       branchCount: 2,
       matrixSize: 5,
-      elements: [vsA, vsB, rLoad, withNodeIds(andGate, [1, 2, 3])],
+      elements,
       labelToNodeId: new Map(),
-      statePool: new StatePool(0),
+      statePool: makeStatePool(elements),
     };
 
     engine.init(circuit);
@@ -580,15 +607,16 @@ describe("Integration", () => {
     const vsB = makeVoltageSource(2, 0, 4, 3.3);
     const rLoad = makeResistor(3, 0, LOAD_R);
 
+    const elements = [vsA, vsB, rLoad, andGate];
     const circuit: ConcreteCompiledAnalogCircuit = {
       netCount: 3,
       componentCount: 4,
       nodeCount: 3,
       branchCount: 2,
       matrixSize: 5,
-      elements: [vsA, vsB, rLoad, andGate],
+      elements,
       labelToNodeId: new Map(),
-      statePool: new StatePool(0),
+      statePool: makeStatePool(elements),
     };
 
     engine.init(circuit);
@@ -621,15 +649,16 @@ describe("Integration", () => {
     const rLoadQ = makeResistor(3, 0, LOAD_R);
     const rLoadQBar = makeResistor(4, 0, LOAD_R);
 
+    const elements = [rLoadQ, rLoadQBar, dff];
     const circuit: ConcreteCompiledAnalogCircuit = {
       netCount: 4,
       componentCount: 3,
       nodeCount: 4,
       branchCount: 0,
       matrixSize: 4,
-      elements: [rLoadQ, rLoadQBar, dff],
+      elements,
       labelToNodeId: new Map(),
-      statePool: new StatePool(0),
+      statePool: makeStatePool(elements),
     };
 
     engine.init(circuit);

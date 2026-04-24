@@ -1,261 +1,33 @@
 {
   "summary": {
-    "passed": 216,
-    "failed": 37,
-    "skipped": 10,
-    "totalFiles": 28,
-    "durationSeconds": 3.6
+    "passed": 7,
+    "failed": 3,
+    "skipped": 0,
+    "totalFiles": 1,
+    "durationSeconds": 0.4
   },
   "failures": [
     {
-      "message": "Cannot read properties of undefined (reading '1')",
-      "count": 24,
+      "message": "Cannot read properties of undefined (reading 'states')",
+      "count": 3,
       "locations": [
         {
           "file": "src\\components\\passives\\capacitor.ts",
-          "test": "rc-step: runs to stopTime without collapse",
-          "line": 272,
+          "test": "loaded output adapter stamps rOut conductance on node diagonal",
+          "line": 254,
           "column": 27
         },
         {
           "file": "src\\components\\passives\\capacitor.ts",
-          "test": "rc-ac-lowpass: runs to stopTime without collapse",
-          "line": 272,
-          "column": 27
-        },
-        {
-          "file": "src\\components\\passives\\inductor.ts",
-          "test": "rl-step: runs to stopTime without collapse",
-          "line": 340,
-          "column": 26
-        },
-        {
-          "file": "src\\components\\passives\\inductor.ts",
-          "test": "rl-ac: runs to stopTime without collapse",
-          "line": 340,
-          "column": 26
-        },
-        {
-          "file": "src\\components\\passives\\inductor.ts",
-          "test": "rlc-ringdown: runs to stopTime without collapse",
-          "line": 340,
-          "column": 26
-        },
-        {
-          "file": "src\\components\\passives\\inductor.ts",
-          "test": "ourSession has at least 2 steps (boot + at least one transient step)",
-          "line": 340,
-          "column": 26
-        },
-        {
-          "file": "src\\components\\passives\\inductor.ts",
-          "test": "step 0 has stepStartTime === 0",
-          "line": 340,
-          "column": 26
-        },
-        {
-          "file": "src\\components\\passives\\inductor.ts",
-          "test": "step 0 has at least 2 attempts (DCOP attempt + tranInit attempt)",
-          "line": 340,
-          "column": 26
-        },
-        {
-          "file": "src\\components\\passives\\inductor.ts",
-          "test": "step 0 contains a DCOP-phase attempt",
-          "line": 340,
-          "column": 26
-        },
-        {
-          "file": "src\\components\\passives\\inductor.ts",
-          "test": "step 0 contains a transient-phase attempt (tranInit or tranNR)",
-          "line": 340,
-          "column": 26
-        },
-        {
-          "file": "src\\components\\passives\\inductor.ts",
-          "test": "acceptedAttemptIndex points at a transient-phase attempt (not a DCOP sub-solve)",
-          "line": 340,
-          "column": 26
-        },
-        {
-          "file": "src\\components\\passives\\inductor.ts",
-          "test": "step 0 accepted === true",
-          "line": 340,
-          "column": 26
-        },
-        {
-          "file": "src\\components\\passives\\inductor.ts",
-          "test": "subsequent steps have stepStartTime > 0",
-          "line": 340,
-          "column": 26
-        },
-        {
-          "file": "src\\components\\passives\\capacitor.ts",
-          "test": "rc-step.dts: ComparisonSession.ngspiceSession exposes Q/CCAP on capacitor",
-          "line": 272,
+          "test": "input adapter loaded stamps rIn on node diagonal",
+          "line": 254,
           "column": 27
         },
         {
           "file": "src\\components\\passives\\capacitor.ts",
-          "test": "rc-step.dts: getAttempt(tranNR) exposes Q/CCAP on CVC in ngspice elementStates",
-          "line": 272,
+          "test": "setParam('rOut', 50) hot-updates output adapter conductance",
+          "line": 254,
           "column": 27
-        },
-        {
-          "file": "src\\components\\passives\\inductor.ts",
-          "test": "lteDt_captured_from_ours: lteDt is finite positive on every accepted transient step",
-          "line": 340,
-          "column": 26
-        },
-        {
-          "file": "src\\components\\passives\\capacitor.ts",
-          "test": "5-step self-compare returns presenceCounts: { both: 5, oursOnly: 0, ngspiceOnly: 0 }",
-          "line": 272,
-          "column": 27
-        },
-        {
-          "file": "src\\components\\passives\\capacitor.ts",
-          "test": "truncated ourSession reports presence: ngspiceOnly for the missing tail",
-          "line": 272,
-          "column": 27
-        },
-        {
-          "file": "src\\components\\passives\\capacitor.ts",
-          "test": "returns null for t > simTime",
-          "line": 272,
-          "column": 27
-        },
-        {
-          "file": "src\\components\\passives\\inductor.ts",
-          "test": "creates session and runs transient",
-          "line": 340,
-          "column": 26
-        },
-        {
-          "file": "src\\components\\passives\\capacitor.ts",
-          "test": "self-compare: timeAlign=true and false both return equal indices",
-          "line": 272,
-          "column": 27
-        },
-        {
-          "file": "src\\components\\passives\\capacitor.ts",
-          "test": "rc-step.dts yields >= 3 distinct stepEndTime values",
-          "line": 272,
-          "column": 27
-        },
-        {
-          "file": "src\\components\\passives\\capacitor.ts",
-          "test": "rc-step.dts exposes at least steps 0, 1, 2, 3 with distinct endTimes",
-          "line": 272,
-          "column": 27
-        },
-        {
-          "file": "src\\components\\passives\\capacitor.ts",
-          "test": "dumps s0/s1/s2 for Vc across every iteration of steps 0-4",
-          "line": 272,
-          "column": 27
-        }
-      ]
-    },
-    {
-      "message": "Cannot read properties of undefined (reading '6')",
-      "count": 4,
-      "locations": [
-        {
-          "file": "src\\components\\passives\\inductor.ts",
-          "test": "transient: CCAP in capacitor and BJT junctions over first steps/retries",
-          "line": 340,
-          "column": 26
-        },
-        {
-          "file": "src\\components\\passives\\inductor.ts",
-          "test": "transient: inductor current divergence over iterations in step 1",
-          "line": 340,
-          "column": 26
-        },
-        {
-          "file": "src\\components\\passives\\inductor.ts",
-          "test": "transient: PNP BJT internal node agreement in step 1",
-          "line": 340,
-          "column": 26
-        },
-        {
-          "file": "src\\components\\passives\\inductor.ts",
-          "test": "8. per-element convergence: our engine reports failures",
-          "line": 340,
-          "column": 26
-        }
-      ]
-    },
-    {
-      "message": "inductor NG_VOLT (INDvolt) must be surfaced on at least one step: expected false to be true // Object.is equality",
-      "count": 1,
-      "locations": [
-        {
-          "file": "src\\solver\\analog\\__tests__\\harness\\cap-ind-state-probe.test.ts",
-          "test": "RL transient: direct bridge surfaces PHI and NG_VOLT on L1",
-          "line": 233,
-          "column": 98
-        }
-      ]
-    },
-    {
-      "message": "Cannot read properties of null (reading 'steps')",
-      "count": 7,
-      "locations": [
-        {
-          "file": "src\\solver\\analog\\__tests__\\harness\\step-alignment.test.ts",
-          "test": "both engines produce steps",
-          "line": 56,
-          "column": 32
-        },
-        {
-          "file": "src\\solver\\analog\\__tests__\\harness\\step-alignment.test.ts",
-          "test": "every paired step has a finite stepStartTimeDelta",
-          "line": 66,
-          "column": 42
-        },
-        {
-          "file": "src\\solver\\analog\\__tests__\\harness\\step-alignment.test.ts",
-          "test": "first step of both engines has stepStartTime === 0",
-          "line": 78,
-          "column": 32
-        },
-        {
-          "file": "src\\solver\\analog\\__tests__\\harness\\step-alignment.test.ts",
-          "test": "index-paired steps report stepStartTimeDelta = ours.stepStartTime - ng.stepStartTime",
-          "line": 83,
-          "column": 42
-        },
-        {
-          "file": "src\\solver\\analog\\__tests__\\harness\\step-alignment.test.ts",
-          "test": "stepStartTime values are monotonically non-decreasing in both engines",
-          "line": 99,
-          "column": 42
-        },
-        {
-          "file": "src\\solver\\analog\\__tests__\\harness\\step-alignment.test.ts",
-          "test": "timeAlign=true pairs a mid-run step by time when step counts differ",
-          "line": 109,
-          "column": 42
-        },
-        {
-          "file": "src\\solver\\analog\\__tests__\\harness\\step-alignment.test.ts",
-          "test": "timeAlign=false pairs by positional index (ngspiceStepIndex === ourStepIndex)",
-          "line": 129,
-          "column": 42
-        }
-      ]
-    },
-    {
-      "message": "ComparisonSession: call runDcOp() or runTransient() first",
-      "count": 1,
-      "locations": [
-        {
-          "file": "src\\solver\\analog\\__tests__\\harness\\comparison-session.ts",
-          "test": "session has steps on both sides (presence counts have both > 0)",
-          "line": 2518,
-          "column": 13
         }
       ]
     }

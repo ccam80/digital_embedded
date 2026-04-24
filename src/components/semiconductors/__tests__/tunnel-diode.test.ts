@@ -360,6 +360,31 @@ describe("TunnelDiode", () => {
     expect((TunnelDiodeDefinition.modelRegistry?.["behavioral"] as {kind:"inline";factory:AnalogFactory}|undefined)?.factory).toBeDefined();
     expect(TunnelDiodeDefinition.category).toBe("SEMICONDUCTORS");
   });
+
+  it("cap_state_schema_has_no_cap_geq_ieq_v_slots", () => {
+    const core = createTunnelDiodeElement(
+      new Map([["A", 1], ["K", 2]]),
+      [],
+      -1,
+      makeParamBag({ ...TD_MODEL_PARAMS, CJO: 5e-12 }),
+    );
+    const schema = (core as any).stateSchema;
+    expect(schema.indexOf.get("CAP_GEQ")).toBeUndefined();
+    expect(schema.indexOf.get("CAP_IEQ")).toBeUndefined();
+    expect(schema.indexOf.get("V")).toBeUndefined();
+  });
+
+  it("cap_state_size_is_six", () => {
+    const core = createTunnelDiodeElement(
+      new Map([["A", 1], ["K", 2]]),
+      [],
+      -1,
+      makeParamBag({ ...TD_MODEL_PARAMS, CJO: 5e-12 }),
+    );
+    const schema = (core as any).stateSchema;
+    expect(schema.size).toBe(6);
+    expect(core.stateSize).toBe(6);
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -400,7 +425,7 @@ describe("integration", () => {
       makeParamBag(modelParams),
     );
 
-    const pool = new StatePool(9);
+    const pool = new StatePool(6);
     (core as any).stateBaseOffset = 0;
     core.initState(pool);
 
@@ -408,11 +433,11 @@ describe("integration", () => {
     // from clamping vdNew away from vd (which would make expected values wrong).
     pool.state0[0] = vd;
 
-    // Seed previous-step charge in s1[SLOT_Q=7]
+    // Seed previous-step charge in s1[SLOT_Q=4]
     const prevVd = 0.18;
     const { i: prevId } = tunnelDiodeIV(prevVd, IP, VP, IV, VV, IS, N);
     const q1_val = computeJunctionCharge(prevVd, CJO, VJ, M, FC, TT, prevId);
-    pool.state1[7] = q1_val;
+    pool.state1[4] = q1_val;
 
     // Real SparseSolver — anode=node 1 mapped to row 0, cathode=ground.
     const solver = new SparseSolver();

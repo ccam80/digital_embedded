@@ -149,8 +149,7 @@ export function tunnelDiodeIV(
 
 // Slot index constants — shared between both schema variants.
 const SLOT_VD = 0, SLOT_GEQ = 1, SLOT_IEQ = 2, SLOT_ID = 3;
-const SLOT_CAP_GEQ = 4, SLOT_CAP_IEQ = 5, SLOT_V = 6, SLOT_Q = 7;
-const SLOT_CCAP = 8;
+const SLOT_Q = 4, SLOT_CCAP = 5;
 
 /** Schema for resistive tunnel diode (no junction capacitance): 4 slots. */
 const TUNNEL_DIODE_STATE_SCHEMA = defineStateSchema("TunnelDiodeElement", [
@@ -160,17 +159,14 @@ const TUNNEL_DIODE_STATE_SCHEMA = defineStateSchema("TunnelDiodeElement", [
   { name: "ID",  doc: "Diode current (A)",                    init: { kind: "zero" } },
 ]);
 
-/** Schema for capacitive tunnel diode (CJO > 0 or TT > 0): 9 slots. */
+/** Schema for capacitive tunnel diode (CJO > 0 or TT > 0): 6 slots. */
 const TUNNEL_DIODE_CAP_STATE_SCHEMA = defineStateSchema("TunnelDiodeElement_cap", [
-  { name: "VD",      doc: "Tunnel diode junction voltage (V)",                      init: { kind: "zero" } },
-  { name: "GEQ",     doc: "Differential conductance (S)",                           init: { kind: "constant", value: 1e-12 } },
-  { name: "IEQ",     doc: "Linearized current source (A)",                          init: { kind: "zero" } },
-  { name: "ID",      doc: "Diode current (A)",                                      init: { kind: "zero" } },
-  { name: "CAP_GEQ", doc: "Junction-capacitance companion conductance",             init: { kind: "zero" } },
-  { name: "CAP_IEQ", doc: "Junction-capacitance companion history current",         init: { kind: "zero" } },
-  { name: "V",       doc: "Junction voltage at current step (for companion)",       init: { kind: "zero" } },
-  { name: "Q",       doc: "Junction charge at current step (history from s1/s2/s3)", init: { kind: "zero" } },
-  { name: "CCAP",    doc: "Companion current (NIintegrate)",                        init: { kind: "zero" } },
+  { name: "VD",   doc: "Tunnel diode junction voltage (V)",              init: { kind: "zero" } },
+  { name: "GEQ",  doc: "Differential conductance (S)",                   init: { kind: "constant", value: 1e-12 } },
+  { name: "IEQ",  doc: "Linearized current source (A)",                  init: { kind: "zero" } },
+  { name: "ID",   doc: "Diode current (A)",                              init: { kind: "zero" } },
+  { name: "Q",    doc: "Junction charge (NIintegrate history from s1/s2/s3)", init: { kind: "zero" } },
+  { name: "CCAP", doc: "Companion current (NIintegrate history)",        init: { kind: "zero" } },
 ]);
 
 // ---------------------------------------------------------------------------
@@ -229,7 +225,7 @@ export function createTunnelDiodeElement(
     isNonlinear: true,
     isReactive: hasCapacitance,
     poolBacked: true as const,
-    stateSize: hasCapacitance ? 9 : 4,
+    stateSize: hasCapacitance ? 6 : 4,
     stateSchema: hasCapacitance ? TUNNEL_DIODE_CAP_STATE_SCHEMA : TUNNEL_DIODE_STATE_SCHEMA,
     stateBaseOffset: -1,
 
@@ -309,9 +305,6 @@ export function createTunnelDiodeElement(
           ccapPrev,
         );
         const capIeq = ccap - capGeq * vdNew;
-        s0[base + SLOT_CAP_GEQ] = capGeq;
-        s0[base + SLOT_CAP_IEQ] = capIeq;
-        s0[base + SLOT_V] = vdNew;
         s0[base + SLOT_Q] = q0;
         s0[base + SLOT_CCAP] = ccap;
 

@@ -13,14 +13,22 @@
  * writes (the underlying pin model early-exits).
  */
 
-import type { AnalogElement, LoadContext } from "./element.js";
+import type { AnalogElement, ReactiveAnalogElement } from "./element.js";
+import { isPoolBacked } from "./element.js";
+import type { LoadContext, StatePoolRef } from "./element.js";
 import type { ResolvedPinElectrical } from "../../core/pin-electrical.js";
 import {
   DigitalOutputPinModel,
   DigitalInputPinModel,
   readMnaVoltage,
+  collectPinModelChildren,
 } from "./digital-pin-model.js";
-import { MODETRAN } from "./ckt-mode.js";
+import type { AnalogCapacitorElement } from "../../components/passives/capacitor.js";
+import { defineStateSchema } from "./state-schema.js";
+import type { StateSchema } from "./state-schema.js";
+
+// Empty composite schema for adapter elements — children carry their own schemas.
+const BRIDGE_COMPOSITE_SCHEMA: StateSchema = defineStateSchema("BridgeAdapterComposite", []);
 
 // ---------------------------------------------------------------------------
 // BridgeOutputAdapter
@@ -37,10 +45,11 @@ import { MODETRAN } from "./ckt-mode.js";
  * handled by re-stamping the branch equation on the next load() call, not via
  * NR convergence.
  *
- * isReactive is a getter — true only when loaded and cOut > 0.
+ * isReactive is a getter — true only when the capacitor child is present.
  */
 export class BridgeOutputAdapter implements AnalogElement {
   private readonly _pinModel: DigitalOutputPinModel;
+  private readonly _childElements: AnalogCapacitorElement[];
 
   readonly pinNodeIds: readonly number[];
   readonly allNodeIds: readonly number[];
@@ -48,6 +57,12 @@ export class BridgeOutputAdapter implements AnalogElement {
   readonly branchIndex: number;
   readonly isNonlinear: false = false;
   label?: string;
+
+  readonly poolBacked = true as const;
+  readonly stateSchema: StateSchema = BRIDGE_COMPOSITE_SCHEMA;
+  stateSize: number;
+  stateBaseOffset = -1;
+  private _pool!: StatePoolRef;
 
   /**
    * @param pinModel  - Initialised DigitalOutputPinModel for this bridge pin
@@ -64,16 +79,25 @@ export class BridgeOutputAdapter implements AnalogElement {
     this.pinNodeIds = [pinModel.nodeId];
     this.allNodeIds = [pinModel.nodeId];
     this.internalNodeLabels = [];
+    this._childElements = collectPinModelChildren([pinModel]);
+    this.stateSize = this._childElements.reduce((s, c) => s + c.stateSize, 0);
   }
 
   /**
-   * True only when loaded and cOut > 0.
-   *
-   * The timestep controller reads this flag to decide whether to stamp the
-   * C_out companion model inside load() during transient solves.
+   * True only when the capacitor child is present (loaded and cOut > 0).
    */
   get isReactive(): boolean {
-    return this._pinModel.loaded && this._pinModel.capacitance > 0;
+    return this._childElements.length > 0;
+  }
+
+  initState(pool: StatePoolRef): void {
+    this._pool = pool;
+    let offset = this.stateBaseOffset;
+    for (const child of this._childElements) {
+      child.stateBaseOffset = offset;
+      child.initState(pool);
+      offset += child.stateSize;
+    }
   }
 
   /**
@@ -100,31 +124,13 @@ export class BridgeOutputAdapter implements AnalogElement {
   /**
    * Unified per-NR-iteration load. Stamps the ideal voltage source branch
    * equation (vOH/vOL or Hi-Z) and, during transient solves, the C_out
-   * companion model. Matches ngspice DEVload: one call per element per NR
-   * iteration that reads state and writes conductance/RHS.
-   *
-   * Logic level is owned by the coordinator (setLogicLevel / setHighZ) —
-   * load() does not read the MNA solution to drive a Norton/Thevenin choice;
-   * the branch equation enforces the coordinator-set target.
+   * companion model via child elements.
    */
   load(ctx: LoadContext): void {
     this._pinModel.load(ctx);
-  }
-
-  /**
-   * Post-accepted-step update for the C_out companion state.
-   *
-   * Active for transient solves AND post-DCOP priming (dt=0, ag[0]=0):
-   * the ngspice DEVaccept analog runs after CKTop with MODETRAN set so that
-   * _prevVoltage is seeded with the DCOP node voltage before the first
-   * transient NR stamps a companion. Without this, the companion injects a
-   * fictitious step-change from _prevVoltage=0 and LTE destabilises.
-   */
-  accept(ctx: LoadContext, _simTime: number, _addBreakpoint: (t: number) => void): void {
-    if (!this._pinModel.loaded || this._pinModel.capacitance <= 0) return;
-    if (!(ctx.cktMode & MODETRAN)) return;
-    const v = readMnaVoltage(this._pinModel.nodeId, ctx.rhs);
-    this._pinModel.accept(ctx, v);
+    for (const child of this._childElements) {
+      child.load(ctx);
+    }
   }
 
   /**
@@ -162,10 +168,11 @@ export class BridgeOutputAdapter implements AnalogElement {
  * digital engine.
  *
  * isNonlinear is false — input loading is a linear resistor.
- * isReactive is a getter — true only when loaded and cIn > 0.
+ * isReactive is a getter — true only when the capacitor child is present.
  */
 export class BridgeInputAdapter implements AnalogElement {
   private readonly _pinModel: DigitalInputPinModel;
+  private readonly _childElements: AnalogCapacitorElement[];
 
   readonly pinNodeIds: readonly number[];
   readonly allNodeIds: readonly number[];
@@ -173,6 +180,12 @@ export class BridgeInputAdapter implements AnalogElement {
   readonly branchIndex: number = -1;
   readonly isNonlinear: false = false;
   label?: string;
+
+  readonly poolBacked = true as const;
+  readonly stateSchema: StateSchema = BRIDGE_COMPOSITE_SCHEMA;
+  stateSize: number;
+  stateBaseOffset = -1;
+  private _pool!: StatePoolRef;
 
   /**
    * @param pinModel - Initialised DigitalInputPinModel for this bridge pin.
@@ -184,13 +197,25 @@ export class BridgeInputAdapter implements AnalogElement {
     this.pinNodeIds = [pinModel.nodeId];
     this.allNodeIds = [pinModel.nodeId];
     this.internalNodeLabels = [];
+    this._childElements = collectPinModelChildren([pinModel]);
+    this.stateSize = this._childElements.reduce((s, c) => s + c.stateSize, 0);
   }
 
   /**
-   * True only when loaded and cIn > 0.
+   * True only when the capacitor child is present (loaded and cIn > 0).
    */
   get isReactive(): boolean {
-    return this._pinModel.loaded && this._pinModel.capacitance > 0;
+    return this._childElements.length > 0;
+  }
+
+  initState(pool: StatePoolRef): void {
+    this._pool = pool;
+    let offset = this.stateBaseOffset;
+    for (const child of this._childElements) {
+      child.stateBaseOffset = offset;
+      child.initState(pool);
+      offset += child.stateSize;
+    }
   }
 
   /** Hot-update a single electrical parameter on the underlying pin model. */
@@ -201,25 +226,13 @@ export class BridgeInputAdapter implements AnalogElement {
   /**
    * Unified per-NR-iteration load. Stamps the input loading conductance
    * 1/rIn (no-op when unloaded) and, during transient solves, the C_in
-   * companion model. Matches ngspice DEVload.
+   * companion model via child elements.
    */
   load(ctx: LoadContext): void {
     this._pinModel.load(ctx);
-  }
-
-  /**
-   * Post-accepted-step update for the C_in companion state.
-   *
-   * Active for transient solves AND post-DCOP priming (dt=0, ag[0]=0):
-   * the ngspice DEVaccept analog runs after CKTop with MODETRAN set so that
-   * _prevVoltage is seeded with the DCOP node voltage before the first
-   * transient NR stamps a companion.
-   */
-  accept(ctx: LoadContext, _simTime: number, _addBreakpoint: (t: number) => void): void {
-    if (!this._pinModel.loaded || this._pinModel.capacitance <= 0) return;
-    if (!(ctx.cktMode & MODETRAN)) return;
-    const v = readMnaVoltage(this._pinModel.nodeId, ctx.rhs);
-    this._pinModel.accept(ctx, v);
+    for (const child of this._childElements) {
+      child.load(ctx);
+    }
   }
 
   /**

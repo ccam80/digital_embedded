@@ -6,11 +6,12 @@
  * iteration. Selector bits are read via threshold detection, the appropriate
  * data routing is performed, and output pin Norton equivalents are re-stamped.
  *
- * Pin capacitance companion models are stamped inside load() during transient
- * analysis and updated in accept() once per accepted timestep.
+ * Pin capacitance companion models are stamped inside load() via capacitor
+ * children of the pin models.
  */
 
-import type { AnalogElementCore, LoadContext } from "./element.js";
+import type { LoadContext } from "./element.js";
+import type { StatePoolRef } from "./element.js";
 import type { PropertyBag } from "../../core/properties.js";
 import type { ResolvedPinElectrical } from "../../core/pin-electrical.js";
 import {
@@ -18,8 +19,15 @@ import {
   DigitalOutputPinModel,
   readMnaVoltage,
   delegatePinSetParam,
+  collectPinModelChildren,
 } from "./digital-pin-model.js";
+import type { AnalogCapacitorElement } from "../../components/passives/capacitor.js";
 import type { AnalogElementFactory } from "./behavioral-gate.js";
+import { defineStateSchema } from "./state-schema.js";
+import type { StateSchema } from "./state-schema.js";
+
+// Empty composite schema — children carry their own schemas.
+const COMBINATIONAL_COMPOSITE_SCHEMA: StateSchema = defineStateSchema("BehavioralCombinationalComposite", []);
 
 // ---------------------------------------------------------------------------
 // Shared fallback electrical spec (CMOS 3.3 V defaults)
@@ -57,18 +65,24 @@ const FALLBACK_SPEC: ResolvedPinElectrical = {
  * The sel pin nodeId is treated as the first node; additional selector bit
  * nodes follow immediately.
  */
-export class BehavioralMuxElement implements AnalogElementCore {
+export class BehavioralMuxElement {
   private readonly _selPins: DigitalInputPinModel[];
   private readonly _dataPins: DigitalInputPinModel[][];
   private readonly _outPins: DigitalOutputPinModel[];
   private readonly _bitWidth: number;
   private readonly _pinModelsByLabel: ReadonlyMap<string, DigitalInputPinModel | DigitalOutputPinModel>;
+  private readonly _childElements: AnalogCapacitorElement[];
 
   pinNodeIds!: readonly number[];  // set by compiler via Object.assign after factory returns
   readonly branchIndex: number = -1;
   readonly isNonlinear: true = true;
-  readonly isReactive: true = true;
   label?: string;
+
+  readonly poolBacked = true as const;
+  readonly stateSchema: StateSchema = COMBINATIONAL_COMPOSITE_SCHEMA;
+  stateSize: number;
+  stateBaseOffset = -1;
+  private _pool!: StatePoolRef;
 
   constructor(
     selPins: DigitalInputPinModel[],
@@ -83,6 +97,32 @@ export class BehavioralMuxElement implements AnalogElementCore {
     this._outPins = outPins;
     this._bitWidth = bitWidth;
     this._pinModelsByLabel = pinModelsByLabel;
+
+    const allPins: (DigitalInputPinModel | DigitalOutputPinModel)[] = [
+      ...selPins,
+      ...dataPins.flat(),
+      ...outPins,
+    ];
+    this._childElements = collectPinModelChildren(allPins);
+    this.stateSize = this._childElements.reduce((s, c) => s + c.stateSize, 0);
+  }
+
+  get isReactive(): boolean {
+    return this._childElements.length > 0;
+  }
+
+  initState(pool: StatePoolRef): void {
+    this._pool = pool;
+    let offset = this.stateBaseOffset;
+    for (const child of this._childElements) {
+      child.stateBaseOffset = offset;
+      child.initState(pool);
+      offset += child.stateSize;
+    }
+  }
+
+  checkConvergence(ctx: LoadContext): boolean {
+    return this._childElements.every(c => !c.checkConvergence || c.checkConvergence(ctx));
   }
 
   load(ctx: LoadContext): void {
@@ -118,22 +158,14 @@ export class BehavioralMuxElement implements AnalogElementCore {
       this._outPins[bit].setLogicLevel(outLevel);
       this._outPins[bit].load(ctx);
     }
+
+    for (const child of this._childElements) {
+      child.load(ctx);
+    }
   }
 
-  accept(ctx: LoadContext, _simTime: number, _addBreakpoint: (t: number) => void): void {
-    if (ctx.dt <= 0) return;
-    const voltages = ctx.rhs;
-    for (const p of this._selPins) {
-      p.accept(ctx, readMnaVoltage(p.nodeId, voltages));
-    }
-    for (const group of this._dataPins) {
-      for (const p of group) {
-        p.accept(ctx, readMnaVoltage(p.nodeId, voltages));
-      }
-    }
-    for (const p of this._outPins) {
-      p.accept(ctx, readMnaVoltage(p.nodeId, voltages));
-    }
+  accept(_ctx: LoadContext, _simTime: number, _addBreakpoint: (t: number) => void): void {
+    // No accept() work needed — capacitors handle their own state via load()
   }
 
   /**
@@ -183,18 +215,24 @@ export class BehavioralMuxElement implements AnalogElementCore {
  * The selected output receives the input signal level; all other outputs
  * are driven LOW (vOL).
  */
-export class BehavioralDemuxElement implements AnalogElementCore {
+export class BehavioralDemuxElement {
   private readonly _selPins: DigitalInputPinModel[];
   private readonly _inPin: DigitalInputPinModel;
   private readonly _outPins: DigitalOutputPinModel[];
   private readonly _outputCount: number;
   private readonly _pinModelsByLabel: ReadonlyMap<string, DigitalInputPinModel | DigitalOutputPinModel>;
+  private readonly _childElements: AnalogCapacitorElement[];
 
   pinNodeIds!: readonly number[];  // set by compiler via Object.assign after factory returns
   readonly branchIndex: number = -1;
   readonly isNonlinear: true = true;
-  readonly isReactive: true = true;
   label?: string;
+
+  readonly poolBacked = true as const;
+  readonly stateSchema: StateSchema = COMBINATIONAL_COMPOSITE_SCHEMA;
+  stateSize: number;
+  stateBaseOffset = -1;
+  private _pool!: StatePoolRef;
 
   constructor(
     selPins: DigitalInputPinModel[],
@@ -208,6 +246,32 @@ export class BehavioralDemuxElement implements AnalogElementCore {
     this._outPins = outPins;
     this._outputCount = outputCount;
     this._pinModelsByLabel = pinModelsByLabel;
+
+    const allPins: (DigitalInputPinModel | DigitalOutputPinModel)[] = [
+      ...selPins,
+      inPin,
+      ...outPins,
+    ];
+    this._childElements = collectPinModelChildren(allPins);
+    this.stateSize = this._childElements.reduce((s, c) => s + c.stateSize, 0);
+  }
+
+  get isReactive(): boolean {
+    return this._childElements.length > 0;
+  }
+
+  initState(pool: StatePoolRef): void {
+    this._pool = pool;
+    let offset = this.stateBaseOffset;
+    for (const child of this._childElements) {
+      child.stateBaseOffset = offset;
+      child.initState(pool);
+      offset += child.stateSize;
+    }
+  }
+
+  checkConvergence(ctx: LoadContext): boolean {
+    return this._childElements.every(c => !c.checkConvergence || c.checkConvergence(ctx));
   }
 
   load(ctx: LoadContext): void {
@@ -239,18 +303,14 @@ export class BehavioralDemuxElement implements AnalogElementCore {
       this._outPins[i].setLogicLevel(i === sel ? inLevel : false);
       this._outPins[i].load(ctx);
     }
+
+    for (const child of this._childElements) {
+      child.load(ctx);
+    }
   }
 
-  accept(ctx: LoadContext, _simTime: number, _addBreakpoint: (t: number) => void): void {
-    if (ctx.dt <= 0) return;
-    const voltages = ctx.rhs;
-    for (const p of this._selPins) {
-      p.accept(ctx, readMnaVoltage(p.nodeId, voltages));
-    }
-    this._inPin.accept(ctx, readMnaVoltage(this._inPin.nodeId, voltages));
-    for (const p of this._outPins) {
-      p.accept(ctx, readMnaVoltage(p.nodeId, voltages));
-    }
+  accept(_ctx: LoadContext, _simTime: number, _addBreakpoint: (t: number) => void): void {
+    // No accept() work needed — capacitors handle their own state via load()
   }
 
   /**
@@ -295,17 +355,23 @@ export class BehavioralDemuxElement implements AnalogElementCore {
  * Exactly one output is driven HIGH (the one indexed by the selector value);
  * all others are driven LOW.
  */
-export class BehavioralDecoderElement implements AnalogElementCore {
+export class BehavioralDecoderElement {
   private readonly _selPins: DigitalInputPinModel[];
   private readonly _outPins: DigitalOutputPinModel[];
   private readonly _outputCount: number;
   private readonly _pinModelsByLabel: ReadonlyMap<string, DigitalInputPinModel | DigitalOutputPinModel>;
+  private readonly _childElements: AnalogCapacitorElement[];
 
   pinNodeIds!: readonly number[];  // set by compiler via Object.assign after factory returns
   readonly branchIndex: number = -1;
   readonly isNonlinear: true = true;
-  readonly isReactive: true = true;
   label?: string;
+
+  readonly poolBacked = true as const;
+  readonly stateSchema: StateSchema = COMBINATIONAL_COMPOSITE_SCHEMA;
+  stateSize: number;
+  stateBaseOffset = -1;
+  private _pool!: StatePoolRef;
 
   constructor(
     selPins: DigitalInputPinModel[],
@@ -317,6 +383,31 @@ export class BehavioralDecoderElement implements AnalogElementCore {
     this._outPins = outPins;
     this._outputCount = outputCount;
     this._pinModelsByLabel = pinModelsByLabel;
+
+    const allPins: (DigitalInputPinModel | DigitalOutputPinModel)[] = [
+      ...selPins,
+      ...outPins,
+    ];
+    this._childElements = collectPinModelChildren(allPins);
+    this.stateSize = this._childElements.reduce((s, c) => s + c.stateSize, 0);
+  }
+
+  get isReactive(): boolean {
+    return this._childElements.length > 0;
+  }
+
+  initState(pool: StatePoolRef): void {
+    this._pool = pool;
+    let offset = this.stateBaseOffset;
+    for (const child of this._childElements) {
+      child.stateBaseOffset = offset;
+      child.initState(pool);
+      offset += child.stateSize;
+    }
+  }
+
+  checkConvergence(ctx: LoadContext): boolean {
+    return this._childElements.every(c => !c.checkConvergence || c.checkConvergence(ctx));
   }
 
   load(ctx: LoadContext): void {
@@ -342,17 +433,14 @@ export class BehavioralDecoderElement implements AnalogElementCore {
       this._outPins[i].setLogicLevel(i === sel);
       this._outPins[i].load(ctx);
     }
+
+    for (const child of this._childElements) {
+      child.load(ctx);
+    }
   }
 
-  accept(ctx: LoadContext, _simTime: number, _addBreakpoint: (t: number) => void): void {
-    if (ctx.dt <= 0) return;
-    const voltages = ctx.rhs;
-    for (const p of this._selPins) {
-      p.accept(ctx, readMnaVoltage(p.nodeId, voltages));
-    }
-    for (const p of this._outPins) {
-      p.accept(ctx, readMnaVoltage(p.nodeId, voltages));
-    }
+  accept(_ctx: LoadContext, _simTime: number, _addBreakpoint: (t: number) => void): void {
+    // No accept() work needed — capacitors handle their own state via load()
   }
 
   /**

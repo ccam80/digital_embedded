@@ -7,15 +7,23 @@
  * driven by extracting individual bits from the internal count/value.
  */
 
-import type { AnalogElementCore, LoadContext } from "./element.js";
+import type { LoadContext } from "./element.js";
+import type { StatePoolRef } from "./element.js";
 import type { ResolvedPinElectrical } from "../../core/pin-electrical.js";
 import {
   DigitalInputPinModel,
   DigitalOutputPinModel,
   readMnaVoltage,
   delegatePinSetParam,
+  collectPinModelChildren,
 } from "./digital-pin-model.js";
+import type { AnalogCapacitorElement } from "../../components/passives/capacitor.js";
 import type { AnalogElementFactory } from "./behavioral-gate.js";
+import { defineStateSchema } from "./state-schema.js";
+import type { StateSchema } from "./state-schema.js";
+
+// Empty composite schema — children carry their own schemas.
+const SEQUENTIAL_COMPOSITE_SCHEMA: StateSchema = defineStateSchema("BehavioralSequentialComposite", []);
 
 // ---------------------------------------------------------------------------
 // Shared fallback spec
@@ -50,12 +58,13 @@ const FALLBACK_SPEC: ResolvedPinElectrical = {
  * Rising-edge detection uses _prevClockVoltage stored after each accepted
  * timestep.
  */
-export class BehavioralCounterElement implements AnalogElementCore {
+export class BehavioralCounterElement {
   private readonly _clockPin: DigitalInputPinModel;
   private readonly _enPin: DigitalInputPinModel;
   private readonly _clrPin: DigitalInputPinModel;
   private readonly _outBitPins: DigitalOutputPinModel[];
   private readonly _ovfPin: DigitalOutputPinModel;
+  private readonly _childElements: AnalogCapacitorElement[];
 
   private readonly _bitWidth: number;
   private readonly _maxValue: number;
@@ -69,8 +78,13 @@ export class BehavioralCounterElement implements AnalogElementCore {
   pinNodeIds!: readonly number[];  // set by compiler via Object.assign after factory returns
   readonly branchIndex: number = -1;
   readonly isNonlinear: true = true;
-  readonly isReactive: true = true;
   label?: string;
+
+  readonly poolBacked = true as const;
+  readonly stateSchema: StateSchema = SEQUENTIAL_COMPOSITE_SCHEMA;
+  stateSize: number;
+  stateBaseOffset = -1;
+  private _pool!: StatePoolRef;
 
   constructor(
     enPin: DigitalInputPinModel,
@@ -92,6 +106,30 @@ export class BehavioralCounterElement implements AnalogElementCore {
     this._maxValue = bitWidth >= 32 ? 0xFFFFFFFF : (1 << bitWidth) - 1;
     this._vIH = vIH;
     this._pinModelsByLabel = pinModelsByLabel;
+
+    const allPins: (DigitalInputPinModel | DigitalOutputPinModel)[] = [
+      enPin, clockPin, clrPin, ...outBitPins, ovfPin,
+    ];
+    this._childElements = collectPinModelChildren(allPins);
+    this.stateSize = this._childElements.reduce((s, c) => s + c.stateSize, 0);
+  }
+
+  get isReactive(): boolean {
+    return this._childElements.length > 0;
+  }
+
+  initState(pool: StatePoolRef): void {
+    this._pool = pool;
+    let offset = this.stateBaseOffset;
+    for (const child of this._childElements) {
+      child.stateBaseOffset = offset;
+      child.initState(pool);
+      offset += child.stateSize;
+    }
+  }
+
+  checkConvergence(ctx: LoadContext): boolean {
+    return this._childElements.every(c => !c.checkConvergence || c.checkConvergence(ctx));
   }
 
   initVoltages(rhs: Float64Array): void {
@@ -112,12 +150,15 @@ export class BehavioralCounterElement implements AnalogElementCore {
     const ovf = this._count === this._maxValue;
     this._ovfPin.setLogicLevel(ovf);
     this._ovfPin.load(ctx);
+
+    for (const child of this._childElements) {
+      child.load(ctx);
+    }
   }
 
   /**
-   * Rising-edge detection, count update, clear handling, and companion state
-   * update — called once per accepted timestep with the accepted solution
-   * voltages.
+   * Rising-edge detection, count update, and clear handling — called once
+   * per accepted timestep with the accepted solution voltages.
    */
   accept(ctx: LoadContext, _simTime: number, _addBreakpoint: (t: number) => void): void {
     const voltages = ctx.rhs;
@@ -147,16 +188,6 @@ export class BehavioralCounterElement implements AnalogElementCore {
     }
 
     this._prevClockVoltage = currentClockV;
-
-    // Delegate companion updates to pin models.
-    this._enPin.accept(ctx, readMnaVoltage(this._enPin.nodeId, voltages));
-    this._clockPin.accept(ctx, currentClockV);
-    this._clrPin.accept(ctx, readMnaVoltage(this._clrPin.nodeId, voltages));
-
-    for (const pin of this._outBitPins) {
-      pin.accept(ctx, readMnaVoltage(pin.nodeId, voltages));
-    }
-    this._ovfPin.accept(ctx, readMnaVoltage(this._ovfPin.nodeId, voltages));
   }
 
   /**
@@ -215,11 +246,12 @@ export class BehavioralCounterElement implements AnalogElementCore {
  *
  * On rising clock edge with en=1: latches all data inputs to outputs.
  */
-export class BehavioralRegisterElement implements AnalogElementCore {
+export class BehavioralRegisterElement {
   private readonly _clockPin: DigitalInputPinModel;
   private readonly _enPin: DigitalInputPinModel;
   private readonly _dataPins: DigitalInputPinModel[];
   private readonly _outBitPins: DigitalOutputPinModel[];
+  private readonly _childElements: AnalogCapacitorElement[];
 
   private readonly _bitWidth: number;
   private _storedValue = 0;
@@ -231,8 +263,13 @@ export class BehavioralRegisterElement implements AnalogElementCore {
   pinNodeIds!: readonly number[];  // set by compiler via Object.assign after factory returns
   readonly branchIndex: number = -1;
   readonly isNonlinear: true = true;
-  readonly isReactive: true = true;
   label?: string;
+
+  readonly poolBacked = true as const;
+  readonly stateSchema: StateSchema = SEQUENTIAL_COMPOSITE_SCHEMA;
+  stateSize: number;
+  stateBaseOffset = -1;
+  private _pool!: StatePoolRef;
 
   constructor(
     dataPins: DigitalInputPinModel[],
@@ -251,6 +288,30 @@ export class BehavioralRegisterElement implements AnalogElementCore {
     this._bitWidth = bitWidth;
     this._vIH = vIH;
     this._pinModelsByLabel = pinModelsByLabel;
+
+    const allPins: (DigitalInputPinModel | DigitalOutputPinModel)[] = [
+      ...dataPins, clockPin, enPin, ...outBitPins,
+    ];
+    this._childElements = collectPinModelChildren(allPins);
+    this.stateSize = this._childElements.reduce((s, c) => s + c.stateSize, 0);
+  }
+
+  get isReactive(): boolean {
+    return this._childElements.length > 0;
+  }
+
+  initState(pool: StatePoolRef): void {
+    this._pool = pool;
+    let offset = this.stateBaseOffset;
+    for (const child of this._childElements) {
+      child.stateBaseOffset = offset;
+      child.initState(pool);
+      offset += child.stateSize;
+    }
+  }
+
+  checkConvergence(ctx: LoadContext): boolean {
+    return this._childElements.every(c => !c.checkConvergence || c.checkConvergence(ctx));
   }
 
   initVoltages(rhs: Float64Array): void {
@@ -270,12 +331,15 @@ export class BehavioralRegisterElement implements AnalogElementCore {
       this._outBitPins[bit].setLogicLevel(high);
       this._outBitPins[bit].load(ctx);
     }
+
+    for (const child of this._childElements) {
+      child.load(ctx);
+    }
   }
 
   /**
-   * Rising-edge detection, parallel-load latching on en=high, and companion
-   * state update — called once per accepted timestep with the accepted
-   * solution voltages.
+   * Rising-edge detection and parallel-load latching on en=high — called once
+   * per accepted timestep with the accepted solution voltages.
    */
   accept(ctx: LoadContext, _simTime: number, _addBreakpoint: (t: number) => void): void {
     const voltages = ctx.rhs;
@@ -303,17 +367,6 @@ export class BehavioralRegisterElement implements AnalogElementCore {
     }
 
     this._prevClockVoltage = currentClockV;
-
-    // Delegate companion updates to pin models.
-    for (const pin of this._dataPins) {
-      pin.accept(ctx, readMnaVoltage(pin.nodeId, voltages));
-    }
-    this._clockPin.accept(ctx, currentClockV);
-    this._enPin.accept(ctx, readMnaVoltage(this._enPin.nodeId, voltages));
-
-    for (const pin of this._outBitPins) {
-      pin.accept(ctx, readMnaVoltage(pin.nodeId, voltages));
-    }
   }
 
   get storedValue(): number {
@@ -443,7 +496,7 @@ export function makeBehavioralCounterAnalogFactory(): AnalogElementFactory {
  * dir=0 → count up; dir=1 → count down.
  * ovf=1 when: counting up and count==maxValue, or counting down and count==0.
  */
-export class BehavioralCounterPresetElement implements AnalogElementCore {
+export class BehavioralCounterPresetElement {
   private readonly _enPin: DigitalInputPinModel;
   private readonly _clockPin: DigitalInputPinModel;
   private readonly _dirPin: DigitalInputPinModel;
@@ -452,6 +505,7 @@ export class BehavioralCounterPresetElement implements AnalogElementCore {
   private readonly _clrPin: DigitalInputPinModel;
   private readonly _outBitPins: DigitalOutputPinModel[];
   private readonly _ovfPin: DigitalOutputPinModel;
+  private readonly _childElements: AnalogCapacitorElement[];
 
   private readonly _bitWidth: number;
   private readonly _maxValue: number;
@@ -465,8 +519,13 @@ export class BehavioralCounterPresetElement implements AnalogElementCore {
   pinNodeIds!: readonly number[];  // set by compiler via Object.assign after factory returns
   readonly branchIndex: number = -1;
   readonly isNonlinear: true = true;
-  readonly isReactive: true = true;
   label?: string;
+
+  readonly poolBacked = true as const;
+  readonly stateSchema: StateSchema = SEQUENTIAL_COMPOSITE_SCHEMA;
+  stateSize: number;
+  stateBaseOffset = -1;
+  private _pool!: StatePoolRef;
 
   constructor(
     enPin: DigitalInputPinModel,
@@ -495,6 +554,30 @@ export class BehavioralCounterPresetElement implements AnalogElementCore {
     this._maxValue = maxValue;
     this._vIH = vIH;
     this._pinModelsByLabel = pinModelsByLabel;
+
+    const allPins: (DigitalInputPinModel | DigitalOutputPinModel)[] = [
+      enPin, clockPin, dirPin, ...inBitPins, ldPin, clrPin, ...outBitPins, ovfPin,
+    ];
+    this._childElements = collectPinModelChildren(allPins);
+    this.stateSize = this._childElements.reduce((s, c) => s + c.stateSize, 0);
+  }
+
+  get isReactive(): boolean {
+    return this._childElements.length > 0;
+  }
+
+  initState(pool: StatePoolRef): void {
+    this._pool = pool;
+    let offset = this.stateBaseOffset;
+    for (const child of this._childElements) {
+      child.stateBaseOffset = offset;
+      child.initState(pool);
+      offset += child.stateSize;
+    }
+  }
+
+  checkConvergence(ctx: LoadContext): boolean {
+    return this._childElements.every(c => !c.checkConvergence || c.checkConvergence(ctx));
   }
 
   initVoltages(rhs: Float64Array): void {
@@ -530,12 +613,15 @@ export class BehavioralCounterPresetElement implements AnalogElementCore {
     );
     this._ovfPin.setLogicLevel(atOverflow && enHigh === true);
     this._ovfPin.load(ctx);
+
+    for (const child of this._childElements) {
+      child.load(ctx);
+    }
   }
 
   /**
-   * Rising-edge detection, up/down count / load / clear priority resolution,
-   * and companion state update — called once per accepted timestep with the
-   * accepted solution voltages.
+   * Rising-edge detection, up/down count / load / clear priority resolution —
+   * called once per accepted timestep with the accepted solution voltages.
    */
   accept(ctx: LoadContext, _simTime: number, _addBreakpoint: (t: number) => void): void {
     const voltages = ctx.rhs;
@@ -590,21 +676,6 @@ export class BehavioralCounterPresetElement implements AnalogElementCore {
     }
 
     this._prevClockVoltage = currentClockV;
-
-    // Delegate companion updates to pin models.
-    this._enPin.accept(ctx, readMnaVoltage(this._enPin.nodeId, voltages));
-    this._clockPin.accept(ctx, currentClockV);
-    this._dirPin.accept(ctx, readMnaVoltage(this._dirPin.nodeId, voltages));
-    for (const pin of this._inBitPins) {
-      pin.accept(ctx, readMnaVoltage(pin.nodeId, voltages));
-    }
-    this._ldPin.accept(ctx, readMnaVoltage(this._ldPin.nodeId, voltages));
-    this._clrPin.accept(ctx, readMnaVoltage(this._clrPin.nodeId, voltages));
-
-    for (const pin of this._outBitPins) {
-      pin.accept(ctx, readMnaVoltage(pin.nodeId, voltages));
-    }
-    this._ovfPin.accept(ctx, readMnaVoltage(this._ovfPin.nodeId, voltages));
   }
 
   getPinCurrents(voltages: Float64Array): number[] {

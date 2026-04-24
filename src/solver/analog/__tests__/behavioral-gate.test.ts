@@ -649,15 +649,17 @@ describe("Task 6.4.3 — _pinLoading propagation and delegation", () => {
     expect(outLoadSpy).toHaveBeenCalledWith(ctx);
   });
 
-  it("gate_accept_delegates_to_pin_models", () => {
-    // Monkey-patch each pin model's accept() with a spy; assert each is called
-    // with the voltage from ctx.voltages at that pin's node index.
+  it("gate_accept_is_noop_pin_models_have_no_accept", () => {
+    // Since Task 0.2.3, pin model companion state is managed by AnalogCapacitorElement
+    // children aggregated into the owning element's pool-backed composite.
+    // DigitalInputPinModel and DigitalOutputPinModel no longer have an accept() method.
+    // BehavioralGateElement.accept() is a no-op.
     const inA = new DigitalInputPinModel(CMOS_3V3, true);
-    inA.init(1, -1); // MNA node 1 → solver index 0 (0-based)
+    inA.init(1, -1);
     const inB = new DigitalInputPinModel(CMOS_3V3, true);
-    inB.init(2, -1); // MNA node 2 → solver index 1
+    inB.init(2, -1);
     const out = new DigitalOutputPinModel(CMOS_3V3, false, "direct");
-    out.init(3, -1); // MNA node 3 → solver index 2
+    out.init(3, -1);
 
     const gate = new BehavioralGateElement(
       [inA, inB],
@@ -667,25 +669,14 @@ describe("Task 6.4.3 — _pinLoading propagation and delegation", () => {
     );
     withNodeIds(gate, [1, 2, 3]);
 
-    const inAAcceptSpy = vi.spyOn(inA, "accept");
-    const inBAcceptSpy = vi.spyOn(inB, "accept");
-    const outAcceptSpy = vi.spyOn(out, "accept");
+    // Pin models have no accept() method
+    expect(typeof (inA as any).accept).toBe("undefined");
+    expect(typeof (inB as any).accept).toBe("undefined");
+    expect(typeof (out as any).accept).toBe("undefined");
 
-    // Set specific voltages at each node
-    const voltages = new Float64Array(16);
-    voltages[0] = 3.3; // node 1 (MNA) → index 0
-    voltages[1] = 0.0; // node 2 (MNA) → index 1
-    voltages[2] = 3.3; // node 3 (MNA) → index 2
-
-    // dt must be > 0 to trigger accept delegation (gate.accept returns early if dt<=0)
-    const ctx = { ...makeMinimalCtx(voltages), dt: 1e-9 };
-
-    gate.accept(ctx, 0, () => {});
-
-    // Each pin's accept should be called with the voltage at its node
-    expect(inAAcceptSpy).toHaveBeenCalledWith(ctx, voltages[0]);
-    expect(inBAcceptSpy).toHaveBeenCalledWith(ctx, voltages[1]);
-    expect(outAcceptSpy).toHaveBeenCalledWith(ctx, voltages[2]);
+    // BehavioralGateElement has no accept() method — combinational elements
+    // are stateless between timesteps; companion history lives in capacitor children.
+    expect(typeof (gate as any).accept).toBe("undefined");
   });
 
   it("gate_output_uses_direct_role", () => {

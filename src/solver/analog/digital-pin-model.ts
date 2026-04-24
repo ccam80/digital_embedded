@@ -7,13 +7,18 @@
  *
  * DigitalInputPinModel is sense-only by default:
  *   - When loaded, stamps 1/rIn on the node diagonal.
- *   - Companion model for C_in only when loaded and cIn > 0.
+ *   - Companion model for C_in via AnalogCapacitorElement child when loaded and cIn > 0.
  *   - Threshold detection always available regardless of loaded flag.
+ *
+ * Both classes expose getChildElements() so owning elements can aggregate
+ * capacitor children into their own composite state-pool layout, following
+ * the TransmissionLineElement composite pattern.
  */
 
 import type { LoadContext } from "./load-context.js";
 import type { ResolvedPinElectrical } from "../../core/pin-electrical.js";
-import { MODETRAN } from "./ckt-mode.js";
+import type { AnalogElement, ReactiveAnalogElement } from "./element.js";
+import { AnalogCapacitorElement } from "../../components/passives/capacitor.js";
 
 /**
  * Read voltage for an MNA node from the solver solution vector.
@@ -35,7 +40,8 @@ export function readMnaVoltage(nodeId: number, voltages: Float64Array): number {
  * role "direct": conductance+current-source (for behavioural elements).
  *
  * Loading (rOut, cOut) is stamped only when the loaded flag is true.
- * Companion integration is inline via ctx.ag[] — no external helper calls.
+ * When loaded and cOut > 0 an AnalogCapacitorElement child handles companion
+ * integration via the owning element's state-pool composite.
  */
 export class DigitalOutputPinModel {
   private _spec: ResolvedPinElectrical;
@@ -54,8 +60,8 @@ export class DigitalOutputPinModel {
   /** True when in Hi-Z state. */
   private _hiZ = false;
 
-  private _prevVoltage = 0;
-  private _prevCurrent = 0;
+  /** AnalogCapacitorElement child — allocated when loaded && cOut > 0 after init(). */
+  private _capacitorChild: AnalogCapacitorElement | null = null;
 
   /** Cached matrix handles — allocated on first load(), keyed by role. */
   private _handlesInit = false;
@@ -78,11 +84,20 @@ export class DigitalOutputPinModel {
    * branchIdx is the absolute row/col in the augmented MNA matrix
    * (= totalNodeCount + assignedBranchOffset). Pass -1 for direct-role pins
    * (no branch variable needed).
+   *
+   * Creates the AnalogCapacitorElement child when loaded and cOut > 0.
    */
   init(nodeId: number, branchIdx: number): void {
     this._nodeId = nodeId;
     this._branchIdx = branchIdx;
     this._handlesInit = false;
+    if (this._loaded && this._spec.cOut > 0 && nodeId > 0) {
+      const cap = new AnalogCapacitorElement(this._spec.cOut, 0, 0, 0, 300.15, 1, 1);
+      cap.pinNodeIds = [nodeId, 0];
+      this._capacitorChild = cap;
+    } else {
+      this._capacitorChild = null;
+    }
   }
 
   /** Set the output logic level. High → vOH, low → vOL. */
@@ -106,6 +121,17 @@ export class DigitalOutputPinModel {
   get loaded(): boolean { return this._loaded; }
 
   /**
+   * Returns the capacitor child element for state-pool composite aggregation.
+   * Non-empty only when loaded && cOut > 0 and init() has been called.
+   */
+  getChildElements(): readonly AnalogCapacitorElement[] {
+    if (this._capacitorChild !== null) {
+      return [this._capacitorChild];
+    }
+    return [];
+  }
+
+  /**
    * Unified per-NR-iteration load. Dispatches on role:
    *
    * "branch": stamps ideal voltage-source branch equation.
@@ -113,13 +139,10 @@ export class DigitalOutputPinModel {
    *   Hi-Z mode:   branch eq enforces I = 0.
    *   If loaded:   1/rOut (drive) or 1/rHiZ (Hi-Z) on node diagonal.
    *
-   * "direct": stamps conductance+current-source (Norton equivalent).
+   * "direct": stamps conductance+current-source Norton equivalent.
    *   Drive mode:  1/rOut diagonal + V_target/rOut RHS.
    *   Hi-Z mode:   1/rHiZ diagonal only.
    *   (loaded flag governs whether these stamps happen at all for "direct".)
-   *
-   * When loaded and cOut > 0 and (ctx.cktMode & MODETRAN): inline companion stamp
-   * using ctx.ag[] — no external integrateCapacitor helper.
    */
   load(ctx: LoadContext): void {
     const node = this._nodeId;
@@ -173,39 +196,6 @@ export class DigitalOutputPinModel {
         solver.stampRHS(nodeIdx, (this._high ? this._spec.vOH : this._spec.vOL) * gOut);
       }
     }
-
-    // Inline companion stamp for C_out (transient, loaded, cOut > 0)
-    if (this._loaded && this._spec.cOut > 0 && (ctx.cktMode & MODETRAN) !== 0 && ctx.dt > 0) {
-      const C = this._spec.cOut;
-      const ag0 = ctx.ag[0];
-      const ag1 = ctx.ag[1] ?? 0;
-      const q0 = C * this._prevVoltage;
-      const q1 = C * this._prevVoltage;
-      const geq = ag0 * C;
-      const ccap = ag0 * (q0 - q1) + ag1 * this._prevCurrent;
-      const ceq = ccap - geq * this._prevVoltage;
-      solver.stampElement(this._hNodeDiag, geq);
-      solver.stampRHS(nodeIdx, -ceq);
-    }
-  }
-
-  /**
-   * Post-accepted-timestep companion state update.
-   * Updates _prevVoltage and _prevCurrent from the accepted solution.
-   */
-  accept(ctx: LoadContext, voltage: number): void {
-    if (!this._loaded) return;
-    const C = this._spec.cOut;
-    if (C <= 0) return;
-    const ag0 = ctx.ag[0] ?? 0;
-    const ag1 = ctx.ag[1] ?? 0;
-    const q0 = C * voltage;
-    const q1 = C * this._prevVoltage;
-    const geq = ag0 * C;
-    const ccap = ag0 * (q0 - q1) + ag1 * this._prevCurrent;
-    const iNow = geq * voltage - (ccap - geq * voltage);
-    this._prevCurrent = iNow;
-    this._prevVoltage = voltage;
   }
 
   /** The node ID assigned by init(). */
@@ -257,7 +247,9 @@ export class DigitalOutputPinModel {
  * Stamps the analog equivalent of one digital input pin into the MNA matrix.
  *
  * Sense-only by default — threshold detection is always available.
- * When loaded, stamps 1/rIn on the node diagonal and cIn companion model.
+ * When loaded, stamps 1/rIn on the node diagonal.
+ * When loaded and cIn > 0 an AnalogCapacitorElement child handles companion
+ * integration via the owning element's state-pool composite.
  */
 export class DigitalInputPinModel {
   private _spec: ResolvedPinElectrical;
@@ -266,8 +258,8 @@ export class DigitalInputPinModel {
   /** Node this pin reads. Set by init(). */
   private _nodeId = -1;
 
-  private _prevVoltage = 0;
-  private _prevCurrent = 0;
+  /** AnalogCapacitorElement child — allocated when loaded && cIn > 0 after init(). */
+  private _capacitorChild: AnalogCapacitorElement | null = null;
 
   /** Cached matrix handle for node diagonal. */
   private _hNodeDiag = -1;
@@ -280,10 +272,18 @@ export class DigitalInputPinModel {
 
   /**
    * Assign the node this pin reads.
+   * Creates the AnalogCapacitorElement child when loaded and cIn > 0.
    */
   init(nodeId: number, _groundNode: number): void {
     this._nodeId = nodeId;
     this._handlesInit = false;
+    if (this._loaded && this._spec.cIn > 0 && nodeId > 0) {
+      const cap = new AnalogCapacitorElement(this._spec.cIn, 0, 0, 0, 300.15, 1, 1);
+      cap.pinNodeIds = [nodeId, 0];
+      this._capacitorChild = cap;
+    } else {
+      this._capacitorChild = null;
+    }
   }
 
   /** Hot-update a single electrical parameter on this pin model. */
@@ -297,11 +297,20 @@ export class DigitalInputPinModel {
   get loaded(): boolean { return this._loaded; }
 
   /**
+   * Returns the capacitor child element for state-pool composite aggregation.
+   * Non-empty only when loaded && cIn > 0 and init() has been called.
+   */
+  getChildElements(): readonly AnalogCapacitorElement[] {
+    if (this._capacitorChild !== null) {
+      return [this._capacitorChild];
+    }
+    return [];
+  }
+
+  /**
    * Unified per-NR-iteration load.
    *
    * No-op when !_loaded. When loaded, stamps 1/rIn on the node diagonal.
-   * When loaded and cIn > 0 and (ctx.cktMode & MODETRAN): inline companion stamp
-   * using ctx.ag[] — no external integrateCapacitor helper.
    */
   load(ctx: LoadContext): void {
     if (!this._loaded) return;
@@ -316,39 +325,6 @@ export class DigitalInputPinModel {
     }
 
     solver.stampElement(this._hNodeDiag, 1 / this._spec.rIn);
-
-    // Inline companion stamp for C_in (transient, cIn > 0)
-    if (this._spec.cIn > 0 && (ctx.cktMode & MODETRAN) !== 0 && ctx.dt > 0) {
-      const C = this._spec.cIn;
-      const ag0 = ctx.ag[0];
-      const ag1 = ctx.ag[1] ?? 0;
-      const q0 = C * this._prevVoltage;
-      const q1 = C * this._prevVoltage;
-      const geq = ag0 * C;
-      const ccap = ag0 * (q0 - q1) + ag1 * this._prevCurrent;
-      const ceq = ccap - geq * this._prevVoltage;
-      solver.stampElement(this._hNodeDiag, geq);
-      solver.stampRHS(nodeIdx, -ceq);
-    }
-  }
-
-  /**
-   * Post-accepted-timestep companion state update.
-   * Updates _prevVoltage and _prevCurrent from the accepted solution.
-   */
-  accept(ctx: LoadContext, voltage: number): void {
-    if (!this._loaded) return;
-    const C = this._spec.cIn;
-    if (C <= 0) return;
-    const ag0 = ctx.ag[0] ?? 0;
-    const ag1 = ctx.ag[1] ?? 0;
-    const q0 = C * voltage;
-    const q1 = C * this._prevVoltage;
-    const geq = ag0 * C;
-    const ccap = ag0 * (q0 - q1) + ag1 * this._prevCurrent;
-    const iNow = geq * voltage - (ccap - geq * voltage);
-    this._prevCurrent = iNow;
-    this._prevVoltage = voltage;
   }
 
   /**
@@ -381,7 +357,7 @@ export class DigitalInputPinModel {
 }
 
 // ---------------------------------------------------------------------------
-// Shared delegation helper for elements that own pin models
+// Shared delegation helpers for elements that own pin models
 // ---------------------------------------------------------------------------
 
 /**
@@ -410,4 +386,23 @@ export function delegatePinSetParam(
     return true;
   }
   return false;
+}
+
+/**
+ * Collect AnalogCapacitorElement children from an array of pin models.
+ *
+ * Owning elements call this after constructing all pin models to build
+ * their _childElements array for state-pool composite aggregation.
+ * Follows the TransmissionLineElement composite pattern.
+ */
+export function collectPinModelChildren(
+  pinModels: readonly (DigitalInputPinModel | DigitalOutputPinModel)[],
+): AnalogCapacitorElement[] {
+  const result: AnalogCapacitorElement[] = [];
+  for (const model of pinModels) {
+    for (const child of model.getChildElements()) {
+      result.push(child);
+    }
+  }
+  return result;
 }

@@ -14,7 +14,7 @@
  * threshold.
  */
 
-import type { AnalogElementCore, LoadContext } from "./element.js";
+import type { AnalogElementCore, LoadContext, StatePoolRef } from "./element.js";
 import type { PropertyBag } from "../../core/properties.js";
 import type { ResolvedPinElectrical } from "../../core/pin-electrical.js";
 import {
@@ -22,7 +22,14 @@ import {
   DigitalOutputPinModel,
   readMnaVoltage,
   delegatePinSetParam,
+  collectPinModelChildren,
 } from "./digital-pin-model.js";
+import type { AnalogCapacitorElement } from "../../components/passives/capacitor.js";
+import { defineStateSchema } from "./state-schema.js";
+import type { StateSchema } from "./state-schema.js";
+
+// Empty composite schema — children carry their own schemas.
+const GATE_COMPOSITE_SCHEMA: StateSchema = defineStateSchema("BehavioralGateComposite", []);
 
 // ---------------------------------------------------------------------------
 // GateTruthTable — pure function mapping logic levels to output
@@ -63,14 +70,13 @@ export type AnalogElementFactory = (
  * Unified load() protocol (ngspice DEVload):
  *   load()   — delegates input/output pin stamping to pin models, evaluates
  *              the truth table from current NR-iterate voltages.
- *   accept() — delegates companion state update to pin models after each
- *              accepted timestep.
  */
 export class BehavioralGateElement implements AnalogElementCore {
   private readonly _inputs: DigitalInputPinModel[];
   private readonly _output: DigitalOutputPinModel;
   private readonly _truthTable: GateTruthTable;
   private readonly _pinModelsByLabel: ReadonlyMap<string, DigitalInputPinModel | DigitalOutputPinModel>;
+  private readonly _childElements: AnalogCapacitorElement[];
 
   /** Latched logic levels per input — persist across timesteps. */
   private readonly _latchedLevels: boolean[];
@@ -78,8 +84,13 @@ export class BehavioralGateElement implements AnalogElementCore {
   pinNodeIds!: readonly number[];  // set by compiler via Object.assign after factory returns
   readonly branchIndex: number = -1;
   readonly isNonlinear: true = true;
-  readonly isReactive: true = true;
   label?: string;
+
+  readonly poolBacked = true as const;
+  readonly stateSchema: StateSchema = GATE_COMPOSITE_SCHEMA;
+  stateSize: number;
+  stateBaseOffset = -1;
+  private _pool!: StatePoolRef;
 
   constructor(
     inputs: DigitalInputPinModel[],
@@ -92,6 +103,22 @@ export class BehavioralGateElement implements AnalogElementCore {
     this._truthTable = truthTable;
     this._latchedLevels = new Array<boolean>(inputs.length).fill(false);
     this._pinModelsByLabel = pinModelsByLabel;
+    this._childElements = collectPinModelChildren([...inputs, output]);
+    this.stateSize = this._childElements.reduce((s, c) => s + c.stateSize, 0);
+  }
+
+  get isReactive(): boolean {
+    return this._childElements.length > 0;
+  }
+
+  initState(pool: StatePoolRef): void {
+    this._pool = pool;
+    let offset = this.stateBaseOffset;
+    for (const child of this._childElements) {
+      child.stateBaseOffset = offset;
+      child.initState(pool);
+      offset += child.stateSize;
+    }
   }
 
   load(ctx: LoadContext): void {
@@ -116,17 +143,15 @@ export class BehavioralGateElement implements AnalogElementCore {
       inp.load(ctx);
     }
     this._output.load(ctx);
+
+    // Stamp capacitor children.
+    for (const child of this._childElements) {
+      child.load(ctx);
+    }
   }
 
-  accept(ctx: LoadContext, _simTime: number, _addBreakpoint: (t: number) => void): void {
-    if (ctx.dt <= 0) return;
-    const voltages = ctx.rhs;
-    for (const inp of this._inputs) {
-      const v = readMnaVoltage(inp.nodeId, voltages);
-      inp.accept(ctx, v);
-    }
-    const vOut = readMnaVoltage(this._output.nodeId, voltages);
-    this._output.accept(ctx, vOut);
+  checkConvergence(ctx: LoadContext): boolean {
+    return this._childElements.every(c => !c.checkConvergence || c.checkConvergence(ctx));
   }
 
   /**

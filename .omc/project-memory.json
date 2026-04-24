@@ -284,21 +284,93 @@
   },
   "hotPaths": [
     {
+      "path": "src",
+      "accessCount": 21,
+      "lastAccessed": 1776996355994,
+      "type": "directory"
+    },
+    {
       "path": "src\\components\\semiconductors\\__tests__\\diode.test.ts",
       "accessCount": 12,
       "lastAccessed": 1776994352695,
       "type": "file"
     },
     {
-      "path": "src",
+      "path": "src\\components\\semiconductors\\__tests__\\tunnel-diode.test.ts",
       "accessCount": 12,
-      "lastAccessed": 1776994528419,
+      "lastAccessed": 1776996334500,
       "type": "directory"
+    },
+    {
+      "path": "src\\components\\semiconductors\\tunnel-diode.ts",
+      "accessCount": 11,
+      "lastAccessed": 1776996329927,
+      "type": "file"
     },
     {
       "path": "src\\solver\\analog\\__tests__\\harness\\harness-integration.test.ts",
       "accessCount": 10,
       "lastAccessed": 1776994527952,
+      "type": "file"
+    },
+    {
+      "path": "spec\\test-baseline.md",
+      "accessCount": 10,
+      "lastAccessed": 1776996326418,
+      "type": "file"
+    },
+    {
+      "path": "src\\components\\io\\led.ts",
+      "accessCount": 10,
+      "lastAccessed": 1776996329994,
+      "type": "file"
+    },
+    {
+      "path": "src\\solver\\analog\\behavioral-gate.ts",
+      "accessCount": 10,
+      "lastAccessed": 1776996439012,
+      "type": "file"
+    },
+    {
+      "path": "spec\\phase-0-residual-dead-code-audit.md",
+      "accessCount": 9,
+      "lastAccessed": 1776996322474,
+      "type": "file"
+    },
+    {
+      "path": "src\\components\\io\\__tests__\\led.test.ts",
+      "accessCount": 9,
+      "lastAccessed": 1776996335683,
+      "type": "file"
+    },
+    {
+      "path": "src\\solver\\analog\\behavioral-remaining.ts",
+      "accessCount": 9,
+      "lastAccessed": 1776996379910,
+      "type": "file"
+    },
+    {
+      "path": "src\\solver\\analog\\digital-pin-model.ts",
+      "accessCount": 9,
+      "lastAccessed": 1776996431947,
+      "type": "file"
+    },
+    {
+      "path": "spec\\.context\\rules.md",
+      "accessCount": 8,
+      "lastAccessed": 1776996322385,
+      "type": "file"
+    },
+    {
+      "path": "src\\components\\active\\dac.ts",
+      "accessCount": 8,
+      "lastAccessed": 1776996374388,
+      "type": "file"
+    },
+    {
+      "path": "src\\components\\passives\\capacitor.ts",
+      "accessCount": 8,
+      "lastAccessed": 1776996443075,
       "type": "file"
     },
     {
@@ -344,21 +416,21 @@
       "type": "file"
     },
     {
-      "path": "spec\\phase-0-residual-dead-code-audit.md",
+      "path": "spec\\.context\\lock-protocol.md",
       "accessCount": 5,
-      "lastAccessed": 1776994508087,
+      "lastAccessed": 1776994639847,
       "type": "file"
     },
     {
-      "path": "spec\\test-baseline.md",
+      "path": "spec\\.hybrid-state.json",
       "accessCount": 5,
-      "lastAccessed": 1776994508673,
+      "lastAccessed": 1776996270023,
       "type": "file"
     },
     {
-      "path": "spec\\.context\\rules.md",
-      "accessCount": 4,
-      "lastAccessed": 1776994508175,
+      "path": "spec\\progress.md",
+      "accessCount": 5,
+      "lastAccessed": 1776996326385,
       "type": "file"
     },
     {
@@ -368,9 +440,27 @@
       "type": "directory"
     },
     {
-      "path": "spec\\.hybrid-state.json",
+      "path": "src\\solver\\analog\\state-schema.ts",
       "accessCount": 4,
-      "lastAccessed": 1776994577532,
+      "lastAccessed": 1776994763703,
+      "type": "directory"
+    },
+    {
+      "path": "src\\solver\\analog\\behavioral-combinational.ts",
+      "accessCount": 4,
+      "lastAccessed": 1776995732765,
+      "type": "file"
+    },
+    {
+      "path": "",
+      "accessCount": 4,
+      "lastAccessed": 1776995766685,
+      "type": "directory"
+    },
+    {
+      "path": "src\\solver\\analog\\bridge-adapter.ts",
+      "accessCount": 4,
+      "lastAccessed": 1776996369075,
       "type": "file"
     },
     {
@@ -422,40 +512,76 @@
       "type": "file"
     },
     {
-      "path": "spec\\progress.md",
-      "accessCount": 3,
-      "lastAccessed": 1776994508516,
-      "type": "file"
-    },
-    {
       "path": "scripts",
       "accessCount": 3,
       "lastAccessed": 1776994522862,
       "type": "directory"
     },
     {
-      "path": "spec\\.context\\lock-protocol.md",
-      "accessCount": 2,
-      "lastAccessed": 1776993941727,
+      "path": "src\\solver\\analog\\behavioral-flipflop\\shared.ts",
+      "accessCount": 3,
+      "lastAccessed": 1776994954490,
       "type": "file"
     },
     {
-      "path": "",
-      "accessCount": 1,
-      "lastAccessed": 1776994046002,
-      "type": "directory"
+      "path": "src\\solver\\analog\\behavioral-flipflop\\t.ts",
+      "accessCount": 3,
+      "lastAccessed": 1776995159798,
+      "type": "file"
     },
     {
-      "path": "src\\components\\semiconductors\\__tests__\\tunnel-diode.test.ts",
-      "accessCount": 1,
-      "lastAccessed": 1776994325584,
-      "type": "directory"
+      "path": "src\\solver\\analog\\behavioral-flipflop\\rs.ts",
+      "accessCount": 3,
+      "lastAccessed": 1776995190233,
+      "type": "file"
+    },
+    {
+      "path": "src\\solver\\analog\\behavioral-flipflop\\rs-async.ts",
+      "accessCount": 3,
+      "lastAccessed": 1776995215768,
+      "type": "file"
+    },
+    {
+      "path": "src\\solver\\analog\\behavioral-flipflop\\jk.ts",
+      "accessCount": 3,
+      "lastAccessed": 1776995233359,
+      "type": "file"
+    },
+    {
+      "path": "src\\solver\\analog\\behavioral-flipflop\\jk-async.ts",
+      "accessCount": 3,
+      "lastAccessed": 1776995254296,
+      "type": "file"
+    },
+    {
+      "path": "src\\solver\\analog\\behavioral-flipflop\\d-async.ts",
+      "accessCount": 3,
+      "lastAccessed": 1776995271699,
+      "type": "file"
+    },
+    {
+      "path": "src\\solver\\analog\\behavioral-sequential.ts",
+      "accessCount": 3,
+      "lastAccessed": 1776995448554,
+      "type": "file"
+    },
+    {
+      "path": "src\\solver\\analog\\behavioral-flipflop.ts",
+      "accessCount": 2,
+      "lastAccessed": 1776995008031,
+      "type": "file"
     },
     {
       "path": "src\\solver\\analog\\__tests__",
-      "accessCount": 1,
-      "lastAccessed": 1776994545001,
+      "accessCount": 2,
+      "lastAccessed": 1776995856458,
       "type": "directory"
+    },
+    {
+      "path": "src\\components\\passives\\transmission-line.ts",
+      "accessCount": 1,
+      "lastAccessed": 1776994655611,
+      "type": "file"
     }
   ],
   "userDirectives": []

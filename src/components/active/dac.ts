@@ -35,10 +35,15 @@ import {
   type AttributeMapping,
   type ComponentDefinition,
 } from "../../core/registry.js";
-import type { AnalogElementCore, LoadContext } from "../../solver/analog/element.js";
-import { DigitalInputPinModel } from "../../solver/analog/digital-pin-model.js";
+import type { AnalogElementCore, LoadContext, StatePoolRef } from "../../solver/analog/element.js";
+import { collectPinModelChildren, DigitalInputPinModel } from "../../solver/analog/digital-pin-model.js";
 import type { ResolvedPinElectrical } from "../../core/pin-electrical.js";
 import { defineModelParams } from "../../core/model-params.js";
+import { defineStateSchema } from "../../solver/analog/state-schema.js";
+import type { StateSchema } from "../../solver/analog/state-schema.js";
+import type { AnalogCapacitorElement } from "../passives/capacitor.js";
+
+const DAC_COMPOSITE_SCHEMA: StateSchema = defineStateSchema("DACComposite", []);
 
 // ---------------------------------------------------------------------------
 // Model parameter declarations
@@ -313,10 +318,27 @@ function createDACElement(
     }
   }
 
+  const childElements: readonly AnalogCapacitorElement[] = collectPinModelChildren(inputModels);
+  const stateSize = childElements.reduce((s, c) => s + c.stateSize, 0);
+
   return {
     branchIndex: -1,
     isNonlinear: true,
-    isReactive: true,
+    get isReactive(): boolean { return childElements.length > 0; },
+
+    poolBacked: true as const,
+    stateSchema: DAC_COMPOSITE_SCHEMA,
+    stateSize,
+    stateBaseOffset: -1,
+
+    initState(_pool: StatePoolRef): void {
+      let offset = (this as { stateBaseOffset: number }).stateBaseOffset;
+      for (const child of childElements) {
+        child.stateBaseOffset = offset;
+        child.initState(_pool);
+        offset += child.stateSize;
+      }
+    },
 
     load(ctx: LoadContext): void {
       const solver = ctx.solver;
@@ -336,18 +358,11 @@ function createDACElement(
           inputModels[i].load(ctx);
         }
       }
+
+      for (const child of childElements) { child.load(ctx); }
     },
 
-    accept(ctx: LoadContext, _simTime: number, _addBreakpoint: (t: number) => void): void {
-      if (ctx.dt <= 0) return;
-      const voltages = ctx.rhs;
-      for (let i = 0; i < bits; i++) {
-        const nD = nDigitalBits[i];
-        if (nD > 0) {
-          inputModels[i].accept(ctx, readNode(voltages, nD));
-        }
-      }
-    },
+    accept(_ctx: LoadContext, _simTime: number, _addBreakpoint: (t: number) => void): void {},
 
     getPinCurrents(voltages: Float64Array): number[] {
       const currents: number[] = [];

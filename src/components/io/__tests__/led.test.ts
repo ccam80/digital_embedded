@@ -22,6 +22,7 @@ import {
   executeLed,
   LedDefinition,
   LED_ATTRIBUTE_MAPPINGS,
+  LED_CAP_STATE_SCHEMA,
 } from "../led.js";
 import {
   PolarityLedElement,
@@ -898,19 +899,19 @@ describe("integration", () => {
     props.replaceModelParams({ IS, N, CJO, VJ, M, TT, FC });
     const core = getFactory(LedDefinition.modelRegistry!.red!)!(new Map([["in", 1]]), [], -1, props, () => 0);
 
-    const pool = new StatePool(9);
+    const pool = new StatePool(6);
     (core as any).stateBaseOffset = 0;
     core.initState(pool);
 
     // Seed SLOT_VD=0 with vd so pnjlim sees vdOld=vd and returns vdLimited=vd unchanged.
     pool.state0[0] = vd;
 
-    // Seed previous-step charge in s1[SLOT_Q=7]
+    // Seed previous-step charge in s1[SLOT_Q=4]
     const nVt = N * LED_VT;
     const prevVd = 1.75;
     const prevIdRaw = IS * (Math.exp(prevVd / nVt) - 1);
     const q1_val = computeJunctionCharge(prevVd, CJO, VJ, M, FC, TT, prevIdRaw);
-    pool.state1[7] = q1_val;
+    pool.state1[4] = q1_val;
 
     const stamps: Array<[number, number, number]> = [];
     const rhs: Array<[number, number]> = [];
@@ -970,5 +971,21 @@ describe("integration", () => {
     ) as string;
     expect(src).not.toMatch(/integrateCapacitor/);
     expect(src).not.toMatch(/integrateInductor/);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// LED cap state schema tests (Task 0.2.2)
+// ---------------------------------------------------------------------------
+
+describe("Led", () => {
+  it("cap_state_schema_has_no_cap_geq_ieq_v_slots", () => {
+    expect(LED_CAP_STATE_SCHEMA.indexOf.get("CAP_GEQ")).toBeUndefined();
+    expect(LED_CAP_STATE_SCHEMA.indexOf.get("CAP_IEQ")).toBeUndefined();
+    expect(LED_CAP_STATE_SCHEMA.indexOf.get("V")).toBeUndefined();
+  });
+
+  it("cap_state_size_is_six", () => {
+    expect(LED_CAP_STATE_SCHEMA.size).toBe(6);
   });
 });

@@ -2,11 +2,26 @@
  * Behavioral analog factory for edge-triggered T flip-flops.
  */
 
-import type { AnalogElementCore, LoadContext } from "../element.js";
+import type { LoadContext } from "../element.js";
+import type { StatePoolRef } from "../element.js";
 import { readMnaVoltage, delegatePinSetParam } from "../digital-pin-model.js";
 import type { DigitalInputPinModel, DigitalOutputPinModel } from "../digital-pin-model.js";
 import type { AnalogElementFactory } from "../behavioral-gate.js";
-import { FALLBACK_SPEC, getPinSpecs, getPinLoading, makeInputPin, makeOutputPin } from "./shared.js";
+import type { AnalogCapacitorElement } from "../../../components/passives/capacitor.js";
+import {
+  FALLBACK_SPEC,
+  getPinSpecs,
+  getPinLoading,
+  makeInputPin,
+  makeOutputPin,
+  FLIPFLOP_COMPOSITE_SCHEMA,
+  buildChildElements,
+  computeChildStateSize,
+  initChildState,
+  loadChildren,
+  checkChildConvergence,
+} from "./shared.js";
+import type { StateSchema } from "../state-schema.js";
 
 // ---------------------------------------------------------------------------
 // BehavioralTFlipflopElement
@@ -24,15 +39,15 @@ import { FALLBACK_SPEC, getPinSpecs, getPinLoading, makeInputPin, makeOutputPin 
  *
  * Unified interface:
  *   load()   — delegates input/output pin stamping to pin models from the
- *              currently latched Q state.
- *   accept() — rising-edge detection and conditional toggle, plus pin
- *              companion state update after each accepted timestep.
+ *              currently latched Q state, then loads capacitor children.
+ *   accept() — rising-edge detection and conditional toggle.
  */
-export class BehavioralTFlipflopElement implements AnalogElementCore {
+export class BehavioralTFlipflopElement {
   private readonly _tPin: DigitalInputPinModel | null;
   private readonly _clockPin: DigitalInputPinModel;
   private readonly _qPin: DigitalOutputPinModel;
   private readonly _qBarPin: DigitalOutputPinModel;
+  private readonly _childElements: AnalogCapacitorElement[];
 
   private _latchedQ = false;
   private _prevClockVoltage = 0;
@@ -43,8 +58,13 @@ export class BehavioralTFlipflopElement implements AnalogElementCore {
   pinNodeIds!: readonly number[];  // set by compiler via Object.assign after factory returns
   readonly branchIndex: number = -1;
   readonly isNonlinear: true = true;
-  readonly isReactive: true = true;
   label?: string;
+
+  readonly poolBacked = true as const;
+  readonly stateSchema: StateSchema = FLIPFLOP_COMPOSITE_SCHEMA;
+  stateSize: number;
+  stateBaseOffset = -1;
+  private _pool!: StatePoolRef;
 
   constructor(
     tPin: DigitalInputPinModel | null,
@@ -61,6 +81,21 @@ export class BehavioralTFlipflopElement implements AnalogElementCore {
     this._qBarPin = qBarPin;
     this._vIH = vIH;
     this._pinModelsByLabel = pinModelsByLabel;
+    this._childElements = buildChildElements([tPin, clockPin, qPin, qBarPin]);
+    this.stateSize = computeChildStateSize(this._childElements);
+  }
+
+  get isReactive(): boolean {
+    return this._childElements.length > 0;
+  }
+
+  initState(pool: StatePoolRef): void {
+    this._pool = pool;
+    initChildState(this._childElements, this.stateBaseOffset, pool);
+  }
+
+  checkConvergence(ctx: LoadContext): boolean {
+    return checkChildConvergence(this._childElements, ctx);
   }
 
   setParam(key: string, value: number): void {
@@ -80,11 +115,13 @@ export class BehavioralTFlipflopElement implements AnalogElementCore {
     this._qBarPin.setLogicLevel(!this._latchedQ);
     this._qPin.load(ctx);
     this._qBarPin.load(ctx);
+
+    loadChildren(this._childElements, ctx);
   }
 
   /**
-   * Rising-edge detection, conditional toggle, and companion state update —
-   * called once per accepted timestep with the accepted solution voltages.
+   * Rising-edge detection and conditional toggle — called once per accepted
+   * timestep with the accepted solution voltages.
    */
   accept(ctx: LoadContext, _simTime: number, _addBreakpoint: (t: number) => void): void {
     const voltages = ctx.rhs;
@@ -108,14 +145,6 @@ export class BehavioralTFlipflopElement implements AnalogElementCore {
     }
 
     this._prevClockVoltage = currentClockV;
-
-    // Delegate companion updates to pin models.
-    if (this._tPin !== null) {
-      this._tPin.accept(ctx, readMnaVoltage(this._tPin.nodeId, voltages));
-    }
-    this._clockPin.accept(ctx, currentClockV);
-    this._qPin.accept(ctx, readMnaVoltage(this._qPin.nodeId, voltages));
-    this._qBarPin.accept(ctx, readMnaVoltage(this._qBarPin.nodeId, voltages));
   }
 
   getPinCurrents(voltages: Float64Array): number[] {

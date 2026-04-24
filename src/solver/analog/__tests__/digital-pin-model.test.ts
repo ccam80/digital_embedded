@@ -1,7 +1,7 @@
 /**
  * Tests for DigitalOutputPinModel and DigitalInputPinModel.
  *
- * Task 6.4.2 — new load(ctx)/accept(ctx, voltage) API:
+ * Task 6.4.2 — new load(ctx) API:
  *  - output_load_branch_role_drive_loaded
  *  - output_load_branch_role_hiz_ideal
  *  - output_load_direct_role_drive_loaded
@@ -9,13 +9,20 @@
  *  - input_load_loaded_stamps_rIn
  *  - input_load_ideal_is_noop
  *  - output_load_companion_inline_uses_ag
- *  - output_accept_updates_prev_voltage
  *  - loaded_getter_reads_private_field
  *  - handle_cache_stable_across_iterations
  *
  * Task 6.4.4 — legacy stamp methods deleted:
  *  - legacy_stamp_methods_deleted_output
  *  - legacy_stamp_methods_deleted_input
+ *
+ * Task 0.2.3 — DigitalPinModel refactored to use AnalogCapacitorElement child:
+ *  - no_prev_voltage_field
+ *  - accept_method_removed
+ *  - getChildElements_returns_capacitor_when_loaded_and_cout_positive
+ *  - getChildElements_empty_for_unloaded_output
+ *  - getChildElements_returns_capacitor_when_loaded_and_cin_positive
+ *  - getChildElements_empty_for_input_with_zero_cin
  *
  * readLogicLevel threshold test (retained):
  *  - readLogicLevel thresholds correctly
@@ -237,38 +244,19 @@ describe("DigitalOutputPinModel", () => {
     const gOut = 1 / CMOS_3V3.rOut;
   });
 
-  it("output_accept_updates_prev_voltage", () => {
-    const solver = new MockSolver();
+  it("output_load_capacitor_child_included_when_loaded_and_cOut_positive", () => {
+    // When loaded && cOut > 0, getChildElements() returns a capacitor child.
+    // The owning element must call child.load(ctx) separately; this test verifies
+    // the child exists and is a proper AnalogCapacitorElement (non-empty array).
     const pin = new DigitalOutputPinModel(CMOS_3V3, true, "direct");
     pin.init(NODE, -1);
-    pin.setLogicLevel(false);
 
-    const ag = new Float64Array(7);
-    ag[0] = 1e10;
-    ag[1] = 0;
-
-    const ctx = makeCtx({ solver, ag, dt: 1e-9, cktMode: MODETRAN | MODEINITFLOAT });
-
-    // First load — prevVoltage = 0, prevCurrent = 0
-    pin.load(ctx);
-    const rhsAfterFirstLoad = solver.sumRhs(nodeIdx);
-
-    // Accept with voltage = 1.8 — this should update _prevVoltage to 1.8
-    pin.accept(ctx, 1.8);
-
-    // Second load with same solver (handles already allocated) — companion uses updated prevVoltage
-    pin.load(ctx);
-    const rhsAfterSecondLoad = solver.sumRhs(nodeIdx);
-
-    // After accept(1.8): prevVoltage=1.8, so q0=C*1.8, q1=C*1.8 (same), geq=ag0*C
-    // ccap = ag0*(q0-q1) + ag1*prevCurrent = 0, ceq = 0 - geq*1.8 = -geq*1.8
-    // RHS stamp = -ceq = geq*1.8
-    const C = CMOS_3V3.cOut;
-    const geq = ag[0] * C;
-    // The second load adds another RHS contribution. The total should include geq*1.8.
-    // rhsAfterSecondLoad = 2*(vOL/rOut) + geq*0 (first) + geq*1.8 (second)
-    // Difference between loads = geq * 1.8
-    const delta = rhsAfterSecondLoad - rhsAfterFirstLoad;
+    const children = pin.getChildElements();
+    expect(children.length).toBe(1);
+    // The child is an AnalogCapacitorElement with pinNodeIds set
+    const child = children[0];
+    expect(child).toBeDefined();
+    expect(child.pinNodeIds).toEqual([NODE, 0]);
   });
 
   it("loaded_getter_reads_private_field", () => {
@@ -400,5 +388,66 @@ describe("legacy stamp methods deleted", () => {
     expect((pin as any).stamp).toBeUndefined();
     expect((pin as any).stampCompanion).toBeUndefined();
     expect((pin as any).updateCompanion).toBeUndefined();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Task 0.2.3 — DigitalPinModel refactored to use AnalogCapacitorElement child
+// ---------------------------------------------------------------------------
+
+describe("Task 0.2.3 — DigitalPinModel capacitor child refactor", () => {
+  it("no_prev_voltage_field", () => {
+    // _prevVoltage and _prevCurrent must not exist as own properties on either class.
+    // These were removed in Task 0.2.3 — companion history is now held by the
+    // AnalogCapacitorElement child element.
+    const outPin = new DigitalOutputPinModel(CMOS_3V3, true, "direct");
+    const inPin = new DigitalInputPinModel(CMOS_3V3, true);
+    expect(Object.prototype.hasOwnProperty.call(outPin, "_prevVoltage")).toBe(false);
+    expect(Object.prototype.hasOwnProperty.call(outPin, "_prevCurrent")).toBe(false);
+    expect(Object.prototype.hasOwnProperty.call(inPin, "_prevVoltage")).toBe(false);
+    expect(Object.prototype.hasOwnProperty.call(inPin, "_prevCurrent")).toBe(false);
+  });
+
+  it("accept_method_removed", () => {
+    // The accept(ctx, voltage) method was removed in Task 0.2.3.
+    // The companion model state is now advanced by the AnalogCapacitorElement child.
+    const outPin = new DigitalOutputPinModel(CMOS_3V3, true, "direct");
+    const inPin = new DigitalInputPinModel(CMOS_3V3, true);
+    expect(typeof (outPin as any).accept).toBe("undefined");
+    expect(typeof (inPin as any).accept).toBe("undefined");
+  });
+
+  it("getChildElements_returns_capacitor_when_loaded_and_cout_positive", () => {
+    // Loaded output pin with cOut > 0 → one AnalogCapacitorElement child.
+    const pin = new DigitalOutputPinModel(CMOS_3V3, true, "direct");
+    pin.init(1, -1);
+    const children = pin.getChildElements();
+    expect(children.length).toBe(1);
+    // Child has pinNodeIds set to [nodeId, 0]
+    expect(children[0].pinNodeIds).toEqual([1, 0]);
+  });
+
+  it("getChildElements_empty_for_unloaded_output", () => {
+    // Unloaded output pin → no capacitor child (loading disabled).
+    const pin = new DigitalOutputPinModel(CMOS_3V3, false, "direct");
+    pin.init(1, -1);
+    expect(pin.getChildElements().length).toBe(0);
+  });
+
+  it("getChildElements_returns_capacitor_when_loaded_and_cin_positive", () => {
+    // Loaded input pin with cIn > 0 → one AnalogCapacitorElement child.
+    const pin = new DigitalInputPinModel(CMOS_3V3, true);
+    pin.init(2, 0);
+    const children = pin.getChildElements();
+    expect(children.length).toBe(1);
+    expect(children[0].pinNodeIds).toEqual([2, 0]);
+  });
+
+  it("getChildElements_empty_for_input_with_zero_cin", () => {
+    // Input pin spec with cIn = 0 → no capacitor child.
+    const specNoCap: ResolvedPinElectrical = { ...CMOS_3V3, cIn: 0 };
+    const pin = new DigitalInputPinModel(specNoCap, true);
+    pin.init(2, 0);
+    expect(pin.getChildElements().length).toBe(0);
   });
 });

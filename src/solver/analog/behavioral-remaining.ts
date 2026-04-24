@@ -17,16 +17,22 @@
  */
 
 import type { SparseSolver } from "./sparse-solver.js";
-import type { AnalogElementCore, LoadContext } from "./element.js";
+import type { AnalogElementCore, LoadContext, StatePoolRef } from "./element.js";
 import { MODETRAN } from "./ckt-mode.js";
 import type { PropertyBag } from "../../core/properties.js";
 import type { ResolvedPinElectrical } from "../../core/pin-electrical.js";
 import {
+  collectPinModelChildren,
   delegatePinSetParam,
   DigitalInputPinModel,
   DigitalOutputPinModel,
   readMnaVoltage,
 } from "./digital-pin-model.js";
+import { defineStateSchema } from "./state-schema.js";
+import type { StateSchema } from "./state-schema.js";
+import type { AnalogCapacitorElement } from "../../components/passives/capacitor.js";
+
+const REMAINING_COMPOSITE_SCHEMA: StateSchema = defineStateSchema("BehavioralRemainingComposite", []);
 
 // ---------------------------------------------------------------------------
 // Shared electrical fallback spec
@@ -127,10 +133,27 @@ export function createDriverAnalogElement(
     ["out", outputPin],
   ]);
 
+  const childElements: readonly AnalogCapacitorElement[] = collectPinModelChildren([inputPin, selPin, outputPin]);
+  const stateSize = childElements.reduce((s, c) => s + c.stateSize, 0);
+
   return {
     branchIndex: -1,
     isNonlinear: true,
-    isReactive: true,
+    get isReactive(): boolean { return childElements.length > 0; },
+
+    poolBacked: true as const,
+    stateSchema: REMAINING_COMPOSITE_SCHEMA,
+    stateSize,
+    stateBaseOffset: -1,
+
+    initState(pool: StatePoolRef): void {
+      let offset = (this as { stateBaseOffset: number }).stateBaseOffset;
+      for (const child of childElements) {
+        child.stateBaseOffset = offset;
+        child.initState(pool);
+        offset += child.stateSize;
+      }
+    },
 
     load(ctx: LoadContext): void {
       const v = ctx.rhsOld;
@@ -150,14 +173,11 @@ export function createDriverAnalogElement(
       outputPin.setHighZ(!latchedSel);
       outputPin.setLogicLevel(latchedIn);
       outputPin.load(ctx);
+
+      for (const child of childElements) { child.load(ctx); }
     },
 
-    accept(ctx: LoadContext, _simTime: number, _addBreakpoint: (t: number) => void): void {
-      const v = ctx.rhs;
-      inputPin.accept(ctx, readMnaVoltage(nodeIn, v));
-      selPin.accept(ctx, readMnaVoltage(nodeSel, v));
-      outputPin.accept(ctx, readMnaVoltage(nodeOut, v));
-    },
+    accept(_ctx: LoadContext, _simTime: number, _addBreakpoint: (t: number) => void): void {},
 
     getPinCurrents(voltages: Float64Array): number[] {
       // Pin layout order: in (input), sel (enable input), out (output)
@@ -221,10 +241,27 @@ export function createDriverInvAnalogElement(
     ["out", outputPin],
   ]);
 
+  const childElements: readonly AnalogCapacitorElement[] = collectPinModelChildren([inputPin, selPin, outputPin]);
+  const stateSize = childElements.reduce((s, c) => s + c.stateSize, 0);
+
   return {
     branchIndex: -1,
     isNonlinear: true,
-    isReactive: true,
+    get isReactive(): boolean { return childElements.length > 0; },
+
+    poolBacked: true as const,
+    stateSchema: REMAINING_COMPOSITE_SCHEMA,
+    stateSize,
+    stateBaseOffset: -1,
+
+    initState(pool: StatePoolRef): void {
+      let offset = (this as { stateBaseOffset: number }).stateBaseOffset;
+      for (const child of childElements) {
+        child.stateBaseOffset = offset;
+        child.initState(pool);
+        offset += child.stateSize;
+      }
+    },
 
     load(ctx: LoadContext): void {
       const v = ctx.rhsOld;
@@ -245,14 +282,11 @@ export function createDriverInvAnalogElement(
       outputPin.setHighZ(latchedSel);
       outputPin.setLogicLevel(latchedIn);
       outputPin.load(ctx);
+
+      for (const child of childElements) { child.load(ctx); }
     },
 
-    accept(ctx: LoadContext, _simTime: number, _addBreakpoint: (t: number) => void): void {
-      const v = ctx.rhs;
-      inputPin.accept(ctx, readMnaVoltage(nodeIn, v));
-      selPin.accept(ctx, readMnaVoltage(nodeSel, v));
-      outputPin.accept(ctx, readMnaVoltage(nodeOut, v));
-    },
+    accept(_ctx: LoadContext, _simTime: number, _addBreakpoint: (t: number) => void): void {},
 
     getPinCurrents(voltages: Float64Array): number[] {
       // Pin layout order: in (input), sel (enable input), out (output)
@@ -328,10 +362,27 @@ export function createSplitterAnalogElement(
     outputPins.push(pin);
   }
 
+  const childElements: readonly AnalogCapacitorElement[] = collectPinModelChildren([...inputPins, ...outputPins]);
+  const stateSize = childElements.reduce((s, c) => s + c.stateSize, 0);
+
   return {
     branchIndex: -1,
     isNonlinear: true,
-    isReactive: true,
+    get isReactive(): boolean { return childElements.length > 0; },
+
+    poolBacked: true as const,
+    stateSchema: REMAINING_COMPOSITE_SCHEMA,
+    stateSize,
+    stateBaseOffset: -1,
+
+    initState(_pool: StatePoolRef): void {
+      let offset = (this as { stateBaseOffset: number }).stateBaseOffset;
+      for (const child of childElements) {
+        child.stateBaseOffset = offset;
+        child.initState(_pool);
+        offset += child.stateSize;
+      }
+    },
 
     load(ctx: LoadContext): void {
       const v = ctx.rhsOld;
@@ -348,17 +399,11 @@ export function createSplitterAnalogElement(
         outputPins[i].setLogicLevel(latchedLevels[i] ?? false);
         outputPins[i].load(ctx);
       }
+
+      for (const child of childElements) { child.load(ctx); }
     },
 
-    accept(ctx: LoadContext, _simTime: number, _addBreakpoint: (t: number) => void): void {
-      const v = ctx.rhs;
-      for (const p of inputPins) {
-        p.accept(ctx, readMnaVoltage(p.nodeId, v));
-      }
-      for (const p of outputPins) {
-        p.accept(ctx, readMnaVoltage(p.nodeId, v));
-      }
-    },
+    accept(_ctx: LoadContext, _simTime: number, _addBreakpoint: (t: number) => void): void {},
 
     getPinCurrents(voltages: Float64Array): number[] {
       // pinLayout order: inputs first, outputs after

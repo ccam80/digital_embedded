@@ -7,12 +7,12 @@
  *
  * Unified interface:
  *   load()   — delegates pin stamping to pin models and evaluates truth table
- *              from latched Q state.
+ *              from latched Q state; stamps capacitor children.
  *   accept() — edge detection + pin companion state update after each
- *              accepted timestep, delegates to pin model accept().
+ *              accepted timestep.
  */
 
-import type { AnalogElementCore, LoadContext } from "./element.js";
+import type { AnalogElementCore, LoadContext, StatePoolRef } from "./element.js";
 import type { ResolvedPinElectrical } from "../../core/pin-electrical.js";
 import {
   DigitalInputPinModel,
@@ -20,6 +20,16 @@ import {
   readMnaVoltage,
   delegatePinSetParam,
 } from "./digital-pin-model.js";
+import type { AnalogCapacitorElement } from "../../components/passives/capacitor.js";
+import {
+  FLIPFLOP_COMPOSITE_SCHEMA,
+  buildChildElements,
+  computeChildStateSize,
+  initChildState,
+  loadChildren,
+  checkChildConvergence,
+} from "./behavioral-flipflop/shared.js";
+import type { StateSchema } from "./state-schema.js";
 import type { AnalogElementFactory } from "./behavioral-gate.js";
 
 // ---------------------------------------------------------------------------
@@ -49,6 +59,7 @@ export class BehavioralDFlipflopElement implements AnalogElementCore {
   private readonly _qBarPin: DigitalOutputPinModel;
   private readonly _setPin: DigitalInputPinModel | null;
   private readonly _resetPin: DigitalInputPinModel | null;
+  private readonly _childElements: AnalogCapacitorElement[];
 
   /** Current latched Q state. Initial value is false (logic LOW). */
   private _latchedQ = false;
@@ -82,8 +93,13 @@ export class BehavioralDFlipflopElement implements AnalogElementCore {
   pinNodeIds!: readonly number[];  // set by compiler via Object.assign after factory returns
   readonly branchIndex: number = -1;
   readonly isNonlinear: true = true;
-  readonly isReactive: true = true;
   label?: string;
+
+  readonly poolBacked = true as const;
+  readonly stateSchema: StateSchema = FLIPFLOP_COMPOSITE_SCHEMA;
+  stateSize: number;
+  stateBaseOffset = -1;
+  private _pool!: StatePoolRef;
 
   constructor(
     clockPin: DigitalInputPinModel,
@@ -106,6 +122,9 @@ export class BehavioralDFlipflopElement implements AnalogElementCore {
 
     this._vIH = 2.0; // overwritten by factory via _setThresholds
     this._vIL = 0.8;
+
+    this._childElements = buildChildElements([clockPin, dPin, qPin, qBarPin, setPin, resetPin]);
+    this.stateSize = computeChildStateSize(this._childElements);
   }
 
   /**
@@ -114,6 +133,15 @@ export class BehavioralDFlipflopElement implements AnalogElementCore {
    */
   _setThresholds(vIH: number, _vIL: number): void {
     (this as unknown as { _vIH: number })._vIH = vIH;
+  }
+
+  get isReactive(): boolean {
+    return this._childElements.length > 0;
+  }
+
+  initState(pool: StatePoolRef): void {
+    this._pool = pool;
+    initChildState(this._childElements, this.stateBaseOffset, pool);
   }
 
   initVoltages(rhs: Float64Array): void {
@@ -133,6 +161,13 @@ export class BehavioralDFlipflopElement implements AnalogElementCore {
     this._qBarPin.setLogicLevel(!this._latchedQ);
     this._qPin.load(ctx);
     this._qBarPin.load(ctx);
+
+    // Stamp capacitor children.
+    loadChildren(this._childElements, ctx);
+  }
+
+  checkConvergence(ctx: LoadContext): boolean {
+    return checkChildConvergence(this._childElements, ctx);
   }
 
   /**
@@ -145,7 +180,6 @@ export class BehavioralDFlipflopElement implements AnalogElementCore {
    *   3. On rising edge: sample D, update _latchedQ.
    *   4. Handle async set/reset (override clock-triggered state).
    *   5. Update _prevClockVoltage.
-   *   6. Delegate companion updates to pin models.
    */
   accept(ctx: LoadContext, _simTime: number, _addBreakpoint: (t: number) => void): void {
     const voltages = ctx.rhs;
@@ -191,19 +225,6 @@ export class BehavioralDFlipflopElement implements AnalogElementCore {
     }
 
     this._prevClockVoltage = currentClockV;
-
-    // Delegate companion updates to pin models with accepted voltages.
-    this._clockPin.accept(ctx, currentClockV);
-    this._dPin.accept(ctx, dVoltage);
-    this._qPin.accept(ctx, readMnaVoltage(this._qPin.nodeId, voltages));
-    this._qBarPin.accept(ctx, readMnaVoltage(this._qBarPin.nodeId, voltages));
-
-    if (this._setPin !== null) {
-      this._setPin.accept(ctx, readMnaVoltage(this._setPin.nodeId, voltages));
-    }
-    if (this._resetPin !== null) {
-      this._resetPin.accept(ctx, readMnaVoltage(this._resetPin.nodeId, voltages));
-    }
   }
 
   /**

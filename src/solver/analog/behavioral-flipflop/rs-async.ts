@@ -2,13 +2,28 @@
  * Behavioral analog factory for level-sensitive RS latches (no clock).
  */
 
-import type { AnalogElementCore, LoadContext } from "../element.js";
+import type { LoadContext } from "../element.js";
+import type { StatePoolRef } from "../element.js";
 import { readMnaVoltage, delegatePinSetParam } from "../digital-pin-model.js";
 import type { DigitalInputPinModel, DigitalOutputPinModel } from "../digital-pin-model.js";
 import type { AnalogElementFactory } from "../behavioral-gate.js";
 import type { Diagnostic } from "../../../compile/types.js";
 import { makeDiagnostic } from "../diagnostics.js";
-import { FALLBACK_SPEC, getPinSpecs, getPinLoading, makeInputPin, makeOutputPin } from "./shared.js";
+import type { AnalogCapacitorElement } from "../../../components/passives/capacitor.js";
+import {
+  FALLBACK_SPEC,
+  getPinSpecs,
+  getPinLoading,
+  makeInputPin,
+  makeOutputPin,
+  FLIPFLOP_COMPOSITE_SCHEMA,
+  buildChildElements,
+  computeChildStateSize,
+  initChildState,
+  loadChildren,
+  checkChildConvergence,
+} from "./shared.js";
+import type { StateSchema } from "../state-schema.js";
 
 // ---------------------------------------------------------------------------
 // BehavioralRSAsyncLatchElement (level-sensitive SR latch, no clock)
@@ -23,15 +38,15 @@ import { FALLBACK_SPEC, getPinSpecs, getPinLoading, makeInputPin, makeOutputPin 
  *
  * Unified interface:
  *   load()   — delegates input/output pin stamping to pin models from the
- *              currently latched Q state.
- *   accept() — level-sensitive latching, diagnostic emission, and pin
- *              companion state update after each accepted timestep.
+ *              currently latched Q state, then loads capacitor children.
+ *   accept() — level-sensitive latching and diagnostic emission.
  */
-export class BehavioralRSAsyncLatchElement implements AnalogElementCore {
+export class BehavioralRSAsyncLatchElement {
   private readonly _sPin: DigitalInputPinModel;
   private readonly _rPin: DigitalInputPinModel;
   private readonly _qPin: DigitalOutputPinModel;
   private readonly _qBarPin: DigitalOutputPinModel;
+  private readonly _childElements: AnalogCapacitorElement[];
 
   private _latchedQ = false;
 
@@ -42,8 +57,13 @@ export class BehavioralRSAsyncLatchElement implements AnalogElementCore {
   pinNodeIds!: readonly number[];  // set by compiler via Object.assign after factory returns
   readonly branchIndex: number = -1;
   readonly isNonlinear: true = true;
-  readonly isReactive: true = true;
   label?: string;
+
+  readonly poolBacked = true as const;
+  readonly stateSchema: StateSchema = FLIPFLOP_COMPOSITE_SCHEMA;
+  stateSize: number;
+  stateBaseOffset = -1;
+  private _pool!: StatePoolRef;
 
   constructor(
     sPin: DigitalInputPinModel,
@@ -59,6 +79,21 @@ export class BehavioralRSAsyncLatchElement implements AnalogElementCore {
     this._qPin = qPin;
     this._qBarPin = qBarPin;
     this._pinModelsByLabel = pinModelsByLabel;
+    this._childElements = buildChildElements([sPin, rPin, qPin, qBarPin]);
+    this.stateSize = computeChildStateSize(this._childElements);
+  }
+
+  get isReactive(): boolean {
+    return this._childElements.length > 0;
+  }
+
+  initState(pool: StatePoolRef): void {
+    this._pool = pool;
+    initChildState(this._childElements, this.stateBaseOffset, pool);
+  }
+
+  checkConvergence(ctx: LoadContext): boolean {
+    return checkChildConvergence(this._childElements, ctx);
   }
 
   setParam(key: string, value: number): void {
@@ -78,10 +113,12 @@ export class BehavioralRSAsyncLatchElement implements AnalogElementCore {
     this._qBarPin.setLogicLevel(!this._latchedQ);
     this._qPin.load(ctx);
     this._qBarPin.load(ctx);
+
+    loadChildren(this._childElements, ctx);
   }
 
   /**
-   * Level-sensitive latching and companion state update — called once per
+   * Level-sensitive latching and diagnostic emission — called once per
    * accepted timestep with the accepted solution voltages.
    */
   accept(ctx: LoadContext, _simTime: number, _addBreakpoint: (t: number) => void): void {
@@ -114,12 +151,6 @@ export class BehavioralRSAsyncLatchElement implements AnalogElementCore {
         this._latchedQ = false;
       }
     }
-
-    // Delegate companion updates to pin models.
-    this._sPin.accept(ctx, sV);
-    this._rPin.accept(ctx, rV);
-    this._qPin.accept(ctx, readMnaVoltage(this._qPin.nodeId, voltages));
-    this._qBarPin.accept(ctx, readMnaVoltage(this._qBarPin.nodeId, voltages));
   }
 
   getPinCurrents(voltages: Float64Array): number[] {
