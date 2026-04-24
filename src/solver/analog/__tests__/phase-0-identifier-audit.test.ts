@@ -404,6 +404,31 @@ export const BANNED_IDENTIFIERS: ReadonlyArray<BannedIdentifier> = [
       "method anywhere in the engine — a silent invention. Default " +
       "is 'trapezoidal' per cktntask.c:99.",
   },
+
+  // -------------------------------------------------------------------------
+  // Phase 3 Cleanup (C-3.4.4) — block BDF prose / identifier re-introduction
+  // -------------------------------------------------------------------------
+  {
+    regex: /BDF[-_ ][12]/i,
+    description:
+      "Phase 3 Cleanup: 'BDF-1' / 'BDF-2' (and _1 / _2 / space-1 / space-2 variants, " +
+      "any case) is the banned prose name for integration methods. Order 1 under " +
+      "trapezoidal or gear uses trap-1 coefficients (nicomcof.c:40-41); what was " +
+      "called BDF-2 is GEAR order 2 (nicomcof.c:52-127). Use 'order-1 trap', " +
+      "'backward Euler', or 'gear order 2' instead.",
+  },
+  {
+    regex: /bdf[12]/i,
+    description:
+      "Phase 3 Cleanup: 'bdf1' / 'bdf2' (any case, any position — standalone " +
+      "literal, suffix of an identifier, substring of a constant label, etc.) " +
+      "is banned. Covers 'rBdf2', 'NGSPICE_REF_BDF2', 'updateCompanion_bdf1', " +
+      "'BDF1'-run-together-in-prose, etc. Rename to 'order1_trap' / 'order2_gear' / " +
+      "'gear2' / 'rGear2' / 'NGSPICE_REF_GEAR2' as appropriate. Note: this regex " +
+      "deliberately has no word-boundary anchors — the older 3.3.6 rules use " +
+      "`([\"'])bdf1\\1` which already scopes to quoted literals; this rule must " +
+      "catch the identifier-embedded cases those regexes miss.",
+  },
 ];
 
 // ---------------------------------------------------------------------------

@@ -244,15 +244,15 @@
       ],
       "spawned": 3,
       "completed": 3,
-      "verifications_passed": 0,
+      "verifications_passed": 3,
       "verifications_failed": 0,
       "stops_for_clarification": 0,
       "dead_implementers": 0,
       "dead_verifiers": 0,
       "group_status": {
-        "cleanup.prod": "pending",
-        "cleanup.solver-tests": "pending",
-        "cleanup.component-tests": "pending"
+        "cleanup.prod": "passed",
+        "cleanup.solver-tests": "passed",
+        "cleanup.component-tests": "passed"
       },
       "user_required_tasks": {
         "cleanup.prod": [],
@@ -271,8 +271,8 @@
           "C-3.4.4"
         ]
       ],
-      "spawned": 0,
-      "completed": 0,
+      "spawned": 1,
+      "completed": 1,
       "verifications_passed": 0,
       "verifications_failed": 0,
       "stops_for_clarification": 0,
@@ -741,5 +741,5 @@
       "user_acks": {}
     }
   ],
-  "last_updated": "2026-04-24T09:22:08.120Z"
+  "last_updated": "2026-04-24T09:30:09.008Z"
 }
