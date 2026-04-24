@@ -43,8 +43,14 @@ import {
   type AttributeMapping,
   type ComponentDefinition,
 } from "../../core/registry.js";
-import type { AnalogElementCore, LoadContext } from "../../solver/analog/element.js";
+import type { AnalogElementCore, LoadContext, StatePoolRef } from "../../solver/analog/element.js";
+import { collectPinModelChildren } from "../../solver/analog/digital-pin-model.js";
+import type { AnalogCapacitorElement } from "../passives/capacitor.js";
 import { defineModelParams } from "../../core/model-params.js";
+import { defineStateSchema } from "../../solver/analog/state-schema.js";
+import type { StateSchema } from "../../solver/analog/state-schema.js";
+
+const COMPARATOR_COMPOSITE_SCHEMA: StateSchema = defineStateSchema("ComparatorComposite", []);
 
 // ---------------------------------------------------------------------------
 // Model parameter declarations
@@ -218,10 +224,27 @@ export function createOpenCollectorComparatorElement(
     return G_off + _outputWeight * (G_sat - G_off);
   }
 
+  const childElements: readonly AnalogCapacitorElement[] = collectPinModelChildren([]);
+  const childStateSize = childElements.reduce((s, c) => s + c.stateSize, 0);
+
   return {
     branchIndex: -1,
     isNonlinear: true,
-    isReactive: false,
+    get isReactive(): boolean { return childElements.some(c => c.isReactive); },
+
+    poolBacked: true as const,
+    stateSchema: COMPARATOR_COMPOSITE_SCHEMA,
+    stateSize: childStateSize,
+    stateBaseOffset: -1,
+
+    initState(_pool: StatePoolRef): void {
+      let offset = (this as { stateBaseOffset: number }).stateBaseOffset;
+      for (const child of childElements) {
+        child.stateBaseOffset = offset;
+        child.initState(_pool);
+        offset += child.stateSize;
+      }
+    },
 
     load(ctx: LoadContext): void {
       const solver = ctx.solver;
@@ -248,12 +271,15 @@ export function createOpenCollectorComparatorElement(
       if (nOut > 0) {
         solver.stampElement(solver.allocElement(nOut - 1, nOut - 1), computeGeff());
       }
+
+      for (const child of childElements) { child.load(ctx); }
+    },
+
+    checkConvergence(ctx: LoadContext): boolean {
+      return childElements.every(c => !c.checkConvergence || c.checkConvergence(ctx));
     },
 
     accept(ctx: LoadContext, _simTime: number, _addBreakpoint: (t: number) => void): void {
-      // Update _outputWeight toward its target using a first-order Euler step.
-      // Models the propagation delay specified by responseTime. Called once
-      // per accepted timestep.
       const dt = ctx.dt;
       if (dt <= 0) return;
       const target = _outputActive ? 1.0 : 0.0;
@@ -320,10 +346,27 @@ function createPushPullComparatorElement(
     return G_off + _outputWeight * (G_sat - G_off);
   }
 
+  const childElements: readonly AnalogCapacitorElement[] = collectPinModelChildren([]);
+  const childStateSize = childElements.reduce((s, c) => s + c.stateSize, 0);
+
   return {
     branchIndex: -1,
     isNonlinear: true,
-    isReactive: false,
+    get isReactive(): boolean { return childElements.some(c => c.isReactive); },
+
+    poolBacked: true as const,
+    stateSchema: COMPARATOR_COMPOSITE_SCHEMA,
+    stateSize: childStateSize,
+    stateBaseOffset: -1,
+
+    initState(_pool: StatePoolRef): void {
+      let offset = (this as { stateBaseOffset: number }).stateBaseOffset;
+      for (const child of childElements) {
+        child.stateBaseOffset = offset;
+        child.initState(_pool);
+        offset += child.stateSize;
+      }
+    },
 
     load(ctx: LoadContext): void {
       const solver = ctx.solver;
@@ -346,6 +389,12 @@ function createPushPullComparatorElement(
         const vTarget = _outputActive ? p.vOL : p.vOH;
         solver.stampRHS(nOut - 1, vTarget * gEff);
       }
+
+      for (const child of childElements) { child.load(ctx); }
+    },
+
+    checkConvergence(ctx: LoadContext): boolean {
+      return childElements.every(c => !c.checkConvergence || c.checkConvergence(ctx));
     },
 
     accept(ctx: LoadContext, _simTime: number, _addBreakpoint: (t: number) => void): void {

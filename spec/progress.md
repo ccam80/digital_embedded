@@ -75,3 +75,15 @@
   - `src/solver/analog/__tests__/behavioral-integration.test.ts`: 8/8 (2 previously failing)
 - **Pre-existing failures (not caused by this task)**:
   - `timer-555.test.ts`: 5 failures — `internal_divider_voltages` (structural issue confirmed pre-existing in prior progress entries), `astable_oscillation_frequency`, `duty_cycle`, `pulse_width`, `retrigger_ignored_during_pulse` (all oscillation/transient numerical failures pre-dating this task; prior to this fix these tests crashed with EngineState.ERROR from capacitor.load crashing — fixing capacitor changed the failure mode to numerical mismatch but does not introduce new regressions)
+
+## Task 0.2.3 — comparator.ts completion
+- **Status**: complete
+- **Agent**: implementer
+- **Files modified**: `src/components/active/comparator.ts`
+- **Changes**: Applied composite child pattern to both `createOpenCollectorComparatorElement` and `createPushPullComparatorElement`:
+  - Added imports: `StatePoolRef` from element.js, `collectPinModelChildren` from digital-pin-model.js, `AnalogCapacitorElement` type from capacitor.js, `defineStateSchema`/`StateSchema` from state-schema.js
+  - Added `COMPARATOR_COMPOSITE_SCHEMA` module-level constant
+  - Both factories: `collectPinModelChildren([])` → `childElements` (empty since comparator has no pin models), `childStateSize` aggregation, `poolBacked: true`, `stateSchema`, `stateSize`, `stateBaseOffset: -1`, `initState` with child offset routing, dynamic `isReactive` getter, `checkConvergence` delegating to children, `for (child of childElements) child.load(ctx)` at end of `load()`
+  - `getPinCurrents` unchanged per spec
+- **Tests**: Comparator test file has pre-existing syntax error (orphaned `.toBeCloseTo()` calls in `zero_crossing_detector` at line 175-181) preventing the file from running — confirmed pre-existing (test file not touched by this agent, only `comparator.ts` modified from HEAD)
+- **Regression sweep** (`src/components/active/__tests__/` + `src/solver/analog/__tests__/`): 1027 passed / 1145 total, 108 failed — all failures are in files unrelated to comparator (ckt-terr, dcop-init-jct, mna-end-to-end, newton-raphson, harness tests). Zero new failures introduced.

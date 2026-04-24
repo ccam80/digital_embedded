@@ -290,9 +290,33 @@
       "type": "directory"
     },
     {
+      "path": "src\\solver\\analog\\digital-pin-model.ts",
+      "accessCount": 17,
+      "lastAccessed": 1776998952534,
+      "type": "file"
+    },
+    {
       "path": "src\\components\\passives\\capacitor.ts",
-      "accessCount": 13,
-      "lastAccessed": 1776996904475,
+      "accessCount": 16,
+      "lastAccessed": 1776998662493,
+      "type": "file"
+    },
+    {
+      "path": "src\\solver\\analog\\behavioral-gate.ts",
+      "accessCount": 15,
+      "lastAccessed": 1776998745344,
+      "type": "file"
+    },
+    {
+      "path": "src\\components\\active\\__tests__\\timer-555.test.ts",
+      "accessCount": 14,
+      "lastAccessed": 1776998737853,
+      "type": "file"
+    },
+    {
+      "path": "spec\\test-baseline.md",
+      "accessCount": 14,
+      "lastAccessed": 1776998910981,
       "type": "file"
     },
     {
@@ -308,21 +332,21 @@
       "type": "directory"
     },
     {
-      "path": "src\\solver\\analog\\behavioral-gate.ts",
+      "path": "spec\\phase-0-residual-dead-code-audit.md",
       "accessCount": 12,
-      "lastAccessed": 1776996945943,
+      "lastAccessed": 1776998902897,
       "type": "file"
     },
     {
-      "path": "src\\components\\active\\__tests__\\timer-555.test.ts",
+      "path": "src\\components\\io\\led.ts",
       "accessCount": 12,
-      "lastAccessed": 1776997184235,
+      "lastAccessed": 1776999121523,
       "type": "file"
     },
     {
-      "path": "spec\\test-baseline.md",
+      "path": "spec\\progress.md",
       "accessCount": 12,
-      "lastAccessed": 1776997363764,
+      "lastAccessed": 1776999146266,
       "type": "file"
     },
     {
@@ -332,33 +356,21 @@
       "type": "file"
     },
     {
+      "path": "spec\\.context\\rules.md",
+      "accessCount": 11,
+      "lastAccessed": 1776998898282,
+      "type": "file"
+    },
+    {
       "path": "src\\solver\\analog\\__tests__\\harness\\harness-integration.test.ts",
       "accessCount": 10,
       "lastAccessed": 1776994527952,
       "type": "file"
     },
     {
-      "path": "src\\components\\io\\led.ts",
-      "accessCount": 10,
-      "lastAccessed": 1776996329994,
-      "type": "file"
-    },
-    {
-      "path": "spec\\phase-0-residual-dead-code-audit.md",
-      "accessCount": 10,
-      "lastAccessed": 1776996642971,
-      "type": "file"
-    },
-    {
-      "path": "src\\solver\\analog\\digital-pin-model.ts",
-      "accessCount": 10,
-      "lastAccessed": 1776996654319,
-      "type": "file"
-    },
-    {
       "path": "src\\components\\io\\__tests__\\led.test.ts",
-      "accessCount": 9,
-      "lastAccessed": 1776996335683,
+      "accessCount": 10,
+      "lastAccessed": 1776999162893,
       "type": "file"
     },
     {
@@ -368,15 +380,15 @@
       "type": "file"
     },
     {
-      "path": "spec\\.context\\rules.md",
-      "accessCount": 9,
-      "lastAccessed": 1776996634814,
-      "type": "file"
-    },
-    {
       "path": "src\\components\\active\\dac.ts",
       "accessCount": 8,
       "lastAccessed": 1776996374388,
+      "type": "file"
+    },
+    {
+      "path": "src\\components\\semiconductors\\bjt.ts",
+      "accessCount": 8,
+      "lastAccessed": 1776999170561,
       "type": "file"
     },
     {
@@ -386,9 +398,21 @@
       "type": "file"
     },
     {
-      "path": "spec\\progress.md",
+      "path": "src\\solver\\analog\\bridge-adapter.ts",
       "accessCount": 7,
-      "lastAccessed": 1776997408102,
+      "lastAccessed": 1776998746135,
+      "type": "file"
+    },
+    {
+      "path": "spec\\.hybrid-state.json",
+      "accessCount": 7,
+      "lastAccessed": 1776998861767,
+      "type": "file"
+    },
+    {
+      "path": "spec\\.context\\lock-protocol.md",
+      "accessCount": 7,
+      "lastAccessed": 1776998902222,
       "type": "file"
     },
     {
@@ -416,16 +440,10 @@
       "type": "file"
     },
     {
-      "path": "spec\\.context\\lock-protocol.md",
+      "path": "",
       "accessCount": 6,
-      "lastAccessed": 1776996635308,
-      "type": "file"
-    },
-    {
-      "path": "spec\\.hybrid-state.json",
-      "accessCount": 6,
-      "lastAccessed": 1776997450981,
-      "type": "file"
+      "lastAccessed": 1776998683855,
+      "type": "directory"
     },
     {
       "path": "src\\components\\semiconductors\\__tests__\\jfet.test.ts",
@@ -434,27 +452,15 @@
       "type": "file"
     },
     {
-      "path": "src\\solver\\analog\\bridge-adapter.ts",
+      "path": "src\\solver\\analog\\state-schema.ts",
       "accessCount": 5,
-      "lastAccessed": 1776996681027,
-      "type": "file"
-    },
-    {
-      "path": "",
-      "accessCount": 5,
-      "lastAccessed": 1776997390303,
+      "lastAccessed": 1776998963207,
       "type": "directory"
     },
     {
       "path": "e2e",
       "accessCount": 4,
       "lastAccessed": 1776994521543,
-      "type": "directory"
-    },
-    {
-      "path": "src\\solver\\analog\\state-schema.ts",
-      "accessCount": 4,
-      "lastAccessed": 1776994763703,
       "type": "directory"
     },
     {
@@ -497,12 +503,6 @@
       "path": "src\\solver\\analog\\__tests__\\ngspice-parity\\parity-helpers.ts",
       "accessCount": 3,
       "lastAccessed": 1776994283405,
-      "type": "file"
-    },
-    {
-      "path": "src\\components\\semiconductors\\bjt.ts",
-      "accessCount": 3,
-      "lastAccessed": 1776994287751,
       "type": "file"
     },
     {
