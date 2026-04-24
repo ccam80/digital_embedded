@@ -308,15 +308,27 @@
       "type": "file"
     },
     {
+      "path": "spec\\test-baseline.md",
+      "accessCount": 15,
+      "lastAccessed": 1776999227050,
+      "type": "file"
+    },
+    {
       "path": "src\\components\\active\\__tests__\\timer-555.test.ts",
       "accessCount": 14,
       "lastAccessed": 1776998737853,
       "type": "file"
     },
     {
-      "path": "spec\\test-baseline.md",
-      "accessCount": 14,
-      "lastAccessed": 1776998910981,
+      "path": "spec\\phase-0-residual-dead-code-audit.md",
+      "accessCount": 13,
+      "lastAccessed": 1776999222838,
+      "type": "file"
+    },
+    {
+      "path": "spec\\progress.md",
+      "accessCount": 13,
+      "lastAccessed": 1776999222899,
       "type": "file"
     },
     {
@@ -332,33 +344,21 @@
       "type": "directory"
     },
     {
-      "path": "spec\\phase-0-residual-dead-code-audit.md",
-      "accessCount": 12,
-      "lastAccessed": 1776998902897,
-      "type": "file"
-    },
-    {
       "path": "src\\components\\io\\led.ts",
       "accessCount": 12,
       "lastAccessed": 1776999121523,
       "type": "file"
     },
     {
-      "path": "spec\\progress.md",
+      "path": "spec\\.context\\rules.md",
       "accessCount": 12,
-      "lastAccessed": 1776999146266,
+      "lastAccessed": 1776999222428,
       "type": "file"
     },
     {
       "path": "src\\components\\semiconductors\\tunnel-diode.ts",
       "accessCount": 11,
       "lastAccessed": 1776996329927,
-      "type": "file"
-    },
-    {
-      "path": "spec\\.context\\rules.md",
-      "accessCount": 11,
-      "lastAccessed": 1776998898282,
       "type": "file"
     },
     {
