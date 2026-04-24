@@ -285,140 +285,158 @@
   "hotPaths": [
     {
       "path": "src\\components\\semiconductors\\__tests__\\diode.test.ts",
-      "accessCount": 5,
-      "lastAccessed": 1776994094132,
+      "accessCount": 12,
+      "lastAccessed": 1776994352695,
       "type": "file"
     },
     {
       "path": "src",
-      "accessCount": 5,
-      "lastAccessed": 1776994123930,
+      "accessCount": 12,
+      "lastAccessed": 1776994528419,
       "type": "directory"
     },
     {
-      "path": "src\\solver\\analog\\__tests__\\harness\\device-mappings.ts",
-      "accessCount": 4,
-      "lastAccessed": 1776994022252,
+      "path": "src\\solver\\analog\\__tests__\\harness\\harness-integration.test.ts",
+      "accessCount": 10,
+      "lastAccessed": 1776994527952,
       "type": "file"
     },
     {
       "path": "src\\components\\semiconductors\\mosfet.ts",
-      "accessCount": 4,
-      "lastAccessed": 1776994042689,
+      "accessCount": 7,
+      "lastAccessed": 1776994304172,
       "type": "file"
     },
     {
       "path": "src\\components\\semiconductors\\njfet.ts",
-      "accessCount": 4,
-      "lastAccessed": 1776994050281,
+      "accessCount": 6,
+      "lastAccessed": 1776994304907,
       "type": "file"
     },
     {
       "path": "src\\components\\semiconductors\\pjfet.ts",
-      "accessCount": 4,
-      "lastAccessed": 1776994055641,
+      "accessCount": 6,
+      "lastAccessed": 1776994305671,
       "type": "file"
     },
     {
       "path": "src\\components\\semiconductors\\__tests__\\bjt.test.ts",
-      "accessCount": 4,
-      "lastAccessed": 1776994075167,
+      "accessCount": 6,
+      "lastAccessed": 1776994315259,
       "type": "file"
     },
     {
-      "path": "spec\\test-baseline.md",
-      "accessCount": 3,
-      "lastAccessed": 1776993945490,
-      "type": "file"
-    },
-    {
-      "path": "spec\\phase-0-residual-dead-code-audit.md",
-      "accessCount": 3,
-      "lastAccessed": 1776993945689,
+      "path": "src\\solver\\analog\\__tests__\\harness\\device-mappings.ts",
+      "accessCount": 6,
+      "lastAccessed": 1776994397223,
       "type": "file"
     },
     {
       "path": "src\\components\\semiconductors\\__tests__\\jfet.test.ts",
-      "accessCount": 3,
-      "lastAccessed": 1776994086283,
+      "accessCount": 5,
+      "lastAccessed": 1776994331876,
+      "type": "file"
+    },
+    {
+      "path": "src\\components\\active\\__tests__\\timer-555.test.ts",
+      "accessCount": 5,
+      "lastAccessed": 1776994344205,
+      "type": "file"
+    },
+    {
+      "path": "spec\\phase-0-residual-dead-code-audit.md",
+      "accessCount": 5,
+      "lastAccessed": 1776994508087,
+      "type": "file"
+    },
+    {
+      "path": "spec\\test-baseline.md",
+      "accessCount": 5,
+      "lastAccessed": 1776994508673,
       "type": "file"
     },
     {
       "path": "spec\\.context\\rules.md",
-      "accessCount": 2,
-      "lastAccessed": 1776993941478,
+      "accessCount": 4,
+      "lastAccessed": 1776994508175,
       "type": "file"
+    },
+    {
+      "path": "e2e",
+      "accessCount": 4,
+      "lastAccessed": 1776994521543,
+      "type": "directory"
+    },
+    {
+      "path": "spec\\.hybrid-state.json",
+      "accessCount": 4,
+      "lastAccessed": 1776994577532,
+      "type": "file"
+    },
+    {
+      "path": "src\\solver\\analog\\__tests__\\harness\\types.ts",
+      "accessCount": 3,
+      "lastAccessed": 1776994258936,
+      "type": "file"
+    },
+    {
+      "path": "src\\solver\\analog\\__tests__\\harness\\ngspice-bridge.ts",
+      "accessCount": 3,
+      "lastAccessed": 1776994260278,
+      "type": "file"
+    },
+    {
+      "path": "src\\solver\\analog\\__tests__\\harness\\compare.ts",
+      "accessCount": 3,
+      "lastAccessed": 1776994282924,
+      "type": "file"
+    },
+    {
+      "path": "src\\solver\\analog\\__tests__\\ngspice-parity\\parity-helpers.ts",
+      "accessCount": 3,
+      "lastAccessed": 1776994283405,
+      "type": "file"
+    },
+    {
+      "path": "src\\components\\semiconductors\\bjt.ts",
+      "accessCount": 3,
+      "lastAccessed": 1776994287751,
+      "type": "file"
+    },
+    {
+      "path": "src\\components\\semiconductors\\varactor.ts",
+      "accessCount": 3,
+      "lastAccessed": 1776994295046,
+      "type": "file"
+    },
+    {
+      "path": "src\\solver\\analog\\coupled-inductor.ts",
+      "accessCount": 3,
+      "lastAccessed": 1776994295799,
+      "type": "file"
+    },
+    {
+      "path": "src\\solver\\analog\\__tests__\\ckt-mode.test.ts",
+      "accessCount": 3,
+      "lastAccessed": 1776994296485,
+      "type": "file"
+    },
+    {
+      "path": "spec\\progress.md",
+      "accessCount": 3,
+      "lastAccessed": 1776994508516,
+      "type": "file"
+    },
+    {
+      "path": "scripts",
+      "accessCount": 3,
+      "lastAccessed": 1776994522862,
+      "type": "directory"
     },
     {
       "path": "spec\\.context\\lock-protocol.md",
       "accessCount": 2,
       "lastAccessed": 1776993941727,
-      "type": "file"
-    },
-    {
-      "path": "src\\solver\\analog\\__tests__\\harness\\types.ts",
-      "accessCount": 2,
-      "lastAccessed": 1776993975799,
-      "type": "file"
-    },
-    {
-      "path": "src\\solver\\analog\\__tests__\\harness\\ngspice-bridge.ts",
-      "accessCount": 2,
-      "lastAccessed": 1776993997807,
-      "type": "file"
-    },
-    {
-      "path": "src\\solver\\analog\\__tests__\\harness\\compare.ts",
-      "accessCount": 2,
-      "lastAccessed": 1776994006637,
-      "type": "file"
-    },
-    {
-      "path": "src\\solver\\analog\\__tests__\\ngspice-parity\\parity-helpers.ts",
-      "accessCount": 2,
-      "lastAccessed": 1776994012291,
-      "type": "file"
-    },
-    {
-      "path": "src\\solver\\analog\\__tests__\\harness\\harness-integration.test.ts",
-      "accessCount": 2,
-      "lastAccessed": 1776994018718,
-      "type": "file"
-    },
-    {
-      "path": "src\\components\\semiconductors\\bjt.ts",
-      "accessCount": 2,
-      "lastAccessed": 1776994032299,
-      "type": "file"
-    },
-    {
-      "path": "src\\components\\semiconductors\\varactor.ts",
-      "accessCount": 2,
-      "lastAccessed": 1776994059377,
-      "type": "file"
-    },
-    {
-      "path": "src\\components\\active\\__tests__\\timer-555.test.ts",
-      "accessCount": 2,
-      "lastAccessed": 1776994103279,
-      "type": "file"
-    },
-    {
-      "path": "src\\solver\\analog\\__tests__\\ckt-mode.test.ts",
-      "accessCount": 2,
-      "lastAccessed": 1776994108622,
-      "type": "file"
-    },
-    {
-      "path": "src\\solver\\analog\\coupled-inductor.ts",
-      "accessCount": 2,
-      "lastAccessed": 1776994116348,
-      "type": "file"
-    },
-    {
-      "path": "spec\\.hybrid-state.json",
-      "accessCount": 2,
-      "lastAccessed": 1776994211561,
       "type": "file"
     },
     {
@@ -428,16 +446,16 @@
       "type": "directory"
     },
     {
-      "path": "e2e",
+      "path": "src\\components\\semiconductors\\__tests__\\tunnel-diode.test.ts",
       "accessCount": 1,
-      "lastAccessed": 1776994124642,
+      "lastAccessed": 1776994325584,
       "type": "directory"
     },
     {
-      "path": "spec\\progress.md",
+      "path": "src\\solver\\analog\\__tests__",
       "accessCount": 1,
-      "lastAccessed": 1776994211969,
-      "type": "file"
+      "lastAccessed": 1776994545001,
+      "type": "directory"
     }
   ],
   "userDirectives": []

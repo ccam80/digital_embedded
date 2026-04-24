@@ -1,357 +1,261 @@
 {
   "summary": {
-    "passed": 753,
-    "failed": 50,
-    "skipped": 0,
-    "totalFiles": 26,
-    "durationSeconds": 2.3
+    "passed": 216,
+    "failed": 37,
+    "skipped": 10,
+    "totalFiles": 28,
+    "durationSeconds": 3.6
   },
   "failures": [
     {
-      "message": "expected 24.999999999999993 to be less than 1",
-      "count": 1,
-      "locations": [
-        {
-          "file": "src\\components\\active\\__tests__\\timer-555.test.ts",
-          "test": "internal_divider_voltages",
-          "line": 217,
-          "column": 22
-        }
-      ]
-    },
-    {
-      "message": "Cannot read properties of undefined (reading '2')",
-      "count": 10,
-      "locations": [
-        {
-          "file": "src\\components\\passives\\capacitor.ts",
-          "test": "oscillates_at_correct_frequency",
-          "line": 272,
-          "column": 27
-        },
-        {
-          "file": "src\\components\\passives\\capacitor.ts",
-          "test": "duty_cycle",
-          "line": 272,
-          "column": 27
-        },
-        {
-          "file": "src\\components\\semiconductors\\mosfet.ts",
-          "test": "cutoff_region",
-          "line": 1072,
-          "column": 34
-        },
-        {
-          "file": "src\\components\\semiconductors\\mosfet.ts",
-          "test": "stamp_nonlinear_has_conductance_entries",
-          "line": 1072,
-          "column": 34
-        },
-        {
-          "file": "src\\components\\semiconductors\\mosfet.ts",
-          "test": "srcFact_zero_does_not_scale_mosfet_stamps",
-          "line": 1072,
-          "column": 34
-        },
-        {
-          "file": "src\\components\\semiconductors\\mosfet.ts",
-          "test": "srcFact_default_equals_one",
-          "line": 1072,
-          "column": 34
-        },
-        {
-          "file": "src\\components\\semiconductors\\mosfet.ts",
-          "test": "polarity_reversed",
-          "line": 1072,
-          "column": 34
-        },
-        {
-          "file": "src\\components\\semiconductors\\mosfet.ts",
-          "test": "pushes GS (fetlim) event to limitingCollector",
-          "line": 1072,
-          "column": 34
-        },
-        {
-          "file": "src\\components\\semiconductors\\mosfet.ts",
-          "test": "pushes DS (limvds) event to limitingCollector",
-          "line": 1072,
-          "column": 34
-        },
-        {
-          "file": "src\\components\\semiconductors\\mosfet.ts",
-          "test": "pushes BS or BD (pnjlim) bulk junction event",
-          "line": 1072,
-          "column": 34
-        }
-      ]
-    },
-    {
       "message": "Cannot read properties of undefined (reading '1')",
-      "count": 4,
+      "count": 24,
       "locations": [
         {
           "file": "src\\components\\passives\\capacitor.ts",
-          "test": "pulse_width",
+          "test": "rc-step: runs to stopTime without collapse",
           "line": 272,
           "column": 27
         },
         {
           "file": "src\\components\\passives\\capacitor.ts",
-          "test": "retrigger_ignored_during_pulse",
+          "test": "rc-ac-lowpass: runs to stopTime without collapse",
           "line": 272,
           "column": 27
         },
         {
-          "file": "src\\components\\semiconductors\\triac.ts",
-          "test": "pushes MT2-MT1 and G-MT1 events on each load call",
-          "line": 260,
-          "column": 32
+          "file": "src\\components\\passives\\inductor.ts",
+          "test": "rl-step: runs to stopTime without collapse",
+          "line": 340,
+          "column": 26
         },
         {
-          "file": "src\\components\\semiconductors\\triac.ts",
-          "test": "events carry correct elementIndex and label",
-          "line": 260,
-          "column": 32
+          "file": "src\\components\\passives\\inductor.ts",
+          "test": "rl-ac: runs to stopTime without collapse",
+          "line": 340,
+          "column": 26
+        },
+        {
+          "file": "src\\components\\passives\\inductor.ts",
+          "test": "rlc-ringdown: runs to stopTime without collapse",
+          "line": 340,
+          "column": 26
+        },
+        {
+          "file": "src\\components\\passives\\inductor.ts",
+          "test": "ourSession has at least 2 steps (boot + at least one transient step)",
+          "line": 340,
+          "column": 26
+        },
+        {
+          "file": "src\\components\\passives\\inductor.ts",
+          "test": "step 0 has stepStartTime === 0",
+          "line": 340,
+          "column": 26
+        },
+        {
+          "file": "src\\components\\passives\\inductor.ts",
+          "test": "step 0 has at least 2 attempts (DCOP attempt + tranInit attempt)",
+          "line": 340,
+          "column": 26
+        },
+        {
+          "file": "src\\components\\passives\\inductor.ts",
+          "test": "step 0 contains a DCOP-phase attempt",
+          "line": 340,
+          "column": 26
+        },
+        {
+          "file": "src\\components\\passives\\inductor.ts",
+          "test": "step 0 contains a transient-phase attempt (tranInit or tranNR)",
+          "line": 340,
+          "column": 26
+        },
+        {
+          "file": "src\\components\\passives\\inductor.ts",
+          "test": "acceptedAttemptIndex points at a transient-phase attempt (not a DCOP sub-solve)",
+          "line": 340,
+          "column": 26
+        },
+        {
+          "file": "src\\components\\passives\\inductor.ts",
+          "test": "step 0 accepted === true",
+          "line": 340,
+          "column": 26
+        },
+        {
+          "file": "src\\components\\passives\\inductor.ts",
+          "test": "subsequent steps have stepStartTime > 0",
+          "line": 340,
+          "column": 26
+        },
+        {
+          "file": "src\\components\\passives\\capacitor.ts",
+          "test": "rc-step.dts: ComparisonSession.ngspiceSession exposes Q/CCAP on capacitor",
+          "line": 272,
+          "column": 27
+        },
+        {
+          "file": "src\\components\\passives\\capacitor.ts",
+          "test": "rc-step.dts: getAttempt(tranNR) exposes Q/CCAP on CVC in ngspice elementStates",
+          "line": 272,
+          "column": 27
+        },
+        {
+          "file": "src\\components\\passives\\inductor.ts",
+          "test": "lteDt_captured_from_ours: lteDt is finite positive on every accepted transient step",
+          "line": 340,
+          "column": 26
+        },
+        {
+          "file": "src\\components\\passives\\capacitor.ts",
+          "test": "5-step self-compare returns presenceCounts: { both: 5, oursOnly: 0, ngspiceOnly: 0 }",
+          "line": 272,
+          "column": 27
+        },
+        {
+          "file": "src\\components\\passives\\capacitor.ts",
+          "test": "truncated ourSession reports presence: ngspiceOnly for the missing tail",
+          "line": 272,
+          "column": 27
+        },
+        {
+          "file": "src\\components\\passives\\capacitor.ts",
+          "test": "returns null for t > simTime",
+          "line": 272,
+          "column": 27
+        },
+        {
+          "file": "src\\components\\passives\\inductor.ts",
+          "test": "creates session and runs transient",
+          "line": 340,
+          "column": 26
+        },
+        {
+          "file": "src\\components\\passives\\capacitor.ts",
+          "test": "self-compare: timeAlign=true and false both return equal indices",
+          "line": 272,
+          "column": 27
+        },
+        {
+          "file": "src\\components\\passives\\capacitor.ts",
+          "test": "rc-step.dts yields >= 3 distinct stepEndTime values",
+          "line": 272,
+          "column": 27
+        },
+        {
+          "file": "src\\components\\passives\\capacitor.ts",
+          "test": "rc-step.dts exposes at least steps 0, 1, 2, 3 with distinct endTimes",
+          "line": 272,
+          "column": 27
+        },
+        {
+          "file": "src\\components\\passives\\capacitor.ts",
+          "test": "dumps s0/s1/s2 for Vc across every iteration of steps 0-4",
+          "line": 272,
+          "column": 27
         }
       ]
     },
     {
-      "message": "Cannot read properties of undefined (reading '0')",
-      "count": 26,
-      "locations": [
-        {
-          "file": "src\\components\\io\\led.ts",
-          "test": "junction_cap_transient_matches_ngspice",
-          "line": 259,
-          "column": 36
-        },
-        {
-          "file": "src\\components\\semiconductors\\bjt.ts",
-          "test": "pushes BE and BC pnjlim events when limitingCollector provided",
-          "line": 849,
-          "column": 32
-        },
-        {
-          "file": "src\\components\\semiconductors\\bjt.ts",
-          "test": "pushes BE and BC pnjlim events",
-          "line": 1242,
-          "column": 39
-        },
-        {
-          "file": "src\\components\\semiconductors\\diode.ts",
-          "test": "junction_capacitance_when_cjo_nonzero",
-          "line": 530,
-          "column": 39
-        },
-        {
-          "file": "src\\components\\semiconductors\\pjfet.ts",
-          "test": "emits_stamps_when_conducting",
-          "line": 380,
-          "column": 32
-        },
-        {
-          "file": "src\\components\\semiconductors\\scr.ts",
-          "test": "triggers_with_gate_current",
-          "line": 250,
-          "column": 32
-        },
-        {
-          "file": "src\\components\\semiconductors\\scr.ts",
-          "test": "holds_after_gate_removed",
-          "line": 250,
-          "column": 32
-        },
-        {
-          "file": "src\\components\\semiconductors\\scr.ts",
-          "test": "turns_off_below_holding_current",
-          "line": 250,
-          "column": 32
-        },
-        {
-          "file": "src\\components\\semiconductors\\scr.ts",
-          "test": "blocks_reverse",
-          "line": 250,
-          "column": 32
-        },
-        {
-          "file": "src\\components\\semiconductors\\scr.ts",
-          "test": "breakover_voltage",
-          "line": 250,
-          "column": 32
-        },
-        {
-          "file": "src\\components\\semiconductors\\scr.ts",
-          "test": "no_writeback: load does not modify voltages[]",
-          "line": 250,
-          "column": 32
-        },
-        {
-          "file": "src\\components\\semiconductors\\scr.ts",
-          "test": "pool_state: pool.state0 contains correct slot values after load",
-          "line": 250,
-          "column": 32
-        },
-        {
-          "file": "src\\components\\semiconductors\\scr.ts",
-          "test": "pool_state: SLOT_LATCHED is 0.0 in blocking state",
-          "line": 250,
-          "column": 32
-        },
-        {
-          "file": "src\\components\\semiconductors\\scr.ts",
-          "test": "pushes AK and GK pnjlim events when limitingCollector provided",
-          "line": 250,
-          "column": 32
-        },
-        {
-          "file": "src\\components\\semiconductors\\triac.ts",
-          "test": "conducts_positive_when_triggered",
-          "line": 260,
-          "column": 32
-        },
-        {
-          "file": "src\\components\\semiconductors\\triac.ts",
-          "test": "conducts_negative_when_triggered",
-          "line": 260,
-          "column": 32
-        },
-        {
-          "file": "src\\components\\semiconductors\\triac.ts",
-          "test": "turns_off_at_zero_crossing",
-          "line": 260,
-          "column": 32
-        },
-        {
-          "file": "src\\components\\semiconductors\\triac.ts",
-          "test": "phase_control",
-          "line": 260,
-          "column": 32
-        },
-        {
-          "file": "src\\components\\semiconductors\\triac.ts",
-          "test": "no_writeback: load(ctx) does not modify voltages[]",
-          "line": 260,
-          "column": 32
-        },
-        {
-          "file": "src\\components\\semiconductors\\triac.ts",
-          "test": "pool_state: pool.state0 contains correct slot values after load",
-          "line": 260,
-          "column": 32
-        },
-        {
-          "file": "src\\components\\semiconductors\\triac.ts",
-          "test": "pool_state: SLOT_LATCHED is -1.0 for reverse-latched state",
-          "line": 260,
-          "column": 32
-        },
-        {
-          "file": "src\\components\\semiconductors\\triac.ts",
-          "test": "pool_state: SLOT_LATCHED is 0.0 in blocking state",
-          "line": 260,
-          "column": 32
-        },
-        {
-          "file": "src\\components\\semiconductors\\tunnel-diode.ts",
-          "test": "peak_current_at_vp",
-          "line": 250,
-          "column": 36
-        },
-        {
-          "file": "src\\components\\semiconductors\\tunnel-diode.ts",
-          "test": "valley_current_at_vv",
-          "line": 250,
-          "column": 36
-        },
-        {
-          "file": "src\\components\\semiconductors\\tunnel-diode.ts",
-          "test": "negative_resistance_transient_matches_ngspice",
-          "line": 250,
-          "column": 36
-        },
-        {
-          "file": "src\\components\\semiconductors\\zener.ts",
-          "test": "load_does_not_write_voltages",
-          "line": 295,
-          "column": 36
-        }
-      ]
-    },
-    {
-      "message": "expected [Function] to not throw an error but 'TypeError: Cannot read properties of …' was thrown",
+      "message": "Cannot read properties of undefined (reading '6')",
       "count": 4,
       "locations": [
         {
-          "file": "src\\components\\semiconductors\\__tests__\\bjt.test.ts",
-          "test": "does not throw when limitingCollector is null",
-          "line": 421,
-          "column": 74
+          "file": "src\\components\\passives\\inductor.ts",
+          "test": "transient: CCAP in capacitor and BJT junctions over first steps/retries",
+          "line": 340,
+          "column": 26
         },
         {
-          "file": "src\\components\\semiconductors\\__tests__\\mosfet.test.ts",
-          "test": "does not throw when limitingCollector is null",
-          "line": 626,
-          "column": 69
+          "file": "src\\components\\passives\\inductor.ts",
+          "test": "transient: inductor current divergence over iterations in step 1",
+          "line": 340,
+          "column": 26
         },
         {
-          "file": "src\\components\\semiconductors\\__tests__\\scr.test.ts",
-          "test": "does not throw when limitingCollector is null",
-          "line": 499,
-          "column": 66
+          "file": "src\\components\\passives\\inductor.ts",
+          "test": "transient: PNP BJT internal node agreement in step 1",
+          "line": 340,
+          "column": 26
         },
         {
-          "file": "src\\components\\semiconductors\\__tests__\\triac.test.ts",
-          "test": "does not push events when limitingCollector is null",
-          "line": 360,
-          "column": 74
+          "file": "src\\components\\passives\\inductor.ts",
+          "test": "8. per-element convergence: our engine reports failures",
+          "line": 340,
+          "column": 26
         }
       ]
     },
     {
-      "message": "expected 1.055941475717686e-12 to be less than 1.055941475717686e-12",
+      "message": "inductor NG_VOLT (INDvolt) must be surfaced on at least one step: expected false to be true // Object.is equality",
       "count": 1,
       "locations": [
         {
-          "file": "src\\components\\semiconductors\\__tests__\\diode.test.ts",
-          "test": "IKR correction reduces gd for reverse-biased diode with finite IKR",
-          "line": 706,
-          "column": 23
+          "file": "src\\solver\\analog\\__tests__\\harness\\cap-ind-state-probe.test.ts",
+          "test": "RL transient: direct bridge surfaces PHI and NG_VOLT on L1",
+          "line": 233,
+          "column": 98
         }
       ]
     },
     {
-      "message": "expected NaN to be greater than 0",
+      "message": "Cannot read properties of null (reading 'steps')",
+      "count": 7,
+      "locations": [
+        {
+          "file": "src\\solver\\analog\\__tests__\\harness\\step-alignment.test.ts",
+          "test": "both engines produce steps",
+          "line": 56,
+          "column": 32
+        },
+        {
+          "file": "src\\solver\\analog\\__tests__\\harness\\step-alignment.test.ts",
+          "test": "every paired step has a finite stepStartTimeDelta",
+          "line": 66,
+          "column": 42
+        },
+        {
+          "file": "src\\solver\\analog\\__tests__\\harness\\step-alignment.test.ts",
+          "test": "first step of both engines has stepStartTime === 0",
+          "line": 78,
+          "column": 32
+        },
+        {
+          "file": "src\\solver\\analog\\__tests__\\harness\\step-alignment.test.ts",
+          "test": "index-paired steps report stepStartTimeDelta = ours.stepStartTime - ng.stepStartTime",
+          "line": 83,
+          "column": 42
+        },
+        {
+          "file": "src\\solver\\analog\\__tests__\\harness\\step-alignment.test.ts",
+          "test": "stepStartTime values are monotonically non-decreasing in both engines",
+          "line": 99,
+          "column": 42
+        },
+        {
+          "file": "src\\solver\\analog\\__tests__\\harness\\step-alignment.test.ts",
+          "test": "timeAlign=true pairs a mid-run step by time when step counts differ",
+          "line": 109,
+          "column": 42
+        },
+        {
+          "file": "src\\solver\\analog\\__tests__\\harness\\step-alignment.test.ts",
+          "test": "timeAlign=false pairs by positional index (ngspiceStepIndex === ourStepIndex)",
+          "line": 129,
+          "column": 42
+        }
+      ]
+    },
+    {
+      "message": "ComparisonSession: call runDcOp() or runTransient() first",
       "count": 1,
       "locations": [
         {
-          "file": "src\\components\\semiconductors\\__tests__\\diode.test.ts",
-          "test": "cap gate fires under MODETRANOP | MODEUIC (dioload.c:316-317)",
-          "line": 1262,
-          "column": 28
-        }
-      ]
-    },
-    {
-      "message": "expected false to be true // Object.is equality",
-      "count": 3,
-      "locations": [
-        {
-          "file": "src\\components\\semiconductors\\__tests__\\mosfet.test.ts",
-          "test": "common_source_nmos",
-          "line": 464,
-          "column": 30
-        },
-        {
-          "file": "src\\components\\semiconductors\\__tests__\\mosfet.test.ts",
-          "test": "setParam('VTO', 2.5) shifts DC OP to match SPICE reference",
-          "line": 501,
-          "column": 30
-        },
-        {
-          "file": "src\\components\\semiconductors\\__tests__\\mosfet.test.ts",
-          "test": "setParam('KP', 240µ) shifts DC OP to match SPICE reference",
-          "line": 525,
-          "column": 30
+          "file": "src\\solver\\analog\\__tests__\\harness\\comparison-session.ts",
+          "test": "session has steps on both sides (presence counts have both > 0)",
+          "line": 2518,
+          "column": 13
         }
       ]
     }
