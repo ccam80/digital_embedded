@@ -337,8 +337,6 @@ export function createPJfetElement(
       let gds = 0;
       let ggs = 0;
       let ggd = 0;
-      // cite: jfetload.c:165-174 — extrapolated currents for bypass + noncon;
-      // set only in the general-iteration branch.
       let cghat = 0;
       let cdhat = 0;
 
@@ -371,8 +369,9 @@ export function createPJfetElement(
         vgd = 0;
         icheck = 0;
       } else if (mode & MODEINITPRED) {
-        // jfetload.c:124-149: predictor step (#ifndef PREDICTOR default is
-        // inert in ngspice). Use state1 rotation fallback.
+        // cite: jfetload.c:124-149 — predictor step active by default
+        // (#ifndef PREDICTOR is true when PREDICTOR is undefined, the default).
+        // Verbatim port: xfact extrapolation of vgs/vgd plus 9-slot state copy.
         const vgs1 = s1[base + SLOT_VGS];
         const vgd1 = s1[base + SLOT_VGD];
         const deltaOldRatio = ctx.deltaOld[1] > 0 ? ctx.delta / ctx.deltaOld[1] : 0;
@@ -678,7 +677,7 @@ export function createPJfetElement(
       // cite: jfetload.c:498-507 — suppress noncon bump only when both
       // MODEINITFIX and MODEUIC are set (UIC-forced IC at init step).
       // Bitwise `|` on operands that are already 0/1 from `!` is equivalent
-      // to logical `||` — no "quirk," just C convention ported verbatim.
+      // to logical `||` — same Boolean semantics in both languages, ported verbatim.
       if ((!(mode & MODEINITFIX)) | (!(mode & MODEUIC))) {
         const absTol = ctx.iabstol;
         const cgNoncon = Math.abs(cghat - cg)

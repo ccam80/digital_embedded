@@ -11,7 +11,8 @@
  *   - Integration: common-source NMOS DC operating point vs SPICE reference
  */
 
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
+import * as NewtonRaphsonModule from "../../../solver/analog/newton-raphson.js";
 import {
   NmosfetDefinition,
   PmosfetDefinition,
@@ -826,12 +827,12 @@ describe("integration", () => {
 // ---------------------------------------------------------------------------
 
 describe("MOSFET LoadContext precondition", () => {
-  it("bypass and voltTol exist", () => {
-    // Construct a LoadContext with both bypass and voltTol fields explicitly set.
-    // This verifies that the LoadContext type carries these fields (Phase 5
-    // precondition) — if they were absent, TypeScript would reject this object
-    // and the _PhaseAssert type alias in mosfet.ts would produce a compile error.
-    const bag = makeParamBag(NMOS_DEFAULTS);
+  it("bypass and voltTol are read through the bypass branch", () => {
+    // Task 6.1.3: verify ctx.bypass and ctx.voltTol are actually read via the
+    // bypass gate introduced in Task 6.2.4. Use MODEDCOP | MODEINITFLOAT so the
+    // simpleGate path runs (MODEINITJCT goes through the else branch which
+    // never touches the bypass gate).
+    const bag = makeParamBag({ ...NMOS_DEFAULTS, CBD: 0, CBS: 0, CGSO: 0, CGDO: 0 });
     const core = createMosfetElement(1, new Map([["G", 2], ["S", 3], ["D", 1]]), [], -1, bag) as any;
     const pool = new StatePool(core.stateSize);
     core.stateBaseOffset = 0;
@@ -839,43 +840,76 @@ describe("MOSFET LoadContext precondition", () => {
     core.pinNodeIds = [2, 1, 3, 3];
     core.allNodeIds = [2, 1, 3, 3];
 
-    // Use MODEINITJCT mode: this path does not read ctx.rhsOld and does not
-    // require any voltage node setup — it zero-initialises or seeds from tVto.
-    const solver = new SparseSolver();
-    solver.beginAssembly(3);
-    const ctx: LoadContext = {
-      cktMode: MODEDCOP | MODEINITJCT,
-      solver,
-      matrix: solver,
-      rhs: new Float64Array(3),
-      rhsOld: new Float64Array(3),
-      time: 0,
-      dt: 0,
-      method: "trapezoidal",
-      order: 1,
-      deltaOld: [0, 0, 0, 0, 0, 0, 0],
-      ag: new Float64Array(7),
-      srcFact: 1,
-      noncon: { value: 0 },
-      limitingCollector: null,
-      convergenceCollector: null,
-      xfact: 0,
-      gmin: 1e-12,
-      reltol: 1e-3,
-      iabstol: 1e-12,
-      temp: 300.15,
-      vt: 300.15 * 1.3806226e-23 / 1.6021918e-19,
-      cktFixLimit: false,
-      bypass: true,
-      voltTol: 1e-6,
+    // Build a LoadContext on the MODEDCOP | MODEINITFLOAT path (simpleGate=true).
+    const KoverQ_local = 1.3806226e-23 / 1.6021918e-19;
+    const temp = 300.15;
+    const makeCtx = (): LoadContext => {
+      const solver = new SparseSolver();
+      solver.beginAssembly(4);
+      return {
+        cktMode: MODEDCOP | MODEINITFLOAT,
+        solver,
+        matrix: solver,
+        rhs: new Float64Array(4),
+        rhsOld: new Float64Array([2.0, 1.5, 0.0, 0.0]),
+        time: 0,
+        dt: 0,
+        method: "trapezoidal",
+        order: 1,
+        deltaOld: [0, 0, 0, 0, 0, 0, 0],
+        ag: new Float64Array(7),
+        srcFact: 1,
+        noncon: { value: 0 },
+        limitingCollector: [],
+        convergenceCollector: null,
+        xfact: 0,
+        gmin: 1e-12,
+        reltol: 1e-3,
+        iabstol: 1e-12,
+        temp,
+        vt: temp * KoverQ_local,
+        cktFixLimit: false,
+        bypass: true,
+        voltTol: 1e-6,
+      };
     };
 
-    // load() must not throw — bypass and voltTol are present on the context.
-    expect(() => core.load(ctx)).not.toThrow();
+    // First call (bypass:false) converges state0 to a valid operating point so
+    // the bypass gate's five tolerance tests can evaluate against real values.
+    const seedCtx = makeCtx();
+    seedCtx.bypass = false;
+    for (let i = 0; i < 20; i++) {
+      const s = new SparseSolver();
+      s.beginAssembly(4);
+      seedCtx.solver = s;
+      seedCtx.matrix = s;
+      core.load(seedCtx);
+    }
 
-    // The ctx.bypass and ctx.voltTol fields are structurally present.
-    expect(ctx.bypass).toBe(true);
-    expect(ctx.voltTol).toBe(1e-6);
+    // Second call with bypass=true and rhsOld matching state0 — delv's are all
+    // zero so the bypass gate fires. Spy on pnjlim + fetlim to verify the
+    // limiting block is SKIPPED (proving the bypass branch was taken).
+    const pnjlimSpy = vi.spyOn(NewtonRaphsonModule, "pnjlim");
+    const fetlimSpy = vi.spyOn(NewtonRaphsonModule, "fetlim");
+    try {
+      const ctx = makeCtx();
+      ctx.bypass = true;
+      ctx.voltTol = 1e-6;
+
+      // load() must not throw — bypass and voltTol are present and read.
+      expect(() => core.load(ctx)).not.toThrow();
+
+      // The ctx.bypass and ctx.voltTol fields are structurally present.
+      expect(ctx.bypass).toBe(true);
+      expect(ctx.voltTol).toBe(1e-6);
+
+      // Bypass fired → limiting block was skipped → pnjlim/fetlim NOT called.
+      expect(pnjlimSpy).not.toHaveBeenCalled();
+      expect(fetlimSpy).not.toHaveBeenCalled();
+    } finally {
+      pnjlimSpy.mockRestore();
+      fetlimSpy.mockRestore();
+    }
   });
 });
 
@@ -1061,71 +1095,91 @@ const S_MODE = 25, S_VON  = 26, S_VDSAT= 27;
 
 describe("MOSFET M-1", () => {
   it("predictor voltages pass through fetlim", () => {
-    // Seed state1 so that the predictor extrapolates vgs to a large value that
-    // triggers fetlim. vgs1=3.0, vgs2=2.0, xfact=0.5 → vgs_pred=3.5 which is
-    // well above threshold and will trigger fetlim.
+    // Seed state1/state2 so the predictor extrapolates vgs from OFF region
+    // (vold=s1[VGS]=0.5<vto) into a high value triggering fetlim zone 3 clamp.
+    // mos1load.c:211-213 writes s0[VGS] = s1[VGS] BEFORE limiting reads it, so
+    // vgsOldStored = s1[VGS] = 0.5. Predictor xfact=1 (dt=deltaOld[1]):
+    //   vgs_pred = 2*s1[VGS] - 1*s2[VGS] = 2*0.5 - (-5) = 6.0.
+    // fetlim(vnew=6.0, vold=0.5, vto=0.7): vold<vto → zone 3 (OFF), delv>0,
+    //   vtemp=vto+0.5=1.2; vnew=6.0 > vtemp → clamp vnew = 1.2. wasLimited=true.
     const { element, pool } = makeNmosElement62({ VTO: 0.7, KP: 120e-6, GAMMA: 0, CGSO: 0, CGDO: 0, CBD: 0, CBS: 0 });
     const s0 = pool.states[0];
     const s1 = pool.states[1];
     const s2 = pool.states[2];
 
-    // Seed all voltage slots so predictor has valid state1/state2.
-    s1[S_VGS] = 3.0; s2[S_VGS] = 2.0;
-    s1[S_VDS] = 1.0; s2[S_VDS] = 0.8;
+    s1[S_VGS] = 0.5; s2[S_VGS] = -5.0;
+    s1[S_VDS] = 1.0; s2[S_VDS] = 1.0;
     s1[S_VBS] = 0.0; s2[S_VBS] = 0.0;
-    s0[S_VGS] = 3.0; s0[S_VDS] = 1.0; s0[S_VBS] = 0.0;
+    s0[S_VGS] = 0.5; s0[S_VDS] = 1.0; s0[S_VBS] = 0.0;
     s0[S_VBD] = 0.0 - 1.0;
     s1[S_VBD] = 0.0 - 1.0;
 
     const ctx = makeWave62Ctx(MODEDCOP | MODETRAN | MODEINITPRED, {
       dt: 1e-9,
-      deltaOld: [1e-9, 2e-9, 0, 0, 0, 0, 0],
+      deltaOld: [1e-9, 1e-9, 0, 0, 0, 0, 0],
       limitingCollector: [],
     });
 
     element.load(ctx);
 
-    // Verify a fetlim event is present (predictor path ran through limiting).
+    // Verify exactly one fetlim event on the GS junction (forward-mode path).
+    // mos1load.c:368-378: forward branch pushes DEVfetlim(vgs,...) once.
     const fetlimEvents = ctx.limitingCollector!.filter(
       (e: any) => e.limitType === "fetlim",
     );
-    expect(fetlimEvents.length).toBeGreaterThan(0);
+    expect(fetlimEvents).toHaveLength(1);
+    expect(fetlimEvents[0].junction).toBe("GS");
+    expect(fetlimEvents[0].wasLimited).toBe(true);
   });
 
   it("predictor voltages pass through pnjlim", () => {
-    // Seed so predictor yields vbs >> sourceVcrit to trigger pnjlim on BS.
-    const { element, pool } = makeNmosElement62({ VTO: 0.7, KP: 120e-6, GAMMA: 0, CBD: 0, CBS: 1e-12 });
+    // Seed so predictor yields vbs >> sourceVcrit to trigger pnjlim forward-limit.
+    // With IS=1e-6, default temp → tSatCur≈1e-6, vt≈0.02585, and
+    // sourceVcrit ≈ 0.02585 * log(0.02585/(sqrt(2)*1e-6)) ≈ 0.254 V.
+    // mos1load.c:211-214 writes s0[VBS] = s1[VBS] BEFORE limiting reads it, so
+    // vbsOldStored = s1[VBS]. Need |vbs_pred - s1[VBS]| > 2*vt AND vbs_pred > vcrit.
+    // xfact=1: vbs_pred = 2*s1[VBS] - s2[VBS]. Pick s1=0, s2=-1 → vbs_pred=1.0.
+    //   vbsOldStored = s1[VBS] = 0. pnjlim(vnew=1.0, vold=0, vt, vcrit=0.254):
+    //   1.0 > 0.254 AND |1.0-0|=1.0 > 2*vt=0.052 → forward fires.
+    //   vold<=0 → vnew' = vt * log(1.0/vt) ≈ 0.02585*log(38.67) ≈ 0.0945, limited=true.
+    const { element, pool } = makeNmosElement62({
+      VTO: 0.7, KP: 120e-6, GAMMA: 0, CBD: 0, CBS: 1e-12, IS: 1e-6,
+    });
     const s0 = pool.states[0];
     const s1 = pool.states[1];
     const s2 = pool.states[2];
 
-    // Large positive vbs jump will trigger pnjlim Gillespie branch.
-    s1[S_VBS] = 0.5; s2[S_VBS] = 0.3;
+    s1[S_VBS] = 0.0; s2[S_VBS] = -1.0;
     s1[S_VGS] = 1.5; s2[S_VGS] = 1.5;
     s1[S_VDS] = 1.0; s2[S_VDS] = 1.0;
-    s0[S_VBS] = 0.5; s0[S_VGS] = 1.5; s0[S_VDS] = 1.0;
-    s0[S_VBD] = 0.5 - 1.0;
-    s1[S_VBD] = 0.5 - 1.0;
+    s0[S_VBS] = 0.0; s0[S_VGS] = 1.5; s0[S_VDS] = 1.0;
+    s0[S_VBD] = 0.0 - 1.0;
+    s1[S_VBD] = 0.0 - 1.0;
 
     const ctx = makeWave62Ctx(MODEDCOP | MODETRAN | MODEINITPRED, {
       dt: 1e-9,
       deltaOld: [1e-9, 1e-9, 0, 0, 0, 0, 0],
       limitingCollector: [],
-      // Set vt large so pnjlim fires at moderate vbs.
-      vt: 0.3,
     });
-    // Force rhs to yield large vbs after predictor update.
-    ctx.rhsOld[1] = 0; // G node
-    ctx.rhsOld[0] = 1.0; // D node
-    ctx.rhsOld[2] = 0; // S/B node
 
     element.load(ctx);
 
-    // A pnjlim event should have fired on BS or BD junction.
+    // Exactly one pnjlim event on BS (forward mode: vds_pred > 0 → pnjlim on vbs).
+    // mos1load.c:393-406: forward path pushes DEVpnjlim(vbs,...) once.
     const pnjlimEvents = ctx.limitingCollector!.filter(
       (e: any) => e.limitType === "pnjlim",
     );
-    expect(pnjlimEvents.length).toBeGreaterThan(0);
+    expect(pnjlimEvents).toHaveLength(1);
+    expect(pnjlimEvents[0].junction).toBe("BS");
+    expect(pnjlimEvents[0].wasLimited).toBe(true);
+
+    // pnjlim forward-limit formula devsup.c:62-64 (vold<=0 branch):
+    //   vnew' = vt * log(vnew/vt).
+    // Assert vAfter matches the ngspice formula bit-exact.
+    const vt = ctx.vt;
+    const vbsBefore = pnjlimEvents[0].vBefore;
+    const expectedLimited = vt * Math.log(vbsBefore / vt);
+    expect(pnjlimEvents[0].vAfter).toBeCloseTo(expectedLimited, 12);
   });
 
   it("INITJCT path still skips limiting", () => {
@@ -1143,24 +1197,42 @@ describe("MOSFET M-1", () => {
 
 describe("MOSFET M-2", () => {
   it("SMSIG reads voltages from rhsOld", () => {
-    const { element, pool } = makeNmosElement62({ VTO: 0.7, KP: 120e-6, GAMMA: 0, CBD: 0, CBS: 0, CGSO: 0, CGDO: 0 });
-    const s0 = pool.states[0];
+    // Contrast assertion: run the same device with two different rhsOld values
+    // and different state0 seeds. If load() reads from rhsOld (mos1load.c:226-240
+    // general iteration path), the two cd values must differ. If load() incorrectly
+    // read from state0, cd would be identical across both runs.
 
-    // Seed state0 with one set of voltages.
-    s0[S_VGS] = 0.5; s0[S_VDS] = 0.0; s0[S_VBS] = 0.0; s0[S_VBD] = 0.0;
-
-    // Build ctx where rhsOld has Vgs=1.5 (above threshold) — expect saturation stamp.
-    // rhsOld[nodeG-1=1]=1.5, rhsOld[nodeD-1=0]=2.0, rhsOld[nodeS-1=2]=0.0
-    const ctx = makeWave62Ctx(MODEDCOP | MODEINITSMSIG, {
-      rhsOld: new Float64Array([2.0, 1.5, 0.0, 0.0]),
+    // ---- Run A: rhsOld gives vgs=1.5 (above threshold=0.7), state0[VGS]=0.5 (below).
+    const runA = makeNmosElement62({ VTO: 0.7, KP: 120e-6, GAMMA: 0, CBD: 0, CBS: 0, CGSO: 0, CGDO: 0 });
+    runA.pool.states[0][S_VGS] = 0.5; runA.pool.states[0][S_VDS] = 0.0;
+    runA.pool.states[0][S_VBS] = 0.0; runA.pool.states[0][S_VBD] = 0.0;
+    const ctxA = makeWave62Ctx(MODEDCOP | MODEINITSMSIG, {
+      rhsOld: new Float64Array([2.0, 1.5, 0.0, 0.0]),  // V_D=2, V_G=1.5, V_S=0 → vgs=1.5
     });
+    runA.element.load(ctxA);
+    const cdA = runA.pool.states[0][S_CD];
 
-    element.load(ctx);
+    // ---- Run B: rhsOld gives vgs=0.3 (below threshold), state0[VGS]=0.5 (same as A).
+    const runB = makeNmosElement62({ VTO: 0.7, KP: 120e-6, GAMMA: 0, CBD: 0, CBS: 0, CGSO: 0, CGDO: 0 });
+    runB.pool.states[0][S_VGS] = 0.5; runB.pool.states[0][S_VDS] = 0.0;
+    runB.pool.states[0][S_VBS] = 0.0; runB.pool.states[0][S_VBD] = 0.0;
+    const ctxB = makeWave62Ctx(MODEDCOP | MODEINITSMSIG, {
+      rhsOld: new Float64Array([2.0, 0.3, 0.0, 0.0]),  // V_G=0.3 → vgs=0.3 (below threshold)
+    });
+    runB.element.load(ctxB);
+    const cdB = runB.pool.states[0][S_CD];
 
-    // The operating point was evaluated using rhsOld (Vgs=1.5, above threshold).
-    // CD should reflect an active device, not the s0-derived cutoff.
-    const cd = pool.states[0][S_CD];
-    expect(Math.abs(cd)).toBeGreaterThan(1e-15);
+    // Contrast: rhsOld-derived vgs differs → cd differs by many orders of magnitude.
+    // If load() incorrectly read from state0, both runs share state0[VGS]=0.5
+    // (below VTO=0.7) → both would be in cutoff with identical bulk-leak cd.
+    //
+    // Run A (vgs=1.5 > vth): cd dominated by saturation current in the µA range.
+    // Run B (vgs=0.3 < vth): cd is dominated by bulk-drain junction leakage (pA range).
+    // The ratio cdA/cdB must be > 1e6 to distinguish saturation from bulk leak.
+    expect(cdA).toBeGreaterThan(1e-6);             // Run A is a real ON device.
+    expect(Math.abs(cdB)).toBeLessThan(1e-9);     // Run B is cutoff w/ only bulk leak.
+    // Contrast: values MUST differ by >6 orders of magnitude.
+    expect(cdA / Math.max(Math.abs(cdB), 1e-30)).toBeGreaterThan(1e6);
   });
 
   it("SMSIG uses useDouble cap averaging", () => {
@@ -1384,7 +1456,9 @@ describe("MOSFET M-4", () => {
     });
     seedConvergedState(element, pool);
 
-    const cdBefore = pool.states[0][S_CD];
+    // Pre-write SLOT_CD to a sentinel; fresh OP eval overwrites it.
+    const CD_SENTINEL = -9.9999e-42;
+    pool.states[0][S_CD] = CD_SENTINEL;
 
     const ctx = makeWave62Ctx(MODEDCOP | MODETRAN | MODEINITPRED, {
       rhsOld: new Float64Array([2.0, 1.5, 0.0, 0.0]),
@@ -1399,12 +1473,22 @@ describe("MOSFET M-4", () => {
     pool.states[1][S_VBS] = 0.0; pool.states[2][S_VBS] = 0.0;
     pool.states[1][S_VBD] = -2.0; pool.states[2][S_VBD] = -2.0;
 
-    element.load(ctx);
+    // Spy on pnjlim/fetlim — MODEINITPRED excludes bypass so limiting must run.
+    const pnjlimSpy = vi.spyOn(NewtonRaphsonModule, "pnjlim");
+    const fetlimSpy = vi.spyOn(NewtonRaphsonModule, "fetlim");
+    try {
+      element.load(ctx);
 
-    // MODEINITPRED excludes bypass → CD IS updated (not equal to cdBefore necessarily,
-    // but the OP eval ran so it reflects fresh computation).
-    // We just verify no throw and the mode gate worked.
-    expect(ctx.solver.getCSCNonZeros().length).toBeGreaterThan(0);
+      // Bypass disabled → compute path taken → pnjlim+fetlim called.
+      const limitingCalls = pnjlimSpy.mock.calls.length + fetlimSpy.mock.calls.length;
+      expect(limitingCalls).toBeGreaterThan(0);
+
+      // SLOT_CD must have been overwritten (bypass did NOT fire).
+      expect(pool.states[0][S_CD]).not.toBe(CD_SENTINEL);
+    } finally {
+      pnjlimSpy.mockRestore();
+      fetlimSpy.mockRestore();
+    }
   });
 
   it("bypass disabled during SMSIG", () => {
@@ -1413,7 +1497,9 @@ describe("MOSFET M-4", () => {
     });
     seedConvergedState(element, pool);
 
-    const cdBefore = pool.states[0][S_CD];
+    // Pre-write SLOT_CD to a sentinel; fresh OP eval overwrites it.
+    const CD_SENTINEL = -7.7777e-42;
+    pool.states[0][S_CD] = CD_SENTINEL;
 
     const ctx = makeWave62Ctx(MODEDCOP | MODEINITSMSIG, {
       rhsOld: new Float64Array([2.0, 1.5, 0.0, 0.0]),
@@ -1421,10 +1507,22 @@ describe("MOSFET M-4", () => {
       voltTol: 1e-6,
     });
 
-    element.load(ctx);
+    // Spy on pnjlim/fetlim — MODEINITSMSIG excludes bypass so limiting must run.
+    const pnjlimSpy = vi.spyOn(NewtonRaphsonModule, "pnjlim");
+    const fetlimSpy = vi.spyOn(NewtonRaphsonModule, "fetlim");
+    try {
+      element.load(ctx);
 
-    // SMSIG excludes bypass → OP eval ran → CD updated. Just check no throw.
-    expect(ctx.solver.getCSCNonZeros().length).toBeGreaterThan(0);
+      // Bypass disabled → compute path taken → limiting called.
+      const limitingCalls = pnjlimSpy.mock.calls.length + fetlimSpy.mock.calls.length;
+      expect(limitingCalls).toBeGreaterThan(0);
+
+      // SLOT_CD must have been overwritten (bypass did NOT fire).
+      expect(pool.states[0][S_CD]).not.toBe(CD_SENTINEL);
+    } finally {
+      pnjlimSpy.mockRestore();
+      fetlimSpy.mockRestore();
+    }
   });
 
   it("bypass does not fire when delvbs exceeds voltTol", () => {
@@ -1433,19 +1531,17 @@ describe("MOSFET M-4", () => {
     });
     seedConvergedState(element, pool);
 
-    const cdBefore = pool.states[0][S_CD];
-
     // Set delvbs = 10 * voltTol (large deviation → bypass should not fire).
     const s0 = pool.states[0];
     const prevVbs = s0[S_VBS];
-    // Construct rhsOld with vbs shifted by 10x voltTol.
-    // rhsOld[nodeS=2] = S node = 0, rhsOld[nodeB=3] = B = 0.
-    // vbs = polarity*(rhsOld[B-1] - rhsOld[S-1]) = rhsOld[2]-rhsOld[2] = 0.
-    // To shift vbs we shift the G-S or B-S difference. With B=S tied at node 3:
-    // vbs = V(B) - V(S) = 0. So to get delvbs != 0, we need B != S temporarily.
-    // Instead we seed state0[VBS] = prevVbs - 10*voltTol so delvbs = 10*voltTol.
+    // vbs new is derived from rhsOld (V_B - V_S) with B=S=3; both zero → vbs_new=0.
+    // To get delvbs != 0, shift state0[VBS] so new-prev exceeds voltTol.
     const voltTol = 1e-6;
     s0[S_VBS] = prevVbs - 10 * voltTol;
+
+    // Pre-write SLOT_CD to a sentinel; fresh OP eval overwrites it.
+    const CD_SENTINEL = -5.5555e-42;
+    s0[S_CD] = CD_SENTINEL;
 
     const ctx = makeWave62Ctx(MODEDCOP | MODEINITFLOAT, {
       rhsOld: new Float64Array([2.0, 1.5, 0.0, 0.0]),
@@ -1453,11 +1549,22 @@ describe("MOSFET M-4", () => {
       voltTol,
     });
 
-    element.load(ctx);
+    // Spy on pnjlim/fetlim — delvbs exceeds voltTol so bypass must NOT fire.
+    const pnjlimSpy = vi.spyOn(NewtonRaphsonModule, "pnjlim");
+    const fetlimSpy = vi.spyOn(NewtonRaphsonModule, "fetlim");
+    try {
+      element.load(ctx);
 
-    // delvbs exceeded voltTol → bypass did not fire → OP updated → CD may differ.
-    // Verify load ran (no throw, stamps present).
-    expect(ctx.solver.getCSCNonZeros().length).toBeGreaterThan(0);
+      // Bypass suppressed → compute path → limiting called.
+      const limitingCalls = pnjlimSpy.mock.calls.length + fetlimSpy.mock.calls.length;
+      expect(limitingCalls).toBeGreaterThan(0);
+
+      // SLOT_CD must have been overwritten (bypass did NOT fire).
+      expect(pool.states[0][S_CD]).not.toBe(CD_SENTINEL);
+    } finally {
+      pnjlimSpy.mockRestore();
+      fetlimSpy.mockRestore();
+    }
   });
 
   it("bypass with MODETRAN rebuilds capgs/d/b from halves", () => {
@@ -1630,8 +1737,8 @@ describe("MOSFET M-6", () => {
 
     element.load(ctx);
 
-    // pnjlim fired on BD junction (vbd=0.8 > drainVcrit) → noncon++.
-    expect(ctx.noncon.value).toBeGreaterThan(0);
+    // pnjlim fired on BD junction (vbd=0.8 > drainVcrit) → noncon++ exactly once.
+    expect(ctx.noncon.value).toBe(1);
   });
 
   it("OFF=1 + MODEINITFIX suppresses noncon even on limit", () => {

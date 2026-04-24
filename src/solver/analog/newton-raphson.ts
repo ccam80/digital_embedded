@@ -15,12 +15,6 @@ import {
   MODEINITFLOAT, MODEINITJCT, MODEINITFIX,
   MODEINITTRAN, MODEINITPRED, MODEINITSMSIG,
 } from "./ckt-mode.js";
-// Self-namespace import: lets intra-module calls (e.g. `fetlim` → `_computeVtstlo`)
-// route through the exports object rather than the lexical binding, so that
-// `vi.spyOn(NewtonRaphsonModule, "_computeVtstlo")` can intercept the call
-// from test code and guard against future inline re-expansion of the helper.
-import * as self from "./newton-raphson.js";
-
 // ---------------------------------------------------------------------------
 // LimitingEvent — records a single voltage-limiting call per junction per NR iteration
 // ---------------------------------------------------------------------------
@@ -191,7 +185,7 @@ export function _computeVtstlo(vold: number, vto: number): number {
 export function fetlim(vnew: number, vold: number, vto: number): number {
   // cite: devsup.c:101-102
   const vtsthi = Math.abs(2 * (vold - vto)) + 2;
-  const vtstlo = self._computeVtstlo(vold, vto);
+  const vtstlo = _computeVtstlo(vold, vto);
   const vtox = vto + 3.5;
   const delv = vnew - vold;
 

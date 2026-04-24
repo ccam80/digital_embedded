@@ -8,13 +8,15 @@
  * Each test asserts exact numerical equality against ngspice `devsup.c`.
  */
 
-import { describe, it, expect, vi, afterEach } from "vitest";
-import * as nrModule from "../newton-raphson.js";
+import { describe, it, expect } from "vitest";
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+import { dirname, resolve } from "node:path";
 import { _computeVtstlo, fetlim, limvds } from "../newton-raphson.js";
 
-afterEach(() => {
-  vi.restoreAllMocks();
-});
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+const NEWTON_RAPHSON_PATH = resolve(__dirname, "..", "newton-raphson.ts");
 
 describe("_computeVtstlo", () => {
   it("matches ngspice Gillespie formula", () => {
@@ -37,16 +39,31 @@ describe("fetlim", () => {
     expect(fetlim(10.0, 5.0, 0.5)).toBe(10.0);
   });
 
-  it("routes through _computeVtstlo", () => {
-    // Spy on the module namespace so the spy intercepts the intra-module
-    // call in `fetlim`. Inputs: (vnew=0.9, vold=0.0, vto=0.5) — OFF,
-    // delv=0.9 > 0, vtemp=1.0, vnew <= vtemp, which is the branch that
-    // consumes `vtstlo`. The spy must be called exactly once with
-    // (vold, vto) = (0.0, 0.5).
-    const spy = vi.spyOn(nrModule, "_computeVtstlo");
-    fetlim(0.9, 0.0, 0.5);
-    expect(spy).toHaveBeenCalledTimes(1);
-    expect(spy).toHaveBeenCalledWith(0.0, 0.5);
+  it("routes through _computeVtstlo (structural — no inline re-expansion)", () => {
+    // Read newton-raphson.ts as text and locate the `fetlim` function body.
+    // Assert (a) the body calls `_computeVtstlo(vold, vto)` and (b) the body
+    // does NOT contain the inline Gillespie expression `Math.abs(vold - vto) + 1`
+    // anywhere — that form should appear only inside `_computeVtstlo` itself.
+    // Guards against future inline re-expansion of the helper.
+    const source = readFileSync(NEWTON_RAPHSON_PATH, "utf8");
+    const fetlimStart = source.indexOf("export function fetlim(");
+    expect(fetlimStart, "fetlim definition must exist").toBeGreaterThan(-1);
+    // Find matching closing brace via brace-counting starting from the open
+    // brace of the function body.
+    const bodyOpen = source.indexOf("{", fetlimStart);
+    expect(bodyOpen).toBeGreaterThan(-1);
+    let depth = 1;
+    let i = bodyOpen + 1;
+    while (i < source.length && depth > 0) {
+      const ch = source[i];
+      if (ch === "{") depth++;
+      else if (ch === "}") depth--;
+      i++;
+    }
+    expect(depth, "fetlim body must have balanced braces").toBe(0);
+    const fetlimBody = source.slice(bodyOpen, i);
+    expect(fetlimBody.includes("_computeVtstlo(vold, vto)")).toBe(true);
+    expect(fetlimBody.includes("Math.abs(vold - vto) + 1")).toBe(false);
   });
 });
 

@@ -471,8 +471,9 @@ interface BjtOperatingPoint {
 }
 
 /**
- * Simple (L0) Gummel-Poon: NE/NC fixed at 1.5/2, NKF=0.5. bjtload.c:420-560
- * with c2 = BJTtBEleakCur*AREA, c4 = BJTtBCleakCur*AREA, vte/vtc from NE/NC.
+ * Simple (L0) Gummel-Poon kernel — NE/NC are passed in (params.NE/params.NC),
+ * NKF=0.5. bjtload.c:420-560 with c2 = BJTtBEleakCur*AREA, c4 = BJTtBCleakCur*AREA,
+ * vte/vtc from NE/NC.
  */
 function computeBjtOp(
   vbe: number, vbc: number,
@@ -1432,411 +1433,411 @@ export function createSpiceL1BjtElement(
         cdsub  = s0[base + SLOT_CDSUB];
         icheckLimited = false;
       } else {
-      // bjtload.c:383-416: pnjlim on BE, BC, and substrate junctions.
-      vbeLimited = vbeRaw;
-      vbcLimited = vbcRaw;
-      vsubLimited = vsubRaw;
-      let vbeLimFlag = false;
-      let vbcLimFlag = false;
-      let vsubLimFlag = false;
-      if ((mode & (MODEINITJCT | MODEINITSMSIG | MODEINITTRAN)) === 0) {
-        const vbeResult = pnjlim(vbeRaw, s0[base + SLOT_VBE], vt, tp.tVcrit);
-        vbeLimited = vbeResult.value;
-        vbeLimFlag = vbeResult.limited;
-        const vbcResult = pnjlim(vbcRaw, s0[base + SLOT_VBC], vt, tp.tVcrit);
-        vbcLimited = vbcResult.value;
-        vbcLimFlag = vbcResult.limited;
-        const vsubResult = pnjlim(vsubRaw, s0[base + SLOT_VSUB], vt, tp.tSubVcrit);
-        vsubLimited = vsubResult.value;
-        vsubLimFlag = vsubResult.limited;
-      }
-      icheckLimited = vbeLimFlag || vbcLimFlag || vsubLimFlag;
-
-      // cite: bjtload.c:749-754 — icheck++ unless MODEINITFIX && OFF
-      if (icheckLimited && (params.OFF === 0 || !(mode & MODEINITFIX))) ctx.noncon.value++;
-
-      if (ctx.limitingCollector) {
-        ctx.limitingCollector.push({
-          elementIndex: this.elementIndex ?? -1,
-          label: this.label ?? "",
-          junction: "BE",
-          limitType: "pnjlim",
-          vBefore: vbeRaw,
-          vAfter: vbeLimited,
-          wasLimited: vbeLimFlag,
-        });
-        ctx.limitingCollector.push({
-          elementIndex: this.elementIndex ?? -1,
-          label: this.label ?? "",
-          junction: "BC",
-          limitType: "pnjlim",
-          vBefore: vbcRaw,
-          vAfter: vbcLimited,
-          wasLimited: vbcLimFlag,
-        });
-        ctx.limitingCollector.push({
-          elementIndex: this.elementIndex ?? -1,
-          label: this.label ?? "",
-          junction: "SUB",
-          limitType: "pnjlim",
-          vBefore: vsubRaw,
-          vAfter: vsubLimited,
-          wasLimited: vsubLimFlag,
-        });
-      }
-
-      // bjtload.c:420-560: Gummel-Poon operating point at limited voltages.
-      const op = computeSpiceL1BjtOp(
-        vbeLimited, vbcLimited,
-        csat, tp.tBetaF, params.NF, tp.tBetaR, params.NR,
-        c2, c4,
-        params.NE, params.NC,
-        tp.tinvEarlyVoltF, tp.tinvEarlyVoltR,
-        oik, oikr,
-        vt, params.NKF,
-      );
-
-      ({ cc, cb, gm, go, gpi, gmu } = op);
-      let { qb, dqbdve, dqbdvc, cbe, cbc, gbe, gbc, cbcn } = op;
-
-      // bjtload.c:482-491: substrate junction current/conductance (L1 only).
-      const vts = vt * params.NS;
-      if (csubsat > 0) {
-        if (vsubLimited <= -3 * vts) {
-          let a = 3 * vts / (vsubLimited * Math.E);
-          a = a * a * a;
-          gdsub = csubsat * 3 * a / vsubLimited + GMIN;
-          cdsub = -csubsat * (1 + a) + GMIN * vsubLimited;
-        } else {
-          // bjtload.c:488: exp arg clamped to MAX_EXP_ARG to prevent overflow
-          // on paths (MODEINITSMSIG/MODEINITTRAN) that bypass pnjlim.
-          const MAX_EXP_ARG = 709;
-          const evsub = Math.exp(Math.min(MAX_EXP_ARG, vsubLimited / vts));
-          gdsub = csubsat * evsub / vts + GMIN;
-          cdsub = csubsat * (evsub - 1) + GMIN * vsubLimited;
+        // bjtload.c:383-416: pnjlim on BE, BC, and substrate junctions.
+        vbeLimited = vbeRaw;
+        vbcLimited = vbcRaw;
+        vsubLimited = vsubRaw;
+        let vbeLimFlag = false;
+        let vbcLimFlag = false;
+        let vsubLimFlag = false;
+        if ((mode & (MODEINITJCT | MODEINITSMSIG | MODEINITTRAN)) === 0) {
+          const vbeResult = pnjlim(vbeRaw, s0[base + SLOT_VBE], vt, tp.tVcrit);
+          vbeLimited = vbeResult.value;
+          vbeLimFlag = vbeResult.limited;
+          const vbcResult = pnjlim(vbcRaw, s0[base + SLOT_VBC], vt, tp.tVcrit);
+          vbcLimited = vbcResult.value;
+          vbcLimFlag = vbcResult.limited;
+          const vsubResult = pnjlim(vsubRaw, s0[base + SLOT_VSUB], vt, tp.tSubVcrit);
+          vsubLimited = vsubResult.value;
+          vsubLimFlag = vsubResult.limited;
         }
-      } else {
-        gdsub = GMIN;
-        cdsub = GMIN * vsubLimited;
-      }
+        icheckLimited = vbeLimFlag || vbcLimFlag || vsubLimFlag;
 
-      // bjtload.c:518-543: excess-phase filter (Weil's approx, td>0).
-      // Inactive when td==0 (PTF=0 or TF=0). During MODETRAN|MODEAC with td>0:
-      //   cex=cbe*arg3; gex=gbe*arg3; cc recomputed via 3-term IIR.
-      // bjtload.c:519-522: arg1=delta/td, arg2=3*arg1, arg1=arg2*arg1,
-      //                    denom=1+arg1+arg2, arg3=arg1/denom.
-      // cite: bjtload.c:522-524 — cex/gex use raw cbe/gbe from Gummel-Poon, before XTF modification.
-      let cex = cbe;
-      let gex = gbe;
-      let cexbc_now = 0;
-      // bjtload.c:525: gate is (MODETRAN|MODEAC) && td!=0 only — no ctx.delta guard.
-      if ((mode & (MODETRAN | MODEAC)) !== 0 && td !== 0) {
-        const arg1a = ctx.dt / td;
-        const arg2 = 3 * arg1a;
-        const arg1 = arg2 * arg1a;
-        const denom = 1 + arg1 + arg2;
-        const arg3 = arg1 / denom;
-        const deltaOld1 = ctx.deltaOld[1];  // cite: dctran.c:317 — pre-seeded to CKTmaxStep, never zero
-        // cite: bjtload.c:531-535 — INITTRAN seeds state1+state2 cexbc to cbe/qb.
-        if (mode & MODEINITTRAN) {
-          s1[base + SLOT_CEXBC] = cbe / qb;
-          s2[base + SLOT_CEXBC] = s1[base + SLOT_CEXBC];
+        // cite: bjtload.c:749-754 — icheck++ unless MODEINITFIX && OFF
+        if (icheckLimited && (params.OFF === 0 || !(mode & MODEINITFIX))) ctx.noncon.value++;
+
+        if (ctx.limitingCollector) {
+          ctx.limitingCollector.push({
+            elementIndex: this.elementIndex ?? -1,
+            label: this.label ?? "",
+            junction: "BE",
+            limitType: "pnjlim",
+            vBefore: vbeRaw,
+            vAfter: vbeLimited,
+            wasLimited: vbeLimFlag,
+          });
+          ctx.limitingCollector.push({
+            elementIndex: this.elementIndex ?? -1,
+            label: this.label ?? "",
+            junction: "BC",
+            limitType: "pnjlim",
+            vBefore: vbcRaw,
+            vAfter: vbcLimited,
+            wasLimited: vbcLimFlag,
+          });
+          ctx.limitingCollector.push({
+            elementIndex: this.elementIndex ?? -1,
+            label: this.label ?? "",
+            junction: "SUB",
+            limitType: "pnjlim",
+            vBefore: vsubRaw,
+            vAfter: vsubLimited,
+            wasLimited: vsubLimFlag,
+          });
         }
-        // cite: bjtload.c:536-539 — IIR denom uses deltaOld[1] directly (dctran.c:317 seeds).
-        cc = (s1[base + SLOT_CEXBC] * (1 + ctx.dt / deltaOld1 + arg2)
-              - s2[base + SLOT_CEXBC] * ctx.dt / deltaOld1) / denom;
-        cex = cbe * arg3;
-        gex = gbe * arg3;
-        cexbc_now = cc + cex / qb;
-      }
 
-      // Recompute cc, gm, go with possibly filtered cex/gex. bjtload.c:547,559-560.
-      // bjtload.c:547 overwrites cc:
-      //   cc = cc + (cex-cbc)/qb - cbc/betaR - cbcn;
-      // bjtload.c:559-560:
-      //   go = (gbc + (cex-cbc)*dqbdvc/qb)/qb;
-      //   gm = (gex - (cex-cbc)*dqbdve/qb)/qb - go;
-      cc = cc + (cex - cbc) / qb - cbc / params.BR - cbcn;
-      go = (gbc + (cex - cbc) * dqbdvc / qb) / qb;
-      gm = (gex - (cex - cbc) * dqbdve / qb) / qb - go;
+        // bjtload.c:420-560: Gummel-Poon operating point at limited voltages.
+        const op = computeSpiceL1BjtOp(
+          vbeLimited, vbcLimited,
+          csat, tp.tBetaF, params.NF, tp.tBetaR, params.NR,
+          c2, c4,
+          params.NE, params.NC,
+          tp.tinvEarlyVoltF, tp.tinvEarlyVoltR,
+          oik, oikr,
+          vt, params.NKF,
+        );
 
-      // bjtload.c:549-556: effective base-resistance gx.
-      gx = rbpr + rbpi / qb;
-      if (xjrb !== 0) {
-        const arg1a = Math.max(cb / xjrb, 1e-9);
-        const arg2 = (-1 + Math.sqrt(1 + 14.59025 * arg1a)) / 2.4317 / Math.sqrt(arg1a);
-        const arg1b = Math.tan(arg2);
-        gx = rbpr + 3 * rbpi * (arg1b - arg2) / arg2 / arg1b / arg1b;
-      }
-      if (gx !== 0) gx = 1 / gx;
+        ({ cc, cb, gm, go, gpi, gmu } = op);
+        let { qb, dqbdve, dqbdvc, cbe, cbc, gbe, gbc, cbcn } = op;
 
-      // bjtload.c:561-724: capacitance + charge block.
-      // D3: gate on ctx.dt > 0 — DC-OP (dt==0) does NOT update cap charges,
-      // but MODEINITSMSIG and MODETRANOP&&MODEUIC still store capacitances.
-      // bjtload.c:561-563 gate: (MODETRAN|MODEAC) || (MODETRANOP&&MODEUIC) || MODEINITSMSIG.
-      let capbe = 0;
-      let capbc = 0;
-      let capsub = 0;
-      let capbx = 0;
-      geqcb = 0;
-      geqbx = 0;
-      gcsub = 0;
-      // ceqbx and ceqsub are computed at RHS-stamp time (bjtload.c:799-802)
-      // using the stored CQSUB/CQBX state. No init needed here.
-
-      // cite: bjtload.c:561-563 — cap block gate.
-      const capBlockGate = (mode & (MODETRAN | MODEAC)) !== 0
-                        || ((mode & MODETRANOP) !== 0 && (mode & MODEUIC) !== 0)
-                        || (mode & MODEINITSMSIG) !== 0;
-
-      if (hasCapacitance && capBlockGate) {
-        const tf = tp.ttransitTimeF;
-        const tr = tp.ttransitTimeR;
-        const czbe = tp.tBEcap * params.AREA;
-        const pe = tp.tBEpot;
-        const xme = tp.tjunctionExpBE;
-        const cdis = params.XCJC;
-        const ctot = tp.tBCcap * (isLateral ? params.AREAC : params.AREAB); // cite: bjtload.c:573-576
-        const czbc = ctot * cdis;
-        const czbx = ctot - czbc;
-        const pc = tp.tBCpot;
-        const xmc = tp.tjunctionExpBC;
-        const fcpe = tp.tDepCap;
-        const czsub = tp.tSubcap * (isLateral ? params.AREAB : params.AREAC); // cite: bjtload.c:582-585
-        const ps = tp.tSubpot;
-        const xms = tp.tjunctionExpSub;
-        const xtf = params.XTF;
-        const ovtf = params.VTF === Infinity ? 0 : 1 / (1.44 * params.VTF);
-        const xjtf = params.ITF * params.AREA;
-
-        // cite: bjtload.c:591-610 — cbeMod/gbeMod compute unconditionally when tf>0 && vbe>0; XTF=0 collapses argtf=arg2=0.
-        let cbeMod = cbe;
-        let gbeMod = gbe;
-        if (tf !== 0 && vbeLimited > 0) {
-          let argtf = 0;
-          let arg2 = 0;
-          let arg3 = 0;
-          if (xtf !== 0) {
-            argtf = xtf;
-            if (ovtf !== 0) {
-              argtf = argtf * Math.exp(vbcLimited * ovtf);
-            }
-            arg2 = argtf;
-            if (xjtf !== 0) {
-              const temp = cbe / (cbe + xjtf);
-              argtf = argtf * temp * temp;
-              arg2 = argtf * (3 - temp - temp);
-            }
-            arg3 = cbe * argtf * ovtf;
+        // bjtload.c:482-491: substrate junction current/conductance (L1 only).
+        const vts = vt * params.NS;
+        if (csubsat > 0) {
+          if (vsubLimited <= -3 * vts) {
+            let a = 3 * vts / (vsubLimited * Math.E);
+            a = a * a * a;
+            gdsub = csubsat * 3 * a / vsubLimited + GMIN;
+            cdsub = -csubsat * (1 + a) + GMIN * vsubLimited;
+          } else {
+            // bjtload.c:488: exp arg clamped to MAX_EXP_ARG to prevent overflow
+            // on paths (MODEINITSMSIG/MODEINITTRAN) that bypass pnjlim.
+            const MAX_EXP_ARG = 709;
+            const evsub = Math.exp(Math.min(MAX_EXP_ARG, vsubLimited / vts));
+            gdsub = csubsat * evsub / vts + GMIN;
+            cdsub = csubsat * (evsub - 1) + GMIN * vsubLimited;
           }
-          cbeMod = cbe * (1 + argtf) / qb;
-          gbeMod = (gbe * (1 + arg2) - cbeMod * dqbdve) / qb;
-          geqcb = tf * (arg3 - cbeMod * dqbdvc) / qb;
-        }
-
-        // bjtload.c:612-626: QBE + capbe.
-        let qbe: number;
-        if (vbeLimited < fcpe) {
-          const arg = 1 - vbeLimited / pe;
-          const sarg = Math.exp(-xme * Math.log(arg));
-          qbe = tf * cbeMod + pe * czbe * (1 - arg * sarg) / (1 - xme);
-          capbe = tf * gbeMod + czbe * sarg; // cite: bjtload.c:617 — gbeMod from op.gbe (not gm)
         } else {
-          const f1 = tp.tf1;
-          const f2 = tp.f2;
-          const f3 = tp.f3;
-          const czbef2 = czbe / f2;
-          qbe = tf * cbeMod + czbe * f1 + czbef2
-                * (f3 * (vbeLimited - fcpe) + (xme / (pe + pe)) * (vbeLimited * vbeLimited - fcpe * fcpe));
-          capbe = tf * gbeMod + czbef2 * (f3 + xme * vbeLimited / pe); // cite: bjtload.c:625
+          gdsub = GMIN;
+          cdsub = GMIN * vsubLimited;
         }
 
-        // bjtload.c:627-642: QBC + capbc.
-        const fcpc = tp.tf4;
-        const f1c = tp.tf5;
-        const f2c = tp.f6;
-        const f3c = tp.f7;
-        let qbc: number;
-        if (vbcLimited < fcpc) {
-          const arg = 1 - vbcLimited / pc;
-          const sarg = Math.exp(-xmc * Math.log(arg));
-          qbc = tr * cbc + pc * czbc * (1 - arg * sarg) / (1 - xmc);
-          capbc = tr * gbc + czbc * sarg;
-        } else {
-          const czbcf2 = czbc / f2c;
-          qbc = tr * cbc + czbc * f1c + czbcf2
-                * (f3c * (vbcLimited - fcpc) + (xmc / (pc + pc)) * (vbcLimited * vbcLimited - fcpc * fcpc));
-          capbc = tr * gbc + czbcf2 * (f3c + xmc * vbcLimited / pc);
-        }
-
-        // bjtload.c:643-654: QBX + capbx.
-        let qbx: number;
-        if (vbxRaw < fcpc) {
-          const arg = 1 - vbxRaw / pc;
-          const sarg = Math.exp(-xmc * Math.log(arg));
-          qbx = pc * czbx * (1 - arg * sarg) / (1 - xmc);
-          capbx = czbx * sarg;
-        } else {
-          const czbxf2 = czbx / f2c;
-          qbx = czbx * f1c + czbxf2
-                * (f3c * (vbxRaw - fcpc) + (xmc / (pc + pc)) * (vbxRaw * vbxRaw - fcpc * fcpc));
-          capbx = czbxf2 * (f3c + xmc * vbxRaw / pc);
-        }
-
-        // bjtload.c:655-665: QSUB + capsub.
-        let qcs: number;
-        if (vsubLimited < 0) {
-          const arg = 1 - vsubLimited / ps;
-          const sarg = Math.exp(-xms * Math.log(arg));
-          qcs = ps * czsub * (1 - arg * sarg) / (1 - xms);
-          capsub = czsub * sarg;
-        } else {
-          qcs = vsubLimited * czsub * (1 + xms * vsubLimited / (2 * ps));
-          capsub = czsub * (1 + xms * vsubLimited / ps);
-        }
-
-        s0[base + SLOT_QBE] = qbe;
-        s0[base + SLOT_QBC] = qbc;
-        s0[base + SLOT_QBX] = qbx;
-        s0[base + SLOT_QSUB] = qcs;
-
-        // cite: bjtload.c:674-703 — MODEINITSMSIG stores caps+op, skips NIintegrate and stamps via 'continue'
-        if ((mode & MODEINITSMSIG) !== 0 &&
-            !((mode & MODETRANOP) !== 0 && (mode & MODEUIC) !== 0)) {
-          s0[base + SLOT_CQBE] = capbe;
-          s0[base + SLOT_CQBC] = capbc;
-          s0[base + SLOT_CQSUB] = capsub;
-          s0[base + SLOT_CQBX] = capbx;
-          s0[base + SLOT_CEXBC] = geqcb;
-          // bjtload.c:703 `continue` — skip NIintegrate + stamps for smsig.
-          // Write back accepted linearization then return.
-          s0[base + SLOT_VBE] = vbeLimited;
-          s0[base + SLOT_VBC] = vbcLimited;
-          s0[base + SLOT_CC]  = cc;
-          s0[base + SLOT_CB]  = cb;
-          s0[base + SLOT_GPI] = gpi;
-          s0[base + SLOT_GMU] = gmu;
-          s0[base + SLOT_GM]  = gm;
-          s0[base + SLOT_GO]  = go;
-          s0[base + SLOT_GX]  = gx;
-          s0[base + SLOT_GEQCB] = geqcb;
-          s0[base + SLOT_GCSUB] = 0;
-          s0[base + SLOT_GEQBX] = 0;
-          s0[base + SLOT_VSUB]  = vsubLimited;
-          s0[base + SLOT_GDSUB] = gdsub;
-          s0[base + SLOT_CDSUB] = cdsub;
-          return;
-        }
-
-        // cite: bjtload.c:715-724 — MODEINITTRAN copies q-values into state1 for next-step integrate.
-        if (mode & MODEINITTRAN) {
-          s1[base + SLOT_QBE] = qbe;
-          s1[base + SLOT_QBC] = qbc;
-          s1[base + SLOT_QBX] = qbx;
-          s1[base + SLOT_QSUB] = qcs;
-        }
-
-        // bjtload.c:725-734: NIintegrate (B-E, B-C) + geqcb scaled by ag[0].
-        // D3: NIintegrate only valid when ctx.dt > 0 (we have a timestep).
-        if (ctx.dt > 0) {
-          const ag = ctx.ag;
-          // B-E cap companion.
-          {
-            const ccapPrev = s1[base + SLOT_CQBE];
-            const q2 = s2[base + SLOT_QBE];
-            const q3 = s3[base + SLOT_QBE];
-            const { ccap, geq } = niIntegrate(
-              ctx.method, ctx.order, capbe, ag,
-              qbe, s1[base + SLOT_QBE],
-              [q2, q3, 0, 0, 0], ccapPrev,
-            );
-            s0[base + SLOT_CQBE] = ccap;
-            // bjtload.c:727: geqcb = geqcb * CKTag[0].
-            geqcb = geqcb * ag[0];
-            // bjtload.c:728: gpi += geq.
-            gpi = gpi + geq;
-            // bjtload.c:729: cb += CKTstate0[BJTcqbe] (lumped cap companion current).
-            // The value accumulated into cb is ccap — the ngspice companion
-            // current stored in BJTcqbe via state0 at niinteg.c:77.
-            cb = cb + ccap;
-          }
-          // B-C cap companion.
-          {
-            const ccapPrev = s1[base + SLOT_CQBC];
-            const q2 = s2[base + SLOT_QBC];
-            const q3 = s3[base + SLOT_QBC];
-            const { ccap, geq } = niIntegrate(
-              ctx.method, ctx.order, capbc, ag,
-              qbc, s1[base + SLOT_QBC],
-              [q2, q3, 0, 0, 0], ccapPrev,
-            );
-            s0[base + SLOT_CQBC] = ccap;
-            // bjtload.c:732: gmu += geq.
-            gmu = gmu + geq;
-            // bjtload.c:733-734: cb += ccap; cc -= ccap.
-            cb = cb + ccap;
-            cc = cc - ccap;
-          }
-
-          // cite: bjtload.c:735-740 — MODEINITTRAN copies cqbe/cqbc into state1 for next-step integrate.
+        // bjtload.c:518-543: excess-phase filter (Weil's approx, td>0).
+        // Inactive when td==0 (PTF=0 or TF=0). During MODETRAN|MODEAC with td>0:
+        //   cex=cbe*arg3; gex=gbe*arg3; cc recomputed via 3-term IIR.
+        // bjtload.c:519-522: arg1=delta/td, arg2=3*arg1, arg1=arg2*arg1,
+        //                    denom=1+arg1+arg2, arg3=arg1/denom.
+        // cite: bjtload.c:522-524 — cex/gex use raw cbe/gbe from Gummel-Poon, before XTF modification.
+        let cex = cbe;
+        let gex = gbe;
+        let cexbc_now = 0;
+        // bjtload.c:525: gate is (MODETRAN|MODEAC) && td!=0 only — no ctx.delta guard.
+        if ((mode & (MODETRAN | MODEAC)) !== 0 && td !== 0) {
+          const arg1a = ctx.dt / td;
+          const arg2 = 3 * arg1a;
+          const arg1 = arg2 * arg1a;
+          const denom = 1 + arg1 + arg2;
+          const arg3 = arg1 / denom;
+          const deltaOld1 = ctx.deltaOld[1];  // cite: dctran.c:317 — pre-seeded to CKTmaxStep, never zero
+          // cite: bjtload.c:531-535 — INITTRAN seeds state1+state2 cexbc to cbe/qb.
           if (mode & MODEINITTRAN) {
-            s1[base + SLOT_CQBE] = s0[base + SLOT_CQBE];
-            s1[base + SLOT_CQBC] = s0[base + SLOT_CQBC];
+            s1[base + SLOT_CEXBC] = cbe / qb;
+            s2[base + SLOT_CEXBC] = s1[base + SLOT_CEXBC];
           }
-
-          // bjtload.c:757-770: C-S and B-X cap-companion NIintegrate (post-check).
-          // These stay as separate stamps (bjtload.c:823,838-842), not lumped
-          // into gpi/gmu.
-          {
-            const ccapPrev = s1[base + SLOT_CQSUB];
-            const q2 = s2[base + SLOT_QSUB];
-            const q3 = s3[base + SLOT_QSUB];
-            const { ccap, geq } = niIntegrate(
-              ctx.method, ctx.order, capsub, ag,
-              qcs, s1[base + SLOT_QSUB],
-              [q2, q3, 0, 0, 0], ccapPrev,
-            );
-            s0[base + SLOT_CQSUB] = ccap;
-            gcsub = geq;
-          }
-          {
-            const ccapPrev = s1[base + SLOT_CQBX];
-            const q2 = s2[base + SLOT_QBX];
-            const q3 = s3[base + SLOT_QBX];
-            const { ccap, geq } = niIntegrate(
-              ctx.method, ctx.order, capbx, ag,
-              qbx, s1[base + SLOT_QBX],
-              [q2, q3, 0, 0, 0], ccapPrev,
-            );
-            s0[base + SLOT_CQBX] = ccap;
-            geqbx = geq;
-          }
-          // cite: bjtload.c:764-769 — MODEINITTRAN copies cqbx/cqsub into state1 for next-step integrate.
-          if (mode & MODEINITTRAN) {
-            s1[base + SLOT_CQBX] = s0[base + SLOT_CQBX];
-            s1[base + SLOT_CQSUB] = s0[base + SLOT_CQSUB];
-          }
+          // cite: bjtload.c:536-539 — IIR denom uses deltaOld[1] directly (dctran.c:317 seeds).
+          cc = (s1[base + SLOT_CEXBC] * (1 + ctx.dt / deltaOld1 + arg2)
+                - s2[base + SLOT_CEXBC] * ctx.dt / deltaOld1) / denom;
+          cex = cbe * arg3;
+          gex = gbe * arg3;
+          cexbc_now = cc + cex / qb;
         }
-        // End cap block.
-      }
 
-      // bjtload.c:772-786: state0 write-back of accepted linearization.
-      s0[base + SLOT_VBE] = vbeLimited;
-      s0[base + SLOT_VBC] = vbcLimited;
-      s0[base + SLOT_CC]  = cc;
-      s0[base + SLOT_CB]  = cb;
-      s0[base + SLOT_GPI] = gpi;
-      s0[base + SLOT_GMU] = gmu;
-      s0[base + SLOT_GM]  = gm;
-      s0[base + SLOT_GO]  = go;
-      s0[base + SLOT_GX]  = gx;
-      s0[base + SLOT_GEQCB] = geqcb;
-      s0[base + SLOT_GCSUB] = gcsub;
-      s0[base + SLOT_GEQBX] = geqbx;
-      s0[base + SLOT_VSUB]  = vsubLimited;
-      s0[base + SLOT_GDSUB] = gdsub;
-      s0[base + SLOT_CDSUB] = cdsub;
-      s0[base + SLOT_CEXBC] = cexbc_now;
+        // Recompute cc, gm, go with possibly filtered cex/gex. bjtload.c:547,559-560.
+        // bjtload.c:547 overwrites cc:
+        //   cc = cc + (cex-cbc)/qb - cbc/betaR - cbcn;
+        // bjtload.c:559-560:
+        //   go = (gbc + (cex-cbc)*dqbdvc/qb)/qb;
+        //   gm = (gex - (cex-cbc)*dqbdve/qb)/qb - go;
+        cc = cc + (cex - cbc) / qb - cbc / params.BR - cbcn;
+        go = (gbc + (cex - cbc) * dqbdvc / qb) / qb;
+        gm = (gex - (cex - cbc) * dqbdve / qb) / qb - go;
+
+        // bjtload.c:549-556: effective base-resistance gx.
+        gx = rbpr + rbpi / qb;
+        if (xjrb !== 0) {
+          const arg1a = Math.max(cb / xjrb, 1e-9);
+          const arg2 = (-1 + Math.sqrt(1 + 14.59025 * arg1a)) / 2.4317 / Math.sqrt(arg1a);
+          const arg1b = Math.tan(arg2);
+          gx = rbpr + 3 * rbpi * (arg1b - arg2) / arg2 / arg1b / arg1b;
+        }
+        if (gx !== 0) gx = 1 / gx;
+
+        // bjtload.c:561-724: capacitance + charge block.
+        // D3: gate on ctx.dt > 0 — DC-OP (dt==0) does NOT update cap charges,
+        // but MODEINITSMSIG and MODETRANOP&&MODEUIC still store capacitances.
+        // bjtload.c:561-563 gate: (MODETRAN|MODEAC) || (MODETRANOP&&MODEUIC) || MODEINITSMSIG.
+        let capbe = 0;
+        let capbc = 0;
+        let capsub = 0;
+        let capbx = 0;
+        geqcb = 0;
+        geqbx = 0;
+        gcsub = 0;
+        // ceqbx and ceqsub are computed at RHS-stamp time (bjtload.c:799-802)
+        // using the stored CQSUB/CQBX state. No init needed here.
+
+        // cite: bjtload.c:561-563 — cap block gate.
+        const capBlockGate = (mode & (MODETRAN | MODEAC)) !== 0
+                          || ((mode & MODETRANOP) !== 0 && (mode & MODEUIC) !== 0)
+                          || (mode & MODEINITSMSIG) !== 0;
+
+        if (hasCapacitance && capBlockGate) {
+          const tf = tp.ttransitTimeF;
+          const tr = tp.ttransitTimeR;
+          const czbe = tp.tBEcap * params.AREA;
+          const pe = tp.tBEpot;
+          const xme = tp.tjunctionExpBE;
+          const cdis = params.XCJC;
+          const ctot = tp.tBCcap * (isLateral ? params.AREAC : params.AREAB); // cite: bjtload.c:573-576
+          const czbc = ctot * cdis;
+          const czbx = ctot - czbc;
+          const pc = tp.tBCpot;
+          const xmc = tp.tjunctionExpBC;
+          const fcpe = tp.tDepCap;
+          const czsub = tp.tSubcap * (isLateral ? params.AREAB : params.AREAC); // cite: bjtload.c:582-585
+          const ps = tp.tSubpot;
+          const xms = tp.tjunctionExpSub;
+          const xtf = params.XTF;
+          const ovtf = params.VTF === Infinity ? 0 : 1 / (1.44 * params.VTF);
+          const xjtf = params.ITF * params.AREA;
+
+          // cite: bjtload.c:591-610 — cbeMod/gbeMod compute unconditionally when tf>0 && vbe>0; XTF=0 collapses argtf=arg2=0.
+          let cbeMod = cbe;
+          let gbeMod = gbe;
+          if (tf !== 0 && vbeLimited > 0) {
+            let argtf = 0;
+            let arg2 = 0;
+            let arg3 = 0;
+            if (xtf !== 0) {
+              argtf = xtf;
+              if (ovtf !== 0) {
+                argtf = argtf * Math.exp(vbcLimited * ovtf);
+              }
+              arg2 = argtf;
+              if (xjtf !== 0) {
+                const temp = cbe / (cbe + xjtf);
+                argtf = argtf * temp * temp;
+                arg2 = argtf * (3 - temp - temp);
+              }
+              arg3 = cbe * argtf * ovtf;
+            }
+            cbeMod = cbe * (1 + argtf) / qb;
+            gbeMod = (gbe * (1 + arg2) - cbeMod * dqbdve) / qb;
+            geqcb = tf * (arg3 - cbeMod * dqbdvc) / qb;
+          }
+
+          // bjtload.c:612-626: QBE + capbe.
+          let qbe: number;
+          if (vbeLimited < fcpe) {
+            const arg = 1 - vbeLimited / pe;
+            const sarg = Math.exp(-xme * Math.log(arg));
+            qbe = tf * cbeMod + pe * czbe * (1 - arg * sarg) / (1 - xme);
+            capbe = tf * gbeMod + czbe * sarg; // cite: bjtload.c:617 — gbeMod from op.gbe (not gm)
+          } else {
+            const f1 = tp.tf1;
+            const f2 = tp.f2;
+            const f3 = tp.f3;
+            const czbef2 = czbe / f2;
+            qbe = tf * cbeMod + czbe * f1 + czbef2
+                  * (f3 * (vbeLimited - fcpe) + (xme / (pe + pe)) * (vbeLimited * vbeLimited - fcpe * fcpe));
+            capbe = tf * gbeMod + czbef2 * (f3 + xme * vbeLimited / pe); // cite: bjtload.c:625
+          }
+
+          // bjtload.c:627-642: QBC + capbc.
+          const fcpc = tp.tf4;
+          const f1c = tp.tf5;
+          const f2c = tp.f6;
+          const f3c = tp.f7;
+          let qbc: number;
+          if (vbcLimited < fcpc) {
+            const arg = 1 - vbcLimited / pc;
+            const sarg = Math.exp(-xmc * Math.log(arg));
+            qbc = tr * cbc + pc * czbc * (1 - arg * sarg) / (1 - xmc);
+            capbc = tr * gbc + czbc * sarg;
+          } else {
+            const czbcf2 = czbc / f2c;
+            qbc = tr * cbc + czbc * f1c + czbcf2
+                  * (f3c * (vbcLimited - fcpc) + (xmc / (pc + pc)) * (vbcLimited * vbcLimited - fcpc * fcpc));
+            capbc = tr * gbc + czbcf2 * (f3c + xmc * vbcLimited / pc);
+          }
+
+          // bjtload.c:643-654: QBX + capbx.
+          let qbx: number;
+          if (vbxRaw < fcpc) {
+            const arg = 1 - vbxRaw / pc;
+            const sarg = Math.exp(-xmc * Math.log(arg));
+            qbx = pc * czbx * (1 - arg * sarg) / (1 - xmc);
+            capbx = czbx * sarg;
+          } else {
+            const czbxf2 = czbx / f2c;
+            qbx = czbx * f1c + czbxf2
+                  * (f3c * (vbxRaw - fcpc) + (xmc / (pc + pc)) * (vbxRaw * vbxRaw - fcpc * fcpc));
+            capbx = czbxf2 * (f3c + xmc * vbxRaw / pc);
+          }
+
+          // bjtload.c:655-665: QSUB + capsub.
+          let qcs: number;
+          if (vsubLimited < 0) {
+            const arg = 1 - vsubLimited / ps;
+            const sarg = Math.exp(-xms * Math.log(arg));
+            qcs = ps * czsub * (1 - arg * sarg) / (1 - xms);
+            capsub = czsub * sarg;
+          } else {
+            qcs = vsubLimited * czsub * (1 + xms * vsubLimited / (2 * ps));
+            capsub = czsub * (1 + xms * vsubLimited / ps);
+          }
+
+          s0[base + SLOT_QBE] = qbe;
+          s0[base + SLOT_QBC] = qbc;
+          s0[base + SLOT_QBX] = qbx;
+          s0[base + SLOT_QSUB] = qcs;
+
+          // cite: bjtload.c:674-703 — MODEINITSMSIG stores caps+op, skips NIintegrate and stamps via 'continue'
+          if ((mode & MODEINITSMSIG) !== 0 &&
+              !((mode & MODETRANOP) !== 0 && (mode & MODEUIC) !== 0)) {
+            s0[base + SLOT_CQBE] = capbe;
+            s0[base + SLOT_CQBC] = capbc;
+            s0[base + SLOT_CQSUB] = capsub;
+            s0[base + SLOT_CQBX] = capbx;
+            s0[base + SLOT_CEXBC] = geqcb;
+            // bjtload.c:703 `continue` — skip NIintegrate + stamps for smsig.
+            // Write back accepted linearization then return.
+            s0[base + SLOT_VBE] = vbeLimited;
+            s0[base + SLOT_VBC] = vbcLimited;
+            s0[base + SLOT_CC]  = cc;
+            s0[base + SLOT_CB]  = cb;
+            s0[base + SLOT_GPI] = gpi;
+            s0[base + SLOT_GMU] = gmu;
+            s0[base + SLOT_GM]  = gm;
+            s0[base + SLOT_GO]  = go;
+            s0[base + SLOT_GX]  = gx;
+            s0[base + SLOT_GEQCB] = geqcb;
+            s0[base + SLOT_GCSUB] = 0;
+            s0[base + SLOT_GEQBX] = 0;
+            s0[base + SLOT_VSUB]  = vsubLimited;
+            s0[base + SLOT_GDSUB] = gdsub;
+            s0[base + SLOT_CDSUB] = cdsub;
+            return;
+          }
+
+          // cite: bjtload.c:715-724 — MODEINITTRAN copies q-values into state1 for next-step integrate.
+          if (mode & MODEINITTRAN) {
+            s1[base + SLOT_QBE] = qbe;
+            s1[base + SLOT_QBC] = qbc;
+            s1[base + SLOT_QBX] = qbx;
+            s1[base + SLOT_QSUB] = qcs;
+          }
+
+          // bjtload.c:725-734: NIintegrate (B-E, B-C) + geqcb scaled by ag[0].
+          // D3: NIintegrate only valid when ctx.dt > 0 (we have a timestep).
+          if (ctx.dt > 0) {
+            const ag = ctx.ag;
+            // B-E cap companion.
+            {
+              const ccapPrev = s1[base + SLOT_CQBE];
+              const q2 = s2[base + SLOT_QBE];
+              const q3 = s3[base + SLOT_QBE];
+              const { ccap, geq } = niIntegrate(
+                ctx.method, ctx.order, capbe, ag,
+                qbe, s1[base + SLOT_QBE],
+                [q2, q3, 0, 0, 0], ccapPrev,
+              );
+              s0[base + SLOT_CQBE] = ccap;
+              // bjtload.c:727: geqcb = geqcb * CKTag[0].
+              geqcb = geqcb * ag[0];
+              // bjtload.c:728: gpi += geq.
+              gpi = gpi + geq;
+              // bjtload.c:729: cb += CKTstate0[BJTcqbe] (lumped cap companion current).
+              // The value accumulated into cb is ccap — the ngspice companion
+              // current stored in BJTcqbe via state0 at niinteg.c:77.
+              cb = cb + ccap;
+            }
+            // B-C cap companion.
+            {
+              const ccapPrev = s1[base + SLOT_CQBC];
+              const q2 = s2[base + SLOT_QBC];
+              const q3 = s3[base + SLOT_QBC];
+              const { ccap, geq } = niIntegrate(
+                ctx.method, ctx.order, capbc, ag,
+                qbc, s1[base + SLOT_QBC],
+                [q2, q3, 0, 0, 0], ccapPrev,
+              );
+              s0[base + SLOT_CQBC] = ccap;
+              // bjtload.c:732: gmu += geq.
+              gmu = gmu + geq;
+              // bjtload.c:733-734: cb += ccap; cc -= ccap.
+              cb = cb + ccap;
+              cc = cc - ccap;
+            }
+
+            // cite: bjtload.c:735-740 — MODEINITTRAN copies cqbe/cqbc into state1 for next-step integrate.
+            if (mode & MODEINITTRAN) {
+              s1[base + SLOT_CQBE] = s0[base + SLOT_CQBE];
+              s1[base + SLOT_CQBC] = s0[base + SLOT_CQBC];
+            }
+
+            // bjtload.c:757-770: C-S and B-X cap-companion NIintegrate (post-check).
+            // These stay as separate stamps (bjtload.c:823,838-842), not lumped
+            // into gpi/gmu.
+            {
+              const ccapPrev = s1[base + SLOT_CQSUB];
+              const q2 = s2[base + SLOT_QSUB];
+              const q3 = s3[base + SLOT_QSUB];
+              const { ccap, geq } = niIntegrate(
+                ctx.method, ctx.order, capsub, ag,
+                qcs, s1[base + SLOT_QSUB],
+                [q2, q3, 0, 0, 0], ccapPrev,
+              );
+              s0[base + SLOT_CQSUB] = ccap;
+              gcsub = geq;
+            }
+            {
+              const ccapPrev = s1[base + SLOT_CQBX];
+              const q2 = s2[base + SLOT_QBX];
+              const q3 = s3[base + SLOT_QBX];
+              const { ccap, geq } = niIntegrate(
+                ctx.method, ctx.order, capbx, ag,
+                qbx, s1[base + SLOT_QBX],
+                [q2, q3, 0, 0, 0], ccapPrev,
+              );
+              s0[base + SLOT_CQBX] = ccap;
+              geqbx = geq;
+            }
+            // cite: bjtload.c:764-769 — MODEINITTRAN copies cqbx/cqsub into state1 for next-step integrate.
+            if (mode & MODEINITTRAN) {
+              s1[base + SLOT_CQBX] = s0[base + SLOT_CQBX];
+              s1[base + SLOT_CQSUB] = s0[base + SLOT_CQSUB];
+            }
+          }
+          // End cap block.
+        }
+
+        // bjtload.c:772-786: state0 write-back of accepted linearization.
+        s0[base + SLOT_VBE] = vbeLimited;
+        s0[base + SLOT_VBC] = vbcLimited;
+        s0[base + SLOT_CC]  = cc;
+        s0[base + SLOT_CB]  = cb;
+        s0[base + SLOT_GPI] = gpi;
+        s0[base + SLOT_GMU] = gmu;
+        s0[base + SLOT_GM]  = gm;
+        s0[base + SLOT_GO]  = go;
+        s0[base + SLOT_GX]  = gx;
+        s0[base + SLOT_GEQCB] = geqcb;
+        s0[base + SLOT_GCSUB] = gcsub;
+        s0[base + SLOT_GEQBX] = geqbx;
+        s0[base + SLOT_VSUB]  = vsubLimited;
+        s0[base + SLOT_GDSUB] = gdsub;
+        s0[base + SLOT_CDSUB] = cdsub;
+        s0[base + SLOT_CEXBC] = cexbc_now;
       } // end bypass else
 
       // cite: bjtload.c:798-800 — geqsub aggregates gcsub+gdsub; used as single conductance at all substrate stamps.

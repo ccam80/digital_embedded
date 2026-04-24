@@ -547,143 +547,6 @@ export function computeTempParams(p: ResolvedMosfetParams, polarity: 1 | -1): Mo
   };
 }
 
-// ---------------------------------------------------------------------------
-// computeIds / computeGm / computeGds / computeGmbs — standalone functions
-// exported for unit tests that exercise the I-V model directly.
-// DIVERGENCE - NOT "INTENTIONAL": THESE SIGN FLIPS ARE DEFINITELY NOT APPROVED
-// BY THE AUTHOR.
-// The `vsb` argument uses digiTS's `vs - vb` convention; these helpers invert
-// it to ngspice's `vbs` for internal use per mos1load.c:500-509.
-// ---------------------------------------------------------------------------
-
-/**
- * Compute MOSFET drain-source current, threshold, and vdsat.
- * Mirrors mos1load.c:483-546 saturation/triode block.
- *
- * Inputs: `vgs`, `vds`, and `vsb` (VSB legacy = vs - vb → vbs = -vsb inside).
- */
-export function computeIds(
-  vgs: number,
-  vds: number,
-  vsb: number,
-  p: MosfetParams,
-): { ids: number; vth: number; vdsat: number; von: number } {
-  const rp = p as ResolvedMosfetParams;
-  const tKP = rp._tKP ?? p.KP;
-  const tPhi = rp._tPhi ?? p.PHI;
-  const tVto = rp._tVto;
-  const phi = Math.max(tPhi, 0.1);
-
-  // mos1load.c:500-506: sarg = sqrt(tPhi - vbs) when vbs <= 0,
-  //                     else sarg = sqrt(tPhi) - vbs/(2*sarg), clamped >= 0.
-  // Legacy vsb = -vbs; vsb >= 0 means vbs <= 0 → normal reverse bias.
-  let sarg: number;
-  if (vsb >= 0) {
-    sarg = Math.sqrt(phi + vsb);
-  } else {
-    sarg = Math.sqrt(phi);
-    sarg = Math.max(0, sarg + vsb / (2 * sarg));
-  }
-
-  // mos1load.c:507: von = tVbi*type + gamma*sarg — threshold w/ body effect.
-  const vth = tVto !== undefined
-    ? tVto + p.GAMMA * (sarg - Math.sqrt(phi))
-    : p.VTO + p.GAMMA * (sarg - Math.sqrt(phi));
-  const von = vth;
-
-  const vgst = vgs - vth;
-  const vdsat = Math.max(vgst, 0);
-
-  if (vgst <= 0) return { ids: 0, vth, vdsat, von };
-
-  const ld = p.LD ?? 0;
-  const effectiveLength = p.L - 2 * ld;
-  const Beta = tKP * p.W / effectiveLength * (p.M ?? 1);
-  const lambda = p.LAMBDA;
-  const betap = Beta * (1 + lambda * vds);
-
-  // mos1load.c:527-545: saturation / linear region dispatch.
-  if (vds < vgst) {
-    const ids = betap * vds * (vgst - 0.5 * vds);
-    return { ids, vth, vdsat, von };
-  } else {
-    const ids = betap * vgst * vgst * 0.5;
-    return { ids, vth, vdsat, von };
-  }
-}
-
-/** Compute MOSFET transconductance gm = dId/dVgs. */
-export function computeGm(vgs: number, vds: number, vsb: number, p: MosfetParams): number {
-  const rp = p as ResolvedMosfetParams;
-  const tKP = rp._tKP ?? p.KP;
-  const tPhi = rp._tPhi ?? p.PHI;
-  const tVto = rp._tVto;
-  const phi = Math.max(tPhi, 0.1);
-  let sarg: number;
-  if (vsb >= 0) sarg = Math.sqrt(phi + vsb);
-  else { sarg = Math.sqrt(phi); sarg = Math.max(0, sarg + vsb / (2 * sarg)); }
-  const vth = tVto !== undefined
-    ? tVto + p.GAMMA * (sarg - Math.sqrt(phi))
-    : p.VTO + p.GAMMA * (sarg - Math.sqrt(phi));
-  const vgst = vgs - vth;
-  if (vgst <= 0) return 0;
-  const ld = p.LD ?? 0;
-  const effectiveLength = p.L - 2 * ld;
-  const Beta = tKP * p.W / effectiveLength * (p.M ?? 1);
-  const betap = Beta * (1 + p.LAMBDA * vds);
-  // mos1load.c:530, 539 (no +GMIN in standalone; load() adds gmin at stamp time)
-  return (vds < vgst ? betap * vds : betap * vgst) + GMIN;
-}
-
-/** Compute MOSFET output conductance gds = dId/dVds. */
-export function computeGds(vgs: number, vds: number, vsb: number, p: MosfetParams): number {
-  const rp = p as ResolvedMosfetParams;
-  const tKP = rp._tKP ?? p.KP;
-  const tPhi = rp._tPhi ?? p.PHI;
-  const tVto = rp._tVto;
-  const phi = Math.max(tPhi, 0.1);
-  let sarg: number;
-  if (vsb >= 0) sarg = Math.sqrt(phi + vsb);
-  else { sarg = Math.sqrt(phi); sarg = Math.max(0, sarg + vsb / (2 * sarg)); }
-  const vth = tVto !== undefined
-    ? tVto + p.GAMMA * (sarg - Math.sqrt(phi))
-    : p.VTO + p.GAMMA * (sarg - Math.sqrt(phi));
-  const vgst = vgs - vth;
-  if (vgst <= 0) return 0;
-  const ld = p.LD ?? 0;
-  const effectiveLength = p.L - 2 * ld;
-  const Beta = tKP * p.W / effectiveLength * (p.M ?? 1);
-  const lambda = p.LAMBDA;
-  if (vds < vgst) {
-    // mos1load.c:540-543
-    const betap = Beta * (1 + lambda * vds);
-    return betap * (vgst - vds) + Beta * lambda * vds * (vgst - 0.5 * vds) + GMIN;
-  } else {
-    // mos1load.c:531
-    return Beta * lambda * vgst * vgst * 0.5 + GMIN;
-  }
-}
-
-/** Compute MOSFET bulk transconductance gmbs = dId/dVbs. */
-export function computeGmbs(vgs: number, vds: number, vsb: number, p: MosfetParams): number {
-  const rp = p as ResolvedMosfetParams;
-  const tPhi = rp._tPhi ?? p.PHI;
-  const phi = Math.max(tPhi, 0.1);
-  let sarg: number;
-  if (vsb >= 0) sarg = Math.sqrt(phi + vsb);
-  else { sarg = Math.sqrt(phi); sarg = Math.max(0, sarg + vsb / (2 * sarg)); }
-  const tVto = rp._tVto;
-  const vth = tVto !== undefined
-    ? tVto + p.GAMMA * (sarg - Math.sqrt(phi))
-    : p.VTO + p.GAMMA * (sarg - Math.sqrt(phi));
-  const vgst = vgs - vth;
-  if (vgst <= 0 || p.GAMMA <= 0) return 0;
-  const gm = computeGm(vgs, vds, vsb, p);
-  // mos1load.c:511-514, 532, 544: arg = gamma/(sarg+sarg); gmbs = gm*arg.
-  const arg = sarg > 0 ? p.GAMMA / (2 * sarg) : 0;
-  return gm * arg;
-}
-
 /**
  * Apply SPICE3f5 fetlim+limvds limiting algorithm (mos1load.c:363-406).
  * Forward (vdsOld >= 0): fetlim vgs, derive vds, limvds, derive vgd.
@@ -1014,9 +877,8 @@ export function createMosfetElement(
     /**
      * Single-pass load mirroring `mos1load.c::MOS1load` line-by-line.
      *
-     * G1 — Uses ngspice's VBS / VBD convention verbatim. `vbs = vb - vs` and
-     * `vbd = vb - vd` (mos1load.c:231-247). Legacy digiTS VSB = -VBS; every
-     * sign site here uses ngspice's convention.
+     * Uses ngspice's VBS / VBD convention verbatim. `vbs = vb - vs` and
+     * `vbd = vb - vd` (mos1load.c:231-247).
      *
      * Cap companion lumping (mos1load.c:900-end): geq contributions fold into
      * gbd/gbs/gm-matrix stamps; ieq contributions fold into ceqbd/ceqbs/
@@ -1052,6 +914,13 @@ export function createMosfetElement(
       //
       // Else (mos1load.c:412-434) → MODEINITJCT / MODEINITFIX+OFF / default-zero.
       let vbs: number, vgs: number, vds: number, vbd: number, vgd: number;
+
+      // Bypass state — set by the simpleGate branch. Tracked across the whole
+      // load() body so the OP-eval/cap-block gate at `if (bypassed)` works.
+      let bypassed = false;
+      // Bypass-rebuilt cap totals (populated only when bypass fires under
+      // MODETRAN|MODETRANOP per mos1load.c:329-338).
+      let bypassCapgs = 0, bypassCapgd = 0, bypassCapgb = 0;
 
       // mos1load.c:201-203: gate bits for "simple/general iteration" dispatch.
       const simpleGate = (mode & (MODEINITFLOAT | MODEINITPRED | MODEINITSMSIG | MODEINITTRAN)) !== 0
@@ -1098,11 +967,82 @@ export function createMosfetElement(
         vbd = vbs - vds;
         vgd = vgs - vds;
 
-        // mos1load.c:356-406 — voltage limiting (NODELIMITING is undef).
-        // cite: mos1load.c:370, 376, 382, 387, 395, 401
-        // Limiting runs unconditionally inside simpleGate — predictor voltages
-        // also pass through fetlim/limvds/pnjlim per mos1load.c:356-406.
+        // Hoisted cap totals (written by bypass branch or Meyer block below).
+        // Declared here so the post-if block can use them uniformly.
+        // (Assignment happens inside the bypass branch or the Meyer block below.)
+        // NOTE: this is re-declared below for the else branch — JS block-scoped.
+
+        // cite: mos1load.c:258-348 — NOBYPASS bypass gate runs BEFORE limiting.
+        // ngspice structure: (1) compute delv's + cdhat + cbhat; (2) bypass gate;
+        // (3) if !bypass, run limiting (mos1load.c:356-406). The bypass path
+        // `goto bypass;` at mos1load.c:346 skips limiting entirely — so no
+        // pnjlim/fetlim/limvds events post to ctx.limitingCollector when bypass
+        // fires, and icheckLimited stays false on bypass.
         {
+          const prevCd   = s0[base + SLOT_CD];
+          const prevCbs  = s0[base + SLOT_CBS];
+          const prevCbd  = s0[base + SLOT_CBD];
+          const prevGm   = s0[base + SLOT_GM];
+          const prevGds  = s0[base + SLOT_GDS];
+          const prevGmbs = s0[base + SLOT_GMBS];
+          const prevGbd  = s0[base + SLOT_GBD];
+          const prevGbs  = s0[base + SLOT_GBS];
+          const prevMode = s0[base + SLOT_MODE];
+          const prevVbs  = s0[base + SLOT_VBS];
+          const prevVbd  = s0[base + SLOT_VBD];
+          const prevVgs  = s0[base + SLOT_VGS];
+          const prevVds  = s0[base + SLOT_VDS];
+
+          const delvbs = vbs - prevVbs;
+          const delvbd = vbd - prevVbd;
+          const delvgs = vgs - prevVgs;
+          const delvds = vds - prevVds;
+
+          let cdhat: number;
+          if (prevMode >= 0) {
+            // cite: mos1load.c:258-264 — normal-mode cdhat uses delvgs/delvds/
+            // delvbs/delvbd directly. delvgd is only used in the reverse branch.
+            cdhat = prevCd + prevGm * delvgs + prevGds * delvds + prevGmbs * delvbs - prevGbd * delvbd;
+          } else {
+            // cite: mos1load.c:265-272 — reverse-mode cdhat uses delvgd.
+            const delvgd = delvgs - delvds;
+            cdhat = prevCd - (prevGbd - prevGmbs) * delvbd - prevGm * delvgd + prevGds * delvds;
+          }
+          const cbhat = prevCbs + prevCbd + prevGbd * delvbd + prevGbs * delvbs;
+
+          if (
+            !(mode & (MODEINITPRED | MODEINITTRAN | MODEINITSMSIG))
+            && ctx.bypass
+            && (Math.abs(cbhat - (prevCbs + prevCbd)) < ctx.reltol * (Math.max(Math.abs(cbhat), Math.abs(prevCbs + prevCbd)) + ctx.iabstol))
+            && Math.abs(delvbs) < ctx.reltol * Math.max(Math.abs(vbs), Math.abs(prevVbs)) + ctx.voltTol
+            && Math.abs(delvbd) < ctx.reltol * Math.max(Math.abs(vbd), Math.abs(prevVbd)) + ctx.voltTol
+            && Math.abs(delvgs) < ctx.reltol * Math.max(Math.abs(vgs), Math.abs(prevVgs)) + ctx.voltTol
+            && Math.abs(delvds) < ctx.reltol * Math.max(Math.abs(vds), Math.abs(prevVds)) + ctx.voltTol
+            && Math.abs(cdhat - prevCd) < ctx.reltol * Math.max(Math.abs(cdhat), Math.abs(prevCd)) + ctx.iabstol
+          ) {
+            // cite: mos1load.c:322-347 — bypass: reload voltages from state0,
+            // rebuild cap totals from cached half-caps (MODETRAN/MODETRANOP only),
+            // then `goto bypass;` which skips the limiting block entirely.
+            vbs = prevVbs; vbd = prevVbd; vgs = prevVgs; vds = prevVds;
+            vgd = vgs - vds;
+
+            if (mode & (MODETRAN | MODETRANOP)) {
+              bypassCapgs = s0[base + SLOT_CAPGS] + s1[base + SLOT_CAPGS] + GateSourceOverlapCap;
+              bypassCapgd = s0[base + SLOT_CAPGD] + s1[base + SLOT_CAPGD] + GateDrainOverlapCap;
+              bypassCapgb = s0[base + SLOT_CAPGB] + s1[base + SLOT_CAPGB] + GateBulkOverlapCap;
+            }
+            bypassed = true;
+          }
+        }
+
+        if (!bypassed) {
+          // mos1load.c:356-406 — voltage limiting (NODELIMITING is undef).
+          // cite: mos1load.c:370, 376, 382, 387, 395, 401
+          // Limiting runs only when bypass did NOT fire. ngspice `goto bypass;`
+          // at line 346 jumps past this entire block. Predictor voltages also
+          // pass through fetlim/limvds/pnjlim per mos1load.c:356-406, but MODE
+          // INITPRED/INITTRAN/INITSMSIG exclude bypass via the gate above, so
+          // they always land here.
           // mos1load.c:356: von = MOS1type * here->MOS1von.
           const vonStored = s0[base + SLOT_VON];
           const vonForLim = vonStored !== 0 ? vonStored : tp.tVto;
@@ -1244,67 +1184,8 @@ export function createMosfetElement(
       vgd = vgs - vds;
       // vgb unused except in Meyer cap block; compute at that site.
 
-      // Hoisted cap totals (written by bypass branch or Meyer block below).
-      let capgs = 0, capgd = 0, capgb = 0;
-
-      // cite: mos1load.c:258-348 — NOBYPASS bypass gate.
-      // cdhat/cbhat predict drain and bulk currents from previous-iteration
-      // conductances. delvXX computes against s0[SLOT_V*] which still holds
-      // the prior-iteration stored values (state0 overwrite is at line ~1395).
-      let bypassed = false;
-      {
-        const prevCd   = s0[base + SLOT_CD];
-        const prevCbs  = s0[base + SLOT_CBS];
-        const prevCbd  = s0[base + SLOT_CBD];
-        const prevGm   = s0[base + SLOT_GM];
-        const prevGds  = s0[base + SLOT_GDS];
-        const prevGmbs = s0[base + SLOT_GMBS];
-        const prevGbd  = s0[base + SLOT_GBD];
-        const prevGbs  = s0[base + SLOT_GBS];
-        const prevMode = s0[base + SLOT_MODE];
-        const prevVbs  = s0[base + SLOT_VBS];
-        const prevVbd  = s0[base + SLOT_VBD];
-        const prevVgs  = s0[base + SLOT_VGS];
-        const prevVds  = s0[base + SLOT_VDS];
-
-        const delvbs = vbs - prevVbs;
-        const delvbd = vbd - prevVbd;
-        const delvgs = vgs - prevVgs;
-        const delvds = vds - prevVds;
-
-        let cdhat: number;
-        if (prevMode >= 0) {
-          const delvgd = delvgs - delvds;
-          cdhat = prevCd + prevGm * delvgs + prevGds * delvds + prevGmbs * delvbs - prevGbd * delvbd;
-        } else {
-          const delvgd = delvgs - delvds;
-          cdhat = prevCd - (prevGbd - prevGmbs) * delvbd - prevGm * delvgd + prevGds * delvds;
-        }
-        const cbhat = prevCbs + prevCbd + prevGbd * delvbd + prevGbs * delvbs;
-
-        if (
-          !(mode & (MODEINITPRED | MODEINITTRAN | MODEINITSMSIG))
-          && ctx.bypass
-          && (Math.abs(cbhat - (prevCbs + prevCbd)) < ctx.reltol * (Math.max(Math.abs(cbhat), Math.abs(prevCbs + prevCbd)) + ctx.iabstol))
-          && Math.abs(delvbs) < ctx.reltol * Math.max(Math.abs(vbs), Math.abs(prevVbs)) + ctx.voltTol
-          && Math.abs(delvbd) < ctx.reltol * Math.max(Math.abs(vbd), Math.abs(prevVbd)) + ctx.voltTol
-          && Math.abs(delvgs) < ctx.reltol * Math.max(Math.abs(vgs), Math.abs(prevVgs)) + ctx.voltTol
-          && Math.abs(delvds) < ctx.reltol * Math.max(Math.abs(vds), Math.abs(prevVds)) + ctx.voltTol
-          && Math.abs(cdhat - prevCd) < ctx.reltol * Math.max(Math.abs(cdhat), Math.abs(prevCd)) + ctx.iabstol
-        ) {
-          // cite: mos1load.c:322-347 — bypass: reload voltages from state0,
-          // rebuild cap totals from cached half-caps (MODETRAN/MODETRANOP only).
-          vbs = prevVbs; vbd = prevVbd; vgs = prevVgs; vds = prevVds;
-          vgd = vgs - vds;
-
-          if (mode & (MODETRAN | MODETRANOP)) {
-            capgs = s0[base + SLOT_CAPGS] + s1[base + SLOT_CAPGS] + GateSourceOverlapCap;
-            capgd = s0[base + SLOT_CAPGD] + s1[base + SLOT_CAPGD] + GateDrainOverlapCap;
-            capgb = s0[base + SLOT_CAPGB] + s1[base + SLOT_CAPGB] + GateBulkOverlapCap;
-          }
-          bypassed = true;
-        }
-      }
+      // Hoisted cap totals (populated above by bypass branch or below by Meyer block).
+      let capgs = bypassCapgs, capgd = bypassCapgd, capgb = bypassCapgb;
 
       // mos1load.c:472-478: device mode (normal/inverse) from vds sign.
       const opMode = vds >= 0 ? 1 : -1;
@@ -1333,7 +1214,15 @@ export function createMosfetElement(
         cbd   = s0[base + SLOT_CBD];
         cbs   = s0[base + SLOT_CBS];
         cd    = s0[base + SLOT_CD];
-        // Reconstruct cdrain from cd: cd = opMode * cdrain - cbd → cdrain = opMode * (cd + cbd)
+        // cite: mos1load.c:472-478 — Reconstruct cdrain from cd:
+        //   cd = opMode * cdrain - cbd → cdrain = opMode * (cd + cbd).
+        // ngspice writes `cdrain = here->MOS1mode * (here->MOS1cd + here->MOS1cbd)`
+        // where MOS1mode is the stored mode from the previous iteration. Here we
+        // use `opMode` freshly computed from the just-reloaded vds (line 1192).
+        // These are numerically identical because bypass reloaded `vds = prevVds`
+        // from state0, and the stored s0[SLOT_MODE] was written as
+        // (prevVds >= 0 ? 1 : -1). The two signs always agree on bypass — vds
+        // is deterministic once prevVds is reloaded. Documented per review G-2.
         cdrain = opMode * (cd + cbd);
       } else {
         // mos1load.c:453-468: bulk-source and bulk-drain junction currents.
