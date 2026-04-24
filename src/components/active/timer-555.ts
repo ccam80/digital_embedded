@@ -83,8 +83,12 @@ import {
 import type { AnalogElementCore, LoadContext } from "../../solver/analog/element.js";
 import { defineModelParams } from "../../core/model-params.js";
 import { stampG, stampRHS } from "../../solver/analog/stamp-helpers.js";
-import { DigitalOutputPinModel } from "../../solver/analog/digital-pin-model.js";
+import {
+  DigitalOutputPinModel,
+  collectPinModelChildren,
+} from "../../solver/analog/digital-pin-model.js";
 import type { StatePoolRef } from "../../core/analog-types.js";
+import type { AnalogCapacitorElement } from "../passives/capacitor.js";
 
 // Sub-element: discharge BJT — bjtload.c:170-end (L0 Gummel-Poon)
 import {
@@ -441,6 +445,10 @@ function createTimer555Element(
   });
   _outputPin.init(nOut, -1);
 
+  // Collect capacitor children from output pin model (cOut=0 → empty array at runtime).
+  const _childElements: AnalogCapacitorElement[] = collectPinModelChildren([_outputPin]);
+  const _childStateSize = _childElements.reduce((s, c) => s + c.stateSize, 0);
+
   function readNode(voltages: Float64Array, n: number): number {
     return n > 0 ? voltages[n - 1] : 0;
   }
@@ -493,9 +501,11 @@ function createTimer555Element(
   return {
     branchIndex: -1,
     isNonlinear: true,
-    isReactive: false as const,
+    get isReactive(): boolean {
+      return _childElements.length > 0;
+    },
     poolBacked: true as const,
-    stateSize: BJT_STATE_SIZE,
+    stateSize: BJT_STATE_SIZE + _childStateSize,
     stateSchema: BJT_SIMPLE_SCHEMA,
     stateBaseOffset: -1,
 
@@ -503,10 +513,16 @@ function createTimer555Element(
       pool = poolRef;
       bjtBase = this.stateBaseOffset;
 
-      // BJT occupies the entire state block for this composite.
-      // Comparators are F4c behavioral — no pool state.
+      // BJT occupies the first block of state; capacitor children follow.
       bjtSub.stateBaseOffset = bjtBase;
       bjtSub.initState(poolRef);
+
+      let childOffset = bjtBase + BJT_STATE_SIZE;
+      for (const child of _childElements) {
+        child.stateBaseOffset = childOffset;
+        child.initState(poolRef);
+        childOffset += child.stateSize;
+      }
     },
 
     load(ctx: LoadContext): void {
@@ -609,6 +625,17 @@ function createTimer555Element(
       // ---------------------------------------------------------------
       _outputPin.setLogicLevel(_flipflopQ);
       _outputPin.load(ctx);
+
+      // ---------------------------------------------------------------
+      // Capacitor children from output pin model (companion companion math).
+      // ---------------------------------------------------------------
+      for (const child of _childElements) {
+        child.load(ctx);
+      }
+    },
+
+    checkConvergence(ctx: LoadContext): boolean {
+      return _childElements.every(c => !c.checkConvergence || c.checkConvergence(ctx));
     },
 
     accept(ctx: LoadContext, _simTime: number, _addBreakpoint: (t: number) => void): void {

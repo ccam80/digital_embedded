@@ -520,7 +520,8 @@ describe("Integration", () => {
     ): import("../load-context.js").LoadContext {
       return {
         solver: nullSolver,
-        voltages: v,
+        rhsOld: v,
+        rhs: v,
         cktMode: MODETRAN | MODEINITFLOAT,
         dt: ctxDt,
         method,

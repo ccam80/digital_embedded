@@ -243,7 +243,7 @@ export class AnalogCapacitorElement implements ReactiveAnalogElementCore {
    * source). Matches the Appendix D2 reference pattern.
    */
   load(ctx: LoadContext): void {
-    const { solver, voltages, ag, cktMode: mode } = ctx;
+    const { solver, rhsOld: voltages, ag, cktMode: mode } = ctx;
     const n0 = this.pinNodeIds[0];
     const n1 = this.pinNodeIds[1];
     const C = this.C;

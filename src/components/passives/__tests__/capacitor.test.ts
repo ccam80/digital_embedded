@@ -75,7 +75,7 @@ function makeCompanionCtx(opts: {
   return {
     cktMode,
     solver: opts.solver,
-    voltages: opts.voltages,
+    rhsOld: opts.voltages,
     dt: opts.dt,
     method: (opts.method === "bdf1" ? "trapezoidal" : opts.method) as LoadContext["method"],
     order: opts.order,
@@ -548,7 +548,7 @@ describe("Capacitor trap-order-2 xmu parity (C4.6)", () => {
     const ctx: LoadContext = {
       cktMode: MODETRAN | MODEINITFLOAT,
       solver: mockSolver,
-      voltages,
+      rhsOld: voltages,
       dt,
       method: "trapezoidal",
       order: 2,
@@ -703,7 +703,7 @@ describe("capacitor_load_transient_parity (C4.2)", () => {
       const ctx: LoadContext = {
         cktMode: step === 0 ? (MODETRAN | MODEINITTRAN) : (MODETRAN | MODEINITFLOAT),
         solver,
-        voltages: new Float64Array([Vsrc, v2, 0]),
+        rhsOld: new Float64Array([Vsrc, v2, 0]),
         dt,
         method,
         order,

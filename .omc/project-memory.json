@@ -290,6 +290,12 @@
       "type": "directory"
     },
     {
+      "path": "src\\components\\passives\\capacitor.ts",
+      "accessCount": 13,
+      "lastAccessed": 1776996904475,
+      "type": "file"
+    },
+    {
       "path": "src\\components\\semiconductors\\__tests__\\diode.test.ts",
       "accessCount": 12,
       "lastAccessed": 1776994352695,
@@ -300,6 +306,24 @@
       "accessCount": 12,
       "lastAccessed": 1776996334500,
       "type": "directory"
+    },
+    {
+      "path": "src\\solver\\analog\\behavioral-gate.ts",
+      "accessCount": 12,
+      "lastAccessed": 1776996945943,
+      "type": "file"
+    },
+    {
+      "path": "src\\components\\active\\__tests__\\timer-555.test.ts",
+      "accessCount": 12,
+      "lastAccessed": 1776997184235,
+      "type": "file"
+    },
+    {
+      "path": "spec\\test-baseline.md",
+      "accessCount": 12,
+      "lastAccessed": 1776997363764,
+      "type": "file"
     },
     {
       "path": "src\\components\\semiconductors\\tunnel-diode.ts",
@@ -314,27 +338,21 @@
       "type": "file"
     },
     {
-      "path": "spec\\test-baseline.md",
-      "accessCount": 10,
-      "lastAccessed": 1776996326418,
-      "type": "file"
-    },
-    {
       "path": "src\\components\\io\\led.ts",
       "accessCount": 10,
       "lastAccessed": 1776996329994,
       "type": "file"
     },
     {
-      "path": "src\\solver\\analog\\behavioral-gate.ts",
+      "path": "spec\\phase-0-residual-dead-code-audit.md",
       "accessCount": 10,
-      "lastAccessed": 1776996439012,
+      "lastAccessed": 1776996642971,
       "type": "file"
     },
     {
-      "path": "spec\\phase-0-residual-dead-code-audit.md",
-      "accessCount": 9,
-      "lastAccessed": 1776996322474,
+      "path": "src\\solver\\analog\\digital-pin-model.ts",
+      "accessCount": 10,
+      "lastAccessed": 1776996654319,
       "type": "file"
     },
     {
@@ -350,15 +368,9 @@
       "type": "file"
     },
     {
-      "path": "src\\solver\\analog\\digital-pin-model.ts",
-      "accessCount": 9,
-      "lastAccessed": 1776996431947,
-      "type": "file"
-    },
-    {
       "path": "spec\\.context\\rules.md",
-      "accessCount": 8,
-      "lastAccessed": 1776996322385,
+      "accessCount": 9,
+      "lastAccessed": 1776996634814,
       "type": "file"
     },
     {
@@ -368,15 +380,15 @@
       "type": "file"
     },
     {
-      "path": "src\\components\\passives\\capacitor.ts",
-      "accessCount": 8,
-      "lastAccessed": 1776996443075,
-      "type": "file"
-    },
-    {
       "path": "src\\components\\semiconductors\\mosfet.ts",
       "accessCount": 7,
       "lastAccessed": 1776994304172,
+      "type": "file"
+    },
+    {
+      "path": "spec\\progress.md",
+      "accessCount": 7,
+      "lastAccessed": 1776997408102,
       "type": "file"
     },
     {
@@ -404,34 +416,34 @@
       "type": "file"
     },
     {
+      "path": "spec\\.context\\lock-protocol.md",
+      "accessCount": 6,
+      "lastAccessed": 1776996635308,
+      "type": "file"
+    },
+    {
+      "path": "spec\\.hybrid-state.json",
+      "accessCount": 6,
+      "lastAccessed": 1776997450981,
+      "type": "file"
+    },
+    {
       "path": "src\\components\\semiconductors\\__tests__\\jfet.test.ts",
       "accessCount": 5,
       "lastAccessed": 1776994331876,
       "type": "file"
     },
     {
-      "path": "src\\components\\active\\__tests__\\timer-555.test.ts",
+      "path": "src\\solver\\analog\\bridge-adapter.ts",
       "accessCount": 5,
-      "lastAccessed": 1776994344205,
+      "lastAccessed": 1776996681027,
       "type": "file"
     },
     {
-      "path": "spec\\.context\\lock-protocol.md",
+      "path": "",
       "accessCount": 5,
-      "lastAccessed": 1776994639847,
-      "type": "file"
-    },
-    {
-      "path": "spec\\.hybrid-state.json",
-      "accessCount": 5,
-      "lastAccessed": 1776996270023,
-      "type": "file"
-    },
-    {
-      "path": "spec\\progress.md",
-      "accessCount": 5,
-      "lastAccessed": 1776996326385,
-      "type": "file"
+      "lastAccessed": 1776997390303,
+      "type": "directory"
     },
     {
       "path": "e2e",
@@ -452,15 +464,15 @@
       "type": "file"
     },
     {
-      "path": "",
+      "path": "src\\solver\\analog\\behavioral-flipflop.ts",
       "accessCount": 4,
-      "lastAccessed": 1776995766685,
-      "type": "directory"
+      "lastAccessed": 1776996753511,
+      "type": "file"
     },
     {
-      "path": "src\\solver\\analog\\bridge-adapter.ts",
+      "path": "src\\solver\\analog\\behavioral-flipflop\\shared.ts",
       "accessCount": 4,
-      "lastAccessed": 1776996369075,
+      "lastAccessed": 1776996775251,
       "type": "file"
     },
     {
@@ -518,12 +530,6 @@
       "type": "directory"
     },
     {
-      "path": "src\\solver\\analog\\behavioral-flipflop\\shared.ts",
-      "accessCount": 3,
-      "lastAccessed": 1776994954490,
-      "type": "file"
-    },
-    {
       "path": "src\\solver\\analog\\behavioral-flipflop\\t.ts",
       "accessCount": 3,
       "lastAccessed": 1776995159798,
@@ -563,12 +569,6 @@
       "path": "src\\solver\\analog\\behavioral-sequential.ts",
       "accessCount": 3,
       "lastAccessed": 1776995448554,
-      "type": "file"
-    },
-    {
-      "path": "src\\solver\\analog\\behavioral-flipflop.ts",
-      "accessCount": 2,
-      "lastAccessed": 1776995008031,
       "type": "file"
     },
     {

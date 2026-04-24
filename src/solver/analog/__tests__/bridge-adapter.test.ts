@@ -18,6 +18,7 @@ import {
   makeBridgeInputAdapter,
 } from "../bridge-adapter.js";
 import type { ResolvedPinElectrical } from "../../../core/pin-electrical.js";
+import { StatePool } from "../state-pool.js";
 
 // ---------------------------------------------------------------------------
 // Test helper — records stamp() and stampRHS() calls
@@ -174,6 +175,9 @@ describe("BridgeOutputAdapter", () => {
 
   it("loaded output adapter stamps rOut conductance on node diagonal", () => {
     const adapter = makeBridgeOutputAdapter(CMOS_3V3, NODE, BRANCH_IDX, true);
+    const pool = new StatePool(adapter.stateSize);
+    adapter.stateBaseOffset = 0;
+    adapter.initState(pool);
     adapter.load(makeCtx(solver));
 
     // 1/rOut must appear on the node diagonal
@@ -199,6 +203,9 @@ describe("BridgeOutputAdapter", () => {
 
   it("input adapter loaded stamps rIn on node diagonal", () => {
     const adapter = makeBridgeInputAdapter(CMOS_3V3, NODE, true);
+    const pool = new StatePool(adapter.stateSize);
+    adapter.stateBaseOffset = 0;
+    adapter.initState(pool);
     adapter.load(makeCtx(solver));
 
     const gIn = 1 / CMOS_3V3.rIn;
@@ -218,6 +225,9 @@ describe("BridgeOutputAdapter", () => {
 
   it("setParam('rOut', 50) hot-updates output adapter conductance", () => {
     const adapter = makeBridgeOutputAdapter(CMOS_3V3, NODE, BRANCH_IDX, true);
+    const pool = new StatePool(adapter.stateSize);
+    adapter.stateBaseOffset = 0;
+    adapter.initState(pool);
     adapter.load(makeCtx(solver));
     const gOutBefore = solver.sumStamp(NODE_IDX, NODE_IDX);
 

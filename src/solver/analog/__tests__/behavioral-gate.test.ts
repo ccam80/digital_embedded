@@ -41,6 +41,7 @@ import { PropertyBag } from "../../../core/properties.js";
 import type { AnalogElement } from "../element.js";
 import type { LoadContext } from "../load-context.js";
 import { MODETRAN, MODEINITFLOAT } from "../ckt-mode.js";
+import { StatePool } from "../state-pool.js";
 
 // ---------------------------------------------------------------------------
 // Shared test constants
@@ -537,6 +538,9 @@ describe("Task 6.4.3 — _pinLoading propagation and delegation", () => {
     (ctx as any).solver = solver;
 
     withNodeIds(element, [1, 2, 3]);
+    const pool = new StatePool(element.stateSize);
+    element.stateBaseOffset = 0;
+    element.initState(pool);
     element.load(ctx);
 
     // When all inputs are loaded (rIn stamps), each input contributes at least
@@ -604,6 +608,9 @@ describe("Task 6.4.3 — _pinLoading propagation and delegation", () => {
     (ctx as any).solver = solver;
 
     withNodeIds(element, [1, 2, 3]);
+    const pool = new StatePool(element.stateSize);
+    element.stateBaseOffset = 0;
+    element.initState(pool);
     element.load(ctx);
 
     // MNA node IDs are 1-based; allocElement receives 0-based nodeIdx = nodeId-1.
@@ -633,6 +640,9 @@ describe("Task 6.4.3 — _pinLoading propagation and delegation", () => {
       new Map(),
     );
     withNodeIds(gate, [1, 2, 3]);
+    const pool = new StatePool(gate.stateSize);
+    gate.stateBaseOffset = 0;
+    gate.initState(pool);
 
     const inALoadSpy = vi.spyOn(inA, "load");
     const inBLoadSpy = vi.spyOn(inB, "load");
@@ -693,6 +703,9 @@ describe("Task 6.4.3 — _pinLoading propagation and delegation", () => {
       [], -1, props, () => 0,
     );
     withNodeIds(element, [1, 2, 3]);
+    const pool = new StatePool(element.stateSize);
+    element.stateBaseOffset = 0;
+    element.initState(pool);
 
     const allocCalls: Array<[number, number]> = [];
     const solver = {
