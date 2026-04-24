@@ -43,7 +43,7 @@
   },
   "build": {
     "buildCommand": "cd \"C:/local_working_projects/digital_in_browser\" && npx tsc --noEmit 2>&1 | tail -20",
-    "testCommand": "cd \"C:/local_working_projects/digital_in_browser\" && npx vitest run --testTimeout=120000 \"src/components/semiconductors/__tests__/diode.test.ts\" \"src/components/io/__tests__/led.test.ts\" \"src/components/passives/__tests__/inductor.test.ts\" 2>&1 | tail -20",
+    "testCommand": "cd \"C:/local_working_projects/digital_in_browser\" && npx vitest run --testTimeout=120000 \"src/solver/analog/__tests__/ckt-context.test.ts\" 2>&1 | tail -60",
     "lintCommand": "npm run lint",
     "devCommand": "npm run dev",
     "scripts": {
@@ -291,38 +291,38 @@
     },
     {
       "path": "src",
-      "accessCount": 97,
-      "lastAccessed": 1777027002883,
+      "accessCount": 99,
+      "lastAccessed": 1777027468534,
       "type": "directory"
     },
     {
       "path": "spec\\progress.md",
-      "accessCount": 95,
-      "lastAccessed": 1777026963704,
+      "accessCount": 97,
+      "lastAccessed": 1777027426063,
       "type": "file"
     },
     {
       "path": "src\\components\\semiconductors\\__tests__\\diode.test.ts",
-      "accessCount": 69,
-      "lastAccessed": 1777027278518,
+      "accessCount": 70,
+      "lastAccessed": 1777027458611,
       "type": "file"
     },
     {
       "path": "spec\\.context\\rules.md",
-      "accessCount": 66,
-      "lastAccessed": 1777026958611,
+      "accessCount": 67,
+      "lastAccessed": 1777027417775,
       "type": "file"
     },
     {
       "path": "src\\components\\io\\__tests__\\led.test.ts",
-      "accessCount": 62,
-      "lastAccessed": 1777027267478,
+      "accessCount": 63,
+      "lastAccessed": 1777027459495,
       "type": "file"
     },
     {
       "path": "spec\\test-baseline.md",
-      "accessCount": 61,
-      "lastAccessed": 1777026964059,
+      "accessCount": 62,
+      "lastAccessed": 1777027422341,
       "type": "file"
     },
     {
@@ -332,16 +332,16 @@
       "type": "file"
     },
     {
+      "path": "src\\components\\semiconductors\\__tests__\\tunnel-diode.test.ts",
+      "accessCount": 41,
+      "lastAccessed": 1777027452360,
+      "type": "directory"
+    },
+    {
       "path": "spec\\.context\\lock-protocol.md",
       "accessCount": 39,
       "lastAccessed": 1777026958910,
       "type": "file"
-    },
-    {
-      "path": "src\\components\\semiconductors\\__tests__\\tunnel-diode.test.ts",
-      "accessCount": 39,
-      "lastAccessed": 1777027266701,
-      "type": "directory"
     },
     {
       "path": "src\\solver\\analog\\behavioral-remaining.ts",

@@ -1,51 +1,21 @@
 {
   "summary": {
-    "passed": 163,
-    "failed": 4,
+    "passed": 8,
+    "failed": 1,
     "skipped": 0,
-    "totalFiles": 3,
+    "totalFiles": 1,
     "durationSeconds": 0.6
   },
   "failures": [
     {
-      "message": "Cannot read properties of undefined (reading '0')",
-      "count": 2,
-      "locations": [
-        {
-          "file": "src\\components\\io\\led.ts",
-          "test": "junction_cap_transient_matches_ngspice",
-          "line": 267,
-          "column": 36
-        },
-        {
-          "file": "src\\components\\semiconductors\\diode.ts",
-          "test": "junction_capacitance_when_cjo_nonzero",
-          "line": 533,
-          "column": 39
-        }
-      ]
-    },
-    {
-      "message": "expected 1.055941475717686e-12 to be less than 1.055941475717686e-12",
+      "message": "expected undefined to be an instance of Float64Array",
       "count": 1,
       "locations": [
         {
-          "file": "src\\components\\semiconductors\\__tests__\\diode.test.ts",
-          "test": "IKR correction reduces gd for reverse-biased diode with finite IKR",
-          "line": 710,
-          "column": 23
-        }
-      ]
-    },
-    {
-      "message": "expected NaN to be greater than 0",
-      "count": 1,
-      "locations": [
-        {
-          "file": "src\\components\\semiconductors\\__tests__\\diode.test.ts",
-          "test": "cap gate fires under MODETRANOP | MODEUIC (dioload.c:316-317)",
-          "line": 1280,
-          "column": 28
+          "file": "src\\solver\\analog\\__tests__\\ckt-context.test.ts",
+          "test": "loadCtx_fields_populated",
+          "line": 260,
+          "column": 25
         }
       ]
     }

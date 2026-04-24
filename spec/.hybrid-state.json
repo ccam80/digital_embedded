@@ -382,10 +382,10 @@
           "7.5.5.1"
         ]
       ],
-      "spawned": 8,
-      "completed": 8,
+      "spawned": 9,
+      "completed": 9,
       "verifications_passed": 6,
-      "verifications_failed": 1,
+      "verifications_failed": 2,
       "stops_for_clarification": 0,
       "dead_implementers": 0,
       "dead_verifiers": 0,
@@ -407,7 +407,14 @@
         "7.5.scr": [],
         "7.5.tunnel": []
       },
-      "user_acks": {}
+      "user_acks": {},
+      "recovery_log": [
+        {
+          "script": "i-fixed-it.sh",
+          "timestamp": "2026-04-24T10:45:47.978Z",
+          "description": "Added bypass: false, voltTol: 1e-6 to two remaining LoadContext literals missed by implementer fix-pass: phase-3-relay-composite.test.ts:124 (makeCtx) and sparse-solver.test.ts:453 (rawCtx). Two-field additions each, no semantic change."
+        }
+      ]
     },
     {
       "id": "batch-cross-b-w5.1-plus-w6.1-plus-w7.1",
@@ -741,5 +748,5 @@
       "user_acks": {}
     }
   ],
-  "last_updated": "2026-04-24T10:42:34.758Z"
+  "last_updated": "2026-04-24T10:45:47.978Z"
 }
