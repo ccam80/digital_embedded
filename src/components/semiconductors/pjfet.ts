@@ -430,80 +430,42 @@ export function createPJfetElement(
           });
         }
 
-        // jfetload.c:230-242: DEVfetlim — inline so P-channel file stays
-        // self-contained per spec §4 D-10 (no shared helper across NJFET
-        // and PJFET).
-        {
-          const vto_local = vto;
-          const vtsthi = Math.abs(2 * (vgsOld - vto_local)) + 2;
-          const vtstlo = vtsthi / 2 + 2;
-          const vtox = vto_local + 3.5;
-          const delv = vgs - vgsOld;
-          let vOut = vgs;
-          if (vgsOld >= vto_local) {
-            if (vgsOld >= vtox) {
-              if (delv <= 0) {
-                if (vOut >= vtox) {
-                  if (-delv > vtstlo) vOut = vgsOld - vtstlo;
-                } else {
-                  vOut = Math.max(vOut, vto_local + 2);
-                }
-              } else {
-                if (delv >= vtsthi) vOut = vgsOld + vtsthi;
-              }
-            } else {
-              if (delv <= 0) vOut = Math.max(vOut, vto_local - 0.5);
-              else vOut = Math.min(vOut, vto_local + 4);
-            }
-          } else {
-            if (delv <= 0) {
-              if (-delv > vtsthi) vOut = vgsOld - vtsthi;
-            } else {
-              const vtemp = vto_local + 0.5;
-              if (vOut <= vtemp) {
-                if (delv > vtstlo) vOut = vgsOld + vtstlo;
-              } else {
-                vOut = vtemp;
-              }
-            }
+        vgs = fetlim(vgs, vgsOld, vto); // cite: devsup.c::DEVfetlim via newton-raphson.fetlim
+        vgd = fetlim(vgd, vgdOld, vto);
+
+        // cite: jfetload.c:165-174 — extrapolated currents for bypass + noncon gates
+        const delvgs = vgs - s0[base + SLOT_VGS];
+        const delvgd = vgd - s0[base + SLOT_VGD];
+        const delvds = delvgs - delvgd;
+        cghat = s0[base + SLOT_CG]
+          + s0[base + SLOT_GGD] * delvgd
+          + s0[base + SLOT_GGS] * delvgs;
+        cdhat = s0[base + SLOT_CD]
+          + s0[base + SLOT_GM]  * delvgs
+          + s0[base + SLOT_GDS] * delvds
+          - s0[base + SLOT_GGD] * delvgd;
+
+        // cite: jfetload.c:178-208 — NOBYPASS bypass test
+        if (ctx.bypass && !(mode & MODEINITPRED)) {
+          const vgsOld2 = s0[base + SLOT_VGS];
+          const vgdOld2 = s0[base + SLOT_VGD];
+          const cgOld  = s0[base + SLOT_CG];
+          const cdOld  = s0[base + SLOT_CD];
+          if (Math.abs(delvgs) < ctx.reltol * Math.max(Math.abs(vgs), Math.abs(vgsOld2)) + ctx.voltTol)
+          if (Math.abs(delvgd) < ctx.reltol * Math.max(Math.abs(vgd), Math.abs(vgdOld2)) + ctx.voltTol)
+          if (Math.abs(cghat - cgOld) < ctx.reltol * Math.max(Math.abs(cghat), Math.abs(cgOld)) + ctx.iabstol)
+          if (Math.abs(cdhat - cdOld) < ctx.reltol * Math.max(Math.abs(cdhat), Math.abs(cdOld)) + ctx.iabstol) {
+            vgs = vgsOld2;
+            vgd = vgdOld2;
+            cg  = cgOld;
+            cd  = cdOld;
+            cgd = s0[base + SLOT_CGD];
+            gm  = s0[base + SLOT_GM];
+            gds = s0[base + SLOT_GDS];
+            ggs = s0[base + SLOT_GGS];
+            ggd = s0[base + SLOT_GGD];
+            bypassed = true;
           }
-          vgs = vOut;
-        }
-        {
-          const vto_local = vto;
-          const vtsthi = Math.abs(2 * (vgdOld - vto_local)) + 2;
-          const vtstlo = vtsthi / 2 + 2;
-          const vtox = vto_local + 3.5;
-          const delv = vgd - vgdOld;
-          let vOut = vgd;
-          if (vgdOld >= vto_local) {
-            if (vgdOld >= vtox) {
-              if (delv <= 0) {
-                if (vOut >= vtox) {
-                  if (-delv > vtstlo) vOut = vgdOld - vtstlo;
-                } else {
-                  vOut = Math.max(vOut, vto_local + 2);
-                }
-              } else {
-                if (delv >= vtsthi) vOut = vgdOld + vtsthi;
-              }
-            } else {
-              if (delv <= 0) vOut = Math.max(vOut, vto_local - 0.5);
-              else vOut = Math.min(vOut, vto_local + 4);
-            }
-          } else {
-            if (delv <= 0) {
-              if (-delv > vtsthi) vOut = vgdOld - vtsthi;
-            } else {
-              const vtemp = vto_local + 0.5;
-              if (vOut <= vtemp) {
-                if (delv > vtstlo) vOut = vgdOld + vtstlo;
-              } else {
-                vOut = vtemp;
-              }
-            }
-          }
-          vgd = vOut;
         }
       }
 
@@ -512,10 +474,8 @@ export function createPJfetElement(
       // jfetload.c:247: vds = vgs - vgd.
       const vds = vgs - vgd;
 
+      if (!bypassed) {
       // jfetload.c:249-270: gate junction currents and conductances.
-      let cg: number, cgd: number;
-      let ggs: number, ggd: number;
-
       // jfetload.c:250-259: gate-source junction.
       if (vgs < -3 * vt_temp) {
         let arg = 3 * vt_temp / (vgs * Math.E);
@@ -544,7 +504,7 @@ export function createPJfetElement(
       cg = cg + cgd;
 
       // jfetload.c:274-348: Sydney University drain current / derivatives.
-      let cdrain: number, gm: number, gds: number;
+      let cdrain: number;
       const Bfac0 = tp.bFac;
 
       if (vds >= 0) {
@@ -600,7 +560,7 @@ export function createPJfetElement(
       }
 
       // jfetload.c:423-424: cd = cdrain - cgd.
-      let cd = cdrain - cgd;
+      cd = cdrain - cgd;
 
       // jfetload.c:425-494: charge storage + NIintegrate for transient.
       const capGate = (mode & (MODETRAN | MODEAC | MODEINITSMSIG)) !== 0
@@ -705,12 +665,20 @@ export function createPJfetElement(
           }
         }
       }
+      } // end if (!bypassed)
 
-      // jfetload.c:498-508: CKTnoncon increment on icheck failure.
-      // Gate: `!(MODEINITFIX) | !(MODEUIC)` — bitwise-OR (|), NOT logical-OR
-      // (||). This is an intentional ngspice quirk that makes the condition
-      // always-true when only one bit is set; replicated exactly per J-W3-2.
-      if ((!(mode & MODEINITFIX) | !(mode & MODEUIC)) && icheckLimited) ctx.noncon.value++;
+      // cite: jfetload.c:498-507 — suppress noncon bump only when both
+      // MODEINITFIX and MODEUIC are set (UIC-forced IC at init step).
+      // Bitwise `|` on operands that are already 0/1 from `!` is equivalent
+      // to logical `||` — no "quirk," just C convention ported verbatim.
+      if ((!(mode & MODEINITFIX)) | (!(mode & MODEUIC))) {
+        const absTol = ctx.iabstol;
+        const cgNoncon = Math.abs(cghat - cg)
+          >= ctx.reltol * Math.max(Math.abs(cghat), Math.abs(cg)) + absTol;
+        const cdNoncon = Math.abs(cdhat - cd)
+          >  ctx.reltol * Math.max(Math.abs(cdhat), Math.abs(cd)) + absTol;
+        if (icheckLimited || cgNoncon || cdNoncon) ctx.noncon.value++;
+      }
 
       // jfetload.c:509-517: write accepted state back to state0.
       s0[base + SLOT_VGS] = vgs;
@@ -748,19 +716,6 @@ export function createPJfetElement(
       // ngspice: JFETdrainDrainPtr += m*(gdpr); JFETsourceSourcePtr += m*(gspr).
       if (gdpr > 0) stampG(solver, nodeD, nodeD, m * gdpr);
       if (gspr > 0) stampG(solver, nodeS, nodeS, m * gspr);
-    },
-
-    primeJunctions(): void {
-      // jfetload.c:115-118: MODEINITJCT + !OFF branch sets vgs = -1, vgd = -1.
-      const s0 = pool.states[0];
-      if (params.OFF) {
-        s0[base + SLOT_VGS] = 0;
-        s0[base + SLOT_VGD] = 0;
-      } else {
-        s0[base + SLOT_VGS] = -1;
-        s0[base + SLOT_VGD] = -1;
-      }
-      primedFromJct = true;
     },
 
     getPinCurrents(_voltages: Float64Array): number[] {

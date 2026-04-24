@@ -447,16 +447,16 @@
           "7.1.6"
         ]
       ],
-      "spawned": 3,
-      "completed": 1,
-      "verifications_passed": 0,
+      "spawned": 5,
+      "completed": 3,
+      "verifications_passed": 1,
       "verifications_failed": 0,
       "stops_for_clarification": 0,
       "dead_implementers": 2,
       "dead_verifiers": 0,
       "group_status": {
         "5.1": "pending",
-        "6.1": "pending",
+        "6.1": "passed",
         "7.1": "pending"
       },
       "user_required_tasks": {
@@ -748,5 +748,5 @@
       "user_acks": {}
     }
   ],
-  "last_updated": "2026-04-24T11:11:35.478Z"
+  "last_updated": "2026-04-24T11:29:49.270Z"
 }

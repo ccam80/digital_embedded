@@ -659,3 +659,93 @@ Previously-confirmed-patched files regression check: load-context.ts, ckt-contex
 - **Files created**: none
 - **Files modified**: src/components/semiconductors/mosfet.ts, src/components/semiconductors/__tests__/mosfet.test.ts
 - **Tests**: 3/3 passing (MOSFET primeJunctions::method absent from element, MOSFET primeJunctions::MODEINITJCT branch primes directly, MOSFET primeJunctions::dc-operating-point skips MOSFET)
+
+## Task 7.1.1: Complete MODEINITPRED state-copy list
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: none
+- **Files modified**: `src/components/semiconductors/njfet.ts`, `src/components/semiconductors/pjfet.ts`
+- **Prior implementer state**: NJFET — complete on disk (lines 408-415 had all 7 additional slot copies with `// cite: jfetload.c:135-148`). PJFET — complete on disk (lines 376-383 had all 7 additional slot copies with same citation).
+- **This agent**: No changes needed for this task — both files were already complete.
+- **Tests**: 5/6 passing in jfet.test.ts (1 pre-existing failure: `emits_stamps_when_conducting` — ctx.rhsOld undefined in test fixture, documented in task 0.1.2 progress entry)
+
+## Task 7.1.2: Port cghat/cdhat extrapolation + noncon convergence gate
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: none
+- **Files modified**: `src/components/semiconductors/njfet.ts`, `src/components/semiconductors/pjfet.ts`
+- **Prior implementer state**: NJFET — complete on disk (delvgs/delvgd/delvds/cghat/cdhat at lines 469-479; noncon gate with 3-trigger form, `>=`/`>` asymmetry, correct comment at lines 713-724). PJFET — MISSING: `cghat`/`cdhat` variable declarations were promoted to function scope (lines 334-335) but were never computed in the `else` branch; noncon gate had old single-trigger form with "quirk" comment.
+- **This agent**: Added cghat/cdhat computation block to PJFET `else` branch (after fetlim calls); replaced PJFET noncon gate with 3-trigger form preserving `>=`/`>` asymmetry; added correct comment `// cite: jfetload.c:498-507`.
+- **Tests**: 5/6 passing (same pre-existing failure)
+
+## Task 7.1.3: Port NOBYPASS bypass block
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: none
+- **Files modified**: `src/components/semiconductors/njfet.ts`, `src/components/semiconductors/pjfet.ts`
+- **Prior implementer state**: NJFET — complete on disk: `bypassed` flag declared at top of load(), four-level nested `if` bypass block present, compute block wrapped in `if (!bypassed)`, noncon gate and state-writeback unconditional. PJFET — PARTIAL: `bypassed = false` declared, function-scope `let` declarations for cg/cd/cgd/gm/gds/ggs/ggd present, but bypass block was missing; compute block had duplicate `let cg: number, cgd: number;`/`let ggs: number, ggd: number;`/`let cdrain: number, gm: number, gds: number;`/`let cd = cdrain - cgd;` declarations inside it; compute block not wrapped in `if (!bypassed)`.
+- **This agent**: Added four-level nested bypass block to PJFET (after cghat/cdhat computation); removed duplicate inner `let` declarations from compute block (already at function scope); changed `let cd = cdrain - cgd;` to `cd = cdrain - cgd;`; wrapped PJFET compute block with `if (!bypassed) {` / `} // end if (!bypassed)`.
+- **Tests**: 5/6 passing (same pre-existing failure)
+
+## Task 7.1.4: Delete primeJunctions() and primedFromJct one-shot seed path
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: none
+- **Files modified**: `src/components/semiconductors/njfet.ts`, `src/components/semiconductors/pjfet.ts`
+- **Prior implementer state**: NJFET — complete on disk: no `primeJunctions` method, no `primedFromJct` variable. PJFET — INCOMPLETE/BROKEN: `primeJunctions()` method still present at lines 753-764 with `primedFromJct = true;` at line 763 referencing an undeclared variable (compile error — prior implementer deleted the `let primedFromJct = false;` declaration but left the usage).
+- **This agent**: Deleted `primeJunctions()` method from PJFET entirely, resolving the compile error. dc-operating-point.ts left untouched per spec.
+- **Tests**: 5/6 passing (same pre-existing failure)
+
+## Task 7.1.5: Replace inline fetlim with the Phase 4 shared helper
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: none
+- **Files modified**: `src/components/semiconductors/njfet.ts`, `src/components/semiconductors/pjfet.ts`
+- **Prior implementer state**: NJFET — complete on disk: `import { pnjlim, fetlim }` at line 32; two `fetlim(...)` calls at lines 466-467; no `vtsthi`/`vtstlo` locals. PJFET — INCOMPLETE: `import { pnjlim, fetlim }` at line 32 (import was added), but two ~35-line inline fetlim blocks still present in the `else` branch (lines 433-507).
+- **This agent**: Replaced both inline fetlim blocks in PJFET with `vgs = fetlim(vgs, vgsOld, vto);` and `vgd = fetlim(vgd, vgdOld, vto);` with citation comments. No `vtsthi`/`vtstlo`/`vtox`/`delv` locals remain.
+- **Tests**: 5/6 passing (same pre-existing failure)
+
+## Task 7.1.6: Correct the noncon-gate comment and verify bitwise semantics
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: none
+- **Files modified**: `src/components/semiconductors/njfet.ts`, `src/components/semiconductors/pjfet.ts`
+- **Prior implementer state**: NJFET — complete on disk: correct 4-line comment block above noncon gate with `// cite: jfetload.c:498-507` and semantics-correct text. PJFET — INCOMPLETE: old "intentional ngspice quirk" comment and single-trigger `icheckLimited`-only gate still present.
+- **This agent**: Replaced PJFET noncon gate comment with the 4-line semantics-correct comment matching NJFET. Note: both files contain the word "quirk" in the corrected comment (in the phrase `no "quirk,"`) — this matches the spec-specified comment text and the acceptance criterion intent (the old framing is removed).
+- **Tests**: 5/6 passing in jfet.test.ts. 1 pre-existing failure: `PJFET > emits_stamps_when_conducting` — `Cannot read properties of undefined (reading '0')` at pjfet.ts:391 — `ctx.rhsOld` is undefined because `makeDcOpCtx` passes `voltages:` as shorthand key instead of `rhsOld:`. Documented pre-existing in task 0.1.2 progress ("pjfet Cannot-read-properties engine crashes"). Not caused by any Wave 7.1 change.
+
+## Task 5.1.3: NOBYPASS bypass test (A4)
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: none
+- **Files modified**:
+  - `src/components/semiconductors/bjt.ts` — fixed broken stamp block (prior agent used non-existent `op.X` references; replaced with `s0[base + SLOT_X]` reads); the bypass if/else gate (added by prior agent) was structurally correct and preserved. Also added MODEINITSMSIG early-return before stamp block (Task 5.1.6 combined here since the stamp block fix is the natural insertion point).
+  - `src/components/semiconductors/__tests__/bjt.test.ts` — added `describe("BJT L0 NOBYPASS")` with 3 tests: `bypass_disabled_when_ctx_bypass_false`, `bypass_triggers_when_tolerances_met`, `bypass_disabled_by_MODEINITPRED`.
+- **Tests**: 3/3 NOBYPASS tests passing. 52 total passing / 3 pre-existing failures (LimitingEvent tests crashing on `ctx.rhsOld` undefined — documented since Task 4.2.2).
+
+## Task 5.1.4: noncon INITFIX/off gate verification (A5)
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: none
+- **Files modified**:
+  - `src/components/semiconductors/bjt.ts` — refreshed citation comment to `// cite: bjtload.c:749-754 — icheck++ unless MODEINITFIX && OFF`
+  - `src/components/semiconductors/__tests__/bjt.test.ts` — added `describe("BJT L0 noncon")` with 3 tests: `no_bump_when_initfix_and_off`, `bumps_when_initfix_and_not_off`, `bumps_when_not_initfix_and_off`.
+- **Tests**: 3/3 noncon tests passing.
+
+## Task 5.1.5: Parameterize NE / NC (A8)
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: none
+- **Files modified**:
+  - `src/components/semiconductors/bjt.ts` — added `NE: { default: 1.5 }` and `NC: { default: 2 }` to `BJT_PARAM_DEFS` (NPN secondary), `BJT_PNP_DEFAULTS` secondary; added `NE: props.getModelParam("NE"), NC: props.getModelParam("NC")` to `createBjtElement` params factory; updated `makeTp()` to pass `NE: params.NE, NC: params.NC`; replaced `1.5, 2.0` literals at `computeBjtOp` call site with `params.NE, params.NC`.
+  - `src/components/semiconductors/__tests__/bjt.test.ts` — added `describe("ModelParams")` NE/NC block with 4 tests: `NE_default_1_5`, `NC_default_2`, `paramDefs_include_NE_NC`, `setParam_NE_NC_no_throw`.
+- **Tests**: 4/4 ModelParams NE/NC tests passing. No `1.5`/`2.0` NE/NC literals remain in L0 `load()` or `makeTp()`.
+
+## Task 5.1.6: MODEINITSMSIG early-return + MODEINITTRAN state1 seed (A2/A9)
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: none
+- **Files modified**:
+  - `src/components/semiconductors/bjt.ts` — inserted `if (mode & MODEINITSMSIG) return;` before the stamp block (after op-slot write-back at line 961, before `const solver = ctx.solver`); inserted `s1[base + SLOT_VBE] = vbeRaw; s1[base + SLOT_VBC] = vbcRaw;` inside the MODEINITTRAN branch after reading from s1.
+  - `src/components/semiconductors/__tests__/bjt.test.ts` — added `describe("BJT L0 MODEINITSMSIG")` with 2 tests (`no_stamps_emitted`, `state0_op_slots_populated`) and `describe("BJT L0 MODEINITTRAN")` with 1 test (`state1_VBE_VBC_seeded`).
+- **Tests**: 3/3 MODEINITSMSIG/MODEINITTRAN tests passing.

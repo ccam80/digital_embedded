@@ -67,6 +67,8 @@ export const { paramDefs: BJT_PARAM_DEFS, defaults: BJT_NPN_DEFAULTS } = defineM
     ISC: { default: 0,      unit: "A", description: "B-C leakage saturation current" },
     NR:  { default: 1,      description: "Reverse emission coefficient" },
     VAR: { default: Infinity, unit: "V", description: "Reverse Early voltage" },
+    NE:  { default: 1.5,    description: "B-E leakage emission coefficient" },
+    NC:  { default: 2,      description: "B-C leakage emission coefficient" },
     AREA: { default: 1,     description: "Device area factor" },
     M:   { default: 1,      description: "Parallel device multiplier" },
     TNOM: { default: 300.15, unit: "K", description: "Nominal temperature" },
@@ -91,6 +93,8 @@ export const { defaults: BJT_PNP_DEFAULTS } = defineModelParams({
     ISC: { default: 0,      unit: "A", description: "B-C leakage saturation current" },
     NR:  { default: 1,      description: "Reverse emission coefficient" },
     VAR: { default: Infinity, unit: "V", description: "Reverse Early voltage" },
+    NE:  { default: 1.5,    description: "B-E leakage emission coefficient" },
+    NC:  { default: 2,      description: "B-C leakage emission coefficient" },
     AREA: { default: 1,     description: "Device area factor" },
     M:   { default: 1,      description: "Parallel device multiplier" },
     TNOM: { default: 300.15, unit: "K", description: "Nominal temperature" },
@@ -736,6 +740,8 @@ export function createBjtElement(
     VAR: props.getModelParam<number>("VAR"),
     IKF: props.getModelParam<number>("IKF"),
     IKR: props.getModelParam<number>("IKR"),
+    NE: props.getModelParam<number>("NE"),
+    NC: props.getModelParam<number>("NC"),
     AREA: props.getModelParam<number>("AREA"),
     M: props.getModelParam<number>("M"),
     TNOM: props.getModelParam<number>("TNOM"),
@@ -748,7 +754,7 @@ export function createBjtElement(
     return computeBjtTempParams({
       IS: params.IS, BF: params.BF, BR: params.BR,
       ISE: params.ISE, ISC: params.ISC,
-      NE: 1.5, NC: 2.0, EG: 1.11, XTI: 3, XTB: 0,
+      NE: params.NE, NC: params.NC, EG: 1.11, XTI: 3, XTB: 0,
       IKF: params.IKF, IKR: params.IKR,
       RC: 0, RE: 0, RB: 0, RBM: 0, IRB: 0,
       CJE: 0, VJE: 0.75, MJE: 0.33,
@@ -822,6 +828,10 @@ export function createBjtElement(
         // bjtload.c:245-257: seed from CKTstate1 for transient init.
         vbeRaw = s1[base + SLOT_VBE];
         vbcRaw = s1[base + SLOT_VBC];
+        // cite: bjtload.c:236-257 — MODEINITTRAN seeds state1 from the initial voltage read
+        // so subsequent NIintegrate history has a valid t=0 prior value.
+        s1[base + SLOT_VBE] = vbeRaw;
+        s1[base + SLOT_VBC] = vbcRaw;
       } else if ((mode & MODEINITJCT) && (mode & MODETRANOP) && (mode & MODEUIC)) {
         // cite: bjtload.c:258-264 — MODEINITJCT+MODETRANOP+MODEUIC: seed from IC* params.
         const vbe_ic = polarity * (isNaN(params.ICVBE) ? 0 : params.ICVBE);
@@ -905,7 +915,7 @@ export function createBjtElement(
         // "no caps, no transit time, no excess phase, no substrate" L0 scope note at
         // the top of this load() body.
 
-        // bjtload.c:749-754: skip noncon++ when MODEINITFIX && BJToff.
+        // cite: bjtload.c:749-754 — icheck++ unless MODEINITFIX && OFF
         if (icheckLimited && (params.OFF === 0 || !(mode & MODEINITFIX))) ctx.noncon.value++;
 
         if (ctx.limitingCollector) {
@@ -936,7 +946,7 @@ export function createBjtElement(
           tp.tBEleakCur * params.AREA, tp.tBCleakCur * params.AREA,
           tp.tinvEarlyVoltF, tp.tinvEarlyVoltR,
           tp.tinvRollOffF / params.AREA, tp.tinvRollOffR / params.AREA,
-          tp.vt, 1.5, 2.0,
+          tp.vt, params.NE, params.NC,
         );
 
         // bjtload.c:772-786: CKTstate0 write-back of accepted linearization.
@@ -958,12 +968,20 @@ export function createBjtElement(
       // ceqbc = BJTtype * (-cc + vbe*(gm+go) - vbc*(gmu+go));
       // Simple L0: geqcb=0 (no transit-time charge feedback).
       const m = params.M;
-      const ceqbe = polarity * (op.cc + op.cb
-                              - vbeLimited * (op.gm + op.go + op.gpi)
-                              + vbcLimited * op.go);
-      const ceqbc = polarity * (-op.cc
-                              + vbeLimited * (op.gm + op.go)
-                              - vbcLimited * (op.gmu + op.go));
+      const cc  = s0[base + SLOT_CC];
+      const cb  = s0[base + SLOT_CB];
+      const gpi = s0[base + SLOT_GPI];
+      const gmu = s0[base + SLOT_GMU];
+      const gm  = s0[base + SLOT_GM];
+      const go  = s0[base + SLOT_GO];
+      const ceqbe = polarity * (cc + cb
+                              - vbeLimited * (gm + go + gpi)
+                              + vbcLimited * go);
+      const ceqbc = polarity * (-cc
+                              + vbeLimited * (gm + go)
+                              - vbcLimited * (gmu + go));
+
+      if (mode & MODEINITSMSIG) return;  // cite: bjtload.c:676,703 — MODEINITSMSIG stores op state, skips stamps
 
       const solver = ctx.solver;
 
@@ -983,15 +1001,15 @@ export function createBjtElement(
       //   BJTbasePrimeEmitPrimePtr  += -gpi
       //   BJTemitPrimeColPrimePtr   += -go   (no geqcb)
       //   BJTemitPrimeBasePrimePtr  += -gpi - gm  (no geqcb)
-      stampG(solver, nodeB, nodeB, m * (op.gpi + op.gmu));
-      stampG(solver, nodeC, nodeC, m * (op.gmu + op.go));
-      stampG(solver, nodeE, nodeE, m * (op.gpi + op.gm + op.go));
-      stampG(solver, nodeC, nodeB, m * (-op.gmu + op.gm));
-      stampG(solver, nodeC, nodeE, m * (-op.gm - op.go));
-      stampG(solver, nodeB, nodeC, m * -op.gmu);
-      stampG(solver, nodeB, nodeE, m * -op.gpi);
-      stampG(solver, nodeE, nodeC, m * -op.go);
-      stampG(solver, nodeE, nodeB, m * (-op.gpi - op.gm));
+      stampG(solver, nodeB, nodeB, m * (gpi + gmu));
+      stampG(solver, nodeC, nodeC, m * (gmu + go));
+      stampG(solver, nodeE, nodeE, m * (gpi + gm + go));
+      stampG(solver, nodeC, nodeB, m * (-gmu + gm));
+      stampG(solver, nodeC, nodeE, m * (-gm - go));
+      stampG(solver, nodeB, nodeC, m * -gmu);
+      stampG(solver, nodeB, nodeE, m * -gpi);
+      stampG(solver, nodeE, nodeC, m * -go);
+      stampG(solver, nodeE, nodeB, m * (-gpi - gm));
     },
 
     checkConvergence(ctx: LoadContext): boolean {

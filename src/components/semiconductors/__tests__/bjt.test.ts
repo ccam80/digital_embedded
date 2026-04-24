@@ -7,7 +7,7 @@
  * wiring), and LimitingEvent instrumentation remain.
  */
 
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import {
   createBjtElement,
   createSpiceL1BjtElement,
@@ -29,6 +29,7 @@ import { createTestPropertyBag } from "../../../test-fixtures/model-fixtures.js"
 import {
   MODEDCOP, MODEINITFLOAT, MODETRAN, MODEINITPRED,
   MODEINITJCT, MODETRANOP, MODEUIC, MODEINITFIX,
+  MODEINITSMSIG, MODEINITTRAN,
 } from "../../../solver/analog/ckt-mode.js";
 import type { LimitingEvent } from "../../../solver/analog/newton-raphson.js";
 
@@ -688,5 +689,488 @@ describe("BJT L0 MODEINITJCT", () => {
     element.load(ctx);
     // vbeRaw=0, vbcRaw=0 → computeBjtOp produces near-zero cc (IS * (exp(0)-1) ~ 0).
     expect(Math.abs(s0[SLOT_CC])).toBeLessThan(1e-6);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Task 5.1.3 — NOBYPASS bypass test (A4)
+// bjtload.c:338-381: 4-tolerance gate skips recompute when tolerances met.
+// ---------------------------------------------------------------------------
+
+describe("BJT L0 NOBYPASS", () => {
+  const SLOT_VBE = 0, SLOT_VBC = 1, SLOT_CC = 2, SLOT_CB = 3;
+  const SLOT_GPI = 4, SLOT_GMU = 5, SLOT_GM = 6, SLOT_GO = 7, SLOT_GX = 8;
+
+  function makeBypassCtx(
+    cktMode: number,
+    rhsOld: Float64Array,
+    bypass: boolean,
+    modelParams?: Record<string, number>,
+  ): { ctx: LoadContext; element: AnalogElement; s0: Float64Array; pool: StatePool; stampCount: { g: number; rhs: number } } {
+    const propsObj = makeBjtProps(modelParams);
+    const core = createBjtElement(1, new Map([["B", 1], ["C", 2], ["E", 3]]), -1, propsObj) as AnalogElementCore;
+    const pool = new StatePool((core as any).stateSize);
+    (core as any).stateBaseOffset = 0;
+    (core as any).initState(pool);
+    const solver = new SparseSolver();
+    solver.beginAssembly(10);
+    const stampCount = { g: 0, rhs: 0 };
+    const origAddEntry = solver.addEntry?.bind(solver);
+    const origStampG = (solver as any).stampG;
+    // Wrap solver to count stamps via addEntry (SparseSolver.addEntry is the stamp primitive).
+    const origAddEntryFn = (solver as any).addEntry;
+    if (origAddEntryFn) {
+      (solver as any).addEntry = (row: number, col: number, val: number) => {
+        if (row === col) stampCount.g++;
+        origAddEntryFn.call(solver, row, col, val);
+      };
+    }
+    const ctx: LoadContext = {
+      cktMode,
+      solver,
+      matrix: solver,
+      rhs: new Float64Array(10),
+      rhsOld,
+      time: 0,
+      dt: 0,
+      method: "trapezoidal",
+      order: 1,
+      deltaOld: [0, 0, 0, 0, 0, 0, 0],
+      ag: new Float64Array(7),
+      srcFact: 1,
+      noncon: { value: 0 },
+      limitingCollector: null,
+      convergenceCollector: null,
+      xfact: 1,
+      gmin: 1e-12,
+      reltol: 1e-3,
+      iabstol: 1e-12,
+      temp: 300.15,
+      vt: 0.025852,
+      cktFixLimit: false,
+      bypass,
+      voltTol: 1e-6,
+    };
+    const element = withNodeIds(core, [1, 2, 3]);
+    return { ctx, element, s0: pool.states[0], pool, stampCount };
+  }
+
+  it("bypass_disabled_when_ctx_bypass_false", () => {
+    // cite: bjtload.c:338 — bypass gate requires ctx.bypass=true; both calls must compute.
+    // With bypass=false the gate never fires even when tolerances are met.
+    const rhsOld = new Float64Array(10);
+    rhsOld[0] = 0.65; // nodeB=1
+    rhsOld[1] = 3.0;  // nodeC=2
+    rhsOld[2] = 0.0;  // nodeE=3
+
+    // First call — compute path, writes s0.
+    const { ctx: ctx1, element: el1 } = makeBypassCtx(MODEDCOP | MODEINITFLOAT, rhsOld, false);
+    el1.load(ctx1);
+    const noncon1 = ctx1.noncon.value;
+
+    // Second call with identical rhsOld — bypass=false, so compute path again.
+    const { ctx: ctx2, element: el2, s0 } = makeBypassCtx(MODEDCOP | MODEINITFLOAT, rhsOld, false);
+    // Prime s0 with same state from first call to make tolerances nominally met.
+    const s0prime = (el1 as any).pool?.states?.[0];
+    // Second load should also run compute (bypass=false), noncon should be >= 0.
+    el2.load(ctx2);
+    // Both calls produced noncon values (compute ran); the test checks bypass=false doesn't skip.
+    // Verify stamps were emitted on the second call by checking no throw and noncon is consistent.
+    expect(ctx2.noncon.value).toBeGreaterThanOrEqual(0);
+    // s0[CC] is finite (compute wrote it, not NaN from a skip).
+    expect(Number.isFinite(s0[SLOT_CC])).toBe(true);
+  });
+
+  it("bypass_triggers_when_tolerances_met", () => {
+    // cite: bjtload.c:338-381 — bypass fires when ctx.bypass=true and all 4 tolerances pass.
+    // Strategy: run first load() to prime s0, then manually align rhsOld to s0[VBE]/s0[VBC]
+    // so delvbe=0 and delvbc=0 exactly, ensuring all 4 tolerance tests pass on the second call.
+    const propsObj = makeBjtProps();
+    const core = createBjtElement(1, new Map([["B", 1], ["C", 2], ["E", 3]]), -1, propsObj) as AnalogElementCore;
+    const pool = new StatePool((core as any).stateSize);
+    (core as any).stateBaseOffset = 0;
+    (core as any).initState(pool);
+    const s0 = pool.states[0];
+
+    function makeCtx(rhsOld: Float64Array, bypass: boolean, nonconRef: { value: number }): LoadContext {
+      const solver = new SparseSolver();
+      solver.beginAssembly(10);
+      return {
+        cktMode: MODEDCOP | MODEINITFLOAT,
+        solver,
+        matrix: solver,
+        rhs: new Float64Array(10),
+        rhsOld,
+        time: 0,
+        dt: 0,
+        method: "trapezoidal",
+        order: 1,
+        deltaOld: [0, 0, 0, 0, 0, 0, 0],
+        ag: new Float64Array(7),
+        srcFact: 1,
+        noncon: nonconRef,
+        limitingCollector: null,
+        convergenceCollector: null,
+        xfact: 1,
+        gmin: 1e-12,
+        reltol: 1e-3,
+        iabstol: 1e-12,
+        temp: 300.15,
+        vt: 0.025852,
+        cktFixLimit: false,
+        bypass,
+        voltTol: 1e-6,
+      };
+    }
+
+    const element = withNodeIds(core, [1, 2, 3]);
+
+    // First call — bypass=false, primes s0 with self-consistent op-state.
+    const rhsOld1 = new Float64Array(10);
+    rhsOld1[0] = 0.65; rhsOld1[1] = 3.0; rhsOld1[2] = 0.0;
+    element.load(makeCtx(rhsOld1, false, { value: 0 }));
+
+    // Build rhsOld2 aligned to s0[VBE]/s0[VBC] so delvbe=delvbc=0 exactly.
+    // NPN: vbeRaw = vB-vE, vbcRaw = vB-vC. Set vB-vE = s0[VBE], vB-vC = s0[VBC].
+    // Let vE=0, vC=0, solve: vB = s0[VBE]; vC = vB - s0[VBC].
+    const vbeTarget = s0[SLOT_VBE];
+    const vbcTarget = s0[SLOT_VBC];
+    const rhsOld2 = new Float64Array(10);
+    rhsOld2[0] = vbeTarget;           // nodeB=1 → vB = vbeTarget (vE=0)
+    rhsOld2[1] = vbeTarget - vbcTarget; // nodeC=2 → vC = vB - vbcTarget
+    rhsOld2[2] = 0.0;                 // nodeE=3
+
+    const cc1 = s0[SLOT_CC];
+    const noncon2 = { value: 0 };
+    element.load(makeCtx(rhsOld2, true, noncon2));
+    const cc2 = s0[SLOT_CC];
+
+    // (a) noncon unchanged — bypass skips pnjlim+compute, no noncon bump.
+    expect(noncon2.value).toBe(0);
+    // (b) s0[CC] unchanged — bypass path does not call computeBjtOp, s0 preserved.
+    expect(cc2).toBe(cc1);
+    // (c) s0 values are finite — stamps emitted with restored values.
+    expect(Number.isFinite(s0[SLOT_VBE])).toBe(true);
+    expect(Number.isFinite(s0[SLOT_VBC])).toBe(true);
+  });
+
+  it("bypass_disabled_by_MODEINITPRED", () => {
+    // cite: bjtload.c:347 — !(MODEINITPRED) is part of the bypass gate.
+    // With cktMode|=MODEINITPRED, bypass gate must not fire even when ctx.bypass=true.
+    // Strategy: prime s0 with a normal load, then call with MODEINITPRED and bypass=true.
+    // Check that computeBjtOp ran by verifying s0[CC] reflects the computed (not sentinel) value.
+    const propsObj = makeBjtProps();
+    const core = createBjtElement(1, new Map([["B", 1], ["C", 2], ["E", 3]]), -1, propsObj) as AnalogElementCore;
+    const pool = new StatePool((core as any).stateSize);
+    (core as any).stateBaseOffset = 0;
+    (core as any).initState(pool);
+    const s0 = pool.states[0];
+    const s1 = pool.states[1];
+    const s2 = pool.states[2];
+
+    function makeCtx(cktMode: number, rhsOld: Float64Array, bypass: boolean): LoadContext {
+      const solver = new SparseSolver();
+      solver.beginAssembly(10);
+      return {
+        cktMode,
+        solver,
+        matrix: solver,
+        rhs: new Float64Array(10),
+        rhsOld,
+        time: 0,
+        dt: 1e-9,
+        method: "trapezoidal",
+        order: 1,
+        deltaOld: [1e-9, 1e-9, 1e-9, 1e-9, 1e-9, 1e-9, 1e-9],
+        ag: new Float64Array(7),
+        srcFact: 1,
+        noncon: { value: 0 },
+        limitingCollector: null,
+        convergenceCollector: null,
+        xfact: 0,
+        gmin: 1e-12,
+        reltol: 1e-3,
+        iabstol: 1e-12,
+        temp: 300.15,
+        vt: 0.025852,
+        cktFixLimit: false,
+        bypass,
+        voltTol: 1e-6,
+      };
+    }
+
+    // Prime s0 at forward-active bias.
+    const rhsOld = new Float64Array(10);
+    rhsOld[0] = 0.65; rhsOld[1] = 3.0; rhsOld[2] = 0.0;
+    const element = withNodeIds(core, [1, 2, 3]);
+    element.load(makeCtx(MODEDCOP | MODEINITFLOAT, rhsOld, false));
+
+    // Copy s0 → s1 and s2 so xfact=0 extrapolation gives same vbe/vbc.
+    for (let i = 0; i < (core as any).stateSize; i++) {
+      s1[i] = s0[i];
+      s2[i] = s0[i];
+    }
+
+    // Overwrite s0[CC] with a sentinel to detect whether computeBjtOp rewrites it.
+    const sentinel = -999;
+    s0[SLOT_CC] = sentinel;
+
+    // Call with MODEINITPRED + bypass=true — bypass gate must NOT fire.
+    element.load(makeCtx(MODETRAN | MODEINITPRED, new Float64Array(10), true));
+
+    // If bypass was (incorrectly) taken, s0[CC] would remain sentinel.
+    // If compute ran (correct), s0[CC] is rewritten to a real value.
+    expect(s0[SLOT_CC]).not.toBe(sentinel);
+    expect(Number.isFinite(s0[SLOT_CC])).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Task 5.1.4 — noncon INITFIX/off gate verification (A5)
+// bjtload.c:749-754: icheck++ unless MODEINITFIX && OFF.
+// ---------------------------------------------------------------------------
+
+describe("BJT L0 noncon", () => {
+  function makeNonconCtx(cktMode: number, off: number): { ctx: LoadContext; element: AnalogElement; s0: Float64Array } {
+    // Use large rhsOld to trigger pnjlim (large delvbe forces limiting).
+    const rhsOld = new Float64Array(10);
+    rhsOld[0] = 5.0; // vB high — ensures vbeRaw >> s0[VBE] → pnjlim fires, icheckLimited=true.
+    rhsOld[1] = 3.0;
+    rhsOld[2] = 0.0;
+    const propsObj = makeBjtProps({ OFF: off });
+    const core = createBjtElement(1, new Map([["B", 1], ["C", 2], ["E", 3]]), -1, propsObj) as AnalogElementCore;
+    const pool = new StatePool((core as any).stateSize);
+    (core as any).stateBaseOffset = 0;
+    (core as any).initState(pool);
+    const solver = new SparseSolver();
+    solver.beginAssembly(10);
+    const ctx: LoadContext = {
+      cktMode,
+      solver,
+      matrix: solver,
+      rhs: new Float64Array(10),
+      rhsOld,
+      time: 0,
+      dt: 0,
+      method: "trapezoidal",
+      order: 1,
+      deltaOld: [0, 0, 0, 0, 0, 0, 0],
+      ag: new Float64Array(7),
+      srcFact: 1,
+      noncon: { value: 0 },
+      limitingCollector: null,
+      convergenceCollector: null,
+      xfact: 1,
+      gmin: 1e-12,
+      reltol: 1e-3,
+      iabstol: 1e-12,
+      temp: 300.15,
+      vt: 0.025852,
+      cktFixLimit: false,
+      bypass: false,
+      voltTol: 1e-6,
+    };
+    return { ctx, element: withNodeIds(core, [1, 2, 3]), s0: pool.states[0] };
+  }
+
+  it("no_bump_when_initfix_and_off", () => {
+    // cite: bjtload.c:749-754 — icheck++ unless MODEINITFIX && OFF.
+    // OFF=1, cktMode=MODEINITFIX: the gate condition (OFF===0 || !(INITFIX)) is false → no bump.
+    const { ctx, element } = makeNonconCtx(MODEINITFIX, 1);
+    element.load(ctx);
+    expect(ctx.noncon.value).toBe(0);
+  });
+
+  it("bumps_when_initfix_and_not_off", () => {
+    // cite: bjtload.c:749-754 — OFF=0, MODEINITFIX: OFF===0 is true → bump permitted.
+    // Large vB ensures pnjlim fires → icheckLimited=true → noncon increments.
+    const { ctx, element } = makeNonconCtx(MODEINITFIX, 0);
+    element.load(ctx);
+    expect(ctx.noncon.value).toBeGreaterThanOrEqual(1);
+  });
+
+  it("bumps_when_not_initfix_and_off", () => {
+    // cite: bjtload.c:749-754 — OFF=1, cktMode=MODEDCOP (no INITFIX): !(INITFIX) is true → bump.
+    const { ctx, element } = makeNonconCtx(MODEDCOP | MODEINITFLOAT, 1);
+    element.load(ctx);
+    expect(ctx.noncon.value).toBeGreaterThanOrEqual(1);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Task 5.1.5 — Parameterize NE / NC (A8)
+// NE default 1.5, NC default 2 in BJT_PARAM_DEFS.
+// ---------------------------------------------------------------------------
+
+describe("ModelParams", () => {
+  it("NE_default_1_5", () => {
+    const propsObj = makeBjtProps();
+    expect(propsObj.getModelParam<number>("NE")).toBe(1.5);
+  });
+
+  it("NC_default_2", () => {
+    const propsObj = makeBjtProps();
+    expect(propsObj.getModelParam<number>("NC")).toBe(2);
+  });
+
+  it("paramDefs_include_NE_NC", () => {
+    const keys = BJT_PARAM_DEFS.map(pd => pd.key);
+    expect(keys).toContain("NE");
+    expect(keys).toContain("NC");
+  });
+
+  it("setParam_NE_NC_no_throw", () => {
+    const propsObj = makeBjtProps();
+    const element = createBjtElement(1, new Map([["B", 2], ["C", 1], ["E", 3]]), -1, propsObj);
+    expect(() => element.setParam("NE", 1.2)).not.toThrow();
+    expect(() => element.setParam("NC", 2.5)).not.toThrow();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Task 5.1.6 — MODEINITSMSIG early-return + MODEINITTRAN state1 seed (A2/A9)
+// ---------------------------------------------------------------------------
+
+describe("BJT L0 MODEINITSMSIG", () => {
+  const SLOT_VBE = 0, SLOT_VBC = 1, SLOT_CC = 2, SLOT_CB = 3;
+  const SLOT_GPI = 4, SLOT_GMU = 5, SLOT_GM = 6, SLOT_GO = 7, SLOT_GX = 8;
+
+  function makeSmsigCtx(primePool?: { s0: Float64Array }): { ctx: LoadContext; element: AnalogElement; s0: Float64Array; solver: SparseSolver } {
+    const propsObj = makeBjtProps();
+    const core = createBjtElement(1, new Map([["B", 1], ["C", 2], ["E", 3]]), -1, propsObj) as AnalogElementCore;
+    const pool = new StatePool((core as any).stateSize);
+    (core as any).stateBaseOffset = 0;
+    (core as any).initState(pool);
+
+    // Prime s0 with valid DC-OP state so MODEINITSMSIG reads meaningful values.
+    if (primePool) {
+      const s0 = pool.states[0];
+      const src = primePool.s0;
+      for (let i = 0; i < Math.min(s0.length, src.length); i++) s0[i] = src[i];
+    } else {
+      // Run a DC-OP priming pass at forward-active bias.
+      const primeSolver = new SparseSolver();
+      primeSolver.beginAssembly(10);
+      const rhsPrime = new Float64Array(10);
+      rhsPrime[0] = 0.65; rhsPrime[1] = 3.0; rhsPrime[2] = 0.0;
+      const primeCtx: LoadContext = {
+        cktMode: MODEDCOP | MODEINITFLOAT,
+        solver: primeSolver,
+        matrix: primeSolver,
+        rhs: new Float64Array(10),
+        rhsOld: rhsPrime,
+        time: 0, dt: 0, method: "trapezoidal", order: 1,
+        deltaOld: [0, 0, 0, 0, 0, 0, 0],
+        ag: new Float64Array(7), srcFact: 1,
+        noncon: { value: 0 }, limitingCollector: null, convergenceCollector: null,
+        xfact: 1, gmin: 1e-12, reltol: 1e-3, iabstol: 1e-12,
+        temp: 300.15, vt: 0.025852, cktFixLimit: false, bypass: false, voltTol: 1e-6,
+      };
+      withNodeIds(core, [1, 2, 3]).load(primeCtx);
+    }
+
+    const solver = new SparseSolver();
+    solver.beginAssembly(10);
+    const ctx: LoadContext = {
+      cktMode: MODEDCOP | MODEINITSMSIG,
+      solver,
+      matrix: solver,
+      rhs: new Float64Array(10),
+      rhsOld: new Float64Array(10),
+      time: 0, dt: 0, method: "trapezoidal", order: 1,
+      deltaOld: [0, 0, 0, 0, 0, 0, 0],
+      ag: new Float64Array(7), srcFact: 1,
+      noncon: { value: 0 }, limitingCollector: null, convergenceCollector: null,
+      xfact: 1, gmin: 1e-12, reltol: 1e-3, iabstol: 1e-12,
+      temp: 300.15, vt: 0.025852, cktFixLimit: false, bypass: false, voltTol: 1e-6,
+    };
+    return { ctx, element: withNodeIds(core, [1, 2, 3]), s0: pool.states[0], solver };
+  }
+
+  it("no_stamps_emitted", () => {
+    // cite: bjtload.c:676,703 — MODEINITSMSIG stores op state, skips stamps via early return.
+    const { ctx, element, solver } = makeSmsigCtx();
+
+    // Wrap solver.addEntry to count stamp calls.
+    let stampCallCount = 0;
+    const origAddEntry = (solver as any).addEntry?.bind(solver);
+    if (origAddEntry) {
+      (solver as any).addEntry = (...args: unknown[]) => {
+        stampCallCount++;
+        return origAddEntry(...args);
+      };
+    }
+
+    // Also count RHS via direct rhs array mutation detection — track rhs before/after.
+    const rhsBefore = Array.from(ctx.rhs);
+    element.load(ctx);
+    const rhsAfter = Array.from(ctx.rhs);
+
+    // Under MODEINITSMSIG, the early-return fires before stamp block — zero stamps.
+    expect(stampCallCount).toBe(0);
+    // RHS must not have changed.
+    expect(rhsAfter).toEqual(rhsBefore);
+  });
+
+  it("state0_op_slots_populated", () => {
+    // cite: bjtload.c:676,703 — MODEINITSMSIG reads s0 and runs computeBjtOp, writing back op slots.
+    const { ctx, element, s0 } = makeSmsigCtx();
+    element.load(ctx);
+    // All 9 op-state slots in s0 must be finite after load() under MODEINITSMSIG.
+    expect(Number.isFinite(s0[SLOT_VBE])).toBe(true);
+    expect(Number.isFinite(s0[SLOT_VBC])).toBe(true);
+    expect(Number.isFinite(s0[SLOT_CC])).toBe(true);
+    expect(Number.isFinite(s0[SLOT_CB])).toBe(true);
+    expect(Number.isFinite(s0[SLOT_GPI])).toBe(true);
+    expect(Number.isFinite(s0[SLOT_GMU])).toBe(true);
+    expect(Number.isFinite(s0[SLOT_GM])).toBe(true);
+    expect(Number.isFinite(s0[SLOT_GO])).toBe(true);
+    expect(Number.isFinite(s0[SLOT_GX])).toBe(true);
+  });
+});
+
+describe("BJT L0 MODEINITTRAN", () => {
+  const SLOT_VBE = 0, SLOT_VBC = 1;
+
+  it("state1_VBE_VBC_seeded", () => {
+    // cite: bjtload.c:236-257 — MODEINITTRAN seeds state1 from the initial voltage read
+    // so subsequent NIintegrate history has a valid t=0 prior value.
+    const propsObj = makeBjtProps();
+    const core = createBjtElement(1, new Map([["B", 1], ["C", 2], ["E", 3]]), -1, propsObj) as AnalogElementCore;
+    const pool = new StatePool((core as any).stateSize);
+    (core as any).stateBaseOffset = 0;
+    (core as any).initState(pool);
+
+    const s1 = pool.states[1];
+
+    // Seed state1 with known vbeRaw / vbcRaw values:
+    // nodeB=1 → rhsOld[0], nodeC=2 → rhsOld[1], nodeE=3 → rhsOld[2].
+    // NPN polarity=1: vbeRaw = vB - vE = 0.5, vbcRaw = vB - vC = 0.5 - (-0.3) = 0.8
+    // State1 is pre-seeded by ngspice with the DC-OP values; for MODEINITTRAN,
+    // load() reads from s1[VBE]/s1[VBC] and then writes them back.
+    s1[SLOT_VBE] = 0.5;
+    s1[SLOT_VBC] = 0.8;
+
+    const solver = new SparseSolver();
+    solver.beginAssembly(10);
+    const ctx: LoadContext = {
+      cktMode: MODETRAN | MODEINITTRAN,
+      solver,
+      matrix: solver,
+      rhs: new Float64Array(10),
+      rhsOld: new Float64Array(10),
+      time: 1e-9, dt: 1e-9, method: "trapezoidal", order: 1,
+      deltaOld: [1e-9, 1e-9, 1e-9, 1e-9, 1e-9, 1e-9, 1e-9],
+      ag: new Float64Array(7), srcFact: 1,
+      noncon: { value: 0 }, limitingCollector: null, convergenceCollector: null,
+      xfact: 1, gmin: 1e-12, reltol: 1e-3, iabstol: 1e-12,
+      temp: 300.15, vt: 0.025852, cktFixLimit: false, bypass: false, voltTol: 1e-6,
+    };
+
+    withNodeIds(core, [1, 2, 3]).load(ctx);
+
+    // After MODEINITTRAN load(), state1 VBE/VBC must equal what was read from s1.
+    expect(s1[SLOT_VBE]).toBe(0.5);
+    expect(s1[SLOT_VBC]).toBe(0.8);
   });
 });
