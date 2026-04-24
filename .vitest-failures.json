@@ -1,10 +1,41 @@
 {
   "summary": {
-    "passed": 4,
-    "failed": 0,
-    "skipped": 85,
+    "passed": 35,
+    "failed": 3,
+    "skipped": 0,
     "totalFiles": 1,
     "durationSeconds": 0.6
   },
-  "failures": []
+  "failures": [
+    {
+      "message": "Cannot read properties of undefined (reading '0')",
+      "count": 2,
+      "locations": [
+        {
+          "file": "src\\components\\semiconductors\\bjt.ts",
+          "test": "pushes BE and BC pnjlim events when limitingCollector provided",
+          "line": 850,
+          "column": 32
+        },
+        {
+          "file": "src\\components\\semiconductors\\bjt.ts",
+          "test": "pushes BE and BC pnjlim events",
+          "line": 1250,
+          "column": 39
+        }
+      ]
+    },
+    {
+      "message": "expected [Function] to not throw an error but 'TypeError: Cannot read properties of …' was thrown",
+      "count": 1,
+      "locations": [
+        {
+          "file": "src\\components\\semiconductors\\__tests__\\bjt.test.ts",
+          "test": "does not throw when limitingCollector is null",
+          "line": 421,
+          "column": 74
+        }
+      ]
+    }
+  ]
 }

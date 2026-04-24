@@ -424,3 +424,25 @@
 - **Files modified**: src/components/io/led.ts, src/components/io/__tests__/led.test.ts
 - **Tests**: 4/4 new LED limitingCollector tests passing; 88/89 existing tests passing
 - **Pre-existing failure (not caused by this change)**: `junction_cap_transient_matches_ngspice` crashes at `led.ts:255 voltages[nodeAnode - 1]` because the ctx literal in that test sets `voltages:` but not `rhsOld:`, and `load()` reads `ctx.rhsOld`. My edit only adds a push block after `s0[base + SLOT_VD] = vdLimited;` at line ~267 — it did not modify the node-voltage read at line 255. The failure is independent of Task 4.2.1's change.
+
+## Task 4.2.2: BJT L1 substrate pnjlim audit + L0 scope comment
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**:
+  - src/components/semiconductors/__tests__/bjt-l0-scope-comment.test.ts
+- **Files modified**:
+  - src/components/semiconductors/bjt.ts (L0 load(): inserted 4-line structural comment citing architectural-alignment.md §E1, immediately after `icheckLimited = vbeLimFlag || vbcLimFlag;` at line 874)
+- **Tests**: 1/1 passing for targeted acceptance test `bjt-l0-scope-comment.test.ts`.
+- **Audit result (Part 1, no code change)**: L1 substrate pnjlim call at `bjt.ts:1332` verified against the (clarification-corrected) spec:
+  - Arg 1 = `vsubRaw` OK
+  - Arg 2 = `s0[base + SLOT_VSUB]` OK
+  - Arg 3 = `vt` OK
+  - Arg 4 = `tp.tSubVcrit` OK
+  - Enclosing gate at `bjt.ts:1325` = `(mode & (MODEINITJCT | MODEINITSMSIG | MODEINITTRAN)) === 0` OK (MODEINITPRED intentionally absent per Phase 3 W3.2 commit `cce3cf3d`; bjtload.c:386-414 runs pnjlim unconditionally on MODEINITPRED-extrapolated vsubRaw). No L1 code change made.
+- **Vitest invocations run**:
+  - `npx vitest run --testTimeout=120000 src/components/semiconductors/__tests__/bjt-l0-scope-comment.test.ts` → 1 passed / 0 failed (0.3s, exit code 0).
+  - `npx vitest run --testTimeout=120000 src/components/semiconductors/__tests__/bjt.test.ts` → 35 passed / 3 failed (0.6s). Failures are in **existing** tests reading pre-existing runtime code paths, unrelated to my comment-only edit:
+    - "pushes BE and BC pnjlim events when limitingCollector provided" — crashes at `bjt.ts:850:32` (L0 `voltages[nodeB - 1]` read).
+    - "pushes BE and BC pnjlim events" — crashes at `bjt.ts:1250:39` (L1 `voltages[nodeB - 1]` read).
+    - "does not throw when limitingCollector is null" — same L0 `TypeError: Cannot read properties of undefined (reading '0')` at `bjt.ts:850:32`.
+  - My working-copy diff against HEAD on `bjt.ts` is only the 4-line comment block at lines 875-878 (confirmed via `git diff --unified=1`). My edit cannot reach `bjt.ts:850:32` or `bjt.ts:1250:39` — those are runtime code lines untouched by this task. These failures are therefore pre-existing per `spec/test-baseline.md` expected-red policy and reported verbatim here rather than chased.

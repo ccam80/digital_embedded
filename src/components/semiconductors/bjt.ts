@@ -872,6 +872,10 @@ export function createBjtElement(
         vbcLimFlag = vbcResult.limited;
       }
       icheckLimited = vbeLimFlag || vbcLimFlag;
+      // L0 has no substrate junction — substrate is L1-only per the model-registry
+      // split (architectural-alignment.md §E1 APPROVED ACCEPT). See also the
+      // "no caps, no transit time, no excess phase, no substrate" L0 scope note at
+      // the top of this load() body.
 
       // bjtload.c:749-754: skip noncon++ when MODEINITFIX && BJToff.
       if (icheckLimited && (params.OFF === 0 || !(mode & MODEINITFIX))) ctx.noncon.value++;

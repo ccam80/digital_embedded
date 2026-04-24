@@ -115,7 +115,9 @@ Phase 4 depends on Phase 3 and gates the parallel device phases (5, 6, 7, 7.5). 
   - Argument 2 is not `s0[base + SLOT_VSUB]`.
   - Argument 3 is not `vt` (the local variable, which is `tp.vt` per Phase 5 Wave 5.0.2 precondition — but at Phase 4 it may still be `ctx.vt`; either is acceptable at this phase, Phase 5 will normalize).
   - Argument 4 is not `tp.tSubVcrit`.
-  - The enclosing gate is not `(mode & (MODEINITJCT | MODEINITSMSIG | MODEINITTRAN | MODEINITPRED)) === 0`.
+  - The enclosing gate is not `(mode & (MODEINITJCT | MODEINITSMSIG | MODEINITTRAN)) === 0`.
+
+  **2026-04-24 clarification applied (spec authoring was stale).** Phase 3 Wave 3.2 (landed at commit `cce3cf3d`, verified PASS) removed `MODEINITPRED` from the L1 pnjlim skip mask per `bjtload.c:386-414` (pnjlim runs unconditionally on the MODEINITPRED-extrapolated `vsubRaw`). This spec was originally authored against the pre-Phase-3 mask that still included MODEINITPRED. The current code at `bjt.ts:1325` with gate `(MODEINITJCT | MODEINITSMSIG | MODEINITTRAN)` (no MODEINITPRED) is the ngspice-correct state and is what Task 4.2.2 audits against — per CLAUDE.md "SPICE-Correct Implementations Only", ngspice is the authority, and the spec has been corrected here to match.
 
 - **Files to modify**:
   - `src/components/semiconductors/bjt.ts` — at the end of the L0 `pnjlim` block (immediately after `icheckLimited = vbeLimFlag || vbcLimFlag;` at line 870), add a one-line structural comment:
