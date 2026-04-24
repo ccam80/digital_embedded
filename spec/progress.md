@@ -1015,3 +1015,25 @@ Previously-confirmed-patched files regression check: load-context.ts, ckt-contex
 - **Files created**: none
 - **Files modified**: none (already implemented: bjt.ts lines 1471-1479 have SUB junction LimitingEvent push inside `if (ctx.limitingCollector)` block, conditional on collector being non-null)
 - **Tests**: 2/2 passing (`pushes_SUB_event_when_collector_present`, `no_SUB_event_when_collector_null`)
+
+## Task 5.2.8 / 5.2.10 fix pass — test-design correction
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: none
+- **Files modified**: `src/components/semiconductors/__tests__/bjt.test.ts`
+- **Tests**: 37/37 passing
+
+### Fix 1 — makeDcInitCtx() in BJT L1 AREAB_AREAC (Tasks 5.2.8 & 5.2.9)
+- **Helper modified**: `makeDcInitCtx()` (line ~1873)
+- **Before**: `rhsOld[0] = 0.65` (VB), `rhsOld[1] = 0.65` (VC) → vbc = VB - VC = 0, cbcn = c4*(exp(0)-1) = 0, defeating AREAB/AREAC scaling checks.
+- **After**: `rhsOld[0] = 0.65` (VB), `rhsOld[1] = 0.0` (VC) → vbc = 0.65 (forward-biased), cbcn ∝ c4, assertions correctly distinguish AREAB=2 vs AREAB=4 and AREAC=2 vs AREAC=4.
+
+### Fix 2 — seed values in uses_deltaOld1_directly (Task 5.2.10)
+- **Test modified**: `uses_deltaOld1_directly` (line ~2106)
+- **Before**: `pool*.states[1][SLOT_CEXBC] = 1e-12` and `pool*.states[2][SLOT_CEXBC] = 1e-12` (s1 == s2 → dt/d1 terms cancel algebraically, IIR output independent of deltaOld1).
+- **After**: `pool*.states[1][SLOT_CEXBC] = 1e-12` (s1) and `pool*.states[2][SLOT_CEXBC] = 2e-12` (s2 ≠ s1) → dt/d1 terms do not cancel, cc varies with deltaOld1 as specified.
+
+### Production code status
+- `bjt.ts` was NOT touched. The c4 branching (bjt.ts:1289) and IIR formula (bjt.ts:1540-1541) are unchanged.
+
+### Final test count: 37/37 passing

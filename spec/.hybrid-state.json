@@ -516,15 +516,15 @@
           "7.5.6.2"
         ]
       ],
-      "spawned": 5,
-      "completed": 4,
+      "spawned": 6,
+      "completed": 5,
       "verifications_passed": 3,
-      "verifications_failed": 0,
+      "verifications_failed": 1,
       "stops_for_clarification": 0,
       "dead_implementers": 1,
       "dead_verifiers": 0,
       "group_status": {
-        "5.2": "pending",
+        "5.2": "failed",
         "6.2": "passed",
         "7.2": "passed",
         "7.5.6": "passed"
@@ -748,5 +748,5 @@
       "user_acks": {}
     }
   ],
-  "last_updated": "2026-04-24T12:32:53.157Z"
+  "last_updated": "2026-04-24T21:40:03.497Z"
 }

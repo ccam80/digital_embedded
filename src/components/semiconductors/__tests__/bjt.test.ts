@@ -1873,11 +1873,13 @@ describe("BJT L1 AREAB_AREAC", () => {
   function makeDcInitCtx(): LoadContext {
     // Use MODEINITFLOAT with VBC forward-biased so cbcn = c4*(exp(vbc/(nc*vt))-1) != 0.
     // c4 = tBCleakCur * AREAB (VERTICAL) or AREAC (LATERAL). Differences in c4 → differences in cb.
+    // NPN node order: B=node[0], C=node[1], E=node[2]. vbc = voltages[0] - voltages[1].
+    // Set VB=0.65, VC=0 → vbc = 0.65 (forward-biased), making cbcn nonzero and proportional to c4.
     const solver = new SparseSolver();
     solver.beginAssembly(10);
     const rhsOld = new Float64Array(10);
-    rhsOld[0] = 0.65;  // VBE forward
-    rhsOld[1] = 0.65;  // VBC also forward — cbcn fires
+    rhsOld[0] = 0.65;  // VB: VBE forward
+    rhsOld[1] = 0.0;   // VC=0 → vbc = VB - VC = 0.65 (forward-biased, cbcn fires)
     return {
       cktMode: MODEDCOP | MODEINITFLOAT,
       solver, matrix: solver,
@@ -2102,12 +2104,14 @@ describe("BJT L1 excess_phase", () => {
     const { el: el1, pool: pool1 } = makeExcessPhaseEl();
     const { el: el2, pool: pool2 } = makeExcessPhaseEl();
 
-    // Manually seed state1+state2 with a non-zero cexbc value (simulating prior INITTRAN or tran step).
-    const seedVal = 1e-12;
-    pool1.states[1][SLOT_CEXBC] = seedVal;
-    pool1.states[2][SLOT_CEXBC] = seedVal;
-    pool2.states[1][SLOT_CEXBC] = seedVal;
-    pool2.states[2][SLOT_CEXBC] = seedVal;
+    // Manually seed state1+state2 with distinct cexbc values so the dt/d1 terms in the IIR
+    // formula do not cancel algebraically (s1 != s2 → cc depends on deltaOld1).
+    const s1 = 1e-12;
+    const s2 = 2e-12;
+    pool1.states[1][SLOT_CEXBC] = s1;
+    pool1.states[2][SLOT_CEXBC] = s2;
+    pool2.states[1][SLOT_CEXBC] = s1;
+    pool2.states[2][SLOT_CEXBC] = s2;
 
     function makeTranCtxWith(deltaOld1: number): LoadContext {
       const solver = new SparseSolver();
