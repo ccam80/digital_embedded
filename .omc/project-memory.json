@@ -43,7 +43,7 @@
   },
   "build": {
     "buildCommand": "cd \"C:/local_working_projects/digital_in_browser\" && npx tsc --noEmit -p . 2>&1 | head -20",
-    "testCommand": "cd \"C:/local_working_projects/digital_in_browser\" && cat >> \"spec/progress.md\" <<'EOF'\n\n## Task 4.2.2: BJT L1 substrate pnjlim audit + L0 scope comment\n- **Status**: complete\n- **Agent**: implementer\n- **Files created**:\n  - src/components/semiconductors/__tests__/bjt-l0-scope-comment.test.ts\n- **Files modified**:\n  - src/components/semiconductors/bjt.ts (L0 load(): inserted 4-line structural comment citing architectural-alignment.md §E1, immediately after `icheckLimited = vbeLimFlag || vbcLimFlag;` at line 874)\n- **Tests**: 1/1 passing for targeted acceptance test `bjt-l0-scope-comment.test.ts`.\n- **Audit result (Part 1, no code change)**: L1 substrate pnjlim call at `bjt.ts:1332` verified against the (clarification-corrected) spec:\n  - Arg 1 = `vsubRaw` OK\n  - Arg 2 = `s0[base + SLOT_VSUB]` OK\n  - Arg 3 = `vt` OK\n  - Arg 4 = `tp.tSubVcrit` OK\n  - Enclosing gate at `bjt.ts:1325` = `(mode & (MODEINITJCT | MODEINITSMSIG | MODEINITTRAN)) === 0` OK (MODEINITPRED intentionally absent per Phase 3 W3.2 commit `cce3cf3d`; bjtload.c:386-414 runs pnjlim unconditionally on MODEINITPRED-extrapolated vsubRaw). No L1 code change made.\n- **Vitest invocations run**:\n  - `npx vitest run --testTimeout=120000 src/components/semiconductors/__tests__/bjt-l0-scope-comment.test.ts` → 1 passed / 0 failed (0.3s, exit code 0).\n  - `npx vitest run --testTimeout=120000 src/components/semiconductors/__tests__/bjt.test.ts` → 35 passed / 3 failed (0.6s). Failures are in **existing** tests reading pre-existing runtime code paths, unrelated to my comment-only edit:\n    - \"pushes BE and BC pnjlim events when limitingCollector provided\" — crashes at `bjt.ts:850:32` (L0 `voltages[nodeB - 1]` read).\n    - \"pushes BE and BC pnjlim events\" — crashes at `bjt.ts:1250:39` (L1 `voltages[nodeB - 1]` read).\n    - \"does not throw when limitingCollector is null\" — same L0 `TypeError: Cannot read properties of undefined (reading '0')` at `bjt.ts:850:32`.\n  - My working-copy diff against HEAD on `bjt.ts` is only the 4-line comment block at lines 875-878 (confirmed via `git diff --unified=1`). My edit cannot reach `bjt.ts:850:32` or `bjt.ts:1250:39` — those are runtime code lines untouched by this task. These failures are therefore pre-existing per `spec/test-baseline.md` expected-red policy and reported verbatim here rather than chased.\nEOF\nrm -rf \"spec/.locks/tasks/4.2.2\" && echo \"task lock released\"",
+    "testCommand": "cd \"C:/local_working_projects/digital_in_browser\" && npx vitest run --testTimeout=120000 src/components/semiconductors/__tests__/bjt-l0-scope-comment.test.ts 2>&1 | tail -40",
     "lintCommand": "npm run lint",
     "devCommand": "npm run dev",
     "scripts": {
@@ -284,15 +284,15 @@
   },
   "hotPaths": [
     {
-      "path": "spec\\progress.md",
-      "accessCount": 78,
-      "lastAccessed": 1777024799448,
+      "path": "src\\components\\semiconductors\\bjt.ts",
+      "accessCount": 80,
+      "lastAccessed": 1777024961226,
       "type": "file"
     },
     {
-      "path": "src\\components\\semiconductors\\bjt.ts",
-      "accessCount": 77,
-      "lastAccessed": 1777024739611,
+      "path": "spec\\progress.md",
+      "accessCount": 80,
+      "lastAccessed": 1777025015547,
       "type": "file"
     },
     {
@@ -303,14 +303,14 @@
     },
     {
       "path": "spec\\.context\\rules.md",
-      "accessCount": 51,
-      "lastAccessed": 1777024690784,
+      "accessCount": 52,
+      "lastAccessed": 1777024913478,
       "type": "file"
     },
     {
       "path": "spec\\test-baseline.md",
-      "accessCount": 50,
-      "lastAccessed": 1777024695362,
+      "accessCount": 51,
+      "lastAccessed": 1777024921196,
       "type": "file"
     },
     {

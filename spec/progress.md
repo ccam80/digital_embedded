@@ -446,3 +446,22 @@
     - "pushes BE and BC pnjlim events" — crashes at `bjt.ts:1250:39` (L1 `voltages[nodeB - 1]` read).
     - "does not throw when limitingCollector is null" — same L0 `TypeError: Cannot read properties of undefined (reading '0')` at `bjt.ts:850:32`.
   - My working-copy diff against HEAD on `bjt.ts` is only the 4-line comment block at lines 875-878 (confirmed via `git diff --unified=1`). My edit cannot reach `bjt.ts:850:32` or `bjt.ts:1250:39` — those are runtime code lines untouched by this task. These failures are therefore pre-existing per `spec/test-baseline.md` expected-red policy and reported verbatim here rather than chased.
+
+---
+## Phase 4 Complete
+- **Batches**: 2 (batch-p4-w4.1 Wave 4.1 newton-raphson primitives; batch-p4-w4.2 Wave 4.2 device call-site fixes)
+- **Tasks**: 5 (4.1.1 fetlim Gillespie `_computeVtstlo`; 4.1.2 limvds audit + citation; 4.1.3 pnjlim citation refresh; 4.2.1 LED limitingCollector push; 4.2.2 BJT L1 substrate pnjlim audit + L0 §E1 scope comment)
+- **All verified**: yes (group_status for every task_group in both batches is "passed")
+- **Recovery events**: 1 clarification stop (Task 4.2.2 — spec condition 5 included stale MODEINITPRED in the skip mask, contradicting Phase 3 W3.2's ngspice-aligned removal per `bjtload.c:386-414`; resolved by correcting `spec/phase-4-f5-residual-limiting-primitives.md` on disk with dated editorial note, then respawning the implementer).
+- **Verification cycles**: both batches passed on first verifier pass after the 4.2.2 respawn.
+- **Artifacts landed**:
+  - `src/solver/analog/__tests__/newton-raphson-limiting.test.ts` — 10 tests covering `_computeVtstlo` (Gillespie formula) + `fetlim` routing + `limvds` six-branch coverage.
+  - `src/components/io/__tests__/led.test.ts` — new `describe("LED limitingCollector")` with 4 tests covering AK junction push in both MODEINITJCT and pnjlim branches, null-collector guard, and no-limit path.
+  - `src/components/semiconductors/__tests__/bjt-l0-scope-comment.test.ts` — comment-presence guard for the L0 §E1 architectural scope note.
+- **Production code deltas**:
+  - `src/solver/analog/newton-raphson.ts` — `_computeVtstlo(vold, vto) = |vold - vto| + 1` (ngspice Gillespie formula per `devsup.c:102`); `fetlim` routes via `self._computeVtstlo` (self-namespace import added for intra-module spy-ability). `limvds` unchanged (audit pass), docstring updated to `devsup.c:17-40`. `pnjlim` unchanged (D4 Gillespie branch already in place), both JSDoc citations normalized to `devsup.c:49-84`.
+  - `src/components/io/led.ts` — `ctx.limitingCollector`-gated push block added immediately after `s0[base + SLOT_VD] = vdLimited;` with `junction: "AK"`, matching diode's pattern. Push fires in both MODEINITJCT seed branch (wasLimited=false) and pnjlim branch.
+  - `src/components/semiconductors/bjt.ts` — L1 pnjlim call at line 1336 audit-verified pass; L0 load() gained a 4-line `architectural-alignment.md §E1 APPROVED ACCEPT` scope comment at lines 875-878 immediately after `icheckLimited = vbeLimFlag || vbcLimFlag;`.
+- **Spec amendment**: `spec/phase-4-f5-residual-limiting-primitives.md` §Task 4.2.2 condition 5 corrected from the pre-Phase-3 gate to the current ngspice-aligned gate `(MODEINITJCT | MODEINITSMSIG | MODEINITTRAN)` with dated editorial note.
+- **Follow-through**: Phase 4 unblocks the parallel device phases — 5 (F-BJT), 6 (F-MOS), 7 (F5ext-JFET), and 7.5 (F-RESIDUAL). Per `spec/plan.md` Dependency Graph, these four phases run in parallel after Phase 4; the state file's `batch-cross-a-w5.0-plus-w7.5-devices` is the next planned batch. Execution halted here per user direction.
+
