@@ -98,6 +98,8 @@ function buildCtx(
     reltol: 1e-3,
     iabstol: 1e-12,
     cktFixLimit: false,
+    bypass: false,
+    voltTol: 1e-6,
     ...overrides,
   } as LoadContext;
 }
@@ -108,6 +110,7 @@ function buildCtx(
 
 describe("Task 3.2.1 — Diode MODEINITPRED xfact", () => {
   it("extrapolates vdRaw as (1+xfact)*s1 - xfact*s2", () => {
+    const pnjlimSpy = vi.spyOn(NewtonRaphsonModule, "pnjlim");
     const element = makeDiode();
     const pool = initPool(element);
 
@@ -119,22 +122,40 @@ describe("Task 3.2.1 — Diode MODEINITPRED xfact", () => {
     element.load(ctx);
 
     // (1 + 0.5) * 0.65 - 0.5 * 0.60 = 0.975 - 0.30 = 0.675
+    // pnjlim is called with the extrapolated vdRaw as its first argument.
     const expected = (1 + 0.5) * 0.65 - 0.5 * 0.60;
-    expect((ctx as any).__phase3ProbeVdRaw).toBe(expected);
+    expect(pnjlimSpy.mock.calls.length).toBe(1);
+    expect(pnjlimSpy.mock.calls[0][0]).toBe(expected);
+
+    pnjlimSpy.mockRestore();
   });
 
   it("copies s1→s0 for VD, ID, GEQ before extrapolation", () => {
-    // The copy is verified via pnjlim's vold argument, which equals s0[SLOT_VD]
-    // at the time pnjlim is called — i.e., after the state-copy overwrites s0[SLOT_VD]
-    // with s1[SLOT_VD]. load() subsequently overwrites s0[SLOT_ID] and s0[SLOT_GEQ]
-    // with the post-load computed values, so they cannot be inspected on s0 after load().
-    // Instead we spy on pnjlim to capture the vold argument (= s0[SLOT_VD] post-copy).
-    const pnjlimSpy = vi.spyOn(NewtonRaphsonModule, "pnjlim");
+    // load() overwrites s0[SLOT_ID] and s0[SLOT_GEQ] at the end with newly computed
+    // values, so we cannot inspect them on s0 after load() returns.
+    // Instead we spy on pnjlim to capture a snapshot of s0 immediately before the
+    // first call — at that moment the state-copy has already run but the end-of-load
+    // write-back has not yet occurred.
+    let capturedS0ID: number | undefined;
+    let capturedS0GEQ: number | undefined;
+    const pnjlimSpy = vi.spyOn(NewtonRaphsonModule, "pnjlim").mockImplementation(
+      (vnew, vold, vt, vcrit) => {
+        if (capturedS0ID === undefined) {
+          // First call: capture s0[SLOT_ID] and s0[SLOT_GEQ] right now.
+          capturedS0ID  = pool.states[0][SLOT_ID];
+          capturedS0GEQ = pool.states[0][SLOT_GEQ];
+        }
+        // Delegate to the real pnjlim so diode.load() completes normally.
+        return NewtonRaphsonModule.pnjlim.wrappedImplementation
+          ? NewtonRaphsonModule.pnjlim.wrappedImplementation(vnew, vold, vt, vcrit)
+          : { value: vnew, limited: false };
+      }
+    );
 
     const element = makeDiode();
     const pool = initPool(element);
 
-    // s0: pre-copy sentinel values
+    // s0: pre-copy sentinel values (must differ from s1 to detect the copy)
     pool.states[0][SLOT_VD]  = 0.1;
     pool.states[0][SLOT_ID]  = 2e-3;
     pool.states[0][SLOT_GEQ] = 8e-2;
@@ -148,17 +169,39 @@ describe("Task 3.2.1 — Diode MODEINITPRED xfact", () => {
     pool.states[2][SLOT_VD] = 0.60;
 
     const ctx = buildCtx(pool, MODETRAN | MODEINITPRED, 0.5);
-    element.load(ctx);
-
-    // pnjlim is called with vold = s0[SLOT_VD] AFTER the state-copy.
-    // The copy sets s0[SLOT_VD] = s1[SLOT_VD] = 0.65, so vold must be 0.65.
-    const calls = pnjlimSpy.mock.calls;
-    expect(calls.length).toBeGreaterThanOrEqual(1);
-    // Find a call whose vold (second arg) equals 0.65 (the copied value, not the sentinel 0.1)
-    const copyVerifiedCall = calls.find((c) => c[1] === 0.65);
-    expect(copyVerifiedCall).toBeDefined();
 
     pnjlimSpy.mockRestore();
+
+    // Use a clean implementation-capturing spy without wrapping pnjlim recursively.
+    // Capture s0 slots directly inside the spy via closure over pool.
+    capturedS0ID  = undefined;
+    capturedS0GEQ = undefined;
+    const realPnjlim = NewtonRaphsonModule.pnjlim;
+    const captureSpy = vi.spyOn(NewtonRaphsonModule, "pnjlim").mockImplementation(
+      (vnew, vold, vt, vcrit) => {
+        if (capturedS0ID === undefined) {
+          capturedS0ID  = pool.states[0][SLOT_ID];
+          capturedS0GEQ = pool.states[0][SLOT_GEQ];
+        }
+        return realPnjlim(vnew, vold, vt, vcrit);
+      }
+    );
+
+    element.load(ctx);
+
+    // VD copy: pnjlim receives vold = s0[SLOT_VD] after copy = s1[SLOT_VD] = 0.65
+    const calls = captureSpy.mock.calls;
+    expect(calls.length).toBe(1);
+    const voldArg = calls[0][1];
+    expect(voldArg).toBe(0.65);
+
+    // ID copy: s0[SLOT_ID] at the moment of the first pnjlim call must equal s1[SLOT_ID] = 1e-3
+    expect(capturedS0ID).toBe(1e-3);
+
+    // GEQ copy: s0[SLOT_GEQ] at the moment of the first pnjlim call must equal s1[SLOT_GEQ] = 4e-2
+    expect(capturedS0GEQ).toBe(4e-2);
+
+    captureSpy.mockRestore();
   });
 
   it("runs pnjlim on the extrapolated vdRaw", () => {
@@ -177,9 +220,9 @@ describe("Task 3.2.1 — Diode MODEINITPRED xfact", () => {
     const ctx = buildCtx(pool, MODETRAN | MODEINITPRED, 2.0);
     element.load(ctx);
 
-    // pnjlim must be called at least once with vdRaw = 1.0
+    // pnjlim is called exactly once: the standard forward-bias path (not the breakdown path).
     const calls = pnjlimSpy.mock.calls;
-    expect(calls.length).toBeGreaterThanOrEqual(1);
+    expect(calls.length).toBe(1);
 
     // The first arg to the standard pnjlim call is the extrapolated vdRaw = 1.0
     const extrapolated = (1 + 2.0) * 0.9 - 2.0 * 0.85;
@@ -195,6 +238,7 @@ describe("Task 3.2.1 — Diode MODEINITPRED xfact", () => {
   });
 
   it("falls through to rhsOld when MODEINITPRED is not set", () => {
+    const pnjlimSpy = vi.spyOn(NewtonRaphsonModule, "pnjlim");
     const element = makeDiode();
     const pool = initPool(element);
 
@@ -206,11 +250,15 @@ describe("Task 3.2.1 — Diode MODEINITPRED xfact", () => {
     // nodeAnode=1 → voltages[0]; nodeCathode=2 → voltages[1]
     const rhsOld = new Float64Array([0.72, 0.0, 0.0]);
 
-    // MODETRAN without MODEINITPRED → MODEINITFLOAT path → rhsOld read
+    // MODETRAN without MODEINITPRED → MODEINITFLOAT path → rhsOld read.
+    // pnjlim's first argument is the rhsOld-derived vdRaw — confirms the else branch.
     const ctx = buildCtx(pool, MODETRAN | MODEINITFLOAT, 0.5, rhsOld);
     element.load(ctx);
 
-    expect((ctx as any).__phase3ProbeVdRaw).toBe(0.72);
+    expect(pnjlimSpy.mock.calls.length).toBe(1);
+    expect(pnjlimSpy.mock.calls[0][0]).toBe(0.72);
+
+    pnjlimSpy.mockRestore();
   });
 
   it("does not allocate during the MODEINITPRED branch", () => {
@@ -311,6 +359,8 @@ function buildBjtCtx(
     reltol: 1e-3,
     iabstol: 1e-12,
     cktFixLimit: false,
+    bypass: false,
+    voltTol: 1e-6,
     ...overrides,
   } as LoadContext;
 }
@@ -327,6 +377,7 @@ const BJT_SLOT_VSUB = 21;
 
 describe("Task 3.2.2 — BJT L0 MODEINITPRED xfact", () => {
   it("extrapolates vbeRaw and vbcRaw as (1+xfact)*s1 - xfact*s2", () => {
+    const pnjlimSpy = vi.spyOn(NewtonRaphsonModule, "pnjlim");
     const element = makeBjtL0();
     const pool = initBjtPool(element);
 
@@ -343,8 +394,13 @@ describe("Task 3.2.2 — BJT L0 MODEINITPRED xfact", () => {
     const expectedVbe = (1 + 0.25) * 0.72 - 0.25 * 0.70;
     // (1+0.25)*(-0.3) - 0.25*(-0.28) = -0.305 exactly
     const expectedVbc = (1 + 0.25) * (-0.3) - 0.25 * (-0.28);
-    expect((ctx as any).__phase3ProbeVbeRaw).toBe(expectedVbe);
-    expect((ctx as any).__phase3ProbeVbcRaw).toBe(expectedVbc);
+    // pnjlim call sequence under L0 MODEINITPRED: [BE, BC] — first arg is the
+    // extrapolated raw voltage for each junction.
+    expect(pnjlimSpy.mock.calls.length).toBe(2);
+    expect(pnjlimSpy.mock.calls[0][0]).toBe(expectedVbe);
+    expect(pnjlimSpy.mock.calls[1][0]).toBe(expectedVbc);
+
+    pnjlimSpy.mockRestore();
   });
 
   it("copies s1→s0 for VBE and VBC before extrapolation (verified via pnjlim vold)", () => {
@@ -362,9 +418,10 @@ describe("Task 3.2.2 — BJT L0 MODEINITPRED xfact", () => {
     const ctx = buildBjtCtx(pool, MODETRAN | MODEINITPRED, 0.5);
     element.load(ctx);
 
-    // pnjlim is called with vold = s0[VBE] after the copy, which equals s1[VBE]=0.65
+    // pnjlim is called with vold = s0[VBE] after the copy, which equals s1[VBE]=0.65.
+    // BJT L0 calls pnjlim exactly twice under MODEINITPRED: once for BE, once for BC.
     const calls = pnjlimSpy.mock.calls;
-    expect(calls.length).toBeGreaterThanOrEqual(1);
+    expect(calls.length).toBe(2);
     const copyVerifiedCall = calls.find((c) => c[1] === 0.65);
     expect(copyVerifiedCall).toBeDefined();
 
@@ -427,6 +484,7 @@ describe("Task 3.2.2 — BJT L0 MODEINITPRED xfact", () => {
   });
 
   it("falls through to rhsOld when MODEINITPRED is not set", () => {
+    const pnjlimSpy = vi.spyOn(NewtonRaphsonModule, "pnjlim");
     const element = makeBjtL0();
     const pool = initBjtPool(element);
 
@@ -436,7 +494,12 @@ describe("Task 3.2.2 — BJT L0 MODEINITPRED xfact", () => {
     const ctx = buildBjtCtx(pool, MODETRAN | MODEINITFLOAT, 0.5, rhsOld);
     element.load(ctx);
 
-    expect((ctx as any).__phase3ProbeVbeRaw).toBe(0.7);
+    // pnjlim's first call (BE junction) receives vbeRaw — must equal the rhsOld-derived value.
+    // L0 rhsOld path calls pnjlim exactly twice (BE + BC).
+    expect(pnjlimSpy.mock.calls.length).toBe(2);
+    expect(pnjlimSpy.mock.calls[0][0]).toBe(0.7);
+
+    pnjlimSpy.mockRestore();
   });
 
 });
@@ -447,6 +510,7 @@ describe("Task 3.2.2 — BJT L0 MODEINITPRED xfact", () => {
 
 describe("Task 3.2.3 — BJT L1 MODEINITPRED xfact", () => {
   it("extrapolates vbeRaw and vbcRaw via xfact", () => {
+    const pnjlimSpy = vi.spyOn(NewtonRaphsonModule, "pnjlim");
     const element = makeBjtL1();
     const pool = initBjtPool(element);
 
@@ -461,8 +525,13 @@ describe("Task 3.2.3 — BJT L1 MODEINITPRED xfact", () => {
 
     const expectedVbe = (1 + 0.25) * 0.72 - 0.25 * 0.70;
     const expectedVbc = (1 + 0.25) * (-0.3) - 0.25 * (-0.28);
-    expect((ctx as any).__phase3ProbeVbeRaw).toBe(expectedVbe);
-    expect((ctx as any).__phase3ProbeVbcRaw).toBe(expectedVbc);
+    // pnjlim call sequence under L1 MODEINITPRED: [BE, BC, substrate] — the first two
+    // receive the extrapolated raw voltages; substrate is observed separately.
+    expect(pnjlimSpy.mock.calls.length).toBe(3);
+    expect(pnjlimSpy.mock.calls[0][0]).toBe(expectedVbe);
+    expect(pnjlimSpy.mock.calls[1][0]).toBe(expectedVbc);
+
+    pnjlimSpy.mockRestore();
   });
 
   it("writes extrapolated vsubRaw then overwrites with rhsOld per bjtload.c:328-330", () => {
@@ -604,8 +673,9 @@ describe("Task 3.2.4 — BJT L1 VSUB state-copy", () => {
 
     // pnjlim is called as pnjlim(vsubRaw, s0[VSUB], vt, tSubVcrit).
     // The second argument (vold) must equal s1[VSUB]=0.42 after the state-copy.
+    // BJT L1 calls pnjlim exactly three times under MODEINITPRED: BE, BC, and substrate.
     const calls = pnjlimSpy.mock.calls;
-    expect(calls.length).toBeGreaterThanOrEqual(1);
+    expect(calls.length).toBe(3);
     const copyVerifiedCall = calls.find((c) => c[1] === 0.42);
     expect(copyVerifiedCall).toBeDefined();
 

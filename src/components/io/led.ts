@@ -34,8 +34,13 @@ import { niIntegrate } from "../../solver/analog/ni-integrate.js";
 import type { LteParams } from "../../solver/analog/ckt-terr.js";
 import { defineModelParams } from "../../core/model-params.js";
 import type { StatePoolRef } from "../../core/analog-types.js";
-import { VT as LED_VT } from "../../core/constants.js";
 import { defineStateSchema, applyInitialValues } from "../../solver/analog/state-schema.js";
+
+// ---------------------------------------------------------------------------
+// Physical constants (ngspice const.h values)
+// ---------------------------------------------------------------------------
+const CONSTboltz = 1.3806226e-23;
+const CHARGE = 1.6021918e-19;
 
 // ---------------------------------------------------------------------------
 // Layout constants
@@ -145,15 +150,15 @@ export const { paramDefs: LED_PARAM_DEFS, defaults: LED_DEFAULTS } = defineModel
     N:  { default: 1.8,      unit: "",  description: "Ideality factor" },
   },
   secondary: {
-    CJO: { default: 0,   unit: "F", description: "Zero-bias junction capacitance" },
-    VJ:  { default: 1,   unit: "V", description: "Junction built-in potential" },
-    M:   { default: 0.5,            description: "Grading coefficient" },
-    TT:  { default: 0,   unit: "s", description: "Transit time" },
-    FC:  { default: 0.5,            description: "Forward-bias capacitance coefficient" },
+    CJO:  { default: 0,      unit: "F", description: "Zero-bias junction capacitance" },
+    VJ:   { default: 1,      unit: "V", description: "Junction built-in potential" },
+    M:    { default: 0.5,               description: "Grading coefficient" },
+    TT:   { default: 0,      unit: "s", description: "Transit time" },
+    FC:   { default: 0.5,               description: "Forward-bias capacitance coefficient" },
+    TEMP: { default: 300.15, unit: "K", description: "Per-instance operating temperature" },
   },
 });
 
-// LED_VT (thermal voltage) imported from ../../core/constants.js
 /** Minimum conductance for numerical stability. */
 const LED_GMIN = 1e-12;
 
@@ -198,16 +203,23 @@ function createLedAnalogElement(
   const nodeCathode = 0;
 
   const params: Record<string, number> = {
-    IS:  props.getModelParam<number>("IS"),
-    N:   props.getModelParam<number>("N"),
-    CJO: props.getModelParam<number>("CJO"),
-    VJ:  props.getModelParam<number>("VJ"),
-    M:   props.getModelParam<number>("M"),
-    TT:  props.getModelParam<number>("TT"),
-    FC:  props.getModelParam<number>("FC"),
+    IS:   props.getModelParam<number>("IS"),
+    N:    props.getModelParam<number>("N"),
+    CJO:  props.getModelParam<number>("CJO"),
+    VJ:   props.getModelParam<number>("VJ"),
+    M:    props.getModelParam<number>("M"),
+    TT:   props.getModelParam<number>("TT"),
+    FC:   props.getModelParam<number>("FC"),
+    TEMP: props.getModelParam<number>("TEMP"),
   };
 
   const hasCapacitance = params.CJO > 0 || params.TT > 0;
+
+  // cite: dioload.c / diotemp.c — per-instance TEMP (maps to ngspice DIOtemp)
+  let ledTp = { vt: params.TEMP * CONSTboltz / CHARGE };
+  function recomputeLedTp(): void {
+    ledTp = { vt: params.TEMP * CONSTboltz / CHARGE };
+  }
 
   // Pool reference — set by initState. State arrays accessed via pool.states[N]
   // at call time. No cached Float64Array refs.
@@ -232,7 +244,7 @@ function createLedAnalogElement(
       applyInitialValues(this.stateSchema, pool, base, params);
     },
 
-    load(ctx: LoadContext): void {
+    load(this: PoolBackedAnalogElementCore, ctx: LoadContext): void {
       // Access state arrays at call time — no cached Float64Array refs.
       const s0 = pool.states[0];
       const s1 = pool.states[1];
@@ -240,7 +252,7 @@ function createLedAnalogElement(
       const s3 = pool.states[3];
 
       const voltages = ctx.rhsOld;
-      const nVt = params.N * LED_VT;
+      const nVt = params.N * ledTp.vt;
       const vcrit = nVt * Math.log(nVt / (params.IS * Math.SQRT2));
 
       let vdRaw: number;
@@ -266,8 +278,8 @@ function createLedAnalogElement(
 
       if (ctx.limitingCollector) {
         ctx.limitingCollector.push({
-          elementIndex: (this as any).elementIndex ?? -1,
-          label: (this as any).label ?? "",
+          elementIndex: this.elementIndex ?? -1,
+          label: this.label ?? "",
           junction: "AK",
           limitType: "pnjlim",
           vBefore: vdRaw,
@@ -360,7 +372,10 @@ function createLedAnalogElement(
     },
 
     setParam(key: string, value: number): void {
-      if (key in params) params[key] = value;
+      if (key in params) {
+        params[key] = value;
+        if (key === "TEMP") recomputeLedTp();
+      }
     },
   };
 

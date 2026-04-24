@@ -26,11 +26,6 @@ describe("_computeVtstlo", () => {
   });
 
   it("rejects spice3f vtsthi/2+2 formula", () => {
-    // spice3f5 legacy formula at (vold=1.0, vto=1.5):
-    //   vtsthi = |2*(1 - 1.5)| + 2 = 1 + 2 = 3
-    //   vtstlo_spice3f = vtsthi/2 + 2 = 3.5
-    // Gillespie formula: |1 - 1.5| + 1 = 1.5
-    // Explicit guard against accidental revert.
     expect(_computeVtstlo(1.0, 1.5)).not.toBe(3.5);
   });
 });

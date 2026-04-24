@@ -77,6 +77,8 @@ function makeDiagnosticCtx(
     reltol: 1e-3,
     iabstol: 1e-12,
     cktFixLimit: false,
+    bypass: false,
+    voltTol: 1e-6,
   };
 }
 
@@ -114,6 +116,8 @@ function makeSlotLoadCtx(
     reltol: 1e-3,
     iabstol: 1e-12,
     cktFixLimit: false,
+    bypass: false,
+    voltTol: 1e-6,
   };
 }
 
@@ -263,6 +267,8 @@ describe("PolarizedCap", () => {
         reltol: 1e-3,
         iabstol: 1e-12,
         cktFixLimit: false,
+        bypass: false,
+        voltTol: 1e-6,
       };
 
       solver.beginAssembly(matrixSize);
@@ -350,6 +356,8 @@ describe("PolarizedCap", () => {
           reltol: 1e-3,
           iabstol: 1e-12,
           cktFixLimit: false,
+          bypass: false,
+          voltTol: 1e-6,
         };
 
         solver.beginAssembly(matrixSize);
@@ -633,6 +641,8 @@ describe("polarized_cap_load_transient_parity (C4.2)", () => {
         reltol: 1e-3,
         iabstol: 1e-12,
         cktFixLimit: false,
+        bypass: false,
+        voltTol: 1e-6,
       };
 
       element.load(ctx);
@@ -746,6 +756,8 @@ describe("polarized_cap_F4b_clamp_diode_stamp (PC-W3-4)", () => {
       reltol: 1e-3,
       iabstol: 1e-12,
       cktFixLimit: false,
+      bypass: false,
+      voltTol: 1e-6,
     };
 
     element.load(ctx);

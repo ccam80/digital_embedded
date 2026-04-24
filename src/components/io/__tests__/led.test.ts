@@ -23,6 +23,8 @@ import {
   LedDefinition,
   LED_ATTRIBUTE_MAPPINGS,
   LED_CAP_STATE_SCHEMA,
+  LED_PARAM_DEFS,
+  LED_DEFAULTS,
 } from "../led.js";
 import {
   PolarityLedElement,
@@ -795,7 +797,7 @@ describe("AnalogLED", () => {
   it("analog_factory_produces_nonlinear_element", () => {
     const props = new PropertyBag();
     props.set("color", "red");
-    props.replaceModelParams({ IS: 3.17e-19, N: 1.8, CJO: 0, VJ: 1, M: 0.5, TT: 0, FC: 0.5 });
+    props.replaceModelParams({ IS: 3.17e-19, N: 1.8, CJO: 0, VJ: 1, M: 0.5, TT: 0, FC: 0.5, TEMP: 300.15 });
     const core = getFactory(LedDefinition.modelRegistry!.red!)!(new Map([["in", 1]]), [], -1, props, () => 0);
     const { element } = withState(core);
     expect(element.isNonlinear).toBe(true);
@@ -819,7 +821,7 @@ describe("AnalogLED", () => {
 
     const props = new PropertyBag();
     props.set("color", "red");
-    props.replaceModelParams({ IS: 3.17e-19, N: 1.8, CJO: 0, VJ: 1, M: 0.5, TT: 0, FC: 0.5 });
+    props.replaceModelParams({ IS: 3.17e-19, N: 1.8, CJO: 0, VJ: 1, M: 0.5, TT: 0, FC: 0.5, TEMP: 300.15 });
     const ledCore = getFactory(LedDefinition.modelRegistry!.red!)!(new Map([["in", 1]]), [], -1, props, () => 0);
     const { element: ledStateWrapped } = withState(ledCore);
     const led = withNodeIds(ledStateWrapped, [1, 0]);
@@ -850,7 +852,7 @@ describe("AnalogLED", () => {
 
     const props = new PropertyBag();
     props.set("color", "blue");
-    props.replaceModelParams({ IS: 6.26e-24, N: 2.5, CJO: 0, VJ: 1, M: 0.5, TT: 0, FC: 0.5 });
+    props.replaceModelParams({ IS: 6.26e-24, N: 2.5, CJO: 0, VJ: 1, M: 0.5, TT: 0, FC: 0.5, TEMP: 300.15 });
     const ledCore = getFactory(LedDefinition.modelRegistry!.blue!)!(new Map([["in", 1]]), [], -1, props, () => 0);
     const { element: ledStateWrapped } = withState(ledCore);
     const led = withNodeIds(ledStateWrapped, [1, 0]);
@@ -899,7 +901,7 @@ describe("integration", () => {
 
     const props = new PropertyBag();
     props.set("color", "red");
-    props.replaceModelParams({ IS, N, CJO, VJ, M, TT, FC });
+    props.replaceModelParams({ IS, N, CJO, VJ, M, TT, FC, TEMP: 300.15 });
     const core = getFactory(LedDefinition.modelRegistry!.red!)!(new Map([["in", 1]]), [], -1, props, () => 0);
 
     const pool = new StatePool(6);
@@ -1001,7 +1003,7 @@ describe("LED limitingCollector", () => {
   function makeLedCoreWithPool(overrides?: { label?: string; elementIndex?: number }) {
     const props = new PropertyBag();
     props.set("color", "red");
-    props.replaceModelParams({ IS: 3.17e-19, N: 1.8, CJO: 0, VJ: 1, M: 0.5, TT: 0, FC: 0.5 });
+    props.replaceModelParams({ IS: 3.17e-19, N: 1.8, CJO: 0, VJ: 1, M: 0.5, TT: 0, FC: 0.5, TEMP: 300.15 });
     const core = getFactory(LedDefinition.modelRegistry!.red!)!(new Map([["in", 1]]), [], -1, props, () => 0);
     (core as unknown as { label: string }).label = overrides?.label ?? "LED1";
     (core as unknown as { elementIndex: number }).elementIndex = overrides?.elementIndex ?? 7;
@@ -1112,5 +1114,109 @@ describe("LED limitingCollector", () => {
     expect(collector.length).toBe(1);
     expect(collector[0].wasLimited).toBe(false);
     expect(collector[0].vBefore).toBe(collector[0].vAfter);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// LED TEMP tests (Phase 7.5 Task 7.5.3.1)
+// ---------------------------------------------------------------------------
+
+describe("LED TEMP", () => {
+  const CONSTboltz = 1.3806226e-23;
+  const CHARGE = 1.6021918e-19;
+  const KoverQ = CONSTboltz / CHARGE;
+
+  function makeLedProps(overrides?: Record<string, number>): PropertyBag {
+    const props = new PropertyBag();
+    props.set("color", "red");
+    const defaults = { ...LED_DEFAULTS, ...overrides };
+    props.replaceModelParams(defaults);
+    return props;
+  }
+
+  function makeLedCoreWithTEMP(overrides?: Record<string, number>) {
+    const props = makeLedProps(overrides);
+    const core = getFactory(LedDefinition.modelRegistry!.red!)!(
+      new Map([["in", 1]]),
+      [],
+      -1,
+      props,
+      () => 0,
+    );
+    const { element, pool } = withState(core as AnalogElementCore);
+    return { element, pool, core };
+  }
+
+  function buildTempLoadCtx(overrides: Partial<LoadContext> = {}): LoadContext {
+    const solver = new SparseSolver();
+    solver.beginAssembly(1);
+    return {
+      solver,
+      matrix: solver,
+      rhsOld: new Float64Array(1),
+      rhs: new Float64Array(1),
+      cktMode: MODEINITJCT,
+      time: 0,
+      dt: 0,
+      method: "trapezoidal",
+      order: 1,
+      deltaOld: [0, 0, 0, 0, 0, 0, 0],
+      ag: new Float64Array(7),
+      srcFact: 1,
+      noncon: { value: 0 },
+      limitingCollector: null,
+      convergenceCollector: null,
+      xfact: 1,
+      gmin: 1e-12,
+      reltol: 1e-3,
+      iabstol: 1e-12,
+      temp: 300.15,
+      vt: 0.02585,
+      cktFixLimit: false,
+      bypass: false,
+      voltTol: 1e-6,
+      ...overrides,
+    };
+  }
+
+  it("TEMP_default_300_15", () => {
+    const props = makeLedProps();
+    expect(props.getModelParam<number>("TEMP")).toBe(300.15);
+  });
+
+  it("paramDefs_include_TEMP", () => {
+    const keys = LED_PARAM_DEFS.map((d) => d.key);
+    expect(keys).toContain("TEMP");
+  });
+
+  it("vt_reflects_TEMP", () => {
+    // Construct LED with TEMP=400, seed MODEINITJCT, and confirm vcrit uses 400K vt.
+    // At MODEINITJCT with OFF=0: s0[SLOT_VD] = vcrit = nVt * log(nVt / (IS * sqrt(2)))
+    // where nVt = N * vt(400K) = N * 400 * KoverQ.
+    const IS = 3.17e-19;
+    const N = 1.8;
+    const TEMP = 400;
+    const { element, pool } = makeLedCoreWithTEMP({ TEMP });
+    const ctx = buildTempLoadCtx({ cktMode: MODEINITJCT });
+    element.load(ctx);
+    const vd = pool.state0[0];
+    const nVt400 = N * TEMP * KoverQ;
+    const vcritExpected = nVt400 * Math.log(nVt400 / (IS * Math.SQRT2));
+    expect(Math.abs(vd - vcritExpected) / Math.abs(vcritExpected)).toBeLessThan(1e-10);
+  });
+
+  it("setParam_TEMP_recomputes", () => {
+    // After setParam('TEMP', 400), load() under MODEINITJCT seeds vcrit using 400K vt.
+    const IS = 3.17e-19;
+    const N = 1.8;
+    const TEMP_new = 400;
+    const { element, pool } = makeLedCoreWithTEMP();
+    element.setParam("TEMP", TEMP_new);
+    const ctx = buildTempLoadCtx({ cktMode: MODEINITJCT });
+    element.load(ctx);
+    const vd = pool.state0[0];
+    const nVt400 = N * TEMP_new * KoverQ;
+    const vcritExpected = nVt400 * Math.log(nVt400 / (IS * Math.SQRT2));
+    expect(Math.abs(vd - vcritExpected) / Math.abs(vcritExpected)).toBeLessThan(1e-10);
   });
 });

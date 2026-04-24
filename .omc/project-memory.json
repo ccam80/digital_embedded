@@ -43,7 +43,7 @@
   },
   "build": {
     "buildCommand": "cd \"C:/local_working_projects/digital_in_browser\" && npx tsc --noEmit -p . 2>&1 | head -20",
-    "testCommand": "cd \"C:/local_working_projects/digital_in_browser\" && npx vitest run --testTimeout=120000 src/components/semiconductors/__tests__/bjt-l0-scope-comment.test.ts 2>&1 | tail -40",
+    "testCommand": "cd \"C:/local_working_projects/digital_in_browser\" && npx vitest run --testTimeout=120000 \"src/components/semiconductors/__tests__/scr.test.ts\" 2>&1 | head -80",
     "lintCommand": "npm run lint",
     "devCommand": "npm run dev",
     "scripts": {
@@ -285,38 +285,62 @@
   "hotPaths": [
     {
       "path": "src\\components\\semiconductors\\bjt.ts",
-      "accessCount": 80,
-      "lastAccessed": 1777024961226,
+      "accessCount": 114,
+      "lastAccessed": 1777026013876,
       "type": "file"
     },
     {
       "path": "spec\\progress.md",
-      "accessCount": 80,
-      "lastAccessed": 1777025015547,
+      "accessCount": 92,
+      "lastAccessed": 1777026381298,
       "type": "file"
     },
     {
       "path": "src",
-      "accessCount": 76,
-      "lastAccessed": 1777023387576,
+      "accessCount": 90,
+      "lastAccessed": 1777026235963,
       "type": "directory"
     },
     {
       "path": "spec\\.context\\rules.md",
-      "accessCount": 52,
-      "lastAccessed": 1777024913478,
+      "accessCount": 64,
+      "lastAccessed": 1777025841004,
       "type": "file"
     },
     {
       "path": "spec\\test-baseline.md",
-      "accessCount": 51,
-      "lastAccessed": 1777024921196,
+      "accessCount": 59,
+      "lastAccessed": 1777026040639,
+      "type": "file"
+    },
+    {
+      "path": "src\\components\\io\\__tests__\\led.test.ts",
+      "accessCount": 50,
+      "lastAccessed": 1777026103990,
+      "type": "file"
+    },
+    {
+      "path": "src\\components\\io\\led.ts",
+      "accessCount": 48,
+      "lastAccessed": 1777026127018,
+      "type": "file"
+    },
+    {
+      "path": "src\\components\\semiconductors\\__tests__\\diode.test.ts",
+      "accessCount": 41,
+      "lastAccessed": 1777026091893,
       "type": "file"
     },
     {
       "path": "spec\\.context\\lock-protocol.md",
-      "accessCount": 31,
-      "lastAccessed": 1777024690886,
+      "accessCount": 38,
+      "lastAccessed": 1777025764258,
+      "type": "file"
+    },
+    {
+      "path": "src\\solver\\analog\\behavioral-remaining.ts",
+      "accessCount": 33,
+      "lastAccessed": 1777025831697,
       "type": "file"
     },
     {
@@ -326,16 +350,28 @@
       "type": "file"
     },
     {
-      "path": "src\\solver\\analog\\behavioral-remaining.ts",
-      "accessCount": 28,
-      "lastAccessed": 1777017972296,
+      "path": "spec\\.hybrid-state.json",
+      "accessCount": 27,
+      "lastAccessed": 1777025226216,
       "type": "file"
     },
     {
-      "path": "spec\\.hybrid-state.json",
+      "path": "src\\components\\semiconductors\\tunnel-diode.ts",
       "accessCount": 26,
-      "lastAccessed": 1777022201153,
+      "lastAccessed": 1777026010706,
       "type": "file"
+    },
+    {
+      "path": "src\\components\\semiconductors\\__tests__\\tunnel-diode.test.ts",
+      "accessCount": 26,
+      "lastAccessed": 1777026099854,
+      "type": "directory"
+    },
+    {
+      "path": "",
+      "accessCount": 23,
+      "lastAccessed": 1777025817709,
+      "type": "directory"
     },
     {
       "path": "src\\solver\\analog\\digital-pin-model.ts",
@@ -350,33 +386,9 @@
       "type": "file"
     },
     {
-      "path": "src\\components\\io\\led.ts",
-      "accessCount": 22,
-      "lastAccessed": 1777024580966,
-      "type": "file"
-    },
-    {
-      "path": "src\\components\\io\\__tests__\\led.test.ts",
-      "accessCount": 21,
-      "lastAccessed": 1777024591215,
-      "type": "file"
-    },
-    {
       "path": "src\\components\\semiconductors\\mosfet.ts",
       "accessCount": 19,
       "lastAccessed": 1777009282192,
-      "type": "file"
-    },
-    {
-      "path": "",
-      "accessCount": 19,
-      "lastAccessed": 1777022920215,
-      "type": "directory"
-    },
-    {
-      "path": "src\\components\\semiconductors\\__tests__\\diode.test.ts",
-      "accessCount": 19,
-      "lastAccessed": 1777024152362,
       "type": "file"
     },
     {
@@ -384,12 +396,6 @@
       "accessCount": 18,
       "lastAccessed": 1777005321736,
       "type": "file"
-    },
-    {
-      "path": "src\\components\\semiconductors\\__tests__\\tunnel-diode.test.ts",
-      "accessCount": 17,
-      "lastAccessed": 1777005431122,
-      "type": "directory"
     },
     {
       "path": "src\\solver\\analog\\behavioral-gate.ts",
@@ -404,16 +410,16 @@
       "type": "file"
     },
     {
-      "path": "src\\components\\semiconductors\\tunnel-diode.ts",
-      "accessCount": 14,
-      "lastAccessed": 1777009125695,
-      "type": "file"
-    },
-    {
       "path": "e2e",
       "accessCount": 12,
       "lastAccessed": 1777020433795,
       "type": "directory"
+    },
+    {
+      "path": "src\\components\\semiconductors\\__tests__\\bjt.test.ts",
+      "accessCount": 12,
+      "lastAccessed": 1777025940595,
+      "type": "file"
     },
     {
       "path": "src\\solver\\analog\\__tests__\\harness\\harness-integration.test.ts",
@@ -422,10 +428,10 @@
       "type": "file"
     },
     {
-      "path": "src\\components\\semiconductors\\__tests__\\bjt.test.ts",
-      "accessCount": 10,
-      "lastAccessed": 1777014158994,
-      "type": "file"
+      "path": "src\\solver\\analog\\__tests__",
+      "accessCount": 11,
+      "lastAccessed": 1777025873903,
+      "type": "directory"
     },
     {
       "path": "scripts",
@@ -434,15 +440,15 @@
       "type": "directory"
     },
     {
-      "path": "src\\solver\\analog\\__tests__",
-      "accessCount": 10,
-      "lastAccessed": 1777023294589,
-      "type": "directory"
-    },
-    {
       "path": "src\\components\\active\\dac.ts",
       "accessCount": 9,
       "lastAccessed": 1777005411731,
+      "type": "file"
+    },
+    {
+      "path": "src\\solver\\analog\\__tests__\\harness\\ngspice-bridge.ts",
+      "accessCount": 9,
+      "lastAccessed": 1777025719505,
       "type": "file"
     },
     {
@@ -485,12 +491,6 @@
       "path": "src\\components\\semiconductors\\__tests__\\jfet.test.ts",
       "accessCount": 6,
       "lastAccessed": 1777005461297,
-      "type": "file"
-    },
-    {
-      "path": "src\\solver\\analog\\__tests__\\harness\\ngspice-bridge.ts",
-      "accessCount": 6,
-      "lastAccessed": 1777019475354,
       "type": "file"
     },
     {

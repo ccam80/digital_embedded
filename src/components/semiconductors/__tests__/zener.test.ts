@@ -9,7 +9,7 @@
  */
 
 import { describe, it, expect } from "vitest";
-import { ZenerDiodeDefinition, createZenerElement } from "../zener.js";
+import { ZenerDiodeDefinition, createZenerElement, ZENER_PARAM_DEFS, ZENER_PARAM_DEFAULTS } from "../zener.js";
 import { PropertyBag } from "../../../core/properties.js";
 import { withNodeIds } from "../../../solver/analog/__tests__/test-helpers.js";
 import { StatePool } from "../../../solver/analog/state-pool.js";
@@ -18,7 +18,7 @@ import type { AnalogElementCore } from "../../../core/analog-types.js";
 import type { ReactiveAnalogElement } from "../../../solver/analog/element.js";
 import type { AnalogFactory } from "../../../core/registry.js";
 import type { LoadContext } from "../../../solver/analog/load-context.js";
-import { MODEDCOP, MODEINITFLOAT } from "../../../solver/analog/ckt-mode.js";
+import { MODEDCOP, MODEINITFLOAT, MODEINITJCT } from "../../../solver/analog/ckt-mode.js";
 
 // ---------------------------------------------------------------------------
 // Helper: allocate a StatePool for a single element and call initState
@@ -52,6 +52,8 @@ function buildUnitCtx(
 ): LoadContext {
   return {
     solver,
+    rhsOld: voltages,
+    rhs: voltages,
     voltages,
     cktMode: MODEDCOP | MODEINITFLOAT,
     dt: 0,
@@ -62,13 +64,18 @@ function buildUnitCtx(
     srcFact: 1,
     noncon: { value: 0 },
     limitingCollector: null,
+    convergenceCollector: null,
     xfact: 1,
     gmin: 1e-12,
     reltol: 1e-3,
     iabstol: 1e-12,
+    temp: 300.15,
+    vt: 300.15 * 1.3806226e-23 / 1.6021918e-19,
     cktFixLimit: false,
+    bypass: false,
+    voltTol: 1e-6,
     ...overrides,
-  };
+  } as LoadContext;
 }
 
 // ---------------------------------------------------------------------------
@@ -127,5 +134,153 @@ describe("Zener", () => {
     expect(() => element.setParam("IS", 1e-13)).not.toThrow();
     expect(() => element.setParam("N", 1.1)).not.toThrow();
     expect(() => element.setParam("NBV", 1.2)).not.toThrow();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Physical constants (mirroring zener.ts values)
+// ---------------------------------------------------------------------------
+
+const CONSTboltz = 1.3806226e-23;
+const CHARGE = 1.6021918e-19;
+const KoverQ = CONSTboltz / CHARGE;
+
+// ---------------------------------------------------------------------------
+// Zener primeJunctions tests
+// ---------------------------------------------------------------------------
+
+describe("Zener primeJunctions", () => {
+  it("method_absent", () => {
+    // primeJunctions() must NOT exist on the element — in-load MODEINITJCT priming
+    // replaces it per dioload.c:130-138.
+    const propsObj = makeParamBag({ IS: 1e-14, N: 1, BV: 5.1, IBV: 1e-3, TNOM: 300.15, TEMP: 300.15 });
+    const core = createZenerElement(new Map([["A", 1], ["K", 2]]), [], -1, propsObj);
+    const { element } = withState(core);
+    expect((element as unknown as Record<string, unknown>)["primeJunctions"]).toBeUndefined();
+  });
+
+  it("MODEINITJCT_seeds_tVcrit", () => {
+    // load() under MODEDCOP | MODEINITJCT with OFF==0 (default) must write
+    // s0[SLOT_VD] = tVcrit = nVt * ln(nVt / (IS * sqrt(2))).  cite: dioload.c:135-136
+    const IS = 1e-14;
+    const N = 1;
+    const TEMP = 300.15;
+    const propsObj = makeParamBag({ IS, N, BV: 5.1, IBV: 1e-3, TNOM: 300.15, TEMP });
+    const core = createZenerElement(new Map([["A", 1], ["K", 2]]), [], -1, propsObj);
+    const { element, pool } = withState(core);
+    const el = withNodeIds(element, [1, 2]);
+
+    const vt = TEMP * KoverQ;
+    const nVt = N * vt;
+    const expectedTVcrit = nVt * Math.log(nVt / (IS * Math.SQRT2));
+
+    const voltages = new Float64Array(2);
+    const solver = new SparseSolver();
+    solver.beginAssembly(2);
+    const ctx = buildUnitCtx(solver, voltages, { cktMode: MODEDCOP | MODEINITJCT });
+    el.load(ctx);
+
+    expect(pool.state0[0]).toBeCloseTo(expectedTVcrit, 10);
+  });
+
+  it("MODEINITJCT_OFF_zeros_vd", () => {
+    // load() under MODEDCOP | MODEINITJCT with OFF==1 must write s0[SLOT_VD] = 0.
+    // cite: dioload.c:133-134
+    const propsObj = makeParamBag({ IS: 1e-14, N: 1, BV: 5.1, IBV: 1e-3, TNOM: 300.15, TEMP: 300.15, OFF: 1 });
+    const core = createZenerElement(new Map([["A", 1], ["K", 2]]), [], -1, propsObj);
+    const { element, pool } = withState(core);
+    const el = withNodeIds(element, [1, 2]);
+
+    const voltages = new Float64Array(2);
+    const solver = new SparseSolver();
+    solver.beginAssembly(2);
+    const ctx = buildUnitCtx(solver, voltages, { cktMode: MODEDCOP | MODEINITJCT });
+    el.load(ctx);
+
+    expect(pool.state0[0]).toBe(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Zener TEMP tests
+// ---------------------------------------------------------------------------
+
+describe("Zener TEMP", () => {
+  it("TEMP_default_300_15", () => {
+    // After construction with full ZENER_PARAM_DEFAULTS (which includes TEMP),
+    // getModelParam("TEMP") must return 300.15.
+    const propsObj = makeParamBag({ ...ZENER_PARAM_DEFAULTS });
+    expect(propsObj.getModelParam<number>("TEMP")).toBe(300.15);
+  });
+
+  it("paramDefs_include_TEMP", () => {
+    // ZENER_PARAM_DEFS must include a "TEMP" entry in the secondary rank.
+    const tempDef = ZENER_PARAM_DEFS.find((d) => d.key === "TEMP");
+    expect(tempDef).toBeDefined();
+    expect(tempDef!.rank).toBe("secondary");
+    expect(tempDef!.default).toBe(300.15);
+  });
+
+  it("vt_reflects_TEMP", () => {
+    // Construct zener with TEMP=400. Under MODEINITJCT, load() seeds
+    // s0[SLOT_VD] = tp.tVcrit = nVt * ln(nVt / (IS * sqrt(2))).
+    // nVt at 400K = 400 * KoverQ (with N=1).
+    // Verify s0[SLOT_VD] equals the expected tVcrit at 400K.
+    const IS = 1e-14;
+    const N = 1;
+    const TEMP = 400;
+    const propsObj = makeParamBag({ IS, N, BV: 5.1, IBV: 1e-3, TNOM: 300.15, TEMP });
+    const core = createZenerElement(new Map([["A", 1], ["K", 2]]), [], -1, propsObj);
+    const { element, pool } = withState(core);
+    const el = withNodeIds(element, [1, 2]);
+
+    const vt400 = TEMP * KoverQ;
+    const nVt400 = N * vt400;
+    const expectedTVcrit = nVt400 * Math.log(nVt400 / (IS * Math.SQRT2));
+
+    const voltages = new Float64Array(2);
+    const solver = new SparseSolver();
+    solver.beginAssembly(2);
+    const ctx = buildUnitCtx(solver, voltages, { cktMode: MODEDCOP | MODEINITJCT });
+    el.load(ctx);
+
+    // s0[SLOT_VD = 0] is set to tVcrit under MODEINITJCT when OFF==0
+    const storedVd = pool.state0[0];
+    expect(storedVd).toBeCloseTo(expectedTVcrit, 10);
+  });
+
+  it("setParam_TEMP_recomputes", () => {
+    // After setParam('TEMP', 400), load() under MODEINITJCT seeds s0[SLOT_VD]
+    // with tVcrit recomputed at 400K — not at the original 300.15K.
+    const IS = 1e-14;
+    const N = 1;
+    const propsObj = makeParamBag({ IS, N, BV: 5.1, IBV: 1e-3, TNOM: 300.15, TEMP: 300.15 });
+    const core = createZenerElement(new Map([["A", 1], ["K", 2]]), [], -1, propsObj);
+    const { element, pool } = withState(core);
+    const el = withNodeIds(element, [1, 2]);
+
+    // Recompute expected tVcrit at 400K
+    const vt400 = 400 * KoverQ;
+    const nVt400 = N * vt400;
+    const expectedTVcrit400 = nVt400 * Math.log(nVt400 / (IS * Math.SQRT2));
+
+    // tVcrit at 300.15K (should differ)
+    const vt300 = 300.15 * KoverQ;
+    const nVt300 = N * vt300;
+    const tVcrit300 = nVt300 * Math.log(nVt300 / (IS * Math.SQRT2));
+    expect(expectedTVcrit400).not.toBeCloseTo(tVcrit300, 5);
+
+    // Set TEMP to 400K — should trigger tp recompute
+    element.setParam("TEMP", 400);
+
+    const voltages = new Float64Array(2);
+    const solver = new SparseSolver();
+    solver.beginAssembly(2);
+    const ctx = buildUnitCtx(solver, voltages, { cktMode: MODEDCOP | MODEINITJCT });
+    el.load(ctx);
+
+    // s0[SLOT_VD] must reflect 400K tVcrit, not 300.15K
+    const storedVd = pool.state0[0];
+    expect(storedVd).toBeCloseTo(expectedTVcrit400, 10);
   });
 });

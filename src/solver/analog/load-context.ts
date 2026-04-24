@@ -122,4 +122,11 @@ export interface LoadContext {
    * See mos1load.c:385: `if(!(ckt->CKTfixLimit)) { ... limvds(-vds, ...) }`.
    */
   cktFixLimit: boolean;
+  // cite: cktinit.c:53-55 — CKTbypass default false; CKTvoltTol default 1e-6
+  /** Bypass gate flag (ngspice CKTbypass). When true, device load() may skip
+   * recompute if voltage deltas are within tolerance. Default false. */
+  bypass: boolean;
+  /** Absolute voltage convergence tolerance in volts (ngspice CKTvoltTol).
+   * Used by device bypass gates. Default 1e-6 V. */
+  voltTol: number;
 }

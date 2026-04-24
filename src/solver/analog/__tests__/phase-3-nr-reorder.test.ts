@@ -88,19 +88,37 @@ describe("Task 3.1.1 — NR loop-top forceReorder gate", () => {
     ctx.cktMode = setAnalysis(MODETRAN, ctx.cktMode);
     ctx.cktMode = setInitf(ctx.cktMode, MODEINITTRAN);
 
+    // Track forceReorder calls per NR iteration by using a cktLoad interleave.
+    // cktLoad is called exactly once per iteration; forceReorder calls between
+    // consecutive cktLoad calls belong to the same iteration.
+    //
+    // Approach: use a postIterationHook to snapshot forceReorder call count at
+    // the end of each iteration, then compare counts across iterations.
     const forceReorderSpy = vi.spyOn(ctx.solver, "forceReorder");
-    const preorderSpy = vi.spyOn(ctx.solver, "preorder");
+
+    // Record the spy call count at the END of each iteration (after STEP J / INITF dispatch).
+    const callCountAfterIteration: number[] = [];
+    ctx.postIterationHook = () => {
+      callCountAfterIteration.push(forceReorderSpy.mock.calls.length);
+    };
 
     newtonRaphson(ctx);
 
-    // Assert that forceReorder was called during the first iteration
-    expect(forceReorderSpy).toHaveBeenCalled();
-    expect(forceReorderSpy.mock.calls.length).toBeGreaterThanOrEqual(1);
+    // At least 2 iterations must have run (iteration 0 forces noncon=1, so >= 2 total).
+    expect(callCountAfterIteration.length).toBeGreaterThanOrEqual(2);
 
-    // For MODEINITTRAN, the loop-top gate at niiter.c:856-859 fires only on iteration 0
-    // (iterno == 1 in 1-based ngspice == iteration 0 in 0-based code)
-    // This test verifies the gate logic is correct by checking that the forceReorder
-    // is called at all during MODEINITTRAN mode
+    // The loop-top gate (niiter.c:856-859) fires ONLY on iteration 0 for MODEINITTRAN
+    // because the mode transitions to MODEINITFLOAT at the end of iteration 0.
+    // MODEINITTRAN→MODEINITFLOAT does NOT call forceReorder in the INITF dispatcher
+    // (unlike MODEINITJCT→MODEINITFIX which does). So exactly 1 forceReorder total.
+    //
+    // forceReorder count after iteration 0 must be exactly 1 (the loop-top call).
+    expect(callCountAfterIteration[0]).toBe(1);
+
+    // forceReorder count must NOT increase in iteration 1 or later (gate already closed).
+    for (let i = 1; i < callCountAfterIteration.length; i++) {
+      expect(callCountAfterIteration[i]).toBe(callCountAfterIteration[0]);
+    }
   });
 
   it("does not fire forceReorder on MODEINITFLOAT or MODEINITFIX", () => {

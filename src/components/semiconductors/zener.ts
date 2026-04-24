@@ -66,6 +66,9 @@ export const { paramDefs: ZENER_PARAM_DEFS, defaults: ZENER_PARAM_DEFAULTS } = d
     TCV: { default: 0,    unit: "V/°C", description: "Breakdown voltage temperature coefficient" },
     TNOM:{ default: 300.15, unit: "K",  description: "Parameter measurement temperature" },
   },
+  secondary: {
+    TEMP: { default: 300.15, unit: "K", description: "Per-instance operating temperature" },
+  },
 });
 
 // Full SPICE L1 zener param declarations (diode superset with BV as primary)
@@ -171,28 +174,38 @@ export function createZenerElement(
   // diosetup.c:93-95: NBV (DIObrkdEmissionCoeff) defaults to N (DIOemissionCoeff)
   if (isNaN(params.NBV)) params.NBV = params.N;
 
-  // Compute temperature-derived working values.
-  // cite: diotemp.c — DIOtemp function
-  // We run at REFTEMP (27°C); dt = REFTEMP - TNOM
-  const circuitTemp = REFTEMP;
-  const dt = circuitTemp - (isFinite(params.TNOM) ? params.TNOM : REFTEMP);
-  const vt = (CONSTboltz * circuitTemp) / CHARGE;
-  const nVt = params.N * vt;
-  const nbvVt = params.NBV * vt;
+  // Temperature-derived working values — recomputed whenever params.TEMP changes.
+  // cite: dioload.c / diotemp.c — per-instance TEMP (maps to ngspice DIOtemp)
+  interface ZenerTp {
+    vt: number;
+    nVt: number;
+    nbvVt: number;
+    tVcrit: number;
+    vcritBrk: number;
+    tBV: number;
+  }
 
-  // tVcrit: DIOtVcrit = vt * ln(vt / (IS * sqrt(2)))  cite: diotemp.c
-  const tVcrit = nVt * Math.log(nVt / (params.IS * Math.SQRT2));
+  function computeZenerTp(): ZenerTp {
+    // cite: dioload.c / diotemp.c — per-instance TEMP (maps to ngspice DIOtemp)
+    const circuitTemp = params.TEMP;
+    const dt = circuitTemp - (isFinite(params.TNOM) ? params.TNOM : REFTEMP);
+    const vt = (CONSTboltz * circuitTemp) / CHARGE;
+    const nVt = params.N * vt;
+    const nbvVt = params.NBV * vt;
+    // tVcrit: DIOtVcrit = vt * ln(vt / (IS * sqrt(2)))  cite: diotemp.c
+    const tVcrit = nVt * Math.log(nVt / (params.IS * Math.SQRT2));
+    // vcritBrk: pnjlim vcrit for breakdown domain using nbvVt  cite: dioload.c:189-190
+    const vcritBrk = nbvVt * Math.log(nbvVt / (params.IS * Math.SQRT2));
+    // tBV: temperature-scaled breakdown voltage  cite: diotemp.c:208-244
+    const tBV = computeTBV(
+      params.BV, params.IBV, params.NBV, params.IS, vt,
+      isFinite(params.TCV) ? params.TCV : 0,
+      dt,
+    );
+    return { vt, nVt, nbvVt, tVcrit, vcritBrk, tBV };
+  }
 
-  // vcritBrk: pnjlim vcrit for breakdown domain using nbvVt  cite: dioload.c:189-190
-  // When NBV === N, this equals tVcrit; when NBV !== N, it differs.
-  const vcritBrk = nbvVt * Math.log(nbvVt / (params.IS * Math.SQRT2));
-
-  // tBV: temperature-scaled breakdown voltage  cite: diotemp.c:208-244
-  const tBV = computeTBV(
-    params.BV, params.IBV, params.NBV, params.IS, vt,
-    isFinite(params.TCV) ? params.TCV : 0,
-    dt,
-  );
+  let tp = computeZenerTp();
 
   // State pool slot indices
   const SLOT_VD = 0, SLOT_GEQ = 1, SLOT_IEQ = 2, SLOT_ID = 3;
@@ -248,19 +261,19 @@ export function createZenerElement(
         // compute conductance at OP point (for AC small-signal analysis)
         // three-region eval at vdOp  cite: dioload.c:245-265
         let gdOp: number;
-        if (vdOp >= -3 * nVt) {
+        if (vdOp >= -3 * tp.nVt) {
           // forward
-          const evd = Math.exp(vdOp / nVt);
-          gdOp = params.IS * evd / nVt;
-        } else if (!isFinite(tBV) || vdOp >= -tBV) {
+          const evd = Math.exp(vdOp / tp.nVt);
+          gdOp = params.IS * evd / tp.nVt;
+        } else if (!isFinite(tp.tBV) || vdOp >= -tp.tBV) {
           // reverse-cubic  cite: dioload.c:251-257
-          const arg = 3 * nVt / (vdOp * CONSTe);
+          const arg = 3 * tp.nVt / (vdOp * CONSTe);
           const arg3 = arg * arg * arg;
           gdOp = params.IS * 3 * arg3 / (-vdOp);
         } else {
           // breakdown  cite: dioload.c:261-263
-          const evrev = Math.exp(-(tBV + vdOp) / nbvVt);
-          gdOp = params.IS * evrev / nbvVt;
+          const evrev = Math.exp(-(tp.tBV + vdOp) / tp.nbvVt);
+          gdOp = params.IS * evrev / tp.nbvVt;
         }
         // store capd (small-signal conductance) — dioload.c:363 stores capd here;
         // for a resistive zener (no cap), we store gd for any bypass/convergence use.
@@ -271,7 +284,8 @@ export function createZenerElement(
 
       // -----------------------------------------------------------------------
       // Z-W3-4: 4-branch MODEINITJCT dispatch  cite: dioload.c:130-138
-      // Mirrors post-W1.1 diode.ts dispatch verbatim.
+      // In-load priming: MODEINITJCT sets SLOT_VD = tVcrit (OFF==0) or 0 (OFF!=0)
+      // directly inside load(), matching ngspice dioload.c:130-138.
       // -----------------------------------------------------------------------
       let vdRaw: number;
       if (mode & MODEINITTRAN) {
@@ -286,7 +300,7 @@ export function createZenerElement(
         vdRaw = 0;
       } else if (mode & MODEINITJCT) {
         // dioload.c:135-136: MODEINITJCT else → vd = tVcrit
-        vdRaw = tVcrit;
+        vdRaw = tp.tVcrit;
       } else if ((mode & MODEINITFIX) && (params.OFF !== undefined && params.OFF !== 0)) {
         // dioload.c:137-138: MODEINITFIX && DIOoff → vd = 0
         vdRaw = 0;
@@ -307,17 +321,17 @@ export function createZenerElement(
         // These phases set vd directly — no pnjlim  cite: dioload.c:126-138
         vdLimited = vdRaw;
         pnjlimLimited = false;
-      } else if (isFinite(tBV) && vdRaw < Math.min(0, -tBV + 10 * nbvVt)) {
+      } else if (isFinite(tp.tBV) && vdRaw < Math.min(0, -tp.tBV + 10 * tp.nbvVt)) {
         // dioload.c:183-195: breakdown path — pnjlim in reflected domain.
         // Z-W3-6: use vcritBrk (computed from nbvVt) not tVcrit  cite: dioload.c:189-190
-        const vdtemp = -(vdRaw + tBV);
-        const vdtempOld = -(vdOld + tBV);
-        const reflResult = pnjlim(vdtemp, vdtempOld, nbvVt, vcritBrk);
+        const vdtemp = -(vdRaw + tp.tBV);
+        const vdtempOld = -(vdOld + tp.tBV);
+        const reflResult = pnjlim(vdtemp, vdtempOld, tp.nbvVt, tp.vcritBrk);
         pnjlimLimited = reflResult.limited;
-        vdLimited = -(reflResult.value + tBV);
+        vdLimited = -(reflResult.value + tp.tBV);
       } else {
         // dioload.c:196-204: standard pnjlim for forward/normal-reverse.
-        const vdResult = pnjlim(vdRaw, vdOld, nVt, tVcrit);
+        const vdResult = pnjlim(vdRaw, vdOld, tp.nVt, tp.tVcrit);
         vdLimited = vdResult.value;
         pnjlimLimited = vdResult.limited;
       }
@@ -343,24 +357,24 @@ export function createZenerElement(
       let cdb: number;
       let gdb: number;
 
-      if (vdLimited >= -3 * nVt) {
+      if (vdLimited >= -3 * tp.nVt) {
         // Forward region  cite: dioload.c:245-249
-        const evd = Math.exp(vdLimited / nVt);
+        const evd = Math.exp(vdLimited / tp.nVt);
         cdb = params.IS * (evd - 1);
-        gdb = params.IS * evd / nVt;
-      } else if (!isFinite(tBV) || vdLimited >= -tBV) {
+        gdb = params.IS * evd / tp.nVt;
+      } else if (!isFinite(tp.tBV) || vdLimited >= -tp.tBV) {
         // Reverse-cubic region  cite: dioload.c:251-258
         // arg = 3*vte / (vd * CONSTe); cdb = -IS*(1+arg^3); gdb = IS*3*arg^3/(-vd)
-        const arg = 3 * nVt / (vdLimited * CONSTe);
+        const arg = 3 * tp.nVt / (vdLimited * CONSTe);
         const arg3 = arg * arg * arg;
         cdb = -params.IS * (1 + arg3);
         gdb = params.IS * 3 * arg3 / (-vdLimited);
       } else {
         // Breakdown region  cite: dioload.c:259-264
         // cdb = -IS * exp(-(tBV+vd)/vtebrk); gdb = IS * exp(...)/vtebrk
-        const evrev = Math.exp(-(tBV + vdLimited) / nbvVt);
+        const evrev = Math.exp(-(tp.tBV + vdLimited) / tp.nbvVt);
         cdb = -params.IS * evrev;
-        gdb = params.IS * evrev / nbvVt;
+        gdb = params.IS * evrev / tp.nbvVt;
       }
 
       // cd / gd = intrinsic junction values (no sidewall/tunnel for simplified model)
@@ -423,13 +437,11 @@ export function createZenerElement(
       return [id, -id];
     },
 
-    primeJunctions(): void {
-      // dioload.c:135-136: MODEINITJCT sets vd = tVcrit
-      pool.states[0][base + SLOT_VD] = tVcrit;
-    },
-
     setParam(key: string, value: number): void {
-      if (key in params) params[key] = value;
+      if (key in params) {
+        params[key] = value;
+        tp = computeZenerTp();
+      }
     },
   };
 }

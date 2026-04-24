@@ -47,14 +47,16 @@ import { niIntegrate } from "../../solver/analog/ni-integrate.js";
 import type { LteParams } from "../../solver/analog/ckt-terr.js";
 import { defineModelParams } from "../../core/model-params.js";
 import type { StatePoolRef } from "../../core/analog-types.js";
-import { VT } from "../../core/constants.js";
 import { defineStateSchema, applyInitialValues } from "../../solver/analog/state-schema.js";
 
 // ---------------------------------------------------------------------------
 // Physical constants
 // ---------------------------------------------------------------------------
 
-// VT (thermal voltage) imported from ../../core/constants.js
+/** Boltzmann constant (ngspice CONSTboltz, const.h). */
+const CONSTboltz = 1.3806226e-23;
+/** Electron charge (ngspice CHARGE, const.h). */
+const CHARGE = 1.6021918e-19;
 
 /** Minimum conductance for numerical stability (GMIN). */
 const GMIN = 1e-12;
@@ -80,13 +82,14 @@ export const { paramDefs: TUNNEL_DIODE_PARAM_DEFS, defaults: TUNNEL_DIODE_PARAM_
     VV: { default: 0.35,  unit: "V", description: "Valley voltage" },
   },
   secondary: {
-    IS:  { default: 1e-14, unit: "A", description: "Shockley saturation current" },
-    N:   { default: 1,                description: "Emission coefficient" },
-    CJO: { default: 0,    unit: "F",  description: "Zero-bias junction capacitance" },
-    VJ:  { default: 1,    unit: "V",  description: "Junction built-in potential" },
-    M:   { default: 0.5,              description: "Grading coefficient" },
-    TT:  { default: 0,    unit: "s",  description: "Transit time" },
-    FC:  { default: 0.5,              description: "Forward-bias capacitance coefficient" },
+    IS:   { default: 1e-14,  unit: "A", description: "Shockley saturation current" },
+    N:    { default: 1,                  description: "Emission coefficient" },
+    CJO:  { default: 0,      unit: "F",  description: "Zero-bias junction capacitance" },
+    VJ:   { default: 1,      unit: "V",  description: "Junction built-in potential" },
+    M:    { default: 0.5,                description: "Grading coefficient" },
+    TT:   { default: 0,      unit: "s",  description: "Transit time" },
+    FC:   { default: 0.5,                description: "Forward-bias capacitance coefficient" },
+    TEMP: { default: 300.15, unit: "K",  description: "Per-instance operating temperature" },
   },
 });
 
@@ -97,11 +100,14 @@ export const { paramDefs: TUNNEL_DIODE_PARAM_DEFS, defaults: TUNNEL_DIODE_PARAM_
 /**
  * Compute tunnel diode current and differential conductance at voltage V.
  *
- * @param v   - Junction voltage (V)
- * @param ip  - Peak tunnel current (A)
- * @param vp  - Peak voltage (V)
- * @param iv  - Valley current (A)
- * @param vv  - Valley voltage (V)
+ * @param v      - Junction voltage (V)
+ * @param ip     - Peak tunnel current (A)
+ * @param vp     - Peak voltage (V)
+ * @param iv     - Valley current (A)
+ * @param vv     - Valley voltage (V)
+ * @param iS     - Shockley saturation current (A)
+ * @param nCoeff - Emission coefficient
+ * @param vt     - Thermal voltage (V) — derived from per-instance TEMP
  * @returns { i, dIdV } — current and differential conductance
  */
 export function tunnelDiodeIV(
@@ -112,6 +118,7 @@ export function tunnelDiodeIV(
   vv: number,
   iS: number = IS_THERMAL,
   nCoeff: number = 1,
+  vt: number = 300.15 * CONSTboltz / CHARGE,
 ): { i: number; dIdV: number } {
   // --- Tunnel current component ---
   // I_t(V) = I_p * (V/V_p) * exp(1 - V/V_p)
@@ -130,11 +137,11 @@ export function tunnelDiodeIV(
   // dI_x/dV = I_v / V_x * exp((V - V_v) / V_x)
   const dIExcess = (iv / VX) * expX;
 
-  // --- Thermal (Shockley) component ---
-  const nVt = nCoeff * VT;
+  // --- Thermal (Shockley) component — cite: dioload.c, per-instance TEMP ---
+  const nVt = nCoeff * vt;
   const expTh = Math.exp(v / nVt);
   const iThermal = iS * (expTh - 1);
-  // dI_thermal/dV = IS / (N*VT) * exp(V/(N*VT))
+  // dI_thermal/dV = IS / (N*vt) * exp(V/(N*vt))
   const dIThermal = (iS * expTh) / nVt;
 
   const i = iTunnel + iExcess + iThermal;
@@ -188,20 +195,24 @@ export function createTunnelDiodeElement(
   }
 
   const params: Record<string, number> = {
-    IP:  readParam("IP"),
-    VP:  readParam("VP"),
-    IV:  readParam("IV"),
-    VV:  readParam("VV"),
-    IS:  readParam("IS"),
-    N:   readParam("N"),
-    CJO: readParam("CJO"),
-    VJ:  readParam("VJ"),
-    M:   readParam("M"),
-    TT:  readParam("TT"),
-    FC:  readParam("FC"),
+    IP:   readParam("IP"),
+    VP:   readParam("VP"),
+    IV:   readParam("IV"),
+    VV:   readParam("VV"),
+    IS:   readParam("IS"),
+    N:    readParam("N"),
+    CJO:  readParam("CJO"),
+    VJ:   readParam("VJ"),
+    M:    readParam("M"),
+    TT:   readParam("TT"),
+    FC:   readParam("FC"),
+    TEMP: readParam("TEMP"),
   };
 
   const hasCapacitance = params.CJO > 0 || params.TT > 0;
+
+  // Per-instance thermal voltage — cite: dioload.c / diotemp.c, per-instance TEMP (maps to ngspice DIOtemp).
+  let vt = params.TEMP * CONSTboltz / CHARGE;
 
   // Pool reference — set by initState. State arrays accessed via pool.states[N]
   // at call time. No cached Float64Array refs.
@@ -209,7 +220,7 @@ export function createTunnelDiodeElement(
   let base: number;
 
   function recompute(s0: Float64Array, v: number): void {
-    const { i, dIdV } = tunnelDiodeIV(v, params.IP, params.VP, params.IV, params.VV, params.IS, params.N);
+    const { i, dIdV } = tunnelDiodeIV(v, params.IP, params.VP, params.IV, params.VV, params.IS, params.N, vt);
     // dIdV already includes GMIN from tunnelDiodeIV; add GMIN*v to current (DD5)
     s0[base + SLOT_ID] = i + GMIN * v;
     s0[base + SLOT_GEQ] = dIdV;
@@ -285,7 +296,7 @@ export function createTunnelDiodeElement(
         const method = ctx.method;
 
         const Cj = computeJunctionCapacitance(vdNew, params.CJO, params.VJ, params.M, params.FC);
-        const { dIdV: gDiode, i: iNowDiode } = tunnelDiodeIV(vdNew, params.IP, params.VP, params.IV, params.VV, params.IS, params.N);
+        const { dIdV: gDiode, i: iNowDiode } = tunnelDiodeIV(vdNew, params.IP, params.VP, params.IV, params.VV, params.IS, params.N, vt);
         const Ct = params.TT * gDiode;
         const Ctotal = Cj + Ct;
 
@@ -344,7 +355,10 @@ export function createTunnelDiodeElement(
     },
 
     setParam(key: string, value: number): void {
-      if (key in params) params[key] = value;
+      if (key in params) {
+        params[key] = value;
+        if (key === "TEMP") vt = params.TEMP * CONSTboltz / CHARGE;
+      }
     },
   };
 

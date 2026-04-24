@@ -734,10 +734,8 @@ export class NgspiceBridge {
         wasLimited: ev.wasLimited,
       }));
 
-      // ngspice integrateMethod FFI code (niiter.c) → harness IntegrationMethod.
-      // ngspice exposes only trapezoidal/gear in CKTintegrateMethod.
-      // Map code 0→trapezoidal (order 1 trap per ngspice legacy), 1→trapezoidal,
-      // 2→gear. Anything else falls back to "trapezoidal" (ngspice default).
+      // ngspice integrateMethod FFI code (cktdefs.h:107-108) → harness IntegrationMethod.
+      // TRAPEZOIDAL=1, GEAR=2. Code 2 → "gear"; all other values → "trapezoidal".
       const ngIntegrateMethod: IntegrationMethod =
         raw.integrateMethod === 2 ? "gear"
         : "trapezoidal";

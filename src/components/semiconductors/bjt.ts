@@ -24,7 +24,7 @@ import {
   type AttributeMapping,
   type ComponentDefinition,
 } from "../../core/registry.js";
-import type { IntegrationMethod, LoadContext } from "../../solver/analog/element.js";
+import type { IntegrationMethod, LoadContext, PoolBackedAnalogElementCore } from "../../solver/analog/element.js";
 import {
   MODEINITJCT, MODEINITFIX, MODEINITSMSIG, MODEINITTRAN, MODEINITPRED,
   MODETRAN, MODEAC, MODETRANOP, MODEUIC,
@@ -803,7 +803,7 @@ export function createBjtElement(
      * (no caps, no transit time, no excess phase, no substrate, no terminal
      * resistances). L0 is the direct dc-op of the Gummel-Poon equations.
      */
-    load(ctx: LoadContext): void {
+    load(this: PoolBackedAnalogElementCore, ctx: LoadContext): void {
       const s0 = pool.states[0];
       const s1 = pool.states[1];
       const s2 = pool.states[2];
@@ -843,8 +843,6 @@ export function createBjtElement(
         s0[base + SLOT_VBC] = s1[base + SLOT_VBC];
         vbeRaw = (1 + ctx.xfact) * s1[base + SLOT_VBE] - ctx.xfact * s2[base + SLOT_VBE];
         vbcRaw = (1 + ctx.xfact) * s1[base + SLOT_VBC] - ctx.xfact * s2[base + SLOT_VBC];
-        (ctx as any).__phase3ProbeVbeRaw = vbeRaw;
-        (ctx as any).__phase3ProbeVbcRaw = vbcRaw;
       } else {
         // bjtload.c:311-319: normal NR iteration — read from CKTrhsOld.
         const vB = nodeB > 0 ? voltages[nodeB - 1] : 0;
@@ -852,8 +850,6 @@ export function createBjtElement(
         const vE = nodeE > 0 ? voltages[nodeE - 1] : 0;
         vbeRaw = polarity * (vB - vE);
         vbcRaw = polarity * (vB - vC);
-        (ctx as any).__phase3ProbeVbeRaw = vbeRaw;
-        (ctx as any).__phase3ProbeVbcRaw = vbcRaw;
       }
 
       // bjtload.c:383-416: pnjlim on BE/BC. pnjlim runs under MODEINITPRED — ngspice has no
@@ -882,8 +878,8 @@ export function createBjtElement(
 
       if (ctx.limitingCollector) {
         ctx.limitingCollector.push({
-          elementIndex: (this as any).elementIndex ?? -1,
-          label: (this as any).label ?? "",
+          elementIndex: this.elementIndex ?? -1,
+          label: this.label ?? "",
           junction: "BE",
           limitType: "pnjlim",
           vBefore: vbeRaw,
@@ -891,8 +887,8 @@ export function createBjtElement(
           wasLimited: vbeLimFlag,
         });
         ctx.limitingCollector.push({
-          elementIndex: (this as any).elementIndex ?? -1,
-          label: (this as any).label ?? "",
+          elementIndex: this.elementIndex ?? -1,
+          label: this.label ?? "",
           junction: "BC",
           limitType: "pnjlim",
           vBefore: vbcRaw,
@@ -1215,7 +1211,7 @@ export function createSpiceL1BjtElement(
      *
      * D3: cap/charge update gated on ctx.delta > 0 (DC-OP has delta=0).
      */
-    load(ctx: LoadContext): void {
+    load(this: PoolBackedAnalogElementCore, ctx: LoadContext): void {
       const s0 = pool.states[0];
       const s1 = pool.states[1];
       const s2 = pool.states[2];
@@ -1302,21 +1298,14 @@ export function createSpiceL1BjtElement(
         vbeRaw  = (1 + ctx.xfact) * s1[base + SLOT_VBE]  - ctx.xfact * s2[base + SLOT_VBE];
         vbcRaw  = (1 + ctx.xfact) * s1[base + SLOT_VBC]  - ctx.xfact * s2[base + SLOT_VBC];
         vsubRaw = (1 + ctx.xfact) * s1[base + SLOT_VSUB] - ctx.xfact * s2[base + SLOT_VSUB];
-        (ctx as any).__phase3ProbeVsubExtrap = vsubRaw;
         vbxRaw  = polarity * (vBe_ext - vCi);           // bjtload.c:325-327
         vsubRaw = polarity * subs * (0 - vSubCon);      // bjtload.c:328-330
-        (ctx as any).__phase3ProbeVbeRaw   = vbeRaw;
-        (ctx as any).__phase3ProbeVbcRaw   = vbcRaw;
-        (ctx as any).__phase3ProbeVsubFinal = vsubRaw;
       } else {
         // bjtload.c:311-319: normal NR iteration — read from CKTrhsOld.
         vbeRaw  = polarity * (vBi - vEi);
         vbcRaw  = polarity * (vBi - vCi);
         vbxRaw  = polarity * (vBe_ext - vCi);           // bjtload.c:325-327
         vsubRaw = polarity * subs * (0 - vSubCon);      // bjtload.c:328-330
-        (ctx as any).__phase3ProbeVbeRaw   = vbeRaw;
-        (ctx as any).__phase3ProbeVbcRaw   = vbcRaw;
-        (ctx as any).__phase3ProbeVsubFinal = vsubRaw;
       }
 
       // bjtload.c:383-416: pnjlim on BE, BC, and substrate junctions.
@@ -1344,8 +1333,8 @@ export function createSpiceL1BjtElement(
 
       if (ctx.limitingCollector) {
         ctx.limitingCollector.push({
-          elementIndex: (this as any).elementIndex ?? -1,
-          label: (this as any).label ?? "",
+          elementIndex: this.elementIndex ?? -1,
+          label: this.label ?? "",
           junction: "BE",
           limitType: "pnjlim",
           vBefore: vbeRaw,
@@ -1353,8 +1342,8 @@ export function createSpiceL1BjtElement(
           wasLimited: vbeLimFlag,
         });
         ctx.limitingCollector.push({
-          elementIndex: (this as any).elementIndex ?? -1,
-          label: (this as any).label ?? "",
+          elementIndex: this.elementIndex ?? -1,
+          label: this.label ?? "",
           junction: "BC",
           limitType: "pnjlim",
           vBefore: vbcRaw,
@@ -1414,7 +1403,7 @@ export function createSpiceL1BjtElement(
         const arg1 = arg2 * arg1a;
         const denom = 1 + arg1 + arg2;
         const arg3 = arg1 / denom;
-        const deltaOld1 = ctx.deltaOld[1] > 0 ? ctx.deltaOld[1] : ctx.delta;
+        const deltaOld1 = ctx.deltaOld[1];  // cite: dctran.c:317 — pre-seeded to CKTmaxStep, never zero
         // bjtload.c:531-535: MODEINITTRAN seeds state1/state2 cexbc = cbe/qb.
         if (mode & MODEINITTRAN) {
           s1[base + SLOT_CEXBC] = cbe / qb;

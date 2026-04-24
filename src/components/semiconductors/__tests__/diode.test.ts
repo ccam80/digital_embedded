@@ -10,7 +10,7 @@
  */
 
 import { describe, it, expect } from "vitest";
-import { DiodeDefinition, createDiodeElement, computeJunctionCapacitance, DIODE_PARAM_DEFAULTS } from "../diode.js";
+import { DiodeDefinition, createDiodeElement, computeJunctionCapacitance, DIODE_PARAM_DEFAULTS, DIODE_PARAM_DEFS } from "../diode.js";
 import { PropertyBag } from "../../../core/properties.js";
 import { makeDcVoltageSource } from "../../sources/dc-voltage-source.js";
 import { withNodeIds, runDcOp, makeSimpleCtx } from "../../../solver/analog/__tests__/test-helpers.js";
@@ -1352,5 +1352,95 @@ describe("diode checkConvergence A7 fix (MODEINITFIX | MODEINITSMSIG)", () => {
     // Since OFF=0, it falls through to the convergence math; with matching
     // voltages the delta is 0, so it must converge.
     expect(result).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Diode TEMP — per-instance operating temperature (Phase 7.5.1)
+// ---------------------------------------------------------------------------
+
+function makeDiodeProps(overrides: Record<string, number> = {}): PropertyBag {
+  return makeParamBag({ ...DIODE_PARAM_DEFAULTS, ...overrides });
+}
+
+describe("Diode TEMP", () => {
+  it("TEMP_default_300_15", () => {
+    const propsObj = makeDiodeProps();
+    expect(propsObj.getModelParam<number>("TEMP")).toBe(300.15);
+  });
+
+  it("paramDefs_include_TEMP", () => {
+    const keys = DIODE_PARAM_DEFS.map((d) => d.key);
+    expect(keys).toContain("TEMP");
+  });
+
+  it("setParam_TEMP_no_throw", () => {
+    const propsObj = makeDiodeProps();
+    const core = createDiodeElement(new Map([["A", 1], ["K", 2]]), [], -1, propsObj);
+    expect(() => core.setParam("TEMP", 400)).not.toThrow();
+  });
+
+  it("tp_vt_reflects_TEMP", () => {
+    const CONSTboltz_local = 1.3806226e-23;
+    const CHARGE_local = 1.6021918e-19;
+    const KoverQ = CONSTboltz_local / CHARGE_local;
+    const p = {
+      IS: 1e-14, N: 1, VJ: 1.0, CJO: 0, M: 0.5,
+      BV: Infinity, IBV: 1e-3, NBV: 1, EG: 1.11, XTI: 3, TNOM: 300.15,
+    };
+    const tp = dioTemp(p, 400);
+    expect(Math.abs(tp.vt - 400 * KoverQ) / (400 * KoverQ)).toBeLessThan(1e-10);
+  });
+
+  it("tSatCur_scales_with_TEMP", () => {
+    const p = {
+      IS: 1e-14, N: 1, VJ: 1.0, CJO: 0, M: 0.5,
+      BV: Infinity, IBV: 1e-3, NBV: 1, EG: 1.11, XTI: 3, TNOM: 300.15,
+    };
+    const tp_nom = dioTemp(p, 300.15);
+    const tp_hot = dioTemp(p, 400);
+    expect(tp_hot.tIS).toBeGreaterThan(tp_nom.tIS);
+  });
+
+  it("TNOM_stays_nominal_refs", () => {
+    const CONSTboltz_local = 1.3806226e-23;
+    const CHARGE_local = 1.6021918e-19;
+    const p = {
+      IS: 1e-14, N: 1, VJ: 1.0, CJO: 0, M: 0.5,
+      BV: Infinity, IBV: 1e-3, NBV: 1, EG: 1.11, XTI: 3, TNOM: 300.15,
+    };
+    const tp = dioTemp(p, 400);
+    const expectedVtnom = 300.15 * CONSTboltz_local / CHARGE_local;
+    expect(Math.abs(tp.vtnom - expectedVtnom) / expectedVtnom).toBeLessThan(1e-10);
+  });
+
+  it("setParam_TEMP_recomputes_tp", () => {
+    // Construct diode at default TEMP (300.15K), then change to 400K via setParam.
+    // Verify next load() uses the 400K tVcrit by driving MODEINITJCT (OFF=0):
+    // dioload.c:135-136: vdRaw = tVcrit when MODEINITJCT && !OFF — no pnjlim applied.
+    // So s0[SLOT_VD] after load() equals the recomputed tVcrit at 400K.
+    const IS = 1e-14;
+    const N = 1;
+    const TNOM = 300.15;
+    const propsObj = makeDiodeProps({ IS, N, TNOM });
+    const core = createDiodeElement(new Map([["A", 1], ["K", 2]]), [], -1, propsObj);
+    const pool = new StatePool(Math.max((core as any).stateSize, 1));
+    (core as any).stateBaseOffset = 0;
+    core.initState(pool);
+
+    // Change TEMP to 400K — triggers recomputeTemp()
+    core.setParam("TEMP", 400);
+
+    // Compute expected tVcrit at 400K
+    const pForTemp = { IS, N, VJ: 1.0, CJO: 0, M: 0.5, BV: Infinity, IBV: 1e-3, NBV: N, EG: 1.11, XTI: 3, TNOM };
+    const tp400 = dioTemp(pForTemp, 400);
+
+    // Invoke load() under MODEINITJCT with OFF=0
+    const solver = new SparseSolver();
+    solver.beginAssembly(2);
+    core.load(buildUnitCtx(solver, new Float64Array(2), { cktMode: MODEDCOP | MODEINITJCT }));
+
+    // s0[SLOT_VD=0] must equal the 400K tVcrit (set by MODEINITJCT path, no pnjlim)
+    expect(pool.state0[0]).toBe(tp400.tVcrit);
   });
 });

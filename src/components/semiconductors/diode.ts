@@ -28,7 +28,7 @@ import {
   type AttributeMapping,
   type ComponentDefinition,
 } from "../../core/registry.js";
-import type { IntegrationMethod, LoadContext } from "../../solver/analog/element.js";
+import type { IntegrationMethod, LoadContext, PoolBackedAnalogElementCore } from "../../solver/analog/element.js";
 import { stampG, stampRHS } from "../../solver/analog/stamp-helpers.js";
 import {
   MODEINITJCT,
@@ -133,6 +133,7 @@ export const { paramDefs: DIODE_PARAM_DEFS, defaults: DIODE_PARAM_DEFAULTS } = d
     IBEQ:  { default: 0,    unit: "A",  description: "Tunnel bottom saturation current (DIOtunSatCur)" },
     IBSW:  { default: 0,    unit: "A",  description: "Tunnel sidewall saturation current (DIOtunSatSWCur)" },
     NB:    { default: 1,               description: "Tunnel emission coefficient (DIOtunEmissionCoeff)" },
+    TEMP:  { default: 300.15, unit: "K", description: "Per-instance operating temperature" },
   },
 });
 
@@ -239,6 +240,8 @@ export function computeJunctionCharge(
 export interface DioTempParams {
   /** Temperature-scaled thermal voltage kT/q */
   vt: number;
+  /** Nominal thermal voltage kT_nom/q at TNOM (diotemp.c vtnom) */
+  vtnom: number;
   /** Temperature-scaled saturation current (DIOtSatCur) */
   tIS: number;
   /** Temperature-scaled junction potential (DIOtJctPot) */
@@ -273,7 +276,7 @@ export interface DioTempParams {
 export function dioTemp(p: {
   IS: number; N: number; VJ: number; CJO: number; M: number;
   BV: number; IBV: number; NBV: number; EG: number; XTI: number; TNOM: number;
-}, T: number = REFTEMP): DioTempParams {
+}, T: number): DioTempParams {
   const vt = T * CONSTboltz / CHARGE;
   const vtnom = p.TNOM * CONSTboltz / CHARGE;
 
@@ -330,7 +333,7 @@ export function dioTemp(p: {
     tBV = xbv;
   }
 
-  return { vt, tIS, tVJ, tCJO, tVcrit, tBV };
+  return { vt, vtnom, tIS, tVJ, tCJO, tVcrit, tBV };
 }
 
 // ---------------------------------------------------------------------------
@@ -407,6 +410,7 @@ export function createDiodeElement(
     IBEQ: props.getModelParam<number>("IBEQ"),
     IBSW: props.getModelParam<number>("IBSW"),
     NB:   props.getModelParam<number>("NB"),
+    TEMP: props.getModelParam<number>("TEMP"),
   };
 
   // diosetup.c:93-95: NBV defaults to N when not explicitly given
@@ -439,7 +443,7 @@ export function createDiodeElement(
       IS: params.IS, N: params.N, VJ: params.VJ, CJO: params.CJO, M: params.M,
       BV: params.BV, IBV: params.IBV, NBV: params.NBV, EG: params.EG,
       XTI: params.XTI, TNOM: params.TNOM,
-    }, REFTEMP);
+    }, params.TEMP);
     tIS = tp.tIS;
     tVJ = tp.tVJ;
     tCJO = tp.tCJO;
@@ -484,7 +488,7 @@ export function createDiodeElement(
       applyInitialValues(this.stateSchema, pool, base, params);
     },
 
-    load(ctx: LoadContext): void {
+    load(this: PoolBackedAnalogElementCore, ctx: LoadContext): void {
       // Direct state-array access per call — no cached Float64Array refs.
       // Mirrors ngspice CKTstate0/1/2/3 pointer semantics in dioload.c.
       const s0 = pool.states[0];
@@ -524,13 +528,11 @@ export function createDiodeElement(
         // dioload.c:144: vd = DEVpred(ckt, DIOvoltage) =
         //       (1+xfact)*state1[vd] - xfact*state2[vd] under #ifndef PREDICTOR.
         vdRaw = (1 + ctx.xfact) * s1[base + SLOT_VD] - ctx.xfact * s2[base + SLOT_VD];
-        (ctx as any).__phase3ProbeVdRaw = vdRaw;
       } else {
         // dioload.c:151-152: normal NR — read from CKTrhsOld.
         const va = nodeJunction > 0 ? voltages[nodeJunction - 1] : 0;
         const vc = nodeCathode > 0 ? voltages[nodeCathode - 1] : 0;
         vdRaw = va - vc;
-        (ctx as any).__phase3ProbeVdRaw = vdRaw;
       }
 
       const vtebrk = params.NBV * vt;
@@ -562,8 +564,8 @@ export function createDiodeElement(
 
       if (ctx.limitingCollector) {
         ctx.limitingCollector.push({
-          elementIndex: (this as any).elementIndex ?? -1,
-          label: (this as any).label ?? "",
+          elementIndex: this.elementIndex ?? -1,
+          label: this.label ?? "",
           junction: "AK",
           limitType: "pnjlim",
           vBefore: vdRaw,

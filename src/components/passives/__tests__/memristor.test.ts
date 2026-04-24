@@ -72,6 +72,8 @@ function acceptStep(mem: MemristorElement, dt: number, voltages: Float64Array): 
     reltol: 1e-3,
     iabstol: 1e-12,
     cktFixLimit: false,
+    bypass: false,
+    voltTol: 1e-6,
   };
   mem.accept(ctx, 0, () => {});
 }
@@ -306,6 +308,8 @@ describe("Memristor", () => {
         reltol: 1e-3,
         iabstol: 1e-12,
         cktFixLimit: false,
+        bypass: false,
+        voltTol: 1e-6,
       };
       (mem as unknown as AnalogElement).load(ctx);
 
@@ -449,6 +453,8 @@ describe("memristor_load_transient_parity (C4.2)", () => {
         reltol: 1e-3,
         iabstol: 1e-12,
         cktFixLimit: false,
+        bypass: false,
+        voltTol: 1e-6,
       };
 
       mem.load(ctx);

@@ -34,14 +34,16 @@ import { stampG, stampRHS } from "../../solver/analog/stamp-helpers.js";
 import { pnjlim } from "../../solver/analog/newton-raphson.js";
 import { defineModelParams } from "../../core/model-params.js";
 import type { StatePoolRef } from "../../core/analog-types.js";
-import { VT } from "../../core/constants.js";
 import { defineStateSchema, applyInitialValues } from "../../solver/analog/state-schema.js";
 
 // ---------------------------------------------------------------------------
-// Physical constants
+// Physical constants (ngspice const.h values)
 // ---------------------------------------------------------------------------
 
-// VT (thermal voltage) imported from ../../core/constants.js
+/** Boltzmann constant (CONSTboltz). */
+const CONSTboltz = 1.3806226e-23;
+/** Electron charge (CHARGE). */
+const CHARGE = 1.6021918e-19;
 
 /** Minimum conductance for numerical stability (GMIN). */
 const GMIN = 1e-12;
@@ -75,11 +77,13 @@ export const { paramDefs: SCR_PARAM_DEFS, defaults: SCR_PARAM_DEFAULTS } = defin
     vBreakover: { default: 100,   unit: "V", description: "Forward breakover voltage (triggers without gate)" },
   },
   secondary: {
-    iS:      { default: 1e-12, unit: "A", description: "Reverse saturation current" },
-    alpha1:  { default: 0.5,              description: "PNP transistor current gain (fixed)" },
-    alpha2_0:{ default: 0.3,              description: "NPN off-state current gain" },
-    i_ref:   { default: 1e-3,  unit: "A", description: "Gate current scale factor for α₂ modulation" },
-    n:       { default: 1,                description: "Emission coefficient" },
+    iS:      { default: 1e-12,  unit: "A", description: "Reverse saturation current" },
+    alpha1:  { default: 0.5,               description: "PNP transistor current gain (fixed)" },
+    alpha2_0:{ default: 0.3,               description: "NPN off-state current gain" },
+    i_ref:   { default: 1e-3,   unit: "A", description: "Gate current scale factor for α₂ modulation" },
+    n:       { default: 1,                 description: "Emission coefficient" },
+    TEMP:    { default: 300.15, unit: "K", description: "Per-instance operating temperature" },
+    OFF:     { default: 0,                 description: "Initial off-state flag (0 = normal, 1 = forced off)" },
   },
 });
 
@@ -128,11 +132,20 @@ export function createScrElement(
     alpha2_0:   props.getModelParam<number>("alpha2_0"),
     i_ref:      props.getModelParam<number>("i_ref"),
     n:          props.getModelParam<number>("n"),
+    TEMP:       props.getModelParam<number>("TEMP"),
+    OFF:        props.getModelParam<number>("OFF"),
   };
 
-  let nVt = p.n * VT;
-  let vcrit = nVt * Math.log(nVt / (p.iS * Math.SQRT2));
-  let vcritGate = nVt * Math.log(nVt / (p.iS * Math.SQRT2));
+  // cite: dioload.c / diotemp.c — per-instance TEMP drives thermal voltage
+  function computeScrTempParams(): { vt: number; nVt: number; vcrit: number; vcritGate: number; tVcrit: number } {
+    const vt = (CONSTboltz * p.TEMP) / CHARGE;
+    const nVt = p.n * vt;
+    const vcrit = nVt * Math.log(nVt / (p.iS * Math.SQRT2));
+    const vcritGate = nVt * Math.log(nVt / (p.iS * Math.SQRT2));
+    return { vt, nVt, vcrit, vcritGate, tVcrit: vcrit };
+  }
+
+  let tp = computeScrTempParams();
 
   // Pool reference — set by initState. State arrays accessed via pool.states[N]
   // at call time. No cached Float64Array refs.
@@ -142,17 +155,6 @@ export function createScrElement(
   // Ephemeral per-iteration pnjlim limiting flag
   let pnjlimLimited = false;
 
-  // One-shot cold-start seeds from dcopInitJct. Non-null only between
-  // primeJunctions() and the next updateOperatingPoint() call.
-  let primedVak: number | null = null;
-  let primedVgk: number | null = null;
-
-  function recomputeDerivedConstants(): void {
-    nVt = p.n * VT;
-    vcrit = nVt * Math.log(nVt / (p.iS * Math.SQRT2));
-    vcritGate = nVt * Math.log(nVt / (p.iS * Math.SQRT2));
-  }
-
   function computeAlpha2(iGate: number): number {
     const raw = 1 - (1 - p.alpha2_0) * Math.exp(-Math.abs(iGate) / p.i_ref);
     return Math.min(raw, ALPHA_MAX);
@@ -160,7 +162,7 @@ export function createScrElement(
 
   function computeOperatingPoint(s0: Float64Array, vak: number, vgk: number): void {
     // Gate current through a small forward-biased junction (simplified model)
-    const iGate = p.iS * (Math.exp(vgk / nVt) - 1) + GMIN * vgk;
+    const iGate = p.iS * (Math.exp(vgk / tp.nVt) - 1) + GMIN * vgk;
 
     const a2 = computeAlpha2(iGate);
     const a1clamped = Math.min(p.alpha1, ALPHA_MAX);
@@ -193,8 +195,8 @@ export function createScrElement(
 
     // Gate junction model: forward-biased diode linearized at the (already
     // pnjlim-limited) vgk operating point.
-    const expVgk = Math.exp(vgk / nVt);
-    const gGate = (p.iS * expVgk) / nVt + GMIN;
+    const expVgk = Math.exp(vgk / tp.nVt);
+    const gGate = (p.iS * expVgk) / tp.nVt + GMIN;
     const iGateCurrent = p.iS * (expVgk - 1);
     s0[base + SLOT_G_GATE_GEQ] = gGate;
     s0[base + SLOT_G_GATE_IEQ] = iGateCurrent - gGate * vgk;
@@ -209,10 +211,10 @@ export function createScrElement(
       s0[base + SLOT_IAK] = GMIN * vak;
     } else {
       // Reverse blocking — reverse-biased diode (J1 junction)
-      const expArg = Math.min(vak / nVt, 0);
+      const expArg = Math.min(vak / tp.nVt, 0);
       const expVal = Math.exp(expArg);
       const iRev = p.iS * (expVal - 1);
-      const gRev = (p.iS * expVal) / nVt + GMIN;
+      const gRev = (p.iS * expVal) / tp.nVt + GMIN;
       s0[base + SLOT_GEQ] = gRev;
       s0[base + SLOT_IEQ] = iRev - gRev * vak;
       s0[base + SLOT_IAK] = iRev;
@@ -238,21 +240,21 @@ export function createScrElement(
       // Access state arrays at call time — no cached Float64Array refs.
       const s0 = pool.states[0];
 
-      const voltages = ctx.rhsOld;
-      let vakRaw: number;
-      let vgkRaw: number;
-      if (primedVak !== null) {
-        vakRaw = primedVak;
-        vgkRaw = primedVgk!;
-        primedVak = null;
-        primedVgk = null;
-      } else {
-        const vA = nodeA > 0 ? voltages[nodeA - 1] : 0;
-        const vK = nodeK > 0 ? voltages[nodeK - 1] : 0;
-        const vGateNode = nodeG > 0 ? voltages[nodeG - 1] : 0;
-        vakRaw = vA - vK;
-        vgkRaw = vGateNode - vK;
+      // cite: dioload.c:130-138 — MODEINITJCT branch seeds junction voltages
+      // before first NR iteration. Anode-cathode seeds to tVcrit (OFF=0) or 0
+      // (OFF=1); gate-cathode always seeds to 0.
+      if (ctx.cktMode & MODEINITJCT) {
+        s0[base + SLOT_VAK] = p.OFF === 0 ? tp.tVcrit : 0;
+        s0[base + SLOT_VGK] = 0;
+        return;
       }
+
+      const voltages = ctx.rhsOld;
+      const vA = nodeA > 0 ? voltages[nodeA - 1] : 0;
+      const vK = nodeK > 0 ? voltages[nodeK - 1] : 0;
+      const vGateNode = nodeG > 0 ? voltages[nodeG - 1] : 0;
+      const vakRaw = vA - vK;
+      const vgkRaw = vGateNode - vK;
 
       // Check breakover using raw voltage before pnjlim.
       if (s0[base + SLOT_LATCHED] === 0.0 && vakRaw > p.vBreakover) {
@@ -261,18 +263,13 @@ export function createScrElement(
 
       let vakLimited: number;
       let vgkLimited: number;
-      if (ctx.cktMode & MODEINITJCT) {
-        // MODEINITJCT: use raw voltages directly without pnjlim on cold start.
-        vakLimited = vakRaw;
-        vgkLimited = vgkRaw;
-        pnjlimLimited = false;
-      } else {
+      {
         // Apply pnjlim to anode-cathode junction voltage for NR stability
-        const vakResult = pnjlim(vakRaw, s0[base + SLOT_VAK], nVt, vcrit);
+        const vakResult = pnjlim(vakRaw, s0[base + SLOT_VAK], tp.nVt, tp.vcrit);
         vakLimited = vakResult.value;
 
         // Apply pnjlim to gate-cathode junction voltage for NR stability
-        const vgkResult = pnjlim(vgkRaw, s0[base + SLOT_VGK], nVt, vcritGate);
+        const vgkResult = pnjlim(vgkRaw, s0[base + SLOT_VGK], tp.nVt, tp.vcritGate);
         vgkLimited = vgkResult.value;
         pnjlimLimited = vakResult.limited || vgkResult.limited;
 
@@ -375,16 +372,10 @@ export function createScrElement(
       return [iA, iK, iG];
     },
 
-    primeJunctions(): void {
-      // SCR MODEINITJCT seed: prime anode-cathode to vcrit, gate unbiased.
-      primedVak = vcrit;
-      primedVgk = 0;
-    },
-
     setParam(key: string, value: number): void {
       if (key in p) {
         (p as Record<string, number>)[key] = value;
-        recomputeDerivedConstants();
+        tp = computeScrTempParams();
       }
     },
 

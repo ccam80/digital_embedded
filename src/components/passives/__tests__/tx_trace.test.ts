@@ -35,6 +35,8 @@ function makeTransientCtx(solver: SparseSolverType, voltages: Float64Array, dt: 
     reltol: 1e-3,
     iabstol: 1e-12,
     cktFixLimit: false,
+    bypass: false,
+    voltTol: 1e-6,
   };
 }
 

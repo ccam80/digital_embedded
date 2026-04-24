@@ -13,7 +13,10 @@
  */
 
 import { describe, it, expect } from "vitest";
+import { readFileSync } from "fs";
+import { fileURLToPath } from "url";
 import { createScrElement, ScrDefinition, SCR_PARAM_DEFAULTS } from "../scr.js";
+import { pnjlim } from "../../../solver/analog/newton-raphson.js";
 import { PropertyBag } from "../../../core/properties.js";
 import { createTestPropertyBag } from "../../../test-fixtures/model-fixtures.js";
 import { makeDcVoltageSource } from "../../sources/dc-voltage-source.js";
@@ -25,7 +28,7 @@ import type { AnalogElementCore } from "../../../core/analog-types.js";
 import type { ReactiveAnalogElement } from "../../../solver/analog/element.js";
 import type { AnalogFactory } from "../../../core/registry.js";
 import type { LimitingEvent } from "../../../solver/analog/newton-raphson.js";
-import { MODEDCOP, MODEINITFLOAT } from "../../../solver/analog/ckt-mode.js";
+import { MODEDCOP, MODEINITFLOAT, MODEINITJCT } from "../../../solver/analog/ckt-mode.js";
 
 // ---------------------------------------------------------------------------
 // Helper: allocate a StatePool for a single element and call initState
@@ -57,6 +60,7 @@ const SCR_DEFAULTS = {
 
 // Slot indices (must match scr.ts)
 const SLOT_VAK        = 0;
+const SLOT_VGK        = 1;
 const SLOT_GEQ        = 2;
 const SLOT_IEQ        = 3;
 const SLOT_G_GATE_GEQ = 4;
@@ -109,8 +113,11 @@ function buildUnitCtx(
 ): import("../../../solver/analog/load-context.js").LoadContext {
   return {
     solver,
-    voltages,
+    matrix: solver,
+    rhsOld: voltages,
+    rhs: new Float64Array(voltages.length),
     cktMode: MODEDCOP | MODEINITFLOAT,
+    time: 0,
     dt: 0,
     method: "trapezoidal",
     order: 1,
@@ -119,10 +126,13 @@ function buildUnitCtx(
     srcFact: 1,
     noncon: { value: 0 },
     limitingCollector: null,
+    convergenceCollector: null,
     xfact: 1,
     gmin: 1e-12,
     reltol: 1e-3,
     iabstol: 1e-12,
+    temp: 300.15,
+    vt: 300.15 * 1.3806226e-23 / 1.6021918e-19,
     cktFixLimit: false,
     ...overrides,
   };
@@ -497,5 +507,169 @@ describe("SCR LimitingEvent instrumentation", () => {
     const voltages = new Float64Array(10);
     voltages[0] = 3.0;
     expect(() => loadWithCollector(element, voltages, null)).not.toThrow();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// SCR TEMP tests — per-instance operating temperature
+// ---------------------------------------------------------------------------
+
+// Physical constants (ngspice const.h values — identical to scr.ts)
+const CONSTboltz_TEST = 1.3806226e-23;
+const CHARGE_TEST = 1.6021918e-19;
+const KoverQ = CONSTboltz_TEST / CHARGE_TEST;
+
+describe("SCR TEMP", () => {
+  it("TEMP_default_300_15", () => {
+    const props = new PropertyBag();
+    props.replaceModelParams({ ...SCR_PARAM_DEFAULTS, ...SCR_DEFAULTS });
+    expect(props.getModelParam<number>("TEMP")).toBe(300.15);
+  });
+
+  it("vt_reflects_TEMP", () => {
+    // Construct SCR with TEMP=400K. Run one load() at forward-biased voltages
+    // from a cold start so pnjlim is called. Verify that the pnjlim vAfter
+    // matches what pnjlim would produce with nVt(400K).
+    const params = { ...SCR_PARAM_DEFAULTS, ...SCR_DEFAULTS, TEMP: 400 };
+    const props = createTestPropertyBag();
+    props.replaceModelParams(params);
+    const core = createScrElement(new Map([["A", 1], ["K", 2], ["G", 3]]), [], -1, props);
+    const pool = new StatePool(Math.max((core as unknown as { stateSize: number }).stateSize, 1));
+    (core as { stateBaseOffset: number }).stateBaseOffset = 0;
+    (core as unknown as ReactiveAnalogElement).initState(pool);
+    const element = withNodeIds(core, [1, 2, 3]);
+
+    const voltages = new Float64Array(3);
+    voltages[0] = 2.0;  // A
+    voltages[1] = 0.0;  // K
+    voltages[2] = 0.65; // G
+
+    const collector: LimitingEvent[] = [];
+    const solver = new SparseSolver();
+    solver.beginAssembly(3);
+    element.load(buildUnitCtx(solver, voltages, { limitingCollector: collector }));
+
+    // Compute expected pnjlim result at TEMP=400K
+    const vt400 = 400 * KoverQ;
+    const nVt400 = params.n * vt400;
+    const vcrit400 = nVt400 * Math.log(nVt400 / (params.iS * Math.SQRT2));
+
+    const gkEv = collector.find((e: LimitingEvent) => e.junction === "GK");
+    expect(gkEv).toBeDefined();
+    const expected = pnjlim(gkEv!.vBefore, 0, nVt400, vcrit400);
+    expect(gkEv!.vAfter).toBeCloseTo(expected.value, 10);
+  });
+
+  it("setParam_TEMP_recomputes", () => {
+    // Construct SCR at default 300.15K, then setParam('TEMP', 400).
+    // Verify that pnjlim now uses nVt(400K) by checking the GK limiting result.
+    const params = { ...SCR_PARAM_DEFAULTS, ...SCR_DEFAULTS };
+    const props = createTestPropertyBag();
+    props.replaceModelParams(params);
+    const core = createScrElement(new Map([["A", 1], ["K", 2], ["G", 3]]), [], -1, props);
+    const pool = new StatePool(Math.max((core as unknown as { stateSize: number }).stateSize, 1));
+    (core as { stateBaseOffset: number }).stateBaseOffset = 0;
+    (core as unknown as ReactiveAnalogElement).initState(pool);
+    const element = withNodeIds(core, [1, 2, 3]);
+
+    // Change TEMP to 400K — should recompute tp
+    element.setParam("TEMP", 400);
+
+    const voltages = new Float64Array(3);
+    voltages[0] = 2.0;
+    voltages[1] = 0.0;
+    voltages[2] = 0.65;
+
+    const collector: LimitingEvent[] = [];
+    const solver = new SparseSolver();
+    solver.beginAssembly(3);
+    element.load(buildUnitCtx(solver, voltages, { limitingCollector: collector }));
+
+    const vt400 = 400 * KoverQ;
+    const nVt400 = params.n * vt400;
+    const vcrit400 = nVt400 * Math.log(nVt400 / (params.iS * Math.SQRT2));
+
+    const gkEv = collector.find((e: LimitingEvent) => e.junction === "GK");
+    expect(gkEv).toBeDefined();
+    const expected = pnjlim(gkEv!.vBefore, 0, nVt400, vcrit400);
+    expect(gkEv!.vAfter).toBeCloseTo(expected.value, 10);
+
+    // Verify the result differs from what 300.15K would produce, confirming
+    // that the recompute actually changed the thermal voltage.
+    const vt300 = 300.15 * KoverQ;
+    const nVt300 = params.n * vt300;
+    const vcrit300 = nVt300 * Math.log(nVt300 / (params.iS * Math.SQRT2));
+    const expected300 = pnjlim(gkEv!.vBefore, 0, nVt300, vcrit300);
+    expect(gkEv!.vAfter).not.toBeCloseTo(expected300.value, 3);
+  });
+
+  it("no_ctx_vt_read", () => {
+    // Verify that scr.ts contains zero occurrences of "ctx.vt" — every
+    // thermal-voltage site must read from tp.vt (per-instance TEMP).
+    const scrPath = fileURLToPath(new URL("../scr.ts", import.meta.url));
+    const source = readFileSync(scrPath, "utf8");
+    const occurrences = (source.match(/ctx\.vt/g) ?? []).length;
+    expect(occurrences).toBe(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// SCR primeJunctions tests — Task 7.5.4.2
+// ---------------------------------------------------------------------------
+
+describe("SCR primeJunctions", () => {
+  function makeScrWithPool(overrides: Partial<typeof SCR_DEFAULTS & { OFF?: number }> = {}): {
+    element: AnalogElement;
+    pool: StatePool;
+  } {
+    const params = { ...SCR_PARAM_DEFAULTS, ...SCR_DEFAULTS, ...overrides };
+    const props = createTestPropertyBag();
+    props.replaceModelParams(params);
+    const core = createScrElement(new Map([["A", 1], ["K", 2], ["G", 3]]), [], -1, props);
+    const pool = new StatePool(Math.max((core as unknown as { stateSize: number }).stateSize, 1));
+    (core as { stateBaseOffset: number }).stateBaseOffset = 0;
+    (core as unknown as ReactiveAnalogElement).initState(pool);
+    const element = withNodeIds(core, [1, 2, 3]);
+    return { element, pool };
+  }
+
+  it("method_absent", () => {
+    const { element } = makeScrWithPool();
+    expect((element as unknown as Record<string, unknown>)["primeJunctions"]).toBeUndefined();
+  });
+
+  it("MODEINITJCT_seeds_vak_vcrit", () => {
+    // With OFF=0, MODEINITJCT branch should write tp.tVcrit to SLOT_VAK and 0 to SLOT_VGK.
+    const { element, pool } = makeScrWithPool({ OFF: 0 } as Parameters<typeof makeScrWithPool>[0]);
+
+    // Compute expected tVcrit using same formula as scr.ts computeScrTempParams()
+    const vt = SCR_DEFAULTS.n * 1 * (300.15 * CONSTboltz_TEST / CHARGE_TEST);
+    const nVt = vt;
+    const tVcrit = nVt * Math.log(nVt / (SCR_DEFAULTS.iS * Math.SQRT2));
+
+    const solver = new SparseSolver();
+    solver.beginAssembly(3);
+    element.load(buildUnitCtx(solver, new Float64Array(3), {
+      cktMode: MODEDCOP | MODEINITJCT,
+    }));
+
+    const s0 = pool.states[0];
+    expect(s0[SLOT_VAK]).toBeCloseTo(tVcrit, 10);
+    expect(s0[SLOT_VGK]).toBe(0);
+  });
+
+  it("MODEINITJCT_OFF_zeros_both", () => {
+    // With OFF=1, MODEINITJCT branch should write 0 to both SLOT_VAK and SLOT_VGK.
+    const { element, pool } = makeScrWithPool({ OFF: 1 } as Parameters<typeof makeScrWithPool>[0]);
+
+    const solver = new SparseSolver();
+    solver.beginAssembly(3);
+    element.load(buildUnitCtx(solver, new Float64Array(3), {
+      cktMode: MODEDCOP | MODEINITJCT,
+    }));
+
+    const s0 = pool.states[0];
+    expect(s0[SLOT_VAK]).toBe(0);
+    expect(s0[SLOT_VGK]).toBe(0);
   });
 });

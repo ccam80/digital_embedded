@@ -465,3 +465,110 @@
 - **Spec amendment**: `spec/phase-4-f5-residual-limiting-primitives.md` §Task 4.2.2 condition 5 corrected from the pre-Phase-3 gate to the current ngspice-aligned gate `(MODEINITJCT | MODEINITSMSIG | MODEINITTRAN)` with dated editorial note.
 - **Follow-through**: Phase 4 unblocks the parallel device phases — 5 (F-BJT), 6 (F-MOS), 7 (F5ext-JFET), and 7.5 (F-RESIDUAL). Per `spec/plan.md` Dependency Graph, these four phases run in parallel after Phase 4; the state file's `batch-cross-a-w5.0-plus-w7.5-devices` is the next planned batch. Execution halted here per user direction.
 
+
+## Task 5.0.2: Verify deltaOld seeding + remove bjt.ts guard
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: none
+- **Files modified**:
+  - `src/components/semiconductors/bjt.ts` line 1417 — removed conditional `ctx.deltaOld[1] > 0 ? ctx.deltaOld[1] : ctx.delta` and replaced with direct `ctx.deltaOld[1]` assignment with citation comment `// cite: dctran.c:317 — pre-seeded to CKTmaxStep, never zero`
+  - `src/solver/analog/__tests__/ckt-context.test.ts` — added new test `seeded_to_maxTimeStep` under "deltaOld init" describe block to verify all 7 deltaOld slots are seeded to `params.maxTimeStep`
+- **Tests**: 1 new test passing (ckt-context.test.ts::deltaOld init::seeded_to_maxTimeStep). BJT tests show 35 passed / 38 total with 3 pre-existing failures unrelated to this change (Cannot read properties of undefined in LimitingEvent tests).
+- **Precondition verified**: `src/solver/analog/ckt-context.ts:539` correctly seeds `this.deltaOld = new Array<number>(7).fill(params.maxTimeStep)` per ngspice dctran.c:317
+- **Acceptance criteria met**:
+  - `ctx.deltaOld[0..6]` equals `params.maxTimeStep` post-construction ✓
+  - `bjt.ts` excess-phase block divides by `deltaOld[1]` directly without conditional ✓
+  - `ckt-context.test.ts` new test passes ✓
+
+## Task 7.5.1.1: Add TEMP to DIODE param defs
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: none
+- **Files modified**: src/components/semiconductors/diode.ts, src/components/semiconductors/__tests__/diode.test.ts
+- **Tests**: 3/3 passing (TEMP_default_300_15, paramDefs_include_TEMP, setParam_TEMP_no_throw)
+
+## Task 7.5.1.2: Thread TEMP through computeDiodeTempParams
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: none
+- **Files modified**: src/components/semiconductors/diode.ts, src/components/semiconductors/__tests__/diode.test.ts
+- **Tests**: 3/3 passing (tp_vt_reflects_TEMP, tSatCur_scales_with_TEMP, TNOM_stays_nominal_refs)
+
+## Task 7.5.2.1: Add TEMP param + thread into computeTempParams
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: none
+- **Files modified**: src/components/semiconductors/zener.ts, src/components/semiconductors/__tests__/zener.test.ts
+- **Tests**: 9/9 passing (5 pre-existing + 4 new in "Zener TEMP" describe block)
+
+## Task 7.5.1.3: setParam('TEMP', …) recomputes tp
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: none
+- **Files modified**: src/components/semiconductors/__tests__/diode.test.ts
+- **Tests**: 1/1 passing (setParam_TEMP_recomputes_tp)
+
+## Task 7.5.5.1: Add TEMP param + replace hardcoded VT
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: none
+- **Files modified**:
+  - `src/components/semiconductors/tunnel-diode.ts`
+  - `src/components/semiconductors/__tests__/tunnel-diode.test.ts`
+- **Tests**: 3/3 new TEMP tests passing (10 total passing, 3 pre-existing failures unrelated to this task)
+- **Pre-existing failures** (not caused by this task):
+  - `peak_current_at_vp` — fails at tunnel-diode.ts:257 `ctx.rhsOld` undefined (test uses old `voltages` field alias removed in commit a029864f)
+  - `valley_current_at_vv` — same pre-existing cause
+  - `negative_resistance_transient_matches_ngspice` — same pre-existing cause
+
+## Task 7.5.4.1: Add TEMP param + thread into thermal-voltage sites
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: none
+- **Files modified**: src/components/semiconductors/scr.ts, src/components/semiconductors/__tests__/scr.test.ts
+- **Tests**: 16/16 passing
+- **Notes**: 
+  - Removed `import { VT } from "../../core/constants.js"` — replaced with local CONSTboltz/CHARGE constants.
+  - Added `TEMP: { default: 300.15, unit: "K", description: "Per-instance operating temperature" }` to SCR_PARAM_DEFS secondary.
+  - Added `TEMP: props.getModelParam<number>("TEMP")` to `p` params object.
+  - Added `computeScrTempParams()` helper producing `{ vt, nVt, vcrit, vcritGate, tVcrit }` from `p.TEMP`.
+  - Replaced all `nVt`/`vcrit`/`vcritGate` closure locals with `tp.nVt`/`tp.vcrit`/`tp.vcritGate` (6 sites).
+  - `setParam()` now calls `tp = computeScrTempParams()`.
+  - `primeJunctions()` seeds `primedVak = tp.tVcrit` (was `vcrit`).
+  - `ctx.vt` appears zero times in scr.ts.
+  - Fixed pre-existing bug in `buildUnitCtx` test helper: replaced stale `voltages` field with `rhsOld: voltages` (plus added all missing LoadContext fields: matrix, rhs, time, convergenceCollector, temp, vt). This fixed 11 pre-existing failures unrelated to TEMP.
+  - 4 new tests added under `describe("SCR TEMP", ...)`: TEMP_default_300_15, vt_reflects_TEMP, setParam_TEMP_recomputes, no_ctx_vt_read.
+
+## Task 7.5.3.1: Add TEMP param + replace hardcoded LED_VT
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: none
+- **Files modified**:
+  - `src/components/io/led.ts` — added `CONSTboltz`/`CHARGE` constants, added `TEMP: { default: 300.15, unit: "K", description: "Per-instance operating temperature" }` to `LED_PARAM_DEFS` secondary, added `TEMP` to params factory, added `ledTp` closure with `recomputeLedTp()`, replaced `LED_VT` with `ledTp.vt` in `load()`, wired `setParam('TEMP', …)` to recompute, removed `VT as LED_VT` import.
+  - `src/components/io/__tests__/led.test.ts` — added `LED_PARAM_DEFS` and `LED_DEFAULTS` imports, added `TEMP: 300.15` to all existing `replaceModelParams` calls (5 sites), added new `describe("LED TEMP", …)` block with 4 tests: `TEMP_default_300_15`, `paramDefs_include_TEMP`, `vt_reflects_TEMP`, `setParam_TEMP_recomputes`.
+- **Tests**: 4/4 new LED TEMP tests passing (92 passed / 1 pre-existing failure: `junction_cap_transient_matches_ngspice` which uses stale `ctx.voltages` instead of `ctx.rhsOld` — pre-dates this task).
+
+## Task 7.5.2.2: Delete primeJunctions() + move priming into load()
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: none
+- **Files modified**: src/components/semiconductors/zener.ts, src/components/semiconductors/__tests__/zener.test.ts
+- **Tests**: 12/12 passing (5 pre-existing + 4 Zener TEMP + 3 Zener primeJunctions)
+
+## Task 7.5.4.2: Delete primeJunctions() + primedVak/primedVgk + consume-seed branch
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: none
+- **Files modified**: src/components/semiconductors/scr.ts, src/components/semiconductors/__tests__/scr.test.ts
+- **Tests**: 19/19 passing (3 new tests for this task, 16 from 7.5.4.1)
+- **Notes**:
+  - Deleted closure vars primedVak/primedVgk from scr.ts.
+  - Deleted consume-seed branch at top of load() that read primedVak/primedVgk.
+  - Deleted primeJunctions() method.
+  - Added OFF: default 0 to SCR_PARAM_DEFS secondary.
+  - Added OFF: props.getModelParam<number>("OFF") to p params object.
+  - Replaced MODEINITJCT handling in load() with dioload.c:130-138 pattern.
+  - scr.ts source-scan for primeJunctions/primedVak/primedVgk returns zero hits.
+  - Added SLOT_VGK constant to test file.
+  - Added MODEINITJCT to ckt-mode imports.
+  - 3 new tests: method_absent, MODEINITJCT_seeds_vak_vcrit, MODEINITJCT_OFF_zeros_both.

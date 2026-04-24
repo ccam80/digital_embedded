@@ -89,6 +89,8 @@ function makeCompanionCtx(opts: {
     reltol: 1e-3,
     iabstol: 1e-12,
     cktFixLimit: false,
+    bypass: false,
+    voltTol: 1e-6,
   };
 }
 
@@ -561,6 +563,8 @@ describe("Capacitor trap-order-2 xmu parity (C4.6)", () => {
       reltol: 1e-3,
       iabstol: 1e-12,
       cktFixLimit: false,
+      bypass: false,
+      voltTol: 1e-6,
     };
 
     element.load(ctx);
@@ -716,6 +720,8 @@ describe("capacitor_load_transient_parity (C4.2)", () => {
         reltol: 1e-3,
         iabstol: 1e-12,
         cktFixLimit: false,
+        bypass: false,
+        voltTol: 1e-6,
       };
 
       element.load(ctx);

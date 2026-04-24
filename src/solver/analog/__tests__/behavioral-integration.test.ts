@@ -536,6 +536,8 @@ describe("Integration", () => {
         reltol: 1e-3,
         iabstol: 1e-12,
         cktFixLimit: false,
+        bypass: false,
+        voltTol: 1e-6,
       };
     }
 

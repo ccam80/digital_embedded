@@ -14,6 +14,8 @@ import {
   createTunnelDiodeElement,
   tunnelDiodeIV,
   TunnelDiodeDefinition,
+  TUNNEL_DIODE_PARAM_DEFS,
+  TUNNEL_DIODE_PARAM_DEFAULTS,
 } from "../tunnel-diode.js";
 import { computeJunctionCapacitance, computeJunctionCharge } from "../diode.js";
 import { computeNIcomCof } from "../../../solver/analog/integration.js";
@@ -384,6 +386,129 @@ describe("TunnelDiode", () => {
     const schema = (core as any).stateSchema;
     expect(schema.size).toBe(6);
     expect(core.stateSize).toBe(6);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// TunnelDiode TEMP — per-instance temperature tests
+// ---------------------------------------------------------------------------
+
+// Physical constants (matching tunnel-diode.ts)
+const CONSTboltz = 1.3806226e-23;
+const CHARGE = 1.6021918e-19;
+
+function makeTunnelDiodeProps(overrides: Record<string, number> = {}): PropertyBag {
+  return makeParamBag({ ...TUNNEL_DIODE_PARAM_DEFAULTS, ...overrides });
+}
+
+function buildTempCtx(
+  solver: SparseSolver,
+  rhsOld: Float64Array,
+): import("../../../solver/analog/load-context.js").LoadContext {
+  return {
+    cktMode: MODEDCOP | MODEINITFLOAT,
+    solver,
+    matrix: solver,
+    rhs: new Float64Array(rhsOld.length),
+    rhsOld,
+    time: 0,
+    dt: 0,
+    method: "trapezoidal",
+    order: 1,
+    deltaOld: [0, 0, 0, 0, 0, 0, 0],
+    ag: new Float64Array(7),
+    srcFact: 1,
+    noncon: { value: 0 },
+    limitingCollector: null,
+    convergenceCollector: null,
+    xfact: 1,
+    gmin: 1e-12,
+    reltol: 1e-3,
+    iabstol: 1e-12,
+    temp: 300.15,
+    vt: 300.15 * CONSTboltz / CHARGE,
+    cktFixLimit: false,
+  };
+}
+
+describe("TunnelDiode TEMP", () => {
+  it("TEMP_default_300_15", () => {
+    const propsObj = makeTunnelDiodeProps();
+    expect(propsObj.getModelParam<number>("TEMP")).toBe(300.15);
+  });
+
+  it("vt_reflects_TEMP", () => {
+    // Construct with TEMP=400K. At forward bias v=0.3V, the Shockley component
+    // dominates over the NDR region. Compute expected current at 400K and compare
+    // against what the element produces.
+    const TEMP = 400;
+    const vtExpected = TEMP * CONSTboltz / CHARGE;
+    const IS = 1e-14, N = 1;
+    const IP = 5e-3, VP = 0.08, IV = 0.5e-3, VV = 0.5;
+    const v = 0.3;
+
+    // Expected current using 400K vt (the full tunnelDiodeIV with explicit vt arg)
+    const { i: iExpected } = tunnelDiodeIV(v, IP, VP, IV, VV, IS, N, vtExpected);
+
+    // Element constructed with TEMP=400
+    const props = makeTunnelDiodeProps({ IP, VP, IV, VV, IS, N, TEMP });
+    const core = createTunnelDiodeElement(new Map([["A", 1], ["K", 2]]), [], -1, props);
+    const pool = new StatePool(Math.max(core.stateSize, 1));
+    (core as any).stateBaseOffset = 0;
+    core.initState(pool);
+    // Seed SLOT_VD=v so vdOld=v; NDR step clamp sees zero delta and does not clamp.
+    pool.state0[0] = v;
+
+    const solver = new SparseSolver();
+    solver.beginAssembly(2);
+    core.load(buildTempCtx(solver, new Float64Array([v, 0])));
+
+    // Read SLOT_ID (index 3) from state pool
+    const iElement = pool.state0[3];
+    expect(iElement).toBeCloseTo(iExpected + 1e-12 * v, 15);
+  });
+
+  it("setParam_TEMP_recomputes", () => {
+    // Construct at default TEMP=300.15, then call setParam('TEMP', 400).
+    // The next load() must use vt derived from 400K.
+    const IP = 5e-3, VP = 0.08, IV = 0.5e-3, VV = 0.5;
+    const IS = 1e-14, N = 1;
+    const v = 0.3;
+
+    const vtAt400 = 400 * CONSTboltz / CHARGE;
+    const vtAt300 = 300.15 * CONSTboltz / CHARGE;
+
+    const props = makeTunnelDiodeProps({ IP, VP, IV, VV, IS, N });
+    const core = createTunnelDiodeElement(new Map([["A", 1], ["K", 2]]), [], -1, props);
+    const pool = new StatePool(Math.max(core.stateSize, 1));
+    (core as any).stateBaseOffset = 0;
+    core.initState(pool);
+    // Seed SLOT_VD=v so the NDR step clamp sees zero delta and does not clamp.
+    pool.state0[0] = v;
+
+    // First load at 300.15K
+    const solver1 = new SparseSolver();
+    solver1.beginAssembly(2);
+    core.load(buildTempCtx(solver1, new Float64Array([v, 0])));
+    const iAt300 = pool.state0[3];
+
+    // Expected at 300.15K
+    const { i: iExpected300 } = tunnelDiodeIV(v, IP, VP, IV, VV, IS, N, vtAt300);
+    expect(iAt300).toBeCloseTo(iExpected300 + 1e-12 * v, 15);
+
+    // Now setParam TEMP=400 and reload (SLOT_VD is already v from prior load)
+    core.setParam("TEMP", 400);
+    const solver2 = new SparseSolver();
+    solver2.beginAssembly(2);
+    core.load(buildTempCtx(solver2, new Float64Array([v, 0])));
+    const iAt400 = pool.state0[3];
+
+    // Expected at 400K
+    const { i: iExpected400 } = tunnelDiodeIV(v, IP, VP, IV, VV, IS, N, vtAt400);
+    expect(iAt400).toBeCloseTo(iExpected400 + 1e-12 * v, 15);
+
+    // The 400K current must differ from the 300K current (vt affects Shockley term)
+    expect(iAt400).not.toBe(iAt300);
   });
 });
 

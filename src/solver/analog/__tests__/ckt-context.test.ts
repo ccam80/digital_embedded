@@ -320,6 +320,24 @@ describe("CKTCircuitContext", () => {
     expect(typeof lc.iabstol).toBe("number");
     expect(lc.iabstol).toBe(defaultParams.abstol);
   });
+
+  // -------------------------------------------------------------------------
+  // Test: deltaOld init (Task 5.0.2)
+  // -------------------------------------------------------------------------
+
+  describe("deltaOld init", () => {
+    it("seeded_to_maxTimeStep", () => {
+      // Task 5.0.2: verify deltaOld[i] is seeded to params.maxTimeStep per dctran.c:317
+      const customParams = { ...defaultParams, maxTimeStep: 1e-6 };
+      const circuit = makeTestCircuit(9, 1);
+      const ctx = new CKTCircuitContext(circuit, customParams, noopBreakpoint, new SparseSolver());
+
+      // All 7 slots should be seeded to maxTimeStep
+      for (let i = 0; i < 7; i++) {
+        expect(ctx.loadCtx.deltaOld[i]).toBe(1e-6);
+      }
+    });
+  });
 });
 
 // ---------------------------------------------------------------------------

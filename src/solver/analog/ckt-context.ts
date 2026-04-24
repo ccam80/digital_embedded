@@ -301,6 +301,10 @@ export class CKTCircuitContext {
   voltTol: number;
   /** Absolute current tolerance (ngspice CKTabstol). */
   iabstol: number;
+  // cite: cktinit.c:53-55 — CKTbypass default false
+  /** Bypass gate flag (ngspice CKTbypass). When true, device load() may skip
+   * recompute if voltage deltas are within tolerance. Default false. */
+  bypass: boolean;
   /** Maximum NR iterations for DC-OP. */
   maxIterations: number;
   /** Maximum NR iterations per transient step (ngspice ITL4). */
@@ -576,6 +580,9 @@ export class CKTCircuitContext {
       temp: ctxTemp,
       vt: ctxVt,
       cktFixLimit: false,
+      // cite: cktinit.c:53-55 — CKTbypass default false; CKTvoltTol default 1e-6
+      bypass: false,
+      voltTol: 1e-6,
     };
 
     // Tolerances
@@ -583,6 +590,8 @@ export class CKTCircuitContext {
     this.abstol = params.voltTol;
     this.voltTol = params.voltTol;
     this.iabstol = params.abstol;
+    // cite: cktinit.c:53-55 — CKTbypass default false
+    this.bypass = false;
     this.maxIterations = params.maxIterations;
     this.transientMaxIterations = params.transientMaxIterations;
     this.dcTrcvMaxIter = params.dcTrcvMaxIter;
