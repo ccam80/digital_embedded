@@ -3,8 +3,7 @@
  *
  * Port of ngspice `ref/ngspice/src/spicelib/devices/mos1/mos1load.c::MOS1load`.
  * Single-pass `load()` per device per NR iteration (Wave 6.1 unified interface).
- * No `_updateOp`/`_stampCompanion` split — cap companions lump inline into the
- * gpi/gmu-analog MOS stamps per `mos1load.c:900-end`.
+ * Cap companions lump inline into the gpi/gmu-analog MOS stamps per `mos1load.c:900-end`.
  *
  * Invented cross-method slots deleted per Phase 2.5 Wave 1.3 A1 (11 cap+Q
  * slots cited in C-AUD-6). Only slots with direct ngspice MOS1state<n>
@@ -881,7 +880,7 @@ const SLOT_VDSAT = 27;
 
 // ---------------------------------------------------------------------------
 // createMosfetElement — AnalogElement factory (closure-based, BJT pattern)
-// Single load() ported from mos1load.c line-by-line. No _updateOp/_stampCompanion.
+// Single load() ported from mos1load.c line-by-line.
 // No cached Float64Array state refs — pool.states[N] at call time.
 // ---------------------------------------------------------------------------
 

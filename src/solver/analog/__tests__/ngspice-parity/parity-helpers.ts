@@ -69,20 +69,6 @@ export function assertIterationMatch(
       ).toBe(0);
     }
 
-    // Also compare derived slots if mapping defines them
-    if (mapping.derivedNgspiceSlots) {
-      for (const [slotName] of Object.entries(mapping.derivedNgspiceSlots)) {
-        const ourVal = ourEs.slots[slotName];
-        const ngVal = ngEs[slotName];
-        if (ourVal === undefined || ngVal === undefined) continue;
-
-        const absDelta = Math.abs(ourVal - ngVal);
-        expect(
-          absDelta,
-          `${ctxLabel} state0[${ourEs.label}][${slotName}] (derived): ours=${ourVal} ngspice=${ngVal} absDelta=${absDelta}`,
-        ).toBe(0);
-      }
-    }
   }
 
   // Compare noncon

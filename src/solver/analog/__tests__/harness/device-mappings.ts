@@ -4,13 +4,9 @@
  *
  * This file contains ONLY direct-offset correspondences — i.e. the same
  * physical quantity (junction voltage, junction charge, etc.) recorded on
- * both sides under different names. Anything that required a formula, a
- * sign flip, a mapping table, or a tolerance to declare "equivalent" was
- * architectural papering and has been removed. If a slot does not have a
- * direct correspondence here, it is not comparable — that is a BLOCKER, to
- * be resolved in `architectural-alignment.md` (Track A) or by collapsing
- * `_updateOp`/`_stampCompanion` (Track B). It is never resolved by adding
- * an entry here.
+ * both sides under different names. If a slot does not have a direct
+ * correspondence here, it is not comparable — that is a BLOCKER, to be
+ * resolved in `architectural-alignment.md`.
  *
  * Sources:
  *   Capacitor: ngspice src/spicelib/devices/cap/capdefs.h

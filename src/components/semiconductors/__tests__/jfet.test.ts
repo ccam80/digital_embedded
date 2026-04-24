@@ -6,8 +6,6 @@
  *   - Hand-computed expected values on intermediate state (cutoff_zero_current,
  *     saturation_current, linear_region, gate_forward_current,
  *     output_characteristics, lambda_channel_length_modulation) → deleted.
- *   - Tests inspecting invented extension slots SLOT_VGS_JUNCTION / SLOT_GD_JUNCTION
- *     / SLOT_ID_JUNCTION (all excised by W1.4) → deleted.
  *   - jfet_load_dcop_parity / MODEINITSMSIG / MODEINITTRAN tests that
  *     hand-computed expected values via the banned `Math.min(expArg, 80)`
  *     clamp (PARITY items A-1, A-2) → deleted.

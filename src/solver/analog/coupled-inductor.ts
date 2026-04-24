@@ -5,9 +5,6 @@
  * inductance M = k·√(L₁·L₂). Used by transformer.ts to derive L1, L2, M
  * for the MNA stamp. Integration state is managed by the state-pool schema
  * in transformer.ts (SLOT_PHI1/PHI2/CCAP1/CCAP2) — no separate state object.
- *
- * Note: CoupledInductorState and createState() have been deleted (dead code
- * per post-a1-parity.md §1.6 extra observation — never called by transformer.ts).
  */
 
 // ---------------------------------------------------------------------------

@@ -492,19 +492,6 @@ export class NgspiceBridge {
         if (absOffset < state2.length) state2Slots[slotName] = state2[absOffset];
       }
 
-      if (mapping.derivedNgspiceSlots) {
-        for (const [slotName, derived] of Object.entries(mapping.derivedNgspiceSlots)) {
-          const maxNeeded = derived.sourceOffsets.length === 0
-            ? 0 : Math.max(...derived.sourceOffsets);
-          if (dev.stateBase + maxNeeded < state0.length)
-            slots[slotName] = derived.compute(state0, dev.stateBase);
-          if (dev.stateBase + maxNeeded < state1.length)
-            state1Slots[slotName] = derived.compute(state1, dev.stateBase);
-          if (dev.stateBase + maxNeeded < state2.length)
-            state2Slots[slotName] = derived.compute(state2, dev.stateBase);
-        }
-      }
-
       if (Object.keys(slots).length > 0) {
         snapshots.push({
           elementIndex: -1,

@@ -3,8 +3,7 @@
  *
  * Simple L0 and SPICE L1 (Gummel-Poon) models ported mechanically from
  * `ref/ngspice/src/spicelib/devices/bjt/bjtload.c::BJTload`. Single-pass load()
- * per device per NR iteration. No cross-method `_updateOp`/`_stampCompanion`
- * split. No cached `Float64Array` references to `pool.states[N]` — every state
+ * per device per NR iteration. No cached `Float64Array` references to `pool.states[N]` — every state
  * access reads through `pool.states[0..3]` at call time (matches ngspice's
  * `CKTstate0`/`CKTstate1` pointer semantics).
  *

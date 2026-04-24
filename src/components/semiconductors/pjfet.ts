@@ -3,8 +3,7 @@
  *
  * Port of ngspice `ref/ngspice/src/spicelib/devices/jfet/jfetload.c::JFETload`.
  * Single-pass `load()` per device per NR iteration (Wave 6.1 unified interface).
- * No `_updateOp`/`_stampCompanion` split — gate-junction caps lump inline into
- * the stamps per `jfetload.c:477-492`.
+ * Gate-junction caps lump inline into the stamps per `jfetload.c:477-492`.
  *
  * Invented cross-method slots deleted per Phase 2.5 Wave 1.4 A1. Only slots
  * with direct ngspice correspondence in `jfetdefs.h:154-166` survive.
@@ -230,9 +229,8 @@ function computePjfetTempParams(p: PjfetParams): PjfetTempParams {
 
 // ---------------------------------------------------------------------------
 // createPJfetElement — P-channel JFET factory (polarity literal = -1).
-// Single load() ported from jfetload.c line-by-line. No _updateOp/
-// _stampCompanion. No cached Float64Array state refs — pool.states[N] at
-// call time.
+// Single load() ported from jfetload.c line-by-line.
+// No cached Float64Array state refs — pool.states[N] at call time.
 // ---------------------------------------------------------------------------
 
 export function createPJfetElement(

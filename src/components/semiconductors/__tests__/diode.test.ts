@@ -699,14 +699,6 @@ describe("IKF/IKR high-injection correction", () => {
     expect(gdWithIkf).toBeLessThan(gdNoIkf);
   });
 
-  // Two prior tests with hand-computed expected values containing
-  // `Math.min(vd/nVt, 700)` were deleted in Phase 2.5 W1.1 per the A1
-  // test-handling rule. The clamp is D-1 banned (ngspice dioload.c does
-  // not clamp the exponent argument), and the expected values were hand-
-  // computed rather than produced by the ngspice harness. The surviving
-  // IKF/IKR tests below compare against Infinity-vs-finite deltas, which
-  // test behavioural direction without locking in a numerical value.
-
   it("IKR correction reduces gd for reverse-biased diode with finite IKR", () => {
     const vd = -0.05;
     const gdNoIkr  = diodeGd(vd, { IKR: Infinity });

@@ -329,17 +329,10 @@ export interface StepSnapshot {
 // Device mapping — maps our state slots to ngspice state offsets
 // ---------------------------------------------------------------------------
 
-export interface DerivedNgspiceSlot {
-  sourceOffsets: readonly number[];
-  compute: (state: Float64Array, base: number) => number;
-  doc?: string;
-}
-
 export interface DeviceMapping {
   deviceType: string;
   slotToNgspice: Record<string, number | null>;
   ngspiceToSlot: Record<number, string>;
-  derivedNgspiceSlots?: Record<string, DerivedNgspiceSlot>;
 }
 
 // ---------------------------------------------------------------------------

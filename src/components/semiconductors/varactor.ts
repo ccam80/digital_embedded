@@ -10,11 +10,6 @@
  * in diode.ts; this file only owns the rendered symbol, pin layout,
  * and property plumbing.
  *
- * Previous implementation (pre-Phase 2.5 W1.1) had a parallel
- * `createVaractorElement` + `VARACTOR_STATE_SCHEMA` with lowercase-named
- * parameters and a cross-method `SLOT_CAP_GEQ / SLOT_CAP_IEQ` layout.
- * That was deleted wholesale in Wave 1.1 — the invented slots had no
- * ngspice counterpart and the parallel schema duplicated the diode load.
  */
 
 import { AbstractCircuitElement } from "../../core/element.js";

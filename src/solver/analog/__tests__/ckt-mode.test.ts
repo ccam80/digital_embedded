@@ -1,9 +1,8 @@
 /**
  * Unit tests for the ckt-mode bitfield helpers.
  *
- * Focus: `bitsToName()` — the diagnostic decoder replacing the deleted
- * `InitMode` string union (landed in Phase 2.5). Canonical policy for the
- * `cktMode` bitfield is `spec/architectural-alignment.md` §C2.
+ * Focus: `bitsToName()` — the diagnostic decoder for the `cktMode` bitfield.
+ * Canonical policy for the `cktMode` bitfield is `spec/architectural-alignment.md` §C2.
  */
 
 import { describe, it, expect } from "vitest";

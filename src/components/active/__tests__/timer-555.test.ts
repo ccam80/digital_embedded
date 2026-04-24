@@ -2,17 +2,9 @@
  * Tests for the 555 Timer IC F4b composite model.
  *
  * Test handling per A1 §Test handling rule (spec/architectural-alignment.md §A1):
- *   - Hand-computed expected values: DELETED
- *   - Calls to _updateOp / _stampCompanion: DELETED (methods removed)
- *   - Post-load observable state with hand-computed values: DELETED
  *   - Post-load observable state (engine-agnostic, node voltages): KEPT
  *   - Parameter-plumbing (setParam on vDrop, rDischarge): KEPT
  *   - Engine-agnostic interface contracts: KEPT
- *
- * Deleted tests:
- *   Reset::forces_output_low                    — inspected Norton RHS via hand-computed rOut
- *   Control::external_voltage_changes_thresholds — same pattern
- *   Discharge::saturates_when_output_low         — inspected matrix stamps directly
  *   Timer555 parity (C4.5)::timer555_load_transient_parity
  *                                               — bit-exact stamp assertions with
  *                                                 hand-computed NGSPICE_* expected values
