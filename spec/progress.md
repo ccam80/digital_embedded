@@ -399,3 +399,28 @@
 - **Files modified**: src/solver/analog/newton-raphson.ts
 - **Tests**: no new tests per spec (comment-only change); existing `phase-3-xfact-predictor.test.ts` (24/24) and `newton-raphson.test.ts` (30 pass, 2 pre-existing failures at lines 396/410 in `pnjlim_matches_ngspice_*` — their expected-value formulas use `vold + vt*Math.log(arg)` but ngspice computes `vold + vt*(2+log(arg-2))`; unrelated to this phase, pre-existing per expected-red policy)
 - **Notes**: Changed `(devsup.c:50-58)` at pnjlim JSDoc line 67 → `(devsup.c:49-84)`; changed `(devsup.c:50-84)` above `_pnjlimResult` port-verbatim comment → `(devsup.c:49-84)`. Grep confirms 2 hits for `devsup.c:49-84`, 0 hits for both old forms.
+
+## Task 4.2.2: BJT L1 substrate pnjlim audit + L0-divergence scope comment — CLARIFICATION NEEDED
+- **Agent**: implementer
+- **Blocker**: Spec condition 5 (enclosing gate) contradicts ngspice ground truth and the recently-landed Phase 3 W3.2 ngspice-aligned implementation.
+- **What the spec says**: Phase 4 §Wave 4.2 Task 4.2.2 lists audit-escalation triggers; condition 5 reads "The enclosing gate is not `(mode & (MODEINITJCT | MODEINITSMSIG | MODEINITTRAN | MODEINITPRED)) === 0`." (Re-stated in the assignment's Part 1 condition 5 as "Enclosing gate is `(mode & (MODEINITJCT | MODEINITSMSIG | MODEINITTRAN | MODEINITPRED)) === 0`.") The spec instructs: "If ANY of these conditions is not met, STOP and escalate per governing principle §9 — do not invent an alternative gate or reshape the call."
+- **Why it is ambiguous**: The current L1 code at `bjt.ts:1325` has the gate `(mode & (MODEINITJCT | MODEINITSMSIG | MODEINITTRAN)) === 0` — MODEINITPRED is deliberately absent from the skip-set. Two readings are plausible:
+  (a) The spec is correct and the code must be fixed to add `MODEINITPRED` to the skip-set. But doing so would regress the pnjlim call to NOT run under MODEINITPRED — which contradicts `bjtload.c:276-306,383-416` where the pnjlim block is inside the outer `else` of the init-dispatch chain and is reached by both the MODEINITPRED sub-branch and the normal sub-branch. The existing code comment at `bjt.ts:1293-1294` explicitly asserts "pnjlim runs under MODEINITPRED — ngspice has no MODEINITPRED skip". Phase 3 W3.2's landed commit (`cce3cf3d`) is titled "BJT MODEINITPRED xfact extrapolation (ngspice-aligned)". This reading would violate CLAUDE.md "SPICE-Correct Implementations Only".
+  (b) The spec's condition 5 contains a typo and the gate should read `(mode & (MODEINITJCT | MODEINITSMSIG | MODEINITTRAN)) === 0` (without MODEINITPRED) — matching the current code and ngspice. Under this reading, all five conditions pass and Part 2 (L0 scope comment) and Part 3 (test) proceed as specified.
+- **What you checked before stopping**:
+  - `spec/phase-4-f5-residual-limiting-primitives.md` §Wave 4.2 Task 4.2.2 (the task spec itself, including both the assignment's Part 1 list and the §"STOP and escalate" negated form).
+  - `src/components/semiconductors/bjt.ts:1317-1335` (L1 pnjlim block) and `bjt.ts:859-874` (L0 pnjlim block, same gate shape).
+  - `src/components/semiconductors/bjt.ts:1293-1294` (explicit "pnjlim runs under MODEINITPRED — ngspice has no MODEINITPRED skip" comment — author's intent is explicit).
+  - `ref/ngspice/src/spicelib/devices/bjt/bjtload.c:236-416` — confirmed the init-dispatch chain: MODEINITSMSIG / MODEINITTRAN / MODEINITJCT variants each consume their own `else if`, then the outer `else` at line 276 holds MODEINITPRED-vs-normal dispatch followed by pnjlim at 383-416. pnjlim is reached unconditionally from both MODEINITPRED and normal sub-paths.
+  - Phase 3 recent commits (`cce3cf3d`, `ebd7d362`, `5272e319`, `dd127ed8`) — "BJT MODEINITPRED xfact extrapolation (ngspice-aligned)" landed the xfact-extrapolation path; the decision to NOT skip pnjlim under MODEINITPRED was the ngspice-correct choice at that time.
+  - `CLAUDE.md` §"SPICE-Correct Implementations Only" — mandates bit-exact match against ngspice source; a change that would cause pnjlim to skip under MODEINITPRED when ngspice does not skip would violate this rule.
+  - Both conditions 1-4 of the audit pass: arg1=`vsubRaw` ✓, arg2=`s0[base + SLOT_VSUB]` ✓, arg3=`vt` (local, matches spec's "either ctx.vt or tp.vt is acceptable at this phase") ✓, arg4=`tp.tSubVcrit` ✓.
+- **User resolution needed**: Confirm whether (a) the spec is authoritative and the code must gate pnjlim under MODEINITPRED (accepting the regression from ngspice), or (b) the spec contains a typo and the current code is correct. The task's Part 2 and Part 3 deliverables are unaffected by either resolution and can be completed once condition 5 is settled.
+
+## Task 4.2.1: LED limitingCollector push
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: none
+- **Files modified**: src/components/io/led.ts, src/components/io/__tests__/led.test.ts
+- **Tests**: 4/4 new LED limitingCollector tests passing; 88/89 existing tests passing
+- **Pre-existing failure (not caused by this change)**: `junction_cap_transient_matches_ngspice` crashes at `led.ts:255 voltages[nodeAnode - 1]` because the ctx literal in that test sets `voltages:` but not `rhsOld:`, and `load()` reads `ctx.rhsOld`. My edit only adds a push block after `s0[base + SLOT_VD] = vdLimited;` at line ~267 — it did not modify the node-voltage read at line 255. The failure is independent of Task 4.2.1's change.

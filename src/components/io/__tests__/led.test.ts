@@ -55,7 +55,10 @@ import type { AnalogElement } from "../../../solver/analog/element.js";
 import type { AnalogElementCore } from "../../../core/analog-types.js";
 import type { ReactiveAnalogElement } from "../../../solver/analog/element.js";
 import type { SparseSolver as SparseSolverType } from "../../../solver/analog/sparse-solver.js";
-import { MODETRAN, MODEINITFLOAT } from "../../../solver/analog/ckt-mode.js";
+import { MODETRAN, MODEINITFLOAT, MODEINITJCT } from "../../../solver/analog/ckt-mode.js";
+import type { LimitingEvent } from "../../../solver/analog/newton-raphson.js";
+import type { LoadContext } from "../../../solver/analog/load-context.js";
+import { SparseSolver } from "../../../solver/analog/sparse-solver.js";
 
 // ---------------------------------------------------------------------------
 // Helper: narrow ModelEntry to inline factory (throws if netlist kind)
@@ -987,5 +990,127 @@ describe("Led", () => {
 
   it("cap_state_size_is_six", () => {
     expect(LED_CAP_STATE_SCHEMA.size).toBe(6);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// LED limitingCollector tests (Phase 4 Task 4.2.1)
+// ---------------------------------------------------------------------------
+
+describe("LED limitingCollector", () => {
+  function makeLedCoreWithPool(overrides?: { label?: string; elementIndex?: number }) {
+    const props = new PropertyBag();
+    props.set("color", "red");
+    props.replaceModelParams({ IS: 3.17e-19, N: 1.8, CJO: 0, VJ: 1, M: 0.5, TT: 0, FC: 0.5 });
+    const core = getFactory(LedDefinition.modelRegistry!.red!)!(new Map([["in", 1]]), [], -1, props, () => 0);
+    (core as unknown as { label: string }).label = overrides?.label ?? "LED1";
+    (core as unknown as { elementIndex: number }).elementIndex = overrides?.elementIndex ?? 7;
+    const { element, pool } = withState(core as AnalogElementCore);
+    return { element, pool, core };
+  }
+
+  function buildLedLoadCtx(
+    solver: SparseSolver,
+    voltages: Float64Array,
+    overrides: Partial<LoadContext> = {},
+  ): LoadContext {
+    return {
+      solver,
+      matrix: solver,
+      rhsOld: voltages,
+      rhs: voltages,
+      cktMode: MODEINITFLOAT,
+      time: 0,
+      dt: 0,
+      method: "trapezoidal",
+      order: 1,
+      deltaOld: [0, 0, 0, 0, 0, 0, 0],
+      ag: new Float64Array(7),
+      srcFact: 1,
+      noncon: { value: 0 },
+      limitingCollector: null,
+      convergenceCollector: null,
+      xfact: 1,
+      gmin: 1e-12,
+      reltol: 1e-3,
+      iabstol: 1e-12,
+      temp: 300.15,
+      vt: 0.02585,
+      cktFixLimit: false,
+      ...overrides,
+    };
+  }
+
+  it("pushes AK pnjlim event on non-init NR iteration", () => {
+    // Red LED: vcrit ≈ 1.82 V, 2*nVt ≈ 0.093 V. Drive vdRaw = 5 V from vdOld = 0
+    // to force the pnjlim forward branch (vnew > vcrit and |vnew-vold| > 2*vt).
+    const { element } = makeLedCoreWithPool({ label: "LED_push", elementIndex: 11 });
+    const voltages = new Float64Array(1);
+    voltages[0] = 5.0;
+    const solver = new SparseSolver();
+    solver.beginAssembly(1);
+    const collector: LimitingEvent[] = [];
+    const ctx = buildLedLoadCtx(solver, voltages, { limitingCollector: collector });
+    element.load(ctx);
+
+    expect(collector.length).toBe(1);
+    expect(collector[0].junction).toBe("AK");
+    expect(collector[0].limitType).toBe("pnjlim");
+    expect(collector[0].wasLimited).toBe(true);
+    expect(collector[0].vBefore).not.toBe(collector[0].vAfter);
+    expect(collector[0].elementIndex).toBe(11);
+    expect(collector[0].label).toBe("LED_push");
+  });
+
+  it("pushes AK event with wasLimited=false under MODEINITJCT", () => {
+    // MODEINITJCT seed branch: vdRaw = vcrit (OFF not set), vdLimited = vdRaw,
+    // pnjlimLimited = false. The push must still fire with wasLimited=false and
+    // vBefore === vAfter.
+    const { element } = makeLedCoreWithPool({ label: "LED_initJct", elementIndex: 4 });
+    const voltages = new Float64Array(1);
+    voltages[0] = 0; // unused under MODEINITJCT; vdRaw is forced to vcrit.
+    const solver = new SparseSolver();
+    solver.beginAssembly(1);
+    const collector: LimitingEvent[] = [];
+    const ctx = buildLedLoadCtx(solver, voltages, {
+      cktMode: MODEINITJCT,
+      limitingCollector: collector,
+    });
+    element.load(ctx);
+
+    expect(collector.length).toBe(1);
+    expect(collector[0].junction).toBe("AK");
+    expect(collector[0].limitType).toBe("pnjlim");
+    expect(collector[0].wasLimited).toBe(false);
+    expect(collector[0].vBefore).toBe(collector[0].vAfter);
+  });
+
+  it("does not push when ctx.limitingCollector is null", () => {
+    const { element } = makeLedCoreWithPool();
+    const voltages = new Float64Array(1);
+    voltages[0] = 5.0;
+    const solver = new SparseSolver();
+    solver.beginAssembly(1);
+    const ctx = buildLedLoadCtx(solver, voltages, { limitingCollector: null });
+    expect(() => element.load(ctx)).not.toThrow();
+  });
+
+  it("pushes wasLimited=false on non-init NR iteration when pnjlim does not limit", () => {
+    // Small forward bias (vdRaw = 0.5 V) is below vcrit (~1.82 V), so pnjlim's
+    // forward branch is not entered; vdRaw is non-negative, so the Gillespie
+    // reverse branch is not entered either. pnjlim returns value=vdRaw,
+    // limited=false. The push must still fire with vBefore === vAfter.
+    const { element } = makeLedCoreWithPool();
+    const voltages = new Float64Array(1);
+    voltages[0] = 0.5;
+    const solver = new SparseSolver();
+    solver.beginAssembly(1);
+    const collector: LimitingEvent[] = [];
+    const ctx = buildLedLoadCtx(solver, voltages, { limitingCollector: collector });
+    element.load(ctx);
+
+    expect(collector.length).toBe(1);
+    expect(collector[0].wasLimited).toBe(false);
+    expect(collector[0].vBefore).toBe(collector[0].vAfter);
   });
 });

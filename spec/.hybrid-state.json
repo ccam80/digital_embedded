@@ -300,13 +300,13 @@
       ],
       "spawned": 1,
       "completed": 1,
-      "verifications_passed": 0,
+      "verifications_passed": 1,
       "verifications_failed": 0,
       "stops_for_clarification": 0,
       "dead_implementers": 0,
       "dead_verifiers": 0,
       "group_status": {
-        "4.1": "pending"
+        "4.1": "passed"
       },
       "user_required_tasks": {
         "4.1": []
@@ -327,11 +327,11 @@
           "4.2.2"
         ]
       ],
-      "spawned": 0,
-      "completed": 0,
+      "spawned": 2,
+      "completed": 1,
       "verifications_passed": 0,
       "verifications_failed": 0,
-      "stops_for_clarification": 0,
+      "stops_for_clarification": 1,
       "dead_implementers": 0,
       "dead_verifiers": 0,
       "group_status": {
@@ -741,5 +741,5 @@
       "user_acks": {}
     }
   ],
-  "last_updated": "2026-04-24T09:38:27.844Z"
+  "last_updated": "2026-04-24T09:53:07.950Z"
 }

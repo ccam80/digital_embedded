@@ -264,6 +264,18 @@ function createLedAnalogElement(
 
       s0[base + SLOT_VD] = vdLimited;
 
+      if (ctx.limitingCollector) {
+        ctx.limitingCollector.push({
+          elementIndex: (this as any).elementIndex ?? -1,
+          label: (this as any).label ?? "",
+          junction: "AK",
+          limitType: "pnjlim",
+          vBefore: vdRaw,
+          vAfter: vdLimited,
+          wasLimited: pnjlimLimited,
+        });
+      }
+
       const expVal = Math.exp(vdLimited / nVt);
       const idRaw = params.IS * (expVal - 1);
       const gdRaw = (params.IS * expVal) / nVt;
