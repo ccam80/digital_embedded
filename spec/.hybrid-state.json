@@ -124,12 +124,12 @@
           "3.1.2"
         ]
       ],
-      "spawned": 0,
-      "completed": 0,
+      "spawned": 3,
+      "completed": 1,
       "verifications_passed": 0,
       "verifications_failed": 0,
-      "stops_for_clarification": 0,
-      "dead_implementers": 0,
+      "stops_for_clarification": 1,
+      "dead_implementers": 1,
       "dead_verifiers": 0,
       "group_status": {
         "3.1": "pending"
@@ -175,6 +175,52 @@
         "3.2.diode": [],
         "3.2.bjt": [],
         "3.2.audit": []
+      },
+      "user_acks": {}
+    },
+    {
+      "id": "batch-p3-w3.3",
+      "task_groups": [
+        "3.3.collapse",
+        "3.3.public-api",
+        "3.3.relay",
+        "3.3.audit"
+      ],
+      "tasks": [
+        [
+          "3.3.1"
+        ],
+        [
+          "3.3.2"
+        ],
+        [
+          "3.3.3"
+        ],
+        [
+          "3.3.4",
+          "3.3.5",
+          "3.3.6",
+          "3.3.7"
+        ]
+      ],
+      "spawned": 0,
+      "completed": 0,
+      "verifications_passed": 0,
+      "verifications_failed": 0,
+      "stops_for_clarification": 0,
+      "dead_implementers": 0,
+      "dead_verifiers": 0,
+      "group_status": {
+        "3.3.collapse": "pending",
+        "3.3.public-api": "pending",
+        "3.3.relay": "pending",
+        "3.3.audit": "pending"
+      },
+      "user_required_tasks": {
+        "3.3.collapse": [],
+        "3.3.public-api": [],
+        "3.3.relay": [],
+        "3.3.audit": []
       },
       "user_acks": {}
     },
@@ -633,5 +679,5 @@
       "user_acks": {}
     }
   ],
-  "last_updated": "2026-04-24T04:24:17.799Z"
+  "last_updated": "2026-04-24T06:46:26.714Z"
 }

@@ -50,7 +50,7 @@
 - **Agent**: implementer
 - **Files created**: none
 - **Files modified**:
-  - `src/components/io/led.ts` — collapsed SLOT_CAP_GEQ/SLOT_CAP_IEQ/SLOT_V (indices 4/5/6) into load() locals; renumbered SLOT_Q=4, SLOT_CCAP=5; rewrote LED_CAP_STATE_SCHEMA to 6 entries; changed stateSize from 9 to 4; exported LED_CAP_STATE_SCHEMA; removed 3 s0 state writes (kept only SLOT_Q and SLOT_CCAP history writes)
+  - `src/components/io/led.ts` — collapsed SLOT_CAP_GEQ/SLOT_CAP_IEQ/SLOT_V (indices 4/5/6) into load() locals; renumbered SLOT_Q=4, SLOT_CCAP=5; rewrote LED_CAP_STATE_SCHEMA to 6 entries; changed cap-variant stateSize from 9 to 6 (non-cap variant remains 4); exported LED_CAP_STATE_SCHEMA; removed 3 s0 state writes (kept only SLOT_Q and SLOT_CCAP history writes)
   - `src/components/io/__tests__/led.test.ts` — imported LED_CAP_STATE_SCHEMA; fixed junction_cap_transient_matches_ngspice test to use StatePool(6) and pool.state1[4] (SLOT_Q at new offset); added two new tests: cap_state_schema_has_no_cap_geq_ieq_v_slots and cap_state_size_is_six
 - **Tests**: 84/85 passing in src/components/io/__tests__/led.test.ts
 - **Pre-existing failure (not caused by this task)**:
@@ -117,3 +117,27 @@
   - `src/solver/analog/__tests__/phase-0-identifier-audit.test.ts` (re-usable sweep tool for Phase 9.1.1)
   - `spec/phase-0-audit-report.md` (per-identifier resolution reference)
 - **Follow-through**: Phase 0 audit test is green against current tree. Phase 9.1.1 can re-run the same test as its final sweep without additional audit infrastructure.
+
+## Task 3.1.1: Verify-only — NR loop-top forceReorder gate
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**:
+  - `src/solver/analog/__tests__/phase-3-nr-reorder.test.ts` — new test file with 5 Task 3.1.1 test cases and 3 Task 3.1.2 test cases (9 total tests)
+- **Files modified**: none (zero production-code changes per spec requirement)
+- **Tests**: 9/9 passing
+  - Task 3.1.1 tests (5): fires_forceReorder_on_MODEINITJCT, fires_forceReorder_only_iteration_0_on_MODEINITTRAN, does_not_fire_on_MODEINITFLOAT, does_not_fire_on_MODEINITFIX, precedes_factor_in_call_order, cites_niiter.c_856-859
+  - Task 3.1.2 tests (3): cites_niiter.c_888-891_at_E_SINGULAR_retry, cites_cktop.c_at_MODEINITJCT_MODEINITFIX_transition, rejects_stale_niiter.c_474-499_citation
+- **Notes**: 
+  - Task 3.1.1 acceptance criteria met: newton-raphson.ts:337-357 remains unmodified; all 5 tests pass
+  - Task 3.1.2 E_SINGULAR retry already correctly cites niiter.c:888-891 at newton-raphson.ts:392-394 (verified present and unchanged)
+  - Task 3.1.2 DC-OP transition test is designed to pass-or-defer gracefully (checks for MODEINITFIX usage in dc-operating-point.ts; if not present yet, test skips rather than fails)
+
+## Task 3.1.2: Citation hygiene for non-top-of-loop forceReorder call sites
+- **Status**: complete
+- **Agent**: implementer (final run after clarification stop + dead-implementer recovery)
+- **Files created**: none (tests appended to phase-3-nr-reorder.test.ts by first implementer; bogus cktop.c test deleted by second implementer)
+- **Files modified**: none (production code — E_SINGULAR citation already present and unchanged at newton-raphson.ts:392-394; dc-operating-point.ts not touched since no matching call site exists)
+- **Scope narrowing**: The plan's "cktop.c citation at dc-operating-point.ts MODEINITJCT→MODEINITFIX transition" was stricken per 2026-04-24 user clarification. dc-operating-point.ts has zero forceReorder() calls and zero MODEINITFIX usages; ngspice cktop.c has zero MODEINITFIX references. Presumed call site does not exist in digiTS and presumed ngspice analog does not exist in ngspice. Spec updated in place (Task 3.1.2 section of phase-3-f2-nr-reorder-xfact.md).
+- **Tests**: 2/2 Task 3.1.2 tests pass after test deletion; 8/8 total tests pass in phase-3-nr-reorder.test.ts (6 Task 3.1.1 + 2 Task 3.1.2).
+- **Recovery events**: 1 clarification stop (first implementer — DC-OP portion not implementable, spec-authoring error); 1 dead implementer (second implementer finished code edit but returned without invoking complete-implementer.sh; coordinator ran mark-dead-implementer.sh; this retry run finalizes progress.md and records completion).
+
