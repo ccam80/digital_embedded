@@ -115,6 +115,8 @@ function buildUnitCtx(
     reltol: 1e-3,
     iabstol: 1e-12,
     cktFixLimit: false,
+    bypass: false,
+    voltTol: 1e-6,
     ...overrides,
   };
 }
@@ -279,6 +281,8 @@ describe("Diode", () => {
       reltol: 1e-3,
       iabstol: 1e-12,
       cktFixLimit: false,
+      bypass: false,
+      voltTol: 1e-6,
     };
     capSolver.beginAssembly(2);
     element.load(capCtx);
@@ -773,6 +777,8 @@ describe("AREA scaling", () => {
         reltol: 1e-3,
         iabstol: 1e-12,
         cktFixLimit: false,
+        bypass: false,
+        voltTol: 1e-6,
       };
     }
 
@@ -937,6 +943,8 @@ function makeParityCtx(
     reltol: 1e-3,
     iabstol: 1e-12,
     cktFixLimit: false,
+    bypass: false,
+    voltTol: 1e-6,
   };
 }
 
@@ -1096,6 +1104,8 @@ describe("diode MODEINITSMSIG seeding (dioload.c:126-127)", () => {
       reltol: 1e-3,
       iabstol: 1e-12,
       cktFixLimit: false,
+      bypass: false,
+      voltTol: 1e-6,
     });
 
     // SLOT_VD must remain 0.4V (seeded from state0, not the 2V iterate).
@@ -1134,6 +1144,8 @@ describe("diode MODEINITSMSIG seeding (dioload.c:126-127)", () => {
       reltol: 1e-3,
       iabstol: 1e-12,
       cktFixLimit: false,
+      bypass: false,
+      voltTol: 1e-6,
     });
 
     // SLOT_VD must be 0.35V (seeded from state1, not the 3V iterate).
@@ -1174,6 +1186,8 @@ describe("diode MODEINITSMSIG seeding (dioload.c:126-127)", () => {
       reltol: 1e-3,
       iabstol: 1e-12,
       cktFixLimit: false,
+      bypass: false,
+      voltTol: 1e-6,
     });
 
     expect(noncon.value).toBe(0);
@@ -1214,6 +1228,8 @@ describe("diode MODEINITSMSIG seeding (dioload.c:126-127)", () => {
       reltol: 1e-3,
       iabstol: 1e-12,
       cktFixLimit: false,
+      bypass: false,
+      voltTol: 1e-6,
     });
 
     // MODEINITSMSIG: SLOT_CAP_CURRENT (index 4) holds capd (Farads) = Ctotal.
@@ -1256,6 +1272,8 @@ describe("diode MODEINITSMSIG seeding (dioload.c:126-127)", () => {
       reltol: 1e-3,
       iabstol: 1e-12,
       cktFixLimit: false,
+      bypass: false,
+      voltTol: 1e-6,
     });
 
     // SLOT_CAP_CURRENT (index 4) holds iqcap (A) under MODETRAN/MODEUIC — dioload.c:363.
@@ -1293,6 +1311,8 @@ describe("diode MODEINITSMSIG seeding (dioload.c:126-127)", () => {
       reltol: 1e-3,
       iabstol: 1e-12,
       cktFixLimit: false,
+      bypass: false,
+      voltTol: 1e-6,
     });
 
     // SLOT_CAP_CURRENT (index 4) must remain 0 — cap block not entered under DCOP.

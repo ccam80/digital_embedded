@@ -98,6 +98,8 @@ function buildUnitCtx(
     reltol: 1e-3,
     iabstol: 1e-12,
     cktFixLimit: false,
+    bypass: false,
+    voltTol: 1e-6,
     ...overrides,
   };
 }
@@ -428,6 +430,8 @@ function buildTempCtx(
     temp: 300.15,
     vt: 300.15 * CONSTboltz / CHARGE,
     cktFixLimit: false,
+    bypass: false,
+    voltTol: 1e-6,
   };
 }
 
@@ -584,6 +588,8 @@ describe("integration", () => {
       reltol: 1e-3,
       iabstol: 1e-12,
       cktFixLimit: false,
+      bypass: false,
+      voltTol: 1e-6,
     };
 
     core.load(ctx);

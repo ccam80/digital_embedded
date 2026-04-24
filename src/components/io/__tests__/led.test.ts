@@ -943,6 +943,8 @@ describe("integration", () => {
       gmin: 1e-12,
       reltol: 1e-3,
       iabstol: 1e-12,
+      bypass: false,
+      voltTol: 1e-6,
     };
 
     core.load(ctx);
@@ -1039,6 +1041,8 @@ describe("LED limitingCollector", () => {
       temp: 300.15,
       vt: 0.02585,
       cktFixLimit: false,
+      bypass: false,
+      voltTol: 1e-6,
       ...overrides,
     };
   }

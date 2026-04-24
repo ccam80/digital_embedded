@@ -382,21 +382,21 @@
           "7.5.5.1"
         ]
       ],
-      "spawned": 7,
-      "completed": 7,
-      "verifications_passed": 0,
-      "verifications_failed": 0,
+      "spawned": 8,
+      "completed": 8,
+      "verifications_passed": 6,
+      "verifications_failed": 1,
       "stops_for_clarification": 0,
       "dead_implementers": 0,
       "dead_verifiers": 0,
       "group_status": {
-        "5.0.loadctx": "pending",
-        "5.0.bjt": "pending",
-        "7.5.diode": "pending",
-        "7.5.zener": "pending",
-        "7.5.led": "pending",
-        "7.5.scr": "pending",
-        "7.5.tunnel": "pending"
+        "5.0.loadctx": "failed",
+        "5.0.bjt": "passed",
+        "7.5.diode": "passed",
+        "7.5.zener": "passed",
+        "7.5.led": "passed",
+        "7.5.scr": "passed",
+        "7.5.tunnel": "passed"
       },
       "user_required_tasks": {
         "5.0.loadctx": [],
@@ -741,5 +741,5 @@
       "user_acks": {}
     }
   ],
-  "last_updated": "2026-04-24T10:25:39.515Z"
+  "last_updated": "2026-04-24T10:42:34.758Z"
 }

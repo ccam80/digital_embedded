@@ -338,6 +338,26 @@ describe("CKTCircuitContext", () => {
       }
     });
   });
+
+  // -------------------------------------------------------------------------
+  // Test: LoadContext defaults (Task 5.0.1)
+  // -------------------------------------------------------------------------
+
+  describe("LoadContext defaults", () => {
+    it("bypass_defaults_to_false", () => {
+      // cite: cktinit.c:53-55 — CKTbypass defaults to false
+      const circuit = makeTestCircuit(9, 1);
+      const ctx = new CKTCircuitContext(circuit, defaultParams, noopBreakpoint, new SparseSolver());
+      expect(ctx.loadCtx.bypass).toBe(false);
+    });
+
+    it("voltTol_defaults_to_1e_minus_6", () => {
+      // cite: cktinit.c:53-55 — CKTvoltTol defaults to 1e-6
+      const circuit = makeTestCircuit(9, 1);
+      const ctx = new CKTCircuitContext(circuit, defaultParams, noopBreakpoint, new SparseSolver());
+      expect(ctx.loadCtx.voltTol).toBe(1e-6);
+    });
+  });
 });
 
 // ---------------------------------------------------------------------------

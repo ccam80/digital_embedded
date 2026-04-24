@@ -134,6 +134,8 @@ function buildUnitCtx(
     temp: 300.15,
     vt: 300.15 * 1.3806226e-23 / 1.6021918e-19,
     cktFixLimit: false,
+    bypass: false,
+    voltTol: 1e-6,
     ...overrides,
   };
 }

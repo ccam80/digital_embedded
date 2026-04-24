@@ -172,6 +172,7 @@ describe("Inductor", () => {
         srcFact: 1, noncon: { value: 0 }, limitingCollector: null,
         xfact: 1, gmin: 1e-12, uic: false,
         reltol: 1e-3, iabstol: 1e-12, cktFixLimit: false,
+        bypass: false, voltTol: 1e-6,
       };
       analogElement.load(ctx);
 

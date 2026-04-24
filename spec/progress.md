@@ -572,3 +572,24 @@
   - Added SLOT_VGK constant to test file.
   - Added MODEINITJCT to ckt-mode imports.
   - 3 new tests: method_absent, MODEINITJCT_seeds_vak_vcrit, MODEINITJCT_OFF_zeros_both.
+
+## Task 5.0.loadctx (fix pass): Extend LoadContext with bypass + voltTol
+- **Status**: complete
+- **Agent**: implementer (fix pass)
+- **Files created**: none
+- **Files modified**:
+  - `src/solver/analog/__tests__/ckt-context.test.ts` — added `LoadContext defaults` describe block with `bypass_defaults_to_false` and `voltTol_defaults_to_1e_minus_6` tests
+  - `src/components/semiconductors/__tests__/scr.test.ts` — added `bypass: false, voltTol: 1e-6` to `buildUnitCtx` literal
+  - `src/components/semiconductors/__tests__/tunnel-diode.test.ts` — added `bypass: false, voltTol: 1e-6` to `buildUnitCtx`, `buildTempCtx`, and inline `ctx` literals (3 sites)
+  - `src/solver/analog/__tests__/dcop-init-jct.test.ts` — added `bypass: false, voltTol: 1e-6` to `makeSoloLoadCtx` literal
+  - `src/components/active/__tests__/adc.test.ts` — added `bypass: false, voltTol: 1e-6` to `makeAdcParityCtx` literal
+  - `src/components/sensors/__tests__/spark-gap.test.ts` — added `bypass: false, voltTol: 1e-6` to `makeAcceptCtx` literal
+  - `src/components/sensors/__tests__/ntc-thermistor.test.ts` — added `bypass: false, voltTol: 1e-6` to `makeAcceptCtx` literal
+  - `src/components/semiconductors/__tests__/diode.test.ts` — added `bypass: false, voltTol: 1e-6` to `buildUnitCtx`, `capCtx`, `makeCtxForSolver`, `makeParityCtx`, and 5 inline `core.load({...})` literals (10 sites total; 11th `deltaOld` is in an overrides object, not a LoadContext literal)
+  - `src/components/io/__tests__/led.test.ts` — added `bypass: false, voltTol: 1e-6` to inline `ctx` literal and `buildLedLoadCtx` helper (2 sites)
+  - `src/components/passives/__tests__/inductor.test.ts` — added `bypass: false, voltTol: 1e-6` to inline `ctx` literal
+- **Tests**: New tests: `bypass_defaults_to_false` passes, `voltTol_defaults_to_1e_minus_6` passes. Pre-existing failures in all files are engine crashes (Cannot read properties of undefined) unrelated to LoadContext field additions.
+  - ckt-context.test.ts: 8/9 (1 pre-existing failure `loadCtx_fields_populated`)
+  - scr/dcop-init-jct/adc/spark-gap/ntc-thermistor: 54/75 (21 pre-existing engine crashes)
+  - tunnel-diode: 10/13 (3 pre-existing engine crashes in tunnel-diode.ts:257)
+  - diode/led/inductor: 163/167 (4 pre-existing failures)
