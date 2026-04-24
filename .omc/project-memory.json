@@ -291,8 +291,8 @@
     },
     {
       "path": "spec\\progress.md",
-      "accessCount": 20,
-      "lastAccessed": 1776999767706,
+      "accessCount": 21,
+      "lastAccessed": 1777004564670,
       "type": "file"
     },
     {
@@ -302,15 +302,21 @@
       "type": "file"
     },
     {
+      "path": "spec\\test-baseline.md",
+      "accessCount": 17,
+      "lastAccessed": 1777004569065,
+      "type": "file"
+    },
+    {
       "path": "src\\components\\passives\\capacitor.ts",
       "accessCount": 16,
       "lastAccessed": 1776998662493,
       "type": "file"
     },
     {
-      "path": "spec\\test-baseline.md",
+      "path": "spec\\phase-0-residual-dead-code-audit.md",
       "accessCount": 16,
-      "lastAccessed": 1776999484755,
+      "lastAccessed": 1777004564640,
       "type": "file"
     },
     {
@@ -320,21 +326,15 @@
       "type": "file"
     },
     {
-      "path": "spec\\phase-0-residual-dead-code-audit.md",
+      "path": "spec\\.context\\rules.md",
       "accessCount": 15,
-      "lastAccessed": 1776999508940,
+      "lastAccessed": 1777004564263,
       "type": "file"
     },
     {
       "path": "src\\components\\active\\__tests__\\timer-555.test.ts",
       "accessCount": 14,
       "lastAccessed": 1776998737853,
-      "type": "file"
-    },
-    {
-      "path": "spec\\.context\\rules.md",
-      "accessCount": 14,
-      "lastAccessed": 1776999508077,
       "type": "file"
     },
     {
@@ -398,6 +398,12 @@
       "type": "file"
     },
     {
+      "path": "spec\\.hybrid-state.json",
+      "accessCount": 8,
+      "lastAccessed": 1777004686626,
+      "type": "file"
+    },
+    {
       "path": "src\\components\\semiconductors\\mosfet.ts",
       "accessCount": 7,
       "lastAccessed": 1776994304172,
@@ -407,12 +413,6 @@
       "path": "src\\solver\\analog\\bridge-adapter.ts",
       "accessCount": 7,
       "lastAccessed": 1776998746135,
-      "type": "file"
-    },
-    {
-      "path": "spec\\.hybrid-state.json",
-      "accessCount": 7,
-      "lastAccessed": 1776998861767,
       "type": "file"
     },
     {

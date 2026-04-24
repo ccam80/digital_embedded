@@ -106,3 +106,14 @@
 - **Files modified**: none
 - **Tests**: none (documentation file; machine verification is Task 0.3.1's audit test)
 - **Summary**: Created the Phase 0 audit resolution report at `spec/phase-0-audit-report.md`. The report contains: (1) header with HEAD SHA `b07db497bf7ce948ee31871b2a7be33378388527`; (2) per-identifier table covering all identifiers from the Task 0.3.1 manifest with resolution category, evidence (file + line or "zero hits"), and cited-at task; (3) four bucket sections — truly absent, deleted-in-Wave-0.1, refactored-in-Wave-0.2, allowlisted; (4) "How to re-run this audit" section pointing at `phase-0-identifier-audit.test.ts` with the one-line vitest command. All identifier resolutions verified against live filesystem via Grep before writing.
+
+---
+## Phase 0 Complete
+- **Batches**: 3 (batch-p0-w0.1, batch-p0-w0.2, batch-p0-w0.3)
+- **Tasks**: 7 (0.1.1, 0.1.2, 0.2.1, 0.2.2, 0.2.3, 0.3.1, 0.3.2)
+- **All verified**: yes
+- **Recovery events**: 1 dead implementer (0.2.3 initial runtime timeout), 2 i-fixed-it entries (one for 0.1.1 rule-compliance comment removal, one for 0.2.3 counter-normalization after a prompt-error over-verification)
+- **Artifacts landed**:
+  - `src/solver/analog/__tests__/phase-0-identifier-audit.test.ts` (re-usable sweep tool for Phase 9.1.1)
+  - `spec/phase-0-audit-report.md` (per-identifier resolution reference)
+- **Follow-through**: Phase 0 audit test is green against current tree. Phase 9.1.1 can re-run the same test as its final sweep without additional audit infrastructure.
