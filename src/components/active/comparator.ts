@@ -47,10 +47,16 @@ import type { AnalogElementCore, LoadContext, StatePoolRef } from "../../solver/
 import { collectPinModelChildren } from "../../solver/analog/digital-pin-model.js";
 import type { AnalogCapacitorElement } from "../passives/capacitor.js";
 import { defineModelParams } from "../../core/model-params.js";
-import { defineStateSchema } from "../../solver/analog/state-schema.js";
+import { applyInitialValues, defineStateSchema } from "../../solver/analog/state-schema.js";
 import type { StateSchema } from "../../solver/analog/state-schema.js";
 
-const COMPARATOR_COMPOSITE_SCHEMA: StateSchema = defineStateSchema("ComparatorComposite", []);
+const SLOT_OUTPUT_LATCH = 0;
+const SLOT_OUTPUT_WEIGHT = 1;
+
+const COMPARATOR_COMPOSITE_SCHEMA: StateSchema = defineStateSchema("ComparatorComposite", [
+  { name: "OUTPUT_LATCH",  doc: "Hysteresis latch (1.0 = output active/sinking, 0.0 = inactive)", init: { kind: "zero" } },
+  { name: "OUTPUT_WEIGHT", doc: "Response-time blend weight [0.0, 1.0]",                          init: { kind: "zero" } },
+]);
 
 // ---------------------------------------------------------------------------
 // Model parameter declarations
@@ -208,20 +214,16 @@ export function createOpenCollectorComparatorElement(
   const nInn = pinNodes.get("in-")!; // inverting input node (1-based)
   const nOut = pinNodes.get("out")!; // output node (1-based)
 
-  // Hysteresis state: true when output is active (open-collector sinking)
-  let _outputActive = false;
-
-  // Continuous blend weight: 0.0 = fully inactive, 1.0 = fully active
-  // Used to model response-time delay via a first-order filter.
-  let _outputWeight = 0.0;
+  let pool: StatePoolRef;
+  let base: number;
 
   function readNode(voltages: Float64Array, n: number): number {
     return n > 0 ? voltages[n - 1] : 0;
   }
 
-  function computeGeff(): number {
+  function computeGeff(weight: number): number {
     const G_sat = 1 / Math.max(p.rSat, 1e-9);
-    return G_off + _outputWeight * (G_sat - G_off);
+    return G_off + weight * (G_sat - G_off);
   }
 
   const childElements: readonly AnalogCapacitorElement[] = collectPinModelChildren([]);
@@ -234,14 +236,17 @@ export function createOpenCollectorComparatorElement(
 
     poolBacked: true as const,
     stateSchema: COMPARATOR_COMPOSITE_SCHEMA,
-    stateSize: childStateSize,
+    stateSize: COMPARATOR_COMPOSITE_SCHEMA.size + childStateSize,
     stateBaseOffset: -1,
 
-    initState(_pool: StatePoolRef): void {
-      let offset = (this as { stateBaseOffset: number }).stateBaseOffset;
+    initState(poolRef: StatePoolRef): void {
+      pool = poolRef;
+      base = this.stateBaseOffset;
+      applyInitialValues(COMPARATOR_COMPOSITE_SCHEMA, pool, base, {});
+      let offset = base + COMPARATOR_COMPOSITE_SCHEMA.size;
       for (const child of childElements) {
         child.stateBaseOffset = offset;
-        child.initState(_pool);
+        child.initState(pool);
         offset += child.stateSize;
       }
     },
@@ -249,27 +254,35 @@ export function createOpenCollectorComparatorElement(
     load(ctx: LoadContext): void {
       const solver = ctx.solver;
       const voltages = ctx.rhsOld;
+      const s0 = pool.states[0];
+      const s1 = pool.states[1];
 
-      // Hysteresis state update from current NR-iterate voltages.
+      // Read latch/weight from the last accepted step. s1 is untouched by
+      // failed NR iterations, so hysteresis state is restored correctly on retry.
+      let latchActive = s1[base + SLOT_OUTPUT_LATCH] >= 0.5;
+      let weight = s1[base + SLOT_OUTPUT_WEIGHT];
+
       const vInp = readNode(voltages, nInp);
       const vInn = readNode(voltages, nInn);
       const vDiff = vInp - vInn - p.vos;
       const halfHyst = p.hysteresis / 2;
-      if (_outputActive) {
+      if (latchActive) {
         if (vDiff < -halfHyst) {
-          _outputActive = false;
-          _outputWeight = 0.0;
+          latchActive = false;
+          weight = 0.0;
         }
       } else {
         if (vDiff > halfHyst) {
-          _outputActive = true;
-          _outputWeight = 1.0;
+          latchActive = true;
+          weight = 1.0;
         }
       }
 
-      // Stamp the effective conductance from out to ground.
+      s0[base + SLOT_OUTPUT_LATCH] = latchActive ? 1.0 : 0.0;
+      s0[base + SLOT_OUTPUT_WEIGHT] = weight;
+
       if (nOut > 0) {
-        solver.stampElement(solver.allocElement(nOut - 1, nOut - 1), computeGeff());
+        solver.stampElement(solver.allocElement(nOut - 1, nOut - 1), computeGeff(weight));
       }
 
       for (const child of childElements) { child.load(ctx); }
@@ -282,10 +295,13 @@ export function createOpenCollectorComparatorElement(
     accept(ctx: LoadContext, _simTime: number, _addBreakpoint: (t: number) => void): void {
       const dt = ctx.dt;
       if (dt <= 0) return;
-      const target = _outputActive ? 1.0 : 0.0;
+      const s0 = pool.states[0];
+      const latchActive = s0[base + SLOT_OUTPUT_LATCH] >= 0.5;
+      const target = latchActive ? 1.0 : 0.0;
       const tau = Math.max(p.responseTime, 1e-12);
       const alpha = dt / (tau + dt);
-      _outputWeight = _outputWeight + alpha * (target - _outputWeight);
+      const currentWeight = s0[base + SLOT_OUTPUT_WEIGHT];
+      s0[base + SLOT_OUTPUT_WEIGHT] = currentWeight + alpha * (target - currentWeight);
     },
 
     getPinCurrents(voltages: Float64Array): number[] {
@@ -297,8 +313,9 @@ export function createOpenCollectorComparatorElement(
       const iInn = nInn > 0 ? vInn / R_IN : 0;
 
       // Output pin: I_out = V_out * G_eff (current sinks to ground)
+      const weight = pool.states[0][base + SLOT_OUTPUT_WEIGHT];
       const vOut = readNode(voltages, nOut);
-      const gEff = computeGeff();
+      const gEff = computeGeff(weight);
       const iOut = nOut > 0 ? vOut * gEff : 0;
 
       return [iInp, iInn, iOut];
@@ -334,16 +351,16 @@ function createPushPullComparatorElement(
   const nInn = pinNodes.get("in-")!;
   const nOut = pinNodes.get("out")!;
 
-  let _outputActive = false;
-  let _outputWeight = 0.0;
+  let pool: StatePoolRef;
+  let base: number;
 
   function readNode(voltages: Float64Array, n: number): number {
     return n > 0 ? voltages[n - 1] : 0;
   }
 
-  function computeGeff(): number {
+  function computeGeff(weight: number): number {
     const G_sat = 1 / Math.max(p.rSat, 1e-9);
-    return G_off + _outputWeight * (G_sat - G_off);
+    return G_off + weight * (G_sat - G_off);
   }
 
   const childElements: readonly AnalogCapacitorElement[] = collectPinModelChildren([]);
@@ -356,14 +373,17 @@ function createPushPullComparatorElement(
 
     poolBacked: true as const,
     stateSchema: COMPARATOR_COMPOSITE_SCHEMA,
-    stateSize: childStateSize,
+    stateSize: COMPARATOR_COMPOSITE_SCHEMA.size + childStateSize,
     stateBaseOffset: -1,
 
-    initState(_pool: StatePoolRef): void {
-      let offset = (this as { stateBaseOffset: number }).stateBaseOffset;
+    initState(poolRef: StatePoolRef): void {
+      pool = poolRef;
+      base = this.stateBaseOffset;
+      applyInitialValues(COMPARATOR_COMPOSITE_SCHEMA, pool, base, {});
+      let offset = base + COMPARATOR_COMPOSITE_SCHEMA.size;
       for (const child of childElements) {
         child.stateBaseOffset = offset;
-        child.initState(_pool);
+        child.initState(pool);
         offset += child.stateSize;
       }
     },
@@ -371,22 +391,32 @@ function createPushPullComparatorElement(
     load(ctx: LoadContext): void {
       const solver = ctx.solver;
       const voltages = ctx.rhsOld;
+      const s0 = pool.states[0];
+      const s1 = pool.states[1];
+
+      // Read latch/weight from the last accepted step. s1 is untouched by
+      // failed NR iterations, so hysteresis state is restored correctly on retry.
+      let latchActive = s1[base + SLOT_OUTPUT_LATCH] >= 0.5;
+      let weight = s1[base + SLOT_OUTPUT_WEIGHT];
 
       const vInp = readNode(voltages, nInp);
       const vInn = readNode(voltages, nInn);
       const vDiff = vInp - vInn - p.vos;
       const halfHyst = p.hysteresis / 2;
-      if (_outputActive) {
-        if (vDiff < -halfHyst) { _outputActive = false; _outputWeight = 0.0; }
+      if (latchActive) {
+        if (vDiff < -halfHyst) { latchActive = false; weight = 0.0; }
       } else {
-        if (vDiff > halfHyst) { _outputActive = true; _outputWeight = 1.0; }
+        if (vDiff > halfHyst) { latchActive = true; weight = 1.0; }
       }
 
-      const gEff = computeGeff();
+      s0[base + SLOT_OUTPUT_LATCH] = latchActive ? 1.0 : 0.0;
+      s0[base + SLOT_OUTPUT_WEIGHT] = weight;
+
+      const gEff = computeGeff(weight);
       if (nOut > 0) {
         solver.stampElement(solver.allocElement(nOut - 1, nOut - 1), gEff);
         // Norton current source drives output toward vOH or vOL
-        const vTarget = _outputActive ? p.vOL : p.vOH;
+        const vTarget = latchActive ? p.vOL : p.vOH;
         solver.stampRHS(nOut - 1, vTarget * gEff);
       }
 
@@ -400,10 +430,13 @@ function createPushPullComparatorElement(
     accept(ctx: LoadContext, _simTime: number, _addBreakpoint: (t: number) => void): void {
       const dt = ctx.dt;
       if (dt <= 0) return;
-      const target = _outputActive ? 1.0 : 0.0;
+      const s0 = pool.states[0];
+      const latchActive = s0[base + SLOT_OUTPUT_LATCH] >= 0.5;
+      const target = latchActive ? 1.0 : 0.0;
       const tau = Math.max(p.responseTime, 1e-12);
       const alpha = dt / (tau + dt);
-      _outputWeight = _outputWeight + alpha * (target - _outputWeight);
+      const currentWeight = s0[base + SLOT_OUTPUT_WEIGHT];
+      s0[base + SLOT_OUTPUT_WEIGHT] = currentWeight + alpha * (target - currentWeight);
     },
 
     getPinCurrents(voltages: Float64Array): number[] {
@@ -413,11 +446,14 @@ function createPushPullComparatorElement(
       const iInp = nInp > 0 ? vInp / R_IN : 0;
       const iInn = nInn > 0 ? vInn / R_IN : 0;
 
+      const s0 = pool.states[0];
+      const latchActive = s0[base + SLOT_OUTPUT_LATCH] >= 0.5;
+      const weight = s0[base + SLOT_OUTPUT_WEIGHT];
       const vOut = readNode(voltages, nOut);
-      const gEff = computeGeff();
+      const gEff = computeGeff(weight);
       let iOut = 0;
       if (nOut > 0) {
-        const vTarget = _outputActive ? p.vOL : p.vOH;
+        const vTarget = latchActive ? p.vOL : p.vOH;
         iOut = (vOut - vTarget) * gEff;
       }
       return [iInp, iInn, iOut];

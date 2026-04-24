@@ -1,130 +1,302 @@
-# Review Report: Phase 0 — Dead Code Removal
+# Review Report: Phase 0 — Residual Dead Code Audit
 
 ## Summary
 
-| Item | Value |
+| Item | Count |
 |------|-------|
-| Tasks reviewed | 3 (0.1.2, 0.1.3, 0.1.4) |
-| Violations | 3 |
-| Gaps | 1 |
+| Tasks reviewed | 7 (0.1.1, 0.1.2, 0.2.1, 0.2.2, 0.2.3, 0.3.1, 0.3.2) |
+| Violations — critical | 0 |
+| Violations — major | 2 |
+| Violations — minor | 3 |
+| Gaps | 2 |
 | Weak tests | 0 |
-| Legacy references | 2 |
-| Verdict | **has-violations** |
+| Legacy references | 3 |
 
-Task 0.1.5 is user-owned and excluded per assignment. Task 0.1.1 is spec hygiene only and excluded per assignment.
+**Verdict: has-violations**
 
 ---
 
 ## Violations
 
-### V1 — Historical-provenance comment in bjt.ts (major)
+### V-1 — MAJOR: `comparator.ts` changed from non-pool-backed to `poolBacked: true` with `stateSize: 0`, while retaining per-object mutable closure scalars outside the state pool
 
-**File**: `src/components/semiconductors/bjt.ts`, line 55
-**Rule violated**: rules.md § Code Hygiene — "No `# previously this was...` comments"; "Comments exist ONLY to explain complicated code to future developers. They never describe what was changed, what was removed, or historical behaviour."
+**File**: `src/components/active/comparator.ts` — lines 232–237 and 355–360
+**Rule violated**: Code Hygiene — "No fallbacks. No backwards compatibility shims. No safety wrappers. All replaced or edited code is removed entirely." / CLAUDE.md — Component Model Architecture: pool-backed elements must have all mutable state in the state pool.
+
 **Evidence**:
-```
-// BJ1: VT import removed — all code now uses tp.vt (temperature-dependent thermal voltage)
-```
-This comment describes a historical change ("VT import removed"), not the current state of the code. It is a historical-provenance comment. The governing rules require deletion; such comments must not exist in the codebase.
 
-**Severity**: major
+```ts
+// comparator.ts — both factory functions
+const childElements: readonly AnalogCapacitorElement[] = collectPinModelChildren([]);
+const childStateSize = childElements.reduce((s, c) => s + c.stateSize, 0);
+
+return {
+  poolBacked: true as const,
+  stateSchema: COMPARATOR_COMPOSITE_SCHEMA,
+  stateSize: childStateSize,  // always 0 — comparator has no DigitalPinModel instances
+  ...
+```
+
+And simultaneously retaining at the top of each factory:
+
+```ts
+let _outputActive = false;   // per-object mutable scalar outside state pool
+let _outputWeight = 0.0;     // per-object mutable scalar outside state pool
+```
+
+**Analysis**: Prior to Phase 0, `createOpenCollectorComparatorElement` and `createPushPullComparatorElement` were plain `AnalogElementCore` (non-pool-backed, `isReactive: false`, no `stateSize`). The Phase 0 change adds `poolBacked: true`, `stateSize: 0`, and `stateSchema: COMPARATOR_COMPOSITE_SCHEMA` (an empty schema with zero slots). However the comparator has no `DigitalPinModel` instances, so `collectPinModelChildren([])` always returns an empty array. The composite pattern adds zero functional value here.
+
+More critically: `_outputActive` and `_outputWeight` remain as per-object closure scalars that are NOT checkpointed/rolled-back by the analog engine on NR-failure or LTE-rejection retries. The element now declares itself `poolBacked: true` — which signals to the engine that all mutable state is in the pool and safe to checkpoint — but this claim is false. On any NR retry, `_outputActive` and `_outputWeight` will retain their values from the failed iteration rather than being restored to the pre-attempt state.
+
+The spec for Task 0.2.3 explicitly states that `comparator.ts` is one of the owning files to apply the composite pattern to. However, it does not authorize converting a non-pool-backed element to pool-backed when the element has no pin models and retains out-of-pool mutable state.
 
 ---
 
-### V2 — `Math.min(..., 80)` exp overflow clamp introduced in njfet.ts (major)
+### V-2 — MAJOR: Audit test walk excludes entire `ref/` directory instead of only `ref/ngspice/` as specified
 
-**File**: `src/components/semiconductors/njfet.ts`, lines 284, 302, 320, 381
-**Rule violated**: plan.md Governing Principle 1 — "Match ngspice, or the job has failed." plan.md Phase 0 Verification — "all banned… `Math.exp(700)` guards removed"; CLAUDE.md — "SPICE-Correct Implementations Only: never watered-down 'pragmatic' versions."
-**Evidence** (representative; pattern repeated at lines 302, 320, 381):
-```typescript
-const expArg = Math.min(this._vgs_junction / vt_n, 80);
-this._gd_junction = (this._p.IS / vt_n) * Math.exp(expArg) + GMIN;
-this._id_junction = this._p.IS * (Math.exp(expArg) - 1);
+**File**: `src/solver/analog/__tests__/phase-0-identifier-audit.test.ts` — lines 387–393
+**Rule violated**: Spec acceptance criteria mismatch — Task 0.3.1 states "Walk excludes exactly: `node_modules`, `dist`, `ref/ngspice`, `spec`, `.git`, and the test's own file."
+
+**Evidence**:
+
+```ts
+const EXCLUDED_DIR_NAMES = new Set([
+  "node_modules",
+  "dist",
+  "ref",        // ← excludes ALL of ref/, not just ref/ngspice/
+  "spec",
+  ".git",
+]);
 ```
-This is an exp overflow guard (clamping the exponent to 80) applied to the JFET gate junction Shockley diode calculation. ngspice `jfetload.c` does not clamp the exponent here; it relies on `pnjlim` voltage limiting upstream to keep the argument in range. This pattern is structurally identical to the `Math.exp(Math.min(..., 700))` pattern banned in bjt.ts by task 0.1.3 — the only difference is the threshold value. The Phase 0 governing principle explicitly requires that all `Math.exp(700)` guards be removed; introducing an equivalent guard at 80 in a new code path contradicts that principle. Phase 0 verification requires these guards to be absent from JFET files as much as BJT files.
 
-Note: This code was introduced during Phase 7 (F5ext JFET work), not directly by Phase 0 agents. However it constitutes a banned pattern that exists in the codebase as of Phase 0 completion, and the Phase 0 review must record it.
-
-**Severity**: major
+The spec says "ref/ngspice" specifically. The implementation excludes all of `ref/`. Currently `ref/` contains only `ref/ngspice/`, so there is no practical difference. However the acceptance criterion is not met: a future developer placing source files in `ref/some-other-tool/` would have them silently excluded from the audit without any test failure. The exclusion should match the spec exactly.
 
 ---
 
-### V3 — `Math.min(..., 80)` exp overflow clamp introduced in pjfet.ts (major)
+### V-3 — MINOR: `mosfet.ts` line 532 — "legacy" comment in a Phase-0-modified file
 
-**File**: `src/components/semiconductors/pjfet.ts`, lines 137, 155, 173, 235
-**Rule violated**: Same as V2 — plan.md Governing Principle 1; CLAUDE.md "SPICE-Correct Implementations Only."
-**Evidence** (representative; pattern repeated at lines 155, 173, 235):
-```typescript
-const expArg = Math.min(this._vgs_junction / vt_n, 80);
-this._gd_junction = (this._p.IS / vt_n) * Math.exp(expArg) + GMIN;
-this._id_junction = this._p.IS * (Math.exp(expArg) - 1);
+**File**: `src/components/semiconductors/mosfet.ts` — lines 532–533
+**Rule violated**: Code Hygiene — "Historical-provenance comments are dead-code markers" / comments containing "legacy" must be investigated.
+
+**Evidence**:
+
+```ts
+// The `vsb` argument is the legacy digiTS VSB = vs - vb convention; these
+// helpers invert it to ngspice's vbs for internal use per mos1load.c:500-509.
 ```
-Identical issue as V2 but in the P-channel JFET element. The `_updateOp` override in `PJfetAnalogElement` duplicates the 80-clamp across all four mode branches (MODEINITSMSIG, MODEINITTRAN, MODEINITJCT, and the general path).
 
-**Severity**: major
+**Analysis**: `mosfet.ts` was modified in Task 0.1.2 (per `spec/progress.md`). The comment describes a naming-convention difference between the `computeIds`/`computeGm` helpers and ngspice. The word "legacy" here refers to the argument naming, not to dead code — the helpers are live and the inversion at line 533 is the actual implementation. This is not a dead-code situation; however the comment does contain the banned word "legacy" in a file modified by Phase 0, and by the Code Hygiene rule it must be flagged for inspection. The `vsb` argument is still used at live call sites; the code it decorates is not dead.
+
+---
+
+### V-4 — MINOR: `mosfet.ts` line 950 — "legacy" comment in a Phase-0-modified file
+
+**File**: `src/components/semiconductors/mosfet.ts` — line 950
+**Rule violated**: Code Hygiene — comments containing "legacy."
+
+**Evidence**:
+
+```ts
+// For PMOS, VTO is stored as magnitude (matching legacy expectation);
+// type sign is applied via polarity at use sites.
+```
+
+**Analysis**: Same file as V-3. The comment describes how `VTO` is stored for PMOS. "legacy expectation" refers to a convention, not a removed code path. The `Math.abs(params.VTO)` line it decorates is live PMOS polarity code. Not dead code, but the word "legacy" appears in a Phase-0-modified file.
+
+---
+
+### V-5 — MINOR: Progress.md Task 0.2.2 entry contains a documentation error about `stateSize`
+
+**File**: `spec/progress.md` — Task 0.2.2 entry
+**Rule violated**: Completeness / accuracy of implementation record.
+
+**Evidence** (from `spec/progress.md`):
+
+```
+changed stateSize from 9 to 4
+```
+
+The actual implementation in `src/components/io/led.ts` line 225:
+
+```ts
+stateSize: hasCapacitance ? 6 : 4,
+```
+
+The stateSize for the capacitive variant was changed from 9 to **6**, not 4. The "4" in progress.md appears to refer only to the non-capacitive variant. The spec requires the cap variant to have exactly 6 slots, which the code correctly implements. This is a documentation-only error (the code is correct), but it misrepresents the implementation to future readers of `progress.md`.
 
 ---
 
 ## Gaps
 
-### G1 — SLOT_GD_JUNCTION and SLOT_ID_JUNCTION still exported from njfet.ts and imported by name in jfet.test.ts
+### G-1: Task 0.2.3 spec requires test `getChildElements_returns_capacitor_when_loaded_and_cout_positive` to assert `cOut` condition "fails" — test only checks length, not the spec-stated failure case
 
-**Spec requirement** (plan.md task 7.3.1): "Update test imports — replace `SLOT_GD_JUNCTION`/`SLOT_ID_JUNCTION` with `stateSchema.getSlotOffset("GGS_JUNCTION")`/`("CG_JUNCTION")` per schema-lookup rule"; spec task 7.1.1 renames these slots to `SLOT_GGS_JUNCTION`/`SLOT_CG_JUNCTION`.
+**Spec requirement** (Task 0.2.3):
 
-**What was actually found**:
-- `src/components/semiconductors/njfet.ts` lines 68–69: `SLOT_GD_JUNCTION = 46` and `SLOT_ID_JUNCTION = 47` are still exported under the old names (no rename to `SLOT_GGS_JUNCTION`/`SLOT_CG_JUNCTION` per task 7.1.1).
-- `src/components/semiconductors/__tests__/jfet.test.ts` lines 20–21: imports `SLOT_GD_JUNCTION` and `SLOT_ID_JUNCTION` directly from `njfet.js`; lines 474–475, 495, 515, 519, 531–532 use these constants directly rather than through `stateSchema.getSlotOffset(...)`.
+> `getChildElements_returns_capacitor_when_loaded_and_cout_positive` — asserts `getChildElements()` returns an array of length 1 when `loaded=true` and `cOut=1e-12`, **length 0 when either condition fails**.
 
-**Note**: This gap belongs to Phase 7, not Phase 0. It is recorded here because the Phase 9 spec (Wave 9.1.1) requires a repo-wide grep for `SLOT_GD_JUNCTION` and `SLOT_ID_JUNCTION` to return zero hits — they currently return 9 hits each. Recording for the Phase 9 audit.
+**What was found** (`src/solver/analog/__tests__/digital-pin-model.test.ts` — lines 420–435):
 
-**File**: `src/components/semiconductors/njfet.ts` lines 68–69; `src/components/semiconductors/__tests__/jfet.test.ts` lines 20–21, 474–475, 495, 515, 519, 531–532
+The test `getChildElements_returns_capacitor_when_loaded_and_cout_positive` (line 420) only asserts the length-1 positive case. The "length 0 when either condition fails" assertion (when `loaded=false` with `cOut > 0`) is in a separate test `getChildElements_empty_for_unloaded_output` (line 430). The `loaded=true, cOut=0` failure case is tested via `getChildElements_empty_for_input_with_zero_cin` for the input model, but there is no direct test of `DigitalOutputPinModel` with `loaded=true, cOut=0`.
+
+The spec combined both positive and negative cases into a single test. The implementation splits them into two tests; while the negative case for the input model is covered, the negative case for the output model with `cOut=0` is absent.
+
+---
+
+### G-2: Task 0.3.1 acceptance criterion "Walk excludes exactly" is not met — `ref/ngspice` versus `ref/`
+
+**Spec requirement** (Task 0.3.1):
+
+> "Walk excludes exactly: `node_modules`, `dist`, `ref/ngspice`, `spec`, `.git`, and the test's own file (to avoid recursive matches on the manifest)."
+
+**What was found**: The walk excludes `ref` entirely (all content), not `ref/ngspice` specifically. See V-2 above for the implementation evidence. This acceptance criterion is explicitly not met, even though the practical effect is currently identical.
 
 ---
 
 ## Weak Tests
 
-None found. The jfet.test.ts state-pool tests at lines 474–532 check specific slot values (constants, zero-init, GMIN), which are concrete assertions. No trivially-true assertions observed in the Phase 0 test files.
+None found.
 
 ---
 
 ## Legacy References
 
-### L1 — "removed" in historical-provenance comment in bjt.ts
+### L-1: `src/solver/analog/load-context.ts` line 89 — "backwards compatibility" in interface JSDoc
 
-**File**: `src/components/semiconductors/bjt.ts`, line 55
-**Evidence**:
+**File**: `src/solver/analog/load-context.ts` — line 89
+**Reference**:
+
+```ts
+ * The string form is retained for backwards compatibility
+ * with existing IntegrationMethod consumers; use numeric 0/1 when porting
 ```
-// BJ1: VT import removed — all code now uses tp.vt (temperature-dependent thermal voltage)
-```
-The word "removed" in a comment is a historical-provenance marker. This is the same code flagged in V1; recorded here as a legacy reference as well per reviewer workflow.
+
+**Note**: `load-context.ts` is NOT in the Phase 0 modified files list. This is a pre-existing legacy reference outside Phase 0 scope. It is reported here because it appears in a production interface file that the audit test should ideally check, and because it decorates a live field — the comment explains an intentional design choice to retain the string form. No dead code is present. The use of the banned phrase "backwards compatibility" in a comment, however, violates the Code Hygiene rule and should be addressed in a follow-on cleanup.
 
 ---
 
-### L2 — "fallback" in code-logic comment in bjt.ts
+### L-2: `src/components/semiconductors/mosfet.ts` line 532 — "legacy" in function-group comment
 
-**File**: `src/components/semiconductors/bjt.ts`, line 1516
-**Evidence**:
-```typescript
-// bjtload.c:258-276: MODEINITJCT with OFF / UIC / fallback.
+**File**: `src/components/semiconductors/mosfet.ts` — line 532
+
+```ts
+// The `vsb` argument is the legacy digiTS VSB = vs - vb convention; these
 ```
-The word "fallback" appears in this comment. After examining context (lines 1515–1530), the comment describes the three branches of the ngspice `bjtload.c:258-276` algorithm: the OFF branch (`vbeRaw=0`), the UIC/IC-values branch (`params.ICVBE`), and the default branch (`tpL1.tVcrit`). The word "fallback" here refers to the ngspice algorithm's own terminology for the default branch — it is not a dead-code marker or transitional code descriptor. The code it decorates (the `else if (mode & MODEINITJCT)` block) is live production code faithfully porting ngspice. This is a borderline case; recorded per reviewer protocol. A reviewer cannot confirm it describes historical dead code; it appears to be an ngspice algorithm citation.
 
-**Note**: This is recorded for completeness. The decorated code block (lines 1515–1530) appears to be correct ngspice-aligned production code. The use of "fallback" as an ngspice algorithm term rather than a code-state descriptor makes this a minor concern, but it still violates the letter of the rule ("Comments exist ONLY to explain complicated code to future developers").
+This file was modified in Phase 0 (Task 0.1.2). The comment describes a live naming convention, not a removed code path. See V-3 for full analysis.
 
 ---
 
-## Positive Confirmation (Phase 0 User Requirements)
+### L-3: `src/components/semiconductors/mosfet.ts` line 950 — "legacy" in inline comment
 
-The following were explicitly mandated by the review assignment for verification:
+**File**: `src/components/semiconductors/mosfet.ts` — line 950
 
-1. **`Math.exp(700)` / `Math.min(..., 700)` / `Math.exp(Math.min(..., 700))` in bjt.ts**: Grep across `bjt.ts` returns **zero hits**. All 11–13 clamps are deleted. CONFIRMED CLEAN.
+```ts
+  // For PMOS, VTO is stored as magnitude (matching legacy expectation);
+```
 
-2. **Banned Vds clamps in njfet.ts / pjfet.ts**: `if (vds < -10)` / `if (vds > 50)` patterns grep to **zero hits** across the entire `src/components/semiconductors/` tree. CONFIRMED CLEAN.
+This file was modified in Phase 0 (Task 0.1.2). See V-4 for full analysis.
 
-3. **`junctionCap` export from mosfet.ts**: Grep across all `*.ts` files in `src/` returns **zero hits**. Function and callers are fully deleted. CONFIRMED CLEAN.
+---
 
-4. **Comments saying "removed the clamp" / "was clamped" / legacy breadcrumbs in bjt.ts/njfet.ts/pjfet.ts**: The only hits are (a) `bjt.ts:55` "VT import removed" (recorded as V1/L1) and (b) `bjt.ts:1516` "fallback" (recorded as L2). No "removed the clamp", "was clamped", "workaround", "temporary", "for now", "shim", "previously", or "migrated from" comments found in the three target files.
+## Per-Task Adherence Summary
 
-5. **Re-introduction of banned exp clamps downstream in bjt.ts**: `Math.min(..., \d+)` in `bjt.ts` returns only one hit — `Math.min(Math.max(params.XCJC, 0), 1)` at line 1790, which clamps the XCJC model parameter (a fraction, not an exp argument). **Zero exp-clamp re-introductions in bjt.ts**. CONFIRMED CLEAN.
+### Task 0.1.1 — Delete `derivedNgspiceSlots`
 
-6. **New exp clamp `Math.min(..., 80)` in njfet.ts/pjfet.ts**: Present. Recorded as V2 and V3.
+All deletions confirmed:
+- `DerivedNgspiceSlot` interface: absent from `src/solver/analog/__tests__/harness/types.ts` (grep: zero hits in entire `src/`)
+- `derivedNgspiceSlots?` field: absent from `DeviceMapping`
+- `if (mapping.derivedNgspiceSlots)` blocks in `ngspice-bridge.ts`, `compare.ts`, `parity-helpers.ts`: all removed
+- `derivedNgspiceSlots.VSB` comment in `harness-integration.test.ts`: removed
+- `device-mappings.ts` docstring: tightened to "direct-offset correspondences only"
+
+**Result: CLEAN**
+
+---
+
+### Task 0.1.2 — Strip historical doc-comment residue
+
+All specified comment deletions confirmed:
+- `bjt.ts` module header: `_updateOp`/`_stampCompanion` sentence absent
+- `mosfet.ts` module header and line 884: cleaned (new "legacy vsb" comments at lines 532/540/950 are pre-existing or from sign-convention documentation, not Phase 0 introductions — see L-2, L-3)
+- `njfet.ts`, `pjfet.ts` module headers and inline blocks: clean
+- `varactor.ts` paragraph 13–17: replaced with correct §F2 architectural-alignment rationale
+- `bjt.test.ts` lines 6 and 323: clean
+- `jfet.test.ts` lines 9–10: clean
+- `diode.test.ts` line 703 area: `Math.min(vd/nVt, 700)` deletion note absent; line 703 now contains normal test code
+- `timer-555.test.ts` line 6: clean (header contains only A1 test-handling rationale)
+- `ckt-mode.test.ts` line 5: `InitMode` mention absent
+- `coupled-inductor.ts` lines 9–10: clean (file now describes mutual inductance purpose without provenance commentary)
+
+**Result: CLEAN**
+
+---
+
+### Task 0.2.1 — Collapse tunnel-diode cross-method state slots
+
+All spec changes confirmed:
+- Slot constants: `const SLOT_VD = 0, SLOT_GEQ = 1, SLOT_IEQ = 2, SLOT_ID = 3; const SLOT_Q = 4, SLOT_CCAP = 5;` — correct
+- `TUNNEL_DIODE_CAP_STATE_SCHEMA`: 6 entries (VD, GEQ, IEQ, ID, Q, CCAP) — confirmed
+- `stateSize: hasCapacitance ? 6 : 4` — confirmed
+- `load()` writes only `s0[base + SLOT_Q] = q0; s0[base + SLOT_CCAP] = ccap;` (no SLOT_CAP_GEQ/IEQ/V writes) — confirmed
+- `capGeq`, `capIeq` remain as `load()` locals stamped directly — confirmed
+- Spec-required tests `cap_state_schema_has_no_cap_geq_ieq_v_slots` and `cap_state_size_is_six` present with correct assertions via `schema.indexOf.get()` and `schema.size`
+
+Note: spec prescribed `stateSchema.getSlotOffset("CAP_GEQ")` but `StateSchema` has no `getSlotOffset` method — only `indexOf: ReadonlyMap`. The tests use `schema.indexOf.get()` which is the correct API. Similarly spec said `totalSlots === 6` but the property is `size`. Both are correct-API choices; the spec text was aspirational.
+
+**Result: CLEAN**
+
+---
+
+### Task 0.2.2 — Collapse LED cross-method state slots
+
+All spec changes confirmed:
+- Slot constants: `const SLOT_VD = 0, SLOT_GEQ = 1, SLOT_IEQ = 2, SLOT_ID = 3; const SLOT_Q = 4, SLOT_CCAP = 5;` — correct
+- `LED_CAP_STATE_SCHEMA` exported, 6 entries — confirmed
+- `stateSize: hasCapacitance ? 6 : 4` — confirmed (progress.md says "9 to 4" which is wrong; see V-5)
+- `load()` writes only SLOT_Q and SLOT_CCAP — confirmed
+- Spec-required tests present — confirmed
+
+**Result: CLEAN (minor progress.md documentation error — V-5)**
+
+---
+
+### Task 0.2.3 — Refactor `DigitalPinModel` to use `AnalogCapacitorElement` child
+
+Key acceptance criteria:
+- `_prevVoltage`, `_prevCurrent` absent from `digital-pin-model.ts` — confirmed (grep zero hits)
+- `accept(ctx, voltage)` method absent from both classes — confirmed (tests assert this)
+- `getChildElements()` returns capacitor child when `loaded && cOut > 0` — confirmed
+- `collectPinModelChildren` helper present in `digital-pin-model.ts` — confirmed
+- All 15+ listed owning files have composite pattern applied — confirmed via grep (19 files total in `src/solver/analog/` and `src/components/active/` have `_childElements`/`collectPinModelChildren`)
+
+Concerns:
+- `comparator.ts` converted from non-pool-backed to `poolBacked: true` with `stateSize: 0` while retaining `_outputActive` and `_outputWeight` as out-of-pool mutable scalars — see V-1
+
+**Result: has-violations (V-1, G-1)**
+
+---
+
+### Task 0.3.1 — Author identifier-audit vitest test
+
+All three required tests present (`scope_dirs_exist`, `no_unexpected_hits`, `allowlist_is_not_stale`).
+All manifest identifiers from the spec are present.
+`_prevClockVoltage` allowlist covers the correct 7 files.
+`Math.min(..., 700)` allowlist covers the single test-side reference.
+Walk correctly excludes the test's own file via `THIS_FILE` comparison.
+
+Concern:
+- Excludes all of `ref/` rather than just `ref/ngspice/` — see V-2 and G-2
+
+**Result: has-violations (V-2, G-2)**
+
+---
+
+### Task 0.3.2 — Author Phase 0 audit report
+
+`spec/phase-0-audit-report.md` exists and is correctly structured:
+- Header with HEAD SHA present
+- Per-identifier resolution table covers all manifest identifiers
+- Four bucket sections match manifest classifications
+- "How to re-run" section present with correct vitest command
+
+**Result: CLEAN**

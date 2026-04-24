@@ -529,8 +529,10 @@ function computeTempParams(p: ResolvedMosfetParams, polarity: 1 | -1): MosfetTem
 // ---------------------------------------------------------------------------
 // computeIds / computeGm / computeGds / computeGmbs — standalone functions
 // exported for unit tests that exercise the I-V model directly.
-// The `vsb` argument is the legacy digiTS VSB = vs - vb convention; these
-// helpers invert it to ngspice's vbs for internal use per mos1load.c:500-509.
+// DIVERGENCE - NOT "INTENTIONAL": THESE SIGN FLIPS ARE DEFINITELY NOT APPROVED
+// BY THE AUTHOR.
+// The `vsb` argument uses digiTS's `vs - vb` convention; these helpers invert
+// it to ngspice's `vbs` for internal use per mos1load.c:500-509.
 // ---------------------------------------------------------------------------
 
 /**
@@ -947,8 +949,10 @@ export function createMosfetElement(
   };
 
   const params = resolveParams(rawParams, kpDefault);
-  // For PMOS, VTO is stored as magnitude (matching legacy expectation);
-  // type sign is applied via polarity at use sites.
+  // DIVERGENCE - NOT "INTENTIONAL": THESE SIGN FLIPS ARE DEFINITELY NOT APPROVED
+  // BY THE AUTHOR.
+  // For PMOS, VTO is stored as magnitude and type sign is applied via polarity
+  // at use sites. ngspice mos1temp.c stores signed VTO directly.
   if (polarity === -1) {
     params.VTO = Math.abs(params.VTO);
   }

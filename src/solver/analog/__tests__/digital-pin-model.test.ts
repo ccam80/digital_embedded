@@ -434,6 +434,16 @@ describe("Task 0.2.3 — DigitalPinModel capacitor child refactor", () => {
     expect(pin.getChildElements().length).toBe(0);
   });
 
+  it("getChildElements_empty_for_output_with_zero_cout", () => {
+    // Output pin spec with cOut = 0 → no capacitor child even when loaded.
+    // Covers the second negative branch of Task 0.2.3's acceptance criterion
+    // (length 0 when either `loaded` or `cOut > 0` fails) for the output model.
+    const specNoCap: ResolvedPinElectrical = { ...CMOS_3V3, cOut: 0 };
+    const pin = new DigitalOutputPinModel(specNoCap, true, "direct");
+    pin.init(1, -1);
+    expect(pin.getChildElements().length).toBe(0);
+  });
+
   it("getChildElements_returns_capacitor_when_loaded_and_cin_positive", () => {
     // Loaded input pin with cIn > 0 → one AnalogCapacitorElement child.
     const pin = new DigitalInputPinModel(CMOS_3V3, true);
