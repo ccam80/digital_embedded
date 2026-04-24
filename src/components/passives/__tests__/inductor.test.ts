@@ -45,7 +45,7 @@ function companionAg(dt: number, method: string, order: number): Float64Array {
       ag[0] = 1.0 / dt / (1.0 - xmu);
       ag[1] = xmu / (1 - xmu);
     }
-  } else if (method === "bdf2") {
+  } else if (method === "gear") {
     const r2 = 2;
     const u22 = r2 * (r2 - 1);
     const rhs2 = 1 / dt;
@@ -54,7 +54,6 @@ function companionAg(dt: number, method: string, order: number): Float64Array {
     ag[0] = -(ag[1] + ag2);
     ag[2] = ag2;
   } else {
-    // BDF-1
     ag[0] = 1 / dt;
     ag[1] = -1 / dt;
   }
@@ -77,7 +76,7 @@ function makeCompanionCtx(opts: {
     solver: opts.solver,
     voltages: opts.voltages,
     dt: opts.dt,
-    method: (opts.method === "bdf1" ? "trapezoidal" : opts.method) as LoadContext["method"],
+    method: opts.method as LoadContext["method"],
     order: opts.order,
     deltaOld: [opts.dt, opts.dt, opts.dt, opts.dt, opts.dt, opts.dt, opts.dt],
     ag: companionAg(opts.dt, opts.method, opts.order),
@@ -224,7 +223,7 @@ describe("Inductor", () => {
 
       // For BDF-1: geq = L/h = 0.01 / 1e-4 = 100
       const { solver, stamps } = makeCaptureSolver();
-      analogElement.load(makeCompanionCtx({ solver, voltages, dt: 1e-4, method: "bdf1", order: 1 }));
+      analogElement.load(makeCompanionCtx({ solver, voltages, dt: 1e-4, method: "trapezoidal", order: 1 }));
 
       const branchDiag = stamps.find((s) => s[0] === 2 && s[1] === 2);
       expect(branchDiag).toBeDefined();
@@ -313,7 +312,7 @@ describe("Inductor", () => {
       // voltages[0]=V(node1)=5V, voltages[1]=V(node2)=0V, voltages[2]=I_branch=0.5A
       const voltages = new Float64Array([5, 0, 0.5]);
       const { solver } = makeCaptureSolver();
-      element.load(makeCompanionCtx({ solver, voltages, dt: 1e-4, method: "bdf1", order: 1 }));
+      element.load(makeCompanionCtx({ solver, voltages, dt: 1e-4, method: "trapezoidal", order: 1 }));
 
       // slot 0 = GEQ = L/h = 0.01 / 1e-4 = 100
       // slot 2 = I_PREV = iNow = 0.5 (branch current from voltages[branchIndex=2])
@@ -331,7 +330,7 @@ describe("Inductor", () => {
       // terminal voltage = 10V, branch current = 0.3A
       const voltages = new Float64Array([10, 0, 0.3]);
       const { solver } = makeCaptureSolver();
-      element.load(makeCompanionCtx({ solver, voltages, dt: 1e-4, method: "bdf1", order: 1 }));
+      element.load(makeCompanionCtx({ solver, voltages, dt: 1e-4, method: "trapezoidal", order: 1 }));
 
       // slot 2 must be branch current (0.3), not terminal voltage (10)
     });
@@ -347,13 +346,13 @@ describe("Inductor", () => {
 
       // First call establishes i=0.5 in s0, then rotate so it lands in s1
       const { solver } = makeCaptureSolver();
-      element.load(makeCompanionCtx({ solver, voltages: new Float64Array([5, 0, 0.5]), dt: 1e-4, method: "bdf1", order: 1 }));
+      element.load(makeCompanionCtx({ solver, voltages: new Float64Array([5, 0, 0.5]), dt: 1e-4, method: "trapezoidal", order: 1 }));
       pool.rotateStateVectors();
       // Second call: i=0.6, s1 now has i=0.5
-      element.load(makeCompanionCtx({ solver, voltages: new Float64Array([5, 0, 0.6]), dt: 1e-4, method: "bdf1", order: 1 }));
+      element.load(makeCompanionCtx({ solver, voltages: new Float64Array([5, 0, 0.6]), dt: 1e-4, method: "trapezoidal", order: 1 }));
 
       const lteParams = { trtol: 7, reltol: 1e-3, abstol: 1e-6, chgtol: 1e-14 };
-      const result = element.getLteTimestep!(1e-4, [1e-4, 1e-4], 1, "bdf1", lteParams);
+      const result = element.getLteTimestep!(1e-4, [1e-4, 1e-4], 1, "trapezoidal", lteParams);
       expect(result).toBeGreaterThan(0);
       expect(isFinite(result)).toBe(true);
     });
@@ -379,7 +378,7 @@ describe("Inductor SLOT_VOLT", () => {
     // V(node1)=10V, V(node2)=3V → terminal voltage = 10-3 = 7V
     const voltages = new Float64Array([10, 3, 0.5]);
     const { solver } = makeCaptureSolver();
-    element.load(makeCompanionCtx({ solver, voltages, dt: 1e-4, method: "bdf1", order: 1 }));
+    element.load(makeCompanionCtx({ solver, voltages, dt: 1e-4, method: "trapezoidal", order: 1 }));
 
   });
 
@@ -395,7 +394,7 @@ describe("Inductor SLOT_VOLT", () => {
     // Same voltage on both terminals
     const voltages = new Float64Array([5, 5, 0.0]);
     const { solver } = makeCaptureSolver();
-    element.load(makeCompanionCtx({ solver, voltages, dt: 1e-4, method: "bdf1", order: 1 }));
+    element.load(makeCompanionCtx({ solver, voltages, dt: 1e-4, method: "trapezoidal", order: 1 }));
 
   });
 });

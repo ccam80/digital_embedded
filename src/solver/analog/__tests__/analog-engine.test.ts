@@ -881,8 +881,8 @@ describe("method_stable_across_ringing", () => {
     // the old code. Assert method remains trapezoidal throughout.
     //
     // We run an RC circuit (reactive element) through many steps and verify
-    // currentMethod never becomes "bdf2" (which the old checkMethodSwitch would
-    // have set on detecting alternating terminal voltages).
+    // currentMethod remains "trapezoidal" (the old checkMethodSwitch would
+    // have switched method on detecting alternating terminal voltages).
     const circuit = makeRCCircuit();
     const engine = new MNAEngine();
     engine.init(circuit);
@@ -894,10 +894,8 @@ describe("method_stable_across_ringing", () => {
       expect(engine.getState()).not.toBe(EngineState.ERROR);
     }
 
-    // Method must remain trapezoidal — no BDF-2 switching.
-    expect(engine.integrationMethod).not.toBe("bdf2");
-    // Method is either trapezoidal (initial) or bdf1 (post-breakpoint reset only).
-    expect(["trapezoidal", "bdf1"]).toContain(engine.integrationMethod);
+    // Method must remain trapezoidal.
+    expect(engine.integrationMethod).toBe("trapezoidal");
   });
 });
 

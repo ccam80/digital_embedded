@@ -44,7 +44,7 @@ function companionAg(dt: number, method: string, order: number): Float64Array {
       ag[0] = 1.0 / dt / (1.0 - xmu);
       ag[1] = xmu / (1 - xmu);
     }
-  } else if (method === "bdf2") {
+  } else if (method === "gear") {
     // Equal-step case (deltaOld[1] = dt): ag[0] = 3/(2*dt), ag[1] = -2/dt, ag[2] = 1/(2*dt)
     const r2 = 2;
     const u22 = r2 * (r2 - 1);
@@ -54,7 +54,6 @@ function companionAg(dt: number, method: string, order: number): Float64Array {
     ag[0] = -(ag[1] + ag2);
     ag[2] = ag2;
   } else {
-    // BDF-1
     ag[0] = 1 / dt;
     ag[1] = -1 / dt;
   }
@@ -77,7 +76,7 @@ function makeCompanionCtx(opts: {
     solver: opts.solver,
     rhsOld: opts.voltages,
     dt: opts.dt,
-    method: (opts.method === "bdf1" ? "trapezoidal" : opts.method) as LoadContext["method"],
+    method: opts.method as LoadContext["method"],
     order: opts.order,
     deltaOld: [opts.dt, opts.dt, opts.dt, opts.dt, opts.dt, opts.dt, opts.dt],
     ag: companionAg(opts.dt, opts.method, opts.order),
@@ -183,7 +182,7 @@ describe("Capacitor", () => {
 
       // For BDF-1: geq = C/h = 1e-6 / 1e-6 = 1.0
       const { solver, stamps } = makeCaptureSolver();
-      const ctx = makeCompanionCtx({ solver, voltages, dt: 1e-6, method: "bdf1", order: 1 });
+      const ctx = makeCompanionCtx({ solver, voltages, dt: 1e-6, method: "trapezoidal", order: 1 });
       analogElement.load(ctx);
 
       const geqStamps = stamps.filter((s) => s[2] > 0);
@@ -201,7 +200,7 @@ describe("Capacitor", () => {
 
       // For BDF-2: geq = 3C/(2h) = 3 * 1e-6 / (2 * 1e-6) = 1.5
       const { solver, stamps } = makeCaptureSolver();
-      const ctx = makeCompanionCtx({ solver, voltages, dt: 1e-6, method: "bdf2", order: 2 });
+      const ctx = makeCompanionCtx({ solver, voltages, dt: 1e-6, method: "gear", order: 2 });
       analogElement.load(ctx);
 
       const geqStamps = stamps.filter((s) => s[2] > 0);
@@ -285,7 +284,7 @@ describe("Capacitor", () => {
 
       const voltages = new Float64Array([5, 0]);
       const { solver } = makeCaptureSolver();
-      element.load(makeCompanionCtx({ solver, voltages, dt: 1e-6, method: "bdf1", order: 1 }));
+      element.load(makeCompanionCtx({ solver, voltages, dt: 1e-6, method: "trapezoidal", order: 1 }));
 
       // slot 0 = GEQ = C/h = 1e-6 / 1e-6 = 1.0
       // slot 1 = IEQ = ceq = ccap - geq*vNow. First step: q1=0, ccap=(q0-q1)/dt=C*vNow/dt, ceq=C*vNow/dt - (C/dt)*vNow = 0
@@ -303,10 +302,10 @@ describe("Capacitor", () => {
       const { solver } = makeCaptureSolver();
 
       // First call: voltage = 3V
-      element.load(makeCompanionCtx({ solver, voltages: new Float64Array([3, 0]), dt: 1e-6, method: "bdf1", order: 1 }));
+      element.load(makeCompanionCtx({ solver, voltages: new Float64Array([3, 0]), dt: 1e-6, method: "trapezoidal", order: 1 }));
 
       // Second call: voltage = 7V — V_PREV should now be 7V after the call
-      element.load(makeCompanionCtx({ solver, voltages: new Float64Array([7, 0]), dt: 1e-6, method: "bdf1", order: 1 }));
+      element.load(makeCompanionCtx({ solver, voltages: new Float64Array([7, 0]), dt: 1e-6, method: "trapezoidal", order: 1 }));
     });
 
     it("getLteTimestep returns finite value after two stampCompanion steps", () => {
@@ -319,12 +318,12 @@ describe("Capacitor", () => {
       const { element, pool } = withState(core);
 
       const { solver } = makeCaptureSolver();
-      element.load(makeCompanionCtx({ solver, voltages: new Float64Array([5, 0]), dt: 1e-6, method: "bdf1", order: 1 }));
+      element.load(makeCompanionCtx({ solver, voltages: new Float64Array([5, 0]), dt: 1e-6, method: "trapezoidal", order: 1 }));
       pool.rotateStateVectors();
-      element.load(makeCompanionCtx({ solver, voltages: new Float64Array([7, 0]), dt: 1e-6, method: "bdf1", order: 1 }));
+      element.load(makeCompanionCtx({ solver, voltages: new Float64Array([7, 0]), dt: 1e-6, method: "trapezoidal", order: 1 }));
 
       const lteParams = { trtol: 7, reltol: 1e-3, abstol: 1e-6, chgtol: 1e-14 };
-      const result = element.getLteTimestep!(1e-6, [1e-6, 1e-6], 1, "bdf1", lteParams);
+      const result = element.getLteTimestep!(1e-6, [1e-6, 1e-6], 1, "trapezoidal", lteParams);
       expect(result).toBeGreaterThan(0);
     });
 
@@ -340,13 +339,13 @@ describe("Capacitor", () => {
 
       // First call: v1 = 3V — rotate pool so v=3 lands in s1
       const { solver } = makeCaptureSolver();
-      element.load(makeCompanionCtx({ solver, voltages: new Float64Array([3, 0]), dt: 1e-6, method: "bdf1", order: 1 }));
+      element.load(makeCompanionCtx({ solver, voltages: new Float64Array([3, 0]), dt: 1e-6, method: "trapezoidal", order: 1 }));
       pool.rotateStateVectors();
       // Second call: v2 = 7V
-      element.load(makeCompanionCtx({ solver, voltages: new Float64Array([7, 0]), dt: 1e-6, method: "bdf1", order: 1 }));
+      element.load(makeCompanionCtx({ solver, voltages: new Float64Array([7, 0]), dt: 1e-6, method: "trapezoidal", order: 1 }));
 
       const lteParams = { trtol: 7, reltol: 1e-3, abstol: 1e-6, chgtol: 1e-14 };
-      const result = element.getLteTimestep!(1e-6, [1e-6, 1e-6], 1, "bdf1", lteParams);
+      const result = element.getLteTimestep!(1e-6, [1e-6, 1e-6], 1, "trapezoidal", lteParams);
       expect(result).toBeGreaterThan(0);
       expect(isFinite(result)).toBe(true);
     });
@@ -363,13 +362,13 @@ describe("Capacitor", () => {
 
       // First call: v1 = 5V (non-zero) — rotate so v=5 lands in s1
       const { solver } = makeCaptureSolver();
-      element.load(makeCompanionCtx({ solver, voltages: new Float64Array([5, 0]), dt: 1e-6, method: "bdf1", order: 1 }));
+      element.load(makeCompanionCtx({ solver, voltages: new Float64Array([5, 0]), dt: 1e-6, method: "trapezoidal", order: 1 }));
       pool.rotateStateVectors();
       // Second call: v2 = 0V (zero crossing)
-      element.load(makeCompanionCtx({ solver, voltages: new Float64Array([0, 0]), dt: 1e-6, method: "bdf1", order: 1 }));
+      element.load(makeCompanionCtx({ solver, voltages: new Float64Array([0, 0]), dt: 1e-6, method: "trapezoidal", order: 1 }));
 
       const lteParams = { trtol: 7, reltol: 1e-3, abstol: 1e-6, chgtol: 1e-14 };
-      const result = element.getLteTimestep!(1e-6, [1e-6, 1e-6], 1, "bdf1", lteParams);
+      const result = element.getLteTimestep!(1e-6, [1e-6, 1e-6], 1, "trapezoidal", lteParams);
       expect(result).toBeGreaterThan(0);
     });
   });
@@ -392,13 +391,13 @@ describe("Capacitor initPred", () => {
 
     // First step: v=3V, accepted — charge C*3 lands in s1 after rotateStateVectors
     const { solver } = makeCaptureSolver();
-    element.load(makeCompanionCtx({ solver, voltages: new Float64Array([3, 0]), dt: 1e-6, method: "bdf1", order: 1 }));
+    element.load(makeCompanionCtx({ solver, voltages: new Float64Array([3, 0]), dt: 1e-6, method: "trapezoidal", order: 1 }));
     pool.rotateStateVectors();
 
     // Second step: initPred mode, v=7V (different voltage)
     // q0 should use s1[SLOT_Q] = C*3 = 3µC, NOT C*7 = 7µC
     element.load(makeCompanionCtx({
-      solver, voltages: new Float64Array([7, 0]), dt: 1e-6, method: "bdf1", order: 1,
+      solver, voltages: new Float64Array([7, 0]), dt: 1e-6, method: "trapezoidal", order: 1,
       cktMode: MODETRAN | MODEINITPRED,
     }));
 

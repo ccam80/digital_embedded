@@ -161,14 +161,14 @@
       ],
       "spawned": 5,
       "completed": 4,
-      "verifications_passed": 2,
+      "verifications_passed": 3,
       "verifications_failed": 1,
       "stops_for_clarification": 0,
       "dead_implementers": 1,
       "dead_verifiers": 0,
       "group_status": {
         "3.2.diode": "passed",
-        "3.2.bjt": "failed",
+        "3.2.bjt": "passed",
         "3.2.audit": "passed"
       },
       "user_required_tasks": {
@@ -203,17 +203,17 @@
           "3.3.7"
         ]
       ],
-      "spawned": 0,
-      "completed": 0,
-      "verifications_passed": 0,
+      "spawned": 6,
+      "completed": 4,
+      "verifications_passed": 3,
       "verifications_failed": 0,
       "stops_for_clarification": 0,
-      "dead_implementers": 0,
+      "dead_implementers": 2,
       "dead_verifiers": 0,
       "group_status": {
-        "3.3.collapse": "pending",
-        "3.3.public-api": "pending",
-        "3.3.relay": "pending",
+        "3.3.collapse": "passed",
+        "3.3.public-api": "passed",
+        "3.3.relay": "passed",
         "3.3.audit": "pending"
       },
       "user_required_tasks": {
@@ -679,5 +679,5 @@
       "user_acks": {}
     }
   ],
-  "last_updated": "2026-04-24T07:48:30.456Z"
+  "last_updated": "2026-04-24T08:42:53.050Z"
 }

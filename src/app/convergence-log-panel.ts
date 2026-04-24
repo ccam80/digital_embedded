@@ -112,8 +112,7 @@ function formatSimTime(t: number): string {
 function formatMethod(m: string): string {
   switch (m) {
     case 'trapezoidal': return 'Trap';
-    case 'bdf1': return 'BDF-1';
-    case 'bdf2': return 'BDF-2';
+    case 'gear': return 'Gear';
     default: return m;
   }
 }

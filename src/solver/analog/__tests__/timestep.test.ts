@@ -32,7 +32,7 @@ const DEFAULT_PARAMS: ResolvedSimulationParams = {
   trtol: 7.0,
   maxIterations: 100,
   transientMaxIterations: 10,
-  integrationMethod: "auto",
+  integrationMethod: "trapezoidal",
   dcTrcvMaxIter: 50,
   gmin: 1e-12,
   nodeDamping: false,
@@ -231,14 +231,14 @@ describe("no_method_switching", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Task 5.1.1 — post_breakpoint_bdf1_reset_preserved
+// Task 5.1.1 — post_breakpoint_order1_trap_preserved
 // ---------------------------------------------------------------------------
 
-describe("post_breakpoint_bdf1_reset_preserved", () => {
-  it("post_breakpoint_bdf1_reset_preserved", () => {
-    // Consume a breakpoint mid-simulation. Assert currentMethod === "bdf1"
-    // immediately after the breakpoint accept; assert subsequent
-    // tryOrderPromotion calls skip while _acceptedSteps <= 1.
+describe("post_breakpoint_order1_trap_preserved", () => {
+  it("post_breakpoint_order1_trap_preserved", () => {
+    // Consume a breakpoint mid-simulation. Assert currentMethod === "trapezoidal"
+    // and currentOrder === 1 immediately after the breakpoint accept; assert
+    // subsequent tryOrderPromotion calls skip while _acceptedSteps <= 1.
     const params: ResolvedSimulationParams = { ...DEFAULT_PARAMS, tStop: 1e-3 };
     const ctrl = new TimestepController(params);
 
@@ -253,23 +253,22 @@ describe("post_breakpoint_bdf1_reset_preserved", () => {
     ctrl.addBreakpoint(bpTime);
     ctrl.accept(bpTime);
 
-    // Post-breakpoint: method must be "bdf1".
-    expect(ctrl.currentMethod).toBe("bdf1");
-    expect(ctrl.currentOrder).toBe(1);
+    // Post-breakpoint: method must be order-1 trapezoidal.
+    expect(ctrl.currentMethod === "trapezoidal" && ctrl.currentOrder === 1).toBe(true);
 
     // tryOrderPromotion skips while _acceptedSteps <= 1 after breakpoint reset.
     // The breakpoint accept incremented _acceptedSteps, so we need to check that
     // immediately after the breakpoint step (step count = 6), tryOrderPromotion
     // does NOT promote yet (guard: _acceptedSteps <= 1 is relative to the
-    // internal counter, which is now 6 — but the post-breakpoint bdf1 is set
-    // after accept increments the counter, so the first step after breakpoint
+    // internal counter, which is now 6 — but the post-breakpoint order-1 trap is
+    // set after accept increments the counter, so the first step after breakpoint
     // starts with _acceptedSteps = 7 after next accept).
     //
-    // Direct behaviour check: accept one more step (still in bdf1 due to breakpoint reset).
+    // Direct behaviour check: accept one more step (still order-1 trap due to breakpoint reset).
     // tryOrderPromotion with no reactive elements won't change anything, but the
-    // method must remain "bdf1" until promoted by tryOrderPromotion on next step.
+    // method must remain order-1 trapezoidal until promoted by tryOrderPromotion on next step.
     ctrl.accept(7e-6);
-    // After one step past the breakpoint, method stays bdf1 until tryOrderPromotion
+    // After one step past the breakpoint, method stays order-1 trap until tryOrderPromotion
     // succeeds (requires _acceptedSteps > 1 from the breakpoint's perspective).
     // Since _acceptedSteps is cumulative (7 now), promotion guard passes.
     // But without reactive elements to trigger LTE, tryOrderPromotion's rawTrialDt

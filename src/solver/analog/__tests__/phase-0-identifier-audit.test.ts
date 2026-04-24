@@ -378,6 +378,32 @@ export const BANNED_IDENTIFIERS: ReadonlyArray<BannedIdentifier> = [
     description:
       "Banned Vds upper-clamp pattern (vds > 50). Deleted in Phase 2.5 MOSFET refactor.",
   },
+
+  // -------------------------------------------------------------------------
+  // Phase 3 Wave 3.3 — banned IntegrationMethod literals
+  // -------------------------------------------------------------------------
+  {
+    regex: /(["'])bdf1\1/,
+    description:
+      "Phase 3 Wave 3.3: 'bdf1' is an invented integration method; " +
+      "ngspice has no BDF-1 as a selectable method (cktdefs.h:107-108). " +
+      "Order 1 under either 'trapezoidal' or 'gear' uses the trap-1 " +
+      "coefficients per nicomcof.c:40-41.",
+  },
+  {
+    regex: /(["'])bdf2\1/,
+    description:
+      "Phase 3 Wave 3.3: 'bdf2' is a digiTS rename of ngspice GEAR. " +
+      "Collapsed into 'gear' per cktdefs.h:107-108 (TRAPEZOIDAL=1, " +
+      "GEAR=2). Order 2 routes through solveGearVandermonde.",
+  },
+  {
+    regex: /integrationMethod\s*:\s*["']auto["']/,
+    description:
+      "Phase 3 Wave 3.3: 'auto' is never resolved to a concrete " +
+      "method anywhere in the engine — a silent invention. Default " +
+      "is 'trapezoidal' per cktntask.c:99.",
+  },
 ];
 
 // ---------------------------------------------------------------------------

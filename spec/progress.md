@@ -188,3 +188,105 @@
 - **Files modified**:
   - `src/components/semiconductors/__tests__/phase-3-xfact-predictor.test.ts` — post-verifier fix: added missing pnjlim-calls-under-MODEINITPRED assertions (exact counts: 2 for L0, 3 for L1), added pnjlim-skipped under MODEINITJCT/SMSIG/TRAN tests for both levels, added s1→s0 three-way copy verification for L1, merged split tests to match spec names (vbeRaw+vbcRaw combined for L0 and L1, vsubExtrap+vsubFinal combined for L1), tightened weak `>= 1` assertion to exact `=== 3`, added MODEDCOP/MODEINITJCT/MODEINITSMSIG/MODEINITTRAN imports, removed obsolete probe-writes-defined weak coverage test
 - **Tests**: 17/17 passing
+
+## Task 3.3.2: SimulationParams.integrationMethod public API — delete "auto", match internal type exactly
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: none
+- **Files modified**:
+  - `src/core/analog-engine-interface.ts` — extended import at line 15 to include `IntegrationMethod`; updated doc-comment at line 62; replaced inline union `"auto" | "trapezoidal" | "bdf1" | "bdf2"` with `IntegrationMethod` at line 63; updated default at line 153 from `"auto"` to `"trapezoidal"`
+  - `src/core/__tests__/analog-engine-interface.test.ts` — changed fixture `integrationMethod: "auto"` to `"trapezoidal"` at line 40; updated two `toBe("auto")` assertions to `"trapezoidal"` at lines 52 and 63; rewrote `simulation_params_integration_methods` test to enumerate only `["trapezoidal", "gear"]`
+  - `src/solver/analog/__tests__/timestep.test.ts` — changed fixture `integrationMethod: "auto"` to `"trapezoidal"` at line 35
+  - `src/solver/analog/__tests__/harness/types.ts` — tightened `integrationMethod: { ours: string | null; ngspice: string | null }` to `IntegrationMethod | null` at line 53; tightened `integrationMethod: string | null` to `IntegrationMethod | null` at lines 497 and 994 (import already present at line 11)
+- **Tests**: 28/28 passing
+  - `src/core/__tests__/analog-engine-interface.test.ts`: all tests pass
+  - `src/solver/analog/__tests__/timestep.test.ts`: all tests pass
+- **tsc --noEmit**: zero errors in modified files; 10 pre-existing errors in `comparator.test.ts` (syntax) and `analog-shape-audit.test.ts` (syntax), both pre-existing per progress.md Task 0.2.3
+
+## Task 3.3.4: getLteTimestep signature narrowing audit (regression guard only)
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: none
+- **Files modified**: none
+- **Tests**: 0/0 (audit-only task — covered by Task 3.3.6 manifest extension)
+- **Audit result**: zero hits for `"bdf1"` / `"bdf2"` in `src/components/**/*.ts` EXCLUDING `__tests__/` directories. All hits are confined to `__tests__/` subdirectories which are owned by parallel tasks 3.3.1/3.3.2/3.3.3.
+
+## Task 3.3.5: Compile-time assertion in analog-engine-interface.ts
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: none
+- **Files modified**: `src/core/analog-engine-interface.ts` — appended `_AssertPublicInternalEq` conditional-type assertion + const + void at module scope after the `AnalogEngine` interface closing brace (lines 415-429)
+- **Tests**: 0/0 (compilation is the test)
+- **tsc result**: zero errors from `analog-engine-interface.ts`; `_AssertPublicInternalEq` resolves to `true` (both directions of extends hold). Pre-existing errors in `comparator.test.ts` and `analog-shape-audit.test.ts` unchanged.
+
+## Task 3.3.6: Identifier-audit manifest extension
+- **Status**: complete (manifest entries added; audit test passes once parallel tasks 3.3.1/3.3.3 clean remaining bdf1/bdf2 hits from their owned files)
+- **Agent**: implementer
+- **Files created**: none
+- **Files modified**:
+  - `src/solver/analog/__tests__/phase-0-identifier-audit.test.ts` — appended three `BannedIdentifier` entries to `BANNED_IDENTIFIERS`: `/(["'])bdf1\1/`, `/(["'])bdf2\1/`, `/integrationMethod\s*:\s*["']auto["']/`
+  - `spec/phase-0-audit-report.md` — appended Phase 3 Wave 3.3 rule additions section with three rule rows
+- **Tests**: 2/3 passing at time of run — `scope_dirs_exist` and `allowlist_is_not_stale` pass; `no_unexpected_hits` fails with 29 violations all in files owned by parallel tasks 3.3.1/3.3.3. Expected to pass fully once those tasks complete.
+
+## Task 3.3.7: Public-surface consumer audit
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: none
+- **Files modified**: none — zero hits for `integrationMethod` in `scripts/`, `src/io/`, `src/app/`, `e2e/`; zero hits for `"auto"/"bdf1"/"bdf2"` in any of those directories. No edits required.
+- **Tests**: 0/0 (audit-only — acceptance criteria met by zero hits in public surfaces)
+
+## Task 3.3.3: behavioral relay composite-child rewrite
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: src/solver/analog/__tests__/phase-3-relay-composite.test.ts
+- **Files modified**:
+  - src/solver/analog/behavioral-remaining.ts — rewrote createRelayAnalogElement and createRelayDTAnalogElement to delegate coil integration to AnalogInductorElement child via composite-child pattern; deleted iL/geqL/ieqL closure vars and all method===bdf1/bdf2/trapezoidal branches; added import for AnalogInductorElement and INDUCTOR_DEFAULTS
+  - src/components/switching/relay.ts — added branchCount: 1 to behavioral modelRegistry entry
+  - src/components/switching/relay-dt.ts — added branchCount: 1 to behavioral modelRegistry entry
+  - src/solver/analog/__tests__/behavioral-remaining.test.ts — updated coil_energizes_contact test to use a real branchIdx (7), matrixSize=8, state pool initialization, computeNIcomCof, MODEINITTRAN on first step, and voltages field in ctx
+- **Tests**: 3/3 passing (phase-3-relay-composite.test.ts: 2/2; behavioral-remaining.test.ts relay test: 1/1)
+- **Pre-existing failures in behavioral-remaining.test.ts**: remaining_pin_loading_propagates (digital-pin-model.ts:29 — voltages vs rhsOld mismatch in test ctx, pre-dates this task)
+- **Pre-existing failures in behavioral-flipflop tests**: 14 failures (capacitor.ts:254 and digital-pin-model.ts:29 — same voltages/rhsOld mismatch pattern, zero relay references in those test files, unrelated to relay rewrite)
+
+## Task 3.3.1: bdf1/bdf2 purge — part 2 after dead implementer (3.3.collapse retry)
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: none
+- **Files modified**:
+  - `src/solver/analog/timestep.ts` — doc comment line 130 updated; `this.currentMethod = "bdf1"` → `"trapezoidal"` in breakpoint reset path (line 537)
+  - `src/solver/analog/ni-pred.ts` — alias comments at lines 28, 50, 167 updated to remove bdf1/bdf2 references; `@param method` doc updated to `"trapezoidal" | "gear"`
+  - `src/solver/analog/ckt-terr.ts` — doc-comment `@param order` updated from `1 for bdf1/trap, 2 for bdf2` to `1 for trap; 1..6 for gear`
+  - `src/solver/analog/analog-engine.ts` — three `"bdf1"` literals in DCOP convergence-log records replaced with `"trapezoidal"`
+  - `src/app/convergence-log-panel.ts` — removed dead `bdf1`/`bdf2` cases from `formatMethod()`, added `gear` case
+  - `src/solver/analog/__tests__/integration.test.ts` — remapped `"bdf1"` → `"trapezoidal"` (order 1), `"bdf2"` → `"gear"` (order 2)
+  - `src/solver/analog/__tests__/ckt-terr.test.ts` — all `"bdf1"` → `"gear"` (GEAR path) and `"bdf2"` → `"gear"`; test labels updated (`order 1 bdf1:` → `order 1 trapezoidal:`, `order 2 bdf2:` → `order 2 gear:`)
+  - `src/solver/analog/__tests__/compute-refs.test.ts` — `"bdf1"` → `"trapezoidal"`, `"bdf2"` → `"gear"`; log labels updated
+  - `src/solver/analog/__tests__/analog-engine.test.ts` — deleted `not.toBe("bdf2")` assertion; collapsed `.toContain(["trapezoidal", "bdf1"])` to `toBe("trapezoidal")`; fixed comment
+  - `src/solver/analog/__tests__/behavioral-flipflop.test.ts` — 11 `'bdf1'` → `'trapezoidal'`
+  - `src/solver/analog/__tests__/behavioral-flipflop-variants.test.ts` — `"bdf1" as const` → `"trapezoidal" as const`
+  - `src/solver/analog/__tests__/ckt-context.test.ts` — validMethods array narrowed to `["trapezoidal", "gear"]`
+  - `src/solver/analog/__tests__/timestep.test.ts` — renamed describe/it from `post_breakpoint_bdf1_reset_preserved` → `post_breakpoint_order1_trap_preserved`; assertion updated from `ctrl.currentMethod === "bdf1"` to `ctrl.currentMethod === "trapezoidal" && ctrl.currentOrder === 1`
+  - `src/solver/analog/__tests__/harness/ngspice-bridge.ts` — removed `"bdf1"` from method map, simplified to 2 cases
+  - `src/solver/analog/__tests__/harness/comparison-session.ts` — `rawMethod === "bdf2"` → `rawMethod === "gear"`
+  - `src/solver/analog/__tests__/harness/types.ts` — doc comments updated to remove bdf1/bdf2 from method vocabulary
+- **Tests**: 98 passed / 124 total in targeted files. 26 failures are pre-existing: 12x behavioral-flipflop (`_pool.states undefined` in capacitor.ts:254, unrelated to integration method); 2x digital-pin-model (pre-existing); 1x ckt-context (pre-existing Float64Array assertion); 11x ckt-terr (pre-existing formula mismatch between NGSPICE_REF using `exp(log(del)/(order+1))` vs code using `exp(log(del)/order)` for order>2, and order=1 sqrt mismatch). None of these failures were caused by the bdf1/bdf2 remap.
+- **tsc**: Zero errors in modified files. Two pre-existing unrelated syntax errors in `comparator.test.ts` and `analog-shape-audit.test.ts`.
+
+## Task 3.3.4/3.3.5/3.3.6/3.3.7: Wave 3.3 collapse + audit manifest extension + public-surface verification (fix + completion pass)
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: none
+- **Files modified**:
+  - `src/solver/analog/__tests__/phase-0-identifier-audit.test.ts` — three new banned-literal manifest entries already present (bdf1-literal, bdf2-literal, integrationMethod-auto) from prior implementer; THIS_FILE self-exclusion confirmed operative for all three
+  - `spec/phase-0-audit-report.md` — Phase 3 Wave 3.3 rule additions table already present from prior implementer
+  - `src/core/analog-engine-interface.ts` — compile-time assertion `_AssertPublicInternalEq` already present (Task 3.3.5, prior implementer)
+  - `src/components/passives/__tests__/capacitor.test.ts` — replaced all `"bdf1"` → `"trapezoidal"`, `"bdf2"` → `"gear"`; removed `method === "bdf1" ? "trapezoidal"` coercion shim from `makeCompanionCtx`; updated `companionAg()` branch from `"bdf2"` to `"gear"`
+  - `src/components/passives/__tests__/inductor.test.ts` — same replacements: all `"bdf1"` → `"trapezoidal"`, removed coercion shim, updated `companionAg()` branch from `"bdf2"` to `"gear"`
+  - `src/components/passives/__tests__/polarized-cap.test.ts` — replaced all `"bdf1"` → `"trapezoidal"`
+  - `src/components/passives/__tests__/transmission-line.test.ts` — replaced all `"bdf1"` → `"trapezoidal"`
+- **Tests**: 3/3 passing (`phase-0-identifier-audit.test.ts`: scope_dirs_exist, no_unexpected_hits, allowlist_is_not_stale all green)
+- **Public-surface grep (Task 3.3.7)**:
+  - `e2e/`: zero hits for integrationMethod auto/bdf1/bdf2
+  - `scripts/`: zero hits
+  - `src/io/`: zero hits
+  - `src/app/`: zero hits

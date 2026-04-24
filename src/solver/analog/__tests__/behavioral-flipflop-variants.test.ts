@@ -79,7 +79,7 @@ function makeCtx(v: Float64Array = new Float64Array(8)): LoadContext {
     voltages: v,
     cktMode: MODETRAN | MODEINITFLOAT,
     dt: 0,
-    method: "bdf1" as const,
+    method: "trapezoidal" as const,
     order: 1,
     deltaOld: [],
     ag: new Float64Array(7),

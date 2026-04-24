@@ -311,27 +311,16 @@ export function computeNIcomCof(
       ag[0] = 1.0 / dt / (1.0 - xmu);
       ag[1] = xmu / (1 - xmu);
     }
-  } else if (method === "bdf2") {
-    const h1 = deltaOld[1] > 0 ? deltaOld[1] : dt;
-    const r1 = 1;
-    const r2 = (dt + h1) / dt;
-    const u22 = r2 * (r2 - r1);
-    if (Math.abs(u22) < 1e-30) {
+  } else {
+    // method === "gear"
+    // nicomcof.c:40-41 — order 1 regardless of method uses the trap-1 formula.
+    if (order === 1) {
       ag[0] = 1 / dt;
       ag[1] = -1 / dt;
     } else {
-      const rhs2 = r1 / dt;
-      const ag2 = rhs2 / u22;
-      ag[1] = (-1 / dt - r2 * ag2) / r1;
-      ag[0] = -(ag[1] + ag2);
-      ag[2] = ag2;
+      // nicomcof.c:52-127 — GEAR order 2..6 via Vandermonde collocation.
+      solveGearVandermonde(dt, deltaOld, order, ag, scratch);
     }
-  } else if (method === "gear") {
-    solveGearVandermonde(dt, deltaOld, order, ag, scratch);
-  } else {
-    // BDF-1
-    ag[0] = 1 / dt;
-    ag[1] = -1 / dt;
   }
 }
 

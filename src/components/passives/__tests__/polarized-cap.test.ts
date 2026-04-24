@@ -244,14 +244,14 @@ describe("PolarizedCap", () => {
       const deltaOld = [dt, dt, dt, dt, dt, dt, dt];
       const ag = new Float64Array(7);
       const scratch = new Float64Array(64);
-      computeNIcomCof(dt, deltaOld, 1, "bdf1", ag, scratch);
+      computeNIcomCof(dt, deltaOld, 1, "trapezoidal", ag, scratch);
 
       const ctx: LoadContext = {
         cktMode: MODETRAN | MODEINITTRAN,
         solver,
         voltages,
         dt,
-        method: "bdf1",
+        method: "trapezoidal",
         order: 1,
         deltaOld,
         ag,
@@ -318,7 +318,7 @@ describe("PolarizedCap", () => {
       const dt = RC / 500;
       const steps = 500;
 
-      const method: IntegrationMethod = "bdf1";
+      const method: IntegrationMethod = "trapezoidal";
       const order = 1;
       const deltaOld = [dt, dt, dt, dt, dt, dt, dt];
       const ag = new Float64Array(7);
@@ -496,7 +496,7 @@ describe("PolarizedCap", () => {
       const voltages = new Float64Array([5, 0]); // node1=5V, node2=0V
       const solver = new SparseSolver();
       solver.beginAssembly(2);
-      el.load(makeSlotLoadCtx(solver, voltages, 1e-6, "bdf1", 1, MODETRAN | MODEINITTRAN));
+      el.load(makeSlotLoadCtx(solver, voltages, 1e-6, "trapezoidal", 1, MODETRAN | MODEINITTRAN));
       solver.finalize();
       expect(pool.state0[0]).toBeGreaterThan(0); // GEQ = C/dt > 0
       // IEQ = ceq = 0 on first step (zero charge history): ccap = C*vNow/dt, geq*vNow = C*vNow/dt → ceq=0
@@ -509,7 +509,7 @@ describe("PolarizedCap", () => {
       const voltages = new Float64Array([0, 3]); // node1=0, node2=3V
       const solver = new SparseSolver();
       solver.beginAssembly(2);
-      el.load(makeSlotLoadCtx(solver, voltages, 1e-6, "bdf1", 1, MODETRAN | MODEINITTRAN));
+      el.load(makeSlotLoadCtx(solver, voltages, 1e-6, "trapezoidal", 1, MODETRAN | MODEINITTRAN));
       solver.finalize();
     });
 

@@ -12,7 +12,7 @@
 
 import type { Engine, CompiledCircuit, MeasurementObserver } from "./engine-interface.js";
 import type { Wire } from "../core/circuit.js";
-import type { AcParams, AcResult, DiagnosticSuggestion, StatePoolRef } from "./analog-types.js";
+import type { AcParams, AcResult, DiagnosticSuggestion, StatePoolRef, IntegrationMethod } from "./analog-types.js";
 import type { ConvergenceLog } from "../solver/analog/convergence-log.js";
 import type { Diagnostic, DiagnosticCode } from "../compile/types.js";
 export type { AcParams, AcResult, DiagnosticSuggestion };
@@ -59,8 +59,8 @@ export interface SimulationParams {
   maxIterations: number;
   /** Max NR iterations per transient timestep (ngspice ITL4). Default: 10 */
   transientMaxIterations: number;
-  /** Integration method. Default: 'auto' */
-  integrationMethod: "auto" | "trapezoidal" | "bdf1" | "bdf2";
+  /** Integration method. Default: 'trapezoidal' per ngspice cktntask.c:99. No auto mode exists in ngspice; GEAR is user-selectable. */
+  integrationMethod: IntegrationMethod;
   /**
    * Max NR iterations per gmin/source stepping sub-solve (ngspice ITL3 / CKTdcTrcvMaxIter).
    * Default: 50.
@@ -150,7 +150,7 @@ export const DEFAULT_SIMULATION_PARAMS: ResolvedSimulationParams = {
   trtol: 7.0,
   maxIterations: 100,
   transientMaxIterations: 10,
-  integrationMethod: "auto",
+  integrationMethod: "trapezoidal",
   dcTrcvMaxIter: 50,
   gmin: 1e-12,
   nodeDamping: false,
@@ -412,3 +412,17 @@ export interface AnalogEngine extends Engine {
    */
   removeMeasurementObserver(observer: MeasurementObserver): void;
 }
+
+// --- Compile-time guard: public SimulationParams.integrationMethod must
+// equal the internal IntegrationMethod type exactly (no drift between the
+// UI / MCP / postMessage public surface and the solver-facing type).
+// If this line fails to compile, the two types have diverged — realign
+// before shipping. See spec/phase-3-f2-nr-reorder-xfact.md Wave 3.3.
+type _AssertPublicInternalEq =
+  SimulationParams["integrationMethod"] extends IntegrationMethod
+    ? IntegrationMethod extends SimulationParams["integrationMethod"]
+      ? true
+      : never
+    : never;
+const _assertPublicInternalEq: _AssertPublicInternalEq = true;
+void _assertPublicInternalEq;

@@ -292,6 +292,7 @@ export const RelayDTDefinition: ComponentDefinition = {
       factory: createRelayDTAnalogElement,
       paramDefs: [],
       params: {},
+      branchCount: 1,
     },
   },
   defaultModel: "digital",

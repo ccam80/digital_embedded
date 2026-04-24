@@ -2669,7 +2669,7 @@ export class ComparisonSession {
     const rawMethod: IntegrationMethod = this._engine.integrationMethod;
     const method: "backwardEuler" | "trapezoidal" | "gear2" =
       rawMethod === "trapezoidal" ? "trapezoidal"
-      : rawMethod === "bdf2" ? "gear2"
+      : rawMethod === "gear" ? "gear2"
       : "backwardEuler";
     // After a step completes: deltaOld[0] = dt used in this step (set by setDeltaOldCurrent),
     // deltaOld[1] = dt of the previous step (h1), deltaOld[2] = h_{n-2}.

@@ -152,10 +152,10 @@ describe("DFF", () => {
     const currVoltages = voltages(3.3, 3.3);  // clock high (rising edge), D high
 
     // First accepted timestep at clock=low
-    element.accept(makeCtx(prevVoltages, 1e-9, 'bdf1'), 0, () => {});
+    element.accept(makeCtx(prevVoltages, 1e-9, 'trapezoidal'), 0, () => {});
 
     // Second timestep: clock rises → should latch D=high
-    element.accept(makeCtx(currVoltages, 1e-9, 'bdf1'), 0, () => {});
+    element.accept(makeCtx(currVoltages, 1e-9, 'trapezoidal'), 0, () => {});
 
     // After rising edge with D=3.3V (> vIH=2.0), Q should be latched HIGH.
     // Refresh pin state via load().
@@ -173,11 +173,11 @@ describe("DFF", () => {
     element.load(makeCtx());
 
     // Rising edge with D=high → latch Q=true
-    element.accept(makeCtx(voltages(0.0, 3.3), 1e-9, 'bdf1'), 0, () => {});
-    element.accept(makeCtx(voltages(3.3, 3.3), 1e-9, 'bdf1'), 0, () => {});
+    element.accept(makeCtx(voltages(0.0, 3.3), 1e-9, 'trapezoidal'), 0, () => {});
+    element.accept(makeCtx(voltages(3.3, 3.3), 1e-9, 'trapezoidal'), 0, () => {});
 
     // Falling edge with D=low — Q must NOT change
-    element.accept(makeCtx(voltages(0.0, 0.0), 1e-9, 'bdf1'), 0, () => {});
+    element.accept(makeCtx(voltages(0.0, 0.0), 1e-9, 'trapezoidal'), 0, () => {});
 
     element.load(makeCtx(voltages(0.0, 0.0)));
 
@@ -192,8 +192,8 @@ describe("DFF", () => {
 
 
     // Rising edge with D=high → Q=true
-    element.accept(makeCtx(voltages(0.0, 3.3), 1e-9, 'bdf1'), 0, () => {});
-    element.accept(makeCtx(voltages(3.3, 3.3), 1e-9, 'bdf1'), 0, () => {});
+    element.accept(makeCtx(voltages(0.0, 3.3), 1e-9, 'trapezoidal'), 0, () => {});
+    element.accept(makeCtx(voltages(3.3, 3.3), 1e-9, 'trapezoidal'), 0, () => {});
 
     element.load(makeCtx(voltages(3.3, 3.3)));
 
@@ -220,8 +220,8 @@ describe("DFF", () => {
     }
 
     // Now accept the timestep via accept() — Q should latch D=high
-    element.accept(makeCtx(voltages(0.0, 3.3), 1e-9, 'bdf1'), 0, () => {});  // prev: clock low
-    element.accept(makeCtx(voltages(3.3, 3.3), 1e-9, 'bdf1'), 0, () => {});  // curr: rising edge
+    element.accept(makeCtx(voltages(0.0, 3.3), 1e-9, 'trapezoidal'), 0, () => {});  // prev: clock low
+    element.accept(makeCtx(voltages(3.3, 3.3), 1e-9, 'trapezoidal'), 0, () => {});  // curr: rising edge
 
     element.load(makeCtx(voltages(3.3, 3.3)));
   });
@@ -232,13 +232,13 @@ describe("DFF", () => {
     const { element, qPin } = buildDff(true);
 
     // First latch Q=high via rising edge
-    element.accept(makeCtx(voltages(0.0, 3.3, 0, 0, 3.3), 1e-9, 'bdf1'), 0, () => {}); // clock low
-    element.accept(makeCtx(voltages(3.3, 3.3, 3.3, 0, 3.3), 1e-9, 'bdf1'), 0, () => {}); // rising edge, reset HIGH (inactive)
+    element.accept(makeCtx(voltages(0.0, 3.3, 0, 0, 3.3), 1e-9, 'trapezoidal'), 0, () => {}); // clock low
+    element.accept(makeCtx(voltages(3.3, 3.3, 3.3, 0, 3.3), 1e-9, 'trapezoidal'), 0, () => {}); // rising edge, reset HIGH (inactive)
 
     element.load(makeCtx(voltages(3.3, 3.3, 3.3, 0, 3.3)));
 
     // Now apply reset (active-low: reset voltage < vIL=0.8 → force Q=false)
-    element.accept(makeCtx(voltages(3.3, 3.3, 3.3, 0, 0.0), 1e-9, 'bdf1'), 0, () => {}); // reset = 0V < vIL
+    element.accept(makeCtx(voltages(3.3, 3.3, 3.3, 0, 0.0), 1e-9, 'trapezoidal'), 0, () => {}); // reset = 0V < vIL
 
     element.load(makeCtx(voltages(3.3, 3.3, 3.3, 0, 0.0)));
   });

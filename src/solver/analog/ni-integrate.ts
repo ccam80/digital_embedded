@@ -35,9 +35,8 @@ export function niIntegrate(
       // niinteg.c:32-34 — RECURSIVE in ccapPrev
       ccap = -ccapPrev * ag[1] + ag[0] * (q0 - q1);
     }
-  } else if (method === "gear" || method === "bdf1" || method === "bdf2") {
-    // GEAR / BDF-n — niinteg.c:43, 47-63.
-    // "bdf1" and "bdf2" are digiTS aliases for the same BDF accumulator path.
+  } else if (method === "gear") {
+    // GEAR — niinteg.c:43, 47-63.
     // capload.c:69: NIintegrate returns E_ORDER for invalid order; mirror that here.
     if (order < 1) {
       throw new Error(`niIntegrate: unsupported BDF/GEAR order ${order} (ngspice E_ORDER)`);

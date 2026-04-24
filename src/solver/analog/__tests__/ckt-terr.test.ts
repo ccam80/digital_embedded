@@ -19,14 +19,14 @@ const defaultParams: LteParams = {
 
 describe("cktTerr", () => {
   it("returns Infinity when dt <= 0", () => {
-    expect(cktTerr(0, [1e-9, 1e-9], 1, "bdf1", 1e-12, 1e-12, 0, 0, 0, 0, defaultParams)).toBe(Infinity);
-    expect(cktTerr(-1e-9, [1e-9, 1e-9], 1, "bdf1", 1e-12, 1e-12, 0, 0, 0, 0, defaultParams)).toBe(Infinity);
+    expect(cktTerr(0, [1e-9, 1e-9], 1, "gear", 1e-12, 1e-12, 0, 0, 0, 0, defaultParams)).toBe(Infinity);
+    expect(cktTerr(-1e-9, [1e-9, 1e-9], 1, "gear", 1e-12, 1e-12, 0, 0, 0, 0, defaultParams)).toBe(Infinity);
   });
 
-  it("order 1 bdf1: returns finite positive timestep for non-trivial charges", () => {
+  it("order 1 trapezoidal: returns finite positive timestep for non-trivial charges", () => {
     const dt = 1e-9;
     const q0 = 1e-12, q1 = 0.9e-12, q2 = 0.8e-12;
-    const result = cktTerr(dt, [dt, dt], 1, "bdf1", q0, q1, q2, 0, q0, q1, defaultParams);
+    const result = cktTerr(dt, [dt, dt], 1, "gear", q0, q1, q2, 0, q0, q1, defaultParams);
 
     // NGSPICE_REF: ngspice cktterr.c CKTterr, order=1 GEAR (BDF-1) path.
     // Divided difference (2nd) -> tolerance -> del = trtol*tol/max(abstol, factor*ddiff)
@@ -50,11 +50,11 @@ describe("cktTerr", () => {
     expect(result).toBe(NGSPICE_REF);
   });
 
-  it("order 2 bdf2: returns sqrt-scaled timestep", () => {
+  it("order 2 gear: returns sqrt-scaled timestep", () => {
     // Use cubic charge history so 3rd divided difference is nonzero for order=2
     const dt = 1e-9;
     const q0 = 27e-12, q1 = 8e-12, q2 = 1e-12, q3 = 0;
-    const r2 = cktTerr(dt, [dt, dt], 2, "bdf2", q0, q1, q2, q3, q0, q1, defaultParams);
+    const r2 = cktTerr(dt, [dt, dt], 2, "gear", q0, q1, q2, q3, q0, q1, defaultParams);
 
     // NGSPICE_REF: ngspice cktterr.c CKTterr, order=2 GEAR (BDF-2) path.
     // 3rd divided difference -> tol -> del -> root via exp(log(del)/(order+1)).
@@ -85,7 +85,7 @@ describe("cktTerr", () => {
     // When ddiff=0, TRAP returns Infinity; GEAR returns sqrt(abstol-gated del)
     const dt = 1e-9;
     const q = 1e-12;
-    const result = cktTerr(dt, [dt, dt], 1, "bdf1", q, q, q, q, q, q, defaultParams);
+    const result = cktTerr(dt, [dt, dt], 1, "gear", q, q, q, q, q, q, defaultParams);
 
     // NGSPICE_REF: ngspice cktterr.c CKTterr, order=1 GEAR, ddiff=0 case.
     // Constant Q -> 2nd divided difference = 0 -> denom clamps to abstol ->
@@ -101,13 +101,13 @@ describe("cktTerr", () => {
     expect(result).toBe(NGSPICE_REF);
   });
 
-  it("bdf2 order 2 returns positive finite timestep for cubic charge data", () => {
-    // TRAP order 2 and BDF2 order 2 use different formula families.
+  it("gear order 2 returns positive finite timestep for cubic charge data", () => {
+    // TRAP order 2 and gear order 2 use different formula families.
     // Both must return a positive finite timestep for nonlinear input data.
     const dt = 1.0;
     const q0 = 27.0, q1 = 8.0, q2 = 1.0, q3 = 0.0;
     const rTrap = cktTerr(dt, [dt, dt], 2, "trapezoidal", q0, q1, q2, q3, q0, q1, defaultParams);
-    const rBdf2 = cktTerr(dt, [dt, dt], 2, "bdf2", q0, q1, q2, q3, q0, q1, defaultParams);
+    const rBdf2 = cktTerr(dt, [dt, dt], 2, "gear", q0, q1, q2, q3, q0, q1, defaultParams);
 
     // Shared divided-difference bookkeeping (ngspice cktterr.c:43-59 order=2).
     const h0 = dt, h1 = dt, h2 = dt;
@@ -149,8 +149,8 @@ describe("cktTerr", () => {
 
 describe("cktTerrVoltage", () => {
   it("returns Infinity when dt <= 0", () => {
-    expect(cktTerrVoltage(1, 0.9, 0.8, 0.7, 0, [1e-9, 1e-9], 1, "bdf1", 1e-3, 1e-6, 7)).toBe(Infinity);
-    expect(cktTerrVoltage(1, 0.9, 0.8, 0.7, -1e-9, [1e-9, 1e-9], 1, "bdf1", 1e-3, 1e-6, 7)).toBe(Infinity);
+    expect(cktTerrVoltage(1, 0.9, 0.8, 0.7, 0, [1e-9, 1e-9], 1, "gear", 1e-3, 1e-6, 7)).toBe(Infinity);
+    expect(cktTerrVoltage(1, 0.9, 0.8, 0.7, -1e-9, [1e-9, 1e-9], 1, "gear", 1e-3, 1e-6, 7)).toBe(Infinity);
   });
 
   it("constant voltages produce finite timestep (not Infinity) — lteAbstol-gated", () => {
@@ -158,7 +158,7 @@ describe("cktTerrVoltage", () => {
     const v = 5.0;
     const dt = 1e-9;
     const lteReltol = 1e-3, lteAbstol = 1e-6, trtol = 7;
-    const result = cktTerrVoltage(v, v, v, v, dt, [dt, dt], 1, "bdf1", lteReltol, lteAbstol, trtol);
+    const result = cktTerrVoltage(v, v, v, v, dt, [dt, dt], 1, "gear", lteReltol, lteAbstol, trtol);
 
     // NGSPICE_REF: ngspice ckttrunc.c NEWTRUNC GEAR order 1, ddiff=0 case.
     //   tol = lteAbstol + lteReltol * max(|vNow|,|v1|)
@@ -175,12 +175,12 @@ describe("cktTerrVoltage", () => {
     expect(result).toBe(NGSPICE_REF);
   });
 
-  it("order 1 bdf1: linear voltage gives finite (lteAbstol-gated) result", () => {
+  it("order 1 trapezoidal: linear voltage gives finite (lteAbstol-gated) result", () => {
     // Linear ramp: 2nd divided diff = 0 for order=1; GEAR returns sqrt(del) where del>0
     const dt = 1e-9;
     const vNow = 4.0, v1 = 3.0, v2 = 2.0, v3 = 1.0;
     const lteReltol = 1e-3, lteAbstol = 1e-6, trtol = 7;
-    const result = cktTerrVoltage(vNow, v1, v2, v3, dt, [dt, dt], 1, "bdf1", lteReltol, lteAbstol, trtol);
+    const result = cktTerrVoltage(vNow, v1, v2, v3, dt, [dt, dt], 1, "gear", lteReltol, lteAbstol, trtol);
 
     // NGSPICE_REF: ngspice ckttrunc.c NEWTRUNC GEAR order 1.
     // For a strictly linear ramp, the 2nd divided difference is 0; denom clamps to lteAbstol.
@@ -201,12 +201,12 @@ describe("cktTerrVoltage", () => {
     expect(result).toBe(NGSPICE_REF);
   });
 
-  it("order 2 bdf2: applies sqrt root extraction for nonzero 3rd divided difference", () => {
+  it("order 2 gear: applies sqrt root extraction for nonzero 3rd divided difference", () => {
     // Cubic data: v=27,8,1,0 at dt=1 gives 3rd divided diff = 1
     const dt = 1.0;
     const vNow = 27, v1 = 8, v2 = 1, v3 = 0;
     const lteReltol = 1e-3, lteAbstol = 1e-6, trtol = 7;
-    const r2 = cktTerrVoltage(vNow, v1, v2, v3, dt, [dt, dt], 2, "bdf2", lteReltol, lteAbstol, trtol);
+    const r2 = cktTerrVoltage(vNow, v1, v2, v3, dt, [dt, dt], 2, "gear", lteReltol, lteAbstol, trtol);
 
     // NGSPICE_REF: ngspice ckttrunc.c NEWTRUNC GEAR order 2.
     //   result = delta * exp(log(tmp) / (order+1))
@@ -237,8 +237,8 @@ describe("cktTerrVoltage", () => {
     // larger lteReltol increases tol without affecting denom -> larger del.
     const dt = 1.0;
     const v0 = 9.0, v1 = 4.0, v2 = 1.0, v3 = 0.0;
-    const rLoose = cktTerrVoltage(v0, v1, v2, v3, dt, [dt, dt], 1, "bdf1", 1e-2, 1e-6, 7);
-    const rTight = cktTerrVoltage(v0, v1, v2, v3, dt, [dt, dt], 1, "bdf1", 1e-4, 1e-6, 7);
+    const rLoose = cktTerrVoltage(v0, v1, v2, v3, dt, [dt, dt], 1, "gear", 1e-2, 1e-6, 7);
+    const rTight = cktTerrVoltage(v0, v1, v2, v3, dt, [dt, dt], 1, "gear", 1e-4, 1e-6, 7);
     expect(rLoose).toBeGreaterThan(rTight);
   });
 
@@ -248,19 +248,19 @@ describe("cktTerrVoltage", () => {
     // not exactly 2x. But the comparison still holds: bigger trtol -> bigger result.
     const dt = 1.0;
     const v0 = 9.0, v1 = 4.0, v2 = 1.0, v3 = 0.0;
-    const rBig = cktTerrVoltage(v0, v1, v2, v3, dt, [dt, dt], 1, "bdf1", 1e-3, 1e-6, 14);
-    const rSmall = cktTerrVoltage(v0, v1, v2, v3, dt, [dt, dt], 1, "bdf1", 1e-3, 1e-6, 7);
+    const rBig = cktTerrVoltage(v0, v1, v2, v3, dt, [dt, dt], 1, "gear", 1e-3, 1e-6, 14);
+    const rSmall = cktTerrVoltage(v0, v1, v2, v3, dt, [dt, dt], 1, "gear", 1e-3, 1e-6, 7);
     expect(rBig).toBeGreaterThan(rSmall);
   });
 
-  it("trapezoidal order 2 and bdf2 order 2 both return positive finite timestep for cubic data", () => {
-    // TRAP order 2 and BDF2 order 2 use different formula families.
+  it("trapezoidal order 2 and gear order 2 both return positive finite timestep for cubic data", () => {
+    // TRAP order 2 and gear order 2 use different formula families.
     // Both must return a positive finite timestep for nonlinear input data.
     const dt = 1.0;
     const v0 = 27.0, v1 = 8.0, v2 = 1.0, v3 = 0.0;
     const lteReltol = 1e-3, lteAbstol = 1e-6, trtol = 7;
     const rTrap = cktTerrVoltage(v0, v1, v2, v3, dt, [dt, dt], 2, "trapezoidal", lteReltol, lteAbstol, trtol);
-    const rBdf2 = cktTerrVoltage(v0, v1, v2, v3, dt, [dt, dt], 2, "bdf2", lteReltol, lteAbstol, trtol);
+    const rBdf2 = cktTerrVoltage(v0, v1, v2, v3, dt, [dt, dt], 2, "gear", lteReltol, lteAbstol, trtol);
 
     // Shared divided-difference (ngspice ckttrunc.c NEWTRUNC, order=2).
     const h0 = dt, h1 = dt, h2 = dt;
@@ -296,7 +296,7 @@ describe("cktTerrVoltage", () => {
     const dt = 1.0;
     const vNow = 4, v1 = 3, v2 = 2, v3 = 1;
     const lteReltol = 1e-3, lteAbstol = 1e-6, trtol = 7;
-    const result = cktTerrVoltage(vNow, v1, v2, v3, dt, [dt, dt], 2, "bdf2", lteReltol, lteAbstol, trtol);
+    const result = cktTerrVoltage(vNow, v1, v2, v3, dt, [dt, dt], 2, "gear", lteReltol, lteAbstol, trtol);
 
     // NGSPICE_REF: ngspice ckttrunc.c NEWTRUNC GEAR order 2.
     // Linear ramp -> 3rd divided difference = 0 -> denom clamps to lteAbstol.
@@ -351,8 +351,8 @@ describe("zero_allocations_in_lte_path", () => {
     const params: LteParams = { trtol: 7, reltol: 1e-3, abstol: 1e-6, chgtol: 1e-14 };
 
     // Warm up — first call may trigger internal initialisation not counted.
-    cktTerr(dt, deltaOld, 1, "bdf1", 1e-12, 0.9e-12, 0.8e-12, 0, 1e-12, 0.9e-12, params);
-    cktTerrVoltage(5.0, 4.9, 4.8, 4.7, dt, deltaOld, 1, "bdf1", 1e-3, 1e-6, 7);
+    cktTerr(dt, deltaOld, 1, "gear", 1e-12, 0.9e-12, 0.8e-12, 0, 1e-12, 0.9e-12, params);
+    cktTerrVoltage(5.0, 4.9, 4.8, 4.7, dt, deltaOld, 1, "gear", 1e-3, 1e-6, 7);
 
     // Reset counters after warmup.
     f64Count = 0;
@@ -361,10 +361,10 @@ describe("zero_allocations_in_lte_path", () => {
     // Run 100 LTE evaluations across orders 1 and 2, charge-based and voltage-based.
     for (let i = 0; i < 50; i++) {
       const q = 1e-12 * (1 + i * 0.01);
-      cktTerr(dt, deltaOld, 1, "bdf1", q, q * 0.99, q * 0.98, 0, q, q * 0.99, params);
-      cktTerr(dt, deltaOld, 2, "bdf2", q, q * 0.99, q * 0.98, q * 0.97, q, q * 0.99, params);
-      cktTerrVoltage(5 + i * 0.001, 4.9, 4.8, 4.7, dt, deltaOld, 1, "bdf1", 1e-3, 1e-6, 7);
-      cktTerrVoltage(5 + i * 0.001, 4.9, 4.8, 4.7, dt, deltaOld, 2, "bdf2", 1e-3, 1e-6, 7);
+      cktTerr(dt, deltaOld, 1, "gear", q, q * 0.99, q * 0.98, 0, q, q * 0.99, params);
+      cktTerr(dt, deltaOld, 2, "gear", q, q * 0.99, q * 0.98, q * 0.97, q, q * 0.99, params);
+      cktTerrVoltage(5 + i * 0.001, 4.9, 4.8, 4.7, dt, deltaOld, 1, "gear", 1e-3, 1e-6, 7);
+      cktTerrVoltage(5 + i * 0.001, 4.9, 4.8, 4.7, dt, deltaOld, 2, "gear", 1e-3, 1e-6, 7);
     }
 
     (globalThis as unknown as Record<string, unknown>)["Float64Array"] = RealF64;
@@ -429,7 +429,7 @@ describe("gear_lte_factor_selection", () => {
     const dt = 1e-6;
     const q0 = 27e-12, q1 = 8e-12, q2 = 1e-12, q3 = 0;
     const params: LteParams = { trtol: 7, reltol: 1e-3, abstol: 1e-12, chgtol: 1e-14 };
-    const resultOrder3 = cktTerr(dt, [dt, dt, dt], 3, "bdf2", q0, q1, q2, q3, q0, q1, params);
+    const resultOrder3 = cktTerr(dt, [dt, dt, dt], 3, "gear", q0, q1, q2, q3, q0, q1, params);
 
     // Reference using correct factor 3/22 for order 3
     // Compute ddiff for order=2 path (order=3 also uses order=2 divide-diff since only unrolled for 1,2)
@@ -464,7 +464,7 @@ describe("gear_lte_factor_selection", () => {
     const dt = 1e-6;
     const q0 = 27e-12, q1 = 8e-12, q2 = 1e-12, q3 = 0;
     const params: LteParams = { trtol: 7, reltol: 1e-3, abstol: 1e-12, chgtol: 1e-14 };
-    const resultOrder5 = cktTerr(dt, [dt, dt, dt, dt, dt], 5, "bdf2", q0, q1, q2, q3, q0, q1, params);
+    const resultOrder5 = cktTerr(dt, [dt, dt, dt, dt, dt], 5, "gear", q0, q1, q2, q3, q0, q1, params);
 
     // Reference using correct factor 10/137 for order 5 (order>=2 uses the same
     // order-2 divided-difference path; only the factor and root index differ).
@@ -500,7 +500,7 @@ describe("gear_lte_factor_selection", () => {
     const dt = 1e-6;
     const q0 = 27e-12, q1 = 8e-12, q2 = 1e-12, q3 = 0;
     const params: LteParams = { trtol: 7, reltol: 1e-3, abstol: 1e-12, chgtol: 1e-14 };
-    const resultOrder6 = cktTerr(dt, [dt, dt, dt, dt, dt], 6, "bdf2", q0, q1, q2, q3, q0, q1, params);
+    const resultOrder6 = cktTerr(dt, [dt, dt, dt, dt, dt], 6, "gear", q0, q1, q2, q3, q0, q1, params);
 
     // Bit-exact reference for order 6.
     const h0 = dt, h1 = dt, h2 = dt;
@@ -621,7 +621,7 @@ describe("cktTerr_formula_fixes", () => {
     const tmp = (tolV * trtol * delsum) / (denomV * delta);
     const reference = delta * Math.exp(Math.log(tmp) / (order + 1));
 
-    const result = cktTerrVoltage(vNow, v1, v2, v3, dt, deltaOld, order, "bdf2", lteReltol, lteAbstol, trtol);
+    const result = cktTerrVoltage(vNow, v1, v2, v3, dt, deltaOld, order, "gear", lteReltol, lteAbstol, trtol);
     expect(result).toBe(reference); // bit-exact IEEE-754
   });
 
@@ -651,7 +651,7 @@ describe("cktTerr_formula_fixes", () => {
     const del = 7 * tol / denom;
     const expectedSqrt = Math.sqrt(del);
 
-    const result = cktTerr(dt, deltaOld, 1, "bdf1", q0, q1, q2, q3, ccap0, ccap1, params);
+    const result = cktTerr(dt, deltaOld, 1, "gear", q0, q1, q2, q3, ccap0, ccap1, params);
     expect(result).toBe(expectedSqrt); // must be sqrt(del), not del
     expect(result).not.toBe(del);       // confirm del != sqrt(del) for this input
   });
@@ -680,7 +680,7 @@ describe("cktTerr_formula_fixes", () => {
     const tmp = (tolV * trtol * delsum) / (denomV * delta);
     const expectedResult = delta * Math.sqrt(tmp);
 
-    const result = cktTerrVoltage(vNow, v1, v2, v3, dt, deltaOld, 1, "bdf1", lteReltol, lteAbstol, trtol);
+    const result = cktTerrVoltage(vNow, v1, v2, v3, dt, deltaOld, 1, "gear", lteReltol, lteAbstol, trtol);
     expect(result).toBe(expectedResult);
   });
 
@@ -716,7 +716,7 @@ describe("cktTerr_formula_fixes", () => {
     // Wrong (old): exp(log(del) / 3) = del^(1/3)
     const wrongOrder = Math.exp(Math.log(del) / 3);
 
-    const result = cktTerr(dt, deltaOld, 3, "bdf2", q0, q1, q2, q3, ccap0, ccap1, params);
+    const result = cktTerr(dt, deltaOld, 3, "gear", q0, q1, q2, q3, ccap0, ccap1, params);
     expect(result).toBe(expectedOrderPlus1); // bit-exact: uses (order+1)=4
     expect(result).not.toBe(wrongOrder);     // confirm old formula was different
   });

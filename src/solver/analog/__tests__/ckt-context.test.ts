@@ -274,7 +274,7 @@ describe("CKTCircuitContext", () => {
     expect(lc.dt).toBe(0);
 
     // method — valid integration method string
-    const validMethods = ["trapezoidal", "bdf1", "bdf2", "gear"];
+    const validMethods = ["trapezoidal", "gear"];
     expect(validMethods).toContain(lc.method);
 
     // order — default is 1 at construction

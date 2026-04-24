@@ -207,3 +207,16 @@ immediate test failure with the offending file paths and line numbers printed.
 
 Phase 9.1.1 re-runs this test as its final sweep. A green run with zero unexpected hits
 confirms that no banned identifier has been reintroduced since Phase 0 closed.
+
+---
+
+## Phase 3 Wave 3.3 rule additions
+
+Three banned-literal rules were appended to the audit manifest in Task 3.3.6 to ban the
+invented `IntegrationMethod` identifiers deleted by Wave 3.3.
+
+| Rule ID | Pattern | Scope | Allowlist | Resolution | Cited-at |
+|---|---|---|---|---|---|
+| `bdf1-literal` | `/(["'])bdf1\1/` | `src/**/*.ts` (all, via SCOPE_DIRS walker) | empty | deleted-in-Phase-3 — purged from all of `src/` by Tasks 3.3.1, 3.3.2, 3.3.3. ngspice has no BDF-1 selectable method (cktdefs.h:107-108); order 1 under either method uses trap-1 coefficients per nicomcof.c:40-41. | 3.3.6 |
+| `bdf2-literal` | `/(["'])bdf2\1/` | `src/**/*.ts` (all, via SCOPE_DIRS walker) | empty | deleted-in-Phase-3 — collapsed into `"gear"` per cktdefs.h:107-108 (TRAPEZOIDAL=1, GEAR=2). Order 2 routes through solveGearVandermonde. | 3.3.6 |
+| `integrationMethod-auto` | `/integrationMethod\s*:\s*["']auto["']/` | `src/**/*.ts` (all, via SCOPE_DIRS walker) | empty | deleted-in-Phase-3 — `"auto"` was never resolved to a concrete method anywhere in the engine. Default changed to `"trapezoidal"` per cktntask.c:99. | 3.3.6 |

@@ -15,12 +15,19 @@
 /**
  * Numerical integration method used by companion-model reactive elements.
  *
- * 'trapezoidal' — second-order A-stable (Gear/SPICE default)
- * 'bdf1'        — first-order backward Euler (robust, low accuracy)
- * 'bdf2'        — second-order BDF (good stiffness handling)
- * 'gear'        — general Gear BDF method, orders 3-6 (nicomcof.c Vandermonde)
+ * Corresponds to ngspice cktdefs.h:107-108:
+ *   #define TRAPEZOIDAL 1
+ *   #define GEAR        2
+ *
+ * 'trapezoidal' — A-stable trapezoidal rule (ngspice TRAPEZOIDAL=1).
+ *                 Order 1 uses the trap-1 coefficients per nicomcof.c:40-41.
+ * 'gear'        — Gear BDF method, orders 1..6 via Vandermonde collocation
+ *                 (ngspice GEAR=2, nicomcof.c:52-127). Order 1 also uses the
+ *                 trap-1 coefficients per nicomcof.c:40-41.
+ *
+ * Default per ngspice cktntask.c:99: TRAPEZOIDAL.
  */
-export type IntegrationMethod = "trapezoidal" | "bdf1" | "bdf2" | "gear";
+export type IntegrationMethod = "trapezoidal" | "gear";
 
 // ---------------------------------------------------------------------------
 // Minimal SparseSolver interface — structural duck-type for stamp methods

@@ -127,7 +127,7 @@ export class TimestepController {
 
   /**
    * Integration order derived from currentMethod.
-   * 1 for bdf1, 2 for trapezoidal and bdf2. ngspice: CKTorder.
+   * 1 for order-1 trapezoidal; 2 for order-2 trapezoidal or gear. ngspice: CKTorder.
    *
    * Initialized to 1 to match ngspice dctran.c:315 (`ckt->CKTorder = 1;` at
    * transient entry). Order is promoted to 2 only after the first order-1
@@ -532,9 +532,9 @@ export class TimestepController {
     }
 
     // ngspice dctran.c:493 — reset integration order after a breakpoint
-    // so the first step past the discontinuity uses the robust BDF-1.
+    // so the first step past the discontinuity uses order-1 trapezoidal.
     if (breakpointConsumed) {
-      this.currentMethod = "bdf1";
+      this.currentMethod = "trapezoidal";
       this.currentOrder = 1;
 
       // ngspice dctran.c:506-507 — reduce delta after breakpoint:

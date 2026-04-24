@@ -37,7 +37,7 @@ describe("AnalogEngineTypes", () => {
       trtol: 7.0,
       maxIterations: 100,
       transientMaxIterations: 10,
-      integrationMethod: "auto",
+      integrationMethod: "trapezoidal",
       dcTrcvMaxIter: 50,
       gmin: 1e-12,
       nodeDamping: false,
@@ -49,7 +49,7 @@ describe("AnalogEngineTypes", () => {
     expect(params.voltTol).toBe(1e-6);
     expect(params.chargeTol).toBe(1e-14);
     expect(params.maxIterations).toBe(100);
-    expect(params.integrationMethod).toBe("auto");
+    expect(params.integrationMethod).toBe("trapezoidal");
     expect(params.gmin).toBe(1e-12);
 
     // Verify DEFAULT_SIMULATION_PARAMS matches the spec
@@ -60,7 +60,7 @@ describe("AnalogEngineTypes", () => {
     expect(DEFAULT_SIMULATION_PARAMS.voltTol).toBe(1e-6);
     expect(DEFAULT_SIMULATION_PARAMS.chargeTol).toBe(1e-14);
     expect(DEFAULT_SIMULATION_PARAMS.maxIterations).toBe(100);
-    expect(DEFAULT_SIMULATION_PARAMS.integrationMethod).toBe("auto");
+    expect(DEFAULT_SIMULATION_PARAMS.integrationMethod).toBe("trapezoidal");
     expect(DEFAULT_SIMULATION_PARAMS.gmin).toBe(1e-12);
   });
 
@@ -270,10 +270,8 @@ describe("AnalogEngineTypes", () => {
 
   it("simulation_params_integration_methods", () => {
     const methods: SimulationParams["integrationMethod"][] = [
-      "auto",
       "trapezoidal",
-      "bdf1",
-      "bdf2",
+      "gear",
     ];
 
     for (const method of methods) {

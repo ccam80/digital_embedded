@@ -735,13 +735,11 @@ export class NgspiceBridge {
       }));
 
       // ngspice integrateMethod FFI code (niiter.c) → harness IntegrationMethod.
-      // ngspice exposes only trapezoidal/gear in CKTintegrateMethod; our enum
-      // additionally covers bdf1/bdf2. Map code 0→bdf1 (backward Euler / TRAP
-      // with order 1 in ngspice legacy), 1→trapezoidal, 2→gear. Anything else
-      // falls back to "trapezoidal" (ngspice default).
+      // ngspice exposes only trapezoidal/gear in CKTintegrateMethod.
+      // Map code 0→trapezoidal (order 1 trap per ngspice legacy), 1→trapezoidal,
+      // 2→gear. Anything else falls back to "trapezoidal" (ngspice default).
       const ngIntegrateMethod: IntegrationMethod =
-        raw.integrateMethod === 0 ? "bdf1"
-        : raw.integrateMethod === 2 ? "gear"
+        raw.integrateMethod === 2 ? "gear"
         : "trapezoidal";
       // Only ag0/ag1 are marshalled across the FFI (see §8.1 of ngspice-bridge
       // struct); pad remaining slots with 0 to match the length-7 harness shape.

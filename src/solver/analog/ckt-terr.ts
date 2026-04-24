@@ -85,7 +85,7 @@ export const __testHooks = {
  * @param dt        Current timestep (seconds)
  * @param deltaOld  Timestep history: [h_{n-1}, h_{n-2}, ...]. Length >= order.
  *                  This is the controller's pre-allocated array, never copied.
- * @param order     Integration order (1 for bdf1/trap, 2 for bdf2)
+ * @param order     Integration order (1 for trap; 1..6 for gear)
  * @param method    Integration method (determines LTE coefficient)
  * @param q0        Charge at current step Q_n
  * @param q1        Charge at step n-1

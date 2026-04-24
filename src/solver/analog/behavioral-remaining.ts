@@ -31,6 +31,7 @@ import {
 import { defineStateSchema } from "./state-schema.js";
 import type { StateSchema } from "./state-schema.js";
 import type { AnalogCapacitorElement } from "../../components/passives/capacitor.js";
+import { AnalogInductorElement, INDUCTOR_DEFAULTS } from "../../components/passives/inductor.js";
 
 const REMAINING_COMPOSITE_SCHEMA: StateSchema = defineStateSchema("BehavioralRemainingComposite", []);
 
@@ -583,6 +584,10 @@ export function createRelayAnalogElement(
   branchIdx: number,
   props: PropertyBag,
 ): AnalogElementCore {
+  // Composite-child pattern — delegates coil integration to a standard
+  // AnalogInductorElement child, following the DigitalPinModel →
+  // AnalogCapacitorElement precedent landed in Phase 0 Wave 0.2.3
+  // (src/solver/analog/digital-pin-model.ts).
   const nodeCoil1 = pinNodes.get("in1")!; // coil terminal 1
   const nodeCoil2 = pinNodes.get("in2")!; // coil terminal 2
   const nodeContactA = pinNodes.get("A1")!; // contact A
@@ -601,85 +606,75 @@ export function createRelayAnalogElement(
     ? (props.get("normallyClosed") as boolean)
     : false;
 
-  // Inductor companion model state
-  let iL = 0; // inductor current (through branch)
-  let geqL = 0;
-  let ieqL = 0;
+  // Child inductor element owns coil branch row, state pool slots, and load()
+  // integration. The relay's own load() stamps only the contact conductances.
+  const coilInductor = new AnalogInductorElement(
+    branchIdx,
+    L,
+    INDUCTOR_DEFAULTS["IC"]!,
+    INDUCTOR_DEFAULTS["TC1"]!,
+    INDUCTOR_DEFAULTS["TC2"]!,
+    INDUCTOR_DEFAULTS["TNOM"]!,
+    INDUCTOR_DEFAULTS["SCALE"]!,
+    INDUCTOR_DEFAULTS["M"]!,
+  );
+  coilInductor.pinNodeIds = [nodeCoil1, nodeCoil2];
 
   // Contact state
   let contactClosed = normallyClosed;
 
-  // Current contact conductance
   function contactG(): number {
     return contactClosed ? 1 / RELAY_R_ON : 1 / RELAY_R_OFF;
   }
 
-  const branchRow = branchIdx; // MNA row for inductor branch current
-
   return {
-    branchIndex: branchRow,
+    branchIndex: branchIdx,
     isNonlinear: true,
     isReactive: true,
 
+    poolBacked: true as const,
+    stateSchema: REMAINING_COMPOSITE_SCHEMA,
+    stateSize: coilInductor.stateSize,
+    stateBaseOffset: -1,
+
+    initState(pool: StatePoolRef): void {
+      coilInductor.stateBaseOffset = (this as { stateBaseOffset: number }).stateBaseOffset;
+      coilInductor.initState(pool);
+    },
+
+    getChildElements(): readonly AnalogInductorElement[] {
+      return [coilInductor];
+    },
+
     load(ctx: LoadContext): void {
       const s = ctx.solver;
-      const voltages = ctx.rhsOld;
-
       // Coil DC resistance stamps between coil1 and coil2
       stampG(s, nodeCoil1, nodeCoil2, 1 / rCoil);
       // Contact variable resistance (current contact state)
       stampG(s, nodeContactA, nodeContactB, contactG());
-
-      if ((ctx.cktMode & MODETRAN) !== 0 && ctx.dt > 0 && L > 0) {
-        // Inductor companion model: G_eq = dt/(2L) for trapezoidal,
-        // dt/L for BDF-1, 2/3 * dt/L for BDF-2
-        const factor = ctx.method === "bdf1" ? 1 : (ctx.method === "bdf2" ? 2 / 3 : 0.5);
-        geqL = (ctx.dt * factor) / L;
-        const vCoil1 = nodeCoil1 > 0 ? voltages[nodeCoil1 - 1] : 0;
-        const vCoil2 = nodeCoil2 > 0 ? voltages[nodeCoil2 - 1] : 0;
-        const vL = vCoil1 - vCoil2;
-        if (ctx.method === "trapezoidal") {
-          ieqL = iL + geqL * vL;
-        } else {
-          ieqL = iL;
-        }
-        // Stamp inductor companion: parallel conductance + current source
-        stampG(s, nodeCoil1, nodeCoil2, geqL);
-        stampRHS(s, nodeCoil1, ieqL);
-        if (nodeCoil2 > 0) stampRHS(s, nodeCoil2, -ieqL);
-      }
+      // Coil inductor stamping is handled entirely by the child element
+      coilInductor.load(ctx);
     },
 
     accept(ctx: LoadContext, _simTime: number, _addBreakpoint: (t: number) => void): void {
-      const voltages = ctx.rhs;
-      // Update inductor current from accepted solution
-      if (L > 0 && ctx.dt > 0) {
-        const vCoil1 = nodeCoil1 > 0 ? voltages[nodeCoil1 - 1] : 0;
-        const vCoil2 = nodeCoil2 > 0 ? voltages[nodeCoil2 - 1] : 0;
-        const vL = vCoil1 - vCoil2;
-        const factor = 0.5; // trapezoidal default
-        iL = ieqL + geqL * vL + factor * (ctx.dt / L) * vL;
-      }
-      // Update contact state based on coil current magnitude
-      const coilCurrentMag = Math.abs(iL);
-      const energised = coilCurrentMag > iPull;
+      // Read accepted coil current from the child inductor's branch row
+      const iCoil = branchIdx >= 0 ? ctx.rhs[branchIdx] : 0;
+      const energised = Math.abs(iCoil) > iPull;
       contactClosed = normallyClosed ? !energised : energised;
     },
 
     getPinCurrents(voltages: Float64Array): number[] {
       // Pin layout order: in1, in2, A1, B1 (Relay poles=1).
-      // Coil: 1/rCoil between coil1 and coil2.
+      // Coil branch current from child inductor's branch row.
       // Contact: contactG() between A1 and B1.
-      const vCoil1 = nodeCoil1 > 0 ? voltages[nodeCoil1 - 1] : 0;
-      const vCoil2 = nodeCoil2 > 0 ? voltages[nodeCoil2 - 1] : 0;
-      const iCoil = (vCoil1 - vCoil2) / rCoil;
+      const iCoil = branchIdx >= 0 ? voltages[branchIdx] : 0;
       const vA = nodeContactA > 0 ? voltages[nodeContactA - 1] : 0;
       const vB = nodeContactB > 0 ? voltages[nodeContactB - 1] : 0;
       const iContact = contactG() * (vA - vB);
       return [iCoil, -iCoil, iContact, -iContact];
     },
 
-    setParam(_key: string, _value: number) {},
+    setParam(key: string, value: number) { coilInductor.setParam(key, value); },
   };
 }
 
@@ -700,6 +695,10 @@ export function createRelayDTAnalogElement(
   branchIdx: number,
   props: PropertyBag,
 ): AnalogElementCore {
+  // Composite-child pattern — delegates coil integration to a standard
+  // AnalogInductorElement child, following the DigitalPinModel →
+  // AnalogCapacitorElement precedent landed in Phase 0 Wave 0.2.3
+  // (src/solver/analog/digital-pin-model.ts).
   const nodeCoil1 = pinNodes.get("in1")!; // coil terminal 1
   const nodeCoil2 = pinNodes.get("in2")!; // coil terminal 2
   const nodeCommon = pinNodes.get("A1")!;  // common (A1)
@@ -716,9 +715,19 @@ export function createRelayDTAnalogElement(
     ? (props.get("iPull") as number)
     : RELAY_I_PULL_DEFAULT;
 
-  let iL = 0;
-  let geqL = 0;
-  let ieqL = 0;
+  // Child inductor element owns coil branch row, state pool slots, and load()
+  // integration. The relay's own load() stamps only the contact conductances.
+  const coilInductor = new AnalogInductorElement(
+    branchIdx,
+    L,
+    INDUCTOR_DEFAULTS["IC"]!,
+    INDUCTOR_DEFAULTS["TC1"]!,
+    INDUCTOR_DEFAULTS["TC2"]!,
+    INDUCTOR_DEFAULTS["TNOM"]!,
+    INDUCTOR_DEFAULTS["SCALE"]!,
+    INDUCTOR_DEFAULTS["M"]!,
+  );
+  coilInductor.pinNodeIds = [nodeCoil1, nodeCoil2];
 
   // Initial state: de-energised → A-C connected (rest), A-B open (throw)
   let energised = false;
@@ -731,45 +740,40 @@ export function createRelayDTAnalogElement(
     isNonlinear: true,
     isReactive: true,
 
+    poolBacked: true as const,
+    stateSchema: REMAINING_COMPOSITE_SCHEMA,
+    stateSize: coilInductor.stateSize,
+    stateBaseOffset: -1,
+
+    initState(pool: StatePoolRef): void {
+      coilInductor.stateBaseOffset = (this as { stateBaseOffset: number }).stateBaseOffset;
+      coilInductor.initState(pool);
+    },
+
+    getChildElements(): readonly AnalogInductorElement[] {
+      return [coilInductor];
+    },
+
     load(ctx: LoadContext): void {
       const s = ctx.solver;
-      const voltages = ctx.rhsOld;
-
       stampG(s, nodeCoil1, nodeCoil2, 1 / rCoil);
       stampG(s, nodeCommon, nodeThrow, gThrow());
       stampG(s, nodeCommon, nodeRest, gRest());
-
-      if ((ctx.cktMode & MODETRAN) !== 0 && ctx.dt > 0 && L > 0) {
-        const factor = ctx.method === "bdf1" ? 1 : (ctx.method === "bdf2" ? 2 / 3 : 0.5);
-        geqL = (ctx.dt * factor) / L;
-        const vCoil1 = nodeCoil1 > 0 ? voltages[nodeCoil1 - 1] : 0;
-        const vCoil2 = nodeCoil2 > 0 ? voltages[nodeCoil2 - 1] : 0;
-        const vL = vCoil1 - vCoil2;
-        ieqL = ctx.method === "trapezoidal" ? iL + geqL * vL : iL;
-        stampG(s, nodeCoil1, nodeCoil2, geqL);
-        stampRHS(s, nodeCoil1, ieqL);
-        if (nodeCoil2 > 0) stampRHS(s, nodeCoil2, -ieqL);
-      }
+      // Coil inductor stamping is handled entirely by the child element
+      coilInductor.load(ctx);
     },
 
     accept(ctx: LoadContext, _simTime: number, _addBreakpoint: (t: number) => void): void {
-      const voltages = ctx.rhs;
-      if (L > 0 && ctx.dt > 0) {
-        const vCoil1 = nodeCoil1 > 0 ? voltages[nodeCoil1 - 1] : 0;
-        const vCoil2 = nodeCoil2 > 0 ? voltages[nodeCoil2 - 1] : 0;
-        const vL = vCoil1 - vCoil2;
-        iL = ieqL + geqL * vL + 0.5 * (ctx.dt / L) * vL;
-      }
-      energised = Math.abs(iL) > iPull;
+      // Read accepted coil current from the child inductor's branch row
+      const iCoil = branchIdx >= 0 ? ctx.rhs[branchIdx] : 0;
+      energised = Math.abs(iCoil) > iPull;
     },
 
     getPinCurrents(voltages: Float64Array): number[] {
       // Pin layout order: in1, in2, A1 (common), B1 (throw), C1 (rest).
-      // Coil: 1/rCoil between in1 and in2.
+      // Coil branch current from child inductor's branch row.
       // Contacts: gThrow() between common/throw, gRest() between common/rest.
-      const vCoil1 = nodeCoil1 > 0 ? voltages[nodeCoil1 - 1] : 0;
-      const vCoil2 = nodeCoil2 > 0 ? voltages[nodeCoil2 - 1] : 0;
-      const iCoil = (vCoil1 - vCoil2) / rCoil;
+      const iCoil = branchIdx >= 0 ? voltages[branchIdx] : 0;
       const vCom = nodeCommon > 0 ? voltages[nodeCommon - 1] : 0;
       const vThr = nodeThrow > 0 ? voltages[nodeThrow - 1] : 0;
       const vRst = nodeRest > 0 ? voltages[nodeRest - 1] : 0;
@@ -778,7 +782,7 @@ export function createRelayDTAnalogElement(
       return [iCoil, -iCoil, iThrow + iRest, -iThrow, -iRest];
     },
 
-    setParam(_key: string, _value: number) {},
+    setParam(key: string, value: number) { coilInductor.setParam(key, value); },
   };
 }
 

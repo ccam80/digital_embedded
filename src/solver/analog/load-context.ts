@@ -84,12 +84,7 @@ export interface LoadContext {
   time: number;
   /** Current timestep in seconds (ngspice CKTdelta). 0 during DC-OP. */
   dt: number;
-  /**
-   * Active numerical integration method. 0 = Trapezoidal, 1 = Gear per
-   * ngspice cktdefs.h. The string form is retained for backwards compatibility
-   * with existing IntegrationMethod consumers; use numeric 0/1 when porting
-   * directly from ngspice device load functions.
-   */
+  /** Active numerical integration method (ngspice CKTintegrateMethod). */
   method: IntegrationMethod;
   /** Integration order (1 or 2). */
   order: number;

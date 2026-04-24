@@ -227,15 +227,15 @@ describe("computeNIcomCof", () => {
   it("fills ag with zeros when dt <= 0", () => {
     const ag = new Float64Array(7);
     ag.fill(99); // pre-fill to confirm overwrite
-    computeNIcomCof(0, [0, 0], 1, "bdf1", ag, scratch);
+    computeNIcomCof(0, [0, 0], 1, "trapezoidal", ag, scratch);
     for (let i = 0; i < ag.length; i++) {
       expect(ag[i]).toBe(0);
     }
   });
 
-  it("BDF-1 order 1: ag[0]=1/dt, ag[1]=-1/dt", () => {
+  it("trapezoidal order 1 (was BDF-1): ag[0]=1/dt, ag[1]=-1/dt", () => {
     const ag = new Float64Array(7);
-    computeNIcomCof(h, [h, h], 1, "bdf1", ag, scratch);
+    computeNIcomCof(h, [h, h], 1, "trapezoidal", ag, scratch);
     expect(ag[0]).toBe(1 / h);
     expect(ag[1]).toBe(-1 / h);
   });
@@ -255,9 +255,9 @@ describe("computeNIcomCof", () => {
     expect(ag[1]).toBe(1);
   });
 
-  it("BDF-2 equal steps: ag[0]=3/(2h), ag[1]=-2/h, ag[2]=1/(2h)", () => {
+  it("gear order 2 equal steps: ag[0]=3/(2h), ag[1]=-2/h, ag[2]=1/(2h)", () => {
     const ag = new Float64Array(7);
-    computeNIcomCof(h, [h, h], 2, "bdf2", ag, scratch);
+    computeNIcomCof(h, [h, h], 2, "gear", ag, scratch);
     // With h1=h: r1=1, r2=2, u22=2*(2-1)=2, rhs2=1/h
     // ag2 = (1/h)/2 = 1/(2h), ag1 = (-1/h - 2/(2h))/1 = -2/h
     // ag0 = -(ag1+ag2) = 2/h - 1/(2h) = 3/(2h)
@@ -266,11 +266,11 @@ describe("computeNIcomCof", () => {
     expect(ag[2]).toBe(1 / (2 * h));
   });
 
-  it("BDF-2 degenerate (h1=0): safeH1=dt yields equal-steps BDF-2 coefficients", () => {
-    // When deltaOld[1]=0, safeH1 defaults to dt, which gives equal-steps BDF-2, not BE.
-    // Spec: h1 = deltaOld[1] > 0 ? deltaOld[1] : dt — so h1=dt → equal steps BDF-2.
+  it("gear order 2 degenerate (h1=0): safeH1=dt yields equal-steps gear-2 coefficients", () => {
+    // When deltaOld[1]=0, safeH1 defaults to dt, which gives equal-steps gear-2.
+    // Spec: h1 = deltaOld[1] > 0 ? deltaOld[1] : dt — so h1=dt → equal steps gear-2.
     const ag = new Float64Array(7);
-    computeNIcomCof(h, [h, 0], 2, "bdf2", ag, scratch);
+    computeNIcomCof(h, [h, 0], 2, "gear", ag, scratch);
     // h1=0 → safeH1=dt=h → same as equal steps
     expect(ag[0]).toBe(3 / (2 * h));
     expect(ag[1]).toBe(-2 / h);

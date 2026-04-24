@@ -13,10 +13,6 @@
  *   CKTorder                   -> timestep.currentOrder
  *   CKTintegrateMethod         -> timestep.currentMethod
  *
- * Note on method mapping:
- *   Our engine uses "bdf1", "trapezoidal", and "bdf2". ALL THREE map to the
- *   TRAPEZOIDAL branch in nicomcof.c/nipred.c (not GEAR). GEAR paths are dead
- *   code for our engine but are implemented for exact ngspice parity.
  */
 
 import type { IntegrationMethod } from "./element.js";
@@ -29,7 +25,7 @@ import type { NodeVoltageHistory } from "./integration.js";
 /**
  * Compute Adams-Gear predictor coefficients agp[0..order] for the current timestep.
  *
- * TRAPEZOIDAL path (nicomcof.c:141-145) - covers bdf1, trapezoidal, bdf2:
+ * TRAPEZOIDAL path (nicomcof.c:141-145):
  *   arg = delta / (2 * deltaOld[1])
  *   agp[0] = 1 + arg
  *   agp[1] = -arg
@@ -38,7 +34,7 @@ import type { NodeVoltageHistory } from "./integration.js";
  * exact parity. Builds (order+1)x(order+1) collocation matrix, LU-decomposes,
  * solves with RHS [1,0,0,...,0]. Result is agp[0..order].
  *
- * @param method    - Integration method ("bdf1" | "trapezoidal" | "bdf2")
+ * @param method    - Integration method ("trapezoidal" | "gear")
  * @param order     - Integration order (1 or 2 for our engine; 1-6 for GEAR)
  * @param delta     - Current timestep (deltaOld[0] after setDeltaOldCurrent)
  * @param deltaOld  - CKTdeltaOld[]: [delta, h1, h2, h3, ...]
@@ -51,8 +47,8 @@ export function computeAgp(
   deltaOld: readonly number[],
   agp: Float64Array,
 ): void {
-  // All our methods (bdf1, trapezoidal, bdf2) use the TRAPEZOIDAL predictor
-  // branch in nicomcof.c. GEAR branch is provided for completeness.
+  // TRAPEZOIDAL method uses the trap predictor; GEAR method uses the Adams-Gear
+  // predictor (`_computeAgpGear`, `_predictVoltagesGear`).
   if (method !== "gear") {
     // nicomcof.c:141-145 - TRAPEZOIDAL predictor coefficients
     const dOld1 = deltaOld[1] > 0 ? deltaOld[1] : delta;
@@ -168,7 +164,7 @@ export function predictVoltages(
   const nodeCount = out.length;
   const filled = history.filled;
 
-  // All our methods (bdf1, trapezoidal, bdf2) use TRAPEZOIDAL predictor branch.
+  // TRAPEZOIDAL method uses the trap predictor; GEAR method uses the Adams-Gear predictor (`_computeAgpGear`, `_predictVoltagesGear`).
   if (method !== "gear") {
     if (order <= 1) {
       // nipred.c:46-52 - TRAPEZOIDAL order 1

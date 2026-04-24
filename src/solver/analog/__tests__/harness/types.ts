@@ -50,7 +50,7 @@ export interface StepShape {
   /** Per-side attempt summaries (length-limited; full detail is on the StepSnapshot). */
   attempts: { ours: AttemptShapeSummary[] | null; ngspice: AttemptShapeSummary[] | null };
   /** Final integration method per side; null when absent. */
-  integrationMethod: { ours: string | null; ngspice: string | null };
+  integrationMethod: { ours: IntegrationMethod | null; ngspice: IntegrationMethod | null };
 }
 
 /** Whole-session shape descriptor. */
@@ -202,9 +202,9 @@ export interface IterationSnapshot {
    */
   ag: Float64Array;
   /**
-   * Integration method active at this NR iteration ("trapezoidal" | "bdf1" |
-   * "bdf2" | "gear"). Captured from `ctx.loadCtx.method` (our engine) or
-   * derived from ngspice's NiIterationData.integrateMethod code.
+   * Integration method active at this NR iteration ("trapezoidal" | "gear").
+   * Captured from `ctx.loadCtx.method` (our engine) or derived from
+   * ngspice's NiIterationData.integrateMethod code.
    */
   method: IntegrationMethod;
   globalConverged: boolean;
@@ -494,7 +494,7 @@ export interface SessionSummary {
   firstDivergence: { stepIndex: number; iterationIndex: number; stepStartTime: number; worstLabel: string; absDelta: number } | null;
   totals: { compared: number; passed: number; failed: number };
   perDeviceType: Record<string, { divergenceCount: number; worstAbsDelta: number }>;
-  integrationMethod: string | null;
+  integrationMethod: IntegrationMethod | null;
   stateHistoryIssues: {
     state1Mismatches: number;
     state2Mismatches: number;
@@ -867,9 +867,9 @@ export interface IterationSideData {
    */
   ag: number[];
   /**
-   * Integration method active at this iteration ("trapezoidal" | "bdf1" |
-   * "bdf2" | "gear" on our side; "backwardEuler" | "trapezoidal" | "gear2"
-   * on ngspice side). Kept as `string` to accommodate both vocabularies.
+   * Integration method active at this iteration ("trapezoidal" | "gear" on our
+   * side; "backwardEuler" | "trapezoidal" | "gear2" on ngspice side). Kept as
+   * `string` to accommodate both vocabularies.
    */
   method: string;
   /** Integration order active at this iteration (1 = BDF-1, 2 = trap/BDF-2). */
@@ -991,7 +991,7 @@ export interface SessionReport {
       absDelta: number;
     } | null;
     perDeviceType: Record<string, { divergenceCount: number; worstAbsDelta: number }>;
-    integrationMethod: string | null;
+    integrationMethod: IntegrationMethod | null;
     stateHistoryIssues: { state1Mismatches: number; state2Mismatches: number };
   };
   steps: Array<{

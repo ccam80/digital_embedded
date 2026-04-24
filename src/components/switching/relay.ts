@@ -310,6 +310,7 @@ export const RelayDefinition: ComponentDefinition = {
       factory: createRelayAnalogElement,
       paramDefs: [],
       params: {},
+      branchCount: 1,
     },
   },
   defaultModel: "digital",

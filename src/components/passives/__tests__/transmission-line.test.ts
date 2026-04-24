@@ -95,7 +95,7 @@ function makeStubCtx(
   } = {},
 ): LoadContext {
   const dt = opts.dt ?? 1e-9;
-  const method: IntegrationMethod = opts.method ?? "bdf1";
+  const method: IntegrationMethod = opts.method ?? "trapezoidal";
   const order = opts.order ?? 1;
   const deltaOld = [dt, dt, dt, dt, dt, dt, dt];
   const ag = new Float64Array(7);
@@ -211,7 +211,7 @@ describe("TLine", () => {
 
       const voltages = new Float64Array(6 + N);
       const { solver, stamps } = makeStubSolver();
-      el.load(makeStubCtx(solver, { voltages, dt: 1e-9, method: "bdf1", order: 1, cktMode: MODETRAN | MODEINITTRAN }));
+      el.load(makeStubCtx(solver, { voltages, dt: 1e-9, method: "trapezoidal", order: 1, cktMode: MODETRAN | MODEINITTRAN }));
 
       // For a lossless line all resistive stamps (R_seg) should be zero conductance
       // or equivalent to MIN_CONDUCTANCE (1e-12 S). The inductors will also stamp
@@ -277,7 +277,7 @@ describe("TLine", () => {
       const dt = 1e-9;
       const voltages = new Float64Array(nodeCount + N);
       const { solver, stamps } = makeStubSolver();
-      el.load(makeStubCtx(solver, { voltages, dt, method: "bdf1", order: 1, cktMode: MODETRAN | MODEINITTRAN }));
+      el.load(makeStubCtx(solver, { voltages, dt, method: "trapezoidal", order: 1, cktMode: MODETRAN | MODEINITTRAN }));
 
       // BDF-1 geq = L/dt. For each segment's inductor (SegmentInductorElement):
       // geq = lSeg / dt = 50e-9 / 1e-9 = 50
@@ -826,7 +826,7 @@ describe("TransmissionLine", () => {
 
       const voltages = new Float64Array(nodeCount + 3);
       const { solver, stamps } = makeStubSolver();
-      el.load(makeStubCtx(solver, { voltages, dt: 1e-9, method: "bdf1", order: 1, cktMode: MODETRAN | MODEINITTRAN }));
+      el.load(makeStubCtx(solver, { voltages, dt: 1e-9, method: "trapezoidal", order: 1, cktMode: MODETRAN | MODEINITTRAN }));
       expect(stamps.length).toBeGreaterThan(0);
     });
 
@@ -891,7 +891,7 @@ describe("TransmissionLine", () => {
       el.initState!(pool);
       const voltages = new Float64Array(2 + 2 * (N - 1) + N);
       const { solver } = makeStubSolver();
-      expect(() => el.load(makeStubCtx(solver, { voltages, dt: 1e-9, method: "bdf1", order: 1, cktMode: MODETRAN | MODEINITTRAN }))).not.toThrow();
+      expect(() => el.load(makeStubCtx(solver, { voltages, dt: 1e-9, method: "trapezoidal", order: 1, cktMode: MODETRAN | MODEINITTRAN }))).not.toThrow();
     });
 
     it("SegmentInductorElement sub-elements declare stateSchema with 5 slots", () => {
