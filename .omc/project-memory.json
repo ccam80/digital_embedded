@@ -285,14 +285,20 @@
   "hotPaths": [
     {
       "path": "src",
-      "accessCount": 21,
-      "lastAccessed": 1776996355994,
+      "accessCount": 53,
+      "lastAccessed": 1776999570782,
       "type": "directory"
     },
     {
+      "path": "spec\\progress.md",
+      "accessCount": 20,
+      "lastAccessed": 1776999767706,
+      "type": "file"
+    },
+    {
       "path": "src\\solver\\analog\\digital-pin-model.ts",
-      "accessCount": 17,
-      "lastAccessed": 1776998952534,
+      "accessCount": 18,
+      "lastAccessed": 1776999539427,
       "type": "file"
     },
     {
@@ -302,15 +308,21 @@
       "type": "file"
     },
     {
+      "path": "spec\\test-baseline.md",
+      "accessCount": 16,
+      "lastAccessed": 1776999484755,
+      "type": "file"
+    },
+    {
       "path": "src\\solver\\analog\\behavioral-gate.ts",
       "accessCount": 15,
       "lastAccessed": 1776998745344,
       "type": "file"
     },
     {
-      "path": "spec\\test-baseline.md",
+      "path": "spec\\phase-0-residual-dead-code-audit.md",
       "accessCount": 15,
-      "lastAccessed": 1776999227050,
+      "lastAccessed": 1776999508940,
       "type": "file"
     },
     {
@@ -320,16 +332,16 @@
       "type": "file"
     },
     {
-      "path": "spec\\phase-0-residual-dead-code-audit.md",
-      "accessCount": 13,
-      "lastAccessed": 1776999222838,
+      "path": "spec\\.context\\rules.md",
+      "accessCount": 14,
+      "lastAccessed": 1776999508077,
       "type": "file"
     },
     {
-      "path": "spec\\progress.md",
-      "accessCount": 13,
-      "lastAccessed": 1776999222899,
-      "type": "file"
+      "path": "src\\components\\semiconductors\\__tests__\\tunnel-diode.test.ts",
+      "accessCount": 14,
+      "lastAccessed": 1776999561294,
+      "type": "directory"
     },
     {
       "path": "src\\components\\semiconductors\\__tests__\\diode.test.ts",
@@ -338,21 +350,9 @@
       "type": "file"
     },
     {
-      "path": "src\\components\\semiconductors\\__tests__\\tunnel-diode.test.ts",
-      "accessCount": 12,
-      "lastAccessed": 1776996334500,
-      "type": "directory"
-    },
-    {
       "path": "src\\components\\io\\led.ts",
       "accessCount": 12,
       "lastAccessed": 1776999121523,
-      "type": "file"
-    },
-    {
-      "path": "spec\\.context\\rules.md",
-      "accessCount": 12,
-      "lastAccessed": 1776999222428,
       "type": "file"
     },
     {
@@ -377,6 +377,12 @@
       "path": "src\\solver\\analog\\behavioral-remaining.ts",
       "accessCount": 9,
       "lastAccessed": 1776996379910,
+      "type": "file"
+    },
+    {
+      "path": "spec\\.context\\lock-protocol.md",
+      "accessCount": 9,
+      "lastAccessed": 1776999508862,
       "type": "file"
     },
     {
@@ -410,12 +416,6 @@
       "type": "file"
     },
     {
-      "path": "spec\\.context\\lock-protocol.md",
-      "accessCount": 7,
-      "lastAccessed": 1776998902222,
-      "type": "file"
-    },
-    {
       "path": "src\\components\\semiconductors\\njfet.ts",
       "accessCount": 6,
       "lastAccessed": 1776994304907,
@@ -446,6 +446,12 @@
       "type": "directory"
     },
     {
+      "path": "src\\solver\\analog\\behavioral-flipflop.ts",
+      "accessCount": 6,
+      "lastAccessed": 1776999552521,
+      "type": "file"
+    },
+    {
       "path": "src\\components\\semiconductors\\__tests__\\jfet.test.ts",
       "accessCount": 5,
       "lastAccessed": 1776994331876,
@@ -458,28 +464,40 @@
       "type": "directory"
     },
     {
-      "path": "e2e",
-      "accessCount": 4,
-      "lastAccessed": 1776994521543,
-      "type": "directory"
-    },
-    {
       "path": "src\\solver\\analog\\behavioral-combinational.ts",
-      "accessCount": 4,
-      "lastAccessed": 1776995732765,
+      "accessCount": 5,
+      "lastAccessed": 1776999523994,
       "type": "file"
     },
     {
-      "path": "src\\solver\\analog\\behavioral-flipflop.ts",
-      "accessCount": 4,
-      "lastAccessed": 1776996753511,
+      "path": "src\\solver\\analog\\behavioral-sequential.ts",
+      "accessCount": 5,
+      "lastAccessed": 1776999575554,
       "type": "file"
+    },
+    {
+      "path": "e2e",
+      "accessCount": 5,
+      "lastAccessed": 1776999579313,
+      "type": "directory"
     },
     {
       "path": "src\\solver\\analog\\behavioral-flipflop\\shared.ts",
       "accessCount": 4,
       "lastAccessed": 1776996775251,
       "type": "file"
+    },
+    {
+      "path": "src\\solver\\analog\\behavioral-flipflop\\rs-async.ts",
+      "accessCount": 4,
+      "lastAccessed": 1776999530841,
+      "type": "file"
+    },
+    {
+      "path": "scripts",
+      "accessCount": 4,
+      "lastAccessed": 1776999580082,
+      "type": "directory"
     },
     {
       "path": "src\\solver\\analog\\__tests__\\harness\\types.ts",
@@ -524,12 +542,6 @@
       "type": "file"
     },
     {
-      "path": "scripts",
-      "accessCount": 3,
-      "lastAccessed": 1776994522862,
-      "type": "directory"
-    },
-    {
       "path": "src\\solver\\analog\\behavioral-flipflop\\t.ts",
       "accessCount": 3,
       "lastAccessed": 1776995159798,
@@ -539,12 +551,6 @@
       "path": "src\\solver\\analog\\behavioral-flipflop\\rs.ts",
       "accessCount": 3,
       "lastAccessed": 1776995190233,
-      "type": "file"
-    },
-    {
-      "path": "src\\solver\\analog\\behavioral-flipflop\\rs-async.ts",
-      "accessCount": 3,
-      "lastAccessed": 1776995215768,
       "type": "file"
     },
     {
@@ -563,12 +569,6 @@
       "path": "src\\solver\\analog\\behavioral-flipflop\\d-async.ts",
       "accessCount": 3,
       "lastAccessed": 1776995271699,
-      "type": "file"
-    },
-    {
-      "path": "src\\solver\\analog\\behavioral-sequential.ts",
-      "accessCount": 3,
-      "lastAccessed": 1776995448554,
       "type": "file"
     },
     {

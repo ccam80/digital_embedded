@@ -87,3 +87,22 @@
   - `getPinCurrents` unchanged per spec
 - **Tests**: Comparator test file has pre-existing syntax error (orphaned `.toBeCloseTo()` calls in `zero_crossing_detector` at line 175-181) preventing the file from running — confirmed pre-existing (test file not touched by this agent, only `comparator.ts` modified from HEAD)
 - **Regression sweep** (`src/components/active/__tests__/` + `src/solver/analog/__tests__/`): 1027 passed / 1145 total, 108 failed — all failures are in files unrelated to comparator (ckt-terr, dcop-init-jct, mna-end-to-end, newton-raphson, harness tests). Zero new failures introduced.
+
+## Task 0.3.1: Author the identifier-audit vitest test
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: `src/solver/analog/__tests__/phase-0-identifier-audit.test.ts`
+- **Files modified**: none
+- **Tests**: 3/3 passing
+  - `IdentifierAudit::scope_dirs_exist` — pass
+  - `IdentifierAudit::no_unexpected_hits` — pass
+  - `IdentifierAudit::allowlist_is_not_stale` — pass
+- **Notes**: `_prevClockVoltage` allowlist covers the 7 files that actually contain it (behavioral-flipflop.ts, behavioral-sequential.ts, behavioral-flipflop/d-async.ts, jk-async.ts, jk.ts, rs.ts, t.ts); behavioral-combinational.ts and rs-async.ts have no occurrences and are not listed. `Math.exp(700)` has no allowlist entry (absent everywhere including tests); `Math.min(..., 700)` has one allowlist entry for tunnel-diode.test.ts:217. The `no_unexpected_hits` test verifies file-level allowlist membership only; the `reason` field is manifest documentation, not a required substring on each source line.
+
+## Task 0.3.2: Author the Phase 0 audit report
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: `spec/phase-0-audit-report.md`
+- **Files modified**: none
+- **Tests**: none (documentation file; machine verification is Task 0.3.1's audit test)
+- **Summary**: Created the Phase 0 audit resolution report at `spec/phase-0-audit-report.md`. The report contains: (1) header with HEAD SHA `b07db497bf7ce948ee31871b2a7be33378388527`; (2) per-identifier table covering all identifiers from the Task 0.3.1 manifest with resolution category, evidence (file + line or "zero hits"), and cited-at task; (3) four bucket sections — truly absent, deleted-in-Wave-0.1, refactored-in-Wave-0.2, allowlisted; (4) "How to re-run this audit" section pointing at `phase-0-identifier-audit.test.ts` with the one-line vitest command. All identifier resolutions verified against live filesystem via Grep before writing.

@@ -1,10 +1,35 @@
 {
   "summary": {
-    "passed": 0,
-    "failed": 0,
+    "passed": 1,
+    "failed": 2,
     "skipped": 0,
     "totalFiles": 1,
-    "durationSeconds": 0.3
+    "durationSeconds": 8.8
   },
-  "failures": []
+  "failures": [
+    {
+      "message": "Banned identifier audit found 43 violation(s):",
+      "count": 1,
+      "locations": [
+        {
+          "file": "src\\solver\\analog\\__tests__\\phase-0-identifier-audit.test.ts",
+          "test": "no_unexpected_hits",
+          "line": 539,
+          "column": 13
+        }
+      ]
+    },
+    {
+      "message": "Allowlist staleness detected — 1 stale entry(ies):",
+      "count": 1,
+      "locations": [
+        {
+          "file": "src\\solver\\analog\\__tests__\\phase-0-identifier-audit.test.ts",
+          "test": "allowlist_is_not_stale",
+          "line": 580,
+          "column": 13
+        }
+      ]
+    }
+  ]
 }
