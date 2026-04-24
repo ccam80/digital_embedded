@@ -29,21 +29,19 @@ describe("BJT L0 scope documentation", () => {
     // We want the L0 occurrence specifically — the one without `|| vsubLimFlag`.
     const l0AnchorRegex = /icheckLimited = vbeLimFlag \|\| vbcLimFlag;(?! \|\| vsubLimFlag)/;
     const l0AnchorMatch = l0AnchorRegex.exec(source);
-    expect(l0AnchorMatch, "L0 icheckLimited anchor line must exist").not.toBeNull();
-    const l0AnchorIndex = l0AnchorMatch!.index;
+    if (l0AnchorMatch === null) {
+      throw new Error(
+        "L0 icheckLimited anchor `icheckLimited = vbeLimFlag || vbcLimFlag;` (without `|| vsubLimFlag`) " +
+          "not found in bjt.ts — the L0 pnjlim block has been restructured and this test must be updated.",
+      );
+    }
+    const l0AnchorIndex = l0AnchorMatch.index;
 
-    // Find the next `computeBjtOp(` call after the L0 anchor — this delimits
-    // the region in which the scope comment must appear.
+    // The scope comment must appear in the region between the L0 anchor and
+    // the next L0 `computeBjtOp(` call.
     const computeBjtOpIndex = source.indexOf("computeBjtOp(", l0AnchorIndex);
-    expect(computeBjtOpIndex, "computeBjtOp( must appear after L0 icheckLimited line").toBeGreaterThan(
-      l0AnchorIndex,
-    );
-
     const region = source.slice(l0AnchorIndex, computeBjtOpIndex);
-    expect(
-      region.includes("architectural-alignment.md §E1"),
-      "L0 scope comment citing architectural-alignment.md §E1 must appear between the " +
-        "L0 `icheckLimited = vbeLimFlag || vbcLimFlag;` line and the L0 `computeBjtOp(` call",
-    ).toBe(true);
+    const expectedCitation = "architectural-alignment.md §E1";
+    expect(region).toContain(expectedCitation);
   });
 });

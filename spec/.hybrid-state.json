@@ -581,12 +581,12 @@
           "8.1.1"
         ]
       ],
-      "spawned": 0,
-      "completed": 0,
+      "spawned": 3,
+      "completed": 1,
       "verifications_passed": 0,
       "verifications_failed": 0,
-      "stops_for_clarification": 0,
-      "dead_implementers": 0,
+      "stops_for_clarification": 1,
+      "dead_implementers": 1,
       "dead_verifiers": 0,
       "group_status": {
         "8.1": "pending"
@@ -748,5 +748,5 @@
       "user_acks": {}
     }
   ],
-  "last_updated": "2026-04-24T22:13:35.823Z"
+  "last_updated": "2026-04-24T23:07:35.980Z"
 }

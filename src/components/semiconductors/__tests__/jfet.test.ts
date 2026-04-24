@@ -129,8 +129,10 @@ function makeDcOpCtx(voltages: Float64Array, matrixSize: number): LoadContext {
   return {
     cktMode: MODEDCOP | MODEINITFLOAT,
     solver,
-    voltages,
+    rhsOld: voltages,
+    rhs: new Float64Array(matrixSize),
     dt: 0,
+    time: 0,
     method: "trapezoidal",
     order: 1,
     deltaOld: [0, 0, 0, 0, 0, 0, 0],
@@ -180,8 +182,13 @@ function makeResistorElement(nodeA: number, nodeB: number, resistance: number): 
 
 describe("PJFET", () => {
   it("emits_stamps_when_conducting", () => {
-    // Common-source PJFET: Vg=2V, Vd=0V, Vs=5V. Device should conduct and
-    // emit non-trivial stamps. No hand-computed expected values.
+    // Common-source PJFET: Vg=2V, Vd=0V, Vs=5V. Device must conduct in
+    // saturation (vgs=3, vgd=-2, vds=5, vgst=vgs-VTO=1, vgst<vds).
+    // Expected drain current magnitude with BETA=1e-4, B=1, LAMBDA=0:
+    //   cdrain = betap * vgst² * (B+Bfac) = 1e-4 * 1 * 1 ≈ 1e-4 A
+    //   gm     = betap * vgst * (2B+3*Bfac*vgst) = 1e-4 * 1 * 2 ≈ 2e-4 S
+    // Both exceed GMIN=1e-12 by 8+ orders of magnitude.
+    // Node map: G=node1 (col/row 0), D=node2 (col/row 1), S=node3 (col/row 2).
     const propsObj = createTestPropertyBag();
     propsObj.replaceModelParams(PJFET_PARAMS);
     const core = withState(createPJfetElement(new Map([["G", 1], ["D", 2], ["S", 3]]), [], -1, propsObj));
@@ -200,8 +207,46 @@ describe("PJFET", () => {
     element.load(ctx);
     const entries = ctx.solver.getCSCNonZeros();
 
-    const nonzeroStamps = entries.filter((e) => Math.abs(e.value) > 1e-15);
-    expect(nonzeroStamps.length).toBeGreaterThan(0);
+    // Aggregate stamps by (row, col) — one stamp call per position for the
+    // external-only pin set (no internal RD/RS nodes because RD=RS=0).
+    const stampAt = (row: number, col: number): number => {
+      const match = entries.filter((e) => e.row === row && e.col === col);
+      return match.reduce((s, e) => s + e.value, 0);
+    };
+
+    // Row/col 0=G, 1=D, 2=S in matrix (0-based node index = nodeId - 1).
+    const gG_G = stampAt(0, 0); // (ggd + ggs): gate self-conductance
+    const gG_D = stampAt(0, 1); // -ggd
+    const gG_S = stampAt(0, 2); // -ggs
+    const gD_G = stampAt(1, 0); // gm - ggd: transconductance term
+    const gD_D = stampAt(1, 1); // gdpr + gds + ggd (+ redundant gdpr=0 here)
+    const gD_S = stampAt(1, 2); // -gds - gm: source-drain off-diagonal
+    const gS_G = stampAt(2, 0); // -ggs - gm
+    const gS_S = stampAt(2, 2); // gspr + gds + gm + ggs: source self-conductance
+
+    // At least four specific stamp positions must be non-zero.
+    expect(Math.abs(gG_G)).toBeGreaterThan(0);
+    expect(Math.abs(gG_D)).toBeGreaterThan(0);
+    expect(Math.abs(gD_S)).toBeGreaterThan(0);
+    expect(Math.abs(gD_D)).toBeGreaterThan(0);
+
+    // Source-drain off-diagonal = -(gds + gm). With gm≈2e-4 and gds≈0
+    // (LAMBDA=0 in saturation), magnitude must exceed GMIN by orders of
+    // magnitude — proves active conduction, not GMIN-only clamp.
+    const GMIN = 1e-12;
+    expect(Math.abs(gD_S)).toBeGreaterThan(1e-5);
+    expect(Math.abs(gD_S)).toBeGreaterThan(GMIN * 1e6);
+
+    // Transconductance appears in D-row-G-col (gm - ggd). With ggd at GMIN
+    // level (reverse-biased GD junction) and gm ≈ 2e-4, |gD_G| ≈ 2e-4.
+    expect(Math.abs(gD_G)).toBeGreaterThan(1e-5);
+
+    // KCL-style sign: gD_S and gS_G must carry opposite polarity pair
+    // versus their diagonals (off-diagonals negative when diagonals positive).
+    expect(gD_D).toBeGreaterThan(0);
+    expect(gS_S).toBeGreaterThan(0);
+    expect(gD_S).toBeLessThan(0);
+    expect(gS_G).toBeLessThan(0);
   });
 });
 
@@ -211,7 +256,14 @@ describe("PJFET", () => {
 
 describe("NR", () => {
   it("converges_within_10_iterations", () => {
-    // Common-source NJFET with Rd load: Vdd=10V, Rd=10kΩ, gate grounded.
+    // Common-source NJFET with Rd load.
+    //   VDD=10V, Rd=10kΩ, gate=0V, source=0V → VGS=0V
+    //   VTO=-2V → vgst = VGS - VTO = 2V (device ON in saturation)
+    //   BETA=1e-4, B=1, LAMBDA=0, Bfac = (1-B)/(PB-VTO) = 0
+    //   cdrain = BETA * vgst² * (B + Bfac*vgst) = 1e-4 * 4 * 1 = 4e-4 A
+    //   Vdrop  = cdrain * Rd = 4e-4 * 1e4 = 4V
+    //   VDS    = VDD - Vdrop = 10 - 4 = 6V  (still in saturation: VDS > vgst)
+    //   node1 (drain) ≈ 6V, node2 (vdd) = 10V, node3 (gate) = 0V.
     const matrixSize = 5;
 
     const propsObj = createTestPropertyBag();
@@ -230,6 +282,30 @@ describe("NR", () => {
 
     expect(result.converged).toBe(true);
     expect(result.iterations).toBeLessThanOrEqual(10);
+
+    // Node-voltage assertions — nodeVoltages[i-1] holds node i (1-based).
+    const vDrain = result.nodeVoltages[0];
+    const vVdd   = result.nodeVoltages[1];
+    const vGate  = result.nodeVoltages[2];
+
+    // VDD rail must sit at exactly 10V (voltage source).
+    expect(vVdd).toBeCloseTo(10, 6);
+    // Gate pinned at 0V.
+    expect(vGate).toBeCloseTo(0, 6);
+
+    // Drain voltage: analytic prediction is 6V. Allow a generous window that
+    // excludes cutoff (VDS≈10V, no drain current) and excludes the linear
+    // region (VDS<vgst=2V). Band (1V, 10V) proves the solution is in the
+    // saturation operating regime the circuit is designed to produce.
+    expect(vDrain).toBeGreaterThan(1);
+    expect(vDrain).toBeLessThan(10);
+
+    // Drain current through Rd: |iD| = (VDD - VDrain) / Rd.
+    // Analytic expectation ≈ 4e-4 A. Bound between 1e-5 A (device barely
+    // on) and 1e-3 A (device hard-shorted) — at least two orders above GMIN.
+    const iD = Math.abs((vVdd - vDrain) / 10000);
+    expect(iD).toBeGreaterThan(1e-5);
+    expect(iD).toBeLessThan(1e-3);
   });
 });
 

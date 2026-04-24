@@ -307,7 +307,8 @@ Non-goals for Phase 6 (deferred):
     - Rewrite `computeTempParams` signature to accept `TEMP` as the per-instance operating temperature. Inside, replace every `REFTEMP` used for instance-level calculations with `p.TEMP`:
       - `vt = p.TEMP * KoverQ` (was `REFTEMP * KoverQ`)
       - `ratio = p.TEMP / p.TNOM` (was `REFTEMP / p.TNOM`)
-      - `fact2 = p.TEMP / p.TNOM` (was `1`; now reflects `p.TEMP / p.TNOM`)
+      - `fact2 = p.TEMP / REFTEMP` (was `1`; matches ngspice `mos1temp.c` which uses `CKTtemp / CONSTRefTemp`).
+        > 2026-04-25 correction: previous spec text "p.TEMP / p.TNOM" was incorrect; ngspice mos1temp.c uses REFTEMP not TNOM for fact2. Code already implements REFTEMP per ngspice; spec text now matches.
       - `kt = p.TEMP * CONSTboltz` (was `REFTEMP * CONSTboltz`)
       - `egfet = 1.16 - (7.02e-4 * p.TEMP * p.TEMP) / (p.TEMP + 1108)` (was `REFTEMP` form)
       - `arg = -egfet / (kt + kt) + 1.1150877 / (CONSTboltz * (REFTEMP + REFTEMP))` — leave the `1.1150877 / (CONSTboltz * 2*REFTEMP)` constant alone per `mos1temp.c:45-51` (model-level egnom at REFTEMP).

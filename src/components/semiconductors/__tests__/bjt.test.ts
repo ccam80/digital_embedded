@@ -674,11 +674,16 @@ describe("BJT L0 MODEINITJCT", () => {
 
   it("on_path_seeds_tVcrit", () => {
     // cite: bjtload.c:265-269 — MODEINITJCT, OFF=0: vbe=tVcrit, vbc=0.
+    // tVcrit = vt * log(vt / (sqrt(2) * tSatCur)) with tSatCur = IS*AREA for
+    // L0 (see bjt-temp.ts). For NPN defaults IS≈tSatCur scaled at T=300.15 K,
+    // tVcrit lands near 0.85 V. Bound 0.6 V < vbe < 1.0 V matches the
+    // thermal-voltage-derived critical voltage and rules out any trivially-
+    // positive seed (e.g. vt itself ≈ 0.026 V or a bare pnjlim default).
     const rhsOld = new Float64Array(10);
     const { ctx, element, s0 } = makeFullLoadCtx(MODEINITJCT, rhsOld, { OFF: 0 });
     element.load(ctx);
-    // tVcrit > 0 for NPN (thermal-voltage-derived critical voltage).
-    expect(s0[SLOT_VBE]).toBeGreaterThan(0);
+    expect(s0[SLOT_VBE]).toBeGreaterThan(0.6);
+    expect(s0[SLOT_VBE]).toBeLessThan(1.0);
     expect(s0[SLOT_VBC]).toBe(0);
   });
 
@@ -701,12 +706,25 @@ describe("BJT L0 NOBYPASS", () => {
   const SLOT_VBE = 0, SLOT_VBC = 1, SLOT_CC = 2, SLOT_CB = 3;
   const SLOT_GPI = 4, SLOT_GMU = 5, SLOT_GM = 6, SLOT_GO = 7, SLOT_GX = 8;
 
+  // Path-selection discriminator: bjt.ts L0 load() only calls
+  // ctx.limitingCollector.push() on the compute path (bjt.ts:932-951,
+  // inside the `else` branch of the bypass gate). On the bypass path
+  // (bjt.ts:903-906), push() is never called. Providing a non-null
+  // limitingCollector array therefore gives an exact 0/≥1 discriminator
+  // between "bypass fired" and "compute ran".
   function makeBypassCtx(
     cktMode: number,
     rhsOld: Float64Array,
     bypass: boolean,
     modelParams?: Record<string, number>,
-  ): { ctx: LoadContext; element: AnalogElement; s0: Float64Array; pool: StatePool; stampCount: { g: number; rhs: number } } {
+  ): {
+    ctx: LoadContext;
+    element: AnalogElement;
+    s0: Float64Array;
+    pool: StatePool;
+    stampCount: { g: number; rhs: number };
+    limitingCollector: LimitingEvent[];
+  } {
     const propsObj = makeBjtProps(modelParams);
     const core = createBjtElement(1, new Map([["B", 1], ["C", 2], ["E", 3]]), -1, propsObj) as AnalogElementCore;
     const pool = new StatePool((core as any).stateSize);
@@ -714,17 +732,24 @@ describe("BJT L0 NOBYPASS", () => {
     (core as any).initState(pool);
     const solver = new SparseSolver();
     solver.beginAssembly(10);
+    // Stamp-count probe: wrap SparseSolver.stampElement (the G-matrix stamp
+    // primitive used by the stampG helper) and SparseSolver.stampRHS (used by
+    // stampRHS helper). Both paths of the bypass gate emit stamps (the stamp
+    // block at bjt.ts:999-1023 runs unconditionally after the if/else), so
+    // this probe primarily serves as a "stamps actually fired" sanity check
+    // on the no-bypass path.
     const stampCount = { g: 0, rhs: 0 };
-    const origAddEntry = solver.addEntry?.bind(solver);
-    const origStampG = (solver as any).stampG;
-    // Wrap solver to count stamps via addEntry (SparseSolver.addEntry is the stamp primitive).
-    const origAddEntryFn = (solver as any).addEntry;
-    if (origAddEntryFn) {
-      (solver as any).addEntry = (row: number, col: number, val: number) => {
-        if (row === col) stampCount.g++;
-        origAddEntryFn.call(solver, row, col, val);
-      };
-    }
+    const origStampElement = solver.stampElement.bind(solver);
+    solver.stampElement = (handle: number, value: number) => {
+      stampCount.g++;
+      origStampElement(handle, value);
+    };
+    const origStampRHS = solver.stampRHS.bind(solver);
+    solver.stampRHS = (row: number, value: number) => {
+      stampCount.rhs++;
+      origStampRHS(row, value);
+    };
+    const limitingCollector: LimitingEvent[] = [];
     const ctx: LoadContext = {
       cktMode,
       solver,
@@ -739,7 +764,7 @@ describe("BJT L0 NOBYPASS", () => {
       ag: new Float64Array(7),
       srcFact: 1,
       noncon: { value: 0 },
-      limitingCollector: null,
+      limitingCollector,
       convergenceCollector: null,
       xfact: 1,
       gmin: 1e-12,
@@ -752,39 +777,58 @@ describe("BJT L0 NOBYPASS", () => {
       voltTol: 1e-6,
     };
     const element = withNodeIds(core, [1, 2, 3]);
-    return { ctx, element, s0: pool.states[0], pool, stampCount };
+    return { ctx, element, s0: pool.states[0], pool, stampCount, limitingCollector };
   }
 
   it("bypass_disabled_when_ctx_bypass_false", () => {
     // cite: bjtload.c:338 — bypass gate requires ctx.bypass=true; both calls must compute.
-    // With bypass=false the gate never fires even when tolerances are met.
+    // Spec (task 5.1.3): "Assert both calls emit non-zero stamp counts (stamp-count
+    // probe wrapping stampG/stampRHS)." We additionally assert the compute path
+    // ran on both calls (limitingCollector populated), since with bypass=false
+    // the gate can never fire even when tolerances are nominally met.
     const rhsOld = new Float64Array(10);
     rhsOld[0] = 0.65; // nodeB=1
     rhsOld[1] = 3.0;  // nodeC=2
     rhsOld[2] = 0.0;  // nodeE=3
 
     // First call — compute path, writes s0.
-    const { ctx: ctx1, element: el1 } = makeBypassCtx(MODEDCOP | MODEINITFLOAT, rhsOld, false);
-    el1.load(ctx1);
-    const noncon1 = ctx1.noncon.value;
+    const first = makeBypassCtx(MODEDCOP | MODEINITFLOAT, rhsOld, false);
+    first.element.load(first.ctx);
 
     // Second call with identical rhsOld — bypass=false, so compute path again.
-    const { ctx: ctx2, element: el2, s0 } = makeBypassCtx(MODEDCOP | MODEINITFLOAT, rhsOld, false);
-    // Prime s0 with same state from first call to make tolerances nominally met.
-    const s0prime = (el1 as any).pool?.states?.[0];
-    // Second load should also run compute (bypass=false), noncon should be >= 0.
-    el2.load(ctx2);
-    // Both calls produced noncon values (compute ran); the test checks bypass=false doesn't skip.
-    // Verify stamps were emitted on the second call by checking no throw and noncon is consistent.
-    expect(ctx2.noncon.value).toBeGreaterThanOrEqual(0);
-    // s0[CC] is finite (compute wrote it, not NaN from a skip).
-    expect(Number.isFinite(s0[SLOT_CC])).toBe(true);
+    // Prime s0 of the second element with the first element's s0 so that
+    // tolerances WOULD be met if the gate were reachable; this proves the
+    // ctx.bypass=false guard is what's blocking bypass, not the tolerances.
+    const second = makeBypassCtx(MODEDCOP | MODEINITFLOAT, rhsOld, false);
+    second.s0.set(first.s0);
+    second.element.load(second.ctx);
+
+    // (a) Both calls emit non-zero stamp counts. L0 stamps exactly 9 G-matrix
+    // entries and 3 RHS entries per load (bjt.ts:999-1023), for nodes B=1,
+    // C=2, E=3 (none are ground, so no stamps are dropped).
+    expect(first.stampCount.g).toBe(9);
+    expect(first.stampCount.rhs).toBe(3);
+    expect(second.stampCount.g).toBe(9);
+    expect(second.stampCount.rhs).toBe(3);
+    // (b) Compute path ran on both calls — limitingCollector gets exactly
+    // 2 pushes per compute call (BE + BC junctions, bjt.ts:932-951).
+    expect(first.limitingCollector.length).toBe(2);
+    expect(second.limitingCollector.length).toBe(2);
   });
 
   it("bypass_triggers_when_tolerances_met", () => {
     // cite: bjtload.c:338-381 — bypass fires when ctx.bypass=true and all 4 tolerances pass.
-    // Strategy: run first load() to prime s0, then manually align rhsOld to s0[VBE]/s0[VBC]
-    // so delvbe=0 and delvbc=0 exactly, ensuring all 4 tolerance tests pass on the second call.
+    // Spec (task 5.1.3): "(a) ctx.noncon.value unchanged on second call, (b) stamps
+    // still emitted on second call (bypass preserves stamps), (c) a probe on
+    // computeBjtOp call-count shows it was invoked once (first call) not twice."
+    //
+    // computeBjtOp is a private module function, so call-count is measured
+    // indirectly via ctx.limitingCollector: bjt.ts L0 load() pushes to
+    // limitingCollector only on the compute path (lines 932-951) — the
+    // bypass path (lines 903-906) skips it entirely. The collector therefore
+    // gives an exact 0/≥1 discriminator:
+    //   compute ran  → limitingCollector.length === 2 (BE + BC)
+    //   bypass fired → limitingCollector.length === 0
     const propsObj = makeBjtProps();
     const core = createBjtElement(1, new Map([["B", 1], ["C", 2], ["E", 3]]), -1, propsObj) as AnalogElementCore;
     const pool = new StatePool((core as any).stateSize);
@@ -792,10 +836,26 @@ describe("BJT L0 NOBYPASS", () => {
     (core as any).initState(pool);
     const s0 = pool.states[0];
 
-    function makeCtx(rhsOld: Float64Array, bypass: boolean, nonconRef: { value: number }): LoadContext {
+    function makeCtx(
+      rhsOld: Float64Array,
+      bypass: boolean,
+      nonconRef: { value: number },
+      limitingCollector: LimitingEvent[],
+    ): { ctx: LoadContext; stampCount: { g: number; rhs: number } } {
       const solver = new SparseSolver();
       solver.beginAssembly(10);
-      return {
+      const stampCount = { g: 0, rhs: 0 };
+      const origStampElement = solver.stampElement.bind(solver);
+      solver.stampElement = (handle: number, value: number) => {
+        stampCount.g++;
+        origStampElement(handle, value);
+      };
+      const origStampRHS = solver.stampRHS.bind(solver);
+      solver.stampRHS = (row: number, value: number) => {
+        stampCount.rhs++;
+        origStampRHS(row, value);
+      };
+      const ctx: LoadContext = {
         cktMode: MODEDCOP | MODEINITFLOAT,
         solver,
         matrix: solver,
@@ -809,7 +869,7 @@ describe("BJT L0 NOBYPASS", () => {
         ag: new Float64Array(7),
         srcFact: 1,
         noncon: nonconRef,
-        limitingCollector: null,
+        limitingCollector,
         convergenceCollector: null,
         xfact: 1,
         gmin: 1e-12,
@@ -821,6 +881,7 @@ describe("BJT L0 NOBYPASS", () => {
         bypass,
         voltTol: 1e-6,
       };
+      return { ctx, stampCount };
     }
 
     const element = withNodeIds(core, [1, 2, 3]);
@@ -828,37 +889,46 @@ describe("BJT L0 NOBYPASS", () => {
     // First call — bypass=false, primes s0 with self-consistent op-state.
     const rhsOld1 = new Float64Array(10);
     rhsOld1[0] = 0.65; rhsOld1[1] = 3.0; rhsOld1[2] = 0.0;
-    element.load(makeCtx(rhsOld1, false, { value: 0 }));
+    const limits1: LimitingEvent[] = [];
+    const call1 = makeCtx(rhsOld1, false, { value: 0 }, limits1);
+    element.load(call1.ctx);
+
+    // First-call path probe: compute ran → exactly 2 pushes (BE + BC).
+    expect(limits1.length).toBe(2);
 
     // Build rhsOld2 aligned to s0[VBE]/s0[VBC] so delvbe=delvbc=0 exactly.
-    // NPN: vbeRaw = vB-vE, vbcRaw = vB-vC. Set vB-vE = s0[VBE], vB-vC = s0[VBC].
-    // Let vE=0, vC=0, solve: vB = s0[VBE]; vC = vB - s0[VBC].
+    // NPN: vbeRaw = vB-vE, vbcRaw = vB-vC. Let vE=0, vC=vB-s0[VBC], vB=s0[VBE].
     const vbeTarget = s0[SLOT_VBE];
     const vbcTarget = s0[SLOT_VBC];
     const rhsOld2 = new Float64Array(10);
-    rhsOld2[0] = vbeTarget;           // nodeB=1 → vB = vbeTarget (vE=0)
+    rhsOld2[0] = vbeTarget;             // nodeB=1 → vB = vbeTarget (vE=0)
     rhsOld2[1] = vbeTarget - vbcTarget; // nodeC=2 → vC = vB - vbcTarget
-    rhsOld2[2] = 0.0;                 // nodeE=3
+    rhsOld2[2] = 0.0;                   // nodeE=3
 
-    const cc1 = s0[SLOT_CC];
     const noncon2 = { value: 0 };
-    element.load(makeCtx(rhsOld2, true, noncon2));
-    const cc2 = s0[SLOT_CC];
+    const limits2: LimitingEvent[] = [];
+    const call2 = makeCtx(rhsOld2, true, noncon2, limits2);
+    element.load(call2.ctx);
 
-    // (a) noncon unchanged — bypass skips pnjlim+compute, no noncon bump.
+    // (a) noncon unchanged — bypass skips pnjlim+icheck++ (bjt.ts:930).
     expect(noncon2.value).toBe(0);
-    // (b) s0[CC] unchanged — bypass path does not call computeBjtOp, s0 preserved.
-    expect(cc2).toBe(cc1);
-    // (c) s0 values are finite — stamps emitted with restored values.
-    expect(Number.isFinite(s0[SLOT_VBE])).toBe(true);
-    expect(Number.isFinite(s0[SLOT_VBC])).toBe(true);
+    // (b) stamps still emitted on bypass path — bypass preserves the stamp
+    // block (bjt.ts:999-1023). L0 emits exactly 9 G entries + 3 RHS entries.
+    expect(call2.stampCount.g).toBe(9);
+    expect(call2.stampCount.rhs).toBe(3);
+    // (c) computeBjtOp call-count probe: bypass path did NOT push to
+    // limitingCollector (lines 932-951 are inside the compute-path else
+    // branch). Exactly 0 pushes proves bypass fired instead of compute.
+    expect(limits2.length).toBe(0);
   });
 
   it("bypass_disabled_by_MODEINITPRED", () => {
     // cite: bjtload.c:347 — !(MODEINITPRED) is part of the bypass gate.
-    // With cktMode|=MODEINITPRED, bypass gate must not fire even when ctx.bypass=true.
-    // Strategy: prime s0 with a normal load, then call with MODEINITPRED and bypass=true.
-    // Check that computeBjtOp ran by verifying s0[CC] reflects the computed (not sentinel) value.
+    // With cktMode|=MODEINITPRED, bypass gate must not fire even when
+    // ctx.bypass=true and tolerances are met.
+    //
+    // Probe: limitingCollector populated ⇒ compute path ran (bjt.ts:932-951).
+    // If bypass had (incorrectly) fired, the collector would be empty.
     const propsObj = makeBjtProps();
     const core = createBjtElement(1, new Map([["B", 1], ["C", 2], ["E", 3]]), -1, propsObj) as AnalogElementCore;
     const pool = new StatePool((core as any).stateSize);
@@ -868,7 +938,12 @@ describe("BJT L0 NOBYPASS", () => {
     const s1 = pool.states[1];
     const s2 = pool.states[2];
 
-    function makeCtx(cktMode: number, rhsOld: Float64Array, bypass: boolean): LoadContext {
+    function makeCtx(
+      cktMode: number,
+      rhsOld: Float64Array,
+      bypass: boolean,
+      limitingCollector: LimitingEvent[],
+    ): LoadContext {
       const solver = new SparseSolver();
       solver.beginAssembly(10);
       return {
@@ -885,7 +960,7 @@ describe("BJT L0 NOBYPASS", () => {
         ag: new Float64Array(7),
         srcFact: 1,
         noncon: { value: 0 },
-        limitingCollector: null,
+        limitingCollector,
         convergenceCollector: null,
         xfact: 0,
         gmin: 1e-12,
@@ -903,25 +978,25 @@ describe("BJT L0 NOBYPASS", () => {
     const rhsOld = new Float64Array(10);
     rhsOld[0] = 0.65; rhsOld[1] = 3.0; rhsOld[2] = 0.0;
     const element = withNodeIds(core, [1, 2, 3]);
-    element.load(makeCtx(MODEDCOP | MODEINITFLOAT, rhsOld, false));
+    element.load(makeCtx(MODEDCOP | MODEINITFLOAT, rhsOld, false, []));
 
-    // Copy s0 → s1 and s2 so xfact=0 extrapolation gives same vbe/vbc.
+    // Copy s0 → s1 and s2 so xfact=0 extrapolation gives vbe/vbc == s0 values.
+    // With rhsOld nulled out, the MODEINITPRED branch computes vbeRaw/vbcRaw
+    // from s1 (extrapolated), not from rhsOld — so the extrapolated values
+    // match s0 exactly, and delvbe/delvbc = 0. Tolerances are nominally met;
+    // only the !(MODEINITPRED) guard blocks bypass.
     for (let i = 0; i < (core as any).stateSize; i++) {
       s1[i] = s0[i];
       s2[i] = s0[i];
     }
 
-    // Overwrite s0[CC] with a sentinel to detect whether computeBjtOp rewrites it.
-    const sentinel = -999;
-    s0[SLOT_CC] = sentinel;
-
     // Call with MODEINITPRED + bypass=true — bypass gate must NOT fire.
-    element.load(makeCtx(MODETRAN | MODEINITPRED, new Float64Array(10), true));
+    const limits: LimitingEvent[] = [];
+    element.load(makeCtx(MODETRAN | MODEINITPRED, new Float64Array(10), true, limits));
 
-    // If bypass was (incorrectly) taken, s0[CC] would remain sentinel.
-    // If compute ran (correct), s0[CC] is rewritten to a real value.
-    expect(s0[SLOT_CC]).not.toBe(sentinel);
-    expect(Number.isFinite(s0[SLOT_CC])).toBe(true);
+    // Path probe: compute ran (limitingCollector populated) ⇒ bypass did not
+    // fire under MODEINITPRED. Exactly 2 pushes (BE + BC junctions).
+    expect(limits.length).toBe(2);
   });
 });
 
@@ -1114,18 +1189,27 @@ describe("BJT L0 MODEINITSMSIG", () => {
 
   it("state0_op_slots_populated", () => {
     // cite: bjtload.c:676,703 — MODEINITSMSIG reads s0 and runs computeBjtOp, writing back op slots.
+    // Priming bias is vbe≈0.65 V forward-active (makeSmsigCtx prime pass); the
+    // MODEINITSMSIG call dispatches through the general path which reads
+    // vbeRaw/vbcRaw from s0 (MODEINITSMSIG is one of the modes that skips
+    // pnjlim at bjt.ts:915), so s0[VBE]/s0[VBC] are written back unchanged.
     const { ctx, element, s0 } = makeSmsigCtx();
+    const vbeBefore = s0[SLOT_VBE];
+    const vbcBefore = s0[SLOT_VBC];
     element.load(ctx);
-    // All 9 op-state slots in s0 must be finite after load() under MODEINITSMSIG.
-    expect(Number.isFinite(s0[SLOT_VBE])).toBe(true);
-    expect(Number.isFinite(s0[SLOT_VBC])).toBe(true);
-    expect(Number.isFinite(s0[SLOT_CC])).toBe(true);
-    expect(Number.isFinite(s0[SLOT_CB])).toBe(true);
-    expect(Number.isFinite(s0[SLOT_GPI])).toBe(true);
-    expect(Number.isFinite(s0[SLOT_GMU])).toBe(true);
-    expect(Number.isFinite(s0[SLOT_GM])).toBe(true);
-    expect(Number.isFinite(s0[SLOT_GO])).toBe(true);
-    expect(Number.isFinite(s0[SLOT_GX])).toBe(true);
+    // (a) VBE / VBC write-back is bit-exact under MODEINITSMSIG.
+    expect(s0[SLOT_VBE]).toBe(vbeBefore);
+    expect(s0[SLOT_VBC]).toBe(vbcBefore);
+    // (b) Forward-active Gummel-Poon at vbe≈0.65 V produces clearly positive
+    // cc, cb, gpi, gmu, gm, go for NPN defaults (IS=1e-16, BF=100, VAF=∞).
+    expect(s0[SLOT_CC]).toBeGreaterThan(0);
+    expect(s0[SLOT_CB]).toBeGreaterThan(0);
+    expect(s0[SLOT_GPI]).toBeGreaterThan(0);
+    expect(s0[SLOT_GMU]).toBeGreaterThan(0);
+    expect(s0[SLOT_GM]).toBeGreaterThan(0);
+    expect(s0[SLOT_GO]).toBeGreaterThan(0);
+    // L0 has no base resistance → gx=0 (bjt.ts:972).
+    expect(s0[SLOT_GX]).toBe(0);
   });
 });
 
@@ -1257,13 +1341,21 @@ describe("BJT L1 MODEINITSMSIG", () => {
 
   it("cap_values_stored", () => {
     // cite: bjtload.c:674-703 — MODEINITSMSIG stores capbe/capbc/capsub/capbx into s0.
-    const { ctx, element, s0 } = makeL1SmsigCtx();
+    // Defaults used: CJE=CJC=1e-12 (makeL1SmsigCtx baseline) + override
+    // CJS=1e-12 (SPICE default is 0 → capsub would collapse to 0) and
+    // XCJC=0.5 (SPICE default is 1 → czbx = ctot*(1-XCJC) = 0 → capbx=0).
+    // With forward-active bias (vbe≈0.65 V, vbc≈-2.35 V), all four
+    // depletion+diffusion caps are strictly positive:
+    //   capbe = tf*gbeMod + czbe*sarg   (czbe=CJE*AREA > 0, sarg > 0)
+    //   capbc = tr*gbc + czbc*sarg      (czbc = CJC*AREA*XCJC > 0)
+    //   capsub = czsub * sarg           (czsub = CJS*AREA > 0 w/ CJS=1e-12)
+    //   capbx = czbx * sarg             (czbx = CJC*AREA*(1-XCJC) > 0 w/ XCJC=0.5)
+    const { ctx, element, s0 } = makeL1SmsigCtx({ CJS: 1e-12, XCJC: 0.5 });
     element.load(ctx);
-    // Cap slots must be finite (non-NaN) after MODEINITSMSIG with CJE=CJC=1e-12.
-    expect(Number.isFinite(s0[SLOT_CQBE])).toBe(true);
-    expect(Number.isFinite(s0[SLOT_CQBC])).toBe(true);
-    expect(Number.isFinite(s0[SLOT_CQSUB])).toBe(true);
-    expect(Number.isFinite(s0[SLOT_CQBX])).toBe(true);
+    expect(s0[SLOT_CQBE]).toBeGreaterThan(0);
+    expect(s0[SLOT_CQBC]).toBeGreaterThan(0);
+    expect(s0[SLOT_CQSUB]).toBeGreaterThan(0);
+    expect(s0[SLOT_CQBX]).toBeGreaterThan(0);
   });
 
   it("cexbc_equals_geqcb", () => {
@@ -1430,12 +1522,25 @@ describe("BJT L1 NOBYPASS", () => {
   const SLOT_GM = 6, SLOT_GO = 7, SLOT_GX = 16;
   const SLOT_VBE = 0, SLOT_VBC = 1, SLOT_VSUB = 21;
 
+  // Path-selection discriminator: bjt.ts L1 load() only calls
+  // ctx.limitingCollector.push() on the compute path (bjt.ts:1458-1486,
+  // inside the `else` branch of the bypass gate). On the bypass path
+  // (bjt.ts:1417-1432), push() is never called. L1 pushes exactly 3
+  // events per compute call (BE + BC + SUB junctions), giving a clean
+  // 0/3 discriminator.
   function makeL1BypassCtx(
     cktMode: number,
     rhsOld: Float64Array,
     bypass: boolean,
     modelParams?: Record<string, number>,
-  ): { ctx: LoadContext; element: AnalogElement; s0: Float64Array; pool: StatePool; stampCount: { n: number } } {
+  ): {
+    ctx: LoadContext;
+    element: AnalogElement;
+    s0: Float64Array;
+    pool: StatePool;
+    stampCount: { n: number };
+    limitingCollector: LimitingEvent[];
+  } {
     const propsObj = makeSpiceL1Props(modelParams);
     const core = createSpiceL1BjtElement(1, new Map([["B", 1], ["C", 2], ["E", 3]]), [], -1, propsObj) as AnalogElementCore;
     const pool = new StatePool((core as any).stateSize);
@@ -1443,14 +1548,20 @@ describe("BJT L1 NOBYPASS", () => {
     (core as any).initState(pool);
     const solver = new SparseSolver();
     solver.beginAssembly(10);
+    // Stamp-count probe: wrap solver.stampElement (G-matrix primitive used by
+    // the stampG helper) and solver.stampRHS (method used by stampRHS helper).
     const stampCount = { n: 0 };
-    const origAddEntryFn = (solver as any).addEntry;
-    if (origAddEntryFn) {
-      (solver as any).addEntry = (row: number, col: number, val: number) => {
-        if (row === col) stampCount.n++;
-        origAddEntryFn.call(solver, row, col, val);
-      };
-    }
+    const origStampElement = solver.stampElement.bind(solver);
+    solver.stampElement = (handle: number, value: number) => {
+      stampCount.n++;
+      origStampElement(handle, value);
+    };
+    const origStampRHS = solver.stampRHS.bind(solver);
+    solver.stampRHS = (row: number, value: number) => {
+      stampCount.n++;
+      origStampRHS(row, value);
+    };
+    const limitingCollector: LimitingEvent[] = [];
     const ctx: LoadContext = {
       cktMode,
       solver,
@@ -1461,30 +1572,52 @@ describe("BJT L1 NOBYPASS", () => {
       method: "trapezoidal", order: 1,
       deltaOld: [0, 0, 0, 0, 0, 0, 0],
       ag: new Float64Array(7), srcFact: 1,
-      noncon: { value: 0 }, limitingCollector: null, convergenceCollector: null,
+      noncon: { value: 0 }, limitingCollector, convergenceCollector: null,
       xfact: 1, gmin: 1e-12, reltol: 1e-3, iabstol: 1e-12,
       temp: 300.15, vt: 0.025852, cktFixLimit: false,
       bypass, voltTol: 1e-6,
     };
     const element = withNodeIds(core, [1, 2, 3]);
-    return { ctx, element, s0: pool.states[0], pool, stampCount };
+    return { ctx, element, s0: pool.states[0], pool, stampCount, limitingCollector };
   }
 
   it("bypass_disabled_when_ctx_bypass_false", () => {
     // cite: bjtload.c:338 — bypass=false means gate never fires; compute always runs.
+    // Spec (task 5.2.3, same pattern as 5.1.3): assert both calls emit
+    // non-zero stamps AND compute path ran (limitingCollector populated).
     const rhsOld = new Float64Array(10);
     rhsOld[0] = 0.65; rhsOld[1] = 3.0; rhsOld[2] = 0.0;
 
-    const { ctx, element, s0 } = makeL1BypassCtx(MODEDCOP | MODEINITFLOAT, rhsOld, false);
-    element.load(ctx);
-    // Compute ran — s0[CC] is finite.
-    expect(Number.isFinite(s0[SLOT_CC])).toBe(true);
-    expect(ctx.noncon.value).toBeGreaterThanOrEqual(0);
+    // First call — compute path, writes s0.
+    const first = makeL1BypassCtx(MODEDCOP | MODEINITFLOAT, rhsOld, false);
+    first.element.load(first.ctx);
+    const stamps1 = first.stampCount.n;
+    const limits1 = first.limitingCollector.length;
+
+    // Second call with identical rhsOld — bypass=false so compute runs again
+    // even though s0 was pre-aligned to rhsOld (tolerances trivially met).
+    const second = makeL1BypassCtx(MODEDCOP | MODEINITFLOAT, rhsOld, false);
+    second.s0.set(first.s0);
+    second.element.load(second.ctx);
+    const stamps2 = second.stampCount.n;
+    const limits2 = second.limitingCollector.length;
+
+    // (a) Both calls emit non-zero stamp counts. Exact counts depend on the
+    // L1 stamp block (bjt.ts:1849-1905) and aren't brittle — assert > 0.
+    expect(stamps1).toBeGreaterThan(0);
+    expect(stamps2).toBeGreaterThan(0);
+    // (b) Compute path ran on both calls — L1 pushes exactly 3 events per
+    // compute call (BE + BC + SUB, bjt.ts:1459-1485).
+    expect(limits1).toBe(3);
+    expect(limits2).toBe(3);
   });
 
   it("bypass_restores_and_stamps", () => {
     // cite: bjtload.c:338-381 — bypass fires when ctx.bypass=true and tolerances met.
     // Stamp block still runs on bypass path (mirrors ngspice goto load).
+    // Spec (task 5.2.3): assert (a) noncon unchanged, (b) stamps still
+    // emitted, (c) computeSpiceL1BjtOp NOT called on the bypass call
+    // (limitingCollector length 0 — only compute path pushes).
     const propsObj = makeSpiceL1Props();
     const core = createSpiceL1BjtElement(1, new Map([["B", 1], ["C", 2], ["E", 3]]), [], -1, propsObj) as AnalogElementCore;
     const pool = new StatePool((core as any).stateSize);
@@ -1492,29 +1625,49 @@ describe("BJT L1 NOBYPASS", () => {
     (core as any).initState(pool);
     const s0 = pool.states[0];
 
-    function makeCtx(rhsOld: Float64Array, bypass: boolean, nonconRef: { value: number }): LoadContext {
+    function makeCtx(
+      rhsOld: Float64Array,
+      bypass: boolean,
+      nonconRef: { value: number },
+      limitingCollector: LimitingEvent[],
+    ): { ctx: LoadContext; stampCount: { n: number } } {
       const solver = new SparseSolver();
       solver.beginAssembly(10);
-      return {
+      const stampCount = { n: 0 };
+      const origStampElement = solver.stampElement.bind(solver);
+      solver.stampElement = (handle: number, value: number) => {
+        stampCount.n++;
+        origStampElement(handle, value);
+      };
+      const origStampRHS = solver.stampRHS.bind(solver);
+      solver.stampRHS = (row: number, value: number) => {
+        stampCount.n++;
+        origStampRHS(row, value);
+      };
+      const ctx: LoadContext = {
         cktMode: MODEDCOP | MODEINITFLOAT,
         solver, matrix: solver,
         rhs: new Float64Array(10), rhsOld,
         time: 0, dt: 0, method: "trapezoidal", order: 1,
         deltaOld: [0, 0, 0, 0, 0, 0, 0],
         ag: new Float64Array(7), srcFact: 1,
-        noncon: nonconRef, limitingCollector: null, convergenceCollector: null,
+        noncon: nonconRef, limitingCollector, convergenceCollector: null,
         xfact: 1, gmin: 1e-12, reltol: 1e-3, iabstol: 1e-12,
         temp: 300.15, vt: 0.025852, cktFixLimit: false,
         bypass, voltTol: 1e-6,
       };
+      return { ctx, stampCount };
     }
 
     const element = withNodeIds(core, [1, 2, 3]);
 
-    // First load: prime s0.
+    // First load: prime s0. bypass=false → compute path → 3 pushes expected.
     const rhsOld1 = new Float64Array(10);
     rhsOld1[0] = 0.65; rhsOld1[1] = 3.0; rhsOld1[2] = 0.0;
-    element.load(makeCtx(rhsOld1, false, { value: 0 }));
+    const limits1: LimitingEvent[] = [];
+    const call1 = makeCtx(rhsOld1, false, { value: 0 }, limits1);
+    element.load(call1.ctx);
+    expect(limits1.length).toBe(3);
 
     // Build rhsOld2 aligned to s0[VBE]/s0[VBC] so delvbe=delvbc=0.
     const vbeTarget = s0[SLOT_VBE];
@@ -1524,25 +1677,26 @@ describe("BJT L1 NOBYPASS", () => {
     rhsOld2[1] = vbeTarget - vbcTarget;
     rhsOld2[2] = 0.0;
 
-    const cc1 = s0[SLOT_CC];
     const noncon2 = { value: 0 };
+    const limits2: LimitingEvent[] = [];
     // Second load: bypass=true, same voltages → tolerances met.
-    const ctx2 = makeCtx(rhsOld2, true, noncon2);
+    const call2 = makeCtx(rhsOld2, true, noncon2, limits2);
+    element.load(call2.ctx);
 
-    element.load(ctx2);
-    const cc2 = s0[SLOT_CC];
-
-    // (a) noncon unchanged — bypass skips pnjlim+compute, no noncon bump.
+    // (a) noncon unchanged — bypass skips pnjlim+icheck++ (bjt.ts:1456).
     expect(noncon2.value).toBe(0);
-    // (b) s0[CC] unchanged — bypass path does not call computeSpiceL1BjtOp.
-    expect(cc2).toBe(cc1);
-    // (c) s0 values are finite — bypassed values were restored correctly.
-    expect(Number.isFinite(s0[SLOT_VBE])).toBe(true);
-    expect(Number.isFinite(s0[SLOT_CC])).toBe(true);
+    // (b) stamps still emitted on bypass path — bypass preserves the L1
+    // stamp block (bjt.ts:1849-1905). Count must be > 0.
+    expect(call2.stampCount.n).toBeGreaterThan(0);
+    // (c) computeSpiceL1BjtOp call-count probe: bypass path did NOT push to
+    // limitingCollector (lines 1458-1486 are inside the compute-path else).
+    // Zero pushes proves bypass fired instead of compute.
+    expect(limits2.length).toBe(0);
   });
 
   it("bypass_disabled_by_MODEINITPRED", () => {
     // cite: bjtload.c:347 — !(MODEINITPRED) is part of the bypass gate; MODEINITPRED disables it.
+    // Probe: limitingCollector populated ⇒ compute path ran under MODEINITPRED.
     const propsObj = makeSpiceL1Props();
     const core = createSpiceL1BjtElement(1, new Map([["B", 1], ["C", 2], ["E", 3]]), [], -1, propsObj) as AnalogElementCore;
     const pool = new StatePool((core as any).stateSize);
@@ -1552,7 +1706,12 @@ describe("BJT L1 NOBYPASS", () => {
     const s1 = pool.states[1];
     const s2 = pool.states[2];
 
-    function makeCtx(cktMode: number, rhsOld: Float64Array, bypass: boolean): LoadContext {
+    function makeCtx(
+      cktMode: number,
+      rhsOld: Float64Array,
+      bypass: boolean,
+      limitingCollector: LimitingEvent[],
+    ): LoadContext {
       const solver = new SparseSolver();
       solver.beginAssembly(10);
       return {
@@ -1561,7 +1720,7 @@ describe("BJT L1 NOBYPASS", () => {
         time: 1e-9, dt: 1e-9, method: "trapezoidal", order: 1,
         deltaOld: [1e-9, 1e-9, 1e-9, 1e-9, 1e-9, 1e-9, 1e-9],
         ag: new Float64Array(7), srcFact: 1,
-        noncon: { value: 0 }, limitingCollector: null, convergenceCollector: null,
+        noncon: { value: 0 }, limitingCollector, convergenceCollector: null,
         xfact: 0, gmin: 1e-12, reltol: 1e-3, iabstol: 1e-12,
         temp: 300.15, vt: 0.025852, cktFixLimit: false,
         bypass, voltTol: 1e-6,
@@ -1573,22 +1732,18 @@ describe("BJT L1 NOBYPASS", () => {
     // Prime s0 with a normal NR pass at forward-active bias.
     const rhsOld1 = new Float64Array(10);
     rhsOld1[0] = 0.65; rhsOld1[1] = 3.0; rhsOld1[2] = 0.0;
-    element.load(makeCtx(MODEDCOP | MODEINITFLOAT, rhsOld1, false));
+    element.load(makeCtx(MODEDCOP | MODEINITFLOAT, rhsOld1, false, []));
 
     // Copy s0→s1, s1→s2 so MODEINITPRED extrapolation collapses to s0 values.
     s1.set(s0); s2.set(s0);
 
-    // Overwrite s0[CC] with sentinel so we can detect whether compute ran.
-    const sentinel = 9999;
-    s0[SLOT_CC] = sentinel;
-
     // Call with MODEINITPRED + bypass=true — MODEINITPRED gate must prevent bypass.
-    // The compute path will rewrite s0[CC] with the real computed value.
-    element.load(makeCtx(MODETRAN | MODEINITPRED, rhsOld1, true));
+    // The compute path will push 3 entries to limitingCollector.
+    const limits: LimitingEvent[] = [];
+    element.load(makeCtx(MODETRAN | MODEINITPRED, rhsOld1, true, limits));
 
-    // If bypass had fired, s0[CC] would still be sentinel.
-    // Since MODEINITPRED disables bypass, computeSpiceL1BjtOp ran and overwrote s0[CC].
-    expect(s0[SLOT_CC]).not.toBe(sentinel);
+    // Path probe: compute ran ⇒ exactly 3 pushes (BE + BC + SUB).
+    expect(limits.length).toBe(3);
   });
 });
 
