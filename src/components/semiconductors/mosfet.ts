@@ -50,6 +50,9 @@ import {
   MODEINITTRAN, MODEINITPRED, MODETRAN, MODETRANOP, MODEAC, MODEUIC,
 } from "../../solver/analog/ckt-mode.js";
 
+// Phase 5 precondition: compile error if LoadContext is missing bypass or voltTol.
+type _PhaseAssert = Pick<LoadContext, "bypass" | "voltTol">;
+
 // ---------------------------------------------------------------------------
 // Physical constants (ngspice const.h / defines.h values)
 // ---------------------------------------------------------------------------
@@ -975,9 +978,6 @@ export function createMosfetElement(
   let pool: StatePoolRef;
   let base: number;
 
-  // One-shot cold-start seed flag from primeJunctions(); consumed by next load().
-  let primedFromJct = false;
-
   return {
     branchIndex: -1,
     isNonlinear: true,
@@ -1039,18 +1039,7 @@ export function createMosfetElement(
       const simpleGate = (mode & (MODEINITFLOAT | MODEINITPRED | MODEINITSMSIG | MODEINITTRAN)) !== 0
         || ((mode & MODEINITFIX) !== 0 && params.OFF === 0);
 
-      if (primedFromJct) {
-        // Consume one-shot seeds written by primeJunctions() — the MODEINITJCT
-        // path below (mos1load.c:419-430) but driven from slot state rather
-        // than re-reading MOS1icVBS/VDS/VGS. Voltages are already polarity-
-        // applied and stored in {VBS,VGS,VDS} slots.
-        vbs = s0[base + SLOT_VBS];
-        vgs = s0[base + SLOT_VGS];
-        vds = s0[base + SLOT_VDS];
-        vbd = vbs - vds;
-        vgd = vgs - vds;
-        primedFromJct = false;
-      } else if (simpleGate) {
+      if (simpleGate) {
         if (mode & (MODEINITPRED | MODEINITTRAN)) {
           // mos1load.c:205-225: predictor step (#ifndef PREDICTOR).
           const deltaOldRatio = ctx.deltaOld[1] > 0 ? ctx.delta / ctx.deltaOld[1] : 0;
@@ -1682,27 +1671,6 @@ export function createMosfetElement(
       const tolD = ctx.reltol * Math.max(Math.abs(cdhat), Math.abs(cd)) + ctx.iabstol;
       const tolB = ctx.reltol * Math.max(Math.abs(cbhat), Math.abs(cbs + cbd)) + ctx.iabstol;
       return Math.abs(cdhat - cd) <= tolD && Math.abs(cbhat - (cbs + cbd)) <= tolB;
-    },
-
-    primeJunctions(): void {
-      // mos1load.c:419-430: MODEINITJCT seed state.
-      //   OFF=0: vbs=-1, vgs=type*tVto, vds=0
-      //   OFF=1: vbs=vgs=vds=0
-      // primeJunctions() is invoked once before the first NR iteration; the
-      // next load() consumes these seeds (primedFromJct flag) and clears.
-      const s0 = pool.states[0];
-      if (params.OFF) {
-        s0[base + SLOT_VGS] = 0;
-        s0[base + SLOT_VDS] = 0;
-        s0[base + SLOT_VBS] = 0;
-        s0[base + SLOT_VBD] = 0;
-      } else {
-        s0[base + SLOT_VGS] = polarity * tp.tVto;
-        s0[base + SLOT_VDS] = 0;
-        s0[base + SLOT_VBS] = -1;
-        s0[base + SLOT_VBD] = -1;
-      }
-      primedFromJct = true;
     },
 
     getPinCurrents(_voltages: Float64Array): number[] {

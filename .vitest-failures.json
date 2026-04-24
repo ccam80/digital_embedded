@@ -1,21 +1,99 @@
 {
   "summary": {
-    "passed": 8,
-    "failed": 1,
+    "passed": 18,
+    "failed": 12,
     "skipped": 0,
     "totalFiles": 1,
-    "durationSeconds": 0.5
+    "durationSeconds": 0.6
   },
   "failures": [
     {
-      "message": "expected undefined to be an instance of Float64Array",
+      "message": "Cannot read properties of undefined (reading '2')",
+      "count": 8,
+      "locations": [
+        {
+          "file": "src\\components\\semiconductors\\mosfet.ts",
+          "test": "cutoff_region",
+          "line": 1065,
+          "column": 34
+        },
+        {
+          "file": "src\\components\\semiconductors\\mosfet.ts",
+          "test": "stamp_nonlinear_has_conductance_entries",
+          "line": 1065,
+          "column": 34
+        },
+        {
+          "file": "src\\components\\semiconductors\\mosfet.ts",
+          "test": "srcFact_zero_does_not_scale_mosfet_stamps",
+          "line": 1065,
+          "column": 34
+        },
+        {
+          "file": "src\\components\\semiconductors\\mosfet.ts",
+          "test": "srcFact_default_equals_one",
+          "line": 1065,
+          "column": 34
+        },
+        {
+          "file": "src\\components\\semiconductors\\mosfet.ts",
+          "test": "polarity_reversed",
+          "line": 1065,
+          "column": 34
+        },
+        {
+          "file": "src\\components\\semiconductors\\mosfet.ts",
+          "test": "pushes GS (fetlim) event to limitingCollector",
+          "line": 1065,
+          "column": 34
+        },
+        {
+          "file": "src\\components\\semiconductors\\mosfet.ts",
+          "test": "pushes DS (limvds) event to limitingCollector",
+          "line": 1065,
+          "column": 34
+        },
+        {
+          "file": "src\\components\\semiconductors\\mosfet.ts",
+          "test": "pushes BS or BD (pnjlim) bulk junction event",
+          "line": 1065,
+          "column": 34
+        }
+      ]
+    },
+    {
+      "message": "expected false to be true // Object.is equality",
+      "count": 3,
+      "locations": [
+        {
+          "file": "src\\components\\semiconductors\\__tests__\\mosfet.test.ts",
+          "test": "common_source_nmos",
+          "line": 468,
+          "column": 30
+        },
+        {
+          "file": "src\\components\\semiconductors\\__tests__\\mosfet.test.ts",
+          "test": "setParam('VTO', 2.5) shifts DC OP to match SPICE reference",
+          "line": 505,
+          "column": 30
+        },
+        {
+          "file": "src\\components\\semiconductors\\__tests__\\mosfet.test.ts",
+          "test": "setParam('KP', 240µ) shifts DC OP to match SPICE reference",
+          "line": 529,
+          "column": 30
+        }
+      ]
+    },
+    {
+      "message": "expected [Function] to not throw an error but 'TypeError: Cannot read properties of …' was thrown",
       "count": 1,
       "locations": [
         {
-          "file": "src\\solver\\analog\\__tests__\\ckt-context.test.ts",
-          "test": "loadCtx_fields_populated",
-          "line": 260,
-          "column": 25
+          "file": "src\\components\\semiconductors\\__tests__\\mosfet.test.ts",
+          "test": "does not throw when limitingCollector is null",
+          "line": 630,
+          "column": 69
         }
       ]
     }

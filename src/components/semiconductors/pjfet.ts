@@ -29,7 +29,7 @@ import {
 } from "../../core/registry.js";
 import type { IntegrationMethod, LoadContext } from "../../solver/analog/element.js";
 import { stampG, stampRHS } from "../../solver/analog/stamp-helpers.js";
-import { pnjlim } from "../../solver/analog/newton-raphson.js";
+import { pnjlim, fetlim } from "../../solver/analog/newton-raphson.js";
 import { cktTerr } from "../../solver/analog/ckt-terr.js";
 import type { LteParams } from "../../solver/analog/ckt-terr.js";
 import { niIntegrate } from "../../solver/analog/ni-integrate.js";
@@ -278,10 +278,6 @@ export function createPJfetElement(
   // Ephemeral per-iteration icheck flag (jfetload.c:500-508 CKTnoncon bump).
   let icheckLimited = false;
 
-  // One-shot cold-start seed flag from primeJunctions(); consumed by next
-  // load() and cleared.
-  let primedFromJct = false;
-
   return {
     branchIndex: -1,
     isNonlinear: true,
@@ -319,19 +315,26 @@ export function createPJfetElement(
       const vto = tp.tThreshold;
 
       let icheck = 1;
+      let bypassed = false;
 
       // jfetload.c:103-164: linearization voltage dispatch per cktMode.
       let vgs: number;
       let vgd: number;
+      // Promoted to function scope so bypass reload and stamp phase share the
+      // same bindings; initial values are set in the compute block.
+      let cg = 0;
+      let cd = 0;
+      let cgd = 0;
+      let gm = 0;
+      let gds = 0;
+      let ggs = 0;
+      let ggd = 0;
+      // cite: jfetload.c:165-174 — extrapolated currents for bypass + noncon;
+      // set only in the general-iteration branch.
+      let cghat = 0;
+      let cdhat = 0;
 
-      if (primedFromJct) {
-        // Consume one-shot seed from primeJunctions() — MODEINITJCT/!OFF
-        // branch (jfetload.c:115-118) seed vgs=-1, vgd=-1.
-        vgs = s0[base + SLOT_VGS];
-        vgd = s0[base + SLOT_VGD];
-        primedFromJct = false;
-        icheck = 0;
-      } else if (mode & MODEINITSMSIG) {
+      if (mode & MODEINITSMSIG) {
         // jfetload.c:103-105: seed from CKTstate0.
         vgs = s0[base + SLOT_VGS];
         vgd = s0[base + SLOT_VGD];
@@ -370,6 +373,14 @@ export function createPJfetElement(
         vgs = (1 + xfact) * vgs1 - xfact * s2[base + SLOT_VGS];
         s0[base + SLOT_VGD] = vgd1;
         vgd = (1 + xfact) * vgd1 - xfact * s2[base + SLOT_VGD];
+        // cite: jfetload.c:135-148
+        s0[base + SLOT_CG]  = s1[base + SLOT_CG];
+        s0[base + SLOT_CD]  = s1[base + SLOT_CD];
+        s0[base + SLOT_CGD] = s1[base + SLOT_CGD];
+        s0[base + SLOT_GM]  = s1[base + SLOT_GM];
+        s0[base + SLOT_GDS] = s1[base + SLOT_GDS];
+        s0[base + SLOT_GGS] = s1[base + SLOT_GGS];
+        s0[base + SLOT_GGD] = s1[base + SLOT_GGD];
         icheck = 0;
       } else {
         // jfetload.c:151-164: general iteration — read from CKTrhsOld with

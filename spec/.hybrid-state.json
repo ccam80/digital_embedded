@@ -384,13 +384,13 @@
       ],
       "spawned": 10,
       "completed": 10,
-      "verifications_passed": 6,
+      "verifications_passed": 7,
       "verifications_failed": 3,
       "stops_for_clarification": 0,
       "dead_implementers": 0,
       "dead_verifiers": 0,
       "group_status": {
-        "5.0.loadctx": "failed",
+        "5.0.loadctx": "passed",
         "5.0.bjt": "passed",
         "7.5.diode": "passed",
         "7.5.zener": "passed",
@@ -447,12 +447,12 @@
           "7.1.6"
         ]
       ],
-      "spawned": 0,
-      "completed": 0,
+      "spawned": 3,
+      "completed": 1,
       "verifications_passed": 0,
       "verifications_failed": 0,
       "stops_for_clarification": 0,
-      "dead_implementers": 0,
+      "dead_implementers": 2,
       "dead_verifiers": 0,
       "group_status": {
         "5.1": "pending",
@@ -748,5 +748,5 @@
       "user_acks": {}
     }
   ],
-  "last_updated": "2026-04-24T10:54:57.881Z"
+  "last_updated": "2026-04-24T11:11:35.478Z"
 }

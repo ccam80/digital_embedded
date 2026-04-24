@@ -26,7 +26,10 @@ import { SparseSolver } from "../../../solver/analog/sparse-solver.js";
 import type { AnalogElement } from "../../../solver/analog/element.js";
 import type { AnalogElementCore } from "../../../core/analog-types.js";
 import { createTestPropertyBag } from "../../../test-fixtures/model-fixtures.js";
-import { MODEDCOP, MODEINITFLOAT } from "../../../solver/analog/ckt-mode.js";
+import {
+  MODEDCOP, MODEINITFLOAT, MODETRAN, MODEINITPRED,
+  MODEINITJCT, MODETRANOP, MODEUIC, MODEINITFIX,
+} from "../../../solver/analog/ckt-mode.js";
 import type { LimitingEvent } from "../../../solver/analog/newton-raphson.js";
 
 // ---------------------------------------------------------------------------
@@ -458,5 +461,232 @@ describe("BJT L1 LimitingEvent instrumentation", () => {
     expect(beEv!.limitType).toBe("pnjlim");
     expect(Number.isFinite(beEv!.vBefore)).toBe(true);
     expect(Number.isFinite(beEv!.vAfter)).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Task 5.1.1 — MODEINITPRED full state-copy list (A1)
+// bjtload.c:288-303: all 9 L0 op-state slots copied from state1 to state0.
+// ---------------------------------------------------------------------------
+
+describe("BJT L0 MODEINITPRED", () => {
+  it("copies_9_slots_state1_to_state0", () => {
+    // L0 slot indices (match bjt.ts createBjtElement local consts):
+    // 0=VBE, 1=VBC, 2=CC, 3=CB, 4=GPI, 5=GMU, 6=GM, 7=GO, 8=GX
+    const SLOT_VBE = 0, SLOT_VBC = 1, SLOT_CC = 2, SLOT_CB = 3;
+    const SLOT_GPI = 4, SLOT_GMU = 5, SLOT_GM = 6, SLOT_GO = 7, SLOT_GX = 8;
+
+    const propsObj = makeBjtProps();
+    const core = createBjtElement(1, new Map([["B", 1], ["C", 2], ["E", 3]]), -1, propsObj) as AnalogElementCore;
+    const stateSize: number = (core as any).stateSize;
+    const pool = new StatePool(stateSize);
+    (core as any).stateBaseOffset = 0;
+    (core as any).initState(pool);
+
+    const s0 = pool.states[0];
+    const s1 = pool.states[1];
+    const s2 = pool.states[2];
+
+    // Prime state1 with physically consistent op-state values by running a
+    // normal NR load() pass at vbe=0.65 V, vbc=-1.0 V (forward-active bias).
+    // This gives s0 values that are self-consistent at those voltages; we then
+    // copy s0 → s1 to simulate what the previous time-step would have left.
+    const rhsOldPrime = new Float64Array(10);
+    rhsOldPrime[0] = 0.65; // nodeB=1 → rhsOld[0]
+    rhsOldPrime[1] = -1.0; // nodeC=2 → rhsOld[1]
+    rhsOldPrime[2] = 0.0;  // nodeE=3 → rhsOld[2]
+    const solverPrime = new SparseSolver();
+    solverPrime.beginAssembly(10);
+    const rhs = new Float64Array(10);
+    const ctxPrime: LoadContext = {
+      cktMode: MODEDCOP | MODEINITFLOAT,
+      solver: solverPrime,
+      matrix: solverPrime,
+      rhs,
+      rhsOld: rhsOldPrime,
+      time: 0,
+      dt: 0,
+      method: "trapezoidal",
+      order: 1,
+      deltaOld: [0, 0, 0, 0, 0, 0, 0],
+      ag: new Float64Array(7),
+      srcFact: 1,
+      noncon: { value: 0 },
+      limitingCollector: null,
+      convergenceCollector: null,
+      xfact: 1,
+      gmin: 1e-12,
+      reltol: 1e-3,
+      iabstol: 1e-12,
+      temp: 300.15,
+      vt: 0.025852,
+      cktFixLimit: false,
+      bypass: false,
+      voltTol: 1e-6,
+    };
+    const element = withNodeIds(core, [1, 2, 3]);
+    element.load(ctxPrime);
+
+    // Copy s0 → s1 so that s1 holds physically consistent sentinels.
+    s1[SLOT_VBE] = s0[SLOT_VBE];
+    s1[SLOT_VBC] = s0[SLOT_VBC];
+    s1[SLOT_CC]  = s0[SLOT_CC];
+    s1[SLOT_CB]  = s0[SLOT_CB];
+    s1[SLOT_GPI] = s0[SLOT_GPI];
+    s1[SLOT_GMU] = s0[SLOT_GMU];
+    s1[SLOT_GM]  = s0[SLOT_GM];
+    s1[SLOT_GO]  = s0[SLOT_GO];
+    s1[SLOT_GX]  = s0[SLOT_GX];
+
+    // Capture sentinel values for assertion.
+    const sentVBE = s1[SLOT_VBE];
+    const sentVBC = s1[SLOT_VBC];
+    const sentCC  = s1[SLOT_CC];
+    const sentCB  = s1[SLOT_CB];
+    const sentGPI = s1[SLOT_GPI];
+    const sentGMU = s1[SLOT_GMU];
+    const sentGM  = s1[SLOT_GM];
+    const sentGO  = s1[SLOT_GO];
+    const sentGX  = s1[SLOT_GX];
+
+    // Also seed s2 with the same values (so xfact extrapolation with any xfact
+    // collapses to s1 values exactly — s0 = (1+x)*s1 - x*s2 = s1 when s2=s1).
+    s2[SLOT_VBE] = sentVBE;
+    s2[SLOT_VBC] = sentVBC;
+
+    // Now run MODEINITPRED: bjtload.c:288-303 must copy all 9 slots s1 → s0,
+    // then extrapolate voltages (collapsed to s1 values since s2=s1), run pnjlim
+    // (no-op since prior=new), run computeBjtOp at the same voltages, and write
+    // back the same op values — so s0 ends up identical to s1 sentinels.
+    const solver = new SparseSolver();
+    solver.beginAssembly(10);
+    const rhsOld = new Float64Array(10);
+    const ctx: LoadContext = {
+      cktMode: MODETRAN | MODEINITPRED,
+      solver,
+      matrix: solver,
+      rhs: new Float64Array(10),
+      rhsOld,
+      time: 1e-9,
+      dt: 1e-9,
+      method: "trapezoidal",
+      order: 1,
+      deltaOld: [1e-9, 1e-9, 1e-9, 1e-9, 1e-9, 1e-9, 1e-9],
+      ag: new Float64Array(7),
+      srcFact: 1,
+      noncon: { value: 0 },
+      limitingCollector: null,
+      convergenceCollector: null,
+      xfact: 1,
+      gmin: 1e-12,
+      reltol: 1e-3,
+      iabstol: 1e-12,
+      temp: 300.15,
+      vt: 0.025852,
+      cktFixLimit: false,
+      bypass: false,
+      voltTol: 1e-6,
+    };
+    element.load(ctx);
+
+    // All 9 slots in s0 must equal the corresponding s1 sentinels.
+    // VBE/VBC: copy + pnjlim(same,same) = same + writeback = sentinel.
+    // CC/CB/GPI/GMU/GM/GO/GX: copy sets s0=s1, writeback with same voltages
+    // sets s0 to identical computed op value.
+    expect(s0[SLOT_VBE]).toBe(sentVBE);
+    expect(s0[SLOT_VBC]).toBe(sentVBC);
+    expect(s0[SLOT_CC]).toBe(sentCC);
+    expect(s0[SLOT_CB]).toBe(sentCB);
+    expect(s0[SLOT_GPI]).toBe(sentGPI);
+    expect(s0[SLOT_GMU]).toBe(sentGMU);
+    expect(s0[SLOT_GM]).toBe(sentGM);
+    expect(s0[SLOT_GO]).toBe(sentGO);
+    expect(s0[SLOT_GX]).toBe(sentGX);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Shared helper for 5.1.2 / 5.1.3 / 5.1.4 tests — full LoadContext literal.
+// ---------------------------------------------------------------------------
+
+function makeFullLoadCtx(cktMode: number, rhsOld: Float64Array, modelParams?: Record<string, number>): { ctx: LoadContext; element: AnalogElement; s0: Float64Array; pool: StatePool } {
+  const propsObj = makeBjtProps(modelParams);
+  const core = createBjtElement(1, new Map([["B", 1], ["C", 2], ["E", 3]]), -1, propsObj) as AnalogElementCore;
+  const pool = new StatePool((core as any).stateSize);
+  (core as any).stateBaseOffset = 0;
+  (core as any).initState(pool);
+  const solver = new SparseSolver();
+  solver.beginAssembly(10);
+  const ctx: LoadContext = {
+    cktMode,
+    solver,
+    matrix: solver,
+    rhs: new Float64Array(10),
+    rhsOld,
+    time: 0,
+    dt: 0,
+    method: "trapezoidal",
+    order: 1,
+    deltaOld: [0, 0, 0, 0, 0, 0, 0],
+    ag: new Float64Array(7),
+    srcFact: 1,
+    noncon: { value: 0 },
+    limitingCollector: null,
+    convergenceCollector: null,
+    xfact: 1,
+    gmin: 1e-12,
+    reltol: 1e-3,
+    iabstol: 1e-12,
+    temp: 300.15,
+    vt: 0.025852,
+    cktFixLimit: false,
+    bypass: false,
+    voltTol: 1e-6,
+  };
+  const element = withNodeIds(core, [1, 2, 3]);
+  return { ctx, element, s0: pool.states[0], pool };
+}
+
+// ---------------------------------------------------------------------------
+// Task 5.1.2 — MODEINITJCT 3-branch priming verification (A3)
+// bjtload.c:258-264, :265-269, :270-275 citation refresh + path-selection tests.
+// ---------------------------------------------------------------------------
+
+describe("BJT L0 MODEINITJCT", () => {
+  // L0 slot indices
+  const SLOT_VBE = 0, SLOT_VBC = 1, SLOT_CC = 2;
+
+  it("uic_path_seeds_from_icvbe_icvce", () => {
+    // cite: bjtload.c:258-264 — MODEINITJCT+MODETRANOP+MODEUIC seeds from IC* params.
+    // pnjlim is skipped when MODEINITJCT is set; s0[VBE] = raw IC-derived voltage.
+    const rhsOld = new Float64Array(10);
+    const { ctx, element, s0 } = makeFullLoadCtx(
+      MODEINITJCT | MODETRANOP | MODEUIC,
+      rhsOld,
+      { ICVBE: 0.5, ICVCE: 1.0 },
+    );
+    element.load(ctx);
+    // NPN polarity=1: vbe_ic = 0.5, vbcRaw = vbe_ic - vce_ic = 0.5 - 1.0 = -0.5.
+    // pnjlim is skipped under MODEINITJCT, so s0[VBE] = vbeLimited = vbeRaw = 0.5.
+    expect(s0[SLOT_VBE]).toBe(0.5);
+  });
+
+  it("on_path_seeds_tVcrit", () => {
+    // cite: bjtload.c:265-269 — MODEINITJCT, OFF=0: vbe=tVcrit, vbc=0.
+    const rhsOld = new Float64Array(10);
+    const { ctx, element, s0 } = makeFullLoadCtx(MODEINITJCT, rhsOld, { OFF: 0 });
+    element.load(ctx);
+    // tVcrit > 0 for NPN (thermal-voltage-derived critical voltage).
+    expect(s0[SLOT_VBE]).toBeGreaterThan(0);
+    expect(s0[SLOT_VBC]).toBe(0);
+  });
+
+  it("off_path_zero_seeds", () => {
+    // cite: bjtload.c:270-275 — MODEINITJCT+OFF: vbe=vbc=0 → near-zero downstream op.
+    const rhsOld = new Float64Array(10);
+    const { ctx, element, s0 } = makeFullLoadCtx(MODEINITJCT, rhsOld, { OFF: 1 });
+    element.load(ctx);
+    // vbeRaw=0, vbcRaw=0 → computeBjtOp produces near-zero cc (IS * (exp(0)-1) ~ 0).
+    expect(Math.abs(s0[SLOT_CC])).toBeLessThan(1e-6);
   });
 });

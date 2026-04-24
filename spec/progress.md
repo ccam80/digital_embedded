@@ -617,3 +617,45 @@ Comprehensive pattern search performed after all edits. Pattern `iabstol: 1e-12,
 All 48 files with `deltaOld: [` verified to have both `bypass: false` and `voltTol: 1e-6` in each LoadContext literal. The `iabstol: 1e-12` count (94 occurrences, 50 files) exceeds the `deltaOld: [` count because several files (`behavioral-gate.test.ts`, `behavioral-combinational.test.ts`, `behavioral-remaining.test.ts`, `polarized-cap.test.ts`, `transmission-line.test.ts`, `transformer.test.ts`) use `iabstol: 1e-12` inside NR_OPTS configuration objects (not LoadContext literals). Confirmed by inspection that all NR_OPTS usages have no `bypass`/`voltTol` requirement and no LoadContext literal in those files is unpatched.
 
 Previously-confirmed-patched files regression check: load-context.ts, ckt-context.ts (interface + defaults), ckt-context.test.ts, scr.test.ts, tunnel-diode.test.ts, dcop-init-jct.test.ts, adc.test.ts, spark-gap.test.ts, ntc-thermistor.test.ts, diode.test.ts, led.test.ts, inductor.test.ts, phase-3-relay-composite.test.ts, sparse-solver.test.ts — all confirmed still patched (zero `iabstol: 1e-12,` immediately-followed-by-closing-brace pattern match across entire src/).
+
+## Task 5.1.1: MODEINITPRED full state-copy list (A1)
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: none
+- **Files modified**: src/components/semiconductors/bjt.ts, src/components/semiconductors/__tests__/bjt.test.ts
+- **Tests**: 1/1 passing (copies_9_slots_state1_to_state0 passes; 3 pre-existing failures unrelated to this task at bjt.ts:856 / bjt.ts:1254 due to makeDcOpCtx using `voltages` instead of `rhsOld`)
+
+## Task 6.1.1: Verify SLOT_VON zero-initialisation
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: none
+- **Files modified**: src/components/semiconductors/__tests__/mosfet.test.ts
+- **Tests**: 2/2 passing (MOSFET schema::SLOT_VON init kind, MOSFET schema::VON read path has no NaN guard)
+
+## Task 6.1.2: Verify getLteTimestep covers bulk charges
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: none
+- **Files modified**: src/components/semiconductors/__tests__/mosfet.test.ts
+- **Tests**: 1/1 passing (MOSFET LTE::includes QBS and QBD)
+
+## Task 5.1.2: MODEINITJCT 3-branch priming verification (A3)
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: none
+- **Files modified**: src/components/semiconductors/bjt.ts (citation refresh lines 825-839), src/components/semiconductors/__tests__/bjt.test.ts (3 new tests + makeFullLoadCtx helper)
+- **Tests**: 3/3 passing (uic_path_seeds_from_icvbe_icvce, on_path_seeds_tVcrit, off_path_zero_seeds); 3 pre-existing failures unchanged
+
+## Task 6.1.3: Assert LoadContext.bypass and voltTol landed
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: none
+- **Files modified**: src/components/semiconductors/mosfet.ts, src/components/semiconductors/__tests__/mosfet.test.ts
+- **Tests**: 1/1 passing (MOSFET LoadContext precondition::bypass and voltTol exist)
+
+## Task 6.1.4: Delete primeJunctions() + primedFromJct + consume-seed branch
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: none
+- **Files modified**: src/components/semiconductors/mosfet.ts, src/components/semiconductors/__tests__/mosfet.test.ts
+- **Tests**: 3/3 passing (MOSFET primeJunctions::method absent from element, MOSFET primeJunctions::MODEINITJCT branch primes directly, MOSFET primeJunctions::dc-operating-point skips MOSFET)

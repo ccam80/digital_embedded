@@ -43,7 +43,7 @@
   },
   "build": {
     "buildCommand": "cd \"C:/local_working_projects/digital_in_browser\" && npx tsc --noEmit 2>&1 | tail -20",
-    "testCommand": "cd \"C:/local_working_projects/digital_in_browser\" && npx vitest run --testTimeout=120000 \"src/solver/analog/__tests__/ckt-context.test.ts\" 2>&1 | tail -30",
+    "testCommand": "cd \"C:/local_working_projects/digital_in_browser\" && npx vitest run --testTimeout=120000 \"src/components/semiconductors/__tests__/mosfet.test.ts\" 2>&1",
     "lintCommand": "npm run lint",
     "devCommand": "npm run dev",
     "scripts": {
@@ -285,20 +285,26 @@
   "hotPaths": [
     {
       "path": "src\\components\\semiconductors\\bjt.ts",
-      "accessCount": 115,
-      "lastAccessed": 1777026575860,
+      "accessCount": 128,
+      "lastAccessed": 1777029009628,
       "type": "file"
     },
     {
       "path": "src",
-      "accessCount": 115,
-      "lastAccessed": 1777027999601,
+      "accessCount": 118,
+      "lastAccessed": 1777028360624,
       "type": "directory"
     },
     {
       "path": "spec\\progress.md",
-      "accessCount": 103,
-      "lastAccessed": 1777028089555,
+      "accessCount": 108,
+      "lastAccessed": 1777029066365,
+      "type": "file"
+    },
+    {
+      "path": "spec\\.context\\rules.md",
+      "accessCount": 73,
+      "lastAccessed": 1777028567511,
       "type": "file"
     },
     {
@@ -308,15 +314,9 @@
       "type": "file"
     },
     {
-      "path": "spec\\.context\\rules.md",
-      "accessCount": 69,
-      "lastAccessed": 1777027742321,
-      "type": "file"
-    },
-    {
       "path": "spec\\test-baseline.md",
-      "accessCount": 64,
-      "lastAccessed": 1777027938439,
+      "accessCount": 68,
+      "lastAccessed": 1777028573679,
       "type": "file"
     },
     {
@@ -332,15 +332,27 @@
       "type": "file"
     },
     {
+      "path": "src\\components\\semiconductors\\mosfet.ts",
+      "accessCount": 46,
+      "lastAccessed": 1777029009978,
+      "type": "file"
+    },
+    {
+      "path": "spec\\.context\\lock-protocol.md",
+      "accessCount": 43,
+      "lastAccessed": 1777028567749,
+      "type": "file"
+    },
+    {
       "path": "src\\components\\semiconductors\\__tests__\\tunnel-diode.test.ts",
       "accessCount": 41,
       "lastAccessed": 1777027452360,
       "type": "directory"
     },
     {
-      "path": "spec\\.context\\lock-protocol.md",
-      "accessCount": 40,
-      "lastAccessed": 1777027742634,
+      "path": "src\\components\\semiconductors\\njfet.ts",
+      "accessCount": 36,
+      "lastAccessed": 1777028935026,
       "type": "file"
     },
     {
@@ -368,9 +380,15 @@
       "type": "file"
     },
     {
+      "path": "src\\components\\semiconductors\\__tests__\\bjt.test.ts",
+      "accessCount": 27,
+      "lastAccessed": 1777028904214,
+      "type": "file"
+    },
+    {
       "path": "",
-      "accessCount": 25,
-      "lastAccessed": 1777027934766,
+      "accessCount": 26,
+      "lastAccessed": 1777028571262,
       "type": "directory"
     },
     {
@@ -383,12 +401,6 @@
       "path": "src\\components\\passives\\capacitor.ts",
       "accessCount": 22,
       "lastAccessed": 1777022666856,
-      "type": "file"
-    },
-    {
-      "path": "src\\components\\semiconductors\\mosfet.ts",
-      "accessCount": 19,
-      "lastAccessed": 1777009282192,
       "type": "file"
     },
     {
@@ -410,16 +422,16 @@
       "type": "file"
     },
     {
+      "path": "src\\components\\semiconductors\\pjfet.ts",
+      "accessCount": 14,
+      "lastAccessed": 1777028967733,
+      "type": "file"
+    },
+    {
       "path": "e2e",
       "accessCount": 12,
       "lastAccessed": 1777020433795,
       "type": "directory"
-    },
-    {
-      "path": "src\\components\\semiconductors\\__tests__\\bjt.test.ts",
-      "accessCount": 12,
-      "lastAccessed": 1777025940595,
-      "type": "file"
     },
     {
       "path": "src\\solver\\analog\\__tests__",
@@ -437,6 +449,12 @@
       "path": "scripts",
       "accessCount": 10,
       "lastAccessed": 1777020431174,
+      "type": "directory"
+    },
+    {
+      "path": "src\\solver\\analog\\state-schema.ts",
+      "accessCount": 10,
+      "lastAccessed": 1777028607858,
       "type": "directory"
     },
     {
@@ -464,33 +482,15 @@
       "type": "file"
     },
     {
-      "path": "src\\components\\semiconductors\\njfet.ts",
+      "path": "src\\components\\semiconductors\\__tests__\\jfet.test.ts",
       "accessCount": 7,
-      "lastAccessed": 1777005398423,
+      "lastAccessed": 1777028430700,
       "type": "file"
-    },
-    {
-      "path": "src\\components\\semiconductors\\pjfet.ts",
-      "accessCount": 7,
-      "lastAccessed": 1777005460241,
-      "type": "file"
-    },
-    {
-      "path": "src\\solver\\analog\\state-schema.ts",
-      "accessCount": 7,
-      "lastAccessed": 1777009126177,
-      "type": "directory"
     },
     {
       "path": "src\\solver\\analog\\behavioral-flipflop.ts",
       "accessCount": 6,
       "lastAccessed": 1776999552521,
-      "type": "file"
-    },
-    {
-      "path": "src\\components\\semiconductors\\__tests__\\jfet.test.ts",
-      "accessCount": 6,
-      "lastAccessed": 1777005461297,
       "type": "file"
     },
     {

@@ -823,24 +823,32 @@ export function createBjtElement(
         vbeRaw = s1[base + SLOT_VBE];
         vbcRaw = s1[base + SLOT_VBC];
       } else if ((mode & MODEINITJCT) && (mode & MODETRANOP) && (mode & MODEUIC)) {
-        // bjtload.c:258-264: UIC dispatch with IC* params.
+        // cite: bjtload.c:258-264 — MODEINITJCT+MODETRANOP+MODEUIC: seed from IC* params.
         const vbe_ic = polarity * (isNaN(params.ICVBE) ? 0 : params.ICVBE);
         const vce_ic = polarity * (isNaN(params.ICVCE) ? 0 : params.ICVCE);
         vbeRaw = vbe_ic;
         vbcRaw = vbe_ic - vce_ic;
       } else if ((mode & MODEINITJCT) && params.OFF === 0) {
-        // bjtload.c:265-269: initJct, device on → seed vbe=tVcrit, vbc=0.
+        // cite: bjtload.c:265-269 — MODEINITJCT, device ON: seed vbe=tVcrit, vbc=0.
         vbeRaw = tp.tVcrit;
         vbcRaw = 0;
       } else if ((mode & MODEINITJCT) ||
                  ((mode & MODEINITFIX) && params.OFF !== 0)) {
-        // bjtload.c:270-275: initJct w/ OFF or initFix+OFF → zero-seed.
+        // cite: bjtload.c:270-275 — MODEINITJCT+OFF or MODEINITFIX+OFF: zero-seed.
         vbeRaw = 0;
         vbcRaw = 0;
       } else if (mode & MODEINITPRED) {
         // bjtload.c:278-287: #ifndef PREDICTOR state1→state0 copy + xfact extrapolation.
         s0[base + SLOT_VBE] = s1[base + SLOT_VBE];
         s0[base + SLOT_VBC] = s1[base + SLOT_VBC];
+        // cite: bjtload.c:288-303 — copy remaining op-state slots from state1 to state0.
+        s0[base + SLOT_CC]  = s1[base + SLOT_CC];  // cite: bjtload.c:289
+        s0[base + SLOT_CB]  = s1[base + SLOT_CB];  // cite: bjtload.c:290
+        s0[base + SLOT_GPI] = s1[base + SLOT_GPI]; // cite: bjtload.c:291
+        s0[base + SLOT_GMU] = s1[base + SLOT_GMU]; // cite: bjtload.c:292
+        s0[base + SLOT_GM]  = s1[base + SLOT_GM];  // cite: bjtload.c:293
+        s0[base + SLOT_GO]  = s1[base + SLOT_GO];  // cite: bjtload.c:294
+        s0[base + SLOT_GX]  = s1[base + SLOT_GX];  // cite: bjtload.c:295
         vbeRaw = (1 + ctx.xfact) * s1[base + SLOT_VBE] - ctx.xfact * s2[base + SLOT_VBE];
         vbcRaw = (1 + ctx.xfact) * s1[base + SLOT_VBC] - ctx.xfact * s2[base + SLOT_VBC];
       } else {
@@ -852,76 +860,100 @@ export function createBjtElement(
         vbcRaw = polarity * (vB - vC);
       }
 
-      // bjtload.c:383-416: pnjlim on BE/BC. pnjlim runs under MODEINITPRED — ngspice has no
-      // MODEINITPRED skip (bjtload.c:386 unconditional; !(MODEINITPRED) guard at :347 is for
-      // bypass only).
-      let vbeLimited = vbeRaw;
-      let vbcLimited = vbcRaw;
-      let vbeLimFlag = false;
-      let vbcLimFlag = false;
-      if ((mode & (MODEINITJCT | MODEINITSMSIG | MODEINITTRAN)) === 0) {
-        const vbeResult = pnjlim(vbeRaw, s0[base + SLOT_VBE], tp.vt, tp.tVcrit);
-        vbeLimited = vbeResult.value;
-        vbeLimFlag = vbeResult.limited;
-        const vbcResult = pnjlim(vbcRaw, s0[base + SLOT_VBC], tp.vt, tp.tVcrit);
-        vbcLimited = vbcResult.value;
-        vbcLimFlag = vbcResult.limited;
+      // cite: bjtload.c:323-337 — delvbe/delvbc + cchat/cbhat current prediction
+      // (used by both checkConvergence and the bypass gate below).
+      const delvbe = vbeRaw - s0[base + SLOT_VBE];
+      const delvbc = vbcRaw - s0[base + SLOT_VBC];
+      const cchat = s0[base + SLOT_CC] + (s0[base + SLOT_GM] + s0[base + SLOT_GO]) * delvbe
+                    - (s0[base + SLOT_GO] + s0[base + SLOT_GMU]) * delvbc;
+      const cbhat = s0[base + SLOT_CB] + s0[base + SLOT_GPI] * delvbe
+                    + s0[base + SLOT_GMU] * delvbc;
+
+      // cite: bjtload.c:338-381 — NOBYPASS gate: skip recompute when tolerances met.
+      // Arranged as if/else wrapping the pnjlim+compute block, mirroring ngspice goto load.
+      let vbeLimited: number;
+      let vbcLimited: number;
+      if (ctx.bypass &&
+          !(mode & MODEINITPRED) &&
+          (Math.abs(delvbe) < ctx.reltol * Math.max(Math.abs(vbeRaw), Math.abs(s0[base + SLOT_VBE])) + ctx.voltTol) &&
+          (Math.abs(delvbc) < ctx.reltol * Math.max(Math.abs(vbcRaw), Math.abs(s0[base + SLOT_VBC])) + ctx.voltTol) &&
+          (Math.abs(cchat - s0[base + SLOT_CC]) < ctx.reltol * Math.max(Math.abs(cchat), Math.abs(s0[base + SLOT_CC])) + ctx.iabstol) &&
+          (Math.abs(cbhat - s0[base + SLOT_CB]) < ctx.reltol * Math.max(Math.abs(cbhat), Math.abs(s0[base + SLOT_CB])) + ctx.iabstol)) {
+        // cite: bjtload.c:365-380 — bypass: restore op-state from state0, skip pnjlim+compute.
+        vbeLimited = s0[base + SLOT_VBE];
+        vbcLimited = s0[base + SLOT_VBC];
+        icheckLimited = false;
+      } else {
+        // bjtload.c:383-416: pnjlim on BE/BC. pnjlim runs under MODEINITPRED — ngspice has no
+        // MODEINITPRED skip (bjtload.c:386 unconditional; !(MODEINITPRED) guard at :347 is for
+        // bypass only).
+        vbeLimited = vbeRaw;
+        vbcLimited = vbcRaw;
+        let vbeLimFlag = false;
+        let vbcLimFlag = false;
+        if ((mode & (MODEINITJCT | MODEINITSMSIG | MODEINITTRAN)) === 0) {
+          const vbeResult = pnjlim(vbeRaw, s0[base + SLOT_VBE], tp.vt, tp.tVcrit);
+          vbeLimited = vbeResult.value;
+          vbeLimFlag = vbeResult.limited;
+          const vbcResult = pnjlim(vbcRaw, s0[base + SLOT_VBC], tp.vt, tp.tVcrit);
+          vbcLimited = vbcResult.value;
+          vbcLimFlag = vbcResult.limited;
+        }
+        icheckLimited = vbeLimFlag || vbcLimFlag;
+        // L0 has no substrate junction — substrate is L1-only per the model-registry
+        // split (architectural-alignment.md §E1 APPROVED ACCEPT). See also the
+        // "no caps, no transit time, no excess phase, no substrate" L0 scope note at
+        // the top of this load() body.
+
+        // bjtload.c:749-754: skip noncon++ when MODEINITFIX && BJToff.
+        if (icheckLimited && (params.OFF === 0 || !(mode & MODEINITFIX))) ctx.noncon.value++;
+
+        if (ctx.limitingCollector) {
+          ctx.limitingCollector.push({
+            elementIndex: this.elementIndex ?? -1,
+            label: this.label ?? "",
+            junction: "BE",
+            limitType: "pnjlim",
+            vBefore: vbeRaw,
+            vAfter: vbeLimited,
+            wasLimited: vbeLimFlag,
+          });
+          ctx.limitingCollector.push({
+            elementIndex: this.elementIndex ?? -1,
+            label: this.label ?? "",
+            junction: "BC",
+            limitType: "pnjlim",
+            vBefore: vbcRaw,
+            vAfter: vbcLimited,
+            wasLimited: vbcLimFlag,
+          });
+        }
+
+        // bjtload.c:420-560: Gummel-Poon evaluation at limited voltages.
+        const opComputed = computeBjtOp(
+          vbeLimited, vbcLimited,
+          tp.tSatCur * params.AREA, tp.tBetaF, params.NF, tp.tBetaR, params.NR,
+          tp.tBEleakCur * params.AREA, tp.tBCleakCur * params.AREA,
+          tp.tinvEarlyVoltF, tp.tinvEarlyVoltR,
+          tp.tinvRollOffF / params.AREA, tp.tinvRollOffR / params.AREA,
+          tp.vt, 1.5, 2.0,
+        );
+
+        // bjtload.c:772-786: CKTstate0 write-back of accepted linearization.
+        s0[base + SLOT_VBE] = vbeLimited;
+        s0[base + SLOT_VBC] = vbcLimited;
+        s0[base + SLOT_CC]  = opComputed.cc;
+        s0[base + SLOT_CB]  = opComputed.cb;
+        s0[base + SLOT_GPI] = opComputed.gpi;
+        s0[base + SLOT_GMU] = opComputed.gmu;
+        s0[base + SLOT_GM]  = opComputed.gm;
+        s0[base + SLOT_GO]  = opComputed.go;
+        s0[base + SLOT_GX]  = 0; // bjtload.c:780 — L0 has no RB so gx=0
       }
-      icheckLimited = vbeLimFlag || vbcLimFlag;
-      // L0 has no substrate junction — substrate is L1-only per the model-registry
-      // split (architectural-alignment.md §E1 APPROVED ACCEPT). See also the
-      // "no caps, no transit time, no excess phase, no substrate" L0 scope note at
-      // the top of this load() body.
-
-      // bjtload.c:749-754: skip noncon++ when MODEINITFIX && BJToff.
-      if (icheckLimited && (params.OFF === 0 || !(mode & MODEINITFIX))) ctx.noncon.value++;
-
-      if (ctx.limitingCollector) {
-        ctx.limitingCollector.push({
-          elementIndex: this.elementIndex ?? -1,
-          label: this.label ?? "",
-          junction: "BE",
-          limitType: "pnjlim",
-          vBefore: vbeRaw,
-          vAfter: vbeLimited,
-          wasLimited: vbeLimFlag,
-        });
-        ctx.limitingCollector.push({
-          elementIndex: this.elementIndex ?? -1,
-          label: this.label ?? "",
-          junction: "BC",
-          limitType: "pnjlim",
-          vBefore: vbcRaw,
-          vAfter: vbcLimited,
-          wasLimited: vbcLimFlag,
-        });
-      }
-
-      // bjtload.c:420-560: Gummel-Poon evaluation at limited voltages.
-      const op = computeBjtOp(
-        vbeLimited, vbcLimited,
-        tp.tSatCur * params.AREA, tp.tBetaF, params.NF, tp.tBetaR, params.NR,
-        tp.tBEleakCur * params.AREA, tp.tBCleakCur * params.AREA,
-        tp.tinvEarlyVoltF, tp.tinvEarlyVoltR,
-        tp.tinvRollOffF / params.AREA, tp.tinvRollOffR / params.AREA,
-        tp.vt, 1.5, 2.0,
-      );
-
-      // bjtload.c:772-786: CKTstate0 write-back of accepted linearization.
-      s0[base + SLOT_VBE] = vbeLimited;
-      s0[base + SLOT_VBC] = vbcLimited;
-      s0[base + SLOT_CC]  = op.cc;
-      s0[base + SLOT_CB]  = op.cb;
-      s0[base + SLOT_GPI] = op.gpi;
-      s0[base + SLOT_GMU] = op.gmu;
-      s0[base + SLOT_GM]  = op.gm;
-      s0[base + SLOT_GO]  = op.go;
-      s0[base + SLOT_GX]  = 0; // bjtload.c:780 — L0 has no RB so gx=0
-
-      // bjtload.c:749-754: CKTnoncon++ when icheck set.
-      // (Already handled above via ctx.noncon.value increment.)
 
       // bjtload.c:795-805: ceqbe/ceqbc RHS terms.
+      // On bypass path, vbeLimited/vbcLimited are restored from s0; op values read from s0.
+      // On compute path, vbeLimited/vbcLimited are the newly limited values; op values in s0.
       // ceqbe = BJTtype * (cc + cb - vbe*(gm+go+gpi) + vbc*(go - geqcb));
       // ceqbc = BJTtype * (-cc + vbe*(gm+go) - vbc*(gmu+go));
       // Simple L0: geqcb=0 (no transit-time charge feedback).

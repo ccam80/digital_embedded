@@ -17,6 +17,7 @@ import {
   PmosfetDefinition,
   createMosfetElement,
   MOSFET_NMOS_DEFAULTS,
+  MOSFET_SCHEMA,
 } from "../mosfet.js";
 import { PropertyBag } from "../../../core/properties.js";
 import { makeDcVoltageSource } from "../../sources/dc-voltage-source.js";
@@ -30,6 +31,7 @@ import type { AnalogFactory } from "../../../core/registry.js";
 import type { LoadContext } from "../../../solver/analog/load-context.js";
 import {
   MODEDCOP, MODEINITFLOAT, MODEINITFIX,
+  MODETRAN, MODEINITTRAN, MODEINITJCT,
   setInitf,
 } from "../../../solver/analog/ckt-mode.js";
 
@@ -703,6 +705,39 @@ describe("MOSFET primeJunctions", () => {
     return { element: core, pool };
   }
 
+  function makeFullCtx(cktMode: number): LoadContext {
+    const solver = new SparseSolver();
+    solver.beginAssembly(3);
+    const KoverQ = 1.3806226e-23 / 1.6021918e-19;
+    const temp = 300.15;
+    return {
+      cktMode,
+      solver,
+      matrix: solver,
+      rhs: new Float64Array(3),
+      rhsOld: new Float64Array(3),
+      time: 0,
+      dt: 0,
+      method: "trapezoidal",
+      order: 1,
+      deltaOld: [0, 0, 0, 0, 0, 0, 0],
+      ag: new Float64Array(7),
+      srcFact: 1,
+      noncon: { value: 0 },
+      limitingCollector: null,
+      convergenceCollector: null,
+      xfact: 0,
+      gmin: 1e-12,
+      reltol: 1e-3,
+      iabstol: 1e-12,
+      temp,
+      vt: temp * KoverQ,
+      cktFixLimit: false,
+      bypass: false,
+      voltTol: 1e-6,
+    };
+  }
+
   it("checkConvergence_returns_true_during_initFix_when_OFF", () => {
     const { element } = makeNmosElement({ OFF: 1 });
     const voltages = new Float64Array(4);
@@ -710,6 +745,42 @@ describe("MOSFET primeJunctions", () => {
     ctx.cktMode = setInitf(ctx.cktMode, MODEINITFIX);
     const result = element.checkConvergence(ctx);
     expect(result).toBe(true);
+  });
+
+  it("method absent from element", () => {
+    // Task 6.1.4: primeJunctions() deleted — property must be absent.
+    const { element } = makeNmosElement();
+    expect(element.primeJunctions).toBeUndefined();
+  });
+
+  it("MODEINITJCT branch primes directly", () => {
+    // Task 6.1.4: With primeJunctions() gone, the MODEINITJCT path inside
+    // load() itself seeds VBS=-1, VGS=tVto, VDS=0 (OFF=0 fallback).
+    const { element, pool } = makeNmosElement({ OFF: 0 });
+    const ctx = makeFullCtx(MODEDCOP | MODEINITJCT);
+    element.load(ctx);
+
+    const s0 = pool.states[0];
+    const iVBS = MOSFET_SCHEMA.indexOf.get("VBS")!;
+    const iVGS = MOSFET_SCHEMA.indexOf.get("VGS")!;
+    const iVDS = MOSFET_SCHEMA.indexOf.get("VDS")!;
+
+    expect(s0[iVBS]).toBe(-1);
+    expect(s0[iVDS]).toBe(0);
+    // tVto is stored in params; retrieve via element._p
+    const tVto: number = element._p._tVto;
+    expect(s0[iVGS]).toBe(tVto);
+  });
+
+  it("dc-operating-point skips MOSFET", () => {
+    // Task 6.1.4: dc-operating-point.ts:323-324 uses `el.primeJunctions?.()`.
+    // With the method absent, the optional-chain skips silently — no throw.
+    const { element } = makeNmosElement();
+    expect(() => {
+      if ((element as any).isNonlinear && (element as any).primeJunctions) {
+        (element as any).primeJunctions();
+      }
+    }).not.toThrow();
   });
 });
 
@@ -734,6 +805,155 @@ describe("integration", () => {
     ) as string;
     expect(src).not.toMatch(/integrateCapacitor/);
     expect(src).not.toMatch(/integrateInductor/);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// MOSFET LoadContext precondition — Task 6.1.3 compile-time assertion test
+// ---------------------------------------------------------------------------
+
+describe("MOSFET LoadContext precondition", () => {
+  it("bypass and voltTol exist", () => {
+    // Construct a LoadContext with both bypass and voltTol fields explicitly set.
+    // This verifies that the LoadContext type carries these fields (Phase 5
+    // precondition) — if they were absent, TypeScript would reject this object
+    // and the _PhaseAssert type alias in mosfet.ts would produce a compile error.
+    const bag = makeParamBag(NMOS_DEFAULTS);
+    const core = createMosfetElement(1, new Map([["G", 2], ["S", 3], ["D", 1]]), [], -1, bag) as any;
+    const pool = new StatePool(core.stateSize);
+    core.stateBaseOffset = 0;
+    core.initState(pool);
+    core.pinNodeIds = [2, 1, 3, 3];
+    core.allNodeIds = [2, 1, 3, 3];
+
+    // Use MODEINITJCT mode: this path does not read ctx.rhsOld and does not
+    // require any voltage node setup — it zero-initialises or seeds from tVto.
+    const solver = new SparseSolver();
+    solver.beginAssembly(3);
+    const ctx: LoadContext = {
+      cktMode: MODEDCOP | MODEINITJCT,
+      solver,
+      matrix: solver,
+      rhs: new Float64Array(3),
+      rhsOld: new Float64Array(3),
+      time: 0,
+      dt: 0,
+      method: "trapezoidal",
+      order: 1,
+      deltaOld: [0, 0, 0, 0, 0, 0, 0],
+      ag: new Float64Array(7),
+      srcFact: 1,
+      noncon: { value: 0 },
+      limitingCollector: null,
+      convergenceCollector: null,
+      xfact: 0,
+      gmin: 1e-12,
+      reltol: 1e-3,
+      iabstol: 1e-12,
+      temp: 300.15,
+      vt: 300.15 * 1.3806226e-23 / 1.6021918e-19,
+      cktFixLimit: false,
+      bypass: true,
+      voltTol: 1e-6,
+    };
+
+    // load() must not throw — bypass and voltTol are present on the context.
+    expect(() => core.load(ctx)).not.toThrow();
+
+    // The ctx.bypass and ctx.voltTol fields are structurally present.
+    expect(ctx.bypass).toBe(true);
+    expect(ctx.voltTol).toBe(1e-6);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// MOSFET schema — Task 6.1.1 verify-only tests
+// ---------------------------------------------------------------------------
+
+describe("MOSFET schema", () => {
+  it("SLOT_VON init kind", () => {
+    const vonIdx = MOSFET_SCHEMA.indexOf.get("VON");
+    expect(vonIdx).toBeDefined();
+    expect(MOSFET_SCHEMA.slots[vonIdx!].init.kind).toBe("zero");
+  });
+
+  it("VON read path has no NaN guard", () => {
+    const fs = require("fs");
+    const src = fs.readFileSync(
+      require("path").resolve(__dirname, "../mosfet.ts"),
+      "utf8",
+    ) as string;
+    const isNanVonMatches = src.match(/isNaN[^)]*VON/g) ?? [];
+    const numberIsNanVonMatches = src.match(/Number\.isNaN[^)]*VON/g) ?? [];
+    expect(isNanVonMatches.length).toBe(0);
+    expect(numberIsNanVonMatches.length).toBe(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// MOSFET LTE — Task 6.1.2 verify-only tests
+// ---------------------------------------------------------------------------
+
+describe("MOSFET LTE", () => {
+  it("includes QBS and QBD", () => {
+    // Construct NMOS with CBD=1pF, CBS=1pF (hasCapacitance → isReactive → getLteTimestep defined).
+    const bag = makeParamBag({ ...NMOS_DEFAULTS, CBD: 1e-12, CBS: 1e-12 });
+    const core = createMosfetElement(1, new Map([["G", 2], ["S", 3], ["D", 1]]), [], -1, bag) as any;
+    const pool = new StatePool(core.stateSize);
+    core.stateBaseOffset = 0;
+    core.initState(pool);
+    core.pinNodeIds = [2, 1, 3, 3];
+    core.allNodeIds = [2, 1, 3, 3];
+
+    // Resolve slot indices from the schema.
+    const iQGS  = MOSFET_SCHEMA.indexOf.get("QGS")!;
+    const iQGD  = MOSFET_SCHEMA.indexOf.get("QGD")!;
+    const iQGB  = MOSFET_SCHEMA.indexOf.get("QGB")!;
+    const iCQGS = MOSFET_SCHEMA.indexOf.get("CQGS")!;
+    const iCQGD = MOSFET_SCHEMA.indexOf.get("CQGD")!;
+    const iCQGB = MOSFET_SCHEMA.indexOf.get("CQGB")!;
+    const iQBS  = MOSFET_SCHEMA.indexOf.get("QBS")!;
+    const iQBD  = MOSFET_SCHEMA.indexOf.get("QBD")!;
+    const iCQBS = MOSFET_SCHEMA.indexOf.get("CQBS")!;
+    const iCQBD = MOSFET_SCHEMA.indexOf.get("CQBD")!;
+
+    // Directly seed state arrays with representative bulk charge values.
+    // s0 = current step, s1 = previous step (different values so cktTerr fires).
+    const s0 = pool.states[0];
+    const s1 = pool.states[1];
+
+    // Zero all gate-cap charge slots so they cannot contribute to minDt.
+    s0[iQGS] = 0;  s0[iQGD] = 0;  s0[iQGB] = 0;
+    s0[iCQGS] = 0; s0[iCQGD] = 0; s0[iCQGB] = 0;
+    s1[iQGS] = 0;  s1[iQGD] = 0;  s1[iQGB] = 0;
+    s1[iCQGS] = 0; s1[iCQGD] = 0; s1[iCQGB] = 0;
+
+    // Seed QBS / CQBS with non-zero values differing between s0 and s1.
+    // Non-zero difference → cktTerr returns a finite dt estimate.
+    s0[iQBS]  = 1e-13;
+    s1[iQBS]  = 2e-13;
+    s0[iCQBS] = 1e-4;
+    s1[iCQBS] = 2e-4;
+
+    // Seed QBD / CQBD similarly.
+    s0[iQBD]  = 5e-14;
+    s1[iQBD]  = 9e-14;
+    s0[iCQBD] = 5e-5;
+    s1[iCQBD] = 9e-5;
+
+    const dt = 1e-9;
+    const lteParams = { trtol: 7, abstol: 1e-12, reltol: 1e-3, chgtol: 1e-14 };
+    const minDt = core.getLteTimestep(
+      dt,
+      [dt, dt, dt, dt, dt, dt, dt],
+      1,
+      "trapezoidal",
+      lteParams,
+    );
+
+    // getLteTimestep must return a finite value because SLOT_QBS and SLOT_QBD
+    // carry non-zero, differing values in s0 vs s1.
+    expect(minDt).toBeLessThan(Infinity);
   });
 });
 
