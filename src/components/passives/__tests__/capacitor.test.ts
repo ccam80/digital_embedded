@@ -171,8 +171,8 @@ describe("Capacitor", () => {
     });
   });
 
-  describe("updateCompanion_bdf1", () => {
-    it("computes correct geq for BDF-1 method", () => {
+  describe("updateCompanion_order1_trap", () => {
+    it("computes correct geq for order-1 trap method", () => {
       const props = new PropertyBag();
       props.setModelParam("capacitance", 1e-6);
 
@@ -180,7 +180,7 @@ describe("Capacitor", () => {
 
       const voltages = new Float64Array([5, 0]);
 
-      // For BDF-1: geq = C/h = 1e-6 / 1e-6 = 1.0
+      // For order-1 trap: geq = C/h = 1e-6 / 1e-6 = 1.0
       const { solver, stamps } = makeCaptureSolver();
       const ctx = makeCompanionCtx({ solver, voltages, dt: 1e-6, method: "trapezoidal", order: 1 });
       analogElement.load(ctx);
@@ -189,8 +189,8 @@ describe("Capacitor", () => {
     });
   });
 
-  describe("updateCompanion_bdf2", () => {
-    it("computes correct geq for BDF-2 method and uses vPrevPrev", () => {
+  describe("updateCompanion_order2_gear", () => {
+    it("computes correct geq for order-2 gear method and uses vPrevPrev", () => {
       const props = new PropertyBag();
       props.setModelParam("capacitance", 1e-6);
 
@@ -198,7 +198,7 @@ describe("Capacitor", () => {
 
       const voltages = new Float64Array([5, 0]);
 
-      // For BDF-2: geq = 3C/(2h) = 3 * 1e-6 / (2 * 1e-6) = 1.5
+      // For order-2 gear: geq = 3C/(2h) = 3 * 1e-6 / (2 * 1e-6) = 1.5
       const { solver, stamps } = makeCaptureSolver();
       const ctx = makeCompanionCtx({ solver, voltages, dt: 1e-6, method: "gear", order: 2 });
       analogElement.load(ctx);
@@ -404,7 +404,7 @@ describe("Capacitor initPred", () => {
     // GEQ = C/dt regardless of q0
     const geq = pool.states[0][0]; // SLOT_GEQ
 
-    // ceq = ccap - geq*vNow (BDF1: ccap = (q0-q1)/dt)
+    // ceq = ccap - geq*vNow (order-1: ccap = (q0-q1)/dt)
     // q0 = s1[SLOT_Q] = C*3 = 3e-6, q1 = 3e-6 (same as s1 after 1 rotation)
     //   ccap = ag[0]*q0 + ag[1]*q1 = (1/dt)*3e-6 + (-1/dt)*3e-6 = 0
     //   ceq = ccap - ag[0]*q0 = 0 - (1/dt)*3e-6 = -3  (at dt=1e-6)
@@ -582,11 +582,11 @@ describe("Capacitor trap-order-2 xmu parity (C4.6)", () => {
 // ---------------------------------------------------------------------------
 //
 // Circuit: V_src=1V (node 1 → gnd) — R=1000Ω (node 1 → node 2) — C=1µF (node 2 → gnd)
-// Integration: BDF-1 / trapezoidal order=1, fixed dt=1e-6 s, 10 steps.
+// Integration: order-1 trap, fixed dt=1e-6 s, 10 steps.
 //
-// ngspice reference (capload.c:58, niinteg.c:28-63, BDF-1 case):
+// ngspice reference (capload.c:58, niinteg.c:28-63, order-1 (backward-Euler) case):
 //   q0   = C * vcap                              (capload.c:58)
-//   ccap = ag[0]*q0 + ag[1]*q1                  (niinteg.c BDF-1: ag[0]=1/dt, ag[1]=-1/dt)
+//   ccap = ag[0]*q0 + ag[1]*q1                  (niinteg.c order-1 (backward-Euler): ag[0]=1/dt, ag[1]=-1/dt)
 //   geq  = ag[0] * C                             (niinteg.c:77)
 //   ceq  = ccap - ag[0]*q0 = ag[1]*q1 = -(C/dt)*v_prev   (niinteg.c:78)
 //
@@ -606,11 +606,11 @@ describe("Capacitor trap-order-2 xmu parity (C4.6)", () => {
 // ---------------------------------------------------------------------------
 //
 // Circuit: V_src=1V (node 1 → gnd) — R=1000Ω (node 1 → node 2) — C=1µF (node 2 → gnd)
-// Integration: BDF-1 / trapezoidal order=1, fixed dt=1e-6 s, 10 steps.
+// Integration: order-1 trap, fixed dt=1e-6 s, 10 steps.
 //
-// ngspice reference (capload.c:58, niinteg.c:28-63, BDF-1 case):
+// ngspice reference (capload.c:58, niinteg.c:28-63, order-1 (backward-Euler) case):
 //   q0   = C * vcap                             (capload.c:58)
-//   ccap = ag[0]*q0 + ag[1]*q1                 (niinteg.c BDF-1: ag[0]=1/dt, ag[1]=-1/dt)
+//   ccap = ag[0]*q0 + ag[1]*q1                 (niinteg.c order-1 (backward-Euler): ag[0]=1/dt, ag[1]=-1/dt)
 //   geq  = ag[0] * C                            (niinteg.c:77)
 //   ceq  = ccap - ag[0]*q0 = ag[1]*q1          (niinteg.c:78 → -(C/dt)*v_prev)
 //
@@ -621,7 +621,7 @@ describe("Capacitor trap-order-2 xmu parity (C4.6)", () => {
 // Node voltage update formula (KCL at node 2, v1=Vsrc fixed):
 //   G_R*(Vsrc - v2) - ceq = geq*v2
 //   v2_new = (G_R*Vsrc - ceq) / (G_R + geq)
-//   ceq    = ag[1]*C*v2_prev  (BDF-1)
+//   ceq    = ag[1]*C*v2_prev  (order-1 trap)
 //
 // ngspice source → our variable mapping:
 //   capload.c:CAPload::cstate0[CAPqcap]  → s0[SLOT_Q]   = C*vcap
@@ -640,7 +640,7 @@ describe("capacitor_load_transient_parity (C4.2)", () => {
     const order  = 1;
     const method = "trapezoidal" as const;
 
-    // ngspice niinteg.c BDF-1 coefficients: ag[0]=1/dt, ag[1]=-1/dt
+    // ngspice niinteg.c order-1 (backward-Euler) coefficients: ag[0]=1/dt, ag[1]=-1/dt
     const ag0 = 1 / dt;
     const ag1 = -1 / dt;
     // geq = ag[0]*C  (niinteg.c:77) — bit-exact reference constant
@@ -679,7 +679,7 @@ describe("capacitor_load_transient_parity (C4.2)", () => {
       stampRHS: (row: number, v: number): void => { rhsEntries.push([row, v]); },
     } as unknown as SparseSolverType;
 
-    // Compute bit-exact reference sequence using the same BDF-1 arithmetic.
+    // Compute bit-exact reference sequence using the same order-1 trap arithmetic.
     // v2[k] = (G_R*Vsrc - ceq[k]) / (G_R + geq), where ceq[k] = ag[1]*C*v2[k-1]
     const refV2: number[] = [];
     let v2_ref = 0;

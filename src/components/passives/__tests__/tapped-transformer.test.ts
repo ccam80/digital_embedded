@@ -504,7 +504,7 @@ describe("TappedTransformerDefinition", () => {
 //
 // All voltages zero → i1=i2=i3=0 → all flux linkages = 0 → hist1=hist2=hist3=0.
 //
-// BDF-1 / trapezoidal (order=1): ag[0]=1/dt, ag[1]=-1/dt.
+// order-1 trap: ag[0]=1/dt, ag[1]=-1/dt.
 //   g11 = ag[0]*L1           (niinteg.c:77 for primary winding)
 //   g22 = ag[0]*L2           (niinteg.c:77 for secondary half-1)
 //   g33 = ag[0]*L3           (niinteg.c:77 for secondary half-2)
@@ -537,7 +537,7 @@ describe("tapped_transformer_load_transient_parity (C4.2)", () => {
     const M13 = k * Math.sqrt(L1 * L3);
     const M23 = k * Math.sqrt(L2 * L3);
 
-    // BDF-1 coefficients: ag[0]=1/dt, ag[1]=-1/dt
+    // order-1 trap coefficients: ag[0]=1/dt, ag[1]=-1/dt
     const ag0 = 1 / dt;
     const ag1 = -1 / dt;
 

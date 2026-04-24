@@ -4,7 +4,7 @@
  *
  * Operates on charge (Q) history passed as scalar parameters, using
  * unrolled divided differences for order 1 and order 2 (the only orders
- * supported by our BDF-1 / trapezoidal / BDF-2 integrator).
+ * supported by our trapezoidal and gear integrators).
  *
  * ngspice reference: CKTterr() in src/cktterr.c
  *
@@ -39,8 +39,8 @@ const TRAP_LTE_FACTORS = [0.5, 1 / 12];
  * of the truncated decimals ngspice ships; see
  * spec/state-machines/ngspice-cktterr-vs-ckt-terr.md rows 43-48 for the
  * per-element mapping).
- *   [0] = 0.5           = 0.5          (order 1, BDF-1)
- *   [1] = 2/9           ≈ .2222222222  (order 2, BDF-2)
+ *   [0] = 0.5           = 0.5          (order 1, trap / gear)
+ *   [1] = 2/9           ≈ .2222222222  (order 2, gear)
  *   [2] = 3/22          ≈ .1363636364  (order 3)
  *   [3] = 12/125        = .096         (order 4)
  *   [4] = 10/137        ≈ .07299270073 (order 5)
@@ -323,7 +323,7 @@ export function cktTerrVoltage(
     }
   }
 
-  // GEAR / BDF-1 / BDF-2: factor-based formula
+  // GEAR: factor-based formula (orders 1..6)
   const idx = Math.min(order - 1, GEAR_LTE_FACTORS.length - 1);
   const factor = GEAR_LTE_FACTORS[idx];
 

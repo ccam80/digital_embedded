@@ -4,7 +4,7 @@
  * Reactive two-terminal element modelled using companion model (equivalent
  * conductance + history current source). Implements updateCompanion() to
  * recompute geq and ieq at each timestep using one of three integration methods:
- * BDF-1, trapezoidal, or BDF-2.
+ * trapezoidal or gear (orders 1..2).
  */
 
 import { AbstractCircuitElement } from "../../core/element.js";

@@ -62,7 +62,7 @@ export interface StepRecord {
   acceptedDt: number;
   /** Integration method at step entry. */
   entryMethod: IntegrationMethod;
-  /** Final integration method (may differ after NR-failure BDF-1 fallback). */
+  /** Final integration method (may differ after NR-failure order-1 fallback). */
   exitMethod: IntegrationMethod;
   /** All NR attempts for this step (typically 1; more on retry). */
   attempts: NRAttemptRecord[];

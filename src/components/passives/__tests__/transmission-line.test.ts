@@ -252,7 +252,7 @@ describe("TLine", () => {
 
 
       // Verify these match what the element stamps by checking geq of the first
-      // inductor segment after load with BDF-1 (geq = L/dt)
+      // inductor segment after load with order-1 trap (geq = L/dt)
       const props = new PropertyBag();
       props.setModelParam("impedance", Z0);
       props.setModelParam("delay", delay);
@@ -279,7 +279,7 @@ describe("TLine", () => {
       const { solver, stamps } = makeStubSolver();
       el.load(makeStubCtx(solver, { voltages, dt, method: "trapezoidal", order: 1, cktMode: MODETRAN | MODEINITTRAN }));
 
-      // BDF-1 geq = L/dt. For each segment's inductor (SegmentInductorElement):
+      // order-1 trap geq = L/dt. For each segment's inductor (SegmentInductorElement):
       // geq = lSeg / dt = 50e-9 / 1e-9 = 50
       // These show up as -geq on the branch diagonal (branch row = branch col).
       const expectedGeq = lSeg / dt; // 50

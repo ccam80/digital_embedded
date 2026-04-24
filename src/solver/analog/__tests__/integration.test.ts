@@ -3,7 +3,7 @@
  *
  * Covers:
  *  - HistoryStore push/get/reset semantics
- *  - computeNIcomCof coefficient values for BDF-1, trapezoidal, BDF-2, GEAR
+ *  - computeNIcomCof coefficient values for trapezoidal (orders 1..2), gear (orders 1..6)
  *  - Gear Vandermonde correctness (zero-alloc scratch buffer)
  */
 
@@ -233,7 +233,7 @@ describe("computeNIcomCof", () => {
     }
   });
 
-  it("trapezoidal order 1 (was BDF-1): ag[0]=1/dt, ag[1]=-1/dt", () => {
+  it("trapezoidal order 1: ag[0]=1/dt, ag[1]=-1/dt", () => {
     const ag = new Float64Array(7);
     computeNIcomCof(h, [h, h], 1, "trapezoidal", ag, scratch);
     expect(ag[0]).toBe(1 / h);
@@ -277,8 +277,7 @@ describe("computeNIcomCof", () => {
     expect(ag[2]).toBe(1 / (2 * h));
   });
 
-  it("GEAR order 2 equal steps matches BDF-2: ag[0]=3/(2h), ag[1]=-2/h, ag[2]=1/(2h)", () => {
-    // GEAR method with order=2 and equal steps should produce same coefficients as BDF-2.
+  it("GEAR order 2 equal steps: ag[0]=3/(2h), ag[1]=-2/h, ag[2]=1/(2h)", () => {
     // nicomcof.c: Vandermonde with r[1]=1, r[2]=2 gives ag*dt = [1.5, -2, 0.5].
     const ag = new Float64Array(7);
     const scratch = new Float64Array(49);

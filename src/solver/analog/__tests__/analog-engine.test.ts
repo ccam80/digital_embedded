@@ -877,7 +877,7 @@ describe("xfact_computed_from_deltaOld", () => {
 
 describe("method_stable_across_ringing", () => {
   it("method_stable_across_ringing", () => {
-    // Create an RLC oscillator that would have triggered BDF-2 switching under
+    // Create an RLC oscillator that would have triggered order-2 (gear) switching under
     // the old code. Assert method remains trapezoidal throughout.
     //
     // We run an RC circuit (reactive element) through many steps and verify
@@ -905,7 +905,7 @@ describe("method_stable_across_ringing", () => {
 
 describe("first_step_uses_order_1", () => {
   it("first_step_uses_order_1", () => {
-    // Run one transient step. Assert integration coefficients match BDF-1
+    // Run one transient step. Assert integration coefficients match order-1 trap
     // (order 1), not trapezoidal (order 2).
     //
     // ngspice alignment:
@@ -918,7 +918,7 @@ describe("first_step_uses_order_1", () => {
     //
     // So on the very first step the method field may be "trapezoidal"
     // (matching the ngspice default CKTintegrateMethod) but the order is
-    // 1 and the coefficients written into ctx.ag are the BDF-1 ones.
+    // 1 and the coefficients written into ctx.ag are the order-1 trap ones.
     const circuit = makeRCCircuit();
     const engine = new MNAEngine();
     engine.init(circuit);
@@ -932,14 +932,14 @@ describe("first_step_uses_order_1", () => {
     expect(engine.getState()).not.toBe(EngineState.ERROR);
 
     // After first step, the integration coefficients written to ctx.ag
-    // must match BDF-1: ag[0] = 1/dt (niinteg.c:20-21).
+    // must match order-1 trap: ag[0] = 1/dt (niinteg.c:20-21).
     const ctx = (engine as unknown as { _ctx: { ag: number[]; loadCtx: { dt: number } } })._ctx;
     const dt = engine.lastDt;
     // Tightened per Phase 5 review V-1: the assertion runs unconditionally —
     // if dt === 0 after a successful first step, that itself is a real bug
     // and should surface as a test failure, not a silent skip.
     const ag0 = ctx.ag[0];
-    // ag[0] * dt should be 1 for BDF-1 (order 1) on the first step.
+    // ag[0] * dt should be 1 for order 1 on the first step.
   });
 });
 

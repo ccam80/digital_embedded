@@ -285,7 +285,7 @@ describe("PolarizedCap", () => {
   describe("charges_with_rc_time_constant", () => {
     it("capacitor voltage reaches 63% of step voltage at t ≈ RC", () => {
       // RC circuit: 10µF cap + 1kΩ series resistor, 5V step input
-      // Run transient to t = RC = 10ms using BDF-1 (backward Euler).
+      // Run transient to t = RC = 10ms using backward Euler.
       // Expected: V(cap_pos) ≈ 5 * (1 - exp(-1)) ≈ 3.161V at t = RC.
       //
       // MNA layout (1-based nodes, 0=ground):
@@ -314,7 +314,7 @@ describe("PolarizedCap", () => {
       const matrixSize = 4;
       const voltages = new Float64Array(matrixSize);
 
-      // Run 500 steps at dt = RC/500 = 20µs using BDF-1 (no ringing on step input)
+      // Run 500 steps at dt = RC/500 = 20µs using order-1 trap (no ringing on step input)
       const dt = RC / 500;
       const steps = 500;
 
@@ -381,7 +381,7 @@ describe("PolarizedCap", () => {
       // After RC seconds, V(cap_pos = node2, solver index 1) ≈ 5*(1-exp(-1)) ≈ 3.161V
       const vCapPos = voltages[1];
       const expected = V_step * (1 - Math.exp(-1));
-      const tolerance = 0.10; // 10% — BDF-1 has first-order error
+      const tolerance = 0.10; // 10% — order-1 trap has first-order error
       expect(Math.abs(vCapPos - expected) / expected).toBeLessThan(tolerance);
     });
   });
@@ -525,7 +525,7 @@ describe("PolarizedCap", () => {
 // PolarizedCap topology: pos─ESR─nCap─(C||leakage)─neg.
 // The capacitor body stamps between nCap(2) and neg(0).
 //
-// BDF-1 / trapezoidal integration (order=1):
+// order-1 trap integration:
 //   ag[0] = 1/dt,  ag[1] = -1/dt
 //   geq = ag[0]*C   (niinteg.c:77, capload.c:CAPload::geq)
 //   ceq = ag[1]*q_prev = ag[1]*C*v_cap_prev   (capload.c:CAPload::ceq)
@@ -552,7 +552,7 @@ describe("polarized_cap_load_transient_parity (C4.2)", () => {
     const order = 1;
     const method = "trapezoidal" as const;
 
-    // BDF-1 coefficients: ag[0]=1/dt, ag[1]=-1/dt
+    // order-1 trap coefficients: ag[0]=1/dt, ag[1]=-1/dt
     const ag0 = 1 / dt;
     const ag1 = -1 / dt;
 

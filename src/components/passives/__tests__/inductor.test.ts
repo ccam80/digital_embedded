@@ -212,8 +212,8 @@ describe("Inductor", () => {
     });
   });
 
-  describe("updateCompanion_bdf1", () => {
-    it("computes correct geq for BDF-1 method", () => {
+  describe("updateCompanion_order1_trap", () => {
+    it("computes correct geq for order-1 trap method", () => {
       const props = new PropertyBag();
       props.setModelParam("inductance", 0.01);
 
@@ -221,7 +221,7 @@ describe("Inductor", () => {
 
       const voltages = new Float64Array([5, 0, 0]);
 
-      // For BDF-1: geq = L/h = 0.01 / 1e-4 = 100
+      // For order-1 trap: geq = L/h = 0.01 / 1e-4 = 100
       const { solver, stamps } = makeCaptureSolver();
       analogElement.load(makeCompanionCtx({ solver, voltages, dt: 1e-4, method: "trapezoidal", order: 1 }));
 
@@ -467,12 +467,12 @@ describe("Inductor M multiplicity", () => {
 // ---------------------------------------------------------------------------
 //
 // Circuit: V_src=1V (node 1 → gnd) — R=1000Ω (node 1 → node 2) — L=1mH (node 2 → gnd)
-// Integration: BDF-1 / trapezoidal order=1, fixed dt=1e-6 s, 10 steps.
+// Integration: order-1 trap, fixed dt=1e-6 s, 10 steps.
 // Matrix layout: node1=1, node2=2, bVsrc=2 (abs row), bL=3 (abs row); matrixSize=4.
 //
-// ngspice reference (indload.c INDload, niinteg.c, BDF-1 case):
+// ngspice reference (indload.c INDload, niinteg.c, order-1 (backward-Euler) case):
 //   phi0   = L * iNow                             (indload.c flux storage)
-//   ccap   = ag[0]*phi0 + ag[1]*phi1             (niinteg.c BDF-1: ag[0]=1/dt, ag[1]=-1/dt)
+//   ccap   = ag[0]*phi0 + ag[1]*phi1             (niinteg.c order-1 (backward-Euler): ag[0]=1/dt, ag[1]=-1/dt)
 //   geq    = ag[0] * L                            (niinteg.c:77)
 //   ceq    = ccap - ag[0]*phi0 = ag[1]*phi1       (niinteg.c:78 → -(L/dt)*i_prev)
 //
@@ -502,7 +502,7 @@ describe("inductor_load_transient_parity (C4.2)", () => {
     const order  = 1;
     const method = "trapezoidal" as const;
 
-    // ngspice niinteg.c BDF-1 coefficients
+    // ngspice niinteg.c order-1 (backward-Euler) coefficients
     const ag0 = 1 / dt;   // = 1e6
     const ag1 = -1 / dt;  // = -1e6
     // geq = ag[0]*L (niinteg.c:77) — bit-exact reference constant

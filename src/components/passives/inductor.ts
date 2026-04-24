@@ -4,7 +4,7 @@
  * Reactive two-terminal element that requires a branch variable (extra MNA row)
  * to track branch current. Uses companion model (equivalent conductance + history
  * current source) recomputed at each timestep with one of three integration methods:
- * BDF-1, trapezoidal, or BDF-2.
+ * trapezoidal or gear (orders 1..2).
  */
 
 import { AbstractCircuitElement } from "../../core/element.js";

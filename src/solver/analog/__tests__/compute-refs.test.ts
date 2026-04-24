@@ -20,9 +20,9 @@ describe("compute_refs", () => {
     console.log("T-03:", r(r03));
 
     const rTrap4 = cktTerr(1.0, [1.0, 1.0], 2, "trapezoidal", 27.0, 8.0, 1.0, 0.0, 27.0, 8.0, defaultParams);
-    const rBdf24 = cktTerr(1.0, [1.0, 1.0], 2, "gear", 27.0, 8.0, 1.0, 0.0, 27.0, 8.0, defaultParams);
+    const rGear24 = cktTerr(1.0, [1.0, 1.0], 2, "gear", 27.0, 8.0, 1.0, 0.0, 27.0, 8.0, defaultParams);
     console.log("T-04 trap:", r(rTrap4));
-    console.log("T-04 gear:", r(rBdf24));
+    console.log("T-04 gear:", r(rGear24));
 
     const r05 = cktTerrVoltage(5.0, 5.0, 5.0, 5.0, dt, [dt, dt], 1, "trapezoidal", 1e-3, 1e-6, 7);
     console.log("T-05:", r(r05));
@@ -37,8 +37,8 @@ describe("compute_refs", () => {
     console.log("T-08:", r(r08));
 
     const rTrap9 = cktTerrVoltage(27, 8, 1, 0, 1.0, [1.0, 1.0], 2, "trapezoidal", 1e-3, 1e-6, 7);
-    const rBdf29 = cktTerrVoltage(27, 8, 1, 0, 1.0, [1.0, 1.0], 2, "gear", 1e-3, 1e-6, 7);
+    const rGear29 = cktTerrVoltage(27, 8, 1, 0, 1.0, [1.0, 1.0], 2, "gear", 1e-3, 1e-6, 7);
     console.log("T-09 trap:", r(rTrap9));
-    console.log("T-09 gear:", r(rBdf29));
+    console.log("T-09 gear:", r(rGear29));
   });
 });

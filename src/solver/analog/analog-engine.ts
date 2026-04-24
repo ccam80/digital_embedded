@@ -522,7 +522,7 @@ export class MNAEngine implements AnalogEngine {
           stepRec!.lteProposedDt = newDt;
         }
 
-        // ngspice dctran.c:856-876 — trial promotion from BDF-1 to trapezoidal.
+        // ngspice dctran.c:856-876 — trial promotion from order 1 to order 2 (trapezoidal free-running).
         // Runs INSIDE LTE check, before accept/reject, matching ngspice CKTtrunc ordering.
         // Gate: only attempt when order is 1 and LTE result is >= 90% of the executed step.
         if (this._timestep.currentOrder === 1 && newDt > 0.9 * dt) {
@@ -670,7 +670,7 @@ export class MNAEngine implements AnalogEngine {
     return this._engineState;
   }
 
-  /** Current integration order (1 = BDF-1 startup, 2 = order-2 free-running). */
+  /** Current integration order (1 = order-1 startup, 2 = order-2 free-running). */
   get integrationOrder(): number {
     return this._timestep.currentOrder;
   }

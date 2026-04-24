@@ -121,7 +121,7 @@ export interface SimulationParams {
    * Default: 1 (full scale).
    */
   srcFact?: number;
-  /** Trapezoidal integration weighting factor (0=BDF1, 0.5=trapezoidal). Default: 0.5 */
+  /** Trapezoidal integration weighting factor (0=backward Euler, 0.5=trapezoidal). Default: 0.5 */
   xmu?: number;
   /**
    * Skip all NR iterations in the DC-OP ladder (cktop.c noOpIter path).

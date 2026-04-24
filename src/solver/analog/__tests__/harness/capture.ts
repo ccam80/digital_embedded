@@ -379,7 +379,7 @@ export function createStepCaptureHook(
     integrationCoefficients: IntegrationCoefficients;
     analysisPhase: "dcop" | "tranInit" | "tranFloat";
     acceptedAttemptIndex: number;
-    /** Integration order for the step (1 = BDF-1, 2 = trap/BDF-2). Required. */
+    /** Integration order for the step (1 = order-1 trap/gear, 2 = order-2 trap/gear). Required. */
     order: number;
     /** Timestep used for the step (seconds). Required. */
     delta: number;
@@ -473,7 +473,7 @@ export function createStepCaptureHook(
       integrationCoefficients: IntegrationCoefficients;
       analysisPhase: "dcop" | "tranInit" | "tranFloat";
       acceptedAttemptIndex: number;
-      /** Integration order for the step (1 = BDF-1, 2 = trap/BDF-2). */
+      /** Integration order for the step (1 = order-1 trap/gear, 2 = order-2 trap/gear). */
       order: number;
       /** Timestep used for the step (seconds). */
       delta: number;

@@ -324,7 +324,7 @@ export class RealOpAmpElement extends AbstractCircuitElement {
  * Transient:
  *   A_eff is reduced by the companion integrator's bandwidth-limiting factor.
  *   The effective gain at frequency ω is A_OL / (1 + jω*τ), implemented as
- *   a first-order BDF-1 update of V_int each timestep with slew-rate clamping.
+ *   a first-order backward-Euler update of V_int each timestep with slew-rate clamping.
  */
 export function createRealOpAmpElement(
   pinNodes: ReadonlyMap<string, number>,
@@ -394,7 +394,7 @@ export function createRealOpAmpElement(
   // In DC mode (no companion): aEff = p.aol. In transient: aEff < p.aol.
   let aEff = p.aol;
 
-  // BDF-1 companion model for the gain-stage integrator.
+  // backward-Euler companion model for the gain-stage integrator.
   // geq_int > 0 only during transient; 0 during DC.
   let geq_int  = 0;
   let vIntPrev = 0;
@@ -534,7 +534,7 @@ export function createRealOpAmpElement(
       } else if (slewLimited) {
         solver.stampRHS(nOut - 1, vInt * G_out);
       } else {
-        // Normal operation: bandwidth-limited VCVS with BDF-1 history current.
+        // Normal operation: bandwidth-limited VCVS with backward-Euler history current.
         const aEffScaled = aEff * scale;
         const ieq = geq_int > 0
           ? (geq_int / (1 + geq_int)) * vIntPrev * G_out
@@ -547,7 +547,7 @@ export function createRealOpAmpElement(
 
     accept(ctx: LoadContext, _simTime: number, _addBreakpoint: (t: number) => void): void {
       // Record the accepted-timestep vInt and output voltage so the next
-      // step's BDF-1 history term uses the converged state.
+      // step's backward-Euler history term uses the converged state.
       vIntPrev = vInt;
       _vOutPrev = readNode(ctx.rhs, nOut);
     },

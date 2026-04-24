@@ -1,11 +1,11 @@
 {
   "summary": {
     "vitest": {
-      "passed": 11,
-      "failed": 2,
+      "passed": 3,
+      "failed": 0,
       "skipped": 0,
       "totalFiles": 1,
-      "durationSeconds": 1.7
+      "durationSeconds": 9.6
     },
     "playwright": {
       "passed": 476,
@@ -14,30 +14,11 @@
       "totalFiles": 23,
       "durationSeconds": 214.74311200000002
     },
-    "totalFailed": 14,
-    "totalPassed": 487
+    "totalFailed": 12,
+    "totalPassed": 479
   },
   "failures": {
-    "vitest": [
-      {
-        "message": "Transform failed with 2 errors:",
-        "count": 2,
-        "locations": [
-          {
-            "file": "src\\editor\\__tests__\\wire-current-resolver.test.ts",
-            "test": "cross-component current equality through real compiled lrctest.dig",
-            "line": null,
-            "column": null
-          },
-          {
-            "file": "src\\editor\\__tests__\\wire-current-resolver.test.ts",
-            "test": "component-as-node KCL: wire at pin A ≈ wire at pin B ≈ body current",
-            "line": null,
-            "column": null
-          }
-        ]
-      }
-    ],
+    "vitest": [],
     "playwright": [
       {
         "message": "Error: Expected 2.64043954025776 to be close to 0.02084652 (err=2.61959302025776, limit=2.084652e-8)",

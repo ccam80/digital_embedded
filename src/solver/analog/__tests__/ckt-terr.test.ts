@@ -28,7 +28,7 @@ describe("cktTerr", () => {
     const q0 = 1e-12, q1 = 0.9e-12, q2 = 0.8e-12;
     const result = cktTerr(dt, [dt, dt], 1, "gear", q0, q1, q2, 0, q0, q1, defaultParams);
 
-    // NGSPICE_REF: ngspice cktterr.c CKTterr, order=1 GEAR (BDF-1) path.
+    // NGSPICE_REF: ngspice cktterr.c CKTterr, order=1 GEAR path.
     // Divided difference (2nd) -> tolerance -> del = trtol*tol/max(abstol, factor*ddiff)
     // -> GEAR order 1 takes sqrt(del).
     const h0 = dt, h1 = dt;
@@ -56,7 +56,7 @@ describe("cktTerr", () => {
     const q0 = 27e-12, q1 = 8e-12, q2 = 1e-12, q3 = 0;
     const r2 = cktTerr(dt, [dt, dt], 2, "gear", q0, q1, q2, q3, q0, q1, defaultParams);
 
-    // NGSPICE_REF: ngspice cktterr.c CKTterr, order=2 GEAR (BDF-2) path.
+    // NGSPICE_REF: ngspice cktterr.c CKTterr, order=2 GEAR path.
     // 3rd divided difference -> tol -> del -> root via exp(log(del)/(order+1)).
     const h0 = dt, h1 = dt, h2 = dt;
     let d0 = q0, d1 = q1, d2 = q2, d3 = q3;
@@ -107,7 +107,7 @@ describe("cktTerr", () => {
     const dt = 1.0;
     const q0 = 27.0, q1 = 8.0, q2 = 1.0, q3 = 0.0;
     const rTrap = cktTerr(dt, [dt, dt], 2, "trapezoidal", q0, q1, q2, q3, q0, q1, defaultParams);
-    const rBdf2 = cktTerr(dt, [dt, dt], 2, "gear", q0, q1, q2, q3, q0, q1, defaultParams);
+    const rGear2 = cktTerr(dt, [dt, dt], 2, "gear", q0, q1, q2, q3, q0, q1, defaultParams);
 
     // Shared divided-difference bookkeeping (ngspice cktterr.c:43-59 order=2).
     const h0 = dt, h1 = dt, h2 = dt;
@@ -131,15 +131,15 @@ describe("cktTerr", () => {
     const d0old = dt, d1old = dt;
     const NGSPICE_REF_TRAP = Math.abs(d0old * defaultParams.trtol * tol * 3 * (d0old + d1old) / diffSigned);
 
-    // NGSPICE_REF_BDF2: ngspice cktterr.c GEAR order 2:
+    // NGSPICE_REF_GEAR2: ngspice cktterr.c GEAR order 2:
     //   del = trtol*tol/max(abstol, factor*ddiff); result = exp(log(del)/(order+1))
     const factor = 2 / 9; // GEAR_LTE_FACTORS[1]
     const denom = Math.max(defaultParams.abstol, factor * ddiff);
     const del = defaultParams.trtol * tol / denom;
-    const NGSPICE_REF_BDF2 = Math.exp(Math.log(del) / (2 + 1));
+    const NGSPICE_REF_GEAR2 = Math.exp(Math.log(del) / (2 + 1));
 
     expect(rTrap).toBe(NGSPICE_REF_TRAP);
-    expect(rBdf2).toBe(NGSPICE_REF_BDF2);
+    expect(rGear2).toBe(NGSPICE_REF_GEAR2);
   });
 });
 
@@ -260,7 +260,7 @@ describe("cktTerrVoltage", () => {
     const v0 = 27.0, v1 = 8.0, v2 = 1.0, v3 = 0.0;
     const lteReltol = 1e-3, lteAbstol = 1e-6, trtol = 7;
     const rTrap = cktTerrVoltage(v0, v1, v2, v3, dt, [dt, dt], 2, "trapezoidal", lteReltol, lteAbstol, trtol);
-    const rBdf2 = cktTerrVoltage(v0, v1, v2, v3, dt, [dt, dt], 2, "gear", lteReltol, lteAbstol, trtol);
+    const rGear2 = cktTerrVoltage(v0, v1, v2, v3, dt, [dt, dt], 2, "gear", lteReltol, lteAbstol, trtol);
 
     // Shared divided-difference (ngspice ckttrunc.c NEWTRUNC, order=2).
     const h0 = dt, h1 = dt, h2 = dt;
@@ -281,15 +281,15 @@ describe("cktTerrVoltage", () => {
     const d0old = dt, d1old = dt;
     const NGSPICE_REF_TRAP = Math.abs(d0old * trtol * tol * 3 * (d0old + d1old) / diffSigned);
 
-    // NGSPICE_REF_BDF2: ngspice ckttrunc.c NEWTRUNC GEAR order 2.
+    // NGSPICE_REF_GEAR2: ngspice ckttrunc.c NEWTRUNC GEAR order 2.
     const factor = 2 / 9; // GEAR_LTE_FACTORS[1]
     const denom = Math.max(lteAbstol, factor * ddiff);
     const delsum = dt + dt; // deltaOld=[dt,dt], order=2 but deltaOld.length=2
     const tmp = (tol * trtol * delsum) / (denom * dt);
-    const NGSPICE_REF_BDF2 = dt * Math.exp(Math.log(tmp) / (2 + 1));
+    const NGSPICE_REF_GEAR2 = dt * Math.exp(Math.log(tmp) / (2 + 1));
 
     expect(rTrap).toBe(NGSPICE_REF_TRAP);
-    expect(rBdf2).toBe(NGSPICE_REF_BDF2);
+    expect(rGear2).toBe(NGSPICE_REF_GEAR2);
   });
 
   it("order 2 linear data gives finite timestep (lteAbstol-gated)", () => {

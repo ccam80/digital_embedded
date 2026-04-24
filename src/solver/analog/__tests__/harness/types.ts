@@ -187,7 +187,7 @@ export interface IterationSnapshot {
    */
   initMode: string;
   /**
-   * Integration order active at this NR iteration (1 = BDF-1, 2 = trap/BDF-2).
+   * Integration order active at this NR iteration (1 = order-1 trap/gear, 2 = order-2 trap/gear).
    * Set per-iteration from `ctx.loadCtx.order` for our engine and from the
    * ngspice NiIterationData.order FFI field. Populated by createIterationCaptureHook
    * and ngspice-bridge at iteration time — no longer painted at step-end.
@@ -872,7 +872,7 @@ export interface IterationSideData {
    * `string` to accommodate both vocabularies.
    */
   method: string;
-  /** Integration order active at this iteration (1 = BDF-1, 2 = trap/BDF-2). */
+  /** Integration order active at this iteration (1 = order-1 trap/gear, 2 = order-2 trap/gear). */
   order: number;
 }
 

@@ -42,8 +42,8 @@
     "runtime": null
   },
   "build": {
-    "buildCommand": "npm run build",
-    "testCommand": "npm test",
+    "buildCommand": "cat >> \"C:/local_working_projects/digital_in_browser/spec/progress.md\" <<'EOF'\n\n---\n## Phase 3 Complete\n- **Batches**: 3 (batch-p3-w3.1 Wave 3.1 NR reorder; batch-p3-w3.2 Wave 3.2 diode+BJT xfact; batch-p3-w3.3 Wave 3.3 IntegrationMethod alignment)\n- **Tasks**: 14 (3.1.1, 3.1.2, 3.2.1, 3.2.2, 3.2.3, 3.2.4, 3.2.5, 3.3.1, 3.3.2, 3.3.3, 3.3.4, 3.3.5, 3.3.6, 3.3.7)\n- **All verified**: yes (group_status for every task_group in every batch is \"passed\")\n- **Recovery events**: 1 clarification stop (Task 3.1.2 DC-OP cktop.c citation portion stricken per 2026-04-24 user clarification — presumed call site does not exist in digiTS and presumed ngspice analog does not exist in ngspice); 4 dead implementers (3.1 retry, 3.2.bjt first pass, 3.3.collapse first pass, 3.3.audit first pass — each recovered via mark-dead-implementer.sh + retry implementer).\n- **Verification cycles**: batch-p3-w3.1 had 1 FAIL (test-split + call-site discrimination fixes); batch-p3-w3.2 had 1 FAIL (missing pnjlim exact-count assertions, weak `>= 1` tightened to `=== 3`, missing skip-mask sub-case tests added). All FAILs converted to PASS after fix-implementer retries.\n- **Artifacts landed**:\n  - `src/solver/analog/__tests__/phase-3-nr-reorder.test.ts` — 7 tests guarding the NR loop-top NISHOULDREORDER gate + E_SINGULAR retry citation.\n  - `src/components/semiconductors/__tests__/phase-3-xfact-predictor.test.ts` — 17 tests covering diode + BJT L0 + BJT L1 xfact extrapolation, state-copy, pnjlim under MODEINITPRED (exact counts), VSUB state-copy regression guard.\n  - `src/solver/analog/__tests__/phase-3-xfact-scope-audit.test.ts` — 3 tests asserting every ctx.xfact read is MODEINITPRED-guarded.\n  - `src/solver/analog/__tests__/phase-3-relay-composite.test.ts` — 2 tests asserting SPDT/DPDT relays expose coil inductor as composite child.\n  - Phase 0 identifier audit manifest extended with 3 banned-literal rules (bdf1-literal, bdf2-literal, integrationMethod-auto); matching rows in `spec/phase-0-audit-report.md`.\n  - Compile-time assertion `_AssertPublicInternalEq` in `src/core/analog-engine-interface.ts` locks SimulationParams.integrationMethod === IntegrationMethod at tsc time.\n- **Production code deltas**:\n  - `diode.ts`, `bjt.ts` — MODEINITPRED branch rewritten to copy s1->s0 and extrapolate via `(1 + ctx.xfact) * s1 - ctx.xfact * s2` per dioload.c:141-152 and bjtload.c:278-330; pnjlim skip masks stripped of MODEINITPRED so pnjlim runs on the extrapolated voltages per bjtload.c:386-414.\n  - `bjt.ts` L1 VSUB: extrapolated, then re-read from rhsOld per bjtload.c:328-330 verbatim port of the ngspice vbx/vsub unconditional rewrite.\n  - `analog-types.ts` IntegrationMethod narrowed to \"trapezoidal\" | \"gear\" per cktdefs.h:107-108.\n  - `integration.ts` bdf-two branch deleted; order-1 gear via inline trap-1 per nicomcof.c:40-41; order >= 2 gear via solveGearVandermonde.\n  - `analog-engine-interface.ts` SimulationParams.integrationMethod narrowed; default = \"trapezoidal\" per cktntask.c:99; no \"auto\" coercion shim.\n  - `behavioral-remaining.ts` SPDT and DPDT relay factories rewritten to delegate coil integration to a child AnalogInductorElement via the Phase 0 composite-child pattern; hand-rolled method-dispatched companion deleted.\n  - `timestep.ts`, `convergence-log-panel.ts`, `ni-pred.ts`, `ni-integrate.ts`, `ckt-terr.ts`, `analog-engine.ts` — residual bdf1/bdf2 cleanup; `load-context.ts` \"backwards compatibility\" block deleted.\n- **Follow-through**: Phase 4 (F5 residual limiting primitives) is the next batch; its batch-p4-w4.1 entry is already planned in `.hybrid-state.json`. Phase 4 depends on Phase 3 per plan.md serialization.\nEOF\nls \"C:/local_working_projects/digital_in_browser/spec/progress.md\"",
+    "testCommand": "cd \"C:/local_working_projects/digital_in_browser\" && npx vitest run --testTimeout=120000 -t \"updateCompanion_order1_trap|updateCompanion_order2_gear\" src/components/passives/__tests__/capacitor.test.ts src/components/passives/__tests__/inductor.test.ts 2>&1 | tail -20",
     "lintCommand": "npm run lint",
     "devCommand": "npm run dev",
     "scripts": {
@@ -285,38 +285,98 @@
   "hotPaths": [
     {
       "path": "src",
-      "accessCount": 53,
-      "lastAccessed": 1776999570782,
+      "accessCount": 75,
+      "lastAccessed": 1777022186118,
       "type": "directory"
     },
     {
-      "path": "spec\\progress.md",
-      "accessCount": 21,
-      "lastAccessed": 1777004564670,
+      "path": "src\\components\\semiconductors\\bjt.ts",
+      "accessCount": 70,
+      "lastAccessed": 1777017051317,
       "type": "file"
     },
     {
-      "path": "src\\solver\\analog\\digital-pin-model.ts",
-      "accessCount": 18,
-      "lastAccessed": 1776999539427,
+      "path": "spec\\progress.md",
+      "accessCount": 67,
+      "lastAccessed": 1777022515016,
+      "type": "file"
+    },
+    {
+      "path": "spec\\.context\\rules.md",
+      "accessCount": 42,
+      "lastAccessed": 1777022256318,
       "type": "file"
     },
     {
       "path": "spec\\test-baseline.md",
-      "accessCount": 17,
-      "lastAccessed": 1777004569065,
+      "accessCount": 42,
+      "lastAccessed": 1777022270210,
+      "type": "file"
+    },
+    {
+      "path": "src\\solver\\analog\\behavioral-remaining.ts",
+      "accessCount": 28,
+      "lastAccessed": 1777017972296,
+      "type": "file"
+    },
+    {
+      "path": "src\\solver\\analog\\__tests__\\harness\\types.ts",
+      "accessCount": 27,
+      "lastAccessed": 1777022307635,
+      "type": "file"
+    },
+    {
+      "path": "spec\\.hybrid-state.json",
+      "accessCount": 26,
+      "lastAccessed": 1777022201153,
+      "type": "file"
+    },
+    {
+      "path": "spec\\.context\\lock-protocol.md",
+      "accessCount": 26,
+      "lastAccessed": 1777022257144,
+      "type": "file"
+    },
+    {
+      "path": "src\\solver\\analog\\digital-pin-model.ts",
+      "accessCount": 22,
+      "lastAccessed": 1777017713200,
       "type": "file"
     },
     {
       "path": "src\\components\\passives\\capacitor.ts",
-      "accessCount": 16,
-      "lastAccessed": 1776998662493,
+      "accessCount": 21,
+      "lastAccessed": 1777022321478,
+      "type": "file"
+    },
+    {
+      "path": "src\\components\\semiconductors\\mosfet.ts",
+      "accessCount": 19,
+      "lastAccessed": 1777009282192,
       "type": "file"
     },
     {
       "path": "spec\\phase-0-residual-dead-code-audit.md",
+      "accessCount": 18,
+      "lastAccessed": 1777005321736,
+      "type": "file"
+    },
+    {
+      "path": "src\\components\\semiconductors\\__tests__\\tunnel-diode.test.ts",
+      "accessCount": 17,
+      "lastAccessed": 1777005431122,
+      "type": "directory"
+    },
+    {
+      "path": "",
+      "accessCount": 17,
+      "lastAccessed": 1777017300711,
+      "type": "directory"
+    },
+    {
+      "path": "src\\components\\io\\led.ts",
       "accessCount": 16,
-      "lastAccessed": 1777004564640,
+      "lastAccessed": 1777005430668,
       "type": "file"
     },
     {
@@ -326,88 +386,64 @@
       "type": "file"
     },
     {
-      "path": "spec\\.context\\rules.md",
-      "accessCount": 15,
-      "lastAccessed": 1777004564263,
-      "type": "file"
-    },
-    {
       "path": "src\\components\\active\\__tests__\\timer-555.test.ts",
-      "accessCount": 14,
-      "lastAccessed": 1776998737853,
+      "accessCount": 15,
+      "lastAccessed": 1777005465650,
       "type": "file"
-    },
-    {
-      "path": "src\\components\\semiconductors\\__tests__\\tunnel-diode.test.ts",
-      "accessCount": 14,
-      "lastAccessed": 1776999561294,
-      "type": "directory"
     },
     {
       "path": "src\\components\\semiconductors\\__tests__\\diode.test.ts",
-      "accessCount": 12,
-      "lastAccessed": 1776994352695,
-      "type": "file"
-    },
-    {
-      "path": "src\\components\\io\\led.ts",
-      "accessCount": 12,
-      "lastAccessed": 1776999121523,
+      "accessCount": 15,
+      "lastAccessed": 1777013951811,
       "type": "file"
     },
     {
       "path": "src\\components\\semiconductors\\tunnel-diode.ts",
-      "accessCount": 11,
-      "lastAccessed": 1776996329927,
-      "type": "file"
-    },
-    {
-      "path": "src\\solver\\analog\\__tests__\\harness\\harness-integration.test.ts",
-      "accessCount": 10,
-      "lastAccessed": 1776994527952,
+      "accessCount": 14,
+      "lastAccessed": 1777009125695,
       "type": "file"
     },
     {
       "path": "src\\components\\io\\__tests__\\led.test.ts",
+      "accessCount": 13,
+      "lastAccessed": 1777005431751,
+      "type": "file"
+    },
+    {
+      "path": "e2e",
+      "accessCount": 12,
+      "lastAccessed": 1777020433795,
+      "type": "directory"
+    },
+    {
+      "path": "src\\solver\\analog\\__tests__\\harness\\harness-integration.test.ts",
+      "accessCount": 11,
+      "lastAccessed": 1777005335382,
+      "type": "file"
+    },
+    {
+      "path": "src\\components\\semiconductors\\__tests__\\bjt.test.ts",
       "accessCount": 10,
-      "lastAccessed": 1776999162893,
+      "lastAccessed": 1777014158994,
       "type": "file"
     },
     {
-      "path": "src\\solver\\analog\\behavioral-remaining.ts",
-      "accessCount": 9,
-      "lastAccessed": 1776996379910,
-      "type": "file"
-    },
-    {
-      "path": "spec\\.context\\lock-protocol.md",
-      "accessCount": 9,
-      "lastAccessed": 1776999508862,
-      "type": "file"
+      "path": "scripts",
+      "accessCount": 10,
+      "lastAccessed": 1777020431174,
+      "type": "directory"
     },
     {
       "path": "src\\components\\active\\dac.ts",
-      "accessCount": 8,
-      "lastAccessed": 1776996374388,
+      "accessCount": 9,
+      "lastAccessed": 1777005411731,
       "type": "file"
     },
     {
-      "path": "src\\components\\semiconductors\\bjt.ts",
+      "path": "src\\solver\\analog\\__tests__",
       "accessCount": 8,
-      "lastAccessed": 1776999170561,
-      "type": "file"
-    },
-    {
-      "path": "spec\\.hybrid-state.json",
-      "accessCount": 8,
-      "lastAccessed": 1777004686626,
-      "type": "file"
-    },
-    {
-      "path": "src\\components\\semiconductors\\mosfet.ts",
-      "accessCount": 7,
-      "lastAccessed": 1776994304172,
-      "type": "file"
+      "lastAccessed": 1777022399630,
+      "type": "directory"
     },
     {
       "path": "src\\solver\\analog\\bridge-adapter.ts",
@@ -416,33 +452,27 @@
       "type": "file"
     },
     {
+      "path": "src\\solver\\analog\\__tests__\\harness\\device-mappings.ts",
+      "accessCount": 7,
+      "lastAccessed": 1777005325879,
+      "type": "file"
+    },
+    {
       "path": "src\\components\\semiconductors\\njfet.ts",
-      "accessCount": 6,
-      "lastAccessed": 1776994304907,
+      "accessCount": 7,
+      "lastAccessed": 1777005398423,
       "type": "file"
     },
     {
       "path": "src\\components\\semiconductors\\pjfet.ts",
-      "accessCount": 6,
-      "lastAccessed": 1776994305671,
+      "accessCount": 7,
+      "lastAccessed": 1777005460241,
       "type": "file"
     },
     {
-      "path": "src\\components\\semiconductors\\__tests__\\bjt.test.ts",
-      "accessCount": 6,
-      "lastAccessed": 1776994315259,
-      "type": "file"
-    },
-    {
-      "path": "src\\solver\\analog\\__tests__\\harness\\device-mappings.ts",
-      "accessCount": 6,
-      "lastAccessed": 1776994397223,
-      "type": "file"
-    },
-    {
-      "path": "",
-      "accessCount": 6,
-      "lastAccessed": 1776998683855,
+      "path": "src\\solver\\analog\\state-schema.ts",
+      "accessCount": 7,
+      "lastAccessed": 1777009126177,
       "type": "directory"
     },
     {
@@ -453,15 +483,15 @@
     },
     {
       "path": "src\\components\\semiconductors\\__tests__\\jfet.test.ts",
-      "accessCount": 5,
-      "lastAccessed": 1776994331876,
+      "accessCount": 6,
+      "lastAccessed": 1777005461297,
       "type": "file"
     },
     {
-      "path": "src\\solver\\analog\\state-schema.ts",
-      "accessCount": 5,
-      "lastAccessed": 1776998963207,
-      "type": "directory"
+      "path": "src\\solver\\analog\\__tests__\\harness\\ngspice-bridge.ts",
+      "accessCount": 6,
+      "lastAccessed": 1777019475354,
+      "type": "file"
     },
     {
       "path": "src\\solver\\analog\\behavioral-combinational.ts",
@@ -476,12 +506,6 @@
       "type": "file"
     },
     {
-      "path": "e2e",
-      "accessCount": 5,
-      "lastAccessed": 1776999579313,
-      "type": "directory"
-    },
-    {
       "path": "src\\solver\\analog\\behavioral-flipflop\\shared.ts",
       "accessCount": 4,
       "lastAccessed": 1776996775251,
@@ -494,51 +518,33 @@
       "type": "file"
     },
     {
-      "path": "scripts",
-      "accessCount": 4,
-      "lastAccessed": 1776999580082,
-      "type": "directory"
-    },
-    {
-      "path": "src\\solver\\analog\\__tests__\\harness\\types.ts",
-      "accessCount": 3,
-      "lastAccessed": 1776994258936,
-      "type": "file"
-    },
-    {
-      "path": "src\\solver\\analog\\__tests__\\harness\\ngspice-bridge.ts",
-      "accessCount": 3,
-      "lastAccessed": 1776994260278,
-      "type": "file"
-    },
-    {
       "path": "src\\solver\\analog\\__tests__\\harness\\compare.ts",
-      "accessCount": 3,
-      "lastAccessed": 1776994282924,
+      "accessCount": 4,
+      "lastAccessed": 1777005331074,
       "type": "file"
     },
     {
       "path": "src\\solver\\analog\\__tests__\\ngspice-parity\\parity-helpers.ts",
-      "accessCount": 3,
-      "lastAccessed": 1776994283405,
+      "accessCount": 4,
+      "lastAccessed": 1777005331645,
       "type": "file"
     },
     {
       "path": "src\\components\\semiconductors\\varactor.ts",
-      "accessCount": 3,
-      "lastAccessed": 1776994295046,
+      "accessCount": 4,
+      "lastAccessed": 1777005449063,
       "type": "file"
     },
     {
       "path": "src\\solver\\analog\\coupled-inductor.ts",
-      "accessCount": 3,
-      "lastAccessed": 1776994295799,
+      "accessCount": 4,
+      "lastAccessed": 1777005449562,
       "type": "file"
     },
     {
       "path": "src\\solver\\analog\\__tests__\\ckt-mode.test.ts",
-      "accessCount": 3,
-      "lastAccessed": 1776994296485,
+      "accessCount": 4,
+      "lastAccessed": 1777005450337,
       "type": "file"
     },
     {
@@ -570,12 +576,6 @@
       "accessCount": 3,
       "lastAccessed": 1776995271699,
       "type": "file"
-    },
-    {
-      "path": "src\\solver\\analog\\__tests__",
-      "accessCount": 2,
-      "lastAccessed": 1776995856458,
-      "type": "directory"
     },
     {
       "path": "src\\components\\passives\\transmission-line.ts",

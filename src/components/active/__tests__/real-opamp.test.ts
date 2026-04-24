@@ -152,7 +152,7 @@ function solveDC(elements: AnalogElement[], matrixSize: number, nodeCount: numbe
 
 // ---------------------------------------------------------------------------
 // Run transient simulation starting from zero initial conditions.
-// Each step: build a transient ctx with BDF-1 coefficients, run NR, then
+// Each step: build a transient ctx with order-1 trap coefficients, run NR, then
 // invoke accept(ctx) on reactive elements to advance their companion state.
 // Returns the output voltage time series at the given output node (1-based).
 // The first value in the array is the output after step 1 (not DC).
@@ -167,7 +167,7 @@ function runTransient(
 ): Float64Array {
   const vOut = new Float64Array(nSteps);
   const ctx = makeSimpleCtx({ elements, matrixSize, nodeCount });
-  // Configure the ctx for transient stepping: BDF-1 trapezoidal, dt, ag coefficients.
+  // Configure the ctx for transient stepping: order-1 trap, dt, ag coefficients.
   ctx.cktMode = MODETRAN | MODEINITFLOAT;
   ctx.loadCtx.cktMode = MODETRAN | MODEINITFLOAT;
   ctx.loadCtx.dt = dt;

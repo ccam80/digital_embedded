@@ -12,9 +12,9 @@ import type { IntegrationMethod } from "./element.js";
 // ---------------------------------------------------------------------------
 
 /**
- * Two-slot rotating history store for BDF-2 reactive element state.
+ * Two-timepoint rotating history store for reactive element state.
  *
- * BDF-2 requires the value at v(n) and v(n-1) for each reactive element.
+ * Stores the value at v(n) and v(n-1) for each reactive element.
  * History is stored in two `Float64Array` buffers (slots A and B). Each
  * element independently tracks which slot is its current (v(n)) slot via a
  * per-element flag in a `Uint8Array`. Rotating history for one element does
@@ -182,7 +182,7 @@ export class NodeVoltageHistory {
  *
  * ag[0] = coefficient on Q_n (current timepoint)
  * ag[1] = coefficient on Q_{n-1}
- * ag[2] = coefficient on Q_{n-2} (BDF-2 only)
+ * ag[2] = coefficient on Q_{n-2} (order ≥ 2 only)
  */
 /**
  * Solve the GEAR Vandermonde system for integration coefficients ag[0..order].

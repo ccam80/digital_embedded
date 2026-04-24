@@ -314,3 +314,45 @@
   - `behavioral-remaining.ts` SPDT and DPDT relay factories rewritten to delegate coil integration to a child AnalogInductorElement via the Phase 0 composite-child pattern; hand-rolled method-dispatched companion deleted.
   - `timestep.ts`, `convergence-log-panel.ts`, `ni-pred.ts`, `ni-integrate.ts`, `ckt-terr.ts`, `analog-engine.ts` — residual bdf1/bdf2 cleanup; `load-context.ts` "backwards compatibility" block deleted.
 - **Follow-through**: Phase 4 (F5 residual limiting primitives) is the next batch; its batch-p4-w4.1 entry is already planned in `.hybrid-state.json`. Phase 4 depends on Phase 3 per plan.md serialization.
+
+## Task C-3.4.1: Purge BDF-1/BDF-2 residue from production doc-comments (src/ non-test)
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: none
+- **Files modified**: src/core/analog-engine-interface.ts, src/solver/analog/integration.ts, src/solver/analog/ckt-terr.ts, src/solver/analog/convergence-log.ts, src/solver/analog/timestep.ts, src/solver/analog/analog-engine.ts, src/components/passives/capacitor.ts, src/components/passives/inductor.ts, src/components/active/real-opamp.ts
+- **Tests**: n/a — comment/doc-string rename-only per spec section 4 Task C-3.4.1 acceptance; no behavioural change; task spec does not prescribe new tests. Acceptance gate verified via the built-in Grep tool across all 9 scoped files for the regex `\bBDF[-_ ]?[12]\b|\bbdf[12]\b` — zero hits in all 9 files.
+- **Notes**: Applied spec section 3 renaming table verbatim. `BDF-1` mapped to `order-1 trap` / `backward Euler` / `order-1 startup` / `order-1 backward-Euler` per context; `BDF-2` mapped to `gear order 2` / `order-2` / `order 2` per context; `BDF1` (xmu docstring, no hyphen) mapped to `backward Euler`. All 17 enumerated edits applied.
+
+## Task C-3.4.2: Purge BDF-1/BDF-2 residue from solver-side test source files
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: none
+- **Files modified**:
+  - `src/solver/analog/__tests__/harness/types.ts` — rewrote two JSDoc comments (lines 190, 875): `(1 = BDF-1, 2 = trap/BDF-2)` → `(1 = order-1 trap/gear, 2 = order-2 trap/gear)`
+  - `src/solver/analog/__tests__/harness/capture.ts` — rewrote two JSDoc comments (lines 382, 476): same pattern as types.ts
+  - `src/solver/analog/__tests__/integration.test.ts` — module doc (line 6): `BDF-1, trapezoidal, BDF-2, GEAR` → `trapezoidal (orders 1..2), gear (orders 1..6)`; deleted `(was BDF-1)` parenthetical from test title (line 236); changed `matches BDF-2` test title and removed the now-redundant body comment on the GEAR order 2 equal steps test (lines 280-281)
+  - `src/solver/analog/__tests__/compute-refs.test.ts` — renamed local `rBdf24` → `rGear24` (lines 23, 25) and `rBdf29` → `rGear29` (lines 40, 42)
+  - `src/solver/analog/__tests__/ckt-terr.test.ts` — removed `(BDF-1)` / `(BDF-2)` parentheticals from `NGSPICE_REF:` citations (lines 31, 59); renamed `rBdf2` → `rGear2` and `NGSPICE_REF_BDF2` → `NGSPICE_REF_GEAR2` in both the charge test (lines 110, 134, 139, 142) and the voltage test (lines 263, 284, 289, 292)
+  - `src/solver/analog/__tests__/analog-engine.test.ts` — rewrote 5 transient-test comments (lines 880, 908, 921, 935, 942) per §3 rename table
+- **Tests**:
+  - `npx vitest run src/solver/analog/__tests__/integration.test.ts src/solver/analog/__tests__/compute-refs.test.ts src/solver/analog/__tests__/ckt-terr.test.ts`: 39 passed / 11 failed. All 11 failures are pre-existing numerical `Object.is` mismatches in `ckt-terr.test.ts` (e.g., `expected Infinity to be 2.645751312387466` on line 50, outside my edit scope; `expected 1.5060159361706635 to be 1.134042` on the renamed `rGear2 toBe NGSPICE_REF_GEAR2` test on line 141 — the numerical value diverges independent of the rename). Per `spec/test-baseline.md`, this run is expected-red and these failures are not caused by my edits: my task is pure rename with no numerical code changes.
+  - `npx vitest run src/solver/analog/__tests__/analog-engine.test.ts`: 30 passed / 0 failed.
+  - Harness files `types.ts` and `capture.ts` edited in JSDoc comments only, no runtime behaviour change; import consumers (`parity-helpers.ts`, `buckbjt-*.test.ts`) unaffected.
+- **Acceptance gate**: `Grep -E '\bBDF[-_ ]?[12]\b|\bbdf[12]\b' src/solver/analog/__tests__/ --glob='!phase-0-identifier-audit.test.ts'` → 0 hits. Residue fully purged from the six scoped files. The documented exception (`phase-0-identifier-audit.test.ts`) retains its self-referential regex definitions per spec §2.3.
+
+## Task C-3.4.3: Purge residue from test source under `src/components/`
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: none
+- **Files modified**:
+  - `src/components/passives/__tests__/capacitor.test.ts` — describe blocks `updateCompanion_bdf1` → `updateCompanion_order1_trap`, `updateCompanion_bdf2` → `updateCompanion_order2_gear`; interior `BDF-1 method` → `order-1 trap method`, `BDF-2 method` → `order-2 gear method`, `(BDF1: …)` → `(order-1: …)`; banners `BDF-1 / trapezoidal order=1` → `order-1 trap`; ngspice-citations `niinteg.c BDF-1 case` → `niinteg.c order-1 (backward-Euler) case`; `BDF-1 coefficients` / `BDF-1 arithmetic` → `order-1 trap` equivalents
+  - `src/components/passives/__tests__/inductor.test.ts` — describe block `updateCompanion_bdf1` → `updateCompanion_order1_trap`; `BDF-1 method` → `order-1 trap method`; banner `BDF-1 / trapezoidal order=1` → `order-1 trap`; `niinteg.c BDF-1 case` → `niinteg.c order-1 (backward-Euler) case`; `niinteg.c BDF-1 coefficients` → `niinteg.c order-1 (backward-Euler) coefficients`
+  - `src/components/passives/__tests__/polarized-cap.test.ts` — `BDF-1 (backward Euler)` → `backward Euler`; `BDF-1 (no ringing…)` → `order-1 trap (no ringing…)`; `BDF-1 has first-order error` → `order-1 trap has first-order error`; `BDF-1 / trapezoidal integration (order=1)` → `order-1 trap integration`; `BDF-1 coefficients` → `order-1 trap coefficients`
+  - `src/components/passives/__tests__/transmission-line.test.ts` — `BDF-1 (geq = L/dt)` → `order-1 trap (geq = L/dt)`; `BDF-1 geq = L/dt` → `order-1 trap geq = L/dt`
+  - `src/components/passives/__tests__/tapped-transformer.test.ts` — `BDF-1 / trapezoidal (order=1)` → `order-1 trap`; `BDF-1 coefficients` → `order-1 trap coefficients`
+  - `src/components/active/__tests__/real-opamp.test.ts` — `with BDF-1 coefficients` → `with order-1 trap coefficients`; `BDF-1 trapezoidal` → `order-1 trap`
+- **Tests**:
+  - `npx vitest run --testTimeout=120000` across all six edited files: 111 passed / 19 failed (130 total).
+  - Targeted check of the two renamed describe blocks (`-t "updateCompanion_order1_trap|updateCompanion_order2_gear"`): 3/3 passed, 48 skipped.
+  - None of the 19 failures are in lines this task edited, and none are in the two renamed describe blocks. They originate at production source lines inside `src/components/{active/real-opamp.ts:403, passives/polarized-cap.ts:381, passives/tapped-transformer.ts:393, passives/transmission-line.ts:365, semiconductors/diode.ts:531}` — these are production-side `Cannot read properties of undefined` crashes plus a few numerical assertions (e.g., `expected 1.98e-20 to be greater than 0.35` in `transmission-line.test.ts:504`). Task_group `cleanup.prod` is running in parallel and renaming production sources; the production-side undefined reads are consistent with its in-flight work. Under `spec/test-baseline.md` expected-red policy these are pre-existing/parallel-task failures and not caused by this rename-only task.
+- **Acceptance gate**: Grep tool scan for `BDF[-_ ]?[12]|bdf[12]` across `src/components/` returns zero matches. Residue fully purged from the six scoped component test files.

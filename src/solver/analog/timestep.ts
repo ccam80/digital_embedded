@@ -192,9 +192,9 @@ export class TimestepController {
     );
     // ngspice default CKTintegrateMethod = TRAPEZOIDAL (set in
     // ref/ngspice/src/spicelib/analysis/cktsetup.c — paired with
-    // dctran.c:315 `ckt->CKTorder = 1` so the first step runs BDF-1
-    // semantics via the order-1 coefficients even though the configured
-    // method is trapezoidal).
+    // dctran.c:315 `ckt->CKTorder = 1` so the first step runs order-1
+    // backward-Euler semantics via the order-1 coefficients even though
+    // the configured method is trapezoidal).
     this.currentMethod = "trapezoidal";
     this._breakpoints = [];
     this._lastAcceptedSimTime = -Infinity;
