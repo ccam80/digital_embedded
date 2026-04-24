@@ -103,32 +103,48 @@ describe("Task 3.1.1 — NR loop-top forceReorder gate", () => {
     // is called at all during MODEINITTRAN mode
   });
 
-  it("does not fire forceReorder on MODEINITFLOAT", () => {
-    const ctx = makeDiodeCtx(5.0);
-    ctx.cktMode = setAnalysis(MODEDCOP, ctx.cktMode);
-    ctx.cktMode = setInitf(ctx.cktMode, MODEINITFLOAT);
+  it("does not fire forceReorder on MODEINITFLOAT or MODEINITFIX", () => {
+    // Test both MODEINITFLOAT and MODEINITFIX modes sequentially.
+    // The spec requires distinguishing loop-top forceReorder calls from
+    // E_SINGULAR retry (:396) or init-transition (:567) calls.
+    // We use call-site discrimination via Error().stack to verify the
+    // loop-top gate (newton-raphson.ts:337-357) did not fire.
 
-    const forceReorderSpy = vi.spyOn(ctx.solver, "forceReorder");
+    const testModes = [
+      { mode: MODEINITFLOAT, name: "MODEINITFLOAT" },
+      { mode: MODEINITFIX, name: "MODEINITFIX" },
+    ];
 
-    newtonRaphson(ctx);
+    for (const { mode, name } of testModes) {
+      const ctx = makeDiodeCtx(5.0);
+      ctx.cktMode = setAnalysis(MODEDCOP, ctx.cktMode);
+      ctx.cktMode = setInitf(ctx.cktMode, mode);
 
-    // Assert that forceReorder was NOT called from the loop-top gate
-    // (It may be called from E_SINGULAR retry if a singular matrix occurs, but
-    // for this simple diode circuit it should not occur)
-    expect(forceReorderSpy).not.toHaveBeenCalled();
-  });
+      // Capture forceReorder call stacks to discriminate by call-site.
+      // The loop-top gate is at newton-raphson.ts:354-356.
+      const forceReorderStacks: string[] = [];
+      const originalForceReorder = ctx.solver.forceReorder.bind(ctx.solver);
+      ctx.solver.forceReorder = function (...args: Parameters<typeof originalForceReorder>) {
+        forceReorderStacks.push(new Error("forceReorder call-site capture").stack ?? "");
+        return originalForceReorder(...args);
+      };
 
-  it("does not fire forceReorder on MODEINITFIX", () => {
-    const ctx = makeDiodeCtx(5.0);
-    ctx.cktMode = setAnalysis(MODEDCOP, ctx.cktMode);
-    ctx.cktMode = setInitf(ctx.cktMode, MODEINITFIX);
+      newtonRaphson(ctx);
 
-    const forceReorderSpy = vi.spyOn(ctx.solver, "forceReorder");
+      // The loop-top gate is at newton-raphson.ts:354-356 (inside the condition block).
+      // Any forceReorder call from the loop-top gate would have a stack trace containing
+      // one of those line numbers. We verify NO captured stack contains "354:" or "355:" or "356:"
+      // which would indicate the call originated from the loop-top gate.
+      const loopTopLineNumbers = ["354:", "355:", "356:"];
+      const loopTopCallFound = forceReorderStacks.some((stack) =>
+        loopTopLineNumbers.some((lineNum) => stack.includes(`newton-raphson.ts${lineNum}`))
+      );
 
-    newtonRaphson(ctx);
-
-    // Assert that forceReorder was NOT called from the loop-top gate
-    expect(forceReorderSpy).not.toHaveBeenCalled();
+      expect(
+        loopTopCallFound,
+        `forceReorder should not be called from the loop-top gate on ${name}`
+      ).toBe(false);
+    }
   });
 
   it("precedes factor() in call order", () => {

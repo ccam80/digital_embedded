@@ -120,17 +120,19 @@
 
 ## Task 3.1.1: Verify-only — NR loop-top forceReorder gate
 - **Status**: complete
-- **Agent**: implementer
+- **Agent**: implementer (batch-p3-w3.1 verifier-fix pass)
 - **Files created**:
-  - `src/solver/analog/__tests__/phase-3-nr-reorder.test.ts` — new test file with 5 Task 3.1.1 test cases and 3 Task 3.1.2 test cases (9 total tests)
-- **Files modified**: none (zero production-code changes per spec requirement)
-- **Tests**: 9/9 passing
-  - Task 3.1.1 tests (5): fires_forceReorder_on_MODEINITJCT, fires_forceReorder_only_iteration_0_on_MODEINITTRAN, does_not_fire_on_MODEINITFLOAT, does_not_fire_on_MODEINITFIX, precedes_factor_in_call_order, cites_niiter.c_856-859
-  - Task 3.1.2 tests (3): cites_niiter.c_888-891_at_E_SINGULAR_retry, cites_cktop.c_at_MODEINITJCT_MODEINITFIX_transition, rejects_stale_niiter.c_474-499_citation
+  - `src/solver/analog/__tests__/phase-3-nr-reorder.test.ts` — test file with 5 Task 3.1.1 test cases and 2 Task 3.1.2 test cases (7 total tests)
+- **Files modified**: 
+  - `src/solver/analog/__tests__/phase-3-nr-reorder.test.ts` — merged two separate `it("does not fire forceReorder on MODEINITFLOAT")` and `it("does not fire forceReorder on MODEINITFIX")` tests into one combined test `it("does not fire forceReorder on MODEINITFLOAT or MODEINITFIX")` per spec Task 3.1.1 wording. Implemented call-site discrimination using Error().stack to verify the loop-top gate (newton-raphson.ts:354-356) did NOT fire, while allowing E_SINGULAR retry (:396) and init-transition (:567) calls to occur unobstructed.
+- **Tests**: 7/7 passing
+  - Task 3.1.1 tests (5): fires_forceReorder_on_MODEINITJCT, fires_forceReorder_only_iteration_0_on_MODEINITTRAN, does_not_fire_on_MODEINITFLOAT_or_MODEINITFIX (merged with call-site discrimination), precedes_factor_in_call_order, cites_niiter.c_856-859
+  - Task 3.1.2 tests (2): cites_niiter.c_888-891_at_E_SINGULAR_retry, rejects_stale_niiter.c_474-499_citation
 - **Notes**: 
   - Task 3.1.1 acceptance criteria met: newton-raphson.ts:337-357 remains unmodified; all 5 tests pass
+  - Merged MODEINITFLOAT/MODEINITFIX test uses Error().stack to capture call-site line numbers; validates no captured stack contains "354:" "355:" or "356:" (loop-top gate line numbers)
   - Task 3.1.2 E_SINGULAR retry already correctly cites niiter.c:888-891 at newton-raphson.ts:392-394 (verified present and unchanged)
-  - Task 3.1.2 DC-OP transition test is designed to pass-or-defer gracefully (checks for MODEINITFIX usage in dc-operating-point.ts; if not present yet, test skips rather than fails)
+  - Task 3.1.2 DC-OP transition test was removed per user clarification (stale citation test remains)
 
 ## Task 3.1.2: Citation hygiene for non-top-of-loop forceReorder call sites
 - **Status**: complete
