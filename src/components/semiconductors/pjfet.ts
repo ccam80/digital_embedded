@@ -85,6 +85,7 @@ export const { paramDefs: PJFET_PARAM_DEFS, defaults: PJFET_PARAM_DEFAULTS } = d
     KF:   { default: 0,                 description: "Flicker noise coefficient" },
     AF:   { default: 1,                 description: "Flicker noise exponent" },
     TNOM: { default: REFTEMP, unit: "K", description: "Nominal temperature for parameters" },
+    TEMP: { default: 300.15,  unit: "K", description: "Per-instance operating temperature" },
     OFF:  { default: 0,                 description: "Initial condition: device off (0=false, 1=true)" },
   },
 });
@@ -93,7 +94,7 @@ export const { paramDefs: PJFET_PARAM_DEFS, defaults: PJFET_PARAM_DEFAULTS } = d
 // PjfetParams — resolved model parameters
 // ---------------------------------------------------------------------------
 
-interface PjfetParams {
+export interface PjfetParams {
   VTO: number;
   BETA: number;
   LAMBDA: number;
@@ -113,6 +114,7 @@ interface PjfetParams {
   KF: number;
   AF: number;
   TNOM: number;
+  TEMP: number;
   OFF: number;
 }
 
@@ -159,7 +161,7 @@ const SLOT_CQGD = 12;
 // PJFET temperature-corrected parameters (jfettemp.c port, local copy).
 // ---------------------------------------------------------------------------
 
-interface PjfetTempParams {
+export interface PjfetTempParams {
   vt: number;
   tSatCur: number;
   tGatePot: number;
@@ -175,7 +177,11 @@ interface PjfetTempParams {
   bFac: number;
 }
 
-function computePjfetTempParams(p: PjfetParams): PjfetTempParams {
+/**
+ * Port of `jfettemp.c::JFETtemp`. Instance operating temperature is taken
+ * from `p.TEMP` (maps to ngspice JFETtemp, configurable per device).
+ */
+export function computePjfetTempParams(p: PjfetParams): PjfetTempParams {
   // jfettemp.c:43-49.
   const vtnom = CONSTKoverQ * p.TNOM;
   const fact1 = p.TNOM / REFTEMP;
@@ -196,7 +202,8 @@ function computePjfetTempParams(p: PjfetParams): PjfetTempParams {
   // jfettemp.c:75-77: Sydney University bFac.
   const bFac = (1 - p.B) / (p.PB - p.VTO);
 
-  const temp = REFTEMP;
+  // cite: jfettemp.c:83 — instance temp from params.TEMP (maps to ngspice JFETtemp)
+  const temp = p.TEMP;
   const vt = temp * CONSTKoverQ;
   const fact2 = temp / REFTEMP;
   const ratio1 = temp / p.TNOM - 1;
@@ -266,6 +273,7 @@ export function createPJfetElement(
     KF:     props.getModelParam<number>("KF"),
     AF:     props.getModelParam<number>("AF"),
     TNOM:   props.getModelParam<number>("TNOM"),
+    TEMP:   props.getModelParam<number>("TEMP"),
     OFF:    props.getModelParam<number>("OFF"),
   };
 

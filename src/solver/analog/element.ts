@@ -108,18 +108,6 @@ export interface AnalogElement {
   stampAc?(solver: ComplexSparseSolver, omega: number, ctx: LoadContext): void;
 
   /**
-   * Arm a one-shot per-device junction seed for cold-start NR convergence.
-   * Called once by the dcopInitJct phase before the main NR runs. The device
-   * stores tVcrit-derived junction voltages in internal state; the next call
-   * to load() consumes and clears that state.
-   *
-   * Matches ngspice MODEINITJCT (bjtload.c:265-274): a per-device
-   * linearization-point override, NOT a write into the shared MNA vector.
-   * Optional; linear elements do not implement this.
-   */
-  primeJunctions?(): void;
-
-  /**
    * Compute per-pin currents for this element.
    *
    * Returns an array of currents in pinLayout order (same as pinNodeIds),

@@ -410,7 +410,6 @@ export class CKTCircuitContext {
    * see `initf()` / `setInitf()` in ckt-mode.ts; cktdefs.h:177-182).
    */
   dcopModeLadder: {
-    runPrimeJunctions(): void;
     onModeBegin(phase: "dcopInitJct" | "dcopInitFix" | "dcopInitFloat", iteration: number): void;
     onModeEnd(phase: "dcopInitJct" | "dcopInitFix" | "dcopInitFloat", iteration: number, converged: boolean): void;
   } | null;

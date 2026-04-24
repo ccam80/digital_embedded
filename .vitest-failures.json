@@ -1,39 +1,39 @@
 {
   "summary": {
-    "passed": 52,
+    "passed": 0,
     "failed": 3,
-    "skipped": 0,
+    "skipped": 89,
     "totalFiles": 1,
     "durationSeconds": 0.6
   },
   "failures": [
     {
-      "message": "Cannot read properties of undefined (reading '0')",
+      "message": "expected 8.21065526691059e-8 to be greater than 8.21065526691059e-8",
       "count": 2,
       "locations": [
         {
-          "file": "src\\components\\semiconductors\\bjt.ts",
-          "test": "pushes BE and BC pnjlim events when limitingCollector provided",
-          "line": 866,
-          "column": 32
+          "file": "src\\components\\semiconductors\\__tests__\\bjt.test.ts",
+          "test": "c4_scales_with_AREAB_under_VERTICAL",
+          "line": 1928,
+          "column": 27
         },
         {
-          "file": "src\\components\\semiconductors\\bjt.ts",
-          "test": "pushes BE and BC pnjlim events",
-          "line": 1296,
-          "column": 39
+          "file": "src\\components\\semiconductors\\__tests__\\bjt.test.ts",
+          "test": "c4_scales_with_AREAC_under_LATERAL",
+          "line": 1939,
+          "column": 27
         }
       ]
     },
     {
-      "message": "expected [Function] to not throw an error but 'TypeError: Cannot read properties of …' was thrown",
+      "message": "expected 0.000006391326875647134 not to be 0.000006391326875647134 // Object.is equality",
       "count": 1,
       "locations": [
         {
           "file": "src\\components\\semiconductors\\__tests__\\bjt.test.ts",
-          "test": "does not throw when limitingCollector is null",
-          "line": 427,
-          "column": 74
+          "test": "uses_deltaOld1_directly",
+          "line": 2136,
+          "column": 45
         }
       ]
     }

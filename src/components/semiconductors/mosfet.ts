@@ -48,6 +48,7 @@ import {
 import {
   MODEINITFLOAT, MODEINITJCT, MODEINITFIX, MODEINITSMSIG,
   MODEINITTRAN, MODEINITPRED, MODETRAN, MODETRANOP, MODEAC, MODEUIC,
+  MODEDCOP, MODEDCTRANCURVE,
 } from "../../solver/analog/ckt-mode.js";
 
 // Phase 5 precondition: compile error if LoadContext is missing bypass or voltTol.
@@ -97,6 +98,8 @@ interface MosfetParams {
   LD?: number; UO?: number;
   KF?: number; AF?: number;
   M?: number; OFF?: number;
+  ICVDS?: number; ICVGS?: number; ICVBS?: number;
+  TEMP?: number;
 }
 
 interface ResolvedMosfetParams {
@@ -112,6 +115,8 @@ interface ResolvedMosfetParams {
   LD: number; UO: number;
   KF: number; AF: number;
   M: number; OFF: number;
+  ICVDS: number; ICVGS: number; ICVBS: number;
+  TEMP: number;
   // Temperature-corrected values — populated by MosfetTempParams
   _tKP?: number;
   _tPhi?: number;
@@ -164,6 +169,10 @@ export const { paramDefs: MOSFET_NMOS_PARAM_DEFS, defaults: MOSFET_NMOS_DEFAULTS
     FC:     { default: 0.5,                  description: "Forward-bias depletion capacitance coefficient" },
     M:      { default: 1,                    description: "Parallel device multiplier" },
     OFF:    { default: 0,                    description: "Initial condition: device off (0=false, 1=true)" },
+    ICVDS:  { default: 0,    unit: "V",      description: "Initial condition for Vds (MODEUIC)" },
+    ICVGS:  { default: 0,    unit: "V",      description: "Initial condition for Vgs (MODEUIC)" },
+    ICVBS:  { default: 0,    unit: "V",      description: "Initial condition for Vbs (MODEUIC)" },
+    TEMP:   { default: REFTEMP, unit: "K",   description: "Per-instance operating temperature" },
   },
 });
 
@@ -263,6 +272,10 @@ export const { paramDefs: MOSFET_PMOS_PARAM_DEFS, defaults: MOSFET_PMOS_DEFAULTS
     FC:     { default: 0.5,                  description: "Forward-bias depletion capacitance coefficient" },
     M:      { default: 1,                    description: "Parallel device multiplier" },
     OFF:    { default: 0,                    description: "Initial condition: device off (0=false, 1=true)" },
+    ICVDS:  { default: 0,    unit: "V",      description: "Initial condition for Vds (MODEUIC)" },
+    ICVGS:  { default: 0,    unit: "V",      description: "Initial condition for Vgs (MODEUIC)" },
+    ICVBS:  { default: 0,    unit: "V",      description: "Initial condition for Vbs (MODEUIC)" },
+    TEMP:   { default: REFTEMP, unit: "K",   description: "Per-instance operating temperature" },
   },
 });
 
@@ -345,6 +358,8 @@ function resolveParams(raw: MosfetParams, kpDefault: number): ResolvedMosfetPara
     TPG:  raw.TPG  ?? 1, LD: raw.LD ?? 0, UO: raw.UO ?? 600,
     KF:   raw.KF   ?? 0, AF: raw.AF ?? 1,
     M:    raw.M    ?? 1, OFF: raw.OFF ?? 0,
+    ICVDS: raw.ICVDS ?? 0, ICVGS: raw.ICVGS ?? 0, ICVBS: raw.ICVBS ?? 0,
+    TEMP: raw.TEMP ?? REFTEMP,
   };
 
   if (p.NSUB > 0 && p.TOX > 0) {
@@ -379,6 +394,7 @@ function resolveParams(raw: MosfetParams, kpDefault: number): ResolvedMosfetPara
 // ---------------------------------------------------------------------------
 
 interface MosfetTempParams {
+  vt: number;                  // mos1load.c:107: p.TEMP * KoverQ
   tTransconductance: number;  // mos1temp.c:165-166
   tPhi: number;               // mos1temp.c:168-169
   tVbi: number;               // mos1temp.c:170-174
@@ -410,12 +426,13 @@ function computeTempParams(p: ResolvedMosfetParams, polarity: 1 | -1): MosfetTem
   const arg1 = -egfet1 / (kt1 + kt1) + 1.1150877 / (CONSTboltz * (REFTEMP + REFTEMP));
   const pbfact1 = -2 * vtnom * (1.5 * Math.log(fact1) + Q * arg1);
 
-  // --- Instance-level (mos1temp.c:135-200); circuit temp = REFTEMP ---
-  const vt = REFTEMP * KoverQ;
-  const ratio = REFTEMP / p.TNOM;
-  const fact2 = 1;  // REFTEMP / REFTEMP
-  const kt = REFTEMP * CONSTboltz;
-  const egfet = 1.16 - (7.02e-4 * REFTEMP * REFTEMP) / (REFTEMP + 1108);
+  // --- Instance-level (mos1temp.c:135-200); circuit temp = p.TEMP ---
+  const instanceTemp = p.TEMP;
+  const vt = instanceTemp * KoverQ;
+  const ratio = instanceTemp / p.TNOM;
+  const fact2 = instanceTemp / REFTEMP;
+  const kt = instanceTemp * CONSTboltz;
+  const egfet = 1.16 - (7.02e-4 * instanceTemp * instanceTemp) / (instanceTemp + 1108);
   const arg = -egfet / (kt + kt) + 1.1150877 / (CONSTboltz * (REFTEMP + REFTEMP));
   const pbfact = -2 * vt * (1.5 * Math.log(fact2) + Q * arg);
 
@@ -449,11 +466,11 @@ function computeTempParams(p: ResolvedMosfetParams, polarity: 1 | -1): MosfetTem
   let tCjsw = p.CJSW * capfact;
   const tBulkPot = fact2 * pbo + pbfact;
   const gmanew = (tBulkPot - pbo) / pbo;
-  capfact = 1 + p.MJ * (4e-4 * (REFTEMP - REFTEMP) - gmanew);
+  capfact = 1 + p.MJ * (4e-4 * (instanceTemp - REFTEMP) - gmanew);
   tCbd *= capfact;
   tCbs *= capfact;
   tCj *= capfact;
-  capfact = 1 + p.MJSW * (4e-4 * (REFTEMP - REFTEMP) - gmanew);
+  capfact = 1 + p.MJSW * (4e-4 * (instanceTemp - REFTEMP) - gmanew);
   tCjsw *= capfact;
   const tDepCap = p.FC * tBulkPot;
 
@@ -520,6 +537,7 @@ function computeTempParams(p: ResolvedMosfetParams, polarity: 1 | -1): MosfetTem
     - tDepCap * f2s;
 
   return {
+    vt,
     tTransconductance, tPhi, tVbi, tVto,
     tSatCur, tSatCurDens,
     tBulkPot, tDepCap, tCbd, tCbs, tCj, tCjsw,
@@ -949,6 +967,10 @@ export function createMosfetElement(
     FC: props.getModelParam<number>("FC"),
     M: props.getModelParam<number>("M"),
     OFF: props.getModelParam<number>("OFF"),
+    ICVDS: props.getModelParam<number>("ICVDS"),
+    ICVGS: props.getModelParam<number>("ICVGS"),
+    ICVBS: props.getModelParam<number>("ICVBS"),
+    TEMP: props.getModelParam<number>("TEMP"),
   };
 
   const params = resolveParams(rawParams, kpDefault);
@@ -1005,8 +1027,8 @@ export function createMosfetElement(
      * ceqgs/ceqgd/ceqgb RHS terms. No cross-method cap+Q slots.
      */
     load(ctx: LoadContext): void {
-      // mos1load.c:108: Check=1 — reset per call, not per-closure.
-      let icheckLimited = true;
+      // mos1load.c:108: Check=0 — false initially; set true only if pnjlim fires.
+      let icheckLimited = false;
 
       const s0 = pool.states[0];
       const s1 = pool.states[1];
@@ -1015,8 +1037,8 @@ export function createMosfetElement(
       const voltages = ctx.rhsOld;
       const solver = ctx.solver;
 
-      // mos1load.c:107: vt = CONSTKoverQ * MOS1temp — device-level thermal voltage.
-      const vt = ctx.vt;
+      // mos1load.c:107: vt = CONSTKoverQ * MOS1temp — per-instance thermal voltage.
+      const vt = tp.vt;
 
       // mos1load.c:130-147: precomputed operation-point constants.
       const m = params.M;
@@ -1039,10 +1061,18 @@ export function createMosfetElement(
       const simpleGate = (mode & (MODEINITFLOAT | MODEINITPRED | MODEINITSMSIG | MODEINITTRAN)) !== 0
         || ((mode & MODEINITFIX) !== 0 && params.OFF === 0);
 
+      // cite: mos1load.c:202-204, 226-240, 565, 789, 862
+      // MODEINITFLOAT | MODEINITPRED | MODEINITSMSIG | MODEINITTRAN |
+      // (MODEINITFIX && !OFF) all take the simple/general block. SMSIG takes the
+      // general-iteration path (rhsOld), not a special seed-from-state0 branch —
+      // ngspice mos1load.c:202-204 gates SMSIG into the simple block; line 226
+      // else reads vbs/vgs/vds from CKTrhsOld, same as MODEINITFLOAT. No early
+      // return and no special seed for SMSIG.
       if (simpleGate) {
         if (mode & (MODEINITPRED | MODEINITTRAN)) {
           // mos1load.c:205-225: predictor step (#ifndef PREDICTOR).
-          const deltaOldRatio = ctx.deltaOld[1] > 0 ? ctx.delta / ctx.deltaOld[1] : 0;
+          // cite: mos1load.c:211-225
+          const deltaOldRatio = ctx.deltaOld[1] > 0 ? ctx.dt / ctx.deltaOld[1] : 0;
           const xfact = deltaOldRatio;
           const vbs1 = s1[base + SLOT_VBS];
           const vgs1 = s1[base + SLOT_VGS];
@@ -1054,14 +1084,9 @@ export function createMosfetElement(
           s0[base + SLOT_VDS] = vds1;
           vds = (1 + xfact) * vds1 - xfact * s2[base + SLOT_VDS];
           s0[base + SLOT_VBD] = s0[base + SLOT_VBS] - s0[base + SLOT_VDS];
-        } else if (mode & MODEINITSMSIG) {
-          // mos1load.c:187-193 SENSDEBUG-free default: seed from state0.
-          vbs = s0[base + SLOT_VBS];
-          vgs = s0[base + SLOT_VGS];
-          vds = s0[base + SLOT_VDS];
         } else {
-          // mos1load.c:229-240: general iteration. vbs/vgs/vds from CKTrhsOld
-          // with polarity sign flip for PMOS.
+          // mos1load.c:226-240: general iteration path (MODEINITFLOAT, MODEINITSMSIG,
+          // MODEINITFIX+!OFF). vbs/vgs/vds from CKTrhsOld with polarity sign flip.
           const vB = nodeB > 0 ? voltages[nodeB - 1] : 0;
           const vS_volt = nodeS > 0 ? voltages[nodeS - 1] : 0;
           const vG_volt = nodeG > 0 ? voltages[nodeG - 1] : 0;
@@ -1078,10 +1103,10 @@ export function createMosfetElement(
         vgd = vgs - vds;
 
         // mos1load.c:356-406 — voltage limiting (NODELIMITING is undef).
-        // Skip during init dispatch cases (predictor & smsig handle their own
-        // state seed; hand-stored predictor-vbs value is considered a
-        // clean predictor estimate without pnjlim).
-        if ((mode & (MODEINITPRED | MODEINITTRAN)) === 0) {
+        // cite: mos1load.c:370, 376, 382, 387, 395, 401
+        // Limiting runs unconditionally inside simpleGate — predictor voltages
+        // also pass through fetlim/limvds/pnjlim per mos1load.c:356-406.
+        {
           // mos1load.c:356: von = MOS1type * here->MOS1von.
           const vonStored = s0[base + SLOT_VON];
           const vonForLim = vonStored !== 0 ? vonStored : tp.tVto;
@@ -1146,6 +1171,7 @@ export function createMosfetElement(
           }
 
           // mos1load.c:393-406: pnjlim on bulk junctions — vds sign-based dispatch.
+          // Only pnjlim mutates icheckLimited (devsup.c:50-58); fetlim/limvds do not.
           if (vds >= 0) {
             // G1: pnjlim on vbs (bulk-source), vbd derives from vbs - vds.
             const vbsBefore = vbs;
@@ -1154,7 +1180,7 @@ export function createMosfetElement(
             vbs = vbsResult.value;
             vbd = vbs - vds;
 
-            if (vbsResult.limited) icheckLimited = true;
+            icheckLimited = icheckLimited || vbsResult.limited;
             if (ctx.limitingCollector) {
               ctx.limitingCollector.push({
                 elementIndex: (this as any).elementIndex ?? -1,
@@ -1172,7 +1198,7 @@ export function createMosfetElement(
             vbd = vbdResult.value;
             vbs = vbd + vds;
 
-            if (vbdResult.limited) icheckLimited = true;
+            icheckLimited = icheckLimited || vbdResult.limited;
             if (ctx.limitingCollector) {
               ctx.limitingCollector.push({
                 elementIndex: (this as any).elementIndex ?? -1,
@@ -1183,24 +1209,33 @@ export function createMosfetElement(
               });
             }
           }
-        } else {
-          icheckLimited = false;
         }
       } else {
         // mos1load.c:412-434: not one of the simple cases — MODEINITJCT /
         // MODEINITFIX+OFF / default-zero dispatch.
         if ((mode & MODEINITJCT) && params.OFF === 0) {
-          // mos1load.c:419-430: MODEINITJCT path — use MOS1icVDS/GS/BS if
-          // all zero AND (MODETRAN|MODEDCOP|MODEDCTRANCURVE or !MODEUIC),
-          // fall back to (vbs=-1, vgs=type*tVto, vds=0).
-          // digiTS no longer carries icVBS/ICVDS/ICVGS params; the
-          // all-zero branch always applies. Ngspice wraps with polarity
-          // (type multiplier) — apply it.
-          vbs = -1;
-          vgs = polarity * tp.tVto;
-          vds = 0;
+          // cite: mos1load.c:419-430
+          // MODEINITJCT path — read ICVDS/ICVGS/ICVBS; if all zero AND
+          // (MODETRAN|MODEDCOP|MODEDCTRANCURVE || !MODEUIC), fall back to
+          // (vbs=-1, vgs=polarity*tVto, vds=0).
+          vds = polarity * params.ICVDS;
+          vgs = polarity * params.ICVGS;
+          vbs = polarity * params.ICVBS;
+          const allZero = vds === 0 && vgs === 0 && vbs === 0;
+          const fallback = allZero && (
+            (mode & (MODETRAN | MODEDCOP | MODEDCTRANCURVE)) !== 0
+            || (mode & MODEUIC) === 0
+          );
+          if (fallback) {
+            vbs = -1;
+            vgs = polarity * tp.tVto;
+            vds = 0;
+          }
         } else {
-          // mos1load.c:431-433: default (MODEINITFIX+OFF or unhandled) → zero.
+          // mos1load.c:431-433 — default-zero path: (MODEINITFIX && OFF) OR the
+          // "not one of the simple cases" fallthrough. simpleGate at line 1036
+          // excludes (MODEINITFIX && OFF) from the simple/general block, so control
+          // lands here. Matches mos1load.c:204 which gates on `!MOS1off` for INITFIX.
           vbs = 0; vgs = 0; vds = 0;
         }
         vbd = vbs - vds;
@@ -1213,80 +1248,171 @@ export function createMosfetElement(
       vgd = vgs - vds;
       // vgb unused except in Meyer cap block; compute at that site.
 
-      // mos1load.c:453-468: bulk-source and bulk-drain junction currents.
-      let gbs: number, cbs: number;
-      if (vbs <= -3 * vt) {
-        gbs = GMIN;
-        cbs = gbs * vbs - sourceSatCur;
-      } else {
-        const evbs = Math.exp(Math.min(MAX_EXP_ARG, vbs / vt));
-        gbs = sourceSatCur * evbs / vt + GMIN;
-        cbs = sourceSatCur * (evbs - 1) + GMIN * vbs;
-      }
-      let gbd: number, cbd: number;
-      if (vbd <= -3 * vt) {
-        gbd = GMIN;
-        cbd = gbd * vbd - drainSatCur;
-      } else {
-        const evbd = Math.exp(Math.min(MAX_EXP_ARG, vbd / vt));
-        gbd = drainSatCur * evbd / vt + GMIN;
-        cbd = drainSatCur * (evbd - 1) + GMIN * vbd;
+      // Hoisted cap totals (written by bypass branch or Meyer block below).
+      let capgs = 0, capgd = 0, capgb = 0;
+
+      // cite: mos1load.c:258-348 — NOBYPASS bypass gate.
+      // cdhat/cbhat predict drain and bulk currents from previous-iteration
+      // conductances. delvXX computes against s0[SLOT_V*] which still holds
+      // the prior-iteration stored values (state0 overwrite is at line ~1395).
+      let bypassed = false;
+      {
+        const prevCd   = s0[base + SLOT_CD];
+        const prevCbs  = s0[base + SLOT_CBS];
+        const prevCbd  = s0[base + SLOT_CBD];
+        const prevGm   = s0[base + SLOT_GM];
+        const prevGds  = s0[base + SLOT_GDS];
+        const prevGmbs = s0[base + SLOT_GMBS];
+        const prevGbd  = s0[base + SLOT_GBD];
+        const prevGbs  = s0[base + SLOT_GBS];
+        const prevMode = s0[base + SLOT_MODE];
+        const prevVbs  = s0[base + SLOT_VBS];
+        const prevVbd  = s0[base + SLOT_VBD];
+        const prevVgs  = s0[base + SLOT_VGS];
+        const prevVds  = s0[base + SLOT_VDS];
+
+        const delvbs = vbs - prevVbs;
+        const delvbd = vbd - prevVbd;
+        const delvgs = vgs - prevVgs;
+        const delvds = vds - prevVds;
+
+        let cdhat: number;
+        if (prevMode >= 0) {
+          const delvgd = delvgs - delvds;
+          cdhat = prevCd + prevGm * delvgs + prevGds * delvds + prevGmbs * delvbs - prevGbd * delvbd;
+        } else {
+          const delvgd = delvgs - delvds;
+          cdhat = prevCd - (prevGbd - prevGmbs) * delvbd - prevGm * delvgd + prevGds * delvds;
+        }
+        const cbhat = prevCbs + prevCbd + prevGbd * delvbd + prevGbs * delvbs;
+
+        if (
+          !(mode & (MODEINITPRED | MODEINITTRAN | MODEINITSMSIG))
+          && ctx.bypass
+          && (Math.abs(cbhat - (prevCbs + prevCbd)) < ctx.reltol * (Math.max(Math.abs(cbhat), Math.abs(prevCbs + prevCbd)) + ctx.iabstol))
+          && Math.abs(delvbs) < ctx.reltol * Math.max(Math.abs(vbs), Math.abs(prevVbs)) + ctx.voltTol
+          && Math.abs(delvbd) < ctx.reltol * Math.max(Math.abs(vbd), Math.abs(prevVbd)) + ctx.voltTol
+          && Math.abs(delvgs) < ctx.reltol * Math.max(Math.abs(vgs), Math.abs(prevVgs)) + ctx.voltTol
+          && Math.abs(delvds) < ctx.reltol * Math.max(Math.abs(vds), Math.abs(prevVds)) + ctx.voltTol
+          && Math.abs(cdhat - prevCd) < ctx.reltol * Math.max(Math.abs(cdhat), Math.abs(prevCd)) + ctx.iabstol
+        ) {
+          // cite: mos1load.c:322-347 — bypass: reload voltages from state0,
+          // rebuild cap totals from cached half-caps (MODETRAN/MODETRANOP only).
+          vbs = prevVbs; vbd = prevVbd; vgs = prevVgs; vds = prevVds;
+          vgd = vgs - vds;
+
+          if (mode & (MODETRAN | MODETRANOP)) {
+            capgs = s0[base + SLOT_CAPGS] + s1[base + SLOT_CAPGS] + GateSourceOverlapCap;
+            capgd = s0[base + SLOT_CAPGD] + s1[base + SLOT_CAPGD] + GateDrainOverlapCap;
+            capgb = s0[base + SLOT_CAPGB] + s1[base + SLOT_CAPGB] + GateBulkOverlapCap;
+          }
+          bypassed = true;
+        }
       }
 
       // mos1load.c:472-478: device mode (normal/inverse) from vds sign.
       const opMode = vds >= 0 ? 1 : -1;
 
-      // mos1load.c:483-546: Shichman-Hodges drain current evaluation.
-      const tPhi = tp.tPhi;
-      let sarg: number;
-      const vbEffective = opMode === 1 ? vbs : vbd;
-      if (vbEffective <= 0) {
-        sarg = Math.sqrt(tPhi - vbEffective);
-      } else {
-        sarg = Math.sqrt(tPhi);
-        sarg = sarg - vbEffective / (sarg + sarg);
-        sarg = Math.max(0, sarg);
-      }
-      const von = tp.tVbi * polarity + params.GAMMA * sarg;
-      const vgst = (opMode === 1 ? vgs : vgd) - von;
-      const vdsat = Math.max(vgst, 0);
-      const argBE = sarg <= 0 ? 0 : params.GAMMA / (sarg + sarg);
+      // cap gate: gated by mode bits; hoisted here so bypass branch can skip cap blocks.
+      let capGate = false;
 
-      let cdrain: number, gmNR: number, gdsNR: number, gmbsNR: number;
-      if (vgst <= 0) {
-        // cutoff region (mos1load.c:515-522)
-        cdrain = 0; gmNR = 0; gdsNR = 0; gmbsNR = 0;
+      // Conductances and currents — filled by OP eval below, or reloaded from
+      // state0 on bypass per mos1load.c:322-340.
+      let gmNR: number, gdsNR: number, gmbsNR: number;
+      let gbs: number, cbs: number;
+      let gbd: number, cbd: number;
+      let cd: number;
+
+      let cdrain: number;
+      let ceqgs = 0, ceqgd = 0, ceqgb = 0;
+      let gcgs = 0, gcgd = 0, gcgb = 0;
+
+      if (bypassed) {
+        // cite: mos1load.c:322-340 — bypass path: reload conductances from state0.
+        gmNR  = s0[base + SLOT_GM];
+        gdsNR = s0[base + SLOT_GDS];
+        gmbsNR= s0[base + SLOT_GMBS];
+        gbd   = s0[base + SLOT_GBD];
+        gbs   = s0[base + SLOT_GBS];
+        cbd   = s0[base + SLOT_CBD];
+        cbs   = s0[base + SLOT_CBS];
+        cd    = s0[base + SLOT_CD];
+        // Reconstruct cdrain from cd: cd = opMode * cdrain - cbd → cdrain = opMode * (cd + cbd)
+        cdrain = opMode * (cd + cbd);
       } else {
-        const betap = Beta * (1 + params.LAMBDA * (vds * opMode));
-        if (vgst <= vds * opMode) {
-          // saturation (mos1load.c:527-532)
-          cdrain = betap * vgst * vgst * 0.5;
-          gmNR = betap * vgst;
-          gdsNR = params.LAMBDA * Beta * vgst * vgst * 0.5;
-          gmbsNR = gmNR * argBE;
+        // mos1load.c:453-468: bulk-source and bulk-drain junction currents.
+        if (vbs <= -3 * vt) {
+          gbs = GMIN;
+          cbs = gbs * vbs - sourceSatCur;
         } else {
-          // linear/triode (mos1load.c:533-545)
-          const vdsMode = vds * opMode;
-          cdrain = betap * vdsMode * (vgst - 0.5 * vdsMode);
-          gmNR = betap * vdsMode;
-          gdsNR = betap * (vgst - vdsMode)
-            + params.LAMBDA * Beta * vdsMode * (vgst - 0.5 * vdsMode);
-          gmbsNR = gmNR * argBE;
+          const evbs = Math.exp(Math.min(MAX_EXP_ARG, vbs / vt));
+          gbs = sourceSatCur * evbs / vt + GMIN;
+          cbs = sourceSatCur * (evbs - 1) + GMIN * vbs;
         }
-      }
+        if (vbd <= -3 * vt) {
+          gbd = GMIN;
+          cbd = gbd * vbd - drainSatCur;
+        } else {
+          const evbd = Math.exp(Math.min(MAX_EXP_ARG, vbd / vt));
+          gbd = drainSatCur * evbd / vt + GMIN;
+          cbd = drainSatCur * (evbd - 1) + GMIN * vbd;
+        }
 
-      // mos1load.c:557-563: von, vdsat, cd write-back with polarity.
-      s0[base + SLOT_VON] = polarity * von;
-      s0[base + SLOT_VDSAT] = polarity * vdsat;
-      const cd = opMode * cdrain - cbd;
-      s0[base + SLOT_CD] = cd;
+        // mos1load.c:483-546: Shichman-Hodges drain current evaluation.
+        const tPhi = tp.tPhi;
+        let sarg: number;
+        const vbEffective = opMode === 1 ? vbs : vbd;
+        if (vbEffective <= 0) {
+          sarg = Math.sqrt(tPhi - vbEffective);
+        } else {
+          sarg = Math.sqrt(tPhi);
+          sarg = sarg - vbEffective / (sarg + sarg);
+          sarg = Math.max(0, sarg);
+        }
+        // mos1load.c:507: von = tVbi * MOS1type + gamma * sarg.
+        // tVbi is stored polarity-unsigned in mos1temp.c (vtbi = VTO - polarity * gamma*sqrt(PHI) + ...),
+        // so multiplying by polarity here applies the type sign at the evaluation site.
+        // For NMOS (polarity=+1): von > 0, threshold above source. For PMOS (polarity=-1): von < 0.
+        // Downstream `vgst = (mode==1 ? vgs : vgd) - von` then carries the correct sign.
+        const von = tp.tVbi * polarity + params.GAMMA * sarg;
+        const vgst = (opMode === 1 ? vgs : vgd) - von;
+        const vdsat = Math.max(vgst, 0);
+        const argBE = sarg <= 0 ? 0 : params.GAMMA / (sarg + sarg);
 
-      // mos1load.c:565-725: cap + charge block.
-      // Gate on (MODETRAN|MODETRANOP|MODEINITSMSIG).
-      const capGate = (mode & (MODETRAN | MODETRANOP | MODEINITSMSIG)) !== 0;
+        if (vgst <= 0) {
+          // cutoff region (mos1load.c:515-522)
+          cdrain = 0; gmNR = 0; gdsNR = 0; gmbsNR = 0;
+        } else {
+          const betap = Beta * (1 + params.LAMBDA * (vds * opMode));
+          if (vgst <= vds * opMode) {
+            // saturation (mos1load.c:527-532)
+            cdrain = betap * vgst * vgst * 0.5;
+            gmNR = betap * vgst;
+            gdsNR = params.LAMBDA * Beta * vgst * vgst * 0.5;
+            gmbsNR = gmNR * argBE;
+          } else {
+            // linear/triode (mos1load.c:533-545)
+            const vdsMode = vds * opMode;
+            cdrain = betap * vdsMode * (vgst - 0.5 * vdsMode);
+            gmNR = betap * vdsMode;
+            gdsNR = betap * (vgst - vdsMode)
+              + params.LAMBDA * Beta * vdsMode * (vgst - 0.5 * vdsMode);
+            gmbsNR = gmNR * argBE;
+          }
+        }
 
-      let capbd = 0, capbs = 0;
-      if (capGate) {
+        // mos1load.c:557-563: von, vdsat, cd write-back with polarity.
+        s0[base + SLOT_VON] = polarity * von;
+        s0[base + SLOT_VDSAT] = polarity * vdsat;
+        cd = opMode * cdrain - cbd;
+        s0[base + SLOT_CD] = cd;
+
+        // mos1load.c:565-725: cap + charge block.
+        // Gate on (MODETRAN|MODETRANOP|MODEINITSMSIG).
+        capGate = (mode & (MODETRAN | MODETRANOP | MODEINITSMSIG)) !== 0;
+
+        let capbd = 0, capbs = 0;
+        if (capGate) {
         // mos1load.c:586-638: bulk-source depletion cap + charge.
         if (tp.czbs > 0 || tp.czbssw > 0) {
           if (vbs < tp.tDepCap) {
@@ -1383,19 +1509,14 @@ export function createMosfetElement(
         }
       }
 
-      // mos1load.c:750-753: save vbs, vbd, vgs, vds back to state0.
-      s0[base + SLOT_VBS] = vbs;
-      s0[base + SLOT_VBD] = vbd;
-      s0[base + SLOT_VGS] = vgs;
-      s0[base + SLOT_VDS] = vds;
+        // mos1load.c:750-753: save vbs, vbd, vgs, vds back to state0.
+        s0[base + SLOT_VBS] = vbs;
+        s0[base + SLOT_VBD] = vbd;
+        s0[base + SLOT_VGS] = vgs;
+        s0[base + SLOT_VDS] = vds;
 
-      // mos1load.c:759-856: Meyer capacitance + overlap + NIintegrate.
-      // capgs/capgd/capgb hold totals (including overlap) used for stamping.
-      let capgs = 0, capgd = 0, capgb = 0;
-      let ceqgs = 0, ceqgd = 0, ceqgb = 0;
-      let gcgs = 0, gcgd = 0, gcgb = 0;
-
-      if (capGate) {
+        // mos1load.c:759-856: Meyer capacitance + overlap + NIintegrate.
+        if (capGate) {
         // mos1load.c:773-785: DEVqmeyer — mode-dependent vgs/vgd swap.
         const vgb_read = vgs - vbs;  // vgb = vgs - vbs (computed lazily here).
         let meyerCapgs: number, meyerCapgd: number, meyerCapgb: number;
@@ -1429,11 +1550,14 @@ export function createMosfetElement(
         const vgd1 = vgs1 - s1[base + SLOT_VDS];
         const vgb1 = vgs1 - s1[base + SLOT_VBS];
         if (mode & (MODEINITPRED | MODEINITTRAN)) {
-          // mos1load.c:828-837: predictor extrapolation (PREDICTOR #undef
-          // default uses xfact=0 → q0 = q1).
-          s0[base + SLOT_QGS] = s1[base + SLOT_QGS];
-          s0[base + SLOT_QGD] = s1[base + SLOT_QGD];
-          s0[base + SLOT_QGB] = s1[base + SLOT_QGB];
+          // mos1load.c:828-836: predictor extrapolation using xfact.
+          // xfact = delta/deltaOld[1]; fallback to 0 when deltaOld[1]=0.
+          // q0 = (1+xfact)*q1 - xfact*q2. Do NOT use ctx.xfact — compute
+          // locally to match mos1load.c verbatim.
+          const xfactQ = ctx.deltaOld[1] > 0 ? ctx.dt / ctx.deltaOld[1] : 0;
+          s0[base + SLOT_QGS] = (1 + xfactQ) * s1[base + SLOT_QGS] - xfactQ * s2[base + SLOT_QGS];
+          s0[base + SLOT_QGD] = (1 + xfactQ) * s1[base + SLOT_QGD] - xfactQ * s2[base + SLOT_QGD];
+          s0[base + SLOT_QGB] = (1 + xfactQ) * s1[base + SLOT_QGB] - xfactQ * s2[base + SLOT_QGB];
         } else if (mode & MODETRAN) {
           // mos1load.c:840-846: incremental charge.
           s0[base + SLOT_QGS] = (vgs - vgs1) * capgs + s1[base + SLOT_QGS];
@@ -1447,91 +1571,90 @@ export function createMosfetElement(
         }
       }
 
-      // mos1load.c:860-894: NIintegrate the three gate caps, fold companion
-      // geq/ceq inline into gcgs/gcgd/gcgb (NOT into invented slots).
-      const initOrNoTran = (mode & MODEINITTRAN) !== 0 || (mode & MODETRAN) === 0;
-      if (initOrNoTran) {
-        // mos1load.c:862-873: MODEINITTRAN or not-in-TRAN → zero companions.
-        gcgs = 0; ceqgs = 0;
-        gcgd = 0; ceqgd = 0;
-        gcgb = 0; ceqgb = 0;
-      } else {
-        // mos1load.c:875-877: zero cqgs/gd/gb when corresponding cap = 0.
-        // These are in the MODETRAN else branch in ngspice, before NIintegrate.
-        if (capgs === 0) s0[base + SLOT_CQGS] = 0;
-        if (capgd === 0) s0[base + SLOT_CQGD] = 0;
-        if (capgb === 0) s0[base + SLOT_CQGB] = 0;
-        // mos1load.c:878-894: MODETRAN-only path. NIintegrate the three caps.
-        const ag = ctx.ag;
-        // Gate-source cap companion.
-        {
-          const q0 = s0[base + SLOT_QGS];
-          const q1 = s1[base + SLOT_QGS];
-          let q2 = 0;
-          if (ctx.order >= 2) q2 = s2[base + SLOT_QGS];
-          let ccap_gs: number;
-          if (ctx.method === "trapezoidal") {
-            if (ctx.order === 1) {
+        // mos1load.c:860-894: NIintegrate the three gate caps, fold companion
+        // geq/ceq inline into gcgs/gcgd/gcgb (NOT into invented slots).
+        const initOrNoTran = (mode & MODEINITTRAN) !== 0 || (mode & MODETRAN) === 0;
+        if (initOrNoTran) {
+          // mos1load.c:862-873: MODEINITTRAN or not-in-TRAN → zero companions.
+          gcgs = 0; ceqgs = 0;
+          gcgd = 0; ceqgd = 0;
+          gcgb = 0; ceqgb = 0;
+        } else {
+          // mos1load.c:875-877: zero cqgs/gd/gb when corresponding cap = 0.
+          if (capgs === 0) s0[base + SLOT_CQGS] = 0;
+          if (capgd === 0) s0[base + SLOT_CQGD] = 0;
+          if (capgb === 0) s0[base + SLOT_CQGB] = 0;
+          // mos1load.c:878-894: MODETRAN-only path. NIintegrate the three caps.
+          const ag = ctx.ag;
+          // Gate-source cap companion.
+          {
+            const q0 = s0[base + SLOT_QGS];
+            const q1 = s1[base + SLOT_QGS];
+            let q2 = 0;
+            if (ctx.order >= 2) q2 = s2[base + SLOT_QGS];
+            let ccap_gs: number;
+            if (ctx.method === "trapezoidal") {
+              if (ctx.order === 1) {
+                ccap_gs = ag[0] * q0 + ag[1] * q1;
+              } else {
+                const ccapPrev = s1[base + SLOT_CQGS];
+                ccap_gs = -ccapPrev * ag[1] + ag[0] * (q0 - q1);
+              }
+            } else {
               ccap_gs = ag[0] * q0 + ag[1] * q1;
-            } else {
-              const ccapPrev = s1[base + SLOT_CQGS];
-              ccap_gs = -ccapPrev * ag[1] + ag[0] * (q0 - q1);
+              if (ctx.order >= 2) ccap_gs += ag[2] * q2;
             }
-          } else {
-            ccap_gs = ag[0] * q0 + ag[1] * q1;
-            if (ctx.order >= 2) ccap_gs += ag[2] * q2;
+            gcgs = ag[0] * capgs;
+            ceqgs = ccap_gs - gcgs * vgs + ag[0] * q0;
+            s0[base + SLOT_CQGS] = ccap_gs;
           }
-          gcgs = ag[0] * capgs;
-          // mos1load.c:888-889: ceqgs = ccap - gcgs*vgs + ag[0]*qgs.
-          ceqgs = ccap_gs - gcgs * vgs + ag[0] * q0;
-          s0[base + SLOT_CQGS] = ccap_gs;
-        }
-        // Gate-drain cap companion.
-        {
-          const q0 = s0[base + SLOT_QGD];
-          const q1 = s1[base + SLOT_QGD];
-          let q2 = 0;
-          if (ctx.order >= 2) q2 = s2[base + SLOT_QGD];
-          let ccap_gd: number;
-          if (ctx.method === "trapezoidal") {
-            if (ctx.order === 1) {
+          // Gate-drain cap companion.
+          {
+            const q0 = s0[base + SLOT_QGD];
+            const q1 = s1[base + SLOT_QGD];
+            let q2 = 0;
+            if (ctx.order >= 2) q2 = s2[base + SLOT_QGD];
+            let ccap_gd: number;
+            if (ctx.method === "trapezoidal") {
+              if (ctx.order === 1) {
+                ccap_gd = ag[0] * q0 + ag[1] * q1;
+              } else {
+                const ccapPrev = s1[base + SLOT_CQGD];
+                ccap_gd = -ccapPrev * ag[1] + ag[0] * (q0 - q1);
+              }
+            } else {
               ccap_gd = ag[0] * q0 + ag[1] * q1;
-            } else {
-              const ccapPrev = s1[base + SLOT_CQGD];
-              ccap_gd = -ccapPrev * ag[1] + ag[0] * (q0 - q1);
+              if (ctx.order >= 2) ccap_gd += ag[2] * q2;
             }
-          } else {
-            ccap_gd = ag[0] * q0 + ag[1] * q1;
-            if (ctx.order >= 2) ccap_gd += ag[2] * q2;
+            gcgd = ag[0] * capgd;
+            ceqgd = ccap_gd - gcgd * vgd + ag[0] * q0;
+            s0[base + SLOT_CQGD] = ccap_gd;
           }
-          gcgd = ag[0] * capgd;
-          ceqgd = ccap_gd - gcgd * vgd + ag[0] * q0;
-          s0[base + SLOT_CQGD] = ccap_gd;
-        }
-        // Gate-bulk cap companion.
-        {
-          const q0 = s0[base + SLOT_QGB];
-          const q1 = s1[base + SLOT_QGB];
-          let q2 = 0;
-          if (ctx.order >= 2) q2 = s2[base + SLOT_QGB];
-          let ccap_gb: number;
-          if (ctx.method === "trapezoidal") {
-            if (ctx.order === 1) {
+          // Gate-bulk cap companion.
+          {
+            const q0 = s0[base + SLOT_QGB];
+            const q1 = s1[base + SLOT_QGB];
+            let q2 = 0;
+            if (ctx.order >= 2) q2 = s2[base + SLOT_QGB];
+            let ccap_gb: number;
+            if (ctx.method === "trapezoidal") {
+              if (ctx.order === 1) {
+                ccap_gb = ag[0] * q0 + ag[1] * q1;
+              } else {
+                const ccapPrev = s1[base + SLOT_CQGB];
+                ccap_gb = -ccapPrev * ag[1] + ag[0] * (q0 - q1);
+              }
+            } else {
               ccap_gb = ag[0] * q0 + ag[1] * q1;
-            } else {
-              const ccapPrev = s1[base + SLOT_CQGB];
-              ccap_gb = -ccapPrev * ag[1] + ag[0] * (q0 - q1);
+              if (ctx.order >= 2) ccap_gb += ag[2] * q2;
             }
-          } else {
-            ccap_gb = ag[0] * q0 + ag[1] * q1;
-            if (ctx.order >= 2) ccap_gb += ag[2] * q2;
+            gcgb = ag[0] * capgb;
+            const vgb_now = vgs - vbs;
+            ceqgb = ccap_gb - gcgb * vgb_now + ag[0] * q0;
+            s0[base + SLOT_CQGB] = ccap_gb;
           }
-          gcgb = ag[0] * capgb;
-          const vgb_now = vgs - vbs;
-          ceqgb = ccap_gb - gcgb * vgb_now + ag[0] * q0;
-          s0[base + SLOT_CQGB] = ccap_gb;
         }
-      }
+      } // end if (!bypassed)
 
       // mos1load.c:902-916: ceqbs, ceqbd, cdreq RHS terms.
       const ceqbs = polarity * (cbs - gbs * vbs);

@@ -749,3 +749,158 @@ Previously-confirmed-patched files regression check: load-context.ts, ckt-contex
   - `src/components/semiconductors/bjt.ts` — inserted `if (mode & MODEINITSMSIG) return;` before the stamp block (after op-slot write-back at line 961, before `const solver = ctx.solver`); inserted `s1[base + SLOT_VBE] = vbeRaw; s1[base + SLOT_VBC] = vbcRaw;` inside the MODEINITTRAN branch after reading from s1.
   - `src/components/semiconductors/__tests__/bjt.test.ts` — added `describe("BJT L0 MODEINITSMSIG")` with 2 tests (`no_stamps_emitted`, `state0_op_slots_populated`) and `describe("BJT L0 MODEINITTRAN")` with 1 test (`state1_VBE_VBC_seeded`).
 - **Tests**: 3/3 MODEINITSMSIG/MODEINITTRAN tests passing.
+
+## Task 7.5.6.1: Delete the dc-operating-point primeJunctions call site
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: none
+- **Files modified**:
+  - `src/solver/analog/dc-operating-point.ts` — deleted `runPrimeJunctions(): void { for (const el of elements) { if (el.isNonlinear && el.primeJunctions) { el.primeJunctions(); } } }` method from ladder object (enclosing block becomes empty so entire method removed)
+  - `src/solver/analog/ckt-context.ts` — deleted `runPrimeJunctions(): void;` from `dcopModeLadder` interface
+  - `src/solver/analog/newton-raphson.ts` — deleted `ladder.runPrimeJunctions();` call and updated comment
+  - `src/solver/analog/__tests__/newton-raphson.test.ts` — deleted `runPrimeJunctions(): void {}` stubs from 3 mock ladder objects
+- **Tests**: 4/8 passing in dcop-init-jct.test.ts; 4 failures are pre-existing (3 × ctx.rhsOld undefined engine crashes from makeSoloLoadCtx helper; 1 × NPN CE node-voltage band miss at 1.6014V vs [1.3,1.6]). All confirmed pre-existing per progress.md lines 89, 593.
+
+## Task 7.5.6.2: Delete the primeJunctions? interface member
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: none
+- **Files modified**:
+  - `src/core/analog-types.ts` — deleted `primeJunctions?(): void;` member and its 9-line JSDoc comment block
+  - `src/solver/analog/element.ts` — deleted `primeJunctions?(): void;` member and its comment block (including orphaned leading `/**` line)
+- **Tests**: Build check — only pre-existing TypeScript errors in comparator.test.ts (lines 175-181 orphaned `.toBeCloseTo()` calls, documented in progress.md line 88) and analog-shape-audit.test.ts. Zero new TypeScript errors introduced.
+- **Acceptance**: `src/core/analog-types.ts` grep for `primeJunctions` = zero hits. `src/solver/analog/element.ts` grep for `primeJunctions` = zero hits. `src/` grep returns only 4 test files that assert the method is absent (mosfet.test.ts, dcop-init-jct.test.ts, scr.test.ts, zener.test.ts).
+
+## Task 7.2.1: Add TEMP to NJFET and PJFET param defs
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: none
+- **Files modified**:
+  - `src/components/semiconductors/njfet.ts` — added `TEMP: { default: 300.15, unit: "K", description: "Per-instance operating temperature" }` to secondary params; added `TEMP: number` to `JfetParams` interface; added `TEMP: props.getModelParam<number>("TEMP")` to factory params object
+  - `src/components/semiconductors/pjfet.ts` — identical additions to `PJFET_PARAM_DEFS`, `PjfetParams` interface, and factory params object
+  - `src/components/semiconductors/__tests__/jfet.test.ts` — imported `NJFET_PARAM_DEFS`, `NJFET_PARAM_DEFAULTS`, `PJFET_PARAM_DEFS`, `PJFET_PARAM_DEFAULTS`; added `TEMP: 300.15` to hardcoded `NJFET_PARAMS` and `PJFET_PARAMS` constants; added `makeNjfetProps()` and `makePjfetProps()` helpers; added `describe("NJFET TEMP")` and `describe("PJFET TEMP")` blocks with 4 tests
+- **Tests**: 4/4 passing (targeted acceptance criteria); 1 pre-existing failure (`PJFET > emits_stamps_when_conducting` — test ctx passes `voltages` field but pjfet.ts reads `ctx.rhsOld` which is undefined; unrelated to TEMP changes, pre-dates this task)
+
+## Task 7.2.2: Thread TEMP through computeJfetTempParams (NJFET + PJFET)
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: none
+- **Files modified**:
+  - `src/components/semiconductors/njfet.ts` — updated `computeJfetTempParams` docstring; replaced `const temp = REFTEMP;` with `// cite: jfettemp.c:83 — instance temp from params.TEMP (maps to ngspice JFETtemp)` + `const temp = p.TEMP;`; exported `JfetParams` interface
+  - `src/components/semiconductors/pjfet.ts` — identical changes to `computePjfetTempParams`; exported `PjfetParams`, `PjfetTempParams`, and `computePjfetTempParams`
+  - `src/components/semiconductors/__tests__/jfet.test.ts` — imported `computeJfetTempParams`, `JfetParams`, `computePjfetTempParams`, `PjfetParams`; added `CONSTKoverQ` constant; added `baseNjfetParams()` and `basePjfetParams()` helpers; added 5 new tests: `tp_vt_reflects_TEMP` (NJFET+PJFET), `tSatCur_scales_with_TEMP` (NJFET+PJFET), `TNOM_stays_nominal` (NJFET)
+- **Tests**: 5/5 passing (targeted acceptance criteria); 1 pre-existing failure (`PJFET > emits_stamps_when_conducting` — ctx mock uses `voltages` field instead of `rhsOld`, unrelated to TEMP)
+
+## Task 7.2.3: load() reads tp.vt at every thermal-voltage site (audit)
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: none
+- **Files modified**:
+  - `src/components/semiconductors/__tests__/jfet.test.ts` — added `readFileSync`, `fileURLToPath`, `join`, `dirname` imports; added `no_ctx_vt_read_in_njfet_ts` test to `NJFET TEMP` describe; added `no_ctx_vt_read_in_pjfet_ts` test to `PJFET TEMP` describe
+- **Tests**: 2/2 passing (targeted acceptance criteria); audit confirmed zero `ctx.vt` reads in both njfet.ts and pjfet.ts
+
+## Task 7.2.4: setParam('TEMP', …) recomputes tp (NJFET + PJFET)
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: none
+- **Files modified**:
+  - `src/components/semiconductors/__tests__/jfet.test.ts` — imported `SLOT_VGS` from njfet.js; added `setParam_TEMP_recomputes_tp` test to `NJFET TEMP` describe (constructs element at 300.15K vs setParam to 400K, verifies post-load VGS differs due to different vcrit/vt); added `setParam_TEMP_recomputes_tp` test to `PJFET TEMP` describe (same approach with polarity=-1 rhsOld)
+- **Notes**: setParam already routed through computeJfetTempParams/computePjfetTempParams since TEMP is now in JfetParams/PjfetParams, so no source changes needed — the param defs additions from 7.2.1/7.2.2 made `key in params` true for TEMP
+- **Tests**: 2/2 passing (targeted acceptance criteria); 1 pre-existing failure (PJFET > emits_stamps_when_conducting — test mock uses voltages field instead of rhsOld, pre-existing issue unrelated to this task)
+
+## Task 6.2.1: M-1 — MODEINITPRED limiting routing
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: none
+- **Files modified**:
+  - `src/components/semiconductors/mosfet.ts` — removed `if ((mode & (MODEINITPRED | MODEINITTRAN)) === 0)` wrapper; limiting block now runs unconditionally inside simpleGate; removed `else { icheckLimited = false; }` blanket reset
+  - `src/components/semiconductors/__tests__/mosfet.test.ts` — added `MOSFET M-1` describe block with 3 tests
+- **Tests**: 74/74 passing
+
+## Task 6.2.2: M-2 — MODEINITSMSIG general-iteration path
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: none
+- **Files modified**:
+  - `src/components/semiconductors/mosfet.ts` — deleted SMSIG `else if` branch that seeded from state0; SMSIG now falls through to general rhsOld read path; citation comment added
+  - `src/components/semiconductors/__tests__/mosfet.test.ts` — added `MOSFET M-2` describe block with 5 tests
+- **Tests**: 74/74 passing
+
+## Task 6.2.3: M-3 — MODEINITJCT IC_VDS / IC_VGS / IC_VBS
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: none
+- **Files modified**:
+  - `src/components/semiconductors/mosfet.ts` — added ICVDS/ICVGS/ICVBS to params/resolvedParams/paramDefs; replaced MODEINITJCT branch with mos1load.c:419-430 fallback logic; imported MODEDCTRANCURVE/MODEUIC
+  - `src/components/semiconductors/__tests__/mosfet.test.ts` — added `MOSFET M-3` describe block with 6 tests
+- **Tests**: 74/74 passing
+
+## Task 6.2.4: M-4 — NOBYPASS bypass test
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: none
+- **Files modified**:
+  - `src/components/semiconductors/mosfet.ts` — ported mos1load.c:258-348 verbatim: cdhat/cbhat computation, 5-tolerance bypass gate, bypass path reloading voltages/conductances from state0; `if (!bypassed)` wraps OP eval + cap + Meyer + NIintegrate blocks
+  - `src/components/semiconductors/__tests__/mosfet.test.ts` — added `MOSFET M-4` describe block with 6 tests
+- **Tests**: 74/74 passing
+
+## Task 6.2.5: M-5 — Verify CKTfixLimit gate on reverse limvds
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: none
+- **Files modified**:
+  - `src/components/semiconductors/__tests__/mosfet.test.ts` — added `MOSFET M-5` describe block with 3 tests
+- **Tests**: 74/74 passing
+
+## Task 6.2.6: M-6 — icheckLimited init semantics
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: none
+- **Files modified**:
+  - `src/components/semiconductors/mosfet.ts` — changed `let icheckLimited = true` to `let icheckLimited = false`; changed `if (limited) icheckLimited = true` to `icheckLimited = icheckLimited || vbsResult.limited`
+  - `src/components/semiconductors/__tests__/mosfet.test.ts` — added `MOSFET M-6` describe block with 4 tests
+- **Tests**: 74/74 passing
+
+## Task 6.2.7: M-7 — qgs/qgd/qgb xfact extrapolation
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: none
+- **Files modified**:
+  - `src/components/semiconductors/mosfet.ts` — replaced charge predictor q0=q1 with `(1+xfactQ)*s1 - xfactQ*s2` where `xfactQ = ctx.dt/ctx.deltaOld[1]`; updated comment to cite mos1load.c:828-836; also fixed ctx.delta → ctx.dt in voltage predictor
+  - `src/components/semiconductors/__tests__/mosfet.test.ts` — added `MOSFET M-7` describe block with 5 tests
+- **Tests**: 74/74 passing
+
+## Task 6.2.8: M-8 — von polarity-convention comment
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: none
+- **Files modified**:
+  - `src/components/semiconductors/mosfet.ts` — added comment block above `von = tp.tVbi * polarity + params.GAMMA * sarg` citing mos1load.c:507 and explaining polarity convention
+  - `src/components/semiconductors/__tests__/mosfet.test.ts` — added `MOSFET M-8` describe block with 1 test
+- **Tests**: 74/74 passing
+
+## Task 6.2.9: M-9 — Per-instance TEMP parameter
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: none
+- **Files modified**:
+  - `src/components/semiconductors/mosfet.ts` — added TEMP to MosfetParams/ResolvedMosfetParams; added TEMP to NMOS/PMOS param defs; threaded through resolveParams; updated computeTempParams to use p.TEMP; added vt field to MosfetTempParams; load() uses tp.vt instead of ctx.vt
+  - `src/components/semiconductors/__tests__/mosfet.test.ts` — added `MOSFET M-9` describe block with 5 tests
+- **Tests**: 74/74 passing
+
+## Task 6.2.10: M-12 — Verify MODEINITFIX+OFF → zero voltages
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: none
+- **Files modified**:
+  - `src/components/semiconductors/mosfet.ts` — added citation comment above default-zero branch citing mos1load.c:204, 431-433
+  - `src/components/semiconductors/__tests__/mosfet.test.ts` — added `MOSFET M-12` describe block with 3 tests
+- **Tests**: 74/74 passing
+
+## Task 6.2.11: Verify bulk-cap companion zero fix (#32)
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: none
+- **Files modified**:
+  - `src/components/semiconductors/__tests__/mosfet.test.ts` — added `MOSFET companion-zero` describe block with 3 tests
+- **Tests**: 74/74 passing

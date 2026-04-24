@@ -22,13 +22,25 @@
  */
 
 import { describe, it, expect } from "vitest";
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+import { join, dirname } from "node:path";
 import {
   NJfetDefinition,
   createNJfetElement,
+  NJFET_PARAM_DEFS,
+  NJFET_PARAM_DEFAULTS,
+  SLOT_VGS,
+  computeJfetTempParams,
+  type JfetParams,
 } from "../njfet.js";
 import {
   PJfetDefinition,
   createPJfetElement,
+  PJFET_PARAM_DEFS,
+  PJFET_PARAM_DEFAULTS,
+  computePjfetTempParams,
+  type PjfetParams,
 } from "../pjfet.js";
 import { ComponentRegistry } from "../../../core/registry.js";
 import { createTestPropertyBag } from "../../../test-fixtures/model-fixtures.js";
@@ -79,6 +91,7 @@ const NJFET_PARAMS = {
   KF: 0,
   AF: 1,
   TNOM: 300.15,
+  TEMP: 300.15,
   OFF: 0,
 };
 
@@ -98,6 +111,7 @@ const PJFET_PARAMS = {
   TCV: 0,
   BEX: 0,
   AREA: 1,
+  TEMP: 300.15,
   M: 1,
   KF: 0,
   AF: 1,
@@ -259,5 +273,232 @@ describe("Registration", () => {
     expect(labels).toContain("G");
     expect(labels).toContain("D");
     expect(labels).toContain("S");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Helpers for TEMP tests.
+// ---------------------------------------------------------------------------
+
+function makeNjfetProps(overrides: Record<string, number> = {}): ReturnType<typeof createTestPropertyBag> {
+  const propsObj = createTestPropertyBag();
+  propsObj.replaceModelParams({ ...NJFET_PARAM_DEFAULTS, ...overrides });
+  return propsObj;
+}
+
+function makePjfetProps(overrides: Record<string, number> = {}): ReturnType<typeof createTestPropertyBag> {
+  const propsObj = createTestPropertyBag();
+  propsObj.replaceModelParams({ ...PJFET_PARAM_DEFAULTS, ...overrides });
+  return propsObj;
+}
+
+const CONSTKoverQ = 1.3806226e-23 / 1.6021918e-19;
+
+function baseNjfetParams(overrides: Partial<JfetParams> = {}): JfetParams {
+  return {
+    VTO: -2.0, BETA: 1e-4, LAMBDA: 0, IS: 1e-14, N: 1,
+    CGS: 0, CGD: 0, PB: 1.0, FC: 0.5, RD: 0, RS: 0,
+    B: 1.0, TCV: 0, BEX: 0, AREA: 1, M: 1, KF: 0, AF: 1,
+    TNOM: 300.15, TEMP: 300.15, OFF: 0,
+    ...overrides,
+  };
+}
+
+function basePjfetParams(overrides: Partial<PjfetParams> = {}): PjfetParams {
+  return {
+    VTO: 2.0, BETA: 1e-4, LAMBDA: 0, IS: 1e-14, N: 1,
+    CGS: 0, CGD: 0, PB: 1.0, FC: 0.5, RD: 0, RS: 0,
+    B: 1.0, TCV: 0, BEX: 0, AREA: 1, M: 1, KF: 0, AF: 1,
+    TNOM: 300.15, TEMP: 300.15, OFF: 0,
+    ...overrides,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// NJFET TEMP tests (Tasks 7.2.1 + 7.2.2).
+// ---------------------------------------------------------------------------
+
+describe("NJFET TEMP", () => {
+  it("TEMP_default_300_15", () => {
+    const propsObj = makeNjfetProps();
+    expect(propsObj.getModelParam<number>("TEMP")).toBe(300.15);
+  });
+
+  it("paramDefs_include_TEMP", () => {
+    const keys = NJFET_PARAM_DEFS.map((pd) => pd.key);
+    expect(keys).toContain("TEMP");
+  });
+
+  it("tp_vt_reflects_TEMP", () => {
+    const tp = computeJfetTempParams(baseNjfetParams({ TEMP: 400 }));
+    expect(tp.vt).toBeCloseTo(400 * CONSTKoverQ, 10);
+  });
+
+  it("tSatCur_scales_with_TEMP", () => {
+    const tp300 = computeJfetTempParams(baseNjfetParams({ IS: 1e-14, TNOM: 300.15, TEMP: 300.15 }));
+    const tp400 = computeJfetTempParams(baseNjfetParams({ IS: 1e-14, TNOM: 300.15, TEMP: 400 }));
+    expect(tp400.tSatCur).toBeGreaterThan(tp300.tSatCur);
+  });
+
+  it("TNOM_stays_nominal", () => {
+    const tp = computeJfetTempParams(baseNjfetParams({ TEMP: 400, TNOM: 300.15, BEX: 1 }));
+    expect(tp.tBeta).toBeCloseTo(1e-4 * (400 / 300.15), 10);
+  });
+
+  it("no_ctx_vt_read_in_njfet_ts", () => {
+    const srcDir = dirname(fileURLToPath(import.meta.url));
+    const src = readFileSync(join(srcDir, "..", "njfet.ts"), "utf8");
+    const count = (src.match(/ctx\.vt/g) ?? []).length;
+    expect(count).toBe(0);
+  });
+
+  it("setParam_TEMP_recomputes_tp", () => {
+    const matrixSize = 3;
+
+    // G=node1 at 1.5V forces a pnjlim-limited VGS; vcrit differs by temperature
+    // so the post-limit VGS will differ between 300.15K and 400K.
+    const rhsOld = new Float64Array([1.5, 0, 0]);
+
+    function makeCtx(): LoadContext {
+      const solver = new SparseSolver();
+      solver.beginAssembly(matrixSize);
+      return {
+        cktMode: MODEDCOP | MODEINITFLOAT,
+        solver,
+        rhsOld,
+        rhs: new Float64Array(matrixSize),
+        dt: 0,
+        time: 0,
+        method: "trapezoidal",
+        order: 1,
+        deltaOld: [0, 0, 0, 0, 0, 0, 0],
+        ag: new Float64Array(7),
+        srcFact: 1,
+        noncon: { value: 0 },
+        limitingCollector: null,
+        xfact: 1,
+        gmin: 1e-12,
+        reltol: 1e-3,
+        iabstol: 1e-12,
+        cktFixLimit: false,
+        bypass: false,
+        voltTol: 1e-6,
+      } as LoadContext;
+    }
+
+    function createAndInit(overrides: Record<string, number> = {}): { element: ReactiveAnalogElement; pool: StatePool } {
+      const propsObj = makeNjfetProps(overrides);
+      const core = createNJfetElement(new Map([["G", 1], ["S", 0], ["D", 2]]), [], -1, propsObj) as unknown as ReactiveAnalogElement;
+      core.stateBaseOffset = 0;
+      const pool = new StatePool(core.stateSize);
+      core.initState(pool);
+      return { element: core, pool };
+    }
+
+    // Element at 300.15K
+    const { element: el300, pool: pool300 } = createAndInit({ TEMP: 300.15 });
+    el300.load(makeCtx());
+    const vgs300 = pool300.state0[SLOT_VGS];
+
+    // Element at 300.15K, setParam to 400K before load
+    const { element: el400, pool: pool400 } = createAndInit({ TEMP: 300.15 });
+    (el400 as unknown as { setParam: (k: string, v: number) => void }).setParam("TEMP", 400);
+    el400.load(makeCtx());
+    const vgs400 = pool400.state0[SLOT_VGS];
+
+    expect(vgs300).not.toBe(vgs400);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// PJFET TEMP tests (Tasks 7.2.1 + 7.2.2 + 7.2.3).
+// ---------------------------------------------------------------------------
+
+describe("PJFET TEMP", () => {
+  it("TEMP_default_300_15", () => {
+    const propsObj = makePjfetProps();
+    expect(propsObj.getModelParam<number>("TEMP")).toBe(300.15);
+  });
+
+  it("paramDefs_include_TEMP", () => {
+    const keys = PJFET_PARAM_DEFS.map((pd) => pd.key);
+    expect(keys).toContain("TEMP");
+  });
+
+  it("tp_vt_reflects_TEMP", () => {
+    const tp = computePjfetTempParams(basePjfetParams({ TEMP: 400 }));
+    expect(tp.vt).toBeCloseTo(400 * CONSTKoverQ, 10);
+  });
+
+  it("tSatCur_scales_with_TEMP", () => {
+    const tp300 = computePjfetTempParams(basePjfetParams({ IS: 1e-14, TNOM: 300.15, TEMP: 300.15 }));
+    const tp400 = computePjfetTempParams(basePjfetParams({ IS: 1e-14, TNOM: 300.15, TEMP: 400 }));
+    expect(tp400.tSatCur).toBeGreaterThan(tp300.tSatCur);
+  });
+
+  it("no_ctx_vt_read_in_pjfet_ts", () => {
+    const srcDir = dirname(fileURLToPath(import.meta.url));
+    const src = readFileSync(join(srcDir, "..", "pjfet.ts"), "utf8");
+    const count = (src.match(/ctx\.vt/g) ?? []).length;
+    expect(count).toBe(0);
+  });
+
+  it("setParam_TEMP_recomputes_tp", () => {
+    const matrixSize = 3;
+
+    // G=node1 at -1.5V, S=node3 at 0, D=node2 at 0.
+    // vgsRaw = polarity * (vG - vS) = -1 * (-1.5 - 0) = 1.5 for PJFET.
+    const rhsOld = new Float64Array([-1.5, 0, 0]);
+
+    function makeCtx(): LoadContext {
+      const solver = new SparseSolver();
+      solver.beginAssembly(matrixSize);
+      return {
+        cktMode: MODEDCOP | MODEINITFLOAT,
+        solver,
+        rhsOld,
+        rhs: new Float64Array(matrixSize),
+        dt: 0,
+        time: 0,
+        method: "trapezoidal",
+        order: 1,
+        deltaOld: [0, 0, 0, 0, 0, 0, 0],
+        ag: new Float64Array(7),
+        srcFact: 1,
+        noncon: { value: 0 },
+        limitingCollector: null,
+        xfact: 1,
+        gmin: 1e-12,
+        reltol: 1e-3,
+        iabstol: 1e-12,
+        cktFixLimit: false,
+        bypass: false,
+        voltTol: 1e-6,
+      } as LoadContext;
+    }
+
+    function createAndInitP(overrides: Record<string, number> = {}): { element: ReactiveAnalogElement; pool: StatePool } {
+      const propsObj = makePjfetProps(overrides);
+      const core = createPJfetElement(new Map([["G", 1], ["S", 0], ["D", 2]]), [], -1, propsObj) as unknown as ReactiveAnalogElement;
+      core.stateBaseOffset = 0;
+      const pool = new StatePool(core.stateSize);
+      core.initState(pool);
+      return { element: core, pool };
+    }
+
+    const PSLOT_VGS = 0;
+
+    // Element at 300.15K
+    const { element: el300, pool: pool300 } = createAndInitP({ TEMP: 300.15 });
+    el300.load(makeCtx());
+    const vgs300 = pool300.state0[PSLOT_VGS];
+
+    // Element at 300.15K, setParam to 400K before load
+    const { element: el400, pool: pool400 } = createAndInitP({ TEMP: 300.15 });
+    (el400 as unknown as { setParam: (k: string, v: number) => void }).setParam("TEMP", 400);
+    el400.load(makeCtx());
+    const vgs400 = pool400.state0[PSLOT_VGS];
+
+    expect(vgs300).not.toBe(vgs400);
   });
 });

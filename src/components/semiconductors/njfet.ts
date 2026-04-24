@@ -85,6 +85,7 @@ export const { paramDefs: NJFET_PARAM_DEFS, defaults: NJFET_PARAM_DEFAULTS } = d
     KF:   { default: 0,                 description: "Flicker noise coefficient" },
     AF:   { default: 1,                 description: "Flicker noise exponent" },
     TNOM: { default: REFTEMP, unit: "K", description: "Nominal temperature for parameters" },
+    TEMP: { default: 300.15,  unit: "K", description: "Per-instance operating temperature" },
     OFF:  { default: 0,                 description: "Initial condition: device off (0=false, 1=true)" },
   },
 });
@@ -93,7 +94,7 @@ export const { paramDefs: NJFET_PARAM_DEFS, defaults: NJFET_PARAM_DEFAULTS } = d
 // JfetParams — resolved model parameters
 // ---------------------------------------------------------------------------
 
-interface JfetParams {
+export interface JfetParams {
   VTO: number;
   BETA: number;
   LAMBDA: number;
@@ -113,6 +114,7 @@ interface JfetParams {
   KF: number;
   AF: number;
   TNOM: number;
+  TEMP: number;
   OFF: number;
 }
 
@@ -198,8 +200,8 @@ export interface JfetTempParams {
 }
 
 /**
- * Port of `jfettemp.c::JFETtemp`. Circuit temperature defaults to REFTEMP
- * (no CKTtemp/CKTnomTemp exposed through digiTS — we assume REFTEMP for both).
+ * Port of `jfettemp.c::JFETtemp`. Instance operating temperature is taken
+ * from `p.TEMP` (maps to ngspice JFETtemp, configurable per device).
  */
 export function computeJfetTempParams(p: JfetParams): JfetTempParams {
   // jfettemp.c:43-49: model-level constants at TNOM.
@@ -224,8 +226,8 @@ export function computeJfetTempParams(p: JfetParams): JfetTempParams {
   // jfettemp.c:75-77: Sydney University bFac.
   const bFac = (1 - p.B) / (p.PB - p.VTO);
 
-  // jfettemp.c:83-104: instance-level at temp = REFTEMP (no dtemp support).
-  const temp = REFTEMP;
+  // cite: jfettemp.c:83 — instance temp from params.TEMP (maps to ngspice JFETtemp)
+  const temp = p.TEMP;
   const vt = temp * CONSTKoverQ;
   const fact2 = temp / REFTEMP;
   const ratio1 = temp / p.TNOM - 1;
@@ -297,6 +299,7 @@ export function createNJfetElement(
     KF:     props.getModelParam<number>("KF"),
     AF:     props.getModelParam<number>("AF"),
     TNOM:   props.getModelParam<number>("TNOM"),
+    TEMP:   props.getModelParam<number>("TEMP"),
     OFF:    props.getModelParam<number>("OFF"),
   };
 

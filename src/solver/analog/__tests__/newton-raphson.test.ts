@@ -487,7 +487,6 @@ describe("ipass hadNodeset gate", () => {
     let convergeIter = -1;
 
     ctx.dcopModeLadder = {
-      runPrimeJunctions(): void {},
       onModeBegin(phase: "dcopInitJct" | "dcopInitFix" | "dcopInitFloat", iter: number): void {
         if (phase === "dcopInitFloat") initFloatBeginIter = iter;
       },
@@ -532,7 +531,6 @@ describe("ipass hadNodeset gate", () => {
     let convergeIter = -1;
 
     ctx.dcopModeLadder = {
-      runPrimeJunctions(): void {},
       onModeBegin(phase: "dcopInitJct" | "dcopInitFix" | "dcopInitFloat", iter: number): void {
         if (phase === "dcopInitFloat") initFloatBeginIter = iter;
       },
@@ -688,7 +686,6 @@ describe("NR NISHOULDREORDER lifecycle", () => {
     ctx.solver = proxySolver;
     ctx.cktMode = setInitf(MODEDCOP, MODEINITJCT);
     ctx.dcopModeLadder = {
-      runPrimeJunctions(): void {},
       onModeBegin(_phase: "dcopInitJct" | "dcopInitFix" | "dcopInitFloat", _iter: number): void {},
       onModeEnd(_phase: "dcopInitJct" | "dcopInitFix" | "dcopInitFloat", _iter: number, _converged: boolean): void {},
     };

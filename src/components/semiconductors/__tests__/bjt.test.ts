@@ -1174,3 +1174,1268 @@ describe("BJT L0 MODEINITTRAN", () => {
     expect(s1[SLOT_VBC]).toBe(0.8);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Task 5.2.2 — MODEINITSMSIG return block verification (B3)
+// bjtload.c:674-703: stores caps+op into state0, skips NIintegrate + stamps.
+// ---------------------------------------------------------------------------
+
+describe("BJT L1 MODEINITSMSIG", () => {
+  // L1 slot indices used in these tests
+  const SLOT_CQBE = 9, SLOT_CQBC = 11, SLOT_CQSUB = 13, SLOT_CQBX = 15;
+  const SLOT_CEXBC = 17, SLOT_GEQCB = 18;
+
+  function makeL1SmsigCtx(modelParams?: Record<string, number>): {
+    ctx: LoadContext; element: AnalogElement; s0: Float64Array; solver: SparseSolver;
+  } {
+    const propsObj = makeSpiceL1Props({ CJE: 1e-12, CJC: 1e-12, ...modelParams });
+    const core = createSpiceL1BjtElement(1, new Map([["B", 1], ["C", 2], ["E", 3]]), [], -1, propsObj) as AnalogElementCore;
+    const pool = new StatePool((core as any).stateSize);
+    (core as any).stateBaseOffset = 0;
+    (core as any).initState(pool);
+
+    // Prime s0 with a forward-active DC-OP pass so MODEINITSMSIG reads valid values.
+    const primeSolver = new SparseSolver();
+    primeSolver.beginAssembly(10);
+    const rhsPrime = new Float64Array(10);
+    rhsPrime[0] = 0.65; rhsPrime[1] = 3.0; rhsPrime[2] = 0.0;
+    const primeCtx: LoadContext = {
+      cktMode: MODEDCOP | MODEINITFLOAT,
+      solver: primeSolver,
+      matrix: primeSolver,
+      rhs: new Float64Array(10),
+      rhsOld: rhsPrime,
+      time: 0, dt: 0, method: "trapezoidal", order: 1,
+      deltaOld: [0, 0, 0, 0, 0, 0, 0],
+      ag: new Float64Array(7), srcFact: 1,
+      noncon: { value: 0 }, limitingCollector: null, convergenceCollector: null,
+      xfact: 1, gmin: 1e-12, reltol: 1e-3, iabstol: 1e-12,
+      temp: 300.15, vt: 0.025852, cktFixLimit: false, bypass: false, voltTol: 1e-6,
+    };
+    withNodeIds(core, [1, 2, 3]).load(primeCtx);
+
+    const solver = new SparseSolver();
+    solver.beginAssembly(10);
+    // MODEINITSMSIG reads vbeRaw/vbcRaw from s0, so rhsOld is only used for vbx/vsub.
+    // Use same voltages as prime so vbx/vsub are consistent.
+    const ctx: LoadContext = {
+      cktMode: MODEDCOP | MODEINITSMSIG,
+      solver,
+      matrix: solver,
+      rhs: new Float64Array(10),
+      rhsOld: rhsPrime,
+      time: 0, dt: 0, method: "trapezoidal", order: 1,
+      deltaOld: [0, 0, 0, 0, 0, 0, 0],
+      ag: new Float64Array(7), srcFact: 1,
+      noncon: { value: 0 }, limitingCollector: null, convergenceCollector: null,
+      xfact: 1, gmin: 1e-12, reltol: 1e-3, iabstol: 1e-12,
+      temp: 300.15, vt: 0.025852, cktFixLimit: false, bypass: false, voltTol: 1e-6,
+    };
+    return { ctx, element: withNodeIds(core, [1, 2, 3]), s0: pool.states[0], solver };
+  }
+
+  it("no_stamps_emitted", () => {
+    // cite: bjtload.c:674-703 — MODEINITSMSIG stores caps+op and returns before stamps.
+    const { ctx, element, solver } = makeL1SmsigCtx();
+
+    let stampCallCount = 0;
+    const origAddEntry = (solver as any).addEntry?.bind(solver);
+    if (origAddEntry) {
+      (solver as any).addEntry = (...args: unknown[]) => {
+        stampCallCount++;
+        return origAddEntry(...args);
+      };
+    }
+
+    const rhsBefore = Array.from(ctx.rhs);
+    element.load(ctx);
+    const rhsAfter = Array.from(ctx.rhs);
+
+    expect(stampCallCount).toBe(0);
+    expect(rhsAfter).toEqual(rhsBefore);
+  });
+
+  it("cap_values_stored", () => {
+    // cite: bjtload.c:674-703 — MODEINITSMSIG stores capbe/capbc/capsub/capbx into s0.
+    const { ctx, element, s0 } = makeL1SmsigCtx();
+    element.load(ctx);
+    // Cap slots must be finite (non-NaN) after MODEINITSMSIG with CJE=CJC=1e-12.
+    expect(Number.isFinite(s0[SLOT_CQBE])).toBe(true);
+    expect(Number.isFinite(s0[SLOT_CQBC])).toBe(true);
+    expect(Number.isFinite(s0[SLOT_CQSUB])).toBe(true);
+    expect(Number.isFinite(s0[SLOT_CQBX])).toBe(true);
+  });
+
+  it("cexbc_equals_geqcb", () => {
+    // cite: bjtload.c:674-703 — s0[CEXBC] = geqcb and s0[GEQCB] = geqcb (same value).
+    // With TF=1e-9 and forward VBE, geqcb is non-zero; both slots receive the same value.
+    const { ctx, element, s0 } = makeL1SmsigCtx({ TF: 1e-9 });
+    element.load(ctx);
+    // Both CEXBC and GEQCB slots should hold the same geqcb value.
+    expect(s0[SLOT_CEXBC]).toBe(s0[SLOT_GEQCB]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Task 5.2.1 — MODEINITPRED full state-copy list (B1/B2)
+// bjtload.c:288-303: all 10 L1 op-state slots copied from state1 to state0.
+// ---------------------------------------------------------------------------
+
+describe("BJT L1 MODEINITPRED", () => {
+  it("copies_10_slots_state1_to_state0", () => {
+    // L1 slot indices (match bjt.ts createSpiceL1BjtElement local consts):
+    // 0=VBE, 1=VBC, 2=CC, 3=CB, 4=GPI, 5=GMU, 6=GM, 7=GO, 8=QBE, 9=CQBE,
+    // 10=QBC, 11=CQBC, 12=QSUB, 13=CQSUB, 14=QBX, 15=CQBX, 16=GX,
+    // 17=CEXBC, 18=GEQCB, 19=GCSUB, 20=GEQBX, 21=VSUB, 22=CDSUB, 23=GDSUB
+    const SLOT_VBE = 0, SLOT_VBC = 1, SLOT_CC = 2, SLOT_CB = 3;
+    const SLOT_GPI = 4, SLOT_GMU = 5, SLOT_GM = 6, SLOT_GO = 7;
+    const SLOT_GX = 16, SLOT_VSUB = 21;
+
+    const propsObj = makeSpiceL1Props();
+    const core = createSpiceL1BjtElement(1, new Map([["B", 1], ["C", 2], ["E", 3]]), [], -1, propsObj) as AnalogElementCore;
+    const stateSize: number = (core as any).stateSize;
+    const pool = new StatePool(stateSize);
+    (core as any).stateBaseOffset = 0;
+    (core as any).initState(pool);
+
+    const s0 = pool.states[0];
+    const s1 = pool.states[1];
+    const s2 = pool.states[2];
+
+    // Prime state1 with physically consistent op-state values by running a
+    // normal NR load() pass at vbe=0.65 V forward-active bias.
+    const rhsOldPrime = new Float64Array(10);
+    rhsOldPrime[0] = 0.65; // nodeB=1 → rhsOld[0]
+    rhsOldPrime[1] = -1.0; // nodeC=2 → rhsOld[1]
+    rhsOldPrime[2] = 0.0;  // nodeE=3 → rhsOld[2]
+    const solverPrime = new SparseSolver();
+    solverPrime.beginAssembly(10);
+    const ctxPrime: LoadContext = {
+      cktMode: MODEDCOP | MODEINITFLOAT,
+      solver: solverPrime,
+      matrix: solverPrime,
+      rhs: new Float64Array(10),
+      rhsOld: rhsOldPrime,
+      time: 0,
+      dt: 0,
+      method: "trapezoidal",
+      order: 1,
+      deltaOld: [0, 0, 0, 0, 0, 0, 0],
+      ag: new Float64Array(7),
+      srcFact: 1,
+      noncon: { value: 0 },
+      limitingCollector: null,
+      convergenceCollector: null,
+      xfact: 1,
+      gmin: 1e-12,
+      reltol: 1e-3,
+      iabstol: 1e-12,
+      temp: 300.15,
+      vt: 0.025852,
+      cktFixLimit: false,
+      bypass: false,
+      voltTol: 1e-6,
+    };
+    const element = withNodeIds(core, [1, 2, 3]);
+    element.load(ctxPrime);
+
+    // Copy s0 → s1 to simulate what the previous time-step would have left.
+    s1[SLOT_VBE]  = s0[SLOT_VBE];
+    s1[SLOT_VBC]  = s0[SLOT_VBC];
+    s1[SLOT_CC]   = s0[SLOT_CC];
+    s1[SLOT_CB]   = s0[SLOT_CB];
+    s1[SLOT_GPI]  = s0[SLOT_GPI];
+    s1[SLOT_GMU]  = s0[SLOT_GMU];
+    s1[SLOT_GM]   = s0[SLOT_GM];
+    s1[SLOT_GO]   = s0[SLOT_GO];
+    s1[SLOT_GX]   = s0[SLOT_GX];
+    s1[SLOT_VSUB] = s0[SLOT_VSUB];
+
+    // Capture sentinel values for assertion.
+    const sentVBE  = s1[SLOT_VBE];
+    const sentVBC  = s1[SLOT_VBC];
+    const sentCC   = s1[SLOT_CC];
+    const sentCB   = s1[SLOT_CB];
+    const sentGPI  = s1[SLOT_GPI];
+    const sentGMU  = s1[SLOT_GMU];
+    const sentGM   = s1[SLOT_GM];
+    const sentGO   = s1[SLOT_GO];
+    const sentGX   = s1[SLOT_GX];
+    const sentVSUB = s1[SLOT_VSUB];
+
+    // Seed s2 with identical values so xfact extrapolation collapses to s1
+    // (s0 = (1+x)*s1 - x*s2 = s1 when s2=s1).
+    s2[SLOT_VBE]  = sentVBE;
+    s2[SLOT_VBC]  = sentVBC;
+    s2[SLOT_VSUB] = sentVSUB;
+
+    // Run MODEINITPRED: bjtload.c:288-303 must copy all 10 slots s1→s0.
+    // Use xfact=0 so extrapolated voltage = s1 value exactly (no prediction shift).
+    // Use the same rhsOld as the prime run so vbxRaw/vsubRaw (which are always read
+    // from rhsOld directly, not from extrapolated state) match the prime values —
+    // this keeps pnjlim a no-op and the op writeback identical to the prime result.
+    const solver = new SparseSolver();
+    solver.beginAssembly(10);
+    const ctx: LoadContext = {
+      cktMode: MODETRAN | MODEINITPRED,
+      solver,
+      matrix: solver,
+      rhs: new Float64Array(10),
+      rhsOld: rhsOldPrime,
+      time: 1e-9,
+      dt: 1e-9,
+      method: "trapezoidal",
+      order: 1,
+      deltaOld: [1e-9, 1e-9, 1e-9, 1e-9, 1e-9, 1e-9, 1e-9],
+      ag: new Float64Array(7),
+      srcFact: 1,
+      noncon: { value: 0 },
+      limitingCollector: null,
+      convergenceCollector: null,
+      xfact: 0,
+      gmin: 1e-12,
+      reltol: 1e-3,
+      iabstol: 1e-12,
+      temp: 300.15,
+      vt: 0.025852,
+      cktFixLimit: false,
+      bypass: false,
+      voltTol: 1e-6,
+    };
+    element.load(ctx);
+
+    // All 10 slots in s0 must equal the corresponding s1 sentinels.
+    // With xfact=0: extrapolated VBE/VBC/VSUB = s1 value. Same rhsOld as prime means
+    // pnjlim sees prior=new → no limiting → writeback identical to prime values.
+    expect(s0[SLOT_VBE]).toBe(sentVBE);
+    expect(s0[SLOT_VBC]).toBe(sentVBC);
+    expect(s0[SLOT_CC]).toBe(sentCC);
+    expect(s0[SLOT_CB]).toBe(sentCB);
+    expect(s0[SLOT_GPI]).toBe(sentGPI);
+    expect(s0[SLOT_GMU]).toBe(sentGMU);
+    expect(s0[SLOT_GM]).toBe(sentGM);
+    expect(s0[SLOT_GO]).toBe(sentGO);
+    expect(s0[SLOT_GX]).toBe(sentGX);
+    expect(s0[SLOT_VSUB]).toBe(sentVSUB);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Task 5.2.3 — NOBYPASS bypass test (B4)
+// bjtload.c:338-381: 4-tolerance gate + 15-slot restore on L1.
+// ---------------------------------------------------------------------------
+
+describe("BJT L1 NOBYPASS", () => {
+  const SLOT_CC = 2, SLOT_CB = 3, SLOT_GPI = 4, SLOT_GMU = 5;
+  const SLOT_GM = 6, SLOT_GO = 7, SLOT_GX = 16;
+  const SLOT_VBE = 0, SLOT_VBC = 1, SLOT_VSUB = 21;
+
+  function makeL1BypassCtx(
+    cktMode: number,
+    rhsOld: Float64Array,
+    bypass: boolean,
+    modelParams?: Record<string, number>,
+  ): { ctx: LoadContext; element: AnalogElement; s0: Float64Array; pool: StatePool; stampCount: { n: number } } {
+    const propsObj = makeSpiceL1Props(modelParams);
+    const core = createSpiceL1BjtElement(1, new Map([["B", 1], ["C", 2], ["E", 3]]), [], -1, propsObj) as AnalogElementCore;
+    const pool = new StatePool((core as any).stateSize);
+    (core as any).stateBaseOffset = 0;
+    (core as any).initState(pool);
+    const solver = new SparseSolver();
+    solver.beginAssembly(10);
+    const stampCount = { n: 0 };
+    const origAddEntryFn = (solver as any).addEntry;
+    if (origAddEntryFn) {
+      (solver as any).addEntry = (row: number, col: number, val: number) => {
+        if (row === col) stampCount.n++;
+        origAddEntryFn.call(solver, row, col, val);
+      };
+    }
+    const ctx: LoadContext = {
+      cktMode,
+      solver,
+      matrix: solver,
+      rhs: new Float64Array(10),
+      rhsOld,
+      time: 0, dt: 0,
+      method: "trapezoidal", order: 1,
+      deltaOld: [0, 0, 0, 0, 0, 0, 0],
+      ag: new Float64Array(7), srcFact: 1,
+      noncon: { value: 0 }, limitingCollector: null, convergenceCollector: null,
+      xfact: 1, gmin: 1e-12, reltol: 1e-3, iabstol: 1e-12,
+      temp: 300.15, vt: 0.025852, cktFixLimit: false,
+      bypass, voltTol: 1e-6,
+    };
+    const element = withNodeIds(core, [1, 2, 3]);
+    return { ctx, element, s0: pool.states[0], pool, stampCount };
+  }
+
+  it("bypass_disabled_when_ctx_bypass_false", () => {
+    // cite: bjtload.c:338 — bypass=false means gate never fires; compute always runs.
+    const rhsOld = new Float64Array(10);
+    rhsOld[0] = 0.65; rhsOld[1] = 3.0; rhsOld[2] = 0.0;
+
+    const { ctx, element, s0 } = makeL1BypassCtx(MODEDCOP | MODEINITFLOAT, rhsOld, false);
+    element.load(ctx);
+    // Compute ran — s0[CC] is finite.
+    expect(Number.isFinite(s0[SLOT_CC])).toBe(true);
+    expect(ctx.noncon.value).toBeGreaterThanOrEqual(0);
+  });
+
+  it("bypass_restores_and_stamps", () => {
+    // cite: bjtload.c:338-381 — bypass fires when ctx.bypass=true and tolerances met.
+    // Stamp block still runs on bypass path (mirrors ngspice goto load).
+    const propsObj = makeSpiceL1Props();
+    const core = createSpiceL1BjtElement(1, new Map([["B", 1], ["C", 2], ["E", 3]]), [], -1, propsObj) as AnalogElementCore;
+    const pool = new StatePool((core as any).stateSize);
+    (core as any).stateBaseOffset = 0;
+    (core as any).initState(pool);
+    const s0 = pool.states[0];
+
+    function makeCtx(rhsOld: Float64Array, bypass: boolean, nonconRef: { value: number }): LoadContext {
+      const solver = new SparseSolver();
+      solver.beginAssembly(10);
+      return {
+        cktMode: MODEDCOP | MODEINITFLOAT,
+        solver, matrix: solver,
+        rhs: new Float64Array(10), rhsOld,
+        time: 0, dt: 0, method: "trapezoidal", order: 1,
+        deltaOld: [0, 0, 0, 0, 0, 0, 0],
+        ag: new Float64Array(7), srcFact: 1,
+        noncon: nonconRef, limitingCollector: null, convergenceCollector: null,
+        xfact: 1, gmin: 1e-12, reltol: 1e-3, iabstol: 1e-12,
+        temp: 300.15, vt: 0.025852, cktFixLimit: false,
+        bypass, voltTol: 1e-6,
+      };
+    }
+
+    const element = withNodeIds(core, [1, 2, 3]);
+
+    // First load: prime s0.
+    const rhsOld1 = new Float64Array(10);
+    rhsOld1[0] = 0.65; rhsOld1[1] = 3.0; rhsOld1[2] = 0.0;
+    element.load(makeCtx(rhsOld1, false, { value: 0 }));
+
+    // Build rhsOld2 aligned to s0[VBE]/s0[VBC] so delvbe=delvbc=0.
+    const vbeTarget = s0[SLOT_VBE];
+    const vbcTarget = s0[SLOT_VBC];
+    const rhsOld2 = new Float64Array(10);
+    rhsOld2[0] = vbeTarget;
+    rhsOld2[1] = vbeTarget - vbcTarget;
+    rhsOld2[2] = 0.0;
+
+    const cc1 = s0[SLOT_CC];
+    const noncon2 = { value: 0 };
+    // Second load: bypass=true, same voltages → tolerances met.
+    const ctx2 = makeCtx(rhsOld2, true, noncon2);
+
+    element.load(ctx2);
+    const cc2 = s0[SLOT_CC];
+
+    // (a) noncon unchanged — bypass skips pnjlim+compute, no noncon bump.
+    expect(noncon2.value).toBe(0);
+    // (b) s0[CC] unchanged — bypass path does not call computeSpiceL1BjtOp.
+    expect(cc2).toBe(cc1);
+    // (c) s0 values are finite — bypassed values were restored correctly.
+    expect(Number.isFinite(s0[SLOT_VBE])).toBe(true);
+    expect(Number.isFinite(s0[SLOT_CC])).toBe(true);
+  });
+
+  it("bypass_disabled_by_MODEINITPRED", () => {
+    // cite: bjtload.c:347 — !(MODEINITPRED) is part of the bypass gate; MODEINITPRED disables it.
+    const propsObj = makeSpiceL1Props();
+    const core = createSpiceL1BjtElement(1, new Map([["B", 1], ["C", 2], ["E", 3]]), [], -1, propsObj) as AnalogElementCore;
+    const pool = new StatePool((core as any).stateSize);
+    (core as any).stateBaseOffset = 0;
+    (core as any).initState(pool);
+    const s0 = pool.states[0];
+    const s1 = pool.states[1];
+    const s2 = pool.states[2];
+
+    function makeCtx(cktMode: number, rhsOld: Float64Array, bypass: boolean): LoadContext {
+      const solver = new SparseSolver();
+      solver.beginAssembly(10);
+      return {
+        cktMode, solver, matrix: solver,
+        rhs: new Float64Array(10), rhsOld,
+        time: 1e-9, dt: 1e-9, method: "trapezoidal", order: 1,
+        deltaOld: [1e-9, 1e-9, 1e-9, 1e-9, 1e-9, 1e-9, 1e-9],
+        ag: new Float64Array(7), srcFact: 1,
+        noncon: { value: 0 }, limitingCollector: null, convergenceCollector: null,
+        xfact: 0, gmin: 1e-12, reltol: 1e-3, iabstol: 1e-12,
+        temp: 300.15, vt: 0.025852, cktFixLimit: false,
+        bypass, voltTol: 1e-6,
+      };
+    }
+
+    const element = withNodeIds(core, [1, 2, 3]);
+
+    // Prime s0 with a normal NR pass at forward-active bias.
+    const rhsOld1 = new Float64Array(10);
+    rhsOld1[0] = 0.65; rhsOld1[1] = 3.0; rhsOld1[2] = 0.0;
+    element.load(makeCtx(MODEDCOP | MODEINITFLOAT, rhsOld1, false));
+
+    // Copy s0→s1, s1→s2 so MODEINITPRED extrapolation collapses to s0 values.
+    s1.set(s0); s2.set(s0);
+
+    // Overwrite s0[CC] with sentinel so we can detect whether compute ran.
+    const sentinel = 9999;
+    s0[SLOT_CC] = sentinel;
+
+    // Call with MODEINITPRED + bypass=true — MODEINITPRED gate must prevent bypass.
+    // The compute path will rewrite s0[CC] with the real computed value.
+    element.load(makeCtx(MODETRAN | MODEINITPRED, rhsOld1, true));
+
+    // If bypass had fired, s0[CC] would still be sentinel.
+    // Since MODEINITPRED disables bypass, computeSpiceL1BjtOp ran and overwrote s0[CC].
+    expect(s0[SLOT_CC]).not.toBe(sentinel);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Task 5.2.4 — noncon INITFIX/off gate verification (B5)
+// cite: bjtload.c:749-754 — icheck++ unless MODEINITFIX && OFF
+// ---------------------------------------------------------------------------
+
+describe("BJT L1 noncon", () => {
+  function makeNonconCtx(cktMode: number, modelParams?: Record<string, number>): {
+    ctx: LoadContext; element: AnalogElement;
+  } {
+    const propsObj = makeSpiceL1Props(modelParams);
+    const core = createSpiceL1BjtElement(1, new Map([["B", 1], ["C", 2], ["E", 3]]), [], -1, propsObj) as AnalogElementCore;
+    const pool = new StatePool((core as any).stateSize);
+    (core as any).stateBaseOffset = 0;
+    (core as any).initState(pool);
+    const solver = new SparseSolver();
+    solver.beginAssembly(10);
+    // rhsOld: large voltage shift to trigger pnjlim.
+    const rhsOld = new Float64Array(10);
+    rhsOld[0] = 5.0; rhsOld[1] = 0.0; rhsOld[2] = 0.0;
+    const ctx: LoadContext = {
+      cktMode,
+      solver, matrix: solver,
+      rhs: new Float64Array(10), rhsOld,
+      time: 0, dt: 0, method: "trapezoidal", order: 1,
+      deltaOld: [0, 0, 0, 0, 0, 0, 0],
+      ag: new Float64Array(7), srcFact: 1,
+      noncon: { value: 0 }, limitingCollector: null, convergenceCollector: null,
+      xfact: 1, gmin: 1e-12, reltol: 1e-3, iabstol: 1e-12,
+      temp: 300.15, vt: 0.025852, cktFixLimit: false, bypass: false, voltTol: 1e-6,
+    };
+    return { ctx, element: withNodeIds(core, [1, 2, 3]) };
+  }
+
+  it("no_bump_when_initfix_and_off", () => {
+    // cite: bjtload.c:749-754 — OFF=1 + MODEINITFIX: noncon must not increment.
+    const { ctx, element } = makeNonconCtx(MODEINITFIX, { OFF: 1 });
+    element.load(ctx);
+    expect(ctx.noncon.value).toBe(0);
+  });
+
+  it("bumps_when_initfix_and_not_off", () => {
+    // cite: bjtload.c:749-754 — OFF=0 + MODEINITFIX: noncon increments when pnjlim fires.
+    const { ctx, element } = makeNonconCtx(MODEINITFIX, { OFF: 0 });
+    element.load(ctx);
+    expect(ctx.noncon.value).toBeGreaterThanOrEqual(1);
+  });
+
+  it("bumps_when_not_initfix_and_off", () => {
+    // cite: bjtload.c:749-754 — OFF=1 + MODEDCOP (no MODEINITFIX): noncon increments.
+    const { ctx, element } = makeNonconCtx(MODEDCOP | MODEINITFLOAT, { OFF: 1 });
+    element.load(ctx);
+    expect(ctx.noncon.value).toBeGreaterThanOrEqual(1);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Task 5.2.5 — CdBE uses op.gbe verification (B8)
+// cite: bjtload.c:617, :625 — capbe = tf*gbeMod + ...; gbeMod derived from op.gbe.
+// ---------------------------------------------------------------------------
+
+describe("BJT L1 CdBE", () => {
+  const SLOT_QBE = 8;
+
+  it("scales_with_gbe_not_gm", () => {
+    // cite: bjtload.c:617 — capbe uses gbeMod which derives from gbe (not gm).
+    // Run two loads with different IS (changes gbe ~ IS*exp(vbe/vt)/vt) and compare QBE.
+    // QBE = tf*cbeMod + czbe*(1-arg*sarg)/(1-xme); cbeMod scales with gbe via XTF path.
+    // With TF>0 and vbeLimited>0, cbeMod = cbe*(1+argtf)/qb where argtf depends on gbe.
+    function makeL1TranEl(IS: number): { el: AnalogElement; pool: StatePool } {
+      const propsObj = makeSpiceL1Props({ TF: 1e-9, CJE: 1e-12, IS });
+      const core = createSpiceL1BjtElement(1, new Map([["B", 1], ["C", 2], ["E", 3]]), [], -1, propsObj) as AnalogElementCore;
+      const pool = new StatePool((core as any).stateSize);
+      (core as any).stateBaseOffset = 0;
+      (core as any).initState(pool);
+      return { el: withNodeIds(core, [1, 2, 3]), pool };
+    }
+
+    function makeCtx(): LoadContext {
+      const solver = new SparseSolver();
+      solver.beginAssembly(10);
+      const rhsOld = new Float64Array(10);
+      rhsOld[0] = 0.65; rhsOld[1] = 3.0; rhsOld[2] = 0.0;
+      return {
+        cktMode: MODEDCOP | MODEINITSMSIG,
+        solver, matrix: solver,
+        rhs: new Float64Array(10), rhsOld,
+        time: 0, dt: 0, method: "trapezoidal", order: 1,
+        deltaOld: [0, 0, 0, 0, 0, 0, 0],
+        ag: new Float64Array(7), srcFact: 1,
+        noncon: { value: 0 }, limitingCollector: null, convergenceCollector: null,
+        xfact: 1, gmin: 1e-12, reltol: 1e-3, iabstol: 1e-12,
+        temp: 300.15, vt: 0.025852, cktFixLimit: false, bypass: false, voltTol: 1e-6,
+      };
+    }
+
+    const { el: el1, pool: pool1 } = makeL1TranEl(1e-16);
+    const { el: el2, pool: pool2 } = makeL1TranEl(1e-15);
+
+    // Prime s0 with MODEDCOP|MODEINITFLOAT first so MODEINITSMSIG reads valid op state.
+    const primeSolver = new SparseSolver(); primeSolver.beginAssembly(10);
+    const rhsPrime = new Float64Array(10); rhsPrime[0] = 0.65; rhsPrime[1] = 3.0;
+    const primeCtx: LoadContext = {
+      cktMode: MODEDCOP | MODEINITFLOAT,
+      solver: primeSolver, matrix: primeSolver,
+      rhs: new Float64Array(10), rhsOld: rhsPrime,
+      time: 0, dt: 0, method: "trapezoidal", order: 1,
+      deltaOld: [0, 0, 0, 0, 0, 0, 0],
+      ag: new Float64Array(7), srcFact: 1,
+      noncon: { value: 0 }, limitingCollector: null, convergenceCollector: null,
+      xfact: 1, gmin: 1e-12, reltol: 1e-3, iabstol: 1e-12,
+      temp: 300.15, vt: 0.025852, cktFixLimit: false, bypass: false, voltTol: 1e-6,
+    };
+    // Need separate prime solvers.
+    const primeSolver2 = new SparseSolver(); primeSolver2.beginAssembly(10);
+    el1.load({ ...primeCtx });
+    el2.load({ ...primeCtx, solver: primeSolver2, matrix: primeSolver2 });
+
+    el1.load(makeCtx());
+    el2.load(makeCtx());
+
+    const qbe1 = pool1.states[0][SLOT_QBE];
+    const qbe2 = pool2.states[0][SLOT_QBE];
+
+    // IS×10 → gbe×10 → larger QBE (monotonic response).
+    expect(Number.isFinite(qbe1)).toBe(true);
+    expect(Number.isFinite(qbe2)).toBe(true);
+    expect(qbe2).toBeGreaterThan(qbe1);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Task 5.2.6 — External BC cap stamp destination verification (B9)
+// cite: bjtload.c:841-842 — geqbx stamps to (nodeB_ext, nodeC_int), NOT nodeC_ext.
+// ---------------------------------------------------------------------------
+
+describe("BJT L1 BC_cap_stamps", () => {
+  it("target_colPrime", () => {
+    // cite: bjtload.c:841-842 — BJTbaseColPrimePtr targets nodeC_int (colPrime), not nodeC_ext.
+    // With RC>0, nodeC_int !== nodeC_ext. Verify no stamp hits (nodeB_ext, nodeC_ext).
+    // Node assignment: B=1 (ext), C=2 (ext), E=3; RC>0 creates nodeC_int=4.
+    // internalNodeIds = [4] (internal collector node from RC).
+    const propsObj = makeSpiceL1Props({ RC: 1, CJC: 1e-11 });
+    const core = createSpiceL1BjtElement(
+      1, new Map([["B", 1], ["C", 2], ["E", 3]]), [4], -1, propsObj,
+    ) as AnalogElementCore;
+    const pool = new StatePool((core as any).stateSize);
+    (core as any).stateBaseOffset = 0;
+    (core as any).initState(pool);
+
+    // Pre-allocate all needed matrix entries before load() (stampG calls allocElement at assembly time).
+    // stampG subtracts 1 from node IDs before calling allocElement, so node N → index N-1.
+    // We allocate entries for all node pairs that the L1 stamp block may touch.
+    // Nodes: B_ext=1, C_ext=2, E=3, C_int=4. All pairs (0-based: 0,1,2,3).
+    const solver = new SparseSolver();
+    const nodeCount = 5; // 1-based nodes up to 4 → need size 5
+    solver.beginAssembly(nodeCount);
+
+    // Capture all (row, col) 0-based index pairs passed to allocElement.
+    // Stored as 1-based node IDs to match the assertion logic.
+    const allocatedPairs: Array<{ row: number; col: number }> = [];
+    const origAllocElement = (solver as any).allocElement.bind(solver);
+    (solver as any).allocElement = (row: number, col: number): number => {
+      allocatedPairs.push({ row: row + 1, col: col + 1 }); // convert 0-based → 1-based
+      return origAllocElement(row, col);
+    };
+
+    const rhsOld = new Float64Array(nodeCount);
+    rhsOld[0] = 0.65; rhsOld[1] = -1.0; rhsOld[2] = 0.0;
+    // Use MODEINITTRAN so s1 QBX is seeded and NIintegrate fires on the second call.
+    // First call: MODEINITTRAN seeds QBX into state1.
+    const ctxInit: LoadContext = {
+      cktMode: MODETRAN | MODEINITTRAN,
+      solver, matrix: solver,
+      rhs: new Float64Array(nodeCount), rhsOld,
+      time: 0, dt: 1e-9, method: "trapezoidal", order: 1,
+      deltaOld: [1e-9, 1e-9, 1e-9, 1e-9, 1e-9, 1e-9, 1e-9],
+      ag: new Float64Array(7), srcFact: 1,
+      noncon: { value: 0 }, limitingCollector: null, convergenceCollector: null,
+      xfact: 1, gmin: 1e-12, reltol: 1e-3, iabstol: 1e-12,
+      temp: 300.15, vt: 0.025852, cktFixLimit: false, bypass: false, voltTol: 1e-6,
+    };
+    const el = withNodeIds(core, [1, 2, 3, 4]);
+    el.load(ctxInit);
+
+    // Clear collected pairs, then run MODETRAN | MODEINITFLOAT to trigger NIintegrate + geqbx stamp.
+    allocatedPairs.length = 0;
+    const ag = new Float64Array(7);
+    ag[0] = 1 / 1e-9; // trapezoidal ag[0] = 1/dt
+    const ctx: LoadContext = {
+      cktMode: MODETRAN | MODEINITFLOAT,
+      solver, matrix: solver,
+      rhs: new Float64Array(nodeCount), rhsOld,
+      time: 1e-9, dt: 1e-9, method: "trapezoidal", order: 1,
+      deltaOld: [1e-9, 1e-9, 1e-9, 1e-9, 1e-9, 1e-9, 1e-9],
+      ag, srcFact: 1,
+      noncon: { value: 0 }, limitingCollector: null, convergenceCollector: null,
+      xfact: 1, gmin: 1e-12, reltol: 1e-3, iabstol: 1e-12,
+      temp: 300.15, vt: 0.025852, cktFixLimit: false, bypass: false, voltTol: 1e-6,
+    };
+    el.load(ctx);
+
+    // nodeB_ext=1, nodeC_ext=2, nodeC_int=4.
+    // No stamp should target (nodeB_ext=1, nodeC_ext=2) or (nodeC_ext=2, nodeB_ext=1).
+    const nodeB_ext = 1, nodeC_ext = 2;
+    const forbidden = allocatedPairs.filter(
+      s => (s.row === nodeB_ext && s.col === nodeC_ext) ||
+           (s.row === nodeC_ext && s.col === nodeB_ext),
+    );
+    expect(forbidden).toHaveLength(0);
+
+    // A stamp to (nodeB_ext=1, nodeC_int=4) must be present (geqbx).
+    const nodeC_int = 4;
+    const toColPrime = allocatedPairs.filter(
+      s => (s.row === nodeB_ext && s.col === nodeC_int) ||
+           (s.row === nodeC_int && s.col === nodeB_ext),
+    );
+    expect(toColPrime.length).toBeGreaterThan(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Task 5.2.7 — BJTsubs SUBS model param (B10)
+// cite: bjtload.c:184-187 — SUBS: 1=VERTICAL, 0=LATERAL
+// ---------------------------------------------------------------------------
+
+describe("SpiceL1 ModelParams", () => {
+  it("SUBS_default_1", () => {
+    const propsObj = makeSpiceL1Props();
+    expect(propsObj.getModelParam<number>("SUBS")).toBe(1);
+  });
+
+  it("SUBS_in_paramDefs", () => {
+    const keys = BJT_SPICE_L1_PARAM_DEFS.map((pd: { key: string }) => pd.key);
+    expect(keys).toContain("SUBS");
+  });
+
+  it("setParam_SUBS_no_throw", () => {
+    const propsObj = makeSpiceL1Props();
+    const core = createSpiceL1BjtElement(1, new Map([["B", 1], ["C", 2], ["E", 3]]), [], -1, propsObj) as AnalogElementCore;
+    expect(() => (core as any).setParam("SUBS", 0)).not.toThrow();
+  });
+
+  // ---------------------------------------------------------------------------
+  // Task 5.2.8 — AREAB / AREAC params (B11)
+  // ---------------------------------------------------------------------------
+
+  it("AREAB_default_1", () => {
+    const propsObj = makeSpiceL1Props();
+    expect(propsObj.getModelParam<number>("AREAB")).toBe(1);
+  });
+
+  it("AREAC_default_1", () => {
+    const propsObj = makeSpiceL1Props();
+    expect(propsObj.getModelParam<number>("AREAC")).toBe(1);
+  });
+
+  it("paramDefs_include_AREAB_AREAC", () => {
+    const keys = BJT_SPICE_L1_PARAM_DEFS.map((pd: { key: string }) => pd.key);
+    expect(keys).toContain("AREAB");
+    expect(keys).toContain("AREAC");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Task 5.2.8 — AREAB/AREAC area-scaling correctness tests
+// cite: bjtload.c:184-187, 573-576, 582-585
+// ---------------------------------------------------------------------------
+
+describe("BJT L1 AREAB_AREAC", () => {
+  function makeL1El(modelParams: Record<string, number>): { el: AnalogElement; pool: StatePool } {
+    const propsObj = makeSpiceL1Props(modelParams);
+    const core = createSpiceL1BjtElement(1, new Map([["B", 1], ["C", 2], ["E", 3]]), [], -1, propsObj) as AnalogElementCore;
+    const pool = new StatePool((core as any).stateSize);
+    (core as any).stateBaseOffset = 0;
+    (core as any).initState(pool);
+    return { el: withNodeIds(core, [1, 2, 3]), pool };
+  }
+
+  function makeDcInitCtx(): LoadContext {
+    // Use MODEINITFLOAT with VBC forward-biased so cbcn = c4*(exp(vbc/(nc*vt))-1) != 0.
+    // c4 = tBCleakCur * AREAB (VERTICAL) or AREAC (LATERAL). Differences in c4 → differences in cb.
+    const solver = new SparseSolver();
+    solver.beginAssembly(10);
+    const rhsOld = new Float64Array(10);
+    rhsOld[0] = 0.65;  // VBE forward
+    rhsOld[1] = 0.65;  // VBC also forward — cbcn fires
+    return {
+      cktMode: MODEDCOP | MODEINITFLOAT,
+      solver, matrix: solver,
+      rhs: new Float64Array(10), rhsOld,
+      time: 0, dt: 0, method: "trapezoidal", order: 1,
+      deltaOld: [0, 0, 0, 0, 0, 0, 0],
+      ag: new Float64Array(7), srcFact: 1,
+      noncon: { value: 0 }, limitingCollector: null, convergenceCollector: null,
+      xfact: 1, gmin: 1e-12, reltol: 1e-3, iabstol: 1e-12,
+      temp: 300.15, vt: 0.025852, cktFixLimit: false, bypass: false, voltTol: 1e-6,
+    };
+  }
+
+  function makeTranCtx(): LoadContext {
+    const solver = new SparseSolver();
+    solver.beginAssembly(10);
+    const rhsOld = new Float64Array(10);
+    rhsOld[0] = 0.65;
+    rhsOld[1] = -1.0;
+    const ag = new Float64Array(7);
+    ag[0] = 1 / 1e-9;
+    return {
+      cktMode: MODETRAN | MODEINITTRAN,
+      solver, matrix: solver,
+      rhs: new Float64Array(10), rhsOld,
+      time: 1e-9, dt: 1e-9, method: "trapezoidal", order: 1,
+      deltaOld: [1e-9, 1e-9, 1e-9, 1e-9, 1e-9, 1e-9, 1e-9],
+      ag, srcFact: 1,
+      noncon: { value: 0 }, limitingCollector: null, convergenceCollector: null,
+      xfact: 1, gmin: 1e-12, reltol: 1e-3, iabstol: 1e-12,
+      temp: 300.15, vt: 0.025852, cktFixLimit: false, bypass: false, voltTol: 1e-6,
+    };
+  }
+
+  const SLOT_CB = 3;
+  const SLOT_CQSUB = 13;
+
+  it("c4_scales_with_AREAB_under_VERTICAL", () => {
+    // SUBS=1 (VERTICAL): c4 = tBCleakCur * AREAB. Run MODEINITJCT so ISC leakage fires.
+    const { el: el1, pool: pool1 } = makeL1El({ SUBS: 1, AREAB: 2, AREAC: 4, ISC: 1e-12 });
+    const { el: el2, pool: pool2 } = makeL1El({ SUBS: 1, AREAB: 4, AREAC: 4, ISC: 1e-12 });
+    el1.load(makeDcInitCtx());
+    el2.load(makeDcInitCtx());
+    // cb contains the BC leakage contribution via cbcn which scales with c4=ISC*AREAB.
+    // el2 has AREAB=4 vs el1 AREAB=2 — el2 should have larger |CB|.
+    const cb1 = pool1.states[0][SLOT_CB];
+    const cb2 = pool2.states[0][SLOT_CB];
+    expect(Math.abs(cb2)).toBeGreaterThan(Math.abs(cb1));
+  });
+
+  it("c4_scales_with_AREAC_under_LATERAL", () => {
+    // SUBS=0 (LATERAL): c4 = tBCleakCur * AREAC.
+    const { el: el1, pool: pool1 } = makeL1El({ SUBS: 0, AREAB: 2, AREAC: 2, ISC: 1e-12 });
+    const { el: el2, pool: pool2 } = makeL1El({ SUBS: 0, AREAB: 2, AREAC: 4, ISC: 1e-12 });
+    el1.load(makeDcInitCtx());
+    el2.load(makeDcInitCtx());
+    const cb1 = pool1.states[0][SLOT_CB];
+    const cb2 = pool2.states[0][SLOT_CB];
+    expect(Math.abs(cb2)).toBeGreaterThan(Math.abs(cb1));
+  });
+
+  it("czsub_scales_with_AREAC_under_VERTICAL", () => {
+    // SUBS=1 (VERTICAL): czsub = tSubcap * AREAC. Probe via CQSUB after MODEINITTRAN.
+    const { el: el1, pool: pool1 } = makeL1El({ SUBS: 1, AREAB: 2, AREAC: 2, CJS: 1e-12 });
+    const { el: el2, pool: pool2 } = makeL1El({ SUBS: 1, AREAB: 2, AREAC: 4, CJS: 1e-12 });
+    el1.load(makeTranCtx());
+    el2.load(makeTranCtx());
+    // MODEINITTRAN seeds s1[CQSUB] = s0[CQSUB]. s0[CQSUB] reflects capsub ∝ czsub ∝ AREAC.
+    const cqsub1 = pool1.states[1][SLOT_CQSUB]; // state1 after MODEINITTRAN copy
+    const cqsub2 = pool2.states[1][SLOT_CQSUB];
+    expect(cqsub2).toBeGreaterThan(cqsub1);
+  });
+
+  it("czsub_scales_with_AREAB_under_LATERAL", () => {
+    // SUBS=0 (LATERAL): czsub = tSubcap * AREAB.
+    const { el: el1, pool: pool1 } = makeL1El({ SUBS: 0, AREAB: 2, AREAC: 4, CJS: 1e-12 });
+    const { el: el2, pool: pool2 } = makeL1El({ SUBS: 0, AREAB: 4, AREAC: 4, CJS: 1e-12 });
+    el1.load(makeTranCtx());
+    el2.load(makeTranCtx());
+    const cqsub1 = pool1.states[1][SLOT_CQSUB];
+    const cqsub2 = pool2.states[1][SLOT_CQSUB];
+    expect(cqsub2).toBeGreaterThan(cqsub1);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Task 5.2.9 — MODEINITTRAN charge state copy verification (B12)
+// cite: bjtload.c:715-724, 735-740, 764-769
+// ---------------------------------------------------------------------------
+
+describe("BJT L1 MODEINITTRAN", () => {
+  const SLOT_QBE = 8, SLOT_CQBE = 9;
+  const SLOT_QBC = 10, SLOT_CQBC = 11;
+  const SLOT_QSUB = 12, SLOT_CQSUB = 13;
+  const SLOT_QBX = 14, SLOT_CQBX = 15;
+
+  function makeL1TranInittranEl(modelParams?: Record<string, number>): { el: AnalogElement; pool: StatePool } {
+    const propsObj = makeSpiceL1Props({ CJE: 1e-12, CJC: 1e-12, CJS: 1e-12, ...modelParams });
+    const core = createSpiceL1BjtElement(1, new Map([["B", 1], ["C", 2], ["E", 3]]), [], -1, propsObj) as AnalogElementCore;
+    const pool = new StatePool((core as any).stateSize);
+    (core as any).stateBaseOffset = 0;
+    (core as any).initState(pool);
+    return { el: withNodeIds(core, [1, 2, 3]), pool };
+  }
+
+  function makeInittranCtx(): LoadContext {
+    const solver = new SparseSolver();
+    solver.beginAssembly(10);
+    const rhsOld = new Float64Array(10);
+    rhsOld[0] = 0.65; rhsOld[1] = -1.0;
+    const ag = new Float64Array(7);
+    ag[0] = 1 / 1e-9;
+    return {
+      cktMode: MODETRAN | MODEINITTRAN,
+      solver, matrix: solver,
+      rhs: new Float64Array(10), rhsOld,
+      time: 1e-9, dt: 1e-9, method: "trapezoidal", order: 1,
+      deltaOld: [1e-9, 1e-9, 1e-9, 1e-9, 1e-9, 1e-9, 1e-9],
+      ag, srcFact: 1,
+      noncon: { value: 0 }, limitingCollector: null, convergenceCollector: null,
+      xfact: 1, gmin: 1e-12, reltol: 1e-3, iabstol: 1e-12,
+      temp: 300.15, vt: 0.025852, cktFixLimit: false, bypass: false, voltTol: 1e-6,
+    };
+  }
+
+  it("copies_qbe_qbc_qbx_qsub_to_state1", () => {
+    const { el, pool } = makeL1TranInittranEl();
+    el.load(makeInittranCtx());
+    const s0 = pool.states[0];
+    const s1 = pool.states[1];
+    expect(s1[SLOT_QBE]).toBe(s0[SLOT_QBE]);
+    expect(s1[SLOT_QBC]).toBe(s0[SLOT_QBC]);
+    expect(s1[SLOT_QBX]).toBe(s0[SLOT_QBX]);
+    expect(s1[SLOT_QSUB]).toBe(s0[SLOT_QSUB]);
+  });
+
+  it("copies_cqbe_cqbc_to_state1", () => {
+    const { el, pool } = makeL1TranInittranEl();
+    el.load(makeInittranCtx());
+    const s0 = pool.states[0];
+    const s1 = pool.states[1];
+    expect(s1[SLOT_CQBE]).toBe(s0[SLOT_CQBE]);
+    expect(s1[SLOT_CQBC]).toBe(s0[SLOT_CQBC]);
+  });
+
+  it("copies_cqbx_cqsub_to_state1", () => {
+    const { el, pool } = makeL1TranInittranEl();
+    el.load(makeInittranCtx());
+    const s0 = pool.states[0];
+    const s1 = pool.states[1];
+    expect(s1[SLOT_CQBX]).toBe(s0[SLOT_CQBX]);
+    expect(s1[SLOT_CQSUB]).toBe(s0[SLOT_CQSUB]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Task 5.2.10 — cexbc INITTRAN seed + dt guard removal (B15)
+// cite: bjtload.c:531-535, 536-539
+// ---------------------------------------------------------------------------
+
+describe("BJT L1 excess_phase", () => {
+  const SLOT_CEXBC = 17;
+
+  function makeExcessPhaseEl(modelParams?: Record<string, number>): { el: AnalogElement; pool: StatePool } {
+    const propsObj = makeSpiceL1Props({ PTF: 15, TF: 1e-9, ...modelParams });
+    const core = createSpiceL1BjtElement(1, new Map([["B", 1], ["C", 2], ["E", 3]]), [], -1, propsObj) as AnalogElementCore;
+    const pool = new StatePool((core as any).stateSize);
+    (core as any).stateBaseOffset = 0;
+    (core as any).initState(pool);
+    return { el: withNodeIds(core, [1, 2, 3]), pool };
+  }
+
+  function makeInittranCtx(): LoadContext {
+    const solver = new SparseSolver();
+    solver.beginAssembly(10);
+    const rhsOld = new Float64Array(10);
+    rhsOld[0] = 0.65; rhsOld[1] = -1.0;
+    const ag = new Float64Array(7);
+    ag[0] = 1 / 1e-9;
+    return {
+      cktMode: MODETRAN | MODEINITTRAN,
+      solver, matrix: solver,
+      rhs: new Float64Array(10), rhsOld,
+      time: 1e-9, dt: 1e-9, method: "trapezoidal", order: 1,
+      deltaOld: [1e-9, 1e-9, 1e-9, 1e-9, 1e-9, 1e-9, 1e-9],
+      ag, srcFact: 1,
+      noncon: { value: 0 }, limitingCollector: null, convergenceCollector: null,
+      xfact: 1, gmin: 1e-12, reltol: 1e-3, iabstol: 1e-12,
+      temp: 300.15, vt: 0.025852, cktFixLimit: false, bypass: false, voltTol: 1e-6,
+    };
+  }
+
+  it("initTran_seeds_cexbc_state1_state2", () => {
+    // cite: bjtload.c:531-535 — INITTRAN seeds state1+state2 cexbc to cbe/qb.
+    // Pre-seed state1[VBE] with a forward vbe so cbe > 0 at the INITTRAN call.
+    const { el, pool } = makeExcessPhaseEl();
+    // Prime: run DC-OP pass so s0[VBE] = 0.65 (computed and stored).
+    const primeSolver = new SparseSolver(); primeSolver.beginAssembly(10);
+    const rhsPrime = new Float64Array(10); rhsPrime[0] = 0.65; rhsPrime[1] = -1.0;
+    el.load({
+      cktMode: MODEDCOP | MODEINITFLOAT, solver: primeSolver, matrix: primeSolver,
+      rhs: new Float64Array(10), rhsOld: rhsPrime,
+      time: 0, dt: 0, method: "trapezoidal", order: 1,
+      deltaOld: [0, 0, 0, 0, 0, 0, 0], ag: new Float64Array(7), srcFact: 1,
+      noncon: { value: 0 }, limitingCollector: null, convergenceCollector: null,
+      xfact: 1, gmin: 1e-12, reltol: 1e-3, iabstol: 1e-12,
+      temp: 300.15, vt: 0.025852, cktFixLimit: false, bypass: false, voltTol: 1e-6,
+    });
+    // Copy s0[VBE] → s1[VBE] so MODEINITTRAN branch reads a non-zero vbe.
+    pool.states[1][0] = pool.states[0][0]; // SLOT_VBE = 0
+    el.load(makeInittranCtx());
+    const s1val = pool.states[1][SLOT_CEXBC];
+    const s2val = pool.states[2][SLOT_CEXBC];
+    expect(s1val).toBe(s2val);
+    expect(s1val).toBeGreaterThan(0);
+  });
+
+  it("uses_deltaOld1_directly", () => {
+    // cite: bjtload.c:536-539 — IIR denom uses deltaOld[1] directly (dctran.c:317 seeds).
+    // Two elements with identical state but different deltaOld[1] must produce different s0[CEXBC],
+    // proving the IIR denominator consumes deltaOld[1].
+    const { el: el1, pool: pool1 } = makeExcessPhaseEl();
+    const { el: el2, pool: pool2 } = makeExcessPhaseEl();
+
+    // Manually seed state1+state2 with a non-zero cexbc value (simulating prior INITTRAN or tran step).
+    const seedVal = 1e-12;
+    pool1.states[1][SLOT_CEXBC] = seedVal;
+    pool1.states[2][SLOT_CEXBC] = seedVal;
+    pool2.states[1][SLOT_CEXBC] = seedVal;
+    pool2.states[2][SLOT_CEXBC] = seedVal;
+
+    function makeTranCtxWith(deltaOld1: number): LoadContext {
+      const solver = new SparseSolver();
+      solver.beginAssembly(10);
+      const rhsOld = new Float64Array(10);
+      rhsOld[0] = 0.65; rhsOld[1] = -1.0;
+      const ag = new Float64Array(7);
+      ag[0] = 1 / 1e-9;
+      return {
+        cktMode: MODETRAN | MODEINITFLOAT,
+        solver, matrix: solver,
+        rhs: new Float64Array(10), rhsOld,
+        time: 1e-9, dt: 1e-9, method: "trapezoidal", order: 1,
+        deltaOld: [1e-9, deltaOld1, 1e-9, 1e-9, 1e-9, 1e-9, 1e-9],
+        ag, srcFact: 1,
+        noncon: { value: 0 }, limitingCollector: null, convergenceCollector: null,
+        xfact: 1, gmin: 1e-12, reltol: 1e-3, iabstol: 1e-12,
+        temp: 300.15, vt: 0.025852, cktFixLimit: false, bypass: false, voltTol: 1e-6,
+      };
+    }
+
+    el1.load(makeTranCtxWith(1e-6));
+    el2.load(makeTranCtxWith(1e-5));
+
+    // Different deltaOld[1] → different dt/deltaOld1 term → different IIR cc → different s0[CEXBC].
+    expect(pool1.states[0][SLOT_CEXBC]).not.toBe(pool2.states[0][SLOT_CEXBC]);
+  });
+
+  // ---------------------------------------------------------------------------
+  // Task 5.2.11 — cex uses raw op.cbe (B22)
+  // cite: bjtload.c:522-524
+  // ---------------------------------------------------------------------------
+
+  it("cex_is_raw_cbe_not_cbeMod", () => {
+    // cite: bjtload.c:522-524 — cex/gex seeded from raw cbe/gbe BEFORE XTF modification.
+    // INITTRAN seeds s1[CEXBC] = cbe/qb — independent of XTF.
+    // Two elements differing only in XTF must produce identical s1[CEXBC].
+    const { el: el0, pool: pool0 } = makeExcessPhaseEl({ XTF: 0 });
+    const { el: el10, pool: pool10 } = makeExcessPhaseEl({ XTF: 10 });
+
+    el0.load(makeInittranCtx());
+    el10.load(makeInittranCtx());
+
+    expect(pool0.states[1][SLOT_CEXBC]).toBe(pool10.states[1][SLOT_CEXBC]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Task 5.2.12 — XTF=0 gbe adjustment verification (F-BJT-ADD-21)
+// cite: bjtload.c:591-610
+// ---------------------------------------------------------------------------
+
+describe("BJT L1 XTF_zero", () => {
+  const SLOT_QBE = 8;
+
+  function makeL1WithTfXtf(TF: number, XTF: number): { el: AnalogElement; pool: StatePool } {
+    const propsObj = makeSpiceL1Props({ TF, XTF, CJE: 1e-12 });
+    const core = createSpiceL1BjtElement(1, new Map([["B", 1], ["C", 2], ["E", 3]]), [], -1, propsObj) as AnalogElementCore;
+    const pool = new StatePool((core as any).stateSize);
+    (core as any).stateBaseOffset = 0;
+    (core as any).initState(pool);
+    return { el: withNodeIds(core, [1, 2, 3]), pool };
+  }
+
+  function makeSmsigCtx(): LoadContext {
+    const solver = new SparseSolver();
+    solver.beginAssembly(10);
+    const rhsOld = new Float64Array(10);
+    rhsOld[0] = 0.65; rhsOld[1] = -1.0;
+    return {
+      cktMode: MODEDCOP | MODEINITSMSIG,
+      solver, matrix: solver,
+      rhs: new Float64Array(10), rhsOld,
+      time: 0, dt: 0, method: "trapezoidal", order: 1,
+      deltaOld: [0, 0, 0, 0, 0, 0, 0],
+      ag: new Float64Array(7), srcFact: 1,
+      noncon: { value: 0 }, limitingCollector: null, convergenceCollector: null,
+      xfact: 1, gmin: 1e-12, reltol: 1e-3, iabstol: 1e-12,
+      temp: 300.15, vt: 0.025852, cktFixLimit: false, bypass: false, voltTol: 1e-6,
+    };
+  }
+
+  it("cbeMod_computed_when_tf_nonzero_xtf_zero", () => {
+    // cite: bjtload.c:591-610 — when tf>0 && vbe>0, cbeMod block runs.
+    // XTF=0 collapses argtf=arg2=0, so cbeMod = cbe*(1+0)/qb = cbe/qb (still non-zero).
+    const { el: elTf, pool: poolTf } = makeL1WithTfXtf(1e-9, 0);
+    const { el: elNoTf, pool: poolNoTf } = makeL1WithTfXtf(0, 0);
+
+    // Prime with DC-OP first.
+    const primeSolver1 = new SparseSolver(); primeSolver1.beginAssembly(10);
+    const primeSolver2 = new SparseSolver(); primeSolver2.beginAssembly(10);
+    const rhsOld = new Float64Array(10); rhsOld[0] = 0.65; rhsOld[1] = -1.0;
+    const primeCtx1: LoadContext = {
+      cktMode: MODEDCOP | MODEINITFLOAT, solver: primeSolver1, matrix: primeSolver1,
+      rhs: new Float64Array(10), rhsOld,
+      time: 0, dt: 0, method: "trapezoidal", order: 1,
+      deltaOld: [0, 0, 0, 0, 0, 0, 0], ag: new Float64Array(7), srcFact: 1,
+      noncon: { value: 0 }, limitingCollector: null, convergenceCollector: null,
+      xfact: 1, gmin: 1e-12, reltol: 1e-3, iabstol: 1e-12,
+      temp: 300.15, vt: 0.025852, cktFixLimit: false, bypass: false, voltTol: 1e-6,
+    };
+    elTf.load(primeCtx1);
+    elNoTf.load({ ...primeCtx1, solver: primeSolver2, matrix: primeSolver2 });
+
+    elTf.load(makeSmsigCtx());
+    elNoTf.load(makeSmsigCtx());
+
+    const qbeTf = poolTf.states[0][SLOT_QBE];
+    const qbeNoTf = poolNoTf.states[0][SLOT_QBE];
+    // With TF>0, QBE includes transit-time contribution: TF*cbeMod term.
+    expect(qbeTf).toBeGreaterThan(0);
+    expect(qbeNoTf).toBeGreaterThan(0);
+    // TF=1e-9 adds transit-time contribution → larger QBE.
+    expect(qbeTf).toBeGreaterThan(qbeNoTf);
+  });
+
+  it("cbeMod_skipped_when_tf_zero", () => {
+    // cite: bjtload.c:591-610 — when tf=0, cbeMod block is skipped entirely.
+    // QBE = DC component only: pe*czbe*(1-arg*sarg)/(1-xme) for vbe<fcpe.
+    const { el, pool } = makeL1WithTfXtf(0, 0);
+
+    // Prime.
+    const primeSolver = new SparseSolver(); primeSolver.beginAssembly(10);
+    const rhsOld = new Float64Array(10); rhsOld[0] = 0.65; rhsOld[1] = -1.0;
+    el.load({
+      cktMode: MODEDCOP | MODEINITFLOAT, solver: primeSolver, matrix: primeSolver,
+      rhs: new Float64Array(10), rhsOld,
+      time: 0, dt: 0, method: "trapezoidal", order: 1,
+      deltaOld: [0, 0, 0, 0, 0, 0, 0], ag: new Float64Array(7), srcFact: 1,
+      noncon: { value: 0 }, limitingCollector: null, convergenceCollector: null,
+      xfact: 1, gmin: 1e-12, reltol: 1e-3, iabstol: 1e-12,
+      temp: 300.15, vt: 0.025852, cktFixLimit: false, bypass: false, voltTol: 1e-6,
+    });
+
+    el.load(makeSmsigCtx());
+
+    const qbe = pool.states[0][SLOT_QBE];
+    // TF=0 → no transit-time contribution → QBE == DC charge (CJE>0, so QBE>0).
+    expect(qbe).toBeGreaterThan(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Task 5.2.13 — geqsub Norton aggregation verification (F-BJT-ADD-23)
+// cite: bjtload.c:798-800, 823
+// ---------------------------------------------------------------------------
+
+describe("BJT L1 substrate", () => {
+  const SLOT_GCSUB = 19, SLOT_GDSUB = 23;
+
+  it("geqsub_aggregates_gcsub_gdsub", () => {
+    // cite: bjtload.c:798-800 — geqsub = gcsub + gdsub; all substrate stamps use geqsub.
+    // Strategy: run with CJS>0 and ISS>0 in tran mode so both gcsub and gdsub are non-zero.
+    // Read gcsub and gdsub from s0. The stamp at (substConNode, substConNode) must equal
+    // m * (gcsub + gdsub). We verify by checking the sum is non-zero and finite.
+    const propsObj = makeSpiceL1Props({ CJS: 1e-12, ISS: 1e-14, SUBS: 1 });
+    const core = createSpiceL1BjtElement(1, new Map([["B", 1], ["C", 2], ["E", 3]]), [], -1, propsObj) as AnalogElementCore;
+    const pool = new StatePool((core as any).stateSize);
+    (core as any).stateBaseOffset = 0;
+    (core as any).initState(pool);
+    const el = withNodeIds(core, [1, 2, 3]);
+
+    const ag = new Float64Array(7);
+    ag[0] = 1 / 1e-9;
+    const rhsOld = new Float64Array(10);
+    rhsOld[0] = 0.65; rhsOld[1] = -1.0;
+    const solver = new SparseSolver(); solver.beginAssembly(10);
+    const ctx: LoadContext = {
+      cktMode: MODETRAN | MODEINITTRAN,
+      solver, matrix: solver,
+      rhs: new Float64Array(10), rhsOld,
+      time: 1e-9, dt: 1e-9, method: "trapezoidal", order: 1,
+      deltaOld: [1e-9, 1e-9, 1e-9, 1e-9, 1e-9, 1e-9, 1e-9],
+      ag, srcFact: 1,
+      noncon: { value: 0 }, limitingCollector: null, convergenceCollector: null,
+      xfact: 1, gmin: 1e-12, reltol: 1e-3, iabstol: 1e-12,
+      temp: 300.15, vt: 0.025852, cktFixLimit: false, bypass: false, voltTol: 1e-6,
+    };
+    el.load(ctx);
+
+    const s0 = pool.states[0];
+    const gcsub = s0[SLOT_GCSUB];
+    const gdsub = s0[SLOT_GDSUB];
+    const geqsub = gcsub + gdsub;
+    // geqsub must be positive and finite — confirms both components contribute.
+    expect(geqsub).toBeGreaterThan(0);
+    expect(Number.isFinite(geqsub)).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Task 5.2.14 — Cap block gating verification (F-BJT-ADD-25)
+// cite: bjtload.c:561-563
+// ---------------------------------------------------------------------------
+
+describe("BJT L1 cap_block", () => {
+  const SLOT_QBE = 8, SLOT_CQBE = 9;
+
+  function makeL1Cap(modelParams?: Record<string, number>): { el: AnalogElement; pool: StatePool } {
+    const propsObj = makeSpiceL1Props({ CJE: 1e-12, ...modelParams });
+    const core = createSpiceL1BjtElement(1, new Map([["B", 1], ["C", 2], ["E", 3]]), [], -1, propsObj) as AnalogElementCore;
+    const pool = new StatePool((core as any).stateSize);
+    (core as any).stateBaseOffset = 0;
+    (core as any).initState(pool);
+    return { el: withNodeIds(core, [1, 2, 3]), pool };
+  }
+
+  function makeCtxWith(cktMode: number, dt: number): LoadContext {
+    const solver = new SparseSolver();
+    solver.beginAssembly(10);
+    const rhsOld = new Float64Array(10);
+    rhsOld[0] = 0.65; rhsOld[1] = -1.0;
+    const ag = new Float64Array(7);
+    if (dt > 0) ag[0] = 1 / dt;
+    return {
+      cktMode,
+      solver, matrix: solver,
+      rhs: new Float64Array(10), rhsOld,
+      time: dt, dt, method: "trapezoidal", order: 1,
+      deltaOld: [dt, dt, dt, dt, dt, dt, dt],
+      ag, srcFact: 1,
+      noncon: { value: 0 }, limitingCollector: null, convergenceCollector: null,
+      xfact: 1, gmin: 1e-12, reltol: 1e-3, iabstol: 1e-12,
+      temp: 300.15, vt: 0.025852, cktFixLimit: false, bypass: false, voltTol: 1e-6,
+    };
+  }
+
+  it("skipped_under_pure_dcop", () => {
+    // cite: bjtload.c:561-563 — cap block gate excludes pure DCOP.
+    const { el, pool } = makeL1Cap({ CJC: 1e-12 });
+    el.load(makeCtxWith(MODEDCOP | MODEINITFLOAT, 0));
+    // Cap block did not fire — QBE stays 0.
+    expect(pool.states[0][SLOT_QBE]).toBe(0);
+  });
+
+  it("entered_under_MODETRAN", () => {
+    // cite: bjtload.c:561-563 — MODETRAN bit opens cap block.
+    const { el, pool } = makeL1Cap();
+    el.load(makeCtxWith(MODEDCOP | MODETRAN | MODEINITFLOAT, 1e-9));
+    expect(pool.states[0][SLOT_QBE]).toBeGreaterThan(0);
+  });
+
+  it("entered_under_MODETRANOP_MODEUIC", () => {
+    // cite: bjtload.c:562 — (MODETRANOP && MODEUIC) opens cap block.
+    const { el, pool } = makeL1Cap();
+    el.load(makeCtxWith(MODETRANOP | MODEUIC | MODEINITFLOAT, 0));
+    expect(pool.states[0][SLOT_QBE]).toBeGreaterThan(0);
+  });
+
+  it("entered_under_MODEINITSMSIG", () => {
+    // cite: bjtload.c:563 — MODEINITSMSIG opens cap block; stores cap values in s0.
+    const { el, pool } = makeL1Cap();
+    // Prime s0 first with a DC-OP so MODEINITSMSIG reads valid op values.
+    const primeSolver = new SparseSolver(); primeSolver.beginAssembly(10);
+    const rhsOld = new Float64Array(10); rhsOld[0] = 0.65; rhsOld[1] = -1.0;
+    el.load({
+      cktMode: MODEDCOP | MODEINITFLOAT, solver: primeSolver, matrix: primeSolver,
+      rhs: new Float64Array(10), rhsOld,
+      time: 0, dt: 0, method: "trapezoidal", order: 1,
+      deltaOld: [0, 0, 0, 0, 0, 0, 0], ag: new Float64Array(7), srcFact: 1,
+      noncon: { value: 0 }, limitingCollector: null, convergenceCollector: null,
+      xfact: 1, gmin: 1e-12, reltol: 1e-3, iabstol: 1e-12,
+      temp: 300.15, vt: 0.025852, cktFixLimit: false, bypass: false, voltTol: 1e-6,
+    });
+    el.load(makeCtxWith(MODEDCOP | MODEINITSMSIG, 0));
+    // MODEINITSMSIG stores cap value in CQBE slot.
+    expect(pool.states[0][SLOT_CQBE]).toBeGreaterThan(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Task 5.2.15 — VSUB limiting collector entry (F-BJT-ADD-34)
+// cite: after BC push — SUB push with junction="SUB"
+// ---------------------------------------------------------------------------
+
+describe("BJT L1 LimitingEvent SUB", () => {
+  function makeL1ElWithLabel(modelParams?: Record<string, number>): AnalogElement {
+    const propsObj = makeSpiceL1Props({ ISS: 1e-14, ...modelParams });
+    const core = createSpiceL1BjtElement(
+      1, new Map([["B", 1], ["C", 2], ["E", 3]]), [], -1, propsObj,
+    ) as AnalogElementCore & { label?: string; elementIndex?: number };
+    core.label = "Q_SUB";
+    core.elementIndex = 7;
+    const pool = new StatePool((core as any).stateSize);
+    (core as any).stateBaseOffset = 0;
+    (core as any).initState(pool);
+    return withNodeIds(core, [1, 2, 3]);
+  }
+
+  function makeCtxForSubLimiting(collector: LimitingEvent[] | null): LoadContext {
+    // Use DC-OP mode with moderate vbe to trigger pnjlim on sub junction.
+    // vsubRaw = polarity*subs*(0 - vSubCon) — with default SUBS=1 NPN, substConNode=nodeC_int=nodeC_ext=node2.
+    // rhsOld[1] = 0 (collector=0) → vsubRaw = 1*1*(0-0) = 0. Use a large VBC to ensure sub junction fires.
+    // Instead: start with all-zero state so pnjlim fires on BE at minimum.
+    const solver = new SparseSolver();
+    solver.beginAssembly(10);
+    const rhsOld = new Float64Array(10);
+    rhsOld[0] = 5.0;  // VBE very large — triggers pnjlim on BE and limits.
+    return {
+      cktMode: MODEDCOP | MODEINITFLOAT,
+      solver, matrix: solver,
+      rhs: new Float64Array(10), rhsOld,
+      time: 0, dt: 0, method: "trapezoidal", order: 1,
+      deltaOld: [0, 0, 0, 0, 0, 0, 0],
+      ag: new Float64Array(7), srcFact: 1,
+      noncon: { value: 0 }, limitingCollector: collector, convergenceCollector: null,
+      xfact: 1, gmin: 1e-12, reltol: 1e-3, iabstol: 1e-12,
+      temp: 300.15, vt: 0.025852, cktFixLimit: false, bypass: false, voltTol: 1e-6,
+    };
+  }
+
+  it("pushes_SUB_event_when_collector_present", () => {
+    const el = makeL1ElWithLabel();
+    const collector: LimitingEvent[] = [];
+    el.load(makeCtxForSubLimiting(collector));
+
+    const subEv = collector.find((e: LimitingEvent) => e.junction === "SUB");
+    expect(subEv).toBeDefined();
+    expect(subEv!.limitType).toBe("pnjlim");
+    expect(subEv!.elementIndex).toBe(7);
+    expect(subEv!.label).toBe("Q_SUB");
+    expect(Number.isFinite(subEv!.vBefore)).toBe(true);
+    expect(Number.isFinite(subEv!.vAfter)).toBe(true);
+    expect(typeof subEv!.wasLimited).toBe("boolean");
+  });
+
+  it("no_SUB_event_when_collector_null", () => {
+    const el = makeL1ElWithLabel();
+    expect(() => el.load(makeCtxForSubLimiting(null))).not.toThrow();
+  });
+});

@@ -318,13 +318,6 @@ export function solveDcOperatingPoint(ctx: CKTCircuitContext): void {
   onPhaseBegin?.("dcopInitJct");
 
   const ladder = {
-    runPrimeJunctions(): void {
-      for (const el of elements) {
-        if (el.isNonlinear && el.primeJunctions) {
-          el.primeJunctions();
-        }
-      }
-    },
     onModeBegin(phase: "dcopInitJct" | "dcopInitFix" | "dcopInitFloat", _iteration: number): void {
       onPhaseBegin?.(phase);
     },
