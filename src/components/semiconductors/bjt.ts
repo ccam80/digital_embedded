@@ -806,6 +806,7 @@ export function createBjtElement(
     load(ctx: LoadContext): void {
       const s0 = pool.states[0];
       const s1 = pool.states[1];
+      const s2 = pool.states[2];
       const mode = ctx.cktMode;
       const voltages = ctx.rhsOld;
 
@@ -837,13 +838,13 @@ export function createBjtElement(
         vbeRaw = 0;
         vbcRaw = 0;
       } else if (mode & MODEINITPRED) {
-        // bjtload.c:278-306: predictor state rotation (PREDICTOR #undef by
-        // default in ngspice — inert path). Seed from s1 as a safe rotation
-        // since our pool-rotation model replays state1 on the next step.
-        vbeRaw = s1[base + SLOT_VBE];
-        vbcRaw = s1[base + SLOT_VBC];
-        s0[base + SLOT_VBE] = vbeRaw;
-        s0[base + SLOT_VBC] = vbcRaw;
+        // bjtload.c:278-287: #ifndef PREDICTOR state1→state0 copy + xfact extrapolation.
+        s0[base + SLOT_VBE] = s1[base + SLOT_VBE];
+        s0[base + SLOT_VBC] = s1[base + SLOT_VBC];
+        vbeRaw = (1 + ctx.xfact) * s1[base + SLOT_VBE] - ctx.xfact * s2[base + SLOT_VBE];
+        vbcRaw = (1 + ctx.xfact) * s1[base + SLOT_VBC] - ctx.xfact * s2[base + SLOT_VBC];
+        (ctx as any).__phase3ProbeVbeRaw = vbeRaw;
+        (ctx as any).__phase3ProbeVbcRaw = vbcRaw;
       } else {
         // bjtload.c:311-319: normal NR iteration — read from CKTrhsOld.
         const vB = nodeB > 0 ? voltages[nodeB - 1] : 0;
@@ -851,15 +852,18 @@ export function createBjtElement(
         const vE = nodeE > 0 ? voltages[nodeE - 1] : 0;
         vbeRaw = polarity * (vB - vE);
         vbcRaw = polarity * (vB - vC);
+        (ctx as any).__phase3ProbeVbeRaw = vbeRaw;
+        (ctx as any).__phase3ProbeVbcRaw = vbcRaw;
       }
 
-      // bjtload.c:383-416: pnjlim (skipped during init dispatch cases per
-      // :258-275,236-257 which set voltages directly).
+      // bjtload.c:383-416: pnjlim on BE/BC. pnjlim runs under MODEINITPRED — ngspice has no
+      // MODEINITPRED skip (bjtload.c:386 unconditional; !(MODEINITPRED) guard at :347 is for
+      // bypass only).
       let vbeLimited = vbeRaw;
       let vbcLimited = vbcRaw;
       let vbeLimFlag = false;
       let vbcLimFlag = false;
-      if ((mode & (MODEINITJCT | MODEINITSMSIG | MODEINITTRAN | MODEINITPRED)) === 0) {
+      if ((mode & (MODEINITJCT | MODEINITSMSIG | MODEINITTRAN)) === 0) {
         const vbeResult = pnjlim(vbeRaw, s0[base + SLOT_VBE], tp.vt, tp.tVcrit);
         vbeLimited = vbeResult.value;
         vbeLimFlag = vbeResult.limited;
@@ -1285,19 +1289,30 @@ export function createSpiceL1BjtElement(
         vbxRaw = 0;
         vsubRaw = 0;
       } else if (mode & MODEINITPRED) {
-        // bjtload.c:278-306 predictor rotation (PREDICTOR #undef default).
-        vbeRaw = s1[base + SLOT_VBE];
-        vbcRaw = s1[base + SLOT_VBC];
-        s0[base + SLOT_VBE] = vbeRaw;
-        s0[base + SLOT_VBC] = vbcRaw;
-        vbxRaw = polarity * (vBe_ext - vCi);
-        vsubRaw = polarity * subs * (0 - vSubCon);
+        // bjtload.c:278-287: #ifndef PREDICTOR state1→state0 copy + xfact extrapolation.
+        // bjtload.c:383-416: pnjlim runs under MODEINITPRED — ngspice has no MODEINITPRED
+        // skip (bjtload.c:386 unconditional; !(MODEINITPRED) guard at :347 is for bypass only).
+        s0[base + SLOT_VBE]  = s1[base + SLOT_VBE];
+        s0[base + SLOT_VBC]  = s1[base + SLOT_VBC];
+        s0[base + SLOT_VSUB] = s1[base + SLOT_VSUB];
+        vbeRaw  = (1 + ctx.xfact) * s1[base + SLOT_VBE]  - ctx.xfact * s2[base + SLOT_VBE];
+        vbcRaw  = (1 + ctx.xfact) * s1[base + SLOT_VBC]  - ctx.xfact * s2[base + SLOT_VBC];
+        vsubRaw = (1 + ctx.xfact) * s1[base + SLOT_VSUB] - ctx.xfact * s2[base + SLOT_VSUB];
+        (ctx as any).__phase3ProbeVsubExtrap = vsubRaw;
+        vbxRaw  = polarity * (vBe_ext - vCi);           // bjtload.c:325-327
+        vsubRaw = polarity * subs * (0 - vSubCon);      // bjtload.c:328-330
+        (ctx as any).__phase3ProbeVbeRaw   = vbeRaw;
+        (ctx as any).__phase3ProbeVbcRaw   = vbcRaw;
+        (ctx as any).__phase3ProbeVsubFinal = vsubRaw;
       } else {
         // bjtload.c:311-319: normal NR iteration — read from CKTrhsOld.
-        vbeRaw = polarity * (vBi - vEi);
-        vbcRaw = polarity * (vBi - vCi);
-        vbxRaw = polarity * (vBe_ext - vCi);           // bjtload.c:325-327
+        vbeRaw  = polarity * (vBi - vEi);
+        vbcRaw  = polarity * (vBi - vCi);
+        vbxRaw  = polarity * (vBe_ext - vCi);           // bjtload.c:325-327
         vsubRaw = polarity * subs * (0 - vSubCon);      // bjtload.c:328-330
+        (ctx as any).__phase3ProbeVbeRaw   = vbeRaw;
+        (ctx as any).__phase3ProbeVbcRaw   = vbcRaw;
+        (ctx as any).__phase3ProbeVsubFinal = vsubRaw;
       }
 
       // bjtload.c:383-416: pnjlim on BE, BC, and substrate junctions.
@@ -1307,7 +1322,7 @@ export function createSpiceL1BjtElement(
       let vbeLimFlag = false;
       let vbcLimFlag = false;
       let vsubLimFlag = false;
-      if ((mode & (MODEINITJCT | MODEINITSMSIG | MODEINITTRAN | MODEINITPRED)) === 0) {
+      if ((mode & (MODEINITJCT | MODEINITSMSIG | MODEINITTRAN)) === 0) {
         const vbeResult = pnjlim(vbeRaw, s0[base + SLOT_VBE], vt, tp.tVcrit);
         vbeLimited = vbeResult.value;
         vbeLimFlag = vbeResult.limited;

@@ -126,13 +126,13 @@
       ],
       "spawned": 4,
       "completed": 2,
-      "verifications_passed": 0,
+      "verifications_passed": 1,
       "verifications_failed": 1,
       "stops_for_clarification": 1,
       "dead_implementers": 1,
       "dead_verifiers": 0,
       "group_status": {
-        "3.1": "failed"
+        "3.1": "passed"
       },
       "user_required_tasks": {
         "3.1": []
@@ -159,17 +159,17 @@
           "3.2.5"
         ]
       ],
-      "spawned": 0,
-      "completed": 0,
-      "verifications_passed": 0,
+      "spawned": 4,
+      "completed": 3,
+      "verifications_passed": 2,
       "verifications_failed": 0,
       "stops_for_clarification": 0,
-      "dead_implementers": 0,
+      "dead_implementers": 1,
       "dead_verifiers": 0,
       "group_status": {
-        "3.2.diode": "pending",
+        "3.2.diode": "passed",
         "3.2.bjt": "pending",
-        "3.2.audit": "pending"
+        "3.2.audit": "passed"
       },
       "user_required_tasks": {
         "3.2.diode": [],
@@ -679,5 +679,5 @@
       "user_acks": {}
     }
   ],
-  "last_updated": "2026-04-24T06:55:05.458Z"
+  "last_updated": "2026-04-24T07:40:11.998Z"
 }

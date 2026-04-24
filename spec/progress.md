@@ -143,3 +143,40 @@
 - **Tests**: 2/2 Task 3.1.2 tests pass after test deletion; 8/8 total tests pass in phase-3-nr-reorder.test.ts (6 Task 3.1.1 + 2 Task 3.1.2).
 - **Recovery events**: 1 clarification stop (first implementer — DC-OP portion not implementable, spec-authoring error); 1 dead implementer (second implementer finished code edit but returned without invoking complete-implementer.sh; coordinator ran mark-dead-implementer.sh; this retry run finalizes progress.md and records completion).
 
+
+## Task 3.2.1: Diode MODEINITPRED xfact extrapolation
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: src/components/semiconductors/__tests__/phase-3-xfact-predictor.test.ts
+- **Files modified**: src/components/semiconductors/diode.ts
+- **Tests**: 5/5 passing
+
+## Task 3.2.5: xfact scope audit
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**:
+  - `src/solver/analog/__tests__/phase-3-xfact-scope-audit.test.ts` — manifest-driven xfact scope audit test
+- **Files modified**: none
+- **Tests**: 3/3 passing
+  - `it("has zero unguarded xfact reads in src/components/")` — PASS. Audit detects 3 xfact reads (bjt.ts:843, bjt.ts:844, diode.ts:526) all properly guarded by `if (mode & MODEINITPRED)` blocks.
+  - `it("has zero unguarded xfact reads in src/solver/analog/")` — PASS. Only read is analog-engine.ts:430 (the xfact write, on allowlist).
+  - `it("allowlist is exhaustive — no stale entries")` — PASS. Allowlist entry analog-engine.ts:430 verified to exist and contain "xfact".
+- **Implementation notes**:
+  - Guard detection scans backwards from each xfact read, counting braces to determine if the read is inside a MODEINITPRED-guarded block.
+  - Allowlist for src/components/ is empty (all current reads are guarded by Phase 3.2 landing).
+  - Allowlist for src/solver/analog/ contains exactly one entry: analog-engine.ts:430 (the engine-side xfact computation write).
+  - Test is parallel-safe: passes both pre-Phase-3.2-land (0 reads) and post-Phase-3.2-land (6 reads, all guarded).
+
+## Task 3.2.2 / 3.2.3 / 3.2.4: BJT L0 probe writes, BJT L1 xfact/VSUB/pnjlim fix, VSUB state-copy guard
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: none
+- **Files modified**:
+  - `src/components/semiconductors/bjt.ts`
+  - `src/components/semiconductors/__tests__/phase-3-xfact-predictor.test.ts`
+- **Tests**: 17/17 passing (5 diode Task 3.2.1 + 5 BJT L0 Task 3.2.2 + 6 BJT L1 Task 3.2.3 + 1 VSUB Task 3.2.4)
+- **Recovery note**: 1 dead implementer on first pass — L0 landed without probe writes, L1 scaffolded without xfact / VSUB copy / pnjlim mask fix; retry landed full work.
+- **Changes made**:
+  - L0 `createBjtElement::load()`: added `s2 = pool.states[2]` declaration; added probe writes `__phase3ProbeVbeRaw` / `__phase3ProbeVbcRaw` in both MODEINITPRED branch and rhsOld else branch.
+  - L1 `createSpiceL1BjtElement::load()`: rewrote MODEINITPRED branch — state-copy for VBE/VBC/VSUB, xfact extrapolation for all three, `__phase3ProbeVsubExtrap` immediately after extrapolation, vbxRaw rhsOld read (bjtload.c:325-327), vsubRaw rhsOld re-read (bjtload.c:328-330), final probes `__phase3ProbeVbeRaw` / `__phase3ProbeVbcRaw` / `__phase3ProbeVsubFinal`; probe writes added to rhsOld else branch; pnjlim skip mask changed from `(MODEINITJCT | MODEINITSMSIG | MODEINITTRAN | MODEINITPRED)` to `(MODEINITJCT | MODEINITSMSIG | MODEINITTRAN)`.
+  - Test file: updated imports to include `createBjtElement`, `createSpiceL1BjtElement`, `BJT_NPN_DEFAULTS`, `BJT_SPICE_L1_NPN_DEFAULTS`; appended Task 3.2.2 describe block (5 tests), Task 3.2.3 describe block (6 tests), Task 3.2.4 describe block (1 test).

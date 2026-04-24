@@ -515,21 +515,22 @@ export function createDiodeElement(
       } else if ((mode & MODEINITFIX) && params.OFF) {
         // dioload.c:137-138: MODEINITFIX && DIOoff → vd = 0
         vdRaw = 0;
+      } else if (mode & MODEINITPRED) {
+        // cite: dioload.c:141-152
+        // dioload.c:142-148: state1→state0 copies (DIOvoltage, DIOcurrent, DIOconduct).
+        s0[base + SLOT_VD]  = s1[base + SLOT_VD];
+        s0[base + SLOT_ID]  = s1[base + SLOT_ID];
+        s0[base + SLOT_GEQ] = s1[base + SLOT_GEQ];
+        // dioload.c:144: vd = DEVpred(ckt, DIOvoltage) =
+        //       (1+xfact)*state1[vd] - xfact*state2[vd] under #ifndef PREDICTOR.
+        vdRaw = (1 + ctx.xfact) * s1[base + SLOT_VD] - ctx.xfact * s2[base + SLOT_VD];
+        (ctx as any).__phase3ProbeVdRaw = vdRaw;
       } else {
-        // D-W3-3: MODEINITPRED — dioload.c:141-155 (#ifndef PREDICTOR block).
-        // Copy state1→state0, then fall through directly to the rhsOld read.
-        // ngspice does NOT re-test MODEINITSMSIG/MODEINITTRAN after the copy;
-        // it falls straight into the rhsOld read (DEVpred output used as vd).
-        // cite: dioload.c:141-149
-        if (mode & MODEINITPRED) {
-          s0[base + SLOT_VD]  = s1[base + SLOT_VD];
-          s0[base + SLOT_ID]  = s1[base + SLOT_ID];
-          s0[base + SLOT_GEQ] = s1[base + SLOT_GEQ];
-        }
-        // dioload.c:151-152: vd = CKTrhsOld[DIOposPrimeNode] - CKTrhsOld[DIOnegNode]
+        // dioload.c:151-152: normal NR — read from CKTrhsOld.
         const va = nodeJunction > 0 ? voltages[nodeJunction - 1] : 0;
         const vc = nodeCathode > 0 ? voltages[nodeCathode - 1] : 0;
         vdRaw = va - vc;
+        (ctx as any).__phase3ProbeVdRaw = vdRaw;
       }
 
       const vtebrk = params.NBV * vt;
