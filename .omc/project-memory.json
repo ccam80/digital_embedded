@@ -43,7 +43,7 @@
   },
   "build": {
     "buildCommand": "cat >> \"C:/local_working_projects/digital_in_browser/spec/progress.md\" <<'EOF'\n\n---\n## Phase 3 Complete\n- **Batches**: 3 (batch-p3-w3.1 Wave 3.1 NR reorder; batch-p3-w3.2 Wave 3.2 diode+BJT xfact; batch-p3-w3.3 Wave 3.3 IntegrationMethod alignment)\n- **Tasks**: 14 (3.1.1, 3.1.2, 3.2.1, 3.2.2, 3.2.3, 3.2.4, 3.2.5, 3.3.1, 3.3.2, 3.3.3, 3.3.4, 3.3.5, 3.3.6, 3.3.7)\n- **All verified**: yes (group_status for every task_group in every batch is \"passed\")\n- **Recovery events**: 1 clarification stop (Task 3.1.2 DC-OP cktop.c citation portion stricken per 2026-04-24 user clarification — presumed call site does not exist in digiTS and presumed ngspice analog does not exist in ngspice); 4 dead implementers (3.1 retry, 3.2.bjt first pass, 3.3.collapse first pass, 3.3.audit first pass — each recovered via mark-dead-implementer.sh + retry implementer).\n- **Verification cycles**: batch-p3-w3.1 had 1 FAIL (test-split + call-site discrimination fixes); batch-p3-w3.2 had 1 FAIL (missing pnjlim exact-count assertions, weak `>= 1` tightened to `=== 3`, missing skip-mask sub-case tests added). All FAILs converted to PASS after fix-implementer retries.\n- **Artifacts landed**:\n  - `src/solver/analog/__tests__/phase-3-nr-reorder.test.ts` — 7 tests guarding the NR loop-top NISHOULDREORDER gate + E_SINGULAR retry citation.\n  - `src/components/semiconductors/__tests__/phase-3-xfact-predictor.test.ts` — 17 tests covering diode + BJT L0 + BJT L1 xfact extrapolation, state-copy, pnjlim under MODEINITPRED (exact counts), VSUB state-copy regression guard.\n  - `src/solver/analog/__tests__/phase-3-xfact-scope-audit.test.ts` — 3 tests asserting every ctx.xfact read is MODEINITPRED-guarded.\n  - `src/solver/analog/__tests__/phase-3-relay-composite.test.ts` — 2 tests asserting SPDT/DPDT relays expose coil inductor as composite child.\n  - Phase 0 identifier audit manifest extended with 3 banned-literal rules (bdf1-literal, bdf2-literal, integrationMethod-auto); matching rows in `spec/phase-0-audit-report.md`.\n  - Compile-time assertion `_AssertPublicInternalEq` in `src/core/analog-engine-interface.ts` locks SimulationParams.integrationMethod === IntegrationMethod at tsc time.\n- **Production code deltas**:\n  - `diode.ts`, `bjt.ts` — MODEINITPRED branch rewritten to copy s1->s0 and extrapolate via `(1 + ctx.xfact) * s1 - ctx.xfact * s2` per dioload.c:141-152 and bjtload.c:278-330; pnjlim skip masks stripped of MODEINITPRED so pnjlim runs on the extrapolated voltages per bjtload.c:386-414.\n  - `bjt.ts` L1 VSUB: extrapolated, then re-read from rhsOld per bjtload.c:328-330 verbatim port of the ngspice vbx/vsub unconditional rewrite.\n  - `analog-types.ts` IntegrationMethod narrowed to \"trapezoidal\" | \"gear\" per cktdefs.h:107-108.\n  - `integration.ts` bdf-two branch deleted; order-1 gear via inline trap-1 per nicomcof.c:40-41; order >= 2 gear via solveGearVandermonde.\n  - `analog-engine-interface.ts` SimulationParams.integrationMethod narrowed; default = \"trapezoidal\" per cktntask.c:99; no \"auto\" coercion shim.\n  - `behavioral-remaining.ts` SPDT and DPDT relay factories rewritten to delegate coil integration to a child AnalogInductorElement via the Phase 0 composite-child pattern; hand-rolled method-dispatched companion deleted.\n  - `timestep.ts`, `convergence-log-panel.ts`, `ni-pred.ts`, `ni-integrate.ts`, `ckt-terr.ts`, `analog-engine.ts` — residual bdf1/bdf2 cleanup; `load-context.ts` \"backwards compatibility\" block deleted.\n- **Follow-through**: Phase 4 (F5 residual limiting primitives) is the next batch; its batch-p4-w4.1 entry is already planned in `.hybrid-state.json`. Phase 4 depends on Phase 3 per plan.md serialization.\nEOF\nls \"C:/local_working_projects/digital_in_browser/spec/progress.md\"",
-    "testCommand": "cd \"C:/local_working_projects/digital_in_browser\" && npx vitest run --testTimeout=120000 src/solver/analog/__tests__/phase-0-identifier-audit.test.ts 2>&1 | tail -80",
+    "testCommand": "cd \"C:/local_working_projects/digital_in_browser\" && npx vitest run --testTimeout=120000 src/solver/analog/__tests__/phase-3-nr-reorder.test.ts src/components/semiconductors/__tests__/phase-3-xfact-predictor.test.ts 2>&1 | tail -15",
     "lintCommand": "npm run lint",
     "devCommand": "npm run dev",
     "scripts": {
@@ -285,14 +285,14 @@
   "hotPaths": [
     {
       "path": "src",
-      "accessCount": 75,
-      "lastAccessed": 1777022186118,
+      "accessCount": 76,
+      "lastAccessed": 1777023387576,
       "type": "directory"
     },
     {
       "path": "spec\\progress.md",
-      "accessCount": 71,
-      "lastAccessed": 1777022999163,
+      "accessCount": 72,
+      "lastAccessed": 1777023055946,
       "type": "file"
     },
     {
@@ -303,14 +303,14 @@
     },
     {
       "path": "spec\\.context\\rules.md",
-      "accessCount": 44,
-      "lastAccessed": 1777022842043,
+      "accessCount": 46,
+      "lastAccessed": 1777023185043,
       "type": "file"
     },
     {
       "path": "spec\\test-baseline.md",
-      "accessCount": 44,
-      "lastAccessed": 1777022848300,
+      "accessCount": 46,
+      "lastAccessed": 1777023186404,
       "type": "file"
     },
     {
@@ -327,8 +327,8 @@
     },
     {
       "path": "spec\\.context\\lock-protocol.md",
-      "accessCount": 27,
-      "lastAccessed": 1777022841966,
+      "accessCount": 28,
+      "lastAccessed": 1777023185818,
       "type": "file"
     },
     {
@@ -434,16 +434,16 @@
       "type": "directory"
     },
     {
+      "path": "src\\solver\\analog\\__tests__",
+      "accessCount": 10,
+      "lastAccessed": 1777023294589,
+      "type": "directory"
+    },
+    {
       "path": "src\\components\\active\\dac.ts",
       "accessCount": 9,
       "lastAccessed": 1777005411731,
       "type": "file"
-    },
-    {
-      "path": "src\\solver\\analog\\__tests__",
-      "accessCount": 8,
-      "lastAccessed": 1777022399630,
-      "type": "directory"
     },
     {
       "path": "src\\solver\\analog\\bridge-adapter.ts",

@@ -366,3 +366,36 @@
   - `spec/phase-0-audit-report.md` — appended two new rows (`bdf-hyphenated`, `bdf-substring`) to the Phase 3 Wave 3.3 rule-additions table, matching the existing `bdf1-literal` / `bdf2-literal` layout; reasons mirror the `description` fields in the manifest. Cited-at column is `C-3.4.4`.
 - **Tests**: 3/3 passing. Ran `npx vitest run --testTimeout=120000 src/solver/analog/__tests__/phase-0-identifier-audit.test.ts`: `scope_dirs_exist`, `no_unexpected_hits`, `allowlist_is_not_stale` all green (11.6s). Grep-tool verification: the only file under `src/`, `scripts/`, `e2e/` matching either new regex is the audit test file itself, which is self-excluded via `THIS_FILE` — confirming the tree is clean after Tasks C-3.4.1/2/3 and that the new regexes are green against HEAD.
 - **Acceptance gate**: Five Wave-3.3-/Phase-3-cleanup-era manifest rows are present (three existing + two new). Audit test passes against current tree. Regex form is `/BDF[-_ ][12]/i` and `/bdf[12]/i` — no word-boundary anchors, as required by the spec so `rBdf2`, `NGSPICE_REF_BDF2`, `updateCompanion_bdf1` and similar compound-identifier cases are caught.
+
+---
+## Phase 3 Cleanup Complete (BDF-1/BDF-2 vocabulary purge)
+- **Batches**: 2 (batch-p3cleanup-residue-parallel [C-3.4.1+2+3 in parallel]; batch-p3cleanup-residue-audit [C-3.4.4])
+- **Tasks**: 4 (C-3.4.1 production doc-comments; C-3.4.2 solver-side tests; C-3.4.3 component-side tests; C-3.4.4 phase-0 audit manifest extension)
+- **All verified**: yes (group_status for every task_group in both batches is "passed")
+- **Outcome**: the 175 occurrences of `bdf1`/`bdf2`/`BDF-1`/`BDF-2` across 27 files reported in the spec's §2 inventory are purged. Two new banned-literal regex rules (`bdf-hyphenated: /BDF[-_ ][12]/i` and `bdf-substring: /bdf[12]/i`) now block re-introduction across `src/`, `scripts/`, `e2e/`. Five total Phase-3-era manifest entries guard the vocabulary (3 existing + 2 new).
+- **Rename-only discipline**: every edit was comment / doc-string / identifier / describe-block rename. Zero numerical assertion changes, zero executable-code changes in the 9 production files. Existing pre-existing test failures (ckt-terr numerical divergence, component transient crashes) remain unchanged — expected per `spec/test-baseline.md` and not attributable to this cleanup.
+
+
+## Task 4.1.1: fetlim vtstlo Gillespie formula (`_computeVtstlo` helper)
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: src/solver/analog/__tests__/newton-raphson-limiting.test.ts
+- **Files modified**: src/solver/analog/newton-raphson.ts
+- **Tests**: 10/10 passing (4 for _computeVtstlo + fetlim in this task, plus 6 for 4.1.2 in same file)
+- **Notes**: Added `export function _computeVtstlo(vold, vto): number` adjacent to `fetlim`, replaced `vtstlo = vtsthi/2 + 2` at what was line 171 with `self._computeVtstlo(vold, vto)`, added `// cite: devsup.c:101-102` comment. Added `import * as self from "./newton-raphson.js"` self-namespace so the spec-mandated `vi.spyOn(namespace, "_computeVtstlo")` test can intercept the intra-module call — without self-dispatch the lexical binding wins and the spy test fails (reproduced and fixed). All four §4.1.1 tests pass with exact equality.
+
+## Task 4.1.2: limvds parity audit + citation refresh (devsup.c:17-40)
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: (none — tests appended to newton-raphson-limiting.test.ts from Task 4.1.1)
+- **Files modified**: src/solver/analog/newton-raphson.ts
+- **Tests**: 6/6 passing
+- **Notes**: Audited `limvds` at (pre-edit) lines 226-241 against ref/ngspice/src/spicelib/devices/devsup.c:17-40. Mapping verified bit-identical: gate `vold >= 3.5` (devsup.c:24), upper clamp `Math.min(vnew, 3*vold+2)` (:25-26), lower floor `Math.max(vnew, 2)` (:28-29), low-Vds clamps `Math.min(vnew,4)` (:33-34) and `Math.max(vnew,-0.5)` (:35-36). No numerical divergence — docstring-only change applied (added `:17-40` to the existing `DEVlimvds (devsup.c)` citation).
+
+## Task 4.1.3: pnjlim citation refresh (devsup.c:49-84) post-D4
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: (none)
+- **Files modified**: src/solver/analog/newton-raphson.ts
+- **Tests**: no new tests per spec (comment-only change); existing `phase-3-xfact-predictor.test.ts` (24/24) and `newton-raphson.test.ts` (30 pass, 2 pre-existing failures at lines 396/410 in `pnjlim_matches_ngspice_*` — their expected-value formulas use `vold + vt*Math.log(arg)` but ngspice computes `vold + vt*(2+log(arg-2))`; unrelated to this phase, pre-existing per expected-red policy)
+- **Notes**: Changed `(devsup.c:50-58)` at pnjlim JSDoc line 67 → `(devsup.c:49-84)`; changed `(devsup.c:50-84)` above `_pnjlimResult` port-verbatim comment → `(devsup.c:49-84)`. Grep confirms 2 hits for `devsup.c:49-84`, 0 hits for both old forms.

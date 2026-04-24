@@ -15,6 +15,11 @@ import {
   MODEINITFLOAT, MODEINITJCT, MODEINITFIX,
   MODEINITTRAN, MODEINITPRED, MODEINITSMSIG,
 } from "./ckt-mode.js";
+// Self-namespace import: lets intra-module calls (e.g. `fetlim` → `_computeVtstlo`)
+// route through the exports object rather than the lexical binding, so that
+// `vi.spyOn(NewtonRaphsonModule, "_computeVtstlo")` can intercept the call
+// from test code and guard against future inline re-expansion of the helper.
+import * as self from "./newton-raphson.js";
 
 // ---------------------------------------------------------------------------
 // LimitingEvent — records a single voltage-limiting call per junction per NR iteration
@@ -64,7 +69,7 @@ export interface PnjlimResult {
  * compressing large forward-bias steps logarithmically, and clamping
  * large reverse-bias steps.
  *
- * Matches ngspice DEVpnjlim (devsup.c:50-58) exactly, including the
+ * Matches ngspice DEVpnjlim (devsup.c:49-84) exactly, including the
  * `*icheck` output parameter exposed here as the `limited` field.
  *
  * @param vnew  - Proposed new junction voltage
@@ -81,7 +86,7 @@ export interface PnjlimResult {
 const _pnjlimResult: PnjlimResult = { value: 0, limited: false };
 
 /**
- * Direct JavaScript port of ngspice DEVpnjlim (devsup.c:50-84).
+ * Direct JavaScript port of ngspice DEVpnjlim (devsup.c:49-84).
  *
  * Includes the Gillespie negative-bias branch (devsup.c:67-82) — D4 in
  * spec/architectural-alignment.md. When vnew is not above the forward
@@ -145,6 +150,23 @@ export function pnjlim(vnew: number, vold: number, vt: number, vcrit: number): P
 }
 
 /**
+ * Alan Gillespie's `vtstlo` coefficient for `fetlim`.
+ *
+ * ngspice redefined this coefficient from the spice3f5 formula
+ * `vtsthi/2 + 2` to `fabs(vold - vto) + 1` (devsup.c:102, see the
+ * "new definition for vtstlo" note at devsup.c:88-90 and ngspice.texi:12002-12008).
+ *
+ * Exported so the test suite can exercise the Gillespie formula directly:
+ * the outer `fetlim` clamps (`vtemp = vto + 0.5`, `vtox = vto + 3.5`) dominate
+ * every end-to-end input that would straddle the old/new `vtstlo` thresholds,
+ * so no `fetlim(vnew, vold, vto)` triple exposes the `vtstlo` coefficient to a
+ * round-trip assertion.
+ */
+export function _computeVtstlo(vold: number, vto: number): number {
+  return Math.abs(vold - vto) + 1;
+}
+
+/**
  * MOSFET gate-source voltage limiting (fetlim).
  *
  * Three-zone algorithm from SPICE3f5/ngspice DEVfetlim (devsup.c):
@@ -167,8 +189,9 @@ export function pnjlim(vnew: number, vold: number, vt: number, vcrit: number): P
  * @returns    - Voltage-limited new Vgs
  */
 export function fetlim(vnew: number, vold: number, vto: number): number {
+  // cite: devsup.c:101-102
   const vtsthi = Math.abs(2 * (vold - vto)) + 2;
-  const vtstlo = vtsthi / 2 + 2;
+  const vtstlo = self._computeVtstlo(vold, vto);
   const vtox = vto + 3.5;
   const delv = vnew - vold;
 
@@ -217,7 +240,7 @@ export function fetlim(vnew: number, vold: number, vto: number): number {
  * Prevents large Vds swings per NR iteration. Critical for switching
  * circuits where Vds can swing across the full supply range.
  *
- * Algorithm from SPICE3f5/ngspice DEVlimvds (devsup.c).
+ * Algorithm from SPICE3f5/ngspice DEVlimvds (devsup.c:17-40).
  *
  * @param vnew - Proposed new Vds
  * @param vold - Previous Vds
