@@ -1140,3 +1140,54 @@ Previously-confirmed-patched files regression check: load-context.ts, ckt-contex
 - **Fix**: Re-scanned all three files using the same citationRe + commentLineRe as the test, built replacement rows with exact sourceLine values, inserted them at the same positions in the array (replacing old rows one-for-one), then re-numbered all C-NNN IDs continuously. Total row count stayed at 1284.
 - **Non-mosfet rows**: untouched — all other files' rows preserved exactly.
 - **MD Priority sub-table**: IDs C-0989 through C-1065 still correctly reference dc-operating-point.ts and newton-raphson.ts rows — no renumbering impact.
+
+## Task 8.2.3: analog-types.ts citation correction (satisfied-by-absence)
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: (none)
+- **Files modified**:
+  - `spec/ngspice-citation-audit.json` — updated rows C-0836 through C-0842 (all `sourceFile === "src/core/analog-types.ts"`) from `unverified` to `verified`; set `claimKeyword` for each row
+  - `src/solver/analog/__tests__/citation-audit.test.ts` — appended `AnalogTypesCitations::allVerified` and `PlanTargetRotAbsent::noStaleNiiter991` describe blocks
+- **Tests**: 10/10 passing
+- **Verification**:
+  - Repo-wide search for `niiter.c:991-997` under `src/` returned zero matches (satisfied-by-absence confirmed)
+  - `cktdefs.h:107-108` resolves: `#define TRAPEZOIDAL 1` / `#define GEAR 2` (keyword: `TRAPEZOIDAL`)
+  - `nicomcof.c:40-41` resolves: `ckt->CKTag[0]` / `ckt->CKTag[1]` assignments (keyword: `CKTag`)
+  - `nicomcof.c:52-127` resolves: GEAR case block (keyword: `GEAR`)
+  - `cktntask.c:99` resolves: `tsk->TSKintegrateMethod = TRAPEZOIDAL` (keyword: `TRAPEZOIDAL`)
+  - `cktdefs.h:177-182` resolves: INITF defines block including `MODEINITFLOAT` through `MODEINITPRED` (keyword: `MODEINITFLOAT`)
+  - `nicomcof.c:33-51` resolves: switch on `CKTintegrateMethod` with TRAPEZOIDAL case (keyword: `CKTintegrateMethod`)
+
+## Task 8.2.1: dc-operating-point.ts citation corrections
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: (none)
+- **Files modified**:
+  - `src/solver/analog/dc-operating-point.ts` — corrected 7 citation comments (see details below)
+  - `spec/ngspice-citation-audit.json` — updated 11 rows for dc-operating-point.ts: flipped stale rows to verified, updated ngspiceRef values, set claimKeyword, cleared stale notes
+  - `src/solver/analog/__tests__/citation-audit.test.ts` — added DcopCitations describe block with enumeratedCorrectionsLanded and allInventoryVerifiedOrMissing tests
+- **Correction details**:
+  - ts:10,683,687 `cktop.c:354-546` → `cktop.c:369-569` (gillespie_src runs 369-569 in vendored file)
+  - ts:253 `cktop.c:546+` → `cktncdump.c` (CKTncDump lives in cktncdump.c, not cktop.c)
+  - ts:451 `cktop.c:546+` → `cktncdump.c` (same as above)
+  - ts:529 `cktop.c:179` — citation already correct per ref file (line 179 IS continuemode write); JSON stale note was wrong; marked verified
+  - ts:701 `cktop.c:381` — citation already correct per ref file (line 381 IS firstmode write); JSON stale note was wrong; marked verified
+  - ts:709 `cktop.c:370-385` → `cktop.c:406-409` (NIiter zero-source call at 406-409)
+  - ts:718 `cktop.c:386-418` → `cktop.c:413-458` (gmin bootstrap block is 413-458)
+  - ts:747 `cktop.c:420-424` → `cktop.c:385-387` (stepping params raise/ConvFact init at 385-387)
+- **Tests**: 30/30 passing (28 dc-operating-point.test.ts + 2 new DcopCitations tests)
+  - everyCitationCovered fails due to newton-raphson.ts citations added by 8.2.nr implementer — not caused by this task's changes, outside scope
+
+## Task 8.2.2: newton-raphson.ts citation corrections (resumed after dead implementer)
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: none
+- **Files modified**:
+  - `spec/ngspice-citation-audit.json` — updated all 34 newton-raphson.ts inventory rows (C-1032 through C-1065): fixed ngspiceRef for 5 stale rows (C-1032, C-1033, C-1047, C-1062, C-1065), set status to "verified" for all rows, added claimKeyword to all rows
+  - `src/solver/analog/__tests__/citation-audit.test.ts` — appended NewtonRaphsonCitations describe block with 2 new tests: enumeratedCorrectionsLanded and allInventoryVerifiedOrMissing
+- **Tests**: 44/46 passing (2 pre-existing failures in newton-raphson.test.ts: pnjlim_matches_ngspice_forward_bias and pnjlim_matches_ngspice_arg_le_zero_branch — numerical pnjlim behavior, not caused by citation edits, pre-existing per spec/test-baseline.md expected-red policy)
+- **Enumerated corrections applied** (all 4 were already in the source file by prior implementer):
+  1. Line 66: devsup.c:50-82 (was devsup.c:49-84 in inventory, now corrected)
+  2. Line 289: niiter.c:622 (was niiter.c:37-38 in inventory, now corrected)
+  3. Line 514: niiter.c:1020-1046 (was niiter.c:204-229 in inventory, now corrected)
+  4. Line 600: niiter.c:1073-1075 (was niiter.c:1074 in inventory, now corrected)

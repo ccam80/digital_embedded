@@ -193,3 +193,148 @@ describe("InventoryStructure", () => {
     ).toHaveLength(0);
   });
 });
+
+describe("AnalogTypesCitations", () => {
+  it("allVerified", () => {
+    const inv = loadInventory();
+    const analogTypeRows = inv.rows.filter(
+      (r) => r.sourceFile === "src/core/analog-types.ts"
+    );
+    expect(
+      analogTypeRows.length,
+      "Expected at least one inventory row for src/core/analog-types.ts"
+    ).toBeGreaterThan(0);
+    for (const row of analogTypeRows) {
+      expect(
+        row.status,
+        `Row ${row.id} (${row.ngspiceRef}) must be verified but is "${row.status}"`
+      ).toBe("verified");
+    }
+  });
+});
+
+describe("DcopCitations", () => {
+  const DCOP_FILE = "src/solver/analog/dc-operating-point.ts";
+
+  it("enumeratedCorrectionsLanded", () => {
+    const inv = loadInventory();
+    const dcopRows = inv.rows.filter((r) => r.sourceFile === DCOP_FILE);
+
+    const expected: Array<[number, string]> = [
+      [65,  "cktop.c:385"],
+      [253, "cktncdump.c"],
+      [451, "cktncdump.c"],
+      [529, "cktop.c:179"],
+      [701, "cktop.c:381"],
+      [709, "cktop.c:406-409"],
+      [718, "cktop.c:413-458"],
+      [747, "cktop.c:385-387"],
+      [10,  "cktop.c:369-569"],
+      [683, "cktop.c:369-569"],
+      [687, "cktop.c:369-569"],
+    ];
+
+    for (const [sourceLine, expectedRef] of expected) {
+      const row = dcopRows.find(
+        (r) => r.sourceLine === sourceLine && r.ngspiceRef === expectedRef
+      );
+      expect(
+        row,
+        `Expected dc-operating-point.ts:${sourceLine} to have ngspiceRef "${expectedRef}" but no matching row found`
+      ).toBeDefined();
+      expect(
+        row!.status,
+        `Row for dc-operating-point.ts:${sourceLine} ngspiceRef="${expectedRef}" must be verified, got "${row!.status}"`
+      ).toBe("verified");
+    }
+  });
+
+  it("allInventoryVerifiedOrMissing", () => {
+    const inv = loadInventory();
+    const dcopRows = inv.rows.filter((r) => r.sourceFile === DCOP_FILE);
+    expect(
+      dcopRows.length,
+      "Expected at least one inventory row for dc-operating-point.ts"
+    ).toBeGreaterThan(0);
+    for (const row of dcopRows) {
+      expect(
+        row.status,
+        `Row ${row.id} (${row.ngspiceRef} at line ${row.sourceLine}) must be verified or missing, got "${row.status}"`
+      ).not.toBe("stale");
+    }
+  });
+});
+
+describe("PlanTargetRotAbsent", () => {
+  it("noStaleNiiter991", () => {
+    const srcDir = join(repoRoot, "src");
+    const target = "niiter.c:991-997";
+    const matches: string[] = [];
+
+    function walk(dir: string): void {
+      for (const e of readdirSync(dir, { withFileTypes: true })) {
+        if (e.name === "node_modules" || e.name === "dist") continue;
+        const full = join(dir, e.name);
+        if (e.isDirectory()) {
+          walk(full);
+        } else if (e.name.endsWith(".ts") && !e.name.endsWith(".test.ts")) {
+          const content = readFileSync(full, "utf8");
+          if (content.includes(target)) {
+            matches.push(relative(repoRoot, full).split("\\").join("/"));
+          }
+        }
+      }
+    }
+
+    walk(srcDir);
+    expect(
+      matches,
+      `Found stale plan-target citation "${target}" in: ${matches.join(", ")}`
+    ).toHaveLength(0);
+  });
+});
+
+describe("NewtonRaphsonCitations", () => {
+  const NR_FILE = "src/solver/analog/newton-raphson.ts";
+
+  it("enumeratedCorrectionsLanded", () => {
+    const inv = loadInventory();
+    const nrRows = inv.rows.filter((r) => r.sourceFile === NR_FILE);
+
+    const expected: Array<[number, string]> = [
+      [66,  "devsup.c:50-82"],
+      [289, "niiter.c:622"],
+      [514, "niiter.c:1020-1046"],
+      [600, "niiter.c:1073-1075"],
+    ];
+
+    for (const [sourceLine, expectedRef] of expected) {
+      const row = nrRows.find(
+        (r) => r.sourceLine === sourceLine && r.ngspiceRef === expectedRef
+      );
+      expect(
+        row,
+        `Expected newton-raphson.ts:${sourceLine} to have ngspiceRef "${expectedRef}" but no matching row found`
+      ).toBeDefined();
+      expect(
+        row!.status,
+        `Row for newton-raphson.ts:${sourceLine} ngspiceRef="${expectedRef}" must be verified, got "${row!.status}"`
+      ).toBe("verified");
+    }
+  });
+
+  it("allInventoryVerifiedOrMissing", () => {
+    const inv = loadInventory();
+    const nrRows = inv.rows.filter((r) => r.sourceFile === NR_FILE);
+    expect(
+      nrRows.length,
+      "Expected at least one inventory row for newton-raphson.ts"
+    ).toBeGreaterThan(0);
+    for (const row of nrRows) {
+      expect(
+        row.status,
+        `Row ${row.id} (${row.ngspiceRef} at line ${row.sourceLine}) must be verified or missing, got "${row.status}"`
+      ).not.toBe("stale");
+    }
+  });
+});

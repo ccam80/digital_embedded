@@ -63,7 +63,7 @@ export interface PnjlimResult {
  * compressing large forward-bias steps logarithmically, and clamping
  * large reverse-bias steps.
  *
- * Matches ngspice DEVpnjlim (devsup.c:49-84) exactly, including the
+ * Matches ngspice DEVpnjlim (devsup.c:50-82) exactly, including the
  * `*icheck` output parameter exposed here as the `limited` field.
  *
  * @param vnew  - Proposed new junction voltage
@@ -80,7 +80,7 @@ export interface PnjlimResult {
 const _pnjlimResult: PnjlimResult = { value: 0, limited: false };
 
 /**
- * Direct JavaScript port of ngspice DEVpnjlim (devsup.c:49-84).
+ * Direct JavaScript port of ngspice DEVpnjlim (devsup.c:50-82).
  *
  * Includes the Gillespie negative-bias branch (devsup.c:67-82) — D4 in
  * spec/architectural-alignment.md. When vnew is not above the forward
@@ -286,7 +286,7 @@ export function newtonRaphson(ctx: CKTCircuitContext): void {
 
   const diagnostics = ctx.diagnostics;
 
-  // ngspice niiter.c:37-38 — unconditional floor: if (maxIter < 100) maxIter = 100;
+  // ngspice niiter.c:622 — unconditional floor: if (maxIter < 100) maxIter = 100;
   // Bypassed when exactMaxIterations is set (INITJCT/INITFIX need exactly 1 iteration).
   const rawMaxIter = ctx.maxIterations;
   const maxIterations = ctx.exactMaxIterations ? rawMaxIter : Math.max(rawMaxIter, 100);
@@ -511,7 +511,7 @@ export function newtonRaphson(ctx: CKTCircuitContext): void {
       }
     }
 
-    // ---- STEP I: Newton damping (ngspice niiter.c:204-229) ----
+    // ---- STEP I: Newton damping (ngspice niiter.c:1020-1046) ----
     if (ctx.nodeDamping && ctx.noncon !== 0 && isDcop(ctx.cktMode) && iteration > 0) {
       let maxDelta = 0;
       for (let i = 0; i < nodeCount; i++) {
@@ -597,7 +597,7 @@ export function newtonRaphson(ctx: CKTCircuitContext): void {
     } else if (curInitf === MODEINITTRAN) {
       // B5 (Phase 2.5 W2.1): the NISHOULDREORDER trigger moved to the top of
       // the loop (before factor), matching ngspice niiter.c:856-859. Here we
-      // only mirror niiter.c:1074 — clear MODEINITTRAN and set MODEINITFLOAT
+      // only mirror niiter.c:1073-1075 — clear MODEINITTRAN and set MODEINITFLOAT
       // for subsequent iterations:
       //     ckt->CKTmode = (ckt->CKTmode&(~INITF))|MODEINITFLOAT;
       ctx.cktMode = setInitf(ctx.cktMode, MODEINITFLOAT);

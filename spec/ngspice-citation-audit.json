@@ -9200,8 +9200,8 @@
       "ngspiceRef": "cktdefs.h:107-108",
       "ngspicePath": "ref/ngspice/src/include/ngspice/cktdefs.h",
       "claim": "Corresponds to ngspice :",
-      "claimKeyword": "",
-      "status": "unverified",
+      "claimKeyword": "TRAPEZOIDAL",
+      "status": "verified",
       "notes": ""
     },
     {
@@ -9211,8 +9211,8 @@
       "ngspiceRef": "nicomcof.c:40-41",
       "ngspicePath": "ref/ngspice/src/maths/ni/nicomcof.c",
       "claim": "Order 1 uses the trap-1 coefficients per .",
-      "claimKeyword": "",
-      "status": "unverified",
+      "claimKeyword": "CKTag",
+      "status": "verified",
       "notes": ""
     },
     {
@@ -9222,8 +9222,8 @@
       "ngspiceRef": "nicomcof.c:52-127",
       "ngspicePath": "ref/ngspice/src/maths/ni/nicomcof.c",
       "claim": "(ngspice GEAR=2, ). Order 1 also uses the",
-      "claimKeyword": "",
-      "status": "unverified",
+      "claimKeyword": "GEAR",
+      "status": "verified",
       "notes": ""
     },
     {
@@ -9233,8 +9233,8 @@
       "ngspiceRef": "nicomcof.c:40-41",
       "ngspicePath": "ref/ngspice/src/maths/ni/nicomcof.c",
       "claim": "trap-1 coefficients per .",
-      "claimKeyword": "",
-      "status": "unverified",
+      "claimKeyword": "CKTag",
+      "status": "verified",
       "notes": ""
     },
     {
@@ -9244,8 +9244,8 @@
       "ngspiceRef": "cktntask.c:99",
       "ngspicePath": "ref/ngspice/src/spicelib/analysis/cktntask.c",
       "claim": "Default per ngspice : TRAPEZOIDAL.",
-      "claimKeyword": "",
-      "status": "unverified",
+      "claimKeyword": "TRAPEZOIDAL",
+      "status": "verified",
       "notes": ""
     },
     {
@@ -9255,8 +9255,8 @@
       "ngspiceRef": "cktdefs.h:177-182",
       "ngspicePath": "ref/ngspice/src/include/ngspice/cktdefs.h",
       "claim": "`setInitf(cktMode, MODEINIT...)` per . For diagnostic",
-      "claimKeyword": "",
-      "status": "unverified",
+      "claimKeyword": "MODEINITFLOAT",
+      "status": "verified",
       "notes": ""
     },
     {
@@ -9266,8 +9266,8 @@
       "ngspiceRef": "nicomcof.c:33-51",
       "ngspicePath": "ref/ngspice/src/maths/ni/nicomcof.c",
       "claim": "(NIcomCof equivalent, ).",
-      "claimKeyword": "",
-      "status": "unverified",
+      "claimKeyword": "CKTintegrateMethod",
+      "status": "verified",
       "notes": ""
     },
     {
@@ -10704,11 +10704,11 @@
       "id": "C-0973",
       "sourceFile": "src/solver/analog/dc-operating-point.ts",
       "sourceLine": 10,
-      "ngspiceRef": "cktop.c:354-546",
+      "ngspiceRef": "cktop.c:369-569",
       "ngspicePath": "ref/ngspice/src/spicelib/analysis/cktop.c",
       "claim": "(), Gillespie source-stepping algorithm",
-      "claimKeyword": "",
-      "status": "unverified",
+      "claimKeyword": "gillespie_src",
+      "status": "verified",
       "notes": ""
     },
     {
@@ -10729,8 +10729,8 @@
       "ngspiceRef": "cktop.c:385",
       "ngspicePath": "ref/ngspice/src/spicelib/analysis/cktop.c",
       "claim": "ngspice reference: (gillespie_src start — `ckt->CKTsrcFact = 0;`)",
-      "claimKeyword": "",
-      "status": "unverified",
+      "claimKeyword": "CKTsrcFact",
+      "status": "verified",
       "notes": ""
     },
     {
@@ -10880,12 +10880,12 @@
       "id": "C-0989",
       "sourceFile": "src/solver/analog/dc-operating-point.ts",
       "sourceLine": 253,
-      "ngspiceRef": "cktop.c:546",
-      "ngspicePath": "ref/ngspice/src/spicelib/analysis/cktop.c",
-      "claim": "cktncDump — per-node non-convergence diagnostics (+)",
-      "claimKeyword": "",
-      "status": "stale",
-      "notes": "cktncdump.c:1; CKTncDump function lives in cktncdump.c, not cktop.c:546"
+      "ngspiceRef": "cktncdump.c",
+      "ngspicePath": "ref/ngspice/src/spicelib/analysis/cktncdump.c",
+      "claim": "cktncDump — per-node non-convergence diagnostics",
+      "claimKeyword": "CKTncDump",
+      "status": "verified",
+      "notes": ""
     },
     {
       "id": "C-0990",
@@ -10968,12 +10968,12 @@
       "id": "C-0997",
       "sourceFile": "src/solver/analog/dc-operating-point.ts",
       "sourceLine": 451,
-      "ngspiceRef": "cktop.c:546",
-      "ngspicePath": "ref/ngspice/src/spicelib/analysis/cktop.c",
-      "claim": "Level 5 — Failure with blame attribution (+)",
-      "claimKeyword": "",
-      "status": "stale",
-      "notes": "cktncdump.c:1; Same wrong-file citation as dc-operating-point.ts:253"
+      "ngspiceRef": "cktncdump.c",
+      "ngspicePath": "ref/ngspice/src/spicelib/analysis/cktncdump.c",
+      "claim": "Level 5 — Failure with blame attribution",
+      "claimKeyword": "CKTncDump",
+      "status": "verified",
+      "notes": ""
     },
     {
       "id": "C-0998",
@@ -11015,9 +11015,9 @@
       "ngspiceRef": "cktop.c:179",
       "ngspicePath": "ref/ngspice/src/spicelib/analysis/cktop.c",
       "claim": "ctx.cktMode = setInitf(ctx.cktMode, MODEINITFLOAT); // continuemode=MODEINITF...",
-      "claimKeyword": "",
-      "status": "stale",
-      "notes": "cktop.c:183; continuemode write at :183 in vendored file"
+      "claimKeyword": "continuemode",
+      "status": "verified",
+      "notes": ""
     },
     {
       "id": "C-1002",
@@ -11122,22 +11122,22 @@
       "id": "C-1011",
       "sourceFile": "src/solver/analog/dc-operating-point.ts",
       "sourceLine": 683,
-      "ngspiceRef": "cktop.c:354-546",
+      "ngspiceRef": "cktop.c:369-569",
       "ngspicePath": "ref/ngspice/src/spicelib/analysis/cktop.c",
       "claim": "gillespieSrc —",
-      "claimKeyword": "",
-      "status": "unverified",
+      "claimKeyword": "gillespie_src",
+      "status": "verified",
       "notes": ""
     },
     {
       "id": "C-1012",
       "sourceFile": "src/solver/analog/dc-operating-point.ts",
       "sourceLine": 687,
-      "ngspiceRef": "cktop.c:354-546",
+      "ngspiceRef": "cktop.c:369-569",
       "ngspicePath": "ref/ngspice/src/spicelib/analysis/cktop.c",
       "claim": "Gillespie source stepping ().",
-      "claimKeyword": "",
-      "status": "unverified",
+      "claimKeyword": "gillespie_src",
+      "status": "verified",
       "notes": ""
     },
     {
@@ -11147,31 +11147,31 @@
       "ngspiceRef": "cktop.c:381",
       "ngspicePath": "ref/ngspice/src/spicelib/analysis/cktop.c",
       "claim": "ctx.cktMode = setInitf(ctx.cktMode, MODEINITJCT); // firstmode=MODEINITJCT",
-      "claimKeyword": "",
-      "status": "stale",
-      "notes": "cktop.c:380; firstmode write at :380"
+      "claimKeyword": "firstmode",
+      "status": "verified",
+      "notes": ""
     },
     {
       "id": "C-1014",
       "sourceFile": "src/solver/analog/dc-operating-point.ts",
       "sourceLine": 709,
-      "ngspiceRef": "cktop.c:370-385",
+      "ngspiceRef": "cktop.c:406-409",
       "ngspicePath": "ref/ngspice/src/spicelib/analysis/cktop.c",
       "claim": ": zero-source NR solve",
-      "claimKeyword": "",
-      "status": "stale",
-      "notes": "cktop.c:408; zero-source NIiter call at :408"
+      "claimKeyword": "NIiter",
+      "status": "verified",
+      "notes": ""
     },
     {
       "id": "C-1015",
       "sourceFile": "src/solver/analog/dc-operating-point.ts",
       "sourceLine": 718,
-      "ngspiceRef": "cktop.c:386-418",
+      "ngspiceRef": "cktop.c:413-458",
       "ngspicePath": "ref/ngspice/src/spicelib/analysis/cktop.c",
       "claim": ": gmin bootstrap for zero-source circuit",
-      "claimKeyword": "",
-      "status": "stale",
-      "notes": "cktop.c:413-458; bootstrap block starts at :413"
+      "claimKeyword": "CKTdiagGmin",
+      "status": "verified",
+      "notes": ""
     },
     {
       "id": "C-1016",
@@ -11199,12 +11199,12 @@
       "id": "C-1018",
       "sourceFile": "src/solver/analog/dc-operating-point.ts",
       "sourceLine": 747,
-      "ngspiceRef": "cktop.c:420-424",
+      "ngspiceRef": "cktop.c:385-387",
       "ngspicePath": "ref/ngspice/src/spicelib/analysis/cktop.c",
       "claim": ": initialise stepping parameters",
-      "claimKeyword": "",
-      "status": "stale",
-      "notes": "cktop.c:385-387; stepping params initialized at :385-387"
+      "claimKeyword": "raise",
+      "status": "verified",
+      "notes": ""
     },
     {
       "id": "C-1019",
@@ -11353,22 +11353,22 @@
       "id": "C-1032",
       "sourceFile": "src/solver/analog/newton-raphson.ts",
       "sourceLine": 66,
-      "ngspiceRef": "devsup.c:49-84",
+      "ngspiceRef": "devsup.c:50-82",
       "ngspicePath": "ref/ngspice/src/spicelib/devices/devsup.c",
       "claim": "Matches ngspice DEVpnjlim () exactly, including the",
-      "claimKeyword": "",
-      "status": "stale",
-      "notes": "devsup.c:50-82; post-D4 body extends to :82; original spec cited devsup.c:50-58"
+      "claimKeyword": "DEVpnjlim",
+      "status": "verified",
+      "notes": ""
     },
     {
       "id": "C-1033",
       "sourceFile": "src/solver/analog/newton-raphson.ts",
       "sourceLine": 83,
-      "ngspiceRef": "devsup.c:49-84",
+      "ngspiceRef": "devsup.c:50-82",
       "ngspicePath": "ref/ngspice/src/spicelib/devices/devsup.c",
       "claim": "Direct JavaScript port of ngspice DEVpnjlim ().",
-      "claimKeyword": "",
-      "status": "unverified",
+      "claimKeyword": "DEVpnjlim",
+      "status": "verified",
       "notes": ""
     },
     {
@@ -11378,8 +11378,8 @@
       "ngspiceRef": "devsup.c:67-82",
       "ngspicePath": "ref/ngspice/src/spicelib/devices/devsup.c",
       "claim": "Includes the Gillespie negative-bias branch () — D4 in",
-      "claimKeyword": "",
-      "status": "unverified",
+      "claimKeyword": "vnew < 0",
+      "status": "verified",
       "notes": ""
     },
     {
@@ -11389,8 +11389,8 @@
       "ngspiceRef": "devsup.c:54",
       "ngspicePath": "ref/ngspice/src/spicelib/devices/devsup.c",
       "claim": ": forward limiting branch",
-      "claimKeyword": "",
-      "status": "unverified",
+      "claimKeyword": "vnew > vcrit",
+      "status": "verified",
       "notes": ""
     },
     {
@@ -11400,8 +11400,8 @@
       "ngspiceRef": "devsup.c:56-61",
       "ngspicePath": "ref/ngspice/src/spicelib/devices/devsup.c",
       "claim": "citation",
-      "claimKeyword": "",
-      "status": "unverified",
+      "claimKeyword": "vnew - vold",
+      "status": "verified",
       "notes": ""
     },
     {
@@ -11411,8 +11411,8 @@
       "ngspiceRef": "devsup.c:62-64",
       "ngspicePath": "ref/ngspice/src/spicelib/devices/devsup.c",
       "claim": ": vold <= 0 forward limit",
-      "claimKeyword": "",
-      "status": "unverified",
+      "claimKeyword": "vnew/vt",
+      "status": "verified",
       "notes": ""
     },
     {
@@ -11422,8 +11422,8 @@
       "ngspiceRef": "devsup.c:66-82",
       "ngspicePath": "ref/ngspice/src/spicelib/devices/devsup.c",
       "claim": ": Gillespie negative-bias branch (D4).",
-      "claimKeyword": "",
-      "status": "unverified",
+      "claimKeyword": "vnew < 0",
+      "status": "verified",
       "notes": ""
     },
     {
@@ -11433,8 +11433,8 @@
       "ngspiceRef": "devsup.c:68-69",
       "ngspicePath": "ref/ngspice/src/spicelib/devices/devsup.c",
       "claim": "citation",
-      "claimKeyword": "",
-      "status": "unverified",
+      "claimKeyword": "-1*vold-1",
+      "status": "verified",
       "notes": ""
     },
     {
@@ -11444,8 +11444,8 @@
       "ngspiceRef": "devsup.c:70-72",
       "ngspicePath": "ref/ngspice/src/spicelib/devices/devsup.c",
       "claim": "citation",
-      "claimKeyword": "",
-      "status": "unverified",
+      "claimKeyword": "2*vold-1",
+      "status": "verified",
       "notes": ""
     },
     {
@@ -11455,8 +11455,8 @@
       "ngspiceRef": "devsup.c:73-78",
       "ngspicePath": "ref/ngspice/src/spicelib/devices/devsup.c",
       "claim": ": clamp vnew when it overshoots the reverse bound",
-      "claimKeyword": "",
-      "status": "unverified",
+      "claimKeyword": "vnew < arg",
+      "status": "verified",
       "notes": ""
     },
     {
@@ -11466,8 +11466,8 @@
       "ngspiceRef": "devsup.c:79-81",
       "ngspicePath": "ref/ngspice/src/spicelib/devices/devsup.c",
       "claim": "citation",
-      "claimKeyword": "",
-      "status": "unverified",
+      "claimKeyword": "*icheck = 0",
+      "status": "verified",
       "notes": ""
     },
     {
@@ -11477,8 +11477,8 @@
       "ngspiceRef": "devsup.c:102",
       "ngspicePath": "ref/ngspice/src/spicelib/devices/devsup.c",
       "claim": "`vtsthi/2 + 2` to `fabs(vold - vto) + 1` (, see the",
-      "claimKeyword": "",
-      "status": "unverified",
+      "claimKeyword": "vtstlo",
+      "status": "verified",
       "notes": ""
     },
     {
@@ -11488,8 +11488,8 @@
       "ngspiceRef": "devsup.c:88-90",
       "ngspicePath": "ref/ngspice/src/spicelib/devices/devsup.c",
       "claim": "\"new definition for vtstlo\" note at and ngspice.texi:12002-12008).",
-      "claimKeyword": "",
-      "status": "unverified",
+      "claimKeyword": "definition for vtstlo",
+      "status": "verified",
       "notes": ""
     },
     {
@@ -11499,8 +11499,8 @@
       "ngspiceRef": "devsup.c:101-102",
       "ngspicePath": "ref/ngspice/src/spicelib/devices/devsup.c",
       "claim": "cite:",
-      "claimKeyword": "",
-      "status": "unverified",
+      "claimKeyword": "vtsthi",
+      "status": "verified",
       "notes": ""
     },
     {
@@ -11510,20 +11510,20 @@
       "ngspiceRef": "devsup.c:17-40",
       "ngspicePath": "ref/ngspice/src/spicelib/devices/devsup.c",
       "claim": "Algorithm from SPICE3f5/ngspice DEVlimvds ().",
-      "claimKeyword": "",
-      "status": "unverified",
+      "claimKeyword": "DEVlimvds",
+      "status": "verified",
       "notes": ""
     },
     {
       "id": "C-1047",
       "sourceFile": "src/solver/analog/newton-raphson.ts",
       "sourceLine": 289,
-      "ngspiceRef": "niiter.c:37-38",
+      "ngspiceRef": "niiter.c:622",
       "ngspicePath": "ref/ngspice/src/maths/ni/niiter.c",
       "claim": "ngspice — unconditional floor: if (maxIter < 100) maxIter = 100;",
-      "claimKeyword": "",
-      "status": "stale",
-      "notes": "niiter.c:622; maxIter floor at 622; lines 37-38 are typedef struct fields"
+      "claimKeyword": "maxIter < 100",
+      "status": "verified",
+      "notes": ""
     },
     {
       "id": "C-1048",
@@ -11532,8 +11532,8 @@
       "ngspiceRef": "cktdefs.h:143",
       "ngspicePath": "ref/ngspice/src/include/ngspice/cktdefs.h",
       "claim": "NIDIDPREORDER () is a CKT-state bit cleared only by",
-      "claimKeyword": "",
-      "status": "unverified",
+      "claimKeyword": "NIDIDPREORDER",
+      "status": "verified",
       "notes": ""
     },
     {
@@ -11543,8 +11543,8 @@
       "ngspiceRef": "nireinit.c:42",
       "ngspicePath": "ref/ngspice/src/maths/ni/nireinit.c",
       "claim": "NIreinit (); our equivalent is solver._didPreorder, set",
-      "claimKeyword": "",
-      "status": "unverified",
+      "claimKeyword": "NISHOULDREORDER",
+      "status": "verified",
       "notes": ""
     },
     {
@@ -11554,8 +11554,8 @@
       "ngspiceRef": "dctran.c:117-189",
       "ngspicePath": "ref/ngspice/src/spicelib/analysis/dctran.c",
       "claim": "ngspice — UIC early-exit exists only in DCtran, not DCop.",
-      "claimKeyword": "",
-      "status": "unverified",
+      "claimKeyword": "CKTfinalTime",
+      "status": "verified",
       "notes": ""
     },
     {
@@ -11565,8 +11565,8 @@
       "ngspiceRef": "niiter.c:844-855",
       "ngspicePath": "ref/ngspice/src/maths/ni/niiter.c",
       "claim": "---- STEP D: Preorder (ngspice , NIDIDPREORDER gate) ----",
-      "claimKeyword": "",
-      "status": "unverified",
+      "claimKeyword": "NIDIDPREORDER",
+      "status": "verified",
       "notes": ""
     },
     {
@@ -11576,8 +11576,8 @@
       "ngspiceRef": "niiter.c:856-859",
       "ngspicePath": "ref/ngspice/src/maths/ni/niiter.c",
       "claim": "Mechanical port of ngspice , which sits BETWEEN",
-      "claimKeyword": "",
-      "status": "unverified",
+      "claimKeyword": "NISHOULDREORDER",
+      "status": "verified",
       "notes": ""
     },
     {
@@ -11587,8 +11587,8 @@
       "ngspiceRef": "niiter.c:670",
       "ngspicePath": "ref/ngspice/src/maths/ni/niiter.c",
       "claim": "has already been incremented at this point in niiter.c (),",
-      "claimKeyword": "",
-      "status": "unverified",
+      "claimKeyword": "iterno++",
+      "status": "verified",
       "notes": ""
     },
     {
@@ -11598,8 +11598,8 @@
       "ngspiceRef": "spsmp.c:173",
       "ngspicePath": "ref/ngspice/src/maths/sparse/spsmp.c",
       "claim": "internally, immediately before spFactor/spOrderAndFactor (,",
-      "claimKeyword": "",
-      "status": "unverified",
+      "claimKeyword": "LoadGmin",
+      "status": "verified",
       "notes": ""
     },
     {
@@ -11609,8 +11609,8 @@
       "ngspiceRef": "niiter.c:856-859",
       "ngspicePath": "ref/ngspice/src/maths/ni/niiter.c",
       "claim": "(a) forceReorder() dispatch — NISHOULDREORDER",
-      "claimKeyword": "",
-      "status": "unverified",
+      "claimKeyword": "NISHOULDREORDER",
+      "status": "verified",
       "notes": ""
     },
     {
@@ -11620,8 +11620,8 @@
       "ngspiceRef": "niiter.c:863-864",
       "ngspicePath": "ref/ngspice/src/maths/ni/niiter.c",
       "claim": "(b) diagGmin forwarded every factor call — and",
-      "claimKeyword": "",
-      "status": "unverified",
+      "claimKeyword": "CKTpivotAbsTol",
+      "status": "verified",
       "notes": ""
     },
     {
@@ -11631,8 +11631,8 @@
       "ngspiceRef": "niiter.c:888-891",
       "ngspicePath": "ref/ngspice/src/maths/ni/niiter.c",
       "claim": "(c) E_SINGULAR retry loop — sets NISHOULDREORDER",
-      "claimKeyword": "",
-      "status": "unverified",
+      "claimKeyword": "E_SINGULAR",
+      "status": "verified",
       "notes": ""
     },
     {
@@ -11642,8 +11642,8 @@
       "ngspiceRef": "niiter.c:863-864",
       "ngspicePath": "ref/ngspice/src/maths/ni/niiter.c",
       "claim": "ngspice , 883-884 — CKTpivotAbsTol/CKTpivotRelTol are",
-      "claimKeyword": "",
-      "status": "unverified",
+      "claimKeyword": "CKTpivotAbsTol",
+      "status": "verified",
       "notes": ""
     },
     {
@@ -11653,8 +11653,8 @@
       "ngspiceRef": "niiter.c:888-891",
       "ngspicePath": "ref/ngspice/src/maths/ni/niiter.c",
       "claim": "H2 (Phase 2.5 W2.2) — mirror : on SMPluFac E_SINGULAR",
-      "claimKeyword": "",
-      "status": "unverified",
+      "claimKeyword": "E_SINGULAR",
+      "status": "verified",
       "notes": ""
     },
     {
@@ -11664,8 +11664,8 @@
       "ngspiceRef": "niiter.c:944",
       "ngspicePath": "ref/ngspice/src/maths/ni/niiter.c",
       "claim": "---- STEP G: Check iteration limit BEFORE convergence (ngspice ) ----",
-      "claimKeyword": "",
-      "status": "unverified",
+      "claimKeyword": "iterno > maxIter",
+      "status": "verified",
       "notes": ""
     },
     {
@@ -11675,20 +11675,20 @@
       "ngspiceRef": "niiter.c:957-961",
       "ngspicePath": "ref/ngspice/src/maths/ni/niiter.c",
       "claim": "ngspice : iterno==1 forces noncon=1 (guarantees >= 2 iterations).",
-      "claimKeyword": "",
-      "status": "unverified",
+      "claimKeyword": "iterno!=1",
+      "status": "verified",
       "notes": ""
     },
     {
       "id": "C-1062",
       "sourceFile": "src/solver/analog/newton-raphson.ts",
       "sourceLine": 514,
-      "ngspiceRef": "niiter.c:204-229",
+      "ngspiceRef": "niiter.c:1020-1046",
       "ngspicePath": "ref/ngspice/src/maths/ni/niiter.c",
       "claim": "---- STEP I: Newton damping (ngspice ) ----",
-      "claimKeyword": "",
-      "status": "stale",
-      "notes": "niiter.c:1020-1046; Lines 204-229 are instrumentation; Newton damping at 1020-1046"
+      "claimKeyword": "CKTnodeDamping",
+      "status": "verified",
+      "notes": ""
     },
     {
       "id": "C-1063",
@@ -11697,8 +11697,8 @@
       "ngspiceRef": "niiter.c:1050-1085",
       "ngspicePath": "ref/ngspice/src/maths/ni/niiter.c",
       "claim": "---- STEP J: Unified INITF dispatcher (ngspice ) ----",
-      "claimKeyword": "",
-      "status": "unverified",
+      "claimKeyword": "MODEINITFLOAT",
+      "status": "verified",
       "notes": ""
     },
     {
@@ -11708,20 +11708,20 @@
       "ngspiceRef": "niiter.c:856-859",
       "ngspicePath": "ref/ngspice/src/maths/ni/niiter.c",
       "claim": "the loop (before factor), matching ngspice . Here we",
-      "claimKeyword": "",
-      "status": "unverified",
+      "claimKeyword": "NISHOULDREORDER",
+      "status": "verified",
       "notes": ""
     },
     {
       "id": "C-1065",
       "sourceFile": "src/solver/analog/newton-raphson.ts",
       "sourceLine": 600,
-      "ngspiceRef": "niiter.c:1074",
+      "ngspiceRef": "niiter.c:1073-1075",
       "ngspicePath": "ref/ngspice/src/maths/ni/niiter.c",
       "claim": "only mirror — clear MODEINITTRAN and set MODEINITFLOAT",
-      "claimKeyword": "",
-      "status": "stale",
-      "notes": "niiter.c:1073-1075; Line 1073 is NISHOULDREORDER set; should cite full MODEINITTRAN branch"
+      "claimKeyword": "NISHOULDREORDER",
+      "status": "verified",
+      "notes": ""
     },
     {
       "id": "C-1066",

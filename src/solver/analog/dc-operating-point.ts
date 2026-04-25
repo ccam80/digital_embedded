@@ -7,7 +7,7 @@
  *   Level 1 — dynamicGmin: adaptive diagonal conductance stepping
  *              (cktop.c:127-258), analogous to ngspice's CKTdcOp gmin path
  *   Level 2 — gillespieSrc: adaptive source stepping
- *              (cktop.c:354-546), Gillespie source-stepping algorithm
+ *              (cktop.c:369-569), Gillespie source-stepping algorithm
  *   Level 3 — Failure: emit blame diagnostics
  *
  * Variable mapping (ngspice → ours):
@@ -250,7 +250,7 @@ function dcopFinalize(
 }
 
 // ---------------------------------------------------------------------------
-// cktncDump — per-node non-convergence diagnostics (cktop.c:546+)
+// cktncDump — per-node non-convergence diagnostics (cktncdump.c)
 // ---------------------------------------------------------------------------
 
 /**
@@ -448,7 +448,7 @@ export function solveDcOperatingPoint(ctx: CKTCircuitContext): void {
   }
 
   // -------------------------------------------------------------------------
-  // Level 5 — Failure with blame attribution (cktop.c:546+)
+  // Level 5 — Failure with blame attribution (cktncdump.c)
   // -------------------------------------------------------------------------
   const ncNodes = cktncDump(
     ctx.ncDumpScratch,
@@ -680,11 +680,11 @@ function spice3Src(
 }
 
 // ---------------------------------------------------------------------------
-// gillespieSrc — cktop.c:354-546
+// gillespieSrc — cktop.c:369-569
 // ---------------------------------------------------------------------------
 
 /**
- * Gillespie source stepping (cktop.c:354-546).
+ * Gillespie source stepping (cktop.c:369-569).
  *
  * Scales independent sources from 0 to 1 adaptively, using each converged
  * solution as the initial guess for the next step.
@@ -706,7 +706,7 @@ function gillespieSrc(
 
   let totalIter = 0;
 
-  // cktop.c:370-385: zero-source NR solve
+  // cktop.c:406-409: zero-source NR solve
   onPhaseBegin?.("dcopSrcSweep", 0);
   ctx.rhsOld.set(voltages);
   const zeroResult = runNR(ctx, params.dcTrcvMaxIter, 0, null);
@@ -715,7 +715,7 @@ function gillespieSrc(
 
   if (!zeroResult.converged) {
     onPhaseEnd?.("nrFailedRetry", false);
-    // cktop.c:386-418: gmin bootstrap for zero-source circuit
+    // cktop.c:413-458: gmin bootstrap for zero-source circuit
     let diagGmin = params.gmin * 1e10;
     let bootstrapConverged = false;
     for (let decade = 0; decade <= 10; decade++) {
@@ -744,7 +744,7 @@ function gillespieSrc(
     ctx.cktMode = setInitf(ctx.cktMode, MODEINITFLOAT);  // cktop.c:453-497 continuemode=MODEINITFLOAT
   }
 
-  // cktop.c:420-424: initialise stepping parameters
+  // cktop.c:385-387: initialise stepping parameters
   let raise = 0.001;
   let convFact = 0;
   let srcFact = raise;

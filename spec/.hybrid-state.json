@@ -614,17 +614,17 @@
           "8.2.3"
         ]
       ],
-      "spawned": 0,
-      "completed": 0,
-      "verifications_passed": 0,
+      "spawned": 4,
+      "completed": 3,
+      "verifications_passed": 2,
       "verifications_failed": 0,
       "stops_for_clarification": 0,
-      "dead_implementers": 0,
+      "dead_implementers": 1,
       "dead_verifiers": 0,
       "group_status": {
-        "8.2.dcop": "pending",
+        "8.2.dcop": "passed",
         "8.2.nr": "pending",
-        "8.2.analogtypes": "pending"
+        "8.2.analogtypes": "passed"
       },
       "user_required_tasks": {
         "8.2.dcop": [],
@@ -748,5 +748,5 @@
       "user_acks": {}
     }
   ],
-  "last_updated": "2026-04-24T23:33:56.662Z"
+  "last_updated": "2026-04-25T00:02:19.594Z"
 }
