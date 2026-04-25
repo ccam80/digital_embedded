@@ -21,7 +21,7 @@ import { describe, it, expect } from "vitest";
 import { ConcreteCompiledAnalogCircuit } from "../../../solver/analog/compiled-analog-circuit.js";
 import { StatePool } from "../../../solver/analog/state-pool.js";
 import { MNAEngine } from "../../../solver/analog/analog-engine.js";
-import { makeResistor, makeVoltageSource, withNodeIds } from "../../../solver/analog/__tests__/test-helpers.js";
+import { makeResistor, makeVoltageSource, withNodeIds, makeLoadCtx } from "../../../solver/analog/__tests__/test-helpers.js";
 import { OTADefinition } from "../ota.js";
 import { PropertyBag } from "../../../core/properties.js";
 import type { AnalogElement } from "../../../solver/analog/element.js";
@@ -324,26 +324,12 @@ function makeOtaCaptureSolver(): {
 }
 
 function makeOtaParityCtx(voltages: Float64Array, solver: SparseSolverType): LoadContext {
-  return {
+  return makeLoadCtx({
     solver,
     voltages,
     cktMode: MODEDCOP | MODEINITFLOAT,
     dt: 0,
-    method: "trapezoidal",
-    order: 1,
-    deltaOld: [0, 0, 0, 0, 0, 0, 0],
-    ag: new Float64Array(7),
-    srcFact: 1,
-    noncon: { value: 0 },
-    limitingCollector: null,
-    xfact: 1,
-    gmin: 1e-12,
-    reltol: 1e-3,
-    iabstol: 1e-12,
-    cktFixLimit: false,
-    bypass: false,
-    voltTol: 1e-6,
-  };
+  });
 }
 
 describe("OTA parity (C4.5)", () => {

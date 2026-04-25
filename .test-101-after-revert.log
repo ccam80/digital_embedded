@@ -1,0 +1,25 @@
+ FAIL  src/solver/analog/__tests__/ngspice-parity/resistive-divider.test.ts > Resistive divider DC-OP parity > transient_per_step_match
+AssertionError: step=0 iter=0 rhsOld[1]: ours=0 ngspice=2.5 absDelta=2.5: expected 2.5 to be +0 // Object.is equality
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[32m- 0[39m
+[31m+ 2.5[39m
+
+ ❯ Module.assertIterationMatch src/solver/analog/__tests__/ngspice-parity/parity-helpers.ts:40:95
+     38|     const n = ngRhsOld[i];
+     39|     const absDelta = Math.abs(o - n);
+     40|     expect(absDelta, `${ctxLabel} rhsOld[${i}]: ours=${o} ngspice=${n}…
+       |                                                                                               ^
+     41|   }
+     42| 
+ ❯ src/solver/analog/__tests__/ngspice-parity/resistive-divider.test.ts:115:11
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+
+ Test Files  1 failed (1)
+      Tests  2 failed (2)
+   Start at  01:16:33
+   Duration  4.61s (transform 3.11s, setup 0ms, collect 4.18s, tests 61ms, environment 0ms, prepare 121ms)
+

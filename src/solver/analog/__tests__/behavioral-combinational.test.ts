@@ -15,7 +15,7 @@
  */
 
 import { describe, it, expect } from "vitest";
-import { makeVoltageSource, makeResistor, withNodeIds, runNR } from "./test-helpers.js";
+import { makeVoltageSource, makeResistor, withNodeIds, runNR, initElement } from "./test-helpers.js";
 import {
   BehavioralMuxElement,
   BehavioralDemuxElement,
@@ -427,6 +427,7 @@ describe("Task 6.4.3 — combinational pin loading propagates", () => {
       factory(new Map([["sel", 1], ["in_0", 2], ["in_1", 3], ["out", 4]]), [], -1, props, () => 0),
       [1, 2, 3, 4],
     );
+    initElement(element);
 
     const allocCalls: Array<[number, number]> = [];
     const solver = {

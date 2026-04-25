@@ -9,7 +9,7 @@
  */
 
 import { describe, it, expect } from "vitest";
-import { ZenerDiodeDefinition, createZenerElement, ZENER_PARAM_DEFS, ZENER_PARAM_DEFAULTS } from "../zener.js";
+import { ZenerDiodeDefinition, createZenerElement, ZENER_PARAM_DEFS, ZENER_PARAM_DEFAULTS, ZENER_SPICE_L1_PARAM_DEFS } from "../zener.js";
 import { PropertyBag } from "../../../core/properties.js";
 import { withNodeIds } from "../../../solver/analog/__tests__/test-helpers.js";
 import { StatePool } from "../../../solver/analog/state-pool.js";
@@ -282,5 +282,34 @@ describe("Zener TEMP", () => {
     // s0[SLOT_VD] must reflect 400K tVcrit, not 300.15K
     const storedVd = pool.state0[0];
     expect(storedVd).toBeCloseTo(expectedTVcrit400, 10);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Zener schema partition layout tests
+// ---------------------------------------------------------------------------
+
+describe("ZENER_PARAM_DEFS partition layout", () => {
+  it("TEMP has partition 'instance'", () => {
+    const tempDef = ZENER_PARAM_DEFS.find((d) => d.key === "TEMP");
+    expect(tempDef).toBeDefined();
+    expect(tempDef!.partition).toBe("instance");
+  });
+
+  it("model params have partition 'model'", () => {
+    const modelParamKeys = ["IS", "N", "BV", "NBV", "IBV", "TCV", "TNOM"];
+    for (const key of modelParamKeys) {
+      const def = ZENER_PARAM_DEFS.find((d) => d.key === key);
+      expect(def).toBeDefined();
+      expect(def!.partition).toBe("model");
+    }
+  });
+});
+
+describe("ZENER_SPICE_L1_PARAM_DEFS unchanged", () => {
+  it("all SPICE_L1 defs have partition 'model'", () => {
+    for (const def of ZENER_SPICE_L1_PARAM_DEFS) {
+      expect(def.partition).toBe("model");
+    }
   });
 });

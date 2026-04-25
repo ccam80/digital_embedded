@@ -18,6 +18,7 @@ import { SparseSolver } from "../../../solver/analog/sparse-solver.js";
 import type { AnalogElement } from "../../../solver/analog/element.js";
 import type { LoadContext } from "../../../solver/analog/load-context.js";
 import { MODETRAN, MODEINITFLOAT, MODEDCOP, MODEINITTRAN } from "../../../solver/analog/ckt-mode.js";
+import { makeLoadCtx } from "../../../solver/analog/__tests__/test-helpers.js";
 
 // ---------------------------------------------------------------------------
 // Test defaults matching MemristorDefinition
@@ -55,26 +56,13 @@ function makeMemristor(overrides: Partial<{
  * Memristor.accept() reads ctx.dt and ctx.voltages to compute dw/dt.
  */
 function acceptStep(mem: MemristorElement, dt: number, voltages: Float64Array): void {
-  const ctx: LoadContext = {
-    solver: new SparseSolver(),
+  const ctx = makeLoadCtx({
+    solver: new SparseSolver() as unknown as import("../../../solver/analog/sparse-solver.js").SparseSolver,
     voltages,
     cktMode: MODETRAN | MODEINITFLOAT,
     dt,
-    method: "trapezoidal",
-    order: 1,
     deltaOld: [dt, dt, dt, dt, dt, dt, dt],
-    ag: new Float64Array(7),
-    srcFact: 1,
-    noncon: { value: 0 },
-    limitingCollector: null,
-    xfact: 1,
-    gmin: 1e-12,
-    reltol: 1e-3,
-    iabstol: 1e-12,
-    cktFixLimit: false,
-    bypass: false,
-    voltTol: 1e-6,
-  };
+  });
   mem.accept(ctx, 0, () => {});
 }
 

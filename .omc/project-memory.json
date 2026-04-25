@@ -42,8 +42,8 @@
     "runtime": null
   },
   "build": {
-    "buildCommand": "npx tsc --noEmit > /tmp/tsc.log 2>&1; echo \"exit=$?\"; wc -l /tmp/tsc.log; tail -30 /tmp/tsc.log",
-    "testCommand": "cd \"C:/local_working_projects/digital_in_browser\" && npx vitest run src/core/__tests__/registry.test.ts --reporter=default 2>&1 | tail -40",
+    "buildCommand": "npx tsc --noEmit > .tsc-final.log 2>&1; echo done; wc -l .tsc-final.log",
+    "testCommand": "cd \"C:/local_working_projects/digital_in_browser\" && timeout 60 npx vitest run src/components/semiconductors/__tests__/mosfet.test.ts --reporter=default --testNamePattern=\"partition layout\" 2>&1 | tail -25",
     "lintCommand": "npm run lint",
     "devCommand": "npm run dev",
     "scripts": {
@@ -310,8 +310,8 @@
     },
     {
       "path": "src\\solver\\analog\\newton-raphson.ts",
-      "accessCount": 41,
-      "lastAccessed": 1777107425857,
+      "accessCount": 43,
+      "lastAccessed": 1777122767965,
       "type": "file"
     },
     {
@@ -322,8 +322,14 @@
     },
     {
       "path": "src\\solver\\analog\\__tests__\\harness\\capture.ts",
-      "accessCount": 20,
-      "lastAccessed": 1777108935936,
+      "accessCount": 22,
+      "lastAccessed": 1777123062316,
+      "type": "file"
+    },
+    {
+      "path": "spec\\progress.md",
+      "accessCount": 17,
+      "lastAccessed": 1777123092040,
       "type": "file"
     },
     {
@@ -334,20 +340,20 @@
     },
     {
       "path": "src\\solver\\analog\\__tests__\\ngspice-parity\\parity-helpers.ts",
-      "accessCount": 14,
-      "lastAccessed": 1777114014698,
+      "accessCount": 15,
+      "lastAccessed": 1777122534819,
       "type": "file"
     },
     {
       "path": "src\\solver\\analog\\__tests__\\harness",
-      "accessCount": 14,
-      "lastAccessed": 1777117029273,
+      "accessCount": 15,
+      "lastAccessed": 1777122566484,
       "type": "directory"
     },
     {
       "path": "src\\solver\\analog\\__tests__\\ngspice-parity\\resistive-divider.test.ts",
-      "accessCount": 12,
-      "lastAccessed": 1777107632103,
+      "accessCount": 13,
+      "lastAccessed": 1777122553603,
       "type": "file"
     },
     {
@@ -363,6 +369,12 @@
       "type": "file"
     },
     {
+      "path": "src/solver/analog",
+      "accessCount": 11,
+      "lastAccessed": 1777122879015,
+      "type": "directory"
+    },
+    {
       "path": "src\\solver\\analog\\dc-operating-point.ts",
       "accessCount": 9,
       "lastAccessed": 1777106072861,
@@ -375,22 +387,22 @@
       "type": "file"
     },
     {
-      "path": "src/solver/analog",
-      "accessCount": 7,
-      "lastAccessed": 1777119012387,
+      "path": "src\\components\\semiconductors\\diode.ts",
+      "accessCount": 9,
+      "lastAccessed": 1777122837630,
       "type": "directory"
-    },
-    {
-      "path": "spec\\progress.md",
-      "accessCount": 7,
-      "lastAccessed": 1777119904257,
-      "type": "file"
     },
     {
       "path": "spec\\phase-10-parity-tickets.md",
       "accessCount": 6,
       "lastAccessed": 1777108872619,
       "type": "file"
+    },
+    {
+      "path": "src/solver/analog/__tests__/harness",
+      "accessCount": 6,
+      "lastAccessed": 1777123056524,
+      "type": "directory"
     },
     {
       "path": "src\\solver\\analog\\__tests__\\ngspice-parity\\fixtures\\resistive-divider.dts",
@@ -405,22 +417,10 @@
       "type": "file"
     },
     {
-      "path": "src/solver/analog/__tests__/harness",
-      "accessCount": 5,
-      "lastAccessed": 1777106950783,
-      "type": "directory"
-    },
-    {
       "path": "src\\solver\\analog\\__tests__\\ngspice-parity\\rc-transient.test.ts",
       "accessCount": 5,
       "lastAccessed": 1777107117482,
       "type": "file"
-    },
-    {
-      "path": "src\\components\\semiconductors\\diode.ts",
-      "accessCount": 5,
-      "lastAccessed": 1777119797908,
-      "type": "directory"
     },
     {
       "path": "src\\headless\\__tests__\\master-switch.test.ts",

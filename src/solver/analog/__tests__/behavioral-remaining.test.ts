@@ -23,7 +23,7 @@
 import { describe, it, expect } from "vitest";
 import { SparseSolver } from "../sparse-solver.js";
 import { newtonRaphson } from "../newton-raphson.js";
-import { makeVoltageSource, makeResistor, withNodeIds, makeSimpleCtx } from "./test-helpers.js";
+import { makeVoltageSource, makeResistor, withNodeIds, makeSimpleCtx, makeLoadCtx, initElement } from "./test-helpers.js";
 import { StatePool } from "../state-pool.js";
 import {
   createDriverAnalogElement,
@@ -493,6 +493,7 @@ describe("Task 6.4.3 — remaining pin loading propagates", () => {
       [], -1, props,
     );
     Object.assign(element, { pinNodeIds: [1, 2, 3], allNodeIds: [1, 2, 3] });
+    initElement(element);
 
     const allocCalls: Array<[number, number]> = [];
     const solver = {
@@ -501,27 +502,14 @@ describe("Task 6.4.3 — remaining pin loading propagates", () => {
       stampRHS(_i: number, _v: number) {},
     };
 
-    const ag = new Float64Array(7);
-    const ctx: LoadContext = {
+    const ctx: LoadContext = makeLoadCtx({
       solver: solver as any,
       voltages: new Float64Array(16),
       cktMode: MODETRAN | MODEINITFLOAT,
       dt: 0,
-      method: "trapezoidal" as const,
+      method: "trapezoidal",
       order: 1,
-      deltaOld: [],
-      ag,
-      srcFact: 1,
-      noncon: { value: 0 },
-      limitingCollector: null,
-      xfact: 0,
-      gmin: 1e-12,
-      reltol: 1e-3,
-      iabstol: 1e-12,
-      cktFixLimit: false,
-      bypass: false,
-      voltTol: 1e-6,
-    };
+    });
 
     element.load(ctx);
 

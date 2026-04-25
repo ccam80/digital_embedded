@@ -89,6 +89,8 @@ export const { paramDefs: TUNNEL_DIODE_PARAM_DEFS, defaults: TUNNEL_DIODE_PARAM_
     M:    { default: 0.5,                description: "Grading coefficient" },
     TT:   { default: 0,      unit: "s",  description: "Transit time" },
     FC:   { default: 0.5,                description: "Forward-bias capacitance coefficient" },
+  },
+  instance: {
     TEMP: { default: 300.15, unit: "K",  description: "Per-instance operating temperature" },
   },
 });

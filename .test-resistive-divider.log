@@ -1,0 +1,14 @@
+FFFF
+
+============================================================
+  0 passed  2 failed  0 skipped  (3.1s)
+  1 test files
+============================================================
+
+Failures grouped by error:
+
+  [1] step=0 iter=0 rhsOld[1]: ours=0 ngspice=2.5 absDelta=2.5: expected 2.5 to be +0 // Object.is equality  (x2)
+      src\solver\analog\__tests__\ngspice-parity\parity-helpers.ts:40:95  "dc_op_iteration_match"
+      src\solver\analog\__tests__\ngspice-parity\parity-helpers.ts:40:95  "transient_per_step_match"
+
+Structured report: .vitest-failures.json

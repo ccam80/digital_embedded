@@ -14,7 +14,7 @@ import { describe, it, expect } from "vitest";
 import { createTriacElement, TriacDefinition, TRIAC_PARAM_DEFAULTS } from "../triac.js";
 import { createTestPropertyBag } from "../../../test-fixtures/model-fixtures.js";
 import { PropertyBag } from "../../../core/properties.js";
-import { withNodeIds } from "../../../solver/analog/__tests__/test-helpers.js";
+import { withNodeIds, makeLoadCtx } from "../../../solver/analog/__tests__/test-helpers.js";
 import { StatePool } from "../../../solver/analog/state-pool.js";
 import { SparseSolver } from "../../../solver/analog/sparse-solver.js";
 import type { AnalogElement } from "../../../solver/analog/element.js";
@@ -74,26 +74,12 @@ function makeTriac(overrides: Partial<typeof TRIAC_DEFAULTS> = {}): AnalogElemen
 function makeDcOpCtx(voltages: Float64Array): LoadContext {
   const solver = new SparseSolver();
   solver.beginAssembly(3);
-  return {
+  return makeLoadCtx({
     solver,
     voltages,
     cktMode: MODEDCOP | MODEINITFLOAT,
     dt: 0,
-    method: "trapezoidal",
-    order: 1,
-    deltaOld: [0, 0, 0, 0, 0, 0, 0],
-    ag: new Float64Array(7),
-    srcFact: 1,
-    noncon: { value: 0 },
-    limitingCollector: null,
-    xfact: 1,
-    gmin: 1e-12,
-    reltol: 1e-3,
-    iabstol: 1e-12,
-    cktFixLimit: false,
-    bypass: false,
-    voltTol: 1e-6,
-  };
+  });
 }
 
 /**

@@ -34,7 +34,7 @@ import {
 import { PropertyBag } from "../../../core/properties.js";
 import { ComponentCategory, ComponentRegistry } from "../../../core/registry.js";
 import { SparseSolver } from "../../../solver/analog/sparse-solver.js";
-import { makeVoltageSource, makeResistor } from "../../../solver/analog/__tests__/test-helpers.js";
+import { makeVoltageSource, makeResistor, makeLoadCtx } from "../../../solver/analog/__tests__/test-helpers.js";
 import { StatePool } from "../../../solver/analog/state-pool.js";
 import type { AnalogElementCore } from "../../../core/analog-types.js";
 import type { ReactiveAnalogElement } from "../../../solver/analog/element.js";
@@ -76,7 +76,7 @@ function makeTransientCtx(
   if (dt > 0) {
     computeNIcomCof(dt, deltaOld, order, method, ag, scratch);
   }
-  return {
+  return makeLoadCtx({
     cktMode: opts.cktMode ?? (MODETRAN | MODEINITFLOAT),
     solver: solver as unknown as import("../../../solver/analog/sparse-solver.js").SparseSolver,
     voltages,
@@ -85,15 +85,7 @@ function makeTransientCtx(
     order,
     deltaOld,
     ag,
-    srcFact: 1,
-    noncon: { value: 0 },
-    limitingCollector: null,
-    xfact: 1,
-    gmin: 1e-12,
-    reltol: 1e-3,
-    iabstol: 1e-12,
-    cktFixLimit: false,
-  };
+  });
 }
 
 // ---------------------------------------------------------------------------

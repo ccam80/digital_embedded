@@ -15,7 +15,7 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "fs";
 import { fileURLToPath } from "url";
-import { createScrElement, ScrDefinition, SCR_PARAM_DEFAULTS } from "../scr.js";
+import { createScrElement, ScrDefinition, SCR_PARAM_DEFAULTS, SCR_PARAM_DEFS } from "../scr.js";
 import { pnjlim } from "../../../solver/analog/newton-raphson.js";
 import { PropertyBag } from "../../../core/properties.js";
 import { createTestPropertyBag } from "../../../test-fixtures/model-fixtures.js";
@@ -190,6 +190,32 @@ function stampAndCapture(
   }
   return { stamps, rhs };
 }
+
+// ---------------------------------------------------------------------------
+// SCR partition layout tests
+// ---------------------------------------------------------------------------
+
+describe("SCR_PARAM_DEFS partition layout", () => {
+  it("TEMP OFF have partition='instance'", () => {
+    const tempDef = SCR_PARAM_DEFS.find((d) => d.key === "TEMP");
+    const offDef = SCR_PARAM_DEFS.find((d) => d.key === "OFF");
+
+    expect(tempDef).toBeDefined();
+    expect(offDef).toBeDefined();
+
+    expect(tempDef!.partition).toBe("instance");
+    expect(offDef!.partition).toBe("instance");
+  });
+
+  it("vOn iH rOn vBreakover iS alpha1 alpha2_0 i_ref n have partition='model'", () => {
+    const modelKeys = ["vOn", "iH", "rOn", "vBreakover", "iS", "alpha1", "alpha2_0", "i_ref", "n"];
+    for (const key of modelKeys) {
+      const def = SCR_PARAM_DEFS.find((d) => d.key === key);
+      expect(def).toBeDefined();
+      expect(def!.partition).toBe("model");
+    }
+  });
+});
 
 // ---------------------------------------------------------------------------
 // SCR unit tests

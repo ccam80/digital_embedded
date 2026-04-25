@@ -61,8 +61,14 @@
  *   internalNodeIds[3] = nDischargeBase  (BJT base — driven by RS-FF glue)
  *
  * State pool layout:
- *   [0 .. BJT_SIMPLE_SCHEMA.size-1] — discharge BJT slots (bjtload.c)
- *   (Comparators are F4c behavioral; no pool state.)
+ *   [0 .. BJT_SIMPLE_SCHEMA.size-1]                         — discharge BJT slots (bjtload.c)
+ *   [bjtEnd .. bjtEnd + comp1.stateSize-1]                  — comparator 1 (threshold)
+ *   [comp1End .. comp1End + comp2.stateSize-1]              — comparator 2 (trigger)
+ *   [comp2End ..]                                           — capacitor children from output pin
+ *
+ * Comparators are F4c behavioral and pool-backed (latch + soft-weight slots
+ * for hysteresis & responseTime integration); the parent allocates their
+ * slot ranges and calls their initState in initState().
  *
  * Pins (nodeIds order): [DIS, TRIG, THR, VCC, CTRL, OUT, RST, GND]
  */
@@ -505,7 +511,16 @@ function createTimer555Element(
       return _childElements.length > 0;
     },
     poolBacked: true as const,
-    stateSize: BJT_STATE_SIZE + _childStateSize,
+    // Composite state layout: BJT slots, then both comparator sub-elements,
+    // then capacitor children from the output pin model. Each sub-element is
+    // pool-backed and must be allocated a unique slot range from the parent's
+    // pool — the engine never visits sub-elements directly, so the parent
+    // must include their stateSize and call their initState().
+    stateSize:
+      BJT_STATE_SIZE +
+      (comp1Sub as unknown as { stateSize: number }).stateSize +
+      (comp2Sub as unknown as { stateSize: number }).stateSize +
+      _childStateSize,
     stateSchema: BJT_SIMPLE_SCHEMA,
     stateBaseOffset: -1,
 
@@ -513,15 +528,38 @@ function createTimer555Element(
       pool = poolRef;
       bjtBase = this.stateBaseOffset;
 
-      // BJT occupies the first block of state; capacitor children follow.
+      // BJT occupies the first block of state.
       bjtSub.stateBaseOffset = bjtBase;
       bjtSub.initState(poolRef);
 
-      let childOffset = bjtBase + BJT_STATE_SIZE;
+      // Comparators follow — each is poolBacked with its own stateSize.
+      // Without these initState calls the comparator's `pool` closure is
+      // undefined and load() throws "Cannot read properties of undefined
+      // (reading 'states')".
+      let offset = bjtBase + BJT_STATE_SIZE;
+      const comp1 = comp1Sub as unknown as {
+        stateSize: number;
+        stateBaseOffset: number;
+        initState: (p: StatePoolRef) => void;
+      };
+      comp1.stateBaseOffset = offset;
+      comp1.initState(poolRef);
+      offset += comp1.stateSize;
+
+      const comp2 = comp2Sub as unknown as {
+        stateSize: number;
+        stateBaseOffset: number;
+        initState: (p: StatePoolRef) => void;
+      };
+      comp2.stateBaseOffset = offset;
+      comp2.initState(poolRef);
+      offset += comp2.stateSize;
+
+      // Capacitor children from the output pin model (cOut=0 → none at runtime).
       for (const child of _childElements) {
-        child.stateBaseOffset = childOffset;
+        child.stateBaseOffset = offset;
         child.initState(poolRef);
-        childOffset += child.stateSize;
+        offset += child.stateSize;
       }
     },
 

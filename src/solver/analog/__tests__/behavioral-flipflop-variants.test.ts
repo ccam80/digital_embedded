@@ -31,6 +31,7 @@ import { DAsyncDefinition } from "../../../components/flipflops/d-async.js";
 import type { ResolvedPinElectrical } from "../../../core/pin-electrical.js";
 import type { LoadContext } from "../load-context.js";
 import { MODETRAN, MODEINITFLOAT } from "../ckt-mode.js";
+import { makeLoadCtx, initElement } from "./test-helpers.js";
 
 // ---------------------------------------------------------------------------
 // Shared test constants
@@ -69,7 +70,7 @@ function makeOutputPin(nodeId: number): DigitalOutputPinModel {
 }
 
 function makeCtx(v: Float64Array = new Float64Array(8)): LoadContext {
-  return {
+  return makeLoadCtx({
     solver: {
       allocElement: (_r: number, _c: number) => 0,
       stampElement: (_h: number, _v: number) => {},
@@ -78,22 +79,8 @@ function makeCtx(v: Float64Array = new Float64Array(8)): LoadContext {
     } as any,
     voltages: v,
     cktMode: MODETRAN | MODEINITFLOAT,
-    dt: 0,
-    method: "trapezoidal" as const,
     order: 1,
-    deltaOld: [],
-    ag: new Float64Array(7),
-    srcFact: 1,
-    noncon: { value: 0 },
-    limitingCollector: null,
-    xfact: 0,
-    gmin: 1e-12,
-    reltol: 1e-3,
-    iabstol: 1e-12,
-    cktFixLimit: false,
-    bypass: false,
-    voltTol: 1e-6,
-  };
+  });
 }
 
 function makeAcceptCtx(v: Float64Array): LoadContext {
@@ -122,6 +109,7 @@ function buildJK(): {
     jPin, clockPin, kPin, qPin, qBarPin,
     VIH, CMOS33.vIL, new Map(),
   );
+  initElement(element);
   return { element, jPin, clockPin, kPin, qPin, qBarPin };
 }
 
@@ -147,6 +135,7 @@ function buildRS(): {
     sPin, clockPin, rPin, qPin, qBarPin,
     VIH, CMOS33.vIL, new Map(),
   );
+  initElement(element);
   return { element, sPin, clockPin, rPin, qPin, qBarPin };
 }
 
@@ -170,6 +159,7 @@ function buildT(): {
     tPin, clockPin, qPin, qBarPin,
     VIH, CMOS33.vIL, new Map(),
   );
+  initElement(element);
   return { element, tPin, clockPin, qPin, qBarPin };
 }
 

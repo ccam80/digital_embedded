@@ -51,7 +51,7 @@ import type { ComponentLayout } from "../../../core/registry.js";
 import type { RenderContext, Point, TextAnchor, FontSpec, PathData } from "../../../core/renderer-interface.js";
 import type { ThemeColor } from "../../../core/renderer-interface.js";
 import { makeDcVoltageSource } from "../../sources/dc-voltage-source.js";
-import { withNodeIds, runDcOp } from "../../../solver/analog/__tests__/test-helpers.js";
+import { withNodeIds, runDcOp, makeLoadCtx } from "../../../solver/analog/__tests__/test-helpers.js";
 import { StatePool } from "../../../solver/analog/state-pool.js";
 import type { AnalogElement } from "../../../solver/analog/element.js";
 import type { AnalogElementCore } from "../../../core/analog-types.js";
@@ -927,25 +927,16 @@ describe("integration", () => {
       stampRHS: (r: number, v: number) => rhs.push([r, v]),
     } as any;
 
-    const ctx = {
+    const ctx = makeLoadCtx({
       cktMode: MODETRAN | MODEINITFLOAT,
-      solver: mockSolver,
+      solver: mockSolver as unknown as import("../../../solver/analog/sparse-solver.js").SparseSolver,
       voltages: new Float64Array([vd]),
       dt,
-      method: "trapezoidal" as const,
+      method: "trapezoidal",
       order: 2,
       deltaOld: [dt, dt, dt, dt, dt, dt, dt],
       ag,
-      srcFact: 1,
-      noncon: { value: 0 },
-      limitingCollector: null,
-      xfact: 1,
-      gmin: 1e-12,
-      reltol: 1e-3,
-      iabstol: 1e-12,
-      bypass: false,
-      voltTol: 1e-6,
-    };
+    });
 
     core.load(ctx);
 

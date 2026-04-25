@@ -13,7 +13,7 @@ import { describe, it, expect } from "vitest";
 import { DiodeDefinition, createDiodeElement, computeJunctionCapacitance, DIODE_PARAM_DEFAULTS, DIODE_PARAM_DEFS } from "../diode.js";
 import { PropertyBag } from "../../../core/properties.js";
 import { makeDcVoltageSource } from "../../sources/dc-voltage-source.js";
-import { withNodeIds, runDcOp, makeSimpleCtx } from "../../../solver/analog/__tests__/test-helpers.js";
+import { withNodeIds, runDcOp, makeSimpleCtx, makeLoadCtx } from "../../../solver/analog/__tests__/test-helpers.js";
 import { StatePool } from "../../../solver/analog/state-pool.js";
 import {
   MODEDCOP,
@@ -264,7 +264,7 @@ describe("Diode", () => {
     voltages[1] = 0;  // cathode at 0V
 
     const capSolver = new SparseSolver();
-    const capCtx: LoadContext = {
+    const capCtx = makeLoadCtx({
       solver: capSolver,
       voltages,
       cktMode: MODETRAN | MODEINITFLOAT,
@@ -272,18 +272,7 @@ describe("Diode", () => {
       method: "trapezoidal",
       order: 1,
       deltaOld: [1e-6, 1e-6, 1e-6, 1e-6, 1e-6, 1e-6, 1e-6],
-      ag: new Float64Array(7),
-      srcFact: 1,
-      noncon: { value: 0 },
-      limitingCollector: null,
-      xfact: 1,
-      gmin: 1e-12,
-      reltol: 1e-3,
-      iabstol: 1e-12,
-      cktFixLimit: false,
-      bypass: false,
-      voltTol: 1e-6,
-    };
+    });
     capSolver.beginAssembly(2);
     element.load(capCtx);
 
@@ -1462,5 +1451,65 @@ describe("Diode TEMP", () => {
 
     // s0[SLOT_VD=0] must equal the 400K tVcrit (set by MODEINITJCT path, no pnjlim)
     expect(pool.state0[0]).toBe(tp400.tVcrit);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// DIODE_PARAM_DEFS partition layout
+// ---------------------------------------------------------------------------
+
+describe("DIODE_PARAM_DEFS partition layout", () => {
+  it("AREA, TEMP, OFF, IC have partition === 'instance'", () => {
+    const instanceKeys = ["AREA", "TEMP", "OFF", "IC"];
+    for (const key of instanceKeys) {
+      const def = DIODE_PARAM_DEFS.find((d) => d.key === key);
+      expect(def, `ParamDef for key "${key}" not found`).toBeDefined();
+      expect(def!.partition).toBe("instance");
+    }
+  });
+
+  it("IS, N, RS, CJO, VJ, M, TT, FC, BV, IBV, NBV, IKF, IKR, EG, XTI, KF, AF, TNOM, ISW, NSW, IBEQ, IBSW, NB have partition === 'model'", () => {
+    const modelKeys = ["IS", "N", "RS", "CJO", "VJ", "M", "TT", "FC", "BV", "IBV", "NBV", "IKF", "IKR", "EG", "XTI", "KF", "AF", "TNOM", "ISW", "NSW", "IBEQ", "IBSW", "NB"];
+    for (const key of modelKeys) {
+      const def = DIODE_PARAM_DEFS.find((d) => d.key === key);
+      expect(def, `ParamDef for key "${key}" not found`).toBeDefined();
+      expect(def!.partition).toBe("model");
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// DIODE_PARAM_DEFAULTS unchanged
+// ---------------------------------------------------------------------------
+
+describe("DIODE_PARAM_DEFAULTS unchanged", () => {
+  it("preserves all default values", () => {
+    expect(DIODE_PARAM_DEFAULTS.AREA).toBe(1);
+    expect(DIODE_PARAM_DEFAULTS.OFF).toBe(0);
+    expect(isNaN(DIODE_PARAM_DEFAULTS.IC)).toBe(true);
+    expect(DIODE_PARAM_DEFAULTS.TEMP).toBe(300.15);
+    expect(DIODE_PARAM_DEFAULTS.IS).toBe(1e-14);
+    expect(DIODE_PARAM_DEFAULTS.N).toBe(1);
+    expect(DIODE_PARAM_DEFAULTS.RS).toBe(0);
+    expect(DIODE_PARAM_DEFAULTS.CJO).toBe(0);
+    expect(DIODE_PARAM_DEFAULTS.VJ).toBe(1);
+    expect(DIODE_PARAM_DEFAULTS.M).toBe(0.5);
+    expect(DIODE_PARAM_DEFAULTS.TT).toBe(0);
+    expect(DIODE_PARAM_DEFAULTS.FC).toBe(0.5);
+    expect(DIODE_PARAM_DEFAULTS.BV).toBe(Infinity);
+    expect(DIODE_PARAM_DEFAULTS.IBV).toBe(1e-3);
+    expect(isNaN(DIODE_PARAM_DEFAULTS.NBV)).toBe(true);
+    expect(DIODE_PARAM_DEFAULTS.IKF).toBe(Infinity);
+    expect(DIODE_PARAM_DEFAULTS.IKR).toBe(Infinity);
+    expect(DIODE_PARAM_DEFAULTS.EG).toBe(1.11);
+    expect(DIODE_PARAM_DEFAULTS.XTI).toBe(3);
+    expect(DIODE_PARAM_DEFAULTS.KF).toBe(0);
+    expect(DIODE_PARAM_DEFAULTS.AF).toBe(1);
+    expect(DIODE_PARAM_DEFAULTS.TNOM).toBe(300.15);
+    expect(DIODE_PARAM_DEFAULTS.ISW).toBe(0);
+    expect(isNaN(DIODE_PARAM_DEFAULTS.NSW)).toBe(true);
+    expect(DIODE_PARAM_DEFAULTS.IBEQ).toBe(0);
+    expect(DIODE_PARAM_DEFAULTS.IBSW).toBe(0);
+    expect(DIODE_PARAM_DEFAULTS.NB).toBe(1);
   });
 });

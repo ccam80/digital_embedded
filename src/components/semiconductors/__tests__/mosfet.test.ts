@@ -18,6 +18,8 @@ import {
   PmosfetDefinition,
   createMosfetElement,
   MOSFET_NMOS_DEFAULTS,
+  MOSFET_NMOS_PARAM_DEFS,
+  MOSFET_PMOS_PARAM_DEFS,
   MOSFET_SCHEMA,
 } from "../mosfet.js";
 import { PropertyBag } from "../../../core/properties.js";
@@ -2231,6 +2233,62 @@ describe("MOSFET companion-zero", () => {
     // They should be valid finite numbers.
     expect(isFinite(pool.states[0][S_CQBD])).toBe(true);
     expect(isFinite(pool.states[0][S_CQBS])).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Partition layout tests
+// ---------------------------------------------------------------------------
+
+describe("NMOS partition layout", () => {
+  const instanceKeys = ["W", "L", "M", "OFF", "ICVDS", "ICVGS", "ICVBS", "TEMP"];
+  const modelKeys = [
+    "VTO", "KP", "GAMMA", "PHI", "LAMBDA", "RD", "RS", "CBD", "CBS",
+    "IS", "PB", "CGSO", "CGDO", "CGBO", "RSH", "CJ", "MJ", "CJSW",
+    "MJSW", "JS", "TOX", "NSUB", "NSS", "NFS", "TPG", "XJ", "LD",
+    "UO", "KF", "AF", "FC", "TNOM",
+  ];
+
+  it("instance keys have partition === 'instance'", () => {
+    for (const key of instanceKeys) {
+      const def = MOSFET_NMOS_PARAM_DEFS.find(d => d.key === key);
+      expect(def, `NMOS paramDef for ${key} not found`).toBeDefined();
+      expect(def!.partition, `NMOS ${key} partition`).toBe("instance");
+    }
+  });
+
+  it("model keys have partition === 'model'", () => {
+    for (const key of modelKeys) {
+      const def = MOSFET_NMOS_PARAM_DEFS.find(d => d.key === key);
+      if (!def) continue; // key may not be declared; only check declared ones
+      expect(def.partition, `NMOS ${key} partition`).toBe("model");
+    }
+  });
+});
+
+describe("PMOS partition layout", () => {
+  const instanceKeys = ["W", "L", "M", "OFF", "ICVDS", "ICVGS", "ICVBS", "TEMP"];
+  const modelKeys = [
+    "VTO", "KP", "GAMMA", "PHI", "LAMBDA", "RD", "RS", "CBD", "CBS",
+    "IS", "PB", "CGSO", "CGDO", "CGBO", "RSH", "CJ", "MJ", "CJSW",
+    "MJSW", "JS", "TOX", "NSUB", "NSS", "NFS", "TPG", "XJ", "LD",
+    "UO", "KF", "AF", "FC", "TNOM",
+  ];
+
+  it("instance keys have partition === 'instance'", () => {
+    for (const key of instanceKeys) {
+      const def = MOSFET_PMOS_PARAM_DEFS.find(d => d.key === key);
+      expect(def, `PMOS paramDef for ${key} not found`).toBeDefined();
+      expect(def!.partition, `PMOS ${key} partition`).toBe("instance");
+    }
+  });
+
+  it("model keys have partition === 'model'", () => {
+    for (const key of modelKeys) {
+      const def = MOSFET_PMOS_PARAM_DEFS.find(d => d.key === key);
+      if (!def) continue; // key may not be declared; only check declared ones
+      expect(def.partition, `PMOS ${key} partition`).toBe("model");
+    }
   });
 });
 

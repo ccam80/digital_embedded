@@ -1,0 +1,559 @@
+
+ RUN  v2.1.9 C:/local_working_projects/digital_in_browser
+
+ × src/components/active/__tests__/schmitt-trigger.test.ts > Inverting > switches_low_on_rising_threshold
+   → Cannot read properties of undefined (reading '0')
+ ✓ src/components/active/__tests__/schmitt-trigger.test.ts > Inverting > switches_high_on_falling_threshold
+ × src/components/active/__tests__/schmitt-trigger.test.ts > Inverting > hysteresis_prevents_oscillation
+   → Cannot read properties of undefined (reading '0')
+ ✓ src/components/active/__tests__/schmitt-trigger.test.ts > NonInverting > output_follows_input_sense
+ × src/components/active/__tests__/schmitt-trigger.test.ts > Hysteresis > noisy_sine_clean_square
+   → Cannot read properties of undefined (reading '0')
+ × src/components/active/__tests__/schmitt-trigger.test.ts > Transfer > plot_matches_hysteresis_loop
+   → Cannot read properties of undefined (reading '0')
+ × src/components/active/__tests__/schmitt-trigger.test.ts > SchmittTrigger parity (C4.5) > schmitt_load_dcop_parity
+   → Cannot read properties of undefined (reading '0')
+ × src/solver/analog/__tests__/behavioral-flipflop.test.ts > DFF > latches_d_on_rising_edge
+   → Cannot read properties of undefined (reading 'states')
+ × src/solver/analog/__tests__/behavioral-flipflop.test.ts > DFF > holds_on_falling_edge
+   → Cannot read properties of undefined (reading 'states')
+ × src/solver/analog/__tests__/behavioral-flipflop.test.ts > DFF > q_bar_is_complement
+   → Cannot read properties of undefined (reading 'states')
+ × src/solver/analog/__tests__/behavioral-flipflop.test.ts > DFF > does_not_latch_during_nr_iteration
+   → Cannot read properties of undefined (reading 'states')
+ × src/solver/analog/__tests__/behavioral-flipflop.test.ts > DFF > async_reset_forces_q_low
+   → Cannot read properties of undefined (reading 'length')
+ × src/solver/analog/__tests__/behavioral-flipflop.test.ts > DFF > edge_rate_from_capacitance
+   → Cannot read properties of undefined (reading 'length')
+ × src/solver/analog/__tests__/behavioral-flipflop.test.ts > Task 6.4.3 — flipflop load delegates to pin models > flipflop_load_delegates_to_pin_models
+   → Cannot read properties of undefined (reading 'states')
+ ✓ src/solver/analog/__tests__/behavioral-flipflop.test.ts > Registration > d_flipflop_has_analog_model
+ ✓ src/solver/analog/__tests__/behavioral-flipflop.test.ts > Registration > d_flipflop_engine_type_is_both
+ ✓ src/solver/analog/__tests__/behavioral-flipflop.test.ts > Registration > d_flipflop_simulation_modes_include_digital_and_simplified
+ ✓ src/solver/analog/__tests__/behavioral-flipflop.test.ts > Registration > analog_factory_returns_analog_element
+ × src/components/sensors/__tests__/spark-gap.test.ts > SparkGap > blocks_below_breakdown > 500V across 1000V gap: current ≈ 500/R_off (nA range)
+   → Cannot read properties of undefined (reading '0')
+ × src/components/sensors/__tests__/spark-gap.test.ts > SparkGap > blocks_below_breakdown > resistance below breakdown is close to R_off
+   → Cannot read properties of undefined (reading '0')
+ ✓ src/components/sensors/__tests__/spark-gap.test.ts > SparkGap > blocks_below_breakdown > gap starts in blocking state
+ × src/components/sensors/__tests__/spark-gap.test.ts > SparkGap > conducts_above_breakdown > 1500V fires the gap and allows current to flow
+   → Cannot read properties of undefined (reading '0')
+ × src/components/sensors/__tests__/spark-gap.test.ts > SparkGap > conducts_above_breakdown > resistance drops significantly above breakdown
+   → Cannot read properties of undefined (reading '0')
+ × src/components/sensors/__tests__/spark-gap.test.ts > SparkGap > conducts_above_breakdown > current above breakdown is much larger than below
+   → Cannot read properties of undefined (reading '0')
+ × src/components/sensors/__tests__/spark-gap.test.ts > SparkGap > holds_until_current_drops > gap stays conducting while voltage keeps current above iHold
+   → Cannot read properties of undefined (reading '0')
+ × src/components/sensors/__tests__/spark-gap.test.ts > SparkGap > holds_until_current_drops > conducting gap has low resistance well above holding current
+   → Cannot read properties of undefined (reading '0')
+ × src/components/sensors/__tests__/spark-gap.test.ts > SparkGap > extinguishes_below_holding > gap returns to blocking when current drops below iHold
+   → Cannot read properties of undefined (reading '0')
+ × src/components/sensors/__tests__/spark-gap.test.ts > SparkGap > extinguishes_below_holding > resistance returns toward R_off after extinction
+   → Cannot read properties of undefined (reading '0')
+ × src/components/sensors/__tests__/spark-gap.test.ts > SparkGap > extinguishes_below_holding > can re-fire after extinction
+   → Cannot read properties of undefined (reading '0')
+ × src/components/sensors/__tests__/spark-gap.test.ts > SparkGap > smooth_transition > resistance changes monotonically across the breakdown transition zone
+   → Cannot read properties of undefined (reading '0')
+ × src/components/sensors/__tests__/spark-gap.test.ts > SparkGap > smooth_transition > resistance at breakdown voltage is midpoint between rOn and rOff
+   → Cannot read properties of undefined (reading '0')
+ × src/components/sensors/__tests__/spark-gap.test.ts > SparkGap > load > stamps conductance matrix between nodes in blocking state
+   → Cannot read properties of undefined (reading '0')
+ × src/components/sensors/__tests__/spark-gap.test.ts > SparkGap > load > stamps higher conductance in conducting state
+   → Cannot read properties of undefined (reading '0')
+ ✓ src/components/sensors/__tests__/spark-gap.test.ts > SparkGap > definition > SparkGapDefinition has engine type analog
+ ✓ src/components/sensors/__tests__/spark-gap.test.ts > SparkGap > definition > SparkGapDefinition has correct category
+ ✓ src/components/sensors/__tests__/spark-gap.test.ts > SparkGap > definition > SparkGapDefinition has vBreakdown default 1000
+ ✓ src/components/sensors/__tests__/spark-gap.test.ts > SparkGap > definition > analogFactory creates a SparkGapElement
+ ✓ src/components/sensors/__tests__/spark-gap.test.ts > SparkGap > definition > branchCount is false
+ ✓ src/components/sensors/__tests__/spark-gap.test.ts > spark_gap_load_dcop_parity > non-firing spark gap stamps G=1/firingResistance(0) bit-exact
+ × src/components/active/__tests__/timer-555.test.ts > Timer555 > internal_divider_voltages
+   → Cannot read properties of undefined (reading 'states')
+ × src/components/active/__tests__/timer-555.test.ts > Astable > oscillates_at_correct_frequency
+   → Cannot read properties of undefined (reading 'states')
+ × src/components/active/__tests__/timer-555.test.ts > Astable > duty_cycle
+   → Cannot read properties of undefined (reading 'states')
+ × src/components/active/__tests__/timer-555.test.ts > Monostable > pulse_width
+   → Cannot read properties of undefined (reading 'states')
+ × src/components/active/__tests__/timer-555.test.ts > Monostable > retrigger_ignored_during_pulse
+   → Cannot read properties of undefined (reading 'states')
+
+⎯⎯⎯⎯⎯⎯ Failed Tests 31 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/components/active/__tests__/schmitt-trigger.test.ts > Inverting > switches_low_on_rising_threshold
+TypeError: Cannot read properties of undefined (reading '0')
+ ❯ readNode src/components/active/schmitt-trigger.ts:142:20
+    140| 
+    141|   function readNode(voltages: Float64Array, n: number): number {
+    142|     return n > 0 ? voltages[n - 1] : 0;
+       |                    ^
+    143|   }
+    144| 
+ ❯ Object.load src/components/active/schmitt-trigger.ts:179:19
+ ❯ driveAndReadOutput src/components/active/__tests__/schmitt-trigger.test.ts:172:11
+ ❯ src/components/active/__tests__/schmitt-trigger.test.ts:192:22
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/31]⎯
+
+ FAIL  src/components/active/__tests__/schmitt-trigger.test.ts > Inverting > hysteresis_prevents_oscillation
+TypeError: Cannot read properties of undefined (reading '0')
+ ❯ readNode src/components/active/schmitt-trigger.ts:142:20
+    140| 
+    141|   function readNode(voltages: Float64Array, n: number): number {
+    142|     return n > 0 ? voltages[n - 1] : 0;
+       |                    ^
+    143|   }
+    144| 
+ ❯ Object.load src/components/active/schmitt-trigger.ts:179:19
+ ❯ driveAndReadOutput src/components/active/__tests__/schmitt-trigger.test.ts:172:11
+ ❯ src/components/active/__tests__/schmitt-trigger.test.ts:222:24
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/31]⎯
+
+ FAIL  src/components/active/__tests__/schmitt-trigger.test.ts > Hysteresis > noisy_sine_clean_square
+TypeError: Cannot read properties of undefined (reading '0')
+ ❯ readNode src/components/active/schmitt-trigger.ts:142:20
+    140| 
+    141|   function readNode(voltages: Float64Array, n: number): number {
+    142|     return n > 0 ? voltages[n - 1] : 0;
+       |                    ^
+    143|   }
+    144| 
+ ❯ Object.load src/components/active/schmitt-trigger.ts:179:19
+ ❯ driveAndReadOutput src/components/active/__tests__/schmitt-trigger.test.ts:172:11
+ ❯ src/components/active/__tests__/schmitt-trigger.test.ts:295:19
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/31]⎯
+
+ FAIL  src/components/active/__tests__/schmitt-trigger.test.ts > Transfer > plot_matches_hysteresis_loop
+TypeError: Cannot read properties of undefined (reading '0')
+ ❯ readNode src/components/active/schmitt-trigger.ts:142:20
+    140| 
+    141|   function readNode(voltages: Float64Array, n: number): number {
+    142|     return n > 0 ? voltages[n - 1] : 0;
+       |                    ^
+    143|   }
+    144| 
+ ❯ Object.load src/components/active/schmitt-trigger.ts:179:19
+ ❯ driveAndReadOutput src/components/active/__tests__/schmitt-trigger.test.ts:172:11
+ ❯ src/components/active/__tests__/schmitt-trigger.test.ts:335:5
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/31]⎯
+
+ FAIL  src/components/active/__tests__/schmitt-trigger.test.ts > SchmittTrigger parity (C4.5) > schmitt_load_dcop_parity
+TypeError: Cannot read properties of undefined (reading '0')
+ ❯ readNode src/components/active/schmitt-trigger.ts:142:20
+    140| 
+    141|   function readNode(voltages: Float64Array, n: number): number {
+    142|     return n > 0 ? voltages[n - 1] : 0;
+       |                    ^
+    143|   }
+    144| 
+ ❯ Object.load src/components/active/schmitt-trigger.ts:179:19
+ ❯ src/components/active/__tests__/schmitt-trigger.test.ts:460:13
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/31]⎯
+
+ FAIL  src/components/active/__tests__/timer-555.test.ts > Timer555 > internal_divider_voltages
+TypeError: Cannot read properties of undefined (reading 'states')
+ ❯ Object.load src/components/active/comparator.ts:257:23
+    255|       const solver = ctx.solver;
+    256|       const voltages = ctx.rhsOld;
+    257|       const s0 = pool.states[0];
+       |                       ^
+    258|       const s1 = pool.states[1];
+    259| 
+ ❯ Object.load src/components/active/timer-555.ts:568:16
+ ❯ Module.cktLoad src/solver/analog/ckt-load.ts:84:13
+ ❯ Module.newtonRaphson src/solver/analog/newton-raphson.ts:360:5
+ ❯ runNR src/solver/analog/dc-operating-point.ts:164:3
+ ❯ cktop src/solver/analog/dc-operating-point.ts:199:10
+ ❯ Module.solveDcOperatingPoint src/solver/analog/dc-operating-point.ts:334:24
+ ❯ Module.runDcOp src/solver/analog/__tests__/test-helpers.ts:799:3
+ ❯ src/components/active/__tests__/timer-555.test.ts:204:20
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/31]⎯
+
+ FAIL  src/components/active/__tests__/timer-555.test.ts > Astable > oscillates_at_correct_frequency
+TypeError: Cannot read properties of undefined (reading 'states')
+ ❯ Object.load src/components/active/comparator.ts:257:23
+    255|       const solver = ctx.solver;
+    256|       const voltages = ctx.rhsOld;
+    257|       const s0 = pool.states[0];
+       |                       ^
+    258|       const s1 = pool.states[1];
+    259| 
+ ❯ Object.load src/components/active/timer-555.ts:568:16
+ ❯ Module.cktLoad src/solver/analog/ckt-load.ts:84:13
+ ❯ Module.newtonRaphson src/solver/analog/newton-raphson.ts:360:5
+ ❯ runNR src/solver/analog/dc-operating-point.ts:164:3
+ ❯ cktop src/solver/analog/dc-operating-point.ts:199:10
+ ❯ Module.solveDcOperatingPoint src/solver/analog/dc-operating-point.ts:334:24
+ ❯ MNAEngine.dcOperatingPoint src/solver/analog/analog-engine.ts:878:5
+ ❯ src/components/active/__tests__/timer-555.test.ts:331:29
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[7/31]⎯
+
+ FAIL  src/components/active/__tests__/timer-555.test.ts > Astable > duty_cycle
+TypeError: Cannot read properties of undefined (reading 'states')
+ ❯ Object.load src/components/active/comparator.ts:257:23
+    255|       const solver = ctx.solver;
+    256|       const voltages = ctx.rhsOld;
+    257|       const s0 = pool.states[0];
+       |                       ^
+    258|       const s1 = pool.states[1];
+    259| 
+ ❯ Object.load src/components/active/timer-555.ts:568:16
+ ❯ Module.cktLoad src/solver/analog/ckt-load.ts:84:13
+ ❯ Module.newtonRaphson src/solver/analog/newton-raphson.ts:360:5
+ ❯ runNR src/solver/analog/dc-operating-point.ts:164:3
+ ❯ cktop src/solver/analog/dc-operating-point.ts:199:10
+ ❯ Module.solveDcOperatingPoint src/solver/analog/dc-operating-point.ts:334:24
+ ❯ MNAEngine.dcOperatingPoint src/solver/analog/analog-engine.ts:878:5
+ ❯ src/components/active/__tests__/timer-555.test.ts:397:29
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[8/31]⎯
+
+ FAIL  src/components/active/__tests__/timer-555.test.ts > Monostable > pulse_width
+TypeError: Cannot read properties of undefined (reading 'states')
+ ❯ Object.load src/components/active/comparator.ts:257:23
+    255|       const solver = ctx.solver;
+    256|       const voltages = ctx.rhsOld;
+    257|       const s0 = pool.states[0];
+       |                       ^
+    258|       const s1 = pool.states[1];
+    259| 
+ ❯ Object.load src/components/active/timer-555.ts:568:16
+ ❯ Module.cktLoad src/solver/analog/ckt-load.ts:84:13
+ ❯ Module.newtonRaphson src/solver/analog/newton-raphson.ts:360:5
+ ❯ runNR src/solver/analog/dc-operating-point.ts:164:3
+ ❯ cktop src/solver/analog/dc-operating-point.ts:199:10
+ ❯ Module.solveDcOperatingPoint src/solver/analog/dc-operating-point.ts:334:24
+ ❯ MNAEngine.dcOperatingPoint src/solver/analog/analog-engine.ts:878:5
+ ❯ src/components/active/__tests__/timer-555.test.ts:571:29
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[9/31]⎯
+
+ FAIL  src/components/active/__tests__/timer-555.test.ts > Monostable > retrigger_ignored_during_pulse
+TypeError: Cannot read properties of undefined (reading 'states')
+ ❯ Object.load src/components/active/comparator.ts:257:23
+    255|       const solver = ctx.solver;
+    256|       const voltages = ctx.rhsOld;
+    257|       const s0 = pool.states[0];
+       |                       ^
+    258|       const s1 = pool.states[1];
+    259| 
+ ❯ Object.load src/components/active/timer-555.ts:568:16
+ ❯ Module.cktLoad src/solver/analog/ckt-load.ts:84:13
+ ❯ Module.newtonRaphson src/solver/analog/newton-raphson.ts:360:5
+ ❯ runNR src/solver/analog/dc-operating-point.ts:164:3
+ ❯ cktop src/solver/analog/dc-operating-point.ts:199:10
+ ❯ Module.solveDcOperatingPoint src/solver/analog/dc-operating-point.ts:334:24
+ ❯ MNAEngine.dcOperatingPoint src/solver/analog/analog-engine.ts:878:5
+ ❯ src/components/active/__tests__/timer-555.test.ts:635:12
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[10/31]⎯
+
+ FAIL  src/components/sensors/__tests__/spark-gap.test.ts > SparkGap > blocks_below_breakdown > 500V across 1000V gap: current ≈ 500/R_off (nA range)
+TypeError: Cannot read properties of undefined (reading '0')
+ ❯ SparkGapElement.accept src/components/sensors/spark-gap.ts:199:29
+    197|     const nPos = this.pinNodeIds[0];
+    198|     const nNeg = this.pinNodeIds[1];
+    199|     const vPos = nPos > 0 ? voltages[nPos - 1] : 0;
+       |                             ^
+    200|     const vNeg = nNeg > 0 ? voltages[nNeg - 1] : 0;
+    201|     this._vTerminal = vPos - vNeg;
+ ❯ applyVoltage src/components/sensors/__tests__/spark-gap.test.ts:122:7
+ ❯ src/components/sensors/__tests__/spark-gap.test.ts:133:7
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[11/31]⎯
+
+ FAIL  src/components/sensors/__tests__/spark-gap.test.ts > SparkGap > blocks_below_breakdown > resistance below breakdown is close to R_off
+TypeError: Cannot read properties of undefined (reading '0')
+ ❯ SparkGapElement.accept src/components/sensors/spark-gap.ts:199:29
+    197|     const nPos = this.pinNodeIds[0];
+    198|     const nNeg = this.pinNodeIds[1];
+    199|     const vPos = nPos > 0 ? voltages[nPos - 1] : 0;
+       |                             ^
+    200|     const vNeg = nNeg > 0 ? voltages[nNeg - 1] : 0;
+    201|     this._vTerminal = vPos - vNeg;
+ ❯ applyVoltage src/components/sensors/__tests__/spark-gap.test.ts:122:7
+ ❯ src/components/sensors/__tests__/spark-gap.test.ts:143:7
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[12/31]⎯
+
+ FAIL  src/components/sensors/__tests__/spark-gap.test.ts > SparkGap > conducts_above_breakdown > 1500V fires the gap and allows current to flow
+TypeError: Cannot read properties of undefined (reading '0')
+ ❯ SparkGapElement.accept src/components/sensors/spark-gap.ts:199:29
+    197|     const nPos = this.pinNodeIds[0];
+    198|     const nNeg = this.pinNodeIds[1];
+    199|     const vPos = nPos > 0 ? voltages[nPos - 1] : 0;
+       |                             ^
+    200|     const vNeg = nNeg > 0 ? voltages[nNeg - 1] : 0;
+    201|     this._vTerminal = vPos - vNeg;
+ ❯ applyVoltage src/components/sensors/__tests__/spark-gap.test.ts:122:7
+ ❯ src/components/sensors/__tests__/spark-gap.test.ts:157:7
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[13/31]⎯
+
+ FAIL  src/components/sensors/__tests__/spark-gap.test.ts > SparkGap > conducts_above_breakdown > resistance drops significantly above breakdown
+TypeError: Cannot read properties of undefined (reading '0')
+ ❯ SparkGapElement.accept src/components/sensors/spark-gap.ts:199:29
+    197|     const nPos = this.pinNodeIds[0];
+    198|     const nNeg = this.pinNodeIds[1];
+    199|     const vPos = nPos > 0 ? voltages[nPos - 1] : 0;
+       |                             ^
+    200|     const vNeg = nNeg > 0 ? voltages[nNeg - 1] : 0;
+    201|     this._vTerminal = vPos - vNeg;
+ ❯ applyVoltage src/components/sensors/__tests__/spark-gap.test.ts:122:7
+ ❯ src/components/sensors/__tests__/spark-gap.test.ts:163:7
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[14/31]⎯
+
+ FAIL  src/components/sensors/__tests__/spark-gap.test.ts > SparkGap > conducts_above_breakdown > current above breakdown is much larger than below
+TypeError: Cannot read properties of undefined (reading '0')
+ ❯ SparkGapElement.accept src/components/sensors/spark-gap.ts:199:29
+    197|     const nPos = this.pinNodeIds[0];
+    198|     const nNeg = this.pinNodeIds[1];
+    199|     const vPos = nPos > 0 ? voltages[nPos - 1] : 0;
+       |                             ^
+    200|     const vNeg = nNeg > 0 ? voltages[nNeg - 1] : 0;
+    201|     this._vTerminal = vPos - vNeg;
+ ❯ applyVoltage src/components/sensors/__tests__/spark-gap.test.ts:122:7
+ ❯ src/components/sensors/__tests__/spark-gap.test.ts:172:7
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[15/31]⎯
+
+ FAIL  src/components/sensors/__tests__/spark-gap.test.ts > SparkGap > holds_until_current_drops > gap stays conducting while voltage keeps current above iHold
+TypeError: Cannot read properties of undefined (reading '0')
+ ❯ SparkGapElement.accept src/components/sensors/spark-gap.ts:199:29
+    197|     const nPos = this.pinNodeIds[0];
+    198|     const nNeg = this.pinNodeIds[1];
+    199|     const vPos = nPos > 0 ? voltages[nPos - 1] : 0;
+       |                             ^
+    200|     const vNeg = nNeg > 0 ? voltages[nNeg - 1] : 0;
+    201|     this._vTerminal = vPos - vNeg;
+ ❯ applyVoltage src/components/sensors/__tests__/spark-gap.test.ts:122:7
+ ❯ src/components/sensors/__tests__/spark-gap.test.ts:190:7
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[16/31]⎯
+
+ FAIL  src/components/sensors/__tests__/spark-gap.test.ts > SparkGap > holds_until_current_drops > conducting gap has low resistance well above holding current
+TypeError: Cannot read properties of undefined (reading '0')
+ ❯ SparkGapElement.accept src/components/sensors/spark-gap.ts:199:29
+    197|     const nPos = this.pinNodeIds[0];
+    198|     const nNeg = this.pinNodeIds[1];
+    199|     const vPos = nPos > 0 ? voltages[nPos - 1] : 0;
+       |                             ^
+    200|     const vNeg = nNeg > 0 ? voltages[nNeg - 1] : 0;
+    201|     this._vTerminal = vPos - vNeg;
+ ❯ applyVoltage src/components/sensors/__tests__/spark-gap.test.ts:122:7
+ ❯ src/components/sensors/__tests__/spark-gap.test.ts:205:7
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[17/31]⎯
+
+ FAIL  src/components/sensors/__tests__/spark-gap.test.ts > SparkGap > extinguishes_below_holding > gap returns to blocking when current drops below iHold
+TypeError: Cannot read properties of undefined (reading '0')
+ ❯ SparkGapElement.accept src/components/sensors/spark-gap.ts:199:29
+    197|     const nPos = this.pinNodeIds[0];
+    198|     const nNeg = this.pinNodeIds[1];
+    199|     const vPos = nPos > 0 ? voltages[nPos - 1] : 0;
+       |                             ^
+    200|     const vNeg = nNeg > 0 ? voltages[nNeg - 1] : 0;
+    201|     this._vTerminal = vPos - vNeg;
+ ❯ applyVoltage src/components/sensors/__tests__/spark-gap.test.ts:122:7
+ ❯ src/components/sensors/__tests__/spark-gap.test.ts:217:7
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[18/31]⎯
+
+ FAIL  src/components/sensors/__tests__/spark-gap.test.ts > SparkGap > extinguishes_below_holding > resistance returns toward R_off after extinction
+TypeError: Cannot read properties of undefined (reading '0')
+ ❯ SparkGapElement.accept src/components/sensors/spark-gap.ts:199:29
+    197|     const nPos = this.pinNodeIds[0];
+    198|     const nNeg = this.pinNodeIds[1];
+    199|     const vPos = nPos > 0 ? voltages[nPos - 1] : 0;
+       |                             ^
+    200|     const vNeg = nNeg > 0 ? voltages[nNeg - 1] : 0;
+    201|     this._vTerminal = vPos - vNeg;
+ ❯ applyVoltage src/components/sensors/__tests__/spark-gap.test.ts:122:7
+ ❯ src/components/sensors/__tests__/spark-gap.test.ts:228:7
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[19/31]⎯
+
+ FAIL  src/components/sensors/__tests__/spark-gap.test.ts > SparkGap > extinguishes_below_holding > can re-fire after extinction
+TypeError: Cannot read properties of undefined (reading '0')
+ ❯ SparkGapElement.accept src/components/sensors/spark-gap.ts:199:29
+    197|     const nPos = this.pinNodeIds[0];
+    198|     const nNeg = this.pinNodeIds[1];
+    199|     const vPos = nPos > 0 ? voltages[nPos - 1] : 0;
+       |                             ^
+    200|     const vNeg = nNeg > 0 ? voltages[nNeg - 1] : 0;
+    201|     this._vTerminal = vPos - vNeg;
+ ❯ applyVoltage src/components/sensors/__tests__/spark-gap.test.ts:122:7
+ ❯ src/components/sensors/__tests__/spark-gap.test.ts:235:7
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[20/31]⎯
+
+ FAIL  src/components/sensors/__tests__/spark-gap.test.ts > SparkGap > smooth_transition > resistance changes monotonically across the breakdown transition zone
+TypeError: Cannot read properties of undefined (reading '0')
+ ❯ SparkGapElement.accept src/components/sensors/spark-gap.ts:199:29
+    197|     const nPos = this.pinNodeIds[0];
+    198|     const nNeg = this.pinNodeIds[1];
+    199|     const vPos = nPos > 0 ? voltages[nPos - 1] : 0;
+       |                             ^
+    200|     const vNeg = nNeg > 0 ? voltages[nNeg - 1] : 0;
+    201|     this._vTerminal = vPos - vNeg;
+ ❯ applyVoltage src/components/sensors/__tests__/spark-gap.test.ts:122:7
+ ❯ src/components/sensors/__tests__/spark-gap.test.ts:252:9
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[21/31]⎯
+
+ FAIL  src/components/sensors/__tests__/spark-gap.test.ts > SparkGap > smooth_transition > resistance at breakdown voltage is midpoint between rOn and rOff
+TypeError: Cannot read properties of undefined (reading '0')
+ ❯ SparkGapElement.accept src/components/sensors/spark-gap.ts:199:29
+    197|     const nPos = this.pinNodeIds[0];
+    198|     const nNeg = this.pinNodeIds[1];
+    199|     const vPos = nPos > 0 ? voltages[nPos - 1] : 0;
+       |                             ^
+    200|     const vNeg = nNeg > 0 ? voltages[nNeg - 1] : 0;
+    201|     this._vTerminal = vPos - vNeg;
+ ❯ applyVoltage src/components/sensors/__tests__/spark-gap.test.ts:122:7
+ ❯ src/components/sensors/__tests__/spark-gap.test.ts:269:7
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[22/31]⎯
+
+ FAIL  src/components/sensors/__tests__/spark-gap.test.ts > SparkGap > load > stamps conductance matrix between nodes in blocking state
+TypeError: Cannot read properties of undefined (reading '0')
+ ❯ SparkGapElement.accept src/components/sensors/spark-gap.ts:199:29
+    197|     const nPos = this.pinNodeIds[0];
+    198|     const nNeg = this.pinNodeIds[1];
+    199|     const vPos = nPos > 0 ? voltages[nPos - 1] : 0;
+       |                             ^
+    200|     const vNeg = nNeg > 0 ? voltages[nNeg - 1] : 0;
+    201|     this._vTerminal = vPos - vNeg;
+ ❯ applyVoltage src/components/sensors/__tests__/spark-gap.test.ts:122:7
+ ❯ src/components/sensors/__tests__/spark-gap.test.ts:285:7
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[23/31]⎯
+
+ FAIL  src/components/sensors/__tests__/spark-gap.test.ts > SparkGap > load > stamps higher conductance in conducting state
+TypeError: Cannot read properties of undefined (reading '0')
+ ❯ SparkGapElement.accept src/components/sensors/spark-gap.ts:199:29
+    197|     const nPos = this.pinNodeIds[0];
+    198|     const nNeg = this.pinNodeIds[1];
+    199|     const vPos = nPos > 0 ? voltages[nPos - 1] : 0;
+       |                             ^
+    200|     const vNeg = nNeg > 0 ? voltages[nNeg - 1] : 0;
+    201|     this._vTerminal = vPos - vNeg;
+ ❯ applyVoltage src/components/sensors/__tests__/spark-gap.test.ts:122:7
+ ❯ src/components/sensors/__tests__/spark-gap.test.ts:309:7
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[24/31]⎯
+
+ FAIL  src/solver/analog/__tests__/behavioral-flipflop.test.ts > DFF > latches_d_on_rising_edge
+TypeError: Cannot read properties of undefined (reading 'states')
+ ❯ AnalogCapacitorElement.load src/components/passives/capacitor.ts:254:27
+    252|     const base = this.stateBaseOffset;
+    253|     // pool.states[N] accessed at call time — no cached Float64Array r…
+    254|     const s0 = this._pool.states[0];
+       |                           ^
+    255|     const s1 = this._pool.states[1];
+    256|     const s2 = this._pool.states[2];
+ ❯ Module.loadChildren src/solver/analog/behavioral-flipflop/shared.ts:112:11
+ ❯ BehavioralDFlipflopElement.load src/solver/analog/behavioral-flipflop.ts:166:5
+ ❯ src/solver/analog/__tests__/behavioral-flipflop.test.ts:150:13
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[25/31]⎯
+
+ FAIL  src/solver/analog/__tests__/behavioral-flipflop.test.ts > DFF > holds_on_falling_edge
+TypeError: Cannot read properties of undefined (reading 'states')
+ ❯ AnalogCapacitorElement.load src/components/passives/capacitor.ts:254:27
+    252|     const base = this.stateBaseOffset;
+    253|     // pool.states[N] accessed at call time — no cached Float64Array r…
+    254|     const s0 = this._pool.states[0];
+       |                           ^
+    255|     const s1 = this._pool.states[1];
+    256|     const s2 = this._pool.states[2];
+ ❯ Module.loadChildren src/solver/analog/behavioral-flipflop/shared.ts:112:11
+ ❯ BehavioralDFlipflopElement.load src/solver/analog/behavioral-flipflop.ts:166:5
+ ❯ src/solver/analog/__tests__/behavioral-flipflop.test.ts:175:13
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[26/31]⎯
+
+ FAIL  src/solver/analog/__tests__/behavioral-flipflop.test.ts > DFF > q_bar_is_complement
+TypeError: Cannot read properties of undefined (reading 'states')
+ ❯ AnalogCapacitorElement.load src/components/passives/capacitor.ts:254:27
+    252|     const base = this.stateBaseOffset;
+    253|     // pool.states[N] accessed at call time — no cached Float64Array r…
+    254|     const s0 = this._pool.states[0];
+       |                           ^
+    255|     const s1 = this._pool.states[1];
+    256|     const s2 = this._pool.states[2];
+ ❯ Module.loadChildren src/solver/analog/behavioral-flipflop/shared.ts:112:11
+ ❯ BehavioralDFlipflopElement.load src/solver/analog/behavioral-flipflop.ts:166:5
+ ❯ src/solver/analog/__tests__/behavioral-flipflop.test.ts:193:13
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[27/31]⎯
+
+ FAIL  src/solver/analog/__tests__/behavioral-flipflop.test.ts > DFF > does_not_latch_during_nr_iteration
+TypeError: Cannot read properties of undefined (reading 'states')
+ ❯ AnalogCapacitorElement.load src/components/passives/capacitor.ts:254:27
+    252|     const base = this.stateBaseOffset;
+    253|     // pool.states[N] accessed at call time — no cached Float64Array r…
+    254|     const s0 = this._pool.states[0];
+       |                           ^
+    255|     const s1 = this._pool.states[1];
+    256|     const s2 = this._pool.states[2];
+ ❯ Module.loadChildren src/solver/analog/behavioral-flipflop/shared.ts:112:11
+ ❯ BehavioralDFlipflopElement.load src/solver/analog/behavioral-flipflop.ts:166:5
+ ❯ src/solver/analog/__tests__/behavioral-flipflop.test.ts:212:13
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[28/31]⎯
+
+ FAIL  src/solver/analog/__tests__/behavioral-flipflop.test.ts > DFF > async_reset_forces_q_low
+TypeError: Cannot read properties of undefined (reading 'length')
+ ❯ Module.readMnaVoltage src/solver/analog/digital-pin-model.ts:29:46
+     27|  */
+     28| export function readMnaVoltage(nodeId: number, voltages: Float64Array)…
+     29|   return nodeId > 0 && nodeId - 1 < voltages.length ? voltages[nodeId …
+       |                                              ^
+     30| }
+     31| 
+ ❯ BehavioralDFlipflopElement.accept src/solver/analog/behavioral-flipflop.ts:189:27
+ ❯ src/solver/analog/__tests__/behavioral-flipflop.test.ts:237:13
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[29/31]⎯
+
+ FAIL  src/solver/analog/__tests__/behavioral-flipflop.test.ts > DFF > edge_rate_from_capacitance
+TypeError: Cannot read properties of undefined (reading 'length')
+ ❯ Module.readMnaVoltage src/solver/analog/digital-pin-model.ts:29:46
+     27|  */
+     28| export function readMnaVoltage(nodeId: number, voltages: Float64Array)…
+     29|   return nodeId > 0 && nodeId - 1 < voltages.length ? voltages[nodeId …
+       |                                              ^
+     30| }
+     31| 
+ ❯ BehavioralDFlipflopElement.accept src/solver/analog/behavioral-flipflop.ts:189:27
+ ❯ src/solver/analog/__tests__/behavioral-flipflop.test.ts:296:8
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[30/31]⎯
+
+ FAIL  src/solver/analog/__tests__/behavioral-flipflop.test.ts > Task 6.4.3 — flipflop load delegates to pin models > flipflop_load_delegates_to_pin_models
+TypeError: Cannot read properties of undefined (reading 'states')
+ ❯ AnalogCapacitorElement.load src/components/passives/capacitor.ts:254:27
+    252|     const base = this.stateBaseOffset;
+    253|     // pool.states[N] accessed at call time — no cached Float64Array r…
+    254|     const s0 = this._pool.states[0];
+       |                           ^
+    255|     const s1 = this._pool.states[1];
+    256|     const s2 = this._pool.states[2];
+ ❯ Module.loadChildren src/solver/analog/behavioral-flipflop/shared.ts:112:11
+ ❯ BehavioralDFlipflopElement.load src/solver/analog/behavioral-flipflop.ts:166:5
+ ❯ src/solver/analog/__tests__/behavioral-flipflop.test.ts:368:13
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[31/31]⎯
+
+ Test Files  4 failed (4)
+      Tests  31 failed | 13 passed (44)
+   Start at  00:43:01
+   Duration  737ms (transform 615ms, setup 0ms, collect 1.05s, tests 49ms, environment 1ms, prepare 498ms)
+

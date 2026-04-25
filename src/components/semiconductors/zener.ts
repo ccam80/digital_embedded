@@ -67,6 +67,8 @@ export const { paramDefs: ZENER_PARAM_DEFS, defaults: ZENER_PARAM_DEFAULTS } = d
     TNOM:{ default: 300.15, unit: "K",  description: "Parameter measurement temperature" },
   },
   secondary: {
+  },
+  instance: {
     TEMP: { default: 300.15, unit: "K", description: "Per-instance operating temperature" },
   },
 });

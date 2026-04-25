@@ -30,7 +30,7 @@ import { ADCDefinition, ADC_DEFAULTS } from "../adc.js";
 import { PropertyBag } from "../../../core/properties.js";
 import type { AnalogElement } from "../../../solver/analog/element.js";
 import type { LoadContext } from "../../../solver/analog/load-context.js";
-import { makeSimpleCtx } from "../../../solver/analog/__tests__/test-helpers.js";
+import { makeSimpleCtx, makeLoadCtx } from "../../../solver/analog/__tests__/test-helpers.js";
 import { MODEDCOP, MODEINITFLOAT, MODETRAN } from "../../../solver/analog/ckt-mode.js";
 
 // ---------------------------------------------------------------------------
@@ -125,17 +125,12 @@ function makeAdc(
  * clock edges and to step the internal companion-model state of the pin models.
  */
 function makeAcceptCtx(voltages: Float64Array, dt: number): LoadContext {
-  const ctx = makeSimpleCtx({
-    elements: [],
-    matrixSize: voltages.length,
-    nodeCount: voltages.length,
-    branchCount: 0,
-  }) as unknown as LoadContext;
-  // Mutate fields that makeSimpleCtx's default values leave at DC-OP settings.
-  ctx.rhs = voltages;
-  (ctx as { dt: number }).dt = dt;
-  (ctx as { cktMode: number }).cktMode = MODETRAN | MODEINITFLOAT;
-  return ctx;
+  return makeLoadCtx({
+    solver: undefined as unknown as import("../../../solver/analog/sparse-solver.js").SparseSolver,
+    voltages,
+    cktMode: MODETRAN | MODEINITFLOAT,
+    dt,
+  });
 }
 
 /**

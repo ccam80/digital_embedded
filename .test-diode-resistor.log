@@ -1,0 +1,13 @@
+FFF
+
+============================================================
+  0 passed  1 failed  0 skipped  (2.8s)
+  1 test files
+============================================================
+
+Failures grouped by error:
+
+  [1] NR iteration count mismatch: ours=9 ngspice=8: expected 9 to be 8 // Object.is equality  (x1)
+      src\solver\analog\__tests__\ngspice-parity\diode-resistor.test.ts:52:7  "dc_op_pnjlim_match"
+
+Structured report: .vitest-failures.json

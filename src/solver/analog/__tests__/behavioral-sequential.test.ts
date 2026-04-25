@@ -23,6 +23,7 @@ import { RegisterDefinition } from "../../../components/memory/register.js";
 import type { ResolvedPinElectrical } from "../../../core/pin-electrical.js";
 import type { LoadContext } from "../load-context.js";
 import { MODETRAN, MODEINITFLOAT } from "../ckt-mode.js";
+import { makeLoadCtx, initElement } from "./test-helpers.js";
 
 // ---------------------------------------------------------------------------
 // Helper: narrow ModelEntry to inline factory (throws if netlist kind)
@@ -30,32 +31,24 @@ import { MODETRAN, MODEINITFLOAT } from "../ckt-mode.js";
 import type { ModelEntry, AnalogFactory } from "../../../core/registry.js";
 import { PropertyBag } from "../../../core/properties.js";
 
-function makeCtx(v: Float64Array = new Float64Array(16)): LoadContext {
+function makeNullSolver() {
   return {
-    solver: {
-      allocElement: (_r: number, _c: number) => 0,
-      stampElement: (_h: number, _v: number) => {},
-      stampRHS: (_i: number, _v: number) => {},
-      stamp: (_r: number, _c: number, _v: number) => {},
-    } as any,
+    allocElement: (_r: number, _c: number) => 0,
+    stampElement: (_h: number, _v: number) => {},
+    stampRHS: (_i: number, _v: number) => {},
+    stamp: (_r: number, _c: number, _v: number) => {},
+  } as any;
+}
+
+function makeCtx(v: Float64Array = new Float64Array(16)): LoadContext {
+  return makeLoadCtx({
+    solver: makeNullSolver(),
     voltages: v,
-    cktMode: MODETRAN | MODEINITFLOAT,
     dt: 0,
-    method: "trapezoidal" as const,
+    method: "trapezoidal",
     order: 1,
-    deltaOld: [],
-    ag: new Float64Array(7),
-    srcFact: 1,
-    noncon: { value: 0 },
-    limitingCollector: null,
-    xfact: 0,
-    gmin: 1e-12,
-    reltol: 1e-3,
-    iabstol: 1e-12,
-    cktFixLimit: false,
-    bypass: false,
-    voltTol: 1e-6,
-  };
+    cktMode: MODETRAN | MODEINITFLOAT,
+  });
 }
 
 function makeAcceptCtx(v: Float64Array, dt = 1e-9): LoadContext {
@@ -132,6 +125,7 @@ function buildCounter(bitWidth = 4): {
     CMOS33.vIL,
     new Map(),
   );
+  initElement(element);
 
   const solverSize = 4 + bitWidth;
 
@@ -191,6 +185,7 @@ function buildRegister(bitWidth = 8): {
     CMOS33.vIL,
     new Map(),
   );
+  initElement(element);
 
   const solverSize = 2 * bitWidth + 2;
 
@@ -273,6 +268,7 @@ describe("Counter", () => {
       new Map([["en", 1], ["C", 2], ["clr", 3], ["out", 4], ["ovf", 8]]),
       [], -1, props, () => 0,
     ) as BehavioralCounterElement;
+    initElement(element);
 
     element.load(makeCtx());
 
@@ -468,6 +464,7 @@ describe("Task 6.4.3 — sequential pin loading propagates", () => {
       [], -1, props, () => 0,
     );
     Object.assign(element, { pinNodeIds: [1, 2, 3, 4, 5], allNodeIds: [1, 2, 3, 4, 5] });
+    initElement(element);
 
     const allocCalls: Array<[number, number]> = [];
     const solver = {
@@ -476,27 +473,14 @@ describe("Task 6.4.3 — sequential pin loading propagates", () => {
       stampRHS(_i: number, _v: number) {},
     };
 
-    const ag = new Float64Array(7);
-    const ctx: LoadContext = {
+    const ctx: LoadContext = makeLoadCtx({
       solver: solver as any,
       voltages: new Float64Array(16),
       cktMode: MODETRAN | MODEINITFLOAT,
       dt: 0,
-      method: "trapezoidal" as const,
+      method: "trapezoidal",
       order: 1,
-      deltaOld: [],
-      ag,
-      srcFact: 1,
-      noncon: { value: 0 },
-      limitingCollector: null,
-      xfact: 0,
-      gmin: 1e-12,
-      reltol: 1e-3,
-      iabstol: 1e-12,
-      cktFixLimit: false,
-      bypass: false,
-      voltTol: 1e-6,
-    };
+    });
 
     element.load(ctx);
 

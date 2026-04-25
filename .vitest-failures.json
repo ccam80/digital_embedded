@@ -1,10 +1,23 @@
 {
   "summary": {
-    "passed": 1,
-    "failed": 0,
+    "passed": 0,
+    "failed": 1,
     "skipped": 0,
     "totalFiles": 1,
-    "durationSeconds": 0.9
+    "durationSeconds": 2.8
   },
-  "failures": []
+  "failures": [
+    {
+      "message": "NR iteration count mismatch: ours=9 ngspice=8: expected 9 to be 8 // Object.is equality",
+      "count": 1,
+      "locations": [
+        {
+          "file": "src\\solver\\analog\\__tests__\\ngspice-parity\\diode-resistor.test.ts",
+          "test": "dc_op_pnjlim_match",
+          "line": 52,
+          "column": 7
+        }
+      ]
+    }
+  ]
 }

@@ -352,6 +352,52 @@ describe("Registration", () => {
   });
 });
 
+describe("NJFET_PARAM_DEFS partition layout", () => {
+  it("instance params have partition='instance'", () => {
+    const instanceKeys = ["AREA", "M", "TEMP", "OFF"];
+    for (const key of instanceKeys) {
+      const def = NJFET_PARAM_DEFS.find((d) => d.key === key);
+      expect(def).toBeDefined();
+      expect(def!.partition).toBe("instance");
+    }
+  });
+
+  it("model params have partition='model'", () => {
+    const modelKeys = [
+      "VTO", "BETA", "LAMBDA", "IS", "N", "CGS", "CGD", "PB", "FC",
+      "RD", "RS", "B", "TCV", "BEX", "KF", "AF", "TNOM"
+    ];
+    for (const key of modelKeys) {
+      const def = NJFET_PARAM_DEFS.find((d) => d.key === key);
+      expect(def).toBeDefined();
+      expect(def!.partition).toBe("model");
+    }
+  });
+});
+
+describe("PJFET_PARAM_DEFS partition layout", () => {
+  it("instance params have partition='instance'", () => {
+    const instanceKeys = ["AREA", "M", "TEMP", "OFF"];
+    for (const key of instanceKeys) {
+      const def = PJFET_PARAM_DEFS.find((d) => d.key === key);
+      expect(def).toBeDefined();
+      expect(def!.partition).toBe("instance");
+    }
+  });
+
+  it("model params have partition='model'", () => {
+    const modelKeys = [
+      "VTO", "BETA", "LAMBDA", "IS", "N", "CGS", "CGD", "PB", "FC",
+      "RD", "RS", "B", "TCV", "BEX", "KF", "AF", "TNOM"
+    ];
+    for (const key of modelKeys) {
+      const def = PJFET_PARAM_DEFS.find((d) => d.key === key);
+      expect(def).toBeDefined();
+      expect(def!.partition).toBe("model");
+    }
+  });
+});
+
 // ---------------------------------------------------------------------------
 // Helpers for TEMP tests.
 // ---------------------------------------------------------------------------

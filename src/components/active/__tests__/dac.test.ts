@@ -26,7 +26,7 @@
 import { describe, it, expect } from "vitest";
 import { DACDefinition, DAC_DEFAULTS } from "../dac.js";
 import { PropertyBag } from "../../../core/properties.js";
-import { withNodeIds, runDcOp } from "../../../solver/analog/__tests__/test-helpers.js";
+import { withNodeIds, runDcOp, makeLoadCtx } from "../../../solver/analog/__tests__/test-helpers.js";
 import { makeDcVoltageSource } from "../../sources/dc-voltage-source.js";
 import type { AnalogElement } from "../../../solver/analog/element.js";
 
@@ -316,26 +316,12 @@ function makeDacCaptureSolver(): {
 }
 
 function makeDacParityCtx(voltages: Float64Array, solver: SparseSolverType): LoadContext {
-  return {
+  return makeLoadCtx({
     solver,
     voltages,
     cktMode: MODEDCOP | MODEINITFLOAT,
     dt: 0,
-    method: "trapezoidal",
-    order: 1,
-    deltaOld: [0, 0, 0, 0, 0, 0, 0],
-    ag: new Float64Array(7),
-    srcFact: 1,
-    noncon: { value: 0 },
-    limitingCollector: null,
-    xfact: 1,
-    gmin: 1e-12,
-    reltol: 1e-3,
-    iabstol: 1e-12,
-    cktFixLimit: false,
-    bypass: false,
-    voltTol: 1e-6,
-  };
+  });
 }
 
 describe("DAC parity (C4.5)", () => {

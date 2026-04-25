@@ -18,7 +18,7 @@ import {
 } from "../polarized-cap.js";
 import { PropertyBag } from "../../../core/properties.js";
 import { SparseSolver } from "../../../solver/analog/sparse-solver.js";
-import { runDcOp } from "../../../solver/analog/__tests__/test-helpers.js";
+import { runDcOp, makeLoadCtx } from "../../../solver/analog/__tests__/test-helpers.js";
 import { makeDcVoltageSource } from "../../sources/dc-voltage-source.js";
 import type { Diagnostic } from "../../../compile/types.js";
 import { StatePool } from "../../../solver/analog/state-pool.js";
@@ -60,26 +60,12 @@ function makeDiagnosticCtx(
   solver: SparseSolver,
   voltages: Float64Array,
 ): LoadContext {
-  return {
+  return makeLoadCtx({
     cktMode: MODEDCOP | MODEINITFLOAT,
     solver,
     voltages,
     dt: 0,
-    method: "trapezoidal",
-    order: 1,
-    deltaOld: [0, 0, 0, 0, 0, 0, 0],
-    ag: new Float64Array(7),
-    srcFact: 1,
-    noncon: { value: 0 },
-    limitingCollector: null,
-    xfact: 1,
-    gmin: 1e-12,
-    reltol: 1e-3,
-    iabstol: 1e-12,
-    cktFixLimit: false,
-    bypass: false,
-    voltTol: 1e-6,
-  };
+  });
 }
 
 /**
@@ -99,7 +85,7 @@ function makeSlotLoadCtx(
   const ag = new Float64Array(7);
   const scratch = new Float64Array(64);
   computeNIcomCof(dt, deltaOld, order, method, ag, scratch);
-  return {
+  return makeLoadCtx({
     cktMode,
     solver,
     voltages,
@@ -108,17 +94,7 @@ function makeSlotLoadCtx(
     order,
     deltaOld,
     ag,
-    srcFact: 1,
-    noncon: { value: 0 },
-    limitingCollector: null,
-    xfact: 1,
-    gmin: 1e-12,
-    reltol: 1e-3,
-    iabstol: 1e-12,
-    cktFixLimit: false,
-    bypass: false,
-    voltTol: 1e-6,
-  };
+  });
 }
 
 /**

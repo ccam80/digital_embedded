@@ -21,7 +21,7 @@ import { PropertyBag } from "../../../core/properties.js";
 import { ComponentCategory } from "../../../core/registry.js";
 import type { AnalogFactory } from "../../../core/registry.js";
 import type { AnalogElement } from "../../../solver/analog/element.js";
-import { makeSimpleCtx } from "../../../solver/analog/__tests__/test-helpers.js";
+import { makeSimpleCtx, makeLoadCtx } from "../../../solver/analog/__tests__/test-helpers.js";
 import { MODETRAN, MODEINITFLOAT } from "../../../solver/analog/ckt-mode.js";
 import type { SparseSolver as SparseSolverType } from "../../../solver/analog/sparse-solver.js";
 
@@ -70,25 +70,13 @@ function makeCaptureSolver(): {
 // ---------------------------------------------------------------------------
 
 function makeAcceptCtx(voltages: Float64Array, dt: number): import("../../../solver/analog/load-context.js").LoadContext {
-  return {
+  return makeLoadCtx({
     solver: undefined as unknown as SparseSolverType,
     voltages,
     cktMode: MODETRAN | MODEINITFLOAT,
     dt,
-    method: "trapezoidal",
-    order: 1,
     deltaOld: [dt, dt, dt, dt, dt, dt, dt],
-    ag: new Float64Array(7),
-    srcFact: 1,
-    noncon: { value: 0 },
-    limitingCollector: null,
-    xfact: 1,
-    gmin: 1e-12,
-    reltol: 1e-3,
-    iabstol: 1e-12,
-    bypass: false,
-    voltTol: 1e-6,
-  };
+  });
 }
 
 // ---------------------------------------------------------------------------

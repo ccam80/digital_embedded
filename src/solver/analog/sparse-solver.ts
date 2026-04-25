@@ -573,59 +573,116 @@ export class SparseSolver {
   }
 
   /**
-   * Sparse forward/backward substitution on CSC L/U.
+   * Sparse forward/backward substitution by walking the linked structure.
    *
-   * L and U row indices are in original-column-order space.
-   * Pivot mapping: _pinv[origRow] = step, _q[step] = origRow.
+   * ngspice spsolve.c spSolve — port mirroring forward-sub at spsolve.c:154,
+   * back-sub at spsolve.c:173. RHS-in permutation at spsolve.c:149-151,
+   * RHS-out permutation at spsolve.c:186-188.
    *
-   * 1. Apply pivot permutation: b[k] = rhs[q[k]]
-   * 2. Sparse forward sub (L, unit lower triangular CSC)
-   * 3. Sparse backward sub (U, upper triangular CSC)
-   * 4. Copy solution: x[k] = b[k]. Row pivoting does not permute columns.
+   * Post-factor linked-structure convention (ngspice unit-diag-U):
+   *   _elVal[_diag[k]]      = 1 / pivot_k
+   *   _elVal[(i, k)] i < k  = U_ik = A_ik_post / pivot_i   (U scaled, unit diag)
+   *   _elVal[(i, k)] i > k  = L_ik = A_ik_post              (L unscaled)
+   *
+   * Variable map (ngspice → digiTS):
+   *   Matrix->Diag[k]            → _diag[k]
+   *   pPivot->Real               → _elVal[_diag[k]]
+   *   pElement->NextInCol        → _elNextInCol[e]
+   *   pElement->NextInRow        → _elNextInRow[e]
+   *   pElement->Real             → _elVal[e]
+   *   pElement->Row              → _elRow[e]
+   *   pElement->Col              → _elCol[e]
+   *   Matrix->IntToExtRowMap[k]  → _intToExtRow[k]
+   *   Matrix->IntToExtColMap[k]  → _preorderColPerm[k]   (inverse of _extToIntCol)
+   *   RHS                        → this._rhs (stamped by caller, original-row keyed)
+   *   Solution                   → x (caller output, original-col keyed)
+   *   Intermediate               → b (this._scratch)
    */
   solve(x: Float64Array): void {
     const n = this._n;
     if (n === 0) return;
 
-    const intToExt = this._intToExtRow;
     const b = this._scratch;
+    const rhs = this._rhs;
+    const intToExtRow = this._intToExtRow;
+    const intToExtCol = this._preorderColPerm;
+    const diag = this._diag;
+    const elVal = this._elVal;
+    const elRow = this._elRow;
+    const elCol = this._elCol;
+    const elNextInCol = this._elNextInCol;
+    const elNextInRow = this._elNextInRow;
 
-    // Step 1: Apply pivot row permutation to RHS. Post-port,
-    // _intToExtRow[slot] = the original row that ended up at slot. The RHS is
-    // stamped by the caller using ORIGINAL row indices (`stampRHS(origRow,
-    // value)`), so we lookup by original row at slot k.
-    for (let k = 0; k < n; k++) b[k] = this._rhs[intToExt[k]];
+    // Initialize Intermediate vector — spsolve.c:149-151.
+    //   pExtOrder = &Matrix->IntToExtRowMap[Size];
+    //   for (I = Size; I > 0; I--)
+    //       Intermediate[I] = RHS[*(pExtOrder--)];
+    // RHS comes from the solver's internal _rhs (populated via stampRHS calls
+    // from ckt-load.ts; the NR comment "stamps into ctx.rhs" is misleading —
+    // cktLoad goes through ctx.solver.stampRHS, which writes to this._rhs).
+    // _intToExtRow[k] = original row at slot k.
+    for (let k = 0; k < n; k++) b[k] = rhs[intToExtRow[k]];
 
-    // Step 2: Sparse forward sub (L, unit lower triangular CSC). Post-port
-    // _lRowIdx is slot-keyed (matches the slot indexing used during
-    // factorization), so the inner-loop write target is slot-direct — no
-    // pinv translation needed.
-    for (let j = 0; j < n; j++) {
-      const p0 = this._lColPtr[j];
-      const p1 = this._lColPtr[j + 1];
-      const bj = b[j];
-      for (let p = p0; p < p1; p++) {
-        b[this._lRowIdx[p]] -= this._lVals[p] * bj;
+    // Forward elimination. Solves Lc = b — spsolve.c:154-170.
+    //   for (I = 1; I <= Size; I++) {
+    //       if ((Temp = Intermediate[I]) != 0.0) {
+    //           pPivot = Matrix->Diag[I];
+    //           Intermediate[I] = (Temp *= pPivot->Real);
+    //           pElement = pPivot->NextInCol;
+    //           while (pElement != NULL) {
+    //               Intermediate[pElement->Row] -= Temp * pElement->Real;
+    //               pElement = pElement->NextInCol;
+    //           }
+    //       }
+    //   }
+    // pPivot->Real holds 1/pivot_k post-factor (ngspice spfactor.c:349/383/408,
+    // mirrored on _elVal[_diag[k]]). Elements below the diagonal in column k
+    // hold L_ik = A_ik_post (unscaled); the multiply Temp * elVal[e] forms
+    // L_ik * y_k as required.
+    for (let k = 0; k < n; k++) {
+      let temp = b[k];
+      if (temp !== 0.0) {
+        const pPivot = diag[k];
+        temp *= elVal[pPivot];
+        b[k] = temp;
+        let pElement = elNextInCol[pPivot];
+        while (pElement >= 0) {
+          b[elRow[pElement]] -= temp * elVal[pElement];
+          pElement = elNextInCol[pElement];
+        }
       }
     }
 
-    // Step 3: Sparse backward sub (U, upper triangular CSC).
-    // Multiply by precomputed reciprocal (ngspice spfactor.c:349/383/408 +
-    // spsolve.c) so the back-sub division rounding matches ngspice.
-    for (let j = n - 1; j >= 0; j--) {
-      const p0 = this._uColPtr[j];
-      const p1 = this._uColPtr[j + 1];
-      b[j] *= this._uDiagInv[j];
-      const bj = b[j];
-      for (let p = p0; p < p1 - 1; p++) {
-        b[this._uRowIdx[p]] -= this._uVals[p] * bj;
+    // Backward Substitution. Solves Ux = c — spsolve.c:173-183.
+    //   for (I = Size; I > 0; I--) {
+    //       Temp = Intermediate[I];
+    //       pElement = Matrix->Diag[I]->NextInRow;
+    //       while (pElement != NULL) {
+    //           Temp -= pElement->Real * Intermediate[pElement->Col];
+    //           pElement = pElement->NextInRow;
+    //       }
+    //       Intermediate[I] = Temp;
+    //   }
+    // U is unit-diagonal in ngspice convention — no division at the diagonal.
+    // Elements right of the diagonal in row k hold U_ki = A_ki_post / pivot_k
+    // (already scaled at factor time).
+    for (let k = n - 1; k >= 0; k--) {
+      let temp = b[k];
+      let pElement = elNextInRow[diag[k]];
+      while (pElement >= 0) {
+        temp -= elVal[pElement] * b[elCol[pElement]];
+        pElement = elNextInRow[pElement];
       }
+      b[k] = temp;
     }
 
-    // Step 4: Apply preorder inverse permutation and write solution.
-    // _preorderColPerm[k] = original column index for slot k.
-    const pcp = this._preorderColPerm;
-    for (let k = 0; k < n; k++) x[pcp[k]] = b[k];
+    // Unscramble Intermediate vector while placing data into Solution vector
+    // — spsolve.c:186-188.
+    //   pExtOrder = &Matrix->IntToExtColMap[Size];
+    //   for (I = Size; I > 0; I--)
+    //       Solution[*(pExtOrder--)] = Intermediate[I];
+    // _preorderColPerm[k] = original col for slot k (mirrors IntToExtColMap).
+    for (let k = 0; k < n; k++) x[intToExtCol[k]] = b[k];
   }
 
   /**
@@ -1369,311 +1426,123 @@ export class SparseSolver {
       }
     }
 
-    // ============================================================
-    // PHASE 2 — convert ngspice convention to port convention and commit
-    // to CSC. The port's solve() expects:
-    //   _uDiagInv[k] = 1 / pivot_k
-    //   U(i,k) at i < k: A_ik_post                       (unscaled)
-    //   L(i,k) at i > k: A_ik_post / pivot_k             (scaled by 1/pivot)
-    // Diagonal U slot stores pivot_k itself (read by solve only via the
-    // p1-1 skip; _uDiagInv carries the actual reciprocal).
-    // ============================================================
-    // Step 2a — capture ngspice diagonals (= 1/pivot_k) BEFORE mutating any
-    // _elVal[e] in the U-conversion pass; the U conversion at row r needs
-    // the saved 1/pivot_r (= column r's diagonal pre-conversion).
-    for (let k = 0; k < n; k++) {
-      const dk = this._diag[k];
-      this._uDiagInv[k] = this._elVal[dk];
-    }
-
-    // Step 2b — walk each column's chain in row-ascending order, converting
-    // _elVal[e] in place and emitting CSC entries. Column chains are kept
-    // sorted by row (insertIntoCol invariant), so the natural chain walk
-    // produces row-ascending CSC ordering.
-    let lnz = 0, unz = 0;
-    for (let k = 0; k < n; k++) {
-      this._lColPtr[k] = lnz;
-      this._uColPtr[k] = unz;
-      if (lnz + n > this._lRowIdx.length) this._growL(lnz + n);
-      if (unz + n > this._uRowIdx.length) this._growU(unz + n);
-
-      const invPivotK = this._uDiagInv[k];
-      let e = this._colHead[k];
-      while (e >= 0) {
-        const r = this._elRow[e];
-        if (r < k) {
-          // U entry: ngspice scaled (= A/pivot_r) → port unscaled (= A).
-          const v = this._elVal[e] / this._uDiagInv[r];
-          this._elVal[e] = v;
-          this._uCscToElem[unz] = e;
-          this._uValueIndex[e] = unz;
-          this._uRowIdx[unz] = r;
-          this._uVals[unz] = v;
-          unz++;
-        } else if (r === k) {
-          // Diagonal — handled below as the LAST U entry for column k,
-          // matching the legacy commit ordering that solve() relies on
-          // (back-sub iterates [p0, p1-1) over U, skipping the diagonal).
-        } else {
-          // L entry: ngspice unscaled (= A) → port scaled (= A/pivot_k).
-          const v = this._elVal[e] * invPivotK;
-          this._elVal[e] = v;
-          this._lCscToElem[lnz] = e;
-          this._lValueIndex[e] = lnz;
-          this._lRowIdx[lnz] = r;
-          this._lVals[lnz] = v;
-          lnz++;
-        }
-        e = this._elNextInCol[e];
-      }
-
-      // Diagonal commit: place pivot_k as the trailing U entry for column k.
-      const dk = this._diag[k];
-      const pivotK = 1 / invPivotK;
-      this._elVal[dk] = pivotK;
-      this._uCscToElem[unz] = dk;
-      this._uValueIndex[dk] = unz;
-      this._uRowIdx[unz] = k;
-      this._uVals[unz] = pivotK;
-      unz++;
-    }
-    this._lColPtr[n] = lnz;
-    this._uColPtr[n] = unz;
-
-    // Condition estimate from final U diagonals.
+    // Condition estimate from final pivot diagonals. ngspice convention:
+    // _elVal[_diag[k]] = 1/pivot_k, so the pivot magnitude is 1 / |inv_pivot|.
     let maxDiag = 0, minDiag = Infinity;
     for (let k = 0; k < n; k++) {
-      const e = this._uColPtr[k + 1];
-      if (e > this._uColPtr[k]) {
-        const v = Math.abs(this._uVals[e - 1]);
-        if (v > maxDiag) maxDiag = v;
-        if (v < minDiag) minDiag = v;
-      }
+      const invPivot = Math.abs(this._elVal[this._diag[k]]);
+      const pivotMag = invPivot > 0 ? 1 / invPivot : 0;
+      if (pivotMag > maxDiag) maxDiag = pivotMag;
+      if (pivotMag > 0 && pivotMag < minDiag) minDiag = pivotMag;
     }
-
     return { success: true, conditionEstimate: minDiag > 0 ? maxDiag / minDiag : Infinity };
   }
 
   /**
    * Numeric LU factorization reusing pivot order from a prior factorWithReorder call.
-   * Skips pivot search — uses stored pinv[]/q[].
-   * Scatters values directly into existing CSC positions via _lValueIndex/_uValueIndex:
-   * zero linked-list operations in this hot path.
-   * ngspice: spFactor (spfactor.c).
+   * Skips pivot search — operates on the existing linked structure with the
+   * pivot order already stored in _diag[]. Mirrors ngspice spFactor
+   * (spfactor.c:322-414), the no-reorder factor entry point that calls
+   * RealRowColElimination (spfactor.c:2553-2598) over the existing structure.
+   *
+   * ngspice spFactor — reuse-pivot factor with RealRowColElimination at
+   * spfactor.c:2553-2598. There is no SearchForPivot, no ExchangeRowsAndCols,
+   * no UpdateMarkowitzNumbers, no CreateFillin: every fill-in already exists
+   * in the linked structure from the prior spOrderAndFactor.
+   *
+   * Variable map (ngspice → digiTS):
+   *   Matrix->Diag[k]              → _diag[k]
+   *   pElement->NextInRow          → _elNextInRow[e]
+   *   pElement->NextInCol          → _elNextInCol[e]
+   *   pElement->Row                → _elRow[e]
+   *   pElement->Col                → _elCol[e]
+   *   pElement->Real               → _elVal[e]
+   *
+   * Output convention written onto _elVal[e]:
+   *   _elVal[_diag[k]]      = 1 / pivot_k                  (spfactor.c:2567)
+   *   _elVal[(i, k)] i < k  = A_ik_post_elim / pivot_i     (spfactor.c:2572)
+   *   _elVal[(i, k)] i > k  = A_ik_post_elim               (unscaled)
    */
   private _numericLUReusePivots(): FactorResult {
     const n = this._n;
     if (n === 0) return { success: true };
 
-    const x = this._x;
-    const xNzIdx = this._xNzIdx;
-    const q = this._q;
-    const aColStart = this._aMatrixColStart;
-    const aHandles = this._aMatrixHandlesByCol;
+    // Zero any persisting fill-in pool elements before elimination — the
+    // rank-1 update at spfactor.c:2591 accumulates `_elVal[pSub] -= ...` into
+    // existing pool entries, so any fill-in that survived assembly must start
+    // at zero (A-matrix entries already hold their freshly-stamped values).
+    const elFlags = this._elFlags;
     const elVal = this._elVal;
-    const elRow = this._elRow;
+    const elCount = this._elCount;
+    for (let e = 0; e < elCount; e++) {
+      if (elFlags[e] & FLAG_FILL_IN) elVal[e] = 0;
+    }
+
+    const elNextInRow = this._elNextInRow;
     const elNextInCol = this._elNextInCol;
+    const elRow = this._elRow;
     const diag = this._diag;
-    const relThreshold = this._relThreshold;
-    const absThreshold = this._absThreshold;
-    const lCscToElem = this._lCscToElem;
-    const uCscToElem = this._uCscToElem;
 
-    const lnzTotal = this._lColPtr[n];
-    const unzTotal = this._uColPtr[n];
-    for (let i = 0; i < lnzTotal; i++) this._lVals[i] = 0;
-    for (let i = 0; i < unzTotal; i++) this._uVals[i] = 0;
-
-    this._reachMark.fill(-1);
-
+    // ngspice spFactor — per-step elimination over the existing linked
+    // structure. Body identical to RealRowColElimination at spfactor.c:
+    // 2553-2598 (mirrored in _numericLUMarkowitz Phase 1).
     for (let k = 0; k < n; k++) {
-      // Scatter A-matrix values via the flat per-column handle array built
-      // by _buildAMatrixHandleCSR. No _colHead / _elNextInCol access in the
-      // hot path per Task 0.1.3 acceptance ("zero linked-list operations").
-      let xNzCount = 0;
-      const cs = aColStart[k];
-      const ce = aColStart[k + 1];
-      for (let p = cs; p < ce; p++) {
-        const ae = aHandles[p];
-        const row = elRow[ae];
-        if (x[row] === 0) xNzIdx[xNzCount++] = row;
-        x[row] += elVal[ae];
-      }
-
-      const reachTop = this._reach(k);
-      const reachStack = this._reachStack;
-      for (let ri = reachTop; ri < n; ri++) {
-        const j = reachStack[ri];
-        if (x[j] === 0) continue;
-
-        const ljp0 = this._lColPtr[j];
-        const ljp1 = this._lColPtr[j + 1];
-        for (let lp = ljp0; lp < ljp1; lp++) {
-          const li = this._lRowIdx[lp];
-          if (x[li] === 0) xNzIdx[xNzCount++] = li;
-          x[li] -= this._lVals[lp] * x[j];
-        }
-      }
-
-      // Post-port: pivot at slot k is x[k]; q[] retains origRow for harness use.
-      const pivotRow = k;
-      const diagVal = x[pivotRow];
-      const diagMag = Math.abs(diagVal);
-
-      // B1 (Phase 2.5 W2.1): column-relative partial-pivot guard, mechanical
-      // port of ngspice spfactor.c:214-227 (the `if (!Matrix->NeedsOrdering)`
-      // reuse-pivots branch of spOrderAndFactor):
-      //
-      //     for (Step = 1; Step <= Size; Step++) {
-      //         pPivot = Matrix->Diag[Step];
-      //         LargestInCol = FindLargestInCol(pPivot->NextInCol);   // :218
-      //         if ((LargestInCol * RelThreshold < ELEMENT_MAG(pPivot))) {
-      //             ... RealRowColElimination ...                     // :219-223
-      //         } else {
-      //             ReorderingRequired = YES;                         // :225
-      //             break;
-      //         }
-      //     }
-      //
-      // Ngspice accepts the stored pivot iff
-      //     LargestInCol * RelThreshold < |pPivot|
-      // (strict less-than). Negating that: reorder is required when
-      //     LargestInCol * RelThreshold >= |pPivot|.
-      //
-      // pPivot = Matrix->Diag[Step], so pPivot->NextInCol is the first entry
-      // BELOW the diagonal in column Step — matching `elNextInCol[diagE]`.
-      //
-      // On rejection we return { success: false, needsReorder: true } so that
-      // factor() falls through to factorWithReorder (ngspice's "partial
-      // reordering" dispatch at spfactor.c:231-237 where `break` from the
-      // reuse loop lands the control flow in the full reorder section). This
-      // fires BEFORE writing this column's L/U values so a rejected pivot
-      // never pollutes the CSC.
-      const diagE = diag[k];
-      if (diagE >= 0) {
-        const largestInCol = this._findLargestInCol(elNextInCol[diagE]);
-        // spfactor.c:219 — strict < on the acceptance side, so >= on reject.
-        if (largestInCol * relThreshold >= diagMag || diagMag <= absThreshold) {
-          for (let idx = 0; idx < xNzCount; idx++) x[xNzIdx[idx]] = 0;
-          return { success: false, needsReorder: true };
-        }
-      } else if (diagMag <= absThreshold) {
-        // No diagonal pool element — cannot even evaluate the spfactor.c:219
-        // test. Ngspice asserts Matrix->Diag[Step] exists for every Step after
-        // a successful reorder (spfactor.c:217 dereference without a NULL
-        // check); hitting this branch means the linked structure is
-        // inconsistent with the pivot order. Demand a full reorder.
-        for (let idx = 0; idx < xNzCount; idx++) x[xNzIdx[idx]] = 0;
+      const pivotE = diag[k];   // already at slot k from prior reorder
+      if (pivotE < 0 || Math.abs(elVal[pivotE]) === 0) {
+        // Structural zero where prior reorder expected a non-zero — pivot
+        // order is no longer valid. Caller dispatches to _numericLUMarkowitz.
         return { success: false, needsReorder: true };
       }
+      // ngspice spfactor.c:2567 — store reciprocal at the diagonal.
+      elVal[pivotE] = 1 / elVal[pivotE];
 
-      // ngspice spfactor.c:349/383/408 — store reciprocal of pivot for use
-      // in subsequent elim and back-sub.
-      const invDiag = 1 / diagVal;
-      this._uDiagInv[k] = invDiag;
+      // ngspice spfactor.c:2569-2596 — eliminate every row reached via the
+      // pivot row × pivot column outer product. pUpper walks the pivot row
+      // (right of the diagonal), and for each upper element we walk its
+      // column (below the diagonal) in lockstep with the pivot column.
+      let pUpper = elNextInRow[pivotE];
+      while (pUpper >= 0) {
+        // ngspice spfactor.c:2572 — scale upper triangular element.
+        elVal[pUpper] *= elVal[pivotE];
 
-      // U scatter: write CSC and mirror onto _elVal[e] via reverse map so
-      // post-factor pool state matches ngspice spMatrix (Element->Real holds
-      // the factored value after spFactor/spOrderAndFactor).
-      for (let p = this._uColPtr[k]; p < this._uColPtr[k + 1]; p++) {
-        const i = this._uRowIdx[p];
-        const val = x[i];
-        this._uVals[p] = val;
-        const ue = uCscToElem[p];
-        if (ue >= 0) elVal[ue] = val;
+        let pSub = elNextInCol[pUpper];
+        let pLower = elNextInCol[pivotE];
+        while (pLower >= 0) {
+          const row = elRow[pLower];
+          // ngspice spfactor.c:2580-2581 — advance pSub to row alignment.
+          while (pSub >= 0 && elRow[pSub] < row) {
+            pSub = elNextInCol[pSub];
+          }
+          if (pSub < 0 || elRow[pSub] > row) {
+            // Reuse-pivot must NOT create fill-ins. A missing entry here
+            // means the prior reorder's pivot order is no longer
+            // structurally valid. Caller dispatches to _numericLUMarkowitz
+            // (ngspice spfactor.c:225 "ReorderingRequired = YES; break").
+            return { success: false, needsReorder: true };
+          }
+          // ngspice spfactor.c:2591 — rank-1 update.
+          elVal[pSub] -= elVal[pUpper] * elVal[pLower];
+          pSub = elNextInCol[pSub];
+          pLower = elNextInCol[pLower];
+        }
+        pUpper = elNextInRow[pUpper];
       }
-
-      // L scatter: scale by reciprocal of pivot — matches ngspice spfactor.c
-      // `Mult = Dest * pivotReciprocal` rounding rather than direct division.
-      for (let p = this._lColPtr[k]; p < this._lColPtr[k + 1]; p++) {
-        const i = this._lRowIdx[p];
-        const val = x[i] * invDiag;
-        this._lVals[p] = val;
-        const le = lCscToElem[p];
-        if (le >= 0) elVal[le] = val;
-      }
-
-      for (let idx = 0; idx < xNzCount; idx++) x[xNzIdx[idx]] = 0;
     }
 
+    // Condition estimate from final pivot reciprocals stored at the diagonals.
     let maxDiag = 0, minDiag = Infinity;
     for (let k = 0; k < n; k++) {
-      const e = this._uColPtr[k + 1];
-      if (e > this._uColPtr[k]) {
-        const v = Math.abs(this._uVals[e - 1]);
-        if (v > maxDiag) maxDiag = v;
-        if (v < minDiag) minDiag = v;
-      }
+      const dk = diag[k];
+      if (dk < 0) continue;
+      // _elVal[dk] = 1 / pivot_k — magnitude of pivot is the reciprocal.
+      const invMag = Math.abs(elVal[dk]);
+      if (invMag === 0) continue;
+      const v = 1 / invMag;
+      if (v > maxDiag) maxDiag = v;
+      if (v < minDiag) minDiag = v;
     }
 
-    if (minDiag <= this._absThreshold) return { success: false, needsReorder: true };
-    return { success: true, conditionEstimate: minDiag > 0 ? maxDiag / minDiag : Infinity };
-  }
-
-  /**
-   * Snapshot pool → CSC: walk the element pool once and copy _elVal[e] into
-   * the CSC L/U arrays via the _lValueIndex[e] / _uValueIndex[e] positions
-   * recorded during _numericLUMarkowitz. Also builds the A-matrix handle CSR
-   * that _numericLUReusePivots uses to scatter A values without touching
-   * linked-list chain fields.
-   */
-  private _buildCSCFromLinked(): void {
-    const elCount = this._elCount;
-    const lValueIndex = this._lValueIndex;
-    const uValueIndex = this._uValueIndex;
-    const elVal = this._elVal;
-    const lVals = this._lVals;
-    const uVals = this._uVals;
-    // U fill-ins are now allocated via _createFillin alongside L fill-ins,
-    // so every CSC slot — both L and U — has a pool element backing it.
-    // The `>= 0` guard is preserved here only because pool elements that
-    // weren't visited by the most recent factorization (e.g. structural
-    // zeros from prior assemblies) still have lValueIndex/uValueIndex set
-    // to -1.
-    for (let e = 0; e < elCount; e++) {
-      const li = lValueIndex[e];
-      if (li >= 0) lVals[li] = elVal[e];
-      const ui = uValueIndex[e];
-      if (ui >= 0) uVals[ui] = elVal[e];
-    }
-
-    this._buildAMatrixHandleCSR();
-  }
-
-  /**
-   * Build the per-column flat array of A-matrix (non-fill-in) pool handles
-   * consumed by _numericLUReusePivots. Called at the tail of every
-   * factorWithReorder so the CSR tracks the current post-preorder column
-   * chain state. Fill-ins are excluded by the FLAG_FILL_IN filter.
-   */
-  private _buildAMatrixHandleCSR(): void {
-    const n = this._n;
-    if (this._aMatrixColStart.length !== n + 1) {
-      this._aMatrixColStart = new Int32Array(n + 1);
-    }
-    const colStart = this._aMatrixColStart;
-    let total = 0;
-    for (let col = 0; col < n; col++) {
-      colStart[col] = total;
-      let e = this._colHead[col];
-      while (e >= 0) {
-        if (!(this._elFlags[e] & FLAG_FILL_IN)) total++;
-        e = this._elNextInCol[e];
-      }
-    }
-    colStart[n] = total;
-    if (this._aMatrixHandlesByCol.length < total) {
-      this._aMatrixHandlesByCol = new Int32Array(total);
-    }
-    const handles = this._aMatrixHandlesByCol;
-    let idx = 0;
-    for (let col = 0; col < n; col++) {
-      let e = this._colHead[col];
-      while (e >= 0) {
-        if (!(this._elFlags[e] & FLAG_FILL_IN)) handles[idx++] = e;
-        e = this._elNextInCol[e];
-      }
-    }
+    return { success: true, conditionEstimate: minDiag > 0 && minDiag !== Infinity ? maxDiag / minDiag : Infinity };
   }
 
   // =========================================================================
@@ -1703,7 +1572,6 @@ export class SparseSolver {
       //   Matrix->Factored = YES;
       this._needsReorder = false;
       this._factored = true;
-      this._buildCSCFromLinked();
     }
     return result;
   }

@@ -64,8 +64,10 @@ export const { paramDefs: VARACTOR_PARAM_DEFS, defaults: VARACTOR_PARAM_DEFAULTS
       XTI: { default: DIODE_PARAM_DEFAULTS.XTI,             description: "Saturation current temperature exponent" },
       KF:  { default: DIODE_PARAM_DEFAULTS.KF,              description: "Flicker noise coefficient" },
       AF:  { default: DIODE_PARAM_DEFAULTS.AF,              description: "Flicker noise exponent" },
-      AREA: { default: DIODE_PARAM_DEFAULTS.AREA,           description: "Area scaling factor" },
       TNOM: { default: DIODE_PARAM_DEFAULTS.TNOM, unit: "K", description: "Parameter measurement temperature" },
+    },
+    instance: {
+      AREA: { default: DIODE_PARAM_DEFAULTS.AREA,           description: "Area scaling factor" },
       OFF:  { default: DIODE_PARAM_DEFAULTS.OFF,            description: "Initial condition: device off" },
       IC:   { default: DIODE_PARAM_DEFAULTS.IC,  unit: "V", description: "Initial condition: junction voltage for UIC" },
     },

@@ -19,6 +19,7 @@ import type { ResolvedPinElectrical } from "../../../core/pin-electrical.js";
 import type { LoadContext } from "../load-context.js";
 import { MODETRAN, MODEINITFLOAT } from "../ckt-mode.js";
 import type { IntegrationMethod } from "../../../core/analog-types.js";
+import { makeLoadCtx, initElement } from "./test-helpers.js";
 
 function makeNullSolver() {
   return {
@@ -85,6 +86,7 @@ function buildDff(withReset = false): {
     'low',
   );
   element._setThresholds(CMOS33.vIH, CMOS33.vIL);
+  initElement(element);
 
   return { element, clockPin, dPin, qPin, qBarPin, resetPin };
 }
@@ -113,27 +115,14 @@ function makeCtx(
   dt = 0,
   method: IntegrationMethod = "trapezoidal",
 ): LoadContext {
-  const ag = new Float64Array(7);
-  return {
+  return makeLoadCtx({
     solver: makeNullSolver(),
     voltages: v,
-    cktMode: MODETRAN | MODEINITFLOAT,
     dt,
     method,
     order: 1,
-    deltaOld: [],
-    ag,
-    srcFact: 1,
-    noncon: { value: 0 },
-    limitingCollector: null,
-    xfact: 0,
-    gmin: 1e-12,
-    reltol: 1e-3,
-    iabstol: 1e-12,
-    cktFixLimit: false,
-    bypass: false,
-    voltTol: 1e-6,
-  };
+    cktMode: MODETRAN | MODEINITFLOAT,
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -308,30 +297,12 @@ describe("DFF", () => {
 // ---------------------------------------------------------------------------
 
 function makeMinimalFlipflopCtx(voltages?: Float64Array): LoadContext {
-  const ag = new Float64Array(7);
-  return {
-    solver: {
-      allocElement: (_r: number, _c: number) => 0,
-      stampElement: (_h: number, _v: number) => {},
-      stampRHS: (_i: number, _v: number) => {},
-    } as any,
+  return makeLoadCtx({
+    solver: makeNullSolver(),
     voltages: voltages ?? new Float64Array(16),
     cktMode: MODETRAN | MODEINITFLOAT,
-    dt: 0,
-    method: "trapezoidal" as const,
     order: 1,
-    deltaOld: [],
-    ag,
-    srcFact: 1,
-    noncon: { value: 0 },
-    limitingCollector: null,
-    xfact: 0,
-    gmin: 1e-12,
-    reltol: 1e-3,
-    iabstol: 1e-12,
-    bypass: false,
-    voltTol: 1e-6,
-  };
+  });
 }
 
 describe("Task 6.4.3 — flipflop load delegates to pin models", () => {
@@ -357,6 +328,7 @@ describe("Task 6.4.3 — flipflop load delegates to pin models", () => {
       "low",
     );
     element._setThresholds(CMOS33.vIH, CMOS33.vIL);
+    initElement(element);
     Object.assign(element, { pinNodeIds: [1, 2, 3, 4], allNodeIds: [1, 2, 3, 4] });
 
     const clockLoadSpy = vi.spyOn(clockPin, "load");

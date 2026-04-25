@@ -27,6 +27,7 @@ import {
   MODETRAN, MODEDC, MODEDCOP,
   MODEINITFLOAT, MODEINITTRAN,
 } from "../../../solver/analog/ckt-mode.js";
+import { makeLoadCtx } from "../../../solver/analog/__tests__/test-helpers.js";
 
 // ---------------------------------------------------------------------------
 // companion context builder — replaces the deleted stampCompanion(dt, method,
@@ -69,29 +70,17 @@ function makeCompanionCtx(opts: {
   cktMode?: number;
   uic?: boolean;
 }): LoadContext {
-  // Default: MODETRAN | MODEINITFLOAT (normal transient NR iteration).
-  const cktMode = opts.cktMode ?? (MODETRAN | MODEINITFLOAT);
-  return {
-    cktMode,
+  return makeLoadCtx({
     solver: opts.solver,
     voltages: opts.voltages,
+    cktMode: opts.cktMode ?? (MODETRAN | MODEINITFLOAT),
     dt: opts.dt,
     method: opts.method as LoadContext["method"],
     order: opts.order,
     deltaOld: [opts.dt, opts.dt, opts.dt, opts.dt, opts.dt, opts.dt, opts.dt],
     ag: companionAg(opts.dt, opts.method, opts.order),
-    srcFact: 1,
-    noncon: { value: 0 },
-    limitingCollector: null,
-    xfact: 1,
-    gmin: 1e-12,
     uic: opts.uic ?? false,
-    reltol: 1e-3,
-    iabstol: 1e-12,
-    cktFixLimit: false,
-    bypass: false,
-    voltTol: 1e-6,
-  };
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -581,7 +570,7 @@ describe("inductor_load_transient_parity (C4.2)", () => {
       // voltages[0]=Vsrc (node1 fixed), voltages[1]=v2 (node2), voltages[3]=i_L (branch current)
       const voltages = new Float64Array([Vsrc, v2, 0, i_L]);
 
-      const ctx: LoadContext = {
+      const ctx: LoadContext = makeLoadCtx({
         cktMode: step === 0 ? (MODETRAN | MODEINITTRAN) : (MODETRAN | MODEINITFLOAT),
         solver,
         voltages,
@@ -590,17 +579,7 @@ describe("inductor_load_transient_parity (C4.2)", () => {
         order,
         deltaOld: [dt, dt, dt, dt, dt, dt, dt],
         ag,
-        srcFact: 1,
-        noncon: { value: 0 },
-        limitingCollector: null,
-        xfact: 1,
-        gmin: 1e-12,
-        reltol: 1e-3,
-        iabstol: 1e-12,
-        cktFixLimit: false,
-        bypass: false,
-        voltTol: 1e-6,
-      };
+      });
 
       element.load(ctx);
 

@@ -120,7 +120,9 @@
       "Bash(rm -rf \"spec/.locks/tasks/\"* \"spec/.locks/files/\"*)",
       "Bash(git add *)",
       "Bash(git commit *)",
-      "Bash(python3 -c ' *)"
+      "Bash(python3 -c ' *)",
+      "Bash(echo \"---rc=$?---\")",
+      "Bash(rm -rf spec/.locks/tasks/* spec/.locks/files/*)"
     ]
   },
   "enableAllProjectMcpServers": true,

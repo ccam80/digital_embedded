@@ -1,0 +1,25 @@
+
+ FAIL  src/solver/analog/__tests__/ngspice-parity/diode-resistor.test.ts > Diode + resistor DC-OP parity > dc_op_pnjlim_match
+AssertionError: NR iteration count mismatch: ours=9 ngspice=8: expected 9 to be 8 // Object.is equality
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[32m- 8[39m
+[31m+ 9[39m
+
+ ❯ src/solver/analog/__tests__/ngspice-parity/diode-resistor.test.ts:52:7
+     50|       ourTotalIters,
+     51|       `NR iteration count mismatch: ours=${ourTotalIters} ngspice=${ng…
+     52|     ).toBe(ngTotalIters);
+       |       ^
+     53| 
+     54|     // Per-step/iteration comparison (covers pnjlim bit-exact voltage …
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+ Test Files  1 failed (1)
+      Tests  1 failed (1)
+   Start at  01:16:37
+   Duration  2.68s (transform 1.52s, setup 0ms, collect 2.26s, tests 40ms, environment 0ms, prepare 127ms)
+

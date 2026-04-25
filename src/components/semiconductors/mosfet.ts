@@ -132,8 +132,6 @@ export const { paramDefs: MOSFET_NMOS_PARAM_DEFS, defaults: MOSFET_NMOS_DEFAULTS
     VTO:    { default: 1.0,  unit: "V",      description: "Threshold voltage" },
     KP:     { default: 2e-5, unit: "A/V²",   description: "Process transconductance parameter" },
     LAMBDA: { default: 0,    unit: "1/V",    description: "Channel-length modulation" },
-    W:      { default: 1e-6, unit: "m",      description: "Channel width" },
-    L:      { default: 1e-6, unit: "m",      description: "Channel length" },
   },
   secondary: {
     PHI:    { default: 0.6,  unit: "V",      description: "Surface potential" },
@@ -167,6 +165,10 @@ export const { paramDefs: MOSFET_NMOS_PARAM_DEFS, defaults: MOSFET_NMOS_DEFAULTS
     KF:     { default: 0,                    description: "Flicker noise coefficient" },
     AF:     { default: 1,                    description: "Flicker noise exponent" },
     FC:     { default: 0.5,                  description: "Forward-bias depletion capacitance coefficient" },
+  },
+  instance: {
+    W:      { default: 1e-6, unit: "m",      description: "Channel width" },
+    L:      { default: 1e-6, unit: "m",      description: "Channel length" },
     M:      { default: 1,                    description: "Parallel device multiplier" },
     OFF:    { default: 0,                    description: "Initial condition: device off (0=false, 1=true)" },
     ICVDS:  { default: 0,    unit: "V",      description: "Initial condition for Vds (MODEUIC)" },
@@ -235,8 +237,6 @@ export const { paramDefs: MOSFET_PMOS_PARAM_DEFS, defaults: MOSFET_PMOS_DEFAULTS
     VTO:    { default: -1.0, unit: "V",      description: "Threshold voltage" },
     KP:     { default: 1e-5, unit: "A/V²",   description: "Process transconductance parameter" },
     LAMBDA: { default: 0,    unit: "1/V",    description: "Channel-length modulation" },
-    W:      { default: 1e-6, unit: "m",      description: "Channel width" },
-    L:      { default: 1e-6, unit: "m",      description: "Channel length" },
   },
   secondary: {
     PHI:    { default: 0.6,  unit: "V",      description: "Surface potential" },
@@ -270,6 +270,10 @@ export const { paramDefs: MOSFET_PMOS_PARAM_DEFS, defaults: MOSFET_PMOS_DEFAULTS
     KF:     { default: 0,                    description: "Flicker noise coefficient" },
     AF:     { default: 1,                    description: "Flicker noise exponent" },
     FC:     { default: 0.5,                  description: "Forward-bias depletion capacitance coefficient" },
+  },
+  instance: {
+    W:      { default: 1e-6, unit: "m",      description: "Channel width" },
+    L:      { default: 1e-6, unit: "m",      description: "Channel length" },
     M:      { default: 1,                    description: "Parallel device multiplier" },
     OFF:    { default: 0,                    description: "Initial condition: device off (0=false, 1=true)" },
     ICVDS:  { default: 0,    unit: "V",      description: "Initial condition for Vds (MODEUIC)" },

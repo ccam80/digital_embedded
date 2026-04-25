@@ -17,6 +17,8 @@ import {
   BJT_SPICE_L1_PARAM_DEFS,
   BJT_SPICE_L1_NPN_DEFAULTS,
   BJT_NPN_DEFAULTS,
+  BJT_PNP_DEFAULTS,
+  BJT_SPICE_L1_PNP_DEFAULTS,
 } from "../bjt.js";
 import type { LoadContext } from "../../../solver/analog/element.js";
 import { PropertyBag } from "../../../core/properties.js";
@@ -2948,5 +2950,79 @@ describe("BJT TEMP", () => {
     element.load(makeJctCtx());
     const vbe400 = pool.states[0][0];
     expect(Math.abs(vbe400 - expectedTVcrit400)).toBeLessThan(1e-6);
+  });
+});
+
+describe("BJT_PARAM_DEFS partition layout", () => {
+  it("instance keys carry partition='instance'", () => {
+    for (const key of ["AREA", "M", "TEMP", "OFF", "ICVBE", "ICVCE"]) {
+      const def = BJT_PARAM_DEFS.find(pd => pd.key === key);
+      expect(def, `expected ${key} in BJT_PARAM_DEFS`).toBeDefined();
+      expect(def!.partition, `${key} should be instance`).toBe("instance");
+    }
+  });
+
+  it("model keys carry partition='model'", () => {
+    for (const key of ["BF", "BR", "IS", "NF", "NR", "VAF", "VAR", "IKF", "IKR", "ISE", "ISC", "NE", "NC", "TNOM"]) {
+      const def = BJT_PARAM_DEFS.find(pd => pd.key === key);
+      expect(def, `expected ${key} in BJT_PARAM_DEFS`).toBeDefined();
+      expect(def!.partition, `${key} should be model`).toBe("model");
+    }
+  });
+});
+
+describe("BJT_SPICE_L1_PARAM_DEFS partition layout", () => {
+  it("instance keys carry partition='instance'", () => {
+    for (const key of ["AREA", "AREAB", "AREAC", "M", "TEMP", "OFF", "ICVBE", "ICVCE", "SUBS"]) {
+      const def = BJT_SPICE_L1_PARAM_DEFS.find(pd => pd.key === key);
+      expect(def, `expected ${key} in BJT_SPICE_L1_PARAM_DEFS`).toBeDefined();
+      expect(def!.partition, `${key} should be instance`).toBe("instance");
+    }
+  });
+
+  it("model keys retain partition='model'", () => {
+    for (const key of ["BF", "IS", "NF", "BR", "NR", "VAF", "VAR", "IKF", "IKR", "ISE", "ISC", "NE", "NC", "RB", "IRB", "RBM", "RC", "RE", "CJE", "VJE", "MJE", "CJC", "VJC", "MJC", "XCJC", "FC", "TF", "XTF", "VTF", "ITF", "PTF", "TR", "CJS", "VJS", "MJS", "ISS", "NS", "XTB", "EG", "XTI", "KF", "AF", "NKF", "TNOM"]) {
+      const def = BJT_SPICE_L1_PARAM_DEFS.find(pd => pd.key === key);
+      expect(def, `expected ${key} in BJT_SPICE_L1_PARAM_DEFS`).toBeDefined();
+      expect(def!.partition, `${key} should be model`).toBe("model");
+    }
+  });
+});
+
+describe("NPN/PNP defaults preserved", () => {
+  it("simple model instance param defaults match pre-change values", () => {
+    expect(BJT_NPN_DEFAULTS.AREA).toBe(1);
+    expect(BJT_NPN_DEFAULTS.M).toBe(1);
+    expect(BJT_NPN_DEFAULTS.TEMP).toBe(300.15);
+    expect(BJT_NPN_DEFAULTS.OFF).toBe(0);
+    expect(Number.isNaN(BJT_NPN_DEFAULTS.ICVBE)).toBe(true);
+    expect(Number.isNaN(BJT_NPN_DEFAULTS.ICVCE)).toBe(true);
+    expect(BJT_PNP_DEFAULTS.AREA).toBe(1);
+    expect(BJT_PNP_DEFAULTS.M).toBe(1);
+    expect(BJT_PNP_DEFAULTS.TEMP).toBe(300.15);
+    expect(BJT_PNP_DEFAULTS.OFF).toBe(0);
+    expect(Number.isNaN(BJT_PNP_DEFAULTS.ICVBE)).toBe(true);
+    expect(Number.isNaN(BJT_PNP_DEFAULTS.ICVCE)).toBe(true);
+  });
+
+  it("spice-l1 model instance param defaults match pre-change values", () => {
+    expect(BJT_SPICE_L1_NPN_DEFAULTS.AREA).toBe(1);
+    expect(BJT_SPICE_L1_NPN_DEFAULTS.AREAB).toBe(1);
+    expect(BJT_SPICE_L1_NPN_DEFAULTS.AREAC).toBe(1);
+    expect(BJT_SPICE_L1_NPN_DEFAULTS.M).toBe(1);
+    expect(BJT_SPICE_L1_NPN_DEFAULTS.TEMP).toBe(300.15);
+    expect(BJT_SPICE_L1_NPN_DEFAULTS.OFF).toBe(0);
+    expect(Number.isNaN(BJT_SPICE_L1_NPN_DEFAULTS.ICVBE)).toBe(true);
+    expect(Number.isNaN(BJT_SPICE_L1_NPN_DEFAULTS.ICVCE)).toBe(true);
+    expect(BJT_SPICE_L1_NPN_DEFAULTS.SUBS).toBe(1);
+    expect(BJT_SPICE_L1_PNP_DEFAULTS.AREA).toBe(1);
+    expect(BJT_SPICE_L1_PNP_DEFAULTS.AREAB).toBe(1);
+    expect(BJT_SPICE_L1_PNP_DEFAULTS.AREAC).toBe(1);
+    expect(BJT_SPICE_L1_PNP_DEFAULTS.M).toBe(1);
+    expect(BJT_SPICE_L1_PNP_DEFAULTS.TEMP).toBe(300.15);
+    expect(BJT_SPICE_L1_PNP_DEFAULTS.OFF).toBe(0);
+    expect(Number.isNaN(BJT_SPICE_L1_PNP_DEFAULTS.ICVBE)).toBe(true);
+    expect(Number.isNaN(BJT_SPICE_L1_PNP_DEFAULTS.ICVCE)).toBe(true);
+    expect(BJT_SPICE_L1_PNP_DEFAULTS.SUBS).toBe(1);
   });
 });

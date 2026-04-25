@@ -22,7 +22,7 @@ import { computeNIcomCof } from "../../../solver/analog/integration.js";
 import { PropertyBag } from "../../../core/properties.js";
 import { SparseSolver } from "../../../solver/analog/sparse-solver.js";
 import { DiagnosticCollector } from "../../../solver/analog/diagnostics.js";
-import { withNodeIds, runNR } from "../../../solver/analog/__tests__/test-helpers.js";
+import { withNodeIds, runNR, makeLoadCtx } from "../../../solver/analog/__tests__/test-helpers.js";
 import { StatePool } from "../../../solver/analog/state-pool.js";
 import type { AnalogElement, AnalogElementCore, ReactiveAnalogElement } from "../../../solver/analog/element.js";
 import type { AnalogFactory } from "../../../core/registry.js";
@@ -81,27 +81,12 @@ function buildUnitCtx(
   voltages: Float64Array,
   overrides: Partial<import("../../../solver/analog/load-context.js").LoadContext> = {},
 ): import("../../../solver/analog/load-context.js").LoadContext {
-  return {
+  return Object.assign(makeLoadCtx({
     cktMode: MODEDCOP | MODEINITFLOAT,
     solver,
     voltages,
     dt: 0,
-    method: "trapezoidal",
-    order: 1,
-    deltaOld: [0, 0, 0, 0, 0, 0, 0],
-    ag: new Float64Array(7),
-    srcFact: 1,
-    noncon: { value: 0 },
-    limitingCollector: null,
-    xfact: 1,
-    gmin: 1e-12,
-    reltol: 1e-3,
-    iabstol: 1e-12,
-    cktFixLimit: false,
-    bypass: false,
-    voltTol: 1e-6,
-    ...overrides,
-  };
+  }), overrides);
 }
 
 /**
@@ -625,5 +610,20 @@ describe("integration", () => {
     ) as string;
     expect(src).not.toMatch(/integrateCapacitor/);
     expect(src).not.toMatch(/integrateInductor/);
+  });
+
+  it("TUNNEL_DIODE_PARAM_DEFS partition layout", () => {
+    // TEMP should have partition "instance"
+    const tempDef = TUNNEL_DIODE_PARAM_DEFS.find((d) => d.key === "TEMP");
+    expect(tempDef).toBeDefined();
+    expect(tempDef!.partition).toBe("instance");
+
+    // All other keys should have partition "model"
+    const modelParamKeys = ["IP", "VP", "IV", "VV", "IS", "N", "CJO", "VJ", "M", "TT", "FC"];
+    for (const key of modelParamKeys) {
+      const def = TUNNEL_DIODE_PARAM_DEFS.find((d) => d.key === key);
+      expect(def).toBeDefined();
+      expect(def!.partition).toBe("model");
+    }
   });
 });

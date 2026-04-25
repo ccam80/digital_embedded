@@ -28,7 +28,8 @@ import { SparseSolver } from "../sparse-solver.js";
 import type { AnalogElement, AnalogElementCore, ReactiveAnalogElement } from "../element.js";
 import { isPoolBacked } from "../element.js";
 import type { LoadContext } from "../load-context.js";
-import { MODETRAN, MODEINITPRED, MODEINITTRAN } from "../ckt-mode.js";
+import { MODETRAN, MODEINITPRED, MODEINITTRAN, MODEINITFLOAT } from "../ckt-mode.js";
+import type { IntegrationMethod } from "../../../core/analog-types.js";
 import { pnjlim, newtonRaphson } from "../newton-raphson.js";
 import { niIntegrate } from "../ni-integrate.js";
 import { StatePool } from "../state-pool.js";
@@ -836,4 +837,133 @@ export function runNR(opts: SimpleNROptions): NRResult {
   }
   newtonRaphson(ctx);
   return ctx.nrResult;
+}
+
+// ---------------------------------------------------------------------------
+// makeLoadCtx — build a fully-populated LoadContext literal for unit tests
+// ---------------------------------------------------------------------------
+
+export interface MakeLoadCtxOptions {
+  /** SparseSolver (or capture stub) used for stamps. */
+  solver: LoadContext["solver"];
+  /**
+   * Node/branch voltage vector. Aliased into both `voltages`, `rhs`, and
+   * `rhsOld` so element load() (reads rhsOld) and element accept() (reads
+   * rhs) see the same values without a per-test split. Pass distinct arrays
+   * via `rhs`/`rhsOld` overrides if a test needs them divergent.
+   */
+  voltages?: Float64Array;
+  rhs?: Float64Array;
+  rhsOld?: Float64Array;
+  cktMode?: number;
+  dt?: number;
+  method?: IntegrationMethod;
+  order?: number;
+  ag?: Float64Array;
+  deltaOld?: readonly number[];
+  srcFact?: number;
+  noncon?: { value: number };
+  limitingCollector?: LoadContext["limitingCollector"];
+  convergenceCollector?: LoadContext["convergenceCollector"];
+  xfact?: number;
+  gmin?: number;
+  reltol?: number;
+  iabstol?: number;
+  cktFixLimit?: boolean;
+  bypass?: boolean;
+  voltTol?: number;
+  uic?: boolean;
+  time?: number;
+  temp?: number;
+  vt?: number;
+}
+
+/**
+ * Build a fully-populated `LoadContext` with sane defaults for unit tests.
+ *
+ * Tests that build `LoadContext` literals by hand routinely forget required
+ * fields (e.g. `rhsOld`, which inductor / capacitor / comparator / behavioral
+ * elements destructure on every load). When the engine adds a field the
+ * literal silently becomes `undefined` and tests break with
+ * `Cannot read properties of undefined (reading '0')`. Centralise here so a
+ * one-line schema bump fixes every caller.
+ *
+ * Defaults:
+ *   - cktMode  = MODETRAN | MODEINITFLOAT (a normal NR iteration during
+ *     transient — produces the same bit pattern an engine drives on
+ *     non-init iterations).
+ *   - dt = 0, order = 1, method = "trapezoidal".
+ *   - rhs / rhsOld both alias `voltages` unless overridden.
+ *   - All optional fields populated with the values from
+ *     `cktinit.c:53-55` defaults.
+ */
+export function makeLoadCtx(opts: MakeLoadCtxOptions): LoadContext {
+  const voltages = opts.voltages ?? new Float64Array(0);
+  const rhs = opts.rhs ?? voltages;
+  const rhsOld = opts.rhsOld ?? voltages;
+  const ctx: LoadContext = {
+    cktMode: opts.cktMode ?? (MODETRAN | MODEINITFLOAT),
+    solver: opts.solver,
+    matrix: opts.solver,
+    rhs,
+    rhsOld,
+    time: opts.time ?? 0,
+    dt: opts.dt ?? 0,
+    method: opts.method ?? "trapezoidal",
+    order: opts.order ?? 1,
+    deltaOld: opts.deltaOld ?? [0, 0, 0, 0, 0, 0, 0],
+    ag: opts.ag ?? new Float64Array(7),
+    srcFact: opts.srcFact ?? 1,
+    noncon: opts.noncon ?? { value: 0 },
+    limitingCollector: opts.limitingCollector ?? null,
+    convergenceCollector: opts.convergenceCollector ?? null,
+    xfact: opts.xfact ?? 1,
+    gmin: opts.gmin ?? 1e-12,
+    reltol: opts.reltol ?? 1e-3,
+    iabstol: opts.iabstol ?? 1e-12,
+    temp: opts.temp ?? 300.15,
+    vt: opts.vt ?? 0.025852,
+    cktFixLimit: opts.cktFixLimit ?? false,
+    bypass: opts.bypass ?? false,
+    voltTol: opts.voltTol ?? 1e-6,
+  };
+  // The interface also has a `voltages` alias on some historical call sites;
+  // include it via an as-cast so tests that read `ctx.voltages` still work.
+  (ctx as unknown as { voltages: Float64Array }).voltages = voltages;
+  if (opts.uic !== undefined) {
+    (ctx as unknown as { uic: boolean }).uic = opts.uic;
+  }
+  return ctx;
+}
+
+// ---------------------------------------------------------------------------
+// initElement — wire a single element to a freshly-allocated StatePool
+// ---------------------------------------------------------------------------
+
+/**
+ * Allocate a `StatePool` sized to the element's `stateSize`, set the
+ * element's `stateBaseOffset` to 0, and call `initState(pool)`. Required
+ * before driving `element.load()` directly in unit tests for any pool-backed
+ * element (capacitor, inductor, BJT, MOSFET, comparator, behavioral
+ * flip-flop, etc.) — otherwise the element's `_pool` reference is undefined
+ * and `load()` throws `Cannot read properties of undefined (reading
+ * 'states')`.
+ *
+ * Mirrors the engine's compile path:
+ *   - compile.ts walks every analog element with `poolBacked: true`, assigns
+ *     consecutive offsets, builds a single `StatePool`, then calls each
+ *     element's `initState(pool)`.
+ *
+ * Returns the allocated pool so callers can seed slots before `load()`
+ * (e.g. `pool.state1[base + SLOT_PHI] = ...` to fake prior-step state).
+ */
+export function initElement(
+  element: ReactiveAnalogElement | AnalogElement,
+): StatePool {
+  const re = element as ReactiveAnalogElement;
+  const size = Math.max(re.stateSize ?? 0, 1);
+  const pool = new StatePool(size);
+  re.stateBaseOffset = 0;
+  re.initState?.(pool);
+  return pool;
 }

@@ -82,6 +82,8 @@ export const { paramDefs: SCR_PARAM_DEFS, defaults: SCR_PARAM_DEFAULTS } = defin
     alpha2_0:{ default: 0.3,               description: "NPN off-state current gain" },
     i_ref:   { default: 1e-3,   unit: "A", description: "Gate current scale factor for α₂ modulation" },
     n:       { default: 1,                 description: "Emission coefficient" },
+  },
+  instance: {
     TEMP:    { default: 300.15, unit: "K", description: "Per-instance operating temperature" },
     OFF:     { default: 0,                 description: "Initial off-state flag (0 = normal, 1 = forced off)" },
   },
