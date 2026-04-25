@@ -178,7 +178,23 @@ export function computeFirstStep(tStop: number, tStep: number): number {
 
 /** Resolve optional timestep fields to defaults. */
 export function resolveSimulationParams(params: SimulationParams): ResolvedSimulationParams {
-  const maxTimeStep = params.maxTimeStep ?? DEFAULT_SIMULATION_PARAMS.maxTimeStep;
+  // ngspice traninit.c:23-32. CKTmaxStep is auto-derived only when the user
+  // omits it (TRANmaxStep defaults to 0 in trandefs.h, and the ngspice gate
+  // is `if (CKTmaxStep == 0)` — negatives/NaN pass through unchanged).
+  let maxTimeStep: number;
+  const userMax = params.maxTimeStep;
+  if (userMax != null && userMax !== 0) {
+    maxTimeStep = userMax;
+  } else if (params.tStop != null && params.tStop > 0 && params.outputStep != null) {
+    // CKTmaxStep = MIN(CKTstep, (CKTfinalTime - CKTinitTime) / 50)
+    const tStart = params.initTime ?? 0;
+    const span = (params.tStop - tStart) / 50;
+    maxTimeStep = params.outputStep < span ? params.outputStep : span;
+  } else {
+    // Streaming mode (no tStop) — ngspice cannot run .tran without a
+    // finalTime; the static default is the closest analogue.
+    maxTimeStep = DEFAULT_SIMULATION_PARAMS.maxTimeStep;
+  }
   // ngspice: CKTdelmin = 1e-11 * CKTmaxStep. Only compute when user hasn't set it explicitly.
   const minTimeStep = params.minTimeStep != null ? params.minTimeStep : 1e-11 * maxTimeStep;
   let firstStep = params.firstStep;

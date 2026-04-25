@@ -80,9 +80,9 @@ export class UICircuitBuilder {
   // Setup
   // =========================================================================
 
-  /** Navigate to simulator.html and wait for canvas + test bridge. */
+  /** Navigate to the simulator and wait for canvas + test bridge. */
   async load(): Promise<void> {
-    await this.page.goto('/simulator.html');
+    await this.page.goto('/');
     await this.page.locator('#sim-canvas').waitFor({ state: 'visible' });
     await this.page.waitForFunction(
       () => (window as any).__test !== undefined,

@@ -111,7 +111,7 @@ describe("lte-retry-grouping: LTE-rejected attempt + retry grouped in same step"
     sc.endAttempt("lteRejectedRetry" as NRAttemptOutcome, true);
 
     // Attempt 2: smaller dt, both NR and LTE pass → accepted
-    sc.beginAttempt("tranLteRetry" as NRPhase, 5e-10);
+    sc.beginAttempt("tranPredictor" as NRPhase, 5e-10);
     fakeIter(engine.postIterationHook, 0, true, engine);
     sc.endAttempt("accepted" as NRAttemptOutcome, true);
 
@@ -146,7 +146,7 @@ describe("lte-retry-grouping: LTE-rejected attempt + retry grouped in same step"
     fakeIter(engine.postIterationHook, 0, true, engine);
     sc.endAttempt("lteRejectedRetry" as NRAttemptOutcome, true);
 
-    sc.beginAttempt("tranLteRetry" as NRPhase, 5e-10);
+    sc.beginAttempt("tranPredictor" as NRPhase, 5e-10);
     fakeIter(engine.postIterationHook, 0, true, engine);
     sc.endAttempt("accepted" as NRAttemptOutcome, true);
 
@@ -182,7 +182,7 @@ describe("lte-retry-grouping: LTE-rejected attempt + retry grouped in same step"
     fakeIter(engine.postIterationHook, 0, true, engine);
     sc.endAttempt("lteRejectedRetry" as NRAttemptOutcome, true);
 
-    sc.beginAttempt("tranLteRetry" as NRPhase, 5e-10);
+    sc.beginAttempt("tranPredictor" as NRPhase, 5e-10);
     fakeIter(engine.postIterationHook, 0, true, engine);
     sc.endAttempt("accepted" as NRAttemptOutcome, true);
 
@@ -217,7 +217,7 @@ describe("lte-retry-grouping: LTE-rejected attempt + retry grouped in same step"
     fakeIter(engine.postIterationHook, 0, true, engine);
     sc.endAttempt("lteRejectedRetry" as NRAttemptOutcome, true);
 
-    sc.beginAttempt("tranLteRetry" as NRPhase, 5e-10);
+    sc.beginAttempt("tranPredictor" as NRPhase, 5e-10);
     fakeIter(engine.postIterationHook, 0, true, engine);
     sc.endAttempt("accepted" as NRAttemptOutcome, true);
 
@@ -252,7 +252,7 @@ describe("lte-retry-grouping: LTE-rejected attempt + retry grouped in same step"
     fakeIter(engine.postIterationHook, 0, true, engine);
     sc.endAttempt("lteRejectedRetry" as NRAttemptOutcome, true);
 
-    sc.beginAttempt("tranLteRetry" as NRPhase, 5e-10);
+    sc.beginAttempt("tranPredictor" as NRPhase, 5e-10);
     fakeIter(engine.postIterationHook, 0, true, engine);
     sc.endAttempt("accepted" as NRAttemptOutcome, true);
 
@@ -286,7 +286,7 @@ describe("lte-retry-grouping: LTE-rejected attempt + retry grouped in same step"
     fakeIter(engine.postIterationHook, 0, true, engine);
     sc.endAttempt("lteRejectedRetry" as NRAttemptOutcome, true);
 
-    sc.beginAttempt("tranLteRetry" as NRPhase, 5e-10);
+    sc.beginAttempt("tranPredictor" as NRPhase, 5e-10);
     fakeIter(engine.postIterationHook, 0, true, engine);
     sc.endAttempt("accepted" as NRAttemptOutcome, true);
 
@@ -320,7 +320,7 @@ describe("lte-retry-grouping: LTE-rejected attempt + retry grouped in same step"
     fakeIter(engine.postIterationHook, 0, true, engine);
     sc.endAttempt("lteRejectedRetry" as NRAttemptOutcome, true);
 
-    sc.beginAttempt("tranLteRetry" as NRPhase, 5e-10);
+    sc.beginAttempt("tranPredictor" as NRPhase, 5e-10);
     fakeIter(engine.postIterationHook, 0, true, engine);
     sc.endAttempt("accepted" as NRAttemptOutcome, true);
 
@@ -354,7 +354,7 @@ describe("lte-retry-grouping: LTE-rejected attempt + retry grouped in same step"
     sc.beginAttempt("tranNR" as NRPhase, 1e-9);
     fakeIter(engine.postIterationHook, 0, true, engine);
     sc.endAttempt("lteRejectedRetry" as NRAttemptOutcome, true);
-    sc.beginAttempt("tranLteRetry" as NRPhase, 5e-10);
+    sc.beginAttempt("tranPredictor" as NRPhase, 5e-10);
     fakeIter(engine.postIterationHook, 0, true, engine);
     sc.endAttempt("accepted" as NRAttemptOutcome, true);
     sc.endStep({
@@ -370,7 +370,7 @@ describe("lte-retry-grouping: LTE-rejected attempt + retry grouped in same step"
     sc.beginAttempt("tranNR" as NRPhase, 1e-9);
     fakeIter(engine.postIterationHook, 0, true, engine);
     sc.endAttempt("lteRejectedRetry" as NRAttemptOutcome, true);
-    sc.beginAttempt("tranLteRetry" as NRPhase, 5e-10);
+    sc.beginAttempt("tranPredictor" as NRPhase, 5e-10);
     fakeIter(engine.postIterationHook, 0, true, engine);
     sc.endAttempt("accepted" as NRAttemptOutcome, true);
     sc.endStep({

@@ -75,7 +75,6 @@ export class DefaultSimulationCoordinator implements SimulationCoordinator {
   private _voltageMin: number = Infinity;
   private _voltageMax: number = -Infinity;
   private readonly _registry: ComponentRegistry | null;
-  private _cachedDcOpResult: DcOpResult | null = null;
   /** Lazily-built inverted index: CircuitElement → analog element index. */
   private _elementIndexCache: Map<CircuitElement, number> | null = null;
   /** Lazily-built inverted index: CircuitElement → digital component index. */
@@ -83,7 +82,12 @@ export class DefaultSimulationCoordinator implements SimulationCoordinator {
   /** Reusable Map for getPinVoltages() to avoid per-call allocation. */
   private readonly _pinVoltageResult = new Map<string, number>();
   private _analysisPhase: "dcop" | "tranInit" | "tranFloat" = "dcop";
-  private _initialized: boolean = false;
+  /**
+   * One-shot guard for the transient-boot DCOP. Set to true the first time
+   * step() runs the MODETRANOP|MODEINITJCT warm-start (matches ngspice
+   * dctran.c:230-233 firsttime path). Cleared by reset().
+   */
+  private _transientSeeded: boolean = false;
   private _convergenceLogPreHookState: boolean = false;
   private _captureHookInstalled: boolean = false;
 
@@ -171,6 +175,8 @@ export class DefaultSimulationCoordinator implements SimulationCoordinator {
     this._stepCount = 0;
     this._voltageMin = Infinity;
     this._voltageMax = -Infinity;
+    this._transientSeeded = false;
+    this._analysisPhase = "dcop";
     for (const obs of this._observers) obs.onReset();
   }
 
@@ -181,6 +187,16 @@ export class DefaultSimulationCoordinator implements SimulationCoordinator {
   }
 
   step(): void {
+    // Lazy transient-boot DCOP — matches ngspice dctran.c:230-233 firsttime
+    // path. The transient stepping path requires _seedFromDcop to have run
+    // (state vectors populated, ctx.cktMode = MODEINITTRAN). We invoke it on
+    // the first step() so consumers that only ever want a standalone .op
+    // (via dcOperatingPoint()) don't pay for it.
+    if (this._analog !== null && !this._transientSeeded) {
+      (this._analog as MNAEngine).transientDcop();
+      this._transientSeeded = true;
+    }
+
     const analogTimeBefore = this._analog?.simTime ?? 0;
 
     if (this._analog !== null && this._analysisPhase === "dcop") {
@@ -352,17 +368,6 @@ export class DefaultSimulationCoordinator implements SimulationCoordinator {
     return this._analysisPhase;
   }
 
-  initialize(): void {
-    if (this._initialized) return;
-    if (!this._analog) {
-      this._initialized = true;
-      return;
-    }
-    // ngspice dctran.c:230-233 MODETRANOP|MODEINITJCT entry for transient boot.
-    this._cachedDcOpResult = (this._analog as MNAEngine).transientDcop();
-    this._initialized = true;
-  }
-
   applyCaptureHook(bundle: PhaseAwareCaptureHook | null): void {
     if (!this._analog) return;
     const e = this._analog as MNAEngine;
@@ -388,9 +393,18 @@ export class DefaultSimulationCoordinator implements SimulationCoordinator {
     this._captureHookInstalled = true;
   }
 
+  /**
+   * Standalone DC operating-point analysis (matches ngspice `.op` →
+   * `dcop.c::DCop` → `CKTop(MODEDCOP|MODEINITJCT, MODEDCOP|MODEINITFLOAT)`).
+   * Each invocation runs a fresh DCOP — ngspice rebuilds the bias point
+   * for every `.op` directive and does not reuse cached results across
+   * jobs. Distinct from the transient-boot DCOP that step() lazily runs
+   * (which uses MODETRANOP and only seeds transient state).
+   */
   dcOperatingPoint(): DcOpResult | null {
+    if (this._analog === null) return null;
     this._analysisPhase = "dcop";
-    return this._cachedDcOpResult;
+    return (this._analog as MNAEngine).dcOperatingPoint();
   }
 
   acAnalysis(params: AcParams): AcResult | null {

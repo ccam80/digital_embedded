@@ -1,6 +1,7 @@
 import { defineConfig } from 'vite';
 import { resolve } from 'path';
-import { copyFileSync, cpSync, statSync } from 'fs';
+import { copyFileSync, cpSync, mkdirSync, statSync } from 'fs';
+import { dirname } from 'path';
 
 /**
  * Copy static asset directories and non-Vite HTML files into the build output
@@ -22,11 +23,13 @@ function copyStaticAssets() {
           // Directory doesn't exist yet — skip silently
         }
       }
-      // HTML files that use inline scripts or pre-built bundles (not Vite inputs)
-      const htmlFiles = ['tutorial.html', 'tutorials.html', 'tutorial-viewer.html'];
+      // HTML files that use inline scripts (not Vite inputs)
+      const htmlFiles = ['app/tutorial/index.html', 'app/tutorial/view.html'];
       for (const file of htmlFiles) {
         try {
-          copyFileSync(resolve(__dirname, file), resolve(__dirname, 'dist', file));
+          const dest = resolve(__dirname, 'dist', file);
+          mkdirSync(dirname(dest), { recursive: true });
+          copyFileSync(resolve(__dirname, file), dest);
         } catch {
           // File doesn't exist — skip
         }
@@ -45,8 +48,8 @@ export default defineConfig({
   build: {
     rollupOptions: {
       input: {
-        simulator: resolve(__dirname, 'simulator.html'),
-        'tutorial-editor': resolve(__dirname, 'tutorial-editor.html'),
+        main: resolve(__dirname, 'index.html'),
+        'tutorial-edit': resolve(__dirname, 'app/tutorial/edit.html'),
       },
     },
     outDir: 'dist',

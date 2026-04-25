@@ -135,7 +135,7 @@ type PhaseEndFn = ((outcome: DcOpNRAttemptOutcome, converged: boolean) => void) 
  * Configure ctx for a DC-OP sub-solve and run newtonRaphson.
  *
  * Sets isDcOp=true, maxIterations, initialGuess, diagonalGmin, and
- * dcopModeLadder on ctx, then calls newtonRaphson(ctx).
+ * nrModeLadder on ctx, then calls newtonRaphson(ctx).
  *
  * Returns a StepResult pointing to ctx.rhs (the solved voltage vector).
  * Callers must copy ctx.rhs before the next runNR call if they want to
@@ -145,7 +145,7 @@ function runNR(
   ctx: CKTCircuitContext,
   maxIterations: number,
   diagonalGmin: number,
-  ladder: CKTCircuitContext["dcopModeLadder"],
+  ladder: CKTCircuitContext["nrModeLadder"],
 ): StepResult {
   // The caller (dcOperatingPoint / _transientDcop in analog-engine.ts) owns
   // the cktMode write — standalone .OP sets MODEDCOP | MODEINITJCT (dcop.c:82)
@@ -158,7 +158,7 @@ function runNR(
 
   ctx.maxIterations = maxIterations;
   ctx.diagonalGmin = diagonalGmin;
-  ctx.dcopModeLadder = ladder;
+  ctx.nrModeLadder = ladder;
   ctx.exactMaxIterations = false;
   ctx.noncon = 1;
   newtonRaphson(ctx);
@@ -185,7 +185,7 @@ function cktop(
   firstInitf: number,
   maxIter: number,
   preExistingVoltages: Float64Array,
-  ladder: CKTCircuitContext["dcopModeLadder"],
+  ladder: CKTCircuitContext["nrModeLadder"],
 ): StepResult {
   ctx.cktMode = setInitf(ctx.cktMode, firstInitf);
   if (ctx.params.noOpIter) {

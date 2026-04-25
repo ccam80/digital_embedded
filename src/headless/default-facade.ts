@@ -101,9 +101,9 @@ export class DefaultSimulatorFacade implements SimulatorFacade {
   // =========================================================================
 
   /**
-   * Install a phase-aware capture hook bundle. Pass null to clear.
-   * The hook is applied to the coordinator before initialize() so the
-   * in-init DCOP is captured.
+   * Install a phase-aware capture hook bundle. Pass null to clear. The hook
+   * fires for every NR iteration thereafter — install it before any analysis
+   * call (`dcOperatingPoint()`, `step()`) whose iterations you want captured.
    */
   setCaptureHook(bundle: PhaseAwareCaptureHook | null): void {
     this._captureHook = bundle;
@@ -112,7 +112,7 @@ export class DefaultSimulatorFacade implements SimulatorFacade {
     }
   }
 
-  compile(circuit: Circuit, opts?: { deferInitialize?: boolean }): SimulationCoordinator {
+  compile(circuit: Circuit): SimulationCoordinator {
     this._disposeCurrentEngine();
 
     this._circuit = null;
@@ -125,9 +125,6 @@ export class DefaultSimulatorFacade implements SimulatorFacade {
 
     if (this._captureHook) coordinator.applyCaptureHook(this._captureHook);
 
-    if (!opts?.deferInitialize) {
-      coordinator.initialize();
-    }
     return coordinator;
   }
 

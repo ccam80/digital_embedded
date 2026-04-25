@@ -292,11 +292,21 @@ export function newtonRaphson(ctx: CKTCircuitContext): void {
   const maxIterations = ctx.exactMaxIterations ? rawMaxIter : Math.max(rawMaxIter, 100);
 
   ctx.nrResult.reset();
+  // Re-alias nrResult.voltages to the current ctx.rhs in case a previous
+  // newtonRaphson() call left ctx.rhs pointing at the OTHER buffer (the
+  // pointer swap mirrors ngspice niiter.c:1087-1090, see ctx.swapRhsBuffers).
+  ctx.nrResult.voltages = ctx.rhs;
 
-  // Use ctx.rhs and ctx.rhsOld as the voltage ping-pong buffers.
-  // nrResult.voltages already points to ctx.rhs.
-  let voltages = ctx.rhs;
-  let prevVoltages = ctx.rhsOld;
+  // Pointer-swap model — ctx.rhs and ctx.rhsOld are the live ping-pong
+  // pointers, mirroring ngspice's CKTrhs/CKTrhsOld pair on the CKTcircuit
+  // struct. Each NR iteration:
+  //   - cktLoad reads ctx.rhsOld (= iter K input) and stamps into ctx.rhs.
+  //   - solver.solve(ctx.rhs) writes iter K output into ctx.rhs.
+  //   - On non-convergence, ctx.swapRhsBuffers() rotates the pointers, so
+  //     iter K's output becomes iter K+1's input.
+  // On exit, ctx.rhsOld holds the converging iter's input and ctx.rhs holds
+  // its output — bit-exactly matching ngspice's NIiter exit invariant
+  // regardless of the converging-iter parity.
 
   const statePool = ctx.statePool ?? null;
   let oldState0: Float64Array | null = null;
@@ -313,23 +323,26 @@ export function newtonRaphson(ctx: CKTCircuitContext): void {
   // Hoist the iter-0 split hook to avoid per-iteration property lookup.
   const onIter0Complete = ctx.onIteration0Complete;
 
-  // dcopModeLadder: set initial INITF bit (MODEINITJCT) before iter 0.
-  const ladder = ctx.dcopModeLadder ?? null;
-  if (ladder) {
+  // nrModeLadder: set initial INITF bit (MODEINITJCT) before iter 0 IF this is
+  // a DC-OP ladder entry. For transient NR calls the caller has already set
+  // MODEINITTRAN or MODEINITPRED on cktMode; we must not stomp it back to JCT.
+  const ladder = ctx.nrModeLadder ?? null;
+  if (ladder && isDcop(ctx.cktMode)) {
     ctx.cktMode = setInitf(ctx.cktMode, MODEINITJCT);
   }
 
   // MODETRANOP && MODEUIC: single CKTload, no iteration (ngspice dctran.c UIC path).
-  // ngspice dctran.c:117-189 — UIC early-exit exists only in DCtran, not DCop.
-  // Gate on isTranOp(cktMode) && isUic(cktMode): standalone .OP with UIC=true
-  // must NOT take this path — it must run the full CKTop ladder.
+  // ngspice niiter.c:628-637 — pointer swap of CKTrhsOld/CKTrhs, then a single
+  // CKTload, then return OK. ngspice dctran.c:117-189 confirms UIC early-exit
+  // exists only in DCtran, not DCop. Gate on isTranOp(cktMode) && isUic(cktMode):
+  // standalone .OP with UIC=true must NOT take this path — it must run the full
+  // CKTop ladder.
   if (isTranOp(ctx.cktMode) && isUic(ctx.cktMode)) {
-    [voltages, prevVoltages] = [prevVoltages, voltages];
-    ctx.rhsOld.set(prevVoltages);
+    ctx.swapRhsBuffers();
     cktLoad(ctx);
     ctx.nrResult.converged = true;
     ctx.nrResult.iterations = 0;
-    ctx.rhs.set(prevVoltages);
+    ctx.nrResult.voltages = ctx.rhs;
     return;
   }
 
@@ -341,7 +354,9 @@ export function newtonRaphson(ctx: CKTCircuitContext): void {
     }
 
     // ---- STEP B: CKTload — single-pass device evaluation ----
-    ctx.rhsOld.set(prevVoltages);
+    // ctx.rhsOld already holds iter K's input voltages: at iter 0 it is whatever
+    // the caller seeded (predictor / DC-OP carryover); at iter K>0 the previous
+    // ctx.swapRhsBuffers() rotated iter K-1's solve output into ctx.rhsOld.
     cktLoad(ctx);
 
     // ---- STEP D: Preorder (ngspice niiter.c:844-855, NIDIDPREORDER gate) ----
@@ -422,6 +437,7 @@ export function newtonRaphson(ctx: CKTCircuitContext): void {
       ctx.nrResult.iterations = iteration + 1;
       ctx.nrResult.largestChangeElement = -1;
       ctx.nrResult.largestChangeNode = -1;
+      ctx.nrResult.voltages = ctx.rhs;
       return;
     }
 
@@ -434,21 +450,42 @@ export function newtonRaphson(ctx: CKTCircuitContext): void {
     }
 
     // ---- STEP F: Solve ----
-    solver.solve(voltages);
+    // Solver writes the iter K solve output directly into ctx.rhs. ctx.rhsOld
+    // is preserved (still holds iter K's input voltages). Mirrors ngspice
+    // niiter.c:927: SMPsolve(ckt->CKTmatrix, ckt->CKTrhs, ckt->CKTrhsSpare).
+    solver.solve(ctx.rhs);
 
     // ---- STEP G: Check iteration limit BEFORE convergence (ngspice niiter.c:944) ----
+    // Pre-swap return mirrors niiter.c:944-955 — at exit, ctx.rhsOld = iter K's
+    // input, ctx.rhs = iter K's output.
     if (iteration + 1 > maxIterations) {
       ctx.nrResult.converged = false;
       ctx.nrResult.iterations = iteration + 1;
       ctx.nrResult.largestChangeElement = -1;
       ctx.nrResult.largestChangeNode = -1;
-      ctx.rhs.set(voltages);
+      ctx.nrResult.voltages = ctx.rhs;
       return;
     }
 
     // ---- STEP H: Convergence check (ngspice NIconvTest) ----
-    // ngspice niiter.c:957-961: iterno==1 forces noncon=1 (guarantees >= 2 iterations).
-    if (iteration === 0) {
+    //
+    // Mirror niiter.c:957-961 in full:
+    //
+    //   if (CKTnoncon == 0 && iterno != 1) {
+    //       CKTnoncon = NIconvTest(ckt);   // 0 if converged, else 1
+    //   } else {
+    //       CKTnoncon = 1;                  // ASSIGNMENT, not increment
+    //   }
+    //
+    // The else branch fires for both first-iteration AND device-limited cases.
+    // The assignment normalizes any multi-junction limiter increments (BJT,
+    // MOSFET, multi-diode) so the INITF dispatcher and the harness only ever
+    // read 0 or 1. Devices use `ctx.noncon.value++`, so without this collapse
+    // we leak counts > 1 to the harness comparison.
+    if (iteration === 0 || ctx.noncon !== 0) {
+      // niiter.c:960 — `CKTnoncon = 1` for the entire else branch
+      // `(CKTnoncon != 0 || iterno == 1)`. Assignment, not increment, so any
+      // multi-junction limiter increments collapse to 1.
       ctx.noncon = 1;
     }
 
@@ -462,13 +499,13 @@ export function newtonRaphson(ctx: CKTCircuitContext): void {
     if (ctx.noncon === 0 && iteration > 0) {
       globalConverged = true;
       for (let i = 0; i < matrixSize; i++) {
-        const delta = Math.abs(voltages[i] - prevVoltages[i]);
+        const delta = Math.abs(ctx.rhs[i] - ctx.rhsOld[i]);
         if (delta > largestChangeMag) {
           largestChangeMag = delta;
           largestChangeNode = i;
         }
         const absTol = i < nodeCount ? abstol : iabstol;
-        const tol = reltol * Math.max(Math.abs(voltages[i]), Math.abs(prevVoltages[i])) + absTol;
+        const tol = reltol * Math.max(Math.abs(ctx.rhs[i]), Math.abs(ctx.rhsOld[i])) + absTol;
         if (delta > tol) {
           globalConverged = false;
         }
@@ -496,6 +533,15 @@ export function newtonRaphson(ctx: CKTCircuitContext): void {
           }
         }
       }
+
+      // niiter.c:957-961 — write the NIconvTest result back into CKTnoncon so
+      // the INITF dispatcher (and MODEINITFLOAT return gate) sees a unified
+      // convergence indicator. Without this, INITFIX→INITFLOAT transitions
+      // fire after a single iteration whenever no device limited, regardless
+      // of whether the global convergence test actually passed.
+      if (!globalConverged || !elemConverged) {
+        ctx.noncon = 1;
+      }
     } else if (ctx.noncon > 0 && iteration > 0 && ctx.detailedConvergence) {
       const failedIndices: number[] = [];
       for (let i = 0; i < ctx.elementsWithConvergence.length; i++) {
@@ -515,13 +561,13 @@ export function newtonRaphson(ctx: CKTCircuitContext): void {
     if (ctx.nodeDamping && ctx.noncon !== 0 && isDcop(ctx.cktMode) && iteration > 0) {
       let maxDelta = 0;
       for (let i = 0; i < nodeCount; i++) {
-        const delta = Math.abs(voltages[i] - prevVoltages[i]);
+        const delta = Math.abs(ctx.rhs[i] - ctx.rhsOld[i]);
         if (delta > maxDelta) maxDelta = delta;
       }
       if (maxDelta > 10) {
         const dampFactor = Math.max(10 / maxDelta, 0.1);
         for (let i = 0; i < nodeCount; i++) {
-          voltages[i] = prevVoltages[i] + dampFactor * (voltages[i] - prevVoltages[i]);
+          ctx.rhs[i] = ctx.rhsOld[i] + dampFactor * (ctx.rhs[i] - ctx.rhsOld[i]);
         }
         if (statePool && oldState0) {
           const s0 = statePool.state0;
@@ -542,7 +588,7 @@ export function newtonRaphson(ctx: CKTCircuitContext): void {
         let elDelta = 0;
         for (const ni of el.pinNodeIds) {
           if (ni > 0 && ni - 1 < matrixSize) {
-            const d = Math.abs(voltages[ni - 1] - prevVoltages[ni - 1]);
+            const d = Math.abs(ctx.rhs[ni - 1] - ctx.rhsOld[ni - 1]);
             if (d > elDelta) elDelta = d;
           }
         }
@@ -555,7 +601,7 @@ export function newtonRaphson(ctx: CKTCircuitContext): void {
 
     // Post-iteration hook for external instrumentation
     const limitingEvents = ctx.limitingCollector ?? [];
-    ctx.postIterationHook?.(iteration, voltages, prevVoltages, ctx.noncon, globalConverged, elemConverged, limitingEvents, convergenceFailedElements, ctx);
+    ctx.postIterationHook?.(iteration, ctx.rhs, ctx.rhsOld, ctx.noncon, globalConverged, elemConverged, limitingEvents, convergenceFailedElements, ctx);
 
     // ---- STEP J: Unified INITF dispatcher (ngspice niiter.c:1050-1085) ----
     // Read current INITF bits from cktMode (single source of truth).
@@ -568,13 +614,24 @@ export function newtonRaphson(ctx: CKTCircuitContext): void {
           ctx.noncon = 1;
         } else {
           if (ladder) {
-            ladder.onModeEnd("dcopInitFloat", iteration, true);
+            // The terminal-mode label depends on whether this NR call is a
+            // DC-OP solve (terminal mode = dcopInitFloat) or a transient
+            // solve (terminal mode = tranNR). In a transient call, the
+            // dispatcher below has already promoted MODEINITTRAN or
+            // MODEINITPRED to MODEINITFLOAT and emitted the corresponding
+            // ladder.onModeBegin("tranNR", ...).
+            const terminalPhase = isDcop(ctx.cktMode) ? "dcopInitFloat" : "tranNR";
+            ladder.onModeEnd(terminalPhase, iteration, true);
           }
+          // Pre-swap return mirrors niiter.c:1058-1062: on MODEINITFLOAT
+          // converged, NIiter returns OK without executing the trailing
+          // CKTrhsOld/CKTrhs swap at niiter.c:1087-1090. ctx.rhsOld holds
+          // the converging-iter input; ctx.rhs holds the converging-iter output.
           ctx.nrResult.converged = true;
           ctx.nrResult.iterations = iteration + 1;
           ctx.nrResult.largestChangeElement = largestChangeElement;
           ctx.nrResult.largestChangeNode = largestChangeNode;
-          ctx.rhs.set(voltages);
+          ctx.nrResult.voltages = ctx.rhs;
           return;
         }
       }
@@ -601,10 +658,20 @@ export function newtonRaphson(ctx: CKTCircuitContext): void {
       // for subsequent iterations:
       //     ckt->CKTmode = (ckt->CKTmode&(~INITF))|MODEINITFLOAT;
       ctx.cktMode = setInitf(ctx.cktMode, MODEINITFLOAT);
+      if (ladder) {
+        ladder.onModeEnd("tranInit", iteration, false);
+        ladder.onModeBegin("tranNR", iteration + 1);
+      }
     } else if (curInitf === MODEINITPRED) {
       ctx.cktMode = setInitf(ctx.cktMode, MODEINITFLOAT);
+      if (ladder) {
+        ladder.onModeEnd("tranPredictor", iteration, false);
+        ladder.onModeBegin("tranNR", iteration + 1);
+      }
     } else if (curInitf === MODEINITSMSIG) {
       ctx.cktMode = setInitf(ctx.cktMode, MODEINITFLOAT);
+      // Small-signal AC bias has no transient/DC-OP attempt-grouping equivalent
+      // in the harness; no ladder callback fires.
     }
 
     // Split marker: after iteration 0, let the harness observe cold linearization
@@ -612,16 +679,14 @@ export function newtonRaphson(ctx: CKTCircuitContext): void {
       onIter0Complete();
     }
 
-    // ---- STEP K: Swap RHS vectors (O(1) pointer swap) ----
-    const tmp = voltages;
-    voltages = prevVoltages;
-    prevVoltages = tmp;
+    // ---- STEP K: Swap rhs / rhsOld pointers (mirrors niiter.c:1087-1090) ----
+    // Rotates iter K's solve output (held in ctx.rhs) into ctx.rhsOld so it
+    // becomes iter K+1's input; ctx.rhs becomes the scratch buffer that
+    // cktLoad and solver.solve will overwrite next iteration.
+    ctx.swapRhsBuffers();
   }
 
-  // After the final Step K swap, prevVoltages holds the last solution.
-  ctx.nrResult.converged = false;
-  ctx.nrResult.iterations = maxIterations;
-  ctx.nrResult.largestChangeElement = -1;
-  ctx.nrResult.largestChangeNode = -1;
-  ctx.rhs.set(prevVoltages);
+  // Unreachable — the for(;;) loop returns via the iterlim, singular-matrix,
+  // and converged exits above. Kept as a defensive fallthrough so the
+  // compiler can prove the function returns void.
 }

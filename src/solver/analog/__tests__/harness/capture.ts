@@ -313,7 +313,13 @@ export function createIterationCaptureHook(
       ag: new Float64Array(ctx.ag),
       method: ctx.loadCtx.method,
       order: ctx.loadCtx.order,
-      delta: 0,
+      // Mirror ngspice: each iteration captures the active CKTdelta. dctran.c
+      // sets CKTdelta=delta before each NIiter call (line 770) and dcop.c
+      // never writes CKTdelta (cktdojob.c:117 zero persists during DCOP). Our
+      // engine sets ctx.loadCtx.dt before each NIiter (analog-engine.ts:432)
+      // and DCOP entry zeroes ctx.loadCtx.dt (analog-engine.ts dcOperatingPoint
+      // / _transientDcop) to mirror that flow.
+      delta: ctx.loadCtx.dt,
       globalConverged,
       elemConverged,
       limitingEvents: [...limitingEvents],
@@ -360,7 +366,7 @@ export function createIterationCaptureHook(
  *   endStep({ stepEndTime: 0, integrationCoefficients: zeroDcop, analysisPhase: "dcop", acceptedAttemptIndex: N })
  *
  * Usage for transient (called from comparison-session.ts per coordinator.step()):
- *   beginAttempt("tranInit" | "tranNR" | "tranNrRetry" | "tranLteRetry", dt)
+ *   beginAttempt("tranInit" | "tranPredictor" | "tranNR", dt)
  *   ... NR iterations fire via hook ...
  *   endAttempt("accepted" | "nrFailedRetry" | "lteRejectedRetry", converged)
  *   endStep({ stepEndTime: engine.simTime, ... })

@@ -18,6 +18,7 @@ import { ComponentRegistry } from "../../../../core/registry.js";
 import { DefaultSimulationCoordinator } from "../../../../solver/coordinator.js";
 import type { Circuit } from "../../../../core/circuit.js";
 import type { MNAEngine } from "../../analog-engine.js";
+import type { SimulationParams } from "../../../../core/analog-engine-interface.js";
 import type { ConcreteCompiledAnalogCircuit } from "../../compiled-analog-circuit.js";
 import {
   captureTopology,
@@ -453,9 +454,7 @@ export class ComparisonSession {
   }
 
   private async _initWithCircuit(circuit: Circuit): Promise<void> {
-    this._coordinator = this._facade.compile(
-      circuit, { deferInitialize: true }
-    ) as DefaultSimulationCoordinator;
+    this._coordinator = this._facade.compile(circuit) as DefaultSimulationCoordinator;
     this._engine = this._coordinator.getAnalogEngine() as MNAEngine;
 
     if (!this._engine) {
@@ -492,11 +491,10 @@ export class ComparisonSession {
     this._facade.setCaptureHook(bundle);
 
     sc.setStepStartTime(0);
-    this._coordinator.initialize();
-    // NOTE: do NOT call endStep() here. DCOP attempts must remain pending so
-    // runTransient() can merge them with the first tranInit attempt into a
-    // single boot step (stepStartTime=0). Standalone DCOP users go through
-    // runDcOp(), which flushes the pending attempts itself.
+    // No analysis runs here. runDcOp() invokes coordinator.dcOperatingPoint()
+    // (standalone .op, MODEDCOP). runTransient() invokes coordinator.step(),
+    // whose first call lazily runs the transient-boot DCOP (MODETRANOP) and
+    // captures it into step 0 alongside the first tranInit attempt.
 
     if (this._opts.cirPath) {
       const cirRaw = readFileSync(resolvePath(this._opts.cirPath), "utf-8");
@@ -515,9 +513,11 @@ export class ComparisonSession {
   /**
    * Run DC operating point comparison.
    *
-   * The boot step was already built into _stepCapture during init(). This method
-   * snapshots it as _ourSession, then runs the ngspice side (or deep-clones for
-   * self-compare mode).
+   * Invokes coordinator.dcOperatingPoint() — standalone `.op` (MODEDCOP),
+   * matching ngspice `dcop.c::DCop`. The capture hook collects per-NR-iter
+   * snapshots into _stepCapture; this method then closes step 0 and snapshots
+   * the result as _ourSession before running the ngspice side (or deep-cloning
+   * for self-compare mode).
    */
   async runDcOp(): Promise<void> {
     this._ensureInited();
@@ -526,10 +526,11 @@ export class ComparisonSession {
     this._analysis = "dcop";
     this._comparisons = null;
 
-    // Flush the pending DCOP attempts captured during init() into step 0.
-    // _initWithCircuit() deliberately leaves them in the buffer so that
-    // runTransient() can merge them with the first tranInit attempt; for
-    // standalone DCOP runs we close the step ourselves here.
+    // Run standalone .op on our engine. Capture hook accumulates iterations
+    // into the pending step buffer; endStep() closes them as step 0.
+    if (this._coordinator) {
+      this._coordinator.dcOperatingPoint();
+    }
     if (this._stepCapture) {
       this._stepCapture.endStep({
         stepEndTime: 0,
@@ -537,7 +538,12 @@ export class ComparisonSession {
         analysisPhase: "dcop",
         acceptedAttemptIndex: -1,
         order: this._engine.integrationOrder,
-        delta: this._engine.currentDt,
+        // cktdojob.c:117 — the dispatcher zeroes CKTdelta at job entry, and
+        // dcop.c::DCop never writes it. The harness IS the dispatcher
+        // equivalent here, so the captured CKTdelta during a standalone .op
+        // step is 0. Do not read _engine.currentDt: that field belongs to
+        // the transient flow and reflects whatever configure() seeded.
+        delta: 0,
       });
     }
 
@@ -583,35 +589,21 @@ export class ComparisonSession {
    * The master-switch hook bundle was installed in init(), so the per-step loop
    * needs no hook rewiring. At the end, the master switch is released.
    */
-  async runTransient(_tStart: number, tStop: number, maxStep?: number): Promise<void> {
+  async runTransient(tStart: number, tStop: number, maxStep?: number): Promise<void> {
     this._ensureInited();
     if (this._hasRun) return;
 
     this._analysis = "tran";
     this._comparisons = null;
 
-    // Derive ngspice-matching transient parameters for harness comparison.
-    // CKTstep = tstep sent to ngspice .tran command.
+    // CKTstep = tstep sent to ngspice .tran command. Hand tStop+outputStep
+    // (and tStart via initTime) to the engine and let
+    // resolveSimulationParams reproduce traninit.c:23-32 / dctran.c:118 —
+    // single source of truth.
     const tstep = tStop / 100;
-    const tStart = _tStart;
-
-    // traninit.c:27-31: auto-compute maxStep when user omits it.
-    const resolvedMaxStep = maxStep != null
-      ? maxStep
-      : Math.min(tstep, (tStop - tStart) / 50);
-
-    // traninit.c:34: CKTdelmin = 1e-11 * CKTmaxStep
-    const resolvedMinStep = 1e-11 * resolvedMaxStep;
-
-    // dctran.c:118: delta = MIN(CKTfinalTime/100, CKTstep) / 10
-    const resolvedFirstStep = Math.min(tStop / 100, tstep) / 10;
-
-    this._engine.configure({
-      tStop,
-      maxTimeStep: resolvedMaxStep,
-      minTimeStep: resolvedMinStep,
-      firstStep: resolvedFirstStep,
-    });
+    const cfg: Partial<SimulationParams> = { tStop, outputStep: tstep, initTime: tStart };
+    if (maxStep != null) cfg.maxTimeStep = maxStep;
+    this._engine.configure(cfg);
 
     const stopStr = this._formatSpiceTime(tStop);
     const stepStr = maxStep
@@ -633,7 +625,12 @@ export class ComparisonSession {
           analysisPhase: this._curAnalysisPhase(),
           acceptedAttemptIndex: -1,
           order: this._engine.integrationOrder,
-          delta: this._engine.currentDt,
+          // Capture the dt USED for the failed step, not the next-dt.
+          // _engine.currentDt was advanced to next-dt by computeNewDt
+          // (analog-engine.ts:668); _engine.lastDt is the just-used value
+          // (line 665). ngspice captures CKTdelta at the iteration moment,
+          // which is the used-dt — match that.
+          delta: this._engine.lastDt,
         });
         this.errors.push(`Our engine failed at step ${s}: ${e.message}`);
         break;
@@ -660,7 +657,13 @@ export class ComparisonSession {
           analysisPhase: this._curAnalysisPhase(),
           acceptedAttemptIndex: -1,
           order: this._engine.integrationOrder,
-          delta: this._engine.currentDt,
+          // Capture the dt USED for this step, not the next-dt.
+          // _engine.currentDt was advanced to next-dt by computeNewDt
+          // (analog-engine.ts:668); _engine.lastDt is the just-used value
+          // (line 665). ngspice captures CKTdelta at the iteration moment,
+          // which is the used-dt — match that. lteDt below carries the
+          // next-step proposal separately.
+          delta: this._engine.lastDt,
           ...(hasLte ? { lteDt: lteDtValue } : {}),
         });
         prevSimTime = nowTime;
@@ -2656,11 +2659,13 @@ export class ComparisonSession {
   }
 
   private _formatSpiceTime(seconds: number): string {
-    if (seconds >= 1) return `${seconds}`;
-    if (seconds >= 1e-3) return `${seconds * 1e3}m`;
-    if (seconds >= 1e-6) return `${seconds * 1e6}u`;
-    if (seconds >= 1e-9) return `${seconds * 1e9}n`;
-    return `${seconds * 1e12}p`;
+    // Use the JS number's own string form so SPICE's strtod parses the same
+    // IEEE-754 double we hold here. Engineering suffixes ("10u", "1m") trigger
+    // SPICE-side `magnitude * 1e-N` multiplications that introduce 1-ULP
+    // mismatches against the JS literal — e.g. SPICE "10u" → 10 * 1e-6 =
+    // 0x3ee4f8b588e368f0, while JS `10e-6` === `1e-5` = 0x3ee4f8b588e368f1
+    // (1 ULP higher). Plain decimal / scientific text round-trips exactly.
+    return seconds.toString();
   }
 
   private _captureIntegCoeff(): IntegrationCoefficients {

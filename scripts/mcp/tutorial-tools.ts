@@ -335,8 +335,8 @@ export function registerTutorialTools(
       }
 
       lines.push(`\nTutorial created successfully.`);
-      lines.push(`To use: open tutorials.html or load directly with:`);
-      lines.push(`  tutorial-viewer.html?manifest=${outputDir}/manifest.json`);
+      lines.push(`To use: open app/tutorial/ or load directly with:`);
+      lines.push(`  app/tutorial/view.html?manifest=${outputDir}/manifest.json`);
 
       return {
         content: [{ type: "text" as const, text: lines.join("\n") }],

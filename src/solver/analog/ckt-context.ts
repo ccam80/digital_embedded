@@ -405,13 +405,22 @@ export class CKTCircuitContext {
   // -------------------------------------------------------------------------
 
   /**
-   * DC operating point mode ladder for initJct/initFix/initFloat transitions.
-   * Null during transient NR (INITF state carried via `cktMode` bitfield —
-   * see `initf()` / `setInitf()` in ckt-mode.ts; cktdefs.h:177-182).
+   * NR mode ladder for INITF transitions inside a single newtonRaphson call.
+   * Fires on JCT→FIX and FIX→FLOAT (DC-OP), and on INITTRAN→FLOAT and
+   * INITPRED→FLOAT (transient). Null during production runs; the harness
+   * sets it to receive intra-NR-call mode boundaries as attempt boundaries,
+   * matching the ngspice bridge's split-on-cktMode-change rule.
    */
-  dcopModeLadder: {
-    onModeBegin(phase: "dcopInitJct" | "dcopInitFix" | "dcopInitFloat", iteration: number): void;
-    onModeEnd(phase: "dcopInitJct" | "dcopInitFix" | "dcopInitFloat", iteration: number, converged: boolean): void;
+  nrModeLadder: {
+    onModeBegin(
+      phase: "dcopInitJct" | "dcopInitFix" | "dcopInitFloat" | "tranInit" | "tranPredictor" | "tranNR",
+      iteration: number,
+    ): void;
+    onModeEnd(
+      phase: "dcopInitJct" | "dcopInitFix" | "dcopInitFloat" | "tranInit" | "tranPredictor" | "tranNR",
+      iteration: number,
+      converged: boolean,
+    ): void;
   } | null;
 
   /**
@@ -619,7 +628,7 @@ export class CKTCircuitContext {
     this.convergenceFailures = [];
 
     // NR call-specific parameters (set by caller before each newtonRaphson call)
-    this.dcopModeLadder = null;
+    this.nrModeLadder = null;
     this.exactMaxIterations = false;
     this.onIteration0Complete = null;
 
@@ -680,5 +689,26 @@ export class CKTCircuitContext {
    */
   updateHadNodeset(): void {
     this.hadNodeset = this.nodesets.size > 0;
+  }
+
+  /**
+   * Atomically swap the rhs / rhsOld buffer pointers, mirroring ngspice
+   * niiter.c:1087-1090:
+   *
+   *   temp = ckt->CKTrhsOld;
+   *   ckt->CKTrhsOld = ckt->CKTrhs;
+   *   ckt->CKTrhs = temp;
+   *
+   * All aliases that cache these references (loadCtx.rhs/rhsOld, nrResult.voltages)
+   * are re-pointed in the same call so devices, the post-iter hook, and
+   * downstream consumers always see a consistent (rhs, rhsOld) pair.
+   */
+  swapRhsBuffers(): void {
+    const tmp = this.rhsOld;
+    this.rhsOld = this.rhs;
+    this.rhs = tmp;
+    this.loadCtx.rhsOld = this.rhsOld;
+    this.loadCtx.rhs = this.rhs;
+    this.nrResult.voltages = this.rhs;
   }
 }

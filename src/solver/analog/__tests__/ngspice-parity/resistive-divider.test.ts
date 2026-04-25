@@ -1,8 +1,9 @@
 /**
- * Parity test: Resistive divider DC-OP
+ * Parity test: Resistive divider DC-OP + transient
  *
  * Circuit: V1=5V at node "in", R1=1kΩ from "in" to "mid", R2=1kΩ from "mid" to gnd.
- * Expected: converges in exactly 1 NR iteration after initJct→initFix→initFloat.
+ * Expected (DC-OP): converges in exactly 1 NR iteration after initJct→initFix→initFloat.
+ * Expected (transient): linear stamp on every step, single iter per step, uniform dt.
  * Tolerance contract: absDelta === 0 (exact IEEE-754 bit equality) on all fields.
  */
 
@@ -82,4 +83,45 @@ describeIfDll("Resistive divider DC-OP parity", () => {
     // Convergence flow comparison (noncon, diagGmin, srcFact)
     assertConvergenceFlowMatch(ourSession, ngSession);
   }, 60_000);
+
+  it("transient_per_step_match", async () => {
+    const session = new ComparisonSession({
+      dtsPath: DTS_PATH,
+      dllPath: DLL_PATH,
+    });
+
+    await session.init();
+    await session.runTransient(0, 1e-3, 10e-6);
+
+    const ourSession = session.ourSession!;
+    const ngSession = session.ngspiceSessionAligned!;
+
+    const stepCount = Math.min(ourSession.steps.length, ngSession.steps.length);
+
+    for (let si = 0; si < stepCount; si++) {
+      const ourStep = ourSession.steps[si]!;
+      const ngStep = ngSession.steps[si]!;
+
+      const maxAttempts = Math.min(ourStep.attempts.length, ngStep.attempts.length);
+      for (let ai = 0; ai < maxAttempts; ai++) {
+        const ourAttempt = ourStep.attempts[ai]!;
+        const ngAttempt = ngStep.attempts[ai]!;
+
+        const iterCount = Math.min(
+          ourAttempt.iterations.length,
+          ngAttempt.iterations.length,
+        );
+        for (let ii = 0; ii < iterCount; ii++) {
+          assertIterationMatch(
+            ourAttempt.iterations[ii]!,
+            ngAttempt.iterations[ii]!,
+            { stepIndex: si, iterIndex: ii },
+          );
+        }
+      }
+    }
+
+    assertModeTransitionMatch(ourSession, ngSession);
+    assertConvergenceFlowMatch(ourSession, ngSession);
+  }, 120_000);
 });

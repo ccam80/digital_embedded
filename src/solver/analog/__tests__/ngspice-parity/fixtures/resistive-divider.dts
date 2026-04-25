@@ -63,5 +63,7 @@
         ]
       }
     ]
-  }
+  },
+  "format": "dts",
+  "version": 1
 }

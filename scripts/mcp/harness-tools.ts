@@ -494,7 +494,7 @@ export function registerHarnessTools(
         phase: z.enum([
           "dcopInitJct", "dcopInitFloat",
           "dcopDirect", "dcopGminDynamic", "dcopGminSpice3", "dcopSrcSweep",
-          "tranInit", "tranPredictor", "tranNR", "tranNrRetry", "tranLteRetry",
+          "tranInit", "tranPredictor", "tranNR",
         ] as [NRPhase, ...NRPhase[]]).describe("NR phase name"),
         phaseAttemptIndex: z.number().int().min(0).describe(
           "0-based index within attempts of this phase (usually 0).",

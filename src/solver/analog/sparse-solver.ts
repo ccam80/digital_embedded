@@ -165,6 +165,14 @@ export class SparseSolver {
   private _uColPtr: Int32Array = new Int32Array(0);
   private _uRowIdx: Int32Array = new Int32Array(0);
   private _uVals: Float64Array = new Float64Array(0);
+  // Per-pivot reciprocal of U[k,k] — written at factor time, read at solve.
+  // Mirrors ngspice spfactor.c:349/383/408 `Diag[Step]->Real = 1.0 / pivot`,
+  // which converts the diagonal to its reciprocal once so the elimination
+  // (`Mult = Dest * pElement->Real`, spfactor.c:368) and back-substitution
+  // (spsolve.c) can multiply instead of divide. `x*(1/p)` and `x/p` differ
+  // by 1 ULP in general, so storing the same reciprocal ngspice stores is
+  // required for IEEE-754 bit-exact parity in the LU pipeline.
+  private _uDiagInv: Float64Array = new Float64Array(0);
 
   // =========================================================================
   // Pivot permutation
@@ -558,11 +566,13 @@ export class SparseSolver {
       }
     }
 
-    // Step 3: Sparse backward sub (U, upper triangular CSC)
+    // Step 3: Sparse backward sub (U, upper triangular CSC).
+    // Multiply by precomputed reciprocal (ngspice spfactor.c:349/383/408 +
+    // spsolve.c) so the back-sub division rounding matches ngspice.
     for (let j = n - 1; j >= 0; j--) {
       const p0 = this._uColPtr[j];
       const p1 = this._uColPtr[j + 1];
-      b[j] /= this._uVals[p1 - 1];
+      b[j] *= this._uDiagInv[j];
       const bj = b[j];
       for (let p = p0; p < p1 - 1; p++) {
         b[pinv[this._uRowIdx[p]]] -= this._uVals[p] * bj;
@@ -894,6 +904,7 @@ export class SparseSolver {
     this._uRowIdx = new Int32Array(alloc);
     this._uVals = new Float64Array(alloc);
     this._uCscToElem = new Int32Array(alloc).fill(-1);
+    this._uDiagInv = new Float64Array(n);
 
     this._aMatrixColStart = new Int32Array(n + 1);
     this._aMatrixHandlesByCol = new Int32Array(0);
@@ -1097,6 +1108,7 @@ export class SparseSolver {
     this._uRowIdx = new Int32Array(alloc);
     this._uVals = new Float64Array(alloc);
     this._uCscToElem = new Int32Array(alloc).fill(-1);
+    this._uDiagInv = new Float64Array(n);
 
     this._aMatrixColStart = new Int32Array(n + 1);
     this._aMatrixHandlesByCol = new Int32Array(0);
@@ -1352,6 +1364,12 @@ export class SparseSolver {
         for (let idx = 0; idx < xNzCount; idx++) x[xNzIdx[idx]] = 0;
         return { success: false, singularRow: k };
       }
+      // ngspice spfactor.c:349/383/408 — store reciprocal of pivot for use
+      // in subsequent elim and back-sub. `x*(1/p)` and `x/p` differ by 1
+      // ULP, so committing to the reciprocal-multiplication path is what
+      // delivers IEEE-754 bit-exact LU output vs ngspice.
+      const invDiag = 1 / diagVal;
+      this._uDiagInv[k] = invDiag;
 
       // Update Markowitz numbers via linked-list traversal
       if (k < n - 1) {
@@ -1391,11 +1409,13 @@ export class SparseSolver {
       unz++;
 
       // Store L entries (unpivoted rows, scaled by 1/diagonal).
+      // Use the precomputed reciprocal so the L value rounding matches
+      // ngspice spfactor.c:368/399 (`Mult = Dest * pivotReciprocal`).
       for (let idx = 0; idx < xNzCount; idx++) {
         const i = xNzIdx[idx];
         if (x[i] === 0) continue;
         if (pinv[i] >= 0) continue;
-        const lVal = x[i] / diagVal;
+        const lVal = x[i] * invDiag;
         let le = -1;
         if (this._elMark[i] === k) le = rowToElem[i];
         this._lCscToElem[lnz] = le;
@@ -1540,6 +1560,11 @@ export class SparseSolver {
         return { success: false, needsReorder: true };
       }
 
+      // ngspice spfactor.c:349/383/408 — store reciprocal of pivot for use
+      // in subsequent elim and back-sub.
+      const invDiag = 1 / diagVal;
+      this._uDiagInv[k] = invDiag;
+
       // U scatter: write CSC and mirror onto _elVal[e] via reverse map so
       // post-factor pool state matches ngspice spMatrix (Element->Real holds
       // the factored value after spFactor/spOrderAndFactor).
@@ -1551,10 +1576,11 @@ export class SparseSolver {
         if (ue >= 0) elVal[ue] = val;
       }
 
-      // L scatter: same pool mirror for L entries.
+      // L scatter: scale by reciprocal of pivot — matches ngspice spfactor.c
+      // `Mult = Dest * pivotReciprocal` rounding rather than direct division.
       for (let p = this._lColPtr[k]; p < this._lColPtr[k + 1]; p++) {
         const i = this._lRowIdx[p];
-        const val = x[i] / diagVal;
+        const val = x[i] * invDiag;
         this._lVals[p] = val;
         const le = lCscToElem[p];
         if (le >= 0) elVal[le] = val;

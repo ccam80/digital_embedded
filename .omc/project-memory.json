@@ -1,6 +1,6 @@
 {
   "version": "1.0.0",
-  "lastScanned": 1776993765907,
+  "lastScanned": 1777082296051,
   "projectRoot": "C:\\local_working_projects\\digital_in_browser",
   "techStack": {
     "languages": [
@@ -42,8 +42,8 @@
     "runtime": null
   },
   "build": {
-    "buildCommand": "cd \"C:/local_working_projects/digital_in_browser\" && npx tsc --noEmit 2>&1 | head -5",
-    "testCommand": "cd \"C:/local_working_projects/digital_in_browser\" && npx vitest run --testTimeout=120000 \"src/components/semiconductors/__tests__/bjt.test.ts\" -t \"c4_scales_with|uses_deltaOld1\" 2>&1 | tail -60",
+    "buildCommand": "rm -f .engine-test.out .tsc-out.log && git status --short | head -10 && echo \"---\" && git diff src/solver/analog/__tests__/analog-engine.test.ts | head -80",
+    "testCommand": "npx vitest run src/solver/analog/__tests__/ngspice-parity/resistive-divider.test.ts src/solver/analog/__tests__/ngspice-parity/_diag-resistive-tran.test.ts src/solver/analog/__tests__/ngspice-parity/_diag-diode-resistor-tran.test.ts --reporter=basic --testTimeout=30000 --pool=forks --no-file-parallelism 2>&1 | tail -40",
     "lintCommand": "npm run lint",
     "devCommand": "npm run dev",
     "scripts": {
@@ -66,6 +66,7 @@
     "isMonorepo": false,
     "workspaces": [],
     "mainDirectories": [
+      "app",
       "docs",
       "lib",
       "scripts",
@@ -79,11 +80,18 @@
   },
   "customNotes": [],
   "directoryMap": {
+    "app": {
+      "path": "app",
+      "purpose": "Application code",
+      "fileCount": 0,
+      "lastAccessed": 1777082296005,
+      "keyFiles": []
+    },
     "circuits": {
       "path": "circuits",
       "purpose": null,
       "fileCount": 5,
-      "lastAccessed": 1776993765867,
+      "lastAccessed": 1777082296005,
       "keyFiles": [
         "and-gate.dig",
         "half-adder.dig",
@@ -95,35 +103,31 @@
     "dist": {
       "path": "dist",
       "purpose": "Distribution/build output",
-      "fileCount": 5,
-      "lastAccessed": 1776993765868,
+      "fileCount": 1,
+      "lastAccessed": 1777082296006,
       "keyFiles": [
-        "simulator.html",
-        "tutorial-editor.html",
-        "tutorial-viewer.html",
-        "tutorial.html",
-        "tutorials.html"
+        "index.html"
       ]
     },
     "docs": {
       "path": "docs",
       "purpose": "Documentation",
       "fileCount": 0,
-      "lastAccessed": 1776993765868,
+      "lastAccessed": 1777082296006,
       "keyFiles": []
     },
     "e2e": {
       "path": "e2e",
       "purpose": null,
       "fileCount": 0,
-      "lastAccessed": 1776993765869,
+      "lastAccessed": 1777082296031,
       "keyFiles": []
     },
     "fixtures": {
       "path": "fixtures",
       "purpose": "Test fixtures",
       "fileCount": 16,
-      "lastAccessed": 1776993765888,
+      "lastAccessed": 1777082296031,
       "keyFiles": [
         "analog-rc-workflow.dig",
         "broken_chain.dig",
@@ -136,54 +140,54 @@
       "path": "lib",
       "purpose": "Library code",
       "fileCount": 0,
-      "lastAccessed": 1776993765889,
+      "lastAccessed": 1777082296031,
       "keyFiles": []
     },
     "modules": {
       "path": "modules",
       "purpose": null,
       "fileCount": 0,
-      "lastAccessed": 1776993765889,
+      "lastAccessed": 1777082296032,
       "keyFiles": []
     },
     "ref": {
       "path": "ref",
       "purpose": null,
       "fileCount": 0,
-      "lastAccessed": 1776993765889,
+      "lastAccessed": 1777082296032,
       "keyFiles": []
     },
     "scripts": {
       "path": "scripts",
       "purpose": "Build/utility scripts",
-      "fileCount": 7,
-      "lastAccessed": 1776993765889,
+      "fileCount": 10,
+      "lastAccessed": 1777082296032,
       "keyFiles": [
         "circuit-mcp-server.ts",
         "extract-reports.mjs",
         "generate-spice-references.sh",
         "mcp-wrapper.mjs",
-        "run-all-tests.mjs"
+        "phase-9-baseline-parser.cjs"
       ]
     },
     "spec": {
       "path": "spec",
       "purpose": "Test specifications",
-      "fileCount": 16,
-      "lastAccessed": 1776993765890,
+      "fileCount": 23,
+      "lastAccessed": 1777082296033,
       "keyFiles": [
         "architectural-alignment.md",
-        "phase-0-residual-dead-code-audit.md",
-        "phase-10-bit-exact-ngspice-parity.md",
-        "phase-10-follow-ups.md",
-        "phase-10-parity-tickets.md"
+        "citation-verification-batches.md",
+        "ngspice-citation-audit.json",
+        "ngspice-citation-audit.md",
+        "phase-0-audit-report.md"
       ]
     },
     "src": {
       "path": "src",
       "purpose": "Source code",
       "fileCount": 1,
-      "lastAccessed": 1776993765890,
+      "lastAccessed": 1777082296033,
       "keyFiles": [
         "main.ts"
       ]
@@ -192,7 +196,7 @@
       "path": "test-results",
       "purpose": null,
       "fileCount": 3,
-      "lastAccessed": 1776993765890,
+      "lastAccessed": 1777082296033,
       "keyFiles": [
         "playwright-failures.json",
         "test-failures.json"
@@ -202,7 +206,7 @@
       "path": "tmp-hang-circuits",
       "purpose": null,
       "fileCount": 5,
-      "lastAccessed": 1776993765891,
+      "lastAccessed": 1777082296034,
       "keyFiles": [
         "rc-ac-lowpass.dts",
         "rc-step.dts",
@@ -215,48 +219,45 @@
       "path": "tutorials",
       "purpose": null,
       "fileCount": 1,
-      "lastAccessed": 1776993765891,
+      "lastAccessed": 1777082296034,
       "keyFiles": [
         "index.json"
       ]
+    },
+    "dist\\app": {
+      "path": "dist\\app",
+      "purpose": "Application code",
+      "fileCount": 0,
+      "lastAccessed": 1777082296035,
+      "keyFiles": []
     },
     "dist\\assets": {
       "path": "dist\\assets",
       "purpose": "Static assets",
       "fileCount": 5,
-      "lastAccessed": 1776993765891,
+      "lastAccessed": 1777082296035,
       "keyFiles": [
+        "main-DuWHuFk1.js",
         "memory-editor-DEA45Iu0.js",
-        "search-B4BtHZDg.js",
-        "simulator-4S55luQI.js"
+        "search-B4BtHZDg.js"
       ]
     },
     "e2e\\fixtures": {
       "path": "e2e\\fixtures",
       "purpose": "Test fixtures",
       "fileCount": 8,
-      "lastAccessed": 1776993765892,
+      "lastAccessed": 1777082296036,
       "keyFiles": [
         "harness.html",
         "master1-digital.dts",
         "master1-export.dts"
       ]
     },
-    "scripts\\__tests__": {
-      "path": "scripts\\__tests__",
-      "purpose": "Test files",
-      "fileCount": 2,
-      "lastAccessed": 1776993765893,
-      "keyFiles": [
-        "circuit-mcp-server.test.ts",
-        "circuit-tools-w2t2.test.ts"
-      ]
-    },
     "src\\app": {
       "path": "src\\app",
       "purpose": "Application code",
       "fileCount": 25,
-      "lastAccessed": 1776993765894,
+      "lastAccessed": 1777082296037,
       "keyFiles": [
         "analysis-dialogs.ts",
         "app-context.ts",
@@ -267,7 +268,7 @@
       "path": "src\\components",
       "purpose": "UI components",
       "fileCount": 4,
-      "lastAccessed": 1776993765894,
+      "lastAccessed": 1777082296037,
       "keyFiles": [
         "draw-helpers.ts",
         "generic-shape.ts",
@@ -278,309 +279,309 @@
       "path": "src\\fixtures",
       "purpose": "Test fixtures",
       "fileCount": 0,
-      "lastAccessed": 1776993765894,
+      "lastAccessed": 1777082296038,
       "keyFiles": []
     }
   },
   "hotPaths": [
     {
-      "path": "src\\components\\semiconductors\\bjt.ts",
-      "accessCount": 284,
-      "lastAccessed": 1777032857171,
+      "path": "src\\solver\\analog\\analog-engine.ts",
+      "accessCount": 109,
+      "lastAccessed": 1777095830965,
       "type": "file"
     },
     {
-      "path": "src\\components\\semiconductors\\mosfet.ts",
-      "accessCount": 135,
-      "lastAccessed": 1777032099865,
-      "type": "file"
-    },
-    {
-      "path": "spec\\progress.md",
-      "accessCount": 131,
-      "lastAccessed": 1777032898881,
-      "type": "file"
-    },
-    {
-      "path": "src",
-      "accessCount": 123,
-      "lastAccessed": 1777031530156,
-      "type": "directory"
-    },
-    {
-      "path": "src\\components\\semiconductors\\__tests__\\bjt.test.ts",
-      "accessCount": 98,
-      "lastAccessed": 1777032783851,
-      "type": "file"
-    },
-    {
-      "path": "spec\\.context\\rules.md",
-      "accessCount": 81,
-      "lastAccessed": 1777030630666,
-      "type": "file"
-    },
-    {
-      "path": "spec\\test-baseline.md",
-      "accessCount": 78,
-      "lastAccessed": 1777030840029,
-      "type": "file"
-    },
-    {
-      "path": "src\\components\\semiconductors\\__tests__\\diode.test.ts",
-      "accessCount": 70,
-      "lastAccessed": 1777027458611,
-      "type": "file"
-    },
-    {
-      "path": "src\\components\\semiconductors\\njfet.ts",
+      "path": "src\\solver\\analog\\timestep.ts",
       "accessCount": 66,
-      "lastAccessed": 1777031244475,
+      "lastAccessed": 1777095828861,
       "type": "file"
     },
     {
-      "path": "src\\components\\io\\__tests__\\led.test.ts",
-      "accessCount": 63,
-      "lastAccessed": 1777027459495,
+      "path": "ref\\ngspice\\src\\spicelib\\analysis\\dctran.c",
+      "accessCount": 51,
+      "lastAccessed": 1777095816041,
       "type": "file"
     },
     {
-      "path": "src\\components\\semiconductors\\pjfet.ts",
-      "accessCount": 58,
-      "lastAccessed": 1777031315578,
+      "path": "src\\solver\\analog\\__tests__\\harness\\comparison-session.ts",
+      "accessCount": 35,
+      "lastAccessed": 1777095468040,
       "type": "file"
     },
     {
-      "path": "src\\components\\io\\led.ts",
-      "accessCount": 50,
-      "lastAccessed": 1777026609370,
-      "type": "file"
-    },
-    {
-      "path": "spec\\.context\\lock-protocol.md",
-      "accessCount": 49,
-      "lastAccessed": 1777030630880,
-      "type": "file"
-    },
-    {
-      "path": "src\\components\\semiconductors\\__tests__\\tunnel-diode.test.ts",
-      "accessCount": 41,
-      "lastAccessed": 1777027452360,
-      "type": "directory"
-    },
-    {
-      "path": "src\\solver\\analog\\behavioral-remaining.ts",
-      "accessCount": 33,
-      "lastAccessed": 1777025831697,
-      "type": "file"
-    },
-    {
-      "path": "src\\components\\semiconductors\\__tests__\\jfet.test.ts",
-      "accessCount": 33,
-      "lastAccessed": 1777031308877,
-      "type": "file"
-    },
-    {
-      "path": "",
-      "accessCount": 30,
-      "lastAccessed": 1777031812572,
-      "type": "directory"
-    },
-    {
-      "path": "src\\solver\\analog\\__tests__\\harness\\types.ts",
-      "accessCount": 29,
-      "lastAccessed": 1777022676568,
-      "type": "file"
-    },
-    {
-      "path": "src\\components\\semiconductors\\tunnel-diode.ts",
-      "accessCount": 28,
-      "lastAccessed": 1777026622778,
-      "type": "file"
-    },
-    {
-      "path": "spec\\.hybrid-state.json",
-      "accessCount": 27,
-      "lastAccessed": 1777025226216,
-      "type": "file"
-    },
-    {
-      "path": "src\\solver\\analog\\digital-pin-model.ts",
-      "accessCount": 22,
-      "lastAccessed": 1777017713200,
-      "type": "file"
-    },
-    {
-      "path": "src\\components\\passives\\capacitor.ts",
-      "accessCount": 22,
-      "lastAccessed": 1777022666856,
-      "type": "file"
-    },
-    {
-      "path": "spec\\phase-0-residual-dead-code-audit.md",
-      "accessCount": 18,
-      "lastAccessed": 1777005321736,
-      "type": "file"
-    },
-    {
-      "path": "src\\solver\\analog\\behavioral-gate.ts",
-      "accessCount": 15,
-      "lastAccessed": 1776998745344,
-      "type": "file"
-    },
-    {
-      "path": "src\\components\\active\\__tests__\\timer-555.test.ts",
-      "accessCount": 15,
-      "lastAccessed": 1777005465650,
-      "type": "file"
-    },
-    {
-      "path": "src\\solver\\analog\\state-schema.ts",
-      "accessCount": 14,
-      "lastAccessed": 1777030904767,
-      "type": "directory"
-    },
-    {
-      "path": "src\\solver\\analog\\__tests__",
-      "accessCount": 13,
-      "lastAccessed": 1777031824684,
-      "type": "directory"
-    },
-    {
-      "path": "e2e",
-      "accessCount": 12,
-      "lastAccessed": 1777020433795,
-      "type": "directory"
-    },
-    {
-      "path": "src\\solver\\analog\\__tests__\\harness\\harness-integration.test.ts",
-      "accessCount": 11,
-      "lastAccessed": 1777005335382,
-      "type": "file"
-    },
-    {
-      "path": "scripts",
-      "accessCount": 10,
-      "lastAccessed": 1777020431174,
-      "type": "directory"
-    },
-    {
-      "path": "src\\components\\active\\dac.ts",
-      "accessCount": 9,
-      "lastAccessed": 1777005411731,
+      "path": "src\\solver\\analog\\newton-raphson.ts",
+      "accessCount": 34,
+      "lastAccessed": 1777092341055,
       "type": "file"
     },
     {
       "path": "src\\solver\\analog\\__tests__\\harness\\ngspice-bridge.ts",
+      "accessCount": 18,
+      "lastAccessed": 1777093692058,
+      "type": "file"
+    },
+    {
+      "path": "src\\solver\\analog\\__tests__\\harness\\capture.ts",
+      "accessCount": 14,
+      "lastAccessed": 1777095495686,
+      "type": "file"
+    },
+    {
+      "path": "src\\solver\\analog\\__tests__\\ngspice-parity\\resistive-divider.test.ts",
+      "accessCount": 11,
+      "lastAccessed": 1777094982791,
+      "type": "file"
+    },
+    {
+      "path": "src\\solver\\coordinator.ts",
+      "accessCount": 10,
+      "lastAccessed": 1777084586708,
+      "type": "file"
+    },
+    {
+      "path": "ref\\ngspice\\src\\maths\\ni\\niiter.c",
       "accessCount": 9,
-      "lastAccessed": 1777025719505,
+      "lastAccessed": 1777093712907,
+      "type": "directory"
+    },
+    {
+      "path": "src\\solver\\analog\\__tests__\\harness",
+      "accessCount": 9,
+      "lastAccessed": 1777093976914,
+      "type": "directory"
+    },
+    {
+      "path": "src\\solver\\analog\\dc-operating-point.ts",
+      "accessCount": 8,
+      "lastAccessed": 1777088948304,
       "type": "file"
     },
     {
-      "path": "src\\solver\\analog\\bridge-adapter.ts",
+      "path": ".vitest-failures.json",
       "accessCount": 7,
-      "lastAccessed": 1776998746135,
+      "lastAccessed": 1777095216038,
       "type": "file"
     },
     {
-      "path": "src\\solver\\analog\\__tests__\\harness\\device-mappings.ts",
-      "accessCount": 7,
-      "lastAccessed": 1777005325879,
-      "type": "file"
-    },
-    {
-      "path": "src\\solver\\analog\\behavioral-flipflop.ts",
+      "path": "spec\\phase-10-bit-exact-ngspice-parity.md",
       "accessCount": 6,
-      "lastAccessed": 1776999552521,
+      "lastAccessed": 1777088548332,
       "type": "file"
     },
     {
-      "path": "src\\solver\\analog\\behavioral-combinational.ts",
-      "accessCount": 5,
-      "lastAccessed": 1776999523994,
-      "type": "file"
-    },
-    {
-      "path": "src\\solver\\analog\\behavioral-sequential.ts",
-      "accessCount": 5,
-      "lastAccessed": 1776999575554,
-      "type": "file"
-    },
-    {
-      "path": "src\\solver\\analog\\behavioral-flipflop\\shared.ts",
-      "accessCount": 4,
-      "lastAccessed": 1776996775251,
-      "type": "file"
-    },
-    {
-      "path": "src\\solver\\analog\\behavioral-flipflop\\rs-async.ts",
-      "accessCount": 4,
-      "lastAccessed": 1776999530841,
-      "type": "file"
-    },
-    {
-      "path": "src\\solver\\analog\\__tests__\\harness\\compare.ts",
-      "accessCount": 4,
-      "lastAccessed": 1777005331074,
+      "path": "spec\\progress.md",
+      "accessCount": 6,
+      "lastAccessed": 1777088552393,
       "type": "file"
     },
     {
       "path": "src\\solver\\analog\\__tests__\\ngspice-parity\\parity-helpers.ts",
+      "accessCount": 6,
+      "lastAccessed": 1777088553501,
+      "type": "file"
+    },
+    {
+      "path": "src\\solver\\analog\\__tests__\\ngspice-parity\\fixtures\\resistive-divider.dts",
+      "accessCount": 5,
+      "lastAccessed": 1777091940658,
+      "type": "file"
+    },
+    {
+      "path": "src\\headless\\__tests__\\master-switch.test.ts",
       "accessCount": 4,
-      "lastAccessed": 1777005331645,
+      "lastAccessed": 1777084659168,
       "type": "file"
     },
     {
-      "path": "src\\components\\semiconductors\\varactor.ts",
+      "path": "src\\solver\\__tests__\\coordinator-capability.test.ts",
       "accessCount": 4,
-      "lastAccessed": 1777005449063,
+      "lastAccessed": 1777084675785,
       "type": "file"
     },
     {
-      "path": "src\\solver\\analog\\coupled-inductor.ts",
+      "path": "src\\solver\\analog\\__tests__\\ngspice-parity\\fixtures\\diode-resistor.dts",
       "accessCount": 4,
-      "lastAccessed": 1777005449562,
+      "lastAccessed": 1777088563270,
       "type": "file"
     },
     {
-      "path": "src\\solver\\analog\\__tests__\\ckt-mode.test.ts",
+      "path": "src/solver/analog/__tests__/harness",
       "accessCount": 4,
-      "lastAccessed": 1777005450337,
+      "lastAccessed": 1777092023892,
+      "type": "directory"
+    },
+    {
+      "path": "src\\solver\\analog\\__tests__\\ngspice-parity\\fixtures\\rc-transient.dts",
+      "accessCount": 4,
+      "lastAccessed": 1777092192005,
       "type": "file"
     },
     {
-      "path": "src\\solver\\analog\\behavioral-flipflop\\t.ts",
+      "path": "src/solver/analog/analog-engine.ts",
       "accessCount": 3,
-      "lastAccessed": 1776995159798,
-      "type": "file"
+      "lastAccessed": 1777084867274,
+      "type": "directory"
     },
     {
-      "path": "src\\solver\\analog\\behavioral-flipflop\\rs.ts",
+      "path": "src\\solver\\analog\\__tests__\\ngspice-parity\\rc-transient.test.ts",
       "accessCount": 3,
-      "lastAccessed": 1776995190233,
+      "lastAccessed": 1777088553239,
       "type": "file"
     },
     {
-      "path": "src\\solver\\analog\\behavioral-flipflop\\jk.ts",
+      "path": "src/solver/analog/timestep.ts",
       "accessCount": 3,
-      "lastAccessed": 1776995233359,
-      "type": "file"
+      "lastAccessed": 1777090238377,
+      "type": "directory"
     },
     {
-      "path": "src\\solver\\analog\\behavioral-flipflop\\jk-async.ts",
+      "path": "src\\components\\active\\__tests__\\comparator.test.ts",
       "accessCount": 3,
-      "lastAccessed": 1776995254296,
+      "lastAccessed": 1777094574919,
       "type": "file"
     },
     {
-      "path": "src\\solver\\analog\\behavioral-flipflop\\d-async.ts",
-      "accessCount": 3,
-      "lastAccessed": 1776995271699,
+      "path": "src\\solver\\coordinator-types.ts",
+      "accessCount": 2,
+      "lastAccessed": 1777084536233,
       "type": "file"
     },
     {
-      "path": "src\\components\\passives\\transmission-line.ts",
+      "path": "src\\headless\\default-facade.ts",
+      "accessCount": 2,
+      "lastAccessed": 1777084601821,
+      "type": "file"
+    },
+    {
+      "path": "src\\solver\\__tests__\\coordinator-visualization.test.ts",
+      "accessCount": 2,
+      "lastAccessed": 1777084665675,
+      "type": "file"
+    },
+    {
+      "path": "scripts\\mcp\\__tests__\\harness-shape-mcp.test.ts",
+      "accessCount": 2,
+      "lastAccessed": 1777084683138,
+      "type": "file"
+    },
+    {
+      "path": "src/solver/analog/__tests__/harness/capture.ts",
+      "accessCount": 2,
+      "lastAccessed": 1777084758350,
+      "type": "directory"
+    },
+    {
+      "path": "ref/ngspice/src/spicelib/analysis/dcop.c",
+      "accessCount": 2,
+      "lastAccessed": 1777084847675,
+      "type": "directory"
+    },
+    {
+      "path": "src/solver/analog",
+      "accessCount": 2,
+      "lastAccessed": 1777084879529,
+      "type": "directory"
+    },
+    {
+      "path": "spec/progress.md",
+      "accessCount": 2,
+      "lastAccessed": 1777085122165,
+      "type": "directory"
+    },
+    {
+      "path": "src\\solver\\analog\\__tests__\\ngspice-parity\\diode-resistor-debug.test.ts",
+      "accessCount": 2,
+      "lastAccessed": 1777086284657,
+      "type": "file"
+    },
+    {
+      "path": "src\\solver\\analog\\__tests__\\ngspice-parity\\diode-resistor.test.ts",
+      "accessCount": 2,
+      "lastAccessed": 1777087055367,
+      "type": "file"
+    },
+    {
+      "path": "spec\\phase-10-parity-tickets.md",
+      "accessCount": 2,
+      "lastAccessed": 1777088549066,
+      "type": "file"
+    },
+    {
+      "path": "src\\components\\semiconductors\\diode.ts",
+      "accessCount": 2,
+      "lastAccessed": 1777093713853,
+      "type": "directory"
+    },
+    {
+      "path": "ref\\ngspice\\src\\spicelib\\analysis\\dcop.c",
+      "accessCount": 2,
+      "lastAccessed": 1777094535921,
+      "type": "file"
+    },
+    {
+      "path": "ref\\ngspice\\BUILD-SHARED-WIN.md",
       "accessCount": 1,
-      "lastAccessed": 1776994655611,
+      "lastAccessed": 1777082411192,
+      "type": "file"
+    },
+    {
+      "path": "src\\io\\dts-schema.ts",
+      "accessCount": 1,
+      "lastAccessed": 1777082718690,
+      "type": "file"
+    },
+    {
+      "path": "src/solver/analog/__tests__/ngspice-parity/fixtures",
+      "accessCount": 1,
+      "lastAccessed": 1777082745559,
+      "type": "directory"
+    },
+    {
+      "path": "src/solver/analog/__tests__/harness/comparison-session.ts",
+      "accessCount": 1,
+      "lastAccessed": 1777082800595,
+      "type": "directory"
+    },
+    {
+      "path": "src/solver/analog/dc-operating-point.ts",
+      "accessCount": 1,
+      "lastAccessed": 1777082801865,
+      "type": "directory"
+    },
+    {
+      "path": "src/solver/coordinator.ts",
+      "accessCount": 1,
+      "lastAccessed": 1777082816466,
+      "type": "directory"
+    },
+    {
+      "path": "src/solver/coordinator-types.ts",
+      "accessCount": 1,
+      "lastAccessed": 1777084436801,
+      "type": "directory"
+    },
+    {
+      "path": "src\\headless\\__tests__\\compile-defer-initialize.test.ts",
+      "accessCount": 1,
+      "lastAccessed": 1777084477968,
+      "type": "file"
+    },
+    {
+      "path": "ref/ngspice/src/spicelib/analysis",
+      "accessCount": 1,
+      "lastAccessed": 1777084849126,
+      "type": "directory"
+    },
+    {
+      "path": "spec\\plan.md",
+      "accessCount": 1,
+      "lastAccessed": 1777085666217,
+      "type": "file"
+    },
+    {
+      "path": "src\\solver\\analog\\__tests__\\harness\\boot-step-merge.test.ts",
+      "accessCount": 1,
+      "lastAccessed": 1777086011300,
       "type": "file"
     }
   ],

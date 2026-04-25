@@ -467,7 +467,7 @@ describe("fetlim ngspice-exact", () => {
 
 describe("ipass hadNodeset gate", () => {
   it("ipass_skipped_without_nodesets", () => {
-    // Circuit with no nodesets and dcopModeLadder: after initFix→initFloat,
+    // Circuit with no nodesets and nrModeLadder: after initFix→initFloat,
     // hadNodeset=false so ipass is never decremented — convergence fires immediately
     // when noncon===0 and tolerances pass.
     const vs = makeVoltageSource(1, 0, 2, 5.0);
@@ -486,7 +486,7 @@ describe("ipass hadNodeset gate", () => {
     let initFloatBeginIter = -1;
     let convergeIter = -1;
 
-    ctx.dcopModeLadder = {
+    ctx.nrModeLadder = {
       onModeBegin(phase: "dcopInitJct" | "dcopInitFix" | "dcopInitFloat", iter: number): void {
         if (phase === "dcopInitFloat") initFloatBeginIter = iter;
       },
@@ -530,7 +530,7 @@ describe("ipass hadNodeset gate", () => {
     let initFloatBeginIter = -1;
     let convergeIter = -1;
 
-    ctx.dcopModeLadder = {
+    ctx.nrModeLadder = {
       onModeBegin(phase: "dcopInitJct" | "dcopInitFix" | "dcopInitFloat", iter: number): void {
         if (phase === "dcopInitFloat") initFloatBeginIter = iter;
       },
@@ -655,7 +655,7 @@ describe("NR singular retry", () => {
 
 describe("NR NISHOULDREORDER lifecycle", () => {
   it("forceReorder_called_on_initJct_to_initFix", () => {
-    // Run NR with dcopModeLadder starting in initJct mode.
+    // Run NR with nrModeLadder starting in initJct mode.
     // The STEP J initJct branch calls forceReorder() after transitioning to initFix.
     const vs = makeVoltageSource(1, 0, 2, 5.0);
     const r = makeResistor(1, 2, 1000);
@@ -685,7 +685,7 @@ describe("NR NISHOULDREORDER lifecycle", () => {
 
     ctx.solver = proxySolver;
     ctx.cktMode = setInitf(MODEDCOP, MODEINITJCT);
-    ctx.dcopModeLadder = {
+    ctx.nrModeLadder = {
       onModeBegin(_phase: "dcopInitJct" | "dcopInitFix" | "dcopInitFloat", _iter: number): void {},
       onModeEnd(_phase: "dcopInitJct" | "dcopInitFix" | "dcopInitFloat", _iter: number, _converged: boolean): void {},
     };

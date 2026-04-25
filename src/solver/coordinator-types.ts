@@ -130,9 +130,6 @@ export interface SimulationCoordinator {
   /** Apply a phase-aware capture hook (master switch). Pass null to clear. */
   applyCaptureHook(bundle: PhaseAwareCaptureHook | null): void;
 
-  /** Run the deferred initialization (DCOP for analog backends). Idempotent. */
-  initialize(): void;
-
   // -------------------------------------------------------------------------
   // §1.11 Convergence logging
   // -------------------------------------------------------------------------

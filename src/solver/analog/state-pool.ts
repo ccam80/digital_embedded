@@ -21,6 +21,21 @@ export class StatePool {
    */
   temperature: number = 300.15;
 
+  /**
+   * Maximum integration order — mirrors ngspice CKTmaxOrder
+   * (cktdojob.c:53 sets `CKTmaxOrder = TSKmaxOrder` once per job; default 2
+   * for trapezoidal). Bounds the rotation ring in `rotateStateVectors()` to
+   * exactly slots `0..maxOrder+1`, matching `dctran.c:719-723`. Slots above
+   * `maxOrder+1` are inert (never rotated, never read by integration), the
+   * digiTS analog of ngspice not allocating them at all
+   * (`cktsetup.c:82-83` allocates only slots `0..MAX(2,maxOrder)+1`).
+   *
+   * Set once at engine init from `SimulationParams.maxOrder`; do not mutate
+   * mid-simulation. Default 2 = TRAP, also the ngspice default
+   * (`cktinit.c:65`).
+   */
+  maxOrder: number = 2;
+
   constructor(totalSlots: number) {
     this.totalSlots = totalSlots;
     this.states = [
@@ -45,14 +60,25 @@ export class StatePool {
   get state7(): Float64Array { return this.states[7]; }
 
   /**
-   * Ring rotation of state arrays — pointer swap, not data copy.
-   * After rotation: states[0] is fresh recycled storage (was states[n-1]),
-   * states[1] = previous states[0], states[2] = previous states[1], etc.
-   * Matches ngspice dctran.c:715-723 state rotation before the retry loop.
+   * Ring rotation of state arrays — pointer swap, not data copy. Mirrors
+   * ngspice `dctran.c:719-723`:
+   *
+   *   temp = ckt->CKTstates[ckt->CKTmaxOrder+1];
+   *   for(i=ckt->CKTmaxOrder; i>=0; i--)
+   *     ckt->CKTstates[i+1] = ckt->CKTstates[i];
+   *   ckt->CKTstates[0] = temp;
+   *
+   * The ring spans slots `0..maxOrder+1` exactly — slots above `maxOrder+1`
+   * are NOT rotated. They stay at construction-zero, matching ngspice's
+   * allocator (`cktsetup.c:82-83`) which never allocates above
+   * `MAX(2,maxOrder)+1`. Without this bound, slots beyond the integration
+   * window would carry stale rotated data into any future Gear-order
+   * configuration that reaches them.
    */
   rotateStateVectors(): void {
-    const recycled = this.states[this.states.length - 1];
-    for (let i = this.states.length - 1; i > 0; i--) {
+    const top = this.maxOrder + 1;
+    const recycled = this.states[top];
+    for (let i = top; i > 0; i--) {
       this.states[i] = this.states[i - 1];
     }
     this.states[0] = recycled;
@@ -66,28 +92,23 @@ export class StatePool {
   }
 
   /**
-   * Seed state2 through state7 from state1 (ngspice dctran.c:782-786).
-   * Called after first transient step acceptance.
+   * Copy state1 into state2 and state3 only — matches ngspice dctran.c:795-799
+   * exactly (both placement-inside-for(;;)-loop and width).
+   *
+   *   if(firsttime) {
+   *       for(i=0;i<ckt->CKTnumStates;i++) {
+   *           ckt->CKTstate2[i] = ckt->CKTstate1[i];
+   *           ckt->CKTstate3[i] = ckt->CKTstate1[i];
+   *       }
+   *   }
+   *
+   * Called by analog-engine.ts inside the transient retry loop, on every
+   * outer iteration while _stepCount === 0 (firsttime).
    */
-  seedFromState1(): void {
+  copyState1ToState23(): void {
     const s1 = this.states[1];
     this.states[2].set(s1);
     this.states[3].set(s1);
-    this.states[4].set(s1);
-    this.states[5].set(s1);
-    this.states[6].set(s1);
-    this.states[7].set(s1);
   }
 
-  /** Seed history from current operating point (post-DCOP). */
-  seedHistory(): void {
-    const s0 = this.states[0];
-    this.states[1].set(s0);
-    this.states[2].set(s0);
-    this.states[3].set(s0);
-    this.states[4].set(s0);
-    this.states[5].set(s0);
-    this.states[6].set(s0);
-    this.states[7].set(s0);
-  }
 }

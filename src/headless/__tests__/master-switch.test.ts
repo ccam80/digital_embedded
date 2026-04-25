@@ -46,7 +46,7 @@ describe("setCaptureHook master switch", () => {
   it("flips all five engine flags atomically when bundle is installed", () => {
     const facade = new DefaultSimulatorFacade(registry);
     const circuit = buildRcCircuit(facade);
-    const coord = facade.compile(circuit, { deferInitialize: true }) as DefaultSimulationCoordinator;
+    const coord = facade.compile(circuit) as DefaultSimulationCoordinator;
     const engine = coord.getAnalogEngine() as MNAEngine;
 
     const bundle = makeNoopBundle();
@@ -62,7 +62,7 @@ describe("setCaptureHook master switch", () => {
   it("setConvergenceLogEnabled(false) throws when bundle installed", () => {
     const facade = new DefaultSimulatorFacade(registry);
     const circuit = buildRcCircuit(facade);
-    facade.compile(circuit, { deferInitialize: true });
+    facade.compile(circuit);
     facade.setCaptureHook(makeNoopBundle());
     expect(() => facade.setConvergenceLogEnabled(false)).toThrowError(/comparison harness/);
   });
@@ -70,7 +70,7 @@ describe("setCaptureHook master switch", () => {
   it("setCaptureHook(null) restores pre-hook log state", () => {
     const facade = new DefaultSimulatorFacade(registry);
     const circuit = buildRcCircuit(facade);
-    const coord = facade.compile(circuit, { deferInitialize: true }) as DefaultSimulationCoordinator;
+    const coord = facade.compile(circuit) as DefaultSimulationCoordinator;
     const engine = coord.getAnalogEngine() as MNAEngine;
 
     // User enables convergence log BEFORE installing harness

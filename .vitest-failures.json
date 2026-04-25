@@ -1,41 +1,10 @@
 {
   "summary": {
-    "passed": 0,
-    "failed": 3,
-    "skipped": 89,
+    "passed": 1,
+    "failed": 0,
+    "skipped": 0,
     "totalFiles": 1,
-    "durationSeconds": 0.6
+    "durationSeconds": 2.6
   },
-  "failures": [
-    {
-      "message": "expected 8.21065526691059e-8 to be greater than 8.21065526691059e-8",
-      "count": 2,
-      "locations": [
-        {
-          "file": "src\\components\\semiconductors\\__tests__\\bjt.test.ts",
-          "test": "c4_scales_with_AREAB_under_VERTICAL",
-          "line": 1928,
-          "column": 27
-        },
-        {
-          "file": "src\\components\\semiconductors\\__tests__\\bjt.test.ts",
-          "test": "c4_scales_with_AREAC_under_LATERAL",
-          "line": 1939,
-          "column": 27
-        }
-      ]
-    },
-    {
-      "message": "expected 0.000006391326875647134 not to be 0.000006391326875647134 // Object.is equality",
-      "count": 1,
-      "locations": [
-        {
-          "file": "src\\components\\semiconductors\\__tests__\\bjt.test.ts",
-          "test": "uses_deltaOld1_directly",
-          "line": 2136,
-          "column": 45
-        }
-      ]
-    }
-  ]
+  "failures": []
 }

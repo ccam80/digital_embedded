@@ -94,7 +94,7 @@ describe("nr-retry-grouping: failed attempt + retry grouped in same step", () =>
     sc.endAttempt("nrFailedRetry" as NRAttemptOutcome, false);
 
     // Attempt 2: accepted with half-dt
-    sc.beginAttempt("tranNrRetry" as NRPhase, 5e-10);
+    sc.beginAttempt("tranPredictor" as NRPhase, 5e-10);
     (engine.postIterationHook as any)(
       0,
       new Float64Array(3),
@@ -137,7 +137,7 @@ describe("nr-retry-grouping: failed attempt + retry grouped in same step", () =>
     (engine.postIterationHook as any)(0, new Float64Array(3), new Float64Array(3), 1, false, false, [], [], engine.cktContext!);
     sc.endAttempt("nrFailedRetry" as NRAttemptOutcome, false);
 
-    sc.beginAttempt("tranNrRetry" as NRPhase, 5e-10);
+    sc.beginAttempt("tranPredictor" as NRPhase, 5e-10);
     (engine.postIterationHook as any)(0, new Float64Array(3), new Float64Array(3), 0, true, true, [], [], engine.cktContext!);
     sc.endAttempt("accepted" as NRAttemptOutcome, true);
 
@@ -172,7 +172,7 @@ describe("nr-retry-grouping: failed attempt + retry grouped in same step", () =>
     (engine.postIterationHook as any)(0, new Float64Array(3), new Float64Array(3), 1, false, false, [], [], engine.cktContext!);
     sc.endAttempt("nrFailedRetry" as NRAttemptOutcome, false);
 
-    sc.beginAttempt("tranNrRetry" as NRPhase, 5e-10);
+    sc.beginAttempt("tranPredictor" as NRPhase, 5e-10);
     (engine.postIterationHook as any)(0, new Float64Array(3), new Float64Array(3), 0, true, true, [], [], engine.cktContext!);
     sc.endAttempt("accepted" as NRAttemptOutcome, true);
 
@@ -207,7 +207,7 @@ describe("nr-retry-grouping: failed attempt + retry grouped in same step", () =>
     (engine.postIterationHook as any)(0, new Float64Array(3), new Float64Array(3), 1, false, false, [], [], engine.cktContext!);
     sc.endAttempt("nrFailedRetry" as NRAttemptOutcome, false);
 
-    sc.beginAttempt("tranNrRetry" as NRPhase, 5e-10);
+    sc.beginAttempt("tranPredictor" as NRPhase, 5e-10);
     (engine.postIterationHook as any)(0, new Float64Array(3), new Float64Array(3), 0, true, true, [], [], engine.cktContext!);
     sc.endAttempt("accepted" as NRAttemptOutcome, true);
 
@@ -245,7 +245,7 @@ describe("nr-retry-grouping: failed attempt + retry grouped in same step", () =>
     (engine.postIterationHook as any)(0, new Float64Array(3), new Float64Array(3), 1, false, false, [], [], engine.cktContext!);
     sc.endAttempt("nrFailedRetry" as NRAttemptOutcome, false);
 
-    sc.beginAttempt("tranNrRetry" as NRPhase, 5e-10);
+    sc.beginAttempt("tranPredictor" as NRPhase, 5e-10);
     (engine.postIterationHook as any)(0, new Float64Array(3), new Float64Array(3), 0, true, true, [], [], engine.cktContext!);
     sc.endAttempt("accepted" as NRAttemptOutcome, true);
 
@@ -280,7 +280,7 @@ describe("nr-retry-grouping: failed attempt + retry grouped in same step", () =>
     (engine.postIterationHook as any)(0, new Float64Array(3), new Float64Array(3), 1, false, false, [], [], engine.cktContext!);
     sc.endAttempt("nrFailedRetry" as NRAttemptOutcome, false);
 
-    sc.beginAttempt("tranNrRetry" as NRPhase, 5e-10);
+    sc.beginAttempt("tranPredictor" as NRPhase, 5e-10);
     (engine.postIterationHook as any)(0, new Float64Array(3), new Float64Array(3), 0, true, true, [], [], engine.cktContext!);
     sc.endAttempt("accepted" as NRAttemptOutcome, true);
 
@@ -318,7 +318,7 @@ describe("nr-retry-grouping: failed attempt + retry grouped in same step", () =>
       sc.endAttempt("nrFailedRetry" as NRAttemptOutcome, false);
     }
 
-    sc.beginAttempt("tranNrRetry" as NRPhase, 1e-10);
+    sc.beginAttempt("tranPredictor" as NRPhase, 1e-10);
     (engine.postIterationHook as any)(0, new Float64Array(3), new Float64Array(3), 0, true, true, [], [], engine.cktContext!);
     sc.endAttempt("accepted" as NRAttemptOutcome, true);
 

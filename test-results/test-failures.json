@@ -1,53 +1,1548 @@
 {
   "summary": {
     "vitest": {
-      "passed": 3,
-      "failed": 0,
-      "skipped": 0,
-      "totalFiles": 1,
-      "durationSeconds": 9.6
+      "passed": 8183,
+      "failed": 199,
+      "skipped": 10,
+      "totalFiles": 393,
+      "durationSeconds": 22.7
     },
     "playwright": {
-      "passed": 476,
-      "failed": 12,
+      "passed": 470,
+      "failed": 18,
       "skipped": 0,
       "totalFiles": 23,
-      "durationSeconds": 214.74311200000002
+      "durationSeconds": 192.836419
     },
-    "totalFailed": 12,
-    "totalPassed": 479
+    "totalFailed": 217,
+    "totalPassed": 8653
   },
   "failures": {
-    "vitest": [],
+    "vitest": [
+      {
+        "message": "Cannot read properties of undefined (reading '1')",
+        "count": 25,
+        "locations": [
+          {
+            "file": "src\\components\\passives\\inductor.ts",
+            "test": "prints per-step V_R vs analytical",
+            "line": 340,
+            "column": 26
+          },
+          {
+            "file": "src\\components\\passives\\inductor.ts",
+            "test": "RL step response: V_R matches 1-e^-t/τ (R=10, L=1mH, τ=100µs)",
+            "line": 340,
+            "column": 26
+          },
+          {
+            "file": "src\\components\\passives\\inductor.ts",
+            "test": "series RLC ring-down: oscillatory with strictly decreasing envelope",
+            "line": 340,
+            "column": 26
+          },
+          {
+            "file": "src\\components\\passives\\inductor.ts",
+            "test": "RL resistor zero-crossings at f=200Hz (f<<fc): ≥6 crossings over 4 periods",
+            "line": 340,
+            "column": 26
+          },
+          {
+            "file": "src\\components\\passives\\inductor.ts",
+            "test": "cross-component current equality through real compiled lrctest.dig",
+            "line": 341,
+            "column": 26
+          },
+          {
+            "file": "src\\components\\passives\\inductor.ts",
+            "test": "component-as-node KCL: wire at pin A ≈ wire at pin B ≈ body current",
+            "line": 341,
+            "column": 26
+          },
+          {
+            "file": "src\\components\\active\\__tests__\\real-opamp.test.ts",
+            "test": "large_signal_step",
+            "line": 180,
+            "column": 15
+          },
+          {
+            "file": "src\\components\\active\\__tests__\\real-opamp.test.ts",
+            "test": "small_signal_not_slew_limited",
+            "line": 180,
+            "column": 15
+          },
+          {
+            "file": "src\\components\\active\\real-opamp.ts",
+            "test": "real_opamp_load_dcop_parity",
+            "line": 403,
+            "column": 20
+          },
+          {
+            "file": "src\\components\\semiconductors\\triac.ts",
+            "test": "pushes MT2-MT1 and G-MT1 events on each load call",
+            "line": 260,
+            "column": 32
+          },
+          {
+            "file": "src\\components\\semiconductors\\triac.ts",
+            "test": "events carry correct elementIndex and label",
+            "line": 260,
+            "column": 32
+          },
+          {
+            "file": "src\\components\\semiconductors\\diode.ts",
+            "test": "capacitor voltage reaches 63% of step voltage at t ≈ RC",
+            "line": 534,
+            "column": 38
+          },
+          {
+            "file": "src\\components\\passives\\inductor.ts",
+            "test": "rl-step: runs to stopTime without collapse",
+            "line": 340,
+            "column": 26
+          },
+          {
+            "file": "src\\components\\passives\\inductor.ts",
+            "test": "rl-ac: runs to stopTime without collapse",
+            "line": 340,
+            "column": 26
+          },
+          {
+            "file": "src\\components\\passives\\inductor.ts",
+            "test": "rlc-ringdown: runs to stopTime without collapse",
+            "line": 340,
+            "column": 26
+          },
+          {
+            "file": "src\\components\\passives\\inductor.ts",
+            "test": "ourSession has at least 2 steps (boot + at least one transient step)",
+            "line": 340,
+            "column": 26
+          },
+          {
+            "file": "src\\components\\passives\\inductor.ts",
+            "test": "step 0 has stepStartTime === 0",
+            "line": 340,
+            "column": 26
+          },
+          {
+            "file": "src\\components\\passives\\inductor.ts",
+            "test": "step 0 has at least 2 attempts (DCOP attempt + tranInit attempt)",
+            "line": 340,
+            "column": 26
+          },
+          {
+            "file": "src\\components\\passives\\inductor.ts",
+            "test": "step 0 contains a DCOP-phase attempt",
+            "line": 340,
+            "column": 26
+          },
+          {
+            "file": "src\\components\\passives\\inductor.ts",
+            "test": "step 0 contains a transient-phase attempt (tranInit or tranNR)",
+            "line": 340,
+            "column": 26
+          },
+          {
+            "file": "src\\components\\passives\\inductor.ts",
+            "test": "acceptedAttemptIndex points at a transient-phase attempt (not a DCOP sub-solve)",
+            "line": 340,
+            "column": 26
+          },
+          {
+            "file": "src\\components\\passives\\inductor.ts",
+            "test": "step 0 accepted === true",
+            "line": 340,
+            "column": 26
+          },
+          {
+            "file": "src\\components\\passives\\inductor.ts",
+            "test": "subsequent steps have stepStartTime > 0",
+            "line": 340,
+            "column": 26
+          },
+          {
+            "file": "src\\components\\passives\\inductor.ts",
+            "test": "lteDt_captured_from_ours: lteDt is finite positive on every accepted transient step",
+            "line": 340,
+            "column": 26
+          },
+          {
+            "file": "src\\components\\passives\\inductor.ts",
+            "test": "creates session and runs transient",
+            "line": 340,
+            "column": 26
+          }
+        ]
+      },
+      {
+        "message": "Cannot read properties of undefined (reading 'states')",
+        "count": 23,
+        "locations": [
+          {
+            "file": "src\\components\\passives\\capacitor.ts",
+            "test": "adc_load_dcop_parity",
+            "line": 254,
+            "column": 27
+          },
+          {
+            "file": "src\\components\\active\\comparator.ts",
+            "test": "internal_divider_voltages",
+            "line": 257,
+            "column": 23
+          },
+          {
+            "file": "src\\components\\active\\comparator.ts",
+            "test": "oscillates_at_correct_frequency",
+            "line": 257,
+            "column": 23
+          },
+          {
+            "file": "src\\components\\active\\comparator.ts",
+            "test": "duty_cycle",
+            "line": 257,
+            "column": 23
+          },
+          {
+            "file": "src\\components\\active\\comparator.ts",
+            "test": "pulse_width",
+            "line": 257,
+            "column": 23
+          },
+          {
+            "file": "src\\components\\active\\comparator.ts",
+            "test": "retrigger_ignored_during_pulse",
+            "line": 257,
+            "column": 23
+          },
+          {
+            "file": "src\\components\\passives\\capacitor.ts",
+            "test": "combinational_pin_loading_propagates",
+            "line": 254,
+            "column": 27
+          },
+          {
+            "file": "src\\components\\passives\\capacitor.ts",
+            "test": "toggle_when_both_high",
+            "line": 254,
+            "column": 27
+          },
+          {
+            "file": "src\\components\\passives\\capacitor.ts",
+            "test": "set_when_j_high",
+            "line": 254,
+            "column": 27
+          },
+          {
+            "file": "src\\components\\passives\\capacitor.ts",
+            "test": "reset_when_k_high",
+            "line": 254,
+            "column": 27
+          },
+          {
+            "file": "src\\components\\passives\\capacitor.ts",
+            "test": "set_and_reset",
+            "line": 254,
+            "column": 27
+          },
+          {
+            "file": "src\\components\\passives\\capacitor.ts",
+            "test": "both_high_holds",
+            "line": 254,
+            "column": 27
+          },
+          {
+            "file": "src\\components\\passives\\capacitor.ts",
+            "test": "toggles_on_t_high",
+            "line": 254,
+            "column": 27
+          },
+          {
+            "file": "src\\components\\passives\\capacitor.ts",
+            "test": "both_set_emits_diagnostic",
+            "line": 254,
+            "column": 27
+          },
+          {
+            "file": "src\\components\\passives\\capacitor.ts",
+            "test": "latches_d_on_rising_edge",
+            "line": 254,
+            "column": 27
+          },
+          {
+            "file": "src\\components\\passives\\capacitor.ts",
+            "test": "holds_on_falling_edge",
+            "line": 254,
+            "column": 27
+          },
+          {
+            "file": "src\\components\\passives\\capacitor.ts",
+            "test": "q_bar_is_complement",
+            "line": 254,
+            "column": 27
+          },
+          {
+            "file": "src\\components\\passives\\capacitor.ts",
+            "test": "does_not_latch_during_nr_iteration",
+            "line": 254,
+            "column": 27
+          },
+          {
+            "file": "src\\components\\passives\\capacitor.ts",
+            "test": "flipflop_load_delegates_to_pin_models",
+            "line": 254,
+            "column": 27
+          },
+          {
+            "file": "src\\components\\passives\\capacitor.ts",
+            "test": "counts_on_clock_edges",
+            "line": 254,
+            "column": 27
+          },
+          {
+            "file": "src\\components\\passives\\capacitor.ts",
+            "test": "output_voltages_match_logic",
+            "line": 254,
+            "column": 27
+          },
+          {
+            "file": "src\\components\\passives\\capacitor.ts",
+            "test": "latches_all_bits",
+            "line": 254,
+            "column": 27
+          },
+          {
+            "file": "src\\components\\passives\\capacitor.ts",
+            "test": "sequential_pin_loading_propagates",
+            "line": 254,
+            "column": 27
+          }
+        ]
+      },
+      {
+        "message": "Cannot read properties of undefined (reading '8')",
+        "count": 1,
+        "locations": [
+          {
+            "file": "src\\components\\active\\dac.ts",
+            "test": "dac_load_dcop_parity",
+            "line": 297,
+            "column": 20
+          }
+        ]
+      },
+      {
+        "message": "Cannot read properties of undefined (reading '0')",
+        "count": 65,
+        "locations": [
+          {
+            "file": "src\\components\\active\\opamp.ts",
+            "test": "linear_region",
+            "line": 195,
+            "column": 20
+          },
+          {
+            "file": "src\\components\\active\\opamp.ts",
+            "test": "positive_saturation",
+            "line": 195,
+            "column": 20
+          },
+          {
+            "file": "src\\components\\active\\opamp.ts",
+            "test": "negative_saturation",
+            "line": 195,
+            "column": 20
+          },
+          {
+            "file": "src\\components\\active\\opamp.ts",
+            "test": "opamp_load_dcop_parity",
+            "line": 195,
+            "column": 20
+          },
+          {
+            "file": "src\\components\\active\\schmitt-trigger.ts",
+            "test": "switches_low_on_rising_threshold",
+            "line": 142,
+            "column": 20
+          },
+          {
+            "file": "src\\components\\active\\schmitt-trigger.ts",
+            "test": "hysteresis_prevents_oscillation",
+            "line": 142,
+            "column": 20
+          },
+          {
+            "file": "src\\components\\active\\schmitt-trigger.ts",
+            "test": "noisy_sine_clean_square",
+            "line": 142,
+            "column": 20
+          },
+          {
+            "file": "src\\components\\active\\schmitt-trigger.ts",
+            "test": "plot_matches_hysteresis_loop",
+            "line": 142,
+            "column": 20
+          },
+          {
+            "file": "src\\components\\active\\schmitt-trigger.ts",
+            "test": "schmitt_load_dcop_parity",
+            "line": 142,
+            "column": 20
+          },
+          {
+            "file": "src\\components\\io\\led.ts",
+            "test": "junction_cap_transient_matches_ngspice",
+            "line": 267,
+            "column": 36
+          },
+          {
+            "file": "src\\components\\semiconductors\\diode.ts",
+            "test": "junction_capacitance_when_cjo_nonzero",
+            "line": 533,
+            "column": 39
+          },
+          {
+            "file": "src\\components\\semiconductors\\triac.ts",
+            "test": "conducts_positive_when_triggered",
+            "line": 260,
+            "column": 32
+          },
+          {
+            "file": "src\\components\\semiconductors\\triac.ts",
+            "test": "conducts_negative_when_triggered",
+            "line": 260,
+            "column": 32
+          },
+          {
+            "file": "src\\components\\semiconductors\\triac.ts",
+            "test": "turns_off_at_zero_crossing",
+            "line": 260,
+            "column": 32
+          },
+          {
+            "file": "src\\components\\semiconductors\\triac.ts",
+            "test": "phase_control",
+            "line": 260,
+            "column": 32
+          },
+          {
+            "file": "src\\components\\semiconductors\\triac.ts",
+            "test": "no_writeback: load(ctx) does not modify voltages[]",
+            "line": 260,
+            "column": 32
+          },
+          {
+            "file": "src\\components\\semiconductors\\triac.ts",
+            "test": "pool_state: pool.state0 contains correct slot values after load",
+            "line": 260,
+            "column": 32
+          },
+          {
+            "file": "src\\components\\semiconductors\\triac.ts",
+            "test": "pool_state: SLOT_LATCHED is -1.0 for reverse-latched state",
+            "line": 260,
+            "column": 32
+          },
+          {
+            "file": "src\\components\\semiconductors\\triac.ts",
+            "test": "pool_state: SLOT_LATCHED is 0.0 in blocking state",
+            "line": 260,
+            "column": 32
+          },
+          {
+            "file": "src\\components\\semiconductors\\tunnel-diode.ts",
+            "test": "peak_current_at_vp",
+            "line": 257,
+            "column": 36
+          },
+          {
+            "file": "src\\components\\semiconductors\\tunnel-diode.ts",
+            "test": "valley_current_at_vv",
+            "line": 257,
+            "column": 36
+          },
+          {
+            "file": "src\\components\\semiconductors\\tunnel-diode.ts",
+            "test": "negative_resistance_transient_matches_ngspice",
+            "line": 257,
+            "column": 36
+          },
+          {
+            "file": "src\\components\\passives\\analog-fuse.ts",
+            "test": "0.5A through 1A-rated fuse for 1s stays intact",
+            "line": 155,
+            "column": 29
+          },
+          {
+            "file": "src\\components\\passives\\analog-fuse.ts",
+            "test": "3A through 1A-rated fuse blows at t ≈ i2tRating/I² ≈ 0.111s",
+            "line": 155,
+            "column": 29
+          },
+          {
+            "file": "src\\components\\passives\\analog-fuse.ts",
+            "test": "blown fuse has resistance close to R_blown",
+            "line": 155,
+            "column": 29
+          },
+          {
+            "file": "src\\components\\passives\\analog-fuse.ts",
+            "test": "resistance changes continuously without step discontinuity near blow threshold",
+            "line": 155,
+            "column": 29
+          },
+          {
+            "file": "src\\components\\passives\\analog-fuse.ts",
+            "test": "driving 2× rated current emits fuse-blown diagnostic with info severity",
+            "line": 155,
+            "column": 29
+          },
+          {
+            "file": "src\\components\\passives\\analog-fuse.ts",
+            "test": "diagnostic is emitted only once even after multiple steps past blow",
+            "line": 155,
+            "column": 29
+          },
+          {
+            "file": "src\\components\\passives\\analog-fuse.ts",
+            "test": "thermalRatio is 0 initially and increases toward 1",
+            "line": 155,
+            "column": 29
+          },
+          {
+            "file": "src\\components\\passives\\analog-fuse.ts",
+            "test": "onStateChange callback receives blown and thermalRatio",
+            "line": 155,
+            "column": 29
+          },
+          {
+            "file": "src\\components\\passives\\analog-fuse.ts",
+            "test": "createAnalogFuseElement writes blown and _thermalRatio into props",
+            "line": 155,
+            "column": 29
+          },
+          {
+            "file": "src\\components\\passives\\analog-fuse.ts",
+            "test": "stamps near-zero conductance when blown",
+            "line": 155,
+            "column": 29
+          },
+          {
+            "file": "src\\components\\passives\\memristor.ts",
+            "test": "positive voltage causes w to increase",
+            "line": 157,
+            "column": 25
+          },
+          {
+            "file": "src\\components\\passives\\memristor.ts",
+            "test": "positive voltage causes resistance to decrease",
+            "line": 157,
+            "column": 25
+          },
+          {
+            "file": "src\\components\\passives\\memristor.ts",
+            "test": "negative voltage causes w to decrease",
+            "line": 157,
+            "column": 25
+          },
+          {
+            "file": "src\\components\\passives\\memristor.ts",
+            "test": "negative voltage causes resistance to increase",
+            "line": 157,
+            "column": 25
+          },
+          {
+            "file": "src\\components\\passives\\memristor.ts",
+            "test": "I-V characteristic is different for increasing vs decreasing V (pinched loop)",
+            "line": 157,
+            "column": 25
+          },
+          {
+            "file": "src\\components\\passives\\memristor.ts",
+            "test": "large positive current never pushes w above 1.0",
+            "line": 157,
+            "column": 25
+          },
+          {
+            "file": "src\\components\\passives\\memristor.ts",
+            "test": "large negative current never pushes w below 0.0",
+            "line": 157,
+            "column": 25
+          },
+          {
+            "file": "src\\components\\passives\\memristor.ts",
+            "test": "window function fp is zero at w=0 (no state drift below boundary)",
+            "line": 157,
+            "column": 25
+          },
+          {
+            "file": "src\\components\\passives\\memristor.ts",
+            "test": "window function fp is zero at w=1 (no state drift above boundary)",
+            "line": 157,
+            "column": 25
+          },
+          {
+            "file": "src\\components\\passives\\memristor.ts",
+            "test": "memristor_load_transient_parity",
+            "line": 157,
+            "column": 25
+          },
+          {
+            "file": "src\\components\\passives\\polarized-cap.ts",
+            "test": "DC current through capacitor equals V/R_leak in steady state",
+            "line": 381,
+            "column": 31
+          },
+          {
+            "file": "src\\components\\semiconductors\\diode.ts",
+            "test": "emits reverse-biased-cap diagnostic when V(pos) < V(neg) - reverseMax",
+            "line": 534,
+            "column": 38
+          },
+          {
+            "file": "src\\components\\semiconductors\\diode.ts",
+            "test": "emits no diagnostic when forward biased",
+            "line": 534,
+            "column": 38
+          },
+          {
+            "file": "src\\components\\semiconductors\\diode.ts",
+            "test": "polarized_cap_load_transient_parity",
+            "line": 534,
+            "column": 38
+          },
+          {
+            "file": "src\\components\\sensors\\ntc-thermistor.ts",
+            "test": "temperature rises from ambient under power dissipation",
+            "line": 225,
+            "column": 29
+          },
+          {
+            "file": "src\\components\\sensors\\ntc-thermistor.ts",
+            "test": "self-heating reaches T_ambient + P·R_thermal at steady state",
+            "line": 225,
+            "column": 29
+          },
+          {
+            "file": "src\\components\\sensors\\spark-gap.ts",
+            "test": "500V across 1000V gap: current ≈ 500/R_off (nA range)",
+            "line": 199,
+            "column": 29
+          },
+          {
+            "file": "src\\components\\sensors\\spark-gap.ts",
+            "test": "resistance below breakdown is close to R_off",
+            "line": 199,
+            "column": 29
+          },
+          {
+            "file": "src\\components\\sensors\\spark-gap.ts",
+            "test": "1500V fires the gap and allows current to flow",
+            "line": 199,
+            "column": 29
+          },
+          {
+            "file": "src\\components\\sensors\\spark-gap.ts",
+            "test": "resistance drops significantly above breakdown",
+            "line": 199,
+            "column": 29
+          },
+          {
+            "file": "src\\components\\sensors\\spark-gap.ts",
+            "test": "current above breakdown is much larger than below",
+            "line": 199,
+            "column": 29
+          },
+          {
+            "file": "src\\components\\sensors\\spark-gap.ts",
+            "test": "gap stays conducting while voltage keeps current above iHold",
+            "line": 199,
+            "column": 29
+          },
+          {
+            "file": "src\\components\\sensors\\spark-gap.ts",
+            "test": "conducting gap has low resistance well above holding current",
+            "line": 199,
+            "column": 29
+          },
+          {
+            "file": "src\\components\\sensors\\spark-gap.ts",
+            "test": "gap returns to blocking when current drops below iHold",
+            "line": 199,
+            "column": 29
+          },
+          {
+            "file": "src\\components\\sensors\\spark-gap.ts",
+            "test": "resistance returns toward R_off after extinction",
+            "line": 199,
+            "column": 29
+          },
+          {
+            "file": "src\\components\\sensors\\spark-gap.ts",
+            "test": "can re-fire after extinction",
+            "line": 199,
+            "column": 29
+          },
+          {
+            "file": "src\\components\\sensors\\spark-gap.ts",
+            "test": "resistance changes monotonically across the breakdown transition zone",
+            "line": 199,
+            "column": 29
+          },
+          {
+            "file": "src\\components\\sensors\\spark-gap.ts",
+            "test": "resistance at breakdown voltage is midpoint between rOn and rOff",
+            "line": 199,
+            "column": 29
+          },
+          {
+            "file": "src\\components\\sensors\\spark-gap.ts",
+            "test": "stamps conductance matrix between nodes in blocking state",
+            "line": 199,
+            "column": 29
+          },
+          {
+            "file": "src\\components\\sensors\\spark-gap.ts",
+            "test": "stamps higher conductance in conducting state",
+            "line": 199,
+            "column": 29
+          },
+          {
+            "file": "src\\components\\semiconductors\\bjt.ts",
+            "test": "NPN: arms Vbe=tVcrit, Vbc=0 as per-device local override",
+            "line": 878,
+            "column": 32
+          },
+          {
+            "file": "src\\components\\semiconductors\\bjt.ts",
+            "test": "NPN L1: arms Vbe=tVcrit, Vbc=0 as per-device local override",
+            "line": 1314,
+            "column": 39
+          },
+          {
+            "file": "src\\components\\semiconductors\\diode.ts",
+            "test": "arms Vd=tVcrit as per-device local override",
+            "line": 533,
+            "column": 39
+          }
+        ]
+      },
+      {
+        "message": "expected false to be true // Object.is equality",
+        "count": 3,
+        "locations": [
+          {
+            "file": "src\\components\\active\\__tests__\\opamp.test.ts",
+            "test": "inverting_amplifier",
+            "line": 281,
+            "column": 30
+          },
+          {
+            "file": "src\\components\\active\\__tests__\\real-opamp.test.ts",
+            "test": "inverting_amplifier_gain",
+            "line": 229,
+            "column": 30
+          },
+          {
+            "file": "src\\components\\active\\__tests__\\real-opamp.test.ts",
+            "test": "output_offset_with_gain",
+            "line": 458,
+            "column": 30
+          }
+        ]
+      },
+      {
+        "message": "expected 13 to be 12 // Object.is equality",
+        "count": 1,
+        "locations": [
+          {
+            "file": "src\\components\\active\\__tests__\\optocoupler.test.ts",
+            "test": "is poolBacked with combined diode+BJT stateSize",
+            "line": 88,
+            "column": 35
+          }
+        ]
+      },
+      {
+        "message": "MODEDCOP is not defined",
+        "count": 1,
+        "locations": [
+          {
+            "file": "src\\components\\active\\__tests__\\ota.test.ts",
+            "test": "ota_load_dcop_parity",
+            "line": 330,
+            "column": 14
+          }
+        ]
+      },
+      {
+        "message": "expected 1.055941475717686e-12 to be less than 1.055941475717686e-12",
+        "count": 1,
+        "locations": [
+          {
+            "file": "src\\components\\semiconductors\\__tests__\\diode.test.ts",
+            "test": "IKR correction reduces gd for reverse-biased diode with finite IKR",
+            "line": 710,
+            "column": 23
+          }
+        ]
+      },
+      {
+        "message": "expected NaN to be greater than 0",
+        "count": 1,
+        "locations": [
+          {
+            "file": "src\\components\\semiconductors\\__tests__\\diode.test.ts",
+            "test": "cap gate fires under MODETRANOP | MODEUIC (dioload.c:316-317)",
+            "line": 1280,
+            "column": 28
+          }
+        ]
+      },
+      {
+        "message": "expected [Function] to not throw an error but 'TypeError: Cannot read properties of …' was thrown",
+        "count": 4,
+        "locations": [
+          {
+            "file": "src\\components\\semiconductors\\__tests__\\triac.test.ts",
+            "test": "does not push events when limitingCollector is null",
+            "line": 362,
+            "column": 74
+          },
+          {
+            "file": "src\\components\\passives\\__tests__\\transmission-line.test.ts",
+            "test": "sub-elements are pool-bound immediately after construction — load works after initState",
+            "line": 894,
+            "column": 145
+          },
+          {
+            "file": "src\\solver\\analog\\__tests__\\buckbjt-mcp-surface.test.ts",
+            "test": "compile() on buckbjt fixture does not throw",
+            "line": 34,
+            "column": 37
+          },
+          {
+            "file": "src\\solver\\analog\\__tests__\\buckbjt-stagnation-regression.test.ts",
+            "test": "compiles without throwing",
+            "line": 39,
+            "column": 37
+          }
+        ]
+      },
+      {
+        "message": "Cannot read properties of undefined (reading '5')",
+        "count": 3,
+        "locations": [
+          {
+            "file": "src\\components\\passives\\tapped-transformer.ts",
+            "test": "symmetric_halves — secondary half voltages equal in magnitude, opposite phase to CT",
+            "line": 393,
+            "column": 19
+          },
+          {
+            "file": "src\\components\\passives\\tapped-transformer.ts",
+            "test": "tapped_transformer_load_transient_parity",
+            "line": 393,
+            "column": 19
+          },
+          {
+            "file": "src\\components\\passives\\tapped-transformer.ts",
+            "test": "traces transformer with NR per step",
+            "line": 393,
+            "column": 19
+          }
+        ]
+      },
+      {
+        "message": "expected 3.385226522425835 to be greater than 6.51",
+        "count": 1,
+        "locations": [
+          {
+            "file": "src\\components\\passives\\__tests__\\tapped-transformer.test.ts",
+            "test": "full_wave_rectifier — two diodes + CT ground produce DC output ≈ Vpeak_sec",
+            "line": 392,
+            "column": 18
+          }
+        ]
+      },
+      {
+        "message": "Cannot read properties of undefined (reading '3')",
+        "count": 5,
+        "locations": [
+          {
+            "file": "src\\components\\passives\\transformer.ts",
+            "test": "voltage_ratio — N=10:1 secondary ≈ primary/10 for k=0.99 in AC steady state",
+            "line": 373,
+            "column": 17
+          },
+          {
+            "file": "src\\components\\passives\\transformer.ts",
+            "test": "current_ratio_inverse — secondary current ≈ N × primary branch current",
+            "line": 373,
+            "column": 17
+          },
+          {
+            "file": "src\\components\\passives\\transformer.ts",
+            "test": "power_conservation — P_primary ≈ P_secondary for k=0.99 within 10%",
+            "line": 373,
+            "column": 17
+          },
+          {
+            "file": "src\\components\\passives\\transformer.ts",
+            "test": "leakage_with_low_k — k=0.8 secondary voltage < k=0.99 secondary voltage",
+            "line": 373,
+            "column": 17
+          },
+          {
+            "file": "src\\components\\passives\\transformer.ts",
+            "test": "dc_blocks — DC source on primary produces ~0 secondary voltage in steady state",
+            "line": 373,
+            "column": 17
+          }
+        ]
+      },
+      {
+        "message": "Cannot read properties of undefined (reading '4')",
+        "count": 1,
+        "locations": [
+          {
+            "file": "src\\components\\passives\\transformer.ts",
+            "test": "winding_resistance_drops_voltage — R_pri=10Ω drops ~10V with 1A",
+            "line": 373,
+            "column": 17
+          }
+        ]
+      },
+      {
+        "message": "Cannot read properties of undefined (reading '6')",
+        "count": 16,
+        "locations": [
+          {
+            "file": "src\\components\\passives\\transmission-line.ts",
+            "test": "lossless line: R_seg and G_seg stamps are zero when loss=0",
+            "line": 365,
+            "column": 22
+          },
+          {
+            "file": "src\\components\\passives\\transmission-line.ts",
+            "test": "stamp produces entries into solver",
+            "line": 365,
+            "column": 22
+          },
+          {
+            "file": "src\\components\\passives\\inductor.ts",
+            "test": "buckbjt_load_dcop_parity: rhsOld + noncon + diagGmin + srcFact bit-exact vs ngspice",
+            "line": 340,
+            "column": 26
+          },
+          {
+            "file": "src\\components\\passives\\inductor.ts",
+            "test": "DC op result after compile has converged === true and all finite node voltages",
+            "line": 340,
+            "column": 26
+          },
+          {
+            "file": "src\\components\\passives\\inductor.ts",
+            "test": "first coordinator.step() does not transition engine to ERROR",
+            "line": 340,
+            "column": 26
+          },
+          {
+            "file": "src\\components\\passives\\inductor.ts",
+            "test": "step 0 and step 1 iteration-by-iteration",
+            "line": 340,
+            "column": 26
+          },
+          {
+            "file": "src\\components\\passives\\inductor.ts",
+            "test": "captures per-iteration state at stagnation point",
+            "line": 340,
+            "column": 26
+          },
+          {
+            "file": "src\\components\\passives\\inductor.ts",
+            "test": "DC operating point converges",
+            "line": 340,
+            "column": 26
+          },
+          {
+            "file": "src\\components\\passives\\inductor.ts",
+            "test": "transient stepping does not error after 50 steps",
+            "line": 340,
+            "column": 26
+          },
+          {
+            "file": "src\\components\\passives\\inductor.ts",
+            "test": "survives 2000 transient steps without ERROR state",
+            "line": 340,
+            "column": 26
+          },
+          {
+            "file": "src\\components\\passives\\inductor.ts",
+            "test": "survives 600µs of sim time (matches UI run duration)",
+            "line": 340,
+            "column": 26
+          },
+          {
+            "file": "src\\solver\\analog\\__tests__\\test-helpers.ts",
+            "test": "mna_50node_realistic_circuit_performance",
+            "line": 345,
+            "column": 34
+          },
+          {
+            "file": "src\\components\\passives\\inductor.ts",
+            "test": "transient: CCAP in capacitor and BJT junctions over first steps/retries",
+            "line": 340,
+            "column": 26
+          },
+          {
+            "file": "src\\components\\passives\\inductor.ts",
+            "test": "transient: inductor current divergence over iterations in step 1",
+            "line": 340,
+            "column": 26
+          },
+          {
+            "file": "src\\components\\passives\\inductor.ts",
+            "test": "transient: PNP BJT internal node agreement in step 1",
+            "line": 340,
+            "column": 26
+          },
+          {
+            "file": "src\\components\\passives\\inductor.ts",
+            "test": "8. per-element convergence: our engine reports failures",
+            "line": 340,
+            "column": 26
+          }
+        ]
+      },
+      {
+        "message": "Cannot read properties of undefined (reading '20')",
+        "count": 1,
+        "locations": [
+          {
+            "file": "src\\components\\passives\\transmission-line.ts",
+            "test": "derives correct L_seg and C_seg from Z0 and delay",
+            "line": 365,
+            "column": 22
+          }
+        ]
+      },
+      {
+        "message": "expected 1.9846949765374743e-20 to be greater than 0.35",
+        "count": 1,
+        "locations": [
+          {
+            "file": "src\\components\\passives\\__tests__\\transmission-line.test.ts",
+            "test": "matched load produces no reflection — output voltage ≈ input/2",
+            "line": 504,
+            "column": 22
+          }
+        ]
+      },
+      {
+        "message": "expected 'ERROR' not to be 'ERROR' // Object.is equality",
+        "count": 1,
+        "locations": [
+          {
+            "file": "src\\components\\passives\\__tests__\\transmission-line.test.ts",
+            "test": "unterminated line: voltage at port2 rises above source step voltage",
+            "line": 687,
+            "column": 37
+          }
+        ]
+      },
+      {
+        "message": "expected 1.5164485730860577 to be less than 0.8644719901267445",
+        "count": 1,
+        "locations": [
+          {
+            "file": "src\\components\\sources\\__tests__\\ac-voltage-source.test.ts",
+            "test": "rc_lowpass",
+            "line": 313,
+            "column": 22
+          }
+        ]
+      },
+      {
+        "message": "Cannot read properties of undefined (reading 'length')",
+        "count": 6,
+        "locations": [
+          {
+            "file": "src\\solver\\analog\\digital-pin-model.ts",
+            "test": "async_reset_forces_q_low",
+            "line": 29,
+            "column": 46
+          },
+          {
+            "file": "src\\solver\\analog\\digital-pin-model.ts",
+            "test": "edge_rate_from_capacitance",
+            "line": 29,
+            "column": 46
+          },
+          {
+            "file": "src\\solver\\analog\\digital-pin-model.ts",
+            "test": "remaining_pin_loading_propagates",
+            "line": 29,
+            "column": 46
+          },
+          {
+            "file": "src\\solver\\analog\\digital-pin-model.ts",
+            "test": "clear_resets_to_zero",
+            "line": 29,
+            "column": 46
+          },
+          {
+            "file": "src\\solver\\analog\\digital-pin-model.ts",
+            "test": "does_not_latch_without_enable",
+            "line": 29,
+            "column": 46
+          },
+          {
+            "file": "src\\solver\\analog\\digital-pin-model.ts",
+            "test": "holds_value_across_timesteps",
+            "line": 29,
+            "column": 46
+          }
+        ]
+      },
+      {
+        "message": "PropertyBag: model param \"TEMP\" not found",
+        "count": 1,
+        "locations": [
+          {
+            "file": "src\\core\\properties.ts",
+            "test": "forward_current_lights",
+            "line": 137,
+            "column": 13
+          }
+        ]
+      },
+      {
+        "message": "expected 0.02 to be +0 // Object.is equality",
+        "count": 1,
+        "locations": [
+          {
+            "file": "src\\solver\\analog\\__tests__\\bridge-compilation.test.ts",
+            "test": "per-net ideal override on boundary group produces unloaded output adapter",
+            "line": 182,
+            "column": 35
+          }
+        ]
+      },
+      {
+        "message": "Verified row C-0171: claimKeyword must be non-empty (verified rows must record evidence per spec/phase-8 Task 8.1.1): expected 0 to be greater than 0",
+        "count": 1,
+        "locations": [
+          {
+            "file": "src\\solver\\analog\\__tests__\\citation-audit.test.ts",
+            "test": "verifiedRowsResolve",
+            "line": 123,
+            "column": 11
+          }
+        ]
+      },
+      {
+        "message": "Row C-0836 (cktdefs.h:107-108) must be verified but is \"unverified\": expected 'unverified' to be 'verified' // Object.is equality",
+        "count": 1,
+        "locations": [
+          {
+            "file": "src\\solver\\analog\\__tests__\\citation-audit.test.ts",
+            "test": "allVerified",
+            "line": 216,
+            "column": 9
+          }
+        ]
+      },
+      {
+        "message": "Row for dc-operating-point.ts:65 ngspiceRef=\"cktop.c:385\" must be verified, got \"unverified\": expected 'unverified' to be 'verified' // Object.is equality",
+        "count": 1,
+        "locations": [
+          {
+            "file": "src\\solver\\analog\\__tests__\\citation-audit.test.ts",
+            "test": "enumeratedCorrectionsLanded",
+            "line": 253,
+            "column": 9
+          }
+        ]
+      },
+      {
+        "message": "Row C-0971 (cktop.c:20-79 at line 4) must be verified or missing, got \"unverified\": expected [ 'verified', 'missing' ] to include 'unverified'",
+        "count": 1,
+        "locations": [
+          {
+            "file": "src\\solver\\analog\\__tests__\\citation-audit.test.ts",
+            "test": "allInventoryVerifiedOrMissing",
+            "line": 268,
+            "column": 9
+          }
+        ]
+      },
+      {
+        "message": "Row for newton-raphson.ts:66 ngspiceRef=\"devsup.c:50-82\" must be verified, got \"unverified\": expected 'unverified' to be 'verified' // Object.is equality",
+        "count": 1,
+        "locations": [
+          {
+            "file": "src\\solver\\analog\\__tests__\\citation-audit.test.ts",
+            "test": "enumeratedCorrectionsLanded",
+            "line": 327,
+            "column": 9
+          }
+        ]
+      },
+      {
+        "message": "Row C-1032 (devsup.c:50-82 at line 66) must be verified or missing, got \"unverified\": expected [ 'verified', 'missing' ] to include 'unverified'",
+        "count": 1,
+        "locations": [
+          {
+            "file": "src\\solver\\analog\\__tests__\\citation-audit.test.ts",
+            "test": "allInventoryVerifiedOrMissing",
+            "line": 342,
+            "column": 9
+          }
+        ]
+      },
+      {
+        "message": "expected undefined to be an instance of Float64Array",
+        "count": 1,
+        "locations": [
+          {
+            "file": "src\\solver\\analog\\__tests__\\ckt-context.test.ts",
+            "test": "loadCtx_fields_populated",
+            "line": 260,
+            "column": 25
+          }
+        ]
+      },
+      {
+        "message": "expected Infinity to be 2.645751312387466 // Object.is equality",
+        "count": 2,
+        "locations": [
+          {
+            "file": "src\\solver\\analog\\__tests__\\ckt-terr.test.ts",
+            "test": "order 1 trapezoidal: returns finite positive timestep for non-trivial charges",
+            "line": 50,
+            "column": 20
+          },
+          {
+            "file": "src\\solver\\analog\\__tests__\\ckt-terr.test.ts",
+            "test": "constant charge history produces finite timestep (not Infinity) — abstol-gated",
+            "line": 101,
+            "column": 20
+          }
+        ]
+      },
+      {
+        "message": "expected 9.222255689363639e-10 to be 9.474539396484565e-7 // Object.is equality",
+        "count": 1,
+        "locations": [
+          {
+            "file": "src\\solver\\analog\\__tests__\\ckt-terr.test.ts",
+            "test": "order 2 gear: returns sqrt-scaled timestep",
+            "line": 81,
+            "column": 16
+          }
+        ]
+      },
+      {
+        "message": "expected 1.5060159361706635 to be 1.134042 // Object.is equality",
+        "count": 1,
+        "locations": [
+          {
+            "file": "src\\solver\\analog\\__tests__\\ckt-terr.test.ts",
+            "test": "gear order 2 returns positive finite timestep for cubic charge data",
+            "line": 141,
+            "column": 19
+          }
+        ]
+      },
+      {
+        "message": "expected 0.00011149474795453514 to be 0.0010850276550489007 // Object.is equality",
+        "count": 1,
+        "locations": [
+          {
+            "file": "src\\solver\\analog\\__tests__\\ckt-terr.test.ts",
+            "test": "gear_lte_factor_order_3",
+            "line": 456,
+            "column": 26
+          }
+        ]
+      },
+      {
+        "message": "expected 0.004815445525253121 to be 0.011718276157728014 // Object.is equality",
+        "count": 1,
+        "locations": [
+          {
+            "file": "src\\solver\\analog\\__tests__\\ckt-terr.test.ts",
+            "test": "gear_lte_factor_order_5",
+            "line": 490,
+            "column": 26
+          }
+        ]
+      },
+      {
+        "message": "expected 0.012165248594803255 to be 0.022838897354229643 // Object.is equality",
+        "count": 1,
+        "locations": [
+          {
+            "file": "src\\solver\\analog\\__tests__\\ckt-terr.test.ts",
+            "test": "gear_lte_factor_order_6",
+            "line": 525,
+            "column": 26
+          }
+        ]
+      },
+      {
+        "message": "expected 2.799999999999998e-7 to be 5.291502622129179e-10 // Object.is equality",
+        "count": 1,
+        "locations": [
+          {
+            "file": "src\\solver\\analog\\__tests__\\ckt-terr.test.ts",
+            "test": "cktTerr_trap_order1_matches_ngspice",
+            "line": 560,
+            "column": 20
+          }
+        ]
+      },
+      {
+        "message": "expected 0.0000015060159361706639 to be 1.1340420000000001e-24 // Object.is equality",
+        "count": 1,
+        "locations": [
+          {
+            "file": "src\\solver\\analog\\__tests__\\ckt-terr.test.ts",
+            "test": "cktTerr_trap_order2_matches_ngspice",
+            "line": 591,
+            "column": 20
+          }
+        ]
+      },
+      {
+        "message": "expected 2.799999999999998e-7 to be 0.000529150262212918 // Object.is equality",
+        "count": 1,
+        "locations": [
+          {
+            "file": "src\\solver\\analog\\__tests__\\ckt-terr.test.ts",
+            "test": "cktTerr_gear_order1_sqrt",
+            "line": 655,
+            "column": 20
+          }
+        ]
+      },
+      {
+        "message": "expected 0.00011149612441591165 to be 0.0010850377014617293 // Object.is equality",
+        "count": 1,
+        "locations": [
+          {
+            "file": "src\\solver\\analog\\__tests__\\ckt-terr.test.ts",
+            "test": "gear_higher_order_root_is_order_plus_one",
+            "line": 720,
+            "column": 20
+          }
+        ]
+      },
+      {
+        "message": "no node in base band [1.3, 1.6] V; voltages=10.0000, 1.8000, 1.6014, 6.0271, 0.8495, -0.0008, -0.0000: expected false to be true // Object.is equality",
+        "count": 1,
+        "locations": [
+          {
+            "file": "src\\solver\\analog\\__tests__\\dcop-init-jct.test.ts",
+            "test": "NPN CE circuit (fixtures/npn-ce-harness.dts): DC OP converges with priming",
+            "line": 417,
+            "column": 9
+          }
+        ]
+      },
+      {
+        "message": "expected 97.56098155858157 to be less than 0.1",
+        "count": 1,
+        "locations": [
+          {
+            "file": "src\\solver\\analog\\__tests__\\mna-end-to-end.test.ts",
+            "test": "rl_dc_steady_state_tight_tolerance",
+            "line": 370,
+            "column": 22
+          }
+        ]
+      },
+      {
+        "message": "expected 0.838698003514509 to be 0.7895470511246272 // Object.is equality",
+        "count": 1,
+        "locations": [
+          {
+            "file": "src\\solver\\analog\\__tests__\\newton-raphson.test.ts",
+            "test": "pnjlim_matches_ngspice_forward_bias",
+            "line": 396,
+            "column": 26
+          }
+        ]
+      },
+      {
+        "message": "expected 0.4062106161985045 to be 0.3 // Object.is equality",
+        "count": 1,
+        "locations": [
+          {
+            "file": "src\\solver\\analog\\__tests__\\newton-raphson.test.ts",
+            "test": "pnjlim_matches_ngspice_arg_le_zero_branch",
+            "line": 410,
+            "column": 26
+          }
+        ]
+      },
+      {
+        "message": "Banned identifier audit found 7 violation(s):",
+        "count": 1,
+        "locations": [
+          {
+            "file": "src\\solver\\analog\\__tests__\\phase-0-identifier-audit.test.ts",
+            "test": "no_unexpected_hits",
+            "line": 623,
+            "column": 13
+          }
+        ]
+      },
+      {
+        "message": "expected [ 'semiconductors\\mosfet.ts:1440' ] to deeply equal []",
+        "count": 1,
+        "locations": [
+          {
+            "file": "src\\solver\\analog\\__tests__\\phase-3-xfact-scope-audit.test.ts",
+            "test": "has zero unguarded xfact reads in src/components/",
+            "line": 136,
+            "column": 24
+          }
+        ]
+      },
+      {
+        "message": "expected 'undefined' to be 'string' // Object.is equality",
+        "count": 1,
+        "locations": [
+          {
+            "file": "src\\solver\\analog\\__tests__\\phase-9-sweep.test.ts",
+            "test": "snapshotExists",
+            "line": 224,
+            "column": 36
+          }
+        ]
+      },
+      {
+        "message": "command must not be null/empty: expected undefined to be truthy",
+        "count": 1,
+        "locations": [
+          {
+            "file": "src\\solver\\analog\\__tests__\\phase-9-sweep.test.ts",
+            "test": "schemaFields",
+            "line": 244,
+            "column": 60
+          }
+        ]
+      },
+      {
+        "message": "inductor NG_VOLT (INDvolt) must be surfaced on at least one step: expected false to be true // Object.is equality",
+        "count": 1,
+        "locations": [
+          {
+            "file": "src\\solver\\analog\\__tests__\\harness\\cap-ind-state-probe.test.ts",
+            "test": "RL transient: direct bridge surfaces PHI and NG_VOLT on L1",
+            "line": 233,
+            "column": 98
+          }
+        ]
+      },
+      {
+        "message": "Cannot read properties of null (reading 'steps')",
+        "count": 7,
+        "locations": [
+          {
+            "file": "src\\solver\\analog\\__tests__\\harness\\step-alignment.test.ts",
+            "test": "both engines produce steps",
+            "line": 56,
+            "column": 32
+          },
+          {
+            "file": "src\\solver\\analog\\__tests__\\harness\\step-alignment.test.ts",
+            "test": "every paired step has a finite stepStartTimeDelta",
+            "line": 66,
+            "column": 42
+          },
+          {
+            "file": "src\\solver\\analog\\__tests__\\harness\\step-alignment.test.ts",
+            "test": "first step of both engines has stepStartTime === 0",
+            "line": 78,
+            "column": 32
+          },
+          {
+            "file": "src\\solver\\analog\\__tests__\\harness\\step-alignment.test.ts",
+            "test": "index-paired steps report stepStartTimeDelta = ours.stepStartTime - ng.stepStartTime",
+            "line": 83,
+            "column": 42
+          },
+          {
+            "file": "src\\solver\\analog\\__tests__\\harness\\step-alignment.test.ts",
+            "test": "stepStartTime values are monotonically non-decreasing in both engines",
+            "line": 99,
+            "column": 42
+          },
+          {
+            "file": "src\\solver\\analog\\__tests__\\harness\\step-alignment.test.ts",
+            "test": "timeAlign=true pairs a mid-run step by time when step counts differ",
+            "line": 109,
+            "column": 42
+          },
+          {
+            "file": "src\\solver\\analog\\__tests__\\harness\\step-alignment.test.ts",
+            "test": "timeAlign=false pairs by positional index (ngspiceStepIndex === ourStepIndex)",
+            "line": 129,
+            "column": 42
+          }
+        ]
+      },
+      {
+        "message": "ComparisonSession: call runDcOp() or runTransient() first",
+        "count": 1,
+        "locations": [
+          {
+            "file": "src\\solver\\analog\\__tests__\\harness\\comparison-session.ts",
+            "test": "session has steps on both sides (presence counts have both > 0)",
+            "line": 2518,
+            "column": 13
+          }
+        ]
+      },
+      {
+        "message": "expected 0.5 to be less than 0.001",
+        "count": 1,
+        "locations": [
+          {
+            "file": "src\\solver\\analog\\__tests__\\harness\\stream-verification.test.ts",
+            "test": "5. integration coefficients: method transitions to trapezoidal",
+            "line": 139,
+            "column": 24
+          }
+        ]
+      }
+    ],
     "playwright": [
       {
-        "message": "Error: Expected 2.64043954025776 to be close to 0.02084652 (err=2.61959302025776, limit=2.084652e-8)",
-        "count": 1,
+        "message": "Error: Status bar shows an error",
+        "count": 8,
         "locations": [
           {
             "file": "gui/analog-bjt-convergence.spec.ts",
             "test": "compile and step — no convergence error, supply rail is 10V",
             "line": 251,
             "column": 3
-          }
-        ]
-      },
-      {
-        "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mnot\u001b[2m.\u001b[22mtoBeCloseTo\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m, \u001b[22mprecision\u001b[2m)\u001b[22m",
-        "count": 1,
-        "locations": [
+          },
+          {
+            "file": "gui/analog-bjt-convergence.spec.ts",
+            "test": "run continuously — voltages remain bounded",
+            "line": 355,
+            "column": 3
+          },
           {
             "file": "gui/analog-bjt-convergence.spec.ts",
             "test": "step to 5ms — output voltage evolves and trace captures transient",
             "line": 387,
             "column": 3
-          }
-        ]
-      },
-      {
-        "message": "Error: Status bar shows an error",
-        "count": 5,
-        "locations": [
+          },
           {
             "file": "gui/component-sweep.spec.ts",
             "test": "DAC at bits=4: set property and compile",
@@ -81,7 +1576,7 @@
         ]
       },
       {
-        "message": "Error: Expected 0.07501569351860839 to be close to 0.0957744513 (err=0.020758757781391607, limit=9.577445129999999e-8)",
+        "message": "Error: Expected 0.07499771749798083 to be close to 0.0957744513 (err=0.020776733802019165, limit=9.577445129999999e-8)",
         "count": 1,
         "locations": [
           {
@@ -117,25 +1612,49 @@
         ]
       },
       {
-        "message": "Error: simTime only advanced 0.0us — expected at least 500us",
-        "count": 1,
+        "message": "Error: page.evaluate: Error: Timed out waiting for message: sim-loaded",
+        "count": 7,
         "locations": [
           {
             "file": "gui/stepping-perf.spec.ts",
             "test": "buckbjt at 1ms/s — simTime advances at least 500us in 2s wall time",
             "line": 48,
             "column": 3
-          }
-        ]
-      },
-      {
-        "message": "Error: FF only advanced 0.0us — expected ~1ms",
-        "count": 1,
-        "locations": [
+          },
           {
             "file": "gui/stepping-perf.spec.ts",
             "test": "buckbjt fast-forward 1ms — completes within 5s wall budget",
             "line": 93,
+            "column": 3
+          },
+          {
+            "file": "gui/stress-speed.spec.ts",
+            "test": "buckbjt at 1 ms/s — 3s wall time",
+            "line": 39,
+            "column": 3
+          },
+          {
+            "file": "gui/stress-speed.spec.ts",
+            "test": "buckbjt at 10 ms/s — 3s wall time",
+            "line": 39,
+            "column": 3
+          },
+          {
+            "file": "gui/stress-speed.spec.ts",
+            "test": "buckbjt at 100 ms/s — 3s wall time",
+            "line": 39,
+            "column": 3
+          },
+          {
+            "file": "gui/stress-speed.spec.ts",
+            "test": "buckbjt at 500 ms/s — 3s wall time",
+            "line": 39,
+            "column": 3
+          },
+          {
+            "file": "gui/stress-speed.spec.ts",
+            "test": "buckbjt at 1 s/s — 3s wall time",
+            "line": 39,
             "column": 3
           }
         ]

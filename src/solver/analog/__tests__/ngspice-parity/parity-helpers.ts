@@ -3,7 +3,7 @@ import type { CaptureSession, IterationSnapshot } from "../harness/types.js";
 import { DEVICE_MAPPINGS } from "../harness/device-mappings.js";
 import { describe, expect } from "vitest";
 
-export const DLL_PATH = "C:/local_working_projects/digital_in_browser/third_party/ngspice/bin/ngspice.dll";
+export const DLL_PATH = "C:/local_working_projects/digital_in_browser/ref/ngspice/visualc-shared/x64/Release/bin/spice.dll";
 
 let _dllAvailable: boolean | null = null;
 export function dllAvailable(): boolean {

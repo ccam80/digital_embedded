@@ -6,6 +6,19 @@ Here is the comprehensive executable diff:
 
 # NGSPICE STATE-ARCHITECTURE ALIGNMENT — EXECUTABLE DIFF
 
+> **SUPERSEDED — `seedHistory()`** (lines 85, 108 below): the bulk-seed call that
+> filled `state1..state7` from `state0` was later **removed entirely**. ngspice
+> only seeds `state1` at firsttime entry (`dctran.c:349-350`); `state2`/`state3`
+> are filled from `state1` *inside* the `for(;;)` loop on the first transient
+> step (`dctran.c:795-799`); `state4..state(maxOrder+1)` stay at the calloc-zero
+> set by `CKALLOC` (`cktsetup.c:82-83` → `tmalloc` → `calloc`). Production now
+> mirrors that split: `_seedFromDcop` (`analog-engine.ts:1254-1270`) does the
+> single `states[1].set(states[0])` copy, and `copyState1ToState23`
+> (`state-pool.ts`) is invoked from inside the `for(;;)` loop while
+> `_stepCount === 0` (`analog-engine.ts:512-514`). Do **not** reintroduce a
+> `seedHistory()`-style bulk fill — it over-seeds `state4..state7` with DCOP
+> values, which would diverge from ngspice the moment Gear order ≥ 4 is enabled.
+
 ## Preamble — Key Design Decisions
 
 **D3 field name:** `isTransientDcop: boolean` on both `CKTCircuitContext` and `LoadContext`. Rejected alternative `isMODETRANOP` is too SPICE-internal; `isDcopForTransient` is verbose. `isTransientDcop` reads as "this is the DCOP that precedes transient," matches ngspice's `MODETRANOP` semantics, and composes naturally with `isDcOp && isTransientDcop` at element sites that want to mimic `vsrcload.c:410-411`.

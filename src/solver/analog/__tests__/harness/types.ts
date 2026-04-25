@@ -272,9 +272,7 @@ export type NRPhase =
   | "dcopSrcSweep"
   | "tranInit"
   | "tranPredictor"
-  | "tranNR"
-  | "tranNrRetry"
-  | "tranLteRetry";
+  | "tranNR";
 
 /**
  * Outcome of a single NR solve attempt.
@@ -285,6 +283,7 @@ export type NRAttemptOutcome =
   | "lteRejectedRetry"
   | "dcopSubSolveConverged"
   | "dcopPhaseHandoff"
+  | "tranPhaseHandoff"
   | "finalFailure";
 
 // ---------------------------------------------------------------------------

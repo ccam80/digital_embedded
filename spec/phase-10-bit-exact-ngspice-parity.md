@@ -30,11 +30,14 @@ D-8 is closed; no separate gesture required.
 ## Operational rules (apply to every wave)
 
 ### 1. DLL presence
-ngspice.dll is present at
-`C:/local_working_projects/digital_in_browser/third_party/ngspice/bin/ngspice.dll`
-and loadable. Tests gate on `describeIfDll` — when the DLL is present, the
-test body runs; when absent, it silently skips. Phase 10 execution assumes
-presence; a skipped test is not acceptable evidence of closure.
+The instrumented ngspice shared library is present at
+`C:/local_working_projects/digital_in_browser/ref/ngspice/visualc-shared/x64/Release/bin/spice.dll`
+and loadable (built per `ref/ngspice/BUILD-SHARED-WIN.md` from the modified
+`ref/ngspice/src/maths/ni/niiter.c` source containing `ni_instrument_register`
+and `ni_topology_register`). Tests gate on `describeIfDll` — when the DLL is
+present, the test body runs; when absent, it silently skips. Phase 10
+execution assumes presence; a skipped test is not acceptable evidence of
+closure.
 
 ### 2. Commit evidence
 Every wave commit body carries:

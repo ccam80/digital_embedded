@@ -702,7 +702,19 @@ export class NgspiceBridge {
       if (currentStep.pendingAttempt === null || isIterReset || isPhaseChange) {
         if (currentStep.pendingAttempt && (isIterReset || isPhaseChange)) {
           let outcome: NRAttemptOutcome;
-          if (currentStep.pendingAttempt.iterations.length > 0) {
+          // Transient INITTRAN→FLOAT and INITPRED→FLOAT happen inside one
+          // ngspice NIiter call (niiter.c:1072-1076 INITF dispatcher) — the
+          // mid-call mode flip is not a NR failure or a sub-solve boundary,
+          // it is a phase handoff. Emit "tranPhaseHandoff" so the outcome
+          // matches our engine's transient mode-ladder, instead of falsely
+          // labeling it "nrFailedRetry" / "dcopSubSolveConverged".
+          const isTranHandoff = isPhaseChange &&
+            (currentStep.pendingAttempt.phase === "tranInit" ||
+             currentStep.pendingAttempt.phase === "tranPredictor") &&
+            attemptPhase === "tranNR";
+          if (isTranHandoff) {
+            outcome = "tranPhaseHandoff";
+          } else if (currentStep.pendingAttempt.iterations.length > 0) {
             const lastIter = currentStep.pendingAttempt.iterations[currentStep.pendingAttempt.iterations.length - 1]!;
             if (lastIter.globalConverged) {
               outcome = "dcopSubSolveConverged";

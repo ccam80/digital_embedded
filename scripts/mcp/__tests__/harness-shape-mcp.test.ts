@@ -156,8 +156,9 @@ describe("circuit_convergence_log disable conflict", () => {
     const simFacade = new DefaultSimulatorFacade(registry);
     const circuit = buildRcCircuit(registry);
 
-    // Compile via facade (with deferInitialize so no DCOP runs yet)
-    const coordinator = simFacade.compile(circuit, { deferInitialize: true });
+    // Compile via facade. No DCOP runs at compile time — analyses
+    // (dcOperatingPoint(), step()) drive their own DCOP on demand.
+    const coordinator = simFacade.compile(circuit);
 
     // Install capture hook — sets _captureHookInstalled on the coordinator
     const bundle: PhaseAwareCaptureHook = {
