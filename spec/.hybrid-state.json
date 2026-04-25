@@ -137,15 +137,15 @@
           "4.2"
         ]
       ],
-      "spawned": 0,
-      "completed": 0,
+      "spawned": 3,
+      "completed": 1,
       "verifications_passed": 0,
-      "verifications_failed": 0,
+      "verifications_failed": 1,
       "stops_for_clarification": 0,
-      "dead_implementers": 0,
+      "dead_implementers": 1,
       "dead_verifiers": 0,
       "group_status": {
-        "4.1": "pending",
+        "4.1": "failed",
         "4.2": "pending"
       },
       "user_required_tasks": {
@@ -155,5 +155,5 @@
       "user_acks": {}
     }
   ],
-  "last_updated": "2026-04-25T13:43:32.518Z"
+  "last_updated": "2026-04-25T14:09:39.355Z"
 }
