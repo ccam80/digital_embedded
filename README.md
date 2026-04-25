@@ -9,7 +9,7 @@ npm install
 npx vite           # Vite dev server on localhost:5173
 ```
 
-Open `http://localhost:5173/simulator.html` in your browser.
+Open `http://localhost:5173/` in your browser.
 
 ## Build
 
@@ -21,7 +21,7 @@ npm run build        # Production bundle -> dist/
 
 ## URL Parameters
 
-All parameters work on `simulator.html`:
+All parameters work on the simulator (root URL):
 
 | Parameter | Example | Description |
 |-----------|---------|-------------|
@@ -33,7 +33,7 @@ All parameters work on `simulator.html`:
 | `dark` | `dark=0` | Force light color scheme (default: dark) |
 | `panels` | `panels=none` | Hide all panels (presentation mode) |
 
-Parameters can be combined: `simulator.html?file=intro.dig&locked=1&palette=And,Or,Not,In,Out`
+Parameters can be combined: `/?file=intro.dig&locked=1&palette=And,Or,Not,In,Out`
 
 URL parameters always override module config defaults.
 
@@ -45,7 +45,7 @@ The simulator is designed for iframe embedding. It communicates with the host pa
 
 ```html
 <iframe
-  src="https://<user>.github.io/<repo>/simulator.html"
+  src="https://<user>.github.io/<repo>/"
   width="800" height="600"
 ></iframe>
 ```
@@ -54,7 +54,7 @@ The simulator is designed for iframe embedding. It communicates with the host pa
 
 ```html
 <iframe
-  src="https://<user>.github.io/<repo>/simulator.html?file=circuits/half-adder.dig&locked=1"
+  src="https://<user>.github.io/<repo>/?file=circuits/half-adder.dig&locked=1"
   width="800" height="600"
 ></iframe>
 ```
@@ -63,7 +63,7 @@ The simulator is designed for iframe embedding. It communicates with the host pa
 
 ```html
 <iframe
-  src="https://<user>.github.io/<repo>/simulator.html?module=ece101"
+  src="https://<user>.github.io/<repo>/?module=ece101"
   width="800" height="600"
 ></iframe>
 ```
@@ -163,7 +163,7 @@ modules/
 ### Usage
 
 ```
-simulator.html?module=ece101
+/?module=ece101
 ```
 
 The module config is fetched from `modules/ece101/config.json`. Circuit file paths in the config are resolved relative to the module directory.
@@ -176,8 +176,8 @@ Step-by-step circuit-building exercises with test-vector validation.
 
 ### Viewing tutorials
 
-- `tutorials.html` -- Tutorial index (lists all available tutorials)
-- `tutorial-viewer.html?manifest=tutorials/sr-to-flipflop/manifest.json` -- Single tutorial viewer
+- `app/tutorial/` -- Tutorial index (lists all available tutorials)
+- `app/tutorial/view.html?manifest=tutorials/sr-to-flipflop/manifest.json` -- Single tutorial viewer
 
 ### Tutorial files
 
@@ -222,7 +222,7 @@ circuits/
   shift-add-multiplier.dig
 ```
 
-Load any hosted circuit via URL: `simulator.html?file=circuits/half-adder.dig`
+Load any hosted circuit via URL: `/?file=circuits/half-adder.dig`
 
 Or via postMessage: `{ type: 'sim-load-url', url: 'circuits/half-adder.dig' }`
 
