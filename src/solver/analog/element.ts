@@ -196,9 +196,21 @@ export interface AnalogElement {
 
   /**
    * Called once per accepted timestep so the element can schedule its next
-   * waveform edge as a timestep breakpoint.
+   * waveform edge as a timestep breakpoint. Mirrors ngspice's per-device
+   * DEVaccept dispatch (vsrcacct.c VSRCaccept).
+   *
+   * `atBreakpoint` is the engine's CKTbreak flag: true when the just-accepted
+   * step landed via a breakpoint clamp. ngspice gates every CKTsetBreak inside
+   * VSRCaccept on this flag (see `if(ckt->CKTbreak && ...)` throughout the
+   * PULSE/PWL/TRNOISE/TRRANDOM switch) so non-boundary acceptances register
+   * nothing. Sources that ignore this flag will register stale breakpoints on
+   * every step, diverging from ngspice queue contents.
    */
-  acceptStep?(simTime: number, addBreakpoint: (t: number) => void): void;
+  acceptStep?(
+    simTime: number,
+    addBreakpoint: (t: number) => void,
+    atBreakpoint: boolean,
+  ): void;
 }
 
 /**

@@ -24,9 +24,13 @@ const _ulpI64 = new BigInt64Array(_ulpBuf);
 /**
  * Returns true when a and b are within maxUlps IEEE-754 ULPs of each other.
  * Uses a module-level singleton ArrayBuffer — allocation-free after module load.
- * Matches ngspice dctran.c:553-554 AlmostEqualUlps(time, bkpt, 100).
+ * Matches ngspice dctran.c:553-554 and vsrcacct.c AlmostEqualUlps usage.
+ *
+ * Exported for source-element acceptStep gating (TRNOISE/TRRANDOM/PWL pattern
+ * in vsrcacct.c uses `AlmostEqualUlps(nearest, CKTtime, 3)` to detect that
+ * CKTtime sits at a sample boundary).
  */
-function almostEqualUlps(a: number, b: number, maxUlps: number): boolean {
+export function almostEqualUlps(a: number, b: number, maxUlps: number): boolean {
   if (Number.isNaN(a) || Number.isNaN(b)) return false;
   if (Math.sign(a) !== Math.sign(b) && a !== 0 && b !== 0) return a === b;
   _ulpF64[0] = a; const ai = _ulpI64[0];
@@ -380,22 +384,29 @@ export class TimestepController {
       // worstRatio: >1 means step should be rejected (proposed < current dt)
       worstRatio = minProposedDt < dt ? dt / minProposedDt : 0;
     } else {
-      // No reactive elements with getLteTimestep -- grow step toward maxTimeStep.
-      newDt = Math.min(dt * 2, this._params.maxTimeStep);
+      // ngspice ckttrunc.c:53 with timetemp=HUGE (no devices have DEVtrunc):
+      // *timeStep = MIN(2 * *timeStep, HUGE) = 2 * *timeStep. No maxStep
+      // clamp here — that is applied at top-of-next-step in dctran.c:540
+      // (mirrored by getClampedDt). Clamping here would publish a maxStep-
+      // capped value as the LTE proposal and break parity capture of the
+      // unclamped CKTdelta that ngspice reports out of CKTtrunc.
+      newDt = dt * 2;
       worstRatio = 0;
     }
 
-    // Clamp to solver bounds.
-    newDt = Math.max(this._params.minTimeStep, Math.min(this._params.maxTimeStep, newDt));
-
-    // Clamp to next breakpoint.
-    if (this._breakpoints.length > 0) {
-      const nextBp = this._breakpoints[0]!;
-      const remaining = nextBp - simTime;
-      if (remaining > 0 && newDt > remaining) {
-        newDt = remaining;
-      }
-    }
+    // Do NOT clamp to [minTimeStep, maxTimeStep] here. ngspice CKTtrunc
+    // returns the raw LTE proposal; top-of-step (dctran.c:540) handles the
+    // maxStep clamp via getClampedDt, and the delmin two-strike check
+    // (dctran.c:766, mirrored at analog-engine.ts:614) handles below-delmin.
+    // Mirror that exact split — clamping here would diverge bit-for-bit
+    // from ngspice's published CKTdelta between steps.
+    //
+    // Likewise, do NOT clamp to the next breakpoint here. ngspice CKTtrunc
+    // does not consult CKTbreaks; the approaching-breakpoint clamp lives at
+    // dctran.c:594-602 (mirrored by getClampedDt at the top of the next
+    // step). Clamping here was emitting a bp-truncated value as the LTE
+    // proposal whenever simTime advanced past (bp - 2*dt), which is one
+    // step earlier than the ngspice proposal sees the constraint.
 
     // Return via pre-allocated result object (zero allocation).
     this._lteResult.newDt = newDt;
@@ -529,17 +540,12 @@ export class TimestepController {
     }
     this._lastAcceptedSimTime = simTime;
 
-    // ngspice spec map rows 302-306 (spec/state-machines/ngspice-timestep-vs-timestep.md):
-    // pin order=1 during the firsttime startup window (steps 0 and 1) so
-    // the order-2 divided-difference LTE cannot fire on step 1 with
-    // deltaOld[1..] = maxTimeStep seeds (dctran.c:316-318), which would
-    // divide rounding noise by h0·h1·(h0+h1) ≈ 1e-20 s³ and cause dt
-    // collapse. ngspice's firsttime branch (dctran.c:849-872) does the
-    // same by goto nextTime, skipping CKTtrunc entirely on step 0; on
-    // step 1 order is still 1 until the order-1 LTE gate passes
-    // (dctran.c:881-892).
-    this._updateMethodForStartup();
-
+    // ngspice CKTaccept does NOT write CKTorder. Order stays at 1 during
+    // step 0 because dctran.c:849-866's firsttime branch does
+    // `goto nextTime` and skips the LTE/promotion code entirely; our
+    // _stepCount === 0 early-break in MNAEngine.step() (around line 568)
+    // mirrors that skip — computeNewDt and tryOrderPromotion never run on
+    // step 0, so order cannot be promoted. No defensive pin needed here.
     this._acceptedSteps++;
 
     // deltaOld rotation removed — now performed by the engine before/inside
@@ -547,32 +553,6 @@ export class TimestepController {
     //
     // Breakpoint pop and at-breakpoint clamp live in getClampedDt() — see
     // ngspice dctran.c:540-644 (top-of-next-step, not at-acceptance).
-  }
-
-  // -------------------------------------------------------------------------
-  // Startup order pin (ngspice firsttime replacement)
-  // -------------------------------------------------------------------------
-
-  /**
-   * Pin `currentOrder = 1` during the startup window so order-2 LTE cannot
-   * fire on step 0 or step 1. Matches the ngspice firsttime state machine:
-   *  - dctran.c:315 sets `ckt->CKTorder = 1` at transient entry.
-   *  - dctran.c:849-872 does `firsttime=0; goto nextTime;` on step 0,
-   *    skipping CKTtrunc entirely.
-   *  - dctran.c:881-892 only promotes to order 2 AFTER order-1 LTE passes
-   *    (gated on `newdelta > .9 * CKTdelta` at line 880).
-   *
-   * Called by accept() BEFORE `_acceptedSteps++`, so step 0 (_acceptedSteps=0
-   * pre-increment) and step 1 (_acceptedSteps=1 pre-increment) are both
-   * pinned at order=1. tryOrderPromotion()'s `_acceptedSteps <= 1` gate
-   * then allows promotion from step 2 onward (dctran.c:864-866 equivalent).
-   *
-   * Spec map: spec/state-machines/ngspice-timestep-vs-timestep.md rows 302-306.
-   */
-  private _updateMethodForStartup(): void {
-    if (this._acceptedSteps <= 1) {
-      this.currentOrder = 1;
-    }
   }
 
   // -------------------------------------------------------------------------
@@ -599,11 +579,13 @@ export class TimestepController {
     _simTime: number,
     executedDt: number,
   ): void {
-    // Only promote when still at order 1, and only after the first accepted
-    // step (ngspice clears firsttime after step 0, then skips LTE via goto
-    // nextTime on that step — promotion trial first runs from step 2 onward,
-    // matching dctran.c:864-866).
-    if (this._acceptedSteps <= 1) return;
+    // Skip only on step 0 (ngspice firsttime branch at dctran.c:849-866 does
+    // `firsttime=0; goto nextTime;` and bypasses CKTtrunc entirely). From
+    // step 1 onward ngspice runs the order-1 CKTtrunc and then the order-2
+    // promotion trial at dctran.c:881-892. _acceptedSteps reflects steps
+    // already accepted at step()-time, so _acceptedSteps===0 ⇔ processing
+    // step 0; _acceptedSteps===1 ⇔ processing step 1, eligible for promotion.
+    if (this._acceptedSteps === 0) return;
 
     // ngspice dctran.c:864-866: re-seed and re-truncate at order 2.
     // Compute the raw LTE-proposed dt at order 2 WITHOUT maxTimeStep clamping.

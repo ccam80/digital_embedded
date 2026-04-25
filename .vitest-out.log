@@ -1,0 +1,29 @@
+
+[1m[7m[36m RUN [39m[27m[22m [36mv2.1.9 [39m[90mC:/local_working_projects/digital_in_browser[39m
+
+ [32m✓[39m src/solver/analog/__tests__/analog-engine.test.ts [2m([22m[2m30 tests[22m[2m)[22m[90m 31[2mms[22m[39m
+ [31m❯[39m src/components/sources/__tests__/ac-voltage-source.test.ts [2m([22m[2m38 tests[22m[2m | [22m[31m1 failed[39m[2m)[22m[90m 33[2mms[22m[39m
+[31m   [31m×[31m Integration[2m > [22mrc_lowpass[90m 21[2mms[22m[31m[39m
+[31m     → expected 1.5164499625412833 to be less than 0.8644719901267445[39m
+ [32m✓[39m src/components/io/__tests__/analog-clock.test.ts [2m([22m[2m14 tests[22m[2m)[22m[90m 5[2mms[22m[39m
+ [32m✓[39m src/solver/analog/__tests__/ngspice-parity/resistive-divider.test.ts [2m([22m[2m2 tests[22m[2m)[22m[90m 69[2mms[22m[39m
+
+[31m⎯⎯⎯⎯⎯⎯⎯[1m[7m Failed Tests 1 [27m[22m⎯⎯⎯⎯⎯⎯⎯[39m
+
+[31m[1m[7m FAIL [27m[22m[39m src/components/sources/__tests__/ac-voltage-source.test.ts[2m > [22mIntegration[2m > [22mrc_lowpass
+[31m[1mAssertionError[22m: expected 1.5164499625412833 to be less than 0.8644719901267445[39m
+[36m [2m❯[22m src/components/sources/__tests__/ac-voltage-source.test.ts:[2m313:22[22m[39m
+    [90m311| [39m    [35mconst[39m expectedAmplitude [33m=[39m [34m5[39m [33m/[39m [33mMath[39m[33m.[39m[34msqrt[39m([34m1[39m [33m+[39m [33mMath[39m[33m.[39m[34mpow[39m([34m2[39m [33m*[39m [33mMath[39m[33m.[39m[33mPI[39m [33m*[39m…
+    [90m312| [39m    [34mexpect[39m(peakVcap)[33m.[39m[34mtoBeGreaterThan[39m(expectedAmplitude [33m*[39m [34m0.9[39m)[33m;[39m
+    [90m313| [39m    [34mexpect[39m(peakVcap)[33m.[39m[34mtoBeLessThan[39m(expectedAmplitude [33m*[39m [34m1.1[39m)[33m;[39m
+    [90m   | [39m                     [31m^[39m
+    [90m314| [39m  })[33m;[39m
+    [90m315| [39m})[33m;[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯[22m[39m
+
+[2m Test Files [22m [1m[31m1 failed[39m[22m[2m | [22m[1m[32m3 passed[39m[22m[90m (4)[39m
+[2m      Tests [22m [1m[31m1 failed[39m[22m[2m | [22m[1m[32m83 passed[39m[22m[90m (84)[39m
+[2m   Start at [22m 19:20:31
+[2m   Duration [22m 2.86s[2m (transform 1.29s, setup 0ms, collect 2.02s, tests 138ms, environment 0ms, prepare 233ms)[22m
+

@@ -42,8 +42,8 @@
     "runtime": null
   },
   "build": {
-    "buildCommand": "rm -f .engine-test.out .tsc-out.log && git status --short | head -10 && echo \"---\" && git diff src/solver/analog/__tests__/analog-engine.test.ts | head -80",
-    "testCommand": "npx vitest run src/solver/analog/__tests__/ngspice-parity/resistive-divider.test.ts src/solver/analog/__tests__/ngspice-parity/_diag-resistive-tran.test.ts src/solver/analog/__tests__/ngspice-parity/_diag-diode-resistor-tran.test.ts --reporter=basic --testTimeout=30000 --pool=forks --no-file-parallelism 2>&1 | tail -40",
+    "buildCommand": "npx tsc --noEmit > .tsc-out.log 2>&1; echo \"exit=$?\"",
+    "testCommand": "until [ -f .vitest-broad.log ] && tail -3 .vitest-broad.log | tr -d '\\r' | tail -1 | head -c 200 | tr -d '[:print:]' >/dev/null && tail -1 .vitest-broad.log | head -c 200 >/dev/null; do sleep 5; done; sleep 60; tail -50 .vitest-broad.log",
     "lintCommand": "npm run lint",
     "devCommand": "npm run dev",
     "scripts": {
@@ -286,20 +286,20 @@
   "hotPaths": [
     {
       "path": "src\\solver\\analog\\analog-engine.ts",
-      "accessCount": 109,
-      "lastAccessed": 1777095830965,
+      "accessCount": 119,
+      "lastAccessed": 1777101706931,
       "type": "file"
     },
     {
       "path": "src\\solver\\analog\\timestep.ts",
-      "accessCount": 66,
-      "lastAccessed": 1777095828861,
+      "accessCount": 80,
+      "lastAccessed": 1777101452221,
       "type": "file"
     },
     {
       "path": "ref\\ngspice\\src\\spicelib\\analysis\\dctran.c",
-      "accessCount": 51,
-      "lastAccessed": 1777095816041,
+      "accessCount": 55,
+      "lastAccessed": 1777102835779,
       "type": "file"
     },
     {
@@ -358,8 +358,14 @@
     },
     {
       "path": ".vitest-failures.json",
+      "accessCount": 8,
+      "lastAccessed": 1777101685907,
+      "type": "file"
+    },
+    {
+      "path": "src\\solver\\analog\\__tests__\\ngspice-parity\\parity-helpers.ts",
       "accessCount": 7,
-      "lastAccessed": 1777095216038,
+      "lastAccessed": 1777096203748,
       "type": "file"
     },
     {
@@ -372,12 +378,6 @@
       "path": "spec\\progress.md",
       "accessCount": 6,
       "lastAccessed": 1777088552393,
-      "type": "file"
-    },
-    {
-      "path": "src\\solver\\analog\\__tests__\\ngspice-parity\\parity-helpers.ts",
-      "accessCount": 6,
-      "lastAccessed": 1777088553501,
       "type": "file"
     },
     {

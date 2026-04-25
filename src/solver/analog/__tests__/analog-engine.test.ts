@@ -513,7 +513,9 @@ describe("MNAEngine", () => {
       setParam(_k: string, _v: number) {},
       load(_ctx: unknown) {},
       getPinCurrents(_v: Float64Array): number[] { return []; },
-      acceptStep(simTime: number, addBreakpoint: (t: number) => void): void {
+      acceptStep(simTime: number, addBreakpoint: (t: number) => void, _atBreakpoint: boolean): void {
+        // Test stub deliberately ignores atBreakpoint — this fixture verifies
+        // generic acceptStep dispatch, not source-element phase-boundary gating.
         const nextEdge = Math.ceil((simTime + 1e-20) / edgePeriod) * edgePeriod;
         scheduledEdges.push(nextEdge);
         addBreakpoint(nextEdge);

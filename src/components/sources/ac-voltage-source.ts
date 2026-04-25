@@ -33,6 +33,7 @@ import type { AnalogElementCore, LoadContext } from "../../solver/analog/element
 import { parseExpression, evaluateExpression, ExprParseError } from "../../solver/analog/expression.js";
 import type { ExprNode } from "../../solver/analog/expression.js";
 import { defineModelParams } from "../../core/model-params.js";
+import { almostEqualUlps } from "../../solver/analog/timestep.js";
 
 // ---------------------------------------------------------------------------
 // Waveform computation
@@ -71,6 +72,14 @@ export interface ExtendedWaveformParams {
    *     than one period.
    */
   fallTime?: number;
+  /**
+   * Noise sample period TS (seconds). Mirrors ngspice TRNOISE's TS param
+   * (vsrcacct.c:194). Breakpoints are registered at integer multiples of TS
+   * via the TRNOISE pattern: at each accepted-step that sits within 3 ULPs of
+   * `floor(t/TS + 0.5)*TS`, register `(n+1)*TS`. When TS = 0 no breakpoints
+   * are registered (matches ngspice's `if (TS == 0.0 && RTSAM == 0.0) break`).
+   */
+  noiseSampleTime?: number;
 }
 
 /**
@@ -309,6 +318,7 @@ export const { paramDefs: AC_VOLTAGE_SOURCE_PARAM_DEFS, defaults: AC_VOLTAGE_SOU
     dcOffset: { default: 0,    unit: "V",   description: "DC offset added to waveform" },
     riseTime: { default: 1e-12, unit: "s",   description: "Rise time for square wave transitions" },
     fallTime: { default: 1e-12, unit: "s",   description: "Fall time for square/sawtooth wave transitions" },
+    noiseSampleTime: { default: 0, unit: "s", description: "Noise sample period TS (ngspice TRNOISE). Default 0 disables breakpoints." },
   },
 });
 
@@ -550,6 +560,7 @@ function createAcVoltageSourceElement(
     dcOffset:  props.getModelParam<number>("dcOffset"),
     riseTime:  props.hasModelParam("riseTime") ? props.getModelParam<number>("riseTime") : 1e-12,
     fallTime:  props.hasModelParam("fallTime") ? props.getModelParam<number>("fallTime") : 1e-12,
+    noiseSampleTime: props.hasModelParam("noiseSampleTime") ? props.getModelParam<number>("noiseSampleTime") : 0,
   };
   let amplitude = p.amplitude;
   let frequency = p.frequency;
@@ -557,6 +568,7 @@ function createAcVoltageSourceElement(
   let dcOffset = p.dcOffset;
   let riseTime = p.riseTime;
   let fallTime = p.fallTime;
+  let noiseSampleTime = p.noiseSampleTime;
   const waveform = props.getOrDefault<string>("waveform", "sine") as Waveform;
   const ext: ExtendedWaveformParams = {
     freqStart: props.getOrDefault<number>("freqStart", 100),
@@ -568,6 +580,7 @@ function createAcVoltageSourceElement(
     modulationIndex: props.getOrDefault<number>("modulationIndex", 1),
     riseTime,
     fallTime,
+    noiseSampleTime,
   };
 
   // Parse expression once at creation for expression waveform mode.
@@ -599,8 +612,10 @@ function createAcVoltageSourceElement(
         dcOffset = p.dcOffset;
         riseTime = p.riseTime;
         fallTime = p.fallTime;
+        noiseSampleTime = p.noiseSampleTime;
         ext.riseTime = riseTime;
         ext.fallTime = fallTime;
+        ext.noiseSampleTime = noiseSampleTime;
       }
     },
 
@@ -691,15 +706,168 @@ function createAcVoltageSourceElement(
         return best;
       }
       if (waveform === "noise") {
-        return afterTime + 1 / (20 * frequency);
+        // ngspice TRNOISE schedule (vsrcacct.c:209-224): samples land at integer
+        // multiples of TS. The next sample strictly after `afterTime` is
+        // (floor(afterTime/TS) + 1) * TS — works whether afterTime is exactly
+        // n*TS (returns (n+1)*TS) or in between (returns next n*TS).
+        if (noiseSampleTime <= 0) return null;
+        return (Math.floor(afterTime / noiseSampleTime) + 1) * noiseSampleTime;
       }
       return null;
     },
 
-    acceptStep(simTime: number, addBreakpoint: (t: number) => void): void {
-      const next = element.nextBreakpoint(simTime);
-      if (next !== null) {
-        addBreakpoint(next);
+    /**
+     * Mirrors ngspice VSRCaccept (vsrcacct.c:24-310). Registers at most one
+     * breakpoint per call, gated on:
+     *   - CKTbreak (atBreakpoint flag) — non-boundary acceptances do nothing
+     *   - SAMETIME(time, phase-boundary) — current CKTtime must sit on a
+     *     phase boundary; the registration target is the NEXT phase boundary
+     *
+     * SAMETIME(a,b) := |a-b| <= 1e-7 * PW (vsrcacct.c:21). PW maps to
+     * `halfPeriod - riseTime` for our square wave (matches load() math). For
+     * triangle/sawtooth (digiTS-only waveforms with no ngspice analogue) we
+     * apply the same SAMETIME pattern using each waveform's natural phase
+     * boundaries; PW is taken as halfPeriod (triangle) or riseSpan (sawtooth)
+     * so the tolerance scales with the local phase width.
+     */
+    acceptStep(
+      simTime: number,
+      addBreakpoint: (t: number) => void,
+      atBreakpoint: boolean,
+    ): void {
+      // ngspice gates every CKTsetBreak inside VSRCaccept on CKTbreak.
+      if (!atBreakpoint) return;
+
+      // SINE / EXP / SFFM / AM-equivalent / expression: ngspice empty cases
+      // (vsrcacct.c:147-165). No breakpoints to register.
+      if (waveform === "sine" || waveform === "expression"
+          || waveform === "am" || waveform === "fm" || waveform === "sweep") {
+        return;
+      }
+      if (frequency <= 0) return;
+
+      const period = 1 / frequency;
+      const halfP = period / 2;
+      const tshift = phase / (2 * Math.PI * frequency);
+
+      if (waveform === "square") {
+        // Direct port of vsrcacct.c:50-145 PULSE branch.
+        // PW maps to halfPeriod - riseTime (consistent with load() math).
+        const TR = riseTime;
+        const TF = fallTime;
+        const PW = Math.max(0, halfP - TR);
+        const PER = period;
+        const TIMETOL = 1e-7;
+        const sametime = (a: number, b: number) => Math.abs(a - b) <= TIMETOL * PW;
+
+        // ngspice: time = CKTtime - TD; tshift = TD. We use phase-derived tshift
+        // (TD-equivalent for sinusoidal alignment); same algebra applies.
+        let time = simTime - tshift;
+        let basetime = 0;
+        if (time >= PER) {
+          basetime = PER * Math.floor(time / PER);
+          time -= basetime;
+        }
+
+        if (time <= 0 || time >= TR + PW + TF) {
+          if (sametime(time, 0)) {
+            addBreakpoint(basetime + TR + tshift);
+          } else if (sametime(TR + PW + TF, time)) {
+            addBreakpoint(basetime + PER + tshift);
+          } else if (time === -tshift) {
+            addBreakpoint(basetime + tshift);
+          } else if (sametime(PER, time)) {
+            addBreakpoint(basetime + tshift + TR + PER);
+          }
+        } else if (time >= TR && time <= TR + PW) {
+          if (sametime(time, TR)) {
+            addBreakpoint(basetime + tshift + TR + PW);
+          } else if (sametime(TR + PW, time)) {
+            addBreakpoint(basetime + tshift + TR + PW + TF);
+          }
+        } else if (time > 0 && time < TR) {
+          if (sametime(time, 0)) {
+            addBreakpoint(basetime + tshift + TR);
+          } else if (sametime(time, TR)) {
+            addBreakpoint(basetime + tshift + TR + PW);
+          }
+        } else {
+          // time in (TR + PW, TR + PW + TF)
+          if (sametime(time, TR + PW)) {
+            addBreakpoint(basetime + tshift + TR + PW + TF);
+          } else if (sametime(time, TR + PW + TF)) {
+            addBreakpoint(basetime + tshift + PER);
+          }
+        }
+        return;
+      }
+
+      if (waveform === "triangle") {
+        // digiTS extension (no ngspice analogue). Phase boundaries: tMod = 0
+        // (valley) and tMod = halfP (peak). PW = halfP for SAMETIME scaling.
+        const PW = halfP;
+        const TIMETOL = 1e-7;
+        const sametime = (a: number, b: number) => Math.abs(a - b) <= TIMETOL * PW;
+
+        let time = simTime - tshift;
+        let basetime = 0;
+        if (time >= period) {
+          basetime = period * Math.floor(time / period);
+          time -= basetime;
+        }
+
+        if (sametime(time, 0)) {
+          addBreakpoint(basetime + tshift + halfP);
+        } else if (sametime(time, halfP)) {
+          addBreakpoint(basetime + tshift + period);
+        } else if (sametime(time, period)) {
+          addBreakpoint(basetime + tshift + period + halfP);
+        } else if (time === -tshift) {
+          addBreakpoint(basetime + tshift);
+        }
+        return;
+      }
+
+      if (waveform === "sawtooth") {
+        // digiTS extension (no ngspice analogue). Phase boundaries:
+        // tMod = riseSpan (start of sharp fall) and tMod = period (valley of
+        // next cycle). PW = riseSpan for SAMETIME scaling (the dominant
+        // phase width).
+        const TF = fallTime;
+        const riseSpan = period - TF;
+        const PW = riseSpan;
+        const TIMETOL = 1e-7;
+        const sametime = (a: number, b: number) => Math.abs(a - b) <= TIMETOL * PW;
+
+        let time = simTime - tshift;
+        let basetime = 0;
+        if (time >= period) {
+          basetime = period * Math.floor(time / period);
+          time -= basetime;
+        }
+
+        if (sametime(time, 0)) {
+          addBreakpoint(basetime + tshift + riseSpan);
+        } else if (sametime(time, riseSpan)) {
+          addBreakpoint(basetime + tshift + period);
+        } else if (sametime(time, period)) {
+          addBreakpoint(basetime + tshift + period + riseSpan);
+        } else if (time === -tshift) {
+          addBreakpoint(basetime + tshift);
+        }
+        return;
+      }
+
+      if (waveform === "noise") {
+        // Direct port of vsrcacct.c:209-224 TRNOISE branch.
+        const TS = noiseSampleTime;
+        if (TS <= 0) return;
+        const n = Math.floor(simTime / TS + 0.5);
+        const nearest = n * TS;
+        if (almostEqualUlps(nearest, simTime, 3)) {
+          addBreakpoint((n + 1) * TS);
+        }
+        return;
       }
     },
 

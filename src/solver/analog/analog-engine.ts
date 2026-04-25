@@ -692,10 +692,14 @@ export class MNAEngine implements AnalogEngine {
       }
     }
 
-    // Schedule next waveform breakpoints after acceptance
+    // Schedule next waveform breakpoints after acceptance.
+    // ngspice CKTaccept dispatch: VSRCaccept reads CKTbreak to gate every
+    // CKTsetBreak. We pass the same flag through so source elements can
+    // mirror the SAMETIME-gated phase-boundary registration in vsrcacct.c.
+    const breakFlag = this._timestep.breakFlag;
     for (const el of elements) {
       if (el.acceptStep) {
-        el.acceptStep(this._simTime, addBP);
+        el.acceptStep(this._simTime, addBP, breakFlag);
       }
     }
 
@@ -1153,6 +1157,16 @@ export class MNAEngine implements AnalogEngine {
     if (this._ctx) {
       this._ctx.refreshTolerances(this._params);
     }
+    // ngspice cktdojob.c sets CKTfinalTime per .tran job before dctran reads it.
+    // Our compile() seeds the sentinel with whatever tStop was known at compile
+    // time (often undefined → Infinity for the harness path). When configure()
+    // later supplies the real tStop, re-seed so the [0, finalTime] sentinel and
+    // _finalTime carry the new boundary. Without this, getClampedDt's
+    // approaching-breakpoint clamp compares against Infinity and the sim
+    // overshoots tStop on the last step.
+    if (transientInputsChanged) {
+      this._seedBreakpoints();
+    }
   }
 
   // -------------------------------------------------------------------------
@@ -1302,15 +1316,31 @@ export class MNAEngine implements AnalogEngine {
   }
 
   /**
-   * Seed the breakpoint table with the [0, finalTime] sentinel.
-   * ngspice dctran.c:140-145 — initial breakpoint table is exactly [0, finalTime].
-   * No source pre-querying. Sources register via acceptStep after each accepted
-   * step, exactly as ngspice DEVaccept → CKTsetBreak.
+   * Seed the breakpoint table with the [0, finalTime] sentinel, then fire a
+   * t=0 acceptStep on every source element so they can register their first
+   * phase-boundary breakpoint.
+   *
+   * ngspice dctran.c:140-145 seeds [0, finalTime]. Before the transient loop
+   * dctran calls CKTaccept once, which dispatches DEVaccept (vsrcacct.c) at
+   * CKTtime=0 with CKTbreak=true — for PULSE this hits the SAMETIME(time, 0)
+   * branch and registers TR. Without that t=0 dispatch, phase-boundary-gated
+   * sources never receive the priming CKTbreak step that seeds their first
+   * edge into the queue.
    */
   private _seedBreakpoints(): void {
     if (!this._compiled) return;
     const finalTime = this._params.tStop ?? Number.POSITIVE_INFINITY;
     this._timestep.seedSentinel(finalTime);
+
+    // ngspice CKTaccept-at-t=0 equivalent. atBreakpoint=true mirrors the fact
+    // that t=0 sits at the leading sentinel breakpoint (queue[0] == 0).
+    const elements = this._compiled.elements;
+    const addBP = (t: number) => this._timestep.addBreakpoint(t);
+    for (const el of elements) {
+      if (el.acceptStep) {
+        el.acceptStep(0, addBP, true);
+      }
+    }
   }
 
 }

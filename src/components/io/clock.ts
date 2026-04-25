@@ -297,9 +297,40 @@ export function makeAnalogClockElement(
       return result > afterTime ? result : (idx + 1) * halfPeriod;
     },
 
-    acceptStep(simTime: number, addBreakpoint: (t: number) => void): void {
-      const next = element.nextBreakpoint(simTime);
-      if (next !== null) addBreakpoint(next);
+    /**
+     * Mirrors ngspice VSRCaccept PULSE branch (vsrcacct.c:50-145) collapsed
+     * for the clock-specific case TR = TF = 0. Phase boundaries land at
+     * integer multiples of halfPeriod; SAMETIME tolerance scales with halfP
+     * (the natural plateau width). atBreakpoint mirrors CKTbreak.
+     */
+    acceptStep(
+      simTime: number,
+      addBreakpoint: (t: number) => void,
+      atBreakpoint: boolean,
+    ): void {
+      if (!atBreakpoint) return;
+      const PW = halfPeriod;
+      const PER = 2 * halfPeriod;
+      const TIMETOL = 1e-7;
+      const sametime = (a: number, b: number) => Math.abs(a - b) <= TIMETOL * PW;
+
+      let time = simTime;
+      let basetime = 0;
+      if (time >= PER) {
+        basetime = PER * Math.floor(time / PER);
+        time -= basetime;
+      }
+
+      // TR = TF = 0 collapses VSRCaccept's switch to two boundaries: time = 0
+      // (rising edge) and time = halfPeriod (falling edge). After hitting one,
+      // register the next.
+      if (sametime(time, 0)) {
+        addBreakpoint(basetime + halfPeriod);
+      } else if (sametime(time, halfPeriod)) {
+        addBreakpoint(basetime + PER);
+      } else if (sametime(time, PER)) {
+        addBreakpoint(basetime + PER + halfPeriod);
+      }
     },
 
     getBreakpoints(tStart: number, tEnd: number): number[] {
