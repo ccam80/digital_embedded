@@ -225,13 +225,6 @@ export interface AnalogElementCore {
    */
   nextBreakpoint?(afterTime: number): number | null;
 
-  /**
-   * Optional: register a callback invoked by the element when a setParam
-   * change invalidates the outstanding breakpoint (e.g. frequency/phase).
-   * The engine uses this to refresh the queue entry. Called once at seed
-   * time by MNAEngine._seedBreakpoints().
-   */
-  registerRefreshCallback?(cb: () => void): void;
 }
 
 // ---------------------------------------------------------------------------

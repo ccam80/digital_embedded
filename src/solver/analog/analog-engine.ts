@@ -320,7 +320,12 @@ export class MNAEngine implements AnalogEngine {
     }
 
     const ctx = this._ctx!;
-    ctx.rhsOld.set(ctx.rhs);
+    // ngspice does NOT copy CKTrhs into CKTrhsOld between accepted steps
+    // (see dctran.c around lines 715-723: only CKTdeltaOld and CKTstates are
+    // rotated; CKTrhs/CKTrhsOld are left to carry forward whatever the previous
+    // NIiter call left). Newton-raphson.ts now mirrors NIiter's pointer-swap
+    // exit invariant via ctx.swapRhsBuffers(), so ctx.rhsOld already holds the
+    // converging iter's input — no extra copy required here.
     const statePool = (this._compiled as CompiledWithBridges).statePool ?? null;
 
     let dt = this._timestep.getClampedDt(this._simTime);
@@ -380,9 +385,10 @@ export class MNAEngine implements AnalogEngine {
       // Fires on every retry iteration (dt changes on NR-failure/LTE-rejection).
       // Matches ngspice dctran.c:734 NIcomCof + dctran.c:750 NIpred.
       // Gated on _stepCount > 0: on step 0, ctx.rhs already holds the
-      // converged DC-OP solution (written at seedHistory). ngspice does not run
-      // MODEINITPRED under MODEINITTRAN, so the DC-OP result in CKTrhsOld is
-      // used directly as the NR initial guess.
+      // converged DC-OP solution (written by _seedFromDcop, mirroring
+      // dctran.c:349-350). ngspice does not run MODEINITPRED under
+      // MODEINITTRAN, so the DC-OP result in CKTrhsOld is used directly
+      // as the NR initial guess.
       if (this._stepCount > 0 && (this._params.predictor ?? false)) {
         computeAgp(this._timestep.currentMethod, this._timestep.currentOrder,
           dt, this._timestep.deltaOld, ctx.agp);
@@ -392,12 +398,18 @@ export class MNAEngine implements AnalogEngine {
       }
 
       // --- Phase hook: begin attempt ---
+      // Label by the cktMode INITF bit the NR call will see on its first
+      // iteration. Step 0 enters in MODEINITTRAN (set by _seedFromDcop);
+      // subsequent steps enter in MODEINITPRED (re-applied at the end of the
+      // last accepted step, dctran.c:794). Mislabeling step 1+ as "tranNR"
+      // would desync from the bridge, which derives phase strings from
+      // cktMode bits directly (ngspice-bridge.ts:78-81).
       if (this.stepPhaseHook) {
-        let attemptPhase: "tranInit" | "tranNR" | "tranNrRetry" | "tranLteRetry";
+        let attemptPhase: "tranInit" | "tranPredictor" | "tranNR" | "tranNrRetry" | "tranLteRetry";
         if (this._stepCount === 0 && _stepAttemptCount === 0) {
           attemptPhase = "tranInit";
         } else if (_stepAttemptCount === 0) {
-          attemptPhase = "tranNR";
+          attemptPhase = "tranPredictor";
         } else {
           // Retry: we can't distinguish NR retry from LTE retry here; mark generic retry.
           // The actual outcome is set by the NR/LTE exit paths below.
@@ -447,7 +459,40 @@ export class MNAEngine implements AnalogEngine {
       ctx.postIterationHook = this.postIterationHook;
       ctx.detailedConvergence = this.detailedConvergence;
       ctx.limitingCollector = this.limitingCollector;
-      ctx.dcopModeLadder = null;
+      // Wire the transient mode ladder ONLY when a phase hook is attached
+      // (harness mode). It fires on intra-NR-call INITF transitions
+      // (MODEINITTRAN→FLOAT, MODEINITPRED→FLOAT) so harness attempt-grouping
+      // matches the ngspice bridge's split-on-cktMode-change rule.
+      //
+      // Ownership of attempt boundaries:
+      //   - The OUTER hook above (line 406) opens the first attempt for this
+      //     NR call (tranInit / tranPredictor / tranNrRetry / tranLteRetry).
+      //   - The OUTER hook below (lines 510, 534, 560, 565) closes the LAST
+      //     attempt for this NR call (accepted / nrFailedRetry / lte... ).
+      //   - The LADDER fires only the MIDDLE split: when the INITF dispatcher
+      //     promotes MODEINITTRAN/MODEINITPRED to MODEINITFLOAT mid-NR, it
+      //     ends the current attempt with "tranPhaseHandoff" and opens a
+      //     fresh "tranNR" attempt. The terminal "tranNR" close from
+      //     newton-raphson is intentionally a no-op here — the outer hook
+      //     owns the final outcome.
+      //
+      // Production runs (stepPhaseHook null) leave nrModeLadder null — zero
+      // overhead beyond one null-coalesce per NR call.
+      const tranLadderHook = this.stepPhaseHook;
+      ctx.nrModeLadder = tranLadderHook
+        ? {
+            onModeBegin(phase, _iter): void {
+              if (phase === "tranNR") {
+                tranLadderHook.onAttemptBegin("tranNR", dt);
+              }
+            },
+            onModeEnd(phase, _iter, _converged): void {
+              if (phase === "tranInit" || phase === "tranPredictor") {
+                tranLadderHook.onAttemptEnd("tranPhaseHandoff", false);
+              }
+            },
+          }
+        : null;
       ctx.exactMaxIterations = false;
       ctx.onIteration0Complete = null;
       // ngspice dctran.c:794 — MODEINITPRED is set AFTER NIiter returns, not
@@ -459,6 +504,15 @@ export class MNAEngine implements AnalogEngine {
       // dispatcher. No per-step write is needed here.
       newtonRaphson(ctx);
       const nrResult = ctx.nrResult;
+
+      // ngspice dctran.c:795-799 — firsttime block fires AFTER NIiter on every
+      // outer iteration (converged or not), copying state1 into state2 and
+      // state3 (only those two slots; state4..state7 are not touched). Placed
+      // here, inside the for(;;) loop, to match ngspice's structural location.
+      // Width (state2 + state3 only) matches the dctran loop bound.
+      if (this._stepCount === 0 && statePool) {
+        statePool.copyState1ToState23();
+      }
 
       // --- Logging (merged from initial and retry blocks) ---
       if (logging) {
@@ -481,9 +535,14 @@ export class MNAEngine implements AnalogEngine {
 
       if (!nrResult.converged) {
         // --- NR FAILED (ngspice dctran.c:793-810) ---
+        // ngspice does NOT restore CKTrhs/CKTrhsOld on NR failure — see
+        // dctran.c:806-828, which only rewinds CKTtime, shrinks CKTdelta by 8,
+        // sets CKTorder = 1, and (when firsttime) restores MODEINITTRAN. The
+        // retry's next NIiter call uses whatever CKTrhsOld carries forward
+        // (the failed iter's last input) plus the fresh predictor pass at the
+        // top of the for(;;) loop.
         this.stepPhaseHook?.onAttemptEnd("nrFailedRetry", false);
         this._simTime -= dt;                              // ngspice dctran.c:796
-        ctx.rhs.set(ctx.rhsOld);
         dt = dt / 8;                                    // ngspice dctran.c:802
         this._timestep.currentDt = dt;
         this._timestep.currentOrder = 1;                // ngspice dctran.c:810 — order, NOT method
@@ -536,11 +595,14 @@ export class MNAEngine implements AnalogEngine {
         }
 
         // --- LTE REJECTED (ngspice dctran.c:917-931) ---
+        // ngspice does NOT restore CKTrhs/CKTrhsOld on LTE rejection — see
+        // dctran.c:935-954, which only rewinds CKTtime and sets CKTdelta to
+        // newdelta. The retry uses whatever CKTrhsOld carries forward plus
+        // the fresh predictor pass at the top of the for(;;) loop.
         this.stepPhaseHook?.onAttemptEnd("lteRejectedRetry", true);
         this._simTime -= dt;                            // ngspice dctran.c:920
         if (logging) stepRec!.lteRejected = true;
 
-        ctx.rhs.set(ctx.rhsOld);
         dt = newDt;                                     // ngspice dctran.c:926
         this._timestep.currentDt = dt;
         // fall through to delmin check below
@@ -578,15 +640,11 @@ export class MNAEngine implements AnalogEngine {
     // ---- End single retry loop ----
 
     // Accept the timestep — rotation already happened before the retry loop.
+    // The firsttime state2/state3 = state1 copy that ngspice does at
+    // dctran.c:795-799 already fired inside the for(;;) loop above (after
+    // newtonRaphson returned), matching ngspice's structural placement.
     if (statePool) {
       statePool.tranStep++;
-      // ngspice dctran.c:795-799: on firsttime acceptance, seed s2..s7 from s1.
-      // states[1] already holds the DCOP state from _seedFromDcop (bcopy at
-      // dctran.c:349-350). seedFromState1 copies s1 into s2..s7, matching
-      // dctran.c:795-799. Runs once per first-step acceptance.
-      if (this._stepCount === 0) {
-        statePool.seedFromState1();
-      }
     }
 
     // NIpred: push fully-accepted solution into history for next step predictor.
@@ -799,6 +857,12 @@ export class MNAEngine implements AnalogEngine {
     ctx.srcFact = 1;
     const uicBitDcop = ctx.cktMode & MODEUIC;
     ctx.cktMode = uicBitDcop | MODEDCOP | MODEINITJCT;
+    // cktdojob.c:117 — CKTdelta is zeroed by the job dispatcher at job entry.
+    // dcop.c never writes CKTdelta. Mirror on both the timestep controller
+    // (consumer-visible currentDt) and loadCtx.dt (per-iter capture and
+    // device load() reads).
+    this._timestep.currentDt = 0;
+    ctx.loadCtx.dt = 0;
     ctx._onPhaseBegin = phaseHook ? (phase: string, param?: number) => phaseHook.onAttemptBegin(phase as DcOpNRPhase, param ?? 0) : null;
     ctx._onPhaseEnd = phaseHook ? (outcome: string, converged: boolean) => phaseHook.onAttemptEnd(outcome as DcOpNRAttemptOutcome, converged) : null;
     solveDcOperatingPoint(ctx);
@@ -891,6 +955,13 @@ export class MNAEngine implements AnalogEngine {
     ctx.srcFact = 1;
     const uicBitTransDcop = ctx.cktMode & MODEUIC;
     ctx.cktMode = uicBitTransDcop | MODETRANOP | MODEINITJCT;
+    // cktdojob.c:117 — CKTdelta is zeroed by the job dispatcher at job entry.
+    // dctran.c writes CKTdelta=delta only at line 319, AFTER CKTop returns,
+    // so during the warm-start DCOP iterations CKTdelta is still 0. Mirror
+    // on both the timestep controller (consumer-visible currentDt) and
+    // loadCtx.dt (per-iter capture and device load() reads).
+    this._timestep.currentDt = 0;
+    ctx.loadCtx.dt = 0;
     ctx._onPhaseBegin = phaseHook ? (phase: string, param?: number) => phaseHook.onAttemptBegin(phase as DcOpNRPhase, param ?? 0) : null;
     ctx._onPhaseEnd = phaseHook ? (outcome: string, converged: boolean) => phaseHook.onAttemptEnd(outcome as DcOpNRAttemptOutcome, converged) : null;
     solveDcOperatingPoint(ctx);
@@ -898,6 +969,14 @@ export class MNAEngine implements AnalogEngine {
 
     if (result.converged) {
       this._seedFromDcop(result, elements, cac);
+      // dctran.c:319 — CKTdelta = delta (the local first-step value computed
+      // at dctran.c:118 as MIN(CKTfinalTime/100, CKTstep)/10). The harness
+      // passes this value as `firstStep` via configure(); writing it here
+      // mirrors ngspice's post-CKTop restoration so the first transient
+      // step's getClampedDt() firsttime branch (timestep.ts:416-434) divides
+      // a non-zero firstStep by 10 (matching dctran.c:580) instead of
+      // dividing 0 and floor-clamping to 2*minTimeStep.
+      this._timestep.currentDt = this._params.firstStep;
     }
 
     return result;
@@ -1041,7 +1120,26 @@ export class MNAEngine implements AnalogEngine {
    * Rebuilds the timestep controller so new bounds take effect immediately.
    */
   configure(params: Partial<SimulationParams>): void {
-    this._params = resolveSimulationParams({ ...this._params, ...params });
+    // ngspice-parity: when the caller does not provide an explicit
+    // maxTimeStep override but does provide tStop / outputStep / initTime,
+    // the previously-resolved maxTimeStep (and its derived minTimeStep /
+    // firstStep) would survive the spread and short-circuit
+    // resolveSimulationParams's auto-derivation (traninit.c:23-32). Strip
+    // the derived bundle from the baseline before merging so resolution
+    // re-fires from the new inputs.
+    //
+    // If you copy this merge pattern elsewhere (parameter-sweep, monte-carlo),
+    // copy the baseline-strip too.
+    const baseline: SimulationParams = { ...this._params };
+    const callerOmitsMax = !("maxTimeStep" in params);
+    const transientInputsChanged =
+      "tStop" in params || "outputStep" in params || "initTime" in params;
+    if (callerOmitsMax && transientInputsChanged) {
+      baseline.maxTimeStep = undefined;
+      baseline.minTimeStep = undefined;
+      baseline.firstStep = undefined;
+    }
+    this._params = resolveSimulationParams({ ...baseline, ...params });
     // Non-destructive update: preserves currentDt (clamped to new maxTimeStep),
     // _acceptedSteps, _deltaOld history, currentOrder, currentMethod, and the
     // breakpoint queue. Only tolerance / step-bound fields are refreshed.
@@ -1124,8 +1222,8 @@ export class MNAEngine implements AnalogEngine {
    * first transient solve.
    */
   stepPhaseHook: {
-    onAttemptBegin(phase: DcOpNRPhase | "tranInit" | "tranNR" | "tranNrRetry" | "tranLteRetry", dt: number): void;
-    onAttemptEnd(outcome: DcOpNRAttemptOutcome | "accepted" | "nrFailedRetry" | "lteRejectedRetry" | "finalFailure", converged: boolean): void;
+    onAttemptBegin(phase: DcOpNRPhase | "tranInit" | "tranPredictor" | "tranNR" | "tranNrRetry" | "tranLteRetry", dt: number): void;
+    onAttemptEnd(outcome: DcOpNRAttemptOutcome | "accepted" | "nrFailedRetry" | "lteRejectedRetry" | "finalFailure" | "tranPhaseHandoff", converged: boolean): void;
   } | null = null;
 
   // -------------------------------------------------------------------------
@@ -1137,10 +1235,9 @@ export class MNAEngine implements AnalogEngine {
     this._timestep.addBreakpoint(time);
   }
 
-  /** Remove all registered breakpoints and reseed from element sources. */
+  /** Remove all registered breakpoints. */
   clearBreakpoints(): void {
     this._timestep.clearBreakpoints();
-    this._seedBreakpoints();
   }
 
   // -------------------------------------------------------------------------
@@ -1201,36 +1298,15 @@ export class MNAEngine implements AnalogEngine {
   }
 
   /**
-   * Seed the breakpoint queue from all elements that implement nextBreakpoint.
-   * Called once after init(), reset(), and configure() to populate the queue
-   * with the first upcoming edge for each periodic source.
+   * Seed the breakpoint table with the [0, finalTime] sentinel.
+   * ngspice dctran.c:140-145 — initial breakpoint table is exactly [0, finalTime].
+   * No source pre-querying. Sources register via acceptStep after each accepted
+   * step, exactly as ngspice DEVaccept → CKTsetBreak.
    */
   private _seedBreakpoints(): void {
     if (!this._compiled) return;
-    for (const el of this._compiled.elements) {
-      if (typeof el.nextBreakpoint === "function") {
-        const first = el.nextBreakpoint(this._simTime);
-        if (first !== null) {
-          this._timestep.insertForSource(first, el);
-        }
-      }
-      if (typeof el.registerRefreshCallback === "function") {
-        el.registerRefreshCallback(() => this.refreshBreakpointForSource(el));
-      }
-    }
-  }
-
-  /**
-   * Refresh the queue entry for a source after a setParam change that
-   * invalidates its outstanding breakpoint (e.g. frequency/phase change).
-   */
-  refreshBreakpointForSource(source: AnalogElement): void {
-    if (!this._compiled) return;
-    const newNextTime =
-      typeof source.nextBreakpoint === "function"
-        ? source.nextBreakpoint(this._simTime)
-        : null;
-    this._timestep.refreshForSource(source, newNextTime);
+    const finalTime = this._params.tStop ?? Number.POSITIVE_INFINITY;
+    this._timestep.seedSentinel(finalTime);
   }
 
 }

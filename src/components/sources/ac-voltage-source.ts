@@ -112,8 +112,17 @@ export function computeWaveformValue(
       // Positive phase shifts waveform left (earlier) in time.
       const phaseShift = phase / (2 * Math.PI * frequency);
       const tShifted = t - phaseShift;
-      // Position within the full period, always in [0, period).
-      const tMod = ((tShifted % period) + period) % period;
+      // Mirrors vsrcload.c:112-117 bit-exact: gate on `time > PER`, then
+      // reduce via `time -= PER * floor(time/PER)`. For tShifted <= PER the
+      // value is used as-is — preserves f64 precision for tShifted << PER
+      // (the failing rc-transient case where ((x%P)+P)%P loses ~2e7 ULPs).
+      // Negative tShifted (from positive phase shift) falls through unchanged
+      // and is handled by the `tMod <= 0` branch below, matching ngspice's
+      // `time <= 0` PULSE branch.
+      let tMod = tShifted;
+      if (tMod > period) {
+        tMod = tMod - period * Math.floor(tMod / period);
+      }
 
       const TR = riseTime;
       const TF = fallTime;
@@ -147,9 +156,16 @@ export function computeWaveformValue(
       const halfPeriod = period / 2;
       const phaseShift = phase / (2 * Math.PI * frequency);
       const tShifted = t - phaseShift;
-      const tMod = ((tShifted % period) + period) % period;
+      // ngspice vsrcload.c:112-117 bit-exact reduction.
+      let tMod = tShifted;
+      if (tMod > period) {
+        tMod = tMod - period * Math.floor(tMod / period);
+      }
       const V1 = dcOffset - amplitude;
       const V2 = dcOffset + amplitude;
+      // Mirrors PULSE branch `time <= 0 || time >= TR + PW + TF` (= period for
+      // triangle): handles negative tShifted from phase shift.
+      if (tMod <= 0 || tMod >= period) return V1;
       if (tMod < halfPeriod) {
         return V1 + (V2 - V1) * tMod / halfPeriod;
       }
@@ -171,9 +187,16 @@ export function computeWaveformValue(
       const riseSpan = period - fallTime;
       const phaseShift = phase / (2 * Math.PI * frequency);
       const tShifted = t - phaseShift;
-      const tMod = ((tShifted % period) + period) % period;
+      // ngspice vsrcload.c:112-117 bit-exact reduction.
+      let tMod = tShifted;
+      if (tMod > period) {
+        tMod = tMod - period * Math.floor(tMod / period);
+      }
       const V1 = dcOffset - amplitude;
       const V2 = dcOffset + amplitude;
+      // Mirrors PULSE branch `time <= 0 || time >= TR + PW + TF` (= period for
+      // sawtooth): handles negative tShifted from phase shift.
+      if (tMod <= 0 || tMod >= period) return V1;
       if (tMod < riseSpan) {
         return V1 + (V2 - V1) * tMod / riseSpan;
       }
@@ -500,8 +523,6 @@ export interface AcVoltageSourceAnalogElement extends AnalogElementCore {
   getBreakpoints(tStart: number, tEnd: number): number[];
   /** Returns the strictly-next breakpoint strictly after afterTime, or null. */
   nextBreakpoint(afterTime: number): number | null;
-  /** Register a callback to be invoked when a setParam change invalidates the outstanding breakpoint. */
-  registerRefreshCallback(cb: () => void): void;
   /**
    * Parsed expression AST for expression waveform mode.
    * Null if waveform is not "expression" or if parsing failed.
@@ -536,7 +557,6 @@ function createAcVoltageSourceElement(
   let dcOffset = p.dcOffset;
   let riseTime = p.riseTime;
   let fallTime = p.fallTime;
-  let refreshCallback: (() => void) | null = null;
   const waveform = props.getOrDefault<string>("waveform", "sine") as Waveform;
   const ext: ExtendedWaveformParams = {
     freqStart: props.getOrDefault<number>("freqStart", 100),
@@ -581,16 +601,6 @@ function createAcVoltageSourceElement(
         fallTime = p.fallTime;
         ext.riseTime = riseTime;
         ext.fallTime = fallTime;
-        // Any param that can shift breakpoint timing must invalidate the
-        // outstanding breakpoint cached in the timestep controller.
-        const shiftsBreakpoints =
-          key === "frequency" ||
-          key === "phase" ||
-          key === "riseTime" ||
-          key === "fallTime";
-        if (shiftsBreakpoints && refreshCallback !== null) {
-          refreshCallback();
-        }
       }
     },
 
@@ -684,10 +694,6 @@ function createAcVoltageSourceElement(
         return afterTime + 1 / (20 * frequency);
       }
       return null;
-    },
-
-    registerRefreshCallback(cb: () => void): void {
-      refreshCallback = cb;
     },
 
     acceptStep(simTime: number, addBreakpoint: (t: number) => void): void {

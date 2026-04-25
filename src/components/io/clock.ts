@@ -235,8 +235,6 @@ export interface AnalogClockElement extends AnalogElementCore {
   getBreakpoints(tStart: number, tEnd: number): number[];
   /** Returns the strictly-next breakpoint strictly after afterTime. Clock is infinite; never returns null. */
   nextBreakpoint(afterTime: number): number | null;
-  /** Register a callback to be invoked when a setParam change invalidates the outstanding breakpoint. */
-  registerRefreshCallback(cb: () => void): void;
 }
 
 /**
@@ -257,17 +255,13 @@ export function makeAnalogClockElement(
   getTime: () => number,
 ): AnalogClockElement & { stampAtTime(solver: SparseSolver, t: number): void } {
   const halfPeriod = 1 / (2 * frequency);
-  let refreshCallback: (() => void) | null = null;
 
   const element: AnalogClockElement & { stampAtTime(solver: SparseSolver, t: number): void } = {
     branchIndex: branchIdx,
     isNonlinear: false,
     isReactive: false,
 
-    setParam(key: string, _value: number): void {
-      if (key === "frequency" && refreshCallback !== null) {
-        refreshCallback();
-      }
+    setParam(_key: string, _value: number): void {
     },
 
     load(ctx: LoadContext): void {
@@ -303,8 +297,9 @@ export function makeAnalogClockElement(
       return result > afterTime ? result : (idx + 1) * halfPeriod;
     },
 
-    registerRefreshCallback(cb: () => void): void {
-      refreshCallback = cb;
+    acceptStep(simTime: number, addBreakpoint: (t: number) => void): void {
+      const next = element.nextBreakpoint(simTime);
+      if (next !== null) addBreakpoint(next);
     },
 
     getBreakpoints(tStart: number, tEnd: number): number[] {

@@ -36,22 +36,6 @@ function almostEqualUlps(a: number, b: number, maxUlps: number): boolean {
 }
 
 // ---------------------------------------------------------------------------
-// BreakpointEntry — file-private
-// ---------------------------------------------------------------------------
-
-interface BreakpointEntry {
-  /** Absolute simulation time in seconds. */
-  time: number;
-  /**
-   * Element that produced this breakpoint, or null for external one-shots
-   * registered via the public addBreakpoint(time) API. On pop, if source
-   * is non-null and implements nextBreakpoint, the controller refills the
-   * queue with the element's next edge.
-   */
-  source: AnalogElement | null;
-}
-
-// ---------------------------------------------------------------------------
 // TimestepController
 // ---------------------------------------------------------------------------
 
@@ -72,8 +56,11 @@ export class TimestepController {
 
   private _params: ResolvedSimulationParams;
 
-  /** Sorted ascending list of registered breakpoint entries. */
-  private _breakpoints: BreakpointEntry[];
+  /** Sorted ascending list of registered breakpoint times. ngspice CKTbreaks. */
+  private _breakpoints: number[];
+
+  /** Final simulation time used as the perpetual sentinel at breaks[length-1]. ngspice CKTfinalTime. */
+  private _finalTime: number = Infinity;
 
   /** Simulation time of the last accepted step. Used for accept() invariant check. */
   private _lastAcceptedSimTime: number;
@@ -86,10 +73,17 @@ export class TimestepController {
 
   /**
    * Minimum timestep used for breakpoint proximity detection.
-   * ngspice: CKTminStep = CKTfinalTime / 1e11 (set at transient init).
-   * When tStop is unavailable, falls back to minTimeStep.
+   * ngspice traninit.c:34: `CKTdelmin = 1e-11 * CKTmaxStep`.
+   * Gates the `breaks[0] - simTime <= delmin` test in dctran.c:554.
    */
   private _delmin: number = 0;
+
+  /**
+   * Minimum-break threshold used by the breakpoint pop loop and queue dedup.
+   * ngspice dctran.c:157: CKTminBreak = CKTmaxStep * 5e-5 (different threshold
+   * from CKTdelmin — see dctran.c:554 vs dctran.c:629).
+   */
+  private _minBreak: number = 0;
 
   /**
    * Unclamped dt saved before breakpoint clamping in getClampedDt().
@@ -222,11 +216,16 @@ export class TimestepController {
       ? params.tStop / 50
       : params.maxTimeStep;
 
-    // ngspice CKTminStep = CKTfinalTime / 1e11 (set at transient init, dctran.c).
-    // Used for breakpoint proximity detection in accept().
-    this._delmin = params.tStop != null
-      ? params.tStop * 1e-11
-      : params.minTimeStep;
+    // ngspice traninit.c:34 — CKTdelmin = 1e-11 * CKTmaxStep. Gates the
+    // at-breakpoint proximity test (`breaks[0] - simTime <= delmin`) in
+    // getClampedDt() / dctran.c:554. Streaming-mode safe: maxTimeStep is
+    // always meaningful, no tStop dependence.
+    this._delmin = params.maxTimeStep * 1e-11;
+
+    // ngspice dctran.c:157 — CKTminBreak = CKTmaxStep * 5e-5. Distinct from
+    // CKTdelmin: minBreak gates the breakpoint pop loop and queue dedup,
+    // delmin gates the at-breakpoint proximity test.
+    this._minBreak = params.maxTimeStep * 5e-5;
   }
 
   /**
@@ -238,7 +237,7 @@ export class TimestepController {
    * breakpoint queue are all preserved across the call.
    *
    * Only fields that originate from `params` are refreshed:
-   *   - maxTimeStep / minTimeStep / _delmin (derived from tStop when set)
+   *   - _delmin / _minBreak (both derived from maxTimeStep, traninit.c:34 / dctran.c:157)
    *   - _lteParams (trtol, reltol, abstol, chgtol) — cast past readonly
    *     because the struct is logically immutable per computeNewDt call but
    *     we deliberately refresh it once on configure().
@@ -264,10 +263,11 @@ export class TimestepController {
     lte.abstol = params.abstol;
     lte.chgtol = params.chargeTol;
 
-    // Re-derive _delmin from tStop like the constructor does.
-    this._delmin = params.tStop != null
-      ? params.tStop * 1e-11
-      : params.minTimeStep;
+    // Re-derive _delmin from maxStep (traninit.c:34: CKTdelmin = 1e-11 * CKTmaxStep).
+    this._delmin = params.maxTimeStep * 1e-11;
+
+    // Re-derive _minBreak from maxStep (dctran.c:157: CKTminBreak = CKTmaxStep * 5e-5).
+    this._minBreak = params.maxTimeStep * 5e-5;
 
     if (this._isFirstGetClampedDt) {
       // No step has been taken yet. Re-apply firstStep exactly as the
@@ -390,7 +390,7 @@ export class TimestepController {
 
     // Clamp to next breakpoint.
     if (this._breakpoints.length > 0) {
-      const nextBp = this._breakpoints[0]!.time;
+      const nextBp = this._breakpoints[0]!;
       const remaining = nextBp - simTime;
       if (remaining > 0 && newDt > remaining) {
         newDt = remaining;
@@ -404,47 +404,82 @@ export class TimestepController {
   }
 
   /**
-   * Return currentDt clamped to the next breakpoint so the current step
-   * cannot overshoot a registered target time.  Called at the top of
-   * AnalogEngine.step() instead of reading `currentDt` directly.
+   * Mirrors ngspice dctran.c:540-644 top-of-step flow (XSPICE build, default).
+   *
+   *   540: dt = MIN(dt, maxStep)
+   *   553: at-breakpoint clamp (order=1, 0.1*MIN(saveDelta, gap), /=10 firsttime, 2*delmin floor)
+   *   594: else-if approaching-breakpoint clamp (saveDelta capture, dt = bp - simTime)
+   *   624: pop loop using minBreak
+   *
+   * Does NOT mutate this.currentDt — the clamp applies only to this step's
+   * working dt. Persisting it would prevent NR retries from halving from the
+   * pre-clamp value (stagnation at t=0).
    */
   getClampedDt(simTime: number): number {
-    let dt = this.currentDt;
-
-    // ngspice dctran.c:572-580: at t=0 (firsttime), apply proximity clamp
-    // (when breakpoints exist) then divide by 10 unconditionally.
-    if (this._isFirstGetClampedDt) {
-      this._isFirstGetClampedDt = false;
-      if (this._breakpoints.length > 1) {
-        // ngspice dctran.c:572-573: gap is between the first two breakpoints,
-        // not from simTime to breaks[0]. Matches ngspice CKTbreaks[1]-CKTbreaks[0].
-        const nextBreakGap = this._breakpoints[1]!.time - this._breakpoints[0]!.time;
-        if (nextBreakGap > 0) {
-          // dctran.c:572-573: delta = MIN(delta, 0.1 * MIN(savedDelta, nextBreakGap)).
-          dt = Math.min(dt, 0.1 * Math.min(dt, nextBreakGap));
-        }
-      }
-      // dctran.c:580: CKTdelta /= 10 — unconditional firsttime safety factor.
-      dt /= 10;
-      // Keep within [minTimeStep, maxTimeStep]
-      dt = Math.max(dt, this._params.minTimeStep * 2);
-      // Do NOT update this.currentDt — the clamp applies only to this step's
-      // working dt.  Persisting it would prevent NR retries from halving from
-      // the pre-clamp value, causing stagnation at t=0.
-    }
+    // dctran.c:540 — CKTdelta = MIN(CKTdelta, CKTmaxStep)
+    let dt = Math.min(this.currentDt, this._params.maxTimeStep);
 
     this._breakFlag = false;
-    if (this._breakpoints.length > 0) {
-      const nextBp = this._breakpoints[0]!.time;
-      const remaining = nextBp - simTime;
-      if (remaining > 0 && dt >= remaining) {
-        // ngspice dctran.c:583-585: simple clamp to the breakpoint.
-        // ngspice dctran.c:595: saveDelta captured only at breakpoint hit.
+
+    const len = this._breakpoints.length;
+    if (len > 0) {
+      const bp0 = this._breakpoints[0]!;
+      const atBreak =
+        almostEqualUlps(simTime, bp0, 100) || bp0 - simTime <= this._delmin;
+
+      if (atBreak) {
+        // dctran.c:559 — CKTorder = 1 on at-breakpoint
+        this.currentOrder = 1;
+
+        // dctran.c:572-573 — CKTdelta = MIN(CKTdelta, 0.1 * MIN(saveDelta,
+        //   breaks[1] - breaks[0])). Sentinel guarantees length >= 2 after
+        //   seedSentinel; breaks[1] is always the next bp or finalTime.
+        const gap = this._breakpoints[1]! - bp0;
+        dt = Math.min(dt, 0.1 * Math.min(this._savedDelta, gap));
+
+        // dctran.c:580 — firsttime: CKTdelta /= 10. The proximity clamp above
+        // fires on every at-breakpoint step; the /=10 cut is firsttime-only.
+        if (this._isFirstGetClampedDt) {
+          dt /= 10;
+        }
+
+        // dctran.c:586-589 — `MAX(CKTdelta, CKTdelmin * 2.0)` is wrapped
+        // in `#ifndef XSPICE`. The function-level comment above states we
+        // port the XSPICE branch, so this floor is intentionally absent.
+        // Applying any floor here (whether using CKTdelmin or minTimeStep)
+        // would diverge from ngspice's actual XSPICE-build behaviour.
+      } else if (simTime + dt >= bp0) {
+        // dctran.c:594-602 (non-XSPICE branch — also semantically equivalent
+        // to the XSPICE late-clamp at line 640-644). Save the unclamped dt
+        // before truncating; on the next step the at-breakpoint branch above
+        // will read saveDelta to size the post-bp dt.
         this._savedDelta = dt;
-        dt = remaining;
+        dt = bp0 - simTime;
         this._breakFlag = true;
       }
     }
+
+    this._isFirstGetClampedDt = false;
+
+    // dctran.c:624-638 — XSPICE pop loop using CKTminBreak. ngspice's pop is
+    // shift-only; sources register their next edge via DEVaccept → CKTsetBreak
+    // after the step is accepted. We mirror that via element.acceptStep(simTime,
+    // addBP) in MNAEngine.step() — refilling from `popped.source` here would
+    // re-insert the same edge inside the loop and spin (next > simTime is true
+    // when next sits within minBreak of simTime, which the next pop iteration
+    // then re-pops).
+    while (this._breakpoints.length > 2) {
+      const bp = this._breakpoints[0]!;
+      if (!(almostEqualUlps(bp, simTime, 100) || bp <= simTime + this._minBreak)) break;
+      this._clrBreak();
+    }
+    if (this._breakpoints.length === 2) {
+      const bp = this._breakpoints[0]!;
+      if ((almostEqualUlps(bp, simTime, 100) || bp <= simTime + this._minBreak) && bp < this._finalTime) {
+        this._clrBreak();
+      }
+    }
+
     return dt;
   }
 
@@ -509,44 +544,9 @@ export class TimestepController {
 
     // deltaOld rotation removed — now performed by the engine before/inside
     // the for(;;) loop to match ngspice dctran.c:704-706, 735.
-
-    // Pop breakpoints that have been reached and refill from source if any.
-    // ngspice dctran.c:553-554,628: consume a breakpoint when simTime is
-    // within 100 ULPs of the breakpoint time, or within the delmin band.
-    // Guard: nextBreakpoint() can return a value <= simTime due to
-    // floating-point rounding (e.g. clock halfPeriod not exactly
-    // representable). Without the strict-future check, the loop would
-    // pop, re-insert at the front, and spin forever.
-    let breakpointConsumed = false;
-    while (this._breakpoints.length > 0) {
-      const bp = this._breakpoints[0]!.time;
-      if (!(almostEqualUlps(simTime, bp, 100) || bp - simTime <= this._delmin)) break;
-      breakpointConsumed = true;
-      const popped = this._breakpoints.shift()!;
-      if (typeof popped.source?.nextBreakpoint === "function") {
-        const next = popped.source.nextBreakpoint(simTime);
-        if (next !== null && next > simTime) {
-          this.insertForSource(next, popped.source);
-        }
-      }
-    }
-
-    // ngspice dctran.c:493 — reset integration order after a breakpoint
-    // so the first step past the discontinuity uses order-1 trapezoidal.
-    if (breakpointConsumed) {
-      this.currentMethod = "trapezoidal";
-      this.currentOrder = 1;
-
-      // ngspice dctran.c:506-507 — reduce delta after breakpoint:
-      //   delta = MAX(0.1 * MIN(saveDelta, nextBreakDelta), 2 * delmin)
-      const nextBreakGap = this._breakpoints.length > 0
-        ? this._breakpoints[0]!.time - simTime
-        : Infinity;
-      this.currentDt = Math.max(
-        0.1 * Math.min(this._savedDelta, nextBreakGap),
-        2 * this._params.minTimeStep,
-      );
-    }
+    //
+    // Breakpoint pop and at-breakpoint clamp live in getClampedDt() — see
+    // ngspice dctran.c:540-644 (top-of-next-step, not at-acceptance).
   }
 
   // -------------------------------------------------------------------------
@@ -651,6 +651,22 @@ export class TimestepController {
   // Breakpoints
   // -------------------------------------------------------------------------
 
+  /** ngspice dctran.c:140-145 — seed [0, finalTime] at transient init. */
+  seedSentinel(finalTime: number): void {
+    this._finalTime = finalTime;
+    this._breakpoints = [0, finalTime];
+  }
+
+  /** ngspice cktclrbk.c — shift breakpoint array, maintaining finalTime sentinel when length collapses to 2. */
+  private _clrBreak(): void {
+    if (this._breakpoints.length > 2) {
+      this._breakpoints.shift();
+    } else {
+      this._breakpoints[0] = this._breakpoints[1]!;
+      this._breakpoints[1] = this._finalTime;
+    }
+  }
+
   /**
    * Register a simulation time at which the timestep controller must land a
    * step exactly. Inserted into the sorted breakpoint list. Duplicate
@@ -661,74 +677,22 @@ export class TimestepController {
    * @param time - Breakpoint time in seconds
    */
   addBreakpoint(time: number): void {
-    // Binary-search insertion point.
-    let lo = 0;
-    let hi = this._breakpoints.length;
+    let lo = 0, hi = this._breakpoints.length;
     while (lo < hi) {
       const mid = (lo + hi) >>> 1;
-      if (this._breakpoints[mid]!.time < time) lo = mid + 1;
-      else hi = mid;
-    }
-    // Dedup: if an existing entry at lo or lo-1 is within eps of `time`,
-    // treat as already registered. ngspice: CKTminBreak = CKTmaxStep * 5e-5.
-    const eps = this._params.maxTimeStep * 5e-5;
-    if (lo < this._breakpoints.length && this._breakpoints[lo]!.time - time < eps) {
-      return;
-    }
-    if (lo > 0 && time - this._breakpoints[lo - 1]!.time < eps) {
-      return;
-    }
-    this._breakpoints.splice(lo, 0, { time, source: null });
-  }
-
-  /**
-   * Register the next outstanding breakpoint for an element source. The
-   * controller holds at most one entry per source; when this entry is
-   * consumed in accept(), the controller calls source.nextBreakpoint to
-   * refill.
-   *
-   * Seeded at compile time for every element with nextBreakpoint, and
-   * re-seeded automatically during accept(). Never called from the hot
-   * path per step.
-   */
-  insertForSource(time: number, source: AnalogElement): void {
-    let lo = 0;
-    let hi = this._breakpoints.length;
-    while (lo < hi) {
-      const mid = (lo + hi) >>> 1;
-      if (this._breakpoints[mid]!.time < time) lo = mid + 1;
-      else hi = mid;
+      if (this._breakpoints[mid]! < time) lo = mid + 1; else hi = mid;
     }
     const eps = this._params.maxTimeStep * 5e-5;
-    if (lo < this._breakpoints.length && this._breakpoints[lo]!.time - time < eps) {
-      return;
-    }
-    if (lo > 0 && time - this._breakpoints[lo - 1]!.time < eps) {
-      return;
-    }
-    this._breakpoints.splice(lo, 0, { time, source });
+    if (lo < this._breakpoints.length && this._breakpoints[lo]! - time < eps) return;
+    if (lo > 0 && time - this._breakpoints[lo - 1]! < eps) return;
+    this._breakpoints.splice(lo, 0, time);
   }
 
   /**
-   * Find the existing queue entry for source (by identity), remove it, and
-   * reinsert at newNextTime if non-null. Used by the engine to refresh a
-   * stale breakpoint after a setParam change (e.g. frequency/phase change).
-   */
-  refreshForSource(source: AnalogElement, newNextTime: number | null): void {
-    const idx = this._breakpoints.findIndex((e) => e.source === source);
-    if (idx >= 0) {
-      this._breakpoints.splice(idx, 1);
-    }
-    if (newNextTime !== null) {
-      this.insertForSource(newNextTime, source);
-    }
-  }
-
-  /**
-   * Remove all registered breakpoints.
+   * Remove all registered breakpoints and reseed the [0, finalTime] sentinel.
    */
   clearBreakpoints(): void {
-    this._breakpoints = [];
+    this._breakpoints = [0, this._finalTime];
   }
 
 }
