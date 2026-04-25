@@ -446,265 +446,10 @@ function computeBjtTempParams(p: {
   };
 }
 
-// ---------------------------------------------------------------------------
-// Gummel-Poon operating point — bjtload.c:420-560
-// ---------------------------------------------------------------------------
-
-interface BjtOperatingPoint {
-  cc: number;        // collector current (bjtload.c:547 cc)
-  cb: number;        // base current (bjtload.c:548 cb)
-  gm: number;        // transconductance (bjtload.c:560 gm)
-  go: number;        // output conductance (bjtload.c:559 go)
-  gpi: number;       // input conductance (bjtload.c:557 gpi)
-  gmu: number;       // feedback conductance (bjtload.c:558 gmu)
-  qb: number;        // base charge factor (bjtload.c:497,509 qb)
-  dqbdve: number;    // dqb/dVbe (bjtload.c:498,511,514)
-  dqbdvc: number;    // dqb/dVbc (bjtload.c:499,512,515)
-  cbe: number;       // forward junction current (bjtload.c:424,429 cbe)
-  cbc: number;       // reverse junction current (bjtload.c:454,459 cbc)
-  gbe: number;       // forward junction conductance (bjtload.c:425,430 gbe)
-  gbc: number;       // reverse junction conductance (bjtload.c:455,460 gbc)
-  cben: number;      // non-ideal BE current w/ GMIN (bjtload.c:433,438,448)
-  gben: number;      // non-ideal BE conductance w/ GMIN (bjtload.c:434,439,447)
-  cbcn: number;      // non-ideal BC current w/ GMIN (bjtload.c:463,468,478)
-  gbcn: number;      // non-ideal BC conductance w/ GMIN (bjtload.c:464,469,477)
-}
-
-/**
- * Simple (L0) Gummel-Poon kernel — NE/NC are passed in (params.NE/params.NC),
- * NKF=0.5. bjtload.c:420-560 with c2 = BJTtBEleakCur*AREA, c4 = BJTtBCleakCur*AREA,
- * vte/vtc from NE/NC.
- */
-function computeBjtOp(
-  vbe: number, vbc: number,
-  csat: number, betaF: number, NF: number, betaR: number, NR: number,
-  c2: number, c4: number,
-  tinvEarlyVoltF: number, tinvEarlyVoltR: number,
-  oik: number, oikr: number,
-  vt: number,
-  NE: number, NC: number,
-): BjtOperatingPoint {
-  // bjtload.c:420 vtn = vt * BJTtemissionCoeffF (NF)
-  const vtn_f = vt * NF;
-  const vte = vt * NE;
-  const vtn_r = vt * NR;
-  const vtc = vt * NC;
-
-  // bjtload.c:422-431: forward B-E junction current + conductance.
-  let cbe: number, gbe: number;
-  if (vbe >= -3 * vtn_f) {
-    const evbe = Math.exp(vbe / vtn_f);
-    cbe = csat * (evbe - 1);
-    gbe = csat * evbe / vtn_f;
-  } else {
-    // bjtload.c:427-430: reverse-bias cubic fallback.
-    let a = 3 * vtn_f / (vbe * Math.E);
-    a = a * a * a;
-    cbe = -csat * (1 + a);
-    gbe = csat * 3 * a / vbe;
-  }
-
-  // bjtload.c:432-446: non-ideal B-E (c2/vte).
-  let cben: number, gben: number;
-  if (c2 === 0) { cben = 0; gben = 0; }
-  else if (vbe >= -3 * vte) {
-    const evben = Math.exp(vbe / vte);
-    cben = c2 * (evben - 1);
-    gben = c2 * evben / vte;
-  } else {
-    let a = 3 * vte / (vbe * Math.E);
-    a = a * a * a;
-    cben = -c2 * (1 + a);
-    gben = c2 * 3 * a / vbe;
-  }
-  // bjtload.c:447-448: gben += CKTgmin; cben += CKTgmin*vbe.
-  gben += GMIN;
-  cben += GMIN * vbe;
-
-  // bjtload.c:452-461: reverse B-C junction current + conductance.
-  let cbc: number, gbc: number;
-  if (vbc >= -3 * vtn_r) {
-    const evbc = Math.exp(vbc / vtn_r);
-    cbc = csat * (evbc - 1);
-    gbc = csat * evbc / vtn_r;
-  } else {
-    let a = 3 * vtn_r / (vbc * Math.E);
-    a = a * a * a;
-    cbc = -csat * (1 + a);
-    gbc = csat * 3 * a / vbc;
-  }
-
-  // bjtload.c:462-476: non-ideal B-C (c4/vtc).
-  let cbcn: number, gbcn: number;
-  if (c4 === 0) { cbcn = 0; gbcn = 0; }
-  else if (vbc >= -3 * vtc) {
-    const evbcn = Math.exp(vbc / vtc);
-    cbcn = c4 * (evbcn - 1);
-    gbcn = c4 * evbcn / vtc;
-  } else {
-    let a = 3 * vtc / (vbc * Math.E);
-    a = a * a * a;
-    cbcn = -c4 * (1 + a);
-    gbcn = c4 * 3 * a / vbc;
-  }
-  // bjtload.c:477-478: gbcn += CKTgmin; cbcn += CKTgmin*vbc.
-  gbcn += GMIN;
-  cbcn += GMIN * vbc;
-
-  // bjtload.c:495-517: base charge qb (NKF=0.5 → sqrt branch).
-  const q1 = 1 / (1 - tinvEarlyVoltF * vbc - tinvEarlyVoltR * vbe);
-  let qb: number, dqbdve: number, dqbdvc: number;
-  if (oik === 0 && oikr === 0) {
-    qb = q1;
-    dqbdve = q1 * qb * tinvEarlyVoltR;
-    dqbdvc = q1 * qb * tinvEarlyVoltF;
-  } else {
-    const q2 = oik * cbe + oikr * cbc;
-    const arg_qb = Math.max(0, 1 + 4 * q2);
-    const sqarg = arg_qb !== 0 ? Math.sqrt(arg_qb) : 1;
-    qb = q1 * (1 + sqarg) / 2;
-    // bjtload.c:511-512: default NKF=0.5 branch.
-    const sqargSafe = Math.max(sqarg, 1e-30);
-    dqbdve = q1 * (qb * tinvEarlyVoltR + oik * gbe / sqargSafe);
-    dqbdvc = q1 * (qb * tinvEarlyVoltF + oikr * gbc / sqargSafe);
-  }
-
-  // bjtload.c:546-548: cc, cb (terminal currents).
-  // Simple L0 ignores excess-phase (td=0), so cex=cbe, gex=gbe, cc=0 start.
-  const cex = cbe;
-  const gex = gbe;
-  let cc = 0;
-  cc = cc + (cex - cbc) / qb - cbc / betaR - cbcn;
-  const cb = cbe / betaF + cben + cbc / betaR + cbcn;
-
-  // bjtload.c:557-560: small-signal conductances.
-  const gpi = gbe / betaF + gben;
-  const gmu = gbc / betaR + gbcn;
-  const go = (gbc + (cex - cbc) * dqbdvc / qb) / qb;
-  const gm = (gex - (cex - cbc) * dqbdve / qb) / qb - go;
-
-  return { cc, cb, gm, go, gpi, gmu, qb, dqbdve, dqbdvc, cbe, cbc, gbe, gbc, cben, gben, cbcn, gbcn };
-}
-
-/**
- * SPICE-L1 Gummel-Poon: tunable NE/NC and NKF. Same ngspice bjtload.c formulas
- * with the NKF power branch per bjtload.c:504-516.
- */
-function computeSpiceL1BjtOp(
-  vbe: number, vbc: number,
-  csat: number, betaF: number, NF: number, betaR: number, NR: number,
-  c2: number, c4: number,
-  NE: number, NC: number,
-  tinvEarlyVoltF: number, tinvEarlyVoltR: number,
-  oik: number, oikr: number,
-  vt: number,
-  NKF: number,
-): BjtOperatingPoint {
-  const vtn_f = vt * NF;
-  const vte = vt * NE;
-  const vtn_r = vt * NR;
-  const vtc = vt * NC;
-
-  // bjtload.c:422-431
-  let cbe: number, gbe: number;
-  if (vbe >= -3 * vtn_f) {
-    const evbe = Math.exp(vbe / vtn_f);
-    cbe = csat * (evbe - 1);
-    gbe = csat * evbe / vtn_f;
-  } else {
-    let a = 3 * vtn_f / (vbe * Math.E);
-    a = a * a * a;
-    cbe = -csat * (1 + a);
-    gbe = csat * 3 * a / vbe;
-  }
-
-  // bjtload.c:432-446
-  let cben: number, gben: number;
-  if (c2 === 0) { cben = 0; gben = 0; }
-  else if (vbe >= -3 * vte) {
-    const evben = Math.exp(vbe / vte);
-    cben = c2 * (evben - 1);
-    gben = c2 * evben / vte;
-  } else {
-    let a = 3 * vte / (vbe * Math.E);
-    a = a * a * a;
-    cben = -c2 * (1 + a);
-    gben = c2 * 3 * a / vbe;
-  }
-  gben += GMIN;
-  cben += GMIN * vbe;
-
-  // bjtload.c:452-461
-  let cbc: number, gbc: number;
-  if (vbc >= -3 * vtn_r) {
-    const evbc = Math.exp(vbc / vtn_r);
-    cbc = csat * (evbc - 1);
-    gbc = csat * evbc / vtn_r;
-  } else {
-    let a = 3 * vtn_r / (vbc * Math.E);
-    a = a * a * a;
-    cbc = -csat * (1 + a);
-    gbc = csat * 3 * a / vbc;
-  }
-
-  // bjtload.c:462-476
-  let cbcn: number, gbcn: number;
-  if (c4 === 0) { cbcn = 0; gbcn = 0; }
-  else if (vbc >= -3 * vtc) {
-    const evbcn = Math.exp(vbc / vtc);
-    cbcn = c4 * (evbcn - 1);
-    gbcn = c4 * evbcn / vtc;
-  } else {
-    let a = 3 * vtc / (vbc * Math.E);
-    a = a * a * a;
-    cbcn = -c4 * (1 + a);
-    gbcn = c4 * 3 * a / vbc;
-  }
-  gbcn += GMIN;
-  cbcn += GMIN * vbc;
-
-  // bjtload.c:495-517 — NKF branch: sqarg = pow(arg, NKF) and derivative scaled.
-  const q1 = 1 / (1 - tinvEarlyVoltF * vbc - tinvEarlyVoltR * vbe);
-  let qb: number, dqbdve: number, dqbdvc: number;
-  if (oik === 0 && oikr === 0) {
-    qb = q1;
-    dqbdve = q1 * qb * tinvEarlyVoltR;
-    dqbdvc = q1 * qb * tinvEarlyVoltF;
-  } else {
-    const q2 = oik * cbe + oikr * cbc;
-    const arg_qb = Math.max(0, 1 + 4 * q2);
-    let sqarg = 1;
-    if (NKF === 0.5) {
-      if (arg_qb !== 0) sqarg = Math.sqrt(arg_qb);
-    } else {
-      if (arg_qb !== 0) sqarg = Math.pow(arg_qb, NKF);
-    }
-    qb = q1 * (1 + sqarg) / 2;
-    if (NKF === 0.5) {
-      const sqargSafe = Math.max(sqarg, 1e-30);
-      dqbdve = q1 * (qb * tinvEarlyVoltR + oik * gbe / sqargSafe);
-      dqbdvc = q1 * (qb * tinvEarlyVoltF + oikr * gbc / sqargSafe);
-    } else {
-      const argSafe = Math.max(arg_qb, 1e-30);
-      dqbdve = q1 * (qb * tinvEarlyVoltR + oik * gbe * 2 * sqarg * NKF / argSafe);
-      dqbdvc = q1 * (qb * tinvEarlyVoltF + oikr * gbc * 2 * sqarg * NKF / argSafe);
-    }
-  }
-
-  // bjtload.c:546-560.
-  const cex = cbe;
-  const gex = gbe;
-  let cc = 0;
-  cc = cc + (cex - cbc) / qb - cbc / betaR - cbcn;
-  const cb = cbe / betaF + cben + cbc / betaR + cbcn;
-
-  const gpi = gbe / betaF + gben;
-  const gmu = gbc / betaR + gbcn;
-  const go = (gbc + (cex - cbc) * dqbdvc / qb) / qb;
-  const gm = (gex - (cex - cbc) * dqbdve / qb) / qb - go;
-
-  return { cc, cb, gm, go, gpi, gmu, qb, dqbdve, dqbdvc, cbe, cbc, gbe, gbc, cben, gben, cbcn, gbcn };
-}
+// Gummel-Poon evaluation lives inline in each load() body, mirroring ngspice
+// bjtload.c:420-560 line-for-line. ngspice has no helper for this block; a
+// helper would re-introduce the structural seam that caused the doubled-cc
+// bug (op.cc returned by helper + `cc = cc + (cex-cbc)/qb - ...` in caller).
 
 // ---------------------------------------------------------------------------
 // State schema — BJT simple (L0). Matches bjtdefs.h offsets for the subset
@@ -951,25 +696,124 @@ export function createBjtElement(
           });
         }
 
-        // bjtload.c:420-560: Gummel-Poon evaluation at limited voltages.
-        const opComputed = computeBjtOp(
-          vbeLimited, vbcLimited,
-          tp.tSatCur * params.AREA, tp.tBetaF, params.NF, tp.tBetaR, params.NR,
-          tp.tBEleakCur * params.AREA, tp.tBCleakCur * params.AREA,
-          tp.tinvEarlyVoltF, tp.tinvEarlyVoltR,
-          tp.tinvRollOffF / params.AREA, tp.tinvRollOffR / params.AREA,
-          tp.vt, params.NE, params.NC,
-        );
+        // bjtload.c:420-560: inline Gummel-Poon evaluation at limited voltages.
+        // L0 = simple resistive Gummel-Poon (no excess phase, no caps). NKF=0.5
+        // implicit (sqrt branch only). All formulas mirror bjtload.c line-for-line.
+        const csat = tp.tSatCur * params.AREA;
+        const betaF = tp.tBetaF;
+        const betaR = tp.tBetaR;
+        const c2 = tp.tBEleakCur * params.AREA;
+        const c4 = tp.tBCleakCur * params.AREA;
+        const tinvEarlyVoltF = tp.tinvEarlyVoltF;
+        const tinvEarlyVoltR = tp.tinvEarlyVoltR;
+        const oik = tp.tinvRollOffF / params.AREA;
+        const oikr = tp.tinvRollOffR / params.AREA;
+        const vt = tp.vt;
+        const vtn_f = vt * params.NF;
+        const vte = vt * params.NE;
+        const vtn_r = vt * params.NR;
+        const vtc = vt * params.NC;
+
+        // bjtload.c:422-431: forward B-E junction current + conductance.
+        let cbe: number, gbe: number;
+        if (vbeLimited >= -3 * vtn_f) {
+          const evbe = Math.exp(vbeLimited / vtn_f);
+          cbe = csat * (evbe - 1);
+          gbe = csat * evbe / vtn_f;
+        } else {
+          let a = 3 * vtn_f / (vbeLimited * Math.E);
+          a = a * a * a;
+          cbe = -csat * (1 + a);
+          gbe = csat * 3 * a / vbeLimited;
+        }
+
+        // bjtload.c:432-446: non-ideal B-E (c2/vte).
+        let cben: number, gben: number;
+        if (c2 === 0) { cben = 0; gben = 0; }
+        else if (vbeLimited >= -3 * vte) {
+          const evben = Math.exp(vbeLimited / vte);
+          cben = c2 * (evben - 1);
+          gben = c2 * evben / vte;
+        } else {
+          let a = 3 * vte / (vbeLimited * Math.E);
+          a = a * a * a;
+          cben = -c2 * (1 + a);
+          gben = c2 * 3 * a / vbeLimited;
+        }
+        // bjtload.c:447-448
+        gben += GMIN;
+        cben += GMIN * vbeLimited;
+
+        // bjtload.c:452-461: reverse B-C junction current + conductance.
+        let cbc: number, gbc: number;
+        if (vbcLimited >= -3 * vtn_r) {
+          const evbc = Math.exp(vbcLimited / vtn_r);
+          cbc = csat * (evbc - 1);
+          gbc = csat * evbc / vtn_r;
+        } else {
+          let a = 3 * vtn_r / (vbcLimited * Math.E);
+          a = a * a * a;
+          cbc = -csat * (1 + a);
+          gbc = csat * 3 * a / vbcLimited;
+        }
+
+        // bjtload.c:462-476: non-ideal B-C (c4/vtc).
+        let cbcn: number, gbcn: number;
+        if (c4 === 0) { cbcn = 0; gbcn = 0; }
+        else if (vbcLimited >= -3 * vtc) {
+          const evbcn = Math.exp(vbcLimited / vtc);
+          cbcn = c4 * (evbcn - 1);
+          gbcn = c4 * evbcn / vtc;
+        } else {
+          let a = 3 * vtc / (vbcLimited * Math.E);
+          a = a * a * a;
+          cbcn = -c4 * (1 + a);
+          gbcn = c4 * 3 * a / vbcLimited;
+        }
+        // bjtload.c:477-478
+        gbcn += GMIN;
+        cbcn += GMIN * vbcLimited;
+
+        // bjtload.c:495-517: base charge qb (NKF=0.5 → sqrt branch).
+        const q1 = 1 / (1 - tinvEarlyVoltF * vbcLimited - tinvEarlyVoltR * vbeLimited);
+        let qb: number, dqbdve: number, dqbdvc: number;
+        if (oik === 0 && oikr === 0) {
+          qb = q1;
+          dqbdve = q1 * qb * tinvEarlyVoltR;
+          dqbdvc = q1 * qb * tinvEarlyVoltF;
+        } else {
+          const q2 = oik * cbe + oikr * cbc;
+          const arg_qb = Math.max(0, 1 + 4 * q2);
+          const sqarg = arg_qb !== 0 ? Math.sqrt(arg_qb) : 1;
+          qb = q1 * (1 + sqarg) / 2;
+          // bjtload.c:511-512: NKF=0.5 default branch.
+          const sqargSafe = Math.max(sqarg, 1e-30);
+          dqbdve = q1 * (qb * tinvEarlyVoltR + oik * gbe / sqargSafe);
+          dqbdvc = q1 * (qb * tinvEarlyVoltF + oikr * gbc / sqargSafe);
+        }
+
+        // bjtload.c:522-524: cc=0; cex=cbe; gex=gbe (L0 has no excess phase).
+        let cc = 0;
+        const cex = cbe;
+        const gex = gbe;
+
+        // bjtload.c:547-560: dc incremental currents and conductances.
+        cc = cc + (cex - cbc) / qb - cbc / betaR - cbcn;
+        const cb = cbe / betaF + cben + cbc / betaR + cbcn;
+        const gpi = gbe / betaF + gben;
+        const gmu = gbc / betaR + gbcn;
+        const go = (gbc + (cex - cbc) * dqbdvc / qb) / qb;
+        const gm = (gex - (cex - cbc) * dqbdve / qb) / qb - go;
 
         // bjtload.c:772-786: CKTstate0 write-back of accepted linearization.
         s0[base + SLOT_VBE] = vbeLimited;
         s0[base + SLOT_VBC] = vbcLimited;
-        s0[base + SLOT_CC]  = opComputed.cc;
-        s0[base + SLOT_CB]  = opComputed.cb;
-        s0[base + SLOT_GPI] = opComputed.gpi;
-        s0[base + SLOT_GMU] = opComputed.gmu;
-        s0[base + SLOT_GM]  = opComputed.gm;
-        s0[base + SLOT_GO]  = opComputed.go;
+        s0[base + SLOT_CC]  = cc;
+        s0[base + SLOT_CB]  = cb;
+        s0[base + SLOT_GPI] = gpi;
+        s0[base + SLOT_GMU] = gmu;
+        s0[base + SLOT_GM]  = gm;
+        s0[base + SLOT_GO]  = go;
         s0[base + SLOT_GX]  = 0; // bjtload.c:780 — L0 has no RB so gx=0
       }
 
@@ -1486,19 +1330,71 @@ export function createSpiceL1BjtElement(
           });
         }
 
-        // bjtload.c:420-560: Gummel-Poon operating point at limited voltages.
-        const op = computeSpiceL1BjtOp(
-          vbeLimited, vbcLimited,
-          csat, tp.tBetaF, params.NF, tp.tBetaR, params.NR,
-          c2, c4,
-          params.NE, params.NC,
-          tp.tinvEarlyVoltF, tp.tinvEarlyVoltR,
-          oik, oikr,
-          vt, params.NKF,
-        );
+        // bjtload.c:420-478: inline Gummel-Poon junction evaluation at limited voltages.
+        const vtn_f = vt * params.NF;
+        const vte = vt * params.NE;
+        const vtn_r = vt * params.NR;
+        const vtc = vt * params.NC;
 
-        ({ cc, cb, gm, go, gpi, gmu } = op);
-        let { qb, dqbdve, dqbdvc, cbe, cbc, gbe, gbc, cbcn } = op;
+        // bjtload.c:422-431: forward B-E junction current + conductance.
+        let cbe: number, gbe: number;
+        if (vbeLimited >= -3 * vtn_f) {
+          const evbe = Math.exp(vbeLimited / vtn_f);
+          cbe = csat * (evbe - 1);
+          gbe = csat * evbe / vtn_f;
+        } else {
+          let a = 3 * vtn_f / (vbeLimited * Math.E);
+          a = a * a * a;
+          cbe = -csat * (1 + a);
+          gbe = csat * 3 * a / vbeLimited;
+        }
+
+        // bjtload.c:432-446: non-ideal B-E (c2/vte).
+        let cben: number, gben: number;
+        if (c2 === 0) { cben = 0; gben = 0; }
+        else if (vbeLimited >= -3 * vte) {
+          const evben = Math.exp(vbeLimited / vte);
+          cben = c2 * (evben - 1);
+          gben = c2 * evben / vte;
+        } else {
+          let a = 3 * vte / (vbeLimited * Math.E);
+          a = a * a * a;
+          cben = -c2 * (1 + a);
+          gben = c2 * 3 * a / vbeLimited;
+        }
+        // bjtload.c:447-448
+        gben += GMIN;
+        cben += GMIN * vbeLimited;
+
+        // bjtload.c:452-461: reverse B-C junction current + conductance.
+        let cbc: number, gbc: number;
+        if (vbcLimited >= -3 * vtn_r) {
+          const evbc = Math.exp(vbcLimited / vtn_r);
+          cbc = csat * (evbc - 1);
+          gbc = csat * evbc / vtn_r;
+        } else {
+          let a = 3 * vtn_r / (vbcLimited * Math.E);
+          a = a * a * a;
+          cbc = -csat * (1 + a);
+          gbc = csat * 3 * a / vbcLimited;
+        }
+
+        // bjtload.c:462-476: non-ideal B-C (c4/vtc).
+        let cbcn: number, gbcn: number;
+        if (c4 === 0) { cbcn = 0; gbcn = 0; }
+        else if (vbcLimited >= -3 * vtc) {
+          const evbcn = Math.exp(vbcLimited / vtc);
+          cbcn = c4 * (evbcn - 1);
+          gbcn = c4 * evbcn / vtc;
+        } else {
+          let a = 3 * vtc / (vbcLimited * Math.E);
+          a = a * a * a;
+          cbcn = -c4 * (1 + a);
+          gbcn = c4 * 3 * a / vbcLimited;
+        }
+        // bjtload.c:477-478
+        gbcn += GMIN;
+        cbcn += GMIN * vbcLimited;
 
         // bjtload.c:482-491: substrate junction current/conductance (L1 only).
         const vts = vt * params.NS;
@@ -1521,12 +1417,38 @@ export function createSpiceL1BjtElement(
           cdsub = GMIN * vsubLimited;
         }
 
-        // bjtload.c:518-543: excess-phase filter (Weil's approx, td>0).
-        // Inactive when td==0 (PTF=0 or TF=0). During MODETRAN|MODEAC with td>0:
-        //   cex=cbe*arg3; gex=gbe*arg3; cc recomputed via 3-term IIR.
-        // bjtload.c:519-522: arg1=delta/td, arg2=3*arg1, arg1=arg2*arg1,
-        //                    denom=1+arg1+arg2, arg3=arg1/denom.
-        // cite: bjtload.c:522-524 — cex/gex use raw cbe/gbe from Gummel-Poon, before XTF modification.
+        // bjtload.c:495-517: base charge qb. Default NKF (0.5) → sqrt branch;
+        // explicit NKF (model->BJTnkfGiven) → pow branch.
+        const q1 = 1 / (1 - tp.tinvEarlyVoltF * vbcLimited - tp.tinvEarlyVoltR * vbeLimited);
+        let qb: number, dqbdve: number, dqbdvc: number;
+        if (oik === 0 && oikr === 0) {
+          qb = q1;
+          dqbdve = q1 * qb * tp.tinvEarlyVoltR;
+          dqbdvc = q1 * qb * tp.tinvEarlyVoltF;
+        } else {
+          const q2 = oik * cbe + oikr * cbc;
+          const arg_qb = Math.max(0, 1 + 4 * q2);
+          let sqarg = 1;
+          if (params.NKF === 0.5) {
+            if (arg_qb !== 0) sqarg = Math.sqrt(arg_qb);
+          } else {
+            if (arg_qb !== 0) sqarg = Math.pow(arg_qb, params.NKF);
+          }
+          qb = q1 * (1 + sqarg) / 2;
+          if (params.NKF === 0.5) {
+            const sqargSafe = Math.max(sqarg, 1e-30);
+            dqbdve = q1 * (qb * tp.tinvEarlyVoltR + oik * gbe / sqargSafe);
+            dqbdvc = q1 * (qb * tp.tinvEarlyVoltF + oikr * gbc / sqargSafe);
+          } else {
+            const argSafe = Math.max(arg_qb, 1e-30);
+            dqbdve = q1 * (qb * tp.tinvEarlyVoltR + oik * gbe * 2 * sqarg * params.NKF / argSafe);
+            dqbdvc = q1 * (qb * tp.tinvEarlyVoltF + oikr * gbc * 2 * sqarg * params.NKF / argSafe);
+          }
+        }
+
+        // bjtload.c:518-543: Weil's approx for excess phase (backward-Euler).
+        // bjtload.c:522-524: cc=0; cex=cbe; gex=gbe (defaults; excess-phase block updates them).
+        cc = 0;
         let cex = cbe;
         let gex = gbe;
         let cexbc_now = 0;
@@ -1551,16 +1473,9 @@ export function createSpiceL1BjtElement(
           cexbc_now = cc + cex / qb;
         }
 
-        // Recompute cc, gm, go with possibly filtered cex/gex. bjtload.c:547,559-560.
-        // bjtload.c:547 overwrites cc:
-        //   cc = cc + (cex-cbc)/qb - cbc/betaR - cbcn;
-        // bjtload.c:559-560:
-        //   go = (gbc + (cex-cbc)*dqbdvc/qb)/qb;
-        //   gm = (gex - (cex-cbc)*dqbdve/qb)/qb - go;
-        cc = cc + (cex - cbc) / qb - cbc / params.BR - cbcn;
-        go = (gbc + (cex - cbc) * dqbdvc / qb) / qb;
-        gm = (gex - (cex - cbc) * dqbdve / qb) / qb - go;
-
+        // bjtload.c:547-560: dc incremental currents and conductances (post-excess-phase).
+        cc = cc + (cex - cbc) / qb - cbc / tp.tBetaR - cbcn;
+        cb = cbe / tp.tBetaF + cben + cbc / tp.tBetaR + cbcn;
         // bjtload.c:549-556: effective base-resistance gx.
         gx = rbpr + rbpi / qb;
         if (xjrb !== 0) {
@@ -1570,6 +1485,10 @@ export function createSpiceL1BjtElement(
           gx = rbpr + 3 * rbpi * (arg1b - arg2) / arg2 / arg1b / arg1b;
         }
         if (gx !== 0) gx = 1 / gx;
+        gpi = gbe / tp.tBetaF + gben;
+        gmu = gbc / tp.tBetaR + gbcn;
+        go = (gbc + (cex - cbc) * dqbdvc / qb) / qb;
+        gm = (gex - (cex - cbc) * dqbdve / qb) / qb - go;
 
         // bjtload.c:561-724: capacitance + charge block.
         // D3: gate on ctx.dt > 0 — DC-OP (dt==0) does NOT update cap charges,

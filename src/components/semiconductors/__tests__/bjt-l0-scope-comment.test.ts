@@ -8,7 +8,8 @@
  *
  * The test reads `bjt.ts` as text (no element construction) and asserts the
  * substring appears between the L0 `icheckLimited = vbeLimFlag || vbcLimFlag;`
- * line and the L0 `computeBjtOp(` call.
+ * line and the L0 inline-Gummel-Poon header
+ * (`bjtload.c:420-560: inline Gummel-Poon evaluation`).
  */
 
 import { describe, it, expect } from "vitest";
@@ -38,9 +39,18 @@ describe("BJT L0 scope documentation", () => {
     const l0AnchorIndex = l0AnchorMatch.index;
 
     // The scope comment must appear in the region between the L0 anchor and
-    // the next L0 `computeBjtOp(` call.
-    const computeBjtOpIndex = source.indexOf("computeBjtOp(", l0AnchorIndex);
-    const region = source.slice(l0AnchorIndex, computeBjtOpIndex);
+    // the next inline-Gummel-Poon header (the L0 occurrence — not the L1 one,
+    // whose header reads "bjtload.c:420-478: inline Gummel-Poon junction
+    // evaluation").
+    const inlineHeader = "bjtload.c:420-560: inline Gummel-Poon evaluation";
+    const inlineHeaderIndex = source.indexOf(inlineHeader, l0AnchorIndex);
+    if (inlineHeaderIndex === -1) {
+      throw new Error(
+        `L0 inline-Gummel-Poon header "${inlineHeader}" not found after the L0 ` +
+          "icheckLimited anchor — the L0 compute block has been restructured and this test must be updated.",
+      );
+    }
+    const region = source.slice(l0AnchorIndex, inlineHeaderIndex);
     const expectedCitation = "architectural-alignment.md §E1";
     expect(region).toContain(expectedCitation);
   });
