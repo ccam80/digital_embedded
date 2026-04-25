@@ -417,10 +417,10 @@ export function initAnalysisDialogs(ctx: AppContext): void {
   // Tutorials menu
   // -------------------------------------------------------------------------
   document.getElementById('btn-browse-tutorials')?.addEventListener('click', () => {
-    window.open('tutorials.html', '_blank');
+    window.open('app/tutorial/', '_blank');
   });
   document.getElementById('btn-edit-tutorial')?.addEventListener('click', () => {
-    window.open('tutorial-editor.html', '_blank');
+    window.open('app/tutorial/edit.html', '_blank');
   });
 
   // -------------------------------------------------------------------------

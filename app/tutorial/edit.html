@@ -222,7 +222,7 @@
       <button class="top-btn" id="btn-import" title="Import manifest.json">Import</button>
       <button class="top-btn" id="btn-export" title="Export manifest.json">Export</button>
       <button class="top-btn primary" id="btn-validate">Validate</button>
-      <a href="tutorials.html" class="top-btn" style="text-decoration:none">Browse</a>
+      <a href="index.html" class="top-btn" style="text-decoration:none">Browse</a>
     </div>
     <div class="tutorial-toggle" id="tutorial-toggle">Tutorial Settings</div>
     <div class="tutorial-fields" id="tutorial-fields"></div>
@@ -298,8 +298,13 @@
       if (editable) editableFields = new Set(editable.split(','));
       else editableFields = new Set(['testData', 'instructions', 'hints']);
     }
-    const manifestUrl = params.get('manifest');
-    if (manifestUrl) {
+    // This page lives at /<base>/app/tutorial/edit.html — resolve manifest paths
+    // (callers pass root-relative paths like "tutorials/foo/manifest.json") against
+    // the deploy root so they work regardless of page depth.
+    const DEPLOY_ROOT = new URL('../../', location.href).href;
+    const rawManifest = params.get('manifest');
+    if (rawManifest) {
+      const manifestUrl = new URL(rawManifest, DEPLOY_ROOT).href;
       fetch(manifestUrl)
         .then(r => { if (!r.ok) throw new Error(r.statusText); return r.json(); })
         .then(data => { manifest = data; renderAll(); })
@@ -842,7 +847,7 @@
     }
 
     // -----------------------------------------------------------------------
-    // Markdown renderer (matches tutorial-viewer.html)
+    // Markdown renderer (matches view.html)
     // -----------------------------------------------------------------------
     function renderMarkdown(md) {
       const escaped = md.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
@@ -1083,7 +1088,7 @@
       previewPendingApply = true;
       previewPlaceholder.style.display = 'none';
       previewIframe.style.display = '';
-      previewIframe.src = 'simulator.html';
+      previewIframe.src = '/';
       previewStatus.textContent = 'Loading simulator...';
     });
 

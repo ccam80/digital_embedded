@@ -8,7 +8,7 @@ import { test, expect } from '@playwright/test';
 
 test.describe('GUI: simulation controls', () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto('/simulator.html');
+    await page.goto('/');
     await page.locator('#sim-canvas').waitFor({ state: 'visible' });
   });
 

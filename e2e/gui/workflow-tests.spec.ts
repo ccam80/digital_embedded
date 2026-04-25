@@ -208,7 +208,7 @@ async function circuitInfo(page: Page) {
 
 test.describe('Workflow: component placement', () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto('/simulator.html');
+    await page.goto('/');
     await page.locator('#sim-canvas').waitFor({ state: 'visible' });
     await page.waitForTimeout(500);
   });
@@ -273,7 +273,7 @@ test.describe('Workflow: component placement', () => {
 
 test.describe('Workflow: property editing', () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto('/simulator.html');
+    await page.goto('/');
     await page.locator('#sim-canvas').waitFor({ state: 'visible' });
     await page.waitForTimeout(500);
   });
@@ -348,7 +348,7 @@ test.describe('Workflow: property editing', () => {
 
 test.describe('Workflow: undo/redo', () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto('/simulator.html');
+    await page.goto('/');
     await page.locator('#sim-canvas').waitFor({ state: 'visible' });
     await page.waitForTimeout(500);
   });
@@ -452,7 +452,7 @@ const MINIMAL_DIGITAL_XML = `<?xml version="1.0" encoding="utf-8"?>
 
 test.describe('Workflow: speed control', () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto('/simulator.html');
+    await page.goto('/');
     await page.locator('#sim-canvas').waitFor({ state: 'visible' });
     await page.waitForTimeout(500);
     // Load and compile a minimal circuit so a real coordinator is active.
@@ -479,7 +479,7 @@ test.describe('Workflow: speed control', () => {
 
 test.describe('Workflow: digital simulation', () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto('/simulator.html');
+    await page.goto('/');
     await page.locator('#sim-canvas').waitFor({ state: 'visible' });
     await page.waitForTimeout(500);
   });
@@ -517,7 +517,7 @@ test.describe('Workflow: digital simulation', () => {
 
 test.describe('Workflow: analog mode', () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto('/simulator.html');
+    await page.goto('/');
     await page.locator('#sim-canvas').waitFor({ state: 'visible' });
     await page.waitForTimeout(500);
   });
@@ -548,7 +548,7 @@ test.describe('Workflow: analog mode', () => {
 
 test.describe('Workflow: analog simulation with sliders', () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto('/simulator.html');
+    await page.goto('/');
     await page.locator('#sim-canvas').waitFor({ state: 'visible' });
     await page.waitForTimeout(500);
   });

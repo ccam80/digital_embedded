@@ -18,7 +18,7 @@
  *   - Name validation: empty and duplicate rejection
  *   - Palette shows the new subcircuit in SUBCIRCUIT category
  *
- * All DOM queries target simulator.html directly (no iframe layer).
+ * All DOM queries target the simulator directly (no iframe layer).
  * The test bridge (__test) is used ONLY for coordinate queries and state reads.
  */
 import { test, expect } from '@playwright/test';

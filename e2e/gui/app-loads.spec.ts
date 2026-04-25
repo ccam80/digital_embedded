@@ -13,7 +13,7 @@ test.describe('GUI: application loads', () => {
     page.on('pageerror', (err) => errors.push(err.message));
     (page as any).__consoleErrors = errors;
 
-    await page.goto('/simulator.html');
+    await page.goto('/');
     // Wait for the canvas to be present and sized
     await page.locator('#sim-canvas').waitFor({ state: 'visible' });
   });

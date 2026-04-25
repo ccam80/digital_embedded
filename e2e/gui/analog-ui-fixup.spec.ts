@@ -91,7 +91,7 @@ async function buildAndCompileRc(harness: SimulatorHarness): Promise<void> {
 }
 
 /**
- * Load circuit data into a page that runs simulator.html directly (not via iframe harness).
+ * Load circuit data into a page that runs the simulator directly (not via iframe harness).
  * Waits for the sim-loaded response instead of a fixed sleep.
  */
 async function loadCircuitDataDirect(page: Page, b64: string): Promise<void> {
@@ -265,8 +265,8 @@ test.describe('Analog UI fixes', () => {
   // -----------------------------------------------------------------------
 
   test('capacitor shows property popup with float input', async ({ page }) => {
-    // Navigate directly to simulator.html (not through the iframe harness)
-    await page.goto('/simulator.html');
+    // Navigate directly to the simulator (not through the iframe harness)
+    await page.goto('/');
     await page.locator('#sim-canvas').waitFor({ state: 'visible' });
     await page.waitForTimeout(500);
 

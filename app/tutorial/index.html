@@ -83,8 +83,8 @@
   <div class="header">
     <h1>digiTS Tutorials</h1>
     <div class="header-actions">
-      <a href="tutorial-editor.html">New Tutorial</a>
-      <a href="simulator.html">Simulator</a>
+      <a href="edit.html">New Tutorial</a>
+      <a href="/">Simulator</a>
     </div>
   </div>
   <div class="filters" id="filters">
@@ -99,6 +99,10 @@
   <div class="error-state" id="error" style="display:none"></div>
 
   <script>
+    // --- Deploy-root resolver: this page lives at /<base>/app/tutorial/index.html ---
+    const DEPLOY_ROOT = new URL('../../', location.href).href;
+    const resolveFromRoot = (p) => new URL(p, DEPLOY_ROOT).href;
+
     // --- State ---
     let tutorials = [];
     let activeFilter = 'all';
@@ -108,11 +112,11 @@
     const lockedManifest = params.get('tutorial');
     if (lockedManifest) {
       // Locked mode — skip the index, go straight to the viewer
-      window.location.href = 'tutorial-viewer.html?manifest=' + encodeURIComponent(lockedManifest);
+      window.location.href = 'view.html?manifest=' + encodeURIComponent(lockedManifest);
     }
 
     // --- Load index ---
-    const indexUrl = params.get('index') || 'tutorials/index.json';
+    const indexUrl = resolveFromRoot(params.get('index') || 'tutorials/index.json');
 
     async function init() {
       try {
@@ -161,8 +165,8 @@
           .map(tag => `<span class="tag">${esc(tag)}</span>`)
           .join('');
 
-        const viewerUrl = 'tutorial-viewer.html?manifest=' + encodeURIComponent(t.manifestPath);
-        const editorUrl = 'tutorial-editor.html?manifest=' + encodeURIComponent(t.manifestPath);
+        const viewerUrl = 'view.html?manifest=' + encodeURIComponent(t.manifestPath);
+        const editorUrl = 'edit.html?manifest=' + encodeURIComponent(t.manifestPath);
 
         card.innerHTML = `
           <div class="card-title">${esc(t.title)}</div>

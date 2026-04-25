@@ -2,7 +2,7 @@
  * Tutorial shared bundle — browser-safe barrel export for the tutorial editor.
  *
  * This module re-exports presets, type guards, and validation helpers
- * so that tutorial-editor.html can import them via a single <script type="module">.
+ * so that app/tutorial/edit.html can import them via a single <script type="module">.
  *
  * During dev: loaded directly as /src/tutorial/tutorial-bundle.ts (Vite transpiles).
  * In production: built as part of the main bundle or a separate entry.

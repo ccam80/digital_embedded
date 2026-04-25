@@ -75,7 +75,7 @@ export function buildInstructionsUrl(basePath: string): string {
 /**
  * Build simulator iframe src with proper parameters
  *
- * @param simulatorUrl - URL to simulator.html
+ * @param simulatorUrl - URL to the simulator entry (defaults to deploy root '/')
  * @param basePath - Base path for circuit file resolution
  * @param file - Optional circuit file to load (e.g., "and-gate.dig")
  * @returns Complete iframe src URL
@@ -110,12 +110,12 @@ export class TutorialHost {
    *
    * @param tutorial - Tutorial name
    * @param step - Step number (1-indexed)
-   * @param simulatorUrl - URL to simulator.html
+   * @param simulatorUrl - URL to the simulator entry (defaults to deploy root '/')
    */
   async init(
     tutorial: string,
     step: number,
-    simulatorUrl: string = 'simulator.html'
+    simulatorUrl: string = '/'
   ): Promise<void> {
     const basePath = buildCheckpointPath(tutorial, step);
     const instructionsUrl = buildInstructionsUrl(basePath);
@@ -166,7 +166,7 @@ export class TutorialHost {
    * Update all registered iframes with new base path
    *
    * @param basePath - New base path for circuit resolution
-   * @param simulatorUrl - URL to simulator.html
+   * @param simulatorUrl - URL to the simulator entry (defaults to deploy root '/')
    */
   private updateIframeBasePaths(
     basePath: string,
@@ -194,12 +194,12 @@ export class TutorialHost {
    *
    * @param tutorial - Tutorial name
    * @param step - Step number (1-indexed)
-   * @param simulatorUrl - URL to simulator.html
+   * @param simulatorUrl - URL to the simulator entry (defaults to deploy root '/')
    */
   async navigateToCheckpoint(
     tutorial: string,
     step: number,
-    simulatorUrl: string = 'simulator.html'
+    simulatorUrl: string = '/'
   ): Promise<void> {
     await this.init(tutorial, step, simulatorUrl);
   }

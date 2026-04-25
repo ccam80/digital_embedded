@@ -36,15 +36,21 @@
     <div class="top-bar">
       <h1 id="title">Loading...</h1>
       <span class="top-bar-meta" id="meta"></span>
-      <a href="tutorials.html">All Tutorials</a>
+      <a href="index.html">All Tutorials</a>
     </div>
-    <iframe id="simulator" class="simulator-frame" src="simulator.html"></iframe>
+    <iframe id="simulator" class="simulator-frame" src="/"></iframe>
   </div>
 
   <script>
+    // This page lives at /<base>/app/tutorial/view.html — resolve manifest paths
+    // (callers pass root-relative paths like "tutorials/foo/manifest.json")
+    // against the deploy root so they work regardless of page depth and so that
+    // the absolute basePath we forward to the simulator iframe resolves cleanly.
+    const DEPLOY_ROOT = new URL('../../', location.href).href;
     const iframe = document.getElementById('simulator');
     const params = new URLSearchParams(window.location.search);
-    const manifestUrl = params.get('manifest') || 'tutorials/sr-to-flipflop/manifest.json';
+    const rawManifest = params.get('manifest') || 'tutorials/sr-to-flipflop/manifest.json';
+    const manifestUrl = new URL(rawManifest, DEPLOY_ROOT).href;
     let manifest = null;
 
     async function init() {
