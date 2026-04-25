@@ -8,6 +8,7 @@
 
 import type { ConcreteCompiledAnalogCircuit } from "../../compiled-analog-circuit.js";
 import type { PropertyBag } from "../../../../core/properties.js";
+import { ComponentRegistry, type ParamDef } from "../../../../core/registry.js";
 
 // ---------------------------------------------------------------------------
 // SPICE prefix table (typeId -> SPICE prefix, model type for semiconductors)
@@ -27,8 +28,8 @@ const ELEMENT_SPECS: Record<string, ElementSpec> = {
   DcCurrentSource: { prefix: "I" },
   AcCurrentSource: { prefix: "I" },
   Diode:           { prefix: "D", modelType: "D" },
-  Zener:           { prefix: "D", modelType: "D" },
-  Varactor:        { prefix: "D", modelType: "D" },
+  ZenerDiode:      { prefix: "D", modelType: "D" },
+  VaractorDiode:   { prefix: "D", modelType: "D" },
   TunnelDiode:     { prefix: "D", modelType: "D" },
   NpnBJT:          { prefix: "Q", modelType: "NPN" },
   PnpBJT:          { prefix: "Q", modelType: "PNP" },
@@ -39,11 +40,37 @@ const ELEMENT_SPECS: Record<string, ElementSpec> = {
 };
 
 // ---------------------------------------------------------------------------
+// Per-device ngspice translation rules
+// ---------------------------------------------------------------------------
+
+interface DeviceNetlistRules {
+  renames?: Record<string, string>;
+  modelCardPrefix?: (props: PropertyBag) => string[];
+  modelCardDropIfZero?: string[];
+}
+
+function tunnelLevel(props: PropertyBag): string[] {
+  const ibeq = props.hasModelParam("IBEQ") ? props.getModelParam<number>("IBEQ") : 0;
+  const ibsw = props.hasModelParam("IBSW") ? props.getModelParam<number>("IBSW") : 0;
+  return (ibeq > 0 || ibsw > 0) ? ["LEVEL=3"] : [];
+}
+
+const DEVICE_NETLIST_RULES: Record<string, DeviceNetlistRules> = {
+  Diode:        { renames: { ISW: "JSW" }, modelCardPrefix: tunnelLevel },
+  ZenerDiode:   { renames: { ISW: "JSW" } },
+  VaractorDiode:{ renames: { ISW: "JSW" } },
+  TunnelDiode:  { renames: { ISW: "JSW" }, modelCardPrefix: tunnelLevel },
+  NMOS:         { modelCardDropIfZero: ["NSUB", "NSS"] },
+  PMOS:         { modelCardDropIfZero: ["NSUB", "NSS"] },
+};
+
+// ---------------------------------------------------------------------------
 // generateSpiceNetlist
 // ---------------------------------------------------------------------------
 
 export function generateSpiceNetlist(
   compiled: ConcreteCompiledAnalogCircuit,
+  registry: ComponentRegistry,
   elementLabels: Map<number, string>,
   title?: string,
 ): string {
@@ -69,6 +96,22 @@ export function generateSpiceNetlist(
 
     const props = circuitEl.getProperties();
     const nodes = el.pinNodeIds;
+
+    let paramDefs: ParamDef[] = [];
+    if (spec.modelType !== undefined) {
+      const def = registry.get(typeId);
+      if (!def) {
+        throw new Error(`netlist-generator: typeId "${typeId}" not registered`);
+      }
+      const modelKey = props.has("model")
+        ? props.get<string>("model")
+        : (def.defaultModel ?? "");
+      const modelEntry = def.modelRegistry?.[modelKey];
+      if (!modelEntry) {
+        throw new Error(`netlist-generator: typeId "${typeId}" has no modelRegistry["${modelKey}"]`);
+      }
+      paramDefs = modelEntry.paramDefs;
+    }
 
     let line: string;
 
@@ -130,48 +173,38 @@ export function generateSpiceNetlist(
 
     } else if (spec.prefix === "D") {
       const modelName = `${label}_${spec.modelType}`;
-      line = `${label} ${nodes[0] ?? 0} ${nodes[1] ?? 0} ${modelName}`;
+      line = `${label} ${nodes[0] ?? 0} ${nodes[1] ?? 0} ${modelName}${instanceParamSuffix(paramDefs, props, typeId)}`;
       if (!modelCards.has(modelName)) {
-        modelCards.set(modelName, buildModelCard(modelName, spec.modelType!, props));
+        modelCards.set(modelName, modelCardSuffix(modelName, spec.modelType!, paramDefs, props, typeId));
       }
 
     } else if (spec.prefix === "Q") {
       const modelName = `${label}_${spec.modelType}`;
-      line = `${label} ${nodes[1] ?? 0} ${nodes[0] ?? 0} ${nodes[2] ?? 0} ${modelName}`;
+      line = `${label} ${nodes[1] ?? 0} ${nodes[0] ?? 0} ${nodes[2] ?? 0} ${modelName}${instanceParamSuffix(paramDefs, props, typeId)}`;
       if (!modelCards.has(modelName)) {
-        modelCards.set(modelName, buildModelCard(modelName, spec.modelType!, props));
+        modelCards.set(modelName, modelCardSuffix(modelName, spec.modelType!, paramDefs, props, typeId));
       }
 
     } else if (spec.prefix === "M") {
       const modelName = `${label}_${spec.modelType}`;
-      const W = getPropNumber(props, "W", 1e-6);
-      const L = getPropNumber(props, "L", 1e-6);
       let d: number, g: number, s: number, b: number;
       if (typeId === "NMOS") {
-        // Internal: [G, S, D] → emit D G S body (where body=source)
-        d = nodes[2] ?? 0;
-        g = nodes[0] ?? 0;
-        s = nodes[1] ?? 0;
-        b = nodes[1] ?? 0;
+        d = nodes[2] ?? 0; g = nodes[0] ?? 0; s = nodes[1] ?? 0; b = nodes[1] ?? 0;
       } else if (typeId === "PMOS") {
-        // Internal: [G, D, S] → emit D G S body (where body=source)
-        d = nodes[1] ?? 0;
-        g = nodes[0] ?? 0;
-        s = nodes[2] ?? 0;
-        b = nodes[2] ?? 0;
+        d = nodes[1] ?? 0; g = nodes[0] ?? 0; s = nodes[2] ?? 0; b = nodes[2] ?? 0;
       } else {
         throw new Error(`netlist-generator: unknown MOSFET typeId '${typeId}' — add an explicit pin-order branch`);
       }
-      line = `${label} ${d} ${g} ${s} ${b} ${modelName} W=${W} L=${L}`;
+      line = `${label} ${d} ${g} ${s} ${b} ${modelName}${instanceParamSuffix(paramDefs, props, typeId)}`;
       if (!modelCards.has(modelName)) {
-        modelCards.set(modelName, buildModelCard(modelName, spec.modelType!, props));
+        modelCards.set(modelName, modelCardSuffix(modelName, spec.modelType!, paramDefs, props, typeId));
       }
 
     } else if (spec.prefix === "J") {
       const modelName = `${label}_${spec.modelType}`;
-      line = `${label} ${nodes[2] ?? 0} ${nodes[0] ?? 0} ${nodes[1] ?? 0} ${modelName}`;
+      line = `${label} ${nodes[2] ?? 0} ${nodes[0] ?? 0} ${nodes[1] ?? 0} ${modelName}${instanceParamSuffix(paramDefs, props, typeId)}`;
       if (!modelCards.has(modelName)) {
-        modelCards.set(modelName, buildModelCard(modelName, spec.modelType!, props));
+        modelCards.set(modelName, modelCardSuffix(modelName, spec.modelType!, paramDefs, props, typeId));
       }
 
     } else {
@@ -189,6 +222,62 @@ export function generateSpiceNetlist(
   lines.push(".end");
 
   return lines.join("\n");
+}
+
+// ---------------------------------------------------------------------------
+// Instance-param suffix (element line)
+// ---------------------------------------------------------------------------
+
+function instanceParamSuffix(
+  paramDefs: readonly ParamDef[],
+  props: PropertyBag,
+  _typeId: string,
+): string {
+  const parts: string[] = [];
+  for (const def of paramDefs) {
+    if (def.partition !== "instance") continue;
+    if (!props.hasModelParam(def.key)) continue;
+    const v = props.getModelParam<number>(def.key);
+    if (typeof v !== "number" || !Number.isFinite(v)) continue;
+    parts.push(`${def.key}=${v}`);
+  }
+  return parts.length === 0 ? "" : ` ${parts.join(" ")}`;
+}
+
+// ---------------------------------------------------------------------------
+// Model-card suffix (.model line)
+// ---------------------------------------------------------------------------
+
+function modelCardSuffix(
+  modelName: string,
+  spiceModelType: string,
+  paramDefs: readonly ParamDef[],
+  props: PropertyBag,
+  typeId: string,
+): string {
+  const rules = DEVICE_NETLIST_RULES[typeId];
+  const dropIfZero = new Set(rules?.modelCardDropIfZero ?? []);
+  const parts: string[] = [];
+
+  // Prefix tokens (e.g. LEVEL=3) come first.
+  if (rules?.modelCardPrefix) {
+    parts.push(...rules.modelCardPrefix(props));
+  }
+
+  for (const def of paramDefs) {
+    if (def.partition === "instance") continue;
+    if (!props.hasModelParam(def.key)) continue;
+    const v = props.getModelParam<number>(def.key);
+    if (typeof v !== "number" || !Number.isFinite(v)) continue;
+    if (dropIfZero.has(def.key) && v === 0) continue;
+    const emittedKey = rules?.renames?.[def.key] ?? def.key;
+    parts.push(`${emittedKey}=${v}`);
+  }
+
+  if (parts.length === 0) {
+    return `.model ${modelName} ${spiceModelType}`;
+  }
+  return `.model ${modelName} ${spiceModelType} (${parts.join(" ")})`;
 }
 
 // ---------------------------------------------------------------------------
@@ -331,32 +420,6 @@ function buildAcSourceSpec(
 }
 
 // ---------------------------------------------------------------------------
-// Model card builder
-// ---------------------------------------------------------------------------
-
-function buildModelCard(
-  modelName: string,
-  spiceModelType: string,
-  props: PropertyBag,
-): string {
-  const paramKeys = props.getModelParamKeys();
-  const paramParts: string[] = [];
-
-  for (const key of paramKeys) {
-    if (!isSpiceModelParam(key)) continue;
-    const value = props.getModelParam<number>(key);
-    if (typeof value === "number" && isFinite(value)) {
-      paramParts.push(`${key}=${value}`);
-    }
-  }
-
-  if (paramParts.length === 0) {
-    return `.model ${modelName} ${spiceModelType}`;
-  }
-  return `.model ${modelName} ${spiceModelType} (${paramParts.join(" ")})`;
-}
-
-// ---------------------------------------------------------------------------
 // Helper: read a numeric property from model params or regular bag
 // ---------------------------------------------------------------------------
 
@@ -368,21 +431,4 @@ function getPropNumber(props: PropertyBag, key: string, defaultValue: number): n
     return props.get<number>(key);
   }
   return defaultValue;
-}
-
-// ---------------------------------------------------------------------------
-// Filter out non-SPICE model param keys
-// ---------------------------------------------------------------------------
-
-const NON_MODEL_KEYS = new Set([
-  // UI / component metadata
-  "label", "model", "waveform", "expression", "bits", "bitWidth",
-  // Instance parameters (belong on the element line, not the .model card)
-  "W", "L", "AREA", "M", "TNOM",
-  // Zero-valued substrate doping is physically invalid in ngspice
-  "NSUB", "NSS",
-]);
-
-function isSpiceModelParam(key: string): boolean {
-  return !NON_MODEL_KEYS.has(key);
 }

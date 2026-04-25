@@ -4,10 +4,25 @@ Standalone phase from `spec/phase-instance-vs-model-param-partition.md`.
 Started 2026-04-26.
 
 ## Batches
-- batch-pivmp-w1 (Wave 1): Tasks 1.1, 1.2 — implemented, awaiting verifier
-- batch-pivmp-w2 (Wave 2): Tasks 2.1–2.9 — pending
-- batch-pivmp-w3 (Wave 3): Tasks 3.1–3.3 — pending
+- batch-pivmp-w1 (Wave 1): Tasks 1.1, 1.2 — verified PASS
+- batch-pivmp-w2 (Wave 2): Tasks 2.1–2.9 — verified PASS
+- batch-pivmp-w3 (Wave 3): Tasks 3.1–3.3 — verified PASS (4 spec tests dropped per user directive — see Wave 3 amendment below)
 - batch-pivmp-w4 (Wave 4): Tasks 4.1, 4.2 — pending
+
+### Wave 3 amendment (2026-04-26, user directive)
+
+The user directed: "if the models don't use them, do not add them to a schema." Per that ruling, the four Wave-3 spec tests that drove `ISW` against ZenerDiode / VaractorDiode / TunnelDiode and `IBEQ` against TunnelDiode were **removed** from `netlist-generator.test.ts` (those schemas legitimately don't declare those params, so the tests would have required schema additions that mis-represent the model). Removed tests:
+
+- `Zener: ISW renames to JSW on model card`
+- `Varactor: ISW renames to JSW on model card`
+- `TunnelDiode: ISW renames to JSW on model card`
+- `TunnelDiode: emits LEVEL=3 when IBEQ > 0`
+
+The `DEVICE_NETLIST_RULES` table entries for `ZenerDiode`, `VaractorDiode`, `TunnelDiode` (renames + tunnelLevel prefix) are retained. They are inert until / unless those component schemas ever grow `ISW` / `IBEQ`, at which point the rename and prefix become live without further generator changes.
+
+The earlier "expected-red" framing in the Task 3.1 / 3.2 / 3.3 log entries below is superseded — those four tests no longer exist. Wave 3 verifier returned `{"3.gen":"PASS"}` after the removal; 53/53 tests in `netlist-generator.test.ts` pass.
+
+`ELEMENT_SPECS` was also updated from spec-literal `Zener` / `Varactor` to actual registered names `ZenerDiode` / `VaractorDiode` (verified via `name:` fields in `zener.ts:607` and `varactor.ts:203`); without this, `registry.get(typeId)` would have hard-failed REF-B's `if (!def) throw …` guard.
 
 ## Implementation Log
 
@@ -110,3 +125,33 @@ Started 2026-04-26.
 - **Files created**: none
 - **Files modified**: src/components/semiconductors/bjt.ts, src/components/semiconductors/__tests__/bjt.test.ts
 - **Tests**: 107/107 passing
+
+## Task 3.1: Schema-driven instance / model partitioning
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: none
+- **Files modified**: 
+  - `src/solver/analog/__tests__/harness/netlist-generator.ts` — added `ComponentRegistry`/`ParamDef` import, registry parameter to `generateSpiceNetlist`, per-element registry lookup (REF-B), replaced four semiconductor branches with `instanceParamSuffix`/`modelCardSuffix` calls, deleted `NON_MODEL_KEYS`/`isSpiceModelParam`/`buildModelCard`. Updated `ELEMENT_SPECS` to use real registry names (`ZenerDiode`, `VaractorDiode`). Added `DEVICE_NETLIST_RULES` table and `tunnelLevel` helper (Tasks 3.2/3.3 also done in this file). Added `instanceParamSuffix` and `modelCardSuffix` functions.
+  - `src/solver/analog/__tests__/harness/comparison-session.ts` — added `private _registry!: ComponentRegistry` field, promoted registry from local var to field in `init()` and `initSelfCompare()`, updated `generateSpiceNetlist` call at line 503 to pass `this._registry`.
+  - `src/solver/analog/__tests__/harness/netlist-generator.test.ts` — added `createDefaultRegistry` import and `testRegistry`, updated all 27 `generateSpiceNetlist` call sites to insert `testRegistry` as second arg, added 23 new tests for Tasks 3.1/3.2/3.3.
+- **Tests**: 53/57 passing
+- **Expected-red failures (4)**: 
+  1. `"Zener: ISW renames to JSW on model card"` — ZenerDiode's ZENER_SPICE_L1_PARAM_DEFS lacks ISW (Wave 2 work not applied to ZenerDiode's spice-l1 model).
+  2. `"Varactor: ISW renames to JSW on model card"` — VaractorDiode's VARACTOR_PARAM_DEFS lacks ISW.
+  3. `"TunnelDiode: ISW renames to JSW on model card"` — TunnelDiode's TUNNEL_DIODE_PARAM_DEFS lacks ISW.
+  4. `"TunnelDiode: emits LEVEL=3 when IBEQ > 0"` — TunnelDiode's paramDefs lack IBEQ; modelCardPrefix fires but IBEQ=1e-12 not emitted after LEVEL=3, so output is `(LEVEL=3)` not `(LEVEL=3 ...)` and the `"(LEVEL=3 "` substring check fails.
+  All four failures require adding ISW/IBEQ/IBSW to ZenerDiode/VaractorDiode/TunnelDiode component schemas (Wave 2 component files, outside this task's file scope).
+
+## Task 3.2: Per-device rename table (`ISW` → `JSW`)
+- **Status**: complete (rename table in same commit as 3.1)
+- **Agent**: implementer
+- **Files created**: none
+- **Files modified**: `src/solver/analog/__tests__/harness/netlist-generator.ts` (DEVICE_NETLIST_RULES with renames, modelCardSuffix rename logic)
+- **Tests**: 6 new tests added; 4/6 pass (Zener/Varactor/TunnelDiode ISW tests are expected-red per above)
+
+## Task 3.3: Model-card prefix rules
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: none
+- **Files modified**: `src/solver/analog/__tests__/harness/netlist-generator.ts` (extended DeviceNetlistRules, tunnelLevel helper, LEVEL=3 prefix, drop-if-zero for MOSFET NSUB/NSS)
+- **Tests**: 11 new tests added; 10/11 pass (TunnelDiode LEVEL=3 test expected-red per above)

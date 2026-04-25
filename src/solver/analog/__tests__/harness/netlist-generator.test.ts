@@ -11,6 +11,9 @@ import type { RenderContext } from "../../../../core/element.js";
 import type { Pin } from "../../../../core/pin.js";
 import type { AnalogElement, LoadContext } from "../../element.js";
 import type { StatePool } from "../../state-pool.js";
+import { createDefaultRegistry } from "../../../../components/register-all.js";
+
+const testRegistry = createDefaultRegistry();
 
 describe("BJT_MAPPING companion current slots", () => {
   it("slotToNgspice maps CQBE to offset 9", () => {
@@ -92,17 +95,17 @@ function makeCompiled(elements: AnalogElement[], ce: CEMap): ConcreteCompiledAna
 
 describe("generateSpiceNetlist", () => {
   it("title line is first line", () => {
-    const r = generateSpiceNetlist(makeCompiled([], new Map()), new Map(), "Test");
+    const r = generateSpiceNetlist(makeCompiled([], new Map()), testRegistry, new Map(), "Test");
     expect(r.split("\n")[0]).toBe("Test");
   });
 
   it("uses default title when not provided", () => {
-    const r = generateSpiceNetlist(makeCompiled([], new Map()), new Map());
+    const r = generateSpiceNetlist(makeCompiled([], new Map()), testRegistry, new Map());
     expect(r.split("\n")[0]).toBe("Auto-generated netlist");
   });
 
   it("always ends with .end", () => {
-    const ls = generateSpiceNetlist(makeCompiled([], new Map()), new Map()).split("\n");
+    const ls = generateSpiceNetlist(makeCompiled([], new Map()), testRegistry, new Map()).split("\n");
     expect(ls[ls.length - 1]).toBe(".end");
   });
 
@@ -113,7 +116,7 @@ describe("generateSpiceNetlist", () => {
       [makeAnalogEl([1, 2])],
       new Map([[0, new TestCircuitElement("Resistor", props)]]),
     );
-    expect(generateSpiceNetlist(compiled, new Map([[0, "R1"]]))).toContain("R1 1 2 4700");
+    expect(generateSpiceNetlist(compiled, testRegistry, new Map([[0, "R1"]]))).toContain("R1 1 2 4700");
   });
 
   it("capacitor: C prefix and value", () => {
@@ -123,7 +126,7 @@ describe("generateSpiceNetlist", () => {
       [makeAnalogEl([1, 0])],
       new Map([[0, new TestCircuitElement("Capacitor", props)]]),
     );
-    expect(generateSpiceNetlist(compiled, new Map([[0, "C1"]]))).toContain("C1 1 0");
+    expect(generateSpiceNetlist(compiled, testRegistry, new Map([[0, "C1"]]))).toContain("C1 1 0");
   });
 
   it("inductor: L prefix and value", () => {
@@ -133,7 +136,7 @@ describe("generateSpiceNetlist", () => {
       [makeAnalogEl([1, 0])],
       new Map([[0, new TestCircuitElement("Inductor", props)]]),
     );
-    expect(generateSpiceNetlist(compiled, new Map([[0, "L1"]]))).toContain("L1 1 0");
+    expect(generateSpiceNetlist(compiled, testRegistry, new Map([[0, "L1"]]))).toContain("L1 1 0");
   });
 
   it("DcVoltageSource: V prefix with DC keyword", () => {
@@ -143,7 +146,7 @@ describe("generateSpiceNetlist", () => {
       [makeAnalogEl([1, 0])],
       new Map([[0, new TestCircuitElement("DcVoltageSource", props)]]),
     );
-    expect(generateSpiceNetlist(compiled, new Map([[0, "V1"]]))).toContain("V1 0 1 DC 5");
+    expect(generateSpiceNetlist(compiled, testRegistry, new Map([[0, "V1"]]))).toContain("V1 0 1 DC 5");
   });
 
   it("AcVoltageSource sine: emits SIN transient specifier", () => {
@@ -157,7 +160,7 @@ describe("generateSpiceNetlist", () => {
       [makeAnalogEl([1, 0])],
       new Map([[0, new TestCircuitElement("AcVoltageSource", props)]]),
     );
-    const netlist = generateSpiceNetlist(compiled, new Map([[0, "VAC"]]));
+    const netlist = generateSpiceNetlist(compiled, testRegistry, new Map([[0, "VAC"]]));
     // Should emit SIN(VO VA FREQ TD THETA PHASE_DEG), NOT the old "DC 0.5 AC 1.5"
     expect(netlist).toContain("VAC 0 1 SIN(0.5 1.5 1000 0 0 0)");
     expect(netlist).not.toContain("DC 0.5 AC 1.5");
@@ -174,7 +177,7 @@ describe("generateSpiceNetlist", () => {
       [makeAnalogEl([1, 0])],
       new Map([[0, new TestCircuitElement("AcVoltageSource", props)]]),
     );
-    const netlist = generateSpiceNetlist(compiled, new Map([[0, "Vin"]]));
+    const netlist = generateSpiceNetlist(compiled, testRegistry, new Map([[0, "Vin"]]));
     expect(netlist).toContain("Vin 0 1 SIN(0 2 500 0 0 90)");
   });
 
@@ -198,7 +201,7 @@ describe("generateSpiceNetlist", () => {
       [makeAnalogEl([1, 0])],
       new Map([[0, new TestCircuitElement("AcVoltageSource", props)]]),
     );
-    const netlist = generateSpiceNetlist(compiled, new Map([[0, "Vin"]]));
+    const netlist = generateSpiceNetlist(compiled, testRegistry, new Map([[0, "Vin"]]));
     // V1 = 1.9 - 0.1 = 1.7999999999999998 (floating point), V2 = 2, PER = 0.001
     expect(netlist).toContain("Vin 0 1 PULSE(");
     expect(netlist).toContain("1.7999999999999998"); // V1 = dc - amp (floating point)
@@ -221,7 +224,7 @@ describe("generateSpiceNetlist", () => {
       [makeAnalogEl([1, 0])],
       new Map([[0, new TestCircuitElement("AcVoltageSource", props)]]),
     );
-    const netlist = generateSpiceNetlist(compiled, new Map([[0, "Vsq"]]));
+    const netlist = generateSpiceNetlist(compiled, testRegistry, new Map([[0, "Vsq"]]));
     // period=0.001, halfPeriod=0.0005
     // riseTime=0, fallTime=0
     // phaseShift=0, rawTD=-0, td=(0%0.001+0.001)%0.001=0
@@ -236,7 +239,7 @@ describe("generateSpiceNetlist", () => {
       [makeAnalogEl([1, 0])],
       new Map([[0, new TestCircuitElement("DcCurrentSource", props)]]),
     );
-    expect(generateSpiceNetlist(compiled, new Map([[0, "I1"]]))).toContain("I1 1 0 DC 0.01");
+    expect(generateSpiceNetlist(compiled, testRegistry, new Map([[0, "I1"]]))).toContain("I1 1 0 DC 0.01");
   });
 
   it("AcCurrentSource square: emits PULSE transient specifier with correct values", () => {
@@ -258,7 +261,7 @@ describe("generateSpiceNetlist", () => {
       [makeAnalogEl([1, 0])],
       new Map([[0, new TestCircuitElement("AcCurrentSource", props)]]),
     );
-    const netlist = generateSpiceNetlist(compiled, new Map([[0, "Iac"]]));
+    const netlist = generateSpiceNetlist(compiled, testRegistry, new Map([[0, "Iac"]]));
     expect(netlist).toContain("Iac 0 1 PULSE(-2 2 0 0 0 0.0005 0.001)");
     expect(netlist).not.toContain("AC 2");
   });
@@ -274,7 +277,7 @@ describe("generateSpiceNetlist", () => {
       [makeAnalogEl([1, 0])],
       new Map([[0, new TestCircuitElement("AcCurrentSource", props)]]),
     );
-    const netlist = generateSpiceNetlist(compiled, new Map([[0, "Iac"]]));
+    const netlist = generateSpiceNetlist(compiled, testRegistry, new Map([[0, "Iac"]]));
     expect(netlist).toContain("Iac 0 1 SIN(0 1.5 500 0 0 0)");
     expect(netlist).not.toContain("AC 1.5");
   });
@@ -290,7 +293,7 @@ describe("generateSpiceNetlist", () => {
       [makeAnalogEl([1, 0])],
       new Map([[0, new TestCircuitElement("AcCurrentSource", props)]]),
     );
-    const netlist = generateSpiceNetlist(compiled, new Map([[0, "Iac"]]));
+    const netlist = generateSpiceNetlist(compiled, testRegistry, new Map([[0, "Iac"]]));
     expect(netlist).toContain("Iac 0 1 SIN(0 3 1000 0 0 90)");
   });
 
@@ -302,7 +305,7 @@ describe("generateSpiceNetlist", () => {
       [makeAnalogEl([3, 2, 1])],
       new Map([[0, new TestCircuitElement("NpnBJT", props)]]),
     );
-    const r = generateSpiceNetlist(compiled, new Map([[0, "Q1"]]));
+    const r = generateSpiceNetlist(compiled, testRegistry, new Map([[0, "Q1"]]));
     expect(r).toContain("Q1 2 3 1 Q1_NPN");
     expect(r).toContain(".model Q1_NPN NPN");
     expect(r).toContain("BF=100");
@@ -316,7 +319,7 @@ describe("generateSpiceNetlist", () => {
       [makeAnalogEl([3, 2, 1])],
       new Map([[0, new TestCircuitElement("PnpBJT", props)]]),
     );
-    const r = generateSpiceNetlist(compiled, new Map([[0, "Q2"]]));
+    const r = generateSpiceNetlist(compiled, testRegistry, new Map([[0, "Q2"]]));
     expect(r).toContain("Q2 2 3 1 Q2_PNP");
     expect(r).toContain(".model Q2_PNP PNP");
   });
@@ -328,7 +331,7 @@ describe("generateSpiceNetlist", () => {
       [makeAnalogEl([2, 0])],
       new Map([[0, new TestCircuitElement("Diode", props)]]),
     );
-    const r = generateSpiceNetlist(compiled, new Map([[0, "D1"]]));
+    const r = generateSpiceNetlist(compiled, testRegistry, new Map([[0, "D1"]]));
     expect(r).toContain("D1 2 0 D1_D");
     expect(r).toContain(".model D1_D D");
   });
@@ -341,7 +344,7 @@ describe("generateSpiceNetlist", () => {
       [makeAnalogEl([3, 2, 1, 0])],
       new Map([[0, new TestCircuitElement("NMOS", props)]]),
     );
-    const r = generateSpiceNetlist(compiled, new Map([[0, "M1"]]));
+    const r = generateSpiceNetlist(compiled, testRegistry, new Map([[0, "M1"]]));
     expect(r).toContain("M1 1 3 2 2 M1_NMOS");
     expect(r).toContain(".model M1_NMOS NMOS");
   });
@@ -353,7 +356,7 @@ describe("generateSpiceNetlist", () => {
       [makeAnalogEl([3, 2, 1])],
       new Map([[0, new TestCircuitElement("NJFET", props)]]),
     );
-    const r = generateSpiceNetlist(compiled, new Map([[0, "J1"]]));
+    const r = generateSpiceNetlist(compiled, testRegistry, new Map([[0, "J1"]]));
     expect(r).toContain("J1 1 3 2 J1_NMF");
     expect(r).toContain(".model J1_NMF NMF");
   });
@@ -365,7 +368,7 @@ describe("generateSpiceNetlist", () => {
       [makeAnalogEl([3, 2, 1])],
       new Map([[0, new TestCircuitElement("PJFET", props)]]),
     );
-    const r = generateSpiceNetlist(compiled, new Map([[0, "J2"]]));
+    const r = generateSpiceNetlist(compiled, testRegistry, new Map([[0, "J2"]]));
     expect(r).toContain("J2 1 3 2 J2_PMF");
     expect(r).toContain(".model J2_PMF PMF");
   });
@@ -377,12 +380,12 @@ describe("generateSpiceNetlist", () => {
       [makeAnalogEl([1, 0])],
       new Map([[0, new TestCircuitElement("Resistor", props)]]),
     );
-    expect(generateSpiceNetlist(compiled, new Map())).toContain("element_0 1 0");
+    expect(generateSpiceNetlist(compiled, testRegistry, new Map())).toContain("element_0 1 0");
   });
 
   it("skips elements with no circuitElement entry", () => {
     const compiled = makeCompiled([makeAnalogEl([1, 0])], new Map());
-    const ls = generateSpiceNetlist(compiled, new Map([[0, "X1"]])).split("\n");
+    const ls = generateSpiceNetlist(compiled, testRegistry, new Map([[0, "X1"]])).split("\n");
     expect(ls).toHaveLength(2);
   });
 
@@ -392,7 +395,7 @@ describe("generateSpiceNetlist", () => {
       [makeAnalogEl([1, 0])],
       new Map([[0, new TestCircuitElement("UnknownThing", props)]]),
     );
-    const ls = generateSpiceNetlist(compiled, new Map([[0, "X1"]])).split("\n");
+    const ls = generateSpiceNetlist(compiled, testRegistry, new Map([[0, "X1"]])).split("\n");
     expect(ls).toHaveLength(2);
   });
 
@@ -402,9 +405,328 @@ describe("generateSpiceNetlist", () => {
       [makeAnalogEl([1, 0])],
       new Map([[0, new TestCircuitElement("Diode", props)]]),
     );
-    const r = generateSpiceNetlist(compiled, new Map([[0, "D1"]]));
+    const r = generateSpiceNetlist(compiled, testRegistry, new Map([[0, "D1"]]));
     expect(r).toContain(".model D1_D D");
     expect(r).not.toContain("(");
   });
-});
 
+  // -------------------------------------------------------------------------
+  // Task 3.1: Schema-driven partition tests
+  // -------------------------------------------------------------------------
+
+  it("diode: instance params emit on element line in paramDefs order, NaN dropped", () => {
+    const props = new PropertyBag();
+    props.setModelParam("AREA", 2);
+    props.setModelParam("OFF", 1);
+    props.setModelParam("TEMP", 325);
+    // IC left at default NaN — should not appear
+    const compiled = makeCompiled(
+      [makeAnalogEl([1, 2])],
+      new Map([[0, new TestCircuitElement("Diode", props)]]),
+    );
+    const netlist = generateSpiceNetlist(compiled, testRegistry, new Map([[0, "D1"]]));
+    expect(netlist).toContain("D1 1 2 D1_D AREA=2 OFF=1 TEMP=325");
+    expect(netlist).not.toContain("IC=");
+  });
+
+  it("diode: model card excludes instance keys", () => {
+    const props = new PropertyBag();
+    props.setModelParam("AREA", 2);
+    props.setModelParam("OFF", 1);
+    props.setModelParam("TEMP", 325);
+    props.setModelParam("IS", 1e-14);
+    const compiled = makeCompiled(
+      [makeAnalogEl([1, 2])],
+      new Map([[0, new TestCircuitElement("Diode", props)]]),
+    );
+    const netlist = generateSpiceNetlist(compiled, testRegistry, new Map([[0, "D1"]]));
+    // Instance params must not appear on .model line
+    const modelLine = netlist.split("\n").find(l => l.startsWith(".model D1_D D"))!;
+    expect(modelLine).toBeDefined();
+    expect(modelLine).not.toContain("OFF=");
+    expect(modelLine).not.toContain("AREA=");
+    expect(modelLine).not.toContain("TEMP=");
+    expect(modelLine).not.toContain("IC=");
+    // Model params must appear on .model line
+    expect(modelLine).toContain("IS=");
+  });
+
+  it("MOSFET NMOS: element line emits W L M OFF ICVDS ICVGS ICVBS TEMP in paramDefs order", () => {
+    const props = new PropertyBag();
+    props.setModelParam("W", 2e-6);
+    props.setModelParam("L", 1e-6);
+    props.setModelParam("M", 1);
+    props.setModelParam("OFF", 0);
+    props.setModelParam("ICVDS", 0);
+    props.setModelParam("ICVGS", 0);
+    props.setModelParam("ICVBS", 0);
+    props.setModelParam("TEMP", 300.15);
+    const compiled = makeCompiled(
+      [makeAnalogEl([3, 2, 1, 0])],
+      new Map([[0, new TestCircuitElement("NMOS", props)]]),
+    );
+    const netlist = generateSpiceNetlist(compiled, testRegistry, new Map([[0, "M1"]]));
+    const elementLine = netlist.split("\n").find(l => l.startsWith("M1 "))!;
+    expect(elementLine).toBeDefined();
+    const wPos = elementLine.indexOf("W=");
+    const lPos = elementLine.indexOf("L=");
+    const mPos = elementLine.indexOf("M=");
+    const offPos = elementLine.indexOf("OFF=");
+    const icvdsPos = elementLine.indexOf("ICVDS=");
+    const icvgsPos = elementLine.indexOf("ICVGS=");
+    const icvbsPos = elementLine.indexOf("ICVBS=");
+    const tempPos = elementLine.indexOf("TEMP=");
+    expect(wPos).toBeGreaterThan(-1);
+    expect(lPos).toBeGreaterThan(wPos);
+    expect(mPos).toBeGreaterThan(lPos);
+    expect(offPos).toBeGreaterThan(mPos);
+    expect(icvdsPos).toBeGreaterThan(offPos);
+    expect(icvgsPos).toBeGreaterThan(icvdsPos);
+    expect(icvbsPos).toBeGreaterThan(icvgsPos);
+    expect(tempPos).toBeGreaterThan(icvbsPos);
+  });
+
+  it("MOSFET NMOS: model card excludes W L M ICV* OFF TEMP", () => {
+    const props = new PropertyBag();
+    props.setModelParam("W", 2e-6);
+    props.setModelParam("L", 1e-6);
+    props.setModelParam("M", 1);
+    props.setModelParam("OFF", 0);
+    props.setModelParam("ICVDS", 0);
+    props.setModelParam("ICVGS", 0);
+    props.setModelParam("ICVBS", 0);
+    props.setModelParam("TEMP", 300.15);
+    props.setModelParam("VTO", 1.5);
+    const compiled = makeCompiled(
+      [makeAnalogEl([3, 2, 1, 0])],
+      new Map([[0, new TestCircuitElement("NMOS", props)]]),
+    );
+    const netlist = generateSpiceNetlist(compiled, testRegistry, new Map([[0, "M1"]]));
+    const modelLine = netlist.split("\n").find(l => l.startsWith(".model M1_NMOS NMOS"))!;
+    expect(modelLine).toBeDefined();
+    expect(modelLine).not.toContain("W=");
+    expect(modelLine).not.toContain("L=");
+    expect(modelLine).not.toContain("M=");
+    expect(modelLine).not.toContain("OFF=");
+    expect(modelLine).not.toContain("ICVDS=");
+    expect(modelLine).not.toContain("ICVGS=");
+    expect(modelLine).not.toContain("ICVBS=");
+    expect(modelLine).not.toContain("TEMP=");
+    expect(modelLine).toContain("VTO=");
+  });
+
+  it("BJT NPN spice variant: element line emits AREA AREAB AREAC M OFF ICVBE ICVCE TEMP SUBS", () => {
+    const props = new PropertyBag();
+    props.setModelParam("AREA", 1);
+    props.setModelParam("AREAB", 1);
+    props.setModelParam("AREAC", 1);
+    props.setModelParam("M", 1);
+    props.setModelParam("OFF", 0);
+    props.setModelParam("ICVBE", 0.7);
+    props.setModelParam("ICVCE", 5);
+    props.setModelParam("TEMP", 300.15);
+    props.setModelParam("SUBS", 1);
+    const compiled = makeCompiled(
+      [makeAnalogEl([3, 2, 1])],
+      new Map([[0, new TestCircuitElement("NpnBJT", props)]]),
+    );
+    const netlist = generateSpiceNetlist(compiled, testRegistry, new Map([[0, "Q1"]]));
+    const elementLine = netlist.split("\n").find(l => l.startsWith("Q1 "))!;
+    expect(elementLine).toBeDefined();
+    // Verify instance keys appear on element line in lift order
+    expect(elementLine).toContain("AREA=");
+    expect(elementLine).toContain("AREAB=");
+    expect(elementLine).toContain("AREAC=");
+    expect(elementLine).toContain("M=");
+    expect(elementLine).toContain("OFF=");
+    expect(elementLine).toContain("ICVBE=");
+    expect(elementLine).toContain("ICVCE=");
+    expect(elementLine).toContain("TEMP=");
+    expect(elementLine).toContain("SUBS=");
+    // Model card must not contain instance keys
+    const modelLine = netlist.split("\n").find(l => l.startsWith(".model Q1_NPN NPN"))!;
+    expect(modelLine).toBeDefined();
+    expect(modelLine).not.toContain("AREA=");
+    expect(modelLine).not.toContain("AREAB=");
+    expect(modelLine).not.toContain("AREAC=");
+    expect(modelLine).not.toContain("M=");
+    expect(modelLine).not.toContain("OFF=");
+    expect(modelLine).not.toContain("ICVBE=");
+    expect(modelLine).not.toContain("ICVCE=");
+    expect(modelLine).not.toContain("TEMP=");
+    expect(modelLine).not.toContain("SUBS=");
+  });
+
+  it("non-semiconductor branches are unchanged", () => {
+    const props = new PropertyBag();
+    props.setModelParam("resistance", 4700);
+    const compiled = makeCompiled(
+      [makeAnalogEl([1, 2])],
+      new Map([[0, new TestCircuitElement("Resistor", props)]]),
+    );
+    const netlist = generateSpiceNetlist(compiled, testRegistry, new Map([[0, "R1"]]));
+    expect(netlist).toContain("R1 1 2 4700");
+  });
+
+  // -------------------------------------------------------------------------
+  // Task 3.2: Per-device rename table tests
+  // -------------------------------------------------------------------------
+
+  it("Diode: ISW renames to JSW on model card", () => {
+    const props = new PropertyBag();
+    props.setModelParam("ISW", 1e-15);
+    const compiled = makeCompiled(
+      [makeAnalogEl([1, 2])],
+      new Map([[0, new TestCircuitElement("Diode", props)]]),
+    );
+    const netlist = generateSpiceNetlist(compiled, testRegistry, new Map([[0, "D1"]]));
+    expect(netlist).toContain("JSW=1e-15");
+    expect(netlist).not.toContain("ISW=");
+  });
+
+  it("non-renamed model params emit unchanged", () => {
+    const props = new PropertyBag();
+    props.setModelParam("IS", 2e-14);
+    props.setModelParam("ISW", 1e-15);
+    const compiled = makeCompiled(
+      [makeAnalogEl([1, 2])],
+      new Map([[0, new TestCircuitElement("Diode", props)]]),
+    );
+    const netlist = generateSpiceNetlist(compiled, testRegistry, new Map([[0, "D1"]]));
+    expect(netlist).toContain("IS=2e-14");
+    expect(netlist).toContain("JSW=1e-15");
+    expect(netlist).not.toContain("ISW=");
+  });
+
+  it("BJT model card emits all keys verbatim (no rename leakage)", () => {
+    const props = new PropertyBag();
+    props.setModelParam("IS", 1e-14);
+    const compiled = makeCompiled(
+      [makeAnalogEl([3, 2, 1])],
+      new Map([[0, new TestCircuitElement("NpnBJT", props)]]),
+    );
+    const netlist = generateSpiceNetlist(compiled, testRegistry, new Map([[0, "Q1"]]));
+    const modelLine = netlist.split("\n").find(l => l.startsWith(".model Q1_NPN NPN"))!;
+    expect(modelLine).toBeDefined();
+    expect(modelLine).toContain("IS=");
+    expect(modelLine).not.toContain("JS=");
+  });
+
+  // -------------------------------------------------------------------------
+  // Task 3.3: Model-card prefix and drop-if-zero tests
+  // -------------------------------------------------------------------------
+
+  it("Diode: emits LEVEL=3 when IBEQ > 0", () => {
+    const props = new PropertyBag();
+    props.setModelParam("IBEQ", 1e-12);
+    const compiled = makeCompiled(
+      [makeAnalogEl([1, 2])],
+      new Map([[0, new TestCircuitElement("Diode", props)]]),
+    );
+    const netlist = generateSpiceNetlist(compiled, testRegistry, new Map([[0, "D1"]]));
+    expect(netlist).toContain("(LEVEL=3 ");
+  });
+
+  it("Diode: emits LEVEL=3 when IBSW > 0", () => {
+    const props = new PropertyBag();
+    props.setModelParam("IBSW", 1e-12);
+    const compiled = makeCompiled(
+      [makeAnalogEl([1, 2])],
+      new Map([[0, new TestCircuitElement("Diode", props)]]),
+    );
+    const netlist = generateSpiceNetlist(compiled, testRegistry, new Map([[0, "D1"]]));
+    expect(netlist).toContain("(LEVEL=3 ");
+  });
+
+  it("Diode: does NOT emit LEVEL=3 when IBEQ=0 and IBSW=0", () => {
+    const props = new PropertyBag();
+    const compiled = makeCompiled(
+      [makeAnalogEl([1, 2])],
+      new Map([[0, new TestCircuitElement("Diode", props)]]),
+    );
+    const netlist = generateSpiceNetlist(compiled, testRegistry, new Map([[0, "D1"]]));
+    expect(netlist).not.toContain("LEVEL=3");
+  });
+
+  it("Diode: does NOT emit LEVEL=3 for non-default NB alone", () => {
+    const props = new PropertyBag();
+    props.setModelParam("NB", 2);
+    const compiled = makeCompiled(
+      [makeAnalogEl([1, 2])],
+      new Map([[0, new TestCircuitElement("Diode", props)]]),
+    );
+    const netlist = generateSpiceNetlist(compiled, testRegistry, new Map([[0, "D1"]]));
+    expect(netlist).not.toContain("LEVEL=3");
+  });
+
+  it("Zener: never emits LEVEL=3", () => {
+    const props = new PropertyBag();
+    const compiled = makeCompiled(
+      [makeAnalogEl([1, 2])],
+      new Map([[0, new TestCircuitElement("ZenerDiode", props)]]),
+    );
+    const netlist = generateSpiceNetlist(compiled, testRegistry, new Map([[0, "D1"]]));
+    expect(netlist).not.toContain("LEVEL=3");
+  });
+
+  it("NMOS: NSUB=0 dropped from model card", () => {
+    const props = new PropertyBag();
+    // NSUB default is 0, do not set it explicitly — default should be dropped
+    const compiled = makeCompiled(
+      [makeAnalogEl([3, 2, 1, 0])],
+      new Map([[0, new TestCircuitElement("NMOS", props)]]),
+    );
+    const netlist = generateSpiceNetlist(compiled, testRegistry, new Map([[0, "M1"]]));
+    const modelLine = netlist.split("\n").find(l => l.startsWith(".model M1_NMOS NMOS"))!;
+    expect(modelLine).toBeDefined();
+    expect(modelLine).not.toContain("NSUB=");
+  });
+
+  it("NMOS: NSUB=1e16 emitted on model card", () => {
+    const props = new PropertyBag();
+    props.setModelParam("NSUB", 1e16);
+    const compiled = makeCompiled(
+      [makeAnalogEl([3, 2, 1, 0])],
+      new Map([[0, new TestCircuitElement("NMOS", props)]]),
+    );
+    const netlist = generateSpiceNetlist(compiled, testRegistry, new Map([[0, "M1"]]));
+    expect(netlist).toContain("NSUB=" + String(1e16));
+  });
+
+  it("NMOS: NSS=0 dropped from model card", () => {
+    const props = new PropertyBag();
+    // NSS default is 0
+    const compiled = makeCompiled(
+      [makeAnalogEl([3, 2, 1, 0])],
+      new Map([[0, new TestCircuitElement("NMOS", props)]]),
+    );
+    const netlist = generateSpiceNetlist(compiled, testRegistry, new Map([[0, "M1"]]));
+    const modelLine = netlist.split("\n").find(l => l.startsWith(".model M1_NMOS NMOS"))!;
+    expect(modelLine).toBeDefined();
+    expect(modelLine).not.toContain("NSS=");
+  });
+
+  it("NMOS: NSS=2e10 emitted on model card", () => {
+    const props = new PropertyBag();
+    props.setModelParam("NSS", 2e10);
+    const compiled = makeCompiled(
+      [makeAnalogEl([3, 2, 1, 0])],
+      new Map([[0, new TestCircuitElement("NMOS", props)]]),
+    );
+    const netlist = generateSpiceNetlist(compiled, testRegistry, new Map([[0, "M1"]]));
+    expect(netlist).toContain("NSS=" + String(2e10));
+  });
+
+  it("PMOS: NSUB=0 and NSS=0 dropped from model card", () => {
+    const props = new PropertyBag();
+    const compiled = makeCompiled(
+      [makeAnalogEl([3, 2, 1, 0])],
+      new Map([[0, new TestCircuitElement("PMOS", props)]]),
+    );
+    const netlist = generateSpiceNetlist(compiled, testRegistry, new Map([[0, "M1"]]));
+    const modelLine = netlist.split("\n").find(l => l.startsWith(".model M1_PMOS PMOS"))!;
+    expect(modelLine).toBeDefined();
+    expect(modelLine).not.toContain("NSUB=");
+    expect(modelLine).not.toContain("NSS=");
+  });
+});

@@ -375,6 +375,9 @@ export class ComparisonSession {
   // Analysis type
   protected _analysis: "dcop" | "tran" | null = null;
 
+  // ComponentRegistry for netlist generation
+  private _registry!: ComponentRegistry;
+
   // Whether init() has completed
   protected _inited: boolean = false;
 
@@ -433,8 +436,8 @@ export class ComparisonSession {
    * and close the boot step directly into _stepCapture.
    */
   async init(): Promise<void> {
-    const registry = createDefaultRegistry();
-    this._facade = new DefaultSimulatorFacade(registry);
+    this._registry = createDefaultRegistry();
+    this._facade = new DefaultSimulatorFacade(this._registry);
 
     const dtsJson = readFileSync(resolvePath(this._opts.dtsPath!), "utf-8");
     const circuit = this._facade.deserialize(dtsJson);
@@ -443,11 +446,11 @@ export class ComparisonSession {
   }
 
   private async initSelfCompare(buildCircuit?: (registry: ComponentRegistry) => Circuit): Promise<void> {
-    const registry = createDefaultRegistry();
-    this._facade = new DefaultSimulatorFacade(registry);
+    this._registry = createDefaultRegistry();
+    this._facade = new DefaultSimulatorFacade(this._registry);
 
     const circuit = buildCircuit
-      ? buildCircuit(registry)
+      ? buildCircuit(this._registry)
       : this._facade.deserialize(readFileSync(resolvePath(this._opts.dtsPath!), "utf-8"));
 
     await this._initWithCircuit(circuit);
@@ -500,7 +503,7 @@ export class ComparisonSession {
       const cirRaw = readFileSync(resolvePath(this._opts.cirPath), "utf-8");
       this._cirClean = stripControlBlock(cirRaw);
     } else if (!this._opts.selfCompare) {
-      this._cirClean = generateSpiceNetlist(compiled, this._elementLabels);
+      this._cirClean = generateSpiceNetlist(compiled, this._registry, this._elementLabels);
     }
 
     this._inited = true;
