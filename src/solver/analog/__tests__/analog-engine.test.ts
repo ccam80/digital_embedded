@@ -225,7 +225,7 @@ describe("MNAEngine", () => {
     engine.init(circuit);
 
     // DC operating point: capacitor charges to Vs=5V
-    engine.dcOperatingPoint();
+    engine.transientDcop();
 
     // Step until simTime reaches approximately RC = 1ms
     // maxTimeStep defaults to 5e-6; 1ms / 5e-6 = 200 steps minimum
@@ -255,7 +255,7 @@ describe("MNAEngine", () => {
   it("sim_time_advances", () => {
     const circuit = makeResistorDividerCircuit();
     engine.init(circuit);
-    engine.dcOperatingPoint();
+    engine.transientDcop();
 
     expect(engine.simTime).toBe(0);
 
@@ -269,7 +269,7 @@ describe("MNAEngine", () => {
   it("last_dt_reflects_adaptive_step", () => {
     const circuit = makeResistorDividerCircuit();
     engine.init(circuit);
-    engine.dcOperatingPoint();
+    engine.transientDcop();
 
     engine.step();
 
@@ -374,7 +374,7 @@ describe("MNAEngine", () => {
   it("breakpoint_honored", () => {
     const circuit = makeResistorDividerCircuit();
     engine.init(circuit);
-    engine.dcOperatingPoint();
+    engine.transientDcop();
 
     const targetTime = 50e-6; // 50µs
     engine.addBreakpoint(targetTime);
@@ -478,7 +478,7 @@ describe("MNAEngine", () => {
     const circuit = makeDiodeCircuit();
     engine.init(circuit);
     engine.configure({ predictor: false });
-    engine.dcOperatingPoint();
+    engine.transientDcop();
 
     // Run several transient steps; engine must not enter ERROR state.
     for (let i = 0; i < 20; i++) {
@@ -578,7 +578,7 @@ describe("MNAEngine", () => {
     const circuit = makeRCCircuit();
     engine.init(circuit);
     // Default configure — predictor is false
-    engine.dcOperatingPoint();
+    engine.transientDcop();
 
     // Step for at least one RC time constant
     const RC = 1e-3; // 1kΩ × 1µF
@@ -616,7 +616,7 @@ describe("MNAEngine", () => {
     };
 
     engine.init(circuit);
-    engine.dcOperatingPoint();
+    engine.transientDcop();
 
     // Before transient: fuse should be intact
     expect(fuse.blown).toBe(false);
@@ -792,7 +792,7 @@ describe("rc_transient_without_separate_loops", () => {
     const circuit = makeRCCircuit();
     const engine = new MNAEngine();
     engine.init(circuit);
-    engine.dcOperatingPoint();
+    engine.transientDcop();
 
     // Run 100 transient steps.
     for (let i = 0; i < 100; i++) {
@@ -886,7 +886,7 @@ describe("method_stable_across_ringing", () => {
     const circuit = makeRCCircuit();
     const engine = new MNAEngine();
     engine.init(circuit);
-    engine.dcOperatingPoint();
+    engine.transientDcop();
 
     // Run 50 transient steps.
     for (let i = 0; i < 50; i++) {
@@ -960,7 +960,7 @@ describe("predictor_gate_off_by_default", () => {
       const engine = new MNAEngine();
       engine.init(circuit);
       engine.configure({ predictor: false });
-      engine.dcOperatingPoint();
+      engine.transientDcop();
 
       // Run 10 steps with predictor explicitly disabled.
       for (let i = 0; i < 10; i++) {
