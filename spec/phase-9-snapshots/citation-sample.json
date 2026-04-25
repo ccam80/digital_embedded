@@ -1,0 +1,98 @@
+{
+  "capturedAt": "2026-04-25T01:15:00.000Z",
+  "populationSize": 1284,
+  "sampleSize": 10,
+  "samples": [
+    {
+      "inventoryRowId": "C-0171",
+      "sourceFile": "src/components/passives/transformer.ts",
+      "sourceLine": 325,
+      "ngspiceRef": "indload.c:107",
+      "verificationResult": "verified",
+      "matchType": "function-definition",
+      "notes": "indload.c:107 contains \"newmind = here->INDinduct/m;\" matching the claim \"newmind = L/m\" exactly."
+    },
+    {
+      "inventoryRowId": "C-0230",
+      "sourceFile": "src/components/semiconductors/bjt.ts",
+      "sourceLine": 462,
+      "ngspiceRef": "bjtload.c:499",
+      "verificationResult": "verified",
+      "matchType": "control-flow-pattern",
+      "notes": "bjtload.c:499 assigns dqbdvc=q1*qb*here->BJTtinvEarlyVoltF; lines 512 and 515 contain alternate dqbdvc assignments. All three match the claim referencing dqb/dVbc at (,512,515)."
+    },
+    {
+      "inventoryRowId": "C-0343",
+      "sourceFile": "src/components/semiconductors/bjt.ts",
+      "sourceLine": 1577,
+      "ngspiceRef": "bjtload.c:561-563",
+      "verificationResult": "verified",
+      "matchType": "control-flow-pattern",
+      "notes": "bjtload.c:561-563 contains the exact mode-gating pattern: (MODETRAN|MODEAC) || (MODETRANOP&&MODEUIC) || MODEINITSMSIG, matching the claim verbatim."
+    },
+    {
+      "inventoryRowId": "C-0490",
+      "sourceFile": "src/components/semiconductors/mosfet.ts",
+      "sourceLine": 477,
+      "ngspiceRef": "mos1load.c:131-141",
+      "verificationResult": "verified",
+      "matchType": "control-flow-pattern",
+      "notes": "mos1load.c:131-141 contains DrainSatCur and SourceSatCur assignments scaled by here->MOS1m, matching the claim about drain/source saturation currents scaled by M."
+    },
+    {
+      "inventoryRowId": "C-0520",
+      "sourceFile": "src/components/semiconductors/mosfet.ts",
+      "sourceLine": 938,
+      "ngspiceRef": "mos1load.c:205-225",
+      "verificationResult": "verified",
+      "matchType": "control-flow-pattern",
+      "notes": "mos1load.c:205-225 opens with #ifndef PREDICTOR guard and contains the predictor step code block with comment \"predictor step\", matching the claim."
+    },
+    {
+      "inventoryRowId": "C-0558",
+      "sourceFile": "src/components/semiconductors/mosfet.ts",
+      "sourceLine": 1320,
+      "ngspiceRef": "mos1load.c:641-694",
+      "verificationResult": "verified",
+      "matchType": "control-flow-pattern",
+      "notes": "mos1load.c:641-694 contains the bulk-drain depletion capacitance and charge computation (MOS1qbd, MOS1capbd), matching the claim about bulk-drain depletion cap + charge."
+    },
+    {
+      "inventoryRowId": "C-0638",
+      "sourceFile": "src/components/semiconductors/njfet.ts",
+      "sourceLine": 747,
+      "ngspiceRef": "jfetload.c:534-550",
+      "verificationResult": "verified",
+      "matchType": "control-flow-pattern",
+      "notes": "jfetload.c:534-550 contains the Y-matrix stamp block (comment: \"load y matrix\") with all JFET conductance stamps. JFET has no separate RD/RS resistance sub-nodes; gdpr/gspr are stamped directly."
+    },
+    {
+      "inventoryRowId": "C-0703",
+      "sourceFile": "src/components/semiconductors/zener.ts",
+      "sourceLine": 274,
+      "ngspiceRef": "dioload.c:261-263",
+      "verificationResult": "verified",
+      "matchType": "control-flow-pattern",
+      "notes": "dioload.c:261-263 contains the breakdown branch: evrev=exp(-(DIOtBrkdwnV+vd)/vtebrk); cdb=-csat*evrev; gdb=csat*evrev/vtebrk. Matches breakdown citation."
+    },
+    {
+      "inventoryRowId": "C-1110",
+      "sourceFile": "src/solver/analog/sparse-solver.ts",
+      "sourceLine": 269,
+      "ngspiceRef": "spalloc.c:192",
+      "verificationResult": "verified",
+      "matchType": "function-definition",
+      "notes": "spalloc.c:192 assigns Matrix->RelThreshold = DEFAULT_THRESHOLD, matching the claim about pivot relative threshold."
+    },
+    {
+      "inventoryRowId": "C-1165",
+      "sourceFile": "src/solver/analog/timestep.ts",
+      "sourceLine": 27,
+      "ngspiceRef": "dctran.c:553-554",
+      "verificationResult": "verified",
+      "matchType": "control-flow-pattern",
+      "notes": "dctran.c:553-554 contains AlmostEqualUlps(ckt->CKTtime, ckt->CKTbreaks[0], 100) matching the claim exactly."
+    }
+  ],
+  "expansions": []
+}

@@ -50,10 +50,11 @@ gate at Phase 9.1.3, meaning 9.1.3 must *run to completion*, not
   `spec/plan.md` before Phase 9 runs. Phase 9 reads the list as it
   stands in `spec/plan.md` at phase start.
 - **Files to create**:
-  - `test-results/phase-9-identifier-sweep.json` — durable snapshot of
-    the sweep result. Schema below.
+  - `spec/phase-9-snapshots/identifier-sweep.json` — durable snapshot of
+    the sweep result. Schema below. Path moved out of `test-results/`
+    because Playwright wipes that directory at the start of every run.
 - **Files to modify**: (none)
-- **Snapshot schema** (`test-results/phase-9-identifier-sweep.json`):
+- **Snapshot schema** (`spec/phase-9-snapshots/identifier-sweep.json`):
   ```
   {
     "capturedAt": "<ISO-8601 UTC timestamp>",
@@ -78,7 +79,7 @@ gate at Phase 9.1.3, meaning 9.1.3 must *run to completion*, not
   means an earlier phase's closure claim was incomplete.
 - **Tests**:
   - `src/solver/analog/__tests__/phase-9-sweep.test.ts::IdentifierSweep::snapshotExists`
-    — assert `test-results/phase-9-identifier-sweep.json` exists and
+    — assert `spec/phase-9-snapshots/identifier-sweep.json` exists and
     parses as valid JSON against the schema above.
   - `src/solver/analog/__tests__/phase-9-sweep.test.ts::IdentifierSweep::allZeroOffendingPaths`
     — assert every identifier row has `hitsOutsideAllowlist === 0`.
@@ -106,9 +107,10 @@ gate at Phase 9.1.3, meaning 9.1.3 must *run to completion*, not
   correct is a human review responsibility (spot-check during user
   review of the commit).
 - **Files to create**:
-  - `test-results/phase-9-citation-sample.json` — durable snapshot
+  - `spec/phase-9-snapshots/citation-sample.json` — durable snapshot
     holding the sample, the verdicts, the scope-expansion records,
-    and the correction count.
+    and the correction count. Path moved out of `test-results/`
+    because Playwright wipes that directory at the start of every run.
 - **Files to modify**:
   - `spec/ngspice-citation-audit.json` — rows for sampled citations
     transition from `unverified` to `verified` or `stale`. When
@@ -168,7 +170,7 @@ gate at Phase 9.1.3, meaning 9.1.3 must *run to completion*, not
     landed) and a rot-surfacing expansion means Phase 8's sweep
     missed it.
 
-- **Snapshot schema** (`test-results/phase-9-citation-sample.json`):
+- **Snapshot schema** (`spec/phase-9-snapshots/citation-sample.json`):
   ```
   {
     "capturedAt": "<ISO-8601 UTC timestamp>",
@@ -199,7 +201,7 @@ gate at Phase 9.1.3, meaning 9.1.3 must *run to completion*, not
 
 - **Tests (artifact-hygiene only — NOT content verification)**:
   - `src/solver/analog/__tests__/phase-9-sweep.test.ts::CitationSample::snapshotExists`
-    — assert `test-results/phase-9-citation-sample.json` exists and
+    — assert `spec/phase-9-snapshots/citation-sample.json` exists and
     parses as valid JSON.
   - `src/solver/analog/__tests__/phase-9-sweep.test.ts::CitationSample::schemaShape`
     — assert the top-level keys match the schema and every entry in
@@ -260,12 +262,13 @@ gate at Phase 9.1.3, meaning 9.1.3 must *run to completion*, not
   acceptance triage. Do NOT attempt fixes. Do NOT re-run selectively
   to chase flakes; the full-suite single-run is the baseline.
 - **Files to create**:
-  - `test-results/phase-9-full-suite-baseline.json` — durable JSON
+  - `spec/phase-9-snapshots/full-suite-baseline.json` — durable JSON
     snapshot of full-suite failures. Stable path for Phase 10 handoff;
     must NOT be the transient `test-results/test-failures.json` that
-    `npm run test:q` overwrites.
+    `npm run test:q` overwrites. Path moved out of `test-results/`
+    because Playwright wipes that directory at the start of every run.
 - **Files to modify**: (none)
-- **Snapshot schema** (`test-results/phase-9-full-suite-baseline.json`):
+- **Snapshot schema** (`spec/phase-9-snapshots/full-suite-baseline.json`):
   ```
   {
     "capturedAt": "<ISO-8601 UTC timestamp>",
@@ -306,7 +309,7 @@ gate at Phase 9.1.3, meaning 9.1.3 must *run to completion*, not
   originating phase's closure claim, which Phase 10 triage surfaces.
 - **Tests**:
   - `src/solver/analog/__tests__/phase-9-sweep.test.ts::FullSuiteBaseline::snapshotExists`
-    — assert `test-results/phase-9-full-suite-baseline.json` exists
+    — assert `spec/phase-9-snapshots/full-suite-baseline.json` exists
     and validates against the schema. (This test itself runs as part
     of the baseline — the snapshot it checks is the ONE from the
     prior run; on the first run the snapshot is absent, which is the
@@ -317,7 +320,7 @@ gate at Phase 9.1.3, meaning 9.1.3 must *run to completion*, not
 - **Acceptance criteria**:
   - `npm test` ran to completion. `exitCode` is recorded in the
     snapshot regardless of pass/fail.
-  - `test-results/phase-9-full-suite-baseline.json` exists and
+  - `spec/phase-9-snapshots/full-suite-baseline.json` exists and
     validates against the schema.
   - Snapshot is NOT the same file as the transient
     `test-results/test-failures.json`; it is a stable, phase-scoped

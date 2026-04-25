@@ -1,0 +1,566 @@
+{
+  "capturedAt": "2026-04-25T01:08:33.659Z",
+  "listSource": "spec/plan.md Wave 0.1.1 (read at phase start)",
+  "identifiers": [
+    {
+      "identifier": "updateOp",
+      "hitCount": 0,
+      "hitsOutsideAllowlist": 0,
+      "allowlist": [
+        "ref/ngspice/",
+        "spec/"
+      ],
+      "offendingPaths": []
+    },
+    {
+      "identifier": "stampCompanion",
+      "hitCount": 0,
+      "hitsOutsideAllowlist": 0,
+      "allowlist": [
+        "ref/ngspice/",
+        "spec/"
+      ],
+      "offendingPaths": []
+    },
+    {
+      "identifier": "ctxInitMode",
+      "hitCount": 0,
+      "hitsOutsideAllowlist": 0,
+      "allowlist": [
+        "ref/ngspice/",
+        "spec/"
+      ],
+      "offendingPaths": []
+    },
+    {
+      "identifier": "firsttime",
+      "hitCount": 0,
+      "hitsOutsideAllowlist": 0,
+      "allowlist": [
+        "ref/ngspice/",
+        "spec/"
+      ],
+      "offendingPaths": []
+    },
+    {
+      "identifier": "firstNrForThisStep",
+      "hitCount": 0,
+      "hitsOutsideAllowlist": 0,
+      "allowlist": [
+        "ref/ngspice/",
+        "spec/"
+      ],
+      "offendingPaths": []
+    },
+    {
+      "identifier": "loadCtx-iteration",
+      "hitCount": 0,
+      "hitsOutsideAllowlist": 0,
+      "allowlist": [
+        "ref/ngspice/",
+        "spec/"
+      ],
+      "offendingPaths": []
+    },
+    {
+      "identifier": "ctx-initMode",
+      "hitCount": 0,
+      "hitsOutsideAllowlist": 0,
+      "allowlist": [
+        "ref/ngspice/",
+        "spec/"
+      ],
+      "offendingPaths": []
+    },
+    {
+      "identifier": "ctx-isDcOp",
+      "hitCount": 0,
+      "hitsOutsideAllowlist": 0,
+      "allowlist": [
+        "ref/ngspice/",
+        "spec/"
+      ],
+      "offendingPaths": []
+    },
+    {
+      "identifier": "ctx-isTransient",
+      "hitCount": 0,
+      "hitsOutsideAllowlist": 0,
+      "allowlist": [
+        "ref/ngspice/",
+        "spec/"
+      ],
+      "offendingPaths": []
+    },
+    {
+      "identifier": "ctx-isAc",
+      "hitCount": 0,
+      "hitsOutsideAllowlist": 0,
+      "allowlist": [
+        "ref/ngspice/",
+        "spec/"
+      ],
+      "offendingPaths": []
+    },
+    {
+      "identifier": "ctx-isTransientDcop",
+      "hitCount": 0,
+      "hitsOutsideAllowlist": 0,
+      "allowlist": [
+        "ref/ngspice/",
+        "spec/"
+      ],
+      "offendingPaths": []
+    },
+    {
+      "identifier": "statePool-analysisMode",
+      "hitCount": 0,
+      "hitsOutsideAllowlist": 0,
+      "allowlist": [
+        "ref/ngspice/",
+        "spec/"
+      ],
+      "offendingPaths": []
+    },
+    {
+      "identifier": "pool-uic",
+      "hitCount": 0,
+      "hitsOutsideAllowlist": 0,
+      "allowlist": [
+        "ref/ngspice/",
+        "spec/"
+      ],
+      "offendingPaths": []
+    },
+    {
+      "identifier": "poolBackedElements",
+      "hitCount": 0,
+      "hitsOutsideAllowlist": 0,
+      "allowlist": [
+        "ref/ngspice/",
+        "spec/"
+      ],
+      "offendingPaths": []
+    },
+    {
+      "identifier": "refreshElementRefs",
+      "hitCount": 0,
+      "hitsOutsideAllowlist": 0,
+      "allowlist": [
+        "ref/ngspice/",
+        "spec/"
+      ],
+      "offendingPaths": []
+    },
+    {
+      "identifier": "mnaAssembler",
+      "hitCount": 0,
+      "hitsOutsideAllowlist": 0,
+      "allowlist": [
+        "ref/ngspice/",
+        "spec/"
+      ],
+      "offendingPaths": []
+    },
+    {
+      "identifier": "tunnelDiodeMapping",
+      "hitCount": 0,
+      "hitsOutsideAllowlist": 0,
+      "allowlist": [
+        "ref/ngspice/",
+        "spec/"
+      ],
+      "offendingPaths": []
+    },
+    {
+      "identifier": "varactorMapping",
+      "hitCount": 0,
+      "hitsOutsideAllowlist": 0,
+      "allowlist": [
+        "ref/ngspice/",
+        "spec/"
+      ],
+      "offendingPaths": []
+    },
+    {
+      "identifier": "derivedNgspiceSlots",
+      "hitCount": 0,
+      "hitsOutsideAllowlist": 0,
+      "allowlist": [
+        "ref/ngspice/",
+        "spec/"
+      ],
+      "offendingPaths": []
+    },
+    {
+      "identifier": "junctionCap",
+      "hitCount": 0,
+      "hitsOutsideAllowlist": 0,
+      "allowlist": [
+        "ref/ngspice/",
+        "spec/"
+      ],
+      "offendingPaths": []
+    },
+    {
+      "identifier": "coupledInductorState",
+      "hitCount": 0,
+      "hitsOutsideAllowlist": 0,
+      "allowlist": [
+        "ref/ngspice/",
+        "spec/"
+      ],
+      "offendingPaths": []
+    },
+    {
+      "identifier": "createState",
+      "hitCount": 0,
+      "hitsOutsideAllowlist": 0,
+      "allowlist": [
+        "ref/ngspice/",
+        "spec/"
+      ],
+      "offendingPaths": []
+    },
+    {
+      "identifier": "initMode-type",
+      "hitCount": 0,
+      "hitsOutsideAllowlist": 0,
+      "allowlist": [
+        "ref/ngspice/",
+        "spec/"
+      ],
+      "offendingPaths": []
+    },
+    {
+      "identifier": "slot-gd-junction",
+      "hitCount": 0,
+      "hitsOutsideAllowlist": 0,
+      "allowlist": [
+        "ref/ngspice/",
+        "spec/"
+      ],
+      "offendingPaths": []
+    },
+    {
+      "identifier": "slot-id-junction",
+      "hitCount": 0,
+      "hitsOutsideAllowlist": 0,
+      "allowlist": [
+        "ref/ngspice/",
+        "spec/"
+      ],
+      "offendingPaths": []
+    },
+    {
+      "identifier": "l1-slot-cap-geq",
+      "hitCount": 0,
+      "hitsOutsideAllowlist": 0,
+      "allowlist": [
+        "ref/ngspice/",
+        "spec/"
+      ],
+      "offendingPaths": []
+    },
+    {
+      "identifier": "l1-slot-ieq",
+      "hitCount": 0,
+      "hitsOutsideAllowlist": 0,
+      "allowlist": [
+        "ref/ngspice/",
+        "spec/"
+      ],
+      "offendingPaths": []
+    },
+    {
+      "identifier": "slot-cap-geq-gs",
+      "hitCount": 0,
+      "hitsOutsideAllowlist": 0,
+      "allowlist": [
+        "ref/ngspice/",
+        "spec/"
+      ],
+      "offendingPaths": []
+    },
+    {
+      "identifier": "slot-cap-geq-gd",
+      "hitCount": 0,
+      "hitsOutsideAllowlist": 0,
+      "allowlist": [
+        "ref/ngspice/",
+        "spec/"
+      ],
+      "offendingPaths": []
+    },
+    {
+      "identifier": "slot-cap-geq-db",
+      "hitCount": 0,
+      "hitsOutsideAllowlist": 0,
+      "allowlist": [
+        "ref/ngspice/",
+        "spec/"
+      ],
+      "offendingPaths": []
+    },
+    {
+      "identifier": "slot-cap-geq-sb",
+      "hitCount": 0,
+      "hitsOutsideAllowlist": 0,
+      "allowlist": [
+        "ref/ngspice/",
+        "spec/"
+      ],
+      "offendingPaths": []
+    },
+    {
+      "identifier": "slot-cap-geq-gb",
+      "hitCount": 0,
+      "hitsOutsideAllowlist": 0,
+      "allowlist": [
+        "ref/ngspice/",
+        "spec/"
+      ],
+      "offendingPaths": []
+    },
+    {
+      "identifier": "slot-ieq-gs",
+      "hitCount": 0,
+      "hitsOutsideAllowlist": 0,
+      "allowlist": [
+        "ref/ngspice/",
+        "spec/"
+      ],
+      "offendingPaths": []
+    },
+    {
+      "identifier": "slot-ieq-gd",
+      "hitCount": 0,
+      "hitsOutsideAllowlist": 0,
+      "allowlist": [
+        "ref/ngspice/",
+        "spec/"
+      ],
+      "offendingPaths": []
+    },
+    {
+      "identifier": "slot-ieq-db",
+      "hitCount": 0,
+      "hitsOutsideAllowlist": 0,
+      "allowlist": [
+        "ref/ngspice/",
+        "spec/"
+      ],
+      "offendingPaths": []
+    },
+    {
+      "identifier": "slot-ieq-sb",
+      "hitCount": 0,
+      "hitsOutsideAllowlist": 0,
+      "allowlist": [
+        "ref/ngspice/",
+        "spec/"
+      ],
+      "offendingPaths": []
+    },
+    {
+      "identifier": "slot-ieq-gb",
+      "hitCount": 0,
+      "hitsOutsideAllowlist": 0,
+      "allowlist": [
+        "ref/ngspice/",
+        "spec/"
+      ],
+      "offendingPaths": []
+    },
+    {
+      "identifier": "slot-q-gs",
+      "hitCount": 0,
+      "hitsOutsideAllowlist": 0,
+      "allowlist": [
+        "ref/ngspice/",
+        "spec/"
+      ],
+      "offendingPaths": []
+    },
+    {
+      "identifier": "slot-q-gd",
+      "hitCount": 0,
+      "hitsOutsideAllowlist": 0,
+      "allowlist": [
+        "ref/ngspice/",
+        "spec/"
+      ],
+      "offendingPaths": []
+    },
+    {
+      "identifier": "slot-q-gb",
+      "hitCount": 0,
+      "hitsOutsideAllowlist": 0,
+      "allowlist": [
+        "ref/ngspice/",
+        "spec/"
+      ],
+      "offendingPaths": []
+    },
+    {
+      "identifier": "slot-q-db",
+      "hitCount": 0,
+      "hitsOutsideAllowlist": 0,
+      "allowlist": [
+        "ref/ngspice/",
+        "spec/"
+      ],
+      "offendingPaths": []
+    },
+    {
+      "identifier": "slot-q-sb",
+      "hitCount": 0,
+      "hitsOutsideAllowlist": 0,
+      "allowlist": [
+        "ref/ngspice/",
+        "spec/"
+      ],
+      "offendingPaths": []
+    },
+    {
+      "identifier": "slot-cap-geq-bare",
+      "hitCount": 0,
+      "hitsOutsideAllowlist": 0,
+      "allowlist": [
+        "ref/ngspice/",
+        "spec/"
+      ],
+      "offendingPaths": []
+    },
+    {
+      "identifier": "slot-cap-ieq-bare",
+      "hitCount": 0,
+      "hitsOutsideAllowlist": 0,
+      "allowlist": [
+        "ref/ngspice/",
+        "spec/"
+      ],
+      "offendingPaths": []
+    },
+    {
+      "identifier": "prevVoltage",
+      "hitCount": 0,
+      "hitsOutsideAllowlist": 0,
+      "allowlist": [
+        "ref/ngspice/",
+        "spec/"
+      ],
+      "offendingPaths": []
+    },
+    {
+      "identifier": "prevCurrent",
+      "hitCount": 0,
+      "hitsOutsideAllowlist": 0,
+      "allowlist": [
+        "ref/ngspice/",
+        "spec/"
+      ],
+      "offendingPaths": []
+    },
+    {
+      "identifier": "prevClockVoltage",
+      "hitCount": 42,
+      "hitsOutsideAllowlist": 0,
+      "allowlist": [
+        "ref/ngspice/",
+        "spec/"
+      ],
+      "offendingPaths": []
+    },
+    {
+      "identifier": "math-exp-700",
+      "hitCount": 0,
+      "hitsOutsideAllowlist": 0,
+      "allowlist": [
+        "ref/ngspice/",
+        "spec/"
+      ],
+      "offendingPaths": []
+    },
+    {
+      "identifier": "math-min-700",
+      "hitCount": 1,
+      "hitsOutsideAllowlist": 0,
+      "allowlist": [
+        "ref/ngspice/",
+        "spec/"
+      ],
+      "offendingPaths": []
+    },
+    {
+      "identifier": "vds-lower-clamp",
+      "hitCount": 0,
+      "hitsOutsideAllowlist": 0,
+      "allowlist": [
+        "ref/ngspice/",
+        "spec/"
+      ],
+      "offendingPaths": []
+    },
+    {
+      "identifier": "vds-upper-clamp",
+      "hitCount": 0,
+      "hitsOutsideAllowlist": 0,
+      "allowlist": [
+        "ref/ngspice/",
+        "spec/"
+      ],
+      "offendingPaths": []
+    },
+    {
+      "identifier": "bdf1-literal",
+      "hitCount": 0,
+      "hitsOutsideAllowlist": 0,
+      "allowlist": [
+        "ref/ngspice/",
+        "spec/"
+      ],
+      "offendingPaths": []
+    },
+    {
+      "identifier": "bdf2-literal",
+      "hitCount": 0,
+      "hitsOutsideAllowlist": 0,
+      "allowlist": [
+        "ref/ngspice/",
+        "spec/"
+      ],
+      "offendingPaths": []
+    },
+    {
+      "identifier": "integrationMethod-auto",
+      "hitCount": 0,
+      "hitsOutsideAllowlist": 0,
+      "allowlist": [
+        "ref/ngspice/",
+        "spec/"
+      ],
+      "offendingPaths": []
+    },
+    {
+      "identifier": "bdf-hyphenated",
+      "hitCount": 0,
+      "hitsOutsideAllowlist": 0,
+      "allowlist": [
+        "ref/ngspice/",
+        "spec/"
+      ],
+      "offendingPaths": []
+    },
+    {
+      "identifier": "bdf-substring",
+      "hitCount": 0,
+      "hitsOutsideAllowlist": 0,
+      "allowlist": [
+        "ref/ngspice/",
+        "spec/"
+      ],
+      "offendingPaths": []
+    }
+  ]
+}

@@ -1265,3 +1265,23 @@ Previously-confirmed-patched files regression check: load-context.ts, ckt-contex
 - **Files modified**: none (no fix-chasing per phase spec)
 - **Tests**: 2/2 passing (FullSuiteBaseline::snapshotExists, FullSuiteBaseline::schemaFields). Combined phase-9-sweep.test.ts result: 11/11 passing.
 - **Baseline summary**: vitest 8183/8382 (199 failed, 10 skipped), playwright 470/488 (18 failed), exitCode 1. Hand-off artifact for Phase 10 acceptance triage.
+
+## Wave 9.1 verification
+
+- **First wave-verifier (`a24c1a8b9889c732b`)**: returned FAIL on a single rule violation — claimed `scripts/phase-9-identifier-sweep.cjs` had only 52 BANNED_IDENTIFIERS entries vs the authoritative 56 in `phase-0-identifier-audit.test.ts`, with `prevVoltage`, `prevCurrent`, `prevClockVoltage`, `math-min-700` allegedly missing. Coordinator re-audited the script: all 4 are present (lines 54, 59, 64, 78) and the script's total `id: "..."` count is 56, matching the authoritative source. The verifier had counted only single-line `{ id: "x", pattern: /y/ },` entries (52) and overlooked the 4 multi-line entries. False-positive FAIL.
+- **Second wave-verifier (`a2a011494e22ddb8e`, re-run with explicit false-positive evidence in prompt)**: returned PASS. Independently confirmed the 56-entry count via `^\s*id:` grep on both files. Confirmed all 11 phase-9-sweep tests pass, 10 inventory rows transitioned correctly (only those 10), and all snapshot schemas validate.
+- **Final batch state**: `group_status[9.1] = "passed"`, `verifications_passed=1`, `verifications_failed=1`, `completed=2`, `spawned=4`, `dead_implementers=3`.
+
+## Phase 9 Complete
+- **Batches**: 1 (`batch-p9-w9.1`)
+- **All verified**: yes (after one false-positive FAIL, confirmed PASS on re-verify)
+- **Deliverables landed**:
+  - `spec/phase-9-snapshots/identifier-sweep.json` (56 banned identifiers, all zero offending paths)
+  - `spec/phase-9-snapshots/citation-sample.json` (10 random samples, all 10 verified, no expansions)
+  - `spec/phase-9-snapshots/full-suite-baseline.json` (8392 tests / 8183 passed / 199+18 failed / 10 skipped, exitCode=1; Phase 10 acceptance triage input)
+  - `src/solver/analog/__tests__/phase-9-sweep.test.ts` (11 tests, all passing)
+  - `scripts/phase-9-identifier-sweep.cjs`, `scripts/phase-9-citation-sample.cjs`, `scripts/phase-9-baseline-parser.cjs`
+  - `spec/phase-9-legacy-reference-review.md` (path amendment: snapshots moved out of `test-results/` to `spec/phase-9-snapshots/` per recovery)
+  - 10 row transitions (`unverified` → `verified`) in `spec/ngspice-citation-audit.json` for: C-0171, C-0230, C-0343, C-0490, C-0520, C-0558, C-0638, C-0703, C-1110, C-1165
+- **Recovery cost**: 4 implementer attempts (3 dead) + 2 verifier runs (1 false-positive FAIL).
+- **Commit**: deferred — working tree contains parallel user work (Phase 8 reset, tutorial HTML rearrange) that should not be bundled into the Phase 9 commit. User to decide commit scope.
