@@ -194,7 +194,19 @@ export class TimestepController {
     // backward-Euler semantics via the order-1 coefficients even though
     // the configured method is trapezoidal).
     this.currentMethod = "trapezoidal";
-    this._breakpoints = [];
+
+    // Mirror ngspice dctran.c:140-145 (queue) + line 188 (CKTbreak=1):
+    // every transient run starts with breaks=[0, finalTime] and CKTbreak
+    // pre-seeded so the first arrival at `nextTime:` (the head of the
+    // transient loop) dispatches CKTaccept with breakFlag=true. The seed
+    // lives in the constructor — not in a separate method — because
+    // ngspice's dctran does it inline and there's no lifecycle reason for
+    // a fresh controller to be in any other state. The configure() path
+    // that re-seeds without re-constructing has its own restart method.
+    this._finalTime = params.tStop ?? Number.POSITIVE_INFINITY;
+    this._breakpoints = [0, this._finalTime];
+    this._breakFlag = true;
+
     this._lastAcceptedSimTime = -Infinity;
     this._acceptedSteps = 0;
     this._largestErrorElement = undefined;
@@ -226,10 +238,14 @@ export class TimestepController {
     // always meaningful, no tStop dependence.
     this._delmin = params.maxTimeStep * 1e-11;
 
-    // ngspice dctran.c:157 — CKTminBreak = CKTmaxStep * 5e-5. Distinct from
-    // CKTdelmin: minBreak gates the breakpoint pop loop and queue dedup,
-    // delmin gates the at-breakpoint proximity test.
-    this._minBreak = params.maxTimeStep * 5e-5;
+    // ngspice dctran.c:154 (XSPICE init, runs first) — CKTminBreak = 10 *
+    // CKTdelmin. Under XSPICE this resolves to ~1e-15 for typical runs;
+    // small enough that the loose `<=` pop predicate at dctran.c:629
+    // behaves like the strict `>` pop at dctran.c:412 in practice. The
+    // non-XSPICE fallback (maxStep * 5e-5, dctran.c:157) is ~500× larger
+    // and would pop breakpoints prematurely. digiTS targets the XSPICE
+    // lane (mixed digital/analog), so the XSPICE init is the correct one.
+    this._minBreak = 10 * this._delmin;
   }
 
   /**
@@ -270,8 +286,8 @@ export class TimestepController {
     // Re-derive _delmin from maxStep (traninit.c:34: CKTdelmin = 1e-11 * CKTmaxStep).
     this._delmin = params.maxTimeStep * 1e-11;
 
-    // Re-derive _minBreak from maxStep (dctran.c:157: CKTminBreak = CKTmaxStep * 5e-5).
-    this._minBreak = params.maxTimeStep * 5e-5;
+    // Re-derive _minBreak from delmin (dctran.c:154 XSPICE init: CKTminBreak = 10 * CKTdelmin).
+    this._minBreak = 10 * this._delmin;
 
     if (this._isFirstGetClampedDt) {
       // No step has been taken yet. Re-apply firstStep exactly as the
@@ -444,7 +460,7 @@ export class TimestepController {
 
         // dctran.c:572-573 — CKTdelta = MIN(CKTdelta, 0.1 * MIN(saveDelta,
         //   breaks[1] - breaks[0])). Sentinel guarantees length >= 2 after
-        //   seedSentinel; breaks[1] is always the next bp or finalTime.
+        //   the constructor seed; breaks[1] is always the next bp or finalTime.
         const gap = this._breakpoints[1]! - bp0;
         dt = Math.min(dt, 0.1 * Math.min(this._savedDelta, gap));
 
@@ -633,10 +649,23 @@ export class TimestepController {
   // Breakpoints
   // -------------------------------------------------------------------------
 
-  /** ngspice dctran.c:140-145 — seed [0, finalTime] at transient init. */
-  seedSentinel(finalTime: number): void {
+  /**
+   * Restart the transient loop with a new finalTime, preserving accepted-step
+   * history (currentDt, deltaOld, currentOrder, currentMethod, _stepCount).
+   *
+   * **No ngspice analogue.** dctran is a one-shot function — it never
+   * re-runs its prologue without re-entering the whole routine. This method
+   * exists for the digiTS-specific configure() path where tStop changes
+   * mid-run and the engine must reset the queue+breakFlag without
+   * re-constructing the controller (which would lose step history).
+   *
+   * The seed itself is the same as the constructor's: queue=[0, finalTime],
+   * breakFlag=true (mirrors dctran.c:140-145 + line 188 CKTbreak=1).
+   */
+  restartTransientLoop(finalTime: number): void {
     this._finalTime = finalTime;
     this._breakpoints = [0, finalTime];
+    this._breakFlag = true;
   }
 
   /** ngspice cktclrbk.c — shift breakpoint array, maintaining finalTime sentinel when length collapses to 2. */
@@ -672,9 +701,14 @@ export class TimestepController {
 
   /**
    * Remove all registered breakpoints and reseed the [0, finalTime] sentinel.
+   * Also resets breakFlag=true so the next acceptStep dispatch sees the same
+   * "we're starting fresh" CKTbreak pre-seed that the constructor establishes.
+   * Public AnalogEngine API; called when the engine is asked to restart its
+   * breakpoint state mid-run.
    */
   clearBreakpoints(): void {
     this._breakpoints = [0, this._finalTime];
+    this._breakFlag = true;
   }
 
 }

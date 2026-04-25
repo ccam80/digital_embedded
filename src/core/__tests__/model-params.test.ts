@@ -105,4 +105,54 @@ describe("defineModelParams", () => {
   it("shared fixture RESISTOR_DEFAULTS has correct value", () => {
     expect(RESISTOR_DEFAULTS).toEqual({ resistance: 1000 });
   });
+
+  describe("defineModelParams partition tagging", () => {
+    it("primary params get partition='model'", () => {
+      const result = defineModelParams({ primary: { IS: { default: 1e-14 } } });
+      expect(result.paramDefs[0]!.partition).toBe("model");
+    });
+
+    it("secondary params get partition='model'", () => {
+      const result = defineModelParams({
+        primary: { IS: { default: 1 } },
+        secondary: { N: { default: 1 } },
+      });
+      const nEntry = result.paramDefs.find((d) => d.key === "N")!;
+      expect(nEntry.partition).toBe("model");
+    });
+
+    it("instance params get partition='instance' and rank='secondary'", () => {
+      const result = defineModelParams({
+        primary: { IS: { default: 1 } },
+        instance: { OFF: { default: 0 } },
+      });
+      const offEntry = result.paramDefs.find((d) => d.key === "OFF")!;
+      expect(offEntry.partition).toBe("instance");
+      expect(offEntry.rank).toBe("secondary");
+    });
+
+    it("instance defaults merge into the same defaults record", () => {
+      const result = defineModelParams({
+        primary: { IS: { default: 1 } },
+        instance: { OFF: { default: 0 } },
+      });
+      expect(result.defaults.OFF).toBe(0);
+      expect(result.defaults.IS).toBe(1);
+    });
+
+    it("emission order is primary then secondary then instance", () => {
+      const result = defineModelParams({
+        primary: { A: { default: 1 } },
+        secondary: { B: { default: 2 } },
+        instance: { C: { default: 3 } },
+      });
+      expect(result.paramDefs.map((d) => d.key)).toEqual(["A", "B", "C"]);
+    });
+
+    it("omitting instance does not change paramDefs[]", () => {
+      const result = defineModelParams({ primary: { IS: { default: 1 } } });
+      expect(result.paramDefs).toHaveLength(1);
+      expect(result.paramDefs[0]!.partition).toBe("model");
+    });
+  });
 });

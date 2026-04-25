@@ -37,6 +37,15 @@ export interface ParamDef {
   unit?: string;
   description?: string;
   rank: "primary" | "secondary";
+  /**
+   * SPICE-emission partition. "instance" means the param is emitted on the
+   * element line (e.g. `D1 a k MOD AREA=2 OFF=1`) and is NOT a `.model` card
+   * parameter. Anything else (including `undefined`) is treated as "model"
+   * and emitted on the `.model` card. Defaulting to undefined preserves
+   * compatibility with hand-authored ParamDef literals outside
+   * defineModelParams().
+   */
+  partition?: "instance" | "model";
   min?: number;
   max?: number;
   default?: number;

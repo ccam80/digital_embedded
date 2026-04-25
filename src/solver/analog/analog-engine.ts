@@ -209,7 +209,8 @@ export class MNAEngine implements AnalogEngine {
     // Wire diagnostics
     this._ctx.diagnostics = this._diagnostics;
 
-    this._seedBreakpoints();
+    // Constructor seeds queue=[0, finalTime] and breakFlag=true (ngspice
+    // dctran.c:140-145, 188). No explicit seed call needed.
     this._transitionState(EngineState.STOPPED);
   }
 
@@ -247,7 +248,7 @@ export class MNAEngine implements AnalogEngine {
     for (const obs of this._measurementObservers) {
       obs.onReset();
     }
-    this._seedBreakpoints();
+    // Constructor (above) seeded queue + breakFlag.
     this._transitionState(EngineState.STOPPED);
   }
 
@@ -332,6 +333,21 @@ export class MNAEngine implements AnalogEngine {
     // exit invariant via ctx.swapRhsBuffers(), so ctx.rhsOld already holds the
     // converging iter's input — no extra copy required here.
     const statePool = (this._compiled as CompiledWithBridges).statePool ?? null;
+
+    // Top-of-iteration acceptStep dispatch — mirrors ngspice CKTaccept at
+    // dctran.c:410 (head of the `nextTime:` iteration body, BEFORE the
+    // breakpoint clamp). On the first call simTime=0 and breakFlag=true via
+    // the constructor's CKTbreak=1 pre-seed (dctran.c:188), so PULSE sources
+    // hit SAMETIME(time, 0) and register their first TR. On subsequent
+    // calls breakFlag carries over from the previous step's getClampedDt
+    // approaching-breakpoint clamp.
+    const addBPTop = ctx.addBreakpointBound;
+    const breakFlagTop = this._timestep.breakFlag;
+    for (const el of elements) {
+      if (el.acceptStep) {
+        el.acceptStep(this._simTime, addBPTop, breakFlagTop);
+      }
+    }
 
     let dt = this._timestep.getClampedDt(this._simTime);
     const method = this._timestep.currentMethod;
@@ -692,16 +708,10 @@ export class MNAEngine implements AnalogEngine {
       }
     }
 
-    // Schedule next waveform breakpoints after acceptance.
-    // ngspice CKTaccept dispatch: VSRCaccept reads CKTbreak to gate every
-    // CKTsetBreak. We pass the same flag through so source elements can
-    // mirror the SAMETIME-gated phase-boundary registration in vsrcacct.c.
-    const breakFlag = this._timestep.breakFlag;
-    for (const el of elements) {
-      if (el.acceptStep) {
-        el.acceptStep(this._simTime, addBP, breakFlag);
-      }
-    }
+    // (acceptStep dispatch lives at the TOP of step() — see ngspice CKTaccept
+    // ordering at dctran.c:410, head of the `nextTime:` iteration body. It
+    // does NOT also fire here; doing so would dispatch twice per step and
+    // diverge from ngspice's once-per-iteration semantics.)
 
     // Notify measurement observers
     this._stepCount++;
@@ -1165,7 +1175,12 @@ export class MNAEngine implements AnalogEngine {
     // approaching-breakpoint clamp compares against Infinity and the sim
     // overshoots tStop on the last step.
     if (transientInputsChanged) {
-      this._seedBreakpoints();
+      // digiTS-specific path: tStop changed mid-run, controller is preserved
+      // (currentDt, deltaOld, order, method, _stepCount). Reset queue +
+      // breakFlag so the next step's acceptStep dispatch behaves as if we
+      // just entered the transient loop with the new finalTime.
+      const finalTime = this._params.tStop ?? Number.POSITIVE_INFINITY;
+      this._timestep.restartTransientLoop(finalTime);
     }
   }
 
@@ -1312,34 +1327,6 @@ export class MNAEngine implements AnalogEngine {
     this._engineState = newState;
     for (const listener of this._changeListeners) {
       listener(newState);
-    }
-  }
-
-  /**
-   * Seed the breakpoint table with the [0, finalTime] sentinel, then fire a
-   * t=0 acceptStep on every source element so they can register their first
-   * phase-boundary breakpoint.
-   *
-   * ngspice dctran.c:140-145 seeds [0, finalTime]. Before the transient loop
-   * dctran calls CKTaccept once, which dispatches DEVaccept (vsrcacct.c) at
-   * CKTtime=0 with CKTbreak=true — for PULSE this hits the SAMETIME(time, 0)
-   * branch and registers TR. Without that t=0 dispatch, phase-boundary-gated
-   * sources never receive the priming CKTbreak step that seeds their first
-   * edge into the queue.
-   */
-  private _seedBreakpoints(): void {
-    if (!this._compiled) return;
-    const finalTime = this._params.tStop ?? Number.POSITIVE_INFINITY;
-    this._timestep.seedSentinel(finalTime);
-
-    // ngspice CKTaccept-at-t=0 equivalent. atBreakpoint=true mirrors the fact
-    // that t=0 sits at the leading sentinel breakpoint (queue[0] == 0).
-    const elements = this._compiled.elements;
-    const addBP = (t: number) => this._timestep.addBreakpoint(t);
-    for (const el of elements) {
-      if (el.acceptStep) {
-        el.acceptStep(0, addBP, true);
-      }
     }
   }
 

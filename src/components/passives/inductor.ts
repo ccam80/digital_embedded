@@ -156,24 +156,22 @@ export class InductorElement extends AbstractCircuitElement {
 // AnalogInductorElement — MNA implementation
 // ---------------------------------------------------------------------------
 
-// Slot layout — 5 slots total. Previous values are read from s1/s2/s3
-// at the same offsets (pointer-rotation history).
+// State schema — exact ngspice INDinstance layout (inddefs.h:68-69).
+// Two slots only:
+//   INDflux = INDstate+0  — flux Φ = L·i (the qcap fed to NIintegrate)
+//   INDvolt = INDstate+1  — NIintegrate companion-current cache. Despite the
+//                            "INDvolt" name in ngspice, niinteg.c:15
+//                            (`#define ccap qcap+1`) makes this slot the
+//                            ccap recursion buffer for trap order 2.
+// No GEQ/IEQ/I/VOLT-as-node-voltage slots exist in ngspice — req/veq are
+// indload.c locals; branch current comes from CKTrhsOld[INDbrEq], not state.
 const INDUCTOR_SCHEMA: StateSchema = defineStateSchema("AnalogInductorElement", [
-  { name: "GEQ",  doc: "Companion conductance",          init: { kind: "zero" } },
-  { name: "IEQ",  doc: "Companion history current",      init: { kind: "zero" } },
-  { name: "I",    doc: "Branch current this step",       init: { kind: "zero" } },
-  { name: "PHI",  doc: "Flux phi=L*i this step",         init: { kind: "zero" } },
-  { name: "CCAP", doc: "Companion current (NIintegrate)", init: { kind: "zero" } },
-  { name: "VOLT", doc: "Terminal voltage this step",     init: { kind: "zero" } },
+  { name: "PHI",  doc: "Flux Φ = L·i — ngspice INDflux (INDstate+0)", init: { kind: "zero" } },
+  { name: "CCAP", doc: "NIintegrate companion current — ngspice INDvolt (INDstate+1) per niinteg.c:15 `#define ccap qcap+1`", init: { kind: "zero" } },
 ]);
 
-// Slot indices within the state pool
-const SLOT_GEQ  = 0;
-const SLOT_IEQ  = 1;
-const SLOT_I    = 2;
-const SLOT_PHI  = 3;
-const SLOT_CCAP = 4;
-const SLOT_VOLT = 5;
+const SLOT_PHI  = 0;  // ngspice INDflux = INDstate+0
+const SLOT_CCAP = 1;  // ngspice INDvolt = INDstate+1 (= NIintegrate ccap)
 
 export class AnalogInductorElement implements ReactiveAnalogElementCore {
   pinNodeIds!: readonly number[];  // set by compiler via Object.assign after factory returns
@@ -244,22 +242,31 @@ export class AnalogInductorElement implements ReactiveAnalogElementCore {
   }
 
   /**
-   * Unified load() — ngspice indload.c INDload (lines 35-124).
+   * load() — exact 1:1 port of ngspice indload.c INDload (lines 35-124).
    *
-   * Structure mirrors indload.c exactly after W4.B.4 fixes:
-   *   indload.c:43-51  — flux-from-current update (I-W3-1/I-W3-2)
-   *   indload.c:88-109 — integration (req/veq) with MODEINITPRED/MODEINITTRAN ordering (I-W3-5)
-   *   indload.c:114-117 — SLOT_VOLT s0→s1 copy on MODEINITTRAN (I-W3-3)
-   *   indload.c:119-123 — unconditional stamp sequence
-   * In DC (MODEDC) we set req=veq=0 (indload.c:88-90); in TRAN we compute them
-   * via niIntegrate. The five stamps (±1 incidence, -req branch diagonal, +veq
-   * RHS) then run unconditionally (indload.c:119-123). Matrix pattern is
-   * mode-invariant; the sparse handle table keeps the structural nonzero.
+   * Structural mirror (no extra slots, no extra helpers, no DC-OP-only branch
+   * outside ngspice's MODEDC arm):
+   *   indload.c:43-51   — flux-from-current update, gated on !(MODEDC|MODEINITPRED)
+   *   indload.c:88-110  — req/veq: DC ⇒ 0, else mutually-exclusive
+   *                        MODEINITPRED (s0=s1 PHI) / MODEINITTRAN (s1=s0 PHI),
+   *                        then NIintegrate(geq, ceq, L, INDflux). niinteg.c:15
+   *                        `#define ccap qcap+1` ⇒ NIintegrate writes
+   *                        state0[INDflux+1] = state0[INDvolt] = s0[SLOT_CCAP]
+   *                        and reads state1[INDvolt] = s1[SLOT_CCAP] for the
+   *                        TRAP order-2 recursion buffer.
+   *   indload.c:112     — *(CKTrhs + INDbrEq) += veq
+   *   indload.c:114-117 — *(CKTstate1 + INDvolt) = *(CKTstate0 + INDvolt)
+   *                        on MODEINITTRAN (= s1[CCAP] = s0[CCAP]; seeds the
+   *                        TRAP-order-2 recursion buffer for the next step).
+   *   indload.c:119-123 — unconditional 5-stamp sequence: ±1 incidence,
+   *                        -req branch diagonal.
    *
-   * Flux update is guarded by !(MODEDC|MODEINITPRED) (indload.c:43).
+   * `m` (parallel multiplicity) and SCALE / TC1 / TC2 / TNOM are folded into
+   * `this.L` by `_computeEffectiveL()`, so `L` here corresponds to ngspice's
+   * `here->INDinduct/m` after temperature scaling.
    */
   load(ctx: LoadContext): void {
-    const { solver, voltages, ag, cktMode: mode } = ctx;
+    const { solver, rhsOld, ag, cktMode: mode } = ctx;
     const n0 = this.pinNodeIds[0];
     const n1 = this.pinNodeIds[1];
     const b = this.branchIndex;
@@ -270,46 +277,37 @@ export class AnalogInductorElement implements ReactiveAnalogElementCore {
     const s2 = this._pool.states[2];
     const s3 = this._pool.states[3];
 
-    // indload.c:43-51 — flux-from-current update gated on !(MODEDC|MODEINITPRED).
-    // I-W3-1/I-W3-2: removed spurious (MODEDC & MODEINITJCT) arm from cond1;
-    // UIC path moved inside the !(MODEDC|MODEINITPRED) gate per indload.c:44-46.
-    // voltages[b] is ctx.rhsOld[b] (prior NR iterate branch current) — correct,
-    // matching CKTrhsOld + INDbrEq. loadCtx.rhsOld points at ctx.rhsOld
-    // (set at construction time in ckt-context.ts and never swung).
+    // indload.c:43-51 — flux-from-current update.
     if (!(mode & (MODEDC | MODEINITPRED))) {
-      // indload.c:44-46: UIC path seeds flux from IC param.
       if ((mode & MODEUIC) && (mode & MODEINITTRAN) && !isNaN(this._IC)) {
+        // indload.c:44-46: UIC seed.
         s0[base + SLOT_PHI] = L * this._IC;
       } else {
-        // indload.c:48-50: normal path — flux from prior accepted branch current.
-        s0[base + SLOT_PHI] = L * voltages[b];
+        // indload.c:48-50: flux from prior NR iterate branch current
+        // (CKTrhsOld + INDbrEq).
+        s0[base + SLOT_PHI] = L * rhsOld[b];
       }
     }
 
-    // Compute req, veq — mirrors indload.c:88-109.
-    // I-W3-5: MODEINITPRED s1→s0 flux copy is now inside the else branch,
-    // after the flux-from-current block, mirroring indload.c:93-104 structure.
+    // indload.c:88-110 — req/veq.
     let req = 0;
     let veq = 0;
-    let ccap = 0;
     if (mode & MODEDC) {
-      // indload.c:88-90: DC-OP — req=veq=0.
+      // indload.c:88-90.
       req = 0;
       veq = 0;
     } else {
-      // indload.c:93-104 (#ifndef PREDICTOR block):
-      // MODEINITPRED: copy s1→s0 flux (predictor extrapolation).
-      // I-W3-5: this copy now occurs here (inside the non-DC branch, before
-      // NIintegrate), matching ngspice indload.c:94-96 ordering.
+      // indload.c:93-104 (#ifndef PREDICTOR): mutually-exclusive flux copies.
       if (mode & MODEINITPRED) {
+        // indload.c:94-96: predictor — s0[INDflux] = s1[INDflux].
         s0[base + SLOT_PHI] = s1[base + SLOT_PHI];
-      }
-      // indload.c:99-102: MODEINITTRAN — copy s0→s1 flux BEFORE NIintegrate.
-      // I-W3-5: this copy is inside the non-DC branch, after the pred copy.
-      if (mode & MODEINITTRAN) {
+      } else if (mode & MODEINITTRAN) {
+        // indload.c:99-102: transient init — s1[INDflux] = s0[INDflux]
+        // BEFORE NIintegrate so the order-2 history is seeded.
         s1[base + SLOT_PHI] = s0[base + SLOT_PHI];
       }
-      // indload.c:106-109: NIintegrate for req/veq.
+      // indload.c:106-109: NIintegrate(ckt, &geq, &ceq, L, INDflux).
+      // niinteg.c writes state0[INDvolt] = state0[ccap] = s0[SLOT_CCAP].
       const phi0 = s0[base + SLOT_PHI];
       const phi1 = s1[base + SLOT_PHI];
       const phi2 = s2[base + SLOT_PHI];
@@ -324,43 +322,28 @@ export class AnalogInductorElement implements ReactiveAnalogElementCore {
         [phi2, phi3, 0, 0, 0],
         ccapPrev,
       );
-      ccap = ni.ccap;
-      veq = ni.ceq;
       req = ni.geq;
-      s0[base + SLOT_CCAP] = ccap;
-      if (mode & MODEINITTRAN) {
-        s1[base + SLOT_CCAP] = ccap;
-      }
+      veq = ni.ceq;
+      s0[base + SLOT_CCAP] = ni.ccap;
     }
 
-    // indload.c:112: RHS injection (veq). Done before SLOT_VOLT copy per ngspice order.
-    // Stamps below mirror indload.c:112, 114-123.
-
-    // Diagnostic cache (mode-invariant bookkeeping).
-    const n0v = n0 > 0 ? voltages[n0 - 1] : 0;
-    const n1v = n1 > 0 ? voltages[n1 - 1] : 0;
-    s0[base + SLOT_GEQ]  = req;
-    s0[base + SLOT_IEQ]  = veq;
-    s0[base + SLOT_I]    = voltages[b];
-    s0[base + SLOT_VOLT] = n0v - n1v;
-
-    // indload.c:114-117 (I-W3-3): SLOT_VOLT s0→s1 copy on MODEINITTRAN.
-    // ngspice copies INDvolt state1←state0 after the RHS injection and before
-    // the matrix stamps to seed the voltage history for the second transient step.
+    // indload.c:114-117: state0[INDvolt] → state1[INDvolt] on MODEINITTRAN
+    // (= s0[CCAP] → s1[CCAP]; seeds the trap-order-2 recursion buffer).
     if (mode & MODEINITTRAN) {
-      s1[base + SLOT_VOLT] = s0[base + SLOT_VOLT];
+      s1[base + SLOT_CCAP] = s0[base + SLOT_CCAP];
     }
 
-    // indload.c:119-123: unconditional stamp sequence.
-    // B sub-matrix: I_branch flows into n0, out of n1 (INDposIbrptr/INDnegIbrptr).
+    // indload.c:119-123: unconditional 5-stamp sequence.
+    // INDposIbrptr / INDnegIbrptr (B sub-matrix: ±1 at (n, b)).
     if (n0 !== 0) solver.stampElement(solver.allocElement(n0 - 1, b), 1);
     if (n1 !== 0) solver.stampElement(solver.allocElement(n1 - 1, b), -1);
-    // C sub-matrix: KVL incidence (INDibrPosptr/INDibrNegptr).
+    // INDibrPosptr / INDibrNegptr (C sub-matrix: ±1 at (b, n) — KVL incidence).
     if (n0 !== 0) solver.stampElement(solver.allocElement(b, n0 - 1), 1);
     if (n1 !== 0) solver.stampElement(solver.allocElement(b, n1 - 1), -1);
-    // Branch diagonal (-req) and RHS (+veq) — stamped even if req=veq=0 at DC.
-    // allocElement is idempotent via handle table → structural nonzero preserved.
+    // INDibrIbrptr (-req branch diagonal). Stamped even at DC where req=0 so
+    // the structural nonzero is preserved across the handle table.
     solver.stampElement(solver.allocElement(b, b), -req);
+    // indload.c:112: *(CKTrhs + INDbrEq) += veq.
     solver.stampRHS(b, veq);
   }
 

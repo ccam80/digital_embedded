@@ -42,8 +42,8 @@
     "runtime": null
   },
   "build": {
-    "buildCommand": "npx tsc --noEmit > .tsc-out.log 2>&1; echo \"exit=$?\"",
-    "testCommand": "until [ -f .vitest-broad.log ] && tail -3 .vitest-broad.log | tr -d '\\r' | tail -1 | head -c 200 | tr -d '[:print:]' >/dev/null && tail -1 .vitest-broad.log | head -c 200 >/dev/null; do sleep 5; done; sleep 60; tail -50 .vitest-broad.log",
+    "buildCommand": "npx tsc --noEmit > /tmp/tsc.log 2>&1; echo \"exit=$?\"; wc -l /tmp/tsc.log; tail -30 /tmp/tsc.log",
+    "testCommand": "cd \"C:/local_working_projects/digital_in_browser\" && npx vitest run src/core/__tests__/registry.test.ts --reporter=default 2>&1 | tail -40",
     "lintCommand": "npm run lint",
     "devCommand": "npm run dev",
     "scripts": {
@@ -286,98 +286,110 @@
   "hotPaths": [
     {
       "path": "src\\solver\\analog\\analog-engine.ts",
-      "accessCount": 119,
-      "lastAccessed": 1777101706931,
+      "accessCount": 144,
+      "lastAccessed": 1777113838022,
       "type": "file"
     },
     {
       "path": "src\\solver\\analog\\timestep.ts",
-      "accessCount": 80,
-      "lastAccessed": 1777101452221,
+      "accessCount": 110,
+      "lastAccessed": 1777108249102,
       "type": "file"
     },
     {
       "path": "ref\\ngspice\\src\\spicelib\\analysis\\dctran.c",
-      "accessCount": 55,
-      "lastAccessed": 1777102835779,
+      "accessCount": 68,
+      "lastAccessed": 1777106918236,
       "type": "file"
     },
     {
       "path": "src\\solver\\analog\\__tests__\\harness\\comparison-session.ts",
-      "accessCount": 35,
-      "lastAccessed": 1777095468040,
+      "accessCount": 62,
+      "lastAccessed": 1777119857478,
       "type": "file"
     },
     {
       "path": "src\\solver\\analog\\newton-raphson.ts",
-      "accessCount": 34,
-      "lastAccessed": 1777092341055,
+      "accessCount": 41,
+      "lastAccessed": 1777107425857,
       "type": "file"
     },
     {
       "path": "src\\solver\\analog\\__tests__\\harness\\ngspice-bridge.ts",
-      "accessCount": 18,
-      "lastAccessed": 1777093692058,
+      "accessCount": 35,
+      "lastAccessed": 1777117073386,
       "type": "file"
     },
     {
       "path": "src\\solver\\analog\\__tests__\\harness\\capture.ts",
-      "accessCount": 14,
-      "lastAccessed": 1777095495686,
-      "type": "file"
-    },
-    {
-      "path": "src\\solver\\analog\\__tests__\\ngspice-parity\\resistive-divider.test.ts",
-      "accessCount": 11,
-      "lastAccessed": 1777094982791,
-      "type": "file"
-    },
-    {
-      "path": "src\\solver\\coordinator.ts",
-      "accessCount": 10,
-      "lastAccessed": 1777084586708,
+      "accessCount": 20,
+      "lastAccessed": 1777108935936,
       "type": "file"
     },
     {
       "path": "ref\\ngspice\\src\\maths\\ni\\niiter.c",
-      "accessCount": 9,
-      "lastAccessed": 1777093712907,
+      "accessCount": 15,
+      "lastAccessed": 1777107497602,
       "type": "directory"
-    },
-    {
-      "path": "src\\solver\\analog\\__tests__\\harness",
-      "accessCount": 9,
-      "lastAccessed": 1777093976914,
-      "type": "directory"
-    },
-    {
-      "path": "src\\solver\\analog\\dc-operating-point.ts",
-      "accessCount": 8,
-      "lastAccessed": 1777088948304,
-      "type": "file"
-    },
-    {
-      "path": ".vitest-failures.json",
-      "accessCount": 8,
-      "lastAccessed": 1777101685907,
-      "type": "file"
     },
     {
       "path": "src\\solver\\analog\\__tests__\\ngspice-parity\\parity-helpers.ts",
-      "accessCount": 7,
-      "lastAccessed": 1777096203748,
+      "accessCount": 14,
+      "lastAccessed": 1777114014698,
+      "type": "file"
+    },
+    {
+      "path": "src\\solver\\analog\\__tests__\\harness",
+      "accessCount": 14,
+      "lastAccessed": 1777117029273,
+      "type": "directory"
+    },
+    {
+      "path": "src\\solver\\analog\\__tests__\\ngspice-parity\\resistive-divider.test.ts",
+      "accessCount": 12,
+      "lastAccessed": 1777107632103,
       "type": "file"
     },
     {
       "path": "spec\\phase-10-bit-exact-ngspice-parity.md",
-      "accessCount": 6,
-      "lastAccessed": 1777088548332,
+      "accessCount": 12,
+      "lastAccessed": 1777108864931,
       "type": "file"
     },
     {
+      "path": "src\\solver\\coordinator.ts",
+      "accessCount": 12,
+      "lastAccessed": 1777113757909,
+      "type": "file"
+    },
+    {
+      "path": "src\\solver\\analog\\dc-operating-point.ts",
+      "accessCount": 9,
+      "lastAccessed": 1777106072861,
+      "type": "file"
+    },
+    {
+      "path": ".vitest-failures.json",
+      "accessCount": 9,
+      "lastAccessed": 1777118044245,
+      "type": "file"
+    },
+    {
+      "path": "src/solver/analog",
+      "accessCount": 7,
+      "lastAccessed": 1777119012387,
+      "type": "directory"
+    },
+    {
       "path": "spec\\progress.md",
+      "accessCount": 7,
+      "lastAccessed": 1777119904257,
+      "type": "file"
+    },
+    {
+      "path": "spec\\phase-10-parity-tickets.md",
       "accessCount": 6,
-      "lastAccessed": 1777088552393,
+      "lastAccessed": 1777108872619,
       "type": "file"
     },
     {
@@ -385,6 +397,30 @@
       "accessCount": 5,
       "lastAccessed": 1777091940658,
       "type": "file"
+    },
+    {
+      "path": "src\\solver\\analog\\__tests__\\ngspice-parity\\fixtures\\rc-transient.dts",
+      "accessCount": 5,
+      "lastAccessed": 1777103782406,
+      "type": "file"
+    },
+    {
+      "path": "src/solver/analog/__tests__/harness",
+      "accessCount": 5,
+      "lastAccessed": 1777106950783,
+      "type": "directory"
+    },
+    {
+      "path": "src\\solver\\analog\\__tests__\\ngspice-parity\\rc-transient.test.ts",
+      "accessCount": 5,
+      "lastAccessed": 1777107117482,
+      "type": "file"
+    },
+    {
+      "path": "src\\components\\semiconductors\\diode.ts",
+      "accessCount": 5,
+      "lastAccessed": 1777119797908,
+      "type": "directory"
     },
     {
       "path": "src\\headless\\__tests__\\master-switch.test.ts",
@@ -405,15 +441,15 @@
       "type": "file"
     },
     {
-      "path": "src/solver/analog/__tests__/harness",
+      "path": "src\\headless\\default-facade.ts",
       "accessCount": 4,
-      "lastAccessed": 1777092023892,
-      "type": "directory"
+      "lastAccessed": 1777113792755,
+      "type": "file"
     },
     {
-      "path": "src\\solver\\analog\\__tests__\\ngspice-parity\\fixtures\\rc-transient.dts",
+      "path": "src\\components\\active\\__tests__\\comparator.test.ts",
       "accessCount": 4,
-      "lastAccessed": 1777092192005,
+      "lastAccessed": 1777120315458,
       "type": "file"
     },
     {
@@ -423,33 +459,27 @@
       "type": "directory"
     },
     {
-      "path": "src\\solver\\analog\\__tests__\\ngspice-parity\\rc-transient.test.ts",
-      "accessCount": 3,
-      "lastAccessed": 1777088553239,
-      "type": "file"
-    },
-    {
       "path": "src/solver/analog/timestep.ts",
       "accessCount": 3,
       "lastAccessed": 1777090238377,
       "type": "directory"
     },
     {
-      "path": "src\\components\\active\\__tests__\\comparator.test.ts",
+      "path": "ref\\ngspice\\BUILD-SHARED-WIN.md",
       "accessCount": 3,
-      "lastAccessed": 1777094574919,
+      "lastAccessed": 1777104555042,
+      "type": "file"
+    },
+    {
+      "path": "spec\\plan.md",
+      "accessCount": 3,
+      "lastAccessed": 1777110937310,
       "type": "file"
     },
     {
       "path": "src\\solver\\coordinator-types.ts",
       "accessCount": 2,
       "lastAccessed": 1777084536233,
-      "type": "file"
-    },
-    {
-      "path": "src\\headless\\default-facade.ts",
-      "accessCount": 2,
-      "lastAccessed": 1777084601821,
       "type": "file"
     },
     {
@@ -477,12 +507,6 @@
       "type": "directory"
     },
     {
-      "path": "src/solver/analog",
-      "accessCount": 2,
-      "lastAccessed": 1777084879529,
-      "type": "directory"
-    },
-    {
       "path": "spec/progress.md",
       "accessCount": 2,
       "lastAccessed": 1777085122165,
@@ -501,28 +525,22 @@
       "type": "file"
     },
     {
-      "path": "spec\\phase-10-parity-tickets.md",
-      "accessCount": 2,
-      "lastAccessed": 1777088549066,
-      "type": "file"
-    },
-    {
-      "path": "src\\components\\semiconductors\\diode.ts",
-      "accessCount": 2,
-      "lastAccessed": 1777093713853,
-      "type": "directory"
-    },
-    {
       "path": "ref\\ngspice\\src\\spicelib\\analysis\\dcop.c",
       "accessCount": 2,
       "lastAccessed": 1777094535921,
       "type": "file"
     },
     {
-      "path": "ref\\ngspice\\BUILD-SHARED-WIN.md",
-      "accessCount": 1,
-      "lastAccessed": 1777082411192,
-      "type": "file"
+      "path": "ref/ngspice/src/spicelib/analysis",
+      "accessCount": 2,
+      "lastAccessed": 1777106542633,
+      "type": "directory"
+    },
+    {
+      "path": "src/solver/analog/__tests__/harness/comparison-session.ts",
+      "accessCount": 2,
+      "lastAccessed": 1777118909670,
+      "type": "directory"
     },
     {
       "path": "src\\io\\dts-schema.ts",
@@ -534,12 +552,6 @@
       "path": "src/solver/analog/__tests__/ngspice-parity/fixtures",
       "accessCount": 1,
       "lastAccessed": 1777082745559,
-      "type": "directory"
-    },
-    {
-      "path": "src/solver/analog/__tests__/harness/comparison-session.ts",
-      "accessCount": 1,
-      "lastAccessed": 1777082800595,
       "type": "directory"
     },
     {
@@ -564,18 +576,6 @@
       "path": "src\\headless\\__tests__\\compile-defer-initialize.test.ts",
       "accessCount": 1,
       "lastAccessed": 1777084477968,
-      "type": "file"
-    },
-    {
-      "path": "ref/ngspice/src/spicelib/analysis",
-      "accessCount": 1,
-      "lastAccessed": 1777084849126,
-      "type": "directory"
-    },
-    {
-      "path": "spec\\plan.md",
-      "accessCount": 1,
-      "lastAccessed": 1777085666217,
       "type": "file"
     },
     {

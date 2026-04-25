@@ -596,19 +596,24 @@ export class ComparisonSession {
     this._analysis = "tran";
     this._comparisons = null;
 
-    // CKTstep = tstep sent to ngspice .tran command. Hand tStop+outputStep
-    // (and tStart via initTime) to the engine and let
-    // resolveSimulationParams reproduce traninit.c:23-32 / dctran.c:118 —
-    // single source of truth.
+    // ngspice CKTstep ↔ our outputStep, ngspice CKTmaxStep ↔ our maxTimeStep.
+    // The two are independent ngspice .tran fields (TSTEP and TMAX) and govern
+    // different things — see ngspice-bridge.ts runTran() for the cite. Earlier
+    // versions of this harness sent `maxStep` as TSTEP and `tStop/100` as the
+    // engine's outputStep, which silently desynced ngspice's `CKTstep`-driven
+    // `delta = MIN(CKTfinalTime/100, CKTstep)/10` (dctran.c:118) from our
+    // `firstStep = computeFirstStep(tStop, outputStep)`. The bug is invisible
+    // when `tStop/100 == maxStep` (the MIN picks the same value either way)
+    // and visible otherwise — most starkly on RLC where tStop/100=4e-5 but
+    // maxStep=1e-6.
     const tstep = tStop / 100;
     const cfg: Partial<SimulationParams> = { tStop, outputStep: tstep, initTime: tStart };
     if (maxStep != null) cfg.maxTimeStep = maxStep;
     this._engine.configure(cfg);
 
     const stopStr = this._formatSpiceTime(tStop);
-    const stepStr = maxStep
-      ? this._formatSpiceTime(maxStep)
-      : this._formatSpiceTime(tStop / 100);
+    const stepStr = this._formatSpiceTime(tstep);
+    const tMaxStr = maxStep != null ? this._formatSpiceTime(maxStep) : undefined;
 
     const sc = this._stepCapture;
     let prevSimTime = 0;
@@ -690,7 +695,7 @@ export class ComparisonSession {
       try {
         await bridge.init();
         bridge.loadNetlist(this._cirClean);
-        bridge.runTran(stopStr, stepStr);
+        bridge.runTran(stopStr, stepStr, tMaxStr);
         this._ngSession = bridge.getCaptureSession();
         this._buildNodeMapping(bridge);
       } catch (e: any) {

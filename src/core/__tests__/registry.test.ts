@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach } from "vitest";
 import {
   ComponentRegistry,
   ComponentCategory,
+  type ParamDef,
 } from "../registry.js";
 import type {
   ComponentDefinition,
@@ -10,7 +11,7 @@ import type {
   ExecuteFunction,
   ComponentModels,
 } from "../registry.js";
-import { PropertyBag } from "../properties.js";
+import { PropertyBag, PropertyType } from "../properties.js";
 import type { PinElectricalSpec } from "../pin-electrical.js";
 import type { CircuitElement, SerializedElement } from "../element.js";
 import type { PropertyValue } from "../properties.js";
@@ -497,5 +498,22 @@ describe("ComponentRegistry", () => {
       expect(stored.pinElectricalOverrides).toBeUndefined();
     });
 
+  });
+
+  describe("ParamDef.partition", () => {
+    it("accepts omitted partition (defaults to undefined)", () => {
+      const d: ParamDef = { key: "X", type: PropertyType.FLOAT, label: "X", rank: "primary" };
+      expect(d.partition).toBeUndefined();
+    });
+
+    it("accepts partition: 'instance'", () => {
+      const d: ParamDef = { key: "OFF", type: PropertyType.FLOAT, label: "OFF", rank: "secondary", partition: "instance" };
+      expect(d.partition).toBe("instance");
+    });
+
+    it("accepts partition: 'model'", () => {
+      const d: ParamDef = { key: "IS", type: PropertyType.FLOAT, label: "IS", rank: "primary", partition: "model" };
+      expect(d.partition).toBe("model");
+    });
   });
 });

@@ -112,8 +112,11 @@ describe("LTE", () => {
     expect(newDt).toBeLessThanOrEqual(4 * dt);
   });
 
-  it("clamps_to_bounds", () => {
-    const params: SimulationParams = {
+  it("computeNewDt_returns_raw_unclamped_proposal", () => {
+    // ngspice ckttrunc.c only applies the 2× growth cap; min/max clamping
+    // is at top-of-next-step (dctran.c:540) and the engine-level delmin
+    // two-strike check. computeNewDt deliberately returns the raw proposal.
+    const params: ResolvedSimulationParams = {
       ...DEFAULT_PARAMS,
       minTimeStep: 1e-14,
       maxTimeStep: 5e-6,
@@ -121,19 +124,24 @@ describe("LTE", () => {
     };
     const ctrl = new TimestepController(params);
 
-    // Extremely large error — would push dt far below minTimeStep
     const hugeError = 1e10;
     const elements = [makeReactiveElement(hugeError)];
-    const history = new HistoryStore(1);
+    const { newDt } = ctrl.computeNewDt(elements, new HistoryStore(1), 0);
 
-    const { newDt: newDtSmall } = ctrl.computeNewDt(elements, history, 0);
-    expect(newDtSmall).toBeGreaterThanOrEqual(params.minTimeStep);
+    // No lower-bound clamp — proposal can fall arbitrarily below minTimeStep.
+    expect(newDt).toBeLessThan(params.minTimeStep);
+  });
 
-    // Extremely small error — would push dt far above maxTimeStep
-    const tinyError = 1e-30;
-    const elements2 = [makeReactiveElement(tinyError)];
-    const { newDt: newDtLarge } = ctrl.computeNewDt(elements2, history, 0);
-    expect(newDtLarge).toBeLessThanOrEqual(params.maxTimeStep);
+  it("getClampedDt_enforces_maxTimeStep", () => {
+    // dctran.c:540 — CKTdelta = MIN(CKTdelta, CKTmaxStep). The maxStep
+    // clamp lives at top-of-step in getClampedDt, not in computeNewDt.
+    const params: ResolvedSimulationParams = {
+      ...DEFAULT_PARAMS,
+      maxTimeStep: 5e-6,
+      firstStep: 1e-3,
+    };
+    const ctrl = new TimestepController(params);
+    expect(ctrl.getClampedDt(0)).toBeLessThanOrEqual(params.maxTimeStep);
   });
 
   it("safety_factor_0_9", () => {
@@ -468,7 +476,9 @@ describe("savedDelta_only_at_breakpoint_hit", () => {
   it("savedDelta_only_at_breakpoint_hit", () => {
     // Run several steps without hitting a breakpoint. Assert _savedDelta is unchanged.
     // Then hit a breakpoint. Assert _savedDelta captures the pre-clamp dt.
-    const params: ResolvedSimulationParams = { ...DEFAULT_PARAMS, tStop: 1e-3 };
+    // maxTimeStep raised to 20e-6 so the dctran.c:540 maxStep pre-clamp does
+    // not fire and saveDelta captures the genuine pre-bp working dt (10e-6).
+    const params: ResolvedSimulationParams = { ...DEFAULT_PARAMS, maxTimeStep: 20e-6, tStop: 1e-3 };
     const ctrl = new TimestepController(params);
 
     // Add a breakpoint far away so early steps don't hit it.
@@ -535,21 +545,23 @@ describe("Breakpoints", () => {
     // Remaining to breakpoint = 100e-6 - 95e-6 = 5e-6; dt should be clamped to 5us
   });
 
-  it("pops_breakpoint_on_accept", () => {
+  it("pops_breakpoint_via_getClampedDt", () => {
+    // ngspice dctran.c:624-638 — the pop loop runs at top of next step
+    // (inside getClampedDt), not at accept-time. accept() updates the step
+    // counter only; getClampedDt is the sole pop site.
     const ctrl = new TimestepController(DEFAULT_PARAMS);
     ctrl.addBreakpoint(100e-6);
-
-    // Accept at simTime = 100us — breakpoint should be popped
     ctrl.accept(100e-6);
-
-    // After popping, computeNewDt should not clamp to that breakpoint anymore
-    const elements = [makeReactiveElement(0)];
-    const history = new HistoryStore(1);
     ctrl.currentDt = 5e-6;
-    const { newDt } = ctrl.computeNewDt(elements, history, 100e-6);
 
-    // No breakpoint remaining → dt is unclamped (should equal currentDt = 5e-6, no scaling for zero error)
-    expect(newDt).toBe(5e-6);
+    // Top-of-next-step pop drains bp at 100e-6 (almostEqualUlps match).
+    ctrl.getClampedDt(100e-6);
+
+    // No reactive constraint and no remaining breakpoint — ckttrunc.c:53
+    // (HUGE timetemp) returns 2 * dt with no maxStep clamp from computeNewDt.
+    const elements = [makeReactiveElement(0)];
+    const { newDt } = ctrl.computeNewDt(elements, new HistoryStore(1), 100e-6);
+    expect(newDt).toBe(2 * 5e-6);
   });
 
   it("clear_removes_all", () => {

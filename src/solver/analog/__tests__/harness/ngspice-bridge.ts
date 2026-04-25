@@ -458,10 +458,28 @@ export class NgspiceBridge {
     this._cmd("op");
   }
 
-  runTran(stopTime: string, maxStep: string): void {
+  /**
+   * Issue ngspice `.tran TSTEP TSTOP <TSTART <TMAX>>`.
+   *
+   * Parameter naming matches the .tran spec exactly so callers can't conflate
+   * TSTEP (the printing/output interval, → CKTstep) with TMAX (the integration
+   * ceiling, → CKTmaxStep). The two govern very different things:
+   *   - CKTstep drives `delta = MIN(CKTfinalTime/100, CKTstep)/10` (dctran.c:118).
+   *   - CKTmaxStep drives the per-step `MIN(CKTdelta, CKTmaxStep)` clamp at
+   *     dctran.c:540 and (when TMAX is omitted) auto-derives via
+   *     `CKTmaxStep = MIN(CKTstep, (TSTOP-TSTART)/50)` (traninit.c:23-32).
+   * Conflating them silently desyncs `delta` from any digiTS engine config that
+   * separately picks `outputStep = tStop/100` and `maxTimeStep = maxStep`.
+   */
+  runTran(tStop: string, tStep: string, tMax?: string): void {
     this._iterations = [];
     this._outerEvents = [];
-    this._cmd(`tran ${maxStep} ${stopTime}`);
+    if (tMax !== undefined) {
+      // 4-arg form requires TSTART positionally; harness path always uses 0.
+      this._cmd(`tran ${tStep} ${tStop} 0 ${tMax}`);
+    } else {
+      this._cmd(`tran ${tStep} ${tStop}`);
+    }
   }
 
   getTopology(): NgspiceTopology | null { return this._topology; }

@@ -41,7 +41,7 @@ describeIfDll("MOSFET inverter — ngspice DC-OP + transient parity", () => {
     await session.runDcOp();
 
     const ours = session.ourSession!;
-    const ngspice = session.ngspiceSession!;
+    const ngspice = session.ngspiceSessionAligned ?? session.ngspiceSession!;
 
     // Per-step, per-iteration bit-exact match for DC-OP
     const maxSteps = Math.max(ours.steps.length, ngspice.steps.length);
@@ -83,7 +83,7 @@ describeIfDll("MOSFET inverter — ngspice DC-OP + transient parity", () => {
     await session.runTransient(0, TRAN_STOP_TIME, TRAN_MAX_STEP);
 
     const ours = session.ourSession!;
-    const ngspice = session.ngspiceSession!;
+    const ngspice = session.ngspiceSessionAligned ?? session.ngspiceSession!;
 
     // Per-step, per-iteration bit-exact match for transient
     const maxSteps = Math.max(ours.steps.length, ngspice.steps.length);

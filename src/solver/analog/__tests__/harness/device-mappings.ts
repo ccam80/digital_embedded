@@ -39,17 +39,25 @@ export const CAPACITOR_MAPPING: DeviceMapping = {
 // ---------------------------------------------------------------------------
 // Inductor
 // ---------------------------------------------------------------------------
-// ngspice ind state offsets (inddefs.h:68): INDflux=0. INDstate has a single
-// offset — no companion-current state entry. The digiTS schema's CCAP slot
-// is an NIintegrate output with no ngspice CKTstate correspondence.
+// ngspice ind state offsets (inddefs.h:68-69):
+//   INDflux = INDstate+0   — flux Φ = L·i (the qcap fed to NIintegrate)
+//   INDvolt = INDstate+1   — NIintegrate companion current. Despite the
+//                            "INDvolt" name, niinteg.c:15
+//                            (`#define ccap qcap+1`) makes this slot the
+//                            ccap recursion buffer, not a node voltage.
+//
+// digiTS schema (inductor.ts INDUCTOR_SCHEMA): PHI=0, CCAP=1 — same offsets,
+// same semantics, ngspice-exact 1:1.
 
 export const INDUCTOR_MAPPING: DeviceMapping = {
   deviceType: "inductor",
   slotToNgspice: {
-    PHI: 0,
+    PHI:  0,
+    CCAP: 1,
   },
   ngspiceToSlot: {
     0: "PHI",
+    1: "CCAP",
   },
 };
 
