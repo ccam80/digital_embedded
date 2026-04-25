@@ -1,694 +1,43 @@
 {
   "batches": [
     {
-      "id": "batch-p0-w0.1",
-      "task_groups": [
-        "0.1.1",
-        "0.1.2"
-      ],
-      "tasks": [
-        [
-          "0.1.1"
-        ],
-        [
-          "0.1.2"
-        ]
-      ],
-      "spawned": 3,
-      "completed": 3,
-      "verifications_passed": 2,
-      "verifications_failed": 1,
-      "stops_for_clarification": 0,
-      "dead_implementers": 0,
-      "dead_verifiers": 0,
-      "group_status": {
-        "0.1.1": "passed",
-        "0.1.2": "passed"
-      },
-      "user_required_tasks": {
-        "0.1.1": [],
-        "0.1.2": []
-      },
-      "user_acks": {},
-      "recovery_log": [
-        {
-          "script": "i-fixed-it.sh",
-          "timestamp": "2026-04-24T01:34:45.562Z",
-          "description": "Deleted 4-line historical-provenance comment at harness-integration.test.ts:302-305 that violated rules.md code hygiene (described removed tests + cited a commit hash). No code semantics changed."
-        }
-      ]
-    },
-    {
-      "id": "batch-p0-w0.2",
-      "task_groups": [
-        "0.2.1",
-        "0.2.2",
-        "0.2.3"
-      ],
-      "tasks": [
-        [
-          "0.2.1"
-        ],
-        [
-          "0.2.2"
-        ],
-        [
-          "0.2.3"
-        ]
-      ],
-      "spawned": 6,
-      "completed": 5,
-      "verifications_passed": 3,
-      "verifications_failed": 2,
-      "stops_for_clarification": 0,
-      "dead_implementers": 1,
-      "dead_verifiers": 0,
-      "group_status": {
-        "0.2.1": "passed",
-        "0.2.2": "passed",
-        "0.2.3": "passed"
-      },
-      "user_required_tasks": {
-        "0.2.1": [],
-        "0.2.2": [],
-        "0.2.3": []
-      },
-      "user_acks": {},
-      "recovery_log": [
-        {
-          "script": "i-fixed-it.sh",
-          "timestamp": "2026-04-24T02:43:11.523Z",
-          "description": "Counter normalization: first-pass verifier issued FAIL for 0.2.3 before any completion existed for that group (coordinator prompt error). Replacement implementer has since completed real work on 0.2.3 (timer-555 composite, capacitor rhsOld alignment, test initState setup). Net imbalance: completed=reviewed=3 but the 0.2.3 completion is unreviewed. This record opens the verifier gate for the legitimate re-audit."
-        }
-      ]
-    },
-    {
-      "id": "batch-p0-w0.3",
-      "task_groups": [
-        "0.3.1",
-        "0.3.2"
-      ],
-      "tasks": [
-        [
-          "0.3.1"
-        ],
-        [
-          "0.3.2"
-        ]
-      ],
+      "id": "batch-pivmp-w1",
+      "task_groups": ["1.1", "1.2"],
+      "tasks": [["1.1"], ["1.2"]],
       "spawned": 2,
       "completed": 2,
-      "verifications_passed": 2,
+      "verifications_passed": 0,
       "verifications_failed": 0,
       "stops_for_clarification": 0,
       "dead_implementers": 0,
       "dead_verifiers": 0,
       "group_status": {
-        "0.3.1": "passed",
-        "0.3.2": "passed"
+        "1.1": "pending",
+        "1.2": "pending"
       },
       "user_required_tasks": {
-        "0.3.1": [],
-        "0.3.2": []
-      },
-      "user_acks": {}
-    },
-    {
-      "id": "batch-p3-w3.1",
-      "task_groups": [
-        "3.1"
-      ],
-      "tasks": [
-        [
-          "3.1.1",
-          "3.1.2"
-        ]
-      ],
-      "spawned": 4,
-      "completed": 2,
-      "verifications_passed": 1,
-      "verifications_failed": 1,
-      "stops_for_clarification": 1,
-      "dead_implementers": 1,
-      "dead_verifiers": 0,
-      "group_status": {
-        "3.1": "passed"
-      },
-      "user_required_tasks": {
-        "3.1": []
-      },
-      "user_acks": {}
-    },
-    {
-      "id": "batch-p3-w3.2",
-      "task_groups": [
-        "3.2.diode",
-        "3.2.bjt",
-        "3.2.audit"
-      ],
-      "tasks": [
-        [
-          "3.2.1"
-        ],
-        [
-          "3.2.2",
-          "3.2.3",
-          "3.2.4"
-        ],
-        [
-          "3.2.5"
-        ]
-      ],
-      "spawned": 5,
-      "completed": 4,
-      "verifications_passed": 3,
-      "verifications_failed": 1,
-      "stops_for_clarification": 0,
-      "dead_implementers": 1,
-      "dead_verifiers": 0,
-      "group_status": {
-        "3.2.diode": "passed",
-        "3.2.bjt": "passed",
-        "3.2.audit": "passed"
-      },
-      "user_required_tasks": {
-        "3.2.diode": [],
-        "3.2.bjt": [],
-        "3.2.audit": []
-      },
-      "user_acks": {}
-    },
-    {
-      "id": "batch-p3-w3.3",
-      "task_groups": [
-        "3.3.collapse",
-        "3.3.public-api",
-        "3.3.relay",
-        "3.3.audit"
-      ],
-      "tasks": [
-        [
-          "3.3.1"
-        ],
-        [
-          "3.3.2"
-        ],
-        [
-          "3.3.3"
-        ],
-        [
-          "3.3.4",
-          "3.3.5",
-          "3.3.6",
-          "3.3.7"
-        ]
-      ],
-      "spawned": 6,
-      "completed": 4,
-      "verifications_passed": 4,
-      "verifications_failed": 0,
-      "stops_for_clarification": 0,
-      "dead_implementers": 2,
-      "dead_verifiers": 0,
-      "group_status": {
-        "3.3.collapse": "passed",
-        "3.3.public-api": "passed",
-        "3.3.relay": "passed",
-        "3.3.audit": "passed"
-      },
-      "user_required_tasks": {
-        "3.3.collapse": [],
-        "3.3.public-api": [],
-        "3.3.relay": [],
-        "3.3.audit": []
-      },
-      "user_acks": {}
-    },
-    {
-      "id": "batch-p3cleanup-residue-parallel",
-      "task_groups": [
-        "cleanup.prod",
-        "cleanup.solver-tests",
-        "cleanup.component-tests"
-      ],
-      "tasks": [
-        [
-          "C-3.4.1"
-        ],
-        [
-          "C-3.4.2"
-        ],
-        [
-          "C-3.4.3"
-        ]
-      ],
-      "spawned": 3,
-      "completed": 3,
-      "verifications_passed": 3,
-      "verifications_failed": 0,
-      "stops_for_clarification": 0,
-      "dead_implementers": 0,
-      "dead_verifiers": 0,
-      "group_status": {
-        "cleanup.prod": "passed",
-        "cleanup.solver-tests": "passed",
-        "cleanup.component-tests": "passed"
-      },
-      "user_required_tasks": {
-        "cleanup.prod": [],
-        "cleanup.solver-tests": [],
-        "cleanup.component-tests": []
-      },
-      "user_acks": {}
-    },
-    {
-      "id": "batch-p3cleanup-residue-audit",
-      "task_groups": [
-        "cleanup.audit"
-      ],
-      "tasks": [
-        [
-          "C-3.4.4"
-        ]
-      ],
-      "spawned": 1,
-      "completed": 1,
-      "verifications_passed": 1,
-      "verifications_failed": 0,
-      "stops_for_clarification": 0,
-      "dead_implementers": 0,
-      "dead_verifiers": 0,
-      "group_status": {
-        "cleanup.audit": "passed"
-      },
-      "user_required_tasks": {
-        "cleanup.audit": []
-      },
-      "user_acks": {}
-    },
-    {
-      "id": "batch-p4-w4.1",
-      "task_groups": [
-        "4.1"
-      ],
-      "tasks": [
-        [
-          "4.1.1",
-          "4.1.2",
-          "4.1.3"
-        ]
-      ],
-      "spawned": 1,
-      "completed": 1,
-      "verifications_passed": 1,
-      "verifications_failed": 0,
-      "stops_for_clarification": 0,
-      "dead_implementers": 0,
-      "dead_verifiers": 0,
-      "group_status": {
-        "4.1": "passed"
-      },
-      "user_required_tasks": {
-        "4.1": []
-      },
-      "user_acks": {}
-    },
-    {
-      "id": "batch-p4-w4.2",
-      "task_groups": [
-        "4.2.led",
-        "4.2.bjt"
-      ],
-      "tasks": [
-        [
-          "4.2.1"
-        ],
-        [
-          "4.2.2"
-        ]
-      ],
-      "spawned": 3,
-      "completed": 2,
-      "verifications_passed": 2,
-      "verifications_failed": 0,
-      "stops_for_clarification": 1,
-      "dead_implementers": 0,
-      "dead_verifiers": 0,
-      "group_status": {
-        "4.2.led": "passed",
-        "4.2.bjt": "passed"
-      },
-      "user_required_tasks": {
-        "4.2.led": [],
-        "4.2.bjt": []
-      },
-      "user_acks": {}
-    },
-    {
-      "id": "batch-cross-a-w5.0-plus-w7.5-devices",
-      "task_groups": [
-        "5.0.loadctx",
-        "5.0.bjt",
-        "7.5.diode",
-        "7.5.zener",
-        "7.5.led",
-        "7.5.scr",
-        "7.5.tunnel"
-      ],
-      "tasks": [
-        [
-          "5.0.1"
-        ],
-        [
-          "5.0.2"
-        ],
-        [
-          "7.5.1.1",
-          "7.5.1.2",
-          "7.5.1.3"
-        ],
-        [
-          "7.5.2.1",
-          "7.5.2.2"
-        ],
-        [
-          "7.5.3.1"
-        ],
-        [
-          "7.5.4.1",
-          "7.5.4.2"
-        ],
-        [
-          "7.5.5.1"
-        ]
-      ],
-      "spawned": 10,
-      "completed": 10,
-      "verifications_passed": 7,
-      "verifications_failed": 3,
-      "stops_for_clarification": 0,
-      "dead_implementers": 0,
-      "dead_verifiers": 0,
-      "group_status": {
-        "5.0.loadctx": "passed",
-        "5.0.bjt": "passed",
-        "7.5.diode": "passed",
-        "7.5.zener": "passed",
-        "7.5.led": "passed",
-        "7.5.scr": "passed",
-        "7.5.tunnel": "passed"
-      },
-      "user_required_tasks": {
-        "5.0.loadctx": [],
-        "5.0.bjt": [],
-        "7.5.diode": [],
-        "7.5.zener": [],
-        "7.5.led": [],
-        "7.5.scr": [],
-        "7.5.tunnel": []
+        "1.1": [],
+        "1.2": []
       },
       "user_acks": {},
       "recovery_log": [
         {
-          "script": "i-fixed-it.sh",
-          "timestamp": "2026-04-24T10:45:47.978Z",
-          "description": "Added bypass: false, voltTol: 1e-6 to two remaining LoadContext literals missed by implementer fix-pass: phase-3-relay-composite.test.ts:124 (makeCtx) and sparse-solver.test.ts:453 (rawCtx). Two-field additions each, no semantic change."
+          "script": "manual-state-rewrite",
+          "timestamp": "2026-04-26T00:50:00.000Z",
+          "description": "Coordinator-rewrite after state file was inadvertently reverted to prior-phase content. Wave-1 implementers (1.1, 1.2) had finished their code edits to src/core/registry.ts and src/core/model-params.ts plus the corresponding test files, but the recording scripts never ran. Counters set to spawned=2, completed=2 to reflect work-on-disk. Wave verifier still owed."
         }
       ]
     },
     {
-      "id": "batch-cross-b-w5.1-plus-w6.1-plus-w7.1",
-      "task_groups": [
-        "5.1",
-        "6.1",
-        "7.1"
-      ],
+      "id": "batch-pivmp-w2",
+      "task_groups": ["2.1", "2.2", "2.3", "2.jfet", "2.zentun", "2.varscr"],
       "tasks": [
-        [
-          "5.1.1",
-          "5.1.2",
-          "5.1.3",
-          "5.1.4",
-          "5.1.5",
-          "5.1.6"
-        ],
-        [
-          "6.1.1",
-          "6.1.2",
-          "6.1.3",
-          "6.1.4"
-        ],
-        [
-          "7.1.1",
-          "7.1.2",
-          "7.1.3",
-          "7.1.4",
-          "7.1.5",
-          "7.1.6"
-        ]
-      ],
-      "spawned": 5,
-      "completed": 3,
-      "verifications_passed": 3,
-      "verifications_failed": 0,
-      "stops_for_clarification": 0,
-      "dead_implementers": 2,
-      "dead_verifiers": 0,
-      "group_status": {
-        "5.1": "passed",
-        "6.1": "passed",
-        "7.1": "passed"
-      },
-      "user_required_tasks": {
-        "5.1": [],
-        "6.1": [],
-        "7.1": []
-      },
-      "user_acks": {}
-    },
-    {
-      "id": "batch-cross-c-w5.2-plus-w6.2-plus-w7.2-plus-w7.5.6",
-      "task_groups": [
-        "5.2",
-        "6.2",
-        "7.2",
-        "7.5.6"
-      ],
-      "tasks": [
-        [
-          "5.2.1",
-          "5.2.2",
-          "5.2.3",
-          "5.2.4",
-          "5.2.5",
-          "5.2.6",
-          "5.2.7",
-          "5.2.8",
-          "5.2.9",
-          "5.2.10",
-          "5.2.11",
-          "5.2.12",
-          "5.2.13",
-          "5.2.14",
-          "5.2.15"
-        ],
-        [
-          "6.2.1",
-          "6.2.2",
-          "6.2.3",
-          "6.2.4",
-          "6.2.5",
-          "6.2.6",
-          "6.2.7",
-          "6.2.8",
-          "6.2.9",
-          "6.2.10",
-          "6.2.11"
-        ],
-        [
-          "7.2.1",
-          "7.2.2",
-          "7.2.3",
-          "7.2.4"
-        ],
-        [
-          "7.5.6.1",
-          "7.5.6.2"
-        ]
-      ],
-      "spawned": 6,
-      "completed": 5,
-      "verifications_passed": 4,
-      "verifications_failed": 1,
-      "stops_for_clarification": 0,
-      "dead_implementers": 1,
-      "dead_verifiers": 0,
-      "group_status": {
-        "5.2": "passed",
-        "6.2": "passed",
-        "7.2": "passed",
-        "7.5.6": "passed"
-      },
-      "user_required_tasks": {
-        "5.2": [],
-        "6.2": [],
-        "7.2": [],
-        "7.5.6": []
-      },
-      "user_acks": {}
-    },
-    {
-      "id": "batch-cross-d-w5.3-plus-w6.3",
-      "task_groups": [
-        "5.3",
-        "6.3"
-      ],
-      "tasks": [
-        [
-          "5.3.1",
-          "5.3.2",
-          "5.3.3",
-          "5.3.4"
-        ],
-        [
-          "6.3.1"
-        ]
-      ],
-      "spawned": 2,
-      "completed": 2,
-      "verifications_passed": 2,
-      "verifications_failed": 0,
-      "stops_for_clarification": 0,
-      "dead_implementers": 0,
-      "dead_verifiers": 0,
-      "group_status": {
-        "5.3": "passed",
-        "6.3": "passed"
-      },
-      "user_required_tasks": {
-        "5.3": [],
-        "6.3": []
-      },
-      "user_acks": {}
-    },
-    {
-      "id": "batch-p8-w8.1",
-      "task_groups": [
-        "8.1"
-      ],
-      "tasks": [
-        [
-          "8.1.1"
-        ]
-      ],
-      "spawned": 4,
-      "completed": 2,
-      "verifications_passed": 1,
-      "verifications_failed": 1,
-      "stops_for_clarification": 1,
-      "dead_implementers": 1,
-      "dead_verifiers": 0,
-      "group_status": {
-        "8.1": "passed"
-      },
-      "user_required_tasks": {
-        "8.1": []
-      },
-      "user_acks": {}
-    },
-    {
-      "id": "batch-p8-w8.2",
-      "task_groups": [
-        "8.2.dcop",
-        "8.2.nr",
-        "8.2.analogtypes"
-      ],
-      "tasks": [
-        [
-          "8.2.1"
-        ],
-        [
-          "8.2.2"
-        ],
-        [
-          "8.2.3"
-        ]
-      ],
-      "spawned": 4,
-      "completed": 3,
-      "verifications_passed": 3,
-      "verifications_failed": 0,
-      "stops_for_clarification": 0,
-      "dead_implementers": 1,
-      "dead_verifiers": 0,
-      "group_status": {
-        "8.2.dcop": "passed",
-        "8.2.nr": "passed",
-        "8.2.analogtypes": "passed"
-      },
-      "user_required_tasks": {
-        "8.2.dcop": [],
-        "8.2.nr": [],
-        "8.2.analogtypes": []
-      },
-      "user_acks": {}
-    },
-    {
-      "id": "batch-p9-w9.1",
-      "task_groups": [
-        "9.1"
-      ],
-      "tasks": [
-        [
-          "9.1.1",
-          "9.1.2",
-          "9.1.3"
-        ]
-      ],
-      "spawned": 4,
-      "completed": 2,
-      "verifications_passed": 1,
-      "verifications_failed": 1,
-      "stops_for_clarification": 0,
-      "dead_implementers": 3,
-      "dead_verifiers": 0,
-      "group_status": {
-        "9.1": "passed"
-      },
-      "user_required_tasks": {
-        "9.1": []
-      },
-      "user_acks": {}
-    },
-    {
-      "id": "batch-p10-a",
-      "task_groups": [
-        "10.1",
-        "10.2",
-        "10.3",
-        "10.4",
-        "10.5",
-        "10.6"
-      ],
-      "tasks": [
-        [
-          "10.1.1"
-        ],
-        [
-          "10.2.1"
-        ],
-        [
-          "10.3.1"
-        ],
-        [
-          "10.4.1"
-        ],
-        [
-          "10.5.1"
-        ],
-        [
-          "10.6.1"
-        ]
+        ["2.1"],
+        ["2.2"],
+        ["2.3"],
+        ["2.4", "2.5"],
+        ["2.6", "2.7"],
+        ["2.8", "2.9"]
       ],
       "spawned": 0,
       "completed": 0,
@@ -698,38 +47,27 @@
       "dead_implementers": 0,
       "dead_verifiers": 0,
       "group_status": {
-        "10.1": "pending",
-        "10.2": "pending",
-        "10.3": "pending",
-        "10.4": "pending",
-        "10.5": "pending",
-        "10.6": "pending"
+        "2.1": "pending",
+        "2.2": "pending",
+        "2.3": "pending",
+        "2.jfet": "pending",
+        "2.zentun": "pending",
+        "2.varscr": "pending"
       },
       "user_required_tasks": {
-        "10.1": [],
-        "10.2": [],
-        "10.3": [],
-        "10.4": [],
-        "10.5": [],
-        "10.6": []
+        "2.1": [],
+        "2.2": [],
+        "2.3": [],
+        "2.jfet": [],
+        "2.zentun": [],
+        "2.varscr": []
       },
       "user_acks": {}
     },
     {
-      "id": "batch-p10-b",
-      "task_groups": [
-        "10.7",
-        "10.8"
-      ],
-      "tasks": [
-        [
-          "10.7.1"
-        ],
-        [
-          "10.8.1",
-          "10.8.2"
-        ]
-      ],
+      "id": "batch-pivmp-w3",
+      "task_groups": ["3.gen"],
+      "tasks": [["3.1", "3.2", "3.3"]],
       "spawned": 0,
       "completed": 0,
       "verifications_passed": 0,
@@ -738,15 +76,34 @@
       "dead_implementers": 0,
       "dead_verifiers": 0,
       "group_status": {
-        "10.7": "pending",
-        "10.8": "pending"
+        "3.gen": "pending"
       },
       "user_required_tasks": {
-        "10.7": [],
-        "10.8": []
+        "3.gen": []
+      },
+      "user_acks": {}
+    },
+    {
+      "id": "batch-pivmp-w4",
+      "task_groups": ["4.1", "4.2"],
+      "tasks": [["4.1"], ["4.2"]],
+      "spawned": 0,
+      "completed": 0,
+      "verifications_passed": 0,
+      "verifications_failed": 0,
+      "stops_for_clarification": 0,
+      "dead_implementers": 0,
+      "dead_verifiers": 0,
+      "group_status": {
+        "4.1": "pending",
+        "4.2": "pending"
+      },
+      "user_required_tasks": {
+        "4.1": [],
+        "4.2": []
       },
       "user_acks": {}
     }
   ],
-  "last_updated": "2026-04-25T01:39:24.781Z"
+  "last_updated": "2026-04-26T00:55:00.000Z"
 }
