@@ -117,9 +117,14 @@ describe("InventoryStructure", () => {
           existsSync(absPath),
           `Verified row ${row.id}: ngspicePath "${row.ngspicePath}" must exist`
         ).toBe(true);
+        expect(
+          row.claimKeyword.length,
+          `Verified row ${row.id}: claimKeyword must be non-empty (verified rows must record evidence per spec/phase-8 Task 8.1.1)`
+        ).toBeGreaterThan(0);
         const fileContent = readFileSync(absPath, "utf8");
         const fileLines = fileContent.split("\n");
         const rangeMatch = row.ngspiceRef.match(/:(\d+)(?:-(\d+))?$/);
+        let rangeText: string;
         if (rangeMatch) {
           const startLine = parseInt(rangeMatch[1], 10);
           const endLine = rangeMatch[2] ? parseInt(rangeMatch[2], 10) : startLine;
@@ -131,14 +136,14 @@ describe("InventoryStructure", () => {
             endLine,
             `Verified row ${row.id}: end line ${endLine} must be within file length ${fileLines.length}`
           ).toBeLessThanOrEqual(fileLines.length);
-          if (row.claimKeyword) {
-            const rangeText = fileLines.slice(startLine - 1, endLine).join("\n");
-            expect(
-              rangeText,
-              `Verified row ${row.id}: claimKeyword "${row.claimKeyword}" must appear in cited range`
-            ).toContain(row.claimKeyword);
-          }
+          rangeText = fileLines.slice(startLine - 1, endLine).join("\n");
+        } else {
+          rangeText = fileContent;
         }
+        expect(
+          rangeText,
+          `Verified row ${row.id}: claimKeyword "${row.claimKeyword}" must appear in ${rangeMatch ? "cited range" : "cited file"}`
+        ).toContain(row.claimKeyword);
       }
     }
   });
@@ -258,9 +263,9 @@ describe("DcopCitations", () => {
     ).toBeGreaterThan(0);
     for (const row of dcopRows) {
       expect(
-        row.status,
+        ["verified", "missing"],
         `Row ${row.id} (${row.ngspiceRef} at line ${row.sourceLine}) must be verified or missing, got "${row.status}"`
-      ).not.toBe("stale");
+      ).toContain(row.status);
     }
   });
 });
@@ -332,9 +337,9 @@ describe("NewtonRaphsonCitations", () => {
     ).toBeGreaterThan(0);
     for (const row of nrRows) {
       expect(
-        row.status,
+        ["verified", "missing"],
         `Row ${row.id} (${row.ngspiceRef} at line ${row.sourceLine}) must be verified or missing, got "${row.status}"`
-      ).not.toBe("stale");
+      ).toContain(row.status);
     }
   });
 });
