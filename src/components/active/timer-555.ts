@@ -640,8 +640,8 @@ function createTimer555Element(
         stampG(ctx.solver,  nVcc,          nDischargeBase, -G_BASE_DRIVE);
         stampG(ctx.solver,  nDischargeBase, nVcc,          -G_BASE_DRIVE);
         stampG(ctx.solver,  nDischargeBase, nDischargeBase, G_BASE_DRIVE);
-        stampRHS(ctx.solver, nDischargeBase, G_BASE_DRIVE * vVccVal);
-        stampRHS(ctx.solver, nVcc,          -G_BASE_DRIVE * vVccVal);
+        stampRHS(ctx.rhs, nDischargeBase, G_BASE_DRIVE * vVccVal);
+        stampRHS(ctx.rhs, nVcc,          -G_BASE_DRIVE * vVccVal);
       } else {
         // Q=1 (SET): pull base to GND â†’ BJT cutoff
         stampG(ctx.solver, nDischargeBase, nDischargeBase,  G_BASE_DRIVE);

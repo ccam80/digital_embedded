@@ -164,8 +164,8 @@ export function createDiacElement(
       stampG(solver, nodeA, nodeB, -_geq);
       stampG(solver, nodeB, nodeA, -_geq);
       stampG(solver, nodeB, nodeB, _geq);
-      stampRHS(solver, nodeA, -_ieq);
-      stampRHS(solver, nodeB, _ieq);
+      stampRHS(ctx.rhs, nodeA, -_ieq);
+      stampRHS(ctx.rhs, nodeB, _ieq);
     },
 
     checkConvergence(ctx: LoadContext): boolean {

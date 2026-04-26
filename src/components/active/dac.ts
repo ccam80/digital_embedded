@@ -36,6 +36,7 @@ import {
   type ComponentDefinition,
 } from "../../core/registry.js";
 import type { AnalogElementCore, LoadContext, StatePoolRef } from "../../solver/analog/element.js";
+import { stampRHS } from "../../solver/analog/stamp-helpers.js";
 import { collectPinModelChildren, DigitalInputPinModel } from "../../solver/analog/digital-pin-model.js";
 import type { ResolvedPinElectrical } from "../../core/pin-electrical.js";
 import { defineModelParams } from "../../core/model-params.js";
@@ -350,7 +351,7 @@ function createDACElement(
       if (nOut > 0) {
         solver.stampElement(solver.allocElement(nOut, nOut), G_out);
         // Norton current source: I = V_out Â· G_out injected at OUT node
-        solver.stampRHS(nOut, _vOut * G_out);
+        stampRHS(ctx.rhs,nOut, _vOut * G_out);
       }
       // Stamp input loading for each digital input pin
       for (let i = 0; i < bits; i++) {

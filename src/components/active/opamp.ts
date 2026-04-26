@@ -30,6 +30,7 @@ import {
   type ComponentDefinition,
 } from "../../core/registry.js";
 import type { AnalogElementCore, LoadContext } from "../../solver/analog/element.js";
+import { stampRHS } from "../../solver/analog/stamp-helpers.js";
 import { defineModelParams } from "../../core/model-params.js";
 
 // ---------------------------------------------------------------------------
@@ -246,7 +247,7 @@ function createOpAmpElement(
         }
       } else if (nOut > 0) {
         // Saturation: inject Norton current to clamp output to rail voltage.
-        solver.stampRHS(nOut, vOutTarget * G_out);
+        stampRHS(ctx.rhs,nOut, vOutTarget * G_out);
       }
     },
 

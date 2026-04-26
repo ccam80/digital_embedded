@@ -258,7 +258,7 @@ function createOptocouplerElement(
       const vK = ctx.rhsOld[nCathode];
       const vd = vA - vK;
       const iBaseNorton = iBase - gmCtr * vd;
-      stampRHS(ctx.solver, nBase, iBaseNorton);
+      stampRHS(ctx.rhs, nBase, iBaseNorton);
 
       // 3. Phototransistor BJT stamp — bjtload.c:170-end
       bjtSub.load(ctx);

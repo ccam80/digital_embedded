@@ -40,7 +40,7 @@ import {
 } from "../../core/registry.js";
 import type { AnalogElementCore, ReactiveAnalogElement, IntegrationMethod, LoadContext } from "../../solver/analog/element.js";
 import { MODETRAN, MODETRANOP, MODEINITPRED, MODEINITTRAN, MODEAC, MODEDC, MODEUIC, MODEINITJCT } from "../../solver/analog/ckt-mode.js";
-import { stampG } from "../../solver/analog/stamp-helpers.js";
+import { stampG, stampRHS } from "../../solver/analog/stamp-helpers.js";
 import type { Diagnostic } from "../../compile/types.js";
 import { defineModelParams } from "../../core/model-params.js";
 import {
@@ -474,8 +474,8 @@ export class AnalogPolarizedCapElement implements ReactiveAnalogElement {
       stampG(solver, nCap, nNeg, -m * geq);
       stampG(solver, nNeg, nCap, -m * geq);
       stampG(solver, nNeg, nNeg, m * geq);
-      if (nCap !== 0) solver.stampRHS(nCap, -m * ceq);
-      if (nNeg !== 0) solver.stampRHS(nNeg, m * ceq);
+      if (nCap !== 0) stampRHS(ctx.rhs,nCap, -m * ceq);
+      if (nNeg !== 0) stampRHS(ctx.rhs,nNeg, m * ceq);
     } else {
       // DC operating point.
       // cite: capload.c:81 state0[CAPqcap] = here->CAPcapac * vcap

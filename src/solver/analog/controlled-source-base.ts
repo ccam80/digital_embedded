@@ -137,7 +137,7 @@ export abstract class ControlledSourceElement implements AnalogElementCore {
     this._stampLinear(ctx.solver);
     const value = this._compiledExpr(this._ctx);
     const deriv = this._compiledDeriv(this._ctx);
-    this.stampOutput(ctx.solver, value, deriv, this._ctrlValue);
+    this.stampOutput(ctx.solver, ctx.rhs, value, deriv, this._ctrlValue);
   }
 
   /**
@@ -173,6 +173,7 @@ export abstract class ControlledSourceElement implements AnalogElementCore {
    */
   abstract stampOutput(
     solver: SparseSolver,
+    rhs: Float64Array,
     value: number,
     derivative: number,
     ctrlValue: number,

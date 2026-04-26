@@ -28,6 +28,7 @@ import {
   type ComponentDefinition,
 } from "../../core/registry.js";
 import type { AnalogElementCore, ReactiveAnalogElement, IntegrationMethod, LoadContext } from "../../solver/analog/element.js";
+import { stampRHS } from "../../solver/analog/stamp-helpers.js";
 import { niIntegrate } from "../../solver/analog/ni-integrate.js";
 import { MODEDC, MODEINITPRED, MODEINITTRAN, MODEUIC } from "../../solver/analog/ckt-mode.js";
 import { CoupledInductorPair } from "../../solver/analog/coupled-inductor.js";
@@ -444,8 +445,8 @@ export class AnalogTransformerElement implements ReactiveAnalogElement {
     solver.stampElement(solver.allocElement(b1, b2), -g12);
     solver.stampElement(solver.allocElement(b2, b1), -g12);
     solver.stampElement(solver.allocElement(b2, b2), -g22);
-    solver.stampRHS(b1, hist1);
-    solver.stampRHS(b2, hist2);
+    stampRHS(ctx.rhs,b1, hist1);
+    stampRHS(ctx.rhs,b2, hist2);
 
     // T-W3-6: SLOT_VOLT1/VOLT2 â€” terminal voltage state, MODEINITTRAN copy
     // per indload.c:114-116 (state1[INDvolt] = state0[INDvolt]).

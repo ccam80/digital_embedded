@@ -409,8 +409,8 @@ export function createZenerElement(
       stampG(solver, nodeAnode, nodeCathode, -gd);
       stampG(solver, nodeCathode, nodeAnode, -gd);
       stampG(solver, nodeCathode, nodeCathode, gd);
-      stampRHS(solver, nodeAnode, -ieq);
-      stampRHS(solver, nodeCathode, ieq);
+      stampRHS(ctx.rhs, nodeAnode, -ieq);
+      stampRHS(ctx.rhs, nodeCathode, ieq);
     },
 
     checkConvergence(ctx: LoadContext): boolean {

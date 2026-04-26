@@ -705,9 +705,9 @@ export function createPJfetElement(
       const ceqgs = polarity * ((cg - cgd) - ggs * vgs);
       const cdreq = polarity * ((cd + cgd) - gds * vds - gm * vgs);
 
-      stampRHS(solver, nodeG, m * (-ceqgs - ceqgd));
-      stampRHS(solver, nodeD, m * (-cdreq + ceqgd));
-      stampRHS(solver, nodeS, m * (cdreq + ceqgs));
+      stampRHS(ctx.rhs, nodeG, m * (-ceqgs - ceqgd));
+      stampRHS(ctx.rhs, nodeD, m * (-cdreq + ceqgd));
+      stampRHS(ctx.rhs, nodeS, m * (cdreq + ceqgs));
 
       // jfetload.c:534-550: Y-matrix stamps.
       // jfetload.c:536-544: off-diagonal + prime-node stamps (cross terms).

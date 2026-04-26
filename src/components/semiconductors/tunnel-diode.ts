@@ -306,8 +306,8 @@ export function createTunnelDiodeElement(
       stampG(solver, nodeAnode,   nodeCathode, -geq);
       stampG(solver, nodeCathode, nodeAnode,   -geq);
       stampG(solver, nodeCathode, nodeCathode, geq);
-      stampRHS(solver, nodeAnode,   -ieq);
-      stampRHS(solver, nodeCathode, ieq);
+      stampRHS(ctx.rhs, nodeAnode,   -ieq);
+      stampRHS(ctx.rhs, nodeCathode, ieq);
 
       // Reactive companion: junction capacitance + transit-time diffusion cap
       if (hasCapacitance && (ctx.cktMode & (MODETRAN | MODEAC))) {
@@ -343,8 +343,8 @@ export function createTunnelDiodeElement(
           stampG(solver, nodeAnode,   nodeCathode, -capGeq);
           stampG(solver, nodeCathode, nodeAnode,   -capGeq);
           stampG(solver, nodeCathode, nodeCathode, capGeq);
-          stampRHS(solver, nodeAnode,   -capIeq);
-          stampRHS(solver, nodeCathode, capIeq);
+          stampRHS(ctx.rhs, nodeAnode,   -capIeq);
+          stampRHS(ctx.rhs, nodeCathode, capIeq);
         }
       }
     },

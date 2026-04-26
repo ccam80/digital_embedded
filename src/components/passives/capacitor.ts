@@ -28,6 +28,7 @@ import {
   MODETRAN, MODEAC, MODETRANOP, MODEDC,
   MODEINITJCT, MODEINITTRAN, MODEINITPRED, MODEUIC,
 } from "../../solver/analog/ckt-mode.js";
+import { stampRHS } from "../../solver/analog/stamp-helpers.js";
 import { defineModelParams } from "../../core/model-params.js";
 import type { StatePoolRef } from "../../core/analog-types.js";
 import {
@@ -333,8 +334,8 @@ export class AnalogCapacitorElement implements ReactiveAnalogElementCore {
         solver.stampElement(this._hAB, -m * geq);
         solver.stampElement(this._hBA, -m * geq);
       }
-      if (n0 !== 0) solver.stampRHS(n0, -m * ceq);
-      if (n1 !== 0) solver.stampRHS(n1, m * ceq);
+      if (n0 !== 0) stampRHS(ctx.rhs,n0, -m * ceq);
+      if (n1 !== 0) stampRHS(ctx.rhs,n1, m * ceq);
     } else {
       // DC operating point: just store charge, no matrix stamp (capload.c:84).
       s0[base + SLOT_Q] = C * vcap;

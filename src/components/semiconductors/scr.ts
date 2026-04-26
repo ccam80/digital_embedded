@@ -315,16 +315,16 @@ export function createScrElement(
       stampG(solver, nodeA, nodeK, -geq);
       stampG(solver, nodeK, nodeA, -geq);
       stampG(solver, nodeK, nodeK, geq);
-      stampRHS(solver, nodeA, -ieq);
-      stampRHS(solver, nodeK, ieq);
+      stampRHS(ctx.rhs, nodeA, -ieq);
+      stampRHS(ctx.rhs, nodeK, ieq);
 
       // Gate-cathode path (gate junction)
       stampG(solver, nodeG, nodeG, gGateGeq);
       stampG(solver, nodeG, nodeK, -gGateGeq);
       stampG(solver, nodeK, nodeG, -gGateGeq);
       stampG(solver, nodeK, nodeK, gGateGeq);
-      stampRHS(solver, nodeG, -gGateIeq);
-      stampRHS(solver, nodeK, gGateIeq);
+      stampRHS(ctx.rhs, nodeG, -gGateIeq);
+      stampRHS(ctx.rhs, nodeK, gGateIeq);
     },
 
     checkConvergence(ctx: LoadContext): boolean {

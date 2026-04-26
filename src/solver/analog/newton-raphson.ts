@@ -419,7 +419,8 @@ export function newtonRaphson(ctx: CKTCircuitContext): void {
     // construction) matches ngspice's per-call semantic and lets hot-loaded
     // params propagate without an engine rebuild.
     solver.setPivotTolerances(ctx.pivotRelTol, ctx.pivotAbsTol);
-    const errorCode = solver.factor(ctx.diagonalGmin);
+    // ngspice niiter.c:883-884 — SMPluFac(Matrix, CKTpivotAbsTol, CKTdiagGmin).
+    const errorCode = solver.factor(ctx.pivotAbsTol, ctx.diagonalGmin);
     if (errorCode !== spOKAY) {
       // H2 (Phase 2.5 W2.2) — mirror niiter.c:881-902 in full.
       //
@@ -459,10 +460,12 @@ export function newtonRaphson(ctx: CKTCircuitContext): void {
     }
 
     // ---- STEP F: Solve ----
-    // Solver writes the iter K solve output directly into ctx.rhs. ctx.rhsOld
-    // is preserved (still holds iter K's input voltages). Mirrors ngspice
-    // niiter.c:927: SMPsolve(ckt->CKTmatrix, ckt->CKTrhs, ckt->CKTrhsSpare).
-    solver.solve(ctx.rhs);
+    // Solver reads RHS from ctx.rhs and writes the iter K solve output
+    // back into ctx.rhs (in-place — spsolve.c:90-91 RHS and Solution may
+    // alias). ctx.rhsOld is preserved (still holds iter K's input
+    // voltages). Mirrors ngspice niiter.c:927:
+    //   SMPsolve(ckt->CKTmatrix, ckt->CKTrhs, ckt->CKTrhsSpare).
+    solver.solve(ctx.rhs, ctx.rhs);
 
     // ---- STEP G: Check iteration limit BEFORE convergence (ngspice niiter.c:944) ----
     // Pre-swap return mirrors niiter.c:944-955 — at exit, ctx.rhsOld = iter K's

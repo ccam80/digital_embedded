@@ -181,6 +181,7 @@ class VCCSAnalogElement extends ControlledSourceElement {
    */
   override stampOutput(
     solver: SparseSolver,
+    rhs: Float64Array,
     value: number,
     derivative: number,
     ctrlValue: number,
@@ -212,10 +213,10 @@ class VCCSAnalogElement extends ControlledSourceElement {
     // RHS: NR-linearized independent current source (constant term).
     // Positive iNR injected INTO nOutP (current enters node â†’ positive RHS).
     if (this._nOutP !== 0) {
-      solver.stampRHS(this._nOutP - 1, iNR);
+      rhs[this._nOutP - 1] += iNR;
     }
     if (this._nOutN !== 0) {
-      solver.stampRHS(this._nOutN - 1, -iNR);
+      rhs[this._nOutN - 1] += -iNR;
     }
   }
 

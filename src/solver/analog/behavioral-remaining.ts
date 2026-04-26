@@ -85,8 +85,8 @@ function stampG(
   }
 }
 
-function stampRHS(solver: SparseSolver, n: number, val: number): void {
-  if (n > 0) solver.stampRHS(n, val);
+function stampRHS(rhs: Float64Array, n: number, val: number): void {
+  if (n > 0) rhs[n] += val;
 }
 
 // ---------------------------------------------------------------------------
@@ -482,8 +482,8 @@ function createSegmentDiodeElement(
       _idStored = geq * vd + ieq;
 
       stampG(s, nodeAnode, nodeCathode, geq);
-      stampRHS(s, nodeAnode, -ieq);
-      if (nodeCathode > 0) stampRHS(s, nodeCathode, ieq);
+      stampRHS(ctx.rhs, nodeAnode, -ieq);
+      if (nodeCathode > 0) stampRHS(ctx.rhs, nodeCathode, ieq);
     },
 
     checkConvergence(ctx: LoadContext): boolean {

@@ -733,8 +733,8 @@ export function createDiodeElement(
       stampG(solver, nodeJunction, nodeCathode, -gd);
       stampG(solver, nodeCathode, nodeJunction, -gd);
       stampG(solver, nodeCathode, nodeCathode, gd);
-      stampRHS(solver, nodeJunction, -ieq);
-      stampRHS(solver, nodeCathode, ieq);
+      stampRHS(ctx.rhs, nodeJunction, -ieq);
+      stampRHS(ctx.rhs, nodeCathode, ieq);
 
       // dioload.c:316-317: capacitance gated on
       //   (MODETRAN | MODEAC | MODEINITSMSIG) || ((MODETRANOP) && (MODEUIC))
@@ -808,8 +808,8 @@ export function createDiodeElement(
           stampG(solver, nodeJunction, nodeCathode, -capGeq);
           stampG(solver, nodeCathode, nodeJunction, -capGeq);
           stampG(solver, nodeCathode, nodeCathode, capGeq);
-          stampRHS(solver, nodeJunction, -capIeq);
-          stampRHS(solver, nodeCathode, capIeq);
+          stampRHS(ctx.rhs, nodeJunction, -capIeq);
+          stampRHS(ctx.rhs, nodeCathode, capIeq);
         }
       }
     },

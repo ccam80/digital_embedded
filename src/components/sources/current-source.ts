@@ -24,6 +24,7 @@ import {
 } from "../../core/registry.js";
 import { formatSI } from "../../editor/si-format.js";
 import type { AnalogElementCore, LoadContext } from "../../solver/analog/element.js";
+import { stampRHS } from "../../solver/analog/stamp-helpers.js";
 import { defineModelParams } from "../../core/model-params.js";
 
 // ---------------------------------------------------------------------------
@@ -183,8 +184,8 @@ export function makeCurrentSource(
       lastSrcFact = ctx.srcFact;
       const I = p.current * ctx.srcFact;
       const solver = ctx.solver;
-      if (nodePos !== 0) solver.stampRHS(nodePos, I);
-      if (nodeNeg !== 0) solver.stampRHS(nodeNeg, -I);
+      if (nodePos !== 0) stampRHS(ctx.rhs,nodePos, I);
+      if (nodeNeg !== 0) stampRHS(ctx.rhs,nodeNeg, -I);
     },
 
     getPinCurrents(_voltages: Float64Array): number[] {

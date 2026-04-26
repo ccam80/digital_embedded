@@ -71,6 +71,7 @@ import {
   type ComponentDefinition,
 } from "../../core/registry.js";
 import type { AnalogElementCore, LoadContext } from "../../solver/analog/element.js";
+import { stampRHS } from "../../solver/analog/stamp-helpers.js";
 import { defineModelParams } from "../../core/model-params.js";
 
 // ---------------------------------------------------------------------------
@@ -209,8 +210,8 @@ function createOTAElement(
       if (nOutN !== 0 && nVm !== 0) solver.stampElement(solver.allocElement(nOutN, nVm), -gmEff);
 
       // RHS: Norton constant
-      if (nOutP !== 0) solver.stampRHS(nOutP, iNR);
-      if (nOutN !== 0) solver.stampRHS(nOutN, -iNR);
+      if (nOutP !== 0) stampRHS(ctx.rhs,nOutP, iNR);
+      if (nOutN !== 0) stampRHS(ctx.rhs,nOutN, -iNR);
     },
 
     /**

@@ -42,8 +42,8 @@
     "runtime": null
   },
   "build": {
-    "buildCommand": "cd C:/local_working_projects/digital_in_browser && npx tsc --noEmit -p tsconfig.json > .phase2-tsc.log 2>&1; echo \"exit=$?\"; cat .phase2-tsc.log | head -30",
-    "testCommand": "cd C:/local_working_projects/digital_in_browser && timeout 120 npx vitest run src/solver/analog/__tests__/sparse-solver.test.ts --reporter=basic --no-coverage 2>&1 | tail -80",
+    "buildCommand": "tail -800 /c/local_working_projects/digital_in_browser/.phase6-tsc-clean.log 2>&1 | head -1000",
+    "testCommand": "timeout 120 npx vitest run src/solver/analog/__tests__/sparse-reset-semantics.test.ts src/solver/analog/__tests__/harness/harness-integration.test.ts src/solver/analog/__tests__/harness/boot-step.test.ts src/solver/analog/__tests__/newton-raphson.test.ts --reporter=basic --no-coverage > .phase5-final.log 2>&1; echo \"exit=$?\"",
     "lintCommand": "npm run lint",
     "devCommand": "npm run dev",
     "scripts": {
@@ -303,8 +303,8 @@
     },
     {
       "path": "src\\solver\\analog\\newton-raphson.ts",
-      "accessCount": 89,
-      "lastAccessed": 1777204702216,
+      "accessCount": 95,
+      "lastAccessed": 1777209294627,
       "type": "file"
     },
     {
@@ -321,8 +321,8 @@
     },
     {
       "path": "src\\components\\semiconductors\\diode.ts",
-      "accessCount": 42,
-      "lastAccessed": 1777185837779,
+      "accessCount": 46,
+      "lastAccessed": 1777209663909,
       "type": "directory"
     },
     {
@@ -393,8 +393,8 @@
     },
     {
       "path": "src\\components\\active\\__tests__\\comparator.test.ts",
-      "accessCount": 10,
-      "lastAccessed": 1777204695420,
+      "accessCount": 11,
+      "lastAccessed": 1777209468252,
       "type": "file"
     },
     {

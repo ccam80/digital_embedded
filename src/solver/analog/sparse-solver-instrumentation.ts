@@ -5,7 +5,7 @@
  * `SparseSolver` instance for test-only / harness-only inspection of
  * internal state: read-only white-box accessors (Markowitz pivot
  * bookkeeping, dimension, singletons, element counts) plus
- * post-stamp/post-factor reads (`getRhsSnapshot`, `getCSCNonZeros`).
+ * post-factor reads (`getCSCNonZeros`).
  *
  * The in-class pre-factor / pre-solve capture API was deleted in
  * Phase 0 (architect B.30); harness consumers that need a pre-factor
@@ -76,15 +76,10 @@ export class SparseSolverInstrumentation {
 
   // -------------------------------------------------------------------------
   // Read-only accessors — the in-class capture API (B.30) was deleted in
-  // Phase 0; pre-factor / pre-solve snapshots must be taken externally by
-  // the harness via getCSCNonZeros() and getRhsSnapshot() at the
-  // appropriate boundaries.
+  // Phase 0; pre-factor snapshots must be taken externally by the harness
+  // via getCSCNonZeros() at the appropriate boundary. RHS snapshotting
+  // moved to the caller per B.16 / Phase 6 (RHS lives on `ctx.rhs`).
   // -------------------------------------------------------------------------
-
-  /** Live RHS slice (post-stamp, pre-solve). */
-  getRhsSnapshot(): Float64Array {
-    return this._solver.getRhsSnapshot();
-  }
 
   /**
    * Assembled-matrix non-zero entries in original ordering. Post-factor

@@ -61,6 +61,7 @@ import {
   type ComponentDefinition,
 } from "../../core/registry.js";
 import type { AnalogElementCore, LoadContext } from "../../solver/analog/element.js";
+import { stampRHS } from "../../solver/analog/stamp-helpers.js";
 import { MODETRAN } from "../../solver/analog/ckt-mode.js";
 import type { SparseSolver } from "../../solver/analog/sparse-solver.js";
 import { defineModelParams } from "../../core/model-params.js";
@@ -521,18 +522,18 @@ export function createRealOpAmpElement(
 
       // Input bias currents
       const iBiasScaled = Math.abs(p.iBias) * scale;
-      if (nInp > 0) solver.stampRHS(nInp, -iBiasScaled);
-      if (nInn > 0) solver.stampRHS(nInn, -iBiasScaled);
+      if (nInp > 0) stampRHS(ctx.rhs,nInp, -iBiasScaled);
+      if (nInn > 0) stampRHS(ctx.rhs,nInn, -iBiasScaled);
 
       if (nOut <= 0) return;
 
       // Gain-stage output
       if (outputSaturated) {
-        solver.stampRHS(nOut, outputClampLevel * G_out);
+        stampRHS(ctx.rhs,nOut, outputClampLevel * G_out);
       } else if (currentLimited) {
-        solver.stampRHS(nOut, iOutLimited);
+        stampRHS(ctx.rhs,nOut, iOutLimited);
       } else if (slewLimited) {
-        solver.stampRHS(nOut, vInt * G_out);
+        stampRHS(ctx.rhs,nOut, vInt * G_out);
       } else {
         // Normal operation: bandwidth-limited VCVS with backward-Euler history current.
         const aEffScaled = aEff * scale;
@@ -541,7 +542,7 @@ export function createRealOpAmpElement(
           : 0;
         if (nInp > 0) solver.stampElement(solver.allocElement(nOut, nInp), -aEffScaled * G_out);
         if (nInn > 0) solver.stampElement(solver.allocElement(nOut, nInn), aEffScaled * G_out);
-        solver.stampRHS(nOut, ieq + aEffScaled * G_out * p.vos * scale);
+        stampRHS(ctx.rhs,nOut, ieq + aEffScaled * G_out * p.vos * scale);
       }
     },
 

@@ -44,6 +44,7 @@ import {
   type ComponentDefinition,
 } from "../../core/registry.js";
 import type { AnalogElementCore, LoadContext, StatePoolRef } from "../../solver/analog/element.js";
+import { stampRHS } from "../../solver/analog/stamp-helpers.js";
 import { collectPinModelChildren } from "../../solver/analog/digital-pin-model.js";
 import type { AnalogCapacitorElement } from "../passives/capacitor.js";
 import { defineModelParams } from "../../core/model-params.js";
@@ -417,7 +418,7 @@ function createPushPullComparatorElement(
         solver.stampElement(solver.allocElement(nOut, nOut), gEff);
         // Norton current source drives output toward vOH or vOL
         const vTarget = latchActive ? p.vOL : p.vOH;
-        solver.stampRHS(nOut, vTarget * gEff);
+        stampRHS(ctx.rhs,nOut, vTarget * gEff);
       }
 
       for (const child of childElements) { child.load(ctx); }

@@ -322,16 +322,16 @@ export function createTriacElement(
       stampG(solver, nodeMT2, nodeMT1, -geq);
       stampG(solver, nodeMT1, nodeMT2, -geq);
       stampG(solver, nodeMT1, nodeMT1, geq);
-      stampRHS(solver, nodeMT2, -ieq);
-      stampRHS(solver, nodeMT1, ieq);
+      stampRHS(ctx.rhs, nodeMT2, -ieq);
+      stampRHS(ctx.rhs, nodeMT1, ieq);
 
       // Gate-MT1 path
       stampG(solver, nodeG,   nodeG,   gGateGeq);
       stampG(solver, nodeG,   nodeMT1, -gGateGeq);
       stampG(solver, nodeMT1, nodeG,   -gGateGeq);
       stampG(solver, nodeMT1, nodeMT1, gGateGeq);
-      stampRHS(solver, nodeG,   -gGateIeq);
-      stampRHS(solver, nodeMT1, gGateIeq);
+      stampRHS(ctx.rhs, nodeG,   -gGateIeq);
+      stampRHS(ctx.rhs, nodeMT1, gGateIeq);
     },
 
     checkConvergence(ctx: LoadContext): boolean {

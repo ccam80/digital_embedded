@@ -2,4 +2,7 @@
 > digits-sim@0.1.0 test:q
 > node scripts/run-all-tests.mjs -q
 
-vs: no DC value, transient time 0 value usedvs: no DC value, transient time 0 value usedv1: no DC value, transient time 0 value usedv1: no DC value, transient time 0 value usedv1: no DC value, transient time 0 value usedv1: no DC value, transient time 0 value usedvac: no DC value, transient time 0 value usedv_in: no DC value, transient time 0 value usedv1: no DC value, transient time 0 value usedv1: no DC value, transient time 0 value usedv1: no DC value, transient time 0 value usedvs: no DC value, transient time 0 value usedvs: no DC value, transient time 0 value usedv1: no DC value, transient time 0 value used
+vs: no DC value, transient time 0 value usedvs: no DC value, transient time 0 value usedv1: no DC value, transient time 0 value usedv1: no DC value, transient time 0 value usedv1: no DC value, transient time 0 value usedv1: no DC value, transient time 0 value usedvac: no DC value, transient time 0 value usedv_in: no DC value, transient time 0 value usedv1: no DC value, transient time 0 value usedv1: no DC value, transient time 0 value usedv1: no DC value, transient time 0 value usedvs: no DC value, transient time 0 value usedvs: no DC value, transient time 0 value usedv1: no DC value, transient time 0 value used[run-all-tests] vitest exceeded 600s wall-clock timeout and was killed.
+
+COMBINED: 468 passed, 20 failed (vitest: 0/0 88.7s, playwright: 468/488 0.0s)
+Details: test-results/test-failures.json

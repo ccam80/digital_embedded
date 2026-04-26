@@ -27,6 +27,7 @@ import { niIntegrate } from "../../solver/analog/ni-integrate.js";
 import {
   MODEDC, MODEINITTRAN, MODEINITPRED, MODEUIC,
 } from "../../solver/analog/ckt-mode.js";
+import { stampRHS } from "../../solver/analog/stamp-helpers.js";
 import { defineModelParams } from "../../core/model-params.js";
 import type { StatePoolRef } from "../../core/analog-types.js";
 import { defineStateSchema, applyInitialValues } from "../../solver/analog/state-schema.js";
@@ -344,7 +345,7 @@ export class AnalogInductorElement implements ReactiveAnalogElementCore {
     // the structural nonzero is preserved across the handle table.
     solver.stampElement(solver.allocElement(b, b), -req);
     // indload.c:112: *(CKTrhs + INDbrEq) += veq.
-    solver.stampRHS(b, veq);
+    stampRHS(ctx.rhs,b, veq);
   }
 
   getPinCurrents(voltages: Float64Array): number[] {

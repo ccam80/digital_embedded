@@ -850,9 +850,9 @@ export function createBjtElement(
 
       // bjtload.c:807-814: RHS stamps per terminal. Simple L0 collapses
       // base/base-prime and col/col-prime (no RB/RC internal nodes).
-      stampRHS(solver, nodeB, m * (-ceqbe - ceqbc));  // BJTbasePrimeNode += -ceqbe-ceqbc
-      stampRHS(solver, nodeC, m * ceqbc);              // BJTcolPrimeNode += ceqbx+ceqbc, ceqbx=0
-      stampRHS(solver, nodeE, m * ceqbe);              // BJTemitPrimeNode += ceqbe
+      stampRHS(ctx.rhs, nodeB, m * (-ceqbe - ceqbc));  // BJTbasePrimeNode += -ceqbe-ceqbc
+      stampRHS(ctx.rhs, nodeC, m * ceqbc);              // BJTcolPrimeNode += ceqbx+ceqbc, ceqbx=0
+      stampRHS(ctx.rhs, nodeE, m * ceqbe);              // BJTemitPrimeNode += ceqbe
 
       // bjtload.c:819-842: Y-matrix stamps. Simple L0 subset:
       //   BJTbasePrimeBasePrimePtr  += gpi + gmu  (no geqcb, no gx/geqbx)
@@ -1776,12 +1776,12 @@ export function createSpiceL1BjtElement(
       const ceqbc = polarity * (-cc + vbeLimited * (gm + go) - vbcLimited * (gmu + go));
 
       // bjtload.c:807-814: RHS stamps.
-      stampRHS(solver, nodeB_ext,       m * -ceqbx);            // BJTbaseNode
-      stampRHS(solver, nodeC_int,       m * (ceqbx + ceqbc));   // BJTcolPrimeNode
-      stampRHS(solver, substConNode,    m * ceqsub);            // BJTsubstConNode
-      stampRHS(solver, nodeB_int,       m * (-ceqbe - ceqbc));  // BJTbasePrimeNode
-      stampRHS(solver, nodeE_int,       m * ceqbe);             // BJTemitPrimeNode
-      stampRHS(solver, 0,               m * -ceqsub);           // BJTsubstNode (ground)
+      stampRHS(ctx.rhs, nodeB_ext,       m * -ceqbx);            // BJTbaseNode
+      stampRHS(ctx.rhs, nodeC_int,       m * (ceqbx + ceqbc));   // BJTcolPrimeNode
+      stampRHS(ctx.rhs, substConNode,    m * ceqsub);            // BJTsubstConNode
+      stampRHS(ctx.rhs, nodeB_int,       m * (-ceqbe - ceqbc));  // BJTbasePrimeNode
+      stampRHS(ctx.rhs, nodeE_int,       m * ceqbe);             // BJTemitPrimeNode
+      stampRHS(ctx.rhs, 0,               m * -ceqsub);           // BJTsubstNode (ground)
 
       // bjtload.c:819-842: Y-matrix stamps.
       // Terminal resistances + base resistance + intrinsic block + cap terms.

@@ -19,6 +19,7 @@ import type { LoadContext } from "./load-context.js";
 import type { ResolvedPinElectrical } from "../../core/pin-electrical.js";
 import type { AnalogElement, ReactiveAnalogElement } from "./element.js";
 import { AnalogCapacitorElement } from "../../components/passives/capacitor.js";
+import { stampRHS } from "./stamp-helpers.js";
 
 /**
  * Read voltage for an MNA node from the solver solution vector.
@@ -169,7 +170,7 @@ export class DigitalOutputPinModel {
         solver.stampElement(this._hBranchBranch, 1);
         solver.stampElement(this._hBranchNode, 0);
         solver.stampElement(this._hNodeBranch, 1);
-        solver.stampRHS(bIdx, 0);
+        stampRHS(ctx.rhs, bIdx, 0);
         if (this._loaded) {
           solver.stampElement(this._hNodeDiag, 1 / this._spec.rHiZ);
         }
@@ -177,7 +178,7 @@ export class DigitalOutputPinModel {
         solver.stampElement(this._hBranchNode, 1);
         solver.stampElement(this._hBranchBranch, 0);
         solver.stampElement(this._hNodeBranch, 1);
-        solver.stampRHS(bIdx, this._high ? this._spec.vOH : this._spec.vOL);
+        stampRHS(ctx.rhs, bIdx, this._high ? this._spec.vOH : this._spec.vOL);
         if (this._loaded) {
           solver.stampElement(this._hNodeDiag, 1 / this._spec.rOut);
         }
@@ -194,7 +195,7 @@ export class DigitalOutputPinModel {
       } else {
         const gOut = 1 / this._spec.rOut;
         solver.stampElement(this._hNodeDiag, gOut);
-        solver.stampRHS(nodeIdx, (this._high ? this._spec.vOH : this._spec.vOL) * gOut);
+        stampRHS(ctx.rhs, nodeIdx, (this._high ? this._spec.vOH : this._spec.vOL) * gOut);
       }
     }
   }

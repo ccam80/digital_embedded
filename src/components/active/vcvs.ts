@@ -193,6 +193,7 @@ class VCVSAnalogElement extends ControlledSourceElement {
    */
   override stampOutput(
     solver: SparseSolver,
+    rhs: Float64Array,
     value: number,
     derivative: number,
     ctrlValue: number,
@@ -208,7 +209,7 @@ class VCVSAnalogElement extends ControlledSourceElement {
     }
 
     // NR-linearized RHS: constant term after factoring out Jacobian
-    solver.stampRHS(k, value - derivative * ctrlValue);
+    rhs[k] += value - derivative * ctrlValue;
   }
 
   /**

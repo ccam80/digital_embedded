@@ -38,6 +38,7 @@ import {
   type ComponentDefinition,
 } from "../../core/registry.js";
 import type { AnalogElementCore, LoadContext } from "../../solver/analog/element.js";
+import { stampRHS } from "../../solver/analog/stamp-helpers.js";
 import { defineModelParams } from "../../core/model-params.js";
 
 // ---------------------------------------------------------------------------
@@ -209,7 +210,7 @@ export function makeVariableRailElement(
       if (nodeInt !== 0) solver.stampElement(solver.allocElement(nodeInt, k), -1);
       if (nodePos !== 0) solver.stampElement(solver.allocElement(k, nodePos), 1);
       if (nodeInt !== 0) solver.stampElement(solver.allocElement(k, nodeInt), -1);
-      solver.stampRHS(k, p.voltage);
+      stampRHS(ctx.rhs,k, p.voltage);
 
       // Internal resistance: nodeInt â†’ nodeNeg.
       if (nodeInt !== 0) solver.stampElement(solver.allocElement(nodeInt, nodeInt), G);

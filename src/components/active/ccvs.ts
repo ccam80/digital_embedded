@@ -229,6 +229,7 @@ class CCVSAnalogElement extends ControlledSourceElement {
    */
   override stampOutput(
     solver: SparseSolver,
+    rhs: Float64Array,
     value: number,
     derivative: number,
     ctrlValue: number,
@@ -240,7 +241,7 @@ class CCVSAnalogElement extends ControlledSourceElement {
     solver.stampElement(solver.allocElement(ko, ks), -derivative);
 
     // NR-linearized RHS
-    solver.stampRHS(ko, value - derivative * ctrlValue);
+    rhs[ko] += value - derivative * ctrlValue;
   }
 
   /**

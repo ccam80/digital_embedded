@@ -305,8 +305,8 @@ function createLedAnalogElement(
       stampG(solver, nodeAnode, nodeCathode, -gd);
       stampG(solver, nodeCathode, nodeAnode, -gd);
       stampG(solver, nodeCathode, nodeCathode, gd);
-      stampRHS(solver, nodeAnode, -ieq);
-      stampRHS(solver, nodeCathode, ieq);
+      stampRHS(ctx.rhs, nodeAnode, -ieq);
+      stampRHS(ctx.rhs, nodeCathode, ieq);
 
       if (hasCapacitance && (ctx.cktMode & (MODETRAN | MODEAC))) {
         const order = ctx.order;
@@ -341,8 +341,8 @@ function createLedAnalogElement(
           stampG(solver, nodeAnode, nodeCathode, -capGeq);
           stampG(solver, nodeCathode, nodeAnode, -capGeq);
           stampG(solver, nodeCathode, nodeCathode, capGeq);
-          stampRHS(solver, nodeAnode, -capIeq);
-          stampRHS(solver, nodeCathode, capIeq);
+          stampRHS(ctx.rhs, nodeAnode, -capIeq);
+          stampRHS(ctx.rhs, nodeCathode, capIeq);
         }
       }
     },

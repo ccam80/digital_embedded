@@ -37,7 +37,9 @@ export type IntegrationMethod = "trapezoidal" | "gear";
  * Minimal structural interface for the MNA sparse solver.
  *
  * Production elements call the full `SparseSolver` via `LoadContext.solver`
- * and use the handle-based `allocElement` / `stampElement` / `stampRHS` API.
+ * and use the handle-based `allocElement` / `stampElement` API. RHS stamps
+ * write directly into `LoadContext.rhs` (ngspice CKTrhs) — see
+ * `stamp-helpers.ts::stampRHS(rhs, row, val)` and Phase 6 / B.16.
  *
  * The full SparseSolver class (with factorization, solve, etc.) lives in
  * solver/analog/sparse-solver.ts and satisfies this interface structurally.
@@ -45,7 +47,6 @@ export type IntegrationMethod = "trapezoidal" | "gear";
 export interface SparseSolverStamp {
   allocElement(row: number, col: number): number;
   stampElement(handle: number, value: number): void;
-  stampRHS(row: number, value: number): void;
 }
 
 

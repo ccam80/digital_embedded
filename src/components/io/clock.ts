@@ -23,6 +23,7 @@ import {
 } from "../../core/registry.js";
 import type { AnalogElementCore, LoadContext } from "../../solver/analog/element.js";
 import type { SparseSolver } from "../../solver/analog/sparse-solver.js";
+import { stampRHS } from "../../solver/analog/stamp-helpers.js";
 
 // ---------------------------------------------------------------------------
 // Layout constants
@@ -278,7 +279,7 @@ export function makeAnalogClockElement(
       const t = getTime();
       const halfPeriods = Math.floor(t / halfPeriod);
       const v = halfPeriods % 2 === 0 ? vdd : 0;
-      solver.stampRHS(k, v * ctx.srcFact);
+      stampRHS(ctx.rhs,k, v * ctx.srcFact);
     },
 
     // stampAtTime retained for callers that drive the engine's time loop
@@ -288,7 +289,7 @@ export function makeAnalogClockElement(
       const k = branchIdx;
       const halfPeriods = Math.floor(t / halfPeriod);
       const v = halfPeriods % 2 === 0 ? vdd : 0;
-      solver.stampRHS(k, v);
+      stampRHS(ctx.rhs,k, v);
     },
 
     nextBreakpoint(afterTime: number): number | null {

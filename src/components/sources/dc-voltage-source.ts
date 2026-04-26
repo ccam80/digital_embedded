@@ -27,6 +27,7 @@ import {
 } from "../../core/registry.js";
 import { formatSI } from "../../editor/si-format.js";
 import type { AnalogElementCore, LoadContext } from "../../solver/analog/element.js";
+import { stampRHS } from "../../solver/analog/stamp-helpers.js";
 import { defineModelParams } from "../../core/model-params.js";
 
 // ---------------------------------------------------------------------------
@@ -184,7 +185,7 @@ export function makeDcVoltageSource(
       if (nodeNeg !== 0) solver.stampElement(solver.allocElement(k, nodeNeg), -1);
 
       // RHS voltage constraint scaled by ctx.srcFact (CKTsrcFact) for DC source stepping.
-      solver.stampRHS(k, p.voltage * ctx.srcFact);
+      stampRHS(ctx.rhs,k, p.voltage * ctx.srcFact);
     },
 
     getPinCurrents(voltages: Float64Array): number[] {

@@ -51,7 +51,7 @@ import {
 } from "../../core/registry.js";
 import type { AnalogElement, AnalogElementCore, ReactiveAnalogElement, IntegrationMethod, LoadContext } from "../../solver/analog/element.js";
 import { MODEDC, MODETRAN, MODETRANOP, MODEINITPRED, MODEINITTRAN } from "../../solver/analog/ckt-mode.js";
-import { stampG } from "../../solver/analog/stamp-helpers.js";
+import { stampG, stampRHS } from "../../solver/analog/stamp-helpers.js";
 import { cktTerr } from "../../solver/analog/ckt-terr.js";
 import { niIntegrate } from "../../solver/analog/ni-integrate.js";
 import type { LteParams } from "../../solver/analog/ckt-terr.js";
@@ -413,7 +413,7 @@ class SegmentInductorElement implements ReactiveAnalogElement {
     if (nA !== 0) solver.stampElement(solver.allocElement(b, nA), 1);
     if (nB !== 0) solver.stampElement(solver.allocElement(b, nB), -1);
     solver.stampElement(solver.allocElement(b, b), -geq);
-    solver.stampRHS(b, ceq);
+    stampRHS(ctx.rhs,b, ceq);
   }
 
   getPinCurrents(voltages: Float64Array): number[] {
@@ -502,7 +502,7 @@ class SegmentCapacitorElement implements ReactiveAnalogElement {
       s0[base + SLOT_V_PREV] = vNow;
       if (n0 !== 0) {
         solver.stampElement(solver.allocElement(n0, n0), geq);
-        solver.stampRHS(n0, -ceq);
+        stampRHS(ctx.rhs,n0, -ceq);
       }
     } else {
       s0[base + SLOT_C_Q]    = C * vNow;
@@ -626,7 +626,7 @@ class CombinedRLElement implements ReactiveAnalogElement {
     if (nA !== 0) solver.stampElement(solver.allocElement(b, nA), 1);
     if (nB !== 0) solver.stampElement(solver.allocElement(b, nB), -1);
     solver.stampElement(solver.allocElement(b, b), -(this.R + geq));
-    solver.stampRHS(b, ceq);
+    stampRHS(ctx.rhs,b, ceq);
   }
 
   getPinCurrents(voltages: Float64Array): number[] {

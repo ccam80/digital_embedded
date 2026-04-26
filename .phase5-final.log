@@ -1,0 +1,674 @@
+
+[1m[7m[36m RUN [39m[27m[22m [36mv2.1.9 [39m[90mC:/local_working_projects/digital_in_browser[39m
+
+ [32m✓[39m src/solver/analog/__tests__/sparse-reset-semantics.test.ts [2m([22m[2m3 tests[22m[2m)[22m[90m 5[2mms[22m[39m
+ [31m❯[39m src/solver/analog/__tests__/harness/boot-step.test.ts [2m([22m[2m8 tests[22m[2m | [22m[31m2 failed[39m[2m)[22m[90m 18[2mms[22m[39m
+[31m   [31m×[31m boot-step: runDcOp() produces exactly 1 step at time 0[2m > [22mstep accepted === true and converged === true for a simple converging circuit[90m 7[2mms[22m[31m[39m
+[31m     → expected false to be true // Object.is equality[39m
+[31m   [31m×[31m boot-step: runDcOp() produces exactly 1 step at time 0[2m > [22mstep has at least 1 NR iteration captured[90m 1[2mms[22m[31m[39m
+[31m     → expected 0 to be greater than or equal to 1[39m
+ [31m❯[39m src/solver/analog/__tests__/newton-raphson.test.ts [2m([22m[2m32 tests[22m[2m | [22m[31m20 failed[39m[2m)[22m[90m 30[2mms[22m[39m
+[31m   [31m×[31m NR[2m > [22mlinear_converges_in_two_iterations[90m 9[2mms[22m[31m[39m
+[31m     → expected false to be true // Object.is equality[39m
+[31m   [31m×[31m NR[2m > [22mwrites_into_ctx_nrResult[90m 1[2mms[22m[31m[39m
+[31m     → expected false to be true // Object.is equality[39m
+[31m   [31m×[31m NR[2m > [22mzero_allocations_in_nr_loop[90m 1[2mms[22m[31m[39m
+[31m     → expected false to be true // Object.is equality[39m
+[31m   [31m×[31m NR[2m > [22mdiode_circuit_converges[90m 1[2mms[22m[31m[39m
+[31m     → expected false to be true // Object.is equality[39m
+[31m   [31m×[31m NR[2m > [22mdiode_reverse_bias[90m 1[2mms[22m[31m[39m
+[31m     → expected false to be true // Object.is equality[39m
+[31m   [31m×[31m NR[2m > [22mblame_scalars_populated[90m 1[2mms[22m[31m[39m
+[31m     → expected false to be true // Object.is equality[39m
+[31m   [31m×[31m NR[2m > [22minitial_guess_used[90m 1[2mms[22m[31m[39m
+[31m     → expected false to be true // Object.is equality[39m
+[31m   [31m×[31m NR[2m > [22mnonlinear_circuit_runs_at_least_2_iterations_with_state_pool[90m 1[2mms[22m[31m[39m
+[31m     → expected false to be true // Object.is equality[39m
+[31m   [31m×[31m NR[2m > [22mnonlinear_circuit_forced_noncon_on_iteration_0[90m 1[2mms[22m[31m[39m
+[31m     → expected false to be true // Object.is equality[39m
+[31m   [31m×[31m NR[2m > [22minitTran_transitions_to_initFloat_after_iteration_0[90m 1[2mms[22m[31m[39m
+[31m     → expected false to be true // Object.is equality[39m
+[31m   [31m×[31m NR[2m > [22minitPred_transitions_to_initFloat_immediately[90m 1[2mms[22m[31m[39m
+[31m     → expected false to be true // Object.is equality[39m
+[31m   [31m×[31m NR[2m > [22mtransient_mode_allows_convergence_without_ladder[90m 1[2mms[22m[31m[39m
+[31m     → expected false to be true // Object.is equality[39m
+[31m   [31m×[31m NR[2m > [22mno_pool_allows_convergence[90m 1[2mms[22m[31m[39m
+[31m     → expected false to be true // Object.is equality[39m
+[31m   [31m×[31m pnjlim ngspice-exact[2m > [22mpnjlim_matches_ngspice_forward_bias[90m 1[2mms[22m[31m[39m
+[31m     → expected 0.838698003514509 to be 0.7895470511246272 // Object.is equality[39m
+[31m   [31m×[31m pnjlim ngspice-exact[2m > [22mpnjlim_matches_ngspice_arg_le_zero_branch[90m 0[2mms[22m[31m[39m
+[31m     → expected 0.4062106161985045 to be 0.3 // Object.is equality[39m
+[31m   [31m×[31m ipass hadNodeset gate[2m > [22mipass_skipped_without_nodesets[90m 1[2mms[22m[31m[39m
+[31m     → expected false to be true // Object.is equality[39m
+[31m   [31m×[31m ipass hadNodeset gate[2m > [22mipass_fires_with_nodesets[90m 1[2mms[22m[31m[39m
+[31m     → expected false to be true // Object.is equality[39m
+[31m   [31m×[31m NR NISHOULDREORDER lifecycle[2m > [22mforceReorder_called_on_initJct_to_initFix[90m 1[2mms[22m[31m[39m
+[31m     → expected 512 not to be 512 // Object.is equality[39m
+[31m   [31m×[31m NR E_SINGULAR recovery via continue[2m > [22me_singular_recovers_via_continue[90m 1[2mms[22m[31m[39m
+[31m     → expected false to be true // Object.is equality[39m
+[31m   [31m×[31m NR E_SINGULAR recovery via continue[2m > [22me_singular_recovery_reloads_and_refactors[90m 1[2mms[22m[31m[39m
+[31m     → expected false to be true // Object.is equality[39m
+ [31m❯[39m src/solver/analog/__tests__/harness/harness-integration.test.ts [2m([22m[2m29 tests[22m[2m | [22m[31m12 failed[39m[2m)[22m[90m 33[2mms[22m[39m
+[31m   [31m×[31m harness integration[2m > [22miteration capture hook records NR iterations during DC OP[90m 6[2mms[22m[31m[39m
+[31m     → expected 0 to be greater than 0[39m
+[31m   [31m×[31m harness integration[2m > [22mpostIterationHook fires during DC OP (nonlinear circuit)[90m 3[2mms[22m[31m[39m
+[31m     → expected false to be true // Object.is equality[39m
+[31m   [31m×[31m harness integration[2m > [22mpostIterationHook fires during DC OP (linear circuit)[90m 1[2mms[22m[31m[39m
+[31m     → expected false to be true // Object.is equality[39m
+[31m   [31m×[31m harness integration[2m > [22mstep capture hook packages iterations into step snapshots[90m 2[2mms[22m[31m[39m
+[31m     → expected 1 to be greater than 1[39m
+[31m   [31m×[31m harness integration[2m > [22mconvergenceSummary reports correct statistics[90m 1[2mms[22m[31m[39m
+[31m     → expected +0 to be 1 // Object.is equality[39m
+[31m   [31m×[31m harness integration[2m > [22mnodeVoltageTrajectory returns voltage history[90m 1[2mms[22m[31m[39m
+[31m     → expected 0 to be greater than 0[39m
+[31m   [31m×[31m harness integration[2m > [22mquerySteps filters by convergence[90m 1[2mms[22m[31m[39m
+[31m     → expected +0 to be 1 // Object.is equality[39m
+[31m   [31m×[31m harness integration[2m > [22mcompareSnapshots returns all-pass for self-comparison[90m 1[2mms[22m[31m[39m
+[31m     → expected 0 to be greater than 0[39m
+[31m   [31m×[31m harness integration[2m > [22mformatComparison produces readable output[90m 1[2mms[22m[31m[39m
+[31m     → Cannot read properties of undefined (reading 'stepIndex')[39m
+[31m   [31m×[31m harness integration[2m > [22mstep capture hook supports retry tracking via beginAttempt/endAttempt[90m 1[2mms[22m[31m[39m
+[31m     → expected false to be true // Object.is equality[39m
+[31m   [31m×[31m harness integration[2m > [22mSparseSolver exposes dimension, getRhsSnapshot, getCSCNonZeros[90m 1[2mms[22m[31m[39m
+[31m     → expected 4 to be 3 // Object.is equality[39m
+[31m   [31m×[31m harness integration[2m > [22mfindLargestDelta identifies worst convergence point[90m 1[2mms[22m[31m[39m
+[31m     → expected null not to be null[39m
+
+[31m⎯⎯⎯⎯⎯⎯[1m[7m Failed Tests 34 [27m[22m⎯⎯⎯⎯⎯⎯⎯[39m
+
+[31m[1m[7m FAIL [27m[22m[39m src/solver/analog/__tests__/newton-raphson.test.ts[2m > [22mNR[2m > [22mlinear_converges_in_two_iterations
+[31m[1mAssertionError[22m: expected false to be true // Object.is equality[39m
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[32m- true[39m
+[31m+ false[39m
+
+[36m [2m❯[22m src/solver/analog/__tests__/newton-raphson.test.ts:[2m133:36[22m[39m
+    [90m131| [39m    [34mnewtonRaphson[39m(ctx)[33m;[39m
+    [90m132| [39m
+    [90m133| [39m    [34mexpect[39m(ctx[33m.[39mnrResult[33m.[39mconverged)[33m.[39m[34mtoBe[39m([35mtrue[39m)[33m;[39m
+    [90m   | [39m                                   [31m^[39m
+    [90m134| [39m    [34mexpect[39m(ctx[33m.[39mnrResult[33m.[39miterations)[33m.[39m[34mtoBe[39m([34m2[39m)[33m;[39m
+    [90m135| [39m    [90m// Node 2 (index 1 in 0-based solver) = midpoint voltage ~2.5V[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/34]⎯[22m[39m
+
+[31m[1m[7m FAIL [27m[22m[39m src/solver/analog/__tests__/newton-raphson.test.ts[2m > [22mNR[2m > [22mwrites_into_ctx_nrResult
+[31m[1mAssertionError[22m: expected false to be true // Object.is equality[39m
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[32m- true[39m
+[31m+ false[39m
+
+[36m [2m❯[22m src/solver/analog/__tests__/newton-raphson.test.ts:[2m149:36[22m[39m
+    [90m147| [39m    [34mnewtonRaphson[39m(ctx)[33m;[39m
+    [90m148| [39m
+    [90m149| [39m    [34mexpect[39m(ctx[33m.[39mnrResult[33m.[39mconverged)[33m.[39m[34mtoBe[39m([35mtrue[39m)[33m;[39m
+    [90m   | [39m                                   [31m^[39m
+    [90m150| [39m    [34mexpect[39m(ctx[33m.[39mnrResult[33m.[39miterations)[33m.[39m[34mtoBeGreaterThan[39m([34m0[39m)[33m;[39m
+    [90m151| [39m    [90m// nrResult.voltages points into ctx.rhs — must be a valid buffer[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/34]⎯[22m[39m
+
+[31m[1m[7m FAIL [27m[22m[39m src/solver/analog/__tests__/newton-raphson.test.ts[2m > [22mNR[2m > [22mzero_allocations_in_nr_loop
+[31m[1mAssertionError[22m: expected false to be true // Object.is equality[39m
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[32m- true[39m
+[31m+ false[39m
+
+[36m [2m❯[22m src/solver/analog/__tests__/newton-raphson.test.ts:[2m191:38[22m[39m
+    [90m189| [39m      [90m// No Float64Array allocations during the second NR call[39m
+    [90m190| [39m      [34mexpect[39m(allocCount)[33m.[39m[34mtoBe[39m([34m0[39m)[33m;[39m
+    [90m191| [39m      [34mexpect[39m(ctx[33m.[39mnrResult[33m.[39mconverged)[33m.[39m[34mtoBe[39m([35mtrue[39m)[33m;[39m
+    [90m   | [39m                                     [31m^[39m
+    [90m192| [39m    } [35mfinally[39m {
+    [90m193| [39m      [90m// eslint-disable-next-line @typescript-eslint/no-explicit-any[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/34]⎯[22m[39m
+
+[31m[1m[7m FAIL [27m[22m[39m src/solver/analog/__tests__/newton-raphson.test.ts[2m > [22mNR[2m > [22mdiode_circuit_converges
+[31m[1mAssertionError[22m: expected false to be true // Object.is equality[39m
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[32m- true[39m
+[31m+ false[39m
+
+[36m [2m❯[22m src/solver/analog/__tests__/newton-raphson.test.ts:[2m207:36[22m[39m
+    [90m205| [39m    [34mnewtonRaphson[39m(ctx)[33m;[39m
+    [90m206| [39m
+    [90m207| [39m    [34mexpect[39m(ctx[33m.[39mnrResult[33m.[39mconverged)[33m.[39m[34mtoBe[39m([35mtrue[39m)[33m;[39m
+    [90m   | [39m                                   [31m^[39m
+    [90m208| [39m    [34mexpect[39m(ctx[33m.[39mnrResult[33m.[39miterations)[33m.[39m[34mtoBeLessThan[39m([34m20[39m)[33m;[39m
+    [90m209| [39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/34]⎯[22m[39m
+
+[31m[1m[7m FAIL [27m[22m[39m src/solver/analog/__tests__/newton-raphson.test.ts[2m > [22mNR[2m > [22mdiode_reverse_bias
+[31m[1mAssertionError[22m: expected false to be true // Object.is equality[39m
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[32m- true[39m
+[31m+ false[39m
+
+[36m [2m❯[22m src/solver/analog/__tests__/newton-raphson.test.ts:[2m226:36[22m[39m
+    [90m224| [39m    [34mnewtonRaphson[39m(ctx)[33m;[39m
+    [90m225| [39m
+    [90m226| [39m    [34mexpect[39m(ctx[33m.[39mnrResult[33m.[39mconverged)[33m.[39m[34mtoBe[39m([35mtrue[39m)[33m;[39m
+    [90m   | [39m                                   [31m^[39m
+    [90m227| [39m
+    [90m228| [39m    [90m// In reverse bias: anode voltage ≈ -5V (clamped by Is ≈ -1e-14 A)[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/34]⎯[22m[39m
+
+[31m[1m[7m FAIL [27m[22m[39m src/solver/analog/__tests__/newton-raphson.test.ts[2m > [22mNR[2m > [22mblame_scalars_populated
+[31m[1mAssertionError[22m: expected false to be true // Object.is equality[39m
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[32m- true[39m
+[31m+ false[39m
+
+[36m [2m❯[22m src/solver/analog/__tests__/newton-raphson.test.ts:[2m245:36[22m[39m
+    [90m243| [39m    [34mnewtonRaphson[39m(ctx)[33m;[39m
+    [90m244| [39m
+    [90m245| [39m    [34mexpect[39m(ctx[33m.[39mnrResult[33m.[39mconverged)[33m.[39m[34mtoBe[39m([35mtrue[39m)[33m;[39m
+    [90m   | [39m                                   [31m^[39m
+    [90m246| [39m    [90m// largestChangeNode is a valid node index (>= 0) after a nonlinea[39m…
+    [90m247| [39m    [34mexpect[39m(ctx[33m.[39mnrResult[33m.[39mlargestChangeNode)[33m.[39m[34mtoBeGreaterThanOrEqual[39m([34m0[39m)[33m;[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/34]⎯[22m[39m
+
+[31m[1m[7m FAIL [27m[22m[39m src/solver/analog/__tests__/newton-raphson.test.ts[2m > [22mNR[2m > [22minitial_guess_used
+[31m[1mAssertionError[22m: expected false to be true // Object.is equality[39m
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[32m- true[39m
+[31m+ false[39m
+
+[36m [2m❯[22m src/solver/analog/__tests__/newton-raphson.test.ts:[2m272:37[22m[39m
+    [90m270| [39m    [34mnewtonRaphson[39m(ctx2)[33m;[39m
+    [90m271| [39m
+    [90m272| [39m    [34mexpect[39m(ctx2[33m.[39mnrResult[33m.[39mconverged)[33m.[39m[34mtoBe[39m([35mtrue[39m)[33m;[39m
+    [90m   | [39m                                    [31m^[39m
+    [90m273| [39m    [34mexpect[39m(ctx1[33m.[39mnrResult[33m.[39mconverged)[33m.[39m[34mtoBe[39m([35mtrue[39m)[33m;[39m
+    [90m274| [39m    [90m// A good initial guess should converge in fewer or equal iteratio[39m…
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[7/34]⎯[22m[39m
+
+[31m[1m[7m FAIL [27m[22m[39m src/solver/analog/__tests__/newton-raphson.test.ts[2m > [22mNR[2m > [22mnonlinear_circuit_runs_at_least_2_iterations_with_state_pool
+[31m[1mAssertionError[22m: expected false to be true // Object.is equality[39m
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[32m- true[39m
+[31m+ false[39m
+
+[36m [2m❯[22m src/solver/analog/__tests__/newton-raphson.test.ts:[2m288:36[22m[39m
+    [90m286| [39m    [34mnewtonRaphson[39m(ctx)[33m;[39m
+    [90m287| [39m
+    [90m288| [39m    [34mexpect[39m(ctx[33m.[39mnrResult[33m.[39mconverged)[33m.[39m[34mtoBe[39m([35mtrue[39m)[33m;[39m
+    [90m   | [39m                                   [31m^[39m
+    [90m289| [39m    [34mexpect[39m(ctx[33m.[39mnrResult[33m.[39miterations)[33m.[39m[34mtoBeGreaterThanOrEqual[39m([34m2[39m)[33m;[39m
+    [90m290| [39m  })[33m;[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[8/34]⎯[22m[39m
+
+[31m[1m[7m FAIL [27m[22m[39m src/solver/analog/__tests__/newton-raphson.test.ts[2m > [22mNR[2m > [22mnonlinear_circuit_forced_noncon_on_iteration_0
+[31m[1mAssertionError[22m: expected false to be true // Object.is equality[39m
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[32m- true[39m
+[31m+ false[39m
+
+[36m [2m❯[22m src/solver/analog/__tests__/newton-raphson.test.ts:[2m300:36[22m[39m
+    [90m298| [39m    [34mnewtonRaphson[39m(ctx)[33m;[39m
+    [90m299| [39m
+    [90m300| [39m    [34mexpect[39m(ctx[33m.[39mnrResult[33m.[39mconverged)[33m.[39m[34mtoBe[39m([35mtrue[39m)[33m;[39m
+    [90m   | [39m                                   [31m^[39m
+    [90m301| [39m    [34mexpect[39m(ctx[33m.[39mnrResult[33m.[39miterations)[33m.[39m[34mtoBeGreaterThanOrEqual[39m([34m2[39m)[33m;[39m
+    [90m302| [39m  })[33m;[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[9/34]⎯[22m[39m
+
+[31m[1m[7m FAIL [27m[22m[39m src/solver/analog/__tests__/newton-raphson.test.ts[2m > [22mNR[2m > [22minitTran_transitions_to_initFloat_after_iteration_0
+[31m[1mAssertionError[22m: expected false to be true // Object.is equality[39m
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[32m- true[39m
+[31m+ false[39m
+
+[36m [2m❯[22m src/solver/analog/__tests__/newton-raphson.test.ts:[2m314:36[22m[39m
+    [90m312| [39m    [34mnewtonRaphson[39m(ctx)[33m;[39m
+    [90m313| [39m
+    [90m314| [39m    [34mexpect[39m(ctx[33m.[39mnrResult[33m.[39mconverged)[33m.[39m[34mtoBe[39m([35mtrue[39m)[33m;[39m
+    [90m   | [39m                                   [31m^[39m
+    [90m315| [39m    [90m// After NR completes, INITF must have decayed to MODEINITFLOAT[39m
+    [90m316| [39m    [90m// (niiter.c:1070-1071 INITF dispatcher, cktdefs.h:177).[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[10/34]⎯[22m[39m
+
+[31m[1m[7m FAIL [27m[22m[39m src/solver/analog/__tests__/newton-raphson.test.ts[2m > [22mNR[2m > [22minitPred_transitions_to_initFloat_immediately
+[31m[1mAssertionError[22m: expected false to be true // Object.is equality[39m
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[32m- true[39m
+[31m+ false[39m
+
+[36m [2m❯[22m src/solver/analog/__tests__/newton-raphson.test.ts:[2m326:36[22m[39m
+    [90m324| [39m    [34mnewtonRaphson[39m(ctx)[33m;[39m
+    [90m325| [39m
+    [90m326| [39m    [34mexpect[39m(ctx[33m.[39mnrResult[33m.[39mconverged)[33m.[39m[34mtoBe[39m([35mtrue[39m)[33m;[39m
+    [90m   | [39m                                   [31m^[39m
+    [90m327| [39m    [34mexpect[39m([34minitf[39m(ctx[33m.[39mcktMode))[33m.[39m[34mtoBe[39m([33mMODEINITFLOAT[39m)[33m;[39m
+    [90m328| [39m  })[33m;[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[11/34]⎯[22m[39m
+
+[31m[1m[7m FAIL [27m[22m[39m src/solver/analog/__tests__/newton-raphson.test.ts[2m > [22mNR[2m > [22mtransient_mode_allows_convergence_without_ladder
+[31m[1mAssertionError[22m: expected false to be true // Object.is equality[39m
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[32m- true[39m
+[31m+ false[39m
+
+[36m [2m❯[22m src/solver/analog/__tests__/newton-raphson.test.ts:[2m336:36[22m[39m
+    [90m334| [39m    [34mnewtonRaphson[39m(ctx)[33m;[39m
+    [90m335| [39m
+    [90m336| [39m    [34mexpect[39m(ctx[33m.[39mnrResult[33m.[39mconverged)[33m.[39m[34mtoBe[39m([35mtrue[39m)[33m;[39m
+    [90m   | [39m                                   [31m^[39m
+    [90m337| [39m  })[33m;[39m
+    [90m338| [39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[12/34]⎯[22m[39m
+
+[31m[1m[7m FAIL [27m[22m[39m src/solver/analog/__tests__/newton-raphson.test.ts[2m > [22mNR[2m > [22mno_pool_allows_convergence
+[31m[1mAssertionError[22m: expected false to be true // Object.is equality[39m
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[32m- true[39m
+[31m+ false[39m
+
+[36m [2m❯[22m src/solver/analog/__tests__/newton-raphson.test.ts:[2m344:36[22m[39m
+    [90m342| [39m    [34mnewtonRaphson[39m(ctx)[33m;[39m
+    [90m343| [39m
+    [90m344| [39m    [34mexpect[39m(ctx[33m.[39mnrResult[33m.[39mconverged)[33m.[39m[34mtoBe[39m([35mtrue[39m)[33m;[39m
+    [90m   | [39m                                   [31m^[39m
+    [90m345| [39m  })[33m;[39m
+    [90m346| [39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[13/34]⎯[22m[39m
+
+[31m[1m[7m FAIL [27m[22m[39m src/solver/analog/__tests__/newton-raphson.test.ts[2m > [22mpnjlim ngspice-exact[2m > [22mpnjlim_matches_ngspice_forward_bias
+[31m[1mAssertionError[22m: expected 0.838698003514509 to be 0.7895470511246272 // Object.is equality[39m
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[32m- 0.7895470511246272[39m
+[31m+ 0.838698003514509[39m
+
+[36m [2m❯[22m src/solver/analog/__tests__/newton-raphson.test.ts:[2m396:26[22m[39m
+    [90m394| [39m    [35mconst[39m expected [33m=[39m vold [33m+[39m vt [33m*[39m [33mMath[39m[33m.[39m[34mlog[39m(arg)[33m;[39m
+    [90m395| [39m    [35mconst[39m result [33m=[39m [34mpnjlim[39m(vnew[33m,[39m vold[33m,[39m vt[33m,[39m vcrit)[33m;[39m
+    [90m396| [39m    [34mexpect[39m(result[33m.[39mvalue)[33m.[39m[34mtoBe[39m(expected)[33m;[39m
+    [90m   | [39m                         [31m^[39m
+    [90m397| [39m    [34mexpect[39m(result[33m.[39mlimited)[33m.[39m[34mtoBe[39m([35mtrue[39m)[33m;[39m
+    [90m398| [39m  })[33m;[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[14/34]⎯[22m[39m
+
+[31m[1m[7m FAIL [27m[22m[39m src/solver/analog/__tests__/newton-raphson.test.ts[2m > [22mpnjlim ngspice-exact[2m > [22mpnjlim_matches_ngspice_arg_le_zero_branch
+[31m[1mAssertionError[22m: expected 0.4062106161985045 to be 0.3 // Object.is equality[39m
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[32m- 0.3[39m
+[31m+ 0.4062106161985045[39m
+
+[36m [2m❯[22m src/solver/analog/__tests__/newton-raphson.test.ts:[2m410:26[22m[39m
+    [90m408| [39m    [35mconst[39m vcrit [33m=[39m [34m0.3[39m[33m;[39m
+    [90m409| [39m    [35mconst[39m result [33m=[39m [34mpnjlim[39m(vnew[33m,[39m vold[33m,[39m vt[33m,[39m vcrit)[33m;[39m
+    [90m410| [39m    [34mexpect[39m(result[33m.[39mvalue)[33m.[39m[34mtoBe[39m(vcrit)[33m;[39m
+    [90m   | [39m                         [31m^[39m
+    [90m411| [39m    [34mexpect[39m(result[33m.[39mlimited)[33m.[39m[34mtoBe[39m([35mtrue[39m)[33m;[39m
+    [90m412| [39m  })[33m;[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[15/34]⎯[22m[39m
+
+[31m[1m[7m FAIL [27m[22m[39m src/solver/analog/__tests__/newton-raphson.test.ts[2m > [22mipass hadNodeset gate[2m > [22mipass_skipped_without_nodesets
+[31m[1mAssertionError[22m: expected false to be true // Object.is equality[39m
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[32m- true[39m
+[31m+ false[39m
+
+[36m [2m❯[22m src/solver/analog/__tests__/newton-raphson.test.ts:[2m500:36[22m[39m
+    [90m498| [39m    [34mnewtonRaphson[39m(ctx)[33m;[39m
+    [90m499| [39m
+    [90m500| [39m    [34mexpect[39m(ctx[33m.[39mnrResult[33m.[39mconverged)[33m.[39m[34mtoBe[39m([35mtrue[39m)[33m;[39m
+    [90m   | [39m                                   [31m^[39m
+    [90m501| [39m    [34mexpect[39m(ctx[33m.[39mhadNodeset)[33m.[39m[34mtoBe[39m([35mfalse[39m)[33m;[39m
+    [90m502| [39m    [90m// With a primed diode junction and no nodesets, initFloat begins [39m…
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[16/34]⎯[22m[39m
+
+[31m[1m[7m FAIL [27m[22m[39m src/solver/analog/__tests__/newton-raphson.test.ts[2m > [22mipass hadNodeset gate[2m > [22mipass_fires_with_nodesets
+[31m[1mAssertionError[22m: expected false to be true // Object.is equality[39m
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[32m- true[39m
+[31m+ false[39m
+
+[36m [2m❯[22m src/solver/analog/__tests__/newton-raphson.test.ts:[2m544:36[22m[39m
+    [90m542| [39m    [34mnewtonRaphson[39m(ctx)[33m;[39m
+    [90m543| [39m
+    [90m544| [39m    [34mexpect[39m(ctx[33m.[39mnrResult[33m.[39mconverged)[33m.[39m[34mtoBe[39m([35mtrue[39m)[33m;[39m
+    [90m   | [39m                                   [31m^[39m
+    [90m545| [39m    [34mexpect[39m(ctx[33m.[39mhadNodeset)[33m.[39m[34mtoBe[39m([35mtrue[39m)[33m;[39m
+    [90m546| [39m    [90m// With nodesets, ipass fires: convergeIter must be at least 1 ite[39m…
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[17/34]⎯[22m[39m
+
+[31m[1m[7m FAIL [27m[22m[39m src/solver/analog/__tests__/newton-raphson.test.ts[2m > [22mNR NISHOULDREORDER lifecycle[2m > [22mforceReorder_called_on_initJct_to_initFix
+[31m[1mAssertionError[22m: expected 512 not to be 512 // Object.is equality[39m
+[36m [2m❯[22m src/solver/analog/__tests__/newton-raphson.test.ts:[2m701:36[22m[39m
+    [90m699| [39m
+    [90m700| [39m    [34mexpect[39m(forceReorderCalled)[33m.[39m[34mtoBe[39m([35mtrue[39m)[33m;[39m
+    [90m701| [39m    [34mexpect[39m([34minitf[39m(ctx[33m.[39mcktMode))[33m.[39mnot[33m.[39m[34mtoBe[39m([33mMODEINITJCT[39m)[33m;[39m
+    [90m   | [39m                                   [31m^[39m
+    [90m702| [39m  })[33m;[39m
+    [90m703| [39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[18/34]⎯[22m[39m
+
+[31m[1m[7m FAIL [27m[22m[39m src/solver/analog/__tests__/newton-raphson.test.ts[2m > [22mNR E_SINGULAR recovery via continue[2m > [22me_singular_recovers_via_continue
+[31m[1mAssertionError[22m: expected false to be true // Object.is equality[39m
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[32m- true[39m
+[31m+ false[39m
+
+[36m [2m❯[22m src/solver/analog/__tests__/newton-raphson.test.ts:[2m814:36[22m[39m
+    [90m812| [39m    [34mnewtonRaphson[39m(ctx)[33m;[39m
+    [90m813| [39m
+    [90m814| [39m    [34mexpect[39m(ctx[33m.[39mnrResult[33m.[39mconverged)[33m.[39m[34mtoBe[39m([35mtrue[39m)[33m;[39m
+    [90m   | [39m                                   [31m^[39m
+    [90m815| [39m    [34mexpect[39m(singularIterationSeen)[33m.[39m[34mtoBe[39m([35mtrue[39m)[33m;[39m
+    [90m816| [39m    [34mexpect[39m(forceReorderCalledAfterFailure)[33m.[39m[34mtoBe[39m([35mtrue[39m)[33m;[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[19/34]⎯[22m[39m
+
+[31m[1m[7m FAIL [27m[22m[39m src/solver/analog/__tests__/newton-raphson.test.ts[2m > [22mNR E_SINGULAR recovery via continue[2m > [22me_singular_recovery_reloads_and_refactors
+[31m[1mAssertionError[22m: expected false to be true // Object.is equality[39m
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[32m- true[39m
+[31m+ false[39m
+
+[36m [2m❯[22m src/solver/analog/__tests__/newton-raphson.test.ts:[2m881:36[22m[39m
+    [90m879| [39m    [34mnewtonRaphson[39m(ctx)[33m;[39m
+    [90m880| [39m
+    [90m881| [39m    [34mexpect[39m(ctx[33m.[39mnrResult[33m.[39mconverged)[33m.[39m[34mtoBe[39m([35mtrue[39m)[33m;[39m
+    [90m   | [39m                                   [31m^[39m
+    [90m882| [39m    [34mexpect[39m(forceReorderCalled)[33m.[39m[34mtoBe[39m([35mtrue[39m)[33m;[39m
+    [90m883| [39m    [34mexpect[39m(beginAssemblyAfterFailure)[33m.[39m[34mtoBeGreaterThan[39m([34m0[39m)[33m;[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[20/34]⎯[22m[39m
+
+[31m[1m[7m FAIL [27m[22m[39m src/solver/analog/__tests__/harness/boot-step.test.ts[2m > [22mboot-step: runDcOp() produces exactly 1 step at time 0[2m > [22mstep accepted === true and converged === true for a simple converging circuit
+[31m[1mAssertionError[22m: expected false to be true // Object.is equality[39m
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[32m- true[39m
+[31m+ false[39m
+
+[36m [2m❯[22m src/solver/analog/__tests__/harness/boot-step.test.ts:[2m139:32[22m[39m
+    [90m137| [39m  [34mit[39m([32m"step accepted === true and converged === true for a simple conve[39m…
+    [90m138| [39m    [35mconst[39m steps [33m=[39m [34mrunDcopCapture[39m()[33m;[39m
+    [90m139| [39m    [34mexpect[39m(steps[[34m0[39m][33m.[39mconverged)[33m.[39m[34mtoBe[39m([35mtrue[39m)[33m;[39m
+    [90m   | [39m                               [31m^[39m
+    [90m140| [39m    [34mexpect[39m(steps[[34m0[39m][33m.[39maccepted)[33m.[39m[34mtoBe[39m([35mtrue[39m)[33m;[39m
+    [90m141| [39m  })[33m;[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[21/34]⎯[22m[39m
+
+[31m[1m[7m FAIL [27m[22m[39m src/solver/analog/__tests__/harness/boot-step.test.ts[2m > [22mboot-step: runDcOp() produces exactly 1 step at time 0[2m > [22mstep has at least 1 NR iteration captured
+[31m[1mAssertionError[22m: expected 0 to be greater than or equal to 1[39m
+[36m [2m❯[22m src/solver/analog/__tests__/harness/boot-step.test.ts:[2m145:37[22m[39m
+    [90m143| [39m  [34mit[39m([32m"step has at least 1 NR iteration captured"[39m[33m,[39m () [33m=>[39m {
+    [90m144| [39m    [35mconst[39m steps [33m=[39m [34mrunDcopCapture[39m()[33m;[39m
+    [90m145| [39m    [34mexpect[39m(steps[[34m0[39m][33m.[39miterationCount)[33m.[39m[34mtoBeGreaterThanOrEqual[39m([34m1[39m)[33m;[39m
+    [90m   | [39m                                    [31m^[39m
+    [90m146| [39m    [34mexpect[39m(steps[[34m0[39m][33m.[39miterations[33m.[39mlength)[33m.[39m[34mtoBeGreaterThanOrEqual[39m([34m1[39m)[33m;[39m
+    [90m147| [39m  })[33m;[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[22/34]⎯[22m[39m
+
+[31m[1m[7m FAIL [27m[22m[39m src/solver/analog/__tests__/harness/harness-integration.test.ts[2m > [22mharness integration[2m > [22miteration capture hook records NR iterations during DC OP
+[31m[1mAssertionError[22m: expected 0 to be greater than 0[39m
+[36m [2m❯[22m src/solver/analog/__tests__/harness/harness-integration.test.ts:[2m90:30[22m[39m
+    [90m 88| [39m    engine[33m.[39m[34mdcOperatingPoint[39m()[33m;[39m
+    [90m 89| [39m    [35mconst[39m snapshots [33m=[39m [34mgetSnapshots[39m()[33m;[39m
+    [90m 90| [39m    [34mexpect[39m(snapshots[33m.[39mlength)[33m.[39m[34mtoBeGreaterThan[39m([34m0[39m)[33m;[39m
+    [90m   | [39m                             [31m^[39m
+    [90m 91| [39m    [35mconst[39m first [33m=[39m snapshots[[34m0[39m][33m;[39m
+    [90m 92| [39m    [34mexpect[39m(first[33m.[39miteration)[33m.[39m[34mtoBe[39m([34m0[39m)[33m;[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[23/34]⎯[22m[39m
+
+[31m[1m[7m FAIL [27m[22m[39m src/solver/analog/__tests__/harness/harness-integration.test.ts[2m > [22mharness integration[2m > [22mpostIterationHook fires during DC OP (nonlinear circuit)
+[31m[1mAssertionError[22m: expected false to be true // Object.is equality[39m
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[32m- true[39m
+[31m+ false[39m
+
+[36m [2m❯[22m src/solver/analog/__tests__/harness/harness-integration.test.ts:[2m112:30[22m[39m
+    [90m110| [39m    engine[33m.[39mpostIterationHook [33m=[39m (_i[33m:[39m number[33m,[39m _v[33m:[39m [33mFloat64Array[39m[33m,[39m _p[33m:[39m [33mFloa[39m…
+    [90m111| [39m    [35mconst[39m result [33m=[39m engine[33m.[39m[34mdcOperatingPoint[39m()[33m;[39m
+    [90m112| [39m    [34mexpect[39m(result[33m.[39mconverged)[33m.[39m[34mtoBe[39m([35mtrue[39m)[33m;[39m
+    [90m   | [39m                             [31m^[39m
+    [90m113| [39m    [34mexpect[39m(hookCallCount)[33m.[39m[34mtoBeGreaterThan[39m([34m0[39m)[33m;[39m
+    [90m114| [39m  })[33m;[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[24/34]⎯[22m[39m
+
+[31m[1m[7m FAIL [27m[22m[39m src/solver/analog/__tests__/harness/harness-integration.test.ts[2m > [22mharness integration[2m > [22mpostIterationHook fires during DC OP (linear circuit)
+[31m[1mAssertionError[22m: expected false to be true // Object.is equality[39m
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[32m- true[39m
+[31m+ false[39m
+
+[36m [2m❯[22m src/solver/analog/__tests__/harness/harness-integration.test.ts:[2m126:30[22m[39m
+    [90m124| [39m    }[33m;[39m
+    [90m125| [39m    [35mconst[39m result [33m=[39m engine[33m.[39m[34mdcOperatingPoint[39m()[33m;[39m
+    [90m126| [39m    [34mexpect[39m(result[33m.[39mconverged)[33m.[39m[34mtoBe[39m([35mtrue[39m)[33m;[39m
+    [90m   | [39m                             [31m^[39m
+    [90m127| [39m    [34mexpect[39m(hookCallCount)[33m.[39m[34mtoBeGreaterThan[39m([34m0[39m)[33m;[39m
+    [90m128| [39m    [34mexpect[39m(lastGlobalConverged)[33m.[39m[34mtoBe[39m([35mtrue[39m)[33m;[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[25/34]⎯[22m[39m
+
+[31m[1m[7m FAIL [27m[22m[39m src/solver/analog/__tests__/harness/harness-integration.test.ts[2m > [22mharness integration[2m > [22mstep capture hook packages iterations into step snapshots
+[31m[1mAssertionError[22m: expected 1 to be greater than 1[39m
+[36m [2m❯[22m src/solver/analog/__tests__/harness/harness-integration.test.ts:[2m156:26[22m[39m
+    [90m154| [39m    engine[33m.[39mpostIterationHook [33m=[39m [35mnull[39m[33m;[39m
+    [90m155| [39m    [35mconst[39m steps [33m=[39m capture[33m.[39m[34mgetSteps[39m()[33m;[39m
+    [90m156| [39m    [34mexpect[39m(steps[33m.[39mlength)[33m.[39m[34mtoBeGreaterThan[39m([34m1[39m)[33m;[39m
+    [90m   | [39m                         [31m^[39m
+    [90m157| [39m    [34mexpect[39m(steps[[34m0[39m][33m.[39mstepStartTime)[33m.[39m[34mtoBe[39m([34m0[39m)[33m;[39m
+    [90m158| [39m    [34mexpect[39m(steps[[34m0[39m][33m.[39miterations[33m.[39mlength)[33m.[39m[34mtoBeGreaterThan[39m([34m0[39m)[33m;[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[26/34]⎯[22m[39m
+
+[31m[1m[7m FAIL [27m[22m[39m src/solver/analog/__tests__/harness/harness-integration.test.ts[2m > [22mharness integration[2m > [22mconvergenceSummary reports correct statistics
+[31m[1mAssertionError[22m: expected +0 to be 1 // Object.is equality[39m
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[32m- 1[39m
+[31m+ 0[39m
+
+[36m [2m❯[22m src/solver/analog/__tests__/harness/harness-integration.test.ts:[2m188:36[22m[39m
+    [90m186| [39m    [35mconst[39m summary [33m=[39m [34mconvergenceSummary[39m(session)[33m;[39m
+    [90m187| [39m    [34mexpect[39m(summary[33m.[39mtotalSteps)[33m.[39m[34mtoBeGreaterThan[39m([34m0[39m)[33m;[39m
+    [90m188| [39m    [34mexpect[39m(summary[33m.[39mconvergedSteps)[33m.[39m[34mtoBe[39m(summary[33m.[39mtotalSteps)[33m;[39m
+    [90m   | [39m                                   [31m^[39m
+    [90m189| [39m    [34mexpect[39m(summary[33m.[39mfailedSteps)[33m.[39m[34mtoBe[39m([34m0[39m)[33m;[39m
+    [90m190| [39m    [34mexpect[39m(summary[33m.[39mavgIterations)[33m.[39m[34mtoBeGreaterThan[39m([34m0[39m)[33m;[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[27/34]⎯[22m[39m
+
+[31m[1m[7m FAIL [27m[22m[39m src/solver/analog/__tests__/harness/harness-integration.test.ts[2m > [22mharness integration[2m > [22mnodeVoltageTrajectory returns voltage history
+[31m[1mAssertionError[22m: expected 0 to be greater than 0[39m
+[36m [2m❯[22m src/solver/analog/__tests__/harness/harness-integration.test.ts:[2m219:31[22m[39m
+    [90m217| [39m    [35mconst[39m session[33m:[39m [33mCaptureSession[39m [33m=[39m { source[33m:[39m [32m"ours"[39m[33m,[39m topology[33m:[39m [34mcaptur[39m…
+    [90m218| [39m    [35mconst[39m trajectory [33m=[39m [34mnodeVoltageTrajectory[39m(session[33m,[39m [34m0[39m)[33m;[39m
+    [90m219| [39m    [34mexpect[39m(trajectory[33m.[39mlength)[33m.[39m[34mtoBeGreaterThan[39m([34m0[39m)[33m;[39m
+    [90m   | [39m                              [31m^[39m
+    [90m220| [39m  })[33m;[39m
+    [90m221| [39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[28/34]⎯[22m[39m
+
+[31m[1m[7m FAIL [27m[22m[39m src/solver/analog/__tests__/harness/harness-integration.test.ts[2m > [22mharness integration[2m > [22mquerySteps filters by convergence
+[31m[1mAssertionError[22m: expected +0 to be 1 // Object.is equality[39m
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[32m- 1[39m
+[31m+ 0[39m
+
+[36m [2m❯[22m src/solver/analog/__tests__/harness/harness-integration.test.ts:[2m237:61[22m[39m
+    [90m235| [39m    engine[33m.[39mpostIterationHook [33m=[39m [35mnull[39m[33m;[39m
+    [90m236| [39m    [35mconst[39m session[33m:[39m [33mCaptureSession[39m [33m=[39m { source[33m:[39m [32m"ours"[39m[33m,[39m topology[33m:[39m [34mcaptur[39m…
+    [90m237| [39m    [34mexpect[39m([34mquerySteps[39m(session[33m,[39m { converged[33m:[39m [35mtrue[39m })[33m.[39mlength)[33m.[39m[34mtoBe[39m(sessi…
+    [90m   | [39m                                                            [31m^[39m
+    [90m238| [39m    [34mexpect[39m([34mquerySteps[39m(session[33m,[39m { converged[33m:[39m [35mfalse[39m })[33m.[39mlength)[33m.[39m[34mtoBe[39m([34m0[39m)[33m;[39m
+    [90m239| [39m  })[33m;[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[29/34]⎯[22m[39m
+
+[31m[1m[7m FAIL [27m[22m[39m src/solver/analog/__tests__/harness/harness-integration.test.ts[2m > [22mharness integration[2m > [22mcompareSnapshots returns all-pass for self-comparison
+[31m[1mAssertionError[22m: expected 0 to be greater than 0[39m
+[36m [2m❯[22m src/solver/analog/__tests__/harness/harness-integration.test.ts:[2m257:28[22m[39m
+    [90m255| [39m    [35mconst[39m session[33m:[39m [33mCaptureSession[39m [33m=[39m { source[33m:[39m [32m"ours"[39m[33m,[39m topology[33m:[39m [34mcaptur[39m…
+    [90m256| [39m    [35mconst[39m results [33m=[39m [34mcompareSnapshots[39m(session[33m,[39m session)[33m;[39m
+    [90m257| [39m    [34mexpect[39m(results[33m.[39mlength)[33m.[39m[34mtoBeGreaterThan[39m([34m0[39m)[33m;[39m
+    [90m   | [39m                           [31m^[39m
+    [90m258| [39m    [35mfor[39m ([35mconst[39m r [35mof[39m results) {
+    [90m259| [39m      [34mexpect[39m(r[33m.[39mallWithinTol)[33m.[39m[34mtoBe[39m([35mtrue[39m)[33m;[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[30/34]⎯[22m[39m
+
+[31m[1m[7m FAIL [27m[22m[39m src/solver/analog/__tests__/harness/harness-integration.test.ts[2m > [22mharness integration[2m > [22mformatComparison produces readable output
+[31m[1mTypeError[22m: Cannot read properties of undefined (reading 'stepIndex')[39m
+[36m [2m❯[22m Module.formatComparison src/solver/analog/__tests__/harness/compare.ts:[2m214:33[22m[39m
+    [90m212| [39m[35mexport[39m [35mfunction[39m [34mformatComparison[39m(result[33m:[39m [33mComparisonResult[39m)[33m:[39m string {
+    [90m213| [39m  [35mconst[39m lines[33m:[39m string[] [33m=[39m [][33m;[39m
+    [90m214| [39m  lines[33m.[39m[34mpush[39m([32m`=== Step [39m[36m${[39mresult[33m.[39mstepIndex[36m}[39m[32m, Iteration [39m[36m${[39mresult[33m.[39miterati…
+    [90m   | [39m                                [31m^[39m
+    [90m215| [39m  lines[33m.[39m[34mpush[39m([32m`  Overall: [39m[36m${[39mresult[33m.[39mallWithinTol [33m?[39m [32m"PASS"[39m [33m:[39m [32m"FAIL"[39m[36m}[39m[32m`[39m)[33m;[39m
+    [90m216| [39m
+[90m [2m❯[22m src/solver/analog/__tests__/harness/harness-integration.test.ts:[2m279:23[22m[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[31/34]⎯[22m[39m
+
+[31m[1m[7m FAIL [27m[22m[39m src/solver/analog/__tests__/harness/harness-integration.test.ts[2m > [22mharness integration[2m > [22mstep capture hook supports retry tracking via beginAttempt/endAttempt
+[31m[1mAssertionError[22m: expected false to be true // Object.is equality[39m
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[32m- true[39m
+[31m+ false[39m
+
+[36m [2m❯[22m src/solver/analog/__tests__/harness/harness-integration.test.ts:[2m322:32[22m[39m
+    [90m320| [39m    [35mconst[39m steps [33m=[39m capture[33m.[39m[34mgetSteps[39m()[33m;[39m
+    [90m321| [39m    [34mexpect[39m(steps[33m.[39mlength)[33m.[39m[34mtoBe[39m([34m1[39m)[33m;[39m
+    [90m322| [39m    [34mexpect[39m(steps[[34m0[39m][33m.[39mconverged)[33m.[39m[34mtoBe[39m([35mtrue[39m)[33m;[39m
+    [90m   | [39m                               [31m^[39m
+    [90m323| [39m    [90m// Should have attempts array with 2 entries (failed + accepted)[39m
+    [90m324| [39m    [34mexpect[39m(steps[[34m0[39m][33m.[39mattempts[33m.[39mlength)[33m.[39m[34mtoBe[39m([34m2[39m)[33m;[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[32/34]⎯[22m[39m
+
+[31m[1m[7m FAIL [27m[22m[39m src/solver/analog/__tests__/harness/harness-integration.test.ts[2m > [22mharness integration[2m > [22mSparseSolver exposes dimension, getRhsSnapshot, getCSCNonZeros
+[31m[1mAssertionError[22m: expected 4 to be 3 // Object.is equality[39m
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[32m- 3[39m
+[31m+ 4[39m
+
+[36m [2m❯[22m src/solver/analog/__tests__/harness/harness-integration.test.ts:[2m376:24[22m[39m
+    [90m374| [39m    [35mconst[39m rhs [33m=[39m solver[33m.[39m[34mgetRhsSnapshot[39m()[33m;[39m
+    [90m375| [39m    [34mexpect[39m(rhs)[33m.[39m[34mtoBeInstanceOf[39m([33mFloat64Array[39m)[33m;[39m
+    [90m376| [39m    [34mexpect[39m(rhs[33m.[39mlength)[33m.[39m[34mtoBe[39m([34m3[39m)[33m;[39m
+    [90m   | [39m                       [31m^[39m
+    [90m377| [39m    [35mconst[39m nz [33m=[39m solver[33m.[39m[34mgetCSCNonZeros[39m()[33m;[39m
+    [90m378| [39m    [34mexpect[39m(nz[33m.[39mlength)[33m.[39m[34mtoBeGreaterThan[39m([34m0[39m)[33m;[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[33/34]⎯[22m[39m
+
+[31m[1m[7m FAIL [27m[22m[39m src/solver/analog/__tests__/harness/harness-integration.test.ts[2m > [22mharness integration[2m > [22mfindLargestDelta identifies worst convergence point
+[31m[1mAssertionError[22m: expected null not to be null[39m
+[36m [2m❯[22m src/solver/analog/__tests__/harness/harness-integration.test.ts:[2m400:24[22m[39m
+    [90m398| [39m    [35mconst[39m session[33m:[39m [33mCaptureSession[39m [33m=[39m { source[33m:[39m [32m"ours"[39m[33m,[39m topology[33m:[39m [34mcaptur[39m…
+    [90m399| [39m    [35mconst[39m result [33m=[39m [34mfindLargestDelta[39m(session[33m,[39m [34m1[39m)[33m;[39m
+    [90m400| [39m    [34mexpect[39m(result)[33m.[39mnot[33m.[39m[34mtoBeNull[39m()[33m;[39m
+    [90m   | [39m                       [31m^[39m
+    [90m401| [39m    [34mexpect[39m(result[33m![39m[33m.[39mdelta)[33m.[39m[34mtoBeGreaterThan[39m([34m0[39m)[33m;[39m
+    [90m402| [39m  })[33m;[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[34/34]⎯[22m[39m
+
+[2m Test Files [22m [1m[31m3 failed[39m[22m[2m | [22m[1m[32m1 passed[39m[22m[90m (4)[39m
+[2m      Tests [22m [1m[31m34 failed[39m[22m[2m | [22m[1m[32m38 passed[39m[22m[90m (72)[39m
+[2m   Start at [22m 01:00:16
+[2m   Duration [22m 991ms[2m (transform 499ms, setup 0ms, collect 1.13s, tests 87ms, environment 1ms, prepare 764ms)[22m
+

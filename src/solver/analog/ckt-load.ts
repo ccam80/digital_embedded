@@ -7,6 +7,7 @@
  */
 
 import type { CKTCircuitContext } from "./ckt-context.js";
+import { stampRHS } from "./stamp-helpers.js";
 import {
   MODEDC,
   MODEINITJCT,
@@ -45,11 +46,14 @@ const CKTNS_PIN = 1e10;
  *   CKTtroubleNode-> ctx.troubleNode      (zeroed each time noncon rises)
  */
 export function cktLoad(ctx: CKTCircuitContext): void {
-  // Step 1: clear matrix and RHS (ngspice cktload.c:34-47, :52-56).
+  // Step 1: clear matrix and RHS (ngspice cktload.c:52-56).
+  //   size = SMPmatSize(ckt->CKTmatrix);
+  //   for (i = 0; i <= size; i++) ckt->CKTrhs[i] = 0;
+  //   SMPclear(ckt->CKTmatrix);
   // Note: ngspice cktload.c:57-58 — CKTnoncon is NOT reset here in the
   // default build; it only runs under `#ifdef STEPDEBUG`. NR owner
   // (newtonRaphson) is responsible for `ctx.noncon = 0` before the call.
-  // ngspice cktload.c:56 — SMPclear → spClear.
+  ctx.rhs.fill(0);
   ctx.solver._resetForAssembly();
 
   // Step 2: propagate per-call context scalars to loadCtx.
@@ -98,12 +102,12 @@ export function cktLoad(ctx: CKTCircuitContext): void {
   // Variable mapping (ngspice cktload.c → ours):
   //   ckt->CKTnodeset    → ctx.nodesets
   //   1e10 (conductance) → CKTNS_PIN
-  //   *ckt->CKTrhs += …  → ctx.solver.stampRHS(node, val)
+  //   *ckt->CKTrhs       → ctx.rhs
   //   CKTsrcFact         → ctx.srcFact
   if ((ctx.cktMode & MODEDC) && (ctx.cktMode & (MODEINITJCT | MODEINITFIX))) {
     for (const [node, value] of ctx.nodesets) {
       ctx.solver.stampElement(ctx.solver.allocElement(node, node), CKTNS_PIN);
-      ctx.solver.stampRHS(node, CKTNS_PIN * value * ctx.srcFact);
+      stampRHS(ctx.rhs, node, CKTNS_PIN * value * ctx.srcFact);
     }
   }
 
@@ -118,7 +122,7 @@ export function cktLoad(ctx: CKTCircuitContext): void {
   if ((ctx.cktMode & MODETRANOP) && !(ctx.cktMode & MODEUIC)) {
     for (const [node, value] of ctx.ics) {
       ctx.solver.stampElement(ctx.solver.allocElement(node, node), CKTNS_PIN);
-      ctx.solver.stampRHS(node, CKTNS_PIN * value * ctx.srcFact);
+      stampRHS(ctx.rhs, node, CKTNS_PIN * value * ctx.srcFact);
     }
   }
 

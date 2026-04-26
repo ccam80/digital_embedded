@@ -570,34 +570,34 @@ describe("SparseSolver pre-solve RHS capture", () => {
 // ---------------------------------------------------------------------------
 
 describe("SparseSolver preorder", () => {
-  it("preorder can be called before factorWithReorder without error", () => {
+  it("preorder can be called before factor without error", () => {
     const solver = new SparseSolver();
     solver._initStructure(2);
-    solver.stampElement(solver.allocElement(0, 0), 4);
-    solver.stampElement(solver.allocElement(0, 1), 1);
-    solver.stampElement(solver.allocElement(1, 0), 1);
-    solver.stampElement(solver.allocElement(1, 1), 3);
-    solver.stampRHS(0, 1);
-    solver.stampRHS(1, 2);
+    solver.stampElement(solver.allocElement(1, 1), 4);
+    solver.stampElement(solver.allocElement(1, 2), 1);
+    solver.stampElement(solver.allocElement(2, 1), 1);
+    solver.stampElement(solver.allocElement(2, 2), 3);
+    solver.stampRHS(1, 1);
+    solver.stampRHS(2, 2);
     solver.preorder();
-    const result = solver.factorWithReorder();
+    const result = solver.factor();
     expect(result).toBe(0);
-    const x = new Float64Array(2);
+    const x = new Float64Array(3);
     solver.solve(x);
   });
 
   it("preorder is idempotent — second call is a no-op", () => {
     const solver = new SparseSolver();
     solver._initStructure(2);
-    solver.stampElement(solver.allocElement(0, 0), 2);
-    solver.stampElement(solver.allocElement(1, 1), 3);
-    solver.stampRHS(0, 4);
-    solver.stampRHS(1, 6);
+    solver.stampElement(solver.allocElement(1, 1), 2);
+    solver.stampElement(solver.allocElement(2, 2), 3);
+    solver.stampRHS(1, 4);
+    solver.stampRHS(2, 6);
     solver.preorder();
     solver.preorder();
-    const result = solver.factorWithReorder();
+    const result = solver.factor();
     expect(result).toBe(0);
-    const x = new Float64Array(2);
+    const x = new Float64Array(3);
     solver.solve(x);
   });
 });
@@ -1607,50 +1607,36 @@ describe("SparseSolver handle-based stamp API", () => {
 
 describe("SparseSolver SMPpreOrder", () => {
   it("preorder_fixes_zero_diagonal_from_voltage_source", () => {
-    // Build a 3x3 MNA matrix for a voltage source:
-    // Node 0: conductance G=1 (row 0, col 0)
-    // VS KCL: A[0][2] = 1 (current into node 0 from branch)
-    // VS KVL: A[2][0] = 1 (v0 - V = 0, so v0 coeff is 1)
-    // This creates a structural zero at diagonal [2][2].
-    // The twin pair: (2,0) in col 0 (value=1) and (0,2) in col 2 (value=1).
-    // After preorder, swapping columns 0 and 2 should put the current branch at position 0.
+    // ngspice 1-based external indexing: 0 = ground, 1..Size = active rows/cols.
+    // 3x3 MNA matrix for a voltage source:
+    //   Node 1: conductance G=1 at (1,1)
+    //   VS KCL: (1,3) = 1 (current into node 1 from branch)
+    //   VS KVL: (3,1) = 1 (v1 - V = 0, so v1 coeff is 1)
+    //   Diagonal (3,3) = 0 — structural zero; preorder must swap cols 1 and 3
+    //   to expose the (3,1) twin entry on the new diagonal.
     const solver = new SparseSolver();
     solver._initStructure(3);
-    solver.stampElement(solver.allocElement(0, 0), 1);   // conductance
-    solver.stampElement(solver.allocElement(0, 2), 1);   // VS KCL stamp
-    solver.stampElement(solver.allocElement(2, 0), 1);   // VS KVL stamp
-    // diagonal [2][2] = 0 (not stamped)
-    // add a third equation: node 1 isolated (diagonal only to make solvable)
-    solver.stampElement(solver.allocElement(1, 1), 1);
-    solver.stampRHS(0, 0);   // KCL: G*v0 + I_vs = 0
-    solver.stampRHS(1, 0);   // isolated node
-    solver.stampRHS(2, 5);   // KVL: v0 = 5
+    solver.stampElement(solver.allocElement(1, 1), 1);   // conductance
+    solver.stampElement(solver.allocElement(1, 3), 1);   // VS KCL stamp
+    solver.stampElement(solver.allocElement(3, 1), 1);   // VS KVL stamp
+    // diagonal (3,3) = 0 (not stamped)
+    // add a third equation: node 2 isolated (diagonal only to make solvable)
+    solver.stampElement(solver.allocElement(2, 2), 1);
+    solver.stampRHS(1, 0);   // KCL: G*v1 + I_vs = 0
+    solver.stampRHS(2, 0);   // isolated node
+    solver.stampRHS(3, 5);   // KVL: v1 = 5
 
     solver.preorder();
 
-    // After preorder, diagonal at col 2 should now have a non-zero entry
-    // (because column 0 and column 2 were swapped if twin pair found).
-    // Factor and solve — verify correct result.
-    const result = solver.factorWithReorder();
+    const result = solver.factor();
     expect(result).toBe(0);
 
-    const x = new Float64Array(3);
+    const x = new Float64Array(4);
     solver.solve(x);
-    // With the voltage source circuit: v0=5, I_vs=-5 (current from branch equation)
-    // But after preorder column swap, the unknowns are reordered.
-    // The key check: factorization succeeded and solution satisfies A*x=b.
-    // A*x = b: check each row
-    // Row 0: 1*x[0] + 1*x[2] = 0
-    // Row 1: 1*x[1] = 0
-    // Row 2: 1*x[0] = 5
-    // Solution: x[0]=5, x[1]=0, x[2]=-5 (in original variable order before preorder swap)
-    // After preorder column swap of columns 0 and 2, x[2] holds the original x[0] etc.
-    // The exact permutation depends on which columns were swapped — just verify Ax=b.
-    // Use the RHS vector [0, 0, 5] and the original A matrix entries.
-    // Original A: row0: col0=1, col2=1; row1: col1=1; row2: col0=1
-    const vals: [number, number, number][] = [[0,0,1],[0,2,1],[1,1,1],[2,0,1]];
-    const rhs = [0, 0, 5];
-    for (let i = 0; i < 3; i++) {
+    // Verify A*x = b in original matrix coordinates (1-based).
+    const vals: [number, number, number][] = [[1,1,1],[1,3,1],[2,2,1],[3,1,1]];
+    const rhs = [0, 0, 0, 5]; // index 0 unused
+    for (let i = 1; i <= 3; i++) {
       let sum = 0;
       for (const [r, c, v] of vals) {
         if (r === i) sum += v * x[c];
@@ -1660,40 +1646,40 @@ describe("SparseSolver SMPpreOrder", () => {
   });
 
   it("preorder_handles_multiple_twins", () => {
-    // Build a 5x5 MNA with two voltage sources (two zero diagonals).
-    // node 0: G=1 at (0,0), VS1 stamp at (0,3)=1 and (3,0)=1
-    // node 1: G=1 at (1,1), VS2 stamp at (1,4)=1 and (4,1)=1
-    // node 2: G=1 at (2,2) isolated
-    // Branch rows 3,4 have zero diagonal initially.
+    // ngspice 1-based: 5x5 MNA with two voltage sources (two zero diagonals).
+    //   node 1: G=1 at (1,1), VS1 stamp at (1,4)=1 and (4,1)=1
+    //   node 2: G=1 at (2,2), VS2 stamp at (2,5)=1 and (5,2)=1
+    //   node 3: G=1 at (3,3) isolated
+    //   Branch rows 4,5 have zero diagonal initially.
     const solver = new SparseSolver();
     solver._initStructure(5);
-    solver.stampElement(solver.allocElement(0, 0), 1);
-    solver.stampElement(solver.allocElement(0, 3), 1);
-    solver.stampElement(solver.allocElement(3, 0), 1);
     solver.stampElement(solver.allocElement(1, 1), 1);
     solver.stampElement(solver.allocElement(1, 4), 1);
     solver.stampElement(solver.allocElement(4, 1), 1);
     solver.stampElement(solver.allocElement(2, 2), 1);
-    solver.stampRHS(0, 0);
+    solver.stampElement(solver.allocElement(2, 5), 1);
+    solver.stampElement(solver.allocElement(5, 2), 1);
+    solver.stampElement(solver.allocElement(3, 3), 1);
     solver.stampRHS(1, 0);
     solver.stampRHS(2, 0);
-    solver.stampRHS(3, 3); // V1 = 3
-    solver.stampRHS(4, 7); // V2 = 7
+    solver.stampRHS(3, 0);
+    solver.stampRHS(4, 3); // V1 = 3
+    solver.stampRHS(5, 7); // V2 = 7
 
     solver.preorder();
 
-    const result = solver.factorWithReorder();
+    const result = solver.factor();
     expect(result).toBe(0);
 
-    const x = new Float64Array(5);
+    const x = new Float64Array(6);
     solver.solve(x);
 
-    // Verify A*x = b in original matrix coordinates
+    // Verify A*x = b in original (1-based) matrix coordinates.
     const entries: [number, number, number][] = [
-      [0,0,1],[0,3,1],[3,0,1],[1,1,1],[1,4,1],[4,1,1],[2,2,1],
+      [1,1,1],[1,4,1],[4,1,1],[2,2,1],[2,5,1],[5,2,1],[3,3,1],
     ];
-    const rhs = [0, 0, 0, 3, 7];
-    for (let i = 0; i < 5; i++) {
+    const rhs = [0, 0, 0, 0, 3, 7]; // index 0 unused
+    for (let i = 1; i <= 5; i++) {
       let sum = 0;
       for (const [r, c, v] of entries) {
         if (r === i) sum += v * x[c];
@@ -1704,31 +1690,29 @@ describe("SparseSolver SMPpreOrder", () => {
 
   it("preorder_is_idempotent", () => {
     // Calling preorder() twice produces the same result as calling it once.
+    // ngspice 1-based: same VS-style fixture as preorder_fixes_zero_diagonal_*.
     const solver = new SparseSolver();
     solver._initStructure(3);
-    solver.stampElement(solver.allocElement(0, 0), 1);
-    solver.stampElement(solver.allocElement(0, 2), 1);
-    solver.stampElement(solver.allocElement(2, 0), 1);
     solver.stampElement(solver.allocElement(1, 1), 1);
-    solver.stampRHS(0, 0);
+    solver.stampElement(solver.allocElement(1, 3), 1);
+    solver.stampElement(solver.allocElement(3, 1), 1);
+    solver.stampElement(solver.allocElement(2, 2), 1);
     solver.stampRHS(1, 0);
-    solver.stampRHS(2, 5);
+    solver.stampRHS(2, 0);
+    solver.stampRHS(3, 5);
 
-    // First preorder — gated by _didPreorder flag
     solver.preorder();
-    // Second call — must be a no-op (gated by _didPreorder)
     solver.preorder();
 
-    // Should still factor and solve correctly
-    const result = solver.factorWithReorder();
+    const result = solver.factor();
     expect(result).toBe(0);
 
-    const x = new Float64Array(3);
+    const x = new Float64Array(4);
     solver.solve(x);
 
-    const vals: [number, number, number][] = [[0,0,1],[0,2,1],[1,1,1],[2,0,1]];
-    const rhs = [0, 0, 5];
-    for (let i = 0; i < 3; i++) {
+    const vals: [number, number, number][] = [[1,1,1],[1,3,1],[2,2,1],[3,1,1]];
+    const rhs = [0, 0, 0, 5]; // index 0 unused
+    for (let i = 1; i <= 3; i++) {
       let sum = 0;
       for (const [r, c, v] of vals) {
         if (r === i) sum += v * x[c];
@@ -1738,13 +1722,13 @@ describe("SparseSolver SMPpreOrder", () => {
   });
 
   it("preorder_no_swap_when_diagonal_nonzero", () => {
-    // A 3x3 matrix with all-nonzero diagonals — preorder should be a no-op.
+    // ngspice 1-based: 3x3 tridiagonal — all diagonals non-zero, preorder no-op.
     const solver = new SparseSolver();
     solver._initStructure(3);
-    solver.stampElement(solver.allocElement(0, 0), 2); solver.stampElement(solver.allocElement(0, 1), -1);
-    solver.stampElement(solver.allocElement(1, 0), -1); solver.stampElement(solver.allocElement(1, 1), 3); solver.stampElement(solver.allocElement(1, 2), -1);
-    solver.stampElement(solver.allocElement(2, 1), -1); solver.stampElement(solver.allocElement(2, 2), 2);
-    solver.stampRHS(0, 1); solver.stampRHS(1, 2); solver.stampRHS(2, 1);
+    solver.stampElement(solver.allocElement(1, 1), 2); solver.stampElement(solver.allocElement(1, 2), -1);
+    solver.stampElement(solver.allocElement(2, 1), -1); solver.stampElement(solver.allocElement(2, 2), 3); solver.stampElement(solver.allocElement(2, 3), -1);
+    solver.stampElement(solver.allocElement(3, 2), -1); solver.stampElement(solver.allocElement(3, 3), 2);
+    solver.stampRHS(1, 1); solver.stampRHS(2, 2); solver.stampRHS(3, 1);
 
     // Record colHead state before preorder
     const colHeadBefore = Array.from((solver as any)._colHead as Int32Array);
@@ -1755,27 +1739,27 @@ describe("SparseSolver SMPpreOrder", () => {
     const colHeadAfter = Array.from((solver as any)._colHead as Int32Array);
     expect(colHeadAfter).toEqual(colHeadBefore);
 
-    const result = solver.factorWithReorder();
+    const result = solver.factor();
     expect(result).toBe(0);
 
-    const x = new Float64Array(3);
+    const x = new Float64Array(4);
     solver.solve(x);
   });
 
   it("_elCol_preserved_after_preorder_swap", () => {
-    // Every element's stored _elCol must remain equal to its original column
-    // after preorder swaps (ngspice Element->Col convention: sputils.c:283-301).
-    // Build a 3x3 MNA matrix with a zero diagonal at col 2 so preorder will
-    // actually swap columns 0 and 2.
+    // ngspice SwapCols (sputils.c:283-301) does NOT touch any Element->Col
+    // field; only spcLinkRows (spbuild.c:923) refreshes pElement->Col on the
+    // first factor. Preorder swap must leave _elCol values untouched.
+    // 1-based 3x3 MNA: zero diagonal at (3,3) → preorder swaps cols 1 and 3.
     const solver = new SparseSolver();
     solver._initStructure(3);
-    solver.stampElement(solver.allocElement(0, 0), 1);
-    solver.stampElement(solver.allocElement(0, 2), 1);
-    solver.stampElement(solver.allocElement(2, 0), 1);
     solver.stampElement(solver.allocElement(1, 1), 1);
-    solver.stampRHS(0, 0);
+    solver.stampElement(solver.allocElement(1, 3), 1);
+    solver.stampElement(solver.allocElement(3, 1), 1);
+    solver.stampElement(solver.allocElement(2, 2), 1);
     solver.stampRHS(1, 0);
-    solver.stampRHS(2, 5);
+    solver.stampRHS(2, 0);
+    solver.stampRHS(3, 5);
 
     // Capture each element's original column BEFORE preorder.
     const elCount = (solver as any)._elCount as number;
@@ -1785,8 +1769,10 @@ describe("SparseSolver SMPpreOrder", () => {
     solver.preorder();
 
     // Verify preorder actually performed a swap.
-    const perm = Array.from((solver as any)._preorderColPerm as Int32Array);
-    const swapOccurred = perm.some((v, i) => v !== i);
+    const perm = Array.from((solver as any)._intToExtCol as Int32Array);
+    // Slot 0 is the unused ground sentinel (perm[0] = 0); active slots 1..n
+    // start identity, so any deviation among them indicates a swap.
+    const swapOccurred = perm.slice(1).some((v, i) => v !== i + 1);
     expect(swapOccurred).toBe(true);
 
     // Every element's _elCol must still equal its original column.
@@ -1798,13 +1784,13 @@ describe("SparseSolver SMPpreOrder", () => {
     expect(elRowAfter).toEqual(elRowBefore);
 
     // Factor and solve must still satisfy A*x = b in original coordinates.
-    const result = solver.factorWithReorder();
+    const result = solver.factor();
     expect(result).toBe(0);
-    const x = new Float64Array(3);
+    const x = new Float64Array(4);
     solver.solve(x);
-    const entries: [number, number, number][] = [[0,0,1],[0,2,1],[1,1,1],[2,0,1]];
-    const rhs = [0, 0, 5];
-    for (let i = 0; i < 3; i++) {
+    const entries: [number, number, number][] = [[1,1,1],[1,3,1],[2,2,1],[3,1,1]];
+    const rhs = [0, 0, 0, 5]; // index 0 unused
+    for (let i = 1; i <= 3; i++) {
       let sum = 0;
       for (const [r, c, v] of entries) {
         if (r === i) sum += v * x[c];

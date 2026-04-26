@@ -30,6 +30,7 @@ import {
   type ComponentDefinition,
 } from "../../core/registry.js";
 import type { AnalogElementCore, LoadContext } from "../../solver/analog/element.js";
+import { stampRHS } from "../../solver/analog/stamp-helpers.js";
 import { parseExpression, evaluateExpression, ExprParseError } from "../../solver/analog/expression.js";
 import type { ExprNode } from "../../solver/analog/expression.js";
 import { defineModelParams } from "../../core/model-params.js";
@@ -644,7 +645,7 @@ function createAcVoltageSourceElement(
       if (nodeNeg !== 0) solver.stampElement(solver.allocElement(k, nodeNeg), -1);
 
       // RHS voltage constraint (ctx.srcFact folded in above).
-      solver.stampRHS(k, v);
+      stampRHS(ctx.rhs,k, v);
     },
 
     getPinCurrents(voltages: Float64Array): number[] {

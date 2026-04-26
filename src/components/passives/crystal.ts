@@ -46,7 +46,7 @@ import {
 import { formatSI } from "../../editor/si-format.js";
 import type { AnalogElementCore, ReactiveAnalogElement, IntegrationMethod, LoadContext } from "../../solver/analog/element.js";
 import { MODETRAN, MODETRANOP, MODEINITPRED, MODEINITTRAN } from "../../solver/analog/ckt-mode.js";
-import { stampG } from "../../solver/analog/stamp-helpers.js";
+import { stampG, stampRHS } from "../../solver/analog/stamp-helpers.js";
 import { defineModelParams } from "../../core/model-params.js";
 import type { StatePoolRef } from "../../core/analog-types.js";
 import {
@@ -425,23 +425,23 @@ export class AnalogCrystalElement implements ReactiveAnalogElement {
 
       // L_s companion stamp on branch row.
       solver.stampElement(solver.allocElement(b, b), -geqL);
-      solver.stampRHS(b, ceqL);
+      stampRHS(ctx.rhs,b, ceqL);
 
       // C_s companion stamp (n2 â†” nB).
       stampG(solver, n2, n2, geqCs);
       stampG(solver, n2, nB, -geqCs);
       stampG(solver, nB, n2, -geqCs);
       stampG(solver, nB, nB, geqCs);
-      if (n2 !== 0) solver.stampRHS(n2, -ceqCs);
-      if (nB !== 0) solver.stampRHS(nB, ceqCs);
+      if (n2 !== 0) stampRHS(ctx.rhs,n2, -ceqCs);
+      if (nB !== 0) stampRHS(ctx.rhs,nB, ceqCs);
 
       // C_0 companion stamp (nA â†” nB).
       stampG(solver, nA, nA, geqC0);
       stampG(solver, nA, nB, -geqC0);
       stampG(solver, nB, nA, -geqC0);
       stampG(solver, nB, nB, geqC0);
-      if (nA !== 0) solver.stampRHS(nA, -ceqC0);
-      if (nB !== 0) solver.stampRHS(nB, ceqC0);
+      if (nA !== 0) stampRHS(ctx.rhs,nA, -ceqC0);
+      if (nB !== 0) stampRHS(ctx.rhs,nB, ceqC0);
 
       // Cache.
       s0[base + SLOT_GEQ_L]  = geqL;

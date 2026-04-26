@@ -239,10 +239,10 @@ export function createTriodeElement(
       stampG(solver, nodeK, nodeK, ggi);
 
       // Norton RHS: inject independent current terms
-      stampRHS(solver, nodeP, -ipNorton);
-      stampRHS(solver, nodeK, ipNorton);
-      stampRHS(solver, nodeG, -igNorton);
-      stampRHS(solver, nodeK, igNorton);
+      stampRHS(ctx.rhs, nodeP, -ipNorton);
+      stampRHS(ctx.rhs, nodeK, ipNorton);
+      stampRHS(ctx.rhs, nodeG, -igNorton);
+      stampRHS(ctx.rhs, nodeK, igNorton);
     },
 
     getPinCurrents(voltages: Float64Array): number[] {

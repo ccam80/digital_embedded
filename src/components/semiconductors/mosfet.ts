@@ -1535,10 +1535,10 @@ export function createMosfetElement(
       // NOTE: ngspice accounts for Meyer caps at gate node separately from
       // bulk via (ceqgs + ceqgb + ceqgd) lump; ditto bulk-side via -(ceqbs +
       // ceqbd - type*ceqgb). Same reading here.
-      stampRHS(solver, nodeG, -(polarity * (ceqgs + ceqgb + ceqgd)));
-      stampRHS(solver, nodeB, -(ceqbs + ceqbd - polarity * ceqgb));
-      stampRHS(solver, nodeD, (ceqbd - cdreq + polarity * ceqgd));
-      stampRHS(solver, nodeS, (cdreq + ceqbs + polarity * ceqgs));
+      stampRHS(ctx.rhs, nodeG, -(polarity * (ceqgs + ceqgb + ceqgd)));
+      stampRHS(ctx.rhs, nodeB, -(ceqbs + ceqbd - polarity * ceqgb));
+      stampRHS(ctx.rhs, nodeD, (ceqbd - cdreq + polarity * ceqgd));
+      stampRHS(ctx.rhs, nodeS, (cdreq + ceqbs + polarity * ceqgs));
 
       // RS/RD external terminal stamps (mos1load.c linear model pieces).
       if (params.RD > 0 && nodeD !== nodeD_ext) {
