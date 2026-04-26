@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Tests for SimulationCoordinator capability queries (section 1.1) and unified
  * execution methods (section 1.2): supportsMicroStep, supportsRunToBreak,
  * supportsAcSweep, supportsDcOp, timingModel, microStep, runToBreak,
@@ -46,20 +46,20 @@ function makeResistorAnalogEl(nodeA: number, nodeB: number, r: number): AnalogEl
     isReactive: false,
     load(ctx: LoadContext): void {
       if (nodeA !== 0 && nodeB !== 0) {
-        ctx.solver.stampElement(ctx.solver.allocElement(nodeA - 1, nodeA - 1), +g);
-        ctx.solver.stampElement(ctx.solver.allocElement(nodeB - 1, nodeB - 1), +g);
-        ctx.solver.stampElement(ctx.solver.allocElement(nodeA - 1, nodeB - 1), -g);
-        ctx.solver.stampElement(ctx.solver.allocElement(nodeB - 1, nodeA - 1), -g);
+        ctx.solver.stampElement(ctx.solver.allocElement(nodeA, nodeA), +g);
+        ctx.solver.stampElement(ctx.solver.allocElement(nodeB, nodeB), +g);
+        ctx.solver.stampElement(ctx.solver.allocElement(nodeA, nodeB), -g);
+        ctx.solver.stampElement(ctx.solver.allocElement(nodeB, nodeA), -g);
       } else if (nodeA !== 0) {
-        ctx.solver.stampElement(ctx.solver.allocElement(nodeA - 1, nodeA - 1), +g);
+        ctx.solver.stampElement(ctx.solver.allocElement(nodeA, nodeA), +g);
       } else if (nodeB !== 0) {
-        ctx.solver.stampElement(ctx.solver.allocElement(nodeB - 1, nodeB - 1), +g);
+        ctx.solver.stampElement(ctx.solver.allocElement(nodeB, nodeB), +g);
       }
     },
     stampAc(s: SparseSolver) {
-      if (nodeA > 0) s.stampElement(s.allocElement(nodeA - 1, nodeA - 1), g);
-      if (nodeB > 0) s.stampElement(s.allocElement(nodeB - 1, nodeB - 1), g);
-      if (nodeA > 0 && nodeB > 0) { s.stampElement(s.allocElement(nodeA - 1, nodeB - 1), -g); s.stampElement(s.allocElement(nodeB - 1, nodeA - 1), -g); }
+      if (nodeA > 0) s.stampElement(s.allocElement(nodeA, nodeA), g);
+      if (nodeB > 0) s.stampElement(s.allocElement(nodeB, nodeB), g);
+      if (nodeA > 0 && nodeB > 0) { s.stampElement(s.allocElement(nodeA, nodeB), -g); s.stampElement(s.allocElement(nodeB, nodeA), -g); }
     },
     getPinCurrents(_v: Float64Array) { return [0, 0]; },
     setParam(_key: string, _value: number) {},
@@ -188,7 +188,7 @@ function makeAnalogEl(
  * from element+wire topology so that transient simulation (time-advancing
  * MNA steps) can be verified.
  *
- * Topology: Vcc(5V) → R(1kΩ) → C(1µF) → GND, Vcc− → GND
+ * Topology: Vcc(5V) â†’ R(1kÎ©) â†’ C(1ÂµF) â†’ GND, Vccâˆ’ â†’ GND
  * Node 1: Vcc+ / R.A   Node 2: R.B / C.pos   Node 0: GND
  */
 function buildRcCoordinator() {
@@ -256,10 +256,10 @@ function buildDigitalCoordinator() {
 }
 
 // ---------------------------------------------------------------------------
-// Section 1.3 snapshotSignals and signalCount — digital-only
+// Section 1.3 snapshotSignals and signalCount â€” digital-only
 // ---------------------------------------------------------------------------
 
-describe('snapshotSignals and signalCount — digital-only coordinator', () => {
+describe('snapshotSignals and signalCount â€” digital-only coordinator', () => {
   it('signalCount equals digital netCount', () => {
     const { coordinator } = buildDigitalCoordinator();
     expect(coordinator.signalCount).toBe(3);
@@ -290,7 +290,7 @@ describe('snapshotSignals and signalCount — digital-only coordinator', () => {
   });
 });
 
-describe('snapshotSignals and signalCount — analog-only coordinator', () => {
+describe('snapshotSignals and signalCount â€” analog-only coordinator', () => {
   it('signalCount equals analog nodeCount', () => {
     const registry = buildAnalogRegistry();
     const circuit = buildAnalogCircuit(registry);
@@ -321,10 +321,10 @@ describe('snapshotSignals and signalCount — analog-only coordinator', () => {
 });
 
 // ---------------------------------------------------------------------------
-// Section 1.1 Capability queries — digital-only
+// Section 1.1 Capability queries â€” digital-only
 // ---------------------------------------------------------------------------
 
-describe('capability queries — digital-only coordinator', () => {
+describe('capability queries â€” digital-only coordinator', () => {
   it('supportsMicroStep returns true', () => {
     const { coordinator } = buildDigitalCoordinator();
     expect(coordinator.supportsMicroStep()).toBe(true);
@@ -357,10 +357,10 @@ describe('capability queries — digital-only coordinator', () => {
 });
 
 // ---------------------------------------------------------------------------
-// Section 1.1 Capability queries — analog-only
+// Section 1.1 Capability queries â€” analog-only
 // ---------------------------------------------------------------------------
 
-describe('capability queries — analog-only coordinator', () => {
+describe('capability queries â€” analog-only coordinator', () => {
   it('supportsMicroStep returns true (digital engine exists via neutral components)', () => {
     const registry = buildAnalogRegistry();
     const circuit = buildAnalogCircuit(registry);
@@ -411,10 +411,10 @@ describe('capability queries — analog-only coordinator', () => {
 });
 
 // ---------------------------------------------------------------------------
-// Section 1.2 Unified execution — digital-only
+// Section 1.2 Unified execution â€” digital-only
 // ---------------------------------------------------------------------------
 
-describe('unified execution methods — digital-only coordinator', () => {
+describe('unified execution methods â€” digital-only coordinator', () => {
   it('microStep executes without throwing', () => {
     const { coordinator } = buildDigitalCoordinator();
     expect(() => coordinator.microStep()).not.toThrow();
@@ -477,10 +477,10 @@ describe('unified execution methods — digital-only coordinator', () => {
 });
 
 // ---------------------------------------------------------------------------
-// Section 1.2 Unified execution — analog-only
+// Section 1.2 Unified execution â€” analog-only
 // ---------------------------------------------------------------------------
 
-describe('unified execution methods — analog-only coordinator', () => {
+describe('unified execution methods â€” analog-only coordinator', () => {
   it('microStep is a no-op (does not throw)', () => {
     const registry = buildAnalogRegistry();
     const circuit = buildAnalogCircuit(registry);
@@ -544,7 +544,7 @@ describe('unified execution methods — analog-only coordinator', () => {
 // Section 1.11 Narrowed compiled accessor
 // ---------------------------------------------------------------------------
 
-describe('narrowed compiled accessor — digital-only coordinator', () => {
+describe('narrowed compiled accessor â€” digital-only coordinator', () => {
   it('compiled.wireSignalMap is a Map', () => {
     const { coordinator } = buildDigitalCoordinator();
     expect(coordinator.compiled.wireSignalMap).toBeInstanceOf(Map);
@@ -569,7 +569,7 @@ describe('narrowed compiled accessor — digital-only coordinator', () => {
 
   it('compiled accessor via SimulationCoordinator interface exposes wireSignalMap', () => {
     const { coordinator } = buildDigitalCoordinator();
-    // Type-check via interface reference — only the narrowed fields are visible
+    // Type-check via interface reference â€” only the narrowed fields are visible
     const iface: import('../../solver/coordinator-types.js').SimulationCoordinator = coordinator;
     expect(iface.compiled.wireSignalMap).toBeInstanceOf(Map);
     coordinator.dispose();

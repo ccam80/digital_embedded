@@ -1,9 +1,9 @@
-/**
- * Diac analog component — bidirectional trigger diode.
+﻿/**
+ * Diac analog component â€” bidirectional trigger diode.
  *
  * Blocks in both directions until |V| exceeds breakover voltage V_BO,
  * then conducts with a negative-resistance snap (voltage drops to V_hold).
- * Symmetric device — no gate terminal.
+ * Symmetric device â€” no gate terminal.
  *
  * I-V model (piecewise smooth with tanh for NR stability):
  *   - Blocking region (|V| < V_BO): high resistance R_off
@@ -44,15 +44,15 @@ const GMIN = 1e-12;
 
 export const { paramDefs: DIAC_PARAM_DEFS, defaults: DIAC_PARAM_DEFAULTS } = defineModelParams({
   primary: {
-    vBreakover: { default: 32,  unit: "V", description: "Breakover voltage — conduction threshold" },
+    vBreakover: { default: 32,  unit: "V", description: "Breakover voltage â€” conduction threshold" },
     vHold:      { default: 28,  unit: "V", description: "On-state holding voltage" },
-    rOn:        { default: 10,  unit: "Ω", description: "On-state resistance" },
-    rOff:       { default: 1e7, unit: "Ω", description: "Off-state resistance" },
+    rOn:        { default: 10,  unit: "Î©", description: "On-state resistance" },
+    rOff:       { default: 1e7, unit: "Î©", description: "Off-state resistance" },
   },
 });
 
 // ---------------------------------------------------------------------------
-// diacConductance — smooth piecewise model
+// diacConductance â€” smooth piecewise model
 // ---------------------------------------------------------------------------
 
 /**
@@ -86,7 +86,7 @@ function diacModel(
   const arg = (absV - vBreakover) / sharpness;
   const tanhVal = Math.tanh(arg);
   const s = 0.5 * (1 + tanhVal);
-  // ds/d|V| = 0.5 * (1 - tanh²(arg)) / sharpness = 0.5 * sech²(arg) / sharpness
+  // ds/d|V| = 0.5 * (1 - tanhÂ²(arg)) / sharpness = 0.5 * sechÂ²(arg) / sharpness
   const sech2 = 1 - tanhVal * tanhVal;
   const dsDAbsV = 0.5 * sech2 / sharpness;
 
@@ -111,7 +111,7 @@ function diacModel(
 }
 
 // ---------------------------------------------------------------------------
-// createDiacElement — AnalogElement factory
+// createDiacElement â€” AnalogElement factory
 // ---------------------------------------------------------------------------
 
 export function createDiacElement(
@@ -154,8 +154,8 @@ export function createDiacElement(
 
     load(ctx: LoadContext): void {
       const voltages = ctx.rhsOld;
-      const vA = nodeA > 0 ? voltages[nodeA - 1] : 0;
-      const vB = nodeB > 0 ? voltages[nodeB - 1] : 0;
+      const vA = voltages[nodeA];
+      const vB = voltages[nodeB];
       _v = vA - vB;
       recompute(_v);
 
@@ -170,8 +170,8 @@ export function createDiacElement(
 
     checkConvergence(ctx: LoadContext): boolean {
       const voltages = ctx.rhsOld;
-      const vA = nodeA > 0 ? voltages[nodeA - 1] : 0;
-      const vB = nodeB > 0 ? voltages[nodeB - 1] : 0;
+      const vA = voltages[nodeA];
+      const vB = voltages[nodeB];
       const vRaw = vA - vB;
 
       const delvd = vRaw - _v;
@@ -194,7 +194,7 @@ export function createDiacElement(
 }
 
 // ---------------------------------------------------------------------------
-// DiacElement — CircuitElement implementation
+// DiacElement â€” CircuitElement implementation
 // ---------------------------------------------------------------------------
 
 export class DiacElement extends AbstractCircuitElement {
@@ -333,7 +333,7 @@ export const DiacDefinition: ComponentDefinition = {
   attributeMap: DIAC_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.SEMICONDUCTORS,
   helpText:
-    "Diac — bidirectional trigger diode.\n" +
+    "Diac â€” bidirectional trigger diode.\n" +
     "Pins: A (terminal 1), B (terminal 2).\n" +
     "Blocks until |V| > V_breakover, then snaps to V_hold.",
   models: {},

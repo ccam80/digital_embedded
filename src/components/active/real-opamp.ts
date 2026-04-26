@@ -1,22 +1,22 @@
-/**
+﻿/**
  * Real Op-Amp composite model.
  *
  * Extends the ideal op-amp with physically realistic effects:
  *   - Finite open-loop gain (A_OL)
- *   - Finite gain-bandwidth product (GBW) — single-pole first-order rolloff
+ *   - Finite gain-bandwidth product (GBW) â€” single-pole first-order rolloff
  *   - Input offset voltage (V_os)
  *   - Input bias current (I_bias) at both inputs
  *   - Input resistance (R_in)
  *   - Slew rate limiting (clamped integrator)
  *   - Output resistance (R_out)
- *   - Output current limiting (|I_out| ≤ I_max)
- *   - Rail saturation (output clamps to V_supply ± V_sat)
+ *   - Output current limiting (|I_out| â‰¤ I_max)
+ *   - Rail saturation (output clamps to V_supply Â± V_sat)
  *
- * Implementation strategy — single-pole rolloff as a companion-model integrator:
+ * Implementation strategy â€” single-pole rolloff as a companion-model integrator:
  *   The gain stage is modelled as a first-order low-pass filter on V_diff.
  *   An internal node V_int integrates toward A_OL * (V_diff + V_os) with
- *   time constant τ = A_OL / (2π * GBW).  In MNA this becomes a capacitor
- *   companion model:  C_eq = τ * G_int,  where G_int = 1/R_int (a small
+ *   time constant Ï„ = A_OL / (2Ï€ * GBW).  In MNA this becomes a capacitor
+ *   companion model:  C_eq = Ï„ * G_int,  where G_int = 1/R_int (a small
  *   internal resistance chosen for numerical stability).
  *
  *   For DC analysis the integrator settles and V_int = A_OL * V_diff (ideal
@@ -29,11 +29,11 @@
  * .MODEL support:
  *   Standard op-amp models (741, LM358, TL072, OPA2134) are pre-defined.
  *   Keys in the model params record:
- *     A    — open-loop gain (default 100000)
- *     GBW  — gain-bandwidth product in Hz (default 1e6)
- *     SR   — slew rate in V/s (default 0.5e6)
- *     Vos  — input offset voltage in V (default 1e-3)
- *     Ibias — input bias current in A (default 80e-9)
+ *     A    â€” open-loop gain (default 100000)
+ *     GBW  â€” gain-bandwidth product in Hz (default 1e6)
+ *     SR   â€” slew rate in V/s (default 0.5e6)
+ *     Vos  â€” input offset voltage in V (default 1e-3)
+ *     Ibias â€” input bias current in A (default 80e-9)
  *
  * Node layout passed to analogFactory:
  *   [0] = in+   (non-inverting input)
@@ -41,7 +41,7 @@
  *   [2] = out   (output)
  *   [3] = Vcc+  (positive supply)
  *   [4] = Vcc-  (negative supply)
- *   [5] = V_int (internal gain-stage node — allocated by analog compiler)
+ *   [5] = V_int (internal gain-stage node â€” allocated by analog compiler)
  *
  * branchIdx is -1 (no extra MNA branch rows needed; the output is a Norton
  * equivalent, not a voltage-source branch).
@@ -145,8 +145,8 @@ export const { paramDefs: REAL_OPAMP_PARAM_DEFS, defaults: REAL_OPAMP_DEFAULTS }
     iBias:    { default: 80e-9, unit: "A",   description: "Input bias current" },
   },
   secondary: {
-    rIn:      { default: 2e6,   unit: "Ω",   description: "Input resistance" },
-    rOut:     { default: 75,    unit: "Ω",   description: "Output resistance" },
+    rIn:      { default: 2e6,   unit: "Î©",   description: "Input resistance" },
+    rOut:     { default: 75,    unit: "Î©",   description: "Output resistance" },
     iMax:     { default: 25e-3, unit: "A",   description: "Output current limit" },
     vSatPos:  { default: 1.5,   unit: "V",   description: "Positive rail saturation drop" },
     vSatNeg:  { default: 1.5,   unit: "V",   description: "Negative rail saturation drop" },
@@ -208,7 +208,7 @@ function buildRealOpAmpPinDeclarations(): PinDeclaration[] {
 }
 
 // ---------------------------------------------------------------------------
-// RealOpAmpElement — CircuitElement
+// RealOpAmpElement â€” CircuitElement
 // ---------------------------------------------------------------------------
 
 export class RealOpAmpElement extends AbstractCircuitElement {
@@ -245,7 +245,7 @@ export class RealOpAmpElement extends AbstractCircuitElement {
     const triLeft = 0;
     const triRight = 4;
 
-    // Triangle body — stays COMPONENT color
+    // Triangle body â€” stays COMPONENT color
     ctx.setColor("COMPONENT");
     ctx.drawPolygon(
       [{ x: triLeft, y: -2 }, { x: triRight, y: 0 }, { x: triLeft, y: 2 }],
@@ -258,7 +258,7 @@ export class RealOpAmpElement extends AbstractCircuitElement {
     // Supply rail stubs: Vcc- stub
     drawColoredLead(ctx, signals, vVccN, 2, 2, 2, 1);
 
-    // +/- signs — body decoration, stays COMPONENT color
+    // +/- signs â€” body decoration, stays COMPONENT color
     ctx.setColor("COMPONENT");
     ctx.setFont({ family: "sans-serif", size: 0.7 });
     ctx.drawText('-', 13 / 16, -18 / 16, { horizontal: "center", vertical: "middle" });
@@ -275,7 +275,7 @@ export class RealOpAmpElement extends AbstractCircuitElement {
 }
 
 // ---------------------------------------------------------------------------
-// createRealOpAmpElement — AnalogElement factory
+// createRealOpAmpElement â€” AnalogElement factory
 // ---------------------------------------------------------------------------
 
 /**
@@ -288,7 +288,7 @@ export class RealOpAmpElement extends AbstractCircuitElement {
  *   nodeIds[3] = Vcc+  (positive supply)
  *   nodeIds[4] = Vcc-  (negative supply)
  *
- * MNA formulation — Norton/VCVS hybrid with proper Jacobian:
+ * MNA formulation â€” Norton/VCVS hybrid with proper Jacobian:
  *
  * Input stage:
  *   - R_in conductance between in+ and in-
@@ -315,15 +315,15 @@ export class RealOpAmpElement extends AbstractCircuitElement {
  *   voltage with slew-rate clamping and rail saturation applied.
  *
  * Saturation:
- *   When V_out ≥ V_supply+ - V_sat or V_out ≤ V_supply- + V_sat:
+ *   When V_out â‰¥ V_supply+ - V_sat or V_out â‰¤ V_supply- + V_sat:
  *   the Jacobian coupling is zeroed and a Norton current drives V_out to rail.
  *
  * Current limiting:
- *   When |I_out| > I_max: inject a constant current ±I_max instead.
+ *   When |I_out| > I_max: inject a constant current Â±I_max instead.
  *
  * Transient:
  *   A_eff is reduced by the companion integrator's bandwidth-limiting factor.
- *   The effective gain at frequency ω is A_OL / (1 + jω*τ), implemented as
+ *   The effective gain at frequency Ï‰ is A_OL / (1 + jÏ‰*Ï„), implemented as
  *   a first-order backward-Euler update of V_int each timestep with slew-rate clamping.
  */
 export function createRealOpAmpElement(
@@ -363,7 +363,7 @@ export function createRealOpAmpElement(
   const nVccP = pinNodes.get("Vcc+")!; // positive supply
   const nVccN = pinNodes.get("Vcc-")!; // negative supply
 
-  // Internal gain-stage state — not an MNA node.
+  // Internal gain-stage state â€” not an MNA node.
   // Updated each NR iteration inside load().
   let vInt = 0;
 
@@ -386,7 +386,7 @@ export function createRealOpAmpElement(
   let slewLimited = false;
   let _vOutPrev = 0; void _vOutPrev;      // output voltage at previous accepted timestep
 
-  // Source scale for source-stepping DC convergence — read from ctx.srcFact
+  // Source scale for source-stepping DC convergence â€” read from ctx.srcFact
   // (ngspice CKTsrcFact) in load() and cached for getPinCurrents().
   let lastSrcFact = 1;
 
@@ -400,7 +400,7 @@ export function createRealOpAmpElement(
   let vIntPrev = 0;
 
   function readNode(voltages: Float64Array, n: number): number {
-    return n > 0 ? voltages[n - 1] : 0;
+    return voltages[n];
   }
 
   function stampCond(
@@ -409,11 +409,11 @@ export function createRealOpAmpElement(
     nB: number,
     g: number,
   ): void {
-    if (nA > 0) solver.stampElement(solver.allocElement(nA - 1, nA - 1), g);
-    if (nB > 0) solver.stampElement(solver.allocElement(nB - 1, nB - 1), g);
+    if (nA > 0) solver.stampElement(solver.allocElement(nA, nA), g);
+    if (nB > 0) solver.stampElement(solver.allocElement(nB, nB), g);
     if (nA > 0 && nB > 0) {
-      solver.stampElement(solver.allocElement(nA - 1, nB - 1), -g);
-      solver.stampElement(solver.allocElement(nB - 1, nA - 1), -g);
+      solver.stampElement(solver.allocElement(nA, nB), -g);
+      solver.stampElement(solver.allocElement(nB, nA), -g);
     }
   }
 
@@ -516,32 +516,32 @@ export function createRealOpAmpElement(
       stampCond(solver, nInp, nInn, G_in);
       // Output conductance G_out (always present for NR stability)
       if (nOut > 0) {
-        solver.stampElement(solver.allocElement(nOut - 1, nOut - 1), G_out);
+        solver.stampElement(solver.allocElement(nOut, nOut), G_out);
       }
 
       // Input bias currents
       const iBiasScaled = Math.abs(p.iBias) * scale;
-      if (nInp > 0) solver.stampRHS(nInp - 1, -iBiasScaled);
-      if (nInn > 0) solver.stampRHS(nInn - 1, -iBiasScaled);
+      if (nInp > 0) solver.stampRHS(nInp, -iBiasScaled);
+      if (nInn > 0) solver.stampRHS(nInn, -iBiasScaled);
 
       if (nOut <= 0) return;
 
       // Gain-stage output
       if (outputSaturated) {
-        solver.stampRHS(nOut - 1, outputClampLevel * G_out);
+        solver.stampRHS(nOut, outputClampLevel * G_out);
       } else if (currentLimited) {
-        solver.stampRHS(nOut - 1, iOutLimited);
+        solver.stampRHS(nOut, iOutLimited);
       } else if (slewLimited) {
-        solver.stampRHS(nOut - 1, vInt * G_out);
+        solver.stampRHS(nOut, vInt * G_out);
       } else {
         // Normal operation: bandwidth-limited VCVS with backward-Euler history current.
         const aEffScaled = aEff * scale;
         const ieq = geq_int > 0
           ? (geq_int / (1 + geq_int)) * vIntPrev * G_out
           : 0;
-        if (nInp > 0) solver.stampElement(solver.allocElement(nOut - 1, nInp - 1), -aEffScaled * G_out);
-        if (nInn > 0) solver.stampElement(solver.allocElement(nOut - 1, nInn - 1), aEffScaled * G_out);
-        solver.stampRHS(nOut - 1, ieq + aEffScaled * G_out * p.vos * scale);
+        if (nInp > 0) solver.stampElement(solver.allocElement(nOut, nInp), -aEffScaled * G_out);
+        if (nInn > 0) solver.stampElement(solver.allocElement(nOut, nInn), aEffScaled * G_out);
+        solver.stampRHS(nOut, ieq + aEffScaled * G_out * p.vos * scale);
       }
     },
 
@@ -559,14 +559,14 @@ export function createRealOpAmpElement(
       // Current into element at each input terminal from the resistor:
       //   I_resistor_at_nInn = (vInn - vInp) * G_in
       //   I_resistor_at_nInp = (vInp - vInn) * G_in
-      // Bias currents: stampRHS injects -iBias into each node → element draws +iBias.
+      // Bias currents: stampRHS injects -iBias into each node â†’ element draws +iBias.
       //
       // Output (Norton equivalent, G_out stamped on diagonal to ground):
-      //   Normal/slewing:        Norton target = vInt → I_out = (vOut - vInt) * G_out
-      //   Saturated (no limit):  Norton target = outputClampLevel → I_out = (vOut - outputClampLevel) * G_out
+      //   Normal/slewing:        Norton target = vInt â†’ I_out = (vOut - vInt) * G_out
+      //   Saturated (no limit):  Norton target = outputClampLevel â†’ I_out = (vOut - outputClampLevel) * G_out
       //   Current limited:       RHS carries iOutLimited directly (injects INTO node)
-      //                          → element draws -iOutLimited; diagonal G_out drives to ground
-      //                          → I_out = vOut * G_out - iOutLimited
+      //                          â†’ element draws -iOutLimited; diagonal G_out drives to ground
+      //                          â†’ I_out = vOut * G_out - iOutLimited
       //
       // Supply pins: by KCL the sum of all 5 pin currents must be zero.
       // Total supply current = -(I_inn + I_inp + I_out).
@@ -668,7 +668,7 @@ export const RealOpAmpDefinition: ComponentDefinition = {
   attributeMap: REAL_OPAMP_ATTRIBUTE_MAPPINGS,
 
   helpText:
-    "Real Op-Amp — composite model with finite gain, GBW, slew rate, " +
+    "Real Op-Amp â€” composite model with finite gain, GBW, slew rate, " +
     "input offset/bias, output resistance, current limiting, and rail saturation. " +
     "Pins: in+, in-, out, Vcc+, Vcc-.",
 

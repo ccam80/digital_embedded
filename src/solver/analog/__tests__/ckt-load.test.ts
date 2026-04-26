@@ -18,7 +18,7 @@ import {
   allocateStatePool,
 } from './test-helpers.js';
 import { newtonRaphson } from '../newton-raphson.js';
-import { SparseSolver } from '../sparse-solver.js';
+import { SparseSolver, spSINGULAR } from '../sparse-solver.js';
 import {
   MODEDCOP,
   MODETRANOP,
@@ -298,10 +298,12 @@ describe('E_SINGULAR', () => {
     const elements = [Vs, R];
 
     let factorCallCount = 0;
-    // Stage 6.3.3 — `lastFactorUsedReorder` instance field deleted; per-call
-    // signal is now `FactorResult.usedReorder` returned by factor(). Capture
-    // the returned result on the proxy and assert against the last one.
-    let lastFactorResult: { success: boolean; usedReorder?: boolean } | undefined;
+    // factor() returns the ngspice error code (number); the per-call
+    // walkedReorder signal lives on the solver instance (lastFactorWalkedReorder).
+    // Capture both around the proxy so the test can assert the retry succeeded
+    // via the SMPreorder path.
+    let lastErrorCode: number | undefined;
+    let stubWalkedReorder = false;
 
     const realSolver = new SparseSolver();
 
@@ -311,14 +313,20 @@ describe('E_SINGULAR', () => {
           return () => {
             factorCallCount++;
             if (factorCallCount === 1) {
-              const r = { success: false, usedReorder: false };
-              lastFactorResult = r;
-              return r;
+              // Simulate SMPluFac (reuse) failing with spSINGULAR — this
+              // triggers the NR-side NISHOULDREORDER retry.
+              stubWalkedReorder = false;
+              lastErrorCode = spSINGULAR;
+              return spSINGULAR;
             }
-            const r = (target as SparseSolver).factor();
-            lastFactorResult = r;
-            return r;
+            const errorCode = (target as SparseSolver).factor();
+            stubWalkedReorder = (target as SparseSolver).lastFactorWalkedReorder;
+            lastErrorCode = errorCode;
+            return errorCode;
           };
+        }
+        if (prop === 'lastFactorWalkedReorder') {
+          return stubWalkedReorder;
         }
         if (prop === 'forceReorder') {
           return () => {
@@ -338,7 +346,10 @@ describe('E_SINGULAR', () => {
 
     expect(ctx.nrResult.converged).toBe(true);
     expect(factorCallCount).toBeGreaterThanOrEqual(2);
-    expect(lastFactorResult?.usedReorder).toBe(true);
+    // After the retry, the next factor() call must walk the SMPreorder
+    // (spOrderAndFactor) body — mirrors niiter.c:861 NISHOULDREORDER branch.
+    expect(stubWalkedReorder).toBe(true);
+    expect(lastErrorCode).toBe(0);
     expect(ctx.nrResult.iterations).toBe(3);
   });
 });

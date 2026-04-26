@@ -1,11 +1,11 @@
-/**
- * Switch component — SPST switch with mechanical symbol rendering.
+﻿/**
+ * Switch component â€” SPST switch with mechanical symbol rendering.
  *
  * Like PlainSwitch but with the standard mechanical switch symbol:
  * a diagonal line for open state, straight line for closed state,
  * plus a dashed lever and grip indicator.
  *
- * Additional property: switchActsAsInput — when true and a label is set,
+ * Additional property: switchActsAsInput â€” when true and a label is set,
  * the switch can also be driven by an external digital signal (1=closed, 0=open).
  *
  * Pattern follows the And gate exemplar exactly.
@@ -72,7 +72,7 @@ function buildPinDeclarations(poles: number, bitWidth: number): PinDeclaration[]
 }
 
 // ---------------------------------------------------------------------------
-// SwitchElement — CircuitElement implementation
+// SwitchElement â€” CircuitElement implementation
 // ---------------------------------------------------------------------------
 
 export class SwitchElement extends AbstractCircuitElement {
@@ -111,7 +111,7 @@ export class SwitchElement extends AbstractCircuitElement {
     ctx.setColor("COMPONENT");
     ctx.setLineWidth(1);
 
-    // Contact arm line: (0,0) to (1.8,-0.5) — angled switch arm (open state)
+    // Contact arm line: (0,0) to (1.8,-0.5) â€” angled switch arm (open state)
     ctx.drawLine(0, 0, 1.8, -0.5);
 
     // Dashed linkage line: (1,-0.25) to (1,-1.25)
@@ -143,7 +143,7 @@ export class SwitchElement extends AbstractCircuitElement {
 }
 
 // ---------------------------------------------------------------------------
-// executeSwitch — flat simulation function
+// executeSwitch â€” flat simulation function
 //
 // Switches are handled by the bus resolution subsystem (Phase 3 task 3.2.3).
 // The closed/open state is managed by the interactive engine layer.
@@ -259,7 +259,7 @@ const SWITCH_PROPERTY_DEFS: PropertyDefinition[] = [
   {
     key: "Ron",
     type: PropertyType.FLOAT,
-    label: "Ron (Ω)",
+    label: "Ron (Î©)",
     defaultValue: 1,
     min: 1e-12,
     description: "On-state resistance in ohms (analog mode)",
@@ -267,7 +267,7 @@ const SWITCH_PROPERTY_DEFS: PropertyDefinition[] = [
   {
     key: "Roff",
     type: PropertyType.FLOAT,
-    label: "Roff (Ω)",
+    label: "Roff (Î©)",
     defaultValue: 1e9,
     min: 1,
     description: "Off-state resistance in ohms (analog mode)",
@@ -289,7 +289,7 @@ const SWITCH_PROPERTY_DEFS: PropertyDefinition[] = [
 ];
 
 // ---------------------------------------------------------------------------
-// Analog helpers — SPST variable-resistance model
+// Analog helpers â€” SPST variable-resistance model
 // ---------------------------------------------------------------------------
 
 function stampConductanceSpst(
@@ -298,11 +298,11 @@ function stampConductanceSpst(
   nodeB: number,
   G: number,
 ): void {
-  if (nodeA !== 0) solver.stampElement(solver.allocElement(nodeA - 1, nodeA - 1), G);
-  if (nodeB !== 0) solver.stampElement(solver.allocElement(nodeB - 1, nodeB - 1), G);
+  if (nodeA !== 0) solver.stampElement(solver.allocElement(nodeA, nodeA), G);
+  if (nodeB !== 0) solver.stampElement(solver.allocElement(nodeB, nodeB), G);
   if (nodeA !== 0 && nodeB !== 0) {
-    solver.stampElement(solver.allocElement(nodeA - 1, nodeB - 1), -G);
-    solver.stampElement(solver.allocElement(nodeB - 1, nodeA - 1), -G);
+    solver.stampElement(solver.allocElement(nodeA, nodeB), -G);
+    solver.stampElement(solver.allocElement(nodeB, nodeA), -G);
   }
 }
 
@@ -344,8 +344,8 @@ function createSwitchAnalogElement(
       // Pin layout order: A1, B1.
       // I = G * (V_A - V_B); positive = current into element at A1.
       const G = effectivelyClosed ? 1 / ron : 1 / roff;
-      const vA = nodeA > 0 ? voltages[nodeA - 1] : 0;
-      const vB = nodeB > 0 ? voltages[nodeB - 1] : 0;
+      const vA = voltages[nodeA];
+      const vB = voltages[nodeB];
       const I = G * (vA - vB);
       return [I, -I];
     },
@@ -381,7 +381,7 @@ export const SwitchDefinition: ComponentDefinition = {
   attributeMap: SWITCH_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.SWITCHING,
   helpText:
-    "Switch (SPST) — a manually controlled single-pole single-throw switch.\n" +
+    "Switch (SPST) â€” a manually controlled single-pole single-throw switch.\n" +
     "When closed, terminals A and B are connected (bus nets merged).\n" +
     "When open, terminals are disconnected.\n" +
     "Click to toggle during simulation.",

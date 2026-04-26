@@ -1,5 +1,5 @@
-/**
- * SwitchDT component — SPDT switch with mechanical symbol rendering.
+﻿/**
+ * SwitchDT component â€” SPDT switch with mechanical symbol rendering.
  *
  * Double-throw switch: three terminals per pole (A=common, B=upper, C=lower).
  * When closed=true: A-B are connected, A-C are disconnected.
@@ -88,7 +88,7 @@ function buildPinDeclarations(poles: number, bitWidth: number): PinDeclaration[]
 }
 
 // ---------------------------------------------------------------------------
-// SwitchDTElement — CircuitElement implementation
+// SwitchDTElement â€” CircuitElement implementation
 // ---------------------------------------------------------------------------
 
 export class SwitchDTElement extends AbstractCircuitElement {
@@ -111,7 +111,7 @@ export class SwitchDTElement extends AbstractCircuitElement {
   getBoundingBox(): Rect {
     const poles = this._properties.getOrDefault<number>("poles", 1);
     const h = componentHeight(poles);
-    // Thin bar at (0.5,-0.75)→(1.5,-0.75); contact arm to (1.8,0.5); pole stub to (2,1).
+    // Thin bar at (0.5,-0.75)â†’(1.5,-0.75); contact arm to (1.8,0.5); pole stub to (2,1).
     // MinX=0, MaxX=2, MinY=-0.75, MaxY=max(h, 1).
     return {
       x: this.position.x,
@@ -128,7 +128,7 @@ export class SwitchDTElement extends AbstractCircuitElement {
     ctx.setColor("COMPONENT");
     ctx.setLineWidth(1);
 
-    // Pole stub (open L): (2,1) → (1.75,1) → (1.75,0.6) — use drawPath so the
+    // Pole stub (open L): (2,1) â†’ (1.75,1) â†’ (1.75,0.6) â€” use drawPath so the
     // rasterizer treats it as an open polyline matching the Java fixture (closed=false).
     ctx.drawPath({ operations: [
       { op: "moveTo", x: 2, y: 1 },
@@ -167,7 +167,7 @@ export class SwitchDTElement extends AbstractCircuitElement {
 }
 
 // ---------------------------------------------------------------------------
-// executeSwitchDT — flat simulation function
+// executeSwitchDT â€” flat simulation function
 //
 // SPDT switches are handled by the bus resolution subsystem (Phase 3).
 // The switch state is managed by the interactive engine layer.
@@ -271,7 +271,7 @@ const SWITCH_DT_PROPERTY_DEFS: PropertyDefinition[] = [
   {
     key: "Ron",
     type: PropertyType.FLOAT,
-    label: "Ron (Ω)",
+    label: "Ron (Î©)",
     defaultValue: 1,
     min: 1e-12,
     description: "On-state resistance in ohms (analog mode)",
@@ -279,7 +279,7 @@ const SWITCH_DT_PROPERTY_DEFS: PropertyDefinition[] = [
   {
     key: "Roff",
     type: PropertyType.FLOAT,
-    label: "Roff (Ω)",
+    label: "Roff (Î©)",
     defaultValue: 1e9,
     min: 1,
     description: "Off-state resistance in ohms (analog mode)",
@@ -301,7 +301,7 @@ const SWITCH_DT_PROPERTY_DEFS: PropertyDefinition[] = [
 ];
 
 // ---------------------------------------------------------------------------
-// Analog helpers — SPDT variable-resistance model
+// Analog helpers â€” SPDT variable-resistance model
 // ---------------------------------------------------------------------------
 
 function stampConductanceSpdt(
@@ -310,11 +310,11 @@ function stampConductanceSpdt(
   nodeB: number,
   G: number,
 ): void {
-  if (nodeA !== 0) solver.stampElement(solver.allocElement(nodeA - 1, nodeA - 1), G);
-  if (nodeB !== 0) solver.stampElement(solver.allocElement(nodeB - 1, nodeB - 1), G);
+  if (nodeA !== 0) solver.stampElement(solver.allocElement(nodeA, nodeA), G);
+  if (nodeB !== 0) solver.stampElement(solver.allocElement(nodeB, nodeB), G);
   if (nodeA !== 0 && nodeB !== 0) {
-    solver.stampElement(solver.allocElement(nodeA - 1, nodeB - 1), -G);
-    solver.stampElement(solver.allocElement(nodeB - 1, nodeA - 1), -G);
+    solver.stampElement(solver.allocElement(nodeA, nodeB), -G);
+    solver.stampElement(solver.allocElement(nodeB, nodeA), -G);
   }
 }
 
@@ -370,9 +370,9 @@ function createSwitchDTAnalogElement(
       const Goff = 1 / roff;
       const GAB = effectivelyClosed ? Gon : Goff;
       const GAC = effectivelyClosed ? Goff : Gon;
-      const vA = nodeCommon > 0 ? voltages[nodeCommon - 1] : 0;
-      const vB = nodeB > 0 ? voltages[nodeB - 1] : 0;
-      const vC = nodeC > 0 ? voltages[nodeC - 1] : 0;
+      const vA = voltages[nodeCommon];
+      const vB = voltages[nodeB];
+      const vC = voltages[nodeC];
       const iAB = GAB * (vA - vB);
       const iAC = GAC * (vA - vC);
       return [iAB + iAC, -iAB, -iAC];
@@ -409,7 +409,7 @@ export const SwitchDTDefinition: ComponentDefinition = {
   attributeMap: SWITCH_DT_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.SWITCHING,
   helpText:
-    "Switch DT (SPDT) — a manually controlled single-pole double-throw switch.\n" +
+    "Switch DT (SPDT) â€” a manually controlled single-pole double-throw switch.\n" +
     "Common terminal A connects to B when closed, to C when open.\n" +
     "Net merging/splitting handled by bus resolution subsystem.\n" +
     "Click to toggle during simulation.",

@@ -1,11 +1,11 @@
-/**
- * Triode vacuum tube analog component — Koren model.
+﻿/**
+ * Triode vacuum tube analog component â€” Koren model.
  *
  * The Koren model is the standard for audio amplifier simulation. The plate
  * current depends on both plate voltage and grid voltage via:
  *
- *   E₁ = V_PK / K_P · ln(1 + exp(K_P · (1/µ + V_GK / sqrt(K_VB + V_PK²))))
- *   I_P = (E₁ / K_G1)^EX   when E₁ > 0, else 0
+ *   Eâ‚ = V_PK / K_P Â· ln(1 + exp(K_P Â· (1/Âµ + V_GK / sqrt(K_VB + V_PKÂ²))))
+ *   I_P = (Eâ‚ / K_G1)^EX   when Eâ‚ > 0, else 0
  *
  * Grid current when V_GK > 0:
  *   I_G = (V_GK / R_GI)   (resistive grid current for positive grid drive)
@@ -22,7 +22,7 @@
  *   - Norton current sources at P, G, K nodes
  *
  * Voltage limiting: V_GK steps are clamped to prevent exponential overflow
- * in the Koren E₁ formula.
+ * in the Koren Eâ‚ formula.
  */
 
 import { AbstractCircuitElement } from "../../core/element.js";
@@ -58,19 +58,19 @@ const VGK_MAX_STEP = 1.0;
 
 export const { paramDefs: TRIODE_PARAM_DEFS, defaults: TRIODE_PARAM_DEFAULTS } = defineModelParams({
   primary: {
-    mu:  { default: 100,  description: "Amplification factor µ" },
+    mu:  { default: 100,  description: "Amplification factor Âµ" },
     kp:  { default: 600,  description: "Koren K_P parameter controlling plate-voltage sensitivity" },
     kg1: { default: 1060, description: "Koren K_G1 transconductance scaling factor" },
   },
   secondary: {
-    kvb: { default: 300,  description: "Koren K_VB parameter (V²) for grid-plate interaction" },
+    kvb: { default: 300,  description: "Koren K_VB parameter (VÂ²) for grid-plate interaction" },
     ex:  { default: 1.4,  description: "Koren current exponent EX" },
-    rGI: { default: 2000, unit: "Ω", description: "Grid input resistance (limits grid current when V_GK > 0)" },
+    rGI: { default: 2000, unit: "Î©", description: "Grid input resistance (limits grid current when V_GK > 0)" },
   },
 });
 
 // ---------------------------------------------------------------------------
-// Stamp helpers — node 0 is ground (skipped)
+// Stamp helpers â€” node 0 is ground (skipped)
 // ---------------------------------------------------------------------------
 
 
@@ -83,9 +83,9 @@ interface TriodeOperatingPoint {
   vpk: number;
   ip: number;
   ig: number;
-  /** dI_P/dV_GK — transconductance */
+  /** dI_P/dV_GK â€” transconductance */
   gm: number;
-  /** dI_P/dV_PK — plate conductance */
+  /** dI_P/dV_PK â€” plate conductance */
   gp: number;
   /** Grid input conductance (1/R_GI when positive grid; GMIN otherwise) */
   ggi: number;
@@ -104,15 +104,15 @@ function computeTriodeOp(
   // Clamp V_PK to avoid sqrt of negative
   const vpkSafe = Math.max(vpk, 0);
 
-  // Koren E₁ inner argument
+  // Koren Eâ‚ inner argument
   const innerArg = kp * (1 / mu + vgk / Math.sqrt(kvb + vpkSafe * vpkSafe));
 
-  // E₁ = V_PK/K_P · ln(1 + exp(innerArg)), clamped to prevent overflow
+  // Eâ‚ = V_PK/K_P Â· ln(1 + exp(innerArg)), clamped to prevent overflow
   const clampedArg = Math.min(innerArg, 500);
   const logTerm = Math.log1p(Math.exp(clampedArg));
   const e1 = (vpkSafe / kp) * logTerm;
 
-  // I_P = (E₁/K_G1)^EX when E₁ > 0
+  // I_P = (Eâ‚/K_G1)^EX when Eâ‚ > 0
   const ip = e1 > 0 ? Math.pow(e1 / kg1, ex) : 0;
 
   // Grid current: resistive when V_GK > 0
@@ -121,20 +121,20 @@ function computeTriodeOp(
 
   // --- Analytical Jacobian for NR linearisation ---
   //
-  // dE₁/dV_GK = (vpkSafe/kp) · exp(innerArg)/(1+exp(innerArg)) · kp/sqrt(kvb+vpk²)
-  //           = vpkSafe · exp(innerArg)/(1+exp(innerArg)) / sqrt(kvb+vpk²)
+  // dEâ‚/dV_GK = (vpkSafe/kp) Â· exp(innerArg)/(1+exp(innerArg)) Â· kp/sqrt(kvb+vpkÂ²)
+  //           = vpkSafe Â· exp(innerArg)/(1+exp(innerArg)) / sqrt(kvb+vpkÂ²)
   //
-  // dE₁/dV_PK:
-  //   Term 1: (1/kp) · ln(1+exp(innerArg))   [from ∂(vpkSafe/kp)/∂V_PK]
-  //   Term 2: (vpkSafe/kp) · exp(innerArg)/(1+exp(innerArg)) · kp·(-vpkSafe/(kvb+vpkSafe²)^(3/2))·vpkSafe
-  //         = -vpkSafe² · exp(innerArg)/(1+exp(innerArg)) / (kvb+vpkSafe²)^(3/2) · (vpkSafe/kp)... wait
+  // dEâ‚/dV_PK:
+  //   Term 1: (1/kp) Â· ln(1+exp(innerArg))   [from âˆ‚(vpkSafe/kp)/âˆ‚V_PK]
+  //   Term 2: (vpkSafe/kp) Â· exp(innerArg)/(1+exp(innerArg)) Â· kpÂ·(-vpkSafe/(kvb+vpkSafeÂ²)^(3/2))Â·vpkSafe
+  //         = -vpkSafeÂ² Â· exp(innerArg)/(1+exp(innerArg)) / (kvb+vpkSafeÂ²)^(3/2) Â· (vpkSafe/kp)... wait
   //
-  // Let sq = sqrt(kvb + vpkSafe²), so dSq/dVpk = vpkSafe/sq.
+  // Let sq = sqrt(kvb + vpkSafeÂ²), so dSq/dVpk = vpkSafe/sq.
   // innerArg = kp*(1/mu + vgk/sq)
-  // d(innerArg)/dVpk = kp * vgk * (-1/sq²) * (vpkSafe/sq) = -kp*vgk*vpkSafe/sq³
+  // d(innerArg)/dVpk = kp * vgk * (-1/sqÂ²) * (vpkSafe/sq) = -kp*vgk*vpkSafe/sqÂ³
   //
-  // dE₁/dVpk = logTerm/kp + (vpkSafe/kp)*sigmoid*(-kp*vgk*vpkSafe/sq³)
-  //          = logTerm/kp - vpkSafe²*vgk*sigmoid/sq³
+  // dEâ‚/dVpk = logTerm/kp + (vpkSafe/kp)*sigmoid*(-kp*vgk*vpkSafe/sqÂ³)
+  //          = logTerm/kp - vpkSafeÂ²*vgk*sigmoid/sqÂ³
   //   where sigmoid = exp(innerArg)/(1+exp(innerArg))
 
   const sq = Math.sqrt(kvb + vpkSafe * vpkSafe);
@@ -147,7 +147,7 @@ function computeTriodeOp(
     ? logTerm / kp - vpkSafe * vpkSafe * vgk * sigmoid / (sq * sq * sq)
     : 0;
 
-  // dI_P/dE₁ = EX * (E₁/K_G1)^(EX-1) / K_G1  when E₁ > 0
+  // dI_P/dEâ‚ = EX * (Eâ‚/K_G1)^(EX-1) / K_G1  when Eâ‚ > 0
   const dIpdE1 = e1 > 0 ? ex * Math.pow(e1 / kg1, ex - 1) / kg1 : 0;
 
   const gm = dIpdE1 * dE1dVgk + GMIN;
@@ -157,7 +157,7 @@ function computeTriodeOp(
 }
 
 // ---------------------------------------------------------------------------
-// createTriodeElement — AnalogElement factory
+// createTriodeElement â€” AnalogElement factory
 // ---------------------------------------------------------------------------
 
 export function createTriodeElement(
@@ -191,9 +191,9 @@ export function createTriodeElement(
 
     load(ctx: LoadContext): void {
       const voltages = ctx.rhsOld;
-      const vP = nodeP > 0 ? voltages[nodeP - 1] : 0;
-      const vG = nodeG > 0 ? voltages[nodeG - 1] : 0;
-      const vK = nodeK > 0 ? voltages[nodeK - 1] : 0;
+      const vP = voltages[nodeP];
+      const vG = voltages[nodeG];
+      const vK = voltages[nodeK];
 
       const vgkNew = vG - vK;
       const vpkNew = vP - vK;
@@ -246,9 +246,9 @@ export function createTriodeElement(
     },
 
     getPinCurrents(voltages: Float64Array): number[] {
-      const vP = nodeP > 0 ? voltages[nodeP - 1] : 0;
-      const vG = nodeG > 0 ? voltages[nodeG - 1] : 0;
-      const vK = nodeK > 0 ? voltages[nodeK - 1] : 0;
+      const vP = voltages[nodeP];
+      const vG = voltages[nodeG];
+      const vK = voltages[nodeK];
 
       const { ip, ig, gm, gp, ggi, vgk: vgkOp, vpk: vpkOp } = op;
 
@@ -260,7 +260,7 @@ export function createTriodeElement(
       // Positive = flowing into the grid
       const iGrid = ig + ggi * ((vG - vK) - vgkOp);
 
-      // Cathode current: KCL — all three must sum to zero
+      // Cathode current: KCL â€” all three must sum to zero
       const iCathode = -(iPlate + iGrid);
 
       // pinLayout order: P, G, K
@@ -269,9 +269,9 @@ export function createTriodeElement(
 
     checkConvergence(ctx: LoadContext): boolean {
       const voltages = ctx.rhsOld;
-      const vP = nodeP > 0 ? voltages[nodeP - 1] : 0;
-      const vG = nodeG > 0 ? voltages[nodeG - 1] : 0;
-      const vK = nodeK > 0 ? voltages[nodeK - 1] : 0;
+      const vP = voltages[nodeP];
+      const vG = voltages[nodeG];
+      const vK = voltages[nodeK];
 
       const vgkRaw = vG - vK;
       const vpkRaw = vP - vK;
@@ -298,7 +298,7 @@ export function createTriodeElement(
 }
 
 // ---------------------------------------------------------------------------
-// TriodeCircuitElement — AbstractCircuitElement (editor/visual layer)
+// TriodeCircuitElement â€” AbstractCircuitElement (editor/visual layer)
 // ---------------------------------------------------------------------------
 
 export class TriodeCircuitElement extends AbstractCircuitElement {
@@ -330,20 +330,20 @@ export class TriodeCircuitElement extends AbstractCircuitElement {
     ctx.setColor("COMPONENT");
     ctx.setLineWidth(1);
 
-    // All coordinates in grid units (Falstad pixels ÷ 16)
+    // All coordinates in grid units (Falstad pixels Ã· 16)
     // Reference: TriodeElm in fixtures/falstad-shapes.json
     // Origin: G pin at (0, 0), point2 at (4, 0)
 
-    // Envelope circle: center (4, 0), r = 23.52/16 ≈ 1.47
+    // Envelope circle: center (4, 0), r = 23.52/16 â‰ˆ 1.47
     ctx.drawCircle(4.0, 0.0, 23.52 / 16, false);
 
-    // Plate lead: (4, -2) → (4, -0.5)
+    // Plate lead: (4, -2) â†’ (4, -0.5)
     ctx.drawLine(4.0, -2.0, 4.0, -0.5);
 
-    // Plate bar: (2.875, -0.5) → (5.125, -0.5)
+    // Plate bar: (2.875, -0.5) â†’ (5.125, -0.5)
     ctx.drawLine(2.875, -0.5, 5.125, -0.5);
 
-    // Grid lead: (0, 0) → (2.5, 0)
+    // Grid lead: (0, 0) â†’ (2.5, 0)
     ctx.drawLine(0.0, 0.0, 2.5, 0.0);
 
     // Grid dashes (3 segments)
@@ -351,13 +351,13 @@ export class TriodeCircuitElement extends AbstractCircuitElement {
     ctx.drawLine(3.8125, 0.0, 4.1875, 0.0);
     ctx.drawLine(4.8125, 0.0, 5.1875, 0.0);
 
-    // Cathode vertical: (3, 2) → (3, 0.5)
+    // Cathode vertical: (3, 2) â†’ (3, 0.5)
     ctx.drawLine(3.0, 2.0, 3.0, 0.5);
 
-    // Cathode horizontal: (3, 0.5) → (5, 0.5)
+    // Cathode horizontal: (3, 0.5) â†’ (5, 0.5)
     ctx.drawLine(3.0, 0.5, 5.0, 0.5);
 
-    // Cathode stub: (5, 0.5) → (5, 0.625)
+    // Cathode stub: (5, 0.5) â†’ (5, 0.625)
     ctx.drawLine(5.0, 0.5, 5.0, 0.625);
 
     ctx.restore();
@@ -435,9 +435,9 @@ export const TriodeDefinition: ComponentDefinition = {
   attributeMap: TRIODE_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.SEMICONDUCTORS,
   helpText:
-    "Triode vacuum tube — Koren model.\n" +
+    "Triode vacuum tube â€” Koren model.\n" +
     "Pins: P (plate), G (grid), K (cathode).\n" +
-    "Standard 12AX7 defaults: µ=100, K_P=600, K_VB=300, K_G1=1060, EX=1.4.",
+    "Standard 12AX7 defaults: Âµ=100, K_P=600, K_VB=300, K_G1=1060, EX=1.4.",
   models: {},
   modelRegistry: {
     "koren": {

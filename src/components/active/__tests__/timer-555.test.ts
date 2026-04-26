@@ -1,34 +1,34 @@
-/**
+﻿/**
  * Tests for the 555 Timer IC F4b composite model.
  *
- * Test handling per A1 §Test handling rule (spec/architectural-alignment.md §A1):
+ * Test handling per A1 Â§Test handling rule (spec/architectural-alignment.md Â§A1):
  *   - Post-load observable state (engine-agnostic, node voltages): KEPT
  *   - Parameter-plumbing (setParam on vDrop, rDischarge): KEPT
  *   - Engine-agnostic interface contracts: KEPT
  *   Timer555 parity (C4.5)::timer555_load_transient_parity
- *                                               — bit-exact stamp assertions with
+ *                                               â€” bit-exact stamp assertions with
  *                                                 hand-computed NGSPICE_* expected values
  *
  * Kept tests:
- *   Timer555::internal_divider_voltages         — observable node voltage (CTRL = 2/3 VCC)
+ *   Timer555::internal_divider_voltages         â€” observable node voltage (CTRL = 2/3 VCC)
  *                                                 via runDcOp; engine-agnostic.
- *   Astable::oscillates_at_correct_frequency    — transient observable (transition count)
- *   Astable::duty_cycle                         — transient observable (time-weighted)
- *   Monostable::pulse_width                     — transient observable (pulse timing)
- *   Monostable::retrigger_ignored_during_pulse  — transient observable (pulse width bound)
+ *   Astable::oscillates_at_correct_frequency    â€” transient observable (transition count)
+ *   Astable::duty_cycle                         â€” transient observable (time-weighted)
+ *   Monostable::pulse_width                     â€” transient observable (pulse timing)
+ *   Monostable::retrigger_ignored_during_pulse  â€” transient observable (pulse width bound)
  *
  * Astable circuit:
- *   VCC=5V — R1 — node_a — R2 — node_b(THR=TRIG) — C — GND
+ *   VCC=5V â€” R1 â€” node_a â€” R2 â€” node_b(THR=TRIG) â€” C â€” GND
  *   DIS connected to node_a (between R1 and R2)
  *   OUT connected to node_out
  *   CTRL connected to node_ctrl (floating via internal divider)
  *   RST connected to VCC
  *
- * The voltage divider inside the 555 sets CTRL ≈ 2/3 VCC = 3.33V.
+ * The voltage divider inside the 555 sets CTRL â‰ˆ 2/3 VCC = 3.33V.
  * Charging: through R1+R2, from 1/3 VCC to 2/3 VCC.
  * Discharging: through R2 (DIS discharges through R2), from 2/3 VCC to 1/3 VCC.
- * f = 1.44 / ((R1 + 2·R2) · C)
- * duty = (R1 + R2) / (R1 + 2·R2)
+ * f = 1.44 / ((R1 + 2Â·R2) Â· C)
+ * duty = (R1 + R2) / (R1 + 2Â·R2)
  */
 
 import { describe, it, expect } from "vitest";
@@ -144,11 +144,11 @@ function makeResistor(nodeA: number, nodeB: number, resistance: number): AnalogE
     getPinCurrents(): number[] { return []; },
     load(ctx): void {
       const { solver } = ctx;
-      if (nodeA > 0) { const h = solver.allocElement(nodeA - 1, nodeA - 1); solver.stampElement(h, G); }
-      if (nodeB > 0) { const h = solver.allocElement(nodeB - 1, nodeB - 1); solver.stampElement(h, G); }
+      if (nodeA > 0) { const h = solver.allocElement(nodeA, nodeA); solver.stampElement(h, G); }
+      if (nodeB > 0) { const h = solver.allocElement(nodeB, nodeB); solver.stampElement(h, G); }
       if (nodeA > 0 && nodeB > 0) {
-        const hab = solver.allocElement(nodeA - 1, nodeB - 1); solver.stampElement(hab, -G);
-        const hba = solver.allocElement(nodeB - 1, nodeA - 1); solver.stampElement(hba, -G);
+        const hab = solver.allocElement(nodeA, nodeB); solver.stampElement(hab, -G);
+        const hba = solver.allocElement(nodeB, nodeA); solver.stampElement(hba, -G);
       }
     },
   };
@@ -163,13 +163,13 @@ import {
 } from "../../../solver/analog/__tests__/test-helpers.js";
 
 // ---------------------------------------------------------------------------
-// Timer555 unit tests — observable DC operating point
+// Timer555 unit tests â€” observable DC operating point
 // ---------------------------------------------------------------------------
 
 describe("Timer555", () => {
   it("internal_divider_voltages", () => {
-    // CTRL pin floating: internal divider sets CTRL ≈ 2/3 × VCC.
-    // With VCC=5V: CTRL ≈ 3.333V ±1%
+    // CTRL pin floating: internal divider sets CTRL â‰ˆ 2/3 Ã— VCC.
+    // With VCC=5V: CTRL â‰ˆ 3.333V Â±1%
     // Solve DC with VCC=5V fixed, CTRL floating (driven only by internal divider).
     //
     // Node assignment:
@@ -179,7 +179,7 @@ describe("Timer555", () => {
     //
     // For a simpler approach: use 1-based nodes, VCC=1, GND=2(=circuit GND),
     // CTRL=3 (floating, driven only by internal divider).
-    // The 555 stamps 5kΩ from VCC→CTRL and 10kΩ from CTRL→GND.
+    // The 555 stamps 5kÎ© from VCCâ†’CTRL and 10kÎ© from CTRLâ†’GND.
     // DC solve gives CTRL = VCC * (10k/15k) = 2/3 VCC.
     //
     // Let GND node = circuit ground (node 0). VCC node=1, CTRL node=2,
@@ -187,7 +187,7 @@ describe("Timer555", () => {
     // branchCount=1 (VCC voltage source), matrixSize=5.
     //
     // Nodes: 1=VCC, 2=CTRL, 3=TRIG(unused), 4=THR(unused), 5=RST(=VCC)
-    //         DIS=0(GND), OUT=0(GND) — grounded for simplicity
+    //         DIS=0(GND), OUT=0(GND) â€” grounded for simplicity
     const VCC = 5;
     const nVcc = 1, nGnd = 0, nTrig = 0, nThr = 0, nCtrl = 2;
     const nRst = 1; // RST tied to VCC
@@ -209,14 +209,14 @@ describe("Timer555", () => {
 
     expect(result.converged).toBe(true);
 
-    const vCtrlSolved = result.nodeVoltages[nCtrl - 1];
+    const vCtrlSolved = result.nodeVoltages[nCtrl];
     const vExpected = VCC * (2 / 3);
     const errorPct = Math.abs(vCtrlSolved - vExpected) / vExpected * 100;
 
-    // CTRL ≈ 2/3 VCC ±1%
+    // CTRL â‰ˆ 2/3 VCC Â±1%
     expect(errorPct).toBeLessThan(1);
 
-    // Trigger reference = CTRL/2 ≈ 1/3 VCC ±1%
+    // Trigger reference = CTRL/2 â‰ˆ 1/3 VCC Â±1%
     const vTrigRef = vCtrlSolved * 0.5;
     const vTrigExpected = VCC / 3;
     const trigErrorPct = Math.abs(vTrigRef - vTrigExpected) / vTrigExpected * 100;
@@ -231,26 +231,26 @@ describe("Timer555", () => {
 /**
  * Astable 555 circuit:
  *
- *   VCC ─── R1 ─── node_a ─── R2 ─── node_b ─── C ─── GND
- *                     │                  │
+ *   VCC â”€â”€â”€ R1 â”€â”€â”€ node_a â”€â”€â”€ R2 â”€â”€â”€ node_b â”€â”€â”€ C â”€â”€â”€ GND
+ *                     â”‚                  â”‚
  *                    DIS               THR, TRIG
  *
  * The DIS pin connects between R1 and R2 (node_a).
  * THR and TRIG are both connected to node_b (the capacitor top plate).
  *
- * Charge path: VCC → R1 → R2 → C (DIS is OFF/Hi-Z)
- * Discharge path: C → R2 → DIS (which sinks to GND through R_sat)
+ * Charge path: VCC â†’ R1 â†’ R2 â†’ C (DIS is OFF/Hi-Z)
+ * Discharge path: C â†’ R2 â†’ DIS (which sinks to GND through R_sat)
  *
  * Timing:
- *   t_high = 0.693 × (R1 + R2) × C
- *   t_low  = 0.693 × R2 × C
- *   T      = t_high + t_low = 0.693 × (R1 + 2R2) × C
- *   f      = 1.44 / ((R1 + 2R2) × C)
+ *   t_high = 0.693 Ã— (R1 + R2) Ã— C
+ *   t_low  = 0.693 Ã— R2 Ã— C
+ *   T      = t_high + t_low = 0.693 Ã— (R1 + 2R2) Ã— C
+ *   f      = 1.44 / ((R1 + 2R2) Ã— C)
  *   duty   = (R1 + R2) / (R1 + 2R2)
  *
- * For R1=1kΩ, R2=10kΩ, C=10µF:
- *   f ≈ 1.44 / (21000 × 10e-6) = 6.857 Hz → period ≈ 145.8ms
- *   duty ≈ 11/21 ≈ 52.38%
+ * For R1=1kÎ©, R2=10kÎ©, C=10ÂµF:
+ *   f â‰ˆ 1.44 / (21000 Ã— 10e-6) = 6.857 Hz â†’ period â‰ˆ 145.8ms
+ *   duty â‰ˆ 11/21 â‰ˆ 52.38%
  *
  * Node assignment for MNA:
  *   1 = VCC (fixed at 5V via voltage source, branch 0)
@@ -262,10 +262,10 @@ describe("Timer555", () => {
  *   RST = VCC = node 1 (always active)
  *
  * Elements:
- *   VS_VCC:   voltage source, 5V, node1→GND, branch row 5
- *   R1:       1kΩ, node1 → node2
- *   R2:       10kΩ, node2 → node3
- *   C:        10µF, node3 → GND
+ *   VS_VCC:   voltage source, 5V, node1â†’GND, branch row 5
+ *   R1:       1kÎ©, node1 â†’ node2
+ *   R2:       10kÎ©, node2 â†’ node3
+ *   C:        10ÂµF, node3 â†’ GND
  *   timer555: [VCC=1, GND=0, TRIG=3, THR=3, CTRL=5, RST=1, DIS=2, OUT=4]
  *
  * nodeCount=5 (VCC, node_a, node_b, OUT, CTRL)
@@ -316,12 +316,12 @@ function buildAstableCircuit(R1: number, R2: number, C: number, VCC: number, vDr
 
 describe("Astable", () => {
   it("oscillates_at_correct_frequency", () => {
-    const R1 = 1000;    // 1kΩ
-    const R2 = 10000;   // 10kΩ
-    const C  = 10e-6;   // 10µF
+    const R1 = 1000;    // 1kÎ©
+    const R2 = 10000;   // 10kÎ©
+    const C  = 10e-6;   // 10ÂµF
     const VCC = 5;
 
-    // Expected: f = 1.44 / ((R1 + 2*R2) * C) = 1.44 / (21000 * 10e-6) ≈ 6.857 Hz
+    // Expected: f = 1.44 / ((R1 + 2*R2) * C) = 1.44 / (21000 * 10e-6) â‰ˆ 6.857 Hz
     const fExpected = 1.44 / ((R1 + 2 * R2) * C);
     const periodExpected = 1 / fExpected;
 
@@ -387,7 +387,7 @@ describe("Astable", () => {
     const C  = 10e-6;
     const VCC = 5;
 
-    // Expected duty cycle: (R1 + R2) / (R1 + 2*R2) = 11000/21000 ≈ 52.38%
+    // Expected duty cycle: (R1 + R2) / (R1 + 2*R2) = 11000/21000 â‰ˆ 52.38%
     const dutyExpected = (R1 + R2) / (R1 + 2 * R2);
     const fExpected = 1.44 / ((R1 + 2 * R2) * C);
     const periodExpected = 1 / fExpected;
@@ -455,8 +455,8 @@ describe("Astable", () => {
 /**
  * Monostable 555 circuit:
  *
- *   VCC ─── R ─── node_thr ─── C ─── GND
- *                   │
+ *   VCC â”€â”€â”€ R â”€â”€â”€ node_thr â”€â”€â”€ C â”€â”€â”€ GND
+ *                   â”‚
  *                  THR (and DIS)
  *
  *   TRIG: externally driven (pulsed low to trigger)
@@ -465,12 +465,12 @@ describe("Astable", () => {
  * Initial state: C is discharged, TRIG is high (idle).
  * The 555 is in RESET state (Q=0, output low, DIS grounds C through R_sat).
  *
- * Trigger event: TRIG goes below 1/3 VCC → SET (Q=1, output high, DIS off).
+ * Trigger event: TRIG goes below 1/3 VCC â†’ SET (Q=1, output high, DIS off).
  * C now charges through R from VCC.
- * When V_C reaches 2/3 VCC → RESET (Q=0, output low, DIS discharges C).
+ * When V_C reaches 2/3 VCC â†’ RESET (Q=0, output low, DIS discharges C).
  *
- * Pulse width: t_W = 1.1 × R × C
- * For R=100kΩ, C=1µF: t_W = 1.1 × 100e3 × 1e-6 = 110ms
+ * Pulse width: t_W = 1.1 Ã— R Ã— C
+ * For R=100kÎ©, C=1ÂµF: t_W = 1.1 Ã— 100e3 Ã— 1e-6 = 110ms
  *
  * Node assignment:
  *   1 = VCC     (fixed at 5V, branch 0)
@@ -482,10 +482,10 @@ describe("Astable", () => {
  *   RST = VCC = node 1
  *
  * Elements:
- *   VS_VCC:    5V source, node1→GND, branch 5
- *   R:         100kΩ, node1→node2
- *   C:         1µF, node2→GND
- *   VS_TRIG:   voltage source controlling TRIG, node3→GND, branch 6
+ *   VS_VCC:    5V source, node1â†’GND, branch 5
+ *   R:         100kÎ©, node1â†’node2
+ *   C:         1ÂµF, node2â†’GND
+ *   VS_TRIG:   voltage source controlling TRIG, node3â†’GND, branch 6
  *   timer555:  [VCC=1, GND=0, TRIG=3, THR=2, CTRL=5, RST=1, DIS=2, OUT=4]
  *
  * nodeCount=5, branchCount=2, matrixSize=7
@@ -529,8 +529,8 @@ function buildMonostableCircuit(R: number, Cval: number, VCC: number): {
       const { solver } = ctx;
       const k = brTrig;
       if (nTrig > 0) {
-        const h1 = solver.allocElement(nTrig - 1, k); solver.stampElement(h1, 1);
-        const h2 = solver.allocElement(k, nTrig - 1); solver.stampElement(h2, 1);
+        const h1 = solver.allocElement(nTrig, k); solver.stampElement(h1, 1);
+        const h2 = solver.allocElement(k, nTrig); solver.stampElement(h2, 1);
       }
       solver.stampRHS(k, _trigVoltage);
     },
@@ -558,11 +558,11 @@ function buildMonostableCircuit(R: number, Cval: number, VCC: number): {
 
 describe("Monostable", () => {
   it("pulse_width", () => {
-    const R    = 100e3;  // 100kΩ
-    const Cval = 1e-6;   // 1µF
+    const R    = 100e3;  // 100kÎ©
+    const Cval = 1e-6;   // 1ÂµF
     const VCC  = 5;
 
-    // Expected pulse width: 1.1 × R × C = 110ms
+    // Expected pulse width: 1.1 Ã— R Ã— C = 110ms
     const tWidthExpected = 1.1 * R * Cval;
 
     const { engine, nOut, setTrig } = buildMonostableCircuit(R, Cval, VCC);
@@ -575,7 +575,7 @@ describe("Monostable", () => {
     const maxDt = tWidthExpected * 0.005;
     engine.configure({ maxTimeStep: maxDt });
 
-    // Apply trigger pulse (TRIG goes to 0.5V < 1/3 VCC = 1.67V → fires trigger comparator)
+    // Apply trigger pulse (TRIG goes to 0.5V < 1/3 VCC = 1.67V â†’ fires trigger comparator)
     setTrig(0.5);
 
     // Run one step to register the trigger
@@ -591,7 +591,7 @@ describe("Monostable", () => {
 
     let steps = 0;
     const maxSteps = 50000;
-    const maxSimTime = tWidthExpected * 3; // simulate 3× expected pulse width
+    const maxSimTime = tWidthExpected * 3; // simulate 3Ã— expected pulse width
 
     while (engine.simTime < maxSimTime && steps < maxSteps) {
       engine.step();
@@ -684,8 +684,8 @@ describe("Monostable", () => {
 
     const tWidthMeasured = pulseEnd - pulseStart;
 
-    // Pulse width must NOT be extended beyond 1.1×RC × 1.15 (15% margin).
-    // If retrigger extended the pulse, it would be ~2× tWidthExpected.
+    // Pulse width must NOT be extended beyond 1.1Ã—RC Ã— 1.15 (15% margin).
+    // If retrigger extended the pulse, it would be ~2Ã— tWidthExpected.
     expect(tWidthMeasured).toBeLessThan(tWidthExpected * 1.15);
     // Pulse must have the normal width (within 10%)
     const tWidthError = Math.abs(tWidthMeasured - tWidthExpected) / tWidthExpected;

@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Analog Comparator component.
  *
  * Similar to an op-amp but optimized for switching speed: no linear region,
@@ -6,8 +6,8 @@
  * window), and an input offset voltage (vos).
  *
  * Open-collector model (default):
- *   - Output active (sinking):  R_sat to ground  → output pulled LOW
- *   - Output inactive (off):    R_off to ground  → output pulled HIGH by
+ *   - Output active (sinking):  R_sat to ground  â†’ output pulled LOW
+ *   - Output inactive (off):    R_off to ground  â†’ output pulled HIGH by
  *                                                   external resistor
  *
  * Push-pull model:
@@ -66,7 +66,7 @@ export const { paramDefs: COMPARATOR_PARAM_DEFS, defaults: COMPARATOR_DEFAULTS }
   primary: {
     hysteresis:   { default: 0,    unit: "V", description: "Hysteresis band width" },
     vos:          { default: 0.001, unit: "V", description: "Input offset voltage" },
-    rSat:         { default: 50,   unit: "Ω", description: "Output saturation resistance" },
+    rSat:         { default: 50,   unit: "Î©", description: "Output saturation resistance" },
     responseTime: { default: 1e-6, unit: "s", description: "Propagation delay time constant" },
     vOH:          { default: 3.3,  unit: "V", description: "Output HIGH voltage" },
     vOL:          { default: 0.0,  unit: "V", description: "Output LOW voltage" },
@@ -110,7 +110,7 @@ function buildComparatorPinDeclarations(): PinDeclaration[] {
 }
 
 // ---------------------------------------------------------------------------
-// ComparatorElement — CircuitElement implementation
+// ComparatorElement â€” CircuitElement implementation
 // ---------------------------------------------------------------------------
 
 export class ComparatorElement extends AbstractCircuitElement {
@@ -144,7 +144,7 @@ export class ComparatorElement extends AbstractCircuitElement {
 
     ctx.save();
 
-    // Triangle body — stays COMPONENT color, thin line
+    // Triangle body â€” stays COMPONENT color, thin line
     ctx.setLineWidth(1);
     ctx.setColor("COMPONENT");
     ctx.drawPolygon(
@@ -162,20 +162,20 @@ export class ComparatorElement extends AbstractCircuitElement {
     // Output lead (thick)
     drawColoredLead(ctx, signals, vOut, 3.625, 0, 4, 0);
 
-    // Text labels — body decoration, stays COMPONENT color
+    // Text labels â€” body decoration, stays COMPONENT color
     ctx.setLineWidth(1);
     ctx.setColor("COMPONENT");
     ctx.setFont({ family: "sans-serif", size: 0.7 });
     ctx.drawText("-", 1.0, -1.125, { horizontal: "center", vertical: "middle" });
     ctx.drawText("+", 1.0, 1.0, { horizontal: "center", vertical: "middle" });
-    ctx.drawText("≥?", 2.0, 0.0, { horizontal: "center", vertical: "middle" });
+    ctx.drawText("â‰¥?", 2.0, 0.0, { horizontal: "center", vertical: "middle" });
 
     ctx.restore();
   }
 }
 
 // ---------------------------------------------------------------------------
-// createComparatorElement — AnalogElement factory
+// createComparatorElement â€” AnalogElement factory
 // ---------------------------------------------------------------------------
 
 /**
@@ -205,7 +205,7 @@ export function createOpenCollectorComparatorElement(
     responseTime: Math.max(props.getModelParam<number>("responseTime"), 1e-12),
   };
 
-  const R_OFF = 1e9; // open-collector off-state impedance (1 GΩ)
+  const R_OFF = 1e9; // open-collector off-state impedance (1 GÎ©)
   const G_off = 1 / R_OFF;
 
   // G_sat is computed from p.rSat at call time to support setParam hot-loading
@@ -218,7 +218,7 @@ export function createOpenCollectorComparatorElement(
   let base: number;
 
   function readNode(voltages: Float64Array, n: number): number {
-    return n > 0 ? voltages[n - 1] : 0;
+    return voltages[n];
   }
 
   function computeGeff(weight: number): number {
@@ -282,7 +282,7 @@ export function createOpenCollectorComparatorElement(
       s0[base + SLOT_OUTPUT_WEIGHT] = weight;
 
       if (nOut > 0) {
-        solver.stampElement(solver.allocElement(nOut - 1, nOut - 1), computeGeff(weight));
+        solver.stampElement(solver.allocElement(nOut, nOut), computeGeff(weight));
       }
 
       for (const child of childElements) { child.load(ctx); }
@@ -305,7 +305,7 @@ export function createOpenCollectorComparatorElement(
     },
 
     getPinCurrents(voltages: Float64Array): number[] {
-      // Input pins: high-impedance load — implicit R_IN to ground
+      // Input pins: high-impedance load â€” implicit R_IN to ground
       const R_IN = 1e7;
       const vInp = readNode(voltages, nInp);
       const vInn = readNode(voltages, nInn);
@@ -328,7 +328,7 @@ export function createOpenCollectorComparatorElement(
 }
 
 // ---------------------------------------------------------------------------
-// createPushPullComparatorElement — push-pull output factory
+// createPushPullComparatorElement â€” push-pull output factory
 // ---------------------------------------------------------------------------
 
 function createPushPullComparatorElement(
@@ -355,7 +355,7 @@ function createPushPullComparatorElement(
   let base: number;
 
   function readNode(voltages: Float64Array, n: number): number {
-    return n > 0 ? voltages[n - 1] : 0;
+    return voltages[n];
   }
 
   function computeGeff(weight: number): number {
@@ -414,10 +414,10 @@ function createPushPullComparatorElement(
 
       const gEff = computeGeff(weight);
       if (nOut > 0) {
-        solver.stampElement(solver.allocElement(nOut - 1, nOut - 1), gEff);
+        solver.stampElement(solver.allocElement(nOut, nOut), gEff);
         // Norton current source drives output toward vOH or vOL
         const vTarget = latchActive ? p.vOL : p.vOH;
-        solver.stampRHS(nOut - 1, vTarget * gEff);
+        solver.stampRHS(nOut, vTarget * gEff);
       }
 
       for (const child of childElements) { child.load(ctx); }
@@ -506,7 +506,7 @@ export const VoltageComparatorDefinition: ComponentDefinition = {
   attributeMap: COMPARATOR_ATTRIBUTE_MAPPINGS,
 
   helpText:
-    "Analog Comparator — 3-terminal (in+, in-, out). " +
+    "Analog Comparator â€” 3-terminal (in+, in-, out). " +
     "Switches output based on V+ vs V-. Open-collector output requires external pull-up. " +
     "Optional hysteresis prevents output chatter on noisy inputs.",
 

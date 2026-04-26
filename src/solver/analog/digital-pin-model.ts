@@ -1,5 +1,5 @@
-/**
- * DigitalPinModel — MNA stamp helpers for digital pins.
+﻿/**
+ * DigitalPinModel â€” MNA stamp helpers for digital pins.
  *
  * DigitalOutputPinModel stamps an ideal voltage source branch equation ("branch" role)
  * or a conductance+current-source ("direct" role) based on the role assigned at
@@ -22,11 +22,12 @@ import { AnalogCapacitorElement } from "../../components/passives/capacitor.js";
 
 /**
  * Read voltage for an MNA node from the solver solution vector.
- * MNA node 0 is ground (always 0 V); non-ground nodes are stored
- * at solver index nodeId - 1.
+ * MNA node 0 is ground (always 0 V; slot 0 is the ngspice ground
+ * sentinel). Non-ground nodes are stored at solver index nodeId
+ * (1-based: slots 1..nodeCount).
  */
 export function readMnaVoltage(nodeId: number, voltages: Float64Array): number {
-  return nodeId > 0 && nodeId - 1 < voltages.length ? voltages[nodeId - 1] : 0;
+  return nodeId > 0 && nodeId < voltages.length ? voltages[nodeId] : 0;
 }
 
 // ---------------------------------------------------------------------------
@@ -60,10 +61,10 @@ export class DigitalOutputPinModel {
   /** True when in Hi-Z state. */
   private _hiZ = false;
 
-  /** AnalogCapacitorElement child — allocated when loaded && cOut > 0 after init(). */
+  /** AnalogCapacitorElement child â€” allocated when loaded && cOut > 0 after init(). */
   private _capacitorChild: AnalogCapacitorElement | null = null;
 
-  /** Cached matrix handles — allocated on first load(), keyed by role. */
+  /** Cached matrix handles â€” allocated on first load(), keyed by role. */
   private _handlesInit = false;
   // branch role handles
   private _hBranchNode = -1;   // (branchIdx, nodeIdx)
@@ -100,7 +101,7 @@ export class DigitalOutputPinModel {
     }
   }
 
-  /** Set the output logic level. High → vOH, low → vOL. */
+  /** Set the output logic level. High â†’ vOH, low â†’ vOL. */
   setLogicLevel(high: boolean): void {
     this._high = high;
   }
@@ -182,7 +183,7 @@ export class DigitalOutputPinModel {
         }
       }
     } else {
-      // "direct" role — conductance+current-source Norton equivalent
+      // "direct" role â€” conductance+current-source Norton equivalent
       if (!this._handlesInit) {
         this._hNodeDiag = solver.allocElement(nodeIdx, nodeIdx);
         this._handlesInit = true;
@@ -246,7 +247,7 @@ export class DigitalOutputPinModel {
 /**
  * Stamps the analog equivalent of one digital input pin into the MNA matrix.
  *
- * Sense-only by default — threshold detection is always available.
+ * Sense-only by default â€” threshold detection is always available.
  * When loaded, stamps 1/rIn on the node diagonal.
  * When loaded and cIn > 0 an AnalogCapacitorElement child handles companion
  * integration via the owning element's state-pool composite.
@@ -258,7 +259,7 @@ export class DigitalInputPinModel {
   /** Node this pin reads. Set by init(). */
   private _nodeId = -1;
 
-  /** AnalogCapacitorElement child — allocated when loaded && cIn > 0 after init(). */
+  /** AnalogCapacitorElement child â€” allocated when loaded && cIn > 0 after init(). */
   private _capacitorChild: AnalogCapacitorElement | null = null;
 
   /** Cached matrix handle for node diagonal. */
@@ -332,7 +333,7 @@ export class DigitalInputPinModel {
    *
    * Returns true  when voltage > vIH  (logic HIGH),
    *         false when voltage < vIL  (logic LOW),
-   *         undefined               (indeterminate — between thresholds).
+   *         undefined               (indeterminate â€” between thresholds).
    */
   readLogicLevel(voltage: number): boolean | undefined {
     if (voltage > this._spec.vIH) return true;
@@ -365,7 +366,7 @@ export class DigitalInputPinModel {
  * pin model's setParam. Returns true if the key was handled.
  *
  * Elements that hold DigitalInputPinModel / DigitalOutputPinModel instances
- * build a label→model map at construction time and delegate from setParam:
+ * build a labelâ†’model map at construction time and delegate from setParam:
  *
  *   setParam(key: string, value: number): void {
  *     delegatePinSetParam(this._pinModelsByLabel, key, value);

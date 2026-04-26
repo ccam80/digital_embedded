@@ -1,9 +1,9 @@
-/**
- * BJT analog components — NPN and PNP bipolar junction transistors.
+﻿/**
+ * BJT analog components â€” NPN and PNP bipolar junction transistors.
  *
  * Simple L0 and SPICE L1 (Gummel-Poon) models ported mechanically from
  * `ref/ngspice/src/spicelib/devices/bjt/bjtload.c::BJTload`. Single-pass load()
- * per device per NR iteration. No cached `Float64Array` references to `pool.states[N]` — every state
+ * per device per NR iteration. No cached `Float64Array` references to `pool.states[N]` â€” every state
  * access reads through `pool.states[0..3]` at call time (matches ngspice's
  * `CKTstate0`/`CKTstate1` pointer semantics).
  *
@@ -132,11 +132,11 @@ export const { paramDefs: BJT_SPICE_L1_PARAM_DEFS, defaults: BJT_SPICE_L1_NPN_DE
     VAR: { default: Infinity, unit: "V", description: "Reverse Early voltage" },
     NE:  { default: 1.5,    description: "B-E leakage emission coefficient" },
     NC:  { default: 2,      description: "B-C leakage emission coefficient" },
-    RB:  { default: 0,      unit: "Ω", description: "Zero-bias base resistance" },
+    RB:  { default: 0,      unit: "Î©", description: "Zero-bias base resistance" },
     IRB: { default: 0,      unit: "A", description: "Current where base resistance falls halfway to minimum" },
-    RBM: { default: 0,      unit: "Ω", description: "Minimum base resistance at high currents" },
-    RC:  { default: 0,      unit: "Ω", description: "Collector resistance" },
-    RE:  { default: 0,      unit: "Ω", description: "Emitter resistance" },
+    RBM: { default: 0,      unit: "Î©", description: "Minimum base resistance at high currents" },
+    RC:  { default: 0,      unit: "Î©", description: "Collector resistance" },
+    RE:  { default: 0,      unit: "Î©", description: "Emitter resistance" },
     CJE: { default: 0,      unit: "F", description: "B-E zero-bias junction capacitance" },
     VJE: { default: 0.75,   unit: "V", description: "B-E built-in potential" },
     MJE: { default: 0.33,   description: "B-E grading coefficient" },
@@ -149,7 +149,7 @@ export const { paramDefs: BJT_SPICE_L1_PARAM_DEFS, defaults: BJT_SPICE_L1_NPN_DE
     XTF: { default: 0,      description: "Transit time bias dependence coefficient" },
     VTF: { default: Infinity, unit: "V", description: "Transit time dependency on Vbc" },
     ITF: { default: 0,      unit: "A", description: "Transit time dependency on Ic" },
-    PTF: { default: 0,      unit: "°", description: "Excess phase at freq=1/(2π·TF)" },
+    PTF: { default: 0,      unit: "Â°", description: "Excess phase at freq=1/(2Ï€Â·TF)" },
     TR:  { default: 0,      unit: "s", description: "Reverse transit time" },
     CJS: { default: 0,      unit: "F", description: "Collector-substrate zero-bias capacitance" },
     VJS: { default: 0.75,   unit: "V", description: "Substrate junction built-in potential" },
@@ -193,11 +193,11 @@ export const { defaults: BJT_SPICE_L1_PNP_DEFAULTS } = defineModelParams({
     VAR: { default: Infinity, unit: "V", description: "Reverse Early voltage" },
     NE:  { default: 1.5,    description: "B-E leakage emission coefficient" },
     NC:  { default: 2,      description: "B-C leakage emission coefficient" },
-    RB:  { default: 0,      unit: "Ω", description: "Zero-bias base resistance" },
+    RB:  { default: 0,      unit: "Î©", description: "Zero-bias base resistance" },
     IRB: { default: 0,      unit: "A", description: "Current where base resistance falls halfway to minimum" },
-    RBM: { default: 0,      unit: "Ω", description: "Minimum base resistance at high currents" },
-    RC:  { default: 0,      unit: "Ω", description: "Collector resistance" },
-    RE:  { default: 0,      unit: "Ω", description: "Emitter resistance" },
+    RBM: { default: 0,      unit: "Î©", description: "Minimum base resistance at high currents" },
+    RC:  { default: 0,      unit: "Î©", description: "Collector resistance" },
+    RE:  { default: 0,      unit: "Î©", description: "Emitter resistance" },
     CJE: { default: 0,      unit: "F", description: "B-E zero-bias junction capacitance" },
     VJE: { default: 0.75,   unit: "V", description: "B-E built-in potential" },
     MJE: { default: 0.33,   description: "B-E grading coefficient" },
@@ -210,7 +210,7 @@ export const { defaults: BJT_SPICE_L1_PNP_DEFAULTS } = defineModelParams({
     XTF: { default: 0,      description: "Transit time bias dependence coefficient" },
     VTF: { default: Infinity, unit: "V", description: "Transit time dependency on Vbc" },
     ITF: { default: 0,      unit: "A", description: "Transit time dependency on Ic" },
-    PTF: { default: 0,      unit: "°", description: "Excess phase at freq=1/(2π·TF)" },
+    PTF: { default: 0,      unit: "Â°", description: "Excess phase at freq=1/(2Ï€Â·TF)" },
     TR:  { default: 0,      unit: "s", description: "Reverse transit time" },
     CJS: { default: 0,      unit: "F", description: "Collector-substrate zero-bias capacitance" },
     VJS: { default: 0.75,   unit: "V", description: "Substrate junction built-in potential" },
@@ -298,7 +298,7 @@ const PNP_TIP32C = deviceParams(BJT_SPICE_L1_PARAM_DEFS, {
 });
 
 // ---------------------------------------------------------------------------
-// Temperature / area scaling — maps to bjttemp.c:158-257
+// Temperature / area scaling â€” maps to bjttemp.c:158-257
 // ---------------------------------------------------------------------------
 
 interface BjtTempParams {
@@ -459,7 +459,7 @@ function computeBjtTempParams(p: {
 // bug (op.cc returned by helper + `cc = cc + (cex-cbc)/qb - ...` in caller).
 
 // ---------------------------------------------------------------------------
-// State schema — BJT simple (L0). Matches bjtdefs.h offsets for the subset
+// State schema â€” BJT simple (L0). Matches bjtdefs.h offsets for the subset
 // of slots we track. VBE=0, VBC=1 line up with BJTvbe=0, BJTvbc=1.
 // ---------------------------------------------------------------------------
 
@@ -472,13 +472,13 @@ export const BJT_SIMPLE_SCHEMA: StateSchema = defineStateSchema("BjtSimpleElemen
   { name: "GMU", doc: "bjtdefs.h BJTgmu", init: { kind: "zero" } },
   { name: "GM",  doc: "bjtdefs.h BJTgm",  init: { kind: "zero" } },
   { name: "GO",  doc: "bjtdefs.h BJTgo",  init: { kind: "zero" } },
-  { name: "GX",  doc: "bjtdefs.h BJTgx=16 (base-resistance cond); L0 always 0 — no RB", init: { kind: "zero" } },
+  { name: "GX",  doc: "bjtdefs.h BJTgx=16 (base-resistance cond); L0 always 0 â€” no RB", init: { kind: "zero" } },
 ]);
 
 // ---------------------------------------------------------------------------
-// createBjtElement — Simple L0 (resistive) factory.
+// createBjtElement â€” Simple L0 (resistive) factory.
 // Single load() mirroring bjtload.c without cap/transit-time handling.
-// No cached Float64Array state refs — pool.states[N] read at call time.
+// No cached Float64Array state refs â€” pool.states[N] read at call time.
 // ---------------------------------------------------------------------------
 
 export function createBjtElement(
@@ -543,7 +543,7 @@ export function createBjtElement(
   const SLOT_GO  = 7;
   const SLOT_GX  = 8; // bjtdefs.h BJTgx=16; L0 always writes 0 (bjtload.c:780)
 
-  // Pool binding — only the pool reference is retained. Individual state
+  // Pool binding â€” only the pool reference is retained. Individual state
   // arrays are NOT cached as member variables: every access inside load()
   // reads pool.states[N] at call time. Mirrors ngspice CKTstate0/1/2/3
   // pointer access (bjtload.c never caches state pointers on devices).
@@ -592,30 +592,30 @@ export function createBjtElement(
         // bjtload.c:245-257: seed from CKTstate1 for transient init.
         vbeRaw = s1[base + SLOT_VBE];
         vbcRaw = s1[base + SLOT_VBC];
-        // cite: bjtload.c:236-257 — MODEINITTRAN seeds state1 from the initial voltage read
+        // cite: bjtload.c:236-257 â€” MODEINITTRAN seeds state1 from the initial voltage read
         // so subsequent NIintegrate history has a valid t=0 prior value.
         s1[base + SLOT_VBE] = vbeRaw;
         s1[base + SLOT_VBC] = vbcRaw;
       } else if ((mode & MODEINITJCT) && (mode & MODETRANOP) && (mode & MODEUIC)) {
-        // cite: bjtload.c:258-264 — MODEINITJCT+MODETRANOP+MODEUIC: seed from IC* params.
+        // cite: bjtload.c:258-264 â€” MODEINITJCT+MODETRANOP+MODEUIC: seed from IC* params.
         const vbe_ic = polarity * (isNaN(params.ICVBE) ? 0 : params.ICVBE);
         const vce_ic = polarity * (isNaN(params.ICVCE) ? 0 : params.ICVCE);
         vbeRaw = vbe_ic;
         vbcRaw = vbe_ic - vce_ic;
       } else if ((mode & MODEINITJCT) && params.OFF === 0) {
-        // cite: bjtload.c:265-269 — MODEINITJCT, device ON: seed vbe=tVcrit, vbc=0.
+        // cite: bjtload.c:265-269 â€” MODEINITJCT, device ON: seed vbe=tVcrit, vbc=0.
         vbeRaw = tp.tVcrit;
         vbcRaw = 0;
       } else if ((mode & MODEINITJCT) ||
                  ((mode & MODEINITFIX) && params.OFF !== 0)) {
-        // cite: bjtload.c:270-275 — MODEINITJCT+OFF or MODEINITFIX+OFF: zero-seed.
+        // cite: bjtload.c:270-275 â€” MODEINITJCT+OFF or MODEINITFIX+OFF: zero-seed.
         vbeRaw = 0;
         vbcRaw = 0;
       } else if (mode & MODEINITPRED) {
-        // bjtload.c:278-287: #ifndef PREDICTOR state1→state0 copy + xfact extrapolation.
+        // bjtload.c:278-287: #ifndef PREDICTOR state1â†’state0 copy + xfact extrapolation.
         s0[base + SLOT_VBE] = s1[base + SLOT_VBE];
         s0[base + SLOT_VBC] = s1[base + SLOT_VBC];
-        // cite: bjtload.c:288-303 — copy remaining op-state slots from state1 to state0.
+        // cite: bjtload.c:288-303 â€” copy remaining op-state slots from state1 to state0.
         s0[base + SLOT_CC]  = s1[base + SLOT_CC];  // cite: bjtload.c:289
         s0[base + SLOT_CB]  = s1[base + SLOT_CB];  // cite: bjtload.c:290
         s0[base + SLOT_GPI] = s1[base + SLOT_GPI]; // cite: bjtload.c:291
@@ -626,15 +626,15 @@ export function createBjtElement(
         vbeRaw = (1 + ctx.xfact) * s1[base + SLOT_VBE] - ctx.xfact * s2[base + SLOT_VBE];
         vbcRaw = (1 + ctx.xfact) * s1[base + SLOT_VBC] - ctx.xfact * s2[base + SLOT_VBC];
       } else {
-        // bjtload.c:311-319: normal NR iteration — read from CKTrhsOld.
-        const vB = nodeB > 0 ? voltages[nodeB - 1] : 0;
-        const vC = nodeC > 0 ? voltages[nodeC - 1] : 0;
-        const vE = nodeE > 0 ? voltages[nodeE - 1] : 0;
+        // bjtload.c:311-319: normal NR iteration â€” read from CKTrhsOld.
+        const vB = voltages[nodeB];
+        const vC = voltages[nodeC];
+        const vE = voltages[nodeE];
         vbeRaw = polarity * (vB - vE);
         vbcRaw = polarity * (vB - vC);
       }
 
-      // cite: bjtload.c:323-337 — delvbe/delvbc + cchat/cbhat current prediction
+      // cite: bjtload.c:323-337 â€” delvbe/delvbc + cchat/cbhat current prediction
       // (used by both checkConvergence and the bypass gate below).
       const delvbe = vbeRaw - s0[base + SLOT_VBE];
       const delvbc = vbcRaw - s0[base + SLOT_VBC];
@@ -643,7 +643,7 @@ export function createBjtElement(
       const cbhat = s0[base + SLOT_CB] + s0[base + SLOT_GPI] * delvbe
                     + s0[base + SLOT_GMU] * delvbc;
 
-      // cite: bjtload.c:338-381 — NOBYPASS gate: skip recompute when tolerances met.
+      // cite: bjtload.c:338-381 â€” NOBYPASS gate: skip recompute when tolerances met.
       // Arranged as if/else wrapping the pnjlim+compute block, mirroring ngspice goto load.
       let vbeLimited: number;
       let vbcLimited: number;
@@ -653,12 +653,12 @@ export function createBjtElement(
           (Math.abs(delvbc) < ctx.reltol * Math.max(Math.abs(vbcRaw), Math.abs(s0[base + SLOT_VBC])) + ctx.voltTol) &&
           (Math.abs(cchat - s0[base + SLOT_CC]) < ctx.reltol * Math.max(Math.abs(cchat), Math.abs(s0[base + SLOT_CC])) + ctx.iabstol) &&
           (Math.abs(cbhat - s0[base + SLOT_CB]) < ctx.reltol * Math.max(Math.abs(cbhat), Math.abs(s0[base + SLOT_CB])) + ctx.iabstol)) {
-        // cite: bjtload.c:365-380 — bypass: restore op-state from state0, skip pnjlim+compute.
+        // cite: bjtload.c:365-380 â€” bypass: restore op-state from state0, skip pnjlim+compute.
         vbeLimited = s0[base + SLOT_VBE];
         vbcLimited = s0[base + SLOT_VBC];
         icheckLimited = false;
       } else {
-        // bjtload.c:383-416: pnjlim on BE/BC. pnjlim runs under MODEINITPRED — ngspice has no
+        // bjtload.c:383-416: pnjlim on BE/BC. pnjlim runs under MODEINITPRED â€” ngspice has no
         // MODEINITPRED skip (bjtload.c:386 unconditional; !(MODEINITPRED) guard at :347 is for
         // bypass only).
         vbeLimited = vbeRaw;
@@ -674,12 +674,12 @@ export function createBjtElement(
           vbcLimFlag = vbcResult.limited;
         }
         icheckLimited = vbeLimFlag || vbcLimFlag;
-        // L0 has no substrate junction — substrate is L1-only per the model-registry
-        // split (architectural-alignment.md §E1 APPROVED ACCEPT). See also the
+        // L0 has no substrate junction â€” substrate is L1-only per the model-registry
+        // split (architectural-alignment.md Â§E1 APPROVED ACCEPT). See also the
         // "no caps, no transit time, no excess phase, no substrate" L0 scope note at
         // the top of this load() body.
 
-        // cite: bjtload.c:749-754 — icheck++ unless MODEINITFIX && OFF
+        // cite: bjtload.c:749-754 â€” icheck++ unless MODEINITFIX && OFF
         if (icheckLimited && (params.OFF === 0 || !(mode & MODEINITFIX))) ctx.noncon.value++;
 
         if (ctx.limitingCollector) {
@@ -781,7 +781,7 @@ export function createBjtElement(
         gbcn += GMIN;
         cbcn += GMIN * vbcLimited;
 
-        // bjtload.c:495-517: base charge qb (NKF=0.5 → sqrt branch).
+        // bjtload.c:495-517: base charge qb (NKF=0.5 â†’ sqrt branch).
         const q1 = 1 / (1 - tinvEarlyVoltF * vbcLimited - tinvEarlyVoltR * vbeLimited);
         let qb: number, dqbdve: number, dqbdvc: number;
         if (oik === 0 && oikr === 0) {
@@ -821,7 +821,7 @@ export function createBjtElement(
         s0[base + SLOT_GMU] = gmu;
         s0[base + SLOT_GM]  = gm;
         s0[base + SLOT_GO]  = go;
-        s0[base + SLOT_GX]  = 0; // bjtload.c:780 — L0 has no RB so gx=0
+        s0[base + SLOT_GX]  = 0; // bjtload.c:780 â€” L0 has no RB so gx=0
       }
 
       // bjtload.c:795-805: ceqbe/ceqbc RHS terms.
@@ -844,7 +844,7 @@ export function createBjtElement(
                               + vbeLimited * (gm + go)
                               - vbcLimited * (gmu + go));
 
-      if (mode & MODEINITSMSIG) return;  // cite: bjtload.c:676,703 — MODEINITSMSIG stores op state, skips stamps
+      if (mode & MODEINITSMSIG) return;  // cite: bjtload.c:676,703 â€” MODEINITSMSIG stores op state, skips stamps
 
       const solver = ctx.solver;
 
@@ -880,9 +880,9 @@ export function createBjtElement(
       if (params.OFF && (ctx.cktMode & (MODEINITFIX | MODEINITSMSIG))) return true;
 
       const voltages = ctx.rhsOld;
-      const vB = nodeB > 0 ? voltages[nodeB - 1] : 0;
-      const vC = nodeC > 0 ? voltages[nodeC - 1] : 0;
-      const vE = nodeE > 0 ? voltages[nodeE - 1] : 0;
+      const vB = voltages[nodeB];
+      const vC = voltages[nodeC];
+      const vE = voltages[nodeE];
       const vbeRaw = polarity * (vB - vE);
       const vbcRaw = polarity * (vB - vC);
 
@@ -925,7 +925,7 @@ export function createBjtElement(
 }
 
 // ---------------------------------------------------------------------------
-// State schema — BJT SPICE L1. Only the slots that have direct ngspice
+// State schema â€” BJT SPICE L1. Only the slots that have direct ngspice
 // correspondences survive the W1.2 excision. bjtdefs.h offsets:
 //   BJTvbe=0, BJTvbc=1, BJTcc=2, BJTcb=3, BJTgpi=4, BJTgmu=5, BJTgm=6,
 //   BJTgo=7, BJTqbe=8, BJTcqbe=9, BJTqbc=10, BJTcqbc=11, BJTqsub=12,
@@ -972,10 +972,10 @@ export const BJT_L1_SCHEMA: StateSchema = defineStateSchema("BjtSpiceL1Element",
 ]);
 
 // ---------------------------------------------------------------------------
-// createSpiceL1BjtElement — SPICE L1 factory ported from bjtload.c.
+// createSpiceL1BjtElement â€” SPICE L1 factory ported from bjtload.c.
 // Single load() pass with inline cap-companion lumping (bjtload.c:725-734).
 // D3: cap/charge integration gated on ctx.dt > 0 (dc-op has dt=0).
-// No cached Float64Array state refs — pool.states[N] at call time.
+// No cached Float64Array state refs â€” pool.states[N] at call time.
 // ---------------------------------------------------------------------------
 
 export function createSpiceL1BjtElement(
@@ -1137,9 +1137,9 @@ export function createSpiceL1BjtElement(
       const solver = ctx.solver;
       const mode = ctx.cktMode;
       const m = params.M;
-      // cite: bjtload.c:184-187 — BJTsubs: VERTICAL uses AREAB for c4; LATERAL uses AREAC.
+      // cite: bjtload.c:184-187 â€” BJTsubs: VERTICAL uses AREAB for c4; LATERAL uses AREAC.
       // `isLateral` is closure-captured from the outer factory (BJT topology
-      // is a model variant, not a parameter — see modelRegistry "spice" vs
+      // is a model variant, not a parameter â€” see modelRegistry "spice" vs
       // "spice-lateral" entries).
 
       const vt = tp.vt;
@@ -1164,11 +1164,11 @@ export function createSpiceL1BjtElement(
       let vbxRaw: number;
       let vsubRaw: number;
 
-      const vBe_ext = nodeB_ext > 0 ? voltages[nodeB_ext - 1] : 0;
-      const vBi     = nodeB_int > 0 ? voltages[nodeB_int - 1] : 0;
-      const vCi     = nodeC_int > 0 ? voltages[nodeC_int - 1] : 0;
-      const vEi     = nodeE_int > 0 ? voltages[nodeE_int - 1] : 0;
-      const vSubCon = substConNode > 0 ? voltages[substConNode - 1] : 0;
+      const vBe_ext = voltages[nodeB_ext];
+      const vBi     = voltages[nodeB_int];
+      const vCi     = voltages[nodeC_int];
+      const vEi     = voltages[nodeE_int];
+      const vSubCon = voltages[substConNode];
 
       if (mode & MODEINITSMSIG) {
         // bjtload.c:236-244.
@@ -1177,7 +1177,7 @@ export function createSpiceL1BjtElement(
         vbxRaw = polarity * (vBe_ext - vCi);
         vsubRaw = polarity * subs * (0 - vSubCon);
       } else if (mode & MODEINITTRAN) {
-        // bjtload.c:245-257 — with MODEUIC inside MODETRAN override.
+        // bjtload.c:245-257 â€” with MODEUIC inside MODETRAN override.
         vbeRaw = s1[base + SLOT_VBE];
         vbcRaw = s1[base + SLOT_VBC];
         vbxRaw = polarity * (vBe_ext - vCi);
@@ -1210,8 +1210,8 @@ export function createSpiceL1BjtElement(
         vbxRaw = 0;
         vsubRaw = 0;
       } else if (mode & MODEINITPRED) {
-        // bjtload.c:278-287: #ifndef PREDICTOR state1→state0 copy + xfact extrapolation.
-        // bjtload.c:383-416: pnjlim runs under MODEINITPRED — ngspice has no MODEINITPRED
+        // bjtload.c:278-287: #ifndef PREDICTOR state1â†’state0 copy + xfact extrapolation.
+        // bjtload.c:383-416: pnjlim runs under MODEINITPRED â€” ngspice has no MODEINITPRED
         // skip (bjtload.c:386 unconditional; !(MODEINITPRED) guard at :347 is for bypass only).
         s0[base + SLOT_VBE]  = s1[base + SLOT_VBE];   // cite: bjtload.c:288
         s0[base + SLOT_VBC]  = s1[base + SLOT_VBC];   // cite: bjtload.c:289
@@ -1229,14 +1229,14 @@ export function createSpiceL1BjtElement(
         vbxRaw  = polarity * (vBe_ext - vCi);           // bjtload.c:325-327
         vsubRaw = polarity * subs * (0 - vSubCon);      // bjtload.c:328-330
       } else {
-        // bjtload.c:311-319: normal NR iteration — read from CKTrhsOld.
+        // bjtload.c:311-319: normal NR iteration â€” read from CKTrhsOld.
         vbeRaw  = polarity * (vBi - vEi);
         vbcRaw  = polarity * (vBi - vCi);
         vbxRaw  = polarity * (vBe_ext - vCi);           // bjtload.c:325-327
         vsubRaw = polarity * subs * (0 - vSubCon);      // bjtload.c:328-330
       }
 
-      // cite: bjtload.c:323-337 — delvbe/delvbc + cchat/cbhat current prediction
+      // cite: bjtload.c:323-337 â€” delvbe/delvbc + cchat/cbhat current prediction
       // (used by both checkConvergence and the bypass gate below).
       const delvbe = vbeRaw - s0[base + SLOT_VBE];
       const delvbc = vbcRaw - s0[base + SLOT_VBC];
@@ -1245,7 +1245,7 @@ export function createSpiceL1BjtElement(
       const cbhat = s0[base + SLOT_CB] + s0[base + SLOT_GPI] * delvbe
                     + s0[base + SLOT_GMU] * delvbc;
 
-      // cite: bjtload.c:338-381 — NOBYPASS gate: skip recompute when tolerances met.
+      // cite: bjtload.c:338-381 â€” NOBYPASS gate: skip recompute when tolerances met.
       // Arranged as if/else wrapping the pnjlim+compute+cap block, mirroring ngspice goto load.
       let vbeLimited: number;
       let vbcLimited: number;
@@ -1268,7 +1268,7 @@ export function createSpiceL1BjtElement(
           (Math.abs(delvbc) < ctx.reltol * Math.max(Math.abs(vbcRaw), Math.abs(s0[base + SLOT_VBC])) + ctx.voltTol) &&
           (Math.abs(cchat - s0[base + SLOT_CC]) < ctx.reltol * Math.max(Math.abs(cchat), Math.abs(s0[base + SLOT_CC])) + ctx.iabstol) &&
           (Math.abs(cbhat - s0[base + SLOT_CB]) < ctx.reltol * Math.max(Math.abs(cbhat), Math.abs(s0[base + SLOT_CB])) + ctx.iabstol)) {
-        // cite: bjtload.c:365-379 — bypass: restore 15 op-state values from state0.
+        // cite: bjtload.c:365-379 â€” bypass: restore 15 op-state values from state0.
         vbeLimited = s0[base + SLOT_VBE];
         vbcLimited = s0[base + SLOT_VBC];
         cc   = s0[base + SLOT_CC];
@@ -1306,7 +1306,7 @@ export function createSpiceL1BjtElement(
         }
         icheckLimited = vbeLimFlag || vbcLimFlag || vsubLimFlag;
 
-        // cite: bjtload.c:749-754 — icheck++ unless MODEINITFIX && OFF
+        // cite: bjtload.c:749-754 â€” icheck++ unless MODEINITFIX && OFF
         if (icheckLimited && (params.OFF === 0 || !(mode & MODEINITFIX))) ctx.noncon.value++;
 
         if (ctx.limitingCollector) {
@@ -1426,8 +1426,8 @@ export function createSpiceL1BjtElement(
           cdsub = GMIN * vsubLimited;
         }
 
-        // bjtload.c:495-517: base charge qb. Default NKF (0.5) → sqrt branch;
-        // explicit NKF (model->BJTnkfGiven) → pow branch.
+        // bjtload.c:495-517: base charge qb. Default NKF (0.5) â†’ sqrt branch;
+        // explicit NKF (model->BJTnkfGiven) â†’ pow branch.
         const q1 = 1 / (1 - tp.tinvEarlyVoltF * vbcLimited - tp.tinvEarlyVoltR * vbeLimited);
         let qb: number, dqbdve: number, dqbdvc: number;
         if (oik === 0 && oikr === 0) {
@@ -1461,20 +1461,20 @@ export function createSpiceL1BjtElement(
         let cex = cbe;
         let gex = gbe;
         let cexbc_now = 0;
-        // bjtload.c:525: gate is (MODETRAN|MODEAC) && td!=0 only — no ctx.delta guard.
+        // bjtload.c:525: gate is (MODETRAN|MODEAC) && td!=0 only â€” no ctx.delta guard.
         if ((mode & (MODETRAN | MODEAC)) !== 0 && td !== 0) {
           const arg1a = ctx.dt / td;
           const arg2 = 3 * arg1a;
           const arg1 = arg2 * arg1a;
           const denom = 1 + arg1 + arg2;
           const arg3 = arg1 / denom;
-          const deltaOld1 = ctx.deltaOld[1];  // cite: dctran.c:317 — pre-seeded to CKTmaxStep, never zero
-          // cite: bjtload.c:531-535 — INITTRAN seeds state1+state2 cexbc to cbe/qb.
+          const deltaOld1 = ctx.deltaOld[1];  // cite: dctran.c:317 â€” pre-seeded to CKTmaxStep, never zero
+          // cite: bjtload.c:531-535 â€” INITTRAN seeds state1+state2 cexbc to cbe/qb.
           if (mode & MODEINITTRAN) {
             s1[base + SLOT_CEXBC] = cbe / qb;
             s2[base + SLOT_CEXBC] = s1[base + SLOT_CEXBC];
           }
-          // cite: bjtload.c:536-539 — IIR denom uses deltaOld[1] directly (dctran.c:317 seeds).
+          // cite: bjtload.c:536-539 â€” IIR denom uses deltaOld[1] directly (dctran.c:317 seeds).
           cc = (s1[base + SLOT_CEXBC] * (1 + ctx.dt / deltaOld1 + arg2)
                 - s2[base + SLOT_CEXBC] * ctx.dt / deltaOld1) / denom;
           cex = cbe * arg3;
@@ -1500,7 +1500,7 @@ export function createSpiceL1BjtElement(
         gm = (gex - (cex - cbc) * dqbdve / qb) / qb - go;
 
         // bjtload.c:561-724: capacitance + charge block.
-        // D3: gate on ctx.dt > 0 — DC-OP (dt==0) does NOT update cap charges,
+        // D3: gate on ctx.dt > 0 â€” DC-OP (dt==0) does NOT update cap charges,
         // but MODEINITSMSIG and MODETRANOP&&MODEUIC still store capacitances.
         // bjtload.c:561-563 gate: (MODETRAN|MODEAC) || (MODETRANOP&&MODEUIC) || MODEINITSMSIG.
         let capbe = 0;
@@ -1513,7 +1513,7 @@ export function createSpiceL1BjtElement(
         // ceqbx and ceqsub are computed at RHS-stamp time (bjtload.c:799-802)
         // using the stored CQSUB/CQBX state. No init needed here.
 
-        // cite: bjtload.c:561-563 — cap block gate.
+        // cite: bjtload.c:561-563 â€” cap block gate.
         const capBlockGate = (mode & (MODETRAN | MODEAC)) !== 0
                           || ((mode & MODETRANOP) !== 0 && (mode & MODEUIC) !== 0)
                           || (mode & MODEINITSMSIG) !== 0;
@@ -1538,7 +1538,7 @@ export function createSpiceL1BjtElement(
           const ovtf = params.VTF === Infinity ? 0 : 1 / (1.44 * params.VTF);
           const xjtf = params.ITF * params.AREA;
 
-          // cite: bjtload.c:591-610 — cbeMod/gbeMod compute unconditionally when tf>0 && vbe>0; XTF=0 collapses argtf=arg2=0.
+          // cite: bjtload.c:591-610 â€” cbeMod/gbeMod compute unconditionally when tf>0 && vbe>0; XTF=0 collapses argtf=arg2=0.
           let cbeMod = cbe;
           let gbeMod = gbe;
           if (tf !== 0 && vbeLimited > 0) {
@@ -1569,7 +1569,7 @@ export function createSpiceL1BjtElement(
             const arg = 1 - vbeLimited / pe;
             const sarg = Math.exp(-xme * Math.log(arg));
             qbe = tf * cbeMod + pe * czbe * (1 - arg * sarg) / (1 - xme);
-            capbe = tf * gbeMod + czbe * sarg; // cite: bjtload.c:617 — gbeMod from op.gbe (not gm)
+            capbe = tf * gbeMod + czbe * sarg; // cite: bjtload.c:617 â€” gbeMod from op.gbe (not gm)
           } else {
             const f1 = tp.tf1;
             const f2 = tp.f2;
@@ -1629,7 +1629,7 @@ export function createSpiceL1BjtElement(
           s0[base + SLOT_QBX] = qbx;
           s0[base + SLOT_QSUB] = qcs;
 
-          // cite: bjtload.c:674-703 — MODEINITSMSIG stores caps+op, skips NIintegrate and stamps via 'continue'
+          // cite: bjtload.c:674-703 â€” MODEINITSMSIG stores caps+op, skips NIintegrate and stamps via 'continue'
           if ((mode & MODEINITSMSIG) !== 0 &&
               !((mode & MODETRANOP) !== 0 && (mode & MODEUIC) !== 0)) {
             s0[base + SLOT_CQBE] = capbe;
@@ -1637,7 +1637,7 @@ export function createSpiceL1BjtElement(
             s0[base + SLOT_CQSUB] = capsub;
             s0[base + SLOT_CQBX] = capbx;
             s0[base + SLOT_CEXBC] = geqcb;
-            // bjtload.c:703 `continue` — skip NIintegrate + stamps for smsig.
+            // bjtload.c:703 `continue` â€” skip NIintegrate + stamps for smsig.
             // Write back accepted linearization then return.
             s0[base + SLOT_VBE] = vbeLimited;
             s0[base + SLOT_VBC] = vbcLimited;
@@ -1657,7 +1657,7 @@ export function createSpiceL1BjtElement(
             return;
           }
 
-          // cite: bjtload.c:715-724 — MODEINITTRAN copies q-values into state1 for next-step integrate.
+          // cite: bjtload.c:715-724 â€” MODEINITTRAN copies q-values into state1 for next-step integrate.
           if (mode & MODEINITTRAN) {
             s1[base + SLOT_QBE] = qbe;
             s1[base + SLOT_QBC] = qbc;
@@ -1685,7 +1685,7 @@ export function createSpiceL1BjtElement(
               // bjtload.c:728: gpi += geq.
               gpi = gpi + geq;
               // bjtload.c:729: cb += CKTstate0[BJTcqbe] (lumped cap companion current).
-              // The value accumulated into cb is ccap — the ngspice companion
+              // The value accumulated into cb is ccap â€” the ngspice companion
               // current stored in BJTcqbe via state0 at niinteg.c:77.
               cb = cb + ccap;
             }
@@ -1707,7 +1707,7 @@ export function createSpiceL1BjtElement(
               cc = cc - ccap;
             }
 
-            // cite: bjtload.c:735-740 — MODEINITTRAN copies cqbe/cqbc into state1 for next-step integrate.
+            // cite: bjtload.c:735-740 â€” MODEINITTRAN copies cqbe/cqbc into state1 for next-step integrate.
             if (mode & MODEINITTRAN) {
               s1[base + SLOT_CQBE] = s0[base + SLOT_CQBE];
               s1[base + SLOT_CQBC] = s0[base + SLOT_CQBC];
@@ -1740,7 +1740,7 @@ export function createSpiceL1BjtElement(
               s0[base + SLOT_CQBX] = ccap;
               geqbx = geq;
             }
-            // cite: bjtload.c:764-769 — MODEINITTRAN copies cqbx/cqsub into state1 for next-step integrate.
+            // cite: bjtload.c:764-769 â€” MODEINITTRAN copies cqbx/cqsub into state1 for next-step integrate.
             if (mode & MODEINITTRAN) {
               s1[base + SLOT_CQBX] = s0[base + SLOT_CQBX];
               s1[base + SLOT_CQSUB] = s0[base + SLOT_CQSUB];
@@ -1768,7 +1768,7 @@ export function createSpiceL1BjtElement(
         s0[base + SLOT_CEXBC] = cexbc_now;
       } // end bypass else
 
-      // cite: bjtload.c:798-800 — geqsub aggregates gcsub+gdsub; used as single conductance at all substrate stamps.
+      // cite: bjtload.c:798-800 â€” geqsub aggregates gcsub+gdsub; used as single conductance at all substrate stamps.
       const geqsub = gcsub + gdsub;
       const ceqsub = polarity * subs * (s0[base + SLOT_CQSUB] + cdsub - vsubLimited * geqsub);
       const ceqbx = polarity * (s0[base + SLOT_CQBX] - vbxRaw * geqbx);
@@ -1802,7 +1802,7 @@ export function createSpiceL1BjtElement(
       stampG(solver, nodeB_ext, nodeB_ext, m * (gx + geqbx));
       // bjtload.c:822: BJTcolPrimeColPrimePtr += gmu + go + gcpr + geqbx.
       stampG(solver, nodeC_int, nodeC_int, m * (gmu + go + gcpr + geqbx));
-      // cite: bjtload.c:823 — BJTsubstConSubstConPtr += geqsub (aggregated).
+      // cite: bjtload.c:823 â€” BJTsubstConSubstConPtr += geqsub (aggregated).
       stampG(solver, substConNode, substConNode, m * geqsub);
       // bjtload.c:824: BJTbasePrimeBasePrimePtr += gx + gpi + gmu + geqcb.
       stampG(solver, nodeB_int, nodeB_int, m * (gx + gpi + gmu + geqcb));
@@ -1829,7 +1829,7 @@ export function createSpiceL1BjtElement(
       // bjtload.c:839-840: BJTsubstConSubstPtr / BJTsubstSubstConPtr += -geqsub.
       stampG(solver, substConNode, 0, m * -geqsub);
       stampG(solver, 0, substConNode, m * -geqsub);
-      // cite: bjtload.c:841-842 — BJTbaseColPrimePtr/BJTcolPrimeBasePtr target colPrime (nodeC_int), NOT colExt.
+      // cite: bjtload.c:841-842 â€” BJTbaseColPrimePtr/BJTcolPrimeBasePtr target colPrime (nodeC_int), NOT colExt.
       stampG(solver, nodeB_ext, nodeC_int, m * -geqbx);
       stampG(solver, nodeC_int, nodeB_ext, m * -geqbx);
     },
@@ -1839,9 +1839,9 @@ export function createSpiceL1BjtElement(
       if (params.OFF && (ctx.cktMode & (MODEINITFIX | MODEINITSMSIG))) return true;
 
       const voltages = ctx.rhsOld;
-      const vBi = nodeB_int > 0 ? voltages[nodeB_int - 1] : 0;
-      const vCi = nodeC_int > 0 ? voltages[nodeC_int - 1] : 0;
-      const vEi = nodeE_int > 0 ? voltages[nodeE_int - 1] : 0;
+      const vBi = voltages[nodeB_int];
+      const vCi = voltages[nodeC_int];
+      const vEi = voltages[nodeE_int];
       const vbeRaw = polarity * (vBi - vEi);
       const vbcRaw = polarity * (vBi - vCi);
 
@@ -1916,9 +1916,9 @@ export function createSpiceL1BjtElement(
 }
 
 // ---------------------------------------------------------------------------
-// createBjtL1Element — outer factory capturing polarity and isLateral as
+// createBjtL1Element â€” outer factory capturing polarity and isLateral as
 // closure constants. BJT vertical/lateral topology is a model variant (see
-// modelRegistry "spice" vs "spice-lateral"), not a runtime parameter — so
+// modelRegistry "spice" vs "spice-lateral"), not a runtime parameter â€” so
 // `isLateral` is set once at element construction rather than read per-load.
 // ---------------------------------------------------------------------------
 
@@ -1948,7 +1948,7 @@ function getSpiceL1InternalNodeLabels(props: PropertyBag): readonly string[] {
 }
 
 // ---------------------------------------------------------------------------
-// NpnBjtElement + PnpBjtElement — visual classes (unchanged)
+// NpnBjtElement + PnpBjtElement â€” visual classes (unchanged)
 // ---------------------------------------------------------------------------
 
 export class NpnBjtElement extends AbstractCircuitElement {
@@ -2175,7 +2175,7 @@ export const NpnBjtDefinition: ComponentDefinition = {
   attributeMap: BJT_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.SEMICONDUCTORS,
   helpText:
-    "NPN BJT — Gummel-Poon Level 2 bipolar junction transistor.\n" +
+    "NPN BJT â€” Gummel-Poon Level 2 bipolar junction transistor.\n" +
     "Pins: C (collector), B (base), E (emitter).\n" +
     "Model parameters: IS, BF, NF, BR, NR, VAF, VAR, IKF, IKR.",
   models: {},
@@ -2248,7 +2248,7 @@ export const PnpBjtDefinition: ComponentDefinition = {
   attributeMap: BJT_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.SEMICONDUCTORS,
   helpText:
-    "PNP BJT — Gummel-Poon Level 2 bipolar junction transistor (PNP polarity).\n" +
+    "PNP BJT â€” Gummel-Poon Level 2 bipolar junction transistor (PNP polarity).\n" +
     "Pins: C (collector), B (base), E (emitter).\n" +
     "Model parameters: IS, BF, NF, BR, NR, VAF, VAR, IKF, IKR.",
   models: {},

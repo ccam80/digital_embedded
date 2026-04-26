@@ -1,8 +1,8 @@
-/**
+﻿/**
  * Tests for the DAC (Digital-to-Analog Converter) component.
  *
  * The DAC converts an N-bit digital input code to an analog output voltage:
- *   V_out = V_ref · code / 2^N  (unipolar)
+ *   V_out = V_ref Â· code / 2^N  (unipolar)
  *
  * All tests use the DC operating point solver with:
  *   - A voltage source on each digital input to set its logic level
@@ -20,7 +20,7 @@
  *
  * Branch rows start at node count (10) and go up.
  * Each bit VS has one branch row, VREF has one branch row.
- * For N=8 bits: 9 voltage sources → 9 branch rows (10..18) → matrixSize = 19.
+ * For N=8 bits: 9 voltage sources â†’ 9 branch rows (10..18) â†’ matrixSize = 19.
  */
 
 import { describe, it, expect } from "vitest";
@@ -66,14 +66,14 @@ function solveDac(
   const driveHigh = vHigh ?? vRef;
 
   // Node layout:
-  //   nodes 1..BITS  → digital input nodes D0..D(BITS-1)
-  //   node BITS+1    → VREF node
-  //   node BITS+2    → OUT node
-  //   node 0         → GND (implicit MNA ground)
+  //   nodes 1..BITS  â†’ digital input nodes D0..D(BITS-1)
+  //   node BITS+1    â†’ VREF node
+  //   node BITS+2    â†’ OUT node
+  //   node 0         â†’ GND (implicit MNA ground)
   //
   // Voltage sources:
-  //   branchRows BITS+2 .. 2*BITS+1  → one per digital input (BITS sources)
-  //   branchRow  2*BITS+2            → VREF source
+  //   branchRows BITS+2 .. 2*BITS+1  â†’ one per digital input (BITS sources)
+  //   branchRow  2*BITS+2            â†’ VREF source
   //
   // matrixSize = numNodes + numBranches = (BITS+2) + (BITS+1)
 
@@ -128,7 +128,7 @@ function solveDac(
 
   return {
     converged: result.converged,
-    vOut: result.nodeVoltages[nOutNode - 1],
+    vOut: result.nodeVoltages[nOutNode],
   };
 }
 
@@ -148,7 +148,7 @@ function codeToBits(code: number): boolean[] {
 describe("DAC", () => {
   it("full_scale", () => {
     // All inputs HIGH: code = 255
-    // V_out = V_ref · (2^N - 1) / 2^N = 5 · 255/256 ≈ 4.980 V
+    // V_out = V_ref Â· (2^N - 1) / 2^N = 5 Â· 255/256 â‰ˆ 4.980 V
     const allHigh = Array(BITS).fill(true);
     const { converged, vOut } = solveDac(allHigh);
 
@@ -157,7 +157,7 @@ describe("DAC", () => {
   });
 
   it("zero_code", () => {
-    // All inputs LOW: code = 0 → V_out = 0V
+    // All inputs LOW: code = 0 â†’ V_out = 0V
     const allLow = Array(BITS).fill(false);
     const { converged, vOut } = solveDac(allLow);
 
@@ -166,7 +166,7 @@ describe("DAC", () => {
 
   it("midscale", () => {
     // MSB (D7) = 1, rest = 0: code = 128 (0b10000000)
-    // V_out = V_ref · 128/256 = V_ref / 2 = 2.5 V
+    // V_out = V_ref Â· 128/256 = V_ref / 2 = 2.5 V
     const bits = Array(BITS).fill(false);
     bits[BITS - 1] = true;  // D7 = MSB = 1
     const { converged, vOut } = solveDac(bits);
@@ -189,12 +189,12 @@ describe("DAC", () => {
 
     // Assert monotonically increasing
     for (let i = 1; i < voltages.length; i++) {
-      expect(voltages[i]).toBeGreaterThan(voltages[i - 1]!);
+      expect(voltages[i]).toBeGreaterThan(voltages[i]!);
     }
   });
 
   it("lsb_step_size", () => {
-    // LSB step size = V_ref / 2^N = 5.0 / 256 ≈ 0.019531 V
+    // LSB step size = V_ref / 2^N = 5.0 / 256 â‰ˆ 0.019531 V
     // Test: code=1 vs code=0, code=2 vs code=1, code=128 vs code=127
     const expectedLsb = V_REF / MAX_CODE;
 
@@ -207,9 +207,9 @@ describe("DAC", () => {
     // Each step should equal expectedLsb within 1% tolerance
   });
 
-  it("3.3V CMOS driving 5V VREF — default thresholds detect HIGH correctly", () => {
+  it("3.3V CMOS driving 5V VREF â€” default thresholds detect HIGH correctly", () => {
     // Default vIH=2.0V. CMOS 3.3V gates output vOH=3.3V.
-    // 3.3V > 2.0V → all bits read as HIGH → full-scale output.
+    // 3.3V > 2.0V â†’ all bits read as HIGH â†’ full-scale output.
     const allHigh = Array(BITS).fill(true);
     const { converged, vOut } = solveDac(allHigh, 5.0, 3.3);
 
@@ -217,17 +217,17 @@ describe("DAC", () => {
     const expected = 5.0 * (MAX_CODE - 1) / MAX_CODE;
   });
 
-  it("3.3V CMOS driving 5V VREF — LOW correctly detected", () => {
-    // 0V < vIL=0.8V → all bits read as LOW → output 0V.
+  it("3.3V CMOS driving 5V VREF â€” LOW correctly detected", () => {
+    // 0V < vIL=0.8V â†’ all bits read as LOW â†’ output 0V.
     const allLow = Array(BITS).fill(false);
     const { converged, vOut } = solveDac(allLow, 5.0, 0.0);
 
     expect(converged).toBe(true);
   });
 
-  it("voltage between thresholds reads as LOW (indeterminate → 0)", () => {
-    // Drive all bits at 1.5V — between vIL=0.8V and vIH=2.0V.
-    // Indeterminate is treated as LOW by the DAC → code=0 → output 0V.
+  it("voltage between thresholds reads as LOW (indeterminate â†’ 0)", () => {
+    // Drive all bits at 1.5V â€” between vIL=0.8V and vIH=2.0V.
+    // Indeterminate is treated as LOW by the DAC â†’ code=0 â†’ output 0V.
     const allHigh = Array(BITS).fill(true);
     const { converged, vOut } = solveDac(allHigh, 5.0, 1.5);
 
@@ -235,15 +235,15 @@ describe("DAC", () => {
   });
 
   it("custom vIH/vIL thresholds are respected", () => {
-    // Set vIH=4.0V. Drive at 3.3V → below threshold → reads as indeterminate → LOW.
+    // Set vIH=4.0V. Drive at 3.3V â†’ below threshold â†’ reads as indeterminate â†’ LOW.
     const allHigh = Array(BITS).fill(true);
     const { converged, vOut } = solveDac(allHigh, 5.0, 3.3, { vIH: 4.0, vIL: 2.0 });
 
     expect(converged).toBe(true);
   });
 
-  it("custom vIH/vIL — drive above custom threshold reads HIGH", () => {
-    // Set vIH=1.0V, vIL=0.5V. Drive at 1.5V → above 1.0V → HIGH.
+  it("custom vIH/vIL â€” drive above custom threshold reads HIGH", () => {
+    // Set vIH=1.0V, vIL=0.5V. Drive at 1.5V â†’ above 1.0V â†’ HIGH.
     const allHigh = Array(BITS).fill(true);
     const { converged, vOut } = solveDac(allHigh, 5.0, 1.5, { vIH: 1.0, vIL: 0.5 });
 
@@ -263,17 +263,17 @@ describe("DAC", () => {
 });
 
 // ---------------------------------------------------------------------------
-// C4.5 parity test — dac_load_dcop_parity
+// C4.5 parity test â€” dac_load_dcop_parity
 // ---------------------------------------------------------------------------
 //
 // Drives the unipolar DAC via load(ctx) at a canonical operating point
-// (VREF=5V, all bits LOW except D0 HIGH → code=1) and asserts the stamped
+// (VREF=5V, all bits LOW except D0 HIGH â†’ code=1) and asserts the stamped
 // conductance + RHS entries are bit-exact against the closed-form converter.
 //
 // Reference formulas (from dac.ts createDACElement + digital-pin-model.ts):
-//   Output: stamp G_out = 1/rOut on nOut diagonal, RHS(nOut) = V_out·G_out.
-//   V_out  = V_REF * code / 2^N (unipolar); code = 1, 2^8 = 256 → V_out = 5/256.
-//   Input loading: inputModels[i].load(ctx) → stamps 1/rIn on nDi diagonal (loaded=true).
+//   Output: stamp G_out = 1/rOut on nOut diagonal, RHS(nOut) = V_outÂ·G_out.
+//   V_out  = V_REF * code / 2^N (unipolar); code = 1, 2^8 = 256 â†’ V_out = 5/256.
+//   Input loading: inputModels[i].load(ctx) â†’ stamps 1/rIn on nDi diagonal (loaded=true).
 //   inputSpec.rIn = p.rIn (from model params; default 1e7).
 
 import type { LoadContext } from "../../../solver/analog/load-context.js";
@@ -346,8 +346,8 @@ describe("DAC parity (C4.5)", () => {
     const voltages = new Float64Array(matrixSize);
     voltages[0] = 3.3;                     // D0 HIGH
     for (let i = 1; i < bits; i++) voltages[i] = 0;  // D1..D7 LOW
-    voltages[nVref - 1] = 5.0;
-    voltages[nOut - 1]  = 0;
+    voltages[nVref] = 5.0;
+    voltages[nOut]  = 0;
 
     const { solver, stamps, rhs } = makeDacCaptureSolver();
     const ctx = makeDacParityCtx(voltages, solver);

@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Three-winding (center-tapped) transformer component.
  *
  * Models a transformer with one primary winding and two secondary halves
@@ -6,27 +6,27 @@
  * the two secondary half-windings, providing a midpoint voltage reference.
  *
  * Pin layout (5 physical terminals):
- *   P1  — primary positive
- *   P2  — primary negative
- *   S1  — secondary half-1 positive (top end)
- *   CT  — center tap (shared: sec-half-1 negative = sec-half-2 positive)
- *   S2  — secondary half-2 negative (bottom end)
+ *   P1  â€” primary positive
+ *   P2  â€” primary negative
+ *   S1  â€” secondary half-1 positive (top end)
+ *   CT  â€” center tap (shared: sec-half-1 negative = sec-half-2 positive)
+ *   S2  â€” secondary half-2 negative (bottom end)
  *
  * Three branch variables:
- *   branch1 (branchIndex)     — primary winding current
- *   branch2 (branchIndex + 1) — secondary half-1 current (S1 → CT)
- *   branch3 (branchIndex + 2) — secondary half-2 current (CT → S2)
+ *   branch1 (branchIndex)     â€” primary winding current
+ *   branch2 (branchIndex + 1) â€” secondary half-1 current (S1 â†’ CT)
+ *   branch3 (branchIndex + 2) â€” secondary half-2 current (CT â†’ S2)
  *
  * Inductance relationships for turns ratio N (total secondary / primary):
- *   L2 = L3 = L1 × (N/2)²
- *   M12 = k × √(L1 × L2)
- *   M13 = k × √(L1 × L3)  (= M12 for symmetric halves)
- *   M23 = k × √(L2 × L3)  (= k × L2 for symmetric halves)
+ *   L2 = L3 = L1 Ã— (N/2)Â²
+ *   M12 = k Ã— âˆš(L1 Ã— L2)
+ *   M13 = k Ã— âˆš(L1 Ã— L3)  (= M12 for symmetric halves)
+ *   M23 = k Ã— âˆš(L2 Ã— L3)  (= k Ã— L2 for symmetric halves)
  *
- * The 3×3 MNA branch equations (trapezoidal):
- *   V1 = g11·I1 + g12·I2 + g13·I3 + hist1
- *   V2 = g12·I1 + g22·I2 + g23·I3 + hist2
- *   V3 = g13·I1 + g23·I2 + g33·I3 + hist3
+ * The 3Ã—3 MNA branch equations (trapezoidal):
+ *   V1 = g11Â·I1 + g12Â·I2 + g13Â·I3 + hist1
+ *   V2 = g12Â·I1 + g22Â·I2 + g23Â·I3 + hist2
+ *   V3 = g13Â·I1 + g23Â·I2 + g33Â·I3 + hist3
  */
 
 import { AbstractCircuitElement } from "../../core/element.js";
@@ -61,24 +61,24 @@ export const { paramDefs: TAPPED_TRANSFORMER_PARAM_DEFS, defaults: TAPPED_TRANSF
     couplingCoefficient: { default: 0.99,  description: "Magnetic coupling coefficient (0 = no coupling, 1 = ideal)", min: 0, max: 1 },
   },
   secondary: {
-    primaryResistance:   { default: 0.0,   unit: "Ω", description: "Primary winding series resistance in ohms", min: 0 },
-    secondaryResistance: { default: 0.0,   unit: "Ω", description: "Each secondary half winding series resistance in ohms", min: 0 },
+    primaryResistance:   { default: 0.0,   unit: "Î©", description: "Primary winding series resistance in ohms", min: 0 },
+    secondaryResistance: { default: 0.0,   unit: "Î©", description: "Each secondary half winding series resistance in ohms", min: 0 },
   },
 });
 
 // ---------------------------------------------------------------------------
-// State-pool schema — 18 slots: 9 companion matrix coefficients + 3 current
+// State-pool schema â€” 18 slots: 9 companion matrix coefficients + 3 current
 // history + 3 flux linkage + 3 voltage history (indload.c:114-116 SLOT_VOLT)
 // ---------------------------------------------------------------------------
 
-// Slot layout — 18 slots total. Previous values are read from s1/s2/s3
+// Slot layout â€” 18 slots total. Previous values are read from s1/s2/s3
 // at the same offsets (pointer-rotation history).
 const TAPPED_TRANSFORMER_SCHEMA: StateSchema = defineStateSchema("AnalogTappedTransformerElement", [
   { name: "G11",   doc: "Primary self-conductance companion coefficient",          init: { kind: "zero" } },
   { name: "G22",   doc: "Secondary half-1 self-conductance companion coefficient", init: { kind: "zero" } },
   { name: "G33",   doc: "Secondary half-2 self-conductance companion coefficient", init: { kind: "zero" } },
-  { name: "G12",   doc: "Primary–secondary half-1 mutual conductance",             init: { kind: "zero" } },
-  { name: "G13",   doc: "Primary–secondary half-2 mutual conductance",             init: { kind: "zero" } },
+  { name: "G12",   doc: "Primaryâ€“secondary half-1 mutual conductance",             init: { kind: "zero" } },
+  { name: "G13",   doc: "Primaryâ€“secondary half-2 mutual conductance",             init: { kind: "zero" } },
   { name: "G23",   doc: "Secondary half-1 to half-2 mutual conductance",           init: { kind: "zero" } },
   { name: "HIST1", doc: "Primary winding history voltage term",                    init: { kind: "zero" } },
   { name: "HIST2", doc: "Secondary half-1 history voltage term",                   init: { kind: "zero" } },
@@ -169,7 +169,7 @@ function buildTappedTransformerPinDeclarations(): PinDeclaration[] {
 }
 
 // ---------------------------------------------------------------------------
-// TappedTransformerElement — visual/editor representation
+// TappedTransformerElement â€” visual/editor representation
 // ---------------------------------------------------------------------------
 
 export class TappedTransformerElement extends AbstractCircuitElement {
@@ -201,14 +201,14 @@ export class TappedTransformerElement extends AbstractCircuitElement {
     ctx.setColor("COMPONENT");
     ctx.setLineWidth(1);
 
-    // Lead lines: pin → coil edge
+    // Lead lines: pin â†’ coil edge
     ctx.drawLine(0, 0, 1.25, 0);      // P1 lead
     ctx.drawLine(0, 4, 1.25, 4);      // P2 lead
     ctx.drawLine(4, 0, 2.75, 0);      // S1 lead
     ctx.drawLine(4, 2, 2.75, 2);      // CT lead
     ctx.drawLine(4, 4, 2.75, 4);      // S2 lead
 
-    // Primary coil: 6 right-facing arcs at x=1.25 (3π/2 to 5π/2) with vertical connectors
+    // Primary coil: 6 right-facing arcs at x=1.25 (3Ï€/2 to 5Ï€/2) with vertical connectors
     const arcR = 5.333 / 16;
     for (let i = 0; i < 6; i++) {
       const cy = (i * 2 + 1) * arcR;
@@ -216,7 +216,7 @@ export class TappedTransformerElement extends AbstractCircuitElement {
       ctx.drawLine(1.25, i * 2 * arcR, 1.25, (i + 1) * 2 * arcR);
     }
 
-    // Secondary coil: 6 right-facing arcs at x=2.75 (3π/2 to 5π/2) with vertical connectors
+    // Secondary coil: 6 right-facing arcs at x=2.75 (3Ï€/2 to 5Ï€/2) with vertical connectors
     for (let i = 0; i < 6; i++) {
       const cy = (i * 2 + 1) * arcR;
       ctx.drawArc(2.75, cy, arcR, 3 * Math.PI / 2, 5 * Math.PI / 2);
@@ -232,7 +232,7 @@ export class TappedTransformerElement extends AbstractCircuitElement {
 }
 
 // ---------------------------------------------------------------------------
-// AnalogTappedTransformerElement — MNA implementation
+// AnalogTappedTransformerElement â€” MNA implementation
 // ---------------------------------------------------------------------------
 
 /**
@@ -246,7 +246,7 @@ export class TappedTransformerElement extends AbstractCircuitElement {
  *   [2] = S1 (sec-half-1+) [3] = CT (center tap)
  *   [4] = S2 (sec-half-2-)
  *
- * The 3×3 companion matrix coefficients are computed in stampCompanion() and
+ * The 3Ã—3 companion matrix coefficients are computed in stampCompanion() and
  * applied in stamp(), following the same "pre-compute then stamp" pattern as
  * AnalogTransformerElement.
  */
@@ -300,7 +300,7 @@ export class AnalogTappedTransformerElement implements ReactiveAnalogElement {
     this._rPri = rPri;
     this._rSec = rSec;
 
-    // L2 = L3 = L1 × (N/2)² — each secondary half has half the total turns
+    // L2 = L3 = L1 Ã— (N/2)Â² â€” each secondary half has half the total turns
     this._l1 = lPrimary;
     const halfRatio = turnsRatio / 2;
     this._l2 = lPrimary * halfRatio * halfRatio;
@@ -329,12 +329,12 @@ export class AnalogTappedTransformerElement implements ReactiveAnalogElement {
   }
 
   /**
-   * Unified load() — three-winding tapped transformer.
+   * Unified load() â€” three-winding tapped transformer.
    *
    * Mirrors ngspice indload.c INDload structure (two-pass per user ruling TT-W3-5):
-   *   Pass 1 — self-loop (three inductors, indload.c:43-109):
+   *   Pass 1 â€” self-loop (three inductors, indload.c:43-109):
    *     flux write, MODEINITPRED copy, NIintegrate per winding
-   *   Pass 2 — mutual-loop (three MUT pairs, indload.c:65-75):
+   *   Pass 2 â€” mutual-loop (three MUT pairs, indload.c:65-75):
    *     mutual flux accumulation and mutual companion stamp
    *
    * indload.c:114-116 SLOT_VOLT copy on MODEINITTRAN done after pass 1+2.
@@ -349,45 +349,45 @@ export class AnalogTappedTransformerElement implements ReactiveAnalogElement {
     // Winding resistances.
     if (this._rPri > 0) {
       const gPri = 1 / this._rPri;
-      if (p1 !== 0) solver.stampElement(solver.allocElement(p1 - 1, p1 - 1), gPri);
-      if (p2 !== 0) solver.stampElement(solver.allocElement(p2 - 1, p2 - 1), gPri);
+      if (p1 !== 0) solver.stampElement(solver.allocElement(p1, p1), gPri);
+      if (p2 !== 0) solver.stampElement(solver.allocElement(p2, p2), gPri);
       if (p1 !== 0 && p2 !== 0) {
-        solver.stampElement(solver.allocElement(p1 - 1, p2 - 1), -gPri);
-        solver.stampElement(solver.allocElement(p2 - 1, p1 - 1), -gPri);
+        solver.stampElement(solver.allocElement(p1, p2), -gPri);
+        solver.stampElement(solver.allocElement(p2, p1), -gPri);
       }
     }
     if (this._rSec > 0) {
       const gSec = 1 / this._rSec;
-      // Sec half-1 (S1 ↔ CT)
-      if (sec1 !== 0) solver.stampElement(solver.allocElement(sec1 - 1, sec1 - 1), gSec);
-      if (ct !== 0) solver.stampElement(solver.allocElement(ct - 1, ct - 1), gSec);
+      // Sec half-1 (S1 â†” CT)
+      if (sec1 !== 0) solver.stampElement(solver.allocElement(sec1, sec1), gSec);
+      if (ct !== 0) solver.stampElement(solver.allocElement(ct, ct), gSec);
       if (sec1 !== 0 && ct !== 0) {
-        solver.stampElement(solver.allocElement(sec1 - 1, ct - 1), -gSec);
-        solver.stampElement(solver.allocElement(ct - 1, sec1 - 1), -gSec);
+        solver.stampElement(solver.allocElement(sec1, ct), -gSec);
+        solver.stampElement(solver.allocElement(ct, sec1), -gSec);
       }
-      // Sec half-2 (CT ↔ S2)
-      if (ct !== 0) solver.stampElement(solver.allocElement(ct - 1, ct - 1), gSec);
-      if (sec2 !== 0) solver.stampElement(solver.allocElement(sec2 - 1, sec2 - 1), gSec);
+      // Sec half-2 (CT â†” S2)
+      if (ct !== 0) solver.stampElement(solver.allocElement(ct, ct), gSec);
+      if (sec2 !== 0) solver.stampElement(solver.allocElement(sec2, sec2), gSec);
       if (ct !== 0 && sec2 !== 0) {
-        solver.stampElement(solver.allocElement(ct - 1, sec2 - 1), -gSec);
-        solver.stampElement(solver.allocElement(sec2 - 1, ct - 1), -gSec);
+        solver.stampElement(solver.allocElement(ct, sec2), -gSec);
+        solver.stampElement(solver.allocElement(sec2, ct), -gSec);
       }
     }
 
     // Branch incidence (B and C sub-matrices, topology-constant).
-    if (p1 !== 0) solver.stampElement(solver.allocElement(p1 - 1, b1), 1);
-    if (p2 !== 0) solver.stampElement(solver.allocElement(p2 - 1, b1), -1);
-    if (sec1 !== 0) solver.stampElement(solver.allocElement(sec1 - 1, b2), 1);
-    if (ct !== 0) solver.stampElement(solver.allocElement(ct - 1, b2), -1);
-    if (ct !== 0) solver.stampElement(solver.allocElement(ct - 1, b3), 1);
-    if (sec2 !== 0) solver.stampElement(solver.allocElement(sec2 - 1, b3), -1);
+    if (p1 !== 0) solver.stampElement(solver.allocElement(p1, b1), 1);
+    if (p2 !== 0) solver.stampElement(solver.allocElement(p2, b1), -1);
+    if (sec1 !== 0) solver.stampElement(solver.allocElement(sec1, b2), 1);
+    if (ct !== 0) solver.stampElement(solver.allocElement(ct, b2), -1);
+    if (ct !== 0) solver.stampElement(solver.allocElement(ct, b3), 1);
+    if (sec2 !== 0) solver.stampElement(solver.allocElement(sec2, b3), -1);
 
-    if (p1 !== 0) solver.stampElement(solver.allocElement(b1, p1 - 1), 1);
-    if (p2 !== 0) solver.stampElement(solver.allocElement(b1, p2 - 1), -1);
-    if (sec1 !== 0) solver.stampElement(solver.allocElement(b2, sec1 - 1), 1);
-    if (ct !== 0) solver.stampElement(solver.allocElement(b2, ct - 1), -1);
-    if (ct !== 0) solver.stampElement(solver.allocElement(b3, ct - 1), 1);
-    if (sec2 !== 0) solver.stampElement(solver.allocElement(b3, sec2 - 1), -1);
+    if (p1 !== 0) solver.stampElement(solver.allocElement(b1, p1), 1);
+    if (p2 !== 0) solver.stampElement(solver.allocElement(b1, p2), -1);
+    if (sec1 !== 0) solver.stampElement(solver.allocElement(b2, sec1), 1);
+    if (ct !== 0) solver.stampElement(solver.allocElement(b2, ct), -1);
+    if (ct !== 0) solver.stampElement(solver.allocElement(b3, ct), 1);
+    if (sec2 !== 0) solver.stampElement(solver.allocElement(b3, sec2), -1);
 
     const voltages = ctx.rhsOld;
     const i1Now = voltages[b1];
@@ -400,7 +400,7 @@ export class AnalogTappedTransformerElement implements ReactiveAnalogElement {
     const mode = ctx.cktMode;
 
     // -----------------------------------------------------------------------
-    // Pass 1 — self-loop: three inductors, one per winding.
+    // Pass 1 â€” self-loop: three inductors, one per winding.
     // Mirrors indload.c:43-109 applied three times (b1/L1, b2/L2, b3/L3).
     //
     // TT-W3-5 (user ruling): two-pass structure matching ngspice indload.c.
@@ -409,30 +409,30 @@ export class AnalogTappedTransformerElement implements ReactiveAnalogElement {
     //          matching indload.c:100-102 + 114-116 ordering.
     // -----------------------------------------------------------------------
 
-    // indload.c:43-51 — flux-from-current write, gated !(MODEDC|MODEINITPRED).
+    // indload.c:43-51 â€” flux-from-current write, gated !(MODEDC|MODEINITPRED).
     // TT-W3-5 pass-1 self-flux: each winding sees only its own current here;
     // mutual contributions are added in pass 2 below.
     if (!(mode & (MODEDC | MODEINITPRED))) {
-      // cite: indload.c:48-49 — state0[INDflux] = INDinduct * rhsOld[INDbrEq]
+      // cite: indload.c:48-49 â€” state0[INDflux] = INDinduct * rhsOld[INDbrEq]
       // (self-flux only; mutual accumulated in pass 2 per indload.c:65-67)
       s0[base + SLOT_PHI1] = this._l1 * i1Now;
       s0[base + SLOT_PHI2] = this._l2 * i2Now;
       s0[base + SLOT_PHI3] = this._l3 * i3Now;
     } else if (mode & MODEINITPRED) {
-      // cite: indload.c:95-97 — MODEINITPRED: state0[INDflux] = state1[INDflux]
+      // cite: indload.c:95-97 â€” MODEINITPRED: state0[INDflux] = state1[INDflux]
       s0[base + SLOT_PHI1] = s1[base + SLOT_PHI1];
       s0[base + SLOT_PHI2] = s1[base + SLOT_PHI2];
       s0[base + SLOT_PHI3] = s1[base + SLOT_PHI3];
     }
 
     // -----------------------------------------------------------------------
-    // Pass 2 — mutual-loop: three MUT instances (12, 13, 23).
-    // Mirrors indload.c:65-75 — accumulate mutual flux into state0[INDflux]
+    // Pass 2 â€” mutual-loop: three MUT instances (12, 13, 23).
+    // Mirrors indload.c:65-75 â€” accumulate mutual flux into state0[INDflux]
     // for each pair, then stamp off-diagonal companion conductance.
     // TT-W3-5: mutual flux += MUTfactor * rhsOld[partner_brEq]
     // -----------------------------------------------------------------------
 
-    // cite: indload.c:65-67 — state0[ind1.INDflux] += MUTfactor * rhsOld[ind2.INDbrEq]
+    // cite: indload.c:65-67 â€” state0[ind1.INDflux] += MUTfactor * rhsOld[ind2.INDbrEq]
     //                          state0[ind2.INDflux] += MUTfactor * rhsOld[ind1.INDbrEq]
     if (!(mode & (MODEDC | MODEINITPRED))) {
       // Pair (1,2): M12
@@ -447,9 +447,9 @@ export class AnalogTappedTransformerElement implements ReactiveAnalogElement {
     }
 
     // -----------------------------------------------------------------------
-    // Integration — self companion (req/veq) per winding.
+    // Integration â€” self companion (req/veq) per winding.
     // TT-W3-3: gate is !(MODEDC) per indload.c:88, not MODETRAN.
-    // TT-W3-2: MODEINITTRAN s1←s0 copy happens here AFTER flux is written,
+    // TT-W3-2: MODEINITTRAN s1â†s0 copy happens here AFTER flux is written,
     //          per indload.c:100-102 (copy before NIintegrate restores s1 first).
     // -----------------------------------------------------------------------
 
@@ -457,10 +457,10 @@ export class AnalogTappedTransformerElement implements ReactiveAnalogElement {
     let hist1 = 0, hist2 = 0, hist3 = 0;
 
     if (!(mode & MODEDC)) {
-      // cite: indload.c:94-102 — MODEINITPRED copies s1→s0 (already done above);
-      //        else: MODEINITTRAN copies s0→s1 before NIintegrate
+      // cite: indload.c:94-102 â€” MODEINITPRED copies s1â†’s0 (already done above);
+      //        else: MODEINITTRAN copies s0â†’s1 before NIintegrate
       if (mode & MODEINITTRAN) {
-        // cite: indload.c:100-102 — state1[INDflux] = state0[INDflux] (copy after flux write)
+        // cite: indload.c:100-102 â€” state1[INDflux] = state0[INDflux] (copy after flux write)
         s1[base + SLOT_PHI1] = s0[base + SLOT_PHI1];
         s1[base + SLOT_PHI2] = s0[base + SLOT_PHI2];
         s1[base + SLOT_PHI3] = s0[base + SLOT_PHI3];
@@ -470,7 +470,7 @@ export class AnalogTappedTransformerElement implements ReactiveAnalogElement {
       const method = ctx.method;
       const order = ctx.order;
 
-      // cite: indload.c:108 — NIintegrate(ckt, &req, &veq, INDinduct/m, INDflux)
+      // cite: indload.c:108 â€” NIintegrate(ckt, &req, &veq, INDinduct/m, INDflux)
       // Winding 1 (primary, L1)
       {
         const q0 = s0[base + SLOT_PHI1];
@@ -499,7 +499,7 @@ export class AnalogTappedTransformerElement implements ReactiveAnalogElement {
         hist3 = r3.ceq;
       }
 
-      // cite: indload.c:74-75 — mutual off-diagonal companion conductance:
+      // cite: indload.c:74-75 â€” mutual off-diagonal companion conductance:
       //   *(MUTbr1br2) -= MUTfactor * CKTag[0]
       //   *(MUTbr2br1) -= MUTfactor * CKTag[0]
       g12 = ag[0] * this._m12;
@@ -507,8 +507,8 @@ export class AnalogTappedTransformerElement implements ReactiveAnalogElement {
       g23 = ag[0] * this._m23;
     }
 
-    // cite: indload.c:119-123 — self diagonal: *(INDibrIbrptr) -= req
-    // cite: indload.c:74-75   — mutual off-diagonal: *(MUTbr1br2) -= MUTfactor*ag[0]
+    // cite: indload.c:119-123 â€” self diagonal: *(INDibrIbrptr) -= req
+    // cite: indload.c:74-75   â€” mutual off-diagonal: *(MUTbr1br2) -= MUTfactor*ag[0]
     solver.stampElement(solver.allocElement(b1, b1), -g11);
     solver.stampElement(solver.allocElement(b1, b2), -g12);
     solver.stampElement(solver.allocElement(b1, b3), -g13);
@@ -518,22 +518,22 @@ export class AnalogTappedTransformerElement implements ReactiveAnalogElement {
     solver.stampElement(solver.allocElement(b3, b1), -g13);
     solver.stampElement(solver.allocElement(b3, b2), -g23);
     solver.stampElement(solver.allocElement(b3, b3), -g33);
-    // cite: indload.c:112 — *(CKTrhs + INDbrEq) += veq
+    // cite: indload.c:112 â€” *(CKTrhs + INDbrEq) += veq
     solver.stampRHS(b1, hist1);
     solver.stampRHS(b2, hist2);
     solver.stampRHS(b3, hist3);
 
-    // TT-W3-4: SLOT_VOLT — winding terminal voltage, copied s0→s1 on MODEINITTRAN.
-    // cite: indload.c:114-116 — state1[INDvolt] = state0[INDvolt] on MODEINITTRAN.
+    // TT-W3-4: SLOT_VOLT â€” winding terminal voltage, copied s0â†’s1 on MODEINITTRAN.
+    // cite: indload.c:114-116 â€” state1[INDvolt] = state0[INDvolt] on MODEINITTRAN.
     // Terminal voltages: V_winding = V_pos - V_neg for each winding.
-    const vWind1 = (p1 !== 0 ? voltages[p1 - 1] : 0) - (p2 !== 0 ? voltages[p2 - 1] : 0);
-    const vWind2 = (sec1 !== 0 ? voltages[sec1 - 1] : 0) - (ct !== 0 ? voltages[ct - 1] : 0);
-    const vWind3 = (ct !== 0 ? voltages[ct - 1] : 0) - (sec2 !== 0 ? voltages[sec2 - 1] : 0);
+    const vWind1 = (voltages[p1]) - (voltages[p2]);
+    const vWind2 = (voltages[sec1]) - (voltages[ct]);
+    const vWind3 = (voltages[ct]) - (voltages[sec2]);
     s0[base + SLOT_VOLT1] = vWind1;
     s0[base + SLOT_VOLT2] = vWind2;
     s0[base + SLOT_VOLT3] = vWind3;
     if (mode & MODEINITTRAN) {
-      // cite: indload.c:115-116 — state1[INDvolt] = state0[INDvolt]
+      // cite: indload.c:115-116 â€” state1[INDvolt] = state0[INDvolt]
       s1[base + SLOT_VOLT1] = vWind1;
       s1[base + SLOT_VOLT2] = vWind2;
       s1[base + SLOT_VOLT3] = vWind3;
@@ -579,12 +579,12 @@ export class AnalogTappedTransformerElement implements ReactiveAnalogElement {
   }
 
   getPinCurrents(voltages: Float64Array): number[] {
-    const i1 = voltages[this.branchIndex]; // primary: P1→P2
-    const i2 = voltages[this._b2];         // sec half-1: S1→CT
-    const i3 = voltages[this._b3];         // sec half-2: CT→S2
+    const i1 = voltages[this.branchIndex]; // primary: P1â†’P2
+    const i2 = voltages[this._b2];         // sec half-1: S1â†’CT
+    const i3 = voltages[this._b3];         // sec half-2: CTâ†’S2
     // pinLayout order: P1, P2, S1, CT, S2
-    // CT: i2 exits (−i2) and i3 enters (+i3) → net = i3 − i2
-    // Sum: i1 + (−i1) + i2 + (i3−i2) + (−i3) = 0 ✓
+    // CT: i2 exits (âˆ’i2) and i3 enters (+i3) â†’ net = i3 âˆ’ i2
+    // Sum: i1 + (âˆ’i1) + i2 + (i3âˆ’i2) + (âˆ’i3) = 0 âœ“
     return [i1, -i1, i2, i3 - i2, -i3];
   }
 
@@ -682,8 +682,8 @@ const TAPPED_TRANSFORMER_PROPERTY_DEFS: PropertyDefinition[] = [
   {
     key: "primaryResistance",
     type: PropertyType.FLOAT,
-    label: "Primary Resistance (Ω)",
-    unit: "Ω",
+    label: "Primary Resistance (Î©)",
+    unit: "Î©",
     defaultValue: 0.0,
     min: 0,
     description: "Primary winding series resistance in ohms",
@@ -691,8 +691,8 @@ const TAPPED_TRANSFORMER_PROPERTY_DEFS: PropertyDefinition[] = [
   {
     key: "secondaryResistance",
     type: PropertyType.FLOAT,
-    label: "Secondary Resistance per Half (Ω)",
-    unit: "Ω",
+    label: "Secondary Resistance per Half (Î©)",
+    unit: "Î©",
     defaultValue: 0.0,
     min: 0,
     description: "Each secondary half winding series resistance in ohms",
@@ -754,7 +754,7 @@ export const TappedTransformerDefinition: ComponentDefinition = {
   attributeMap: TAPPED_TRANSFORMER_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.PASSIVES,
   helpText:
-    "Center-tapped three-winding transformer using 3×3 coupled inductor companion model.\n" +
+    "Center-tapped three-winding transformer using 3Ã—3 coupled inductor companion model.\n" +
     "Specify total turns ratio N, primary inductance, coupling coefficient k, and winding resistances.",
   models: {},
   modelRegistry: {

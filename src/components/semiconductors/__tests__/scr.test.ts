@@ -1,12 +1,12 @@
-/**
+﻿/**
  * Tests for the SCR (Silicon Controlled Rectifier) component.
  *
  * Covers:
- *   - blocks_without_gate: V_AK = 50V, no gate — only leakage
+ *   - blocks_without_gate: V_AK = 50V, no gate â€” only leakage
  *   - triggers_with_gate_current: gate current > I_GT latches device
  *   - holds_after_gate_removed: SCR stays conducting after gate removed
  *   - turns_off_below_holding_current: unlatch when I_AK < I_hold
- *   - blocks_reverse: V_AK = -50V — only reverse leakage
+ *   - blocks_reverse: V_AK = -50V â€” only reverse leakage
  *   - breakover_voltage: V_AK > V_breakover triggers without gate
  *   - no_writeback: load does not modify voltages[]
  *   - pool_state: pool.state0 slots contain correct values after load
@@ -92,11 +92,11 @@ function makeResistorElement(nodeA: number, nodeB: number, resistance: number): 
     getPinCurrents(_v: Float64Array): number[] { return []; },
     load(ctx): void {
       const solver = ctx.solver;
-      if (nodeA !== 0) solver.stampElement(solver.allocElement(nodeA - 1, nodeA - 1), G);
-      if (nodeB !== 0) solver.stampElement(solver.allocElement(nodeB - 1, nodeB - 1), G);
+      if (nodeA !== 0) solver.stampElement(solver.allocElement(nodeA, nodeA), G);
+      if (nodeB !== 0) solver.stampElement(solver.allocElement(nodeB, nodeB), G);
       if (nodeA !== 0 && nodeB !== 0) {
-        solver.stampElement(solver.allocElement(nodeA - 1, nodeB - 1), -G);
-        solver.stampElement(solver.allocElement(nodeB - 1, nodeA - 1), -G);
+        solver.stampElement(solver.allocElement(nodeA, nodeB), -G);
+        solver.stampElement(solver.allocElement(nodeB, nodeA), -G);
       }
     },
   };
@@ -223,14 +223,14 @@ describe("SCR_PARAM_DEFS partition layout", () => {
 
 describe("SCR", () => {
   it("blocks_without_gate", () => {
-    // V_AK = 50V, I_G = 0 — SCR should block (only leakage current in µA range)
-    // Use a DC circuit: 50V source + 10kΩ load + SCR (A=node1, K=gnd)
+    // V_AK = 50V, I_G = 0 â€” SCR should block (only leakage current in ÂµA range)
+    // Use a DC circuit: 50V source + 10kÎ© load + SCR (A=node1, K=gnd)
     // With no gate drive, SCR in blocking state: I_AK << 1mA
 
     // Circuit nodes: node1=anode, node2=positive source terminal
     // Branch row for voltage source = row index 2 (0-based = matrix row 2)
-    // matrixSize = 3 nodes + 1 branch = 4... but node2 is shared via 10kΩ
-    // Layout: VS(node2→gnd) + R(node2→node1) + SCR(A=node1, K=gnd, G=gnd)
+    // matrixSize = 3 nodes + 1 branch = 4... but node2 is shared via 10kÎ©
+    // Layout: VS(node2â†’gnd) + R(node2â†’node1) + SCR(A=node1, K=gnd, G=gnd)
     //   node1=anode, node2=source+, gnd=0; SCR gate tied to gnd
     //   branchRow index = 2 (third row, after 2 node rows)
 
@@ -240,7 +240,7 @@ describe("SCR", () => {
     const { element: scrEl } = withState(scrCore);
     const scr = withNodeIds(scrEl, [1, 0, 0]);
     const vs = withNodeIds(makeDcVoltageSource(2, 0, 2, 50), [2, 0]);
-    const rLoad = makeResistorElement(2, 1, 10000); // 10kΩ
+    const rLoad = makeResistorElement(2, 1, 10000); // 10kÎ©
 
     const result = runDcOp({
       elements: [vs, rLoad, scr],
@@ -258,7 +258,7 @@ describe("SCR", () => {
   });
 
   it("triggers_with_gate_current", () => {
-    // V_AK = 50V, inject gate current well above I_GT (200µA).
+    // V_AK = 50V, inject gate current well above I_GT (200ÂµA).
     // Expected: SCR latches and presents low on-state conductance.
     const scrProps1 = new PropertyBag(); scrProps1.replaceModelParams({ ...SCR_PARAM_DEFAULTS, ...SCR_DEFAULTS });
     const scrCore1 = createScrElement(new Map([["A", 1], ["K", 2], ["G", 3]]), [], -1, scrProps1);
@@ -267,9 +267,9 @@ describe("SCR", () => {
 
     // Drive to operating point: 50V anode, 0V cathode, 0.65V gate
     const voltages = new Float64Array(3);
-    voltages[0] = 50;   // anode (node1 → index 0)
-    voltages[1] = 0;    // cathode (node2 → index 1)
-    voltages[2] = 0.65; // gate (node3 → index 2) — forward-biased
+    voltages[0] = 50;   // anode (node1 â†’ index 0)
+    voltages[1] = 0;    // cathode (node2 â†’ index 1)
+    voltages[2] = 0.65; // gate (node3 â†’ index 2) â€” forward-biased
 
     for (let i = 0; i < 200; i++) {
       const iterSolver = new SparseSolver();
@@ -277,7 +277,7 @@ describe("SCR", () => {
       scr.load(buildUnitCtx(iterSolver, voltages));
     }
 
-    // Verify SCR is in on-state by checking high conductance (≈ 1/R_on = 100 S)
+    // Verify SCR is in on-state by checking high conductance (â‰ˆ 1/R_on = 100 S)
     const { stamps: mockCalls } = stampAndCapture(scr, voltages);
 
     // On-state: A-K diagonal conductance at (0,0) (anode row) is pure geq.
@@ -292,7 +292,7 @@ describe("SCR", () => {
   });
 
   it("holds_after_gate_removed", () => {
-    // Trigger SCR first (α₁ + α₂ > 0.95 with gate current)
+    // Trigger SCR first (Î±â‚ + Î±â‚‚ > 0.95 with gate current)
     // Then drive to steady state at vak=50V, vgate=0 (gate removed)
     // SCR should remain latched because current is above I_hold
     const scr = makeScrElement();
@@ -313,7 +313,7 @@ describe("SCR", () => {
     }
 
     // Check latch state via re-stamping into a real solver: in on-state,
-    // conductance = 1/R_on (high); in blocking state, conductance ≈ GMIN.
+    // conductance = 1/R_on (high); in blocking state, conductance â‰ˆ GMIN.
     // (0,0) is the pure anode-cathode diagonal (isolated from gate junction).
     const { stamps: mockCalls } = stampAndCapture(scr, voltages);
 
@@ -337,7 +337,7 @@ describe("SCR", () => {
     const gBefore = Math.max(...diagBefore.map((c) => Math.abs(c[2])));
     expect(gBefore).toBeGreaterThan(1.0); // on-state
 
-    // Now reduce V_AK to 0.1V — current = (0.1 - 1.5) / 0.01 = -140A (negative → below I_hold)
+    // Now reduce V_AK to 0.1V â€” current = (0.1 - 1.5) / 0.01 = -140A (negative â†’ below I_hold)
     const voltages = new Float64Array(3);
     voltages[0] = 0.1; // very low anode voltage
     voltages[1] = 0;
@@ -353,23 +353,23 @@ describe("SCR", () => {
     const { stamps: mockCalls2 } = stampAndCapture(scr, voltages);
     const diagAfter = mockCalls2.filter((c) => c[0] === c[1] && c[0] < 2);
     const gAfter = Math.max(...diagAfter.map((c) => Math.abs(c[2])));
-    expect(gAfter).toBeLessThan(0.1); // very small — blocking state restored
+    expect(gAfter).toBeLessThan(0.1); // very small â€” blocking state restored
   });
 
   it("blocks_reverse", () => {
-    // V_AK = -50V — reverse blocking, I_AK ≈ -I_S (small reverse leakage)
+    // V_AK = -50V â€” reverse blocking, I_AK â‰ˆ -I_S (small reverse leakage)
     const scr = makeScrElement();
     driveToOp(scr, -50, 0, 0, 100);
 
     const voltages = new Float64Array([-50, 0, 0]);
     const { stamps: mockCalls, rhs: mockRhs } = stampAndCapture(scr, voltages);
 
-    // In reverse blocking, geq ≈ GMIN (≈ 1e-12)
+    // In reverse blocking, geq â‰ˆ GMIN (â‰ˆ 1e-12)
     const aaDiag = mockCalls.find((c) => c[0] === 0 && c[1] === 0);
     expect(aaDiag).toBeDefined();
     expect(Math.abs(aaDiag![2])).toBeLessThan(1e-3);
 
-    // Norton current at reverse bias: I ≈ -I_S (tiny)
+    // Norton current at reverse bias: I â‰ˆ -I_S (tiny)
     const rhsA = mockRhs.find((r) => r[0] === 0);
     expect(rhsA).toBeDefined();
     expect(Math.abs(rhsA![1])).toBeLessThan(1e-3);
@@ -433,7 +433,7 @@ describe("SCR", () => {
     expect(Number.isFinite(vakInPool)).toBe(true);
     expect(vakInPool).toBeGreaterThan(0); // positive for forward-biased state
 
-    // SLOT_GEQ = 2: in on-state should be ≈ 1/rOn
+    // SLOT_GEQ = 2: in on-state should be â‰ˆ 1/rOn
     const geqInPool = pool.state0[SLOT_GEQ];
     expect(geqInPool).toBeGreaterThan(1.0); // 1/0.01 = 100 S
 
@@ -452,7 +452,7 @@ describe("SCR", () => {
     const { element: stated, pool } = withState(core);
     const element = withNodeIds(stated, [1, 2, 3]);
 
-    // Drive with forward voltage but no gate → blocking
+    // Drive with forward voltage but no gate â†’ blocking
     const voltages = new Float64Array([10, 0, 0]);
     for (let i = 0; i < 50; i++) {
       const iterSolver = new SparseSolver();
@@ -475,7 +475,7 @@ describe("SCR", () => {
 });
 
 // ---------------------------------------------------------------------------
-// LimitingEvent instrumentation tests — SCR
+// LimitingEvent instrumentation tests â€” SCR
 // ---------------------------------------------------------------------------
 
 describe("SCR LimitingEvent instrumentation", () => {
@@ -539,10 +539,10 @@ describe("SCR LimitingEvent instrumentation", () => {
 });
 
 // ---------------------------------------------------------------------------
-// SCR TEMP tests — per-instance operating temperature
+// SCR TEMP tests â€” per-instance operating temperature
 // ---------------------------------------------------------------------------
 
-// Physical constants (ngspice const.h values — identical to scr.ts)
+// Physical constants (ngspice const.h values â€” identical to scr.ts)
 const CONSTboltz_TEST = 1.3806226e-23;
 const CHARGE_TEST = 1.6021918e-19;
 const KoverQ = CONSTboltz_TEST / CHARGE_TEST;
@@ -600,7 +600,7 @@ describe("SCR TEMP", () => {
     (core as unknown as ReactiveAnalogElement).initState(pool);
     const element = withNodeIds(core, [1, 2, 3]);
 
-    // Change TEMP to 400K — should recompute tp
+    // Change TEMP to 400K â€” should recompute tp
     element.setParam("TEMP", 400);
 
     const voltages = new Float64Array(3);
@@ -632,7 +632,7 @@ describe("SCR TEMP", () => {
   });
 
   it("no_ctx_vt_read", () => {
-    // Verify that scr.ts contains zero occurrences of "ctx.vt" — every
+    // Verify that scr.ts contains zero occurrences of "ctx.vt" â€” every
     // thermal-voltage site must read from tp.vt (per-instance TEMP).
     const scrPath = fileURLToPath(new URL("../scr.ts", import.meta.url));
     const source = readFileSync(scrPath, "utf8");
@@ -642,7 +642,7 @@ describe("SCR TEMP", () => {
 });
 
 // ---------------------------------------------------------------------------
-// SCR primeJunctions tests — Task 7.5.4.2
+// SCR primeJunctions tests â€” Task 7.5.4.2
 // ---------------------------------------------------------------------------
 
 describe("SCR primeJunctions", () => {

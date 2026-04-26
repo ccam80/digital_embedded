@@ -528,18 +528,24 @@ export class CKTCircuitContext {
     this.solver = solver;
     solver._initStructure(matrixSize);
 
+    // Caller-side buffers are length matrixSize + 1: slot 0 is the ngspice
+    // ground sentinel (always 0), slots 1..matrixSize hold the active node
+    // voltages and branch currents. solve() and stampRHS share the same
+    // 1-based external keying via IntToExtRowMap.
+    const sizePlusOne = matrixSize + 1;
+
     // Node voltage buffers
-    this.rhsOld = new Float64Array(matrixSize);
-    this.rhs = new Float64Array(matrixSize);
-    this.rhsSpare = new Float64Array(matrixSize);
+    this.rhsOld = new Float64Array(sizePlusOne);
+    this.rhs = new Float64Array(sizePlusOne);
+    this.rhsSpare = new Float64Array(sizePlusOne);
 
     // Accepted solution
-    this.acceptedVoltages = new Float64Array(matrixSize);
-    this.prevAcceptedVoltages = new Float64Array(matrixSize);
+    this.acceptedVoltages = new Float64Array(sizePlusOne);
+    this.prevAcceptedVoltages = new Float64Array(sizePlusOne);
 
     // DC-OP scratch
-    this.dcopVoltages = new Float64Array(matrixSize);
-    this.dcopSavedVoltages = new Float64Array(matrixSize);
+    this.dcopVoltages = new Float64Array(sizePlusOne);
+    this.dcopSavedVoltages = new Float64Array(sizePlusOne);
     this.dcopSavedState0 = new Float64Array(statePoolSize);
     this.dcopOldState0 = new Float64Array(statePoolSize);
 
@@ -552,7 +558,7 @@ export class CKTCircuitContext {
     // MNAEngine.init() inherits them (shared-reference invariant).
     this.deltaOld = new Array<number>(7).fill(params.maxTimeStep);
     this.nodeVoltageHistory = new NodeVoltageHistory();
-    this.nodeVoltageHistory.initNodeVoltages(matrixSize);
+    this.nodeVoltageHistory.initNodeVoltages(sizePlusOne);
 
     // Gear scratch (7×7 flat)
     this.gearMatScratch = new Float64Array(49);

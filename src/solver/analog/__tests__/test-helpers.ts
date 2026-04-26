@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Engine-internal test fixture elements for MNA infrastructure testing.
  *
  * These are minimal AnalogElement implementations used only in unit tests.
@@ -47,7 +47,7 @@ import { DiagnosticCollector } from "../diagnostics.js";
 import { DEFAULT_SIMULATION_PARAMS, type ResolvedSimulationParams } from "../../../core/analog-engine-interface.js";
 
 // ---------------------------------------------------------------------------
-// withNodeIds — test helper for factory-created elements
+// withNodeIds â€” test helper for factory-created elements
 // ---------------------------------------------------------------------------
 
 /**
@@ -71,12 +71,12 @@ export function withNodeIds(
 }
 
 // ---------------------------------------------------------------------------
-// Internal helper — stamp into solver, skipping ground (node 0)
+// Internal helper â€” stamp into solver, skipping ground (node 0)
 // ---------------------------------------------------------------------------
 
 function G(solver: SparseSolver, row: number, col: number, val: number): void {
   if (row !== 0 && col !== 0) {
-    const h = solver.allocElement(row - 1, col - 1);
+    const h = solver.allocElement(row, col);
     solver.stampElement(h, val);
   }
 }
@@ -89,7 +89,7 @@ function S(solver: SparseSolver, row: number, col: number, val: number): void {
 
 function RHS(solver: SparseSolver, row: number, val: number): void {
   if (row !== 0) {
-    solver.stampRHS(row - 1, val);
+    solver.stampRHS(row, val);
   }
 }
 
@@ -132,8 +132,8 @@ export function makeResistor(
     setParam(_key: string, _value: number): void {},
 
     getPinCurrents(voltages: Float64Array): number[] {
-      const vA = nodeA > 0 ? voltages[nodeA - 1] : 0;
-      const vB = nodeB > 0 ? voltages[nodeB - 1] : 0;
+      const vA = voltages[nodeA];
+      const vB = voltages[nodeB];
       const I = G_val * (vA - vB);
       return [I, -I];
     },
@@ -184,7 +184,7 @@ export function makeVoltageSource(
     load(ctx: LoadContext): void {
       const { solver } = ctx;
       // The branch row is an absolute 0-based solver index supplied by the
-      // caller via branchIdx. We do NOT offset by nodeCount here — the caller
+      // caller via branchIdx. We do NOT offset by nodeCount here â€” the caller
       // sets up the matrix with matrixSize = nodeCount + branchCount and
       // passes branchIdx as the absolute row within that full matrix.
       const k = branchIdx; // absolute 0-based solver row
@@ -198,7 +198,7 @@ export function makeVoltageSource(
       if (nodeNeg !== 0) S(solver, k, nodeNeg - 1, -1);
 
       // RHS entry for the voltage constraint (scaled by source stepping factor
-      // via ctx.srcFact — ngspice CKTsrcFact).
+      // via ctx.srcFact â€” ngspice CKTsrcFact).
       solver.stampRHS(k, voltage * ctx.srcFact);
     },
 
@@ -219,7 +219,7 @@ export function makeVoltageSource(
  * Current flows from nodeNeg to nodePos through the source (conventional
  * positive direction: into nodePos, out of nodeNeg).
  *
- * Stamps only into the RHS vector — no G-matrix entries.
+ * Stamps only into the RHS vector â€” no G-matrix entries.
  *
  * @param nodePos - Node where current enters (0 = ground)
  * @param nodeNeg - Node where current leaves (0 = ground)
@@ -278,14 +278,14 @@ const DIODE_SCHEMA: StateSchema = defineStateSchema("TestHelperDiodeElement", [
 /**
  * Create a Shockley diode test element with NR linearization.
  *
- * Models the ideal diode equation: Id = Is · (exp(Vd / (n·Vt)) - 1)
+ * Models the ideal diode equation: Id = Is Â· (exp(Vd / (nÂ·Vt)) - 1)
  *
  * The companion model at each NR iteration linearizes the exponential as a
  * parallel conductance (geq) and independent current source (ieq):
- *   geq = dId/dVd = Is · exp(Vd/(n·Vt)) / (n·Vt)   + GMIN
- *   ieq = Id - geq · Vd                              (Norton equivalent offset)
+ *   geq = dId/dVd = Is Â· exp(Vd/(nÂ·Vt)) / (nÂ·Vt)   + GMIN
+ *   ieq = Id - geq Â· Vd                              (Norton equivalent offset)
  *
- * `stamp()` is a no-op — the diode has no linear (topology-independent)
+ * `stamp()` is a no-op â€” the diode has no linear (topology-independent)
  * contribution. All MNA entries come from `stampNonlinear`.
  *
  * State is stored in a StatePool. Use `withState` to allocate the pool.
@@ -293,7 +293,7 @@ const DIODE_SCHEMA: StateSchema = defineStateSchema("TestHelperDiodeElement", [
  * @param nodeAnode   - Anode node ID (0 = ground, 1-based)
  * @param nodeCathode - Cathode node ID (0 = ground, 1-based)
  * @param is          - Saturation current in amperes (e.g. 1e-14)
- * @param n           - Ideality factor (typically 1.0–2.0)
+ * @param n           - Ideality factor (typically 1.0â€“2.0)
  * @returns An AnalogElement implementing the Shockley diode model
  */
 export function makeDiode(
@@ -305,7 +305,7 @@ export function makeDiode(
   const nVt = n * VT;
   const vcrit = nVt * Math.log(nVt / (is * Math.SQRT2));
 
-  // Pool binding — set by initState
+  // Pool binding â€” set by initState
   let s0: Float64Array;
   let s1: Float64Array;
   let s2: Float64Array;
@@ -343,8 +343,8 @@ export function makeDiode(
       const { solver, rhsOld, noncon } = ctx;
 
       // Update operating point: read rhsOld (prior NR iterate), limit, compute Shockley model.
-      const va = nodeAnode > 0 ? rhsOld[nodeAnode - 1] : 0;
-      const vc = nodeCathode > 0 ? rhsOld[nodeCathode - 1] : 0;
+      const va = rhsOld[nodeAnode];
+      const vc = rhsOld[nodeCathode];
       const vdRaw = va - vc;
       const vdOld = s0[base + SLOT_VD];
       const limResult = pnjlim(vdRaw, vdOld, nVt, vcrit);
@@ -372,16 +372,16 @@ export function makeDiode(
 
     checkConvergence(ctx: LoadContext): boolean {
       const { rhsOld } = ctx;
-      const va = nodeAnode > 0 ? rhsOld[nodeAnode - 1] : 0;
-      const vc = nodeCathode > 0 ? rhsOld[nodeCathode - 1] : 0;
+      const va = rhsOld[nodeAnode];
+      const vc = rhsOld[nodeCathode];
       const vdRaw = va - vc;
       const vdLim = s0[base + SLOT_VD];
       return Math.abs(vdLim - vdRaw) <= 2 * nVt;
     },
 
     getPinCurrents(voltages: Float64Array): number[] {
-      const va = nodeAnode > 0 ? voltages[nodeAnode - 1] : 0;
-      const vc = nodeCathode > 0 ? voltages[nodeCathode - 1] : 0;
+      const va = voltages[nodeAnode];
+      const vc = voltages[nodeCathode];
       const geq = s0[base + SLOT_GEQ];
       const ieq = s0[base + SLOT_IEQ];
       const I = geq * (va - vc) - ieq;
@@ -398,7 +398,7 @@ export function makeDiode(
  * Create a linear capacitor test element with companion model integration.
  *
  * The capacitor is modelled as a parallel conductance (geq) and independent
- * current source (ieq) — the standard Norton companion model. Coefficients
+ * current source (ieq) â€” the standard Norton companion model. Coefficients
  * are recomputed each timestep by `stampCompanion`; `stamp` re-stamps the
  * same coefficients on every NR iteration within that timestep.
  *
@@ -418,7 +418,7 @@ export function makeCapacitor(
   nodeB: number,
   capacitance: number,
 ): AnalogElement {
-  // Companion model state — updated each NR iteration inside load().
+  // Companion model state â€” updated each NR iteration inside load().
   let geq = 0;
   let ceq = 0;
   // Charge history: q0 = current step, q1 = previous step, q2 = two steps back, q3 = three steps back.
@@ -444,8 +444,8 @@ export function makeCapacitor(
 
       if (!(mode & MODETRAN)) return;
 
-      const vA = nodeA > 0 ? rhsOld[nodeA - 1] : 0;
-      const vB = nodeB > 0 ? rhsOld[nodeB - 1] : 0;
+      const vA = rhsOld[nodeA];
+      const vB = rhsOld[nodeB];
       const vcap = vA - vB;
 
       if (mode & MODEINITPRED) {
@@ -486,8 +486,8 @@ export function makeCapacitor(
       // Advance history: q2 becomes q3, q1 becomes q2, current q0 becomes q1.
       // Also roll ccap into ccapPrev so TRAP order 2 recursion (niinteg.c:32) works.
       const { rhs } = ctx;
-      const vA = nodeA > 0 ? rhs[nodeA - 1] : 0;
-      const vB = nodeB > 0 ? rhs[nodeB - 1] : 0;
+      const vA = rhs[nodeA];
+      const vB = rhs[nodeB];
       q3 = q2;
       q2 = q1;
       q1 = capacitance * (vA - vB);
@@ -498,8 +498,8 @@ export function makeCapacitor(
     getLteTimestep(): number { return Infinity; },
 
     getPinCurrents(voltages: Float64Array): number[] {
-      const vA = nodeA > 0 ? voltages[nodeA - 1] : 0;
-      const vB = nodeB > 0 ? voltages[nodeB - 1] : 0;
+      const vA = voltages[nodeA];
+      const vB = voltages[nodeB];
       const I = geq * (vA - vB) + ceq;
       return [I, -I];
     },
@@ -542,7 +542,7 @@ export function makeInductor(
   inductance: number,
 ): AnalogElement {
   // Companion model state. Before transient starts, geq=0 makes branch equation
-  // V_A - V_B = 0 (short circuit) — correct DC operating point for inductor.
+  // V_A - V_B = 0 (short circuit) â€” correct DC operating point for inductor.
   let geq = 0;
   let ceq = 0;
   // Flux history: phi0 = current, phi1 = previous, phi2 = two steps back.
@@ -622,7 +622,7 @@ export function makeInductor(
 }
 
 // ---------------------------------------------------------------------------
-// createTestCapacitor / createTestInductor — real element wrappers
+// createTestCapacitor / createTestInductor â€” real element wrappers
 // ---------------------------------------------------------------------------
 
 /**
@@ -651,7 +651,7 @@ export function createTestInductor(inductance: number, nodeA: number, nodeB: num
  * Create a time-varying sinusoidal voltage source test element.
  *
  * Identical to `makeVoltageSource` except the RHS voltage is
- *   V(t) = dcOffset + amplitude · sin(2π · frequency · t + phase)
+ *   V(t) = dcOffset + amplitude Â· sin(2Ï€ Â· frequency Â· t + phase)
  *
  * The caller supplies a `getTime` callback that returns the current
  * simulation time in seconds. For MNAEngine integration, pass
@@ -713,7 +713,7 @@ export function makeAcVoltageSource(
 }
 
 // ---------------------------------------------------------------------------
-// allocateStatePool — mirror compiler state-pool allocation in test fixtures
+// allocateStatePool â€” mirror compiler state-pool allocation in test fixtures
 // ---------------------------------------------------------------------------
 
 /**
@@ -722,7 +722,7 @@ export function makeAcVoltageSource(
  * element's `initState` hook so closure-captured `s0`/`base` are populated.
  *
  * Tests that build `ConcreteCompiledAnalogCircuit` directly (bypassing the
- * real compiler) must call this before `engine.init()` — otherwise pool-backed
+ * real compiler) must call this before `engine.init()` â€” otherwise pool-backed
  * elements arrive with `stateBaseOffset=-1` and the engine's allocation
  * assertion throws. Tests that stamp into a solver without going through the
  * engine must also call this so element closures have a valid pool reference
@@ -751,7 +751,7 @@ export function allocateStatePool(
 }
 
 // ---------------------------------------------------------------------------
-// makeSimpleCtx / runDcOp / runNR — minimal ctx wrappers for component tests
+// makeSimpleCtx / runDcOp / runNR â€” minimal ctx wrappers for component tests
 // ---------------------------------------------------------------------------
 
 export interface SimpleCtxOptions {
@@ -840,7 +840,7 @@ export function runNR(opts: SimpleNROptions): NRResult {
 }
 
 // ---------------------------------------------------------------------------
-// makeLoadCtx — build a fully-populated LoadContext literal for unit tests
+// makeLoadCtx â€” build a fully-populated LoadContext literal for unit tests
 // ---------------------------------------------------------------------------
 
 export interface MakeLoadCtxOptions {
@@ -890,7 +890,7 @@ export interface MakeLoadCtxOptions {
  *
  * Defaults:
  *   - cktMode  = MODETRAN | MODEINITFLOAT (a normal NR iteration during
- *     transient — produces the same bit pattern an engine drives on
+ *     transient â€” produces the same bit pattern an engine drives on
  *     non-init iterations).
  *   - dt = 0, order = 1, method = "trapezoidal".
  *   - rhs / rhsOld both alias `voltages` unless overridden.
@@ -937,7 +937,7 @@ export function makeLoadCtx(opts: MakeLoadCtxOptions): LoadContext {
 }
 
 // ---------------------------------------------------------------------------
-// initElement — wire a single element to a freshly-allocated StatePool
+// initElement â€” wire a single element to a freshly-allocated StatePool
 // ---------------------------------------------------------------------------
 
 /**
@@ -945,7 +945,7 @@ export function makeLoadCtx(opts: MakeLoadCtxOptions): LoadContext {
  * element's `stateBaseOffset` to 0, and call `initState(pool)`. Required
  * before driving `element.load()` directly in unit tests for any pool-backed
  * element (capacitor, inductor, BJT, MOSFET, comparator, behavioral
- * flip-flop, etc.) — otherwise the element's `_pool` reference is undefined
+ * flip-flop, etc.) â€” otherwise the element's `_pool` reference is undefined
  * and `load()` throws `Cannot read properties of undefined (reading
  * 'states')`.
  *

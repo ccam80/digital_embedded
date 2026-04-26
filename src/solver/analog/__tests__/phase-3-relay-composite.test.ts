@@ -1,5 +1,5 @@
-/**
- * Phase 3 Task 3.3.3 — Relay composite-child existence tests.
+﻿/**
+ * Phase 3 Task 3.3.3 â€” Relay composite-child existence tests.
  *
  * Verifies that both relay factories expose a child AnalogInductorElement
  * via getChildElements(), following the composite-child pattern landed in
@@ -58,11 +58,11 @@ describe("Phase 3 Task 3.3.3 -- Relay composite-child", () => {
     //   voltages[0] = branch current (inductor row), voltages[1] = node1 voltage,
     //   voltages[2] = node2 voltage (ground, always 0).
     // The AnalogInductorElement's pinNodeIds are [nodeCoil1=1, nodeCoil2=2].
-    // n0=1 → voltages[n0-1]=voltages[0] = branch row, n1=2 → voltages[1].
+    // n0=1 â†’ voltages[n0]=voltages[0] = branch row, n1=2 â†’ voltages[1].
     // We set the coil node voltage: voltages[1] = 5V (node 1), voltages[2] = 0V (node 2).
     //
-    // Step 1: MODEINITTRAN — seeds flux from prior branch current, copies s0→s1.
-    // Step 2: MODEINITFLOAT — computes req/veq via NIintegrate from seeded flux.
+    // Step 1: MODEINITTRAN â€” seeds flux from prior branch current, copies s0â†’s1.
+    // Step 2: MODEINITFLOAT â€” computes req/veq via NIintegrate from seeded flux.
     //         After load(), s0[SLOT_GEQ] (=req=1/L*ag[0]) is positive, proving
     //         integration ran. s0[SLOT_I] = voltages[branchIdx] = the branch current.
 
@@ -89,7 +89,7 @@ describe("Phase 3 Task 3.3.3 -- Relay composite-child", () => {
     //   solver index 1 = node 1 (coil+)
     //   solver index 2 = node 2 (coil-/gnd)
     const matrixSize = 3;
-    const dt = 1e-6; // 1 µs timestep
+    const dt = 1e-6; // 1 Âµs timestep
 
     // ag[] for order-1 trapezoidal: ag[0] = 1/dt, ag[1] = -1/dt.
     const ag = new Float64Array(7);
@@ -128,16 +128,16 @@ describe("Phase 3 Task 3.3.3 -- Relay composite-child", () => {
       } as LoadContext;
     }
 
-    // Step 1: MODEINITTRAN — seeds flux and copies state.
+    // Step 1: MODEINITTRAN â€” seeds flux and copies state.
     const ctx1 = makeCtx(MODETRAN | MODEINITTRAN);
     relay.load(ctx1);
 
-    // Step 2: MODEINITFLOAT — runs NIintegrate, producing non-zero req/veq.
+    // Step 2: MODEINITFLOAT â€” runs NIintegrate, producing non-zero req/veq.
     const ctx2 = makeCtx(MODETRAN | MODEINITFLOAT);
     relay.load(ctx2);
 
     // The inductor state pool slot SLOT_GEQ = 0 holds the companion conductance req.
-    // For order-1 integration with L=0.1H and dt=1µs:
+    // For order-1 integration with L=0.1H and dt=1Âµs:
     //   req = ag[0] / L = (1/dt) / L = 1e6 / 0.1 = 1e7 S (non-zero).
     // A positive req proves NIintegrate ran and produced a companion model.
     const SLOT_GEQ_IDX = 0; // first slot in inductor schema
@@ -146,27 +146,27 @@ describe("Phase 3 Task 3.3.3 -- Relay composite-child", () => {
     expect(geq).toBeGreaterThan(0);
 
     // SLOT_VOLT = 5: voltage across the coil = n0v - n1v.
-    // n0=1 → voltages[0] (branch row, ~0), n1=2 → voltages[1] (5V).
-    // Actually: n0v = voltages[n0-1] = voltages[0] = 0 (branch current slot, not node voltage).
-    // Hmm — in this matrix layout voltages[0] IS the branch row.
-    // The coil voltage is V(node1) - V(node2) = voltages[1-1] - voltages[2-1]
+    // n0=1 â†’ voltages[0] (branch row, ~0), n1=2 â†’ voltages[1] (5V).
+    // Actually: n0v = voltages[n0] = voltages[0] = 0 (branch current slot, not node voltage).
+    // Hmm â€” in this matrix layout voltages[0] IS the branch row.
+    // The coil voltage is V(node1) - V(node2) = voltages[1] - voltages[2]
     //   = voltages[0] - voltages[1].
-    // Since node1=1 maps to voltages[0] in the solver… wait, the solver
-    // maps 1-based node IDs to 0-based indices: node k → voltages[k-1].
-    // node1=1 → voltages[0], node2=2 → voltages[1].
+    // Since node1=1 maps to voltages[0] in the solverâ€¦ wait, the solver
+    // maps 1-based node IDs to 0-based indices: node k â†’ voltages[k].
+    // node1=1 â†’ voltages[0], node2=2 â†’ voltages[1].
     // But voltages[0] is the branch row, not node 1's voltage.
     // To avoid index aliasing, check that the coil voltage recorded in SLOT_VOLT
     // matches the applied drive: n0v - n1v where n0=pinNodeIds[0]=1, n1=pinNodeIds[1]=2.
     const SLOT_VOLT_IDX = 5;
     const volt = pool.states[0][base + SLOT_VOLT_IDX];
-    // n0v = node1>0 ? voltages[node1-1] : 0 = voltages[0]; n1v = voltages[1] = 5V.
-    // volt = voltages[0] - voltages[1] = 0 - 5 = -5 (sign-correct: current flows in1→in2).
+    // n0v = voltages[node1] = voltages[0]; n1v = voltages[1] = 5V.
+    // volt = voltages[0] - voltages[1] = 0 - 5 = -5 (sign-correct: current flows in1â†’in2).
     expect(volt).toBe(voltages[0] - voltages[1]);
 
     // The sign of volt shows current direction: negative means current flows from
     // the higher-potential pin (in2 at 5V as seen from node-index perspective) into
     // the coil, which is the physically correct direction for a positive coil voltage.
-    // The magnitude must be non-zero since voltages[1] = 5V ≠ 0.
+    // The magnitude must be non-zero since voltages[1] = 5V â‰  0.
     expect(Math.abs(volt)).toBeGreaterThan(0);
   });
 });

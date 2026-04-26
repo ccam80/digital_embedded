@@ -1,5 +1,5 @@
-/**
- * LED component — single-color indicator.
+﻿/**
+ * LED component â€” single-color indicator.
  *
  * Circle shape, configurable color, lights up when input is non-zero.
  * 1-bit input: on when input = 1, off when input = 0.
@@ -66,7 +66,7 @@ function buildLedPinDeclarations(): PinDeclaration[] {
 }
 
 // ---------------------------------------------------------------------------
-// LedElement — CircuitElement implementation
+// LedElement â€” CircuitElement implementation
 // ---------------------------------------------------------------------------
 
 export class LedElement extends AbstractCircuitElement {
@@ -126,7 +126,7 @@ export class LedElement extends AbstractCircuitElement {
 }
 
 // ---------------------------------------------------------------------------
-// executeLed — reads input, writes to output slot for display state
+// executeLed â€” reads input, writes to output slot for display state
 // ---------------------------------------------------------------------------
 
 export function executeLed(
@@ -167,7 +167,7 @@ const LED_GMIN = 1e-12;
 // State schema declarations
 // ---------------------------------------------------------------------------
 
-// Slot index constants — shared between both schema variants.
+// Slot index constants â€” shared between both schema variants.
 const SLOT_VD = 0, SLOT_GEQ = 1, SLOT_IEQ = 2, SLOT_ID = 3;
 const SLOT_Q = 4, SLOT_CCAP = 5;
 
@@ -190,7 +190,7 @@ export const LED_CAP_STATE_SCHEMA = defineStateSchema("LedAnalogElement_cap", [
 ]);
 
 // ---------------------------------------------------------------------------
-// createLedAnalogElement — AnalogElement factory
+// createLedAnalogElement â€” AnalogElement factory
 // ---------------------------------------------------------------------------
 
 function createLedAnalogElement(
@@ -217,13 +217,13 @@ function createLedAnalogElement(
 
   const hasCapacitance = params.CJO > 0 || params.TT > 0;
 
-  // cite: dioload.c / diotemp.c — per-instance TEMP (maps to ngspice DIOtemp)
+  // cite: dioload.c / diotemp.c â€” per-instance TEMP (maps to ngspice DIOtemp)
   let ledTp = { vt: params.TEMP * CONSTboltz / CHARGE };
   function recomputeLedTp(): void {
     ledTp = { vt: params.TEMP * CONSTboltz / CHARGE };
   }
 
-  // Pool reference — set by initState. State arrays accessed via pool.states[N]
+  // Pool reference â€” set by initState. State arrays accessed via pool.states[N]
   // at call time. No cached Float64Array refs.
   let pool: StatePoolRef;
   let base: number;
@@ -247,7 +247,7 @@ function createLedAnalogElement(
     },
 
     load(this: PoolBackedAnalogElementCore, ctx: LoadContext): void {
-      // Access state arrays at call time — no cached Float64Array refs.
+      // Access state arrays at call time â€” no cached Float64Array refs.
       const s0 = pool.states[0];
       const s1 = pool.states[1];
       const s2 = pool.states[2];
@@ -266,8 +266,8 @@ function createLedAnalogElement(
         vdLimited = vdRaw;
         pnjlimLimited = false;
       } else {
-        const va = nodeAnode > 0 ? voltages[nodeAnode - 1] : 0;
-        const vc = nodeCathode > 0 ? voltages[nodeCathode - 1] : 0;
+        const va = voltages[nodeAnode];
+        const vc = voltages[nodeCathode];
         vdRaw = va - vc;
         const vdOld = s0[base + SLOT_VD];
         const vdResult = pnjlim(vdRaw, vdOld, nVt, vcrit);
@@ -360,8 +360,8 @@ function createLedAnalogElement(
 
       const s0 = pool.states[0];
       const voltages = ctx.rhsOld;
-      const va = nodeAnode > 0 ? voltages[nodeAnode - 1] : 0;
-      const vc = nodeCathode > 0 ? voltages[nodeCathode - 1] : 0;
+      const va = voltages[nodeAnode];
+      const vc = voltages[nodeCathode];
       const vdRaw = va - vc;
 
       // Current-prediction convergence test
@@ -463,7 +463,7 @@ export const LedDefinition: ComponentDefinition = {
   attributeMap: LED_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.IO,
   helpText:
-    "LED — single-color light-emitting diode indicator.\n" +
+    "LED â€” single-color light-emitting diode indicator.\n" +
     "Lights up (filled circle) when the input is non-zero.\n" +
     "Color is configurable. Label is shown above the component.",
   models: {

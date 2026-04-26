@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Tests for the AnalogResistor component and voltage divider integration.
  */
 
@@ -130,11 +130,11 @@ function makeResistor(nodeA: number, nodeB: number, resistance: number): AnalogE
     getPinCurrents(_v: Float64Array): number[] { return []; },
     load(ctx: import("../../../solver/analog/load-context.js").LoadContext): void {
       const { solver } = ctx;
-      if (nodeA !== 0) solver.stampElement(solver.allocElement(nodeA - 1, nodeA - 1), G);
-      if (nodeB !== 0) solver.stampElement(solver.allocElement(nodeB - 1, nodeB - 1), G);
+      if (nodeA !== 0) solver.stampElement(solver.allocElement(nodeA, nodeA), G);
+      if (nodeB !== 0) solver.stampElement(solver.allocElement(nodeB, nodeB), G);
       if (nodeA !== 0 && nodeB !== 0) {
-        solver.stampElement(solver.allocElement(nodeA - 1, nodeB - 1), -G);
-        solver.stampElement(solver.allocElement(nodeB - 1, nodeA - 1), -G);
+        solver.stampElement(solver.allocElement(nodeA, nodeB), -G);
+        solver.stampElement(solver.allocElement(nodeB, nodeA), -G);
       }
     },
   };
@@ -146,14 +146,14 @@ function makeResistor(nodeA: number, nodeB: number, resistance: number): AnalogE
 
 describe("Integration", () => {
   it("voltage_divider_dc_op", () => {
-    // Circuit: 10V source → R1=1kΩ → node 1 → R2=2kΩ → ground
+    // Circuit: 10V source â†’ R1=1kÎ© â†’ node 1 â†’ R2=2kÎ© â†’ ground
     //
     // Analytical solution:
-    //   V(node1) = 10 × 2000/3000 = 6.6667 V
+    //   V(node1) = 10 Ã— 2000/3000 = 6.6667 V
     //   I_source = 10 / 3000 = 3.3333 mA
     //
     // MNA node assignment:
-    //   node 1 = R1–R2 junction
+    //   node 1 = R1â€“R2 junction
     //   node 2 = positive terminal of the voltage source
     //   ground = node 0
     //   branch row = absolute solver index 2 (after the 2 node rows)
@@ -164,8 +164,8 @@ describe("Integration", () => {
     const branchRow = 2; // absolute 0-based solver row for branch current
 
     const vs = makeDcVoltageSource(2, 0, branchRow, 10) as unknown as AnalogElement; // 10V: node2(+) to gnd(-)
-    const r1 = makeResistor(1, 2, 1000);                  // 1kΩ: node1 ↔ node2
-    const r2 = makeResistor(1, 0, 2000);                  // 2kΩ: node1 ↔ ground
+    const r1 = makeResistor(1, 2, 1000);                  // 1kÎ©: node1 â†” node2
+    const r2 = makeResistor(1, 0, 2000);                  // 2kÎ©: node1 â†” ground
 
     const result = runDcOp({
       elements: [vs, r1, r2],
@@ -176,24 +176,24 @@ describe("Integration", () => {
     expect(result.converged).toBe(true);
 
     // Solution vector layout: [V(node1), V(node2), I_branch]
-    const vJunction  = result.nodeVoltages[0]; // V at R1–R2 junction
+    const vJunction  = result.nodeVoltages[0]; // V at R1â€“R2 junction
     const vSourcePos = result.nodeVoltages[1]; // V at voltage source positive terminal
     const iBranch    = result.nodeVoltages[2]; // branch current (A)
 
     // Voltage source enforces V(node2) = 10 V
 
-    // Junction voltage: 10 × (2000/3000) ≈ 6.6667 V, tolerance 1e-4
+    // Junction voltage: 10 Ã— (2000/3000) â‰ˆ 6.6667 V, tolerance 1e-4
 
-    // Source current: 10/3000 ≈ 3.333 mA, tolerance 1e-6 A
+    // Source current: 10/3000 â‰ˆ 3.333 mA, tolerance 1e-6 A
   });
 });
 
 // ---------------------------------------------------------------------------
-// resistor_load_dcop_parity — C4.1 / Task 6.2.1
+// resistor_load_dcop_parity â€” C4.1 / Task 6.2.1
 //
-// 3-resistor divider: Vs=5V, R1=R2=R3=1kΩ in series from node1 (Vs.pos) down
+// 3-resistor divider: Vs=5V, R1=R2=R3=1kÎ© in series from node1 (Vs.pos) down
 // to ground. Runs DC-OP via runDcOp() and asserts the converged node voltages
-// bit-exact against the ngspice reference (closed-form divider formula —
+// bit-exact against the ngspice reference (closed-form divider formula â€”
 // the same IEEE-754 operation sequence ngspice executes).
 //
 // NGSPICE reference: ngspice resload.c RESload stamps G=1/R at four matrix
@@ -288,14 +288,14 @@ describe("resistor_load_dcop_parity", () => {
 });
 
 // ---------------------------------------------------------------------------
-// resistor_load_interface — companion to mna-end-to-end.test.ts::resistor_load_interface.
+// resistor_load_interface â€” companion to mna-end-to-end.test.ts::resistor_load_interface.
 // Constructs a resistor via the real definition factory, builds a minimal
 // LoadContext, calls element.load(ctx), and asserts solver's G matrix entries
 // equal 1/R bit-exact. ngspice ref: resload.c:45-48.
 // ---------------------------------------------------------------------------
 
 describe("resistor_load_interface", () => {
-  it("load(ctx) stamps G=1/R bit-exact for R=1kΩ", () => {
+  it("load(ctx) stamps G=1/R bit-exact for R=1kÎ©", () => {
     const props = new PropertyBag();
     props.replaceModelParams({ resistance: 1000 });
     const core = getFactory(ResistorDefinition.modelRegistry!.behavioral!)(

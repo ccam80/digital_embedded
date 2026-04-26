@@ -1,4 +1,4 @@
-/**
+﻿/**
  * OTA (Operational Transconductance Amplifier) analog component.
  *
  * Voltage-in, current-out amplifier whose transconductance (gm) is
@@ -9,18 +9,18 @@
  *   I_out = I_bias * tanh(V_diff / (2 * V_T))
  *
  * For small V_diff (|V_diff| << 2*V_T):
- *   tanh(x) ≈ x  →  I_out ≈ gm * V_diff  (linear region)
+ *   tanh(x) â‰ˆ x  â†’  I_out â‰ˆ gm * V_diff  (linear region)
  *
  * For large V_diff:
- *   I_out → ±I_bias  (saturated at bias current)
+ *   I_out â†’ Â±I_bias  (saturated at bias current)
  *
  * MNA formulation:
  *   The OTA is a nonlinear VCCS. At operating point V_diff0:
  *     I_out = I_bias * tanh(V_diff0 / (2*V_T))
- *     dI_out/dV_diff = I_bias / (2*V_T) * sech²(V_diff0 / (2*V_T)) = gm_eff
+ *     dI_out/dV_diff = I_bias / (2*V_T) * sechÂ²(V_diff0 / (2*V_T)) = gm_eff
  *
  *   NR-linearized Norton equivalent:
- *     I_out ≈ gm_eff * V_diff + [I_out0 - gm_eff * V_diff0]
+ *     I_out â‰ˆ gm_eff * V_diff + [I_out0 - gm_eff * V_diff0]
  *
  *   Stamped as a VCCS from (V+,V-) controlling current into (OUT+, OUT-):
  *     G[OUT+, V+]  -= gm_eff    G[OUT+, V-]  += gm_eff
@@ -32,7 +32,7 @@
  * The I_bias value is taken as the net current flowing INTO the Iabc node
  * from an external current source; to model this, we read the node voltage
  * at the Iabc pin and convert it to a current via an external reference
- * conductance. However, per the spec, Iabc is a current INPUT pin — the
+ * conductance. However, per the spec, Iabc is a current INPUT pin â€” the
  * bias current is directly the current flowing into that node.
  *
  * Implementation note: since we cannot directly read a current at a node
@@ -42,17 +42,17 @@
  * external current source stamps the bias current into the Iabc node.
  * In practice users connect a current source to Iabc; the node voltage at
  * Iabc is determined by the external circuit. We read I_bias by summing
- * all currents into the node — but that requires KCL bookkeeping.
+ * all currents into the node â€” but that requires KCL bookkeeping.
  *
  * Simpler and correct approach: model Iabc as a voltage node representing
- * the bias current magnitude, with 1 Ω shunt to ground (so V(Iabc) = I_bias
+ * the bias current magnitude, with 1 Î© shunt to ground (so V(Iabc) = I_bias
  * when a current source drives it). This is the standard VCA/OTA test setup.
  * The OTA element reads V(Iabc) directly as I_bias.
  *
  * Pins (nodeIds order):
  *   [0] = nVp   (V+, non-inverting input)
  *   [1] = nVm   (V-, inverting input)
- *   [2] = nIabc (bias current control — voltage here equals I_bias in amps
+ *   [2] = nIabc (bias current control â€” voltage here equals I_bias in amps
  *                when the Iabc node is driven by a 1 A/V current source)
  *   [3] = nOutP (OUT+ output)
  *   [4] = nOutN (OUT- output)
@@ -165,7 +165,7 @@ function createOTAElement(
   let iOut = 0; // cached output current for getPinCurrents
 
   function readNode(voltages: Float64Array, n: number): number {
-    return n > 0 ? voltages[n - 1] : 0;
+    return voltages[n];
   }
 
   return {
@@ -193,8 +193,8 @@ function createOTAElement(
       const iOutNow = iBias * tanhX;
       iOut = iOutNow;
 
-      // Effective transconductance: dI_out/dV_diff = I_bias/(2*V_T) * sech²(x)
-      // sech²(x) = 1 - tanh²(x)
+      // Effective transconductance: dI_out/dV_diff = I_bias/(2*V_T) * sechÂ²(x)
+      // sechÂ²(x) = 1 - tanhÂ²(x)
       const sech2 = 1 - tanhX * tanhX;
       const gmRaw = (iBias / twoVt) * sech2;
       const gmEff = Math.min(Math.abs(gmRaw), p.gmMax);
@@ -203,14 +203,14 @@ function createOTAElement(
       const iNR = iOutNow - gmEff * vDiff;
 
       // Stamp VCCS: current gm_eff * V_diff injected into OUT+ from (V+, V-)
-      if (nOutP !== 0 && nVp !== 0) solver.stampElement(solver.allocElement(nOutP - 1, nVp - 1), -gmEff);
-      if (nOutP !== 0 && nVm !== 0) solver.stampElement(solver.allocElement(nOutP - 1, nVm - 1), gmEff);
-      if (nOutN !== 0 && nVp !== 0) solver.stampElement(solver.allocElement(nOutN - 1, nVp - 1), gmEff);
-      if (nOutN !== 0 && nVm !== 0) solver.stampElement(solver.allocElement(nOutN - 1, nVm - 1), -gmEff);
+      if (nOutP !== 0 && nVp !== 0) solver.stampElement(solver.allocElement(nOutP, nVp), -gmEff);
+      if (nOutP !== 0 && nVm !== 0) solver.stampElement(solver.allocElement(nOutP, nVm), gmEff);
+      if (nOutN !== 0 && nVp !== 0) solver.stampElement(solver.allocElement(nOutN, nVp), gmEff);
+      if (nOutN !== 0 && nVm !== 0) solver.stampElement(solver.allocElement(nOutN, nVm), -gmEff);
 
       // RHS: Norton constant
-      if (nOutP !== 0) solver.stampRHS(nOutP - 1, iNR);
-      if (nOutN !== 0) solver.stampRHS(nOutN - 1, -iNR);
+      if (nOutP !== 0) solver.stampRHS(nOutP, iNR);
+      if (nOutN !== 0) solver.stampRHS(nOutN, -iNR);
     },
 
     /**
@@ -233,7 +233,7 @@ function createOTAElement(
 }
 
 // ---------------------------------------------------------------------------
-// OTAElement — CircuitElement
+// OTAElement â€” CircuitElement
 // ---------------------------------------------------------------------------
 
 export class OTAElement extends AbstractCircuitElement {
@@ -253,7 +253,7 @@ export class OTAElement extends AbstractCircuitElement {
 
   getBoundingBox(): Rect {
     // Leftmost extent: arrow triangles extend to x=-0.25
-    // Rightmost extent: OUT pin at x=5.875 + circle radius 0.55125 ≈ 6.42625
+    // Rightmost extent: OUT pin at x=5.875 + circle radius 0.55125 â‰ˆ 6.42625
     // Top: y=-3 (triangle apex at V+ lead), Bottom: y=3 (triangle apex at V- lead)
     return {
       x: this.position.x - 0.25,
@@ -274,7 +274,7 @@ export class OTAElement extends AbstractCircuitElement {
     ctx.setLineWidth(1);
     ctx.setColor("COMPONENT");
 
-    // Triangle body — open polyline (not closed polygon)
+    // Triangle body â€” open polyline (not closed polygon)
     ctx.drawPolygon(
       [{ x: 0, y: -3 }, { x: 0, y: 3 }, { x: 4, y: 0 }],
       false,
@@ -362,7 +362,7 @@ export const OTADefinition: ComponentDefinition = {
   attributeMap: OTA_ATTRIBUTE_MAPPINGS,
 
   helpText:
-    "Operational Transconductance Amplifier — 5-terminal element (V+, V-, Iabc, OUT+, OUT). " +
+    "Operational Transconductance Amplifier â€” 5-terminal element (V+, V-, Iabc, OUT+, OUT). " +
     "Output current = I_bias * tanh(V_diff / (2*V_T)).",
 
   factory(props: PropertyBag): OTAElement {

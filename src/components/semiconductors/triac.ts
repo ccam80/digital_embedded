@@ -1,16 +1,16 @@
-/**
- * Triac analog component — bidirectional thyristor.
+﻿/**
+ * Triac analog component â€” bidirectional thyristor.
  *
  * Implements two anti-parallel SCR paths sharing a gate terminal.
  * Conducts in both directions when triggered by gate current, and latches
  * until the main terminal current crosses zero (drops below I_hold).
  *
  * Terminal convention:
- *   MT1 — Main Terminal 1 (reference terminal for gate control)
- *   MT2 — Main Terminal 2
- *   G   — Gate
+ *   MT1 â€” Main Terminal 1 (reference terminal for gate control)
+ *   MT2 â€” Main Terminal 2
+ *   G   â€” Gate
  *
- * Model: two independent latch states (forward path MT2→MT1, reverse path MT1→MT2).
+ * Model: two independent latch states (forward path MT2â†’MT1, reverse path MT1â†’MT2).
  * The active path is selected based on the sign of V_MT2-MT1. Gate current in
  * either polarity triggers the corresponding SCR path.
  *
@@ -49,7 +49,7 @@ import { MODEINITJCT } from "../../solver/analog/ckt-mode.js";
 /** Minimum conductance for numerical stability (GMIN). */
 const GMIN = 1e-12;
 
-/** Maximum alpha value — prevents division-by-zero. */
+/** Maximum alpha value â€” prevents division-by-zero. */
 const ALPHA_MAX = 0.95;
 
 // ---------------------------------------------------------------------------
@@ -73,14 +73,14 @@ const SLOT_IGK        = 8;
 export const { paramDefs: TRIAC_PARAM_DEFS, defaults: TRIAC_PARAM_DEFAULTS } = defineModelParams({
   primary: {
     vOn:  { default: 1.5,   unit: "V", description: "On-state forward voltage drop" },
-    iH:   { default: 10e-3, unit: "A", description: "Holding current — minimum main current to stay on" },
-    rOn:  { default: 0.01,  unit: "Ω", description: "On-state series resistance" },
+    iH:   { default: 10e-3, unit: "A", description: "Holding current â€” minimum main current to stay on" },
+    rOn:  { default: 0.01,  unit: "Î©", description: "On-state series resistance" },
     iS:   { default: 1e-12, unit: "A", description: "Reverse saturation current" },
   },
   secondary: {
     alpha1:   { default: 0.5,  description: "PNP transistor current gain (fixed)" },
     alpha2_0: { default: 0.3,  description: "NPN off-state current gain" },
-    i_ref:    { default: 1e-3, unit: "A", description: "Gate current scale factor for α₂ modulation" },
+    i_ref:    { default: 1e-3, unit: "A", description: "Gate current scale factor for Î±â‚‚ modulation" },
     n:        { default: 1,               description: "Emission coefficient" },
   },
 });
@@ -102,12 +102,12 @@ const TRIAC_STATE_SCHEMA = defineStateSchema("TriacElement", [
 ]);
 
 // ---------------------------------------------------------------------------
-// Stamp helpers — node 0 is ground (skipped)
+// Stamp helpers â€” node 0 is ground (skipped)
 // ---------------------------------------------------------------------------
 
 
 // ---------------------------------------------------------------------------
-// createTriacElement — AnalogElement factory
+// createTriacElement â€” AnalogElement factory
 // ---------------------------------------------------------------------------
 
 export function createTriacElement(
@@ -135,7 +135,7 @@ export function createTriacElement(
   let vcritMain = nVt * Math.log(nVt / (p.iS * Math.SQRT2));
   let vcritGate = nVt * Math.log(nVt / (p.iS * Math.SQRT2));
 
-  // Pool reference — set by initState. State arrays accessed via pool.states[N]
+  // Pool reference â€” set by initState. State arrays accessed via pool.states[N]
   // at call time inside load(). No cached Float64Array refs.
   let pool: StatePoolRef;
   let base: number;
@@ -179,7 +179,7 @@ export function createTriacElement(
     const latched = s0[base + SLOT_LATCHED];
 
     if (vmt >= 0) {
-      // Forward path (MT2→MT1)
+      // Forward path (MT2â†’MT1)
       if (latched !== 1.0 && triggered) {
         s0[base + SLOT_LATCHED] = 1.0;
       }
@@ -201,12 +201,12 @@ export function createTriacElement(
         s0[base + SLOT_LATCHED] = 0.0;
       }
     } else {
-      // Reverse path (MT1→MT2, vmt < 0)
+      // Reverse path (MT1â†’MT2, vmt < 0)
       if (latched !== -1.0 && triggered) {
         s0[base + SLOT_LATCHED] = -1.0;
       }
       if (s0[base + SLOT_LATCHED] === -1.0) {
-        // Mirror: current flows MT1→MT2, V_drop = -V_on
+        // Mirror: current flows MT1â†’MT2, V_drop = -V_on
         const gOn = 1.0 / p.rOn;
         const iOn = (vmt + p.vOn) / p.rOn;
         s0[base + SLOT_GEQ] = gOn + GMIN;
@@ -253,13 +253,13 @@ export function createTriacElement(
     },
 
     load(ctx: LoadContext): void {
-      // Access state arrays at call time — no cached Float64Array refs.
+      // Access state arrays at call time â€” no cached Float64Array refs.
       const s0 = pool.states[0];
 
       const voltages = ctx.rhsOld;
-      const v1 = nodeMT1 > 0 ? voltages[nodeMT1 - 1] : 0;
-      const v2 = nodeMT2 > 0 ? voltages[nodeMT2 - 1] : 0;
-      const vG = nodeG   > 0 ? voltages[nodeG   - 1] : 0;
+      const v1 = voltages[nodeMT1];
+      const v2 = voltages[nodeMT2];
+      const vG = voltages[nodeG];
 
       const vmtRaw = v2 - v1;
       const vg1Raw = vG - v1;
@@ -269,7 +269,7 @@ export function createTriacElement(
       let vmtWasLimited = false;
       let vg1WasLimited = false;
       if (ctx.cktMode & MODEINITJCT) {
-        // Triac MODEINITJCT: seed junction voltages from vcrit — standard
+        // Triac MODEINITJCT: seed junction voltages from vcrit â€” standard
         // thyristor initialization, avoids pnjlim on cold start.
         vmtLimited = vcritMain;
         vg1Limited = vcritGate;
@@ -340,9 +340,9 @@ export function createTriacElement(
 
       const s0 = pool.states[0];
       const voltages = ctx.rhsOld;
-      const v1 = nodeMT1 > 0 ? voltages[nodeMT1 - 1] : 0;
-      const v2 = nodeMT2 > 0 ? voltages[nodeMT2 - 1] : 0;
-      const vG = nodeG   > 0 ? voltages[nodeG   - 1] : 0;
+      const v1 = voltages[nodeMT1];
+      const v2 = voltages[nodeMT2];
+      const vG = voltages[nodeG];
 
       // Current-prediction convergence test on MT2-MT1 junction
       const vmtRaw = v2 - v1;
@@ -366,9 +366,9 @@ export function createTriacElement(
     getPinCurrents(voltages: Float64Array): number[] {
       // pinLayout order: [MT2(0), MT1(1), G(2)]
       const s0 = pool.states[0];
-      const v1 = nodeMT1 > 0 ? voltages[nodeMT1 - 1] : 0;
-      const v2 = nodeMT2 > 0 ? voltages[nodeMT2 - 1] : 0;
-      const vG = nodeG   > 0 ? voltages[nodeG   - 1] : 0;
+      const v1 = voltages[nodeMT1];
+      const v2 = voltages[nodeMT2];
+      const vG = voltages[nodeG];
 
       const iMT = s0[base + SLOT_GEQ] * (v2 - v1) + s0[base + SLOT_IEQ];
       const iG  = s0[base + SLOT_G_GATE_GEQ] * (vG - v1) + s0[base + SLOT_G_GATE_IEQ];
@@ -390,7 +390,7 @@ export function createTriacElement(
 }
 
 // ---------------------------------------------------------------------------
-// TriacElement — CircuitElement implementation
+// TriacElement â€” CircuitElement implementation
 // ---------------------------------------------------------------------------
 
 export class TriacElement extends AbstractCircuitElement {
@@ -437,27 +437,27 @@ export class TriacElement extends AbstractCircuitElement {
     // Bar 2 at x=2.5, from y=-1 to y=+1
     ctx.drawLine(bar2x, -1,     bar2x, 1);
 
-    // Forward arrow triangle (pointing right): (bar1x, 0.5) → (bar2x, 1.0) → (bar2x, 0)
+    // Forward arrow triangle (pointing right): (bar1x, 0.5) â†’ (bar2x, 1.0) â†’ (bar2x, 0)
     ctx.drawPolygon([
       { x: bar1x, y:  8 / 16 },
       { x: bar2x, y: 16 / 16 },
       { x: bar2x, y: 0 },
     ], true);
 
-    // Reverse arrow triangle (pointing left): (bar2x, -0.5) → (bar1x, -1.0) → (bar1x, 0)
+    // Reverse arrow triangle (pointing left): (bar2x, -0.5) â†’ (bar1x, -1.0) â†’ (bar1x, 0)
     ctx.drawPolygon([
       { x: bar2x, y:  -8 / 16 },
       { x: bar1x, y: -16 / 16 },
       { x: bar1x, y: 0 },
     ], true);
 
-    // MT2 lead: pin 0 at (0,0) → bar1 at (1.5,0)
+    // MT2 lead: pin 0 at (0,0) â†’ bar1 at (1.5,0)
     drawColoredLead(ctx, signals, vMT2, 0, 0, bar1x, 0);
 
-    // MT1 lead: bar2 at (2.5,0) → pin 1 at (4,0)
+    // MT1 lead: bar2 at (2.5,0) â†’ pin 1 at (4,0)
     drawColoredLead(ctx, signals, vMT1, bar2x, 0, 4, 0);
 
-    // Gate lead: (2.5,0) → (4,-1.5) → (4,-2) to pin 2
+    // Gate lead: (2.5,0) â†’ (4,-1.5) â†’ (4,-2) to pin 2
     drawColoredLead(ctx, signals, vG, bar2x, 0, 4, -24 / 16);
     ctx.drawLine(4, -24 / 16, 4, -2);
 
@@ -536,7 +536,7 @@ export const TriacDefinition: ComponentDefinition = {
   attributeMap: TRIAC_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.SEMICONDUCTORS,
   helpText:
-    "Triac — bidirectional thyristor.\n" +
+    "Triac â€” bidirectional thyristor.\n" +
     "Pins: MT1 (main terminal 1), MT2 (main terminal 2), G (gate).\n" +
     "Conducts in both directions when triggered. Turns off at current zero-crossing.",
   models: {},

@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Resistor analog component.
  *
  * Stamps a conductance matrix: G = 1/R at four positions in the MNA matrix.
@@ -24,7 +24,7 @@ import { stampG } from "../../solver/analog/stamp-helpers.js";
 import { defineModelParams } from "../../core/model-params.js";
 
 // ---------------------------------------------------------------------------
-// Minimum resistance clamp — prevents G → ∞ for degenerate values
+// Minimum resistance clamp â€” prevents G â†’ âˆž for degenerate values
 // ---------------------------------------------------------------------------
 
 const MIN_RESISTANCE = 1e-9;
@@ -35,7 +35,7 @@ const MIN_RESISTANCE = 1e-9;
 
 export const { paramDefs: RESISTOR_PARAM_DEFS, defaults: RESISTOR_DEFAULTS } = defineModelParams({
   primary: {
-    resistance: { default: 1000, unit: "Ω", description: "Resistance in ohms. Minimum clamped to 1e-9 Ω.", min: 1e-9 },
+    resistance: { default: 1000, unit: "Î©", description: "Resistance in ohms. Minimum clamped to 1e-9 Î©.", min: 1e-9 },
   },
 });
 
@@ -67,7 +67,7 @@ function buildResistorPinDeclarations(): PinDeclaration[] {
 }
 
 // ---------------------------------------------------------------------------
-// ResistorElement — CircuitElement implementation
+// ResistorElement â€” CircuitElement implementation
 // ---------------------------------------------------------------------------
 
 export class ResistorElement extends AbstractCircuitElement {
@@ -105,7 +105,7 @@ export class ResistorElement extends AbstractCircuitElement {
     const vB = signals?.getPinVoltage("B");
     const hasVoltage = vA !== undefined && vB !== undefined;
 
-    // Lead wires — colored by their respective node voltages
+    // Lead wires â€” colored by their respective node voltages
     drawColoredLead(ctx, hasVoltage ? signals : undefined, vA, 0, 0, 1, 0);
     drawColoredLead(ctx, hasVoltage ? signals : undefined, vB, 3, 0, 4, 0);
 
@@ -119,7 +119,7 @@ export class ResistorElement extends AbstractCircuitElement {
     }
     pts.push({ x: 3, y: 0 });
 
-    // Body gradient: interpolate voltage from vA→vB along the zigzag
+    // Body gradient: interpolate voltage from vAâ†’vB along the zigzag
     if (hasVoltage && ctx.setLinearGradient) {
       ctx.setLinearGradient(1, 0, 3, 0, [
         { offset: 0, color: signals!.voltageColor(vA) },
@@ -133,7 +133,7 @@ export class ResistorElement extends AbstractCircuitElement {
     }
 
     // Value label below body
-    const displayLabel = label.length > 0 ? label : (this._shouldShowValue() ? formatSI(resistance, "Ω") : "");
+    const displayLabel = label.length > 0 ? label : (this._shouldShowValue() ? formatSI(resistance, "Î©") : "");
     ctx.setColor("TEXT");
     ctx.setFont({ family: "sans-serif", size: 0.8 });
     ctx.drawText(displayLabel, 2, 0.75, { horizontal: "center", vertical: "top" });
@@ -178,8 +178,8 @@ function buildResistorElement(
     },
 
     getPinCurrents(voltages: Float64Array): number[] {
-      const vA = n0 > 0 ? voltages[n0 - 1] : 0;
-      const vB = n1 > 0 ? voltages[n1 - 1] : 0;
+      const vA = voltages[n0];
+      const vB = voltages[n1];
       const I = G * (vA - vB);
       return [I, -I];
     },
@@ -244,8 +244,8 @@ export const ResistorDefinition: ComponentDefinition = {
   attributeMap: RESISTOR_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.PASSIVES,
   helpText:
-    "Resistor — stamps conductance G=1/R into the MNA matrix.\n" +
-    "Minimum resistance is clamped to 1e-9 Ω.",
+    "Resistor â€” stamps conductance G=1/R into the MNA matrix.\n" +
+    "Minimum resistance is clamped to 1e-9 Î©.",
   models: {},
   modelRegistry: {
     "behavioral": {

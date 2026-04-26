@@ -1,5 +1,5 @@
-/**
- * AC Voltage Source — time-varying independent voltage source.
+﻿/**
+ * AC Voltage Source â€” time-varying independent voltage source.
  *
  * Supports four waveforms: sine, square, triangle, sawtooth.
  * The waveform is evaluated at the current simulation time via getTime().
@@ -65,7 +65,7 @@ export interface ExtendedWaveformParams {
   riseTime?: number;
   /**
    * Fall time (seconds). Used by:
-   *   - square wave: duration of the trapezoidal falling edge (V2 → V1).
+   *   - square wave: duration of the trapezoidal falling edge (V2 â†’ V1).
    *   - sawtooth: duration of the sharp fall from V2 back to V1 at the period
    *     boundary. Default 1 ps so that SPICE PULSE can encode it exactly while
    *     remaining below typical transient timesteps. Must be strictly less
@@ -113,7 +113,7 @@ export function computeWaveformValue(
       if (riseTime === 0 && fallTime === 0) {
         return dcOffset + amplitude * Math.sign(Math.sin(arg));
       }
-      // Trapezoidal square wave — ngspice PULSE semantics (vsrcload.c).
+      // Trapezoidal square wave â€” ngspice PULSE semantics (vsrcload.c).
       // V1 = dcOffset - amplitude (LOW), V2 = dcOffset + amplitude (HIGH)
       // Rising edge: [0, TR]; HIGH plateau: [TR, TR+PW]; falling edge: [TR+PW, TR+PW+TF]; LOW: rest.
       const period = frequency > 0 ? 1 / frequency : Infinity;
@@ -123,7 +123,7 @@ export function computeWaveformValue(
       const tShifted = t - phaseShift;
       // Mirrors vsrcload.c:112-117 bit-exact: gate on `time > PER`, then
       // reduce via `time -= PER * floor(time/PER)`. For tShifted <= PER the
-      // value is used as-is — preserves f64 precision for tShifted << PER
+      // value is used as-is â€” preserves f64 precision for tShifted << PER
       // (the failing rc-transient case where ((x%P)+P)%P loses ~2e7 ULPs).
       // Negative tShifted (from positive phase shift) falls through unchanged
       // and is handled by the `tMod <= 0` branch below, matching ngspice's
@@ -157,9 +157,9 @@ export function computeWaveformValue(
       // V1 = dcOffset - amplitude and rises linearly to V2 = dcOffset + amplitude
       // at t = period/2, then falls linearly back to V1 at t = period. The
       // piecewise-linear form is bit-exact against a SPICE PULSE(V1 V2 TD halfP
-      // halfP 0 period) emission — indispensable for .tran parity against
+      // halfP 0 period) emission â€” indispensable for .tran parity against
       // ngspice (computing via asin(sin(...)) instead drifts by ~1 ulp per
-      // sample due to the irrational-π rounding chain).
+      // sample due to the irrational-Ï€ rounding chain).
       if (frequency <= 0) return dcOffset - amplitude;
       const period = 1 / frequency;
       const halfPeriod = period / 2;
@@ -251,7 +251,7 @@ export function computeWaveformValue(
  *
  * Under ngspice PULSE semantics, within each period starting at t0 = n*period - phaseShift,
  * the four breakpoints are:
- *   t0 + 0      (start of rising edge — only useful when > tStart)
+ *   t0 + 0      (start of rising edge â€” only useful when > tStart)
  *   t0 + TR     (end of rising edge)
  *   t0 + halfPeriod          (start of falling edge)
  *   t0 + halfPeriod + TF     (end of falling edge)
@@ -323,7 +323,7 @@ export const { paramDefs: AC_VOLTAGE_SOURCE_PARAM_DEFS, defaults: AC_VOLTAGE_SOU
 });
 
 // ---------------------------------------------------------------------------
-// AcVoltageSourceElement — CircuitElement implementation
+// AcVoltageSourceElement â€” CircuitElement implementation
 // ---------------------------------------------------------------------------
 
 export class AcVoltageSourceElement extends AbstractCircuitElement {
@@ -347,8 +347,8 @@ export class AcVoltageSourceElement extends AbstractCircuitElement {
 
   draw(ctx: RenderContext, signals?: PinVoltageAccess): void {
     // All coordinates from Falstad reference (px / 16 = grid units):
-    // Leads: (0,0)→(15,0) and (49,0)→(64,0)
-    // Circle: cx=32, cy=0, r=16.66 → cx=2gu, r=1.04125gu
+    // Leads: (0,0)â†’(15,0) and (49,0)â†’(64,0)
+    // Circle: cx=32, cy=0, r=16.66 â†’ cx=2gu, r=1.04125gu
     // Sine wave: 21 line segments from x=22..42 px
     const PX = 1 / 16;
 
@@ -368,7 +368,7 @@ export class AcVoltageSourceElement extends AbstractCircuitElement {
     ctx.setColor("COMPONENT");
     ctx.drawCircle(2, 0, 16.66 * PX, false);
 
-    // Sine wave inside the circle — matches Falstad reference exactly
+    // Sine wave inside the circle â€” matches Falstad reference exactly
     // 21 segments from x=22 to x=42 px, y values trace one full sine cycle
     const sinePoints: [number, number][] = [
       [22, 0], [23, -2], [24, -4], [25, -6], [26, -7],
@@ -525,7 +525,7 @@ const AC_VOLTAGE_SOURCE_ATTRIBUTE_MAP: AttributeMapping[] = [
 ];
 
 // ---------------------------------------------------------------------------
-// AcVoltageSourceAnalogElement — AnalogElement with time-varying stamp
+// AcVoltageSourceAnalogElement â€” AnalogElement with time-varying stamp
 // ---------------------------------------------------------------------------
 
 export interface AcVoltageSourceAnalogElement extends AnalogElementCore {
@@ -636,12 +636,12 @@ function createAcVoltageSourceElement(
       }
 
       // B sub-matrix: node rows, branch column k
-      if (nodePos !== 0) solver.stampElement(solver.allocElement(nodePos - 1, k), 1);
-      if (nodeNeg !== 0) solver.stampElement(solver.allocElement(nodeNeg - 1, k), -1);
+      if (nodePos !== 0) solver.stampElement(solver.allocElement(nodePos, k), 1);
+      if (nodeNeg !== 0) solver.stampElement(solver.allocElement(nodeNeg, k), -1);
 
       // C sub-matrix: branch row k, node columns
-      if (nodePos !== 0) solver.stampElement(solver.allocElement(k, nodePos - 1), 1);
-      if (nodeNeg !== 0) solver.stampElement(solver.allocElement(k, nodeNeg - 1), -1);
+      if (nodePos !== 0) solver.stampElement(solver.allocElement(k, nodePos), 1);
+      if (nodeNeg !== 0) solver.stampElement(solver.allocElement(k, nodeNeg), -1);
 
       // RHS voltage constraint (ctx.srcFact folded in above).
       solver.stampRHS(k, v);
@@ -679,7 +679,7 @@ function createAcVoltageSourceElement(
             break;
           case "sawtooth": {
             // PULSE-aligned sawtooth (Fix 2): start of fall at tMod=riseSpan,
-            // end of fall / start of next rise at tMod=period (≡ 0 of next cycle).
+            // end of fall / start of next rise at tMod=period (â‰¡ 0 of next cycle).
             const riseSpan = period - fallTime;
             offsets = [riseSpan, period];
             break;
@@ -708,7 +708,7 @@ function createAcVoltageSourceElement(
       if (waveform === "noise") {
         // ngspice TRNOISE schedule (vsrcacct.c:209-224): samples land at integer
         // multiples of TS. The next sample strictly after `afterTime` is
-        // (floor(afterTime/TS) + 1) * TS — works whether afterTime is exactly
+        // (floor(afterTime/TS) + 1) * TS â€” works whether afterTime is exactly
         // n*TS (returns (n+1)*TS) or in between (returns next n*TS).
         if (noiseSampleTime <= 0) return null;
         return (Math.floor(afterTime / noiseSampleTime) + 1) * noiseSampleTime;
@@ -719,8 +719,8 @@ function createAcVoltageSourceElement(
     /**
      * Mirrors ngspice VSRCaccept (vsrcacct.c:24-310). Registers at most one
      * breakpoint per call, gated on:
-     *   - CKTbreak (atBreakpoint flag) — non-boundary acceptances do nothing
-     *   - SAMETIME(time, phase-boundary) — current CKTtime must sit on a
+     *   - CKTbreak (atBreakpoint flag) â€” non-boundary acceptances do nothing
+     *   - SAMETIME(time, phase-boundary) â€” current CKTtime must sit on a
      *     phase boundary; the registration target is the NEXT phase boundary
      *
      * SAMETIME(a,b) := |a-b| <= 1e-7 * PW (vsrcacct.c:21). PW maps to
@@ -903,7 +903,7 @@ export const AcVoltageSourceDefinition: ComponentDefinition = {
   propertyDefs: AC_VOLTAGE_SOURCE_PROPERTY_DEFS,
   attributeMap: AC_VOLTAGE_SOURCE_ATTRIBUTE_MAP,
 
-  helpText: "AC Voltage Source — time-varying voltage source with configurable waveform.",
+  helpText: "AC Voltage Source â€” time-varying voltage source with configurable waveform.",
 
   factory(props: PropertyBag): AcVoltageSourceElement {
     return new AcVoltageSourceElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);

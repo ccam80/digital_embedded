@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Tests for the Ideal Op-Amp component.
  *
  * The op-amp uses a linear MNA stamp in the unsaturated region:
@@ -64,17 +64,18 @@ function makeOpAmp(opts: {
 }
 
 /**
- * Build a solution vector with given node voltages (1-based node IDs).
+ * Build a solution vector with given node voltages (1-based node IDs;
+ * slot 0 is the ngspice ground sentinel).
  */
 function makeSolutionVector(
   size: number,
   nodeVoltages: Record<number, number>,
 ): Float64Array {
-  const v = new Float64Array(size);
+  const v = new Float64Array(size + 1);
   for (const [node, voltage] of Object.entries(nodeVoltages)) {
     const n = parseInt(node);
     if (n > 0 && n <= size) {
-      v[n - 1] = voltage;
+      v[n] = voltage;
     }
   }
   return v;
@@ -97,7 +98,7 @@ describe("OpAmp", () => {
     const voltages = makeSolutionVector(6, {
       1: 1e-6,   // in+
       2: 0,      // in-
-      3: 1.0,    // out — within linear range (between -15 and +15)
+      3: 1.0,    // out â€” within linear range (between -15 and +15)
       4: 15,     // Vcc+
       5: -15,    // Vcc-
     });
@@ -110,9 +111,9 @@ describe("OpAmp", () => {
 
     // G_out on out diagonal: stamp(out-1, out-1, G_out) = stamp(2, 2, G_out)
 
-    // VCVS: G[out, in+] -= gain*G_out → stamp(2, 0, -gain*G_out)
+    // VCVS: G[out, in+] -= gain*G_out â†’ stamp(2, 0, -gain*G_out)
 
-    // VCVS: G[out, in-] += gain*G_out → stamp(2, 1, +gain*G_out)
+    // VCVS: G[out, in-] += gain*G_out â†’ stamp(2, 1, +gain*G_out)
 
     // Linear region: no RHS contribution at the output node
     const rhsAtOut = rhs.filter((r) => r.row === 2);
@@ -124,11 +125,11 @@ describe("OpAmp", () => {
     const opamp = makeOpAmp({ gain: 1e6, rOut: 75 });
     const G_out = 1 / 75;
 
-    // Set Vout = 20V > Vcc+ = 15V → saturated
+    // Set Vout = 20V > Vcc+ = 15V â†’ saturated
     const voltages = makeSolutionVector(6, {
       1: 1e-3,   // in+
       2: 0,      // in-
-      3: 20,     // out — above Vcc+
+      3: 20,     // out â€” above Vcc+
       4: 15,     // Vcc+
       5: -15,    // Vcc-
     });
@@ -153,11 +154,11 @@ describe("OpAmp", () => {
     const opamp = makeOpAmp({ gain: 1e6, rOut: 75 });
     const G_out = 1 / 75;
 
-    // Set Vout = -20V < Vcc- = -15V → saturated
+    // Set Vout = -20V < Vcc- = -15V â†’ saturated
     const voltages = makeSolutionVector(6, {
       1: -1e-3,  // in+
       2: 0,      // in-
-      3: -20,    // out — below Vcc-
+      3: -20,    // out â€” below Vcc-
       4: 15,     // Vcc+
       5: -15,    // Vcc-
     });
@@ -169,11 +170,11 @@ describe("OpAmp", () => {
   });
 
   it("output_impedance", () => {
-    // Circuit: Vin=2µV fixes in+, in- grounded by VS, R_load=75Ω on output.
+    // Circuit: Vin=2ÂµV fixes in+, in- grounded by VS, R_load=75Î© on output.
     // Vout_open = gain * Vin = 1e6 * 2e-6 = 2V
-    // With R_load = R_out = 75Ω: Vout = 2 * R_load/(R_out+R_load) = 1V ± 0.1V
+    // With R_load = R_out = 75Î©: Vout = 2 * R_load/(R_out+R_load) = 1V Â± 0.1V
     //
-    // MNA: nodes 1..5, branches 5..8 → matrixSize = 9
+    // MNA: nodes 1..5, branches 5..8 â†’ matrixSize = 9
     //   node 1 = in+, node 2 = in- (grounded via VS), node 3 = out
     //   node 4 = Vcc+, node 5 = Vcc-
     const nInp = 1, nInn = 2, nOut = 3, nVccP = 4, nVccN = 5;
@@ -186,7 +187,7 @@ describe("OpAmp", () => {
       new Map([["in+", nInp], ["in-", nInn], ["out", nOut]]), [], -1, props, () => 0,
     ), [nInn, nInp, nOut]); // pinLayout order: [in-, in+, out]
 
-    // 75Ω load on output
+    // 75Î© load on output
     const G_load = 1 / 75;
     const rLoadEl: AnalogElement = {
       pinNodeIds: [nOut, 0],
@@ -195,7 +196,7 @@ describe("OpAmp", () => {
       setParam(_key: string, _value: number): void {},
       getPinCurrents(): number[] { return []; },
       load(ctx): void {
-        const h = ctx.solver.allocElement(nOut - 1, nOut - 1);
+        const h = ctx.solver.allocElement(nOut, nOut);
         ctx.solver.stampElement(h, G_load);
       },
     };
@@ -212,8 +213,8 @@ describe("OpAmp", () => {
     });
 
     expect(result.converged).toBe(true);
-    const vOut = result.nodeVoltages[nOut - 1];
-    // Vout = 2V * (75/(75+75)) = 1V ± 0.1V
+    const vOut = result.nodeVoltages[nOut];
+    // Vout = 2V * (75/(75+75)) = 1V Â± 0.1V
   });
 });
 
@@ -232,19 +233,19 @@ describe("Integration", () => {
       getPinCurrents(): number[] { return []; },
       load(ctx): void {
         const { solver } = ctx;
-        if (nodeA > 0) { const h = solver.allocElement(nodeA - 1, nodeA - 1); solver.stampElement(h, G); }
-        if (nodeB > 0) { const h = solver.allocElement(nodeB - 1, nodeB - 1); solver.stampElement(h, G); }
+        if (nodeA > 0) { const h = solver.allocElement(nodeA, nodeA); solver.stampElement(h, G); }
+        if (nodeB > 0) { const h = solver.allocElement(nodeB, nodeB); solver.stampElement(h, G); }
         if (nodeA > 0 && nodeB > 0) {
-          const hab = solver.allocElement(nodeA - 1, nodeB - 1); solver.stampElement(hab, -G);
-          const hba = solver.allocElement(nodeB - 1, nodeA - 1); solver.stampElement(hba, -G);
+          const hab = solver.allocElement(nodeA, nodeB); solver.stampElement(hab, -G);
+          const hba = solver.allocElement(nodeB, nodeA); solver.stampElement(hba, -G);
         }
       },
     };
   }
 
   it("inverting_amplifier", () => {
-    // Inverting amplifier: gain = -Rf/Rin = -10kΩ/1kΩ = -10
-    // Vin = 1V → Vout ≈ -10V ± 0.01V
+    // Inverting amplifier: gain = -Rf/Rin = -10kÎ©/1kÎ© = -10
+    // Vin = 1V â†’ Vout â‰ˆ -10V Â± 0.01V
     //
     // Node assignments:
     //   node 1 = Vin terminal
@@ -253,7 +254,7 @@ describe("Integration", () => {
     //   node 4 = in+ (grounded via VS)
     //   node 5 = Vcc+
     //   node 6 = Vcc-
-    // Branch rows: 6..9 → matrixSize = 10
+    // Branch rows: 6..9 â†’ matrixSize = 10
     const nVin = 1, nInn = 2, nOut = 3, nInp = 4, nVccP = 5, nVccN = 6;
     const brVin = 6, brInp = 7, brVccP = 8, brVccN = 9;
     const matrixSize = 10;
@@ -279,16 +280,16 @@ describe("Integration", () => {
     });
 
     expect(result.converged).toBe(true);
-    const vOut = result.nodeVoltages[nOut - 1];
-    // Ideal inverting gain = -Rf/Rin = -10 → Vout = -10V ± 0.05V
+    const vOut = result.nodeVoltages[nOut];
+    // Ideal inverting gain = -Rf/Rin = -10 â†’ Vout = -10V Â± 0.05V
   });
 
   it("voltage_follower", () => {
-    // Voltage follower: in- connected to out → Vout = Vin = 3.7V ± 0.001V
+    // Voltage follower: in- connected to out â†’ Vout = Vin = 3.7V Â± 0.001V
     //
     // Model: in- and out share the same node (node 2).
     // Node 1 = in+, node 2 = in- = out, node 3 = Vcc+, node 4 = Vcc-
-    // Branches: brVin=4, brVccP=5, brVccN=6 → matrixSize = 7
+    // Branches: brVin=4, brVccP=5, brVccN=6 â†’ matrixSize = 7
     const nInp = 1, nFeedback = 2, nVccP = 3, nVccN = 4;
     const brVin = 4, brVccP = 5, brVccN = 6;
     const matrixSize = 7;
@@ -311,13 +312,13 @@ describe("Integration", () => {
     });
 
     expect(result.converged).toBe(true);
-    const vOut = result.nodeVoltages[nFeedback - 1];
-    // Voltage follower: Vout = Vin = 3.7V ± 0.005V
+    const vOut = result.nodeVoltages[nFeedback];
+    // Voltage follower: Vout = Vin = 3.7V Â± 0.005V
   });
 });
 
 // ---------------------------------------------------------------------------
-// C4.5 parity test — opamp_load_dcop_parity
+// C4.5 parity test â€” opamp_load_dcop_parity
 // ---------------------------------------------------------------------------
 //
 // Drives the ideal op-amp via load(ctx) at a canonical operating point (linear
@@ -382,7 +383,7 @@ function makeOpAmpParityCtx(voltages: Float64Array, solver: SparseSolverType): L
 
 describe("OpAmp parity (C4.5)", () => {
   it("opamp_load_dcop_parity", () => {
-    // Canonical operating point: V+ = 1mV, V- = 0, V_out = 1V (within ±15V rails).
+    // Canonical operating point: V+ = 1mV, V- = 0, V_out = 1V (within Â±15V rails).
     // gain=1e6, rOut=75 (defaults).
     const nInp = 1, nInn = 2, nOut = 3;
     const opamp = getFactory(_OpAmpDefinitionForParity.modelRegistry!["behavioral"]!)(
@@ -398,9 +399,9 @@ describe("OpAmp parity (C4.5)", () => {
     );
 
     const voltages = new Float64Array(3);
-    voltages[nInp - 1] = 1e-3;
-    voltages[nInn - 1] = 0;
-    voltages[nOut - 1] = 1.0; // linear region, between -15 and +15
+    voltages[nInp] = 1e-3;
+    voltages[nInn] = 0;
+    voltages[nOut] = 1.0; // linear region, between -15 and +15
     const { solver, stamps, rhs } = makeCaptureSolver();
     const ctx = makeOpAmpParityCtx(voltages, solver);
     opamp.load(ctx);
@@ -411,7 +412,7 @@ describe("OpAmp parity (C4.5)", () => {
     const NGSPICE_GOUT = 1 / NGSPICE_ROUT;
     const NGSPICE_EFF = NGSPICE_GAIN * 1; // srcFact = 1
 
-    // Sum stamps by (row, col) — element may fold stamps through handle reuse.
+    // Sum stamps by (row, col) â€” element may fold stamps through handle reuse.
     const outRow = nOut - 1;
     const sumAt = (row: number, col: number): number =>
       stamps.filter((s) => s.row === row && s.col === col)

@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Tests for the PolarizedCap component.
  *
  * Covers:
@@ -142,10 +142,10 @@ function makeResistorElement(nA: number, nB: number, resistance: number) {
     getPinCurrents(_v: Float64Array): number[] { return []; },
     load(ctx: LoadContext): void {
       const { solver } = ctx;
-      if (nA !== 0) solver.stampElement(solver.allocElement(nA - 1, nA - 1), G);
-      if (nA !== 0 && nB !== 0) solver.stampElement(solver.allocElement(nA - 1, nB - 1), -G);
-      if (nB !== 0 && nA !== 0) solver.stampElement(solver.allocElement(nB - 1, nA - 1), -G);
-      if (nB !== 0) solver.stampElement(solver.allocElement(nB - 1, nB - 1), G);
+      if (nA !== 0) solver.stampElement(solver.allocElement(nA, nA), G);
+      if (nA !== 0 && nB !== 0) solver.stampElement(solver.allocElement(nA, nB), -G);
+      if (nB !== 0 && nA !== 0) solver.stampElement(solver.allocElement(nB, nA), -G);
+      if (nB !== 0) solver.stampElement(solver.allocElement(nB, nB), G);
     },
   };
 }
@@ -157,9 +157,9 @@ function makeResistorElement(nA: number, nB: number, resistance: number) {
 describe("PolarizedCap", () => {
   describe("dc_behaves_as_open_with_leakage", () => {
     it("DC current through capacitor equals V/R_leak in steady state", () => {
-      // Circuit: 5V source → polarized cap (pos=node1, neg=ground, cap_internal=node2)
-      // Leakage: R_leak = 25V / 1µA = 25MΩ
-      // ESR: 0.1Ω (negligible at DC)
+      // Circuit: 5V source â†’ polarized cap (pos=node1, neg=ground, cap_internal=node2)
+      // Leakage: R_leak = 25V / 1ÂµA = 25MÎ©
+      // ESR: 0.1Î© (negligible at DC)
       // At DC steady state: cap is open, only leakage path conducts
       // I_leak = V / R_leak = 5 / 25e6 = 200nA
       //
@@ -189,7 +189,7 @@ describe("PolarizedCap", () => {
       // V(node1) = 5V (enforced by source)
 
       // Branch current = leakage current through ESR + cap_node path to ground
-      // I = V / (ESR + R_leak) ≈ V / R_leak (ESR << R_leak)
+      // I = V / (ESR + R_leak) â‰ˆ V / R_leak (ESR << R_leak)
       const expectedI = V / (esr + rLeak);
       const branchCurrent = Math.abs(result.nodeVoltages[2]);
       expect(Math.abs(branchCurrent - expectedI) / expectedI).toBeLessThan(0.01);
@@ -200,7 +200,7 @@ describe("PolarizedCap", () => {
     it("initial current spike is dominated by ESR at t=0", () => {
       // At t=0 (first transient step with very small dt), the capacitor companion
       // has geq = C/dt >> G_leak, so almost all impedance is in ESR.
-      // For a step from 0V to V_step, initial current ≈ V_step / ESR.
+      // For a step from 0V to V_step, initial current â‰ˆ V_step / ESR.
       //
       // MNA: node1=pos, node0=ground=neg, node2=cap_internal
       // Source: V_step on node1
@@ -256,7 +256,7 @@ describe("PolarizedCap", () => {
 
       // At t=0 with geq >> G_leak, cap is near short-circuit
       // Most of V_step drops across ESR
-      // I ≈ V_step / ESR
+      // I â‰ˆ V_step / ESR
       const expectedI = V_step / esr;
       const branchCurrent = Math.abs(voltages[2]);
       expect(Math.abs(branchCurrent - expectedI) / expectedI).toBeLessThan(0.1);
@@ -264,10 +264,10 @@ describe("PolarizedCap", () => {
   });
 
   describe("charges_with_rc_time_constant", () => {
-    it("capacitor voltage reaches 63% of step voltage at t ≈ RC", () => {
-      // RC circuit: 10µF cap + 1kΩ series resistor, 5V step input
+    it("capacitor voltage reaches 63% of step voltage at t â‰ˆ RC", () => {
+      // RC circuit: 10ÂµF cap + 1kÎ© series resistor, 5V step input
       // Run transient to t = RC = 10ms using backward Euler.
-      // Expected: V(cap_pos) ≈ 5 * (1 - exp(-1)) ≈ 3.161V at t = RC.
+      // Expected: V(cap_pos) â‰ˆ 5 * (1 - exp(-1)) â‰ˆ 3.161V at t = RC.
       //
       // MNA layout (1-based nodes, 0=ground):
       //   node 1 = voltage source positive terminal
@@ -277,7 +277,7 @@ describe("PolarizedCap", () => {
       //   matrixSize = 4 (3 non-ground nodes + 1 voltage source branch)
       //
       // Cap: [nPos=2, nNeg=0(ground), nCap=3]
-      // R: node1 ↔ node2
+      // R: node1 â†” node2
       // Vs: node1 to ground (branchIdx=3 = solver row 3)
 
       const V_step = 5;
@@ -295,7 +295,7 @@ describe("PolarizedCap", () => {
       const matrixSize = 4;
       const voltages = new Float64Array(matrixSize);
 
-      // Run 500 steps at dt = RC/500 = 20µs using order-1 trap (no ringing on step input)
+      // Run 500 steps at dt = RC/500 = 20Âµs using order-1 trap (no ringing on step input)
       const dt = RC / 500;
       const steps = 500;
 
@@ -360,10 +360,10 @@ describe("PolarizedCap", () => {
         capPool.rotateStateVectors();
       }
 
-      // After RC seconds, V(cap_pos = node2, solver index 1) ≈ 5*(1-exp(-1)) ≈ 3.161V
+      // After RC seconds, V(cap_pos = node2, solver index 1) â‰ˆ 5*(1-exp(-1)) â‰ˆ 3.161V
       const vCapPos = voltages[1];
       const expected = V_step * (1 - Math.exp(-1));
-      const tolerance = 0.10; // 10% — order-1 trap has first-order error
+      const tolerance = 0.10; // 10% â€” order-1 trap has first-order error
       expect(Math.abs(vCapPos - expected) / expected).toBeLessThan(tolerance);
     });
   });
@@ -382,7 +382,7 @@ describe("PolarizedCap", () => {
       );
       withState(capReverse);
 
-      // V(node1) = -5V → reverse biased by 5V
+      // V(node1) = -5V â†’ reverse biased by 5V
       const voltagesReverse = new Float64Array([-5, 0]);
       const solver = new SparseSolver();
       solver._initStructure(2);
@@ -407,7 +407,7 @@ describe("PolarizedCap", () => {
       );
       withState(cap);
 
-      // V(node1) = +5V → forward biased
+      // V(node1) = +5V â†’ forward biased
       const voltages = new Float64Array([5, 0]);
       const solver = new SparseSolver();
       solver._initStructure(2);
@@ -478,13 +478,13 @@ describe("PolarizedCap", () => {
       solver._initStructure(2);
       el.load(makeSlotLoadCtx(solver, voltages, 1e-6, "trapezoidal", 1, MODETRAN | MODEINITTRAN));
       expect(pool.state0[0]).toBeGreaterThan(0); // GEQ = C/dt > 0
-      // IEQ = ceq = 0 on first step (zero charge history): ccap = C*vNow/dt, geq*vNow = C*vNow/dt → ceq=0
+      // IEQ = ceq = 0 on first step (zero charge history): ccap = C*vNow/dt, geq*vNow = C*vNow/dt â†’ ceq=0
     });
 
     it("load writes V_PREV to pool slot 2", () => {
       const el = new AnalogPolarizedCapElement([1, 0, 2], 100e-6, 0.1, 25e6, 1.0);
       const { pool } = withState(el);
-      // nCap=2 (1-based), nNeg=0 → vCapNode = voltages[1], vNeg = 0
+      // nCap=2 (1-based), nNeg=0 â†’ vCapNode = voltages[1], vNeg = 0
       const voltages = new Float64Array([0, 3]); // node1=0, node2=3V
       const solver = new SparseSolver();
       solver._initStructure(2);
@@ -495,12 +495,12 @@ describe("PolarizedCap", () => {
 });
 
 // ---------------------------------------------------------------------------
-// C4.2 — Transient parity test
+// C4.2 â€” Transient parity test
 //
 // Circuit: Vsrc=1V step on node 1 (pos), neg=gnd(0), internal cap node=2.
 // ESR is set to a very small value so it is negligible; leakage set large.
 //
-// PolarizedCap topology: pos─ESR─nCap─(C||leakage)─neg.
+// PolarizedCap topology: posâ”€ESRâ”€nCapâ”€(C||leakage)â”€neg.
 // The capacitor body stamps between nCap(2) and neg(0).
 //
 // order-1 trap integration:
@@ -508,24 +508,24 @@ describe("PolarizedCap", () => {
 //   geq = ag[0]*C   (niinteg.c:77, capload.c:CAPload::geq)
 //   ceq = ag[1]*q_prev = ag[1]*C*v_cap_prev   (capload.c:CAPload::ceq)
 //
-// ngspice source → our variable mapping:
-//   capload.c:CAPload::cstate0[CAPqcap]  → s0[SLOT_Q]   = C*v_cap
-//   niinteg.c:NIintegrate::ag[0]         → ctx.ag[0]     = 1/dt
-//   niinteg.c:NIintegrate::ag[1]         → ctx.ag[1]     = -1/dt
-//   capload.c:CAPload::geq               → s0[SLOT_GEQ]  = ag[0]*C
-//   capload.c:CAPload::ceq               → s0[SLOT_IEQ]  = ag[1]*q_prev
+// ngspice source â†’ our variable mapping:
+//   capload.c:CAPload::cstate0[CAPqcap]  â†’ s0[SLOT_Q]   = C*v_cap
+//   niinteg.c:NIintegrate::ag[0]         â†’ ctx.ag[0]     = 1/dt
+//   niinteg.c:NIintegrate::ag[1]         â†’ ctx.ag[1]     = -1/dt
+//   capload.c:CAPload::geq               â†’ s0[SLOT_GEQ]  = ag[0]*C
+//   capload.c:CAPload::ceq               â†’ s0[SLOT_IEQ]  = ag[1]*q_prev
 //
-// With ESR negligible (1e-9 Ω) and leakage very large (1e12 Ω, G_leak≈1e-12):
+// With ESR negligible (1e-9 Î©) and leakage very large (1e12 Î©, G_leakâ‰ˆ1e-12):
 //   The dominant path for the cap body: geq+G_leak+G_esr stamps on nCap.
-//   We use all-zero voltages so ceq = 0 every step → geq is the only
+//   We use all-zero voltages so ceq = 0 every step â†’ geq is the only
 //   state-dependent quantity we assert bit-exact.
 // ---------------------------------------------------------------------------
 
 describe("polarized_cap_load_transient_parity (C4.2)", () => {
   it("polarized_cap_load_transient_parity", () => {
-    const C_val = 100e-6;  // 100 µF (default)
+    const C_val = 100e-6;  // 100 ÂµF (default)
     const ESR   = 1e-9;    // negligible ESR: G_esr = 1/max(ESR, 1e-9) = 1e9
-    const rLeak = 1e12;    // very large leakage resistance: G_leak ≈ 1e-12
+    const rLeak = 1e12;    // very large leakage resistance: G_leak â‰ˆ 1e-12
     const dt    = 1e-6;    // timestep (s)
     const order = 1;
     const method = "trapezoidal" as const;
@@ -538,9 +538,9 @@ describe("polarized_cap_load_transient_parity (C4.2)", () => {
     //   geq = ag[0] * C_val
     const geq = ag0 * C_val;
 
-    // G_esr = 1 / max(ESR, 1e-9) — matches MIN_RESISTANCE constant in polarized-cap.ts
+    // G_esr = 1 / max(ESR, 1e-9) â€” matches MIN_RESISTANCE constant in polarized-cap.ts
     const G_esr  = 1 / Math.max(ESR, 1e-9);
-    // G_leak = 1 / max(rLeak, 1e-9) — leakage conductance
+    // G_leak = 1 / max(rLeak, 1e-9) â€” leakage conductance
     const G_leak = 1 / Math.max(rLeak, 1e-9);
 
     // Build element: pinNodeIds = [n_pos=1, n_neg=0, n_cap=2]
@@ -587,7 +587,7 @@ describe("polarized_cap_load_transient_parity (C4.2)", () => {
     ag[1] = ag1;
 
     // All voltages zero throughout (so cap body voltage = V(nCap) - V(neg) = 0)
-    // ceq = ag[1]*C*0 = 0 every step → geq is constant = ag[0]*C.
+    // ceq = ag[1]*C*0 = 0 every step â†’ geq is constant = ag[0]*C.
     const voltages = new Float64Array(3); // [V(node1), V(node2), V(node3)] but gnd=node0 excluded
 
     // 10-step transient loop
@@ -622,11 +622,11 @@ describe("polarized_cap_load_transient_parity (C4.2)", () => {
       expect(ctx.order).toBe(order);
       expect(ctx.method).toBe(method);
 
-      // Rotate state: s1 ← s0
+      // Rotate state: s1 â† s0
       poolEl._pool.states[1].set(poolEl._pool.states[0]);
     }
 
-    // G_esr and G_leak are topology-constant — referenced only to confirm
+    // G_esr and G_leak are topology-constant â€” referenced only to confirm
     // the element was constructed with the intended parameters.
     void G_esr;
     void G_leak;
@@ -634,7 +634,7 @@ describe("polarized_cap_load_transient_parity (C4.2)", () => {
 });
 
 // ---------------------------------------------------------------------------
-// PC-W3-4 — F4b parity: clamp diode stamp verification
+// PC-W3-4 â€” F4b parity: clamp diode stamp verification
 //
 // Structural test: verifies that the F4b clamp diode (PC-W3-1) produces
 // nonzero matrix entries between nPos (K, cathode) and nNeg (A, anode).
@@ -647,7 +647,7 @@ describe("polarized_cap_load_transient_parity (C4.2)", () => {
 // initial-guess companion conductance.
 //
 // Pin layout: nPos=1 (solver idx 0), nNeg=0 (ground), nCap=2 (solver idx 1).
-// Clamp diode: A=nNeg=0(gnd), K=nPos=1 → stamps on solver row/col 0 (nPos-1).
+// Clamp diode: A=nNeg=0(gnd), K=nPos=1 â†’ stamps on solver row/col 0 (nPos-1).
 //
 // Verification: after load() in MODETRAN|MODEINITTRAN mode, the matrix
 // entry at (nPos-1, nPos-1) = (0,0) must include the diode's companion
@@ -673,7 +673,7 @@ describe("polarized_cap_F4b_clamp_diode_stamp (PC-W3-4)", () => {
     element.stateBaseOffset = 0;
     element.initState(pool);
 
-    // Track matrix entries by (row,col) — accumulate across stamps.
+    // Track matrix entries by (row,col) â€” accumulate across stamps.
     const matEntries = new Map<string, number>();
     const solver = {
       allocElement: (row: number, col: number): number => {
@@ -733,10 +733,10 @@ describe("polarized_cap_F4b_clamp_diode_stamp (PC-W3-4)", () => {
     element.load(ctx);
 
     // PC-W3-4: Verify clamp diode produced a stamp at (nPos-1, nPos-1) = (0,0).
-    // nPos=1 → solver index 0. The diode stamps on nPos self-diagonal (K side).
+    // nPos=1 â†’ solver index 0. The diode stamps on nPos self-diagonal (K side).
     // The ESR also stamps here, so total must exceed ESR contribution alone.
     // G_esr = 1/max(0.1, 1e-9) = 10. ESR self-stamp on (0,0) = G_esr.
-    // Diode geq (at MODEINITTRAN zero-voltage init) ≈ gmin (1e-12).
+    // Diode geq (at MODEINITTRAN zero-voltage init) â‰ˆ gmin (1e-12).
     // So (0,0) > G_esr = 10 if diode stamp is present.
     const G_esr = 1 / Math.max(ESR, 1e-9); // 10
     const entry00 = matEntries.get("0,0") ?? 0;
@@ -744,10 +744,10 @@ describe("polarized_cap_F4b_clamp_diode_stamp (PC-W3-4)", () => {
     expect(entry00).toBeGreaterThan(0);
     // Specifically: entry00 >= G_esr (ESR) + diode_geq (clamp diode).
     // Since diode is initialised at MODEINITTRAN (vd from state1 = 0 initially),
-    // geq ≈ gmin = 1e-12. So entry00 ≈ G_esr + gmin > G_esr.
+    // geq â‰ˆ gmin = 1e-12. So entry00 â‰ˆ G_esr + gmin > G_esr.
     expect(entry00).toBeGreaterThanOrEqual(G_esr);
 
-    // PC-W3-4: nNeg=0 (ground) — not in solver matrix, so no (nNeg-1) entry.
+    // PC-W3-4: nNeg=0 (ground) â€” not in solver matrix, so no (nNeg-1) entry.
     // The clamp diode stamps nPos diagonal (solver idx 0) and nNeg diagonal (ground, excluded).
     // Verify that at least two distinct matrix entries exist (ESR: (0,1) and (1,0);
     // cap-body: (1,1); clamp diode: (0,0) cross-entry with nNeg=gnd excluded).

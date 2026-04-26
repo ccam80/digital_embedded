@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Parameter sweep runner.
  *
  * Runs one analog simulation per step value of a single parameter, sweeping
@@ -36,7 +36,7 @@ export interface SweepConfig {
   start: number;
   /** Stop value (inclusive). */
   stop: number;
-  /** Number of simulation steps (including start and stop). Must be ≥ 2. */
+  /** Number of simulation steps (including start and stop). Must be â‰¥ 2. */
   steps: number;
   /** How to space the parameter values between start and stop. */
   scale: "linear" | "log";
@@ -92,7 +92,7 @@ export type SweepCircuitFactory = (
  *
  * @param start - First value
  * @param stop  - Last value
- * @param steps - Number of values (≥ 2)
+ * @param steps - Number of values (â‰¥ 2)
  * @param scale - 'linear' or 'log'
  */
 export function generateSweepValues(
@@ -147,7 +147,7 @@ function runTransientSync(
 
   const dcResult = engine.dcOperatingPoint();
   if (!dcResult.converged) {
-    return { converged: false, nodeVoltages: new Float64Array(compiled.matrixSize) };
+    return { converged: false, nodeVoltages: new Float64Array(compiled.matrixSize + 1) };
   }
 
   let steps = 0;
@@ -156,13 +156,16 @@ function runTransientSync(
     engine.step();
     steps++;
     if (engine.getState() === EngineState.ERROR) {
-      return { converged: false, nodeVoltages: new Float64Array(compiled.matrixSize) };
+      return { converged: false, nodeVoltages: new Float64Array(compiled.matrixSize + 1) };
     }
   }
 
-  const voltages = new Float64Array(compiled.matrixSize);
+  // Public nodeVoltages mirrors the ngspice 1-based layout: slot 0 is the
+  // ground sentinel (always 0), slots 1..nodeCount hold node voltages, and
+  // any remaining slots up to matrixSize are reserved for branch currents.
+  const voltages = new Float64Array(compiled.matrixSize + 1);
   for (let n = 1; n <= compiled.nodeCount; n++) {
-    voltages[n - 1] = engine.getNodeVoltage(n);
+    voltages[n] = engine.getNodeVoltage(n);
   }
   return { converged: true, nodeVoltages: voltages };
 }
@@ -175,8 +178,8 @@ function measureOutput(
   if (spec.type === "voltage" && spec.node !== undefined) {
     const nodeId = compiled.labelToNodeId.get(spec.node);
     if (nodeId === undefined || nodeId === 0) return 0;
-    if (nodeId - 1 >= nodeVoltages.length) return 0;
-    return nodeVoltages[nodeId - 1];
+    if (nodeId >= nodeVoltages.length) return 0;
+    return nodeVoltages[nodeId];
   }
   return NaN;
 }

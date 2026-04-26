@@ -1,12 +1,12 @@
-/**
+﻿/**
  * Tests for the Analog Comparator component.
  *
  * Tests cover:
- *   Comparator::output_high_when_vp_greater   — V+=2V, V-=1V; output sinks (open-collector active)
- *   Comparator::output_low_when_vm_greater    — V+=1V, V-=2V; output high-impedance (off)
- *   Comparator::hysteresis_prevents_chatter  — 10mV hysteresis; ±5mV input oscillation; no toggle
- *   Comparator::zero_crossing_detector       — V-=0V; V+ sweeps through 0; clean transition
- *   Comparator::response_time                — step input; transition completes within responseTime
+ *   Comparator::output_high_when_vp_greater   â€” V+=2V, V-=1V; output sinks (open-collector active)
+ *   Comparator::output_low_when_vm_greater    â€” V+=1V, V-=2V; output high-impedance (off)
+ *   Comparator::hysteresis_prevents_chatter  â€” 10mV hysteresis; Â±5mV input oscillation; no toggle
+ *   Comparator::zero_crossing_detector       â€” V-=0V; V+ sweeps through 0; clean transition
+ *   Comparator::response_time                â€” step input; transition completes within responseTime
  *
  * Testing approach: drive load(ctx) with synthetic voltage vectors and
  * inspect captured stamp entries to observe the output state. For the
@@ -68,10 +68,11 @@ function makeComparator(
 }
 
 function makeVoltages(size: number, nodeVoltages: Record<number, number>): Float64Array {
-  const v = new Float64Array(size);
+  // ngspice 1-based: slot 0 is the ground sentinel; node n lives at v[n].
+  const v = new Float64Array(size + 1);
   for (const [node, voltage] of Object.entries(nodeVoltages)) {
     const n = parseInt(node);
-    if (n > 0 && n <= size) v[n - 1] = voltage;
+    if (n > 0 && n <= size) v[n] = voltage;
   }
   return v;
 }
@@ -99,13 +100,13 @@ function readTotalOutputConductance(
 
 describe("Comparator", () => {
   it("output_high_when_vp_greater", () => {
-    // V+ = 2V, V- = 1V: V+ > V- → comparator activates (open-collector sinks)
+    // V+ = 2V, V- = 1V: V+ > V- â†’ comparator activates (open-collector sinks)
     // Active state: stamps G_sat = 1/50 = 0.02 S on the output node.
     const nInp = 1, nInn = 2, nOut = 3;
     const rSat = 50;
     const cmp = makeComparator(nInp, nInn, nOut, { rSat, hysteresis: 0, vos: 0 });
 
-    // Set V+ = 2V, V- = 1V → output should activate
+    // Set V+ = 2V, V- = 1V â†’ output should activate
     const voltages = makeVoltages(3, { 1: 2.0, 2: 1.0, 3: 0.0 });
 
     // The active (sinking) state stamps G_sat on output node diagonal
@@ -114,14 +115,14 @@ describe("Comparator", () => {
   });
 
   it("output_low_when_vm_greater", () => {
-    // V+ = 1V, V- = 2V: V+ < V- → comparator inactive (open-collector off)
-    // Inactive state: stamps G_off = 1/1e9 ≈ 1e-9 S on the output node.
+    // V+ = 1V, V- = 2V: V+ < V- â†’ comparator inactive (open-collector off)
+    // Inactive state: stamps G_off = 1/1e9 â‰ˆ 1e-9 S on the output node.
     const nInp = 1, nInn = 2, nOut = 3;
     const rSat = 50;
     const R_OFF = 1e9;
     const cmp = makeComparator(nInp, nInn, nOut, { rSat, hysteresis: 0, vos: 0 });
 
-    // Set V+ = 1V, V- = 2V → output should be inactive (high-impedance)
+    // Set V+ = 1V, V- = 2V â†’ output should be inactive (high-impedance)
     const voltages = makeVoltages(3, { 1: 1.0, 2: 2.0, 3: 0.0 });
 
     // Inactive state: G_off = 1/R_OFF
@@ -130,7 +131,7 @@ describe("Comparator", () => {
   });
 
   it("hysteresis_prevents_chatter", () => {
-    // 10mV hysteresis: V+ oscillates ±5mV around V- (threshold at 0V).
+    // 10mV hysteresis: V+ oscillates Â±5mV around V- (threshold at 0V).
     // The input never exceeds +5mV (< +5mV needed to trip) and never drops
     // below -5mV (> -5mV needed to reset). Output must not toggle.
     const nInp = 1, nInn = 2, nOut = 3;
@@ -147,8 +148,8 @@ describe("Comparator", () => {
     // Verify initial state is inactive
     const gBefore = readTotalOutputConductance(cmp, nOut, vStart);
 
-    // Oscillate ±5mV around threshold (just inside hysteresis band)
-    // The half-band is 5mV; voltages of ±4mV are within the dead band.
+    // Oscillate Â±5mV around threshold (just inside hysteresis band)
+    // The half-band is 5mV; voltages of Â±4mV are within the dead band.
     const perturbations = [-0.004, +0.004, -0.004, +0.004, -0.004, +0.004];
     let vLast = vStart;
     for (const delta of perturbations) {
@@ -162,7 +163,7 @@ describe("Comparator", () => {
 
   it("zero_crossing_detector", () => {
     // V- = 0V (ground); V+ sweeps through 0.
-    // Transition: V+ negative → output inactive; V+ positive → output active.
+    // Transition: V+ negative â†’ output inactive; V+ positive â†’ output active.
     const nInp = 1, nInn = 2, nOut = 3;
     const rSat = 50;
     const cmp = makeComparator(nInp, nInn, nOut, { hysteresis: 0, vos: 0, rSat });
@@ -171,33 +172,33 @@ describe("Comparator", () => {
     const G_off = 1 / R_OFF;
     const G_sat = 1 / rSat;
 
-    // V+ = -1V → output inactive
+    // V+ = -1V â†’ output inactive
       .toBeCloseTo(G_off, 12);
 
-    // V+ = +0.1V → output active (V+ > V- + vos ≈ 0.001)
+    // V+ = +0.1V â†’ output active (V+ > V- + vos â‰ˆ 0.001)
       .toBeCloseTo(G_sat, 6);
 
-    // V+ = -0.1V → output inactive again
+    // V+ = -0.1V â†’ output inactive again
       .toBeCloseTo(G_off, 12);
   });
 
   it("response_time", () => {
     // Step input: V+ goes from 0V to 3V at t=0 (V- = 1V).
-    // responseTime = 1µs. After 5 time constants (5µs) the output weight
+    // responseTime = 1Âµs. After 5 time constants (5Âµs) the output weight
     // should have settled to > 99% of its final value (fully active).
     //
     // accept(ctx) advances _outputWeight toward the target using a first-order
     // filter: alpha = dt/(tau+dt). After N accepted timesteps of dt each, the
-    // weight should be ≥ 0.99.
+    // weight should be â‰¥ 0.99.
     const nInp = 1, nInn = 2, nOut = 3;
-    const responseTime = 1e-6; // 1 µs
+    const responseTime = 1e-6; // 1 Âµs
     const rSat = 50;
     const cmp = makeComparator(nInp, nInn, nOut, { responseTime, rSat, hysteresis: 0, vos: 0 });
 
-    // Step: V+ = 3V, V- = 1V → activates immediately on first load()
+    // Step: V+ = 3V, V- = 1V â†’ activates immediately on first load()
     const voltages = makeVoltages(3, { 1: 3.0, 2: 1.0, 3: 0.0 });
 
-    // Advance via accept() for 10 steps of 0.5µs each = 5µs total.
+    // Advance via accept() for 10 steps of 0.5Âµs each = 5Âµs total.
     // load(ctx) each iteration to update _outputActive, then accept(ctx) to
     // advance the first-order filter state by dt.
     const dt = 0.5e-6;
@@ -209,7 +210,7 @@ describe("Comparator", () => {
       cmp.accept?.(ctx, i * dt, () => {});
     }
 
-    // After 5τ the weight should be > 99% active → conductance near G_sat
+    // After 5Ï„ the weight should be > 99% active â†’ conductance near G_sat
     const G_sat = 1 / rSat;
     const G_off = 1 / 1e9;
     const gFinal = readTotalOutputConductance(cmp, nOut, voltages);
@@ -221,7 +222,7 @@ describe("Comparator", () => {
 });
 
 // ---------------------------------------------------------------------------
-// C4.5 parity test — comparator_load_dcop_parity
+// C4.5 parity test â€” comparator_load_dcop_parity
 // ---------------------------------------------------------------------------
 //
 // Drives the open-collector comparator via load(ctx) at a canonical operating
@@ -229,10 +230,10 @@ describe("Comparator", () => {
 // conductance is bit-exact.
 //
 // Reference formulas (from comparator.ts createOpenCollectorComparatorElement):
-//   R_OFF = 1e9 → G_off = 1e-9
+//   R_OFF = 1e9 â†’ G_off = 1e-9
 //   G_sat = 1 / rSat
 //   When V+ - V- - vos > hysteresis/2: _outputActive becomes true and
-//   _outputWeight clamps to 1.0 → G_eff = G_off + 1.0 * (G_sat - G_off) = G_sat
+//   _outputWeight clamps to 1.0 â†’ G_eff = G_off + 1.0 * (G_sat - G_off) = G_sat
 //   Stamp on (nOut, nOut): G_eff
 
 import type { LoadContext } from "../../../solver/analog/load-context.js";
@@ -326,17 +327,17 @@ function makeComparatorTransientCtx(
 
 describe("Comparator parity (C4.5)", () => {
   it("comparator_load_dcop_parity", () => {
-    // Canonical operating point: V+=2V, V-=1V → output active (open-collector sinks).
+    // Canonical operating point: V+=2V, V-=1V â†’ output active (open-collector sinks).
     // Use rSat=50, hysteresis=0, vos=0; _outputActive flips true on first load(),
-    // _outputWeight becomes 1.0 → G_eff = G_sat = 1/50 = 0.02 S.
+    // _outputWeight becomes 1.0 â†’ G_eff = G_sat = 1/50 = 0.02 S.
     const nInp = 1, nInn = 2, nOut = 3;
     const rSat = 50;
     const cmp = makeComparator(nInp, nInn, nOut, { rSat, hysteresis: 0, vos: 0 });
 
     const voltages = new Float64Array(3);
-    voltages[nInp - 1] = 2;
-    voltages[nInn - 1] = 1;
-    voltages[nOut - 1] = 0;
+    voltages[nInp] = 2;
+    voltages[nInn] = 1;
+    voltages[nOut] = 0;
 
     const { solver, stamps, rhs } = makeComparatorCaptureSolver();
     const ctx = makeComparatorParityCtx(voltages, solver);

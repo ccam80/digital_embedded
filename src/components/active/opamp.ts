@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Ideal Op-Amp analog component.
  *
  * Three-terminal nonlinear element: in+ (non-inverting), in- (inverting),
@@ -39,7 +39,7 @@ import { defineModelParams } from "../../core/model-params.js";
 export const { paramDefs: OPAMP_PARAM_DEFS, defaults: OPAMP_DEFAULTS } = defineModelParams({
   primary: {
     gain: { default: 1e6,  description: "Open-loop voltage gain" },
-    rOut: { default: 75,   unit: "Ω",  description: "Output resistance" },
+    rOut: { default: 75,   unit: "Î©",  description: "Output resistance" },
   },
 });
 
@@ -80,7 +80,7 @@ function buildOpAmpPinDeclarations(): PinDeclaration[] {
 }
 
 // ---------------------------------------------------------------------------
-// OpAmpElement — CircuitElement implementation
+// OpAmpElement â€” CircuitElement implementation
 // ---------------------------------------------------------------------------
 
 export class OpAmpElement extends AbstractCircuitElement {
@@ -115,8 +115,8 @@ export class OpAmpElement extends AbstractCircuitElement {
     ctx.save();
     ctx.setLineWidth(1);
 
-    // Triangle body — stays COMPONENT color
-    // Matches Falstad 3-point polyline (6,-32)→(6,32)→(58,0) which draws only 2 segments
+    // Triangle body â€” stays COMPONENT color
+    // Matches Falstad 3-point polyline (6,-32)â†’(6,32)â†’(58,0) which draws only 2 segments
     ctx.setColor("COMPONENT");
     ctx.drawLine(0.375, -2, 0.375, 2);
     ctx.drawLine(0.375, 2, 3.625, 0);
@@ -143,7 +143,7 @@ export class OpAmpElement extends AbstractCircuitElement {
 
 
 // ---------------------------------------------------------------------------
-// createOpAmpElement — AnalogElement factory
+// createOpAmpElement â€” AnalogElement factory
 // ---------------------------------------------------------------------------
 
 /**
@@ -192,7 +192,7 @@ function createOpAmpElement(
   let lastSrcFact = 1;
 
   function readNode(voltages: Float64Array, n: number): number {
-    return n > 0 ? voltages[n - 1] : 0;
+    return voltages[n];
   }
 
   return {
@@ -213,7 +213,7 @@ function createOpAmpElement(
       // Saturation is determined by the current output voltage, not the ideal
       // open-loop voltage. This prevents oscillation: the linear stamp is used
       // whenever the output is within the supply rails, letting NR find the
-      // virtual-ground solution (V_inn ≈ 0) without toggling the Jacobian.
+      // virtual-ground solution (V_inn â‰ˆ 0) without toggling the Jacobian.
       const vOut = readNode(voltages, nOut);
       if (vOut >= vVccP) {
         saturated = true;
@@ -228,7 +228,7 @@ function createOpAmpElement(
 
       // G_out: output resistance between nOut and ground (always present).
       if (nOut > 0) {
-        solver.stampElement(solver.allocElement(nOut - 1, nOut - 1), G_out);
+        solver.stampElement(solver.allocElement(nOut, nOut), G_out);
       }
 
       if (!saturated) {
@@ -239,23 +239,23 @@ function createOpAmpElement(
         //                                                G[out,in-] += gain*G_out
         const effectiveGain = p.gain * scale;
         if (nOut > 0 && nInp > 0) {
-          solver.stampElement(solver.allocElement(nOut - 1, nInp - 1), -effectiveGain * G_out);
+          solver.stampElement(solver.allocElement(nOut, nInp), -effectiveGain * G_out);
         }
         if (nOut > 0 && nInn > 0) {
-          solver.stampElement(solver.allocElement(nOut - 1, nInn - 1), effectiveGain * G_out);
+          solver.stampElement(solver.allocElement(nOut, nInn), effectiveGain * G_out);
         }
       } else if (nOut > 0) {
         // Saturation: inject Norton current to clamp output to rail voltage.
-        solver.stampRHS(nOut - 1, vOutTarget * G_out);
+        solver.stampRHS(nOut, vOutTarget * G_out);
       }
     },
 
     getPinCurrents(voltages: Float64Array): number[] {
       const G_out = 1 / Math.max(p.rOut, 1e-9);
-      // Input pins: ideal op-amp — infinite input impedance, zero input current.
+      // Input pins: ideal op-amp â€” infinite input impedance, zero input current.
       // No conductance is stamped at in+ or in- nodes, so I_in+ = I_in- = 0.
 
-      // Output pin: Norton equivalent — conductance G_out from nOut to ground.
+      // Output pin: Norton equivalent â€” conductance G_out from nOut to ground.
       //   Linear region:   vOutTarget = gain*(V_inp - V_inn)  (full open-loop target)
       //   Saturated region: vOutTarget = rail voltage
       // The element sources (vOutTarget - V_out)*G_out into the nOut node.
@@ -270,7 +270,7 @@ function createOpAmpElement(
       const iOut = nOut > 0 ? (vOut - idealTarget) * G_out : 0;
 
       // pinLayout order: in-, in+, out
-      // Sum is nonzero — residual is implicit supply current (no explicit Vcc/Vee pins).
+      // Sum is nonzero â€” residual is implicit supply current (no explicit Vcc/Vee pins).
       return [0, 0, iOut];
     },
 
@@ -319,7 +319,7 @@ export const OpAmpDefinition: ComponentDefinition = {
   attributeMap: OPAMP_ATTRIBUTE_MAPPINGS,
 
   helpText:
-    "Ideal Op-Amp — 3-terminal nonlinear element (in+, in-, out). " +
+    "Ideal Op-Amp â€” 3-terminal nonlinear element (in+, in-, out). " +
     "High-gain voltage amplifier with output saturation at supply rails.",
 
   factory(props: PropertyBag): OpAmpElement {

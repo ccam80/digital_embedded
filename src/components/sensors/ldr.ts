@@ -1,18 +1,18 @@
-/**
- * LDR (Light Dependent Resistor) — illumination-dependent resistor.
+﻿/**
+ * LDR (Light Dependent Resistor) â€” illumination-dependent resistor.
  *
  * Resistance model:
  *   lux = 0:         R = rDark  (no illumination)
- *   lux > 0:         R = rDark · (lux / luxRef)^(-gamma)
+ *   lux > 0:         R = rDark Â· (lux / luxRef)^(-gamma)
  *
- * At lux = luxRef, R = rDark · 1 = rDark.
+ * At lux = luxRef, R = rDark Â· 1 = rDark.
  * The rLight property records the expected resistance at luxRef; for consistency
  * rLight should equal rDark * (luxRef/luxRef)^(-gamma) = rDark, but it is exposed
  * as a separate settable property to allow the user to override the dark resistance
  * via the light reference point.
  *
  * When rLight is provided as a non-zero calibration anchor, the formula becomes:
- *   R(lux) = rLight · (lux / luxRef)^(-gamma)   for lux > 0
+ *   R(lux) = rLight Â· (lux / luxRef)^(-gamma)   for lux > 0
  *
  * This ensures R(luxRef) = rLight exactly, which is the natural calibration point.
  * rDark is used only for lux = 0 (or as default when rLight is not separately
@@ -24,7 +24,7 @@
  *   branchIndex    = -1
  *
  * Unified load() pipeline (matches ngspice DEVload):
- *   load(ctx) — stamps conductance 1/R(lux) between terminals every NR iteration
+ *   load(ctx) â€” stamps conductance 1/R(lux) between terminals every NR iteration
  */
 
 import type { AnalogElementCore, LoadContext } from "../../solver/analog/element.js";
@@ -54,7 +54,7 @@ const MIN_RESISTANCE = 1e-12;
 
 export const { paramDefs: LDR_PARAM_DEFS, defaults: LDR_DEFAULTS } = defineModelParams({
   primary: {
-    rDark:  { default: 1e6,  unit: "Ω",   description: "Resistance in darkness (lux = 0)" },
+    rDark:  { default: 1e6,  unit: "Î©",   description: "Resistance in darkness (lux = 0)" },
     lux:    { default: 500,  unit: "lux", description: "Current light level in lux" },
   },
   secondary: {
@@ -64,7 +64,7 @@ export const { paramDefs: LDR_PARAM_DEFS, defaults: LDR_DEFAULTS } = defineModel
 });
 
 // ---------------------------------------------------------------------------
-// LDRElement — MNA implementation
+// LDRElement â€” MNA implementation
 // ---------------------------------------------------------------------------
 
 export class LDRElement implements AnalogElementCore {
@@ -104,7 +104,7 @@ export class LDRElement implements AnalogElementCore {
     return Math.max(R, MIN_RESISTANCE);
   }
 
-  /** Current lux level — exposed for testing. */
+  /** Current lux level â€” exposed for testing. */
   get lux(): number {
     return this._p.lux;
   }
@@ -126,25 +126,25 @@ export class LDRElement implements AnalogElementCore {
     const G = 1 / this.resistance();
 
     if (nPos !== 0 && nNeg !== 0) {
-      solver.stampElement(solver.allocElement(nPos - 1, nPos - 1), G);
-      solver.stampElement(solver.allocElement(nPos - 1, nNeg - 1), -G);
-      solver.stampElement(solver.allocElement(nNeg - 1, nPos - 1), -G);
-      solver.stampElement(solver.allocElement(nNeg - 1, nNeg - 1), G);
+      solver.stampElement(solver.allocElement(nPos, nPos), G);
+      solver.stampElement(solver.allocElement(nPos, nNeg), -G);
+      solver.stampElement(solver.allocElement(nNeg, nPos), -G);
+      solver.stampElement(solver.allocElement(nNeg, nNeg), G);
     } else if (nPos !== 0) {
-      solver.stampElement(solver.allocElement(nPos - 1, nPos - 1), G);
+      solver.stampElement(solver.allocElement(nPos, nPos), G);
     } else if (nNeg !== 0) {
-      solver.stampElement(solver.allocElement(nNeg - 1, nNeg - 1), G);
+      solver.stampElement(solver.allocElement(nNeg, nNeg), G);
     }
   }
 
   getPinCurrents(voltages: Float64Array): number[] {
-    // No branch row — compute from constitutive equation: I = G * (V_pos - V_neg).
+    // No branch row â€” compute from constitutive equation: I = G * (V_pos - V_neg).
     // pinNodeIds[0] = n_pos (pos pin, index 0 in pinLayout).
     // pinNodeIds[1] = n_neg (neg pin, index 1 in pinLayout).
     const nPos = this.pinNodeIds[0];
     const nNeg = this.pinNodeIds[1];
-    const vPos = nPos > 0 ? voltages[nPos - 1] : 0;
-    const vNeg = nNeg > 0 ? voltages[nNeg - 1] : 0;
+    const vPos = voltages[nPos];
+    const vNeg = voltages[nNeg];
     const G = 1 / this.resistance();
     const I = G * (vPos - vNeg);
     return [I, -I];
@@ -197,7 +197,7 @@ function buildLDRPinDeclarations(): PinDeclaration[] {
 }
 
 // ---------------------------------------------------------------------------
-// LDRCircuitElement — editor/visual layer
+// LDRCircuitElement â€” editor/visual layer
 // ---------------------------------------------------------------------------
 
 export class LDRCircuitElement extends AbstractCircuitElement {
@@ -234,8 +234,8 @@ export class LDRCircuitElement extends AbstractCircuitElement {
     ctx.save();
     ctx.setLineWidth(1);
 
-    // Lead 1: (0,0)→(1,0); Zigzag body: (1,0)→(3,0); Lead 2: (3,0)→(4,0)
-    // Zigzag vertices derived from Falstad pixel coords (absolute px ÷ 16):
+    // Lead 1: (0,0)â†’(1,0); Zigzag body: (1,0)â†’(3,0); Lead 2: (3,0)â†’(4,0)
+    // Zigzag vertices derived from Falstad pixel coords (absolute px Ã· 16):
     // absolute x = local_x + 16 (because Falstad draws with a +16px x-offset)
     const hs = 6 / 16; // 0.375 grid units perpendicular offset
     const pts: Array<{ x: number; y: number }> = [
@@ -253,7 +253,7 @@ export class LDRCircuitElement extends AbstractCircuitElement {
       { x: 4, y: 0 },   // lead2 end
     ];
 
-    // Gradient spans full component width (pos→neg, 0→4)
+    // Gradient spans full component width (posâ†’neg, 0â†’4)
     if (hasVoltage && ctx.setLinearGradient) {
       ctx.setLinearGradient(0, 0, 4, 0, [
         { offset: 0, color: signals!.voltageColor(vPos!) },
@@ -267,15 +267,15 @@ export class LDRCircuitElement extends AbstractCircuitElement {
     }
 
     // Light arrows: shaft lines + two perpendicular bars (T-head arrowhead style)
-    // Coordinates from Falstad pixel reference ÷ 16
+    // Coordinates from Falstad pixel reference Ã· 16
     ctx.setColor("COMPONENT");
 
-    // Arrow 1: shaft (0.5,1.625)→(1.5,0.75), bar1 (1.125,0.75)→(1.5,0.75), bar2 (1.5,0.75)→(1.5,1.125)
+    // Arrow 1: shaft (0.5,1.625)â†’(1.5,0.75), bar1 (1.125,0.75)â†’(1.5,0.75), bar2 (1.5,0.75)â†’(1.5,1.125)
     ctx.drawLine(0.5, 1.625, 1.5, 0.75);
     ctx.drawLine(1.125, 0.75, 1.5, 0.75);
     ctx.drawLine(1.5, 0.75, 1.5, 1.125);
 
-    // Arrow 2: shaft (1.75,1.625)→(2.625,0.75), bar1 (2.25,0.75)→(2.625,0.75), bar2 (2.625,0.75)→(2.625,1.125)
+    // Arrow 2: shaft (1.75,1.625)â†’(2.625,0.75), bar1 (2.25,0.75)â†’(2.625,0.75), bar2 (2.625,0.75)â†’(2.625,1.125)
     ctx.drawLine(1.75, 1.625, 2.625, 0.75);
     ctx.drawLine(2.25, 0.75, 2.625, 0.75);
     ctx.drawLine(2.625, 0.75, 2.625, 1.125);
@@ -357,8 +357,8 @@ export const LDRDefinition: ComponentDefinition = {
   attributeMap: LDR_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.PASSIVES,
   helpText:
-    "LDR (Light Dependent Resistor) — resistance varies with illumination. " +
-    "Power-law model: R = R_dark × (lux / lux_ref)^(-γ).",
+    "LDR (Light Dependent Resistor) â€” resistance varies with illumination. " +
+    "Power-law model: R = R_dark Ã— (lux / lux_ref)^(-Î³).",
   models: {},
   modelRegistry: {
     "behavioral": {

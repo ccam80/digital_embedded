@@ -1,27 +1,27 @@
-/**
+﻿/**
  * End-to-end integration tests for behavioral digital gates in the MNA engine.
  *
  * These tests verify the full pipeline:
- *   circuit construction → MNA engine initialization → DC operating point
- *   → transient simulation → correct output voltages with realistic edge rates
+ *   circuit construction â†’ MNA engine initialization â†’ DC operating point
+ *   â†’ transient simulation â†’ correct output voltages with realistic edge rates
  *
  * Circuit topology overview:
  *
  *   AND gate DC test (nodes 1-based, 0=ground):
- *     Node 1: input A — driven by 3.3V ideal voltage source (branch row 3)
- *     Node 2: input B — driven by 3.3V ideal voltage source (branch row 4)
- *     Node 3: AND gate output — Norton equivalent → load resistor (10kΩ) to ground
+ *     Node 1: input A â€” driven by 3.3V ideal voltage source (branch row 3)
+ *     Node 2: input B â€” driven by 3.3V ideal voltage source (branch row 4)
+ *     Node 3: AND gate output â€” Norton equivalent â†’ load resistor (10kÎ©) to ground
  *     matrixSize = 5
  *
  *   D flip-flop toggle test:
- *     Node 1: clock input — driven by square wave (alternated via updateCompanion)
- *     Node 2: D input — connected to ~Q output (feedback)
+ *     Node 1: clock input â€” driven by square wave (alternated via updateCompanion)
+ *     Node 2: D input â€” connected to ~Q output (feedback)
  *     Node 3: Q output
- *     Node 4: ~Q output — feedback to D
- *     matrixSize = 4 (no branch rows — Norton outputs, no ideal voltage sources)
+ *     Node 4: ~Q output â€” feedback to D
+ *     matrixSize = 4 (no branch rows â€” Norton outputs, no ideal voltage sources)
  *
  * Node numbering follows the test-elements.ts convention:
- *   1-based circuit nodes → voltages[nodeId - 1] in the solver solution.
+ *   1-based circuit nodes â†’ voltages[nodeId] in the solver solution.
  *   MNA pin models use 0-based solver indices = (circuit node - 1).
  */
 
@@ -106,7 +106,7 @@ const TTL: ResolvedPinElectrical = {
   rHiZ: 1e7,
 };
 
-const LOAD_R = 10_000; // 10 kΩ output load resistor
+const LOAD_R = 10_000; // 10 kÎ© output load resistor
 
 // ---------------------------------------------------------------------------
 // Circuit builder helpers
@@ -116,9 +116,9 @@ const LOAD_R = 10_000; // 10 kΩ output load resistor
  * Build a ConcreteCompiledAnalogCircuit for a 2-input AND gate.
  *
  * Layout (1-based circuit nodes, 0=ground):
- *   Node 1: input A  — driven by ideal VS (branch row 3, 0-based absolute)
- *   Node 2: input B  — driven by ideal VS (branch row 4, 0-based absolute)
- *   Node 3: output   — AND gate Norton equivalent + 10kΩ load to ground
+ *   Node 1: input A  â€” driven by ideal VS (branch row 3, 0-based absolute)
+ *   Node 2: input B  â€” driven by ideal VS (branch row 4, 0-based absolute)
+ *   Node 3: output   â€” AND gate Norton equivalent + 10kÎ© load to ground
  *
  * Solver (0-based):
  *   voltages[0] = node 1 (input A)
@@ -152,10 +152,10 @@ function buildAndGateCircuit(
   );
 
   // Ideal voltage sources driving input nodes (branch rows are absolute 0-based)
-  const vsA = makeVoltageSource(1, 0, 3, vA); // node1 → branch row 3
-  const vsB = makeVoltageSource(2, 0, 4, vB); // node2 → branch row 4
+  const vsA = makeVoltageSource(1, 0, 3, vA); // node1 â†’ branch row 3
+  const vsB = makeVoltageSource(2, 0, 4, vB); // node2 â†’ branch row 4
 
-  // Load resistor on output (10kΩ from node 3 to ground)
+  // Load resistor on output (10kÎ© from node 3 to ground)
   const rLoad = makeResistor(3, 0, LOAD_R);
 
   const elements: AnalogElement[] = [vsA, vsB, rLoad, withNodeIds(andGate, [1, 2, 3])];
@@ -177,8 +177,8 @@ function buildAndGateCircuit(
  * a high-impedance source on input A.
  *
  * Layout:
- *   Node 1: input A — driven through 100kΩ from 3.3V (source node 4)
- *   Node 2: input B — ideal 3.3V VS (branch row 4)
+ *   Node 1: input A â€” driven through 100kÎ© from 3.3V (source node 4)
+ *   Node 2: input B â€” ideal 3.3V VS (branch row 4)
  *   Node 3: output
  *   Node 4: source node for input A (ideal VS at 3.3V, branch row 3)
  *
@@ -186,7 +186,7 @@ function buildAndGateCircuit(
  *   voltages[0] = node 1 (input A, will sag due to rIn loading)
  *   voltages[1] = node 2 (input B)
  *   voltages[2] = node 3 (output)
- *   voltages[3] = node 4 (source side of 100kΩ)
+ *   voltages[3] = node 4 (source side of 100kÎ©)
  *   voltages[4] = branch VS_A current
  *   voltages[5] = branch VS_B current
  *   matrixSize = 6
@@ -210,7 +210,7 @@ function buildHighImpedanceSourceCircuit(): ConcreteCompiledAnalogCircuit {
 
   // Ideal 3.3V source at node 4 (solver node 3), branch row 4 (absolute)
   const vsA = makeVoltageSource(4, 0, 4, 3.3);
-  // 100kΩ from node 4 to node 1 (high-impedance source path)
+  // 100kÎ© from node 4 to node 1 (high-impedance source path)
   const rSource = makeResistor(4, 1, 100_000);
 
   // Ideal 3.3V source at node 2 (input B), branch row 5
@@ -236,11 +236,11 @@ function buildHighImpedanceSourceCircuit(): ConcreteCompiledAnalogCircuit {
 /**
  * Build a D flip-flop circuit where D is tied to ~Q (toggle on every clock edge).
  *
- * All pins use Norton output — no branch variables.
+ * All pins use Norton output â€” no branch variables.
  *
  * Layout (solver 0-based):
  *   solver 0: clock input
- *   solver 1: D input (read from ~Q feedback — modelled as external voltage here)
+ *   solver 1: D input (read from ~Q feedback â€” modelled as external voltage here)
  *   solver 2: Q output
  *   solver 3: ~Q output
  *   matrixSize = 4
@@ -283,7 +283,7 @@ function buildDffToggleCircuit(): {
   element._setThresholds(CMOS_3V3.vIH, CMOS_3V3.vIL);
 
   // Load resistors on Q and ~Q for stable node voltages
-  const rLoadQ = makeResistor(3, 0, LOAD_R);    // 10kΩ from ~Q to ground
+  const rLoadQ = makeResistor(3, 0, LOAD_R);    // 10kÎ© from ~Q to ground
 
   const elements: AnalogElement[] = [rLoadQ, withNodeIds(element, [1, 4, 3, 4])];
 
@@ -313,13 +313,13 @@ describe("Integration", () => {
   });
 
   // -------------------------------------------------------------------------
-  // DC operating point: both inputs HIGH → output HIGH
+  // DC operating point: both inputs HIGH â†’ output HIGH
   // -------------------------------------------------------------------------
 
   it("dc_op_with_behavioral_and_gate", () => {
-    // Both inputs at 3.3V (above vIH=2.0) → AND output HIGH
-    // Expected output voltage: voltage divider vOH × LOAD_R / (rOut + LOAD_R)
-    // = 3.3 × 10000 / (50 + 10000) ≈ 3.284V
+    // Both inputs at 3.3V (above vIH=2.0) â†’ AND output HIGH
+    // Expected output voltage: voltage divider vOH Ã— LOAD_R / (rOut + LOAD_R)
+    // = 3.3 Ã— 10000 / (50 + 10000) â‰ˆ 3.284V
     const circuit = buildAndGateCircuit(3.3, 3.3);
     engine.init(circuit);
 
@@ -339,11 +339,11 @@ describe("Integration", () => {
   });
 
   // -------------------------------------------------------------------------
-  // DC operating point: one input LOW → output LOW
+  // DC operating point: one input LOW â†’ output LOW
   // -------------------------------------------------------------------------
 
   it("dc_op_one_input_low", () => {
-    // Input B at 0V → AND gate output should be LOW (vOL ≈ 0V)
+    // Input B at 0V â†’ AND gate output should be LOW (vOL â‰ˆ 0V)
     const circuit = buildAndGateCircuit(3.3, 0.0);
     engine.init(circuit);
 
@@ -360,10 +360,10 @@ describe("Integration", () => {
   // -------------------------------------------------------------------------
 
   it("transient_edge_rate", () => {
-    // Start with input A=0V, input B=3.3V → output LOW (AND = false)
+    // Start with input A=0V, input B=3.3V â†’ output LOW (AND = false)
     // After DC OP, step the simulation with input A switched HIGH (via its
     // node being driven HIGH). We verify that the output transitions upward
-    // over multiple timesteps, consistent with R_out × C_out edge rate.
+    // over multiple timesteps, consistent with R_out Ã— C_out edge rate.
     //
     // Approach: We build a circuit where input A starts low and then run
     // transient simulation. Because the ideal voltage source sets input A
@@ -392,14 +392,14 @@ describe("Integration", () => {
   });
 
   // -------------------------------------------------------------------------
-  // Input loading: 100kΩ source → node voltage sags due to rIn loading
+  // Input loading: 100kÎ© source â†’ node voltage sags due to rIn loading
   // -------------------------------------------------------------------------
 
   it("input_loading_measurable", () => {
-    // Input A driven through 100kΩ source resistor from 3.3V.
-    // Expected node voltage: 3.3 × rIn / (rIn + 100kΩ)
-    //   = 3.3 × 1e7 / (1e7 + 1e5) = 3.3 × 10000/10100 ≈ 3.267V
-    // The gate input (rIn=10MΩ) pulls the node down from 3.3V by a small amount.
+    // Input A driven through 100kÎ© source resistor from 3.3V.
+    // Expected node voltage: 3.3 Ã— rIn / (rIn + 100kÎ©)
+    //   = 3.3 Ã— 1e7 / (1e7 + 1e5) = 3.3 Ã— 10000/10100 â‰ˆ 3.267V
+    // The gate input (rIn=10MÎ©) pulls the node down from 3.3V by a small amount.
     const circuit = buildHighImpedanceSourceCircuit();
     engine.init(circuit);
 
@@ -422,8 +422,8 @@ describe("Integration", () => {
   // -------------------------------------------------------------------------
 
   it("ttl_logic_family_different_thresholds", () => {
-    // TTL: vIL=0.8, vIH=2.0 — same thresholds as CMOS 3.3V for this parameter set.
-    // Input A at 1.5V: between vIL=0.8 and vIH=2.0 → indeterminate.
+    // TTL: vIL=0.8, vIH=2.0 â€” same thresholds as CMOS 3.3V for this parameter set.
+    // Input A at 1.5V: between vIL=0.8 and vIH=2.0 â†’ indeterminate.
     // Initial latched level is false, so AND gate output should be LOW.
     // This also verifies that TTL output levels (vOH=3.4V) are different from CMOS.
     const inA = new DigitalInputPinModel(TTL, true);
@@ -464,7 +464,7 @@ describe("Integration", () => {
 
     expect(result.converged).toBe(true);
 
-    // Input A is indeterminate → latch holds false → AND output LOW
+    // Input A is indeterminate â†’ latch holds false â†’ AND output LOW
     const vOut = engine.getNodeVoltage(3);
   });
 
@@ -477,10 +477,10 @@ describe("Integration", () => {
     // Initial state: Q=false, ~Q=true (initial latched Q is false).
     //
     // Run 4 clock edges (2 full periods). After each rising edge:
-    //   Edge 1: D=~Q_prev=true  → Q latches true
-    //   Edge 2: D=~Q_prev=false → Q latches false
-    //   Edge 3: D=true          → Q latches true
-    //   Edge 4: D=false         → Q latches false
+    //   Edge 1: D=~Q_prev=true  â†’ Q latches true
+    //   Edge 2: D=~Q_prev=false â†’ Q latches false
+    //   Edge 3: D=true          â†’ Q latches true
+    //   Edge 4: D=false         â†’ Q latches false
     //
     // We drive the circuit manually via updateCompanion because the clock
     // source is driven externally (not from a voltage source in the MNA matrix).
@@ -548,7 +548,7 @@ describe("Integration", () => {
     // Track Q state through 4 rising edges
     const qStates: boolean[] = [];
 
-    // Edge 1: clock LOW → HIGH; D = ~Q = vOH (true) → latch Q=true
+    // Edge 1: clock LOW â†’ HIGH; D = ~Q = vOH (true) â†’ latch Q=true
     element.accept(makeCtxWith(makeVoltages(0.0, CMOS_3V3.vOL, CMOS_3V3.vOH)), 0, () => {});
     element.accept(makeCtxWith(makeVoltages(3.3, CMOS_3V3.vOL, CMOS_3V3.vOH)), 0, () => {});
     flushQ(makeVoltages(3.3, CMOS_3V3.vOL, CMOS_3V3.vOH));
@@ -557,7 +557,7 @@ describe("Integration", () => {
     // Clock stays HIGH for one step (no edge)
     element.accept(makeCtxWith(makeVoltages(3.3, CMOS_3V3.vOH, CMOS_3V3.vOL)), 0, () => {});
 
-    // Edge 2: clock HIGH → LOW → HIGH; D = ~Q = vOL (false) → latch Q=false
+    // Edge 2: clock HIGH â†’ LOW â†’ HIGH; D = ~Q = vOL (false) â†’ latch Q=false
     element.accept(makeCtxWith(makeVoltages(0.0, CMOS_3V3.vOH, CMOS_3V3.vOL)), 0, () => {});
     element.accept(makeCtxWith(makeVoltages(3.3, CMOS_3V3.vOH, CMOS_3V3.vOL)), 0, () => {});
     flushQ(makeVoltages(3.3, CMOS_3V3.vOH, CMOS_3V3.vOL));
@@ -566,7 +566,7 @@ describe("Integration", () => {
     // Clock stays HIGH for one step
     element.accept(makeCtxWith(makeVoltages(3.3, CMOS_3V3.vOL, CMOS_3V3.vOH)), 0, () => {});
 
-    // Edge 3: clock HIGH → LOW → HIGH; D = ~Q = vOH (true) → latch Q=true
+    // Edge 3: clock HIGH â†’ LOW â†’ HIGH; D = ~Q = vOH (true) â†’ latch Q=true
     element.accept(makeCtxWith(makeVoltages(0.0, CMOS_3V3.vOL, CMOS_3V3.vOH)), 0, () => {});
     element.accept(makeCtxWith(makeVoltages(3.3, CMOS_3V3.vOL, CMOS_3V3.vOH)), 0, () => {});
     flushQ(makeVoltages(3.3, CMOS_3V3.vOL, CMOS_3V3.vOH));
@@ -575,7 +575,7 @@ describe("Integration", () => {
     // Clock stays HIGH for one step
     element.accept(makeCtxWith(makeVoltages(3.3, CMOS_3V3.vOH, CMOS_3V3.vOL)), 0, () => {});
 
-    // Edge 4: clock HIGH → LOW → HIGH; D = ~Q = vOL (false) → latch Q=false
+    // Edge 4: clock HIGH â†’ LOW â†’ HIGH; D = ~Q = vOL (false) â†’ latch Q=false
     element.accept(makeCtxWith(makeVoltages(0.0, CMOS_3V3.vOH, CMOS_3V3.vOL)), 0, () => {});
     element.accept(makeCtxWith(makeVoltages(3.3, CMOS_3V3.vOH, CMOS_3V3.vOL)), 0, () => {});
     flushQ(makeVoltages(3.3, CMOS_3V3.vOH, CMOS_3V3.vOL));
@@ -627,7 +627,7 @@ describe("Integration", () => {
 
     expect(result.converged).toBe(true);
 
-    // Both inputs HIGH → output near vOH through load divider
+    // Both inputs HIGH â†’ output near vOH through load divider
     const vOut = engine.getNodeVoltage(3);
     const expectedVout = CMOS_3V3.vOH * LOAD_R / (CMOS_3V3.rOut + LOAD_R);
     expect(vOut).toBeGreaterThan(expectedVout * 0.99);
@@ -667,13 +667,13 @@ describe("Integration", () => {
     engine.init(circuit);
     const result = engine.dcOperatingPoint();
 
-    // DC operating point should converge — DFF stamps Norton equivalents
+    // DC operating point should converge â€” DFF stamps Norton equivalents
     expect(result.converged).toBe(true);
     expect(engine.getState()).not.toBe(EngineState.ERROR);
 
-    // After DC OP with no clock edge, Q should remain in initial state (false → vOL)
+    // After DC OP with no clock edge, Q should remain in initial state (false â†’ vOL)
     // Q is MNA node 3 (solver index 2)
     const vQ = engine.getNodeVoltage(3);
-    // vOL=0V → through rOut (50Ω) and rLoad (10kΩ) → ≈0V
+    // vOL=0V â†’ through rOut (50Î©) and rLoad (10kÎ©) â†’ â‰ˆ0V
   });
 });

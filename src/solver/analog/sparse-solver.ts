@@ -1,56 +1,44 @@
 /**
- * Sparse linear solver for MNA circuit simulation.
- *
- * Architecture: Persistent linked-list matrix format matching ngspice spMatrix.
- * The linked structure is the primary storage — no COO triplet arrays.
- * Assembly: allocElement() at compile time, stampElement() in NR hot path.
- * LU factorization: Markowitz pivot selection on original column order (no AMD).
- * Solve: sparse forward/backward substitution on CSC L/U built from linked structure.
+ * Sparse linear solver for MNA circuit simulation — direct port of ngspice
+ * `spMatrix` (real-only).
  *
  * ngspice references:
- *   spGetElement (spbuild.c) — allocElement
- *   spOrderAndFactor (spfactor.c) — factorWithReorder
- *   spFactor (spfactor.c) — factorNumerical
- *   spSolve (spsolve.c) — solve
+ *   spCreate (spalloc.c:117-277)         — _initStructure
+ *   spClear (spbuild.c:96-142)           — _resetForAssembly
+ *   spStripMatrix (sputils.c:1106-1145)  — invalidateTopology
+ *   spcCreateInternalVectors (spfactor.c:706-747) — _allocateWorkspace
+ *   spcLinkRows (spbuild.c:907-932)      — _linkRows
+ *   spGetElement (spbuild.c:264-318)     — allocElement
+ *   spcFindElementInCol (spbuild.c:362-393) — _spcFindElementInCol
+ *   spcCreateElement (spbuild.c:768-871) — _spcCreateElement
+ *   spcGetElement (spalloc.c:310-364)    — _newElement
+ *   Translate (spbuild.c:436-504)        — _translate
+ *   CreateFillin (spfactor.c:2799-2829)  — _createFillin
+ *   spOrderAndFactor (spfactor.c:191-284)— _spOrderAndFactor
+ *   spFactor (spfactor.c:322-414)        — _spFactor
+ *   spSolve (spsolve.c:126-191)          — solve
  *
  * =========================================================================
- * Indexing convention (Stage 7 — option b: documented translation rule)
+ * Indexing convention — ngspice 1-based (port-spec stage 7 option a)
  * =========================================================================
  *
- * ngspice is 1-based throughout: arrays of length `Size + 1` with slot 0
- * unused, loops `for (Step = 1; Step <= Size; Step++)`. digiTS keeps a
- * uniform 0-based internal convention to match TypeScript-idiomatic typed
- * arrays and to keep the public-surface row/col arguments 0-based for
- * compatibility with caller MNA storage (§7.3.7).
+ * Every per-row / per-col / per-slot vector has length `Size + 1`. Slot 0
+ * is the ngspice ground-node sentinel; loops run `for (I = 1; I <= Size; I++)`.
  *
- * The mechanical translation rule applied uniformly across this file is:
+ * Element pool: slot 0 is the TrashCan (spdefs.h:776, spalloc.c:204-211);
+ * `allocElement` returns handle 0 when Row == 0 or Col == 0, so any stamp
+ * to a ground row/col writes into `_elVal[0]`, which `_resetForAssembly`
+ * zeros every NR iteration (spbuild.c:133-134). The first usable element
+ * handle is 1.
  *
- *     digiTS slot/step k    <==>    ngspice Step = k + 1
- *     digiTS array length n <==>    ngspice array length Size + 1
- *     for (k = 0; k < n; k++) <==>  for (Step = 1; Step <= Size; Step++)
- *     for (k = n - 1; k >= 0; k--) <==>
- *                                   for (Step = Size; Step > 0; Step--)
- *     _diag[k] / _colHead[k] / _rowHead[k] / _intToExtRow[k] /
- *     _preorderColPerm[k] / _markowitz*[k]   read at internal slot k;
- *                                            same datum as ngspice's
- *                                            FirstInCol[k+1] etc.
- *
- * Sentinel slots (e.g. `_markowitzProd[Size + 1]` in ngspice's
- * QuicklySearchDiagonal scan — see spfactor.c) become `_markowitzProd[n]`
- * here, allocated as the (n+1)-th slot per the array sizing in
- * `_initStructure`.
- *
- * The public surface (`allocElement(row, col)`, `stampElement(handle, v)`,
- * `stampRHS(row, value)`, `solve(x)`) is 0-based, matching caller-side
- * MNA row/col numbering. The internal slot/step indexing follows the
- * rule above. Do NOT mix the two conventions inside one method.
- *
- * Per spec §7.5: option (a) (full 1-based conversion) was evaluated and
- * judged disruptive enough that the rollback signal already applied
- * (every loop in this 2500+-line file would change, with no test gate
- * available during the port). Option (b) is the strict-port-compatible
- * fallback; it preserves bit-exact factor/solve semantics by keeping the
- * mechanical rule uniform.
+ * Caller-facing convention:
+ *   * Public allocElement(row, col) takes ngspice external indices: 0 is
+ *     ground, 1..Size are the active MNA rows / cols.
+ *   * solve(x) reads `x[0]` only as the sink for the unused ground slot
+ *     (`_intToExtCol[0] = 0`); active solution lives in `x[1..Size]`.
+ *   * RHS array passed in by the caller (currently the solver-owned
+ *     `_rhs` field, deferred B.16) is keyed by external row, same
+ *     1-based convention.
  */
 
 // factor() returns the ngspice error code directly (one of spOKAY,
@@ -119,36 +107,51 @@ export class SparseSolver {
   private _diag: Int32Array = new Int32Array(0);
 
   /**
-   * Preorder column permutation: _preorderColPerm[internalCol] = originalCol.
-   * Identity initially. Updated by _swapColumns during preorder().
-   * solve() maps internal column k → original column _preorderColPerm[k].
-   * Matches ngspice IntToExtColMap (sputils.c:291).
+   * Internal-slot → external-col map. ngspice Matrix->IntToExtColMap
+   * (spdefs.h, sputils.c:291). Length Size + 1; slot 0 unused.
+   * Identity at construction; updated in lockstep by _swapColumns and
+   * _spcColExchange. solve() unscrambles the column permutation via
+   * `Solution[*pExtOrder--] = Intermediate[I]` (spsolve.c:186-188).
+   *
+   * (Architect verdict B.34/B.11: this is the SOLE column-permutation
+   * vector. The previous `_preorderColPerm` / `_intToExtCol` split was
+   * a digiTS-only divergence and is now collapsed.)
    */
   private _preorderColPerm: Int32Array = new Int32Array(0);
 
   /**
-   * Inverse of _preorderColPerm: _extToIntCol[originalCol] = internalCol.
-   * Identity initially. Updated by _swapColumns in lockstep with _preorderColPerm.
-   * Used by _updateMarkowitzNumbers to translate the element's stored original
-   * column into the internal column index that keys _colHead/_markowitzCol.
+   * External-col → internal-slot map. ngspice Matrix->ExtToIntColMap
+   * (spalloc.c:246). Length Size + 1; slot 0 = 0 (ground sentinel),
+   * slots 1..Size start at -1 and Translate (spbuild.c:436-504) lazily
+   * assigns CurrentSize on first sight (spalloc.c:255-259).
    */
   private _extToIntCol: Int32Array = new Int32Array(0);
 
   /**
-   * Slot → original-row map. _intToExtRow[slot] = original row index.
-   * Identity at factor entry; updated by _spcRowExchange when rows physical-swap.
-   * Mirrors ngspice IntToExtRowMap.
+   * Internal-slot → external-row map. ngspice Matrix->IntToExtRowMap
+   * (spdefs.h, sputils.c). Length Size + 1; slot 0 unused. Identity at
+   * construction; updated by _spcRowExchange.
    */
   private _intToExtRow: Int32Array = new Int32Array(0);
 
   /**
-   * Original-row → slot map. _extToIntRow[origRow] = slot index.
-   * Identity at factor entry; updated by _spcRowExchange in lockstep with
-   * _intToExtRow. Mirrors ngspice ExtToIntRowMap.
+   * External-row → internal-slot map. ngspice Matrix->ExtToIntRowMap
+   * (spalloc.c:250). Length Size + 1; slot 0 = 0 (ground sentinel),
+   * slots 1..Size start at -1.
    */
   private _extToIntRow: Int32Array = new Int32Array(0);
 
-  /** Next free slot in element pool. */
+  /**
+   * ngspice Matrix->CurrentSize (spalloc.c:181) — running count of
+   * internal slots assigned by Translate. Bumped from 0 to Size as
+   * external indices are first observed via _translate.
+   */
+  private _currentSize: number = 0;
+
+  /**
+   * Next free slot in element pool. Slot 0 is the TrashCan sentinel
+   * (spdefs.h:776; A2 amendment); first real handle is 1.
+   */
   private _elCount: number = 0;
   /** Current pool capacity. */
   private _elCapacity: number = 0;
@@ -323,6 +326,14 @@ export class SparseSolver {
   private _markowitzProd: Int32Array = new Int32Array(0);
   private _singletons: number = 0;
 
+  // ngspice MatrixFrame.PivotSelectionMethod (spdefs.h). Written by
+  // SearchForPivot at each return site (spfactor.c:958/973/983/991).
+  private _pivotSelectionMethod: string = '';
+
+  // ngspice QuicklySearchDiagonal stack array `TiedElements[MAX_MARKOWITZ_TIES + 1]`
+  // (spfactor.c:1260). Allocated once as class field per architect B.42.
+  private _tiedElements: Int32Array = new Int32Array(101);
+
   // =========================================================================
   // Constructor
   // =========================================================================
@@ -334,33 +345,74 @@ export class SparseSolver {
   // =========================================================================
 
   /**
-   * Allocate or find the element at (row, col) in the persistent linked structure.
-   * Returns a stable handle (pool index) for use with stampElement().
+   * ngspice spGetElement (spbuild.c:264-318) — line-for-line port.
    *
-   * Called at compile time by every caller (element factories, cktLoad).
-   * ngspice: spGetElement (spbuild.c:265-318) — returns a pointer used by
-   * *ElementPtr += value. Translates the caller's original (row, col) into
-   * the current slot space and dispatches to _spcFindElementInCol +
-   * _spcCreateElement, mirroring the C two-call structure.
+   *   if (Row == 0 || Col == 0) return &Matrix->TrashCan.Real;
+   *   Translate(Matrix, &Row, &Col);
+   *   if (Row != Col || Diag[Row] == NULL)
+   *       pElement = spcFindElementInCol(...);
+   *   else pElement = Matrix->Diag[Row];
+   *   return &pElement->Real;
    *
-   * O(column chain length) per call.
+   * Returns the pool handle for use with stampElement(). Handle 0 is the
+   * TrashCan (amendment A2): stamps to ground rows/cols write into
+   * `_elVal[0]` which is reset by _resetForAssembly per spbuild.c:133.
    */
   allocElement(row: number, col: number): number {
-    // Guard: without _initStructure(), _extToIntCol is zero-length, so
-    // _extToIntCol[col] → undefined, which Int32Array writes in
-    // _insertIntoCol coerce to 0 — producing a self-referential cycle
-    // in the column linked list that makes the next search spin forever.
-    // Throw loudly instead.
-    if (this._n === 0) {
-      throw new Error(
-        `SparseSolver.allocElement(${row}, ${col}) called before ` +
-        `_initStructure(). Call solver._initStructure(matrixSize) first.`,
-      );
+    // ngspice spbuild.c:272-273 — Row == 0 || Col == 0 → TrashCan handle.
+    if (row === 0 || col === 0) return 0;
+    // ngspice spbuild.c:280 (TRANSLATE) — translate BOTH Row and Col.
+    const translated = this._translate(row, col);
+    const intRow = translated.row;
+    const intCol = translated.col;
+    // ngspice spbuild.c:306-316 — Diag[Row] fast-path. When the element is
+    // on the diagonal AND already exists, skip the column-chain walk.
+    if (intRow === intCol) {
+      const pDiag = this._diag[intRow];
+      if (pDiag >= 0) return pDiag;
     }
-    // Translate the caller's original column to the current internal column
-    // so the search walks the correct _colHead chain after preorder swaps.
-    const internalCol = this._extToIntCol[col];
-    return this._spcFindElementInCol(internalCol, row, /*createIfMissing=*/ true);
+    // ngspice spbuild.c:313-315 — spcFindElementInCol(&FirstInCol[Col], Row, Col, YES).
+    return this._spcFindElementInCol(intCol, intRow, /*createIfMissing=*/ true);
+  }
+
+  /**
+   * ngspice Translate (spbuild.c:436-504) — line-for-line port. TRANSLATE
+   * is always on per amendment A3.
+   *
+   *   ExtRow / ExtCol → IntRow / IntCol via lazy assignment of CurrentSize
+   *   on first sight (`ExtToInt[I] == -1`). The first sight of an external
+   *   index N also sets IntToExt[CurrentSize] = N, building both
+   *   permutation directions in lockstep.
+   *
+   * digiTS divergence: spbuild.c:445-455 ExpandTranslationArrays /
+   * ExtSize tracking is omitted (EXPANDABLE compiles off in stock
+   * ngspice — spconfig.h:226). Caller-side `_initStructure(n)` fixes the
+   * external dimension upfront.
+   */
+  private _translate(extRow: number, extCol: number): { row: number; col: number } {
+    // ngspice spbuild.c:458-477 — translate ExtRow.
+    let intRow = this._extToIntRow[extRow];
+    if (intRow === -1) {
+      this._currentSize++;
+      this._extToIntRow[extRow] = this._currentSize;
+      this._extToIntCol[extRow] = this._currentSize;
+      intRow = this._currentSize;
+      this._intToExtRow[intRow] = extRow;
+      this._preorderColPerm[intRow] = extRow;
+    }
+
+    // ngspice spbuild.c:480-499 — translate ExtCol.
+    let intCol = this._extToIntCol[extCol];
+    if (intCol === -1) {
+      this._currentSize++;
+      this._extToIntRow[extCol] = this._currentSize;
+      this._extToIntCol[extCol] = this._currentSize;
+      intCol = this._currentSize;
+      this._intToExtRow[intCol] = extCol;
+      this._preorderColPerm[intCol] = extCol;
+    }
+
+    return { row: intRow, col: intCol };
   }
 
   /**
@@ -386,52 +438,105 @@ export class SparseSolver {
   }
 
   /**
-   * ngspice spcCreateElement (spbuild.c:768-871) — line-for-line port.
-   * Allocates a new element from the pool and splices it into the column
-   * chain immediately after `prevInCol` (or at the head if `prevInCol < 0`),
-   * and into the row chain when `_rowsLinked` is true. Sets `_diag[col]`
-   * when row == col (centralised in `_newElement`, mirroring spbuild.c:793
-   * (RowsLinked) and spbuild.c:851 (unlinked) — single sink). Sets
-   * `_needsReorder = true` for non-fill-in elements per spbuild.c:788.
-   *
-   * Variable map (ngspice → digiTS):
-   *   Matrix->FirstInCol[Col]  → _colHead[col]
-   *   Matrix->FirstInRow[Row]  → _rowHead[row]
-   *   Matrix->Diag[Row]        → _diag[col]    (Row == Col)
-   *   pElement->NextInCol      → _elNextInCol[e]
-   *   pElement->NextInRow      → _elNextInRow[e]
-   *   pElement->Row            → _elRow[e]
-   *   pElement->Col            → _elCol[e]
+   * ngspice spcCreateElement (spbuild.c:767-872) — line-for-line port. Two
+   * complete branches under `if (RowsLinked)` per architect B.22 / port-
+   * spec edit 1.3.5. Each branch:
+   *   - alloc via spcGetElement (we reuse _newElement for both element and
+   *     fill-in pools — ngspice's spcGetFillin falls back to spcGetElement
+   *     on FillinsRemaining == 0 per spalloc.c:481-483, and amendment A5
+   *     reclassifies the block-list as TS-mandated absent);
+   *   - if (Row == Col) Matrix->Diag[Row] = pElement (spbuild.c:793/851);
+   *   - initialise pElement->Row / Col / Real (spbuild.c:797-803/855-863);
+   *   - splice into column chain via *LastAddr (spbuild.c:806-807/866-867);
+   *   - RowsLinked branch additionally walks FirstInRow[Row] for the row
+   *     splice (spbuild.c:810-837);
+   *   - bump counters per branch (spbuild.c:782/787/847) and Matrix->
+   *     Elements++ (spbuild.c:870).
    */
   private _spcCreateElement(
     row: number, col: number, prevInCol: number, fillin: boolean,
   ): number {
-    const newE = this._newElement(row, col, 0, 0);
-    // Splice into column chain at prevInCol. _newElement initialised
-    // _elNextInCol[newE] = -1; we set it to whatever was after prevInCol.
-    if (prevInCol < 0) {
-      this._elNextInCol[newE] = this._colHead[col];
-      this._colHead[col] = newE;
+    let pElement: number;
+    if (this._rowsLinked) {
+      // ngspice spbuild.c:776-789 — Row pointers cannot be ignored.
+      // ngspice splits between spcGetFillin and spcGetElement here; both
+      // funnel into the same pool walk in our model (amendment A5).
+      pElement = this._newElement();
+      if (fillin) {
+        this._fillins++;
+      } else {
+        this._originals++;
+        // ngspice spbuild.c:788 — Matrix->NeedsOrdering = YES.
+        this._needsReorder = true;
+      }
+
+      // ngspice spbuild.c:793 — `if (Row == Col) Matrix->Diag[Row] = pElement`.
+      if (row === col) this._diag[row] = pElement;
+
+      // ngspice spbuild.c:797-800 — initialise Element fields.
+      this._elRow[pElement] = row;
+      this._elCol[pElement] = col;
+      this._elVal[pElement] = 0.0;
+      // (Imag = 0.0 / pInitInfo = NULL — complex / INITIALIZE both off.)
+
+      // ngspice spbuild.c:806-807 — splice into column at *LastAddr.
+      if (prevInCol < 0) {
+        this._elNextInCol[pElement] = this._colHead[col];
+        this._colHead[col] = pElement;
+      } else {
+        this._elNextInCol[pElement] = this._elNextInCol[prevInCol];
+        this._elNextInCol[prevInCol] = pElement;
+      }
+
+      // ngspice spbuild.c:810-822 — search FirstInRow[Row] for splice point.
+      let pLastInRow = -1;
+      let pInRow = this._rowHead[row];
+      while (pInRow >= 0) {
+        if (this._elCol[pInRow] < col) {
+          pLastInRow = pInRow;
+          pInRow = this._elNextInRow[pInRow];
+        } else {
+          // ngspice spbuild.c:821 — `else pElement = NULL;` to break loop.
+          break;
+        }
+      }
+
+      // ngspice spbuild.c:825-837 — splice into row.
+      if (pLastInRow < 0) {
+        this._elNextInRow[pElement] = this._rowHead[row];
+        this._rowHead[row] = pElement;
+      } else {
+        this._elNextInRow[pElement] = this._elNextInRow[pLastInRow];
+        this._elNextInRow[pLastInRow] = pElement;
+      }
     } else {
-      this._elNextInCol[newE] = this._elNextInCol[prevInCol];
-      this._elNextInCol[prevInCol] = newE;
-    }
-    // ngspice spcCreateElement (spbuild.c:776) — row insert only when
-    // RowsLinked == YES. During assembly and preorder, row chains do not
-    // exist; spcLinkRows builds them lazily on first factor entry.
-    if (this._rowsLinked) this._insertIntoRow(newE, row);
-    // ngspice counter writes (spbuild.c:782 fillin, 787 originals (linked
-    // branch), 847 originals (unlinked branch), 870 elements). Mirror them
-    // here so _elements == _originals + _fillins is invariant.
-    if (fillin) {
-      this._fillins++;
-    } else {
+      // ngspice spbuild.c:840-867 — row chains do not exist yet; just
+      // splice into the column chain.
+      pElement = this._newElement();
       this._originals++;
-      // ngspice spbuild.c:788 — every non-fill-in element forces reorder.
-      this._needsReorder = true;
+
+      // ngspice spbuild.c:851 — `if (Row == Col) Matrix->Diag[Row] = pElement`.
+      if (row === col) this._diag[row] = pElement;
+
+      // ngspice spbuild.c:855-860 — initialise. (DEBUG branch always sets
+      // Col; we do too because pivot search reads _elCol unconditionally.)
+      this._elRow[pElement] = row;
+      this._elCol[pElement] = col;
+      this._elVal[pElement] = 0.0;
+
+      // ngspice spbuild.c:866-867 — splice into column at *LastAddr.
+      if (prevInCol < 0) {
+        this._elNextInCol[pElement] = this._colHead[col];
+        this._colHead[col] = pElement;
+      } else {
+        this._elNextInCol[pElement] = this._elNextInCol[prevInCol];
+        this._elNextInCol[prevInCol] = pElement;
+      }
     }
+
+    // ngspice spbuild.c:870 — Matrix->Elements++.
     this._elements++;
-    return newE;
+    return pElement;
   }
 
   /**
@@ -446,9 +551,17 @@ export class SparseSolver {
   }
 
   /**
-   * Additive per ngspice spfactor.c (every stamp is *(ptr) += val). Verified A1 C-W3-1 2026-04-22.
+   * Additive RHS stamp. ngspice has no MatrixFrame.RHS — RHS lives in the
+   * NI layer (`*ckt->CKTrhs += val`). digiTS-only ownership pending B.16
+   * (Phase 6) which will hand RHS back to the caller.
+   *
+   * Mirrors the TrashCan semantics of allocElement: a stamp targeting the
+   * ground row (`row == 0`) is silently dropped — `_rhs[0]` is reserved
+   * as the ground slot and is never read by `solve()` (the
+   * IntToExtRowMap walk skips slot 0).
    */
   stampRHS(row: number, value: number): void {
+    if (row === 0) return;
     this._rhs[row] += value;
   }
 
@@ -546,18 +659,13 @@ export class SparseSolver {
     const elNextInCol = this._elNextInCol;
     const elNextInRow = this._elNextInRow;
 
-    // Initialize Intermediate vector — spsolve.c:149-151.
+    // ngspice spsolve.c:149-151 — Initialize Intermediate vector.
     //   pExtOrder = &Matrix->IntToExtRowMap[Size];
     //   for (I = Size; I > 0; I--)
     //       Intermediate[I] = RHS[*(pExtOrder--)];
-    // RHS comes from the solver's internal _rhs (populated via stampRHS calls
-    // from ckt-load.ts; the NR comment "stamps into ctx.rhs" is misleading —
-    // cktLoad goes through ctx.solver.stampRHS, which writes to this._rhs).
-    // _intToExtRow[k] = original row at slot k.
-    // Walk reverse to match ngspice spsolve.c:150 `for (I = Size; I > 0; I--)`.
-    for (let k = n - 1; k >= 0; k--) b[k] = rhs[intToExtRow[k]];
+    for (let i = n; i >= 1; i--) b[i] = rhs[intToExtRow[i]];
 
-    // Forward elimination. Solves Lc = b — spsolve.c:154-170.
+    // ngspice spsolve.c:154-170 — Forward elimination, solves Lc = b.
     //   for (I = 1; I <= Size; I++) {
     //       if ((Temp = Intermediate[I]) != 0.0) {
     //           pPivot = Matrix->Diag[I];
@@ -569,16 +677,13 @@ export class SparseSolver {
     //           }
     //       }
     //   }
-    // pPivot->Real holds 1/pivot_k post-factor (ngspice spfactor.c:349/383/408,
-    // mirrored on _elVal[_diag[k]]). Elements below the diagonal in column k
-    // hold L_ik = A_ik_post (unscaled); the multiply Temp * elVal[e] forms
-    // L_ik * y_k as required.
-    for (let k = 0; k < n; k++) {
-      let temp = b[k];
+    // pPivot->Real holds 1/pivot_k post-factor (spfactor.c:349/383/408).
+    for (let i = 1; i <= n; i++) {
+      let temp = b[i];
       if (temp !== 0.0) {
-        const pPivot = diag[k];
+        const pPivot = diag[i];
         temp *= elVal[pPivot];
-        b[k] = temp;
+        b[i] = temp;
         let pElement = elNextInCol[pPivot];
         while (pElement >= 0) {
           b[elRow[pElement]] -= temp * elVal[pElement];
@@ -587,7 +692,7 @@ export class SparseSolver {
       }
     }
 
-    // Backward Substitution. Solves Ux = c — spsolve.c:173-183.
+    // ngspice spsolve.c:173-183 — Backward Substitution. Solves Ux = c.
     //   for (I = Size; I > 0; I--) {
     //       Temp = Intermediate[I];
     //       pElement = Matrix->Diag[I]->NextInRow;
@@ -597,27 +702,22 @@ export class SparseSolver {
     //       }
     //       Intermediate[I] = Temp;
     //   }
-    // U is unit-diagonal in ngspice convention — no division at the diagonal.
-    // Elements right of the diagonal in row k hold U_ki = A_ki_post / pivot_k
-    // (already scaled at factor time).
-    for (let k = n - 1; k >= 0; k--) {
-      let temp = b[k];
-      let pElement = elNextInRow[diag[k]];
+    for (let i = n; i >= 1; i--) {
+      let temp = b[i];
+      let pElement = elNextInRow[diag[i]];
       while (pElement >= 0) {
         temp -= elVal[pElement] * b[elCol[pElement]];
         pElement = elNextInRow[pElement];
       }
-      b[k] = temp;
+      b[i] = temp;
     }
 
-    // Unscramble Intermediate vector while placing data into Solution vector
-    // — spsolve.c:186-188.
+    // ngspice spsolve.c:186-188 — Unscramble Intermediate vector while
+    // placing data into Solution vector.
     //   pExtOrder = &Matrix->IntToExtColMap[Size];
     //   for (I = Size; I > 0; I--)
     //       Solution[*(pExtOrder--)] = Intermediate[I];
-    // _preorderColPerm[k] = original col for slot k (mirrors IntToExtColMap).
-    // Walk reverse to match ngspice spsolve.c:187 `for (I = Size; I > 0; I--)`.
-    for (let k = n - 1; k >= 0; k--) x[intToExtCol[k]] = b[k];
+    for (let i = n; i >= 1; i--) x[intToExtCol[i]] = b[i];
   }
 
   /**
@@ -653,12 +753,14 @@ export class SparseSolver {
     this._elements = 0;
     this._originals = 0;
     this._fillins = 0;
-    // ngspice sputils.c:1117-1133 — element-list cursor reset. Bucket A.5:
-    // pool slot 0 stays as TrashCan; reusable pool starts at slot 1.
+    // ngspice sputils.c:1117-1133 — element-list cursor reset (block-walk
+    // collapses to "pool counter resets to first usable slot" per Bucket
+    // A.5 / amendment A5; the doubling pool reuses the buffer).
     this._elCount = 1;
-    // ngspice sputils.c:1135-1144 — per-slot reset of chain heads and Diag.
+    // ngspice sputils.c:1135-1144 — `for (I = 1; I <= Size; I++)` resets
+    // FirstInRow / FirstInCol / Diag.
     const n = this._n;
-    for (let i = 0; i < n; i++) {
+    for (let i = 1; i <= n; i++) {
       this._rowHead[i] = -1;
       this._colHead[i] = -1;
       this._diag[i] = -1;
@@ -709,11 +811,11 @@ export class SparseSolver {
     // on any twin pair: swap(J,R) on pass 1, then on pass 2 the new _diag[R] is
     // the old zero, the original twins are still |value|=1 in the swapped
     // chains, and the algorithm swaps back.
-    let startAt = 0;
+    let startAt = 1;
     let didSwap = true;
     while (didSwap) {
       didSwap = false;
-      for (let col = startAt; col < this._n; col++) {
+      for (let col = startAt; col <= this._n; col++) {
         // Only fix columns with a structural zero on the diagonal
         if (this._diag[col] >= 0 && this._elVal[this._diag[col]] !== 0) continue;
 
@@ -753,7 +855,8 @@ export class SparseSolver {
    */
   /** ngspice spcLinkRows (spbuild.c:907-932) — line-for-line port. */
   private _linkRows(): void {
-    for (let col = this._n - 1; col >= 0; col--) {
+    // ngspice spbuild.c:917 — `for (Col = Matrix->Size; Col >= 1; Col--)`.
+    for (let col = this._n; col >= 1; col--) {
       let pElement = this._colHead[col];
       while (pElement >= 0) {
         // ngspice spbuild.c:923 — pElement->Col = Col (refresh after SwapCols).
@@ -807,22 +910,6 @@ export class SparseSolver {
     this._diag[col2] = pTwin1;
   }
 
-  /**
-   * Search column slot's chain for its diagonal pool element.
-   * Post-port the diagonal of slot `slot` is the element with `_elRow[e] === slot`
-   * (the slot row equals the slot col on the diagonal). Mirrors ngspice
-   * spcFindElementInCol with `(Col, Col)` arguments — see ExchangeRowsAndCols
-   * (spfactor.c:2046, 2065-2069).
-   */
-  private _findDiagOnColumn(slot: number): number {
-    let e = this._colHead[slot];
-    while (e >= 0) {
-      if (this._elRow[e] === slot) return e;
-      e = this._elNextInCol[e];
-    }
-    return -1;
-  }
-
   // =========================================================================
   // @instrumentation — Stage 8 prefix-marker fallback (spec §8.3 lines 965-967)
   // =========================================================================
@@ -857,9 +944,15 @@ export class SparseSolver {
   /** @instrumentation Test-only. Use SparseSolverInstrumentation in new code. */
   get singletons(): number { return this._singletons; }
 
-  /** @instrumentation Test-only. Use SparseSolverInstrumentation in new code. */
+  /**
+   * @instrumentation Test-only. Use SparseSolverInstrumentation in new code.
+   *
+   * Returns the live RHS slice including the ground-slot zero at index 0
+   * (length Size + 1). Caller-side test fixtures keyed by external row
+   * read this directly.
+   */
   getRhsSnapshot(): Float64Array {
-    return this._rhs.slice(0, this._n);
+    return this._rhs.slice(0, this._n + 1);
   }
 
   /**
@@ -874,7 +967,8 @@ export class SparseSolver {
   getCSCNonZeros(): Array<{ row: number; col: number; value: number }> {
     const n = this._n;
     const result: Array<{ row: number; col: number; value: number }> = [];
-    for (let col = 0; col < n; col++) {
+    // Walk slots 1..n; slot 0 is the ground sentinel and never linked.
+    for (let col = 1; col <= n; col++) {
       let e = this._colHead[col];
       while (e >= 0) {
         result.push({ row: this._elRow[e], col: this._elCol[e], value: this._elVal[e] });
@@ -891,8 +985,9 @@ export class SparseSolver {
   /** ngspice spCreate (spalloc.c:117-277) — line-for-line port (real-only). */
   _initStructure(n: number): void {
     this._n = n;
-    // digiTS-only: caller-owned RHS buffer (B.16 deferred to Phase 6).
-    this._rhs = new Float64Array(n);
+    // ngspice has no MatrixFrame.RHS; digiTS-only owned RHS buffer (B.16
+    // deferred to Phase 6). Length Size + 1; slot 0 = ground (always 0).
+    this._rhs = new Float64Array(n + 1);
 
     // ngspice spalloc.c:164-198 — MatrixFrame field init.
     this._factored = false;
@@ -907,32 +1002,39 @@ export class SparseSolver {
     this._internalVectorsAllocated = false;
     this._singularCol = 0;
     this._singularRow = 0;
+    // ngspice spalloc.c:181 — CurrentSize starts at 0; Translate bumps it.
+    this._currentSize = 0;
 
-    // ngspice spalloc.c:215, 220, 225 — SP_CALLOC zero-inits chain head /
-    // diag arrays; digiTS uses -1 sentinel (Bucket A.1 Int32Array encoding).
-    this._rowHead = new Int32Array(n).fill(-1);
-    this._colHead = new Int32Array(n).fill(-1);
-    this._diag = new Int32Array(n).fill(-1);
+    // ngspice spalloc.c:215, 220, 225 — SP_CALLOC zero-inits Diag /
+    // FirstInCol / FirstInRow over Size + 1 slots. digiTS uses -1 sentinel
+    // (Bucket A.1 — Int32Array cannot store NULL).
+    this._rowHead = new Int32Array(n + 1).fill(-1);
+    this._colHead = new Int32Array(n + 1).fill(-1);
+    this._diag = new Int32Array(n + 1).fill(-1);
 
-    // ngspice spalloc.c:230, 234 — IntToExt{Col,Row}Map identity.
-    // ExtToInt{Col,Row}Map: ngspice initialises to -1 and uses Translate to
-    // lazy-assign on first sight (spalloc.c:255-259, spbuild.c:436-504). The
-    // -1 init couples to the Translate port, which is a Phase 2 deliverable
-    // per amendment A3; for Phase 1 the existing identity init stays.
-    this._preorderColPerm = new Int32Array(n);
-    this._intToExtRow = new Int32Array(n);
-    this._extToIntCol = new Int32Array(n);
-    this._extToIntRow = new Int32Array(n);
-    for (let i = 0; i < n; i++) {
+    // ngspice spalloc.c:238-241 — IntToExt{Col,Row}Map[I] = I for I in
+    // 1..AllocatedSize. Slot 0 is unused but we set it to 0 for cleanliness.
+    this._preorderColPerm = new Int32Array(n + 1);
+    this._intToExtRow = new Int32Array(n + 1);
+    for (let i = 0; i <= n; i++) {
       this._preorderColPerm[i] = i;
       this._intToExtRow[i] = i;
-      this._extToIntCol[i] = i;
-      this._extToIntRow[i] = i;
     }
 
+    // ngspice spalloc.c:254-259 (TRANSLATE branch, always on per amendment
+    // A3): ExtToInt{Col,Row}Map[I] = -1 for I in 1..AllocatedSize, then
+    // ExtToInt{Col,Row}Map[0] = 0 forces ground to map to slot 0.
+    this._extToIntCol = new Int32Array(n + 1).fill(-1);
+    this._extToIntRow = new Int32Array(n + 1).fill(-1);
+    this._extToIntCol[0] = 0;
+    this._extToIntRow[0] = 0;
+
     // ngspice spalloc.c:263 — InitializeElementBlocks. Pool slot 0 is the
-    // TrashCan element (spalloc.c:204-211); first real handle is 1.
-    const elCap = Math.max(n * 4, 64);
+    // TrashCan element (spalloc.c:204-211 + amendment A2); first real
+    // handle is 1. spalloc.c:204-209 zero-initialises the TrashCan; we
+    // mirror via the implicit Float64Array zero plus -1 chain pointers
+    // that are never read (TrashCan is never linked into any chain).
+    const elCap = Math.max((n + 1) * 4, 64);
     this._elRow = new Int32Array(elCap);
     this._elCol = new Int32Array(elCap);
     this._elVal = new Float64Array(elCap);
@@ -967,15 +1069,15 @@ export class SparseSolver {
    */
   /** ngspice spClear (spbuild.c:96-142) — line-for-line port (real-only). */
   _resetForAssembly(): void {
-    // ngspice spbuild.c:121-129 (real branch).
-    for (let i = this._n - 1; i >= 0; i--) {
+    // ngspice spbuild.c:121-129 (real branch) — `for (I = Size; I > 0; I--)`.
+    for (let i = this._n; i >= 1; i--) {
       let e = this._colHead[i];
       while (e >= 0) {
         this._elVal[e] = 0.0;
         e = this._elNextInCol[e];
       }
     }
-    // ngspice spbuild.c:133 — TrashCan.Real = 0.0.
+    // ngspice spbuild.c:133-134 — TrashCan.Real / .Imag = 0.0.
     this._elVal[0] = 0.0;
     // ngspice spbuild.c:136-139.
     this._error = spOKAY;
@@ -989,115 +1091,72 @@ export class SparseSolver {
   // =========================================================================
 
   /**
-   * Allocate a new element from the pool. Sets row, col, val. Returns element
-   * index. The `flags` parameter is unused (retained for call-site stability;
-   * fill-in distinction is now tracked by counter, not per-element flag).
+   * ngspice spcGetElement (spalloc.c:310-364) — pool advance only. Per
+   * architect B.20 / B.21 / port-spec edit 1.3.5, this routine no longer
+   * carries val / flags arguments and does not touch the diagonal: the
+   * caller (_spcCreateElement) initialises every Element field including
+   * the Diag set, mirroring spbuild.c:793/851.
    *
-   * ngspice: spcGetElement (spalloc.c:310-364) / spcGetFillin (spalloc.c:475-518)
-   * plus the centralised `Diag[Row] = pElement` set sites at spbuild.c:793
-   * (RowsLinked=YES branch) and spbuild.c:851 (RowsLinked=NO branch). Both
-   * branches in ngspice funnel through one diagonal set; we centralise the
-   * same way here.
+   * Field init (Row / Col / Real / NextInCol / NextInRow) lives at the
+   * caller. We only return a fresh slot whose pointers happen to be -1
+   * thanks to the Int32Array zero-fill at construction; this is identical
+   * in behaviour to ngspice's `Matrix->NextAvailElement++` returning a
+   * SP_MALLOC'd block whose fields are uninitialised (the caller writes
+   * them all anyway).
    */
-  private _newElement(row: number, col: number, val: number, _flags: number): number {
+  private _newElement(): number {
     if (this._elCount >= this._elCapacity) this._growElements();
-    const e = this._elCount++;
-    this._elRow[e] = row;
-    this._elCol[e] = col;
-    this._elVal[e] = val;
-    this._elNextInRow[e] = -1;
-    this._elNextInCol[e] = -1;
-    // ngspice spcCreateElement spbuild.c:793 / spbuild.c:851 — single sink
-    // for `if (Row == Col) Matrix->Diag[Row] = pElement;` regardless of
-    // the RowsLinked branch.
-    if (row === col) this._diag[col] = e;
-    return e;
+    return this._elCount++;
   }
 
   /**
-   * Insert `e` into row `row`'s chain at the column-sorted position.
-   * ngspice spcCreateElement (spbuild.c:809-837) — singly-linked chain walk
-   * with a local `prev`; no prev-pointer maintenance.
+   * ngspice CreateFillin (spfactor.c:2799-2829) — line-for-line port.
    *
-   * ngspice's pivot search routines (SearchForSingleton, SearchEntireMatrix,
-   * FindBiggestInColExclude) walk chains and skip leading entries with
-   * `Col < Step` / `Row < Step`. They rely on chains being sorted ascending
-   * by row/col.
-   */
-  private _insertIntoRow(e: number, row: number): void {
-    const eCol = this._elCol[e];
-    let prev = -1;
-    let cur = this._rowHead[row];
-    while (cur >= 0 && this._elCol[cur] < eCol) {
-      prev = cur;
-      cur = this._elNextInRow[cur];
-    }
-    this._elNextInRow[e] = cur;
-    if (prev < 0) this._rowHead[row] = e;
-    else this._elNextInRow[prev] = e;
-  }
-
-  /**
-   * Allocate a fill-in pool element at (row, col) and splice it into the
-   * row/col linked structure. Returns the new pool index.
+   *     ppElementAbove = &Matrix->FirstInCol[Col];
+   *     pElement = *ppElementAbove;
+   *     while (pElement != NULL) {
+   *         if (pElement->Row < Row) {
+   *             ppElementAbove = &pElement->NextInCol;
+   *             pElement = *ppElementAbove;
+   *         } else break;
+   *     }
+   *     pElement = spcCreateElement( Matrix, Row, Col, ppElementAbove, YES );
+   *     Matrix->MarkowitzProd[Row] = ++Matrix->MarkowitzRow[Row] *
+   *                                  Matrix->MarkowitzCol[Row];
+   *     if ((Matrix->MarkowitzRow[Row] == 1) && (Matrix->MarkowitzCol[Row] != 0))
+   *         Matrix->Singletons--;
+   *     Matrix->MarkowitzProd[Col] = ++Matrix->MarkowitzCol[Col] *
+   *                                  Matrix->MarkowitzRow[Col];
+   *     if ((Matrix->MarkowitzRow[Col] != 0) && (Matrix->MarkowitzCol[Col] == 1))
+   *         Matrix->Singletons--;
    *
-   * Markowitz/Singletons bookkeeping mirrors ngspice CreateFillin
-   * spfactor.c:2798-2829 line-for-line. Pre-increment order matters: each
-   * count is incremented BEFORE the product is recomputed, and the
-   * Singletons check inspects the post-increment value of the count being
-   * ++'d alongside the unchanged value of the other count.
-   *
-   *   ngspice                            digiTS
-   *   ----------------------------------+-------------------------
-   *   Matrix->MarkowitzRow[Row]         | this._markowitzRow[row]
-   *   Matrix->MarkowitzCol[Col]         | this._markowitzCol[col]
-   *   Matrix->MarkowitzProd[i]          | this._markowitzProd[i]
-   *   Matrix->Singletons                | this._singletons
+   * The C `*ppElementAbove` pointer-to-pointer is replaced by a `prev`
+   * local plus the canonical Bucket A.5 mitigation passed to
+   * _spcCreateElement.
    */
   private _createFillin(row: number, col: number): number {
-    // ngspice CreateFillin (spfactor.c:2799-2829) calls spcCreateElement
-    // (spbuild.c:768-871) via spcGetFillin path; fillin=true so _needsReorder
-    // is NOT set (matches spcGetFillin spbuild.c:779-782 which does not touch
-    // NeedsOrdering). Find the column-chain insert position first, then
-    // dispatch to _spcCreateElement which mirrors the ngspice splice.
+    // Find Element above fill-in.
     let prev = -1;
-    let cur = this._colHead[col];
-    while (cur >= 0 && this._elRow[cur] < row) {
-      prev = cur;
-      cur = this._elNextInCol[cur];
-    }
-    const fe = this._spcCreateElement(row, col, prev, /*fillin=*/ true);
-
-    // ngspice CreateFillin spfactor.c:2818-2826.
-    this._markowitzRow[row] += 1;
-    this._markowitzProd[row] = this._markowitzRow[row] * this._markowitzCol[row];
-    if (this._markowitzRow[row] === 1 && this._markowitzCol[row] !== 0) {
-      this._singletons -= 1;
-    }
-    this._markowitzCol[col] += 1;
-    this._markowitzProd[col] = this._markowitzCol[col] * this._markowitzRow[col];
-    if (this._markowitzRow[col] !== 0 && this._markowitzCol[col] === 1) {
-      this._singletons -= 1;
+    let pElement = this._colHead[col];
+    while (pElement >= 0) {
+      if (this._elRow[pElement] < row) {
+        prev = pElement;
+        pElement = this._elNextInCol[pElement];
+      } else break;
     }
 
-    return fe;
-  }
+    // End of search, create the element.
+    pElement = this._spcCreateElement(row, col, prev, /*Fillin=*/ true);
 
-  /**
-   * Sorted-insert into column `col`'s chain — ngspice spcCreateElement
-   * (spbuild.c:805-807); same rationale as _insertIntoRow.
-   */
-  private _insertIntoCol(e: number, col: number): void {
-    const eRow = this._elRow[e];
-    let prev = -1;
-    let cur = this._colHead[col];
-    while (cur >= 0 && this._elRow[cur] < eRow) {
-      prev = cur;
-      cur = this._elNextInCol[cur];
-    }
-    this._elNextInCol[e] = cur;
-    if (prev < 0) this._colHead[col] = e;
-    else this._elNextInCol[prev] = e;
+    // Update Markowitz counts and products.
+    this._markowitzProd[row] = ++this._markowitzRow[row] * this._markowitzCol[row];
+    if (this._markowitzRow[row] === 1 && this._markowitzCol[row] !== 0)
+      this._singletons--;
+    this._markowitzProd[col] = ++this._markowitzCol[col] * this._markowitzRow[col];
+    if (this._markowitzRow[col] !== 0 && this._markowitzCol[col] === 1)
+      this._singletons--;
+
+    return pElement;
   }
 
   private _growElements(): void {
@@ -1128,14 +1187,18 @@ export class SparseSolver {
   private _allocateWorkspace(): void {
     if (this._internalVectorsAllocated) return;
     const n = this._n;
-    // ngspice spfactor.c:715-726 — Markowitz row/col/prod.
+    // ngspice spfactor.c:715-726 — MarkowitzRow / MarkowitzCol /
+    // MarkowitzProd. Allocated length Size + 2 to host the dual-purpose
+    // [Size+1] slot used by SearchForSingleton / QuicklySearchDiagonal.
     if (this._markowitzRow.length === 0) this._markowitzRow = new Int32Array(n + 2);
     if (this._markowitzCol.length === 0) this._markowitzCol = new Int32Array(n + 2);
     if (this._markowitzProd.length === 0) this._markowitzProd = new Int32Array(n + 2);
-    // ngspice spfactor.c:728-732 — DoRealDirect (real-only; DoCmplxDirect skipped).
+    // ngspice spfactor.c:728-732 — DoRealDirect length Size + 1 (real-only;
+    // DoCmplxDirect skipped per amendment A4 + complex-out-of-scope A8).
     if (this._doRealDirect.length === 0) this._doRealDirect = new Int32Array(n + 1);
-    // ngspice spfactor.c:738-742 — Intermediate (real-only: drop the 2*).
-    if (this._scratch.length === 0) this._scratch = new Float64Array(n);
+    // ngspice spfactor.c:738-742 — Intermediate length Size + 1 (real-only:
+    // drop the `2 *` complex factor at spfactor.c:738).
+    if (this._scratch.length === 0) this._scratch = new Float64Array(n + 1);
     // ngspice spfactor.c:745.
     this._internalVectorsAllocated = true;
   }
@@ -1175,9 +1238,9 @@ export class SparseSolver {
       this._allocateWorkspace();
     }
 
-    // Function-local Step counter (ngspice convention; banned-pattern guard
-    // rule #7 — keep local rather than instance field).
-    let step = 0;
+    // ngspice spfactor.c convention — Step is a function-local counter
+    // running 1..Size.
+    let step = 1;
 
     // -----------------------------------------------------------------
     // Reuse loop — ngspice spfactor.c:214-228 `if (!Matrix->NeedsOrdering)`.
@@ -1188,7 +1251,7 @@ export class SparseSolver {
       const elNextInCol = this._elNextInCol;
       const diag = this._diag;
       const relThreshold = this._relThreshold;
-      for (; step < n; step++) {
+      for (; step <= n; step++) {
         const pivotE = diag[step];
         if (pivotE < 0 || Math.abs(elVal[pivotE]) === 0) {
           // ngspice spfactor.c:225 ReorderingRequired = YES; break.
@@ -1226,9 +1289,12 @@ export class SparseSolver {
     this._countMarkowitz(step, this._rhs);
     this._markowitzProducts(step);
 
-    for (; step < n; step++) {
+    for (; step <= n; step++) {
       // ngspice spfactor.c:261 SearchForPivot.
-      const pivotE = this._searchForPivot(step);
+      // DiagPivoting is hard-wired TRUE in stock ngspice (niiter.c always
+      // passes spDIAG_PIVOTING_AS_DEFAULT == TRUE). Phase 5 will thread it
+      // through _spOrderAndFactor's parameter list (B.32).
+      const pivotE = this._searchForPivot(step, true);
       if (pivotE < 0) return this._matrixIsSingular(step);
 
       // ngspice spfactor.c:263 ExchangeRowsAndCols.
@@ -1245,8 +1311,8 @@ export class SparseSolver {
       // ngspice spfactor.c:2568-2596 — outer-product elimination.
       this._realRowColElimination(pivotE);
 
-      // ngspice spfactor.c:271 UpdateMarkowitzNumbers.
-      if (step < n - 1) {
+      // ngspice spfactor.c:271 — `if (Step < Size) UpdateMarkowitzNumbers(...)`.
+      if (step < n) {
         this._updateMarkowitzNumbers(pivotE);
       }
     }
@@ -1443,19 +1509,17 @@ export class SparseSolver {
 
     /* Initialize the variable Largest. */
     let largest: number;
-    if (e >= 0 && this._elRow[e] !== row) {
+    if (this._elRow[e] !== row)
       largest = Math.abs(this._elVal[e]);
-    } else {
+    else
       largest = 0.0;
-    }
 
     /* Search rest of column for largest element, avoiding excluded element. */
-    while (e >= 0) {
-      e = this._elNextInCol[e];
-      if (e < 0) break;
+    while ((e = this._elNextInCol[e]) >= 0) {
       const magnitude = Math.abs(this._elVal[e]);
-      if (magnitude > largest && this._elRow[e] !== row) {
-        largest = magnitude;
+      if (magnitude > largest) {
+        if (this._elRow[e] !== row)
+          largest = magnitude;
       }
     }
 
@@ -1482,7 +1546,8 @@ export class SparseSolver {
     const mCol = this._markowitzCol;
 
     /* Generate MarkowitzRow Count for each row. */
-    for (let i = step; i < n; i++) {
+    // ngspice spfactor.c:794 — `for (I = Step; I <= Matrix->Size; I++)`.
+    for (let i = step; i <= n; i++) {
       let count = -1;
       let e = this._rowHead[i];
       while (e >= 0 && this._elCol[e] < step) e = this._elNextInRow[e];
@@ -1498,7 +1563,8 @@ export class SparseSolver {
     }
 
     /* Generate MarkowitzCol count for each column. */
-    for (let i = step; i < n; i++) {
+    // ngspice spfactor.c:813 — same loop bounds.
+    for (let i = step; i <= n; i++) {
       let count = -1;
       let e = this._colHead[i];
       while (e >= 0 && this._elRow[e] < step) e = this._elNextInCol[e];
@@ -1520,14 +1586,17 @@ export class SparseSolver {
   private _markowitzProducts(step: number): void {
     const n = this._n;
     this._singletons = 0;
-    for (let i = step; i < n; i++) {
+    // ngspice spfactor.c:880 — `for (I = Step; I <= Size; I++)`.
+    for (let i = step; i <= n; i++) {
       const r = this._markowitzRow[i];
       const c = this._markowitzCol[i];
       if ((r > SparseSolver.LARGEST_SHORT_INTEGER && c !== 0) ||
           (c > SparseSolver.LARGEST_SHORT_INTEGER && r !== 0)) {
-        const fp = r * c; // double-precision multiply
-        this._markowitzProd[i] =
-          fp >= SparseSolver.LARGEST_LONG_INTEGER ? SparseSolver.LARGEST_LONG_INTEGER : fp | 0;
+        const fProduct = r * c;
+        if (fProduct >= SparseSolver.LARGEST_LONG_INTEGER)
+          this._markowitzProd[i] = SparseSolver.LARGEST_LONG_INTEGER;
+        else
+          this._markowitzProd[i] = Math.trunc(fProduct);
       } else {
         const product = r * c;
         this._markowitzProd[i] = product;
@@ -1540,22 +1609,38 @@ export class SparseSolver {
    * ngspice SearchForPivot (spfactor.c:947-994) — dispatch. Returns the pool
    * element handle of the chosen pivot, or -1 if no acceptable pivot exists
    * (matrix is singular at this step).
-   *
-   * Uses 0-based step; routine bodies write the canonical 1-based ngspice
-   * names but interpret indices in our 0-based slot space.
    */
-  private _searchForPivot(step: number): number {
-    let chosen: number;
+  private _searchForPivot(step: number, diagPivoting: boolean): number {
+    let chosenPivot: number;
+
+    /* If singletons exist, look for an acceptable one to use as pivot. */
     if (this._singletons > 0) {
-      chosen = this._searchForSingleton(step);
-      if (chosen >= 0) return chosen;
+      chosenPivot = this._searchForSingleton(step);
+      if (chosenPivot >= 0) {
+        this._pivotSelectionMethod = 's';
+        return chosenPivot;
+      }
     }
-    // DIAGONAL_PIVOTING is on by default in spconfig.h.
-    chosen = this._quicklySearchDiagonal(step);
-    if (chosen >= 0) return chosen;
-    chosen = this._searchDiagonal(step);
-    if (chosen >= 0) return chosen;
-    return this._searchEntireMatrix(step);
+
+    /* DIAGONAL_PIVOTING compile-flag is YES in stock ngspice. */
+    if (diagPivoting) {
+      chosenPivot = this._quicklySearchDiagonal(step);
+      if (chosenPivot >= 0) {
+        this._pivotSelectionMethod = 'q';
+        return chosenPivot;
+      }
+      chosenPivot = this._searchDiagonal(step);
+      if (chosenPivot >= 0) {
+        this._pivotSelectionMethod = 'd';
+        return chosenPivot;
+      }
+    }
+
+    /* No acceptable pivot found yet, search entire matrix. */
+    chosenPivot = this._searchEntireMatrix(step);
+    this._pivotSelectionMethod = 'e';
+
+    return chosenPivot;
   }
 
   /**
@@ -1576,95 +1661,90 @@ export class SparseSolver {
     const n = this._n;
     const mProd = this._markowitzProd;
 
-    // Initialize the pointer to scan through MarkowitzProduct.
-    // ngspice: pMarkowitzProduct = &MarkowitzProd[Size+1]; in our 0-based
-    // world Size+1 maps to index n (since Size = n - 1).
-    let p = n;
-    mProd[n] = mProd[step];
+    /* Initialize pointer that is to scan through MarkowitzProduct vector. */
+    // ngspice spfactor.c:1051 — `pMarkowitzProduct = &MarkowitzProd[Size+1]`.
+    let p = n + 1;
+    mProd[n + 1] = mProd[step];
 
-    // Decrement count of available singletons on the assumption that an
-    // acceptable one will be found.
-    let singletons = this._singletons;
-    this._singletons--;
+    /* Decrement the count of available singletons, on the assumption that an
+     * acceptable one will be found. */
+    let singletons = this._singletons--;
 
-    // Termination guard: ngspice writes mProd[Step-1] = 0. When step == 0
-    // there is no slot at -1; the inner while still terminates because we
-    // bound the read at `p < 0 ? 0 : mProd[p]` (acts as implicit sentinel).
-    if (step >= 1) mProd[step - 1] = 0;
+    /* Assure that following while loop will always terminate. */
+    mProd[step - 1] = 0;
 
     while (singletons-- > 0) {
-      // Inner while: walk down MarkowitzProd until a zero is found.
-      // Mirrors ngspice's `while (*pMarkowitzProduct--) {}` post-decrement.
-      let v: number;
-      do {
-        v = (p >= 0) ? mProd[p] : 0;
-        p--;
-      } while (v !== 0);
+      /* Singletons exist, find them. */
 
+      // ngspice spfactor.c:1087 — `while ( *pMarkowitzProduct-- ) {}`.
+      while (mProd[p--]) {}
+      // ngspice spfactor.c:1095 — `I = (pMarkowitzProduct - MarkowitzProd) + 1`.
+      // Post-decrement leaves p one below the zero position; +1 recovers it.
       let i = p + 1;
 
-      // Assure that I is valid.
+      /* Assure that I is valid. */
       if (i < step) break;
-      if (i > n - 1) i = step;
+      if (i > n) i = step;
 
-      // Singleton has been found in either/both row or/and column I.
-      const diagE = this._diag[i];
-      if (diagE >= 0) {
-        // Singleton lies on the diagonal.
-        const pivotMag = Math.abs(this._elVal[diagE]);
+      /* Singleton has been found in either/both row or/and column I. */
+      let chosenPivot = this._diag[i];
+      if (chosenPivot >= 0) {
+        /* Singleton lies on the diagonal. */
+        const pivotMag = Math.abs(this._elVal[chosenPivot]);
         if (pivotMag > this._absThreshold &&
-            pivotMag > this._relThreshold * this._findBiggestInColExclude(diagE, step)) {
-          return diagE;
-        }
+            pivotMag > this._relThreshold *
+            this._findBiggestInColExclude(chosenPivot, step))
+          return chosenPivot;
       } else {
-        // Singleton does not lie on diagonal, find it.
+        /* Singleton does not lie on diagonal, find it. */
         if (this._markowitzCol[i] === 0) {
-          let chosen = this._colHead[i];
-          while (chosen >= 0 && this._elRow[chosen] < step) chosen = this._elNextInCol[chosen];
-          if (chosen >= 0) {
-            // ngspice spfactor.c:1116 inverted-condition bug — break exits
-            // the outer singleton scan whenever a candidate IS found.
-            // Comment claims "no elements, matrix is singular" but condition
-            // is reversed. Preserved for bit-exact ngspice parity.
+          chosenPivot = this._colHead[i];
+          while ((chosenPivot >= 0) && (this._elRow[chosenPivot] < step))
+            chosenPivot = this._elNextInCol[chosenPivot];
+          if (chosenPivot >= 0) {
+            /* Reduced column has no elements, matrix is singular. */
             break;
           }
-          const pivotMag = chosen >= 0 ? Math.abs(this._elVal[chosen]) : 0;
+          const pivotMag = Math.abs(this._elVal[chosenPivot]);
           if (pivotMag > this._absThreshold &&
-              pivotMag > this._relThreshold * this._findBiggestInColExclude(chosen, step)) {
-            return chosen;
-          } else {
+              pivotMag > this._relThreshold *
+              this._findBiggestInColExclude(chosenPivot, step))
+            return chosenPivot;
+          else {
             if (this._markowitzRow[i] === 0) {
-              let chosen2 = this._rowHead[i];
-              while (chosen2 >= 0 && this._elCol[chosen2] < step) chosen2 = this._elNextInRow[chosen2];
-              if (chosen2 >= 0) {
-                // spfactor.c:1132 — same inverted-condition bug.
+              chosenPivot = this._rowHead[i];
+              while ((chosenPivot >= 0) && (this._elCol[chosenPivot] < step))
+                chosenPivot = this._elNextInRow[chosenPivot];
+              if (chosenPivot >= 0) {
+                /* Reduced row has no elements, matrix is singular. */
                 break;
               }
-              const pivotMag2 = chosen2 >= 0 ? Math.abs(this._elVal[chosen2]) : 0;
+              const pivotMag2 = Math.abs(this._elVal[chosenPivot]);
               if (pivotMag2 > this._absThreshold &&
-                  pivotMag2 > this._relThreshold * this._findBiggestInColExclude(chosen2, step)) {
-                return chosen2;
-              }
+                  pivotMag2 > this._relThreshold *
+                  this._findBiggestInColExclude(chosenPivot, step))
+                return chosenPivot;
             }
           }
         } else {
-          let chosen = this._rowHead[i];
-          while (chosen >= 0 && this._elCol[chosen] < step) chosen = this._elNextInRow[chosen];
-          if (chosen >= 0) {
-            // spfactor.c:1150 — same inverted-condition bug.
+          chosenPivot = this._rowHead[i];
+          while ((chosenPivot >= 0) && (this._elCol[chosenPivot] < step))
+            chosenPivot = this._elNextInRow[chosenPivot];
+          if (chosenPivot >= 0) {
+            /* Reduced row has no elements, matrix is singular. */
             break;
           }
-          const pivotMag = chosen >= 0 ? Math.abs(this._elVal[chosen]) : 0;
+          const pivotMag = Math.abs(this._elVal[chosenPivot]);
           if (pivotMag > this._absThreshold &&
-              pivotMag > this._relThreshold * this._findBiggestInColExclude(chosen, step)) {
-            return chosen;
-          }
+              pivotMag > this._relThreshold *
+              this._findBiggestInColExclude(chosenPivot, step))
+            return chosenPivot;
         }
       }
       /* Singleton not acceptable (too small), try another. */
-    }
+    } /* end of while(lSingletons>0) */
 
-    // All singletons unacceptable — restore Singletons count.
+    /* All singletons were unacceptable.  Restore Matrix->Singletons count. */
     this._singletons++;
     return -1;
   }
@@ -1679,60 +1759,58 @@ export class SparseSolver {
   private _quicklySearchDiagonal(step: number): number {
     const n = this._n;
     const mProd = this._markowitzProd;
+    const tiedElements = this._tiedElements;
+
+    /* Begin `QuicklySearchDiagonal'. */
     let numberOfTies = -1;
     let minMarkowitzProduct = SparseSolver.LARGEST_LONG_INTEGER;
-    // pMarkowitzProduct = &MarkowitzProd[Size+2]; our index n+1.
-    let p = n + 1;
-    mProd[n] = mProd[step];
+    // ngspice spfactor.c:1268 — `pMarkowitzProduct = &MarkowitzProd[Size+2]`.
+    let p = n + 2;
+    mProd[n + 1] = mProd[step];
 
-    // Termination guard: mProd[step-1] = -1.
-    if (step >= 1) mProd[step - 1] = -1;
+    /* Assure that following while loop will always terminate. */
+    mProd[step - 1] = -1;
 
-    const tied: number[] = new Array(SparseSolver.MAX_MARKOWITZ_TIES + 1);
-
-    /* Endless for loop. */
-    for (;;) {
-      // ngspice: while (MinMarkowitzProduct < *(--pMarkowitzProduct)) {}
-      // Pre-decrement, then test: keeps walking while the (just-decremented)
-      // slot's product is strictly greater than the current minimum.
-      let v: number;
-      do {
-        p--;
-        v = (p >= 0) ? mProd[p] : -1;
-      } while (minMarkowitzProduct < v);
+    for (;;) { /* Endless for loop. */
+      // ngspice spfactor.c:1294 — `while (MinMarkowitzProduct < *(--pMarkowitzProduct)) {}`.
+      while (minMarkowitzProduct < mProd[--p]) {}
 
       let i = p;
 
-      // Assure that I is valid; if I < Step, terminate search.
-      if (i < step) break;
-      if (i > n - 1) i = step;
+      /* Assure that I is valid; if I < Step, terminate search. */
+      if (i < step) break; /* Endless for loop */
+      if (i > n) i = step;
 
-      const pDiag = this._diag[i];
-      if (pDiag < 0) continue;
-      const magnitude = Math.abs(this._elVal[pDiag]);
-      if (magnitude <= this._absThreshold) continue;
+      let pDiag: number;
+      if ((pDiag = this._diag[i]) < 0)
+        continue; /* Endless for loop */
+      let magnitude: number;
+      if ((magnitude = Math.abs(this._elVal[pDiag])) <= this._absThreshold)
+        continue; /* Endless for loop */
 
       if (mProd[p] === 1) {
-        /* Only one element exists in row and column other than diagonal. */
+        /* Case where only one element exists in row and column other than diagonal. */
+
+        /* Find off diagonal elements. */
         let pOtherInRow = this._elNextInRow[pDiag];
         let pOtherInCol = this._elNextInCol[pDiag];
         if (pOtherInRow < 0 && pOtherInCol < 0) {
           pOtherInRow = this._rowHead[i];
           while (pOtherInRow >= 0) {
-            const c = this._elCol[pOtherInRow];
-            if (c >= step && c !== i) break;
+            if (this._elCol[pOtherInRow] >= step && this._elCol[pOtherInRow] !== i)
+              break;
             pOtherInRow = this._elNextInRow[pOtherInRow];
           }
           pOtherInCol = this._colHead[i];
           while (pOtherInCol >= 0) {
-            const r = this._elRow[pOtherInCol];
-            if (r >= step && r !== i) break;
+            if (this._elRow[pOtherInCol] >= step && this._elRow[pOtherInCol] !== i)
+              break;
             pOtherInCol = this._elNextInCol[pOtherInCol];
           }
         }
 
-        // Accept diagonal if larger than off-diagonals AND off-diagonals
-        // placed symmetrically.
+        /* Accept diagonal as pivot if diagonal is larger than off diagonals
+         * and the off diagonals are placed symmetricly. */
         if (pOtherInRow >= 0 && pOtherInCol >= 0) {
           if (this._elCol[pOtherInRow] === this._elRow[pOtherInCol]) {
             const largestOffDiagonal = Math.max(
@@ -1740,6 +1818,7 @@ export class SparseSolver {
               Math.abs(this._elVal[pOtherInCol]),
             );
             if (magnitude >= largestOffDiagonal) {
+              /* Accept pivot, it is unlikely to contribute excess error. */
               return pDiag;
             }
           }
@@ -1747,35 +1826,39 @@ export class SparseSolver {
       }
 
       if (mProd[p] < minMarkowitzProduct) {
-        // Strict inequality — new smallest MarkowitzProduct.
-        tied[0] = pDiag;
+        /* Notice strict inequality in test. This is a new smallest MarkowitzProduct. */
+        tiedElements[0] = pDiag;
         minMarkowitzProduct = mProd[p];
         numberOfTies = 0;
       } else {
-        // Markowitz tie.
+        /* This case handles Markowitz ties. */
         if (numberOfTies < SparseSolver.MAX_MARKOWITZ_TIES) {
-          tied[++numberOfTies] = pDiag;
-          if (numberOfTies >= minMarkowitzProduct * SparseSolver.TIES_MULTIPLIER) break;
+          tiedElements[++numberOfTies] = pDiag;
+          if (numberOfTies >= minMarkowitzProduct * SparseSolver.TIES_MULTIPLIER)
+            break; /* Endless for loop */
         }
       }
-    }
+    } /* End of endless for loop. */
 
-    if (numberOfTies < 0) return -1;
+    /* Test to see if any element was chosen as a pivot candidate. */
+    if (numberOfTies < 0)
+      return -1;
 
-    // Determine which tied element is best numerically.
-    let chosen = -1;
+    /* Determine which of tied elements is best numerically. */
+    let chosenPivot = -1;
     let maxRatio = 1.0 / this._relThreshold;
-    for (let j = 0; j <= numberOfTies; j++) {
-      const pDiag = tied[j];
+
+    for (let i = 0; i <= numberOfTies; i++) {
+      const pDiag = tiedElements[i];
       const magnitude = Math.abs(this._elVal[pDiag]);
       const largestInCol = this._findBiggestInColExclude(pDiag, step);
       const ratio = largestInCol / magnitude;
       if (ratio < maxRatio) {
-        chosen = pDiag;
+        chosenPivot = pDiag;
         maxRatio = ratio;
       }
     }
-    return chosen;
+    return chosenPivot;
   }
 
   /**
@@ -1783,49 +1866,61 @@ export class SparseSolver {
    */
   private _searchDiagonal(step: number): number {
     const n = this._n;
-    const size = n - 1;
     const mProd = this._markowitzProd;
-    let chosen = -1;
-    let minMarkowitzProduct = SparseSolver.LARGEST_LONG_INTEGER;
-    let ratioOfAccepted = 0;
     let numberOfTies = 0;
-    // pMarkowitzProduct = &MarkowitzProd[Size+2]; index n+1.
-    let p = n + 1;
-    mProd[n] = mProd[step];
 
-    /* for (J = Size+1; J > Step; J--) — our 0-based: J from n down to step+1. */
-    for (let j = n; j > step; j--) {
-      p--;
-      if (p < 0) break;
-      if (mProd[p] > minMarkowitzProduct) continue;
+    /* Begin `SearchDiagonal'. */
+    let chosenPivot = -1;
+    let minMarkowitzProduct = SparseSolver.LARGEST_LONG_INTEGER;
+    // ngspice spfactor.c:1622 — `pMarkowitzProduct = &MarkowitzProd[Size+2]`.
+    let p = n + 2;
+    mProd[n + 1] = mProd[step];
+
+    let ratioOfAccepted = 0;
+
+    /* Start search of diagonal. */
+    // ngspice spfactor.c:1626 — `for (J = Size+1; J > Step; J--)`.
+    for (let j = n + 1; j > step; j--) {
+      // ngspice spfactor.c:1627 — `if (*(--pMarkowitzProduct) > MinMarkowitzProduct) continue;`.
+      if (mProd[--p] > minMarkowitzProduct)
+        continue; /* for loop */
       let i: number;
-      if (j > size) i = step; else i = j;
-      const pDiag = this._diag[i];
-      if (pDiag < 0) continue;
-      const magnitude = Math.abs(this._elVal[pDiag]);
-      if (magnitude <= this._absThreshold) continue;
+      if (j > n)
+        i = step;
+      else
+        i = j;
+      let pDiag: number;
+      if ((pDiag = this._diag[i]) < 0)
+        continue; /* for loop */
+      let magnitude: number;
+      if ((magnitude = Math.abs(this._elVal[pDiag])) <= this._absThreshold)
+        continue; /* for loop */
 
-      // Test diagonal magnitude acceptable.
+      /* Test to see if diagonal's magnitude is acceptable. */
       const largestInCol = this._findBiggestInColExclude(pDiag, step);
-      if (magnitude <= this._relThreshold * largestInCol) continue;
+      if (magnitude <= this._relThreshold * largestInCol)
+        continue; /* for loop */
 
       if (mProd[p] < minMarkowitzProduct) {
-        chosen = pDiag;
+        /* Notice strict inequality in test. This is a new
+           smallest MarkowitzProduct. */
+        chosenPivot = pDiag;
         minMarkowitzProduct = mProd[p];
         ratioOfAccepted = largestInCol / magnitude;
         numberOfTies = 0;
       } else {
-        // Markowitz tie.
+        /* This case handles Markowitz ties. */
         numberOfTies++;
         const ratio = largestInCol / magnitude;
         if (ratio < ratioOfAccepted) {
-          chosen = pDiag;
+          chosenPivot = pDiag;
           ratioOfAccepted = ratio;
         }
-        if (numberOfTies >= minMarkowitzProduct * SparseSolver.TIES_MULTIPLIER) return chosen;
+        if (numberOfTies >= minMarkowitzProduct * SparseSolver.TIES_MULTIPLIER)
+          return chosenPivot;
       }
-    }
-    return chosen;
+    } /* End of for(Step) */
+    return chosenPivot;
   }
 
   /**
@@ -1836,58 +1931,81 @@ export class SparseSolver {
    */
   private _searchEntireMatrix(step: number): number {
     const n = this._n;
-    let chosen = -1;
-    let pLargestElement = -1;
-    let largestElementMag = 0;
-    let minMarkowitzProduct = SparseSolver.LARGEST_LONG_INTEGER;
-    let ratioOfAccepted = 0;
     let numberOfTies = 0;
+    let minMarkowitzProduct: number;
+    let chosenPivot: number;
+    let pLargestElement = -1;
+    let largestElementMag: number;
+    let ratioOfAccepted = 0;
     const mRow = this._markowitzRow;
     const mCol = this._markowitzCol;
 
-    for (let i = step; i < n; i++) {
-      let pElement = this._colHead[i];
-      while (pElement >= 0 && this._elRow[pElement] < step) pElement = this._elNextInCol[pElement];
+    /* Begin `SearchEntireMatrix'. */
+    chosenPivot = -1;
+    largestElementMag = 0.0;
+    minMarkowitzProduct = SparseSolver.LARGEST_LONG_INTEGER;
 
-      const largestInCol = this._findLargestInCol(pElement);
-      if (largestInCol === 0) continue;
+    /* Start search of matrix on column by column basis. */
+    // ngspice spfactor.c:1749 — `for (I = Step; I <= Size; I++)`.
+    for (let i = step; i <= n; i++) {
+      let pElement = this._colHead[i];
+
+      while (pElement >= 0 && this._elRow[pElement] < step)
+        pElement = this._elNextInCol[pElement];
+
+      let largestInCol: number;
+      if ((largestInCol = this._findLargestInCol(pElement)) === 0.0)
+        continue; /* for loop */
 
       while (pElement >= 0) {
-        const magnitude = Math.abs(this._elVal[pElement]);
-        if (magnitude > largestElementMag) {
+        /* Check to see if element is the largest encountered so
+           far.  If so, record its magnitude and address. */
+        let magnitude: number;
+        if ((magnitude = Math.abs(this._elVal[pElement])) > largestElementMag) {
           largestElementMag = magnitude;
           pLargestElement = pElement;
         }
-        const product = mRow[this._elRow[pElement]] * mCol[this._elCol[pElement]];
-        if (product <= minMarkowitzProduct &&
-            magnitude > this._relThreshold * largestInCol &&
-            magnitude > this._absThreshold) {
+        /* Calculate element's MarkowitzProduct. */
+        const product = mRow[this._elRow[pElement]] *
+                        mCol[this._elCol[pElement]];
+
+        /* Test to see if element is acceptable as a pivot candidate. */
+        if ((product <= minMarkowitzProduct) &&
+            (magnitude > this._relThreshold * largestInCol) &&
+            (magnitude > this._absThreshold)) {
+          /* Test to see if element has lowest MarkowitzProduct
+             yet found, or whether it is tied with an element
+             found earlier. */
           if (product < minMarkowitzProduct) {
-            chosen = pElement;
+            /* Notice strict inequality in test. This is a new
+               smallest MarkowitzProduct. */
+            chosenPivot = pElement;
             minMarkowitzProduct = product;
             ratioOfAccepted = largestInCol / magnitude;
             numberOfTies = 0;
           } else {
+            /* This case handles Markowitz ties. */
             numberOfTies++;
             const ratio = largestInCol / magnitude;
             if (ratio < ratioOfAccepted) {
-              chosen = pElement;
+              chosenPivot = pElement;
               ratioOfAccepted = ratio;
             }
-            if (numberOfTies >= minMarkowitzProduct * SparseSolver.TIES_MULTIPLIER) return chosen;
+            if (numberOfTies >= minMarkowitzProduct * SparseSolver.TIES_MULTIPLIER)
+              return chosenPivot;
           }
         }
         pElement = this._elNextInCol[pElement];
-      }
+      }  /* End of while(pElement != NULL) */
+    } /* End of for(Step) */
+
+    if (chosenPivot >= 0) return chosenPivot;
+
+    if (largestElementMag === 0.0) {
+      this._error = spSINGULAR;
+      return -1;
     }
 
-    if (chosen >= 0) return chosen;
-    // ngspice SearchEntireMatrix fallback (spfactor.c:1799-1809): when no
-    // candidate met RelThreshold * LargestInCol, fall back to the globally
-    // largest element with Matrix->Error = spSMALL_PIVOT (warning, not
-    // failure — Factored is still set on the surrounding return). When the
-    // largest element is exactly zero the matrix is structurally singular.
-    if (largestElementMag === 0) return -1;
     this._error = spSMALL_PIVOT;
     return pLargestElement;
   }
@@ -2277,12 +2395,15 @@ export class SparseSolver {
           if (oldCol === 0) this._singletons--;
           else this._singletons++;
         }
-        this._diag[col] = this._findDiagOnColumn(col);
+        // ngspice spfactor.c:2046 — `spcFindElementInCol(&FirstInCol[Col], Col, Col, NO)`.
+        this._diag[col] = this._spcFindElementInCol(col, col, /*createIfMissing=*/ false);
       }
       if (row !== step) {
-        this._diag[row] = this._findDiagOnColumn(row);
+        // ngspice spfactor.c:2065 — same shape, on the row slot.
+        this._diag[row] = this._spcFindElementInCol(row, row, /*createIfMissing=*/ false);
       }
-      this._diag[step] = this._findDiagOnColumn(step);
+      // ngspice spfactor.c:2069 — and on the step slot.
+      this._diag[step] = this._spcFindElementInCol(step, step, /*createIfMissing=*/ false);
 
       this._markowitzProd[step] = this._markowitzCol[step] * this._markowitzRow[step];
       if ((this._markowitzProd[step] === 0) !== (oldStep === 0)) {
@@ -2308,40 +2429,41 @@ export class SparseSolver {
     const mCol = this._markowitzCol;
     const mProd = this._markowitzProd;
 
-    // Walk pivot COLUMN below the diagonal — each contributing row loses a
-    // column-entry once the pivot row is eliminated.
-    for (let p = this._elNextInCol[pivotE]; p >= 0; p = this._elNextInCol[p]) {
-      const row = this._elRow[p];
-      mRow[row]--;
+    /* Update Markowitz numbers. */
+    // ngspice spfactor.c:2724 — `for (ColPtr = pPivot->NextInCol; ...)`.
+    for (let colPtr = this._elNextInCol[pivotE]; colPtr >= 0; colPtr = this._elNextInCol[colPtr]) {
+      const row = this._elRow[colPtr];
+      --mRow[row];
+
+      /* Form Markowitz product while being cautious of overflows. */
       if ((mRow[row] > SparseSolver.LARGEST_SHORT_INTEGER && mCol[row] !== 0) ||
           (mCol[row] > SparseSolver.LARGEST_SHORT_INTEGER && mRow[row] !== 0)) {
         const product = mCol[row] * mRow[row];
-        mProd[row] = product >= SparseSolver.LARGEST_LONG_INTEGER
-          ? SparseSolver.LARGEST_LONG_INTEGER
-          : product | 0;
-      } else {
-        mProd[row] = mRow[row] * mCol[row];
-      }
-      if (mRow[row] === 0) this._singletons++;
+        if (product >= SparseSolver.LARGEST_LONG_INTEGER)
+          mProd[row] = SparseSolver.LARGEST_LONG_INTEGER;
+        else
+          mProd[row] = Math.trunc(product);
+      } else mProd[row] = mRow[row] * mCol[row];
+      if (mRow[row] === 0)
+        this._singletons++;
     }
 
-    // Walk pivot ROW right of the diagonal — each contributing column loses a
-    // row-entry.
-    for (let p = this._elNextInRow[pivotE]; p >= 0; p = this._elNextInRow[p]) {
-      const col = this._elCol[p];
-      mCol[col]--;
+    // ngspice spfactor.c:2741 — `for (RowPtr = pPivot->NextInRow; ...)`.
+    for (let rowPtr = this._elNextInRow[pivotE]; rowPtr >= 0; rowPtr = this._elNextInRow[rowPtr]) {
+      const col = this._elCol[rowPtr];
+      --mCol[col];
+
+      /* Form Markowitz product while being cautious of overflows. */
       if ((mRow[col] > SparseSolver.LARGEST_SHORT_INTEGER && mCol[col] !== 0) ||
           (mCol[col] > SparseSolver.LARGEST_SHORT_INTEGER && mRow[col] !== 0)) {
         const product = mCol[col] * mRow[col];
-        mProd[col] = product >= SparseSolver.LARGEST_LONG_INTEGER
-          ? SparseSolver.LARGEST_LONG_INTEGER
-          : product | 0;
-      } else {
-        mProd[col] = mRow[col] * mCol[col];
-      }
-      // ngspice spfactor.c:2756 only counts a singleton when MarkoCol == 0
-      // AND MarkoRow != 0 (avoid double-counting the row half above).
-      if (mCol[col] === 0 && mRow[col] !== 0) this._singletons++;
+        if (product >= SparseSolver.LARGEST_LONG_INTEGER)
+          mProd[col] = SparseSolver.LARGEST_LONG_INTEGER;
+        else
+          mProd[col] = Math.trunc(product);
+      } else mProd[col] = mRow[col] * mCol[col];
+      if ((mCol[col] === 0) && (mRow[col] !== 0))
+        this._singletons++;
     }
   }
 
@@ -2363,12 +2485,12 @@ export class SparseSolver {
    * same factor call, never persisting beyond it.
    */
   private _applyDiagGmin(gmin: number): void {
-    // ngspice spsmp.c:432-437 LoadGmin — gates the work on Gmin != 0 (entry guard)
-    // and walks diagonals reverse: `for (I = Matrix->Size; I > 0; I--)`.
+    // ngspice spsmp.c:432-437 LoadGmin — gates on Gmin != 0 and walks
+    // `for (I = Matrix->Size; I > 0; I--)`.
     if (gmin !== 0) {
       const diag = this._diag;
       const elVal = this._elVal;
-      for (let i = this._n - 1; i >= 0; i--) {
+      for (let i = this._n; i >= 1; i--) {
         const e = diag[i];
         if (e >= 0) elVal[e] += gmin;
       }

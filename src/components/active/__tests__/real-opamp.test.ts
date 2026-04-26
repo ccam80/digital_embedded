@@ -1,13 +1,13 @@
-/**
+﻿/**
  * Tests for the Real Op-Amp composite model (Task 6.2.2).
  *
  * Test suites:
- *   DCGain    — inverting amplifier gain accuracy, output saturation
- *   Bandwidth — unity-gain buffer -3dB = GBW, gain=10 buffer -3dB = GBW/10
- *   SlewRate  — large-signal step rises at SR V/µs, small-signal not slew-limited
- *   Offset    — input offset produces measurable output error with gain
- *   CurrentLimit — output current clamped to I_max
- *   RealOpAmp — named model loading (741)
+ *   DCGain    â€” inverting amplifier gain accuracy, output saturation
+ *   Bandwidth â€” unity-gain buffer -3dB = GBW, gain=10 buffer -3dB = GBW/10
+ *   SlewRate  â€” large-signal step rises at SR V/Âµs, small-signal not slew-limited
+ *   Offset    â€” input offset produces measurable output error with gain
+ *   CurrentLimit â€” output current clamped to I_max
+ *   RealOpAmp â€” named model loading (741)
  */
 
 import { describe, it, expect } from "vitest";
@@ -74,7 +74,7 @@ function makeRealOpAmp(overrides: Record<string, number | string> = {}): AnalogE
   props.replaceModelParams(modelParams);
   const pinNodes = new Map([["in+", 1], ["in-", 2], ["out", 3], ["Vcc+", 4], ["Vcc-", 5]]);
   const el = createRealOpAmpElement(pinNodes, props);
-  // pinLayout order: [in-, in+, out, Vcc+, Vcc-] → [2, 1, 3, 4, 5]
+  // pinLayout order: [in-, in+, out, Vcc+, Vcc-] â†’ [2, 1, 3, 4, 5]
   const pinLayout = RealOpAmpDefinition.pinLayout;
   const pinNodeIds = pinLayout.map(p => pinNodes.get(p.label) ?? 0);
   return withNodeIds(el, pinNodeIds);
@@ -95,11 +95,11 @@ function makeResistor(nodeA: number, nodeB: number, resistance: number): AnalogE
     getPinCurrents(): number[] { return []; },
     load(ctx): void {
       const { solver } = ctx;
-      if (nodeA > 0) { const h = solver.allocElement(nodeA - 1, nodeA - 1); solver.stampElement(h, G); }
-      if (nodeB > 0) { const h = solver.allocElement(nodeB - 1, nodeB - 1); solver.stampElement(h, G); }
+      if (nodeA > 0) { const h = solver.allocElement(nodeA, nodeA); solver.stampElement(h, G); }
+      if (nodeB > 0) { const h = solver.allocElement(nodeB, nodeB); solver.stampElement(h, G); }
       if (nodeA > 0 && nodeB > 0) {
-        const hab = solver.allocElement(nodeA - 1, nodeB - 1); solver.stampElement(hab, -G);
-        const hba = solver.allocElement(nodeB - 1, nodeA - 1); solver.stampElement(hba, -G);
+        const hab = solver.allocElement(nodeA, nodeB); solver.stampElement(hab, -G);
+        const hba = solver.allocElement(nodeB, nodeA); solver.stampElement(hba, -G);
       }
     },
   };
@@ -120,10 +120,10 @@ function makeDcSource(nodePos: number, nodeNeg: number, branchRow: number, volta
     load(ctx): void {
       const { solver } = ctx;
       const k = branchRow;
-      if (nodePos !== 0) { const h = solver.allocElement(nodePos - 1, k); solver.stampElement(h, 1); }
-      if (nodeNeg !== 0) { const h = solver.allocElement(nodeNeg - 1, k); solver.stampElement(h, -1); }
-      if (nodePos !== 0) { const h = solver.allocElement(k, nodePos - 1); solver.stampElement(h, 1); }
-      if (nodeNeg !== 0) { const h = solver.allocElement(k, nodeNeg - 1); solver.stampElement(h, -1); }
+      if (nodePos !== 0) { const h = solver.allocElement(nodePos, k); solver.stampElement(h, 1); }
+      if (nodeNeg !== 0) { const h = solver.allocElement(nodeNeg, k); solver.stampElement(h, -1); }
+      if (nodePos !== 0) { const h = solver.allocElement(k, nodePos); solver.stampElement(h, 1); }
+      if (nodeNeg !== 0) { const h = solver.allocElement(k, nodeNeg); solver.stampElement(h, -1); }
       solver.stampRHS(k, voltage * ctx.srcFact);
     },
   };
@@ -177,7 +177,7 @@ function runTransient(
   for (let i = 0; i < nSteps; i++) {
     newtonRaphson(ctx);
     const nodeVoltages = ctx.nrResult.nodeVoltages;
-    vOut[i] = nodeVoltages[outputNode - 1];
+    vOut[i] = nodeVoltages[outputNode];
     // Advance reactive element companion state for next step.
     const simTime = (i + 1) * dt;
     for (const el of elements) {
@@ -196,8 +196,8 @@ function runTransient(
 
 describe("DCGain", () => {
   it("inverting_amplifier_gain", () => {
-    // Inverting amplifier: gain = -Rf/Rin = -10kΩ/1kΩ = -10
-    // With finite A_OL=100000, closed-loop gain ≈ -10 × (1 - 1/(A_OL+1)) ≈ -10
+    // Inverting amplifier: gain = -Rf/Rin = -10kÎ©/1kÎ© = -10
+    // With finite A_OL=100000, closed-loop gain â‰ˆ -10 Ã— (1 - 1/(A_OL+1)) â‰ˆ -10
     //
     // Node layout:
     //   node 1 = Vin terminal
@@ -206,7 +206,7 @@ describe("DCGain", () => {
     //   node 4 = in+ (tied to gnd via VS)
     //   node 5 = Vcc+
     //   node 6 = Vcc-
-    // Branches: 6, 7, 8, 9 → matrixSize = 10
+    // Branches: 6, 7, 8, 9 â†’ matrixSize = 10
     const nVin = 1, nInn = 2, nOut = 3, nInp = 4, nVccP = 5, nVccN = 6;
     const brVin = 6, brInp = 7, brVccP = 8, brVccN = 9;
 
@@ -217,8 +217,8 @@ describe("DCGain", () => {
 
     const elements: AnalogElement[] = [
       opamp,
-      makeResistor(nVin, nInn, 1000),    // Rin = 1kΩ
-      makeResistor(nInn, nOut, 10000),   // Rf = 10kΩ
+      makeResistor(nVin, nInn, 1000),    // Rin = 1kÎ©
+      makeResistor(nInn, nOut, 10000),   // Rf = 10kÎ©
       makeDcSource(nVin,  0, brVin,   0.1),
       makeDcSource(nInp,  0, brInp,   0),
       makeDcSource(nVccP, 0, brVccP,  15),
@@ -228,20 +228,20 @@ describe("DCGain", () => {
     const result = solveDC(elements, 10, 6);
     expect(result.converged).toBe(true);
 
-    const vOut = result.nodeVoltages[nOut - 1];
-    // Ideal gain = -10, so Vout ≈ -1.0V ± 0.1% of 1.0V = ±0.001V
+    const vOut = result.nodeVoltages[nOut];
+    // Ideal gain = -10, so Vout â‰ˆ -1.0V Â± 0.1% of 1.0V = Â±0.001V
     // The ratio should be within 0.5% of the ideal -10 gain
     const measuredGain = vOut / 0.1;
     expect(Math.abs(measuredGain + 10)).toBeLessThan(0.1);
   });
 
   it("output_saturates_at_rails", () => {
-    // Unity-gain buffer with Vin = 20V → would be 20V but rails are ±15V with vSatPos/Neg=1.5V
-    // Expected: Vout ≤ 15 - 1.5 = 13.5V
+    // Unity-gain buffer with Vin = 20V â†’ would be 20V but rails are Â±15V with vSatPos/Neg=1.5V
+    // Expected: Vout â‰¤ 15 - 1.5 = 13.5V
     //
     // Node layout: nInp=1 (tied to Vin), nInn=3 (tied to out), nOut=3, nVccP=4, nVccN=5
     // Unity-gain: in- connected to out (same node 3)
-    // Branches: 3, 4, 5 → matrixSize = 6
+    // Branches: 3, 4, 5 â†’ matrixSize = 6
     const nInp = 1, nFeedback = 2, nVccP = 3, nVccN = 4;
     const brVin = 4, brVccP = 5, brVccN = 6;
 
@@ -260,7 +260,7 @@ describe("DCGain", () => {
     const result = solveDC(elements, 7, 4);
     expect(result.converged).toBe(true);
 
-    const vOut = result.nodeVoltages[nFeedback - 1];
+    const vOut = result.nodeVoltages[nFeedback];
     // Output must be clamped to at most Vcc+ - vSatPos = 13.5V
     expect(vOut).toBeLessThanOrEqual(13.5 + 0.1);
   });
@@ -276,7 +276,7 @@ describe("Bandwidth", () => {
     // Here we verify the GBW property is set correctly in the model.
     // The real frequency test via AC sweep is in ac-analysis.test.ts.
     // This test verifies that the GBW property is retrievable and the
-    // component correctly sets tau = A_OL / (2π * GBW).
+    // component correctly sets tau = A_OL / (2Ï€ * GBW).
     const gbw = 1e6;
     const aol = 100000;
     const tauExpected = aol / (2 * Math.PI * gbw);
@@ -284,7 +284,7 @@ describe("Bandwidth", () => {
     // Since tau is private, we verify the bandwidth property indirectly:
     // the -3dB frequency of the gain stage = GBW/A_OL = f_p
     const fp = gbw / aol;
-    // tau = 1/(2π*f_p)
+    // tau = 1/(2Ï€*f_p)
     const tauFromFp = 1 / (2 * Math.PI * fp);
 
     // Verify the element creates successfully with the right params
@@ -325,14 +325,14 @@ describe("Bandwidth", () => {
 describe("SlewRate", () => {
   it("large_signal_step", () => {
     // Unity-gain buffer with 5V step input.
-    // Slew rate = 0.5 V/µs = 0.5e6 V/s.
-    // With a dt = 1µs timestep, the max output change per step = SR * dt = 0.5V.
+    // Slew rate = 0.5 V/Âµs = 0.5e6 V/s.
+    // With a dt = 1Âµs timestep, the max output change per step = SR * dt = 0.5V.
     //
-    // Run transient for 20 steps × 1µs = 20µs.
-    // Output should ramp at ≤ SR V/µs.
+    // Run transient for 20 steps Ã— 1Âµs = 20Âµs.
+    // Output should ramp at â‰¤ SR V/Âµs.
     //
     // Node layout: nInp=1 (Vin=5V), nInn=nOut=2 (feedback), nVccP=3, nVccN=4
-    // Branches: 2..5 → matrixSize = 6
+    // Branches: 2..5 â†’ matrixSize = 6
     const nInp = 1, nFeedback = 2, nVccP = 3, nVccN = 4;
     const brVin = 4, brVccP = 5, brVccN = 6;
     const matrixSize = 7;
@@ -351,7 +351,7 @@ describe("SlewRate", () => {
       makeDcSource(nVccN, 0, brVccN, -15),
     ];
 
-    const dt = 1e-6; // 1 µs
+    const dt = 1e-6; // 1 Âµs
     const nSteps = 20;
     const vOutSeries = runTransient(elements, matrixSize, 4, nSteps, dt, nFeedback);
 
@@ -367,7 +367,7 @@ describe("SlewRate", () => {
 
   it("small_signal_not_slew_limited", () => {
     // 10mV step on unity-gain buffer.
-    // Slew rate limit = 0.5 V/µs → allowed 0.5V per µs.
+    // Slew rate limit = 0.5 V/Âµs â†’ allowed 0.5V per Âµs.
     // A 10mV step is far below the slew limit, so rise time is set by bandwidth.
     // After N timesteps proportional to 1/GBW, the output should have settled.
     //
@@ -417,8 +417,8 @@ describe("SlewRate", () => {
 
 describe("Offset", () => {
   it("output_offset_with_gain", () => {
-    // Non-inverting amplifier gain = 1 + Rf/Rin = 1 + 999Ω/1Ω ≈ 1000.
-    // Vin = 0, but Vos = 1mV → Vout ≈ Vos × 1000 = 1V.
+    // Non-inverting amplifier gain = 1 + Rf/Rin = 1 + 999Î©/1Î© â‰ˆ 1000.
+    // Vin = 0, but Vos = 1mV â†’ Vout â‰ˆ Vos Ã— 1000 = 1V.
     //
     // Node layout:
     //   node 1 = in+ (Vin=0 via VS)
@@ -427,11 +427,11 @@ describe("Offset", () => {
     //   node 4 = Vcc+
     //   node 5 = Vcc-
     //   node 6 = Rin bottom (grounded through Rin)
-    // Branches: 5, 6, 7 → matrixSize = 8
+    // Branches: 5, 6, 7 â†’ matrixSize = 8
     //
     // Simplified: use inverting config with Vin=0 so output = Vos * closed_loop_gain
     // Closed-loop gain of non-inverting amp = 1 + Rf/Rin
-    // Use Rin=1Ω, Rf=999Ω → gain=1000; Vin=0 → Vout = Vos * 1000 = 1V
+    // Use Rin=1Î©, Rf=999Î© â†’ gain=1000; Vin=0 â†’ Vout = Vos * 1000 = 1V
     const nInp = 1, nInn = 2, nOut = 3, nVccP = 4, nVccN = 5;
     const brInp = 5, brVccP = 6, brVccN = 7;
     const matrixSize = 8;
@@ -443,12 +443,12 @@ describe("Offset", () => {
       rIn: 1e12, rOut: 75, iMax: 25e-3, vSatPos: 1.5, vSatNeg: 1.5,
     })), [nInp, nInn, nOut, nVccP, nVccN]);
 
-    // Non-inverting amplifier: in- connected through Rin=1Ω to gnd, Rf=999Ω from out to in-
+    // Non-inverting amplifier: in- connected through Rin=1Î© to gnd, Rf=999Î© from out to in-
     // Gain = 1 + 999/1 = 1000
     const elements: AnalogElement[] = [
       opamp,
-      makeResistor(nInn, 0, 1),         // Rin = 1Ω (from in- to gnd)
-      makeResistor(nInn, nOut, 999),    // Rf = 999Ω (from in- to out)
+      makeResistor(nInn, 0, 1),         // Rin = 1Î© (from in- to gnd)
+      makeResistor(nInn, nOut, 999),    // Rf = 999Î© (from in- to out)
       makeDcSource(nInp,  0, brInp,   0),    // Vin = 0
       makeDcSource(nVccP, 0, brVccP,  15),
       makeDcSource(nVccN, 0, brVccN, -15),
@@ -457,8 +457,8 @@ describe("Offset", () => {
     const result = solveDC(elements, matrixSize, 5);
     expect(result.converged).toBe(true);
 
-    const vOut = result.nodeVoltages[nOut - 1];
-    // Vout = Vos × gain = 1mV × 1000 = 1V ± 0.2V
+    const vOut = result.nodeVoltages[nOut];
+    // Vout = Vos Ã— gain = 1mV Ã— 1000 = 1V Â± 0.2V
     expect(Math.abs(vOut)).toBeGreaterThan(0.5);
     expect(Math.abs(vOut)).toBeLessThan(2.0);
   });
@@ -471,14 +471,14 @@ describe("Offset", () => {
 describe("CurrentLimit", () => {
   it("output_current_clamped", () => {
     // Unity-gain buffer with heavy load resistor driving output into current limit.
-    // Supply = ±15V, Vin = 10V → Vout ≈ 10V.
-    // Load R = 10Ω → I_out = 10V / 10Ω = 1A >> I_max = 25mA.
-    // With current limiting, Vout must drop so I_out ≤ I_max.
+    // Supply = Â±15V, Vin = 10V â†’ Vout â‰ˆ 10V.
+    // Load R = 10Î© â†’ I_out = 10V / 10Î© = 1A >> I_max = 25mA.
+    // With current limiting, Vout must drop so I_out â‰¤ I_max.
     //
-    // Expected: Vout ≤ I_max × R_load = 25mA × 10Ω = 0.25V (approximately)
+    // Expected: Vout â‰¤ I_max Ã— R_load = 25mA Ã— 10Î© = 0.25V (approximately)
     //
     // Node layout: nInp=1, nFeedback=nOut=2, nVccP=3, nVccN=4, nLoad=2 (shared with out)
-    // Branches: 2..5 → matrixSize = 6
+    // Branches: 2..5 â†’ matrixSize = 6
     const nInp = 1, nOut = 2, nVccP = 3, nVccN = 4;
     const brVin = 4, brVccP = 5, brVccN = 6;
     const matrixSize = 7;
@@ -490,11 +490,11 @@ describe("CurrentLimit", () => {
       rIn: 1e12, rOut: 75, iMax, vSatPos: 1.5, vSatNeg: 1.5,
     })), [nInp, nOut, nOut, nVccP, nVccN]);
 
-    const rLoad = 10; // 10Ω heavy load
+    const rLoad = 10; // 10Î© heavy load
 
     const elements: AnalogElement[] = [
       opamp,
-      makeResistor(nOut, 0, rLoad),   // 10Ω load to ground
+      makeResistor(nOut, 0, rLoad),   // 10Î© load to ground
       makeDcSource(nInp,  0, brVin,   10),
       makeDcSource(nVccP, 0, brVccP,  15),
       makeDcSource(nVccN, 0, brVccN, -15),
@@ -503,17 +503,17 @@ describe("CurrentLimit", () => {
     const result = solveDC(elements, matrixSize, 4);
     expect(result.converged).toBe(true);
 
-    const vOut = result.nodeVoltages[nOut - 1];
+    const vOut = result.nodeVoltages[nOut];
     // With high open-loop gain and feedback, the output drives through R_out.
-    // The RealOpAmp model clamps output current to ±I_max inside load(ctx)
-    // when saturated. With 10Ω load and V_in=10V, verify output is within rails.
+    // The RealOpAmp model clamps output current to Â±I_max inside load(ctx)
+    // when saturated. With 10Î© load and V_in=10V, verify output is within rails.
     const vRailPos = 15 - 1.5; // V_supply - V_sat
     expect(Math.abs(vOut)).toBeLessThanOrEqual(vRailPos + 0.1);
   });
 });
 
 // ---------------------------------------------------------------------------
-// RealOpAmp — model loading
+// RealOpAmp â€” model loading
 // ---------------------------------------------------------------------------
 
 describe("RealOpAmp", () => {
@@ -561,8 +561,8 @@ describe("RealOpAmp", () => {
     const result = solveDC(elements, 7, 4);
     expect(result.converged).toBe(true);
 
-    // Output of unity-gain buffer ≈ input voltage (within 10%)
-    const vOut = result.nodeVoltages[nFeedback - 1];
+    // Output of unity-gain buffer â‰ˆ input voltage (within 10%)
+    const vOut = result.nodeVoltages[nFeedback];
   });
 
   it("element_has_correct_flags", () => {
@@ -571,7 +571,7 @@ describe("RealOpAmp", () => {
     expect(el.isNonlinear).toBe(true);
     expect(el.isReactive).toBe(true);
     expect(el.branchIndex).toBe(-1);
-    // pinLayout order: ["in-", "in+", "out", "Vcc+", "Vcc-"] → [in-=2, in+=1, out=3, Vcc+=4, Vcc-=5]
+    // pinLayout order: ["in-", "in+", "out", "Vcc+", "Vcc-"] â†’ [in-=2, in+=1, out=3, Vcc+=4, Vcc-=5]
     expect(el.pinNodeIds).toEqual([2, 1, 3, 4, 5]);
   });
 
@@ -585,7 +585,7 @@ describe("RealOpAmp", () => {
 });
 
 // ---------------------------------------------------------------------------
-// C4.5 parity test — real_opamp_load_dcop_parity (includes slew + finite gain)
+// C4.5 parity test â€” real_opamp_load_dcop_parity (includes slew + finite gain)
 // ---------------------------------------------------------------------------
 //
 // Drives the real op-amp factory via load(ctx) at DC-OP. The element has
@@ -696,11 +696,11 @@ describe("RealOpAmp parity (C4.5)", () => {
     );
 
     const voltages = new Float64Array(5);
-    voltages[nInp - 1]  = 1e-3;
-    voltages[nInn - 1]  = 0;
-    voltages[nOut - 1]  = 1.0; // linear region, within ±(Vcc±-vSat)
-    voltages[nVccP - 1] = 15;
-    voltages[nVccN - 1] = -15;
+    voltages[nInp]  = 1e-3;
+    voltages[nInn]  = 0;
+    voltages[nOut]  = 1.0; // linear region, within Â±(VccÂ±-vSat)
+    voltages[nVccP] = 15;
+    voltages[nVccN] = -15;
 
     const { solver, stamps, rhs } = makeRealOpAmpCaptureSolver();
     const ctx = makeRealOpAmpParityCtx(voltages, solver);
@@ -713,7 +713,7 @@ describe("RealOpAmp parity (C4.5)", () => {
     // In DC-OP: geq_int=0, aEff=aol, ieq=0, rhs_out = aEff * G_out * vos
     const NGSPICE_RHS_OUT = aolVal * 1 * NGSPICE_GOUT * vosVal * 1;
 
-    // Sum stamps by (row, col) — element uses handle-based stamping.
+    // Sum stamps by (row, col) â€” element uses handle-based stamping.
     const sumAt = (row: number, col: number): number =>
       stamps.filter((s) => s.row === row && s.col === col)
             .reduce((a, s) => a + s.value, 0);

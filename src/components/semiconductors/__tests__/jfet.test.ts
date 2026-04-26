@@ -1,15 +1,15 @@
-/**
- * JFET tests — post-Phase-2.5-W1.4 A1 test handling.
+﻿/**
+ * JFET tests â€” post-Phase-2.5-W1.4 A1 test handling.
  *
- * Per `spec/architectural-alignment.md` §A1 test-handling rule, the vast
+ * Per `spec/architectural-alignment.md` Â§A1 test-handling rule, the vast
  * majority of pre-port JFET tests have been deleted:
  *   - Hand-computed expected values on intermediate state (cutoff_zero_current,
  *     saturation_current, linear_region, gate_forward_current,
- *     output_characteristics, lambda_channel_length_modulation) → deleted.
+ *     output_characteristics, lambda_channel_length_modulation) â†’ deleted.
  *   - jfet_load_dcop_parity / MODEINITSMSIG / MODEINITTRAN tests that
  *     hand-computed expected values via the banned `Math.min(expArg, 80)`
- *     clamp (PARITY items A-1, A-2) → deleted.
- *   - fet-base.test.ts (whole file) → deleted (D-10: fet-base.ts is gone).
+ *     clamp (PARITY items A-1, A-2) â†’ deleted.
+ *   - fet-base.test.ts (whole file) â†’ deleted (D-10: fet-base.ts is gone).
  *
  * Survivors (engine-agnostic interface contracts + parameter plumbing +
  * convergence interface contract):
@@ -56,7 +56,7 @@ import type { LoadContext } from "../../../solver/analog/load-context.js";
 import { MODEDCOP, MODEINITFLOAT } from "../../../solver/analog/ckt-mode.js";
 
 // ---------------------------------------------------------------------------
-// withState — allocate a StatePool and call initState on the element
+// withState â€” allocate a StatePool and call initState on the element
 // ---------------------------------------------------------------------------
 
 function withState(element: AnalogElementCore): ReactiveAnalogElement {
@@ -166,18 +166,18 @@ function makeResistorElement(nodeA: number, nodeB: number, resistance: number): 
     getPinCurrents(_v: Float64Array): number[] { return []; },
     load(ctx: LoadContext): void {
       const { solver } = ctx;
-      if (nodeA !== 0) solver.stampElement(solver.allocElement(nodeA - 1, nodeA - 1), G);
-      if (nodeB !== 0) solver.stampElement(solver.allocElement(nodeB - 1, nodeB - 1), G);
+      if (nodeA !== 0) solver.stampElement(solver.allocElement(nodeA, nodeA), G);
+      if (nodeB !== 0) solver.stampElement(solver.allocElement(nodeB, nodeB), G);
       if (nodeA !== 0 && nodeB !== 0) {
-        solver.stampElement(solver.allocElement(nodeA - 1, nodeB - 1), -G);
-        solver.stampElement(solver.allocElement(nodeB - 1, nodeA - 1), -G);
+        solver.stampElement(solver.allocElement(nodeA, nodeB), -G);
+        solver.stampElement(solver.allocElement(nodeB, nodeA), -G);
       }
     },
   };
 }
 
 // ---------------------------------------------------------------------------
-// PJFET — weak stamp-emission smoke test (engine-agnostic contract).
+// PJFET â€” weak stamp-emission smoke test (engine-agnostic contract).
 // ---------------------------------------------------------------------------
 
 describe("PJFET", () => {
@@ -185,8 +185,8 @@ describe("PJFET", () => {
     // Common-source PJFET: Vg=2V, Vd=0V, Vs=5V. Device must conduct in
     // saturation (vgs=3, vgd=-2, vds=5, vgst=vgs-VTO=1, vgst<vds).
     // Expected drain current magnitude with BETA=1e-4, B=1, LAMBDA=0:
-    //   cdrain = betap * vgst² * (B+Bfac) = 1e-4 * 1 * 1 ≈ 1e-4 A
-    //   gm     = betap * vgst * (2B+3*Bfac*vgst) = 1e-4 * 1 * 2 ≈ 2e-4 S
+    //   cdrain = betap * vgstÂ² * (B+Bfac) = 1e-4 * 1 * 1 â‰ˆ 1e-4 A
+    //   gm     = betap * vgst * (2B+3*Bfac*vgst) = 1e-4 * 1 * 2 â‰ˆ 2e-4 S
     // Both exceed GMIN=1e-12 by 8+ orders of magnitude.
     // Node map: G=node1 (col/row 0), D=node2 (col/row 1), S=node3 (col/row 2).
     const propsObj = createTestPropertyBag();
@@ -207,7 +207,7 @@ describe("PJFET", () => {
     element.load(ctx);
     const entries = ctx.solver.getCSCNonZeros();
 
-    // Aggregate stamps by (row, col) — one stamp call per position for the
+    // Aggregate stamps by (row, col) â€” one stamp call per position for the
     // external-only pin set (no internal RD/RS nodes because RD=RS=0).
     const stampAt = (row: number, col: number): number => {
       const match = entries.filter((e) => e.row === row && e.col === col);
@@ -230,15 +230,15 @@ describe("PJFET", () => {
     expect(Math.abs(gD_S)).toBeGreaterThan(0);
     expect(Math.abs(gD_D)).toBeGreaterThan(0);
 
-    // Source-drain off-diagonal = -(gds + gm). With gm≈2e-4 and gds≈0
+    // Source-drain off-diagonal = -(gds + gm). With gmâ‰ˆ2e-4 and gdsâ‰ˆ0
     // (LAMBDA=0 in saturation), magnitude must exceed GMIN by orders of
-    // magnitude — proves active conduction, not GMIN-only clamp.
+    // magnitude â€” proves active conduction, not GMIN-only clamp.
     const GMIN = 1e-12;
     expect(Math.abs(gD_S)).toBeGreaterThan(1e-5);
     expect(Math.abs(gD_S)).toBeGreaterThan(GMIN * 1e6);
 
     // Transconductance appears in D-row-G-col (gm - ggd). With ggd at GMIN
-    // level (reverse-biased GD junction) and gm ≈ 2e-4, |gD_G| ≈ 2e-4.
+    // level (reverse-biased GD junction) and gm â‰ˆ 2e-4, |gD_G| â‰ˆ 2e-4.
     expect(Math.abs(gD_G)).toBeGreaterThan(1e-5);
 
     // KCL-style sign: gD_S and gS_G must carry opposite polarity pair
@@ -251,19 +251,19 @@ describe("PJFET", () => {
 });
 
 // ---------------------------------------------------------------------------
-// NR convergence test — engine-agnostic interface contract.
+// NR convergence test â€” engine-agnostic interface contract.
 // ---------------------------------------------------------------------------
 
 describe("NR", () => {
   it("converges_within_10_iterations", () => {
     // Common-source NJFET with Rd load.
-    //   VDD=10V, Rd=10kΩ, gate=0V, source=0V → VGS=0V
-    //   VTO=-2V → vgst = VGS - VTO = 2V (device ON in saturation)
+    //   VDD=10V, Rd=10kÎ©, gate=0V, source=0V â†’ VGS=0V
+    //   VTO=-2V â†’ vgst = VGS - VTO = 2V (device ON in saturation)
     //   BETA=1e-4, B=1, LAMBDA=0, Bfac = (1-B)/(PB-VTO) = 0
-    //   cdrain = BETA * vgst² * (B + Bfac*vgst) = 1e-4 * 4 * 1 = 4e-4 A
+    //   cdrain = BETA * vgstÂ² * (B + Bfac*vgst) = 1e-4 * 4 * 1 = 4e-4 A
     //   Vdrop  = cdrain * Rd = 4e-4 * 1e4 = 4V
     //   VDS    = VDD - Vdrop = 10 - 4 = 6V  (still in saturation: VDS > vgst)
-    //   node1 (drain) ≈ 6V, node2 (vdd) = 10V, node3 (gate) = 0V.
+    //   node1 (drain) â‰ˆ 6V, node2 (vdd) = 10V, node3 (gate) = 0V.
     const matrixSize = 5;
 
     const propsObj = createTestPropertyBag();
@@ -283,7 +283,7 @@ describe("NR", () => {
     expect(result.converged).toBe(true);
     expect(result.iterations).toBeLessThanOrEqual(10);
 
-    // Node-voltage assertions — nodeVoltages[i-1] holds node i (1-based).
+    // Node-voltage assertions â€” nodeVoltages[i-1] holds node i (1-based).
     const vDrain = result.nodeVoltages[0];
     const vVdd   = result.nodeVoltages[1];
     const vGate  = result.nodeVoltages[2];
@@ -294,15 +294,15 @@ describe("NR", () => {
     expect(vGate).toBeCloseTo(0, 6);
 
     // Drain voltage: analytic prediction is 6V. Allow a generous window that
-    // excludes cutoff (VDS≈10V, no drain current) and excludes the linear
+    // excludes cutoff (VDSâ‰ˆ10V, no drain current) and excludes the linear
     // region (VDS<vgst=2V). Band (1V, 10V) proves the solution is in the
     // saturation operating regime the circuit is designed to produce.
     expect(vDrain).toBeGreaterThan(1);
     expect(vDrain).toBeLessThan(10);
 
     // Drain current through Rd: |iD| = (VDD - VDrain) / Rd.
-    // Analytic expectation ≈ 4e-4 A. Bound between 1e-5 A (device barely
-    // on) and 1e-3 A (device hard-shorted) — at least two orders above GMIN.
+    // Analytic expectation â‰ˆ 4e-4 A. Bound between 1e-5 A (device barely
+    // on) and 1e-3 A (device hard-shorted) â€” at least two orders above GMIN.
     const iD = Math.abs((vVdd - vDrain) / 10000);
     expect(iD).toBeGreaterThan(1e-5);
     expect(iD).toBeLessThan(1e-3);
@@ -310,7 +310,7 @@ describe("NR", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Registration tests — parameter plumbing / component registry.
+// Registration tests â€” parameter plumbing / component registry.
 // ---------------------------------------------------------------------------
 
 describe("Registration", () => {

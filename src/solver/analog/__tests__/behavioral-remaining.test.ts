@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Tests for behavioral analog factories in behavioral-remaining.ts.
  *
  * Tests:
@@ -11,7 +11,7 @@
  * Node ID conventions (matching behavioral-gate.test.ts and test-elements.ts):
  *   Node ID 0      = ground (implicit; not a solver row)
  *   Node ID N > 0  = solver row N-1 (0-based)
- *   voltages[N-1]  = voltage at circuit node N
+ *   voltages[N]  = voltage at circuit node N
  *
  *   makeVoltageSource(nodePos, nodeNeg, branchRow, voltage):
  *     nodePos/nodeNeg are 1-based circuit node IDs (0=ground)
@@ -116,7 +116,7 @@ describe("Driver", () => {
    * Circuit topology (0-based solver rows):
    *   Solver row 0 = nodeIn   (input data)
    *   Solver row 1 = nodeSel  (enable)
-   *   Solver row 2 = nodeOut  (output; 10kΩ load to ground)
+   *   Solver row 2 = nodeOut  (output; 10kÎ© load to ground)
    *
    * makeVoltageSource takes 1-based circuit node IDs (0=ground):
    *   VS_in  at circuit node 1 (= solver row 0), branch row 3 (absolute)
@@ -126,7 +126,7 @@ describe("Driver", () => {
    *
    * The driver latches sel=HIGH on the second NR iteration when
    * VDD is present at solver row 1 (nodeSel=1).
-   * NR converges to vOut ≈ vOH * LOAD_R / (rOut + LOAD_R) ≈ 3.284V.
+   * NR converges to vOut â‰ˆ vOH * LOAD_R / (rOut + LOAD_R) â‰ˆ 3.284V.
    */
   it("tri_state_high", () => {
     const props = new PropertyBag();
@@ -139,7 +139,7 @@ describe("Driver", () => {
     const vsIn  = makeVoltageSource(1, 0, 3, VDD);
     // Circuit node 2 (1-based) = solver row 1 = nodeSel; branch row 4
     const vsSel = makeVoltageSource(2, 0, 4, VDD);
-    // 10kΩ load on circuit node 3 (solver row 2 = nodeOut) to ground
+    // 10kÎ© load on circuit node 3 (solver row 2 = nodeOut) to ground
     const rLoad = makeResistor(3, 0, LOAD_R);
 
     const elements: AnalogElement[] = [vsIn, vsSel, rLoad, withNodeIds(driver, [1, 2, 3])];
@@ -149,18 +149,18 @@ describe("Driver", () => {
 
     expect(result.converged).toBe(true);
     // voltages[2] = nodeOut = output voltage
-    // Norton: vOH through rOut=50Ω into 10kΩ load → vOut ≈ 3.3 * 10000/10050
+    // Norton: vOH through rOut=50Î© into 10kÎ© load â†’ vOut â‰ˆ 3.3 * 10000/10050
     const vOut = result.voltages[2];
     const expected = VOH * LOAD_R / (ROUT + LOAD_R);
     expect(vOut).toBeGreaterThan(3.0);
   });
 
   /**
-   * tri_state_hiz: enable=0 (sel LOW) → output in Hi-Z mode
+   * tri_state_hiz: enable=0 (sel LOW) â†’ output in Hi-Z mode
    *
-   * Same topology but VS_sel = 0V. The driver detects sel=LOW → Hi-Z.
-   * Hi-Z mode: R_HiZ (10MΩ) from nodeOut to ground, no current source.
-   * With 10kΩ load and no source → output ≈ 0V.
+   * Same topology but VS_sel = 0V. The driver detects sel=LOW â†’ Hi-Z.
+   * Hi-Z mode: R_HiZ (10MÎ©) from nodeOut to ground, no current source.
+   * With 10kÎ© load and no source â†’ output â‰ˆ 0V.
    */
   it("tri_state_hiz", () => {
     const props = new PropertyBag();
@@ -169,7 +169,7 @@ describe("Driver", () => {
     );
 
     const vsIn  = makeVoltageSource(1, 0, 3, VDD);  // data input HIGH
-    const vsSel = makeVoltageSource(2, 0, 4, GND);  // sel = 0 → Hi-Z
+    const vsSel = makeVoltageSource(2, 0, 4, GND);  // sel = 0 â†’ Hi-Z
     const rLoad = makeResistor(3, 0, LOAD_R);
 
     const elements: AnalogElement[] = [vsIn, vsSel, rLoad, withNodeIds(driver, [1, 2, 3])];
@@ -178,7 +178,7 @@ describe("Driver", () => {
     const result = solve(elements, matrixSize);
 
     expect(result.converged).toBe(true);
-    // Hi-Z output: R_HiZ=10MΩ to ground, plus 10kΩ load, no current source.
+    // Hi-Z output: R_HiZ=10MÎ© to ground, plus 10kÎ© load, no current source.
     const vOut = result.voltages[2];
     expect(vOut).toBeLessThan(0.1);
   });
@@ -190,11 +190,11 @@ describe("Driver", () => {
 
 describe("LED", () => {
   /**
-   * forward_current_lights: 3.3V through 330Ω to LED anode, cathode to ground.
+   * forward_current_lights: 3.3V through 330Î© to LED anode, cathode to ground.
    *
    * Circuit:
    *   VS (3.3V) at circuit node 1 (branch row 2)
-   *   330Ω from circuit node 1 to circuit node 2 (LED anode)
+   *   330Î© from circuit node 1 to circuit node 2 (LED anode)
    *   LED anode = circuit node 2, cathode = ground (node 0)
    *
    * nodeIds for LED factory: [nodeAnode=2, nodeCathode=0]
@@ -205,7 +205,7 @@ describe("LED", () => {
    *
    * matrixSize = 3 (2 node rows + 1 branch row at index 2)
    *
-   * For red LED: Vf ≈ 1.8V at 20mA → I ≈ (3.3-1.8)/330 ≈ 4.5mA
+   * For red LED: Vf â‰ˆ 1.8V at 20mA â†’ I â‰ˆ (3.3-1.8)/330 â‰ˆ 4.5mA
    */
   it("forward_current_lights", () => {
     const props = new PropertyBag();
@@ -218,7 +218,7 @@ describe("LED", () => {
 
     // VS at circuit node 1 (solver row 0), branch row 2 (absolute)
     const vs = makeVoltageSource(1, 0, 2, VDD);
-    // 330Ω from circuit node 1 to circuit node 2 (LED anode)
+    // 330Î© from circuit node 1 to circuit node 2 (LED anode)
     const rSeries = makeResistor(1, 2, 330);
 
     const elements: AnalogElement[] = [vs, rSeries, led];
@@ -228,7 +228,7 @@ describe("LED", () => {
 
     expect(result.converged).toBe(true);
     // voltages[0] = node 1 = ~3.3V (VS-forced)
-    // voltages[1] = node 2 = LED anode voltage ≈ 1.8V (red LED Vf)
+    // voltages[1] = node 2 = LED anode voltage â‰ˆ 1.8V (red LED Vf)
     const vAnode = result.voltages[1];
     expect(vAnode).toBeGreaterThan(1.5);
     expect(vAnode).toBeLessThan(2.5);
@@ -237,7 +237,7 @@ describe("LED", () => {
     const iForward = (VDD - vAnode) / 330;
     expect(iForward).toBeGreaterThan(1e-3);   // > 1mA
     expect(iForward).toBeLessThan(15e-3);     // < 15mA
-    // Approximately (3.3 - 1.8) / 330 ≈ 4.5mA
+    // Approximately (3.3 - 1.8) / 330 â‰ˆ 4.5mA
     const expectedApprox = (VDD - 1.8) / 330;
   });
 });
@@ -260,7 +260,7 @@ describe("SevenSeg", () => {
    * matrixSize = 16 (8 node rows + 8 branch rows)
    *
    * Each segment is a piecewise-linear diode:
-   *   V > 2.0V → on (R_on=50Ω), V ≤ 2.0V → off (R_off=10MΩ)
+   *   V > 2.0V â†’ on (R_on=50Î©), V â‰¤ 2.0V â†’ off (R_off=10MÎ©)
    *
    * VS-driven nodes: voltage at each node is forced to the VS value.
    * Active segments (a,b,c) at 3.3V: diode on, but VS still forces node to 3.3V.
@@ -320,19 +320,19 @@ describe("Relay", () => {
    * to advance iL and update contactClosed.
    *
    * Circuit:
-   *   VS_coil: 10V at node 1 (branch row 4) — coil input
+   *   VS_coil: 10V at node 1 (branch row 4) â€” coil input
    *   Node 2 tied to ground via VS (0V, branch row 5)
-   *   VS_contact: 1V at node 3 (branch row 6) — contact A
-   *   1kΩ load: node 4 to ground — measures contact B
+   *   VS_contact: 1V at node 3 (branch row 6) â€” contact A
+   *   1kÎ© load: node 4 to ground â€” measures contact B
    *
    * matrixSize = 7 (4 node rows 0..3 + 3 branch rows 4,5,6)
    *
-   * With rCoil=10Ω, coil voltage=10V: steady-state coil current = 10V/10Ω = 1A >> iPull=20mA.
+   * With rCoil=10Î©, coil voltage=10V: steady-state coil current = 10V/10Î© = 1A >> iPull=20mA.
    * Run enough transient steps for iL to exceed iPull, then verify contact closes.
    */
   it("coil_energizes_contact", () => {
     const props = new PropertyBag();
-    props.set("coilResistance", 10);    // 10Ω coil resistance
+    props.set("coilResistance", 10);    // 10Î© coil resistance
     props.set("inductance", 1e-3);      // 1mH inductance (tau = L/R = 1ms)
     props.set("iPull", 20e-3);          // 20mA threshold
 
@@ -353,7 +353,7 @@ describe("Relay", () => {
     // Coil driven by VS: 10V at node 1 (branch row 4), 0V at node 2 (branch row 5)
     const vsCoil1   = makeVoltageSource(1, 0, 4, 10.0);
     const vsCoil2   = makeVoltageSource(2, 0, 5, 0.0);
-    // Contact: 1V at node 3 (branch row 6), 1kΩ from node 4 to ground
+    // Contact: 1V at node 3 (branch row 6), 1kÎ© from node 4 to ground
     const vsContact = makeVoltageSource(3, 0, 6, 1.0);
     const rLoad     = makeResistor(4, 0, 1_000);
 
@@ -363,8 +363,8 @@ describe("Relay", () => {
     const solver = new SparseSolver();
     let currentVoltages = new Float64Array(matrixSize);
 
-    // tau = L/R = 1e-3/10 = 100µs; run 10 steps of 100µs = 1 tau
-    // After 1 tau: iL = (V/R)*(1-exp(-1)) ≈ (10/10)*0.632 = 0.632A >> 20mA
+    // tau = L/R = 1e-3/10 = 100Âµs; run 10 steps of 100Âµs = 1 tau
+    // After 1 tau: iL = (V/R)*(1-exp(-1)) â‰ˆ (10/10)*0.632 = 0.632A >> 20mA
     const dt = 100e-6;
     const steps = 10;
 
@@ -411,7 +411,7 @@ describe("Relay", () => {
       relayWithState.accept(makeTransientCtx(currentVoltages, false), 0, () => {});
     }
 
-    // After 10 × 100µs, coil current >> 20mA → contact should be closed.
+    // After 10 Ã— 100Âµs, coil current >> 20mA â†’ contact should be closed.
     // Verify by solving again with the updated contact state.
     const finalCtx = makeTransientCtx(currentVoltages, false);
     solver._initStructure(matrixSize);
@@ -419,11 +419,11 @@ describe("Relay", () => {
     solver.factor();
     solver.solve(currentVoltages);
 
-    // Contact A = circuit node 3 → voltages[2] (1-based index 3, solver row 2)
-    // Contact B = circuit node 4 → voltages[3]
+    // Contact A = circuit node 3 â†’ voltages[2] (1-based index 3, solver row 2)
+    // Contact B = circuit node 4 â†’ voltages[3]
     const vContactB = currentVoltages[3];
 
-    // When closed (R_on=0.01Ω), drop across contact is negligible → vContactB ≈ 1V
+    // When closed (R_on=0.01Î©), drop across contact is negligible â†’ vContactB â‰ˆ 1V
     expect(vContactB).toBeGreaterThan(0.99);
   });
 });
@@ -468,16 +468,16 @@ describe("Registration", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Task 6.4.3 — remaining_pin_loading_propagates
+// Task 6.4.3 â€” remaining_pin_loading_propagates
 // ---------------------------------------------------------------------------
 
-describe("Task 6.4.3 — remaining pin loading propagates", () => {
+describe("Task 6.4.3 â€” remaining pin loading propagates", () => {
   it("remaining_pin_loading_propagates", () => {
     // Driver element: pins "in"=node 1, "sel"=node 2, "out"=node 3.
     // Set _pinLoading: "in"=true, "sel"=false.
     // Verify via allocElement spy:
-    //   in  (MNA node 1 → nodeIdx 0) → allocElement called at (0,0)
-    //   sel (MNA node 2 → nodeIdx 1) → NO call at (1,1)
+    //   in  (MNA node 1 â†’ nodeIdx 0) â†’ allocElement called at (0,0)
+    //   sel (MNA node 2 â†’ nodeIdx 1) â†’ NO call at (1,1)
     const pinLoading: Record<string, boolean> = {
       "in": true,
       "sel": false,
@@ -513,7 +513,7 @@ describe("Task 6.4.3 — remaining pin loading propagates", () => {
 
     // in (nodeIdx=0) should produce an allocElement call at (0,0) since loaded=true
     const inDiag = allocCalls.some(([r, c]) => r === 0 && c === 0);
-    // sel (nodeIdx=1) should NOT produce any allocElement call (loaded=false → no-op)
+    // sel (nodeIdx=1) should NOT produce any allocElement call (loaded=false â†’ no-op)
     const selDiag = allocCalls.some(([r, c]) => r === 1 && c === 1);
 
     expect(inDiag).toBe(true);

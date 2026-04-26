@@ -1,5 +1,5 @@
-/**
- * Zener diode analog component — Shockley equation with reverse breakdown.
+﻿/**
+ * Zener diode analog component â€” Shockley equation with reverse breakdown.
  *
  * Extends the standard diode with a reverse breakdown region:
  *   When Vd < -tBV: Id = -IS * exp(-(Vd + tBV) / (NBV*Vt))
@@ -8,7 +8,7 @@
  * Vd = -tBV, modeling the Zener/avalanche effect.
  *
  * cite: ref/ngspice/src/spicelib/devices/dio/dioload.c (DIOload)
- * cite: ref/ngspice/src/spicelib/devices/dio/diotemp.c (DIOtemp — tBV derivation)
+ * cite: ref/ngspice/src/spicelib/devices/dio/diotemp.c (DIOtemp â€” tBV derivation)
  */
 
 import { AbstractCircuitElement } from "../../core/element.js";
@@ -47,7 +47,7 @@ import { defineStateSchema, applyInitialValues } from "../../solver/analog/state
 const CONSTboltz = 1.3806226e-23;
 const CHARGE = 1.6021918e-19;
 const CONSTe = Math.E;          // used in cubic approximation (dioload.c:254)
-const REFTEMP = 300.15;         // 27 °C reference temperature
+const REFTEMP = 300.15;         // 27 Â°C reference temperature
 
 /** Minimum conductance for numerical stability (GMIN). */
 const GMIN = 1e-12;
@@ -63,7 +63,7 @@ export const { paramDefs: ZENER_PARAM_DEFS, defaults: ZENER_PARAM_DEFAULTS } = d
     BV:  { default: 5.1,  unit: "V", description: "Reverse breakdown voltage" },
     NBV: { default: NaN,              description: "Breakdown emission coefficient (defaults to N)" },
     IBV: { default: 1e-3, unit: "A", description: "Current at breakdown voltage" },
-    TCV: { default: 0,    unit: "V/°C", description: "Breakdown voltage temperature coefficient" },
+    TCV: { default: 0,    unit: "V/Â°C", description: "Breakdown voltage temperature coefficient" },
     TNOM:{ default: 300.15, unit: "K",  description: "Parameter measurement temperature" },
   },
   secondary: {
@@ -81,7 +81,7 @@ export const { paramDefs: ZENER_SPICE_L1_PARAM_DEFS, defaults: ZENER_SPICE_L1_DE
     N:   { default: 1,                   description: "Emission coefficient" },
   },
   secondary: {
-    RS:  { default: 0,        unit: "Ω",  description: "Ohmic (series) resistance" },
+    RS:  { default: 0,        unit: "Î©",  description: "Ohmic (series) resistance" },
     CJO: { default: 0,        unit: "F",  description: "Zero-bias junction capacitance" },
     VJ:  { default: 1,        unit: "V",  description: "Junction built-in potential" },
     M:   { default: 0.5,                  description: "Grading coefficient" },
@@ -107,13 +107,13 @@ const ZENER_STATE_SCHEMA = defineStateSchema("ZenerElement", [
 ]);
 
 // ---------------------------------------------------------------------------
-// Temperature scaling — tBV derivation (cite: diotemp.c:206-244)
+// Temperature scaling â€” tBV derivation (cite: diotemp.c:206-244)
 // ---------------------------------------------------------------------------
 
 /**
  * Compute the temperature-scaled breakdown voltage (DIOtBrkdwnV) from BV and IBV.
  *
- * cite: diotemp.c:208-244 — temperature-adjusts BV using DIOtcv (tlev==0 path),
+ * cite: diotemp.c:208-244 â€” temperature-adjusts BV using DIOtcv (tlev==0 path),
  * then iterates xbv to find the intersection of the forward and reverse diode
  * characteristics at the breakdown current cbv.
  *
@@ -123,7 +123,7 @@ const ZENER_STATE_SCHEMA = defineStateSchema("ZenerElement", [
  * @param IS    Temperature-scaled saturation current (DIOtSatCur)
  * @param vt    Thermal voltage at circuit temperature
  * @param TCV   Voltage temperature coefficient (DIOtcv), default 0
- * @param dt    Temperature deviation from TNOM in °C (T - TNOM)
+ * @param dt    Temperature deviation from TNOM in Â°C (T - TNOM)
  */
 function computeTBV(
   BV: number,
@@ -157,7 +157,7 @@ function computeTBV(
 }
 
 // ---------------------------------------------------------------------------
-// createZenerElement — AnalogElement factory
+// createZenerElement â€” AnalogElement factory
 // ---------------------------------------------------------------------------
 
 export function createZenerElement(
@@ -176,8 +176,8 @@ export function createZenerElement(
   // diosetup.c:93-95: NBV (DIObrkdEmissionCoeff) defaults to N (DIOemissionCoeff)
   if (isNaN(params.NBV)) params.NBV = params.N;
 
-  // Temperature-derived working values — recomputed whenever params.TEMP changes.
-  // cite: dioload.c / diotemp.c — per-instance TEMP (maps to ngspice DIOtemp)
+  // Temperature-derived working values â€” recomputed whenever params.TEMP changes.
+  // cite: dioload.c / diotemp.c â€” per-instance TEMP (maps to ngspice DIOtemp)
   interface ZenerTp {
     vt: number;
     nVt: number;
@@ -188,7 +188,7 @@ export function createZenerElement(
   }
 
   function computeZenerTp(): ZenerTp {
-    // cite: dioload.c / diotemp.c — per-instance TEMP (maps to ngspice DIOtemp)
+    // cite: dioload.c / diotemp.c â€” per-instance TEMP (maps to ngspice DIOtemp)
     const circuitTemp = params.TEMP;
     const dt = circuitTemp - (isFinite(params.TNOM) ? params.TNOM : REFTEMP);
     const vt = (CONSTboltz * circuitTemp) / CHARGE;
@@ -212,14 +212,14 @@ export function createZenerElement(
   // State pool slot indices
   const SLOT_VD = 0, SLOT_GEQ = 1, SLOT_IEQ = 2, SLOT_ID = 3;
 
-  // Pool binding — only the pool reference is retained. Individual state
+  // Pool binding â€” only the pool reference is retained. Individual state
   // arrays are NOT cached as member variables: every access inside load()
   // reads pool.states[N] at call time. Mirrors ngspice CKTstate0 pointer
   // access (dioload.c never caches state pointers on devices).
   let pool: StatePoolRef;
   let base: number;
 
-  // Ephemeral per-iteration pnjlim limiting flag (ngspice Check / DIOload → CKTnoncon++)
+  // Ephemeral per-iteration pnjlim limiting flag (ngspice Check / DIOload â†’ CKTnoncon++)
   let pnjlimLimited = false;
 
   return {
@@ -246,7 +246,7 @@ export function createZenerElement(
     },
 
     load(ctx: LoadContext): void {
-      // Direct state-array access per call — no cached Float64Array refs.
+      // Direct state-array access per call â€” no cached Float64Array refs.
       const s0 = pool.states[0];
       const s1 = pool.states[1];
 
@@ -277,7 +277,7 @@ export function createZenerElement(
           const evrev = Math.exp(-(tp.tBV + vdOp) / tp.nbvVt);
           gdOp = params.IS * evrev / tp.nbvVt;
         }
-        // store capd (small-signal conductance) — dioload.c:363 stores capd here;
+        // store capd (small-signal conductance) â€” dioload.c:363 stores capd here;
         // for a resistive zener (no cap), we store gd for any bypass/convergence use.
         s0[base + SLOT_GEQ] = gdOp + GMIN;
         // cite: dioload.c:374: continue (skip stamps)
@@ -294,22 +294,22 @@ export function createZenerElement(
         // Z-W3-9: MODEINITTRAN seeds vd from state1  cite: dioload.c:128-129
         vdRaw = s1[base + SLOT_VD];
       } else if ((mode & MODEINITJCT) && (mode & MODETRANOP) && (mode & MODEUIC)) {
-        // dioload.c:130-132: MODEINITJCT && MODETRANOP && MODEUIC → DIOinitCond
+        // dioload.c:130-132: MODEINITJCT && MODETRANOP && MODEUIC â†’ DIOinitCond
         // Simplified model has no IC param; fall back to 0  (DIOinitCond default).
         vdRaw = 0;
       } else if ((mode & MODEINITJCT) && (params.OFF !== undefined && params.OFF !== 0)) {
-        // dioload.c:133-134: MODEINITJCT && DIOoff → vd = 0
+        // dioload.c:133-134: MODEINITJCT && DIOoff â†’ vd = 0
         vdRaw = 0;
       } else if (mode & MODEINITJCT) {
-        // dioload.c:135-136: MODEINITJCT else → vd = tVcrit
+        // dioload.c:135-136: MODEINITJCT else â†’ vd = tVcrit
         vdRaw = tp.tVcrit;
       } else if ((mode & MODEINITFIX) && (params.OFF !== undefined && params.OFF !== 0)) {
-        // dioload.c:137-138: MODEINITFIX && DIOoff → vd = 0
+        // dioload.c:137-138: MODEINITFIX && DIOoff â†’ vd = 0
         vdRaw = 0;
       } else {
         // dioload.c:151-152: vd from rhsOld (current NR iterate voltages)
-        const va = nodeAnode > 0 ? voltages[nodeAnode - 1] : 0;
-        const vc = nodeCathode > 0 ? voltages[nodeCathode - 1] : 0;
+        const va = voltages[nodeAnode];
+        const vc = voltages[nodeCathode];
         vdRaw = va - vc;
       }
 
@@ -320,11 +320,11 @@ export function createZenerElement(
       let vdLimited: number;
 
       if (mode & (MODEINITJCT | MODEINITTRAN)) {
-        // These phases set vd directly — no pnjlim  cite: dioload.c:126-138
+        // These phases set vd directly â€” no pnjlim  cite: dioload.c:126-138
         vdLimited = vdRaw;
         pnjlimLimited = false;
       } else if (isFinite(tp.tBV) && vdRaw < Math.min(0, -tp.tBV + 10 * tp.nbvVt)) {
-        // dioload.c:183-195: breakdown path — pnjlim in reflected domain.
+        // dioload.c:183-195: breakdown path â€” pnjlim in reflected domain.
         // Z-W3-6: use vcritBrk (computed from nbvVt) not tVcrit  cite: dioload.c:189-190
         const vdtemp = -(vdRaw + tp.tBV);
         const vdtempOld = -(vdOld + tp.tBV);
@@ -391,7 +391,7 @@ export function createZenerElement(
       cd += GMIN * vdLimited;  // cite: dioload.c:299: cd += CKTgmin*vd
 
       // -----------------------------------------------------------------------
-      // Z-W3-7: state0 writes — store GMIN-adjusted pair  cite: dioload.c:417-419
+      // Z-W3-7: state0 writes â€” store GMIN-adjusted pair  cite: dioload.c:417-419
       // ngspice writes the post-GMIN cd and gd to CKTstate0.
       // -----------------------------------------------------------------------
       s0[base + SLOT_VD]  = vdLimited;
@@ -415,12 +415,12 @@ export function createZenerElement(
 
     checkConvergence(ctx: LoadContext): boolean {
       const s0 = pool.states[0];
-      // dioload.c:411-416: CKTnoncon bump on pnjlim → non-convergence
+      // dioload.c:411-416: CKTnoncon bump on pnjlim â†’ non-convergence
       if (pnjlimLimited) return false;
 
       const voltages = ctx.rhsOld;
-      const va = nodeAnode > 0 ? voltages[nodeAnode - 1] : 0;
-      const vc = nodeCathode > 0 ? voltages[nodeCathode - 1] : 0;
+      const va = voltages[nodeAnode];
+      const vc = voltages[nodeCathode];
       const vdRaw = va - vc;
 
       // dioconv.c DIOconvTest: current-prediction convergence
@@ -449,7 +449,7 @@ export function createZenerElement(
 }
 
 // ---------------------------------------------------------------------------
-// ZenerElement — CircuitElement implementation
+// ZenerElement â€” CircuitElement implementation
 // ---------------------------------------------------------------------------
 
 export class ZenerElement extends AbstractCircuitElement {
@@ -504,23 +504,23 @@ export class ZenerElement extends AbstractCircuitElement {
     // Body (triangle, cathode bar, wings) stays COMPONENT color
     ctx.setColor("COMPONENT");
 
-    // Filled diode triangle: lead1 → lead2 tip
+    // Filled diode triangle: lead1 â†’ lead2 tip
     ctx.drawPolygon([
       { x: lead1.x, y: -hs },
       { x: lead1.x, y: hs },
       { x: lead2.x, y: 0 },
     ], true);
 
-    // Cathode bar: cath0/cath1 are perpendicular to lead1→lead2 at lead2
+    // Cathode bar: cath0/cath1 are perpendicular to lead1â†’lead2 at lead2
     // direction is along y axis (perpendicular to horizontal wire)
     const cath0 = { x: lead2.x, y: -hs };
     const cath1 = { x: lead2.x, y: hs };
     ctx.drawLine(cath0.x, cath0.y, cath1.x, cath1.y);
 
-    // Zener wings: bent ends at fraction -0.2 and 1.2 along cath0→cath1
-    // interpPointSingle(a,b,f,g): point at fraction f along a→b, offset g perpendicular (along x for vertical bar)
-    // Perpendicular to cath0→cath1 (which is vertical) is horizontal
-    // Wing tips at ±11/16 = ±0.6875 grid units (from Falstad pixel coords ±11 at 16px/unit)
+    // Zener wings: bent ends at fraction -0.2 and 1.2 along cath0â†’cath1
+    // interpPointSingle(a,b,f,g): point at fraction f along aâ†’b, offset g perpendicular (along x for vertical bar)
+    // Perpendicular to cath0â†’cath1 (which is vertical) is horizontal
+    // Wing tips at Â±11/16 = Â±0.6875 grid units (from Falstad pixel coords Â±11 at 16px/unit)
     const wing0 = {
       x: cath0.x - hs,
       y: -11 / 16,
@@ -612,7 +612,7 @@ export const ZenerDiodeDefinition: ComponentDefinition = {
   attributeMap: ZENER_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.SEMICONDUCTORS,
   helpText:
-    "Zener Diode — Shockley diode with reverse breakdown at tBV.\n" +
+    "Zener Diode â€” Shockley diode with reverse breakdown at tBV.\n" +
     "Forward: Id = IS * (exp(Vd/(N*Vt)) - 1)\n" +
     "Reverse-cubic: Id = -IS*(1 + (3*nVt/(vd*e))^3)\n" +
     "Breakdown (Vd < -tBV): Id = -IS * exp(-(Vd+tBV)/(NBV*Vt))",

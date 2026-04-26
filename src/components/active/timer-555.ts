@@ -1,55 +1,55 @@
-/**
- * 555 Timer IC — F4b pool-backed composite analog model.
+﻿/**
+ * 555 Timer IC â€” F4b pool-backed composite analog model.
  *
  * Textbook internal schematic (NE555 / LM555 datasheet):
  *
  *   VCC
- *    │
- *   [R=5kΩ]  ← upper divider arm
- *    │
- *    ├──────── CTRL pin (2/3 VCC when CTRL floating)
- *    │         └─ Comparator 1 in- (threshold reference)
- *   [R=5kΩ]  ← middle divider arm
- *    │
- *    ├──────── nLower (internal, 1/3 VCC)
- *    │         └─ Comparator 2 in- (trigger reference)
- *   [R=5kΩ]  ← lower divider arm
- *    │
+ *    â”‚
+ *   [R=5kÎ©]  â† upper divider arm
+ *    â”‚
+ *    â”œâ”€â”€â”€â”€â”€â”€â”€â”€ CTRL pin (2/3 VCC when CTRL floating)
+ *    â”‚         â””â”€ Comparator 1 in- (threshold reference)
+ *   [R=5kÎ©]  â† middle divider arm
+ *    â”‚
+ *    â”œâ”€â”€â”€â”€â”€â”€â”€â”€ nLower (internal, 1/3 VCC)
+ *    â”‚         â””â”€ Comparator 2 in- (trigger reference)
+ *   [R=5kÎ©]  â† lower divider arm
+ *    â”‚
  *   GND
  *
- *   Comparator 1 (threshold): in+ = THR,    in- = CTRL   → RESET when THR > CTRL
- *   Comparator 2 (trigger):   in+ = nLower, in- = TRIG   → SET   when TRIG < nLower
+ *   Comparator 1 (threshold): in+ = THR,    in- = CTRL   â†’ RESET when THR > CTRL
+ *   Comparator 2 (trigger):   in+ = nLower, in- = TRIG   â†’ SET   when TRIG < nLower
  *
  *   RS flip-flop (dominant RESET):
- *     RESET=1, SET=0  → Q=0
- *     RESET=0, SET=1  → Q=1
- *     RESET=0, SET=0  → hold
- *     RESET=1, SET=1  → Q=0 (RESET dominates per NE555 spec)
+ *     RESET=1, SET=0  â†’ Q=0
+ *     RESET=0, SET=1  â†’ Q=1
+ *     RESET=0, SET=0  â†’ hold
+ *     RESET=1, SET=1  â†’ Q=0 (RESET dominates per NE555 spec)
  *
- *   Active-low RESET pin: RST < GND+0.7V overrides flip-flop → forces Q=0
+ *   Active-low RESET pin: RST < GND+0.7V overrides flip-flop â†’ forces Q=0
  *
- *   Q=1 (SET):   OUTPUT = VCC − vDrop (high), DISCHARGE = Hi-Z
- *   Q=0 (RESET): OUTPUT ≈ GND + 0.1V (low),  DISCHARGE = transistor ON
+ *   Q=1 (SET):   OUTPUT = VCC âˆ’ vDrop (high), DISCHARGE = Hi-Z
+ *   Q=0 (RESET): OUTPUT â‰ˆ GND + 0.1V (low),  DISCHARGE = transistor ON
  *
- * Composition architecture (F4b pool-backed composite — matches optocoupler.ts
+ * Composition architecture (F4b pool-backed composite â€” matches optocoupler.ts
  * pattern from W1.8a commit 130ddd8a):
  *
  *   createTimer555Element returns a PoolBackedAnalogElementCore.
  *   Sub-elements instantiated at factory time:
  *     - comp1Sub: createOpenCollectorComparatorElement (comparator.ts F4c)
  *     - comp2Sub: createOpenCollectorComparatorElement (comparator.ts F4c)
- *     - bjtSub:   createBjtElement (bjt.ts → bjtload.c, NPN L0 Gummel-Poon)
+ *     - bjtSub:   createBjtElement (bjt.ts â†’ bjtload.c, NPN L0 Gummel-Poon)
  *
- *   R-divider: inline stampG calls — mechanical four-entry conductance stamp
- *   matching resload.c primitive resistor (cite: resload.c — G=1/R stamped at
+ *   R-divider: inline stampG calls â€” mechanical four-entry conductance stamp
+ *   matching resload.c primitive resistor (cite: resload.c â€” G=1/R stamped at
  *   [nA,nA], [nA,nB], [nB,nA], [nB,nB]).
  *
  *   RS flip-flop: behavioral boolean _flipflopQ advanced in accept() once per
  *   accepted timestep. No analog RS-FF primitive exists in digiTS.
  *
- *   RS-FF → BJT base drive: digiTS composition glue — translates _flipflopQ
+ *   RS-FF â†’ BJT base drive: digiTS composition glue â€” translates _flipflopQ
  *   boolean to a physical base voltage via G/RHS stamps into nDischargeBase.
- *   Not cited to ngspice — there is no corresponding ngspice primitive for
+ *   Not cited to ngspice â€” there is no corresponding ngspice primitive for
  *   this inter-element coupling.
  *
  *   Output stage: DigitalOutputPinModel (F4c behavioral, no ngspice primitive).
@@ -58,13 +58,13 @@
  *   internalNodeIds[0] = nLower          (R-divider lower tap, 1/3 VCC)
  *   internalNodeIds[1] = nComp1Out       (threshold comparator OC output)
  *   internalNodeIds[2] = nComp2Out       (trigger comparator OC output)
- *   internalNodeIds[3] = nDischargeBase  (BJT base — driven by RS-FF glue)
+ *   internalNodeIds[3] = nDischargeBase  (BJT base â€” driven by RS-FF glue)
  *
  * State pool layout:
- *   [0 .. BJT_SIMPLE_SCHEMA.size-1]                         — discharge BJT slots (bjtload.c)
- *   [bjtEnd .. bjtEnd + comp1.stateSize-1]                  — comparator 1 (threshold)
- *   [comp1End .. comp1End + comp2.stateSize-1]              — comparator 2 (trigger)
- *   [comp2End ..]                                           — capacitor children from output pin
+ *   [0 .. BJT_SIMPLE_SCHEMA.size-1]                         â€” discharge BJT slots (bjtload.c)
+ *   [bjtEnd .. bjtEnd + comp1.stateSize-1]                  â€” comparator 1 (threshold)
+ *   [comp1End .. comp1End + comp2.stateSize-1]              â€” comparator 2 (trigger)
+ *   [comp2End ..]                                           â€” capacitor children from output pin
  *
  * Comparators are F4c behavioral and pool-backed (latch + soft-weight slots
  * for hysteresis & responseTime integration); the parent allocates their
@@ -96,14 +96,14 @@ import {
 import type { StatePoolRef } from "../../core/analog-types.js";
 import type { AnalogCapacitorElement } from "../passives/capacitor.js";
 
-// Sub-element: discharge BJT — bjtload.c:170-end (L0 Gummel-Poon)
+// Sub-element: discharge BJT â€” bjtload.c:170-end (L0 Gummel-Poon)
 import {
   createBjtElement,
   BJT_SIMPLE_SCHEMA,
   BJT_NPN_DEFAULTS,
 } from "../semiconductors/bjt.js";
 
-// Sub-element: comparators — comparator.ts F4c behavioral (no ngspice primitive)
+// Sub-element: comparators â€” comparator.ts F4c behavioral (no ngspice primitive)
 import { createOpenCollectorComparatorElement } from "./comparator.js";
 
 // ---------------------------------------------------------------------------
@@ -113,7 +113,7 @@ import { createOpenCollectorComparatorElement } from "./comparator.js";
 export const { paramDefs: TIMER555_PARAM_DEFS, defaults: TIMER555_DEFAULTS } = defineModelParams({
   primary: {
     vDrop:      { default: 1.5, unit: "V", description: "Voltage drop from VCC for high output state" },
-    rDischarge: { default: 10,  unit: "Ω", description: "Saturation resistance of the discharge transistor" },
+    rDischarge: { default: 10,  unit: "Î©", description: "Saturation resistance of the discharge transistor" },
   },
 });
 
@@ -121,22 +121,22 @@ export const { paramDefs: TIMER555_PARAM_DEFS, defaults: TIMER555_DEFAULTS } = d
 // Internal constants
 // ---------------------------------------------------------------------------
 
-/** Three equal divider arms (5kΩ each) from VCC to GND — textbook NE555. */
-const R_DIV = 5000;   // Ω
+/** Three equal divider arms (5kÎ© each) from VCC to GND â€” textbook NE555. */
+const R_DIV = 5000;   // Î©
 
 /** Output drive resistance (Norton equivalent, internal). */
-const R_OUT = 10;     // Ω
+const R_OUT = 10;     // Î©
 
 // ---------------------------------------------------------------------------
 // Pin declarations
 // ---------------------------------------------------------------------------
 
-// Pin index → nodeIds[i] mapping:
+// Pin index â†’ nodeIds[i] mapping:
 //   0: DIS      1: TRIG     2: THR      3: VCC
 //   4: CTRL     5: OUT      6: RST      7: GND
 
 function buildTimer555PinDeclarations(): PinDeclaration[] {
-  // Compact IC layout: body (1,0)→(5,6), VCC top-center, GND bottom-center,
+  // Compact IC layout: body (1,0)â†’(5,6), VCC top-center, GND bottom-center,
   // 3 left pins and 3 right pins evenly spaced at y=1,3,5.
   return [
     {
@@ -215,7 +215,7 @@ function buildTimer555PinDeclarations(): PinDeclaration[] {
 }
 
 // ---------------------------------------------------------------------------
-// Timer555Element — CircuitElement implementation
+// Timer555Element â€” CircuitElement implementation
 // ---------------------------------------------------------------------------
 
 export class Timer555Element extends AbstractCircuitElement {
@@ -259,20 +259,20 @@ export class Timer555Element extends AbstractCircuitElement {
     ctx.setColor("COMPONENT");
     ctx.drawRect(1, 0, 4, 6, false);
 
-    // Left-side leads: pin tip (0,y) → body edge (1,y)
+    // Left-side leads: pin tip (0,y) â†’ body edge (1,y)
     drawColoredLead(ctx, signals, vDis,  0, 1, 1, 1);
     drawColoredLead(ctx, signals, vTrig, 0, 3, 1, 3);
     drawColoredLead(ctx, signals, vThr,  0, 5, 1, 5);
 
-    // Right-side leads: pin tip (6,y) → body edge (5,y)
+    // Right-side leads: pin tip (6,y) â†’ body edge (5,y)
     drawColoredLead(ctx, signals, vRst,  6, 1, 5, 1);
     drawColoredLead(ctx, signals, vOut,  6, 3, 5, 3);
     drawColoredLead(ctx, signals, vCtrl, 6, 5, 5, 5);
 
-    // VCC lead (north): pin tip (3,-1) → body edge (3,0)
+    // VCC lead (north): pin tip (3,-1) â†’ body edge (3,0)
     drawColoredLead(ctx, signals, vVcc, 3, -1, 3, 0);
 
-    // GND lead (south): pin tip (3,7) → body edge (3,6)
+    // GND lead (south): pin tip (3,7) â†’ body edge (3,6)
     drawColoredLead(ctx, signals, vGnd, 3, 7, 3, 6);
 
     // Component name centered between top and middle pin rows
@@ -300,7 +300,7 @@ export class Timer555Element extends AbstractCircuitElement {
 // ---------------------------------------------------------------------------
 
 // Only the BJT sub-element contributes pool state.
-// Comparators are F4c behavioral — no pool state.
+// Comparators are F4c behavioral â€” no pool state.
 const BJT_STATE_SIZE = BJT_SIMPLE_SCHEMA.size; // 8 slots
 
 // ---------------------------------------------------------------------------
@@ -330,7 +330,7 @@ function makeCompProps(): PropertyBag {
 }
 
 // ---------------------------------------------------------------------------
-// createTimer555Element — AnalogElementCore factory (F4b pool-backed composite)
+// createTimer555Element â€” AnalogElementCore factory (F4b pool-backed composite)
 // ---------------------------------------------------------------------------
 
 /**
@@ -340,15 +340,15 @@ function makeCompProps(): PropertyBag {
  *   - Sub-elements instantiated at factory time
  *   - initState() partitions pool across sub-elements
  *   - load() delegates to each sub-element's load() in sequence
- *   - Inter-element coupling (RS-FF → BJT base) stamped as digiTS glue
+ *   - Inter-element coupling (RS-FF â†’ BJT base) stamped as digiTS glue
  *
  * Load() body shape:
- *   1. R-divider sub-components (three stampG arms — resload.c)
- *   2. Comparator 1 sub-element load (comp1Sub.load — comparator.ts F4c)
- *   3. Comparator 2 sub-element load (comp2Sub.load — comparator.ts F4c)
- *   4. RS-FF → BJT base drive glue stamps (digiTS composition, no ngspice cite)
- *   5. Discharge BJT sub-element load (bjtSub.load — bjtload.c:170-end)
- *   6. Output stage (DigitalOutputPinModel — F4c behavioral)
+ *   1. R-divider sub-components (three stampG arms â€” resload.c)
+ *   2. Comparator 1 sub-element load (comp1Sub.load â€” comparator.ts F4c)
+ *   3. Comparator 2 sub-element load (comp2Sub.load â€” comparator.ts F4c)
+ *   4. RS-FF â†’ BJT base drive glue stamps (digiTS composition, no ngspice cite)
+ *   5. Discharge BJT sub-element load (bjtSub.load â€” bjtload.c:170-end)
+ *   6. Output stage (DigitalOutputPinModel â€” F4c behavioral)
  */
 function createTimer555Element(
   pinNodes: ReadonlyMap<string, number>,
@@ -372,23 +372,23 @@ function createTimer555Element(
   const nGnd  = pinNodes.get("GND")!;
 
   // Internal nodes (allocated by compiler via getInternalNodeCount = () => 4):
-  //   [0] = nLower          — R-divider lower tap (1/3 VCC when floating)
-  //   [1] = nComp1Out       — threshold comparator open-collector output
-  //   [2] = nComp2Out       — trigger comparator open-collector output
-  //   [3] = nDischargeBase  — BJT base node (driven by RS-FF → base glue)
+  //   [0] = nLower          â€” R-divider lower tap (1/3 VCC when floating)
+  //   [1] = nComp1Out       â€” threshold comparator open-collector output
+  //   [2] = nComp2Out       â€” trigger comparator open-collector output
+  //   [3] = nDischargeBase  â€” BJT base node (driven by RS-FF â†’ base glue)
   const nLower         = internalNodeIds[0] ?? 0;
   const nComp1Out      = internalNodeIds[1] ?? 0;
   const nComp2Out      = internalNodeIds[2] ?? 0;
   const nDischargeBase = internalNodeIds[3] ?? 0;
 
   // -------------------------------------------------------------------------
-  // Sub-element 1 & 2: Comparators (F4c behavioral — comparator.ts)
+  // Sub-element 1 & 2: Comparators (F4c behavioral â€” comparator.ts)
   //
   // Comparator 1 (threshold): in+ = THR, in- = CTRL, out = nComp1Out
-  //   Active (sinking) when V_THR > V_CTRL → asserts RESET to RS flip-flop.
+  //   Active (sinking) when V_THR > V_CTRL â†’ asserts RESET to RS flip-flop.
   //
   // Comparator 2 (trigger): in+ = nLower, in- = TRIG, out = nComp2Out
-  //   Active (sinking) when V_TRIG < V_nLower → asserts SET to RS flip-flop.
+  //   Active (sinking) when V_TRIG < V_nLower â†’ asserts SET to RS flip-flop.
   //
   // Both are F4c behavioral; no ngspice primitive; no pool state.
   // -------------------------------------------------------------------------
@@ -412,8 +412,8 @@ function createTimer555Element(
   // NPN polarity. Base = nDischargeBase (internal, driven by RS-FF glue).
   // Collector = nDis (external DIS pin). Emitter = nGnd (GND pin).
   //
-  // Q=1 (SET):   RS-FF glue pulls base to GND → BJT cutoff → DIS Hi-Z
-  // Q=0 (RESET): RS-FF glue drives base high  → BJT saturates → DIS sinks
+  // Q=1 (SET):   RS-FF glue pulls base to GND â†’ BJT cutoff â†’ DIS Hi-Z
+  // Q=0 (RESET): RS-FF glue drives base high  â†’ BJT saturates â†’ DIS sinks
   // -------------------------------------------------------------------------
   const bjtPinNodes = new Map<string, number>([
     ["B", nDischargeBase],
@@ -423,20 +423,20 @@ function createTimer555Element(
   const bjtProps = makeBjtProps();
   const bjtSub = createBjtElement(1 /* NPN */, bjtPinNodes, -1, bjtProps);
 
-  // Pool binding — set in initState(), read in load()
+  // Pool binding â€” set in initState(), read in load()
   let pool: StatePoolRef;
   let bjtBase: number;
 
   // -------------------------------------------------------------------------
   // RS flip-flop state:
-  //   true  = SET  → output HIGH, discharge BJT cutoff
-  //   false = RESET → output LOW,  discharge BJT saturated
+  //   true  = SET  â†’ output HIGH, discharge BJT cutoff
+  //   false = RESET â†’ output LOW,  discharge BJT saturated
   // Advanced in accept() once per accepted timestep. Held constant during NR.
   // -------------------------------------------------------------------------
   let _flipflopQ = false;
 
   // -------------------------------------------------------------------------
-  // Output pin model (F4c behavioral — DigitalOutputPinModel)
+  // Output pin model (F4c behavioral â€” DigitalOutputPinModel)
   // -------------------------------------------------------------------------
   const _outputPin = new DigitalOutputPinModel({
     rOut:  R_OUT,
@@ -451,12 +451,12 @@ function createTimer555Element(
   });
   _outputPin.init(nOut, -1);
 
-  // Collect capacitor children from output pin model (cOut=0 → empty array at runtime).
+  // Collect capacitor children from output pin model (cOut=0 â†’ empty array at runtime).
   const _childElements: AnalogCapacitorElement[] = collectPinModelChildren([_outputPin]);
   const _childStateSize = _childElements.reduce((s, c) => s + c.stateSize, 0);
 
   function readNode(voltages: Float64Array, n: number): number {
-    return n > 0 ? voltages[n - 1] : 0;
+    return voltages[n];
   }
 
   function updateOutputPinLevels(voltages: Float64Array): void {
@@ -468,31 +468,31 @@ function createTimer555Element(
 
   /**
    * Advance RS flip-flop after an accepted timestep.
-   * Called ONLY from accept() — never during NR iteration.
+   * Called ONLY from accept() â€” never during NR iteration.
    * Comparator state is evaluated from node voltages at the accepted solution.
    */
   function advanceFlipflop(voltages: Float64Array): void {
     const vGnd  = readNode(voltages, nGnd);
     const vRstV = readNode(voltages, nRst);
 
-    // Active-low RESET pin: RST < GND + 0.7V → force Q=0 (overrides all)
+    // Active-low RESET pin: RST < GND + 0.7V â†’ force Q=0 (overrides all)
     if ((vRstV - vGnd) < 0.7) {
       _flipflopQ = false;
       return;
     }
 
     // Read comparator output node voltages to determine comparator states.
-    // comp1: active (sinking, pulled low) → RESET; comp2: active → SET.
+    // comp1: active (sinking, pulled low) â†’ RESET; comp2: active â†’ SET.
     // When nComp1Out/nComp2Out are 0 (unit test fallback), read from pin voltages.
     const vThr   = readNode(voltages, nThr);
     const vTrig  = readNode(voltages, nTrig);
     const vCtrlV = readNode(voltages, nCtrl);
     const vLower = nLower > 0 ? readNode(voltages, nLower) : (vCtrlV * 0.5);
 
-    // Comparator 1: THR > CTRL → RESET asserted
+    // Comparator 1: THR > CTRL â†’ RESET asserted
     const comp1Reset = (vThr - vGnd) > (vCtrlV - vGnd);
 
-    // Comparator 2: TRIG < nLower → SET asserted
+    // Comparator 2: TRIG < nLower â†’ SET asserted
     const comp2Set = (vTrig - vGnd) < (vLower - vGnd);
 
     // RS flip-flop: RESET dominates (NE555 spec)
@@ -514,7 +514,7 @@ function createTimer555Element(
     // Composite state layout: BJT slots, then both comparator sub-elements,
     // then capacitor children from the output pin model. Each sub-element is
     // pool-backed and must be allocated a unique slot range from the parent's
-    // pool — the engine never visits sub-elements directly, so the parent
+    // pool â€” the engine never visits sub-elements directly, so the parent
     // must include their stateSize and call their initState().
     stateSize:
       BJT_STATE_SIZE +
@@ -532,7 +532,7 @@ function createTimer555Element(
       bjtSub.stateBaseOffset = bjtBase;
       bjtSub.initState(poolRef);
 
-      // Comparators follow — each is poolBacked with its own stateSize.
+      // Comparators follow â€” each is poolBacked with its own stateSize.
       // Without these initState calls the comparator's `pool` closure is
       // undefined and load() throws "Cannot read properties of undefined
       // (reading 'states')".
@@ -555,7 +555,7 @@ function createTimer555Element(
       comp2.initState(poolRef);
       offset += comp2.stateSize;
 
-      // Capacitor children from the output pin model (cOut=0 → none at runtime).
+      // Capacitor children from the output pin model (cOut=0 â†’ none at runtime).
       for (const child of _childElements) {
         child.stateBaseOffset = offset;
         child.initState(poolRef);
@@ -572,27 +572,27 @@ function createTimer555Element(
       updateOutputPinLevels(voltages);
 
       // ---------------------------------------------------------------
-      // Sub-component 1: R-divider (three equal 5kΩ arms)
+      // Sub-component 1: R-divider (three equal 5kÎ© arms)
       //
-      // cite: resload.c — primitive resistor G=1/R stamp at four matrix
+      // cite: resload.c â€” primitive resistor G=1/R stamp at four matrix
       // positions: [nA,nA], [nA,nB], [nB,nA], [nB,nB] (conductance G).
       //
-      //   Upper arm:  VCC  → CTRL   (nCtrl = 2/3 VCC when floating)
-      //   Middle arm: CTRL → nLower (nLower = 1/3 VCC when floating)
-      //   Lower arm:  nLower → GND
+      //   Upper arm:  VCC  â†’ CTRL   (nCtrl = 2/3 VCC when floating)
+      //   Middle arm: CTRL â†’ nLower (nLower = 1/3 VCC when floating)
+      //   Lower arm:  nLower â†’ GND
       // ---------------------------------------------------------------
       const G_DIV = 1 / R_DIV;
-      // Upper arm: VCC → CTRL — cite: resload.c primitive G stamp
+      // Upper arm: VCC â†’ CTRL â€” cite: resload.c primitive G stamp
       stampG(ctx.solver, nVcc,   nVcc,   G_DIV);
       stampG(ctx.solver, nVcc,   nCtrl, -G_DIV);
       stampG(ctx.solver, nCtrl,  nVcc,  -G_DIV);
       stampG(ctx.solver, nCtrl,  nCtrl,  G_DIV);
-      // Middle arm: CTRL → nLower — cite: resload.c primitive G stamp
+      // Middle arm: CTRL â†’ nLower â€” cite: resload.c primitive G stamp
       stampG(ctx.solver, nCtrl,  nCtrl,  G_DIV);
       stampG(ctx.solver, nCtrl,  nLower, -G_DIV);
       stampG(ctx.solver, nLower, nCtrl,  -G_DIV);
       stampG(ctx.solver, nLower, nLower,  G_DIV);
-      // Lower arm: nLower → GND — cite: resload.c primitive G stamp
+      // Lower arm: nLower â†’ GND â€” cite: resload.c primitive G stamp
       stampG(ctx.solver, nLower, nLower,  G_DIV);
       stampG(ctx.solver, nLower, nGnd,   -G_DIV);
       stampG(ctx.solver, nGnd,   nLower, -G_DIV);
@@ -613,27 +613,27 @@ function createTimer555Element(
       comp2Sub.load(ctx);
 
       // ---------------------------------------------------------------
-      // RS-FF → BJT base drive (digiTS composition glue, no ngspice cite)
+      // RS-FF â†’ BJT base drive (digiTS composition glue, no ngspice cite)
       //
       // Translates the boolean _flipflopQ to a physical base voltage at
       // nDischargeBase so the Gummel-Poon BJT sees correct BE bias:
       //
       //   Q=0 (RESET, BJT ON): drive base toward a saturating bias
-      //     → conductance G_base between VCC and nDischargeBase
+      //     â†’ conductance G_base between VCC and nDischargeBase
       //       plus RHS injection G_base * V_VCC (Norton equivalent)
-      //       → V_base ≈ V_VCC (pulled strongly high → BJT saturates)
+      //       â†’ V_base â‰ˆ V_VCC (pulled strongly high â†’ BJT saturates)
       //
       //   Q=1 (SET, BJT OFF): pull base to GND
-      //     → conductance G_base between nDischargeBase and GND
+      //     â†’ conductance G_base between nDischargeBase and GND
       //       (no RHS injection)
-      //       → V_base ≈ 0 (pulled low → BJT cuts off)
+      //       â†’ V_base â‰ˆ 0 (pulled low â†’ BJT cuts off)
       //
       // G_base is chosen large enough to overcome the BJT's base current
       // but not so large as to cause solver conditioning issues.
       // ---------------------------------------------------------------
-      const G_BASE_DRIVE = 1.0; // S — digiTS composition glue
+      const G_BASE_DRIVE = 1.0; // S â€” digiTS composition glue
       if (!_flipflopQ) {
-        // Q=0 (RESET): drive base high → BJT saturates
+        // Q=0 (RESET): drive base high â†’ BJT saturates
         // Norton: G between VCC and nDischargeBase + I_norton = G * V_VCC
         const vVccVal = readNode(voltages, nVcc);
         stampG(ctx.solver,  nVcc,          nVcc,           G_BASE_DRIVE);
@@ -643,7 +643,7 @@ function createTimer555Element(
         stampRHS(ctx.solver, nDischargeBase, G_BASE_DRIVE * vVccVal);
         stampRHS(ctx.solver, nVcc,          -G_BASE_DRIVE * vVccVal);
       } else {
-        // Q=1 (SET): pull base to GND → BJT cutoff
+        // Q=1 (SET): pull base to GND â†’ BJT cutoff
         stampG(ctx.solver, nDischargeBase, nDischargeBase,  G_BASE_DRIVE);
         stampG(ctx.solver, nDischargeBase, nGnd,           -G_BASE_DRIVE);
         stampG(ctx.solver, nGnd,           nDischargeBase, -G_BASE_DRIVE);
@@ -703,7 +703,7 @@ function createTimer555Element(
       const iVcc  = G_DIV * (vVccV - vCtrlV);
       const iCtrl = G_DIV * (vCtrlV - vVccV) + G_DIV * (vCtrlV - vLower);
       const iOut  = gOut * vOut - vOutTarget * gOut;
-      // THR, TRIG, RST are comparator inputs — high impedance, negligible
+      // THR, TRIG, RST are comparator inputs â€” high impedance, negligible
       const iTrig = 0;
       const iThr  = 0;
       const iRst  = 0;
@@ -714,14 +714,14 @@ function createTimer555Element(
 
       // Return simplified KCL-consistent currents at the composite boundary
       return [
-        G_DIV * (vDis - vGndV),  // DIS — discharge current (BJT C→E path)
+        G_DIV * (vDis - vGndV),  // DIS â€” discharge current (BJT Câ†’E path)
         iTrig,                    // TRIG
         iThr,                     // THR
         iVcc,                     // VCC (into divider upper arm)
         iCtrl,                    // CTRL
         iOut,                     // OUT
         iRst,                     // RST
-        -(iVcc + iOut),           // GND — satisfies KCL at composite boundary
+        -(iVcc + iOut),           // GND â€” satisfies KCL at composite boundary
       ];
     },
 
@@ -770,7 +770,7 @@ export const Timer555Definition: ComponentDefinition = {
   attributeMap: TIMER555_ATTRIBUTE_MAPPINGS,
 
   helpText:
-    "555 Timer IC — F4b pool-backed composite model (two comparators + RS flip-flop + " +
+    "555 Timer IC â€” F4b pool-backed composite model (two comparators + RS flip-flop + " +
     "BJT discharge transistor + R-divider). Textbook NE555 internal schematic. " +
     "Pins: VCC, GND, TRIG, THR, CTRL, RST, DIS, OUT.",
 

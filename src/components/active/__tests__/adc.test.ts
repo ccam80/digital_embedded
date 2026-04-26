@@ -1,9 +1,9 @@
-/**
+﻿/**
  * Tests for the ADC (Analog-to-Digital Converter) component.
  *
  * The ADC converts an analog input voltage to an N-bit digital output code on
  * each rising clock edge:
- *   code = clamp(floor(V_in / V_ref × 2^N), 0, 2^N - 1)   (unipolar mode)
+ *   code = clamp(floor(V_in / V_ref Ã— 2^N), 0, 2^N - 1)   (unipolar mode)
  *
  * Testing approach: construct the ADC AnalogElement directly via analogFactory,
  * then drive its state via accept(ctx, simTime, addBreakpoint) calls with
@@ -12,16 +12,16 @@
  * full MNA solver.
  *
  * Node assignment (8-bit, unipolar):
- *   nodeIds[0] = VIN   → node 1  (voltages[0])
- *   nodeIds[1] = CLK   → node 2  (voltages[1])
- *   nodeIds[2] = VREF  → node 3  (voltages[2])
- *   nodeIds[3] = GND   → node 0  (MNA ground, implicit)
- *   nodeIds[4] = EOC   → node 4  (voltages[3])
- *   nodeIds[5] = D0    → node 5  (voltages[4])
+ *   nodeIds[0] = VIN   â†’ node 1  (voltages[0])
+ *   nodeIds[1] = CLK   â†’ node 2  (voltages[1])
+ *   nodeIds[2] = VREF  â†’ node 3  (voltages[2])
+ *   nodeIds[3] = GND   â†’ node 0  (MNA ground, implicit)
+ *   nodeIds[4] = EOC   â†’ node 4  (voltages[3])
+ *   nodeIds[5] = D0    â†’ node 5  (voltages[4])
  *   ...
- *   nodeIds[12]= D7    → node 12 (voltages[11])
+ *   nodeIds[12]= D7    â†’ node 12 (voltages[11])
  *
- * The voltages Float64Array is 0-indexed: voltages[nodeId - 1] for nodeId > 0.
+ * The voltages Float64Array is 0-indexed: voltages[nodeId] for nodeId > 0.
  * GND = node 0 is the MNA ground constant (0V, not stored in voltages array).
  */
 
@@ -58,7 +58,7 @@ const MAX_CODE = (1 << BITS) - 1; // 255
 const N_VIN  = 1;
 const N_CLK  = 2;
 const N_VREF = 3;
-const N_GND  = 0;  // MNA ground — implicit, not in voltages array
+const N_GND  = 0;  // MNA ground â€” implicit, not in voltages array
 const N_EOC  = 4;
 // D0..D7 occupy nodes 5..12
 const N_D0   = 5;
@@ -79,16 +79,16 @@ function makeNodeIds(): ReadonlyMap<string, number> {
 // Voltage vector helpers
 // ---------------------------------------------------------------------------
 
-/** Matrix size: 12 data nodes (nodes 1..12) → voltages[0..11]. */
+/** Matrix size: 12 data nodes (nodes 1..12). voltages length = MATRIX_SIZE + 1 (slot 0 = ground). */
 const MATRIX_SIZE = N_D0 + BITS - 1; // = 12
 
 function makeVoltages(overrides: Partial<Record<string, number>> = {}): Float64Array {
-  // nodeId → voltages[nodeId - 1]
-  const v = new Float64Array(MATRIX_SIZE);
-  v[N_VREF - 1] = V_REF;  // default VREF = 5V
+  // nodeId â†’ voltages[nodeId] (ngspice 1-based; slot 0 is the ground sentinel).
+  const v = new Float64Array(MATRIX_SIZE + 1);
+  v[N_VREF] = V_REF;  // default VREF = 5V
   for (const [key, value] of Object.entries(overrides)) {
     const nodeId = parseInt(key);
-    if (nodeId > 0 && nodeId <= MATRIX_SIZE && value !== undefined) v[nodeId - 1] = value;
+    if (nodeId > 0 && nodeId <= MATRIX_SIZE && value !== undefined) v[nodeId] = value;
   }
   return v;
 }
@@ -137,8 +137,8 @@ function makeAcceptCtx(voltages: Float64Array, dt: number): LoadContext {
  * Apply a rising clock edge to the ADC with the given V_in.
  *
  * Steps:
- *   1. Drive CLK LOW with the target V_in set — accept() sees prev=LOW.
- *   2. Drive CLK HIGH — accept() detects the rising edge and converts.
+ *   1. Drive CLK LOW with the target V_in set â€” accept() sees prev=LOW.
+ *   2. Drive CLK HIGH â€” accept() detects the rising edge and converts.
  */
 function applyClockEdge(
   adc: ADCElementExt,
@@ -146,15 +146,15 @@ function applyClockEdge(
   vRef: number = V_REF,
   clkHigh?: number,
 ): void {
-  const dt = 1e-6; // 1 µs timestep
+  const dt = 1e-6; // 1 Âµs timestep
   const vIL = ADC_DEFAULTS.vIL;
   const vIH = clkHigh ?? (ADC_DEFAULTS.vIH + 0.1);
 
-  // Step 1: CLK low — initialise prevClkVoltage to LOW
+  // Step 1: CLK low â€” initialise prevClkVoltage to LOW
   const vLow = makeVoltages({ [N_VIN]: vIn, [N_CLK]: vIL, [N_VREF]: vRef });
   adc.accept!(makeAcceptCtx(vLow, dt), 0, () => {});
 
-  // Step 2: CLK high — rising edge detected, conversion fires
+  // Step 2: CLK high â€” rising edge detected, conversion fires
   const vHigh = makeVoltages({ [N_VIN]: vIn, [N_CLK]: vIH, [N_VREF]: vRef });
   adc.accept!(makeAcceptCtx(vHigh, dt), dt, () => {});
 }
@@ -165,14 +165,14 @@ function applyClockEdge(
 
 describe("ADC", () => {
   it("midscale_input", () => {
-    // V_in = V_ref / 2 = 2.5V → code = floor(0.5 × 256) = 128
+    // V_in = V_ref / 2 = 2.5V â†’ code = floor(0.5 Ã— 256) = 128
     const adc = makeAdc();
     applyClockEdge(adc, V_REF / 2);
     expect(adc.latchedCode).toBe(128);
   });
 
   it("full_scale", () => {
-    // V_in = V_ref - 1 LSB = V_ref × (1 - 1/2^N) → code = 2^N - 1 = 255
+    // V_in = V_ref - 1 LSB = V_ref Ã— (1 - 1/2^N) â†’ code = 2^N - 1 = 255
     const vIn = V_REF * (MAX_CODE / (1 << BITS));
     const adc = makeAdc();
     applyClockEdge(adc, vIn);
@@ -180,7 +180,7 @@ describe("ADC", () => {
   });
 
   it("zero_input", () => {
-    // V_in = 0V → code = floor(0 × 256) = 0
+    // V_in = 0V â†’ code = floor(0 Ã— 256) = 0
     const adc = makeAdc();
     applyClockEdge(adc, 0);
     expect(adc.latchedCode).toBe(0);
@@ -221,12 +221,12 @@ describe("ADC", () => {
   });
 
   it("output scales with VREF from wire", () => {
-    // Same V_in ratio, different VREF — code should be the same
+    // Same V_in ratio, different VREF â€” code should be the same
     const adc3 = makeAdc();
-    applyClockEdge(adc3, 1.65, 3.3);  // 1.65/3.3 = 0.5 → code 128
+    applyClockEdge(adc3, 1.65, 3.3);  // 1.65/3.3 = 0.5 â†’ code 128
 
     const adc5 = makeAdc();
-    applyClockEdge(adc5, 2.5, 5.0);   // 2.5/5.0 = 0.5 → code 128
+    applyClockEdge(adc5, 2.5, 5.0);   // 2.5/5.0 = 0.5 â†’ code 128
 
     expect(adc3.latchedCode).toBe(128);
     expect(adc5.latchedCode).toBe(128);
@@ -240,7 +240,7 @@ describe("ADC", () => {
   });
 
   it("clock below vIH does not trigger conversion", () => {
-    // Drive clock to 1.5V — below default vIH=2.0V. No conversion should fire.
+    // Drive clock to 1.5V â€” below default vIH=2.0V. No conversion should fire.
     const adc = makeAdc();
     const dt = 1e-6;
 
@@ -248,7 +248,7 @@ describe("ADC", () => {
     const vLow = makeVoltages({ [N_VIN]: V_REF / 2, [N_CLK]: 0.0, [N_VREF]: V_REF });
     adc.accept!(makeAcceptCtx(vLow, dt), 0, () => {});
 
-    // Step 2: CLK to 1.5V — still below vIH=2.0V
+    // Step 2: CLK to 1.5V â€” still below vIH=2.0V
     const vMid = makeVoltages({ [N_VIN]: V_REF / 2, [N_CLK]: 1.5, [N_VREF]: V_REF });
     adc.accept!(makeAcceptCtx(vMid, dt), dt, () => {});
 
@@ -267,10 +267,10 @@ describe("ADC", () => {
     const vHigh = makeVoltages({ [N_VIN]: V_REF / 2, [N_CLK]: 3.3, [N_VREF]: V_REF });
     adc.accept!(makeAcceptCtx(vHigh, dt), dt, () => {});
 
-    expect(adc.latchedCode).toBe(0);  // 3.3V < 4.0V → no edge
+    expect(adc.latchedCode).toBe(0);  // 3.3V < 4.0V â†’ no edge
     expect(adc.eocActive).toBe(false);
 
-    // Now drive above 4.0V — should trigger
+    // Now drive above 4.0V â€” should trigger
     const vHigher = makeVoltages({ [N_VIN]: V_REF / 2, [N_CLK]: 4.5, [N_VREF]: V_REF });
     adc.accept!(makeAcceptCtx(vHigher, dt), 2 * dt, () => {});
 
@@ -280,7 +280,7 @@ describe("ADC", () => {
 });
 
 // ---------------------------------------------------------------------------
-// C4.5 parity test — adc_load_dcop_parity
+// C4.5 parity test â€” adc_load_dcop_parity
 // ---------------------------------------------------------------------------
 //
 // Drives the 8-bit unipolar-instant ADC via load(ctx) at DC-OP. Without any
@@ -288,9 +288,9 @@ describe("ADC", () => {
 // state, EOC is low, and analog inputs stamp only their loading conductance.
 //
 // Reference formulas (from adc.ts createADCElement + digital-pin-model.ts):
-//   inputSpec.rIn  = p.rIn  → VIN and CLK diagonal stamps = 1/rIn
-//   outputSpec.rOut = p.rOut → EOC and D0..D(N-1) diagonal stamps = 1/rOut,
-//                              RHS = vOL·(1/rOut) (all initially low → stays at vOL)
+//   inputSpec.rIn  = p.rIn  â†’ VIN and CLK diagonal stamps = 1/rIn
+//   outputSpec.rOut = p.rOut â†’ EOC and D0..D(N-1) diagonal stamps = 1/rOut,
+//                              RHS = vOLÂ·(1/rOut) (all initially low â†’ stays at vOL)
 
 import type { SparseSolver as SparseSolverType } from "../../../solver/analog/sparse-solver.js";
 

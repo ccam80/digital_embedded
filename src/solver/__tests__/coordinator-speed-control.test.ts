@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Tests for speed control methods on DefaultSimulationCoordinator (P5b-4).
  * Covers: timingModel, computeFrameSteps, speed, adjustSpeed, parseSpeed, formatSpeed
  */
@@ -56,9 +56,9 @@ function makeResistorAnalogEl(n1: number, n2: number, resistance: number): Analo
     isNonlinear: false, isReactive: false,
     stampAc(solver: SparseSolverStamp): void {
       const g = 1 / resistance;
-      if (n1 !== 0) { solver.stampElement(solver.allocElement(n1 - 1, n1 - 1), g); }
-      if (n2 !== 0) { solver.stampElement(solver.allocElement(n2 - 1, n2 - 1), g); }
-      if (n1 !== 0 && n2 !== 0) { solver.stampElement(solver.allocElement(n1 - 1, n2 - 1), -g); solver.stampElement(solver.allocElement(n2 - 1, n1 - 1), -g); }
+      if (n1 !== 0) { solver.stampElement(solver.allocElement(n1, n1), g); }
+      if (n2 !== 0) { solver.stampElement(solver.allocElement(n2, n2), g); }
+      if (n1 !== 0 && n2 !== 0) { solver.stampElement(solver.allocElement(n1, n2), -g); solver.stampElement(solver.allocElement(n2, n1), -g); }
     },
     getPinCurrents(_v: Float64Array): number[] { return [0, 0]; },
     setParam(_key: string, _value: number) {},
@@ -172,7 +172,7 @@ describe('DefaultSimulationCoordinator -- computeFrameSteps (digital-only circui
     const unified = compileUnified(circuit, registry);
     coord = new DefaultSimulationCoordinator(unified);
   });
-  it('returns null simTimeGoal — no continuous time model', () => {
+  it('returns null simTimeGoal â€” no continuous time model', () => {
     coord.speed = 1e-3;
     const result = coord.computeFrameSteps(0.016);
     expect(result.steps).toBe(0);
@@ -260,7 +260,7 @@ describe('DefaultSimulationCoordinator -- speed control (continuous)', () => {
   });
   it('formatSpeed returns micros/s for rate in 1e-6 to 1e-3 range', () => {
     coord.speed = 500e-6; const fmt = coord.formatSpeed();
-    expect(fmt.unit).toBe('µs/s'); expect(fmt.value).toBe('500');
+    expect(fmt.unit).toBe('Âµs/s'); expect(fmt.value).toBe('500');
   });
   it('formatSpeed returns ns/s for rate below 1e-6', () => {
     coord.speed = 100e-9; expect(coord.formatSpeed().unit).toBe('ns/s');

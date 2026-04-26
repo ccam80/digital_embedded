@@ -1,4 +1,4 @@
-/**
+﻿/**
  * SCR (Silicon Controlled Rectifier) analog component.
  *
  * Implements a thyristor using the two-transistor alpha-dependent model.
@@ -6,11 +6,11 @@
  * gate current, at which point it latches into a low-resistance on-state.
  *
  * Model summary:
- *   - Forward blocking: I = IS * (exp(V_AK/(N*VT)) - 1) / (1 - α₁ - α₂)
- *     (amplified leakage — small current, both alphas clamped ≤ 0.95)
- *   - Forward conduction (latched): diode in series with R_on, clamping V_AK ≈ V_on
+ *   - Forward blocking: I = IS * (exp(V_AK/(N*VT)) - 1) / (1 - Î±â‚ - Î±â‚‚)
+ *     (amplified leakage â€” small current, both alphas clamped â‰¤ 0.95)
+ *   - Forward conduction (latched): diode in series with R_on, clamping V_AK â‰ˆ V_on
  *   - Reverse blocking: standard reverse-biased diode leakage
- *   - Triggering: when α₁ + α₂ > 0.95
+ *   - Triggering: when Î±â‚ + Î±â‚‚ > 0.95
  *   - Unlatching: when I_AK < I_hold
  *   - Breakover: when V_AK > V_breakover (triggers without gate)
  */
@@ -48,7 +48,7 @@ const CHARGE = 1.6021918e-19;
 /** Minimum conductance for numerical stability (GMIN). */
 const GMIN = 1e-12;
 
-/** Maximum alpha value — prevents division-by-zero in blocking formula. */
+/** Maximum alpha value â€” prevents division-by-zero in blocking formula. */
 const ALPHA_MAX = 0.95;
 
 // ---------------------------------------------------------------------------
@@ -72,15 +72,15 @@ const SLOT_IGK       = 8;
 export const { paramDefs: SCR_PARAM_DEFS, defaults: SCR_PARAM_DEFAULTS } = defineModelParams({
   primary: {
     vOn:        { default: 1.5,   unit: "V", description: "On-state forward voltage drop" },
-    iH:         { default: 5e-3,  unit: "A", description: "Holding current — minimum anode current to stay on" },
-    rOn:        { default: 0.01,  unit: "Ω", description: "On-state series resistance" },
+    iH:         { default: 5e-3,  unit: "A", description: "Holding current â€” minimum anode current to stay on" },
+    rOn:        { default: 0.01,  unit: "Î©", description: "On-state series resistance" },
     vBreakover: { default: 100,   unit: "V", description: "Forward breakover voltage (triggers without gate)" },
   },
   secondary: {
     iS:      { default: 1e-12,  unit: "A", description: "Reverse saturation current" },
     alpha1:  { default: 0.5,               description: "PNP transistor current gain (fixed)" },
     alpha2_0:{ default: 0.3,               description: "NPN off-state current gain" },
-    i_ref:   { default: 1e-3,   unit: "A", description: "Gate current scale factor for α₂ modulation" },
+    i_ref:   { default: 1e-3,   unit: "A", description: "Gate current scale factor for Î±â‚‚ modulation" },
     n:       { default: 1,                 description: "Emission coefficient" },
   },
   instance: {
@@ -90,7 +90,7 @@ export const { paramDefs: SCR_PARAM_DEFS, defaults: SCR_PARAM_DEFAULTS } = defin
 });
 
 // ---------------------------------------------------------------------------
-// Stamp helpers — node 0 is ground (skipped)
+// Stamp helpers â€” node 0 is ground (skipped)
 // ---------------------------------------------------------------------------
 
 
@@ -111,7 +111,7 @@ const SCR_STATE_SCHEMA = defineStateSchema("ScrElement", [
 ]);
 
 // ---------------------------------------------------------------------------
-// createScrElement — AnalogElement factory
+// createScrElement â€” AnalogElement factory
 // ---------------------------------------------------------------------------
 
 export function createScrElement(
@@ -138,7 +138,7 @@ export function createScrElement(
     OFF:        props.getModelParam<number>("OFF"),
   };
 
-  // cite: dioload.c / diotemp.c — per-instance TEMP drives thermal voltage
+  // cite: dioload.c / diotemp.c â€” per-instance TEMP drives thermal voltage
   function computeScrTempParams(): { vt: number; nVt: number; vcrit: number; vcritGate: number; tVcrit: number } {
     const vt = (CONSTboltz * p.TEMP) / CHARGE;
     const nVt = p.n * vt;
@@ -149,7 +149,7 @@ export function createScrElement(
 
   let tp = computeScrTempParams();
 
-  // Pool reference — set by initState. State arrays accessed via pool.states[N]
+  // Pool reference â€” set by initState. State arrays accessed via pool.states[N]
   // at call time. No cached Float64Array refs.
   let pool: StatePoolRef;
   let base: number;
@@ -183,7 +183,7 @@ export function createScrElement(
       s0[base + SLOT_GEQ] = gOn + GMIN;
       s0[base + SLOT_IEQ] = iOn - s0[base + SLOT_GEQ] * vak;
 
-      // Check if current has dropped below holding current → unlatch
+      // Check if current has dropped below holding current â†’ unlatch
       const iAk = s0[base + SLOT_GEQ] * vak + s0[base + SLOT_IEQ];
       s0[base + SLOT_IAK] = iAk;
       if (iAk < p.iH && vak >= 0) {
@@ -212,7 +212,7 @@ export function createScrElement(
       s0[base + SLOT_IEQ] = 0;
       s0[base + SLOT_IAK] = GMIN * vak;
     } else {
-      // Reverse blocking — reverse-biased diode (J1 junction)
+      // Reverse blocking â€” reverse-biased diode (J1 junction)
       const expArg = Math.min(vak / tp.nVt, 0);
       const expVal = Math.exp(expArg);
       const iRev = p.iS * (expVal - 1);
@@ -239,10 +239,10 @@ export function createScrElement(
     },
 
     load(ctx: LoadContext): void {
-      // Access state arrays at call time — no cached Float64Array refs.
+      // Access state arrays at call time â€” no cached Float64Array refs.
       const s0 = pool.states[0];
 
-      // cite: dioload.c:130-138 — MODEINITJCT branch seeds junction voltages
+      // cite: dioload.c:130-138 â€” MODEINITJCT branch seeds junction voltages
       // before first NR iteration. Anode-cathode seeds to tVcrit (OFF=0) or 0
       // (OFF=1); gate-cathode always seeds to 0.
       if (ctx.cktMode & MODEINITJCT) {
@@ -252,9 +252,9 @@ export function createScrElement(
       }
 
       const voltages = ctx.rhsOld;
-      const vA = nodeA > 0 ? voltages[nodeA - 1] : 0;
-      const vK = nodeK > 0 ? voltages[nodeK - 1] : 0;
-      const vGateNode = nodeG > 0 ? voltages[nodeG - 1] : 0;
+      const vA = voltages[nodeA];
+      const vK = voltages[nodeK];
+      const vGateNode = voltages[nodeG];
       const vakRaw = vA - vK;
       const vgkRaw = vGateNode - vK;
 
@@ -333,9 +333,9 @@ export function createScrElement(
 
       const s0 = pool.states[0];
       const voltages = ctx.rhsOld;
-      const vA = nodeA > 0 ? voltages[nodeA - 1] : 0;
-      const vK = nodeK > 0 ? voltages[nodeK - 1] : 0;
-      const vG = nodeG > 0 ? voltages[nodeG - 1] : 0;
+      const vA = voltages[nodeA];
+      const vK = voltages[nodeK];
+      const vG = voltages[nodeG];
 
       // Current-prediction convergence test on anode-cathode junction
       const vakRaw = vA - vK;
@@ -359,9 +359,9 @@ export function createScrElement(
     getPinCurrents(voltages: Float64Array): number[] {
       // pinLayout order: [A(0), K(1), G(2)]
       const s0 = pool.states[0];
-      const vA = nodeA > 0 ? voltages[nodeA - 1] : 0;
-      const vK = nodeK > 0 ? voltages[nodeK - 1] : 0;
-      const vG = nodeG > 0 ? voltages[nodeG - 1] : 0;
+      const vA = voltages[nodeA];
+      const vK = voltages[nodeK];
+      const vG = voltages[nodeG];
 
       const iAK = s0[base + SLOT_GEQ] * (vA - vK) + s0[base + SLOT_IEQ];
       const iGK = s0[base + SLOT_G_GATE_GEQ] * (vG - vK) + s0[base + SLOT_G_GATE_IEQ];
@@ -393,7 +393,7 @@ export function createScrElement(
 }
 
 // ---------------------------------------------------------------------------
-// ScrElement — CircuitElement implementation
+// ScrElement â€” CircuitElement implementation
 // ---------------------------------------------------------------------------
 
 export class ScrElement extends AbstractCircuitElement {
@@ -521,9 +521,9 @@ export const ScrDefinition: ComponentDefinition = {
   attributeMap: SCR_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.SEMICONDUCTORS,
   helpText:
-    "SCR — Silicon Controlled Rectifier.\n" +
+    "SCR â€” Silicon Controlled Rectifier.\n" +
     "Pins: A (anode), K (cathode), G (gate).\n" +
-    "Triggers when gate current raises α₁+α₂ above 0.95. Latches until I_AK < I_hold.",
+    "Triggers when gate current raises Î±â‚+Î±â‚‚ above 0.95. Latches until I_AK < I_hold.",
   models: {},
   modelRegistry: {
     "behavioral": {

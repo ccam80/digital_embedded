@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Unit tests for DefaultSimulationCoordinator (P4-3).
  */
 
@@ -146,14 +146,14 @@ function makeResistorAnalogEl(n1: number, n2: number, resistance: number): Analo
     load(ctx: LoadContext): void {
       const g = 1 / resistance;
       if (n1 !== 0 && n2 !== 0) {
-        ctx.solver.stampElement(ctx.solver.allocElement(n1 - 1, n1 - 1), +g);
-        ctx.solver.stampElement(ctx.solver.allocElement(n2 - 1, n2 - 1), +g);
-        ctx.solver.stampElement(ctx.solver.allocElement(n1 - 1, n2 - 1), -g);
-        ctx.solver.stampElement(ctx.solver.allocElement(n2 - 1, n1 - 1), -g);
+        ctx.solver.stampElement(ctx.solver.allocElement(n1, n1), +g);
+        ctx.solver.stampElement(ctx.solver.allocElement(n2, n2), +g);
+        ctx.solver.stampElement(ctx.solver.allocElement(n1, n2), -g);
+        ctx.solver.stampElement(ctx.solver.allocElement(n2, n1), -g);
       } else if (n1 !== 0) {
-        ctx.solver.stampElement(ctx.solver.allocElement(n1 - 1, n1 - 1), +g);
+        ctx.solver.stampElement(ctx.solver.allocElement(n1, n1), +g);
       } else if (n2 !== 0) {
-        ctx.solver.stampElement(ctx.solver.allocElement(n2 - 1, n2 - 1), +g);
+        ctx.solver.stampElement(ctx.solver.allocElement(n2, n2), +g);
       }
     },
     getPinCurrents(_v: Float64Array): number[] { return [0, 0]; },
@@ -239,7 +239,7 @@ function buildResistorDividerCircuit(): { circuit: Circuit; registry: ComponentR
 }
 
 // ===========================================================================
-// Tests — digital-only
+// Tests â€” digital-only
 // ===========================================================================
 
 describe('DefaultSimulationCoordinator - digital-only', () => {
@@ -443,7 +443,7 @@ describe('DefaultSimulationCoordinator - digital-only', () => {
 });
 
 // ===========================================================================
-// Tests — analog-only
+// Tests â€” analog-only
 // ===========================================================================
 
 describe('DefaultSimulationCoordinator - analog-only', () => {
@@ -482,7 +482,7 @@ describe('DefaultSimulationCoordinator - analog-only', () => {
 });
 
 // ===========================================================================
-// Helpers — mixed-signal
+// Helpers â€” mixed-signal
 // ===========================================================================
 
 /**
@@ -530,7 +530,7 @@ function buildMixedCompiledUnified(): CompiledCircuitUnified {
 }
 
 // ===========================================================================
-// Tests — mixed-signal
+// Tests â€” mixed-signal
 // ===========================================================================
 
 describe('DefaultSimulationCoordinator - mixed-signal', () => {
@@ -583,7 +583,7 @@ describe('DefaultSimulationCoordinator - mixed-signal', () => {
 });
 
 // ===========================================================================
-// Tests — analysisPhase (Item 15)
+// Tests â€” analysisPhase (Item 15)
 // ===========================================================================
 
 describe('DefaultSimulationCoordinator - analysisPhase', () => {

@@ -1,5 +1,5 @@
-/**
- * Variable Rail — user-adjustable DC voltage source.
+﻿/**
+ * Variable Rail â€” user-adjustable DC voltage source.
  *
  * Designed for live parameter slider integration: changing the rail voltage
  * only requires updating the RHS of the MNA system (numeric re-factorization),
@@ -9,12 +9,12 @@
  * junction between the ideal voltage source and the internal resistance,
  * which connects to the external load. This requires one internal MNA node.
  *
- * MNA stamp (voltage source portion — same as DC voltage source):
+ * MNA stamp (voltage source portion â€” same as DC voltage source):
  *   B[nodePos, k] += 1    C[k, nodePos] += 1
  *   B[nodeInt, k] -= 1    C[k, nodeInt] -= 1
  *   RHS[k]        = V
  *
- * Resistor portion (internal node → output terminal):
+ * Resistor portion (internal node â†’ output terminal):
  *   G[nodeInt, nodeInt] += 1/R_int
  *   G[nodeOut, nodeOut] += 1/R_int
  *   G[nodeInt, nodeOut] -= 1/R_int
@@ -47,12 +47,12 @@ import { defineModelParams } from "../../core/model-params.js";
 export const { paramDefs: VARIABLE_RAIL_PARAM_DEFS, defaults: VARIABLE_RAIL_DEFAULTS } = defineModelParams({
   primary: {
     voltage:    { default: 5,    unit: "V", description: "Output voltage in volts" },
-    resistance: { default: 0.01, unit: "Ω", description: "Internal series resistance" },
+    resistance: { default: 0.01, unit: "Î©", description: "Internal series resistance" },
   },
 });
 
 // ---------------------------------------------------------------------------
-// VariableRailElement — CircuitElement implementation
+// VariableRailElement â€” CircuitElement implementation
 // ---------------------------------------------------------------------------
 
 export class VariableRailElement extends AbstractCircuitElement {
@@ -79,7 +79,7 @@ export class VariableRailElement extends AbstractCircuitElement {
 
     ctx.save();
 
-    // Thick lead line from pin to body (Falstad: 0→47px = 0→2.9375 grid units)
+    // Thick lead line from pin to body (Falstad: 0â†’47px = 0â†’2.9375 grid units)
     ctx.setLineWidth(2);
     drawColoredLead(ctx, signals, vPos, 0, 0, 2.9375, 0);
 
@@ -153,7 +153,7 @@ const VARIABLE_RAIL_ATTRIBUTE_MAP: AttributeMapping[] = [
 ];
 
 // ---------------------------------------------------------------------------
-// VariableRailAnalogElement — AnalogElement with mutable voltage
+// VariableRailAnalogElement â€” AnalogElement with mutable voltage
 // ---------------------------------------------------------------------------
 
 export interface VariableRailAnalogElement extends AnalogElementCore {
@@ -200,23 +200,23 @@ export function makeVariableRailElement(
       const k = branchIdx;
       const G = p.resistance > 0 ? 1 / p.resistance : 1e9;
 
-      // Ideal voltage source: nodePos → nodeInt (internal node before R_int).
+      // Ideal voltage source: nodePos â†’ nodeInt (internal node before R_int).
       // Variable rail is a user-facing interactive slider, not an ngspice
       // independent source: ctx.srcFact is deliberately ignored so slider
       // changes take effect immediately and are unaffected by DC-OP source
       // stepping. See VARIABLE_RAIL_PROPERTY_DEFS for the slider definition.
-      if (nodePos !== 0) solver.stampElement(solver.allocElement(nodePos - 1, k), 1);
-      if (nodeInt !== 0) solver.stampElement(solver.allocElement(nodeInt - 1, k), -1);
-      if (nodePos !== 0) solver.stampElement(solver.allocElement(k, nodePos - 1), 1);
-      if (nodeInt !== 0) solver.stampElement(solver.allocElement(k, nodeInt - 1), -1);
+      if (nodePos !== 0) solver.stampElement(solver.allocElement(nodePos, k), 1);
+      if (nodeInt !== 0) solver.stampElement(solver.allocElement(nodeInt, k), -1);
+      if (nodePos !== 0) solver.stampElement(solver.allocElement(k, nodePos), 1);
+      if (nodeInt !== 0) solver.stampElement(solver.allocElement(k, nodeInt), -1);
       solver.stampRHS(k, p.voltage);
 
-      // Internal resistance: nodeInt → nodeNeg.
-      if (nodeInt !== 0) solver.stampElement(solver.allocElement(nodeInt - 1, nodeInt - 1), G);
-      if (nodeNeg !== 0) solver.stampElement(solver.allocElement(nodeNeg - 1, nodeNeg - 1), G);
+      // Internal resistance: nodeInt â†’ nodeNeg.
+      if (nodeInt !== 0) solver.stampElement(solver.allocElement(nodeInt, nodeInt), G);
+      if (nodeNeg !== 0) solver.stampElement(solver.allocElement(nodeNeg, nodeNeg), G);
       if (nodeInt !== 0 && nodeNeg !== 0) {
-        solver.stampElement(solver.allocElement(nodeInt - 1, nodeNeg - 1), -G);
-        solver.stampElement(solver.allocElement(nodeNeg - 1, nodeInt - 1), -G);
+        solver.stampElement(solver.allocElement(nodeInt, nodeNeg), -G);
+        solver.stampElement(solver.allocElement(nodeNeg, nodeInt), -G);
       }
     },
   };
@@ -237,7 +237,7 @@ export const VariableRailDefinition: ComponentDefinition = {
   propertyDefs: VARIABLE_RAIL_PROPERTY_DEFS,
   attributeMap: VARIABLE_RAIL_ATTRIBUTE_MAP,
 
-  helpText: "Variable Rail — adjustable DC voltage source with internal resistance.",
+  helpText: "Variable Rail â€” adjustable DC voltage source with internal resistance.",
 
   factory(props: PropertyBag): VariableRailElement {
     return new VariableRailElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);

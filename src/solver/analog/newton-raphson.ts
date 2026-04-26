@@ -602,8 +602,8 @@ export function newtonRaphson(ctx: CKTCircuitContext): void {
         if (!el.isNonlinear) continue;
         let elDelta = 0;
         for (const ni of el.pinNodeIds) {
-          if (ni > 0 && ni - 1 < matrixSize) {
-            const d = Math.abs(ctx.rhs[ni - 1] - ctx.rhsOld[ni - 1]);
+          if (ni > 0 && ni <= matrixSize) {
+            const d = Math.abs(ctx.rhs[ni] - ctx.rhsOld[ni]);
             if (d > elDelta) elDelta = d;
           }
         }

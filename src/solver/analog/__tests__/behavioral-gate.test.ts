@@ -1,9 +1,9 @@
-/**
+﻿/**
  * Tests for BehavioralGateElement and analog gate factory functions.
  *
  * Circuit topology used in truth table tests:
  *
- *   Node 0 = ground (implicit in SparseSolver — not a free variable)
+ *   Node 0 = ground (implicit in SparseSolver â€” not a free variable)
  *   Node 1 = input A node
  *   Node 2 = input B node  (AND/NAND/OR/NOR/XOR only)
  *   Node 3 = output node
@@ -18,7 +18,7 @@
  * matrixSize = 5 (nodes 1,2,3 + branch rows 3,4) for AND/NAND/OR/NOR/XOR
  *
  * Node IDs here are 1-based circuit nodes (0 = ground is implicit);
- * solver uses 0-based indexing so voltages[nodeId - 1] gives node voltage.
+ * solver uses 0-based indexing so voltages[nodeId] gives node voltage.
  */
 
 import { describe, it, expect, vi } from "vitest";
@@ -61,7 +61,7 @@ const CMOS_3V3: ResolvedPinElectrical = {
 
 const VDD = 3.3;
 const GND = 0.0;
-const LOAD_R = 10_000; // 10 kΩ load resistor on output
+const LOAD_R = 10_000; // 10 kÎ© load resistor on output
 const NR_OPTS = { maxIterations: 50, reltol: 1e-3, abstol: 1e-6, iabstol: 1e-12 };
 
 // ---------------------------------------------------------------------------
@@ -134,9 +134,9 @@ function solve(elements: AnalogElement[], matrixSize: number) {
  * Build a 2-input BehavioralGateElement using direct pin models.
  *
  * MNA node IDs are 1-based (0 = ground is implicit/skipped).
- * MNA node 1 → circuit node 1 (input A) → solver index 0
- * MNA node 2 → circuit node 2 (input B) → solver index 1
- * MNA node 3 → circuit node 3 (output)  → solver index 2
+ * MNA node 1 â†’ circuit node 1 (input A) â†’ solver index 0
+ * MNA node 2 â†’ circuit node 2 (input B) â†’ solver index 1
+ * MNA node 3 â†’ circuit node 3 (output)  â†’ solver index 2
  */
 function make2InputGate(
   truthTable: (inputs: boolean[]) => boolean,
@@ -174,7 +174,7 @@ describe("AND", () => {
 
     expect(result.converged).toBe(true);
     // Output node is solver index 2 (circuit node 3)
-    // Voltage divider: vOH * LOAD_R / (rOut + LOAD_R) ≈ 3.3 * 10000/10050
+    // Voltage divider: vOH * LOAD_R / (rOut + LOAD_R) â‰ˆ 3.3 * 10000/10050
     const vOut = result.voltages[2];
     expect(vOut).toBeGreaterThan(3.0);
   });
@@ -188,7 +188,7 @@ describe("AND", () => {
 
     expect(result.converged).toBe(true);
     const vOut = result.voltages[2];
-    // vOL = 0 — output voltage is essentially 0V
+    // vOL = 0 â€” output voltage is essentially 0V
   });
 });
 
@@ -198,13 +198,13 @@ describe("AND", () => {
 
 describe("NOT", () => {
   it("inverts", () => {
-    // Input HIGH → output LOW
+    // Input HIGH â†’ output LOW
     const gateHigh = make1InputGate((inputs) => !inputs[0]);
     const highCircuit = make1InputGateCircuit(gateHigh, VDD);
     const resultHigh = solve(highCircuit.elements, highCircuit.matrixSize);
     expect(resultHigh.converged).toBe(true);
 
-    // Input LOW → output HIGH
+    // Input LOW â†’ output HIGH
     const gateLow = make1InputGate((inputs) => !inputs[0]);
     const lowCircuit = make1InputGateCircuit(gateLow, GND);
     const resultLow = solve(lowCircuit.elements, lowCircuit.matrixSize);
@@ -293,7 +293,7 @@ describe("NR", () => {
   });
 
   it("indeterminate_input_holds_previous", () => {
-    // Input at 1.5V is between vIL=0.8 and vIH=2.0 → indeterminate
+    // Input at 1.5V is between vIL=0.8 and vIH=2.0 â†’ indeterminate
     // The gate should hold the previous latched level (false initially)
     const gate = make2InputGate((inputs) => inputs[0] && inputs[1]);
     // Input B=3.3V (HIGH), Input A=1.5V (indeterminate)
@@ -315,30 +315,30 @@ describe("NR", () => {
 
 describe("Loading", () => {
   it("input_loads_source", () => {
-    // A high-impedance source through 1kΩ to node 1 with rIn=10MΩ to ground.
-    // Expected voltage: 3.3 * 10e6 / (10e6 + 1000) ≈ 3.2997V
-    // Sag = 3.3 - 3.2997 = 0.3mV (much less than 1µV threshold per 10MΩ with 1kΩ source)
-    // Actually: 3.3 * 1e7 / (1e7 + 1000) ≈ 3.2997V → sag ≈ 0.33mV
-    // The spec says "voltage sag < 1µV for 10MΩ load on 1kΩ divider" but
-    // actually for rIn=10MΩ and Rsource=1kΩ: sag = 3.3 * 1000 / (1e7+1000) ≈ 0.33mV
+    // A high-impedance source through 1kÎ© to node 1 with rIn=10MÎ© to ground.
+    // Expected voltage: 3.3 * 10e6 / (10e6 + 1000) â‰ˆ 3.2997V
+    // Sag = 3.3 - 3.2997 = 0.3mV (much less than 1ÂµV threshold per 10MÎ© with 1kÎ© source)
+    // Actually: 3.3 * 1e7 / (1e7 + 1000) â‰ˆ 3.2997V â†’ sag â‰ˆ 0.33mV
+    // The spec says "voltage sag < 1ÂµV for 10MÎ© load on 1kÎ© divider" but
+    // actually for rIn=10MÎ© and Rsource=1kÎ©: sag = 3.3 * 1000 / (1e7+1000) â‰ˆ 0.33mV
     // The spec's intention is that the loading IS measurable but small.
     // We verify the node voltage is slightly below 3.3V.
 
     // Node 1 = input node (0-based solver: 0)
-    // 1kΩ from 3.3V source to node 1 (driving through resistor, not ideal VS)
+    // 1kÎ© from 3.3V source to node 1 (driving through resistor, not ideal VS)
     // Node 2 = output (0-based solver: 1)
-    // We use: VS 3.3V → node "src" (branch row 2), 1kΩ from src to node 1
+    // We use: VS 3.3V â†’ node "src" (branch row 2), 1kÎ© from src to node 1
     // But test-elements VS stamps into existing nodes. Simpler:
     //   VS at node 3 (branch row 3): 3.3V ideal source
-    //   R=1kΩ from node 3 to node 1: the high-impedance source path
-    //   Gate input pin at node 1: rIn=10MΩ to ground (stamped by gate)
+    //   R=1kÎ© from node 3 to node 1: the high-impedance source path
+    //   Gate input pin at node 1: rIn=10MÎ© to ground (stamped by gate)
     //   Gate output at node 2
     //   rLoad from node 2 to ground
 
     // Layout (1-based MNA node IDs, 0=ground implicit):
-    //   MNA node 1 = input A  → solver index 0
-    //   MNA node 2 = output   → solver index 1
-    //   MNA node 3 = source node (VS pos terminal) → solver index 2
+    //   MNA node 1 = input A  â†’ solver index 0
+    //   MNA node 2 = output   â†’ solver index 1
+    //   MNA node 3 = source node (VS pos terminal) â†’ solver index 2
     //   branch row 3 = VS branch
     // matrixSize = 4 (3 node rows + 1 branch row)
 
@@ -350,7 +350,7 @@ describe("Loading", () => {
 
     // 3.3V ideal source at circuit node 3 (solver node 2, branch row 3)
     const vs = makeVoltageSource(3, 0, 3, VDD);
-    // 1kΩ from circuit node 3 to circuit node 1
+    // 1kÎ© from circuit node 3 to circuit node 1
     const rSource = makeResistor(3, 1, 1000);
     // Load on output
     const rLoad = makeResistor(2, 0, LOAD_R);
@@ -473,12 +473,12 @@ describe("Factory", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Task 6.4.3 — _pinLoading propagation and delegation tests
+// Task 6.4.3 â€” _pinLoading propagation and delegation tests
 // ---------------------------------------------------------------------------
 
 /**
  * Build a minimal LoadContext for delegation spy tests.
- * dt=0 → accept() is a no-op (reactive companion skipped); enough for delegation tests.
+ * dt=0 â†’ accept() is a no-op (reactive companion skipped); enough for delegation tests.
  */
 function makeMinimalCtx(voltages?: Float64Array): LoadContext {
   const ag = new Float64Array(7);
@@ -509,9 +509,9 @@ function makeMinimalCtx(voltages?: Float64Array): LoadContext {
   };
 }
 
-describe("Task 6.4.3 — _pinLoading propagation and delegation", () => {
+describe("Task 6.4.3 â€” _pinLoading propagation and delegation", () => {
   it("pin_loading_propagates_to_pin_models_all_mode", () => {
-    // Factory invoked with _pinLoading: all true → pin.loaded flags should all be true.
+    // Factory invoked with _pinLoading: all true â†’ pin.loaded flags should all be true.
     const pinLoading = { "In_1": true, "In_2": true, "out": true };
     const props = new PropertyBag();
     props.set("_pinLoading", pinLoading as unknown as import("../../../core/properties.js").PropertyValue);
@@ -546,12 +546,12 @@ describe("Task 6.4.3 — _pinLoading propagation and delegation", () => {
     element.load(ctx);
 
     // When all inputs are loaded (rIn stamps), each input contributes at least
-    // one stamp per load() call. Two loaded inputs → at least 2 matrix stamps.
+    // one stamp per load() call. Two loaded inputs â†’ at least 2 matrix stamps.
     expect(solver.stampCalls).toBeGreaterThan(0);
   });
 
   it("pin_loading_propagates_to_pin_models_none_mode", () => {
-    // Factory invoked with _pinLoading: all false → inputs are ideal (no rIn stamp).
+    // Factory invoked with _pinLoading: all false â†’ inputs are ideal (no rIn stamp).
     // Output still stamps its Norton equivalent even when loaded=false (the loaded
     // flag gates only the companion capacitor stamp, not the basic drive stamp).
     // This test verifies that input pins with loaded=false do NOT allocate matrix
@@ -616,9 +616,9 @@ describe("Task 6.4.3 — _pinLoading propagation and delegation", () => {
     element.load(ctx);
 
     // MNA node IDs are 1-based; allocElement receives 0-based nodeIdx = nodeId-1.
-    // In_1 = MNA node 1 → nodeIdx 0. In_2 = MNA node 2 → nodeIdx 1.
-    // In_1 (nodeIdx=0) diagonal should NOT appear (loaded=false → no-op in load()).
-    // In_2 (nodeIdx=1) diagonal SHOULD appear (loaded=true → stamps 1/rIn).
+    // In_1 = MNA node 1 â†’ nodeIdx 0. In_2 = MNA node 2 â†’ nodeIdx 1.
+    // In_1 (nodeIdx=0) diagonal should NOT appear (loaded=false â†’ no-op in load()).
+    // In_2 (nodeIdx=1) diagonal SHOULD appear (loaded=true â†’ stamps 1/rIn).
     const node1Diag = allocCalls.some(([r, c]) => r === 0 && c === 0);
     const node2Diag = allocCalls.some(([r, c]) => r === 1 && c === 1);
     expect(node1Diag).toBe(false);
@@ -686,7 +686,7 @@ describe("Task 6.4.3 — _pinLoading propagation and delegation", () => {
     expect(typeof (inB as any).accept).toBe("undefined");
     expect(typeof (out as any).accept).toBe("undefined");
 
-    // BehavioralGateElement has no accept() method — combinational elements
+    // BehavioralGateElement has no accept() method â€” combinational elements
     // are stateless between timesteps; companion history lives in capacitor children.
     expect(typeof (gate as any).accept).toBe("undefined");
   });
@@ -726,8 +726,8 @@ describe("Task 6.4.3 — _pinLoading propagation and delegation", () => {
     const hasBranchRowStamp = allocCalls.some(([r]) => r >= 3);
     expect(hasBranchRowStamp).toBe(false);
 
-    // Output MNA node 3 → nodeIdx 2. The output diagonal (2,2) IS stamped
-    // (loaded=true, direct role → stamps 1/rOut on node diagonal).
+    // Output MNA node 3 â†’ nodeIdx 2. The output diagonal (2,2) IS stamped
+    // (loaded=true, direct role â†’ stamps 1/rOut on node diagonal).
     const hasOutputDiag = allocCalls.some(([r, c]) => r === 2 && c === 2);
     expect(hasOutputDiag).toBe(true);
   });

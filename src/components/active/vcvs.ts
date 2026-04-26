@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Voltage-Controlled Voltage Source (VCVS) analog component.
  *
  * Four-terminal element: ctrl+ and ctrl- sense the control voltage;
@@ -29,7 +29,7 @@
  * after linearizing around the current operating point. Combined with the
  * Jacobian entries, the branch equation becomes:
  *   V_out+ - V_out- - f'(Vctrl0)*V_ctrl = f(Vctrl0) - f'(Vctrl0)*Vctrl0
- * which at convergence (V_ctrl = Vctrl0) gives V_out = f(Vctrl0). ✓
+ * which at convergence (V_ctrl = Vctrl0) gives V_out = f(Vctrl0). âœ“
  */
 
 import { AbstractCircuitElement } from "../../core/element.js";
@@ -172,8 +172,8 @@ class VCVSAnalogElement extends ControlledSourceElement {
   }
 
   protected override _bindContext(voltages: Float64Array): void {
-    const vCtrlP = this._nCtrlP > 0 ? voltages[this._nCtrlP - 1] : 0;
-    const vCtrlN = this._nCtrlN > 0 ? voltages[this._nCtrlN - 1] : 0;
+    const vCtrlP = this._nCtrlP > 0 ? voltages[this._nCtrlP] : 0;
+    const vCtrlN = this._nCtrlN > 0 ? voltages[this._nCtrlN] : 0;
     const vCtrl = vCtrlP - vCtrlN;
 
     this._ctx.setNodeVoltage("ctrl", vCtrl);
@@ -186,8 +186,8 @@ class VCVSAnalogElement extends ControlledSourceElement {
    * Branch equation: V_out+ - V_out- - f'(Vctrl)*V_ctrl = f(Vctrl0) - f'*Vctrl0
    *
    * C sub-matrix Jacobian entries (control node columns in branch row k):
-   *   C[k, nCtrlP] -= f'   →  ∂(branch_eq)/∂V_ctrlP = -f'
-   *   C[k, nCtrlN] += f'   →  ∂(branch_eq)/∂V_ctrlN = +f'
+   *   C[k, nCtrlP] -= f'   â†’  âˆ‚(branch_eq)/âˆ‚V_ctrlP = -f'
+   *   C[k, nCtrlN] += f'   â†’  âˆ‚(branch_eq)/âˆ‚V_ctrlN = +f'
    *
    * RHS[k] = f(Vctrl0) - f'(Vctrl0) * Vctrl0
    */
@@ -217,7 +217,7 @@ class VCVSAnalogElement extends ControlledSourceElement {
    * The control port is an ideal voltage sensor (infinite impedance), so it
    * draws zero current. The output port current is the branch variable at row
    * `_k` in the MNA solution vector. Positive = current flowing INTO the pin.
-   * KCL: 0 + 0 + I_out - I_out = 0. ✓
+   * KCL: 0 + 0 + I_out - I_out = 0. âœ“
    */
   getPinCurrents(voltages: Float64Array): number[] {
     const iOut = voltages[this._k];
@@ -226,7 +226,7 @@ class VCVSAnalogElement extends ControlledSourceElement {
 }
 
 // ---------------------------------------------------------------------------
-// VCVSElement — CircuitElement
+// VCVSElement â€” CircuitElement
 // ---------------------------------------------------------------------------
 
 export class VCVSElement extends AbstractCircuitElement {
@@ -262,7 +262,7 @@ export class VCVSElement extends AbstractCircuitElement {
     ctx.save();
     ctx.setLineWidth(1);
 
-    // Body — open polyline box (1,-1)→(5,-1)→(5,3)→(1,3) (no left edge)
+    // Body â€” open polyline box (1,-1)â†’(5,-1)â†’(5,3)â†’(1,3) (no left edge)
     ctx.setColor("COMPONENT");
     ctx.drawLine(1, -1, 5, -1);
     ctx.drawLine(5, -1, 5, 3);
@@ -337,7 +337,7 @@ export const VCVSDefinition: ComponentDefinition = {
   attributeMap: VCVS_ATTRIBUTE_MAPPINGS,
 
   helpText:
-    "Voltage-Controlled Voltage Source — output voltage is an expression of " +
+    "Voltage-Controlled Voltage Source â€” output voltage is an expression of " +
     "the control port voltage V(ctrl+ - ctrl-).",
 
   factory(props: PropertyBag): VCVSElement {

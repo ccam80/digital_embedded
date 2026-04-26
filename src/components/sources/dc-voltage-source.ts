@@ -1,9 +1,9 @@
-/**
- * DC Voltage Source — ideal independent voltage source for MNA simulation.
+﻿/**
+ * DC Voltage Source â€” ideal independent voltage source for MNA simulation.
  *
  * Introduces one extra MNA branch row to enforce the voltage constraint.
  * Reads `ctx.srcFact` (ngspice CKTsrcFact) directly inside load() to apply
- * DC-OP source stepping — matches ngspice vsrcload.c:54 exactly.
+ * DC-OP source stepping â€” matches ngspice vsrcload.c:54 exactly.
  *
  * MNA stamp convention (1-based node IDs, solver uses 0-based):
  *   B[nodePos, k] += 1    C[k, nodePos] += 1
@@ -40,7 +40,7 @@ export const { paramDefs: DC_VOLTAGE_SOURCE_PARAM_DEFS, defaults: DC_VOLTAGE_SOU
 });
 
 // ---------------------------------------------------------------------------
-// DcVoltageSourceElement — CircuitElement implementation
+// DcVoltageSourceElement â€” CircuitElement implementation
 // ---------------------------------------------------------------------------
 
 export class DcVoltageSourceElement extends AbstractCircuitElement {
@@ -176,12 +176,12 @@ export function makeDcVoltageSource(
       const k = branchIdx;
 
       // B sub-matrix: node rows, branch column k
-      if (nodePos !== 0) solver.stampElement(solver.allocElement(nodePos - 1, k), 1);
-      if (nodeNeg !== 0) solver.stampElement(solver.allocElement(nodeNeg - 1, k), -1);
+      if (nodePos !== 0) solver.stampElement(solver.allocElement(nodePos, k), 1);
+      if (nodeNeg !== 0) solver.stampElement(solver.allocElement(nodeNeg, k), -1);
 
       // C sub-matrix: branch row k, node columns
-      if (nodePos !== 0) solver.stampElement(solver.allocElement(k, nodePos - 1), 1);
-      if (nodeNeg !== 0) solver.stampElement(solver.allocElement(k, nodeNeg - 1), -1);
+      if (nodePos !== 0) solver.stampElement(solver.allocElement(k, nodePos), 1);
+      if (nodeNeg !== 0) solver.stampElement(solver.allocElement(k, nodeNeg), -1);
 
       // RHS voltage constraint scaled by ctx.srcFact (CKTsrcFact) for DC source stepping.
       solver.stampRHS(k, p.voltage * ctx.srcFact);
@@ -189,7 +189,7 @@ export function makeDcVoltageSource(
 
     getPinCurrents(voltages: Float64Array): number[] {
       // MNA branch variable: +I means current leaves nodePos through the branch.
-      // Pin layout order: [neg, pos] — neg is index 0, pos is index 1.
+      // Pin layout order: [neg, pos] â€” neg is index 0, pos is index 1.
       // "Into element at pos" = +I (current enters element at pos terminal).
       // "Into element at neg" = -I (current exits element at neg terminal).
       // Since pin 0 = neg and pin 1 = pos, return [-I, I].

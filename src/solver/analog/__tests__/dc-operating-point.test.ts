@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Tests for the DC operating point solver (Tasks 1.1.3 and 1.3.2).
  *
  * Tests cover all four outcomes:
@@ -46,7 +46,7 @@ const noopBreakpoint = (_t: number): void => {};
 /**
  * Create a test element that forces NR to report non-convergence until
  * ctx.gmin > 0 (i.e., gmin stepping is active). ctx.gmin (LoadContext.gmin)
- * equals CKTdiagGmin — set per-iteration by ckt-load.ts from ctx.diagonalGmin.
+ * equals CKTdiagGmin â€” set per-iteration by ckt-load.ts from ctx.diagonalGmin.
  * This element bumps noncon.value++ while ctx.gmin === 0 and no positive gmin
  * has been seen yet, simulating a nonlinear device that requires gmin
  * regularisation to converge. Once gmin stepping has warmed up the operating
@@ -63,7 +63,7 @@ function makeGminDependentElement(nodeA: number, nodeB: number = 0): AnalogEleme
   // stop blocking so the final clean solve can converge normally.
   let seenPositiveDiagGmin = false;
   function stampG(solver: import("../sparse-solver.js").SparseSolver, row: number, col: number, val: number): void {
-    if (row !== 0 && col !== 0) solver.stampElement(solver.allocElement(row - 1, col - 1), val);
+    if (row !== 0 && col !== 0) solver.stampElement(solver.allocElement(row, col), val);
   }
   return {
     pinNodeIds: nodeB === 0 ? [nodeA] : [nodeA, nodeB],
@@ -75,13 +75,13 @@ function makeGminDependentElement(nodeA: number, nodeB: number = 0): AnalogEleme
 
     load(ctx: import("../load-context.js").LoadContext): void {
       const { solver } = ctx;
-      const vA = nodeA === 0 ? 0 : ctx.rhsOld[nodeA - 1];
-      const vB = nodeB === 0 ? 0 : ctx.rhsOld[nodeB - 1];
+      const vA = ctx.rhsOld[nodeA];
+      const vB = ctx.rhsOld[nodeB];
       const v = vA - vB;
-      // Shockley diode residual — ill-conditioned at diagonalGmin=0, solvable
+      // Shockley diode residual â€” ill-conditioned at diagonalGmin=0, solvable
       // once ctx.diagonalGmin > 0 (stamped atomically inside SparseSolver.factor).
       // Mirrors ngspice dioload.c:298,310 but intentionally omits the internal
-      // CKTgmin addition — only the outer diagonalGmin stepping stabilizes it.
+      // CKTgmin addition â€” only the outer diagonalGmin stepping stabilizes it.
       const expv = v > 40 * vt ? Math.exp(40) : Math.exp(v / vt);
       const id = Is * (expv - 1);
       const geq = Is * expv / vt;
@@ -92,10 +92,10 @@ function makeGminDependentElement(nodeA: number, nodeB: number = 0): AnalogEleme
       stampG(solver, nodeA, nodeB, -geq);
       stampG(solver, nodeB, nodeA, -geq);
       // RHS stamps
-      if (nodeA !== 0) solver.stampRHS(nodeA - 1, -ieq);
-      if (nodeB !== 0) solver.stampRHS(nodeB - 1, ieq);
+      if (nodeA !== 0) solver.stampRHS(nodeA, -ieq);
+      if (nodeB !== 0) solver.stampRHS(nodeB, ieq);
       // Track whether gmin stepping has started. ctx.gmin (LoadContext.gmin)
-      // equals CKTdiagGmin — set by ckt-load.ts from ctx.diagonalGmin before
+      // equals CKTdiagGmin â€” set by ckt-load.ts from ctx.diagonalGmin before
       // each NR iteration. Once a positive gmin is seen, the operating point
       // has been warmed up and the final clean solve (gmin=0) can converge.
       if (ctx.gmin > 0) seenPositiveDiagGmin = true;
@@ -129,7 +129,7 @@ function makeSrcSteppingRequiredElement(nodeA: number, nodeB: number = 0): Analo
   // stop blocking so the final full-scale step can converge.
   let seenPartialSrcFact = false;
   function stampG(solver: import("../sparse-solver.js").SparseSolver, row: number, col: number, val: number): void {
-    if (row !== 0 && col !== 0) solver.stampElement(solver.allocElement(row - 1, col - 1), val);
+    if (row !== 0 && col !== 0) solver.stampElement(solver.allocElement(row, col), val);
   }
   return {
     pinNodeIds: nodeB === 0 ? [nodeA] : [nodeA, nodeB],
@@ -141,8 +141,8 @@ function makeSrcSteppingRequiredElement(nodeA: number, nodeB: number = 0): Analo
 
     load(ctx: import("../load-context.js").LoadContext): void {
       const { solver } = ctx;
-      const vA = nodeA === 0 ? 0 : ctx.rhsOld[nodeA - 1];
-      const vB = nodeB === 0 ? 0 : ctx.rhsOld[nodeB - 1];
+      const vA = ctx.rhsOld[nodeA];
+      const vB = ctx.rhsOld[nodeB];
       const v = vA - vB;
       // Pathological Shockley residual scaled by source-stepping factor
       // (ctx.srcFact == ngspice CKTsrcFact). Large Is_scaled at full scale
@@ -158,8 +158,8 @@ function makeSrcSteppingRequiredElement(nodeA: number, nodeB: number = 0): Analo
       stampG(solver, nodeB, nodeB, geq);
       stampG(solver, nodeA, nodeB, -geq);
       stampG(solver, nodeB, nodeA, -geq);
-      if (nodeA !== 0) solver.stampRHS(nodeA - 1, -ieq);
-      if (nodeB !== 0) solver.stampRHS(nodeB - 1, ieq);
+      if (nodeA !== 0) solver.stampRHS(nodeA, -ieq);
+      if (nodeB !== 0) solver.stampRHS(nodeB, ieq);
       // Track whether source stepping has started (srcFact < 1 means we're
       // inside the stepping ramp). Once seen, allow the final full-scale step
       // to converge normally so spice3Src/gillespieSrc can complete.
@@ -203,8 +203,8 @@ function makeCtx(
  * Create a voltage source element for source-stepping tests.
  *
  * Reads `ctx.srcFact` (ngspice CKTsrcFact) directly in load() so the
- * DC-OP source-stepping solver ramps the source from 0 → 1 via the
- * shared ctx field — no per-element setter dispatch.
+ * DC-OP source-stepping solver ramps the source from 0 â†’ 1 via the
+ * shared ctx field â€” no per-element setter dispatch.
  */
 function makeScalableVoltageSource(
   nodePos: number,
@@ -221,18 +221,18 @@ function makeScalableVoltageSource(
     load(ctx: import("../load-context.js").LoadContext): void {
       const solver = ctx.solver;
       const k = branchIdx;
-      if (nodePos !== 0) solver.stampElement(solver.allocElement(nodePos - 1, k), 1);
-      if (nodeNeg !== 0) solver.stampElement(solver.allocElement(nodeNeg - 1, k), -1);
-      if (nodePos !== 0) solver.stampElement(solver.allocElement(k, nodePos - 1), 1);
-      if (nodeNeg !== 0) solver.stampElement(solver.allocElement(k, nodeNeg - 1), -1);
+      if (nodePos !== 0) solver.stampElement(solver.allocElement(nodePos, k), 1);
+      if (nodeNeg !== 0) solver.stampElement(solver.allocElement(nodeNeg, k), -1);
+      if (nodePos !== 0) solver.stampElement(solver.allocElement(k, nodePos), 1);
+      if (nodeNeg !== 0) solver.stampElement(solver.allocElement(k, nodeNeg), -1);
       solver.stampRHS(k, voltage * ctx.srcFact);
     },
     stampAc(solver: import("../sparse-solver.js").SparseSolver): void {
       const k = branchIdx;
-      if (nodePos !== 0) solver.stampElement(solver.allocElement(nodePos - 1, k), 1);
-      if (nodeNeg !== 0) solver.stampElement(solver.allocElement(nodeNeg - 1, k), -1);
-      if (nodePos !== 0) solver.stampElement(solver.allocElement(k, nodePos - 1), 1);
-      if (nodeNeg !== 0) solver.stampElement(solver.allocElement(k, nodeNeg - 1), -1);
+      if (nodePos !== 0) solver.stampElement(solver.allocElement(nodePos, k), 1);
+      if (nodeNeg !== 0) solver.stampElement(solver.allocElement(nodeNeg, k), -1);
+      if (nodePos !== 0) solver.stampElement(solver.allocElement(k, nodePos), 1);
+      if (nodeNeg !== 0) solver.stampElement(solver.allocElement(k, nodeNeg), -1);
       solver.stampRHS(k, voltage);
     },
     setParam(_key: string, _value: number): void {},
@@ -246,7 +246,7 @@ function makeScalableVoltageSource(
 
 describe("DcOP", () => {
   it("simple_resistor_divider_direct", () => {
-    // Circuit: Vs=5V, R1=1kOhm (node1→node2), R2=1kOhm (node2→gnd)
+    // Circuit: Vs=5V, R1=1kOhm (node1â†’node2), R2=1kOhm (node2â†’gnd)
     // matrixSize = 2 nodes + 1 branch = 3
     const elements = [
       makeVoltageSource(1, 0, 2, 5),   // Vs=5V: node1(+), gnd(-)
@@ -300,12 +300,12 @@ describe("DcOP", () => {
   });
 
   it("gmin_stepping_fallback", () => {
-    // A 200V source forward-biasing a diode through 1Ω creates an extreme
+    // A 200V source forward-biasing a diode through 1Î© creates an extreme
     // operating point. From zero-voltage initial guess, direct NR diverges.
     // dynamicGmin adds diagonal conductance to stabilise the Jacobian.
     const elements = [
       makeVoltageSource(1, 0, 2, 200),  // extreme 200V source
-      makeResistor(1, 2, 1),             // 1Ω — huge current
+      makeResistor(1, 2, 1),             // 1Î© â€” huge current
       makeDiode(2, 0, 1e-14, 1),
     ];
     const ctx = makeCtx(elements, 2, 1, { ...DEFAULT_PARAMS, gmin: 1e-3 });
@@ -493,9 +493,9 @@ describe("DcOP", () => {
     expect(ctx.dcopResult.nodeVoltages.length).toBe(ctx.matrixSize);
   });
 
-  // Deleted per Phase 2.5 W2.2 + A1 §Test handling rule:
+  // Deleted per Phase 2.5 W2.2 + A1 Â§Test handling rule:
   //   dcopFinalize_transitions_initMode_to_initFloat
-  // Inspected ctx.statePool?.initMode — a string-typed field that never
+  // Inspected ctx.statePool?.initMode â€” a string-typed field that never
   // existed as a writable mirror in production (StatePoolRef.initMode is a
   // harness-surface read-only optional). cktMode bitfield is the sole
   // source of truth for INITF state (D1). Post-W2.2, there is no
@@ -597,8 +597,8 @@ describe("DcOP", () => {
   });
 
   it("cktncDump_uses_voltTol_for_node_rows_and_abstol_for_branch_rows", () => {
-    // Node row (i=0): tol = 1e-3 * max(0,0) + voltTol = 1e-6 → 1e-7 < 1e-6 → converged
-    // Branch row (i=1): tol = 1e-3 * max(0,0) + abstol = 1e-12 → 1e-7 > 1e-12 → non-converged
+    // Node row (i=0): tol = 1e-3 * max(0,0) + voltTol = 1e-6 â†’ 1e-7 < 1e-6 â†’ converged
+    // Branch row (i=1): tol = 1e-3 * max(0,0) + abstol = 1e-12 â†’ 1e-7 > 1e-12 â†’ non-converged
     const voltages = new Float64Array([1e-7, 1e-7]);
     const prevVoltages = new Float64Array([0, 0]);
     const scratch: Array<{ node: number; delta: number; tol: number }> = [];
@@ -610,11 +610,11 @@ describe("DcOP", () => {
   });
 
   // ---------------------------------------------------------------------------
-  // Task C6.3 — cktncDump zero-allocation on failure path
+  // Task C6.3 â€” cktncDump zero-allocation on failure path
   // ---------------------------------------------------------------------------
 
   // ---------------------------------------------------------------------------
-  // Task C6.5 — dcopResult.method reflects last strategy on failure
+  // Task C6.5 â€” dcopResult.method reflects last strategy on failure
   // ---------------------------------------------------------------------------
 
   it("method_reflects_last_strategy", () => {
@@ -660,12 +660,12 @@ describe("DcOP", () => {
   });
 
   // ---------------------------------------------------------------------------
-  // Task 4.1.1 — noncon_set_before_each_nr_call
+  // Task 4.1.1 â€” noncon_set_before_each_nr_call
   // ---------------------------------------------------------------------------
 
   it("noncon_set_before_each_nr_call", () => {
     // ngspice cktop.c:170 sets CKTnoncon=1 before each NIiter call.
-    // Assert ctx.noncon === 1 at the moment newtonRaphson is entered —
+    // Assert ctx.noncon === 1 at the moment newtonRaphson is entered â€”
     // i.e. after runNR's `ctx.noncon = 1` assignment and before NR clears it.
     //
     // Observation mechanism: vi.mock replaces newton-raphson.js for all
@@ -673,7 +673,7 @@ describe("DcOP", () => {
     // ctx.noncon on each call then delegates to the real implementation.
     // _observedNoncons is a module-scope array reset here before each run.
     //
-    // The extreme circuit (200V, 1Ω, diode) forces the dynamicGmin path,
+    // The extreme circuit (200V, 1Î©, diode) forces the dynamicGmin path,
     // guaranteeing multiple runNR calls.
     _observedNoncons = [];
 
@@ -694,7 +694,7 @@ describe("DcOP", () => {
   });
 
   // ---------------------------------------------------------------------------
-  // Task 4.2.1 — dynamicGmin_initial_diagGmin_matches_ngspice
+  // Task 4.2.1 â€” dynamicGmin_initial_diagGmin_matches_ngspice
   // ---------------------------------------------------------------------------
 
   it("dynamicGmin_initial_diagGmin_matches_ngspice", () => {
@@ -742,7 +742,7 @@ describe("DcOP", () => {
   });
 
   // ---------------------------------------------------------------------------
-  // Task 4.2.2 — dynamicGmin_factor_cap_uses_param
+  // Task 4.2.2 â€” dynamicGmin_factor_cap_uses_param
   // ---------------------------------------------------------------------------
 
   it("dynamicGmin_factor_cap_uses_param", () => {
@@ -751,7 +751,7 @@ describe("DcOP", () => {
     //
     // Use makeGminDependentElement to force the dynamicGmin path (direct NR
     // fails because gmin=0). Run with gminFactor=10 and gminFactor=20, count
-    // gmin steps. Larger factor → fewer steps (gmin decreases faster).
+    // gmin steps. Larger factor â†’ fewer steps (gmin decreases faster).
     const makeElements = () => [
       makeVoltageSource(1, 0, 1, 5),
       makeResistor(1, 0, 1000),
@@ -789,7 +789,7 @@ describe("DcOP", () => {
   });
 
   // ---------------------------------------------------------------------------
-  // Task 4.2.3 — dynamicGmin_clean_solve_uses_dcMaxIter
+  // Task 4.2.3 â€” dynamicGmin_clean_solve_uses_dcMaxIter
   // ---------------------------------------------------------------------------
 
   it("dynamicGmin_clean_solve_uses_dcMaxIter", () => {
@@ -817,14 +817,14 @@ describe("DcOP", () => {
 
     expect(ctx.dcopResult.converged).toBe(true);
     // Tightened per Phase 4 review: positive assertion that the dynamicGmin
-    // path was actually exercised — not just "anything except direct".
+    // path was actually exercised â€” not just "anything except direct".
     // If this fails because the dynamicGmin path wasn't forced, the test
-    // fixture (not this assertion) is the problem — escalate per task spec.
+    // fixture (not this assertion) is the problem â€” escalate per task spec.
     expect(ctx.dcopResult.method).toBe("dynamic-gmin");
   });
 
   // ---------------------------------------------------------------------------
-  // Task 4.3.1 — spice3Gmin_uses_gshunt_when_nonzero / spice3Gmin_uses_gmin_when_gshunt_zero
+  // Task 4.3.1 â€” spice3Gmin_uses_gshunt_when_nonzero / spice3Gmin_uses_gmin_when_gshunt_zero
   // ---------------------------------------------------------------------------
 
   it("spice3Gmin_uses_gshunt_when_nonzero", () => {
@@ -923,7 +923,7 @@ describe("DcOP", () => {
   });
 
   // ---------------------------------------------------------------------------
-  // Task 4.4.1 — spice3Src_no_extra_clean_solve
+  // Task 4.4.1 â€” spice3Src_no_extra_clean_solve
   // ---------------------------------------------------------------------------
 
   it("spice3Src_no_extra_clean_solve", () => {
@@ -974,7 +974,7 @@ describe("DcOP", () => {
   });
 
   // ---------------------------------------------------------------------------
-  // Task 4.5.1 — gillespieSrc_source_stepping_uses_gshunt
+  // Task 4.5.1 â€” gillespieSrc_source_stepping_uses_gshunt
   // ---------------------------------------------------------------------------
 
   it("gillespieSrc_source_stepping_uses_gshunt", () => {
@@ -985,7 +985,7 @@ describe("DcOP", () => {
     // Use makeSrcSteppingRequiredElement (fails when srcFact=1, converges when
     // srcFact<1) to force the gillespieSrc path. numSrcSteps=1 selects
     // gillespieSrc. Direct NR and dynamicGmin both fail (srcFact=1).
-    // gillespieSrc stepping loop uses intermediate srcFact → element converges.
+    // gillespieSrc stepping loop uses intermediate srcFact â†’ element converges.
     // Capture ctx.diagonalGmin inside postIterationHook during dcopSrcSweep
     // phase with param > 0 (stepping loop NR calls).
     const gshuntVal = 1e-9;

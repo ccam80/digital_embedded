@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Tests for advanceClocks() on DefaultSimulationCoordinator (section 1.5).
  *
  * Covers:
@@ -86,9 +86,9 @@ function buildAnalogOnlyCoordinator(): DefaultSimulationCoordinator {
           branchIndex: -1 as const,
           isNonlinear: false, isReactive: false,
           stamp(s: SparseSolverStamp) {
-            if (nodeA > 0) s.stampElement(s.allocElement(nodeA - 1, nodeA - 1), g);
-            if (nodeB > 0) s.stampElement(s.allocElement(nodeB - 1, nodeB - 1), g);
-            if (nodeA > 0 && nodeB > 0) { s.stampElement(s.allocElement(nodeA - 1, nodeB - 1), -g); s.stampElement(s.allocElement(nodeB - 1, nodeA - 1), -g); }
+            if (nodeA > 0) s.stampElement(s.allocElement(nodeA, nodeA), g);
+            if (nodeB > 0) s.stampElement(s.allocElement(nodeB, nodeB), g);
+            if (nodeA > 0 && nodeB > 0) { s.stampElement(s.allocElement(nodeA, nodeB), -g); s.stampElement(s.allocElement(nodeB, nodeA), -g); }
           },
           getPinCurrents(_v: Float64Array) { return [0, 0]; },
           setParam(_key: string, _value: number) {},
@@ -136,7 +136,7 @@ function buildDigitalClockCoordinator() {
 // Tests: analog-only coordinator
 // ---------------------------------------------------------------------------
 
-describe('advanceClocks() — analog-only coordinator', () => {
+describe('advanceClocks() â€” analog-only coordinator', () => {
   it('does not throw on an analog-only coordinator', () => {
     const coordinator = buildAnalogOnlyCoordinator();
     expect(() => coordinator.advanceClocks()).not.toThrow();
@@ -158,7 +158,7 @@ describe('advanceClocks() — analog-only coordinator', () => {
 // Tests: digital coordinator with Clock
 // ---------------------------------------------------------------------------
 
-describe('advanceClocks() — digital coordinator with Clock component', () => {
+describe('advanceClocks() â€” digital coordinator with Clock component', () => {
   it('does not throw on a digital coordinator', () => {
     const { coordinator } = buildDigitalClockCoordinator();
     expect(() => coordinator.advanceClocks()).not.toThrow();

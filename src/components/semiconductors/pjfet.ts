@@ -1,4 +1,4 @@
-/**
+﻿/**
  * P-channel JFET analog component.
  *
  * Port of ngspice `ref/ngspice/src/spicelib/devices/jfet/jfetload.c::JFETload`.
@@ -65,7 +65,7 @@ const GMIN = 1e-12;
 export const { paramDefs: PJFET_PARAM_DEFS, defaults: PJFET_PARAM_DEFAULTS } = defineModelParams({
   primary: {
     VTO:    { default: 2.0,   unit: "V",    description: "Pinch-off (threshold) voltage" },
-    BETA:   { default: 1e-4,  unit: "A/V²", description: "Transconductance coefficient" },
+    BETA:   { default: 1e-4,  unit: "A/VÂ²", description: "Transconductance coefficient" },
     LAMBDA: { default: 0.0,   unit: "1/V",  description: "Channel-length modulation" },
   },
   secondary: {
@@ -75,8 +75,8 @@ export const { paramDefs: PJFET_PARAM_DEFS, defaults: PJFET_PARAM_DEFAULTS } = d
     CGD:  { default: 0,     unit: "F",  description: "Gate-drain zero-bias capacitance" },
     PB:   { default: 1.0,   unit: "V",  description: "Gate junction built-in potential" },
     FC:   { default: 0.5,               description: "Forward-bias capacitance coefficient" },
-    RD:   { default: 0,     unit: "Ω",  description: "Drain ohmic resistance" },
-    RS:   { default: 0,     unit: "Ω",  description: "Source ohmic resistance" },
+    RD:   { default: 0,     unit: "Î©",  description: "Drain ohmic resistance" },
+    RS:   { default: 0,     unit: "Î©",  description: "Source ohmic resistance" },
     B:    { default: 1.0,               description: "Sydney University doping-tail parameter" },
     TCV:  { default: 0.0,   unit: "V/K",description: "Threshold voltage temperature coefficient" },
     BEX:  { default: 0.0,               description: "Mobility temperature exponent" },
@@ -93,7 +93,7 @@ export const { paramDefs: PJFET_PARAM_DEFS, defaults: PJFET_PARAM_DEFAULTS } = d
 });
 
 // ---------------------------------------------------------------------------
-// PjfetParams — resolved model parameters
+// PjfetParams â€” resolved model parameters
 // ---------------------------------------------------------------------------
 
 export interface PjfetParams {
@@ -121,10 +121,10 @@ export interface PjfetParams {
 }
 
 // ---------------------------------------------------------------------------
-// State schema — JFET (Phase 2.5 Wave 1.4 A1 post-excision).
+// State schema â€” JFET (Phase 2.5 Wave 1.4 A1 post-excision).
 //
 // Only slots with direct correspondence in `jfetdefs.h:154-166` JFETstate<n>
-// offsets survive. Same layout as the N-channel sibling — the schema is
+// offsets survive. Same layout as the N-channel sibling â€” the schema is
 // polarity-agnostic (ngspice shares JFETstate between NJF and PJF).
 // ---------------------------------------------------------------------------
 
@@ -204,7 +204,7 @@ export function computePjfetTempParams(p: PjfetParams): PjfetTempParams {
   // jfettemp.c:75-77: Sydney University bFac.
   const bFac = (1 - p.B) / (p.PB - p.VTO);
 
-  // cite: jfettemp.c:83 — instance temp from params.TEMP (maps to ngspice JFETtemp)
+  // cite: jfettemp.c:83 â€” instance temp from params.TEMP (maps to ngspice JFETtemp)
   const temp = p.TEMP;
   const vt = temp * CONSTKoverQ;
   const fact2 = temp / REFTEMP;
@@ -237,9 +237,9 @@ export function computePjfetTempParams(p: PjfetParams): PjfetTempParams {
 }
 
 // ---------------------------------------------------------------------------
-// createPJfetElement — P-channel JFET factory (polarity literal = -1).
+// createPJfetElement â€” P-channel JFET factory (polarity literal = -1).
 // Single load() ported from jfetload.c line-by-line.
-// No cached Float64Array state refs — pool.states[N] at call time.
+// No cached Float64Array state refs â€” pool.states[N] at call time.
 // ---------------------------------------------------------------------------
 
 export function createPJfetElement(
@@ -360,18 +360,18 @@ export function createPJfetElement(
         vgd = 0;
         icheck = 0;
       } else if ((mode & MODEINITJCT) && params.OFF === 0) {
-        // jfetload.c:115-118: initJct, device on → vgs=-1, vgd=-1.
+        // jfetload.c:115-118: initJct, device on â†’ vgs=-1, vgd=-1.
         vgs = -1;
         vgd = -1;
         icheck = 0;
       } else if ((mode & MODEINITJCT) ||
                  ((mode & MODEINITFIX) && params.OFF !== 0)) {
-        // jfetload.c:119-122: initJct w/ OFF or initFix+OFF → zero.
+        // jfetload.c:119-122: initJct w/ OFF or initFix+OFF â†’ zero.
         vgs = 0;
         vgd = 0;
         icheck = 0;
       } else if (mode & MODEINITPRED) {
-        // cite: jfetload.c:124-149 — predictor step active by default
+        // cite: jfetload.c:124-149 â€” predictor step active by default
         // (#ifndef PREDICTOR is true when PREDICTOR is undefined, the default).
         // Verbatim port: xfact extrapolation of vgs/vgd plus 9-slot state copy.
         const vgs1 = s1[base + SLOT_VGS];
@@ -392,21 +392,21 @@ export function createPJfetElement(
         s0[base + SLOT_GGD] = s1[base + SLOT_GGD];
         icheck = 0;
       } else {
-        // jfetload.c:151-164: general iteration — read from CKTrhsOld with
+        // jfetload.c:151-164: general iteration â€” read from CKTrhsOld with
         // polarity pre-multiply. jfetload.c:154-161:
         //   vgs = type * (rhsOld[gate] - rhsOld[sourcePrime]);
         //   vgd = type * (rhsOld[gate] - rhsOld[drainPrime]);
-        // P-channel polarity = -1 → negate the raw difference.
-        const vG = nodeG > 0 ? voltages[nodeG - 1] : 0;
-        const vD = nodeD > 0 ? voltages[nodeD - 1] : 0;
-        const vS = nodeS > 0 ? voltages[nodeS - 1] : 0;
+        // P-channel polarity = -1 â†’ negate the raw difference.
+        const vG = voltages[nodeG];
+        const vD = voltages[nodeD];
+        const vS = voltages[nodeS];
         const vgsRaw = polarity * (vG - vS);
         const vgdRaw = polarity * (vG - vD);
         vgs = vgsRaw;
         vgd = vgdRaw;
 
-        // jfetload.c:211-242: voltage limiting — pnjlim then fetlim
-        // (DEVfetlim — three-zone gate-threshold limiter from devsup.c).
+        // jfetload.c:211-242: voltage limiting â€” pnjlim then fetlim
+        // (DEVfetlim â€” three-zone gate-threshold limiter from devsup.c).
         const vgsOld = s0[base + SLOT_VGS];
         const vgdOld = s0[base + SLOT_VGD];
 
@@ -442,7 +442,7 @@ export function createPJfetElement(
         vgs = fetlim(vgs, vgsOld, vto); // cite: devsup.c::DEVfetlim via newton-raphson.fetlim
         vgd = fetlim(vgd, vgdOld, vto);
 
-        // cite: jfetload.c:165-174 — extrapolated currents for bypass + noncon gates
+        // cite: jfetload.c:165-174 â€” extrapolated currents for bypass + noncon gates
         const delvgs = vgs - s0[base + SLOT_VGS];
         const delvgd = vgd - s0[base + SLOT_VGD];
         const delvds = delvgs - delvgd;
@@ -454,7 +454,7 @@ export function createPJfetElement(
           + s0[base + SLOT_GDS] * delvds
           - s0[base + SLOT_GGD] * delvgd;
 
-        // cite: jfetload.c:178-208 — NOBYPASS bypass test
+        // cite: jfetload.c:178-208 â€” NOBYPASS bypass test
         if (ctx.bypass && !(mode & MODEINITPRED)) {
           const vgsOld2 = s0[base + SLOT_VGS];
           const vgdOld2 = s0[base + SLOT_VGD];
@@ -613,12 +613,12 @@ export function createPJfetElement(
         if (!((mode & MODETRANOP) && (mode & MODEUIC))) {
           if (mode & MODEINITSMSIG) {
             // jfetload.c:463-466: store raw caps and continue
-            // (ngspice `continue` skips all stamps — replicated as return).
+            // (ngspice `continue` skips all stamps â€” replicated as return).
             s0[base + SLOT_QGS] = capgs;
             s0[base + SLOT_QGD] = capgd;
             return; // J-W3-1: skip all state-write + stamp blocks per jfetload.c:466
           } else {
-            // jfetload.c:471-476: MODEINITTRAN copies state0 → state1.
+            // jfetload.c:471-476: MODEINITTRAN copies state0 â†’ state1.
             if (mode & MODEINITTRAN) {
               s1[base + SLOT_QGS] = s0[base + SLOT_QGS];
               s1[base + SLOT_QGD] = s0[base + SLOT_QGD];
@@ -676,10 +676,10 @@ export function createPJfetElement(
       }
       } // end if (!bypassed)
 
-      // cite: jfetload.c:498-507 — suppress noncon bump only when both
+      // cite: jfetload.c:498-507 â€” suppress noncon bump only when both
       // MODEINITFIX and MODEUIC are set (UIC-forced IC at init step).
       // Bitwise `|` on operands that are already 0/1 from `!` is equivalent
-      // to logical `||` — same Boolean semantics in both languages, ported verbatim.
+      // to logical `||` â€” same Boolean semantics in both languages, ported verbatim.
       if ((!(mode & MODEINITFIX)) | (!(mode & MODEUIC))) {
         const absTol = ctx.iabstol;
         const cgNoncon = Math.abs(cghat - cg)
@@ -721,7 +721,7 @@ export function createPJfetElement(
       stampG(solver, nodeS, nodeD, m * (-gds));
       stampG(solver, nodeS, nodeS, m * (gspr + gds + gm + ggs));
       // jfetload.c:546,548: external drain/source self-stamps (gdpr/gspr).
-      // J-W3-3: collapsed prime↔external nodes → 2 additional self-stamps.
+      // J-W3-3: collapsed primeâ†”external nodes â†’ 2 additional self-stamps.
       // ngspice: JFETdrainDrainPtr += m*(gdpr); JFETsourceSourcePtr += m*(gspr).
       if (gdpr > 0) stampG(solver, nodeD, nodeD, m * gdpr);
       if (gspr > 0) stampG(solver, nodeS, nodeS, m * gspr);
@@ -781,7 +781,7 @@ export function createPJfetElement(
 }
 
 // ---------------------------------------------------------------------------
-// PJfetElement — CircuitElement implementation
+// PJfetElement â€” CircuitElement implementation
 // ---------------------------------------------------------------------------
 
 export class PJfetElement extends AbstractCircuitElement {
@@ -923,7 +923,7 @@ export const PJfetDefinition: ComponentDefinition = {
   attributeMap: PJFET_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.SEMICONDUCTORS,
   helpText:
-    "P-channel JFET — Shichman-Hodges model (polarity inverted).\n" +
+    "P-channel JFET â€” Shichman-Hodges model (polarity inverted).\n" +
     "Pins: G (gate), D (drain), S (source).\n" +
     "Model parameters: VTO, BETA, LAMBDA, IS, CGS, CGD.",
   models: {},

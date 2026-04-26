@@ -1,5 +1,5 @@
-/**
- * Schmitt Trigger components — Inverting and Non-Inverting.
+﻿/**
+ * Schmitt Trigger components â€” Inverting and Non-Inverting.
  *
  * Output switches between V_OH and V_OL based on input voltage relative to
  * two thresholds: V_TH (upper, triggers on rising input) and V_TL (lower,
@@ -7,9 +7,9 @@
  * spurious switching on noisy inputs.
  *
  * Hysteresis state machine:
- *   If _outputHigh && V_in < V_TL  → switch to low
- *   If !_outputHigh && V_in > V_TH → switch to high
- *   Otherwise                       → hold current state
+ *   If _outputHigh && V_in < V_TL  â†’ switch to low
+ *   If !_outputHigh && V_in > V_TH â†’ switch to high
+ *   Otherwise                       â†’ hold current state
  *
  * Non-inverting: output HIGH when _outputHigh.
  * Inverting:     output HIGH when !_outputHigh (sense is flipped).
@@ -53,19 +53,19 @@ export const { paramDefs: SCHMITT_PARAM_DEFS, defaults: SCHMITT_DEFAULTS } = def
     vTL:  { default: 1.0, unit: "V", description: "Falling input threshold" },
     vOH:  { default: 3.3, unit: "V", description: "Output high voltage" },
     vOL:  { default: 0.0, unit: "V", description: "Output low voltage" },
-    rOut: { default: 50,  unit: "Ω", description: "Output impedance" },
+    rOut: { default: 50,  unit: "Î©", description: "Output impedance" },
   },
 });
 
 // ---------------------------------------------------------------------------
-// buildPinElectrical — construct ResolvedPinElectrical from component props
+// buildPinElectrical â€” construct ResolvedPinElectrical from component props
 // ---------------------------------------------------------------------------
 
 /**
  * Build a ResolvedPinElectrical from the mutable params record.
  *
  * Fields not covered by the Schmitt trigger's own properties use sensible
- * CMOS 3.3V defaults (rIn=10MΩ, cIn=5pF, cOut=5pF, rHiZ=10MΩ).
+ * CMOS 3.3V defaults (rIn=10MÎ©, cIn=5pF, cOut=5pF, rHiZ=10MÎ©).
  */
 function buildOutputSpec(p: Record<string, number>): ResolvedPinElectrical {
   return {
@@ -96,15 +96,15 @@ function buildInputSpec(p: Record<string, number>): ResolvedPinElectrical {
 }
 
 // ---------------------------------------------------------------------------
-// createSchmittTriggerElement — AnalogElement factory
+// createSchmittTriggerElement â€” AnalogElement factory
 // ---------------------------------------------------------------------------
 
 /**
  * Create the MNA element for a Schmitt trigger.
  *
- * @param pinNodes  - map of pin label → MNA node ID (1-based)
+ * @param pinNodes  - map of pin label â†’ MNA node ID (1-based)
  * @param props     - Component properties
- * @param inverting - true → inverting (output opposes input sense)
+ * @param inverting - true â†’ inverting (output opposes input sense)
  */
 function createSchmittTriggerElement(
   pinNodes: ReadonlyMap<string, number>,
@@ -139,7 +139,7 @@ function createSchmittTriggerElement(
   outModel.setLogicLevel(inverting ? _outputHigh : _outputHigh);
 
   function readNode(voltages: Float64Array, n: number): number {
-    return n > 0 ? voltages[n - 1] : 0;
+    return voltages[n];
   }
 
   function updateOutputLevel(): void {
@@ -197,11 +197,11 @@ function createSchmittTriggerElement(
     accept(_ctx: LoadContext, _simTime: number, _addBreakpoint: (t: number) => void): void {},
 
     getPinCurrents(voltages: Float64Array): number[] {
-      // Input pin: conductance 1/rIn from nIn to ground → I_in = V_in / rIn
+      // Input pin: conductance 1/rIn from nIn to ground â†’ I_in = V_in / rIn
       const vIn = readNode(voltages, nIn);
       const iIn = nIn > 0 ? vIn / outputSpec.rIn : 0;
 
-      // Output pin: Norton equivalent — I_out = (V_out - V_target) / rOut
+      // Output pin: Norton equivalent â€” I_out = (V_out - V_target) / rOut
       const vOut = readNode(voltages, nOut);
       const targetVoltage = outModel.currentVoltage;
       const iOut = nOut > 0 ? (vOut - targetVoltage) / outputSpec.rOut : 0;
@@ -267,14 +267,14 @@ export class SchmittInvertingElement extends AbstractCircuitElement {
 
   draw(ctx: RenderContext, signals?: PinVoltageAccess): void {
     // All coordinates derived from Falstad reference (px / 16 = grid units):
-    // Total span 64px = 4gu. Triangle: left x=1, tip x=2.6875, height ±1.
-    // Bubble: cx=2.875, r≈0.18375. Lead2 starts at 3.125.
+    // Total span 64px = 4gu. Triangle: left x=1, tip x=2.6875, height Â±1.
+    // Bubble: cx=2.875, râ‰ˆ0.18375. Lead2 starts at 3.125.
     // Hysteresis symbol (grid units): step from 1.25 to 1.8125 to 1.4375 to 2.0
     const PX = 1 / 16;
 
     const triLeft  = 1.0;               // 16px
     const triTip   = 43 * PX;           // 2.6875 gu
-    const triH     = 1.0;               // ±1 gu
+    const triH     = 1.0;               // Â±1 gu
     const bubCx    = 46 * PX;           // 2.875 gu
     const bubR     = 2.94 * PX;         // ~0.18375 gu
     const lead2x   = 50 * PX;           // 3.125 gu
@@ -285,22 +285,22 @@ export class SchmittInvertingElement extends AbstractCircuitElement {
     ctx.save();
     ctx.setLineWidth(1);
 
-    // Input lead: 0 → triLeft
+    // Input lead: 0 â†’ triLeft
     drawColoredLead(ctx, signals, vIn, 0, 0, triLeft, 0);
 
-    // Output lead: lead2x → 4
+    // Output lead: lead2x â†’ 4
     drawColoredLead(ctx, signals, vOut, lead2x, 0, 4, 0);
 
-    // Body — triangle as open polyline (matching Falstad reference, NOT closed)
+    // Body â€” triangle as open polyline (matching Falstad reference, NOT closed)
     ctx.setColor("COMPONENT");
-    // Falstad polyline: (16,-16)→(16,16)→(43,0) — only 2 segments, no closing edge
+    // Falstad polyline: (16,-16)â†’(16,16)â†’(43,0) â€” only 2 segments, no closing edge
     ctx.drawLine(triLeft, -triH, triLeft, triH);
     ctx.drawLine(triLeft,  triH, triTip,  0);
-    // Bubble (inverter circle) — drawn as arc to match Falstad rasterization
+    // Bubble (inverter circle) â€” drawn as arc to match Falstad rasterization
     ctx.drawArc(bubCx, 0, bubR, 0, 2 * Math.PI);
 
-    // Hysteresis symbol — matches Falstad polyline exactly:
-    // (20,-3),(29,-3),(29,3),(32,3),(23,3),(23,-3) in px → /16 for gu
+    // Hysteresis symbol â€” matches Falstad polyline exactly:
+    // (20,-3),(29,-3),(29,3),(32,3),(23,3),(23,-3) in px â†’ /16 for gu
     const hx1 = 20 * PX;  // 1.25
     const hx2 = 29 * PX;  // 1.8125
     const hx3 = 32 * PX;  // 2.0
@@ -342,7 +342,7 @@ export class SchmittNonInvertingElement extends AbstractCircuitElement {
 
     const triLeft  = 1.0;               // 16px
     const triTip   = 43 * PX;           // 2.6875 gu
-    const triH     = 1.0;               // ±1 gu
+    const triH     = 1.0;               // Â±1 gu
     const lead2x   = 45 * PX;           // 2.8125 gu
 
     const vIn  = signals?.getPinVoltage("in");
@@ -351,20 +351,20 @@ export class SchmittNonInvertingElement extends AbstractCircuitElement {
     ctx.save();
     ctx.setLineWidth(1);
 
-    // Input lead: 0 → triLeft
+    // Input lead: 0 â†’ triLeft
     drawColoredLead(ctx, signals, vIn, 0, 0, triLeft, 0);
 
-    // Output lead: lead2x → 4
+    // Output lead: lead2x â†’ 4
     drawColoredLead(ctx, signals, vOut, lead2x, 0, 4, 0);
 
-    // Body — triangle as open polyline (matching Falstad reference, NOT closed)
+    // Body â€” triangle as open polyline (matching Falstad reference, NOT closed)
     ctx.setColor("COMPONENT");
-    // Falstad polyline: (16,-16)→(16,16)→(43,0) — only 2 segments, no closing edge
+    // Falstad polyline: (16,-16)â†’(16,16)â†’(43,0) â€” only 2 segments, no closing edge
     ctx.drawLine(triLeft, -triH, triLeft, triH);
     ctx.drawLine(triLeft,  triH, triTip,  0);
 
-    // Hysteresis symbol — matches Falstad polyline exactly:
-    // (20,-3),(29,-3),(29,3),(32,3),(23,3),(23,-3) in px → /16 for gu
+    // Hysteresis symbol â€” matches Falstad polyline exactly:
+    // (20,-3),(29,-3),(29,3),(32,3),(23,3),(23,-3) in px â†’ /16 for gu
     const hx1 = 20 * PX;  // 1.25
     const hx2 = 29 * PX;  // 1.8125
     const hx3 = 32 * PX;  // 2.0
@@ -421,7 +421,7 @@ export const SchmittInvertingDefinition: ComponentDefinition = {
   attributeMap: SCHMITT_ATTRIBUTE_MAPPINGS,
 
   helpText:
-    "Schmitt Trigger (Inverting) — two-terminal analog component with hysteresis. " +
+    "Schmitt Trigger (Inverting) â€” two-terminal analog component with hysteresis. " +
     "V_TH and V_TL define the upper and lower switching thresholds.",
 
   factory(props: PropertyBag): SchmittInvertingElement {
@@ -451,7 +451,7 @@ export const SchmittNonInvertingDefinition: ComponentDefinition = {
   attributeMap: SCHMITT_ATTRIBUTE_MAPPINGS,
 
   helpText:
-    "Schmitt Trigger (Non-Inverting) — two-terminal analog component with hysteresis. " +
+    "Schmitt Trigger (Non-Inverting) â€” two-terminal analog component with hysteresis. " +
     "Output tracks input sense; V_TH and V_TL define the upper and lower switching thresholds.",
 
   factory(props: PropertyBag): SchmittNonInvertingElement {

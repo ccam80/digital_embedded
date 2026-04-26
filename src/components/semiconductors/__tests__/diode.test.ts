@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Tests for the AnalogDiode component.
  *
  * Covers:
@@ -52,7 +52,7 @@ function withState(core: AnalogElementCore): { element: ReactiveAnalogElement; p
 // Helper: narrow ModelEntry to inline factory (throws if netlist kind)
 // ---------------------------------------------------------------------------
 
-/** Assert actual ≈ expected within 0.1% relative tolerance (ngspice reference). */
+/** Assert actual â‰ˆ expected within 0.1% relative tolerance (ngspice reference). */
 function expectSpiceRef(actual: number, expected: number, label: string) {
   const rel = Math.abs((actual - expected) / expected);
   if (rel >= 0.001) {
@@ -89,7 +89,7 @@ function makeParamBag(params: Record<string, number>): PropertyBag {
  */
 /**
  * Build a bare LoadContext for a single-element unit test. Caller owns the
- * solver, the state pool, and the voltages buffer — makeSimpleCtx would
+ * solver, the state pool, and the voltages buffer â€” makeSimpleCtx would
  * re-run allocateStatePool and wipe already-seeded pool state.
  */
 function buildUnitCtx(
@@ -199,7 +199,7 @@ function makeDiodeAtVd(
 // ---------------------------------------------------------------------------
 
 describe("Diode", () => {
-  // forward_bias_stamp and reverse_bias_stamp deleted per A1 §Test handling rule:
+  // forward_bias_stamp and reverse_bias_stamp deleted per A1 Â§Test handling rule:
   // both asserted hand-computed geq/ieq Norton pair values. After D-W3-1/D-W3-2
   // (IKF/IKR Norton-pair re-derivation) the GMIN is applied inside the IKF/IKR/else
   // branch, changing the formula for cd and gd. The correct reference is an ngspice
@@ -234,7 +234,7 @@ describe("Diode", () => {
     jumpCtx.loadCtx.rhsOld = voltages;
     element.load(jumpCtx.loadCtx);
 
-    // Voltages array must be unchanged — no write-back
+    // Voltages array must be unchanged â€” no write-back
     expect(voltages[0]).toBe(5.0);
     expect(voltages[1]).toBe(0);
 
@@ -278,7 +278,7 @@ describe("Diode", () => {
 
     // Verify Cj computation: CJO / (1 - Vd/VJ)^M at Vd = -2V
     // Cj = 10pF / (1 - (-2)/0.7)^0.5 = 10pF / (1 + 2/0.7)^0.5
-    // = 10pF / (3.857)^0.5 = 10pF / 1.964 ≈ 5.09pF
+    // = 10pF / (3.857)^0.5 = 10pF / 1.964 â‰ˆ 5.09pF
     const expectedCj = computeJunctionCapacitance(-2, CJO, VJ, M, FC);
 
     // After load(), conductance entries must have been placed
@@ -355,11 +355,11 @@ function makeResistorElement(nodeA: number, nodeB: number, resistance: number): 
     getPinCurrents(_v: Float64Array): number[] { return []; },
     load(ctx): void {
       const solver = ctx.solver;
-      if (nodeA !== 0) solver.stampElement(solver.allocElement(nodeA - 1, nodeA - 1), G);
-      if (nodeB !== 0) solver.stampElement(solver.allocElement(nodeB - 1, nodeB - 1), G);
+      if (nodeA !== 0) solver.stampElement(solver.allocElement(nodeA, nodeA), G);
+      if (nodeB !== 0) solver.stampElement(solver.allocElement(nodeB, nodeB), G);
       if (nodeA !== 0 && nodeB !== 0) {
-        solver.stampElement(solver.allocElement(nodeA - 1, nodeB - 1), -G);
-        solver.stampElement(solver.allocElement(nodeB - 1, nodeA - 1), -G);
+        solver.stampElement(solver.allocElement(nodeA, nodeB), -G);
+        solver.stampElement(solver.allocElement(nodeB, nodeA), -G);
       }
     },
   };
@@ -371,11 +371,11 @@ function makeResistorElement(nodeA: number, nodeB: number, resistance: number): 
 
 describe("Integration", () => {
   it("diode_resistor_dc_op", () => {
-    // Circuit: 5V source (node2=+, gnd=-) → 1kΩ (node1 ↔ node2) → diode (node1 anode, gnd cathode)
+    // Circuit: 5V source (node2=+, gnd=-) â†’ 1kÎ© (node1 â†” node2) â†’ diode (node1 anode, gnd cathode)
     //
     // Default SPICE diode: IS=1e-14, N=1
-    // At Vd ≈ 0.665V: Id = IS*(exp(Vd/Vt)-1) ≈ 4.335mA
-    // Resistor voltage = 5V - 0.665V = 4.335V → I = 4.335mA (consistent)
+    // At Vd â‰ˆ 0.665V: Id = IS*(exp(Vd/Vt)-1) â‰ˆ 4.335mA
+    // Resistor voltage = 5V - 0.665V = 4.335V â†’ I = 4.335mA (consistent)
     //
     // MNA layout:
     //   node 1 = anode/junction node
@@ -389,7 +389,7 @@ describe("Integration", () => {
     // 5V source: node2(+) to ground(-)
     const vs = makeDcVoltageSource(2, 0, branchRow, 5) as unknown as AnalogElement;
 
-    // 1kΩ resistor: node1 ↔ node2
+    // 1kÎ© resistor: node1 â†” node2
     const r = makeResistorElement(1, 2, 1000);
 
     // Diode: anode=node1, cathode=ground(0)
@@ -411,7 +411,7 @@ describe("Integration", () => {
 
     // Voltage source enforces V(node2) = 5V
 
-    // ngspice reference: IS=1e-14, N=1 → Vd=0.6928910V, Id=4.307675mA
+    // ngspice reference: IS=1e-14, N=1 â†’ Vd=0.6928910V, Id=4.307675mA
     expectSpiceRef(vDiode, 6.928910e-01, "V(diode)");
 
     const iDiode = (vSource - vDiode) / 1000;
@@ -420,7 +420,7 @@ describe("Integration", () => {
 });
 
 // ---------------------------------------------------------------------------
-// setParam behavioral verification — reads mutable params object, not captured locals
+// setParam behavioral verification â€” reads mutable params object, not captured locals
 // ---------------------------------------------------------------------------
 
 describe("setParam mutates params object (not captured locals)", () => {
@@ -546,10 +546,10 @@ describe("Diode LimitingEvent instrumentation", () => {
     const element = makeDiodeWithState({ IS: 1e-14, N: 1 });
     const voltages = new Float64Array(10);
     voltages[0] = 0.6;
-    // Warm up to vdOld ≈ 0.6
+    // Warm up to vdOld â‰ˆ 0.6
     loadOnce(element, voltages, null);
 
-    // Tiny step — should not be limited
+    // Tiny step â€” should not be limited
     voltages[0] = 0.601;
     const collector: LimitingEvent[] = [];
     loadOnce(element, voltages, collector);
@@ -641,7 +641,7 @@ describe("dioTemp temperature scaling", () => {
 // ---------------------------------------------------------------------------
 
 describe("IBV knee iteration", () => {
-  it("tBV satisfies knee equation: tIS*(exp((BV-tBV)/(NBV*vt))-1) ≈ IBV", () => {
+  it("tBV satisfies knee equation: tIS*(exp((BV-tBV)/(NBV*vt))-1) â‰ˆ IBV", () => {
     const BV = 5.0;
     const IBV = 1e-3;
     const IS = 1e-14;
@@ -687,7 +687,7 @@ describe("IKF/IKR high-injection correction", () => {
   it("IKF correction reduces gd compared to IKF=Infinity at same Vd", () => {
     const vd = 0.7;
     const gdNoIkf  = diodeGd(vd, { IKF: Infinity });
-    // IKF = 1mA: id at vd=0.7 is ~4mA, so id/ikf = 4 — strong correction
+    // IKF = 1mA: id at vd=0.7 is ~4mA, so id/ikf = 4 â€” strong correction
     const gdWithIkf = diodeGd(vd, { IKF: 1e-3 });
     expect(gdWithIkf).toBeLessThan(gdNoIkf);
   });
@@ -798,15 +798,15 @@ describe("AREA scaling", () => {
 // C2.3: inline NIintegrate integration tests
 // ---------------------------------------------------------------------------
 
-// ngspice → ours variable mapping (niinteg.c:28-63):
-//   ag[0] (CKTag[0])    → ctx.ag[0]   coefficient on q0 (current charge)
-//   ag[1] (CKTag[1])    → ctx.ag[1]   coefficient on q1 (previous charge)
-//   cap (capacitance)   → Ctotal      junction + diffusion cap
-//   q0 (current charge) → q0          computeJunctionCharge at vd
-//   q1 (prev charge)    → s1[SLOT_Q]  state from previous accepted step
-//   ccap (companion I)  → ccap        ag[0]*q0 + ag[1]*q1
-//   geq                 → ag[0]*Ctotal
-//   ceq                 → ccap - geq*vd
+// ngspice â†’ ours variable mapping (niinteg.c:28-63):
+//   ag[0] (CKTag[0])    â†’ ctx.ag[0]   coefficient on q0 (current charge)
+//   ag[1] (CKTag[1])    â†’ ctx.ag[1]   coefficient on q1 (previous charge)
+//   cap (capacitance)   â†’ Ctotal      junction + diffusion cap
+//   q0 (current charge) â†’ q0          computeJunctionCharge at vd
+//   q1 (prev charge)    â†’ s1[SLOT_Q]  state from previous accepted step
+//   ccap (companion I)  â†’ ccap        ag[0]*q0 + ag[1]*q1
+//   geq                 â†’ ag[0]*Ctotal
+//   ceq                 â†’ ccap - geq*vd
 
 describe("integration", () => {
   it("pn_cap_transient_matches_ngspice", () => {
@@ -837,7 +837,7 @@ describe("integration", () => {
     const q1_val = computeJunctionCharge(prevVd, CJO, VJ, M, FC, TT, prevId);
     pool.state1[6] = q1_val; // SLOT_Q = 6 (dioload.c DIOcapCharge)
 
-    // Real SparseSolver — anode=node 1 mapped to row 0, cathode=ground.
+    // Real SparseSolver â€” anode=node 1 mapped to row 0, cathode=ground.
     const solver = new SparseSolver();
     solver._initStructure(1);
 
@@ -890,23 +890,23 @@ describe("integration", () => {
 });
 
 // ===========================================================================
-// Task C4.3 — Diode parity tests (diode_load_dcop_parity + _transient_parity)
+// Task C4.3 â€” Diode parity tests (diode_load_dcop_parity + _transient_parity)
 //
 // Bit-exact parity against the ngspice DIOload reference formula:
 //   geq = IS * exp(Vd/nVt) / nVt + GMIN
 //   id  = IS * (exp(Vd/nVt) - 1) + GMIN * Vd
 //   ieq = id - geq * Vd
-// Stamps: 4× (±geq) into the 2×2 block at (nodeAnode, nodeCathode), 2× RHS
+// Stamps: 4Ã— (Â±geq) into the 2Ã—2 block at (nodeAnode, nodeCathode), 2Ã— RHS
 // at the same rows (-ieq at anode, +ieq at cathode).
 //
 // For transient: junction cap adds capGeq = ag[0]*Ctotal, capIeq = ccap -
 // capGeq*vd, where ccap = ag[0]*q0 + ag[1]*q1.
-// ngspice → ours mapping (dioload.c:240-285, niinteg.c:28-63):
-//   CKTag[0]        → ctx.ag[0]
-//   CKTag[1]        → ctx.ag[1]
-//   q_current       → computeJunctionCharge(Vd, ...)
-//   q_prev          → pool.state1[SLOT_Q]
-//   ieq_norton      → id - geq*Vd
+// ngspice â†’ ours mapping (dioload.c:240-285, niinteg.c:28-63):
+//   CKTag[0]        â†’ ctx.ag[0]
+//   CKTag[1]        â†’ ctx.ag[1]
+//   q_current       â†’ computeJunctionCharge(Vd, ...)
+//   q_prev          â†’ pool.state1[SLOT_Q]
+//   ieq_norton      â†’ id - geq*Vd
 // ===========================================================================
 
 function makeParityCtx(
@@ -953,7 +953,7 @@ describe("diode_load_dcop_parity", () => {
     // Seed pool.state0[SLOT_VD = 0] = VD so pnjlim passes through unchanged.
     pool.state0[0] = VD;
 
-    // Real 2×2 SparseSolver (node indices 0 and 1 for anode and cathode rows).
+    // Real 2Ã—2 SparseSolver (node indices 0 and 1 for anode and cathode rows).
     const solver = new SparseSolver();
     solver._initStructure(2);
 
@@ -968,8 +968,8 @@ describe("diode_load_dcop_parity", () => {
     const NGSPICE_ID = IS * (NGSPICE_EXP - 1) + GMIN * VD;
     const NGSPICE_IEQ = NGSPICE_ID - NGSPICE_GD * VD;
 
-    // Read the assembled matrix. The diode writes four G stamps (anode=1→row 0,
-    // cathode=2→row 1). Sum any entries at each (row, col) pair (in case of
+    // Read the assembled matrix. The diode writes four G stamps (anode=1â†’row 0,
+    // cathode=2â†’row 1). Sum any entries at each (row, col) pair (in case of
     // fill-ins or multi-stamp patterns in the element implementation).
     const entries = solver.getCSCNonZeros();
     const sumAt = (row: number, col: number) =>
@@ -1018,7 +1018,7 @@ describe("diode_load_transient_parity", () => {
     pool.state1[6] = q1; // SLOT_Q = 6 (dioload.c DIOcapCharge)
     pool.state0[0] = VD; // SLOT_VD seed so pnjlim pass-through
 
-    // Real SparseSolver — diode between node 1 (anode) and ground (node 0
+    // Real SparseSolver â€” diode between node 1 (anode) and ground (node 0
     // mapped to no row). matrixSize = 1 (anode only, cathode is ground).
     const solver = new SparseSolver();
     solver._initStructure(1);
@@ -1046,14 +1046,14 @@ describe("diode_load_transient_parity", () => {
 });
 
 // ===========================================================================
-// Task 2.4.1 — MODEINITSMSIG + bitfield migration
+// Task 2.4.1 â€” MODEINITSMSIG + bitfield migration
 //
 // Tests for dioload.c:126-127 (MODEINITSMSIG seeds vd from CKTstate0),
 // dioload.c:128-129 (MODEINITTRAN seeds vd from CKTstate1),
 // dioload.c:316-317 cap-gate expansion to include MODEAC | MODEINITSMSIG,
 // and dioload.c:360-372 small-signal store-back gating.
 //
-// Task 2.4.9a — A7 fix: checkConvergence OFF short-circuit under MODEINITSMSIG
+// Task 2.4.9a â€” A7 fix: checkConvergence OFF short-circuit under MODEINITSMSIG
 // ===========================================================================
 
 describe("diode MODEINITSMSIG seeding (dioload.c:126-127)", () => {
@@ -1143,7 +1143,7 @@ describe("diode MODEINITSMSIG seeding (dioload.c:126-127)", () => {
   it("MODEINITSMSIG skips pnjlim (no noncon increment)", () => {
     // dioload.c:126-135: MODEINITSMSIG sets vd directly without pnjlim.
     // A large iterate would normally trigger limiting. But with MODEINITSMSIG
-    // vd is taken from state0, so pnjlimLimited stays false → noncon stays 0.
+    // vd is taken from state0, so pnjlimLimited stays false â†’ noncon stays 0.
     const IS = 1e-14, N = 1;
     const props = makeParamBag({ IS, N, CJO: 0, VJ: 0.7, M: 0.5, TT: 0, FC: 0.5 });
     const core = createDiodeElement(new Map([["A", 1], ["K", 2]]), [], -1, props);
@@ -1159,7 +1159,7 @@ describe("diode MODEINITSMSIG seeding (dioload.c:126-127)", () => {
 
     core.load({
       solver,
-      rhsOld: new Float64Array([5.0, 0]), // large jump — would limit if not SMSIG
+      rhsOld: new Float64Array([5.0, 0]), // large jump â€” would limit if not SMSIG
       rhs: new Float64Array([5.0, 0]),
       cktMode: MODEDCOP | MODEINITSMSIG,
       dt: 0,
@@ -1222,7 +1222,7 @@ describe("diode MODEINITSMSIG seeding (dioload.c:126-127)", () => {
     });
 
     // MODEINITSMSIG: SLOT_CAP_CURRENT (index 4) holds capd (Farads) = Ctotal.
-    // With CJO=10pF at Vd=0.3V, Ctotal > 0 — dioload.c:363.
+    // With CJO=10pF at Vd=0.3V, Ctotal > 0 â€” dioload.c:363.
     expect(pool.state0[4]).toBeGreaterThan(0);
   });
 
@@ -1265,12 +1265,12 @@ describe("diode MODEINITSMSIG seeding (dioload.c:126-127)", () => {
       voltTol: 1e-6,
     });
 
-    // SLOT_CAP_CURRENT (index 4) holds iqcap (A) under MODETRAN/MODEUIC — dioload.c:363.
+    // SLOT_CAP_CURRENT (index 4) holds iqcap (A) under MODETRAN/MODEUIC â€” dioload.c:363.
     expect(pool.state0[4]).toBeGreaterThan(0);
   });
 
   it("cap gate does NOT fire under pure MODEDCOP (not transient, AC, or SMSIG)", () => {
-    // Under pure MODEDCOP (DC-OP), caps are open — no reactive stamp should appear.
+    // Under pure MODEDCOP (DC-OP), caps are open â€” no reactive stamp should appear.
     const IS = 1e-14, N = 1, CJO = 10e-12, VJ = 0.7, M = 0.5, FC = 0.5, TT = 0;
     const props = makeParamBag({ IS, N, CJO, VJ, M, TT, FC });
     const core = createDiodeElement(new Map([["A", 1], ["K", 2]]), [], -1, props);
@@ -1304,7 +1304,7 @@ describe("diode MODEINITSMSIG seeding (dioload.c:126-127)", () => {
       voltTol: 1e-6,
     });
 
-    // SLOT_CAP_CURRENT (index 4) must remain 0 — cap block not entered under DCOP.
+    // SLOT_CAP_CURRENT (index 4) must remain 0 â€” cap block not entered under DCOP.
     expect(pool.state0[4]).toBe(0);
   });
 });
@@ -1355,7 +1355,7 @@ describe("diode checkConvergence A7 fix (MODEINITFIX | MODEINITSMSIG)", () => {
 
     const solver = new SparseSolver();
     solver._initStructure(2);
-    // Voltages match state0 exactly → should converge.
+    // Voltages match state0 exactly â†’ should converge.
     const convergedVoltages = new Float64Array([0.3, 0]);
     const result = el.checkConvergence!(buildUnitCtx(solver, convergedVoltages, { cktMode: MODEDCOP | MODEINITSMSIG }));
     // Since OFF=0, it falls through to the convergence math; with matching
@@ -1365,7 +1365,7 @@ describe("diode checkConvergence A7 fix (MODEINITFIX | MODEINITSMSIG)", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Diode TEMP — per-instance operating temperature (Phase 7.5.1)
+// Diode TEMP â€” per-instance operating temperature (Phase 7.5.1)
 // ---------------------------------------------------------------------------
 
 function makeDiodeProps(overrides: Record<string, number> = {}): PropertyBag {
@@ -1426,7 +1426,7 @@ describe("Diode TEMP", () => {
   it("setParam_TEMP_recomputes_tp", () => {
     // Construct diode at default TEMP (300.15K), then change to 400K via setParam.
     // Verify next load() uses the 400K tVcrit by driving MODEINITJCT (OFF=0):
-    // dioload.c:135-136: vdRaw = tVcrit when MODEINITJCT && !OFF — no pnjlim applied.
+    // dioload.c:135-136: vdRaw = tVcrit when MODEINITJCT && !OFF â€” no pnjlim applied.
     // So s0[SLOT_VD] after load() equals the recomputed tVcrit at 400K.
     const IS = 1e-14;
     const N = 1;
@@ -1437,7 +1437,7 @@ describe("Diode TEMP", () => {
     (core as any).stateBaseOffset = 0;
     core.initState(pool);
 
-    // Change TEMP to 400K — triggers recomputeTemp()
+    // Change TEMP to 400K â€” triggers recomputeTemp()
     core.setParam("TEMP", 400);
 
     // Compute expected tVcrit at 400K

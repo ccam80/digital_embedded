@@ -1,15 +1,15 @@
-/**
- * NTC Thermistor — negative temperature coefficient temperature-dependent resistor.
+﻿/**
+ * NTC Thermistor â€” negative temperature coefficient temperature-dependent resistor.
  *
  * Resistance model:
- *   B-parameter: R(T) = R₀ · exp(B · (1/T - 1/T₀))
+ *   B-parameter: R(T) = Râ‚€ Â· exp(B Â· (1/T - 1/Tâ‚€))
  *   Steinhart-Hart (when shA/shB/shC all provided):
- *     1/T = A + B·ln(R) + C·(ln(R))³
+ *     1/T = A + BÂ·ln(R) + CÂ·(ln(R))Â³
  *     Solved iteratively since R and T are mutually dependent.
  *
  * Self-heating thermal model (when selfHeating=true):
  *   dT/dt = (P_dissipated - (T - T_ambient) / R_thermal) / C_thermal
- *   where P = V² / R(T)
+ *   where P = VÂ² / R(T)
  *   Integrated with forward Euler each accepted timestep via accept().
  *
  * MNA topology:
@@ -18,8 +18,8 @@
  *   branchIndex    = -1
  *
  * Unified load() pipeline:
- *   load(ctx)  — stamps conductance 1/R(T) between terminals every NR iteration
- *   accept(ctx, ...) — integrates thermal ODE after an accepted timestep when selfHeating
+ *   load(ctx)  â€” stamps conductance 1/R(T) between terminals every NR iteration
+ *   accept(ctx, ...) â€” integrates thermal ODE after an accepted timestep when selfHeating
  */
 
 import type { AnalogElementCore, LoadContext } from "../../solver/analog/element.js";
@@ -42,7 +42,7 @@ import { PinDirection } from "../../core/pin.js";
 // ---------------------------------------------------------------------------
 
 const MIN_RESISTANCE = 1e-12;
-const MIN_TEMPERATURE = 1.0; // 1 K — prevent division by zero
+const MIN_TEMPERATURE = 1.0; // 1 K â€” prevent division by zero
 
 // ---------------------------------------------------------------------------
 // Model parameter declarations
@@ -50,7 +50,7 @@ const MIN_TEMPERATURE = 1.0; // 1 K — prevent division by zero
 
 export const { paramDefs: NTC_PARAM_DEFS, defaults: NTC_DEFAULTS } = defineModelParams({
   primary: {
-    r0:          { default: 10000,  unit: "Ω",   description: "Resistance at reference temperature T₀" },
+    r0:          { default: 10000,  unit: "Î©",   description: "Resistance at reference temperature Tâ‚€" },
     beta:        { default: 3950,   unit: "K",   description: "B-parameter (material constant) in Kelvin" },
     temperature: { default: 298.15, unit: "K",   description: "Operating temperature in Kelvin" },
   },
@@ -67,7 +67,7 @@ export const { paramDefs: NTC_PARAM_DEFS, defaults: NTC_DEFAULTS } = defineModel
 
 /**
  * Compute NTC resistance using the B-parameter model.
- *   R(T) = R₀ · exp(B · (1/T - 1/T₀))
+ *   R(T) = Râ‚€ Â· exp(B Â· (1/T - 1/Tâ‚€))
  */
 function bParameterResistance(r0: number, beta: number, t0: number, t: number): number {
   const tClamped = Math.max(t, MIN_TEMPERATURE);
@@ -76,24 +76,24 @@ function bParameterResistance(r0: number, beta: number, t0: number, t: number): 
 
 /**
  * Compute NTC resistance using the Steinhart-Hart model.
- *   1/T = A + B·ln(R) + C·(ln(R))³
+ *   1/T = A + BÂ·ln(R) + CÂ·(ln(R))Â³
  *
  * Given T, we invert numerically: binary-search R such that S-H gives back T.
- * Search range: [1 Ω, 10 MΩ] — covers all practical NTC values.
+ * Search range: [1 Î©, 10 MÎ©] â€” covers all practical NTC values.
  */
 function steinhartHartResistance(shA: number, shB: number, shC: number, t: number): number {
   const tClamped = Math.max(t, MIN_TEMPERATURE);
   const target = 1 / tClamped;
 
   // Binary search over ln(R)
-  let lo = Math.log(1);        // ln(1 Ω)
-  let hi = Math.log(1e7);      // ln(10 MΩ)
+  let lo = Math.log(1);        // ln(1 Î©)
+  let hi = Math.log(1e7);      // ln(10 MÎ©)
 
   for (let iter = 0; iter < 60; iter++) {
     const mid = (lo + hi) / 2;
     const val = shA + shB * mid + shC * mid * mid * mid;
     if (val > target) {
-      hi = mid; // 1/T too large → ln(R) too large → reduce upper bound
+      hi = mid; // 1/T too large â†’ ln(R) too large â†’ reduce upper bound
     } else {
       lo = mid;
     }
@@ -103,7 +103,7 @@ function steinhartHartResistance(shA: number, shB: number, shC: number, t: numbe
 }
 
 // ---------------------------------------------------------------------------
-// NTCThermistorElement — MNA implementation
+// NTCThermistorElement â€” MNA implementation
 // ---------------------------------------------------------------------------
 
 export class NTCThermistorElement implements AnalogElementCore {
@@ -119,7 +119,7 @@ export class NTCThermistorElement implements AnalogElementCore {
   private readonly _shC: number | undefined;
 
   /**
-   * @param r0                  - Resistance at T₀ in ohms
+   * @param r0                  - Resistance at Tâ‚€ in ohms
    * @param beta                - B-parameter in Kelvin
    * @param t0                  - Reference temperature in Kelvin
    * @param temperature         - Initial/fixed temperature in Kelvin
@@ -181,7 +181,7 @@ export class NTCThermistorElement implements AnalogElementCore {
     );
   }
 
-  /** Current temperature in Kelvin — exposed for testing. */
+  /** Current temperature in Kelvin â€” exposed for testing. */
   get temperature(): number {
     return this._p.temperature;
   }
@@ -194,22 +194,22 @@ export class NTCThermistorElement implements AnalogElementCore {
     const G = 1 / this.resistance();
 
     if (nPos !== 0 && nNeg !== 0) {
-      solver.stampElement(solver.allocElement(nPos - 1, nPos - 1), G);
-      solver.stampElement(solver.allocElement(nPos - 1, nNeg - 1), -G);
-      solver.stampElement(solver.allocElement(nNeg - 1, nPos - 1), -G);
-      solver.stampElement(solver.allocElement(nNeg - 1, nNeg - 1), G);
+      solver.stampElement(solver.allocElement(nPos, nPos), G);
+      solver.stampElement(solver.allocElement(nPos, nNeg), -G);
+      solver.stampElement(solver.allocElement(nNeg, nPos), -G);
+      solver.stampElement(solver.allocElement(nNeg, nNeg), G);
     } else if (nPos !== 0) {
-      solver.stampElement(solver.allocElement(nPos - 1, nPos - 1), G);
+      solver.stampElement(solver.allocElement(nPos, nPos), G);
     } else if (nNeg !== 0) {
-      solver.stampElement(solver.allocElement(nNeg - 1, nNeg - 1), G);
+      solver.stampElement(solver.allocElement(nNeg, nNeg), G);
     }
   }
 
   getPinCurrents(voltages: Float64Array): number[] {
     const nPos = this.pinNodeIds[0];
     const nNeg = this.pinNodeIds[1];
-    const vPos = nPos > 0 ? voltages[nPos - 1] : 0;
-    const vNeg = nNeg > 0 ? voltages[nNeg - 1] : 0;
+    const vPos = voltages[nPos];
+    const vNeg = voltages[nNeg];
     const G = 1 / this.resistance();
     const I = G * (vPos - vNeg);
     return [I, -I];
@@ -222,8 +222,8 @@ export class NTCThermistorElement implements AnalogElementCore {
     const voltages = ctx.rhs;
     const nPos = this.pinNodeIds[0];
     const nNeg = this.pinNodeIds[1];
-    const vPos = nPos > 0 ? voltages[nPos - 1] : 0;
-    const vNeg = nNeg > 0 ? voltages[nNeg - 1] : 0;
+    const vPos = voltages[nPos];
+    const vNeg = voltages[nNeg];
     const vDiff = vPos - vNeg;
 
     const R = this.resistance();
@@ -300,7 +300,7 @@ function buildNTCPinDeclarations(): PinDeclaration[] {
 }
 
 // ---------------------------------------------------------------------------
-// NTCThermistorCircuitElement — editor/visual layer
+// NTCThermistorCircuitElement â€” editor/visual layer
 // ---------------------------------------------------------------------------
 
 export class NTCThermistorCircuitElement extends AbstractCircuitElement {
@@ -337,8 +337,8 @@ export class NTCThermistorCircuitElement extends AbstractCircuitElement {
     ctx.save();
     ctx.setLineWidth(1);
 
-    // Lead lines: (0,0)→(1,0) and (3,0)→(4,0)
-    // Zigzag body spanning x=1→x=3, ±0.375gu amplitude
+    // Lead lines: (0,0)â†’(1,0) and (3,0)â†’(4,0)
+    // Zigzag body spanning x=1â†’x=3, Â±0.375gu amplitude
     const pts: Array<{ x: number; y: number }> = [
       { x: 0, y: 0 },
       { x: 1, y: 0 },
@@ -354,7 +354,7 @@ export class NTCThermistorCircuitElement extends AbstractCircuitElement {
       { x: 4, y: 0 },
     ];
 
-    // Zigzag gradient from pos→neg
+    // Zigzag gradient from posâ†’neg
     if (hasVoltage && ctx.setLinearGradient) {
       ctx.setLinearGradient(0, 0, 4, 0, [
         { offset: 0, color: signals!.voltageColor(vPos!) },
@@ -367,7 +367,7 @@ export class NTCThermistorCircuitElement extends AbstractCircuitElement {
       ctx.drawLine(pts[i].x, pts[i].y, pts[i + 1].x, pts[i + 1].y);
     }
 
-    // NTC hockey stick: horizontal then diagonal — temperature indicator decoration
+    // NTC hockey stick: horizontal then diagonal â€” temperature indicator decoration
     ctx.setColor("COMPONENT");
     ctx.drawLine(0.625, 0.75, 1.375, 0.75);
     ctx.drawLine(1.375, 0.75, 3, -0.75);
@@ -390,10 +390,10 @@ const NTC_PROPERTY_DEFS: PropertyDefinition[] = [
   {
     key: "t0",
     type: PropertyType.FLOAT,
-    label: "T₀ (K)",
+    label: "Tâ‚€ (K)",
     defaultValue: 298.15,
     min: 1,
-    description: "Reference temperature in Kelvin (default 25°C = 298.15 K)",
+    description: "Reference temperature in Kelvin (default 25Â°C = 298.15 K)",
   },
   {
     key: "selfHeating",
@@ -459,7 +459,7 @@ export const NTCThermistorDefinition: ComponentDefinition = {
   attributeMap: NTC_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.PASSIVES,
   helpText:
-    "NTC Thermistor — negative temperature coefficient resistor. " +
+    "NTC Thermistor â€” negative temperature coefficient resistor. " +
     "Resistance decreases exponentially with temperature (B-parameter model).",
   models: {},
   modelRegistry: {

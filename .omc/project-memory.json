@@ -42,8 +42,8 @@
     "runtime": null
   },
   "build": {
-    "buildCommand": "npx tsc --noEmit --strict --target ES2022 --module ESNext --moduleResolution bundler --lib ES2022,DOM src/components/semiconductors/__tests__/zener.test.ts 2>&1 > .phase1-zener.log; head -5 .phase1-zener.log",
-    "testCommand": "npx vitest run \"src/solver/analog/__tests__/harness/harness-integration.test.ts\" \"src/solver/analog/__tests__/ngspice-parity/resistive-divider.test.ts\" \"src/solver/analog/__tests__/ngspice-parity/_diag-rc-transient.test.ts\" --reporter=basic --testTimeout=60000 > .phase1-gates.log 2>&1; echo \"EXIT=$?\"; tail -25 .phase1-gates.log",
+    "buildCommand": "cd C:/local_working_projects/digital_in_browser && npx tsc --noEmit -p tsconfig.json > .phase2-tsc.log 2>&1; echo \"exit=$?\"; cat .phase2-tsc.log | head -30",
+    "testCommand": "cd C:/local_working_projects/digital_in_browser && timeout 120 npx vitest run src/solver/analog/__tests__/sparse-solver.test.ts --reporter=basic --no-coverage 2>&1 | tail -80",
     "lintCommand": "npm run lint",
     "devCommand": "npm run dev",
     "scripts": {
@@ -285,8 +285,8 @@
   "hotPaths": [
     {
       "path": "src\\solver\\analog\\analog-engine.ts",
-      "accessCount": 174,
-      "lastAccessed": 1777199714370,
+      "accessCount": 178,
+      "lastAccessed": 1777203810223,
       "type": "file"
     },
     {
@@ -297,14 +297,14 @@
     },
     {
       "path": "src\\solver\\analog\\__tests__\\harness\\comparison-session.ts",
-      "accessCount": 98,
-      "lastAccessed": 1777194536736,
+      "accessCount": 103,
+      "lastAccessed": 1777204281545,
       "type": "file"
     },
     {
       "path": "src\\solver\\analog\\newton-raphson.ts",
-      "accessCount": 86,
-      "lastAccessed": 1777200668710,
+      "accessCount": 89,
+      "lastAccessed": 1777204702216,
       "type": "file"
     },
     {
@@ -327,8 +327,8 @@
     },
     {
       "path": "src\\solver\\analog\\__tests__\\harness\\capture.ts",
-      "accessCount": 34,
-      "lastAccessed": 1777200835842,
+      "accessCount": 35,
+      "lastAccessed": 1777204784049,
       "type": "file"
     },
     {
@@ -356,6 +356,12 @@
       "type": "file"
     },
     {
+      "path": "src/solver/analog",
+      "accessCount": 18,
+      "lastAccessed": 1777204724751,
+      "type": "directory"
+    },
+    {
       "path": ".vitest-failures.json",
       "accessCount": 16,
       "lastAccessed": 1777199812841,
@@ -366,12 +372,6 @@
       "accessCount": 15,
       "lastAccessed": 1777127562691,
       "type": "file"
-    },
-    {
-      "path": "src/solver/analog",
-      "accessCount": 15,
-      "lastAccessed": 1777127838659,
-      "type": "directory"
     },
     {
       "path": "src\\solver\\coordinator.ts",
@@ -389,6 +389,12 @@
       "path": "src\\solver\\analog\\dc-operating-point.ts",
       "accessCount": 12,
       "lastAccessed": 1777127767963,
+      "type": "file"
+    },
+    {
+      "path": "src\\components\\active\\__tests__\\comparator.test.ts",
+      "accessCount": 10,
+      "lastAccessed": 1777204695420,
       "type": "file"
     },
     {
@@ -413,12 +419,6 @@
       "path": "src\\solver\\analog\\__tests__\\ngspice-parity\\fixtures\\resistive-divider.dts",
       "accessCount": 6,
       "lastAccessed": 1777128033605,
-      "type": "file"
-    },
-    {
-      "path": "src\\components\\active\\__tests__\\comparator.test.ts",
-      "accessCount": 6,
-      "lastAccessed": 1777196311427,
       "type": "file"
     },
     {

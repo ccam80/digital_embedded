@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Capacitor analog component.
  *
  * Reactive two-terminal element modelled using companion model (equivalent
@@ -82,7 +82,7 @@ function buildCapacitorPinDeclarations(): PinDeclaration[] {
 }
 
 // ---------------------------------------------------------------------------
-// CapacitorElement — CircuitElement implementation
+// CapacitorElement â€” CircuitElement implementation
 // ---------------------------------------------------------------------------
 
 export class CapacitorElement extends AbstractCircuitElement {
@@ -120,11 +120,11 @@ export class CapacitorElement extends AbstractCircuitElement {
     const vB = signals?.getPinVoltage("neg");
     const hasVoltage = vA !== undefined && vB !== undefined;
 
-    // Left lead + plate — colored by pin A voltage
+    // Left lead + plate â€” colored by pin A voltage
     drawColoredLead(ctx, hasVoltage ? signals : undefined, vA, 0, 0, 1.75, 0);
     ctx.drawLine(1.75, -0.75, 1.75, 0.75);
 
-    // Right lead + plate — colored by pin B voltage
+    // Right lead + plate â€” colored by pin B voltage
     drawColoredLead(ctx, hasVoltage ? signals : undefined, vB, 2.25, 0, 4, 0);
     ctx.drawLine(2.25, -0.75, 2.25, 0.75);
 
@@ -140,10 +140,10 @@ export class CapacitorElement extends AbstractCircuitElement {
 }
 
 // ---------------------------------------------------------------------------
-// AnalogCapacitorElement — MNA implementation
+// AnalogCapacitorElement â€” MNA implementation
 // ---------------------------------------------------------------------------
 
-// Slot layout — 5 slots total. Previous values are read from s1/s2/s3
+// Slot layout â€” 5 slots total. Previous values are read from s1/s2/s3
 // at the same offsets (pointer-rotation history).
 const CAPACITOR_SCHEMA: StateSchema = defineStateSchema("AnalogCapacitorElement", [
   { name: "GEQ",  doc: "Companion conductance",       init: { kind: "zero" } },
@@ -194,9 +194,9 @@ export class AnalogCapacitorElement implements ReactiveAnalogElementCore {
     this._TNOM = TNOM;
     this._SCALE = SCALE;
     this._M = M;
-    // capload.c:44 — CAPm is applied at stamp time, not folded into CAPcapac.
+    // capload.c:44 â€” CAPm is applied at stamp time, not folded into CAPcapac.
     // C is raw per-instance capacitance (TC + SCALE applied); M kept separate.
-    // _pool not yet set in constructor; temperature defaults to TNOM → dT = 0.
+    // _pool not yet set in constructor; temperature defaults to TNOM â†’ dT = 0.
     const _dT0 = 300.15 - this._TNOM;
     this.C = this._nominalC * (1 + this._TC1 * _dT0 + this._TC2 * _dT0 * _dT0) * this._SCALE;
   }
@@ -230,13 +230,13 @@ export class AnalogCapacitorElement implements ReactiveAnalogElementCore {
       const dT = 300.15 - this._TNOM;
       this.C = this._nominalC * (1 + this._TC1 * dT + this._TC2 * dT * dT) * this._SCALE;
     } else if (key === "M") {
-      // capload.c:44 — M is applied at stamp time; C is not recomputed when M changes.
+      // capload.c:44 â€” M is applied at stamp time; C is not recomputed when M changes.
       this._M = value;
     }
   }
 
   /**
-   * Unified load() — ngspice capload.c CAPload.
+   * Unified load() â€” ngspice capload.c CAPload.
    *
    * Reads terminal voltage, computes charge Q = C*V, NIintegrates inline using
    * ctx.ag[], and stamps the companion model (geq conductance + ceq current
@@ -247,19 +247,19 @@ export class AnalogCapacitorElement implements ReactiveAnalogElementCore {
     const n0 = this.pinNodeIds[0];
     const n1 = this.pinNodeIds[1];
     const C = this.C;
-    // capload.c:44 — m = CAPm; applied at every stamp site, not folded into C.
+    // capload.c:44 â€” m = CAPm; applied at every stamp site, not folded into C.
     const m = this._M;
     const base = this.stateBaseOffset;
-    // pool.states[N] accessed at call time — no cached Float64Array refs (A4).
+    // pool.states[N] accessed at call time â€” no cached Float64Array refs (A4).
     const s0 = this._pool.states[0];
     const s1 = this._pool.states[1];
     const s2 = this._pool.states[2];
     const s3 = this._pool.states[3];
 
-    // ngspice capload.c:30 — participate only in MODETRAN | MODEAC | MODETRANOP.
+    // ngspice capload.c:30 â€” participate only in MODETRAN | MODEAC | MODETRANOP.
     if (!(mode & (MODETRAN | MODEAC | MODETRANOP))) return;
 
-    // capload.c:32-36 — IC gate.
+    // capload.c:32-36 â€” IC gate.
     const cond1 =
       ((mode & MODEDC) && (mode & MODEINITJCT)) ||
       ((mode & MODEUIC) && (mode & MODEINITTRAN));
@@ -269,8 +269,8 @@ export class AnalogCapacitorElement implements ReactiveAnalogElementCore {
     if (cond1) {
       vcap = this._IC;
     } else {
-      const v0 = n0 > 0 ? voltages[n0 - 1] : 0;
-      const v1 = n1 > 0 ? voltages[n1 - 1] : 0;
+      const v0 = voltages[n0];
+      const v1 = voltages[n1];
       vcap = v0 - v1;
     }
 
@@ -317,24 +317,24 @@ export class AnalogCapacitorElement implements ReactiveAnalogElementCore {
 
       // Allocate matrix handles once (ngspice spGetElement pattern).
       if (!this._handlesInit) {
-        if (n0 !== 0) this._hAA = solver.allocElement(n0 - 1, n0 - 1);
-        if (n1 !== 0) this._hBB = solver.allocElement(n1 - 1, n1 - 1);
+        if (n0 !== 0) this._hAA = solver.allocElement(n0, n0);
+        if (n1 !== 0) this._hBB = solver.allocElement(n1, n1);
         if (n0 !== 0 && n1 !== 0) {
-          this._hAB = solver.allocElement(n0 - 1, n1 - 1);
-          this._hBA = solver.allocElement(n1 - 1, n0 - 1);
+          this._hAB = solver.allocElement(n0, n1);
+          this._hBA = solver.allocElement(n1, n0);
         }
         this._handlesInit = true;
       }
 
-      // Stamp companion model (capload.c:74-79 — all entries scaled by m = CAPm).
+      // Stamp companion model (capload.c:74-79 â€” all entries scaled by m = CAPm).
       if (n0 !== 0) solver.stampElement(this._hAA, m * geq);
       if (n1 !== 0) solver.stampElement(this._hBB, m * geq);
       if (n0 !== 0 && n1 !== 0) {
         solver.stampElement(this._hAB, -m * geq);
         solver.stampElement(this._hBA, -m * geq);
       }
-      if (n0 !== 0) solver.stampRHS(n0 - 1, -m * ceq);
-      if (n1 !== 0) solver.stampRHS(n1 - 1, m * ceq);
+      if (n0 !== 0) solver.stampRHS(n0, -m * ceq);
+      if (n1 !== 0) solver.stampRHS(n1, m * ceq);
     } else {
       // DC operating point: just store charge, no matrix stamp (capload.c:84).
       s0[base + SLOT_Q] = C * vcap;
@@ -347,8 +347,8 @@ export class AnalogCapacitorElement implements ReactiveAnalogElementCore {
   getPinCurrents(voltages: Float64Array): number[] {
     const n0 = this.pinNodeIds[0];
     const n1 = this.pinNodeIds[1];
-    const v0 = n0 > 0 ? voltages[n0 - 1] : 0;
-    const v1 = n1 > 0 ? voltages[n1 - 1] : 0;
+    const v0 = voltages[n0];
+    const v1 = voltages[n1];
     const s0 = this._pool.states[0];
     const base = this.stateBaseOffset;
     const geq = s0[base + SLOT_GEQ];
@@ -444,7 +444,7 @@ export const CapacitorDefinition: ComponentDefinition = {
   attributeMap: CAPACITOR_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.PASSIVES,
   helpText:
-    "Capacitor — reactive element with companion model.\n" +
+    "Capacitor â€” reactive element with companion model.\n" +
     "Stamps equivalent conductance and history current source at each timestep.",
   models: {},
   modelRegistry: {

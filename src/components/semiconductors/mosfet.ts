@@ -1,5 +1,5 @@
-/**
- * MOSFET analog components — N-channel and P-channel MOSFETs (SPICE Level 1).
+﻿/**
+ * MOSFET analog components â€” N-channel and P-channel MOSFETs (SPICE Level 1).
  *
  * Port of ngspice `ref/ngspice/src/spicelib/devices/mos1/mos1load.c::MOS1load`.
  * Single-pass `load()` per device per NR iteration (Wave 6.1 unified interface).
@@ -9,10 +9,10 @@
  * slots cited in C-AUD-6). Only slots with direct ngspice MOS1state<n>
  * correspondence in `mos1defs.h:269-291` survive.
  *
- * G1 — Sign convention (Phase 2.5 W1.3 ruling 2026-04-21): digiTS now uses
- * ngspice's VBS / VBD convention — `vbs = vb - vs`, `vbd = vb - vd`. Prior
- * code used VSB/VBD with an opposite sign; every site — limiting,
- * cap-voltage updates, current evaluation, stamps — is ported from
+ * G1 â€” Sign convention (Phase 2.5 W1.3 ruling 2026-04-21): digiTS now uses
+ * ngspice's VBS / VBD convention â€” `vbs = vb - vs`, `vbd = vb - vd`. Prior
+ * code used VSB/VBD with an opposite sign; every site â€” limiting,
+ * cap-voltage updates, current evaluation, stamps â€” is ported from
  * `mos1load.c:150-250` verbatim with the ngspice convention.
  *
  * PMOS is the NMOS model with polarity=-1, matching ngspice `MOS1type`.
@@ -78,7 +78,7 @@ const EPS0 = 8.854214871e-12;
 const EPS_OX = 3.9;
 
 // ---------------------------------------------------------------------------
-// MosfetParams / ResolvedMosfetParams — raw PropertyBag → typed
+// MosfetParams / ResolvedMosfetParams â€” raw PropertyBag â†’ typed
 // ---------------------------------------------------------------------------
 
 interface MosfetParams {
@@ -113,20 +113,20 @@ export interface ResolvedMosfetParams {
   M: number; OFF: number;
   ICVDS: number; ICVGS: number; ICVBS: number;
   TEMP: number;
-  // Temperature-corrected values — populated by MosfetTempParams
+  // Temperature-corrected values â€” populated by MosfetTempParams
   _tKP?: number;
   _tPhi?: number;
   _tVto?: number;
 }
 
 // ---------------------------------------------------------------------------
-// Model parameter declarations — NMOS
+// Model parameter declarations â€” NMOS
 // ---------------------------------------------------------------------------
 
 export const { paramDefs: MOSFET_NMOS_PARAM_DEFS, defaults: MOSFET_NMOS_DEFAULTS } = defineModelParams({
   primary: {
     VTO:    { default: 1.0,  unit: "V",      description: "Threshold voltage" },
-    KP:     { default: 2e-5, unit: "A/V²",   description: "Process transconductance parameter" },
+    KP:     { default: 2e-5, unit: "A/VÂ²",   description: "Process transconductance parameter" },
     LAMBDA: { default: 0,    unit: "1/V",    description: "Channel-length modulation" },
   },
   secondary: {
@@ -137,21 +137,21 @@ export const { paramDefs: MOSFET_NMOS_PARAM_DEFS, defaults: MOSFET_NMOS_DEFAULTS
     CGDO:   { default: 0,    unit: "F/m",    description: "Gate-drain overlap capacitance per unit width" },
     CGSO:   { default: 0,    unit: "F/m",    description: "Gate-source overlap capacitance per unit width" },
     CGBO:   { default: 0,    unit: "F/m",    description: "Gate-bulk overlap capacitance per unit length" },
-    RD:     { default: 0,    unit: "Ω",      description: "Drain ohmic resistance" },
-    RS:     { default: 0,    unit: "Ω",      description: "Source ohmic resistance" },
+    RD:     { default: 0,    unit: "Î©",      description: "Drain ohmic resistance" },
+    RS:     { default: 0,    unit: "Î©",      description: "Source ohmic resistance" },
     IS:     { default: 1e-14, unit: "A",     description: "Bulk junction saturation current" },
     PB:     { default: 0.8,  unit: "V",      description: "Bulk junction potential" },
-    CJ:     { default: 0,    unit: "F/m²",   description: "Zero-bias bulk junction bottom capacitance per unit area" },
+    CJ:     { default: 0,    unit: "F/mÂ²",   description: "Zero-bias bulk junction bottom capacitance per unit area" },
     MJ:     { default: 0.5,                  description: "Bulk junction bottom grading coefficient" },
     CJSW:   { default: 0,    unit: "F/m",    description: "Zero-bias junction sidewall capacitance per unit length" },
     MJSW:   { default: 0.5,                  description: "Bulk junction sidewall grading coefficient" },
-    JS:     { default: 0,    unit: "A/m²",   description: "Bulk junction saturation current density" },
-    RSH:    { default: 0,    unit: "Ω/sq",   description: "Drain/source diffusion sheet resistance" },
+    JS:     { default: 0,    unit: "A/mÂ²",   description: "Bulk junction saturation current density" },
+    RSH:    { default: 0,    unit: "Î©/sq",   description: "Drain/source diffusion sheet resistance" },
     TNOM:   { default: REFTEMP, unit: "K",   description: "Nominal temperature" },
     TOX:    { default: 1e-7, unit: "m",      description: "Oxide thickness" },
     TPG:    { default: 1,                    description: "Gate type: 1=opposite, -1=same, 0=Al gate" },
     LD:     { default: 0,    unit: "m",      description: "Lateral diffusion" },
-    UO:     { default: 600,  unit: "cm²/Vs", description: "Surface mobility" },
+    UO:     { default: 600,  unit: "cmÂ²/Vs", description: "Surface mobility" },
     KF:     { default: 0,                    description: "Flicker noise coefficient" },
     AF:     { default: 1,                    description: "Flicker noise exponent" },
     FC:     { default: 0.5,                  description: "Forward-bias depletion capacitance coefficient" },
@@ -159,8 +159,8 @@ export const { paramDefs: MOSFET_NMOS_PARAM_DEFS, defaults: MOSFET_NMOS_DEFAULTS
   instance: {
     W:      { default: 1e-6, unit: "m",      description: "Channel width" },
     L:      { default: 1e-6, unit: "m",      description: "Channel length" },
-    AD:     { default: 0,    unit: "m²",     description: "Drain area" },
-    AS:     { default: 0,    unit: "m²",     description: "Source area" },
+    AD:     { default: 0,    unit: "mÂ²",     description: "Drain area" },
+    AS:     { default: 0,    unit: "mÂ²",     description: "Source area" },
     PD:     { default: 0,    unit: "m",      description: "Drain perimeter" },
     PS:     { default: 0,    unit: "m",      description: "Source perimeter" },
     M:      { default: 1,                    description: "Parallel device multiplier" },
@@ -223,13 +223,13 @@ const NMOS_IRFZ44N = deviceParams(MOSFET_NMOS_PARAM_DEFS, {
 });
 
 // ---------------------------------------------------------------------------
-// Model parameter declarations — PMOS
+// Model parameter declarations â€” PMOS
 // ---------------------------------------------------------------------------
 
 export const { paramDefs: MOSFET_PMOS_PARAM_DEFS, defaults: MOSFET_PMOS_DEFAULTS } = defineModelParams({
   primary: {
     VTO:    { default: -1.0, unit: "V",      description: "Threshold voltage" },
-    KP:     { default: 1e-5, unit: "A/V²",   description: "Process transconductance parameter" },
+    KP:     { default: 1e-5, unit: "A/VÂ²",   description: "Process transconductance parameter" },
     LAMBDA: { default: 0,    unit: "1/V",    description: "Channel-length modulation" },
   },
   secondary: {
@@ -240,21 +240,21 @@ export const { paramDefs: MOSFET_PMOS_PARAM_DEFS, defaults: MOSFET_PMOS_DEFAULTS
     CGDO:   { default: 0,    unit: "F/m",    description: "Gate-drain overlap capacitance per unit width" },
     CGSO:   { default: 0,    unit: "F/m",    description: "Gate-source overlap capacitance per unit width" },
     CGBO:   { default: 0,    unit: "F/m",    description: "Gate-bulk overlap capacitance per unit length" },
-    RD:     { default: 0,    unit: "Ω",      description: "Drain ohmic resistance" },
-    RS:     { default: 0,    unit: "Ω",      description: "Source ohmic resistance" },
+    RD:     { default: 0,    unit: "Î©",      description: "Drain ohmic resistance" },
+    RS:     { default: 0,    unit: "Î©",      description: "Source ohmic resistance" },
     IS:     { default: 1e-14, unit: "A",     description: "Bulk junction saturation current" },
     PB:     { default: 0.8,  unit: "V",      description: "Bulk junction potential" },
-    CJ:     { default: 0,    unit: "F/m²",   description: "Zero-bias bulk junction bottom capacitance per unit area" },
+    CJ:     { default: 0,    unit: "F/mÂ²",   description: "Zero-bias bulk junction bottom capacitance per unit area" },
     MJ:     { default: 0.5,                  description: "Bulk junction bottom grading coefficient" },
     CJSW:   { default: 0,    unit: "F/m",    description: "Zero-bias junction sidewall capacitance per unit length" },
     MJSW:   { default: 0.5,                  description: "Bulk junction sidewall grading coefficient" },
-    JS:     { default: 0,    unit: "A/m²",   description: "Bulk junction saturation current density" },
-    RSH:    { default: 0,    unit: "Ω/sq",   description: "Drain/source diffusion sheet resistance" },
+    JS:     { default: 0,    unit: "A/mÂ²",   description: "Bulk junction saturation current density" },
+    RSH:    { default: 0,    unit: "Î©/sq",   description: "Drain/source diffusion sheet resistance" },
     TNOM:   { default: REFTEMP, unit: "K",   description: "Nominal temperature" },
     TOX:    { default: 1e-7, unit: "m",      description: "Oxide thickness" },
     TPG:    { default: 1,                    description: "Gate type: 1=opposite, -1=same, 0=Al gate" },
     LD:     { default: 0,    unit: "m",      description: "Lateral diffusion" },
-    UO:     { default: 250,  unit: "cm²/Vs", description: "Surface mobility (PMOS default 250)" },
+    UO:     { default: 250,  unit: "cmÂ²/Vs", description: "Surface mobility (PMOS default 250)" },
     KF:     { default: 0,                    description: "Flicker noise coefficient" },
     AF:     { default: 1,                    description: "Flicker noise exponent" },
     FC:     { default: 0.5,                  description: "Forward-bias depletion capacitance coefficient" },
@@ -262,8 +262,8 @@ export const { paramDefs: MOSFET_PMOS_PARAM_DEFS, defaults: MOSFET_PMOS_DEFAULTS
   instance: {
     W:      { default: 1e-6, unit: "m",      description: "Channel width" },
     L:      { default: 1e-6, unit: "m",      description: "Channel length" },
-    AD:     { default: 0,    unit: "m²",     description: "Drain area" },
-    AS:     { default: 0,    unit: "m²",     description: "Source area" },
+    AD:     { default: 0,    unit: "mÂ²",     description: "Drain area" },
+    AS:     { default: 0,    unit: "mÂ²",     description: "Source area" },
     PD:     { default: 0,    unit: "m",      description: "Drain perimeter" },
     PS:     { default: 0,    unit: "m",      description: "Source perimeter" },
     M:      { default: 1,                    description: "Parallel device multiplier" },
@@ -326,7 +326,7 @@ const PMOS_IRF4905 = deviceParams(MOSFET_PMOS_PARAM_DEFS, {
 });
 
 // ---------------------------------------------------------------------------
-// resolveParams — fill default values for optional MosfetParams fields
+// resolveParams â€” fill default values for optional MosfetParams fields
 // ---------------------------------------------------------------------------
 
 function resolveParams(raw: MosfetParams, _kpDefault: number): ResolvedMosfetParams {
@@ -360,7 +360,7 @@ function resolveParams(raw: MosfetParams, _kpDefault: number): ResolvedMosfetPar
 }
 
 // ---------------------------------------------------------------------------
-// computeTempParams — ngspice mos1temp.c:44-289 port
+// computeTempParams â€” ngspice mos1temp.c:44-289 port
 // ---------------------------------------------------------------------------
 
 export interface MosfetTempParams {
@@ -561,7 +561,7 @@ export function computeCapacitances(
 }
 
 // ---------------------------------------------------------------------------
-// devQmeyer — Meyer gate capacitance model (devsup.c:625-689 port)
+// devQmeyer â€” Meyer gate capacitance model (devsup.c:625-689 port)
 // ---------------------------------------------------------------------------
 
 /**
@@ -616,27 +616,27 @@ function devQmeyer(
 }
 
 // ---------------------------------------------------------------------------
-// State schema — MOSFET SPICE L1 (Phase 2.5 W1.3 A1 post-excision).
+// State schema â€” MOSFET SPICE L1 (Phase 2.5 W1.3 A1 post-excision).
 //
 // Only slots with direct correspondence in `mos1defs.h:269-291` MOS1state<n>
 // offsets, plus a small set of DC-op-only scalar slots required by our
 // factory (cd / gm / gds / gmbs / mode / von / vbs_old / vbd_old / gbd / gbs /
 // cbd / cbs). The 11 invented cap+Q cross-method slots (per C-AUD-6) are
-// deleted — the cap companion geq/ieq values lump inline into gbd/gbs and
+// deleted â€” the cap companion geq/ieq values lump inline into gbd/gbs and
 // the gate-stamp matrix/RHS entries per `mos1load.c:900-end`.
 //
 // Deleted invented slots (the 11 cited in C-AUD-6):
-//   1. CAP_GEQ_GS   (fet-base.ts SLOT 6)  — lumped inline per mos1load.c:930,942
-//   2. CAP_IEQ_GS   (fet-base.ts SLOT 7)  — lumped inline into ceqgs
-//   3. CAP_GEQ_GD   (fet-base.ts SLOT 8)  — lumped inline per mos1load.c:941
-//   4. CAP_IEQ_GD   (fet-base.ts SLOT 9)  — lumped inline into ceqgd
-//   5. CAP_GEQ_GB   (fet-base.ts SLOT 18) — lumped inline per mos1load.c:930,940
-//   6. CAP_IEQ_GB   (fet-base.ts SLOT 19) — lumped inline into ceqgb
-//   7. CAP_GEQ_DB   (fet-base.ts SLOT 12) — lumped into gbd per mos1load.c:717
-//   8. CAP_IEQ_DB   (fet-base.ts SLOT 13) — lumped into cbd per mos1load.c:718-719
-//   9. CAP_GEQ_SB   (fet-base.ts SLOT 14) — lumped into gbs per mos1load.c:723
-//  10. CAP_IEQ_SB   (fet-base.ts SLOT 15) — lumped into cbs per mos1load.c:724
-//  11. MEYER_GB     (fet-base.ts SLOT 37) — ngspice uses CKTstate0/1 capgb
+//   1. CAP_GEQ_GS   (fet-base.ts SLOT 6)  â€” lumped inline per mos1load.c:930,942
+//   2. CAP_IEQ_GS   (fet-base.ts SLOT 7)  â€” lumped inline into ceqgs
+//   3. CAP_GEQ_GD   (fet-base.ts SLOT 8)  â€” lumped inline per mos1load.c:941
+//   4. CAP_IEQ_GD   (fet-base.ts SLOT 9)  â€” lumped inline into ceqgd
+//   5. CAP_GEQ_GB   (fet-base.ts SLOT 18) â€” lumped inline per mos1load.c:930,940
+//   6. CAP_IEQ_GB   (fet-base.ts SLOT 19) â€” lumped inline into ceqgb
+//   7. CAP_GEQ_DB   (fet-base.ts SLOT 12) â€” lumped into gbd per mos1load.c:717
+//   8. CAP_IEQ_DB   (fet-base.ts SLOT 13) â€” lumped into cbd per mos1load.c:718-719
+//   9. CAP_GEQ_SB   (fet-base.ts SLOT 14) â€” lumped into gbs per mos1load.c:723
+//  10. CAP_IEQ_SB   (fet-base.ts SLOT 15) â€” lumped into cbs per mos1load.c:724
+//  11. MEYER_GB     (fet-base.ts SLOT 37) â€” ngspice uses CKTstate0/1 capgb
 //                   averaging (mos1load.c:800-806), not a separate half-cap stash
 //
 // Surviving slots have direct mos1defs.h correspondence:
@@ -735,9 +735,9 @@ const SLOT_VON = 26;
 const SLOT_VDSAT = 27;
 
 // ---------------------------------------------------------------------------
-// createMosfetElement — AnalogElement factory (closure-based, BJT pattern)
+// createMosfetElement â€” AnalogElement factory (closure-based, BJT pattern)
 // Single load() ported from mos1load.c line-by-line.
-// No cached Float64Array state refs — pool.states[N] at call time.
+// No cached Float64Array state refs â€” pool.states[N] at call time.
 // ---------------------------------------------------------------------------
 
 export function createMosfetElement(
@@ -853,7 +853,7 @@ export function createMosfetElement(
      * ceqgs/ceqgd/ceqgb RHS terms. No cross-method cap+Q slots.
      */
     load(ctx: LoadContext): void {
-      // mos1load.c:108: Check=0 — false initially; set true only if pnjlim fires.
+      // mos1load.c:108: Check=0 â€” false initially; set true only if pnjlim fires.
       let icheckLimited = false;
 
       const s0 = pool.states[0];
@@ -863,7 +863,7 @@ export function createMosfetElement(
       const voltages = ctx.rhsOld;
       const solver = ctx.solver;
 
-      // mos1load.c:107: vt = CONSTKoverQ * MOS1temp — per-instance thermal voltage.
+      // mos1load.c:107: vt = CONSTKoverQ * MOS1temp â€” per-instance thermal voltage.
       const vt = tp.vt;
 
       // mos1load.c:130-147: precomputed operation-point constants.
@@ -878,12 +878,12 @@ export function createMosfetElement(
       const OxideCap = params.TOX > 0 ? (EPS_OX * EPS0 / params.TOX) * lde * m * params.W : 0;
 
       // mos1load.c:200-204: MODEINITFLOAT | MODEINITPRED | MODEINITSMSIG | MODEINITTRAN
-      // or (MODEINITFIX && !OFF) → fall through to the "simple" dispatch block.
+      // or (MODEINITFIX && !OFF) â†’ fall through to the "simple" dispatch block.
       //
-      // Else (mos1load.c:412-434) → MODEINITJCT / MODEINITFIX+OFF / default-zero.
+      // Else (mos1load.c:412-434) â†’ MODEINITJCT / MODEINITFIX+OFF / default-zero.
       let vbs: number, vgs: number, vds: number, vbd: number, vgd: number;
 
-      // Bypass state — set by the simpleGate branch. Tracked across the whole
+      // Bypass state â€” set by the simpleGate branch. Tracked across the whole
       // load() body so the OP-eval/cap-block gate at `if (bypassed)` works.
       let bypassed = false;
       // Bypass-rebuilt cap totals (populated only when bypass fires under
@@ -897,7 +897,7 @@ export function createMosfetElement(
       // cite: mos1load.c:202-204, 226-240, 565, 789, 862
       // MODEINITFLOAT | MODEINITPRED | MODEINITSMSIG | MODEINITTRAN |
       // (MODEINITFIX && !OFF) all take the simple/general block. SMSIG takes the
-      // general-iteration path (rhsOld), not a special seed-from-state0 branch —
+      // general-iteration path (rhsOld), not a special seed-from-state0 branch â€”
       // ngspice mos1load.c:202-204 gates SMSIG into the simple block; line 226
       // else reads vbs/vgs/vds from CKTrhsOld, same as MODEINITFLOAT. No early
       // return and no special seed for SMSIG.
@@ -920,11 +920,11 @@ export function createMosfetElement(
         } else {
           // mos1load.c:226-240: general iteration path (MODEINITFLOAT, MODEINITSMSIG,
           // MODEINITFIX+!OFF). vbs/vgs/vds from CKTrhsOld with polarity sign flip.
-          const vB = nodeB > 0 ? voltages[nodeB - 1] : 0;
-          const vS_volt = nodeS > 0 ? voltages[nodeS - 1] : 0;
-          const vG_volt = nodeG > 0 ? voltages[nodeG - 1] : 0;
-          const vD_volt = nodeD > 0 ? voltages[nodeD - 1] : 0;
-          // mos1load.c:231-239 — G1: ngspice computes vbs = B - S, vgs = G - S,
+          const vB = voltages[nodeB];
+          const vS_volt = voltages[nodeS];
+          const vG_volt = voltages[nodeG];
+          const vD_volt = voltages[nodeD];
+          // mos1load.c:231-239 â€” G1: ngspice computes vbs = B - S, vgs = G - S,
           // vds = D - S; polarity scales the result (MOS1type factor).
           vbs = polarity * (vB - vS_volt);
           vgs = polarity * (vG_volt - vS_volt);
@@ -938,12 +938,12 @@ export function createMosfetElement(
         // Hoisted cap totals (written by bypass branch or Meyer block below).
         // Declared here so the post-if block can use them uniformly.
         // (Assignment happens inside the bypass branch or the Meyer block below.)
-        // NOTE: this is re-declared below for the else branch — JS block-scoped.
+        // NOTE: this is re-declared below for the else branch â€” JS block-scoped.
 
-        // cite: mos1load.c:258-348 — NOBYPASS bypass gate runs BEFORE limiting.
+        // cite: mos1load.c:258-348 â€” NOBYPASS bypass gate runs BEFORE limiting.
         // ngspice structure: (1) compute delv's + cdhat + cbhat; (2) bypass gate;
         // (3) if !bypass, run limiting (mos1load.c:356-406). The bypass path
-        // `goto bypass;` at mos1load.c:346 skips limiting entirely — so no
+        // `goto bypass;` at mos1load.c:346 skips limiting entirely â€” so no
         // pnjlim/fetlim/limvds events post to ctx.limitingCollector when bypass
         // fires, and icheckLimited stays false on bypass.
         {
@@ -968,11 +968,11 @@ export function createMosfetElement(
 
           let cdhat: number;
           if (prevMode >= 0) {
-            // cite: mos1load.c:258-264 — normal-mode cdhat uses delvgs/delvds/
+            // cite: mos1load.c:258-264 â€” normal-mode cdhat uses delvgs/delvds/
             // delvbs/delvbd directly. delvgd is only used in the reverse branch.
             cdhat = prevCd + prevGm * delvgs + prevGds * delvds + prevGmbs * delvbs - prevGbd * delvbd;
           } else {
-            // cite: mos1load.c:265-272 — reverse-mode cdhat uses delvgd.
+            // cite: mos1load.c:265-272 â€” reverse-mode cdhat uses delvgd.
             const delvgd = delvgs - delvds;
             cdhat = prevCd - (prevGbd - prevGmbs) * delvbd - prevGm * delvgd + prevGds * delvds;
           }
@@ -988,7 +988,7 @@ export function createMosfetElement(
             && Math.abs(delvds) < ctx.reltol * Math.max(Math.abs(vds), Math.abs(prevVds)) + ctx.voltTol
             && Math.abs(cdhat - prevCd) < ctx.reltol * Math.max(Math.abs(cdhat), Math.abs(prevCd)) + ctx.iabstol
           ) {
-            // cite: mos1load.c:322-347 — bypass: reload voltages from state0,
+            // cite: mos1load.c:322-347 â€” bypass: reload voltages from state0,
             // rebuild cap totals from cached half-caps (MODETRAN/MODETRANOP only),
             // then `goto bypass;` which skips the limiting block entirely.
             vbs = prevVbs; vbd = prevVbd; vgs = prevVgs; vds = prevVds;
@@ -1004,7 +1004,7 @@ export function createMosfetElement(
         }
 
         if (!bypassed) {
-          // mos1load.c:356-406 — voltage limiting (NODELIMITING is undef).
+          // mos1load.c:356-406 â€” voltage limiting (NODELIMITING is undef).
           // cite: mos1load.c:370, 376, 382, 387, 395, 401
           // Limiting runs only when bypass did NOT fire. ngspice `goto bypass;`
           // at line 346 jumps past this entire block. Predictor voltages also
@@ -1019,7 +1019,7 @@ export function createMosfetElement(
           const vdsOldStored = s0[base + SLOT_VDS];
 
           if (vdsOldStored >= 0) {
-            // mos1load.c:368-378: forward — fetlim vgs, derive vds, limvds.
+            // mos1load.c:368-378: forward â€” fetlim vgs, derive vds, limvds.
             const vgsBefore = vgs;
             vgs = fetlim(vgs, vgsOldStored, vonForLim);
             vds = vgs - vgd;
@@ -1044,7 +1044,7 @@ export function createMosfetElement(
               });
             }
           } else {
-            // mos1load.c:380-392: reverse — fetlim vgd, derive vds, neg limvds.
+            // mos1load.c:380-392: reverse â€” fetlim vgd, derive vds, neg limvds.
             const vgdOldStored = vgsOldStored - vdsOldStored;
             const vgdBefore = vgd;
             vgd = fetlim(vgd, vgdOldStored, vonForLim);
@@ -1074,7 +1074,7 @@ export function createMosfetElement(
             }
           }
 
-          // mos1load.c:393-406: pnjlim on bulk junctions — vds sign-based dispatch.
+          // mos1load.c:393-406: pnjlim on bulk junctions â€” vds sign-based dispatch.
           // Only pnjlim mutates icheckLimited (devsup.c:50-58); fetlim/limvds do not.
           if (vds >= 0) {
             // G1: pnjlim on vbs (bulk-source), vbd derives from vbs - vds.
@@ -1115,11 +1115,11 @@ export function createMosfetElement(
           }
         }
       } else {
-        // mos1load.c:412-434: not one of the simple cases — MODEINITJCT /
+        // mos1load.c:412-434: not one of the simple cases â€” MODEINITJCT /
         // MODEINITFIX+OFF / default-zero dispatch.
         if ((mode & MODEINITJCT) && params.OFF === 0) {
           // cite: mos1load.c:419-430
-          // MODEINITJCT path — read ICVDS/ICVGS/ICVBS; if all zero AND
+          // MODEINITJCT path â€” read ICVDS/ICVGS/ICVBS; if all zero AND
           // (MODETRAN|MODEDCOP|MODEDCTRANCURVE || !MODEUIC), fall back to
           // (vbs=-1, vgs=polarity*tVto, vds=0).
           vds = polarity * params.ICVDS;
@@ -1136,7 +1136,7 @@ export function createMosfetElement(
             vds = 0;
           }
         } else {
-          // mos1load.c:431-433 — default-zero path: (MODEINITFIX && OFF) OR the
+          // mos1load.c:431-433 â€” default-zero path: (MODEINITFIX && OFF) OR the
           // "not one of the simple cases" fallthrough. simpleGate at line 1036
           // excludes (MODEINITFIX && OFF) from the simple/general block, so control
           // lands here. Matches mos1load.c:204 which gates on `!MOS1off` for INITFIX.
@@ -1161,7 +1161,7 @@ export function createMosfetElement(
       // cap gate: gated by mode bits; hoisted here so bypass branch can skip cap blocks.
       let capGate = false;
 
-      // Conductances and currents — filled by OP eval below, or reloaded from
+      // Conductances and currents â€” filled by OP eval below, or reloaded from
       // state0 on bypass per mos1load.c:322-340.
       let gmNR: number, gdsNR: number, gmbsNR: number;
       let gbs: number, cbs: number;
@@ -1173,7 +1173,7 @@ export function createMosfetElement(
       let gcgs = 0, gcgd = 0, gcgb = 0;
 
       if (bypassed) {
-        // cite: mos1load.c:322-340 — bypass path: reload conductances from state0.
+        // cite: mos1load.c:322-340 â€” bypass path: reload conductances from state0.
         gmNR  = s0[base + SLOT_GM];
         gdsNR = s0[base + SLOT_GDS];
         gmbsNR= s0[base + SLOT_GMBS];
@@ -1182,14 +1182,14 @@ export function createMosfetElement(
         cbd   = s0[base + SLOT_CBD];
         cbs   = s0[base + SLOT_CBS];
         cd    = s0[base + SLOT_CD];
-        // cite: mos1load.c:472-478 — Reconstruct cdrain from cd:
-        //   cd = opMode * cdrain - cbd → cdrain = opMode * (cd + cbd).
+        // cite: mos1load.c:472-478 â€” Reconstruct cdrain from cd:
+        //   cd = opMode * cdrain - cbd â†’ cdrain = opMode * (cd + cbd).
         // ngspice writes `cdrain = here->MOS1mode * (here->MOS1cd + here->MOS1cbd)`
         // where MOS1mode is the stored mode from the previous iteration. Here we
         // use `opMode` freshly computed from the just-reloaded vds (line 1192).
         // These are numerically identical because bypass reloaded `vds = prevVds`
         // from state0, and the stored s0[SLOT_MODE] was written as
-        // (prevVds >= 0 ? 1 : -1). The two signs always agree on bypass — vds
+        // (prevVds >= 0 ? 1 : -1). The two signs always agree on bypass â€” vds
         // is deterministic once prevVds is reloaded. Documented per review G-2.
         cdrain = opMode * (cd + cbd);
       } else {
@@ -1305,7 +1305,7 @@ export function createMosfetElement(
         }
 
         // mos1load.c:701-725: NIintegrate bulk junctions into gbd/gbs
-        // (direct lumping — no invented CAP_GEQ_DB/SB slots).
+        // (direct lumping â€” no invented CAP_GEQ_DB/SB slots).
         const runBulkNIintegrate = (mode & MODETRAN) !== 0
           || ((mode & MODEINITTRAN) !== 0 && (mode & MODEUIC) === 0);
         if (runBulkNIintegrate) {
@@ -1370,7 +1370,7 @@ export function createMosfetElement(
 
         // mos1load.c:759-856: Meyer capacitance + overlap + NIintegrate.
         if (capGate) {
-        // mos1load.c:773-785: DEVqmeyer — mode-dependent vgs/vgd swap.
+        // mos1load.c:773-785: DEVqmeyer â€” mode-dependent vgs/vgd swap.
         const vgb_read = vgs - vbs;  // vgb = vgs - vbs (computed lazily here).
         let meyerCapgs: number, meyerCapgd: number, meyerCapgb: number;
         if (opMode > 0) {
@@ -1383,8 +1383,8 @@ export function createMosfetElement(
         }
 
         // mos1load.c:787-806: cap averaging.
-        // MODETRANOP | MODEINITSMSIG → 2 * state0.
-        // else → state0 + state1 (incremental averaging).
+        // MODETRANOP | MODEINITSMSIG â†’ 2 * state0.
+        // else â†’ state0 + state1 (incremental averaging).
         const prevCapgs = s1[base + SLOT_CAPGS];
         const prevCapgd = s1[base + SLOT_CAPGD];
         const prevCapgb = s1[base + SLOT_CAPGB];
@@ -1397,15 +1397,15 @@ export function createMosfetElement(
         capgd = (useDouble ? 2 * meyerCapgd : meyerCapgd + prevCapgd) + GateDrainOverlapCap;
         capgb = (useDouble ? 2 * meyerCapgb : meyerCapgb + prevCapgb) + GateBulkOverlapCap;
 
-        // mos1load.c:827-855: update charges (MODETRAN → incremental,
-        // TRANOP → q = c*v).
+        // mos1load.c:827-855: update charges (MODETRAN â†’ incremental,
+        // TRANOP â†’ q = c*v).
         const vgs1 = s1[base + SLOT_VGS];
         const vgd1 = vgs1 - s1[base + SLOT_VDS];
         const vgb1 = vgs1 - s1[base + SLOT_VBS];
         if (mode & (MODEINITPRED | MODEINITTRAN)) {
           // mos1load.c:828-836: predictor extrapolation using xfact.
           // xfact = delta/deltaOld[1]; fallback to 0 when deltaOld[1]=0.
-          // q0 = (1+xfact)*q1 - xfact*q2. Do NOT use ctx.xfact — compute
+          // q0 = (1+xfact)*q1 - xfact*q2. Do NOT use ctx.xfact â€” compute
           // locally to match mos1load.c verbatim.
           const xfactQ = ctx.deltaOld[1] > 0 ? ctx.dt / ctx.deltaOld[1] : 0;
           s0[base + SLOT_QGS] = (1 + xfactQ) * s1[base + SLOT_QGS] - xfactQ * s2[base + SLOT_QGS];
@@ -1428,7 +1428,7 @@ export function createMosfetElement(
         // geq/ceq inline into gcgs/gcgd/gcgb (NOT into invented slots).
         const initOrNoTran = (mode & MODEINITTRAN) !== 0 || (mode & MODETRAN) === 0;
         if (initOrNoTran) {
-          // mos1load.c:862-873: MODEINITTRAN or not-in-TRAN → zero companions.
+          // mos1load.c:862-873: MODEINITTRAN or not-in-TRAN â†’ zero companions.
           gcgs = 0; ceqgs = 0;
           gcgd = 0; ceqgd = 0;
           gcgb = 0; ceqgb = 0;
@@ -1560,8 +1560,8 @@ export function createMosfetElement(
       // NOTE: ngspice uses MOS1DdPtr (drain-drain), MOS1DPdpPtr (drainPrime-
       // drainPrime), etc. With RD=0 / RS=0 the "prime" nodes collapse to the
       // external pins, so only the DPdp/SPsp stamps apply (our nodeD/nodeS).
-      //   MOS1GgPtr += gcgd + gcgs + gcgb       → (nodeG, nodeG)
-      //   MOS1BbPtr += gbd + gbs + gcgb          → (nodeB, nodeB)
+      //   MOS1GgPtr += gcgd + gcgs + gcgb       â†’ (nodeG, nodeG)
+      //   MOS1BbPtr += gbd + gbs + gcgb          â†’ (nodeB, nodeB)
       //   MOS1DPdpPtr += gds + gbd + xrev*(gm+gmbs) + gcgd (+drainConductance)
       //   MOS1SPspPtr += gds + gbs + xnrm*(gm+gmbs) + gcgs (+sourceConductance)
       //   MOS1GbPtr -= gcgb
@@ -1605,10 +1605,10 @@ export function createMosfetElement(
       if (params.OFF && (ctx.cktMode & (MODEINITFIX | MODEINITSMSIG))) return true;
 
       const voltages = ctx.rhsOld;
-      const vB = nodeB > 0 ? voltages[nodeB - 1] : 0;
-      const vS_v = nodeS > 0 ? voltages[nodeS - 1] : 0;
-      const vG_v = nodeG > 0 ? voltages[nodeG - 1] : 0;
-      const vD_v = nodeD > 0 ? voltages[nodeD - 1] : 0;
+      const vB = voltages[nodeB];
+      const vS_v = voltages[nodeS];
+      const vG_v = voltages[nodeG];
+      const vD_v = voltages[nodeD];
       // G1: vbs = polarity*(vB - vS), vds = polarity*(vD - vS).
       const vbsRaw = polarity * (vB - vS_v);
       const vgsRaw = polarity * (vG_v - vS_v);
@@ -1737,7 +1737,7 @@ export function getMosfetInternalNodeLabels(props: PropertyBag): readonly string
 }
 
 // ---------------------------------------------------------------------------
-// NmosfetElement + PmosfetElement — CircuitElement (visual) implementations
+// NmosfetElement + PmosfetElement â€” CircuitElement (visual) implementations
 // ---------------------------------------------------------------------------
 
 export class NmosfetElement extends AbstractCircuitElement {
@@ -1922,7 +1922,7 @@ export const NmosfetDefinition: ComponentDefinition = {
   attributeMap: MOSFET_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.SEMICONDUCTORS,
   helpText:
-    "N-channel MOSFET — Level 1 SPICE model (Shichman-Hodges) with body effect and channel-length modulation.\n" +
+    "N-channel MOSFET â€” Level 1 SPICE model (Shichman-Hodges) with body effect and channel-length modulation.\n" +
     "Pins: D (drain), G (gate), S (source).\n" +
     "Primary: VTO, KP, LAMBDA, W, L.\n" +
     "Secondary: PHI, GAMMA, CBD, CBS, CGDO, CGSO, CGBO, RD, RS, CJ, MJ, CJSW, MJSW, TOX, UO, FC, and more.",
@@ -1995,7 +1995,7 @@ export const PmosfetDefinition: ComponentDefinition = {
   attributeMap: MOSFET_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.SEMICONDUCTORS,
   helpText:
-    "P-channel MOSFET — Level 1 SPICE model (Shichman-Hodges) with body effect and channel-length modulation.\n" +
+    "P-channel MOSFET â€” Level 1 SPICE model (Shichman-Hodges) with body effect and channel-length modulation.\n" +
     "Pins: D (drain), G (gate), S (source).\n" +
     "Primary: VTO, KP, LAMBDA, W, L.\n" +
     "Secondary: PHI, GAMMA, CBD, CBS, CGDO, CGSO, CGBO, RD, RS, CJ, MJ, CJSW, MJSW, TOX, UO, FC, and more.",

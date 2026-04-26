@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Monte Carlo simulation runner and supporting types.
  *
  * Runs N independent analog simulations with randomised component parameters,
@@ -22,7 +22,7 @@ import { SparseSolver } from "./sparse-solver.js";
 import { DEFAULT_SIMULATION_PARAMS } from "../../core/analog-engine-interface.js";
 
 // ---------------------------------------------------------------------------
-// TransientParams — time span for transient analysis
+// TransientParams â€” time span for transient analysis
 // ---------------------------------------------------------------------------
 
 /**
@@ -38,7 +38,7 @@ export interface TransientParams {
 }
 
 // ---------------------------------------------------------------------------
-// AcParams — frequency range for AC small-signal analysis
+// AcParams â€” frequency range for AC small-signal analysis
 // ---------------------------------------------------------------------------
 
 /**
@@ -56,7 +56,7 @@ export interface AcParams {
 }
 
 // ---------------------------------------------------------------------------
-// OutputSpec — what to measure in each trial
+// OutputSpec â€” what to measure in each trial
 // ---------------------------------------------------------------------------
 
 /**
@@ -78,7 +78,7 @@ export interface OutputSpec {
 }
 
 // ---------------------------------------------------------------------------
-// ParameterVariation — how to vary one component property
+// ParameterVariation â€” how to vary one component property
 // ---------------------------------------------------------------------------
 
 /**
@@ -91,7 +91,7 @@ export interface ParameterVariation {
   property: string;
   /** Statistical distribution to use for sampling. */
   distribution: "gaussian" | "uniform";
-  /** Tolerance as a fraction (e.g. 0.05 for ±5%). */
+  /** Tolerance as a fraction (e.g. 0.05 for Â±5%). */
   tolerance: number;
 }
 
@@ -154,7 +154,7 @@ export interface OutputStatistics {
 }
 
 // ---------------------------------------------------------------------------
-// TrialResult — yielded after each trial
+// TrialResult â€” yielded after each trial
 // ---------------------------------------------------------------------------
 
 /**
@@ -175,7 +175,7 @@ export interface TrialResult {
 }
 
 // ---------------------------------------------------------------------------
-// MonteCarloResult — final result after all trials
+// MonteCarloResult â€” final result after all trials
 // ---------------------------------------------------------------------------
 
 /**
@@ -193,7 +193,7 @@ export interface MonteCarloResult {
 }
 
 // ---------------------------------------------------------------------------
-// CircuitFactory — creates a fresh compiled circuit with property overrides
+// CircuitFactory â€” creates a fresh compiled circuit with property overrides
 // ---------------------------------------------------------------------------
 
 /**
@@ -204,7 +204,7 @@ export interface MonteCarloResult {
  * name; the value is a multiplier applied to the nominal property value
  * (e.g. 1.05 means +5%).
  *
- * The factory must produce a fully independent instance for each call —
+ * The factory must produce a fully independent instance for each call â€”
  * shared mutable state between trials causes incorrect results.
  */
 export type CircuitFactory = (
@@ -212,7 +212,7 @@ export type CircuitFactory = (
 ) => ConcreteCompiledAnalogCircuit;
 
 // ---------------------------------------------------------------------------
-// SeededRng — multiplicative LCG for reproducible random sampling
+// SeededRng â€” multiplicative LCG for reproducible random sampling
 // ---------------------------------------------------------------------------
 
 /**
@@ -315,7 +315,7 @@ export function computeOutputStatistics(values: Float64Array): OutputStatistics 
 }
 
 // ---------------------------------------------------------------------------
-// Internal DC runner — synchronous, no engine lifecycle
+// Internal DC runner â€” synchronous, no engine lifecycle
 // ---------------------------------------------------------------------------
 
 function runDcSync(compiled: ConcreteCompiledAnalogCircuit): {
@@ -344,7 +344,7 @@ function runTransientSync(
 
   const dcResult = engine.dcOperatingPoint();
   if (!dcResult.converged) {
-    return { converged: false, nodeVoltages: new Float64Array(compiled.matrixSize) };
+    return { converged: false, nodeVoltages: new Float64Array(compiled.matrixSize + 1) };
   }
 
   let steps = 0;
@@ -353,13 +353,16 @@ function runTransientSync(
     engine.step();
     steps++;
     if (engine.getState() === EngineState.ERROR) {
-      return { converged: false, nodeVoltages: new Float64Array(compiled.matrixSize) };
+      return { converged: false, nodeVoltages: new Float64Array(compiled.matrixSize + 1) };
     }
   }
 
-  const voltages = new Float64Array(compiled.matrixSize);
+  // Public nodeVoltages mirrors the ngspice 1-based layout: slot 0 is the
+  // ground sentinel (always 0), slots 1..nodeCount hold node voltages, and
+  // any remaining slots up to matrixSize are reserved for branch currents.
+  const voltages = new Float64Array(compiled.matrixSize + 1);
   for (let n = 1; n <= compiled.nodeCount; n++) {
-    voltages[n - 1] = engine.getNodeVoltage(n);
+    voltages[n] = engine.getNodeVoltage(n);
   }
   return { converged: true, nodeVoltages: voltages };
 }
@@ -376,8 +379,8 @@ function measureOutput(
   if (spec.type === "voltage" && spec.node !== undefined) {
     const nodeId = compiled.labelToNodeId.get(spec.node);
     if (nodeId === undefined || nodeId === 0) return 0;
-    if (nodeId - 1 >= nodeVoltages.length) return 0;
-    return nodeVoltages[nodeId - 1];
+    if (nodeId >= nodeVoltages.length) return 0;
+    return nodeVoltages[nodeId];
   }
   return NaN;
 }
@@ -397,7 +400,7 @@ function measureOutput(
  * Each variation specifies:
  *   - which component and property to vary
  *   - a distribution (gaussian or uniform)
- *   - a tolerance fraction (e.g. 0.05 = ±5%)
+ *   - a tolerance fraction (e.g. 0.05 = Â±5%)
  *
  * The sampled multiplier is `1 + tolerance * sample`, where `sample` is drawn
  * from N(0,1) for gaussian or Uniform(-1,1) for uniform.

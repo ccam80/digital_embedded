@@ -1,29 +1,21 @@
 /**
  * Shared MNA stamp helpers used by analog component elements.
  *
- * Node 0 is ground (reference) — stamps targeting row or column 0 are silently
- * dropped. All other indices are 1-based MNA node numbers, converted to
- * 0-based solver indices by subtracting 1 before calling into SparseSolver.
+ * Caller-side convention is ngspice 1-based: node 0 is ground, nodes
+ * 1..matrixSize are non-ground MNA rows. The solver itself routes
+ * row==0 / col==0 to the TrashCan element (allocElement spbuild.c:272-273
+ * + amendment A2) and drops row==0 RHS stamps; these helpers exist as a
+ * thin convenience layer that mirrors the historical signature.
  */
 
 import type { SparseSolver } from "./sparse-solver.js";
 
-/**
- * Stamp a conductance value into the G sub-matrix at position (row, col).
- * Skips the entry when either row or col is 0 (ground node).
- */
+/** Stamp a conductance value into the G sub-matrix at (row, col). */
 export function stampG(solver: SparseSolver, row: number, col: number, val: number): void {
-  if (row !== 0 && col !== 0) {
-    solver.stampElement(solver.allocElement(row - 1, col - 1), val);
-  }
+  solver.stampElement(solver.allocElement(row, col), val);
 }
 
-/**
- * Stamp a value into the RHS vector at position row.
- * Skips the entry when row is 0 (ground node).
- */
+/** Stamp a value into the RHS vector at row. */
 export function stampRHS(solver: SparseSolver, row: number, val: number): void {
-  if (row !== 0) {
-    solver.stampRHS(row - 1, val);
-  }
+  solver.stampRHS(row, val);
 }

@@ -1,15 +1,15 @@
-/**
- * Quartz crystal analog component — Butterworth-Van Dyke (BVD) equivalent circuit.
+﻿/**
+ * Quartz crystal analog component â€” Butterworth-Van Dyke (BVD) equivalent circuit.
  *
  * The BVD model represents the mechanical resonance of a quartz crystal as a
  * series RLC branch (motional arm) in parallel with a shunt electrode capacitance:
  *
- *   Series (motional) arm: R_s — L_s — C_s  (between terminal A and B)
+ *   Series (motional) arm: R_s â€” L_s â€” C_s  (between terminal A and B)
  *   Shunt arm:             C_0               (directly across A and B)
  *
  * This produces two resonant frequencies:
- *   Series resonance:   f_s = 1 / (2π √(L_s · C_s))
- *   Parallel resonance: f_p ≈ f_s · √(1 + C_s / C_0)   (slightly above f_s)
+ *   Series resonance:   f_s = 1 / (2Ï€ âˆš(L_s Â· C_s))
+ *   Parallel resonance: f_p â‰ˆ f_s Â· âˆš(1 + C_s / C_0)   (slightly above f_s)
  *
  * MNA topology (1-based node indices, 0 = ground):
  *   pinNodeIds[0] = n_A      external terminal A
@@ -25,8 +25,8 @@
  *   C_0: companion model (geq_c0, ieq_c0) between n_A and n_B
  *
  * Derived parameters from user-specified frequency, Q, C_s, C_0:
- *   L_s = 1 / (4π² · f² · C_s)
- *   R_s = 2π · f · L_s / Q
+ *   L_s = 1 / (4Ï€Â² Â· fÂ² Â· C_s)
+ *   R_s = 2Ï€ Â· f Â· L_s / Q
  */
 
 import { AbstractCircuitElement } from "../../core/element.js";
@@ -60,7 +60,7 @@ import { cktTerr } from "../../solver/analog/ckt-terr.js";
 // State-pool schema
 // ---------------------------------------------------------------------------
 
-// Slot layout — 15 slots total (3 reactive stores × 4 slots each + 3 CCAP slots).
+// Slot layout â€” 15 slots total (3 reactive stores Ã— 4 slots each + 3 CCAP slots).
 // Previous values are read from s1/s2/s3 at the same offsets.
 const CRYSTAL_SCHEMA: StateSchema = defineStateSchema("AnalogCrystalElement", [
   // L_s (inductor motional arm)
@@ -84,7 +84,7 @@ const CRYSTAL_SCHEMA: StateSchema = defineStateSchema("AnalogCrystalElement", [
   { name: "CCAP_C0", doc: "C_0 companion current",  init: { kind: "zero" } },
 ]);
 
-// Slot indices — must match the layout above.
+// Slot indices â€” must match the layout above.
 const SLOT_GEQ_L  = 0;
 const SLOT_IEQ_L  = 1;
 const SLOT_I_L    = 2;
@@ -107,7 +107,7 @@ const SLOT_CCAP_C0 = 14;
 
 /**
  * Compute motional inductance from series resonant frequency and motional capacitance.
- * L_s = 1 / (4π² · f² · C_s)
+ * L_s = 1 / (4Ï€Â² Â· fÂ² Â· C_s)
  */
 export function crystalMotionalInductance(freqHz: number, Cs: number): number {
   return 1 / (4 * Math.PI * Math.PI * freqHz * freqHz * Cs);
@@ -115,7 +115,7 @@ export function crystalMotionalInductance(freqHz: number, Cs: number): number {
 
 /**
  * Compute series resistance from frequency, motional inductance, and quality factor.
- * R_s = 2π · f · L_s / Q
+ * R_s = 2Ï€ Â· f Â· L_s / Q
  */
 export function crystalSeriesResistance(freqHz: number, Ls: number, Q: number): number {
   return (2 * Math.PI * freqHz * Ls) / Q;
@@ -164,7 +164,7 @@ function buildCrystalPinDeclarations(): PinDeclaration[] {
 }
 
 // ---------------------------------------------------------------------------
-// CrystalCircuitElement — AbstractCircuitElement (editor/visual layer)
+// CrystalCircuitElement â€” AbstractCircuitElement (editor/visual layer)
 // ---------------------------------------------------------------------------
 
 export class CrystalCircuitElement extends AbstractCircuitElement {
@@ -202,15 +202,15 @@ export class CrystalCircuitElement extends AbstractCircuitElement {
     const vB = signals?.getPinVoltage("B");
     const hasVoltage = vA !== undefined && vB !== undefined;
 
-    // Left lead + plate — colored by pin A voltage
+    // Left lead + plate â€” colored by pin A voltage
     drawColoredLead(ctx, hasVoltage ? signals : undefined, vA, 0, 0, 0.6, 0);
     ctx.drawLine(0.6, -0.4, 0.6, 0.4);
 
-    // Right lead + plate — colored by pin B voltage
+    // Right lead + plate â€” colored by pin B voltage
     drawColoredLead(ctx, hasVoltage ? signals : undefined, vB, 1.4, 0, 2, 0);
     ctx.drawLine(1.4, -0.4, 1.4, 0.4);
 
-    // Rectangular crystal body between the plates — gradient
+    // Rectangular crystal body between the plates â€” gradient
     if (hasVoltage && ctx.setLinearGradient) {
       ctx.setLinearGradient(0.7, 0, 1.3, 0, [
         { offset: 0, color: signals!.voltageColor(vA) },
@@ -237,7 +237,7 @@ export class CrystalCircuitElement extends AbstractCircuitElement {
 
 
 // ---------------------------------------------------------------------------
-// AnalogCrystalElement — MNA implementation
+// AnalogCrystalElement â€” MNA implementation
 // ---------------------------------------------------------------------------
 
 export class AnalogCrystalElement implements ReactiveAnalogElement {
@@ -260,7 +260,7 @@ export class AnalogCrystalElement implements ReactiveAnalogElement {
   private C_s: number;
   private C_0: number;
 
-  // Pool reference — set by initState(); state arrays accessed via pool.states[N] at call time.
+  // Pool reference â€” set by initState(); state arrays accessed via pool.states[N] at call time.
   private _pool!: StatePoolRef;
 
   /**
@@ -301,13 +301,13 @@ export class AnalogCrystalElement implements ReactiveAnalogElement {
   }
 
   /**
-   * Unified load() — BVD crystal model.
+   * Unified load() â€” BVD crystal model.
    *
    * Stamps in one pass:
-   *   - R_s series conductance (nA ↔ n1, topology-constant).
-   *   - L_s branch incidence + NIintegrate companion (n1 ↔ n2).
-   *   - C_s series capacitor companion (n2 ↔ nB) via inline NIintegrate.
-   *   - C_0 shunt capacitor companion (nA ↔ nB) via inline NIintegrate.
+   *   - R_s series conductance (nA â†” n1, topology-constant).
+   *   - L_s branch incidence + NIintegrate companion (n1 â†” n2).
+   *   - C_s series capacitor companion (n2 â†” nB) via inline NIintegrate.
+   *   - C_0 shunt capacitor companion (nA â†” nB) via inline NIintegrate.
    * All three reactive components use ctx.ag[] coefficients directly.
    */
   load(ctx: LoadContext): void {
@@ -320,18 +320,18 @@ export class AnalogCrystalElement implements ReactiveAnalogElement {
     const b = this.branchIndex;
     const base = this.stateBaseOffset;
 
-    // R_s conductance (nA ↔ n1).
+    // R_s conductance (nA â†” n1).
     stampG(solver, nA, nA, this.G_s);
     stampG(solver, nA, n1, -this.G_s);
     stampG(solver, n1, nA, -this.G_s);
     stampG(solver, n1, n1, this.G_s);
 
     // L_s branch incidence (B sub-matrix).
-    if (n1 !== 0) solver.stampElement(solver.allocElement(n1 - 1, b), 1);
-    if (n2 !== 0) solver.stampElement(solver.allocElement(n2 - 1, b), -1);
+    if (n1 !== 0) solver.stampElement(solver.allocElement(n1, b), 1);
+    if (n2 !== 0) solver.stampElement(solver.allocElement(n2, b), -1);
     // L_s KVL incidence (C sub-matrix).
-    if (n1 !== 0) solver.stampElement(solver.allocElement(b, n1 - 1), 1);
-    if (n2 !== 0) solver.stampElement(solver.allocElement(b, n2 - 1), -1);
+    if (n1 !== 0) solver.stampElement(solver.allocElement(b, n1), 1);
+    if (n2 !== 0) solver.stampElement(solver.allocElement(b, n2), -1);
 
     if (!(mode & (MODETRAN | MODETRANOP))) return;
 
@@ -340,9 +340,9 @@ export class AnalogCrystalElement implements ReactiveAnalogElement {
     const s2 = this._pool.states[2];
 
     const iNow = voltages[b];
-    const vA = nA > 0 ? voltages[nA - 1] : 0;
-    const vBv = nB > 0 ? voltages[nB - 1] : 0;
-    const vN2 = n2 > 0 ? voltages[n2 - 1] : 0;
+    const vA = voltages[nA];
+    const vBv = voltages[nB];
+    const vN2 = voltages[n2];
     const vCs = vN2 - vBv;
     const vC0 = vA - vBv;
 
@@ -427,21 +427,21 @@ export class AnalogCrystalElement implements ReactiveAnalogElement {
       solver.stampElement(solver.allocElement(b, b), -geqL);
       solver.stampRHS(b, ceqL);
 
-      // C_s companion stamp (n2 ↔ nB).
+      // C_s companion stamp (n2 â†” nB).
       stampG(solver, n2, n2, geqCs);
       stampG(solver, n2, nB, -geqCs);
       stampG(solver, nB, n2, -geqCs);
       stampG(solver, nB, nB, geqCs);
-      if (n2 !== 0) solver.stampRHS(n2 - 1, -ceqCs);
-      if (nB !== 0) solver.stampRHS(nB - 1, ceqCs);
+      if (n2 !== 0) solver.stampRHS(n2, -ceqCs);
+      if (nB !== 0) solver.stampRHS(nB, ceqCs);
 
-      // C_0 companion stamp (nA ↔ nB).
+      // C_0 companion stamp (nA â†” nB).
       stampG(solver, nA, nA, geqC0);
       stampG(solver, nA, nB, -geqC0);
       stampG(solver, nB, nA, -geqC0);
       stampG(solver, nB, nB, geqC0);
-      if (nA !== 0) solver.stampRHS(nA - 1, -ceqC0);
-      if (nB !== 0) solver.stampRHS(nB - 1, ceqC0);
+      if (nA !== 0) solver.stampRHS(nA, -ceqC0);
+      if (nB !== 0) solver.stampRHS(nB, ceqC0);
 
       // Cache.
       s0[base + SLOT_GEQ_L]  = geqL;
@@ -477,12 +477,12 @@ export class AnalogCrystalElement implements ReactiveAnalogElement {
 
     // Current through the series R_s (from pin A into the motional arm):
     // I_Rs = G_s * (V_A - V_n1). By KCL at n1 this equals the L_s branch current.
-    const vA = nA > 0 ? voltages[nA - 1] : 0;
-    const vN1 = n1 > 0 ? voltages[n1 - 1] : 0;
+    const vA = voltages[nA];
+    const vN1 = voltages[n1];
     const iMotional = this.G_s * (vA - vN1);
 
     // C_0 shunt current flowing into pin A: I = geqC0 * (vA - vB) + ieqC0
-    const vB = nB > 0 ? voltages[nB - 1] : 0;
+    const vB = voltages[nB];
     const s0 = this._pool.states[0];
     const base = this.stateBaseOffset;
     const geqC0 = s0[base + SLOT_GEQ_C0];
@@ -669,7 +669,7 @@ export const CrystalDefinition: ComponentDefinition = {
   attributeMap: CRYSTAL_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.PASSIVES,
   helpText:
-    "Quartz crystal — Butterworth-Van Dyke equivalent circuit model.\n" +
+    "Quartz crystal â€” Butterworth-Van Dyke equivalent circuit model.\n" +
     "Series RLC motional arm in parallel with shunt electrode capacitance.",
   models: {},
   modelRegistry: {

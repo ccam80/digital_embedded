@@ -1054,32 +1054,31 @@ export class MNAEngine implements AnalogEngine {
    * Return the voltage at MNA node `nodeId` (referenced to ground).
    *
    * Node 0 is ground (always 0 V). Nodes 1..nodeCount are non-ground
-   * voltages stored at solver indices 0..nodeCount-1.
+   * voltages stored at solver indices 1..nodeCount (ngspice 1-based).
    */
   getNodeVoltage(nodeId: number): number {
     if (nodeId <= 0 || !this._ctx) return 0;
-    const idx = nodeId - 1;
-    if (idx >= this._ctx.rhs.length) return 0;
-    return this._ctx.rhs[idx];
+    if (nodeId >= this._ctx.rhs.length) return 0;
+    return this._ctx.rhs[nodeId];
   }
 
   setNodeVoltage(nodeId: number, voltage: number): void {
     if (nodeId <= 0 || !this._ctx) return;
-    const idx = nodeId - 1;
-    if (idx >= this._ctx.rhs.length) return;
-    this._ctx.rhs[idx] = voltage;
-    this._ctx.rhsOld[idx] = voltage;
+    if (nodeId >= this._ctx.rhs.length) return;
+    this._ctx.rhs[nodeId] = voltage;
+    this._ctx.rhsOld[nodeId] = voltage;
   }
 
   /**
    * Return the current through MNA branch row `branchId`.
    *
-   * Branch rows are stored after node voltages in the solution vector.
-   * `branchId` is 0-based within the branch block.
+   * Branch rows are stored after node voltages in the solution vector,
+   * starting at slot `nodeCount + 1` in the 1-based layout. `branchId`
+   * is 0-based within the branch block.
    */
   getBranchCurrent(branchId: number): number {
     if (!this._compiled || !this._ctx) return 0;
-    const offset = this._compiled.nodeCount + branchId;
+    const offset = this._compiled.nodeCount + 1 + branchId;
     if (offset < 0 || offset >= this._ctx.rhs.length) return 0;
     return this._ctx.rhs[offset];
   }

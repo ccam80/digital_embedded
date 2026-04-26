@@ -1176,8 +1176,11 @@ export function compileAnalogPartition(
       }
     }
 
+    // Solver uses ngspice 1-based slot indexing: nodes occupy 1..totalNodeCount,
+    // branches occupy totalNodeCount+1..totalNodeCount+branchCount. The +1
+    // here shifts the 0-based meta.branchIdx ordinal into that range.
     const absoluteBranchIdx =
-      meta.branchIdx >= 0 ? totalNodeCount + meta.branchIdx : -1;
+      meta.branchIdx >= 0 ? totalNodeCount + 1 + meta.branchIdx : -1;
 
     if (activeModel.factory !== undefined) {
       const flatOverrides: Record<string, number> = props.has("_pinElectricalOverrides")
@@ -1321,8 +1324,9 @@ export function compileAnalogPartition(
     const adapters: Array<BridgeOutputAdapter | BridgeInputAdapter> = [];
 
     if (descriptor.direction === "digital-to-analog") {
-      // Digital output pin drives the analog node — BridgeOutputAdapter (voltage source)
-      const branchIdx = totalNodeCount + branchCount;
+      // Digital output pin drives the analog node — BridgeOutputAdapter (voltage source).
+      // 1-based slot indexing per the absoluteBranchIdx convention above.
+      const branchIdx = totalNodeCount + 1 + branchCount;
       branchCount++;
       const adapter = makeBridgeOutputAdapter(spec, nodeId, branchIdx, loaded);
       // Label for coordinator pin-param dispatch (e.g. "out.rOut" → endsWith(":out"))

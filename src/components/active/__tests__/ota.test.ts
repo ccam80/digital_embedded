@@ -1,9 +1,9 @@
-/**
+﻿/**
  * Tests for OTA (Operational Transconductance Amplifier) analog element.
  *
  * Circuit conventions:
  *   - V+ and V- set the differential input voltage.
- *   - Iabc node is driven by a current source with a 1 Ω shunt to ground,
+ *   - Iabc node is driven by a current source with a 1 Î© shunt to ground,
  *     so V(Iabc) = I_bias numerically (1 A/V mapping).
  *   - Output current flows into OUT+ and out of OUT-.
  *   - A load resistor R_load from OUT+ to OUT- converts I_out to V_out:
@@ -89,14 +89,14 @@ function buildCircuit(opts: {
 
 describe("OTA", () => {
   it("linear_region", () => {
-    // Small V_diff = 1mV; I_bias = 1mA; gm = I_bias/(2*V_T) = 0.001/(2*0.026) ≈ 19.23 mS
-    // I_out = gm * V_diff = 19.23e-3 * 1e-3 = 19.23 µA
-    // Load R = 1kΩ from OUT+ to GND → V_out = I_out * R ≈ 19.23mV
+    // Small V_diff = 1mV; I_bias = 1mA; gm = I_bias/(2*V_T) = 0.001/(2*0.026) â‰ˆ 19.23 mS
+    // I_out = gm * V_diff = 19.23e-3 * 1e-3 = 19.23 ÂµA
+    // Load R = 1kÎ© from OUT+ to GND â†’ V_out = I_out * R â‰ˆ 19.23mV
     //
     // Circuit:
     //   Vs_vp = 1mV: node1(+), GND(-)  [branch row 5]
     //   Vs_vm = 0V:  node2(+), GND(-)  [branch row 6]
-    //   I_bias = 1mA into node3; R_shunt = 1Ω node3→GND (so V(node3)=1mV... wait)
+    //   I_bias = 1mA into node3; R_shunt = 1Î© node3â†’GND (so V(node3)=1mV... wait)
     //
     // Better: set V(Iabc) = I_bias directly using a voltage source.
     // Set V(node3) = 1e-3 (representing I_bias = 1mA).
@@ -119,7 +119,7 @@ describe("OTA", () => {
     const vt = 0.026;
     const iBias = 1e-3;       // 1 mA
     const vDiff = 1e-3;       // 1 mV (small signal)
-    const rLoad = 1000;       // 1 kΩ
+    const rLoad = 1000;       // 1 kÎ©
 
     const vsVp   = makeVoltageSource(1, 0, vsBranchVp,   vDiff);  // V+ = 1mV
     const vsVm   = makeVoltageSource(2, 0, vsBranchVm,   0);      // V- = 0V
@@ -134,20 +134,20 @@ describe("OTA", () => {
 
     expect(result.converged).toBe(true);
 
-    // gm = iBias / (2 * vt) = 0.001 / 0.052 ≈ 19.23 mS
+    // gm = iBias / (2 * vt) = 0.001 / 0.052 â‰ˆ 19.23 mS
     const gm = iBias / (2 * vt);
     const iOut = gm * vDiff;
     const vOut = iOut * rLoad;
 
-    // V(OUT+) should be ≈ vOut = gm * vDiff * R
+    // V(OUT+) should be â‰ˆ vOut = gm * vDiff * R
   });
 
   it("tanh_limiting", () => {
     // Large V_diff = 1V (much larger than 2*V_T = 52mV).
-    // I_out should saturate to ≈ I_bias (tanh(1/0.052) ≈ tanh(19.2) ≈ 1).
+    // I_out should saturate to â‰ˆ I_bias (tanh(1/0.052) â‰ˆ tanh(19.2) â‰ˆ 1).
     //
-    // Circuit: V+ = 1V, V- = 0V, I_bias = 5mA, R_load = 1kΩ
-    // I_out ≈ I_bias = 5mA → V_out ≈ 5mA * 1kΩ = 5V
+    // Circuit: V+ = 1V, V- = 0V, I_bias = 5mA, R_load = 1kÎ©
+    // I_out â‰ˆ I_bias = 5mA â†’ V_out â‰ˆ 5mA * 1kÎ© = 5V
     const nodeCount = 4;
     const branchCount = 3;
     const vsBranchVp   = nodeCount + 0;
@@ -157,7 +157,7 @@ describe("OTA", () => {
     const vt = 0.026;
     const iBias = 5e-3;       // 5 mA
     const vDiff = 1.0;        // 1 V (saturating)
-    const rLoad = 1000;       // 1 kΩ
+    const rLoad = 1000;       // 1 kÎ©
 
     const vsVp   = makeVoltageSource(1, 0, vsBranchVp,   vDiff);
     const vsVm   = makeVoltageSource(2, 0, vsBranchVm,   0);
@@ -173,15 +173,15 @@ describe("OTA", () => {
     expect(result.converged).toBe(true);
 
     // I_out should be very close to I_bias (saturation)
-    // V_out = I_out * R ≈ I_bias * R = 5mA * 1kΩ = 5V
+    // V_out = I_out * R â‰ˆ I_bias * R = 5mA * 1kÎ© = 5V
     const vOut = result.nodeVoltages[3];
-    // Allow 1% tolerance — tanh(19.2) ≈ 0.99999997, so saturation is very tight
+    // Allow 1% tolerance â€” tanh(19.2) â‰ˆ 0.99999997, so saturation is very tight
     expect(vOut).toBeGreaterThan(iBias * rLoad * 0.99);
     expect(vOut).toBeLessThan(iBias * rLoad * 1.01);
   });
 
   it("gm_proportional_to_ibias", () => {
-    // Double I_bias → gm doubles → I_out doubles (in linear region).
+    // Double I_bias â†’ gm doubles â†’ I_out doubles (in linear region).
     //
     // Use very small V_diff = 0.1mV to stay in linear region.
     // Measure V_out for I_bias = 1mA and I_bias = 2mA.
@@ -214,7 +214,7 @@ describe("OTA", () => {
     const vOut1 = runWithIbias(1e-3);  // I_bias = 1mA
     const vOut2 = runWithIbias(2e-3);  // I_bias = 2mA
 
-    // gm proportional to I_bias → V_out doubles when I_bias doubles
+    // gm proportional to I_bias â†’ V_out doubles when I_bias doubles
   });
 
   it("vca_circuit", () => {
@@ -222,8 +222,8 @@ describe("OTA", () => {
     // Fixed V_diff = 0.5mV, vary I_bias.
     // Assert gain = V_out / V_diff changes proportionally with I_bias.
     //
-    // At I_bias = 1mA: gm = 1e-3/(2*0.026) ≈ 19.23 mS; gain = gm * R_load
-    // At I_bias = 4mA: gm = 4e-3/(2*0.026) ≈ 76.92 mS; gain = 4x higher
+    // At I_bias = 1mA: gm = 1e-3/(2*0.026) â‰ˆ 19.23 mS; gain = gm * R_load
+    // At I_bias = 4mA: gm = 4e-3/(2*0.026) â‰ˆ 76.92 mS; gain = 4x higher
     const nodeCount = 4;
     const branchCount = 3;
     const vt = 0.026;
@@ -257,7 +257,7 @@ describe("OTA", () => {
 });
 
 // ---------------------------------------------------------------------------
-// C4.5 parity test — ota_load_dcop_parity
+// C4.5 parity test â€” ota_load_dcop_parity
 // ---------------------------------------------------------------------------
 //
 // Drives the OTA via load(ctx) at a canonical operating point and asserts
@@ -276,11 +276,11 @@ describe("OTA", () => {
 // Stamps:
 //   (OUT+, V+) -= gmEff
 //   (OUT+, V-) += gmEff
-//   (OUT-, V+) += gmEff    (but nOutN=0 here → suppressed)
-//   (OUT-, V-) -= gmEff    (but nOutN=0 here → suppressed)
+//   (OUT-, V+) += gmEff    (but nOutN=0 here â†’ suppressed)
+//   (OUT-, V-) -= gmEff    (but nOutN=0 here â†’ suppressed)
 // RHS:
 //   OUT+ += iNR
-//   OUT- -= iNR            (but nOutN=0 here → suppressed)
+//   OUT- -= iNR            (but nOutN=0 here â†’ suppressed)
 //
 // Canonical: V+=1mV, V-=0, Iabc node=1mA, vt=0.026, gmMax=0.01, OUT-=ground.
 
@@ -342,10 +342,10 @@ describe("OTA parity (C4.5)", () => {
     const ota = makeOTAElement(nVp, nVm, nIabc, nOutP, nOutN, { vt, gmMax });
 
     const voltages = new Float64Array(4);
-    voltages[nVp - 1]   = vDiff;
-    voltages[nVm - 1]   = 0;
-    voltages[nIabc - 1] = iBias;
-    voltages[nOutP - 1] = 0;
+    voltages[nVp]   = vDiff;
+    voltages[nVm]   = 0;
+    voltages[nIabc] = iBias;
+    voltages[nOutP] = 0;
 
     const { solver, stamps, rhs } = makeOtaCaptureSolver();
     const ctx = makeOtaParityCtx(voltages, solver);
@@ -354,7 +354,7 @@ describe("OTA parity (C4.5)", () => {
     // Closed-form reference (ngspice-equivalent small-signal Norton):
     const NGSPICE_TWOVT = 2 * vt;
     const NGSPICE_X     = vDiff / NGSPICE_TWOVT;
-    // x ≈ 0.019... well within the ±50 clamp, so xClamp === x bit-exactly
+    // x â‰ˆ 0.019... well within the Â±50 clamp, so xClamp === x bit-exactly
     const NGSPICE_TANHX = Math.tanh(NGSPICE_X);
     const NGSPICE_IOUT  = iBias * NGSPICE_TANHX;
     const NGSPICE_SECH2 = 1 - NGSPICE_TANHX * NGSPICE_TANHX;

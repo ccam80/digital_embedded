@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Behavioral analog factories for remaining digital components.
  *
  * Provides analogFactory functions for:
@@ -77,20 +77,20 @@ function stampG(
   nB: number,
   g: number,
 ): void {
-  if (nA > 0) solver.stampElement(solver.allocElement(nA - 1, nA - 1), g);
-  if (nB > 0) solver.stampElement(solver.allocElement(nB - 1, nB - 1), g);
+  if (nA > 0) solver.stampElement(solver.allocElement(nA, nA), g);
+  if (nB > 0) solver.stampElement(solver.allocElement(nB, nB), g);
   if (nA > 0 && nB > 0) {
-    solver.stampElement(solver.allocElement(nA - 1, nB - 1), -g);
-    solver.stampElement(solver.allocElement(nB - 1, nA - 1), -g);
+    solver.stampElement(solver.allocElement(nA, nB), -g);
+    solver.stampElement(solver.allocElement(nB, nA), -g);
   }
 }
 
 function stampRHS(solver: SparseSolver, n: number, val: number): void {
-  if (n > 0) solver.stampRHS(n - 1, val);
+  if (n > 0) solver.stampRHS(n, val);
 }
 
 // ---------------------------------------------------------------------------
-// Driver analog factory — tri-state buffer
+// Driver analog factory â€” tri-state buffer
 //
 // Pin labels (matching buildDriverPinDeclarations):
 //   "in"  = data input
@@ -203,9 +203,9 @@ export function createDriverAnalogElement(
 }
 
 // ---------------------------------------------------------------------------
-// DriverInvSel analog factory — inverting tri-state (active-low enable)
+// DriverInvSel analog factory â€” inverting tri-state (active-low enable)
 //
-// Same as Driver but enable logic is inverted: sel=0 → driven, sel=1 → Hi-Z
+// Same as Driver but enable logic is inverted: sel=0 â†’ driven, sel=1 â†’ Hi-Z
 // Pin labels: "in", "sel", "out" (matching buildDriverPinDeclarations)
 // ---------------------------------------------------------------------------
 
@@ -231,7 +231,7 @@ export function createDriverInvAnalogElement(
 
   const outputPin = new DigitalOutputPinModel(outSpec, getPinLoadingFlag(props, "out", false), "direct");
   outputPin.init(nodeOut, -1);
-  outputPin.setHighZ(false); // active-low: sel=0 → driven
+  outputPin.setHighZ(false); // active-low: sel=0 â†’ driven
 
   let latchedIn = false;
   let latchedSel = false;
@@ -312,7 +312,7 @@ export function createDriverInvAnalogElement(
 }
 
 // ---------------------------------------------------------------------------
-// Splitter analog factory — pass-through per bit
+// Splitter analog factory â€” pass-through per bit
 //
 // Pin labels are dynamic bit-range names from buildSplitterPinDeclarations
 // (e.g. "0", "4-7", "0,1"). Inputs come first in pinLayout order, outputs after.
@@ -424,26 +424,26 @@ export function createSplitterAnalogElement(
 }
 
 // ---------------------------------------------------------------------------
-// SevenSeg analog factory — 7 parallel LED diode models (segments a–g + dp)
+// SevenSeg analog factory â€” 7 parallel LED diode models (segments aâ€“g + dp)
 //
 // Each of the 8 segment inputs (a, b, c, d, e, f, g, dp) drives an independent
 // LED diode model. nodeIds order matches pin declaration order (a, b, c, d, e, f, g, dp).
 // Each segment diode is modeled as a simplified forward-biased diode
-// (piecewise linear: R_on=50Ω when forward-biased, R_off=10MΩ otherwise).
+// (piecewise linear: R_on=50Î© when forward-biased, R_off=10MÎ© otherwise).
 //
 // For the analog model, each segment pin is treated as a DigitalInputPinModel
 // (reading from the driving circuit) with an LED-style diode load. The cathode
 // of each segment is implicitly at ground (common cathode configuration).
 // ---------------------------------------------------------------------------
 
-/** Piecewise-linear LED diode: Vf ≈ 2.0V, R_on = 50Ω, R_off = 10MΩ */
+/** Piecewise-linear LED diode: Vf â‰ˆ 2.0V, R_on = 50Î©, R_off = 10MÎ© */
 const LED_VF = 2.0;
 const LED_RON = 50;
 const LED_ROFF = 1e7;
 const LED_GMIN = 1e-12;
 
 type SegmentDiodeElement = AnalogElementCore & {
-  /** Unified load entry point — stamps linearized diode equations. */
+  /** Unified load entry point â€” stamps linearized diode equations. */
   load(ctx: LoadContext): void;
   /** NR-iteration convergence test. */
   checkConvergence(ctx: LoadContext): boolean;
@@ -468,8 +468,8 @@ function createSegmentDiodeElement(
     load(ctx: LoadContext): void {
       const s = ctx.solver;
       const voltages = ctx.rhsOld;
-      const va = nodeAnode > 0 ? voltages[nodeAnode - 1] : 0;
-      const vc = nodeCathode > 0 ? voltages[nodeCathode - 1] : 0;
+      const va = voltages[nodeAnode];
+      const vc = voltages[nodeCathode];
       const vd = va - vc;
       if (vd > LED_VF) {
         geq = 1 / LED_RON + LED_GMIN;
@@ -488,8 +488,8 @@ function createSegmentDiodeElement(
 
     checkConvergence(ctx: LoadContext): boolean {
       const voltages = ctx.rhsOld;
-      const va = nodeAnode > 0 ? voltages[nodeAnode - 1] : 0;
-      const vc = nodeCathode > 0 ? voltages[nodeCathode - 1] : 0;
+      const va = voltages[nodeAnode];
+      const vc = voltages[nodeCathode];
       const vdRaw = va - vc;
 
       const delvd = vdRaw - _vdStored;
@@ -500,14 +500,14 @@ function createSegmentDiodeElement(
 
     anodeCurrent(voltages: Float64Array): number {
       // Current flowing into anode = geq*(Va - Vc) - ieq
-      const va = nodeAnode > 0 ? voltages[nodeAnode - 1] : 0;
-      const vc = nodeCathode > 0 ? voltages[nodeCathode - 1] : 0;
+      const va = voltages[nodeAnode];
+      const vc = voltages[nodeCathode];
       return geq * (va - vc) - ieq;
     },
 
     getPinCurrents(voltages: Float64Array): number[] {
-      const va = nodeAnode > 0 ? voltages[nodeAnode - 1] : 0;
-      const vc = nodeCathode > 0 ? voltages[nodeCathode - 1] : 0;
+      const va = voltages[nodeAnode];
+      const vc = voltages[nodeCathode];
       const I = geq * (va - vc) - ieq;
       return [I, -I];
     },
@@ -554,18 +554,18 @@ export function createSevenSegAnalogElement(
 }
 
 // ---------------------------------------------------------------------------
-// Relay analog factory — coil inductor + contact variable resistance
+// Relay analog factory â€” coil inductor + contact variable resistance
 //
-// Coil: series inductance L (default 100mH) + DC resistance R_coil (default 100Ω)
+// Coil: series inductance L (default 100mH) + DC resistance R_coil (default 100Î©)
 //   modeled as companion-model inductor in series with resistor
 // Contact: variable resistance between A1 and B1
-//   R_on = 0.01Ω (closed), R_off = 10MΩ (open)
-//   Threshold: coil current > I_pull (default 20mA) → contact closes
+//   R_on = 0.01Î© (closed), R_off = 10MÎ© (open)
+//   Threshold: coil current > I_pull (default 20mA) â†’ contact closes
 //
 // Pin nodeIds order (SPST, 1 pole):
 //   nodeIds[0] = in1 (coil terminal 1)
 //   nodeIds[1] = in2 (coil terminal 2)
-//   nodeIds[2] = branchIdx row (coil branch — uses MNA branch variable)
+//   nodeIds[2] = branchIdx row (coil branch â€” uses MNA branch variable)
 //   Remaining: contact A1, B1 pins
 //
 // For simplicity the coil is modeled as R_coil only (no inductance transient)
@@ -584,8 +584,8 @@ export function createRelayAnalogElement(
   branchIdx: number,
   props: PropertyBag,
 ): AnalogElementCore {
-  // Composite-child pattern — delegates coil integration to a standard
-  // AnalogInductorElement child, following the DigitalPinModel →
+  // Composite-child pattern â€” delegates coil integration to a standard
+  // AnalogInductorElement child, following the DigitalPinModel â†’
   // AnalogCapacitorElement precedent landed in Phase 0 Wave 0.2.3
   // (src/solver/analog/digital-pin-model.ts).
   const nodeCoil1 = pinNodes.get("in1")!; // coil terminal 1
@@ -668,8 +668,8 @@ export function createRelayAnalogElement(
       // Coil branch current from child inductor's branch row.
       // Contact: contactG() between A1 and B1.
       const iCoil = branchIdx >= 0 ? voltages[branchIdx] : 0;
-      const vA = nodeContactA > 0 ? voltages[nodeContactA - 1] : 0;
-      const vB = nodeContactB > 0 ? voltages[nodeContactB - 1] : 0;
+      const vA = voltages[nodeContactA];
+      const vB = voltages[nodeContactB];
       const iContact = contactG() * (vA - vB);
       return [iCoil, -iCoil, iContact, -iContact];
     },
@@ -679,14 +679,14 @@ export function createRelayAnalogElement(
 }
 
 // ---------------------------------------------------------------------------
-// RelayDT analog factory — same as Relay but with DPDT contact configuration
+// RelayDT analog factory â€” same as Relay but with DPDT contact configuration
 //
 // Pin nodeIds order (SPDT, 1 pole):
 //   nodeIds[0] = in1 (coil)
 //   nodeIds[1] = in2 (coil)
 //   nodeIds[2] = A1 (common contact)
-//   nodeIds[3] = B1 (throw — NO, connects when energised)
-//   nodeIds[4] = C1 (rest — NC, connects when de-energised)
+//   nodeIds[3] = B1 (throw â€” NO, connects when energised)
+//   nodeIds[4] = C1 (rest â€” NC, connects when de-energised)
 // ---------------------------------------------------------------------------
 
 export function createRelayDTAnalogElement(
@@ -695,8 +695,8 @@ export function createRelayDTAnalogElement(
   branchIdx: number,
   props: PropertyBag,
 ): AnalogElementCore {
-  // Composite-child pattern — delegates coil integration to a standard
-  // AnalogInductorElement child, following the DigitalPinModel →
+  // Composite-child pattern â€” delegates coil integration to a standard
+  // AnalogInductorElement child, following the DigitalPinModel â†’
   // AnalogCapacitorElement precedent landed in Phase 0 Wave 0.2.3
   // (src/solver/analog/digital-pin-model.ts).
   const nodeCoil1 = pinNodes.get("in1")!; // coil terminal 1
@@ -729,7 +729,7 @@ export function createRelayDTAnalogElement(
   );
   coilInductor.pinNodeIds = [nodeCoil1, nodeCoil2];
 
-  // Initial state: de-energised → A-C connected (rest), A-B open (throw)
+  // Initial state: de-energised â†’ A-C connected (rest), A-B open (throw)
   let energised = false;
 
   function gThrow(): number { return energised ? 1 / RELAY_R_ON : 1 / RELAY_R_OFF; }
@@ -774,9 +774,9 @@ export function createRelayDTAnalogElement(
       // Coil branch current from child inductor's branch row.
       // Contacts: gThrow() between common/throw, gRest() between common/rest.
       const iCoil = branchIdx >= 0 ? voltages[branchIdx] : 0;
-      const vCom = nodeCommon > 0 ? voltages[nodeCommon - 1] : 0;
-      const vThr = nodeThrow > 0 ? voltages[nodeThrow - 1] : 0;
-      const vRst = nodeRest > 0 ? voltages[nodeRest - 1] : 0;
+      const vCom = voltages[nodeCommon];
+      const vThr = voltages[nodeThrow];
+      const vRst = voltages[nodeRest];
       const iThrow = gThrow() * (vCom - vThr);
       const iRest = gRest() * (vCom - vRst);
       return [iCoil, -iCoil, iThrow + iRest, -iThrow, -iRest];
@@ -787,11 +787,11 @@ export function createRelayDTAnalogElement(
 }
 
 // ---------------------------------------------------------------------------
-// ButtonLED analog factory — switch (variable resistance) + LED diode
+// ButtonLED analog factory â€” switch (variable resistance) + LED diode
 //
 // Pin nodeIds order (matches buildButtonLEDPinDeclarations):
-//   nodeIds[0] = out (button output — digital output pin)
-//   nodeIds[1] = in  (LED input — LED anode, cathode at ground)
+//   nodeIds[0] = out (button output â€” digital output pin)
+//   nodeIds[1] = in  (LED input â€” LED anode, cathode at ground)
 //
 // The button output is driven by a DigitalOutputPinModel (logic HIGH or LOW).
 // The LED input is a forward-biased diode from nodeIds[1] to ground.

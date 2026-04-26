@@ -1,9 +1,9 @@
-/**
- * Clock component — periodic signal source or manual toggle.
+﻿/**
+ * Clock component â€” periodic signal source or manual toggle.
  *
  * When autoRun is true (default), the ClockManager toggles the output
  * automatically at the configured frequency. When autoRun is false, the
- * clock behaves like a manual digital input — user clicks to toggle.
+ * clock behaves like a manual digital input â€” user clicks to toggle.
  */
 
 import { AbstractCircuitElement } from "../../core/element.js";
@@ -50,7 +50,7 @@ function buildClockPinDeclarations(): PinDeclaration[] {
 }
 
 // ---------------------------------------------------------------------------
-// ClockElement — CircuitElement implementation
+// ClockElement â€” CircuitElement implementation
 // ---------------------------------------------------------------------------
 
 export class ClockElement extends AbstractCircuitElement {
@@ -94,7 +94,7 @@ export class ClockElement extends AbstractCircuitElement {
 
     ctx.save();
 
-    // Body rectangle: (-1.55,-0.75) → (-0.05,0.75), closed, NORMAL — same as In
+    // Body rectangle: (-1.55,-0.75) â†’ (-0.05,0.75), closed, NORMAL â€” same as In
     ctx.setColor("COMPONENT_FILL");
     ctx.drawPolygon([
       { x: -1.55, y: -0.75 },
@@ -112,7 +112,7 @@ export class ClockElement extends AbstractCircuitElement {
     ], false);
 
     // Clock waveform (open polyline, THIN): square wave inside the box
-    // Points: (-1.25,0.25)→(-1,0.25)→(-1,-0.25)→(-0.75,-0.25)→(-0.75,0.25)→(-0.5,0.25)→(-0.5,-0.25)→(-0.25,-0.25)
+    // Points: (-1.25,0.25)â†’(-1,0.25)â†’(-1,-0.25)â†’(-0.75,-0.25)â†’(-0.75,0.25)â†’(-0.5,0.25)â†’(-0.5,-0.25)â†’(-0.25,-0.25)
     ctx.setLineWidth(0.5);
     const pts = [
       { x: -1.25, y:  0.25 },
@@ -141,7 +141,7 @@ export class ClockElement extends AbstractCircuitElement {
 }
 
 // ---------------------------------------------------------------------------
-// executeClock — no-op (clock value managed by ClockManager)
+// executeClock â€” no-op (clock value managed by ClockManager)
 // ---------------------------------------------------------------------------
 
 export function executeClock(_index: number, _state: Uint32Array, _highZs: Uint32Array, _layout: ComponentLayout): void {
@@ -269,10 +269,10 @@ export function makeAnalogClockElement(
       const k = branchIdx;
 
       // Branch incidence (B and C sub-matrices).
-      if (nodePos !== 0) solver.stampElement(solver.allocElement(nodePos - 1, k), 1);
-      if (nodeNeg !== 0) solver.stampElement(solver.allocElement(nodeNeg - 1, k), -1);
-      if (nodePos !== 0) solver.stampElement(solver.allocElement(k, nodePos - 1), 1);
-      if (nodeNeg !== 0) solver.stampElement(solver.allocElement(k, nodeNeg - 1), -1);
+      if (nodePos !== 0) solver.stampElement(solver.allocElement(nodePos, k), 1);
+      if (nodeNeg !== 0) solver.stampElement(solver.allocElement(nodeNeg, k), -1);
+      if (nodePos !== 0) solver.stampElement(solver.allocElement(k, nodePos), 1);
+      if (nodeNeg !== 0) solver.stampElement(solver.allocElement(k, nodeNeg), -1);
 
       // Square-wave voltage value at current simulation time.
       const t = getTime();
@@ -373,7 +373,7 @@ export const ClockDefinition: ComponentDefinition = {
   attributeMap: CLOCK_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.IO,
   helpText:
-    "Clock — periodic signal source.\n" +
+    "Clock â€” periodic signal source.\n" +
     "Generates a square wave at the configured frequency.\n" +
     "In real-time mode the frequency corresponds to actual Hz. " +
     "The signal value is managed by ClockManager and set externally.",

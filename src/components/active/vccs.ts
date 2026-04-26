@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Voltage-Controlled Current Source (VCCS) analog component.
  *
  * Four-terminal element: ctrl+ and ctrl- sense the control voltage;
@@ -11,14 +11,14 @@
  * `expression` is the default ("V(ctrl)"), the effective expression is
  * `transconductance * V(ctrl)`.
  *
- * MNA formulation (Norton stamp — no branch variable):
+ * MNA formulation (Norton stamp â€” no branch variable):
  *   No `_stampLinear` override (no linear topology-constant entries).
  *   `load()` (via base class) binds the control voltage, evaluates f(Vctrl)
  *   and f'(Vctrl), then calls `stampOutput()` which stamps the NR-linearized
  *   Norton equivalent:
  *
  *   Norton current source (NR linearized around Vctrl0 = current op point):
- *     I_out(Vctrl) ≈ f(Vctrl0) + f'(Vctrl0) * (Vctrl - Vctrl0)
+ *     I_out(Vctrl) â‰ˆ f(Vctrl0) + f'(Vctrl0) * (Vctrl - Vctrl0)
  *                  = f'(Vctrl0) * Vctrl + [f(Vctrl0) - f'(Vctrl0)*Vctrl0]
  *
  *   MNA off-diagonal stamp for controlled source injecting gm*V_ctrl INTO nOutP:
@@ -31,7 +31,7 @@
  *     RHS[nOutN] -= f(Vctrl0) - f'(Vctrl0) * Vctrl0
  *
  * At convergence (Vctrl = Vctrl0) the current injected into out+ equals
- * f(Vctrl0), which is the desired output current. ✓
+ * f(Vctrl0), which is the desired output current. âœ“
  */
 
 import { AbstractCircuitElement } from "../../core/element.js";
@@ -157,8 +157,8 @@ class VCCSAnalogElement extends ControlledSourceElement {
   }
 
   protected override _bindContext(voltages: Float64Array): void {
-    const vCtrlP = this._nCtrlP > 0 ? voltages[this._nCtrlP - 1] : 0;
-    const vCtrlN = this._nCtrlN > 0 ? voltages[this._nCtrlN - 1] : 0;
+    const vCtrlP = this._nCtrlP > 0 ? voltages[this._nCtrlP] : 0;
+    const vCtrlN = this._nCtrlN > 0 ? voltages[this._nCtrlN] : 0;
     const vCtrl = vCtrlP - vCtrlN;
 
     this._ctx.setNodeVoltage("ctrl", vCtrl);
@@ -175,7 +175,7 @@ class VCCSAnalogElement extends ControlledSourceElement {
    *   G[nOutP, nCtrlP] += f'    G[nOutP, nCtrlN] -= f'
    *   G[nOutN, nCtrlP] -= f'    G[nOutN, nCtrlN] += f'
    *
-   * RHS (independent current source — NR constant term):
+   * RHS (independent current source â€” NR constant term):
    *   RHS[nOutP] += f(Vctrl0) - f'(Vctrl0) * Vctrl0
    *   RHS[nOutN] -= f(Vctrl0) - f'(Vctrl0) * Vctrl0
    */
@@ -210,7 +210,7 @@ class VCCSAnalogElement extends ControlledSourceElement {
     }
 
     // RHS: NR-linearized independent current source (constant term).
-    // Positive iNR injected INTO nOutP (current enters node → positive RHS).
+    // Positive iNR injected INTO nOutP (current enters node â†’ positive RHS).
     if (this._nOutP !== 0) {
       solver.stampRHS(this._nOutP - 1, iNR);
     }
@@ -225,7 +225,7 @@ class VCCSAnalogElement extends ControlledSourceElement {
    * The control port is an ideal voltage sensor (infinite impedance), so it
    * draws zero current. The output current is f(V_ctrl) evaluated at the
    * current operating point. Positive = current flowing INTO the pin.
-   * KCL: 0 + 0 + I_out - I_out = 0. ✓
+   * KCL: 0 + 0 + I_out - I_out = 0. âœ“
    */
   getPinCurrents(_voltages: Float64Array): number[] {
     const iOut = this._compiledExpr(this._ctx);
@@ -234,7 +234,7 @@ class VCCSAnalogElement extends ControlledSourceElement {
 }
 
 // ---------------------------------------------------------------------------
-// VCCSElement — CircuitElement
+// VCCSElement â€” CircuitElement
 // ---------------------------------------------------------------------------
 
 export class VCCSElement extends AbstractCircuitElement {
@@ -270,7 +270,7 @@ export class VCCSElement extends AbstractCircuitElement {
     ctx.save();
     ctx.setLineWidth(1);
 
-    // Body — rect and port lines stay COMPONENT
+    // Body â€” rect and port lines stay COMPONENT
     ctx.setColor("COMPONENT");
     ctx.drawRect(1, -2, 4, 4, false);
 
@@ -343,7 +343,7 @@ export const VCCSDefinition: ComponentDefinition = {
   attributeMap: VCCS_ATTRIBUTE_MAPPINGS,
 
   helpText:
-    "Voltage-Controlled Current Source — output current is an expression of " +
+    "Voltage-Controlled Current Source â€” output current is an expression of " +
     "the control port voltage V(ctrl+ - ctrl-).",
 
   factory(props: PropertyBag): VCCSElement {

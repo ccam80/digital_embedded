@@ -4,7 +4,7 @@
  */
 
 import { describe, it, expect } from "vitest";
-import { SparseSolver } from "../sparse-solver.js";
+import { SparseSolver, spSINGULAR } from "../sparse-solver.js";
 import { DiagnosticCollector } from "../diagnostics.js";
 import { newtonRaphson, pnjlim, fetlim } from "../newton-raphson.js";
 import { CKTCircuitContext } from "../ckt-context.js";
@@ -555,14 +555,14 @@ describe("ipass hadNodeset gate", () => {
 
 describe("NR singular retry", () => {
   it("nr_retries_with_reorder_after_numerical_singular", () => {
-    // Verify that when factor() returns { success: false, usedReorder: false }
-    // (numerical path), the NR loop calls forceReorder() and retries factor().
-    // Stage 6.3.3 — `lastFactorUsedReorder` instance field deleted; the per-call
-    // signal is now `FactorResult.usedReorder` returned by factor().
+    // Verify that when factor() returns spSINGULAR from the SMPluFac (reuse)
+    // path — i.e. lastFactorWalkedReorder=false — the NR loop calls
+    // forceReorder() and retries. Mirrors niiter.c:881-902 else-arm.
     const diagnostics = new DiagnosticCollector();
 
     let forceReorderCalled = false;
     let factorCallCount = 0;
+    let stubWalkedReorder = false;
 
     const realSolver = new SparseSolver();
 
@@ -572,10 +572,16 @@ describe("NR singular retry", () => {
           return () => {
             factorCallCount++;
             if (factorCallCount === 1) {
-              return { success: false, usedReorder: false };
+              // Simulate SMPluFac (reuse) path returning spSINGULAR.
+              stubWalkedReorder = false;
+              return spSINGULAR;
             }
+            stubWalkedReorder = (target as SparseSolver).lastFactorWalkedReorder;
             return (target as SparseSolver).factor();
           };
+        }
+        if (prop === "lastFactorWalkedReorder") {
+          return stubWalkedReorder;
         }
         if (prop === "forceReorder") {
           return () => {
@@ -607,10 +613,10 @@ describe("NR singular retry", () => {
   });
 
   it("nr_emits_singular_diagnostic_when_reorder_also_fails", () => {
-    // When factor() always fails and the failed result advertises usedReorder=true
-    // (reorder path), NR must emit a singular-matrix diagnostic and return
-    // converged=false. Stage 6.3.3 — usedReorder lives on FactorResult, not the
-    // solver instance.
+    // When factor() returns spSINGULAR from the SMPreorder path —
+    // lastFactorWalkedReorder=true — the retry gate cannot fire and NR
+    // must emit a singular-matrix diagnostic with converged=false.
+    // Mirrors niiter.c:881-902 if-arm (NISHOULDREORDER → SMPreorder).
     const diagnostics = new DiagnosticCollector();
 
     const realSolver = new SparseSolver();
@@ -618,9 +624,10 @@ describe("NR singular retry", () => {
     const proxySolver = new Proxy(realSolver, {
       get(target, prop) {
         if (prop === "factor") {
-          return () => {
-            return { success: false, usedReorder: true };
-          };
+          return () => spSINGULAR;
+        }
+        if (prop === "lastFactorWalkedReorder") {
+          return true;
         }
         const val = (target as unknown as Record<string | symbol, unknown>)[prop];
         if (typeof val === "function") return val.bind(target);
@@ -748,6 +755,7 @@ describe("NR E_SINGULAR recovery via continue", () => {
     let factorCallCount = 0;
     let beginAssemblyAfterFailure = 0;
     let singularIterationSeen = false;
+    let stubWalkedReorder = false;
 
     const vs = makeVoltageSource(1, 0, 2, 5.0);
     const r = makeResistor(1, 2, 1000);
@@ -768,10 +776,18 @@ describe("NR E_SINGULAR recovery via continue", () => {
             factorCallCount++;
             if (factorCallCount === 2) {
               singularIterationSeen = true;
-              return { success: false, usedReorder: false };
+              // Simulate SMPluFac (reuse) returning spSINGULAR — eligible
+              // for the NR-side NISHOULDREORDER retry.
+              stubWalkedReorder = false;
+              return spSINGULAR;
             }
-            return (target as SparseSolver).factor();
+            const errorCode = (target as SparseSolver).factor();
+            stubWalkedReorder = (target as SparseSolver).lastFactorWalkedReorder;
+            return errorCode;
           };
+        }
+        if (prop === "lastFactorWalkedReorder") {
+          return stubWalkedReorder;
         }
         if (prop === "forceReorder") {
           return () => {
@@ -808,6 +824,7 @@ describe("NR E_SINGULAR recovery via continue", () => {
     let factorCallCount = 0;
     let beginAssemblyAfterFailure = 0;
     let singularSeen = false;
+    let stubWalkedReorder = false;
 
     const vs = makeVoltageSource(1, 0, 2, 5.0);
     const r = makeResistor(1, 2, 1000);
@@ -828,10 +845,16 @@ describe("NR E_SINGULAR recovery via continue", () => {
             factorCallCount++;
             if (factorCallCount === 2) {
               singularSeen = true;
-              return { success: false, usedReorder: false };
+              stubWalkedReorder = false;
+              return spSINGULAR;
             }
-            return (target as SparseSolver).factor();
+            const errorCode = (target as SparseSolver).factor();
+            stubWalkedReorder = (target as SparseSolver).lastFactorWalkedReorder;
+            return errorCode;
           };
+        }
+        if (prop === "lastFactorWalkedReorder") {
+          return stubWalkedReorder;
         }
         if (prop === "forceReorder") {
           return () => {

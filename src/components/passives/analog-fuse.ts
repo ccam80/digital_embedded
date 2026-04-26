@@ -1,11 +1,11 @@
-/**
- * Analog fuse MNA element — variable-resistance with thermal I²t energy model.
+﻿/**
+ * Analog fuse MNA element â€” variable-resistance with thermal IÂ²t energy model.
  *
  * Models a fuse as a resistance that transitions from R_cold (intact) to
- * R_blown (open circuit) when the accumulated I²t energy exceeds the rating.
+ * R_blown (open circuit) when the accumulated IÂ²t energy exceeds the rating.
  *
  * Thermal model:
- *   _thermalEnergy accumulates I²·dt each accepted timestep via accept().
+ *   _thermalEnergy accumulates IÂ²Â·dt each accepted timestep via accept().
  *   When _thermalEnergy exceeds i2tRating the fuse is permanently blown.
  *
  * Smooth resistance transition:
@@ -16,11 +16,11 @@
  *   R(e) = R_cold + (R_blown - R_cold) * 0.5 * (1 + tanh((e - i2t) / w))
  *
  *   where w = 0.05 * i2tRating (transition width).
- *   Below threshold R ≈ R_cold; above threshold R ≈ R_blown.
+ *   Below threshold R â‰ˆ R_cold; above threshold R â‰ˆ R_blown.
  *
  * Cross-engine state propagation:
  *   The factory captures the CircuitElement's PropertyBag and writes
- *   `_thermalRatio` (0→1) and `blown` (boolean) into it each timestep.
+ *   `_thermalRatio` (0â†’1) and `blown` (boolean) into it each timestep.
  *   The visual FuseElement.draw() reads these for heat glow and blown rendering.
  *   The digital executeFuse reads `blown` for the bus resolver closed flag.
  *
@@ -30,8 +30,8 @@
  *   branchIndex    = -1     (no branch current row)
  *
  * Unified load() pipeline (matches ngspice DEVload):
- *   load(ctx)       — stamps conductance 1/R(_thermalEnergy) every NR iteration
- *   accept(ctx,...) — integrates I²·dt using accepted-step terminal voltages and
+ *   load(ctx)       â€” stamps conductance 1/R(_thermalEnergy) every NR iteration
+ *   accept(ctx,...) â€” integrates IÂ²Â·dt using accepted-step terminal voltages and
  *                     emits the 'fuse-blown' diagnostic (info) on the first step
  *                     where _blown becomes true.
  */
@@ -47,9 +47,9 @@ import { defineModelParams } from "../../core/model-params.js";
 
 export const { paramDefs: ANALOG_FUSE_PARAM_DEFS, defaults: ANALOG_FUSE_DEFAULTS } = defineModelParams({
   primary: {
-    rCold:     { default: 0.01,  unit: "Ω", description: "Cold (intact) resistance in ohms", min: 1e-12 },
-    rBlown:    { default: 1e9,   unit: "Ω", description: "Blown (open) resistance in ohms", min: 1e-6 },
-    i2tRating: { default: 1e-4,  unit: "A²s", description: "I²t energy rating in A²·s", min: 1e-30 },
+    rCold:     { default: 0.01,  unit: "Î©", description: "Cold (intact) resistance in ohms", min: 1e-12 },
+    rBlown:    { default: 1e9,   unit: "Î©", description: "Blown (open) resistance in ohms", min: 1e-6 },
+    i2tRating: { default: 1e-4,  unit: "AÂ²s", description: "IÂ²t energy rating in AÂ²Â·s", min: 1e-30 },
   },
 });
 
@@ -80,7 +80,7 @@ function smoothResistance(
 }
 
 // ---------------------------------------------------------------------------
-// AnalogFuseElement — MNA implementation
+// AnalogFuseElement â€” MNA implementation
 // ---------------------------------------------------------------------------
 
 export class AnalogFuseElement implements AnalogElement {
@@ -106,7 +106,7 @@ export class AnalogFuseElement implements AnalogElement {
    * @param pinNodeIds    - [n_pos, n_neg]
    * @param rCold          - Cold (intact) resistance in ohms
    * @param rBlown         - Blown (open) resistance in ohms
-   * @param i2tRating      - I²t energy rating in A²·s
+   * @param i2tRating      - IÂ²t energy rating in AÂ²Â·s
    * @param emitDiagnostic - Callback invoked when fuse blows
    * @param onStateChange  - Callback invoked each timestep with blown flag and thermal ratio
    */
@@ -136,14 +136,14 @@ export class AnalogFuseElement implements AnalogElement {
     const G = 1 / Math.max(R, MIN_RESISTANCE);
 
     if (nPos !== 0 && nNeg !== 0) {
-      solver.stampElement(solver.allocElement(nPos - 1, nPos - 1), G);
-      solver.stampElement(solver.allocElement(nPos - 1, nNeg - 1), -G);
-      solver.stampElement(solver.allocElement(nNeg - 1, nPos - 1), -G);
-      solver.stampElement(solver.allocElement(nNeg - 1, nNeg - 1), G);
+      solver.stampElement(solver.allocElement(nPos, nPos), G);
+      solver.stampElement(solver.allocElement(nPos, nNeg), -G);
+      solver.stampElement(solver.allocElement(nNeg, nPos), -G);
+      solver.stampElement(solver.allocElement(nNeg, nNeg), G);
     } else if (nPos !== 0) {
-      solver.stampElement(solver.allocElement(nPos - 1, nPos - 1), G);
+      solver.stampElement(solver.allocElement(nPos, nPos), G);
     } else if (nNeg !== 0) {
-      solver.stampElement(solver.allocElement(nNeg - 1, nNeg - 1), G);
+      solver.stampElement(solver.allocElement(nNeg, nNeg), G);
     }
   }
 
@@ -152,15 +152,15 @@ export class AnalogFuseElement implements AnalogElement {
     const voltages = ctx.rhs;
     const nPos = this.pinNodeIds[0];
     const nNeg = this.pinNodeIds[1];
-    const vPos = nPos > 0 ? voltages[nPos - 1] : 0;
-    const vNeg = nNeg > 0 ? voltages[nNeg - 1] : 0;
+    const vPos = voltages[nPos];
+    const vNeg = voltages[nNeg];
     const vDiff = vPos - vNeg;
 
     // Compute current from the current resistance state.
     const R_eff = this._blown ? this._rBlown : this._rCold;
     const I = vDiff / Math.max(R_eff, MIN_RESISTANCE);
 
-    // Integrate thermal energy: I²·dt
+    // Integrate thermal energy: IÂ²Â·dt
     this._thermalEnergy += I * I * dt;
 
     // Check blow condition after integration
@@ -180,9 +180,9 @@ export class AnalogFuseElement implements AnalogElement {
       this._emitDiagnostic({
         code: "fuse-blown",
         severity: "info",
-        message: "Fuse blown: accumulated I²t energy exceeded rating.",
+        message: "Fuse blown: accumulated IÂ²t energy exceeded rating.",
         explanation:
-          "The fuse thermal energy (I²·t integral) exceeded the specified i2tRating. " +
+          "The fuse thermal energy (IÂ²Â·t integral) exceeded the specified i2tRating. " +
           "The fuse is now permanently open (high resistance). " +
           "Replace the fuse or reduce the current to prevent recurrence.",
         suggestions: [
@@ -201,7 +201,7 @@ export class AnalogFuseElement implements AnalogElement {
     this._i2tRating = Math.max(i2tRating, 1e-30);
   }
 
-  /** Current thermal energy state — exposed for testing. */
+  /** Current thermal energy state â€” exposed for testing. */
   get thermalEnergy(): number {
     return this._thermalEnergy;
   }
@@ -211,7 +211,7 @@ export class AnalogFuseElement implements AnalogElement {
     return this._blown;
   }
 
-  /** Ratio of accumulated thermal energy to i2tRating (0→1). */
+  /** Ratio of accumulated thermal energy to i2tRating (0â†’1). */
   get thermalRatio(): number {
     return Math.min(this._thermalEnergy / this._i2tRating, 1);
   }
@@ -222,13 +222,13 @@ export class AnalogFuseElement implements AnalogElement {
   }
 
   getPinCurrents(voltages: Float64Array): number[] {
-    // No branch row — compute from constitutive equation: I = G_eff * (V_A - V_B).
+    // No branch row â€” compute from constitutive equation: I = G_eff * (V_A - V_B).
     // pinNodeIds[0] = n_pos (out1 pin, index 0 in pinLayout).
     // pinNodeIds[1] = n_neg (out2 pin, index 1 in pinLayout).
     const nPos = this.pinNodeIds[0];
     const nNeg = this.pinNodeIds[1];
-    const vPos = nPos > 0 ? voltages[nPos - 1] : 0;
-    const vNeg = nNeg > 0 ? voltages[nNeg - 1] : 0;
+    const vPos = voltages[nPos];
+    const vNeg = voltages[nNeg];
     const R = smoothResistance(this._thermalEnergy, this._i2tRating, this._rCold, this._rBlown);
     const G = 1 / Math.max(R, MIN_RESISTANCE);
     const I = G * (vPos - vNeg);
@@ -237,7 +237,7 @@ export class AnalogFuseElement implements AnalogElement {
 }
 
 // ---------------------------------------------------------------------------
-// analogFactory — creates AnalogFuseElement with PropertyBag writeback
+// analogFactory â€” creates AnalogFuseElement with PropertyBag writeback
 // ---------------------------------------------------------------------------
 
 function buildAnalogFuseElement(

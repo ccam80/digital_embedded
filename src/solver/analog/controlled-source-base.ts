@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Base class for expression-driven controlled analog sources.
  *
  * All four controlled source types (VCVS, VCCS, CCVS, CCCS) share a common
@@ -47,7 +47,7 @@ export class MutableExpressionContext implements ExpressionContext {
   }
 
   setNodeVoltageByIndex(label: string, nodeId: number, voltages: Float64Array): void {
-    const v = nodeId > 0 ? voltages[nodeId - 1] : 0;
+    const v = voltages[nodeId];
     this._voltageMap.set(label, v);
   }
 
@@ -208,7 +208,7 @@ export function buildControlledSourceContext(params: {
       const nodeId = labelToNodeId.get(label);
       if (nodeId === undefined) return 0;
       const voltages = getVoltages();
-      return nodeId > 0 ? voltages[nodeId - 1] : 0;
+      return voltages[nodeId];
     },
 
     getBranchCurrent(label: string): number {
