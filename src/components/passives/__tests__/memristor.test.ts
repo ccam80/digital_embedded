@@ -278,7 +278,7 @@ describe("Memristor", () => {
       const mem = makeMemristor();
 
       const solver = new SparseSolver();
-      solver.beginAssembly(2);
+      solver._initStructure(2);
       const ctx: LoadContext = {
         solver,
         voltages: new Float64Array(2),

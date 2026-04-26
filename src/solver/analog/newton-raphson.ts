@@ -15,6 +15,7 @@ import {
   MODEINITFLOAT, MODEINITJCT, MODEINITFIX,
   MODEINITTRAN, MODEINITPRED, MODEINITSMSIG,
 } from "./ckt-mode.js";
+import { spOKAY, spSINGULAR } from "./sparse-solver.js";
 // ---------------------------------------------------------------------------
 // LimitingEvent — records a single voltage-limiting call per junction per NR iteration
 // ---------------------------------------------------------------------------
@@ -418,21 +419,26 @@ export function newtonRaphson(ctx: CKTCircuitContext): void {
     // construction) matches ngspice's per-call semantic and lets hot-loaded
     // params propagate without an engine rebuild.
     solver.setPivotTolerances(ctx.pivotRelTol, ctx.pivotAbsTol);
-    const factorResult = solver.factor(ctx.diagonalGmin);
-    if (!factorResult.success) {
-      // H2 (Phase 2.5 W2.2) — mirror niiter.c:888-891: on SMPluFac E_SINGULAR
-      // NR sets NISHOULDREORDER and does `continue` back to CKTload. We
-      // invoke solver.forceReorder() and `continue` for the same effect.
-      // Stage 6.3.3 — `lastFactorUsedReorder` instance field deleted; the
-      // signal is now `factorResult.usedReorder` returned by every factor()
-      // call (replaces the prior instance field per spec).
-      if (!factorResult.usedReorder) {
+    const errorCode = solver.factor(ctx.diagonalGmin);
+    if (errorCode !== spOKAY) {
+      // H2 (Phase 2.5 W2.2) — mirror niiter.c:881-902 in full.
+      //
+      // The else arm of `if (NISHOULDREORDER)` calls SMPluFac (the reuse
+      // path) and on `error == E_SINGULAR` sets NISHOULDREORDER and
+      // `continue`s. The if arm calls SMPreorder (the full reorder path)
+      // and surfaces every error verbatim. digiTS folds the dispatch into
+      // factor(); the per-call `lastFactorWalkedReorder` flag tells us
+      // which arm ran. The retry gate combines both halves of ngspice's
+      // condition — error code AND structural arm — so non-singular reuse
+      // failures (spZERO_DIAG, spNO_MEMORY) and any reorder failure
+      // surface as a singular-matrix diagnostic instead of looping.
+      if (errorCode === spSINGULAR && !solver.lastFactorWalkedReorder) {
         solver.forceReorder();
         continue;
       }
       diagnostics.emit(
         makeDiagnostic("singular-matrix", "error", "Singular matrix during NR iteration", {
-          explanation: `The MNA matrix became singular at iteration ${iteration + 1}.`,
+          explanation: `The MNA matrix became singular at iteration ${iteration + 1} (sparse error ${errorCode}).`,
           suggestions: [],
         }),
       );
@@ -572,10 +578,16 @@ export function newtonRaphson(ctx: CKTCircuitContext): void {
         for (let i = 0; i < nodeCount; i++) {
           ctx.rhs[i] = ctx.rhsOld[i] + dampFactor * (ctx.rhs[i] - ctx.rhsOld[i]);
         }
-        if (statePool && oldState0) {
+        // niiter.c:1040-1044 — damp CKTstate0[0..numStates) unconditionally
+        // inside the maxdiff>10 block. ngspice's loop trivially runs zero
+        // iterations when CKTnumStates == 0; digiTS mirrors that by gating
+        // only on statePool — when statePool is non-null, oldState0 is
+        // always populated above the solve (the prior `&& oldState0` was
+        // redundant defensive over-checking).
+        if (statePool) {
           const s0 = statePool.state0;
           for (let i = 0; i < s0.length; i++) {
-            s0[i] = oldState0[i] + dampFactor * (s0[i] - oldState0[i]);
+            s0[i] = oldState0![i] + dampFactor * (s0[i] - oldState0![i]);
           }
         }
       }
@@ -611,32 +623,40 @@ export function newtonRaphson(ctx: CKTCircuitContext): void {
     const curInitf = initf(ctx.cktMode);
 
     if (curInitf === MODEINITFLOAT) {
-      if (ctx.noncon === 0 && globalConverged && elemConverged) {
-        if (isDcop(ctx.cktMode) && ctx.hadNodeset && ipass > 0) {
-          ipass--;
-          ctx.noncon = 1;
-        } else {
-          if (ladder) {
-            // The terminal-mode label depends on whether this NR call is a
-            // DC-OP solve (terminal mode = dcopInitFloat) or a transient
-            // solve (terminal mode = tranNR). In a transient call, the
-            // dispatcher below has already promoted MODEINITTRAN or
-            // MODEINITPRED to MODEINITFLOAT and emitted the corresponding
-            // ladder.onModeBegin("tranNR", ...).
-            const terminalPhase = isDcop(ctx.cktMode) ? "dcopInitFloat" : "tranNR";
-            ladder.onModeEnd(terminalPhase, iteration, true);
-          }
-          // Pre-swap return mirrors niiter.c:1058-1062: on MODEINITFLOAT
-          // converged, NIiter returns OK without executing the trailing
-          // CKTrhsOld/CKTrhs swap at niiter.c:1087-1090. ctx.rhsOld holds
-          // the converging-iter input; ctx.rhs holds the converging-iter output.
-          ctx.nrResult.converged = true;
-          ctx.nrResult.iterations = iteration + 1;
-          ctx.nrResult.largestChangeElement = largestChangeElement;
-          ctx.nrResult.largestChangeNode = largestChangeNode;
-          ctx.nrResult.voltages = ctx.rhs;
-          return;
+      // niiter.c:1051-1057 — DC + nodeset gate. ipass is only ever 0 or 1
+      // (sole writer is the MODEINITFIX branch below). When ipass==1 we
+      // raise noncon to defer the terminating return by one iteration; the
+      // unconditional `ipass = 0` matches ngspice exactly. The outer
+      // globalConverged/elemConverged checks are folded into ctx.noncon at
+      // the convergence step (lines 545-547), so reading noncon alone
+      // mirrors niiter.c:1058 verbatim.
+      if (isDcop(ctx.cktMode) && ctx.hadNodeset) {
+        if (ipass) {
+          ctx.noncon = ipass;
         }
+        ipass = 0;
+      }
+      // niiter.c:1058-1062 — MODEINITFLOAT converged exit. NIiter returns
+      // OK without executing the trailing CKTrhsOld/CKTrhs swap. ctx.rhsOld
+      // holds the converging-iter input; ctx.rhs holds the converging-iter
+      // output.
+      if (ctx.noncon === 0) {
+        if (ladder) {
+          // The terminal-mode label depends on whether this NR call is a
+          // DC-OP solve (terminal mode = dcopInitFloat) or a transient
+          // solve (terminal mode = tranNR). In a transient call, the
+          // dispatcher below has already promoted MODEINITTRAN or
+          // MODEINITPRED to MODEINITFLOAT and emitted the corresponding
+          // ladder.onModeBegin("tranNR", ...).
+          const terminalPhase = isDcop(ctx.cktMode) ? "dcopInitFloat" : "tranNR";
+          ladder.onModeEnd(terminalPhase, iteration, true);
+        }
+        ctx.nrResult.converged = true;
+        ctx.nrResult.iterations = iteration + 1;
+        ctx.nrResult.largestChangeElement = largestChangeElement;
+        ctx.nrResult.largestChangeNode = largestChangeNode;
+        ctx.nrResult.voltages = ctx.rhs;
+        return;
       }
     } else if (curInitf === MODEINITJCT) {
       ctx.cktMode = setInitf(ctx.cktMode, MODEINITFIX);
@@ -679,6 +699,25 @@ export function newtonRaphson(ctx: CKTCircuitContext): void {
       ctx.cktMode = setInitf(ctx.cktMode, MODEINITFLOAT);
       // Small-signal AC bias has no transient/DC-OP attempt-grouping equivalent
       // in the harness; no ladder callback fires.
+    } else {
+      // niiter.c:1077-1085 — unrecognised INITF bit returns E_INTERN. The
+      // NR layer is the sole writer of INITF, so this fires only when an
+      // upstream caller has corrupted cktMode. Surface it loudly rather
+      // than silently falling through to the rhs/rhsOld swap.
+      diagnostics.emit(
+        makeDiagnostic("internal-error", "error",
+          `NR loop saw unrecognised INITF bit 0x${curInitf.toString(16)}`,
+          {
+            explanation: "INITF must be one of MODEINITFLOAT/JCT/FIX/SMSIG/TRAN/PRED.",
+            suggestions: [],
+          }),
+      );
+      ctx.nrResult.converged = false;
+      ctx.nrResult.iterations = iteration + 1;
+      ctx.nrResult.largestChangeElement = largestChangeElement;
+      ctx.nrResult.largestChangeNode = largestChangeNode;
+      ctx.nrResult.voltages = ctx.rhs;
+      return;
     }
 
     // Split marker: after iteration 0, let the harness observe cold linearization

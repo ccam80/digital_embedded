@@ -73,7 +73,7 @@ function makeTriac(overrides: Partial<typeof TRIAC_DEFAULTS> = {}): AnalogElemen
 /** Build a DC-OP LoadContext over a fresh SparseSolver sized for 3 matrix rows (nodes 1..3). */
 function makeDcOpCtx(voltages: Float64Array): LoadContext {
   const solver = new SparseSolver();
-  solver.beginAssembly(3);
+  solver._initStructure(3);
   return makeLoadCtx({
     solver,
     voltages,

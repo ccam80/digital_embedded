@@ -1045,7 +1045,7 @@ describe("LED limitingCollector", () => {
     const voltages = new Float64Array(1);
     voltages[0] = 5.0;
     const solver = new SparseSolver();
-    solver.beginAssembly(1);
+    solver._initStructure(1);
     const collector: LimitingEvent[] = [];
     const ctx = buildLedLoadCtx(solver, voltages, { limitingCollector: collector });
     element.load(ctx);
@@ -1067,7 +1067,7 @@ describe("LED limitingCollector", () => {
     const voltages = new Float64Array(1);
     voltages[0] = 0; // unused under MODEINITJCT; vdRaw is forced to vcrit.
     const solver = new SparseSolver();
-    solver.beginAssembly(1);
+    solver._initStructure(1);
     const collector: LimitingEvent[] = [];
     const ctx = buildLedLoadCtx(solver, voltages, {
       cktMode: MODEINITJCT,
@@ -1087,7 +1087,7 @@ describe("LED limitingCollector", () => {
     const voltages = new Float64Array(1);
     voltages[0] = 5.0;
     const solver = new SparseSolver();
-    solver.beginAssembly(1);
+    solver._initStructure(1);
     const ctx = buildLedLoadCtx(solver, voltages, { limitingCollector: null });
     expect(() => element.load(ctx)).not.toThrow();
   });
@@ -1101,7 +1101,7 @@ describe("LED limitingCollector", () => {
     const voltages = new Float64Array(1);
     voltages[0] = 0.5;
     const solver = new SparseSolver();
-    solver.beginAssembly(1);
+    solver._initStructure(1);
     const collector: LimitingEvent[] = [];
     const ctx = buildLedLoadCtx(solver, voltages, { limitingCollector: collector });
     element.load(ctx);
@@ -1144,7 +1144,7 @@ describe("LED TEMP", () => {
 
   function buildTempLoadCtx(overrides: Partial<LoadContext> = {}): LoadContext {
     const solver = new SparseSolver();
-    solver.beginAssembly(1);
+    solver._initStructure(1);
     return {
       solver,
       matrix: solver,

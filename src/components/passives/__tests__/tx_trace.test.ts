@@ -49,15 +49,14 @@ function doStep(tx: AnalogTappedTransformerElement, solver: SparseSolver, voltag
     const rLoad = makeResistor(2, 4, Rload);
     const rCtGnd = makeResistor(3, 0, 1e6);
     const rS2Gnd = makeResistor(4, 0, 1e6);
-    solver.beginAssembly(matrixSize);
+    solver._initStructure(matrixSize);
     vsrc.load(ctx);
     tx.load(ctx);
     rLoad.load(ctx);
     rCtGnd.load(ctx);
     rS2Gnd.load(ctx);
-    solver.finalize();
     const res = solver.factor();
-    if (!res.success) return false;
+    if (res !== 0) return false;
     solver.solve(voltages);
     // Check convergence
     let conv = true;

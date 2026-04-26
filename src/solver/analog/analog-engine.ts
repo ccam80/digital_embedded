@@ -294,7 +294,7 @@ export class MNAEngine implements AnalogEngine {
         // the exact failure mode that hung tests using larger circuits.
         // The stamps produced here are discarded by the next cktLoad()'s
         // beginAssembly, so it costs us nothing to re-prime.
-        ctx.solver.beginAssembly(ctx.matrixSize);
+        ctx.solver._resetForAssembly();
         for (const element of this._elements) {
           if (isPoolBacked(element)) {
             const violations = assertPoolIsSoleMutableState(

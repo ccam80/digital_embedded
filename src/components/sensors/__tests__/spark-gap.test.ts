@@ -389,9 +389,8 @@ describe("spark_gap_load_dcop_parity", () => {
       matrixSize: 2,
       nodeCount: 2,
     });
-    stampCtx.solver.beginAssembly(2);
+    stampCtx.solver._initStructure(2);
     analogElement.load(stampCtx.loadCtx);
-    stampCtx.solver.finalize();
     const stamps = stampCtx.solver.getCSCNonZeros();
 
     // NGSPICE ref: G = 1/R where R = firingResistance(absV=0, ...).

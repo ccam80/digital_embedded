@@ -242,9 +242,8 @@ describe("potentiometer_load_dcop_parity", () => {
       matrixSize: 3,
       nodeCount: 3,
     });
-    stampCtx.solver.beginAssembly(3);
+    stampCtx.solver._initStructure(3);
     analogElement.load(stampCtx.loadCtx);
-    stampCtx.solver.finalize();
     const stamps = stampCtx.solver.getCSCNonZeros();
 
     // NGSPICE ref: G = 1/R = 1 / (R_total * position) = 1 / (10000 * 0.5)

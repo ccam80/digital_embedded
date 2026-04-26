@@ -369,13 +369,12 @@ describe("harness integration", () => {
     const { circuit } = makeHWR();
     engine.init(circuit);
     const solver = engine.solver!;
-    solver.enablePreFactorMatrixCapture(true);
     engine.dcOperatingPoint();
     expect(solver.dimension).toBe(3);
     const rhs = solver.getRhsSnapshot();
     expect(rhs).toBeInstanceOf(Float64Array);
     expect(rhs.length).toBe(3);
-    const nz = solver.getPreFactorMatrixSnapshot();
+    const nz = solver.getCSCNonZeros();
     expect(nz.length).toBeGreaterThan(0);
     expect(nz[0]).toHaveProperty("row");
     expect(nz[0]).toHaveProperty("col");

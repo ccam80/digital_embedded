@@ -254,8 +254,10 @@ export function createIterationCaptureHook(
   clear: () => void;
   drainForLog: () => NRAttemptRecord["iterationDetails"];
 } {
-  solver.enablePreSolveRhsCapture(true);
-  solver.enablePreFactorMatrixCapture(true);
+  // Phase 0 deleted enable*Capture/getPre*Snapshot machinery; harness now
+  // reads the live RHS / CSC nonzeros at the post-iteration hook moment.
+  // Semantic divergence: matrix is POST-factor (LU values), not pre-factor —
+  // pending the test-harness module rewrite per architect §4.
   let snapshots: IterationSnapshot[] = [];
   let detailBuffer: NonNullable<NRAttemptRecord["iterationDetails"]> = [];
 
@@ -299,8 +301,8 @@ export function createIterationCaptureHook(
       iteration,
       voltages: voltages.slice(),
       prevVoltages: prevVoltages.slice(),
-      preSolveRhs: solver.getPreSolveRhsSnapshot().slice(),
-      matrix: solver.getPreFactorMatrixSnapshot().slice(),
+      preSolveRhs: solver.getRhsSnapshot(),
+      matrix: solver.getCSCNonZeros(),
       elementStates: captureElementStates(elements, statePool, elementLabels),
       noncon,
       diagGmin: ctx.diagonalGmin,

@@ -1,18 +1,175 @@
 {
   "summary": {
     "vitest": {
-      "passed": 1,
+      "passed": 0,
       "failed": 0,
       "skipped": 0,
       "totalFiles": 1,
-      "durationSeconds": 0.9
+      "durationSeconds": 88.7
     },
-    "playwright": null,
-    "totalFailed": 0,
-    "totalPassed": 1
+    "playwright": {
+      "passed": 468,
+      "failed": 20,
+      "skipped": 0,
+      "totalFiles": 23,
+      "durationSeconds": 214.881803
+    },
+    "totalFailed": 20,
+    "totalPassed": 468
   },
   "failures": {
     "vitest": [],
-    "playwright": []
+    "playwright": [
+      {
+        "message": "Error: Status bar shows an error",
+        "count": 15,
+        "locations": [
+          {
+            "file": "gui/analog-bjt-convergence.spec.ts",
+            "test": "compile and step — no convergence error, supply rail is 10V",
+            "line": 251,
+            "column": 3
+          },
+          {
+            "file": "gui/analog-bjt-convergence.spec.ts",
+            "test": "run continuously — voltages remain bounded",
+            "line": 355,
+            "column": 3
+          },
+          {
+            "file": "gui/analog-bjt-convergence.spec.ts",
+            "test": "step to 5ms — output voltage evolves and trace captures transient",
+            "line": 387,
+            "column": 3
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "DAC at bits=4: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "DAC at bits=8: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "ADC at bits=4: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "ADC at bits=8: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/hotload-params-e2e.spec.ts",
+            "test": "changing BF on BJT via primary param row changes output voltage",
+            "line": 103,
+            "column": 3
+          },
+          {
+            "file": "gui/hotload-params-e2e.spec.ts",
+            "test": "rOut override affects simulation output in mixed-signal mode",
+            "line": 217,
+            "column": 3
+          },
+          {
+            "file": "gui/hotload-params-e2e.spec.ts",
+            "test": "selecting Pin Loading: Loaded shows checkmark and simulation continues without error",
+            "line": 301,
+            "column": 3
+          },
+          {
+            "file": "gui/hotload-params-e2e.spec.ts",
+            "test": "switching to Pin Loading: Ideal produces valid finite simulation output",
+            "line": 343,
+            "column": 3
+          },
+          {
+            "file": "gui/master-circuit-assembly.spec.ts",
+            "test": "Master 1: digital logic — gates, flip-flop, counter",
+            "line": 46,
+            "column": 3
+          },
+          {
+            "file": "gui/master-circuit-assembly.spec.ts",
+            "test": "Master 2: analog — switched divider, RC, opamp, BJT",
+            "line": 207,
+            "column": 3
+          },
+          {
+            "file": "gui/master-circuit-assembly.spec.ts",
+            "test": "Master 3: mixed-signal — DAC, RC, comparator, counter",
+            "line": 417,
+            "column": 3
+          },
+          {
+            "file": "gui/spice-model-panel.spec.ts",
+            "test": "IS override affects BJT collector current",
+            "line": 156,
+            "column": 3
+          }
+        ]
+      },
+      {
+        "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBeGreaterThan\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m",
+        "count": 2,
+        "locations": [
+          {
+            "file": "gui/analog-ui-fixup.spec.ts",
+            "test": "speed control affects analog simulation rate",
+            "line": 140,
+            "column": 3
+          },
+          {
+            "file": "gui/workflow-tests.spec.ts",
+            "test": "speed control affects analog simulation rate",
+            "line": 619,
+            "column": 3
+          }
+        ]
+      },
+      {
+        "message": "Error: simTime only advanced 0.0us — expected at least 500us",
+        "count": 1,
+        "locations": [
+          {
+            "file": "gui/stepping-perf.spec.ts",
+            "test": "buckbjt at 1ms/s — simTime advances at least 500us in 2s wall time",
+            "line": 48,
+            "column": 3
+          }
+        ]
+      },
+      {
+        "message": "Error: FF only advanced 0.0us — expected ~1ms",
+        "count": 1,
+        "locations": [
+          {
+            "file": "gui/stepping-perf.spec.ts",
+            "test": "buckbjt fast-forward 1ms — completes within 5s wall budget",
+            "line": 93,
+            "column": 3
+          }
+        ]
+      },
+      {
+        "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBeGreaterThanOrEqual\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m",
+        "count": 1,
+        "locations": [
+          {
+            "file": "parity/rlc-lte-path.spec.ts",
+            "test": "RC zero-crossing progression through the postMessage bridge",
+            "line": 40,
+            "column": 3
+          }
+        ]
+      }
+    ]
   }
 }

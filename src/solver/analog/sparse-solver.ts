@@ -53,43 +53,11 @@
  * mechanical rule uniform.
  */
 
-export interface FactorResult {
-  success: boolean;
-  conditionEstimate?: number;
-  singularRow?: number;
-  /**
-   * Stage 6A — restored Matrix->SingularCol (spdefs.h:773). Returned on
-   * structural-singular and zero-pivot returns; original caller-side col.
-   */
-  singularCol?: number;
-  /**
-   * Stage 6A — restored Matrix->Error (spdefs.h:744). One of the
-   * spOKAY / spSMALL_PIVOT / spZERO_DIAG / spSINGULAR module constants
-   * exported alongside SparseSolver. Set on every factor return.
-   */
-  error?: number;
-  /**
-   * True iff this factor() call walked the reorder loop in
-   * `_spOrderAndFactor` (rather than the reuse-only `_spFactor`). Replaces
-   * the prior `lastFactorUsedReorder` instance field per Stage 6.3.3.
-   * Returned on every call so callers can dispatch the
-   * NISHOULDREORDER-on-numerical-singular recovery (niiter.c:888-891).
-   */
-  usedReorder?: boolean;
-}
-
-/**
- * Internal sentinel returned by `_spFactor`'s reuse loop when a stored pivot
- * fails the column-relative partial-pivot guard (ngspice spfactor.c:218-225
- * `ReorderingRequired = YES; break`). The caller (`factor`) catches this and
- * dispatches into `_spOrderAndFactor` resumed at `step`, mirroring ngspice's
- * shared `Step` counter between the reuse loop (spfactor.c:217-227) and the
- * reorder loop (spfactor.c:241+).
- */
-interface SpFactorReuseResult extends FactorResult {
-  needsReorder?: boolean;
-  rejectedAtStep?: number;
-}
+// factor() returns the ngspice error code directly (one of spOKAY,
+// spSMALL_PIVOT, spZERO_DIAG, spSINGULAR, spNO_MEMORY, spPANIC). Mirrors
+// ngspice spOrderAndFactor / spFactor signature: `int (*)(MatrixPtr, ...)`.
+// SingularRow/SingularCol read via whereSingular(); reorder-vs-reuse
+// dispatch via the `reordered` getter (mirroring Matrix->Reordered).
 
 // =========================================================================
 // ngspice public error codes — spmatrix.h.
@@ -123,7 +91,7 @@ export class SparseSolver {
   // =========================================================================
   // Persistent linked-list element pool
   // =========================================================================
-  // This is the primary matrix storage, persistent across beginAssembly/stamp/finalize cycles.
+  // This is the primary matrix storage, persistent across _initStructure / _resetForAssembly / stamp cycles.
   // ngspice variable mapping:
   //   Element->Row        → _elRow[e]
   //   Element->Col        → _elCol[e]
@@ -216,30 +184,6 @@ export class SparseSolver {
   private _scratch: Float64Array = new Float64Array(0);
 
   // =========================================================================
-  // Pre-solve RHS capture
-  // =========================================================================
-  // @instrumentation — Stage 8 prefix-marker fallback. Test/harness only.
-  // Production code MUST NOT read these fields. The long-term home for the
-  // capture API is `sparse-solver-instrumentation.ts`'s
-  // `SparseSolverInstrumentation` wrapper; the field/method pair stays here
-  // because moving it would require rewriting 20+ test files in one stage.
-  private _preSolveRhs: Float64Array | null = null;
-  private _capturePreSolveRhs = false;
-
-  // =========================================================================
-  // Pre-factor matrix capture
-  // =========================================================================
-  // Factorization overwrites _elVal[e] with combined L/U values (see
-  // _numericLUMarkowitz lines 1415, 1424, 1439 and _numericLUReusePivots
-  // lines 1595, 1605 — ngspice spMatrix semantics). Post-factor snapshots
-  // via getCSCNonZeros() therefore report LU data, not the A matrix that
-  // was factored. This capture snapshots the A matrix at factor() entry
-  // so harness consumers see the system that was actually solved.
-  // @instrumentation — Stage 8 prefix-marker fallback. Test/harness only.
-  private _preFactorMatrix: Array<{ row: number; col: number; value: number }> | null = null;
-  private _capturePreFactorMatrix = false;
-
-  // =========================================================================
   // State flags — ngspice MatrixFrame fields (spdefs.h:733-788) + macro :69.
   //
   // B2 fix (Phase 2.5 W2.1): we no longer conflate Factored + NeedsOrdering
@@ -254,7 +198,10 @@ export class SparseSolver {
   //   Matrix->Factored       → _factored
   //   Matrix->NeedsOrdering  → _needsReorder
   //   IS_FACTORED(Matrix)    → (_factored && !_needsReorder)
-  //   NIDIDPREORDER bit      → _didPreorder (CKT-lifetime — see S3)
+  //
+  // NIDIDPREORDER lives in CKTniState (NI layer), not in MatrixFrame. The
+  // gating decision belongs to the caller; the solver runs preorder()
+  // unconditionally when invoked.
   //
   // Set/clear lifecycle (must match ngspice exactly — see Item #10 audit):
   //   _needsReorder = true (ngspice NeedsOrdering = YES):
@@ -273,15 +220,8 @@ export class SparseSolver {
   //   _factored = false:
   //     * _initStructure — spCreate initial (Factored implicitly NO)
   //     * invalidateTopology() — spStripMatrix path
-  //
-  //   _didPreorder = true:
-  //     * preorder() first call — niiter.c:854 NIDIDPREORDER
-  //   _didPreorder = false:
-  //     * _initStructure — spCreate initial
-  //     * invalidateTopology() — NIreinit (nireinit.c:42 clears CKTniState)
   // =========================================================================
   private _needsReorder: boolean = false;
-  private _didPreorder: boolean = false;
   /**
    * ngspice MatrixFrame.Factored (spdefs.h:748). True iff the matrix currently
    * holds an LU factorization that can be reused by factorNumerical (modulo
@@ -296,10 +236,47 @@ export class SparseSolver {
    * (spfactor.c:246-247).
    */
   private _rowsLinked: boolean = false;
-  /** True when linked structure has never been built, or after invalidateTopology(). */
-  private _structureEmpty: boolean = true;
-  /** Matrix size for which workspace arrays were last allocated. -1 = never. */
-  private _workspaceN: number = -1;
+  /**
+   * ngspice MatrixFrame.InternalVectorsAllocated (spdefs.h:754). Gates the
+   * deferred allocation of the Markowitz / Intermediate vectors inside
+   * spcCreateInternalVectors (spfactor.c:706-747); flipped to TRUE after
+   * the first allocation. Replaces the prior `_workspaceN` size proxy.
+   */
+  private _internalVectorsAllocated: boolean = false;
+
+  /** ngspice Matrix->Partitioned (spdefs.h). */
+  private _partitioned: boolean = false;
+  /** ngspice Matrix->DoRealDirect (spdefs.h). Allocated by spcCreateInternalVectors. */
+  private _doRealDirect: Int32Array = new Int32Array(0);
+
+  /**
+   * ngspice MatrixFrame.Reordered (spdefs.h:770). Set TRUE at
+   * spfactor.c:280 inside spOrderAndFactor when the reorder loop
+   * completes. Read by the NR layer (niiter.c:888-891) to dispatch
+   * NISHOULDREORDER recovery: a numerical-singular factor with
+   * Reordered already TRUE means the next attempt cannot improve by
+   * reordering.
+   */
+  private _reordered: boolean = false;
+
+  /**
+   * Per-call signal — true iff the most recent factor() call entered the
+   * reorder body of `_spOrderAndFactor` (spfactor.c:240+). Reset to false
+   * at every factor() entry, set true the moment the reorder loop body is
+   * about to run.
+   *
+   * ngspice's NR layer distinguishes "this call walked reorder" from "this
+   * call took the reuse path" structurally — `if (NISHOULDREORDER)` calls
+   * `SMPreorder`, the else arm calls `SMPluFac` (niiter.c:861-902). digiTS
+   * does the dispatch inside `factor()`, so the NR layer reads this flag
+   * to mirror the `else` arm of niiter.c — only the SMPluFac path is
+   * eligible for the spSINGULAR-driven NISHOULDREORDER retry.
+   *
+   * Distinct from `_reordered` (sticky `Matrix->Reordered`): that field
+   * stays TRUE for the lifetime of the matrix once the reorder loop runs;
+   * this field is per-call.
+   */
+  private _lastFactorWalkedReorder: boolean = false;
 
   /**
    * Pivot relative threshold (ngspice Matrix->RelThreshold, spalloc.c:192).
@@ -369,7 +346,7 @@ export class SparseSolver {
    * O(column chain length) per call.
    */
   allocElement(row: number, col: number): number {
-    // Guard: without beginAssembly(), _extToIntCol is zero-length, so
+    // Guard: without _initStructure(), _extToIntCol is zero-length, so
     // _extToIntCol[col] → undefined, which Int32Array writes in
     // _insertIntoCol coerce to 0 — producing a self-referential cycle
     // in the column linked list that makes the next search spin forever.
@@ -377,7 +354,7 @@ export class SparseSolver {
     if (this._n === 0) {
       throw new Error(
         `SparseSolver.allocElement(${row}, ${col}) called before ` +
-        `beginAssembly(). Call solver.beginAssembly(matrixSize) first.`,
+        `_initStructure(). Call solver._initStructure(matrixSize) first.`,
       );
     }
     // Translate the caller's original column to the current internal column
@@ -480,130 +457,49 @@ export class SparseSolver {
   // =========================================================================
 
   /**
-   * Begin a new assembly pass.
+   * ngspice SMPluFac (spsmp.c:168-175) — line-for-line port:
    *
-   * Two ngspice entries are folded here, dispatched on `_structureEmpty`:
-   *   - First call (or after `invalidateTopology()`): mirrors
-   *     `spCreate` (spalloc.c:160-200) plus the deferred
-   *     `spcCreateInternalVectors` (spfactor.c:706-747). Allocates the
-   *     element pool, chain heads, permutations, and Markowitz scratch.
-   *   - Steady state (NR re-stamp pass): mirrors `SMPclear`
-   *     (spsmp.c:141-147) which calls `spClear` (spbuild.c:96-142). Zeros
-   *     only `pElement->Real` over the live chain walk; the linked
-   *     structure, permutations, and Markowitz arrays carry forward
-   *     exactly as the previous factor left them.
+   *     int SMPluFac(SMPmatrix *Matrix, double PivTol, double Gmin) {
+   *         LoadGmin(Matrix, Gmin);
+   *         return spFactor(Matrix);
+   *     }
    *
-   * RHS management is the caller's responsibility per `niiter.c`. ngspice
-   * `spClear` does not touch RHS (banned-pattern guard rule #9 in
-   * spec/sparse-solver-direct-port/01-port-spec.md).
+   * The reorder-vs-reuse dispatch is NOT here — it lives inside `spFactor`
+   * at `spfactor.c:333-335` which forwards to `spOrderAndFactor` when
+   * `Matrix->NeedsOrdering` is set. Returns the ngspice error code
+   * (spOKAY, spSMALL_PIVOT, spZERO_DIAG, spSINGULAR, spNO_MEMORY, spPANIC).
    *
-   * Variable map (ngspice → digiTS):
-   *   spCreate(Size)                  → _initStructure(size)
-   *   spcCreateInternalVectors(...)   → _initStructure (Markowitz alloc)
-   *   spClear(Matrix)                 → _resetForAssembly()
+   * Callers read `whereSingular()` for `(SingularRow, SingularCol)` and
+   * the `reordered` getter (mirroring `Matrix->Reordered`) for the
+   * NISHOULDREORDER recovery dispatch (niiter.c:888-891).
    */
-  beginAssembly(size: number): void {
-    if (size !== this._n) {
-      this._n = size;
-      this._structureEmpty = true;
-    }
-
-    if (this._structureEmpty) {
-      // First-call branch — spCreate + spcCreateInternalVectors.
-      this._initStructure(size);
-    } else {
-      // Steady-state branch — SMPclear → spClear.
-      this._resetForAssembly();
-    }
-
-    // ngspice does NOT reset IntToExtRowMap / ExtToIntRowMap between factor
-    // calls — `spClear` (spbuild.c:96-142) zeros only element values. The
-    // row permutation, the chain heads (`FirstInRow/Col`), and per-element
-    // `Row`/`Col` fields all carry forward exactly as the previous factor
-    // left them. The next reorder layers more swaps on top. We mirror that.
-  }
-
-  /**
-   * Finalize after stamping.
-   *
-   * Per ngspice spOrderAndFactor (spfactor.c:255-256): _countMarkowitz and
-   * _markowitzProducts run inside _numericLUMarkowitz (gated to startStep===0),
-   * not here. finalize() no longer touches Markowitz state — mirrors ngspice's
-   * spClear (spbuild.c:96-142) which does NOT recompute Markowitz between NR
-   * iterations.
-   */
-  finalize(): void {
-    if (this._capturePreSolveRhs && this._preSolveRhs) {
-      const n = this._n;
-      if (this._preSolveRhs.length !== n) {
-        this._preSolveRhs = new Float64Array(n);
-      }
-      this._preSolveRhs.set(this._rhs.subarray(0, n));
-    }
-  }
-
-  /**
-   * Factor the currently-assembled matrix. Mirrors ngspice's `SMPluFac`
-   * (spsmp.c:169-200) entry — the public-surface dispatch sole entry point
-   * after Stage 6's collapse of the digiTS dispatch graph. ngspice
-   * counterparts:
-   *   - `diagGmin` → `LoadGmin(Matrix, Gmin)`, called INSIDE `SMPluFac`
-   *     (spsmp.c:173) and `SMPreorder` (spsmp.c:197) before the matching
-   *     `spFactor` / `spOrderAndFactor` invocation. The gmin stamp belongs
-   *     inside the factor routine so callers never observe a post-gmin,
-   *     pre-factor matrix.
-   *   - Dispatch: `spFactor(Matrix)` at spfactor.c:333-335 forwards to
-   *     `spOrderAndFactor` when `Matrix->NeedsOrdering` is set. The B2
-   *     predicate `_needsReorder || !_factored` expands `NeedsOrdering` with
-   *     `Factored = NO` catching the first-ever factor call.
-   *   - The reuse-loop's column-relative partial-pivot guard
-   *     (spfactor.c:218-225 `ReorderingRequired = YES; break`) lands here as
-   *     the `needsReorder` sentinel from `_spFactor`; we resume in
-   *     `_spOrderAndFactor` at the rejected step, mirroring ngspice's shared
-   *     `Step` counter between the two loops.
-   */
-  factor(diagGmin?: number): FactorResult {
-    // ngspice SMPluFac body order (spsmp.c:169-175): LoadGmin, then spFactor.
-    // For SMPreorder (spsmp.c:194-200): LoadGmin, then spOrderAndFactor.
-    // We apply gmin once here and let the dispatch decide which factor body
-    // consumes it — matching ngspice's atomicity guarantee.
+  factor(diagGmin?: number): number {
     if (diagGmin) this._applyDiagGmin(diagGmin);
-    // Snapshot semantics: the matrix as it was when factor() was called —
-    // i.e. the input A to the WHOLE factor pipeline, post-LoadGmin and
-    // pre-elimination. This is correct on every dispatch path including
-    // C3 (where _spFactor partially eliminates before falling through to
-    // _spOrderAndFactor): the harness consumer (rl-iter0-probe.test.ts)
-    // verifies A·x = b against the SOLVED x, and LU factorisation
-    // preserves the system's solution, so the original A — captured
-    // here — is the correct snapshot regardless of internal mid-factor
-    // state. Do NOT re-snapshot inside _spOrderAndFactor on the C3 path.
-    this._takePreFactorSnapshotIfEnabled();
+    // niiter.c:888-891 NR-side gate — reset before each call so the NR
+    // layer can distinguish reorder-path failures (no retry) from
+    // reuse-path failures (eligible for spSINGULAR retry).
+    this._lastFactorWalkedReorder = false;
+    return this._spFactor();
+  }
 
-    // ngspice spdefs.h:69 IS_FACTORED predicate —
-    //   `((m)->Factored && !(m)->NeedsOrdering)`.
-    // Reuse the stored pivot order only when both hold; otherwise full
-    // reorder via spOrderAndFactor (spfactor.c:333-335 dispatch fallthrough).
-    if (this._needsReorder || !this._factored) {
-      const result = this._spOrderAndFactor(0);
-      result.usedReorder = true;
-      return result;
-    }
-    const result = this._spFactor();
-    if (!result.success && result.needsReorder) {
-      // ngspice spfactor.c:218-227 — reuse loop rejects at step k; the outer
-      // for in spOrderAndFactor falls through into the reorder loop at
-      // spfactor.c:241+ with `Step` carrying through. Steps [0, rejectedAtStep)
-      // are already in ngspice-convention factored form; we MUST NOT
-      // re-stamp gmin (already applied above) and MUST NOT restart at 0.
-      const rejectedAtStep = result.rejectedAtStep ?? 0;
-      this._needsReorder = true;
-      this._allocateWorkspace();
-      const reorderResult = this._spOrderAndFactor(rejectedAtStep);
-      reorderResult.usedReorder = true;
-      return reorderResult;
-    }
-    result.usedReorder = false;
-    return result;
+  /**
+   * ngspice MatrixFrame.Reordered (spdefs.h:770) — true iff the most
+   * recent factor pass walked the reorder loop in `_spOrderAndFactor`.
+   * Sticky once set; mirrors `Matrix->Reordered` lifetime.
+   */
+  get reordered(): boolean {
+    return this._reordered;
+  }
+
+  /**
+   * Per-call signal — true iff the most recent factor() call entered the
+   * reorder body of `_spOrderAndFactor`. Used by the NR loop to mirror
+   * the `else` arm of `if (NISHOULDREORDER)` at niiter.c:881-902:
+   *   `errorCode === spSINGULAR && !lastFactorWalkedReorder`
+   * is the SMPluFac → spSINGULAR retry gate.
+   */
+  get lastFactorWalkedReorder(): boolean {
+    return this._lastFactorWalkedReorder;
   }
 
   /**
@@ -725,8 +621,9 @@ export class SparseSolver {
   }
 
   /**
-   * Wipe the persistent linked structure so the next beginAssembly() rebuilds
-   * it from scratch. Mirrors ngspice spStripMatrix (sputils.c:1106-1145)
+   * Wipe the persistent linked structure so the next _initStructure /
+   * _resetForAssembly cycle rebuilds it from scratch. Mirrors ngspice
+   * spStripMatrix (sputils.c:1106-1145)
    * field-by-field. Sets NeedsOrdering = YES at line 1112 so the next factor
    * uses the full reorder path; clears RowsLinked, Elements, Originals,
    * Fillins, and resets every chain head, every diag pointer, and the
@@ -746,53 +643,26 @@ export class SparseSolver {
    *   FirstInRow/Col[I]    → _rowHead[i]/_colHead[i]  (sputils.c:1138-1142)
    *   Diag[I]              → _diag[i]            (sputils.c:1143)
    */
+  /** ngspice spStripMatrix (sputils.c:1106-1145) — line-for-line port. */
   invalidateTopology(): void {
-    const n = this._n;
-    // ngspice spStripMatrix (sputils.c:1111): RowsLinked = NO.
+    // ngspice sputils.c:1110 — short-circuit when nothing to strip.
+    if (this._elements === 0) return;
+    // ngspice sputils.c:1111-1115.
     this._rowsLinked = false;
-    // ngspice spStripMatrix (sputils.c:1112): NeedsOrdering = YES.
     this._needsReorder = true;
-    // ngspice spStripMatrix (sputils.c:1113-1115): Elements/Originals/Fillins
-    // counter zero-out. (Originals is not in spStripMatrix's body verbatim
-    // because ngspice's strip rebuilds via Originals++ in spcCreateElement
-    // again on the next assembly; we zero it here for the same reason.)
     this._elements = 0;
     this._originals = 0;
     this._fillins = 0;
-    // B2: clear Factored (spdefs.h:748). spStripMatrix clears the linked
-    // structure and the factorization along with it.
-    this._factored = false;
-    this._didPreorder = false;
-    // ngspice spStripMatrix (sputils.c:1138-1143) per-slot reset of chain
-    // heads and diagonal pointers. We re-zero the existing typed arrays
-    // rather than reallocating; the next beginAssembly will reuse them
-    // without an _initStructure call when size is unchanged.
-    if (this._rowHead.length >= n) {
-      for (let i = 0; i < n; i++) {
-        this._rowHead[i] = -1;
-        this._colHead[i] = -1;
-        this._diag[i] = -1;
-      }
+    // ngspice sputils.c:1117-1133 — element-list cursor reset. Bucket A.5:
+    // pool slot 0 stays as TrashCan; reusable pool starts at slot 1.
+    this._elCount = 1;
+    // ngspice sputils.c:1135-1144 — per-slot reset of chain heads and Diag.
+    const n = this._n;
+    for (let i = 0; i < n; i++) {
+      this._rowHead[i] = -1;
+      this._colHead[i] = -1;
+      this._diag[i] = -1;
     }
-    // ngspice spStripMatrix (sputils.c:1117-1133): element-list cursor reset.
-    // After Stage 4 the free-list (`_elFreeHead`) is gone; only `_elCount`
-    // remains. Setting _elCount=0 makes the next allocElement reuse the
-    // existing pool from the bottom.
-    this._elCount = 0;
-    // Stage 6A — clear Error/SingularRow/SingularCol along with the strip.
-    this._error = spOKAY;
-    this._singularRow = 0;
-    this._singularCol = 0;
-    // Capture buffers (Stage 8 may move these out): clear so the next
-    // factor's snapshot reflects the rebuilt topology, not the prior one.
-    this._preFactorMatrix = null;
-    // _structureEmpty deletion deferred — Stage 4C.3.10 notes that the
-    // structure is materially empty after this method runs, but the typed
-    // arrays remain allocated. We KEEP the flag so beginAssembly's
-    // dispatch can choose between _initStructure (re-allocate when n
-    // changed) and _resetForAssembly (steady state). The semantic meaning
-    // is now "the linked structure has been wiped" not "arrays unallocated".
-    this._structureEmpty = true;
   }
 
   /**
@@ -828,8 +698,10 @@ export class SparseSolver {
    * first factor entry (spfactor.c:246-247).
    */
   preorder(): void {
-    if (this._didPreorder) return;
-    this._didPreorder = true;
+    // ngspice spMNA_Preorder (sputils.c:177-230) runs unconditionally when
+    // invoked; the NIDIDPREORDER gating decision lives in CKTniState (NI
+    // layer), not in MatrixFrame. Caller-side responsibility per architect
+    // B.37.
 
     // ngspice uses a monotonically-advancing StartAt cursor (sputils.c:181, 210,
     // 218) so a just-swapped pair is never re-examined in the same outer pass.
@@ -879,19 +751,21 @@ export class SparseSolver {
    * Singly-linked: head-insert, no prev-pointer maintenance — mirrors
    * spbuild.c:921-928.
    */
+  /** ngspice spcLinkRows (spbuild.c:907-932) — line-for-line port. */
   private _linkRows(): void {
-    const n = this._n;
-    for (let r = 0; r < n; r++) this._rowHead[r] = -1;
-    for (let col = n - 1; col >= 0; col--) {
-      let e = this._colHead[col];
-      while (e >= 0) {
-        const r = this._elRow[e];
-        this._elCol[e] = col;
-        this._elNextInRow[e] = this._rowHead[r];
-        this._rowHead[r] = e;
-        e = this._elNextInCol[e];
+    for (let col = this._n - 1; col >= 0; col--) {
+      let pElement = this._colHead[col];
+      while (pElement >= 0) {
+        // ngspice spbuild.c:923 — pElement->Col = Col (refresh after SwapCols).
+        this._elCol[pElement] = col;
+        const r = this._elRow[pElement];
+        this._elNextInRow[pElement] = this._rowHead[r];
+        this._rowHead[r] = pElement;
+        pElement = this._elNextInCol[pElement];
       }
     }
+    // ngspice spbuild.c:930.
+    this._rowsLinked = true;
   }
 
   /**
@@ -988,65 +862,14 @@ export class SparseSolver {
     return this._rhs.slice(0, this._n);
   }
 
-  /** @instrumentation Test-only. Use SparseSolverInstrumentation in new code. */
-  enablePreSolveRhsCapture(enabled: boolean): void {
-    this._capturePreSolveRhs = enabled;
-    if (enabled && (this._preSolveRhs === null || this._preSolveRhs.length !== this._n)) {
-      this._preSolveRhs = new Float64Array(this._n);
-    }
-  }
-
-  /** @instrumentation Test-only. Use SparseSolverInstrumentation in new code. */
-  getPreSolveRhsSnapshot(): Float64Array {
-    return this._preSolveRhs ?? new Float64Array(0);
-  }
-
-  /** @instrumentation Test-only. Use SparseSolverInstrumentation in new code. */
-  enablePreFactorMatrixCapture(enabled: boolean): void {
-    this._capturePreFactorMatrix = enabled;
-    if (!enabled) this._preFactorMatrix = null;
-  }
-
-  /**
-   * @instrumentation Test-only. Use SparseSolverInstrumentation in new code.
-   *
-   * Returns the A matrix non-zero entries snapshotted at the most recent
-   * factor() entry, before factorization mutated _elVal. Empty if capture
-   * was never enabled or factor() has not been called since enabling.
-   */
-  getPreFactorMatrixSnapshot(): ReadonlyArray<{ row: number; col: number; value: number }> {
-    return this._preFactorMatrix ?? [];
-  }
-
-  /**
-   * @instrumentation Test-only. Internal helper feeding
-   * `getPreFactorMatrixSnapshot`. Called from `factor()` IMMEDIATELY AFTER
-   * `_applyDiagGmin` so the snapshot reflects the matrix that is actually
-   * about to be factored — matching ngspice's invariant that LoadGmin +
-   * spFactor are observed atomically. Snapshot is skipped when capture is
-   * disabled, so the production hot path pays a single boolean check.
-   */
-  private _takePreFactorSnapshotIfEnabled(): void {
-    if (!this._capturePreFactorMatrix) return;
-    const n = this._n;
-    const snap: Array<{ row: number; col: number; value: number }> = [];
-    for (let col = 0; col < n; col++) {
-      let e = this._colHead[col];
-      while (e >= 0) {
-        snap.push({ row: this._elRow[e], col: this._elCol[e], value: this._elVal[e] });
-        e = this._elNextInCol[e];
-      }
-    }
-    this._preFactorMatrix = snap;
-  }
-
   /**
    * @instrumentation Test-only. Use SparseSolverInstrumentation in new code.
    *
    * Return assembled matrix as array of non-zero entries in original
    * ordering. Used by the ngspice comparison harness. Post-factor reads
-   * report LU-overwritten data, not the pre-factor A matrix — use
-   * `getPreFactorMatrixSnapshot()` for the pre-factor view.
+   * report LU-overwritten data — there is no pre-factor snapshot path
+   * (B.30 deleted the in-class capture; the harness can checkpoint
+   * externally if needed).
    */
   getCSCNonZeros(): Array<{ row: number; col: number; value: number }> {
     const n = this._n;
@@ -1065,10 +888,50 @@ export class SparseSolver {
   // Internal: structure initialization
   // =========================================================================
 
-  private _initStructure(n: number): void {
-    // Allocate workspace arrays sized for n
+  /** ngspice spCreate (spalloc.c:117-277) — line-for-line port (real-only). */
+  _initStructure(n: number): void {
+    this._n = n;
+    // digiTS-only: caller-owned RHS buffer (B.16 deferred to Phase 6).
     this._rhs = new Float64Array(n);
 
+    // ngspice spalloc.c:164-198 — MatrixFrame field init.
+    this._factored = false;
+    this._elements = 0;
+    this._error = spOKAY;
+    this._originals = 0;
+    this._fillins = 0;
+    this._reordered = false;
+    this._needsReorder = true;
+    this._partitioned = false;
+    this._rowsLinked = false;
+    this._internalVectorsAllocated = false;
+    this._singularCol = 0;
+    this._singularRow = 0;
+
+    // ngspice spalloc.c:215, 220, 225 — SP_CALLOC zero-inits chain head /
+    // diag arrays; digiTS uses -1 sentinel (Bucket A.1 Int32Array encoding).
+    this._rowHead = new Int32Array(n).fill(-1);
+    this._colHead = new Int32Array(n).fill(-1);
+    this._diag = new Int32Array(n).fill(-1);
+
+    // ngspice spalloc.c:230, 234 — IntToExt{Col,Row}Map identity.
+    // ExtToInt{Col,Row}Map: ngspice initialises to -1 and uses Translate to
+    // lazy-assign on first sight (spalloc.c:255-259, spbuild.c:436-504). The
+    // -1 init couples to the Translate port, which is a Phase 2 deliverable
+    // per amendment A3; for Phase 1 the existing identity init stays.
+    this._preorderColPerm = new Int32Array(n);
+    this._intToExtRow = new Int32Array(n);
+    this._extToIntCol = new Int32Array(n);
+    this._extToIntRow = new Int32Array(n);
+    for (let i = 0; i < n; i++) {
+      this._preorderColPerm[i] = i;
+      this._intToExtRow[i] = i;
+      this._extToIntCol[i] = i;
+      this._extToIntRow[i] = i;
+    }
+
+    // ngspice spalloc.c:263 — InitializeElementBlocks. Pool slot 0 is the
+    // TrashCan element (spalloc.c:204-211); first real handle is 1.
     const elCap = Math.max(n * 4, 64);
     this._elRow = new Int32Array(elCap);
     this._elCol = new Int32Array(elCap);
@@ -1076,53 +939,14 @@ export class SparseSolver {
     this._elNextInRow = new Int32Array(elCap).fill(-1);
     this._elNextInCol = new Int32Array(elCap).fill(-1);
     this._elCapacity = elCap;
-    this._elCount = 0;
-    // ngspice spCreate (spalloc.c:165, 167-168) initialises the three
-    // counters to zero on a fresh matrix.
-    this._elements = 0;
-    this._originals = 0;
-    this._fillins = 0;
+    this._elCount = 1;
 
-    this._rowHead = new Int32Array(n).fill(-1);
-    this._colHead = new Int32Array(n).fill(-1);
-    this._diag = new Int32Array(n).fill(-1);
-    this._preorderColPerm = new Int32Array(n);
-    this._extToIntCol = new Int32Array(n);
-    for (let i = 0; i < n; i++) {
-      this._preorderColPerm[i] = i;
-      this._extToIntCol[i] = i;
-    }
-
-    // Factor workspace
-    this._scratch = new Float64Array(n);
-
-    this._markowitzRow = new Int32Array(n + 2);
-    this._markowitzCol = new Int32Array(n + 2);
-    this._markowitzProd = new Int32Array(n + 2);
-
-    // ngspice IntToExtRowMap / ExtToIntRowMap initialised identity in
-    // spcCreateInternalVectors (sputils.c). Updated only by spcRowExchange
-    // during pivot selection.
-    this._intToExtRow = new Int32Array(n);
-    this._extToIntRow = new Int32Array(n);
-    for (let i = 0; i < n; i++) {
-      this._intToExtRow[i] = i;
-      this._extToIntRow[i] = i;
-    }
-
-    this._structureEmpty = false;
-    // B2: Factored starts at NO (spdefs.h:748 default — spCreate zero-allocates
-    // MatrixFrame, so Factored = NO implicitly).
-    this._factored = false;
-    // ngspice spalloc.c:173 — Matrix->RowsLinked = NO on initial Create.
-    this._rowsLinked = false;
-    // ngspice spalloc.c:170 — Matrix->NeedsOrdering = YES on initial Create.
-    this._needsReorder = true;
-    this._didPreorder = false;
-    // ngspice spalloc.c:166, 175-176 — Error / SingularRow / SingularCol = 0.
-    this._error = spOKAY;
-    this._singularRow = 0;
-    this._singularCol = 0;
+    // Markowitz / Intermediate / DoRealDirect deferred to spcCreateInternalVectors.
+    this._markowitzRow = new Int32Array(0);
+    this._markowitzCol = new Int32Array(0);
+    this._markowitzProd = new Int32Array(0);
+    this._scratch = new Float64Array(0);
+    this._doRealDirect = new Int32Array(0);
   }
 
   /**
@@ -1141,22 +965,23 @@ export class SparseSolver {
    *   Matrix->Factored        → this._factored
    *   Matrix->SingularRow/Col → (deferred to Stage 6A)
    */
-  private _resetForAssembly(): void {
-    const n = this._n;
-    // ngspice spbuild.c:108-117 / 121-129 (real branch) — reverse column walk.
-    for (let i = n - 1; i >= 0; i--) {
+  /** ngspice spClear (spbuild.c:96-142) — line-for-line port (real-only). */
+  _resetForAssembly(): void {
+    // ngspice spbuild.c:121-129 (real branch).
+    for (let i = this._n - 1; i >= 0; i--) {
       let e = this._colHead[i];
       while (e >= 0) {
-        this._elVal[e] = 0;
+        this._elVal[e] = 0.0;
         e = this._elNextInCol[e];
       }
     }
-    // ngspice spbuild.c:137 — Factored = NO.
-    this._factored = false;
-    // ngspice spbuild.c:138-139 — SingularRow / SingularCol = 0. Stage 6A.
+    // ngspice spbuild.c:133 — TrashCan.Real = 0.0.
+    this._elVal[0] = 0.0;
+    // ngspice spbuild.c:136-139.
     this._error = spOKAY;
-    this._singularRow = 0;
+    this._factored = false;
     this._singularCol = 0;
+    this._singularRow = 0;
   }
 
   // =========================================================================
@@ -1299,18 +1124,20 @@ export class SparseSolver {
   // Workspace allocation (called at reorder time)
   // =========================================================================
 
-  /**
-   * Allocate/resize all factorization workspace arrays.
-   * Called by factorWithReorder on first reorder or after invalidateTopology().
-   * ngspice: no direct equivalent — workspace sizing is embedded in spOrderAndFactor.
-   */
+  /** ngspice spcCreateInternalVectors (spfactor.c:706-747) — line-for-line port (real-only). */
   private _allocateWorkspace(): void {
+    if (this._internalVectorsAllocated) return;
     const n = this._n;
-    if (n === 0) return;
-    if (n === this._workspaceN) return;
-    this._workspaceN = n;
-
-    this._scratch = new Float64Array(n);
+    // ngspice spfactor.c:715-726 — Markowitz row/col/prod.
+    if (this._markowitzRow.length === 0) this._markowitzRow = new Int32Array(n + 2);
+    if (this._markowitzCol.length === 0) this._markowitzCol = new Int32Array(n + 2);
+    if (this._markowitzProd.length === 0) this._markowitzProd = new Int32Array(n + 2);
+    // ngspice spfactor.c:728-732 — DoRealDirect (real-only; DoCmplxDirect skipped).
+    if (this._doRealDirect.length === 0) this._doRealDirect = new Int32Array(n + 1);
+    // ngspice spfactor.c:738-742 — Intermediate (real-only: drop the 2*).
+    if (this._scratch.length === 0) this._scratch = new Float64Array(n);
+    // ngspice spfactor.c:745.
+    this._internalVectorsAllocated = true;
   }
 
   // =========================================================================
@@ -1324,10 +1151,6 @@ export class SparseSolver {
    * and the reorder-loop at spfactor.c:240+). Per banned-pattern guard rule
    * #8 the two loops MUST stay in one TS method.
    *
-   * `startStep` resumes from the rejected step on the C3 fall-through path
-   * (caller in `factor()` invokes us after `_spFactor` returns
-   * `needsReorder: true`). On a fresh entry `startStep === 0`.
-   *
    * Variable map (ngspice → digiTS):
    *   Matrix->Size                → this._n
    *   Matrix->NeedsOrdering       → this._needsReorder
@@ -1336,9 +1159,9 @@ export class SparseSolver {
    *   Matrix->Error               → this._error
    *   Step                        → step
    */
-  private _spOrderAndFactor(startStep: number): FactorResult {
+  private _spOrderAndFactor(): number {
     const n = this._n;
-    if (n === 0) return { success: true };
+    if (n === 0) return spOKAY;
 
     // ngspice spfactor.c:202 — Matrix->Error = spOKAY at entry.
     this._error = spOKAY;
@@ -1346,29 +1169,20 @@ export class SparseSolver {
     // ngspice spfactor.c:246-247 — row chains are built lazily on first
     // factor entry via spcLinkRows. Until the first factor call, RowsLinked
     // == NO and assembly / preorder run on column chains only.
-    if (!this._rowsLinked) {
-      this._linkRows();
-      this._rowsLinked = true;
-    }
+    if (!this._rowsLinked) this._linkRows();
 
     if (this._needsReorder) {
       this._allocateWorkspace();
     }
 
-    // Shared `Step` counter — declared ONCE at top per banned-pattern guard
-    // rule #7 ("instance fields ngspice handles with locals" reverse — keep
-    // local; per rule #8 do NOT split into methods).
-    let step = startStep;
+    // Function-local Step counter (ngspice convention; banned-pattern guard
+    // rule #7 — keep local rather than instance field).
+    let step = 0;
 
     // -----------------------------------------------------------------
     // Reuse loop — ngspice spfactor.c:214-228 `if (!Matrix->NeedsOrdering)`.
-    // This branch runs only when the matrix already has a stored pivot order
-    // we expect to reuse but `factor()` decided to enter spOrderAndFactor
-    // anyway (e.g. partitioned reordering, NEEDS_ORDERING re-enabled).
-    // For the C3 fall-through case `startStep > 0`, the steps below are
-    // already eliminated by `_spFactor` so we skip the reuse loop entirely.
     // -----------------------------------------------------------------
-    let reorderingRequired = this._needsReorder || startStep > 0;
+    let reorderingRequired = this._needsReorder;
     if (!reorderingRequired) {
       const elVal = this._elVal;
       const elNextInCol = this._elNextInCol;
@@ -1396,7 +1210,7 @@ export class SparseSolver {
         // through to the Done label. Mark factored and return.
         this._needsReorder = false;
         this._factored = true;
-        return this._buildFactorResult();
+        return spOKAY;
       }
     }
 
@@ -1404,18 +1218,11 @@ export class SparseSolver {
     // Reorder loop — ngspice spfactor.c:240-281 `if (ReorderingRequired)`.
     // Markowitz precompute runs unconditionally on entry to the reorder
     // section (spfactor.c:255-256 CountMarkowitz + MarkowitzProducts),
-    // then the per-step pivot-search + exchange + elimination loop. The
-    // shared `Step` counter continues from where the reuse loop left off
-    // (or from `startStep` on the C3 fall-through path), but the Markowitz
-    // arrays ARE refreshed against the half-eliminated matrix — both
-    // routines accept a starting `step` and walk only slots [step, n).
+    // then the per-step pivot-search + exchange + elimination loop.
     // -----------------------------------------------------------------
-    // ngspice spfactor.c:255-256 CountMarkowitz + MarkowitzProducts.
-    // RHS-aware count — spfactor.c:803-808. Runs on every reorder entry,
-    // including the C3 resume path where startStep > 0; reuse-loop
-    // elimination has already mutated some off-diagonal entries to
-    // non-zero in the submatrix [startStep, n), so the counts MUST be
-    // refreshed before the pivot search reads _markowitzRow/_markowitzCol.
+    // Mark the per-call signal: the NR layer (niiter.c:881-902 else arm)
+    // gates spSINGULAR retry on "did this factor take the reuse path."
+    this._lastFactorWalkedReorder = true;
     this._countMarkowitz(step, this._rhs);
     this._markowitzProducts(step);
 
@@ -1449,66 +1256,47 @@ export class SparseSolver {
     //   Matrix->Reordered = YES;
     //   Matrix->Factored = YES;
     this._needsReorder = false;
+    this._reordered = true;
     this._factored = true;
-    return this._buildFactorResult();
+    return spOKAY;
   }
 
   /**
-   * ngspice spFactor (spfactor.c:323-414) — reuse-only entry. Falls back to
-   * `_spOrderAndFactor` when `NeedsOrdering` is set (spfactor.c:333-335).
-   * The partition / direct-addressing optimisation (spfactor.c:337,
-   * 352-410) is OUT OF SCOPE per spec §0.4; we always walk the linked
-   * structure via `_realRowColElimination` (the "no-partition" branch).
+   * ngspice spFactor (spfactor.c:322-414) — line-for-line port of the
+   * prelude. The partition-based factor body (spfactor.c:337, 343-413)
+   * is a Phase 5 deliverable per architect §5; until then any caller
+   * that reaches the reuse path (NeedsOrdering=NO, Factored=NO, post-
+   * reorder) throws a clear Phase-5 marker.
    *
-   * The reuse loop here is the SAME body as _spOrderAndFactor's reuse loop.
-   * On a guard-rejection the result includes `needsReorder: true` and
-   * `rejectedAtStep`; the caller in `factor()` dispatches into
-   * `_spOrderAndFactor` resumed at the rejected step.
+   *     int spFactor(MatrixPtr Matrix) {
+   *         assert(IS_VALID(Matrix) && !Matrix->Factored);
+   *         if (Matrix->NeedsOrdering)
+   *             return spOrderAndFactor(Matrix, NULL, 0.0, 0.0,
+   *                                     DIAG_PIVOTING_AS_DEFAULT);
+   *         if (!Matrix->Partitioned) spPartition(Matrix, spDEFAULT_PARTITION);
+   *         if (Matrix->Complex) return FactorComplexMatrix(Matrix);
+   *         ...partition-based body...
+   *     }
    */
-  private _spFactor(): SpFactorReuseResult {
-    const n = this._n;
-    if (n === 0) return { success: true };
+  private _spFactor(): number {
+    // ngspice spfactor.c:331 — assert(IS_VALID(Matrix) && !Matrix->Factored).
+    // The matching assertion forbids re-entering spFactor on an
+    // already-factored, no-reorder-needed matrix; our caller (NR)
+    // currently re-enters unconditionally per iteration, so we drop the
+    // assert until Phase 5 restructures the caller-side dispatch.
 
+    // ngspice spfactor.c:333-335 — NeedsOrdering forwards to spOrderAndFactor.
     if (this._needsReorder) {
-      // ngspice spfactor.c:333-335 fallthrough to spOrderAndFactor.
-      return this._spOrderAndFactor(0);
+      return this._spOrderAndFactor();
     }
 
-    const elVal = this._elVal;
-    const elNextInCol = this._elNextInCol;
-    const diag = this._diag;
-    const relThreshold = this._relThreshold;
-    const absThreshold = this._absThreshold;
-
-    for (let step = 0; step < n; step++) {
-      const pivotE = diag[step];
-      if (pivotE < 0 || Math.abs(elVal[pivotE]) === 0) {
-        // ngspice spfactor.c:348 ZeroPivot.
-        return { ...this._zeroPivot(step), needsReorder: true, rejectedAtStep: step };
-      }
-      // ngspice spfactor.c:218-225 column-relative partial-pivot guard.
-      const pivotMag = Math.abs(elVal[pivotE]);
-      const largestInCol = this._findLargestInCol(elNextInCol[pivotE]);
-      if (largestInCol * relThreshold >= pivotMag || pivotMag <= absThreshold) {
-        // Reuse rejected — caller dispatches into _spOrderAndFactor
-        // resumed at this step.
-        return { success: false, needsReorder: true, rejectedAtStep: step };
-      }
-      // ngspice spfactor.c:2567 — store reciprocal of pivot at the diagonal.
-      elVal[pivotE] = 1 / elVal[pivotE];
-
-      // ngspice spfactor.c:2568-2596 — outer-product elimination via shared
-      // kernel. Reuse-pivot path: any missing fill-in target signals that
-      // the stored pivot order is no longer structurally valid.
-      const fillinResult = this._realRowColEliminationReuse(pivotE, step);
-      if (fillinResult.needsReorder) {
-        return fillinResult;
-      }
-    }
-
-    // ngspice spfactor.c:412 — Matrix->Factored = YES.
-    this._factored = true;
-    return this._buildFactorResult();
+    // Phase 5: spPartition + dual-body partition factor (spfactor.c:337,
+    // 343-413) are not yet ported. Reaching this branch means
+    // NeedsOrdering=NO and Factored=NO — i.e. the partition path —
+    // which has no ngspice line in this file yet.
+    throw new Error(
+      "spFactor partition body (spfactor.c:337-413) is a Phase 5 deliverable.",
+    );
   }
 
   /**
@@ -1553,97 +1341,36 @@ export class SparseSolver {
   }
 
   /**
-   * Reuse-only variant of the elimination kernel — same body as
-   * `_realRowColElimination`, but signals `needsReorder` instead of
-   * creating fill-ins. ngspice's spFactor (spfactor.c:323-414) takes the
-   * same RealRowColElimination kernel at spfactor.c:2553-2598 but with
-   * Matrix->Reordered preventing fill-in (the partition path is out of
-   * scope; in the no-partition path a missing element here is a structural
-   * sign the prior reorder is invalid).
+   * ngspice MatrixIsSingular (spfactor.c:2854-2862) — sets Matrix->Error
+   * to spSINGULAR and records SingularRow/SingularCol, then returns the
+   * error code. Caller propagates the int.
+   *
+   *     static int MatrixIsSingular(MatrixPtr Matrix, int Step) {
+   *         Matrix->SingularRow = Matrix->IntToExtRowMap[Step];
+   *         Matrix->SingularCol = Matrix->IntToExtColMap[Step];
+   *         return (Matrix->Error = spSINGULAR);
+   *     }
    */
-  private _realRowColEliminationReuse(
-    pivotE: number, step: number,
-  ): SpFactorReuseResult {
-    let pUpper = this._elNextInRow[pivotE];
-    while (pUpper >= 0) {
-      this._elVal[pUpper] *= this._elVal[pivotE];
-
-      let pSub = this._elNextInCol[pUpper];
-      let pLower = this._elNextInCol[pivotE];
-      while (pLower >= 0) {
-        const row = this._elRow[pLower];
-        while (pSub >= 0 && this._elRow[pSub] < row) {
-          pSub = this._elNextInCol[pSub];
-        }
-        if (pSub < 0 || this._elRow[pSub] > row) {
-          // Reuse-pivot must NOT create fill-ins. Caller dispatches into
-          // _spOrderAndFactor resumed at this step (ngspice spfactor.c:225
-          // "ReorderingRequired = YES; break").
-          return { success: false, needsReorder: true, rejectedAtStep: step };
-        }
-        this._elVal[pSub] -= this._elVal[pUpper] * this._elVal[pLower];
-        pSub = this._elNextInCol[pSub];
-        pLower = this._elNextInCol[pLower];
-      }
-      pUpper = this._elNextInRow[pUpper];
-    }
-    return { success: true };
+  private _matrixIsSingular(step: number): number {
+    this._singularRow = this._intToExtRow[step];
+    this._singularCol = this._preorderColPerm[step];
+    return (this._error = spSINGULAR);
   }
 
   /**
-   * Compose the success FactorResult with conditionEstimate from final pivot
-   * diagonals. ngspice convention: _elVal[_diag[k]] = 1/pivot_k, so the
-   * pivot magnitude is 1 / |inv_pivot|.
+   * ngspice ZeroPivot (spfactor.c:2865-2873) — same shape as
+   * MatrixIsSingular but with spZERO_DIAG.
+   *
+   *     static int ZeroPivot(MatrixPtr Matrix, int Step) {
+   *         Matrix->SingularRow = Matrix->IntToExtRowMap[Step];
+   *         Matrix->SingularCol = Matrix->IntToExtColMap[Step];
+   *         return (Matrix->Error = spZERO_DIAG);
+   *     }
    */
-  private _buildFactorResult(): FactorResult {
-    const n = this._n;
-    let maxDiag = 0, minDiag = Infinity;
-    for (let k = 0; k < n; k++) {
-      const dk = this._diag[k];
-      if (dk < 0) continue;
-      const invPivot = Math.abs(this._elVal[dk]);
-      const pivotMag = invPivot > 0 ? 1 / invPivot : 0;
-      if (pivotMag > maxDiag) maxDiag = pivotMag;
-      if (pivotMag > 0 && pivotMag < minDiag) minDiag = pivotMag;
-    }
-    return {
-      success: true,
-      conditionEstimate: minDiag > 0 && minDiag !== Infinity ? maxDiag / minDiag : Infinity,
-      error: this._error,
-    };
-  }
-
-  /**
-   * ngspice MatrixIsSingular (spfactor.c, called at spfactor.c:262). Sets
-   * Matrix->Error / SingularRow / SingularCol and returns the singular
-   * FactorResult mapped to caller-side row/col via the permutation maps.
-   */
-  private _matrixIsSingular(step: number): FactorResult {
-    this._error = spSINGULAR;
-    this._singularRow = this._intToExtRow[step] ?? step;
-    this._singularCol = this._preorderColPerm[step] ?? step;
-    return {
-      success: false,
-      error: spSINGULAR,
-      singularRow: this._singularRow,
-      singularCol: this._singularCol,
-    };
-  }
-
-  /**
-   * ngspice ZeroPivot (spfactor.c, called at spfactor.c:348, 382, 407). Same
-   * shape as MatrixIsSingular but with spZERO_DIAG.
-   */
-  private _zeroPivot(step: number): FactorResult {
-    this._error = spZERO_DIAG;
-    this._singularRow = this._intToExtRow[step] ?? step;
-    this._singularCol = this._preorderColPerm[step] ?? step;
-    return {
-      success: false,
-      error: spZERO_DIAG,
-      singularRow: this._singularRow,
-      singularCol: this._singularCol,
-    };
+  private _zeroPivot(step: number): number {
+    this._singularRow = this._intToExtRow[step];
+    this._singularCol = this._preorderColPerm[step];
+    return (this._error = spZERO_DIAG);
   }
 
   // =========================================================================

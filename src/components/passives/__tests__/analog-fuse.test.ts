@@ -58,7 +58,7 @@ function makeFuseElement(opts: {
  */
 function driveFuseStep(fuse: AnalogFuseElement, dt: number, voltages: Float64Array): void {
   const solver = new SparseSolver();
-  solver.beginAssembly(Math.max(voltages.length, 1));
+  solver._initStructure(Math.max(voltages.length, 1));
   const ctx = makeLoadCtx({
     solver,
     voltages,
@@ -378,9 +378,8 @@ describe("AnalogFuseElement", () => {
         matrixSize: 1,
         nodeCount: 1,
       });
-      stampCtx.solver.beginAssembly(1);
+      stampCtx.solver._initStructure(1);
       fuse.load(stampCtx.loadCtx as unknown as LoadContext);
-      stampCtx.solver.finalize();
       const stamps = stampCtx.solver.getCSCNonZeros();
 
       // Only the pos diagonal is stamped (neg=0 is ground, suppressed).

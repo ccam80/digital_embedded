@@ -790,7 +790,7 @@ export function makeSimpleCtx(opts: SimpleCtxOptions): CKTCircuitContext {
   // Prime any real SparseSolver here so callers get a ready-to-use ctx;
   // stub/capture solvers (without beginAssembly) are left alone.
   if (solver instanceof SparseSolver) {
-    solver.beginAssembly(opts.matrixSize);
+    solver._initStructure(opts.matrixSize);
   }
   return ctx;
 }

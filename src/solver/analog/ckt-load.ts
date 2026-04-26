@@ -49,7 +49,8 @@ export function cktLoad(ctx: CKTCircuitContext): void {
   // Note: ngspice cktload.c:57-58 — CKTnoncon is NOT reset here in the
   // default build; it only runs under `#ifdef STEPDEBUG`. NR owner
   // (newtonRaphson) is responsible for `ctx.noncon = 0` before the call.
-  ctx.solver.beginAssembly(ctx.matrixSize);
+  // ngspice cktload.c:56 — SMPclear → spClear.
+  ctx.solver._resetForAssembly();
 
   // Step 2: propagate per-call context scalars to loadCtx.
   ctx.loadCtx.cktMode  = ctx.cktMode;   // single source of truth (F3/F4).
@@ -122,5 +123,4 @@ export function cktLoad(ctx: CKTCircuitContext): void {
   }
 
   // Step 5: finalize matrix
-  ctx.solver.finalize();
 }

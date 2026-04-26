@@ -1,27 +1,15 @@
 /**
- * Sparse-solver instrumentation wrapper (Stage 8 — direct port plan).
+ * Sparse-solver instrumentation wrapper.
  *
  * Production code MUST NOT import this file. It exists to wrap a
  * `SparseSolver` instance for test-only / harness-only inspection of
- * internal state: white-box accessors (Markowitz pivot bookkeeping,
- * dimension, singletons) plus the pre-factor / pre-solve capture API
- * the ngspice-comparison harness consumes.
+ * internal state: read-only white-box accessors (Markowitz pivot
+ * bookkeeping, dimension, singletons, element counts) plus
+ * post-stamp/post-factor reads (`getRhsSnapshot`, `getCSCNonZeros`).
  *
- * Per spec §8.3, the long-term goal is for every test-side white-box
- * read to go through this wrapper, leaving `SparseSolver`'s public
- * surface limited to the production API (`beginAssembly`, `allocElement`,
- * `stampElement`, `stampRHS`, `finalize`, `factor`, `solve`,
- * `forceReorder`, `invalidateTopology`, `setPivotTolerances`,
- * `getError`, `whereSingular`).
- *
- * Per spec §8.3 fallback note ("If the file split is judged too
- * disruptive, the alternative is a prefix marker (`__instrumentation_*`)
- * on every test-only field/method and a lint rule ensuring production
- * code never reads them."), the equivalent methods currently remain on
- * `SparseSolver` carrying an `@instrumentation` JSDoc tag. The 20+ test
- * files importing them are not migrated by this stage; this wrapper
- * exists so that any new test-side white-box read is written against it
- * and so the eventual mechanical migration has a target.
+ * The in-class pre-factor / pre-solve capture API was deleted in
+ * Phase 0 (architect B.30); harness consumers that need a pre-factor
+ * snapshot must call `getCSCNonZeros()` BEFORE invoking `factor()`.
  *
  * ngspice mapping: this wrapper has no ngspice analogue. ngspice exposes
  * white-box state via `spDeviceCount`, `spFillinCount`, `spOriginalCount`
@@ -87,27 +75,11 @@ export class SparseSolverInstrumentation {
   }
 
   // -------------------------------------------------------------------------
-  // Pre-factor / pre-solve / post-assembly capture API.
-  // Used by the ngspice-comparison harness to snapshot the matrix and RHS
-  // at the same observation points ngspice does (LoadGmin + spFactor
-  // boundary; pre-spSolve boundary).
+  // Read-only accessors — the in-class capture API (B.30) was deleted in
+  // Phase 0; pre-factor / pre-solve snapshots must be taken externally by
+  // the harness via getCSCNonZeros() and getRhsSnapshot() at the
+  // appropriate boundaries.
   // -------------------------------------------------------------------------
-
-  enablePreSolveRhsCapture(enabled: boolean): void {
-    this._solver.enablePreSolveRhsCapture(enabled);
-  }
-
-  getPreSolveRhsSnapshot(): Float64Array {
-    return this._solver.getPreSolveRhsSnapshot();
-  }
-
-  enablePreFactorMatrixCapture(enabled: boolean): void {
-    this._solver.enablePreFactorMatrixCapture(enabled);
-  }
-
-  getPreFactorMatrixSnapshot(): ReadonlyArray<PreFactorEntry> {
-    return this._solver.getPreFactorMatrixSnapshot();
-  }
 
   /** Live RHS slice (post-stamp, pre-solve). */
   getRhsSnapshot(): Float64Array {
@@ -115,9 +87,10 @@ export class SparseSolverInstrumentation {
   }
 
   /**
-   * Assembled-matrix non-zero entries in original ordering. Post-factor this
-   * reflects LU-overwritten data, not the pre-factor A matrix — use
-   * `getPreFactorMatrixSnapshot()` for the pre-factor view.
+   * Assembled-matrix non-zero entries in original ordering. Post-factor
+   * this reflects LU-overwritten data, not the pre-factor A matrix —
+   * harness consumers must call this BEFORE invoking factor() if they
+   * want the pre-factor A.
    */
   getCSCNonZeros(): Array<PreFactorEntry> {
     return this._solver.getCSCNonZeros();

@@ -159,7 +159,7 @@ function driveToOp(
   voltages[2] = vGate;
   for (let i = 0; i < iterations; i++) {
     const solver = new SparseSolver();
-    solver.beginAssembly(3);
+    solver._initStructure(3);
     const ctx = buildUnitCtx(solver, voltages);
     element.load(ctx);
   }
@@ -177,7 +177,7 @@ function stampAndCapture(
 ): { stamps: Array<[number, number, number]>; rhs: Array<[number, number]> } {
   const matrixSize = Math.max(voltages.length, element.pinNodeIds.length);
   const solver = new SparseSolver();
-  solver.beginAssembly(matrixSize);
+  solver._initStructure(matrixSize);
   const ctx = buildUnitCtx(solver, voltages);
   element.load(ctx);
 
@@ -273,7 +273,7 @@ describe("SCR", () => {
 
     for (let i = 0; i < 200; i++) {
       const iterSolver = new SparseSolver();
-      iterSolver.beginAssembly(3);
+      iterSolver._initStructure(3);
       scr.load(buildUnitCtx(iterSolver, voltages));
     }
 
@@ -308,7 +308,7 @@ describe("SCR", () => {
 
     for (let i = 0; i < 50; i++) {
       const iterSolver = new SparseSolver();
-      iterSolver.beginAssembly(3);
+      iterSolver._initStructure(3);
       scr.load(buildUnitCtx(iterSolver, voltages));
     }
 
@@ -345,7 +345,7 @@ describe("SCR", () => {
 
     for (let i = 0; i < 100; i++) {
       const iterSolver = new SparseSolver();
-      iterSolver.beginAssembly(3);
+      iterSolver._initStructure(3);
       scr.load(buildUnitCtx(iterSolver, voltages));
     }
 
@@ -402,7 +402,7 @@ describe("SCR", () => {
     const snapshot = new Float64Array(voltages);
 
     const solver = new SparseSolver();
-    solver.beginAssembly(3);
+    solver._initStructure(3);
     element.load(buildUnitCtx(solver, voltages));
 
     expect(voltages[0]).toBe(snapshot[0]);
@@ -421,7 +421,7 @@ describe("SCR", () => {
     const voltages = new Float64Array([50, 0, 0.65]);
     for (let i = 0; i < 200; i++) {
       const iterSolver = new SparseSolver();
-      iterSolver.beginAssembly(3);
+      iterSolver._initStructure(3);
       element.load(buildUnitCtx(iterSolver, voltages));
     }
 
@@ -456,7 +456,7 @@ describe("SCR", () => {
     const voltages = new Float64Array([10, 0, 0]);
     for (let i = 0; i < 50; i++) {
       const iterSolver = new SparseSolver();
-      iterSolver.beginAssembly(3);
+      iterSolver._initStructure(3);
       element.load(buildUnitCtx(iterSolver, voltages));
     }
 
@@ -498,7 +498,7 @@ describe("SCR LimitingEvent instrumentation", () => {
     collector: LimitingEvent[] | null,
   ): void {
     const solver = new SparseSolver();
-    solver.beginAssembly(3);
+    solver._initStructure(3);
     element.load(buildUnitCtx(solver, voltages, {
       limitingCollector: collector,
     }));
@@ -574,7 +574,7 @@ describe("SCR TEMP", () => {
 
     const collector: LimitingEvent[] = [];
     const solver = new SparseSolver();
-    solver.beginAssembly(3);
+    solver._initStructure(3);
     element.load(buildUnitCtx(solver, voltages, { limitingCollector: collector }));
 
     // Compute expected pnjlim result at TEMP=400K
@@ -610,7 +610,7 @@ describe("SCR TEMP", () => {
 
     const collector: LimitingEvent[] = [];
     const solver = new SparseSolver();
-    solver.beginAssembly(3);
+    solver._initStructure(3);
     element.load(buildUnitCtx(solver, voltages, { limitingCollector: collector }));
 
     const vt400 = 400 * KoverQ;
@@ -676,7 +676,7 @@ describe("SCR primeJunctions", () => {
     const tVcrit = nVt * Math.log(nVt / (SCR_DEFAULTS.iS * Math.SQRT2));
 
     const solver = new SparseSolver();
-    solver.beginAssembly(3);
+    solver._initStructure(3);
     element.load(buildUnitCtx(solver, new Float64Array(3), {
       cktMode: MODEDCOP | MODEINITJCT,
     }));
@@ -691,7 +691,7 @@ describe("SCR primeJunctions", () => {
     const { element, pool } = makeScrWithPool({ OFF: 1 } as Parameters<typeof makeScrWithPool>[0]);
 
     const solver = new SparseSolver();
-    solver.beginAssembly(3);
+    solver._initStructure(3);
     element.load(buildUnitCtx(solver, new Float64Array(3), {
       cktMode: MODEDCOP | MODEINITJCT,
     }));

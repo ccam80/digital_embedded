@@ -288,7 +288,7 @@ describe("TappedTransformer", () => {
       const vSrc = Vpeak * Math.sin(2 * Math.PI * freq * t);
       const vsrc = makeVoltageSource(1, 0, bVsrc, vSrc);
 
-      solver.beginAssembly(matrixSize);
+      solver._initStructure(matrixSize);
       const ctx = makeTransientCtx(solver as unknown as SparseSolverType, voltages, dt);
       if (i === 0) ctx.cktMode = MODETRAN | MODEINITTRAN;
       vsrc.load(ctx);
@@ -296,9 +296,8 @@ describe("TappedTransformer", () => {
       rLoad1.load(ctx);
       rLoad2.load(ctx);
       rGnd.load(ctx);
-      solver.finalize();
       const result = solver.factor();
-      if (!result.success) throw new Error(`Singular at step ${i}`);
+      if (result !== 0) throw new Error(`Singular at step ${i}`);
       solver.solve(voltages);
       pool.rotateStateVectors();
 

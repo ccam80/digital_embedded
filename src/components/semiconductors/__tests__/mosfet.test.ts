@@ -90,7 +90,7 @@ const NMOS_DEFAULTS = {
 
 function makeDcOpCtx(voltages: Float64Array, matrixSize: number): LoadContext {
   const solver = new SparseSolver();
-  solver.beginAssembly(matrixSize);
+  solver._initStructure(matrixSize);
   const KoverQ_local = 1.3806226e-23 / 1.6021918e-19;
   const temp = 300.15;
   return {
@@ -723,7 +723,7 @@ describe("MOSFET primeJunctions", () => {
 
   function makeFullCtx(cktMode: number): LoadContext {
     const solver = new SparseSolver();
-    solver.beginAssembly(3);
+    solver._initStructure(3);
     const KoverQ = 1.3806226e-23 / 1.6021918e-19;
     const temp = 300.15;
     return {
@@ -847,7 +847,7 @@ describe("MOSFET LoadContext precondition", () => {
     const temp = 300.15;
     const makeCtx = (): LoadContext => {
       const solver = new SparseSolver();
-      solver.beginAssembly(4);
+      solver._initStructure(4);
       return {
         cktMode: MODEDCOP | MODEINITFLOAT,
         solver,
@@ -882,7 +882,7 @@ describe("MOSFET LoadContext precondition", () => {
     seedCtx.bypass = false;
     for (let i = 0; i < 20; i++) {
       const s = new SparseSolver();
-      s.beginAssembly(4);
+      s._initStructure(4);
       seedCtx.solver = s;
       seedCtx.matrix = s;
       core.load(seedCtx);
@@ -1017,7 +1017,7 @@ const KoverQ_TEST = 1.3806226e-23 / 1.6021918e-19;
 /** Build a full LoadContext for Wave 6.2 tests. */
 function makeWave62Ctx(cktMode: number, overrides: Partial<LoadContext> = {}): LoadContext {
   const solver = new SparseSolver();
-  solver.beginAssembly(4);
+  solver._initStructure(4);
   const temp = 300.15;
   return {
     cktMode,
@@ -1411,7 +1411,7 @@ describe("MOSFET M-4", () => {
     });
     for (let i = 0; i < 20; i++) {
       const s = new SparseSolver();
-      s.beginAssembly(4);
+      s._initStructure(4);
       ctx.solver = s;
       ctx.matrix = s;
       element.load(ctx);

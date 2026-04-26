@@ -255,12 +255,11 @@ describe("resistor_load_dcop_parity", () => {
       matrixSize,
       nodeCount: 3,
     });
-    stampCtx.solver.beginAssembly(matrixSize);
+    stampCtx.solver._initStructure(matrixSize);
     // NR iter 0: voltages are zero, so element.load() sees no bias.
     r1.load(stampCtx.loadCtx);
     r2.load(stampCtx.loadCtx);
     r3.load(stampCtx.loadCtx);
-    stampCtx.solver.finalize();
     const stamps = stampCtx.solver.getCSCNonZeros();
 
     const NGSPICE_G_REF = 1 / 1000;
@@ -316,9 +315,8 @@ describe("resistor_load_interface", () => {
       matrixSize: 2,
       nodeCount: 2,
     });
-    ctx.solver.beginAssembly(2);
+    ctx.solver._initStructure(2);
     element.load(ctx.loadCtx);
-    ctx.solver.finalize();
 
     const entries = ctx.solver.getCSCNonZeros();
     // NGSPICE reference: resload.c stamps G=1/R. For R=1000, G=0.001 exactly.

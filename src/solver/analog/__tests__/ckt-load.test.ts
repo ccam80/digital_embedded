@@ -92,7 +92,7 @@ describe('CKTload', () => {
     ctx.cktMode = MODEDCOP | MODEINITFLOAT;
     cktLoad(ctx);
     const factorResult = ctx.solver.factor();
-    expect(factorResult.success).toBe(true);
+    expect(factorResult).toBe(0);
     const solution = new Float64Array(matrixSize);
     ctx.solver.solve(solution);
     expect(Number.isFinite(solution[0])).toBe(true);
@@ -109,7 +109,7 @@ describe('CKTload', () => {
     ctxJct.nodesets.set(0, 3.0);
     cktLoad(ctxJct);
     const factJct = ctxJct.solver.factor();
-    expect(factJct.success).toBe(true);
+    expect(factJct).toBe(0);
     const solJct = new Float64Array(matrixSize);
     ctxJct.solver.solve(solJct);
     const IS = makeCurrentSource(1, 0, 1e-3);
@@ -119,7 +119,7 @@ describe('CKTload', () => {
     ctxFloat.nodesets.set(0, 3.0);
     cktLoad(ctxFloat);
     const factFloat = ctxFloat.solver.factor();
-    expect(factFloat.success).toBe(true);
+    expect(factFloat).toBe(0);
     const solFloat = new Float64Array(matrixSize);
     ctxFloat.solver.solve(solFloat);
   });

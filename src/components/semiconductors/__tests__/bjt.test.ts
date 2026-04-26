@@ -57,7 +57,7 @@ function makeSpiceL1Props(modelParams?: Record<string, number>): PropertyBag {
 
 function makeDcOpCtx(voltages: Float64Array, matrixSize: number): LoadContext {
   const solver = new SparseSolver();
-  solver.beginAssembly(matrixSize);
+  solver._initStructure(matrixSize);
   return {
     cktMode: MODEDCOP | MODEINITFLOAT,
     solver,
@@ -505,7 +505,7 @@ describe("BJT L0 MODEINITPRED", () => {
     rhsOldPrime[1] = -1.0; // nodeC=2 → rhsOld[1]
     rhsOldPrime[2] = 0.0;  // nodeE=3 → rhsOld[2]
     const solverPrime = new SparseSolver();
-    solverPrime.beginAssembly(10);
+    solverPrime._initStructure(10);
     const rhs = new Float64Array(10);
     const ctxPrime: LoadContext = {
       cktMode: MODEDCOP | MODEINITFLOAT,
@@ -568,7 +568,7 @@ describe("BJT L0 MODEINITPRED", () => {
     // (no-op since prior=new), run computeBjtOp at the same voltages, and write
     // back the same op values — so s0 ends up identical to s1 sentinels.
     const solver = new SparseSolver();
-    solver.beginAssembly(10);
+    solver._initStructure(10);
     const rhsOld = new Float64Array(10);
     const ctx: LoadContext = {
       cktMode: MODETRAN | MODEINITPRED,
@@ -625,7 +625,7 @@ function makeFullLoadCtx(cktMode: number, rhsOld: Float64Array, modelParams?: Re
   (core as any).stateBaseOffset = 0;
   (core as any).initState(pool);
   const solver = new SparseSolver();
-  solver.beginAssembly(10);
+  solver._initStructure(10);
   const ctx: LoadContext = {
     cktMode,
     solver,
@@ -739,7 +739,7 @@ describe("BJT L0 NOBYPASS", () => {
     (core as any).stateBaseOffset = 0;
     (core as any).initState(pool);
     const solver = new SparseSolver();
-    solver.beginAssembly(10);
+    solver._initStructure(10);
     // Stamp-count probe: wrap SparseSolver.stampElement (the G-matrix stamp
     // primitive used by the stampG helper) and SparseSolver.stampRHS (used by
     // stampRHS helper). Both paths of the bypass gate emit stamps (the stamp
@@ -851,7 +851,7 @@ describe("BJT L0 NOBYPASS", () => {
       limitingCollector: LimitingEvent[],
     ): { ctx: LoadContext; stampCount: { g: number; rhs: number } } {
       const solver = new SparseSolver();
-      solver.beginAssembly(10);
+      solver._initStructure(10);
       const stampCount = { g: 0, rhs: 0 };
       const origStampElement = solver.stampElement.bind(solver);
       solver.stampElement = (handle: number, value: number) => {
@@ -953,7 +953,7 @@ describe("BJT L0 NOBYPASS", () => {
       limitingCollector: LimitingEvent[],
     ): LoadContext {
       const solver = new SparseSolver();
-      solver.beginAssembly(10);
+      solver._initStructure(10);
       return {
         cktMode,
         solver,
@@ -1026,7 +1026,7 @@ describe("BJT L0 noncon", () => {
     (core as any).stateBaseOffset = 0;
     (core as any).initState(pool);
     const solver = new SparseSolver();
-    solver.beginAssembly(10);
+    solver._initStructure(10);
     const ctx: LoadContext = {
       cktMode,
       solver,
@@ -1133,7 +1133,7 @@ describe("BJT L0 MODEINITSMSIG", () => {
     } else {
       // Run a DC-OP priming pass at forward-active bias.
       const primeSolver = new SparseSolver();
-      primeSolver.beginAssembly(10);
+      primeSolver._initStructure(10);
       const rhsPrime = new Float64Array(10);
       rhsPrime[0] = 0.65; rhsPrime[1] = 3.0; rhsPrime[2] = 0.0;
       const primeCtx: LoadContext = {
@@ -1153,7 +1153,7 @@ describe("BJT L0 MODEINITSMSIG", () => {
     }
 
     const solver = new SparseSolver();
-    solver.beginAssembly(10);
+    solver._initStructure(10);
     const ctx: LoadContext = {
       cktMode: MODEDCOP | MODEINITSMSIG,
       solver,
@@ -1244,7 +1244,7 @@ describe("BJT L0 MODEINITTRAN", () => {
     s1[SLOT_VBC] = 0.8;
 
     const solver = new SparseSolver();
-    solver.beginAssembly(10);
+    solver._initStructure(10);
     const ctx: LoadContext = {
       cktMode: MODETRAN | MODEINITTRAN,
       solver,
@@ -1288,7 +1288,7 @@ describe("BJT L1 MODEINITSMSIG", () => {
 
     // Prime s0 with a forward-active DC-OP pass so MODEINITSMSIG reads valid values.
     const primeSolver = new SparseSolver();
-    primeSolver.beginAssembly(10);
+    primeSolver._initStructure(10);
     const rhsPrime = new Float64Array(10);
     rhsPrime[0] = 0.65; rhsPrime[1] = 3.0; rhsPrime[2] = 0.0;
     const primeCtx: LoadContext = {
@@ -1307,7 +1307,7 @@ describe("BJT L1 MODEINITSMSIG", () => {
     withNodeIds(core, [1, 2, 3]).load(primeCtx);
 
     const solver = new SparseSolver();
-    solver.beginAssembly(10);
+    solver._initStructure(10);
     // MODEINITSMSIG reads vbeRaw/vbcRaw from s0, so rhsOld is only used for vbx/vsub.
     // Use same voltages as prime so vbx/vsub are consistent.
     const ctx: LoadContext = {
@@ -1409,7 +1409,7 @@ describe("BJT L1 MODEINITPRED", () => {
     rhsOldPrime[1] = -1.0; // nodeC=2 → rhsOld[1]
     rhsOldPrime[2] = 0.0;  // nodeE=3 → rhsOld[2]
     const solverPrime = new SparseSolver();
-    solverPrime.beginAssembly(10);
+    solverPrime._initStructure(10);
     const ctxPrime: LoadContext = {
       cktMode: MODEDCOP | MODEINITFLOAT,
       solver: solverPrime,
@@ -1475,7 +1475,7 @@ describe("BJT L1 MODEINITPRED", () => {
     // from rhsOld directly, not from extrapolated state) match the prime values —
     // this keeps pnjlim a no-op and the op writeback identical to the prime result.
     const solver = new SparseSolver();
-    solver.beginAssembly(10);
+    solver._initStructure(10);
     const ctx: LoadContext = {
       cktMode: MODETRAN | MODEINITPRED,
       solver,
@@ -1555,7 +1555,7 @@ describe("BJT L1 NOBYPASS", () => {
     (core as any).stateBaseOffset = 0;
     (core as any).initState(pool);
     const solver = new SparseSolver();
-    solver.beginAssembly(10);
+    solver._initStructure(10);
     // Stamp-count probe: wrap solver.stampElement (G-matrix primitive used by
     // the stampG helper) and solver.stampRHS (method used by stampRHS helper).
     const stampCount = { n: 0 };
@@ -1640,7 +1640,7 @@ describe("BJT L1 NOBYPASS", () => {
       limitingCollector: LimitingEvent[],
     ): { ctx: LoadContext; stampCount: { n: number } } {
       const solver = new SparseSolver();
-      solver.beginAssembly(10);
+      solver._initStructure(10);
       const stampCount = { n: 0 };
       const origStampElement = solver.stampElement.bind(solver);
       solver.stampElement = (handle: number, value: number) => {
@@ -1721,7 +1721,7 @@ describe("BJT L1 NOBYPASS", () => {
       limitingCollector: LimitingEvent[],
     ): LoadContext {
       const solver = new SparseSolver();
-      solver.beginAssembly(10);
+      solver._initStructure(10);
       return {
         cktMode, solver, matrix: solver,
         rhs: new Float64Array(10), rhsOld,
@@ -1770,7 +1770,7 @@ describe("BJT L1 noncon", () => {
     (core as any).stateBaseOffset = 0;
     (core as any).initState(pool);
     const solver = new SparseSolver();
-    solver.beginAssembly(10);
+    solver._initStructure(10);
     // rhsOld: large voltage shift to trigger pnjlim.
     const rhsOld = new Float64Array(10);
     rhsOld[0] = 5.0; rhsOld[1] = 0.0; rhsOld[2] = 0.0;
@@ -1834,7 +1834,7 @@ describe("BJT L1 CdBE", () => {
 
     function makeCtx(): LoadContext {
       const solver = new SparseSolver();
-      solver.beginAssembly(10);
+      solver._initStructure(10);
       const rhsOld = new Float64Array(10);
       rhsOld[0] = 0.65; rhsOld[1] = 3.0; rhsOld[2] = 0.0;
       return {
@@ -1854,7 +1854,7 @@ describe("BJT L1 CdBE", () => {
     const { el: el2, pool: pool2 } = makeL1TranEl(1e-15);
 
     // Prime s0 with MODEDCOP|MODEINITFLOAT first so MODEINITSMSIG reads valid op state.
-    const primeSolver = new SparseSolver(); primeSolver.beginAssembly(10);
+    const primeSolver = new SparseSolver(); primeSolver._initStructure(10);
     const rhsPrime = new Float64Array(10); rhsPrime[0] = 0.65; rhsPrime[1] = 3.0;
     const primeCtx: LoadContext = {
       cktMode: MODEDCOP | MODEINITFLOAT,
@@ -1868,7 +1868,7 @@ describe("BJT L1 CdBE", () => {
       temp: 300.15, vt: 0.025852, cktFixLimit: false, bypass: false, voltTol: 1e-6,
     };
     // Need separate prime solvers.
-    const primeSolver2 = new SparseSolver(); primeSolver2.beginAssembly(10);
+    const primeSolver2 = new SparseSolver(); primeSolver2._initStructure(10);
     el1.load({ ...primeCtx });
     el2.load({ ...primeCtx, solver: primeSolver2, matrix: primeSolver2 });
 
@@ -1910,7 +1910,7 @@ describe("BJT L1 BC_cap_stamps", () => {
     // Nodes: B_ext=1, C_ext=2, E=3, C_int=4. All pairs (0-based: 0,1,2,3).
     const solver = new SparseSolver();
     const nodeCount = 5; // 1-based nodes up to 4 → need size 5
-    solver.beginAssembly(nodeCount);
+    solver._initStructure(nodeCount);
 
     // Capture all (row, col) 0-based index pairs passed to allocElement.
     // Stored as 1-based node IDs to match the assertion logic.
@@ -2090,7 +2090,7 @@ describe("BJT L1 AREAB_AREAC", () => {
     // NPN node order: B=node[0], C=node[1], E=node[2]. vbc = voltages[0] - voltages[1].
     // Set VB=0.65, VC=0 → vbc = 0.65 (forward-biased), making cbcn nonzero and proportional to c4.
     const solver = new SparseSolver();
-    solver.beginAssembly(10);
+    solver._initStructure(10);
     const rhsOld = new Float64Array(10);
     rhsOld[0] = 0.65;  // VB: VBE forward
     rhsOld[1] = 0.0;   // VC=0 → vbc = VB - VC = 0.65 (forward-biased, cbcn fires)
@@ -2109,7 +2109,7 @@ describe("BJT L1 AREAB_AREAC", () => {
 
   function makeTranCtx(): LoadContext {
     const solver = new SparseSolver();
-    solver.beginAssembly(10);
+    solver._initStructure(10);
     const rhsOld = new Float64Array(10);
     rhsOld[0] = 0.65;
     rhsOld[1] = -1.0;
@@ -2232,7 +2232,7 @@ describe("BJT L1 AREAB_AREAC", () => {
   // for cbcn under polarity=-1 as NPN does under polarity=+1 with VB > VC.
   function makeDcInitCtxPnp(): LoadContext {
     const solver = new SparseSolver();
-    solver.beginAssembly(10);
+    solver._initStructure(10);
     const rhsOld = new Float64Array(10);
     rhsOld[0] = 0.65; // VB
     rhsOld[1] = 0.0;  // VC
@@ -2306,7 +2306,7 @@ describe("BJT L1 MODEINITTRAN", () => {
 
   function makeInittranCtx(): LoadContext {
     const solver = new SparseSolver();
-    solver.beginAssembly(10);
+    solver._initStructure(10);
     const rhsOld = new Float64Array(10);
     rhsOld[0] = 0.65; rhsOld[1] = -1.0;
     const ag = new Float64Array(7);
@@ -2373,7 +2373,7 @@ describe("BJT L1 excess_phase", () => {
 
   function makeInittranCtx(): LoadContext {
     const solver = new SparseSolver();
-    solver.beginAssembly(10);
+    solver._initStructure(10);
     const rhsOld = new Float64Array(10);
     rhsOld[0] = 0.65; rhsOld[1] = -1.0;
     const ag = new Float64Array(7);
@@ -2396,7 +2396,7 @@ describe("BJT L1 excess_phase", () => {
     // Pre-seed state1[VBE] with a forward vbe so cbe > 0 at the INITTRAN call.
     const { el, pool } = makeExcessPhaseEl();
     // Prime: run DC-OP pass so s0[VBE] = 0.65 (computed and stored).
-    const primeSolver = new SparseSolver(); primeSolver.beginAssembly(10);
+    const primeSolver = new SparseSolver(); primeSolver._initStructure(10);
     const rhsPrime = new Float64Array(10); rhsPrime[0] = 0.65; rhsPrime[1] = -1.0;
     el.load({
       cktMode: MODEDCOP | MODEINITFLOAT, solver: primeSolver, matrix: primeSolver,
@@ -2434,7 +2434,7 @@ describe("BJT L1 excess_phase", () => {
 
     function makeTranCtxWith(deltaOld1: number): LoadContext {
       const solver = new SparseSolver();
-      solver.beginAssembly(10);
+      solver._initStructure(10);
       const rhsOld = new Float64Array(10);
       rhsOld[0] = 0.65; rhsOld[1] = -1.0;
       const ag = new Float64Array(7);
@@ -2497,7 +2497,7 @@ describe("BJT L1 XTF_zero", () => {
 
   function makeSmsigCtx(): LoadContext {
     const solver = new SparseSolver();
-    solver.beginAssembly(10);
+    solver._initStructure(10);
     const rhsOld = new Float64Array(10);
     rhsOld[0] = 0.65; rhsOld[1] = -1.0;
     return {
@@ -2520,8 +2520,8 @@ describe("BJT L1 XTF_zero", () => {
     const { el: elNoTf, pool: poolNoTf } = makeL1WithTfXtf(0, 0);
 
     // Prime with DC-OP first.
-    const primeSolver1 = new SparseSolver(); primeSolver1.beginAssembly(10);
-    const primeSolver2 = new SparseSolver(); primeSolver2.beginAssembly(10);
+    const primeSolver1 = new SparseSolver(); primeSolver1._initStructure(10);
+    const primeSolver2 = new SparseSolver(); primeSolver2._initStructure(10);
     const rhsOld = new Float64Array(10); rhsOld[0] = 0.65; rhsOld[1] = -1.0;
     const primeCtx1: LoadContext = {
       cktMode: MODEDCOP | MODEINITFLOAT, solver: primeSolver1, matrix: primeSolver1,
@@ -2553,7 +2553,7 @@ describe("BJT L1 XTF_zero", () => {
     const { el, pool } = makeL1WithTfXtf(0, 0);
 
     // Prime.
-    const primeSolver = new SparseSolver(); primeSolver.beginAssembly(10);
+    const primeSolver = new SparseSolver(); primeSolver._initStructure(10);
     const rhsOld = new Float64Array(10); rhsOld[0] = 0.65; rhsOld[1] = -1.0;
     el.load({
       cktMode: MODEDCOP | MODEINITFLOAT, solver: primeSolver, matrix: primeSolver,
@@ -2597,7 +2597,7 @@ describe("BJT L1 substrate", () => {
     ag[0] = 1 / 1e-9;
     const rhsOld = new Float64Array(10);
     rhsOld[0] = 0.65; rhsOld[1] = -1.0;
-    const solver = new SparseSolver(); solver.beginAssembly(10);
+    const solver = new SparseSolver(); solver._initStructure(10);
     const ctx: LoadContext = {
       cktMode: MODETRAN | MODEINITTRAN,
       solver, matrix: solver,
@@ -2640,7 +2640,7 @@ describe("BJT L1 cap_block", () => {
 
   function makeCtxWith(cktMode: number, dt: number): LoadContext {
     const solver = new SparseSolver();
-    solver.beginAssembly(10);
+    solver._initStructure(10);
     const rhsOld = new Float64Array(10);
     rhsOld[0] = 0.65; rhsOld[1] = -1.0;
     const ag = new Float64Array(7);
@@ -2684,7 +2684,7 @@ describe("BJT L1 cap_block", () => {
     // cite: bjtload.c:563 — MODEINITSMSIG opens cap block; stores cap values in s0.
     const { el, pool } = makeL1Cap();
     // Prime s0 first with a DC-OP so MODEINITSMSIG reads valid op values.
-    const primeSolver = new SparseSolver(); primeSolver.beginAssembly(10);
+    const primeSolver = new SparseSolver(); primeSolver._initStructure(10);
     const rhsOld = new Float64Array(10); rhsOld[0] = 0.65; rhsOld[1] = -1.0;
     el.load({
       cktMode: MODEDCOP | MODEINITFLOAT, solver: primeSolver, matrix: primeSolver,
@@ -2726,7 +2726,7 @@ describe("BJT L1 LimitingEvent SUB", () => {
     // rhsOld[1] = 0 (collector=0) → vsubRaw = 1*1*(0-0) = 0. Use a large VBC to ensure sub junction fires.
     // Instead: start with all-zero state so pnjlim fires on BE at minimum.
     const solver = new SparseSolver();
-    solver.beginAssembly(10);
+    solver._initStructure(10);
     const rhsOld = new Float64Array(10);
     rhsOld[0] = 5.0;  // VBE very large — triggers pnjlim on BE and limits.
     return {
@@ -2835,7 +2835,7 @@ describe("BJT TEMP", () => {
 
     function makeJctCtx(): LoadContext {
       const solver = new SparseSolver();
-      solver.beginAssembly(10);
+      solver._initStructure(10);
       return {
         cktMode: MODEINITJCT,
         solver, matrix: solver,
@@ -2881,7 +2881,7 @@ describe("BJT TEMP", () => {
 
     function makeForwardCtx(): LoadContext {
       const solver = new SparseSolver();
-      solver.beginAssembly(10);
+      solver._initStructure(10);
       const rhsOld = new Float64Array(10);
       rhsOld[0] = 0.65; // VB
       rhsOld[1] = 3.0;  // VC
@@ -2933,7 +2933,7 @@ describe("BJT TEMP", () => {
 
     function makeCtx(): LoadContext {
       const solver = new SparseSolver();
-      solver.beginAssembly(10);
+      solver._initStructure(10);
       const rhsOld = new Float64Array(10);
       rhsOld[0] = 0.65; rhsOld[1] = 3.0; rhsOld[2] = 0.0;
       return {
@@ -3015,7 +3015,7 @@ describe("BJT TEMP", () => {
 
     function makeJctCtx(): LoadContext {
       const solver = new SparseSolver();
-      solver.beginAssembly(10);
+      solver._initStructure(10);
       return {
         cktMode: MODEINITJCT,
         solver, matrix: solver,
@@ -3080,7 +3080,7 @@ describe("BJT TEMP", () => {
 
     function makeJctCtx(): LoadContext {
       const solver = new SparseSolver();
-      solver.beginAssembly(10);
+      solver._initStructure(10);
       return {
         cktMode: MODEINITJCT,
         solver, matrix: solver,

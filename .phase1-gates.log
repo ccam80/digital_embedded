@@ -1,0 +1,450 @@
+
+[1m[7m[36m RUN [39m[27m[22m [36mv2.1.9 [39m[90mC:/local_working_projects/digital_in_browser[39m
+
+ [31m❯[39m src/solver/analog/__tests__/harness/harness-integration.test.ts [2m([22m[2m29 tests[22m[2m | [22m[31m15 failed[39m[2m)[22m[90m 25[2mms[22m[39m
+[31m   [31m×[31m harness integration[2m > [22mcaptureElementStates snapshots pool-backed elements[90m 9[2mms[22m[31m[39m
+[31m     → spFactor partition body (spfactor.c:337-413) is a Phase 5 deliverable.[39m
+[31m   [31m×[31m harness integration[2m > [22miteration capture hook records NR iterations during DC OP[90m 1[2mms[22m[31m[39m
+[31m     → spFactor partition body (spfactor.c:337-413) is a Phase 5 deliverable.[39m
+[31m   [31m×[31m harness integration[2m > [22mpostIterationHook fires during DC OP (nonlinear circuit)[90m 1[2mms[22m[31m[39m
+[31m     → spFactor partition body (spfactor.c:337-413) is a Phase 5 deliverable.[39m
+[31m   [31m×[31m harness integration[2m > [22mpostIterationHook fires during DC OP (linear circuit)[90m 1[2mms[22m[31m[39m
+[31m     → spFactor partition body (spfactor.c:337-413) is a Phase 5 deliverable.[39m
+[31m   [31m×[31m harness integration[2m > [22mstep capture hook packages iterations into step snapshots[90m 1[2mms[22m[31m[39m
+[31m     → spFactor partition body (spfactor.c:337-413) is a Phase 5 deliverable.[39m
+[31m   [31m×[31m harness integration[2m > [22mconvergenceSummary reports correct statistics[90m 2[2mms[22m[31m[39m
+[31m     → spFactor partition body (spfactor.c:337-413) is a Phase 5 deliverable.[39m
+[31m   [31m×[31m harness integration[2m > [22mnodeVoltageTrajectory returns voltage history[90m 1[2mms[22m[31m[39m
+[31m     → spFactor partition body (spfactor.c:337-413) is a Phase 5 deliverable.[39m
+[31m   [31m×[31m harness integration[2m > [22mquerySteps filters by convergence[90m 1[2mms[22m[31m[39m
+[31m     → spFactor partition body (spfactor.c:337-413) is a Phase 5 deliverable.[39m
+[31m   [31m×[31m harness integration[2m > [22mcompareSnapshots returns all-pass for self-comparison[90m 1[2mms[22m[31m[39m
+[31m     → spFactor partition body (spfactor.c:337-413) is a Phase 5 deliverable.[39m
+[31m   [31m×[31m harness integration[2m > [22mformatComparison produces readable output[90m 0[2mms[22m[31m[39m
+[31m     → spFactor partition body (spfactor.c:337-413) is a Phase 5 deliverable.[39m
+[31m   [31m×[31m harness integration[2m > [22mfindFirstDivergence returns null for identical sessions[90m 0[2mms[22m[31m[39m
+[31m     → spFactor partition body (spfactor.c:337-413) is a Phase 5 deliverable.[39m
+[31m   [31m×[31m harness integration[2m > [22mstep capture hook supports retry tracking via beginAttempt/endAttempt[90m 0[2mms[22m[31m[39m
+[31m     → spFactor partition body (spfactor.c:337-413) is a Phase 5 deliverable.[39m
+[31m   [31m×[31m harness integration[2m > [22mstep capture hook emits single attempt when no retries[90m 0[2mms[22m[31m[39m
+[31m     → spFactor partition body (spfactor.c:337-413) is a Phase 5 deliverable.[39m
+[31m   [31m×[31m harness integration[2m > [22mSparseSolver exposes dimension, getRhsSnapshot, getCSCNonZeros[90m 0[2mms[22m[31m[39m
+[31m     → spFactor partition body (spfactor.c:337-413) is a Phase 5 deliverable.[39m
+[31m   [31m×[31m harness integration[2m > [22mfindLargestDelta identifies worst convergence point[90m 0[2mms[22m[31m[39m
+[31m     → spFactor partition body (spfactor.c:337-413) is a Phase 5 deliverable.[39m
+v1: no DC value, transient time 0 value used [31m❯[39m src/solver/analog/__tests__/ngspice-parity/resistive-divider.test.ts [2m([22m[2m2 tests[22m[2m | [22m[31m2 failed[39m[2m)[22m[90m 62[2mms[22m[39m
+[31m   [31m×[31m Resistive divider DC-OP parity[2m > [22mdc_op_iteration_match[90m 19[2mms[22m[31m[39m
+[31m     → spFactor partition body (spfactor.c:337-413) is a Phase 5 deliverable.[39m
+[31m   [31m×[31m Resistive divider DC-OP parity[2m > [22mtransient_per_step_match[90m 43[2mms[22m[31m[39m
+[31m     → step=0 iter=0 noncon: ours=1 ngspice=0 absDelta=1: expected 1 to be +0 // Object.is equality[39m
+ [32m✓[39m src/solver/analog/__tests__/ngspice-parity/_diag-rc-transient.test.ts [2m([22m[2m1 test[22m[2m)[22m[90m 68[2mms[22m[39m
+[90mstdout[2m | src/solver/analog/__tests__/ngspice-parity/_diag-rc-transient.test.ts[2m > [22m[2mDIAG rc-transient[2m > [22m[2mdump step 0..3 structure
+[22m[39m
+=== OURS (steps=1) ===
+Step 0: stepStart=0 stepEnd=0 accIdx=1 attempts=2
+  Attempt 0: phase=dcopInitJct dt=0 (0000000000000000) outcome=dcopPhaseHandoff iters=1
+    Iter 0: initMode=MODETRANOP|MODEINITJCT delta=0 order=1 noncon=1 converged=false
+      prevV=[0(0000000000000000),0(0000000000000000),0(0000000000000000)]
+      v    =[0(0000000000000000),0(0000000000000000),0(0000000000000000)]
+      C1: GEQ=0,IEQ=0,V=0,Q=0,CCAP=0
+  Attempt 1: phase=dcopInitFix dt=0 (0000000000000000) outcome=dcopPhaseHandoff iters=1
+    Iter 0: initMode=MODETRANOP|MODEINITFIX delta=0 order=1 noncon=0 converged=true
+      prevV=[0(0000000000000000),0(0000000000000000),0(0000000000000000)]
+      v    =[0(0000000000000000),0(0000000000000000),0(0000000000000000)]
+      C1: GEQ=0,IEQ=0,V=0,Q=0,CCAP=0
+
+=== NGSPICE (aligned) (steps=245) ===
+Step 0: stepStart=0 stepEnd=1.0000000000000001e-11 accIdx=4 attempts=5
+  Attempt 0: phase=dcopInitJct dt=0 (0000000000000000) outcome=nrFailedRetry iters=1
+    Iter 0: initMode=MODETRANOP|MODEINITJCT delta=0 order=1 noncon=1 converged=false
+      prevV=[0(0000000000000000),0(0000000000000000),0(0000000000000000)]
+      v    =[0(0000000000000000),0(0000000000000000),0(0000000000000000)]
+      C1: Q=0,CCAP=0
+  Attempt 1: phase=dcopInitFix dt=0 (0000000000000000) outcome=dcopSubSolveConverged iters=1
+    Iter 0: initMode=MODETRANOP|MODEINITFIX delta=0 order=1 noncon=0 converged=true
+      prevV=[0(0000000000000000),0(0000000000000000),0(0000000000000000)]
+      v    =[0(0000000000000000),0(0000000000000000),0(0000000000000000)]
+      C1: Q=0,CCAP=0
+  Attempt 2: phase=dcopInitFloat dt=0 (0000000000000000) outcome=dcopSubSolveConverged iters=1
+    Iter 0: initMode=MODETRANOP|MODEINITFLOAT delta=0 order=1 noncon=0 converged=true
+      prevV=[0(0000000000000000),0(0000000000000000),0(0000000000000000)]
+      v    =[0(0000000000000000),0(0000000000000000),0(0000000000000000)]
+      C1: Q=0,CCAP=0
+  Attempt 3: phase=tranInit dt=1.0000000000000001e-11 (3da5fd7fe1796496) outcome=tranPhaseHandoff iters=1
+    Iter 0: initMode=MODETRAN|MODEINITTRAN delta=1.0000000000000001e-11 order=1 noncon=1 converged=false
+      prevV=[0(0000000000000000),0(0000000000000000),0(0000000000000000)]
+      v    =[0.01(3f847ae147ae147b),9.999999900000004e-11(3ddb7cdfd53b2649),-0.000009999999900000003(bee4f8b5855eb0a5)]
+      C1: Q=0,CCAP=0
+  Attempt 4: phase=tranNR dt=1.0000000000000001e-11 (3da5fd7fe1796496) outcome=accepted iters=1
+    Iter 0: initMode=MODETRAN|MODEINITFLOAT delta=1.0000000000000001e-11 order=1 noncon=0 converged=true
+      prevV=[0.01(3f847ae147ae147b),9.999999900000004e-11(3ddb7cdfd53b2649),-0.000009999999900000003(bee4f8b5855eb0a5)]
+      v    =[0.01(3f847ae147ae147b),9.999999900000004e-11(3ddb7cdfd53b2649),-0.000009999999900000003(bee4f8b5855eb0a5)]
+      C1: Q=9.999999900000003e-17,CCAP=0.000009999999900000001
+Step 1: stepStart=1.0000000000000001e-11 stepEnd=2.0000000000000002e-11 accIdx=1 attempts=2
+  Attempt 0: phase=tranPredictor dt=1.0000000000000001e-11 (3da5fd7fe1796496) outcome=tranPhaseHandoff iters=1
+    Iter 0: initMode=MODETRAN|MODEINITPRED delta=1.0000000000000001e-11 order=1 noncon=1 converged=false
+      prevV=[0.01(3f847ae147ae147b),9.999999900000004e-11(3ddb7cdfd53b2649),-0.000009999999900000003(bee4f8b5855eb0a5)]
+      v    =[0.02(3f947ae147ae147b),2.999999960000001e-10(3df49da7dec536da),-0.000019999999700000007(bef4f8b5839c547f)]
+      C1: Q=9.999999900000003e-17,CCAP=0
+  Attempt 1: phase=tranNR dt=1.0000000000000001e-11 (3da5fd7fe1796496) outcome=accepted iters=1
+    Iter 0: initMode=MODETRAN|MODEINITFLOAT delta=1.0000000000000001e-11 order=1 noncon=0 converged=true
+      prevV=[0.02(3f947ae147ae147b),2.999999960000001e-10(3df49da7dec536da),-0.000019999999700000007(bef4f8b5839c547f)]
+      v    =[0.02(3f947ae147ae147b),2.999999960000001e-10(3df49da7dec536da),-0.000019999999700000007(bef4f8b5839c547f)]
+      C1: Q=2.999999960000001e-16,CCAP=0.000019999999700000007
+Step 2: stepStart=2.0000000000000002e-11 stepEnd=4.0000000000000004e-11 accIdx=1 attempts=2
+  Attempt 0: phase=tranPredictor dt=2.0000000000000002e-11 (3db5fd7fe1796496) outcome=tranPhaseHandoff iters=1
+    Iter 0: initMode=MODETRAN|MODEINITPRED delta=2.0000000000000002e-11 order=2 noncon=1 converged=false
+      prevV=[0.02(3f947ae147ae147b),2.999999960000001e-10(3df49da7dec536da),-0.000019999999700000007(bef4f8b5839c547f)]
+      v    =[0.04(3fa47ae147ae147b),8.999999840000004e-10(3e0eec7bcbd9868d),-0.00003999999910000002(bf04f8b580f8ca46)]
+      C1: Q=2.999999960000001e-16,CCAP=-0.000019999999700000007
+  Attempt 1: phase=tranNR dt=2.0000000000000002e-11 (3db5fd7fe1796496) outcome=accepted iters=1
+    Iter 0: initMode=MODETRAN|MODEINITFLOAT delta=2.0000000000000002e-11 order=2 noncon=0 converged=true
+      prevV=[0.04(3fa47ae147ae147b),8.999999840000004e-10(3e0eec7bcbd9868d),-0.00003999999910000002(bf04f8b580f8ca46)]
+      v    =[0.04(3fa47ae147ae147b),8.999999840000004e-10(3e0eec7bcbd9868d),-0.00003999999910000002(bf04f8b580f8ca46)]
+      C1: Q=8.999999840000003e-16,CCAP=0.000039999999100000006
+Step 3: stepStart=4.0000000000000004e-11 stepEnd=8.000000000000001e-11 accIdx=1 attempts=2
+  Attempt 0: phase=tranPredictor dt=4.0000000000000004e-11 (3dc5fd7fe1796496) outcome=tranPhaseHandoff iters=1
+    Iter 0: initMode=MODETRAN|MODEINITPRED delta=4.0000000000000004e-11 order=2 noncon=1 converged=false
+      prevV=[0.04(3fa47ae147ae147b),8.999999840000004e-10(3e0eec7bcbd9868d),-0.00003999999910000002(bf04f8b580f8ca46)]
+      v    =[0.08(3fb47ae147ae147b),3.299999900000003e-9(3e2c58c6ca3d2264),-0.00007999999670000011(bf14f8b57a5ff0bb)]
+      C1: Q=8.999999840000003e-16,CCAP=-0.000039999999100000006
+  Attempt 1: phase=tranNR dt=4.0000000000000004e-11 (3dc5fd7fe1796496) outcome=accepted iters=1
+    Iter 0: initMode=MODETRAN|MODEINITFLOAT delta=4.0000000000000004e-11 order=2 noncon=0 converged=true
+      prevV=[0.08(3fb47ae147ae147b),3.299999900000003e-9(3e2c58c6ca3d2264),-0.00007999999670000011(bf14f8b57a5ff0bb)]
+      v    =[0.08(3fb47ae147ae147b),3.299999900000003e-9(3e2c58c6ca3d2264),-0.00007999999670000011(bf14f8b57a5ff0bb)]
+      C1: Q=3.2999999000000028e-15,CCAP=0.00007999999670000008
+
+
+[31m⎯⎯⎯⎯⎯⎯[1m[7m Failed Tests 17 [27m[22m⎯⎯⎯⎯⎯⎯⎯[39m
+
+[31m[1m[7m FAIL [27m[22m[39m src/solver/analog/__tests__/harness/harness-integration.test.ts[2m > [22mharness integration[2m > [22mcaptureElementStates snapshots pool-backed elements
+[31m[1mError[22m: spFactor partition body (spfactor.c:337-413) is a Phase 5 deliverable.[39m
+[36m [2m❯[22m SparseSolver._spFactor src/solver/analog/sparse-solver.ts:[2m1297:11[22m[39m
+    [90m1295| [39m    // NeedsOrdering=NO and Factored=NO — i.e. the partition path —
+    [90m1296| [39m    // which has no ngspice line in this file yet.
+    [90m1297| [39m    throw new Error(
+    [90m   | [39m          [31m^[39m
+    [90m1298| [39m      "spFactor partition body (spfactor.c:337-413) is a Phase 5 deliv…
+    [90m1299| [39m    );
+[90m [2m❯[22m SparseSolver.factor src/solver/analog/sparse-solver.ts:[2m482:17[22m[39m
+[90m [2m❯[22m Module.newtonRaphson src/solver/analog/newton-raphson.ts:[2m422:30[22m[39m
+[90m [2m❯[22m runNR src/solver/analog/dc-operating-point.ts:[2m164:3[22m[39m
+[90m [2m❯[22m cktop src/solver/analog/dc-operating-point.ts:[2m199:10[22m[39m
+[90m [2m❯[22m Module.solveDcOperatingPoint src/solver/analog/dc-operating-point.ts:[2m334:24[22m[39m
+[90m [2m❯[22m MNAEngine.dcOperatingPoint src/solver/analog/analog-engine.ts:[2m878:5[22m[39m
+[90m [2m❯[22m src/solver/analog/__tests__/harness/harness-integration.test.ts:[2m78:12[22m[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/17]⎯[22m[39m
+
+[31m[1m[7m FAIL [27m[22m[39m src/solver/analog/__tests__/harness/harness-integration.test.ts[2m > [22mharness integration[2m > [22miteration capture hook records NR iterations during DC OP
+[31m[1mError[22m: spFactor partition body (spfactor.c:337-413) is a Phase 5 deliverable.[39m
+[36m [2m❯[22m SparseSolver._spFactor src/solver/analog/sparse-solver.ts:[2m1297:11[22m[39m
+    [90m1295| [39m    // NeedsOrdering=NO and Factored=NO — i.e. the partition path —
+    [90m1296| [39m    // which has no ngspice line in this file yet.
+    [90m1297| [39m    throw new Error(
+    [90m   | [39m          [31m^[39m
+    [90m1298| [39m      "spFactor partition body (spfactor.c:337-413) is a Phase 5 deliv…
+    [90m1299| [39m    );
+[90m [2m❯[22m SparseSolver.factor src/solver/analog/sparse-solver.ts:[2m482:17[22m[39m
+[90m [2m❯[22m Module.newtonRaphson src/solver/analog/newton-raphson.ts:[2m422:30[22m[39m
+[90m [2m❯[22m runNR src/solver/analog/dc-operating-point.ts:[2m164:3[22m[39m
+[90m [2m❯[22m cktop src/solver/analog/dc-operating-point.ts:[2m199:10[22m[39m
+[90m [2m❯[22m Module.solveDcOperatingPoint src/solver/analog/dc-operating-point.ts:[2m334:24[22m[39m
+[90m [2m❯[22m MNAEngine.dcOperatingPoint src/solver/analog/analog-engine.ts:[2m878:5[22m[39m
+[90m [2m❯[22m src/solver/analog/__tests__/harness/harness-integration.test.ts:[2m88:12[22m[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/17]⎯[22m[39m
+
+[31m[1m[7m FAIL [27m[22m[39m src/solver/analog/__tests__/harness/harness-integration.test.ts[2m > [22mharness integration[2m > [22mpostIterationHook fires during DC OP (nonlinear circuit)
+[31m[1mError[22m: spFactor partition body (spfactor.c:337-413) is a Phase 5 deliverable.[39m
+[36m [2m❯[22m SparseSolver._spFactor src/solver/analog/sparse-solver.ts:[2m1297:11[22m[39m
+    [90m1295| [39m    // NeedsOrdering=NO and Factored=NO — i.e. the partition path —
+    [90m1296| [39m    // which has no ngspice line in this file yet.
+    [90m1297| [39m    throw new Error(
+    [90m   | [39m          [31m^[39m
+    [90m1298| [39m      "spFactor partition body (spfactor.c:337-413) is a Phase 5 deliv…
+    [90m1299| [39m    );
+[90m [2m❯[22m SparseSolver.factor src/solver/analog/sparse-solver.ts:[2m482:17[22m[39m
+[90m [2m❯[22m Module.newtonRaphson src/solver/analog/newton-raphson.ts:[2m422:30[22m[39m
+[90m [2m❯[22m runNR src/solver/analog/dc-operating-point.ts:[2m164:3[22m[39m
+[90m [2m❯[22m cktop src/solver/analog/dc-operating-point.ts:[2m199:10[22m[39m
+[90m [2m❯[22m Module.solveDcOperatingPoint src/solver/analog/dc-operating-point.ts:[2m334:24[22m[39m
+[90m [2m❯[22m MNAEngine.dcOperatingPoint src/solver/analog/analog-engine.ts:[2m878:5[22m[39m
+[90m [2m❯[22m src/solver/analog/__tests__/harness/harness-integration.test.ts:[2m111:27[22m[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/17]⎯[22m[39m
+
+[31m[1m[7m FAIL [27m[22m[39m src/solver/analog/__tests__/harness/harness-integration.test.ts[2m > [22mharness integration[2m > [22mpostIterationHook fires during DC OP (linear circuit)
+[31m[1mError[22m: spFactor partition body (spfactor.c:337-413) is a Phase 5 deliverable.[39m
+[36m [2m❯[22m SparseSolver._spFactor src/solver/analog/sparse-solver.ts:[2m1297:11[22m[39m
+    [90m1295| [39m    // NeedsOrdering=NO and Factored=NO — i.e. the partition path —
+    [90m1296| [39m    // which has no ngspice line in this file yet.
+    [90m1297| [39m    throw new Error(
+    [90m   | [39m          [31m^[39m
+    [90m1298| [39m      "spFactor partition body (spfactor.c:337-413) is a Phase 5 deliv…
+    [90m1299| [39m    );
+[90m [2m❯[22m SparseSolver.factor src/solver/analog/sparse-solver.ts:[2m482:17[22m[39m
+[90m [2m❯[22m Module.newtonRaphson src/solver/analog/newton-raphson.ts:[2m422:30[22m[39m
+[90m [2m❯[22m runNR src/solver/analog/dc-operating-point.ts:[2m164:3[22m[39m
+[90m [2m❯[22m cktop src/solver/analog/dc-operating-point.ts:[2m199:10[22m[39m
+[90m [2m❯[22m Module.solveDcOperatingPoint src/solver/analog/dc-operating-point.ts:[2m334:24[22m[39m
+[90m [2m❯[22m MNAEngine.dcOperatingPoint src/solver/analog/analog-engine.ts:[2m878:5[22m[39m
+[90m [2m❯[22m src/solver/analog/__tests__/harness/harness-integration.test.ts:[2m125:27[22m[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/17]⎯[22m[39m
+
+[31m[1m[7m FAIL [27m[22m[39m src/solver/analog/__tests__/harness/harness-integration.test.ts[2m > [22mharness integration[2m > [22mstep capture hook packages iterations into step snapshots
+[31m[1mError[22m: spFactor partition body (spfactor.c:337-413) is a Phase 5 deliverable.[39m
+[36m [2m❯[22m SparseSolver._spFactor src/solver/analog/sparse-solver.ts:[2m1297:11[22m[39m
+    [90m1295| [39m    // NeedsOrdering=NO and Factored=NO — i.e. the partition path —
+    [90m1296| [39m    // which has no ngspice line in this file yet.
+    [90m1297| [39m    throw new Error(
+    [90m   | [39m          [31m^[39m
+    [90m1298| [39m      "spFactor partition body (spfactor.c:337-413) is a Phase 5 deliv…
+    [90m1299| [39m    );
+[90m [2m❯[22m SparseSolver.factor src/solver/analog/sparse-solver.ts:[2m482:17[22m[39m
+[90m [2m❯[22m Module.newtonRaphson src/solver/analog/newton-raphson.ts:[2m422:30[22m[39m
+[90m [2m❯[22m runNR src/solver/analog/dc-operating-point.ts:[2m164:3[22m[39m
+[90m [2m❯[22m cktop src/solver/analog/dc-operating-point.ts:[2m199:10[22m[39m
+[90m [2m❯[22m Module.solveDcOperatingPoint src/solver/analog/dc-operating-point.ts:[2m334:24[22m[39m
+[90m [2m❯[22m MNAEngine.dcOperatingPoint src/solver/analog/analog-engine.ts:[2m878:5[22m[39m
+[90m [2m❯[22m src/solver/analog/__tests__/harness/harness-integration.test.ts:[2m141:12[22m[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/17]⎯[22m[39m
+
+[31m[1m[7m FAIL [27m[22m[39m src/solver/analog/__tests__/harness/harness-integration.test.ts[2m > [22mharness integration[2m > [22mconvergenceSummary reports correct statistics
+[31m[1mError[22m: spFactor partition body (spfactor.c:337-413) is a Phase 5 deliverable.[39m
+[36m [2m❯[22m SparseSolver._spFactor src/solver/analog/sparse-solver.ts:[2m1297:11[22m[39m
+    [90m1295| [39m    // NeedsOrdering=NO and Factored=NO — i.e. the partition path —
+    [90m1296| [39m    // which has no ngspice line in this file yet.
+    [90m1297| [39m    throw new Error(
+    [90m   | [39m          [31m^[39m
+    [90m1298| [39m      "spFactor partition body (spfactor.c:337-413) is a Phase 5 deliv…
+    [90m1299| [39m    );
+[90m [2m❯[22m SparseSolver.factor src/solver/analog/sparse-solver.ts:[2m482:17[22m[39m
+[90m [2m❯[22m Module.newtonRaphson src/solver/analog/newton-raphson.ts:[2m422:30[22m[39m
+[90m [2m❯[22m runNR src/solver/analog/dc-operating-point.ts:[2m164:3[22m[39m
+[90m [2m❯[22m cktop src/solver/analog/dc-operating-point.ts:[2m199:10[22m[39m
+[90m [2m❯[22m Module.solveDcOperatingPoint src/solver/analog/dc-operating-point.ts:[2m334:24[22m[39m
+[90m [2m❯[22m MNAEngine.dcOperatingPoint src/solver/analog/analog-engine.ts:[2m878:5[22m[39m
+[90m [2m❯[22m src/solver/analog/__tests__/harness/harness-integration.test.ts:[2m171:12[22m[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/17]⎯[22m[39m
+
+[31m[1m[7m FAIL [27m[22m[39m src/solver/analog/__tests__/harness/harness-integration.test.ts[2m > [22mharness integration[2m > [22mnodeVoltageTrajectory returns voltage history
+[31m[1mError[22m: spFactor partition body (spfactor.c:337-413) is a Phase 5 deliverable.[39m
+[36m [2m❯[22m SparseSolver._spFactor src/solver/analog/sparse-solver.ts:[2m1297:11[22m[39m
+    [90m1295| [39m    // NeedsOrdering=NO and Factored=NO — i.e. the partition path —
+    [90m1296| [39m    // which has no ngspice line in this file yet.
+    [90m1297| [39m    throw new Error(
+    [90m   | [39m          [31m^[39m
+    [90m1298| [39m      "spFactor partition body (spfactor.c:337-413) is a Phase 5 deliv…
+    [90m1299| [39m    );
+[90m [2m❯[22m SparseSolver.factor src/solver/analog/sparse-solver.ts:[2m482:17[22m[39m
+[90m [2m❯[22m Module.newtonRaphson src/solver/analog/newton-raphson.ts:[2m422:30[22m[39m
+[90m [2m❯[22m runNR src/solver/analog/dc-operating-point.ts:[2m164:3[22m[39m
+[90m [2m❯[22m cktop src/solver/analog/dc-operating-point.ts:[2m199:10[22m[39m
+[90m [2m❯[22m Module.solveDcOperatingPoint src/solver/analog/dc-operating-point.ts:[2m334:24[22m[39m
+[90m [2m❯[22m MNAEngine.dcOperatingPoint src/solver/analog/analog-engine.ts:[2m878:5[22m[39m
+[90m [2m❯[22m src/solver/analog/__tests__/harness/harness-integration.test.ts:[2m203:12[22m[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[7/17]⎯[22m[39m
+
+[31m[1m[7m FAIL [27m[22m[39m src/solver/analog/__tests__/harness/harness-integration.test.ts[2m > [22mharness integration[2m > [22mquerySteps filters by convergence
+[31m[1mError[22m: spFactor partition body (spfactor.c:337-413) is a Phase 5 deliverable.[39m
+[36m [2m❯[22m SparseSolver._spFactor src/solver/analog/sparse-solver.ts:[2m1297:11[22m[39m
+    [90m1295| [39m    // NeedsOrdering=NO and Factored=NO — i.e. the partition path —
+    [90m1296| [39m    // which has no ngspice line in this file yet.
+    [90m1297| [39m    throw new Error(
+    [90m   | [39m          [31m^[39m
+    [90m1298| [39m      "spFactor partition body (spfactor.c:337-413) is a Phase 5 deliv…
+    [90m1299| [39m    );
+[90m [2m❯[22m SparseSolver.factor src/solver/analog/sparse-solver.ts:[2m482:17[22m[39m
+[90m [2m❯[22m Module.newtonRaphson src/solver/analog/newton-raphson.ts:[2m422:30[22m[39m
+[90m [2m❯[22m runNR src/solver/analog/dc-operating-point.ts:[2m164:3[22m[39m
+[90m [2m❯[22m cktop src/solver/analog/dc-operating-point.ts:[2m199:10[22m[39m
+[90m [2m❯[22m Module.solveDcOperatingPoint src/solver/analog/dc-operating-point.ts:[2m334:24[22m[39m
+[90m [2m❯[22m MNAEngine.dcOperatingPoint src/solver/analog/analog-engine.ts:[2m878:5[22m[39m
+[90m [2m❯[22m src/solver/analog/__tests__/harness/harness-integration.test.ts:[2m232:12[22m[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[8/17]⎯[22m[39m
+
+[31m[1m[7m FAIL [27m[22m[39m src/solver/analog/__tests__/harness/harness-integration.test.ts[2m > [22mharness integration[2m > [22mcompareSnapshots returns all-pass for self-comparison
+[31m[1mError[22m: spFactor partition body (spfactor.c:337-413) is a Phase 5 deliverable.[39m
+[36m [2m❯[22m SparseSolver._spFactor src/solver/analog/sparse-solver.ts:[2m1297:11[22m[39m
+    [90m1295| [39m    // NeedsOrdering=NO and Factored=NO — i.e. the partition path —
+    [90m1296| [39m    // which has no ngspice line in this file yet.
+    [90m1297| [39m    throw new Error(
+    [90m   | [39m          [31m^[39m
+    [90m1298| [39m      "spFactor partition body (spfactor.c:337-413) is a Phase 5 deliv…
+    [90m1299| [39m    );
+[90m [2m❯[22m SparseSolver.factor src/solver/analog/sparse-solver.ts:[2m482:17[22m[39m
+[90m [2m❯[22m Module.newtonRaphson src/solver/analog/newton-raphson.ts:[2m422:30[22m[39m
+[90m [2m❯[22m runNR src/solver/analog/dc-operating-point.ts:[2m164:3[22m[39m
+[90m [2m❯[22m cktop src/solver/analog/dc-operating-point.ts:[2m199:10[22m[39m
+[90m [2m❯[22m Module.solveDcOperatingPoint src/solver/analog/dc-operating-point.ts:[2m334:24[22m[39m
+[90m [2m❯[22m MNAEngine.dcOperatingPoint src/solver/analog/analog-engine.ts:[2m878:5[22m[39m
+[90m [2m❯[22m src/solver/analog/__tests__/harness/harness-integration.test.ts:[2m251:12[22m[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[9/17]⎯[22m[39m
+
+[31m[1m[7m FAIL [27m[22m[39m src/solver/analog/__tests__/harness/harness-integration.test.ts[2m > [22mharness integration[2m > [22mformatComparison produces readable output
+[31m[1mError[22m: spFactor partition body (spfactor.c:337-413) is a Phase 5 deliverable.[39m
+[36m [2m❯[22m SparseSolver._spFactor src/solver/analog/sparse-solver.ts:[2m1297:11[22m[39m
+    [90m1295| [39m    // NeedsOrdering=NO and Factored=NO — i.e. the partition path —
+    [90m1296| [39m    // which has no ngspice line in this file yet.
+    [90m1297| [39m    throw new Error(
+    [90m   | [39m          [31m^[39m
+    [90m1298| [39m      "spFactor partition body (spfactor.c:337-413) is a Phase 5 deliv…
+    [90m1299| [39m    );
+[90m [2m❯[22m SparseSolver.factor src/solver/analog/sparse-solver.ts:[2m482:17[22m[39m
+[90m [2m❯[22m Module.newtonRaphson src/solver/analog/newton-raphson.ts:[2m422:30[22m[39m
+[90m [2m❯[22m runNR src/solver/analog/dc-operating-point.ts:[2m164:3[22m[39m
+[90m [2m❯[22m cktop src/solver/analog/dc-operating-point.ts:[2m199:10[22m[39m
+[90m [2m❯[22m Module.solveDcOperatingPoint src/solver/analog/dc-operating-point.ts:[2m334:24[22m[39m
+[90m [2m❯[22m MNAEngine.dcOperatingPoint src/solver/analog/analog-engine.ts:[2m878:5[22m[39m
+[90m [2m❯[22m src/solver/analog/__tests__/harness/harness-integration.test.ts:[2m274:12[22m[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[10/17]⎯[22m[39m
+
+[31m[1m[7m FAIL [27m[22m[39m src/solver/analog/__tests__/harness/harness-integration.test.ts[2m > [22mharness integration[2m > [22mfindFirstDivergence returns null for identical sessions
+[31m[1mError[22m: spFactor partition body (spfactor.c:337-413) is a Phase 5 deliverable.[39m
+[36m [2m❯[22m SparseSolver._spFactor src/solver/analog/sparse-solver.ts:[2m1297:11[22m[39m
+    [90m1295| [39m    // NeedsOrdering=NO and Factored=NO — i.e. the partition path —
+    [90m1296| [39m    // which has no ngspice line in this file yet.
+    [90m1297| [39m    throw new Error(
+    [90m   | [39m          [31m^[39m
+    [90m1298| [39m      "spFactor partition body (spfactor.c:337-413) is a Phase 5 deliv…
+    [90m1299| [39m    );
+[90m [2m❯[22m SparseSolver.factor src/solver/analog/sparse-solver.ts:[2m482:17[22m[39m
+[90m [2m❯[22m Module.newtonRaphson src/solver/analog/newton-raphson.ts:[2m422:30[22m[39m
+[90m [2m❯[22m runNR src/solver/analog/dc-operating-point.ts:[2m164:3[22m[39m
+[90m [2m❯[22m cktop src/solver/analog/dc-operating-point.ts:[2m199:10[22m[39m
+[90m [2m❯[22m Module.solveDcOperatingPoint src/solver/analog/dc-operating-point.ts:[2m334:24[22m[39m
+[90m [2m❯[22m MNAEngine.dcOperatingPoint src/solver/analog/analog-engine.ts:[2m878:5[22m[39m
+[90m [2m❯[22m src/solver/analog/__tests__/harness/harness-integration.test.ts:[2m294:12[22m[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[11/17]⎯[22m[39m
+
+[31m[1m[7m FAIL [27m[22m[39m src/solver/analog/__tests__/harness/harness-integration.test.ts[2m > [22mharness integration[2m > [22mstep capture hook supports retry tracking via beginAttempt/endAttempt
+[31m[1mError[22m: spFactor partition body (spfactor.c:337-413) is a Phase 5 deliverable.[39m
+[36m [2m❯[22m SparseSolver._spFactor src/solver/analog/sparse-solver.ts:[2m1297:11[22m[39m
+    [90m1295| [39m    // NeedsOrdering=NO and Factored=NO — i.e. the partition path —
+    [90m1296| [39m    // which has no ngspice line in this file yet.
+    [90m1297| [39m    throw new Error(
+    [90m   | [39m          [31m^[39m
+    [90m1298| [39m      "spFactor partition body (spfactor.c:337-413) is a Phase 5 deliv…
+    [90m1299| [39m    );
+[90m [2m❯[22m SparseSolver.factor src/solver/analog/sparse-solver.ts:[2m482:17[22m[39m
+[90m [2m❯[22m Module.newtonRaphson src/solver/analog/newton-raphson.ts:[2m422:30[22m[39m
+[90m [2m❯[22m runNR src/solver/analog/dc-operating-point.ts:[2m164:3[22m[39m
+[90m [2m❯[22m cktop src/solver/analog/dc-operating-point.ts:[2m199:10[22m[39m
+[90m [2m❯[22m Module.solveDcOperatingPoint src/solver/analog/dc-operating-point.ts:[2m334:24[22m[39m
+[90m [2m❯[22m MNAEngine.dcOperatingPoint src/solver/analog/analog-engine.ts:[2m878:5[22m[39m
+[90m [2m❯[22m src/solver/analog/__tests__/harness/harness-integration.test.ts:[2m311:12[22m[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[12/17]⎯[22m[39m
+
+[31m[1m[7m FAIL [27m[22m[39m src/solver/analog/__tests__/harness/harness-integration.test.ts[2m > [22mharness integration[2m > [22mstep capture hook emits single attempt when no retries
+[31m[1mError[22m: spFactor partition body (spfactor.c:337-413) is a Phase 5 deliverable.[39m
+[36m [2m❯[22m SparseSolver._spFactor src/solver/analog/sparse-solver.ts:[2m1297:11[22m[39m
+    [90m1295| [39m    // NeedsOrdering=NO and Factored=NO — i.e. the partition path —
+    [90m1296| [39m    // which has no ngspice line in this file yet.
+    [90m1297| [39m    throw new Error(
+    [90m   | [39m          [31m^[39m
+    [90m1298| [39m      "spFactor partition body (spfactor.c:337-413) is a Phase 5 deliv…
+    [90m1299| [39m    );
+[90m [2m❯[22m SparseSolver.factor src/solver/analog/sparse-solver.ts:[2m482:17[22m[39m
+[90m [2m❯[22m Module.newtonRaphson src/solver/analog/newton-raphson.ts:[2m422:30[22m[39m
+[90m [2m❯[22m runNR src/solver/analog/dc-operating-point.ts:[2m164:3[22m[39m
+[90m [2m❯[22m cktop src/solver/analog/dc-operating-point.ts:[2m199:10[22m[39m
+[90m [2m❯[22m Module.solveDcOperatingPoint src/solver/analog/dc-operating-point.ts:[2m334:24[22m[39m
+[90m [2m❯[22m MNAEngine.dcOperatingPoint src/solver/analog/analog-engine.ts:[2m878:5[22m[39m
+[90m [2m❯[22m src/solver/analog/__tests__/harness/harness-integration.test.ts:[2m341:12[22m[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[13/17]⎯[22m[39m
+
+[31m[1m[7m FAIL [27m[22m[39m src/solver/analog/__tests__/harness/harness-integration.test.ts[2m > [22mharness integration[2m > [22mSparseSolver exposes dimension, getRhsSnapshot, getCSCNonZeros
+[31m[1mError[22m: spFactor partition body (spfactor.c:337-413) is a Phase 5 deliverable.[39m
+[36m [2m❯[22m SparseSolver._spFactor src/solver/analog/sparse-solver.ts:[2m1297:11[22m[39m
+    [90m1295| [39m    // NeedsOrdering=NO and Factored=NO — i.e. the partition path —
+    [90m1296| [39m    // which has no ngspice line in this file yet.
+    [90m1297| [39m    throw new Error(
+    [90m   | [39m          [31m^[39m
+    [90m1298| [39m      "spFactor partition body (spfactor.c:337-413) is a Phase 5 deliv…
+    [90m1299| [39m    );
+[90m [2m❯[22m SparseSolver.factor src/solver/analog/sparse-solver.ts:[2m482:17[22m[39m
+[90m [2m❯[22m Module.newtonRaphson src/solver/analog/newton-raphson.ts:[2m422:30[22m[39m
+[90m [2m❯[22m runNR src/solver/analog/dc-operating-point.ts:[2m164:3[22m[39m
+[90m [2m❯[22m cktop src/solver/analog/dc-operating-point.ts:[2m199:10[22m[39m
+[90m [2m❯[22m Module.solveDcOperatingPoint src/solver/analog/dc-operating-point.ts:[2m334:24[22m[39m
+[90m [2m❯[22m MNAEngine.dcOperatingPoint src/solver/analog/analog-engine.ts:[2m878:5[22m[39m
+[90m [2m❯[22m src/solver/analog/__tests__/harness/harness-integration.test.ts:[2m372:12[22m[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[14/17]⎯[22m[39m
+
+[31m[1m[7m FAIL [27m[22m[39m src/solver/analog/__tests__/harness/harness-integration.test.ts[2m > [22mharness integration[2m > [22mfindLargestDelta identifies worst convergence point
+[31m[1mError[22m: spFactor partition body (spfactor.c:337-413) is a Phase 5 deliverable.[39m
+[36m [2m❯[22m SparseSolver._spFactor src/solver/analog/sparse-solver.ts:[2m1297:11[22m[39m
+    [90m1295| [39m    // NeedsOrdering=NO and Factored=NO — i.e. the partition path —
+    [90m1296| [39m    // which has no ngspice line in this file yet.
+    [90m1297| [39m    throw new Error(
+    [90m   | [39m          [31m^[39m
+    [90m1298| [39m      "spFactor partition body (spfactor.c:337-413) is a Phase 5 deliv…
+    [90m1299| [39m    );
+[90m [2m❯[22m SparseSolver.factor src/solver/analog/sparse-solver.ts:[2m482:17[22m[39m
+[90m [2m❯[22m Module.newtonRaphson src/solver/analog/newton-raphson.ts:[2m422:30[22m[39m
+[90m [2m❯[22m runNR src/solver/analog/dc-operating-point.ts:[2m164:3[22m[39m
+[90m [2m❯[22m cktop src/solver/analog/dc-operating-point.ts:[2m199:10[22m[39m
+[90m [2m❯[22m Module.solveDcOperatingPoint src/solver/analog/dc-operating-point.ts:[2m334:24[22m[39m
+[90m [2m❯[22m MNAEngine.dcOperatingPoint src/solver/analog/analog-engine.ts:[2m878:5[22m[39m
+[90m [2m❯[22m src/solver/analog/__tests__/harness/harness-integration.test.ts:[2m394:12[22m[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[15/17]⎯[22m[39m
+
+[31m[1m[7m FAIL [27m[22m[39m src/solver/analog/__tests__/ngspice-parity/resistive-divider.test.ts[2m > [22mResistive divider DC-OP parity[2m > [22mdc_op_iteration_match
+[31m[1mError[22m: spFactor partition body (spfactor.c:337-413) is a Phase 5 deliverable.[39m
+[36m [2m❯[22m SparseSolver._spFactor src/solver/analog/sparse-solver.ts:[2m1297:11[22m[39m
+    [90m1295| [39m    // NeedsOrdering=NO and Factored=NO — i.e. the partition path —
+    [90m1296| [39m    // which has no ngspice line in this file yet.
+    [90m1297| [39m    throw new Error(
+    [90m   | [39m          [31m^[39m
+    [90m1298| [39m      "spFactor partition body (spfactor.c:337-413) is a Phase 5 deliv…
+    [90m1299| [39m    );
+[90m [2m❯[22m SparseSolver.factor src/solver/analog/sparse-solver.ts:[2m482:17[22m[39m
+[90m [2m❯[22m Module.newtonRaphson src/solver/analog/newton-raphson.ts:[2m422:30[22m[39m
+[90m [2m❯[22m runNR src/solver/analog/dc-operating-point.ts:[2m164:3[22m[39m
+[90m [2m❯[22m cktop src/solver/analog/dc-operating-point.ts:[2m199:10[22m[39m
+[90m [2m❯[22m Module.solveDcOperatingPoint src/solver/analog/dc-operating-point.ts:[2m334:24[22m[39m
+[90m [2m❯[22m MNAEngine.dcOperatingPoint src/solver/analog/analog-engine.ts:[2m878:5[22m[39m
+[90m [2m❯[22m DefaultSimulationCoordinator.dcOperatingPoint src/solver/coordinator.ts:[2m407:40[22m[39m
+[90m [2m❯[22m ComparisonSession.runDcOp src/solver/analog/__tests__/harness/comparison-session.ts:[2m535:25[22m[39m
+[90m [2m❯[22m src/solver/analog/__tests__/ngspice-parity/resistive-divider.test.ts:[2m34:19[22m[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[16/17]⎯[22m[39m
+
+[31m[1m[7m FAIL [27m[22m[39m src/solver/analog/__tests__/ngspice-parity/resistive-divider.test.ts[2m > [22mResistive divider DC-OP parity[2m > [22mtransient_per_step_match
+[31m[1mAssertionError[22m: step=0 iter=0 noncon: ours=1 ngspice=0 absDelta=1: expected 1 to be +0 // Object.is equality[39m
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[32m- 0[39m
+[31m+ 1[39m
+
+[36m [2m❯[22m Module.assertIterationMatch src/solver/analog/__tests__/ngspice-parity/parity-helpers.ts:[2m79:5[22m[39m
+    [90m 77| [39m    nonconDelta[33m,[39m
+    [90m 78| [39m    [32m`[39m[36m${[39mctxLabel[36m}[39m[32m noncon: ours=[39m[36m${[39mours[33m.[39mnoncon[36m}[39m[32m ngspice=[39m[36m${[39mngspice[33m.[39mnoncon[36m}[39m…
+    [90m 79| [39m  )[33m.[39m[34mtoBe[39m([34m0[39m)[33m;[39m
+    [90m   | [39m    [31m^[39m
+    [90m 80| [39m
+    [90m 81| [39m  [90m// Compare diagGmin (required field — absence of population surfaces[39m…
+[90m [2m❯[22m src/solver/analog/__tests__/ngspice-parity/resistive-divider.test.ts:[2m115:11[22m[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[17/17]⎯[22m[39m
+
+[2m Test Files [22m [1m[31m2 failed[39m[22m[2m | [22m[1m[32m1 passed[39m[22m[90m (3)[39m
+[2m      Tests [22m [1m[31m17 failed[39m[22m[2m | [22m[1m[32m15 passed[39m[22m[90m (32)[39m
+[2m   Start at [22m 22:55:33
+[2m   Duration [22m 2.28s[2m (transform 1.42s, setup 0ms, collect 4.01s, tests 155ms, environment 0ms, prepare 386ms)[22m
+

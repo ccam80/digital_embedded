@@ -343,9 +343,8 @@ describe("ntc_load_dcop_parity", () => {
       matrixSize: 2,
       nodeCount: 2,
     });
-    stampCtx.solver.beginAssembly(2);
+    stampCtx.solver._initStructure(2);
     analogElement.load(stampCtx.loadCtx);
-    stampCtx.solver.finalize();
     const stamps = stampCtx.solver.getCSCNonZeros();
 
     // Expected: G = 1/r0 when T == T₀ (exponent = 0, exp(0) = 1).

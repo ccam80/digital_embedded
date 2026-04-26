@@ -225,7 +225,7 @@ describe("Transformer", () => {
       const vSrc = Vpeak * Math.sin(2 * Math.PI * freq * t);
       const vsrc = makeVoltageSource(1, 0, bVsrc, vSrc);
 
-      solver.beginAssembly(matrixSize);
+      solver._initStructure(matrixSize);
       const ctx = makeTransientCtx(solver as unknown as SparseSolverType, voltages, {
         dt,
         method: "trapezoidal",
@@ -235,9 +235,8 @@ describe("Transformer", () => {
       vsrc.load(ctx);
       transformer.load(ctx);
       rLoad.load(ctx);
-      solver.finalize();
       const result = solver.factor();
-      if (!result.success) throw new Error(`Singular at step ${i}`);
+      if (result !== 0) throw new Error(`Singular at step ${i}`);
       solver.solve(voltages);
 
       if (i >= lastCycleStart) {
@@ -302,7 +301,7 @@ describe("Transformer", () => {
       const vSrc = Vpeak * Math.sin(2 * Math.PI * freq * t);
       const vsrc = makeVoltageSource(1, 0, bVsrc, vSrc);
 
-      solver.beginAssembly(matrixSize);
+      solver._initStructure(matrixSize);
       const ctx = makeTransientCtx(solver as unknown as SparseSolverType, voltages, {
         dt,
         method: "trapezoidal",
@@ -312,9 +311,8 @@ describe("Transformer", () => {
       vsrc.load(ctx);
       transformer.load(ctx);
       rLoad.load(ctx);
-      solver.finalize();
       const result = solver.factor();
-      if (!result.success) throw new Error(`Singular at step ${i}`);
+      if (result !== 0) throw new Error(`Singular at step ${i}`);
       solver.solve(voltages);
 
       if (i >= lastCycleStart) {
@@ -380,7 +378,7 @@ describe("Transformer", () => {
       const vSrc = Vpeak * Math.sin(2 * Math.PI * freq * t);
       const vsrc = makeVoltageSource(1, 0, bVsrc, vSrc);
 
-      solver.beginAssembly(matrixSize);
+      solver._initStructure(matrixSize);
       const ctx = makeTransientCtx(solver as unknown as SparseSolverType, voltages, {
         dt,
         method: "trapezoidal",
@@ -390,9 +388,8 @@ describe("Transformer", () => {
       vsrc.load(ctx);
       transformer.load(ctx);
       rLoad.load(ctx);
-      solver.finalize();
       const result = solver.factor();
-      if (!result.success) throw new Error(`Singular at step ${i}`);
+      if (result !== 0) throw new Error(`Singular at step ${i}`);
       solver.solve(voltages);
 
       if (i >= lastCycleStart) {
@@ -459,7 +456,7 @@ describe("Transformer", () => {
         const vSrc = Vpeak * Math.sin(2 * Math.PI * freq * t);
         const vsrc = makeVoltageSource(1, 0, bVsrc, vSrc);
 
-        solver.beginAssembly(matrixSize);
+        solver._initStructure(matrixSize);
         const ctx = makeTransientCtx(solver as unknown as SparseSolverType, voltages, {
           dt,
           method: "trapezoidal",
@@ -469,9 +466,8 @@ describe("Transformer", () => {
         vsrc.load(ctx);
         transformer.load(ctx);
         rLoad.load(ctx);
-        solver.finalize();
         const result = solver.factor();
-        if (!result.success) throw new Error(`Singular at step ${i}`);
+        if (result !== 0) throw new Error(`Singular at step ${i}`);
         solver.solve(voltages);
 
         if (i >= lastCycleStart) {
@@ -530,7 +526,7 @@ describe("Transformer", () => {
     let voltages = new Float64Array(matrixSize);
 
     for (let i = 0; i < steps; i++) {
-      solver.beginAssembly(matrixSize);
+      solver._initStructure(matrixSize);
       const ctx = makeTransientCtx(solver as unknown as SparseSolverType, voltages, {
         dt,
         method: "trapezoidal",
@@ -540,9 +536,8 @@ describe("Transformer", () => {
       vsrc.load(ctx);
       transformer.load(ctx);
       rLoad.load(ctx);
-      solver.finalize();
       const result = solver.factor();
-      if (!result.success) throw new Error(`Singular at step ${i}`);
+      if (result !== 0) throw new Error(`Singular at step ${i}`);
       solver.solve(voltages);
     }
 

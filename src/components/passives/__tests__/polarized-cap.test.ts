@@ -247,12 +247,11 @@ describe("PolarizedCap", () => {
         voltTol: 1e-6,
       };
 
-      solver.beginAssembly(matrixSize);
+      solver._initStructure(matrixSize);
       vs.load(ctx);
       cap.load(ctx);
-      solver.finalize();
       const factorResult = solver.factor();
-      expect(factorResult.success).toBe(true);
+      expect(factorResult).toBe(0);
       solver.solve(voltages);
 
       // At t=0 with geq >> G_leak, cap is near short-circuit
@@ -336,14 +335,13 @@ describe("PolarizedCap", () => {
           voltTol: 1e-6,
         };
 
-        solver.beginAssembly(matrixSize);
+        solver._initStructure(matrixSize);
         vs.load(ctx);
         rSeries.load(ctx);
         cap.load(ctx);
-        solver.finalize();
 
         const factorResult = solver.factor();
-        if (!factorResult.success) {
+        if (factorResult !== 0) {
           throw new Error(`Singular matrix at step ${step}`);
         }
         solver.solve(voltages);
@@ -387,9 +385,8 @@ describe("PolarizedCap", () => {
       // V(node1) = -5V → reverse biased by 5V
       const voltagesReverse = new Float64Array([-5, 0]);
       const solver = new SparseSolver();
-      solver.beginAssembly(2);
+      solver._initStructure(2);
       capReverse.load(makeDiagnosticCtx(solver, voltagesReverse));
-      solver.finalize();
 
       expect(diagnostics.length).toBeGreaterThanOrEqual(1);
       expect(diagnostics[0].code).toBe("reverse-biased-cap");
@@ -413,9 +410,8 @@ describe("PolarizedCap", () => {
       // V(node1) = +5V → forward biased
       const voltages = new Float64Array([5, 0]);
       const solver = new SparseSolver();
-      solver.beginAssembly(2);
+      solver._initStructure(2);
       cap.load(makeDiagnosticCtx(solver, voltages));
-      solver.finalize();
 
       expect(diagnostics.length).toBe(0);
     });
@@ -479,9 +475,8 @@ describe("PolarizedCap", () => {
       const { pool } = withState(el);
       const voltages = new Float64Array([5, 0]); // node1=5V, node2=0V
       const solver = new SparseSolver();
-      solver.beginAssembly(2);
+      solver._initStructure(2);
       el.load(makeSlotLoadCtx(solver, voltages, 1e-6, "trapezoidal", 1, MODETRAN | MODEINITTRAN));
-      solver.finalize();
       expect(pool.state0[0]).toBeGreaterThan(0); // GEQ = C/dt > 0
       // IEQ = ceq = 0 on first step (zero charge history): ccap = C*vNow/dt, geq*vNow = C*vNow/dt → ceq=0
     });
@@ -492,9 +487,8 @@ describe("PolarizedCap", () => {
       // nCap=2 (1-based), nNeg=0 → vCapNode = voltages[1], vNeg = 0
       const voltages = new Float64Array([0, 3]); // node1=0, node2=3V
       const solver = new SparseSolver();
-      solver.beginAssembly(2);
+      solver._initStructure(2);
       el.load(makeSlotLoadCtx(solver, voltages, 1e-6, "trapezoidal", 1, MODETRAN | MODEINITTRAN));
-      solver.finalize();
     });
 
   });

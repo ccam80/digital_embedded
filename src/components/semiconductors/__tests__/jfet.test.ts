@@ -125,7 +125,7 @@ const PJFET_PARAMS = {
 
 function makeDcOpCtx(voltages: Float64Array, matrixSize: number): LoadContext {
   const solver = new SparseSolver();
-  solver.beginAssembly(matrixSize);
+  solver._initStructure(matrixSize);
   return {
     cktMode: MODEDCOP | MODEINITFLOAT,
     solver,
@@ -483,7 +483,7 @@ describe("NJFET TEMP", () => {
 
     function makeCtx(): LoadContext {
       const solver = new SparseSolver();
-      solver.beginAssembly(matrixSize);
+      solver._initStructure(matrixSize);
       return {
         cktMode: MODEDCOP | MODEINITFLOAT,
         solver,
@@ -574,7 +574,7 @@ describe("PJFET TEMP", () => {
 
     function makeCtx(): LoadContext {
       const solver = new SparseSolver();
-      solver.beginAssembly(matrixSize);
+      solver._initStructure(matrixSize);
       return {
         cktMode: MODEDCOP | MODEINITFLOAT,
         solver,

@@ -105,14 +105,14 @@ function driveAndGetNorton(
   voltages[1] = 0;
   for (let i = 0; i < iterations; i++) {
     const iterSolver = new SparseSolver();
-    iterSolver.beginAssembly(2);
+    iterSolver._initStructure(2);
     const iterCtx = buildUnitCtx(iterSolver, voltages);
     element.load(iterCtx);
   }
 
   // Re-stamp into a fresh solver for the final Norton read.
   const solver = new SparseSolver();
-  solver.beginAssembly(2);
+  solver._initStructure(2);
   const ctx = buildUnitCtx(solver, voltages);
   element.load(ctx);
 
@@ -449,7 +449,7 @@ describe("TunnelDiode TEMP", () => {
     pool.state0[0] = v;
 
     const solver = new SparseSolver();
-    solver.beginAssembly(2);
+    solver._initStructure(2);
     core.load(buildTempCtx(solver, new Float64Array([v, 0])));
 
     // Read SLOT_ID (index 3) from state pool
@@ -477,7 +477,7 @@ describe("TunnelDiode TEMP", () => {
 
     // First load at 300.15K
     const solver1 = new SparseSolver();
-    solver1.beginAssembly(2);
+    solver1._initStructure(2);
     core.load(buildTempCtx(solver1, new Float64Array([v, 0])));
     const iAt300 = pool.state0[3];
 
@@ -488,7 +488,7 @@ describe("TunnelDiode TEMP", () => {
     // Now setParam TEMP=400 and reload (SLOT_VD is already v from prior load)
     core.setParam("TEMP", 400);
     const solver2 = new SparseSolver();
-    solver2.beginAssembly(2);
+    solver2._initStructure(2);
     core.load(buildTempCtx(solver2, new Float64Array([v, 0])));
     const iAt400 = pool.state0[3];
 
@@ -555,7 +555,7 @@ describe("integration", () => {
 
     // Real SparseSolver — anode=node 1 mapped to row 0, cathode=ground.
     const solver = new SparseSolver();
-    solver.beginAssembly(1);
+    solver._initStructure(1);
     const ctx: import("../../../solver/analog/load-context.js").LoadContext = {
       cktMode: MODETRAN | MODEINITFLOAT,
       solver,

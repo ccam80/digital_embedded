@@ -10,13 +10,12 @@ function buildAndFactor(
   entries: Array<[number, number, number]>
 ): SparseSolver {
   const solver = new SparseSolver();
-  solver.beginAssembly(3);
+  solver._initStructure(3);
   for (const [r, c, v] of entries) {
     solver.stampElement(solver.allocElement(r, c), v);
   }
-  solver.finalize();
   const result = solver.factor();
-  expect(result.success).toBe(true);
+  expect(result).toBe(0);
   return solver;
 }
 
@@ -52,8 +51,8 @@ describe("SparseSolver._resetForAssembly semantics", () => {
     const rowHeadBefore = Array.from(s._rowHead as Int32Array);
     const diagBefore = Array.from(s._diag as Int32Array);
 
-    // Re-stamp identical values and call beginAssembly (triggers _resetForAssembly).
-    solver.beginAssembly(3);
+    // Re-stamp identical values and call _resetForAssembly.
+    solver._resetForAssembly();
     for (const [r, c, v] of entries) {
       solver.stampElement(solver.allocElement(r, c), v);
     }
@@ -101,17 +100,16 @@ describe("SparseSolver._resetForAssembly semantics", () => {
       [2, 0, 1],             [2, 2, 2],
     ];
     const solver = new SparseSolver();
-    solver.beginAssembly(3);
+    solver._initStructure(3);
     for (const [r, c, v] of entries) {
       solver.stampElement(solver.allocElement(r, c), v);
     }
-    solver.finalize();
 
     const s = solver as any;
     const elCountBeforeFactor: number = s._elCount;
 
     const result = solver.factor();
-    expect(result.success).toBe(true);
+    expect(result).toBe(0);
 
     const elCountAfterFactor: number = s._elCount;
     // factor() must have created at least one fill-in (increased _elCount).
@@ -120,8 +118,8 @@ describe("SparseSolver._resetForAssembly semantics", () => {
     const fillInsBefore = countFillIns(solver);
     expect(fillInsBefore).toBeGreaterThanOrEqual(1);
 
-    // beginAssembly resets values but must keep fill-ins in the pool.
-    solver.beginAssembly(3);
+    // _resetForAssembly resets values but must keep fill-ins in the pool.
+    solver._resetForAssembly();
 
     // _elCount unchanged — fill-ins were NOT returned to free-list.
     expect((s._elCount as number)).toBe(elCountAfterFactor);
@@ -149,7 +147,7 @@ describe("SparseSolver._resetForAssembly semantics", () => {
     const elCountAfterFactor: number = s._elCount;
     expect(elCountAfterFactor).toBeGreaterThan(0);
 
-    solver.beginAssembly(3);
+    solver._resetForAssembly();
 
     const elVal: Float64Array = s._elVal;
     const elCount: number = s._elCount;

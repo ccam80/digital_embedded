@@ -523,8 +523,10 @@ export class CKTCircuitContext {
     this.elementsWithLte = elements.filter(el => el.getLteTimestep !== undefined);
     this.elementsWithAcceptStep = elements.filter(el => el.acceptStep !== undefined);
 
-    // Matrix / solver — shared instance owned by the engine
+    // Matrix / solver — shared instance owned by the engine.
+    // ngspice SMPnewMatrix → spCreate is called once at circuit setup.
     this.solver = solver;
+    solver._initStructure(matrixSize);
 
     // Node voltage buffers
     this.rhsOld = new Float64Array(matrixSize);

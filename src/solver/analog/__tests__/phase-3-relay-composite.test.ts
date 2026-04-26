@@ -103,7 +103,7 @@ describe("Phase 3 Task 3.3.3 -- Relay composite-child", () => {
 
     function makeCtx(cktMode: number): LoadContext {
       const solver = new SparseSolver();
-      solver.beginAssembly(matrixSize);
+      solver._initStructure(matrixSize);
       return {
         solver,
         rhsOld: voltages,
