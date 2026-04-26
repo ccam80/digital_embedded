@@ -85,7 +85,7 @@ export const { paramDefs: SCR_PARAM_DEFS, defaults: SCR_PARAM_DEFAULTS } = defin
   },
   instance: {
     TEMP:    { default: 300.15, unit: "K", description: "Per-instance operating temperature" },
-    OFF:     { default: 0,                 description: "Initial off-state flag (0 = normal, 1 = forced off)" },
+    OFF:     { default: 0, emit: "flag",   description: "Initial off-state flag (0 = normal, 1 = forced off)" },
   },
 });
 

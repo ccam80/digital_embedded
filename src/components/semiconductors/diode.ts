@@ -124,16 +124,12 @@ export const { paramDefs: DIODE_PARAM_DEFS, defaults: DIODE_PARAM_DEFAULTS } = d
     AF:  { default: 1,                description: "Flicker noise exponent" },
     TNOM: { default: REFTEMP, unit: "K", description: "Parameter measurement temperature" },
     // D-W3-6: sidewall saturation current params — dioload.c:209-243
-    ISW:   { default: 0,    unit: "A",  description: "Sidewall saturation current (DIOsatSWCur)" },
+    ISW:   { default: 0,    unit: "A",  spiceName: "JSW", description: "Sidewall saturation current (DIOsatSWCur)" },
     NSW:   { default: NaN,             description: "Sidewall emission coefficient (DIOswEmissionCoeff; default=N)" },
-    // D-W3-7: tunnel current params — dioload.c:267-285
-    IBEQ:  { default: 0,    unit: "A",  description: "Tunnel bottom saturation current (DIOtunSatCur)" },
-    IBSW:  { default: 0,    unit: "A",  description: "Tunnel sidewall saturation current (DIOtunSatSWCur)" },
-    NB:    { default: 1,               description: "Tunnel emission coefficient (DIOtunEmissionCoeff)" },
   },
   instance: {
     AREA: { default: 1,               description: "Area scaling factor" },
-    OFF: { default: 0,                description: "Initial condition: device off (0=false, 1=true)" },
+    OFF: { default: 0, emit: "flag",  description: "Initial condition: device off (0=false, 1=true)" },
     IC:  { default: NaN,   unit: "V",  description: "Initial condition: junction voltage for UIC" },
     TEMP:  { default: 300.15, unit: "K", description: "Per-instance operating temperature" },
   },
@@ -371,6 +367,71 @@ export function computeDiodeIV(
 }
 
 // ---------------------------------------------------------------------------
+// diodeLoadTunnel — hoisted tunnel current block (dioload.c:267-285)
+// ---------------------------------------------------------------------------
+
+/**
+ * Tunnel current contribution for diode-style devices that opt in.
+ *
+ * Mirrors ngspice dioload.c:267-285:
+ *   - DIOtunSatSWCurGiven (IBSW): tunnel sidewall current added to (cdsw, gdsw).
+ *   - DIOtunSatCurGiven   (IBEQ): tunnel bottom current added to (cdb,  gdb).
+ *
+ * Both branches use vtetun = NB * vt and evd = exp(-vdLimited / vtetun).
+ *
+ * The function is pure: it returns updated bottom + sidewall Norton-pair
+ * components. Callers compose the post-IKF/IKR cd/gd from the returned values
+ * exactly the way createDiodeElement composed the inline tunnel block before
+ * the hoist.
+ *
+ * @param vdLimited  - pnjlim-limited junction voltage (V)
+ * @param vt         - thermal voltage kT/q for the device temperature (V)
+ * @param IBEQ       - tunnel bottom saturation current (DIOtunSatCur, A)
+ * @param IBSW       - tunnel sidewall saturation current (DIOtunSatSWCur, A)
+ * @param NB         - tunnel emission coefficient (DIOtunEmissionCoeff)
+ * @param cdb        - bottom current pre-tunnel (A)
+ * @param gdb        - bottom conductance pre-tunnel (S)
+ * @param cdsw       - sidewall current pre-tunnel (A)
+ * @param gdsw       - sidewall conductance pre-tunnel (S)
+ * @returns          - { cdb, gdb, cdsw, gdsw } — updated Norton-pair components
+ */
+export function diodeLoadTunnel(
+  vdLimited: number,
+  vt: number,
+  IBEQ: number,
+  IBSW: number,
+  NB: number,
+  cdb: number,
+  gdb: number,
+  cdsw: number,
+  gdsw: number,
+): { cdb: number; gdb: number; cdsw: number; gdsw: number } {
+  let outCdsw = cdsw;
+  let outGdsw = gdsw;
+  let outCdb  = cdb;
+  let outGdb  = gdb;
+
+  // cite: dioload.c:267 `if (model->DIOtunSatSWCurGiven)`
+  if (IBSW > 0) {
+    // cite: dioload.c:269-274: tunnel sidewall
+    const vtetun = NB * vt;
+    const evd = Math.exp(-vdLimited / vtetun);
+    outCdsw = outCdsw - IBSW * (evd - 1);
+    outGdsw = outGdsw + IBSW * evd / vtetun;
+  }
+  // cite: dioload.c:277 `if (model->DIOtunSatCurGiven)`
+  if (IBEQ > 0) {
+    // cite: dioload.c:279-284: tunnel bottom
+    const vtetun = NB * vt;
+    const evd = Math.exp(-vdLimited / vtetun);
+    outCdb = cdb - IBEQ * (evd - 1);
+    outGdb = gdb + IBEQ * evd / vtetun;
+  }
+
+  return { cdb: outCdb, gdb: outGdb, cdsw: outCdsw, gdsw: outGdsw };
+}
+
+// ---------------------------------------------------------------------------
 // createDiodeElement — AnalogElement factory
 // ---------------------------------------------------------------------------
 
@@ -408,10 +469,6 @@ export function createDiodeElement(
     // D-W3-6: sidewall current params (dioload.c:209-243)
     ISW:  props.getModelParam<number>("ISW"),
     NSW:  props.getModelParam<number>("NSW"),
-    // D-W3-7: tunnel current params (dioload.c:267-285)
-    IBEQ: props.getModelParam<number>("IBEQ"),
-    IBSW: props.getModelParam<number>("IBSW"),
-    NB:   props.getModelParam<number>("NB"),
     TEMP: props.getModelParam<number>("TEMP"),
   };
 
@@ -614,29 +671,11 @@ export function createDiodeElement(
       const mergedCsat = (csatsw > 0 && params.NSW === params.N) ? tIS + csatsw : tIS;
       const { id: cdb, gd: gdb } = computeDiodeIV(vdLimited, mergedCsat, nVt, tBV, vtebrk);
 
-      // D-W3-7: tunnel current block — dioload.c:267-285.
-      // cite: dioload.c:267 `if (model->DIOtunSatSWCurGiven)`
-      if (params.IBSW > 0) {
-        // cite: dioload.c:269-274: tunnel sidewall
-        const vtetun = params.NB * vt;
-        const evd = Math.exp(-vdLimited / vtetun);
-        cdsw = cdsw - params.IBSW * (evd - 1);
-        gdsw = gdsw + params.IBSW * evd / vtetun;
-      }
-      // cite: dioload.c:277 `if (model->DIOtunSatCurGiven)`
-      let tunCdb = cdb;
-      let tunGdb = gdb;
-      if (params.IBEQ > 0) {
-        // cite: dioload.c:279-284: tunnel bottom
-        const vtetun = params.NB * vt;
-        const evd = Math.exp(-vdLimited / vtetun);
-        tunCdb = cdb - params.IBEQ * (evd - 1);
-        tunGdb = gdb + params.IBEQ * evd / vtetun;
-      }
-
       // cite: dioload.c:287-288: cd = cdb + cdsw; gd = gdb + gdsw
-      let cd = tunCdb + cdsw;
-      let gd = tunGdb + gdsw;
+      // Tunnel current contributions (dioload.c:267-285) hoisted to diodeLoadTunnel
+      // and consumed by tunnel-diode.ts. Plain-Diode load path is tunnel-free.
+      let cd = cdb + cdsw;
+      let gd = gdb + gdsw;
 
       // D-W3-1/D-W3-2: IKF/IKR Norton-pair re-derivation — dioload.c:290-314.
       // cite: dioload.c:290 `if (vd >= -3*vte)` — forward region

@@ -21,6 +21,7 @@ import { PropertyBag, LABEL_PROPERTY_DEF } from "../../core/properties.js";
 import type { PropertyDefinition } from "../../core/properties.js";
 import {
   ComponentCategory,
+  type AnalogFactory,
   type AttributeMapping,
   type ComponentDefinition,
 } from "../../core/registry.js";
@@ -75,7 +76,7 @@ export const { paramDefs: BJT_PARAM_DEFS, defaults: BJT_NPN_DEFAULTS } = defineM
     AREA: { default: 1,     description: "Device area factor" },
     M:   { default: 1,      description: "Parallel device multiplier" },
     TEMP: { default: 300.15, unit: "K", description: "Per-instance operating temperature" },
-    OFF:   { default: 0,    description: "Initial condition: device off (0=false, 1=true)" },
+    OFF:   { default: 0, emit: "flag",   description: "Initial condition: device off (0=false, 1=true)" },
     ICVBE: { default: NaN,  unit: "V",  description: "Initial condition: B-E voltage for UIC" },
     ICVCE: { default: NaN,  unit: "V",  description: "Initial condition: C-E voltage for UIC" },
   },
@@ -104,7 +105,7 @@ export const { defaults: BJT_PNP_DEFAULTS } = defineModelParams({
     AREA: { default: 1,     description: "Device area factor" },
     M:   { default: 1,      description: "Parallel device multiplier" },
     TEMP: { default: 300.15, unit: "K", description: "Per-instance operating temperature" },
-    OFF:   { default: 0,    description: "Initial condition: device off (0=false, 1=true)" },
+    OFF:   { default: 0, emit: "flag",   description: "Initial condition: device off (0=false, 1=true)" },
     ICVBE: { default: NaN,  unit: "V",  description: "Initial condition: B-E voltage for UIC" },
     ICVCE: { default: NaN,  unit: "V",  description: "Initial condition: C-E voltage for UIC" },
   },
@@ -169,10 +170,9 @@ export const { paramDefs: BJT_SPICE_L1_PARAM_DEFS, defaults: BJT_SPICE_L1_NPN_DE
     AREAC: { default: 1,    description: "Collector-area factor" },
     M:   { default: 1,      description: "Parallel device multiplier" },
     TEMP: { default: 300.15, unit: "K", description: "Per-instance operating temperature" },
-    OFF:   { default: 0,    description: "Initial condition: device off (0=false, 1=true)" },
+    OFF:   { default: 0, emit: "flag",   description: "Initial condition: device off (0=false, 1=true)" },
     ICVBE: { default: NaN,  unit: "V",  description: "Initial condition: B-E voltage for UIC" },
     ICVCE: { default: NaN,  unit: "V",  description: "Initial condition: C-E voltage for UIC" },
-    SUBS:  { default: 1,    description: "Substrate topology: 1=VERTICAL, 0=LATERAL" },
   },
 });
 
@@ -231,10 +231,9 @@ export const { defaults: BJT_SPICE_L1_PNP_DEFAULTS } = defineModelParams({
     AREAC: { default: 1,    description: "Collector-area factor" },
     M:   { default: 1,      description: "Parallel device multiplier" },
     TEMP: { default: 300.15, unit: "K", description: "Per-instance operating temperature" },
-    OFF:   { default: 0,    description: "Initial condition: device off (0=false, 1=true)" },
+    OFF:   { default: 0, emit: "flag",   description: "Initial condition: device off (0=false, 1=true)" },
     ICVBE: { default: NaN,  unit: "V",  description: "Initial condition: B-E voltage for UIC" },
     ICVCE: { default: NaN,  unit: "V",  description: "Initial condition: C-E voltage for UIC" },
-    SUBS:  { default: 1,    description: "Substrate topology: 1=VERTICAL, 0=LATERAL" },
   },
 });
 
@@ -981,6 +980,7 @@ export const BJT_L1_SCHEMA: StateSchema = defineStateSchema("BjtSpiceL1Element",
 
 export function createSpiceL1BjtElement(
   polarity: 1 | -1,
+  isLateral: boolean,
   pinNodes: ReadonlyMap<string, number>,
   internalNodeIds: readonly number[],
   _branchIdx: number,
@@ -1043,7 +1043,6 @@ export function createSpiceL1BjtElement(
     OFF: props.getModelParam<number>("OFF"),
     ICVBE: props.getModelParam<number>("ICVBE"),
     ICVCE: props.getModelParam<number>("ICVCE"),
-    SUBS: props.getModelParam<number>("SUBS"),
   };
 
   function makeTp(): BjtTempParams {
@@ -1138,8 +1137,10 @@ export function createSpiceL1BjtElement(
       const solver = ctx.solver;
       const mode = ctx.cktMode;
       const m = params.M;
-      // cite: bjtload.c:184-187 — BJTsubs: VERTICAL=1 uses AREAB for c4; LATERAL=0 uses AREAC.
-      const isLateral = params.SUBS === 0;
+      // cite: bjtload.c:184-187 — BJTsubs: VERTICAL uses AREAB for c4; LATERAL uses AREAC.
+      // `isLateral` is closure-captured from the outer factory (BJT topology
+      // is a model variant, not a parameter — see modelRegistry "spice" vs
+      // "spice-lateral" entries).
 
       const vt = tp.vt;
       const csat = tp.tSatCur * params.AREA;
@@ -1915,6 +1916,18 @@ export function createSpiceL1BjtElement(
 }
 
 // ---------------------------------------------------------------------------
+// createBjtL1Element — outer factory capturing polarity and isLateral as
+// closure constants. BJT vertical/lateral topology is a model variant (see
+// modelRegistry "spice" vs "spice-lateral"), not a runtime parameter — so
+// `isLateral` is set once at element construction rather than read per-load.
+// ---------------------------------------------------------------------------
+
+export function createBjtL1Element(polarity: 1 | -1, isLateral: boolean): AnalogFactory {
+  return (pinNodes, internalNodeIds, branchIdx, props, _getTime) =>
+    createSpiceL1BjtElement(polarity, isLateral, pinNodes, internalNodeIds, branchIdx, props);
+}
+
+// ---------------------------------------------------------------------------
 // getSpiceL1InternalNodeCount / Labels
 // ---------------------------------------------------------------------------
 
@@ -2176,8 +2189,15 @@ export const NpnBjtDefinition: ComponentDefinition = {
     },
     "spice": {
       kind: "inline",
-      factory: (pinNodes, internalNodeIds, branchIdx, props, _getTime) =>
-        createSpiceL1BjtElement(1, pinNodes, internalNodeIds, branchIdx, props),
+      factory: createBjtL1Element(1, false),
+      paramDefs: BJT_SPICE_L1_PARAM_DEFS,
+      params: BJT_SPICE_L1_NPN_DEFAULTS,
+      getInternalNodeCount: getSpiceL1InternalNodeCount,
+      getInternalNodeLabels: getSpiceL1InternalNodeLabels,
+    },
+    "spice-lateral": {
+      kind: "inline",
+      factory: createBjtL1Element(1, true),
       paramDefs: BJT_SPICE_L1_PARAM_DEFS,
       params: BJT_SPICE_L1_NPN_DEFAULTS,
       getInternalNodeCount: getSpiceL1InternalNodeCount,
@@ -2185,8 +2205,7 @@ export const NpnBjtDefinition: ComponentDefinition = {
     },
     "2N3904": {
       kind: "inline",
-      factory: (pinNodes, internalNodeIds, branchIdx, props, _getTime) =>
-        createSpiceL1BjtElement(1, pinNodes, internalNodeIds, branchIdx, props),
+      factory: createBjtL1Element(1, false),
       paramDefs: BJT_SPICE_L1_PARAM_DEFS,
       params: NPN_2N3904,
       getInternalNodeCount: getSpiceL1InternalNodeCount,
@@ -2194,8 +2213,7 @@ export const NpnBjtDefinition: ComponentDefinition = {
     },
     "BC547B": {
       kind: "inline",
-      factory: (pinNodes, internalNodeIds, branchIdx, props, _getTime) =>
-        createSpiceL1BjtElement(1, pinNodes, internalNodeIds, branchIdx, props),
+      factory: createBjtL1Element(1, false),
       paramDefs: BJT_SPICE_L1_PARAM_DEFS,
       params: NPN_BC547B,
       getInternalNodeCount: getSpiceL1InternalNodeCount,
@@ -2203,8 +2221,7 @@ export const NpnBjtDefinition: ComponentDefinition = {
     },
     "2N2222A": {
       kind: "inline",
-      factory: (pinNodes, internalNodeIds, branchIdx, props, _getTime) =>
-        createSpiceL1BjtElement(1, pinNodes, internalNodeIds, branchIdx, props),
+      factory: createBjtL1Element(1, false),
       paramDefs: BJT_SPICE_L1_PARAM_DEFS,
       params: NPN_2N2222A,
       getInternalNodeCount: getSpiceL1InternalNodeCount,
@@ -2212,8 +2229,7 @@ export const NpnBjtDefinition: ComponentDefinition = {
     },
     "2N2219A": {
       kind: "inline",
-      factory: (pinNodes, internalNodeIds, branchIdx, props, _getTime) =>
-        createSpiceL1BjtElement(1, pinNodes, internalNodeIds, branchIdx, props),
+      factory: createBjtL1Element(1, false),
       paramDefs: BJT_SPICE_L1_PARAM_DEFS,
       params: NPN_2N2219A,
       getInternalNodeCount: getSpiceL1InternalNodeCount,
@@ -2246,8 +2262,15 @@ export const PnpBjtDefinition: ComponentDefinition = {
     },
     "spice": {
       kind: "inline",
-      factory: (pinNodes, internalNodeIds, branchIdx, props, _getTime) =>
-        createSpiceL1BjtElement(-1, pinNodes, internalNodeIds, branchIdx, props),
+      factory: createBjtL1Element(-1, false),
+      paramDefs: BJT_SPICE_L1_PARAM_DEFS,
+      params: BJT_SPICE_L1_PNP_DEFAULTS,
+      getInternalNodeCount: getSpiceL1InternalNodeCount,
+      getInternalNodeLabels: getSpiceL1InternalNodeLabels,
+    },
+    "spice-lateral": {
+      kind: "inline",
+      factory: createBjtL1Element(-1, true),
       paramDefs: BJT_SPICE_L1_PARAM_DEFS,
       params: BJT_SPICE_L1_PNP_DEFAULTS,
       getInternalNodeCount: getSpiceL1InternalNodeCount,
@@ -2255,8 +2278,7 @@ export const PnpBjtDefinition: ComponentDefinition = {
     },
     "2N3906": {
       kind: "inline",
-      factory: (pinNodes, internalNodeIds, branchIdx, props, _getTime) =>
-        createSpiceL1BjtElement(-1, pinNodes, internalNodeIds, branchIdx, props),
+      factory: createBjtL1Element(-1, false),
       paramDefs: BJT_SPICE_L1_PARAM_DEFS,
       params: PNP_2N3906,
       getInternalNodeCount: getSpiceL1InternalNodeCount,
@@ -2264,8 +2286,7 @@ export const PnpBjtDefinition: ComponentDefinition = {
     },
     "BC557B": {
       kind: "inline",
-      factory: (pinNodes, internalNodeIds, branchIdx, props, _getTime) =>
-        createSpiceL1BjtElement(-1, pinNodes, internalNodeIds, branchIdx, props),
+      factory: createBjtL1Element(-1, false),
       paramDefs: BJT_SPICE_L1_PARAM_DEFS,
       params: PNP_BC557B,
       getInternalNodeCount: getSpiceL1InternalNodeCount,
@@ -2273,8 +2294,7 @@ export const PnpBjtDefinition: ComponentDefinition = {
     },
     "2N2907A": {
       kind: "inline",
-      factory: (pinNodes, internalNodeIds, branchIdx, props, _getTime) =>
-        createSpiceL1BjtElement(-1, pinNodes, internalNodeIds, branchIdx, props),
+      factory: createBjtL1Element(-1, false),
       paramDefs: BJT_SPICE_L1_PARAM_DEFS,
       params: PNP_2N2907A,
       getInternalNodeCount: getSpiceL1InternalNodeCount,
@@ -2282,8 +2302,7 @@ export const PnpBjtDefinition: ComponentDefinition = {
     },
     "TIP32C": {
       kind: "inline",
-      factory: (pinNodes, internalNodeIds, branchIdx, props, _getTime) =>
-        createSpiceL1BjtElement(-1, pinNodes, internalNodeIds, branchIdx, props),
+      factory: createBjtL1Element(-1, false),
       paramDefs: BJT_SPICE_L1_PARAM_DEFS,
       params: PNP_TIP32C,
       getInternalNodeCount: getSpiceL1InternalNodeCount,

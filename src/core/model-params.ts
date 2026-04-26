@@ -7,6 +7,9 @@ interface ParamSpec {
   description?: string;
   min?: number;
   max?: number;
+  spiceName?: string;
+  emit?: "key-value" | "flag";
+  emitGroup?: { name: string; index: number };
 }
 
 /**
@@ -36,6 +39,9 @@ export function defineModelParams(spec: {
       if (s.description !== undefined) pDef.description = s.description;
       if (s.min !== undefined) pDef.min = s.min;
       if (s.max !== undefined) pDef.max = s.max;
+      if (s.spiceName !== undefined) pDef.spiceName = s.spiceName;
+      if (s.emit !== undefined) pDef.emit = s.emit;
+      if (s.emitGroup !== undefined) pDef.emitGroup = s.emitGroup;
       paramDefs.push(pDef);
       defaults[key] = s.default;
     }

@@ -2245,7 +2245,7 @@ describe("NMOS partition layout", () => {
   const modelKeys = [
     "VTO", "KP", "GAMMA", "PHI", "LAMBDA", "RD", "RS", "CBD", "CBS",
     "IS", "PB", "CGSO", "CGDO", "CGBO", "RSH", "CJ", "MJ", "CJSW",
-    "MJSW", "JS", "TOX", "NSUB", "NSS", "NFS", "TPG", "XJ", "LD",
+    "MJSW", "JS", "TOX", "NFS", "TPG", "XJ", "LD",
     "UO", "KF", "AF", "FC", "TNOM",
   ];
 
@@ -2271,7 +2271,7 @@ describe("PMOS partition layout", () => {
   const modelKeys = [
     "VTO", "KP", "GAMMA", "PHI", "LAMBDA", "RD", "RS", "CBD", "CBS",
     "IS", "PB", "CGSO", "CGDO", "CGBO", "RSH", "CJ", "MJ", "CJSW",
-    "MJSW", "JS", "TOX", "NSUB", "NSS", "NFS", "TPG", "XJ", "LD",
+    "MJSW", "JS", "TOX", "NFS", "TPG", "XJ", "LD",
     "UO", "KF", "AF", "FC", "TNOM",
   ];
 

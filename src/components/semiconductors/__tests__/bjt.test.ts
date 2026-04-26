@@ -311,14 +311,14 @@ describe("SPICE L1 model — parameter plumbing", () => {
 
   it("factory_produces_valid_element_with_zero_resistances", () => {
     const propsObj = makeSpiceL1Props();
-    const el = createSpiceL1BjtElement(1, new Map([["B", 2], ["C", 1], ["E", 3]]), [], -1, propsObj);
+    const el = createSpiceL1BjtElement(1, false, new Map([["B", 2], ["C", 1], ["E", 3]]),[], -1, propsObj);
     expect(el.isNonlinear).toBe(true);
   });
 
   it("factory_produces_element_with_internal_nodes_when_resistances_nonzero", () => {
     const propsObj = makeSpiceL1Props({ RB: 10, RC: 1, RE: 0.5 });
     const internalNodes = [100, 101, 102];
-    const el = createSpiceL1BjtElement(1, new Map([["B", 2], ["C", 1], ["E", 3]]), internalNodes, -1, propsObj);
+    const el = createSpiceL1BjtElement(1, false, new Map([["B", 2], ["C", 1], ["E", 3]]),internalNodes, -1, propsObj);
     expect(el.isNonlinear).toBe(true);
   });
 });
@@ -356,24 +356,24 @@ describe("stateSchema — BJT simple", () => {
 
 describe("stateSchema — BJT SPICE L1", () => {
   it("stateSchema_declared", () => {
-    const core = createSpiceL1BjtElement(1, new Map([["B", 2], ["C", 1], ["E", 3]]), [], -1, makeSpiceL1Props());
+    const core = createSpiceL1BjtElement(1, false, new Map([["B", 2], ["C", 1], ["E", 3]]),[], -1, makeSpiceL1Props());
     expect(core.stateSchema).toBeDefined();
   });
 
   it("stateSchema_owner_identifies_element", () => {
-    const core = createSpiceL1BjtElement(1, new Map([["B", 2], ["C", 1], ["E", 3]]), [], -1, makeSpiceL1Props());
+    const core = createSpiceL1BjtElement(1, false, new Map([["B", 2], ["C", 1], ["E", 3]]),[], -1, makeSpiceL1Props());
     expect(core.stateSchema!.owner).toBe("BjtSpiceL1Element");
   });
 
   it("warmstart_NPN_VBE_seeded_to_0_6", () => {
-    const core = createSpiceL1BjtElement(1, new Map([["B", 2], ["C", 1], ["E", 3]]), [], -1, makeSpiceL1Props());
+    const core = createSpiceL1BjtElement(1, false, new Map([["B", 2], ["C", 1], ["E", 3]]),[], -1, makeSpiceL1Props());
     const pool = new StatePool(core.stateSize);
     core.stateBaseOffset = 0;
     core.initState!(pool);
   });
 
   it("warmstart_PNP_VBE_seeded_to_minus_0_6", () => {
-    const core = createSpiceL1BjtElement(-1, new Map([["B", 2], ["C", 1], ["E", 3]]), [], -1, makeSpiceL1Props());
+    const core = createSpiceL1BjtElement(-1, false, new Map([["B", 2], ["C", 1], ["E", 3]]),[], -1, makeSpiceL1Props());
     const pool = new StatePool(core.stateSize);
     core.stateBaseOffset = 0;
     core.initState!(pool);
@@ -439,7 +439,7 @@ describe("BJT simple LimitingEvent instrumentation", () => {
 describe("BJT L1 LimitingEvent instrumentation", () => {
   function makeL1NpnWithState(): AnalogElement {
     const props = makeSpiceL1Props();
-    const core = createSpiceL1BjtElement(1, new Map([["B", 1], ["C", 2], ["E", 3]]), [], -1, props) as AnalogElementCore & { label?: string; elementIndex?: number };
+    const core = createSpiceL1BjtElement(1, false, new Map([["B", 1], ["C", 2], ["E", 3]]),[], -1, props) as AnalogElementCore & { label?: string; elementIndex?: number };
     core.label = "Q1";
     core.elementIndex = 5;
     const pool = new StatePool((core as any).stateSize);
@@ -1281,7 +1281,7 @@ describe("BJT L1 MODEINITSMSIG", () => {
     ctx: LoadContext; element: AnalogElement; s0: Float64Array; solver: SparseSolver;
   } {
     const propsObj = makeSpiceL1Props({ CJE: 1e-12, CJC: 1e-12, ...modelParams });
-    const core = createSpiceL1BjtElement(1, new Map([["B", 1], ["C", 2], ["E", 3]]), [], -1, propsObj) as AnalogElementCore;
+    const core = createSpiceL1BjtElement(1, false, new Map([["B", 1], ["C", 2], ["E", 3]]),[], -1, propsObj) as AnalogElementCore;
     const pool = new StatePool((core as any).stateSize);
     (core as any).stateBaseOffset = 0;
     (core as any).initState(pool);
@@ -1392,7 +1392,7 @@ describe("BJT L1 MODEINITPRED", () => {
     const SLOT_GX = 16, SLOT_VSUB = 21;
 
     const propsObj = makeSpiceL1Props();
-    const core = createSpiceL1BjtElement(1, new Map([["B", 1], ["C", 2], ["E", 3]]), [], -1, propsObj) as AnalogElementCore;
+    const core = createSpiceL1BjtElement(1, false, new Map([["B", 1], ["C", 2], ["E", 3]]),[], -1, propsObj) as AnalogElementCore;
     const stateSize: number = (core as any).stateSize;
     const pool = new StatePool(stateSize);
     (core as any).stateBaseOffset = 0;
@@ -1550,7 +1550,7 @@ describe("BJT L1 NOBYPASS", () => {
     limitingCollector: LimitingEvent[];
   } {
     const propsObj = makeSpiceL1Props(modelParams);
-    const core = createSpiceL1BjtElement(1, new Map([["B", 1], ["C", 2], ["E", 3]]), [], -1, propsObj) as AnalogElementCore;
+    const core = createSpiceL1BjtElement(1, false, new Map([["B", 1], ["C", 2], ["E", 3]]),[], -1, propsObj) as AnalogElementCore;
     const pool = new StatePool((core as any).stateSize);
     (core as any).stateBaseOffset = 0;
     (core as any).initState(pool);
@@ -1627,7 +1627,7 @@ describe("BJT L1 NOBYPASS", () => {
     // emitted, (c) computeSpiceL1BjtOp NOT called on the bypass call
     // (limitingCollector length 0 — only compute path pushes).
     const propsObj = makeSpiceL1Props();
-    const core = createSpiceL1BjtElement(1, new Map([["B", 1], ["C", 2], ["E", 3]]), [], -1, propsObj) as AnalogElementCore;
+    const core = createSpiceL1BjtElement(1, false, new Map([["B", 1], ["C", 2], ["E", 3]]),[], -1, propsObj) as AnalogElementCore;
     const pool = new StatePool((core as any).stateSize);
     (core as any).stateBaseOffset = 0;
     (core as any).initState(pool);
@@ -1706,7 +1706,7 @@ describe("BJT L1 NOBYPASS", () => {
     // cite: bjtload.c:347 — !(MODEINITPRED) is part of the bypass gate; MODEINITPRED disables it.
     // Probe: limitingCollector populated ⇒ compute path ran under MODEINITPRED.
     const propsObj = makeSpiceL1Props();
-    const core = createSpiceL1BjtElement(1, new Map([["B", 1], ["C", 2], ["E", 3]]), [], -1, propsObj) as AnalogElementCore;
+    const core = createSpiceL1BjtElement(1, false, new Map([["B", 1], ["C", 2], ["E", 3]]),[], -1, propsObj) as AnalogElementCore;
     const pool = new StatePool((core as any).stateSize);
     (core as any).stateBaseOffset = 0;
     (core as any).initState(pool);
@@ -1765,7 +1765,7 @@ describe("BJT L1 noncon", () => {
     ctx: LoadContext; element: AnalogElement;
   } {
     const propsObj = makeSpiceL1Props(modelParams);
-    const core = createSpiceL1BjtElement(1, new Map([["B", 1], ["C", 2], ["E", 3]]), [], -1, propsObj) as AnalogElementCore;
+    const core = createSpiceL1BjtElement(1, false, new Map([["B", 1], ["C", 2], ["E", 3]]),[], -1, propsObj) as AnalogElementCore;
     const pool = new StatePool((core as any).stateSize);
     (core as any).stateBaseOffset = 0;
     (core as any).initState(pool);
@@ -1825,7 +1825,7 @@ describe("BJT L1 CdBE", () => {
     // With TF>0 and vbeLimited>0, cbeMod = cbe*(1+argtf)/qb where argtf depends on gbe.
     function makeL1TranEl(IS: number): { el: AnalogElement; pool: StatePool } {
       const propsObj = makeSpiceL1Props({ TF: 1e-9, CJE: 1e-12, IS });
-      const core = createSpiceL1BjtElement(1, new Map([["B", 1], ["C", 2], ["E", 3]]), [], -1, propsObj) as AnalogElementCore;
+      const core = createSpiceL1BjtElement(1, false, new Map([["B", 1], ["C", 2], ["E", 3]]),[], -1, propsObj) as AnalogElementCore;
       const pool = new StatePool((core as any).stateSize);
       (core as any).stateBaseOffset = 0;
       (core as any).initState(pool);
@@ -1898,7 +1898,7 @@ describe("BJT L1 BC_cap_stamps", () => {
     // internalNodeIds = [4] (internal collector node from RC).
     const propsObj = makeSpiceL1Props({ RC: 1, CJC: 1e-11 });
     const core = createSpiceL1BjtElement(
-      1, new Map([["B", 1], ["C", 2], ["E", 3]]), [4], -1, propsObj,
+      1, false, new Map([["B", 1], ["C", 2], ["E", 3]]), [4], -1, propsObj,
     ) as AnalogElementCore;
     const pool = new StatePool((core as any).stateSize);
     (core as any).stateBaseOffset = 0;
@@ -1976,27 +1976,61 @@ describe("BJT L1 BC_cap_stamps", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Task 5.2.7 — BJTsubs SUBS model param (B10)
-// cite: bjtload.c:184-187 — SUBS: 1=VERTICAL, 0=LATERAL
+// BJT vertical/lateral topology — model variants, not parameters
+// cite: bjtload.c:184-187 — VERTICAL uses AREAB for c4; LATERAL uses AREAC.
+// SUBS was previously declared as an instance param; it is now expressed as
+// separate ModelEntry rows ("spice" = vertical, "spice-lateral" = lateral)
+// in NpnBJTDefinition / PnpBJTDefinition modelRegistry. The factory captures
+// `isLateral` as a closure constant via createBjtL1Element(polarity, isLateral).
 // ---------------------------------------------------------------------------
 
+describe("SpiceL1 topology — model variants", () => {
+  it("defaultModel_is_spice_vertical_NPN", () => {
+    expect(NpnBjtDefinition.defaultModel).toBe("spice");
+  });
+
+  it("defaultModel_is_spice_vertical_PNP", () => {
+    expect(PnpBjtDefinition.defaultModel).toBe("spice");
+  });
+
+  it("NPN_modelRegistry_has_spice_lateral_entry", () => {
+    expect(NpnBjtDefinition.modelRegistry!["spice-lateral"]).toBeDefined();
+  });
+
+  it("PNP_modelRegistry_has_spice_lateral_entry", () => {
+    expect(PnpBjtDefinition.modelRegistry!["spice-lateral"]).toBeDefined();
+  });
+
+  it("NPN_lateral_paramDefs_referentially_equal_to_vertical", () => {
+    const vertical = NpnBjtDefinition.modelRegistry!["spice"];
+    const lateral = NpnBjtDefinition.modelRegistry!["spice-lateral"];
+    expect(vertical).toBeDefined();
+    expect(lateral).toBeDefined();
+    expect(lateral!.paramDefs).toBe(vertical!.paramDefs);
+  });
+
+  it("PNP_lateral_paramDefs_referentially_equal_to_vertical", () => {
+    const vertical = PnpBjtDefinition.modelRegistry!["spice"];
+    const lateral = PnpBjtDefinition.modelRegistry!["spice-lateral"];
+    expect(vertical).toBeDefined();
+    expect(lateral).toBeDefined();
+    expect(lateral!.paramDefs).toBe(vertical!.paramDefs);
+  });
+
+  it("NPN_lateral_params_referentially_equal_to_vertical", () => {
+    const vertical = NpnBjtDefinition.modelRegistry!["spice"];
+    const lateral = NpnBjtDefinition.modelRegistry!["spice-lateral"];
+    expect((lateral as any).params).toBe((vertical as any).params);
+  });
+
+  it("PNP_lateral_params_referentially_equal_to_vertical", () => {
+    const vertical = PnpBjtDefinition.modelRegistry!["spice"];
+    const lateral = PnpBjtDefinition.modelRegistry!["spice-lateral"];
+    expect((lateral as any).params).toBe((vertical as any).params);
+  });
+});
+
 describe("SpiceL1 ModelParams", () => {
-  it("SUBS_default_1", () => {
-    const propsObj = makeSpiceL1Props();
-    expect(propsObj.getModelParam<number>("SUBS")).toBe(1);
-  });
-
-  it("SUBS_in_paramDefs", () => {
-    const keys = BJT_SPICE_L1_PARAM_DEFS.map((pd: { key: string }) => pd.key);
-    expect(keys).toContain("SUBS");
-  });
-
-  it("setParam_SUBS_no_throw", () => {
-    const propsObj = makeSpiceL1Props();
-    const core = createSpiceL1BjtElement(1, new Map([["B", 1], ["C", 2], ["E", 3]]), [], -1, propsObj) as AnalogElementCore;
-    expect(() => (core as any).setParam("SUBS", 0)).not.toThrow();
-  });
-
   // ---------------------------------------------------------------------------
   // Task 5.2.8 — AREAB / AREAC params (B11)
   // ---------------------------------------------------------------------------
@@ -2024,9 +2058,26 @@ describe("SpiceL1 ModelParams", () => {
 // ---------------------------------------------------------------------------
 
 describe("BJT L1 AREAB_AREAC", () => {
-  function makeL1El(modelParams: Record<string, number>): { el: AnalogElement; pool: StatePool } {
+  function makeL1El(
+    modelParams: Record<string, number>,
+    isLateral: boolean = false,
+  ): { el: AnalogElement; pool: StatePool } {
     const propsObj = makeSpiceL1Props(modelParams);
-    const core = createSpiceL1BjtElement(1, new Map([["B", 1], ["C", 2], ["E", 3]]), [], -1, propsObj) as AnalogElementCore;
+    const core = createSpiceL1BjtElement(1, isLateral, new Map([["B", 1], ["C", 2], ["E", 3]]),[], -1, propsObj) as AnalogElementCore;
+    const pool = new StatePool((core as any).stateSize);
+    (core as any).stateBaseOffset = 0;
+    (core as any).initState(pool);
+    return { el: withNodeIds(core, [1, 2, 3]), pool };
+  }
+
+  function makeL1ElPnp(
+    modelParams: Record<string, number>,
+    isLateral: boolean = false,
+  ): { el: AnalogElement; pool: StatePool } {
+    const propsObj = createTestPropertyBag();
+    const defaults = { ...BJT_SPICE_L1_PNP_DEFAULTS, ...modelParams };
+    propsObj.replaceModelParams(defaults);
+    const core = createSpiceL1BjtElement(-1, isLateral, new Map([["B", 1], ["C", 2], ["E", 3]]), [], -1, propsObj) as AnalogElementCore;
     const pool = new StatePool((core as any).stateSize);
     (core as any).stateBaseOffset = 0;
     (core as any).initState(pool);
@@ -2081,9 +2132,9 @@ describe("BJT L1 AREAB_AREAC", () => {
   const SLOT_CQSUB = 13;
 
   it("c4_scales_with_AREAB_under_VERTICAL", () => {
-    // SUBS=1 (VERTICAL): c4 = tBCleakCur * AREAB. Run MODEINITJCT so ISC leakage fires.
-    const { el: el1, pool: pool1 } = makeL1El({ SUBS: 1, AREAB: 2, AREAC: 4, ISC: 1e-12 });
-    const { el: el2, pool: pool2 } = makeL1El({ SUBS: 1, AREAB: 4, AREAC: 4, ISC: 1e-12 });
+    // VERTICAL (isLateral=false): c4 = tBCleakCur * AREAB. Run MODEINITJCT so ISC leakage fires.
+    const { el: el1, pool: pool1 } = makeL1El({ AREAB: 2, AREAC: 4, ISC: 1e-12 }, false);
+    const { el: el2, pool: pool2 } = makeL1El({ AREAB: 4, AREAC: 4, ISC: 1e-12 }, false);
     el1.load(makeDcInitCtx());
     el2.load(makeDcInitCtx());
     // cb contains the BC leakage contribution via cbcn which scales with c4=ISC*AREAB.
@@ -2094,9 +2145,9 @@ describe("BJT L1 AREAB_AREAC", () => {
   });
 
   it("c4_scales_with_AREAC_under_LATERAL", () => {
-    // SUBS=0 (LATERAL): c4 = tBCleakCur * AREAC.
-    const { el: el1, pool: pool1 } = makeL1El({ SUBS: 0, AREAB: 2, AREAC: 2, ISC: 1e-12 });
-    const { el: el2, pool: pool2 } = makeL1El({ SUBS: 0, AREAB: 2, AREAC: 4, ISC: 1e-12 });
+    // LATERAL (isLateral=true): c4 = tBCleakCur * AREAC.
+    const { el: el1, pool: pool1 } = makeL1El({ AREAB: 2, AREAC: 2, ISC: 1e-12 }, true);
+    const { el: el2, pool: pool2 } = makeL1El({ AREAB: 2, AREAC: 4, ISC: 1e-12 }, true);
     el1.load(makeDcInitCtx());
     el2.load(makeDcInitCtx());
     const cb1 = pool1.states[0][SLOT_CB];
@@ -2105,9 +2156,9 @@ describe("BJT L1 AREAB_AREAC", () => {
   });
 
   it("czsub_scales_with_AREAC_under_VERTICAL", () => {
-    // SUBS=1 (VERTICAL): czsub = tSubcap * AREAC. Probe via CQSUB after MODEINITTRAN.
-    const { el: el1, pool: pool1 } = makeL1El({ SUBS: 1, AREAB: 2, AREAC: 2, CJS: 1e-12 });
-    const { el: el2, pool: pool2 } = makeL1El({ SUBS: 1, AREAB: 2, AREAC: 4, CJS: 1e-12 });
+    // VERTICAL (isLateral=false): czsub = tSubcap * AREAC. Probe via CQSUB after MODEINITTRAN.
+    const { el: el1, pool: pool1 } = makeL1El({ AREAB: 2, AREAC: 2, CJS: 1e-12 }, false);
+    const { el: el2, pool: pool2 } = makeL1El({ AREAB: 2, AREAC: 4, CJS: 1e-12 }, false);
     el1.load(makeTranCtx());
     el2.load(makeTranCtx());
     // MODEINITTRAN seeds s1[CQSUB] = s0[CQSUB]. s0[CQSUB] reflects capsub ∝ czsub ∝ AREAC.
@@ -2117,14 +2168,119 @@ describe("BJT L1 AREAB_AREAC", () => {
   });
 
   it("czsub_scales_with_AREAB_under_LATERAL", () => {
-    // SUBS=0 (LATERAL): czsub = tSubcap * AREAB.
-    const { el: el1, pool: pool1 } = makeL1El({ SUBS: 0, AREAB: 2, AREAC: 4, CJS: 1e-12 });
-    const { el: el2, pool: pool2 } = makeL1El({ SUBS: 0, AREAB: 4, AREAC: 4, CJS: 1e-12 });
+    // LATERAL (isLateral=true): czsub = tSubcap * AREAB.
+    const { el: el1, pool: pool1 } = makeL1El({ AREAB: 2, AREAC: 4, CJS: 1e-12 }, true);
+    const { el: el2, pool: pool2 } = makeL1El({ AREAB: 4, AREAC: 4, CJS: 1e-12 }, true);
     el1.load(makeTranCtx());
     el2.load(makeTranCtx());
     const cqsub1 = pool1.states[1][SLOT_CQSUB];
     const cqsub2 = pool2.states[1][SLOT_CQSUB];
     expect(cqsub2).toBeGreaterThan(cqsub1);
+  });
+
+  // ---------------------------------------------------------------------------
+  // Lateral-vs-vertical c4 stamp differential tests (Step 3b — §3.5 Test impact)
+  // c4 = tBCleakCur * AREAB (vertical) or AREAC (lateral). With identical
+  // params except topology, c4_lateral != c4_vertical when AREAB != AREAC,
+  // and the resulting cbcn contribution flows into SLOT_CB. cb is a sum of
+  // many terms; we assert that the topology branch flips the sign of the
+  // (cb_lateral - cb_vertical) difference predictably as AREAC vs AREAB swaps.
+  // ---------------------------------------------------------------------------
+
+  it("c4_path_differs_between_lateral_and_vertical_NPN", () => {
+    // AREAC > AREAB: lateral path scales c4 by larger factor → larger |cb| contribution from cbcn.
+    const params = { AREAB: 1, AREAC: 4, ISC: 1e-12 };
+    const { el: elV, pool: poolV } = makeL1El(params, false); // vertical: c4 ∝ AREAB=1
+    const { el: elL, pool: poolL } = makeL1El(params, true);  // lateral:  c4 ∝ AREAC=4
+    elV.load(makeDcInitCtx());
+    elL.load(makeDcInitCtx());
+    const cbV = poolV.states[0][SLOT_CB];
+    const cbL = poolL.states[0][SLOT_CB];
+    // cbcn is forward-biased positive; lateral has 4x more c4 → cb_lateral > cb_vertical.
+    expect(cbL).not.toBe(cbV);
+    expect(Math.abs(cbL)).toBeGreaterThan(Math.abs(cbV));
+  });
+
+  it("c4_path_inverted_when_AREAB_dominates_NPN", () => {
+    // AREAB > AREAC: vertical now has the larger c4 contribution.
+    const params = { AREAB: 4, AREAC: 1, ISC: 1e-12 };
+    const { el: elV, pool: poolV } = makeL1El(params, false);
+    const { el: elL, pool: poolL } = makeL1El(params, true);
+    elV.load(makeDcInitCtx());
+    elL.load(makeDcInitCtx());
+    const cbV = poolV.states[0][SLOT_CB];
+    const cbL = poolL.states[0][SLOT_CB];
+    expect(Math.abs(cbV)).toBeGreaterThan(Math.abs(cbL));
+  });
+
+  it("c4_path_differs_between_lateral_and_vertical_PNP", () => {
+    const params = { AREAB: 1, AREAC: 4, ISC: 1e-12 };
+    const { el: elV, pool: poolV } = makeL1ElPnp(params, false); // vertical
+    const { el: elL, pool: poolL } = makeL1ElPnp(params, true);  // lateral
+    // PNP forward-bias context: VB > VC for cbcn (BC) to fire under polarity=-1 convention.
+    const ctxV = makeDcInitCtxPnp();
+    const ctxL = makeDcInitCtxPnp();
+    elV.load(ctxV);
+    elL.load(ctxL);
+    const cbV = poolV.states[0][SLOT_CB];
+    const cbL = poolL.states[0][SLOT_CB];
+    expect(cbL).not.toBe(cbV);
+    expect(Math.abs(cbL)).toBeGreaterThan(Math.abs(cbV));
+  });
+
+  // PNP DC ctx with VB > VC so the BC junction sees the same algebraic sign
+  // for cbcn under polarity=-1 as NPN does under polarity=+1 with VB > VC.
+  function makeDcInitCtxPnp(): LoadContext {
+    const solver = new SparseSolver();
+    solver.beginAssembly(10);
+    const rhsOld = new Float64Array(10);
+    rhsOld[0] = 0.65; // VB
+    rhsOld[1] = 0.0;  // VC
+    return {
+      cktMode: MODEDCOP | MODEINITFLOAT,
+      solver, matrix: solver,
+      rhs: new Float64Array(10), rhsOld,
+      time: 0, dt: 0, method: "trapezoidal", order: 1,
+      deltaOld: [0, 0, 0, 0, 0, 0, 0],
+      ag: new Float64Array(7), srcFact: 1,
+      noncon: { value: 0 }, limitingCollector: null, convergenceCollector: null,
+      xfact: 1, gmin: 1e-12, reltol: 1e-3, iabstol: 1e-12,
+      temp: 300.15, vt: 0.025852, cktFixLimit: false, bypass: false, voltTol: 1e-6,
+    };
+  }
+
+  // ---------------------------------------------------------------------------
+  // Model-swap test (Step 3b — §3.5 Test impact)
+  // Build via the registry's "spice" (vertical) and "spice-lateral" entries
+  // and verify the resulting cb differs — proves the closure-captured
+  // isLateral reaches the c4 stamp site through the registry path.
+  // ---------------------------------------------------------------------------
+
+  it("model_swap_spice_to_spice_lateral_changes_c4_via_factory", () => {
+    const propsObj = makeSpiceL1Props({ AREAB: 1, AREAC: 4, ISC: 1e-12 });
+    const verticalEntry = NpnBjtDefinition.modelRegistry!["spice"];
+    const lateralEntry = NpnBjtDefinition.modelRegistry!["spice-lateral"];
+    expect(verticalEntry).toBeDefined();
+    expect(lateralEntry).toBeDefined();
+    expect(verticalEntry!.kind).toBe("inline");
+    expect(lateralEntry!.kind).toBe("inline");
+
+    function buildAndLoad(entry: typeof verticalEntry): number {
+      const factory = (entry as any).factory;
+      const core = factory(new Map([["B", 1], ["C", 2], ["E", 3]]), [], -1, propsObj, () => 0) as AnalogElementCore;
+      const pool = new StatePool((core as any).stateSize);
+      (core as any).stateBaseOffset = 0;
+      (core as any).initState(pool);
+      const el = withNodeIds(core, [1, 2, 3]);
+      el.load(makeDcInitCtx());
+      return pool.states[0][SLOT_CB];
+    }
+
+    const cbVertical = buildAndLoad(verticalEntry);
+    const cbLateral = buildAndLoad(lateralEntry);
+    // Lateral c4 ∝ AREAC=4, vertical c4 ∝ AREAB=1 — lateral cb must be larger.
+    expect(cbLateral).not.toBe(cbVertical);
+    expect(Math.abs(cbLateral)).toBeGreaterThan(Math.abs(cbVertical));
   });
 });
 
@@ -2141,7 +2297,7 @@ describe("BJT L1 MODEINITTRAN", () => {
 
   function makeL1TranInittranEl(modelParams?: Record<string, number>): { el: AnalogElement; pool: StatePool } {
     const propsObj = makeSpiceL1Props({ CJE: 1e-12, CJC: 1e-12, CJS: 1e-12, ...modelParams });
-    const core = createSpiceL1BjtElement(1, new Map([["B", 1], ["C", 2], ["E", 3]]), [], -1, propsObj) as AnalogElementCore;
+    const core = createSpiceL1BjtElement(1, false, new Map([["B", 1], ["C", 2], ["E", 3]]),[], -1, propsObj) as AnalogElementCore;
     const pool = new StatePool((core as any).stateSize);
     (core as any).stateBaseOffset = 0;
     (core as any).initState(pool);
@@ -2208,7 +2364,7 @@ describe("BJT L1 excess_phase", () => {
 
   function makeExcessPhaseEl(modelParams?: Record<string, number>): { el: AnalogElement; pool: StatePool } {
     const propsObj = makeSpiceL1Props({ PTF: 15, TF: 1e-9, ...modelParams });
-    const core = createSpiceL1BjtElement(1, new Map([["B", 1], ["C", 2], ["E", 3]]), [], -1, propsObj) as AnalogElementCore;
+    const core = createSpiceL1BjtElement(1, false, new Map([["B", 1], ["C", 2], ["E", 3]]),[], -1, propsObj) as AnalogElementCore;
     const pool = new StatePool((core as any).stateSize);
     (core as any).stateBaseOffset = 0;
     (core as any).initState(pool);
@@ -2332,7 +2488,7 @@ describe("BJT L1 XTF_zero", () => {
 
   function makeL1WithTfXtf(TF: number, XTF: number): { el: AnalogElement; pool: StatePool } {
     const propsObj = makeSpiceL1Props({ TF, XTF, CJE: 1e-12 });
-    const core = createSpiceL1BjtElement(1, new Map([["B", 1], ["C", 2], ["E", 3]]), [], -1, propsObj) as AnalogElementCore;
+    const core = createSpiceL1BjtElement(1, false, new Map([["B", 1], ["C", 2], ["E", 3]]),[], -1, propsObj) as AnalogElementCore;
     const pool = new StatePool((core as any).stateSize);
     (core as any).stateBaseOffset = 0;
     (core as any).initState(pool);
@@ -2430,8 +2586,8 @@ describe("BJT L1 substrate", () => {
     // Strategy: run with CJS>0 and ISS>0 in tran mode so both gcsub and gdsub are non-zero.
     // Read gcsub and gdsub from s0. The stamp at (substConNode, substConNode) must equal
     // m * (gcsub + gdsub). We verify by checking the sum is non-zero and finite.
-    const propsObj = makeSpiceL1Props({ CJS: 1e-12, ISS: 1e-14, SUBS: 1 });
-    const core = createSpiceL1BjtElement(1, new Map([["B", 1], ["C", 2], ["E", 3]]), [], -1, propsObj) as AnalogElementCore;
+    const propsObj = makeSpiceL1Props({ CJS: 1e-12, ISS: 1e-14 });
+    const core = createSpiceL1BjtElement(1, false, new Map([["B", 1], ["C", 2], ["E", 3]]),[], -1, propsObj) as AnalogElementCore;
     const pool = new StatePool((core as any).stateSize);
     (core as any).stateBaseOffset = 0;
     (core as any).initState(pool);
@@ -2475,7 +2631,7 @@ describe("BJT L1 cap_block", () => {
 
   function makeL1Cap(modelParams?: Record<string, number>): { el: AnalogElement; pool: StatePool } {
     const propsObj = makeSpiceL1Props({ CJE: 1e-12, ...modelParams });
-    const core = createSpiceL1BjtElement(1, new Map([["B", 1], ["C", 2], ["E", 3]]), [], -1, propsObj) as AnalogElementCore;
+    const core = createSpiceL1BjtElement(1, false, new Map([["B", 1], ["C", 2], ["E", 3]]),[], -1, propsObj) as AnalogElementCore;
     const pool = new StatePool((core as any).stateSize);
     (core as any).stateBaseOffset = 0;
     (core as any).initState(pool);
@@ -2554,7 +2710,7 @@ describe("BJT L1 LimitingEvent SUB", () => {
   function makeL1ElWithLabel(modelParams?: Record<string, number>): AnalogElement {
     const propsObj = makeSpiceL1Props({ ISS: 1e-14, ...modelParams });
     const core = createSpiceL1BjtElement(
-      1, new Map([["B", 1], ["C", 2], ["E", 3]]), [], -1, propsObj,
+      1, false, new Map([["B", 1], ["C", 2], ["E", 3]]), [], -1, propsObj,
     ) as AnalogElementCore & { label?: string; elementIndex?: number };
     core.label = "Q_SUB";
     core.elementIndex = 7;
@@ -2566,7 +2722,7 @@ describe("BJT L1 LimitingEvent SUB", () => {
 
   function makeCtxForSubLimiting(collector: LimitingEvent[] | null): LoadContext {
     // Use DC-OP mode with moderate vbe to trigger pnjlim on sub junction.
-    // vsubRaw = polarity*subs*(0 - vSubCon) — with default SUBS=1 NPN, substConNode=nodeC_int=nodeC_ext=node2.
+    // vsubRaw = polarity*subs*(0 - vSubCon) — with vertical-default NPN, substConNode=nodeC_int=nodeC_ext=node2.
     // rhsOld[1] = 0 (collector=0) → vsubRaw = 1*1*(0-0) = 0. Use a large VBC to ensure sub junction fires.
     // Instead: start with all-zero state so pnjlim fires on BE at minimum.
     const solver = new SparseSolver();
@@ -2716,7 +2872,7 @@ describe("BJT TEMP", () => {
     // larger for TEMP=400 (higher tSatCur → larger cbe at same vbe).
     function makeL1AtTemp(TEMP: number): { el: any; pool: StatePool } {
       const propsObj = makeSpiceL1Props({ IS: 1e-16, XTI: 3, EG: 1.11, TNOM: 300.15, TEMP });
-      const core = createSpiceL1BjtElement(1, new Map([["B", 1], ["C", 2], ["E", 3]]), [], -1, propsObj) as any;
+      const core = createSpiceL1BjtElement(1, false, new Map([["B", 1], ["C", 2], ["E", 3]]),[], -1, propsObj) as any;
       const pool = new StatePool(core.stateSize);
       core.stateBaseOffset = 0;
       core.initState(pool);
@@ -2766,8 +2922,8 @@ describe("BJT TEMP", () => {
 
     // We probe tBetaF by checking the forward gain: in the Gummel-Poon model,
     // cb ≈ cbe / tBetaF + ...; so tBetaF changes the base current.
-    const coreXtb0 = createSpiceL1BjtElement(1, new Map([["B", 1], ["C", 2], ["E", 3]]), [], -1, propsXtb0) as any;
-    const coreXtb05 = createSpiceL1BjtElement(1, new Map([["B", 1], ["C", 2], ["E", 3]]), [], -1, propsXtb05) as any;
+    const coreXtb0 = createSpiceL1BjtElement(1, false, new Map([["B", 1], ["C", 2], ["E", 3]]),[], -1, propsXtb0) as any;
+    const coreXtb05 = createSpiceL1BjtElement(1, false, new Map([["B", 1], ["C", 2], ["E", 3]]),[], -1, propsXtb05) as any;
     const poolXtb0 = new StatePool(coreXtb0.stateSize);
     const poolXtb05 = new StatePool(coreXtb05.stateSize);
     coreXtb0.stateBaseOffset = 0;
@@ -2916,7 +3072,7 @@ describe("BJT TEMP", () => {
     expect(Math.abs(expectedTVcrit400 - expectedTVcrit300)).toBeGreaterThan(0.05);
 
     const propsDefault = makeSpiceL1Props({ IS, EG, XTI });
-    const core = createSpiceL1BjtElement(1, new Map([["B", 1], ["C", 2], ["E", 3]]), [], -1, propsDefault) as any;
+    const core = createSpiceL1BjtElement(1, false, new Map([["B", 1], ["C", 2], ["E", 3]]),[], -1, propsDefault) as any;
     const pool = new StatePool(core.stateSize);
     core.stateBaseOffset = 0;
     core.initState(pool);
@@ -2973,7 +3129,7 @@ describe("BJT_PARAM_DEFS partition layout", () => {
 
 describe("BJT_SPICE_L1_PARAM_DEFS partition layout", () => {
   it("instance keys carry partition='instance'", () => {
-    for (const key of ["AREA", "AREAB", "AREAC", "M", "TEMP", "OFF", "ICVBE", "ICVCE", "SUBS"]) {
+    for (const key of ["AREA", "AREAB", "AREAC", "M", "TEMP", "OFF", "ICVBE", "ICVCE"]) {
       const def = BJT_SPICE_L1_PARAM_DEFS.find(pd => pd.key === key);
       expect(def, `expected ${key} in BJT_SPICE_L1_PARAM_DEFS`).toBeDefined();
       expect(def!.partition, `${key} should be instance`).toBe("instance");
@@ -3014,7 +3170,6 @@ describe("NPN/PNP defaults preserved", () => {
     expect(BJT_SPICE_L1_NPN_DEFAULTS.OFF).toBe(0);
     expect(Number.isNaN(BJT_SPICE_L1_NPN_DEFAULTS.ICVBE)).toBe(true);
     expect(Number.isNaN(BJT_SPICE_L1_NPN_DEFAULTS.ICVCE)).toBe(true);
-    expect(BJT_SPICE_L1_NPN_DEFAULTS.SUBS).toBe(1);
     expect(BJT_SPICE_L1_PNP_DEFAULTS.AREA).toBe(1);
     expect(BJT_SPICE_L1_PNP_DEFAULTS.AREAB).toBe(1);
     expect(BJT_SPICE_L1_PNP_DEFAULTS.AREAC).toBe(1);
@@ -3023,6 +3178,5 @@ describe("NPN/PNP defaults preserved", () => {
     expect(BJT_SPICE_L1_PNP_DEFAULTS.OFF).toBe(0);
     expect(Number.isNaN(BJT_SPICE_L1_PNP_DEFAULTS.ICVBE)).toBe(true);
     expect(Number.isNaN(BJT_SPICE_L1_PNP_DEFAULTS.ICVCE)).toBe(true);
-    expect(BJT_SPICE_L1_PNP_DEFAULTS.SUBS).toBe(1);
   });
 });

@@ -155,4 +155,44 @@ describe("defineModelParams", () => {
       expect(result.paramDefs[0]!.partition).toBe("model");
     });
   });
+
+  describe("defineModelParams forwards SPICE-emission fields", () => {
+    it("spiceName forwards from secondary param spec to ParamDef", () => {
+      const result = defineModelParams({
+        primary: { IS: { default: 1e-14 } },
+        secondary: { ISW: { default: 0, spiceName: "JSW" } },
+      });
+      const def = result.paramDefs.find((d) => d.key === "ISW")!;
+      expect(def.spiceName).toBe("JSW");
+    });
+
+    it("emit: 'flag' forwards from instance param spec to ParamDef", () => {
+      const result = defineModelParams({
+        primary: { IS: { default: 1 } },
+        instance: { OFF: { default: 0, emit: "flag" } },
+      });
+      const def = result.paramDefs.find((d) => d.key === "OFF")!;
+      expect(def.emit).toBe("flag");
+    });
+
+    it("emitGroup forwards from instance param spec to ParamDef", () => {
+      const result = defineModelParams({
+        primary: { IS: { default: 1 } },
+        instance: { ICVGS: { default: 0, emitGroup: { name: "IC", index: 1 } } },
+      });
+      const def = result.paramDefs.find((d) => d.key === "ICVGS")!;
+      expect(def.emitGroup?.name).toBe("IC");
+      expect(def.emitGroup?.index).toBe(1);
+    });
+
+    it("defaults are unset when SPICE-emission fields are not provided", () => {
+      const result = defineModelParams({
+        primary: { IS: { default: 1e-14 } },
+      });
+      const def = result.paramDefs.find((d) => d.key === "IS")!;
+      expect(def.spiceName).toBeUndefined();
+      expect(def.emit).toBeUndefined();
+      expect(def.emitGroup).toBeUndefined();
+    });
+  });
 });

@@ -564,6 +564,84 @@ describe("Breakpoints", () => {
     expect(newDt).toBe(2 * 5e-6);
   });
 
+  it("late_clamp_predicate_is_strict_gt_not_gte", () => {
+    // dctran.c:640 (XSPICE late-clamp) uses `>` not `>=`. When CKTtime + CKTdelta
+    // lands EXACTLY on breaks[0], the late-clamp does not fire and breakFlag
+    // stays false — the next step satisfies the at-breakpoint test instead.
+    // The non-XSPICE branch at dctran.c:594 uses `>=` and would set breakFlag
+    // here. Pure-XSPICE port: `>` is the contract.
+    const params: ResolvedSimulationParams = { ...DEFAULT_PARAMS, maxTimeStep: 20e-6, tStop: 1e-3 };
+    const ctrl = new TimestepController(params);
+
+    // Drain the constructor-seeded bp at t=0 first so it doesn't dominate.
+    ctrl.getClampedDt(0);
+
+    const bp = 100e-6;
+    ctrl.addBreakpoint(bp);
+
+    // Land EXACTLY on breaks[0]: simTime = 90e-6, currentDt = 10e-6 → simTime+dt = 100e-6.
+    const simTime = 90e-6;
+    ctrl.currentDt = 10e-6;
+    const dt = ctrl.getClampedDt(simTime);
+
+    // Strict `>`: 90e-6 + 10e-6 == 100e-6 is NOT > 100e-6, so no late clamp.
+    expect(dt).toBe(10e-6);
+    expect(ctrl.breakFlag).toBe(false);
+  });
+
+  it("temp_breakpoint_clamps_dt_and_cuts_order_next_step", () => {
+    // dctran.c:606-620 + 542-548 (XSPICE). setTempBreakpoint pushes a temp
+    // bp; next getClampedDt clamps dt = tempBp - simTime AND records
+    // _lastTempBreakpoint = simTime + dt. The call after that sees
+    // simTime ≈ _lastTempBreakpoint and forces currentOrder = 1.
+    const params: ResolvedSimulationParams = { ...DEFAULT_PARAMS, maxTimeStep: 20e-6, tStop: 1e-3 };
+    const ctrl = new TimestepController(params);
+
+    // Drain the t=0 breakpoint so it doesn't drive the dt clamp.
+    ctrl.getClampedDt(0);
+
+    // Push temp bp at 50e-6, step from 30e-6 with currentDt = 10e-6 (would
+    // overshoot to 40e-6 without temp bp; with temp bp dt clamps to 20e-6).
+    ctrl.setTempBreakpoint(50e-6);
+    ctrl.currentDt = 10e-6;
+
+    // First call: temp-bp clamp does NOT fire (30e-6 + 10e-6 = 40e-6 < 50e-6).
+    const dt1 = ctrl.getClampedDt(30e-6);
+    expect(dt1).toBe(10e-6);
+
+    // Second call: simTime + dt = 40e-6 + 30e-6 = 70e-6 >= 50e-6. Clamp to
+    // 50e-6 - 40e-6 ≈ 10e-6 (modulo IEEE-754 — 50e-6 - 40e-6 isn't exact).
+    ctrl.currentDt = 30e-6;
+    const dt2 = ctrl.getClampedDt(40e-6);
+    expect(dt2).toBe(50e-6 - 40e-6);
+    // Temp-bp clamp does NOT set breakFlag — only the late-clamp does.
+    expect(ctrl.breakFlag).toBe(false);
+
+    // Promote order so we can observe the order-cut on the next call.
+    ctrl.currentOrder = 2;
+
+    // Third call: simTime ≈ _lastTempBreakpoint (= 50e-6). Order-cut fires.
+    ctrl.currentDt = 5e-6;
+    ctrl.getClampedDt(50e-6);
+    expect(ctrl.currentOrder).toBe(1);
+  });
+
+  it("temp_breakpoint_default_is_no_op", () => {
+    // _tempBreakpoint defaults to +Infinity → temp-bp clamp is unconditionally
+    // false → _lastTempBreakpoint stays at 1e30 → order-cut never matches.
+    // This is the no-event-device steady state digiTS runs in today.
+    const params: ResolvedSimulationParams = { ...DEFAULT_PARAMS, maxTimeStep: 20e-6, tStop: 1e-3 };
+    const ctrl = new TimestepController(params);
+
+    ctrl.getClampedDt(0);
+    ctrl.currentOrder = 2;
+
+    ctrl.currentDt = 5e-6;
+    const dt = ctrl.getClampedDt(1e-6);
+    expect(dt).toBe(5e-6);
+    expect(ctrl.currentOrder).toBe(2);  // no order-cut without an active temp bp
+  });
+
   it("clear_removes_all", () => {
     const params: SimulationParams = { ...DEFAULT_PARAMS, maxTimeStep: 20e-6 };
     const ctrl = new TimestepController(params);

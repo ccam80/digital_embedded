@@ -1468,12 +1468,20 @@ describe("DIODE_PARAM_DEFS partition layout", () => {
     }
   });
 
-  it("IS, N, RS, CJO, VJ, M, TT, FC, BV, IBV, NBV, IKF, IKR, EG, XTI, KF, AF, TNOM, ISW, NSW, IBEQ, IBSW, NB have partition === 'model'", () => {
-    const modelKeys = ["IS", "N", "RS", "CJO", "VJ", "M", "TT", "FC", "BV", "IBV", "NBV", "IKF", "IKR", "EG", "XTI", "KF", "AF", "TNOM", "ISW", "NSW", "IBEQ", "IBSW", "NB"];
+  it("IS, N, RS, CJO, VJ, M, TT, FC, BV, IBV, NBV, IKF, IKR, EG, XTI, KF, AF, TNOM, ISW, NSW have partition === 'model'", () => {
+    const modelKeys = ["IS", "N", "RS", "CJO", "VJ", "M", "TT", "FC", "BV", "IBV", "NBV", "IKF", "IKR", "EG", "XTI", "KF", "AF", "TNOM", "ISW", "NSW"];
     for (const key of modelKeys) {
       const def = DIODE_PARAM_DEFS.find((d) => d.key === key);
       expect(def, `ParamDef for key "${key}" not found`).toBeDefined();
       expect(def!.partition).toBe("model");
+    }
+  });
+
+  it("IBEQ, IBSW, NB are NOT present in plain Diode schema (moved to TunnelDiode in Step 3a)", () => {
+    const tunnelKeys = ["IBEQ", "IBSW", "NB"];
+    for (const key of tunnelKeys) {
+      const def = DIODE_PARAM_DEFS.find((d) => d.key === key);
+      expect(def, `Tunnel-only param "${key}" must NOT be in DIODE_PARAM_DEFS`).toBeUndefined();
     }
   });
 });
@@ -1508,8 +1516,5 @@ describe("DIODE_PARAM_DEFAULTS unchanged", () => {
     expect(DIODE_PARAM_DEFAULTS.TNOM).toBe(300.15);
     expect(DIODE_PARAM_DEFAULTS.ISW).toBe(0);
     expect(isNaN(DIODE_PARAM_DEFAULTS.NSW)).toBe(true);
-    expect(DIODE_PARAM_DEFAULTS.IBEQ).toBe(0);
-    expect(DIODE_PARAM_DEFAULTS.IBSW).toBe(0);
-    expect(DIODE_PARAM_DEFAULTS.NB).toBe(1);
   });
 });

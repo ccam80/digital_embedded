@@ -619,11 +619,19 @@ describe("integration", () => {
     expect(tempDef!.partition).toBe("instance");
 
     // All other keys should have partition "model"
-    const modelParamKeys = ["IP", "VP", "IV", "VV", "IS", "N", "CJO", "VJ", "M", "TT", "FC"];
+    // Step 3a: IBEQ/IBSW/NB migrated from plain Diode into TunnelDiode's secondary group.
+    const modelParamKeys = ["IP", "VP", "IV", "VV", "IS", "N", "CJO", "VJ", "M", "TT", "FC", "IBEQ", "IBSW", "NB"];
     for (const key of modelParamKeys) {
       const def = TUNNEL_DIODE_PARAM_DEFS.find((d) => d.key === key);
-      expect(def).toBeDefined();
+      expect(def, `ParamDef for key "${key}" not found`).toBeDefined();
       expect(def!.partition).toBe("model");
     }
+  });
+
+  it("TUNNEL_DIODE_PARAM_DEFAULTS has tunnel current params with ngspice defaults", () => {
+    // Step 3a: IBEQ/IBSW/NB migrated from plain Diode (dioload.c:267-285).
+    expect(TUNNEL_DIODE_PARAM_DEFAULTS.IBEQ).toBe(0);
+    expect(TUNNEL_DIODE_PARAM_DEFAULTS.IBSW).toBe(0);
+    expect(TUNNEL_DIODE_PARAM_DEFAULTS.NB).toBe(1);
   });
 });

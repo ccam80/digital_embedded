@@ -91,7 +91,7 @@ function makePmosParams(overrides: Partial<ResolvedMosfetParams> = {}): Resolved
     JS: 0, RSH: 0, FC: 0.5,
     AD: 0, AS: 0, PD: 0, PS: 0,
     TNOM: REFTEMP, TOX: 1e-7,
-    NSUB: 0, NSS: 0, TPG: 1, LD: 0, UO: 600,
+    TPG: 1, LD: 0, UO: 600,
     KF: 0, AF: 1,
     M: 1, OFF: 0,
     ICVDS: 0, ICVGS: 0, ICVBS: 0,

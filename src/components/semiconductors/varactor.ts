@@ -68,7 +68,7 @@ export const { paramDefs: VARACTOR_PARAM_DEFS, defaults: VARACTOR_PARAM_DEFAULTS
     },
     instance: {
       AREA: { default: DIODE_PARAM_DEFAULTS.AREA,           description: "Area scaling factor" },
-      OFF:  { default: DIODE_PARAM_DEFAULTS.OFF,            description: "Initial condition: device off" },
+      OFF:  { default: DIODE_PARAM_DEFAULTS.OFF, emit: "flag", description: "Initial condition: device off" },
       IC:   { default: DIODE_PARAM_DEFAULTS.IC,  unit: "V", description: "Initial condition: junction voltage for UIC" },
     },
   });

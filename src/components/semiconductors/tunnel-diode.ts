@@ -41,6 +41,7 @@ import { stampG, stampRHS } from "../../solver/analog/stamp-helpers.js";
 import {
   computeJunctionCapacitance,
   computeJunctionCharge,
+  diodeLoadTunnel,
 } from "./diode.js";
 import { cktTerr } from "../../solver/analog/ckt-terr.js";
 import { niIntegrate } from "../../solver/analog/ni-integrate.js";
@@ -89,6 +90,10 @@ export const { paramDefs: TUNNEL_DIODE_PARAM_DEFS, defaults: TUNNEL_DIODE_PARAM_
     M:    { default: 0.5,                description: "Grading coefficient" },
     TT:   { default: 0,      unit: "s",  description: "Transit time" },
     FC:   { default: 0.5,                description: "Forward-bias capacitance coefficient" },
+    // D-W3-7: tunnel current params — dioload.c:267-285 (consumed via diodeLoadTunnel)
+    IBEQ: { default: 0,      unit: "A",  description: "Tunnel bottom saturation current (DIOtunSatCur)" },
+    IBSW: { default: 0,      unit: "A",  description: "Tunnel sidewall saturation current (DIOtunSatSWCur)" },
+    NB:   { default: 1,                  description: "Tunnel emission coefficient (DIOtunEmissionCoeff)" },
   },
   instance: {
     TEMP: { default: 300.15, unit: "K",  description: "Per-instance operating temperature" },
@@ -208,6 +213,10 @@ export function createTunnelDiodeElement(
     M:    readParam("M"),
     TT:   readParam("TT"),
     FC:   readParam("FC"),
+    // D-W3-7: tunnel current params (dioload.c:267-285), consumed via diodeLoadTunnel
+    IBEQ: readParam("IBEQ"),
+    IBSW: readParam("IBSW"),
+    NB:   readParam("NB"),
     TEMP: readParam("TEMP"),
   };
 
@@ -223,10 +232,18 @@ export function createTunnelDiodeElement(
 
   function recompute(s0: Float64Array, v: number): void {
     const { i, dIdV } = tunnelDiodeIV(v, params.IP, params.VP, params.IV, params.VV, params.IS, params.N, vt);
+    // Hoisted SPICE tunnel band-to-band contribution (dioload.c:267-285) folded
+    // additively into the Norton pair. Gated internally on IBEQ/IBSW > 0.
+    const { cdb: tunCd, gdb: tunGd } = diodeLoadTunnel(
+      v, vt, params.IBEQ, params.IBSW, params.NB,
+      i, dIdV, 0, 0,
+    );
     // dIdV already includes GMIN from tunnelDiodeIV; add GMIN*v to current (DD5)
-    s0[base + SLOT_ID] = i + GMIN * v;
-    s0[base + SLOT_GEQ] = dIdV;
-    s0[base + SLOT_IEQ] = (i + GMIN * v) - dIdV * v;
+    const idTotal = tunCd + GMIN * v;
+    const gdTotal = tunGd;
+    s0[base + SLOT_ID] = idTotal;
+    s0[base + SLOT_GEQ] = gdTotal;
+    s0[base + SLOT_IEQ] = idTotal - gdTotal * v;
   }
 
   function isInNdrRegion(v: number): boolean {

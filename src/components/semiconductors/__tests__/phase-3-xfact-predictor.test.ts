@@ -318,7 +318,7 @@ function makeBjtL1(paramOverrides: Record<string, number> = {}) {
   const pinNodes = new Map<string, number>([["B", 1], ["C", 2], ["E", 3]]);
   const bag = new PropertyBag();
   bag.replaceModelParams({ ...BJT_SPICE_L1_NPN_DEFAULTS, ...paramOverrides });
-  return createSpiceL1BjtElement(1, pinNodes, [], -1, bag);
+  return createSpiceL1BjtElement(1, false, pinNodes, [], -1, bag);
 }
 
 function initBjtPool(element: ReturnType<typeof makeBjtL0>): StatePool {

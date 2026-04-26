@@ -88,7 +88,7 @@ export const { paramDefs: NJFET_PARAM_DEFS, defaults: NJFET_PARAM_DEFAULTS } = d
     AREA: { default: 1.0,               description: "Area factor" },
     M:    { default: 1.0,               description: "Parallel multiplier" },
     TEMP: { default: 300.15,  unit: "K", description: "Per-instance operating temperature" },
-    OFF:  { default: 0,                 description: "Initial condition: device off (0=false, 1=true)" },
+    OFF:  { default: 0, emit: "flag",   description: "Initial condition: device off (0=false, 1=true)" },
   },
 });
 

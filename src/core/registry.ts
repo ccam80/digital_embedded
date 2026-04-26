@@ -49,6 +49,41 @@ export interface ParamDef {
   min?: number;
   max?: number;
   default?: number;
+  /**
+   * SPICE keyword on emission. Defaults to `key`. Use when ngspice's parser
+   * accepts a different identifier for the same parameter. Example: digiTS
+   * uses `ISW` (sidewall saturation current); ngspice's diode parser names
+   * the same parameter `JSW`. Storage and `getModelParam("ISW")` still use
+   * the digiTS key — the rename only applies at the netlist boundary.
+   */
+  spiceName?: string;
+  /**
+   * Emission style. `"key-value"` (default) — `KEY=value`. `"flag"` — bare
+   * uppercase keyword when value is truthy, omitted when zero/false. ngspice
+   * rejects `OFF=0` as a parse error; this is how OFF and any other future
+   * bare-keyword param emit.
+   */
+  emit?: "key-value" | "flag";
+  /**
+   * Combined-emission group. When set, the generator collects every ParamDef
+   * with the same `emitGroup.name` and emits them as a single comma-joined
+   * token: `<NAME>=v1,v2,v3` (in ascending `index` order). Currently used for
+   * the MOS initial-condition triplet (ICVDS/ICVGS/ICVBS → `IC=vds,vgs,vbs`).
+   * The group is emitted only when at least one member has a non-default value.
+   */
+  emitGroup?: { name: string; index: number };
+}
+
+/** SPICE-emission overrides for a ModelEntry. */
+export interface ModelEmissionSpec {
+  /**
+   * Constant tokens prepended to the .model card body, in order, ahead of
+   * any paramDefs-derived params. Use for static SPICE attributes that
+   * are not exposed as digiTS model params (e.g. `LEVEL=3` for a future
+   * SPICE-L3 tunnel-diode ModelEntry — not used by any component in this
+   * cleanup; see ngspice-netlist-generator-architecture.md §3.7a).
+   */
+  modelCardPrefix?: readonly string[];
 }
 
 // ---------------------------------------------------------------------------
@@ -71,8 +106,17 @@ export type ModelEntry =
        * prefix).
        */
       getInternalNodeLabels?: (props: PropertyBag) => readonly string[];
+      /** SPICE-emission overrides for this model. */
+      spice?: ModelEmissionSpec;
     }
-  | { kind: "netlist"; netlist: MnaSubcircuitNetlist; paramDefs: ParamDef[]; params: Record<string, number> };
+  | {
+      kind: "netlist";
+      netlist: MnaSubcircuitNetlist;
+      paramDefs: ParamDef[];
+      params: Record<string, number>;
+      /** SPICE-emission overrides for this model. */
+      spice?: ModelEmissionSpec;
+    };
 
 // ---------------------------------------------------------------------------
 // Well-known property keys

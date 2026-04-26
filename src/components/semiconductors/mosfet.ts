@@ -76,10 +76,6 @@ const MAX_EXP_ARG = 709.0;
 const EPS0 = 8.854214871e-12;
 /** Relative permittivity of SiO2. */
 const EPS_OX = 3.9;
-/** Relative permittivity of Si. */
-const EPS_SI = 11.7;
-/** Intrinsic carrier concentration of Si at 300K (cm⁻³). */
-const NI = 1.45e10;
 
 // ---------------------------------------------------------------------------
 // MosfetParams / ResolvedMosfetParams — raw PropertyBag → typed
@@ -94,7 +90,7 @@ interface MosfetParams {
   CJ?: number; MJ?: number; CJSW?: number; MJSW?: number;
   JS?: number; RSH?: number; FC?: number;
   AD?: number; AS?: number; PD?: number; PS?: number;
-  TNOM?: number; TOX?: number; NSUB?: number; NSS?: number; TPG?: number;
+  TNOM?: number; TOX?: number; TPG?: number;
   LD?: number; UO?: number;
   KF?: number; AF?: number;
   M?: number; OFF?: number;
@@ -111,7 +107,7 @@ export interface ResolvedMosfetParams {
   CJ: number; MJ: number; CJSW: number; MJSW: number;
   JS: number; RSH: number; FC: number;
   AD: number; AS: number; PD: number; PS: number;
-  TNOM: number; TOX: number; NSUB: number; NSS: number; TPG: number;
+  TNOM: number; TOX: number; TPG: number;
   LD: number; UO: number;
   KF: number; AF: number;
   M: number; OFF: number;
@@ -153,8 +149,6 @@ export const { paramDefs: MOSFET_NMOS_PARAM_DEFS, defaults: MOSFET_NMOS_DEFAULTS
     RSH:    { default: 0,    unit: "Ω/sq",   description: "Drain/source diffusion sheet resistance" },
     TNOM:   { default: REFTEMP, unit: "K",   description: "Nominal temperature" },
     TOX:    { default: 1e-7, unit: "m",      description: "Oxide thickness" },
-    NSUB:   { default: 0,    unit: "cm⁻³",   description: "Substrate doping" },
-    NSS:    { default: 0,    unit: "cm⁻²",   description: "Surface state density" },
     TPG:    { default: 1,                    description: "Gate type: 1=opposite, -1=same, 0=Al gate" },
     LD:     { default: 0,    unit: "m",      description: "Lateral diffusion" },
     UO:     { default: 600,  unit: "cm²/Vs", description: "Surface mobility" },
@@ -170,10 +164,10 @@ export const { paramDefs: MOSFET_NMOS_PARAM_DEFS, defaults: MOSFET_NMOS_DEFAULTS
     PD:     { default: 0,    unit: "m",      description: "Drain perimeter" },
     PS:     { default: 0,    unit: "m",      description: "Source perimeter" },
     M:      { default: 1,                    description: "Parallel device multiplier" },
-    OFF:    { default: 0,                    description: "Initial condition: device off (0=false, 1=true)" },
-    ICVDS:  { default: 0,    unit: "V",      description: "Initial condition for Vds (MODEUIC)" },
-    ICVGS:  { default: 0,    unit: "V",      description: "Initial condition for Vgs (MODEUIC)" },
-    ICVBS:  { default: 0,    unit: "V",      description: "Initial condition for Vbs (MODEUIC)" },
+    OFF:    { default: 0, emit: "flag",      description: "Initial condition: device off (0=false, 1=true)" },
+    ICVDS:  { default: 0,    unit: "V",      emitGroup: { name: "IC", index: 0 }, description: "Initial condition for Vds (MODEUIC)" },
+    ICVGS:  { default: 0,    unit: "V",      emitGroup: { name: "IC", index: 1 }, description: "Initial condition for Vgs (MODEUIC)" },
+    ICVBS:  { default: 0,    unit: "V",      emitGroup: { name: "IC", index: 2 }, description: "Initial condition for Vbs (MODEUIC)" },
     TEMP:   { default: REFTEMP, unit: "K",   description: "Per-instance operating temperature" },
   },
 });
@@ -189,7 +183,7 @@ const NMOS_2N7000 = deviceParams(MOSFET_NMOS_PARAM_DEFS, {
   PHI: 0.6, GAMMA: 0, CBD: 0, CBS: 0, CGDO: 1.0724e-11, CGSO: 1.79115e-7,
   CGBO: 0, RD: 0, RS: 0, IS: 1e-14, PB: 0.8,
   CJ: 0, MJ: 0.5, CJSW: 0, MJSW: 0.5, JS: 0, RSH: 0,
-  TOX: 1e-7, NSUB: 0, NSS: 0, TPG: 1, LD: 0, UO: 600, KF: 0, AF: 1, FC: 0.5,
+  TOX: 1e-7, TPG: 1, LD: 0, UO: 600, KF: 0, AF: 1, FC: 0.5,
 });
 
 /** Small signal NMOS (TO-92, 60V/500mA). Source: Zetex BS170/ZTX (12/85). */
@@ -198,7 +192,7 @@ const NMOS_BS170 = deviceParams(MOSFET_NMOS_PARAM_DEFS, {
   PHI: 0.6, GAMMA: 0, CBD: 35e-12, CBS: 0, CGDO: 3e-12, CGSO: 28e-12,
   CGBO: 0, RD: 0, RS: 0, IS: 1e-14, PB: 0.8,
   CJ: 0, MJ: 0.5, CJSW: 0, MJSW: 0.5, JS: 0, RSH: 0,
-  TOX: 1e-7, NSUB: 0, NSS: 0, TPG: 1, LD: 0, UO: 600, KF: 0, AF: 1, FC: 0.5,
+  TOX: 1e-7, TPG: 1, LD: 0, UO: 600, KF: 0, AF: 1, FC: 0.5,
 });
 
 /** Medium power NMOS (TO-220, 100V/17A). Source: IR irf530n_IR. */
@@ -207,7 +201,7 @@ const NMOS_IRF530N = deviceParams(MOSFET_NMOS_PARAM_DEFS, {
   PHI: 0.6, GAMMA: 0, CBD: 0, CBS: 0, CGDO: 2.4372e-7, CGSO: 5.59846e-6,
   CGBO: 0, RD: 0, RS: 0, IS: 1e-14, PB: 0.8,
   CJ: 0, MJ: 0.5, CJSW: 0, MJSW: 0.5, JS: 0, RSH: 0,
-  TOX: 1e-7, NSUB: 0, NSS: 0, TPG: 1, LD: 0, UO: 600, KF: 0, AF: 1, FC: 0.5,
+  TOX: 1e-7, TPG: 1, LD: 0, UO: 600, KF: 0, AF: 1, FC: 0.5,
 });
 
 /** High power NMOS (TO-220, 100V/33A). Source: IR irf540n_IR. */
@@ -216,7 +210,7 @@ const NMOS_IRF540N = deviceParams(MOSFET_NMOS_PARAM_DEFS, {
   PHI: 0.6, GAMMA: 0, CBD: 0, CBS: 0, CGDO: 1.77276e-8, CGSO: 1.23576e-5,
   CGBO: 0, RD: 0, RS: 0, IS: 1e-14, PB: 0.8,
   CJ: 0, MJ: 0.5, CJSW: 0, MJSW: 0.5, JS: 0, RSH: 0,
-  TOX: 1e-7, NSUB: 0, NSS: 0, TPG: 1, LD: 0, UO: 600, KF: 0, AF: 1, FC: 0.5,
+  TOX: 1e-7, TPG: 1, LD: 0, UO: 600, KF: 0, AF: 1, FC: 0.5,
 });
 
 /** High power NMOS (TO-220, 55V/49A). Source: IR irfz44n_IR. */
@@ -225,7 +219,7 @@ const NMOS_IRFZ44N = deviceParams(MOSFET_NMOS_PARAM_DEFS, {
   PHI: 0.6, GAMMA: 0, CBD: 0, CBS: 0, CGDO: 2.2826e-7, CGSO: 1.25255e-5,
   CGBO: 0, RD: 0, RS: 0, IS: 1e-14, PB: 0.8,
   CJ: 0, MJ: 0.5, CJSW: 0, MJSW: 0.5, JS: 0, RSH: 0,
-  TOX: 1e-7, NSUB: 0, NSS: 0, TPG: 1, LD: 0, UO: 600, KF: 0, AF: 1, FC: 0.5,
+  TOX: 1e-7, TPG: 1, LD: 0, UO: 600, KF: 0, AF: 1, FC: 0.5,
 });
 
 // ---------------------------------------------------------------------------
@@ -258,8 +252,6 @@ export const { paramDefs: MOSFET_PMOS_PARAM_DEFS, defaults: MOSFET_PMOS_DEFAULTS
     RSH:    { default: 0,    unit: "Ω/sq",   description: "Drain/source diffusion sheet resistance" },
     TNOM:   { default: REFTEMP, unit: "K",   description: "Nominal temperature" },
     TOX:    { default: 1e-7, unit: "m",      description: "Oxide thickness" },
-    NSUB:   { default: 0,    unit: "cm⁻³",   description: "Substrate doping" },
-    NSS:    { default: 0,    unit: "cm⁻²",   description: "Surface state density" },
     TPG:    { default: 1,                    description: "Gate type: 1=opposite, -1=same, 0=Al gate" },
     LD:     { default: 0,    unit: "m",      description: "Lateral diffusion" },
     UO:     { default: 250,  unit: "cm²/Vs", description: "Surface mobility (PMOS default 250)" },
@@ -275,10 +267,10 @@ export const { paramDefs: MOSFET_PMOS_PARAM_DEFS, defaults: MOSFET_PMOS_DEFAULTS
     PD:     { default: 0,    unit: "m",      description: "Drain perimeter" },
     PS:     { default: 0,    unit: "m",      description: "Source perimeter" },
     M:      { default: 1,                    description: "Parallel device multiplier" },
-    OFF:    { default: 0,                    description: "Initial condition: device off (0=false, 1=true)" },
-    ICVDS:  { default: 0,    unit: "V",      description: "Initial condition for Vds (MODEUIC)" },
-    ICVGS:  { default: 0,    unit: "V",      description: "Initial condition for Vgs (MODEUIC)" },
-    ICVBS:  { default: 0,    unit: "V",      description: "Initial condition for Vbs (MODEUIC)" },
+    OFF:    { default: 0, emit: "flag",      description: "Initial condition: device off (0=false, 1=true)" },
+    ICVDS:  { default: 0,    unit: "V",      emitGroup: { name: "IC", index: 0 }, description: "Initial condition for Vds (MODEUIC)" },
+    ICVGS:  { default: 0,    unit: "V",      emitGroup: { name: "IC", index: 1 }, description: "Initial condition for Vgs (MODEUIC)" },
+    ICVBS:  { default: 0,    unit: "V",      emitGroup: { name: "IC", index: 2 }, description: "Initial condition for Vbs (MODEUIC)" },
     TEMP:   { default: REFTEMP, unit: "K",   description: "Per-instance operating temperature" },
   },
 });
@@ -294,7 +286,7 @@ const PMOS_BS250 = deviceParams(MOSFET_PMOS_PARAM_DEFS, {
   PHI: 0.6, GAMMA: 0, CBD: 105e-12, CBS: 0, CGDO: 0, CGSO: 0,
   CGBO: 0, RD: 0, RS: 0, IS: 1e-14, PB: 0.8,
   CJ: 0, MJ: 0.5, CJSW: 0, MJSW: 0.5, JS: 0, RSH: 0,
-  TOX: 1e-7, NSUB: 0, NSS: 0, TPG: 1, LD: 0, UO: 250, KF: 0, AF: 1, FC: 0.5,
+  TOX: 1e-7, TPG: 1, LD: 0, UO: 250, KF: 0, AF: 1, FC: 0.5,
 });
 
 /** Medium power PMOS (TO-220, -100V/6.8A). Source: IR irf9520_IR. */
@@ -303,7 +295,7 @@ const PMOS_IRF9520 = deviceParams(MOSFET_PMOS_PARAM_DEFS, {
   PHI: 0.6, GAMMA: 0, CBD: 0, CBS: 0, CGDO: 1e-11, CGSO: 3.45033e-6,
   CGBO: 0, RD: 0, RS: 0, IS: 1e-14, PB: 0.8,
   CJ: 0, MJ: 0.5, CJSW: 0, MJSW: 0.5, JS: 0, RSH: 0,
-  TOX: 1e-7, NSUB: 0, NSS: 0, TPG: 1, LD: 0, UO: 250, KF: 0, AF: 1, FC: 0.5,
+  TOX: 1e-7, TPG: 1, LD: 0, UO: 250, KF: 0, AF: 1, FC: 0.5,
 });
 
 /** High power PMOS (TO-247, -200V/12A). Source: IR irfp9240_IR. */
@@ -312,7 +304,7 @@ const PMOS_IRFP9240 = deviceParams(MOSFET_PMOS_PARAM_DEFS, {
   PHI: 0.6, GAMMA: 0, CBD: 0, CBS: 0, CGDO: 1e-11, CGSO: 1.08446e-5,
   CGBO: 0, RD: 0, RS: 0, IS: 1e-14, PB: 0.8,
   CJ: 0, MJ: 0.5, CJSW: 0, MJSW: 0.5, JS: 0, RSH: 0,
-  TOX: 1e-7, NSUB: 0, NSS: 0, TPG: 1, LD: 0, UO: 250, KF: 0, AF: 1, FC: 0.5,
+  TOX: 1e-7, TPG: 1, LD: 0, UO: 250, KF: 0, AF: 1, FC: 0.5,
 });
 
 /** High power PMOS (TO-220, -100V/40A). Source: IR irf5210_IR. */
@@ -321,7 +313,7 @@ const PMOS_IRF5210 = deviceParams(MOSFET_PMOS_PARAM_DEFS, {
   PHI: 0.6, GAMMA: 0, CBD: 0, CBS: 0, CGDO: 1e-11, CGSO: 2.34655e-5,
   CGBO: 0, RD: 0, RS: 0, IS: 1e-14, PB: 0.8,
   CJ: 0, MJ: 0.5, CJSW: 0, MJSW: 0.5, JS: 0, RSH: 0,
-  TOX: 1e-7, NSUB: 0, NSS: 0, TPG: 1, LD: 0, UO: 250, KF: 0, AF: 1, FC: 0.5,
+  TOX: 1e-7, TPG: 1, LD: 0, UO: 250, KF: 0, AF: 1, FC: 0.5,
 });
 
 /** High power PMOS (TO-220, -55V/74A). Source: IR irf4905_IR. */
@@ -330,22 +322,14 @@ const PMOS_IRF4905 = deviceParams(MOSFET_PMOS_PARAM_DEFS, {
   PHI: 0.6, GAMMA: 0, CBD: 0, CBS: 0, CGDO: 1e-11, CGSO: 2.84439e-5,
   CGBO: 0, RD: 0, RS: 0, IS: 1e-14, PB: 0.8,
   CJ: 0, MJ: 0.5, CJSW: 0, MJSW: 0.5, JS: 0, RSH: 0,
-  TOX: 1e-7, NSUB: 0, NSS: 0, TPG: 1, LD: 0, UO: 250, KF: 0, AF: 1, FC: 0.5,
+  TOX: 1e-7, TPG: 1, LD: 0, UO: 250, KF: 0, AF: 1, FC: 0.5,
 });
 
 // ---------------------------------------------------------------------------
-// resolveParams — derive process parameters when NSUB/TOX are specified
+// resolveParams — fill default values for optional MosfetParams fields
 // ---------------------------------------------------------------------------
 
-/**
- * Derive KP, GAMMA, PHI from NSUB/TOX when present. Same ngspice MOS1 Level 1
- * derivation:
- *   Cox  = εox / TOX
- *   KP   = UO * 1e-4 * Cox
- *   GAMMA = sqrt(2 * q * εsi * NSUB*1e6) / Cox
- *   PHI  = 2 * Vt * ln(NSUB / ni)
- */
-function resolveParams(raw: MosfetParams, kpDefault: number): ResolvedMosfetParams {
+function resolveParams(raw: MosfetParams, _kpDefault: number): ResolvedMosfetParams {
   const p: ResolvedMosfetParams = {
     VTO:  raw.VTO, KP: raw.KP, LAMBDA: raw.LAMBDA,
     PHI: raw.PHI, GAMMA: raw.GAMMA, W: raw.W, L: raw.L,
@@ -358,31 +342,13 @@ function resolveParams(raw: MosfetParams, kpDefault: number): ResolvedMosfetPara
     JS:   raw.JS   ?? 0, RSH: raw.RSH ?? 0, FC: raw.FC ?? 0.5,
     AD:   raw.AD   ?? 0, AS: raw.AS ?? 0, PD: raw.PD ?? 0, PS: raw.PS ?? 0,
     TNOM: raw.TNOM ?? REFTEMP,
-    TOX:  raw.TOX  ?? 1e-7, NSUB: raw.NSUB ?? 0, NSS: raw.NSS ?? 0,
+    TOX:  raw.TOX  ?? 1e-7,
     TPG:  raw.TPG  ?? 1, LD: raw.LD ?? 0, UO: raw.UO ?? 600,
     KF:   raw.KF   ?? 0, AF: raw.AF ?? 1,
     M:    raw.M    ?? 1, OFF: raw.OFF ?? 0,
     ICVDS: raw.ICVDS ?? 0, ICVGS: raw.ICVGS ?? 0, ICVBS: raw.ICVBS ?? 0,
     TEMP: raw.TEMP ?? REFTEMP,
   };
-
-  if (p.NSUB > 0 && p.TOX > 0) {
-    const cox = (EPS_OX * EPS0) / p.TOX;
-    const epsSi = EPS_SI * EPS0;
-    const nsubM3 = p.NSUB * 1e6;
-    const vtRoom = REFTEMP * KoverQ;
-
-    if (p.KP === kpDefault) {
-      p.KP = (p.UO * 1e-4) * cox;
-    }
-    if (p.GAMMA === 0) {
-      p.GAMMA = Math.sqrt(2 * Q * epsSi * nsubM3) / cox;
-    }
-    if (p.PHI === 0.6) {
-      const phi = 2 * vtRoom * Math.log(p.NSUB / NI);
-      if (phi > 0.1) p.PHI = phi;
-    }
-  }
 
   if (p.M !== 1) {
     p.CGDO *= p.M;
@@ -824,8 +790,6 @@ export function createMosfetElement(
     PS: props.getModelParam<number>("PS"),
     TNOM: props.getModelParam<number>("TNOM"),
     TOX: props.getModelParam<number>("TOX"),
-    NSUB: props.getModelParam<number>("NSUB"),
-    NSS: props.getModelParam<number>("NSS"),
     TPG: props.getModelParam<number>("TPG"),
     LD: props.getModelParam<number>("LD"),
     UO: props.getModelParam<number>("UO"),
@@ -1961,7 +1925,7 @@ export const NmosfetDefinition: ComponentDefinition = {
     "N-channel MOSFET — Level 1 SPICE model (Shichman-Hodges) with body effect and channel-length modulation.\n" +
     "Pins: D (drain), G (gate), S (source).\n" +
     "Primary: VTO, KP, LAMBDA, W, L.\n" +
-    "Secondary: PHI, GAMMA, CBD, CBS, CGDO, CGSO, CGBO, RD, RS, CJ, MJ, CJSW, MJSW, TOX, NSUB, UO, FC, and more.",
+    "Secondary: PHI, GAMMA, CBD, CBS, CGDO, CGSO, CGBO, RD, RS, CJ, MJ, CJSW, MJSW, TOX, UO, FC, and more.",
   models: {},
   modelRegistry: {
     "spice-l1": {
@@ -2034,7 +1998,7 @@ export const PmosfetDefinition: ComponentDefinition = {
     "P-channel MOSFET — Level 1 SPICE model (Shichman-Hodges) with body effect and channel-length modulation.\n" +
     "Pins: D (drain), G (gate), S (source).\n" +
     "Primary: VTO, KP, LAMBDA, W, L.\n" +
-    "Secondary: PHI, GAMMA, CBD, CBS, CGDO, CGSO, CGBO, RD, RS, CJ, MJ, CJSW, MJSW, TOX, NSUB, UO, FC, and more.",
+    "Secondary: PHI, GAMMA, CBD, CBS, CGDO, CGSO, CGBO, RD, RS, CJ, MJ, CJSW, MJSW, TOX, UO, FC, and more.",
   models: {},
   modelRegistry: {
     "spice-l1": {

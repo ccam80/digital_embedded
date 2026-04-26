@@ -249,6 +249,7 @@ describe("dcopInitJct", () => {
       const props = makeSpiceL1Props();
       const core = createSpiceL1BjtElement(
         1,
+        false,
         new Map([["B", 1], ["C", 2], ["E", 3]]),
         [],
         -1,

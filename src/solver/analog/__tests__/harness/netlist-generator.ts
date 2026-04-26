@@ -8,7 +8,11 @@
 
 import type { ConcreteCompiledAnalogCircuit } from "../../compiled-analog-circuit.js";
 import type { PropertyBag } from "../../../../core/properties.js";
-import { ComponentRegistry, type ParamDef } from "../../../../core/registry.js";
+import {
+  ComponentRegistry,
+  type ParamDef,
+  type ModelEmissionSpec,
+} from "../../../../core/registry.js";
 
 // ---------------------------------------------------------------------------
 // SPICE prefix table (typeId -> SPICE prefix, model type for semiconductors)
@@ -37,118 +41,6 @@ const ELEMENT_SPECS: Record<string, ElementSpec> = {
   PMOS:            { prefix: "M", modelType: "PMOS" },
   NJFET:           { prefix: "J", modelType: "NMF" },
   PJFET:           { prefix: "J", modelType: "PMF" },
-};
-
-// ---------------------------------------------------------------------------
-// Per-device ngspice translation rules
-// ---------------------------------------------------------------------------
-
-interface DeviceNetlistRules {
-  renames?: Record<string, string>;
-  modelCardPrefix?: (props: PropertyBag) => string[];
-  modelCardDropIfZero?: string[];
-  /**
-   * Boolean-flag instance params. ngspice expects bare keywords (e.g. `OFF`)
-   * — emitting `OFF=0` produces a hard "unknown parameter (0)" parse error
-   * because ngspice consumes the keyword and then chokes on the trailing
-   * `=0`. Listed keys are emitted as bare uppercase keywords when their
-   * value is truthy and dropped when zero/false.
-   */
-  instanceFlags?: string[];
-  /**
-   * Instance params to omit when their value equals the listed default. ngspice
-   * has its own per-instance defaults (e.g. M=1, TEMP=$TNOM) and emitting them
-   * is at best noise and at worst trips parse warnings.
-   */
-  instanceDropIfDefault?: Record<string, number>;
-  /**
-   * MOS-style initial-condition triplet. ngspice MOS1 accepts only the combined
-   * form `IC=vds,vgs,vbs`; per-key `ICVDS=`/`ICVGS=`/`ICVBS=` are unrecognised
-   * and trigger the same "unknown parameter (0)" hard error described above.
-   * The listed keys are stripped from the standard instance suffix and, when
-   * any of them is non-zero, re-emitted as a single `IC=v1,v2,v3` token in
-   * canonical order (vds, vgs, vbs).
-   */
-  instanceCombineIC?: [string, string, string];
-  /**
-   * Model-card params that ngspice only accepts at LEVEL≥3 (tunnel-diode
-   * extension). For plain Diode and TunnelDiode at LEVEL=1 these would emit
-   * `Warning: unrecognized parameter (ibeq) - ignored` lines. Drop them
-   * unless the modelCardPrefix has actually requested LEVEL=3.
-   */
-  modelCardDropUnlessTunnel?: string[];
-  /**
-   * Instance-partition params that have no ngspice counterpart at all. They
-   * are diagnostic / topology hints internal to digiTS (e.g. BJT `SUBS`
-   * vertical/lateral flag) and produce hard "unknown parameter" parse
-   * errors when emitted on the SPICE instance line.
-   */
-  instanceDropAlways?: string[];
-}
-
-const REFTEMP = 300.15;
-
-function tunnelLevel(props: PropertyBag): string[] {
-  const ibeq = props.hasModelParam("IBEQ") ? props.getModelParam<number>("IBEQ") : 0;
-  const ibsw = props.hasModelParam("IBSW") ? props.getModelParam<number>("IBSW") : 0;
-  return (ibeq > 0 || ibsw > 0) ? ["LEVEL=3"] : [];
-}
-
-const DEVICE_NETLIST_RULES: Record<string, DeviceNetlistRules> = {
-  Diode: {
-    renames: { ISW: "JSW" },
-    modelCardPrefix: tunnelLevel,
-    instanceFlags: ["OFF"],
-    instanceDropIfDefault: { TEMP: REFTEMP, AREA: 1, M: 1 },
-    modelCardDropUnlessTunnel: ["IBEQ", "IBSW", "NB"],
-  },
-  ZenerDiode: {
-    renames: { ISW: "JSW" },
-    instanceFlags: ["OFF"],
-    instanceDropIfDefault: { TEMP: REFTEMP, AREA: 1, M: 1 },
-  },
-  VaractorDiode: {
-    renames: { ISW: "JSW" },
-    instanceFlags: ["OFF"],
-    instanceDropIfDefault: { TEMP: REFTEMP, AREA: 1, M: 1 },
-  },
-  TunnelDiode: {
-    renames: { ISW: "JSW" },
-    modelCardPrefix: tunnelLevel,
-    instanceFlags: ["OFF"],
-    instanceDropIfDefault: { TEMP: REFTEMP, AREA: 1, M: 1 },
-    modelCardDropUnlessTunnel: ["IBEQ", "IBSW", "NB"],
-  },
-  NpnBJT: {
-    instanceFlags: ["OFF"],
-    instanceDropIfDefault: { TEMP: REFTEMP, AREA: 1, AREAB: 1, AREAC: 1, M: 1 },
-    instanceDropAlways: ["SUBS"],
-  },
-  PnpBJT: {
-    instanceFlags: ["OFF"],
-    instanceDropIfDefault: { TEMP: REFTEMP, AREA: 1, AREAB: 1, AREAC: 1, M: 1 },
-    instanceDropAlways: ["SUBS"],
-  },
-  NMOS: {
-    modelCardDropIfZero: ["NSUB", "NSS"],
-    instanceFlags: ["OFF"],
-    instanceDropIfDefault: { TEMP: REFTEMP, M: 1, AD: 0, AS: 0, PD: 0, PS: 0 },
-    instanceCombineIC: ["ICVDS", "ICVGS", "ICVBS"],
-  },
-  PMOS: {
-    modelCardDropIfZero: ["NSUB", "NSS"],
-    instanceFlags: ["OFF"],
-    instanceDropIfDefault: { TEMP: REFTEMP, M: 1, AD: 0, AS: 0, PD: 0, PS: 0 },
-    instanceCombineIC: ["ICVDS", "ICVGS", "ICVBS"],
-  },
-  NJFET: {
-    instanceFlags: ["OFF"],
-    instanceDropIfDefault: { TEMP: REFTEMP, AREA: 1, M: 1 },
-  },
-  PJFET: {
-    instanceFlags: ["OFF"],
-    instanceDropIfDefault: { TEMP: REFTEMP, AREA: 1, M: 1 },
-  },
 };
 
 // ---------------------------------------------------------------------------
@@ -185,6 +77,7 @@ export function generateSpiceNetlist(
     const nodes = el.pinNodeIds;
 
     let paramDefs: ParamDef[] = [];
+    let emission: ModelEmissionSpec | undefined;
     if (spec.modelType !== undefined) {
       const def = registry.get(typeId);
       if (!def) {
@@ -198,6 +91,7 @@ export function generateSpiceNetlist(
         throw new Error(`netlist-generator: typeId "${typeId}" has no modelRegistry["${modelKey}"]`);
       }
       paramDefs = modelEntry.paramDefs;
+      emission = modelEntry.spice;
     }
 
     let line: string;
@@ -260,16 +154,16 @@ export function generateSpiceNetlist(
 
     } else if (spec.prefix === "D") {
       const modelName = `${label}_${spec.modelType}`;
-      line = `${label} ${nodes[0] ?? 0} ${nodes[1] ?? 0} ${modelName}${instanceParamSuffix(paramDefs, props, typeId)}`;
+      line = `${label} ${nodes[0] ?? 0} ${nodes[1] ?? 0} ${modelName}${instanceParamSuffix(paramDefs, props)}`;
       if (!modelCards.has(modelName)) {
-        modelCards.set(modelName, modelCardSuffix(modelName, spec.modelType!, paramDefs, props, typeId));
+        modelCards.set(modelName, modelCardSuffix(modelName, spec.modelType!, paramDefs, props, emission));
       }
 
     } else if (spec.prefix === "Q") {
       const modelName = `${label}_${spec.modelType}`;
-      line = `${label} ${nodes[1] ?? 0} ${nodes[0] ?? 0} ${nodes[2] ?? 0} ${modelName}${instanceParamSuffix(paramDefs, props, typeId)}`;
+      line = `${label} ${nodes[1] ?? 0} ${nodes[0] ?? 0} ${nodes[2] ?? 0} ${modelName}${instanceParamSuffix(paramDefs, props)}`;
       if (!modelCards.has(modelName)) {
-        modelCards.set(modelName, modelCardSuffix(modelName, spec.modelType!, paramDefs, props, typeId));
+        modelCards.set(modelName, modelCardSuffix(modelName, spec.modelType!, paramDefs, props, emission));
       }
 
     } else if (spec.prefix === "M") {
@@ -282,16 +176,16 @@ export function generateSpiceNetlist(
       } else {
         throw new Error(`netlist-generator: unknown MOSFET typeId '${typeId}' — add an explicit pin-order branch`);
       }
-      line = `${label} ${d} ${g} ${s} ${b} ${modelName}${instanceParamSuffix(paramDefs, props, typeId)}`;
+      line = `${label} ${d} ${g} ${s} ${b} ${modelName}${instanceParamSuffix(paramDefs, props)}`;
       if (!modelCards.has(modelName)) {
-        modelCards.set(modelName, modelCardSuffix(modelName, spec.modelType!, paramDefs, props, typeId));
+        modelCards.set(modelName, modelCardSuffix(modelName, spec.modelType!, paramDefs, props, emission));
       }
 
     } else if (spec.prefix === "J") {
       const modelName = `${label}_${spec.modelType}`;
-      line = `${label} ${nodes[2] ?? 0} ${nodes[0] ?? 0} ${nodes[1] ?? 0} ${modelName}${instanceParamSuffix(paramDefs, props, typeId)}`;
+      line = `${label} ${nodes[2] ?? 0} ${nodes[0] ?? 0} ${nodes[1] ?? 0} ${modelName}${instanceParamSuffix(paramDefs, props)}`;
       if (!modelCards.has(modelName)) {
-        modelCards.set(modelName, modelCardSuffix(modelName, spec.modelType!, paramDefs, props, typeId));
+        modelCards.set(modelName, modelCardSuffix(modelName, spec.modelType!, paramDefs, props, emission));
       }
 
     } else {
@@ -318,48 +212,36 @@ export function generateSpiceNetlist(
 function instanceParamSuffix(
   paramDefs: readonly ParamDef[],
   props: PropertyBag,
-  typeId: string,
 ): string {
-  const rules = DEVICE_NETLIST_RULES[typeId];
-  const flagSet = new Set(rules?.instanceFlags ?? []);
-  const dropAlways = new Set(rules?.instanceDropAlways ?? []);
-  const dropDefaults = rules?.instanceDropIfDefault ?? {};
-  const icKeys = rules?.instanceCombineIC;
-  const icSet = new Set(icKeys ?? []);
-
   const parts: string[] = [];
-  let icVds = 0, icVgs = 0, icVbs = 0, icAny = false;
+  const groups = new Map<string, Array<{ index: number; value: number }>>();
 
   for (const def of paramDefs) {
     if (def.partition !== "instance") continue;
     if (!props.hasModelParam(def.key)) continue;
-    if (dropAlways.has(def.key)) continue;
     const v = props.getModelParam<number>(def.key);
     if (typeof v !== "number" || !Number.isFinite(v)) continue;
 
-    // Combined IC=vds,vgs,vbs handling — collect, do not emit individually.
-    if (icSet.has(def.key)) {
-      if (def.key === icKeys![0]) icVds = v;
-      else if (def.key === icKeys![1]) icVgs = v;
-      else if (def.key === icKeys![2]) icVbs = v;
-      if (v !== 0) icAny = true;
+    if (def.emitGroup) {
+      let arr = groups.get(def.emitGroup.name);
+      if (!arr) { arr = []; groups.set(def.emitGroup.name, arr); }
+      arr.push({ index: def.emitGroup.index, value: v });
       continue;
     }
 
-    // Boolean flags — bare keyword if truthy, omit if zero/false.
-    if (flagSet.has(def.key)) {
-      if (v !== 0) parts.push(def.key);
+    if (def.emit === "flag") {
+      if (v !== 0) parts.push(def.spiceName ?? def.key);
       continue;
     }
 
-    // Drop params that match an ngspice default to avoid noise / parse warnings.
-    if (def.key in dropDefaults && v === dropDefaults[def.key]) continue;
-
-    parts.push(`${def.key}=${v}`);
+    parts.push(`${def.spiceName ?? def.key}=${v}`);
   }
 
-  if (icKeys && icAny) {
-    parts.push(`IC=${icVds},${icVgs},${icVbs}`);
+  for (const [name, members] of groups) {
+    members.sort((a, b) => a.index - b.index);
+    if (members.some(m => m.value !== 0)) {
+      parts.push(`${name}=${members.map(m => m.value).join(",")}`);
+    }
   }
 
   return parts.length === 0 ? "" : ` ${parts.join(" ")}`;
@@ -374,32 +256,27 @@ function modelCardSuffix(
   spiceModelType: string,
   paramDefs: readonly ParamDef[],
   props: PropertyBag,
-  typeId: string,
+  emission: ModelEmissionSpec | undefined,
 ): string {
-  const rules = DEVICE_NETLIST_RULES[typeId];
-  const dropIfZero = new Set(rules?.modelCardDropIfZero ?? []);
-  const dropUnlessTunnel = new Set(rules?.modelCardDropUnlessTunnel ?? []);
   const parts: string[] = [];
 
-  // Prefix tokens (e.g. LEVEL=3) come first.
-  const prefixTokens = rules?.modelCardPrefix ? rules.modelCardPrefix(props) : [];
-  if (prefixTokens.length > 0) parts.push(...prefixTokens);
-  const tunnelMode = prefixTokens.some(t => /^LEVEL\s*=\s*3$/i.test(t));
+  if (emission?.modelCardPrefix) parts.push(...emission.modelCardPrefix);
 
   for (const def of paramDefs) {
     if (def.partition === "instance") continue;
+    if (def.emitGroup || def.emit === "flag") {
+      throw new Error(
+        `netlist-generator: model-card param ${def.key} declares emit/group; ` +
+        `only instance partition supports flag/group emission today`,
+      );
+    }
     if (!props.hasModelParam(def.key)) continue;
     const v = props.getModelParam<number>(def.key);
     if (typeof v !== "number" || !Number.isFinite(v)) continue;
-    if (dropIfZero.has(def.key) && v === 0) continue;
-    if (!tunnelMode && dropUnlessTunnel.has(def.key)) continue;
-    const emittedKey = rules?.renames?.[def.key] ?? def.key;
-    parts.push(`${emittedKey}=${v}`);
+    parts.push(`${def.spiceName ?? def.key}=${v}`);
   }
 
-  if (parts.length === 0) {
-    return `.model ${modelName} ${spiceModelType}`;
-  }
+  if (parts.length === 0) return `.model ${modelName} ${spiceModelType}`;
   return `.model ${modelName} ${spiceModelType} (${parts.join(" ")})`;
 }
 
