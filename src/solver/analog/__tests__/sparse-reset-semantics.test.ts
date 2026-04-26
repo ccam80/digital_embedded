@@ -20,17 +20,10 @@ function buildAndFactor(
   return solver;
 }
 
-/** Count fill-in elements by scanning the full pool [0, _elCount). */
+/** Count fill-in elements via the ngspice-mirrored `Matrix->Fillins` counter
+ * exposed as `fillinCount` (spalloc.c:885 spFillinCount). */
 function countFillIns(solver: SparseSolver): number {
-  const s = solver as any;
-  const FLAG_FILL_IN = 1;
-  const elCount: number = s._elCount;
-  const elFlags: Uint8Array = s._elFlags;
-  let count = 0;
-  for (let e = 0; e < elCount; e++) {
-    if (elFlags[e] & FLAG_FILL_IN) count++;
-  }
-  return count;
+  return solver.fillinCount;
 }
 
 // ---------------------------------------------------------------------------

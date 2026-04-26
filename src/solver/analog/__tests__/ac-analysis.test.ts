@@ -540,6 +540,10 @@ describe("AC — Task 0.4.5", () => {
     const C = 1e-6;
     const circuit = makeRcLowpassCircuit(R, C);
 
+    // injectedSolver is ComplexSparseSolver (CSS), which still carries the
+    // `lastFactorUsedReorder` field. The real SparseSolver port deleted this
+    // field in favour of FactorResult.usedReorder, but the AC sweep uses the
+    // complex solver, which is out of scope of the real-side direct port.
     const injectedSolver = new CSS();
     const reorderFlags: boolean[] = [];
 

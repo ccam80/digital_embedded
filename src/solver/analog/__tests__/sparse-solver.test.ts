@@ -754,11 +754,14 @@ describe("SparseSolver factorNumerical", () => {
 });
 
 // ---------------------------------------------------------------------------
-// factor() dispatch and lastFactorUsedReorder tests
+// factor() dispatch and FactorResult.usedReorder tests
+//
+// Stage 6.3.3 — `lastFactorUsedReorder` instance field deleted; the per-call
+// "did factor() walk the reorder loop?" signal is now `FactorResult.usedReorder`.
 // ---------------------------------------------------------------------------
 
 describe("SparseSolver factor dispatch", () => {
-  it("factor() sets lastFactorUsedReorder=true when _needsReorder is true", () => {
+  it("factor() returns usedReorder=true when _needsReorder is true", () => {
     const solver = new SparseSolver();
     solver.beginAssembly(2);
     solver.stampElement(solver.allocElement(0, 0), 4);
@@ -771,10 +774,10 @@ describe("SparseSolver factor dispatch", () => {
     solver.forceReorder();
     const result = solver.factor();
     expect(result.success).toBe(true);
-    expect(solver.lastFactorUsedReorder).toBe(true);
+    expect(result.usedReorder).toBe(true);
   });
 
-  it("factor() sets lastFactorUsedReorder=false on second call (numerical path)", () => {
+  it("factor() returns usedReorder=false on second call (numerical path)", () => {
     const solver = new SparseSolver();
     solver.beginAssembly(2);
     solver.stampElement(solver.allocElement(0, 0), 4);
@@ -788,8 +791,8 @@ describe("SparseSolver factor dispatch", () => {
     // First factor: _needsReorder starts true (allocElement sets it).
     // Force reorder explicitly then factor to establish pivot order.
     solver.forceReorder();
-    solver.factor();
-    expect(solver.lastFactorUsedReorder).toBe(true);
+    const r1 = solver.factor();
+    expect(r1.usedReorder).toBe(true);
 
     // Second factor with same pattern: numerical path
     solver.beginAssembly(2);
@@ -802,7 +805,7 @@ describe("SparseSolver factor dispatch", () => {
     solver.finalize();
     const result = solver.factor();
     expect(result.success).toBe(true);
-    expect(solver.lastFactorUsedReorder).toBe(false);
+    expect(result.usedReorder).toBe(false);
   });
 
   it("factor() solves correctly on numerical path after reorder", () => {
@@ -834,7 +837,7 @@ describe("SparseSolver factor dispatch", () => {
     solver.finalize();
     const r2 = solver.factor();
     expect(r2.success).toBe(true);
-    expect(solver.lastFactorUsedReorder).toBe(false);
+    expect(r2.usedReorder).toBe(false);
     const x2 = new Float64Array(2);
     solver.solve(x2);
   });
@@ -1987,7 +1990,8 @@ describe("SparseSolver no-AMD Markowitz ordering", () => {
 describe("SparseSolver NISHOULDREORDER lifecycle", () => {
   it("factor_uses_numeric_path_without_forceReorder", () => {
     // After one successful factorWithReorder(), subsequent factor() calls must
-    // use the numeric-only path (factorNumerical). Verified via lastFactorUsedReorder.
+    // use the numeric-only path. Stage 6.3.3 — `lastFactorUsedReorder` instance
+    // field deleted; verified via `FactorResult.usedReorder` returned by factor().
     const solver = new SparseSolver();
     solver.beginAssembly(3);
     solver.stampElement(solver.allocElement(0, 0), 2);
@@ -2005,7 +2009,7 @@ describe("SparseSolver NISHOULDREORDER lifecycle", () => {
     // First factor() must use reorder (no pivot order yet)
     const r1 = solver.factor();
     expect(r1.success).toBe(true);
-    expect(solver.lastFactorUsedReorder).toBe(true);
+    expect(r1.usedReorder).toBe(true);
 
     // Re-assemble with same values
     solver.beginAssembly(3);
@@ -2021,11 +2025,12 @@ describe("SparseSolver NISHOULDREORDER lifecycle", () => {
     // Second factor() must use numeric-only path (no forceReorder called)
     const r2 = solver.factor();
     expect(r2.success).toBe(true);
-    expect(solver.lastFactorUsedReorder).toBe(false);
+    expect(r2.usedReorder).toBe(false);
   });
 
   it("forceReorder_triggers_full_pivot_search", () => {
-    // After forceReorder(), the next factor() call must use factorWithReorder.
+    // After forceReorder(), the next factor() call must use the reorder path.
+    // Stage 6.3.3 — usedReorder reported on each FactorResult.
     const solver = new SparseSolver();
     solver.beginAssembly(3);
     solver.stampElement(solver.allocElement(0, 0), 2);
@@ -2038,8 +2043,8 @@ describe("SparseSolver NISHOULDREORDER lifecycle", () => {
     solver.finalize();
 
     // First factor — builds pivot order
-    solver.factor();
-    expect(solver.lastFactorUsedReorder).toBe(true);
+    const r1 = solver.factor();
+    expect(r1.usedReorder).toBe(true);
 
     // Re-assemble
     solver.beginAssembly(3);
@@ -2053,8 +2058,8 @@ describe("SparseSolver NISHOULDREORDER lifecycle", () => {
     solver.finalize();
 
     // Second factor without forceReorder — numeric path
-    solver.factor();
-    expect(solver.lastFactorUsedReorder).toBe(false);
+    const r2 = solver.factor();
+    expect(r2.usedReorder).toBe(false);
 
     // Re-assemble, then forceReorder
     solver.beginAssembly(3);
@@ -2071,7 +2076,7 @@ describe("SparseSolver NISHOULDREORDER lifecycle", () => {
     // Third factor after forceReorder — must use full pivot search
     const r3 = solver.factor();
     expect(r3.success).toBe(true);
-    expect(solver.lastFactorUsedReorder).toBe(true);
+    expect(r3.usedReorder).toBe(true);
   });
 });
 

@@ -423,7 +423,10 @@ export function newtonRaphson(ctx: CKTCircuitContext): void {
       // H2 (Phase 2.5 W2.2) — mirror niiter.c:888-891: on SMPluFac E_SINGULAR
       // NR sets NISHOULDREORDER and does `continue` back to CKTload. We
       // invoke solver.forceReorder() and `continue` for the same effect.
-      if (!solver.lastFactorUsedReorder) {
+      // Stage 6.3.3 — `lastFactorUsedReorder` instance field deleted; the
+      // signal is now `factorResult.usedReorder` returned by every factor()
+      // call (replaces the prior instance field per spec).
+      if (!factorResult.usedReorder) {
         solver.forceReorder();
         continue;
       }

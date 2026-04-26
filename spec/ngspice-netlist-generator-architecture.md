@@ -106,7 +106,7 @@ Notes:
 
 ### 2.2 Extended `ModelEntry`
 
-The one rule that genuinely cannot live on a `ParamDef` is the `LEVEL=3` prefix for the tunnel-extended diode model: the LEVEL token is not derived from any single param's value (it is a *function* of `IBEQ>0 || IBSW>0`), and conceptually it belongs to the model card as a whole. After we split the Diode and TunnelDiode schemas (Section 3.4), this rule applies to TunnelDiode only and is constant: TunnelDiode's model card always emits `LEVEL=3`.
+The one rule that genuinely cannot live on a `ParamDef` is a per-model-card prefix token. In this cleanup, no such prefix is emitted — TunnelDiode is excluded from ngspice parity (§3.7a) because its behavioral factory models an Esaki I(V) curve with no ngspice LEVEL=3 counterpart. The `ModelEmissionSpec.modelCardPrefix` field is defined here for future use (e.g. a SPICE-L3 TunnelDiode ModelEntry or a BSIM4 variant), but no component in this cleanup sets it.
 
 Augment `src/core/registry.ts:58-75`:
 
@@ -116,32 +116,16 @@ export interface ModelEmissionSpec {
   /**
    * Constant tokens prepended to the .model card body, in order, ahead of
    * any paramDefs-derived params. Use for static SPICE attributes that
-   * are not exposed as digiTS model params.
-   *
-   * Example: TunnelDiode emits `LEVEL=3` so ngspice's diode parser
-   * activates the tunnel-extension code path (dioload.c:267-285).
+   * are not exposed as digiTS model params (e.g. `LEVEL=3` for a future
+   * SPICE-L3 tunnel-diode ModelEntry — not used by any component in this
+   * cleanup; see §3.7a).
    */
   modelCardPrefix?: readonly string[];
-
-  /**
-   * SPICE element-prefix letter. When omitted, the netlist generator falls
-   * back to its built-in ELEMENT_SPECS table. Specifying this on the
-   * ModelEntry lets a model dictate its own SPICE syntax — a future
-   * BSIM4 model could ship `prefix: "M"` here without touching the
-   * generator.
-   *
-   * (Out of scope for this cleanup, but the field is part of the same
-   * contract: the model owns its SPICE emission, not the generator.)
-   */
-  prefix?: string;
-
-  /**
-   * SPICE model-type token (the second word on the .model line, e.g.
-   * "NPN", "NMOS", "D"). Same fall-back rule as `prefix`.
-   */
-  modelType?: string;
 }
+```
 
+```ts
+// src/core/registry.ts
 export type ModelEntry =
   | {
       kind: "inline";
@@ -163,7 +147,7 @@ export type ModelEntry =
     };
 ```
 
-The minimal version of this cleanup only uses `spice.modelCardPrefix`. The other two fields are sketched here so we do not paint ourselves into a corner, but Section 4 only mandates `modelCardPrefix`.
+Only `modelCardPrefix` is defined. `prefix` and `modelType` (model-owned SPICE element letter and model-type token) are explicitly out of scope for this cleanup — they will be added by a future spec when a concrete consumer (e.g. BSIM4) lands.
 
 ### 2.3 Generator after the rewrite
 
@@ -325,7 +309,7 @@ instance: {
 2. `src/components/semiconductors/tunnel-diode.ts:93-95` — TunnelDiode (no OFF today; if added, mark it).
 3. `src/components/semiconductors/bjt.ts:78` and :107 (BJT simple), :172 and :234 (BJT spice L1 NPN/PNP).
 4. `src/components/semiconductors/mosfet.ts:173` (NMOS), :278 (PMOS).
-5. `src/components/semiconductors/jfet.ts` — find OFF declaration, mark as flag.
+5. `src/components/semiconductors/njfet.ts` and `src/components/semiconductors/pjfet.ts` — find OFF declaration in each, mark as flag.
 6. Delete `instanceFlags` from `DeviceNetlistRules`, delete the `flagSet` collection at `netlist-generator.ts:324, 350-353`. The replacement is `if (def.emit === "flag") { if (v !== 0) parts.push(def.spiceName ?? def.key); continue; }` (already in §2.3).
 
 **Test impact.**
@@ -371,15 +355,15 @@ instance: {
 There are two latent design errors here:
 
 1. Plain Diode carries tunnel-only params it cannot use. ngspice silently ignores them at LEVEL=1, but they pollute the netlist and the property panel.
-2. The check "should I emit LEVEL=3?" is computed from param values rather than the model identity, which is the wrong dependency direction — TunnelDiode is *defined* as `LEVEL=3`; that is a property of the model, not of any param.
+2. The check "should I emit LEVEL=3?" is computed from param values rather than the model identity, which is the wrong dependency direction — and in any case TunnelDiode's behavioral factory models an Esaki I(V) curve, not SPICE LEVEL=3, so no `LEVEL=3` emission is correct for this cleanup (see §3.7a).
 
-**Proposed declarative form.** Split the schemas, attach a constant `LEVEL=3` prefix to TunnelDiode's ModelEntry.
+**Proposed declarative form.** Split the schemas. TunnelDiode does not receive a `LEVEL=3` model-card prefix in this cleanup (§3.7a).
 
 The recommendation in the predecessor doc (`spec/ngspice-netlist-generator-cleanup.md` §C) is correct. A `condition: (props) => boolean` predicate on `ParamDef` would also work mechanically, but it has worse properties:
 
 | Option | Pros | Cons |
 |---|---|---|
-| **A. Split schemas** (recommended) | Plain-Diode property panel only shows what plain Diode can do. Tunnel-gated keys cannot be set on plain Diode and so cannot be wrong. ModelEntry-level `LEVEL=3` is constant on TunnelDiode and never has to be derived. Mirrors ngspice's separation: dioload.c:267-285 only runs when the model is built with the tunnel parser path. | Schema duplication. Existing optocoupler/polarized-cap code that imports `DIODE_PARAM_DEFAULTS` is unaffected (those use plain-Diode keys), but if a future tunnel-using consumer of `DIODE_PARAM_DEFAULTS` lands it would have to import the tunnel schema. |
+| **A. Split schemas** (recommended) | Plain-Diode property panel only shows what plain Diode can do. Tunnel-gated keys cannot be set on plain Diode and so cannot be wrong. TunnelDiode carries its own `IBEQ`/`IBSW`/`NB` schema without polluting plain Diode. Mirrors ngspice's separation: dioload.c:267-285 only runs when the model is built with the tunnel parser path. | Schema duplication. Existing optocoupler/polarized-cap code that imports `DIODE_PARAM_DEFAULTS` is unaffected (those use plain-Diode keys), but if a future tunnel-using consumer of `DIODE_PARAM_DEFAULTS` lands it would have to import the tunnel schema. |
 | B. Predicate `condition: (props) => boolean` on ParamDef | One paramDef list, no duplication. | The plain-Diode property panel now has to filter out tunnel keys at render time, OR shows them but the user setting them does nothing. The "this param is/isn't real for this model" question becomes runtime, not schema. The netlist generator has to evaluate predicates per emission. The tunnel-vs-non-tunnel distinction is now spread across the ParamDef list with a hidden decision rule, instead of being two separate models. |
 
 Option A is the cleaner answer. The cost (schema duplication) is real but small — TunnelDiode is the only consumer of the tunnel keys, and we already have separate `ModelEntry` records for the two component types in `register-all.ts:374`.
@@ -387,18 +371,15 @@ Option A is the cleaner answer. The cost (schema duplication) is real but small 
 **Migration steps.**
 
 1. **Edit `src/components/semiconductors/diode.ts:104-140`.** Remove `ISW`, `NSW`, `IBEQ`, `IBSW`, `NB` from `DIODE_PARAM_DEFS.secondary`. (Keep `ISW`/`NSW` in the Diode schema **only if** the code at `diode.ts:412-414` actually uses them at runtime for plain diodes; from the listing at lines 127-132, the comments say `D-W3-6: sidewall saturation current params — dioload.c:209-243` and `D-W3-7: tunnel current params — dioload.c:267-285`. Sidewall is not tunnel-gated; tunnel is. Move only `IBEQ`/`IBSW`/`NB`. Keep `ISW`/`NSW` on plain Diode.)
-2. **Edit `src/components/semiconductors/diode.ts:411-414` (the `params` initialization in `createDiodeElement`).** Delete the three tunnel reads. Update load() at lines 619-635 to early-return / skip the tunnel block (the body of `if (params.IBSW > 0)` / `if (params.IBEQ > 0)` simply never runs, so the simplest change is `if (false && params.IBSW > 0)` — but that is dead code. Cleanest: hoist the tunnel block into a separate function and only call it from TunnelDiode's load path. Phase 1 of execution can leave this as a no-op guard `if (false)` and Phase 2 can extract.
+2. **Edit `src/components/semiconductors/diode.ts:411-415` (the `params` initialization in `createDiodeElement`).** Delete the three tunnel reads (`IBEQ`, `IBSW`, `NB`). Hoist the tunnel block at lines ~619-635 into a separate function `diodeLoadTunnel(...)` (export it from `diode.ts` so TunnelDiode can call it), and call it ONLY from TunnelDiode's load path. After this edit, `createDiodeElement` no longer references tunnel state at all. **Step 3a lands this as one atomic commit; there is no `if (false)` interim state at any commit boundary.** Per CLAUDE.md "No Pragmatic Patches": dead-code guards are not an acceptable interim — the hoist is part of the same step that removes the schema declarations.
 3. **Edit `src/components/semiconductors/tunnel-diode.ts:77-96`.** Expand `TUNNEL_DIODE_PARAM_DEFS` to include the missing diode-secondary params that TunnelDiode actually consumes (currently it imports `computeJunctionCapacitance`/`computeJunctionCharge` from diode.ts and uses `CJO/VJ/M/TT/FC` — these are already declared. Add `IBEQ`, `IBSW`, `NB` here. Decide whether `ISW`/`NSW` belong here too — TunnelDiode does not currently read them per `tunnel-diode.ts:199-212`, so leave them out.).
-4. **Edit `src/components/semiconductors/tunnel-diode.ts:524-532` (TunnelDiodeDefinition.modelRegistry).** Add `spice: { modelCardPrefix: ["LEVEL=3"] }` to the `behavioral` model entry. Whether the netlist generator should attach `LEVEL=3` to a model that simulates internally as the `behavioral` curve (not Shockley-with-tunnel-extension) is an interesting question — the answer is **yes**: the netlist generator's job is to make ngspice produce comparable output, and ngspice's tunnel diode is exactly LEVEL=3. The internal digiTS model can be whatever; the SPICE emission must say LEVEL=3 because that is what ngspice understands.
-5. **Delete from `netlist-generator.ts`:** `modelCardDropUnlessTunnel` field on `DeviceNetlistRules`; the `tunnelLevel(props)` helper at lines 91-95; the `tunnelMode` derivation at line 387; the `dropUnlessTunnel` Set at line 381; the `if (!tunnelMode && dropUnlessTunnel.has(def.key)) continue` at line 395; the `modelCardPrefix` field on `DeviceNetlistRules` (replaced by `ModelEntry.spice.modelCardPrefix` plumbed in §3.7a).
-6. **Audit the blast radius for `DIODE_PARAM_DEFAULTS` consumers** (Grep already confirms three: `optocoupler.ts:134`, `polarized-cap.ts:250`, `varactor.ts:56-72`). None of them reference `IBEQ`/`IBSW`/`NB` after the schema split, so they need no change. Confirm with `Grep` for `IBEQ|IBSW|NB` in those files before merging. (`varactor.ts` reuses `DIODE_PARAM_DEFAULTS.*` for individual keys — none of those keys are the tunnel-gated ones.)
+4. **Do NOT add a `spice` field to TunnelDiode's `behavioral` ModelEntry.** The behavioral factory simulates an Esaki I(V) curve. ngspice's tunnel diode is LEVEL=3 (Shockley + tunnel extension per `dioload.c:267-285`), which digiTS does not implement. Coupling a behavioral-Esaki factory to a `LEVEL=3` SPICE card in a single ModelEntry would mix two different physics models. **TunnelDiode is excluded from ngspice parity testing for this reason.** Until a SPICE-L3 port lands as a separate spec, the netlist generator must not emit `LEVEL=3` for any TunnelDiode (and harness fixtures must not include TunnelDiodes).
+5. **Delete from `netlist-generator.ts`:** `modelCardDropUnlessTunnel` field on `DeviceNetlistRules`; the `tunnelLevel(props)` helper at lines 91-95; the `tunnelMode` derivation at line 387; the `dropUnlessTunnel` Set at line 381; the `if (!tunnelMode && dropUnlessTunnel.has(def.key)) continue` at line 395; the `modelCardPrefix` field on `DeviceNetlistRules`. No replacement is added — TunnelDiode is excluded from ngspice parity (see step 4), so no current component needs a model-card prefix mechanism.
+6. **Audit the blast radius for `DIODE_PARAM_DEFAULTS` consumers.** Grep for `DIODE_PARAM_DEFAULTS` finds production consumers: `optocoupler.ts`, `polarized-cap.ts`, `varactor.ts`. Test consumers: `dcop-init-jct.test.ts`, `phase-3-xfact-predictor.test.ts`. None reference `IBEQ`/`IBSW`/`NB` after the schema split, so none need a behavioral change — but confirm with `Grep` for `IBEQ|IBSW|NB` across all five files before merging step 3a. (`varactor.ts` reuses `DIODE_PARAM_DEFAULTS.*` for individual keys — none of those keys are the tunnel-gated ones.)
 
 **Test impact.**
 
-- `netlist-generator.test.ts:636-687` — three `Diode: emits LEVEL=3 when IBEQ > 0` / `IBSW > 0` / `does NOT emit LEVEL=3 when IBEQ=0 and IBSW=0` / `does NOT emit LEVEL=3 for non-default NB alone` / `Zener: never emits LEVEL=3`. After the migration, all five tests must change:
-  - The `IBEQ > 0`/`IBSW > 0`/`NB` plain-Diode tests become **expected-throw** tests asserting that `props.setModelParam("IBEQ", …)` on a plain Diode throws (because the schema no longer includes that key) or are **moved** to a new TunnelDiode test file.
-  - A new TunnelDiode test asserts that any TunnelDiode emits `(LEVEL=3 …)` unconditionally on its model card.
-  - The `Zener: never emits LEVEL=3` test stays as-is (Zener is plain-Diode-derived and never has LEVEL=3).
+- `netlist-generator.test.ts:636-687` — the five `LEVEL=3` tests (`Diode: emits LEVEL=3 when IBEQ > 0`, `IBSW > 0`, `does NOT emit LEVEL=3 when IBEQ=0 and IBSW=0`, `does NOT emit LEVEL=3 for non-default NB alone`, `Zener: never emits LEVEL=3`) must be **deleted**. TunnelDiode is excluded from ngspice parity (§3.7a); no replacement LEVEL=3 assertion is written. The `IBEQ > 0`/`IBSW > 0` plain-Diode tests also become invalid because plain Diode no longer carries those schema keys — they should be converted to **expected-throw** tests asserting that `props.setModelParam("IBEQ", …)` on a plain Diode throws (schema violation), placed in `diode.test.ts` rather than the netlist-generator test file.
 - `diode.test.ts:1509-1513` — five lines assert `DIODE_PARAM_DEFAULTS.ISW/NSW/IBEQ/IBSW/NB` exist with specific defaults. Three of those (`IBEQ`/`IBSW`/`NB`) must be deleted from `DIODE_PARAM_DEFAULTS` and re-asserted on `TUNNEL_DIODE_PARAM_DEFAULTS`.
 - `tunnel-diode.test.ts` — `TUNNEL_DIODE_PARAM_DEFS partition layout` at line 615 needs to gain assertions for the new `IBEQ`/`IBSW`/`NB` keys.
 
@@ -408,18 +389,18 @@ Option A is the cleaner answer. The cost (schema duplication) is real but small 
 
 **The deeper problem.** `SUBS` is not a parameter. Parameters are numerical knobs that participate in Norton-pair stamps, temperature scaling, area scaling, charge integration. `SUBS` is a binary topology selector — it picks between two structurally different devices, both electrically valid, that stamp on different nodes. Hot-loading `SUBS` mid-simulation would silently re-target a stamp from `colPrime` to `basePrime`; that is not a parameter sweep, it is a different device.
 
-We already have a mechanism for "two structurally distinct devices that share most of their behaviour": `modelRegistry`. NPN vs PNP is a separate component typeId. Vertical NPN vs lateral NPN should be a separate `modelRegistry` entry on the same component, picked via the `model` property — same machinery used for `behavioral` vs `spice-l1` vs device presets (`2N3904`, `BC547B`, …).
+We already have a mechanism for "two structurally distinct devices that share most of their behaviour": `modelRegistry`. NPN vs PNP is a separate component typeId. Vertical NPN vs lateral NPN should be a separate `modelRegistry` entry on the same component, picked via the `model` property — same machinery used for `behavioral` vs `"spice"` vs device presets (`2N3904`, `BC547B`, …).
 
 **Proposed declarative form.** Delete `SUBS` from the schema entirely. Add lateral variants to BJT's `modelRegistry`. The factory captures `isLateral` as a closure constant.
 
-The current BJT L1 factory in `bjt.ts` is **a single top-level function** (named along the lines of `createBjtL1Element`) matching the `AnalogFactory` signature `(pinNodes, internalNodeIds, branchIdx, props) => element`. It builds a `params` object from `props.getModelParam(...)` calls (lines ~1010-1047), derives temperature-scaled working values (`tp = makeTp()`), wires internal nodes, and returns the element object whose `load(ctx)` method does the actual stamps. The factory is **not** currently curried — it is a plain function reference passed directly into `modelRegistry["spice-l1"].factory`.
+The current BJT L1 factory in `bjt.ts` is `createSpiceL1BjtElement(polarity: 1 | -1, pinNodes, internalNodeIds, branchIdx, props, _getTime)`. It is registered in the model registry via an inline arrow that closes over `polarity`: `(pinNodes, internalNodeIds, branchIdx, props, _getTime) => createSpiceL1BjtElement(1, pinNodes, ...)` for NPN (and `-1` for PNP). Polarity is therefore already a closure constant captured at the registry callsite. The factory body builds a `params` object from `props.getModelParam(...)` calls (lines ~1010-1047), derives temperature-scaled working values (`tp = makeTp()`), wires internal nodes, and returns the element object whose `load(ctx)` method does the actual stamps.
 
-The migration converts it to a **factory factory**: the outer function takes `isLateral`, the inner function matches the existing `AnalogFactory` signature, and the `isLateral` constant lives in the closure of the inner function (so every element of a given ModelEntry shares the same topology, set once at registry-load time and never rebound).
+The migration adds `isLateral` as a second closure constant alongside `polarity`. The outer factory `createBjtL1Element(isLateral: boolean): AnalogFactory` returns the inline arrow that already exists at the registry callsite, with `isLateral` captured in the outer call.
 
 ```ts
 // src/components/semiconductors/bjt.ts — sketch
 function createBjtL1Element(isLateral: boolean): AnalogFactory {
-  return (pinNodes, internalNodeIds, branchIdx, props) => {
+  return (pinNodes, internalNodeIds, branchIdx, props, _getTime) => {
     // ...existing factory body verbatim, EXCEPT:
     //   - `SUBS: props.getModelParam<number>("SUBS")` deleted from the params init
     //   - `const isLateral = params.SUBS === 0` at line 1142 deleted
@@ -429,13 +410,13 @@ function createBjtL1Element(isLateral: boolean): AnalogFactory {
 }
 
 // inside NpnBJTDefinition.modelRegistry
-"spice-l1": {
+"spice": {
   kind: "inline",
   factory: createBjtL1Element(false),                    // vertical
   paramDefs: BJT_SPICE_L1_PARAM_DEFS,                    // SUBS removed
   params: BJT_SPICE_L1_NPN_DEFAULTS,
 },
-"spice-l1-lateral": {
+"spice-lateral": {
   kind: "inline",
   factory: createBjtL1Element(true),                     // lateral
   paramDefs: BJT_SPICE_L1_PARAM_DEFS,                    // shared defs
@@ -443,22 +424,22 @@ function createBjtL1Element(isLateral: boolean): AnalogFactory {
 },
 ```
 
-The same shape applies to PNP. Both variants share `BJT_SPICE_L1_PARAM_DEFS`; only the closure-captured topology constant differs. **`defaultModel` MUST remain `"spice-l1"` (vertical)** on both NpnBJTDefinition and PnpBJTDefinition — the lateral variant is strictly opt-in, and any change to `defaultModel` would silently re-target every existing BJT in saved circuits.
+The same shape applies to PNP. Both variants share `BJT_SPICE_L1_PARAM_DEFS`; only the closure-captured topology constant differs. **`defaultModel` MUST remain `"spice"` (vertical)** on both NpnBJTDefinition and PnpBJTDefinition — the lateral variant is strictly opt-in, and any change to `defaultModel` would silently re-target every existing BJT in saved circuits.
 
 **Why this is correct.**
 
 - It mirrors ngspice's actual structure: vertical and lateral are separate model parser paths in ngspice, and the ngspice .model card uses `subs=1` / `subs=-1` as a model parameter only on certain BJT levels (BJT4/VBIC), not the SPICE Level-1 BJT — which is exactly why ngspice rejected our `SUBS=1` instance token in the first place. The `unknown parameter (subs)` error was correct: SUBS does not belong on a Level-1 BJT instance line, full stop.
 - It eliminates the "no-emit / internal" partition concept from `ParamDef`. Every remaining param is either an instance param ngspice accepts or a model-card param ngspice accepts. There is no third bucket for "things ngspice has no slot for", because such things are not parameters.
 - It removes the runtime `if (params.SUBS === 0)` branch entirely — `isLateral` is a constant per-instance, set once at element construction, and the V8 JIT can specialize on it.
-- It is hot-loadable in the only sense that matters: changing the `model` property re-runs the model factory, allocating a fresh element with the new topology. The user already has this mechanism for switching between `spice-l1` and `2N3904`.
+- It is hot-loadable in the only sense that matters: changing the `model` property re-runs the model factory, allocating a fresh element with the new topology. The user already has this mechanism for switching between `"spice"` and `2N3904`.
 
 **Migration steps.**
 
 1. **Edit `src/components/semiconductors/bjt.ts:175`** (NPN_L1 instance group) and **`:237`** (PNP_L1 instance group): delete the `SUBS: { default: 1, … }` line.
 2. **Edit `bjt.ts:1046`**: delete `SUBS: props.getModelParam<number>("SUBS")` from the params object initialization.
-3. **Edit `bjt.ts` factory signature**: convert the existing top-level BJT L1 factory function (the `AnalogFactory`-shaped function consumed by `modelRegistry["spice-l1"].factory`) into the `createBjtL1Element(isLateral: boolean): AnalogFactory` factory-of-factory pattern shown in the sketch above. Replace `const isLateral = params.SUBS === 0` at line 1142 with the closure-captured boolean. The inner function body is otherwise unchanged.
-4. **Edit `bjt.ts` BJT definitions**: locate `NpnBJTDefinition.modelRegistry` and `PnpBJTDefinition.modelRegistry`. For each existing `spice-l1` entry, change `factory: createBjtL1Element` (or whatever it was) to `factory: createBjtL1Element(false)` — the vertical default. Add a parallel `"spice-l1-lateral"` entry built with `createBjtL1Element(true)`. Both entries share the same `paramDefs` and `params`. **`defaultModel` MUST stay `"spice-l1"`** on both polarities — verify the existing value in each Definition is unchanged after the edit.
-5. **Verify the model-swap path before declaring the migration complete.** When a BJT element's `model` property is changed from `"spice-l1"` to `"spice-l1-lateral"`, the simulator MUST re-run the new ModelEntry's factory and replace the element instance — otherwise the topology constant remains the old closure value and the stamp stays wrong. Trace the path `props.set("model", …)` → component recompile / element re-factory in the analog engine before committing this stage. If the existing path does not rebuild on `model` change, that is a pre-existing gap that this stage MUST land a fix for; the lateral variant is unusable without it. Do not assume CLAUDE.md's "model is the source of truth post-placement" guarantee implies a working hot-swap — read the code path and confirm.
+3. **Edit `bjt.ts` factory signature**: convert the existing top-level BJT L1 factory function (the `AnalogFactory`-shaped function consumed by `modelRegistry["spice"].factory`) into the `createBjtL1Element(isLateral: boolean): AnalogFactory` factory-of-factory pattern shown in the sketch above. Replace `const isLateral = params.SUBS === 0` at line 1142 with the closure-captured boolean. The inner function body is otherwise unchanged.
+4. **Edit `bjt.ts` BJT definitions**: locate `NpnBJTDefinition.modelRegistry` and `PnpBJTDefinition.modelRegistry`. For each existing `"spice"` entry, change `factory: createBjtL1Element` (or whatever it was) to `factory: createBjtL1Element(false)` — the vertical default. Add a parallel `"spice-lateral"` entry built with `createBjtL1Element(true)`. Both entries share the same `paramDefs` and `params`. **`defaultModel` MUST stay `"spice"`** on both polarities — verify the existing value in each Definition is unchanged after the edit.
+5. Model swapping is already supported by the analog engine: changing the `model` property triggers a recompile that re-runs the new ModelEntry's factory and allocates a fresh element with the new closure-captured `isLateral` constant. No new engine-side mechanism is required for the lateral variant.
 6. **Edit `netlist-generator.ts`**: delete `instanceDropAlways` from `DeviceNetlistRules`; delete the `dropAlways` Set at line 325; delete `if (dropAlways.has(def.key)) continue` at line 336; delete the two `instanceDropAlways: ["SUBS"]` entries at lines 125 and 130. The mechanism is now unused.
 7. **No `partition: "internal"`.** §2.1 above already removed this from `ParamDef`. The migration is complete with zero new partition values.
 
@@ -467,12 +448,10 @@ The same shape applies to PNP. Both variants share `BJT_SPICE_L1_PARAM_DEFS`; on
 - `bjt.test.ts:1986` (`expect(propsObj.getModelParam<number>("SUBS")).toBe(1)`) — **must be deleted.** SUBS is no longer in the schema; reading it would throw or return undefined.
 - `bjt.test.ts:3017, 3026` (`expect(BJT_SPICE_L1_NPN_DEFAULTS.SUBS).toBe(1)`) — **must be deleted.** Same reason.
 - `netlist-generator.test.ts:542` (`props.setModelParam("SUBS", 1)`) — **must be deleted.** The test still passes (SUBS will not appear in output) but for the wrong reason; remove it and assert the lateral variant test instead (see below).
-- **Default-model preservation test (new).** Under `bjt.test.ts`, assert `NpnBJTDefinition.defaultModel === "spice-l1"` and `PnpBJTDefinition.defaultModel === "spice-l1"` so future edits cannot silently move the vertical-default invariant. Confirm no fixture or test relied on `SUBS=0` to flip a default-vertical BJT into lateral — grep shows only one such test, which is the harness one being deleted.
-- **Lateral-variant existence test (new).** Under `bjt.test.ts`, assert `NpnBJTDefinition.modelRegistry["spice-l1-lateral"] !== undefined` and same for PnpBJTDefinition. Assert both lateral entries share `paramDefs` reference-equality with their vertical siblings.
-- **Lateral-vs-vertical c4 stamp test (new), concrete pattern.** This is the load-time verification that the closure swap actually changed simulation behaviour. Build two BJT instances side-by-side with `AREAB ≠ AREAC` (e.g. `AREAB=1`, `AREAC=2`), identical params otherwise, identical pin nets, one using model `"spice-l1"` and one using `"spice-l1-lateral"`. Run a single `load()` call on each (a DC-OP context is sufficient — no transient needed). Capture the c4 leakage current via the existing convergence-log / state-pool inspection helpers. Assert `c4_lateral / c4_vertical === AREAC / AREAB` (i.e. ratio 2 in this fixture). The test fails if the closure-captured `isLateral` did not reach the `tBCleakCur * (isLateral ? AREAC : AREAB)` site at `bjt.ts:1148`. Same test for PNP.
-- **Model-swap test (new).** Build a single BJT instance with `model = "spice-l1"` and identical AREAB/AREAC asymmetry as above. Capture c4. Then `props.set("model", "spice-l1-lateral")`, force a recompile of the analog engine, and capture c4 again. Assert the second c4 matches the lateral closure path. This test is the regression gate for migration step 5 — if model-swap silently retains the old factory, this test fails and the implementation must be fixed before merge.
-
-**Optional follow-up (not required for this cleanup):** rename the model-registry keys to express topology more crisply, e.g. `spice-l1-vertical` and `spice-l1-lateral`, leaving `spice-l1` as an alias for `spice-l1-vertical` so existing circuits keep loading.
+- **Default-model preservation test (new).** Under `bjt.test.ts`, assert `NpnBJTDefinition.defaultModel === "spice"` and `PnpBJTDefinition.defaultModel === "spice"` so future edits cannot silently move the vertical-default invariant. Confirm no fixture or test relied on `SUBS=0` to flip a default-vertical BJT into lateral — grep shows only one such test, which is the harness one being deleted.
+- **Lateral-variant existence test (new).** Under `bjt.test.ts`, assert `NpnBJTDefinition.modelRegistry["spice-lateral"] !== undefined` and same for PnpBJTDefinition. Assert both lateral entries share `paramDefs` reference-equality with their vertical siblings.
+- **Lateral-vs-vertical c4 stamp test (new), concrete pattern.** This is the load-time verification that the closure swap actually changed simulation behaviour. Build two BJT instances side-by-side with `AREAB ≠ AREAC` (e.g. `AREAB=1`, `AREAC=2`), identical params otherwise, identical pin nets, one using model `"spice"` and one using `"spice-lateral"`. Run a single `load()` call on each (a DC-OP context is sufficient — no transient needed). Capture the c4 leakage current via the existing convergence-log / state-pool inspection helpers. Assert `c4_lateral / c4_vertical === AREAC / AREAB` (i.e. ratio 2 in this fixture). The test fails if the closure-captured `isLateral` did not reach the `tBCleakCur * (isLateral ? AREAC : AREAB)` site at `bjt.ts:1148`. Same test for PNP.
+- **Model-swap test (new).** Build a single BJT instance with `model = "spice"` and identical AREAB/AREAC asymmetry as above. Capture c4. Then `props.set("model", "spice-lateral")`, force a recompile of the analog engine, and capture c4 again. Assert the second c4 matches the lateral closure path.
 
 ### 3.6 Renames are unified with §3.1
 
@@ -502,37 +481,18 @@ Already covered above — listed here only for completeness in the seven-mechani
 
 If the generator output for some ngspice-parity test now includes redundant tokens like `M=1`, that is acceptable and noise-only — the predecessor doc §A confirms ngspice does not warn.
 
-### 3.7a Tunnel `LEVEL=3` prefix
+### 3.7a Tunnel `LEVEL=3` prefix — DELETED, no replacement
 
-**Current state.** `netlist-generator.ts:91-95, 100, 117, 385-387` — a per-device `modelCardPrefix: tunnelLevel` function reads `IBEQ`/`IBSW` from props at emit time.
+**Current state.** `netlist-generator.ts:91-95, 100, 117, 385-387` — a per-device `modelCardPrefix: tunnelLevel` function reads `IBEQ`/`IBSW` from props at emit time and prepends `LEVEL=3` to the diode model card.
 
-**Proposed declarative form.** `ModelEntry.spice.modelCardPrefix: readonly string[]` (Section 2.2), set on TunnelDiode's `behavioral` ModelEntry only:
-
-```ts
-// src/components/semiconductors/tunnel-diode.ts — TunnelDiodeDefinition.modelRegistry
-modelRegistry: {
-  "behavioral": {
-    kind: "inline",
-    factory: createTunnelDiodeElement,
-    paramDefs: TUNNEL_DIODE_PARAM_DEFS,
-    params: TUNNEL_DIODE_PARAM_DEFAULTS,
-    spice: { modelCardPrefix: ["LEVEL=3"] },          // ← new
-  },
-},
-```
-
-Plain Diode's ModelEntry has no `spice.modelCardPrefix` (or has `spice: {}` — same effect).
+**Resolution.** TunnelDiode's `behavioral` ModelEntry simulates an Esaki I(V) curve with no ngspice counterpart. ngspice's LEVEL=3 diode is the Shockley model with tunnel extension (`dioload.c:267-285`), which is not implemented in digiTS. **TunnelDiode is excluded from the ngspice parity harness for this cleanup.** The `tunnelLevel` helper and `modelCardPrefix` rule entries are deleted; no replacement mechanism is introduced. If a future spec ports SPICE-L3 to digiTS, that spec will reintroduce `ModelEntry.spice.modelCardPrefix` (or equivalent) and add a `"spice-l3"` ModelEntry to TunnelDiode at that point.
 
 **Migration steps.**
 
-1. Plumb `ModelEntry.spice` through to `modelCardSuffix()` in the generator. The generator currently only receives `paramDefs` from the ModelEntry — it needs the whole `spice` object too. Edit `netlist-generator.ts:200` to capture `modelEntry.spice` and pass to `modelCardSuffix`.
-2. Add `spice: { modelCardPrefix: ["LEVEL=3"] }` to `tunnel-diode.ts:524-532`.
-3. Delete `tunnelLevel` and `modelCardPrefix` per-device entries from `netlist-generator.ts`.
+1. Delete `tunnelLevel`, `modelCardPrefix` field on `DeviceNetlistRules`, and every per-device `modelCardPrefix:` entry from `netlist-generator.ts`.
+2. Audit harness fixtures (`src/solver/analog/__tests__/ngspice-parity/fixtures/*.dts` and any harness test that builds circuits inline) for TunnelDiode references; either remove them or move them to a non-parity test file. Confirm zero TunnelDiode use under `ngspice-parity/`.
 
-**Test impact.**
-
-- `netlist-generator.test.ts:636-687` — the five LEVEL=3 tests change as described in §3.4.
-- A new TunnelDiode-only test asserts `expect(netlist).toContain(".model TD1_D D (LEVEL=3 ...")` regardless of param values.
+**Test impact.** The five `LEVEL=3` tests at `netlist-generator.test.ts:636-687` must be **deleted** (they assert behavior the new architecture does not support). A comment in `tunnel-diode.test.ts` should note that ngspice parity is not tested for TunnelDiode pending a SPICE-L3 port.
 
 ### 3.7b Pre-existing `modelCardDropIfZero: ["NSUB","NSS"]`
 
@@ -542,23 +502,22 @@ Plain Diode's ModelEntry has no `spice.modelCardPrefix` (or has `spice: {}` — 
 
 The predecessor doc §D flagged this as out of scope but suggested the cleaner answer is to "not declare NSUB/NSS in paramDefs at all unless the model genuinely uses them". That is a follow-up question, not a blocker for this cleanup. **For this cleanup, simply delete `modelCardDropIfZero` and let `NSUB=0`/`NSS=0` emit on the model card.** ngspice ignores them at LEVEL=1 (predecessor doc §D explicitly says this) and emits no warning.
 
-If the user later wants to remove `NSUB`/`NSS` from the MOS Level-1 schema entirely, that is its own architectural call (Level-1 versus Level-2/3 schema split, mirroring the Diode/TunnelDiode split). Keep this cleanup focused; flag it for follow-up.
+Per "No Pragmatic Patches", deleting `modelCardDropIfZero` while leaving the dead `NSUB`/`NSS` schema declarations is itself a half-measure. **This cleanup also removes `NSUB` and `NSS` from the MOS schema and from every preset constant.** Since `NSUB`/`NSS` are not used by the MOS Level-1 model (ngspice ignores them at LEVEL=1, per the predecessor doc §D), the keys are dead schema being actively emitted. Removing them eliminates the dead schema in the same pass that removes the emit-time mask.
 
 **Migration steps.**
 
 1. Delete `modelCardDropIfZero` from `DeviceNetlistRules`.
 2. Delete `dropIfZero` Set and the `if (dropIfZero.has(def.key) && v === 0) continue` line from `modelCardSuffix`.
 3. Delete the two `modelCardDropIfZero: ["NSUB", "NSS"]` entries (`netlist-generator.ts:133, 138`).
+4. Edit `src/components/semiconductors/mosfet.ts`: remove `NSUB` and `NSS` from `MOSFET_NMOS_PARAM_DEFS.secondary` and `MOSFET_PMOS_PARAM_DEFS.secondary`. (Implementer: locate the exact line numbers via Grep at edit time.)
+5. Audit MOSFET preset constants in the codebase (e.g. `NMOS_2N7000`, `NMOS_BS170`, `NMOS_IRF530N`, `PMOS_*`). Grep for `NSUB` and `NSS` references under `src/components/semiconductors/` and remove those keys from every preset that sets them.
+6. Update `mosfet.test.ts` and any preset-validation tests to remove `NSUB`/`NSS` assertions.
 
 **Test impact.**
 
-- `netlist-generator.test.ts:689-748` — six tests covering `NMOS: NSUB=0 dropped from model card`, `NMOS: NSUB=1e16 emitted`, `NMOS: NSS=0 dropped`, etc. Three of these (the "dropped" ones) **must change** to assert the param IS emitted at default zero. Mechanically:
-  - `NMOS: NSUB=0 dropped from model card` → `NMOS: NSUB=0 emitted on model card` (`expect(modelLine).toContain("NSUB=0")`).
-  - `NMOS: NSS=0 dropped from model card` → `NMOS: NSS=0 emitted on model card`.
-  - `PMOS: NSUB=0 and NSS=0 dropped from model card` → `PMOS: NSUB=0 and NSS=0 emitted on model card`.
-  - The "non-zero emitted" tests (NSUB=1e16, NSS=2e10) pass unchanged.
-
-If at execution time the user changes their mind and wants the silence preserved, fine — but the spec author's stated preference (§D) is "not declare them in paramDefs unless they're used", and dropping them at emit time is a half-measure compared to schema cleanup. Half-measures are forbidden by `No Pragmatic Patches`. So: delete `modelCardDropIfZero`. Schema cleanup of NSUB/NSS for MOS L1 is a separate follow-up the user can prioritize independently.
+- `netlist-generator.test.ts:689-748` — the six NSUB/NSS tests are **deleted**. The schema no longer carries these keys; tests that asserted "dropped" or "emitted" both become tautologies / type errors.
+- `mosfet.test.ts` — any assertion referencing `MOSFET_NMOS_PARAM_DEFAULTS.NSUB` / `.NSS` or preset constants' `NSUB`/`NSS` keys is deleted.
+- Preset-validation tests — same treatment.
 
 ---
 
@@ -571,16 +530,17 @@ For executor convenience, here is every file that must change, with the reason:
 | `src/core/registry.ts` | Add `spiceName`, `emit`, `emitGroup` to `ParamDef`; add `spice: ModelEmissionSpec` to `ModelEntry`. | 2.1, 2.2 |
 | `src/core/model-params.ts` | Extend `ParamSpec` with `spiceName`, `emit`, `emitGroup`; forward new fields in `emit()`. (No `partition` override needed — every param's partition is determined by its bucket.) | 3.1 step 1-2 |
 | `src/components/semiconductors/diode.ts` | Remove `IBEQ`/`IBSW`/`NB` from secondary; mark `OFF` as `emit: "flag"`; add `spiceName: "JSW"` to `ISW`; remove `IBEQ`/`IBSW`/`NB` reads from `createDiodeElement`. | 3.1, 3.2, 3.4 |
-| `src/components/semiconductors/tunnel-diode.ts` | Add `IBEQ`/`IBSW`/`NB` to TUNNEL_DIODE_PARAM_DEFS secondary (or: a richer split that matches what TunnelDiode actually models); add `spice: { modelCardPrefix: ["LEVEL=3"] }` to ModelEntry; mark `OFF` as `emit: "flag"` if/when added. | 3.4, 3.7a |
+| `src/components/semiconductors/tunnel-diode.ts` | Add `IBEQ`/`IBSW`/`NB` to TUNNEL_DIODE_PARAM_DEFS secondary (or: a richer split that matches what TunnelDiode actually models); mark `OFF` as `emit: "flag"` if/when added. Do NOT add `spice.modelCardPrefix` — TunnelDiode is excluded from ngspice parity (§3.7a). | 3.4 |
 | `src/components/semiconductors/zener.ts`, `varactor.ts` | Inherit changes via shared paramDefs (no edit needed) OR mark `OFF` as flag if their schemas are independent — verify by grep. | 3.2 |
-| `src/components/semiconductors/bjt.ts` | Delete `SUBS` from BJT_SPICE_L1 instance group (NPN :175, PNP :237) and from params init (:1046); convert L1 factory to take closure-captured `isLateral`; replace `params.SUBS === 0` at :1142 with the closure constant; add `spice-l1-lateral` ModelEntry to NpnBJTDefinition and PnpBJTDefinition modelRegistry; mark `OFF` as `emit: "flag"` (4 sites: :78, :107, :172, :234). | 3.2, 3.5 |
-| `src/components/semiconductors/mosfet.ts` | Mark `OFF` as `emit: "flag"` (NMOS :173, PMOS :278); add `emitGroup: { name: "IC", index: 0\|1\|2 }` to ICVDS/ICVGS/ICVBS (NMOS :174-176, PMOS :279-281). | 3.2, 3.3 |
-| `src/components/semiconductors/jfet.ts` (or wherever NJFET/PJFET live) | Mark `OFF` as `emit: "flag"`. | 3.2 |
+| `src/components/semiconductors/bjt.ts` | Delete `SUBS` from BJT_SPICE_L1 instance group (NPN :175, PNP :237) and from params init (:1046); convert L1 factory to take closure-captured `isLateral`; replace `params.SUBS === 0` at :1142 with the closure constant; add `"spice-lateral"` ModelEntry to NpnBJTDefinition and PnpBJTDefinition modelRegistry; mark `OFF` as `emit: "flag"` (4 sites: :78, :107, :172, :234). | 3.2, 3.5 |
+| `src/components/semiconductors/mosfet.ts` | Mark `OFF` as `emit: "flag"` (NMOS :173, PMOS :278); add `emitGroup: { name: "IC", index: 0\|1\|2 }` to ICVDS/ICVGS/ICVBS (NMOS :174-176, PMOS :279-281); remove `NSUB`/`NSS` from MOS-L1 schema and all preset constants (§3.7b). | 3.2, 3.3, 3.7b |
+| `src/components/semiconductors/mosfet.ts` (preset constants) and any other files setting `NSUB`/`NSS` on MOSFET presets | Delete `NSUB`/`NSS` keys from MOS-L1 schema and all presets. | 3.7b |
+| `src/components/semiconductors/njfet.ts`, `src/components/semiconductors/pjfet.ts` | Mark `OFF` as `emit: "flag"` in both. | 3.2 |
 | `src/solver/analog/__tests__/harness/netlist-generator.ts` | Delete `DEVICE_NETLIST_RULES` table, `tunnelLevel` helper, `REFTEMP` constant, every special-case branch in `instanceParamSuffix` and `modelCardSuffix`. Replace with the schema-driven version in §2.3. Plumb `ModelEntry.spice` to `modelCardSuffix`. | 2.3, 3.1-3.7b |
-| `src/solver/analog/__tests__/harness/netlist-generator.test.ts` | Update three NSUB/NSS "dropped" tests to assert "emitted"; update three IBEQ/IBSW/NB plain-Diode LEVEL=3 tests (move to TunnelDiode). | 3.4, 3.7b |
+| `src/solver/analog/__tests__/harness/netlist-generator.test.ts` | Delete six NSUB/NSS tests (§3.7b, schema removed); delete five LEVEL=3 tests (§3.7a, TunnelDiode excluded from parity); everything else passes unchanged. | 3.4, 3.7a, 3.7b |
 | `src/components/semiconductors/__tests__/diode.test.ts` | Remove `expect(DIODE_PARAM_DEFAULTS.IBEQ/IBSW/NB).toBe(...)` assertions at :1511-1513; add equivalents to tunnel-diode.test.ts. | 3.4 |
-| `src/components/semiconductors/__tests__/tunnel-diode.test.ts` | Add IBEQ/IBSW/NB partition assertions; assert ModelEntry.spice.modelCardPrefix === ["LEVEL=3"]. | 3.4, 3.7a |
-| `src/components/semiconductors/__tests__/bjt.test.ts` | Delete `SUBS` getModelParam / defaults assertions (:1986, :3017, :3026); add `spice-l1-lateral` ModelEntry existence + lateral-vs-vertical c4 stamp assertions. | 3.5 |
+| `src/components/semiconductors/__tests__/tunnel-diode.test.ts` | Add IBEQ/IBSW/NB partition assertions; add comment noting ngspice parity is not tested pending SPICE-L3 port (§3.7a). | 3.4 |
+| `src/components/semiconductors/__tests__/bjt.test.ts` | Delete `SUBS` getModelParam / defaults assertions (:1986, :3017, :3026); add `"spice-lateral"` ModelEntry existence + lateral-vs-vertical c4 stamp assertions. | 3.5 |
 | `src/core/__tests__/model-params.test.ts` (new or extend existing) | Add forwarding tests for `spiceName`, `emit`, `emitGroup`. | 3.1 |
 
 Schema and generator files: ~10. Tests: ~5. The blast radius is contained and the changes are mechanical.
@@ -620,21 +580,25 @@ There is no "predicate-per-param" trade-off offered because Section 3.4 already 
 
 ## 7. Execution Order
 
-Do the work in this sequence. Each step lands cleanly and the suite stays green between steps; do not collapse them into a single mega-PR.
+Do the work in this sequence. Each step is intended to land cleanly without breaking the steps that follow; do not collapse them into a single mega-PR.
 
-**Step 1 — Extend the type system.** Edit `src/core/registry.ts` (`ParamDef` new fields `spiceName`/`emit`/`emitGroup`, `ModelEntry.spice`) and `src/core/model-params.ts` (ParamSpec extensions and field forwarding). Add `src/core/__tests__/model-params.test.ts` assertions that the new fields round-trip from `defineModelParams` to `paramDefs`. Run `npm run test:q -- model-params`. No component yet sets the new fields, so existing tests pass without change.
+**Test-suite status note.** The vitest suite is currently in an infinite-hang state from work prior to this cleanup (see the "Open question" in `spec/ngspice-netlist-generator-cleanup.md`). Until that is resolved, the verification gate for each step below is **(a) tsc compiles cleanly** and **(b) the targeted hand-run sanity check named in the step**, not a full vitest invocation. Do not introduce new commands like `npm run test:q -- X` into commit hooks or CI as part of this work — the hang must be fixed independently before whole-suite gating returns.
 
-**Step 2 — Migrate per-param fields on every component schema.** Edit each component file in §4 to add `emit: "flag"` on every OFF; `spiceName: "JSW"` on Diode's ISW; `emitGroup` on the three MOS IC keys. Do this WITHOUT touching the netlist generator yet — the schema is now correct in declaration but the generator is still consulting its own table. Run the existing test suite; all tests pass because the generator is unchanged.
+**Step 1 — Extend the type system.** Edit `src/core/registry.ts` (`ParamDef` new fields `spiceName`/`emit`/`emitGroup`, `ModelEntry.spice`) and `src/core/model-params.ts` (ParamSpec extensions and field forwarding). Add `src/core/__tests__/model-params.test.ts` assertions that the new fields round-trip from `defineModelParams` to `paramDefs`. Sanity check: tsc clean across the touched files; no component yet sets the new fields, so the change is purely additive.
 
-**Step 3a — Split Diode / TunnelDiode schemas (§3.4).** Move IBEQ/IBSW/NB out of DIODE_PARAM_DEFS into TUNNEL_DIODE_PARAM_DEFS. Update `createDiodeElement` to stop reading them. Add `spice: { modelCardPrefix: ["LEVEL=3"] }` to TunnelDiode's ModelEntry. Update `diode.test.ts:1511-1513` and `tunnel-diode.test.ts` accordingly. Run `npm run test:q -- diode tunnel-diode`. (The netlist generator is still consulting its rule table at this point, which still includes `modelCardDropUnlessTunnel: ["IBEQ","IBSW","NB"]` — those keys simply will not appear on plain-Diode props anymore, so the rule becomes a no-op. The harness tests still pass.)
+**Step 2 — Migrate per-param fields on every component schema.** Edit each component file in §4 to add `emit: "flag"` on every OFF; `spiceName: "JSW"` on Diode's ISW; `emitGroup` on the three MOS IC keys. Do this WITHOUT touching the netlist generator yet — the schema is now correct in declaration but the generator is still consulting its own table. Sanity check: tsc clean; spot-check that `defineModelParams` returns `ParamDef`s with the new fields populated by reading them in a one-off REPL line or temporary log.
 
-**Step 3b — BJT topology as model variants (§3.5).** Delete `SUBS` from BJT_SPICE_L1 NPN/PNP instance groups; delete from params init; convert the L1 factory to take a closure-captured `isLateral` boolean; replace `params.SUBS === 0` at `bjt.ts:1142` with the closure constant. Add `spice-l1-lateral` ModelEntry to NpnBJTDefinition and PnpBJTDefinition (sharing paramDefs and defaults with the vertical entry). Delete the three SUBS assertions from `bjt.test.ts` and the SUBS setModelParam from `netlist-generator.test.ts:542`. Add a lateral-vs-vertical c4 stamp test. Run `npm run test:q -- bjt`. The harness still passes (the rule-table entry for `SUBS` becomes a no-op once the schema no longer carries the key).
+**Step 3a — Split Diode / TunnelDiode schemas (§3.4).** Move IBEQ/IBSW/NB out of DIODE_PARAM_DEFS into TUNNEL_DIODE_PARAM_DEFS. Update `createDiodeElement` to stop reading them (hoist tunnel block into `diodeLoadTunnel` per §3.4 step 2). Do NOT add `spice.modelCardPrefix` to TunnelDiode — it is excluded from ngspice parity (see §3.7a). Update `diode.test.ts:1511-1513` and `tunnel-diode.test.ts` accordingly. Sanity check: tsc clean; the netlist generator is still consulting its rule table at this point, which still includes `modelCardDropUnlessTunnel: ["IBEQ","IBSW","NB"]` — those keys simply will not appear on plain-Diode props anymore, so the rule becomes a no-op.
 
-**Step 4 — Rewrite the generator (§2.3).** Delete `DEVICE_NETLIST_RULES`, `tunnelLevel`, `REFTEMP`, every per-device branch (including `instanceDropAlways`, which is unused after Step 3b deletes SUBS from the schema). Implement the schema-driven `instanceParamSuffix` and `modelCardSuffix` as written. Plumb `ModelEntry.spice` through `generateSpiceNetlist`. Update `netlist-generator.test.ts`: flip three NSUB/NSS dropped→emitted; rewrite the LEVEL=3 tests to TunnelDiode-only; everything else passes unchanged. Run `npm run test:q -- harness`.
+**Step 3b — BJT topology as model variants (§3.5).** Delete `SUBS` from BJT_SPICE_L1 NPN/PNP instance groups; delete from params init; convert the L1 factory to the `createBjtL1Element(isLateral)` factory-of-factory shape per §3.5; replace `params.SUBS === 0` at `bjt.ts:1142` with the closure constant. Add `"spice-lateral"` ModelEntry to NpnBJTDefinition and PnpBJTDefinition (sharing paramDefs and defaults with the vertical entry); confirm `defaultModel` stays `"spice"`. Delete the three SUBS assertions from `bjt.test.ts` and the SUBS setModelParam from `netlist-generator.test.ts:542`. Add the lateral-variant existence, default-model preservation, lateral-vs-vertical c4 stamp, and model-swap tests per §3.5 "Test impact". Sanity check: tsc clean; the new c4 stamp test passes when run in isolation (vitest's `run -t <name>` against a single test should not hang since the hang is a whole-suite issue).
 
-**Step 5 — Verify ngspice parity.** Run the full harness/parity suite with `NGSPICE_LOG=1` (per `spec/ngspice-netlist-generator-cleanup.md` §2). Confirm zero `Error on` / `unknown parameter` / `unrecognized parameter` lines from ngspice. If any appear, the schema migration in Step 2 missed a flag/group; do not re-introduce a generator special case — fix the schema.
+**Step 3c — Remove `NSUB`/`NSS` from MOSFET schema (§3.7b).** Edit `mosfet.ts` to delete `NSUB` and `NSS` from `MOSFET_NMOS_PARAM_DEFS.secondary` and `MOSFET_PMOS_PARAM_DEFS.secondary`. Audit and edit every MOSFET preset constant in `src/components/semiconductors/` that sets `NSUB`/`NSS` and remove those keys. Update `mosfet.test.ts` and preset-validation tests to drop the corresponding assertions. Sanity check: tsc clean; run `mosfet.test.ts` and any preset-validation tests in isolation. The netlist generator still has its `modelCardDropIfZero` mask at this point — it becomes a no-op (since the keys are gone from the schema), and Step 4 deletes the mask entirely.
 
-**Step 6 — Mark the predecessor doc resolved.** Update `spec/ngspice-netlist-generator-cleanup.md` "Cleanup needed" sections A, B, C, D to reference this proposal as their resolution and the relevant commit IDs. The "Open question" worker-crash section is unrelated to this cleanup and stays open.
+**Step 4 — Rewrite the generator (§2.3).** Delete `DEVICE_NETLIST_RULES`, `tunnelLevel`, `REFTEMP`, every per-device branch (including `instanceDropAlways`, which is unused after Step 3b deletes SUBS from the schema). Implement the schema-driven `instanceParamSuffix` and `modelCardSuffix` as written. Plumb `ModelEntry.spice` through `generateSpiceNetlist`. Update `netlist-generator.test.ts`: delete six NSUB/NSS tests (schema removed in Step 3c); delete five LEVEL=3 tests (TunnelDiode excluded from parity per §3.7a); everything else passes unchanged. Sanity check: tsc clean; run the netlist-generator unit tests in isolation (single-file vitest invocation, not whole-suite). **Steps 4 and 5 must be merged sequentially without other commits interleaved.** Step 5 is the regression gate for harness-integration and parity fixtures; do not merge Step 4 to the main branch in isolation. Land the two-step pair atomically.
+
+**Step 5 — Verify ngspice parity.** Run the harness/parity suite *one file at a time* with `NGSPICE_LOG=1` (per `spec/ngspice-netlist-generator-cleanup.md` §2) — single-file invocations sidestep the whole-suite hang. Confirm zero `Error on` / `unknown parameter` / `unrecognized parameter` lines from ngspice across every harness fixture. If any appear, the schema migration in Step 2 missed a flag/group; do not re-introduce a generator special case — fix the schema.
+
+**Step 6 — Mark the predecessor doc resolved.** Update `spec/ngspice-netlist-generator-cleanup.md` "Cleanup needed" sections A, B, C, D to reference this proposal as their resolution and the relevant commit IDs. The "Open question" worker-crash / test-hang section is unrelated to this cleanup and stays open.
 
 After Step 6, `netlist-generator.ts` is a generator, not a translator. The hard-coded device knowledge is gone, and adding a new analog component requires only declaring its `paramDefs` correctly — no edits to `__tests__/` infrastructure.
 
@@ -655,7 +619,7 @@ After Step 6, `netlist-generator.ts` is a generator, not a translator. The hard-
 - `src/components/semiconductors/tunnel-diode.ts:524-532` — TunnelDiodeDefinition.modelRegistry, target of the new `spice` field
 - `src/components/semiconductors/bjt.ts:175,237` — SUBS declarations to delete from BJT_SPICE_L1 instance groups
 - `src/components/semiconductors/bjt.ts:1046,1142` — runtime SUBS reads to replace with closure-captured `isLateral`
-- `src/components/semiconductors/bjt.ts` `NpnBJTDefinition.modelRegistry` / `PnpBJTDefinition.modelRegistry` — target for new `spice-l1-lateral` ModelEntry rows
+- `src/components/semiconductors/bjt.ts` `NpnBJTDefinition.modelRegistry` / `PnpBJTDefinition.modelRegistry` — target for new `"spice-lateral"` ModelEntry rows
 - `src/components/semiconductors/mosfet.ts:174-176, 279-281` — ICVDS/ICVGS/ICVBS, target of `emitGroup`
 - `src/solver/analog/__tests__/harness/netlist-generator.test.ts:417-748` — test file with the assertions to update
 - `spec/ngspice-netlist-generator-cleanup.md` — predecessor handoff document

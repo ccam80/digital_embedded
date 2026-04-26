@@ -555,8 +555,10 @@ describe("ipass hadNodeset gate", () => {
 
 describe("NR singular retry", () => {
   it("nr_retries_with_reorder_after_numerical_singular", () => {
-    // Verify that when factor() returns { success: false } with lastFactorUsedReorder=false
+    // Verify that when factor() returns { success: false, usedReorder: false }
     // (numerical path), the NR loop calls forceReorder() and retries factor().
+    // Stage 6.3.3 — `lastFactorUsedReorder` instance field deleted; the per-call
+    // signal is now `FactorResult.usedReorder` returned by factor().
     const diagnostics = new DiagnosticCollector();
 
     let forceReorderCalled = false;
@@ -570,13 +572,10 @@ describe("NR singular retry", () => {
           return () => {
             factorCallCount++;
             if (factorCallCount === 1) {
-              return { success: false };
+              return { success: false, usedReorder: false };
             }
             return (target as SparseSolver).factor();
           };
-        }
-        if (prop === "lastFactorUsedReorder") {
-          return factorCallCount <= 1 ? false : (target as SparseSolver).lastFactorUsedReorder;
         }
         if (prop === "forceReorder") {
           return () => {
@@ -608,8 +607,10 @@ describe("NR singular retry", () => {
   });
 
   it("nr_emits_singular_diagnostic_when_reorder_also_fails", () => {
-    // When factor() always fails and lastFactorUsedReorder is true (reorder path),
-    // NR must emit a singular-matrix diagnostic and return converged=false.
+    // When factor() always fails and the failed result advertises usedReorder=true
+    // (reorder path), NR must emit a singular-matrix diagnostic and return
+    // converged=false. Stage 6.3.3 — usedReorder lives on FactorResult, not the
+    // solver instance.
     const diagnostics = new DiagnosticCollector();
 
     const realSolver = new SparseSolver();
@@ -618,11 +619,8 @@ describe("NR singular retry", () => {
       get(target, prop) {
         if (prop === "factor") {
           return () => {
-            return { success: false };
+            return { success: false, usedReorder: true };
           };
-        }
-        if (prop === "lastFactorUsedReorder") {
-          return true;
         }
         const val = (target as unknown as Record<string | symbol, unknown>)[prop];
         if (typeof val === "function") return val.bind(target);
@@ -770,13 +768,10 @@ describe("NR E_SINGULAR recovery via continue", () => {
             factorCallCount++;
             if (factorCallCount === 2) {
               singularIterationSeen = true;
-              return { success: false };
+              return { success: false, usedReorder: false };
             }
             return (target as SparseSolver).factor();
           };
-        }
-        if (prop === "lastFactorUsedReorder") {
-          return factorCallCount === 2 ? false : (target as SparseSolver).lastFactorUsedReorder;
         }
         if (prop === "forceReorder") {
           return () => {
@@ -833,13 +828,10 @@ describe("NR E_SINGULAR recovery via continue", () => {
             factorCallCount++;
             if (factorCallCount === 2) {
               singularSeen = true;
-              return { success: false };
+              return { success: false, usedReorder: false };
             }
             return (target as SparseSolver).factor();
           };
-        }
-        if (prop === "lastFactorUsedReorder") {
-          return factorCallCount === 2 ? false : (target as SparseSolver).lastFactorUsedReorder;
         }
         if (prop === "forceReorder") {
           return () => {

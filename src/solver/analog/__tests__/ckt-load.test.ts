@@ -298,6 +298,10 @@ describe('E_SINGULAR', () => {
     const elements = [Vs, R];
 
     let factorCallCount = 0;
+    // Stage 6.3.3 — `lastFactorUsedReorder` instance field deleted; per-call
+    // signal is now `FactorResult.usedReorder` returned by factor(). Capture
+    // the returned result on the proxy and assert against the last one.
+    let lastFactorResult: { success: boolean; usedReorder?: boolean } | undefined;
 
     const realSolver = new SparseSolver();
 
@@ -307,13 +311,14 @@ describe('E_SINGULAR', () => {
           return () => {
             factorCallCount++;
             if (factorCallCount === 1) {
-              return { success: false };
+              const r = { success: false, usedReorder: false };
+              lastFactorResult = r;
+              return r;
             }
-            return (target as SparseSolver).factor();
+            const r = (target as SparseSolver).factor();
+            lastFactorResult = r;
+            return r;
           };
-        }
-        if (prop === 'lastFactorUsedReorder') {
-          return factorCallCount >= 2 ? true : false;
         }
         if (prop === 'forceReorder') {
           return () => {
@@ -333,7 +338,7 @@ describe('E_SINGULAR', () => {
 
     expect(ctx.nrResult.converged).toBe(true);
     expect(factorCallCount).toBeGreaterThanOrEqual(2);
-    expect(ctx.solver.lastFactorUsedReorder).toBe(true);
+    expect(lastFactorResult?.usedReorder).toBe(true);
     expect(ctx.nrResult.iterations).toBe(3);
   });
 });

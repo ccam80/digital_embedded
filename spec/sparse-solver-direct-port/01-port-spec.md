@@ -27,6 +27,7 @@ detail in the cited stages.
 - **Gap 6 — `invalidateTopology` cleanup:** new sub-stage **Stage 4C** enumerates every field `spStripMatrix` clears.
 - **Gap 7 — `Elements` / `Originals` / `Fillins` counters:** new sub-stage **Stage 4B** introduces the three instance fields and wires the increments at the same sites ngspice does.
 - **Gap 8 — `beginAssembly` ngspice home:** investigated three candidates (`spClear`, `spcCreateInternalVectors`, `SMPpreOrder`); the steady-state body maps to `SMPclear` -> `spClear`, the first-call alloc maps to `spCreate` + `spcCreateInternalVectors`. New sub-stage **Stage 4A** restructures `beginAssembly` to mirror that. **No `architectural-alignment.md` escalation needed.**
+- **Stage 1 inter-stage dependency:** `_linkRows` must write `_elCol[e]` to mirror `spcLinkRows` at `spbuild.c:923`. Discovered when tests hung after first Stage 1 application.
 
 ---
 
@@ -172,6 +173,30 @@ ngspice topology. The ordering is:
 
 ## Stage 1 — Lazy Row-Link
 
+### 1.0 Inter-stage dependency note (READ BEFORE EDITING)
+
+The edits in this stage form a chain: `_swapColumns` -> `_linkRows` ->
+`_countMarkowitz`. Specifically, edit 1.3.7 removes `_swapColumns`'s
+`_elCol[e]` rewrite (correctly mirroring `SwapCols` at `sputils.c:283-301`
+which does not touch element fields). The post-condition is that
+`_elCol[e]` becomes stale for every element on a swapped column.
+
+ngspice resolves this in `spcLinkRows` (`spbuild.c:907-932`): the inner
+walk at `spbuild.c:923` writes `pElement->Col = Col;` for every element
+it sees, refreshing every `Col` field. digiTS's existing `_linkRows`
+was written by the prior lazy-link-port author as a workaround that
+left the `_elCol[e]` write in `_swapColumns`; if Stage 1 removes the
+`_swapColumns` write WITHOUT also adding the `_linkRows` write, every
+element on a swapped column ends up with stale `_elCol[e]`. The
+downstream effect is `_countMarkowitz` reading the wrong column for
+those elements -> bad pivot decisions -> likely hang via runaway
+reorder oscillation.
+
+**Lesson:** edits 1.3.7 and 1.3.11 are not independent. Apply them
+together in the same commit; verification gate (§1.4) will not catch
+the bug if 1.3.11 is skipped because the failure mode is a hang, not a
+specific test failure.
+
 ### 1.1 Why this stage
 
 Removes the workaround chain (`_diag[col]` set in `_createFillin`,
@@ -199,7 +224,7 @@ exist during assembly or preorder". Every later stage assumes this.
 | 1.3.8 | `preorder` line 756 `if (anySwap) this._linkRows();` | DELETE the line. Remove the now-dead `anySwap` local declared at line 720. | `spMNA_Preorder` `sputils.c:177-230` does not touch row chains. |
 | 1.3.9 | `factorWithReorder` lines 1427-1448 do not gate on `_rowsLinked` | At top of method body, before `_applyDiagGmin`, add `if (!this._rowsLinked) { this._linkRows(); this._rowsLinked = true; }`. | `spOrderAndFactor` `spfactor.c:246-247` |
 | 1.3.10 | `invalidateTopology` lines 666-674 do not clear `_rowsLinked` | Add `this._rowsLinked = false;` to the body. | `spStripMatrix` `sputils.c:1111` |
-| 1.3.11 | `_linkRows` writes `_elPrevInRow[e]` (lines 777-778) | KEEP for now; deleted in Stage 2. | (Stage 2) |
+| 1.3.11 | `_linkRows` writes `_elPrevInRow[e]` (lines 777-778) but does NOT write `_elCol[e]` | TWO edits: (a) KEEP the prev-pointer maintenance for now; deleted in Stage 2. (b) ADD `this._elCol[e] = col;` inside the inner column-walk loop, before the row-chain head insert. Mirrors ngspice `spcLinkRows` at `spbuild.c:923` (`pElement->Col = Col;`). Without this write, edit 1.3.7 (which removes `_swapColumns`'s `_elCol[e]` rewrite) leaves `_elCol[e]` permanently stale for every element on a swapped column. The two edits are coupled — see §1.0. | `spbuild.c:923` |
 | 1.3.12 | `_initStructure` does not set `_rowsLinked` | Add `this._rowsLinked = false;` in the same block as `this._factored = false;` (lines 992-996). | `spalloc.c:173` |
 | 1.3.13 | `_resetForAssembly` does not touch `_rowsLinked` | Confirm: `_rowsLinked` MUST stay true across `_resetForAssembly` (NR loop re-stamp). | `spClear` `spbuild.c:96-142` does not clear `RowsLinked`. |
 
@@ -226,6 +251,13 @@ If `resistive-divider` or `_diag-rc-transient` regresses, the lazy-link
 gate is wrong. Suspect a missed `_rowsLinked` check at a row-chain
 read site. Do not patch around it. Revert Stage 1 and re-audit
 `Grep`-list of every read of `_rowHead`, `_elNextInRow`, `_elPrevInRow`.
+
+If the harness shows Markowitz pivot search picking pivots inconsistent
+with the post-preorder column structure (or the suite hangs in
+`_numericLUMarkowitz` / `_countMarkowitz` after the first preorder
+swap), suspect a missing `_elCol[e] = col` write inside `_linkRows()`.
+Verify against `spbuild.c:923` (`pElement->Col = Col;`). Edit 1.3.11
+must add this write — see §1.0 dependency note.
 
 ---
 

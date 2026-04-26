@@ -171,6 +171,8 @@ entry. Leaves the netlist a little more verbose but removes a layer of
 "why is this here" config. The unit tests in section 5 already use
 non-default values, so they'd keep passing.
 
+**Resolved by:** `spec/ngspice-netlist-generator-architecture.md` §3.7 (`instanceDropIfDefault` deleted as a concept).
+
 ### B. The `instanceDropAlways: ["SUBS"]` rule masks a data-model bug
 
 `SUBS` ("Substrate topology: 1=VERTICAL, 0=LATERAL") is a digiTS-internal
@@ -187,6 +189,8 @@ unconditionally.
 If that change lands, `instanceDropAlways` and the rule entry for it can be
 deleted from `netlist-generator.ts`.
 
+**Resolved by:** `spec/ngspice-netlist-generator-architecture.md` §3.5 (BJT topology becomes a `modelRegistry` entry — `"spice"` for vertical, `"spice-lateral"` for lateral. `SUBS` deleted from the schema; `instanceDropAlways` deleted from the generator).
+
 ### C. `modelCardDropUnlessTunnel: ["IBEQ","IBSW","NB"]` masks a paramDefs
        sharing bug
 
@@ -202,6 +206,8 @@ contain `IBEQ`, `IBSW`, `NB`. Only TunnelDiode's should. Once split, the
 tunnelLevel` only needs to remain on TunnelDiode (where the params actually
 exist).
 
+**Resolved by:** `spec/ngspice-netlist-generator-architecture.md` §3.4 (Diode/TunnelDiode schemas split — `IBEQ`/`IBSW`/`NB` move to `TUNNEL_DIODE_PARAM_DEFS`; `modelCardDropUnlessTunnel` deleted; TunnelDiode excluded from ngspice parity, see §3.7a).
+
 ### D. Pre-existing `modelCardDropIfZero: ["NSUB","NSS"]` (not added by me)
 
 Same flavour as the above: ngspice MOS1 silently uses the simple-Level-1
@@ -209,6 +215,8 @@ derivation when `nsub=0`, which is what we want, but a `dropIfZero` rule is
 indirect. If we want to be explicit, we should not declare `NSUB`/`NSS` in
 paramDefs at all unless the model genuinely uses them. Out of scope for
 this cleanup but flagged.
+
+**Resolved by:** `spec/ngspice-netlist-generator-architecture.md` §3.7b (`modelCardDropIfZero` deleted AND `NSUB`/`NSS` removed from MOS-L1 schema and all preset constants — Step 3c).
 
 ---
 
