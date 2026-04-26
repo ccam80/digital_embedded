@@ -156,6 +156,7 @@ export const { paramDefs: LED_PARAM_DEFS, defaults: LED_DEFAULTS } = defineModel
     TT:   { default: 0,      unit: "s", description: "Transit time" },
     FC:   { default: 0.5,               description: "Forward-bias capacitance coefficient" },
     TEMP: { default: 300.15, unit: "K", description: "Per-instance operating temperature" },
+    OFF:  { default: 0,                 description: "Initial condition: device off (0=false, 1=true)" },
   },
 });
 
@@ -211,6 +212,7 @@ function createLedAnalogElement(
     TT:   props.getModelParam<number>("TT"),
     FC:   props.getModelParam<number>("FC"),
     TEMP: props.getModelParam<number>("TEMP"),
+    OFF:  props.getModelParam<number>("OFF"),
   };
 
   const hasCapacitance = params.CJO > 0 || params.TT > 0;

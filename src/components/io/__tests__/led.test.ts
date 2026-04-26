@@ -797,7 +797,7 @@ describe("AnalogLED", () => {
   it("analog_factory_produces_nonlinear_element", () => {
     const props = new PropertyBag();
     props.set("color", "red");
-    props.replaceModelParams({ IS: 3.17e-19, N: 1.8, CJO: 0, VJ: 1, M: 0.5, TT: 0, FC: 0.5, TEMP: 300.15 });
+    props.replaceModelParams({ ...LED_DEFAULTS });
     const core = getFactory(LedDefinition.modelRegistry!.red!)!(new Map([["in", 1]]), [], -1, props, () => 0);
     const { element } = withState(core);
     expect(element.isNonlinear).toBe(true);
@@ -821,7 +821,7 @@ describe("AnalogLED", () => {
 
     const props = new PropertyBag();
     props.set("color", "red");
-    props.replaceModelParams({ IS: 3.17e-19, N: 1.8, CJO: 0, VJ: 1, M: 0.5, TT: 0, FC: 0.5, TEMP: 300.15 });
+    props.replaceModelParams({ ...LED_DEFAULTS });
     const ledCore = getFactory(LedDefinition.modelRegistry!.red!)!(new Map([["in", 1]]), [], -1, props, () => 0);
     const { element: ledStateWrapped } = withState(ledCore);
     const led = withNodeIds(ledStateWrapped, [1, 0]);
@@ -852,7 +852,7 @@ describe("AnalogLED", () => {
 
     const props = new PropertyBag();
     props.set("color", "blue");
-    props.replaceModelParams({ IS: 6.26e-24, N: 2.5, CJO: 0, VJ: 1, M: 0.5, TT: 0, FC: 0.5, TEMP: 300.15 });
+    props.replaceModelParams({ ...LED_DEFAULTS, IS: 6.26e-24, N: 2.5 });
     const ledCore = getFactory(LedDefinition.modelRegistry!.blue!)!(new Map([["in", 1]]), [], -1, props, () => 0);
     const { element: ledStateWrapped } = withState(ledCore);
     const led = withNodeIds(ledStateWrapped, [1, 0]);
@@ -901,7 +901,7 @@ describe("integration", () => {
 
     const props = new PropertyBag();
     props.set("color", "red");
-    props.replaceModelParams({ IS, N, CJO, VJ, M, TT, FC, TEMP: 300.15 });
+    props.replaceModelParams({ ...LED_DEFAULTS, IS, N, CJO, VJ, M, TT, FC });
     const core = getFactory(LedDefinition.modelRegistry!.red!)!(new Map([["in", 1]]), [], -1, props, () => 0);
 
     const pool = new StatePool(6);
@@ -996,7 +996,7 @@ describe("LED limitingCollector", () => {
   function makeLedCoreWithPool(overrides?: { label?: string; elementIndex?: number }) {
     const props = new PropertyBag();
     props.set("color", "red");
-    props.replaceModelParams({ IS: 3.17e-19, N: 1.8, CJO: 0, VJ: 1, M: 0.5, TT: 0, FC: 0.5, TEMP: 300.15 });
+    props.replaceModelParams({ ...LED_DEFAULTS });
     const core = getFactory(LedDefinition.modelRegistry!.red!)!(new Map([["in", 1]]), [], -1, props, () => 0);
     (core as unknown as { label: string }).label = overrides?.label ?? "LED1";
     (core as unknown as { elementIndex: number }).elementIndex = overrides?.elementIndex ?? 7;

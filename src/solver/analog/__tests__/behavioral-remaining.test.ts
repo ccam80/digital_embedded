@@ -42,7 +42,7 @@ import { DriverDefinition } from "../../../components/wiring/driver.js";
 import { DriverInvSelDefinition } from "../../../components/wiring/driver-inv.js";
 import { SplitterDefinition } from "../../../components/wiring/splitter.js";
 import { BusSplitterDefinition } from "../../../components/wiring/bus-splitter.js";
-import { LedDefinition } from "../../../components/io/led.js";
+import { LedDefinition, LED_DEFAULTS } from "../../../components/io/led.js";
 import { SevenSegDefinition } from "../../../components/io/seven-seg.js";
 import { SevenSegHexDefinition } from "../../../components/io/seven-seg-hex.js";
 import { RelayDefinition } from "../../../components/switching/relay.js";
@@ -209,7 +209,7 @@ describe("LED", () => {
    */
   it("forward_current_lights", () => {
     const props = new PropertyBag();
-    props.replaceModelParams({ IS: 3.17e-19, N: 1.8, CJO: 0, VJ: 1, M: 0.5, TT: 0, FC: 0.5 });
+    props.replaceModelParams({ ...LED_DEFAULTS });
 
     // LED: anode = circuit node 2, cathode = ground (0)
     const ledCore = getFactory(LedDefinition.modelRegistry!.red!)(new Map([["in", 2]]), [], -1, props, () => 0);

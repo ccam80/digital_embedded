@@ -437,8 +437,11 @@ describe("SparseSolver real MNA circuit", () => {
     const rawAg = new Float64Array(7);
     const rawCtx: import("../load-context.js").LoadContext = {
       solver: rawSolver,
-      voltages: rawVoltages,
+      matrix: rawSolver,
+      rhs: rawVoltages,
+      rhsOld: rawVoltages,
       cktMode: MODEDCOP | MODEINITFLOAT,
+      time: 0,
       dt: 0,
       method: "trapezoidal",
       order: 1,
@@ -447,10 +450,14 @@ describe("SparseSolver real MNA circuit", () => {
       srcFact: 1,
       noncon: { value: 0 },
       limitingCollector: null,
+      convergenceCollector: null,
       xfact: 1,
       gmin: 1e-12,
       reltol: 1e-3,
       iabstol: 1e-12,
+      temp: 300.15,
+      vt: 0.025852,
+      cktFixLimit: false,
       bypass: false,
       voltTol: 1e-6,
     };
@@ -1646,150 +1653,6 @@ describe("SparseSolver handle-based stamp API", () => {
     solver.solve(x2);
 
     void h00b; void h01b; void h10b; void h11b;
-  });
-});
-
-describe("SparseSolver CSC from linked structure", () => {
-  it("csc_solve_matches_linked_factor", () => {
-    // Build a 4x4 test matrix, factor with reorder (builds CSC from linked structure),
-    // then solve and verify the result matches direct computation.
-    // A = tridiagonal with diag=2, off-diag=-1, plus a non-symmetric entry.
-    // A[0][0]=4, A[0][1]=1, A[1][0]=1, A[1][1]=4, A[1][2]=1, A[2][1]=1, A[2][2]=4, A[2][3]=1, A[3][2]=1, A[3][3]=4
-    // b = [1,2,3,4]
-    const n = 4;
-    const solver = new SparseSolver();
-    solver.beginAssembly(n);
-    for (let i = 0; i < n; i++) solver.stampElement(solver.allocElement(i, i), 4);
-    for (let i = 0; i < n - 1; i++) {
-      solver.stampElement(solver.allocElement(i, i + 1), 1);
-      solver.stampElement(solver.allocElement(i + 1, i), 1);
-    }
-    for (let i = 0; i < n; i++) solver.stampRHS(i, i + 1);
-    solver.finalize();
-
-    const result = solver.factorWithReorder();
-    expect(result.success).toBe(true);
-
-    const x = new Float64Array(n);
-    solver.solve(x);
-
-    // Verify A*x = b
-    const A = [
-      [4, 1, 0, 0],
-      [1, 4, 1, 0],
-      [0, 1, 4, 1],
-      [0, 0, 1, 4],
-    ];
-    const b = [1, 2, 3, 4];
-    for (let i = 0; i < n; i++) {
-      let sum = 0;
-      for (let j = 0; j < n; j++) sum += A[i][j] * x[j];
-    }
-
-    // Verify the pool→CSC snapshot contract: _buildCSCFromLinked copies
-    // _elVal[e] into _lVals[li]/_uVals[ui] via the recorded indices. After
-    // factorWithReorder, every pool element with a valid CSC index must
-    // have _lVals[li] === _elVal[e] (IEEE-754 identity) and likewise for U.
-    const elCount = (solver as any)._elCount as number;
-    const lValueIndex = (solver as any)._lValueIndex as Int32Array;
-    const uValueIndex = (solver as any)._uValueIndex as Int32Array;
-    const elVal = (solver as any)._elVal as Float64Array;
-    const lVals = (solver as any)._lVals as Float64Array;
-    const uVals = (solver as any)._uVals as Float64Array;
-
-    let checkedL = 0, checkedU = 0;
-    for (let e = 0; e < elCount; e++) {
-      const li = lValueIndex[e];
-      if (li >= 0) { expect(lVals[li]).toBe(elVal[e]); checkedL++; }
-      const ui = uValueIndex[e];
-      if (ui >= 0) { expect(uVals[ui]).toBe(elVal[e]); checkedU++; }
-    }
-    expect(checkedL).toBeGreaterThan(0);
-    expect(checkedU).toBeGreaterThan(0);
-  });
-
-  it("numeric_refactor_reuses_csc_pattern", () => {
-    // Verify the sparsity-pattern contract of Task 0.1.3: factorNumerical()
-    // after factorWithReorder() must leave _lColPtr / _lRowIdx / _uColPtr /
-    // _uRowIdx byte-identical, with only _lVals / _uVals changing to reflect
-    // the new numeric values. Use a 4x4 symmetric diagonally-dominant matrix
-    // so Markowitz pivot order stays stable under value perturbation.
-    const n = 4;
-    const solver = new SparseSolver();
-    solver.beginAssembly(n);
-    const h00 = solver.allocElement(0, 0); solver.stampElement(h00, 10);
-    const h01 = solver.allocElement(0, 1); solver.stampElement(h01, 1);
-    const h03 = solver.allocElement(0, 3); solver.stampElement(h03, 2);
-    const h10 = solver.allocElement(1, 0); solver.stampElement(h10, 1);
-    const h11 = solver.allocElement(1, 1); solver.stampElement(h11, 10);
-    const h12 = solver.allocElement(1, 2); solver.stampElement(h12, 3);
-    const h21 = solver.allocElement(2, 1); solver.stampElement(h21, 3);
-    const h22 = solver.allocElement(2, 2); solver.stampElement(h22, 10);
-    const h23 = solver.allocElement(2, 3); solver.stampElement(h23, 1);
-    const h30 = solver.allocElement(3, 0); solver.stampElement(h30, 2);
-    const h32 = solver.allocElement(3, 2); solver.stampElement(h32, 1);
-    const h33 = solver.allocElement(3, 3); solver.stampElement(h33, 10);
-    solver.stampRHS(0, 10);
-    solver.stampRHS(1, 20);
-    solver.stampRHS(2, 30);
-    solver.stampRHS(3, 40);
-    solver.finalize();
-
-    const r1 = solver.factorWithReorder();
-    expect(r1.success).toBe(true);
-
-    // Snapshot the sparsity structure after the first reorder.
-    const lColPtrBefore = new Int32Array((solver as any)._lColPtr);
-    const lRowIdxBefore = new Int32Array((solver as any)._lRowIdx);
-    const uColPtrBefore = new Int32Array((solver as any)._uColPtr);
-    const uRowIdxBefore = new Int32Array((solver as any)._uRowIdx);
-    const lValsBefore = new Float64Array((solver as any)._lVals);
-
-    // Re-assemble with perturbed values (same sparsity, still diagonally
-    // dominant so pivot order does not change).
-    solver.beginAssembly(n);
-    solver.stampElement(h00, 12);
-    solver.stampElement(h01, 1.5);
-    solver.stampElement(h03, 2.5);
-    solver.stampElement(h10, 1.5);
-    solver.stampElement(h11, 11);
-    solver.stampElement(h12, 3.5);
-    solver.stampElement(h21, 3.5);
-    solver.stampElement(h22, 13);
-    solver.stampElement(h23, 1.5);
-    solver.stampElement(h30, 2.5);
-    solver.stampElement(h32, 1.5);
-    solver.stampElement(h33, 14);
-    solver.stampRHS(0, 10);
-    solver.stampRHS(1, 20);
-    solver.stampRHS(2, 30);
-    solver.stampRHS(3, 40);
-    solver.finalize();
-
-    const r2 = solver.factorNumerical();
-    expect(r2.success).toBe(true);
-
-    expect(Array.from((solver as any)._lColPtr as Int32Array)).toEqual(Array.from(lColPtrBefore));
-    expect(Array.from((solver as any)._lRowIdx as Int32Array)).toEqual(Array.from(lRowIdxBefore));
-    expect(Array.from((solver as any)._uColPtr as Int32Array)).toEqual(Array.from(uColPtrBefore));
-    expect(Array.from((solver as any)._uRowIdx as Int32Array)).toEqual(Array.from(uRowIdxBefore));
-    expect(Array.from((solver as any)._lVals as Float64Array)).not.toEqual(Array.from(lValsBefore));
-    expect(solver.lastFactorUsedReorder).toBe(false);
-
-    // Solve residual check on the perturbed matrix.
-    const x = new Float64Array(n);
-    solver.solve(x);
-    const A2: number[][] = [
-      [12, 1.5, 0, 2.5],
-      [1.5, 11, 3.5, 0],
-      [0, 3.5, 13, 1.5],
-      [2.5, 0, 1.5, 14],
-    ];
-    const b = [10, 20, 30, 40];
-    for (let i = 0; i < n; i++) {
-      let sum = 0;
-      for (let j = 0; j < n; j++) sum += A2[i][j] * x[j];
-    }
   });
 });
 

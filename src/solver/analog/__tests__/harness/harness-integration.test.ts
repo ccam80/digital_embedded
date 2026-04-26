@@ -368,13 +368,14 @@ describe("harness integration", () => {
   it("SparseSolver exposes dimension, getRhsSnapshot, getCSCNonZeros", () => {
     const { circuit } = makeHWR();
     engine.init(circuit);
-    engine.dcOperatingPoint();
     const solver = engine.solver!;
+    solver.enablePreFactorMatrixCapture(true);
+    engine.dcOperatingPoint();
     expect(solver.dimension).toBe(3);
     const rhs = solver.getRhsSnapshot();
     expect(rhs).toBeInstanceOf(Float64Array);
     expect(rhs.length).toBe(3);
-    const nz = solver.getCSCNonZeros();
+    const nz = solver.getPreFactorMatrixSnapshot();
     expect(nz.length).toBeGreaterThan(0);
     expect(nz[0]).toHaveProperty("row");
     expect(nz[0]).toHaveProperty("col");

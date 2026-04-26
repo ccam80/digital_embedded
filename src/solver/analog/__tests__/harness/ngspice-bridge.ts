@@ -176,9 +176,31 @@ export class NgspiceBridge {
     const SendStat = koffi.proto(`int SendStatCb${uid}(char*, int, void*)`);
     const ControlledExit = koffi.proto(`int ControlledExitCb${uid}(int, int, int, void*)`);
 
-    const charCb = koffi.register((_msg: any, _id: number, _ud: any) => 0, koffi.pointer(SendChar));
-    const statCb = koffi.register((_msg: any, _id: number, _ud: any) => 0, koffi.pointer(SendStat));
-    const exitCb = koffi.register((_status: number, _unload: number, _quit: number, _ud: any) => 0, koffi.pointer(ControlledExit));
+    // SendChar receives every line ngspice would print to stdout/stderr —
+    // including "Warning: parameter X ignored" notices when our netlist
+    // contains a model param ngspice's parser doesn't recognise. Silently
+    // swallowing them masked netlist bugs that left ngspice in a broken
+    // state and crashed the worker fork mid-run. NGSPICE_LOG=1 surfaces the
+    // stream so test fixtures can be debugged.
+    const logNgspice = process.env.NGSPICE_LOG === "1";
+    const charCb = koffi.register((msg: string, _id: number, _ud: any) => {
+      if (logNgspice && typeof msg === "string") {
+        process.stderr.write(`[ngspice] ${msg}\n`);
+      }
+      return 0;
+    }, koffi.pointer(SendChar));
+    const statCb = koffi.register((msg: string, _id: number, _ud: any) => {
+      if (logNgspice && typeof msg === "string") {
+        process.stderr.write(`[ngspice-stat] ${msg}\n`);
+      }
+      return 0;
+    }, koffi.pointer(SendStat));
+    const exitCb = koffi.register((status: number, _unload: number, _quit: number, _ud: any) => {
+      if (logNgspice) {
+        process.stderr.write(`[ngspice-exit] status=${status}\n`);
+      }
+      return 0;
+    }, koffi.pointer(ControlledExit));
 
     const initFn = this._lib.func(
       `int ngSpice_Init(SendCharCb${uid}*, SendStatCb${uid}*, ControlledExitCb${uid}*, void*, void*, void*, void*)`,

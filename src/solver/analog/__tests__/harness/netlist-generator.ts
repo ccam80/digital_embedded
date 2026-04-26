@@ -47,7 +47,46 @@ interface DeviceNetlistRules {
   renames?: Record<string, string>;
   modelCardPrefix?: (props: PropertyBag) => string[];
   modelCardDropIfZero?: string[];
+  /**
+   * Boolean-flag instance params. ngspice expects bare keywords (e.g. `OFF`)
+   * — emitting `OFF=0` produces a hard "unknown parameter (0)" parse error
+   * because ngspice consumes the keyword and then chokes on the trailing
+   * `=0`. Listed keys are emitted as bare uppercase keywords when their
+   * value is truthy and dropped when zero/false.
+   */
+  instanceFlags?: string[];
+  /**
+   * Instance params to omit when their value equals the listed default. ngspice
+   * has its own per-instance defaults (e.g. M=1, TEMP=$TNOM) and emitting them
+   * is at best noise and at worst trips parse warnings.
+   */
+  instanceDropIfDefault?: Record<string, number>;
+  /**
+   * MOS-style initial-condition triplet. ngspice MOS1 accepts only the combined
+   * form `IC=vds,vgs,vbs`; per-key `ICVDS=`/`ICVGS=`/`ICVBS=` are unrecognised
+   * and trigger the same "unknown parameter (0)" hard error described above.
+   * The listed keys are stripped from the standard instance suffix and, when
+   * any of them is non-zero, re-emitted as a single `IC=v1,v2,v3` token in
+   * canonical order (vds, vgs, vbs).
+   */
+  instanceCombineIC?: [string, string, string];
+  /**
+   * Model-card params that ngspice only accepts at LEVEL≥3 (tunnel-diode
+   * extension). For plain Diode and TunnelDiode at LEVEL=1 these would emit
+   * `Warning: unrecognized parameter (ibeq) - ignored` lines. Drop them
+   * unless the modelCardPrefix has actually requested LEVEL=3.
+   */
+  modelCardDropUnlessTunnel?: string[];
+  /**
+   * Instance-partition params that have no ngspice counterpart at all. They
+   * are diagnostic / topology hints internal to digiTS (e.g. BJT `SUBS`
+   * vertical/lateral flag) and produce hard "unknown parameter" parse
+   * errors when emitted on the SPICE instance line.
+   */
+  instanceDropAlways?: string[];
 }
+
+const REFTEMP = 300.15;
 
 function tunnelLevel(props: PropertyBag): string[] {
   const ibeq = props.hasModelParam("IBEQ") ? props.getModelParam<number>("IBEQ") : 0;
@@ -56,12 +95,60 @@ function tunnelLevel(props: PropertyBag): string[] {
 }
 
 const DEVICE_NETLIST_RULES: Record<string, DeviceNetlistRules> = {
-  Diode:        { renames: { ISW: "JSW" }, modelCardPrefix: tunnelLevel },
-  ZenerDiode:   { renames: { ISW: "JSW" } },
-  VaractorDiode:{ renames: { ISW: "JSW" } },
-  TunnelDiode:  { renames: { ISW: "JSW" }, modelCardPrefix: tunnelLevel },
-  NMOS:         { modelCardDropIfZero: ["NSUB", "NSS"] },
-  PMOS:         { modelCardDropIfZero: ["NSUB", "NSS"] },
+  Diode: {
+    renames: { ISW: "JSW" },
+    modelCardPrefix: tunnelLevel,
+    instanceFlags: ["OFF"],
+    instanceDropIfDefault: { TEMP: REFTEMP, AREA: 1, M: 1 },
+    modelCardDropUnlessTunnel: ["IBEQ", "IBSW", "NB"],
+  },
+  ZenerDiode: {
+    renames: { ISW: "JSW" },
+    instanceFlags: ["OFF"],
+    instanceDropIfDefault: { TEMP: REFTEMP, AREA: 1, M: 1 },
+  },
+  VaractorDiode: {
+    renames: { ISW: "JSW" },
+    instanceFlags: ["OFF"],
+    instanceDropIfDefault: { TEMP: REFTEMP, AREA: 1, M: 1 },
+  },
+  TunnelDiode: {
+    renames: { ISW: "JSW" },
+    modelCardPrefix: tunnelLevel,
+    instanceFlags: ["OFF"],
+    instanceDropIfDefault: { TEMP: REFTEMP, AREA: 1, M: 1 },
+    modelCardDropUnlessTunnel: ["IBEQ", "IBSW", "NB"],
+  },
+  NpnBJT: {
+    instanceFlags: ["OFF"],
+    instanceDropIfDefault: { TEMP: REFTEMP, AREA: 1, AREAB: 1, AREAC: 1, M: 1 },
+    instanceDropAlways: ["SUBS"],
+  },
+  PnpBJT: {
+    instanceFlags: ["OFF"],
+    instanceDropIfDefault: { TEMP: REFTEMP, AREA: 1, AREAB: 1, AREAC: 1, M: 1 },
+    instanceDropAlways: ["SUBS"],
+  },
+  NMOS: {
+    modelCardDropIfZero: ["NSUB", "NSS"],
+    instanceFlags: ["OFF"],
+    instanceDropIfDefault: { TEMP: REFTEMP, M: 1, AD: 0, AS: 0, PD: 0, PS: 0 },
+    instanceCombineIC: ["ICVDS", "ICVGS", "ICVBS"],
+  },
+  PMOS: {
+    modelCardDropIfZero: ["NSUB", "NSS"],
+    instanceFlags: ["OFF"],
+    instanceDropIfDefault: { TEMP: REFTEMP, M: 1, AD: 0, AS: 0, PD: 0, PS: 0 },
+    instanceCombineIC: ["ICVDS", "ICVGS", "ICVBS"],
+  },
+  NJFET: {
+    instanceFlags: ["OFF"],
+    instanceDropIfDefault: { TEMP: REFTEMP, AREA: 1, M: 1 },
+  },
+  PJFET: {
+    instanceFlags: ["OFF"],
+    instanceDropIfDefault: { TEMP: REFTEMP, AREA: 1, M: 1 },
+  },
 };
 
 // ---------------------------------------------------------------------------
@@ -231,16 +318,50 @@ export function generateSpiceNetlist(
 function instanceParamSuffix(
   paramDefs: readonly ParamDef[],
   props: PropertyBag,
-  _typeId: string,
+  typeId: string,
 ): string {
+  const rules = DEVICE_NETLIST_RULES[typeId];
+  const flagSet = new Set(rules?.instanceFlags ?? []);
+  const dropAlways = new Set(rules?.instanceDropAlways ?? []);
+  const dropDefaults = rules?.instanceDropIfDefault ?? {};
+  const icKeys = rules?.instanceCombineIC;
+  const icSet = new Set(icKeys ?? []);
+
   const parts: string[] = [];
+  let icVds = 0, icVgs = 0, icVbs = 0, icAny = false;
+
   for (const def of paramDefs) {
     if (def.partition !== "instance") continue;
     if (!props.hasModelParam(def.key)) continue;
+    if (dropAlways.has(def.key)) continue;
     const v = props.getModelParam<number>(def.key);
     if (typeof v !== "number" || !Number.isFinite(v)) continue;
+
+    // Combined IC=vds,vgs,vbs handling — collect, do not emit individually.
+    if (icSet.has(def.key)) {
+      if (def.key === icKeys![0]) icVds = v;
+      else if (def.key === icKeys![1]) icVgs = v;
+      else if (def.key === icKeys![2]) icVbs = v;
+      if (v !== 0) icAny = true;
+      continue;
+    }
+
+    // Boolean flags — bare keyword if truthy, omit if zero/false.
+    if (flagSet.has(def.key)) {
+      if (v !== 0) parts.push(def.key);
+      continue;
+    }
+
+    // Drop params that match an ngspice default to avoid noise / parse warnings.
+    if (def.key in dropDefaults && v === dropDefaults[def.key]) continue;
+
     parts.push(`${def.key}=${v}`);
   }
+
+  if (icKeys && icAny) {
+    parts.push(`IC=${icVds},${icVgs},${icVbs}`);
+  }
+
   return parts.length === 0 ? "" : ` ${parts.join(" ")}`;
 }
 
@@ -257,12 +378,13 @@ function modelCardSuffix(
 ): string {
   const rules = DEVICE_NETLIST_RULES[typeId];
   const dropIfZero = new Set(rules?.modelCardDropIfZero ?? []);
+  const dropUnlessTunnel = new Set(rules?.modelCardDropUnlessTunnel ?? []);
   const parts: string[] = [];
 
   // Prefix tokens (e.g. LEVEL=3) come first.
-  if (rules?.modelCardPrefix) {
-    parts.push(...rules.modelCardPrefix(props));
-  }
+  const prefixTokens = rules?.modelCardPrefix ? rules.modelCardPrefix(props) : [];
+  if (prefixTokens.length > 0) parts.push(...prefixTokens);
+  const tunnelMode = prefixTokens.some(t => /^LEVEL\s*=\s*3$/i.test(t));
 
   for (const def of paramDefs) {
     if (def.partition === "instance") continue;
@@ -270,6 +392,7 @@ function modelCardSuffix(
     const v = props.getModelParam<number>(def.key);
     if (typeof v !== "number" || !Number.isFinite(v)) continue;
     if (dropIfZero.has(def.key) && v === 0) continue;
+    if (!tunnelMode && dropUnlessTunnel.has(def.key)) continue;
     const emittedKey = rules?.renames?.[def.key] ?? def.key;
     parts.push(`${emittedKey}=${v}`);
   }

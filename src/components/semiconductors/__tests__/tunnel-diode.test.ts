@@ -559,7 +559,7 @@ describe("integration", () => {
     const ctx: import("../../../solver/analog/load-context.js").LoadContext = {
       cktMode: MODETRAN | MODEINITFLOAT,
       solver,
-      voltages: new Float64Array([vd, 0]),
+      rhsOld: new Float64Array([vd, 0]),
       dt,
       method: "trapezoidal",
       order: 2,

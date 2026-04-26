@@ -645,12 +645,16 @@ export function newtonRaphson(ctx: CKTCircuitContext): void {
     } else if (curInitf === MODEINITFIX) {
       if (ctx.noncon === 0) {
         ctx.cktMode = setInitf(ctx.cktMode, MODEINITFLOAT);
-        ipass = 1;
         if (ladder) {
           ladder.onModeEnd("dcopInitFix", iteration, false);
           ladder.onModeBegin("dcopInitFloat", iteration + 1);
         }
       }
+      // ngspice niiter.c:1069 sets ipass=1 unconditionally inside the
+      // MODEINITFIX branch, regardless of CKTnoncon. Keeping it inside the
+      // converged-only block diverged from ngspice on circuits where INITFIX
+      // does not converge in a single iteration.
+      ipass = 1;
     } else if (curInitf === MODEINITTRAN) {
       // B5 (Phase 2.5 W2.1): the NISHOULDREORDER trigger moved to the top of
       // the loop (before factor), matching ngspice niiter.c:856-859. Here we

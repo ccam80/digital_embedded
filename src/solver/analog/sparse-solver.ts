@@ -26,6 +26,15 @@ export interface FactorResult {
    * as a singular-matrix failure.
    */
   needsReorder?: boolean;
+  /**
+   * When `needsReorder === true`, the step at which `_numericLUReusePivots`
+   * rejected the stored pivot order. ngspice spOrderAndFactor shares its
+   * `Step` counter between the reuse loop (spfactor.c:217-227) and the
+   * reorder loop (spfactor.c:241+) — on rejection the reorder loop resumes
+   * at the same step. Steps `[0, rejectedAtStep)` are already factored in
+   * ngspice convention; the caller must not redo them.
+   */
+  rejectedAtStep?: number;
 }
 
 /**
@@ -76,36 +85,6 @@ export class SparseSolver {
   private _elNextInCol: Int32Array = new Int32Array(0);
   /** Prev element in same column (-1 = head). */
   private _elPrevInCol: Int32Array = new Int32Array(0);
-  /**
-   * CSC L-array index for element e (-1 if not in L).
-   * Set during _numericLUMarkowitz; used by _buildCSCFromLinked snapshot.
-   */
-  private _lValueIndex: Int32Array = new Int32Array(0);
-  /**
-   * CSC U-array index for element e (-1 if not in U).
-   * Set during _numericLUMarkowitz; used by _buildCSCFromLinked snapshot.
-   */
-  private _uValueIndex: Int32Array = new Int32Array(0);
-
-  /**
-   * Reverse maps: CSC position p → pool element index (or -1 if no backing
-   * pool element). Used by _numericLUReusePivots to keep _elVal[e] in sync
-   * with the factored L/U values written to the CSC arrays.
-   */
-  private _lCscToElem: Int32Array = new Int32Array(0);
-  private _uCscToElem: Int32Array = new Int32Array(0);
-
-  /**
-   * A-matrix handle CSR (ngspice-style flat pool-handle array): for each
-   * internal column k, _aMatrixHandlesByCol[_aMatrixColStart[k]..
-   * _aMatrixColStart[k+1]-1] lists the pool handles of all non-fill-in
-   * (A-matrix) entries in that column. Built inside _buildCSCFromLinked,
-   * consumed by _numericLUReusePivots — so the NR hot path scatters A
-   * values into the dense workspace without ever touching _colHead /
-   * _elNextInCol linked-list fields.
-   */
-  private _aMatrixColStart: Int32Array = new Int32Array(0);
-  private _aMatrixHandlesByCol: Int32Array = new Int32Array(0);
 
   /** First element in row r (-1 = empty). Length n. */
   private _rowHead: Int32Array = new Int32Array(0);
@@ -169,24 +148,6 @@ export class SparseSolver {
   // =========================================================================
   private _n = 0;
 
-  // =========================================================================
-  // CSC L/U for forward/backward substitution
-  // =========================================================================
-  private _lColPtr: Int32Array = new Int32Array(0);
-  private _lRowIdx: Int32Array = new Int32Array(0);
-  private _lVals: Float64Array = new Float64Array(0);
-
-  private _uColPtr: Int32Array = new Int32Array(0);
-  private _uRowIdx: Int32Array = new Int32Array(0);
-  private _uVals: Float64Array = new Float64Array(0);
-  // Per-pivot reciprocal of U[k,k] — written at factor time, read at solve.
-  // Mirrors ngspice spfactor.c:349/383/408 `Diag[Step]->Real = 1.0 / pivot`,
-  // which converts the diagonal to its reciprocal once so the elimination
-  // (`Mult = Dest * pElement->Real`, spfactor.c:368) and back-substitution
-  // (spsolve.c) can multiply instead of divide. `x*(1/p)` and `x/p` differ
-  // by 1 ULP in general, so storing the same reciprocal ngspice stores is
-  // required for IEEE-754 bit-exact parity in the LU pipeline.
-  private _uDiagInv: Float64Array = new Float64Array(0);
 
   // =========================================================================
   // Pivot permutation
@@ -196,19 +157,6 @@ export class SparseSolver {
   private _pinv: Int32Array = new Int32Array(0);
   private _q: Int32Array = new Int32Array(0);
 
-  // =========================================================================
-  // Dense workspace for factorization
-  // =========================================================================
-  private _x: Float64Array = new Float64Array(0);
-  private _xNzIdx: Int32Array = new Int32Array(0);
-
-  // =========================================================================
-  // DFS reach workspace
-  // =========================================================================
-  private _reachStack: Int32Array = new Int32Array(0);
-  private _dfsStack: Int32Array = new Int32Array(0);
-  private _dfsChildPtr: Int32Array = new Int32Array(0);
-  private _reachMark: Int32Array = new Int32Array(0);
 
   // =========================================================================
   // Scratch for solve
@@ -282,6 +230,14 @@ export class SparseSolver {
    * the _needsReorder flag: IS_FACTORED = _factored && !_needsReorder).
    */
   private _factored: boolean = false;
+  /**
+   * ngspice MatrixFrame.RowsLinked (spdefs.h:771). FALSE during assembly and
+   * preorder; flipped to TRUE by spcLinkRows on first factor entry. Single
+   * point of truth for whether row chains exist. Drives the two-branch in
+   * spcCreateElement (spbuild.c:776) and the gate in spOrderAndFactor
+   * (spfactor.c:246-247).
+   */
+  private _rowsLinked: boolean = false;
   /** True when linked structure has never been built, or after invalidateTopology(). */
   private _structureEmpty: boolean = true;
   /** Matrix size for which workspace arrays were last allocated. -1 = never. */
@@ -413,9 +369,11 @@ export class SparseSolver {
     // _newElement directly; ngspice's equivalent is spcGetFillin
     // (spbuild.c:779-782), which does NOT touch NeedsOrdering.
     const newE = this._newElement(row, internalCol, 0, 0);
-    this._insertIntoRow(newE, row);
+    // ngspice spcCreateElement (spbuild.c:776) — row insert only when
+    // RowsLinked == YES. During assembly and preorder, row chains do not
+    // exist; spcLinkRows builds them lazily on first factor entry.
+    if (this._rowsLinked) this._insertIntoRow(newE, row);
     this._insertIntoCol(newE, internalCol);
-    if (row === internalCol) this._diag[internalCol] = newE;
     this._needsReorder = true;
 
     // Record in handle table
@@ -565,9 +523,26 @@ export class SparseSolver {
     this.lastFactorUsedReorder = false;
     const result = this.factorNumerical(diagGmin);
     if (!result.success && result.needsReorder) {
+      // ngspice spOrderAndFactor: when the reuse loop at spfactor.c:217-227
+      // rejects at step k, control falls through to the reorder loop at
+      // spfactor.c:241+ which RESUMES at the same step — the `Step` counter
+      // is shared between the two loops, and steps [0, k) are already in
+      // ngspice-convention factored form. We must NOT re-stamp gmin (already
+      // applied by factorNumerical above) and must NOT restart from step 0.
+      const rejectedAtStep = result.rejectedAtStep ?? 0;
       this._needsReorder = true;
       this.lastFactorUsedReorder = true;
-      return this.factorWithReorder(/* diagGmin */ undefined);
+      this._allocateWorkspace();
+      const reorderResult = this._numericLUMarkowitz(rejectedAtStep);
+      if (reorderResult.success) {
+        // ngspice spfactor.c:279-281
+        //   Matrix->NeedsOrdering = NO;
+        //   Matrix->Reordered = YES;
+        //   Matrix->Factored = YES;
+        this._needsReorder = false;
+        this._factored = true;
+      }
+      return reorderResult;
     }
     return result;
   }
@@ -621,7 +596,8 @@ export class SparseSolver {
     // from ckt-load.ts; the NR comment "stamps into ctx.rhs" is misleading —
     // cktLoad goes through ctx.solver.stampRHS, which writes to this._rhs).
     // _intToExtRow[k] = original row at slot k.
-    for (let k = 0; k < n; k++) b[k] = rhs[intToExtRow[k]];
+    // Walk reverse to match ngspice spsolve.c:150 `for (I = Size; I > 0; I--)`.
+    for (let k = n - 1; k >= 0; k--) b[k] = rhs[intToExtRow[k]];
 
     // Forward elimination. Solves Lc = b — spsolve.c:154-170.
     //   for (I = 1; I <= Size; I++) {
@@ -682,7 +658,8 @@ export class SparseSolver {
     //   for (I = Size; I > 0; I--)
     //       Solution[*(pExtOrder--)] = Intermediate[I];
     // _preorderColPerm[k] = original col for slot k (mirrors IntToExtColMap).
-    for (let k = 0; k < n; k++) x[intToExtCol[k]] = b[k];
+    // Walk reverse to match ngspice spsolve.c:187 `for (I = Size; I > 0; I--)`.
+    for (let k = n - 1; k >= 0; k--) x[intToExtCol[k]] = b[k];
   }
 
   /**
@@ -704,6 +681,8 @@ export class SparseSolver {
     this._didPreorder = false;
     // ngspice spStripMatrix (sputils.c:1112): NeedsOrdering = YES.
     this._needsReorder = true;
+    // ngspice spStripMatrix (sputils.c:1111): RowsLinked = NO.
+    this._rowsLinked = false;
   }
 
   /**
@@ -733,10 +712,10 @@ export class SparseSolver {
   }
 
   /**
-   * One-time static column permutation to eliminate structural zeros on the diagonal.
-   * Finds symmetric twin pairs (J,R) and (R,J) with |value|=1.0 where diagonal at col J
-   * is zero, then swaps columns J and R. Iterates until no more swaps are possible.
-   * ngspice: SMPpreOrder (sputils.c:177-301).
+   * One-time static column permutation to eliminate structural zeros on the
+   * diagonal. ngspice: spMNA_Preorder (sputils.c:177-230). spMNA_Preorder
+   * does not touch row chains — those are built lazily by spcLinkRows on
+   * first factor entry (spfactor.c:246-247).
    */
   preorder(): void {
     if (this._didPreorder) return;
@@ -778,6 +757,32 @@ export class SparseSolver {
   }
 
   /**
+   * Rebuild all row chains from the current column structure. Mirrors ngspice
+   * spcLinkRows (spbuild.c:907-932). Walks columns in DECREASING slot order;
+   * each element is inserted at the HEAD of its row's chain, so that on
+   * completion every row chain is sorted ascending by current _elCol[e].
+   *
+   * Adapted for digiTS' doubly-linked structure: _elPrevInRow is also
+   * maintained alongside _elNextInRow.
+   */
+  private _linkRows(): void {
+    const n = this._n;
+    for (let r = 0; r < n; r++) this._rowHead[r] = -1;
+    for (let col = n - 1; col >= 0; col--) {
+      let e = this._colHead[col];
+      while (e >= 0) {
+        const r = this._elRow[e];
+        const oldHead = this._rowHead[r];
+        this._elNextInRow[e] = oldHead;
+        this._elPrevInRow[e] = -1;
+        if (oldHead >= 0) this._elPrevInRow[oldHead] = e;
+        this._rowHead[r] = e;
+        e = this._elNextInCol[e];
+      }
+    }
+  }
+
+  /**
    * Locate the element in column `col` at row `targetRow` with |value| === 1.0.
    * Returns the element handle, or -1 if no such entry exists.
    * Used by preorder() to find the symmetric partner (pTwin2) of a twin pair.
@@ -794,16 +799,11 @@ export class SparseSolver {
   /**
    * Swap columns col1 and col2 in the persistent linked structure.
    * pTwin1 is the element at (col2, col1); pTwin2 is the element at (col1, col2).
-   * ngspice reference: sputils.c SwapCols (lines 283-301).
-   *
-   * Post-port invariant: `_elCol[e]` records the slot the element currently
-   * occupies (mirrors ngspice's `pElement->Col == FirstInCol-index`). ngspice
-   * achieves this via `spcLinkRows` (spbuild.c:907-932) running between
-   * preorder and first factor, walking every `FirstInCol[c]` and writing
-   * `pElement->Col = c`. digiTS already keeps row chains linked at allocation
-   * time, so the row-chain build is unnecessary, but the `_elCol[e]` rewrite
-   * is the single load-bearing fixup. We perform it inline here, walking
-   * only the two swapped chains.
+   * ngspice reference: SwapCols (sputils.c:283-301). SwapCols swaps the
+   * column heads and the IntToExtColMap entries — it does NOT touch any
+   * element fields. The `pElement->Col == slot` invariant is established
+   * later by spcLinkRows (spbuild.c:923 `pElement->Col = Col`) when row
+   * chains are built on first factor entry.
    */
   private _swapColumns(col1: number, col2: number, pTwin1: number, pTwin2: number): void {
     const tmpHead = this._colHead[col1];
@@ -819,13 +819,6 @@ export class SparseSolver {
 
     this._diag[col1] = pTwin2;
     this._diag[col2] = pTwin1;
-
-    // Rewrite _elCol[e] for every element on the two swapped chains so the
-    // ngspice invariant `pElement->Col == current slot` is maintained.
-    let e = this._colHead[col1];
-    while (e >= 0) { this._elCol[e] = col1; e = this._elNextInCol[e]; }
-    e = this._colHead[col2];
-    while (e >= 0) { this._elCol[e] = col2; e = this._elNextInCol[e]; }
   }
 
   /**
@@ -942,8 +935,6 @@ export class SparseSolver {
     this._elPrevInRow = new Int32Array(elCap).fill(-1);
     this._elNextInCol = new Int32Array(elCap).fill(-1);
     this._elPrevInCol = new Int32Array(elCap).fill(-1);
-    this._lValueIndex = new Int32Array(elCap).fill(-1);
-    this._uValueIndex = new Int32Array(elCap).fill(-1);
     this._elCapacity = elCap;
     this._elCount = 0;
     this._elFreeHead = -1;
@@ -965,29 +956,9 @@ export class SparseSolver {
     this._handleTable = new Int32Array(n * n); // zero = unallocated
 
     // Factor workspace
-    this._x = new Float64Array(n);
-    this._xNzIdx = new Int32Array(n);
-    this._reachStack = new Int32Array(n);
-    this._dfsStack = new Int32Array(n);
-    this._dfsChildPtr = new Int32Array(n);
-    this._reachMark = new Int32Array(n).fill(-1);
     this._pinv = new Int32Array(n);
     this._q = new Int32Array(n);
     this._scratch = new Float64Array(n);
-
-    const alloc = Math.max(n * 6, 32);
-    this._lColPtr = new Int32Array(n + 1);
-    this._lRowIdx = new Int32Array(alloc);
-    this._lVals = new Float64Array(alloc);
-    this._lCscToElem = new Int32Array(alloc).fill(-1);
-    this._uColPtr = new Int32Array(n + 1);
-    this._uRowIdx = new Int32Array(alloc);
-    this._uVals = new Float64Array(alloc);
-    this._uCscToElem = new Int32Array(alloc).fill(-1);
-    this._uDiagInv = new Float64Array(n);
-
-    this._aMatrixColStart = new Int32Array(n + 1);
-    this._aMatrixHandlesByCol = new Int32Array(0);
 
     this._markowitzRow = new Int32Array(n + 2);
     this._markowitzCol = new Int32Array(n + 2);
@@ -1007,47 +978,26 @@ export class SparseSolver {
     // B2: Factored starts at NO (spdefs.h:748 default — spCreate zero-allocates
     // MatrixFrame, so Factored = NO implicitly).
     this._factored = false;
+    // ngspice spalloc.c:173 — Matrix->RowsLinked = NO on initial Create.
+    this._rowsLinked = false;
     // ngspice spalloc.c:170 — Matrix->NeedsOrdering = YES on initial Create.
     this._needsReorder = true;
     this._didPreorder = false;
   }
 
   /**
-   * Reset for a new assembly pass: zero A-entry values, remove fill-in entries
-   * via chain walk, preserve linked structure topology.
-   * Zero allocations — fill-in entries are returned to the free-list.
+   * Reset for a new assembly pass: mirror ngspice spClear (spbuild.c:96-142).
+   * Zero all element values in the pool [0, _elCount). Chains (_elNextInRow,
+   * _elPrevInRow, _elNextInCol, _elPrevInCol, _elRow, _elCol), _diag,
+   * _rowHead, _colHead, _elFreeHead, and fill-in entries are all preserved
+   * exactly as the previous factor left them.
    */
   private _resetForAssembly(): void {
-    const n = this._n;
-
-    for (let col = 0; col < n; col++) {
-      let e = this._colHead[col];
-      while (e >= 0) {
-        const next = this._elNextInCol[e];
-        if (this._elFlags[e] & FLAG_FILL_IN) {
-          // Remove fill-in from row chain
-          this._removeFromRow(e);
-          // Remove from col chain
-          this._removeFromCol(e);
-          // Return to free-list
-          this._elNextInRow[e] = this._elFreeHead;
-          this._elFreeHead = e;
-          // Clear diagonal pointer if this was diagonal
-          const r = this._elRow[e];
-          if (r === col && this._diag[r] === e) this._diag[r] = -1;
-        } else {
-          // A-matrix entry: zero value only
-          this._elVal[e] = 0;
-        }
-        e = next;
-      }
+    const elVal = this._elVal;
+    const elCount = this._elCount;
+    for (let e = 0; e < elCount; e++) {
+      elVal[e] = 0;
     }
-
-    // Zero handle table (fill-in entries have been freed, but their handles
-    // were never stored in the handle table, so only zero A-entry handles
-    // that were cleared via free-list). Since fill-in was never in handle
-    // table and A-entries stay in place, handle table remains valid.
-    // Nothing to do — handle table entries for A-elements remain correct.
   }
 
   // =========================================================================
@@ -1057,6 +1007,11 @@ export class SparseSolver {
   /**
    * Allocate a new element from the pool or free-list.
    * Sets row, col, val, flags. Returns element index.
+   *
+   * ngspice: spcGetElement (spalloc.c:310-364) plus the centralised
+   * `Diag[Row] = pElement` set sites at spbuild.c:793 (RowsLinked=YES branch)
+   * and spbuild.c:851 (RowsLinked=NO branch). Both branches in ngspice
+   * funnel through one diagonal set; we centralise the same way here.
    */
   private _newElement(row: number, col: number, val: number, flags: number): number {
     let e: number;
@@ -1075,8 +1030,10 @@ export class SparseSolver {
     this._elPrevInRow[e] = -1;
     this._elNextInCol[e] = -1;
     this._elPrevInCol[e] = -1;
-    this._lValueIndex[e] = -1;
-    this._uValueIndex[e] = -1;
+    // ngspice spcCreateElement spbuild.c:793 / spbuild.c:851 — single sink
+    // for `if (Row == Col) Matrix->Diag[Row] = pElement;` regardless of
+    // the RowsLinked branch.
+    if (row === col) this._diag[col] = e;
     return e;
   }
 
@@ -1123,8 +1080,13 @@ export class SparseSolver {
    *   Matrix->Singletons                | this._singletons
    */
   private _createFillin(row: number, col: number): number {
+    // ngspice CreateFillin (spfactor.c:2799-2829) calls spcCreateElement
+    // (spbuild.c:768-871). Fill-ins are created during factor only —
+    // _rowsLinked is always true at this point — but gate row insert on
+    // RowsLinked per the spcCreateElement contract (spbuild.c:776).
+    // _diag[col] = fe is centralised in _newElement (spbuild.c:793/851).
     const fe = this._newElement(row, col, 0, FLAG_FILL_IN);
-    this._insertIntoRow(fe, row);
+    if (this._rowsLinked) this._insertIntoRow(fe, row);
     this._insertIntoCol(fe, col);
 
     // ngspice CreateFillin spfactor.c:2818-2826.
@@ -1200,16 +1162,6 @@ export class SparseSolver {
     this._elPrevInRow = growI(this._elPrevInRow);
     this._elNextInCol = growI(this._elNextInCol);
     this._elPrevInCol = growI(this._elPrevInCol);
-    // Grow index arrays; new slots default to 0 (not -1), but will be set
-    // by _numericLUMarkowitz before any read in _numericLUReusePivots.
-    const oldLVI = this._lValueIndex;
-    const newLVI = new Int32Array(newCap).fill(-1);
-    newLVI.set(oldLVI);
-    this._lValueIndex = newLVI;
-    const oldUVI = this._uValueIndex;
-    const newUVI = new Int32Array(newCap).fill(-1);
-    newUVI.set(oldUVI);
-    this._uValueIndex = newUVI;
     this._elCapacity = newCap;
   }
 
@@ -1228,107 +1180,11 @@ export class SparseSolver {
     if (n === this._workspaceN) return;
     this._workspaceN = n;
 
-    this._x = new Float64Array(n);
-    this._xNzIdx = new Int32Array(n);
-    this._reachStack = new Int32Array(n);
-    this._dfsStack = new Int32Array(n);
-    this._dfsChildPtr = new Int32Array(n);
-    this._reachMark = new Int32Array(n);
-    this._reachMark.fill(-1);
     this._pinv = new Int32Array(n);
     this._q = new Int32Array(n);
     this._scratch = new Float64Array(n);
     this._elMark = new Int32Array(n).fill(-1);
     this._rowToElem = new Int32Array(n).fill(-1);
-
-    // Count A-matrix nonzeros for sizing L/U
-    let nnzA = 0;
-    for (let col = 0; col < n; col++) {
-      let e = this._colHead[col];
-      while (e >= 0) {
-        if (!(this._elFlags[e] & FLAG_FILL_IN)) nnzA++;
-        e = this._elNextInCol[e];
-      }
-    }
-    const alloc = Math.max(nnzA * 6, n * 4, 32);
-
-    this._lColPtr = new Int32Array(n + 1);
-    this._lRowIdx = new Int32Array(alloc);
-    this._lVals = new Float64Array(alloc);
-    this._lCscToElem = new Int32Array(alloc).fill(-1);
-    this._uColPtr = new Int32Array(n + 1);
-    this._uRowIdx = new Int32Array(alloc);
-    this._uVals = new Float64Array(alloc);
-    this._uCscToElem = new Int32Array(alloc).fill(-1);
-    this._uDiagInv = new Float64Array(n);
-
-    this._aMatrixColStart = new Int32Array(n + 1);
-    this._aMatrixHandlesByCol = new Int32Array(0);
-  }
-
-  // =========================================================================
-  // DFS reach through L's column structure
-  // =========================================================================
-
-  /**
-   * Compute the reach of column k through L's current structure. Returns top
-   * such that _reachStack[top..n-1] contains the reach in topological order.
-   *
-   * Post-port: chain values _elRow[seed] and _lRowIdx[lp] are slot-keyed.
-   * Slot < k means already-pivoted (pivots are placed at slots 0..k-1 in
-   * order). The previous translation through `pinv[origRow]` collapses to
-   * "is slot < k?" because _exchangeRowsAndCols places origRow at slot k at
-   * step k, so pinv[origRow] = k = slot.
-   */
-  private _reach(k: number): number {
-    const n = this._n;
-    const mark = this._reachMark;
-    const stack = this._reachStack;
-    const dfs = this._dfsStack;
-    const childPtr = this._dfsChildPtr;
-    let top = n;
-
-    // Seed DFS from each nonzero row of A[:,k] (column k slot post-exchange).
-    let seed = this._colHead[k];
-    while (seed >= 0) {
-      const slot = this._elRow[seed];
-      if (this._elFlags[seed] & FLAG_FILL_IN) { seed = this._elNextInCol[seed]; continue; }
-      // Skip slots not yet pivoted (slot >= k).
-      if (slot >= k) { seed = this._elNextInCol[seed]; continue; }
-      if (mark[slot] === k) { seed = this._elNextInCol[seed]; continue; }
-
-      mark[slot] = k;
-      let head = 0;
-      dfs[0] = slot;
-      childPtr[0] = this._lColPtr[slot];
-
-      while (head >= 0) {
-        const cur = dfs[head];
-        const p1 = this._lColPtr[cur + 1];
-        let found = false;
-
-        for (let lp = childPtr[head]; lp < p1; lp++) {
-          const s = this._lRowIdx[lp];
-          if (s >= k || mark[s] === k) continue;
-          mark[s] = k;
-          childPtr[head] = lp + 1;
-          head++;
-          dfs[head] = s;
-          childPtr[head] = this._lColPtr[s];
-          found = true;
-          break;
-        }
-
-        if (!found) {
-          head--;
-          stack[--top] = cur;
-        }
-      }
-
-      seed = this._elNextInCol[seed];
-    }
-
-    return top;
   }
 
   // =========================================================================
@@ -1341,36 +1197,40 @@ export class SparseSolver {
    * Inserts fill-in entries into the linked structure with FLAG_FILL_IN set.
    * ngspice: spOrderAndFactor (spfactor.c).
    */
-  private _numericLUMarkowitz(): FactorResult {
+  private _numericLUMarkowitz(startStep: number = 0): FactorResult {
     const n = this._n;
     if (n === 0) return { success: true };
 
     const pinv = this._pinv;
 
-    pinv.fill(-1);
-
-    // Reset all CSC index mappings before full re-factorization.
-    for (let e = 0; e < this._elCount; e++) {
-      this._lValueIndex[e] = -1;
-      this._uValueIndex[e] = -1;
-    }
-
-    // ngspice spOrderAndFactor:254-256 — initial Markowitz counts/products.
+    // ngspice spOrderAndFactor: CountMarkowitz/MarkowitzProducts run only on
+    // first reorder (gated by Matrix->Partitioned at spfactor.c:248). When
+    // this entry is the fall-through from a rejected `_numericLUReusePivots`
+    // (startStep > 0), every reuse-path elimination has already maintained
+    // Markowitz state via _createFillin → bookkeeping; do not re-init.
     // Pass the live RHS so CountMarkowitz can apply its RHS-aware increment
     // (spfactor.c:803-808): rows whose RHS entry is non-zero get +1 weight.
-    this._countMarkowitz(0, this._rhs);
-    this._markowitzProducts(0);
+    if (startStep === 0) {
+      pinv.fill(-1);
+      this._countMarkowitz(0, this._rhs);
+      this._markowitzProducts(0);
+    }
 
     // ============================================================
-    // PHASE 1 — ngspice-style per-step elimination on linked structure.
+    // ngspice-style per-step elimination on linked structure.
     // Direct port of RealRowColElimination (spfactor.c:2553-2598). The
     // elimination writes ngspice convention onto _elVal[e]:
     //   diag(k):  _elVal = 1 / pivot_k                  (spfactor.c:2567)
     //   U(i,k):   _elVal = A_ik_post / pivot_i          (spfactor.c:2572)
     //   L(i,k):   _elVal = A_ik_post                    (unscaled at step k)
-    // Phase 2 below converts to port convention and commits to CSC.
+    //
+    // When startStep > 0, steps [0, startStep) are already eliminated in
+    // ngspice convention from the rejected reuse-pivot pass; we resume the
+    // reorder at startStep, mirroring ngspice's shared `Step` counter
+    // between the reuse loop (spfactor.c:217-227) and the reorder loop
+    // (spfactor.c:241+) inside spOrderAndFactor.
     // ============================================================
-    for (let k = 0; k < n; k++) {
+    for (let k = startStep; k < n; k++) {
       // ngspice spOrderAndFactor:261 — pivot search BEFORE elimination.
       const pivotE = this._searchForPivot(k);
       if (pivotE < 0) {
@@ -1467,17 +1327,10 @@ export class SparseSolver {
     const n = this._n;
     if (n === 0) return { success: true };
 
-    // Zero any persisting fill-in pool elements before elimination — the
-    // rank-1 update at spfactor.c:2591 accumulates `_elVal[pSub] -= ...` into
-    // existing pool entries, so any fill-in that survived assembly must start
-    // at zero (A-matrix entries already hold their freshly-stamped values).
-    const elFlags = this._elFlags;
-    const elVal = this._elVal;
-    const elCount = this._elCount;
-    for (let e = 0; e < elCount; e++) {
-      if (elFlags[e] & FLAG_FILL_IN) elVal[e] = 0;
-    }
+    // _resetForAssembly already zeroed all element values (including fill-ins),
+    // so no pre-zero loop is needed here.
 
+    const elVal = this._elVal;
     const elNextInRow = this._elNextInRow;
     const elNextInCol = this._elNextInCol;
     const elRow = this._elRow;
@@ -1486,12 +1339,25 @@ export class SparseSolver {
     // ngspice spFactor — per-step elimination over the existing linked
     // structure. Body identical to RealRowColElimination at spfactor.c:
     // 2553-2598 (mirrored in _numericLUMarkowitz Phase 1).
+    const relThreshold = this._relThreshold;
+    const absThreshold = this._absThreshold;
     for (let k = 0; k < n; k++) {
       const pivotE = diag[k];   // already at slot k from prior reorder
       if (pivotE < 0 || Math.abs(elVal[pivotE]) === 0) {
         // Structural zero where prior reorder expected a non-zero — pivot
-        // order is no longer valid. Caller dispatches to _numericLUMarkowitz.
-        return { success: false, needsReorder: true };
+        // order is no longer valid. Caller dispatches to _numericLUMarkowitz
+        // resumed at this step (ngspice spfactor.c:225).
+        return { success: false, needsReorder: true, rejectedAtStep: k };
+      }
+      // ngspice spfactor.c:218-225 — column-relative partial-pivot guard.
+      // Reuse loop accepts the stored pivot iff
+      //     FindLargestInCol(pPivot->NextInCol) * RelThreshold < |pPivot|
+      // Rejection here lands the reorder fall-through at step k, matching
+      // ngspice's shared `Step` counter between the two loops.
+      const pivotMag = Math.abs(elVal[pivotE]);
+      const largestInCol = this._findLargestInCol(elNextInCol[pivotE]);
+      if (largestInCol * relThreshold >= pivotMag || pivotMag <= absThreshold) {
+        return { success: false, needsReorder: true, rejectedAtStep: k };
       }
       // ngspice spfactor.c:2567 — store reciprocal at the diagonal.
       elVal[pivotE] = 1 / elVal[pivotE];
@@ -1517,8 +1383,9 @@ export class SparseSolver {
             // Reuse-pivot must NOT create fill-ins. A missing entry here
             // means the prior reorder's pivot order is no longer
             // structurally valid. Caller dispatches to _numericLUMarkowitz
-            // (ngspice spfactor.c:225 "ReorderingRequired = YES; break").
-            return { success: false, needsReorder: true };
+            // resumed at step k (ngspice spfactor.c:225 "ReorderingRequired
+            // = YES; break"; the reorder loop continues with shared Step).
+            return { success: false, needsReorder: true, rejectedAtStep: k };
           }
           // ngspice spfactor.c:2591 — rank-1 update.
           elVal[pSub] -= elVal[pUpper] * elVal[pLower];
@@ -1551,9 +1418,18 @@ export class SparseSolver {
 
   /**
    * Full factorization with Markowitz pivot selection (no AMD).
-   * Operates on original column order per ngspice spOrderAndFactor.
+   * Operates on original column order per ngspice spOrderAndFactor
+   * (spfactor.c:192-284). Lazy row-link gate at spfactor.c:246-247.
    */
   factorWithReorder(diagGmin?: number): FactorResult {
+    // ngspice spOrderAndFactor (spfactor.c:246-247): row chains are built
+    // lazily on first factor entry via spcLinkRows. Until the first factor
+    // call, RowsLinked == NO and assembly / preorder run on column chains
+    // only.
+    if (!this._rowsLinked) {
+      this._linkRows();
+      this._rowsLinked = true;
+    }
     // B3: Gmin stamped INSIDE the factor routine — ngspice spsmp.c:194-200
     // `SMPreorder` body: `LoadGmin(Matrix, Gmin); return spOrderAndFactor(...)`.
     // LoadGmin (spsmp.c:422-440) adds Gmin to every diagonal element, then
@@ -2489,6 +2365,8 @@ export class SparseSolver {
       this._spcRowExchange(step, row);
       this._spcColExchange(step, col);
       // Swap MarkowitzProd[step] ↔ MarkowitzProd[row] and Diag[row] ↔ Diag[step].
+      // _singletons does NOT need adjustment: the swap permutes values between
+      // two slots, so the global zero-count over the whole array is invariant.
       const mp = this._markowitzProd[step];
       this._markowitzProd[step] = this._markowitzProd[row];
       this._markowitzProd[row] = mp;
@@ -2602,38 +2480,16 @@ export class SparseSolver {
    * same factor call, never persisting beyond it.
    */
   private _applyDiagGmin(gmin: number): void {
-    if (gmin === 0) return;
-    const n = this._n;
-    const diag = this._diag;
-    const elVal = this._elVal;
-    for (let i = 0; i < n; i++) {
-      const e = diag[i];
-      if (e >= 0) elVal[e] += gmin;
+    // ngspice spsmp.c:432-437 LoadGmin — gates the work on Gmin != 0 (entry guard)
+    // and walks diagonals reverse: `for (I = Matrix->Size; I > 0; I--)`.
+    if (gmin !== 0) {
+      const diag = this._diag;
+      const elVal = this._elVal;
+      for (let i = this._n - 1; i >= 0; i--) {
+        const e = diag[i];
+        if (e >= 0) elVal[e] += gmin;
+      }
     }
-  }
-
-  // =========================================================================
-  // Storage growth for L/U CSC arrays
-  // =========================================================================
-
-  private _growL(min: number): void {
-    const sz = Math.max(min, this._lRowIdx.length * 2);
-    const r = new Int32Array(sz), v = new Float64Array(sz);
-    r.set(this._lRowIdx); v.set(this._lVals);
-    this._lRowIdx = r; this._lVals = v;
-    const m = new Int32Array(sz).fill(-1);
-    m.set(this._lCscToElem);
-    this._lCscToElem = m;
-  }
-
-  private _growU(min: number): void {
-    const sz = Math.max(min, this._uRowIdx.length * 2);
-    const r = new Int32Array(sz), v = new Float64Array(sz);
-    r.set(this._uRowIdx); v.set(this._uVals);
-    this._uRowIdx = r; this._uVals = v;
-    const m = new Int32Array(sz).fill(-1);
-    m.set(this._uCscToElem);
-    this._uCscToElem = m;
   }
 
   // =========================================================================

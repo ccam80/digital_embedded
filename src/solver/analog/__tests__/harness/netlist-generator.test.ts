@@ -425,7 +425,10 @@ describe("generateSpiceNetlist", () => {
       new Map([[0, new TestCircuitElement("Diode", props)]]),
     );
     const netlist = generateSpiceNetlist(compiled, testRegistry, new Map([[0, "D1"]]));
-    expect(netlist).toContain("D1 1 2 D1_D AREA=2 OFF=1 TEMP=325");
+    // OFF is a bare-flag instance param in ngspice (`OFF=1` produces a hard
+    // "unknown parameter" parse error); emitted as a bare keyword instead.
+    expect(netlist).toContain("D1 1 2 D1_D AREA=2 OFF TEMP=325");
+    expect(netlist).not.toContain("OFF=");
     expect(netlist).not.toContain("IC=");
   });
 
@@ -451,16 +454,19 @@ describe("generateSpiceNetlist", () => {
     expect(modelLine).toContain("IS=");
   });
 
-  it("MOSFET NMOS: element line emits W L M OFF ICVDS ICVGS ICVBS TEMP in paramDefs order", () => {
+  it("MOSFET NMOS: non-default instance params emit on element line in paramDefs order", () => {
+    // Use NON-default values for every emitted param so each token survives
+    // the ngspice "drop default" filter. M=1, ICV*=0, OFF=0, TEMP=300.15 are
+    // all ngspice defaults and would be silently omitted.
     const props = new PropertyBag();
     props.setModelParam("W", 2e-6);
     props.setModelParam("L", 1e-6);
-    props.setModelParam("M", 1);
-    props.setModelParam("OFF", 0);
-    props.setModelParam("ICVDS", 0);
-    props.setModelParam("ICVGS", 0);
-    props.setModelParam("ICVBS", 0);
-    props.setModelParam("TEMP", 300.15);
+    props.setModelParam("M", 2);
+    props.setModelParam("OFF", 1);          // truthy → bare OFF
+    props.setModelParam("ICVDS", 1.5);
+    props.setModelParam("ICVGS", 0.7);
+    props.setModelParam("ICVBS", -0.2);
+    props.setModelParam("TEMP", 350);
     const compiled = makeCompiled(
       [makeAnalogEl([3, 2, 1, 0])],
       new Map([[0, new TestCircuitElement("NMOS", props)]]),
@@ -471,19 +477,24 @@ describe("generateSpiceNetlist", () => {
     const wPos = elementLine.indexOf("W=");
     const lPos = elementLine.indexOf("L=");
     const mPos = elementLine.indexOf("M=");
-    const offPos = elementLine.indexOf("OFF=");
-    const icvdsPos = elementLine.indexOf("ICVDS=");
-    const icvgsPos = elementLine.indexOf("ICVGS=");
-    const icvbsPos = elementLine.indexOf("ICVBS=");
+    const offPos = elementLine.indexOf(" OFF");
+    const icPos = elementLine.indexOf("IC=");
     const tempPos = elementLine.indexOf("TEMP=");
+    // Non-default instance values appear in the lift order produced by
+    // paramDefs.
     expect(wPos).toBeGreaterThan(-1);
     expect(lPos).toBeGreaterThan(wPos);
     expect(mPos).toBeGreaterThan(lPos);
     expect(offPos).toBeGreaterThan(mPos);
-    expect(icvdsPos).toBeGreaterThan(offPos);
-    expect(icvgsPos).toBeGreaterThan(icvdsPos);
-    expect(icvbsPos).toBeGreaterThan(icvgsPos);
-    expect(tempPos).toBeGreaterThan(icvbsPos);
+    expect(tempPos).toBeGreaterThan(offPos);
+    // OFF emits as a bare keyword (ngspice rejects OFF=1).
+    expect(elementLine).not.toMatch(/\bOFF=/);
+    // ICVDS/ICVGS/ICVBS collapse to a single combined IC=vds,vgs,vbs token.
+    expect(icPos).toBeGreaterThan(-1);
+    expect(elementLine).toContain("IC=1.5,0.7,-0.2");
+    expect(elementLine).not.toContain("ICVDS=");
+    expect(elementLine).not.toContain("ICVGS=");
+    expect(elementLine).not.toContain("ICVBS=");
   });
 
   it("MOSFET NMOS: model card excludes W L M ICV* OFF TEMP", () => {
@@ -515,16 +526,19 @@ describe("generateSpiceNetlist", () => {
     expect(modelLine).toContain("VTO=");
   });
 
-  it("BJT NPN spice variant: element line emits AREA AREAB AREAC M OFF ICVBE ICVCE TEMP SUBS", () => {
+  it("BJT NPN spice variant: element line emits non-default instance params; SUBS dropped, OFF bare", () => {
+    // Non-default values for everything ngspice will accept; SUBS=1 is set to
+    // verify it is dropped (ngspice has no `subs` instance param at all and
+    // emits a hard "unknown parameter (subs)" parse error if surfaced).
     const props = new PropertyBag();
-    props.setModelParam("AREA", 1);
-    props.setModelParam("AREAB", 1);
-    props.setModelParam("AREAC", 1);
-    props.setModelParam("M", 1);
-    props.setModelParam("OFF", 0);
+    props.setModelParam("AREA", 2);
+    props.setModelParam("AREAB", 1.5);
+    props.setModelParam("AREAC", 1.7);
+    props.setModelParam("M", 2);
+    props.setModelParam("OFF", 1);
     props.setModelParam("ICVBE", 0.7);
     props.setModelParam("ICVCE", 5);
-    props.setModelParam("TEMP", 300.15);
+    props.setModelParam("TEMP", 350);
     props.setModelParam("SUBS", 1);
     const compiled = makeCompiled(
       [makeAnalogEl([3, 2, 1])],
@@ -533,16 +547,19 @@ describe("generateSpiceNetlist", () => {
     const netlist = generateSpiceNetlist(compiled, testRegistry, new Map([[0, "Q1"]]));
     const elementLine = netlist.split("\n").find(l => l.startsWith("Q1 "))!;
     expect(elementLine).toBeDefined();
-    // Verify instance keys appear on element line in lift order
-    expect(elementLine).toContain("AREA=");
-    expect(elementLine).toContain("AREAB=");
-    expect(elementLine).toContain("AREAC=");
-    expect(elementLine).toContain("M=");
-    expect(elementLine).toContain("OFF=");
-    expect(elementLine).toContain("ICVBE=");
-    expect(elementLine).toContain("ICVCE=");
-    expect(elementLine).toContain("TEMP=");
-    expect(elementLine).toContain("SUBS=");
+    // Instance keys ngspice accepts: emitted in lift order, with OFF as a
+    // bare keyword.
+    expect(elementLine).toContain("AREA=2");
+    expect(elementLine).toContain("AREAB=1.5");
+    expect(elementLine).toContain("AREAC=1.7");
+    expect(elementLine).toContain("M=2");
+    expect(elementLine).toMatch(/\bOFF\b/);
+    expect(elementLine).not.toMatch(/\bOFF=/);
+    expect(elementLine).toContain("ICVBE=0.7");
+    expect(elementLine).toContain("ICVCE=5");
+    expect(elementLine).toContain("TEMP=350");
+    // SUBS has no ngspice counterpart — must never reach the netlist.
+    expect(elementLine).not.toContain("SUBS");
     // Model card must not contain instance keys
     const modelLine = netlist.split("\n").find(l => l.startsWith(".model Q1_NPN NPN"))!;
     expect(modelLine).toBeDefined();
@@ -550,11 +567,11 @@ describe("generateSpiceNetlist", () => {
     expect(modelLine).not.toContain("AREAB=");
     expect(modelLine).not.toContain("AREAC=");
     expect(modelLine).not.toContain("M=");
-    expect(modelLine).not.toContain("OFF=");
+    expect(modelLine).not.toContain("OFF");
     expect(modelLine).not.toContain("ICVBE=");
     expect(modelLine).not.toContain("ICVCE=");
     expect(modelLine).not.toContain("TEMP=");
-    expect(modelLine).not.toContain("SUBS=");
+    expect(modelLine).not.toContain("SUBS");
   });
 
   it("non-semiconductor branches are unchanged", () => {
