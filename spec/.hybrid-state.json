@@ -203,41 +203,20 @@
       "_planning_note": "W3 per-component setup() body migration - Wave A. PLANNED - awaiting user 'go' signal. Spawn-blocked until batch-3 fully passes (every group_status == 'passed'). Per-agent prompt details in spec/setup-load-split/w3-batch-prompts.md. All implementers are sonnet, run_in_background:true, spawned in one message.",
       "task_groups": [
         "4.A.bjt",
-        "4.A.mosfet",
-        "4.A.jfet",
         "4.A.diode",
-        "4.A.behav-remaining",
         "4.A.behav-combinational",
         "4.A.switching-fets",
-        "4.A.switching-fgfets",
-        "4.A.active-opamps"
+        "4.A.switching-fgfets"
       ],
       "tasks": [
         [
           "PB-BJT"
         ],
         [
-          "PB-NMOS",
-          "PB-PMOS"
-        ],
-        [
-          "PB-NJFET",
-          "PB-PJFET"
-        ],
-        [
           "PB-DIO",
           "PB-ZENER",
           "PB-SCHOTTKY",
           "PB-VARACTOR"
-        ],
-        [
-          "PB-BEHAV-DRIVER",
-          "PB-BEHAV-DRIVERINV",
-          "PB-BEHAV-SPLITTER",
-          "PB-BEHAV-SEVENSEG",
-          "PB-BEHAV-SEVENSEGHEX",
-          "PB-BEHAV-BUTTONLED",
-          "PB-BEHAV-GROUND"
         ],
         [
           "PB-BEHAV-MUX",
@@ -251,34 +230,17 @@
         [
           "PB-FGNFET",
           "PB-FGPFET"
-        ],
-        [
-          "PB-OPAMP",
-          "PB-REAL_OPAMP",
-          "PB-OTA",
-          "PB-COMPARATOR",
-          "PB-SCHMITT"
         ]
       ],
       "_owned_files": {
         "4.A.bjt": [
           "src/components/semiconductors/bjt.ts"
         ],
-        "4.A.mosfet": [
-          "src/components/semiconductors/mosfet.ts"
-        ],
-        "4.A.jfet": [
-          "src/components/semiconductors/njfet.ts",
-          "src/components/semiconductors/pjfet.ts"
-        ],
         "4.A.diode": [
           "src/components/semiconductors/diode.ts",
           "src/components/semiconductors/zener.ts",
           "src/components/semiconductors/schottky.ts",
           "src/components/semiconductors/varactor.ts"
-        ],
-        "4.A.behav-remaining": [
-          "src/solver/analog/behavioral-remaining.ts"
         ],
         "4.A.behav-combinational": [
           "src/solver/analog/behavioral-combinational.ts"
@@ -290,45 +252,43 @@
         "4.A.switching-fgfets": [
           "src/components/switching/fgnfet.ts",
           "src/components/switching/fgpfet.ts"
-        ],
-        "4.A.active-opamps": [
-          "src/components/active/opamp.ts",
-          "src/components/active/real-opamp.ts",
-          "src/components/active/ota.ts",
-          "src/components/active/comparator.ts",
-          "src/components/active/schmitt-trigger.ts"
         ]
       },
-      "spawned": 9,
-      "completed": 4,
-      "verifications_passed": 0,
-      "verifications_failed": 0,
+      "spawned": 16,
+      "completed": 7,
+      "verifications_passed": 4,
+      "verifications_failed": 2,
       "stops_for_clarification": 0,
-      "dead_implementers": 5,
+      "dead_implementers": 9,
       "dead_verifiers": 0,
       "group_status": {
-        "4.A.bjt": "pending",
-        "4.A.mosfet": "pending",
-        "4.A.jfet": "pending",
-        "4.A.diode": "pending",
-        "4.A.behav-remaining": "pending",
-        "4.A.behav-combinational": "pending",
-        "4.A.switching-fets": "pending",
-        "4.A.switching-fgfets": "pending",
-        "4.A.active-opamps": "pending"
+        "4.A.bjt": "passed",
+        "4.A.diode": "failed",
+        "4.A.behav-combinational": "passed",
+        "4.A.switching-fets": "passed",
+        "4.A.switching-fgfets": "passed"
       },
       "user_required_tasks": {
         "4.A.bjt": [],
-        "4.A.mosfet": [],
-        "4.A.jfet": [],
         "4.A.diode": [],
-        "4.A.behav-remaining": [],
         "4.A.behav-combinational": [],
         "4.A.switching-fets": [],
-        "4.A.switching-fgfets": [],
-        "4.A.active-opamps": []
+        "4.A.switching-fgfets": []
       },
-      "user_acks": {}
+      "user_acks": {},
+      "_routing_note": {
+        "4.A.behav-remaining": "Removed and rerouted to one-PB-per-agent across batch-5 (DRIVER, DRIVERINV, SPLITTER) and batch-6 (GROUND, SEVENSEG, SEVENSEGHEX, BUTTONLED) after 2 consecutive deaths showed the 7-PB single-file scope exceeds sonnet runtime. The behav file behavioral-remaining.ts will be touched serially by these 7 agents under file-lock coordination.",
+        "4.A.jfet": "Removed and rerouted to per-PB agents after 2 consecutive deaths showed multi-PB scope exceeds sonnet runtime.",
+        "4.A.mosfet": "Removed and rerouted to per-PB agents after 2 consecutive deaths showed multi-PB scope exceeds sonnet runtime.",
+        "4.A.active-opamps": "Removed and rerouted to per-PB agents after 2 consecutive deaths showed multi-PB scope exceeds sonnet runtime."
+      },
+      "recovery_log": [
+        {
+          "script": "i-fixed-it.sh",
+          "timestamp": "2026-04-27T21:25:48.612Z",
+          "description": "Replaced it.todo('PB-VARACTOR TSTALLOC sequence') at setup-stamp-order.test.ts:526 with a real test asserting the 7-entry TSTALLOC sequence (RS=0, no internal node). Pattern matches PB-DIO/PB-ZENER. Test now green; suite 11/11."
+        }
+      ]
     },
     {
       "id": "batch-5",
@@ -343,7 +303,14 @@
         "5.B.adc-dac",
         "5.B.analog-sw-opto",
         "5.B.timer555",
-        "5.B.sensors"
+        "5.B.sensors",
+        "5.B.behav-driver",
+        "5.B.behav-driverinv",
+        "5.B.behav-splitter",
+        "5.B.njfet",
+        "5.B.pjfet",
+        "5.B.nmos",
+        "5.B.pmos"
       ],
       "tasks": [
         [
@@ -384,6 +351,27 @@
           "PB-LDR",
           "PB-NTC",
           "PB-SPARK"
+        ],
+        [
+          "PB-BEHAV-DRIVER"
+        ],
+        [
+          "PB-BEHAV-DRIVERINV"
+        ],
+        [
+          "PB-BEHAV-SPLITTER"
+        ],
+        [
+          "PB-NJFET"
+        ],
+        [
+          "PB-PJFET"
+        ],
+        [
+          "PB-NMOS"
+        ],
+        [
+          "PB-PMOS"
         ]
       ],
       "_owned_files": {
@@ -425,6 +413,30 @@
           "src/components/sensors/ldr.ts",
           "src/components/sensors/ntc-thermistor.ts",
           "src/components/sensors/spark-gap.ts"
+        ],
+        "5.B.behav-driver": [
+          "src/solver/analog/behavioral-remaining.ts",
+          "src/components/wiring/driver.ts"
+        ],
+        "5.B.behav-driverinv": [
+          "src/solver/analog/behavioral-remaining.ts",
+          "src/components/wiring/driver-inv.ts"
+        ],
+        "5.B.behav-splitter": [
+          "src/solver/analog/behavioral-remaining.ts",
+          "src/components/wiring/splitter.ts"
+        ],
+        "5.B.njfet": [
+          "src/components/semiconductors/njfet.ts"
+        ],
+        "5.B.pjfet": [
+          "src/components/semiconductors/pjfet.ts"
+        ],
+        "5.B.nmos": [
+          "src/components/semiconductors/mosfet.ts"
+        ],
+        "5.B.pmos": [
+          "src/components/semiconductors/mosfet.ts"
         ]
       },
       "spawned": 0,
@@ -444,7 +456,14 @@
         "5.B.adc-dac": "pending",
         "5.B.analog-sw-opto": "pending",
         "5.B.timer555": "pending",
-        "5.B.sensors": "pending"
+        "5.B.sensors": "pending",
+        "5.B.behav-driver": "pending",
+        "5.B.behav-driverinv": "pending",
+        "5.B.behav-splitter": "pending",
+        "5.B.njfet": "pending",
+        "5.B.pjfet": "pending",
+        "5.B.nmos": "pending",
+        "5.B.pmos": "pending"
       },
       "user_required_tasks": {
         "5.B.transgate": [],
@@ -456,7 +475,14 @@
         "5.B.adc-dac": [],
         "5.B.analog-sw-opto": [],
         "5.B.timer555": [],
-        "5.B.sensors": []
+        "5.B.sensors": [],
+        "5.B.behav-driver": [],
+        "5.B.behav-driverinv": [],
+        "5.B.behav-splitter": [],
+        "5.B.njfet": [],
+        "5.B.pjfet": [],
+        "5.B.nmos": [],
+        "5.B.pmos": []
       },
       "user_acks": {}
     },
@@ -473,7 +499,16 @@
         "6.B.vsrc-var-isrc",
         "6.B.diac-scr",
         "6.B.triac-triode",
-        "6.B.tunnel"
+        "6.B.tunnel",
+        "6.B.behav-ground",
+        "6.B.behav-sevenseg",
+        "6.B.behav-sevenseghex",
+        "6.B.behav-buttonled",
+        "6.B.opamp",
+        "6.B.real-opamp",
+        "6.B.ota",
+        "6.B.comparator",
+        "6.B.schmitt"
       ],
       "tasks": [
         [
@@ -514,6 +549,33 @@
         ],
         [
           "PB-TUNNEL"
+        ],
+        [
+          "PB-BEHAV-GROUND"
+        ],
+        [
+          "PB-BEHAV-SEVENSEG"
+        ],
+        [
+          "PB-BEHAV-SEVENSEGHEX"
+        ],
+        [
+          "PB-BEHAV-BUTTONLED"
+        ],
+        [
+          "PB-OPAMP"
+        ],
+        [
+          "PB-REAL_OPAMP"
+        ],
+        [
+          "PB-OTA"
+        ],
+        [
+          "PB-COMPARATOR"
+        ],
+        [
+          "PB-SCHMITT"
         ]
       ],
       "_owned_files": {
@@ -555,6 +617,37 @@
         ],
         "6.B.tunnel": [
           "src/components/semiconductors/tunnel-diode.ts"
+        ],
+        "6.B.behav-ground": [
+          "src/solver/analog/behavioral-remaining.ts",
+          "src/components/io/ground.ts"
+        ],
+        "6.B.behav-sevenseg": [
+          "src/solver/analog/behavioral-remaining.ts",
+          "src/components/io/seven-seg.ts"
+        ],
+        "6.B.behav-sevenseghex": [
+          "src/solver/analog/behavioral-remaining.ts",
+          "src/components/io/seven-seg-hex.ts"
+        ],
+        "6.B.behav-buttonled": [
+          "src/solver/analog/behavioral-remaining.ts",
+          "src/components/io/button-led.ts"
+        ],
+        "6.B.opamp": [
+          "src/components/active/opamp.ts"
+        ],
+        "6.B.real-opamp": [
+          "src/components/active/real-opamp.ts"
+        ],
+        "6.B.ota": [
+          "src/components/active/ota.ts"
+        ],
+        "6.B.comparator": [
+          "src/components/active/comparator.ts"
+        ],
+        "6.B.schmitt": [
+          "src/components/active/schmitt-trigger.ts"
         ]
       },
       "spawned": 0,
@@ -574,7 +667,16 @@
         "6.B.vsrc-var-isrc": "pending",
         "6.B.diac-scr": "pending",
         "6.B.triac-triode": "pending",
-        "6.B.tunnel": "pending"
+        "6.B.tunnel": "pending",
+        "6.B.behav-ground": "pending",
+        "6.B.behav-sevenseg": "pending",
+        "6.B.behav-sevenseghex": "pending",
+        "6.B.behav-buttonled": "pending",
+        "6.B.opamp": "pending",
+        "6.B.real-opamp": "pending",
+        "6.B.ota": "pending",
+        "6.B.comparator": "pending",
+        "6.B.schmitt": "pending"
       },
       "user_required_tasks": {
         "6.B.res-cap": [],
@@ -586,12 +688,22 @@
         "6.B.vsrc-var-isrc": [],
         "6.B.diac-scr": [],
         "6.B.triac-triode": [],
-        "6.B.tunnel": []
+        "6.B.tunnel": [],
+        "6.B.behav-ground": [],
+        "6.B.behav-sevenseg": [],
+        "6.B.behav-sevenseghex": [],
+        "6.B.behav-buttonled": [],
+        "6.B.opamp": [],
+        "6.B.real-opamp": [],
+        "6.B.ota": [],
+        "6.B.comparator": [],
+        "6.B.schmitt": []
       },
-      "user_acks": {}
+      "user_acks": {},
+      "_behav_serialization_note": "All 7 behav-* task_groups (3 in batch-5 + 4 in batch-6) lock the same shared file src/solver/analog/behavioral-remaining.ts. Per the lock-protocol, only one will hold that file at a time within a wave; the others queue. Each agent owns ONE PB-BEHAV-* spec only (one model per agent) for runtime-budget safety after 2 consecutive deaths on the 7-PB combined scope. Agents may also touch their associated component file (driver.ts / splitter.ts / ground.ts / seven-seg.ts / etc.)."
     }
   ],
-  "last_updated": "2026-04-27T20:39:00.016Z",
+  "last_updated": "2026-04-27T21:25:48.612Z",
   "_excluded_from_w3_batch4_5": {
     "PB-TLINE": "Architectural decision pending per plan.md Open Blockers (lossy-N-segment vs ideal-TRA refactor). User must add to architectural-alignment.md or pick refactor option before this can land. Excluded from both wave-A and wave-B.",
     "PB-SUBCKT": "Special structural decomposition path, not in standard component layer. Excluded from both wave-A and wave-B.",

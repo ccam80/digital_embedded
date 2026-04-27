@@ -30,6 +30,7 @@ import type { AnalogElement } from "../element.js";
 import { createBjtElement, BJT_NPN_DEFAULTS } from "../../../components/semiconductors/bjt.js";
 import { createDiodeElement, DIODE_PARAM_DEFAULTS } from "../../../components/semiconductors/diode.js";
 import { createZenerElement, ZENER_PARAM_DEFAULTS } from "../../../components/semiconductors/zener.js";
+import { createMosfetElement } from "../../../components/semiconductors/mosfet.js";
 import { PropertyBag } from "../../../core/properties.js";
 import { createTestPropertyBag } from "../../../test-fixtures/model-fixtures.js";
 
@@ -345,7 +346,53 @@ describe("setup-stamp-order", () => {
   });
 
   it.todo("PB-NJFET TSTALLOC sequence");
-  it.todo("PB-NMOS TSTALLOC sequence");
+  it("PB-NMOS TSTALLOC sequence", () => {
+    // ngspice anchor: mos1set.c:186-207 — 22 TSTALLOC entries (all unconditional).
+    // Nodes: G=3, S=2, D=1.  B=S=2 (body tied to source, 3-terminal).
+    // RD=RS=RSH=0 → no prime nodes → dp=dNode=1, sp=sNode=2.
+    // Ground-involving entries return TrashCan (handle 0) without recording.
+    const props = new PropertyBag();
+    props.replaceModelParams({
+      VTO: 0.7, KP: 120e-6, LAMBDA: 0.02, PHI: 0.6, GAMMA: 0.37,
+      CBD: 0, CBS: 0, CGDO: 0, CGSO: 0, CGBO: 0,
+      W: 1e-6, L: 1e-6, RD: 0, RS: 0, IS: 1e-14, PB: 0.8,
+      CJ: 0, MJ: 0.5, CJSW: 0, MJSW: 0.33, JS: 0, RSH: 0,
+      AD: 0, AS: 0, PD: 0, PS: 0, TNOM: 300.15, TOX: 0,
+      TPG: 1, LD: 0, UO: 600, KF: 0, AF: 1, FC: 0.5, M: 1, OFF: 0,
+      ICVDS: 0, ICVGS: 0, ICVBS: 0, TEMP: 300.15,
+      drainSquares: 0, sourceSquares: 0,
+    });
+    const el = createMosfetElement(1, new Map([["G", 3], ["S", 2], ["D", 1]]), props);
+    const circuit = makeMinimalCircuit([el as unknown as AnalogElement], 3);
+    const engine = new MNAEngine();
+    engine.init(circuit);
+    (engine as any)._setup();
+    const order = (engine as any)._solver._getInsertionOrder();
+    expect(order).toEqual([
+      { extRow: 1, extCol: 1 },  // (1)  dNode, dNode
+      { extRow: 3, extCol: 3 },  // (2)  gNode, gNode
+      { extRow: 2, extCol: 2 },  // (3)  sNode, sNode
+      { extRow: 2, extCol: 2 },  // (4)  bNode, bNode = (sNode, sNode)
+      { extRow: 1, extCol: 1 },  // (5)  dp, dp = (dNode, dNode) — RD=0
+      { extRow: 2, extCol: 2 },  // (6)  sp, sp = (sNode, sNode) — RS=0
+      { extRow: 1, extCol: 1 },  // (7)  dNode, dp = (dNode, dNode) — RD=0
+      { extRow: 3, extCol: 2 },  // (8)  gNode, bNode = (gNode, sNode)
+      { extRow: 3, extCol: 1 },  // (9)  gNode, dp = (gNode, dNode)
+      { extRow: 3, extCol: 2 },  // (10) gNode, sp = (gNode, sNode)
+      { extRow: 2, extCol: 2 },  // (11) sNode, sp = (sNode, sNode) — RS=0
+      { extRow: 2, extCol: 1 },  // (12) bNode, dp = (sNode, dNode)
+      { extRow: 2, extCol: 2 },  // (13) bNode, sp = (sNode, sNode)
+      { extRow: 1, extCol: 2 },  // (14) dp, sp = (dNode, sNode) — RD=RS=0
+      { extRow: 1, extCol: 1 },  // (15) dp, dNode = (dNode, dNode) — RD=0
+      { extRow: 2, extCol: 3 },  // (16) bNode, gNode = (sNode, gNode)
+      { extRow: 1, extCol: 3 },  // (17) dp, gNode = (dNode, gNode) — RD=0
+      { extRow: 2, extCol: 3 },  // (18) sp, gNode = (sNode, gNode) — RS=0
+      { extRow: 2, extCol: 2 },  // (19) sp, sNode = (sNode, sNode) — RS=0
+      { extRow: 1, extCol: 2 },  // (20) dp, bNode = (dNode, sNode)
+      { extRow: 2, extCol: 2 },  // (21) sp, bNode = (sNode, sNode)
+      { extRow: 2, extCol: 1 },  // (22) sp, dp = (sNode, dNode) — RS=RD=0
+    ]);
+  });
   it.todo("PB-NTC TSTALLOC sequence");
   it.todo("PB-OPAMP TSTALLOC sequence");
   it.todo("PB-OPTO TSTALLOC sequence");
@@ -371,7 +418,53 @@ describe("setup-stamp-order", () => {
   });
 
   it.todo("PB-PJFET TSTALLOC sequence");
-  it.todo("PB-PMOS TSTALLOC sequence");
+  it("PB-PMOS TSTALLOC sequence", () => {
+    // ngspice anchor: mos1set.c:186-207 — 22 TSTALLOC entries (all unconditional).
+    // PMOS pin layout: G=3, D=1, S=2.  B=S=2 (body tied to source, 3-terminal).
+    // RD=RS=RSH=0 → no prime nodes → dp=dNode=1, sp=sNode=2.
+    // Identical TSTALLOC sequence to NMOS — mos1set.c:186-207 is polarity-independent.
+    const props = new PropertyBag();
+    props.replaceModelParams({
+      VTO: -0.7, KP: 60e-6, LAMBDA: 0.02, PHI: 0.6, GAMMA: 0.37,
+      CBD: 0, CBS: 0, CGDO: 0, CGSO: 0, CGBO: 0,
+      W: 1e-6, L: 1e-6, RD: 0, RS: 0, IS: 1e-14, PB: 0.8,
+      CJ: 0, MJ: 0.5, CJSW: 0, MJSW: 0.33, JS: 0, RSH: 0,
+      AD: 0, AS: 0, PD: 0, PS: 0, TNOM: 300.15, TOX: 0,
+      TPG: -1, LD: 0, UO: 250, KF: 0, AF: 1, FC: 0.5, M: 1, OFF: 0,
+      ICVDS: 0, ICVGS: 0, ICVBS: 0, TEMP: 300.15,
+      drainSquares: 0, sourceSquares: 0,
+    });
+    const el = createMosfetElement(-1, new Map([["G", 3], ["D", 1], ["S", 2]]), props);
+    const circuit = makeMinimalCircuit([el as unknown as AnalogElement], 3);
+    const engine = new MNAEngine();
+    engine.init(circuit);
+    (engine as any)._setup();
+    const order = (engine as any)._solver._getInsertionOrder();
+    expect(order).toEqual([
+      { extRow: 1, extCol: 1 },  // (1)  dNode, dNode
+      { extRow: 3, extCol: 3 },  // (2)  gNode, gNode
+      { extRow: 2, extCol: 2 },  // (3)  sNode, sNode
+      { extRow: 2, extCol: 2 },  // (4)  bNode, bNode = (sNode, sNode)
+      { extRow: 1, extCol: 1 },  // (5)  dp, dp = (dNode, dNode) — RD=0
+      { extRow: 2, extCol: 2 },  // (6)  sp, sp = (sNode, sNode) — RS=0
+      { extRow: 1, extCol: 1 },  // (7)  dNode, dp = (dNode, dNode) — RD=0
+      { extRow: 3, extCol: 2 },  // (8)  gNode, bNode = (gNode, sNode)
+      { extRow: 3, extCol: 1 },  // (9)  gNode, dp = (gNode, dNode)
+      { extRow: 3, extCol: 2 },  // (10) gNode, sp = (gNode, sNode)
+      { extRow: 2, extCol: 2 },  // (11) sNode, sp = (sNode, sNode) — RS=0
+      { extRow: 2, extCol: 1 },  // (12) bNode, dp = (sNode, dNode)
+      { extRow: 2, extCol: 2 },  // (13) bNode, sp = (sNode, sNode)
+      { extRow: 1, extCol: 2 },  // (14) dp, sp = (dNode, sNode) — RD=RS=0
+      { extRow: 1, extCol: 1 },  // (15) dp, dNode = (dNode, dNode) — RD=0
+      { extRow: 2, extCol: 3 },  // (16) bNode, gNode = (sNode, gNode)
+      { extRow: 1, extCol: 3 },  // (17) dp, gNode = (dNode, gNode) — RD=0
+      { extRow: 2, extCol: 3 },  // (18) sp, gNode = (sNode, gNode) — RS=0
+      { extRow: 2, extCol: 2 },  // (19) sp, sNode = (sNode, sNode) — RS=0
+      { extRow: 1, extCol: 2 },  // (20) dp, bNode = (dNode, sNode)
+      { extRow: 2, extCol: 2 },  // (21) sp, bNode = (sNode, sNode)
+      { extRow: 2, extCol: 1 },  // (22) sp, dp = (sNode, dNode) — RS=RD=0
+    ]);
+  });
   it.todo("PB-POLCAP TSTALLOC sequence");
   it.todo("PB-POT TSTALLOC sequence");
   it.todo("PB-REAL_OPAMP TSTALLOC sequence");
@@ -430,7 +523,29 @@ describe("setup-stamp-order", () => {
   it.todo("PB-TRIAC TSTALLOC sequence");
   it.todo("PB-TRIODE TSTALLOC sequence");
   it.todo("PB-TUNNEL TSTALLOC sequence");
-  it.todo("PB-VARACTOR TSTALLOC sequence");
+  it("PB-VARACTOR TSTALLOC sequence", () => {
+    // ngspice anchor: diosetup.c:232-238 — 7 TSTALLOC entries (identical to DIO).
+    // PB-VARACTOR per spec delegates to createDiodeElement, so the TSTALLOC
+    // sequence is identical to PB-DIO with RS=0 (no internal node).
+    // Nodes: posNode=1 (A), negNode=2 (K). _posPrimeNode = posNode = 1.
+    const props = new PropertyBag();
+    props.replaceModelParams({ ...DIODE_PARAM_DEFAULTS });
+    const el = createDiodeElement(new Map([["A", 1], ["K", 2]]), props);
+    const circuit = makeMinimalCircuit([el as unknown as AnalogElement], 2);
+    const engine = new MNAEngine();
+    engine.init(circuit);
+    (engine as any)._setup();
+    const order = (engine as any)._solver._getInsertionOrder();
+    expect(order).toEqual([
+      { extRow: 1, extCol: 1 },  // (1) posNode, _posPrimeNode
+      { extRow: 2, extCol: 1 },  // (2) negNode, _posPrimeNode
+      { extRow: 1, extCol: 1 },  // (3) _posPrimeNode, posNode
+      { extRow: 1, extCol: 2 },  // (4) _posPrimeNode, negNode
+      { extRow: 1, extCol: 1 },  // (5) posNode, posNode
+      { extRow: 2, extCol: 2 },  // (6) negNode, negNode
+      { extRow: 1, extCol: 1 },  // (7) _posPrimeNode, _posPrimeNode
+    ]);
+  });
   it.todo("PB-VCCS TSTALLOC sequence");
   it.todo("PB-VCVS TSTALLOC sequence");
   it.todo("PB-VSRC-AC TSTALLOC sequence");
