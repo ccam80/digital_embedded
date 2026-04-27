@@ -127,7 +127,7 @@ describe("CCCS", () => {
     const compiled = makeGainCircuit(5.0, 1000, 1000, { currentGain: 1 });
     const engine = new MNAEngine();
     engine.init(compiled);
-    const result = engine.dcOperatingPoint();
+    const result = engine.transientDcop();
 
     expect(result.converged).toBe(true);
     // V_out = I_out * R_load = 5mA * 1000 = 5V

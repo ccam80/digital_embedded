@@ -46,8 +46,8 @@ export class NRResult {
   /** Index of the node with the largest voltage change; -1 when unknown. */
   largestChangeNode: number = -1;
 
-  constructor(voltages: Float64Array) {
-    this.voltages = voltages;
+  constructor(rhs: Float64Array) {
+    this.voltages = rhs;
   }
 
   /** Reset to default state before a new NR solve. */
@@ -364,7 +364,7 @@ export class CKTCircuitContext {
    */
   postIterationHook: ((
     iteration: number,
-    voltages: Float64Array,
+    rhs: Float64Array,
     prevVoltages: Float64Array,
     noncon: number,
     globalConverged: boolean,

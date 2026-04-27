@@ -355,11 +355,11 @@ export class AnalogCapacitorElement implements ReactiveAnalogElementCore {
     }
   }
 
-  getPinCurrents(voltages: Float64Array): number[] {
+  getPinCurrents(rhs: Float64Array): number[] {
     const n0 = this.pinNodeIds[0];
     const n1 = this.pinNodeIds[1];
-    const v0 = voltages[n0];
-    const v1 = voltages[n1];
+    const v0 = rhs[n0];
+    const v1 = rhs[n1];
     const s0 = this._pool.states[0];
     const base = this.stateBaseOffset;
     const geq = s0[base + SLOT_GEQ];

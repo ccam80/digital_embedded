@@ -46,13 +46,13 @@ export class MutableExpressionContext implements ExpressionContext {
     this._voltageMap.set(label, value);
   }
 
-  setNodeVoltageByIndex(label: string, nodeId: number, voltages: Float64Array): void {
-    const v = voltages[nodeId];
+  setNodeVoltageByIndex(label: string, nodeId: number, rhsOld: Float64Array): void {
+    const v = rhsOld[nodeId];
     this._voltageMap.set(label, v);
   }
 
-  setBranchCurrentByIndex(label: string, rowIdx: number, voltages: Float64Array): void {
-    const i = rowIdx >= 0 && rowIdx < voltages.length ? voltages[rowIdx] : 0;
+  setBranchCurrentByIndex(label: string, rowIdx: number, rhsOld: Float64Array): void {
+    const i = rowIdx >= 0 && rowIdx < rhsOld.length ? rhsOld[rowIdx] : 0;
     this._currentMap.set(label, i);
   }
 
@@ -90,7 +90,7 @@ export abstract class ControlledSourceElement implements AnalogElementCore {
   allNodeIds!: readonly number[];  // set by compiler via Object.assign after factory returns
   abstract readonly branchIndex: number;
   abstract readonly ngspiceLoadOrder: number;
-  abstract getPinCurrents(voltages: Float64Array): number[];
+  abstract getPinCurrents(rhs: Float64Array): number[];
 
   readonly isNonlinear = true as const;
   readonly isReactive = false as const;
@@ -157,7 +157,7 @@ export abstract class ControlledSourceElement implements AnalogElementCore {
    * Implementations must also set `this._ctrlValue` to the scalar control
    * quantity for use in the NR linearized RHS computation in `stampOutput`.
    */
-  protected abstract _bindContext(voltages: Float64Array): void;
+  protected abstract _bindContext(rhsOld: Float64Array): void;
 
   /**
    * Stamp the output contribution.

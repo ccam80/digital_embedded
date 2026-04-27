@@ -314,11 +314,11 @@ function makeOtaCaptureSolver(_rhs: Float64Array): {
   return { solver, stamps };
 }
 
-function makeOtaParityCtx(voltages: Float64Array, solver: SparseSolverType, rhs: Float64Array): LoadContext {
+function makeOtaParityCtx(rhsOld: Float64Array, solver: SparseSolverType, rhs: Float64Array): LoadContext {
   return makeLoadCtx({
     solver,
     rhs,
-    rhsOld: voltages,
+    rhsOld: rhsOld,
     cktMode: MODEDCOP | MODEINITFLOAT,
     dt: 0,
   });

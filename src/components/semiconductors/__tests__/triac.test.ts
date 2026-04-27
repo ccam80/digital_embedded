@@ -74,12 +74,12 @@ function makeTriac(overrides: Partial<typeof TRIAC_DEFAULTS> = {}): AnalogElemen
  * Build a DC-OP LoadContext over a fresh SparseSolver sized for 3 matrix rows (nodes 1..3).
  * voltages must be length 4 (index 0 = ground sentinel, 1=MT1, 2=MT2, 3=G).
  */
-function makeDcOpCtx(voltages: Float64Array): LoadContext {
+function makeDcOpCtx(rhs: Float64Array): LoadContext {
   const solver = new SparseSolver();
   solver._initStructure(3);
   return makeLoadCtx({
     solver,
-    rhs: new Float64Array(voltages.length), // separate buffer — stampRHS must not modify voltages
+    rhs: new Float64Array(rhs.length), // separate buffer — stampRHS must not modify caller's buffer
     cktMode: MODEDCOP | MODEINITFLOAT,
     dt: 0,
   });
@@ -116,8 +116,8 @@ function driveToOp(
  * and 2). Stamps the already-converged element into a fresh SparseSolver at
  * the given voltages and reads the assembled diagonal entries.
  */
-function getMainPathConductance(element: AnalogElement, voltages: Float64Array): number {
-  const ctx = makeDcOpCtx(voltages);
+function getMainPathConductance(element: AnalogElement, rhs: Float64Array): number {
+  const ctx = makeDcOpCtx(rhs);
   element.load(ctx);
   const entries = ctx.solver.getCSCNonZeros();
   const sumAt = (row: number, col: number) =>
@@ -321,10 +321,10 @@ describe("Triac LimitingEvent instrumentation", () => {
   }
 
   function makeCtxWithCollector(
-    voltages: Float64Array,
+    rhs: Float64Array,
     collector: import("../../../solver/analog/newton-raphson.js").LimitingEvent[] | null,
   ): LoadContext {
-    const ctx = makeDcOpCtx(voltages);
+    const ctx = makeDcOpCtx(rhs);
     return { ...ctx, limitingCollector: collector };
   }
 

@@ -116,8 +116,8 @@ function _ngspiceIntegCoeff(raw: RawNgspiceIterationEx | undefined): Integration
   if (!raw) {
     return { ag0: 0, ag1: 0, method: "trapezoidal", order: 1 };
   }
-  // ngspice integer 0 is backward Euler; we don't support BE so map to trapezoidal.
-  const methodMap: Record<number, IntegrationMethod> = { 0: "trapezoidal", 1: "trapezoidal", 2: "gear" };
+  // ngspice CKTintegrateMethod (cktintegrate.c): MIF_TRAP=1, MIF_GEAR=2. No MIF_BE.
+  const methodMap: Record<number, IntegrationMethod> = { 1: "trapezoidal", 2: "gear" };
   return {
     ag0: raw.ag0 ?? 0,
     ag1: raw.ag1 ?? 0,

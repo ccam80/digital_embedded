@@ -137,9 +137,9 @@ export class BridgeOutputAdapter implements AnalogElement {
    * With an ideal voltage source, the branch variable at branchIndex carries
    * the source current directly. Reads it from the full solution vector.
    */
-  getPinCurrents(voltages: Float64Array): number[] {
+  getPinCurrents(rhs: Float64Array): number[] {
     const bIdx = this.branchIndex;
-    const i = bIdx >= 0 && bIdx < voltages.length ? voltages[bIdx] : 0;
+    const i = bIdx >= 0 && bIdx < rhs.length ? rhs[bIdx] : 0;
     return [i];
   }
 
@@ -251,10 +251,10 @@ export class BridgeInputAdapter implements AnalogElement {
    *
    * When unloaded, no conductance is stamped, so current contribution is 0.
    */
-  getPinCurrents(voltages: Float64Array): number[] {
+  getPinCurrents(rhs: Float64Array): number[] {
     if (!this._pinModel.loaded) return [0];
     const nodeId = this._pinModel.nodeId;
-    const vNode = voltages[nodeId];
+    const vNode = rhs[nodeId];
     const i = vNode / this._pinModel.rIn;
     return [i];
   }

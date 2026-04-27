@@ -122,13 +122,13 @@ export class BehavioralGateElement implements AnalogElementCore {
   }
 
   load(ctx: LoadContext): void {
-    const voltages = ctx.rhsOld;
+    const rhsOld = ctx.rhsOld;
 
     // Evaluate each input's logic level from the current NR iterate, latching
     // on indeterminate to prevent oscillation as inputs traverse the threshold.
     for (let i = 0; i < this._inputs.length; i++) {
       const nodeId = this._inputs[i].nodeId;
-      const voltage = readMnaVoltage(nodeId, voltages);
+      const voltage = readMnaVoltage(nodeId, rhsOld);
       const level = this._inputs[i].readLogicLevel(voltage);
       if (level !== undefined) {
         this._latchedLevels[i] = level;
@@ -166,13 +166,13 @@ export class BehavioralGateElement implements AnalogElementCore {
    *
    * Returns one entry per pin in pinLayout order: [In_1, ..., In_N, out].
    */
-  getPinCurrents(voltages: Float64Array): number[] {
+  getPinCurrents(rhs: Float64Array): number[] {
     const result: number[] = [];
     for (const inp of this._inputs) {
-      const v = readMnaVoltage(inp.nodeId, voltages);
+      const v = readMnaVoltage(inp.nodeId, rhs);
       result.push(v / inp.rIn);
     }
-    const vOut = readMnaVoltage(this._output.nodeId, voltages);
+    const vOut = readMnaVoltage(this._output.nodeId, rhs);
     result.push((vOut - this._output.currentVoltage) / this._output.rOut);
     return result;
   }

@@ -227,13 +227,13 @@ class AnalogProbeElement implements AnalogElementCore {
     // Probe is a pure voltage measurement — no MNA contribution.
   }
 
-  getVoltage(voltages: Float64Array): number {
-    return voltages[this.pinNodeIds[0]];
+  getVoltage(rhs: Float64Array): number {
+    return rhs[this.pinNodeIds[0]];
   }
 
   setParam(_key: string, _value: number): void {}
 
-  getPinCurrents(_voltages: Float64Array): number[] {
+  getPinCurrents(_rhs: Float64Array): number[] {
     // Probe stamps nothing� it is a pure voltage measurement with no loading.
     // Return zero current for the single input pin.
     return [0];

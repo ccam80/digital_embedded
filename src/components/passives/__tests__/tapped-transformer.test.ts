@@ -55,7 +55,7 @@ function getFactory(entry: ModelEntry): AnalogFactory {
 // stampCompanion(dt, "trapezoidal", voltages) defaults.
 // ---------------------------------------------------------------------------
 
-function makeTransientCtx(solver: SparseSolverType, voltages: Float64Array, dt: number = 1e-6): LoadContext {
+function makeTransientCtx(solver: SparseSolverType, rhs: Float64Array, dt: number = 1e-6): LoadContext {
   const ag = new Float64Array(7);
   // Trapezoidal order 1: ag[0] = 1/dt, ag[1] = -1/dt.
   if (dt > 0) {
@@ -66,8 +66,8 @@ function makeTransientCtx(solver: SparseSolverType, voltages: Float64Array, dt: 
     cktMode: MODETRAN | MODEINITFLOAT,
     solver: solver as unknown as import("../../../solver/analog/sparse-solver.js").SparseSolver,
     matrix: solver as unknown as import("../../../solver/analog/sparse-solver.js").SparseSolver,
-    rhs: voltages,
-    rhsOld: voltages,
+    rhs: rhs,
+    rhsOld: rhs,
     time: 0,
     dt,
     method: "trapezoidal",

@@ -56,11 +56,14 @@ function makeFuseElement(opts: {
  * conductance into the solver (used by NR); accept() integrates I²·dt and
  * updates blown state.
  */
-function driveFuseStep(fuse: AnalogFuseElement, dt: number, voltages: Float64Array): void {
+function driveFuseStep(fuse: AnalogFuseElement, dt: number, rhs: Float64Array): void {
   const solver = new SparseSolver();
-  solver._initStructure(Math.max(voltages.length, 1));
+  // rhs is 1-indexed: length = nodeCount + 1 (slot 0 = ground).
+  solver._initStructure(rhs.length - 1);
   const ctx = makeLoadCtx({
     solver,
+    rhs: rhs,
+    rhsOld: rhs,
     cktMode: MODETRAN | MODEINITFLOAT,
     dt,
     deltaOld: [dt, dt, dt, dt, dt, dt, dt],
@@ -80,8 +83,9 @@ describe("AnalogFuseElement", () => {
       const i2tRating = 1.0;
       const fuse = makeFuseElement({ rCold, i2tRating });
 
-      const voltages = new Float64Array(1);
-      voltages[0] = 0.5 * rCold;
+      // 1-indexed: slot 0 = ground, slot 1 = node 1 (fuse positive terminal).
+      const voltages = new Float64Array(2);
+      voltages[1] = 0.5 * rCold;
 
       const dt = 0.1;
       for (let i = 0; i < 10; i++) {
@@ -102,8 +106,9 @@ describe("AnalogFuseElement", () => {
 
       const current = 3.0;
       const voltage = current * rCold;
-      const voltages = new Float64Array(1);
-      voltages[0] = voltage;
+      // 1-indexed: slot 0 = ground, slot 1 = node 1 (fuse positive terminal).
+      const voltages = new Float64Array(2);
+      voltages[1] = voltage;
 
       const dt = 0.001;
       const expectedBlowTime = i2tRating / (current * current);
@@ -135,8 +140,9 @@ describe("AnalogFuseElement", () => {
       const fuse = makeFuseElement({ rCold, rBlown, i2tRating });
 
       const voltage = 10 * rCold;
-      const voltages = new Float64Array(1);
-      voltages[0] = voltage;
+      // 1-indexed: slot 0 = ground, slot 1 = node 1 (fuse positive terminal).
+      const voltages = new Float64Array(2);
+      voltages[1] = voltage;
 
       const dt = 0.001;
       for (let i = 0; i < 100; i++) {
@@ -163,8 +169,9 @@ describe("AnalogFuseElement", () => {
         const dt = 1.0;
         const current = Math.sqrt(energy);
         const v = current * rCold;
-        const vArr = new Float64Array(1);
-        vArr[0] = v;
+        // 1-indexed: slot 0 = ground, slot 1 = node 1.
+        const vArr = new Float64Array(2);
+        vArr[1] = v;
         driveFuseStep(testFuse, dt, vArr);
         resistances.push(testFuse.currentResistance);
       }
@@ -195,8 +202,9 @@ describe("AnalogFuseElement", () => {
 
       const current = 2.0;
       const voltage = current * 0.01;
-      const voltages = new Float64Array(1);
-      voltages[0] = voltage;
+      // 1-indexed: slot 0 = ground, slot 1 = node 1.
+      const voltages = new Float64Array(2);
+      voltages[1] = voltage;
 
       const dt = 0.01;
       for (let i = 0; i < 50; i++) {
@@ -219,8 +227,9 @@ describe("AnalogFuseElement", () => {
       });
 
       const voltage = 10 * 0.01;
-      const voltages = new Float64Array(1);
-      voltages[0] = voltage;
+      // 1-indexed: slot 0 = ground, slot 1 = node 1.
+      const voltages = new Float64Array(2);
+      voltages[1] = voltage;
 
       const dt = 0.01;
       for (let i = 0; i < 100; i++) {
@@ -237,8 +246,9 @@ describe("AnalogFuseElement", () => {
       const fuse = makeFuseElement({ i2tRating: 1.0 });
       expect(fuse.thermalRatio).toBe(0);
 
-      const voltages = new Float64Array(1);
-      voltages[0] = 1.0; // 100A through 0.01Ω
+      // 1-indexed: slot 0 = ground, slot 1 = node 1.
+      const voltages = new Float64Array(2);
+      voltages[1] = 1.0; // 100A through 0.01Ω
       driveFuseStep(fuse, 0.0001, voltages);
 
       expect(fuse.thermalRatio).toBeGreaterThan(0);
@@ -255,8 +265,9 @@ describe("AnalogFuseElement", () => {
         onStateChange: (blown, ratio) => calls.push({ blown, ratio }),
       });
 
-      const voltages = new Float64Array(1);
-      voltages[0] = 1.0; // high current
+      // 1-indexed: slot 0 = ground, slot 1 = node 1.
+      const voltages = new Float64Array(2);
+      voltages[1] = 1.0; // high current
 
       driveFuseStep(fuse, 0.01, voltages);
 
@@ -272,8 +283,9 @@ describe("AnalogFuseElement", () => {
 
       const el = createAnalogFuseElement(new Map([["out1", 1], ["out2", 0]]), [], -1, props, () => 0) as AnalogFuseElement;
 
-      const voltages = new Float64Array(1);
-      voltages[0] = 1.0;
+      // 1-indexed: slot 0 = ground, slot 1 = node 1.
+      const voltages = new Float64Array(2);
+      voltages[1] = 1.0;
 
       driveFuseStep(el, 0.1, voltages);
 
@@ -286,7 +298,8 @@ describe("AnalogFuseElement", () => {
     it("stamps conductance into MNA solver when intact", () => {
       const rCold = 1.0;
       const fuse = new AnalogFuseElement([1, 0], rCold, 1e9, 100.0);
-      const vs = makeDcVoltageSource(1, 0, 1, 1.0) as unknown as AnalogElement;
+      // nodeCount=1: branch occupies absolute 1-based row 2 (= nodeCount+1).
+      const vs = makeDcVoltageSource(1, 0, 2, 1.0) as unknown as AnalogElement;
 
       const result = runDcOp({
         elements: [vs, fuse],
@@ -300,8 +313,9 @@ describe("AnalogFuseElement", () => {
     it("stamps near-zero conductance when blown", () => {
       const fuse = makeFuseElement({ rCold: 0.01, rBlown: 1e9, i2tRating: 0.0001 });
 
-      const voltages = new Float64Array(1);
-      voltages[0] = 1000 * 0.01;
+      // 1-indexed: slot 0 = ground, slot 1 = node 1.
+      const voltages = new Float64Array(2);
+      voltages[1] = 1000 * 0.01;
       driveFuseStep(fuse, 1.0, voltages);
       expect(fuse.blown).toBe(true);
       expect(fuse.currentResistance).toBeGreaterThan(1e8);
@@ -313,7 +327,8 @@ describe("AnalogFuseElement", () => {
       const rCold = 1.0;
       const rLoad = 9.0;
       const fuse = new AnalogFuseElement([1, 2], rCold, 1e9, 100.0);
-      const vs = makeDcVoltageSource(1, 0, 2, 1.0) as unknown as AnalogElement;
+      // nodeCount=2: branch occupies absolute 1-based row 3 (= nodeCount+1).
+      const vs = makeDcVoltageSource(1, 0, 3, 1.0) as unknown as AnalogElement;
 
       const G_load = 1 / rLoad;
       const loadResistor: AnalogElement = {
@@ -326,7 +341,8 @@ describe("AnalogFuseElement", () => {
         setParam(_key: string, _value: number): void {},
         getPinCurrents(_v: Float64Array): number[] { return []; },
         load(ctx: LoadContext): void {
-          ctx.solver.stampElement(ctx.solver.allocElement(1, 1), G_load);
+          // node 2 diagonal (1-indexed)
+          ctx.solver.stampElement(ctx.solver.allocElement(2, 2), G_load);
         },
       };
 
@@ -381,7 +397,8 @@ describe("AnalogFuseElement", () => {
       const stamps = stampCtx.solver.getCSCNonZeros();
 
       // Only the pos diagonal is stamped (neg=0 is ground, suppressed).
-      const e00 = stamps.find((e) => e.row === 0 && e.col === 0);
+      // Under 1-indexed nodes: node 1 (pos) maps to matrix row/col 1.
+      const e00 = stamps.find((e) => e.row === 1 && e.col === 1);
       expect(e00).toBeDefined();
       expect(e00!.value).toBe(NGSPICE_G_REF);
     });

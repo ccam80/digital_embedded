@@ -190,13 +190,13 @@ export function makeDcVoltageSource(
       stampRHS(ctx.rhs,k, p.voltage * ctx.srcFact);
     },
 
-    getPinCurrents(voltages: Float64Array): number[] {
+    getPinCurrents(rhs: Float64Array): number[] {
       // MNA branch variable: +I means current leaves nodePos through the branch.
       // Pin layout order: [neg, pos] â€” neg is index 0, pos is index 1.
-      // "Into element at pos" = +I (current enters element at pos terminal).
-      // "Into element at neg" = -I (current exits element at neg terminal).
+      // “Into element at pos” = +I (current enters element at pos terminal).
+      // “Into element at neg” = -I (current exits element at neg terminal).
       // Since pin 0 = neg and pin 1 = pos, return [-I, I].
-      const I = voltages[branchIdx];
+      const I = rhs[branchIdx];
       return [-I, I];
     },
   };

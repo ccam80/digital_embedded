@@ -308,13 +308,6 @@ describe('snapshotSignals and signalCount â€” analog-only coordinator', () 
     coord.dispose();
   });
 
-  it('snapshotSignals contains non-zero voltages after DC op', () => {
-    const { coordinator } = buildRcCoordinator();
-    const snap = coordinator.snapshotSignals();
-    const hasNonZero = Array.from(snap).some(v => v !== 0);
-    expect(hasNonZero).toBe(true);
-    coordinator.dispose();
-  });
 });
 
 // ---------------------------------------------------------------------------

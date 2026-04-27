@@ -229,7 +229,7 @@ export function captureElementStates(
  */
 export type PostIterationHook = (
   iteration: number,
-  voltages: Float64Array,
+  rhs: Float64Array,
   prevVoltages: Float64Array,
   noncon: number,
   globalConverged: boolean,
@@ -300,13 +300,13 @@ export function createIterationCaptureHook(
   };
 
   const hook: PostIterationHook = (
-    iteration, voltages, prevVoltages, noncon, globalConverged, elemConverged,
+    iteration, rhs, prevVoltages, noncon, globalConverged, elemConverged,
     limitingEvents, convergenceFailedElements, ctx,
   ) => {
     let maxDelta = 0;
     let maxDeltaNode = -1;
-    for (let i = 0; i < voltages.length; i++) {
-      const d = Math.abs(voltages[i] - prevVoltages[i]);
+    for (let i = 0; i < rhs.length; i++) {
+      const d = Math.abs(rhs[i] - prevVoltages[i]);
       if (d > maxDelta) { maxDelta = d; maxDeltaNode = i; }
     }
 
@@ -326,23 +326,23 @@ export function createIterationCaptureHook(
     // (cktinit.c:43 initializes CKTmaxEqNum = 1; cktlnkeq.c:32 post-increments
     // on each CKTmkVolt/CKTmkCur). After N active equations ngspice has
     // CKTmaxEqNum = 1 + N, and reports matrixSize = CKTmaxEqNum + 1 = N + 2.
-    // Our voltages.length is N + 1 (ground sentinel + N active eqs), so the
-    // ngspice-equivalent matrixSize is voltages.length + 1. The +1 is a
+    // Our rhs.length is N + 1 (ground sentinel + N active eqs), so the
+    // ngspice-equivalent matrixSize is rhs.length + 1. The +1 is a
     // post-inc setup tracker, not an actual rhs-vector slot — ngspice's
     // CKTrhs is allocated to SMPmatSize+1 = N+1 doubles (nireinit.c).
     //
     // rhsBufSize: actual rhs/rhsOld/preSolveRhs buffer length. Our engine
-    // has no TrashCan-style stamp folding, so this equals voltages.length.
+    // has no TrashCan-style stamp folding, so this equals rhs.length.
     // ngspice carries this as a separate field because its rhs buffer
     // (SMPmatSize+1) can be smaller than its matrixSize (CKTmaxEqNum+1).
-    const ourMatrixSize = voltages.length + 1;
-    const ourRhsBufSize = voltages.length;
+    const ourMatrixSize = rhs.length + 1;
+    const ourRhsBufSize = rhs.length;
 
     snapshots.push({
       iteration,
       matrixSize: ourMatrixSize,
       rhsBufSize: ourRhsBufSize,
-      voltages: voltages.slice(),
+      voltages: rhs.slice(),
       prevVoltages: prevVoltages.slice(),
       preSolveRhs: preSolveRhs.slice(),
       matrix: preFactorMatrix,

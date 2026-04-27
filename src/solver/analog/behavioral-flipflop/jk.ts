@@ -163,13 +163,13 @@ export class BehavioralJKFlipflopElement implements ReactiveAnalogElementCore {
     this._prevClockVoltage = currentClockV;
   }
 
-  getPinCurrents(voltages: Float64Array): number[] {
+  getPinCurrents(rhs: Float64Array): number[] {
     // pinLayout order: J, C, K, Q, ~Q
-    const vJ = readMnaVoltage(this._jPin.nodeId, voltages);
-    const vC = readMnaVoltage(this._clockPin.nodeId, voltages);
-    const vK = readMnaVoltage(this._kPin.nodeId, voltages);
-    const vQ = readMnaVoltage(this._qPin.nodeId, voltages);
-    const vQBar = readMnaVoltage(this._qBarPin.nodeId, voltages);
+    const vJ = readMnaVoltage(this._jPin.nodeId, rhs);
+    const vC = readMnaVoltage(this._clockPin.nodeId, rhs);
+    const vK = readMnaVoltage(this._kPin.nodeId, rhs);
+    const vQ = readMnaVoltage(this._qPin.nodeId, rhs);
+    const vQBar = readMnaVoltage(this._qBarPin.nodeId, rhs);
     return [
       vJ / this._jPin.rIn,
       vC / this._clockPin.rIn,

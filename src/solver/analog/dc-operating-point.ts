@@ -268,7 +268,7 @@ function dcopFinalize(ctx: CKTCircuitContext): void {
 export function cktncDump(
   scratch: Array<{ node: number; delta: number; tol: number }>,
   pool: Array<{ node: number; delta: number; tol: number }>,
-  voltages: Float64Array,
+  rhs: Float64Array,
   prevVoltages: Float64Array,
   reltol: number,
   voltTol: number,
@@ -278,9 +278,9 @@ export function cktncDump(
 ): Array<{ node: number; delta: number; tol: number }> {
   scratch.length = 0;
   for (let i = 0; i < matrixSize; i++) {
-    const delta = Math.abs(voltages[i] - prevVoltages[i]);
+    const delta = Math.abs(rhs[i] - prevVoltages[i]);
     const tol =
-      reltol * Math.max(Math.abs(voltages[i]), Math.abs(prevVoltages[i])) +
+      reltol * Math.max(Math.abs(rhs[i]), Math.abs(prevVoltages[i])) +
       (i < nodeCount ? voltTol : abstol);
     if (delta > tol) {
       const entry = pool[scratch.length];

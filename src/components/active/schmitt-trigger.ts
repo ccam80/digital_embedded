@@ -139,8 +139,8 @@ function createSchmittTriggerElement(
   let _outputHigh = false;
   outModel.setLogicLevel(inverting ? _outputHigh : _outputHigh);
 
-  function readNode(voltages: Float64Array, n: number): number {
-    return voltages[n];
+  function readNode(rhs: Float64Array, n: number): number {
+    return rhs[n];
   }
 
   function updateOutputLevel(): void {
@@ -208,13 +208,13 @@ function createSchmittTriggerElement(
 
     accept(_ctx: LoadContext, _simTime: number, _addBreakpoint: (t: number) => void): void {},
 
-    getPinCurrents(voltages: Float64Array): number[] {
+    getPinCurrents(rhs: Float64Array): number[] {
       // Input pin: conductance 1/rIn from nIn to ground â†’ I_in = V_in / rIn
-      const vIn = readNode(voltages, nIn);
+      const vIn = readNode(rhs, nIn);
       const iIn = nIn > 0 ? vIn / outputSpec.rIn : 0;
 
       // Output pin: Norton equivalent â€” I_out = (V_out - V_target) / rOut
-      const vOut = readNode(voltages, nOut);
+      const vOut = readNode(rhs, nOut);
       const targetVoltage = outModel.currentVoltage;
       const iOut = nOut > 0 ? (vOut - targetVoltage) / outputSpec.rOut : 0;
 

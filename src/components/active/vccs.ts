@@ -158,9 +158,9 @@ class VCCSAnalogElement extends ControlledSourceElement {
   setParam(_key: string, _value: number): void {
   }
 
-  protected override _bindContext(voltages: Float64Array): void {
-    const vCtrlP = this._nCtrlP > 0 ? voltages[this._nCtrlP] : 0;
-    const vCtrlN = this._nCtrlN > 0 ? voltages[this._nCtrlN] : 0;
+  protected override _bindContext(rhsOld: Float64Array): void {
+    const vCtrlP = this._nCtrlP > 0 ? rhsOld[this._nCtrlP] : 0;
+    const vCtrlN = this._nCtrlN > 0 ? rhsOld[this._nCtrlN] : 0;
     const vCtrl = vCtrlP - vCtrlN;
 
     this._ctx.setNodeVoltage("ctrl", vCtrl);
@@ -200,25 +200,25 @@ class VCCSAnalogElement extends ControlledSourceElement {
     // the term appears as -gm * V_ctrlP in the KCL row, i.e. current gm*V_ctrl
     // is injected INTO nOutP (enters the node).
     if (this._nOutP !== 0 && this._nCtrlP !== 0) {
-      solver.stampElement(solver.allocElement(this._nOutP - 1, this._nCtrlP - 1), -gm);
+      solver.stampElement(solver.allocElement(this._nOutP, this._nCtrlP), -gm);
     }
     if (this._nOutP !== 0 && this._nCtrlN !== 0) {
-      solver.stampElement(solver.allocElement(this._nOutP - 1, this._nCtrlN - 1), gm);
+      solver.stampElement(solver.allocElement(this._nOutP, this._nCtrlN), gm);
     }
     if (this._nOutN !== 0 && this._nCtrlP !== 0) {
-      solver.stampElement(solver.allocElement(this._nOutN - 1, this._nCtrlP - 1), gm);
+      solver.stampElement(solver.allocElement(this._nOutN, this._nCtrlP), gm);
     }
     if (this._nOutN !== 0 && this._nCtrlN !== 0) {
-      solver.stampElement(solver.allocElement(this._nOutN - 1, this._nCtrlN - 1), -gm);
+      solver.stampElement(solver.allocElement(this._nOutN, this._nCtrlN), -gm);
     }
 
     // RHS: NR-linearized independent current source (constant term).
     // Positive iNR injected INTO nOutP (current enters node â†’ positive RHS).
     if (this._nOutP !== 0) {
-      rhs[this._nOutP - 1] += iNR;
+      rhs[this._nOutP] += iNR;
     }
     if (this._nOutN !== 0) {
-      rhs[this._nOutN - 1] += -iNR;
+      rhs[this._nOutN] += -iNR;
     }
   }
 
@@ -230,7 +230,7 @@ class VCCSAnalogElement extends ControlledSourceElement {
    * current operating point. Positive = current flowing INTO the pin.
    * KCL: 0 + 0 + I_out - I_out = 0. âœ“
    */
-  getPinCurrents(_voltages: Float64Array): number[] {
+  getPinCurrents(_rhs: Float64Array): number[] {
     const iOut = this._compiledExpr(this._ctx);
     return [0, 0, iOut, -iOut];
   }

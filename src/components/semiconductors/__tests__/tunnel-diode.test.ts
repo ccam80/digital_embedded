@@ -78,13 +78,13 @@ function makeTunnelDiode(overrides: Partial<typeof TD_MODEL_PARAMS> = {}): Analo
  */
 function buildUnitCtx(
   solver: SparseSolver,
-  voltages: Float64Array,
+  rhs: Float64Array,
   overrides: Partial<import("../../../solver/analog/load-context.js").LoadContext> = {},
 ): import("../../../solver/analog/load-context.js").LoadContext {
   return Object.assign(makeLoadCtx({
     cktMode: MODEDCOP | MODEINITFLOAT,
     solver,
-    rhs: new Float64Array(voltages.length),
+    rhs: new Float64Array(rhs.length),
     dt: 0,
   }), overrides);
 }

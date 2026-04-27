@@ -125,7 +125,7 @@ function createGroundAnalogElement(
 
     setParam(_key: string, _value: number) {},
 
-    getPinCurrents(_voltages: Float64Array): number[] {
+    getPinCurrents(_rhs: Float64Array): number[] {
       // Ground constraint is enforced by node mapping (pin node = MNA node 0).
       // No current flows through the element stamp� return zero for the one pin.
       return [0];

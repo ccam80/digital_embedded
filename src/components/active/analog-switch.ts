@@ -347,7 +347,7 @@ function createSwitchSPSTElement(
       );
     },
 
-    getPinCurrents(voltages: Float64Array): number[] {
+    getPinCurrents(rhs: Float64Array): number[] {
       // Pin layout order: in, out, ctrl.
       // Conductance g_now stamped between nIn and nOut; ctrl has no stamp.
       const current_state = pool.states[0][base + SLOT_STATE];
@@ -356,8 +356,8 @@ function createSwitchSPSTElement(
       const g_now = ((current_state === REALLY_ON) || (current_state === HYST_ON))
         ? 1 / rOnNow
         : 1 / rOffNow;
-      const vIn  = voltages[nIn];
-      const vOut = voltages[nOut];
+      const vIn  = rhs[nIn];
+      const vOut = rhs[nOut];
       const iThrough = g_now * (vIn - vOut);
       return [iThrough, -iThrough, 0];
     },
@@ -450,7 +450,7 @@ function createSwitchSPDTElement(
       );
     },
 
-    getPinCurrents(voltages: Float64Array): number[] {
+    getPinCurrents(rhs: Float64Array): number[] {
       // Pin layout order: com, no, nc, ctrl.
       const s0_now = pool.states[0];
       const rOnNow  = Math.max(p.rOn, 1e-3);
@@ -459,9 +459,9 @@ function createSwitchSPDTElement(
       const stateNC = s0_now[base + 2];
       const gNO = ((stateNO === REALLY_ON) || (stateNO === HYST_ON)) ? 1 / rOnNow : 1 / rOffNow;
       const gNC = ((stateNC === REALLY_ON) || (stateNC === HYST_ON)) ? 1 / rOnNow : 1 / rOffNow;
-      const vCom = voltages[nCom];
-      const vNo  = voltages[nNO];
-      const vNc  = voltages[nNC];
+      const vCom = rhs[nCom];
+      const vNo  = rhs[nNO];
+      const vNc  = rhs[nNC];
       const iNO  = gNO * (vCom - vNo);
       const iNC  = gNC * (vCom - vNc);
       return [iNO + iNC, -iNO, -iNC, 0];

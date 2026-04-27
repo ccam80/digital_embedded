@@ -70,7 +70,7 @@ function makeCaptureSolver(): {
 // ctx.dt and ctx.voltages; no solver stamps occur inside accept.
 // ---------------------------------------------------------------------------
 
-function makeAcceptCtx(_voltages: Float64Array, dt: number): import("../../../solver/analog/load-context.js").LoadContext {
+function makeAcceptCtx(_rhs: Float64Array, dt: number): import("../../../solver/analog/load-context.js").LoadContext {
   return makeLoadCtx({
     solver: undefined as unknown as SparseSolverType,
     cktMode: MODETRAN | MODEINITFLOAT,

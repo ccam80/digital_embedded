@@ -373,12 +373,12 @@ export function createTriacElement(
       return Math.abs(cmthat - imt) <= tolMT && Math.abs(cg1hat - ig1) <= tolG1;
     },
 
-    getPinCurrents(voltages: Float64Array): number[] {
+    getPinCurrents(rhs: Float64Array): number[] {
       // pinLayout order: [MT2(0), MT1(1), G(2)]
       const s0 = pool.states[0];
-      const v1 = voltages[nodeMT1];
-      const v2 = voltages[nodeMT2];
-      const vG = voltages[nodeG];
+      const v1 = rhs[nodeMT1];
+      const v2 = rhs[nodeMT2];
+      const vG = rhs[nodeG];
 
       const iMT = s0[base + SLOT_GEQ] * (v2 - v1) + s0[base + SLOT_IEQ];
       const iG  = s0[base + SLOT_G_GATE_GEQ] * (vG - v1) + s0[base + SLOT_G_GATE_IEQ];

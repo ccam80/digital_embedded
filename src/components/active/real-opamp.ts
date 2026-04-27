@@ -401,8 +401,8 @@ export function createRealOpAmpElement(
   let geq_int  = 0;
   let vIntPrev = 0;
 
-  function readNode(voltages: Float64Array, n: number): number {
-    return voltages[n];
+  function readNode(rhs: Float64Array, n: number): number {
+    return rhs[n];
   }
 
   function stampCond(
@@ -555,7 +555,7 @@ export function createRealOpAmpElement(
       _vOutPrev = readNode(ctx.rhs, nOut);
     },
 
-    getPinCurrents(_voltages: Float64Array): number[] {
+    getPinCurrents(_rhs: Float64Array): number[] {
       // pinLayout order: in-, in+, out, Vcc+, Vcc-
       //
       // Input resistance G_in is stamped between nInp and nInn.

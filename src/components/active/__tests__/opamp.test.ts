@@ -352,11 +352,11 @@ function makeCaptureSolver(_rhs: Float64Array): { solver: SparseSolverType; stam
   return { solver, stamps };
 }
 
-function makeOpAmpParityCtx(voltages: Float64Array, solver: SparseSolverType, rhs?: Float64Array): LoadContext {
+function makeOpAmpParityCtx(rhsOld: Float64Array, solver: SparseSolverType, rhs?: Float64Array): LoadContext {
   return makeLoadCtx({
     solver,
-    rhs: rhs ?? new Float64Array(voltages.length > 0 ? voltages.length : 16),
-    rhsOld: voltages,
+    rhs: rhs ?? new Float64Array(rhsOld.length > 0 ? rhsOld.length : 16),
+    rhsOld: rhsOld,
     cktMode: MODEDCOP | MODEINITFLOAT,
     dt: 0,
   });

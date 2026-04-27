@@ -192,30 +192,30 @@ class CCVSAnalogElement extends ControlledSourceElement {
 
     // Sense 0V source incidence
     if (this._nSenseP !== 0) {
-      solver.stampElement(solver.allocElement(this._nSenseP - 1, ks), 1);
-      solver.stampElement(solver.allocElement(ks, this._nSenseP - 1), 1);
+      solver.stampElement(solver.allocElement(this._nSenseP, ks), 1);
+      solver.stampElement(solver.allocElement(ks, this._nSenseP), 1);
     }
     if (this._nSenseN !== 0) {
-      solver.stampElement(solver.allocElement(this._nSenseN - 1, ks), -1);
-      solver.stampElement(solver.allocElement(ks, this._nSenseN - 1), -1);
+      solver.stampElement(solver.allocElement(this._nSenseN, ks), -1);
+      solver.stampElement(solver.allocElement(ks, this._nSenseN), -1);
     }
     // RHS = 0V for sense source (no explicit stamp needed — beginAssembly zeros RHS)
 
     // Output voltage source incidence
     if (this._nOutP !== 0) {
-      solver.stampElement(solver.allocElement(this._nOutP - 1, ko), 1);
-      solver.stampElement(solver.allocElement(ko, this._nOutP - 1), 1);
+      solver.stampElement(solver.allocElement(this._nOutP, ko), 1);
+      solver.stampElement(solver.allocElement(ko, this._nOutP), 1);
     }
     if (this._nOutN !== 0) {
-      solver.stampElement(solver.allocElement(this._nOutN - 1, ko), -1);
-      solver.stampElement(solver.allocElement(ko, this._nOutN - 1), -1);
+      solver.stampElement(solver.allocElement(this._nOutN, ko), -1);
+      solver.stampElement(solver.allocElement(ko, this._nOutN), -1);
     }
   }
 
-  protected override _bindContext(voltages: Float64Array): void {
+  protected override _bindContext(rhsOld: Float64Array): void {
     // Read sense current from the sense branch variable
-    const iSense = voltages[this._senseBranch];
-    this._ctx.setBranchCurrentByIndex("sense", this._senseBranch, voltages);
+    const iSense = rhsOld[this._senseBranch];
+    this._ctx.setBranchCurrentByIndex("sense", this._senseBranch, rhsOld);
     this._ctrlValue = iSense;
   }
 
@@ -254,9 +254,9 @@ class CCVSAnalogElement extends ControlledSourceElement {
    * branch variable holds the output current. Positive = current INTO the pin.
    * KCL: I_senseP + I_senseN + I_outP + I_outN = I - I + J - J = 0. ✓
    */
-  getPinCurrents(voltages: Float64Array): number[] {
-    const iSense = voltages[this._senseBranch];
-    const iOut   = voltages[this._outBranch];
+  getPinCurrents(rhs: Float64Array): number[] {
+    const iSense = rhs[this._senseBranch];
+    const iOut   = rhs[this._outBranch];
     return [iSense, -iSense, iOut, -iOut];
   }
 }

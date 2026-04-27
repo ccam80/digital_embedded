@@ -189,7 +189,7 @@ export function makeCurrentSource(
       if (nodeNeg !== 0) stampRHS(ctx.rhs,nodeNeg, -I);
     },
 
-    getPinCurrents(_voltages: Float64Array): number[] {
+    getPinCurrents(_rhs: Float64Array): number[] {
       // No branch row â€” current is defined by the stamp: I = current * srcFact.
       // Pin layout order: [neg, pos] â€” neg is index 0, pos is index 1.
       // Conventional current flows from neg through source to pos (arrow direction).

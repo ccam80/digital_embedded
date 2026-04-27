@@ -633,11 +633,11 @@ function makeRealOpAmpCaptureSolver(_rhs: Float64Array): {
   return { solver, stamps };
 }
 
-function makeRealOpAmpParityCtx(voltages: Float64Array, solver: SparseSolverTypeForParity, rhs: Float64Array): LoadContext {
+function makeRealOpAmpParityCtx(rhsOld: Float64Array, solver: SparseSolverTypeForParity, rhs: Float64Array): LoadContext {
   return makeLoadCtx({
     solver: solver as unknown as import("../../../solver/analog/sparse-solver.js").SparseSolver,
     rhs,
-    rhsOld: voltages,
+    rhsOld: rhsOld,
     cktMode: MODEDCOP | MODEINITFLOAT,
     dt: 0,
   });

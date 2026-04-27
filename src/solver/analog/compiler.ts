@@ -339,11 +339,11 @@ function compileSubcircuitToMnaModel(
           for (const sub of subElements) sub.load(ctx);
         },
 
-        getPinCurrents(voltages: Float64Array): number[] {
+        getPinCurrents(rhs: Float64Array): number[] {
           const currents: number[] = [];
           for (const sub of subElements) {
             if (sub.getPinCurrents) {
-              currents.push(...sub.getPinCurrents(voltages));
+              currents.push(...sub.getPinCurrents(rhs));
             }
           }
           return currents;

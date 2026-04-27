@@ -919,7 +919,7 @@ export function createBjtElement(
       return Math.abs(cchat - cc) <= tolC && Math.abs(cbhat - cb) <= tolB;
     },
 
-    getPinCurrents(_voltages: Float64Array): number[] {
+    getPinCurrents(_rhs: Float64Array): number[] {
       const s0 = pool.states[0];
       const ic = polarity * s0[base + SLOT_CC];
       const ib = polarity * s0[base + SLOT_CB];
@@ -1921,7 +1921,7 @@ export function createSpiceL1BjtElement(
       return minDt;
     },
 
-    getPinCurrents(_voltages: Float64Array): number[] {
+    getPinCurrents(_rhs: Float64Array): number[] {
       const s0 = pool.states[0];
       const ic = polarity * s0[base + SLOT_CC];
       const ib = polarity * s0[base + SLOT_CB];

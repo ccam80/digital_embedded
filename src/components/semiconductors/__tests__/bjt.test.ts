@@ -55,15 +55,15 @@ function makeSpiceL1Props(modelParams?: Record<string, number>): PropertyBag {
   return props;
 }
 
-function makeDcOpCtx(voltages: Float64Array, matrixSize: number): LoadContext {
+function makeDcOpCtx(rhs: Float64Array, matrixSize: number): LoadContext {
   const solver = new SparseSolver();
   solver._initStructure(matrixSize);
   return {
     cktMode: MODEDCOP | MODEINITFLOAT,
     solver,
     matrix: solver,
-    rhs: voltages,
-    rhsOld: voltages,
+    rhs: rhs,
+    rhsOld: rhs,
     time: 0,
     dt: 0,
     method: "trapezoidal",
@@ -397,8 +397,8 @@ describe("BJT simple LimitingEvent instrumentation", () => {
     return withNodeIds(core, [1, 2, 3]);
   }
 
-  function makeCtxWithCollector(voltages: Float64Array, collector: LimitingEvent[] | null): LoadContext {
-    const ctx = makeDcOpCtx(voltages, 10);
+  function makeCtxWithCollector(rhs: Float64Array, collector: LimitingEvent[] | null): LoadContext {
+    const ctx = makeDcOpCtx(rhs, 10);
     return { ...ctx, limitingCollector: collector };
   }
 

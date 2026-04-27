@@ -480,19 +480,19 @@ export class AnalogCrystalElement implements ReactiveAnalogElement {
     }
   }
 
-  getPinCurrents(voltages: Float64Array): number[] {
+  getPinCurrents(rhs: Float64Array): number[] {
     const nA = this.pinNodeIds[0];
     const nB = this.pinNodeIds[1];
     const n1 = this.pinNodeIds[2];
 
     // Current through the series R_s (from pin A into the motional arm):
     // I_Rs = G_s * (V_A - V_n1). By KCL at n1 this equals the L_s branch current.
-    const vA = voltages[nA];
-    const vN1 = voltages[n1];
+    const vA = rhs[nA];
+    const vN1 = rhs[n1];
     const iMotional = this.G_s * (vA - vN1);
 
     // C_0 shunt current flowing into pin A: I = geqC0 * (vA - vB) + ieqC0
-    const vB = voltages[nB];
+    const vB = rhs[nB];
     const s0 = this._pool.states[0];
     const base = this.stateBaseOffset;
     const geqC0 = s0[base + SLOT_GEQ_C0];

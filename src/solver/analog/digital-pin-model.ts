@@ -26,8 +26,8 @@ import { stampRHS } from "./stamp-helpers.js";
  * sentinel). Non-ground nodes are stored at solver index nodeId
  * (1-based: slots 1..nodeCount).
  */
-export function readMnaVoltage(nodeId: number, voltages: Float64Array): number {
-  return nodeId > 0 && nodeId < voltages.length ? voltages[nodeId] : 0;
+export function readMnaVoltage(nodeId: number, rhs: Float64Array): number {
+  return nodeId > 0 && nodeId < rhs.length ? rhs[nodeId] : 0;
 }
 
 // ---------------------------------------------------------------------------

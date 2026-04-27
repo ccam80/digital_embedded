@@ -137,11 +137,11 @@ export class NodeVoltageHistory {
    * _head moves backward (mod depth) so index 0 always maps to _head.
    * ngspice equivalent: CKTsols rotation in dctran.c after NIpred.
    */
-  rotateNodeVoltages(voltages: Float64Array): void {
+  rotateNodeVoltages(rhs: Float64Array): void {
     if (this._buf.length === 0) return;
     // Move head backward: new head holds the most recent solution.
     this._head = (this._head - 1 + NODE_VOLTAGE_HISTORY_DEPTH) % NODE_VOLTAGE_HISTORY_DEPTH;
-    this._buf[this._head].set(voltages);
+    this._buf[this._head].set(rhs);
     if (this._filled < NODE_VOLTAGE_HISTORY_DEPTH) {
       this._filled++;
     }

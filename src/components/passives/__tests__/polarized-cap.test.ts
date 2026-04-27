@@ -58,7 +58,7 @@ function withState(core: AnalogElementCore): { element: ReactiveAnalogElement; p
  */
 function makeDiagnosticCtx(
   solver: SparseSolver,
-  _voltages: Float64Array,
+  _rhs: Float64Array,
 ): LoadContext {
   return makeLoadCtx({
     cktMode: MODEDCOP | MODEINITFLOAT,
@@ -74,7 +74,7 @@ function makeDiagnosticCtx(
  */
 function makeSlotLoadCtx(
   solver: SparseSolver,
-  _voltages: Float64Array,
+  _rhs: Float64Array,
   dt: number,
   method: IntegrationMethod,
   order: number,

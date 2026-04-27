@@ -87,11 +87,11 @@ function makeVoltages(size: number, nodeVoltages: Record<number, number>): Float
 function readTotalOutputConductance(
   element: AnalogElement,
   nOut: number,
-  voltages: Float64Array,
+  rhs: Float64Array,
 ): number {
-  const { solver, stamps, rhs } = makeComparatorCaptureSolver();
-  const ctx = makeComparatorParityCtx(voltages, solver);
-  (ctx as unknown as { rhs: Float64Array }).rhs = rhs;
+  const { solver, stamps, rhs: rhsBuf } = makeComparatorCaptureSolver();
+  const ctx = makeComparatorParityCtx(rhs, solver);
+  (ctx as unknown as { rhs: Float64Array }).rhs = rhsBuf;
   element.load(ctx);
   // allocElement takes 1-based (external) node indices, matching ngspice spGetElement.
   return stamps
@@ -274,7 +274,7 @@ function makeComparatorCaptureSolver(rhsSize = 16): {
   return { solver, stamps, rhs };
 }
 
-function makeComparatorParityCtx(_voltages: Float64Array, solver: SparseSolverType): LoadContext {
+function makeComparatorParityCtx(_rhs: Float64Array, solver: SparseSolverType): LoadContext {
   return makeLoadCtx({
     solver,
     cktMode: MODEDCOP | MODEINITFLOAT,
@@ -283,7 +283,7 @@ function makeComparatorParityCtx(_voltages: Float64Array, solver: SparseSolverTy
 }
 
 function makeComparatorTransientCtx(
-  _voltages: Float64Array,
+  _rhs: Float64Array,
   solver: SparseSolverType,
   dt: number,
 ): LoadContext {

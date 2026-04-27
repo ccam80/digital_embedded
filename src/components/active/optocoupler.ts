@@ -282,7 +282,7 @@ function createOptocouplerElement(
       void key; void value;
     },
 
-    getPinCurrents(_voltages: Float64Array): number[] {
+    getPinCurrents(_rhs: Float64Array): number[] {
       // Pin order: [anode, cathode, collector, emitter]
       const s0   = pool.states[0];
       const iLed = s0[diodeBase + DIODE_SLOT_ID];

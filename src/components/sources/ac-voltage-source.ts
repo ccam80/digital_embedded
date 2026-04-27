@@ -650,13 +650,13 @@ function createAcVoltageSourceElement(
       stampRHS(ctx.rhs,k, v);
     },
 
-    getPinCurrents(voltages: Float64Array): number[] {
-      // MNA branch variable: voltages[branchIdx] = I flowing from nodeNeg
+    getPinCurrents(rhs: Float64Array): number[] {
+      // MNA branch variable: rhs[branchIdx] = I flowing from nodeNeg
       // through source to nodePos.
       // Pin layout order: [neg, pos].
       // "Into element at neg" = -I (current exits neg into external circuit).
       // "Into element at pos" = +I (current enters pos from external circuit).
-      const I = voltages[branchIdx];
+      const I = rhs[branchIdx];
       return [-I, I];
     },
 

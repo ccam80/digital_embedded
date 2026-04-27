@@ -55,7 +55,7 @@ function makeMemristor(overrides: Partial<{
  * Integrate the memristor state variable w forward by one accepted step.
  * Memristor.accept() reads ctx.dt and ctx.voltages to compute dw/dt.
  */
-function acceptStep(mem: MemristorElement, dt: number, _voltages: Float64Array): void {
+function acceptStep(mem: MemristorElement, dt: number, _rhs: Float64Array): void {
   const ctx = makeLoadCtx({
     solver: new SparseSolver() as unknown as import("../../../solver/analog/sparse-solver.js").SparseSolver,
     cktMode: MODETRAN | MODEINITFLOAT,

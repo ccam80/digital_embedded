@@ -15,15 +15,15 @@ const bVsrc = nodeCount + 0;
 const bTx1 = nodeCount + 1;
 const matrixSize = nodeCount + 4;
 
-function makeTransientCtx(solver: SparseSolverType, voltages: Float64Array, dt: number, mode: number): LoadContext {
+function makeTransientCtx(solver: SparseSolverType, rhs: Float64Array, dt: number, mode: number): LoadContext {
   const ag = new Float64Array(7);
   if (dt > 0) { ag[0] = 1/dt; ag[1] = -1/dt; }
   return {
     cktMode: mode,
     solver: solver as unknown as import("../../../solver/analog/sparse-solver.js").SparseSolver,
     matrix: solver as unknown as import("../../../solver/analog/sparse-solver.js").SparseSolver,
-    rhs: voltages,
-    rhsOld: voltages,
+    rhs: rhs,
+    rhsOld: rhs,
     time: 0,
     dt,
     method: "trapezoidal" as "trapezoidal",
@@ -46,11 +46,11 @@ function makeTransientCtx(solver: SparseSolverType, voltages: Float64Array, dt: 
   };
 }
 
-function doStep(tx: AnalogTappedTransformerElement, solver: SparseSolver, voltages: Float64Array, vSrc: number, mode: number): boolean {
-  // Run NR iterations so PHI converges with voltages
-  let prev = new Float64Array(voltages);
+function doStep(tx: AnalogTappedTransformerElement, solver: SparseSolver, rhs: Float64Array, vSrc: number, mode: number): boolean {
+  // Run NR iterations so PHI converges with rhs
+  let prev = new Float64Array(rhs);
   for (let nr = 0; nr < 5; nr++) {
-    const ctx = makeTransientCtx(solver as unknown as SparseSolverType, voltages, dt, mode);
+    const ctx = makeTransientCtx(solver as unknown as SparseSolverType, rhs, dt, mode);
     const vsrc = makeVoltageSource(1, 0, bVsrc, vSrc);
     const rLoad = makeResistor(2, 4, Rload);
     const rCtGnd = makeResistor(3, 0, 1e6);
@@ -63,13 +63,13 @@ function doStep(tx: AnalogTappedTransformerElement, solver: SparseSolver, voltag
     rS2Gnd.load(ctx);
     const res = solver.factor();
     if (res !== 0) return false;
-    solver.solve(voltages, voltages);
+    solver.solve(rhs, rhs);
     // Check convergence
     let conv = true;
-    for (let j = 0; j < voltages.length; j++) {
-      if (Math.abs(voltages[j] - prev[j]) > 1e-9 * (1 + Math.abs(voltages[j]))) { conv = false; break; }
+    for (let j = 0; j < rhs.length; j++) {
+      if (Math.abs(rhs[j] - prev[j]) > 1e-9 * (1 + Math.abs(rhs[j]))) { conv = false; break; }
     }
-    prev = new Float64Array(voltages);
+    prev = new Float64Array(rhs);
     if (conv) break;
   }
   return true;

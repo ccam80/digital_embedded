@@ -40,7 +40,7 @@ class TestControlledSource extends ControlledSourceElement {
     return this._ctx;
   }
 
-  protected _bindContext(_voltages: Float64Array): void {
+  protected _bindContext(_rhsOld: Float64Array): void {
     // Tests set ctx values directly; this is a no-op for unit tests.
   }
 
@@ -50,7 +50,7 @@ class TestControlledSource extends ControlledSourceElement {
     this.lastCtrlValue = ctrlValue;
   }
 
-  getPinCurrents(_voltages: Float64Array): number[] { return [0, 0]; }
+  getPinCurrents(_rhs: Float64Array): number[] { return [0, 0]; }
 }
 
 // ---------------------------------------------------------------------------

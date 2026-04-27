@@ -224,7 +224,7 @@ class AnalogPotentiometerElement implements AnalogElement {
     stamp(n_B, n_W, -this.G_bottom);
   }
 
-  getPinCurrents(voltages: Float64Array): number[] {
+  getPinCurrents(rhs: Float64Array): number[] {
     // Factory passes nodes as [A, B, W] matching pinLayout order [A(0), B(1), W(2)].
     // Stamp variables: n_A=pinNodeIds[0] (A), n_W=pinNodeIds[1] (B pin node),
     // n_B=pinNodeIds[2] (W pin node) â€” the stamp variable names are inverted from
@@ -237,9 +237,9 @@ class AnalogPotentiometerElement implements AnalogElement {
     const n1 = this.pinNodeIds[1]; // middle node (stamp calls this n_W)
     const n2 = this.pinNodeIds[2]; // far end (stamp calls this n_B)
 
-    const v0 = voltages[n0];
-    const v1 = voltages[n1];
-    const v2 = voltages[n2];
+    const v0 = rhs[n0];
+    const v1 = rhs[n1];
+    const v2 = rhs[n2];
 
     // Current into pin at n0 through top resistor: G_top * (V_n0 - V_n1)
     const i0 = this.G_top * (v0 - v1);

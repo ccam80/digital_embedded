@@ -1,10 +1,10 @@
 {
   "summary": {
-    "passed": 8547,
-    "failed": 235,
+    "passed": 8604,
+    "failed": 173,
     "skipped": 15,
     "totalFiles": 395,
-    "durationSeconds": 22.5
+    "durationSeconds": 18.8
   },
   "failures": [
     {
@@ -32,27 +32,45 @@
       ]
     },
     {
-      "message": "expected false to be true // Object.is equality",
-      "count": 60,
+      "message": "expected 'µs/s' to be 'Âµs/s' // Object.is equality",
+      "count": 1,
       "locations": [
         {
-          "file": "src\\solver\\__tests__\\coordinator-capability.test.ts",
-          "test": "snapshotSignals contains non-zero voltages after DC op",
-          "line": 315,
-          "column": 24
-        },
-        {
-          "file": "src\\solver\\__tests__\\coordinator-slider-snapshot.test.ts",
-          "test": "returns finite number for element index 0",
-          "line": 219,
-          "column": 38
-        },
+          "file": "src\\solver\\__tests__\\coordinator-speed-control.test.ts",
+          "test": "formatSpeed returns micros/s for rate in 1e-6 to 1e-3 range",
+          "line": 265,
+          "column": 22
+        }
+      ]
+    },
+    {
+      "message": "expected +0 to be 1e-7 // Object.is equality",
+      "count": 3,
+      "locations": [
         {
           "file": "src\\components\\active\\__tests__\\adc.test.ts",
-          "test": "eoc_pulses_after_conversion",
-          "line": 219,
+          "test": "adc_load_dcop_parity",
+          "line": 372,
+          "column": 41
+        },
+        {
+          "file": "src\\components\\active\\__tests__\\dac.test.ts",
+          "test": "dac_load_dcop_parity",
+          "line": 370,
           "column": 27
         },
+        {
+          "file": "src\\components\\active\\__tests__\\schmitt-trigger.test.ts",
+          "test": "schmitt_load_dcop_parity",
+          "line": 448,
+          "column": 37
+        }
+      ]
+    },
+    {
+      "message": "expected false to be true // Object.is equality",
+      "count": 45,
+      "locations": [
         {
           "file": "src\\components\\active\\__tests__\\cccs.test.ts",
           "test": "current_mirror_gain_1",
@@ -236,50 +254,8 @@
         {
           "file": "src\\components\\io\\__tests__\\led.test.ts",
           "test": "pushes AK pnjlim event on non-init NR iteration",
-          "line": 1049,
+          "line": 1050,
           "column": 37
-        },
-        {
-          "file": "src\\components\\passives\\__tests__\\analog-fuse.test.ts",
-          "test": "3A through 1A-rated fuse blows at t ≈ i2tRating/I² ≈ 0.111s",
-          "line": 122,
-          "column": 26
-        },
-        {
-          "file": "src\\components\\passives\\__tests__\\analog-fuse.test.ts",
-          "test": "blown fuse has resistance close to R_blown",
-          "line": 146,
-          "column": 26
-        },
-        {
-          "file": "src\\components\\passives\\__tests__\\analog-fuse.test.ts",
-          "test": "driving 2× rated current emits fuse-blown diagnostic with info severity",
-          "line": 206,
-          "column": 26
-        },
-        {
-          "file": "src\\components\\passives\\__tests__\\analog-fuse.test.ts",
-          "test": "diagnostic is emitted only once even after multiple steps past blow",
-          "line": 230,
-          "column": 26
-        },
-        {
-          "file": "src\\components\\passives\\__tests__\\analog-fuse.test.ts",
-          "test": "stamps conductance into MNA solver when intact",
-          "line": 297,
-          "column": 32
-        },
-        {
-          "file": "src\\components\\passives\\__tests__\\analog-fuse.test.ts",
-          "test": "stamps near-zero conductance when blown",
-          "line": 306,
-          "column": 26
-        },
-        {
-          "file": "src\\components\\passives\\__tests__\\analog-fuse.test.ts",
-          "test": "intact fuse in series with load resistor: current = V / (R_cold + R_load)",
-          "line": 339,
-          "column": 32
         },
         {
           "file": "src\\components\\passives\\__tests__\\capacitor.test.ts",
@@ -304,12 +280,6 @@
           "test": "DC current through capacitor equals V/R_leak in steady state",
           "line": 185,
           "column": 32
-        },
-        {
-          "file": "src\\components\\passives\\__tests__\\resistor.test.ts",
-          "test": "voltage_divider_dc_op",
-          "line": 179,
-          "column": 30
         },
         {
           "file": "src\\components\\passives\\__tests__\\transmission-line.test.ts",
@@ -360,30 +330,6 @@
           "column": 30
         },
         {
-          "file": "src\\components\\sensors\\__tests__\\spark-gap.test.ts",
-          "test": "1500V fires the gap and allows current to flow",
-          "line": 145,
-          "column": 30
-        },
-        {
-          "file": "src\\components\\sensors\\__tests__\\spark-gap.test.ts",
-          "test": "gap stays conducting while voltage keeps current above iHold",
-          "line": 178,
-          "column": 30
-        },
-        {
-          "file": "src\\components\\sensors\\__tests__\\spark-gap.test.ts",
-          "test": "gap returns to blocking when current drops below iHold",
-          "line": 205,
-          "column": 30
-        },
-        {
-          "file": "src\\components\\sensors\\__tests__\\spark-gap.test.ts",
-          "test": "can re-fire after extinction",
-          "line": 226,
-          "column": 30
-        },
-        {
           "file": "src\\solver\\analog\\__tests__\\behavioral-combinational.test.ts",
           "test": "combinational_pin_loading_propagates",
           "line": 451,
@@ -394,162 +340,6 @@
           "test": "cites niiter.c:888-891 at the E_SINGULAR retry",
           "line": 250,
           "column": 27
-        }
-      ]
-    },
-    {
-      "message": "expected 'µs/s' to be 'Âµs/s' // Object.is equality",
-      "count": 1,
-      "locations": [
-        {
-          "file": "src\\solver\\__tests__\\coordinator-speed-control.test.ts",
-          "test": "formatSpeed returns micros/s for rate in 1e-6 to 1e-3 range",
-          "line": 265,
-          "column": 22
-        }
-      ]
-    },
-    {
-      "message": "expected 0 to be greater than 0",
-      "count": 12,
-      "locations": [
-        {
-          "file": "src\\solver\\__tests__\\coordinator-visualization.test.ts",
-          "test": "voltage source pins span a non-zero potential after DC op",
-          "line": 191,
-          "column": 25
-        },
-        {
-          "file": "src\\solver\\__tests__\\coordinator-visualization.test.ts",
-          "test": "voltageRange max is positive after tracking a 5V DC circuit",
-          "line": 271,
-          "column": 24
-        },
-        {
-          "file": "src\\solver\\__tests__\\coordinator-visualization.test.ts",
-          "test": "voltageRange spans a non-zero range for circuit with voltage differences",
-          "line": 287,
-          "column": 37
-        },
-        {
-          "file": "src\\solver\\__tests__\\coordinator-visualization.test.ts",
-          "test": "voltageRange resets to { min: 0, max: 0 } after coordinator.reset()",
-          "line": 294,
-          "column": 43
-        },
-        {
-          "file": "src\\components\\semiconductors\\__tests__\\bjt.test.ts",
-          "test": "target_colPrime",
-          "line": 1972,
-          "column": 31
-        },
-        {
-          "file": "src\\solver\\analog\\__tests__\\mna-end-to-end.test.ts",
-          "test": "nmos_triode_region_dc_op",
-          "line": 736,
-          "column": 20
-        },
-        {
-          "file": "src\\solver\\analog\\__tests__\\mna-end-to-end.test.ts",
-          "test": "pmos_common_source_dc_op",
-          "line": 814,
-          "column": 20
-        },
-        {
-          "file": "src\\solver\\analog\\__tests__\\newton-raphson.test.ts",
-          "test": "e_singular_recovers_via_continue",
-          "line": 817,
-          "column": 39
-        },
-        {
-          "file": "src\\solver\\analog\\__tests__\\newton-raphson.test.ts",
-          "test": "e_singular_recovery_reloads_and_refactors",
-          "line": 883,
-          "column": 39
-        },
-        {
-          "file": "src\\solver\\analog\\__tests__\\phase-3-relay-composite.test.ts",
-          "test": "SPDT relay child inductor integrates the coil current",
-          "line": 134,
-          "column": 17
-        },
-        {
-          "file": "src\\solver\\analog\\__tests__\\sparse-solver.test.ts",
-          "test": "prefers singleton rows — singletons getter reflects matrix structure",
-          "line": 1084,
-          "column": 31
-        },
-        {
-          "file": "src\\solver\\analog\\__tests__\\harness\\harness-integration.test.ts",
-          "test": "findLargestDelta identifies worst convergence point",
-          "line": 398,
-          "column": 27
-        }
-      ]
-    },
-    {
-      "message": "expected +0 to be 128 // Object.is equality",
-      "count": 4,
-      "locations": [
-        {
-          "file": "src\\components\\active\\__tests__\\adc.test.ts",
-          "test": "midscale_input",
-          "line": 170,
-          "column": 29
-        },
-        {
-          "file": "src\\components\\active\\__tests__\\adc.test.ts",
-          "test": "output scales with VREF from wire",
-          "line": 230,
-          "column": 30
-        },
-        {
-          "file": "src\\components\\active\\__tests__\\adc.test.ts",
-          "test": "3.3V clock triggers edge detection with default thresholds",
-          "line": 238,
-          "column": 29
-        },
-        {
-          "file": "src\\components\\active\\__tests__\\adc.test.ts",
-          "test": "custom vIH threshold changes clock sensitivity",
-          "line": 276,
-          "column": 29
-        }
-      ]
-    },
-    {
-      "message": "expected +0 to be 255 // Object.is equality",
-      "count": 2,
-      "locations": [
-        {
-          "file": "src\\components\\active\\__tests__\\adc.test.ts",
-          "test": "full_scale",
-          "line": 178,
-          "column": 29
-        },
-        {
-          "file": "src\\components\\active\\__tests__\\adc.test.ts",
-          "test": "ramp_test",
-          "line": 207,
-          "column": 37
-        }
-      ]
-    },
-    {
-      "message": "expected +0 to be 1e-7 // Object.is equality",
-      "count": 2,
-      "locations": [
-        {
-          "file": "src\\components\\active\\__tests__\\adc.test.ts",
-          "test": "adc_load_dcop_parity",
-          "line": 368,
-          "column": 41
-        },
-        {
-          "file": "src\\components\\active\\__tests__\\schmitt-trigger.test.ts",
-          "test": "schmitt_load_dcop_parity",
-          "line": 448,
-          "column": 37
         }
       ]
     },
@@ -585,18 +375,6 @@
           "file": "src\\components\\active\\__tests__\\comparator.test.ts",
           "test": "comparator_load_dcop_parity",
           "line": 329,
-          "column": 23
-        }
-      ]
-    },
-    {
-      "message": "expected NaN to be 0.0001953125 // Object.is equality",
-      "count": 1,
-      "locations": [
-        {
-          "file": "src\\components\\active\\__tests__\\dac.test.ts",
-          "test": "dac_load_dcop_parity",
-          "line": 364,
           "column": 23
         }
       ]
@@ -740,90 +518,6 @@
       ]
     },
     {
-      "message": "expected NaN to be less than 1",
-      "count": 1,
-      "locations": [
-        {
-          "file": "src\\components\\passives\\__tests__\\analog-fuse.test.ts",
-          "test": "0.5A through 1A-rated fuse for 1s stays intact",
-          "line": 92,
-          "column": 34
-        }
-      ]
-    },
-    {
-      "message": "expected NaN to be greater than or equal to NaN",
-      "count": 1,
-      "locations": [
-        {
-          "file": "src\\components\\passives\\__tests__\\analog-fuse.test.ts",
-          "test": "resistance changes continuously without step discontinuity near blow threshold",
-          "line": 174,
-          "column": 32
-        }
-      ]
-    },
-    {
-      "message": "expected NaN to be greater than 0",
-      "count": 4,
-      "locations": [
-        {
-          "file": "src\\components\\passives\\__tests__\\analog-fuse.test.ts",
-          "test": "thermalRatio is 0 initially and increases toward 1",
-          "line": 244,
-          "column": 33
-        },
-        {
-          "file": "src\\components\\passives\\__tests__\\analog-fuse.test.ts",
-          "test": "onStateChange callback receives blown and thermalRatio",
-          "line": 264,
-          "column": 30
-        },
-        {
-          "file": "src\\components\\passives\\__tests__\\analog-fuse.test.ts",
-          "test": "createAnalogFuseElement writes blown and _thermalRatio into props",
-          "line": 280,
-          "column": 42
-        },
-        {
-          "file": "src\\components\\semiconductors\\__tests__\\diode.test.ts",
-          "test": "cap gate fires under MODETRANOP | MODEUIC (dioload.c:316-317)",
-          "line": 1151,
-          "column": 28
-        }
-      ]
-    },
-    {
-      "message": "expected undefined to be defined",
-      "count": 4,
-      "locations": [
-        {
-          "file": "src\\components\\passives\\__tests__\\analog-fuse.test.ts",
-          "test": "un-blown fuse stamps G=1/smoothResistance(0) bit-exact",
-          "line": 385,
-          "column": 19
-        },
-        {
-          "file": "src\\components\\passives\\__tests__\\resistor.test.ts",
-          "test": "3-resistor divider Vs=5V R=1k/1k/1k matches ngspice bit-exact",
-          "line": 266,
-          "column": 17
-        },
-        {
-          "file": "src\\components\\passives\\__tests__\\transformer.test.ts",
-          "test": "winding_resistance_drops_voltage — R_pri=10Ω drops ~10V with 1A",
-          "line": 579,
-          "column": 20
-        },
-        {
-          "file": "src\\components\\sensors\\__tests__\\spark-gap.test.ts",
-          "test": "non-firing spark gap stamps G=1/firingResistance(0) bit-exact",
-          "line": 406,
-          "column": 17
-        }
-      ]
-    },
-    {
       "message": "expected 1 to be -0.00796411967079029 // Object.is equality",
       "count": 1,
       "locations": [
@@ -842,7 +536,7 @@
         {
           "file": "src\\components\\passives\\__tests__\\inductor.test.ts",
           "test": "inductor_load_transient_parity",
-          "line": 613,
+          "line": 612,
           "column": 33
         }
       ]
@@ -974,7 +668,7 @@
         {
           "file": "src\\components\\passives\\__tests__\\polarized-cap.test.ts",
           "test": "emits reverse-biased-cap diagnostic when V(pos) < V(neg) - reverseMax",
-          "line": 402,
+          "line": 401,
           "column": 34
         },
         {
@@ -987,42 +681,12 @@
     },
     {
       "message": "Singular at step 0",
-      "count": 6,
+      "count": 1,
       "locations": [
         {
           "file": "src\\components\\passives\\__tests__\\tapped-transformer.test.ts",
           "test": "symmetric_halves — secondary half voltages equal in magnitude, opposite phase to CT",
           "line": 306,
-          "column": 31
-        },
-        {
-          "file": "src\\components\\passives\\__tests__\\transformer.test.ts",
-          "test": "voltage_ratio — N=10:1 secondary ≈ primary/10 for k=0.99 in AC steady state",
-          "line": 238,
-          "column": 31
-        },
-        {
-          "file": "src\\components\\passives\\__tests__\\transformer.test.ts",
-          "test": "current_ratio_inverse — secondary current ≈ N × primary branch current",
-          "line": 314,
-          "column": 31
-        },
-        {
-          "file": "src\\components\\passives\\__tests__\\transformer.test.ts",
-          "test": "power_conservation — P_primary ≈ P_secondary for k=0.99 within 10%",
-          "line": 391,
-          "column": 31
-        },
-        {
-          "file": "src\\components\\passives\\__tests__\\transformer.test.ts",
-          "test": "leakage_with_low_k — k=0.8 secondary voltage < k=0.99 secondary voltage",
-          "line": 469,
-          "column": 33
-        },
-        {
-          "file": "src\\components\\passives\\__tests__\\transformer.test.ts",
-          "test": "dc_blocks — DC source on primary produces ~0 secondary voltage in steady state",
-          "line": 539,
           "column": 31
         }
       ]
@@ -1040,14 +704,68 @@
       ]
     },
     {
-      "message": "expected 'icheckLimited = vbeLimFlag || vbcLimF…' to contain 'architectural-alignment.md §E1'",
+      "message": "expected NaN to be greater than 298.15",
       "count": 1,
       "locations": [
         {
-          "file": "src\\components\\semiconductors\\__tests__\\bjt-l0-scope-comment.test.ts",
-          "test": "documents L0 substrate divergence after pnjlim block",
-          "line": 55,
+          "file": "src\\components\\sensors\\__tests__\\ntc-thermistor.test.ts",
+          "test": "temperature rises from ambient under power dissipation",
+          "line": 183,
+          "column": 31
+        }
+      ]
+    },
+    {
+      "message": "expected NaN to be greater than 268.344",
+      "count": 1,
+      "locations": [
+        {
+          "file": "src\\components\\sensors\\__tests__\\ntc-thermistor.test.ts",
+          "test": "self-heating reaches T_ambient + P·R_thermal at steady state",
+          "line": 225,
+          "column": 31
+        }
+      ]
+    },
+    {
+      "message": "expected 0 to be greater than 0",
+      "count": 6,
+      "locations": [
+        {
+          "file": "src\\components\\semiconductors\\__tests__\\bjt.test.ts",
+          "test": "target_colPrime",
+          "line": 1969,
+          "column": 31
+        },
+        {
+          "file": "src\\solver\\analog\\__tests__\\mna-end-to-end.test.ts",
+          "test": "nmos_triode_region_dc_op",
+          "line": 736,
           "column": 20
+        },
+        {
+          "file": "src\\solver\\analog\\__tests__\\mna-end-to-end.test.ts",
+          "test": "pmos_common_source_dc_op",
+          "line": 814,
+          "column": 20
+        },
+        {
+          "file": "src\\solver\\analog\\__tests__\\newton-raphson.test.ts",
+          "test": "e_singular_recovers_via_continue",
+          "line": 817,
+          "column": 39
+        },
+        {
+          "file": "src\\solver\\analog\\__tests__\\newton-raphson.test.ts",
+          "test": "e_singular_recovery_reloads_and_refactors",
+          "line": 883,
+          "column": 39
+        },
+        {
+          "file": "src\\solver\\analog\\__tests__\\harness\\harness-integration.test.ts",
+          "test": "findLargestDelta identifies worst convergence point",
+          "line": 398,
+          "column": 27
         }
       ]
     },
@@ -1077,19 +795,13 @@
     },
     {
       "message": "expected NaN to be less than 0.000001",
-      "count": 2,
+      "count": 1,
       "locations": [
         {
           "file": "src\\components\\semiconductors\\__tests__\\diode.test.ts",
           "test": "AREA=1 (default) gives same result as no AREA override",
           "line": 677,
           "column": 58
-        },
-        {
-          "file": "src\\components\\sensors\\__tests__\\spark-gap.test.ts",
-          "test": "500V across 1000V gap: current ≈ 500/R_off (nA range)",
-          "line": 124,
-          "column": 17
         }
       ]
     },
@@ -1102,6 +814,18 @@
           "test": "AREA=2 doubles IS and thus id (and gd) relative to AREA=1",
           "line": 684,
           "column": 29
+        }
+      ]
+    },
+    {
+      "message": "expected NaN to be greater than 0",
+      "count": 1,
+      "locations": [
+        {
+          "file": "src\\components\\semiconductors\\__tests__\\diode.test.ts",
+          "test": "cap gate fires under MODETRANOP | MODEUIC (dioload.c:316-317)",
+          "line": 1151,
+          "column": 28
         }
       ]
     },
@@ -1202,132 +926,6 @@
       ]
     },
     {
-      "message": "expected NaN to be greater than 298.15",
-      "count": 1,
-      "locations": [
-        {
-          "file": "src\\components\\sensors\\__tests__\\ntc-thermistor.test.ts",
-          "test": "temperature rises from ambient under power dissipation",
-          "line": 183,
-          "column": 31
-        }
-      ]
-    },
-    {
-      "message": "expected NaN to be greater than 268.344",
-      "count": 1,
-      "locations": [
-        {
-          "file": "src\\components\\sensors\\__tests__\\ntc-thermistor.test.ts",
-          "test": "self-heating reaches T_ambient + P·R_thermal at steady state",
-          "line": 225,
-          "column": 31
-        }
-      ]
-    },
-    {
-      "message": "expected NaN to be greater than 100000000",
-      "count": 1,
-      "locations": [
-        {
-          "file": "src\\components\\sensors\\__tests__\\spark-gap.test.ts",
-          "test": "resistance below breakdown is close to R_off",
-          "line": 132,
-          "column": 32
-        }
-      ]
-    },
-    {
-      "message": "expected NaN to be less than 100",
-      "count": 2,
-      "locations": [
-        {
-          "file": "src\\components\\sensors\\__tests__\\spark-gap.test.ts",
-          "test": "resistance drops significantly above breakdown",
-          "line": 152,
-          "column": 32
-        },
-        {
-          "file": "src\\components\\sensors\\__tests__\\spark-gap.test.ts",
-          "test": "conducting gap has low resistance well above holding current",
-          "line": 194,
-          "column": 32
-        }
-      ]
-    },
-    {
-      "message": "expected NaN to be greater than NaN",
-      "count": 1,
-      "locations": [
-        {
-          "file": "src\\components\\sensors\\__tests__\\spark-gap.test.ts",
-          "test": "current above breakdown is much larger than below",
-          "line": 167,
-          "column": 23
-        }
-      ]
-    },
-    {
-      "message": "expected NaN to be greater than 1000000",
-      "count": 1,
-      "locations": [
-        {
-          "file": "src\\components\\sensors\\__tests__\\spark-gap.test.ts",
-          "test": "resistance returns toward R_off after extinction",
-          "line": 217,
-          "column": 32
-        }
-      ]
-    },
-    {
-      "message": "expected NaN to be less than or equal to NaN",
-      "count": 1,
-      "locations": [
-        {
-          "file": "src\\components\\sensors\\__tests__\\spark-gap.test.ts",
-          "test": "resistance changes monotonically across the breakdown transition zone",
-          "line": 244,
-          "column": 28
-        }
-      ]
-    },
-    {
-      "message": "expected NaN to be greater than 5",
-      "count": 1,
-      "locations": [
-        {
-          "file": "src\\components\\sensors\\__tests__\\spark-gap.test.ts",
-          "test": "resistance at breakdown voltage is midpoint between rOn and rOff",
-          "line": 261,
-          "column": 17
-        }
-      ]
-    },
-    {
-      "message": "expected [ [ 1, 1, NaN ], [ 1, 2, NaN ], …(2) ] to deep equally contain [ +0, +0, NaN ]",
-      "count": 1,
-      "locations": [
-        {
-          "file": "src\\components\\sensors\\__tests__\\spark-gap.test.ts",
-          "test": "stamps conductance matrix between nodes in blocking state",
-          "line": 285,
-          "column": 22
-        }
-      ]
-    },
-    {
-      "message": "Cannot read properties of undefined (reading 'value')",
-      "count": 1,
-      "locations": [
-        {
-          "file": "src\\components\\sensors\\__tests__\\spark-gap.test.ts",
-          "test": "stamps higher conductance in conducting state",
-          "line": 303,
-          "column": 67
-        }
-      ]
-    },
-    {
       "message": "expected 1.5164499625412833 to be less than 0.8644719901267445",
       "count": 1,
       "locations": [
@@ -1407,11 +1005,35 @@
     },
     {
       "message": "Matrix-entry structural divergence at step=0 attempt=0 iter=0:",
-      "count": 24,
+      "count": 33,
       "locations": [
         {
           "file": "src\\solver\\analog\\__tests__\\harness\\comparison-session.ts",
           "test": "buckbjt_load_dcop_parity: rhsOld + noncon + diagGmin + srcFact bit-exact vs ngspice",
+          "line": 2759,
+          "column": 11
+        },
+        {
+          "file": "src\\solver\\analog\\__tests__\\harness\\comparison-session.ts",
+          "test": "rc-step: runs to stopTime without collapse",
+          "line": 2759,
+          "column": 11
+        },
+        {
+          "file": "src\\solver\\analog\\__tests__\\harness\\comparison-session.ts",
+          "test": "rc-ac-lowpass: runs to stopTime without collapse",
+          "line": 2759,
+          "column": 11
+        },
+        {
+          "file": "src\\solver\\analog\\__tests__\\harness\\comparison-session.ts",
+          "test": "rl-step: runs to stopTime without collapse",
+          "line": 2759,
+          "column": 11
+        },
+        {
+          "file": "src\\solver\\analog\\__tests__\\harness\\comparison-session.ts",
+          "test": "rl-ac: runs to stopTime without collapse",
           "line": 2759,
           "column": 11
         },
@@ -1489,6 +1111,18 @@
         },
         {
           "file": "src\\solver\\analog\\__tests__\\harness\\comparison-session.ts",
+          "test": "rc-step.dts: ComparisonSession.ngspiceSession exposes Q/CCAP on capacitor",
+          "line": 2759,
+          "column": 11
+        },
+        {
+          "file": "src\\solver\\analog\\__tests__\\harness\\comparison-session.ts",
+          "test": "rc-step.dts: getAttempt(tranNR) exposes Q/CCAP on CVC in ngspice elementStates",
+          "line": 2759,
+          "column": 11
+        },
+        {
+          "file": "src\\solver\\analog\\__tests__\\harness\\comparison-session.ts",
           "test": "lteDt present on every accepted outer step from real ngspice run",
           "line": 2759,
           "column": 11
@@ -1496,6 +1130,12 @@
         {
           "file": "src\\solver\\analog\\__tests__\\harness\\comparison-session.ts",
           "test": "creates session and runs transient",
+          "line": 2759,
+          "column": 11
+        },
+        {
+          "file": "src\\solver\\analog\\__tests__\\harness\\comparison-session.ts",
+          "test": "dumps s0/s1/s2 for Vc across every iteration of steps 0-4",
           "line": 2759,
           "column": 11
         },
@@ -1543,6 +1183,12 @@
         },
         {
           "file": "src\\solver\\analog\\__tests__\\harness\\comparison-session.ts",
+          "test": "transient_per_step_match",
+          "line": 2759,
+          "column": 11
+        },
+        {
+          "file": "src\\solver\\analog\\__tests__\\harness\\comparison-session.ts",
           "test": "transient_oscillation_match",
           "line": 2759,
           "column": 11
@@ -1550,6 +1196,12 @@
         {
           "file": "src\\solver\\analog\\__tests__\\harness\\comparison-session.ts",
           "test": "dump+compare step 0 attempt structure",
+          "line": 2759,
+          "column": 11
+        },
+        {
+          "file": "src\\solver\\analog\\__tests__\\harness\\comparison-session.ts",
+          "test": "dump step 0..3 structure",
           "line": 2759,
           "column": 11
         }
@@ -1606,6 +1258,18 @@
           "test": "gear order 2 returns positive finite timestep for cubic charge data",
           "line": 141,
           "column": 19
+        }
+      ]
+    },
+    {
+      "message": "expected 200 to be +0 // Object.is equality",
+      "count": 1,
+      "locations": [
+        {
+          "file": "src\\solver\\analog\\__tests__\\ckt-terr.test.ts",
+          "test": "zero_allocations_in_lte_path",
+          "line": 374,
+          "column": 24
         }
       ]
     },
@@ -1712,6 +1376,60 @@
       ]
     },
     {
+      "message": "expected 40 to be +0 // Object.is equality",
+      "count": 2,
+      "locations": [
+        {
+          "file": "src\\solver\\analog\\__tests__\\load-order.test.ts",
+          "test": "Resistor factory returns RES (0)",
+          "line": 23,
+          "column": 33
+        },
+        {
+          "file": "src\\solver\\analog\\__tests__\\load-order.test.ts",
+          "test": "NGSPICE_LOAD_ORDER constants are stable",
+          "line": 42,
+          "column": 36
+        }
+      ]
+    },
+    {
+      "message": "expected 17 to be 1 // Object.is equality",
+      "count": 1,
+      "locations": [
+        {
+          "file": "src\\solver\\analog\\__tests__\\load-order.test.ts",
+          "test": "Capacitor factory returns CAP (1)",
+          "line": 29,
+          "column": 33
+        }
+      ]
+    },
+    {
+      "message": "expected 48 to be 4 // Object.is equality",
+      "count": 1,
+      "locations": [
+        {
+          "file": "src\\solver\\analog\\__tests__\\load-order.test.ts",
+          "test": "VoltageSource factory returns VSRC (4)",
+          "line": 35,
+          "column": 33
+        }
+      ]
+    },
+    {
+      "message": "expected [ 'C1', 'R1', 'R2', 'R3', 'V1' ] to deeply equal [ 'R1', 'R2', 'R3', 'C1', 'V1' ]",
+      "count": 1,
+      "locations": [
+        {
+          "file": "src\\solver\\analog\\__tests__\\load-order.test.ts",
+          "test": "stable-sort preserves intra-bucket order",
+          "line": 77,
+          "column": 37
+        }
+      ]
+    },
+    {
       "message": "expected 4 to be 3 // Object.is equality",
       "count": 2,
       "locations": [
@@ -1786,246 +1504,6 @@
           "test": "pnjlim_matches_ngspice_arg_le_zero_branch",
           "line": 410,
           "column": 26
-        }
-      ]
-    },
-    {
-      "message": "Unguarded xfact reads:",
-      "count": 1,
-      "locations": [
-        {
-          "file": "src\\solver\\analog\\__tests__\\phase-3-xfact-scope-audit.test.ts",
-          "test": "has zero unguarded xfact reads in src/components/",
-          "line": 136,
-          "column": 76
-        }
-      ]
-    },
-    {
-      "message": "Stale allowlist entries:",
-      "count": 1,
-      "locations": [
-        {
-          "file": "src\\solver\\analog\\__tests__\\phase-3-xfact-scope-audit.test.ts",
-          "test": "allowlist is exhaustive — no stale entries",
-          "line": 184,
-          "column": 74
-        }
-      ]
-    },
-    {
-      "message": "expected 2 to be 1 // Object.is equality",
-      "count": 1,
-      "locations": [
-        {
-          "file": "src\\solver\\analog\\__tests__\\sparse-solver.test.ts",
-          "test": "detects singular matrix",
-          "line": 650,
-          "column": 40
-        }
-      ]
-    },
-    {
-      "message": "expected true to be false // Object.is equality",
-      "count": 4,
-      "locations": [
-        {
-          "file": "src\\solver\\analog\\__tests__\\sparse-solver.test.ts",
-          "test": "factor() returns usedReorder=false on second call (numerical path)",
-          "line": 806,
-          "column": 30
-        },
-        {
-          "file": "src\\solver\\analog\\__tests__\\sparse-solver.test.ts",
-          "test": "factor() solves correctly on numerical path after reorder",
-          "line": 838,
-          "column": 30
-        },
-        {
-          "file": "src\\solver\\analog\\__tests__\\sparse-solver.test.ts",
-          "test": "factor_uses_numeric_path_without_forceReorder",
-          "line": 1965,
-          "column": 30
-        },
-        {
-          "file": "src\\solver\\analog\\__tests__\\sparse-solver.test.ts",
-          "test": "forceReorder_triggers_full_pivot_search",
-          "line": 1998,
-          "column": 30
-        }
-      ]
-    },
-    {
-      "message": "expected 0 to be greater than or equal to 5",
-      "count": 1,
-      "locations": [
-        {
-          "file": "src\\solver\\analog\\__tests__\\sparse-solver.test.ts",
-          "test": "allocates markowitzRow, markowitzCol, markowitzProd with correct length",
-          "line": 853,
-          "column": 40
-        }
-      ]
-    },
-    {
-      "message": "expected undefined to be +0 // Object.is equality",
-      "count": 3,
-      "locations": [
-        {
-          "file": "src\\solver\\analog\\__tests__\\sparse-solver.test.ts",
-          "test": "initializes all Markowitz arrays to zero on beginAssembly",
-          "line": 862,
-          "column": 38
-        },
-        {
-          "file": "src\\solver\\analog\\__tests__\\sparse-solver.test.ts",
-          "test": "resets Markowitz arrays to zero when same size is reused",
-          "line": 889,
-          "column": 36
-        },
-        {
-          "file": "src\\solver\\analog\\__tests__\\sparse-solver.test.ts",
-          "test": "counts zero off-diagonals for a diagonal matrix",
-          "line": 1002,
-          "column": 38
-        }
-      ]
-    },
-    {
-      "message": "expected 0 to be greater than or equal to 3",
-      "count": 1,
-      "locations": [
-        {
-          "file": "src\\solver\\analog\\__tests__\\sparse-solver.test.ts",
-          "test": "re-allocates Markowitz arrays when size changes",
-          "line": 872,
-          "column": 40
-        }
-      ]
-    },
-    {
-      "message": "expected NaN to be 4 // Object.is equality",
-      "count": 1,
-      "locations": [
-        {
-          "file": "src\\solver\\analog\\__tests__\\sparse-solver.test.ts",
-          "test": "counts off-diagonal nonzeros correctly for a 3x3 tridiagonal matrix",
-          "line": 957,
-          "column": 27
-        }
-      ]
-    },
-    {
-      "message": "expected undefined to be 1 // Object.is equality",
-      "count": 2,
-      "locations": [
-        {
-          "file": "src\\solver\\analog\\__tests__\\sparse-solver.test.ts",
-          "test": "computes Markowitz products and singletons for tridiagonal matrix",
-          "line": 979,
-          "column": 36
-        },
-        {
-          "file": "src\\solver\\analog\\__tests__\\sparse-solver.test.ts",
-          "test": "counts correctly for a dense 2x2 matrix",
-          "line": 1023,
-          "column": 38
-        }
-      ]
-    },
-    {
-      "message": "expected 0 to be less than 0",
-      "count": 2,
-      "locations": [
-        {
-          "file": "src\\solver\\analog\\__tests__\\sparse-solver.test.ts",
-          "test": "decrements row and column counts after elimination via linked lists",
-          "line": 1146,
-          "column": 24
-        },
-        {
-          "file": "src\\solver\\analog\\__tests__\\sparse-solver.test.ts",
-          "test": "_updateMarkowitzNumbers via linked lists produces correct counts",
-          "line": 1355,
-          "column": 26
-        }
-      ]
-    },
-    {
-      "message": "expected +0 to be 6 // Object.is equality",
-      "count": 1,
-      "locations": [
-        {
-          "file": "src\\solver\\analog\\__tests__\\sparse-solver.test.ts",
-          "test": "fill-in detection: factor a matrix where fill-in is guaranteed, verify Markowitz counts increase",
-          "line": 1258,
-          "column": 33
-        }
-      ]
-    },
-    {
-      "message": "expected +0 to be 2 // Object.is equality",
-      "count": 2,
-      "locations": [
-        {
-          "file": "src\\solver\\analog\\__tests__\\sparse-solver.test.ts",
-          "test": "stamp_inserts_into_linked_structure",
-          "line": 1499,
-          "column": 23
-        },
-        {
-          "file": "src\\solver\\analog\\__tests__\\sparse-solver.test.ts",
-          "test": "beginAssembly_zeros_values_preserves_structure",
-          "line": 1552,
-          "column": 23
-        }
-      ]
-    },
-    {
-      "message": "inductor NG_VOLT (INDvolt) must be surfaced on at least one step: expected false to be true // Object.is equality",
-      "count": 1,
-      "locations": [
-        {
-          "file": "src\\solver\\analog\\__tests__\\harness\\cap-ind-state-probe.test.ts",
-          "test": "RL transient: direct bridge surfaces PHI and NG_VOLT on L1",
-          "line": 233,
-          "column": 98
-        }
-      ]
-    },
-    {
-      "message": "result is not defined",
-      "count": 1,
-      "locations": [
-        {
-          "file": "src\\solver\\analog\\__tests__\\harness\\slice.test.ts",
-          "test": "null matrix stays null rhs and residual still sliced",
-          "line": 155,
-          "column": 12
-        }
-      ]
-    },
-    {
-      "message": "step=0 iter=0 rhsOld[2]: ours=0 ngspice=NaN absDelta=NaN: expected NaN to be +0 // Object.is equality",
-      "count": 3,
-      "locations": [
-        {
-          "file": "src\\solver\\analog\\__tests__\\ngspice-parity\\parity-helpers.ts",
-          "test": "transient_per_step_match",
-          "line": 40,
-          "column": 95
-        },
-        {
-          "file": "src\\solver\\analog\\__tests__\\ngspice-parity\\parity-helpers.ts",
-          "test": "dc_op_iteration_match",
-          "line": 40,
-          "column": 95
-        },
-        {
-          "file": "src\\solver\\analog\\__tests__\\ngspice-parity\\parity-helpers.ts",
-          "test": "transient_per_step_match",
-          "line": 40,
-          "column": 95
         }
       ]
     }

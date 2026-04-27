@@ -184,11 +184,11 @@ export class SparkGapElement implements AnalogElementCore {
     }
   }
 
-  getPinCurrents(voltages: Float64Array): number[] {
+  getPinCurrents(rhs: Float64Array): number[] {
     const nPos = this.pinNodeIds[0];
     const nNeg = this.pinNodeIds[1];
-    const vPos = voltages[nPos];
-    const vNeg = voltages[nNeg];
+    const vPos = rhs[nPos];
+    const vNeg = rhs[nNeg];
     const G = 1 / Math.max(this.resistance(), MIN_RESISTANCE);
     const I = G * (vPos - vNeg);
     return [I, -I];

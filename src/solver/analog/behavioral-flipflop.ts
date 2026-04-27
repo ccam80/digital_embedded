@@ -244,11 +244,11 @@ export class BehavioralDFlipflopElement implements ReactiveAnalogElementCore {
    * Output pins (Q, ~Q): I = (V_node - V_target) / rOut.
    * Sum is nonzero because behavioral outputs have an implicit supply.
    */
-  getPinCurrents(voltages: Float64Array): number[] {
-    const vD = readMnaVoltage(this._dPin.nodeId, voltages);
-    const vC = readMnaVoltage(this._clockPin.nodeId, voltages);
-    const vQ = readMnaVoltage(this._qPin.nodeId, voltages);
-    const vQBar = readMnaVoltage(this._qBarPin.nodeId, voltages);
+  getPinCurrents(rhs: Float64Array): number[] {
+    const vD = readMnaVoltage(this._dPin.nodeId, rhs);
+    const vC = readMnaVoltage(this._clockPin.nodeId, rhs);
+    const vQ = readMnaVoltage(this._qPin.nodeId, rhs);
+    const vQBar = readMnaVoltage(this._qBarPin.nodeId, rhs);
 
     const result = [
       vD / this._dPin.rIn,
@@ -258,11 +258,11 @@ export class BehavioralDFlipflopElement implements ReactiveAnalogElementCore {
     ];
 
     if (this._setPin !== null) {
-      const vSet = readMnaVoltage(this._setPin.nodeId, voltages);
+      const vSet = readMnaVoltage(this._setPin.nodeId, rhs);
       result.push(vSet / this._setPin.rIn);
     }
     if (this._resetPin !== null) {
-      const vReset = readMnaVoltage(this._resetPin.nodeId, voltages);
+      const vReset = readMnaVoltage(this._resetPin.nodeId, rhs);
       result.push(vReset / this._resetPin.rIn);
     }
 

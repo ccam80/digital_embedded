@@ -267,11 +267,11 @@ class SegmentResistorElement implements AnalogElement {
     stampG(solver, this.pinNodeIds[1], this.pinNodeIds[1], this.G);
   }
 
-  getPinCurrents(voltages: Float64Array): number[] {
+  getPinCurrents(rhs: Float64Array): number[] {
     const nA = this.pinNodeIds[0];
     const nB = this.pinNodeIds[1];
-    const vA = voltages[nA];
-    const vB = voltages[nB];
+    const vA = rhs[nA];
+    const vB = rhs[nB];
     const I = this.G * (vA - vB);
     return [I, -I];
   }
@@ -302,9 +302,9 @@ class SegmentShuntConductanceElement implements AnalogElement {
     stampG(ctx.solver, this.pinNodeIds[0], this.pinNodeIds[0], this.G);
   }
 
-  getPinCurrents(voltages: Float64Array): number[] {
+  getPinCurrents(rhs: Float64Array): number[] {
     const n0 = this.pinNodeIds[0];
-    const v = voltages[n0];
+    const v = rhs[n0];
     const I = this.G * v;
     return [I, -I];
   }
@@ -428,8 +428,8 @@ class SegmentInductorElement implements ReactiveAnalogElement {
     stampRHS(ctx.rhs,b, ceq);
   }
 
-  getPinCurrents(voltages: Float64Array): number[] {
-    const I = voltages[this.branchIndex];
+  getPinCurrents(rhs: Float64Array): number[] {
+    const I = rhs[this.branchIndex];
     return [I, -I];
   }
 }
@@ -533,9 +533,9 @@ class SegmentCapacitorElement implements ReactiveAnalogElement {
     }
   }
 
-  getPinCurrents(voltages: Float64Array): number[] {
+  getPinCurrents(rhs: Float64Array): number[] {
     const n0 = this.pinNodeIds[0];
-    const v = voltages[n0];
+    const v = rhs[n0];
     const base = this.stateBaseOffset;
     const s0 = this._pool.states[0];
     const I = s0[base + SLOT_GEQ] * v + s0[base + SLOT_IEQ];
@@ -659,8 +659,8 @@ class CombinedRLElement implements ReactiveAnalogElement {
     stampRHS(ctx.rhs,b, ceq);
   }
 
-  getPinCurrents(voltages: Float64Array): number[] {
-    const I = voltages[this.branchIndex];
+  getPinCurrents(rhs: Float64Array): number[] {
+    const I = rhs[this.branchIndex];
     return [I, -I];
   }
 }
@@ -841,12 +841,12 @@ export class TransmissionLineElement implements AnalogElement {
    * P1a and P2a are the ground-return pins: they carry the equal-and-opposite
    * return current relative to their corresponding high-side pin.
    */
-  getPinCurrents(voltages: Float64Array): number[] {
+  getPinCurrents(rhs: Float64Array): number[] {
     // First segment inductor branch current = current entering Port1 from external.
-    const iPort1 = voltages[this._firstBranchIdx];
+    const iPort1 = rhs[this._firstBranchIdx];
 
     // Last CombinedRL branch flows from last junction â†’ Port2 (exits externally).
-    const iPort2 = -voltages[this._lastBranchIdx];
+    const iPort2 = -rhs[this._lastBranchIdx];
 
     // Return pins carry equal-and-opposite ground return current.
     return [iPort1, iPort2, -iPort1, -iPort2];

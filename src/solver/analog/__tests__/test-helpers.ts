@@ -131,9 +131,9 @@ export function makeResistor(
 
     setParam(_key: string, _value: number): void {},
 
-    getPinCurrents(voltages: Float64Array): number[] {
-      const vA = voltages[nodeA];
-      const vB = voltages[nodeB];
+    getPinCurrents(rhs: Float64Array): number[] {
+      const vA = rhs[nodeA];
+      const vB = rhs[nodeB];
       const I = G_val * (vA - vB);
       return [I, -I];
     },
@@ -202,9 +202,9 @@ export function makeVoltageSource(
       stampRHS(rhs, k, voltage * ctx.srcFact);
     },
 
-    getPinCurrents(voltages: Float64Array): number[] {
+    getPinCurrents(rhs: Float64Array): number[] {
       // Branch current is stored at 1-based slot branchIdx+1 in the rhs buffer.
-      const I = voltages[branchIdx + 1];
+      const I = rhs[branchIdx + 1];
       return [I, -I];
     },
   };
@@ -386,9 +386,9 @@ export function makeDiode(
       return Math.abs(vdLim - vdRaw) <= 2 * nVt;
     },
 
-    getPinCurrents(voltages: Float64Array): number[] {
-      const va = voltages[nodeAnode];
-      const vc = voltages[nodeCathode];
+    getPinCurrents(rhs: Float64Array): number[] {
+      const va = rhs[nodeAnode];
+      const vc = rhs[nodeCathode];
       const geq = s0[base + SLOT_GEQ];
       const ieq = s0[base + SLOT_IEQ];
       const I = geq * (va - vc) - ieq;
@@ -505,9 +505,9 @@ export function makeCapacitor(
 
     getLteTimestep(): number { return Infinity; },
 
-    getPinCurrents(voltages: Float64Array): number[] {
-      const vA = voltages[nodeA];
-      const vB = voltages[nodeB];
+    getPinCurrents(rhs: Float64Array): number[] {
+      const vA = rhs[nodeA];
+      const vB = rhs[nodeB];
       const I = geq * (vA - vB) + ceq;
       return [I, -I];
     },
@@ -625,8 +625,8 @@ export function makeInductor(
 
     getLteTimestep(): number { return Infinity; },
 
-    getPinCurrents(voltages: Float64Array): number[] {
-      const I = voltages[branchIdx + 1]; // 1-based slot for branch current
+    getPinCurrents(rhs: Float64Array): number[] {
+      const I = rhs[branchIdx + 1]; // 1-based slot for branch current
       return [I, -I];
     },
   };
@@ -718,8 +718,8 @@ export function makeAcVoltageSource(
       stampRHS(rhs, k, v);
     },
 
-    getPinCurrents(voltages: Float64Array): number[] {
-      const I = voltages[branchIdx + 1]; // 1-based slot for branch current
+    getPinCurrents(rhs: Float64Array): number[] {
+      const I = rhs[branchIdx + 1]; // 1-based slot for branch current
       return [I, -I];
     },
   };

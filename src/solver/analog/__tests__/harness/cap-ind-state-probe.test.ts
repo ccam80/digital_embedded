@@ -226,7 +226,7 @@ describeIfDll("ngspice cap/ind state via harness_get_attempt path", () => {
       const indEs = iter.elementStates.find((es) => es.label.toUpperCase() === "L1");
       if (!indEs) continue;
       if (indEs.slots.PHI !== undefined) foundPhi = true;
-      if (indEs.slots.NG_VOLT !== undefined) foundVoltSlotKey = true;
+      if (indEs.slots.CCAP !== undefined) foundVoltSlotKey = true;
       if (foundPhi && foundVoltSlotKey) break;
     }
     expect(foundPhi, "inductor PHI (INDflux) must be surfaced on at least one step").toBe(true);

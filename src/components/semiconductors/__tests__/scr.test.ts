@@ -109,14 +109,14 @@ function makeResistorElement(nodeA: number, nodeB: number, resistance: number): 
  */
 function buildUnitCtx(
   solver: SparseSolver,
-  voltages: Float64Array,
+  rhs: Float64Array,
   overrides: Partial<import("../../../solver/analog/load-context.js").LoadContext> = {},
 ): import("../../../solver/analog/load-context.js").LoadContext {
   return {
     solver,
     matrix: solver,
-    rhsOld: voltages,
-    rhs: new Float64Array(voltages.length),
+    rhsOld: rhs,
+    rhs: new Float64Array(rhs.length),
     cktMode: MODEDCOP | MODEINITFLOAT,
     time: 0,
     dt: 0,
@@ -175,22 +175,22 @@ function driveToOp(
  */
 function stampAndCapture(
   element: AnalogElement,
-  voltages: Float64Array,
+  rhs: Float64Array,
 ): { stamps: Array<[number, number, number]>; rhs: Array<[number, number]> } {
-  const matrixSize = Math.max(voltages.length, element.pinNodeIds.length);
+  const matrixSize = Math.max(rhs.length, element.pinNodeIds.length);
   const solver = new SparseSolver();
   solver._initStructure(matrixSize);
-  const ctx = buildUnitCtx(solver, voltages);
+  const ctx = buildUnitCtx(solver, rhs);
   element.load(ctx);
 
   const entries = solver.getCSCNonZeros();
   const stamps: Array<[number, number, number]> = entries.map((e) => [e.row, e.col, e.value]);
   const rhsVec = ctx.rhs;
-  const rhs: Array<[number, number]> = [];
+  const rhsEntries: Array<[number, number]> = [];
   for (let i = 0; i < rhsVec.length; i++) {
-    if (rhsVec[i] !== 0) rhs.push([i, rhsVec[i]]);
+    if (rhsVec[i] !== 0) rhsEntries.push([i, rhsVec[i]]);
   }
-  return { stamps, rhs };
+  return { stamps, rhs: rhsEntries };
 }
 
 // ---------------------------------------------------------------------------
@@ -500,12 +500,12 @@ describe("SCR LimitingEvent instrumentation", () => {
 
   function loadWithCollector(
     element: AnalogElement,
-    voltages: Float64Array,
+    rhs: Float64Array,
     collector: LimitingEvent[] | null,
   ): void {
     const solver = new SparseSolver();
     solver._initStructure(3);
-    element.load(buildUnitCtx(solver, voltages, {
+    element.load(buildUnitCtx(solver, rhs, {
       limitingCollector: collector,
     }));
   }

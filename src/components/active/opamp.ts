@@ -193,8 +193,8 @@ function createOpAmpElement(
   // At srcFact=0 the effective gain is 0 (trivial circuit); at srcFact=1 full gain.
   let lastSrcFact = 1;
 
-  function readNode(voltages: Float64Array, n: number): number {
-    return voltages[n];
+  function readNode(rhs: Float64Array, n: number): number {
+    return rhs[n];
   }
 
   return {
@@ -253,7 +253,7 @@ function createOpAmpElement(
       }
     },
 
-    getPinCurrents(voltages: Float64Array): number[] {
+    getPinCurrents(rhs: Float64Array): number[] {
       const G_out = 1 / Math.max(p.rOut, 1e-9);
       // Input pins: ideal op-amp â€” infinite input impedance, zero input current.
       // No conductance is stamped at in+ or in- nodes, so I_in+ = I_in- = 0.
@@ -263,7 +263,7 @@ function createOpAmpElement(
       //   Saturated region: vOutTarget = rail voltage
       // The element sources (vOutTarget - V_out)*G_out into the nOut node.
       // Current INTO element at out = (V_out - vOutTarget) * G_out.
-      const vOut = readNode(voltages, nOut);
+      const vOut = readNode(rhs, nOut);
       // In linear region vOutTarget was set to vOut (current operating point),
       // but we need the ideal target to compute the current correctly.
       // Reconstruct: in linear, target = gain * srcFact * (V_inp - V_inn).

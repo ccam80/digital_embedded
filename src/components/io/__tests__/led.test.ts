@@ -1000,14 +1000,14 @@ describe("LED limitingCollector", () => {
 
   function buildLedLoadCtx(
     solver: SparseSolver,
-    voltages: Float64Array,
+    rhs: Float64Array,
     overrides: Partial<LoadContext> = {},
   ): LoadContext {
     return {
       solver,
       matrix: solver,
-      rhsOld: voltages,
-      rhs: voltages,
+      rhsOld: rhs,
+      rhs: rhs,
       cktMode: MODEINITFLOAT,
       time: 0,
       dt: 0,

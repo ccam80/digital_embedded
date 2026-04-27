@@ -71,11 +71,11 @@ function makeRecordingSolver(size: number): RecordingSolverResult {
   return { solver, rhs };
 }
 
-function makeSchmittLoadCtx(voltages: Float64Array, solver: SparseSolverType, rhs: Float64Array): LoadContext {
+function makeSchmittLoadCtx(rhsOld: Float64Array, solver: SparseSolverType, rhs: Float64Array): LoadContext {
   return makeLoadCtx({
     solver,
     rhs,
-    rhsOld: voltages,
+    rhsOld: rhsOld,
     cktMode: MODEDCOP | MODEINITFLOAT,
     dt: 0,
   });
@@ -405,11 +405,11 @@ function makeSchmittCaptureSolver(_rhs: Float64Array): {
   return { solver, stamps };
 }
 
-function makeSchmittParityCtx(voltages: Float64Array, solver: SparseSolverType, rhs: Float64Array): LoadContext {
+function makeSchmittParityCtx(rhsOld: Float64Array, solver: SparseSolverType, rhs: Float64Array): LoadContext {
   return makeLoadCtx({
     solver,
     rhs,
-    rhsOld: voltages,
+    rhsOld: rhsOld,
     cktMode: MODEDCOP | MODEINITFLOAT,
     dt: 0,
   });

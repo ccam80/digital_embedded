@@ -343,8 +343,8 @@ function createADCElement(
   // Latched output code
   let latchedCode = 0;
 
-  function readVoltage(voltages: Float64Array, nodeId: number): number {
-    return voltages[nodeId];
+  function readVoltage(rhs: Float64Array, nodeId: number): number {
+    return rhs[nodeId];
   }
 
   function setOutputCode(code: number): void {
@@ -354,10 +354,10 @@ function createADCElement(
     }
   }
 
-  function computeCode(voltages: Float64Array): number {
-    const vIn = readVoltage(voltages, nVin);
-    const vRef = readVoltage(voltages, nVref);
-    const vGnd = readVoltage(voltages, nGnd);
+  function computeCode(rhs: Float64Array): number {
+    const vIn = readVoltage(rhs, nVin);
+    const vRef = readVoltage(rhs, nVref);
+    const vGnd = readVoltage(rhs, nGnd);
 
     const span = vRef - vGnd;
     if (span <= 0) return 0;
@@ -450,20 +450,20 @@ function createADCElement(
       }
     },
 
-    getPinCurrents(voltages: Float64Array): number[] {
+    getPinCurrents(rhs: Float64Array): number[] {
       const rIn = p.rIn;
       const rOut = p.rOut;
 
-      const iVin = nVin > 0 ? readVoltage(voltages, nVin) / rIn : 0;
-      const iClk = nClk > 0 ? readVoltage(voltages, nClk) / rIn : 0;
+      const iVin = nVin > 0 ? readVoltage(rhs, nVin) / rIn : 0;
+      const iClk = nClk > 0 ? readVoltage(rhs, nClk) / rIn : 0;
 
-      const vEoc = readVoltage(voltages, nEoc);
+      const vEoc = readVoltage(rhs, nEoc);
       const iEoc = nEoc > 0 ? (vEoc - eocPin.currentVoltage) / rOut : 0;
 
       const currents: number[] = [iVin, iClk, 0, 0, iEoc];
       for (let i = 0; i < bits; i++) {
         const n = nDigital[i];
-        const vD = readVoltage(voltages, n);
+        const vD = readVoltage(rhs, n);
         currents.push(n > 0 ? (vD - digitalPins[i].currentVoltage) / rOut : 0);
       }
 

@@ -179,9 +179,9 @@ function buildResistorElement(
       stampG(solver, n1, n1, G);
     },
 
-    getPinCurrents(voltages: Float64Array): number[] {
-      const vA = voltages[n0];
-      const vB = voltages[n1];
+    getPinCurrents(rhs: Float64Array): number[] {
+      const vA = rhs[n0];
+      const vB = rhs[n1];
       const I = G * (vA - vB);
       return [I, -I];
     },

@@ -166,8 +166,8 @@ function createOTAElement(
   let iBias = 0;
   let iOut = 0; // cached output current for getPinCurrents
 
-  function readNode(voltages: Float64Array, n: number): number {
-    return voltages[n];
+  function readNode(rhs: Float64Array, n: number): number {
+    return rhs[n];
   }
 
   return {
@@ -225,7 +225,7 @@ function createOTAElement(
      *
      * Positive value = current flowing INTO the element at that pin.
      */
-    getPinCurrents(_voltages: Float64Array): number[] {
+    getPinCurrents(_rhs: Float64Array): number[] {
       return [0, 0, 0, iOut, -iOut];
     },
 

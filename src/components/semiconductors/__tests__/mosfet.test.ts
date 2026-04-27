@@ -87,7 +87,7 @@ const NMOS_DEFAULTS = {
 // DC-OP LoadContext helper â€” fresh SparseSolver sized for matrixSize rows.
 // ---------------------------------------------------------------------------
 
-function makeDcOpCtx(voltages: Float64Array, matrixSize: number): LoadContext {
+function makeDcOpCtx(rhsOld: Float64Array, matrixSize: number): LoadContext {
   const solver = new SparseSolver();
   solver._initStructure(matrixSize);
   const KoverQ_local = 1.3806226e-23 / 1.6021918e-19;
@@ -97,7 +97,7 @@ function makeDcOpCtx(voltages: Float64Array, matrixSize: number): LoadContext {
     solver,
     matrix: solver,
     rhs: new Float64Array(matrixSize),
-    rhsOld: voltages,
+    rhsOld: rhsOld,
     time: 0,
     dt: 0,
     method: "trapezoidal",
@@ -580,10 +580,10 @@ describe("MOSFET LimitingEvent instrumentation", () => {
   }
 
   function makeCtxWithCollector(
-    voltages: Float64Array,
+    rhsOld: Float64Array,
     collector: LimitingEvent[] | null,
   ): LoadContext {
-    const ctx = makeDcOpCtx(voltages, 10);
+    const ctx = makeDcOpCtx(rhsOld, 10);
     return { ...ctx, limitingCollector: collector };
   }
 

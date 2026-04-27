@@ -94,14 +94,14 @@ function makeParamBag(params: Record<string, number>): PropertyBag {
  */
 function buildUnitCtx(
   solver: SparseSolver,
-  voltages: Float64Array,
+  rhs: Float64Array,
   overrides: Partial<LoadContext> = {},
 ): LoadContext {
   return {
     solver,
     matrix: solver,
-    rhsOld: voltages,
-    rhs: voltages,
+    rhsOld: rhs,
+    rhs: rhs,
     cktMode: MODEDCOP | MODEINITFLOAT,
     time: 0,
     dt: 0,
@@ -133,15 +133,15 @@ function buildUnitCtx(
  */
 function driveToOp(
   element: AnalogElement,
-  voltages: Float64Array,
+  rhs: Float64Array,
   iterations: number,
   opts: { matrixSize?: number; limitingCollector?: LimitingEvent[] | null } = {},
 ): void {
-  const matrixSize = opts.matrixSize ?? Math.max(voltages.length, element.pinNodeIds.length, 1);
+  const matrixSize = opts.matrixSize ?? Math.max(rhs.length, element.pinNodeIds.length, 1);
   for (let i = 0; i < iterations; i++) {
     const solver = new SparseSolver();
     solver._initStructure(matrixSize);
-    const ctx = buildUnitCtx(solver, voltages, {
+    const ctx = buildUnitCtx(solver, rhs, {
       limitingCollector: opts.limitingCollector ?? null,
     });
     element.load(ctx);
@@ -444,10 +444,10 @@ describe("Diode LimitingEvent instrumentation", () => {
     return withNodeIds(core, [1, 2]);
   }
 
-  function loadOnce(element: AnalogElement, voltages: Float64Array, collector: LimitingEvent[] | null): void {
+  function loadOnce(element: AnalogElement, rhs: Float64Array, collector: LimitingEvent[] | null): void {
     const solver = new SparseSolver();
-    solver._initStructure(Math.max(voltages.length, element.pinNodeIds.length));
-    element.load(buildUnitCtx(solver, voltages, { limitingCollector: collector }));
+    solver._initStructure(Math.max(rhs.length, element.pinNodeIds.length));
+    element.load(buildUnitCtx(solver, rhs, { limitingCollector: collector }));
   }
 
   it("pushes AK pnjlim event when limitingCollector provided", () => {
@@ -863,14 +863,14 @@ describe("integration", () => {
 
 function makeParityCtx(
   solver: SparseSolver,
-  voltages: Float64Array,
+  rhs: Float64Array,
   opts: { cktMode?: number; dt?: number; ag?: Float64Array },
 ) {
   const dt = opts.dt ?? 0;
   return makeLoadCtx({
     solver,
-    rhsOld: voltages,
-    rhs: voltages,
+    rhsOld: rhs,
+    rhs: rhs,
     cktMode: opts.cktMode ?? (MODEDCOP | MODEINITFLOAT),
     dt,
     method: "trapezoidal",

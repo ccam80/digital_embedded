@@ -193,9 +193,9 @@ export function makeVariableRailElement(
       if (key in p) (p as Record<string, number>)[key] = value;
     },
 
-    getPinCurrents(voltages: Float64Array): number[] {
+    getPinCurrents(rhs: Float64Array): number[] {
       // Branch current = current delivered by the ideal voltage source (into pos terminal).
-      return [voltages[branchIdx]];
+      return [rhs[branchIdx]];
     },
 
     load(ctx: LoadContext): void {

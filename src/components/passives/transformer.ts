@@ -510,9 +510,9 @@ export class AnalogTransformerElement implements ReactiveAnalogElement {
     return Math.min(dt1, dt2);
   }
 
-  getPinCurrents(voltages: Float64Array): number[] {
-    const iPri = voltages[this.branchIndex];
-    const iSec = voltages[this._branch2];
+  getPinCurrents(rhs: Float64Array): number[] {
+    const iPri = rhs[this.branchIndex];
+    const iSec = rhs[this._branch2];
     // pinLayout order: P1, P2, S1, S2
     // Primary current enters at P1 (+) and exits at P2 (-)
     // Secondary current enters at S1 (+) and exits at S2 (-)

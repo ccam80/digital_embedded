@@ -165,16 +165,16 @@ export class BehavioralCounterElement implements ReactiveAnalogElementCore {
    * per accepted timestep with the accepted solution voltages.
    */
   accept(ctx: LoadContext, _simTime: number, _addBreakpoint: (t: number) => void): void {
-    const voltages = ctx.rhs;
+    const rhs = ctx.rhs;
 
-    const currentClockV = readMnaVoltage(this._clockPin.nodeId, voltages);
+    const currentClockV = readMnaVoltage(this._clockPin.nodeId, rhs);
 
     const risingEdge =
       this._prevClockVoltage < this._vIH && currentClockV >= this._vIH;
 
     if (risingEdge) {
-      const enV = readMnaVoltage(this._enPin.nodeId, voltages);
-      const clrV = readMnaVoltage(this._clrPin.nodeId, voltages);
+      const enV = readMnaVoltage(this._enPin.nodeId, rhs);
+      const clrV = readMnaVoltage(this._clrPin.nodeId, rhs);
 
       const enLevel = this._enPin.readLogicLevel(enV);
       const clrLevel = this._clrPin.readLogicLevel(clrV);
@@ -202,10 +202,10 @@ export class BehavioralCounterElement implements ReactiveAnalogElementCore {
    * Output pins (out bits, ovf): I = (V_node - V_target) / rOut.
    * Sum is nonzero because behavioral outputs have an implicit supply.
    */
-  getPinCurrents(voltages: Float64Array): number[] {
-    const vEn = readMnaVoltage(this._enPin.nodeId, voltages);
-    const vClk = readMnaVoltage(this._clockPin.nodeId, voltages);
-    const vClr = readMnaVoltage(this._clrPin.nodeId, voltages);
+  getPinCurrents(rhs: Float64Array): number[] {
+    const vEn = readMnaVoltage(this._enPin.nodeId, rhs);
+    const vClk = readMnaVoltage(this._clockPin.nodeId, rhs);
+    const vClr = readMnaVoltage(this._clrPin.nodeId, rhs);
 
     const result = [
       vEn / this._enPin.rIn,
@@ -214,11 +214,11 @@ export class BehavioralCounterElement implements ReactiveAnalogElementCore {
     ];
 
     for (const pin of this._outBitPins) {
-      const vNode = readMnaVoltage(pin.nodeId, voltages);
+      const vNode = readMnaVoltage(pin.nodeId, rhs);
       result.push((vNode - pin.currentVoltage) / pin.rOut);
     }
 
-    const vOvf = readMnaVoltage(this._ovfPin.nodeId, voltages);
+    const vOvf = readMnaVoltage(this._ovfPin.nodeId, rhs);
     result.push((vOvf - this._ovfPin.currentVoltage) / this._ovfPin.rOut);
 
     return result;
@@ -350,21 +350,21 @@ export class BehavioralRegisterElement implements ReactiveAnalogElementCore {
    * per accepted timestep with the accepted solution voltages.
    */
   accept(ctx: LoadContext, _simTime: number, _addBreakpoint: (t: number) => void): void {
-    const voltages = ctx.rhs;
+    const rhs = ctx.rhs;
 
-    const currentClockV = readMnaVoltage(this._clockPin.nodeId, voltages);
+    const currentClockV = readMnaVoltage(this._clockPin.nodeId, rhs);
 
     const risingEdge =
       this._prevClockVoltage < this._vIH && currentClockV >= this._vIH;
 
     if (risingEdge) {
-      const enV = readMnaVoltage(this._enPin.nodeId, voltages);
+      const enV = readMnaVoltage(this._enPin.nodeId, rhs);
       const enLevel = this._enPin.readLogicLevel(enV);
 
       if (enLevel === true) {
         let newValue = 0;
         for (let bit = 0; bit < this._bitWidth; bit++) {
-          const v = readMnaVoltage(this._dataPins[bit].nodeId, voltages);
+          const v = readMnaVoltage(this._dataPins[bit].nodeId, rhs);
           const level = this._dataPins[bit].readLogicLevel(v);
           if (level === true) {
             newValue |= (1 << bit);
@@ -385,27 +385,27 @@ export class BehavioralRegisterElement implements ReactiveAnalogElementCore {
     delegatePinSetParam(this._pinModelsByLabel, key, value);
   }
 
-  getPinCurrents(voltages: Float64Array): number[] {
+  getPinCurrents(rhs: Float64Array): number[] {
     // Pin layout order: D (bus input), C (clock input), en (enable input), Q (bus output)
     // Input pins: I = V_node / rIn (loading conductance to ground)
     // Output pins: I = (V_node - V_target) / rOut
 
     // D input — all bits share one bus node; report current for the bus pin once
     const dPin = this._dataPins[0];
-    const vD = readMnaVoltage(dPin !== undefined ? dPin.nodeId : 0, voltages);
+    const vD = readMnaVoltage(dPin !== undefined ? dPin.nodeId : 0, rhs);
     const iD = dPin !== undefined ? vD / dPin.rIn : 0;
 
     // C (clock) input
-    const vC = readMnaVoltage(this._clockPin.nodeId, voltages);
+    const vC = readMnaVoltage(this._clockPin.nodeId, rhs);
     const iC = vC / this._clockPin.rIn;
 
     // en (enable) input
-    const vEn = readMnaVoltage(this._enPin.nodeId, voltages);
+    const vEn = readMnaVoltage(this._enPin.nodeId, rhs);
     const iEn = vEn / this._enPin.rIn;
 
     // Q output — all bits share one bus node; report current for the bus pin once
     const qPin = this._outBitPins[0];
-    const vQ = readMnaVoltage(qPin !== undefined ? qPin.nodeId : 0, voltages);
+    const vQ = readMnaVoltage(qPin !== undefined ? qPin.nodeId : 0, rhs);
     const iQ = qPin !== undefined ? (vQ - qPin.currentVoltage) / qPin.rOut : 0;
 
     return [iD, iC, iEn, iQ];
@@ -588,7 +588,7 @@ export class BehavioralCounterPresetElement {
   }
 
   load(ctx: LoadContext): void {
-    const voltages = ctx.rhsOld;
+    const rhsOld = ctx.rhsOld;
 
     this._enPin.load(ctx);
     this._clockPin.load(ctx);
@@ -605,14 +605,14 @@ export class BehavioralCounterPresetElement {
     }
     // ovf depends on dir and en levels at the current NR iterate
     const dirHigh = this._dirPin.readLogicLevel(
-      readMnaVoltage(this._dirPin.nodeId, voltages),
+      readMnaVoltage(this._dirPin.nodeId, rhsOld),
     );
     const countingDown = dirHigh === true;
     const atOverflow = countingDown
       ? this._count === 0
       : this._count === this._maxValue;
     const enHigh = this._enPin.readLogicLevel(
-      readMnaVoltage(this._enPin.nodeId, voltages),
+      readMnaVoltage(this._enPin.nodeId, rhsOld),
     );
     this._ovfPin.setLogicLevel(atOverflow && enHigh === true);
     this._ovfPin.load(ctx);
@@ -627,18 +627,18 @@ export class BehavioralCounterPresetElement {
    * called once per accepted timestep with the accepted solution voltages.
    */
   accept(ctx: LoadContext, _simTime: number, _addBreakpoint: (t: number) => void): void {
-    const voltages = ctx.rhs;
+    const rhs = ctx.rhs;
 
-    const currentClockV = readMnaVoltage(this._clockPin.nodeId, voltages);
+    const currentClockV = readMnaVoltage(this._clockPin.nodeId, rhs);
 
     const risingEdge =
       this._prevClockVoltage < this._vIH && currentClockV >= this._vIH;
 
     if (risingEdge) {
-      const enV = readMnaVoltage(this._enPin.nodeId, voltages);
-      const dirV = readMnaVoltage(this._dirPin.nodeId, voltages);
-      const ldV = readMnaVoltage(this._ldPin.nodeId, voltages);
-      const clrV = readMnaVoltage(this._clrPin.nodeId, voltages);
+      const enV = readMnaVoltage(this._enPin.nodeId, rhs);
+      const dirV = readMnaVoltage(this._dirPin.nodeId, rhs);
+      const ldV = readMnaVoltage(this._ldPin.nodeId, rhs);
+      const clrV = readMnaVoltage(this._clrPin.nodeId, rhs);
 
       const enLevel = this._enPin.readLogicLevel(enV);
       const dirLevel = this._dirPin.readLogicLevel(dirV);
@@ -668,7 +668,7 @@ export class BehavioralCounterPresetElement {
       } else if (ldLevel === true) {
         let loadVal = 0;
         for (let bit = 0; bit < this._bitWidth; bit++) {
-          const v = readMnaVoltage(this._inBitPins[bit].nodeId, voltages);
+          const v = readMnaVoltage(this._inBitPins[bit].nodeId, rhs);
           if (this._inBitPins[bit].readLogicLevel(v) === true) {
             loadVal |= (1 << bit);
           }
@@ -681,22 +681,22 @@ export class BehavioralCounterPresetElement {
     this._prevClockVoltage = currentClockV;
   }
 
-  getPinCurrents(voltages: Float64Array): number[] {
+  getPinCurrents(rhs: Float64Array): number[] {
     // pinLayout order: en, C, dir, in[0..bitWidth-1], ld, clr, out[0..bitWidth-1], ovf
     const result: number[] = [];
-    result.push(readMnaVoltage(this._enPin.nodeId, voltages) / this._enPin.rIn);
-    result.push(readMnaVoltage(this._clockPin.nodeId, voltages) / this._clockPin.rIn);
-    result.push(readMnaVoltage(this._dirPin.nodeId, voltages) / this._dirPin.rIn);
+    result.push(readMnaVoltage(this._enPin.nodeId, rhs) / this._enPin.rIn);
+    result.push(readMnaVoltage(this._clockPin.nodeId, rhs) / this._clockPin.rIn);
+    result.push(readMnaVoltage(this._dirPin.nodeId, rhs) / this._dirPin.rIn);
     for (const pin of this._inBitPins) {
-      result.push(readMnaVoltage(pin.nodeId, voltages) / pin.rIn);
+      result.push(readMnaVoltage(pin.nodeId, rhs) / pin.rIn);
     }
-    result.push(readMnaVoltage(this._ldPin.nodeId, voltages) / this._ldPin.rIn);
-    result.push(readMnaVoltage(this._clrPin.nodeId, voltages) / this._clrPin.rIn);
+    result.push(readMnaVoltage(this._ldPin.nodeId, rhs) / this._ldPin.rIn);
+    result.push(readMnaVoltage(this._clrPin.nodeId, rhs) / this._clrPin.rIn);
     for (const pin of this._outBitPins) {
-      const v = readMnaVoltage(pin.nodeId, voltages);
+      const v = readMnaVoltage(pin.nodeId, rhs);
       result.push((v - pin.currentVoltage) / pin.rOut);
     }
-    const vOvf = readMnaVoltage(this._ovfPin.nodeId, voltages);
+    const vOvf = readMnaVoltage(this._ovfPin.nodeId, rhs);
     result.push((vOvf - this._ovfPin.currentVoltage) / this._ovfPin.rOut);
     return result;
   }

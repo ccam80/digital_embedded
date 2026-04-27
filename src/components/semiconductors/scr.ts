@@ -358,12 +358,12 @@ export function createScrElement(
       return Math.abs(cakhat - iak) <= tolAK && Math.abs(cgkhat - igk) <= tolGK;
     },
 
-    getPinCurrents(voltages: Float64Array): number[] {
+    getPinCurrents(rhs: Float64Array): number[] {
       // pinLayout order: [A(0), K(1), G(2)]
       const s0 = pool.states[0];
-      const vA = voltages[nodeA];
-      const vK = voltages[nodeK];
-      const vG = voltages[nodeG];
+      const vA = rhs[nodeA];
+      const vK = rhs[nodeK];
+      const vG = rhs[nodeG];
 
       const iAK = s0[base + SLOT_GEQ] * (vA - vK) + s0[base + SLOT_IEQ];
       const iGK = s0[base + SLOT_G_GATE_GEQ] * (vG - vK) + s0[base + SLOT_G_GATE_IEQ];

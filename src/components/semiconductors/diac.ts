@@ -182,7 +182,7 @@ export function createDiacElement(
       return Math.abs(cdhat - _id) <= tol;
     },
 
-    getPinCurrents(_voltages: Float64Array): number[] {
+    getPinCurrents(_rhs: Float64Array): number[] {
       // pinLayout order: [A (terminal 1), B (terminal 2)]
       // Positive = current flowing INTO element at that pin.
       // Current flows from A to B through the device: into A, out of B.

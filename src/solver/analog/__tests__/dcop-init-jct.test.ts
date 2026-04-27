@@ -60,12 +60,11 @@ function makeNullSolver(): SparseSolver {
   } as unknown as SparseSolver;
 }
 
-function makeSoloLoadCtx(voltages: Float64Array): LoadContext {
+function makeSoloLoadCtx(rhsOld: Float64Array): LoadContext {
   const solver = makeNullSolver();
   // rhs/rhsOld are separate buffers so that RHS stamps don't contaminate
-  // the caller's voltages array (which the tests assert stays untouched).
-  const rhs = new Float64Array(voltages.length);
-  const rhsOld = voltages;
+  // the caller's rhsOld array (which the tests assert stays untouched).
+  const rhs = new Float64Array(rhsOld.length);
   return makeLoadCtx({
     cktMode: MODEDCOP | MODEINITFLOAT,
     solver,

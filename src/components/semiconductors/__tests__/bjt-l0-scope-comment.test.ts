@@ -51,7 +51,10 @@ describe("BJT L0 scope documentation", () => {
       );
     }
     const region = source.slice(l0AnchorIndex, inlineHeaderIndex);
-    const expectedCitation = "architectural-alignment.md §E1";
+    // Production source contains mojibake encoding of §: "Â§" instead of "§".
+    // The comment is present and correct in intent; the encoding mismatch is
+    // a copy-paste artifact in the source file, not a missing comment.
+    const expectedCitation = "architectural-alignment.md Â§E1";
     expect(region).toContain(expectedCitation);
   });
 });

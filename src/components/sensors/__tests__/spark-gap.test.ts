@@ -66,12 +66,13 @@ function makeCaptureSolver(): {
 // SparkGap.accept reads ctx.voltages and applies discrete state transitions.
 // ---------------------------------------------------------------------------
 
-function makeAcceptCtx(_voltages: Float64Array): LoadContext {
+function makeAcceptCtx(rhs: Float64Array): LoadContext {
   return makeLoadCtx({
     solver: undefined as unknown as SparseSolverType,
     cktMode: MODETRAN | MODEINITFLOAT,
     dt: 1e-6,
     deltaOld: [1e-6, 1e-6, 1e-6, 1e-6, 1e-6, 1e-6, 1e-6],
+    rhs,
   });
 }
 
@@ -102,10 +103,12 @@ function makeSparkGap(overrides: Partial<{
  * conducting/blocking state happens in accept(ctx, simTime, addBreakpoint).
  */
 function applyVoltage(gap: SparkGapElement, v: number): void {
-  const voltages = new Float64Array(2);
-  voltages[0] = v; // node 1 at voltage v
-  voltages[1] = 0; // node 2 at ground
-  const ctx = makeAcceptCtx(voltages);
+  // Under 1-indexed nodes: pinNodeIds=[1,2], so rhs[1]=vPos, rhs[2]=vNeg.
+  // Size 3: index 0 is the trashcan/ground reservoir (unused), 1 and 2 are active.
+  const rhs = new Float64Array(3);
+  rhs[1] = v; // node 1 (pos) at voltage v
+  rhs[2] = 0; // node 2 (neg) at ground
+  const ctx = makeAcceptCtx(rhs);
   gap.accept(ctx, 0, () => {});
 }
 
@@ -281,11 +284,12 @@ describe("SparkGap", () => {
       gap.load(ctx);
 
       const G = 1 / gap.resistance();
+      // Under 1-indexed nodes: pinNodeIds=[1,2] → matrix rows/cols 1 and 2.
       const tuples = stamps.map((s) => [s.row, s.col, s.value] as [number, number, number]);
-      expect(tuples).toContainEqual([0, 0, G]);
-      expect(tuples).toContainEqual([0, 1, -G]);
-      expect(tuples).toContainEqual([1, 0, -G]);
       expect(tuples).toContainEqual([1, 1, G]);
+      expect(tuples).toContainEqual([1, 2, -G]);
+      expect(tuples).toContainEqual([2, 1, -G]);
+      expect(tuples).toContainEqual([2, 2, G]);
     });
 
     it("stamps higher conductance in conducting state", () => {
@@ -300,7 +304,7 @@ describe("SparkGap", () => {
         dt: 0,
       });
       gap.load(ctx1);
-      const G_off = stamps1.find((s) => s.row === 0 && s.col === 0)!.value;
+      const G_off = stamps1.find((s) => s.row === 1 && s.col === 1)!.value;
 
       // Conducting state conductance
       applyVoltage(gap, 1500);
@@ -311,7 +315,7 @@ describe("SparkGap", () => {
         dt: 0,
       });
       gap.load(ctx2);
-      const G_on = stamps2.find((s) => s.row === 0 && s.col === 0)!.value;
+      const G_on = stamps2.find((s) => s.row === 1 && s.col === 1)!.value;
 
       expect(G_on).toBeGreaterThan(G_off);
     });
@@ -380,12 +384,14 @@ describe("spark_gap_load_dcop_parity", () => {
       allNodeIds: [1, 2] as readonly number[],
     }) as unknown as AnalogElement;
 
+    // Under 1-indexed nodes: pinNodeIds=[1,2] → matrix rows/cols 1 and 2.
+    // matrixSize must be nodeCount+1 to accommodate 1-based indexing.
     const stampCtx = makeSimpleCtx({
       elements: [analogElement],
-      matrixSize: 2,
+      matrixSize: 3,
       nodeCount: 2,
     });
-    stampCtx.solver._initStructure(2);
+    stampCtx.solver._initStructure(3);
     analogElement.load(stampCtx.loadCtx);
     const stamps = stampCtx.solver.getCSCNonZeros();
 
@@ -402,18 +408,18 @@ describe("spark_gap_load_dcop_parity", () => {
     const MIN_RESISTANCE = 1e-12;
     const EXPECTED_G = 1 / Math.max(R_REF, MIN_RESISTANCE);
 
-    const e00 = stamps.find((e) => e.row === 0 && e.col === 0);
+    const e00 = stamps.find((e) => e.row === 1 && e.col === 1);
     expect(e00).toBeDefined();
     expect(e00!.value).toBe(EXPECTED_G);
 
-    const e11 = stamps.find((e) => e.row === 1 && e.col === 1);
+    const e11 = stamps.find((e) => e.row === 2 && e.col === 2);
     expect(e11).toBeDefined();
     expect(e11!.value).toBe(EXPECTED_G);
 
-    const e01 = stamps.find((e) => e.row === 0 && e.col === 1);
+    const e01 = stamps.find((e) => e.row === 1 && e.col === 2);
     expect(e01!.value).toBe(-EXPECTED_G);
 
-    const e10 = stamps.find((e) => e.row === 1 && e.col === 0);
+    const e10 = stamps.find((e) => e.row === 2 && e.col === 1);
     expect(e10!.value).toBe(-EXPECTED_G);
   });
 });

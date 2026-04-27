@@ -363,7 +363,7 @@ function createSwitchDTAnalogElement(
       effectivelyClosed = normallyClosed ? !closed : closed;
     },
 
-    getPinCurrents(voltages: Float64Array): number[] {
+    getPinCurrents(rhs: Float64Array): number[] {
       // Pin layout order: A1 (common), B1, C1.
       // When effectivelyClosed: A-B on (Gon), A-C off (Goff).
       // When !effectivelyClosed: A-B off (Goff), A-C on (Gon).
@@ -372,9 +372,9 @@ function createSwitchDTAnalogElement(
       const Goff = 1 / roff;
       const GAB = effectivelyClosed ? Gon : Goff;
       const GAC = effectivelyClosed ? Goff : Gon;
-      const vA = voltages[nodeCommon];
-      const vB = voltages[nodeB];
-      const vC = voltages[nodeC];
+      const vA = rhs[nodeCommon];
+      const vB = rhs[nodeB];
+      const vC = rhs[nodeC];
       const iAB = GAB * (vA - vB);
       const iAC = GAC * (vA - vC);
       return [iAB + iAC, -iAB, -iAC];

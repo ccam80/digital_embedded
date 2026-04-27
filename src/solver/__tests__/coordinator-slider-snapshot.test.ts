@@ -23,12 +23,14 @@ import type { PropertyValue } from "../../core/properties.js";
 function makeAnalogEl(
   typeId: string,
   instanceId: string,
-  pins: Array<{ x: number; y: number }>,
+  pins: Array<{ x: number; y: number; label?: string }>,
   propsMap: Map<string, PropertyValue> = new Map(),
+  registry?: ComponentRegistry,
 ): CircuitElement {
-  const resolvedPins: Pin[] = pins.map(p => ({
+  const def = registry?.get(typeId);
+  const resolvedPins: Pin[] = pins.map((p, i) => ({
     position: { x: p.x, y: p.y },
-    label: '',
+    label: p.label || def?.pinLayout[i]?.label || '',
     direction: PinDirection.BIDIRECTIONAL,
     isNegated: false,
     isClock: false,
@@ -65,18 +67,18 @@ function buildAnalogCoordinator() {
   const circuit = new Circuit();
   const vcc = makeAnalogEl('DcVoltageSource', 'vcc1',
     [{ x: 0, y: 0 }, { x: 4, y: 0 }],
-    new Map<string, PropertyValue>([['voltage', 5]]),
+    new Map<string, PropertyValue>([['voltage', 5]]), registry,
   );
   const r1 = makeAnalogEl('Resistor', 'r1',
     [{ x: 4, y: 0 }, { x: 8, y: 0 }],
-    new Map<string, PropertyValue>([['resistance', 1000]]),
+    new Map<string, PropertyValue>([['resistance', 1000]]), registry,
   );
   const r2 = makeAnalogEl('Resistor', 'r2',
     [{ x: 8, y: 0 }, { x: 12, y: 0 }],
-    new Map<string, PropertyValue>([['resistance', 1000]]),
+    new Map<string, PropertyValue>([['resistance', 1000]]), registry,
   );
-  const gnd = makeAnalogEl('Ground', 'gnd1', [{ x: 0, y: 0 }]);
-  const gnd2 = makeAnalogEl('Ground', 'gnd2', [{ x: 12, y: 0 }]);
+  const gnd = makeAnalogEl('Ground', 'gnd1', [{ x: 0, y: 0 }], new Map(), registry);
+  const gnd2 = makeAnalogEl('Ground', 'gnd2', [{ x: 12, y: 0 }], new Map(), registry);
   circuit.addElement(vcc); circuit.addElement(r1); circuit.addElement(r2);
   circuit.addElement(gnd); circuit.addElement(gnd2);
   circuit.addWire(new Wire({ x: 4, y: 0 }, { x: 4, y: 1 }));
@@ -214,6 +216,8 @@ describe('readElementCurrent -- digital-only coordinator', () => {
 describe('readElementCurrent -- analog coordinator', () => {
   it('returns finite number for element index 0', () => {
     const { coordinator } = buildAnalogCoordinator();
+    const dcResult = coordinator.dcOperatingPoint();
+    expect(dcResult?.converged).toBe(true);
     const result = coordinator.readElementCurrent(0);
     expect(result).not.toBeNull();
     expect(Number.isFinite(result!)).toBe(true);
@@ -236,6 +240,8 @@ describe('readBranchCurrent -- digital-only coordinator', () => {
 describe('readBranchCurrent -- analog coordinator', () => {
   it('returns finite number for branch index 0 (voltage source branch)', () => {
     const { coordinator } = buildAnalogCoordinator();
+    const dcResult = coordinator.dcOperatingPoint();
+    expect(dcResult?.converged).toBe(true);
     const result = coordinator.readBranchCurrent(0);
     expect(result).not.toBeNull();
     expect(Number.isFinite(result!)).toBe(true);

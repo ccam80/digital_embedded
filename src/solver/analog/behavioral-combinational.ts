@@ -122,13 +122,13 @@ export class BehavioralMuxElement {
   }
 
   load(ctx: LoadContext): void {
-    const voltages = ctx.rhsOld;
+    const rhsOld = ctx.rhsOld;
 
     // Decode selector bits into an integer
     let sel = 0;
     for (let b = 0; b < this._selPins.length; b++) {
       const nodeId = this._selPins[b].nodeId;
-      const voltage = readMnaVoltage(nodeId, voltages);
+      const voltage = readMnaVoltage(nodeId, rhsOld);
       const level = this._selPins[b].readLogicLevel(voltage);
       if (level !== undefined) {
         if (level) sel |= 1 << b;
@@ -148,7 +148,7 @@ export class BehavioralMuxElement {
     for (let bit = 0; bit < this._bitWidth; bit++) {
       const inputPin = selectedGroup[bit];
       const inputNodeId = inputPin.nodeId;
-      const inputVoltage = readMnaVoltage(inputNodeId, voltages);
+      const inputVoltage = readMnaVoltage(inputNodeId, rhsOld);
       const level = inputPin.readLogicLevel(inputVoltage);
       const outLevel = level ?? false;
       this._outPins[bit].setLogicLevel(outLevel);
@@ -172,20 +172,20 @@ export class BehavioralMuxElement {
    * Output pins: I = (V_node - V_target) / rOut
    * The sum is nonzero — the residual is the implicit supply current.
    */
-  getPinCurrents(voltages: Float64Array): number[] {
+  getPinCurrents(rhs: Float64Array): number[] {
     const result: number[] = [];
     for (const p of this._selPins) {
-      const v = readMnaVoltage(p.nodeId, voltages);
+      const v = readMnaVoltage(p.nodeId, rhs);
       result.push(v / p.rIn);
     }
     for (const group of this._dataPins) {
       for (const p of group) {
-        const v = readMnaVoltage(p.nodeId, voltages);
+        const v = readMnaVoltage(p.nodeId, rhs);
         result.push(v / p.rIn);
       }
     }
     for (const p of this._outPins) {
-      const v = readMnaVoltage(p.nodeId, voltages);
+      const v = readMnaVoltage(p.nodeId, rhs);
       result.push((v - p.currentVoltage) / p.rOut);
     }
     return result;
@@ -266,13 +266,13 @@ export class BehavioralDemuxElement {
   }
 
   load(ctx: LoadContext): void {
-    const voltages = ctx.rhsOld;
+    const rhsOld = ctx.rhsOld;
 
     // Decode selector
     let sel = 0;
     for (let b = 0; b < this._selPins.length; b++) {
       const nodeId = this._selPins[b].nodeId;
-      const voltage = readMnaVoltage(nodeId, voltages);
+      const voltage = readMnaVoltage(nodeId, rhsOld);
       const level = this._selPins[b].readLogicLevel(voltage);
       if (level !== undefined) {
         if (level) sel |= 1 << b;
@@ -282,7 +282,7 @@ export class BehavioralDemuxElement {
 
     // Read input level
     const inNodeId = this._inPin.nodeId;
-    const inVoltage = readMnaVoltage(inNodeId, voltages);
+    const inVoltage = readMnaVoltage(inNodeId, rhsOld);
     const inLevel = this._inPin.readLogicLevel(inVoltage) ?? false;
 
     // Delegate stamping to pin models for inputs
@@ -312,16 +312,16 @@ export class BehavioralDemuxElement {
    * Output pins: I = (V_node - V_target) / rOut
    * The sum is nonzero — the residual is the implicit supply current.
    */
-  getPinCurrents(voltages: Float64Array): number[] {
+  getPinCurrents(rhs: Float64Array): number[] {
     const result: number[] = [];
     for (const p of this._selPins) {
-      const v = readMnaVoltage(p.nodeId, voltages);
+      const v = readMnaVoltage(p.nodeId, rhs);
       result.push(v / p.rIn);
     }
-    const vIn = readMnaVoltage(this._inPin.nodeId, voltages);
+    const vIn = readMnaVoltage(this._inPin.nodeId, rhs);
     result.push(vIn / this._inPin.rIn);
     for (const p of this._outPins) {
-      const v = readMnaVoltage(p.nodeId, voltages);
+      const v = readMnaVoltage(p.nodeId, rhs);
       result.push((v - p.currentVoltage) / p.rOut);
     }
     return result;
@@ -397,13 +397,13 @@ export class BehavioralDecoderElement {
   }
 
   load(ctx: LoadContext): void {
-    const voltages = ctx.rhsOld;
+    const rhsOld = ctx.rhsOld;
 
     // Decode selector
     let sel = 0;
     for (let b = 0; b < this._selPins.length; b++) {
       const nodeId = this._selPins[b].nodeId;
-      const voltage = readMnaVoltage(nodeId, voltages);
+      const voltage = readMnaVoltage(nodeId, rhsOld);
       const level = this._selPins[b].readLogicLevel(voltage);
       if (level !== undefined) {
         if (level) sel |= 1 << b;
@@ -437,17 +437,17 @@ export class BehavioralDecoderElement {
    * out_i are outputs: I = (V_node - V_target) / rOut (current into element).
    * Sum is nonzero because behavioral outputs have an implicit supply.
    */
-  getPinCurrents(voltages: Float64Array): number[] {
+  getPinCurrents(rhs: Float64Array): number[] {
     const result: number[] = [];
     // sel pin (input) — all selPins share the same node; use first
     const selPin = this._selPins[0];
     if (selPin !== undefined) {
-      const vSel = readMnaVoltage(selPin.nodeId, voltages);
+      const vSel = readMnaVoltage(selPin.nodeId, rhs);
       result.push(vSel / selPin.rIn);
     }
     // output pins
     for (const p of this._outPins) {
-      const vNode = readMnaVoltage(p.nodeId, voltages);
+      const vNode = readMnaVoltage(p.nodeId, rhs);
       result.push((vNode - p.currentVoltage) / p.rOut);
     }
     return result;

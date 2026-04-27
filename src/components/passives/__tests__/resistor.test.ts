@@ -133,6 +133,7 @@ function makeResistor(nodeA: number, nodeB: number, resistance: number): AnalogE
     getPinCurrents(_v: Float64Array): number[] { return []; },
     load(ctx: import("../../../solver/analog/load-context.js").LoadContext): void {
       const { solver } = ctx;
+      // Ground (node 0) is the trashcan row under 1-indexed scheme — suppress stamps into it.
       if (nodeA !== 0) solver.stampElement(solver.allocElement(nodeA, nodeA), G);
       if (nodeB !== 0) solver.stampElement(solver.allocElement(nodeB, nodeB), G);
       if (nodeA !== 0 && nodeB !== 0) {
@@ -156,15 +157,15 @@ describe("Integration", () => {
     //   I_source = 10 / 3000 = 3.3333 mA
     //
     // MNA node assignment:
-    //   node 1 = R1â€“R2 junction
+    //   node 1 = R1â€”R2 junction
     //   node 2 = positive terminal of the voltage source
     //   ground = node 0
-    //   branch row = absolute solver index 2 (after the 2 node rows)
+    //   branch row = absolute solver index 3 (after the 2 node rows; 1-indexed: nodes at 1,2, branch at 3)
     //
-    // matrixSize = 2 (nodes) + 1 (branch) = 3
+    // matrixSize = nodeCount(2) + branchCount(1) = 3  (_initStructure(3) allocates slots 0..3)
 
     const matrixSize = 3;
-    const branchRow = 2; // absolute 0-based solver row for branch current
+    const branchRow = 3; // absolute 1-indexed solver row for branch current
 
     const vs = makeDcVoltageSource(2, 0, branchRow, 10) as unknown as AnalogElement; // 10V: node2(+) to gnd(-)
     const r1 = makeResistor(1, 2, 1000);                  // 1kÎ©: node1 â†” node2
@@ -261,26 +262,27 @@ describe("resistor_load_dcop_parity", () => {
     const stamps = stampCtx.solver.getCSCNonZeros();
 
     const NGSPICE_G_REF = 1 / 1000;
+    // Under 1-indexed nodes: node 1 → row/col 1, node 2 → row/col 2, node 3 → row/col 3.
     // node1 diagonal gets one R1 stamp.
-    const e00 = stamps.find((e) => e.row === 0 && e.col === 0);
+    const e00 = stamps.find((e) => e.row === 1 && e.col === 1);
     expect(e00).toBeDefined();
     expect(e00!.value).toBe(NGSPICE_G_REF);
     // node2 diagonal gets two stamps (R1 + R2): 2*G.
-    const e11 = stamps.find((e) => e.row === 1 && e.col === 1);
+    const e11 = stamps.find((e) => e.row === 2 && e.col === 2);
     expect(e11).toBeDefined();
     expect(e11!.value).toBe(NGSPICE_G_REF + NGSPICE_G_REF);
     // node3 diagonal gets two stamps (R2 + R3): 2*G.
-    const e22 = stamps.find((e) => e.row === 2 && e.col === 2);
+    const e22 = stamps.find((e) => e.row === 3 && e.col === 3);
     expect(e22).toBeDefined();
     expect(e22!.value).toBe(NGSPICE_G_REF + NGSPICE_G_REF);
     // Off-diagonals -G.
-    const e01 = stamps.find((e) => e.row === 0 && e.col === 1);
+    const e01 = stamps.find((e) => e.row === 1 && e.col === 2);
     expect(e01!.value).toBe(-NGSPICE_G_REF);
-    const e10 = stamps.find((e) => e.row === 1 && e.col === 0);
+    const e10 = stamps.find((e) => e.row === 2 && e.col === 1);
     expect(e10!.value).toBe(-NGSPICE_G_REF);
-    const e12 = stamps.find((e) => e.row === 1 && e.col === 2);
+    const e12 = stamps.find((e) => e.row === 2 && e.col === 3);
     expect(e12!.value).toBe(-NGSPICE_G_REF);
-    const e21 = stamps.find((e) => e.row === 2 && e.col === 1);
+    const e21 = stamps.find((e) => e.row === 3 && e.col === 2);
     expect(e21!.value).toBe(-NGSPICE_G_REF);
   });
 });

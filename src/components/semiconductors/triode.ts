@@ -247,10 +247,10 @@ export function createTriodeElement(
       stampRHS(ctx.rhs, nodeK, igNorton);
     },
 
-    getPinCurrents(voltages: Float64Array): number[] {
-      const vP = voltages[nodeP];
-      const vG = voltages[nodeG];
-      const vK = voltages[nodeK];
+    getPinCurrents(rhs: Float64Array): number[] {
+      const vP = rhs[nodeP];
+      const vG = rhs[nodeG];
+      const vK = rhs[nodeK];
 
       const { ip, ig, gm, gp, ggi, vgk: vgkOp, vpk: vpkOp } = op;
 

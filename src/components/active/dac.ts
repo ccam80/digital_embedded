@@ -295,18 +295,18 @@ function createDACElement(
   // Current output voltage (updated each load() pass)
   let _vOut = 0;
 
-  function readNode(voltages: Float64Array, n: number): number {
-    return voltages[n];
+  function readNode(rhs: Float64Array, n: number): number {
+    return rhs[n];
   }
 
-  function computeOutputVoltage(voltages: Float64Array): number {
-    const vRefNow = readNode(voltages, nVref);
+  function computeOutputVoltage(rhs: Float64Array): number {
+    const vRefNow = readNode(rhs, nVref);
 
     // Build digital code from input pin threshold detection
     let code = 0;
     for (let i = 0; i < bits; i++) {
       const nD = nDigitalBits[i];
-      const vD = readNode(voltages, nD);
+      const vD = readNode(rhs, nD);
       const logic = inputModels[i].readLogicLevel(vD);
       // Treat undefined (indeterminate) as LOW for DAC conversion
       const bit = logic === true ? 1 : 0;
@@ -377,18 +377,18 @@ function createDACElement(
 
     accept(_ctx: LoadContext, _simTime: number, _addBreakpoint: (t: number) => void): void {},
 
-    getPinCurrents(voltages: Float64Array): number[] {
+    getPinCurrents(rhs: Float64Array): number[] {
       const currents: number[] = [];
 
       const rIn = p.rIn;
       for (let i = 0; i < bits; i++) {
-        const v = readNode(voltages, nDigitalBits[i]);
+        const v = readNode(rhs, nDigitalBits[i]);
         currents.push(nDigitalBits[i] > 0 ? v / rIn : 0);
       }
 
       currents.push(0); // VREF
 
-      const vOut = readNode(voltages, nOut);
+      const vOut = readNode(rhs, nOut);
       currents.push(nOut > 0 ? (vOut - _vOut) * G_out : 0);
 
       currents.push(0); // GND

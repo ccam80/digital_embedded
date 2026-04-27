@@ -134,16 +134,16 @@ export class BehavioralJKAsyncFlipflopElement {
    * called once per accepted timestep with the accepted solution voltages.
    */
   accept(ctx: LoadContext, _simTime: number, _addBreakpoint: (t: number) => void): void {
-    const voltages = ctx.rhs;
+    const rhs = ctx.rhs;
 
-    const currentClockV = readMnaVoltage(this._clockPin.nodeId, voltages);
+    const currentClockV = readMnaVoltage(this._clockPin.nodeId, rhs);
 
     const risingEdge =
       this._prevClockVoltage < this._vIH && currentClockV >= this._vIH;
 
     if (risingEdge) {
-      const jV = readMnaVoltage(this._jPin.nodeId, voltages);
-      const kV = readMnaVoltage(this._kPin.nodeId, voltages);
+      const jV = readMnaVoltage(this._jPin.nodeId, rhs);
+      const kV = readMnaVoltage(this._kPin.nodeId, rhs);
       const jLevel = this._jPin.readLogicLevel(jV);
       const kLevel = this._kPin.readLogicLevel(kV);
 
@@ -159,12 +159,12 @@ export class BehavioralJKAsyncFlipflopElement {
     }
 
     // Async Set/Clr override clock-triggered state
-    const setV = readMnaVoltage(this._setPin.nodeId, voltages);
+    const setV = readMnaVoltage(this._setPin.nodeId, rhs);
     if (setV > this._vIH) {
       this._latchedQ = true;
     }
 
-    const clrV = readMnaVoltage(this._clrPin.nodeId, voltages);
+    const clrV = readMnaVoltage(this._clrPin.nodeId, rhs);
     if (clrV > this._vIH) {
       this._latchedQ = false;
     }
@@ -172,15 +172,15 @@ export class BehavioralJKAsyncFlipflopElement {
     this._prevClockVoltage = currentClockV;
   }
 
-  getPinCurrents(voltages: Float64Array): number[] {
+  getPinCurrents(rhs: Float64Array): number[] {
     // pinLayout order: Set, J, C, K, Clr, Q, ~Q
-    const vSet = readMnaVoltage(this._setPin.nodeId, voltages);
-    const vJ = readMnaVoltage(this._jPin.nodeId, voltages);
-    const vC = readMnaVoltage(this._clockPin.nodeId, voltages);
-    const vK = readMnaVoltage(this._kPin.nodeId, voltages);
-    const vClr = readMnaVoltage(this._clrPin.nodeId, voltages);
-    const vQ = readMnaVoltage(this._qPin.nodeId, voltages);
-    const vQBar = readMnaVoltage(this._qBarPin.nodeId, voltages);
+    const vSet = readMnaVoltage(this._setPin.nodeId, rhs);
+    const vJ = readMnaVoltage(this._jPin.nodeId, rhs);
+    const vC = readMnaVoltage(this._clockPin.nodeId, rhs);
+    const vK = readMnaVoltage(this._kPin.nodeId, rhs);
+    const vClr = readMnaVoltage(this._clrPin.nodeId, rhs);
+    const vQ = readMnaVoltage(this._qPin.nodeId, rhs);
+    const vQBar = readMnaVoltage(this._qBarPin.nodeId, rhs);
     return [
       vSet / this._setPin.rIn,
       vJ / this._jPin.rIn,

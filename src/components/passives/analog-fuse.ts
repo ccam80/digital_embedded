@@ -223,14 +223,14 @@ export class AnalogFuseElement implements AnalogElement {
     return smoothResistance(this._thermalEnergy, this._i2tRating, this._rCold, this._rBlown);
   }
 
-  getPinCurrents(voltages: Float64Array): number[] {
+  getPinCurrents(rhs: Float64Array): number[] {
     // No branch row â€” compute from constitutive equation: I = G_eff * (V_A - V_B).
     // pinNodeIds[0] = n_pos (out1 pin, index 0 in pinLayout).
     // pinNodeIds[1] = n_neg (out2 pin, index 1 in pinLayout).
     const nPos = this.pinNodeIds[0];
     const nNeg = this.pinNodeIds[1];
-    const vPos = voltages[nPos];
-    const vNeg = voltages[nNeg];
+    const vPos = rhs[nPos];
+    const vNeg = rhs[nNeg];
     const R = smoothResistance(this._thermalEnergy, this._i2tRating, this._rCold, this._rBlown);
     const G = 1 / Math.max(R, MIN_RESISTANCE);
     const I = G * (vPos - vNeg);

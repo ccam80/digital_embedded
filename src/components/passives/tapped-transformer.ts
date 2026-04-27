@@ -589,10 +589,10 @@ export class AnalogTappedTransformerElement implements ReactiveAnalogElement {
     return Math.min(dt1, dt2, dt3);
   }
 
-  getPinCurrents(voltages: Float64Array): number[] {
-    const i1 = voltages[this.branchIndex]; // primary: P1â†’P2
-    const i2 = voltages[this._b2];         // sec half-1: S1â†’CT
-    const i3 = voltages[this._b3];         // sec half-2: CTâ†’S2
+  getPinCurrents(rhs: Float64Array): number[] {
+    const i1 = rhs[this.branchIndex]; // primary: P1â†’P2
+    const i2 = rhs[this._b2];         // sec half-1: S1â†’CT
+    const i3 = rhs[this._b3];         // sec half-2: CTâ†’S2
     // pinLayout order: P1, P2, S1, CT, S2
     // CT: i2 exits (âˆ’i2) and i3 enters (+i3) â†’ net = i3 âˆ’ i2
     // Sum: i1 + (âˆ’i1) + i2 + (i3âˆ’i2) + (âˆ’i3) = 0 âœ“

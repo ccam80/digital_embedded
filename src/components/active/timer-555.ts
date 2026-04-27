@@ -454,13 +454,13 @@ function createTimer555Element(
   const _childElements: AnalogCapacitorElement[] = collectPinModelChildren([_outputPin]);
   const _childStateSize = _childElements.reduce((s, c) => s + c.stateSize, 0);
 
-  function readNode(voltages: Float64Array, n: number): number {
-    return voltages[n];
+  function readNode(rhs: Float64Array, n: number): number {
+    return rhs[n];
   }
 
-  function updateOutputPinLevels(voltages: Float64Array): void {
-    const vVccVal = readNode(voltages, nVcc);
-    const vGndVal = readNode(voltages, nGnd);
+  function updateOutputPinLevels(rhs: Float64Array): void {
+    const vVccVal = readNode(rhs, nVcc);
+    const vGndVal = readNode(rhs, nGnd);
     _outputPin.setParam("vOH", vVccVal - p.vDrop);
     _outputPin.setParam("vOL", vGndVal + 0.1);
   }
@@ -470,9 +470,9 @@ function createTimer555Element(
    * Called ONLY from accept() â€” never during NR iteration.
    * Comparator state is evaluated from node voltages at the accepted solution.
    */
-  function advanceFlipflop(voltages: Float64Array): void {
-    const vGnd  = readNode(voltages, nGnd);
-    const vRstV = readNode(voltages, nRst);
+  function advanceFlipflop(rhs: Float64Array): void {
+    const vGnd  = readNode(rhs, nGnd);
+    const vRstV = readNode(rhs, nRst);
 
     // Active-low RESET pin: RST < GND + 0.7V â†’ force Q=0 (overrides all)
     if ((vRstV - vGnd) < 0.7) {
@@ -483,10 +483,10 @@ function createTimer555Element(
     // Read comparator output node voltages to determine comparator states.
     // comp1: active (sinking, pulled low) â†’ RESET; comp2: active â†’ SET.
     // When nComp1Out/nComp2Out are 0 (unit test fallback), read from pin voltages.
-    const vThr   = readNode(voltages, nThr);
-    const vTrig  = readNode(voltages, nTrig);
-    const vCtrlV = readNode(voltages, nCtrl);
-    const vLower = nLower > 0 ? readNode(voltages, nLower) : (vCtrlV * 0.5);
+    const vThr   = readNode(rhs, nThr);
+    const vTrig  = readNode(rhs, nTrig);
+    const vCtrlV = readNode(rhs, nCtrl);
+    const vLower = nLower > 0 ? readNode(rhs, nLower) : (vCtrlV * 0.5);
 
     // Comparator 1: THR > CTRL â†’ RESET asserted
     const comp1Reset = (vThr - vGnd) > (vCtrlV - vGnd);
@@ -689,16 +689,16 @@ function createTimer555Element(
       comp2Sub.accept?.(ctx, _simTime, _addBreakpoint);
     },
 
-    getPinCurrents(voltages: Float64Array): number[] {
+    getPinCurrents(rhs: Float64Array): number[] {
       // Pin layout order: [DIS, TRIG, THR, VCC, CTRL, OUT, RST, GND]
       // Convention: positive = current flowing INTO the element at that pin.
 
-      const vVccV  = readNode(voltages, nVcc);
-      const vGndV  = readNode(voltages, nGnd);
-      const vCtrlV = readNode(voltages, nCtrl);
-      const vLower = nLower > 0 ? readNode(voltages, nLower) : (vCtrlV + vGndV) / 2;
-      const vOut   = readNode(voltages, nOut);
-      const vDis   = readNode(voltages, nDis);
+      const vVccV  = readNode(rhs, nVcc);
+      const vGndV  = readNode(rhs, nGnd);
+      const vCtrlV = readNode(rhs, nCtrl);
+      const vLower = nLower > 0 ? readNode(rhs, nLower) : (vCtrlV + vGndV) / 2;
+      const vOut   = readNode(rhs, nOut);
+      const vDis   = readNode(rhs, nDis);
 
       const G_DIV = 1 / R_DIV;
       const gOut  = 1 / R_OUT;

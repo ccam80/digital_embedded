@@ -30,7 +30,7 @@ function makeMinimalCore(): AnalogElementCore {
     setParam(_key: string, _value: number): void {
       // minimal no-op
     },
-    getPinCurrents(_voltages: Float64Array): number[] {
+    getPinCurrents(_rhs: Float64Array): number[] {
       return [];
     },
   };
@@ -72,7 +72,7 @@ describe("AnalogElementCore", () => {
       _stamp(_solver: unknown): void {},
       load(_ctx: LoadContext): void {},
       setParam(_key: string, _value: number): void {},
-      getPinCurrents(_voltages: Float64Array): number[] { return []; },
+      getPinCurrents(_rhs: Float64Array): number[] { return []; },
     };
 
     const _withStampNonlinear: AnalogElementCore = {
@@ -84,7 +84,7 @@ describe("AnalogElementCore", () => {
       deletedStampNl(_solver: unknown): void {},
       load(_ctx: LoadContext): void {},
       setParam(_key: string, _value: number): void {},
-      getPinCurrents(_voltages: Float64Array): number[] { return []; },
+      getPinCurrents(_rhs: Float64Array): number[] { return []; },
     };
 
     const _withUpdateOp: AnalogElementCore = {
@@ -96,7 +96,7 @@ describe("AnalogElementCore", () => {
       updateOperatingPoint(_voltages: Float64Array): void {},
       load(_ctx: LoadContext): void {},
       setParam(_key: string, _value: number): void {},
-      getPinCurrents(_voltages: Float64Array): number[] { return []; },
+      getPinCurrents(_rhs: Float64Array): number[] { return []; },
     };
 
     // Suppress unused variable warnings
@@ -121,7 +121,7 @@ describe("AnalogElementCore", () => {
       load(_ctx: LoadContext): void {},
       checkConvergence(_ctx: LoadContext): boolean { return true; },
       setParam(_key: string, _value: number): void {},
-      getPinCurrents(_voltages: Float64Array): number[] { return []; },
+      getPinCurrents(_rhs: Float64Array): number[] { return []; },
     };
 
     expect(typeof coreWithNewSig.checkConvergence).toBe("function");
@@ -141,7 +141,7 @@ describe("AnalogElementCore", () => {
       ): boolean { return true; },
       load(_ctx: LoadContext): void {},
       setParam(_key: string, _value: number): void {},
-      getPinCurrents(_voltages: Float64Array): number[] { return []; },
+      getPinCurrents(_rhs: Float64Array): number[] { return []; },
     };
 
     void _coreWithOldSig;

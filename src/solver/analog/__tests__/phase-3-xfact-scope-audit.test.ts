@@ -17,12 +17,19 @@ describe("Task 3.2.5 — xfact scope audit", () => {
    * must be in the allowlist.
    */
 
-  const allowlistComponents: { file: string; line: number; reason: string }[] = [];
+  const allowlistComponents: { file: string; line: number; reason: string }[] = [
+    {
+      file: "semiconductors\\mosfet.ts",
+      line: 1410,
+      reason:
+        "comment inside MODEINITPRED|MODEINITTRAN guard — mentions ctx.xfact to explain why it is NOT used; not an actual read",
+    },
+  ];
 
   const allowlistSolver: { file: string; line: number; reason: string }[] = [
     {
       file: "analog-engine.ts",
-      line: 430,
+      line: 432,
       reason: "engine-side xfact computation (write, not a guarded read)",
     },
   ];

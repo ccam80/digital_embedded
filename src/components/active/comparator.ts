@@ -219,8 +219,8 @@ export function createOpenCollectorComparatorElement(
   let pool: StatePoolRef;
   let base: number;
 
-  function readNode(voltages: Float64Array, n: number): number {
-    return voltages[n];
+  function readNode(rhs: Float64Array, n: number): number {
+    return rhs[n];
   }
 
   function computeGeff(weight: number): number {
@@ -313,17 +313,17 @@ export function createOpenCollectorComparatorElement(
       s0[base + SLOT_OUTPUT_WEIGHT] = currentWeight + alpha * (target - currentWeight);
     },
 
-    getPinCurrents(voltages: Float64Array): number[] {
+    getPinCurrents(rhs: Float64Array): number[] {
       // Input pins: high-impedance load â€” implicit R_IN to ground
       const R_IN = 1e7;
-      const vInp = readNode(voltages, nInp);
-      const vInn = readNode(voltages, nInn);
+      const vInp = readNode(rhs, nInp);
+      const vInn = readNode(rhs, nInn);
       const iInp = nInp > 0 ? vInp / R_IN : 0;
       const iInn = nInn > 0 ? vInn / R_IN : 0;
 
       // Output pin: I_out = V_out * G_eff (current sinks to ground)
       const weight = pool.states[0][base + SLOT_OUTPUT_WEIGHT];
-      const vOut = readNode(voltages, nOut);
+      const vOut = readNode(rhs, nOut);
       const gEff = computeGeff(weight);
       const iOut = nOut > 0 ? vOut * gEff : 0;
 
@@ -363,8 +363,8 @@ function createPushPullComparatorElement(
   let pool: StatePoolRef;
   let base: number;
 
-  function readNode(voltages: Float64Array, n: number): number {
-    return voltages[n];
+  function readNode(rhs: Float64Array, n: number): number {
+    return rhs[n];
   }
 
   function computeGeff(weight: number): number {
@@ -455,17 +455,17 @@ function createPushPullComparatorElement(
       s0[base + SLOT_OUTPUT_WEIGHT] = currentWeight + alpha * (target - currentWeight);
     },
 
-    getPinCurrents(voltages: Float64Array): number[] {
+    getPinCurrents(rhs: Float64Array): number[] {
       const R_IN = 1e7;
-      const vInp = readNode(voltages, nInp);
-      const vInn = readNode(voltages, nInn);
+      const vInp = readNode(rhs, nInp);
+      const vInn = readNode(rhs, nInn);
       const iInp = nInp > 0 ? vInp / R_IN : 0;
       const iInn = nInn > 0 ? vInn / R_IN : 0;
 
       const s0 = pool.states[0];
       const latchActive = s0[base + SLOT_OUTPUT_LATCH] >= 0.5;
       const weight = s0[base + SLOT_OUTPUT_WEIGHT];
-      const vOut = readNode(voltages, nOut);
+      const vOut = readNode(rhs, nOut);
       const gEff = computeGeff(weight);
       let iOut = 0;
       if (nOut > 0) {

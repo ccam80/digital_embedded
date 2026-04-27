@@ -139,14 +139,14 @@ export class LDRElement implements AnalogElementCore {
     }
   }
 
-  getPinCurrents(voltages: Float64Array): number[] {
+  getPinCurrents(rhs: Float64Array): number[] {
     // No branch row â€” compute from constitutive equation: I = G * (V_pos - V_neg).
     // pinNodeIds[0] = n_pos (pos pin, index 0 in pinLayout).
     // pinNodeIds[1] = n_neg (neg pin, index 1 in pinLayout).
     const nPos = this.pinNodeIds[0];
     const nNeg = this.pinNodeIds[1];
-    const vPos = voltages[nPos];
-    const vNeg = voltages[nNeg];
+    const vPos = rhs[nPos];
+    const vNeg = rhs[nNeg];
     const G = 1 / this.resistance();
     const I = G * (vPos - vNeg);
     return [I, -I];

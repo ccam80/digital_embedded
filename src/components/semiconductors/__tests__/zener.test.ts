@@ -47,14 +47,14 @@ function makeParamBag(params: Record<string, number>): PropertyBag {
  */
 function buildUnitCtx(
   solver: SparseSolver,
-  voltages: Float64Array,
+  rhsOld: Float64Array,
   overrides: Partial<LoadContext> = {},
 ): LoadContext {
   return {
     solver,
     matrix: solver,
-    rhsOld: voltages,
-    rhs: new Float64Array(voltages.length),
+    rhsOld: rhsOld,
+    rhs: new Float64Array(rhsOld.length),
     cktMode: MODEDCOP | MODEINITFLOAT,
     time: 0,
     dt: 0,

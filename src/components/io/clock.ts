@@ -350,11 +350,11 @@ export function makeAnalogClockElement(
       return out;
     },
 
-    getPinCurrents(voltages: Float64Array): number[] {
+    getPinCurrents(rhs: Float64Array): number[] {
       // Pin layout: [out] - positive terminal; negative terminal is implicit ground.
-      // Branch current I = voltages[branchIdx] flows from neg to pos through source.
+      // Branch current I = rhs[branchIdx] flows from neg to pos through source.
       // Current INTO element at out = -I (conventional: exits at positive terminal).
-      const I = voltages[branchIdx];
+      const I = rhs[branchIdx];
       return [-I];
     },
   };

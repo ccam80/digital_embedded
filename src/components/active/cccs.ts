@@ -182,18 +182,18 @@ class CCCSAnalogElement extends ControlledSourceElement {
     const ks = this._senseBranch;
 
     if (this._nSenseP !== 0) {
-      solver.stampElement(solver.allocElement(this._nSenseP - 1, ks), 1);
-      solver.stampElement(solver.allocElement(ks, this._nSenseP - 1), 1);
+      solver.stampElement(solver.allocElement(this._nSenseP, ks), 1);
+      solver.stampElement(solver.allocElement(ks, this._nSenseP), 1);
     }
     if (this._nSenseN !== 0) {
-      solver.stampElement(solver.allocElement(this._nSenseN - 1, ks), -1);
-      solver.stampElement(solver.allocElement(ks, this._nSenseN - 1), -1);
+      solver.stampElement(solver.allocElement(this._nSenseN, ks), -1);
+      solver.stampElement(solver.allocElement(ks, this._nSenseN), -1);
     }
   }
 
-  protected override _bindContext(voltages: Float64Array): void {
-    const iSense = voltages[this._senseBranch];
-    this._ctx.setBranchCurrentByIndex("sense", this._senseBranch, voltages);
+  protected override _bindContext(rhsOld: Float64Array): void {
+    const iSense = rhsOld[this._senseBranch];
+    this._ctx.setBranchCurrentByIndex("sense", this._senseBranch, rhsOld);
     this._ctrlValue = iSense;
   }
 
@@ -213,8 +213,8 @@ class CCCSAnalogElement extends ControlledSourceElement {
    * KCL: I_senseP + I_senseN + I_outP + I_outN = 0 ✓
    *   (iSense) + (-iSense) + (-fI) + (fI) = 0
    */
-  getPinCurrents(voltages: Float64Array): number[] {
-    const iSense = voltages[this._senseBranch];
+  getPinCurrents(rhs: Float64Array): number[] {
+    const iSense = rhs[this._senseBranch];
     const fI = this._compiledExpr(this._ctx); // f(I_sense) at current operating point
     return [
       iSense,   // sense+: I_sense flows in
@@ -253,18 +253,18 @@ class CCCSAnalogElement extends ControlledSourceElement {
 
     // G sub-matrix: sense branch variable → output node rows
     if (this._nOutP !== 0) {
-      solver.stampElement(solver.allocElement(this._nOutP - 1, ks), -derivative);
+      solver.stampElement(solver.allocElement(this._nOutP, ks), -derivative);
     }
     if (this._nOutN !== 0) {
-      solver.stampElement(solver.allocElement(this._nOutN - 1, ks), derivative);
+      solver.stampElement(solver.allocElement(this._nOutN, ks), derivative);
     }
 
     // RHS: Norton constant term
     if (this._nOutP !== 0) {
-      rhs[this._nOutP - 1] += iNR;
+      rhs[this._nOutP] += iNR;
     }
     if (this._nOutN !== 0) {
-      rhs[this._nOutN - 1] += -iNR;
+      rhs[this._nOutN] += -iNR;
     }
   }
 }

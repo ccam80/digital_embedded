@@ -496,11 +496,11 @@ export class AnalogPolarizedCapElement implements ReactiveAnalogElement {
     }
   }
 
-  getPinCurrents(voltages: Float64Array): number[] {
+  getPinCurrents(rhs: Float64Array): number[] {
     const nPos = this.pinNodeIds[0];
     const nCap = this.pinNodeIds[2];
-    const vPos = voltages[nPos];
-    const vCap = voltages[nCap];
+    const vPos = rhs[nPos];
+    const vCap = rhs[nCap];
     // Current into pos pin = current through ESR flowing into the element
     const I = this.G_esr * (vPos - vCap);
     return [I, -I];

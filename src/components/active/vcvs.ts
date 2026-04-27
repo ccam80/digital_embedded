@@ -164,18 +164,18 @@ class VCVSAnalogElement extends ControlledSourceElement {
   protected override _stampLinear(solver: SparseSolver): void {
     const k = this._k;
     if (this._nOutP !== 0) {
-      solver.stampElement(solver.allocElement(this._nOutP - 1, k), 1);   // B[nOutP, k]
-      solver.stampElement(solver.allocElement(k, this._nOutP - 1), 1);   // C[k, nOutP]
+      solver.stampElement(solver.allocElement(this._nOutP, k), 1);   // B[nOutP, k]
+      solver.stampElement(solver.allocElement(k, this._nOutP), 1);   // C[k, nOutP]
     }
     if (this._nOutN !== 0) {
-      solver.stampElement(solver.allocElement(this._nOutN - 1, k), -1);  // B[nOutN, k]
-      solver.stampElement(solver.allocElement(k, this._nOutN - 1), -1);  // C[k, nOutN]
+      solver.stampElement(solver.allocElement(this._nOutN, k), -1);  // B[nOutN, k]
+      solver.stampElement(solver.allocElement(k, this._nOutN), -1);  // C[k, nOutN]
     }
   }
 
-  protected override _bindContext(voltages: Float64Array): void {
-    const vCtrlP = this._nCtrlP > 0 ? voltages[this._nCtrlP] : 0;
-    const vCtrlN = this._nCtrlN > 0 ? voltages[this._nCtrlN] : 0;
+  protected override _bindContext(rhsOld: Float64Array): void {
+    const vCtrlP = this._nCtrlP > 0 ? rhsOld[this._nCtrlP] : 0;
+    const vCtrlN = this._nCtrlN > 0 ? rhsOld[this._nCtrlN] : 0;
     const vCtrl = vCtrlP - vCtrlN;
 
     this._ctx.setNodeVoltage("ctrl", vCtrl);
@@ -204,10 +204,10 @@ class VCVSAnalogElement extends ControlledSourceElement {
 
     // Jacobian: C[k, ctrl] entries
     if (this._nCtrlP !== 0) {
-      solver.stampElement(solver.allocElement(k, this._nCtrlP - 1), -derivative);
+      solver.stampElement(solver.allocElement(k, this._nCtrlP), -derivative);
     }
     if (this._nCtrlN !== 0) {
-      solver.stampElement(solver.allocElement(k, this._nCtrlN - 1), derivative);
+      solver.stampElement(solver.allocElement(k, this._nCtrlN), derivative);
     }
 
     // NR-linearized RHS: constant term after factoring out Jacobian
@@ -222,8 +222,8 @@ class VCVSAnalogElement extends ControlledSourceElement {
    * `_k` in the MNA solution vector. Positive = current flowing INTO the pin.
    * KCL: 0 + 0 + I_out - I_out = 0. âœ“
    */
-  getPinCurrents(voltages: Float64Array): number[] {
-    const iOut = voltages[this._k];
+  getPinCurrents(rhs: Float64Array): number[] {
+    const iOut = rhs[this._k];
     return [0, 0, iOut, -iOut];
   }
 }

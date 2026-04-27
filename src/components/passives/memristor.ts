@@ -169,11 +169,11 @@ export class MemristorElement implements AnalogElementCore {
     this._w = Math.max(0, Math.min(1, this._w + dWdt * ctx.dt));
   }
 
-  getPinCurrents(voltages: Float64Array): number[] {
+  getPinCurrents(rhs: Float64Array): number[] {
     const nA = this.pinNodeIds[0];
     const nB = this.pinNodeIds[1];
-    const vA = voltages[nA];
-    const vB = voltages[nB];
+    const vA = rhs[nA];
+    const vB = rhs[nB];
     const I = this.conductance() * (vA - vB);
     return [I, -I];
   }

@@ -155,15 +155,15 @@ export class BehavioralTFlipflopElement implements ReactiveAnalogElementCore {
     this._prevClockVoltage = currentClockV;
   }
 
-  getPinCurrents(voltages: Float64Array): number[] {
+  getPinCurrents(rhs: Float64Array): number[] {
     // pinLayout order: T (optional), C, Q, ~Q
     const result: number[] = [];
     if (this._tPin !== null) {
-      result.push(readMnaVoltage(this._tPin.nodeId, voltages) / this._tPin.rIn);
+      result.push(readMnaVoltage(this._tPin.nodeId, rhs) / this._tPin.rIn);
     }
-    result.push(readMnaVoltage(this._clockPin.nodeId, voltages) / this._clockPin.rIn);
-    const vQ = readMnaVoltage(this._qPin.nodeId, voltages);
-    const vQBar = readMnaVoltage(this._qBarPin.nodeId, voltages);
+    result.push(readMnaVoltage(this._clockPin.nodeId, rhs) / this._clockPin.rIn);
+    const vQ = readMnaVoltage(this._qPin.nodeId, rhs);
+    const vQBar = readMnaVoltage(this._qBarPin.nodeId, rhs);
     result.push((vQ - this._qPin.currentVoltage) / this._qPin.rOut);
     result.push((vQBar - this._qBarPin.currentVoltage) / this._qBarPin.rOut);
     return result;

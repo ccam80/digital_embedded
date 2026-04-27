@@ -342,12 +342,12 @@ function createSwitchAnalogElement(
       effectivelyClosed = normallyClosed ? !closed : closed;
     },
 
-    getPinCurrents(voltages: Float64Array): number[] {
+    getPinCurrents(rhs: Float64Array): number[] {
       // Pin layout order: A1, B1.
       // I = G * (V_A - V_B); positive = current into element at A1.
       const G = effectivelyClosed ? 1 / ron : 1 / roff;
-      const vA = voltages[nodeA];
-      const vB = voltages[nodeB];
+      const vA = rhs[nodeA];
+      const vB = rhs[nodeB];
       const I = G * (vA - vB);
       return [I, -I];
     },

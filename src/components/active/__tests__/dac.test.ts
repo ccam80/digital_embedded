@@ -303,11 +303,13 @@ function makeDacCaptureSolver(rhsSize = 32): {
   return { solver, stamps, rhs };
 }
 
-function makeDacParityCtx(_voltages: Float64Array, solver: SparseSolverType): LoadContext {
+function makeDacParityCtx(rhs: Float64Array, solver: SparseSolverType): LoadContext {
   return makeLoadCtx({
     solver,
     cktMode: MODEDCOP | MODEINITFLOAT,
     dt: 0,
+    rhs: rhs,
+    rhsOld: rhs,
   });
 }
 

@@ -51,23 +51,23 @@ export type IntegrationMethod = "trapezoidal" | "gear";
  * fixtures for plus a few neighbours.
  */
 export const NGSPICE_LOAD_ORDER = {
-  RES:  0,   // Resistor
-  CAP:  1,   // Capacitor
-  IND:  2,   // Inductor
-  MUT:  3,   // Mutual inductance / transformer
-  VSRC: 4,   // Independent voltage source
-  ISRC: 5,   // Independent current source
-  VCVS: 6,   // Voltage-controlled voltage source
-  VCCS: 7,   // Voltage-controlled current source
-  CCCS: 8,   // Current-controlled current source
-  CCVS: 9,   // Current-controlled voltage source
-  URC:  10,  // Uniform RC line
-  TRA:  11,  // Lossless transmission line
-  DIO:  12,  // Diode
-  BJT:  13,  // Bipolar junction transistor
-  JFET: 14,  // Junction FET
-  MOS:  15,  // MOSFET (any level)
-  SW:   16,  // Switch
+  URC:  0,   // Uniform RC line — pinned first (dev.c:141 "MUST precede both resistors and capacitors")
+  BJT:  2,   // Bipolar junction transistor
+  CAP:  17,  // Capacitor
+  CCCS: 18,  // Current-controlled current source
+  CCVS: 19,  // Current-controlled voltage source
+  DIO:  22,  // Diode
+  IND:  27,  // Inductor
+  MUT:  28,  // Mutual inductance / transformer
+  ISRC: 29,  // Independent current source
+  JFET: 30,  // Junction FET
+  MOS:  35,  // MOSFET (level 1; higher levels would be 36..39)
+  RES:  40,  // Resistor
+  SW:   42,  // Switch
+  TRA:  43,  // Lossless transmission line
+  VCCS: 46,  // Voltage-controlled current source
+  VCVS: 47,  // Voltage-controlled voltage source
+  VSRC: 48,  // Independent voltage source
 } as const;
 
 // ---------------------------------------------------------------------------
@@ -273,7 +273,7 @@ export interface AnalogElementCore {
    * one per visible pin. Positive means current flowing into the element.
    * The array must satisfy KCL: the sum of all entries is zero.
    */
-  getPinCurrents(voltages: Float64Array): number[];
+  getPinCurrents(rhs: Float64Array): number[];
 
   /**
    * Optional display label for diagnostic attribution.

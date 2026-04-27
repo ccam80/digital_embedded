@@ -434,7 +434,7 @@ export function createZenerElement(
       return Math.abs(cdhat - id) <= tol;
     },
 
-    getPinCurrents(_voltages: Float64Array): number[] {
+    getPinCurrents(_rhs: Float64Array): number[] {
       // pinLayout order: [A (anode), K (cathode)]
       // Positive = current flowing INTO element at that pin.
       const id = pool.states[0][base + SLOT_ID];

@@ -63,7 +63,7 @@ function companionAg(dt: number, method: string, order: number): Float64Array {
 
 function makeCompanionCtx(opts: {
   solver: SparseSolverType;
-  voltages: Float64Array;
+  rhs: Float64Array;
   dt: number;
   method: string;
   order: number;
@@ -200,7 +200,7 @@ describe("Inductor", () => {
 
       // For trapezoidal (order 2): geq = ag[0]*L = (2/dt)*L = 2 * 0.01 / 1e-4 = 200
       const { solver, stamps } = makeCaptureSolver();
-      analogElement.load(makeCompanionCtx({ solver, voltages, dt: 1e-4, method: "trapezoidal", order: 2 }));
+      analogElement.load(makeCompanionCtx({ solver, rhs: voltages, dt: 1e-4, method: "trapezoidal", order: 2 }));
 
       // geq appears as -geq on the branch diagonal (row=2, col=2)
       const branchDiag = stamps.find((s) => s[0] === 2 && s[1] === 2);
@@ -219,7 +219,7 @@ describe("Inductor", () => {
 
       // For order-1 trap: geq = L/h = 0.01 / 1e-4 = 100
       const { solver, stamps } = makeCaptureSolver();
-      analogElement.load(makeCompanionCtx({ solver, voltages, dt: 1e-4, method: "trapezoidal", order: 1 }));
+      analogElement.load(makeCompanionCtx({ solver, rhs: voltages, dt: 1e-4, method: "trapezoidal", order: 1 }));
 
       const branchDiag = stamps.find((s) => s[0] === 2 && s[1] === 2);
       expect(branchDiag).toBeDefined();
@@ -308,7 +308,7 @@ describe("Inductor", () => {
       // voltages[0]=V(node1)=5V, voltages[1]=V(node2)=0V, voltages[2]=I_branch=0.5A
       const voltages = new Float64Array([5, 0, 0.5]);
       const { solver } = makeCaptureSolver();
-      element.load(makeCompanionCtx({ solver, voltages, dt: 1e-4, method: "trapezoidal", order: 1 }));
+      element.load(makeCompanionCtx({ solver, rhs: voltages, dt: 1e-4, method: "trapezoidal", order: 1 }));
 
       // slot 0 = GEQ = L/h = 0.01 / 1e-4 = 100
       // slot 2 = I_PREV = iNow = 0.5 (branch current from voltages[branchIndex=2])
@@ -326,7 +326,7 @@ describe("Inductor", () => {
       // terminal voltage = 10V, branch current = 0.3A
       const voltages = new Float64Array([10, 0, 0.3]);
       const { solver } = makeCaptureSolver();
-      element.load(makeCompanionCtx({ solver, voltages, dt: 1e-4, method: "trapezoidal", order: 1 }));
+      element.load(makeCompanionCtx({ solver, rhs: voltages, dt: 1e-4, method: "trapezoidal", order: 1 }));
 
       // slot 2 must be branch current (0.3), not terminal voltage (10)
     });
@@ -342,10 +342,10 @@ describe("Inductor", () => {
 
       // First call establishes i=0.5 in s0, then rotate so it lands in s1
       const { solver } = makeCaptureSolver();
-      element.load(makeCompanionCtx({ solver, voltages: new Float64Array([5, 0, 0.5]), dt: 1e-4, method: "trapezoidal", order: 1 }));
+      element.load(makeCompanionCtx({ solver, rhs: new Float64Array([5, 0, 0.5]), dt: 1e-4, method: "trapezoidal", order: 1 }));
       pool.rotateStateVectors();
       // Second call: i=0.6, s1 now has i=0.5
-      element.load(makeCompanionCtx({ solver, voltages: new Float64Array([5, 0, 0.6]), dt: 1e-4, method: "trapezoidal", order: 1 }));
+      element.load(makeCompanionCtx({ solver, rhs: new Float64Array([5, 0, 0.6]), dt: 1e-4, method: "trapezoidal", order: 1 }));
 
       const lteParams = { trtol: 7, reltol: 1e-3, abstol: 1e-6, chgtol: 1e-14 };
       const result = element.getLteTimestep!(1e-4, [1e-4, 1e-4], 1, "trapezoidal", lteParams);
@@ -372,7 +372,7 @@ describe("Inductor SLOT_VOLT", () => {
     // V(node1)=10V, V(node2)=3V → terminal voltage = 10-3 = 7V
     const voltages = new Float64Array([10, 3, 0.5]);
     const { solver } = makeCaptureSolver();
-    element.load(makeCompanionCtx({ solver, voltages, dt: 1e-4, method: "trapezoidal", order: 1 }));
+    element.load(makeCompanionCtx({ solver, rhs: voltages, dt: 1e-4, method: "trapezoidal", order: 1 }));
 
   });
 
@@ -388,7 +388,7 @@ describe("Inductor SLOT_VOLT", () => {
     // Same voltage on both terminals
     const voltages = new Float64Array([5, 5, 0.0]);
     const { solver } = makeCaptureSolver();
-    element.load(makeCompanionCtx({ solver, voltages, dt: 1e-4, method: "trapezoidal", order: 1 }));
+    element.load(makeCompanionCtx({ solver, rhs: voltages, dt: 1e-4, method: "trapezoidal", order: 1 }));
 
   });
 });

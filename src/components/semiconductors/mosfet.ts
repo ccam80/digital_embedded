@@ -1558,42 +1558,52 @@ export function createMosfetElement(
         stampG(solver, nodeS, nodeS, gRS);
       }
 
-      // mos1load.c:929-956: Y-matrix stamps.
-      // NOTE: ngspice uses MOS1DdPtr (drain-drain), MOS1DPdpPtr (drainPrime-
-      // drainPrime), etc. With RD=0 / RS=0 the "prime" nodes collapse to the
-      // external pins, so only the DPdp/SPsp stamps apply (our nodeD/nodeS).
-      //   MOS1GgPtr += gcgd + gcgs + gcgb       â†’ (nodeG, nodeG)
-      //   MOS1BbPtr += gbd + gbs + gcgb          â†’ (nodeB, nodeB)
-      //   MOS1DPdpPtr += gds + gbd + xrev*(gm+gmbs) + gcgd (+drainConductance)
-      //   MOS1SPspPtr += gds + gbs + xnrm*(gm+gmbs) + gcgs (+sourceConductance)
-      //   MOS1GbPtr -= gcgb
-      //   MOS1GdpPtr -= gcgd
-      //   MOS1GspPtr -= gcgs
-      //   MOS1BgPtr -= gcgb
-      //   MOS1BdpPtr -= gbd
-      //   MOS1BspPtr -= gbs
-      //   MOS1DPgPtr += (xnrm-xrev)*gm - gcgd
-      //   MOS1DPbPtr += -gbd + (xnrm-xrev)*gmbs
-      //   MOS1DPspPtr += -gds - xnrm*(gm+gmbs)
-      //   MOS1SPgPtr += -(xnrm-xrev)*gm - gcgs
-      //   MOS1SPbPtr += -gbs - (xnrm-xrev)*gmbs
-      //   MOS1SPdpPtr += -gds - xrev*(gm+gmbs)
-      stampG(solver, nodeG, nodeG, gcgd + gcgs + gcgb);
-      stampG(solver, nodeB, nodeB, gbd + gbs + gcgb);
-      stampG(solver, nodeD, nodeD, gdsNR + gbd + xrev * (gmNR + gmbsNR) + gcgd);
-      stampG(solver, nodeS, nodeS, gdsNR + gbs + xnrm * (gmNR + gmbsNR) + gcgs);
-      stampG(solver, nodeG, nodeB, -gcgb);
-      stampG(solver, nodeG, nodeD, -gcgd);
-      stampG(solver, nodeG, nodeS, -gcgs);
-      stampG(solver, nodeB, nodeG, -gcgb);
-      stampG(solver, nodeB, nodeD, -gbd);
-      stampG(solver, nodeB, nodeS, -gbs);
-      stampG(solver, nodeD, nodeG, (xnrm - xrev) * gmNR - gcgd);
-      stampG(solver, nodeD, nodeB, -gbd + (xnrm - xrev) * gmbsNR);
-      stampG(solver, nodeD, nodeS, -gdsNR - xnrm * (gmNR + gmbsNR));
-      stampG(solver, nodeS, nodeG, -(xnrm - xrev) * gmNR - gcgs);
-      stampG(solver, nodeS, nodeB, -gbs - (xnrm - xrev) * gmbsNR);
-      stampG(solver, nodeS, nodeD, -gdsNR - xrev * (gmNR + gmbsNR));
+      // Y-matrix stamps. The first-touch order of distinct (row, col) pairs
+      // here determines int-index assignment in the sparse solver and MUST
+      // mirror ngspice's mos1set.c:186-207 SMPmakeElt sequence so that our
+      // matrix int-indices match ngspice's bit-exact. The VALUES are from
+      // mos1load.c:929-956. With RD=0/RS=0 the prime nodes collapse to the
+      // external pins (nodeD_ext == nodeD, nodeS_ext == nodeS).
+      //
+      // mos1set.c TSTALLOC sequence (effective with RD=RS=0):
+      //   1:  (D, D)        15: (Dp, D)   = duplicate of (D, D)
+      //   2:  (G, G)        16: (B, G)
+      //   3:  (S, S)        17: (Dp, G)   = (D, G)
+      //   4:  (B, B)        18: (Sp, G)   = (S, G)
+      //   5:  (Dp, Dp)      19: (Sp, S)   = duplicate
+      //   6:  (Sp, Sp)      20: (Dp, B)   = (D, B)
+      //   7:  (D, Dp)       21: (Sp, B)   = (S, B)
+      //   8:  (G, B)        22: (Sp, Dp)  = (S, D)
+      //   9:  (G, Dp)       = (G, D)
+      //   10: (G, Sp)       = (G, S)
+      //   11: (S, Sp)       = duplicate
+      //   12: (B, Dp)       = (B, D)
+      //   13: (B, Sp)       = (B, S)
+      //   14: (Dp, Sp)      = (D, S)
+      //
+      // KNOWN ISSUE: when RD>0 or RS>0, our nodeD/nodeS_ext branches at
+      // lines 1546-1559 above stamp (D_ext, D_ext), (D_ext, Dp), (Dp, D_ext),
+      // (Dp, Dp) before this block runs. That order doesn't match the
+      // ngspice setup sequence (which places (G, G) at position 2, before
+      // (Dp, Dp) at position 5). Until component models are restructured
+      // into separate setup() and load() phases, MOSFET parity is only
+      // guaranteed for RD=RS=0.
+      stampG(solver, nodeD, nodeD, gdsNR + gbd + xrev * (gmNR + gmbsNR) + gcgd);  // 1: (D, D)  [also DPdp when RD=0]
+      stampG(solver, nodeG, nodeG, gcgd + gcgs + gcgb);                            // 2: (G, G)
+      stampG(solver, nodeS, nodeS, gdsNR + gbs + xnrm * (gmNR + gmbsNR) + gcgs);  // 3: (S, S)  [also SPsp when RS=0]
+      stampG(solver, nodeB, nodeB, gbd + gbs + gcgb);                              // 4: (B, B)
+      stampG(solver, nodeG, nodeB, -gcgb);                                         // 8: (G, B)
+      stampG(solver, nodeG, nodeD, -gcgd);                                         // 9: (G, Dp) = (G, D)
+      stampG(solver, nodeG, nodeS, -gcgs);                                         // 10: (G, Sp) = (G, S)
+      stampG(solver, nodeB, nodeD, -gbd);                                          // 12: (B, Dp) = (B, D)
+      stampG(solver, nodeB, nodeS, -gbs);                                          // 13: (B, Sp) = (B, S)
+      stampG(solver, nodeD, nodeS, -gdsNR - xnrm * (gmNR + gmbsNR));               // 14: (Dp, Sp) = (D, S)
+      stampG(solver, nodeB, nodeG, -gcgb);                                         // 16: (B, G)
+      stampG(solver, nodeD, nodeG, (xnrm - xrev) * gmNR - gcgd);                   // 17: (Dp, G) = (D, G)
+      stampG(solver, nodeS, nodeG, -(xnrm - xrev) * gmNR - gcgs);                  // 18: (Sp, G) = (S, G)
+      stampG(solver, nodeD, nodeB, -gbd + (xnrm - xrev) * gmbsNR);                 // 20: (Dp, B) = (D, B)
+      stampG(solver, nodeS, nodeB, -gbs - (xnrm - xrev) * gmbsNR);                 // 21: (Sp, B) = (S, B)
+      stampG(solver, nodeS, nodeD, -gdsNR - xrev * (gmNR + gmbsNR));               // 22: (Sp, Dp) = (S, D)
 
       // mos1load.c:737-743: noncon gated on OFF==0 || !(MODEINITFIX|MODEINITSMSIG).
       if (icheckLimited && (params.OFF === 0 || !(mode & (MODEINITFIX | MODEINITSMSIG)))) {
@@ -1651,7 +1661,7 @@ export function createMosfetElement(
       return Math.abs(cdhat - cd) <= tolD && Math.abs(cbhat - (cbs + cbd)) <= tolB;
     },
 
-    getPinCurrents(_voltages: Float64Array): number[] {
+    getPinCurrents(_rhs: Float64Array): number[] {
       const s0 = pool.states[0];
       // Drain current: polarity * cd per mos1load.c:563.
       const id = polarity * s0[base + SLOT_CD];

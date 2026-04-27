@@ -187,13 +187,13 @@ export class BehavioralRSFlipflopElement implements ReactiveAnalogElementCore {
     this._prevClockVoltage = currentClockV;
   }
 
-  getPinCurrents(voltages: Float64Array): number[] {
+  getPinCurrents(rhs: Float64Array): number[] {
     // pinLayout order: S, C, R, Q, ~Q
-    const vS = readMnaVoltage(this._sPin.nodeId, voltages);
-    const vC = readMnaVoltage(this._clockPin.nodeId, voltages);
-    const vR = readMnaVoltage(this._rPin.nodeId, voltages);
-    const vQ = readMnaVoltage(this._qPin.nodeId, voltages);
-    const vQBar = readMnaVoltage(this._qBarPin.nodeId, voltages);
+    const vS = readMnaVoltage(this._sPin.nodeId, rhs);
+    const vC = readMnaVoltage(this._clockPin.nodeId, rhs);
+    const vR = readMnaVoltage(this._rPin.nodeId, rhs);
+    const vQ = readMnaVoltage(this._qPin.nodeId, rhs);
+    const vQBar = readMnaVoltage(this._qBarPin.nodeId, rhs);
     return [
       vS / this._sPin.rIn,
       vC / this._clockPin.rIn,

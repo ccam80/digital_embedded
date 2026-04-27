@@ -358,8 +358,8 @@ export class AnalogInductorElement implements ReactiveAnalogElementCore {
     stampRHS(ctx.rhs,b, veq);
   }
 
-  getPinCurrents(voltages: Float64Array): number[] {
-    const I = voltages[this.branchIndex];
+  getPinCurrents(rhs: Float64Array): number[] {
+    const I = rhs[this.branchIndex];
     return [I, -I];
   }
 

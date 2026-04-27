@@ -115,7 +115,7 @@ export interface AnalogElement {
    * one per visible pin. Positive means current flowing into the element.
    * The array must satisfy KCL: the sum of all entries is zero.
    */
-  getPinCurrents(voltages: Float64Array): number[];
+  getPinCurrents(rhs: Float64Array): number[];
 
   /**
    * Pin node IDs in pinLayout order.

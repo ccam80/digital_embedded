@@ -1566,21 +1566,21 @@ export class ComparisonSession {
     };
   }
 
-  private _buildNodeVoltages(voltages: Float64Array): Record<string, number> {
+  private _buildNodeVoltages(rhs: Float64Array): Record<string, number> {
     const result: Record<string, number> = {};
     this._ourTopology.nodeLabels.forEach((label, nodeId) => {
-      if (nodeId > 0 && nodeId - 1 < voltages.length) {
-        result[label] = voltages[nodeId];
+      if (nodeId > 0 && nodeId - 1 < rhs.length) {
+        result[label] = rhs[nodeId];
       }
     });
     return result;
   }
 
-  private _buildBranchValues(voltages: Float64Array, nodeCount: number): Record<string, number> {
+  private _buildBranchValues(rhs: Float64Array, nodeCount: number): Record<string, number> {
     const result: Record<string, number> = {};
     this._ourTopology.matrixRowLabels.forEach((label, row) => {
-      if (row >= nodeCount && row < voltages.length) {
-        result[label] = voltages[row];
+      if (row >= nodeCount && row < rhs.length) {
+        result[label] = rhs[row];
       }
     });
     return result;
@@ -2915,18 +2915,14 @@ export class ComparisonSession {
   private _captureIntegCoeff(): IntegrationCoefficients {
     if (!this._engine) return _zeroDcopCoefficients();
     const order = this._engine.integrationOrder;
-    const rawMethod: IntegrationMethod = this._engine.integrationMethod;
-    const method: IntegrationMethod =
-      rawMethod === "trapezoidal" ? "trapezoidal"
-      : rawMethod === "gear" ? "gear"
-      : "trapezoidal";
+    const method: IntegrationMethod = this._engine.integrationMethod;
     // After a step completes: deltaOld[0] = dt used in this step (set by setDeltaOldCurrent),
     // deltaOld[1] = dt of the previous step (h1), deltaOld[2] = h_{n-2}.
     const deltaOld = this._engine.timestepDeltaOld;
     const dt = deltaOld[0] > 0 ? deltaOld[0] : this._engine.currentDt;
     const agBuf = new Float64Array(7);
     const scratchBuf = new Float64Array(49);
-    computeNIcomCof(dt, deltaOld as number[], order, rawMethod, agBuf, scratchBuf);
+    computeNIcomCof(dt, deltaOld as number[], order, method, agBuf, scratchBuf);
     const ag0 = agBuf[0];
     const ag1 = agBuf[1];
     return {

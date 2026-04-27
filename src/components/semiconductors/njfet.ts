@@ -765,7 +765,7 @@ export function createNJfetElement(
       if (gspr > 0) stampG(solver, nodeS, nodeS, m * gspr);
     },
 
-    getPinCurrents(_voltages: Float64Array): number[] {
+    getPinCurrents(_rhs: Float64Array): number[] {
       const s0 = pool.states[0];
       // jfet.c:33 JFET_CD: id = polarity * cd (JFETtype applied at ask site).
       const id = polarity * s0[base + SLOT_CD];

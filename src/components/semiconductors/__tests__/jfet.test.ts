@@ -123,14 +123,14 @@ const PJFET_PARAMS = {
 // DC-OP LoadContext helper.
 // ---------------------------------------------------------------------------
 
-function makeDcOpCtx(voltages: Float64Array, matrixSize: number): LoadContext {
+function makeDcOpCtx(rhsOld: Float64Array, matrixSize: number): LoadContext {
   const solver = new SparseSolver();
   solver._initStructure(matrixSize);
   return {
     cktMode: MODEDCOP | MODEINITFLOAT,
     solver,
     matrix: solver,
-    rhsOld: voltages,
+    rhsOld: rhsOld,
     rhs: new Float64Array(matrixSize),
     dt: 0,
     time: 0,

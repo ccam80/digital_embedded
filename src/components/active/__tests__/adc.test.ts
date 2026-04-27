@@ -121,14 +121,16 @@ function makeAdc(
 /**
  * Build a transient LoadContext bound to the supplied voltage vector and dt.
  *
- * accept(ctx, simTime, addBreakpoint) reads ctx.voltages and ctx.dt to detect
+ * accept(ctx, simTime, addBreakpoint) reads ctx.rhs and ctx.dt to detect
  * clock edges and to step the internal companion-model state of the pin models.
  */
-function makeAcceptCtx(_voltages: Float64Array, dt: number): LoadContext {
+function makeAcceptCtx(rhs: Float64Array, dt: number): LoadContext {
   return makeLoadCtx({
     solver: undefined as unknown as import("../../../solver/analog/sparse-solver.js").SparseSolver,
     cktMode: MODETRAN | MODEINITFLOAT,
     dt,
+    rhs: rhs,
+    rhsOld: rhs,
   });
 }
 
@@ -325,11 +327,13 @@ function makeAdcCaptureSolver(rhsSize = 32): {
   return { solver, stamps, rhs };
 }
 
-function makeAdcParityCtx(_voltages: Float64Array, solver: SparseSolverType): LoadContext {
+function makeAdcParityCtx(rhs: Float64Array, solver: SparseSolverType): LoadContext {
   return makeLoadCtx({
     solver,
     cktMode: MODEDCOP | MODEINITFLOAT,
     dt: 0,
+    rhs: rhs,
+    rhsOld: rhs,
   });
 }
 
