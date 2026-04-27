@@ -166,8 +166,12 @@ export class ConcreteCompiledAnalogCircuit implements CompiledAnalogCircuit {
     this.diagnostics = params.diagnostics ?? [];
     this.timeRef = params.timeRef ?? { value: 0 };
     this.statePool = params.statePool;
-    this.nodesets = params.nodesets;
-    this.ics = params.ics;
+    if (params.nodesets !== undefined) {
+      (this as { nodesets?: Map<number, number> }).nodesets = params.nodesets;
+    }
+    if (params.ics !== undefined) {
+      (this as { ics?: Map<number, number> }).ics = params.ics;
+    }
   }
 
   // CompiledCircuit base interface

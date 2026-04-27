@@ -11,6 +11,7 @@
  */
 
 import type { LoadContext } from "./element.js";
+import { NGSPICE_LOAD_ORDER } from "./element.js";
 import type { StatePoolRef } from "./element.js";
 import type { PropertyBag } from "../../core/properties.js";
 import type { ResolvedPinElectrical } from "../../core/pin-electrical.js";
@@ -75,6 +76,7 @@ export class BehavioralMuxElement {
 
   pinNodeIds!: readonly number[];  // set by compiler via Object.assign after factory returns
   readonly branchIndex: number = -1;
+  readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.VCVS;
   readonly isNonlinear: true = true;
   label?: string;
 
@@ -82,7 +84,6 @@ export class BehavioralMuxElement {
   readonly stateSchema: StateSchema = COMBINATIONAL_COMPOSITE_SCHEMA;
   stateSize: number;
   stateBaseOffset = -1;
-  private _pool!: StatePoolRef;
 
   constructor(
     selPins: DigitalInputPinModel[],
@@ -112,17 +113,12 @@ export class BehavioralMuxElement {
   }
 
   initState(pool: StatePoolRef): void {
-    this._pool = pool;
     let offset = this.stateBaseOffset;
     for (const child of this._childElements) {
       child.stateBaseOffset = offset;
       child.initState(pool);
       offset += child.stateSize;
     }
-  }
-
-  checkConvergence(ctx: LoadContext): boolean {
-    return this._childElements.every(c => !c.checkConvergence || c.checkConvergence(ctx));
   }
 
   load(ctx: LoadContext): void {
@@ -225,6 +221,7 @@ export class BehavioralDemuxElement {
 
   pinNodeIds!: readonly number[];  // set by compiler via Object.assign after factory returns
   readonly branchIndex: number = -1;
+  readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.VCVS;
   readonly isNonlinear: true = true;
   label?: string;
 
@@ -232,7 +229,6 @@ export class BehavioralDemuxElement {
   readonly stateSchema: StateSchema = COMBINATIONAL_COMPOSITE_SCHEMA;
   stateSize: number;
   stateBaseOffset = -1;
-  private _pool!: StatePoolRef;
 
   constructor(
     selPins: DigitalInputPinModel[],
@@ -261,17 +257,12 @@ export class BehavioralDemuxElement {
   }
 
   initState(pool: StatePoolRef): void {
-    this._pool = pool;
     let offset = this.stateBaseOffset;
     for (const child of this._childElements) {
       child.stateBaseOffset = offset;
       child.initState(pool);
       offset += child.stateSize;
     }
-  }
-
-  checkConvergence(ctx: LoadContext): boolean {
-    return this._childElements.every(c => !c.checkConvergence || c.checkConvergence(ctx));
   }
 
   load(ctx: LoadContext): void {
@@ -364,6 +355,7 @@ export class BehavioralDecoderElement {
 
   pinNodeIds!: readonly number[];  // set by compiler via Object.assign after factory returns
   readonly branchIndex: number = -1;
+  readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.VCVS;
   readonly isNonlinear: true = true;
   label?: string;
 
@@ -371,7 +363,6 @@ export class BehavioralDecoderElement {
   readonly stateSchema: StateSchema = COMBINATIONAL_COMPOSITE_SCHEMA;
   stateSize: number;
   stateBaseOffset = -1;
-  private _pool!: StatePoolRef;
 
   constructor(
     selPins: DigitalInputPinModel[],
@@ -397,17 +388,12 @@ export class BehavioralDecoderElement {
   }
 
   initState(pool: StatePoolRef): void {
-    this._pool = pool;
     let offset = this.stateBaseOffset;
     for (const child of this._childElements) {
       child.stateBaseOffset = offset;
       child.initState(pool);
       offset += child.stateSize;
     }
-  }
-
-  checkConvergence(ctx: LoadContext): boolean {
-    return this._childElements.every(c => !c.checkConvergence || c.checkConvergence(ctx));
   }
 
   load(ctx: LoadContext): void {

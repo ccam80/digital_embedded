@@ -10,7 +10,7 @@
  * the RHS after re-stamping is equivalent to verifying the node voltage.
  */
 
-import { describe, it, expect } from 'vitest';
+import { describe, it } from 'vitest';
 import { makeBridgeOutputAdapter } from '../analog/bridge-adapter.js';
 import type { ResolvedPinElectrical } from '../../core/pin-electrical.js';
 import { MODEDCOP, MODEINITFLOAT } from '../analog/ckt-mode.js';
@@ -27,10 +27,7 @@ const BRANCH_IDX = 2;
 // MockSolver — records stamp/stampRHS calls
 // ---------------------------------------------------------------------------
 
-interface RhsCall { row: number; value: number }
-
 class MockSolver {
-  readonly rhs: RhsCall[] = [];
   private readonly _handles: Array<{ row: number; col: number }> = [];
 
   allocElement(row: number, col: number): number {
@@ -40,24 +37,17 @@ class MockSolver {
 
   stampElement(_handle: number, _value: number): void { /* not needed for RHS checks */ }
 
-  stampRHS(row: number, value: number): void {
-    this.rhs.push({ row, value });
-  }
-
-  reset(): void {
-    this.rhs.length = 0;
-  }
-
-  lastRhs(row: number): number | undefined {
-    const hits = this.rhs.filter((r) => r.row === row);
-    return hits.length > 0 ? hits[hits.length - 1]!.value : undefined;
-  }
+  reset(): void { /* no-op: RHS is captured via ctx.rhs buffer now */ }
 }
 
-function makeCtx(solver: MockSolver) {
+function makeCtx(solver: MockSolver, rhs?: Float64Array) {
+  const rhsBuf = rhs ?? new Float64Array(8);
   return {
     solver: solver as any,
     voltages: new Float64Array(8),
+    rhs: rhsBuf,
+    rhsOld: rhsBuf,
+    matrix: solver as any,
     cktMode: MODEDCOP | MODEINITFLOAT,
     dt: 0,
     method: 'trapezoidal' as const,
@@ -67,10 +57,14 @@ function makeCtx(solver: MockSolver) {
     srcFact: 1,
     noncon: { value: 0 },
     limitingCollector: null,
+    convergenceCollector: null,
     xfact: 1,
     gmin: 1e-12,
     reltol: 1e-3,
     iabstol: 1e-12,
+    time: 0,
+    temp: 300.15,
+    vt: 0.025852,
     cktFixLimit: false,
     bypass: false,
     voltTol: 1e-6,

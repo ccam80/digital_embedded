@@ -17,8 +17,8 @@
  */
 
 import type { SparseSolver } from "./sparse-solver.js";
-import type { AnalogElementCore, LoadContext, StatePoolRef } from "./element.js";
-import { MODETRAN } from "./ckt-mode.js";
+import type { AnalogElementCore, PoolBackedAnalogElementCore, LoadContext, StatePoolRef } from "./element.js";
+import { NGSPICE_LOAD_ORDER } from "./element.js";
 import type { PropertyBag } from "../../core/properties.js";
 import type { ResolvedPinElectrical } from "../../core/pin-electrical.js";
 import {
@@ -106,7 +106,7 @@ export function createDriverAnalogElement(
   _internalNodeIds: readonly number[],
   _branchIdx: number,
   props: PropertyBag,
-): AnalogElementCore {
+): PoolBackedAnalogElementCore {
   const nodeIn = pinNodes.get("in") ?? 0;
   const nodeSel = pinNodes.get("sel") ?? 0;
   const nodeOut = pinNodes.get("out") ?? 0;
@@ -139,6 +139,7 @@ export function createDriverAnalogElement(
 
   return {
     branchIndex: -1,
+    ngspiceLoadOrder: NGSPICE_LOAD_ORDER.VCVS,
     isNonlinear: true,
     get isReactive(): boolean { return childElements.length > 0; },
 
@@ -146,9 +147,17 @@ export function createDriverAnalogElement(
     stateSchema: REMAINING_COMPOSITE_SCHEMA,
     stateSize,
     stateBaseOffset: -1,
+    s0: new Float64Array(0),
+    s1: new Float64Array(0),
+    s2: new Float64Array(0),
+    s3: new Float64Array(0),
+    s4: new Float64Array(0),
+    s5: new Float64Array(0),
+    s6: new Float64Array(0),
+    s7: new Float64Array(0),
 
     initState(pool: StatePoolRef): void {
-      let offset = (this as { stateBaseOffset: number }).stateBaseOffset;
+      let offset = this.stateBaseOffset;
       for (const child of childElements) {
         child.stateBaseOffset = offset;
         child.initState(pool);
@@ -214,7 +223,7 @@ export function createDriverInvAnalogElement(
   _internalNodeIds: readonly number[],
   _branchIdx: number,
   props: PropertyBag,
-): AnalogElementCore {
+): PoolBackedAnalogElementCore {
   const nodeIn = pinNodes.get("in") ?? 0;
   const nodeSel = pinNodes.get("sel") ?? 0;
   const nodeOut = pinNodes.get("out") ?? 0;
@@ -247,6 +256,7 @@ export function createDriverInvAnalogElement(
 
   return {
     branchIndex: -1,
+    ngspiceLoadOrder: NGSPICE_LOAD_ORDER.VCVS,
     isNonlinear: true,
     get isReactive(): boolean { return childElements.length > 0; },
 
@@ -254,9 +264,17 @@ export function createDriverInvAnalogElement(
     stateSchema: REMAINING_COMPOSITE_SCHEMA,
     stateSize,
     stateBaseOffset: -1,
+    s0: new Float64Array(0),
+    s1: new Float64Array(0),
+    s2: new Float64Array(0),
+    s3: new Float64Array(0),
+    s4: new Float64Array(0),
+    s5: new Float64Array(0),
+    s6: new Float64Array(0),
+    s7: new Float64Array(0),
 
     initState(pool: StatePoolRef): void {
-      let offset = (this as { stateBaseOffset: number }).stateBaseOffset;
+      let offset = this.stateBaseOffset;
       for (const child of childElements) {
         child.stateBaseOffset = offset;
         child.initState(pool);
@@ -328,7 +346,7 @@ export function createSplitterAnalogElement(
   _internalNodeIds: readonly number[],
   _branchIdx: number,
   props: PropertyBag,
-): AnalogElementCore {
+): PoolBackedAnalogElementCore {
   const numIn = props.has("_inputCount")
     ? (props.get("_inputCount") as number)
     : 1;
@@ -368,6 +386,7 @@ export function createSplitterAnalogElement(
 
   return {
     branchIndex: -1,
+    ngspiceLoadOrder: NGSPICE_LOAD_ORDER.VCVS,
     isNonlinear: true,
     get isReactive(): boolean { return childElements.length > 0; },
 
@@ -375,9 +394,17 @@ export function createSplitterAnalogElement(
     stateSchema: REMAINING_COMPOSITE_SCHEMA,
     stateSize,
     stateBaseOffset: -1,
+    s0: new Float64Array(0),
+    s1: new Float64Array(0),
+    s2: new Float64Array(0),
+    s3: new Float64Array(0),
+    s4: new Float64Array(0),
+    s5: new Float64Array(0),
+    s6: new Float64Array(0),
+    s7: new Float64Array(0),
 
     initState(_pool: StatePoolRef): void {
-      let offset = (this as { stateBaseOffset: number }).stateBaseOffset;
+      let offset = this.stateBaseOffset;
       for (const child of childElements) {
         child.stateBaseOffset = offset;
         child.initState(_pool);
@@ -462,6 +489,7 @@ function createSegmentDiodeElement(
 
   return {
     branchIndex: -1,
+    ngspiceLoadOrder: NGSPICE_LOAD_ORDER.VCVS,
     isNonlinear: true,
     isReactive: false,
 
@@ -532,6 +560,7 @@ export function createSevenSegAnalogElement(
 
   return {
     branchIndex: -1,
+    ngspiceLoadOrder: NGSPICE_LOAD_ORDER.VCVS,
     isNonlinear: true,
     isReactive: false,
 
@@ -583,7 +612,7 @@ export function createRelayAnalogElement(
   _internalNodeIds: readonly number[],
   branchIdx: number,
   props: PropertyBag,
-): AnalogElementCore {
+): PoolBackedAnalogElementCore & { getChildElements(): readonly AnalogInductorElement[] } {
   // Composite-child pattern â€” delegates coil integration to a standard
   // AnalogInductorElement child, following the DigitalPinModel â†’
   // AnalogCapacitorElement precedent landed in Phase 0 Wave 0.2.3
@@ -629,6 +658,7 @@ export function createRelayAnalogElement(
 
   return {
     branchIndex: branchIdx,
+    ngspiceLoadOrder: NGSPICE_LOAD_ORDER.VCVS,
     isNonlinear: true,
     isReactive: true,
 
@@ -636,9 +666,17 @@ export function createRelayAnalogElement(
     stateSchema: REMAINING_COMPOSITE_SCHEMA,
     stateSize: coilInductor.stateSize,
     stateBaseOffset: -1,
+    s0: new Float64Array(0),
+    s1: new Float64Array(0),
+    s2: new Float64Array(0),
+    s3: new Float64Array(0),
+    s4: new Float64Array(0),
+    s5: new Float64Array(0),
+    s6: new Float64Array(0),
+    s7: new Float64Array(0),
 
     initState(pool: StatePoolRef): void {
-      coilInductor.stateBaseOffset = (this as { stateBaseOffset: number }).stateBaseOffset;
+      coilInductor.stateBaseOffset = this.stateBaseOffset;
       coilInductor.initState(pool);
     },
 
@@ -657,7 +695,8 @@ export function createRelayAnalogElement(
     },
 
     accept(ctx: LoadContext, _simTime: number, _addBreakpoint: (t: number) => void): void {
-      // Read accepted coil current from the child inductor's branch row
+      // Read accepted coil current from the child inductor's branch row.
+      // branchIdx is the 1-based MNA row (matches AnalogInductorElement convention).
       const iCoil = branchIdx >= 0 ? ctx.rhs[branchIdx] : 0;
       const energised = Math.abs(iCoil) > iPull;
       contactClosed = normallyClosed ? !energised : energised;
@@ -665,8 +704,7 @@ export function createRelayAnalogElement(
 
     getPinCurrents(voltages: Float64Array): number[] {
       // Pin layout order: in1, in2, A1, B1 (Relay poles=1).
-      // Coil branch current from child inductor's branch row.
-      // Contact: contactG() between A1 and B1.
+      // Coil branch current from child inductor's branch row (1-based MNA row).
       const iCoil = branchIdx >= 0 ? voltages[branchIdx] : 0;
       const vA = voltages[nodeContactA];
       const vB = voltages[nodeContactB];
@@ -694,7 +732,7 @@ export function createRelayDTAnalogElement(
   _internalNodeIds: readonly number[],
   branchIdx: number,
   props: PropertyBag,
-): AnalogElementCore {
+): PoolBackedAnalogElementCore & { getChildElements(): readonly AnalogInductorElement[] } {
   // Composite-child pattern â€” delegates coil integration to a standard
   // AnalogInductorElement child, following the DigitalPinModel â†’
   // AnalogCapacitorElement precedent landed in Phase 0 Wave 0.2.3
@@ -737,6 +775,7 @@ export function createRelayDTAnalogElement(
 
   return {
     branchIndex: branchIdx,
+    ngspiceLoadOrder: NGSPICE_LOAD_ORDER.VCVS,
     isNonlinear: true,
     isReactive: true,
 
@@ -744,9 +783,17 @@ export function createRelayDTAnalogElement(
     stateSchema: REMAINING_COMPOSITE_SCHEMA,
     stateSize: coilInductor.stateSize,
     stateBaseOffset: -1,
+    s0: new Float64Array(0),
+    s1: new Float64Array(0),
+    s2: new Float64Array(0),
+    s3: new Float64Array(0),
+    s4: new Float64Array(0),
+    s5: new Float64Array(0),
+    s6: new Float64Array(0),
+    s7: new Float64Array(0),
 
     initState(pool: StatePoolRef): void {
-      coilInductor.stateBaseOffset = (this as { stateBaseOffset: number }).stateBaseOffset;
+      coilInductor.stateBaseOffset = this.stateBaseOffset;
       coilInductor.initState(pool);
     },
 
@@ -764,15 +811,15 @@ export function createRelayDTAnalogElement(
     },
 
     accept(ctx: LoadContext, _simTime: number, _addBreakpoint: (t: number) => void): void {
-      // Read accepted coil current from the child inductor's branch row
+      // Read accepted coil current from the child inductor's branch row.
+      // branchIdx is the 1-based MNA row (matches AnalogInductorElement convention).
       const iCoil = branchIdx >= 0 ? ctx.rhs[branchIdx] : 0;
       energised = Math.abs(iCoil) > iPull;
     },
 
     getPinCurrents(voltages: Float64Array): number[] {
       // Pin layout order: in1, in2, A1 (common), B1 (throw), C1 (rest).
-      // Coil branch current from child inductor's branch row.
-      // Contacts: gThrow() between common/throw, gRest() between common/rest.
+      // Coil branch current from child inductor's branch row (1-based MNA row).
       const iCoil = branchIdx >= 0 ? voltages[branchIdx] : 0;
       const vCom = voltages[nodeCommon];
       const vThr = voltages[nodeThrow];
@@ -819,6 +866,7 @@ export function createButtonLEDAnalogElement(
 
   return {
     branchIndex: -1,
+    ngspiceLoadOrder: NGSPICE_LOAD_ORDER.VCVS,
     isNonlinear: true,
     isReactive: false,
 

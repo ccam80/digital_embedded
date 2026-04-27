@@ -1,0 +1,7 @@
+src/fixtures/__tests__/analog-shape-audit.test.ts(115,7): error TS1109: Expression expected.
+src/fixtures/__tests__/analog-shape-audit.test.ts(118,7): error TS1109: Expression expected.
+src/fixtures/__tests__/analog-shape-audit.test.ts(119,5): error TS1128: Declaration or statement expected.
+src/fixtures/__tests__/analog-shape-audit.test.ts(120,3): error TS1128: Declaration or statement expected.
+src/fixtures/__tests__/analog-shape-audit.test.ts(120,4): error TS1128: Declaration or statement expected.
+src/fixtures/__tests__/analog-shape-audit.test.ts(121,1): error TS1128: Declaration or statement expected.
+src/fixtures/__tests__/analog-shape-audit.test.ts(121,2): error TS1128: Declaration or statement expected.

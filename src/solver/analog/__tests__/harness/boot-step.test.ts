@@ -29,8 +29,8 @@ import type { IntegrationCoefficients, NRPhase, NRAttemptOutcome } from "./types
 // ---------------------------------------------------------------------------
 
 const ZERO_INTEG_COEFF: IntegrationCoefficients = {
-  ours: { ag0: 0, ag1: 0, method: "backwardEuler", order: 1 },
-  ngspice: { ag0: 0, ag1: 0, method: "backwardEuler", order: 1 },
+  ours: { ag0: 0, ag1: 0, method: "trapezoidal", order: 1 },
+  ngspice: { ag0: 0, ag1: 0, method: "trapezoidal", order: 1 },
 };
 
 function buildStatePool(elements: AnalogElementCore[]): StatePool {

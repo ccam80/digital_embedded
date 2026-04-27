@@ -162,6 +162,5 @@ describe("VCVS", () => {
     // Output voltage enforced at 10V by VCVS
     // VCVS branch current: I = V_out / R_load = 10 / 1000 = 10mA
     // Branch current sign: positive = current flowing into out+ terminal
-    const vcvsBranchCurrent = result.nodeVoltages[vcvsBranch];
   });
 });

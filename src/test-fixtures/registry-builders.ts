@@ -60,9 +60,10 @@ export interface MixedComponentConfig {
 function makeNoopAnalogFactory() {
   return {
     branchIndex: -1 as const,
+    ngspiceLoadOrder: 0,
     isNonlinear: false,
     isReactive: false,
-    stamp: () => {},
+    load: (_ctx: unknown) => {},
     getPinCurrents: () => [] as number[],
     setParam: (_key: string, _value: number) => {},
   };

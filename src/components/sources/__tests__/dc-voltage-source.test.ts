@@ -22,9 +22,9 @@ function getFactory(entry: ModelEntry): AnalogFactory {
 // Mock solver
 // ---------------------------------------------------------------------------
 
-function makeMockSolver() {
+function makeMockSolver(rhsSize = 8) {
   const stamps: [number, number, number][] = [];
-  const rhs: Record<number, number> = {};
+  const rhs = new Float64Array(rhsSize);
 
   const solver = {
     allocElement: vi.fn((row: number, col: number) => {
@@ -34,9 +34,6 @@ function makeMockSolver() {
     stampElement: vi.fn((h: number, v: number) => {
       stamps[h][2] += v;
     }),
-    stampRHS: vi.fn((row: number, value: number) => {
-      rhs[row] = (rhs[row] ?? 0) + value;
-    }),
     _stamps: stamps,
     _rhs: rhs,
   };
@@ -44,11 +41,15 @@ function makeMockSolver() {
   return solver;
 }
 
-function makeMinimalCtx(solver: unknown) {
+function makeMinimalCtx(solver: ReturnType<typeof makeMockSolver>, rhsOverride?: Float64Array) {
+  const rhs = rhsOverride ?? solver._rhs;
   return {
-    solver: solver as SparseSolver,
-    voltages: new Float64Array(4),
+    solver: solver as unknown as SparseSolver,
+    matrix: solver as unknown as SparseSolver,
+    rhs,
+    rhsOld: new Float64Array(rhs.length),
     cktMode: MODEDCOP | MODEINITFLOAT,
+    time: 0,
     dt: 0,
     method: "trapezoidal" as const,
     order: 1,
@@ -57,10 +58,14 @@ function makeMinimalCtx(solver: unknown) {
     srcFact: 1,
     noncon: { value: 0 },
     limitingCollector: null,
+    convergenceCollector: null,
     xfact: 1,
     gmin: 1e-12,
     reltol: 1e-3,
     iabstol: 1e-12,
+    temp: 300.15,
+    vt: 0.025852,
+    cktFixLimit: false,
     bypass: false,
     voltTol: 1e-6,
   };
@@ -79,22 +84,21 @@ describe("DcVoltageSource", () => {
 
     src.load(makeMinimalCtx(solver));
 
-    // Should produce 4 matrix stamps:
-    // B[1,3] = allocElement(0, 3) → stampElement(h, 1)
-    // B[2,3] = allocElement(1, 3) → stampElement(h, -1)
-    // C[3,1] = allocElement(3, 0) → stampElement(h, 1)
-    // C[3,2] = allocElement(3, 1) → stampElement(h, -1)
+    // Should produce 4 matrix stamps (1-based nodes: nodePos=1, nodeNeg=2, branch=3):
+    // B[nodePos, k] = allocElement(1, 3) → stampElement(h,  1)
+    // B[nodeNeg, k] = allocElement(2, 3) → stampElement(h, -1)
+    // C[k, nodePos] = allocElement(3, 1) → stampElement(h,  1)
+    // C[k, nodeNeg] = allocElement(3, 2) → stampElement(h, -1)
     expect(solver.allocElement).toHaveBeenCalledTimes(4);
 
     const stamps = solver._stamps;
-    expect(stamps.some(([r, c, v]) => r === 0 && c === 3 && v ===  1)).toBe(true);
-    expect(stamps.some(([r, c, v]) => r === 1 && c === 3 && v === -1)).toBe(true);
-    expect(stamps.some(([r, c, v]) => r === 3 && c === 0 && v ===  1)).toBe(true);
-    expect(stamps.some(([r, c, v]) => r === 3 && c === 1 && v === -1)).toBe(true);
+    expect(stamps.some(([r, c, v]) => r === 1 && c === 3 && v ===  1)).toBe(true);
+    expect(stamps.some(([r, c, v]) => r === 2 && c === 3 && v === -1)).toBe(true);
+    expect(stamps.some(([r, c, v]) => r === 3 && c === 1 && v ===  1)).toBe(true);
+    expect(stamps.some(([r, c, v]) => r === 3 && c === 2 && v === -1)).toBe(true);
 
     // RHS at branch row 3: RHS[3] = 10
-    expect(solver.stampRHS).toHaveBeenCalledTimes(1);
-    expect(solver.stampRHS).toHaveBeenCalledWith(3, 10);
+    expect(solver._rhs[3]).toBe(10);
   });
 
   it("set_scale_modifies_rhs", () => {
@@ -110,7 +114,7 @@ describe("DcVoltageSource", () => {
     expect(solver.allocElement).toHaveBeenCalledTimes(4);
 
     // RHS = 10 * 0.5 = 5
-    expect(solver.stampRHS).toHaveBeenCalledWith(3, 5);
+    expect(solver._rhs[3]).toBe(5);
   });
 
   it("ground_node_stamps_suppressed", () => {
@@ -120,12 +124,13 @@ describe("DcVoltageSource", () => {
 
     src.load(makeMinimalCtx(solver));
 
-    // Only 2 matrix stamps (neg is ground — B[0,k] and C[k,0] suppressed)
+    // Only 2 matrix stamps (neg is ground — nodeNeg=0 rows suppressed)
+    // nodePos=1 (1-based), branch=2: B[1,2] and C[2,1]
     expect(solver.allocElement).toHaveBeenCalledTimes(2);
     const stamps = solver._stamps;
-    expect(stamps.some(([r, c, v]) => r === 0 && c === 2 && v === 1)).toBe(true);
-    expect(stamps.some(([r, c, v]) => r === 2 && c === 0 && v === 1)).toBe(true);
-    expect(solver.stampRHS).toHaveBeenCalledWith(2, 5);
+    expect(stamps.some(([r, c, v]) => r === 1 && c === 2 && v === 1)).toBe(true);
+    expect(stamps.some(([r, c, v]) => r === 2 && c === 1 && v === 1)).toBe(true);
+    expect(solver._rhs[2]).toBe(5);
   });
 
   it("branch_index_stored", () => {
@@ -162,7 +167,7 @@ describe("DcVoltageSource", () => {
     el.load(makeMinimalCtx(solver));
 
     // Default voltage is 5V, branch at row 2, nodeNeg=0 so only 2 stamps
-    expect(solver.stampRHS).toHaveBeenCalledWith(2, 5);
+    expect(solver._rhs[2]).toBe(5);
   });
 });
 
@@ -186,34 +191,14 @@ describe("dc_vsource_load_srcfact_parity", () => {
     const BRANCH_ROW = 3;
 
     const src = makeDcVoltageSource(1, 2, BRANCH_ROW, VOLTAGE);
-    const solver = makeMockSolver();
+    const solver = makeMockSolver(8);
 
-    const ctx = {
-      solver: solver as unknown as SparseSolver,
-      voltages: new Float64Array(4),
-      cktMode: MODEDCOP | MODEINITFLOAT,
-      dt: 0,
-      method: "trapezoidal" as const,
-      order: 1,
-      deltaOld: [0, 0, 0, 0, 0, 0, 0],
-      ag: new Float64Array(7),
-      srcFact: SRC_FACT,
-      noncon: { value: 0 },
-      limitingCollector: null,
-      xfact: 1,
-      gmin: 1e-12,
-      reltol: 1e-3,
-      iabstol: 1e-12,
-      bypass: false,
-      voltTol: 1e-6,
-    };
-
-    src.load(ctx);
+    src.load({ ...makeMinimalCtx(solver), srcFact: SRC_FACT });
 
     // ngspice reference: NGSPICE_REF = voltage * srcFact.
     // Bit-exact: the final RHS stamp at the branch row must equal the product.
     const NGSPICE_REF = VOLTAGE * SRC_FACT;
-    expect(solver.stampRHS).toHaveBeenCalledWith(BRANCH_ROW, NGSPICE_REF);
+    expect(solver._rhs[BRANCH_ROW]).toBe(NGSPICE_REF);
     expect(NGSPICE_REF).toBe(5);
   });
 
@@ -223,32 +208,12 @@ describe("dc_vsource_load_srcfact_parity", () => {
     const BRANCH_ROW = 2;
 
     const src = makeDcVoltageSource(1, 0, BRANCH_ROW, VOLTAGE);
-    const solver = makeMockSolver();
+    const solver = makeMockSolver(8);
 
-    const ctx = {
-      solver: solver as unknown as SparseSolver,
-      voltages: new Float64Array(3),
-      cktMode: MODEDCOP | MODEINITFLOAT,
-      dt: 0,
-      method: "trapezoidal" as const,
-      order: 1,
-      deltaOld: [0, 0, 0, 0, 0, 0, 0],
-      ag: new Float64Array(7),
-      srcFact: SRC_FACT,
-      noncon: { value: 0 },
-      limitingCollector: null,
-      xfact: 1,
-      gmin: 1e-12,
-      reltol: 1e-3,
-      iabstol: 1e-12,
-      bypass: false,
-      voltTol: 1e-6,
-    };
-
-    src.load(ctx);
+    src.load({ ...makeMinimalCtx(solver), srcFact: SRC_FACT });
 
     const NGSPICE_REF = VOLTAGE * SRC_FACT;
-    expect(solver.stampRHS).toHaveBeenCalledWith(BRANCH_ROW, NGSPICE_REF);
+    expect(solver._rhs[BRANCH_ROW]).toBe(NGSPICE_REF);
     expect(NGSPICE_REF).toBe(12);
   });
 
@@ -258,39 +223,20 @@ describe("dc_vsource_load_srcfact_parity", () => {
     const BRANCH_ROW = 3;
 
     const src = makeDcVoltageSource(1, 2, BRANCH_ROW, VOLTAGE);
-    const solver = makeMockSolver();
+    const solver = makeMockSolver(8);
 
-    const ctx = {
-      solver: solver as unknown as SparseSolver,
-      voltages: new Float64Array(4),
-      cktMode: MODEDCOP | MODEINITJCT,
-      dt: 0,
-      method: "trapezoidal" as const,
-      order: 1,
-      deltaOld: [0, 0, 0, 0, 0, 0, 0],
-      ag: new Float64Array(7),
-      srcFact: SRC_FACT,
-      noncon: { value: 0 },
-      limitingCollector: null,
-      xfact: 1,
-      gmin: 1e-12,
-      reltol: 1e-3,
-      iabstol: 1e-12,
-      bypass: false,
-      voltTol: 1e-6,
-    };
-
-    src.load(ctx);
+    src.load({ ...makeMinimalCtx(solver), cktMode: MODEDCOP | MODEINITJCT, srcFact: SRC_FACT });
 
     const NGSPICE_REF = VOLTAGE * SRC_FACT;
-    expect(solver.stampRHS).toHaveBeenCalledWith(BRANCH_ROW, NGSPICE_REF);
+    expect(solver._rhs[BRANCH_ROW]).toBe(NGSPICE_REF);
     expect(NGSPICE_REF).toBe(0);
 
     // Incidence stamps are srcFact-independent — must remain present.
+    // Nodes are 1-based: nodePos=1, nodeNeg=2, BRANCH_ROW=3.
     const stamps = solver._stamps;
-    expect(stamps.some(([r, c, v]) => r === 0 && c === BRANCH_ROW && v ===  1)).toBe(true);
-    expect(stamps.some(([r, c, v]) => r === 1 && c === BRANCH_ROW && v === -1)).toBe(true);
-    expect(stamps.some(([r, c, v]) => r === BRANCH_ROW && c === 0 && v ===  1)).toBe(true);
-    expect(stamps.some(([r, c, v]) => r === BRANCH_ROW && c === 1 && v === -1)).toBe(true);
+    expect(stamps.some(([r, c, v]) => r === 1 && c === BRANCH_ROW && v ===  1)).toBe(true);
+    expect(stamps.some(([r, c, v]) => r === 2 && c === BRANCH_ROW && v === -1)).toBe(true);
+    expect(stamps.some(([r, c, v]) => r === BRANCH_ROW && c === 1 && v ===  1)).toBe(true);
+    expect(stamps.some(([r, c, v]) => r === BRANCH_ROW && c === 2 && v === -1)).toBe(true);
   });
 });

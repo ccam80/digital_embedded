@@ -9,6 +9,7 @@ import { PinDirection } from "../../../core/pin.js";
 import type { SparseSolver as SparseSolverType } from "../../../solver/analog/sparse-solver.js";
 import type { LoadContext } from "../../../solver/analog/load-context.js";
 import { MODEDCOP, MODEINITFLOAT } from "../../../solver/analog/ckt-mode.js";
+import { makeLoadCtx as makeLoadCtxHelper } from "../../../solver/analog/__tests__/test-helpers.js";
 
 // ---------------------------------------------------------------------------
 // Helper: narrow ModelEntry to inline factory (throws if netlist kind)
@@ -37,25 +38,12 @@ function makeCaptureSolver(): { solver: SparseSolverType; allocCalls: number; st
 }
 
 function makeLoadCtx(solver: SparseSolverType): LoadContext {
-  return {
+  return makeLoadCtxHelper({
     solver,
-    voltages: new Float64Array(8),
+    rhsOld: new Float64Array(8),
     cktMode: MODEDCOP | MODEINITFLOAT,
     dt: 0,
-    method: "trapezoidal",
-    order: 1,
-    deltaOld: [0, 0, 0, 0, 0, 0, 0],
-    ag: new Float64Array(7),
-    srcFact: 1,
-    noncon: { value: 0 },
-    limitingCollector: null,
-    xfact: 1,
-    gmin: 1e-12,
-    reltol: 1e-3,
-    iabstol: 1e-12,
-    bypass: false,
-    voltTol: 1e-6,
-  };
+  });
 }
 
 // ---------------------------------------------------------------------------

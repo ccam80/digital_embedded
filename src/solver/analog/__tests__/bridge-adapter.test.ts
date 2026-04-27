@@ -30,14 +30,8 @@ interface StampCall {
   value: number;
 }
 
-interface RhsCall {
-  row: number;
-  value: number;
-}
-
 class MockSolver {
   readonly stamps: StampCall[] = [];
-  readonly rhs: RhsCall[] = [];
   private readonly _handles: Array<{ row: number; col: number }> = [];
 
   allocElement(row: number, col: number): number {
@@ -50,13 +44,8 @@ class MockSolver {
     this.stamps.push({ row, col, value });
   }
 
-  stampRHS(row: number, value: number): void {
-    this.rhs.push({ row, value });
-  }
-
   reset(): void {
     this.stamps.length = 0;
-    this.rhs.length = 0;
   }
 
   /** Sum all stamp values at (row, col). */
@@ -66,30 +55,21 @@ class MockSolver {
       .reduce((acc, s) => acc + s.value, 0);
   }
 
-  /** Sum all RHS values at row. */
-  sumRhs(row: number): number {
-    return this.rhs
-      .filter((r) => r.row === row)
-      .reduce((acc, r) => acc + r.value, 0);
-  }
-
   /** Last stamp value written at (row, col), or undefined if never stamped. */
   lastStamp(row: number, col: number): number | undefined {
     const hits = this.stamps.filter((s) => s.row === row && s.col === col);
     return hits.length > 0 ? hits[hits.length - 1].value : undefined;
   }
-
-  /** Last RHS value written at row, or undefined if never stamped. */
-  lastRhs(row: number): number | undefined {
-    const hits = this.rhs.filter((r) => r.row === row);
-    return hits.length > 0 ? hits[hits.length - 1].value : undefined;
-  }
 }
 
-function makeCtx(solver: MockSolver) {
+function makeCtx(solver: MockSolver, rhs?: Float64Array) {
+  const rhsBuf = rhs ?? new Float64Array(8);
   return {
     solver: solver as any,
     voltages: new Float64Array(8),
+    rhs: rhsBuf,
+    rhsOld: rhsBuf,
+    matrix: solver as any,
     cktMode: MODEDCOP | MODEINITFLOAT,
     dt: 0,
     method: "trapezoidal" as const,
@@ -99,10 +79,14 @@ function makeCtx(solver: MockSolver) {
     srcFact: 1,
     noncon: { value: 0 },
     limitingCollector: null,
+    convergenceCollector: null,
     xfact: 1,
     gmin: 1e-12,
     reltol: 1e-3,
     iabstol: 1e-12,
+    time: 0,
+    temp: 300.15,
+    vt: 0.025852,
     cktFixLimit: false,
     bypass: false,
     voltTol: 1e-6,
@@ -125,10 +109,10 @@ const CMOS_3V3: ResolvedPinElectrical = {
   rHiZ: 1e7,
 };
 
-// NODE=1 → nodeIdx=0 (0-based MNA index)
+// NODE=1 → 1-based MNA index (slot 0 is ground sentinel)
 // branchIdx=2 (absolute branch row in augmented matrix with 2 nodes)
 const NODE = 1;
-const NODE_IDX = NODE - 1; // 0
+const NODE_IDX = NODE; // 1-based
 const BRANCH_IDX = 2;
 
 // ---------------------------------------------------------------------------
@@ -165,14 +149,15 @@ describe("BridgeOutputAdapter", () => {
   it("output adapter hi-z stamps I=0", () => {
     const adapter = makeBridgeOutputAdapter(CMOS_3V3, NODE, BRANCH_IDX, false);
     adapter.setHighZ(true);
-    adapter.load(makeCtx(solver));
+    const rhs = new Float64Array(8);
+    adapter.load(makeCtx(solver, rhs));
 
     // Hi-Z branch equation: stamp(branchIdx, branchIdx, 1)
     expect(solver.lastStamp(BRANCH_IDX, BRANCH_IDX)).toBe(1);
     // KCL still present: stamp(nodeIdx, branchIdx, 1)
     expect(solver.lastStamp(NODE_IDX, BRANCH_IDX)).toBe(1);
     // RHS: stampRHS(branchIdx, 0)
-    expect(solver.lastRhs(BRANCH_IDX)).toBe(0);
+    expect(rhs[BRANCH_IDX]).toBe(0);
   });
 
   it("loaded output adapter stamps rOut conductance on node diagonal", () => {
@@ -183,7 +168,6 @@ describe("BridgeOutputAdapter", () => {
     adapter.load(makeCtx(solver));
 
     // 1/rOut must appear on the node diagonal
-    const gOut = 1 / CMOS_3V3.rOut;
   });
 
   it("unloaded output adapter does not stamp rOut on node diagonal", () => {
@@ -196,11 +180,12 @@ describe("BridgeOutputAdapter", () => {
 
   it("input adapter unloaded stamps nothing", () => {
     const adapter = makeBridgeInputAdapter(CMOS_3V3, NODE, false);
-    adapter.load(makeCtx(solver));
+    const rhs = new Float64Array(8);
+    adapter.load(makeCtx(solver, rhs));
 
     // No stamps at all when unloaded
     expect(solver.stamps.length).toBe(0);
-    expect(solver.rhs.length).toBe(0);
+    expect(rhs.every(v => v === 0)).toBe(true);
   });
 
   it("input adapter loaded stamps rIn on node diagonal", () => {
@@ -208,10 +193,10 @@ describe("BridgeOutputAdapter", () => {
     const pool = new StatePool(adapter.stateSize);
     adapter.stateBaseOffset = 0;
     adapter.initState(pool);
-    adapter.load(makeCtx(solver));
+    const rhs = new Float64Array(8);
+    adapter.load(makeCtx(solver, rhs));
 
-    const gIn = 1 / CMOS_3V3.rIn;
-    expect(solver.rhs.length).toBe(0);
+    expect(rhs.every(v => v === 0)).toBe(true);
   });
 
   it("input adapter readLogicLevel thresholds correctly", () => {
@@ -231,13 +216,11 @@ describe("BridgeOutputAdapter", () => {
     adapter.stateBaseOffset = 0;
     adapter.initState(pool);
     adapter.load(makeCtx(solver));
-    const gOutBefore = solver.sumStamp(NODE_IDX, NODE_IDX);
 
     solver.reset();
     const newROut = 100;
     adapter.setParam("rOut", newROut);
     adapter.load(makeCtx(solver));
-    const gOutAfter = solver.sumStamp(NODE_IDX, NODE_IDX);
 
   });
 

@@ -417,8 +417,6 @@ describe('DefaultSimulatorFacade', () => {
     const R1 = 10;
     const R2 = 40;
     const Vsrc = 10;
-    const expectedVmid = Vsrc * R2 / (R1 + R2); // 8 V
-
     const circuit = facade.build({
       components: [
         { id: 'vs',  type: 'DcVoltageSource', props: { voltage: Vsrc, label: 'Vs' } },

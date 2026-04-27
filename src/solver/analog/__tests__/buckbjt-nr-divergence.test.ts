@@ -44,10 +44,11 @@ describe('buckbjt NR divergence: per-iteration voltages', () => {
     const coordinator = facade.compile(circuit) as DefaultSimulationCoordinator;
     const engine = coordinator.getAnalogEngine() as MNAEngine;
 
-    const { hook, getSnapshots, clear } = createIterationCaptureHook(
+    const { hook, preFactorHook, getSnapshots, clear } = createIterationCaptureHook(
       engine.solver!, engine.elements, engine.statePool,
     );
     engine.postIterationHook = hook;
+    engine.preFactorHook = preFactorHook;
 
     // Collect our steps
     const ourSteps: { iters: { iteration: number; voltages: number[]; noncon: number; gConv: boolean; eConv: boolean }[] }[] = [];

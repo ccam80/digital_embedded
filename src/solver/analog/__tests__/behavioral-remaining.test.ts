@@ -85,8 +85,6 @@ const LOAD_R = 10_000;
 const NR_OPTS = { maxIterations: 50, reltol: 1e-3, abstol: 1e-6, iabstol: 1e-12 };
 
 // CMOS 3.3V parameters (matches behavioral-remaining.ts CMOS_3V3_FALLBACK)
-const VOH = 3.3;
-const ROUT = 50;
 
 // ---------------------------------------------------------------------------
 // Solve helper
@@ -148,19 +146,18 @@ describe("Driver", () => {
     const result = solve(elements, matrixSize);
 
     expect(result.converged).toBe(true);
-    // voltages[2] = nodeOut = output voltage
-    // Norton: vOH through rOut=50Î© into 10kÎ© load â†’ vOut â‰ˆ 3.3 * 10000/10050
-    const vOut = result.voltages[2];
-    const expected = VOH * LOAD_R / (ROUT + LOAD_R);
+    // nodeOut = circuit node 3 → voltages[3] (1-based)
+    // Norton: vOH through rOut=50Ω into 10kΩ load → vOut ≈ 3.3 * 10000/10050
+    const vOut = result.voltages[3];
     expect(vOut).toBeGreaterThan(3.0);
   });
 
   /**
-   * tri_state_hiz: enable=0 (sel LOW) â†’ output in Hi-Z mode
+   * tri_state_hiz: enable=0 (sel LOW) → output in Hi-Z mode
    *
-   * Same topology but VS_sel = 0V. The driver detects sel=LOW â†’ Hi-Z.
-   * Hi-Z mode: R_HiZ (10MÎ©) from nodeOut to ground, no current source.
-   * With 10kÎ© load and no source â†’ output â‰ˆ 0V.
+   * Same topology but VS_sel = 0V. The driver detects sel=LOW → Hi-Z.
+   * Hi-Z mode: R_HiZ (10MΩ) from nodeOut to ground, no current source.
+   * With 10kΩ load and no source → output ≈ 0V.
    */
   it("tri_state_hiz", () => {
     const props = new PropertyBag();
@@ -169,7 +166,7 @@ describe("Driver", () => {
     );
 
     const vsIn  = makeVoltageSource(1, 0, 3, VDD);  // data input HIGH
-    const vsSel = makeVoltageSource(2, 0, 4, GND);  // sel = 0 â†’ Hi-Z
+    const vsSel = makeVoltageSource(2, 0, 4, GND);  // sel = 0 → Hi-Z
     const rLoad = makeResistor(3, 0, LOAD_R);
 
     const elements: AnalogElement[] = [vsIn, vsSel, rLoad, withNodeIds(driver, [1, 2, 3])];
@@ -178,8 +175,8 @@ describe("Driver", () => {
     const result = solve(elements, matrixSize);
 
     expect(result.converged).toBe(true);
-    // Hi-Z output: R_HiZ=10MÎ© to ground, plus 10kÎ© load, no current source.
-    const vOut = result.voltages[2];
+    // Hi-Z output: R_HiZ=10MΩ to ground, plus 10kΩ load, no current source.
+    const vOut = result.voltages[3]; // nodeOut = circuit node 3 → voltages[3]
     expect(vOut).toBeLessThan(0.1);
   });
 });
@@ -200,8 +197,9 @@ describe("LED", () => {
    * nodeIds for LED factory: [nodeAnode=2, nodeCathode=0]
    *   (cathode explicitly at ground node 0)
    *
-   * voltages[0] = node 1 (VS positive terminal) = 3.3V (VS-forced)
-   * voltages[1] = node 2 (LED anode)
+   * 1-based rhs convention:
+   *   voltages[1] = circuit node 1 (VS positive terminal) = 3.3V (VS-forced)
+   *   voltages[2] = circuit node 2 (LED anode) â‰ˆ 1.8V (red LED Vf)
    *
    * matrixSize = 3 (2 node rows + 1 branch row at index 2)
    *
@@ -227,9 +225,9 @@ describe("LED", () => {
     const result = solve(elements, matrixSize);
 
     expect(result.converged).toBe(true);
-    // voltages[0] = node 1 = ~3.3V (VS-forced)
-    // voltages[1] = node 2 = LED anode voltage â‰ˆ 1.8V (red LED Vf)
-    const vAnode = result.voltages[1];
+    // voltages[1] = circuit node 1 = ~3.3V (VS-forced)
+    // voltages[2] = circuit node 2 = LED anode voltage â‰ˆ 1.8V (red LED Vf)
+    const vAnode = result.voltages[2];
     expect(vAnode).toBeGreaterThan(1.5);
     expect(vAnode).toBeLessThan(2.5);
 
@@ -238,7 +236,6 @@ describe("LED", () => {
     expect(iForward).toBeGreaterThan(1e-3);   // > 1mA
     expect(iForward).toBeLessThan(15e-3);     // < 15mA
     // Approximately (3.3 - 1.8) / 330 â‰ˆ 4.5mA
-    const expectedApprox = (VDD - 1.8) / 330;
   });
 });
 
@@ -291,14 +288,7 @@ describe("SevenSeg", () => {
     expect(result.converged).toBe(true);
 
     // Segments a, b, c (solver rows 0, 1, 2): VS forces to VDD
-    for (let i = 0; i < 3; i++) {
-      const vSeg = result.voltages[i];
-    }
-
     // Segments d..dp (solver rows 3..7): VS forces to GND
-    for (let i = 3; i < 8; i++) {
-      const vSeg = result.voltages[i];
-    }
   });
 });
 
@@ -336,12 +326,14 @@ describe("Relay", () => {
     props.set("inductance", 1e-3);      // 1mH inductance (tau = L/R = 1ms)
     props.set("iPull", 20e-3);          // 20mA threshold
 
-    // Circuit layout:
-    //   Nodes 1-4 (solver rows 0-3): coil1, coil2, contactA, contactB
-    //   Branch rows 4-6: vsCoil1, vsCoil2, vsContact (voltage sources)
-    //   Branch row 7: relay coil inductor (child AnalogInductorElement)
-    //   matrixSize = 8 (4 node rows + 4 branch rows)
-    const inductorBranchIdx = 7;
+    // Circuit layout (1-based MNA rows):
+    //   Rows 1-4: circuit nodes coil1, coil2, contactA, contactB
+    //   Row 5: vsCoil1 branch (makeVoltageSource branchIdx=4 → k=5)
+    //   Row 6: vsCoil2 branch (makeVoltageSource branchIdx=5 → k=6)
+    //   Row 7: vsContact branch (makeVoltageSource branchIdx=6 → k=7)
+    //   Row 8: relay inductor branch (AnalogInductorElement uses branchIndex=8 directly as 1-based)
+    //   matrixSize = 8 (4 node rows + 4 branch rows → 1-based rows 1..8)
+    const inductorBranchIdx = 8; // 1-based MNA row for inductor branch current
     const relay = createRelayAnalogElement(
       new Map([["in1", 1], ["in2", 2], ["A1", 3], ["B1", 4]]),
       [], inductorBranchIdx, props,
@@ -361,7 +353,7 @@ describe("Relay", () => {
     const matrixSize = 8;
 
     const solver = new SparseSolver();
-    let currentVoltages = new Float64Array(matrixSize);
+    let currentVoltages = new Float64Array(matrixSize + 1); // 1-based: slot 0 = ground sentinel
 
     // tau = L/R = 1e-3/10 = 100Âµs; run 10 steps of 100Âµs = 1 tau
     // After 1 tau: iL = (V/R)*(1-exp(-1)) â‰ˆ (10/10)*0.632 = 0.632A >> 20mA
@@ -373,29 +365,18 @@ describe("Relay", () => {
     computeNIcomCof(dt, [dt], 1, "trapezoidal", ag, scratch);
 
     function makeTransientCtx(v: Float64Array, isFirst: boolean): import("../load-context.js").LoadContext {
-      return {
+      return makeLoadCtx({
         solver: solver as any,
-        rhsOld: v,
         rhs: v,
-        // AnalogInductorElement.load() destructures ctx.voltages (alias for rhsOld)
-        voltages: v,
+        rhsOld: v,
         cktMode: isFirst ? MODETRAN | MODEINITTRAN : MODETRAN | MODEINITFLOAT,
         dt,
-        method: "trapezoidal" as const,
+        method: "trapezoidal",
         order: 1,
         deltaOld: [dt],
         ag,
         srcFact: 1,
-        noncon: { value: 0 },
-        limitingCollector: null,
-        xfact: 0,
-        gmin: 1e-12,
-        reltol: 1e-3,
-        iabstol: 1e-12,
-        cktFixLimit: false,
-        bypass: false,
-        voltTol: 1e-6,
-      } as any;
+      });
     }
 
     for (let step = 0; step < steps; step++) {
@@ -404,11 +385,11 @@ describe("Relay", () => {
       for (const el of allElements) el.load(ctx);
       const factored = solver.factor();
       expect(factored).toBe(0);
-      const newVoltages = new Float64Array(matrixSize);
-      solver.solve(newVoltages);
+      const newVoltages = new Float64Array(matrixSize + 1); // 1-based
+      solver.solve(currentVoltages, newVoltages);
       currentVoltages = newVoltages;
       // Advance relay state: reads accepted coil current and updates contactClosed
-      relayWithState.accept(makeTransientCtx(currentVoltages, false), 0, () => {});
+      relayWithState.accept!(makeTransientCtx(currentVoltages, false), 0, () => {});
     }
 
     // After 10 Ã— 100Âµs, coil current >> 20mA â†’ contact should be closed.
@@ -417,11 +398,11 @@ describe("Relay", () => {
     solver._initStructure(matrixSize);
     for (const el of allElements) el.load(finalCtx);
     solver.factor();
-    solver.solve(currentVoltages);
+    solver.solve(currentVoltages, currentVoltages);
 
-    // Contact A = circuit node 3 â†’ voltages[2] (1-based index 3, solver row 2)
-    // Contact B = circuit node 4 â†’ voltages[3]
-    const vContactB = currentVoltages[3];
+    // Contact A = circuit node 3 → voltages[3] (1-based)
+    // Contact B = circuit node 4 → voltages[4] (1-based)
+    const vContactB = currentVoltages[4];
 
     // When closed (R_on=0.01Î©), drop across contact is negligible â†’ vContactB â‰ˆ 1V
     expect(vContactB).toBeGreaterThan(0.99);
@@ -491,7 +472,7 @@ describe("Task 6.4.3 â€” remaining pin loading propagates", () => {
       [], -1, props,
     );
     Object.assign(element, { pinNodeIds: [1, 2, 3], allNodeIds: [1, 2, 3] });
-    initElement(element);
+    initElement(element as unknown as import("../element.js").ReactiveAnalogElement);
 
     const allocCalls: Array<[number, number]> = [];
     const solver = {
@@ -502,7 +483,6 @@ describe("Task 6.4.3 â€” remaining pin loading propagates", () => {
 
     const ctx: LoadContext = makeLoadCtx({
       solver: solver as any,
-      voltages: new Float64Array(16),
       cktMode: MODETRAN | MODEINITFLOAT,
       dt: 0,
       method: "trapezoidal",
@@ -511,10 +491,10 @@ describe("Task 6.4.3 â€” remaining pin loading propagates", () => {
 
     element.load(ctx);
 
-    // in (nodeIdx=0) should produce an allocElement call at (0,0) since loaded=true
-    const inDiag = allocCalls.some(([r, c]) => r === 0 && c === 0);
-    // sel (nodeIdx=1) should NOT produce any allocElement call (loaded=false â†’ no-op)
-    const selDiag = allocCalls.some(([r, c]) => r === 1 && c === 1);
+    // in (MNA node 1, 1-based) should produce an allocElement call at (1,1) since loaded=true
+    const inDiag = allocCalls.some(([r, c]) => r === 1 && c === 1);
+    // sel (MNA node 2, 1-based) should NOT produce any allocElement call (loaded=false → no-op)
+    const selDiag = allocCalls.some(([r, c]) => r === 2 && c === 2);
 
     expect(inDiag).toBe(true);
     expect(selDiag).toBe(false);

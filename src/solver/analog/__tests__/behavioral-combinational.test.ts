@@ -4,10 +4,10 @@
  * and decoder (BehavioralDecoderElement).
  *
  * Node convention (matching behavioral-gate.test.ts):
- *   - DigitalInputPinModel / DigitalOutputPinModel use 0-based solver indices.
- *     solver index i corresponds to circuit node i+1 (node 0 = ground is implicit).
+ *   - DigitalInputPinModel / DigitalOutputPinModel use 1-based MNA node IDs.
+ *     Node 0 = ground (ngspice TrashCan/sentinel); real nodes start at 1.
  *   - makeVoltageSource / makeResistor use 1-based circuit node IDs.
- *   - result.voltages[i] gives the voltage at solver index i (= circuit node i+1).
+ *   - result.voltages is 1-based: result.voltages[N] = voltage at circuit node N.
  *
  * Pattern per test: input nodes driven by ideal voltage sources, output nodes
  * loaded with 10kΩ to ground. Newton-Raphson converges; output voltages are
@@ -15,7 +15,7 @@
  */
 
 import { describe, it, expect } from "vitest";
-import { makeVoltageSource, makeResistor, withNodeIds, runNR, initElement } from "./test-helpers.js";
+import { makeVoltageSource, makeResistor, withNodeIds, runNR, initElement, makeLoadCtx } from "./test-helpers.js";
 import {
   BehavioralMuxElement,
   BehavioralDemuxElement,
@@ -140,8 +140,8 @@ describe("Mux", () => {
     const result = solve(elements, matrixSize);
 
     expect(result.converged).toBe(true);
-    // out at solver index 6 (result.voltages[6])
-    expect(result.voltages[6]).toBeGreaterThan(CMOS_3V3.vIH);
+    // out at circuit node 7 (result.voltages[7] in 1-based layout)
+    expect(result.voltages[7]).toBeGreaterThan(CMOS_3V3.vIH);
   });
 
   it("selects_low_input", () => {
@@ -150,7 +150,7 @@ describe("Mux", () => {
     const result = solve(elements, matrixSize);
 
     expect(result.converged).toBe(true);
-    expect(result.voltages[6]).toBeLessThan(CMOS_3V3.vIL);
+    expect(result.voltages[7]).toBeLessThan(CMOS_3V3.vIL);
   });
 
   it("all_selector_values_route_correctly", () => {
@@ -229,11 +229,11 @@ describe("Demux", () => {
     const result = solve(elements, matrixSize);
 
     expect(result.converged).toBe(true);
-    // out_0 = voltages[2], out_1 = voltages[3], out_2 = voltages[4], out_3 = voltages[5]
-    expect(result.voltages[2]).toBeLessThan(CMOS_3V3.vIL);   // out_0 LOW
-    expect(result.voltages[3]).toBeLessThan(CMOS_3V3.vIL);   // out_1 LOW
-    expect(result.voltages[4]).toBeLessThan(CMOS_3V3.vIL);   // out_2 LOW
-    expect(result.voltages[5]).toBeGreaterThan(CMOS_3V3.vIH); // out_3 HIGH
+    // out_0..out_3 = circuit nodes 3..6 → voltages[3..6] (1-based)
+    expect(result.voltages[3]).toBeLessThan(CMOS_3V3.vIL);   // out_0 LOW
+    expect(result.voltages[4]).toBeLessThan(CMOS_3V3.vIL);   // out_1 LOW
+    expect(result.voltages[5]).toBeLessThan(CMOS_3V3.vIL);   // out_2 LOW
+    expect(result.voltages[6]).toBeGreaterThan(CMOS_3V3.vIH); // out_3 HIGH
   });
 
   it("all_outputs_low_when_input_low", () => {
@@ -243,7 +243,7 @@ describe("Demux", () => {
 
     expect(result.converged).toBe(true);
     for (let i = 0; i < 4; i++) {
-      expect(result.voltages[2 + i]).toBeLessThan(CMOS_3V3.vIL);
+      expect(result.voltages[3 + i]).toBeLessThan(CMOS_3V3.vIL); // nodes 3..6 (1-based)
     }
   });
 
@@ -254,7 +254,7 @@ describe("Demux", () => {
 
       expect(result.converged).toBe(true);
       for (let i = 0; i < 4; i++) {
-        const vOut = result.voltages[2 + i];
+        const vOut = result.voltages[3 + i]; // nodes 3..6 (1-based)
         if (i === selVal) {
           expect(vOut).toBeGreaterThan(CMOS_3V3.vIH);
         } else {
@@ -275,16 +275,14 @@ describe("Decoder", () => {
    *
    * Per buildDecoderPinDeclarations: sel (2-bit), out_0, out_1, out_2, out_3
    *
-   * Solver index mapping:
-   *   0 = sel bit 0  (circuit node 1)
-   *   1 = sel bit 1  (circuit node 2)
-   *   2 = out_0      (circuit node 3)
-   *   3 = out_1      (circuit node 4)
-   *   4 = out_2      (circuit node 5)
-   *   5 = out_3      (circuit node 6)
-   *   6..7 = branch rows for 2 voltage sources
-   *
-   * matrixSize = 6 nodes + 2 branch rows = 8
+   * Circuit node mapping (1-based, slot 0 = ground sentinel):
+   *   node 1 = sel bit 0    → voltages[1]
+   *   node 2 = sel bit 1    → voltages[2]
+   *   node 3 = out_0        → voltages[3]
+   *   node 4 = out_1        → voltages[4]
+   *   node 5 = out_2        → voltages[5]
+   *   node 6 = out_3        → voltages[6]
+   *   branch rows 7..8 for 2 voltage sources (matrixSize = 8)
    */
   function buildDecoder2bit(selVal: number) {
     const vSel0 = ((selVal >> 0) & 1) === 1 ? VDD : GND;
@@ -322,10 +320,10 @@ describe("Decoder", () => {
     const result = solve(elements, matrixSize);
 
     expect(result.converged).toBe(true);
-    expect(result.voltages[2]).toBeLessThan(CMOS_3V3.vIL);   // out_0 LOW
-    expect(result.voltages[3]).toBeGreaterThan(CMOS_3V3.vIH); // out_1 HIGH
-    expect(result.voltages[4]).toBeLessThan(CMOS_3V3.vIL);   // out_2 LOW
-    expect(result.voltages[5]).toBeLessThan(CMOS_3V3.vIL);   // out_3 LOW
+    expect(result.voltages[3]).toBeLessThan(CMOS_3V3.vIL);   // out_0 LOW  (node 3)
+    expect(result.voltages[4]).toBeGreaterThan(CMOS_3V3.vIH); // out_1 HIGH (node 4)
+    expect(result.voltages[5]).toBeLessThan(CMOS_3V3.vIL);   // out_2 LOW  (node 5)
+    expect(result.voltages[6]).toBeLessThan(CMOS_3V3.vIL);   // out_3 LOW  (node 6)
   });
 
   it("all_selector_values_produce_one_hot", () => {
@@ -335,7 +333,7 @@ describe("Decoder", () => {
 
       expect(result.converged).toBe(true);
       for (let i = 0; i < 4; i++) {
-        const vOut = result.voltages[2 + i];
+        const vOut = result.voltages[3 + i]; // nodes 3..6 (1-based)
         if (i === selVal) {
           expect(vOut).toBeGreaterThan(CMOS_3V3.vIH);
         } else {
@@ -433,31 +431,15 @@ describe("Task 6.4.3 — combinational pin loading propagates", () => {
     const solver = {
       allocElement(r: number, c: number) { allocCalls.push([r, c]); return allocCalls.length - 1; },
       stampElement(_h: number, _v: number) {},
-      stampRHS(_i: number, _v: number) {},
     };
 
-    const ag = new Float64Array(7);
-    const ctx: LoadContext = {
+    const ctx: LoadContext = makeLoadCtx({
       solver: solver as any,
-      rhsOld: new Float64Array(16),
-      rhs: new Float64Array(16),
       cktMode: MODETRAN | MODEINITFLOAT,
       dt: 0,
       method: "trapezoidal" as const,
       order: 1,
-      deltaOld: [],
-      ag,
-      srcFact: 1,
-      noncon: { value: 0 },
-      limitingCollector: null,
-      xfact: 0,
-      gmin: 1e-12,
-      reltol: 1e-3,
-      iabstol: 1e-12,
-      cktFixLimit: false,
-      bypass: false,
-      voltTol: 1e-6,
-    };
+    });
 
     element.load(ctx);
 

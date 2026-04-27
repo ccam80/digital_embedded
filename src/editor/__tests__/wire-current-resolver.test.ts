@@ -338,7 +338,7 @@ describe("WireCurrentResolver", () => {
     expect(result!.current).toBeGreaterThan(0);
 
     const [dx, dy] = result!.direction;
-    const len = Math.sqrt(dx * dx + dy * dy);
+    void Math.sqrt(dx * dx + dy * dy);
   });
 
   it("flowSign_indicates_direction_relative_to_wire", () => {
@@ -417,13 +417,6 @@ describe("WireCurrentResolver — KCL conservation", () => {
       R2 = 2000,
       R3 = 3000,
       VS = 5;
-    const Rpar = (R2 * R3) / (R2 + R3);
-    const Rtotal = R1 + Rpar;
-    const Itotal = VS / Rtotal;
-    const V2 = VS * Rpar / Rtotal;
-    const I_R2 = V2 / R2;
-    const I_R3 = V2 / R3;
-
     // MNA: node1=idx0, node2=idx1, branch=idx2 → matrixSize=3
     const vs = makeVoltageSource(1, 0, 2, VS);
     const r1 = makeResistor(1, 2, R1);
@@ -469,12 +462,6 @@ describe("WireCurrentResolver — KCL conservation", () => {
 
 
     resolver.resolve(makeContextFromEngine(engine, compiled));
-
-    const c_n1 = resolver.getWireCurrent(w_n1)!;
-    const c_r1b = resolver.getWireCurrent(w_r1b)!;
-    const c_r2a = resolver.getWireCurrent(w_r2a)!;
-    const c_r3a = resolver.getWireCurrent(w_r3a)!;
-
 
     // KCL at junction
 
@@ -567,43 +554,8 @@ describe("WireCurrentResolver — KCL conservation", () => {
     const dc = engine.dcOperatingPoint();
     expect(dc.converged).toBe(true);
 
-    const V1 = engine.getNodeVoltage(1);
-    const V2 = engine.getNodeVoltage(2);
-    const V3 = engine.getNodeVoltage(3);
-    const V4 = engine.getNodeVoltage(4);
-
-
-    // Element currents from node voltages
-    const I_R1 = (V1 - V2) / R1v;
-    const I_R2 = V2 / R2v;
-    const I_R3 = (V2 - V3) / R3v;
-    const I_R4 = V3 / R4v;
-    const I_R5 = (V3 - V4) / R5v;
-    const I_R6 = V4 / R6v;
-    const I_R7 = V4 / R7v;
-
-    // Verify MNA KCL at each node
-
     // Run resolver
     resolver.resolve(makeContextFromEngine(engine, compiled));
-
-    // ---- Node 2 junction KCL ----
-    const c2_r1b = resolver.getWireCurrent(w2_r1b)!;
-    const c2_r2a = resolver.getWireCurrent(w2_r2a)!;
-    const c2_r3a = resolver.getWireCurrent(w2_r3a)!;
-
-
-    // ---- Node 3 junction KCL ----
-    const c3_r3b = resolver.getWireCurrent(w3_r3b)!;
-    const c3_r4a = resolver.getWireCurrent(w3_r4a)!;
-    const c3_r5a = resolver.getWireCurrent(w3_r5a)!;
-
-
-    // ---- Node 4 junction KCL ----
-    const c4_r5b = resolver.getWireCurrent(w4_r5b)!;
-    const c4_r6a = resolver.getWireCurrent(w4_r6a)!;
-    const c4_r7a = resolver.getWireCurrent(w4_r7a)!;
-
 
     // ---- Node 1 (single wire) ----
 
@@ -1323,7 +1275,6 @@ describe("WireCurrentResolver — misaligned pin snap (mock)", () => {
     // Without snap-to-vertex, R2's pin B injection is lost, making the
     // wire current on the ground side differ from the R2 side.
     const VS = 5, R1v = 1000, R2v = 1000;
-    const I_expected = VS / (R1v + R2v); // 2.5 mA
 
     const vs = makeVoltageSource(1, 0, 2, VS); // branch index = nodeCount
     const r1 = makeResistor(1, 2, R1v);
@@ -1370,7 +1321,7 @@ describe("WireCurrentResolver — misaligned pin snap (mock)", () => {
     const resolver = new WireCurrentResolver();
     resolver.resolve(makeContextFromEngine(engine, compiled as unknown as ConcreteCompiledAnalogCircuit));
 
-    const I_R2 = Math.abs(engine.getElementCurrent(2));
+    Math.abs(engine.getElementCurrent(2));
 
     // THE KEY CHECKS:
   });

@@ -35,15 +35,13 @@ function makeNullSolver() {
   return {
     allocElement: (_r: number, _c: number) => 0,
     stampElement: (_h: number, _v: number) => {},
-    stampRHS: (_i: number, _v: number) => {},
     stamp: (_r: number, _c: number, _v: number) => {},
   } as any;
 }
 
-function makeCtx(v: Float64Array = new Float64Array(16)): LoadContext {
+function makeCtx(_v: Float64Array = new Float64Array(16)): LoadContext {
   return makeLoadCtx({
     solver: makeNullSolver(),
-    voltages: v,
     dt: 0,
     method: "trapezoidal",
     order: 1,
@@ -130,10 +128,11 @@ function buildCounter(bitWidth = 4): {
   const solverSize = 4 + bitWidth;
 
   const makeVoltages = (en: number, clock: number, clr: number): Float64Array => {
-    const v = new Float64Array(solverSize);
-    v[0] = en;
-    v[1] = clock;
-    v[2] = clr;
+    // 1-based: pins init at nodes 1,2,3 so readMnaVoltage reads v[1],v[2],v[3]
+    const v = new Float64Array(solverSize + 1);
+    v[1] = en;
+    v[2] = clock;
+    v[3] = clr;
     return v;
   };
 
@@ -190,12 +189,13 @@ function buildRegister(bitWidth = 8): {
   const solverSize = 2 * bitWidth + 2;
 
   const makeVoltages = (data: number, en: number, clock: number): Float64Array => {
-    const v = new Float64Array(solverSize);
+    // 1-based: data pins at nodes 1..bitWidth, clock at node 1+bitWidth, en at node 1+bitWidth+1
+    const v = new Float64Array(solverSize + 1);
     for (let bit = 0; bit < bitWidth; bit++) {
-      v[bit] = ((data >> bit) & 1) ? V_HIGH : V_LOW;
+      v[1 + bit] = ((data >> bit) & 1) ? V_HIGH : V_LOW;
     }
-    v[bitWidth] = clock;
-    v[bitWidth + 1] = en;
+    v[1 + bitWidth] = clock;
+    v[1 + bitWidth + 1] = en;
     return v;
   };
 
@@ -275,7 +275,7 @@ describe("Counter", () => {
     // Apply 5 clock edges: count = 5 = 0b0101
     const makeV = (en: number, clock: number, clr: number): Float64Array => {
       const v = new Float64Array(nodeCount);
-      v[0] = en; v[1] = clock; v[2] = clr;
+      v[1] = en; v[2] = clock; v[3] = clr;
       return v;
     };
 
@@ -303,7 +303,7 @@ describe("Counter", () => {
 
 describe("Register", () => {
   it("latches_all_bits", () => {
-    const { element, makeVoltages, outBitPins } = buildRegister(8);
+    const { element, makeVoltages } = buildRegister(8);
 
     element.load(makeCtx());
 
@@ -464,18 +464,16 @@ describe("Task 6.4.3 — sequential pin loading propagates", () => {
       [], -1, props, () => 0,
     );
     Object.assign(element, { pinNodeIds: [1, 2, 3, 4, 5], allNodeIds: [1, 2, 3, 4, 5] });
-    initElement(element);
+    initElement(element as unknown as import("../element.js").ReactiveAnalogElement);
 
     const allocCalls: Array<[number, number]> = [];
     const solver = {
       allocElement(r: number, c: number) { allocCalls.push([r, c]); return allocCalls.length - 1; },
       stampElement(_h: number, _v: number) {},
-      stampRHS(_i: number, _v: number) {},
     };
 
     const ctx: LoadContext = makeLoadCtx({
       solver: solver as any,
-      voltages: new Float64Array(16),
       cktMode: MODETRAN | MODEINITFLOAT,
       dt: 0,
       method: "trapezoidal",
@@ -484,10 +482,10 @@ describe("Task 6.4.3 — sequential pin loading propagates", () => {
 
     element.load(ctx);
 
-    // en (nodeIdx=0) should have a diagonal stamp (loaded=true)
-    const enDiag = allocCalls.some(([r, c]) => r === 0 && c === 0);
-    // C (nodeIdx=1) should NOT have a diagonal stamp (loaded=false → no-op)
-    const clockDiag = allocCalls.some(([r, c]) => r === 1 && c === 1);
+    // en (MNA node 1, 1-based) should have a diagonal stamp (loaded=true)
+    const enDiag = allocCalls.some(([r, c]) => r === 1 && c === 1);
+    // C (MNA node 2, 1-based) should NOT have a diagonal stamp (loaded=false -> no-op)
+    const clockDiag = allocCalls.some(([r, c]) => r === 2 && c === 2);
 
     expect(enDiag).toBe(true);
     expect(clockDiag).toBe(false);

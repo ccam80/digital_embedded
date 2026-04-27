@@ -351,8 +351,8 @@ describe("zero_allocations_in_lte_path", () => {
     const params: LteParams = { trtol: 7, reltol: 1e-3, abstol: 1e-6, chgtol: 1e-14 };
 
     // Warm up — first call may trigger internal initialisation not counted.
-    cktTerr(dt, deltaOld, 1, "gear", 1e-12, 0.9e-12, 0.8e-12, 0, 1e-12, 0.9e-12, params);
-    cktTerrVoltage(5.0, 4.9, 4.8, 4.7, dt, deltaOld, 1, "gear", 1e-3, 1e-6, 7);
+    cktTerr(dt, Array.from(deltaOld), 1, "gear", 1e-12, 0.9e-12, 0.8e-12, 0, 1e-12, 0.9e-12, params);
+    cktTerrVoltage(5.0, 4.9, 4.8, 4.7, dt, Array.from(deltaOld), 1, "gear", 1e-3, 1e-6, 7);
 
     // Reset counters after warmup.
     f64Count = 0;
@@ -361,10 +361,10 @@ describe("zero_allocations_in_lte_path", () => {
     // Run 100 LTE evaluations across orders 1 and 2, charge-based and voltage-based.
     for (let i = 0; i < 50; i++) {
       const q = 1e-12 * (1 + i * 0.01);
-      cktTerr(dt, deltaOld, 1, "gear", q, q * 0.99, q * 0.98, 0, q, q * 0.99, params);
-      cktTerr(dt, deltaOld, 2, "gear", q, q * 0.99, q * 0.98, q * 0.97, q, q * 0.99, params);
-      cktTerrVoltage(5 + i * 0.001, 4.9, 4.8, 4.7, dt, deltaOld, 1, "gear", 1e-3, 1e-6, 7);
-      cktTerrVoltage(5 + i * 0.001, 4.9, 4.8, 4.7, dt, deltaOld, 2, "gear", 1e-3, 1e-6, 7);
+      cktTerr(dt, Array.from(deltaOld), 1, "gear", q, q * 0.99, q * 0.98, 0, q, q * 0.99, params);
+      cktTerr(dt, Array.from(deltaOld), 2, "gear", q, q * 0.99, q * 0.98, q * 0.97, q, q * 0.99, params);
+      cktTerrVoltage(5 + i * 0.001, 4.9, 4.8, 4.7, dt, Array.from(deltaOld), 1, "gear", 1e-3, 1e-6, 7);
+      cktTerrVoltage(5 + i * 0.001, 4.9, 4.8, 4.7, dt, Array.from(deltaOld), 2, "gear", 1e-3, 1e-6, 7);
     }
 
     (globalThis as unknown as Record<string, unknown>)["Float64Array"] = RealF64;

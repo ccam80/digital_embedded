@@ -46,7 +46,8 @@ import {
   type ComponentDefinition,
 } from "../../core/registry.js";
 import { defineModelParams } from "../../core/model-params.js";
-import type { AnalogElementCore, LoadContext, StatePoolRef } from "../../solver/analog/element.js";
+import type { LoadContext, StatePoolRef, PoolBackedAnalogElementCore } from "../../solver/analog/element.js";
+import { NGSPICE_LOAD_ORDER } from "../../solver/analog/element.js";
 import {
   collectPinModelChildren,
   DigitalInputPinModel,
@@ -287,7 +288,7 @@ function createADCElement(
   props: PropertyBag,
   bipolar: boolean,
   sar: boolean,
-): AnalogElementCore {
+): PoolBackedAnalogElementCore & { readonly latchedCode: number; readonly eocActive: boolean } {
   const bits = Math.max(1, Math.min(32, props.getOrDefault<number>("bits", 8)));
   const p: Record<string, number> = {
     vIH:  props.getModelParam<number>("vIH"),
@@ -377,6 +378,7 @@ function createADCElement(
 
   return {
     branchIndex: -1,
+    ngspiceLoadOrder: NGSPICE_LOAD_ORDER.VCVS,
     isNonlinear: true,
     get isReactive(): boolean { return childElements.length > 0; },
 
@@ -384,9 +386,19 @@ function createADCElement(
     stateSchema: ADC_COMPOSITE_SCHEMA,
     stateSize,
     stateBaseOffset: -1,
+    s0: new Float64Array(0),
+    s1: new Float64Array(0),
+    s2: new Float64Array(0),
+    s3: new Float64Array(0),
+    s4: new Float64Array(0),
+    s5: new Float64Array(0),
+    s6: new Float64Array(0),
+    s7: new Float64Array(0),
 
     initState(_pool: StatePoolRef): void {
-      let offset = (this as { stateBaseOffset: number }).stateBaseOffset;
+      this.s0 = _pool.state0; this.s1 = _pool.state1; this.s2 = _pool.state2; this.s3 = _pool.state3;
+      this.s4 = _pool.state4; this.s5 = _pool.state5; this.s6 = _pool.state6; this.s7 = _pool.state7;
+      let offset = this.stateBaseOffset;
       for (const child of childElements) {
         child.stateBaseOffset = offset;
         child.initState(_pool);
@@ -483,7 +495,7 @@ function createADCElement(
         }
       }
     },
-  } as AnalogElementCore & { latchedCode: number; eocActive: boolean };
+  };
 }
 
 // ---------------------------------------------------------------------------

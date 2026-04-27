@@ -1,5 +1,5 @@
 ﻿/**
- * DigitalPinModel â€” MNA stamp helpers for digital pins.
+ * DigitalPinModel â€" MNA stamp helpers for digital pins.
  *
  * DigitalOutputPinModel stamps an ideal voltage source branch equation ("branch" role)
  * or a conductance+current-source ("direct" role) based on the role assigned at
@@ -17,7 +17,6 @@
 
 import type { LoadContext } from "./load-context.js";
 import type { ResolvedPinElectrical } from "../../core/pin-electrical.js";
-import type { AnalogElement, ReactiveAnalogElement } from "./element.js";
 import { AnalogCapacitorElement } from "../../components/passives/capacitor.js";
 import { stampRHS } from "./stamp-helpers.js";
 
@@ -62,10 +61,10 @@ export class DigitalOutputPinModel {
   /** True when in Hi-Z state. */
   private _hiZ = false;
 
-  /** AnalogCapacitorElement child â€” allocated when loaded && cOut > 0 after init(). */
+  /** AnalogCapacitorElement child â€" allocated when loaded && cOut > 0 after init(). */
   private _capacitorChild: AnalogCapacitorElement | null = null;
 
-  /** Cached matrix handles â€” allocated on first load(), keyed by role. */
+  /** Cached matrix handles â€" allocated on first load(), keyed by role. */
   private _handlesInit = false;
   // branch role handles
   private _hBranchNode = -1;   // (branchIdx, nodeIdx)
@@ -102,7 +101,7 @@ export class DigitalOutputPinModel {
     }
   }
 
-  /** Set the output logic level. High â†’ vOH, low â†’ vOL. */
+  /** Set the output logic level. High â†' vOH, low â†' vOL. */
   setLogicLevel(high: boolean): void {
     this._high = high;
   }
@@ -149,7 +148,7 @@ export class DigitalOutputPinModel {
   load(ctx: LoadContext): void {
     const node = this._nodeId;
     if (node <= 0) return;
-    const nodeIdx = node - 1;
+    // node is a 1-based MNA node ID (ngspice convention: 0 = ground sentinel).
     const solver = ctx.solver;
 
     if (this._role === "branch") {
@@ -157,11 +156,11 @@ export class DigitalOutputPinModel {
       if (bIdx < 0) return;
 
       if (!this._handlesInit) {
-        this._hBranchNode = solver.allocElement(bIdx, nodeIdx);
+        this._hBranchNode = solver.allocElement(bIdx, node);
         this._hBranchBranch = solver.allocElement(bIdx, bIdx);
-        this._hNodeBranch = solver.allocElement(nodeIdx, bIdx);
+        this._hNodeBranch = solver.allocElement(node, bIdx);
         if (this._loaded) {
-          this._hNodeDiag = solver.allocElement(nodeIdx, nodeIdx);
+          this._hNodeDiag = solver.allocElement(node, node);
         }
         this._handlesInit = true;
       }
@@ -184,9 +183,10 @@ export class DigitalOutputPinModel {
         }
       }
     } else {
-      // "direct" role â€” conductance+current-source Norton equivalent
+      // direct role: conductance+current-source Norton equivalent.
+      // node is already 1-based; pass directly to allocElement and stampRHS.
       if (!this._handlesInit) {
-        this._hNodeDiag = solver.allocElement(nodeIdx, nodeIdx);
+        this._hNodeDiag = solver.allocElement(node, node);
         this._handlesInit = true;
       }
 
@@ -195,7 +195,7 @@ export class DigitalOutputPinModel {
       } else {
         const gOut = 1 / this._spec.rOut;
         solver.stampElement(this._hNodeDiag, gOut);
-        stampRHS(ctx.rhs, nodeIdx, (this._high ? this._spec.vOH : this._spec.vOL) * gOut);
+        stampRHS(ctx.rhs, node, (this._high ? this._spec.vOH : this._spec.vOL) * gOut);
       }
     }
   }
@@ -248,7 +248,7 @@ export class DigitalOutputPinModel {
 /**
  * Stamps the analog equivalent of one digital input pin into the MNA matrix.
  *
- * Sense-only by default â€” threshold detection is always available.
+ * Sense-only by default â€" threshold detection is always available.
  * When loaded, stamps 1/rIn on the node diagonal.
  * When loaded and cIn > 0 an AnalogCapacitorElement child handles companion
  * integration via the owning element's state-pool composite.
@@ -260,7 +260,7 @@ export class DigitalInputPinModel {
   /** Node this pin reads. Set by init(). */
   private _nodeId = -1;
 
-  /** AnalogCapacitorElement child â€” allocated when loaded && cIn > 0 after init(). */
+  /** AnalogCapacitorElement child â€" allocated when loaded && cIn > 0 after init(). */
   private _capacitorChild: AnalogCapacitorElement | null = null;
 
   /** Cached matrix handle for node diagonal. */
@@ -318,11 +318,11 @@ export class DigitalInputPinModel {
     if (!this._loaded) return;
     const node = this._nodeId;
     if (node <= 0) return;
-    const nodeIdx = node - 1;
+    // node is a 1-based MNA node ID (ngspice convention: 0 = ground sentinel).
     const solver = ctx.solver;
 
     if (!this._handlesInit) {
-      this._hNodeDiag = solver.allocElement(nodeIdx, nodeIdx);
+      this._hNodeDiag = solver.allocElement(node, node);
       this._handlesInit = true;
     }
 
@@ -334,7 +334,7 @@ export class DigitalInputPinModel {
    *
    * Returns true  when voltage > vIH  (logic HIGH),
    *         false when voltage < vIL  (logic LOW),
-   *         undefined               (indeterminate â€” between thresholds).
+   *         undefined               (indeterminate â€" between thresholds).
    */
   readLogicLevel(voltage: number): boolean | undefined {
     if (voltage > this._spec.vIH) return true;
@@ -367,7 +367,7 @@ export class DigitalInputPinModel {
  * pin model's setParam. Returns true if the key was handled.
  *
  * Elements that hold DigitalInputPinModel / DigitalOutputPinModel instances
- * build a labelâ†’model map at construction time and delegate from setParam:
+ * build a labelâ†'model map at construction time and delegate from setParam:
  *
  *   setParam(key: string, value: number): void {
  *     delegatePinSetParam(this._pinModelsByLabel, key, value);

@@ -36,6 +36,7 @@ function makeCaptureSolver(): {
   const handles: { row: number; col: number }[] = [];
   const handleIndex = new Map<string, number>();
   const solver = {
+    _initStructure: (_size: number) => {},
     stampRHS: (row: number, value: number) => {
       rhs.push({ row, value });
     },
@@ -178,7 +179,7 @@ describe("Triode", () => {
   describe("cutoff_at_negative_grid", () => {
     it("I_P ≈ 0 at V_GK = -10V (well below cutoff)", () => {
       const p = makeProps();
-      const ip = computeIp(200, -10, p);
+      computeIp(200, -10, p);
       // Should be essentially zero at such negative grid bias
     });
 
@@ -236,7 +237,6 @@ describe("Triode", () => {
     it("measurable grid current when V_GK = +1V", () => {
       const p = makeProps();
       // Grid current = V_GK / R_GI = 1 / 2000 = 0.5 mA
-      const expectedIg = 1.0 / RGI;
 
       // Use createTriodeElement with nodes P=1, G=2, K=0(ground); matrixSize=2.
       const elem = withNodeIds(
@@ -288,8 +288,8 @@ describe("Triode", () => {
         matrixSize: 2,
         nodeCount: 2,
       });
-      ctx.loadCtx.rhsOld[0] = 100;
-      ctx.loadCtx.rhsOld[1] = 1.0; // V_GK = 1V > 0
+      ctx.loadCtx.rhsOld[1] = 100;  // V(P)=100V, nodeP=1
+      ctx.loadCtx.rhsOld[2] = 1.0; // V(G)=1V > 0, nodeG=2
 
       for (let i = 0; i < 5; i++) {
         elem.load(ctx.loadCtx);

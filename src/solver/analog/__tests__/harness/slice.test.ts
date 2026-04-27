@@ -44,7 +44,7 @@ function makeSide(n: number): IterationSideData {
   const rhs = Array.from({ length: N }, (_, i) => (i + 1) * 10);
   const residual = Array.from({ length: N }, (_, i) => (i + 1) * 0.1);
   const residualInfinityNorm = Math.max(...residual.map(Math.abs));
-  return { rawIteration: 1, globalConverged: false, noncon: 2, nodeVoltages: {}, nodeVoltagesBefore: {}, branchValues: {}, elementStates: {}, limitingEvents: [], rhs, residual, residualInfinityNorm, matrix };
+  return { rawIteration: 1, globalConverged: false, noncon: 2, nodeVoltages: {}, nodeVoltagesBefore: {}, branchValues: {}, elementStates: {}, limitingEvents: [], rhs, residual, residualInfinityNorm, matrix, ag: [0, 0, 0, 0, 0, 0, 0], method: "trapezoidal" as const, order: 1 };
 }
 
 describe("resolveNodeToMatrixIndex", () => {
@@ -146,7 +146,7 @@ describe("applySliceToIteration", () => {
   it("residual infinity norm recomputed over slice", () => {
     const side = makeSide(N);
     const slice = resolveSlice({ nodes: [3] }, topo);
-    const result = applySliceToIteration(side, slice, N);
+    applySliceToIteration(side, slice, N);
   });
   it("null matrix stays null rhs and residual still sliced", () => {
     const side: IterationSideData = { ...makeSide(N), matrix: null };

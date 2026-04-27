@@ -65,7 +65,8 @@ export type DiagnosticCode =
   | 'monte-carlo-trial-failed'
   | 'unconnected-analog-pin'
   | 'floating-terminal'
-  | 'reactive-state-outside-pool';
+  | 'reactive-state-outside-pool'
+  | 'internal-error';
 
 /**
  * A concrete suggestion attached to a `Diagnostic`.

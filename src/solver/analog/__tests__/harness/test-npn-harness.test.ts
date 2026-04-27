@@ -72,7 +72,6 @@ describeGate("NPN-CE harness branch value test", () => {
           stepIndex: 0,
           phase: att.phase,
           phaseAttemptIndex: 0,
-          side: "ngspice",
         });
         
         if (attDetail.ngspiceAttempt && attDetail.iterations.length > 0) {

@@ -67,6 +67,13 @@ export interface SessionShape {
 export interface PhaseAwareCaptureHook {
   /** Per-NR-iteration hook (fires inside newton-raphson.ts loop). */
   iterationHook: PostIterationHook;
+  /**
+   * Optional pre-factor hook. Fires between cktLoad and solver.preorder()/factor()
+   * (newton-raphson.ts STEP B+; ngspice niiter.c:704). Window where the
+   * assembled MNA still holds post-load, pre-LU values — only place a
+   * harness can read the matrix solver.factor() is about to overwrite.
+   */
+  preFactorHook?: (ctx: import("../../ckt-context.js").CKTCircuitContext) => void;
   /** Phase begin/end hook (fires from analog-engine and dc-operating-point). */
   phaseHook: MNAEngine["stepPhaseHook"];
 }
@@ -167,6 +174,30 @@ export interface LimitingEvent {
 /** State captured at a single NR iteration. */
 export interface IterationSnapshot {
   iteration: number;
+  /**
+   * ngspice setup-counter convention. ngspice initializes `CKTmaxEqNum = 1`
+   * (cktinit.c:43) and post-increments it for every CKTmkVolt/CKTmkCur call
+   * (cktlnkeq.c:32). After N active equations CKTmaxEqNum = 1 + N, and
+   * `matrixSize = CKTmaxEqNum + 1 = N + 2` — one slot for ground (idx 0),
+   * N slots for active equations (idx 1..N), plus 1 post-inc tracker slot.
+   * The post-inc slot is NOT an actual rhs/matrix entry — it's setup
+   * bookkeeping. Real rhs allocation is rhsBufSize.
+   *
+   * Both sides report this same N+2 convention so the structural-parity
+   * gate (ComparisonSession._assertMatrixStructuralParity) can compare like
+   * for like. Carried per-iteration because the gate runs at every step —
+   * a session-level constant would mask intra-run drift, which would itself
+   * be an architectural bug.
+   */
+  matrixSize: number;
+  /**
+   * Actual allocation length of the rhs / rhsOld / preSolveRhs buffers.
+   * - Our engine: `voltages.length` (no TrashCan equivalent).
+   * - ngspice: `SMPmatSize(CKTmatrix) + 1`. Can be smaller than matrixSize
+   *   when devices stamp into ground via TrashCan (niiter.c).
+   * Both sides should equal N+1 for circuits with no TrashCan folding.
+   */
+  rhsBufSize: number;
   voltages: Float64Array;
   prevVoltages: Float64Array;
   preSolveRhs: Float64Array;
@@ -236,7 +267,7 @@ export interface ElementStateSnapshot {
 
 /** Integration coefficients ag0/ag1 for a single timestep, from both engines. */
 export interface IntegrationCoefficients {
-  ours: { ag0: number; ag1: number; method: "backwardEuler" | "trapezoidal" | "gear2"; order: number };
+  ours: { ag0: number; ag1: number; method: IntegrationMethod; order: number };
   ngspice: { ag0: number; ag1: number; method: string; order: number };
 }
 
@@ -510,6 +541,13 @@ export interface SessionSummary {
 export interface RawNgspiceIterationEx {
   iteration: number;
   matrixSize: number;
+  /**
+   * SMPmatSize+1 — actual rhs/rhsOld/preSolveRhs slot count on the ngspice side.
+   * Can be smaller than matrixSize when CKTmaxEqNum > SMPmatSize (devices stamp
+   * into ground row/col via TrashCan). The bridge clamps the FFI decode to this
+   * value to prevent OOB reads that surface as NaN bit-pattern garbage.
+   */
+  rhsBufSize: number;
   rhs: Float64Array;
   rhsOld: Float64Array;
   preSolveRhs: Float64Array;
@@ -867,8 +905,8 @@ export interface IterationSideData {
   ag: number[];
   /**
    * Integration method active at this iteration ("trapezoidal" | "gear" on our
-   * side; "backwardEuler" | "trapezoidal" | "gear2" on ngspice side). Kept as
-   * `string` to accommodate both vocabularies.
+   * side; mapped to the same vocabulary on the ngspice side via ngspice-bridge). Kept as
+   * `string` to accommodate raw ngspice values before mapping.
    */
   method: string;
   /** Integration order active at this iteration (1 = order-1 trap/gear, 2 = order-2 trap/gear). */

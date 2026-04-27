@@ -378,7 +378,7 @@ export class TimestepController {
   computeNewDt(
     elements: readonly AnalogElement[],
     _history: HistoryStore,
-    simTime: number = 0,
+    _simTime: number = 0,
     stepDt?: number,
   ): { newDt: number; worstRatio: number } {
     const dt = stepDt ?? this.currentDt;

@@ -104,7 +104,7 @@ describe("parseSubcircuit — R element", () => {
 
   it("parses value with k suffix", () => {
     const sc = parseSubcircuit(TEXT);
-    const r = getElement(sc, "R1");
+    getElement(sc, "R1");
   });
 });
 
@@ -123,7 +123,7 @@ describe("parseSubcircuit — C element", () => {
 
   it("parses value with n suffix", () => {
     const sc = parseSubcircuit(TEXT);
-    const c = getElement(sc, "C1");
+    getElement(sc, "C1");
   });
 });
 
@@ -142,7 +142,7 @@ describe("parseSubcircuit — L element", () => {
 
   it("parses value with u suffix", () => {
     const sc = parseSubcircuit(TEXT);
-    const l = getElement(sc, "L1");
+    getElement(sc, "L1");
   });
 });
 
@@ -241,12 +241,12 @@ describe("parseSubcircuit — M element", () => {
 
   it("captures W parameter", () => {
     const sc = parseSubcircuit(TEXT);
-    const m = getElement(sc, "M1");
+    getElement(sc, "M1");
   });
 
   it("captures L parameter", () => {
     const sc = parseSubcircuit(TEXT);
-    const m = getElement(sc, "M1");
+    getElement(sc, "M1");
   });
 });
 
@@ -290,7 +290,7 @@ describe("parseSubcircuit — V element", () => {
 
   it("parses DC keyword followed by value", () => {
     const sc = parseSubcircuit(`.SUBCKT test p n\nV1 p n DC 3.3\n.ENDS`);
-    const v = getElement(sc, "V1");
+    getElement(sc, "V1");
   });
 
   it("captures nodes without value", () => {
@@ -368,7 +368,7 @@ Q2 3 2 5 NPN
   });
 
   it("parses IS parameter", () => {
-    const sc = parseSubcircuit(TEXT);
+    parseSubcircuit(TEXT);
   });
 
   it("parses BF parameter", () => {
@@ -390,11 +390,11 @@ R1 in out rout
 `.trim();
 
   it("captures GM param", () => {
-    const sc = parseSubcircuit(TEXT);
+    parseSubcircuit(TEXT);
   });
 
   it("captures ROUT param with suffix", () => {
-    const sc = parseSubcircuit(TEXT);
+    parseSubcircuit(TEXT);
   });
 });
 
@@ -416,7 +416,7 @@ describe("parseSubcircuit — value suffixes", () => {
   for (const [line, elName, expected] of suffixCases) {
     it(`parses "${line}" → ${expected}`, () => {
       const sc = parseSubcircuit(`.SUBCKT test a b\n${line}\n.ENDS`);
-      const el = getElement(sc, elName);
+      getElement(sc, elName);
     });
   }
 });
@@ -461,7 +461,7 @@ V1 vcc 0 DC 5
   });
 
   it("returns gm param", () => {
-    const sc = parseSubcircuit(TEXT);
+    parseSubcircuit(TEXT);
   });
 
   it("Q1 has correct nodes and model", () => {
@@ -473,7 +473,7 @@ V1 vcc 0 DC 5
 
   it("M1 has W and L params", () => {
     const sc = parseSubcircuit(TEXT);
-    const m = getElement(sc, "M1");
+    getElement(sc, "M1");
   });
 });
 

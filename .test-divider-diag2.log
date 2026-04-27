@@ -1,0 +1,140 @@
+
+[1m[7m[36m RUN [39m[27m[22m [36mv2.1.9 [39m[90mC:/local_working_projects/digital_in_browser[39m
+
+[90mstdout[2m | src/solver/analog/__tests__/ngspice-parity/_diag-resistive-divider-eqcount.test.ts[2m > [22m[2mDIAG resistive divider equation count[2m > [22m[2mdump cirClean + topology + first-iteration matrix entries
+[22m[39m
+========== SPICE netlist fed to ngspice ==========
+Auto-generated netlist
+V1 1 0 DC 5
+R1 1 2 1000
+R2 2 0 1000
+.end
+
+========== Our topology ==========
+{
+  "matrixSize": 3,
+  "nodeCount": 2,
+  "branchCount": 1,
+  "elementCount": 3,
+  "nodeLabels": [
+    [
+      1,
+      "V1:pos/R1:A"
+    ],
+    [
+      2,
+      "R1:B/R2:A"
+    ]
+  ],
+  "matrixRowLabels": [
+    [
+      0,
+      "V1:pos/R1:A"
+    ],
+    [
+      1,
+      "R1:B/R2:A"
+    ],
+    [
+      2,
+      "V1:branch"
+    ]
+  ],
+  "elements": [
+    {
+      "index": 0,
+      "label": "V1",
+      "type": "vsource",
+      "pinNodeIds": [
+        0,
+        1
+      ]
+    },
+    {
+      "index": 1,
+      "label": "R1",
+      "type": "resistor",
+      "pinNodeIds": [
+        1,
+        2
+      ]
+    },
+    {
+      "index": 2,
+      "label": "R2",
+      "type": "resistor",
+      "pinNodeIds": [
+        2,
+        0
+      ]
+    }
+  ]
+}
+
+========== ngspice topology ==========
+{
+  "matrixSize": 5,
+  "numStates": 0,
+  "nodeNames": [
+    [
+      "1",
+      1
+    ],
+    [
+      "2",
+      2
+    ],
+    [
+      "v1#branch",
+      3
+    ]
+  ],
+  "devices": [
+    {
+      "name": "r2"
+    },
+    {
+      "name": "r1"
+    },
+    {
+      "name": "v1"
+    }
+  ]
+}
+
+========== Our first iter matrix entries ==========
+matrixSize=5 rhsBufSize=4
+voltages.length=4
+voltages: 0.000e+0, 5.000e+0, 2.500e+0, -2.500e-3
+matrix entries (6):
+  row=1 col=1 val=0.001
+  row=2 col=1 val=1
+  row=3 col=1 val=-0.001
+  row=1 col=2 val=1
+  row=1 col=3 val=-0.001
+  row=3 col=3 val=0.002
+
+========== Our compiled engine elements ==========
+label=V1 branchIndex=3 pinNodeIds=[0,1]
+label=R1 branchIndex=-1 pinNodeIds=[1,2]
+label=R2 branchIndex=-1 pinNodeIds=[2,0]
+engine.nodeCount=undefined engine.branchCount=undefined engine.matrixSize=undefined
+
+========== ngspice first iter matrix entries ==========
+matrixSize=5 rhsBufSize=4
+voltages.length=4
+matrix entries (6):
+  row=2 col=1 val=-0.001
+  row=1 col=1 val=0.001
+  row=3 col=1 val=1
+  row=2 col=2 val=0.002
+  row=1 col=2 val=-0.001
+  row=1 col=3 val=1
+
+ [32m✓[39m src/solver/analog/__tests__/ngspice-parity/_diag-resistive-divider-eqcount.test.ts [2m([22m[2m1 test[22m[2m)[22m[90m 32[2mms[22m[39m
+
+[2m Test Files [22m [1m[32m1 passed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[32m1 passed[39m[22m[90m (1)[39m
+[2m   Start at [22m 12:30:33
+[2m   Duration [22m 2.30s[2m (transform 1.35s, setup 0ms, collect 2.06s, tests 32ms, environment 0ms, prepare 69ms)[22m
+

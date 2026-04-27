@@ -1,0 +1,94 @@
+
+[1m[7m[36m RUN [39m[27m[22m [36mv2.1.9 [39m[90mC:/local_working_projects/digital_in_browser[39m
+
+ [31m❯[39m src/solver/analog/__tests__/mna-end-to-end.test.ts [2m([22m[2m15 tests[22m[2m | [22m[31m5 failed[39m[2m)[22m[90m 39[2mms[22m[39m
+[31m   [31m×[31m End-to-end: full pipeline[2m > [22mresistor_divider_dc_op_via_compiler[90m 14[2mms[22m[31m[39m
+[31m     → expected 4 to be 3 // Object.is equality[39m
+[31m   [31m×[31m End-to-end: full pipeline[2m > [22mdiode_circuit_dc_op_via_compiler[90m 3[2mms[22m[31m[39m
+[31m     → expected 0 to be greater than 0.55[39m
+[31m   [31m×[31m End-to-end: tight transient tolerances[2m > [22mrl_dc_steady_state_tight_tolerance[90m 5[2mms[22m[31m[39m
+[31m     → expected 97.56098155858157 to be less than 0.1[39m
+[31m   [31m×[31m MOSFET through compiler[2m > [22mnmos_triode_region_dc_op[90m 1[2mms[22m[31m[39m
+[31m     → expected 0 to be greater than 0[39m
+[31m   [31m×[31m MOSFET through compiler[2m > [22mpmos_common_source_dc_op[90m 1[2mms[22m[31m[39m
+[31m     → expected 0 to be greater than 0[39m
+ [32m✓[39m src/solver/analog/__tests__/monte-carlo.test.ts [2m([22m[2m16 tests[22m[2m)[22m[90m 62[2mms[22m[39m
+ [32m✓[39m src/solver/analog/__tests__/model-parser-subckt.test.ts [2m([22m[2m64 tests[22m[2m)[22m[90m 10[2mms[22m[39m
+ [32m✓[39m src/solver/analog/__tests__/expression.test.ts [2m([22m[2m39 tests[22m[2m)[22m[90m 6[2mms[22m[39m
+ [32m✓[39m src/solver/analog/__tests__/expression-evaluate.test.ts [2m([22m[2m16 tests[22m[2m)[22m[90m 3[2mms[22m[39m
+ [32m✓[39m src/solver/analog/__tests__/model-parser.test.ts [2m([22m[2m13 tests[22m[2m)[22m[90m 5[2mms[22m[39m
+
+[31m⎯⎯⎯⎯⎯⎯⎯[1m[7m Failed Tests 5 [27m[22m⎯⎯⎯⎯⎯⎯⎯[39m
+
+[31m[1m[7m FAIL [27m[22m[39m src/solver/analog/__tests__/mna-end-to-end.test.ts[2m > [22mEnd-to-end: full pipeline[2m > [22mresistor_divider_dc_op_via_compiler
+[31m[1mAssertionError[22m: expected 4 to be 3 // Object.is equality[39m
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[32m- 3[39m
+[31m+ 4[39m
+
+[36m [2m❯[22m src/solver/analog/__tests__/mna-end-to-end.test.ts:[2m200:40[22m[39m
+    [90m198| [39m
+    [90m199| [39m    [34mexpect[39m(result[33m.[39mconverged)[33m.[39m[34mtoBe[39m([35mtrue[39m)[33m;[39m
+    [90m200| [39m    [34mexpect[39m(result[33m.[39mnodeVoltages[33m.[39mlength)[33m.[39m[34mtoBe[39m(compiled[33m.[39mmatrixSize)[33m;[39m
+    [90m   | [39m                                       [31m^[39m
+    [90m201| [39m
+    [90m202| [39m    [90m// We don't know exact node assignment order, so check all node vo[39m…
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/5]⎯[22m[39m
+
+[31m[1m[7m FAIL [27m[22m[39m src/solver/analog/__tests__/mna-end-to-end.test.ts[2m > [22mEnd-to-end: full pipeline[2m > [22mdiode_circuit_dc_op_via_compiler
+[31m[1mAssertionError[22m: expected 0 to be greater than 0.55[39m
+[36m [2m❯[22m src/solver/analog/__tests__/mna-end-to-end.test.ts:[2m252:23[22m[39m
+    [90m250| [39m
+    [90m251| [39m    [90m// Lower voltage = diode anode ≈ 0.6–0.75V[39m
+    [90m252| [39m    [34mexpect[39m(sorted[[34m0[39m])[33m.[39m[34mtoBeGreaterThan[39m([34m0.55[39m)[33m;[39m
+    [90m   | [39m                      [31m^[39m
+    [90m253| [39m    [34mexpect[39m(sorted[[34m0[39m])[33m.[39m[34mtoBeLessThan[39m([34m0.80[39m)[33m;[39m
+    [90m254| [39m    [90m// Higher voltage = supply = 5V[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/5]⎯[22m[39m
+
+[31m[1m[7m FAIL [27m[22m[39m src/solver/analog/__tests__/mna-end-to-end.test.ts[2m > [22mEnd-to-end: tight transient tolerances[2m > [22mrl_dc_steady_state_tight_tolerance
+[31m[1mAssertionError[22m: expected 97.56098155858157 to be less than 0.1[39m
+[36m [2m❯[22m src/solver/analog/__tests__/mna-end-to-end.test.ts:[2m366:22[22m[39m
+    [90m364| [39m    [35mconst[39m iLFinal [33m=[39m engine[33m.[39m[34mgetBranchCurrent[39m([34m1[39m)[33m;[39m
+    [90m365| [39m    [35mconst[39m errorPct [33m=[39m [33mMath[39m[33m.[39m[34mabs[39m([33mMath[39m[33m.[39m[34mabs[39m(iLFinal) [33m-[39m [34m0.05[39m) [33m/[39m [34m0.05[39m [33m*[39m [34m100[39m[33m;[39m
+    [90m366| [39m    [34mexpect[39m(errorPct)[33m.[39m[34mtoBeLessThan[39m([34m0.1[39m)[33m;[39m
+    [90m   | [39m                     [31m^[39m
+    [90m367| [39m  })[33m;[39m
+    [90m368| [39m})[33m;[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/5]⎯[22m[39m
+
+[31m[1m[7m FAIL [27m[22m[39m src/solver/analog/__tests__/mna-end-to-end.test.ts[2m > [22mMOSFET through compiler[2m > [22mnmos_triode_region_dc_op
+[31m[1mAssertionError[22m: expected 0 to be greater than 0[39m
+[36m [2m❯[22m src/solver/analog/__tests__/mna-end-to-end.test.ts:[2m736:20[22m[39m
+    [90m734| [39m    [35mconst[39m vDrain [33m=[39m voltages[voltages[33m.[39mlength [33m-[39m [34m1[39m][33m;[39m
+    [90m735| [39m    [34mexpect[39m(vDrain)[33m.[39m[34mtoBeLessThan[39m([34m2.3[39m)[33m;[39m   [90m// triode condition[39m
+    [90m736| [39m    [34mexpect[39m(vDrain)[33m.[39m[34mtoBeGreaterThan[39m([34m0.0[39m)[33m;[39m [90m// conducting (above ground)[39m
+    [90m   | [39m                   [31m^[39m
+    [90m737| [39m  })[33m;[39m
+    [90m738| [39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/5]⎯[22m[39m
+
+[31m[1m[7m FAIL [27m[22m[39m src/solver/analog/__tests__/mna-end-to-end.test.ts[2m > [22mMOSFET through compiler[2m > [22mpmos_common_source_dc_op
+[31m[1mAssertionError[22m: expected 0 to be greater than 0[39m
+[36m [2m❯[22m src/solver/analog/__tests__/mna-end-to-end.test.ts:[2m814:20[22m[39m
+    [90m812| [39m    [90m// Expected ≈ 0.5V, must be above ground and confirm saturation: |[39m…
+    [90m813| [39m    [35mconst[39m vDrain [33m=[39m voltages[voltages[33m.[39mlength [33m-[39m [34m1[39m][33m;[39m
+    [90m814| [39m    [34mexpect[39m(vDrain)[33m.[39m[34mtoBeGreaterThan[39m([34m0.0[39m)[33m;[39m   [90m// PMOS conducting (above g[39m…
+    [90m   | [39m                   [31m^[39m
+    [90m815| [39m    [34mexpect[39m(vDrain)[33m.[39m[34mtoBeLessThan[39m([34m3.7[39m)[33m;[39m      [90m// saturation: |Vds|=5-Vdra[39m…
+    [90m816| [39m  })[33m;[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/5]⎯[22m[39m
+
+[2m Test Files [22m [1m[31m1 failed[39m[22m[2m | [22m[1m[32m5 passed[39m[22m[90m (6)[39m
+[2m      Tests [22m [1m[31m5 failed[39m[22m[2m | [22m[1m[32m158 passed[39m[22m[90m (163)[39m
+[2m   Start at [22m 10:49:58
+[2m   Duration [22m 2.03s[2m (transform 450ms, setup 0ms, collect 699ms, tests 127ms, environment 1ms, prepare 410ms)[22m
+

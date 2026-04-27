@@ -5,7 +5,7 @@
  * Task 3.2.2–3.2.4: BJT tests appended by the BJT implementer task_group.
  */
 
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { createDiodeElement, DIODE_PARAM_DEFAULTS } from "../diode.js";
 import {
   createBjtElement,
@@ -17,7 +17,6 @@ import { PropertyBag } from "../../../core/properties.js";
 import { StatePool } from "../../../solver/analog/state-pool.js";
 import {
   MODETRAN,
-  MODEDCOP,
   MODEINITPRED,
   MODEINITFLOAT,
   MODEINITJCT,
@@ -33,7 +32,6 @@ import * as NewtonRaphsonModule from "../../../solver/analog/newton-raphson.js";
 // ---------------------------------------------------------------------------
 const SLOT_VD = 0;
 const SLOT_GEQ = 1;
-const SLOT_IEQ = 2;
 const SLOT_ID = 3;
 
 // ---------------------------------------------------------------------------
@@ -71,7 +69,6 @@ function initPool(element: ReturnType<typeof makeDiode>): StatePool {
  * indices 0 and 1).
  */
 function buildCtx(
-  pool: StatePool,
   cktMode: number,
   xfact: number,
   rhsOld?: Float64Array,
@@ -82,9 +79,11 @@ function buildCtx(
   const voltages = rhsOld ?? new Float64Array(3);
   return {
     solver,
+    matrix: solver,
     rhsOld: voltages,
     rhs: voltages,
     cktMode,
+    time: 0,
     dt: 1e-9,
     method: "trapezoidal",
     order: 1,
@@ -93,10 +92,13 @@ function buildCtx(
     srcFact: 1,
     noncon: { value: 0 },
     limitingCollector: null,
+    convergenceCollector: null,
     xfact,
     gmin: 1e-12,
     reltol: 1e-3,
     iabstol: 1e-12,
+    temp: 300.15,
+    vt: 300.15 * 1.3806226e-23 / 1.6021918e-19,
     cktFixLimit: false,
     bypass: false,
     voltTol: 1e-6,
@@ -118,7 +120,7 @@ describe("Task 3.2.1 — Diode MODEINITPRED xfact", () => {
     pool.states[1][SLOT_VD] = 0.65;
     pool.states[2][SLOT_VD] = 0.60;
 
-    const ctx = buildCtx(pool, MODETRAN | MODEINITPRED, 0.5);
+    const ctx = buildCtx(MODETRAN | MODEINITPRED, 0.5);
     element.load(ctx);
 
     // (1 + 0.5) * 0.65 - 0.5 * 0.60 = 0.975 - 0.30 = 0.675
@@ -138,6 +140,7 @@ describe("Task 3.2.1 — Diode MODEINITPRED xfact", () => {
     // write-back has not yet occurred.
     let capturedS0ID: number | undefined;
     let capturedS0GEQ: number | undefined;
+    const realPnjlimForFirstSpy = NewtonRaphsonModule.pnjlim;
     const pnjlimSpy = vi.spyOn(NewtonRaphsonModule, "pnjlim").mockImplementation(
       (vnew, vold, vt, vcrit) => {
         if (capturedS0ID === undefined) {
@@ -146,9 +149,7 @@ describe("Task 3.2.1 — Diode MODEINITPRED xfact", () => {
           capturedS0GEQ = pool.states[0][SLOT_GEQ];
         }
         // Delegate to the real pnjlim so diode.load() completes normally.
-        return NewtonRaphsonModule.pnjlim.wrappedImplementation
-          ? NewtonRaphsonModule.pnjlim.wrappedImplementation(vnew, vold, vt, vcrit)
-          : { value: vnew, limited: false };
+        return realPnjlimForFirstSpy(vnew, vold, vt, vcrit);
       }
     );
 
@@ -168,7 +169,7 @@ describe("Task 3.2.1 — Diode MODEINITPRED xfact", () => {
     // s2 for extrapolation
     pool.states[2][SLOT_VD] = 0.60;
 
-    const ctx = buildCtx(pool, MODETRAN | MODEINITPRED, 0.5);
+    const ctx = buildCtx(MODETRAN | MODEINITPRED, 0.5);
 
     pnjlimSpy.mockRestore();
 
@@ -217,7 +218,7 @@ describe("Task 3.2.1 — Diode MODEINITPRED xfact", () => {
     // s0[SLOT_VD] will be set to s1[SLOT_VD]=0.9 by the state-copy
     pool.states[0][SLOT_VD] = 0.9;
 
-    const ctx = buildCtx(pool, MODETRAN | MODEINITPRED, 2.0);
+    const ctx = buildCtx(MODETRAN | MODEINITPRED, 2.0);
     element.load(ctx);
 
     // pnjlim is called exactly once: the standard forward-bias path (not the breakdown path).
@@ -247,12 +248,12 @@ describe("Task 3.2.1 — Diode MODEINITPRED xfact", () => {
     pool.states[2][SLOT_VD] = 0.60;
 
     // rhsOld: node1=0.72, node2=0.0, so vdRaw = va - vc = 0.72 - 0 = 0.72
-    // nodeAnode=1 → voltages[0]; nodeCathode=2 → voltages[1]
-    const rhsOld = new Float64Array([0.72, 0.0, 0.0]);
+    // nodeAnode=1 → rhsOld[1]; nodeCathode=2 → rhsOld[2] (1-based indexing)
+    const rhsOld = new Float64Array([0.0, 0.72, 0.0]);
 
     // MODETRAN without MODEINITPRED → MODEINITFLOAT path → rhsOld read.
     // pnjlim's first argument is the rhsOld-derived vdRaw — confirms the else branch.
-    const ctx = buildCtx(pool, MODETRAN | MODEINITFLOAT, 0.5, rhsOld);
+    const ctx = buildCtx(MODETRAN | MODEINITFLOAT, 0.5, rhsOld);
     element.load(ctx);
 
     expect(pnjlimSpy.mock.calls.length).toBe(1);
@@ -321,7 +322,7 @@ function makeBjtL1(paramOverrides: Record<string, number> = {}) {
   return createSpiceL1BjtElement(1, false, pinNodes, [], -1, bag);
 }
 
-function initBjtPool(element: ReturnType<typeof makeBjtL0>): StatePool {
+function initBjtPool(element: ReturnType<typeof makeBjtL0> | ReturnType<typeof makeBjtL1>): StatePool {
   const pool = new StatePool(Math.max(element.stateSize, 1));
   element.stateBaseOffset = 0;
   element.initState(pool);
@@ -332,7 +333,6 @@ function initBjtPool(element: ReturnType<typeof makeBjtL0>): StatePool {
  * Build a LoadContext for BJT tests. Solver size=4 covers nodes 1-3 (0-based 0-2).
  */
 function buildBjtCtx(
-  pool: StatePool,
   cktMode: number,
   xfact: number,
   rhsOld?: Float64Array,
@@ -343,9 +343,11 @@ function buildBjtCtx(
   const voltages = rhsOld ?? new Float64Array(4);
   return {
     solver,
+    matrix: solver,
     rhsOld: voltages,
     rhs: voltages,
     cktMode,
+    time: 0,
     dt: 1e-9,
     method: "trapezoidal",
     order: 1,
@@ -354,10 +356,13 @@ function buildBjtCtx(
     srcFact: 1,
     noncon: { value: 0 },
     limitingCollector: null,
+    convergenceCollector: null,
     xfact,
     gmin: 1e-12,
     reltol: 1e-3,
     iabstol: 1e-12,
+    temp: 300.15,
+    vt: 300.15 * 1.3806226e-23 / 1.6021918e-19,
     cktFixLimit: false,
     bypass: false,
     voltTol: 1e-6,
@@ -387,7 +392,7 @@ describe("Task 3.2.2 — BJT L0 MODEINITPRED xfact", () => {
     pool.states[1][BJT_SLOT_VBC] = -0.3;
     pool.states[2][BJT_SLOT_VBC] = -0.28;
 
-    const ctx = buildBjtCtx(pool, MODETRAN | MODEINITPRED, 0.25);
+    const ctx = buildBjtCtx(MODETRAN | MODEINITPRED, 0.25);
     element.load(ctx);
 
     // (1+0.25)*0.72 - 0.25*0.70 = 0.74 exactly
@@ -415,7 +420,7 @@ describe("Task 3.2.2 — BJT L0 MODEINITPRED xfact", () => {
     pool.states[1][BJT_SLOT_VBC] = -0.1;
     pool.states[2][BJT_SLOT_VBC] = -0.08;
 
-    const ctx = buildBjtCtx(pool, MODETRAN | MODEINITPRED, 0.5);
+    const ctx = buildBjtCtx(MODETRAN | MODEINITPRED, 0.5);
     element.load(ctx);
 
     // pnjlim is called with vold = s0[VBE] after the copy, which equals s1[VBE]=0.65.
@@ -442,7 +447,7 @@ describe("Task 3.2.2 — BJT L0 MODEINITPRED xfact", () => {
     pool.states[1][BJT_SLOT_VBC] = -0.1;
     pool.states[2][BJT_SLOT_VBC] = -0.08;
 
-    const ctx = buildBjtCtx(pool, MODETRAN | MODEINITPRED, 2.0);
+    const ctx = buildBjtCtx(MODETRAN | MODEINITPRED, 2.0);
     element.load(ctx);
 
     // Exactly 2 calls: once for BE, once for BC — this is the key ngspice-alignment assertion.
@@ -453,12 +458,12 @@ describe("Task 3.2.2 — BJT L0 MODEINITPRED xfact", () => {
 
   it("skips pnjlim under MODEINITJCT / MODEINITSMSIG / MODEINITTRAN", () => {
     const element = makeBjtL0();
-    const pool = initBjtPool(element);
+    initBjtPool(element);
 
     // Sub-case 1: MODEINITJCT
     {
       const pnjlimSpy = vi.spyOn(NewtonRaphsonModule, "pnjlim");
-      const ctx = buildBjtCtx(pool, MODETRAN | MODEINITJCT, 0.0);
+      const ctx = buildBjtCtx(MODETRAN | MODEINITJCT, 0.0);
       element.load(ctx);
       expect(pnjlimSpy.mock.calls.length).toBe(0);
       pnjlimSpy.mockRestore();
@@ -467,7 +472,7 @@ describe("Task 3.2.2 — BJT L0 MODEINITPRED xfact", () => {
     // Sub-case 2: MODEINITSMSIG
     {
       const pnjlimSpy = vi.spyOn(NewtonRaphsonModule, "pnjlim");
-      const ctx = buildBjtCtx(pool, MODETRAN | MODEINITSMSIG, 0.0);
+      const ctx = buildBjtCtx(MODETRAN | MODEINITSMSIG, 0.0);
       element.load(ctx);
       expect(pnjlimSpy.mock.calls.length).toBe(0);
       pnjlimSpy.mockRestore();
@@ -476,7 +481,7 @@ describe("Task 3.2.2 — BJT L0 MODEINITPRED xfact", () => {
     // Sub-case 3: MODEINITTRAN
     {
       const pnjlimSpy = vi.spyOn(NewtonRaphsonModule, "pnjlim");
-      const ctx = buildBjtCtx(pool, MODETRAN | MODEINITTRAN, 0.0);
+      const ctx = buildBjtCtx(MODETRAN | MODEINITTRAN, 0.0);
       element.load(ctx);
       expect(pnjlimSpy.mock.calls.length).toBe(0);
       pnjlimSpy.mockRestore();
@@ -486,12 +491,13 @@ describe("Task 3.2.2 — BJT L0 MODEINITPRED xfact", () => {
   it("falls through to rhsOld when MODEINITPRED is not set", () => {
     const pnjlimSpy = vi.spyOn(NewtonRaphsonModule, "pnjlim");
     const element = makeBjtL0();
-    const pool = initBjtPool(element);
+    initBjtPool(element);
 
     // rhsOld: vB=node1=0.7, vC=node2=0.0, vE=node3=0.0 → vbeRaw = 0.7
-    const rhsOld = new Float64Array([0.7, 0.0, 0.0, 0.0]);
+    // 1-based: B=node1→rhsOld[1], C=node2→rhsOld[2], E=node3→rhsOld[3]
+    const rhsOld = new Float64Array([0.0, 0.7, 0.0, 0.0]);
 
-    const ctx = buildBjtCtx(pool, MODETRAN | MODEINITFLOAT, 0.5, rhsOld);
+    const ctx = buildBjtCtx(MODETRAN | MODEINITFLOAT, 0.5, rhsOld);
     element.load(ctx);
 
     // pnjlim's first call (BE junction) receives vbeRaw — must equal the rhsOld-derived value.
@@ -520,7 +526,7 @@ describe("Task 3.2.3 — BJT L1 MODEINITPRED xfact", () => {
     pool.states[1][BJT_SLOT_VBC] = -0.3;
     pool.states[2][BJT_SLOT_VBC] = -0.28;
 
-    const ctx = buildBjtCtx(pool, MODETRAN | MODEINITPRED, 0.25);
+    const ctx = buildBjtCtx(MODETRAN | MODEINITPRED, 0.25);
     element.load(ctx);
 
     const expectedVbe = (1 + 0.25) * 0.72 - 0.25 * 0.70;
@@ -543,7 +549,7 @@ describe("Task 3.2.3 — BJT L1 MODEINITPRED xfact", () => {
     pool.states[1][BJT_SLOT_VSUB] = 0.01;
     pool.states[2][BJT_SLOT_VSUB] = 0.005;
 
-    const ctx = buildBjtCtx(pool, MODETRAN | MODEINITPRED, 0.25);
+    const ctx = buildBjtCtx(MODETRAN | MODEINITPRED, 0.25);
     element.load(ctx);
 
     // Runtime assertions. The intermediate extrapolation is overwritten before any
@@ -607,7 +613,7 @@ describe("Task 3.2.3 — BJT L1 MODEINITPRED xfact", () => {
     pool.states[0][BJT_SLOT_VBC]  = 0.0;
     pool.states[0][BJT_SLOT_VSUB] = 0.0;
 
-    const ctx = buildBjtCtx(pool, MODETRAN | MODEINITPRED, 0.25);
+    const ctx = buildBjtCtx(MODETRAN | MODEINITPRED, 0.25);
     element.load(ctx);
 
     const calls = pnjlimSpy.mock.calls;
@@ -629,7 +635,7 @@ describe("Task 3.2.3 — BJT L1 MODEINITPRED xfact", () => {
     pool.states[1][BJT_SLOT_VBE] = 0.65;
     pool.states[2][BJT_SLOT_VBE] = 0.60;
 
-    const ctx = buildBjtCtx(pool, MODETRAN | MODEINITPRED, 0.5);
+    const ctx = buildBjtCtx(MODETRAN | MODEINITPRED, 0.5);
     element.load(ctx);
 
     // Exactly 3 calls: BE, BC, substrate — this is the key ngspice-alignment assertion.
@@ -640,12 +646,12 @@ describe("Task 3.2.3 — BJT L1 MODEINITPRED xfact", () => {
 
   it("skips pnjlim under MODEINITJCT / MODEINITSMSIG / MODEINITTRAN", () => {
     const element = makeBjtL1();
-    const pool = initBjtPool(element);
+    initBjtPool(element);
 
     // Sub-case 1: MODEINITJCT
     {
       const pnjlimSpy = vi.spyOn(NewtonRaphsonModule, "pnjlim");
-      const ctx = buildBjtCtx(pool, MODETRAN | MODEINITJCT, 0.0);
+      const ctx = buildBjtCtx(MODETRAN | MODEINITJCT, 0.0);
       element.load(ctx);
       expect(pnjlimSpy.mock.calls.length).toBe(0);
       pnjlimSpy.mockRestore();
@@ -654,7 +660,7 @@ describe("Task 3.2.3 — BJT L1 MODEINITPRED xfact", () => {
     // Sub-case 2: MODEINITSMSIG
     {
       const pnjlimSpy = vi.spyOn(NewtonRaphsonModule, "pnjlim");
-      const ctx = buildBjtCtx(pool, MODETRAN | MODEINITSMSIG, 0.0);
+      const ctx = buildBjtCtx(MODETRAN | MODEINITSMSIG, 0.0);
       element.load(ctx);
       expect(pnjlimSpy.mock.calls.length).toBe(0);
       pnjlimSpy.mockRestore();
@@ -663,7 +669,7 @@ describe("Task 3.2.3 — BJT L1 MODEINITPRED xfact", () => {
     // Sub-case 3: MODEINITTRAN
     {
       const pnjlimSpy = vi.spyOn(NewtonRaphsonModule, "pnjlim");
-      const ctx = buildBjtCtx(pool, MODETRAN | MODEINITTRAN, 0.0);
+      const ctx = buildBjtCtx(MODETRAN | MODEINITTRAN, 0.0);
       element.load(ctx);
       expect(pnjlimSpy.mock.calls.length).toBe(0);
       pnjlimSpy.mockRestore();
@@ -673,12 +679,13 @@ describe("Task 3.2.3 — BJT L1 MODEINITPRED xfact", () => {
   it("falls through to rhsOld when MODEINITPRED is not set", () => {
     const pnjlimSpy = vi.spyOn(NewtonRaphsonModule, "pnjlim");
     const element = makeBjtL1();
-    const pool = initBjtPool(element);
+    initBjtPool(element);
 
     // vBi=node1(internal=ext when RB=0)=0.7, vCi=node2=0.0, vEi=node3=0.0 → vbeRaw=0.7
-    const rhsOld = new Float64Array([0.7, 0.0, 0.0, 0.0]);
+    // 1-based: B=node1→rhsOld[1], C=node2→rhsOld[2], E=node3→rhsOld[3]
+    const rhsOld = new Float64Array([0.0, 0.7, 0.0, 0.0]);
 
-    const ctx = buildBjtCtx(pool, MODETRAN | MODEINITFLOAT, 0.5, rhsOld);
+    const ctx = buildBjtCtx(MODETRAN | MODEINITFLOAT, 0.5, rhsOld);
     element.load(ctx);
 
     // pnjlim's first call (BE junction) receives vbeRaw — must equal the rhsOld-derived value.
@@ -709,7 +716,7 @@ describe("Task 3.2.4 — BJT L1 VSUB state-copy", () => {
     pool.states[1][BJT_SLOT_VSUB] = 0.42; // the value that must be copied to s0
     pool.states[2][BJT_SLOT_VSUB] = 0.35; // s2 for extrapolation
 
-    const ctx = buildBjtCtx(pool, MODETRAN | MODEINITPRED, 0.5);
+    const ctx = buildBjtCtx(MODETRAN | MODEINITPRED, 0.5);
     element.load(ctx);
 
     // pnjlim is called as pnjlim(vsubRaw, s0[VSUB], vt, tSubVcrit).

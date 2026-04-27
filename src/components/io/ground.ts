@@ -26,6 +26,7 @@ import {
   type ComponentLayout,
 } from "../../core/registry.js";
 import type { AnalogElementCore, LoadContext } from "../../solver/analog/element.js";
+import { NGSPICE_LOAD_ORDER } from "../../solver/analog/element.js";
 
 // ---------------------------------------------------------------------------
 // Pin layout
@@ -111,6 +112,11 @@ function createGroundAnalogElement(
   pinNodes.get("out");
   return {
     branchIndex: -1,
+    // Ground is a no-op stamper (the compiler maps its pin to node 0 directly,
+    // load() does nothing). Ordinal is therefore irrelevant for parity, but
+    // every AnalogElementCore must declare one. RES is the lowest-ordinal
+    // bucket so any other element loads after it.
+    ngspiceLoadOrder: NGSPICE_LOAD_ORDER.RES,
     isNonlinear: false,
     isReactive: false,
     load(_ctx: LoadContext): void {

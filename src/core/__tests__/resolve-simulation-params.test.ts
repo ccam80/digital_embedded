@@ -13,6 +13,7 @@ import { describe, it, expect } from "vitest";
 import {
   resolveSimulationParams,
   DEFAULT_SIMULATION_PARAMS,
+  type SimulationParams,
 } from "@/core/analog-engine-interface";
 import { MNAEngine } from "@/solver/analog/analog-engine";
 
@@ -39,65 +40,71 @@ describe("resolveSimulationParams — ngspice traninit.c:23-32 parity", () => {
   });
 
   it("outputStep < (tStop - 0)/50 → maxTimeStep = outputStep", () => {
-    const r = resolveSimulationParams({
+    const partial: Partial<SimulationParams> = {
       ...DEFAULT_SIMULATION_PARAMS,
-      maxTimeStep: undefined,
       tStop: 100e-3,
       outputStep: 1e-3,
-    });
+    };
+    delete partial.maxTimeStep;
+    const r = resolveSimulationParams(partial as SimulationParams);
     expect(r.maxTimeStep).toBe(1e-3);
   });
 
   it("outputStep > (tStop - 0)/50 → maxTimeStep = (tStop - 0)/50", () => {
-    const r = resolveSimulationParams({
+    const partial: Partial<SimulationParams> = {
       ...DEFAULT_SIMULATION_PARAMS,
-      maxTimeStep: undefined,
       tStop: 1e-3,
       outputStep: 1e-4,
-    });
+    };
+    delete partial.maxTimeStep;
+    const r = resolveSimulationParams(partial as SimulationParams);
     // (1e-3)/50 = 2e-5; outputStep 1e-4 > 2e-5 → maxStep = 2e-5
     expect(r.maxTimeStep).toBe(2e-5);
   });
 
   it("streaming mode (no tStop) falls back to static default", () => {
-    const r = resolveSimulationParams({
+    const partial: Partial<SimulationParams> = {
       ...DEFAULT_SIMULATION_PARAMS,
-      maxTimeStep: undefined,
-    });
+    };
+    delete partial.maxTimeStep;
+    const r = resolveSimulationParams(partial as SimulationParams);
     expect(r.maxTimeStep).toBe(DEFAULT_SIMULATION_PARAMS.maxTimeStep);
   });
 
   it("derived minTimeStep tracks maxTimeStep at 1e-11 ratio (traninit.c:34)", () => {
-    const r = resolveSimulationParams({
+    const partial: Partial<SimulationParams> = {
       ...DEFAULT_SIMULATION_PARAMS,
-      maxTimeStep: undefined,
-      minTimeStep: undefined,
       tStop: 100e-3,
       outputStep: 1e-3,
-    });
+    };
+    delete partial.maxTimeStep;
+    delete partial.minTimeStep;
+    const r = resolveSimulationParams(partial as SimulationParams);
     expect(r.maxTimeStep).toBe(1e-3);
     expect(r.minTimeStep).toBe(1e-14);
   });
 
   it("derived firstStep follows dctran.c:118", () => {
-    const r = resolveSimulationParams({
+    const partial: Partial<SimulationParams> = {
       ...DEFAULT_SIMULATION_PARAMS,
-      firstStep: undefined,
       tStop: 100e-3,
       outputStep: 1e-3,
-    });
+    };
+    delete partial.firstStep;
+    const r = resolveSimulationParams(partial as SimulationParams);
     // MIN(100e-3/100, 1e-3) / 10 = MIN(1e-3, 1e-3) / 10 = 1e-4
     expect(r.firstStep).toBe(1e-4);
   });
 
   it("nonzero initTime affects auto-derivation (ngspice CKTinitTime)", () => {
-    const r = resolveSimulationParams({
+    const partial: Partial<SimulationParams> = {
       ...DEFAULT_SIMULATION_PARAMS,
-      maxTimeStep: undefined,
       tStop: 1e-3,
       outputStep: 1e-4,
       initTime: 0.5e-3,
-    });
+    };
+    delete partial.maxTimeStep;
+    const r = resolveSimulationParams(partial as SimulationParams);
     // (1e-3 - 0.5e-3)/50 = 1e-5; outputStep 1e-4 > 1e-5 → maxStep = 1e-5.
     expect(r.maxTimeStep).toBe(1e-5);
   });

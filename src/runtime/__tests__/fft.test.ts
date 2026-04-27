@@ -32,7 +32,7 @@ describe("FFT", () => {
     // magnitude[1]=0.1 → -20 dB
     // magnitude[2]=0.01 → -40 dB
     const mag = new Float64Array([1, 0.1, 0.01]);
-    const db = magnitudeToDb(mag);
+    magnitudeToDb(mag);
 
   });
 
@@ -47,7 +47,7 @@ describe("FFT", () => {
     fft(re, im);
 
     // DC bin magnitude should be N * amplitude = 1024 * 3
-    const dcMag = Math.sqrt(re[0] * re[0] + im[0] * im[0]);
+    Math.sqrt(re[0] * re[0] + im[0] * im[0]);
 
     // All other bins should be near zero
     for (let k = 1; k < N; k++) {
@@ -73,7 +73,7 @@ describe("FFT", () => {
 
     fft(re, im);
 
-    const { frequency, magnitude } = magnitudeSpectrum(re, im, sampleRate);
+    const { magnitude } = magnitudeSpectrum(re, im, sampleRate);
     const db = magnitudeToDb(magnitude);
 
     // Find peak bin
@@ -121,7 +121,7 @@ describe("FFT", () => {
 
     fft(re, im);
 
-    const { frequency, magnitude } = magnitudeSpectrum(re, im, sampleRate);
+    const { magnitude, frequency } = magnitudeSpectrum(re, im, sampleRate);
 
     // Find the two largest peaks
     const peaks: { bin: number; mag: number }[] = [];
@@ -148,8 +148,6 @@ describe("FFT", () => {
     expect(foundB).toBe(true);
 
     // Relative magnitudes: peak at freqA should be ~2× peak at freqB (3 dB within)
-    const db = magnitudeToDb(magnitude);
-    const dbDiff = Math.abs(db[peak1.bin] - db[peak2.bin]);
     // 20*log10(1.0/0.5) = 6.02 dB; allow 3 dB tolerance
   });
 
@@ -201,7 +199,7 @@ describe("FFT", () => {
 
   it("magnitude_to_db_explicit_reference", () => {
     const mag = new Float64Array([2.0, 1.0, 0.5]);
-    const db = magnitudeToDb(mag, 2.0);
+    magnitudeToDb(mag, 2.0);
   });
 });
 

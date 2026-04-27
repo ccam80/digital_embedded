@@ -28,6 +28,7 @@ import {
   type ComponentDefinition,
 } from "../../core/registry.js";
 import type { AnalogElementCore, ReactiveAnalogElement, IntegrationMethod, LoadContext } from "../../solver/analog/element.js";
+import { NGSPICE_LOAD_ORDER } from "../../solver/analog/element.js";
 import { stampRHS } from "../../solver/analog/stamp-helpers.js";
 import { niIntegrate } from "../../solver/analog/ni-integrate.js";
 import { MODEDC, MODEINITPRED, MODEINITTRAN, MODEUIC } from "../../solver/analog/ckt-mode.js";
@@ -237,12 +238,21 @@ export class AnalogTransformerElement implements ReactiveAnalogElement {
   readonly pinNodeIds: readonly number[];
   readonly allNodeIds: readonly number[];
   readonly branchIndex: number;
+  readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.MUT;
   readonly isNonlinear = false;
   readonly isReactive = true;
   readonly poolBacked = true as const;
   readonly stateSchema = TRANSFORMER_SCHEMA;
   readonly stateSize = TRANSFORMER_SCHEMA.size;
   stateBaseOffset = -1;
+  s0: Float64Array = new Float64Array(0);
+  s1: Float64Array = new Float64Array(0);
+  s2: Float64Array = new Float64Array(0);
+  s3: Float64Array = new Float64Array(0);
+  s4: Float64Array = new Float64Array(0);
+  s5: Float64Array = new Float64Array(0);
+  s6: Float64Array = new Float64Array(0);
+  s7: Float64Array = new Float64Array(0);
 
   private _pair: CoupledInductorPair;
   private readonly _branch2: number;

@@ -16,8 +16,9 @@ import { AnalogInductorElement } from "../../../components/passives/inductor.js"
 import { PropertyBag } from "../../../core/properties.js";
 import { StatePool } from "../state-pool.js";
 import { SparseSolver } from "../sparse-solver.js";
-import { MODETRAN, MODEINITTRAN, MODEINITFLOAT, setInitf } from "../ckt-mode.js";
+import { MODETRAN, MODEINITTRAN, MODEINITFLOAT } from "../ckt-mode.js";
 import type { LoadContext } from "../load-context.js";
+import { makeLoadCtx } from "./test-helpers.js";
 
 describe("Phase 3 Task 3.3.3 -- Relay composite-child", () => {
   it("SPDT relay exposes coil inductor as composite child", () => {
@@ -104,28 +105,15 @@ describe("Phase 3 Task 3.3.3 -- Relay composite-child", () => {
     function makeCtx(cktMode: number): LoadContext {
       const solver = new SparseSolver();
       solver._initStructure(matrixSize);
-      return {
+      return makeLoadCtx({
         solver,
         rhsOld: voltages,
         rhs: voltages,
-        voltages,
         cktMode,
         dt,
-        method: "trapezoidal",
-        order: 1,
         deltaOld: [dt, dt, 0, 0, 0, 0, 0],
         ag,
-        srcFact: 1,
-        noncon: { value: 0 },
-        limitingCollector: null,
-        xfact: 0,
-        gmin: 1e-12,
-        reltol: 1e-3,
-        iabstol: 1e-12,
-        bypass: false,
-        voltTol: 1e-6,
-        cktFixLimit: false,
-      } as LoadContext;
+      });
     }
 
     // Step 1: MODEINITTRAN â€” seeds flux and copies state.

@@ -135,10 +135,6 @@ describe("OTA", () => {
     expect(result.converged).toBe(true);
 
     // gm = iBias / (2 * vt) = 0.001 / 0.052 â‰ˆ 19.23 mS
-    const gm = iBias / (2 * vt);
-    const iOut = gm * vDiff;
-    const vOut = iOut * rLoad;
-
     // V(OUT+) should be â‰ˆ vOut = gm * vDiff * R
   });
 
@@ -211,8 +207,8 @@ describe("OTA", () => {
       return result.nodeVoltages[3];
     }
 
-    const vOut1 = runWithIbias(1e-3);  // I_bias = 1mA
-    const vOut2 = runWithIbias(2e-3);  // I_bias = 2mA
+    runWithIbias(1e-3);  // I_bias = 1mA
+    runWithIbias(2e-3);  // I_bias = 2mA
 
     // gm proportional to I_bias â†’ V_out doubles when I_bias doubles
   });
@@ -249,8 +245,8 @@ describe("OTA", () => {
       return result.nodeVoltages[3] / vDiff;
     }
 
-    const gain1 = gainAtIbias(1e-3);
-    const gain4 = gainAtIbias(4e-3);
+    gainAtIbias(1e-3);
+    gainAtIbias(4e-3);
 
     // Gain should scale 4x when I_bias increases 4x
   });
@@ -286,24 +282,19 @@ describe("OTA", () => {
 
 import type { SparseSolver as SparseSolverType } from "../../../solver/analog/sparse-solver.js";
 import type { LoadContext } from "../../../solver/analog/load-context.js";
+import { MODEDCOP, MODEINITFLOAT } from "../../../solver/analog/ckt-mode.js";
 
 interface OtaCaptureStamp { row: number; col: number; value: number; }
-interface OtaCaptureRhs { row: number; value: number; }
-function makeOtaCaptureSolver(): {
+function makeOtaCaptureSolver(_rhs: Float64Array): {
   solver: SparseSolverType;
   stamps: OtaCaptureStamp[];
-  rhs: OtaCaptureRhs[];
 } {
   const stamps: OtaCaptureStamp[] = [];
-  const rhs: OtaCaptureRhs[] = [];
   const handles: { row: number; col: number }[] = [];
   const handleIndex = new Map<string, number>();
   const solver = {
     stamp: (row: number, col: number, value: number) => {
       stamps.push({ row, col, value });
-    },
-    stampRHS: (row: number, value: number) => {
-      rhs.push({ row, value });
     },
     allocElement: (row: number, col: number): number => {
       const key = `${row},${col}`;
@@ -320,13 +311,14 @@ function makeOtaCaptureSolver(): {
       stamps.push({ row, col, value });
     },
   } as unknown as SparseSolverType;
-  return { solver, stamps, rhs };
+  return { solver, stamps };
 }
 
-function makeOtaParityCtx(voltages: Float64Array, solver: SparseSolverType): LoadContext {
+function makeOtaParityCtx(voltages: Float64Array, solver: SparseSolverType, rhs: Float64Array): LoadContext {
   return makeLoadCtx({
     solver,
-    voltages,
+    rhs,
+    rhsOld: voltages,
     cktMode: MODEDCOP | MODEINITFLOAT,
     dt: 0,
   });
@@ -341,14 +333,15 @@ describe("OTA parity (C4.5)", () => {
     const iBias = 1e-3;
     const ota = makeOTAElement(nVp, nVm, nIabc, nOutP, nOutN, { vt, gmMax });
 
-    const voltages = new Float64Array(4);
+    const voltages = new Float64Array(5);  // 1-based: slot 0 = ground sentinel, slots 1-4 = nodes
     voltages[nVp]   = vDiff;
     voltages[nVm]   = 0;
     voltages[nIabc] = iBias;
     voltages[nOutP] = 0;
 
-    const { solver, stamps, rhs } = makeOtaCaptureSolver();
-    const ctx = makeOtaParityCtx(voltages, solver);
+    const rhsBuf = new Float64Array(16);
+    const { solver, stamps } = makeOtaCaptureSolver(rhsBuf);
+    const ctx = makeOtaParityCtx(voltages, solver, rhsBuf);
     ota.load(ctx);
 
     // Closed-form reference (ngspice-equivalent small-signal Norton):
@@ -364,15 +357,14 @@ describe("OTA parity (C4.5)", () => {
 
     // Stamps: (OUT+, V+) -= gmEff; (OUT+, V-) += gmEff.
     // OUT- is ground (nOutN=0), so (OUT-, *) stamps are suppressed.
-    const outpRow = nOutP - 1;
+    // allocElement uses 1-based ngspice indices directly.
     const sumAt = (row: number, col: number): number =>
       stamps.filter((s) => s.row === row && s.col === col)
             .reduce((a, s) => a + s.value, 0);
-    expect(sumAt(outpRow, nVp - 1)).toBe(-NGSPICE_GMEFF);
-    expect(sumAt(outpRow, nVm - 1)).toBe(NGSPICE_GMEFF);
+    expect(sumAt(nOutP, nVp)).toBe(-NGSPICE_GMEFF);
+    expect(sumAt(nOutP, nVm)).toBe(NGSPICE_GMEFF);
 
-    // RHS: OUT+ += iNR (OUT- ground, suppressed)
-    const rhsOutP = rhs.filter((r) => r.row === outpRow).reduce((a, r) => a + r.value, 0);
-    expect(rhsOutP).toBe(NGSPICE_INR);
+    // RHS: OUT+ += iNR (OUT- ground, suppressed); stampRHS uses 1-based index.
+    expect(rhsBuf[nOutP]).toBe(NGSPICE_INR);
   });
 });

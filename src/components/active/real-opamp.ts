@@ -61,6 +61,7 @@ import {
   type ComponentDefinition,
 } from "../../core/registry.js";
 import type { AnalogElementCore, LoadContext } from "../../solver/analog/element.js";
+import { NGSPICE_LOAD_ORDER } from "../../solver/analog/element.js";
 import { stampRHS } from "../../solver/analog/stamp-helpers.js";
 import { MODETRAN } from "../../solver/analog/ckt-mode.js";
 import type { SparseSolver } from "../../solver/analog/sparse-solver.js";
@@ -420,6 +421,7 @@ export function createRealOpAmpElement(
 
   return {
     branchIndex: -1,
+    ngspiceLoadOrder: NGSPICE_LOAD_ORDER.VCVS,
     isNonlinear: true,
     isReactive: true,
 

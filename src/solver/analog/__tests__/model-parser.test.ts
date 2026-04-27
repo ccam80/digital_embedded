@@ -45,7 +45,6 @@ describe("ModelParser", () => {
     const result = parseModelCard(text);
 
     expect("message" in result).toBe(false);
-    const model = result as ParsedModel;
   });
 
   it("ignores_comments", () => {
@@ -125,7 +124,7 @@ describe("ModelParser", () => {
 
   it("handles_meg_suffix", () => {
     const text = ".MODEL Test NMOS (RG=1.5MEG)";
-    const result = parseModelCard(text) as ParsedModel;
+    parseModelCard(text);
   });
 
   it("file_parser_handles_continuation_and_comments", () => {

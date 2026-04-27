@@ -120,5 +120,8 @@ export function checkChildConvergence(
   children: AnalogCapacitorElement[],
   ctx: import("../load-context.js").LoadContext,
 ): boolean {
-  return children.every(c => !c.checkConvergence || c.checkConvergence(ctx));
+  return children.every(c => {
+    const fn = (c as { checkConvergence?: (ctx: import("../load-context.js").LoadContext) => boolean }).checkConvergence;
+    return !fn || fn.call(c, ctx);
+  });
 }

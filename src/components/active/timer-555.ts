@@ -86,7 +86,8 @@ import {
   type AttributeMapping,
   type ComponentDefinition,
 } from "../../core/registry.js";
-import type { AnalogElementCore, LoadContext } from "../../solver/analog/element.js";
+import type { LoadContext, PoolBackedAnalogElementCore } from "../../solver/analog/element.js";
+import { NGSPICE_LOAD_ORDER } from "../../solver/analog/element.js";
 import { defineModelParams } from "../../core/model-params.js";
 import { stampG, stampRHS } from "../../solver/analog/stamp-helpers.js";
 import {
@@ -356,7 +357,7 @@ function createTimer555Element(
   _branchIdx: number,
   props: PropertyBag,
   _getTime?: () => number,
-): AnalogElementCore {
+): PoolBackedAnalogElementCore {
   const p: Record<string, number> = {
     vDrop:      props.getModelParam<number>("vDrop"),
     rDischarge: props.getModelParam<number>("rDischarge"),
@@ -423,8 +424,6 @@ function createTimer555Element(
   const bjtProps = makeBjtProps();
   const bjtSub = createBjtElement(1 /* NPN */, bjtPinNodes, -1, bjtProps);
 
-  // Pool binding â€” set in initState(), read in load()
-  let pool: StatePoolRef;
   let bjtBase: number;
 
   // -------------------------------------------------------------------------
@@ -506,6 +505,7 @@ function createTimer555Element(
 
   return {
     branchIndex: -1,
+    ngspiceLoadOrder: NGSPICE_LOAD_ORDER.VCVS,
     isNonlinear: true,
     get isReactive(): boolean {
       return _childElements.length > 0;
@@ -523,9 +523,18 @@ function createTimer555Element(
       _childStateSize,
     stateSchema: BJT_SIMPLE_SCHEMA,
     stateBaseOffset: -1,
+    s0: new Float64Array(0),
+    s1: new Float64Array(0),
+    s2: new Float64Array(0),
+    s3: new Float64Array(0),
+    s4: new Float64Array(0),
+    s5: new Float64Array(0),
+    s6: new Float64Array(0),
+    s7: new Float64Array(0),
 
     initState(poolRef: StatePoolRef): void {
-      pool = poolRef;
+      this.s0 = poolRef.state0; this.s1 = poolRef.state1; this.s2 = poolRef.state2; this.s3 = poolRef.state3;
+      this.s4 = poolRef.state4; this.s5 = poolRef.state5; this.s6 = poolRef.state6; this.s7 = poolRef.state7;
       bjtBase = this.stateBaseOffset;
 
       // BJT occupies the first block of state.
@@ -672,10 +681,6 @@ function createTimer555Element(
       }
     },
 
-    checkConvergence(ctx: LoadContext): boolean {
-      return _childElements.every(c => !c.checkConvergence || c.checkConvergence(ctx));
-    },
-
     accept(ctx: LoadContext, _simTime: number, _addBreakpoint: (t: number) => void): void {
       updateOutputPinLevels(ctx.rhs);
       advanceFlipflop(ctx.rhs);
@@ -707,11 +712,6 @@ function createTimer555Element(
       const iTrig = 0;
       const iThr  = 0;
       const iRst  = 0;
-      // DIS current: BJT collector (approximation at current operating point)
-      const iDis  = G_DIV * (vGndV - vLower);   // lower arm current flows into GND
-      const iGnd  = G_DIV * (vGndV - vLower)
-                  + iDis;
-
       // Return simplified KCL-consistent currents at the composite boundary
       return [
         G_DIV * (vDis - vGndV),  // DIS â€” discharge current (BJT Câ†’E path)

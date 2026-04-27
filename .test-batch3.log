@@ -1,0 +1,331 @@
+
+[1m[7m[36m RUN [39m[27m[22m [36mv2.1.9 [39m[90mC:/local_working_projects/digital_in_browser[39m
+
+ [31m❯[39m src/editor/__tests__/wire-current-resolver.test.ts [2m([22m[2m13 tests[22m[2m | [22m[31m4 failed[39m[2m)[22m[33m 1908[2mms[22m[39m
+[31m   [31m×[31m WireCurrentResolver — KCL conservation[2m > [22mDC parallel split: junction wires carry correct individual currents[90m 9[2mms[22m[31m[39m
+[31m     → expected false to be true // Object.is equality[39m
+[31m   [31m×[31m WireCurrentResolver — KCL conservation[2m > [22m4-node ladder: junction wires satisfy KCL at every node[90m 1[2mms[22m[31m[39m
+[31m     → expected false to be true // Object.is equality[39m
+[31m   [31m×[31m WireCurrentResolver — AC transient RLC[2m > [22mRLC junction: wire currents match element currents at every AC timestep[90m 1[2mms[22m[31m[39m
+[31m     → expected false to be true // Object.is equality[39m
+   [33m[2m✓[22m[39m WireCurrentResolver — lrctest.dig real fixture[2m > [22mcross-component current equality through real compiled lrctest.dig [33m1579[2mms[22m[39m
+[31m   [31m×[31m WireCurrentResolver — misaligned pin snap (mock)[2m > [22mcurrent into resistor equals current out despite misaligned pins[90m 1[2mms[22m[31m[39m
+[31m     → expected false to be true // Object.is equality[39m
+ [32m✓[39m src/compile/__tests__/compile-integration.test.ts [2m([22m[2m23 tests[22m[2m)[22m[90m 18[2mms[22m[39m
+ [32m✓[39m src/compile/__tests__/extract-connectivity.test.ts [2m([22m[2m30 tests[22m[2m)[22m[90m 9[2mms[22m[39m
+ [32m✓[39m src/compile/__tests__/coordinator.test.ts [2m([22m[2m27 tests[22m[2m)[22m[90m 26[2mms[22m[39m
+ [31m❯[39m src/solver/__tests__/coordinator-capability.test.ts [2m([22m[2m36 tests[22m[2m | [22m[31m1 failed[39m[2m)[22m[90m 47[2mms[22m[39m
+[31m   [31m×[31m snapshotSignals and signalCount â€” analog-only coordinator[2m > [22msnapshotSignals contains non-zero voltages after DC op[90m 6[2mms[22m[31m[39m
+[31m     → expected false to be true // Object.is equality[39m
+ [32m✓[39m src/compile/__tests__/partition.test.ts [2m([22m[2m23 tests[22m[2m)[22m[90m 8[2mms[22m[39m
+ [32m✓[39m src/analysis/__tests__/karnaugh-map.test.ts [2m([22m[2m47 tests[22m[2m)[22m[90m 11[2mms[22m[39m
+ [32m✓[39m src/core/__tests__/signal.test.ts [2m([22m[2m85 tests[22m[2m)[22m[90m 7[2mms[22m[39m
+ [32m✓[39m src/core/__tests__/registry.test.ts [2m([22m[2m42 tests[22m[2m)[22m[90m 10[2mms[22m[39m
+ [32m✓[39m src/core/__tests__/pin.test.ts [2m([22m[2m50 tests[22m[2m)[22m[90m 9[2mms[22m[39m
+ [32m✓[39m src/solver/__tests__/coordinator-bridge.test.ts [2m([22m[2m16 tests[22m[2m)[22m[90m 6[2mms[22m[39m
+ [32m✓[39m src/compile/__tests__/compile.test.ts [2m([22m[2m5 tests[22m[2m)[22m[90m 8[2mms[22m[39m
+ [32m✓[39m src/editor/__tests__/insert-subcircuit.test.ts [2m([22m[2m13 tests[22m[2m)[22m[90m 7[2mms[22m[39m
+ [32m✓[39m src/analysis/__tests__/model-analyser.test.ts [2m([22m[2m5 tests[22m[2m)[22m[90m 21[2mms[22m[39m
+ [32m✓[39m src/editor/__tests__/property-panel-model.test.ts [2m([22m[2m26 tests[22m[2m)[22m[90m 7[2mms[22m[39m
+ [32m✓[39m src/core/__tests__/engine-interface.test.ts [2m([22m[2m41 tests[22m[2m)[22m[90m 7[2mms[22m[39m
+ [32m✓[39m src/core/__tests__/renderer-interface.test.ts [2m([22m[2m45 tests[22m[2m)[22m[90m 11[2mms[22m[39m
+ [32m✓[39m src/compile/__tests__/stable-net-id.test.ts [2m([22m[2m11 tests[22m[2m)[22m[90m 11[2mms[22m[39m
+ [32m✓[39m src/runtime/__tests__/memory-editor.test.ts [2m([22m[2m18 tests[22m[2m)[22m[90m 10[2mms[22m[39m
+ [32m✓[39m src/compile/__tests__/pin-loading-menu.test.ts [2m([22m[2m7 tests[22m[2m)[22m[90m 11[2mms[22m[39m
+ [32m✓[39m src/analysis/__tests__/path-analysis.test.ts [2m([22m[2m4 tests[22m[2m)[22m[90m 3[2mms[22m[39m
+ [31m❯[39m src/solver/__tests__/coordinator-visualization.test.ts [2m([22m[2m19 tests[22m[2m | [22m[31m4 failed[39m[2m)[22m[90m 28[2mms[22m[39m
+[31m   [31m×[31m getPinVoltages -- analog coordinator[2m > [22mvoltage source pins span a non-zero potential after DC op[90m 4[2mms[22m[31m[39m
+[31m     → expected 0 to be greater than 0[39m
+[31m   [31m×[31m voltageRange and updateVoltageTracking -- analog coordinator[2m > [22mvoltageRange max is positive after tracking a 5V DC circuit[90m 1[2mms[22m[31m[39m
+[31m     → expected 0 to be greater than 0[39m
+[31m   [31m×[31m voltageRange and updateVoltageTracking -- analog coordinator[2m > [22mvoltageRange spans a non-zero range for circuit with voltage differences[90m 1[2mms[22m[31m[39m
+[31m     → expected 0 to be greater than 0[39m
+[31m   [31m×[31m voltageRange and updateVoltageTracking -- analog coordinator[2m > [22mvoltageRange resets to { min: 0, max: 0 } after coordinator.reset()[90m 0[2mms[22m[31m[39m
+[31m     → expected 0 to be greater than 0[39m
+ [31m❯[39m src/solver/__tests__/coordinator-speed-control.test.ts [2m([22m[2m24 tests[22m[2m | [22m[31m1 failed[39m[2m)[22m[90m 20[2mms[22m[39m
+[31m   [31m×[31m DefaultSimulationCoordinator -- speed control (continuous)[2m > [22mformatSpeed returns micros/s for rate in 1e-6 to 1e-3 range[90m 5[2mms[22m[31m[39m
+[31m     → expected 'µs/s' to be 'Âµs/s' // Object.is equality[39m
+ [32m✓[39m src/runtime/__tests__/analog-scope-panel.test.ts [2m([22m[2m18 tests[22m[2m)[22m[90m 8[2mms[22m[39m
+ [32m✓[39m src/solver/__tests__/coordinator-slider-snapshot.test.ts [2m([22m[2m21 tests[22m[2m)[22m[90m 28[2mms[22m[39m
+ [32m✓[39m src/runtime/__tests__/program-loader.test.ts [2m([22m[2m30 tests[22m[2m)[22m[90m 6[2mms[22m[39m
+ [32m✓[39m src/compile/__tests__/pin-loading-overrides.test.ts [2m([22m[2m8 tests[22m[2m)[22m[90m 5[2mms[22m[39m
+ [32m✓[39m src/analysis/__tests__/expression-modifiers.test.ts [2m([22m[2m41 tests[22m[2m)[22m[90m 6[2mms[22m[39m
+ [32m✓[39m src/editor/__tests__/edit-operations.test.ts [2m([22m[2m12 tests[22m[2m)[22m[90m 5[2mms[22m[39m
+ [32m✓[39m src/analysis/__tests__/synthesis.test.ts [2m([22m[2m6 tests[22m[2m)[22m[90m 6[2mms[22m[39m
+ [32m✓[39m src/runtime/__tests__/scope-trigger.test.ts [2m([22m[2m17 tests[22m[2m)[22m[90m 4[2mms[22m[39m
+ [32m✓[39m src/core/__tests__/element.test.ts [2m([22m[2m31 tests[22m[2m)[22m[90m 5[2mms[22m[39m
+ [32m✓[39m src/editor/__tests__/draw-path-filled.test.ts [2m([22m[2m15 tests[22m[2m)[22m[90m 4[2mms[22m[39m
+ [32m✓[39m src/runtime/__tests__/memory-viewer.test.ts [2m([22m[2m9 tests[22m[2m)[22m[90m 7[2mms[22m[39m
+ [32m✓[39m src/editor/__tests__/element-help.test.ts [2m([22m[2m15 tests[22m[2m)[22m[90m 4[2mms[22m[39m
+ [32m✓[39m src/analysis/__tests__/quine-mccluskey.test.ts [2m([22m[2m15 tests[22m[2m)[22m[90m 6[2mms[22m[39m
+ [32m✓[39m src/editor/__tests__/slider-panel.test.ts [2m([22m[2m16 tests[22m[2m)[22m[90m 4[2mms[22m[39m
+ [32m✓[39m src/editor/__tests__/current-animation.test.ts [2m([22m[2m9 tests[22m[2m)[22m[90m 3[2mms[22m[39m
+ [32m✓[39m src/analysis/__tests__/expression-parser.test.ts [2m([22m[2m35 tests[22m[2m)[22m[90m 7[2mms[22m[39m
+ [32m✓[39m src/core/__tests__/analog-engine-interface.test.ts [2m([22m[2m9 tests[22m[2m)[22m[90m 4[2mms[22m[39m
+ [32m✓[39m src/editor/__tests__/wire-drawing.test.ts [2m([22m[2m13 tests[22m[2m)[22m[90m 6[2mms[22m[39m
+ [32m✓[39m src/editor/__tests__/presentation.test.ts [2m([22m[2m26 tests[22m[2m)[22m[90m 7[2mms[22m[39m
+ [32m✓[39m src/core/__tests__/circuit.test.ts [2m([22m[2m24 tests[22m[2m)[22m[90m 6[2mms[22m[39m
+ [32m✓[39m src/analysis/__tests__/jk-synthesis.test.ts [2m([22m[2m4 tests[22m[2m)[22m[90m 4[2mms[22m[39m
+ [32m✓[39m src/solver/__tests__/coordinator-clock.test.ts [2m([22m[2m6 tests[22m[2m)[22m[90m 17[2mms[22m[39m
+ [32m✓[39m src/editor/__tests__/wire-renderer.test.ts [2m([22m[2m11 tests[22m[2m)[22m[90m 4[2mms[22m[39m
+ [32m✓[39m src/core/__tests__/properties.test.ts [2m([22m[2m27 tests[22m[2m)[22m[90m 5[2mms[22m[39m
+ [32m✓[39m src/editor/__tests__/color-scheme.test.ts [2m([22m[2m26 tests[22m[2m)[22m[90m 6[2mms[22m[39m
+ [32m✓[39m src/editor/__tests__/element-renderer.test.ts [2m([22m[2m5 tests[22m[2m)[22m[90m 3[2mms[22m[39m
+ [32m✓[39m src/runtime/__tests__/bode-plot.test.ts [2m([22m[2m4 tests[22m[2m)[22m[90m 3[2mms[22m[39m
+ [31m❯[39m src/runtime/__tests__/fft.test.ts [2m([22m[2m8 tests[22m[2m | [22m[31m1 failed[39m[2m)[22m[90m 18[2mms[22m[39m
+[31m   [31m×[31m FFT[2m > [22mtwo_sines_two_peaks[90m 3[2mms[22m[31m[39m
+[31m     → frequency is not defined[39m
+ [31m❯[39m src/compile/__tests__/compile-bridge-guard.test.ts [2m([22m[2m6 tests[22m[2m | [22m[31m1 failed[39m[2m)[22m[90m 15[2mms[22m[39m
+[31m   [31m×[31m compile-bridge-guard: pure-digital circuit in "all" mode produces finite voltages[2m > [22mDC operating point has all-finite node voltages (ground synthesis produces solvable matrix)[90m 8[2mms[22m[31m[39m
+[31m     → expected false to be true // Object.is equality[39m
+ [32m✓[39m src/analysis/__tests__/expression-editor.test.ts [2m([22m[2m21 tests[22m[2m)[22m[90m 6[2mms[22m[39m
+ [32m✓[39m src/core/__tests__/model-params.test.ts [2m([22m[2m20 tests[22m[2m)[22m[90m 5[2mms[22m[39m
+ [32m✓[39m src/core/__tests__/errors.test.ts [2m([22m[2m32 tests[22m[2m)[22m[90m 7[2mms[22m[39m
+ [32m✓[39m src/analysis/__tests__/expression-gen.test.ts [2m([22m[2m12 tests[22m[2m)[22m[90m 5[2mms[22m[39m
+ [32m✓[39m src/editor/__tests__/palette.test.ts [2m([22m[2m9 tests[22m[2m)[22m[90m 5[2mms[22m[39m
+ [32m✓[39m src/editor/__tests__/hit-test.test.ts [2m([22m[2m13 tests[22m[2m)[22m[90m 4[2mms[22m[39m
+ [32m✓[39m src/editor/__tests__/analog-tooltip.test.ts [2m([22m[2m4 tests[22m[2m)[22m[90m 3[2mms[22m[39m
+ [32m✓[39m src/analysis/__tests__/cycle-detector.test.ts [2m([22m[2m5 tests[22m[2m)[22m[90m 3[2mms[22m[39m
+ [32m✓[39m src/runtime/__tests__/analog-scope-buffer.test.ts [2m([22m[2m8 tests[22m[2m)[22m[90m 4[2mms[22m[39m
+ [32m✓[39m src/analysis/__tests__/state-transition.test.ts [2m([22m[2m4 tests[22m[2m)[22m[90m 4[2mms[22m[39m
+ [32m✓[39m src/app/__tests__/test-bridge.test.ts [2m([22m[2m5 tests[22m[2m)[22m[90m 2[2mms[22m[39m
+ [32m✓[39m src/editor/__tests__/viewport.test.ts [2m([22m[2m12 tests[22m[2m)[22m[90m 3[2mms[22m[39m
+ [32m✓[39m src/editor/__tests__/placement.test.ts [2m([22m[2m7 tests[22m[2m)[22m[90m 3[2mms[22m[39m
+ [32m✓[39m src/analysis/__tests__/statistics.test.ts [2m([22m[2m3 tests[22m[2m)[22m[90m 3[2mms[22m[39m
+ [32m✓[39m src/app/__tests__/url-params.test.ts [2m([22m[2m21 tests[22m[2m)[22m[90m 4[2mms[22m[39m
+ [32m✓[39m src/compile/__tests__/union-find.test.ts [2m([22m[2m20 tests[22m[2m)[22m[90m 4[2mms[22m[39m
+ [32m✓[39m src/editor/__tests__/selection.test.ts [2m([22m[2m10 tests[22m[2m)[22m[90m 3[2mms[22m[39m
+ [32m✓[39m src/core/__tests__/resolve-simulation-params.test.ts [2m([22m[2m11 tests[22m[2m)[22m[90m 3[2mms[22m[39m
+ [32m✓[39m src/editor/__tests__/canvas-renderer.test.ts [2m([22m[2m4 tests[22m[2m)[22m[90m 2[2mms[22m[39m
+ [32m✓[39m src/runtime/__tests__/scope-cursors.test.ts [2m([22m[2m15 tests[22m[2m)[22m[90m 6[2mms[22m[39m
+ [32m✓[39m src/solver/__tests__/coordinator-bridge-hotload.test.ts [2m([22m[2m3 tests[22m[2m)[22m[90m 2[2mms[22m[39m
+ [32m✓[39m src/core/__tests__/property-bag-partition.test.ts [2m([22m[2m12 tests[22m[2m)[22m[90m 4[2mms[22m[39m
+ [32m✓[39m src/editor/__tests__/grid.test.ts [2m([22m[2m6 tests[22m[2m)[22m[90m 3[2mms[22m[39m
+ [32m✓[39m src/analysis/__tests__/truth-table.test.ts [2m([22m[2m8 tests[22m[2m)[22m[90m 4[2mms[22m[39m
+ [32m✓[39m src/compile/__tests__/loading-decisions.test.ts [2m([22m[2m7 tests[22m[2m)[22m[90m 2[2mms[22m[39m
+ [32m✓[39m src/editor/__tests__/search.test.ts [2m([22m[2m5 tests[22m[2m)[22m[90m 4[2mms[22m[39m
+ [32m✓[39m src/editor/__tests__/runtime-to-defaults.test.ts [2m([22m[2m3 tests[22m[2m)[22m[90m 2[2mms[22m[39m
+ [32m✓[39m src/editor/__tests__/undo-redo.test.ts [2m([22m[2m6 tests[22m[2m)[22m[90m 3[2mms[22m[39m
+ [32m✓[39m src/editor/__tests__/label-tools.test.ts [2m([22m[2m2 tests[22m[2m)[22m[90m 2[2mms[22m[39m
+ [32m✓[39m src/editor/__tests__/shortcuts.test.ts [2m([22m[2m6 tests[22m[2m)[22m[90m 3[2mms[22m[39m
+ [32m✓[39m src/editor/__tests__/voltage-range.test.ts [2m([22m[2m8 tests[22m[2m)[22m[90m 2[2mms[22m[39m
+ [32m✓[39m src/core/__tests__/pin-electrical.test.ts [2m([22m[2m5 tests[22m[2m)[22m[90m 3[2mms[22m[39m
+ [32m✓[39m src/editor/__tests__/coordinates.test.ts [2m([22m[2m8 tests[22m[2m)[22m[90m 3[2mms[22m[39m
+ [32m✓[39m src/editor/__tests__/locked-mode.test.ts [2m([22m[2m4 tests[22m[2m)[22m[90m 2[2mms[22m[39m
+ [32m✓[39m src/editor/__tests__/si-format.test.ts [2m([22m[2m28 tests[22m[2m)[22m[90m 5[2mms[22m[39m
+ [32m✓[39m src/editor/__tests__/settings.test.ts [2m([22m[2m4 tests[22m[2m)[22m[90m 2[2mms[22m[39m
+ [32m✓[39m src/core/__tests__/logic-family.test.ts [2m([22m[2m7 tests[22m[2m)[22m[90m 3[2mms[22m[39m
+ [32m✓[39m src/editor/__tests__/file-history.test.ts [2m([22m[2m4 tests[22m[2m)[22m[90m 2[2mms[22m[39m
+ [32m✓[39m src/core/__tests__/wire-split.test.ts [2m([22m[2m3 tests[22m[2m)[22m[90m 2[2mms[22m[39m
+ [32m✓[39m src/solver/__tests__/coordinator-current-resolver.test.ts [2m([22m[2m2 tests[22m[2m)[22m[90m 2[2mms[22m[39m
+ [32m✓[39m src/editor/__tests__/color-interpolation.test.ts [2m([22m[2m3 tests[22m[2m)[22m[90m 2[2mms[22m[39m
+ [32m✓[39m src/core/__tests__/analog-types-setparam.test.ts [2m([22m[2m2 tests[22m[2m)[22m[90m 2[2mms[22m[39m
+ [32m✓[39m src/runtime/__tests__/data-table.test.ts [2m([22m[2m18 tests[22m[2m)[22m[90m 41[2mms[22m[39m
+[90mstderr[2m | src/runtime/__tests__/timing-diagram.test.ts[2m > [22m[2mTimingDiagramPanel[2m > [22m[2mtimeCursor[2m > [22m[2mgetCursorTime returns correct simulation time after mousemove on canvas
+[22m[39mNot implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+
+[90mstderr[2m | src/runtime/__tests__/timing-diagram.test.ts[2m > [22m[2mTimingDiagramPanel[2m > [22m[2mtimeCursor[2m > [22m[2mgetCursorTime returns null after mouseleave
+[22m[39mNot implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+
+ [32m✓[39m src/runtime/__tests__/timing-diagram.test.ts [2m([22m[2m20 tests[22m[2m)[22m[90m 9[2mms[22m[39m
+ [32m✓[39m src/editor/__tests__/context-menu.test.ts [2m([22m[2m8 tests[22m[2m)[22m[90m 20[2mms[22m[39m
+ [32m✓[39m src/analysis/__tests__/truth-table-ui.test.ts [2m([22m[2m3 tests[22m[2m)[22m[90m 18[2mms[22m[39m
+
+[31m⎯⎯⎯⎯⎯⎯[1m[7m Failed Tests 12 [27m[22m⎯⎯⎯⎯⎯⎯⎯[39m
+
+[31m[1m[7m FAIL [27m[22m[39m src/compile/__tests__/compile-bridge-guard.test.ts[2m > [22mcompile-bridge-guard: pure-digital circuit in "all" mode produces finite voltages[2m > [22mDC operating point has all-finite node voltages (ground synthesis produces solvable matrix)
+[31m[1mAssertionError[22m: expected false to be true // Object.is equality[39m
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[32m- true[39m
+[31m+ false[39m
+
+[36m [2m❯[22m src/compile/__tests__/compile-bridge-guard.test.ts:[2m139:32[22m[39m
+    [90m137| [39m
+    [90m138| [39m    [90m// If ground synthesis is fake (no real ground node), MNA produces[39m…
+    [90m139| [39m    [34mexpect[39m(dcResult[33m.[39mconverged)[33m.[39m[34mtoBe[39m([35mtrue[39m)[33m;[39m
+    [90m   | [39m                               [31m^[39m
+    [90m140| [39m    [35mfor[39m ([35mlet[39m i [33m=[39m [34m0[39m[33m;[39m i [33m<[39m dcResult[33m.[39mnodeVoltages[33m.[39mlength[33m;[39m i[33m++[39m) {
+    [90m141| [39m      [34mexpect[39m([33mNumber[39m[33m.[39m[34misFinite[39m(dcResult[33m.[39mnodeVoltages[i]))[33m.[39m[34mtoBe[39m([35mtrue[39m)[33m;[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/12]⎯[22m[39m
+
+[31m[1m[7m FAIL [27m[22m[39m src/editor/__tests__/wire-current-resolver.test.ts[2m > [22mWireCurrentResolver — KCL conservation[2m > [22mDC parallel split: junction wires carry correct individual currents
+[31m[1mAssertionError[22m: expected false to be true // Object.is equality[39m
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[32m- true[39m
+[31m+ false[39m
+
+[36m [2m❯[22m src/editor/__tests__/wire-current-resolver.test.ts:[2m461:26[22m[39m
+    [90m459| [39m    engine[33m.[39m[34minit[39m(compiled [35mas[39m unknown [35mas[39m [33mConcreteCompiledAnalogCircuit[39m)[33m;[39m
+    [90m460| [39m    [35mconst[39m dc [33m=[39m engine[33m.[39m[34mdcOperatingPoint[39m()[33m;[39m
+    [90m461| [39m    [34mexpect[39m(dc[33m.[39mconverged)[33m.[39m[34mtoBe[39m([35mtrue[39m)[33m;[39m
+    [90m   | [39m                         [31m^[39m
+    [90m462| [39m
+    [90m463| [39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/12]⎯[22m[39m
+
+[31m[1m[7m FAIL [27m[22m[39m src/editor/__tests__/wire-current-resolver.test.ts[2m > [22mWireCurrentResolver — KCL conservation[2m > [22m4-node ladder: junction wires satisfy KCL at every node
+[31m[1mAssertionError[22m: expected false to be true // Object.is equality[39m
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[32m- true[39m
+[31m+ false[39m
+
+[36m [2m❯[22m src/editor/__tests__/wire-current-resolver.test.ts:[2m555:26[22m[39m
+    [90m553| [39m    engine[33m.[39m[34minit[39m(compiled [35mas[39m unknown [35mas[39m [33mConcreteCompiledAnalogCircuit[39m)[33m;[39m
+    [90m554| [39m    [35mconst[39m dc [33m=[39m engine[33m.[39m[34mdcOperatingPoint[39m()[33m;[39m
+    [90m555| [39m    [34mexpect[39m(dc[33m.[39mconverged)[33m.[39m[34mtoBe[39m([35mtrue[39m)[33m;[39m
+    [90m   | [39m                         [31m^[39m
+    [90m556| [39m
+    [90m557| [39m    [90m// Run resolver[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/12]⎯[22m[39m
+
+[31m[1m[7m FAIL [27m[22m[39m src/editor/__tests__/wire-current-resolver.test.ts[2m > [22mWireCurrentResolver — AC transient RLC[2m > [22mRLC junction: wire currents match element currents at every AC timestep
+[31m[1mAssertionError[22m: expected false to be true // Object.is equality[39m
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[32m- true[39m
+[31m+ false[39m
+
+[36m [2m❯[22m src/editor/__tests__/wire-current-resolver.test.ts:[2m665:26[22m[39m
+    [90m663| [39m    engine[33m.[39m[34minit[39m(compiled [35mas[39m unknown [35mas[39m [33mConcreteCompiledAnalogCircuit[39m)[33m;[39m
+    [90m664| [39m    [35mconst[39m dc [33m=[39m engine[33m.[39m[34mdcOperatingPoint[39m()[33m;[39m
+    [90m665| [39m    [34mexpect[39m(dc[33m.[39mconverged)[33m.[39m[34mtoBe[39m([35mtrue[39m)[33m;[39m
+    [90m   | [39m                         [31m^[39m
+    [90m666| [39m
+    [90m667| [39m    [90m// Step to steady state: 10 × τ_RC = 10 ms[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/12]⎯[22m[39m
+
+[31m[1m[7m FAIL [27m[22m[39m src/editor/__tests__/wire-current-resolver.test.ts[2m > [22mWireCurrentResolver — misaligned pin snap (mock)[2m > [22mcurrent into resistor equals current out despite misaligned pins
+[31m[1mAssertionError[22m: expected false to be true // Object.is equality[39m
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[32m- true[39m
+[31m+ false[39m
+
+[36m [2m❯[22m src/editor/__tests__/wire-current-resolver.test.ts:[2m1319:26[22m[39m
+    [90m1317| [39m    engine[33m.[39m[34minit[39m(compiled [35mas[39m unknown [35mas[39m [33mConcreteCompiledAnalogCircuit[39m)[33m;[39m
+    [90m1318| [39m    [35mconst[39m dc [33m=[39m engine[33m.[39m[34mdcOperatingPoint[39m()[33m;[39m
+    [90m1319| [39m    [34mexpect[39m(dc[33m.[39mconverged)[33m.[39m[34mtoBe[39m([35mtrue[39m)[33m;[39m
+    [90m   | [39m                         [31m^[39m
+    [90m1320| [39m
+    [90m1321| [39m    [35mconst[39m resolver [33m=[39m [35mnew[39m [33mWireCurrentResolver[39m()[33m;[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/12]⎯[22m[39m
+
+[31m[1m[7m FAIL [27m[22m[39m src/runtime/__tests__/fft.test.ts[2m > [22mFFT[2m > [22mtwo_sines_two_peaks
+[31m[1mReferenceError[22m: frequency is not defined[39m
+[36m [2m❯[22m src/runtime/__tests__/fft.test.ts:[2m142:19[22m[39m
+    [90m140| [39m    [90m// Check frequencies are near freqA and freqB (within 2 bins = ~86[39m…
+    [90m141| [39m    [35mconst[39m binWidth [33m=[39m sampleRate [33m/[39m [33mN[39m[33m;[39m
+    [90m142| [39m    [35mconst[39m freq1 [33m=[39m frequency[peak1[33m.[39mbin][33m;[39m
+    [90m   | [39m                  [31m^[39m
+    [90m143| [39m    [35mconst[39m freq2 [33m=[39m frequency[peak2[33m.[39mbin][33m;[39m
+    [90m144| [39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/12]⎯[22m[39m
+
+[31m[1m[7m FAIL [27m[22m[39m src/solver/__tests__/coordinator-capability.test.ts[2m > [22msnapshotSignals and signalCount â€” analog-only coordinator[2m > [22msnapshotSignals contains non-zero voltages after DC op
+[31m[1mAssertionError[22m: expected false to be true // Object.is equality[39m
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[32m- true[39m
+[31m+ false[39m
+
+[36m [2m❯[22m src/solver/__tests__/coordinator-capability.test.ts:[2m318:24[22m[39m
+    [90m316| [39m    [35mconst[39m snap [33m=[39m coordinator[33m.[39m[34msnapshotSignals[39m()[33m;[39m
+    [90m317| [39m    [35mconst[39m hasNonZero [33m=[39m [33mArray[39m[33m.[39m[35mfrom[39m(snap)[33m.[39m[34msome[39m(v [33m=>[39m v [33m!==[39m [34m0[39m)[33m;[39m
+    [90m318| [39m    [34mexpect[39m(hasNonZero)[33m.[39m[34mtoBe[39m([35mtrue[39m)[33m;[39m
+    [90m   | [39m                       [31m^[39m
+    [90m319| [39m    coordinator[33m.[39m[34mdispose[39m()[33m;[39m
+    [90m320| [39m  })[33m;[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[7/12]⎯[22m[39m
+
+[31m[1m[7m FAIL [27m[22m[39m src/solver/__tests__/coordinator-speed-control.test.ts[2m > [22mDefaultSimulationCoordinator -- speed control (continuous)[2m > [22mformatSpeed returns micros/s for rate in 1e-6 to 1e-3 range
+[31m[1mAssertionError[22m: expected 'µs/s' to be 'Âµs/s' // Object.is equality[39m
+
+Expected: [32m"[7mÂ[27mµs/s"[39m
+Received: [31m"µs/s"[39m
+
+[36m [2m❯[22m src/solver/__tests__/coordinator-speed-control.test.ts:[2m261:22[22m[39m
+    [90m259| [39m  [34mit[39m([32m'formatSpeed returns micros/s for rate in 1e-6 to 1e-3 range'[39m[33m,[39m ()…
+    [90m260| [39m    coord[33m.[39mspeed [33m=[39m [34m500e-6[39m[33m;[39m [35mconst[39m fmt [33m=[39m coord[33m.[39m[34mformatSpeed[39m()[33m;[39m
+    [90m261| [39m    [34mexpect[39m(fmt[33m.[39munit)[33m.[39m[34mtoBe[39m([32m'Âµs/s'[39m)[33m;[39m [34mexpect[39m(fmt[33m.[39mvalue)[33m.[39m[34mtoBe[39m([32m'500'[39m)[33m;[39m
+    [90m   | [39m                     [31m^[39m
+    [90m262| [39m  })[33m;[39m
+    [90m263| [39m  [34mit[39m([32m'formatSpeed returns ns/s for rate below 1e-6'[39m[33m,[39m () [33m=>[39m {
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[8/12]⎯[22m[39m
+
+[31m[1m[7m FAIL [27m[22m[39m src/solver/__tests__/coordinator-visualization.test.ts[2m > [22mgetPinVoltages -- analog coordinator[2m > [22mvoltage source pins span a non-zero potential after DC op
+[31m[1mAssertionError[22m: expected 0 to be greater than 0[39m
+[36m [2m❯[22m src/solver/__tests__/coordinator-visualization.test.ts:[2m191:25[22m[39m
+    [90m189| [39m    [35mconst[39m maxV [33m=[39m [33mMath[39m[33m.[39m[34mmax[39m([33m...[39mvalues)[33m;[39m
+    [90m190| [39m    [35mconst[39m minV [33m=[39m [33mMath[39m[33m.[39m[34mmin[39m([33m...[39mvalues)[33m;[39m
+    [90m191| [39m    [34mexpect[39m(maxV [33m-[39m minV)[33m.[39m[34mtoBeGreaterThan[39m([34m0[39m)[33m;[39m
+    [90m   | [39m                        [31m^[39m
+    [90m192| [39m    coordinator[33m.[39m[34mdispose[39m()[33m;[39m
+    [90m193| [39m  })[33m;[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[9/12]⎯[22m[39m
+
+[31m[1m[7m FAIL [27m[22m[39m src/solver/__tests__/coordinator-visualization.test.ts[2m > [22mvoltageRange and updateVoltageTracking -- analog coordinator[2m > [22mvoltageRange max is positive after tracking a 5V DC circuit
+[31m[1mAssertionError[22m: expected 0 to be greater than 0[39m
+[36m [2m❯[22m src/solver/__tests__/coordinator-visualization.test.ts:[2m271:24[22m[39m
+    [90m269| [39m    coordinator[33m.[39m[34mupdateVoltageTracking[39m()[33m;[39m
+    [90m270| [39m    [35mconst[39m range [33m=[39m coordinator[33m.[39mvoltageRange[33m;[39m
+    [90m271| [39m    [34mexpect[39m(range[33m![39m[33m.[39mmax)[33m.[39m[34mtoBeGreaterThan[39m([34m0[39m)[33m;[39m
+    [90m   | [39m                       [31m^[39m
+    [90m272| [39m    coordinator[33m.[39m[34mdispose[39m()[33m;[39m
+    [90m273| [39m  })[33m;[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[10/12]⎯[22m[39m
+
+[31m[1m[7m FAIL [27m[22m[39m src/solver/__tests__/coordinator-visualization.test.ts[2m > [22mvoltageRange and updateVoltageTracking -- analog coordinator[2m > [22mvoltageRange spans a non-zero range for circuit with voltage differences
+[31m[1mAssertionError[22m: expected 0 to be greater than 0[39m
+[36m [2m❯[22m src/solver/__tests__/coordinator-visualization.test.ts:[2m287:37[22m[39m
+    [90m285| [39m    coordinator[33m.[39m[34mupdateVoltageTracking[39m()[33m;[39m
+    [90m286| [39m    [35mconst[39m range [33m=[39m coordinator[33m.[39mvoltageRange[33m;[39m
+    [90m287| [39m    [34mexpect[39m(range[33m![39m[33m.[39mmax [33m-[39m range[33m![39m[33m.[39mmin)[33m.[39m[34mtoBeGreaterThan[39m([34m0[39m)[33m;[39m
+    [90m   | [39m                                    [31m^[39m
+    [90m288| [39m    coordinator[33m.[39m[34mdispose[39m()[33m;[39m
+    [90m289| [39m  })[33m;[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[11/12]⎯[22m[39m
+
+[31m[1m[7m FAIL [27m[22m[39m src/solver/__tests__/coordinator-visualization.test.ts[2m > [22mvoltageRange and updateVoltageTracking -- analog coordinator[2m > [22mvoltageRange resets to { min: 0, max: 0 } after coordinator.reset()
+[31m[1mAssertionError[22m: expected 0 to be greater than 0[39m
+[36m [2m❯[22m src/solver/__tests__/coordinator-visualization.test.ts:[2m294:43[22m[39m
+    [90m292| [39m    [35mconst[39m { coordinator } [33m=[39m [34mbuildRcCoordinator[39m()[33m;[39m
+    [90m293| [39m    coordinator[33m.[39m[34mupdateVoltageTracking[39m()[33m;[39m
+    [90m294| [39m    [34mexpect[39m(coordinator[33m.[39mvoltageRange[33m![39m[33m.[39mmax)[33m.[39m[34mtoBeGreaterThan[39m([34m0[39m)[33m;[39m
+    [90m   | [39m                                          [31m^[39m
+    [90m295| [39m    coordinator[33m.[39m[34mreset[39m()[33m;[39m
+    [90m296| [39m    [35mconst[39m range [33m=[39m coordinator[33m.[39mvoltageRange[33m;[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[12/12]⎯[22m[39m
+
+[2m Test Files [22m [1m[31m6 failed[39m[22m[2m | [22m[1m[32m92 passed[39m[22m[90m (98)[39m
+[2m      Tests [22m [1m[31m12 failed[39m[22m[2m | [22m[1m[32m1486 passed[39m[22m[90m (1498)[39m
+[2m   Start at [22m 09:22:01
+[2m   Duration [22m 32.67s[2m (transform 2.03s, setup 0ms, collect 4.01s, tests 2.64s, environment 2.31s, prepare 8.12s)[22m
+

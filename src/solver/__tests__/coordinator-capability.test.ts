@@ -24,7 +24,7 @@ import type { Pin } from '../../core/pin.js';
 import type { ComponentDefinition } from '../../core/registry.js';
 import type { AnalogElement } from '../analog/element.js';
 import type { LoadContext } from '../analog/load-context.js';
-import type { SparseSolver } from '../analog/sparse-solver.js';
+import type { ComplexSparseSolver } from '../analog/complex-sparse-solver.js';
 import type { CircuitElement } from '../../core/element.js';
 import type { SerializedElement } from '../../core/element.js';
 import type { PropertyValue } from '../../core/properties.js';
@@ -42,6 +42,7 @@ function makeResistorAnalogEl(nodeA: number, nodeB: number, r: number): AnalogEl
     pinNodeIds: [nodeA, nodeB],
     allNodeIds: [nodeA, nodeB],
     branchIndex: -1,
+    ngspiceLoadOrder: 0,
     isNonlinear: false,
     isReactive: false,
     load(ctx: LoadContext): void {
@@ -56,11 +57,7 @@ function makeResistorAnalogEl(nodeA: number, nodeB: number, r: number): AnalogEl
         ctx.solver.stampElement(ctx.solver.allocElement(nodeB, nodeB), +g);
       }
     },
-    stampAc(s: SparseSolver) {
-      if (nodeA > 0) s.stampElement(s.allocElement(nodeA, nodeA), g);
-      if (nodeB > 0) s.stampElement(s.allocElement(nodeB, nodeB), g);
-      if (nodeA > 0 && nodeB > 0) { s.stampElement(s.allocElement(nodeA, nodeB), -g); s.stampElement(s.allocElement(nodeB, nodeA), -g); }
-    },
+    stampAc(_solver: ComplexSparseSolver, _omega: number, _ctx: LoadContext): void { /* no-op */ },
     getPinCurrents(_v: Float64Array) { return [0, 0]; },
     setParam(_key: string, _value: number) {},
   };

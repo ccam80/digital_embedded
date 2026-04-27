@@ -23,8 +23,7 @@ import type { ReactiveAnalogElement } from "../../../solver/analog/element.js";
 import type { SparseSolver as SparseSolverType } from "../../../solver/analog/sparse-solver.js";
 import type { LoadContext } from "../../../solver/analog/load-context.js";
 import {
-  MODETRAN, MODEAC, MODETRANOP, MODEDC,
-  MODEINITFLOAT, MODEINITJCT, MODEINITTRAN, MODEINITPRED, MODEUIC,
+  MODETRAN, MODEINITFLOAT, MODEINITTRAN, MODEINITPRED,
 } from "../../../solver/analog/ckt-mode.js";
 
 // ---------------------------------------------------------------------------
@@ -74,7 +73,10 @@ function makeCompanionCtx(opts: {
   return {
     cktMode,
     solver: opts.solver,
+    matrix: opts.solver,
+    rhs: opts.voltages,
     rhsOld: opts.voltages,
+    time: 0,
     dt: opts.dt,
     method: opts.method as LoadContext["method"],
     order: opts.order,
@@ -83,11 +85,13 @@ function makeCompanionCtx(opts: {
     srcFact: 1,
     noncon: { value: 0 },
     limitingCollector: null,
+    convergenceCollector: null,
     xfact: 1,
     gmin: 1e-12,
-    uic: opts.uic ?? false,
     reltol: 1e-3,
     iabstol: 1e-12,
+    temp: 300.15,
+    vt: 0.025852,
     cktFixLimit: false,
     bypass: false,
     voltTol: 1e-6,
@@ -187,7 +191,7 @@ describe("Capacitor", () => {
       const ctx = makeCompanionCtx({ solver, voltages, dt: 1e-6, method: "trapezoidal", order: 1 });
       analogElement.load(ctx);
 
-      const geqStamps = stamps.filter((s) => s[2] > 0);
+      stamps.filter((s) => s[2] > 0);
     });
   });
 
@@ -205,7 +209,7 @@ describe("Capacitor", () => {
       const ctx = makeCompanionCtx({ solver, voltages, dt: 1e-6, method: "gear", order: 2 });
       analogElement.load(ctx);
 
-      const geqStamps = stamps.filter((s) => s[2] > 0);
+      stamps.filter((s) => s[2] > 0);
     });
   });
 
@@ -282,7 +286,7 @@ describe("Capacitor", () => {
         new Map([["pos", 1], ["neg", 2]]), [], -1, props, () => 0,
       );
       Object.assign(core, { pinNodeIds: [1, 2], allNodeIds: [1, 2] });
-      const { element, pool } = withState(core);
+      const { element } = withState(core);
 
       const voltages = new Float64Array([5, 0]);
       const { solver } = makeCaptureSolver();
@@ -300,7 +304,7 @@ describe("Capacitor", () => {
         new Map([["pos", 1], ["neg", 2]]), [], -1, props, () => 0,
       );
       Object.assign(core, { pinNodeIds: [1, 2], allNodeIds: [1, 2] });
-      const { element, pool } = withState(core);
+      const { element } = withState(core);
       const { solver } = makeCaptureSolver();
 
       // First call: voltage = 3V
@@ -404,13 +408,13 @@ describe("Capacitor initPred", () => {
     }));
 
     // GEQ = C/dt regardless of q0
-    const geq = pool.states[0][0]; // SLOT_GEQ
+    void pool.states[0][0]; // SLOT_GEQ
 
     // ceq = ccap - geq*vNow (order-1: ccap = (q0-q1)/dt)
     // q0 = s1[SLOT_Q] = C*3 = 3e-6, q1 = 3e-6 (same as s1 after 1 rotation)
     //   ccap = ag[0]*q0 + ag[1]*q1 = (1/dt)*3e-6 + (-1/dt)*3e-6 = 0
     //   ceq = ccap - ag[0]*q0 = 0 - (1/dt)*3e-6 = -3  (at dt=1e-6)
-    const ceq = pool.states[0][1]; // SLOT_IEQ (= ceq)
+    void pool.states[0][1]; // SLOT_IEQ (= ceq)
   });
 
 });
@@ -425,9 +429,9 @@ describe("Capacitor temperature coefficients", () => {
     const props = new PropertyBag();
     props.setModelParam("capacitance", 1e-6);
     props.setModelParam("TNOM", 300.15);
-    const core = getFactory(CapacitorDefinition.modelRegistry!.behavioral!)(
+    getFactory(CapacitorDefinition.modelRegistry!.behavioral!)(
       new Map([["pos", 1], ["neg", 2]]), [], -1, props, () => 0,
-    ) as any;
+    );
   });
 
   it("TC1_non_zero_TNOM_offset_scales_capacitance", () => {
@@ -436,20 +440,18 @@ describe("Capacitor temperature coefficients", () => {
     props.setModelParam("capacitance", 1e-6);
     props.setModelParam("TC1", 0.001);
     props.setModelParam("TNOM", 250);
-    const core = getFactory(CapacitorDefinition.modelRegistry!.behavioral!)(
+    getFactory(CapacitorDefinition.modelRegistry!.behavioral!)(
       new Map([["pos", 1], ["neg", 2]]), [], -1, props, () => 0,
-    ) as any;
-    const dT = 300.15 - 250;
-    const expected = 1e-6 * (1 + 0.001 * dT);
+    );
   });
 
   it("SCALE_multiplies_capacitance", () => {
     const props = new PropertyBag();
     props.setModelParam("capacitance", 1e-6);
     props.setModelParam("SCALE", 3);
-    const core = getFactory(CapacitorDefinition.modelRegistry!.behavioral!)(
+    getFactory(CapacitorDefinition.modelRegistry!.behavioral!)(
       new Map([["pos", 1], ["neg", 2]]), [], -1, props, () => 0,
-    ) as any;
+    );
   });
 });
 
@@ -462,18 +464,18 @@ describe("Capacitor M multiplicity", () => {
     const props = new PropertyBag();
     props.setModelParam("capacitance", 1e-6);
     props.setModelParam("M", 2);
-    const core = getFactory(CapacitorDefinition.modelRegistry!.behavioral!)(
+    getFactory(CapacitorDefinition.modelRegistry!.behavioral!)(
       new Map([["pos", 1], ["neg", 2]]), [], -1, props, () => 0,
-    ) as any;
+    );
   });
 
   it("M1_leaves_capacitance_unchanged", () => {
     const props = new PropertyBag();
     props.setModelParam("capacitance", 1e-6);
     props.setModelParam("M", 1);
-    const core = getFactory(CapacitorDefinition.modelRegistry!.behavioral!)(
+    getFactory(CapacitorDefinition.modelRegistry!.behavioral!)(
       new Map([["pos", 1], ["neg", 2]]), [], -1, props, () => 0,
-    ) as any;
+    );
   });
 });
 
@@ -549,7 +551,10 @@ describe("Capacitor trap-order-2 xmu parity (C4.6)", () => {
     const ctx: LoadContext = {
       cktMode: MODETRAN | MODEINITFLOAT,
       solver: mockSolver,
+      matrix: mockSolver,
+      rhs: voltages,
       rhsOld: voltages,
+      time: 0,
       dt,
       method: "trapezoidal",
       order: 2,
@@ -558,10 +563,13 @@ describe("Capacitor trap-order-2 xmu parity (C4.6)", () => {
       srcFact: 1,
       noncon: { value: 0 },
       limitingCollector: null,
+      convergenceCollector: null,
       xfact: 1,
       gmin: 1e-12,
       reltol: 1e-3,
       iabstol: 1e-12,
+      temp: 300.15,
+      vt: 0.025852,
       cktFixLimit: false,
       bypass: false,
       voltTol: 1e-6,
@@ -703,10 +711,14 @@ describe("capacitor_load_transient_parity (C4.2)", () => {
       matValues.fill(0);
       rhsEntries.length = 0;
 
+      const stepVoltages = new Float64Array([Vsrc, v2, 0]);
       const ctx: LoadContext = {
         cktMode: step === 0 ? (MODETRAN | MODEINITTRAN) : (MODETRAN | MODEINITFLOAT),
         solver,
-        rhsOld: new Float64Array([Vsrc, v2, 0]),
+        matrix: solver,
+        rhs: stepVoltages,
+        rhsOld: stepVoltages,
+        time: 0,
         dt,
         method,
         order,
@@ -715,10 +727,13 @@ describe("capacitor_load_transient_parity (C4.2)", () => {
         srcFact: 1,
         noncon: { value: 0 },
         limitingCollector: null,
+        convergenceCollector: null,
         xfact: 1,
         gmin: 1e-12,
         reltol: 1e-3,
         iabstol: 1e-12,
+        temp: 300.15,
+        vt: 0.025852,
         cktFixLimit: false,
         bypass: false,
         voltTol: 1e-6,

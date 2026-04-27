@@ -173,8 +173,10 @@ function makeResistorAnalogEl(
     pinNodeIds: [n1, n2],
     allNodeIds: [n1, n2],
     branchIndex: -1,
+    ngspiceLoadOrder: 0,
     isNonlinear: false,
     isReactive: false,
+    load(_ctx: LoadContext): void { /* no-op for static test fixture */ },
     stampAc(solver: ComplexSparseSolver, _omega: number, _ctx: LoadContext): void {
       const g = 1 / resistance;
       if (n1 !== 0) {
@@ -254,6 +256,7 @@ function makeGroundDef(): ComponentDefinition {
         pinNodeIds: [],
         allNodeIds: [],
         branchIndex: -1,
+        ngspiceLoadOrder: 0,
         isNonlinear: false,
         isReactive: false,
         stamp(_s: SparseSolver) {},

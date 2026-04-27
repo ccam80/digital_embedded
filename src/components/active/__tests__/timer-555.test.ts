@@ -138,6 +138,7 @@ function makeResistor(nodeA: number, nodeB: number, resistance: number): AnalogE
     pinNodeIds: [nodeA, nodeB],
     allNodeIds: [nodeA, nodeB],
     branchIndex: -1,
+    ngspiceLoadOrder: 0,
     isNonlinear: false,
     isReactive: false,
     setParam(_key: string, _value: number): void {},
@@ -154,6 +155,7 @@ function makeResistor(nodeA: number, nodeB: number, resistance: number): AnalogE
   };
 }
 
+import { stampRHS } from "../../../solver/analog/stamp-helpers.js";
 import {
   createTestCapacitor,
   makeVoltageSource,
@@ -521,18 +523,19 @@ function buildMonostableCircuit(R: number, Cval: number, VCC: number): {
     pinNodeIds: [nTrig, 0],
     allNodeIds: [nTrig, 0],
     branchIndex: brTrig,
+    ngspiceLoadOrder: 0,
     isNonlinear: false,
     isReactive: false,
     setParam(_key: string, _value: number): void {},
     getPinCurrents(_v: Float64Array): number[] { return []; },
     load(ctx): void {
-      const { solver } = ctx;
+      const { solver, rhs } = ctx;
       const k = brTrig;
       if (nTrig > 0) {
         const h1 = solver.allocElement(nTrig, k); solver.stampElement(h1, 1);
         const h2 = solver.allocElement(k, nTrig); solver.stampElement(h2, 1);
       }
-      solver.stampRHS(k, _trigVoltage);
+      stampRHS(rhs, k, _trigVoltage);
     },
   };
 

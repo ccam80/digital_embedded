@@ -7,8 +7,8 @@
  * driven by extracting individual bits from the internal count/value.
  */
 
-import type { LoadContext } from "./element.js";
-import type { StatePoolRef } from "./element.js";
+import type { LoadContext, StatePoolRef, ReactiveAnalogElementCore } from "./element.js";
+import { NGSPICE_LOAD_ORDER } from "./element.js";
 import type { ResolvedPinElectrical } from "../../core/pin-electrical.js";
 import {
   DigitalInputPinModel,
@@ -58,7 +58,7 @@ const FALLBACK_SPEC: ResolvedPinElectrical = {
  * Rising-edge detection uses _prevClockVoltage stored after each accepted
  * timestep.
  */
-export class BehavioralCounterElement {
+export class BehavioralCounterElement implements ReactiveAnalogElementCore {
   private readonly _clockPin: DigitalInputPinModel;
   private readonly _enPin: DigitalInputPinModel;
   private readonly _clrPin: DigitalInputPinModel;
@@ -76,7 +76,9 @@ export class BehavioralCounterElement {
   private readonly _pinModelsByLabel: ReadonlyMap<string, DigitalInputPinModel | DigitalOutputPinModel>;
 
   pinNodeIds!: readonly number[];  // set by compiler via Object.assign after factory returns
+  allNodeIds!: readonly number[];  // set by compiler via Object.assign after factory returns
   readonly branchIndex: number = -1;
+  readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.VCVS;
   readonly isNonlinear: true = true;
   label?: string;
 
@@ -84,7 +86,14 @@ export class BehavioralCounterElement {
   readonly stateSchema: StateSchema = SEQUENTIAL_COMPOSITE_SCHEMA;
   stateSize: number;
   stateBaseOffset = -1;
-  private _pool!: StatePoolRef;
+  s0: Float64Array<ArrayBufferLike> = new Float64Array(0) as Float64Array<ArrayBufferLike>;
+  s1: Float64Array<ArrayBufferLike> = new Float64Array(0) as Float64Array<ArrayBufferLike>;
+  s2: Float64Array<ArrayBufferLike> = new Float64Array(0) as Float64Array<ArrayBufferLike>;
+  s3: Float64Array<ArrayBufferLike> = new Float64Array(0) as Float64Array<ArrayBufferLike>;
+  s4: Float64Array<ArrayBufferLike> = new Float64Array(0) as Float64Array<ArrayBufferLike>;
+  s5: Float64Array<ArrayBufferLike> = new Float64Array(0) as Float64Array<ArrayBufferLike>;
+  s6: Float64Array<ArrayBufferLike> = new Float64Array(0) as Float64Array<ArrayBufferLike>;
+  s7: Float64Array<ArrayBufferLike> = new Float64Array(0) as Float64Array<ArrayBufferLike>;
 
   constructor(
     enPin: DigitalInputPinModel,
@@ -114,22 +123,17 @@ export class BehavioralCounterElement {
     this.stateSize = this._childElements.reduce((s, c) => s + c.stateSize, 0);
   }
 
-  get isReactive(): boolean {
-    return this._childElements.length > 0;
+  get isReactive(): true {
+    return (this._childElements.length > 0) as true;
   }
 
   initState(pool: StatePoolRef): void {
-    this._pool = pool;
     let offset = this.stateBaseOffset;
     for (const child of this._childElements) {
       child.stateBaseOffset = offset;
       child.initState(pool);
       offset += child.stateSize;
     }
-  }
-
-  checkConvergence(ctx: LoadContext): boolean {
-    return this._childElements.every(c => !c.checkConvergence || c.checkConvergence(ctx));
   }
 
   initVoltages(rhs: Float64Array): void {
@@ -246,7 +250,7 @@ export class BehavioralCounterElement {
  *
  * On rising clock edge with en=1: latches all data inputs to outputs.
  */
-export class BehavioralRegisterElement {
+export class BehavioralRegisterElement implements ReactiveAnalogElementCore {
   private readonly _clockPin: DigitalInputPinModel;
   private readonly _enPin: DigitalInputPinModel;
   private readonly _dataPins: DigitalInputPinModel[];
@@ -261,7 +265,9 @@ export class BehavioralRegisterElement {
   private readonly _pinModelsByLabel: ReadonlyMap<string, DigitalInputPinModel | DigitalOutputPinModel>;
 
   pinNodeIds!: readonly number[];  // set by compiler via Object.assign after factory returns
+  allNodeIds!: readonly number[];  // set by compiler via Object.assign after factory returns
   readonly branchIndex: number = -1;
+  readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.VCVS;
   readonly isNonlinear: true = true;
   label?: string;
 
@@ -269,7 +275,14 @@ export class BehavioralRegisterElement {
   readonly stateSchema: StateSchema = SEQUENTIAL_COMPOSITE_SCHEMA;
   stateSize: number;
   stateBaseOffset = -1;
-  private _pool!: StatePoolRef;
+  s0: Float64Array<ArrayBufferLike> = new Float64Array(0) as Float64Array<ArrayBufferLike>;
+  s1: Float64Array<ArrayBufferLike> = new Float64Array(0) as Float64Array<ArrayBufferLike>;
+  s2: Float64Array<ArrayBufferLike> = new Float64Array(0) as Float64Array<ArrayBufferLike>;
+  s3: Float64Array<ArrayBufferLike> = new Float64Array(0) as Float64Array<ArrayBufferLike>;
+  s4: Float64Array<ArrayBufferLike> = new Float64Array(0) as Float64Array<ArrayBufferLike>;
+  s5: Float64Array<ArrayBufferLike> = new Float64Array(0) as Float64Array<ArrayBufferLike>;
+  s6: Float64Array<ArrayBufferLike> = new Float64Array(0) as Float64Array<ArrayBufferLike>;
+  s7: Float64Array<ArrayBufferLike> = new Float64Array(0) as Float64Array<ArrayBufferLike>;
 
   constructor(
     dataPins: DigitalInputPinModel[],
@@ -296,22 +309,17 @@ export class BehavioralRegisterElement {
     this.stateSize = this._childElements.reduce((s, c) => s + c.stateSize, 0);
   }
 
-  get isReactive(): boolean {
-    return this._childElements.length > 0;
+  get isReactive(): true {
+    return (this._childElements.length > 0) as true;
   }
 
   initState(pool: StatePoolRef): void {
-    this._pool = pool;
     let offset = this.stateBaseOffset;
     for (const child of this._childElements) {
       child.stateBaseOffset = offset;
       child.initState(pool);
       offset += child.stateSize;
     }
-  }
-
-  checkConvergence(ctx: LoadContext): boolean {
-    return this._childElements.every(c => !c.checkConvergence || c.checkConvergence(ctx));
   }
 
   initVoltages(rhs: Float64Array): void {
@@ -518,6 +526,7 @@ export class BehavioralCounterPresetElement {
 
   pinNodeIds!: readonly number[];  // set by compiler via Object.assign after factory returns
   readonly branchIndex: number = -1;
+  readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.VCVS;
   readonly isNonlinear: true = true;
   label?: string;
 
@@ -525,7 +534,6 @@ export class BehavioralCounterPresetElement {
   readonly stateSchema: StateSchema = SEQUENTIAL_COMPOSITE_SCHEMA;
   stateSize: number;
   stateBaseOffset = -1;
-  private _pool!: StatePoolRef;
 
   constructor(
     enPin: DigitalInputPinModel,
@@ -562,22 +570,17 @@ export class BehavioralCounterPresetElement {
     this.stateSize = this._childElements.reduce((s, c) => s + c.stateSize, 0);
   }
 
-  get isReactive(): boolean {
-    return this._childElements.length > 0;
+  get isReactive(): true {
+    return (this._childElements.length > 0) as true;
   }
 
   initState(pool: StatePoolRef): void {
-    this._pool = pool;
     let offset = this.stateBaseOffset;
     for (const child of this._childElements) {
       child.stateBaseOffset = offset;
       child.initState(pool);
       offset += child.stateSize;
     }
-  }
-
-  checkConvergence(ctx: LoadContext): boolean {
-    return this._childElements.every(c => !c.checkConvergence || c.checkConvergence(ctx));
   }
 
   initVoltages(rhs: Float64Array): void {

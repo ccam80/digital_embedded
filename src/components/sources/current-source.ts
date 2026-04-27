@@ -24,6 +24,7 @@ import {
 } from "../../core/registry.js";
 import { formatSI } from "../../editor/si-format.js";
 import type { AnalogElementCore, LoadContext } from "../../solver/analog/element.js";
+import { NGSPICE_LOAD_ORDER } from "../../solver/analog/element.js";
 import { stampRHS } from "../../solver/analog/stamp-helpers.js";
 import { defineModelParams } from "../../core/model-params.js";
 
@@ -173,6 +174,7 @@ export function makeCurrentSource(
 
   return {
     branchIndex: -1,
+    ngspiceLoadOrder: NGSPICE_LOAD_ORDER.ISRC,
     isNonlinear: false,
     isReactive: false,
 
@@ -183,7 +185,6 @@ export function makeCurrentSource(
     load(ctx: LoadContext): void {
       lastSrcFact = ctx.srcFact;
       const I = p.current * ctx.srcFact;
-      const solver = ctx.solver;
       if (nodePos !== 0) stampRHS(ctx.rhs,nodePos, I);
       if (nodeNeg !== 0) stampRHS(ctx.rhs,nodeNeg, -I);
     },

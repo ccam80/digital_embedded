@@ -4,7 +4,7 @@ import { createDefaultRegistry } from '../../components/register-all.js';
 
 const registry = createDefaultRegistry();
 
-function fmt(n) { return n.toExponential(6); }
+function fmt(n: number) { return n.toExponential(6); }
 
 describe('DIAGNOSTIC RC step response R=1k C=1uF tau=1ms V=5V', () => {
   it('prints per-step Vc vs analytical', async () => {

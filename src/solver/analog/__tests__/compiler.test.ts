@@ -17,7 +17,8 @@ import type { SerializedElement } from "../../../core/element.js";
 import { ComponentRegistry } from "../../../core/registry.js";
 import type { ComponentCategory } from "../../../core/registry.js";
 import type { AnalogElement } from "../element.js";
-import type { SparseSolver } from "../sparse-solver.js";
+import type { ComplexSparseSolver } from "../complex-sparse-solver.js";
+import type { LoadContext } from "../load-context.js";
 import { compileUnified } from "@/compile/compile.js";
 
 // ---------------------------------------------------------------------------
@@ -96,9 +97,11 @@ function makeTestResistorElement(nodeA: number, nodeB: number): AnalogElement {
     pinNodeIds: [nodeA, nodeB],
     allNodeIds: [nodeA, nodeB],
     branchIndex: -1,
+    ngspiceLoadOrder: 0,
     isNonlinear: false,
     isReactive: false,
-    stampAc(_s: SparseSolver) { /* no-op */ },
+    load(_ctx: LoadContext): void {},
+    stampAc(_solver: ComplexSparseSolver, _omega: number, _ctx: LoadContext): void { /* no-op */ },
     setParam(_key: string, _value: number): void {},
     getPinCurrents(_v: Float64Array): number[] { return [0, 0]; },
   };
@@ -109,9 +112,11 @@ function makeTestVsElement(nodePos: number, nodeNeg: number, branchIdx: number):
     pinNodeIds: [nodePos, nodeNeg],
     allNodeIds: [nodePos, nodeNeg],
     branchIndex: branchIdx,
+    ngspiceLoadOrder: 0,
     isNonlinear: false,
     isReactive: false,
-    stampAc(_s: SparseSolver) { /* no-op */ },
+    load(_ctx: LoadContext): void {},
+    stampAc(_solver: ComplexSparseSolver, _omega: number, _ctx: LoadContext): void { /* no-op */ },
     setParam(_key: string, _value: number): void {},
     getPinCurrents(_v: Float64Array): number[] { return [0, 0]; },
   };
@@ -122,9 +127,11 @@ function makeTestInductorElement(nodeA: number, nodeB: number, branchIdx: number
     pinNodeIds: [nodeA, nodeB],
     allNodeIds: [nodeA, nodeB],
     branchIndex: branchIdx,
+    ngspiceLoadOrder: 0,
     isNonlinear: false,
     isReactive: true,
-    stampAc(_s: SparseSolver) { /* no-op */ },
+    load(_ctx: LoadContext): void {},
+    stampAc(_solver: ComplexSparseSolver, _omega: number, _ctx: LoadContext): void { /* no-op */ },
     setParam(_key: string, _value: number): void {},
     getPinCurrents(_v: Float64Array): number[] { return [0, 0]; },
   };

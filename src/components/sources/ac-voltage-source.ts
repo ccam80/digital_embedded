@@ -30,6 +30,7 @@ import {
   type ComponentDefinition,
 } from "../../core/registry.js";
 import type { AnalogElementCore, LoadContext } from "../../solver/analog/element.js";
+import { NGSPICE_LOAD_ORDER } from "../../solver/analog/element.js";
 import { stampRHS } from "../../solver/analog/stamp-helpers.js";
 import { parseExpression, evaluateExpression, ExprParseError } from "../../solver/analog/expression.js";
 import type { ExprNode } from "../../solver/analog/expression.js";
@@ -598,6 +599,7 @@ function createAcVoltageSourceElement(
 
   const element: AcVoltageSourceAnalogElement = {
     branchIndex: branchIdx,
+    ngspiceLoadOrder: NGSPICE_LOAD_ORDER.VSRC,
     isNonlinear: false,
     isReactive: false,
 

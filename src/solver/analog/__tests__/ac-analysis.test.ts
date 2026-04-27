@@ -49,6 +49,7 @@ function makeAcResistor(nodeA: number, nodeB: number, resistance: number): Analo
     pinNodeIds: [nodeA, nodeB],
     allNodeIds: [nodeA, nodeB],
     branchIndex: -1,
+    ngspiceLoadOrder: 0,
     isNonlinear: false,
     isReactive: false,
     load(_ctx: LoadContext): void {},
@@ -78,6 +79,7 @@ function makeAcCapacitor(nodeA: number, nodeB: number, capacitance: number): Ana
     pinNodeIds: [nodeA, nodeB],
     allNodeIds: [nodeA, nodeB],
     branchIndex: -1,
+    ngspiceLoadOrder: 0,
     isNonlinear: false,
     isReactive: true,
     load(_ctx: LoadContext): void {},
@@ -106,6 +108,7 @@ function makeAcInductor(nodeA: number, nodeB: number, inductance: number): Analo
     pinNodeIds: [nodeA, nodeB],
     allNodeIds: [nodeA, nodeB],
     branchIndex: -1,
+    ngspiceLoadOrder: 0,
     isNonlinear: false,
     isReactive: true,
     load(_ctx: LoadContext): void {},
@@ -368,8 +371,6 @@ describe("AC", () => {
     // First point should be fStart
 
     // Points should be log-spaced
-    const logRatio1 = Math.log10(result[1] / result[0]);
-    const logRatio2 = Math.log10(result[2] / result[1]);
   });
 
   it("linear_sweep_points — type='lin', numPoints=100, 0 to 1kHz; 100 equally-spaced points", () => {
@@ -387,7 +388,6 @@ describe("AC", () => {
     // First and last points
 
     // Equally spaced
-    const step = 1000 / 99;
   });
 
   it("opamp_gain_bandwidth — inverting amplifier gain × bandwidth = GBW", () => {

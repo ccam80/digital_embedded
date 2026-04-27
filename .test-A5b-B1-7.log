@@ -1,0 +1,30 @@
+
+[1m[7m[36m RUN [39m[27m[22m [36mv2.1.9 [39m[90mC:/local_working_projects/digital_in_browser[39m
+
+ [31m❯[39m src/solver/__tests__/coordinator-speed-control.test.ts [2m([22m[2m24 tests[22m[2m | [22m[31m1 failed[39m[2m)[22m[90m 21[2mms[22m[39m
+[31m   [31m×[31m DefaultSimulationCoordinator -- speed control (continuous)[2m > [22mformatSpeed returns micros/s for rate in 1e-6 to 1e-3 range[90m 5[2mms[22m[31m[39m
+[31m     → expected 'µs/s' to be 'Âµs/s' // Object.is equality[39m
+
+[31m⎯⎯⎯⎯⎯⎯⎯[1m[7m Failed Tests 1 [27m[22m⎯⎯⎯⎯⎯⎯⎯[39m
+
+[31m[1m[7m FAIL [27m[22m[39m src/solver/__tests__/coordinator-speed-control.test.ts[2m > [22mDefaultSimulationCoordinator -- speed control (continuous)[2m > [22mformatSpeed returns micros/s for rate in 1e-6 to 1e-3 range
+[31m[1mAssertionError[22m: expected 'µs/s' to be 'Âµs/s' // Object.is equality[39m
+
+Expected: [32m"[7mÂ[27mµs/s"[39m
+Received: [31m"µs/s"[39m
+
+[36m [2m❯[22m src/solver/__tests__/coordinator-speed-control.test.ts:[2m262:22[22m[39m
+    [90m260| [39m  [34mit[39m([32m'formatSpeed returns micros/s for rate in 1e-6 to 1e-3 range'[39m[33m,[39m ()…
+    [90m261| [39m    coord[33m.[39mspeed [33m=[39m [34m500e-6[39m[33m;[39m [35mconst[39m fmt [33m=[39m coord[33m.[39m[34mformatSpeed[39m()[33m;[39m
+    [90m262| [39m    [34mexpect[39m(fmt[33m.[39munit)[33m.[39m[34mtoBe[39m([32m'Âµs/s'[39m)[33m;[39m [34mexpect[39m(fmt[33m.[39mvalue)[33m.[39m[34mtoBe[39m([32m'500'[39m)[33m;[39m
+    [90m   | [39m                     [31m^[39m
+    [90m263| [39m  })[33m;[39m
+    [90m264| [39m  [34mit[39m([32m'formatSpeed returns ns/s for rate below 1e-6'[39m[33m,[39m () [33m=>[39m {
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯[22m[39m
+
+[2m Test Files [22m [1m[31m1 failed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[31m1 failed[39m[22m[2m | [22m[1m[32m23 passed[39m[22m[90m (24)[39m
+[2m   Start at [22m 11:40:51
+[2m   Duration [22m 690ms[2m (transform 341ms, setup 0ms, collect 471ms, tests 21ms, environment 0ms, prepare 65ms)[22m
+

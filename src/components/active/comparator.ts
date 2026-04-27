@@ -43,7 +43,8 @@ import {
   type AttributeMapping,
   type ComponentDefinition,
 } from "../../core/registry.js";
-import type { AnalogElementCore, LoadContext, StatePoolRef } from "../../solver/analog/element.js";
+import type { LoadContext, StatePoolRef, PoolBackedAnalogElementCore } from "../../solver/analog/element.js";
+import { NGSPICE_LOAD_ORDER } from "../../solver/analog/element.js";
 import { stampRHS } from "../../solver/analog/stamp-helpers.js";
 import { collectPinModelChildren } from "../../solver/analog/digital-pin-model.js";
 import type { AnalogCapacitorElement } from "../passives/capacitor.js";
@@ -198,7 +199,7 @@ export class ComparatorElement extends AbstractCircuitElement {
 export function createOpenCollectorComparatorElement(
   pinNodes: ReadonlyMap<string, number>,
   props: PropertyBag,
-): AnalogElementCore {
+): PoolBackedAnalogElementCore {
   const p: Record<string, number> = {
     hysteresis:   Math.max(props.getModelParam<number>("hysteresis"),   0),
     vos:          props.getModelParam<number>("vos"),
@@ -232,6 +233,7 @@ export function createOpenCollectorComparatorElement(
 
   return {
     branchIndex: -1,
+    ngspiceLoadOrder: NGSPICE_LOAD_ORDER.VCVS,
     isNonlinear: true,
     get isReactive(): boolean { return childElements.some(c => c.isReactive); },
 
@@ -239,10 +241,20 @@ export function createOpenCollectorComparatorElement(
     stateSchema: COMPARATOR_COMPOSITE_SCHEMA,
     stateSize: COMPARATOR_COMPOSITE_SCHEMA.size + childStateSize,
     stateBaseOffset: -1,
+    s0: new Float64Array(0),
+    s1: new Float64Array(0),
+    s2: new Float64Array(0),
+    s3: new Float64Array(0),
+    s4: new Float64Array(0),
+    s5: new Float64Array(0),
+    s6: new Float64Array(0),
+    s7: new Float64Array(0),
 
     initState(poolRef: StatePoolRef): void {
       pool = poolRef;
       base = this.stateBaseOffset;
+      this.s0 = poolRef.state0; this.s1 = poolRef.state1; this.s2 = poolRef.state2; this.s3 = poolRef.state3;
+      this.s4 = poolRef.state4; this.s5 = poolRef.state5; this.s6 = poolRef.state6; this.s7 = poolRef.state7;
       applyInitialValues(COMPARATOR_COMPOSITE_SCHEMA, pool, base, {});
       let offset = base + COMPARATOR_COMPOSITE_SCHEMA.size;
       for (const child of childElements) {
@@ -289,10 +301,6 @@ export function createOpenCollectorComparatorElement(
       for (const child of childElements) { child.load(ctx); }
     },
 
-    checkConvergence(ctx: LoadContext): boolean {
-      return childElements.every(c => !c.checkConvergence || c.checkConvergence(ctx));
-    },
-
     accept(ctx: LoadContext, _simTime: number, _addBreakpoint: (t: number) => void): void {
       const dt = ctx.dt;
       if (dt <= 0) return;
@@ -335,7 +343,7 @@ export function createOpenCollectorComparatorElement(
 function createPushPullComparatorElement(
   pinNodes: ReadonlyMap<string, number>,
   props: PropertyBag,
-): AnalogElementCore {
+): PoolBackedAnalogElementCore {
   const p: Record<string, number> = {
     hysteresis:   Math.max(props.getModelParam<number>("hysteresis"),   0),
     vos:          props.getModelParam<number>("vos"),
@@ -369,6 +377,7 @@ function createPushPullComparatorElement(
 
   return {
     branchIndex: -1,
+    ngspiceLoadOrder: NGSPICE_LOAD_ORDER.VCVS,
     isNonlinear: true,
     get isReactive(): boolean { return childElements.some(c => c.isReactive); },
 
@@ -376,10 +385,20 @@ function createPushPullComparatorElement(
     stateSchema: COMPARATOR_COMPOSITE_SCHEMA,
     stateSize: COMPARATOR_COMPOSITE_SCHEMA.size + childStateSize,
     stateBaseOffset: -1,
+    s0: new Float64Array(0),
+    s1: new Float64Array(0),
+    s2: new Float64Array(0),
+    s3: new Float64Array(0),
+    s4: new Float64Array(0),
+    s5: new Float64Array(0),
+    s6: new Float64Array(0),
+    s7: new Float64Array(0),
 
     initState(poolRef: StatePoolRef): void {
       pool = poolRef;
       base = this.stateBaseOffset;
+      this.s0 = poolRef.state0; this.s1 = poolRef.state1; this.s2 = poolRef.state2; this.s3 = poolRef.state3;
+      this.s4 = poolRef.state4; this.s5 = poolRef.state5; this.s6 = poolRef.state6; this.s7 = poolRef.state7;
       applyInitialValues(COMPARATOR_COMPOSITE_SCHEMA, pool, base, {});
       let offset = base + COMPARATOR_COMPOSITE_SCHEMA.size;
       for (const child of childElements) {
@@ -422,10 +441,6 @@ function createPushPullComparatorElement(
       }
 
       for (const child of childElements) { child.load(ctx); }
-    },
-
-    checkConvergence(ctx: LoadContext): boolean {
-      return childElements.every(c => !c.checkConvergence || c.checkConvergence(ctx));
     },
 
     accept(ctx: LoadContext, _simTime: number, _addBreakpoint: (t: number) => void): void {

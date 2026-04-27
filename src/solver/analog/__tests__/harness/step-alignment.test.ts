@@ -88,7 +88,7 @@ describeGate("step-alignment: exact stepStartTime equality between engines", () 
       if (stepShape.presence !== "both") continue;
       const ngStep = ngSession.steps[i];
       if (!ngStep) continue;
-      const expectedDelta = ourSteps[i].stepStartTime - ngStep.stepStartTime;
+      void (ourSteps[i].stepStartTime - ngStep.stepStartTime);
     }
   });
 

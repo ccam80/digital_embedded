@@ -26,7 +26,7 @@ import type { AnalogElementCore, ReactiveAnalogElement } from "../../../solver/a
 import type { LoadContext } from "../../../solver/analog/load-context.js";
 import { computeNIcomCof } from "../../../solver/analog/integration.js";
 import type { IntegrationMethod } from "../../../core/analog-types.js";
-import { MODETRAN, MODEDC, MODEDCOP, MODEINITTRAN, MODEINITFLOAT, MODEINITJCT } from "../../../solver/analog/ckt-mode.js";
+import { MODETRAN, MODEDCOP, MODEINITTRAN, MODEINITFLOAT } from "../../../solver/analog/ckt-mode.js";
 
 // ---------------------------------------------------------------------------
 // Helper: narrow ModelEntry to inline factory (throws if netlist kind)
@@ -58,12 +58,11 @@ function withState(core: AnalogElementCore): { element: ReactiveAnalogElement; p
  */
 function makeDiagnosticCtx(
   solver: SparseSolver,
-  voltages: Float64Array,
+  _voltages: Float64Array,
 ): LoadContext {
   return makeLoadCtx({
     cktMode: MODEDCOP | MODEINITFLOAT,
     solver,
-    voltages,
     dt: 0,
   });
 }
@@ -75,7 +74,7 @@ function makeDiagnosticCtx(
  */
 function makeSlotLoadCtx(
   solver: SparseSolver,
-  voltages: Float64Array,
+  _voltages: Float64Array,
   dt: number,
   method: IntegrationMethod,
   order: number,
@@ -88,7 +87,6 @@ function makeSlotLoadCtx(
   return makeLoadCtx({
     cktMode,
     solver,
-    voltages,
     dt,
     method,
     order,
@@ -136,6 +134,7 @@ function makeResistorElement(nA: number, nB: number, resistance: number) {
     pinNodeIds: [nA, nB] as readonly number[],
     allNodeIds: [nA, nB] as readonly number[],
     branchIndex: -1,
+    ngspiceLoadOrder: 0,
     isNonlinear: false,
     isReactive: false,
     setParam(_key: string, _value: number): void {},
@@ -229,7 +228,10 @@ describe("PolarizedCap", () => {
       const ctx: LoadContext = {
         cktMode: MODETRAN | MODEINITTRAN,
         solver,
-        voltages,
+        matrix: solver,
+        rhs: voltages,
+        rhsOld: voltages,
+        time: 0,
         dt,
         method: "trapezoidal",
         order: 1,
@@ -238,10 +240,13 @@ describe("PolarizedCap", () => {
         srcFact: 1,
         noncon: { value: 0 },
         limitingCollector: null,
+        convergenceCollector: null,
         xfact: 1,
         gmin: 1e-12,
         reltol: 1e-3,
         iabstol: 1e-12,
+        temp: 300.15,
+        vt: 0.025852,
         cktFixLimit: false,
         bypass: false,
         voltTol: 1e-6,
@@ -252,7 +257,7 @@ describe("PolarizedCap", () => {
       cap.load(ctx);
       const factorResult = solver.factor();
       expect(factorResult).toBe(0);
-      solver.solve(voltages);
+      solver.solve(voltages, voltages);
 
       // At t=0 with geq >> G_leak, cap is near short-circuit
       // Most of V_step drops across ESR
@@ -317,7 +322,10 @@ describe("PolarizedCap", () => {
         const ctx: LoadContext = {
           cktMode,
           solver,
-          voltages,
+          matrix: solver,
+          rhs: voltages,
+          rhsOld: voltages,
+          time: 0,
           dt,
           method,
           order,
@@ -326,10 +334,13 @@ describe("PolarizedCap", () => {
           srcFact: 1,
           noncon: { value: 0 },
           limitingCollector: null,
+          convergenceCollector: null,
           xfact: 1,
           gmin: 1e-12,
           reltol: 1e-3,
           iabstol: 1e-12,
+          temp: 300.15,
+          vt: 0.025852,
           cktFixLimit: false,
           bypass: false,
           voltTol: 1e-6,
@@ -344,14 +355,13 @@ describe("PolarizedCap", () => {
         if (factorResult !== 0) {
           throw new Error(`Singular matrix at step ${step}`);
         }
-        solver.solve(voltages);
+        solver.solve(voltages, voltages);
 
         // Accept pass: commit post-solve state (updated voltages) to pool.
         // Uses a no-op stub solver to call cap.load() for state writes only,
         // without disturbing the main solver or creating a stale second assembly.
-        let _sR = -1, _sC = -1;
         const stubSolver = {
-          allocElement: (r: number, c: number) => { _sR = r; _sC = c; return 0; },
+          allocElement: (_r: number, _c: number) => 0,
           stampElement: (_h: number, _v: number) => {},
           stampRHS: (_r: number, _v: number) => {},
         } as unknown as SparseSolver;
@@ -483,7 +493,7 @@ describe("PolarizedCap", () => {
 
     it("load writes V_PREV to pool slot 2", () => {
       const el = new AnalogPolarizedCapElement([1, 0, 2], 100e-6, 0.1, 25e6, 1.0);
-      const { pool } = withState(el);
+      withState(el);
       // nCap=2 (1-based), nNeg=0 â†’ vCapNode = voltages[1], vNeg = 0
       const voltages = new Float64Array([0, 3]); // node1=0, node2=3V
       const solver = new SparseSolver();
@@ -536,7 +546,7 @@ describe("polarized_cap_load_transient_parity (C4.2)", () => {
 
     // Bit-exact companion conductance (niinteg.c:77):
     //   geq = ag[0] * C_val
-    const geq = ag0 * C_val;
+    void (ag0 * C_val);
 
     // G_esr = 1 / max(ESR, 1e-9) â€” matches MIN_RESISTANCE constant in polarized-cap.ts
     const G_esr  = 1 / Math.max(ESR, 1e-9);
@@ -597,7 +607,10 @@ describe("polarized_cap_load_transient_parity (C4.2)", () => {
       const ctx: LoadContext = {
         cktMode: step === 0 ? (MODETRAN | MODEINITTRAN) : (MODETRAN | MODEINITFLOAT),
         solver,
-        voltages,
+        matrix: solver,
+        rhs: voltages,
+        rhsOld: voltages,
+        time: 0,
         dt,
         method,
         order,
@@ -606,10 +619,13 @@ describe("polarized_cap_load_transient_parity (C4.2)", () => {
         srcFact: 1,
         noncon: { value: 0 },
         limitingCollector: null,
+        convergenceCollector: null,
         xfact: 1,
         gmin: 1e-12,
         reltol: 1e-3,
         iabstol: 1e-12,
+        temp: 300.15,
+        vt: 0.025852,
         cktFixLimit: false,
         bypass: false,
         voltTol: 1e-6,
@@ -675,18 +691,6 @@ describe("polarized_cap_F4b_clamp_diode_stamp (PC-W3-4)", () => {
 
     // Track matrix entries by (row,col) â€” accumulate across stamps.
     const matEntries = new Map<string, number>();
-    const solver = {
-      allocElement: (row: number, col: number): number => {
-        const key = `${row},${col}`;
-        if (!matEntries.has(key)) matEntries.set(key, 0);
-        return 0; // single-slot handle (value stored by key)
-      },
-      stampElement: (_h: number, v: number, row?: number, col?: number): void => {
-        // We can't distinguish rows via handle here, so use a recording allocElement.
-        void _h; void v; void row; void col;
-      },
-      stampRHS: (_row: number, _v: number): void => {},
-    } as unknown as SparseSolver;
 
     // Use a proper recording solver that tracks by (row,col) key.
     let lastAllocKey = "";
@@ -712,7 +716,10 @@ describe("polarized_cap_F4b_clamp_diode_stamp (PC-W3-4)", () => {
     const ctx: LoadContext = {
       cktMode: MODETRAN | MODEINITTRAN,
       solver: recSolver,
-      voltages,
+      matrix: recSolver,
+      rhs: voltages,
+      rhsOld: voltages,
+      time: 0,
       dt,
       method: "trapezoidal",
       order: 1,
@@ -721,10 +728,13 @@ describe("polarized_cap_F4b_clamp_diode_stamp (PC-W3-4)", () => {
       srcFact: 1,
       noncon: { value: 0 },
       limitingCollector: null,
+      convergenceCollector: null,
       xfact: 1,
       gmin: 1e-12,
       reltol: 1e-3,
       iabstol: 1e-12,
+      temp: 300.15,
+      vt: 0.025852,
       cktFixLimit: false,
       bypass: false,
       voltTol: 1e-6,

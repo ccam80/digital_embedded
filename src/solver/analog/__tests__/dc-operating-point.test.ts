@@ -70,6 +70,7 @@ function makeGminDependentElement(nodeA: number, nodeB: number = 0): AnalogEleme
     pinNodeIds: nodeB === 0 ? [nodeA] : [nodeA, nodeB],
     allNodeIds: nodeB === 0 ? [nodeA] : [nodeA, nodeB],
     branchIndex: -1,
+    ngspiceLoadOrder: 0,
     isNonlinear: true,
     isReactive: false,
     setParam(_key: string, _value: number): void {},
@@ -136,6 +137,7 @@ function makeSrcSteppingRequiredElement(nodeA: number, nodeB: number = 0): Analo
     pinNodeIds: nodeB === 0 ? [nodeA] : [nodeA, nodeB],
     allNodeIds: nodeB === 0 ? [nodeA] : [nodeA, nodeB],
     branchIndex: -1,
+    ngspiceLoadOrder: 0,
     isNonlinear: true,
     isReactive: false,
     setParam(_key: string, _value: number): void {},
@@ -217,6 +219,7 @@ function makeScalableVoltageSource(
     pinNodeIds: [nodePos, nodeNeg],
     allNodeIds: [nodePos, nodeNeg],
     branchIndex: branchIdx,
+    ngspiceLoadOrder: 0,
     isNonlinear: false,
     isReactive: false,
     load(ctx: import("../load-context.js").LoadContext): void {

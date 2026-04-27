@@ -17,12 +17,12 @@
  * matrixSize = 4 (nodes 1,2,3 + branch row 3) for NOT
  * matrixSize = 5 (nodes 1,2,3 + branch rows 3,4) for AND/NAND/OR/NOR/XOR
  *
- * Node IDs here are 1-based circuit nodes (0 = ground is implicit);
- * solver uses 0-based indexing so voltages[nodeId] gives node voltage.
+ * result.voltages is 1-based (ngspice convention): slot 0 = ground sentinel,
+ * so voltages[N] gives the voltage at circuit node N (1-based).
  */
 
 import { describe, it, expect, vi } from "vitest";
-import { makeVoltageSource, makeResistor, withNodeIds, runNR } from "./test-helpers.js";
+import { makeVoltageSource, makeResistor, withNodeIds, runNR, makeLoadCtx } from "./test-helpers.js";
 import {
   BehavioralGateElement,
   makeAndAnalogFactory,
@@ -38,7 +38,7 @@ import {
 } from "../digital-pin-model.js";
 import type { ResolvedPinElectrical } from "../../../core/pin-electrical.js";
 import { PropertyBag } from "../../../core/properties.js";
-import type { AnalogElement } from "../element.js";
+import type { AnalogElement, PoolBackedAnalogElementCore } from "../element.js";
 import type { LoadContext } from "../load-context.js";
 import { MODETRAN, MODEINITFLOAT } from "../ckt-mode.js";
 import { StatePool } from "../state-pool.js";
@@ -167,27 +167,26 @@ function make1InputGate(
 describe("AND", () => {
   it("both_high_outputs_high", () => {
     const gate = make2InputGate((inputs) => inputs[0] && inputs[1]);
-    const { solver, diagnostics, elements, matrixSize } =
+    const { elements, matrixSize } =
       make2InputGateCircuit(gate, VDD, VDD);
 
     const result = solve(elements, matrixSize);
 
     expect(result.converged).toBe(true);
-    // Output node is solver index 2 (circuit node 3)
-    // Voltage divider: vOH * LOAD_R / (rOut + LOAD_R) â‰ˆ 3.3 * 10000/10050
-    const vOut = result.voltages[2];
+    // Output node is circuit node 3 → voltages[3] (1-based)
+    // Voltage divider: vOH * LOAD_R / (rOut + LOAD_R) ≈ 3.3 * 10000/10050
+    const vOut = result.voltages[3];
     expect(vOut).toBeGreaterThan(3.0);
   });
 
   it("one_low_outputs_low", () => {
     const gate = make2InputGate((inputs) => inputs[0] && inputs[1]);
-    const { solver, diagnostics, elements, matrixSize } =
+    const { elements, matrixSize } =
       make2InputGateCircuit(gate, VDD, GND);
 
     const result = solve(elements, matrixSize);
 
     expect(result.converged).toBe(true);
-    const vOut = result.voltages[2];
     // vOL = 0 â€” output voltage is essentially 0V
   });
 });
@@ -209,7 +208,7 @@ describe("NOT", () => {
     const lowCircuit = make1InputGateCircuit(gateLow, GND);
     const resultLow = solve(lowCircuit.elements, lowCircuit.matrixSize);
     expect(resultLow.converged).toBe(true);
-    const vOut = resultLow.voltages[1];
+    const vOut = resultLow.voltages[2]; // output = circuit node 2 → voltages[2]
     expect(vOut).toBeGreaterThan(3.0);
   });
 });
@@ -230,12 +229,12 @@ describe("NAND", () => {
 
     for (const [vA, vB, expectHigh] of combos) {
       const gate = make2InputGate((inputs) => !(inputs[0] && inputs[1]));
-      const { solver, diagnostics, elements, matrixSize } =
+      const { elements, matrixSize } =
         make2InputGateCircuit(gate, vA, vB);
       const result = solve(elements, matrixSize);
 
       expect(result.converged).toBe(true);
-      const vOut = result.voltages[2];
+      const vOut = result.voltages[3]; // output = circuit node 3 → voltages[3]
       if (expectHigh) {
         expect(vOut).toBeGreaterThan(2.0);
       } else {
@@ -261,12 +260,12 @@ describe("XOR", () => {
 
     for (const [vA, vB, expectHigh] of combos) {
       const gate = make2InputGate((inputs) => inputs[0] !== inputs[1]);
-      const { solver, diagnostics, elements, matrixSize } =
+      const { elements, matrixSize } =
         make2InputGateCircuit(gate, vA, vB);
       const result = solve(elements, matrixSize);
 
       expect(result.converged).toBe(true);
-      const vOut = result.voltages[2];
+      const vOut = result.voltages[3]; // output = circuit node 3 → voltages[3]
       if (expectHigh) {
         expect(vOut).toBeGreaterThan(2.0);
       } else {
@@ -283,7 +282,7 @@ describe("XOR", () => {
 describe("NR", () => {
   it("converges_within_5_iterations", () => {
     const gate = make2InputGate((inputs) => inputs[0] && inputs[1]);
-    const { solver, diagnostics, elements, matrixSize } =
+    const { elements, matrixSize } =
       make2InputGateCircuit(gate, VDD, VDD);
 
     const result = solve(elements, matrixSize);
@@ -297,14 +296,14 @@ describe("NR", () => {
     // The gate should hold the previous latched level (false initially)
     const gate = make2InputGate((inputs) => inputs[0] && inputs[1]);
     // Input B=3.3V (HIGH), Input A=1.5V (indeterminate)
-    const { solver, diagnostics, elements, matrixSize } =
+    const { elements, matrixSize } =
       make2InputGateCircuit(gate, 1.5, VDD);
 
     const result = solve(elements, matrixSize);
 
     expect(result.converged).toBe(true);
     // Initial latch is false, so AND output should be LOW
-    const vOut = result.voltages[2];
+    const vOut = result.voltages[3]; // output = circuit node 3 → voltages[3]
     expect(vOut).toBeLessThan(0.5);
   });
 });
@@ -335,11 +334,11 @@ describe("Loading", () => {
     //   Gate output at node 2
     //   rLoad from node 2 to ground
 
-    // Layout (1-based MNA node IDs, 0=ground implicit):
-    //   MNA node 1 = input A  â†’ solver index 0
-    //   MNA node 2 = output   â†’ solver index 1
-    //   MNA node 3 = source node (VS pos terminal) â†’ solver index 2
-    //   branch row 3 = VS branch
+    // Layout (1-based MNA node IDs, slot 0 = ground sentinel):
+    //   node 1 = input A  → voltages[1]
+    //   node 2 = output   → voltages[2]
+    //   node 3 = source node (VS pos terminal) → voltages[3]
+    //   branch row 4 = VS branch (branchIdx=3 0-based → k=4 1-based)
     // matrixSize = 4 (3 node rows + 1 branch row)
 
     const inA = new DigitalInputPinModel(CMOS_3V3, true);
@@ -348,21 +347,21 @@ describe("Loading", () => {
     out.init(2, -1); // MNA node 2
     const gate = new BehavioralGateElement([inA], out, (inputs) => !inputs[0], new Map());
 
-    // 3.3V ideal source at circuit node 3 (solver node 2, branch row 3)
+    // 3.3V ideal source at circuit node 3, branch index 3 (0-based)
     const vs = makeVoltageSource(3, 0, 3, VDD);
-    // 1kÎ© from circuit node 3 to circuit node 1
+    // 1kΩ from circuit node 3 to circuit node 1
     const rSource = makeResistor(3, 1, 1000);
     // Load on output
     const rLoad = makeResistor(2, 0, LOAD_R);
 
     const elements: AnalogElement[] = [vs, rSource, rLoad, withNodeIds(gate, [1, 2])];
-    const matrixSize = 4; // solver nodes 0,1,2 + branch row 3
+    const matrixSize = 4; // 3 node rows + 1 branch row
 
     const result = solve(elements, matrixSize);
 
     expect(result.converged).toBe(true);
-    // Input node (solver 0) should be slightly below 3.3V due to rIn loading
-    const vInput = result.voltages[0];
+    // Input node 1 should be slightly below 3.3V due to rIn loading
+    const vInput = result.voltages[1]; // node 1 → voltages[1]
     expect(vInput).toBeLessThan(VDD);
     expect(vInput).toBeGreaterThan(VDD - 0.01); // less than 10mV sag
   });
@@ -425,13 +424,13 @@ describe("Factory", () => {
       new Map(),
     );
 
-    const { solver, diagnostics, elements, matrixSize } =
+    const { elements, matrixSize } =
       make2InputGateCircuit(nandGate, VDD, VDD);
     const result = solve(elements, matrixSize);
 
     expect(result.converged).toBe(true);
-    // NAND(HIGH, HIGH) = LOW
-    expect(result.voltages[2]).toBeLessThan(0.5);
+    // NAND(HIGH, HIGH) = LOW — output = circuit node 3 → voltages[3]
+    expect(result.voltages[3]).toBeLessThan(0.5);
 
     // Verify the factory-produced gate also satisfies AnalogElement interface
     expect(gate.isNonlinear).toBe(true);
@@ -480,33 +479,17 @@ describe("Factory", () => {
  * Build a minimal LoadContext for delegation spy tests.
  * dt=0 â†’ accept() is a no-op (reactive companion skipped); enough for delegation tests.
  */
-function makeMinimalCtx(voltages?: Float64Array): LoadContext {
-  const ag = new Float64Array(7);
-  return {
+function makeMinimalCtx(_voltages?: Float64Array): LoadContext {
+  return makeLoadCtx({
     solver: {
       allocElement: (_r: number, _c: number) => 0,
       stampElement: (_h: number, _v: number) => {},
-      stampRHS: (_i: number, _v: number) => {},
     } as any,
-    rhsOld: voltages ?? new Float64Array(16),
-    rhs: voltages ?? new Float64Array(16),
     cktMode: MODETRAN | MODEINITFLOAT,
     dt: 0,
     method: "trapezoidal" as const,
     order: 1,
-    deltaOld: [],
-    ag,
-    srcFact: 1,
-    noncon: { value: 0 },
-    limitingCollector: null,
-    xfact: 0,
-    gmin: 1e-12,
-    reltol: 1e-3,
-    iabstol: 1e-12,
-    cktFixLimit: false,
-    bypass: false,
-    voltTol: 1e-6,
-  };
+  });
 }
 
 describe("Task 6.4.3 â€” _pinLoading propagation and delegation", () => {
@@ -534,7 +517,6 @@ describe("Task 6.4.3 â€” _pinLoading propagation and delegation", () => {
       stampCalls: 0,
       allocElement(_r: number, _c: number) { return 0; },
       stampElement(_h: number, _v: number) { this.stampCalls++; },
-      stampRHS(_i: number, _v: number) {},
     };
     const ctx = makeMinimalCtx();
     (ctx as any).solver = solver;
@@ -570,7 +552,6 @@ describe("Task 6.4.3 â€” _pinLoading propagation and delegation", () => {
     const solver = {
       allocElement(r: number, c: number) { allocCalls.push([r, c]); return allocCalls.length - 1; },
       stampElement(_h: number, _v: number) {},
-      stampRHS(_i: number, _v: number) {},
     };
     const ctx = makeMinimalCtx();
     (ctx as any).solver = solver;
@@ -604,7 +585,6 @@ describe("Task 6.4.3 â€” _pinLoading propagation and delegation", () => {
     const solver = {
       allocElement(r: number, c: number) { allocCalls.push([r, c]); return allocCalls.length - 1; },
       stampElement(_h: number, _v: number) {},
-      stampRHS(_i: number, _v: number) {},
     };
     const ctx = makeMinimalCtx();
     (ctx as any).solver = solver;
@@ -615,12 +595,12 @@ describe("Task 6.4.3 â€” _pinLoading propagation and delegation", () => {
     element.initState(pool);
     element.load(ctx);
 
-    // MNA node IDs are 1-based; allocElement receives 0-based nodeIdx = nodeId-1.
-    // In_1 = MNA node 1 â†’ nodeIdx 0. In_2 = MNA node 2 â†’ nodeIdx 1.
-    // In_1 (nodeIdx=0) diagonal should NOT appear (loaded=false â†’ no-op in load()).
-    // In_2 (nodeIdx=1) diagonal SHOULD appear (loaded=true â†’ stamps 1/rIn).
-    const node1Diag = allocCalls.some(([r, c]) => r === 0 && c === 0);
-    const node2Diag = allocCalls.some(([r, c]) => r === 1 && c === 1);
+    // MNA node IDs are 1-based; allocElement receives the node ID directly (1-based).
+    // In_1 = MNA node 1. In_2 = MNA node 2.
+    // In_1 (node=1) diagonal should NOT appear (loaded=false -> no-op in load()).
+    // In_2 (node=2) diagonal SHOULD appear (loaded=true -> stamps 1/rIn at (2,2)).
+    const node1Diag = allocCalls.some(([r, c]) => r === 1 && c === 1);
+    const node2Diag = allocCalls.some(([r, c]) => r === 2 && c === 2);
     expect(node1Diag).toBe(false);
     expect(node2Diag).toBe(true);
   });
@@ -705,30 +685,30 @@ describe("Task 6.4.3 â€” _pinLoading propagation and delegation", () => {
       [], -1, props, () => 0,
     );
     withNodeIds(element, [1, 2, 3]);
-    const pool = new StatePool(element.stateSize);
-    element.stateBaseOffset = 0;
-    element.initState(pool);
+    const poolBacked = element as unknown as PoolBackedAnalogElementCore;
+    const pool = new StatePool(poolBacked.stateSize);
+    poolBacked.stateBaseOffset = 0;
+    poolBacked.initState(pool);
 
     const allocCalls: Array<[number, number]> = [];
     const solver = {
       allocElement(r: number, c: number) { allocCalls.push([r, c]); return allocCalls.length - 1; },
       stampElement(_h: number, _v: number) {},
-      stampRHS(_i: number, _v: number) {},
     };
     const ctx = makeMinimalCtx();
     (ctx as any).solver = solver;
 
     element.load(ctx);
 
-    // direct role stamps only on node diagonal (nodeIdx, nodeIdx) where
-    // nodeIdx = nodeId - 1 (0-based). No branch rows are allocated.
-    // Branch rows for a 3-node circuit would be at row >= 3 (absolute row).
-    const hasBranchRowStamp = allocCalls.some(([r]) => r >= 3);
+    // direct role stamps only on node diagonal (node, node) where node is 1-based.
+    // No branch rows are allocated. Branch rows for a 3-node circuit would be
+    // at row > 3 (1-based row 4+). Rows 1..3 are node diagonals.
+    const hasBranchRowStamp = allocCalls.some(([r]) => r > 3);
     expect(hasBranchRowStamp).toBe(false);
 
-    // Output MNA node 3 â†’ nodeIdx 2. The output diagonal (2,2) IS stamped
-    // (loaded=true, direct role â†’ stamps 1/rOut on node diagonal).
-    const hasOutputDiag = allocCalls.some(([r, c]) => r === 2 && c === 2);
+    // Output MNA node 3 -> diagonal at (3,3) IS stamped
+    // (loaded=true, direct role -> stamps 1/rOut on node diagonal).
+    const hasOutputDiag = allocCalls.some(([r, c]) => r === 3 && c === 3);
     expect(hasOutputDiag).toBe(true);
   });
 });

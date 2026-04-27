@@ -1,0 +1,33 @@
+
+[1m[7m[36m RUN [39m[27m[22m [36mv2.1.9 [39m[90mC:/local_working_projects/digital_in_browser[39m
+
+ [31m❯[39m src/components/semiconductors/__tests__/jfet.test.ts [2m([22m[2m23 tests[22m[2m | [22m[31m1 failed[39m[2m)[22m[90m 18[2mms[22m[39m
+[31m   [31m×[31m NR[2m > [22mconverges_within_10_iterations[90m 9[2mms[22m[31m[39m
+[31m     → expected false to be true // Object.is equality[39m
+
+[31m⎯⎯⎯⎯⎯⎯⎯[1m[7m Failed Tests 1 [27m[22m⎯⎯⎯⎯⎯⎯⎯[39m
+
+[31m[1m[7m FAIL [27m[22m[39m src/components/semiconductors/__tests__/jfet.test.ts[2m > [22mNR[2m > [22mconverges_within_10_iterations
+[31m[1mAssertionError[22m: expected false to be true // Object.is equality[39m
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[32m- true[39m
+[31m+ false[39m
+
+[36m [2m❯[22m src/components/semiconductors/__tests__/jfet.test.ts:[2m288:30[22m[39m
+    [90m286| [39m    })[33m;[39m
+    [90m287| [39m
+    [90m288| [39m    [34mexpect[39m(result[33m.[39mconverged)[33m.[39m[34mtoBe[39m([35mtrue[39m)[33m;[39m
+    [90m   | [39m                             [31m^[39m
+    [90m289| [39m    [34mexpect[39m(result[33m.[39miterations)[33m.[39m[34mtoBeLessThanOrEqual[39m([34m10[39m)[33m;[39m
+    [90m290| [39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯[22m[39m
+
+[2m Test Files [22m [1m[31m1 failed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[31m1 failed[39m[22m[2m | [22m[1m[32m22 passed[39m[22m[90m (23)[39m
+[2m   Start at [22m 10:53:33
+[2m   Duration [22m 502ms[2m (transform 193ms, setup 0ms, collect 265ms, tests 18ms, environment 0ms, prepare 67ms)[22m
+

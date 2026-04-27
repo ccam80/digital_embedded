@@ -45,6 +45,7 @@ import {
 } from "../../core/registry.js";
 import { formatSI } from "../../editor/si-format.js";
 import type { AnalogElementCore, ReactiveAnalogElement, IntegrationMethod, LoadContext } from "../../solver/analog/element.js";
+import { NGSPICE_LOAD_ORDER } from "../../solver/analog/element.js";
 import { MODETRAN, MODETRANOP, MODEINITPRED, MODEINITTRAN } from "../../solver/analog/ckt-mode.js";
 import { stampG, stampRHS } from "../../solver/analog/stamp-helpers.js";
 import { defineModelParams } from "../../core/model-params.js";
@@ -244,12 +245,21 @@ export class AnalogCrystalElement implements ReactiveAnalogElement {
   readonly pinNodeIds: readonly number[];
   readonly allNodeIds: readonly number[];
   readonly branchIndex: number;
+  readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.CAP;
   readonly isNonlinear = false;
   readonly isReactive = true;
   readonly poolBacked = true as const;
   readonly stateSchema = CRYSTAL_SCHEMA;
   readonly stateSize = CRYSTAL_SCHEMA.size;
   stateBaseOffset = -1;
+  s0: Float64Array = new Float64Array(0);
+  s1: Float64Array = new Float64Array(0);
+  s2: Float64Array = new Float64Array(0);
+  s3: Float64Array = new Float64Array(0);
+  s4: Float64Array = new Float64Array(0);
+  s5: Float64Array = new Float64Array(0);
+  s6: Float64Array = new Float64Array(0);
+  s7: Float64Array = new Float64Array(0);
   setParam(_key: string, _value: number): void {}
 
   // Series resistance
@@ -311,7 +321,7 @@ export class AnalogCrystalElement implements ReactiveAnalogElement {
    * All three reactive components use ctx.ag[] coefficients directly.
    */
   load(ctx: LoadContext): void {
-    const { solver, voltages, ag } = ctx;
+    const { solver, rhsOld: voltages, ag } = ctx;
     const mode = ctx.cktMode;
     const nA = this.pinNodeIds[0];
     const nB = this.pinNodeIds[1];

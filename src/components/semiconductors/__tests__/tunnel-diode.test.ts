@@ -26,7 +26,7 @@ import { withNodeIds, runNR, makeLoadCtx } from "../../../solver/analog/__tests_
 import { StatePool } from "../../../solver/analog/state-pool.js";
 import type { AnalogElement, AnalogElementCore, ReactiveAnalogElement } from "../../../solver/analog/element.js";
 import type { AnalogFactory } from "../../../core/registry.js";
-import { MODETRAN, MODEDC, MODEDCOP, MODEINITFLOAT } from "../../../solver/analog/ckt-mode.js";
+import { MODETRAN, MODEDCOP, MODEINITFLOAT } from "../../../solver/analog/ckt-mode.js";
 
 // ---------------------------------------------------------------------------
 // Default tunnel diode parameters
@@ -84,7 +84,7 @@ function buildUnitCtx(
   return Object.assign(makeLoadCtx({
     cktMode: MODEDCOP | MODEINITFLOAT,
     solver,
-    voltages,
+    rhs: new Float64Array(voltages.length),
     dt: 0,
   }), overrides);
 }
@@ -100,29 +100,30 @@ function driveAndGetNorton(
   vd: number,
   iterations = 200,
 ): { geq: number; ieq: number } {
-  const voltages = new Float64Array(2);
-  voltages[0] = vd;
-  voltages[1] = 0;
+  // 1-based: [0]=ground sentinel, [1]=nodeAnode, [2]=nodeCathode
+  const voltages = new Float64Array(3);
+  voltages[1] = vd;
+  voltages[2] = 0;
   for (let i = 0; i < iterations; i++) {
     const iterSolver = new SparseSolver();
-    iterSolver._initStructure(2);
+    iterSolver._initStructure(3);
     const iterCtx = buildUnitCtx(iterSolver, voltages);
     element.load(iterCtx);
   }
 
   // Re-stamp into a fresh solver for the final Norton read.
   const solver = new SparseSolver();
-  solver._initStructure(2);
+  solver._initStructure(3);
   const ctx = buildUnitCtx(solver, voltages);
   element.load(ctx);
 
   const entries = solver.getCSCNonZeros();
+  // 1-based: nodeAnode=1 → diagonal at (1,1)
   const geq = entries
-    .filter((e) => e.row === 0 && e.col === 0)
+    .filter((e) => e.row === 1 && e.col === 1)
     .reduce((acc, e) => acc + e.value, 0);
-  const rhsVec = solver.getRhsSnapshot();
-  // Element writes -ieq at anode row; Norton ieq = -rhs[anode].
-  const ieq = -rhsVec[0];
+  // Element writes -ieq at ctx.rhs[nodeAnode=1]; Norton ieq = -rhs[1].
+  const ieq = -ctx.rhs[1];
 
   return { geq, ieq };
 }
@@ -285,41 +286,44 @@ describe("TunnelDiode", () => {
     const { element: statedCore } = withState(core);
     const td = withNodeIds(statedCore, [2, 0]);
 
-    // Resistor element (load-style)
+    // Resistor element (load-style) — 1-based: node1=1, node2=2
     const G = 1 / 100;
     const resistor: AnalogElement = {
       pinNodeIds: [1, 2],
       allNodeIds: [1, 2],
       branchIndex: -1,
+      ngspiceLoadOrder: 0,
       isNonlinear: false,
       isReactive: false,
       setParam(_key: string, _value: number): void {},
       getPinCurrents(_v: Float64Array): number[] { return []; },
       load(ctx): void {
         const s = ctx.solver;
-        s.stampElement(s.allocElement(0, 0), G);
         s.stampElement(s.allocElement(1, 1), G);
-        s.stampElement(s.allocElement(0, 1), -G);
-        s.stampElement(s.allocElement(1, 0), -G);
+        s.stampElement(s.allocElement(2, 2), G);
+        s.stampElement(s.allocElement(1, 2), -G);
+        s.stampElement(s.allocElement(2, 1), -G);
       },
     };
 
-    // Voltage source: node1 = vTarget, gnd (branch row = 2, matrix index 2)
+    // Voltage source: node1=1 forced to vTarget, gnd=0.
+    // With nodeCount=2 and branchCount=1, branch row = nodeCount+1 = 3.
     const vsource: AnalogElement = {
       pinNodeIds: [1, 0],
       allNodeIds: [1, 0],
-      branchIndex: 2,
+      branchIndex: 3,
+      ngspiceLoadOrder: 0,
       isNonlinear: false,
       isReactive: false,
       setParam(_key: string, _value: number): void {},
       getPinCurrents(_v: Float64Array): number[] { return []; },
       load(ctx): void {
         const s = ctx.solver;
-        // KCL: add/subtract branch current from node1
-        s.stampElement(s.allocElement(0, 2), 1);  // node1 row, branch col
-        s.stampElement(s.allocElement(2, 0), 1);  // branch row, node1 col
-        // Branch equation: V(node1) = vTarget
-        s.stampRHS(2, vTarget);
+        // KCL: add/subtract branch current from node1 (1-based row 1, branch col 3)
+        s.stampElement(s.allocElement(1, 3), 1);  // node1 row, branch col
+        s.stampElement(s.allocElement(3, 1), 1);  // branch row, node1 col
+        // Branch equation: V(node1) = vTarget — stamp into rhs[3]
+        ctx.rhs[3] += vTarget;
       },
     };
 
@@ -448,9 +452,10 @@ describe("TunnelDiode TEMP", () => {
     // Seed SLOT_VD=v so vdOld=v; NDR step clamp sees zero delta and does not clamp.
     pool.state0[0] = v;
 
+    // 1-based: [0]=ground sentinel, [1]=nodeA, [2]=nodeK
     const solver = new SparseSolver();
-    solver._initStructure(2);
-    core.load(buildTempCtx(solver, new Float64Array([v, 0])));
+    solver._initStructure(3);
+    core.load(buildTempCtx(solver, new Float64Array([0, v, 0])));
 
     // Read SLOT_ID (index 3) from state pool
     const iElement = pool.state0[3];
@@ -476,9 +481,10 @@ describe("TunnelDiode TEMP", () => {
     pool.state0[0] = v;
 
     // First load at 300.15K
+    // 1-based: [0]=ground sentinel, [1]=nodeA, [2]=nodeK
     const solver1 = new SparseSolver();
-    solver1._initStructure(2);
-    core.load(buildTempCtx(solver1, new Float64Array([v, 0])));
+    solver1._initStructure(3);
+    core.load(buildTempCtx(solver1, new Float64Array([0, v, 0])));
     const iAt300 = pool.state0[3];
 
     // Expected at 300.15K
@@ -488,8 +494,8 @@ describe("TunnelDiode TEMP", () => {
     // Now setParam TEMP=400 and reload (SLOT_VD is already v from prior load)
     core.setParam("TEMP", 400);
     const solver2 = new SparseSolver();
-    solver2._initStructure(2);
-    core.load(buildTempCtx(solver2, new Float64Array([v, 0])));
+    solver2._initStructure(3);
+    core.load(buildTempCtx(solver2, new Float64Array([0, v, 0])));
     const iAt400 = pool.state0[3];
 
     // Expected at 400K
@@ -553,29 +559,20 @@ describe("integration", () => {
     const q1_val = computeJunctionCharge(prevVd, CJO, VJ, M, FC, TT, prevId);
     pool.state1[4] = q1_val;
 
-    // Real SparseSolver — anode=node 1 mapped to row 0, cathode=ground.
+    // Real SparseSolver — anode=node 1 (1-based), cathode=ground (node 0).
+    // rhsOld is 1-based: [0]=ground sentinel, [1]=nodeA=vd.
     const solver = new SparseSolver();
-    solver._initStructure(1);
-    const ctx: import("../../../solver/analog/load-context.js").LoadContext = {
+    solver._initStructure(2);
+    const ctx = makeLoadCtx({
       cktMode: MODETRAN | MODEINITFLOAT,
       solver,
-      rhsOld: new Float64Array([vd, 0]),
+      rhs: new Float64Array(2),
+      rhsOld: new Float64Array([0, vd]),
       dt,
-      method: "trapezoidal",
       order: 2,
       deltaOld: [dt, dt, dt, dt, dt, dt, dt],
       ag,
-      srcFact: 1,
-      noncon: { value: 0 },
-      limitingCollector: null,
-      xfact: 1,
-      gmin: 1e-12,
-      reltol: 1e-3,
-      iabstol: 1e-12,
-      cktFixLimit: false,
-      bypass: false,
-      voltTol: 1e-6,
-    };
+    });
 
     core.load(ctx);
 
@@ -593,11 +590,12 @@ describe("integration", () => {
     expect(capGeq_expected).toBe(ag[0] * Ctotal);
     expect(capIeq_expected).toBe(ccap_expected - capGeq_expected * vd);
 
-    // Verify the element stamped the correct total capGeq at diagonal (0,0)
+    // Verify the element stamped the correct total capGeq at diagonal for nodeAnode=1.
+    // getCSCNonZeros() returns internal indices; external node 1 translates to internal 1.
     const { dIdV: geqFull } = tunnelDiodeIV(vd, IP, VP, IV, VV, IS, N);
     const entries = solver.getCSCNonZeros();
     const total00 = entries
-      .filter((e) => e.row === 0 && e.col === 0)
+      .filter((e) => e.row === 1 && e.col === 1)
       .reduce((sum, e) => sum + e.value, 0);
     expect(total00).toBe(geqFull + capGeq_expected);
   });

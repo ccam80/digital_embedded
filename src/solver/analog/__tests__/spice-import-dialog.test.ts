@@ -25,7 +25,8 @@ import { PinDirection } from "../../../core/pin.js";
 import type { Rect, RenderContext } from "../../../core/renderer-interface.js";
 import type { SerializedElement } from "../../../core/element.js";
 import type { AnalogElement } from "../element.js";
-import type { SparseSolver } from "../sparse-solver.js";
+import type { ComplexSparseSolver } from "../complex-sparse-solver.js";
+import type { LoadContext } from "../load-context.js";
 import type { AnalogElementFactory } from "../behavioral-gate.js";
 import { BJT_NPN_DEFAULTS } from "../../../components/semiconductors/bjt.js";
 
@@ -295,9 +296,11 @@ describe("spice-import-dialog: compile integration", () => {
         pinNodeIds: [],
         allNodeIds: [],
         branchIndex: -1,
+        ngspiceLoadOrder: 0,
         isNonlinear: false,
         isReactive: false,
-        stampAc(_s: SparseSolver) {},
+        load(_ctx: LoadContext): void {},
+        stampAc(_solver: ComplexSparseSolver, _omega: number, _ctx: LoadContext): void {},
         setParam(_k: string, _v: number): void {},
         getPinCurrents(_v: Float64Array): number[] { return []; },
       };

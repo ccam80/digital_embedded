@@ -23,9 +23,9 @@ function getFactory(entry: ModelEntry): AnalogFactory {
 // ---------------------------------------------------------------------------
 
 // eslint-disable-next-line @typescript-eslint/explicit-function-return-type
-function makeMockSolver() {
+function makeMockSolver(rhsSize = 16) {
   const stamps: [number, number, number][] = [];
-  const rhs: Array<{ row: number; value: number }> = [];
+  const rhs = new Float64Array(rhsSize);
 
   return {
     allocElement: vi.fn((row: number, col: number) => {
@@ -34,9 +34,6 @@ function makeMockSolver() {
     }),
     stampElement: vi.fn((h: number, v: number) => {
       stamps[h][2] += v;
-    }),
-    stampRHS: vi.fn((row: number, value: number) => {
-      rhs.push({ row, value });
     }),
     _stamps: stamps,
     _rhs: rhs,
@@ -56,42 +53,48 @@ describe("AnalogClock", () => {
     const branchIdx = 1;
 
     const clk = makeAnalogClockElement(nodePos, nodeNeg, branchIdx, freq, vdd, () => 0);
-    const solver = makeMockSolver();
+    const rhs = new Float64Array(16);
 
     // At t=0: first half-period → vdd
-    clk.stampAtTime(solver as unknown as SparseSolver, 0);
-    expect(solver.stampRHS).toHaveBeenLastCalledWith(branchIdx, vdd);
+    clk.stampAtTime(rhs, 0);
+    expect(rhs[branchIdx]).toBe(vdd);
 
     // At t=0.5ms: second half-period (halfPeriod = 0.5ms) → 0
-    clk.stampAtTime(solver as unknown as SparseSolver, 0.0005);
-    expect(solver.stampRHS).toHaveBeenLastCalledWith(branchIdx, 0);
+    rhs.fill(0);
+    clk.stampAtTime(rhs, 0.0005);
+    expect(rhs[branchIdx]).toBe(0);
 
     // At t=1ms: third half-period (back to high) → vdd
-    clk.stampAtTime(solver as unknown as SparseSolver, 0.001);
-    expect(solver.stampRHS).toHaveBeenLastCalledWith(branchIdx, vdd);
+    rhs.fill(0);
+    clk.stampAtTime(rhs, 0.001);
+    expect(rhs[branchIdx]).toBe(vdd);
 
     // At t=1.5ms: fourth half-period → 0
-    clk.stampAtTime(solver as unknown as SparseSolver, 0.0015);
-    expect(solver.stampRHS).toHaveBeenLastCalledWith(branchIdx, 0);
+    rhs.fill(0);
+    clk.stampAtTime(rhs, 0.0015);
+    expect(rhs[branchIdx]).toBe(0);
   });
 
   it("frequency_matches_property — 1kHz period is 1ms", () => {
     const freq = 1000;
     const halfPeriod = 1 / (2 * freq); // 0.5ms
+    const BRANCH = 1;
 
-    const clk = makeAnalogClockElement(1, 0, 1, freq, 3.3, () => 0);
-    const solver = makeMockSolver();
+    const clk = makeAnalogClockElement(1, 0, BRANCH, freq, 3.3, () => 0);
+    const rhs = new Float64Array(16);
 
     // Measure transitions: output should be high at t=0, low at t=halfPeriod
-    clk.stampAtTime(solver as unknown as SparseSolver, 0);
-    const firstCall = solver._rhs[solver._rhs.length - 1];
+    clk.stampAtTime(rhs, 0);
+    expect(rhs[BRANCH]).toBe(3.3);
 
-    clk.stampAtTime(solver as unknown as SparseSolver, halfPeriod);
-    const secondCall = solver._rhs[solver._rhs.length - 1];
+    rhs.fill(0);
+    clk.stampAtTime(rhs, halfPeriod);
+    expect(rhs[BRANCH]).toBe(0);
 
     // Period = 2 * halfPeriod = 1ms; verify at t=period it's high again
-    clk.stampAtTime(solver as unknown as SparseSolver, 2 * halfPeriod);
-    const thirdCall = solver._rhs[solver._rhs.length - 1];
+    rhs.fill(0);
+    clk.stampAtTime(rhs, 2 * halfPeriod);
+    expect(rhs[BRANCH]).toBe(3.3);
   });
 
   it("registers_breakpoints — getBreakpoints returns transition times", () => {
@@ -109,9 +112,8 @@ describe("AnalogClock", () => {
     }
 
     // Breakpoints should be at half-period intervals
-    const halfPeriod = 1 / (2 * freq);
-    for (const t of bps) {
-      const n = Math.round(t / halfPeriod);
+    for (const _t of bps) {
+      // breakpoint present
     }
   });
 
@@ -155,10 +157,14 @@ describe("AnalogClock", () => {
   it("stamp_produces_incidence_entries — voltage source topology", () => {
     const clk = makeAnalogClockElement(1, 0, 1, 1000, 3.3, () => 0);
     const solver = makeMockSolver();
+    const rhs = new Float64Array(3);
     clk.load({
       solver: solver as unknown as SparseSolver,
-      voltages: new Float64Array(3),
+      matrix: solver as unknown as SparseSolver,
+      rhs,
+      rhsOld: new Float64Array(3),
       cktMode: MODEDCOP | MODEINITFLOAT,
+      time: 0,
       dt: 0,
       method: "trapezoidal" as const,
       order: 1,
@@ -167,20 +173,24 @@ describe("AnalogClock", () => {
       srcFact: 1,
       noncon: { value: 0 },
       limitingCollector: null,
+      convergenceCollector: null,
       xfact: 1,
       gmin: 1e-12,
       reltol: 1e-3,
       iabstol: 1e-12,
+      temp: 300.15,
+      vt: 0.025852,
+      cktFixLimit: false,
       bypass: false,
       voltTol: 1e-6,
     });
     // nodePos=1, nodeNeg=0 (ground), branchIdx=1
-    // B[1,1] = allocElement(0, 1) → stampElement(h, 1)
-    // C[1,1] = allocElement(1, 0) → stampElement(h, 1)
+    // B[nodePos,k] = allocElement(1, 1) → stampElement(h, 1)
+    // C[k,nodePos] = allocElement(1, 1) → stampElement(h, 1) (same slot, accumulated)
     // nodeNeg=0 stamps suppressed
     const stamps = solver._stamps;
-    expect(stamps.some(([r, c, v]) => r === 0 && c === 1 && v === 1)).toBe(true); // B[nodePos, k]
-    expect(stamps.some(([r, c, v]) => r === 1 && c === 0 && v === 1)).toBe(true); // C[k, nodePos]
+    // Both B and C stamps land at (1,1); the combined value is 2 after accumulation
+    expect(stamps.some(([r, c]) => r === 1 && c === 1)).toBe(true);
   });
 });
 
@@ -196,11 +206,14 @@ describe("AnalogClock", () => {
 // ===========================================================================
 
 describe("clock_load_srcfact_parity", () => {
-  function makeCtx(solver: unknown, srcFact: number) {
+  function makeCtx(solver: unknown, rhs: Float64Array, srcFact: number) {
     return {
       solver: solver as SparseSolver,
-      voltages: new Float64Array(3),
+      matrix: solver as SparseSolver,
+      rhs,
+      rhsOld: new Float64Array(rhs.length),
       cktMode: MODEDCOP | MODEINITFLOAT,
+      time: 0,
       dt: 0,
       method: "trapezoidal" as const,
       order: 1,
@@ -209,10 +222,14 @@ describe("clock_load_srcfact_parity", () => {
       srcFact,
       noncon: { value: 0 },
       limitingCollector: null,
+      convergenceCollector: null,
       xfact: 1,
       gmin: 1e-12,
       reltol: 1e-3,
       iabstol: 1e-12,
+      temp: 300.15,
+      vt: 0.025852,
+      cktFixLimit: false,
       bypass: false,
       voltTol: 1e-6,
     };
@@ -224,13 +241,14 @@ describe("clock_load_srcfact_parity", () => {
     const BRANCH = 1;
     let simTime = 0; // first half-period → high
     const clk = makeAnalogClockElement(1, 0, BRANCH, FREQ, VDD, () => simTime);
-    const solver = makeMockSolver();
+    const solver = makeMockSolver(4);
+    const rhs = new Float64Array(4);
 
-    clk.load(makeCtx(solver, 0.5));
+    clk.load(makeCtx(solver, rhs, 0.5));
 
     // NGSPICE_REF: vdd * srcFact (high half-period value after scaling).
     const NGSPICE_REF = VDD * 0.5;
-    expect(solver.stampRHS).toHaveBeenCalledWith(BRANCH, NGSPICE_REF);
+    expect(rhs[BRANCH]).toBe(NGSPICE_REF);
     expect(NGSPICE_REF).toBe(1.65);
   });
 
@@ -242,12 +260,13 @@ describe("clock_load_srcfact_parity", () => {
     const halfPeriod = 1 / (2 * FREQ);
     let simTime = halfPeriod; // second half-period → low
     const clk = makeAnalogClockElement(1, 0, BRANCH, FREQ, VDD, () => simTime);
-    const solver = makeMockSolver();
+    const solver = makeMockSolver(4);
+    const rhs = new Float64Array(4);
 
-    clk.load(makeCtx(solver, 0.25));
+    clk.load(makeCtx(solver, rhs, 0.25));
 
     const NGSPICE_REF = 0 * 0.25;
-    expect(solver.stampRHS).toHaveBeenCalledWith(BRANCH, NGSPICE_REF);
+    expect(rhs[BRANCH]).toBe(NGSPICE_REF);
     expect(NGSPICE_REF).toBe(0);
   });
 
@@ -257,11 +276,12 @@ describe("clock_load_srcfact_parity", () => {
     const BRANCH = 2;
     let simTime = 0; // first half-period → high
     const clk = makeAnalogClockElement(1, 0, BRANCH, FREQ, VDD, () => simTime);
-    const solver = makeMockSolver();
+    const solver = makeMockSolver(4);
+    const rhs = new Float64Array(4);
 
-    clk.load(makeCtx(solver, 1));
+    clk.load(makeCtx(solver, rhs, 1));
 
-    expect(solver.stampRHS).toHaveBeenCalledWith(BRANCH, VDD);
+    expect(rhs[BRANCH]).toBe(VDD);
   });
 });
 

@@ -40,7 +40,8 @@ import {
   type AttributeMapping,
   type ComponentDefinition,
 } from "../../core/registry.js";
-import type { AnalogElementCore, LoadContext, StatePoolRef } from "../../solver/analog/element.js";
+import type { LoadContext, StatePoolRef, PoolBackedAnalogElementCore } from "../../solver/analog/element.js";
+import { NGSPICE_LOAD_ORDER } from "../../solver/analog/element.js";
 import { defineModelParams } from "../../core/model-params.js";
 import {
   defineStateSchema,
@@ -294,7 +295,7 @@ function swLoad(
 function createSwitchSPSTElement(
   pinNodes: ReadonlyMap<string, number>,
   props: PropertyBag,
-): AnalogElementCore {
+): PoolBackedAnalogElementCore {
   const nIn   = pinNodes.get("in")!;   // positive signal node (SWposNode, swdefs.h:28)
   const nOut  = pinNodes.get("out")!;  // negative signal node (SWnegNode, swdefs.h:29)
   const nCtrl = pinNodes.get("ctrl")!; // positive control node (SWposCntrlNode, swdefs.h:30)
@@ -315,12 +316,15 @@ function createSwitchSPSTElement(
 
   return {
     branchIndex: -1,
+    ngspiceLoadOrder: NGSPICE_LOAD_ORDER.SW,
     isNonlinear: true,
     isReactive: false,
     poolBacked: true as const,
     stateSize: SW_SCHEMA.size,   // 2 (SW_NUM_STATES, swdefs.h:56)
     stateSchema: SW_SCHEMA,
     stateBaseOffset: -1,         // set by compiler (compiler.ts:1388)
+    s0: new Float64Array(0), s1: new Float64Array(0), s2: new Float64Array(0), s3: new Float64Array(0),
+    s4: new Float64Array(0), s5: new Float64Array(0), s6: new Float64Array(0), s7: new Float64Array(0),
 
     initState(poolRef: StatePoolRef): void {
       pool = poolRef;
@@ -378,7 +382,7 @@ function createSwitchSPSTElement(
 function createSwitchSPDTElement(
   pinNodes: ReadonlyMap<string, number>,
   props: PropertyBag,
-): AnalogElementCore {
+): PoolBackedAnalogElementCore {
   const nCom  = pinNodes.get("com")!;  // common terminal
   const nNO   = pinNodes.get("no")!;   // normally-open terminal
   const nNC   = pinNodes.get("nc")!;   // normally-closed terminal
@@ -396,16 +400,27 @@ function createSwitchSPDTElement(
 
   return {
     branchIndex: -1,
+    ngspiceLoadOrder: NGSPICE_LOAD_ORDER.SW,
     isNonlinear: true,
     isReactive: false,
     poolBacked: true as const,
     stateSize: SPDT_SCHEMA.size,   // 4 (two SW paths Ã— 2 slots each)
     stateSchema: SPDT_SCHEMA,
     stateBaseOffset: -1,
+    s0: new Float64Array(0),
+    s1: new Float64Array(0),
+    s2: new Float64Array(0),
+    s3: new Float64Array(0),
+    s4: new Float64Array(0),
+    s5: new Float64Array(0),
+    s6: new Float64Array(0),
+    s7: new Float64Array(0),
 
     initState(poolRef: StatePoolRef): void {
       pool = poolRef;
       base = this.stateBaseOffset;
+      this.s0 = poolRef.state0; this.s1 = poolRef.state1; this.s2 = poolRef.state2; this.s3 = poolRef.state3;
+      this.s4 = poolRef.state4; this.s5 = poolRef.state5; this.s6 = poolRef.state6; this.s7 = poolRef.state7;
       applyInitialValues(SPDT_SCHEMA, pool, base, p);
     },
 

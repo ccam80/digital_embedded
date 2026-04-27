@@ -37,6 +37,7 @@
  */
 
 import type { AnalogElement, AnalogElementCore, LoadContext } from "../../solver/analog/element.js";
+import { NGSPICE_LOAD_ORDER } from "../../solver/analog/element.js";
 import type { Diagnostic } from "../../compile/types.js";
 import { PropertyBag } from "../../core/properties.js";
 import { defineModelParams } from "../../core/model-params.js";
@@ -87,6 +88,7 @@ export class AnalogFuseElement implements AnalogElement {
   readonly pinNodeIds: readonly number[];
   readonly allNodeIds: readonly number[];
   readonly branchIndex: number = -1;
+  readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.RES;
   readonly isNonlinear: boolean = true;
   readonly isReactive: boolean = false;
   setParam(_key: string, _value: number): void {}

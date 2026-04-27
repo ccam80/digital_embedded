@@ -53,7 +53,7 @@ describeIfDll("all-fixtures regression probe (post order/method sync)", () => {
       console.log(
         `${name}: ourSteps=${ourSteps.length}, ngSteps=${ngSteps.length}, ` +
         `lastSimTime=${lastOurStep?.stepEndTime?.toExponential?.(3)}, ` +
-        `lastRhs=[${lastRhs ? Array.from(lastRhs).map((v: number) => v.toExponential(2)).join(",") : "none"}]`,
+        `lastRhs=[${lastRhs ? Array.from(lastRhs as Float64Array).map((v) => v.toExponential(2)).join(",") : "none"}]`,
       );
 
       expect(ourSteps.length, "must make progress").toBeGreaterThan(3);

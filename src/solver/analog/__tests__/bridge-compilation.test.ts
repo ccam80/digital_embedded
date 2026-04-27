@@ -34,11 +34,9 @@ function makePartition(stubs: BridgeStub[], groups: ConnectivityGroup[]): Solver
 }
 
 interface StampCall { row: number; col: number; value: number }
-interface RhsCall   { row: number; value: number }
 
 class MockSolver {
   readonly stamps: StampCall[] = [];
-  readonly rhs: RhsCall[] = [];
   private readonly _handles: Array<{ row: number; col: number }> = [];
   allocElement(row: number, col: number): number {
     this._handles.push({ row, col });
@@ -48,21 +46,20 @@ class MockSolver {
     const { row, col } = this._handles[handle];
     this.stamps.push({ row, col, value });
   }
-  stampRHS(row: number, value: number): void { this.rhs.push({ row, value }); }
-  reset(): void { this.stamps.length = 0; this.rhs.length = 0; this._handles.length = 0; }
+  reset(): void { this.stamps.length = 0; this._handles.length = 0; }
   sumStamp(row: number, col: number): number {
     return this.stamps.filter(s => s.row === row && s.col === col).reduce((a, s) => a + s.value, 0);
   }
-  lastRhs(row: number): number | undefined {
-    const hits = this.rhs.filter(r => r.row === row);
-    return hits.length > 0 ? hits[hits.length - 1]!.value : undefined;
-  }
 }
 
-function makeCtx(solver: MockSolver) {
+function makeCtx(solver: MockSolver, rhs?: Float64Array) {
+  const rhsBuf = rhs ?? new Float64Array(8);
   return {
     solver: solver as any,
     voltages: new Float64Array(8),
+    rhs: rhsBuf,
+    rhsOld: rhsBuf,
+    matrix: solver as any,
     cktMode: MODEDCOP | MODEINITFLOAT,
     dt: 0,
     method: 'trapezoidal' as const,
@@ -72,10 +69,14 @@ function makeCtx(solver: MockSolver) {
     srcFact: 1,
     noncon: { value: 0 },
     limitingCollector: null,
+    convergenceCollector: null,
     xfact: 1,
     gmin: 1e-12,
     reltol: 1e-3,
     iabstol: 1e-12,
+    time: 0,
+    temp: 300.15,
+    vt: 0.025852,
     cktFixLimit: false,
     bypass: false,
     voltTol: 1e-6,
@@ -149,9 +150,10 @@ describe('bridge-compilation: none mode bridge adapters are unloaded', () => {
     const compiled = compileAnalogPartition(partition, new ComponentRegistry(), undefined, undefined, undefined, 'none');
     const adapter = compiled.bridgeAdaptersByGroupId.get(2)![0] as BridgeInputAdapter;
     const solver = new MockSolver();
-    adapter.load(makeCtx(solver));
+    const rhs = new Float64Array(8);
+    adapter.load(makeCtx(solver, rhs));
     expect(solver.stamps.length).toBe(0);
-    expect(solver.rhs.length).toBe(0);
+    expect(rhs.every(v => v === 0)).toBe(true);
   });
 });
 
@@ -164,7 +166,6 @@ describe('bridge-compilation: cross-domain mode bridge adapters are loaded', () 
     const adapter = compiled.bridgeAdaptersByGroupId.get(1)![0] as BridgeOutputAdapter;
     const solver = new MockSolver();
     adapter.load(makeCtx(solver));
-    const gOut = 1 / CMOS_3V3.rOut;
     // nodeId=1 -> nodeIdx=0. Loaded: 1/rOut on diagonal.
   });
 });
@@ -192,7 +193,8 @@ describe('bridge-compilation: bridge output in hi-z mode stamps I=0', () => {
     const adapter = compiled.bridgeAdaptersByGroupId.get(1)![0] as BridgeOutputAdapter;
     adapter.setHighZ(true);
     const solver = new MockSolver();
-    adapter.load(makeCtx(solver));
-    expect(solver.lastRhs(adapter.branchIndex)).toBe(0);
+    const rhs = new Float64Array(8);
+    adapter.load(makeCtx(solver, rhs));
+    expect(rhs[adapter.branchIndex]).toBe(0);
   });
 });

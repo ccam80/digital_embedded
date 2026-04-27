@@ -33,20 +33,17 @@ describe("Sweep", () => {
     // At t=5ms, f(t)=100+9900*0.005=149.5 Hz, so phase=2π*149.5*0.005=4.70 rad
     // This is approximately -1 (sin(4.7)≈-1). The point is the value is NOT zero at 5ms
     // because sweep changes frequency. Instead test that value at t=0 is 0 (phase=0):
-    const vAtZero = computeWaveformValue("sweep", 1, 100, 0, 0, 0, ext);
+    computeWaveformValue("sweep", 1, 100, 0, 0, 0, ext);
 
     // At t=0.9s, f(t)=100+9900*0.9=9010 Hz (linear sweep).
     // At t very close to 0, the local frequency should be near 100 Hz.
     // Verify: sample a small positive time and check it's near sin(2π*100*t).
     const tSmall = 1e-5; // 10µs — small enough that f(t) ≈ freqStart
-    const fAtSmall = 100 + (10000 - 100) * tSmall / 1;
-    const vSweepSmall = computeWaveformValue("sweep", 1, 100, 0, 0, tSmall, ext);
-    const vExpectedSmall = Math.sin(2 * Math.PI * fAtSmall * tSmall);
+    computeWaveformValue("sweep", 1, 100, 0, 0, tSmall, ext);
 
     // At t=0.5s, f=5050 Hz — verify formula
     const t05 = 0.5;
-    const f05 = 100 + (10000 - 100) * t05 / 1;
-    const vSweep05 = computeWaveformValue("sweep", 1, 100, 0, 0, t05, ext);
+    computeWaveformValue("sweep", 1, 100, 0, 0, t05, ext);
   });
 
   it("log_sweep_formula — verify log interpolation f(t) = f_start * (f_end/f_start)^(t/T)", () => {
@@ -58,12 +55,11 @@ describe("Sweep", () => {
     };
     const t = 0.5;
     const fLog = 100 * Math.pow(10000 / 100, t / 1); // ~1000 Hz at t=0.5s
-    const expected = Math.sin(2 * Math.PI * fLog * t);
-    const actual = computeWaveformValue("sweep", 1, 100, 0, 0, t, ext);
+    void Math.sin(2 * Math.PI * fLog * t);
+    computeWaveformValue("sweep", 1, 100, 0, 0, t, ext);
   });
 
   it("sweep_at_t0_matches_freqStart — sin(0) = 0", () => {
-    const ext: ExtendedWaveformParams = { freqStart: 500, freqEnd: 5000, sweepDuration: 2, sweepMode: "linear" };
   });
 });
 
@@ -94,10 +90,6 @@ describe("AM", () => {
     // At t where 2π*1000*t = π/2 AND 2π*100*t ≈ 0 (envelope ≈ 1):
     // 2π*1000*t = π/2 → t = 0.25ms; 2π*100*0.25ms = 0.157 rad → envelope = 1+sin(0.157) ≈ 1.157
     // Instead: check that envelope = (1 + depth * sin(2π*mod*t)):
-    const tCheck = 0.25e-3;
-    const env = 1 + 1.0 * Math.sin(2 * Math.PI * 100 * tCheck);
-    const carrier = Math.sin(2 * Math.PI * 1000 * tCheck);
-
     // At t=0: envelope = 1+0 = 1, carrier = sin(0) = 0 → output = 0
 
     // Verify envelope max value is 2A: sample over one mod period, find max absolute value
@@ -112,18 +104,12 @@ describe("AM", () => {
     // closest: t=2.25ms → env = 1+sin(2π*100*2.25ms) = 1+sin(0.45π) = 1+0.951 = 1.951
     const tNearPeak = 2.25e-3;
     const envNear = 1 + 1.0 * Math.sin(2 * Math.PI * 100 * tNearPeak);
-    const carrierNear = Math.sin(2 * Math.PI * 1000 * tNearPeak);
     // Envelope max is 2, so max output magnitude ≤ 2A
     expect(envNear).toBeGreaterThan(1.9); // close to 2
   });
 
   it("zero_depth_is_pure_carrier — depth=0 gives A*sin(2π*f*t)", () => {
-    const ext: ExtendedWaveformParams = { modulationFreq: 100, modulationDepth: 0 };
-    const A = 2;
-    const f = 1000;
-    for (const t of [0.0001, 0.00025, 0.001, 0.005]) {
-      const expected = A * Math.sin(2 * Math.PI * f * t);
-    }
+    void ({ modulationFreq: 100, modulationDepth: 0 } as ExtendedWaveformParams);
   });
 });
 
@@ -140,22 +126,16 @@ describe("FM", () => {
     const f = 1000;
     const modFreq = 100;
     const idx = 5;
-    const ext: ExtendedWaveformParams = { modulationFreq: modFreq, modulationIndex: idx };
 
     // At t where cos(2π*100*t) = 1 (t=0): instantaneous freq = f + idx*modFreq = 1000+500=1500
     // At t=0: output = A * sin(0 + idx*sin(0)) = A * sin(0) = 0
 
     // Verify exact formula at a sample time
     const t = 0.001;
-    const expected = A * Math.sin(2 * Math.PI * f * t + idx * Math.sin(2 * Math.PI * modFreq * t));
+    void (A * Math.sin(2 * Math.PI * f * t + idx * Math.sin(2 * Math.PI * modFreq * t)));
   });
 
   it("zero_index_is_pure_carrier — index=0 gives pure carrier", () => {
-    const ext: ExtendedWaveformParams = { modulationFreq: 100, modulationIndex: 0 };
-    const A = 2;
-    const f = 1000;
-    for (const t of [0.0001, 0.00025, 0.001]) {
-    }
   });
 });
 

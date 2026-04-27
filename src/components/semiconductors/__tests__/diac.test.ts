@@ -36,6 +36,7 @@ function makeCaptureSolver(): {
   const handles: { row: number; col: number }[] = [];
   const handleIndex = new Map<string, number>();
   const solver = {
+    _initStructure: (_size: number) => {},
     stampRHS: (row: number, value: number) => {
       rhs.push({ row, value });
     },
@@ -107,8 +108,9 @@ function driveToOp(element: AnalogElement, vA: number, vB: number, iterations = 
       nodeCount: 2,
     });
     // ctx.rhsOld is the load-phase voltage buffer; overwrite it so the diac sees (vA, vB).
-    ctx.loadCtx.rhsOld[0] = vA;
-    ctx.loadCtx.rhsOld[1] = vB;
+    // 1-based: node1→rhsOld[1], node2→rhsOld[2]
+    ctx.loadCtx.rhsOld[1] = vA;
+    ctx.loadCtx.rhsOld[2] = vB;
     element.load(ctx.loadCtx);
     voltages[0] = vA;
     voltages[1] = vB;
@@ -120,29 +122,33 @@ function driveToOp(element: AnalogElement, vA: number, vB: number, iterations = 
  * Compute steady-state current I(V) through diac at given voltage by evaluating
  * the Norton equivalent: I = geq * V + ieq.
  * Returns the current from terminal A to terminal B.
+ * Note: stampRHS is a free function writing to ctx.loadCtx.rhs (Float64Array),
+ * not to the capture solver's stampRHS method — so we read rhs from the context.
  */
 function getCurrentAtV(element: AnalogElement, v: number): number {
   driveToOp(element, v, 0, 50);
 
-  const { solver, stamps, rhs } = makeCaptureSolver();
+  const { solver, stamps } = makeCaptureSolver();
   const ctx = makeSimpleCtx({
     solver,
     elements: [element],
     matrixSize: 2,
     nodeCount: 2,
   });
-  ctx.loadCtx.rhsOld[0] = v;
-  ctx.loadCtx.rhsOld[1] = 0;
+  // 1-based: nodeA=1→rhsOld[1], nodeB=2→rhsOld[2]
+  ctx.loadCtx.rhsOld[1] = v;
+  ctx.loadCtx.rhsOld[2] = 0;
   element.load(ctx.loadCtx);
 
-  // geq is the (0,0) diagonal entry, ieq = RHS[0] (negated)
-  const geqEntry = stamps.find((s) => s.row === 0 && s.col === 0);
-  const ieqEntry = rhs.find((r) => r.row === 0);
+  // geq is the (1,1) diagonal entry (nodeA=1)
+  // ieq: stampRHS writes to ctx.loadCtx.rhs[nodeA] = rhs[1] (free function, not solver method)
+  const geqEntry = stamps.find((s) => s.row === 1 && s.col === 1);
+  const rhsVal = ctx.loadCtx.rhs[1]; // stampRHS(ctx.rhs, 1, -ieq) writes -ieq here
 
-  if (!geqEntry || !ieqEntry) return 0;
+  if (!geqEntry) return 0;
 
   const geq = geqEntry.value;
-  const ieq = -ieqEntry.value; // stampRHS stamps -ieq at row 0
+  const ieq = -rhsVal; // stampRHS stamps -ieq at row 1, so rhs[1] = -ieq
   return geq * v + ieq;
 }
 
@@ -160,7 +166,6 @@ describe("Diac", () => {
     expect(Math.abs(iPosV)).toBeLessThan(1e-3); // less than 1mA confirms blocking
 
     // Also check that |I| ≈ V/R_off
-    const expected = 20 / DIAC_DEFAULTS.rOff;
   });
 
   it("conducts_above_breakover", () => {
@@ -242,21 +247,23 @@ describe("Diac", () => {
       nodeCount: 3,
     });
     for (let i = 0; i < 200; i++) {
-      drivingCtx.loadCtx.rhsOld[0] = 0;    // MT1
-      drivingCtx.loadCtx.rhsOld[1] = 100;  // MT2 (100V positive)
-      drivingCtx.loadCtx.rhsOld[2] = 0.65; // Gate (forward-biased, simulating diac delivery)
+      // 1-based: MT1=node1→rhsOld[1], MT2=node2→rhsOld[2], G=node3→rhsOld[3]
+      drivingCtx.loadCtx.rhsOld[1] = 0;    // MT1
+      drivingCtx.loadCtx.rhsOld[2] = 100;  // MT2 (100V positive)
+      drivingCtx.loadCtx.rhsOld[3] = 0.65; // Gate (forward-biased, simulating diac delivery)
       triacEl.load(drivingCtx.loadCtx);
     }
 
     // Verify triac is now conducting (high conductance) via a fresh capture.
     const { solver: readoutSolver, stamps } = makeCaptureSolver();
     drivingCtx.loadCtx.solver = readoutSolver;
-    drivingCtx.loadCtx.rhsOld[0] = 0;
-    drivingCtx.loadCtx.rhsOld[1] = 100;
-    drivingCtx.loadCtx.rhsOld[2] = 0.65;
+    drivingCtx.loadCtx.rhsOld[1] = 0;
+    drivingCtx.loadCtx.rhsOld[2] = 100;
+    drivingCtx.loadCtx.rhsOld[3] = 0.65;
     triacEl.load(drivingCtx.loadCtx);
 
-    const diagMT = stamps.filter((s) => s.row === s.col && s.row < 2);
+    // 1-based: MT1=row1, MT2=row2 — diagonal entries at (1,1) and (2,2)
+    const diagMT = stamps.filter((s) => s.row === s.col && s.row >= 1 && s.row <= 2);
     const maxG = Math.max(...diagMT.map((s) => Math.abs(s.value)));
     expect(maxG).toBeGreaterThan(1.0); // triac in on-state — diac triggered it
   });

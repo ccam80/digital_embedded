@@ -55,10 +55,9 @@ function makeMemristor(overrides: Partial<{
  * Integrate the memristor state variable w forward by one accepted step.
  * Memristor.accept() reads ctx.dt and ctx.voltages to compute dw/dt.
  */
-function acceptStep(mem: MemristorElement, dt: number, voltages: Float64Array): void {
+function acceptStep(mem: MemristorElement, dt: number, _voltages: Float64Array): void {
   const ctx = makeLoadCtx({
     solver: new SparseSolver() as unknown as import("../../../solver/analog/sparse-solver.js").SparseSolver,
-    voltages,
     cktMode: MODETRAN | MODEINITFLOAT,
     dt,
     deltaOld: [dt, dt, dt, dt, dt, dt, dt],
@@ -73,22 +72,21 @@ function acceptStep(mem: MemristorElement, dt: number, voltages: Float64Array): 
 describe("Memristor", () => {
   describe("initial_resistance", () => {
     it("w=0.5 gives R = (R_on + R_off) / 2", () => {
-      const mem = makeMemristor();
-      const expected = (R_ON + R_OFF) / 2;
+      makeMemristor();
     });
 
     it("w=0.5 gives R = 8050 Ω with defaults", () => {
-      const mem = makeMemristor();
+      makeMemristor();
       // R(0.5) = 100*0.5 + 16000*(0.5) = 50 + 8000 = 8050
     });
 
     it("conductance at w=0 equals 1/R_off", () => {
-      const mem = makeMemristor({ initialState: 0.0 });
+      makeMemristor({ initialState: 0.0 });
       // G(0) = 0*(1/R_on - 1/R_off) + 1/R_off = 1/R_off
     });
 
     it("conductance at w=1 equals 1/R_on", () => {
-      const mem = makeMemristor({ initialState: 1.0 });
+      makeMemristor({ initialState: 1.0 });
       // G(1) = 1*(1/R_on - 1/R_off) + 1/R_off = 1/R_on
     });
   });
@@ -281,7 +279,10 @@ describe("Memristor", () => {
       solver._initStructure(2);
       const ctx: LoadContext = {
         solver,
-        voltages: new Float64Array(2),
+        matrix: solver,
+        rhs: new Float64Array(2),
+        rhsOld: new Float64Array(2),
+        time: 0,
         cktMode: MODEDCOP | MODEINITFLOAT,
         dt: 0,
         method: "trapezoidal",
@@ -291,10 +292,13 @@ describe("Memristor", () => {
         srcFact: 1,
         noncon: { value: 0 },
         limitingCollector: null,
+        convergenceCollector: null,
         xfact: 1,
         gmin: 1e-12,
         reltol: 1e-3,
         iabstol: 1e-12,
+        temp: 300.15,
+        vt: 0.025852,
         cktFixLimit: false,
         bypass: false,
         voltTol: 1e-6,
@@ -426,7 +430,10 @@ describe("memristor_load_transient_parity (C4.2)", () => {
 
       const ctx: LoadContext = {
         solver,
-        voltages,
+        matrix: solver,
+        rhs: voltages,
+        rhsOld: voltages,
+        time: 0,
         cktMode: MODETRAN | (step === 0 ? MODEINITTRAN : MODEINITFLOAT),
         dt,
         method,
@@ -436,10 +443,13 @@ describe("memristor_load_transient_parity (C4.2)", () => {
         srcFact: 1,
         noncon: { value: 0 },
         limitingCollector: null,
+        convergenceCollector: null,
         xfact: 1,
         gmin: 1e-12,
         reltol: 1e-3,
         iabstol: 1e-12,
+        temp: 300.15,
+        vt: 0.025852,
         cktFixLimit: false,
         bypass: false,
         voltTol: 1e-6,

@@ -44,7 +44,8 @@ import {
   type AttributeMapping,
   type ComponentDefinition,
 } from "../../core/registry.js";
-import type { AnalogElementCore, LoadContext } from "../../solver/analog/element.js";
+import type { LoadContext, PoolBackedAnalogElementCore } from "../../solver/analog/element.js";
+import { NGSPICE_LOAD_ORDER } from "../../solver/analog/element.js";
 import { defineModelParams } from "../../core/model-params.js";
 import { stampG, stampRHS } from "../../solver/analog/stamp-helpers.js";
 import type { StatePoolRef } from "../../core/analog-types.js";
@@ -155,7 +156,7 @@ function createOptocouplerElement(
   internalNodeIds: readonly number[],
   _branchIdx: number,
   props: PropertyBag,
-): AnalogElementCore {
+): PoolBackedAnalogElementCore {
   const ctr = props.getModelParam<number>("ctr");
   const Is  = props.getModelParam<number>("Is");
   const n   = props.getModelParam<number>("n");
@@ -195,15 +196,26 @@ function createOptocouplerElement(
 
   return {
     branchIndex: -1,
+    ngspiceLoadOrder: NGSPICE_LOAD_ORDER.DIO,
     isNonlinear: true,
     isReactive: false as const,
     poolBacked: true as const,
     stateSize: DIODE_STATE_SIZE + BJT_STATE_SIZE,
     stateSchema: DIODE_SCHEMA, // primary schema for diagnostics; BJT schema follows
     stateBaseOffset: -1,
+    s0: new Float64Array(0),
+    s1: new Float64Array(0),
+    s2: new Float64Array(0),
+    s3: new Float64Array(0),
+    s4: new Float64Array(0),
+    s5: new Float64Array(0),
+    s6: new Float64Array(0),
+    s7: new Float64Array(0),
 
     initState(poolRef: StatePoolRef): void {
       pool = poolRef;
+      this.s0 = poolRef.state0; this.s1 = poolRef.state1; this.s2 = poolRef.state2; this.s3 = poolRef.state3;
+      this.s4 = poolRef.state4; this.s5 = poolRef.state5; this.s6 = poolRef.state6; this.s7 = poolRef.state7;
       diodeBase = this.stateBaseOffset;
       bjtBase   = this.stateBaseOffset + DIODE_STATE_SIZE;
 
@@ -270,7 +282,7 @@ function createOptocouplerElement(
       void key; void value;
     },
 
-    getPinCurrents(voltages: Float64Array): number[] {
+    getPinCurrents(_voltages: Float64Array): number[] {
       // Pin order: [anode, cathode, collector, emitter]
       const s0   = pool.states[0];
       const iLed = s0[diodeBase + DIODE_SLOT_ID];

@@ -33,7 +33,7 @@ describe("Coordinates", () => {
     const pan: Point = { x: 50, y: -30 };
 
     const screen = worldToScreen(original, zoom, pan);
-    const roundTripped = screenToWorld(screen, zoom, pan);
+    screenToWorld(screen, zoom, pan);
 
   });
 
@@ -65,7 +65,7 @@ describe("Coordinates", () => {
 
     for (const { zoom, pan, world } of cases) {
       const screen = worldToScreen(world, zoom, pan);
-      const back = screenToWorld(screen, zoom, pan);
+      screenToWorld(screen, zoom, pan);
     }
   });
 });

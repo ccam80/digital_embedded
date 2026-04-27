@@ -1,0 +1,1064 @@
+
+[1m[7m[36m RUN [39m[27m[22m [36mv2.1.9 [39m[90mC:/local_working_projects/digital_in_browser[39m
+
+ [31m❯[39m src/solver/analog/__tests__/sparse-solver.test.ts [2m([22m[2m60 tests[22m[2m | [22m[31m48 failed[39m[2m)[22m[90m 47[2mms[22m[39m
+[31m   [31m×[31m SparseSolver[2m > [22msolves_2x2_dense[90m 8[2mms[22m[31m[39m
+[31m     → expected 4 to be +0 // Object.is equality[39m
+[31m   [31m×[31m SparseSolver[2m > [22msolves_3x3_sparse_tridiagonal[90m 1[2mms[22m[31m[39m
+[31m     → expected 4 to be +0 // Object.is equality[39m
+[31m   [31m×[31m SparseSolver[2m > [22msums_duplicate_entries[90m 0[2mms[22m[31m[39m
+[31m     → expected 4 to be +0 // Object.is equality[39m
+[31m   [31m×[31m SparseSolver[2m > [22midentity_matrix_trivial[90m 0[2mms[22m[31m[39m
+[31m     → expected 4 to be +0 // Object.is equality[39m
+[31m   [31m×[31m SparseSolver[2m > [22mreuses_symbolic_across_numeric_refactor[90m 0[2mms[22m[31m[39m
+[31m     → expected 4 to be +0 // Object.is equality[39m
+[31m   [31m×[31m SparseSolver[2m > [22minvalidate_forces_resymbolize[90m 0[2mms[22m[31m[39m
+[31m     → expected 4 to be +0 // Object.is equality[39m
+[31m   [31m×[31m SparseSolver[2m > [22mmna_resistor_divider_3x3[90m 0[2mms[22m[31m[39m
+[31m     → expected 4 to be +0 // Object.is equality[39m
+[31m   [31m×[31m SparseSolver[2m > [22mperformance_50_node[90m 3[2mms[22m[31m[39m
+[31m     → expected 4 to be +0 // Object.is equality[39m
+[31m   [31m×[31m SparseSolver factorWithReorder[2m > [22msolves a 2x2 system correctly[90m 0[2mms[22m[31m[39m
+[31m     → expected 4 to be +0 // Object.is equality[39m
+[31m   [31m×[31m SparseSolver factorWithReorder[2m > [22mdetects singular matrix[90m 0[2mms[22m[31m[39m
+[31m     → expected 2 to be 1 // Object.is equality[39m
+[31m   [31m×[31m SparseSolver factorWithReorder[2m > [22mapplies diagGmin to diagonal before factoring[90m 0[2mms[22m[31m[39m
+[31m     → solver.factorWithReorder is not a function[39m
+[31m   [31m×[31m SparseSolver factorNumerical[2m > [22mreuses pivot order from prior factorWithReorder[90m 0[2mms[22m[31m[39m
+[31m     → expected 4 to be +0 // Object.is equality[39m
+[31m   [31m×[31m SparseSolver factorNumerical[2m > [22mreturns failure when pivot becomes near-zero[90m 0[2mms[22m[31m[39m
+[31m     → solver.factorNumerical is not a function[39m
+[31m   [31m×[31m SparseSolver factorNumerical[2m > [22mapplies diagGmin before numerical factorization[90m 0[2mms[22m[31m[39m
+[31m     → solver.factorNumerical is not a function[39m
+[31m   [31m×[31m SparseSolver factor dispatch[2m > [22mfactor() returns usedReorder=true when _needsReorder is true[90m 0[2mms[22m[31m[39m
+[31m     → expected 4 to be +0 // Object.is equality[39m
+[31m   [31m×[31m SparseSolver factor dispatch[2m > [22mfactor() returns usedReorder=false on second call (numerical path)[90m 0[2mms[22m[31m[39m
+[31m     → expected false to be true // Object.is equality[39m
+[31m   [31m×[31m SparseSolver factor dispatch[2m > [22mfactor() solves correctly on numerical path after reorder[90m 0[2mms[22m[31m[39m
+[31m     → expected 4 to be +0 // Object.is equality[39m
+[31m   [31m×[31m SparseSolver Markowitz data structures[2m > [22mallocates markowitzRow, markowitzCol, markowitzProd with correct length[90m 0[2mms[22m[31m[39m
+[31m     → expected +0 to be 5 // Object.is equality[39m
+[31m   [31m×[31m SparseSolver Markowitz data structures[2m > [22minitializes all Markowitz arrays to zero on beginAssembly[90m 0[2mms[22m[31m[39m
+[31m     → expected undefined to be +0 // Object.is equality[39m
+[31m   [31m×[31m SparseSolver Markowitz data structures[2m > [22mre-allocates Markowitz arrays when size changes[90m 0[2mms[22m[31m[39m
+[31m     → expected +0 to be 3 // Object.is equality[39m
+[31m   [31m×[31m SparseSolver Markowitz data structures[2m > [22mresets Markowitz arrays to zero when same size is reused[90m 0[2mms[22m[31m[39m
+[31m     → expected undefined to be +0 // Object.is equality[39m
+[31m   [31m×[31m SparseSolver Markowitz data structures[2m > [22mMarkowitz arrays survive a full factor cycle without error[90m 0[2mms[22m[31m[39m
+[31m     → expected 4 to be +0 // Object.is equality[39m
+[31m   [31m×[31m SparseSolver Markowitz counts from finalize[2m > [22mcounts off-diagonal nonzeros correctly for a 3x3 tridiagonal matrix[90m 0[2mms[22m[31m[39m
+[31m     → expected NaN to be 4 // Object.is equality[39m
+[31m   [31m×[31m SparseSolver Markowitz counts from finalize[2m > [22mcomputes Markowitz products and singletons for tridiagonal matrix[90m 0[2mms[22m[31m[39m
+[31m     → expected undefined to be 1 // Object.is equality[39m
+[31m   [31m×[31m SparseSolver Markowitz counts from finalize[2m > [22mcounts zero off-diagonals for a diagonal matrix[90m 0[2mms[22m[31m[39m
+[31m     → expected undefined to be +0 // Object.is equality[39m
+[31m   [31m×[31m SparseSolver Markowitz counts from finalize[2m > [22mcounts correctly for a dense 2x2 matrix[90m 0[2mms[22m[31m[39m
+[31m     → expected undefined to be 1 // Object.is equality[39m
+[31m   [31m×[31m SparseSolver pivot selection[2m > [22mselects a valid pivot and produces a correct solution for a well-conditioned 3x3 matrix[90m 0[2mms[22m[31m[39m
+[31m     → expected 4 to be +0 // Object.is equality[39m
+[31m   [31m×[31m SparseSolver pivot selection[2m > [22mprefers singleton rows — singletons getter reflects matrix structure[90m 0[2mms[22m[31m[39m
+[31m     → expected 0 to be greater than 0[39m
+[31m   [31m×[31m SparseSolver pivot selection[2m > [22mselects the largest-magnitude pivot (fallback path) producing correct solution[90m 0[2mms[22m[31m[39m
+[31m     → expected 4 to be +0 // Object.is equality[39m
+[31m   [31m×[31m SparseSolver pivot selection[2m > [22mfactorization ignores already-used pivot rows in subsequent steps[90m 0[2mms[22m[31m[39m
+[31m     → expected 4 to be +0 // Object.is equality[39m
+[31m   [31m×[31m SparseSolver _updateMarkowitzNumbers[2m > [22mdecrements row and column counts after elimination via linked lists[90m 0[2mms[22m[31m[39m
+[31m     → expected 0 to be less than 0[39m
+[31m   [31m×[31m SparseSolver factorWithReorder Markowitz pipeline[2m > [22mfactorWithReorder populates Markowitz data after factoring[90m 0[2mms[22m[31m[39m
+[31m     → expected 4 to be +0 // Object.is equality[39m
+[31m   [31m×[31m SparseSolver factorWithReorder Markowitz pipeline[2m > [22mfactorWithReorder produces correct solution on 3x3 tridiagonal[90m 0[2mms[22m[31m[39m
+[31m     → expected 4 to be +0 // Object.is equality[39m
+[31m   [31m×[31m SparseSolver factorWithReorder Markowitz pipeline[2m > [22mfactorWithReorder solution has residual below 1e-10 on 10x10 matrix[90m 0[2mms[22m[31m[39m
+[31m     → expected 4 to be +0 // Object.is equality[39m
+[31m   [31m×[31m SparseSolver Markowitz linked structure[2m > [22mfill-in detection: factor a matrix where fill-in is guaranteed, verify Markowitz counts increase[90m 0[2mms[22m[31m[39m
+[31m     → expected +0 to be 6 // Object.is equality[39m
+[31m   [31m×[31m SparseSolver Markowitz linked structure[2m > [22mMarkowitz-primary pivot selection: lower product pivot preferred over higher magnitude[90m 0[2mms[22m[31m[39m
+[31m     → expected 4 to be +0 // Object.is equality[39m
+[31m   [31m×[31m SparseSolver Markowitz linked structure[2m > [22m_updateMarkowitzNumbers via linked lists produces correct counts[90m 0[2mms[22m[31m[39m
+[31m     → expected 0 to be less than 0[39m
+[31m   [31m×[31m SparseSolver Markowitz linked structure[2m > [22mpool growth: _growElements is triggered on high-fill-in matrices[90m 0[2mms[22m[31m[39m
+[31m     → expected 4 to be +0 // Object.is equality[39m
+[31m   [31m×[31m SparseSolver handle-based stamp API[2m > [22mallocElement_returns_stable_handle[90m 0[2mms[22m[31m[39m
+[31m     → expected 2 to be 4 // Object.is equality[39m
+[31m   [31m×[31m SparseSolver handle-based stamp API[2m > [22mstampElement_accumulates_via_handle[90m 0[2mms[22m[31m[39m
+[31m     → expected 4 to be +0 // Object.is equality[39m
+[31m   [31m×[31m SparseSolver handle-based stamp API[2m > [22mstamp_inserts_into_linked_structure[90m 0[2mms[22m[31m[39m
+[31m     → expected +0 to be 2 // Object.is equality[39m
+[31m   [31m×[31m SparseSolver handle-based stamp API[2m > [22mbeginAssembly_zeros_values_preserves_structure[90m 2[2mms[22m[31m[39m
+[31m     → spSolve: matrix is not factored (IS_FACTORED assertion)[39m
+[31m   [31m×[31m SparseSolver handle-based stamp API[2m > [22minvalidateTopology_forces_rebuild[90m 0[2mms[22m[31m[39m
+[31m     → expected 4 to be +0 // Object.is equality[39m
+[31m   [31m×[31m SparseSolver no-AMD Markowitz ordering[2m > [22msolve_without_amd_3x3[90m 0[2mms[22m[31m[39m
+[31m     → expected 4 to be +0 // Object.is equality[39m
+[31m   [31m×[31m SparseSolver no-AMD Markowitz ordering[2m > [22msolve_without_amd_voltage_source_branch[90m 0[2mms[22m[31m[39m
+[31m     → expected 4 to be +0 // Object.is equality[39m
+[31m   [31m×[31m SparseSolver no-AMD Markowitz ordering[2m > [22mmarkowitz_fill_in_without_amd[90m 0[2mms[22m[31m[39m
+[31m     → expected 4 to be +0 // Object.is equality[39m
+[31m   [31m×[31m SparseSolver NISHOULDREORDER lifecycle[2m > [22mfactor_uses_numeric_path_without_forceReorder[90m 0[2mms[22m[31m[39m
+[31m     → expected 4 to be +0 // Object.is equality[39m
+[31m   [31m×[31m SparseSolver NISHOULDREORDER lifecycle[2m > [22mforceReorder_triggers_full_pivot_search[90m 0[2mms[22m[31m[39m
+[31m     → expected false to be true // Object.is equality[39m
+ [32m✓[39m src/solver/analog/__tests__/timestep.test.ts [2m([22m[2m23 tests[22m[2m)[22m[90m 6[2mms[22m[39m
+ [32m✓[39m src/solver/analog/__tests__/rc-ac-transient.test.ts [2m([22m[2m8 tests[22m[2m)[22m[90m 69[2mms[22m[39m
+ [31m❯[39m src/solver/analog/__tests__/phase-3-nr-reorder.test.ts [2m([22m[2m7 tests[22m[2m | [22m[31m1 failed[39m[2m)[22m[90m 12[2mms[22m[39m
+[31m   [31m×[31m Task 3.1.2 — non-top-of-loop forceReorder citations[2m > [22mcites niiter.c:888-891 at the E_SINGULAR retry[90m 5[2mms[22m[31m[39m
+[31m     → expected false to be true // Object.is equality[39m
+ [31m❯[39m src/solver/analog/__tests__/phase-3-relay-composite.test.ts [2m([22m[2m3 tests[22m[2m | [22m[31m1 failed[39m[2m)[22m[90m 6[2mms[22m[39m
+[31m   [31m×[31m Phase 3 Task 3.3.3 -- Relay composite-child[2m > [22mSPDT relay child inductor integrates the coil current[90m 4[2mms[22m[31m[39m
+[31m     → expected 0 to be greater than 0[39m
+ [31m❯[39m src/solver/analog/__tests__/phase-3-xfact-scope-audit.test.ts [2m([22m[2m3 tests[22m[2m | [22m[31m2 failed[39m[2m)[22m[90m 53[2mms[22m[39m
+[31m   [31m×[31m Task 3.2.5 — xfact scope audit[2m > [22mhas zero unguarded xfact reads in src/components/[90m 40[2mms[22m[31m[39m
+[31m     → Unguarded xfact reads:
+semiconductors\mosfet.ts:1408: expected [ 'semiconductors\mosfet.ts:1408' ] to deeply equal [][39m
+[31m   [31m×[31m Task 3.2.5 — xfact scope audit[2m > [22mallowlist is exhaustive — no stale entries[90m 1[2mms[22m[31m[39m
+[31m     → Stale allowlist entries:
+analog-engine.ts:430: expected [ 'analog-engine.ts:430' ] to deeply equal [][39m
+
+[31m⎯⎯⎯⎯⎯⎯[1m[7m Failed Tests 52 [27m[22m⎯⎯⎯⎯⎯⎯⎯[39m
+
+[31m[1m[7m FAIL [27m[22m[39m src/solver/analog/__tests__/phase-3-nr-reorder.test.ts[2m > [22mTask 3.1.2 — non-top-of-loop forceReorder citations[2m > [22mcites niiter.c:888-891 at the E_SINGULAR retry
+[31m[1mAssertionError[22m: expected false to be true // Object.is equality[39m
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[32m- true[39m
+[31m+ false[39m
+
+[36m [2m❯[22m src/solver/analog/__tests__/phase-3-nr-reorder.test.ts:[2m250:27[22m[39m
+    [90m248| [39m    }
+    [90m249| [39m
+    [90m250| [39m    [34mexpect[39m(foundCitation)[33m.[39m[34mtoBe[39m([35mtrue[39m)[33m;[39m
+    [90m   | [39m                          [31m^[39m
+    [90m251| [39m  })[33m;[39m
+    [90m252| [39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/52]⎯[22m[39m
+
+[31m[1m[7m FAIL [27m[22m[39m src/solver/analog/__tests__/phase-3-relay-composite.test.ts[2m > [22mPhase 3 Task 3.3.3 -- Relay composite-child[2m > [22mSPDT relay child inductor integrates the coil current
+[31m[1mAssertionError[22m: expected 0 to be greater than 0[39m
+[36m [2m❯[22m src/solver/analog/__tests__/phase-3-relay-composite.test.ts:[2m146:17[22m[39m
+    [90m144| [39m    [35mconst[39m base [33m=[39m inductor[33m.[39mstateBaseOffset[33m;[39m
+    [90m145| [39m    [35mconst[39m geq [33m=[39m pool[33m.[39mstates[[34m0[39m][base [33m+[39m [33mSLOT_GEQ_IDX[39m][33m;[39m
+    [90m146| [39m    [34mexpect[39m(geq)[33m.[39m[34mtoBeGreaterThan[39m([34m0[39m)[33m;[39m
+    [90m   | [39m                [31m^[39m
+    [90m147| [39m
+    [90m148| [39m    [90m// SLOT_VOLT = 5: voltage across the coil = n0v - n1v.[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/52]⎯[22m[39m
+
+[31m[1m[7m FAIL [27m[22m[39m src/solver/analog/__tests__/phase-3-xfact-scope-audit.test.ts[2m > [22mTask 3.2.5 — xfact scope audit[2m > [22mhas zero unguarded xfact reads in src/components/
+[31m[1mAssertionError[22m: Unguarded xfact reads:
+semiconductors\mosfet.ts:1408: expected [ 'semiconductors\mosfet.ts:1408' ] to deeply equal [][39m
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[32m- Array [][39m
+[31m+ Array [[39m
+[31m+   "semiconductors\\mosfet.ts:1408",[39m
+[31m+ ][39m
+
+[36m [2m❯[22m src/solver/analog/__tests__/phase-3-xfact-scope-audit.test.ts:[2m136:76[22m[39m
+    [90m134| [39m    )[33m;[39m
+    [90m135| [39m
+    [90m136| [39m    [34mexpect[39m(violations[33m,[39m [32m`Unguarded xfact reads:\n[39m[36m${[39mviolations[33m.[39m[34mjoin[39m([32m"\n"[39m…
+    [90m   | [39m                                                                           [31m^[39m
+    [90m137| [39m  })[33m;[39m
+    [90m138| [39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/52]⎯[22m[39m
+
+[31m[1m[7m FAIL [27m[22m[39m src/solver/analog/__tests__/phase-3-xfact-scope-audit.test.ts[2m > [22mTask 3.2.5 — xfact scope audit[2m > [22mallowlist is exhaustive — no stale entries
+[31m[1mAssertionError[22m: Stale allowlist entries:
+analog-engine.ts:430: expected [ 'analog-engine.ts:430' ] to deeply equal [][39m
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[32m- Array [][39m
+[31m+ Array [[39m
+[31m+   "analog-engine.ts:430",[39m
+[31m+ ][39m
+
+[36m [2m❯[22m src/solver/analog/__tests__/phase-3-xfact-scope-audit.test.ts:[2m184:74[22m[39m
+    [90m182| [39m
+    [90m183| [39m    [35mconst[39m messages [33m=[39m stale[33m.[39m[34mmap[39m((e) [33m=>[39m [32m`[39m[36m${[39me[33m.[39mfile[36m}[39m[32m:[39m[36m${[39me[33m.[39mline[36m}[39m[32m`[39m)[33m;[39m
+    [90m184| [39m    [34mexpect[39m(messages[33m,[39m [32m`Stale allowlist entries:\n[39m[36m${[39mmessages[33m.[39m[34mjoin[39m([32m"\n"[39m)[36m}[39m…
+    [90m   | [39m                                                                         [31m^[39m
+    [90m185| [39m  })[33m;[39m
+    [90m186| [39m})[33m;[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/52]⎯[22m[39m
+
+[31m[1m[7m FAIL [27m[22m[39m src/solver/analog/__tests__/sparse-solver.test.ts[2m > [22mSparseSolver[2m > [22msolves_2x2_dense
+[31m[1mAssertionError[22m: expected 4 to be +0 // Object.is equality[39m
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[32m- 0[39m
+[31m+ 4[39m
+
+[36m [2m❯[22m assembleSolve src/solver/analog/__tests__/sparse-solver.test.ts:[2m21:18[22m[39m
+    [90m 19| [39m  [35mfor[39m ([35mlet[39m i [33m=[39m [34m0[39m[33m;[39m i [33m<[39m rhsVals[33m.[39mlength[33m;[39m i[33m++[39m) rhs[i] [33m+=[39m rhsVals[i][33m;[39m
+    [90m 20| [39m  [35mconst[39m result [33m=[39m solver[33m.[39m[34mfactor[39m()[33m;[39m
+    [90m 21| [39m  [34mexpect[39m(result)[33m.[39m[34mtoBe[39m([34m0[39m)[33m;[39m
+    [90m   | [39m                 [31m^[39m
+    [90m 22| [39m  [35mconst[39m x [33m=[39m [35mnew[39m [33mFloat64Array[39m(n)[33m;[39m
+    [90m 23| [39m  solver[33m.[39m[34msolve[39m(rhs[33m,[39m x)[33m;[39m
+[90m [2m❯[22m src/solver/analog/__tests__/sparse-solver.test.ts:[2m35:5[22m[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/52]⎯[22m[39m
+
+[31m[1m[7m FAIL [27m[22m[39m src/solver/analog/__tests__/sparse-solver.test.ts[2m > [22mSparseSolver[2m > [22msolves_3x3_sparse_tridiagonal
+[31m[1mAssertionError[22m: expected 4 to be +0 // Object.is equality[39m
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[32m- 0[39m
+[31m+ 4[39m
+
+[36m [2m❯[22m assembleSolve src/solver/analog/__tests__/sparse-solver.test.ts:[2m21:18[22m[39m
+    [90m 19| [39m  [35mfor[39m ([35mlet[39m i [33m=[39m [34m0[39m[33m;[39m i [33m<[39m rhsVals[33m.[39mlength[33m;[39m i[33m++[39m) rhs[i] [33m+=[39m rhsVals[i][33m;[39m
+    [90m 20| [39m  [35mconst[39m result [33m=[39m solver[33m.[39m[34mfactor[39m()[33m;[39m
+    [90m 21| [39m  [34mexpect[39m(result)[33m.[39m[34mtoBe[39m([34m0[39m)[33m;[39m
+    [90m   | [39m                 [31m^[39m
+    [90m 22| [39m  [35mconst[39m x [33m=[39m [35mnew[39m [33mFloat64Array[39m(n)[33m;[39m
+    [90m 23| [39m  solver[33m.[39m[34msolve[39m(rhs[33m,[39m x)[33m;[39m
+[90m [2m❯[22m src/solver/analog/__tests__/sparse-solver.test.ts:[2m59:5[22m[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/52]⎯[22m[39m
+
+[31m[1m[7m FAIL [27m[22m[39m src/solver/analog/__tests__/sparse-solver.test.ts[2m > [22mSparseSolver[2m > [22msums_duplicate_entries
+[31m[1mAssertionError[22m: expected 4 to be +0 // Object.is equality[39m
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[32m- 0[39m
+[31m+ 4[39m
+
+[36m [2m❯[22m src/solver/analog/__tests__/sparse-solver.test.ts:[2m84:20[22m[39m
+    [90m 82| [39m    rhs[[34m0[39m] [33m+=[39m [34m10.0[39m[33m;[39m
+    [90m 83| [39m    [35mconst[39m result [33m=[39m solver[33m.[39m[34mfactor[39m()[33m;[39m
+    [90m 84| [39m    [34mexpect[39m(result)[33m.[39m[34mtoBe[39m([34m0[39m)[33m;[39m
+    [90m   | [39m                   [31m^[39m
+    [90m 85| [39m    [35mconst[39m x [33m=[39m [35mnew[39m [33mFloat64Array[39m([34m1[39m)[33m;[39m
+    [90m 86| [39m    solver[33m.[39m[34msolve[39m(rhs[33m,[39m x)[33m;[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[7/52]⎯[22m[39m
+
+[31m[1m[7m FAIL [27m[22m[39m src/solver/analog/__tests__/sparse-solver.test.ts[2m > [22mSparseSolver[2m > [22midentity_matrix_trivial
+[31m[1mAssertionError[22m: expected 4 to be +0 // Object.is equality[39m
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[32m- 0[39m
+[31m+ 4[39m
+
+[36m [2m❯[22m src/solver/analog/__tests__/sparse-solver.test.ts:[2m115:20[22m[39m
+    [90m113| [39m    [35mfor[39m ([35mlet[39m i [33m=[39m [34m0[39m[33m;[39m i [33m<[39m n[33m;[39m i[33m++[39m) rhs[i] [33m+=[39m b[i][33m;[39m
+    [90m114| [39m    [35mconst[39m result [33m=[39m solver[33m.[39m[34mfactor[39m()[33m;[39m
+    [90m115| [39m    [34mexpect[39m(result)[33m.[39m[34mtoBe[39m([34m0[39m)[33m;[39m
+    [90m   | [39m                   [31m^[39m
+    [90m116| [39m    [35mconst[39m x [33m=[39m [35mnew[39m [33mFloat64Array[39m(n)[33m;[39m
+    [90m117| [39m    solver[33m.[39m[34msolve[39m(rhs[33m,[39m x)[33m;[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[8/52]⎯[22m[39m
+
+[31m[1m[7m FAIL [27m[22m[39m src/solver/analog/__tests__/sparse-solver.test.ts[2m > [22mSparseSolver[2m > [22mreuses_symbolic_across_numeric_refactor
+[31m[1mAssertionError[22m: expected 4 to be +0 // Object.is equality[39m
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[32m- 0[39m
+[31m+ 4[39m
+
+[36m [2m❯[22m src/solver/analog/__tests__/sparse-solver.test.ts:[2m134:16[22m[39m
+    [90m132| [39m    rhs1[[34m0[39m] [33m+=[39m [34m1[39m[33m;[39m rhs1[[34m1[39m] [33m+=[39m [34m2[39m[33m;[39m
+    [90m133| [39m    [35mconst[39m r1 [33m=[39m solver[33m.[39m[34mfactor[39m()[33m;[39m
+    [90m134| [39m    [34mexpect[39m(r1)[33m.[39m[34mtoBe[39m([34m0[39m)[33m;[39m
+    [90m   | [39m               [31m^[39m
+    [90m135| [39m    [35mconst[39m x1 [33m=[39m [35mnew[39m [33mFloat64Array[39m([34m2[39m)[33m;[39m
+    [90m136| [39m    solver[33m.[39m[34msolve[39m(rhs1[33m,[39m x1)[33m;[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[9/52]⎯[22m[39m
+
+[31m[1m[7m FAIL [27m[22m[39m src/solver/analog/__tests__/sparse-solver.test.ts[2m > [22mSparseSolver[2m > [22minvalidate_forces_resymbolize
+[31m[1mAssertionError[22m: expected 4 to be +0 // Object.is equality[39m
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[32m- 0[39m
+[31m+ 4[39m
+
+[36m [2m❯[22m src/solver/analog/__tests__/sparse-solver.test.ts:[2m163:15[22m[39m
+    [90m161| [39m    rhs1[[34m0[39m] [33m+=[39m [34m6[39m[33m;[39m rhs1[[34m1[39m] [33m+=[39m [34m10[39m[33m;[39m
+    [90m162| [39m    [35mlet[39m r [33m=[39m solver[33m.[39m[34mfactor[39m()[33m;[39m
+    [90m163| [39m    [34mexpect[39m(r)[33m.[39m[34mtoBe[39m([34m0[39m)[33m;[39m
+    [90m   | [39m              [31m^[39m
+    [90m164| [39m    [35mconst[39m x1 [33m=[39m [35mnew[39m [33mFloat64Array[39m([34m2[39m)[33m;[39m
+    [90m165| [39m    solver[33m.[39m[34msolve[39m(rhs1[33m,[39m x1)[33m;[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[10/52]⎯[22m[39m
+
+[31m[1m[7m FAIL [27m[22m[39m src/solver/analog/__tests__/sparse-solver.test.ts[2m > [22mSparseSolver[2m > [22mmna_resistor_divider_3x3
+[31m[1mAssertionError[22m: expected 4 to be +0 // Object.is equality[39m
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[32m- 0[39m
+[31m+ 4[39m
+
+[36m [2m❯[22m src/solver/analog/__tests__/sparse-solver.test.ts:[2m221:20[22m[39m
+    [90m219| [39m
+    [90m220| [39m    [35mconst[39m result [33m=[39m solver[33m.[39m[34mfactor[39m()[33m;[39m
+    [90m221| [39m    [34mexpect[39m(result)[33m.[39m[34mtoBe[39m([34m0[39m)[33m;[39m
+    [90m   | [39m                   [31m^[39m
+    [90m222| [39m
+    [90m223| [39m    [35mconst[39m x [33m=[39m [35mnew[39m [33mFloat64Array[39m([34m3[39m)[33m;[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[11/52]⎯[22m[39m
+
+[31m[1m[7m FAIL [27m[22m[39m src/solver/analog/__tests__/sparse-solver.test.ts[2m > [22mSparseSolver[2m > [22mperformance_50_node
+[31m[1mAssertionError[22m: expected 4 to be +0 // Object.is equality[39m
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[32m- 0[39m
+[31m+ 4[39m
+
+[36m [2m❯[22m src/solver/analog/__tests__/sparse-solver.test.ts:[2m282:20[22m[39m
+    [90m280| [39m    [35mconst[39m tFactor [33m=[39m performance[33m.[39m[34mnow[39m() [33m-[39m t1[33m;[39m
+    [90m281| [39m
+    [90m282| [39m    [34mexpect[39m(result)[33m.[39m[34mtoBe[39m([34m0[39m)[33m;[39m
+    [90m   | [39m                   [31m^[39m
+    [90m283| [39m
+    [90m284| [39m    [90m// Solve timing[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[12/52]⎯[22m[39m
+
+[31m[1m[7m FAIL [27m[22m[39m src/solver/analog/__tests__/sparse-solver.test.ts[2m > [22mSparseSolver factorWithReorder[2m > [22msolves a 2x2 system correctly
+[31m[1mAssertionError[22m: expected 4 to be +0 // Object.is equality[39m
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[32m- 0[39m
+[31m+ 4[39m
+
+[36m [2m❯[22m src/solver/analog/__tests__/sparse-solver.test.ts:[2m630:20[22m[39m
+    [90m628| [39m    [34mstampRHS[39m(rhs[33m,[39m [34m1[39m[33m,[39m [34m2[39m)[33m;[39m
+    [90m629| [39m    [35mconst[39m result [33m=[39m solver[33m.[39m[34mfactor[39m()[33m;[39m
+    [90m630| [39m    [34mexpect[39m(result)[33m.[39m[34mtoBe[39m([34m0[39m)[33m;[39m
+    [90m   | [39m                   [31m^[39m
+    [90m631| [39m    [35mconst[39m x [33m=[39m [35mnew[39m [33mFloat64Array[39m([34m2[39m)[33m;[39m
+    [90m632| [39m    solver[33m.[39m[34msolve[39m(rhs[33m,[39m x)[33m;[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[13/52]⎯[22m[39m
+
+[31m[1m[7m FAIL [27m[22m[39m src/solver/analog/__tests__/sparse-solver.test.ts[2m > [22mSparseSolver factorWithReorder[2m > [22mdetects singular matrix
+[31m[1mAssertionError[22m: expected 2 to be 1 // Object.is equality[39m
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[32m- 1[39m
+[31m+ 2[39m
+
+[36m [2m❯[22m src/solver/analog/__tests__/sparse-solver.test.ts:[2m647:40[22m[39m
+    [90m645| [39m    [35mconst[39m result [33m=[39m solver[33m.[39m[34mfactor[39m()[33m;[39m
+    [90m646| [39m    [34mexpect[39m(result)[33m.[39mnot[33m.[39m[34mtoBe[39m([34m0[39m)[33m;[39m
+    [90m647| [39m    [34mexpect[39m(solver[33m.[39m[34mwhereSingular[39m()[33m.[39mrow)[33m.[39m[34mtoBe[39m([34m1[39m)[33m;[39m
+    [90m   | [39m                                       [31m^[39m
+    [90m648| [39m  })[33m;[39m
+    [90m649| [39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[14/52]⎯[22m[39m
+
+[31m[1m[7m FAIL [27m[22m[39m src/solver/analog/__tests__/sparse-solver.test.ts[2m > [22mSparseSolver factorWithReorder[2m > [22mapplies diagGmin to diagonal before factoring
+[31m[1mTypeError[22m: solver.factorWithReorder is not a function[39m
+[36m [2m❯[22m src/solver/analog/__tests__/sparse-solver.test.ts:[2m660:27[22m[39m
+    [90m658| [39m    [34mstampRHS[39m(rhs[33m,[39m [34m0[39m[33m,[39m [34m1[39m)[33m;[39m
+    [90m659| [39m    [34mstampRHS[39m(rhs[33m,[39m [34m1[39m[33m,[39m [34m1[39m)[33m;[39m
+    [90m660| [39m    [35mconst[39m result [33m=[39m solver[33m.[39m[34mfactorWithReorder[39m([34m1.0[39m)[33m;[39m
+    [90m   | [39m                          [31m^[39m
+    [90m661| [39m    [34mexpect[39m(result)[33m.[39m[34mtoBe[39m([34m0[39m)[33m;[39m
+    [90m662| [39m  })[33m;[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[15/52]⎯[22m[39m
+
+[31m[1m[7m FAIL [27m[22m[39m src/solver/analog/__tests__/sparse-solver.test.ts[2m > [22mSparseSolver factorNumerical[2m > [22mreuses pivot order from prior factorWithReorder
+[31m[1mAssertionError[22m: expected 4 to be +0 // Object.is equality[39m
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[32m- 0[39m
+[31m+ 4[39m
+
+[36m [2m❯[22m src/solver/analog/__tests__/sparse-solver.test.ts:[2m678:16[22m[39m
+    [90m676| [39m
+    [90m677| [39m    [35mconst[39m r1 [33m=[39m solver[33m.[39m[34mfactor[39m()[33m;[39m
+    [90m678| [39m    [34mexpect[39m(r1)[33m.[39m[34mtoBe[39m([34m0[39m)[33m;[39m
+    [90m   | [39m               [31m^[39m
+    [90m679| [39m    [35mconst[39m x1 [33m=[39m [35mnew[39m [33mFloat64Array[39m([34m2[39m)[33m;[39m
+    [90m680| [39m    solver[33m.[39m[34msolve[39m(rhs1[33m,[39m x1)[33m;[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[16/52]⎯[22m[39m
+
+[31m[1m[7m FAIL [27m[22m[39m src/solver/analog/__tests__/sparse-solver.test.ts[2m > [22mSparseSolver factorNumerical[2m > [22mreturns failure when pivot becomes near-zero
+[31m[1mTypeError[22m: solver.factorNumerical is not a function[39m
+[36m [2m❯[22m src/solver/analog/__tests__/sparse-solver.test.ts:[2m718:23[22m[39m
+    [90m716| [39m    [34mstampRHS[39m(rhs2[33m,[39m [34m1[39m[33m,[39m [34m1[39m)[33m;[39m
+    [90m717| [39m
+    [90m718| [39m    [35mconst[39m r2 [33m=[39m solver[33m.[39m[34mfactorNumerical[39m()[33m;[39m
+    [90m   | [39m                      [31m^[39m
+    [90m719| [39m    [34mexpect[39m(r2)[33m.[39mnot[33m.[39m[34mtoBe[39m([34m0[39m)[33m;[39m
+    [90m720| [39m    [34mexpect[39m(r2[33m.[39mneedsReorder)[33m.[39m[34mtoBe[39m([35mtrue[39m)[33m;[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[17/52]⎯[22m[39m
+
+[31m[1m[7m FAIL [27m[22m[39m src/solver/analog/__tests__/sparse-solver.test.ts[2m > [22mSparseSolver factorNumerical[2m > [22mapplies diagGmin before numerical factorization
+[31m[1mTypeError[22m: solver.factorNumerical is not a function[39m
+[36m [2m❯[22m src/solver/analog/__tests__/sparse-solver.test.ts:[2m744:27[22m[39m
+    [90m742| [39m    [34mstampRHS[39m(rhs2[33m,[39m [34m1[39m[33m,[39m [34m1[39m)[33m;[39m
+    [90m743| [39m
+    [90m744| [39m    [35mconst[39m result [33m=[39m solver[33m.[39m[34mfactorNumerical[39m([34m1.0[39m)[33m;[39m
+    [90m   | [39m                          [31m^[39m
+    [90m745| [39m    [34mexpect[39m(result)[33m.[39m[34mtoBe[39m([34m0[39m)[33m;[39m
+    [90m746| [39m  })[33m;[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[18/52]⎯[22m[39m
+
+[31m[1m[7m FAIL [27m[22m[39m src/solver/analog/__tests__/sparse-solver.test.ts[2m > [22mSparseSolver factor dispatch[2m > [22mfactor() returns usedReorder=true when _needsReorder is true
+[31m[1mAssertionError[22m: expected 4 to be +0 // Object.is equality[39m
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[32m- 0[39m
+[31m+ 4[39m
+
+[36m [2m❯[22m src/solver/analog/__tests__/sparse-solver.test.ts:[2m769:20[22m[39m
+    [90m767| [39m    solver[33m.[39m[34mforceReorder[39m()[33m;[39m
+    [90m768| [39m    [35mconst[39m result [33m=[39m solver[33m.[39m[34mfactor[39m()[33m;[39m
+    [90m769| [39m    [34mexpect[39m(result)[33m.[39m[34mtoBe[39m([34m0[39m)[33m;[39m
+    [90m   | [39m                   [31m^[39m
+    [90m770| [39m    [34mexpect[39m(solver[33m.[39mreordered)[33m.[39m[34mtoBe[39m([35mtrue[39m)[33m;[39m
+    [90m771| [39m  })[33m;[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[19/52]⎯[22m[39m
+
+[31m[1m[7m FAIL [27m[22m[39m src/solver/analog/__tests__/sparse-solver.test.ts[2m > [22mSparseSolver factor dispatch[2m > [22mfactor() returns usedReorder=false on second call (numerical path)
+[31m[1mAssertionError[22m: expected false to be true // Object.is equality[39m
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[32m- true[39m
+[31m+ false[39m
+
+[36m [2m❯[22m src/solver/analog/__tests__/sparse-solver.test.ts:[2m788:30[22m[39m
+    [90m786| [39m    solver[33m.[39m[34mforceReorder[39m()[33m;[39m
+    [90m787| [39m    solver[33m.[39m[34mfactor[39m()[33m;[39m
+    [90m788| [39m    [34mexpect[39m(solver[33m.[39mreordered)[33m.[39m[34mtoBe[39m([35mtrue[39m)[33m;[39m
+    [90m   | [39m                             [31m^[39m
+    [90m789| [39m
+    [90m790| [39m    [90m// Second factor with same pattern: numerical path[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[20/52]⎯[22m[39m
+
+[31m[1m[7m FAIL [27m[22m[39m src/solver/analog/__tests__/sparse-solver.test.ts[2m > [22mSparseSolver factor dispatch[2m > [22mfactor() solves correctly on numerical path after reorder
+[31m[1mAssertionError[22m: expected 4 to be +0 // Object.is equality[39m
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[32m- 0[39m
+[31m+ 4[39m
+
+[36m [2m❯[22m src/solver/analog/__tests__/sparse-solver.test.ts:[2m818:16[22m[39m
+    [90m816| [39m    solver[33m.[39m[34mforceReorder[39m()[33m;[39m
+    [90m817| [39m    [35mconst[39m r1 [33m=[39m solver[33m.[39m[34mfactor[39m()[33m;[39m
+    [90m818| [39m    [34mexpect[39m(r1)[33m.[39m[34mtoBe[39m([34m0[39m)[33m;[39m
+    [90m   | [39m               [31m^[39m
+    [90m819| [39m    [35mconst[39m x1 [33m=[39m [35mnew[39m [33mFloat64Array[39m([34m2[39m)[33m;[39m
+    [90m820| [39m    solver[33m.[39m[34msolve[39m(rhs1[33m,[39m x1)[33m;[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[21/52]⎯[22m[39m
+
+[31m[1m[7m FAIL [27m[22m[39m src/solver/analog/__tests__/sparse-solver.test.ts[2m > [22mSparseSolver Markowitz data structures[2m > [22mallocates markowitzRow, markowitzCol, markowitzProd with correct length
+[31m[1mAssertionError[22m: expected +0 to be 5 // Object.is equality[39m
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[32m- 5[39m
+[31m+ 0[39m
+
+[36m [2m❯[22m src/solver/analog/__tests__/sparse-solver.test.ts:[2m847:40[22m[39m
+    [90m845| [39m    [35mconst[39m solver [33m=[39m [35mnew[39m [33mSparseSolver[39m()[33m;[39m
+    [90m846| [39m    solver[33m.[39m[34m_initStructure[39m([34m5[39m)[33m;[39m
+    [90m847| [39m    [34mexpect[39m(solver[33m.[39mmarkowitzRow[33m.[39mlength)[33m.[39m[34mtoBe[39m([34m5[39m)[33m;[39m
+    [90m   | [39m                                       [31m^[39m
+    [90m848| [39m    [34mexpect[39m(solver[33m.[39mmarkowitzCol[33m.[39mlength)[33m.[39m[34mtoBe[39m([34m5[39m)[33m;[39m
+    [90m849| [39m    [34mexpect[39m(solver[33m.[39mmarkowitzProd[33m.[39mlength)[33m.[39m[34mtoBe[39m([34m5[39m)[33m;[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[22/52]⎯[22m[39m
+
+[31m[1m[7m FAIL [27m[22m[39m src/solver/analog/__tests__/sparse-solver.test.ts[2m > [22mSparseSolver Markowitz data structures[2m > [22minitializes all Markowitz arrays to zero on beginAssembly
+[31m[1mAssertionError[22m: expected undefined to be +0 // Object.is equality[39m
+
+[32m- Expected:[39m 
+0
+
+[31m+ Received:[39m 
+undefined
+
+[36m [2m❯[22m src/solver/analog/__tests__/sparse-solver.test.ts:[2m856:38[22m[39m
+    [90m854| [39m    solver[33m.[39m[34m_initStructure[39m([34m3[39m)[33m;[39m
+    [90m855| [39m    [35mfor[39m ([35mlet[39m i [33m=[39m [34m0[39m[33m;[39m i [33m<[39m [34m3[39m[33m;[39m i[33m++[39m) {
+    [90m856| [39m      [34mexpect[39m(solver[33m.[39mmarkowitzRow[i])[33m.[39m[34mtoBe[39m([34m0[39m)[33m;[39m
+    [90m   | [39m                                     [31m^[39m
+    [90m857| [39m      [34mexpect[39m(solver[33m.[39mmarkowitzCol[i])[33m.[39m[34mtoBe[39m([34m0[39m)[33m;[39m
+    [90m858| [39m      [34mexpect[39m(solver[33m.[39mmarkowitzProd[i])[33m.[39m[34mtoBe[39m([34m0[39m)[33m;[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[23/52]⎯[22m[39m
+
+[31m[1m[7m FAIL [27m[22m[39m src/solver/analog/__tests__/sparse-solver.test.ts[2m > [22mSparseSolver Markowitz data structures[2m > [22mre-allocates Markowitz arrays when size changes
+[31m[1mAssertionError[22m: expected +0 to be 3 // Object.is equality[39m
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[32m- 3[39m
+[31m+ 0[39m
+
+[36m [2m❯[22m src/solver/analog/__tests__/sparse-solver.test.ts:[2m866:40[22m[39m
+    [90m864| [39m    [35mconst[39m solver [33m=[39m [35mnew[39m [33mSparseSolver[39m()[33m;[39m
+    [90m865| [39m    solver[33m.[39m[34m_initStructure[39m([34m3[39m)[33m;[39m
+    [90m866| [39m    [34mexpect[39m(solver[33m.[39mmarkowitzRow[33m.[39mlength)[33m.[39m[34mtoBe[39m([34m3[39m)[33m;[39m
+    [90m   | [39m                                       [31m^[39m
+    [90m867| [39m
+    [90m868| [39m    solver[33m.[39m[34m_initStructure[39m([34m7[39m)[33m;[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[24/52]⎯[22m[39m
+
+[31m[1m[7m FAIL [27m[22m[39m src/solver/analog/__tests__/sparse-solver.test.ts[2m > [22mSparseSolver Markowitz data structures[2m > [22mresets Markowitz arrays to zero when same size is reused
+[31m[1mAssertionError[22m: expected undefined to be +0 // Object.is equality[39m
+
+[32m- Expected:[39m 
+0
+
+[31m+ Received:[39m 
+undefined
+
+[36m [2m❯[22m src/solver/analog/__tests__/sparse-solver.test.ts:[2m883:36[22m[39m
+    [90m881| [39m
+    [90m882| [39m    solver[33m.[39m[34m_initStructure[39m([34m3[39m)[33m;[39m
+    [90m883| [39m    [34mexpect[39m(solver[33m.[39mmarkowitzRow[[34m0[39m])[33m.[39m[34mtoBe[39m([34m0[39m)[33m;[39m
+    [90m   | [39m                                   [31m^[39m
+    [90m884| [39m    [34mexpect[39m(solver[33m.[39mmarkowitzCol[[34m1[39m])[33m.[39m[34mtoBe[39m([34m0[39m)[33m;[39m
+    [90m885| [39m    [34mexpect[39m(solver[33m.[39mmarkowitzProd[[34m2[39m])[33m.[39m[34mtoBe[39m([34m0[39m)[33m;[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[25/52]⎯[22m[39m
+
+[31m[1m[7m FAIL [27m[22m[39m src/solver/analog/__tests__/sparse-solver.test.ts[2m > [22mSparseSolver Markowitz data structures[2m > [22mMarkowitz arrays survive a full factor cycle without error
+[31m[1mAssertionError[22m: expected 4 to be +0 // Object.is equality[39m
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[32m- 0[39m
+[31m+ 4[39m
+
+[36m [2m❯[22m src/solver/analog/__tests__/sparse-solver.test.ts:[2m908:20[22m[39m
+    [90m906| [39m    [34mstampRHS[39m(rhs[33m,[39m [34m0[39m[33m,[39m [34m1[39m)[33m;[39m [34mstampRHS[39m(rhs[33m,[39m [34m1[39m[33m,[39m [34m2[39m)[33m;[39m [34mstampRHS[39m(rhs[33m,[39m [34m2[39m[33m,[39m [34m1[39m)[33m;[39m
+    [90m907| [39m    [35mconst[39m result [33m=[39m solver[33m.[39m[34mfactor[39m()[33m;[39m
+    [90m908| [39m    [34mexpect[39m(result)[33m.[39m[34mtoBe[39m([34m0[39m)[33m;[39m
+    [90m   | [39m                   [31m^[39m
+    [90m909| [39m
+    [90m910| [39m    [34mexpect[39m(solver[33m.[39mmarkowitzRow[33m.[39mlength)[33m.[39m[34mtoBe[39m([34m3[39m)[33m;[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[26/52]⎯[22m[39m
+
+[31m[1m[7m FAIL [27m[22m[39m src/solver/analog/__tests__/sparse-solver.test.ts[2m > [22mSparseSolver Markowitz counts from finalize[2m > [22mcounts off-diagonal nonzeros correctly for a 3x3 tridiagonal matrix
+[31m[1mAssertionError[22m: expected NaN to be 4 // Object.is equality[39m
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[32m- 4[39m
+[31m+ NaN[39m
+
+[36m [2m❯[22m src/solver/analog/__tests__/sparse-solver.test.ts:[2m954:27[22m[39m
+    [90m952| [39m      totalColCount [33m+=[39m mCol[i][33m;[39m
+    [90m953| [39m    }
+    [90m954| [39m    [34mexpect[39m(totalRowCount)[33m.[39m[34mtoBe[39m([34m4[39m)[33m;[39m
+    [90m   | [39m                          [31m^[39m
+    [90m955| [39m    [34mexpect[39m(totalColCount)[33m.[39m[34mtoBe[39m([34m4[39m)[33m;[39m
+    [90m956| [39m  })[33m;[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[27/52]⎯[22m[39m
+
+[31m[1m[7m FAIL [27m[22m[39m src/solver/analog/__tests__/sparse-solver.test.ts[2m > [22mSparseSolver Markowitz counts from finalize[2m > [22mcomputes Markowitz products and singletons for tridiagonal matrix
+[31m[1mAssertionError[22m: expected undefined to be 1 // Object.is equality[39m
+
+[32m- Expected:[39m 
+1
+
+[31m+ Received:[39m 
+undefined
+
+[36m [2m❯[22m src/solver/analog/__tests__/sparse-solver.test.ts:[2m976:36[22m[39m
+    [90m974| [39m    [90m// Tridiagonal row 1: 2 off-diag → mRow[1]=2, mCol[1]=2 → mProd[1][39m…
+    [90m975| [39m    [90m// Tridiagonal row 2: 1 off-diag → mRow[2]=1, mCol[2]=1 → mProd[2][39m…
+    [90m976| [39m    [34mexpect[39m(solver[33m.[39mmarkowitzRow[[34m0[39m])[33m.[39m[34mtoBe[39m([34m1[39m)[33m;[39m
+    [90m   | [39m                                   [31m^[39m
+    [90m977| [39m    [34mexpect[39m(solver[33m.[39mmarkowitzRow[[34m1[39m])[33m.[39m[34mtoBe[39m([34m2[39m)[33m;[39m
+    [90m978| [39m    [34mexpect[39m(solver[33m.[39mmarkowitzRow[[34m2[39m])[33m.[39m[34mtoBe[39m([34m1[39m)[33m;[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[28/52]⎯[22m[39m
+
+[31m[1m[7m FAIL [27m[22m[39m src/solver/analog/__tests__/sparse-solver.test.ts[2m > [22mSparseSolver Markowitz counts from finalize[2m > [22mcounts zero off-diagonals for a diagonal matrix
+[31m[1mAssertionError[22m: expected undefined to be +0 // Object.is equality[39m
+
+[32m- Expected:[39m 
+0
+
+[31m+ Received:[39m 
+undefined
+
+[36m [2m❯[22m src/solver/analog/__tests__/sparse-solver.test.ts:[2m999:38[22m[39m
+    [90m997| [39m    [90m// Diagonal matrix: zero off-diagonal entries per row and column[39m
+    [90m998| [39m    [35mfor[39m ([35mlet[39m i [33m=[39m [34m0[39m[33m;[39m i [33m<[39m [34m3[39m[33m;[39m i[33m++[39m) {
+    [90m999| [39m      [34mexpect[39m(solver[33m.[39mmarkowitzRow[i])[33m.[39m[34mtoBe[39m([34m0[39m)[33m;[39m
+    [90m   | [39m                                     [31m^[39m
+    [90m1000| [39m      [34mexpect[39m(solver[33m.[39mmarkowitzCol[i])[33m.[39m[34mtoBe[39m([34m0[39m)[33m;[39m
+    [90m1001| [39m      [34mexpect[39m(solver[33m.[39mmarkowitzProd[i])[33m.[39m[34mtoBe[39m([34m0[39m)[33m;[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[29/52]⎯[22m[39m
+
+[31m[1m[7m FAIL [27m[22m[39m src/solver/analog/__tests__/sparse-solver.test.ts[2m > [22mSparseSolver Markowitz counts from finalize[2m > [22mcounts correctly for a dense 2x2 matrix
+[31m[1mAssertionError[22m: expected undefined to be 1 // Object.is equality[39m
+
+[32m- Expected:[39m 
+1
+
+[31m+ Received:[39m 
+undefined
+
+[36m [2m❯[22m src/solver/analog/__tests__/sparse-solver.test.ts:[2m1020:38[22m[39m
+    [90m1018| [39m    [90m// finalize() sets mRow[i]=1, mCol[i]=1, mProd[i]=1*1=1 (not a sin[39m…
+    [90m1019| [39m    [35mfor[39m ([35mlet[39m i [33m=[39m [34m0[39m[33m;[39m i [33m<[39m [34m2[39m[33m;[39m i[33m++[39m) {
+    [90m1020| [39m      [34mexpect[39m(solver[33m.[39mmarkowitzRow[i])[33m.[39m[34mtoBe[39m([34m1[39m)[33m;[39m
+    [90m   | [39m                                     [31m^[39m
+    [90m1021| [39m      [34mexpect[39m(solver[33m.[39mmarkowitzCol[i])[33m.[39m[34mtoBe[39m([34m1[39m)[33m;[39m
+    [90m1022| [39m      [34mexpect[39m(solver[33m.[39mmarkowitzProd[i])[33m.[39m[34mtoBe[39m([34m1[39m)[33m;[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[30/52]⎯[22m[39m
+
+[31m[1m[7m FAIL [27m[22m[39m src/solver/analog/__tests__/sparse-solver.test.ts[2m > [22mSparseSolver pivot selection[2m > [22mselects a valid pivot and produces a correct solution for a well-conditioned 3x3 matrix
+[31m[1mAssertionError[22m: expected 4 to be +0 // Object.is equality[39m
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[32m- 0[39m
+[31m+ 4[39m
+
+[36m [2m❯[22m src/solver/analog/__tests__/sparse-solver.test.ts:[2m1047:26[22m[39m
+    [90m1045| [39m    [34mstampRHS[39m(rhs[33m,[39m [34m0[39m[33m,[39m [34m1[39m)[33m;[39m [34mstampRHS[39m(rhs[33m,[39m [34m1[39m[33m,[39m [34m2[39m)[33m;[39m [34mstampRHS[39m(rhs[33m,[39m [34m2[39m[33m,[39m [34m1[39m)[33m;[39m
+    [90m1046| [39m    [35mconst[39m factorResult [33m=[39m solver[33m.[39m[34mfactor[39m()[33m;[39m
+    [90m1047| [39m    [34mexpect[39m(factorResult)[33m.[39m[34mtoBe[39m([34m0[39m)[33m;[39m
+    [90m   | [39m                         [31m^[39m
+    [90m1048| [39m    [35mconst[39m sol [33m=[39m [35mnew[39m [33mFloat64Array[39m([34m3[39m)[33m;[39m
+    [90m1049| [39m    solver[33m.[39m[34msolve[39m(rhs[33m,[39m sol)[33m;[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[31/52]⎯[22m[39m
+
+[31m[1m[7m FAIL [27m[22m[39m src/solver/analog/__tests__/sparse-solver.test.ts[2m > [22mSparseSolver pivot selection[2m > [22mprefers singleton rows — singletons getter reflects matrix structure
+[31m[1mAssertionError[22m: expected 0 to be greater than 0[39m
+[36m [2m❯[22m src/solver/analog/__tests__/sparse-solver.test.ts:[2m1081:31[22m[39m
+    [90m1079| [39m    { [35mconst[39m rhs [33m=[39m [35mnew[39m [33mFloat64Array[39m([34m3[39m)[33m;[39m [34mstampRHS[39m(rhs[33m,[39m [34m0[39m[33m,[39m [34m1[39m)[33m;[39m [34mstampRHS[39m(r…
+    [90m1080| [39m    solver[33m.[39m[34mfactor[39m()[33m;[39m
+    [90m1081| [39m    [34mexpect[39m(solver[33m.[39msingletons)[33m.[39m[34mtoBeGreaterThan[39m([34m0[39m)[33m;[39m
+    [90m   | [39m                              [31m^[39m
+    [90m1082| [39m  })[33m;[39m
+    [90m1083| [39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[32/52]⎯[22m[39m
+
+[31m[1m[7m FAIL [27m[22m[39m src/solver/analog/__tests__/sparse-solver.test.ts[2m > [22mSparseSolver pivot selection[2m > [22mselects the largest-magnitude pivot (fallback path) producing correct solution
+[31m[1mAssertionError[22m: expected 4 to be +0 // Object.is equality[39m
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[32m- 0[39m
+[31m+ 4[39m
+
+[36m [2m❯[22m src/solver/analog/__tests__/sparse-solver.test.ts:[2m1093:26[22m[39m
+    [90m1091| [39m    [34mstampRHS[39m(rhs[33m,[39m [34m0[39m[33m,[39m [34m1[39m)[33m;[39m [34mstampRHS[39m(rhs[33m,[39m [34m1[39m[33m,[39m [34m6[39m)[33m;[39m
+    [90m1092| [39m    [35mconst[39m factorResult [33m=[39m solver[33m.[39m[34mfactor[39m()[33m;[39m
+    [90m1093| [39m    [34mexpect[39m(factorResult)[33m.[39m[34mtoBe[39m([34m0[39m)[33m;[39m
+    [90m   | [39m                         [31m^[39m
+    [90m1094| [39m    [35mconst[39m sol [33m=[39m [35mnew[39m [33mFloat64Array[39m([34m2[39m)[33m;[39m
+    [90m1095| [39m    solver[33m.[39m[34msolve[39m(rhs[33m,[39m sol)[33m;[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[33/52]⎯[22m[39m
+
+[31m[1m[7m FAIL [27m[22m[39m src/solver/analog/__tests__/sparse-solver.test.ts[2m > [22mSparseSolver pivot selection[2m > [22mfactorization ignores already-used pivot rows in subsequent steps
+[31m[1mAssertionError[22m: expected 4 to be +0 // Object.is equality[39m
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[32m- 0[39m
+[31m+ 4[39m
+
+[36m [2m❯[22m src/solver/analog/__tests__/sparse-solver.test.ts:[2m1108:26[22m[39m
+    [90m1106| [39m    [34mstampRHS[39m(rhs[33m,[39m [34m0[39m[33m,[39m [34m1[39m)[33m;[39m [34mstampRHS[39m(rhs[33m,[39m [34m1[39m[33m,[39m [34m2[39m)[33m;[39m
+    [90m1107| [39m    [35mconst[39m factorResult [33m=[39m solver[33m.[39m[34mfactor[39m()[33m;[39m
+    [90m1108| [39m    [34mexpect[39m(factorResult)[33m.[39m[34mtoBe[39m([34m0[39m)[33m;[39m
+    [90m   | [39m                         [31m^[39m
+    [90m1109| [39m    [35mconst[39m sol [33m=[39m [35mnew[39m [33mFloat64Array[39m([34m2[39m)[33m;[39m
+    [90m1110| [39m    solver[33m.[39m[34msolve[39m(rhs[33m,[39m sol)[33m;[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[34/52]⎯[22m[39m
+
+[31m[1m[7m FAIL [27m[22m[39m src/solver/analog/__tests__/sparse-solver.test.ts[2m > [22mSparseSolver _updateMarkowitzNumbers[2m > [22mdecrements row and column counts after elimination via linked lists
+[31m[1mAssertionError[22m: expected 0 to be less than 0[39m
+[36m [2m❯[22m src/solver/analog/__tests__/sparse-solver.test.ts:[2m1142:24[22m[39m
+    [90m1140| [39m    [90m// After eliminating row 0, the remaining rows should have reduced[39m…
+    [90m1141| [39m    [35mconst[39m postRowSum [33m=[39m [33mArray[39m[33m.[39m[35mfrom[39m(solver[33m.[39mmarkowitzRow)[33m.[39m[34mreduce[39m((a[33m,[39m b) [33m=[39m…
+    [90m1142| [39m    [34mexpect[39m(postRowSum)[33m.[39m[34mtoBeLessThan[39m(initialRowSum)[33m;[39m
+    [90m   | [39m                       [31m^[39m
+    [90m1143| [39m  })[33m;[39m
+    [90m1144| [39m})[33m;[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[35/52]⎯[22m[39m
+
+[31m[1m[7m FAIL [27m[22m[39m src/solver/analog/__tests__/sparse-solver.test.ts[2m > [22mSparseSolver factorWithReorder Markowitz pipeline[2m > [22mfactorWithReorder populates Markowitz data after factoring
+[31m[1mAssertionError[22m: expected 4 to be +0 // Object.is equality[39m
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[32m- 0[39m
+[31m+ 4[39m
+
+[36m [2m❯[22m src/solver/analog/__tests__/sparse-solver.test.ts:[2m1160:20[22m[39m
+    [90m1158| [39m
+    [90m1159| [39m    [35mconst[39m result [33m=[39m solver[33m.[39m[34mfactor[39m()[33m;[39m
+    [90m1160| [39m    [34mexpect[39m(result)[33m.[39m[34mtoBe[39m([34m0[39m)[33m;[39m
+    [90m   | [39m                   [31m^[39m
+    [90m1161| [39m
+    [90m1162| [39m    [90m// After factorWithReorder, Markowitz arrays should exist with pro[39m…
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[36/52]⎯[22m[39m
+
+[31m[1m[7m FAIL [27m[22m[39m src/solver/analog/__tests__/sparse-solver.test.ts[2m > [22mSparseSolver factorWithReorder Markowitz pipeline[2m > [22mfactorWithReorder produces correct solution on 3x3 tridiagonal
+[31m[1mAssertionError[22m: expected 4 to be +0 // Object.is equality[39m
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[32m- 0[39m
+[31m+ 4[39m
+
+[36m [2m❯[22m src/solver/analog/__tests__/sparse-solver.test.ts:[2m1182:20[22m[39m
+    [90m1180| [39m    solver[33m.[39m[34mforceReorder[39m()[33m;[39m
+    [90m1181| [39m    [35mconst[39m result [33m=[39m solver[33m.[39m[34mfactor[39m()[33m;[39m
+    [90m1182| [39m    [34mexpect[39m(result)[33m.[39m[34mtoBe[39m([34m0[39m)[33m;[39m
+    [90m   | [39m                   [31m^[39m
+    [90m1183| [39m    [35mconst[39m x [33m=[39m [35mnew[39m [33mFloat64Array[39m([34m3[39m)[33m;[39m
+    [90m1184| [39m    solver[33m.[39m[34msolve[39m(rhs[33m,[39m x)[33m;[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[37/52]⎯[22m[39m
+
+[31m[1m[7m FAIL [27m[22m[39m src/solver/analog/__tests__/sparse-solver.test.ts[2m > [22mSparseSolver factorWithReorder Markowitz pipeline[2m > [22mfactorWithReorder solution has residual below 1e-10 on 10x10 matrix
+[31m[1mAssertionError[22m: expected 4 to be +0 // Object.is equality[39m
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[32m- 0[39m
+[31m+ 4[39m
+
+[36m [2m❯[22m src/solver/analog/__tests__/sparse-solver.test.ts:[2m1210:20[22m[39m
+    [90m1208| [39m    solver[33m.[39m[34mforceReorder[39m()[33m;[39m
+    [90m1209| [39m    [35mconst[39m result [33m=[39m solver[33m.[39m[34mfactor[39m()[33m;[39m
+    [90m1210| [39m    [34mexpect[39m(result)[33m.[39m[34mtoBe[39m([34m0[39m)[33m;[39m
+    [90m   | [39m                   [31m^[39m
+    [90m1211| [39m    [35mconst[39m x [33m=[39m [35mnew[39m [33mFloat64Array[39m(n)[33m;[39m
+    [90m1212| [39m    solver[33m.[39m[34msolve[39m(rhsBuf[33m,[39m x)[33m;[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[38/52]⎯[22m[39m
+
+[31m[1m[7m FAIL [27m[22m[39m src/solver/analog/__tests__/sparse-solver.test.ts[2m > [22mSparseSolver Markowitz linked structure[2m > [22mfill-in detection: factor a matrix where fill-in is guaranteed, verify Markowitz counts increase
+[31m[1mAssertionError[22m: expected +0 to be 6 // Object.is equality[39m
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[32m- 6[39m
+[31m+ 0[39m
+
+[36m [2m❯[22m src/solver/analog/__tests__/sparse-solver.test.ts:[2m1256:33[22m[39m
+    [90m1254| [39m    [90m// row has 3 off-diag).[39m
+    [90m1255| [39m    [35mconst[39m initialTotalOffDiag [33m=[39m [33mArray[39m[33m.[39m[35mfrom[39m(solver[33m.[39mmarkowitzRow)[33m.[39m[34mreduce[39m…
+    [90m1256| [39m    [34mexpect[39m(initialTotalOffDiag)[33m.[39m[34mtoBe[39m([34m6[39m)[33m;[39m [90m// 3 + 1 + 1 + 1[39m
+    [90m   | [39m                                [31m^[39m
+    [90m1257| [39m
+    [90m1258| [39m    [90m// Factor — this will detect fill-in internally and update Markowi[39m…
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[39/52]⎯[22m[39m
+
+[31m[1m[7m FAIL [27m[22m[39m src/solver/analog/__tests__/sparse-solver.test.ts[2m > [22mSparseSolver Markowitz linked structure[2m > [22mMarkowitz-primary pivot selection: lower product pivot preferred over higher magnitude
+[31m[1mAssertionError[22m: expected 4 to be +0 // Object.is equality[39m
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[32m- 0[39m
+[31m+ 4[39m
+
+[36m [2m❯[22m src/solver/analog/__tests__/sparse-solver.test.ts:[2m1307:20[22m[39m
+    [90m1305| [39m
+    [90m1306| [39m    [35mconst[39m result [33m=[39m solver[33m.[39m[34mfactor[39m()[33m;[39m
+    [90m1307| [39m    [34mexpect[39m(result)[33m.[39m[34mtoBe[39m([34m0[39m)[33m;[39m
+    [90m   | [39m                   [31m^[39m
+    [90m1308| [39m
+    [90m1309| [39m    [90m// Verify solution correctness — the key validation[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[40/52]⎯[22m[39m
+
+[31m[1m[7m FAIL [27m[22m[39m src/solver/analog/__tests__/sparse-solver.test.ts[2m > [22mSparseSolver Markowitz linked structure[2m > [22m_updateMarkowitzNumbers via linked lists produces correct counts
+[31m[1mAssertionError[22m: expected 0 to be less than 0[39m
+[36m [2m❯[22m src/solver/analog/__tests__/sparse-solver.test.ts:[2m1354:26[22m[39m
+    [90m1352| [39m    [35mconst[39m postTotalCol [33m=[39m [33mArray[39m[33m.[39m[35mfrom[39m(solver[33m.[39mmarkowitzCol)[33m.[39m[34mreduce[39m((a[33m,[39m b)…
+    [90m1353| [39m
+    [90m1354| [39m    [34mexpect[39m(postTotalRow)[33m.[39m[34mtoBeLessThan[39m(initialTotalRow)[33m;[39m
+    [90m   | [39m                         [31m^[39m
+    [90m1355| [39m    [34mexpect[39m(postTotalCol)[33m.[39m[34mtoBeLessThan[39m(initialTotalCol)[33m;[39m
+    [90m1356| [39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[41/52]⎯[22m[39m
+
+[31m[1m[7m FAIL [27m[22m[39m src/solver/analog/__tests__/sparse-solver.test.ts[2m > [22mSparseSolver Markowitz linked structure[2m > [22mpool growth: _growElements is triggered on high-fill-in matrices
+[31m[1mAssertionError[22m: expected 4 to be +0 // Object.is equality[39m
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[32m- 0[39m
+[31m+ 4[39m
+
+[36m [2m❯[22m src/solver/analog/__tests__/sparse-solver.test.ts:[2m1386:20[22m[39m
+    [90m1384| [39m    [90m// Factor — this exercises the full linked-structure pipeline incl[39m…
+    [90m1385| [39m    [35mconst[39m result [33m=[39m solver[33m.[39m[34mfactor[39m()[33m;[39m
+    [90m1386| [39m    [34mexpect[39m(result)[33m.[39m[34mtoBe[39m([34m0[39m)[33m;[39m
+    [90m   | [39m                   [31m^[39m
+    [90m1387| [39m
+    [90m1388| [39m    [90m// Verify solution[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[42/52]⎯[22m[39m
+
+[31m[1m[7m FAIL [27m[22m[39m src/solver/analog/__tests__/sparse-solver.test.ts[2m > [22mSparseSolver handle-based stamp API[2m > [22mallocElement_returns_stable_handle
+[31m[1mAssertionError[22m: expected 2 to be 4 // Object.is equality[39m
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[32m- 4[39m
+[31m+ 2[39m
+
+[36m [2m❯[22m src/solver/analog/__tests__/sparse-solver.test.ts:[2m1443:32[22m[39m
+    [90m1441| [39m    [35mconst[39m handles [33m=[39m [h00a[33m,[39m h01[33m,[39m h10[33m,[39m h11][33m;[39m
+    [90m1442| [39m    [35mconst[39m uniqueHandles [33m=[39m [35mnew[39m [33mSet[39m(handles)[33m;[39m
+    [90m1443| [39m    [34mexpect[39m(uniqueHandles[33m.[39msize)[33m.[39m[34mtoBe[39m([34m4[39m)[33m;[39m
+    [90m   | [39m                               [31m^[39m
+    [90m1444| [39m  })[33m;[39m
+    [90m1445| [39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[43/52]⎯[22m[39m
+
+[31m[1m[7m FAIL [27m[22m[39m src/solver/analog/__tests__/sparse-solver.test.ts[2m > [22mSparseSolver handle-based stamp API[2m > [22mstampElement_accumulates_via_handle
+[31m[1mAssertionError[22m: expected 4 to be +0 // Object.is equality[39m
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[32m- 0[39m
+[31m+ 4[39m
+
+[36m [2m❯[22m src/solver/analog/__tests__/sparse-solver.test.ts:[2m1461:20[22m[39m
+    [90m1459| [39m    [34mstampRHS[39m(rhs[33m,[39m [34m1[39m[33m,[39m [34m1.0[39m)[33m;[39m
+    [90m1460| [39m    [35mconst[39m result [33m=[39m solver[33m.[39m[34mfactor[39m()[33m;[39m
+    [90m1461| [39m    [34mexpect[39m(result)[33m.[39m[34mtoBe[39m([34m0[39m)[33m;[39m
+    [90m   | [39m                   [31m^[39m
+    [90m1462| [39m    [35mconst[39m x [33m=[39m [35mnew[39m [33mFloat64Array[39m([34m2[39m)[33m;[39m
+    [90m1463| [39m    solver[33m.[39m[34msolve[39m(rhs[33m,[39m x)[33m;[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[44/52]⎯[22m[39m
+
+[31m[1m[7m FAIL [27m[22m[39m src/solver/analog/__tests__/sparse-solver.test.ts[2m > [22mSparseSolver handle-based stamp API[2m > [22mstamp_inserts_into_linked_structure
+[31m[1mAssertionError[22m: expected +0 to be 2 // Object.is equality[39m
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[32m- 2[39m
+[31m+ 0[39m
+
+[36m [2m❯[22m src/solver/analog/__tests__/sparse-solver.test.ts:[2m1494:23[22m[39m
+    [90m1492| [39m    [35mlet[39m e [33m=[39m rowHead[[34m0[39m][33m;[39m
+    [90m1493| [39m    [35mwhile[39m (e [33m>=[39m [34m0[39m) { countRow0[33m++[39m[33m;[39m e [33m=[39m elNextInRow[e][33m;[39m }
+    [90m1494| [39m    [34mexpect[39m(countRow0)[33m.[39m[34mtoBe[39m([34m2[39m)[33m;[39m
+    [90m   | [39m                      [31m^[39m
+    [90m1495| [39m
+    [90m1496| [39m    [90m// Count elements in row 1 chain[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[45/52]⎯[22m[39m
+
+[31m[1m[7m FAIL [27m[22m[39m src/solver/analog/__tests__/sparse-solver.test.ts[2m > [22mSparseSolver handle-based stamp API[2m > [22mbeginAssembly_zeros_values_preserves_structure
+[31m[1mError[22m: spSolve: matrix is not factored (IS_FACTORED assertion)[39m
+[36m [2m❯[22m SparseSolver.solve src/solver/analog/sparse-solver.ts:[2m635:13[22m[39m
+    [90m633| [39m    // IS_FACTORED == (Matrix->Factored && !Matrix->NeedsOrdering).
+    [90m634| [39m    if (!this._factored || this._needsReorder) {
+    [90m635| [39m      throw new Error("spSolve: matrix is not factored (IS_FACTORED as…
+    [90m   | [39m            [31m^[39m
+    [90m636| [39m    }
+    [90m637| [39m    // ngspice spsolve.c:139-143 — Complex branch dispatched to
+[90m [2m❯[22m src/solver/analog/__tests__/sparse-solver.test.ts:[2m1528:12[22m[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[46/52]⎯[22m[39m
+
+[31m[1m[7m FAIL [27m[22m[39m src/solver/analog/__tests__/sparse-solver.test.ts[2m > [22mSparseSolver handle-based stamp API[2m > [22minvalidateTopology_forces_rebuild
+[31m[1mAssertionError[22m: expected 4 to be +0 // Object.is equality[39m
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[32m- 0[39m
+[31m+ 4[39m
+
+[36m [2m❯[22m src/solver/analog/__tests__/sparse-solver.test.ts:[2m1574:15[22m[39m
+    [90m1572| [39m    [34mstampRHS[39m(rhsA[33m,[39m [34m0[39m[33m,[39m [34m6.0[39m)[33m;[39m [34mstampRHS[39m(rhsA[33m,[39m [34m1[39m[33m,[39m [34m10.0[39m)[33m;[39m
+    [90m1573| [39m    [35mlet[39m r [33m=[39m solver[33m.[39m[34mfactor[39m()[33m;[39m
+    [90m1574| [39m    [34mexpect[39m(r)[33m.[39m[34mtoBe[39m([34m0[39m)[33m;[39m
+    [90m   | [39m              [31m^[39m
+    [90m1575| [39m    [35mconst[39m x1 [33m=[39m [35mnew[39m [33mFloat64Array[39m([34m2[39m)[33m;[39m
+    [90m1576| [39m    solver[33m.[39m[34msolve[39m(rhsA[33m,[39m x1)[33m;[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[47/52]⎯[22m[39m
+
+[31m[1m[7m FAIL [27m[22m[39m src/solver/analog/__tests__/sparse-solver.test.ts[2m > [22mSparseSolver no-AMD Markowitz ordering[2m > [22msolve_without_amd_3x3
+[31m[1mAssertionError[22m: expected 4 to be +0 // Object.is equality[39m
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[32m- 0[39m
+[31m+ 4[39m
+
+[36m [2m❯[22m src/solver/analog/__tests__/sparse-solver.test.ts:[2m1827:20[22m[39m
+    [90m1825| [39m
+    [90m1826| [39m    [35mconst[39m result [33m=[39m solver[33m.[39m[34mfactor[39m()[33m;[39m
+    [90m1827| [39m    [34mexpect[39m(result)[33m.[39m[34mtoBe[39m([34m0[39m)[33m;[39m
+    [90m   | [39m                   [31m^[39m
+    [90m1828| [39m
+    [90m1829| [39m    [35mconst[39m x [33m=[39m [35mnew[39m [33mFloat64Array[39m([34m3[39m)[33m;[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[48/52]⎯[22m[39m
+
+[31m[1m[7m FAIL [27m[22m[39m src/solver/analog/__tests__/sparse-solver.test.ts[2m > [22mSparseSolver no-AMD Markowitz ordering[2m > [22msolve_without_amd_voltage_source_branch
+[31m[1mAssertionError[22m: expected 4 to be +0 // Object.is equality[39m
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[32m- 0[39m
+[31m+ 4[39m
+
+[36m [2m❯[22m src/solver/analog/__tests__/sparse-solver.test.ts:[2m1871:20[22m[39m
+    [90m1869| [39m
+    [90m1870| [39m    [35mconst[39m result [33m=[39m solver[33m.[39m[34mfactor[39m()[33m;[39m
+    [90m1871| [39m    [34mexpect[39m(result)[33m.[39m[34mtoBe[39m([34m0[39m)[33m;[39m
+    [90m   | [39m                   [31m^[39m
+    [90m1872| [39m
+    [90m1873| [39m    [35mconst[39m x [33m=[39m [35mnew[39m [33mFloat64Array[39m([34m2[39m)[33m;[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[49/52]⎯[22m[39m
+
+[31m[1m[7m FAIL [27m[22m[39m src/solver/analog/__tests__/sparse-solver.test.ts[2m > [22mSparseSolver no-AMD Markowitz ordering[2m > [22mmarkowitz_fill_in_without_amd
+[31m[1mAssertionError[22m: expected 4 to be +0 // Object.is equality[39m
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[32m- 0[39m
+[31m+ 4[39m
+
+[36m [2m❯[22m src/solver/analog/__tests__/sparse-solver.test.ts:[2m1900:20[22m[39m
+    [90m1898| [39m
+    [90m1899| [39m    [35mconst[39m result [33m=[39m solver[33m.[39m[34mfactor[39m()[33m;[39m
+    [90m1900| [39m    [34mexpect[39m(result)[33m.[39m[34mtoBe[39m([34m0[39m)[33m;[39m
+    [90m   | [39m                   [31m^[39m
+    [90m1901| [39m
+    [90m1902| [39m    [35mconst[39m x [33m=[39m [35mnew[39m [33mFloat64Array[39m(n)[33m;[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[50/52]⎯[22m[39m
+
+[31m[1m[7m FAIL [27m[22m[39m src/solver/analog/__tests__/sparse-solver.test.ts[2m > [22mSparseSolver NISHOULDREORDER lifecycle[2m > [22mfactor_uses_numeric_path_without_forceReorder
+[31m[1mAssertionError[22m: expected 4 to be +0 // Object.is equality[39m
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[32m- 0[39m
+[31m+ 4[39m
+
+[36m [2m❯[22m src/solver/analog/__tests__/sparse-solver.test.ts:[2m1938:16[22m[39m
+    [90m1936| [39m    [90m// First factor() must use reorder (no pivot order yet)[39m
+    [90m1937| [39m    [35mconst[39m r1 [33m=[39m solver[33m.[39m[34mfactor[39m()[33m;[39m
+    [90m1938| [39m    [34mexpect[39m(r1)[33m.[39m[34mtoBe[39m([34m0[39m)[33m;[39m
+    [90m   | [39m               [31m^[39m
+    [90m1939| [39m    [34mexpect[39m(solver[33m.[39mreordered)[33m.[39m[34mtoBe[39m([35mtrue[39m)[33m;[39m
+    [90m1940| [39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[51/52]⎯[22m[39m
+
+[31m[1m[7m FAIL [27m[22m[39m src/solver/analog/__tests__/sparse-solver.test.ts[2m > [22mSparseSolver NISHOULDREORDER lifecycle[2m > [22mforceReorder_triggers_full_pivot_search
+[31m[1mAssertionError[22m: expected false to be true // Object.is equality[39m
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[32m- true[39m
+[31m+ false[39m
+
+[36m [2m❯[22m src/solver/analog/__tests__/sparse-solver.test.ts:[2m1972:30[22m[39m
+    [90m1970| [39m    [90m// First factor — builds pivot order[39m
+    [90m1971| [39m    solver[33m.[39m[34mfactor[39m()[33m;[39m
+    [90m1972| [39m    [34mexpect[39m(solver[33m.[39mreordered)[33m.[39m[34mtoBe[39m([35mtrue[39m)[33m;[39m
+    [90m   | [39m                             [31m^[39m
+    [90m1973| [39m
+    [90m1974| [39m    [90m// Re-assemble[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[52/52]⎯[22m[39m
+
+[2m Test Files [22m [1m[31m4 failed[39m[22m[2m | [22m[1m[32m2 passed[39m[22m[90m (6)[39m
+[2m      Tests [22m [1m[31m52 failed[39m[22m[2m | [22m[1m[32m52 passed[39m[22m[90m (104)[39m
+[2m   Start at [22m 10:50:16
+[2m   Duration [22m 2.28s[2m (transform 519ms, setup 0ms, collect 853ms, tests 193ms, environment 1ms, prepare 411ms)[22m
+

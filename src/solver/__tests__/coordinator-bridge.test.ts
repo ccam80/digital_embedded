@@ -31,11 +31,9 @@ const BRANCH_IDX = 2;
 // ---------------------------------------------------------------------------
 
 interface StampCall { row: number; col: number; value: number }
-interface RhsCall   { row: number; value: number }
 
 class MockSolver {
   readonly stamps: StampCall[] = [];
-  readonly rhs: RhsCall[] = [];
   private readonly _handles: Array<{ row: number; col: number }> = [];
 
   allocElement(row: number, col: number): number {
@@ -48,13 +46,8 @@ class MockSolver {
     this.stamps.push({ row, col, value });
   }
 
-  stampRHS(row: number, value: number): void {
-    this.rhs.push({ row, value });
-  }
-
   reset(): void {
     this.stamps.length = 0;
-    this.rhs.length = 0;
   }
 
   sumStamp(row: number, col: number): number {
@@ -62,17 +55,16 @@ class MockSolver {
       .filter((s) => s.row === row && s.col === col)
       .reduce((acc, s) => acc + s.value, 0);
   }
-
-  lastRhs(row: number): number | undefined {
-    const hits = this.rhs.filter((r) => r.row === row);
-    return hits.length > 0 ? hits[hits.length - 1]!.value : undefined;
-  }
 }
 
-function makeCtx(solver: MockSolver) {
+function makeCtx(solver: MockSolver, rhs?: Float64Array) {
+  const rhsBuf = rhs ?? new Float64Array(8);
   return {
     solver: solver as any,
     voltages: new Float64Array(8),
+    rhs: rhsBuf,
+    rhsOld: rhsBuf,
+    matrix: solver as any,
     cktMode: MODEDCOP | MODEINITFLOAT,
     dt: 0,
     method: 'trapezoidal' as const,
@@ -82,10 +74,14 @@ function makeCtx(solver: MockSolver) {
     srcFact: 1,
     noncon: { value: 0 },
     limitingCollector: null,
+    convergenceCollector: null,
     xfact: 1,
     gmin: 1e-12,
     reltol: 1e-3,
     iabstol: 1e-12,
+    time: 0,
+    temp: 300.15,
+    vt: 0.025852,
     cktFixLimit: false,
     bypass: false,
     voltTol: 1e-6,
@@ -396,9 +392,10 @@ describe('bridge adapter: hi-z output stops driving analog node', () => {
     const { outputAdapter } = buildBridgeFixture('digital-to-analog');
     outputAdapter.setHighZ(true);
     const solver = new MockSolver();
-    outputAdapter.load(makeCtx(solver));
+    const rhs = new Float64Array(8);
+    outputAdapter.load(makeCtx(solver, rhs));
     // Hi-Z mode: branch RHS must be 0
-    expect(solver.lastRhs(BRANCH_IDX)).toBe(0);
+    expect(rhs[BRANCH_IDX]).toBe(0);
     // Hi-Z mode: stamp(branchIdx, branchIdx, 1)
     expect(solver.stamps.some(s => s.row === BRANCH_IDX && s.col === BRANCH_IDX && s.value === 1)).toBe(true);
   });
@@ -408,9 +405,10 @@ describe('bridge adapter: hi-z output stops driving analog node', () => {
     outputAdapter.setHighZ(true);
     outputAdapter.setLogicLevel(false);
     const solver = new MockSolver();
-    outputAdapter.load(makeCtx(solver));
+    const rhs = new Float64Array(8);
+    outputAdapter.load(makeCtx(solver, rhs));
     // Hi-Z overrides logic level — branch RHS stays 0
-    expect(solver.lastRhs(BRANCH_IDX)).toBe(0);
+    expect(rhs[BRANCH_IDX]).toBe(0);
   });
 
   it('setHighZ(false) after setHighZ(true) restores driven mode', () => {

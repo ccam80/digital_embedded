@@ -33,7 +33,8 @@ import type { Rect, RenderContext } from "../../../core/renderer-interface.js";
 import { ComponentRegistry, ComponentCategory } from "../../../core/registry.js";
 import type { ExecuteFunction } from "../../../core/registry.js";
 import type { AnalogElement } from "../element.js";
-import type { SparseSolver } from "../sparse-solver.js";
+import type { ComplexSparseSolver } from "../complex-sparse-solver.js";
+import type { LoadContext } from "../load-context.js";
 import { BridgeOutputAdapter, BridgeInputAdapter } from "../bridge-adapter.js";
 import { compileUnified } from "@/compile/compile.js";
 import type { ConcreteCompiledAnalogCircuit } from "../compiled-analog-circuit.js";
@@ -67,9 +68,11 @@ function makeStubAnalogElement(pinNodes: ReadonlyMap<string, number>): AnalogEle
     pinNodeIds: [...pinNodes.values()],
     allNodeIds: [...pinNodes.values()],
     branchIndex: -1,
+    ngspiceLoadOrder: 0,
     isNonlinear: false,
     isReactive: false,
-    stampAc(_s: SparseSolver) {},
+    load(_ctx: LoadContext): void {},
+    stampAc(_solver: ComplexSparseSolver, _omega: number, _ctx: LoadContext): void { /* no-op */ },
     setParam(_key: string, _value: number): void {},
     getPinCurrents(_v: Float64Array): number[] { return []; },
   };
@@ -105,9 +108,10 @@ function buildRegistry(
         pinNodeIds: [],
         allNodeIds: [],
         branchIndex: -1,
+        ngspiceLoadOrder: 0,
         isNonlinear: false,
         isReactive: false,
-        stamp() {},
+        load(_ctx: unknown): void {},
         setParam(_k: string, _v: number): void {},
         getPinCurrents(_v: Float64Array): number[] { return []; },
       }), paramDefs: [], params: {} },

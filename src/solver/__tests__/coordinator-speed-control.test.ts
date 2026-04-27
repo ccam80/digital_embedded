@@ -17,7 +17,8 @@ import type { SerializedElement, CircuitElement } from '../../core/element.js';
 import type { PropertyValue } from '../../core/properties.js';
 import type { Rect, RenderContext } from '../../core/renderer-interface.js';
 import type { AnalogElement } from '../analog/element.js';
-import type { SparseSolverStamp } from '../../core/analog-types.js';
+import type { SparseSolverStamp, ComplexSparseSolver } from '../../core/analog-types.js';
+import type { LoadContext } from '../analog/load-context.js';
 import { TestElement, makePin } from '../../test-fixtures/test-element.js';
 import { noopExecFn, executePassThrough } from '../../test-fixtures/execute-stubs.js';
 
@@ -53,12 +54,14 @@ function makeAnalogElementObj(typeId: string, instanceId: string, pins: Array<{ 
 function makeResistorAnalogEl(n1: number, n2: number, resistance: number): AnalogElement {
   return {
     pinNodeIds: [n1, n2], allNodeIds: [n1, n2], branchIndex: -1,
+    ngspiceLoadOrder: 0,
     isNonlinear: false, isReactive: false,
-    stampAc(solver: SparseSolverStamp): void {
+    load(_ctx: LoadContext): void { /* no-op for static test fixture */ },
+    stampAc(solver: ComplexSparseSolver, _omega: number, _ctx: LoadContext): void {
       const g = 1 / resistance;
-      if (n1 !== 0) { solver.stampElement(solver.allocElement(n1, n1), g); }
-      if (n2 !== 0) { solver.stampElement(solver.allocElement(n2, n2), g); }
-      if (n1 !== 0 && n2 !== 0) { solver.stampElement(solver.allocElement(n1, n2), -g); solver.stampElement(solver.allocElement(n2, n1), -g); }
+      if (n1 !== 0) { solver.stampComplexElement(solver.allocComplexElement(n1, n1), g, 0); }
+      if (n2 !== 0) { solver.stampComplexElement(solver.allocComplexElement(n2, n2), g, 0); }
+      if (n1 !== 0 && n2 !== 0) { solver.stampComplexElement(solver.allocComplexElement(n1, n2), -g, 0); solver.stampComplexElement(solver.allocComplexElement(n2, n1), -g, 0); }
     },
     getPinCurrents(_v: Float64Array): number[] { return [0, 0]; },
     setParam(_key: string, _value: number) {},
@@ -106,6 +109,7 @@ function makeGroundDef(): ComponentDefinition {
     modelRegistry: {
       behavioral: { kind: 'inline' as const, factory: (_pinNodes: ReadonlyMap<string, number>) => ({
         branchIndex: -1 as const,
+        ngspiceLoadOrder: 0,
         isNonlinear: false, isReactive: false,
         stamp(_s: SparseSolverStamp) {},
         getPinCurrents(_v: Float64Array) { return [0]; },
@@ -206,8 +210,7 @@ describe('DefaultSimulationCoordinator -- computeFrameSteps (continuous)', () =>
   });
   it('simTimeGoal equals simTime plus speed times wallDt', () => {
     coord.speed = 1e-3;
-    const simTimeBefore = coord.simTime as number;
-    const result = coord.computeFrameSteps(0.016);
+    coord.computeFrameSteps(0.016);
   });
   it('budgetMs is 12 for continuous', () => {
     expect(coord.computeFrameSteps(0.016).budgetMs).toBe(12);
@@ -217,7 +220,6 @@ describe('DefaultSimulationCoordinator -- computeFrameSteps (continuous)', () =>
   });
   it('clamps wallDt to 0.1s for continuous', () => {
     coord.speed = 1e-3;
-    const simTimeBefore = coord.simTime as number;
   });
 });
 

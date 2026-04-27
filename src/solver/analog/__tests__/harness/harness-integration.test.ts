@@ -16,10 +16,9 @@ import { canonicalizeNgspiceName, canonicalizeOurLabel } from "./node-mapping.js
 import type { CaptureSession, IntegrationCoefficients } from "./types.js";
 
 const ZERO_INTEG_COEFF: IntegrationCoefficients = {
-  ours: { ag0: 0, ag1: 0, method: "backwardEuler", order: 1 },
-  ngspice: { ag0: 0, ag1: 0, method: "backwardEuler", order: 1 },
+  ours: { ag0: 0, ag1: 0, method: "trapezoidal", order: 1 },
+  ngspice: { ag0: 0, ag1: 0, method: "trapezoidal", order: 1 },
 };
-import { DEVICE_MAPPINGS } from "./device-mappings.js";
 
 function buildStatePool(elements: AnalogElementCore[]): StatePool {
   let offset = 0;
@@ -83,8 +82,9 @@ describe("harness integration", () => {
   it("iteration capture hook records NR iterations during DC OP", () => {
     const { circuit, pool } = makeHWR();
     engine.init(circuit);
-    const { hook, getSnapshots, clear } = createIterationCaptureHook(engine.solver!, engine.elements, pool);
+    const { hook, preFactorHook, getSnapshots, clear } = createIterationCaptureHook(engine.solver!, engine.elements, pool);
     engine.postIterationHook = hook;
+    engine.preFactorHook = preFactorHook;
     engine.dcOperatingPoint();
     const snapshots = getSnapshots();
     expect(snapshots.length).toBeGreaterThan(0);
@@ -365,15 +365,12 @@ describe("harness integration", () => {
     expect(engine.compiled).toBeNull();
   });
 
-  it("SparseSolver exposes dimension, getRhsSnapshot, getCSCNonZeros", () => {
+  it("SparseSolver exposes dimension, getCSCNonZeros", () => {
     const { circuit } = makeHWR();
     engine.init(circuit);
     const solver = engine.solver!;
     engine.dcOperatingPoint();
     expect(solver.dimension).toBe(3);
-    const rhs = solver.getRhsSnapshot();
-    expect(rhs).toBeInstanceOf(Float64Array);
-    expect(rhs.length).toBe(3);
     const nz = solver.getCSCNonZeros();
     expect(nz.length).toBeGreaterThan(0);
     expect(nz[0]).toHaveProperty("row");
@@ -420,6 +417,8 @@ describe("time-alignment: compareSnapshots with alignment map", () => {
     // transient step cktMode has MODETRAN set, so the label is "MODETRAN".
     const iter: import("./types.js").IterationSnapshot = {
       iteration: 0,
+      matrixSize: 1,
+      rhsBufSize: 1,
       voltages: new Float64Array([voltage]),
       prevVoltages: new Float64Array([voltage]),
       preSolveRhs: new Float64Array([0]),

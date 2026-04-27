@@ -125,7 +125,7 @@ describe("buildSpiceSubcircuit — R element mapping", () => {
 
   it("sets resistance property from value", () => {
     const circuit = buildSpiceSubcircuit(parse(`.SUBCKT t a b\nR1 a b 10k\n.ENDS`));
-    const el = circuit.elements.find((e) => e.typeId === "Resistor");
+    circuit.elements.find((e) => e.typeId === "Resistor");
   });
 
   it("Resistor has pins A and B", () => {
@@ -150,7 +150,7 @@ describe("buildSpiceSubcircuit — C element mapping", () => {
 
   it("sets capacitance property", () => {
     const circuit = buildSpiceSubcircuit(parse(`.SUBCKT t a b\nC1 a b 100n\n.ENDS`));
-    const el = circuit.elements.find((e) => e.typeId === "Capacitor");
+    circuit.elements.find((e) => e.typeId === "Capacitor");
   });
 });
 
@@ -167,7 +167,7 @@ describe("buildSpiceSubcircuit — L element mapping", () => {
 
   it("sets inductance property", () => {
     const circuit = buildSpiceSubcircuit(parse(`.SUBCKT t a b\nL1 a b 1u\n.ENDS`));
-    const el = circuit.elements.find((e) => e.typeId === "Inductor");
+    circuit.elements.find((e) => e.typeId === "Inductor");
   });
 });
 
@@ -288,7 +288,7 @@ M1 d g s b NMOS W=10u L=1u
   it("NMOS model params contain W, L, VTO", () => {
     const circuit = buildSpiceSubcircuit(parse(TEXT));
     const el = circuit.elements.find((e) => e.typeId === "NMOS");
-    const overrides = getModelParams(el!);
+    getModelParams(el!);
   });
 });
 
@@ -308,7 +308,7 @@ M1 d g s b PMOS W=5u L=1u
     expect(pinLabels).toContain("G");
     expect(pinLabels).toContain("D");
     expect(pinLabels).toContain("S");
-    const overrides = getModelParams(el!);
+    getModelParams(el!);
   });
 });
 
@@ -360,7 +360,7 @@ J1 d g s PJFET
     expect(pinLabels).toContain("G");
     expect(pinLabels).toContain("S");
     expect(pinLabels).toContain("D");
-    const overrides = getModelParams(el!);
+    getModelParams(el!);
   });
 });
 
@@ -376,7 +376,7 @@ describe("buildSpiceSubcircuit — V element mapping", () => {
 
   it("sets voltage property", () => {
     const circuit = buildSpiceSubcircuit(parse(`.SUBCKT t p n\nV1 p n DC 3.3\n.ENDS`));
-    const el = circuit.elements.find((e) => e.typeId === "DcVoltageSource");
+    circuit.elements.find((e) => e.typeId === "DcVoltageSource");
   });
 
   it("DcVoltageSource has pins pos and neg", () => {
@@ -400,7 +400,7 @@ describe("buildSpiceSubcircuit — I element mapping", () => {
 
   it("sets current property", () => {
     const circuit = buildSpiceSubcircuit(parse(`.SUBCKT t p n\nI1 p n DC 1m\n.ENDS`));
-    const el = circuit.elements.find((e) => e.typeId === "CurrentSource");
+    circuit.elements.find((e) => e.typeId === "CurrentSource");
   });
 });
 
@@ -469,7 +469,7 @@ M1 d g s b NMOS W=20u L=2u
 `;
     const circuit = buildSpiceSubcircuit(parse(TEXT));
     const el = circuit.elements.find((e) => e.typeId === "NMOS");
-    const overrides = getModelParams(el!);
+    getModelParams(el!);
   });
 });
 
@@ -511,7 +511,7 @@ V1 vcc 0 DC 5
 
   it("DcVoltageSource has voltage=5", () => {
     const circuit = buildSpiceSubcircuit(parse(TEXT));
-    const vs = circuit.elements.find((e) => e.typeId === "DcVoltageSource");
+    circuit.elements.find((e) => e.typeId === "DcVoltageSource");
   });
 
   it("each NpnBJT has model params IS and BF", () => {

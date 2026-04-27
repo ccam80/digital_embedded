@@ -240,8 +240,17 @@ export type PostIterationHook = (
 ) => void;
 
 /**
- * Create a postIterationHook that captures every NR iteration into
- * an IterationSnapshot array and maintains a drainable IterationDetail buffer.
+ * Create a postIterationHook + preFactorHook pair that captures every NR
+ * iteration into an IterationSnapshot array and maintains a drainable
+ * IterationDetail buffer.
+ *
+ * The pre-factor hook fires between cktLoad and solver.preorder()/factor()
+ * (newton-raphson.ts STEP B+; mirrors ngspice niiter.c:704-842 + 915-924).
+ * It captures the post-load, pre-LU MNA matrix and the pre-solve RHS into
+ * scratch buffers — the unique window where these values are observable
+ * before factor() overwrites _elVal[] with LU and solve() overwrites
+ * ctx.rhs with the solution. The post-iteration hook reads the scratch
+ * buffers when assembling each IterationSnapshot.
  */
 export function createIterationCaptureHook(
   solver: SparseSolver,
@@ -250,16 +259,20 @@ export function createIterationCaptureHook(
   elementLabels?: Map<number, string>,
 ): {
   hook: PostIterationHook;
+  preFactorHook: (ctx: CKTCircuitContext) => void;
   getSnapshots: () => IterationSnapshot[];
   clear: () => void;
   drainForLog: () => NRAttemptRecord["iterationDetails"];
 } {
-  // Phase 0 deleted enable*Capture/getPre*Snapshot machinery; harness now
-  // reads the live RHS / CSC nonzeros at the post-iteration hook moment.
-  // Semantic divergence: matrix is POST-factor (LU values), not pre-factor —
-  // pending the test-harness module rewrite per architect §4.
   let snapshots: IterationSnapshot[] = [];
   let detailBuffer: NonNullable<NRAttemptRecord["iterationDetails"]> = [];
+
+  // Pre-factor scratch buffers — populated by preFactorHook, consumed by hook.
+  // Mirrors ngspice's static ni_mxColPtr / ni_mxRowIdx / ni_mxVals / ni_preSolveRhs
+  // (niiter.c:170-175, 166-167) — one snapshot per NR iteration, overwritten
+  // each iteration before the post-iteration hook reads it.
+  let preFactorMatrix: ReturnType<SparseSolver["getCSCNonZeros"]> = [];
+  let preSolveRhs: Float64Array = new Float64Array(0);
 
   // Build a map from raw el.label (used by newton-raphson convergenceFailedElements)
   // to the human label (used by elementStates / elementLabels). This ensures
@@ -273,6 +286,18 @@ export function createIterationCaptureHook(
       if (raw !== human) rawLabelToHumanLabel.set(raw, human);
     }
   }
+
+  const preFactorHook = (ctx: CKTCircuitContext): void => {
+    // Window: post-cktLoad, pre-preorder/factor. ctx.rhs holds load stamps;
+    // solver._elVal[] holds post-load, pre-LU MNA values. ngspice
+    // niiter.c:704-842 (matrix) + niiter.c:915-924 (pre-solve RHS) — both
+    // captures land in this window since factor() does not write RHS.
+    preFactorMatrix = solver.getCSCNonZeros();
+    if (preSolveRhs.length !== ctx.rhs.length) {
+      preSolveRhs = new Float64Array(ctx.rhs.length);
+    }
+    preSolveRhs.set(ctx.rhs);
+  };
 
   const hook: PostIterationHook = (
     iteration, voltages, prevVoltages, noncon, globalConverged, elemConverged,
@@ -297,12 +322,30 @@ export function createIterationCaptureHook(
     // bitsToName joins multiple set bits with "|" — e.g. "MODEDCOP|MODEINITJCT".
     const resolvedInitMode = bitsToName(ctx.cktMode);
 
+    // matrixSize: mirror ngspice's CKTmaxEqNum-based counter convention
+    // (cktinit.c:43 initializes CKTmaxEqNum = 1; cktlnkeq.c:32 post-increments
+    // on each CKTmkVolt/CKTmkCur). After N active equations ngspice has
+    // CKTmaxEqNum = 1 + N, and reports matrixSize = CKTmaxEqNum + 1 = N + 2.
+    // Our voltages.length is N + 1 (ground sentinel + N active eqs), so the
+    // ngspice-equivalent matrixSize is voltages.length + 1. The +1 is a
+    // post-inc setup tracker, not an actual rhs-vector slot — ngspice's
+    // CKTrhs is allocated to SMPmatSize+1 = N+1 doubles (nireinit.c).
+    //
+    // rhsBufSize: actual rhs/rhsOld/preSolveRhs buffer length. Our engine
+    // has no TrashCan-style stamp folding, so this equals voltages.length.
+    // ngspice carries this as a separate field because its rhs buffer
+    // (SMPmatSize+1) can be smaller than its matrixSize (CKTmaxEqNum+1).
+    const ourMatrixSize = voltages.length + 1;
+    const ourRhsBufSize = voltages.length;
+
     snapshots.push({
       iteration,
+      matrixSize: ourMatrixSize,
+      rhsBufSize: ourRhsBufSize,
       voltages: voltages.slice(),
       prevVoltages: prevVoltages.slice(),
-      preSolveRhs: solver.getRhsSnapshot(),
-      matrix: solver.getCSCNonZeros(),
+      preSolveRhs: preSolveRhs.slice(),
+      matrix: preFactorMatrix,
       elementStates: captureElementStates(elements, statePool, elementLabels),
       noncon,
       diagGmin: ctx.diagonalGmin,
@@ -332,8 +375,15 @@ export function createIterationCaptureHook(
 
   return {
     hook,
+    preFactorHook,
     getSnapshots: () => snapshots,
-    clear: () => { snapshots = []; detailBuffer = []; },
+    clear: () => {
+      snapshots = [];
+      detailBuffer = [];
+      preFactorMatrix = [];
+      // Keep preSolveRhs allocation; length-match guard inside preFactorHook
+      // resizes if the matrix dimension changes between runs.
+    },
     drainForLog(): NRAttemptRecord["iterationDetails"] {
       const drained = detailBuffer.slice();
       detailBuffer = [];
@@ -380,6 +430,7 @@ export function createStepCaptureHook(
   elementLabels?: Map<number, string>,
 ): {
   iterationHook: PostIterationHook & { drainForLog: () => NRAttemptRecord["iterationDetails"] };
+  preFactorHook: (ctx: CKTCircuitContext) => void;
   beginAttempt(phase: NRPhase, dt: number, phaseParameter?: number): void;
   endAttempt(outcome: NRAttemptOutcome, converged: boolean): void;
   endStep(params: {
@@ -416,6 +467,7 @@ export function createStepCaptureHook(
 
   return {
     iterationHook,
+    preFactorHook: iterCapture.preFactorHook,
     peekIterations: () => iterCapture.getSnapshots(),
 
     /**

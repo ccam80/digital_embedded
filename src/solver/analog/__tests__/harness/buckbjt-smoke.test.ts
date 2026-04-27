@@ -15,8 +15,7 @@ const DLL_PATH = resolve(
   process.cwd(), "ref/ngspice/visualc-shared/x64/Release/bin/spice.dll",
 );
 
-let dllAvailable = false;
-try { accessSync(DLL_PATH); dllAvailable = true; } catch { throw new Error('ngspice DLL required for buckbjt smoke test'); }
+try { accessSync(DLL_PATH); } catch { throw new Error('ngspice DLL required for buckbjt smoke test'); }
 
 const describeIfDll = describe;
 

@@ -22,9 +22,9 @@ function getFactory(entry: ModelEntry): AnalogFactory {
 // Mock solver
 // ---------------------------------------------------------------------------
 
-function makeMockSolver() {
+function makeMockSolver(rhsSize = 8) {
   const stamps: [number, number, number][] = [];
-  const rhs: Record<number, number> = {};
+  const rhs = new Float64Array(rhsSize);
 
   const solver = {
     allocElement: vi.fn((row: number, col: number) => {
@@ -34,9 +34,6 @@ function makeMockSolver() {
     stampElement: vi.fn((h: number, v: number) => {
       stamps[h][2] += v;
     }),
-    stampRHS: vi.fn((row: number, value: number) => {
-      rhs[row] = (rhs[row] ?? 0) + value;
-    }),
     _stamps: stamps,
     _rhs: rhs,
   };
@@ -44,11 +41,14 @@ function makeMockSolver() {
   return solver;
 }
 
-function makeMinimalCtx(solver: unknown) {
+function makeMinimalCtx(solver: ReturnType<typeof makeMockSolver>) {
   return {
-    solver: solver as SparseSolver,
-    voltages: new Float64Array(4),
+    solver: solver as unknown as SparseSolver,
+    matrix: solver as unknown as SparseSolver,
+    rhs: solver._rhs,
+    rhsOld: new Float64Array(solver._rhs.length),
     cktMode: MODEDCOP | MODEINITFLOAT,
+    time: 0,
     dt: 0,
     method: "trapezoidal" as const,
     order: 1,
@@ -57,10 +57,14 @@ function makeMinimalCtx(solver: unknown) {
     srcFact: 1,
     noncon: { value: 0 },
     limitingCollector: null,
+    convergenceCollector: null,
     xfact: 1,
     gmin: 1e-12,
     reltol: 1e-3,
     iabstol: 1e-12,
+    temp: 300.15,
+    vt: 0.025852,
+    cktFixLimit: false,
     bypass: false,
     voltTol: 1e-6,
   };
@@ -81,11 +85,10 @@ describe("CurrentSource", () => {
     // No matrix stamps — current sources are RHS-only
     expect(solver.allocElement).toHaveBeenCalledTimes(0);
 
-    // RHS[nodePos-1] += I  → RHS[0] += 0.01
-    // RHS[nodeNeg-1] -= I  → RHS[1] -= 0.01
-    expect(solver.stampRHS).toHaveBeenCalledTimes(2);
-    expect(solver.stampRHS).toHaveBeenCalledWith(0,  0.01);
-    expect(solver.stampRHS).toHaveBeenCalledWith(1, -0.01);
+    // RHS[nodePos] += I  → rhs[1] += 0.01
+    // RHS[nodeNeg] -= I  → rhs[2] -= 0.01
+    expect(solver._rhs[1]).toBe(0.01);
+    expect(solver._rhs[2]).toBe(-0.01);
   });
 
   it("set_scale_modifies_current", () => {
@@ -101,8 +104,8 @@ describe("CurrentSource", () => {
     expect(solver.allocElement).toHaveBeenCalledTimes(0);
 
     // I * scale = 0.01 * 0.3 = 0.003
-    expect(solver.stampRHS).toHaveBeenCalledWith(0,  0.003);
-    expect(solver.stampRHS).toHaveBeenCalledWith(1, -0.003);
+    expect(solver._rhs[1]).toBeCloseTo(0.003, 15);
+    expect(solver._rhs[2]).toBeCloseTo(-0.003, 15);
   });
 
   it("ground_node_rhs_suppressed", () => {
@@ -112,9 +115,9 @@ describe("CurrentSource", () => {
 
     src.load(makeMinimalCtx(solver));
 
-    // Only one RHS entry (ground row suppressed)
-    expect(solver.stampRHS).toHaveBeenCalledTimes(1);
-    expect(solver.stampRHS).toHaveBeenCalledWith(0, 0.01);
+    // Only one RHS entry (ground row suppressed — rhs[0] stays 0)
+    expect(solver._rhs[0]).toBe(0);
+    expect(solver._rhs[1]).toBe(0.01);
   });
 
   it("branch_index_is_minus_one", () => {
@@ -150,9 +153,9 @@ describe("CurrentSource", () => {
     const solver = makeMockSolver();
     el.load(makeMinimalCtx(solver));
 
-    // Default current is 0.01 A
-    expect(solver.stampRHS).toHaveBeenCalledWith(0,  0.01);
-    expect(solver.stampRHS).toHaveBeenCalledWith(1, -0.01);
+    // Default current is 0.01 A; nodePos=1 → rhs[1], nodeNeg=2 → rhs[2]
+    expect(solver._rhs[1]).toBe(0.01);
+    expect(solver._rhs[2]).toBe(-0.01);
   });
 });
 
@@ -171,33 +174,13 @@ describe("isource_load_srcfact_parity", () => {
     const src = makeCurrentSource(1, 2, CURRENT);
     const solver = makeMockSolver();
 
-    const ctx = {
-      solver: solver as unknown as SparseSolver,
-      voltages: new Float64Array(3),
-      cktMode: MODEDCOP | MODEINITFLOAT,
-      dt: 0,
-      method: "trapezoidal" as const,
-      order: 1,
-      deltaOld: [0, 0, 0, 0, 0, 0, 0],
-      ag: new Float64Array(7),
-      srcFact: SRC_FACT,
-      noncon: { value: 0 },
-      limitingCollector: null,
-      xfact: 1,
-      gmin: 1e-12,
-      reltol: 1e-3,
-      iabstol: 1e-12,
-      bypass: false,
-      voltTol: 1e-6,
-    };
-
-    src.load(ctx);
+    src.load({ ...makeMinimalCtx(solver), srcFact: SRC_FACT });
 
     // NGSPICE_REF: I * srcFact, bit-exact IEEE-754 product.
     const NGSPICE_REF_POS = CURRENT * SRC_FACT;
     const NGSPICE_REF_NEG = -(CURRENT * SRC_FACT);
-    expect(solver.stampRHS).toHaveBeenCalledWith(0, NGSPICE_REF_POS);
-    expect(solver.stampRHS).toHaveBeenCalledWith(1, NGSPICE_REF_NEG);
+    expect(solver._rhs[1]).toBe(NGSPICE_REF_POS);
+    expect(solver._rhs[2]).toBe(NGSPICE_REF_NEG);
     // Zero matrix stamps (current source is RHS-only).
     expect(solver.allocElement).toHaveBeenCalledTimes(0);
     expect(NGSPICE_REF_POS).toBe(0.003);
@@ -209,30 +192,10 @@ describe("isource_load_srcfact_parity", () => {
     const src = makeCurrentSource(1, 2, CURRENT);
     const solver = makeMockSolver();
 
-    const ctx = {
-      solver: solver as unknown as SparseSolver,
-      voltages: new Float64Array(3),
-      cktMode: MODEDCOP | MODEINITJCT,
-      dt: 0,
-      method: "trapezoidal" as const,
-      order: 1,
-      deltaOld: [0, 0, 0, 0, 0, 0, 0],
-      ag: new Float64Array(7),
-      srcFact: SRC_FACT,
-      noncon: { value: 0 },
-      limitingCollector: null,
-      xfact: 1,
-      gmin: 1e-12,
-      reltol: 1e-3,
-      iabstol: 1e-12,
-      bypass: false,
-      voltTol: 1e-6,
-    };
+    src.load({ ...makeMinimalCtx(solver), cktMode: MODEDCOP | MODEINITJCT, srcFact: SRC_FACT });
 
-    src.load(ctx);
-
-    expect(solver.stampRHS).toHaveBeenCalledWith(0, 0);
-    expect(solver.stampRHS).toHaveBeenCalledWith(1, -0);
+    expect(solver._rhs[1]).toBe(0);
+    expect(solver._rhs[2]).toBe(0);
   });
 
   it("srcfact_1_preserves_full_current", () => {
@@ -240,30 +203,10 @@ describe("isource_load_srcfact_parity", () => {
     const src = makeCurrentSource(1, 0, CURRENT);
     const solver = makeMockSolver();
 
-    const ctx = {
-      solver: solver as unknown as SparseSolver,
-      voltages: new Float64Array(3),
-      cktMode: MODEDCOP | MODEINITFLOAT,
-      dt: 0,
-      method: "trapezoidal" as const,
-      order: 1,
-      deltaOld: [0, 0, 0, 0, 0, 0, 0],
-      ag: new Float64Array(7),
-      srcFact: 1,
-      noncon: { value: 0 },
-      limitingCollector: null,
-      xfact: 1,
-      gmin: 1e-12,
-      reltol: 1e-3,
-      iabstol: 1e-12,
-      bypass: false,
-      voltTol: 1e-6,
-    };
+    src.load(makeMinimalCtx(solver));
 
-    src.load(ctx);
-
-    // pos only (neg is ground → suppressed).
-    expect(solver.stampRHS).toHaveBeenCalledTimes(1);
-    expect(solver.stampRHS).toHaveBeenCalledWith(0, CURRENT);
+    // pos only (neg is ground → suppressed); rhs[1] = CURRENT, rhs[0] stays 0.
+    expect(solver._rhs[0]).toBe(0);
+    expect(solver._rhs[1]).toBe(CURRENT);
   });
 });

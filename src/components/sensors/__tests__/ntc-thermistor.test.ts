@@ -43,6 +43,7 @@ function makeCaptureSolver(): {
   const handles: { row: number; col: number }[] = [];
   const handleIndex = new Map<string, number>();
   const solver = {
+    _initStructure: (_n: number) => {},
     stampRHS: (row: number, value: number) => {
       rhs.push({ row, value });
     },
@@ -69,10 +70,9 @@ function makeCaptureSolver(): {
 // ctx.dt and ctx.voltages; no solver stamps occur inside accept.
 // ---------------------------------------------------------------------------
 
-function makeAcceptCtx(voltages: Float64Array, dt: number): import("../../../solver/analog/load-context.js").LoadContext {
+function makeAcceptCtx(_voltages: Float64Array, dt: number): import("../../../solver/analog/load-context.js").LoadContext {
   return makeLoadCtx({
     solver: undefined as unknown as SparseSolverType,
-    voltages,
     cktMode: MODETRAN | MODEINITFLOAT,
     dt,
     deltaOld: [dt, dt, dt, dt, dt, dt, dt],
@@ -118,11 +118,11 @@ function makeNTC(overrides: Partial<{
 describe("NTC", () => {
   describe("resistance_at_t0_equals_r0", () => {
     it("resistance at T₀ equals R₀", () => {
-      const ntc = makeNTC({ r0: 10000, t0: 298.15, temperature: 298.15 });
+      makeNTC({ r0: 10000, t0: 298.15, temperature: 298.15 });
     });
 
     it("resistance at T₀ = 300K with R₀ = 5000Ω equals 5000Ω", () => {
-      const ntc = makeNTC({ r0: 5000, t0: 300, temperature: 300 });
+      makeNTC({ r0: 5000, t0: 300, temperature: 300 });
     });
   });
 
@@ -141,8 +141,7 @@ describe("NTC", () => {
   describe("beta_model_formula", () => {
     it("R₀=10k, B=3950, T=350K gives expected resistance", () => {
       // R = 10000 · exp(3950 · (1/350 - 1/298.15))
-      const expected = 10000 * Math.exp(3950 * (1 / 350 - 1 / 298.15));
-      const ntc = makeNTC({ r0: 10000, beta: 3950, t0: 298.15, temperature: 350 });
+      makeNTC({ r0: 10000, beta: 3950, t0: 298.15, temperature: 350 });
     });
 
     it("B-parameter formula: result is approximately 1.4kΩ at 350K", () => {
@@ -168,9 +167,11 @@ describe("NTC", () => {
       });
 
       const initialTemp = ntc.temperature;
-      const voltages = new Float64Array(2);
-      voltages[0] = 1.0; // node 1 at 1V
-      voltages[1] = 0.0; // node 2 at 0V
+      // Nodes are 1-based: pinNodeIds=[1,2], so voltages must be sized nodeCount+1=3.
+      // voltages[0] = ground sentinel, voltages[1] = node 1 (pos), voltages[2] = node 2 (neg)
+      const voltages = new Float64Array(3);
+      voltages[1] = 1.0; // node 1 at 1V
+      voltages[2] = 0.0; // node 2 at 0V
 
       // Run many timesteps to accumulate heating
       const dt = 1e-4;
@@ -201,9 +202,10 @@ describe("NTC", () => {
       });
 
       const voltage = 1.0; // V across the thermistor
-      const voltages = new Float64Array(2);
-      voltages[0] = voltage;
-      voltages[1] = 0.0;
+      // Nodes are 1-based: pinNodeIds=[1,2], so voltages must be sized nodeCount+1=3.
+      const voltages = new Float64Array(3);
+      voltages[1] = voltage; // node 1 at 1V (pos)
+      voltages[2] = 0.0;     // node 2 at 0V (neg)
 
       // Run to steady state: time constant = R_thermal * C_thermal = 100 * 0.001 = 0.1s
       // Run for 10× time constant = 1s with dt=1ms
@@ -267,14 +269,15 @@ describe("NTC", () => {
         nodeCount: 2,
       });
 
-      ntc.load(ctx);
+      ntc.load(ctx.loadCtx);
 
       const G = 1 / ntc.resistance();
       const tuples = stamps.map((s) => [s.row, s.col, s.value] as [number, number, number]);
-      expect(tuples).toContainEqual([0, 0, G]);
-      expect(tuples).toContainEqual([0, 1, -G]);
-      expect(tuples).toContainEqual([1, 0, -G]);
+      // Nodes are 1-based: pinNodeIds=[1,2] → row/col 1 and 2
       expect(tuples).toContainEqual([1, 1, G]);
+      expect(tuples).toContainEqual([1, 2, -G]);
+      expect(tuples).toContainEqual([2, 1, -G]);
+      expect(tuples).toContainEqual([2, 2, G]);
     });
   });
 
@@ -343,7 +346,6 @@ describe("ntc_load_dcop_parity", () => {
       matrixSize: 2,
       nodeCount: 2,
     });
-    stampCtx.solver._initStructure(2);
     analogElement.load(stampCtx.loadCtx);
     const stamps = stampCtx.solver.getCSCNonZeros();
 
@@ -351,18 +353,19 @@ describe("ntc_load_dcop_parity", () => {
     // Single IEEE-754 division: 1 / 10000.
     const EXPECTED_G = 1 / NTC_DEFAULTS.r0;
 
-    const e00 = stamps.find((e) => e.row === 0 && e.col === 0);
+    // Nodes are 1-based: pinNodeIds=[1,2] → row/col 1 and 2
+    const e00 = stamps.find((e) => e.row === 1 && e.col === 1);
     expect(e00).toBeDefined();
     expect(e00!.value).toBe(EXPECTED_G);
 
-    const e11 = stamps.find((e) => e.row === 1 && e.col === 1);
+    const e11 = stamps.find((e) => e.row === 2 && e.col === 2);
     expect(e11).toBeDefined();
     expect(e11!.value).toBe(EXPECTED_G);
 
-    const e01 = stamps.find((e) => e.row === 0 && e.col === 1);
+    const e01 = stamps.find((e) => e.row === 1 && e.col === 2);
     expect(e01!.value).toBe(-EXPECTED_G);
 
-    const e10 = stamps.find((e) => e.row === 1 && e.col === 0);
+    const e10 = stamps.find((e) => e.row === 2 && e.col === 1);
     expect(e10!.value).toBe(-EXPECTED_G);
   });
 });

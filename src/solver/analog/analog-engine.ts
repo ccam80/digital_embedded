@@ -34,38 +34,14 @@ import type { LimitingEvent } from "./newton-raphson.js";
 import { CKTCircuitContext } from "./ckt-context.js";
 import type { AnalogElement } from "./element.js";
 import { isPoolBacked } from "./element.js";
-import type { ConcreteCompiledAnalogCircuit as CompiledWithBridges } from "./compiled-analog-circuit.js";
+import type { ConcreteCompiledAnalogCircuit } from "./compiled-analog-circuit.js";
+export type { ConcreteCompiledAnalogCircuit } from "./compiled-analog-circuit.js";
 import type { StatePool } from "./state-pool.js";
 import { assertPoolIsSoleMutableState } from "../../solver/analog/state-schema.js";
 import {
   MODEUIC, MODEDCOP, MODETRAN, MODETRANOP,
   MODEINITJCT, MODEINITTRAN, MODEINITPRED,
 } from "./ckt-mode.js";
-
-// ---------------------------------------------------------------------------
-// ConcreteCompiledAnalogCircuit — minimal interface for what MNAEngine needs
-// ---------------------------------------------------------------------------
-
-/**
- * The runtime-narrowed interface that MNAEngine expects from its compiled
- * circuit. This matches the fields produced by the analog compiler (Task 1.5.1)
- * but is expressed as an interface so MNAEngine does not depend on that
- * concrete class directly.
- */
-export interface ConcreteCompiledAnalogCircuit extends CompiledCircuit {
-  /** Number of non-ground MNA nodes. */
-  readonly nodeCount: number;
-  /** Number of extra MNA rows for voltage sources and inductors. */
-  readonly branchCount: number;
-  /** Total MNA matrix dimension: nodeCount + branchCount. */
-  readonly matrixSize: number;
-  /** All analog elements with their stamp functions. */
-  readonly elements: readonly AnalogElement[];
-  /** Maps component label strings to MNA node IDs. */
-  readonly labelToNodeId: Map<string, number>;
-  /** Shared state pool for per-element operating-point state. */
-  readonly statePool: StatePool;
-}
 
 // ---------------------------------------------------------------------------
 // MNAEngine
@@ -163,7 +139,7 @@ export class MNAEngine implements AnalogEngine {
     // because a silent fallback reassignment would hide future allocation
     // regressions as numerical wrongness (flat capacitor voltages, etc.)
     // rather than loud failures.
-    const cac = compiled as CompiledWithBridges;
+    const cac = compiled as ConcreteCompiledAnalogCircuit;
     if (cac.statePool) {
       for (const el of elements) {
         if (isPoolBacked(el) && el.stateBaseOffset < 0) {
@@ -222,7 +198,7 @@ export class MNAEngine implements AnalogEngine {
     }
     this._history.reset();
     this._simTime = 0;
-    const cac = this._compiled as CompiledWithBridges | undefined;
+    const cac = this._compiled as ConcreteCompiledAnalogCircuit | undefined;
     if (cac?.timeRef) cac.timeRef.value = 0;
     if (cac?.statePool) {
       cac.statePool.reset();
@@ -284,7 +260,7 @@ export class MNAEngine implements AnalogEngine {
 
     if (import.meta.env?.DEV && !this._devProbeRan) {
       this._devProbeRan = true;
-      const statePool = (this._compiled as CompiledWithBridges).statePool ?? null;
+      const statePool = (this._compiled as ConcreteCompiledAnalogCircuit).statePool ?? null;
       if (statePool) {
         const poolSnapshot = statePool.state0.slice();
         const ctx = this._ctx!;
@@ -332,7 +308,7 @@ export class MNAEngine implements AnalogEngine {
     // NIiter call left). Newton-raphson.ts now mirrors NIiter's pointer-swap
     // exit invariant via ctx.swapRhsBuffers(), so ctx.rhsOld already holds the
     // converging iter's input — no extra copy required here.
-    const statePool = (this._compiled as CompiledWithBridges).statePool ?? null;
+    const statePool = (this._compiled as ConcreteCompiledAnalogCircuit).statePool ?? null;
 
     // Top-of-iteration acceptStep dispatch — mirrors ngspice CKTaccept at
     // dctran.c:410 (head of the `nextTime:` iteration body, BEFORE the
@@ -395,7 +371,7 @@ export class MNAEngine implements AnalogEngine {
       // Publish the advanced simTime to timeRef so time-varying sources
       // (AC voltage/current) evaluate at the correct time during the NR
       // solve that follows.
-      const cac = this._compiled as CompiledWithBridges | undefined;
+      const cac = this._compiled as ConcreteCompiledAnalogCircuit | undefined;
       if (cac?.timeRef) cac.timeRef.value = this._simTime;
 
       // NIpred: compute agp[] then predict voltages as NR initial guess.
@@ -471,6 +447,7 @@ export class MNAEngine implements AnalogEngine {
       ctx.maxIterations = params.transientMaxIterations;
       ctx.enableBlameTracking = logging;
       ctx.postIterationHook = this.postIterationHook;
+      ctx.preFactorHook = this.preFactorHook;
       ctx.detailedConvergence = this.detailedConvergence;
       ctx.limitingCollector = this.limitingCollector;
       // Wire the transient mode ladder ONLY when a phase hook is attached
@@ -546,7 +523,10 @@ export class MNAEngine implements AnalogEngine {
         if (this._convergenceLog.enabled) {
           const drainable = this.postIterationHook as unknown as { drainForLog?: () => NRAttemptRecord["iterationDetails"] };
           if (typeof drainable?.drainForLog === "function") {
-            stepRec!.attempts[stepRec!.attempts.length - 1].iterationDetails = drainable.drainForLog();
+            const details = drainable.drainForLog();
+            if (details !== undefined) {
+              stepRec!.attempts[stepRec!.attempts.length - 1].iterationDetails = details;
+            }
           }
         }
       }
@@ -676,7 +656,7 @@ export class MNAEngine implements AnalogEngine {
       this._convergenceLog.record(stepRec!);
     }
 
-    const cac = this._compiled as CompiledWithBridges | undefined;
+    const cac = this._compiled as ConcreteCompiledAnalogCircuit | undefined;
     if (cac?.timeRef) cac.timeRef.value = this._simTime;
     this._lastDt = dt;
 
@@ -837,7 +817,7 @@ export class MNAEngine implements AnalogEngine {
     const { elements } = this._compiled;
     this._diagnostics.clear();
 
-    const cac = this._compiled as CompiledWithBridges;
+    const cac = this._compiled as ConcreteCompiledAnalogCircuit;
     if (cac.statePool) {
       cac.statePool.reset();
       for (const el of this._elements) {
@@ -850,6 +830,7 @@ export class MNAEngine implements AnalogEngine {
     const phaseHook = this.stepPhaseHook;
     const ctx = this._ctx!;
     ctx.postIterationHook = this.postIterationHook;
+    ctx.preFactorHook = this.preFactorHook;
     ctx.detailedConvergence = this.detailedConvergence;
     ctx.limitingCollector = this.limitingCollector;
     ctx.nodesets = cac.nodesets ?? new Map();
@@ -881,6 +862,19 @@ export class MNAEngine implements AnalogEngine {
     if (this._convergenceLog.enabled) {
       const drainable = this.postIterationHook as unknown as { drainForLog?: () => NRAttemptRecord["iterationDetails"] };
       if (typeof drainable?.drainForLog === "function") {
+        const details = drainable.drainForLog();
+        const attempt: NRAttemptRecord = {
+          dt: 0,
+          method: "trapezoidal",
+          iterations: result.iterations,
+          converged: result.converged,
+          blameElement: -1,
+          blameNode: -1,
+          trigger: "initial",
+        };
+        if (details !== undefined) {
+          attempt.iterationDetails = details;
+        }
         const dcopRec: StepRecord = {
           stepNumber: -1,
           simTime: 0,
@@ -892,16 +886,7 @@ export class MNAEngine implements AnalogEngine {
           lteProposedDt: 0,
           lteRejected: false,
           outcome: result.converged ? "accepted" : "error",
-          attempts: [{
-            dt: 0,
-            method: "trapezoidal",
-            iterations: result.iterations,
-            converged: result.converged,
-            blameElement: -1,
-            blameNode: -1,
-            trigger: "initial",
-            iterationDetails: drainable.drainForLog(),
-          }],
+          attempts: [attempt],
         };
         this._convergenceLog.record(dcopRec);
       }
@@ -940,7 +925,7 @@ export class MNAEngine implements AnalogEngine {
     const { elements } = this._compiled;
     this._diagnostics.clear();
 
-    const cac = this._compiled as CompiledWithBridges;
+    const cac = this._compiled as ConcreteCompiledAnalogCircuit;
     if (cac.statePool) {
       cac.statePool.reset();
       for (const el of this._elements) {
@@ -953,6 +938,7 @@ export class MNAEngine implements AnalogEngine {
     const phaseHook = this.stepPhaseHook;
     const ctx = this._ctx!;
     ctx.postIterationHook = this.postIterationHook;
+    ctx.preFactorHook = this.preFactorHook;
     ctx.detailedConvergence = this.detailedConvergence;
     ctx.limitingCollector = this.limitingCollector;
     ctx.nodesets = cac.nodesets ?? new Map();
@@ -1037,7 +1023,7 @@ export class MNAEngine implements AnalogEngine {
   /** Restore simulation time (used by hot-recompile). */
   set simTime(t: number) {
     this._simTime = t;
-    const cac = this._compiled as CompiledWithBridges | undefined;
+    const cac = this._compiled as ConcreteCompiledAnalogCircuit | undefined;
     if (cac?.timeRef) cac.timeRef.value = t;
   }
 
@@ -1152,9 +1138,10 @@ export class MNAEngine implements AnalogEngine {
       "initTime" in params ||
       "maxTimeStep" in params;
     if (transientInputsChanged) {
-      if (!("maxTimeStep" in params)) baseline.maxTimeStep = undefined;
-      baseline.minTimeStep = undefined;
-      baseline.firstStep = undefined;
+      const partial = baseline as Partial<SimulationParams>;
+      if (!("maxTimeStep" in params)) delete partial.maxTimeStep;
+      delete partial.minTimeStep;
+      delete partial.firstStep;
     }
     this._params = resolveSimulationParams({ ...baseline, ...params });
     // Non-destructive update: preserves currentDt (clamped to new maxTimeStep),
@@ -1208,7 +1195,7 @@ export class MNAEngine implements AnalogEngine {
 
   /** Expose the shared state pool for device-state snapshots. Null before init(). */
   get statePool(): StatePool | null {
-    return (this._compiled as CompiledWithBridges | undefined)?.statePool ?? null;
+    return (this._compiled as ConcreteCompiledAnalogCircuit | undefined)?.statePool ?? null;
   }
 
   /** Expose the compiled element array. Empty before init(). */
@@ -1237,6 +1224,13 @@ export class MNAEngine implements AnalogEngine {
     convergenceFailedElements: string[],
     ctx: CKTCircuitContext,
   ) => void) | null = null;
+
+  /**
+   * Optional pre-factor hook (mirrors ngspice niiter.c:704 ni_instrument_cb).
+   * Fires between cktLoad and solver.preorder()/factor(). Propagated to
+   * ctx.preFactorHook before each newtonRaphson() call alongside postIterationHook.
+   */
+  preFactorHook: ((ctx: CKTCircuitContext) => void) | null = null;
 
   /** When true, NR collects all failing element indices instead of short-circuiting. */
   detailedConvergence = false;
@@ -1292,7 +1286,7 @@ export class MNAEngine implements AnalogEngine {
   private _seedFromDcop(
     result: DcOpResult,
     _elements: readonly AnalogElement[],
-    cac: CompiledWithBridges,
+    cac: ConcreteCompiledAnalogCircuit,
   ): void {
     const ctx = this._ctx!;
     ctx.rhs.set(result.nodeVoltages);

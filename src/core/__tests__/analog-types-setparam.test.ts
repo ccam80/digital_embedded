@@ -6,6 +6,7 @@ describe("AnalogElementCore.setParam", () => {
     // @ts-expect-error - missing setParam should be a type error
     const _bad: AnalogElementCore = {
       branchIndex: -1,
+      ngspiceLoadOrder: 0,
       isNonlinear: false,
       isReactive: false,
       stampAc() {},
@@ -19,9 +20,10 @@ describe("AnalogElementCore.setParam", () => {
   it("accepts a conforming object with setParam", () => {
     const good: AnalogElementCore = {
       branchIndex: -1,
+      ngspiceLoadOrder: 0,
       isNonlinear: false,
       isReactive: false,
-      stampAc() {},
+      load(_ctx: unknown) {},
       getPinCurrents() { return []; },
       setParam(_key: string, _value: number) {},
     };

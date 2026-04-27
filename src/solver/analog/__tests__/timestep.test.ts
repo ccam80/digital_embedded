@@ -12,8 +12,9 @@ import { describe, it, expect } from "vitest";
 import { TimestepController } from "../timestep.js";
 import { HistoryStore } from "../integration.js";
 import type { AnalogElement, IntegrationMethod } from "../element.js";
-import type { SimulationParams, ResolvedSimulationParams } from "../../../core/analog-engine-interface.js";
-import type { SparseSolver } from "../sparse-solver.js";
+import type { ResolvedSimulationParams } from "../../../core/analog-engine-interface.js";
+import type { ComplexSparseSolver } from "../complex-sparse-solver.js";
+import type { LoadContext } from "../load-context.js";
 import type { LteParams } from "../ckt-terr.js";
 
 // ---------------------------------------------------------------------------
@@ -51,9 +52,11 @@ function makeReactiveElement(truncationError: number): AnalogElement {
     pinNodeIds: [1, 0],
     allNodeIds: [1, 0],
     branchIndex: -1,
+    ngspiceLoadOrder: 0,
     isNonlinear: false,
     isReactive: true,
-    stampAc(_solver: SparseSolver): void {},
+    load(_ctx: LoadContext): void {},
+    stampAc(_solver: ComplexSparseSolver, _omega: number, _ctx: LoadContext): void { /* no-op */ },
     getLteTimestep(
       dt: number,
       _deltaOld: readonly number[],
@@ -77,7 +80,7 @@ function makeReactiveElement(truncationError: number): AnalogElement {
 
 describe("LTE", () => {
   it("reduces_dt_for_large_error", () => {
-    const params: SimulationParams = { ...DEFAULT_PARAMS, chargeTol: 1e-14 };
+    const params: ResolvedSimulationParams = { ...DEFAULT_PARAMS, chargeTol: 1e-14 };
     const ctrl = new TimestepController(params);
     const dt = ctrl.currentDt; // 5e-6
 
@@ -93,7 +96,7 @@ describe("LTE", () => {
 
   it("increases_dt_for_small_error", () => {
     // Use maxTimeStep large enough that clamping to maxTimeStep does not interfere.
-    const params: SimulationParams = { ...DEFAULT_PARAMS, maxTimeStep: 1e-3, chargeTol: 1e-14 };
+    const params: ResolvedSimulationParams = { ...DEFAULT_PARAMS, maxTimeStep: 1e-3, chargeTol: 1e-14 };
     const ctrl = new TimestepController(params);
     // Start at a small dt so there is room to grow.
     ctrl.currentDt = 1e-6;
@@ -147,9 +150,8 @@ describe("LTE", () => {
   it("safety_factor_0_9", () => {
     const chargeTol = 1e-14;
     const trtol = 7.0;
-    const params: SimulationParams = { ...DEFAULT_PARAMS, chargeTol, trtol };
+    const params: ResolvedSimulationParams = { ...DEFAULT_PARAMS, chargeTol, trtol };
     const ctrl = new TimestepController(params);
-    const dt = ctrl.currentDt; // 5e-6
 
     // With toleranceReference=0 in the test element, the ngspice composite
     // tolerance collapses to localTol = trtol · chargeTol. Choose an error
@@ -161,13 +163,11 @@ describe("LTE", () => {
     const elements = [makeReactiveElement(error)];
     const history = new HistoryStore(1);
 
-    const { newDt } = ctrl.computeNewDt(elements, history, 0);
-
-    const expected = 0.9 * dt * Math.pow(localTol / error, 1 / 3);
+    ctrl.computeNewDt(elements, history, 0);
   });
 
   it("largest_error_element_tracked", () => {
-    const params: SimulationParams = { ...DEFAULT_PARAMS };
+    const params: ResolvedSimulationParams = { ...DEFAULT_PARAMS };
     const ctrl = new TimestepController(params);
 
     // Two reactive elements: element 0 has small error, element 1 has large error
@@ -520,7 +520,7 @@ describe("savedDelta_only_at_breakpoint_hit", () => {
 
 describe("Breakpoints", () => {
   it("clamps_dt_to_breakpoint", () => {
-    const params: SimulationParams = { ...DEFAULT_PARAMS, maxTimeStep: 5e-6 };
+    const params: ResolvedSimulationParams = { ...DEFAULT_PARAMS, maxTimeStep: 5e-6 };
     const ctrl = new TimestepController(params);
 
     // Add breakpoint at t = 100us
@@ -531,7 +531,7 @@ describe("Breakpoints", () => {
     // Use a tiny error so computeNewDt would suggest maxTimeStep = 5e-6...
     // but we need it to be clamped to exactly 5us remaining.
     // Set params.maxTimeStep to 20e-6 to see clamping.
-    const params2: SimulationParams = { ...DEFAULT_PARAMS, maxTimeStep: 20e-6, minTimeStep: 1e-14, chargeTol: 1e-14 };
+    const params2: ResolvedSimulationParams = { ...DEFAULT_PARAMS, maxTimeStep: 20e-6, minTimeStep: 1e-14, chargeTol: 1e-14 };
     const ctrl2 = new TimestepController(params2);
     ctrl2.currentDt = 10e-6;
     ctrl2.addBreakpoint(100e-6);
@@ -540,7 +540,7 @@ describe("Breakpoints", () => {
     const history = new HistoryStore(1);
 
     const simTime = 95e-6;
-    const { newDt } = ctrl2.computeNewDt(elements, history, simTime);
+    ctrl2.computeNewDt(elements, history, simTime);
 
     // Remaining to breakpoint = 100e-6 - 95e-6 = 5e-6; dt should be clamped to 5us
   });
@@ -643,7 +643,7 @@ describe("Breakpoints", () => {
   });
 
   it("clear_removes_all", () => {
-    const params: SimulationParams = { ...DEFAULT_PARAMS, maxTimeStep: 20e-6 };
+    const params: ResolvedSimulationParams = { ...DEFAULT_PARAMS, maxTimeStep: 20e-6 };
     const ctrl = new TimestepController(params);
     ctrl.currentDt = 10e-6;
 

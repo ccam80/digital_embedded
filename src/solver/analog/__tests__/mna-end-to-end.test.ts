@@ -200,9 +200,6 @@ describe("End-to-end: full pipeline", () => {
     expect(result.nodeVoltages.length).toBe(compiled.matrixSize);
 
     // We don't know exact node assignment order, so check all node voltages
-    const voltages = Array.from(result.nodeVoltages).slice(0, compiled.nodeCount);
-    const sorted = [...voltages].sort((a, b) => a - b);
-
     // Midpoint = 2.5V, top = 5.0V
   });
 
@@ -351,7 +348,6 @@ describe("End-to-end: tight transient tolerances", () => {
     // node1=5V, node2=0V (inductor short to ground)
 
     // Inductor current = 50mA
-    const iL = engine.getBranchCurrent(1);
 
     // Run transient for 1ms (10× τ) — should stay at steady state
     engine.configure({ maxTimeStep: 5e-6 });
@@ -506,10 +502,7 @@ describe("End-to-end: analytical verification", () => {
 
     expect(result.converged).toBe(true);
 
-    const expected = 5.0 * 1000 / 3000;
-
     // Current = 5V / 3kΩ
-    const expectedI = 5.0 / 3000;
   });
 
   it("diode_shockley_equation_consistency", () => {

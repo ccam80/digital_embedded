@@ -1,0 +1,26 @@
+
+[1m[7m[36m RUN [39m[27m[22m [36mv2.1.9 [39m[90mC:/local_working_projects/digital_in_browser[39m
+
+ [31m❯[39m src/components/semiconductors/__tests__/bjt.test.ts [2m([22m[2m116 tests[22m[2m | [22m[31m1 failed[39m[2m)[22m[90m 53[2mms[22m[39m
+[31m   [31m×[31m BJT L1 BC_cap_stamps[2m > [22mtarget_colPrime[90m 7[2mms[22m[31m[39m
+[31m     → expected 0 to be greater than 0[39m
+
+[31m⎯⎯⎯⎯⎯⎯⎯[1m[7m Failed Tests 1 [27m[22m⎯⎯⎯⎯⎯⎯⎯[39m
+
+[31m[1m[7m FAIL [27m[22m[39m src/components/semiconductors/__tests__/bjt.test.ts[2m > [22mBJT L1 BC_cap_stamps[2m > [22mtarget_colPrime
+[31m[1mAssertionError[22m: expected 0 to be greater than 0[39m
+[36m [2m❯[22m src/components/semiconductors/__tests__/bjt.test.ts:[2m1972:31[22m[39m
+    [90m1970| [39m           (s.row === nodeC_int && s.col === nodeB_ext),
+    [90m1971| [39m    );
+    [90m1972| [39m    expect(toColPrime.length).toBeGreaterThan(0);
+    [90m   | [39m                              [31m^[39m
+    [90m1973| [39m  });
+    [90m1974| [39m});
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯[22m[39m
+
+[2m Test Files [22m [1m[31m1 failed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[31m1 failed[39m[22m[2m | [22m[1m[32m115 passed[39m[22m[90m (116)[39m
+[2m   Start at [22m 10:49:39
+[2m   Duration [22m 666ms[2m (transform 292ms, setup 0ms, collect 383ms, tests 53ms, environment 0ms, prepare 74ms)[22m
+

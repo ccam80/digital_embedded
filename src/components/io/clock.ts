@@ -22,7 +22,7 @@ import {
   type ComponentLayout,
 } from "../../core/registry.js";
 import type { AnalogElementCore, LoadContext } from "../../solver/analog/element.js";
-import type { SparseSolver } from "../../solver/analog/sparse-solver.js";
+import { NGSPICE_LOAD_ORDER } from "../../solver/analog/element.js";
 import { stampRHS } from "../../solver/analog/stamp-helpers.js";
 
 // ---------------------------------------------------------------------------
@@ -254,11 +254,12 @@ export function makeAnalogClockElement(
   frequency: number,
   vdd: number,
   getTime: () => number,
-): AnalogClockElement & { stampAtTime(solver: SparseSolver, t: number): void } {
+): AnalogClockElement & { stampAtTime(rhs: Float64Array, t: number): void } {
   const halfPeriod = 1 / (2 * frequency);
 
-  const element: AnalogClockElement & { stampAtTime(solver: SparseSolver, t: number): void } = {
+  const element: AnalogClockElement & { stampAtTime(rhs: Float64Array, t: number): void } = {
     branchIndex: branchIdx,
+    ngspiceLoadOrder: NGSPICE_LOAD_ORDER.VSRC,
     isNonlinear: false,
     isReactive: false,
 
@@ -285,11 +286,11 @@ export function makeAnalogClockElement(
     // stampAtTime retained for callers that drive the engine's time loop
     // directly (ClockManager / waveform playback paths); stamps only the RHS
     // value so incidence must be set via load().
-    stampAtTime(solver: SparseSolver, t: number): void {
+    stampAtTime(rhs: Float64Array, t: number): void {
       const k = branchIdx;
       const halfPeriods = Math.floor(t / halfPeriod);
       const v = halfPeriods % 2 === 0 ? vdd : 0;
-      stampRHS(ctx.rhs,k, v);
+      stampRHS(rhs, k, v);
     },
 
     nextBreakpoint(afterTime: number): number | null {

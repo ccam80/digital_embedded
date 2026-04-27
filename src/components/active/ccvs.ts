@@ -61,6 +61,7 @@ import type { SparseSolver } from "../../solver/analog/sparse-solver.js";
 import { parseExpression } from "../../solver/analog/expression.js";
 import { differentiate, simplify } from "../../solver/analog/expression-differentiate.js";
 import { ControlledSourceElement } from "../../solver/analog/controlled-source-base.js";
+import { NGSPICE_LOAD_ORDER } from "../../solver/analog/element.js";
 import { defineModelParams } from "../../core/model-params.js";
 
 // ---------------------------------------------------------------------------
@@ -136,6 +137,7 @@ function buildCCVSPinDeclarations(): PinDeclaration[] {
  */
 class CCVSAnalogElement extends ControlledSourceElement {
   readonly branchIndex: number; // sense branch (used by AnalogElement interface)
+  readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.CCVS;
 
   private readonly _nSenseP: number;
   private readonly _nSenseN: number;

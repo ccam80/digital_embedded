@@ -30,6 +30,47 @@
 export type IntegrationMethod = "trapezoidal" | "gear";
 
 // ---------------------------------------------------------------------------
+// NGSPICE_LOAD_ORDER — device-type ordinals for cktLoad order parity (A1)
+// ---------------------------------------------------------------------------
+
+/**
+ * Per-type cktLoad ordinals matching `ref/ngspice/src/spicelib/devices/dev.c`
+ * `DEVices[]` registration order. Lower ordinal = loaded first.
+ *
+ * Each `make*` analog factory must set its returned `AnalogElementCore.ngspiceLoadOrder`
+ * to one of these constants. The compiler sorts `analogElements` by this field
+ * before handing it to the engine so that the per-iteration `cktLoad` walks
+ * devices in the same per-type bucket order ngspice does (every R, every C,
+ * ..., every V, ...). This is a structural prerequisite for our internal
+ * sparse-matrix indices to match ngspice bit-exact, since ngspice's `Translate`
+ * (spbuild.c:436-504) lazily assigns internal indices on first sight of each
+ * external row/col during the first NR iteration's load loop.
+ *
+ * Extend this enum when a new device type is added under parity testing —
+ * the existing entries reflect the subset of ngspice device types we have
+ * fixtures for plus a few neighbours.
+ */
+export const NGSPICE_LOAD_ORDER = {
+  RES:  0,   // Resistor
+  CAP:  1,   // Capacitor
+  IND:  2,   // Inductor
+  MUT:  3,   // Mutual inductance / transformer
+  VSRC: 4,   // Independent voltage source
+  ISRC: 5,   // Independent current source
+  VCVS: 6,   // Voltage-controlled voltage source
+  VCCS: 7,   // Voltage-controlled current source
+  CCCS: 8,   // Current-controlled current source
+  CCVS: 9,   // Current-controlled voltage source
+  URC:  10,  // Uniform RC line
+  TRA:  11,  // Lossless transmission line
+  DIO:  12,  // Diode
+  BJT:  13,  // Bipolar junction transistor
+  JFET: 14,  // Junction FET
+  MOS:  15,  // MOSFET (any level)
+  SW:   16,  // Switch
+} as const;
+
+// ---------------------------------------------------------------------------
 // Minimal SparseSolver interface — structural duck-type for stamp methods
 // ---------------------------------------------------------------------------
 
@@ -129,6 +170,26 @@ export interface AnalogElementCore {
   readonly branchIndex: number;
 
   /**
+   * Position in ngspice's CKTload iteration order. Mirrors the device-type
+   * ordinal in `ref/ngspice/src/spicelib/devices/dev.c` `DEVices[]`.
+   * Lower-ordinal elements load first.
+   *
+   * Architectural alignment item A1: ngspice's `Translate` (spbuild.c:436-504,
+   * our port at sparse-solver.ts:399-423) lazily assigns internal sparse-matrix
+   * indices on first sight of each external row/col during the first NR
+   * iteration's `cktLoad`. The order in which devices stamp therefore
+   * determines internal numbering — and the only way to match ngspice's
+   * internal layout bit-exact is to load devices in the same per-type bucket
+   * order ngspice uses (every R, then every C, ..., then every V, ...).
+   *
+   * Set this on every `make*` analog factory return value via the
+   * `NGSPICE_LOAD_ORDER` enum in this file. Required, not defaulted —
+   * forgetting it is a type error so new components surface the
+   * "what device is this in ngspice terms?" question at registration.
+   */
+  readonly ngspiceLoadOrder: number;
+
+  /**
    * Primary hot-path method. Called every NR iteration.
    *
    * Reads terminal voltages from ctx.rhsOld, evaluates device equations,
@@ -220,11 +281,34 @@ export interface AnalogElementCore {
   label?: string;
 
   /**
+   * Element index in the compiled circuit's element array.
+   *
+   * Set by the compiler after factory construction via Object.assign.
+   * Used by elements when pushing LimitingEvent records so the harness
+   * can correlate events back to specific circuit elements.
+   */
+  elementIndex?: number;
+
+  /**
    * Return the strictly-next breakpoint strictly greater than afterTime, or
    * null if the source has no more breakpoints. Called once per accepted
    * step on which this source's breakpoint was consumed.
    */
   nextBreakpoint?(afterTime: number): number | null;
+
+  /**
+   * Called once per accepted timestep so the element can schedule its next
+   * waveform edge as a timestep breakpoint. Mirrors ngspice's per-device
+   * DEVaccept dispatch (vsrcacct.c VSRCaccept).
+   *
+   * `atBreakpoint` is the engine's CKTbreak flag: true when the just-accepted
+   * step landed via a breakpoint clamp.
+   */
+  acceptStep?(
+    simTime: number,
+    addBreakpoint: (t: number) => void,
+    atBreakpoint: boolean,
+  ): void;
 
 }
 

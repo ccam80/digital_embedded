@@ -1,0 +1,37 @@
+
+[1m[7m[36m RUN [39m[27m[22m [36mv2.1.9 [39m[90mC:/local_working_projects/digital_in_browser[39m
+
+ [31m❯[39m src/solver/analog/__tests__/analog-engine.test.ts [2m([22m[2m30 tests[22m[2m | [22m[31m1 failed[39m[2m)[22m[90m 35[2mms[22m[39m
+[31m   [31m×[31m buffer_consolidation[2m > [22mno_parallel_voltage_buffer[90m 5[2mms[22m[31m[39m
+[31m     → expected 4 to be 3 // Object.is equality[39m
+ [32m✓[39m src/solver/analog/__tests__/behavioral-flipflop.test.ts [2m([22m[2m11 tests[22m[2m)[22m[90m 5[2mms[22m[39m
+ [32m✓[39m src/solver/analog/__tests__/behavioral-flipflop-variants.test.ts [2m([22m[2m8 tests[22m[2m)[22m[90m 4[2mms[22m[39m
+ [32m✓[39m src/solver/analog/__tests__/element-interface.test.ts [2m([22m[2m3 tests[22m[2m)[22m[90m 2[2mms[22m[39m
+ [32m✓[39m src/solver/analog/__tests__/test-helpers.test.ts [2m([22m[2m4 tests[22m[2m)[22m[90m 2[2mms[22m[39m
+
+[31m⎯⎯⎯⎯⎯⎯⎯[1m[7m Failed Tests 1 [27m[22m⎯⎯⎯⎯⎯⎯⎯[39m
+
+[31m[1m[7m FAIL [27m[22m[39m src/solver/analog/__tests__/analog-engine.test.ts[2m > [22mbuffer_consolidation[2m > [22mno_parallel_voltage_buffer
+[31m[1mAssertionError[22m: expected 4 to be 3 // Object.is equality[39m
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[32m- 3[39m
+[31m+ 4[39m
+
+[36m [2m❯[22m src/solver/analog/__tests__/analog-engine.test.ts:[2m843:28[22m[39m
+    [90m841| [39m    [35mconst[39m ctx [33m=[39m e[33m.[39m_ctx [35mas[39m { rhs[33m:[39m [33mFloat64Array[39m }[33m;[39m
+    [90m842| [39m    [34mexpect[39m(ctx[33m.[39mrhs)[33m.[39m[34mtoBeInstanceOf[39m([33mFloat64Array[39m)[33m;[39m
+    [90m843| [39m    [34mexpect[39m(ctx[33m.[39mrhs[33m.[39mlength)[33m.[39m[34mtoBe[39m(circuit[33m.[39mmatrixSize)[33m;[39m
+    [90m   | [39m                           [31m^[39m
+    [90m844| [39m  })[33m;[39m
+    [90m845| [39m})[33m;[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯[22m[39m
+
+[2m Test Files [22m [1m[31m1 failed[39m[22m[2m | [22m[1m[32m4 passed[39m[22m[90m (5)[39m
+[2m      Tests [22m [1m[31m1 failed[39m[22m[2m | [22m[1m[32m55 passed[39m[22m[90m (56)[39m
+[2m   Start at [22m 09:55:59
+[2m   Duration [22m 1.86s[2m (transform 402ms, setup 0ms, collect 685ms, tests 48ms, environment 1ms, prepare 409ms)[22m
+

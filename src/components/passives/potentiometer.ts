@@ -22,6 +22,7 @@ import {
   type ComponentDefinition,
 } from "../../core/registry.js";
 import type { AnalogElement, AnalogElementCore, LoadContext } from "../../solver/analog/element.js";
+import { NGSPICE_LOAD_ORDER } from "../../solver/analog/element.js";
 import { defineModelParams } from "../../core/model-params.js";
 
 // ---------------------------------------------------------------------------
@@ -168,6 +169,7 @@ class AnalogPotentiometerElement implements AnalogElement {
   readonly pinNodeIds: readonly number[];
   readonly allNodeIds: readonly number[];
   readonly branchIndex: number = -1;
+  readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.RES;
   readonly isNonlinear: boolean = false;
   readonly isReactive: boolean = false;
 

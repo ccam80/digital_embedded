@@ -37,9 +37,9 @@ function getFactory(entry: ModelEntry): AnalogFactory {
 // Mock solver
 // ---------------------------------------------------------------------------
 
-function makeMockSolver() {
+function makeMockSolver(rhsSize = 8) {
   const stamps: [number, number, number][] = [];
-  const rhs: Record<number, number> = {};
+  const rhs = new Float64Array(rhsSize);
 
   const solver = {
     allocElement: vi.fn((row: number, col: number) => {
@@ -49,9 +49,6 @@ function makeMockSolver() {
     stampElement: vi.fn((h: number, v: number) => {
       stamps[h][2] += v;
     }),
-    stampRHS: vi.fn((row: number, value: number) => {
-      rhs[row] = (rhs[row] ?? 0) + value;
-    }),
     _stamps: stamps,
     _rhs: rhs,
   };
@@ -59,11 +56,14 @@ function makeMockSolver() {
   return solver;
 }
 
-function makeMinimalCtx(solver: unknown, _time = 0, srcFact = 1) {
+function makeMinimalCtx(solver: ReturnType<typeof makeMockSolver>, _time = 0, srcFact = 1) {
   return {
-    solver: solver as SparseSolver,
-    voltages: new Float64Array(4),
+    solver: solver as unknown as SparseSolver,
+    matrix: solver as unknown as SparseSolver,
+    rhs: solver._rhs,
+    rhsOld: new Float64Array(solver._rhs.length),
     cktMode: MODEDCOP | MODEINITFLOAT,
+    time: _time,
     dt: 0,
     method: "trapezoidal" as const,
     order: 1,
@@ -72,10 +72,14 @@ function makeMinimalCtx(solver: unknown, _time = 0, srcFact = 1) {
     srcFact,
     noncon: { value: 0 },
     limitingCollector: null,
+    convergenceCollector: null,
     xfact: 1,
     gmin: 1e-12,
     reltol: 1e-3,
     iabstol: 1e-12,
+    temp: 300.15,
+    vt: 0.025852,
+    cktFixLimit: false,
     bypass: false,
     voltTol: 1e-6,
   };
@@ -131,22 +135,18 @@ function makeAcElement(
 describe("computeWaveformValue", () => {
 
   it("sine at quarter period equals amplitude", () => {
-    const t = 0.25e-3; // 0.25ms = quarter period of 1kHz
   });
 
   it("square at three-quarter period is negative amplitude", () => {
-    const t = 0.75e-3; // 0.75ms = 3/4 period, sin = -1
   });
 
   it("triangle at 1/8 period is V1 plus quarter swing (PULSE-aligned rising)", () => {
     // PULSE-aligned triangle: at t=0 the wave sits at V1 = -amplitude and rises
     // linearly to V2 = +amplitude over period/2. At t = period/8 (one quarter of
     // the rise half-period), value = V1 + (V2 - V1) * (1/4) = -5 + 10 * 0.25 = -2.5V.
-    const t = 0.125e-3; // 1/8 period of 1kHz
   });
 
   it("dc offset is additive to sine", () => {
-    const t = 0; // sin(0)=0, so result = dcOffset
   });
 });
 
@@ -176,7 +176,7 @@ describe("AcSource", () => {
     const solver = makeMockSolver();
     el.load(makeMinimalCtx(solver));
     // RHS at branch row 2: V(t=0) = 5 * sin(0) = 0
-    expect(solver.stampRHS).toHaveBeenCalledWith(2, expect.closeTo(0, 8));
+    expect(solver._rhs[2]).toBeCloseTo(0, 8);
   });
 
   it("sine_at_quarter_period", () => {
@@ -184,7 +184,7 @@ describe("AcSource", () => {
     const solver = makeMockSolver();
     el.load(makeMinimalCtx(solver));
     // RHS at branch row 2: V(t=0.25ms) = 5 * sin(π/2) = 5.0
-    expect(solver.stampRHS).toHaveBeenCalledWith(2, expect.closeTo(5.0, 4));
+    expect(solver._rhs[2]).toBeCloseTo(5.0, 4);
   });
 
   it("square_at_half_period", () => {
@@ -193,7 +193,7 @@ describe("AcSource", () => {
     const solver = makeMockSolver();
     el.load(makeMinimalCtx(solver));
     // At t=0.75ms: sin(2π*1000*0.75e-3) = sin(3π/2) = -1 → V = -5
-    expect(solver.stampRHS).toHaveBeenCalledWith(2, expect.closeTo(-5.0, 4));
+    expect(solver._rhs[2]).toBeCloseTo(-5.0, 4);
   });
 
   it("triangle_linearity", () => {
@@ -202,7 +202,7 @@ describe("AcSource", () => {
     el.load(makeMinimalCtx(solver));
     // PULSE-aligned triangle: at t=0 wave is at V1 = -5V rising. At t = period/8
     // (quarter of the rise half-period) value = V1 + (V2-V1)*(1/4) = -2.5V.
-    expect(solver.stampRHS).toHaveBeenCalledWith(2, expect.closeTo(-2.5, 4));
+    expect(solver._rhs[2]).toBeCloseTo(-2.5, 4);
   });
 
   it("dc_offset_applied", () => {
@@ -213,7 +213,7 @@ describe("AcSource", () => {
     const solver = makeMockSolver();
     el.load(makeMinimalCtx(solver));
     // At t=0: sin(0)=0, so RHS = 0*scale + 2 = 2.0
-    expect(solver.stampRHS).toHaveBeenCalledWith(2, expect.closeTo(2.0, 8));
+    expect(solver._rhs[2]).toBeCloseTo(2.0, 8);
   });
 
   it("square_wave_breakpoints", () => {
@@ -259,10 +259,11 @@ describe("Integration", () => {
     let simTime = 0;
     const getTime = () => simTime;
 
+    // 1-based: nodeCount=2, branchCount=1, matrixSize=3. Branch row = nodeCount+1 = 3.
     const acSrc = getFactory(AcVoltageSourceDefinition.modelRegistry!.behavioral!)(
       new Map([["pos", 1], ["neg", 0]]),
       [],
-      2,
+      3,
       props,
       getTime,
     ) as AcVoltageSourceAnalogElement;
@@ -273,7 +274,7 @@ describe("Integration", () => {
     const acElements = [acSrc as unknown as import("../../../solver/analog/element.js").AnalogElement, r, cap];
     const acStatePool = allocateStatePool(acElements);
 
-    const circuit: ConcreteCompiledAnalogCircuit = {
+    const circuit = {
       netCount: 2,
       componentCount: 3,
       nodeCount: 2,
@@ -282,7 +283,7 @@ describe("Integration", () => {
       elements: acElements,
       labelToNodeId: new Map(),
       statePool: acStatePool,
-    };
+    } as unknown as ConcreteCompiledAnalogCircuit;
 
     const engine = new MNAEngine();
     engine.init(circuit);
@@ -353,7 +354,7 @@ describe("ExprWaveform", () => {
     const el = makeExprElement("3 * sin(2 * pi * 500 * t)", 0.001);
     const solver = makeMockSolver();
     el.load(makeMinimalCtx(solver));
-    expect(solver.stampRHS).toHaveBeenCalledWith(2, expect.closeTo(0, 5));
+    expect(solver._rhs[2]).toBeCloseTo(0, 5);
   });
 
   it("ramp", () => {
@@ -361,7 +362,7 @@ describe("ExprWaveform", () => {
     const el = makeExprElement("5 * t", 0.001);
     const solver = makeMockSolver();
     el.load(makeMinimalCtx(solver));
-    expect(solver.stampRHS).toHaveBeenCalledWith(2, expect.closeTo(0.005, 8));
+    expect(solver._rhs[2]).toBeCloseTo(0.005, 8);
   });
 
   it("invalid_expression_emits_diagnostic", () => {
@@ -375,7 +376,7 @@ describe("ExprWaveform", () => {
     // load should not throw and should produce RHS = 0
     const solver = makeMockSolver();
     expect(() => el.load(makeMinimalCtx(solver))).not.toThrow();
-    expect(solver.stampRHS).toHaveBeenCalledWith(2, 0);
+    expect(solver._rhs[2]).toBe(0);
   });
 
   it("expression_parsed_once", () => {
@@ -411,32 +412,12 @@ describe("ac_vsource_load_srcfact_parity", () => {
     const el = makeAcElement({ amplitude: AMPLITUDE, frequency: FREQUENCY, waveform: "sine" }, 1, 0, 2, T);
     const solver = makeMockSolver();
 
-    const ctx = {
-      solver: solver as unknown as SparseSolver,
-      voltages: new Float64Array(3),
-      cktMode: MODEDCOP | MODEINITFLOAT,
-      dt: 0,
-      method: "trapezoidal" as const,
-      order: 1,
-      deltaOld: [0, 0, 0, 0, 0, 0, 0],
-      ag: new Float64Array(7),
-      srcFact: SRC_FACT,
-      noncon: { value: 0 },
-      limitingCollector: null,
-      xfact: 1,
-      gmin: 1e-12,
-      reltol: 1e-3,
-      iabstol: 1e-12,
-      bypass: false,
-      voltTol: 1e-6,
-    };
-
-    el.load(ctx);
+    el.load({ ...makeMinimalCtx(solver), srcFact: SRC_FACT });
 
     // NGSPICE_REF: V(t=0.25ms) * srcFact = amplitude * sin(2π*1000*0.25e-3) * 0.5.
     const NGSPICE_REF =
       (0 + AMPLITUDE * Math.sin(2 * Math.PI * FREQUENCY * T + 0)) * SRC_FACT;
-    expect(solver.stampRHS).toHaveBeenCalledWith(2, NGSPICE_REF);
+    expect(solver._rhs[2]).toBeCloseTo(NGSPICE_REF, 10);
   });
 
   it("square_srcfact_025_scales_rhs_bit_exact_at_negative_half", () => {
@@ -448,34 +429,14 @@ describe("ac_vsource_load_srcfact_parity", () => {
     const el = makeAcElement({ amplitude: AMPLITUDE, frequency: FREQUENCY, waveform: "square" }, 1, 0, 2, T);
     const solver = makeMockSolver();
 
-    const ctx = {
-      solver: solver as unknown as SparseSolver,
-      voltages: new Float64Array(3),
-      cktMode: MODEDCOP | MODEINITFLOAT,
-      dt: 0,
-      method: "trapezoidal" as const,
-      order: 1,
-      deltaOld: [0, 0, 0, 0, 0, 0, 0],
-      ag: new Float64Array(7),
-      srcFact: SRC_FACT,
-      noncon: { value: 0 },
-      limitingCollector: null,
-      xfact: 1,
-      gmin: 1e-12,
-      reltol: 1e-3,
-      iabstol: 1e-12,
-      bypass: false,
-      voltTol: 1e-6,
-    };
-
-    el.load(ctx);
+    el.load({ ...makeMinimalCtx(solver), srcFact: SRC_FACT });
 
     // NGSPICE_REF: square waveform with default riseTime/fallTime = 1ps (AC_VOLTAGE_SOURCE_DEFAULTS).
     // At t=0.75ms (well past halfPeriod + fallTime of 0.5ms+1ps), we are firmly in the
     // "low" half of the wave → value = -amplitude. Result after srcFact = -amplitude * srcFact.
     const NGSPICE_REF =
       computeWaveformValue("square", AMPLITUDE, FREQUENCY, 0, 0, T) * SRC_FACT;
-    expect(solver.stampRHS).toHaveBeenCalledWith(2, NGSPICE_REF);
+    expect(solver._rhs[2]).toBe(NGSPICE_REF);
     expect(NGSPICE_REF).toBe(-AMPLITUDE * SRC_FACT);
   });
 
@@ -483,36 +444,17 @@ describe("ac_vsource_load_srcfact_parity", () => {
     const el = makeAcElement({ amplitude: 5, frequency: 1000, waveform: "sine" }, 1, 2, 3, 0.25e-3);
     const solver = makeMockSolver();
 
-    const ctx = {
-      solver: solver as unknown as SparseSolver,
-      voltages: new Float64Array(4),
-      cktMode: MODEDCOP | MODEINITJCT,
-      dt: 0,
-      method: "trapezoidal" as const,
-      order: 1,
-      deltaOld: [0, 0, 0, 0, 0, 0, 0],
-      ag: new Float64Array(7),
-      srcFact: 0,
-      noncon: { value: 0 },
-      limitingCollector: null,
-      xfact: 1,
-      gmin: 1e-12,
-      reltol: 1e-3,
-      iabstol: 1e-12,
-      bypass: false,
-      voltTol: 1e-6,
-    };
-
-    el.load(ctx);
+    el.load({ ...makeMinimalCtx(solver), cktMode: MODEDCOP | MODEINITJCT, srcFact: 0 });
 
     // NGSPICE_REF at srcFact=0 → RHS entry exactly 0 (independent of waveform value).
-    expect(solver.stampRHS).toHaveBeenCalledWith(3, 0);
+    expect(solver._rhs[3]).toBe(0);
     // Incidence stamps must remain (±1 at four positions).
+    // Nodes are 1-based: nodePos=1, nodeNeg=2, branch=3.
     const stamps = solver._stamps;
-    expect(stamps.some(([r, c, v]) => r === 0 && c === 3 && v ===  1)).toBe(true);
-    expect(stamps.some(([r, c, v]) => r === 1 && c === 3 && v === -1)).toBe(true);
-    expect(stamps.some(([r, c, v]) => r === 3 && c === 0 && v ===  1)).toBe(true);
-    expect(stamps.some(([r, c, v]) => r === 3 && c === 1 && v === -1)).toBe(true);
+    expect(stamps.some(([r, c, v]) => r === 1 && c === 3 && v ===  1)).toBe(true);
+    expect(stamps.some(([r, c, v]) => r === 2 && c === 3 && v === -1)).toBe(true);
+    expect(stamps.some(([r, c, v]) => r === 3 && c === 1 && v ===  1)).toBe(true);
+    expect(stamps.some(([r, c, v]) => r === 3 && c === 2 && v === -1)).toBe(true);
   });
 });
 

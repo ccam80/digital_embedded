@@ -89,6 +89,7 @@ export abstract class ControlledSourceElement implements AnalogElementCore {
   pinNodeIds!: readonly number[];  // set by compiler via Object.assign after factory returns
   allNodeIds!: readonly number[];  // set by compiler via Object.assign after factory returns
   abstract readonly branchIndex: number;
+  abstract readonly ngspiceLoadOrder: number;
   abstract getPinCurrents(voltages: Float64Array): number[];
 
   readonly isNonlinear = true as const;

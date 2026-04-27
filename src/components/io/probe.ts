@@ -25,6 +25,7 @@ import {
   type ComponentLayout,
 } from "../../core/registry.js";
 import type { AnalogElementCore, LoadContext } from "../../solver/analog/element.js";
+import { NGSPICE_LOAD_ORDER } from "../../solver/analog/element.js";
 
 // ---------------------------------------------------------------------------
 // ProbeMode
@@ -216,6 +217,9 @@ const PROBE_PROPERTY_DEFS: PropertyDefinition[] = [
 class AnalogProbeElement implements AnalogElementCore {
   pinNodeIds!: readonly number[];  // set by compiler via Object.assign after factory returns
   readonly branchIndex: number = -1;
+  // Probe is a pure voltage measurement — no MNA contribution. Ordinal is
+  // therefore irrelevant for parity, but every AnalogElementCore must declare one.
+  readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.RES;
   readonly isNonlinear: boolean = false;
   readonly isReactive: boolean = false;
 

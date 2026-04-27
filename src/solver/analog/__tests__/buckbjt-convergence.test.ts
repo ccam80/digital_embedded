@@ -49,8 +49,7 @@ const DLL_PATH = resolve(
   process.cwd(),
   'ref/ngspice/visualc-shared/x64/Release/bin/spice.dll',
 );
-let dllAvailable = false;
-try { accessSync(DLL_PATH); dllAvailable = true; } catch { throw new Error('ngspice DLL required for buckbjt convergence test'); }
+try { accessSync(DLL_PATH); } catch { throw new Error('ngspice DLL required for buckbjt convergence test'); }
 const describeIfDll = describe;
 
 // Phases whose phaseParameter carries diagGmin (ngspice CKTdiagGmin).

@@ -89,8 +89,8 @@ import type { IntegrationMethod } from "../../../../core/analog-types.js";
 
 function _zeroDcopCoefficients(): IntegrationCoefficients {
   return {
-    ours: { ag0: 0, ag1: 0, method: "backwardEuler", order: 1 },
-    ngspice: { ag0: 0, ag1: 0, method: "backwardEuler", order: 1 },
+    ours: { ag0: 0, ag1: 0, method: "trapezoidal", order: 1 },
+    ngspice: { ag0: 0, ag1: 0, method: "trapezoidal", order: 1 },
   };
 }
 
@@ -481,6 +481,7 @@ export class ComparisonSession {
     const sc = this._stepCapture;
     const bundle: PhaseAwareCaptureHook = {
       iterationHook: sc.iterationHook,
+      preFactorHook: sc.preFactorHook,
       phaseHook: {
         onAttemptBegin(phase: string, dt: number, phaseParameter?: number): void {
           sc.beginAttempt(phase as NRPhase, dt, phaseParameter);
@@ -583,6 +584,7 @@ export class ComparisonSession {
     }
 
     this._hasRun = true;
+    this._assertMatrixStructuralParity();
   }
 
   /**
@@ -722,6 +724,7 @@ export class ComparisonSession {
     this._facade.setCaptureHook(null);
 
     this._hasRun = true;
+    this._assertMatrixStructuralParity();
   }
 
   // ---------------------------------------------------------------------------
@@ -1272,7 +1275,7 @@ export class ComparisonSession {
       attempts: { ours: summarize(ours), ngspice: summarize(ng) },
       integrationMethod: {
         ours: ours?.integrationCoefficients.ours.method ?? null,
-        ngspice: ng?.integrationCoefficients.ngspice.method ?? null,
+        ngspice: (ng?.integrationCoefficients.ngspice.method ?? null) as IntegrationMethod | null,
       },
     };
   }
@@ -1487,7 +1490,14 @@ export class ComparisonSession {
       const ourIter = ourIters[ii] ?? null;
       const ngIter  = ngIters[ii] ?? null;
 
-      const ourLinSys = ourIter ? _computeLinearSystemData(ourIter, matrixSize) : null;
+      // Per-side densification — not a graceful fallback. The session-level
+      // structural-parity gate (_assertMatrixStructuralParity, called at the
+      // end of runDcOp/runTransient) hard-fails on any matrixSize divergence,
+      // so by the time this code runs in a non-failing session, both sides
+      // already match. When the gate has fired, the per-side dimensions here
+      // let post-mortem callers (error logs, harness_get_attempt diagnostics)
+      // see what each engine actually built — not a forced common slice.
+      const ourLinSys = ourIter ? _computeLinearSystemData(ourIter, ourIter.matrixSize) : null;
       const ourData: IterationSideData | null = ourIter ? {
         rawIteration: ourIter.iteration,
         globalConverged: ourIter.globalConverged,
@@ -1511,7 +1521,7 @@ export class ComparisonSession {
         order: ourIter.order,
       } : null;
 
-      const ngLinSys = ngIter ? _computeLinearSystemData(ngIter, matrixSize) : null;
+      const ngLinSys = ngIter ? _computeLinearSystemData(ngIter, ngIter.matrixSize) : null;
       const ngData: IterationSideData | null = ngIter ? {
         rawIteration: ngIter.iteration,
         globalConverged: ngIter.globalConverged,
@@ -2110,9 +2120,9 @@ export class ComparisonSession {
     // Integration method
     const ourSteps = this._ourSession!.steps;
     const methods = new Set(ourSteps.map(s => s.integrationCoefficients.ours.method));
-    const integrationMethod = methods.size === 1
+    const integrationMethod: IntegrationMethod | null = methods.size === 1
       ? [...methods][0]
-      : (methods.size > 1 ? [...methods].join(",") : null);
+      : null;
 
     // State history issues (state1/state2 mismatches)
     let state1Mismatches = 0;
@@ -2319,9 +2329,9 @@ export class ComparisonSession {
     if (!step && !ngStep) throw new Error(`Step out of range: ${stepIndex}`);
 
     const ours = step?.integrationCoefficients.ours
-      ?? { ag0: 0, ag1: 0, method: "backwardEuler" as const, order: 1 };
+      ?? { ag0: 0, ag1: 0, method: "trapezoidal" as const, order: 1 };
     const ngspice = ngStep?.integrationCoefficients.ngspice
-      ?? { ag0: 0, ag1: 0, method: "backwardEuler", order: 1 };
+      ?? { ag0: 0, ag1: 0, method: "trapezoidal", order: 1 };
 
     return {
       stepIndex,
@@ -2530,6 +2540,225 @@ export class ComparisonSession {
     }
   }
 
+  /**
+   * Hard structural-parity gate fired at the end of runDcOp / runTransient.
+   *
+   * Walks every captured iteration on both sides and asserts
+   * `ours.matrixSize === ngspice.matrixSize`. Any divergence is an A1-class
+   * MNA-layout error: the engines have different equation counts and any
+   * subsequent value comparison would require silently dropping or padding
+   * one side's data — see comparison-session.ts:_computeLinearSystemData
+   * which now densifies per-side rather than papering over with our size.
+   *
+   * Throws on the first mismatch found, with a structural error message
+   * naming the divergence (sizes, step/iter/attempt locator, and which
+   * column indices the larger side has that the smaller lacks). The fix
+   * direction is always "modify our engine to match ngspice's MNA layout"
+   * — this is not a tolerance or display setting.
+   *
+   * Skipped when `selfCompare` is set (both sides come from the same
+   * engine, so sizes are identical by construction) or when ngspice has
+   * no captured steps (e.g. ngspice failed during init/load — there's
+   * nothing to compare and the existing `errors[]` already records that).
+   */
+  private _assertMatrixStructuralParity(): void {
+    if (this._opts.selfCompare) return;
+    const ours = this._ourSession;
+    const ng = this._ngSession;
+    if (!ours || !ng) return;
+    if (ours.steps.length === 0 || ng.steps.length === 0) return;
+
+    type IterCoord = { stepIndex: number; attemptIndex: number; iterIndex: number; size: number };
+    const collect = (sess: CaptureSession): IterCoord[] => {
+      const out: IterCoord[] = [];
+      for (let si = 0; si < sess.steps.length; si++) {
+        const step = sess.steps[si]!;
+        for (let ai = 0; ai < step.attempts.length; ai++) {
+          const att = step.attempts[ai]!;
+          for (let ii = 0; ii < att.iterations.length; ii++) {
+            out.push({
+              stepIndex: si, attemptIndex: ai, iterIndex: ii,
+              size: att.iterations[ii]!.matrixSize,
+            });
+          }
+        }
+      }
+      return out;
+    };
+
+    const ourIters = collect(ours);
+    const ngIters = collect(ng);
+
+    // Constant-size invariant within each side: ngspice's matrixSize is
+    // CKTmaxEqNum + 1 set at setup time; ours is voltages.length set when
+    // ckt-context allocates its rhs buffers. Either side drifting mid-run
+    // is itself an architectural bug.
+    const checkConstant = (iters: IterCoord[], side: "ours" | "ngspice"): void => {
+      if (iters.length === 0) return;
+      const first = iters[0]!.size;
+      for (const it of iters) {
+        if (it.size !== first) {
+          throw new Error(
+            `Matrix structural divergence (${side}, intra-side drift): ` +
+            `matrixSize changed from ${first} (step=0 iter=0) to ${it.size} ` +
+            `(step=${it.stepIndex} attempt=${it.attemptIndex} iter=${it.iterIndex}). ` +
+            `${side === "ours" ? "Our" : "ngspice"} engine equation count must be ` +
+            `constant for the lifetime of a session — investigate whether a ` +
+            `device added or removed an equation mid-run, which is itself an ` +
+            `A1-class MNA-layout bug.`
+          );
+        }
+      }
+    };
+    checkConstant(ourIters, "ours");
+    checkConstant(ngIters, "ngspice");
+
+    const ourSize = ourIters[0]?.size ?? 0;
+    const ngSize = ngIters[0]?.size ?? 0;
+
+    if (ourSize === ngSize) {
+      // Dimensions match. Cross-check matrix-entry positions on the first
+      // iteration to catch internal-index divergence (A1's row/col-ordering
+      // sub-issue). After the cktLoad-order sort, our engine's lazy
+      // sparse-solver Translate (sparse-solver.ts:399) should assign internal
+      // indices in the same order ngspice does, so every (row, col) pair
+      // present on one side must be present on the other with the same value.
+      this._assertFirstIterationMatrixEntriesMatch(ours, ng);
+      return;
+    }
+
+    // Cross-side divergence — collect detail for the first iteration where
+    // both sides exist, so the error message can point at concrete CSC
+    // entries the smaller side is missing.
+    const firstShared = (() => {
+      const ourMap = new Map<string, IterCoord>();
+      for (const it of ourIters) ourMap.set(`${it.stepIndex}/${it.attemptIndex}/${it.iterIndex}`, it);
+      for (const it of ngIters) {
+        const k = `${it.stepIndex}/${it.attemptIndex}/${it.iterIndex}`;
+        if (ourMap.has(k)) return { ours: ourMap.get(k)!, ng: it };
+      }
+      return null;
+    })();
+
+    let detail = "";
+    if (firstShared) {
+      const { stepIndex, attemptIndex, iterIndex } = firstShared.ng;
+      const ourIt = ours.steps[stepIndex]!.attempts[attemptIndex]!.iterations[iterIndex]!;
+      const ngIt = ng.steps[stepIndex]!.attempts[attemptIndex]!.iterations[iterIndex]!;
+      const minSize = Math.min(ourSize, ngSize);
+      const ourBeyond = ourIt.matrix.filter(e => e.row >= minSize || e.col >= minSize);
+      const ngBeyond = ngIt.matrix.filter(e => e.row >= minSize || e.col >= minSize);
+      const fmt = (e: { row: number; col: number; value: number }) =>
+        `(row=${e.row}, col=${e.col}, val=${e.value})`;
+      detail =
+        `\nFirst paired iteration (step=${stepIndex} attempt=${attemptIndex} iter=${iterIndex}):` +
+        (ourBeyond.length > 0 ? `\n  ours has ${ourBeyond.length} entries beyond shared range [0..${minSize - 1}]: ` +
+          ourBeyond.slice(0, 8).map(fmt).join(", ") + (ourBeyond.length > 8 ? ", ..." : "") : "") +
+        (ngBeyond.length > 0 ? `\n  ngspice has ${ngBeyond.length} entries beyond shared range [0..${minSize - 1}]: ` +
+          ngBeyond.slice(0, 8).map(fmt).join(", ") + (ngBeyond.length > 8 ? ", ..." : "") : "");
+    }
+
+    const lacking = ourSize < ngSize ? "ours" : "ngspice";
+    throw new Error(
+      `Matrix structural divergence (A1): equation counts differ between engines.\n` +
+      `  ours.matrixSize = ${ourSize}\n` +
+      `  ngspice.matrixSize = ${ngSize}\n` +
+      `  delta = ${Math.abs(ourSize - ngSize)} equation(s) — ${lacking} side is short.\n` +
+      `This is an MNA-layout architectural error. Per project rules ngspice is the ` +
+      `golden reference; the fix direction is to modify our engine's equation ` +
+      `allocation (likely CKTmkVolt/CKTmkCur equivalents in our setup path) so the ` +
+      `equation count matches. Do NOT attempt to densify, pad, or otherwise reconcile ` +
+      `at the harness level.${detail}`
+    );
+  }
+
+  /**
+   * Compare the (row, col, value) multiset of the first-iteration MNA matrix
+   * on both sides. Throws on any divergence — extra entries on either side,
+   * missing entries, or value mismatches at the same position.
+   *
+   * Matrix entries reflect each engine's INTERNAL sparse-matrix indices
+   * (assigned by ngspice's `Translate` / our `_translate` on first sight of
+   * each external row/col during the first NR iteration's load loop). For
+   * the indices to line up, both engines must call `cktLoad` in the same
+   * per-device-type order — that's the A1 sort applied in compileAnalogPartition.
+   *
+   * Skipped when self-compare is set or either side has no captured iteration.
+   */
+  private _assertFirstIterationMatrixEntriesMatch(
+    ours: CaptureSession,
+    ng: CaptureSession,
+  ): void {
+    const ourIt = ours.steps[0]?.attempts[0]?.iterations[0];
+    const ngIt = ng.steps[0]?.attempts[0]?.iterations[0];
+    if (!ourIt || !ngIt) return;
+
+    type Entry = { row: number; col: number; value: number };
+    const key = (e: Entry) => `${e.row},${e.col}`;
+    const ourMap = new Map<string, Entry>();
+    const ngMap = new Map<string, Entry>();
+    for (const e of ourIt.matrix) ourMap.set(key(e), e);
+    for (const e of ngIt.matrix) ngMap.set(key(e), e);
+
+    const oursOnly: Entry[] = [];
+    const ngOnly: Entry[] = [];
+    const valueMismatches: Array<{ pos: string; ours: number; ng: number }> = [];
+
+    for (const [k, e] of ourMap) {
+      const n = ngMap.get(k);
+      if (n === undefined) {
+        oursOnly.push(e);
+      } else if (e.value !== n.value) {
+        valueMismatches.push({ pos: k, ours: e.value, ng: n.value });
+      }
+    }
+    for (const [k, e] of ngMap) {
+      if (!ourMap.has(k)) ngOnly.push(e);
+    }
+
+    if (oursOnly.length === 0 && ngOnly.length === 0 && valueMismatches.length === 0) {
+      return;
+    }
+
+    const fmt = (e: Entry) => `(row=${e.row}, col=${e.col}, val=${e.value})`;
+    const lines: string[] = [
+      "Matrix-entry structural divergence at step=0 attempt=0 iter=0:",
+      `  ours has ${ourMap.size} entries; ngspice has ${ngMap.size} entries.`,
+    ];
+    if (oursOnly.length > 0) {
+      lines.push(
+        `  ${oursOnly.length} entries present in ours but missing in ngspice: ` +
+          oursOnly.slice(0, 8).map(fmt).join(", ") +
+          (oursOnly.length > 8 ? ", ..." : ""),
+      );
+    }
+    if (ngOnly.length > 0) {
+      lines.push(
+        `  ${ngOnly.length} entries present in ngspice but missing in ours: ` +
+          ngOnly.slice(0, 8).map(fmt).join(", ") +
+          (ngOnly.length > 8 ? ", ..." : ""),
+      );
+    }
+    if (valueMismatches.length > 0) {
+      lines.push(
+        `  ${valueMismatches.length} entries with same (row,col) but different values: ` +
+          valueMismatches
+            .slice(0, 8)
+            .map((m) => `${m.pos} ours=${m.ours} ngspice=${m.ng}`)
+            .join(", ") +
+          (valueMismatches.length > 8 ? ", ..." : ""),
+      );
+    }
+    lines.push(
+      "This is an MNA-layout architectural error. Equation counts match but the " +
+        "internal sparse-matrix indices diverge — most likely cause is per-device-type " +
+        "load order being out of sync with ngspice's DEVices[] iteration order " +
+        "(see compileAnalogPartition's ngspiceLoadOrder sort, and " +
+        "core/analog-types.ts NGSPICE_LOAD_ORDER). Do NOT reconcile at the harness level.",
+    );
+    throw new Error(lines.join("\n"));
+  }
+
   private _stepPresence(stepIndex: number): SidePresence {
     const ours = this._ourSession?.steps[stepIndex];
     const ng   = this._ngSessionAligned()?.steps[stepIndex];
@@ -2555,8 +2784,15 @@ export class ComparisonSession {
 
   private _reindexNgSession(): void {
     if (this._ngSession && this._nodeMap.length > 0) {
+      // ourSize = matrixSize + 1 to match the snapshot dimension. Snapshots
+      // store ctx.rhs/rhsOld via voltages.slice(); those buffers are sized
+      // matrixSize+1 (ckt-context.ts:543-548) with slot 0 = ground sentinel,
+      // matching the 1-based slot indexing used by node mappings and
+      // el.branchIndex (compiler.ts:1189-1193). Using matrixSize alone leaves
+      // the highest-numbered branch slot OOB and silently dropped, producing
+      // NaN in the reindexed array.
       this._ngSessionReindexed = reindexNgspiceSession(
-        this._ngSession, this._nodeMap, this._ourTopology.matrixSize);
+        this._ngSession, this._nodeMap, this._ourTopology.matrixSize + 1);
     } else {
       this._ngSessionReindexed = this._ngSession;
     }
@@ -2680,10 +2916,10 @@ export class ComparisonSession {
     if (!this._engine) return _zeroDcopCoefficients();
     const order = this._engine.integrationOrder;
     const rawMethod: IntegrationMethod = this._engine.integrationMethod;
-    const method: "backwardEuler" | "trapezoidal" | "gear2" =
+    const method: IntegrationMethod =
       rawMethod === "trapezoidal" ? "trapezoidal"
-      : rawMethod === "gear" ? "gear2"
-      : "backwardEuler";
+      : rawMethod === "gear" ? "gear"
+      : "trapezoidal";
     // After a step completes: deltaOld[0] = dt used in this step (set by setDeltaOldCurrent),
     // deltaOld[1] = dt of the previous step (h1), deltaOld[2] = h_{n-2}.
     const deltaOld = this._engine.timestepDeltaOld;
@@ -2695,7 +2931,7 @@ export class ComparisonSession {
     const ag1 = agBuf[1];
     return {
       ours: { ag0, ag1, method, order },
-      ngspice: { ag0: 0, ag1: 0, method: "backwardEuler", order: 1 },
+      ngspice: { ag0: 0, ag1: 0, method: "trapezoidal", order: 1 },
     };
   }
 

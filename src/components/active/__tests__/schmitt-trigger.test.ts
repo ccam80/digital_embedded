@@ -26,7 +26,7 @@ import type { AnalogElement } from "../../../solver/analog/element.js";
 import type { SparseSolver as SparseSolverType } from "../../../solver/analog/sparse-solver.js";
 import type { LoadContext } from "../../../solver/analog/load-context.js";
 import { MODEDCOP, MODEINITFLOAT } from "../../../solver/analog/ckt-mode.js";
-import { makeLoadCtx } from "../../../solver/analog/__tests__/test-helpers.js";
+import { makeLoadCtx, initElement } from "../../../solver/analog/__tests__/test-helpers.js";
 
 // ---------------------------------------------------------------------------
 // Helper: narrow ModelEntry to inline factory (throws if netlist kind)
@@ -43,16 +43,16 @@ function getFactory(entry: ModelEntry): AnalogFactory {
 // ---------------------------------------------------------------------------
 
 /**
- * Recording solver that implements the public allocElement / stampElement /
- * stampRHS surface that AnalogElement.load() calls. Accumulates RHS entries
- * per row so tests can read the total Norton-equivalent stamp.
+ * Recording solver that implements the public allocElement / stampElement
+ * surface that AnalogElement.load() calls. RHS writes go to a caller-owned
+ * Float64Array via ctx.rhs — the solver mock has no stampRHS method.
  */
 interface RecordingSolverResult {
   solver: SparseSolverType;
-  rhs: Map<number, number>;
+  rhs: Float64Array;
 }
-function makeRecordingSolver(): RecordingSolverResult {
-  const rhs = new Map<number, number>();
+function makeRecordingSolver(size: number): RecordingSolverResult {
+  const rhs = new Float64Array(size);
   const handles: { row: number; col: number }[] = [];
   const handleIndex = new Map<string, number>();
   const solver = {
@@ -67,17 +67,15 @@ function makeRecordingSolver(): RecordingSolverResult {
       return h;
     },
     stampElement: (_handle: number, _value: number): void => {},
-    stampRHS: (row: number, value: number): void => {
-      rhs.set(row, (rhs.get(row) ?? 0) + value);
-    },
   } as unknown as SparseSolverType;
   return { solver, rhs };
 }
 
-function makeSchmittLoadCtx(voltages: Float64Array, solver: SparseSolverType): LoadContext {
+function makeSchmittLoadCtx(voltages: Float64Array, solver: SparseSolverType, rhs: Float64Array): LoadContext {
   return makeLoadCtx({
     solver,
-    voltages,
+    rhs,
+    rhsOld: voltages,
     cktMode: MODEDCOP | MODEINITFLOAT,
     dt: 0,
   });
@@ -112,13 +110,15 @@ function makeSchmittInverting(
   nOut: number,
   overrides: Record<string, number | string> = {},
 ): AnalogElement {
-  return getFactory(SchmittInvertingDefinition.modelRegistry!["behavioral"]!)(
+  const el = getFactory(SchmittInvertingDefinition.modelRegistry!["behavioral"]!)(
     new Map([["in", nIn], ["out", nOut]]),
     [],
     -1,
     makeProps(overrides),
     () => 0,
   ) as unknown as AnalogElement;
+  initElement(el);
+  return el;
 }
 
 function makeSchmittNonInverting(
@@ -126,13 +126,15 @@ function makeSchmittNonInverting(
   nOut: number,
   overrides: Record<string, number | string> = {},
 ): AnalogElement {
-  return getFactory(SchmittNonInvertingDefinition.modelRegistry!["behavioral"]!)(
+  const el = getFactory(SchmittNonInvertingDefinition.modelRegistry!["behavioral"]!)(
     new Map([["in", nIn], ["out", nOut]]),
     [],
     -1,
     makeProps(overrides),
     () => 0,
   ) as unknown as AnalogElement;
+  initElement(el);
+  return el;
 }
 
 /**
@@ -151,14 +153,14 @@ function driveAndReadOutput(
   nOut: number,
   rOut: number,
 ): number {
-  const size = Math.max(nIn, nOut);
+  const size = Math.max(nIn, nOut) + 1;
   const voltages = new Float64Array(size);
   if (nIn > 0) voltages[nIn] = vIn;
-  const { solver, rhs } = makeRecordingSolver();
-  const ctx = makeSchmittLoadCtx(voltages, solver);
+  const { solver, rhs } = makeRecordingSolver(size);
+  const ctx = makeSchmittLoadCtx(voltages, solver, rhs);
   element.load(ctx);
-  const outRhs = rhs.get(nOut - 1);
-  if (outRhs === undefined) return 0;
+  const outRhs = rhs[nOut - 1];
+  if (outRhs === 0) return 0;
   const gOut = 1 / rOut;
   return outRhs / gOut;
 }
@@ -176,7 +178,7 @@ describe("Inverting", () => {
     const st = makeSchmittInverting(nIn, nOut, { vTH: 2.0, vTL: 1.0, vOH: 3.3, vOL: 0.0, rOut });
 
     // Initial state: output HIGH (inverting, input starts low â†’ _outputHigh=false â†’ drive HIGH)
-    const vOutInit = driveAndReadOutput(st, 0.0, nIn, nOut, rOut);
+    driveAndReadOutput(st, 0.0, nIn, nOut, rOut);
 
     // Drive input just below threshold â€” no switch
 
@@ -188,7 +190,7 @@ describe("Inverting", () => {
     // Ramp input below V_TL (1.0V) â†’ output switches HIGH.
     const nIn = 1, nOut = 2;
     const rOut = 50;
-    const st = makeSchmittInverting(nIn, nOut, { vTH: 2.0, vTL: 1.0, vOH: 3.3, vOL: 0.0, rOut });
+    makeSchmittInverting(nIn, nOut, { vTH: 2.0, vTL: 1.0, vOH: 3.3, vOL: 0.0, rOut });
 
     // Force output to LOW by driving input above V_TH
 
@@ -206,12 +208,12 @@ describe("Inverting", () => {
     const st = makeSchmittInverting(nIn, nOut, { vTH, vTL, vOH: 3.3, vOL: 0.0, rOut });
 
     // Start with input low â†’ output HIGH
-    const initialOut = driveAndReadOutput(st, 0.0, nIn, nOut, rOut);
+    driveAndReadOutput(st, 0.0, nIn, nOut, rOut);
 
     // Oscillate input within hysteresis band (V_TL + Îµ to V_TH - Îµ)
     const inBandValues = [1.2, 1.5, 1.8, 1.6, 1.3, 1.7, 1.4, 1.9, 1.1, 1.8];
     for (const v of inBandValues) {
-      const out = driveAndReadOutput(st, v, nIn, nOut, rOut);
+      driveAndReadOutput(st, v, nIn, nOut, rOut);
       // Output must not change â€” still HIGH
     }
   });
@@ -226,7 +228,7 @@ describe("NonInverting", () => {
     // Non-inverting: input > V_TH â†’ output HIGH; input < V_TL â†’ output LOW.
     const nIn = 1, nOut = 2;
     const rOut = 50;
-    const st = makeSchmittNonInverting(nIn, nOut, { vTH: 2.0, vTL: 1.0, vOH: 3.3, vOL: 0.0, rOut });
+    makeSchmittNonInverting(nIn, nOut, { vTH: 2.0, vTL: 1.0, vOH: 3.3, vOL: 0.0, rOut });
 
     // Initial: output LOW (starts low)
 
@@ -374,21 +376,16 @@ describe("Transfer", () => {
 //   Input is below vTH and output starts low â†’ no state change â†’ stays low.
 
 interface SchmittCaptureStamp { row: number; col: number; value: number; }
-function makeSchmittCaptureSolver(): {
+function makeSchmittCaptureSolver(_rhs: Float64Array): {
   solver: SparseSolverType;
   stamps: SchmittCaptureStamp[];
-  rhs: Map<number, number>;
 } {
   const stamps: SchmittCaptureStamp[] = [];
-  const rhs = new Map<number, number>();
   const handles: { row: number; col: number }[] = [];
   const handleIndex = new Map<string, number>();
   const solver = {
     stamp: (row: number, col: number, value: number) => {
       stamps.push({ row, col, value });
-    },
-    stampRHS: (row: number, value: number) => {
-      rhs.set(row, (rhs.get(row) ?? 0) + value);
     },
     allocElement: (row: number, col: number): number => {
       const key = `${row},${col}`;
@@ -405,30 +402,17 @@ function makeSchmittCaptureSolver(): {
       stamps.push({ row, col, value });
     },
   } as unknown as SparseSolverType;
-  return { solver, stamps, rhs };
+  return { solver, stamps };
 }
 
-function makeSchmittParityCtx(voltages: Float64Array, solver: SparseSolverType): LoadContext {
-  return {
+function makeSchmittParityCtx(voltages: Float64Array, solver: SparseSolverType, rhs: Float64Array): LoadContext {
+  return makeLoadCtx({
     solver,
-    voltages,
+    rhs,
+    rhsOld: voltages,
     cktMode: MODEDCOP | MODEINITFLOAT,
     dt: 0,
-    method: "trapezoidal",
-    order: 1,
-    deltaOld: [0, 0, 0, 0, 0, 0, 0],
-    ag: new Float64Array(7),
-    srcFact: 1,
-    noncon: { value: 0 },
-    limitingCollector: null,
-    xfact: 1,
-    gmin: 1e-12,
-    reltol: 1e-3,
-    iabstol: 1e-12,
-    cktFixLimit: false,
-    bypass: false,
-    voltTol: 1e-6,
-  };
+  });
 }
 
 describe("SchmittTrigger parity (C4.5)", () => {
@@ -438,12 +422,14 @@ describe("SchmittTrigger parity (C4.5)", () => {
     const schmitt = makeSchmittNonInverting(nIn, nOut, { vTH, vTL, vOH, vOL, rOut });
 
     // V_in = 0.5V: below V_TL, below V_TH. Initial _outputHigh=false, stays low.
-    const voltages = new Float64Array(2);
+    // 1-based: slot 0 = ground sentinel, nIn=1, nOut=2
+    const voltages = new Float64Array(3);
     voltages[nIn] = 0.5;
     voltages[nOut] = 0.1;
 
-    const { solver, stamps, rhs } = makeSchmittCaptureSolver();
-    const ctx = makeSchmittParityCtx(voltages, solver);
+    const rhsBuf = new Float64Array(16);
+    const { solver, stamps } = makeSchmittCaptureSolver(rhsBuf);
+    const ctx = makeSchmittParityCtx(voltages, solver, rhsBuf);
     schmitt.load(ctx);
 
     // Closed-form reference:
@@ -465,6 +451,6 @@ describe("SchmittTrigger parity (C4.5)", () => {
     expect(sumAt(nOut - 1, nOut - 1)).toBe(NGSPICE_GOUT);
 
     // Output Norton RHS: vOL * G_out
-    expect(rhs.get(nOut - 1) ?? 0).toBe(NGSPICE_RHS_OUT);
+    expect(rhsBuf[nOut - 1]).toBe(NGSPICE_RHS_OUT);
   });
 });

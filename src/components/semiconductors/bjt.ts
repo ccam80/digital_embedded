@@ -26,6 +26,7 @@ import {
   type ComponentDefinition,
 } from "../../core/registry.js";
 import type { IntegrationMethod, LoadContext, PoolBackedAnalogElementCore } from "../../solver/analog/element.js";
+import { NGSPICE_LOAD_ORDER } from "../../solver/analog/element.js";
 import {
   MODEINITJCT, MODEINITFIX, MODEINITSMSIG, MODEINITTRAN, MODEINITPRED,
   MODETRAN, MODEAC, MODETRANOP, MODEUIC,
@@ -555,16 +556,27 @@ export function createBjtElement(
 
   return {
     branchIndex: -1,
+    ngspiceLoadOrder: NGSPICE_LOAD_ORDER.BJT,
     isNonlinear: true,
     isReactive: false as const,
     poolBacked: true as const,
     stateSchema: BJT_SIMPLE_SCHEMA,
     stateSize: BJT_SIMPLE_SCHEMA.size,
     stateBaseOffset: -1,
+    s0: new Float64Array(0) as Float64Array<ArrayBufferLike>,
+    s1: new Float64Array(0) as Float64Array<ArrayBufferLike>,
+    s2: new Float64Array(0) as Float64Array<ArrayBufferLike>,
+    s3: new Float64Array(0) as Float64Array<ArrayBufferLike>,
+    s4: new Float64Array(0) as Float64Array<ArrayBufferLike>,
+    s5: new Float64Array(0) as Float64Array<ArrayBufferLike>,
+    s6: new Float64Array(0) as Float64Array<ArrayBufferLike>,
+    s7: new Float64Array(0) as Float64Array<ArrayBufferLike>,
 
     initState(poolRef: StatePoolRef): void {
       pool = poolRef;
       base = this.stateBaseOffset;
+      this.s0 = poolRef.state0 as Float64Array<ArrayBufferLike>; this.s1 = poolRef.state1 as Float64Array<ArrayBufferLike>; this.s2 = poolRef.state2 as Float64Array<ArrayBufferLike>; this.s3 = poolRef.state3 as Float64Array<ArrayBufferLike>;
+      this.s4 = poolRef.state4 as Float64Array<ArrayBufferLike>; this.s5 = poolRef.state5 as Float64Array<ArrayBufferLike>; this.s6 = poolRef.state6 as Float64Array<ArrayBufferLike>; this.s7 = poolRef.state7 as Float64Array<ArrayBufferLike>;
       applyInitialValues(BJT_SIMPLE_SCHEMA, pool, base, { polarity });
     },
 
@@ -1108,16 +1120,27 @@ export function createSpiceL1BjtElement(
 
   return {
     branchIndex: -1,
+    ngspiceLoadOrder: NGSPICE_LOAD_ORDER.BJT,
     isNonlinear: true,
     isReactive: hasCapacitance,
     poolBacked: true as const,
     stateSchema: BJT_L1_SCHEMA,
     stateSize: BJT_L1_SCHEMA.size,
     stateBaseOffset: -1,
+    s0: new Float64Array(0) as Float64Array<ArrayBufferLike>,
+    s1: new Float64Array(0) as Float64Array<ArrayBufferLike>,
+    s2: new Float64Array(0) as Float64Array<ArrayBufferLike>,
+    s3: new Float64Array(0) as Float64Array<ArrayBufferLike>,
+    s4: new Float64Array(0) as Float64Array<ArrayBufferLike>,
+    s5: new Float64Array(0) as Float64Array<ArrayBufferLike>,
+    s6: new Float64Array(0) as Float64Array<ArrayBufferLike>,
+    s7: new Float64Array(0) as Float64Array<ArrayBufferLike>,
 
     initState(poolRef: StatePoolRef): void {
       pool = poolRef;
       base = this.stateBaseOffset;
+      this.s0 = poolRef.state0 as Float64Array<ArrayBufferLike>; this.s1 = poolRef.state1 as Float64Array<ArrayBufferLike>; this.s2 = poolRef.state2 as Float64Array<ArrayBufferLike>; this.s3 = poolRef.state3 as Float64Array<ArrayBufferLike>;
+      this.s4 = poolRef.state4 as Float64Array<ArrayBufferLike>; this.s5 = poolRef.state5 as Float64Array<ArrayBufferLike>; this.s6 = poolRef.state6 as Float64Array<ArrayBufferLike>; this.s7 = poolRef.state7 as Float64Array<ArrayBufferLike>;
       applyInitialValues(BJT_L1_SCHEMA, pool, base, { polarity, RB: params.RB });
     },
 

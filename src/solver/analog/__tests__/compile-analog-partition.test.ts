@@ -17,7 +17,8 @@ import type { SerializedElement } from "../../../core/element.js";
 import { ComponentRegistry } from "../../../core/registry.js";
 import type { ComponentCategory } from "../../../core/registry.js";
 import type { AnalogElement } from "../element.js";
-import type { SparseSolver } from "../sparse-solver.js";
+import type { ComplexSparseSolver } from "../complex-sparse-solver.js";
+import type { LoadContext } from "../load-context.js";
 import { compileAnalogPartition } from "../compiler.js";
 import type { SolverPartition, PartitionedComponent, ConnectivityGroup } from "../../../compile/types.js";
 import { pinWorldPosition } from "../../../core/pin.js";
@@ -83,9 +84,11 @@ function makeStubElement(nodeIds: number[]): AnalogElement {
     pinNodeIds: nodeIds,
     allNodeIds: nodeIds,
     branchIndex: -1,
+    ngspiceLoadOrder: 0,
     isNonlinear: false,
     isReactive: false,
-    stampAc(_s: SparseSolver) { /* no-op */ },
+    load(_ctx: LoadContext): void { /* no-op */ },
+    stampAc(_solver: ComplexSparseSolver, _omega: number, _ctx: LoadContext): void { /* no-op */ },
     setParam(_key: string, _value: number): void {},
     getPinCurrents(_v: Float64Array) { return nodeIds.map(() => 0); },
   };
@@ -568,6 +571,7 @@ describe("compileAnalogPartition", () => {
       stateSize: 7,
       stateBaseOffset: -1,
       branchIndex: -1,
+      ngspiceLoadOrder: 0,
       isNonlinear: false,
       isReactive: true,
       pinNodeIds: [] as number[],

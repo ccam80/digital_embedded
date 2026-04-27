@@ -69,15 +69,13 @@ function makeOutputPin(nodeId: number): DigitalOutputPinModel {
   return pin;
 }
 
-function makeCtx(v: Float64Array = new Float64Array(8)): LoadContext {
+function makeCtx(_v: Float64Array = new Float64Array(8)): LoadContext {
   return makeLoadCtx({
     solver: {
       allocElement: (_r: number, _c: number) => 0,
       stampElement: (_h: number, _v: number) => {},
-      stampRHS: (_i: number, _v: number) => {},
       stamp: (_r: number, _c: number, _v: number) => {},
     } as any,
-    voltages: v,
     cktMode: MODETRAN | MODEINITFLOAT,
     order: 1,
   });
@@ -165,31 +163,31 @@ function buildT(): {
 
 
 /**
- * Build a voltages array for MNA nodes 1-5 (1-based).
- * readMnaVoltage(nodeId, v) reads v[nodeId-1], so:
- *   v[0]=node1, v[1]=node2, v[2]=node3, v[3]=node4, v[4]=node5
+ * Build a voltages array for MNA nodes 1-5 (1-based ngspice convention).
+ * readMnaVoltage(nodeId, v) reads v[nodeId] (1-based), so slot 0 is the
+ * ground sentinel.  Layout: v[1]=node1, v[2]=node2, ..., v[5]=node5.
  */
 function v6(n1: number, n2: number, n3: number, n4: number, n5: number): Float64Array {
-  const arr = new Float64Array(5);
-  arr[0] = n1;
-  arr[1] = n2;
-  arr[2] = n3;
-  arr[3] = n4;
-  arr[4] = n5;
+  const arr = new Float64Array(6); // slot 0 = ground sentinel (0)
+  arr[1] = n1;
+  arr[2] = n2;
+  arr[3] = n3;
+  arr[4] = n4;
+  arr[5] = n5;
   return arr;
 }
 
 /**
- * Build a voltages array for MNA nodes 1-4 (1-based).
- * readMnaVoltage(nodeId, v) reads v[nodeId-1], so:
- *   v[0]=node1, v[1]=node2, v[2]=node3, v[3]=node4
+ * Build a voltages array for MNA nodes 1-4 (1-based ngspice convention).
+ * readMnaVoltage(nodeId, v) reads v[nodeId] (1-based), so slot 0 is the
+ * ground sentinel.  Layout: v[1]=node1, v[2]=node2, v[3]=node3, v[4]=node4.
  */
 function v5(n1: number, n2: number, n3: number, n4: number): Float64Array {
-  const arr = new Float64Array(4);
-  arr[0] = n1;
-  arr[1] = n2;
-  arr[2] = n3;
-  arr[3] = n4;
+  const arr = new Float64Array(5); // slot 0 = ground sentinel (0)
+  arr[1] = n1;
+  arr[2] = n2;
+  arr[3] = n3;
+  arr[4] = n4;
   return arr;
 }
 
@@ -201,7 +199,7 @@ function v5(n1: number, n2: number, n3: number, n4: number): Float64Array {
 describe("JK", () => {
   it("toggle_when_both_high", () => {
     // J=1, K=1 on rising clock edge → Q toggles
-    const { element, qPin, qBarPin } = buildJK();
+    const { element } = buildJK();
 
     element.load(makeCtx());
 
@@ -222,7 +220,7 @@ describe("JK", () => {
 
   it("set_when_j_high", () => {
     // J=1, K=0, rising clock → Q=1
-    const { element, qPin } = buildJK();
+    const { element } = buildJK();
 
     element.load(makeCtx());
 
@@ -235,7 +233,7 @@ describe("JK", () => {
   it("reset_when_k_high", () => {
     // First set Q=1 via J=1, K=0 edge
     // Then J=0, K=1 on next rising edge → Q=0
-    const { element, qPin } = buildJK();
+    const { element } = buildJK();
 
     element.load(makeCtx());
 
@@ -260,7 +258,7 @@ describe("JK", () => {
 describe("RS", () => {
   it("set_and_reset", () => {
     // S=1, R=0 on rising edge → Q=1; then S=0, R=1 → Q=0
-    const { element, qPin } = buildRS();
+    const { element } = buildRS();
 
     element.load(makeCtx());
 
@@ -280,7 +278,7 @@ describe("RS", () => {
   it("both_high_holds", () => {
     // First set Q=1, then apply S=1, R=1 on rising edge
     // Q must remain 1 (hold previous value)
-    const { element, qPin } = buildRS();
+    const { element } = buildRS();
 
     element.load(makeCtx());
 
@@ -289,7 +287,6 @@ describe("RS", () => {
     element.accept(makeAcceptCtx(v6(V_HIGH, V_HIGH, V_LOW, V_LOW, V_LOW)), 0, () => {});
 
     element.load(makeCtx(v6(V_HIGH, V_HIGH, V_LOW, V_LOW, V_LOW)));
-    const qBefore = qPin.currentVoltage;
 
     // S=1, R=1 on rising edge → forbidden: Q must hold
     element.accept(makeAcceptCtx(v6(V_HIGH, V_LOW, V_HIGH, V_LOW, V_LOW)), 0, () => {});
@@ -306,7 +303,7 @@ describe("RS", () => {
 describe("T", () => {
   it("toggles_on_t_high", () => {
     // T=1 on each rising clock edge → Q toggles each time
-    const { element, qPin } = buildT();
+    const { element } = buildT();
 
     element.load(makeCtx());
 

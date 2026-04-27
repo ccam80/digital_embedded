@@ -4,6 +4,7 @@
 
 import type { LoadContext } from "../element.js";
 import type { StatePoolRef } from "../element.js";
+import { NGSPICE_LOAD_ORDER } from "../element.js";
 import { readMnaVoltage, delegatePinSetParam } from "../digital-pin-model.js";
 import type { DigitalInputPinModel, DigitalOutputPinModel } from "../digital-pin-model.js";
 import type { AnalogElementFactory } from "../behavioral-gate.js";
@@ -57,6 +58,7 @@ export class BehavioralDAsyncFlipflopElement {
 
   pinNodeIds!: readonly number[];  // set by compiler via Object.assign after factory returns
   readonly branchIndex: number = -1;
+  readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.VCVS;
   readonly isNonlinear: true = true;
   label?: string;
 
@@ -64,7 +66,6 @@ export class BehavioralDAsyncFlipflopElement {
   readonly stateSchema: StateSchema = FLIPFLOP_COMPOSITE_SCHEMA;
   stateSize: number;
   stateBaseOffset = -1;
-  private _pool!: StatePoolRef;
 
   constructor(
     setPin: DigitalInputPinModel,
@@ -94,7 +95,6 @@ export class BehavioralDAsyncFlipflopElement {
   }
 
   initState(pool: StatePoolRef): void {
-    this._pool = pool;
     initChildState(this._childElements, this.stateBaseOffset, pool);
   }
 

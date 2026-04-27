@@ -29,9 +29,9 @@ import {
 } from "../../../solver/analog/ckt-mode.js";
 import { SparseSolver } from "../../../solver/analog/sparse-solver.js";
 import type { SparseSolver as SparseSolverType } from "../../../solver/analog/sparse-solver.js";
-import type { AnalogElement } from "../../../solver/analog/element.js";
+import type { AnalogElement, ReactiveAnalogElement } from "../../../solver/analog/element.js";
 import type { AnalogElementCore } from "../../../core/analog-types.js";
-import type { ReactiveAnalogElement } from "../../../solver/analog/element.js";
+import type { PoolBackedAnalogElementCore } from "../../../solver/analog/element.js";
 import type { AnalogFactory } from "../../../core/registry.js";
 import type { LoadContext } from "../../../solver/analog/load-context.js";
 import type { LimitingEvent } from "../../../solver/analog/newton-raphson.js";
@@ -99,9 +99,11 @@ function buildUnitCtx(
 ): LoadContext {
   return {
     solver,
+    matrix: solver,
     rhsOld: voltages,
     rhs: voltages,
     cktMode: MODEDCOP | MODEINITFLOAT,
+    time: 0,
     dt: 0,
     method: "trapezoidal",
     order: 1,
@@ -110,10 +112,13 @@ function buildUnitCtx(
     srcFact: 1,
     noncon: { value: 0 },
     limitingCollector: null,
+    convergenceCollector: null,
     xfact: 1,
     gmin: 1e-12,
     reltol: 1e-3,
     iabstol: 1e-12,
+    temp: 300.15,
+    vt: 300.15 * 1.3806226e-23 / 1.6021918e-19,
     cktFixLimit: false,
     bypass: false,
     voltTol: 1e-6,
@@ -143,57 +148,6 @@ function driveToOp(
   }
 }
 
-/** Load element into a fresh real SparseSolver and return the (row,col,value) entries. */
-function stampAndCaptureEntries(
-  element: AnalogElement,
-  voltages: Float64Array,
-  matrixSize: number,
-): { stamps: Array<[number, number, number]>; rhs: Array<[number, number]>; solver: SparseSolver } {
-  const solver = new SparseSolver();
-  solver._initStructure(matrixSize);
-  const ctx = buildUnitCtx(solver, voltages);
-  element.load(ctx);
-
-  const entries = solver.getCSCNonZeros();
-  const stamps: Array<[number, number, number]> = entries.map((e) => [e.row, e.col, e.value]);
-  const rhsVec = solver.getRhsSnapshot();
-  const rhs: Array<[number, number]> = [];
-  for (let i = 0; i < rhsVec.length; i++) {
-    if (rhsVec[i] !== 0) rhs.push([i, rhsVec[i]]);
-  }
-  return { stamps, rhs, solver };
-}
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-/**
- * Create a diode element and drive it to a specific operating point by
- * calling load(ctx) repeatedly against a fresh solver each iteration to
- * settle SLOT_VD through pnjlim.
- *
- * nodeAnode=1, nodeCathode=2, so solver indices are 0 and 1.
- * Vd = voltages[0] - voltages[1]
- */
-function makeDiodeAtVd(
-  vd: number,
-  modelOverrides?: Record<string, number>,
-): AnalogElement {
-  const propsObj = makeParamBag({ ...DIODE_PARAM_DEFAULTS, IS: 1e-14, N: 1, CJO: 0, VJ: 0.7, M: 0.5, TT: 0, FC: 0.5, ...modelOverrides });
-  const core = createDiodeElement(new Map([["A", 1], ["K", 2]]), [], -1, propsObj);
-  const { element: statedCore } = withState(core);
-  const element = withNodeIds(statedCore, [1, 2]);
-
-  // Drive the element to the operating point by calling load(ctx) multiple
-  // times to converge pnjlim limiting.
-  const voltages = new Float64Array(2);
-  voltages[0] = vd;
-  voltages[1] = 0;
-  driveToOp(element, voltages, 50, { matrixSize: 2 });
-  return element;
-}
-
 // ---------------------------------------------------------------------------
 // Diode unit tests
 // ---------------------------------------------------------------------------
@@ -214,29 +168,29 @@ describe("Diode", () => {
     const { element: stated, pool } = withState(createDiodeElement(new Map([["A", 1], ["K", 2]]), [], -1, propsObj));
     const element = withNodeIds(stated, [1, 2]);
 
-    const voltages = new Float64Array(2);
-    voltages[0] = 0.3;
-    voltages[1] = 0;
+    const voltages = new Float64Array(3);
+    voltages[1] = 0.3; // anode = node 1
+    voltages[2] = 0;   // cathode = node 2
 
     // Drive to 0.3V operating point
-    driveToOp(element, voltages, 20, { matrixSize: 2 });
+    driveToOp(element, voltages, 20, { matrixSize: 3 });
 
     // Now simulate a large NR step to 5.0V
-    voltages[0] = 5.0;
-    voltages[1] = 0;
+    voltages[1] = 5.0;
+    voltages[2] = 0;
     const jumpSolver = new SparseSolver();
     const jumpCtx = makeSimpleCtx({
       solver: jumpSolver,
       elements: [element],
-      matrixSize: 2,
-      nodeCount: 2,
+      matrixSize: 3,
+      nodeCount: 3,
     });
     jumpCtx.loadCtx.rhsOld = voltages;
     element.load(jumpCtx.loadCtx);
 
     // Voltages array must be unchanged â€” no write-back
-    expect(voltages[0]).toBe(5.0);
-    expect(voltages[1]).toBe(0);
+    expect(voltages[1]).toBe(5.0);
+    expect(voltages[2]).toBe(0);
 
     // The limited vd is stored in pool.state0[SLOT_VD = 0]
     const limitedVd = pool.state0[0];
@@ -266,21 +220,18 @@ describe("Diode", () => {
     const capSolver = new SparseSolver();
     const capCtx = makeLoadCtx({
       solver: capSolver,
-      voltages,
       cktMode: MODETRAN | MODEINITFLOAT,
       dt: 1e-6,
       method: "trapezoidal",
       order: 1,
       deltaOld: [1e-6, 1e-6, 1e-6, 1e-6, 1e-6, 1e-6, 1e-6],
     });
-    capSolver._initStructure(2);
+    capSolver._initStructure(3);
     element.load(capCtx);
 
     // Verify Cj computation: CJO / (1 - Vd/VJ)^M at Vd = -2V
     // Cj = 10pF / (1 - (-2)/0.7)^0.5 = 10pF / (1 + 2/0.7)^0.5
     // = 10pF / (3.857)^0.5 = 10pF / 1.964 â‰ˆ 5.09pF
-    const expectedCj = computeJunctionCapacitance(-2, CJO, VJ, M, FC);
-
     // After load(), conductance entries must have been placed
     const capStamps = capSolver.getCSCNonZeros();
     expect(capStamps.length).toBeGreaterThan(0);
@@ -317,22 +268,22 @@ describe("Diode", () => {
     // OFF maps to ngspice .ic OFF: dioload.c skips junction during initFix.
     const propsObj = makeParamBag({ IS: 1e-14, N: 1, CJO: 0, VJ: 0.7, M: 0.5, TT: 0, FC: 0.5, OFF: 1 });
     const core = createDiodeElement(new Map([["A", 1], ["K", 2]]), [], -1, propsObj);
-    const { element, pool } = withState(core);
+    const { element } = withState(core);
     const el = withNodeIds(element, [1, 2]);
 
     // In-load MODEINITJCT: OFF path sets vdRaw=0 directly (no pnjlim).
-    const voltages = new Float64Array(2);
-    voltages[0] = 5; // would give Vd=5V without OFF, but initJct+OFF overrides
+    const voltages = new Float64Array(3);
+    voltages[1] = 5; // would give Vd=5V without OFF, but initJct+OFF overrides
     voltages[1] = 0;
     const solver = new SparseSolver();
-    solver._initStructure(2);
+    solver._initStructure(3);
     el.load(buildUnitCtx(solver, voltages, { cktMode: MODEDCOP | MODEINITJCT }));
 
     // After initJct load with OFF=1, SLOT_VD (index 0) must be 0.
 
     // checkConvergence with initFix mode must return true (OFF suppresses noncon).
     const convSolver = new SparseSolver();
-    convSolver._initStructure(2);
+    convSolver._initStructure(3);
     const converged = el.checkConvergence!(buildUnitCtx(convSolver, voltages, { cktMode: MODEDCOP | MODEINITFIX }));
     expect(converged).toBe(true);
   });
@@ -349,6 +300,7 @@ function makeResistorElement(nodeA: number, nodeB: number, resistance: number): 
     pinNodeIds: [nodeA, nodeB],
     allNodeIds: [nodeA, nodeB],
     branchIndex: -1,
+    ngspiceLoadOrder: 0,
     isNonlinear: false,
     isReactive: false,
     setParam(_key: string, _value: number): void {},
@@ -486,8 +438,8 @@ describe("Diode LimitingEvent instrumentation", () => {
     const core = createDiodeElement(pinNodes, [], -1, props) as AnalogElementCore;
     (core as { label: string }).label = "D1";
     (core as { elementIndex: number }).elementIndex = 3;
-    const pool = new StatePool((core as unknown as { stateSize: number }).stateSize);
-    (core as { stateBaseOffset: number }).stateBaseOffset = 0;
+    const pool = new StatePool((core as unknown as PoolBackedAnalogElementCore).stateSize);
+    (core as unknown as PoolBackedAnalogElementCore).stateBaseOffset = 0;
     (core as unknown as ReactiveAnalogElement).initState(pool);
     return withNodeIds(core, [1, 2]);
   }
@@ -501,7 +453,7 @@ describe("Diode LimitingEvent instrumentation", () => {
   it("pushes AK pnjlim event when limitingCollector provided", () => {
     const element = makeDiodeWithState();
     const voltages = new Float64Array(10);
-    voltages[0] = 5.0; // node 1 = anode
+    voltages[1] = 5.0; // node 1 = anode
 
     const collector: LimitingEvent[] = [];
     loadOnce(element, voltages, collector);
@@ -521,7 +473,7 @@ describe("Diode LimitingEvent instrumentation", () => {
   it("does not throw when limitingCollector is null", () => {
     const element = makeDiodeWithState();
     const voltages = new Float64Array(10);
-    voltages[0] = 5.0;
+    voltages[1] = 5.0;
     expect(() => loadOnce(element, voltages, null)).not.toThrow();
   });
 
@@ -533,7 +485,7 @@ describe("Diode LimitingEvent instrumentation", () => {
     loadOnce(element, voltages, null);
 
     // Now a large jump: should be limited
-    voltages[0] = 10.0;
+    voltages[1] = 10.0;
     const collector: LimitingEvent[] = [];
     loadOnce(element, voltages, collector);
 
@@ -545,12 +497,12 @@ describe("Diode LimitingEvent instrumentation", () => {
   it("wasLimited=false for small voltage steps near operating point", () => {
     const element = makeDiodeWithState({ IS: 1e-14, N: 1 });
     const voltages = new Float64Array(10);
-    voltages[0] = 0.6;
+    voltages[1] = 0.6;
     // Warm up to vdOld â‰ˆ 0.6
     loadOnce(element, voltages, null);
 
-    // Tiny step â€” should not be limited
-    voltages[0] = 0.601;
+    // Tiny step — should not be limited
+    voltages[1] = 0.601;
     const collector: LimitingEvent[] = [];
     loadOnce(element, voltages, collector);
 
@@ -663,12 +615,12 @@ describe("IKF/IKR high-injection correction", () => {
   function diodeSlot(vd: number, slot: number, overrides: Record<string, number> = {}): number {
     const props = makeParamBag({ IS: 1e-14, N: 1, ...overrides });
     const core = createDiodeElement(new Map([["A", 1], ["K", 2]]), [], -1, props) as AnalogElementCore;
-    const pool = new StatePool((core as unknown as { stateSize: number }).stateSize);
-    (core as { stateBaseOffset: number }).stateBaseOffset = 0;
+    const pool = new StatePool((core as unknown as PoolBackedAnalogElementCore).stateSize);
+    (core as unknown as PoolBackedAnalogElementCore).stateBaseOffset = 0;
     (core as unknown as ReactiveAnalogElement).initState(pool);
     const element = withNodeIds(core, [1, 2]);
     const voltages = new Float64Array(10);
-    voltages[0] = vd;
+    voltages[1] = vd;
     driveToOp(element, voltages, 50, { matrixSize: 10 });
     return pool.state0[slot];
   }
@@ -708,12 +660,12 @@ describe("AREA scaling", () => {
   function diodeOP(vd: number, overrides: Record<string, number> = {}): { id: number; gd: number } {
     const props = makeParamBag({ IS: 1e-14, N: 1, RS: 0, CJO: 0, ...overrides });
     const core = createDiodeElement(new Map([["A", 1], ["K", 2]]), [], -1, props) as AnalogElementCore;
-    const pool = new StatePool((core as unknown as { stateSize: number }).stateSize);
-    (core as { stateBaseOffset: number }).stateBaseOffset = 0;
+    const pool = new StatePool((core as unknown as PoolBackedAnalogElementCore).stateSize);
+    (core as unknown as PoolBackedAnalogElementCore).stateBaseOffset = 0;
     (core as unknown as ReactiveAnalogElement).initState(pool);
     const element = withNodeIds(core, [1, 2]);
     const voltages = new Float64Array(10);
-    voltages[0] = vd;
+    voltages[1] = vd;
     driveToOp(element, voltages, 50, { matrixSize: 10 });
     return { id: pool.state0[3], gd: pool.state0[1] }; // SLOT_ID, SLOT_GEQ
   }
@@ -837,11 +789,11 @@ describe("integration", () => {
     const q1_val = computeJunctionCharge(prevVd, CJO, VJ, M, FC, TT, prevId);
     pool.state1[6] = q1_val; // SLOT_Q = 6 (dioload.c DIOcapCharge)
 
-    // Real SparseSolver â€” anode=node 1 mapped to row 0, cathode=ground.
+    // Real SparseSolver â€” anode=node 1 mapped to row 1 (1-based), cathode=ground.
     const solver = new SparseSolver();
-    solver._initStructure(1);
+    solver._initStructure(2);
 
-    const ctx = buildUnitCtx(solver, new Float64Array([vd, 0]), {
+    const ctx = buildUnitCtx(solver, new Float64Array([0, vd]), {
       cktMode: MODETRAN | MODEINITFLOAT,
       dt,
       method: "trapezoidal",
@@ -863,13 +815,13 @@ describe("integration", () => {
     const capGeq_expected = ag[0] * Ctotal;
     const capIeq_expected = ccap_expected - capGeq_expected * vd;
 
-    // The stamp at (0,0) is the sum of diode geq and capGeq contributions.
+    // The stamp at (1,1) is the sum of diode geq and capGeq contributions (1-based: anode=node1â†'row1).
     const entries = solver.getCSCNonZeros();
-    const total00 = entries
-      .filter((e) => e.row === 0 && e.col === 0)
+    const total11 = entries
+      .filter((e) => e.row === 1 && e.col === 1)
       .reduce((sum, e) => sum + e.value, 0);
     const gd_at_vd = IS * Math.exp(vd / (N * VT)) / (N * VT) + 1e-12;
-    expect(total00).toBe(gd_at_vd + capGeq_expected);
+    expect(total11).toBe(gd_at_vd + capGeq_expected);
 
     // Verify capGeq exactly matches the ngspice NIintegrate formula
     expect(capGeq_expected).toBe(ag[0] * Ctotal);
@@ -914,27 +866,18 @@ function makeParityCtx(
   voltages: Float64Array,
   opts: { cktMode?: number; dt?: number; ag?: Float64Array },
 ) {
-  return {
+  const dt = opts.dt ?? 0;
+  return makeLoadCtx({
     solver,
     rhsOld: voltages,
     rhs: voltages,
     cktMode: opts.cktMode ?? (MODEDCOP | MODEINITFLOAT),
-    dt: opts.dt ?? 0,
-    method: "trapezoidal" as const,
+    dt,
+    method: "trapezoidal",
     order: 1,
-    deltaOld: [opts.dt ?? 0, opts.dt ?? 0, opts.dt ?? 0, opts.dt ?? 0, opts.dt ?? 0, opts.dt ?? 0, opts.dt ?? 0],
+    deltaOld: [dt, dt, dt, dt, dt, dt, dt],
     ag: opts.ag ?? new Float64Array(7),
-    srcFact: 1,
-    noncon: { value: 0 },
-    limitingCollector: null,
-    xfact: 1,
-    gmin: 1e-12,
-    reltol: 1e-3,
-    iabstol: 1e-12,
-    cktFixLimit: false,
-    bypass: false,
-    voltTol: 1e-6,
-  };
+  });
 }
 
 describe("diode_load_dcop_parity", () => {
@@ -953,12 +896,13 @@ describe("diode_load_dcop_parity", () => {
     // Seed pool.state0[SLOT_VD = 0] = VD so pnjlim passes through unchanged.
     pool.state0[0] = VD;
 
-    // Real 2Ã—2 SparseSolver (node indices 0 and 1 for anode and cathode rows).
+    // Real 3Ã—3 SparseSolver (1-based: anode=node1â†'row1, cathode=node2â†'row2).
     const solver = new SparseSolver();
-    solver._initStructure(2);
+    solver._initStructure(3);
 
-    const voltages = new Float64Array([VD, 0]);
-    const ctx = makeParityCtx(solver, voltages, { cktMode: MODEDCOP | MODEINITFLOAT });
+    const voltages = new Float64Array([0, VD, 0]);
+    const rhs = new Float64Array(3); // separate rhs so stampRHS writes start from 0
+    const ctx = { ...makeParityCtx(solver, voltages, { cktMode: MODEDCOP | MODEINITFLOAT }), rhs };
     core.load(ctx);
 
     // NGSPICE_REF (DIOload formula, dioload.c:240-285):
@@ -968,8 +912,8 @@ describe("diode_load_dcop_parity", () => {
     const NGSPICE_ID = IS * (NGSPICE_EXP - 1) + GMIN * VD;
     const NGSPICE_IEQ = NGSPICE_ID - NGSPICE_GD * VD;
 
-    // Read the assembled matrix. The diode writes four G stamps (anode=1â†’row 0,
-    // cathode=2â†’row 1). Sum any entries at each (row, col) pair (in case of
+    // Read the assembled matrix. The diode writes four G stamps (anode=1â†’row 1,
+    // cathode=2â†’row 2). Sum any entries at each (row, col) pair (in case of
     // fill-ins or multi-stamp patterns in the element implementation).
     const entries = solver.getCSCNonZeros();
     const sumAt = (row: number, col: number) =>
@@ -977,15 +921,14 @@ describe("diode_load_dcop_parity", () => {
         .filter((e) => e.row === row && e.col === col)
         .reduce((acc, e) => acc + e.value, 0);
 
-    expect(sumAt(0, 0)).toBe(NGSPICE_GD);
-    expect(sumAt(0, 1)).toBe(-NGSPICE_GD);
-    expect(sumAt(1, 0)).toBe(-NGSPICE_GD);
     expect(sumAt(1, 1)).toBe(NGSPICE_GD);
+    expect(sumAt(1, 2)).toBe(-NGSPICE_GD);
+    expect(sumAt(2, 1)).toBe(-NGSPICE_GD);
+    expect(sumAt(2, 2)).toBe(NGSPICE_GD);
 
-    // RHS: -ieq at anode (row 0), +ieq at cathode (row 1).
-    const rhsVec = solver.getRhsSnapshot();
-    expect(rhsVec[0]).toBe(-NGSPICE_IEQ);
-    expect(rhsVec[1]).toBe(NGSPICE_IEQ);
+    // RHS: -ieq at anode (row 1), +ieq at cathode (row 2).
+    expect(rhs[1]).toBe(-NGSPICE_IEQ);
+    expect(rhs[2]).toBe(NGSPICE_IEQ);
   });
 });
 
@@ -1019,11 +962,11 @@ describe("diode_load_transient_parity", () => {
     pool.state0[0] = VD; // SLOT_VD seed so pnjlim pass-through
 
     // Real SparseSolver â€” diode between node 1 (anode) and ground (node 0
-    // mapped to no row). matrixSize = 1 (anode only, cathode is ground).
+    // mapped to no row). matrixSize = 2 (1-based: anode=node1â†'row1).
     const solver = new SparseSolver();
-    solver._initStructure(1);
+    solver._initStructure(2);
 
-    const ctx = makeParityCtx(solver, new Float64Array([VD]), {
+    const ctx = makeParityCtx(solver, new Float64Array([0, VD]), {
       cktMode: MODETRAN | MODEINITFLOAT,
       dt,
       ag,
@@ -1038,10 +981,10 @@ describe("diode_load_transient_parity", () => {
     const NGSPICE_CAPGEQ = ag[0] * NGSPICE_Cj;
 
     const entries = solver.getCSCNonZeros();
-    const sum00 = entries
-      .filter((e) => e.row === 0 && e.col === 0)
+    const sum11 = entries
+      .filter((e) => e.row === 1 && e.col === 1)
       .reduce((acc, e) => acc + e.value, 0);
-    expect(sum00).toBe(NGSPICE_GD + NGSPICE_CAPGEQ);
+    expect(sum11).toBe(NGSPICE_GD + NGSPICE_CAPGEQ);
   });
 });
 
@@ -1073,29 +1016,16 @@ describe("diode MODEINITSMSIG seeding (dioload.c:126-127)", () => {
     pool.state0[0] = 0.4;
 
     const solver = new SparseSolver();
-    solver._initStructure(2);
-    const voltages = new Float64Array([2.0, 0]); // would give Vd=2V if iterated
+    solver._initStructure(3);
+    const voltages = new Float64Array([0, 2.0, 0]); // would give Vd=2V if iterated
 
-    core.load({
+    core.load(makeLoadCtx({
       solver,
-      voltages,
+      rhs: new Float64Array(3),
+      rhsOld: voltages,
       cktMode: MODEDCOP | MODEINITSMSIG,
       dt: 0,
-      method: "trapezoidal" as const,
-      order: 1,
-      deltaOld: [0, 0, 0, 0, 0, 0, 0],
-      ag: new Float64Array(7),
-      srcFact: 1,
-      noncon: { value: 0 },
-      limitingCollector: null,
-      xfact: 0,
-      gmin: 1e-12,
-      reltol: 1e-3,
-      iabstol: 1e-12,
-      cktFixLimit: false,
-      bypass: false,
-      voltTol: 1e-6,
-    });
+    }));
 
     // SLOT_VD must remain 0.4V (seeded from state0, not the 2V iterate).
   });
@@ -1113,29 +1043,17 @@ describe("diode MODEINITSMSIG seeding (dioload.c:126-127)", () => {
     pool.state1[0] = 0.35;
 
     const solver = new SparseSolver();
-    solver._initStructure(2);
-    const voltages = new Float64Array([3.0, 0]);
+    solver._initStructure(3);
+    const voltages = new Float64Array([0, 3.0, 0]);
 
-    core.load({
+    core.load(makeLoadCtx({
       solver,
-      voltages,
+      rhs: new Float64Array(3),
+      rhsOld: voltages,
       cktMode: MODETRAN | MODEINITTRAN,
       dt: 1e-9,
-      method: "trapezoidal" as const,
-      order: 1,
       deltaOld: [1e-9, 1e-9, 1e-9, 1e-9, 1e-9, 1e-9, 1e-9],
-      ag: new Float64Array(7),
-      srcFact: 1,
-      noncon: { value: 0 },
-      limitingCollector: null,
-      xfact: 0,
-      gmin: 1e-12,
-      reltol: 1e-3,
-      iabstol: 1e-12,
-      cktFixLimit: false,
-      bypass: false,
-      voltTol: 1e-6,
-    });
+    }));
 
     // SLOT_VD must be 0.35V (seeded from state1, not the 3V iterate).
   });
@@ -1157,27 +1075,14 @@ describe("diode MODEINITSMSIG seeding (dioload.c:126-127)", () => {
     solver._initStructure(2);
     const noncon = { value: 0 };
 
-    core.load({
+    core.load(makeLoadCtx({
       solver,
-      rhsOld: new Float64Array([5.0, 0]), // large jump â€” would limit if not SMSIG
-      rhs: new Float64Array([5.0, 0]),
+      rhsOld: new Float64Array([0, 5.0, 0]), // large jump — would limit if not SMSIG
+      rhs: new Float64Array([0, 5.0, 0]),
       cktMode: MODEDCOP | MODEINITSMSIG,
       dt: 0,
-      method: "trapezoidal" as const,
-      order: 1,
-      deltaOld: [0, 0, 0, 0, 0, 0, 0],
-      ag: new Float64Array(7),
-      srcFact: 1,
       noncon,
-      limitingCollector: null,
-      xfact: 0,
-      gmin: 1e-12,
-      reltol: 1e-3,
-      iabstol: 1e-12,
-      cktFixLimit: false,
-      bypass: false,
-      voltTol: 1e-6,
-    });
+    }));
 
     expect(noncon.value).toBe(0);
   });
@@ -1199,27 +1104,15 @@ describe("diode MODEINITSMSIG seeding (dioload.c:126-127)", () => {
     const solver = new SparseSolver();
     solver._initStructure(2);
 
-    core.load({
+    core.load(makeLoadCtx({
       solver,
-      rhsOld: new Float64Array([0.3, 0]),
-      rhs: new Float64Array([0.3, 0]),
+      rhsOld: new Float64Array([0, 0.3, 0]),
+      rhs: new Float64Array([0, 0.3, 0]),
       cktMode: MODEAC | MODEINITSMSIG,
       dt: 1e-9,
-      method: "trapezoidal" as const,
-      order: 1,
       deltaOld: [1e-9, 1e-9, 1e-9, 1e-9, 1e-9, 1e-9, 1e-9],
       ag,
-      srcFact: 1,
-      noncon: { value: 0 },
-      limitingCollector: null,
-      xfact: 0,
-      gmin: 1e-12,
-      reltol: 1e-3,
-      iabstol: 1e-12,
-      cktFixLimit: false,
-      bypass: false,
-      voltTol: 1e-6,
-    });
+    }));
 
     // MODEINITSMSIG: SLOT_CAP_CURRENT (index 4) holds capd (Farads) = Ctotal.
     // With CJO=10pF at Vd=0.3V, Ctotal > 0 â€” dioload.c:363.
@@ -1241,29 +1134,18 @@ describe("diode MODEINITSMSIG seeding (dioload.c:126-127)", () => {
     computeNIcomCof(1e-9, [1e-9, 1e-9, 1e-9, 1e-9, 1e-9, 1e-9, 1e-9], 1, "trapezoidal", ag, scratch);
 
     const solver = new SparseSolver();
-    solver._initStructure(2);
+    solver._initStructure(3);
 
-    core.load({
+    core.load(makeLoadCtx({
       solver,
-      rhsOld: new Float64Array([0.3, 0]),
-      rhs: new Float64Array([0.3, 0]),
+      rhsOld: new Float64Array([0, 0.3, 0]),
+      rhs: new Float64Array([0, 0.3, 0]),
       cktMode: MODETRANOP | MODEUIC | MODEINITJCT,
       dt: 1e-9,
-      method: "trapezoidal" as const,
-      order: 1,
       deltaOld: [1e-9, 1e-9, 1e-9, 1e-9, 1e-9, 1e-9, 1e-9],
       ag,
-      srcFact: 1,
-      noncon: { value: 0 },
-      limitingCollector: null,
-      xfact: 0,
-      gmin: 1e-12,
-      reltol: 1e-3,
-      iabstol: 1e-12,
-      cktFixLimit: false,
-      bypass: false,
-      voltTol: 1e-6,
-    });
+      vt: 300.15 * 1.3806226e-23 / 1.6021918e-19,
+    }));
 
     // SLOT_CAP_CURRENT (index 4) holds iqcap (A) under MODETRAN/MODEUIC â€” dioload.c:363.
     expect(pool.state0[4]).toBeGreaterThan(0);
@@ -1282,27 +1164,13 @@ describe("diode MODEINITSMSIG seeding (dioload.c:126-127)", () => {
     const solver = new SparseSolver();
     solver._initStructure(2);
 
-    core.load({
+    core.load(makeLoadCtx({
       solver,
-      rhsOld: new Float64Array([0.3, 0]),
-      rhs: new Float64Array([0.3, 0]),
+      rhsOld: new Float64Array([0, 0.3, 0]),
+      rhs: new Float64Array([0, 0.3, 0]),
       cktMode: MODEDCOP | MODEINITFLOAT,
       dt: 0,
-      method: "trapezoidal" as const,
-      order: 1,
-      deltaOld: [0, 0, 0, 0, 0, 0, 0],
-      ag: new Float64Array(7),
-      srcFact: 1,
-      noncon: { value: 0 },
-      limitingCollector: null,
-      xfact: 0,
-      gmin: 1e-12,
-      reltol: 1e-3,
-      iabstol: 1e-12,
-      cktFixLimit: false,
-      bypass: false,
-      voltTol: 1e-6,
-    });
+    }));
 
     // SLOT_CAP_CURRENT (index 4) must remain 0 â€” cap block not entered under DCOP.
     expect(pool.state0[4]).toBe(0);
@@ -1320,8 +1188,8 @@ describe("diode checkConvergence A7 fix (MODEINITFIX | MODEINITSMSIG)", () => {
     const el = withNodeIds(core, [1, 2]);
 
     const solver = new SparseSolver();
-    solver._initStructure(2);
-    const result = el.checkConvergence!(buildUnitCtx(solver, new Float64Array(2), { cktMode: MODEDCOP | MODEINITFIX }));
+    solver._initStructure(3);
+    const result = el.checkConvergence!(buildUnitCtx(solver, new Float64Array(3), { cktMode: MODEDCOP | MODEINITFIX }));
     expect(result).toBe(true);
   });
 
@@ -1336,8 +1204,8 @@ describe("diode checkConvergence A7 fix (MODEINITFIX | MODEINITSMSIG)", () => {
     const el = withNodeIds(core, [1, 2]);
 
     const solver = new SparseSolver();
-    solver._initStructure(2);
-    const result = el.checkConvergence!(buildUnitCtx(solver, new Float64Array(2), { cktMode: MODEDCOP | MODEINITSMSIG }));
+    solver._initStructure(3);
+    const result = el.checkConvergence!(buildUnitCtx(solver, new Float64Array(3), { cktMode: MODEDCOP | MODEINITSMSIG }));
     expect(result).toBe(true);
   });
 
@@ -1354,9 +1222,9 @@ describe("diode checkConvergence A7 fix (MODEINITFIX | MODEINITSMSIG)", () => {
     const el = withNodeIds(core, [1, 2]);
 
     const solver = new SparseSolver();
-    solver._initStructure(2);
+    solver._initStructure(3);
     // Voltages match state0 exactly â†’ should converge.
-    const convergedVoltages = new Float64Array([0.3, 0]);
+    const convergedVoltages = new Float64Array([0, 0.3, 0]);
     const result = el.checkConvergence!(buildUnitCtx(solver, convergedVoltages, { cktMode: MODEDCOP | MODEINITSMSIG }));
     // Since OFF=0, it falls through to the convergence math; with matching
     // voltages the delta is 0, so it must converge.
@@ -1446,8 +1314,8 @@ describe("Diode TEMP", () => {
 
     // Invoke load() under MODEINITJCT with OFF=0
     const solver = new SparseSolver();
-    solver._initStructure(2);
-    core.load(buildUnitCtx(solver, new Float64Array(2), { cktMode: MODEDCOP | MODEINITJCT }));
+    solver._initStructure(3);
+    core.load(buildUnitCtx(solver, new Float64Array(3), { cktMode: MODEDCOP | MODEINITJCT }));
 
     // s0[SLOT_VD=0] must equal the 400K tVcrit (set by MODEINITJCT path, no pnjlim)
     expect(pool.state0[0]).toBe(tp400.tVcrit);

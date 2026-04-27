@@ -336,12 +336,12 @@ describe('parser', () => {
 
     it('parses #analog:abstol pragma', () => {
       const text = '#analog:abstol 1m\nA B\n0 1';
-      const result = parseTestData(text, 1);
+      parseTestData(text, 1);
     });
 
     it('parses #analog:settle pragma', () => {
       const text = '#analog:settle 10m\nA B\n0 1';
-      const result = parseTestData(text, 1);
+      parseTestData(text, 1);
     });
 
     it('returns empty analogPragmas when no pragmas present', () => {

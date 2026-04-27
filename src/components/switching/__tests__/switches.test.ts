@@ -750,6 +750,7 @@ function makeCaptureSolver() {
   const stamps: Array<[number, number, number]> = [];
   const rhs: Array<[number, number]> = [];
   const solver = {
+    _initStructure: (_n: number) => {},
     allocElement: vi.fn((row: number, col: number) => {
       stamps.push([row, col, 0]);
       return stamps.length - 1;
@@ -795,7 +796,7 @@ describe("AnalogSwitch", () => {
     ) as SpstAnalogElement;
     const { solver, stamps } = makeCaptureSolver();
     const ctx = makeSimpleCtx({ solver: solver as unknown as SparseSolver, elements: [], nodeCount: 2, matrixSize: 2 });
-    el.load(ctx);
+    el.load(ctx.loadCtx);
 
     // G = 1/Ron = 1.0; should stamp conductance entries
     const expectedG = 1.0;
@@ -815,7 +816,7 @@ describe("AnalogSwitch", () => {
     ) as SpstAnalogElement;
     const { solver, stamps } = makeCaptureSolver();
     const ctx = makeSimpleCtx({ solver: solver as unknown as SparseSolver, elements: [], nodeCount: 2, matrixSize: 2 });
-    el.load(ctx);
+    el.load(ctx.loadCtx);
 
     // G = 1/Roff = 1e-9
     const expectedG = 1e-9;
@@ -835,13 +836,13 @@ describe("AnalogSwitch", () => {
 
     const { solver: solver1, stamps: stamps1 } = makeCaptureSolver();
     const ctx1 = makeSimpleCtx({ solver: solver1 as unknown as SparseSolver, elements: [], nodeCount: 2, matrixSize: 2 });
-    el.load(ctx1);
+    el.load(ctx1.loadCtx);
     const gClosed = stamps1.map(([, , v]) => v).find((v) => v > 0)!;
 
     el.setClosed(false);
     const { solver: solver2, stamps: stamps2 } = makeCaptureSolver();
     const ctx2 = makeSimpleCtx({ solver: solver2 as unknown as SparseSolver, elements: [], nodeCount: 2, matrixSize: 2 });
-    el.load(ctx2);
+    el.load(ctx2.loadCtx);
     const gOpen = stamps2.map(([, , v]) => v).find((v) => v > 0)!;
 
     // Closed G = 1/Ron = 1.0; Open G = 1/Roff = 1e-9
@@ -865,7 +866,7 @@ describe("AnalogSwitch", () => {
 
     const { solver, stamps } = makeCaptureSolver();
     const ctx = makeSimpleCtx({ solver: solver as unknown as SparseSolver, elements: [], nodeCount: 2, matrixSize: 2 });
-    el.load(ctx);
+    el.load(ctx.loadCtx);
 
     // NC + closed=false → effectively closed → stamps Ron
     const gVals = stamps.map(([, , v]) => v);
@@ -891,7 +892,7 @@ describe("AnalogSPDT", () => {
 
     const { solver, stamps } = makeCaptureSolver();
     const ctx = makeSimpleCtx({ solver: solver as unknown as SparseSolver, elements: [], nodeCount: 3, matrixSize: 3 });
-    el.load(ctx);
+    el.load(ctx.loadCtx);
 
     const positiveValues = stamps.filter(([, , v]) => v > 0).map(([, , v]) => v);
     const smallG = positiveValues.filter((v) => v < 1e-6);
@@ -917,7 +918,7 @@ describe("AnalogSPDT", () => {
 
     const { solver, stamps } = makeCaptureSolver();
     const ctx = makeSimpleCtx({ solver: solver as unknown as SparseSolver, elements: [], nodeCount: 3, matrixSize: 3 });
-    el.load(ctx);
+    el.load(ctx.loadCtx);
 
     const positiveValues = stamps.filter(([, , v]) => v > 0).map(([, , v]) => v);
     const smallG = positiveValues.filter((v) => v < 1e-6);
@@ -951,7 +952,7 @@ describe("Integration", () => {
     const vs = makeVoltageSource(1, 0, 2, 10);  // 10V: node1→gnd, branch at absolute row 2
     const r = makeResistor(2, 0, 1000);          // 1kΩ: node2→gnd
 
-    const circuit: ConcreteCompiledAnalogCircuit = {
+    const circuit = {
       netCount: 2,
       componentCount: 3,
       nodeCount: 2,
@@ -960,7 +961,7 @@ describe("Integration", () => {
       elements: [vs, swEl as unknown as import("../../../solver/analog/element.js").AnalogElement, r],
       labelToNodeId: new Map(),
       statePool: new StatePool(0),
-    };
+    } as unknown as ConcreteCompiledAnalogCircuit;
 
     const engine = new MNAEngine();
     engine.init(circuit);
@@ -978,6 +979,6 @@ describe("Integration", () => {
     const result2 = engine.dcOperatingPoint();
     expect(result2.converged).toBe(true);
     // With Roff=1e9Ω, V across 1kΩ ≈ 10 * 1000 / (1000 + 1e9) ≈ 1e-5V ≈ 0
-    const vOpen = engine.getNodeVoltage(2);
+    engine.getNodeVoltage(2);
   });
 });

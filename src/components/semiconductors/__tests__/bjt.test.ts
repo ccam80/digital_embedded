@@ -7,7 +7,7 @@
  * wiring), and LimitingEvent instrumentation remain.
  */
 
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect } from "vitest";
 import {
   createBjtElement,
   createSpiceL1BjtElement,
@@ -501,9 +501,9 @@ describe("BJT L0 MODEINITPRED", () => {
     // This gives s0 values that are self-consistent at those voltages; we then
     // copy s0 → s1 to simulate what the previous time-step would have left.
     const rhsOldPrime = new Float64Array(10);
-    rhsOldPrime[0] = 0.65; // nodeB=1 → rhsOld[0]
-    rhsOldPrime[1] = -1.0; // nodeC=2 → rhsOld[1]
-    rhsOldPrime[2] = 0.0;  // nodeE=3 → rhsOld[2]
+    rhsOldPrime[1] = 0.65; // nodeB=1 → rhsOld[0]
+    rhsOldPrime[2] = -1.0; // nodeC=2 → rhsOld[1]
+    rhsOldPrime[3] = 0.0;  // nodeE=3 → rhsOld[2]
     const solverPrime = new SparseSolver();
     solverPrime._initStructure(10);
     const rhs = new Float64Array(10);
@@ -711,8 +711,7 @@ describe("BJT L0 MODEINITJCT", () => {
 // ---------------------------------------------------------------------------
 
 describe("BJT L0 NOBYPASS", () => {
-  const SLOT_VBE = 0, SLOT_VBC = 1, SLOT_CC = 2, SLOT_CB = 3;
-  const SLOT_GPI = 4, SLOT_GMU = 5, SLOT_GM = 6, SLOT_GO = 7, SLOT_GX = 8;
+  const SLOT_VBE = 0, SLOT_VBC = 1;
 
   // Path-selection discriminator: bjt.ts L0 load() only calls
   // ctx.limitingCollector.push() on the compute path (bjt.ts:932-951,
@@ -746,23 +745,23 @@ describe("BJT L0 NOBYPASS", () => {
     // block at bjt.ts:999-1023 runs unconditionally after the if/else), so
     // this probe primarily serves as a "stamps actually fired" sanity check
     // on the no-bypass path.
-    const stampCount = { g: 0, rhs: 0 };
+    const rhs = new Float64Array(10);
+    let _gCount = 0;
     const origStampElement = solver.stampElement.bind(solver);
     solver.stampElement = (handle: number, value: number) => {
-      stampCount.g++;
+      _gCount++;
       origStampElement(handle, value);
     };
-    const origStampRHS = solver.stampRHS.bind(solver);
-    solver.stampRHS = (row: number, value: number) => {
-      stampCount.rhs++;
-      origStampRHS(row, value);
+    const stampCount = {
+      get g() { return _gCount; },
+      get rhs() { return Array.from(rhs).filter((v) => v !== 0).length; },
     };
     const limitingCollector: LimitingEvent[] = [];
     const ctx: LoadContext = {
       cktMode,
       solver,
       matrix: solver,
-      rhs: new Float64Array(10),
+      rhs,
       rhsOld,
       time: 0,
       dt: 0,
@@ -795,9 +794,9 @@ describe("BJT L0 NOBYPASS", () => {
     // ran on both calls (limitingCollector populated), since with bypass=false
     // the gate can never fire even when tolerances are nominally met.
     const rhsOld = new Float64Array(10);
-    rhsOld[0] = 0.65; // nodeB=1
-    rhsOld[1] = 3.0;  // nodeC=2
-    rhsOld[2] = 0.0;  // nodeE=3
+    rhsOld[1] = 0.65; // nodeB=1
+    rhsOld[2] = 3.0;  // nodeC=2
+    rhsOld[3] = 0.0;  // nodeE=3
 
     // First call — compute path, writes s0.
     const first = makeBypassCtx(MODEDCOP | MODEINITFLOAT, rhsOld, false);
@@ -852,22 +851,22 @@ describe("BJT L0 NOBYPASS", () => {
     ): { ctx: LoadContext; stampCount: { g: number; rhs: number } } {
       const solver = new SparseSolver();
       solver._initStructure(10);
-      const stampCount = { g: 0, rhs: 0 };
+      const rhsBuf = new Float64Array(10);
+      let _gCount2 = 0;
       const origStampElement = solver.stampElement.bind(solver);
       solver.stampElement = (handle: number, value: number) => {
-        stampCount.g++;
+        _gCount2++;
         origStampElement(handle, value);
       };
-      const origStampRHS = solver.stampRHS.bind(solver);
-      solver.stampRHS = (row: number, value: number) => {
-        stampCount.rhs++;
-        origStampRHS(row, value);
+      const stampCount = {
+        get g() { return _gCount2; },
+        get rhs() { return Array.from(rhsBuf).filter((v) => v !== 0).length; },
       };
       const ctx: LoadContext = {
         cktMode: MODEDCOP | MODEINITFLOAT,
         solver,
         matrix: solver,
-        rhs: new Float64Array(10),
+        rhs: rhsBuf,
         rhsOld,
         time: 0,
         dt: 0,
@@ -896,7 +895,7 @@ describe("BJT L0 NOBYPASS", () => {
 
     // First call — bypass=false, primes s0 with self-consistent op-state.
     const rhsOld1 = new Float64Array(10);
-    rhsOld1[0] = 0.65; rhsOld1[1] = 3.0; rhsOld1[2] = 0.0;
+    rhsOld1[1] = 0.65; rhsOld1[2] = 3.0; rhsOld1[3] = 0.0;
     const limits1: LimitingEvent[] = [];
     const call1 = makeCtx(rhsOld1, false, { value: 0 }, limits1);
     element.load(call1.ctx);
@@ -909,9 +908,9 @@ describe("BJT L0 NOBYPASS", () => {
     const vbeTarget = s0[SLOT_VBE];
     const vbcTarget = s0[SLOT_VBC];
     const rhsOld2 = new Float64Array(10);
-    rhsOld2[0] = vbeTarget;             // nodeB=1 → vB = vbeTarget (vE=0)
-    rhsOld2[1] = vbeTarget - vbcTarget; // nodeC=2 → vC = vB - vbcTarget
-    rhsOld2[2] = 0.0;                   // nodeE=3
+    rhsOld2[1] = vbeTarget;             // nodeB=1 → vB = vbeTarget (vE=0)
+    rhsOld2[2] = vbeTarget - vbcTarget; // nodeC=2 → vC = vB - vbcTarget
+    rhsOld2[3] = 0.0;                   // nodeE=3
 
     const noncon2 = { value: 0 };
     const limits2: LimitingEvent[] = [];
@@ -984,7 +983,7 @@ describe("BJT L0 NOBYPASS", () => {
 
     // Prime s0 at forward-active bias.
     const rhsOld = new Float64Array(10);
-    rhsOld[0] = 0.65; rhsOld[1] = 3.0; rhsOld[2] = 0.0;
+    rhsOld[1] = 0.65; rhsOld[2] = 3.0; rhsOld[3] = 0.0;
     const element = withNodeIds(core, [1, 2, 3]);
     element.load(makeCtx(MODEDCOP | MODEINITFLOAT, rhsOld, false, []));
 
@@ -1017,9 +1016,9 @@ describe("BJT L0 noncon", () => {
   function makeNonconCtx(cktMode: number, off: number): { ctx: LoadContext; element: AnalogElement; s0: Float64Array } {
     // Use large rhsOld to trigger pnjlim (large delvbe forces limiting).
     const rhsOld = new Float64Array(10);
-    rhsOld[0] = 5.0; // vB high — ensures vbeRaw >> s0[VBE] → pnjlim fires, icheckLimited=true.
-    rhsOld[1] = 3.0;
-    rhsOld[2] = 0.0;
+    rhsOld[1] = 5.0; // vB high — ensures vbeRaw >> s0[VBE] → pnjlim fires, icheckLimited=true.
+    rhsOld[2] = 3.0;
+    rhsOld[3] = 0.0;
     const propsObj = makeBjtProps({ OFF: off });
     const core = createBjtElement(1, new Map([["B", 1], ["C", 2], ["E", 3]]), -1, propsObj) as AnalogElementCore;
     const pool = new StatePool((core as any).stateSize);
@@ -1135,7 +1134,7 @@ describe("BJT L0 MODEINITSMSIG", () => {
       const primeSolver = new SparseSolver();
       primeSolver._initStructure(10);
       const rhsPrime = new Float64Array(10);
-      rhsPrime[0] = 0.65; rhsPrime[1] = 3.0; rhsPrime[2] = 0.0;
+      rhsPrime[1] = 0.65; rhsPrime[2] = 3.0; rhsPrime[3] = 0.0;
       const primeCtx: LoadContext = {
         cktMode: MODEDCOP | MODEINITFLOAT,
         solver: primeSolver,
@@ -1290,7 +1289,7 @@ describe("BJT L1 MODEINITSMSIG", () => {
     const primeSolver = new SparseSolver();
     primeSolver._initStructure(10);
     const rhsPrime = new Float64Array(10);
-    rhsPrime[0] = 0.65; rhsPrime[1] = 3.0; rhsPrime[2] = 0.0;
+    rhsPrime[1] = 0.65; rhsPrime[2] = 3.0; rhsPrime[3] = 0.0;
     const primeCtx: LoadContext = {
       cktMode: MODEDCOP | MODEINITFLOAT,
       solver: primeSolver,
@@ -1405,9 +1404,9 @@ describe("BJT L1 MODEINITPRED", () => {
     // Prime state1 with physically consistent op-state values by running a
     // normal NR load() pass at vbe=0.65 V forward-active bias.
     const rhsOldPrime = new Float64Array(10);
-    rhsOldPrime[0] = 0.65; // nodeB=1 → rhsOld[0]
-    rhsOldPrime[1] = -1.0; // nodeC=2 → rhsOld[1]
-    rhsOldPrime[2] = 0.0;  // nodeE=3 → rhsOld[2]
+    rhsOldPrime[1] = 0.65; // nodeB=1 → rhsOld[0]
+    rhsOldPrime[2] = -1.0; // nodeC=2 → rhsOld[1]
+    rhsOldPrime[3] = 0.0;  // nodeE=3 → rhsOld[2]
     const solverPrime = new SparseSolver();
     solverPrime._initStructure(10);
     const ctxPrime: LoadContext = {
@@ -1526,9 +1525,7 @@ describe("BJT L1 MODEINITPRED", () => {
 // ---------------------------------------------------------------------------
 
 describe("BJT L1 NOBYPASS", () => {
-  const SLOT_CC = 2, SLOT_CB = 3, SLOT_GPI = 4, SLOT_GMU = 5;
-  const SLOT_GM = 6, SLOT_GO = 7, SLOT_GX = 16;
-  const SLOT_VBE = 0, SLOT_VBC = 1, SLOT_VSUB = 21;
+  const SLOT_VBE = 0, SLOT_VBC = 1;
 
   // Path-selection discriminator: bjt.ts L1 load() only calls
   // ctx.limitingCollector.push() on the compute path (bjt.ts:1458-1486,
@@ -1557,24 +1554,23 @@ describe("BJT L1 NOBYPASS", () => {
     const solver = new SparseSolver();
     solver._initStructure(10);
     // Stamp-count probe: wrap solver.stampElement (G-matrix primitive used by
-    // the stampG helper) and solver.stampRHS (method used by stampRHS helper).
-    const stampCount = { n: 0 };
+    // the stampG helper). RHS count is read from ctx.rhs after load.
+    const rhsL1 = new Float64Array(10);
+    let _nCount = 0;
     const origStampElement = solver.stampElement.bind(solver);
     solver.stampElement = (handle: number, value: number) => {
-      stampCount.n++;
+      _nCount++;
       origStampElement(handle, value);
     };
-    const origStampRHS = solver.stampRHS.bind(solver);
-    solver.stampRHS = (row: number, value: number) => {
-      stampCount.n++;
-      origStampRHS(row, value);
+    const stampCount = {
+      get n() { return _nCount + Array.from(rhsL1).filter((v) => v !== 0).length; },
     };
     const limitingCollector: LimitingEvent[] = [];
     const ctx: LoadContext = {
       cktMode,
       solver,
       matrix: solver,
-      rhs: new Float64Array(10),
+      rhs: rhsL1,
       rhsOld,
       time: 0, dt: 0,
       method: "trapezoidal", order: 1,
@@ -1594,7 +1590,7 @@ describe("BJT L1 NOBYPASS", () => {
     // Spec (task 5.2.3, same pattern as 5.1.3): assert both calls emit
     // non-zero stamps AND compute path ran (limitingCollector populated).
     const rhsOld = new Float64Array(10);
-    rhsOld[0] = 0.65; rhsOld[1] = 3.0; rhsOld[2] = 0.0;
+    rhsOld[1] = 0.65; rhsOld[2] = 3.0; rhsOld[3] = 0.0;
 
     // First call — compute path, writes s0.
     const first = makeL1BypassCtx(MODEDCOP | MODEINITFLOAT, rhsOld, false);
@@ -1641,21 +1637,20 @@ describe("BJT L1 NOBYPASS", () => {
     ): { ctx: LoadContext; stampCount: { n: number } } {
       const solver = new SparseSolver();
       solver._initStructure(10);
-      const stampCount = { n: 0 };
+      const rhsBuf2 = new Float64Array(10);
+      let _nCount2 = 0;
       const origStampElement = solver.stampElement.bind(solver);
       solver.stampElement = (handle: number, value: number) => {
-        stampCount.n++;
+        _nCount2++;
         origStampElement(handle, value);
       };
-      const origStampRHS = solver.stampRHS.bind(solver);
-      solver.stampRHS = (row: number, value: number) => {
-        stampCount.n++;
-        origStampRHS(row, value);
+      const stampCount = {
+        get n() { return _nCount2 + Array.from(rhsBuf2).filter((v) => v !== 0).length; },
       };
       const ctx: LoadContext = {
         cktMode: MODEDCOP | MODEINITFLOAT,
         solver, matrix: solver,
-        rhs: new Float64Array(10), rhsOld,
+        rhs: rhsBuf2, rhsOld,
         time: 0, dt: 0, method: "trapezoidal", order: 1,
         deltaOld: [0, 0, 0, 0, 0, 0, 0],
         ag: new Float64Array(7), srcFact: 1,
@@ -1671,7 +1666,7 @@ describe("BJT L1 NOBYPASS", () => {
 
     // First load: prime s0. bypass=false → compute path → 3 pushes expected.
     const rhsOld1 = new Float64Array(10);
-    rhsOld1[0] = 0.65; rhsOld1[1] = 3.0; rhsOld1[2] = 0.0;
+    rhsOld1[1] = 0.65; rhsOld1[2] = 3.0; rhsOld1[3] = 0.0;
     const limits1: LimitingEvent[] = [];
     const call1 = makeCtx(rhsOld1, false, { value: 0 }, limits1);
     element.load(call1.ctx);
@@ -1681,9 +1676,9 @@ describe("BJT L1 NOBYPASS", () => {
     const vbeTarget = s0[SLOT_VBE];
     const vbcTarget = s0[SLOT_VBC];
     const rhsOld2 = new Float64Array(10);
-    rhsOld2[0] = vbeTarget;
-    rhsOld2[1] = vbeTarget - vbcTarget;
-    rhsOld2[2] = 0.0;
+    rhsOld2[1] = vbeTarget;
+    rhsOld2[2] = vbeTarget - vbcTarget;
+    rhsOld2[3] = 0.0;
 
     const noncon2 = { value: 0 };
     const limits2: LimitingEvent[] = [];
@@ -1739,7 +1734,7 @@ describe("BJT L1 NOBYPASS", () => {
 
     // Prime s0 with a normal NR pass at forward-active bias.
     const rhsOld1 = new Float64Array(10);
-    rhsOld1[0] = 0.65; rhsOld1[1] = 3.0; rhsOld1[2] = 0.0;
+    rhsOld1[1] = 0.65; rhsOld1[2] = 3.0; rhsOld1[3] = 0.0;
     element.load(makeCtx(MODEDCOP | MODEINITFLOAT, rhsOld1, false, []));
 
     // Copy s0→s1, s1→s2 so MODEINITPRED extrapolation collapses to s0 values.
@@ -1773,7 +1768,7 @@ describe("BJT L1 noncon", () => {
     solver._initStructure(10);
     // rhsOld: large voltage shift to trigger pnjlim.
     const rhsOld = new Float64Array(10);
-    rhsOld[0] = 5.0; rhsOld[1] = 0.0; rhsOld[2] = 0.0;
+    rhsOld[1] = 5.0; rhsOld[2] = 0.0; rhsOld[3] = 0.0;
     const ctx: LoadContext = {
       cktMode,
       solver, matrix: solver,
@@ -1836,7 +1831,7 @@ describe("BJT L1 CdBE", () => {
       const solver = new SparseSolver();
       solver._initStructure(10);
       const rhsOld = new Float64Array(10);
-      rhsOld[0] = 0.65; rhsOld[1] = 3.0; rhsOld[2] = 0.0;
+      rhsOld[1] = 0.65; rhsOld[2] = 3.0; rhsOld[3] = 0.0;
       return {
         cktMode: MODEDCOP | MODEINITSMSIG,
         solver, matrix: solver,
@@ -1855,7 +1850,7 @@ describe("BJT L1 CdBE", () => {
 
     // Prime s0 with MODEDCOP|MODEINITFLOAT first so MODEINITSMSIG reads valid op state.
     const primeSolver = new SparseSolver(); primeSolver._initStructure(10);
-    const rhsPrime = new Float64Array(10); rhsPrime[0] = 0.65; rhsPrime[1] = 3.0;
+    const rhsPrime = new Float64Array(10); rhsPrime[1] = 0.65; rhsPrime[2] = 3.0;
     const primeCtx: LoadContext = {
       cktMode: MODEDCOP | MODEINITFLOAT,
       solver: primeSolver, matrix: primeSolver,
@@ -1922,7 +1917,7 @@ describe("BJT L1 BC_cap_stamps", () => {
     };
 
     const rhsOld = new Float64Array(nodeCount);
-    rhsOld[0] = 0.65; rhsOld[1] = -1.0; rhsOld[2] = 0.0;
+    rhsOld[1] = 0.65; rhsOld[2] = -1.0; rhsOld[2] = 0.0;
     // Use MODEINITTRAN so s1 QBX is seeded and NIintegrate fires on the second call.
     // First call: MODEINITTRAN seeds QBX into state1.
     const ctxInit: LoadContext = {
@@ -2092,8 +2087,8 @@ describe("BJT L1 AREAB_AREAC", () => {
     const solver = new SparseSolver();
     solver._initStructure(10);
     const rhsOld = new Float64Array(10);
-    rhsOld[0] = 0.65;  // VB: VBE forward
-    rhsOld[1] = 0.0;   // VC=0 → vbc = VB - VC = 0.65 (forward-biased, cbcn fires)
+    rhsOld[1] = 0.65;  // VB: VBE forward
+    rhsOld[2] = 0.0;   // VC=0 → vbc = VB - VC = 0.65 (forward-biased, cbcn fires)
     return {
       cktMode: MODEDCOP | MODEINITFLOAT,
       solver, matrix: solver,
@@ -2111,8 +2106,8 @@ describe("BJT L1 AREAB_AREAC", () => {
     const solver = new SparseSolver();
     solver._initStructure(10);
     const rhsOld = new Float64Array(10);
-    rhsOld[0] = 0.65;
-    rhsOld[1] = -1.0;
+    rhsOld[1] = 0.65;
+    rhsOld[2] = -1.0;
     const ag = new Float64Array(7);
     ag[0] = 1 / 1e-9;
     return {
@@ -2234,8 +2229,8 @@ describe("BJT L1 AREAB_AREAC", () => {
     const solver = new SparseSolver();
     solver._initStructure(10);
     const rhsOld = new Float64Array(10);
-    rhsOld[0] = 0.65; // VB
-    rhsOld[1] = 0.0;  // VC
+    rhsOld[1] = 0.65; // VB
+    rhsOld[2] = 0.0;  // VC
     return {
       cktMode: MODEDCOP | MODEINITFLOAT,
       solver, matrix: solver,
@@ -2308,7 +2303,7 @@ describe("BJT L1 MODEINITTRAN", () => {
     const solver = new SparseSolver();
     solver._initStructure(10);
     const rhsOld = new Float64Array(10);
-    rhsOld[0] = 0.65; rhsOld[1] = -1.0;
+    rhsOld[1] = 0.65; rhsOld[2] = -1.0;
     const ag = new Float64Array(7);
     ag[0] = 1 / 1e-9;
     return {
@@ -2375,7 +2370,7 @@ describe("BJT L1 excess_phase", () => {
     const solver = new SparseSolver();
     solver._initStructure(10);
     const rhsOld = new Float64Array(10);
-    rhsOld[0] = 0.65; rhsOld[1] = -1.0;
+    rhsOld[1] = 0.65; rhsOld[2] = -1.0;
     const ag = new Float64Array(7);
     ag[0] = 1 / 1e-9;
     return {
@@ -2397,7 +2392,7 @@ describe("BJT L1 excess_phase", () => {
     const { el, pool } = makeExcessPhaseEl();
     // Prime: run DC-OP pass so s0[VBE] = 0.65 (computed and stored).
     const primeSolver = new SparseSolver(); primeSolver._initStructure(10);
-    const rhsPrime = new Float64Array(10); rhsPrime[0] = 0.65; rhsPrime[1] = -1.0;
+    const rhsPrime = new Float64Array(10); rhsPrime[1] = 0.65; rhsPrime[2] = -1.0;
     el.load({
       cktMode: MODEDCOP | MODEINITFLOAT, solver: primeSolver, matrix: primeSolver,
       rhs: new Float64Array(10), rhsOld: rhsPrime,
@@ -2436,7 +2431,7 @@ describe("BJT L1 excess_phase", () => {
       const solver = new SparseSolver();
       solver._initStructure(10);
       const rhsOld = new Float64Array(10);
-      rhsOld[0] = 0.65; rhsOld[1] = -1.0;
+      rhsOld[1] = 0.65; rhsOld[2] = -1.0;
       const ag = new Float64Array(7);
       ag[0] = 1 / 1e-9;
       return {
@@ -2499,7 +2494,7 @@ describe("BJT L1 XTF_zero", () => {
     const solver = new SparseSolver();
     solver._initStructure(10);
     const rhsOld = new Float64Array(10);
-    rhsOld[0] = 0.65; rhsOld[1] = -1.0;
+    rhsOld[1] = 0.65; rhsOld[2] = -1.0;
     return {
       cktMode: MODEDCOP | MODEINITSMSIG,
       solver, matrix: solver,
@@ -2522,7 +2517,7 @@ describe("BJT L1 XTF_zero", () => {
     // Prime with DC-OP first.
     const primeSolver1 = new SparseSolver(); primeSolver1._initStructure(10);
     const primeSolver2 = new SparseSolver(); primeSolver2._initStructure(10);
-    const rhsOld = new Float64Array(10); rhsOld[0] = 0.65; rhsOld[1] = -1.0;
+    const rhsOld = new Float64Array(10); rhsOld[1] = 0.65; rhsOld[2] = -1.0;
     const primeCtx1: LoadContext = {
       cktMode: MODEDCOP | MODEINITFLOAT, solver: primeSolver1, matrix: primeSolver1,
       rhs: new Float64Array(10), rhsOld,
@@ -2554,7 +2549,7 @@ describe("BJT L1 XTF_zero", () => {
 
     // Prime.
     const primeSolver = new SparseSolver(); primeSolver._initStructure(10);
-    const rhsOld = new Float64Array(10); rhsOld[0] = 0.65; rhsOld[1] = -1.0;
+    const rhsOld = new Float64Array(10); rhsOld[1] = 0.65; rhsOld[2] = -1.0;
     el.load({
       cktMode: MODEDCOP | MODEINITFLOAT, solver: primeSolver, matrix: primeSolver,
       rhs: new Float64Array(10), rhsOld,
@@ -2596,7 +2591,7 @@ describe("BJT L1 substrate", () => {
     const ag = new Float64Array(7);
     ag[0] = 1 / 1e-9;
     const rhsOld = new Float64Array(10);
-    rhsOld[0] = 0.65; rhsOld[1] = -1.0;
+    rhsOld[1] = 0.65; rhsOld[2] = -1.0;
     const solver = new SparseSolver(); solver._initStructure(10);
     const ctx: LoadContext = {
       cktMode: MODETRAN | MODEINITTRAN,
@@ -2642,7 +2637,7 @@ describe("BJT L1 cap_block", () => {
     const solver = new SparseSolver();
     solver._initStructure(10);
     const rhsOld = new Float64Array(10);
-    rhsOld[0] = 0.65; rhsOld[1] = -1.0;
+    rhsOld[1] = 0.65; rhsOld[2] = -1.0;
     const ag = new Float64Array(7);
     if (dt > 0) ag[0] = 1 / dt;
     return {
@@ -2685,7 +2680,7 @@ describe("BJT L1 cap_block", () => {
     const { el, pool } = makeL1Cap();
     // Prime s0 first with a DC-OP so MODEINITSMSIG reads valid op values.
     const primeSolver = new SparseSolver(); primeSolver._initStructure(10);
-    const rhsOld = new Float64Array(10); rhsOld[0] = 0.65; rhsOld[1] = -1.0;
+    const rhsOld = new Float64Array(10); rhsOld[1] = 0.65; rhsOld[2] = -1.0;
     el.load({
       cktMode: MODEDCOP | MODEINITFLOAT, solver: primeSolver, matrix: primeSolver,
       rhs: new Float64Array(10), rhsOld,
@@ -2728,7 +2723,7 @@ describe("BJT L1 LimitingEvent SUB", () => {
     const solver = new SparseSolver();
     solver._initStructure(10);
     const rhsOld = new Float64Array(10);
-    rhsOld[0] = 5.0;  // VBE very large — triggers pnjlim on BE and limits.
+    rhsOld[1] = 5.0;  // VBE very large — triggers pnjlim on BE and limits.
     return {
       cktMode: MODEDCOP | MODEINITFLOAT,
       solver, matrix: solver,
@@ -2804,15 +2799,8 @@ describe("BJT TEMP", () => {
     // At 400K: tSatCur = IS * exp(factlog) >> IS. Both vt and tSatCur change.
     // Compute expected tVcrit values from the same formula used in computeBjtTempParams.
     const REFTEMP = 300.15;
-    const k = 1.3806226e-23;
-    const q_charge = 1.6021918e-19;
     function computeTVcrit(T: number, IS: number): number {
       const vt = T * KoverQ;
-      const fact2 = T / REFTEMP;
-      const egfet = 1.16 - (7.02e-4 * T * T) / (T + 1108);
-      const arg = -egfet / (2 * k * T) + 1.1150877 / (k * (REFTEMP + REFTEMP));
-      const pbfact = -2 * vt * (1.5 * Math.log(fact2) + q_charge * arg);
-      const pbo_be = (0.75 - pbfact) / (REFTEMP / REFTEMP);
       const ratlog = Math.log(T / REFTEMP);
       const ratio1 = T / REFTEMP - 1;
       const factlog = ratio1 * 1.11 / vt + 3 * ratlog;
@@ -2883,9 +2871,9 @@ describe("BJT TEMP", () => {
       const solver = new SparseSolver();
       solver._initStructure(10);
       const rhsOld = new Float64Array(10);
-      rhsOld[0] = 0.65; // VB
-      rhsOld[1] = 3.0;  // VC
-      rhsOld[2] = 0.0;  // VE
+      rhsOld[1] = 0.65; // VB
+      rhsOld[2] = 3.0;  // VC
+      rhsOld[3] = 0.0;  // VE
       return {
         cktMode: MODEDCOP | MODEINITFLOAT,
         solver, matrix: solver,
@@ -2935,7 +2923,7 @@ describe("BJT TEMP", () => {
       const solver = new SparseSolver();
       solver._initStructure(10);
       const rhsOld = new Float64Array(10);
-      rhsOld[0] = 0.65; rhsOld[1] = 3.0; rhsOld[2] = 0.0;
+      rhsOld[1] = 0.65; rhsOld[2] = 3.0; rhsOld[3] = 0.0;
       return {
         cktMode: MODEDCOP | MODEINITFLOAT,
         solver, matrix: solver,
@@ -2989,10 +2977,6 @@ describe("BJT TEMP", () => {
 
     function computeExpectedTVcrit(T: number, IS: number): number {
       const vt = T * KoverQ;
-      const fact2 = T / REFTEMP;
-      const egfet = 1.16 - (7.02e-4 * T * T) / (T + 1108);
-      const arg = -egfet / (2 * k * T) + 1.1150877 / (k * (REFTEMP + REFTEMP));
-      const pbfact = -2 * vt * (1.5 * Math.log(fact2) + q_charge * arg);
       const ratlog = Math.log(T / REFTEMP);
       const ratio1 = T / REFTEMP - 1;
       const factlog = ratio1 * 1.11 / vt + 3 * ratlog;
@@ -3053,10 +3037,6 @@ describe("BJT TEMP", () => {
 
     function computeExpectedTVcrit(T: number, IS: number, EG: number, XTI: number): number {
       const vt = T * KoverQ;
-      const fact2 = T / REFTEMP;
-      const egfet = 1.16 - (7.02e-4 * T * T) / (T + 1108);
-      const arg = -egfet / (2 * k * T) + 1.1150877 / (k * (REFTEMP + REFTEMP));
-      const pbfact = -2 * vt * (1.5 * Math.log(fact2) + q_charge * arg);
       const ratlog = Math.log(T / REFTEMP);
       const ratio1 = T / REFTEMP - 1;
       const factlog = ratio1 * EG / vt + XTI * ratlog;

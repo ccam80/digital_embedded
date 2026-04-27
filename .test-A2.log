@@ -1,0 +1,645 @@
+
+[1m[7m[36m RUN [39m[27m[22m [36mv2.1.9 [39m[90mC:/local_working_projects/digital_in_browser[39m
+
+ [31m❯[39m src/components/active/__tests__/real-opamp.test.ts [2m([22m[2m12 tests[22m[2m | [22m[31m5 failed[39m[2m)[22m[90m 16[2mms[22m[39m
+[31m   [31m×[31m DCGain[2m > [22minverting_amplifier_gain[90m 9[2mms[22m[31m[39m
+[31m     → expected false to be true // Object.is equality[39m
+[31m   [31m×[31m DCGain[2m > [22moutput_saturates_at_rails[90m 1[2mms[22m[31m[39m
+[31m     → expected false to be true // Object.is equality[39m
+[31m   [31m×[31m Offset[2m > [22moutput_offset_with_gain[90m 1[2mms[22m[31m[39m
+[31m     → expected false to be true // Object.is equality[39m
+[31m   [31m×[31m CurrentLimit[2m > [22moutput_current_clamped[90m 1[2mms[22m[31m[39m
+[31m     → expected false to be true // Object.is equality[39m
+[31m   [31m×[31m RealOpAmp[2m > [22mload_741_model[90m 1[2mms[22m[31m[39m
+[31m     → expected false to be true // Object.is equality[39m
+ [31m❯[39m src/components/active/__tests__/timer-555.test.ts [2m([22m[2m5 tests[22m[2m | [22m[31m5 failed[39m[2m)[22m[90m 17[2mms[22m[39m
+[31m   [31m×[31m Timer555[2m > [22minternal_divider_voltages[90m 10[2mms[22m[31m[39m
+[31m     → expected false to be true // Object.is equality[39m
+[31m   [31m×[31m Astable[2m > [22moscillates_at_correct_frequency[90m 2[2mms[22m[31m[39m
+[31m     → expected false to be true // Object.is equality[39m
+[31m   [31m×[31m Astable[2m > [22mduty_cycle[90m 1[2mms[22m[31m[39m
+[31m     → expected false to be true // Object.is equality[39m
+[31m   [31m×[31m Monostable[2m > [22mpulse_width[90m 1[2mms[22m[31m[39m
+[31m     → expected false to be true // Object.is equality[39m
+[31m   [31m×[31m Monostable[2m > [22mretrigger_ignored_during_pulse[90m 2[2mms[22m[31m[39m
+[31m     → expected 'ERROR' not to be 'ERROR' // Object.is equality[39m
+ [32m✓[39m src/components/active/__tests__/schmitt-trigger.test.ts [2m([22m[2m7 tests[22m[2m)[22m[90m 9[2mms[22m[39m
+ [31m❯[39m src/components/active/__tests__/opamp.test.ts [2m([22m[2m7 tests[22m[2m | [22m[31m3 failed[39m[2m)[22m[90m 12[2mms[22m[39m
+[31m   [31m×[31m OpAmp[2m > [22moutput_impedance[90m 7[2mms[22m[31m[39m
+[31m     → expected false to be true // Object.is equality[39m
+[31m   [31m×[31m Integration[2m > [22minverting_amplifier[90m 1[2mms[22m[31m[39m
+[31m     → expected false to be true // Object.is equality[39m
+[31m   [31m×[31m Integration[2m > [22mvoltage_follower[90m 1[2mms[22m[31m[39m
+[31m     → expected false to be true // Object.is equality[39m
+ [32m✓[39m src/components/active/__tests__/adc.test.ts [2m([22m[2m10 tests[22m[2m)[22m[90m 5[2mms[22m[39m
+ [31m❯[39m src/components/active/__tests__/ota.test.ts [2m([22m[2m5 tests[22m[2m | [22m[31m4 failed[39m[2m)[22m[90m 12[2mms[22m[39m
+[31m   [31m×[31m OTA[2m > [22mlinear_region[90m 8[2mms[22m[31m[39m
+[31m     → expected false to be true // Object.is equality[39m
+[31m   [31m×[31m OTA[2m > [22mtanh_limiting[90m 1[2mms[22m[31m[39m
+[31m     → expected false to be true // Object.is equality[39m
+[31m   [31m×[31m OTA[2m > [22mgm_proportional_to_ibias[90m 1[2mms[22m[31m[39m
+[31m     → expected false to be true // Object.is equality[39m
+[31m   [31m×[31m OTA[2m > [22mvca_circuit[90m 1[2mms[22m[31m[39m
+[31m     → expected false to be true // Object.is equality[39m
+ [31m❯[39m src/components/active/__tests__/dac.test.ts [2m([22m[2m12 tests[22m[2m | [22m[31m9 failed[39m[2m)[22m[90m 22[2mms[22m[39m
+[31m   [31m×[31m DAC[2m > [22mfull_scale[90m 10[2mms[22m[31m[39m
+[31m     → expected false to be true // Object.is equality[39m
+[31m   [31m×[31m DAC[2m > [22mzero_code[90m 1[2mms[22m[31m[39m
+[31m     → expected false to be true // Object.is equality[39m
+[31m   [31m×[31m DAC[2m > [22mmidscale[90m 1[2mms[22m[31m[39m
+[31m     → expected false to be true // Object.is equality[39m
+[31m   [31m×[31m DAC[2m > [22mmonotonic_ramp[90m 1[2mms[22m[31m[39m
+[31m     → expected false to be true // Object.is equality[39m
+[31m   [31m×[31m DAC[2m > [22m3.3V CMOS driving 5V VREF  default thresholds detect HIGH correctly[90m 1[2mms[22m[31m[39m
+[31m     → expected false to be true // Object.is equality[39m
+[31m   [31m×[31m DAC[2m > [22m3.3V CMOS driving 5V VREF  LOW correctly detected[90m 1[2mms[22m[31m[39m
+[31m     → expected false to be true // Object.is equality[39m
+[31m   [31m×[31m DAC[2m > [22mvoltage between thresholds reads as LOW (indeterminate  0)[90m 1[2mms[22m[31m[39m
+[31m     → expected false to be true // Object.is equality[39m
+[31m   [31m×[31m DAC[2m > [22mcustom vIH/vIL thresholds are respected[90m 1[2mms[22m[31m[39m
+[31m     → expected false to be true // Object.is equality[39m
+[31m   [31m×[31m DAC[2m > [22mcustom vIH/vIL  drive above custom threshold reads HIGH[90m 1[2mms[22m[31m[39m
+[31m     → expected false to be true // Object.is equality[39m
+ [32m✓[39m src/components/active/__tests__/comparator.test.ts [2m([22m[2m6 tests[22m[2m)[22m[90m 4[2mms[22m[39m
+ [31m❯[39m src/components/active/__tests__/vcvs.test.ts [2m([22m[2m4 tests[22m[2m | [22m[31m4 failed[39m[2m)[22m[90m 12[2mms[22m[39m
+[31m   [31m×[31m VCVS[2m > [22munity_gain_buffer[90m 9[2mms[22m[31m[39m
+[31m     → expected false to be true // Object.is equality[39m
+[31m   [31m×[31m VCVS[2m > [22mgain_of_10[90m 1[2mms[22m[31m[39m
+[31m     → expected false to be true // Object.is equality[39m
+[31m   [31m×[31m VCVS[2m > [22mnonlinear_expression[90m 1[2mms[22m[31m[39m
+[31m     → expected false to be true // Object.is equality[39m
+[31m   [31m×[31m VCVS[2m > [22moutput_drives_load[90m 1[2mms[22m[31m[39m
+[31m     → expected false to be true // Object.is equality[39m
+
+[31m⎯⎯⎯⎯⎯⎯[1m[7m Failed Tests 30 [27m[22m⎯⎯⎯⎯⎯⎯⎯[39m
+
+[31m[1m[7m FAIL [27m[22m[39m src/components/active/__tests__/dac.test.ts[2m > [22mDAC[2m > [22mfull_scale
+[31m[1mAssertionError[22m: expected false to be true // Object.is equality[39m
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[32m- true[39m
+[31m+ false[39m
+
+[36m [2m❯[22m src/components/active/__tests__/dac.test.ts:[2m154:23[22m[39m
+    [90m152| [39m    [35mconst[39m { converged } [33m=[39m [34msolveDac[39m(allHigh)[33m;[39m
+    [90m153| [39m
+    [90m154| [39m    [34mexpect[39m(converged)[33m.[39m[34mtoBe[39m([35mtrue[39m)[33m;[39m
+    [90m   | [39m                      [31m^[39m
+    [90m155| [39m  })[33m;[39m
+    [90m156| [39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/30]⎯[22m[39m
+
+[31m[1m[7m FAIL [27m[22m[39m src/components/active/__tests__/dac.test.ts[2m > [22mDAC[2m > [22mzero_code
+[31m[1mAssertionError[22m: expected false to be true // Object.is equality[39m
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[32m- true[39m
+[31m+ false[39m
+
+[36m [2m❯[22m src/components/active/__tests__/dac.test.ts:[2m162:23[22m[39m
+    [90m160| [39m    [35mconst[39m { converged } [33m=[39m [34msolveDac[39m(allLow)[33m;[39m
+    [90m161| [39m
+    [90m162| [39m    [34mexpect[39m(converged)[33m.[39m[34mtoBe[39m([35mtrue[39m)[33m;[39m
+    [90m   | [39m                      [31m^[39m
+    [90m163| [39m  })[33m;[39m
+    [90m164| [39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/30]⎯[22m[39m
+
+[31m[1m[7m FAIL [27m[22m[39m src/components/active/__tests__/dac.test.ts[2m > [22mDAC[2m > [22mmidscale
+[31m[1mAssertionError[22m: expected false to be true // Object.is equality[39m
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[32m- true[39m
+[31m+ false[39m
+
+[36m [2m❯[22m src/components/active/__tests__/dac.test.ts:[2m172:23[22m[39m
+    [90m170| [39m    [35mconst[39m { converged } [33m=[39m [34msolveDac[39m(bits)[33m;[39m
+    [90m171| [39m
+    [90m172| [39m    [34mexpect[39m(converged)[33m.[39m[34mtoBe[39m([35mtrue[39m)[33m;[39m
+    [90m   | [39m                      [31m^[39m
+    [90m173| [39m  })[33m;[39m
+    [90m174| [39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/30]⎯[22m[39m
+
+[31m[1m[7m FAIL [27m[22m[39m src/components/active/__tests__/dac.test.ts[2m > [22mDAC[2m > [22mmonotonic_ramp
+[31m[1mAssertionError[22m: expected false to be true // Object.is equality[39m
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[32m- true[39m
+[31m+ false[39m
+
+[36m [2m❯[22m src/components/active/__tests__/dac.test.ts:[2m183:25[22m[39m
+    [90m181| [39m    [35mfor[39m ([35mconst[39m code [35mof[39m steps) {
+    [90m182| [39m      [35mconst[39m { converged[33m,[39m vOut } [33m=[39m [34msolveDac[39m([34mcodeToBits[39m(code))[33m;[39m
+    [90m183| [39m      [34mexpect[39m(converged)[33m.[39m[34mtoBe[39m([35mtrue[39m)[33m;[39m
+    [90m   | [39m                        [31m^[39m
+    [90m184| [39m      voltages[33m.[39m[34mpush[39m(vOut)[33m;[39m
+    [90m185| [39m    }
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/30]⎯[22m[39m
+
+[31m[1m[7m FAIL [27m[22m[39m src/components/active/__tests__/dac.test.ts[2m > [22mDAC[2m > [22m3.3V CMOS driving 5V VREF  default thresholds detect HIGH correctly
+[31m[1mAssertionError[22m: expected false to be true // Object.is equality[39m
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[32m- true[39m
+[31m+ false[39m
+
+[36m [2m❯[22m src/components/active/__tests__/dac.test.ts:[2m211:23[22m[39m
+    [90m209| [39m    [35mconst[39m { converged } [33m=[39m [34msolveDac[39m(allHigh[33m,[39m [34m5.0[39m[33m,[39m [34m3.3[39m)[33m;[39m
+    [90m210| [39m
+    [90m211| [39m    [34mexpect[39m(converged)[33m.[39m[34mtoBe[39m([35mtrue[39m)[33m;[39m
+    [90m   | [39m                      [31m^[39m
+    [90m212| [39m  })[33m;[39m
+    [90m213| [39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/30]⎯[22m[39m
+
+[31m[1m[7m FAIL [27m[22m[39m src/components/active/__tests__/dac.test.ts[2m > [22mDAC[2m > [22m3.3V CMOS driving 5V VREF  LOW correctly detected
+[31m[1mAssertionError[22m: expected false to be true // Object.is equality[39m
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[32m- true[39m
+[31m+ false[39m
+
+[36m [2m❯[22m src/components/active/__tests__/dac.test.ts:[2m219:23[22m[39m
+    [90m217| [39m    [35mconst[39m { converged } [33m=[39m [34msolveDac[39m(allLow[33m,[39m [34m5.0[39m[33m,[39m [34m0.0[39m)[33m;[39m
+    [90m218| [39m
+    [90m219| [39m    [34mexpect[39m(converged)[33m.[39m[34mtoBe[39m([35mtrue[39m)[33m;[39m
+    [90m   | [39m                      [31m^[39m
+    [90m220| [39m  })[33m;[39m
+    [90m221| [39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/30]⎯[22m[39m
+
+[31m[1m[7m FAIL [27m[22m[39m src/components/active/__tests__/dac.test.ts[2m > [22mDAC[2m > [22mvoltage between thresholds reads as LOW (indeterminate  0)
+[31m[1mAssertionError[22m: expected false to be true // Object.is equality[39m
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[32m- true[39m
+[31m+ false[39m
+
+[36m [2m❯[22m src/components/active/__tests__/dac.test.ts:[2m228:23[22m[39m
+    [90m226| [39m    [35mconst[39m { converged } [33m=[39m [34msolveDac[39m(allHigh[33m,[39m [34m5.0[39m[33m,[39m [34m1.5[39m)[33m;[39m
+    [90m227| [39m
+    [90m228| [39m    [34mexpect[39m(converged)[33m.[39m[34mtoBe[39m([35mtrue[39m)[33m;[39m
+    [90m   | [39m                      [31m^[39m
+    [90m229| [39m  })[33m;[39m
+    [90m230| [39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[7/30]⎯[22m[39m
+
+[31m[1m[7m FAIL [27m[22m[39m src/components/active/__tests__/dac.test.ts[2m > [22mDAC[2m > [22mcustom vIH/vIL thresholds are respected
+[31m[1mAssertionError[22m: expected false to be true // Object.is equality[39m
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[32m- true[39m
+[31m+ false[39m
+
+[36m [2m❯[22m src/components/active/__tests__/dac.test.ts:[2m236:23[22m[39m
+    [90m234| [39m    [35mconst[39m { converged } [33m=[39m [34msolveDac[39m(allHigh[33m,[39m [34m5.0[39m[33m,[39m [34m3.3[39m[33m,[39m { vIH[33m:[39m [34m4.0[39m[33m,[39m vIL[33m:[39m…
+    [90m235| [39m
+    [90m236| [39m    [34mexpect[39m(converged)[33m.[39m[34mtoBe[39m([35mtrue[39m)[33m;[39m
+    [90m   | [39m                      [31m^[39m
+    [90m237| [39m  })[33m;[39m
+    [90m238| [39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[8/30]⎯[22m[39m
+
+[31m[1m[7m FAIL [27m[22m[39m src/components/active/__tests__/dac.test.ts[2m > [22mDAC[2m > [22mcustom vIH/vIL  drive above custom threshold reads HIGH
+[31m[1mAssertionError[22m: expected false to be true // Object.is equality[39m
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[32m- true[39m
+[31m+ false[39m
+
+[36m [2m❯[22m src/components/active/__tests__/dac.test.ts:[2m244:23[22m[39m
+    [90m242| [39m    [35mconst[39m { converged } [33m=[39m [34msolveDac[39m(allHigh[33m,[39m [34m5.0[39m[33m,[39m [34m1.5[39m[33m,[39m { vIH[33m:[39m [34m1.0[39m[33m,[39m vIL[33m:[39m…
+    [90m243| [39m
+    [90m244| [39m    [34mexpect[39m(converged)[33m.[39m[34mtoBe[39m([35mtrue[39m)[33m;[39m
+    [90m   | [39m                      [31m^[39m
+    [90m245| [39m  })[33m;[39m
+    [90m246| [39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[9/30]⎯[22m[39m
+
+[31m[1m[7m FAIL [27m[22m[39m src/components/active/__tests__/opamp.test.ts[2m > [22mOpAmp[2m > [22moutput_impedance
+[31m[1mAssertionError[22m: expected false to be true // Object.is equality[39m
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[32m- true[39m
+[31m+ false[39m
+
+[36m [2m❯[22m src/components/active/__tests__/opamp.test.ts:[2m201:30[22m[39m
+    [90m199| [39m    })[33m;[39m
+    [90m200| [39m
+    [90m201| [39m    [34mexpect[39m(result[33m.[39mconverged)[33m.[39m[34mtoBe[39m([35mtrue[39m)[33m;[39m
+    [90m   | [39m                             [31m^[39m
+    [90m202| [39m    [90m// Vout = 2V * (75/(75+75)) = 1V Â± 0.1V[39m
+    [90m203| [39m  })[33m;[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[10/30]⎯[22m[39m
+
+[31m[1m[7m FAIL [27m[22m[39m src/components/active/__tests__/opamp.test.ts[2m > [22mIntegration[2m > [22minverting_amplifier
+[31m[1mAssertionError[22m: expected false to be true // Object.is equality[39m
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[32m- true[39m
+[31m+ false[39m
+
+[36m [2m❯[22m src/components/active/__tests__/opamp.test.ts:[2m267:30[22m[39m
+    [90m265| [39m    })[33m;[39m
+    [90m266| [39m
+    [90m267| [39m    [34mexpect[39m(result[33m.[39mconverged)[33m.[39m[34mtoBe[39m([35mtrue[39m)[33m;[39m
+    [90m   | [39m                             [31m^[39m
+    [90m268| [39m    [90m// Ideal inverting gain = -Rf/Rin = -10 â†’ Vout = -10V Â± 0.05V[39m
+    [90m269| [39m  })[33m;[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[11/30]⎯[22m[39m
+
+[31m[1m[7m FAIL [27m[22m[39m src/components/active/__tests__/opamp.test.ts[2m > [22mIntegration[2m > [22mvoltage_follower
+[31m[1mAssertionError[22m: expected false to be true // Object.is equality[39m
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[32m- true[39m
+[31m+ false[39m
+
+[36m [2m❯[22m src/components/active/__tests__/opamp.test.ts:[2m298:30[22m[39m
+    [90m296| [39m    })[33m;[39m
+    [90m297| [39m
+    [90m298| [39m    [34mexpect[39m(result[33m.[39mconverged)[33m.[39m[34mtoBe[39m([35mtrue[39m)[33m;[39m
+    [90m   | [39m                             [31m^[39m
+    [90m299| [39m    [90m// Voltage follower: Vout = Vin = 3.7V Â± 0.005V[39m
+    [90m300| [39m  })[33m;[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[12/30]⎯[22m[39m
+
+[31m[1m[7m FAIL [27m[22m[39m src/components/active/__tests__/ota.test.ts[2m > [22mOTA[2m > [22mlinear_region
+[31m[1mAssertionError[22m: expected false to be true // Object.is equality[39m
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[32m- true[39m
+[31m+ false[39m
+
+[36m [2m❯[22m src/components/active/__tests__/ota.test.ts:[2m135:30[22m[39m
+    [90m133| [39m    [35mconst[39m result [33m=[39m engine[33m.[39m[34mdcOperatingPoint[39m()[33m;[39m
+    [90m134| [39m
+    [90m135| [39m    [34mexpect[39m(result[33m.[39mconverged)[33m.[39m[34mtoBe[39m([35mtrue[39m)[33m;[39m
+    [90m   | [39m                             [31m^[39m
+    [90m136| [39m
+    [90m137| [39m    [90m// gm = iBias / (2 * vt) = 0.001 / 0.052 â‰ˆ 19.23 mS[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[13/30]⎯[22m[39m
+
+[31m[1m[7m FAIL [27m[22m[39m src/components/active/__tests__/ota.test.ts[2m > [22mOTA[2m > [22mtanh_limiting
+[31m[1mAssertionError[22m: expected false to be true // Object.is equality[39m
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[32m- true[39m
+[31m+ false[39m
+
+[36m [2m❯[22m src/components/active/__tests__/ota.test.ts:[2m169:30[22m[39m
+    [90m167| [39m    [35mconst[39m result [33m=[39m engine[33m.[39m[34mdcOperatingPoint[39m()[33m;[39m
+    [90m168| [39m
+    [90m169| [39m    [34mexpect[39m(result[33m.[39mconverged)[33m.[39m[34mtoBe[39m([35mtrue[39m)[33m;[39m
+    [90m   | [39m                             [31m^[39m
+    [90m170| [39m
+    [90m171| [39m    [90m// I_out should be very close to I_bias (saturation)[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[14/30]⎯[22m[39m
+
+[31m[1m[7m FAIL [27m[22m[39m src/components/active/__tests__/ota.test.ts[2m > [22mOTA[2m > [22mgm_proportional_to_ibias
+[31m[1mAssertionError[22m: expected false to be true // Object.is equality[39m
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[32m- true[39m
+[31m+ false[39m
+
+[36m [2m❯[22m runWithIbias src/components/active/__tests__/ota.test.ts:[2m206:32[22m[39m
+    [90m204| [39m      engine[33m.[39m[34minit[39m(compiled)[33m;[39m
+    [90m205| [39m      [35mconst[39m result [33m=[39m engine[33m.[39m[34mdcOperatingPoint[39m()[33m;[39m
+    [90m206| [39m      [34mexpect[39m(result[33m.[39mconverged)[33m.[39m[34mtoBe[39m([35mtrue[39m)[33m;[39m
+    [90m   | [39m                               [31m^[39m
+    [90m207| [39m      [35mreturn[39m result[33m.[39mnodeVoltages[[34m3[39m][33m;[39m
+    [90m208| [39m    }
+[90m [2m❯[22m src/components/active/__tests__/ota.test.ts:[2m210:5[22m[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[15/30]⎯[22m[39m
+
+[31m[1m[7m FAIL [27m[22m[39m src/components/active/__tests__/ota.test.ts[2m > [22mOTA[2m > [22mvca_circuit
+[31m[1mAssertionError[22m: expected false to be true // Object.is equality[39m
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[32m- true[39m
+[31m+ false[39m
+
+[36m [2m❯[22m gainAtIbias src/components/active/__tests__/ota.test.ts:[2m244:32[22m[39m
+    [90m242| [39m      engine[33m.[39m[34minit[39m(compiled)[33m;[39m
+    [90m243| [39m      [35mconst[39m result [33m=[39m engine[33m.[39m[34mdcOperatingPoint[39m()[33m;[39m
+    [90m244| [39m      [34mexpect[39m(result[33m.[39mconverged)[33m.[39m[34mtoBe[39m([35mtrue[39m)[33m;[39m
+    [90m   | [39m                               [31m^[39m
+    [90m245| [39m      [35mreturn[39m result[33m.[39mnodeVoltages[[34m3[39m] [33m/[39m vDiff[33m;[39m
+    [90m246| [39m    }
+[90m [2m❯[22m src/components/active/__tests__/ota.test.ts:[2m248:5[22m[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[16/30]⎯[22m[39m
+
+[31m[1m[7m FAIL [27m[22m[39m src/components/active/__tests__/real-opamp.test.ts[2m > [22mDCGain[2m > [22minverting_amplifier_gain
+[31m[1mAssertionError[22m: expected false to be true // Object.is equality[39m
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[32m- true[39m
+[31m+ false[39m
+
+[36m [2m❯[22m src/components/active/__tests__/real-opamp.test.ts:[2m230:30[22m[39m
+    [90m228| [39m
+    [90m229| [39m    [35mconst[39m result [33m=[39m [34msolveDC[39m(elements[33m,[39m [34m10[39m[33m,[39m [34m6[39m)[33m;[39m
+    [90m230| [39m    [34mexpect[39m(result[33m.[39mconverged)[33m.[39m[34mtoBe[39m([35mtrue[39m)[33m;[39m
+    [90m   | [39m                             [31m^[39m
+    [90m231| [39m
+    [90m232| [39m    [35mconst[39m vOut [33m=[39m result[33m.[39mnodeVoltages[nOut][33m;[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[17/30]⎯[22m[39m
+
+[31m[1m[7m FAIL [27m[22m[39m src/components/active/__tests__/real-opamp.test.ts[2m > [22mDCGain[2m > [22moutput_saturates_at_rails
+[31m[1mAssertionError[22m: expected false to be true // Object.is equality[39m
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[32m- true[39m
+[31m+ false[39m
+
+[36m [2m❯[22m src/components/active/__tests__/real-opamp.test.ts:[2m262:30[22m[39m
+    [90m260| [39m
+    [90m261| [39m    [35mconst[39m result [33m=[39m [34msolveDC[39m(elements[33m,[39m [34m7[39m[33m,[39m [34m4[39m)[33m;[39m
+    [90m262| [39m    [34mexpect[39m(result[33m.[39mconverged)[33m.[39m[34mtoBe[39m([35mtrue[39m)[33m;[39m
+    [90m   | [39m                             [31m^[39m
+    [90m263| [39m
+    [90m264| [39m    [35mconst[39m vOut [33m=[39m result[33m.[39mnodeVoltages[nFeedback][33m;[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[18/30]⎯[22m[39m
+
+[31m[1m[7m FAIL [27m[22m[39m src/components/active/__tests__/real-opamp.test.ts[2m > [22mOffset[2m > [22moutput_offset_with_gain
+[31m[1mAssertionError[22m: expected false to be true // Object.is equality[39m
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[32m- true[39m
+[31m+ false[39m
+
+[36m [2m❯[22m src/components/active/__tests__/real-opamp.test.ts:[2m446:30[22m[39m
+    [90m444| [39m
+    [90m445| [39m    [35mconst[39m result [33m=[39m [34msolveDC[39m(elements[33m,[39m matrixSize[33m,[39m [34m5[39m)[33m;[39m
+    [90m446| [39m    [34mexpect[39m(result[33m.[39mconverged)[33m.[39m[34mtoBe[39m([35mtrue[39m)[33m;[39m
+    [90m   | [39m                             [31m^[39m
+    [90m447| [39m
+    [90m448| [39m    [35mconst[39m vOut [33m=[39m result[33m.[39mnodeVoltages[nOut][33m;[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[19/30]⎯[22m[39m
+
+[31m[1m[7m FAIL [27m[22m[39m src/components/active/__tests__/real-opamp.test.ts[2m > [22mCurrentLimit[2m > [22moutput_current_clamped
+[31m[1mAssertionError[22m: expected false to be true // Object.is equality[39m
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[32m- true[39m
+[31m+ false[39m
+
+[36m [2m❯[22m src/components/active/__tests__/real-opamp.test.ts:[2m492:30[22m[39m
+    [90m490| [39m
+    [90m491| [39m    [35mconst[39m result [33m=[39m [34msolveDC[39m(elements[33m,[39m matrixSize[33m,[39m [34m4[39m)[33m;[39m
+    [90m492| [39m    [34mexpect[39m(result[33m.[39mconverged)[33m.[39m[34mtoBe[39m([35mtrue[39m)[33m;[39m
+    [90m   | [39m                             [31m^[39m
+    [90m493| [39m
+    [90m494| [39m    [35mconst[39m vOut [33m=[39m result[33m.[39mnodeVoltages[nOut][33m;[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[20/30]⎯[22m[39m
+
+[31m[1m[7m FAIL [27m[22m[39m src/components/active/__tests__/real-opamp.test.ts[2m > [22mRealOpAmp[2m > [22mload_741_model
+[31m[1mAssertionError[22m: expected false to be true // Object.is equality[39m
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[32m- true[39m
+[31m+ false[39m
+
+[36m [2m❯[22m src/components/active/__tests__/real-opamp.test.ts:[2m550:30[22m[39m
+    [90m548| [39m    ][33m;[39m
+    [90m549| [39m    [35mconst[39m result [33m=[39m [34msolveDC[39m(elements[33m,[39m [34m7[39m[33m,[39m [34m4[39m)[33m;[39m
+    [90m550| [39m    [34mexpect[39m(result[33m.[39mconverged)[33m.[39m[34mtoBe[39m([35mtrue[39m)[33m;[39m
+    [90m   | [39m                             [31m^[39m
+    [90m551| [39m
+    [90m552| [39m    [90m// Output of unity-gain buffer â‰ˆ input voltage (within 10%)[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[21/30]⎯[22m[39m
+
+[31m[1m[7m FAIL [27m[22m[39m src/components/active/__tests__/timer-555.test.ts[2m > [22mTimer555[2m > [22minternal_divider_voltages
+[31m[1mAssertionError[22m: expected false to be true // Object.is equality[39m
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[32m- true[39m
+[31m+ false[39m
+
+[36m [2m❯[22m src/components/active/__tests__/timer-555.test.ts:[2m211:30[22m[39m
+    [90m209| [39m    })[33m;[39m
+    [90m210| [39m
+    [90m211| [39m    [34mexpect[39m(result[33m.[39mconverged)[33m.[39m[34mtoBe[39m([35mtrue[39m)[33m;[39m
+    [90m   | [39m                             [31m^[39m
+    [90m212| [39m
+    [90m213| [39m    [35mconst[39m vCtrlSolved [33m=[39m result[33m.[39mnodeVoltages[nCtrl][33m;[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[22/30]⎯[22m[39m
+
+[31m[1m[7m FAIL [27m[22m[39m src/components/active/__tests__/timer-555.test.ts[2m > [22mAstable[2m > [22moscillates_at_correct_frequency
+[31m[1mAssertionError[22m: expected false to be true // Object.is equality[39m
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[32m- true[39m
+[31m+ false[39m
+
+[36m [2m❯[22m src/components/active/__tests__/timer-555.test.ts:[2m333:32[22m[39m
+    [90m331| [39m    [90m// Run DC operating point first to initialize[39m
+    [90m332| [39m    [35mconst[39m dcResult [33m=[39m engine[33m.[39m[34mdcOperatingPoint[39m()[33m;[39m
+    [90m333| [39m    [34mexpect[39m(dcResult[33m.[39mconverged)[33m.[39m[34mtoBe[39m([35mtrue[39m)[33m;[39m
+    [90m   | [39m                               [31m^[39m
+    [90m334| [39m
+    [90m335| [39m    [90m// Use timestep = 0.2% of period for accurate threshold-crossing r[39m…
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[23/30]⎯[22m[39m
+
+[31m[1m[7m FAIL [27m[22m[39m src/components/active/__tests__/timer-555.test.ts[2m > [22mAstable[2m > [22mduty_cycle
+[31m[1mAssertionError[22m: expected false to be true // Object.is equality[39m
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[32m- true[39m
+[31m+ false[39m
+
+[36m [2m❯[22m src/components/active/__tests__/timer-555.test.ts:[2m399:32[22m[39m
+    [90m397| [39m
+    [90m398| [39m    [35mconst[39m dcResult [33m=[39m engine[33m.[39m[34mdcOperatingPoint[39m()[33m;[39m
+    [90m399| [39m    [34mexpect[39m(dcResult[33m.[39mconverged)[33m.[39m[34mtoBe[39m([35mtrue[39m)[33m;[39m
+    [90m   | [39m                               [31m^[39m
+    [90m400| [39m
+    [90m401| [39m    [90m// Use timestep = 0.2% of period for accurate threshold-crossing r[39m…
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[24/30]⎯[22m[39m
+
+[31m[1m[7m FAIL [27m[22m[39m src/components/active/__tests__/timer-555.test.ts[2m > [22mMonostable[2m > [22mpulse_width
+[31m[1mAssertionError[22m: expected false to be true // Object.is equality[39m
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[32m- true[39m
+[31m+ false[39m
+
+[36m [2m❯[22m src/components/active/__tests__/timer-555.test.ts:[2m573:32[22m[39m
+    [90m571| [39m    [90m// Initialize: run DC OP with TRIG high to establish initial RESET[39m…
+    [90m572| [39m    [35mconst[39m dcResult [33m=[39m engine[33m.[39m[34mdcOperatingPoint[39m()[33m;[39m
+    [90m573| [39m    [34mexpect[39m(dcResult[33m.[39mconverged)[33m.[39m[34mtoBe[39m([35mtrue[39m)[33m;[39m
+    [90m   | [39m                               [31m^[39m
+    [90m574| [39m
+    [90m575| [39m    [90m// Use timestep = 0.5% of pulse width for accurate threshold-cross[39m…
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[25/30]⎯[22m[39m
+
+[31m[1m[7m FAIL [27m[22m[39m src/components/active/__tests__/timer-555.test.ts[2m > [22mMonostable[2m > [22mretrigger_ignored_during_pulse
+[31m[1mAssertionError[22m: expected 'ERROR' not to be 'ERROR' // Object.is equality[39m
+[36m [2m❯[22m src/components/active/__tests__/timer-555.test.ts:[2m683:35[22m[39m
+    [90m681| [39m    }
+    [90m682| [39m
+    [90m683| [39m    [34mexpect[39m(engine[33m.[39m[34mgetState[39m())[33m.[39mnot[33m.[39m[34mtoBe[39m([33mEngineState[39m[33m.[39m[33mERROR[39m)[33m;[39m
+    [90m   | [39m                                  [31m^[39m
+    [90m684| [39m    [34mexpect[39m(pulseEnd)[33m.[39m[34mtoBeGreaterThan[39m([34m0[39m)[33m;[39m
+    [90m685| [39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[26/30]⎯[22m[39m
+
+[31m[1m[7m FAIL [27m[22m[39m src/components/active/__tests__/vcvs.test.ts[2m > [22mVCVS[2m > [22munity_gain_buffer
+[31m[1mAssertionError[22m: expected false to be true // Object.is equality[39m
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[32m- true[39m
+[31m+ false[39m
+
+[36m [2m❯[22m src/components/active/__tests__/vcvs.test.ts:[2m103:30[22m[39m
+    [90m101| [39m    [35mconst[39m result [33m=[39m engine[33m.[39m[34mdcOperatingPoint[39m()[33m;[39m
+    [90m102| [39m
+    [90m103| [39m    [34mexpect[39m(result[33m.[39mconverged)[33m.[39m[34mtoBe[39m([35mtrue[39m)[33m;[39m
+    [90m   | [39m                             [31m^[39m
+    [90m104| [39m  })[33m;[39m
+    [90m105| [39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[27/30]⎯[22m[39m
+
+[31m[1m[7m FAIL [27m[22m[39m src/components/active/__tests__/vcvs.test.ts[2m > [22mVCVS[2m > [22mgain_of_10
+[31m[1mAssertionError[22m: expected false to be true // Object.is equality[39m
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[32m- true[39m
+[31m+ false[39m
+
+[36m [2m❯[22m src/components/active/__tests__/vcvs.test.ts:[2m121:30[22m[39m
+    [90m119| [39m    [35mconst[39m result [33m=[39m engine[33m.[39m[34mdcOperatingPoint[39m()[33m;[39m
+    [90m120| [39m
+    [90m121| [39m    [34mexpect[39m(result[33m.[39mconverged)[33m.[39m[34mtoBe[39m([35mtrue[39m)[33m;[39m
+    [90m   | [39m                             [31m^[39m
+    [90m122| [39m  })[33m;[39m
+    [90m123| [39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[28/30]⎯[22m[39m
+
+[31m[1m[7m FAIL [27m[22m[39m src/components/active/__tests__/vcvs.test.ts[2m > [22mVCVS[2m > [22mnonlinear_expression
+[31m[1mAssertionError[22m: expected false to be true // Object.is equality[39m
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[32m- true[39m
+[31m+ false[39m
+
+[36m [2m❯[22m src/components/active/__tests__/vcvs.test.ts:[2m140:30[22m[39m
+    [90m138| [39m    [35mconst[39m result [33m=[39m engine[33m.[39m[34mdcOperatingPoint[39m()[33m;[39m
+    [90m139| [39m
+    [90m140| [39m    [34mexpect[39m(result[33m.[39mconverged)[33m.[39m[34mtoBe[39m([35mtrue[39m)[33m;[39m
+    [90m   | [39m                             [31m^[39m
+    [90m141| [39m    [34mexpect[39m(result[33m.[39miterations)[33m.[39m[34mtoBeLessThanOrEqual[39m([34m10[39m)[33m;[39m
+    [90m142| [39m  })[33m;[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[29/30]⎯[22m[39m
+
+[31m[1m[7m FAIL [27m[22m[39m src/components/active/__tests__/vcvs.test.ts[2m > [22mVCVS[2m > [22moutput_drives_load
+[31m[1mAssertionError[22m: expected false to be true // Object.is equality[39m
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[32m- true[39m
+[31m+ false[39m
+
+[36m [2m❯[22m src/components/active/__tests__/vcvs.test.ts:[2m161:30[22m[39m
+    [90m159| [39m    [35mconst[39m result [33m=[39m engine[33m.[39m[34mdcOperatingPoint[39m()[33m;[39m
+    [90m160| [39m
+    [90m161| [39m    [34mexpect[39m(result[33m.[39mconverged)[33m.[39m[34mtoBe[39m([35mtrue[39m)[33m;[39m
+    [90m   | [39m                             [31m^[39m
+    [90m162| [39m    [90m// Output voltage enforced at 10V by VCVS[39m
+    [90m163| [39m    [90m// VCVS branch current: I = V_out / R_load = 10 / 1000 = 10mA[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[30/30]⎯[22m[39m
+
+[2m Test Files [22m [1m[31m6 failed[39m[22m[2m | [22m[1m[32m3 passed[39m[22m[90m (9)[39m
+[2m      Tests [22m [1m[31m30 failed[39m[22m[2m | [22m[1m[32m38 passed[39m[22m[90m (68)[39m
+[2m   Start at [22m 09:52:54
+[2m   Duration [22m 3.30s[2m (transform 377ms, setup 0ms, collect 854ms, tests 109ms, environment 1ms, prepare 838ms)[22m
+

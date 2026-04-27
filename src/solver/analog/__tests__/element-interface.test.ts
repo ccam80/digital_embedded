@@ -21,6 +21,7 @@ import type { LoadContext } from "../load-context.js";
 function makeMinimalCore(): AnalogElementCore {
   return {
     branchIndex: -1,
+    ngspiceLoadOrder: 0,
     isNonlinear: false,
     isReactive: false,
     load(_ctx: LoadContext): void {
@@ -62,33 +63,36 @@ describe("AnalogElementCore", () => {
     // If the interface mistakenly re-adds any of these, tsc will error on
     // the @ts-expect-error directive itself, turning this test red.
 
-    // @ts-expect-error _stamp is not part of AnalogElementCore
     const _withStamp: AnalogElementCore = {
       branchIndex: -1,
+      ngspiceLoadOrder: 0,
       isNonlinear: false,
       isReactive: false,
+      // @ts-expect-error _stamp is not part of AnalogElementCore
       _stamp(_solver: unknown): void {},
       load(_ctx: LoadContext): void {},
       setParam(_key: string, _value: number): void {},
       getPinCurrents(_voltages: Float64Array): number[] { return []; },
     };
 
-    // @ts-expect-error deletedStampNl is not part of AnalogElementCore
     const _withStampNonlinear: AnalogElementCore = {
       branchIndex: -1,
+      ngspiceLoadOrder: 0,
       isNonlinear: false,
       isReactive: false,
+      // @ts-expect-error deletedStampNl is not part of AnalogElementCore
       deletedStampNl(_solver: unknown): void {},
       load(_ctx: LoadContext): void {},
       setParam(_key: string, _value: number): void {},
       getPinCurrents(_voltages: Float64Array): number[] { return []; },
     };
 
-    // @ts-expect-error updateOperatingPoint is not part of AnalogElementCore
     const _withUpdateOp: AnalogElementCore = {
       branchIndex: -1,
+      ngspiceLoadOrder: 0,
       isNonlinear: false,
       isReactive: false,
+      // @ts-expect-error updateOperatingPoint is not part of AnalogElementCore
       updateOperatingPoint(_voltages: Float64Array): void {},
       load(_ctx: LoadContext): void {},
       setParam(_key: string, _value: number): void {},
@@ -111,6 +115,7 @@ describe("AnalogElementCore", () => {
     // New correct 1-arg signature — must type-check without error
     const coreWithNewSig: AnalogElementCore = {
       branchIndex: -1,
+      ngspiceLoadOrder: 0,
       isNonlinear: false,
       isReactive: false,
       load(_ctx: LoadContext): void {},
@@ -122,11 +127,12 @@ describe("AnalogElementCore", () => {
     expect(typeof coreWithNewSig.checkConvergence).toBe("function");
 
     // Old 4-arg signature — must fail tsc (compile-time negative assertion)
-    // @ts-expect-error checkConvergence must take a single LoadContext arg, not 4 args
     const _coreWithOldSig: AnalogElementCore = {
       branchIndex: -1,
+      ngspiceLoadOrder: 0,
       isNonlinear: false,
       isReactive: false,
+      // @ts-expect-error checkConvergence must take a single LoadContext arg, not 4 args
       checkConvergence(
         _voltages: Float64Array,
         _prevVoltages: Float64Array,

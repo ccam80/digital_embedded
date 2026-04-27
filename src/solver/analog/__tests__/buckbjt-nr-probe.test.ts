@@ -35,12 +35,13 @@ describe('buckbjt NR iteration probe', () => {
     }
 
     // Wire capture hook
-    const { hook, getSnapshots, clear } = createIterationCaptureHook(
+    const { hook, preFactorHook, getSnapshots, clear } = createIterationCaptureHook(
       engine.solver!,
       engine.elements,
       engine.statePool,
     );
     engine.postIterationHook = hook;
+    engine.preFactorHook = preFactorHook;
 
     // --- Step 0 (should converge) ---
     console.log('\n=== STEP 0 (first transient step) ===');

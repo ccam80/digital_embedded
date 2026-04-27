@@ -70,13 +70,16 @@ function makeTriac(overrides: Partial<typeof TRIAC_DEFAULTS> = {}): AnalogElemen
   return withNodeIds(element, [1, 2, 3]);
 }
 
-/** Build a DC-OP LoadContext over a fresh SparseSolver sized for 3 matrix rows (nodes 1..3). */
+/**
+ * Build a DC-OP LoadContext over a fresh SparseSolver sized for 3 matrix rows (nodes 1..3).
+ * voltages must be length 4 (index 0 = ground sentinel, 1=MT1, 2=MT2, 3=G).
+ */
 function makeDcOpCtx(voltages: Float64Array): LoadContext {
   const solver = new SparseSolver();
   solver._initStructure(3);
   return makeLoadCtx({
     solver,
-    voltages,
+    rhs: new Float64Array(voltages.length), // separate buffer — stampRHS must not modify voltages
     cktMode: MODEDCOP | MODEINITFLOAT,
     dt: 0,
   });
@@ -85,7 +88,7 @@ function makeDcOpCtx(voltages: Float64Array): LoadContext {
 /**
  * Drive triac to a steady operating point by calling load(ctx) repeatedly
  * with fixed node voltages, then return the final voltages array.
- * nodeMT1=1 (index 0), nodeMT2=2 (index 1), nodeG=3 (index 2)
+ * nodeMT1=1 (rhsOld[1]), nodeMT2=2 (rhsOld[2]), nodeG=3 (rhsOld[3])
  */
 function driveToOp(
   element: AnalogElement,
@@ -94,22 +97,23 @@ function driveToOp(
   vGate: number,
   iterations = 150,
 ): Float64Array {
-  const voltages = new Float64Array(3);
-  voltages[0] = vMT1;
-  voltages[1] = vMT2;
-  voltages[2] = vGate;
+  // Size 4: index 0 = ground sentinel (0), 1=MT1, 2=MT2, 3=G
+  const voltages = new Float64Array(4);
+  voltages[1] = vMT1;
+  voltages[2] = vMT2;
+  voltages[3] = vGate;
   for (let i = 0; i < iterations; i++) {
     element.load(makeDcOpCtx(voltages));
-    voltages[0] = vMT1;
-    voltages[1] = vMT2;
-    voltages[2] = vGate;
+    voltages[1] = vMT1;
+    voltages[2] = vMT2;
+    voltages[3] = vGate;
   }
   return voltages;
 }
 
 /**
- * Returns the peak diagonal conductance for the MT1-MT2 path (solver rows 0
- * and 1). Stamps the already-converged element into a fresh SparseSolver at
+ * Returns the peak diagonal conductance for the MT1-MT2 path (solver rows 1
+ * and 2). Stamps the already-converged element into a fresh SparseSolver at
  * the given voltages and reads the assembled diagonal entries.
  */
 function getMainPathConductance(element: AnalogElement, voltages: Float64Array): number {
@@ -120,12 +124,11 @@ function getMainPathConductance(element: AnalogElement, voltages: Float64Array):
     entries
       .filter((e) => e.row === row && e.col === col)
       .reduce((acc, e) => acc + e.value, 0);
-  const diag00 = Math.abs(sumAt(0, 0));
+  // 1-based: MT1=node1→row1, MT2=node2→row2
   const diag11 = Math.abs(sumAt(1, 1));
-  return Math.max(diag00, diag11);
+  const diag22 = Math.abs(sumAt(2, 2));
+  return Math.max(diag11, diag22);
 }
-
-const G_ON = 1 / TRIAC_DEFAULTS.rOn; // 100 S
 
 // ---------------------------------------------------------------------------
 // Triac unit tests
@@ -210,7 +213,8 @@ describe("Triac", () => {
     const withPins = withNodeIds(element, [1, 2, 3]);
 
     // Large voltage step that would trigger pnjlim limiting
-    const voltages = new Float64Array([0, 50, 0.65]);
+    // Size 4: index 0=ground sentinel, 1=MT1, 2=MT2, 3=G (1-based nodes)
+    const voltages = new Float64Array([0, 0, 50, 0.65]);
     const snapshot = new Float64Array(voltages);
 
     withPins.load(makeDcOpCtx(voltages));
@@ -218,6 +222,7 @@ describe("Triac", () => {
     expect(voltages[0]).toBe(snapshot[0]);
     expect(voltages[1]).toBe(snapshot[1]);
     expect(voltages[2]).toBe(snapshot[2]);
+    expect(voltages[3]).toBe(snapshot[3]);
   });
 
   it("pool_state: pool.state0 contains correct slot values after load", () => {
@@ -229,12 +234,13 @@ describe("Triac", () => {
 
     // Converge at positive polarity with gate to trigger forward latch
     // MT1=0, MT2=50, G=0.65 → vmt = 50, vg1 = 0.65
-    const voltages = new Float64Array([0, 50, 0.65]);
+    // Size 4: index 0=ground sentinel, 1=MT1, 2=MT2, 3=G (1-based nodes)
+    const voltages = new Float64Array([0, 0, 50, 0.65]);
     for (let i = 0; i < 200; i++) {
       withPins.load(makeDcOpCtx(voltages));
-      voltages[0] = 0;
-      voltages[1] = 50;
-      voltages[2] = 0.65;
+      voltages[1] = 0;
+      voltages[2] = 50;
+      voltages[3] = 0.65;
     }
 
     // SLOT_LATCHED = 6: should be 1.0 (forward latched)
@@ -258,12 +264,13 @@ describe("Triac", () => {
     const withPins = withNodeIds(element, [1, 2, 3]);
 
     // MT1=50, MT2=0, G=50.65 → vmt = -50 (reverse), vg1 = 0.65 → trigger reverse
-    const voltages = new Float64Array([50, 0, 50.65]);
+    // Size 4: index 0=ground sentinel, 1=MT1, 2=MT2, 3=G (1-based nodes)
+    const voltages = new Float64Array([0, 50, 0, 50.65]);
     for (let i = 0; i < 200; i++) {
       withPins.load(makeDcOpCtx(voltages));
-      voltages[0] = 50;
-      voltages[1] = 0;
-      voltages[2] = 50.65;
+      voltages[1] = 50;
+      voltages[2] = 0;
+      voltages[3] = 50.65;
     }
 
     // SLOT_LATCHED should be -1.0 (reverse latched)
@@ -278,12 +285,13 @@ describe("Triac", () => {
     const withPins = withNodeIds(element, [1, 2, 3]);
 
     // Small voltage, no gate → blocking
-    const voltages = new Float64Array([0, 10, 0]);
+    // Size 4: index 0=ground sentinel, 1=MT1, 2=MT2, 3=G (1-based nodes)
+    const voltages = new Float64Array([0, 0, 10, 0]);
     for (let i = 0; i < 50; i++) {
       withPins.load(makeDcOpCtx(voltages));
-      voltages[0] = 0;
-      voltages[1] = 10;
-      voltages[2] = 0;
+      voltages[1] = 0;
+      voltages[2] = 10;
+      voltages[3] = 0;
     }
 
     expect(pool.state0[SLOT_LATCHED]).toBe(0.0);
@@ -323,7 +331,8 @@ describe("Triac LimitingEvent instrumentation", () => {
   it("pushes MT2-MT1 and G-MT1 events on each load call", () => {
     const { element } = makeElement();
     const collector: import("../../../solver/analog/newton-raphson.js").LimitingEvent[] = [];
-    const voltages = new Float64Array([0, 5, 1]);
+    // Size 4: index 0=ground sentinel, 1=MT2, 2=MT1, 3=G (1-based nodes per makeElement pin map)
+    const voltages = new Float64Array([0, 0, 5, 1]);
     element.load(makeCtxWithCollector(voltages, collector));
     const junctions = collector.map((e) => e.junction);
     expect(junctions).toContain("MT2-MT1");
@@ -333,7 +342,8 @@ describe("Triac LimitingEvent instrumentation", () => {
   it("events carry correct elementIndex and label", () => {
     const { element } = makeElement();
     const collector: import("../../../solver/analog/newton-raphson.js").LimitingEvent[] = [];
-    const voltages = new Float64Array([0, 5, 1]);
+    // Size 4: index 0=ground sentinel, 1=MT2, 2=MT1, 3=G (1-based nodes per makeElement pin map)
+    const voltages = new Float64Array([0, 0, 5, 1]);
     element.load(makeCtxWithCollector(voltages, collector));
     for (const ev of collector) {
       expect(ev.elementIndex).toBe(7);
@@ -344,7 +354,8 @@ describe("Triac LimitingEvent instrumentation", () => {
 
   it("does not push events when limitingCollector is null", () => {
     const { element } = makeElement();
-    const voltages = new Float64Array([0, 5, 1]);
+    // Size 4: index 0=ground sentinel, 1=MT2, 2=MT1, 3=G (1-based nodes per makeElement pin map)
+    const voltages = new Float64Array([0, 0, 5, 1]);
     expect(() => element.load(makeCtxWithCollector(voltages, null))).not.toThrow();
   });
 });

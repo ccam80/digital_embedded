@@ -14,9 +14,10 @@ export const STUB_ANALOG_FACTORY: AnalogFactory = (
   _getTime,
 ) => ({
   branchIndex: -1,
-  stamp: () => {},
+  ngspiceLoadOrder: 0,
   isNonlinear: false,
   isReactive: false,
+  load: (_ctx: unknown) => {},
   getPinCurrents: () => [],
   setParam: (_key: string, _value: number) => {},
 });

@@ -12,7 +12,8 @@
  *              accepted timestep.
  */
 
-import type { AnalogElementCore, LoadContext, StatePoolRef } from "./element.js";
+import type { LoadContext, StatePoolRef, ReactiveAnalogElementCore } from "./element.js";
+import { NGSPICE_LOAD_ORDER } from "./element.js";
 import type { ResolvedPinElectrical } from "../../core/pin-electrical.js";
 import {
   DigitalInputPinModel,
@@ -52,7 +53,7 @@ import type { AnalogElementFactory } from "./behavioral-gate.js";
  * when voltage < vIL (active-low, matching standard CMOS CDRST). The set pin
  * uses the opposite active-high convention.
  */
-export class BehavioralDFlipflopElement implements AnalogElementCore {
+export class BehavioralDFlipflopElement implements ReactiveAnalogElementCore {
   private readonly _clockPin: DigitalInputPinModel;
   private readonly _dPin: DigitalInputPinModel;
   private readonly _qPin: DigitalOutputPinModel;
@@ -91,7 +92,9 @@ export class BehavioralDFlipflopElement implements AnalogElementCore {
   private readonly _pinModelsByLabel: ReadonlyMap<string, DigitalInputPinModel | DigitalOutputPinModel>;
 
   pinNodeIds!: readonly number[];  // set by compiler via Object.assign after factory returns
+  allNodeIds!: readonly number[];  // set by compiler via Object.assign after factory returns
   readonly branchIndex: number = -1;
+  readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.VCVS;
   readonly isNonlinear: true = true;
   label?: string;
 
@@ -99,7 +102,14 @@ export class BehavioralDFlipflopElement implements AnalogElementCore {
   readonly stateSchema: StateSchema = FLIPFLOP_COMPOSITE_SCHEMA;
   stateSize: number;
   stateBaseOffset = -1;
-  private _pool!: StatePoolRef;
+  s0: Float64Array<ArrayBufferLike> = new Float64Array(0) as Float64Array<ArrayBufferLike>;
+  s1: Float64Array<ArrayBufferLike> = new Float64Array(0) as Float64Array<ArrayBufferLike>;
+  s2: Float64Array<ArrayBufferLike> = new Float64Array(0) as Float64Array<ArrayBufferLike>;
+  s3: Float64Array<ArrayBufferLike> = new Float64Array(0) as Float64Array<ArrayBufferLike>;
+  s4: Float64Array<ArrayBufferLike> = new Float64Array(0) as Float64Array<ArrayBufferLike>;
+  s5: Float64Array<ArrayBufferLike> = new Float64Array(0) as Float64Array<ArrayBufferLike>;
+  s6: Float64Array<ArrayBufferLike> = new Float64Array(0) as Float64Array<ArrayBufferLike>;
+  s7: Float64Array<ArrayBufferLike> = new Float64Array(0) as Float64Array<ArrayBufferLike>;
 
   constructor(
     clockPin: DigitalInputPinModel,
@@ -135,12 +145,11 @@ export class BehavioralDFlipflopElement implements AnalogElementCore {
     (this as unknown as { _vIH: number })._vIH = vIH;
   }
 
-  get isReactive(): boolean {
-    return this._childElements.length > 0;
+  get isReactive(): true {
+    return (this._childElements.length > 0) as true;
   }
 
   initState(pool: StatePoolRef): void {
-    this._pool = pool;
     initChildState(this._childElements, this.stateBaseOffset, pool);
   }
 

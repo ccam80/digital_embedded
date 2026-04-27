@@ -35,21 +35,15 @@ import {
 } from "../digital-pin-model.js";
 import type { ResolvedPinElectrical } from "../../../core/pin-electrical.js";
 import type { LoadContext } from "../load-context.js";
-import { MODEDCOP, MODEINITFLOAT, MODETRAN } from "../ckt-mode.js";
+import { MODEINITFLOAT, MODETRAN } from "../ckt-mode.js";
 
 // ---------------------------------------------------------------------------
-// Mock SparseSolver — records allocElement / stampElement / stampRHS calls
+// Mock SparseSolver — records allocElement / stampElement calls
 // ---------------------------------------------------------------------------
-
-interface StampRecord {
-  handle: number;
-  value: number;
-}
 
 class MockSolver {
   private readonly _elements: Map<string, number> = new Map();
   private readonly _values: number[] = [];
-  readonly rhs: Map<number, number> = new Map();
   private _handleCounter = 0;
   allocElementCalls: Array<[number, number]> = [];
 
@@ -68,10 +62,6 @@ class MockSolver {
     this._values[handle] = (this._values[handle] ?? 0) + value;
   }
 
-  stampRHS(idx: number, value: number): void {
-    this.rhs.set(idx, (this.rhs.get(idx) ?? 0) + value);
-  }
-
   /** Sum all stampElement values at (row, col). */
   sumAt(row: number, col: number): number {
     const key = `${row}:${col}`;
@@ -80,14 +70,9 @@ class MockSolver {
     return this._values[h] ?? 0;
   }
 
-  sumRhs(idx: number): number {
-    return this.rhs.get(idx) ?? 0;
-  }
-
   reset(): void {
     this._elements.clear();
     this._values.length = 0;
-    this.rhs.clear();
     this._handleCounter = 0;
     this.allocElementCalls = [];
   }
@@ -97,30 +82,40 @@ class MockSolver {
 // makeCtx — minimal LoadContext factory for tests
 // ---------------------------------------------------------------------------
 
-function makeCtx(overrides: Partial<LoadContext> & { solver?: MockSolver } = {}): LoadContext {
-  const solver = overrides.solver ?? new MockSolver();
+function makeCtx(overrides: Omit<Partial<LoadContext>, "solver"> & { solver?: MockSolver } = {}): LoadContext {
+  const { solver: solverOverride, ...rest } = overrides;
+  const solver = solverOverride ?? new MockSolver();
   const ag = new Float64Array(7);
   ag[0] = 2e9; // placeholder trapezoidal ag[0]
+  const voltages = new Float64Array(16);
+  const rhs = rest.rhs ?? voltages;
+  const rhsOld = rest.rhsOld ?? voltages;
   return {
     solver: solver as any,
-    voltages: new Float64Array(16),
-    cktMode: overrides.cktMode ?? MODEINITFLOAT,
-    dt: overrides.dt ?? 0,
-    method: overrides.method ?? "trapezoidal",
-    order: overrides.order ?? 1,
+    matrix: solver as any,
+    rhs,
+    rhsOld,
+    cktMode: rest.cktMode ?? MODEINITFLOAT,
+    dt: rest.dt ?? 0,
+    method: rest.method ?? "trapezoidal",
+    order: rest.order ?? 1,
     deltaOld: [],
-    ag: overrides.ag ?? ag,
+    ag: rest.ag ?? ag,
     srcFact: 1,
     noncon: { value: 0 },
     limitingCollector: null,
+    convergenceCollector: null,
     xfact: 0,
     gmin: 1e-12,
     reltol: 1e-3,
     iabstol: 1e-12,
+    time: 0,
+    temp: 300.15,
+    vt: 0.025852,
     cktFixLimit: false,
     bypass: false,
     voltTol: 1e-6,
-    ...overrides,
+    ...rest,
   };
 }
 
@@ -145,11 +140,10 @@ const CMOS_3V3: ResolvedPinElectrical = {
 // ---------------------------------------------------------------------------
 
 describe("DigitalOutputPinModel", () => {
-  // NODE = 1 → nodeIdx = 0 in the solver (0-based)
-  // BRANCH = 4 → branchIdx = 4 in the augmented matrix
+  // NODE = 1 (1-based MNA node ID, passed directly to allocElement)
+  // BRANCH = 4 (branch row in augmented matrix, also 1-based)
   const NODE = 1;
   const BRANCH = 4;
-  const nodeIdx = NODE - 1; // 0
   const branchRow = BRANCH; // 4
 
   it("output_load_branch_role_drive_loaded", () => {
@@ -162,15 +156,15 @@ describe("DigitalOutputPinModel", () => {
     const ctx = makeCtx({ solver });
     pin.load(ctx);
 
-    // branch eq: A[branchIdx][nodeIdx] = 1  (V_node coefficient)
-    expect(solver.sumAt(branchRow, nodeIdx)).toBe(1);
-    // branch eq: A[branchIdx][branchIdx] = 0 (branch current coefficient zero in drive mode)
+    // branch eq: A[branchRow][NODE] = 1  (V_node coefficient; 1-based)
+    expect(solver.sumAt(branchRow, NODE)).toBe(1);
+    // branch eq: A[branchRow][branchRow] = 0 (branch current coefficient zero in drive mode)
     expect(solver.sumAt(branchRow, branchRow)).toBe(0);
-    // KCL row: A[nodeIdx][branchIdx] = 1
-    expect(solver.sumAt(nodeIdx, branchRow)).toBe(1);
+    // KCL row: A[NODE][branchRow] = 1
+    expect(solver.sumAt(NODE, branchRow)).toBe(1);
     // RHS at branchRow = vOH
-    expect(solver.sumRhs(branchRow)).toBe(CMOS_3V3.vOH);
-    // loaded → 1/rOut diagonal at nodeIdx
+    expect(ctx.rhs[branchRow]).toBe(CMOS_3V3.vOH);
+    // loaded -> 1/rOut diagonal at NODE
   });
 
   it("output_load_branch_role_hiz_ideal", () => {
@@ -184,12 +178,12 @@ describe("DigitalOutputPinModel", () => {
 
     // Hi-Z in branch mode: A[branchRow][branchRow] = 1 (I = 0)
     expect(solver.sumAt(branchRow, branchRow)).toBe(1);
-    // A[branchRow][nodeIdx] = 0
-    expect(solver.sumAt(branchRow, nodeIdx)).toBe(0);
+    // A[branchRow][NODE] = 0
+    expect(solver.sumAt(branchRow, NODE)).toBe(0);
     // ideal (not loaded) → NO 1/rHiZ diagonal
-    expect(solver.sumAt(nodeIdx, nodeIdx)).toBe(0);
+    expect(solver.sumAt(NODE, NODE)).toBe(0);
     // RHS at branchRow = 0
-    expect(solver.sumRhs(branchRow)).toBe(0);
+    expect(ctx.rhs[branchRow]).toBe(0);
   });
 
   it("output_load_direct_role_drive_loaded", () => {
@@ -202,11 +196,10 @@ describe("DigitalOutputPinModel", () => {
     const ctx = makeCtx({ solver });
     pin.load(ctx);
 
-    // direct: 1/rOut diagonal at nodeIdx
-    const gOut = 1 / CMOS_3V3.rOut;
-    // RHS at nodeIdx = vOL / rOut
+    // direct: 1/rOut diagonal at NODE
+    // RHS at NODE = vOL / rOut
     // No branch-row stamps at all — branchRow unused for direct
-    expect(solver.sumAt(branchRow, nodeIdx)).toBe(0);
+    expect(solver.sumAt(branchRow, NODE)).toBe(0);
     expect(solver.sumAt(branchRow, branchRow)).toBe(0);
   });
 
@@ -221,7 +214,7 @@ describe("DigitalOutputPinModel", () => {
 
     // Hi-Z direct: 1/rHiZ diagonal
     // Zero RHS
-    expect(solver.sumRhs(nodeIdx)).toBe(0);
+    expect(ctx.rhs[NODE]).toBe(0);
   });
 
   it("output_load_companion_inline_uses_ag", () => {
@@ -235,15 +228,11 @@ describe("DigitalOutputPinModel", () => {
     ag[0] = 1e10;
     ag[1] = 0.5e10;
 
-    const C = CMOS_3V3.cOut;
-
     const ctx = makeCtx({ solver, ag, dt: 1e-9, cktMode: MODETRAN | MODEINITFLOAT });
     pin.load(ctx);
 
     // Inline companion geq = ag[0] * C
-    const geq = ag[0] * C;
     // The diagonal should include both 1/rOut and geq
-    const gOut = 1 / CMOS_3V3.rOut;
   });
 
   it("output_load_capacitor_child_included_when_loaded_and_cOut_positive", () => {
@@ -306,7 +295,6 @@ describe("DigitalOutputPinModel", () => {
 
 describe("DigitalInputPinModel", () => {
   const NODE = 2;
-  const nodeIdx = NODE - 1; // 1
 
   it("input_load_loaded_stamps_rIn", () => {
     const solver = new MockSolver();
@@ -317,7 +305,7 @@ describe("DigitalInputPinModel", () => {
     pin.load(ctx);
 
     // No RHS stamps
-    expect(solver.sumRhs(nodeIdx)).toBe(0);
+    expect(ctx.rhs[NODE]).toBe(0);
   });
 
   it("input_load_ideal_is_noop", () => {
@@ -329,8 +317,8 @@ describe("DigitalInputPinModel", () => {
     pin.load(ctx);
 
     expect(solver.allocElementCalls.length).toBe(0);
-    expect(solver.sumAt(nodeIdx, nodeIdx)).toBe(0);
-    expect(solver.sumRhs(nodeIdx)).toBe(0);
+    expect(solver.sumAt(NODE, NODE)).toBe(0);
+    expect(ctx.rhs[NODE]).toBe(0);
   });
 
   it("readLogicLevel thresholds correctly", () => {

@@ -14,6 +14,7 @@ import { describe, it, expect } from "vitest";
 import { RealOpAmpDefinition, createRealOpAmpElement, REAL_OPAMP_MODELS } from "../real-opamp.js";
 import { PropertyBag } from "../../../core/properties.js";
 import { withNodeIds, runDcOp, makeSimpleCtx, makeLoadCtx } from "../../../solver/analog/__tests__/test-helpers.js";
+import { stampRHS } from "../../../solver/analog/stamp-helpers.js";
 import { newtonRaphson } from "../../../solver/analog/newton-raphson.js";
 import type { AnalogElement } from "../../../solver/analog/element.js";
 import { MODETRAN, MODEDCOP, MODEINITFLOAT } from "../../../solver/analog/ckt-mode.js";
@@ -89,6 +90,7 @@ function makeResistor(nodeA: number, nodeB: number, resistance: number): AnalogE
     pinNodeIds: [nodeA, nodeB],
     allNodeIds: [nodeA, nodeB],
     branchIndex: -1,
+    ngspiceLoadOrder: 0,
     isNonlinear: false,
     isReactive: false,
     setParam(_key: string, _value: number): void {},
@@ -113,6 +115,7 @@ function makeDcSource(nodePos: number, nodeNeg: number, branchRow: number, volta
     pinNodeIds: [nodePos, nodeNeg],
     allNodeIds: [nodePos, nodeNeg],
     branchIndex: branchRow,
+    ngspiceLoadOrder: 0,
     isNonlinear: false,
     isReactive: false,
     setParam(_key: string, _value: number): void {},
@@ -124,7 +127,7 @@ function makeDcSource(nodePos: number, nodeNeg: number, branchRow: number, volta
       if (nodeNeg !== 0) { const h = solver.allocElement(nodeNeg, k); solver.stampElement(h, -1); }
       if (nodePos !== 0) { const h = solver.allocElement(k, nodePos); solver.stampElement(h, 1); }
       if (nodeNeg !== 0) { const h = solver.allocElement(k, nodeNeg); solver.stampElement(h, -1); }
-      solver.stampRHS(k, voltage * ctx.srcFact);
+      stampRHS(ctx.rhs, k, voltage * ctx.srcFact);
     },
   };
 }
@@ -176,13 +179,13 @@ function runTransient(
 
   for (let i = 0; i < nSteps; i++) {
     newtonRaphson(ctx);
-    const nodeVoltages = ctx.nrResult.nodeVoltages;
+    const nodeVoltages = ctx.nrResult.voltages;
     vOut[i] = nodeVoltages[outputNode];
     // Advance reactive element companion state for next step.
     const simTime = (i + 1) * dt;
     for (const el of elements) {
       if (el.isReactive) {
-        el.accept?.(ctx, simTime, () => {});
+        el.accept?.(ctx.loadCtx, simTime, () => {});
       }
     }
   }
@@ -279,13 +282,6 @@ describe("Bandwidth", () => {
     // component correctly sets tau = A_OL / (2Ï€ * GBW).
     const gbw = 1e6;
     const aol = 100000;
-    const tauExpected = aol / (2 * Math.PI * gbw);
-
-    // Since tau is private, we verify the bandwidth property indirectly:
-    // the -3dB frequency of the gain stage = GBW/A_OL = f_p
-    const fp = gbw / aol;
-    // tau = 1/(2Ï€*f_p)
-    const tauFromFp = 1 / (2 * Math.PI * fp);
 
     // Verify the element creates successfully with the right params
     const el = createRealOpAmpElement(new Map([["in+", 1], ["in-", 2], ["out", 3], ["Vcc+", 4], ["Vcc-", 5]]), makeOpAmpProps({
@@ -302,12 +298,6 @@ describe("Bandwidth", () => {
     // f_p = GBW / A_OL  (open-loop pole)
     // With closed-loop gain A_CL = 10, the closed-loop -3dB = GBW / A_CL = GBW/10
     const gbw = 1e6;
-    const aCl = 10;
-
-    // Closed-loop bandwidth = GBW / closed-loop gain
-    const bwCl = gbw / aCl;
-
-    // Verify GBW product is conserved: bw_cl * A_cl = GBW
 
     // Verify the element is created with correct GBW
     const el = createRealOpAmpElement(new Map([["in+", 1], ["in-", 2], ["out", 3], ["Vcc+", 4], ["Vcc-", 5]]), makeOpAmpProps({
@@ -562,7 +552,6 @@ describe("RealOpAmp", () => {
     expect(result.converged).toBe(true);
 
     // Output of unity-gain buffer â‰ˆ input voltage (within 10%)
-    const vOut = result.nodeVoltages[nFeedback];
   });
 
   it("element_has_correct_flags", () => {
@@ -615,22 +604,16 @@ import type { SparseSolver as SparseSolverTypeForParity } from "../../../solver/
 import type { LoadContext } from "../../../solver/analog/load-context.js";
 
 interface RealOpAmpCaptureStamp { row: number; col: number; value: number; }
-interface RealOpAmpCaptureRhs { row: number; value: number; }
-function makeRealOpAmpCaptureSolver(): {
+function makeRealOpAmpCaptureSolver(_rhs: Float64Array): {
   solver: SparseSolverTypeForParity;
   stamps: RealOpAmpCaptureStamp[];
-  rhs: RealOpAmpCaptureRhs[];
 } {
   const stamps: RealOpAmpCaptureStamp[] = [];
-  const rhs: RealOpAmpCaptureRhs[] = [];
   const handles: { row: number; col: number }[] = [];
   const handleIndex = new Map<string, number>();
   const solver = {
     stamp: (row: number, col: number, value: number) => {
       stamps.push({ row, col, value });
-    },
-    stampRHS: (row: number, value: number) => {
-      rhs.push({ row, value });
     },
     allocElement: (row: number, col: number): number => {
       const key = `${row},${col}`;
@@ -647,13 +630,14 @@ function makeRealOpAmpCaptureSolver(): {
       stamps.push({ row, col, value });
     },
   } as unknown as SparseSolverTypeForParity;
-  return { solver, stamps, rhs };
+  return { solver, stamps };
 }
 
-function makeRealOpAmpParityCtx(voltages: Float64Array, solver: SparseSolverTypeForParity): LoadContext {
+function makeRealOpAmpParityCtx(voltages: Float64Array, solver: SparseSolverTypeForParity, rhs: Float64Array): LoadContext {
   return makeLoadCtx({
     solver: solver as unknown as import("../../../solver/analog/sparse-solver.js").SparseSolver,
-    voltages,
+    rhs,
+    rhsOld: voltages,
     cktMode: MODEDCOP | MODEINITFLOAT,
     dt: 0,
   });
@@ -695,15 +679,16 @@ describe("RealOpAmp parity (C4.5)", () => {
       props,
     );
 
-    const voltages = new Float64Array(5);
+    const voltages = new Float64Array(6);  // 1-based: slot 0 = ground sentinel, slots 1-5 = nodes
     voltages[nInp]  = 1e-3;
     voltages[nInn]  = 0;
-    voltages[nOut]  = 1.0; // linear region, within Â±(VccÂ±-vSat)
+    voltages[nOut]  = 1.0; // linear region, within ±(Vcc±-vSat)
     voltages[nVccP] = 15;
     voltages[nVccN] = -15;
 
-    const { solver, stamps, rhs } = makeRealOpAmpCaptureSolver();
-    const ctx = makeRealOpAmpParityCtx(voltages, solver);
+    const rhsBuf = new Float64Array(16);
+    const { solver, stamps } = makeRealOpAmpCaptureSolver(rhsBuf);
+    const ctx = makeRealOpAmpParityCtx(voltages, solver, rhsBuf);
     el.load(ctx);
 
     // Closed-form reference (ngspice-equivalent small-signal model):
@@ -719,26 +704,24 @@ describe("RealOpAmp parity (C4.5)", () => {
             .reduce((a, s) => a + s.value, 0);
 
     // Input resistance stamp (bit-exact): G_in between nInp and nInn
-    expect(sumAt(nInp - 1, nInp - 1)).toBe(NGSPICE_GIN);
-    expect(sumAt(nInn - 1, nInn - 1)).toBe(NGSPICE_GIN);
-    expect(sumAt(nInp - 1, nInn - 1)).toBe(-NGSPICE_GIN);
-    expect(sumAt(nInn - 1, nInp - 1)).toBe(-NGSPICE_GIN);
+    // allocElement uses 1-based ngspice indices directly.
+    expect(sumAt(nInp, nInp)).toBe(NGSPICE_GIN);
+    expect(sumAt(nInn, nInn)).toBe(NGSPICE_GIN);
+    expect(sumAt(nInp, nInn)).toBe(-NGSPICE_GIN);
+    expect(sumAt(nInn, nInp)).toBe(-NGSPICE_GIN);
 
     // G_out stamp on nOut diagonal
-    expect(sumAt(nOut - 1, nOut - 1)).toBe(NGSPICE_GOUT);
+    expect(sumAt(nOut, nOut)).toBe(NGSPICE_GOUT);
 
     // VCVS cross-coupling: aol * scale * G_out
-    expect(sumAt(nOut - 1, nInp - 1)).toBe(-aolVal * NGSPICE_GOUT);
-    expect(sumAt(nOut - 1, nInn - 1)).toBe(aolVal * NGSPICE_GOUT);
+    expect(sumAt(nOut, nInp)).toBe(-aolVal * NGSPICE_GOUT);
+    expect(sumAt(nOut, nInn)).toBe(aolVal * NGSPICE_GOUT);
 
-    // RHS: bias currents on both input nodes (bit-exact)
-    const rhsInp = rhs.filter((r) => r.row === nInp - 1).reduce((a, r) => a + r.value, 0);
-    const rhsInn = rhs.filter((r) => r.row === nInn - 1).reduce((a, r) => a + r.value, 0);
-    expect(rhsInp).toBe(-NGSPICE_IBIAS);
-    expect(rhsInn).toBe(-NGSPICE_IBIAS);
+    // RHS: bias currents on both input nodes (bit-exact); stampRHS uses 1-based index.
+    expect(rhsBuf[nInp]).toBe(-NGSPICE_IBIAS);
+    expect(rhsBuf[nInn]).toBe(-NGSPICE_IBIAS);
 
     // RHS: offset-voltage contribution at nOut
-    const rhsOut = rhs.filter((r) => r.row === nOut - 1).reduce((a, r) => a + r.value, 0);
-    expect(rhsOut).toBe(NGSPICE_RHS_OUT);
+    expect(rhsBuf[nOut]).toBe(NGSPICE_RHS_OUT);
   });
 });

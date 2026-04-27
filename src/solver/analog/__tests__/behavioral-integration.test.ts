@@ -34,6 +34,7 @@ import {
   makeVoltageSource,
   makeResistor,
   withNodeIds,
+  makeLoadCtx,
 } from "./test-helpers.js";
 import {
   BehavioralGateElement,
@@ -169,7 +170,7 @@ function buildAndGateCircuit(
     elements,
     labelToNodeId: new Map([["out", 3]]),
     statePool: makeStatePool(elements),
-  };
+  } as unknown as ConcreteCompiledAnalogCircuit;
 }
 
 /**
@@ -230,7 +231,7 @@ function buildHighImpedanceSourceCircuit(): ConcreteCompiledAnalogCircuit {
     elements,
     labelToNodeId: new Map(),
     statePool: makeStatePool(elements),
-  };
+  } as unknown as ConcreteCompiledAnalogCircuit;
 }
 
 /**
@@ -287,7 +288,7 @@ function buildDffToggleCircuit(): {
 
   const elements: AnalogElement[] = [rLoadQ, withNodeIds(element, [1, 4, 3, 4])];
 
-  const circuit: ConcreteCompiledAnalogCircuit = {
+  const circuit = {
     netCount: 4,
     componentCount: 2,
     nodeCount: 4,
@@ -296,7 +297,7 @@ function buildDffToggleCircuit(): {
     elements,
     labelToNodeId: new Map([["Q", 3], ["QB", 4]]),
     statePool: makeStatePool(elements),
-  };
+  } as unknown as ConcreteCompiledAnalogCircuit;
 
   return { circuit, clockPin, dPin, qPin, qBarPin, element };
 }
@@ -352,7 +353,6 @@ describe("Integration", () => {
     expect(result.converged).toBe(true);
 
     // Output node (MNA node 3) should be near vOL=0V
-    const vOut = engine.getNodeVoltage(3);
   });
 
   // -------------------------------------------------------------------------
@@ -448,7 +448,7 @@ describe("Integration", () => {
     const rLoad = makeResistor(3, 0, LOAD_R);
 
     const elements = [vsA, vsB, rLoad, withNodeIds(andGate, [1, 2, 3])];
-    const circuit: ConcreteCompiledAnalogCircuit = {
+    const circuit = {
       netCount: 3,
       componentCount: 4,
       nodeCount: 3,
@@ -457,7 +457,7 @@ describe("Integration", () => {
       elements,
       labelToNodeId: new Map(),
       statePool: makeStatePool(elements),
-    };
+    } as unknown as ConcreteCompiledAnalogCircuit;
 
     engine.init(circuit);
     const result = engine.dcOperatingPoint();
@@ -465,7 +465,6 @@ describe("Integration", () => {
     expect(result.converged).toBe(true);
 
     // Input A is indeterminate â†’ latch holds false â†’ AND output LOW
-    const vOut = engine.getNodeVoltage(3);
   });
 
   // -------------------------------------------------------------------------
@@ -484,7 +483,7 @@ describe("Integration", () => {
     //
     // We drive the circuit manually via updateCompanion because the clock
     // source is driven externally (not from a voltage source in the MNA matrix).
-    const { circuit, element, qPin, qBarPin } = buildDffToggleCircuit();
+    const { circuit, element, qPin } = buildDffToggleCircuit();
 
     engine.init(circuit);
     engine.dcOperatingPoint();
@@ -494,13 +493,13 @@ describe("Integration", () => {
     const dt = 1e-9; // 1ns timestep per updateCompanion call
 
     // Helper to build voltages array for the DFF element.
-    // Solver layout: 0=clock, 1=unused, 2=Q, 3=~Q (=D via shared node)
+    // 1-based: clock=node 1, Q=node 3, ~Q=node 4 (D tied to ~Q)
+    // readMnaVoltage reads voltages[nodeId] directly.
     function makeVoltages(clock: number, qVoltage: number, qBarVoltage: number): Float64Array {
-      const v = new Float64Array(4);
-      v[0] = clock;
-      v[1] = 0;
-      v[2] = qVoltage;
-      v[3] = qBarVoltage;
+      const v = new Float64Array(5); // slots 0..4; slot 0 = ground sentinel
+      v[1] = clock;
+      v[3] = qVoltage;
+      v[4] = qBarVoltage;
       return v;
     }
 
@@ -508,7 +507,6 @@ describe("Integration", () => {
     const nullSolver = {
       allocElement: (_r: number, _c: number) => 0,
       stampElement: (_h: number, _v: number) => {},
-      stampRHS: (_i: number, _v: number) => {},
       stamp: (_r: number, _c: number, _v: number) => {},
     } as any;
     const ctxAg = new Float64Array(7);
@@ -518,10 +516,10 @@ describe("Integration", () => {
       ctxDt = dt,
       method: import("../../../core/analog-types.js").IntegrationMethod = "trapezoidal",
     ): import("../load-context.js").LoadContext {
-      return {
+      return makeLoadCtx({
         solver: nullSolver,
-        rhsOld: v,
         rhs: v,
+        rhsOld: v,
         cktMode: MODETRAN | MODEINITFLOAT,
         dt: ctxDt,
         method,
@@ -529,19 +527,10 @@ describe("Integration", () => {
         deltaOld: [],
         ag: ctxAg,
         srcFact: 1,
-        noncon: { value: 0 },
-        limitingCollector: null,
-        xfact: 0,
-        gmin: 1e-12,
-        reltol: 1e-3,
-        iabstol: 1e-12,
-        cktFixLimit: false,
-        bypass: false,
-        voltTol: 1e-6,
-      };
+      });
     }
 
-    function flushQ(v: Float64Array = new Float64Array(4)): void {
+    function flushQ(v: Float64Array = new Float64Array(5)): void {
       element.load(makeCtxWith(v, 0));
     }
 
@@ -611,7 +600,7 @@ describe("Integration", () => {
     const rLoad = makeResistor(3, 0, LOAD_R);
 
     const elements = [vsA, vsB, rLoad, andGate];
-    const circuit: ConcreteCompiledAnalogCircuit = {
+    const circuit = {
       netCount: 3,
       componentCount: 4,
       nodeCount: 3,
@@ -620,7 +609,7 @@ describe("Integration", () => {
       elements,
       labelToNodeId: new Map(),
       statePool: makeStatePool(elements),
-    };
+    } as unknown as ConcreteCompiledAnalogCircuit;
 
     engine.init(circuit);
     const result = engine.dcOperatingPoint();
@@ -653,7 +642,7 @@ describe("Integration", () => {
     const rLoadQBar = makeResistor(4, 0, LOAD_R);
 
     const elements = [rLoadQ, rLoadQBar, dff];
-    const circuit: ConcreteCompiledAnalogCircuit = {
+    const circuit = {
       netCount: 4,
       componentCount: 3,
       nodeCount: 4,
@@ -662,7 +651,7 @@ describe("Integration", () => {
       elements,
       labelToNodeId: new Map(),
       statePool: makeStatePool(elements),
-    };
+    } as unknown as ConcreteCompiledAnalogCircuit;
 
     engine.init(circuit);
     const result = engine.dcOperatingPoint();
@@ -673,7 +662,6 @@ describe("Integration", () => {
 
     // After DC OP with no clock edge, Q should remain in initial state (false â†’ vOL)
     // Q is MNA node 3 (solver index 2)
-    const vQ = engine.getNodeVoltage(3);
     // vOL=0V â†’ through rOut (50Î©) and rLoad (10kÎ©) â†’ â‰ˆ0V
   });
 });

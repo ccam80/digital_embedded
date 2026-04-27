@@ -102,7 +102,7 @@ describeIfDll("ngspice cap state probe — via ComparisonSession", () => {
     console.log("NGSPICE session topology elements:");
     for (const el of session.ngspiceSession!.topology.elements) {
       // eslint-disable-next-line no-console
-      console.log(`  label=${el.label} typeId=${el.typeId}`);
+      console.log(`  label=${el.label} typeId=${el.type}`);
     }
 
     const ngSteps = session.ngspiceSession!.steps;

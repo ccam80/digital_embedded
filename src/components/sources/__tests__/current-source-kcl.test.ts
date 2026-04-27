@@ -49,7 +49,6 @@ describe("CurrentSource — getPinCurrents KCL integration", () => {
     engine.dcOperatingPoint();
 
     // Node 1 voltage: V = I * R = 0.002 * 1000 = 2.0 V
-    const v1 = engine.getNodeVoltage(1);
 
     // --- Core invariant: getPinCurrents sign convention ---
     const pinCurrents = engine.getElementPinCurrents(0); // element 0 = current source
@@ -62,8 +61,6 @@ describe("CurrentSource — getPinCurrents KCL integration", () => {
     const kcl = pinCurrents[0] + pinCurrents[1];
     expect(Math.abs(kcl)).toBeLessThan(1e-10);
 
-    // --- Cross-check against load: Ohm's law gives same magnitude ---
-    const I_load = v1 / R_val;
   });
 
   it("setParam current update propagates to getPinCurrents", () => {
@@ -85,6 +82,6 @@ describe("CurrentSource — getPinCurrents KCL integration", () => {
     src.setParam("current", 0.005);
     engine.dcOperatingPoint();
 
-    const pinCurrents = engine.getElementPinCurrents(0);
+    engine.getElementPinCurrents(0);
   });
 });

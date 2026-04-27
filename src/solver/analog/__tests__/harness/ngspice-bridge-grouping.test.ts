@@ -25,6 +25,7 @@ function makeRaw(overrides: Partial<RawNgspiceIterationEx> = {}): RawNgspiceIter
   return {
     iteration: 0,
     matrixSize: 1,
+    rhsBufSize: 1,
     rhs: new Float64Array([0]),
     rhsOld: new Float64Array([0]),
     preSolveRhs: new Float64Array([0]),

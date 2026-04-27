@@ -72,7 +72,7 @@ function makeAcRcCircuit(timeRef: { value: number }): ConcreteCompiledAnalogCirc
     labelToNodeId: new Map([["Vout", 2]]),
     statePool,
     timeRef,
-  };
+  } as unknown as ConcreteCompiledAnalogCircuit & { timeRef: { value: number } };
 }
 
 // ---------------------------------------------------------------------------
@@ -175,7 +175,6 @@ describe("RC lowpass AC transient — hand-built", () => {
     // Output peak must be less than source (lowpass filtering)
     expect(outputPeak).toBeLessThan(sourcePeak);
     // Output attenuation should match |H(f)|
-    const measuredGain = outputPeak / sourcePeak;
   });
 
   it("output phase lags input", () => {
@@ -255,7 +254,7 @@ describe("RC lowpass AC transient — hand-built", () => {
     const highFElements = [vs, r, cap];
     const highFPool = allocateStatePool(highFElements);
 
-    const circuit: ConcreteCompiledAnalogCircuit & { timeRef: { value: number } } = {
+    const circuit = {
       netCount: 2,
       componentCount: 3,
       nodeCount: 2,
@@ -265,7 +264,7 @@ describe("RC lowpass AC transient — hand-built", () => {
       labelToNodeId: new Map(),
       statePool: highFPool,
       timeRef,
-    };
+    } as unknown as ConcreteCompiledAnalogCircuit & { timeRef: { value: number } };
 
     const engine = new MNAEngine();
     engine.init(circuit);

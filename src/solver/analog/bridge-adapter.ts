@@ -13,14 +13,13 @@
  * writes (the underlying pin model early-exits).
  */
 
-import type { AnalogElement, ReactiveAnalogElement } from "./element.js";
-import { isPoolBacked } from "./element.js";
+import type { AnalogElement } from "./element.js";
 import type { LoadContext, StatePoolRef } from "./element.js";
+import { NGSPICE_LOAD_ORDER } from "./element.js";
 import type { ResolvedPinElectrical } from "../../core/pin-electrical.js";
 import {
   DigitalOutputPinModel,
   DigitalInputPinModel,
-  readMnaVoltage,
   collectPinModelChildren,
 } from "./digital-pin-model.js";
 import type { AnalogCapacitorElement } from "../../components/passives/capacitor.js";
@@ -55,6 +54,7 @@ export class BridgeOutputAdapter implements AnalogElement {
   readonly allNodeIds: readonly number[];
   readonly internalNodeLabels: readonly string[];
   readonly branchIndex: number;
+  readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.VSRC;
   readonly isNonlinear: false = false;
   label?: string;
 
@@ -62,7 +62,6 @@ export class BridgeOutputAdapter implements AnalogElement {
   readonly stateSchema: StateSchema = BRIDGE_COMPOSITE_SCHEMA;
   stateSize: number;
   stateBaseOffset = -1;
-  private _pool!: StatePoolRef;
 
   /**
    * @param pinModel  - Initialised DigitalOutputPinModel for this bridge pin
@@ -91,7 +90,6 @@ export class BridgeOutputAdapter implements AnalogElement {
   }
 
   initState(pool: StatePoolRef): void {
-    this._pool = pool;
     let offset = this.stateBaseOffset;
     for (const child of this._childElements) {
       child.stateBaseOffset = offset;
@@ -178,6 +176,7 @@ export class BridgeInputAdapter implements AnalogElement {
   readonly allNodeIds: readonly number[];
   readonly internalNodeLabels: readonly string[];
   readonly branchIndex: number = -1;
+  readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.ISRC;
   readonly isNonlinear: false = false;
   label?: string;
 
@@ -185,7 +184,6 @@ export class BridgeInputAdapter implements AnalogElement {
   readonly stateSchema: StateSchema = BRIDGE_COMPOSITE_SCHEMA;
   stateSize: number;
   stateBaseOffset = -1;
-  private _pool!: StatePoolRef;
 
   /**
    * @param pinModel - Initialised DigitalInputPinModel for this bridge pin.
@@ -209,7 +207,6 @@ export class BridgeInputAdapter implements AnalogElement {
   }
 
   initState(pool: StatePoolRef): void {
-    this._pool = pool;
     let offset = this.stateBaseOffset;
     for (const child of this._childElements) {
       child.stateBaseOffset = offset;

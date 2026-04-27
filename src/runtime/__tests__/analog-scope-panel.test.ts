@@ -87,7 +87,7 @@ describe("ScopePanel", () => {
     expect(ch).toBeDefined();
     expect(ch!.buffer.sampleCount).toBe(1);
 
-    const samples = ch!.buffer.getSamplesInRange(0, 1);
+    ch!.buffer.getSamplesInRange(0, 1);
   });
 
   it("multiple_channels_independent", () => {
@@ -112,8 +112,8 @@ describe("ScopePanel", () => {
     expect(vch!.buffer.sampleCount).toBe(1);
     expect(ich!.buffer.sampleCount).toBe(1);
 
-    const vSamples = vch!.buffer.getSamplesInRange(0, 1);
-    const iSamples = ich!.buffer.getSamplesInRange(0, 1);
+    vch!.buffer.getSamplesInRange(0, 1);
+    ich!.buffer.getSamplesInRange(0, 1);
 
   });
 
@@ -149,7 +149,7 @@ describe("ScopePanel", () => {
       panel.onStep(i);
     }
 
-    const vp = (panel as unknown as {
+    (panel as unknown as {
       _computeSharedYRange: (tStart: number, tEnd: number) => { yMin: number; yMax: number };
     })._computeSharedYRange(0, 1);
 
@@ -256,7 +256,7 @@ describe("ScopePanel", () => {
     const channels = (panel as unknown as { _channels: { buffer: AnalogScopeBuffer; kind: string }[] })._channels;
     const ch = channels.find((c) => c.kind === "elementCurrent");
     expect(ch).toBeDefined();
-    const samples = ch!.buffer.getSamplesInRange(0, 1);
+    ch!.buffer.getSamplesInRange(0, 1);
   });
 
   it("reads_branch_current_via_coordinator", () => {
@@ -270,7 +270,7 @@ describe("ScopePanel", () => {
     const channels = (panel as unknown as { _channels: { buffer: AnalogScopeBuffer; kind: string }[] })._channels;
     const ch = channels.find((c) => c.kind === "current");
     expect(ch).toBeDefined();
-    const samples = ch!.buffer.getSamplesInRange(0, 1);
+    ch!.buffer.getSamplesInRange(0, 1);
   });
 
   it("uses_coordinator_simTime_for_x_axis", () => {
@@ -282,7 +282,7 @@ describe("ScopePanel", () => {
     panel.onStep(1);
 
     const ch = (panel as unknown as { _channels: { buffer: AnalogScopeBuffer }[] })._channels[0]!;
-    const samples = ch.buffer.getSamplesInRange(0, 1);
+    ch.buffer.getSamplesInRange(0, 1);
   });
 
   it("digital_channel_maps_high_to_vdd", () => {
@@ -298,7 +298,7 @@ describe("ScopePanel", () => {
 
     const ch = (panel as unknown as { _channels: { buffer: AnalogScopeBuffer; kind: string }[] })._channels[0]!;
     expect(ch.kind).toBe("digital");
-    const samples = ch.buffer.getSamplesInRange(0, 1);
+    ch.buffer.getSamplesInRange(0, 1);
   });
 
   it("digital_channel_maps_low_to_zero", () => {
@@ -313,7 +313,7 @@ describe("ScopePanel", () => {
     panel.onStep(1);
 
     const ch = (panel as unknown as { _channels: { buffer: AnalogScopeBuffer }[] })._channels[0]!;
-    const samples = ch.buffer.getSamplesInRange(0, 1);
+    ch.buffer.getSamplesInRange(0, 1);
   });
 
   it("digital_channel_custom_vdd", () => {
@@ -328,7 +328,7 @@ describe("ScopePanel", () => {
     panel.onStep(1);
 
     const ch = (panel as unknown as { _channels: { buffer: AnalogScopeBuffer }[] })._channels[0]!;
-    const samples = ch.buffer.getSamplesInRange(0, 1);
+    ch.buffer.getSamplesInRange(0, 1);
   });
 
   it("discrete_mode_uses_stepcount_as_time", () => {
@@ -343,7 +343,7 @@ describe("ScopePanel", () => {
 
     expect(panel.isDiscreteMode()).toBe(true);
     const ch = (panel as unknown as { _channels: { buffer: AnalogScopeBuffer }[] })._channels[0]!;
-    const samples = ch.buffer.getSamplesInRange(0, 100);
+    ch.buffer.getSamplesInRange(0, 100);
   });
 
   it("voltage_channel_maps_digital_signal_to_vdd", () => {
@@ -361,6 +361,6 @@ describe("ScopePanel", () => {
     panel.onStep(1);
 
     const ch = (panel as unknown as { _channels: { buffer: AnalogScopeBuffer }[] })._channels[0]!;
-    const samples = ch.buffer.getSamplesInRange(0, 1);
+    ch.buffer.getSamplesInRange(0, 1);
   });
 });

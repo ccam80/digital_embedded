@@ -113,7 +113,7 @@ describe("parseSI ↔ formatSI round-trip", () => {
   for (const { value, unit } of cases) {
     it(`round-trips ${value} ${unit}`, () => {
       const formatted = formatSI(value, unit);
-      const parsed = parseSI(formatted);
+      parseSI(formatted);
     });
   }
 });

@@ -38,6 +38,7 @@ function makeCaptureSolver(): {
   const handles: { row: number; col: number }[] = [];
   const handleIndex = new Map<string, number>();
   const solver = {
+    _initStructure: (_n: number) => {},
     stampRHS: (row: number, value: number) => {
       rhs.push({ row, value });
     },
@@ -86,11 +87,11 @@ function makeLDR(overrides: Partial<{
 describe("LDR", () => {
   describe("dark_resistance", () => {
     it("lux=0 returns R_dark (not power-law formula)", () => {
-      const ldr = makeLDR({ rDark: 1e6, lux: 0 });
+      makeLDR({ rDark: 1e6, lux: 0 });
     });
 
     it("lux=0 with custom rDark returns that value", () => {
-      const ldr = makeLDR({ rDark: 500000, lux: 0 });
+      makeLDR({ rDark: 500000, lux: 0 });
     });
   });
 
@@ -99,7 +100,7 @@ describe("LDR", () => {
       // At lux = luxRef: R = rDark * (luxRef/luxRef)^(-γ) = rDark * 1 = rDark
       const rDark = 100; // set rDark to the expected "light" resistance
       const luxRef = 1000;
-      const ldr = makeLDR({ rDark, luxRef, gamma: 0.7, lux: luxRef });
+      makeLDR({ rDark, luxRef, gamma: 0.7, lux: luxRef });
       // R ≈ rDark (which equals rLight at reference illumination)
     });
 
@@ -107,7 +108,7 @@ describe("LDR", () => {
       // Use rDark=100 as the calibrated light resistance at luxRef=1000
       const rLight = 100;
       const luxRef = 1000;
-      const ldr = makeLDR({ rDark: rLight, luxRef, gamma: 0.7, lux: luxRef });
+      makeLDR({ rDark: rLight, luxRef, gamma: 0.7, lux: luxRef });
     });
   });
 
@@ -117,8 +118,7 @@ describe("LDR", () => {
       const luxRef = 1000;
       const gamma = 0.7;
       const lux = 100;
-      const expected = rDark * Math.pow(lux / luxRef, -gamma);
-      const ldr = makeLDR({ rDark, luxRef, gamma, lux });
+      makeLDR({ rDark, luxRef, gamma, lux });
     });
 
     it("lower lux gives higher resistance than at reference", () => {
@@ -149,9 +149,6 @@ describe("LDR", () => {
       const ldr = makeLDR({ rDark: 1e6, luxRef: 1000, gamma: 0.7, lux: 500 });
 
       ldr.setLux(2000);
-      const R = ldr.resistance();
-      const expectedG = 1 / R;
-
       const { solver, stamps } = makeCaptureSolver();
       const ctx = makeSimpleCtx({
         solver,
@@ -159,10 +156,10 @@ describe("LDR", () => {
         matrixSize: 2,
         nodeCount: 2,
       });
-      ldr.load(ctx);
+      ldr.load(ctx.loadCtx);
 
-      // Check that diagonal conductance matches expected
-      const diagStamp = stamps.find((s) => s.row === 0 && s.col === 0);
+      // Check that diagonal conductance matches expected (nodes are 1-based: pin[0]=node1, pin[1]=node2)
+      const diagStamp = stamps.find((s) => s.row === 1 && s.col === 1);
       expect(diagStamp).toBeDefined();
     });
   });
@@ -178,14 +175,15 @@ describe("LDR", () => {
         nodeCount: 2,
       });
 
-      ldr.load(ctx);
+      ldr.load(ctx.loadCtx);
 
       const G = 1 / ldr.resistance();
       const tuples = stamps.map((s) => [s.row, s.col, s.value] as [number, number, number]);
-      expect(tuples).toContainEqual([0, 0, G]);
-      expect(tuples).toContainEqual([0, 1, -G]);
-      expect(tuples).toContainEqual([1, 0, -G]);
+      // Nodes are 1-based: pinNodeIds=[1,2] → row/col 1 and 2
       expect(tuples).toContainEqual([1, 1, G]);
+      expect(tuples).toContainEqual([1, 2, -G]);
+      expect(tuples).toContainEqual([2, 1, -G]);
+      expect(tuples).toContainEqual([2, 2, G]);
     });
 
     it("lux=0 stamps dark conductance", () => {
@@ -199,11 +197,12 @@ describe("LDR", () => {
         nodeCount: 2,
       });
 
-      ldr.load(ctx);
+      ldr.load(ctx.loadCtx);
 
       const G = 1 / rDark;
       const tuples = stamps.map((s) => [s.row, s.col, s.value] as [number, number, number]);
-      expect(tuples).toContainEqual([0, 0, G]);
+      // Nodes are 1-based: pinNodeIds=[1,2] → row/col 1 and 2
+      expect(tuples).toContainEqual([1, 1, G]);
     });
   });
 
@@ -274,7 +273,6 @@ describe("ldr_load_dcop_parity", () => {
       matrixSize: 2,
       nodeCount: 2,
     });
-    stampCtx.solver._initStructure(2);
     analogElement.load(stampCtx.loadCtx);
     const stamps = stampCtx.solver.getCSCNonZeros();
 
@@ -287,18 +285,19 @@ describe("ldr_load_dcop_parity", () => {
     const R_REF = rDark * Math.pow(lux / luxRef, -gamma);
     const NGSPICE_G_REF = 1 / R_REF;
 
-    const e00 = stamps.find((e) => e.row === 0 && e.col === 0);
+    // Nodes are 1-based: pinNodeIds=[1,2] → row/col 1 and 2
+    const e00 = stamps.find((e) => e.row === 1 && e.col === 1);
     expect(e00).toBeDefined();
     expect(e00!.value).toBe(NGSPICE_G_REF);
 
-    const e11 = stamps.find((e) => e.row === 1 && e.col === 1);
+    const e11 = stamps.find((e) => e.row === 2 && e.col === 2);
     expect(e11).toBeDefined();
     expect(e11!.value).toBe(NGSPICE_G_REF);
 
-    const e01 = stamps.find((e) => e.row === 0 && e.col === 1);
+    const e01 = stamps.find((e) => e.row === 1 && e.col === 2);
     expect(e01!.value).toBe(-NGSPICE_G_REF);
 
-    const e10 = stamps.find((e) => e.row === 1 && e.col === 0);
+    const e10 = stamps.find((e) => e.row === 2 && e.col === 1);
     expect(e10!.value).toBe(-NGSPICE_G_REF);
   });
 });

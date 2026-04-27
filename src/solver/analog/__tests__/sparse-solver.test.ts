@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { SparseSolver } from "../sparse-solver.js";
+import { stampRHS } from "../stamp-helpers.js";
 import { MODEDCOP, MODEINITFLOAT } from "../ckt-mode.js";
 
 // ---------------------------------------------------------------------------
@@ -9,16 +10,20 @@ import { MODEDCOP, MODEINITFLOAT } from "../ckt-mode.js";
 function assembleSolve(
   n: number,
   entries: Array<[number, number, number]>,
-  rhs: number[]
+  rhsVals: number[]
 ): Float64Array {
+  // n = number of active equations; solver uses 1-based indices (0 = ground).
+  // entries and rhsVals are 1-based: entry [r, c, v] stamps at row r, col c (1..n).
+  // rhs array is sized n+1; rhs[0] unused (ground sentinel).
   const solver = new SparseSolver();
   solver._initStructure(n);
   for (const [r, c, v] of entries) solver.stampElement(solver.allocElement(r, c), v);
-  for (let i = 0; i < rhs.length; i++) solver.stampRHS(i, rhs[i]);
+  const rhs = new Float64Array(n + 1);
+  for (let i = 0; i < rhsVals.length; i++) rhs[i + 1] += rhsVals[i];
   const result = solver.factor();
   expect(result).toBe(0);
-  const x = new Float64Array(n);
-  solver.solve(x);
+  const x = new Float64Array(n + 1);
+  solver.solve(rhs, x);
   return x;
 }
 
@@ -30,13 +35,13 @@ describe("SparseSolver", () => {
   it("solves_2x2_dense", () => {
     // A = [[4,1],[1,3]], b = [1,2]
     // Analytical: x = [1/11, 7/11]
-    const x = assembleSolve(
+    assembleSolve(
       2,
       [
-        [0, 0, 4],
-        [0, 1, 1],
-        [1, 0, 1],
-        [1, 1, 3],
+        [1, 1, 4],
+        [1, 2, 1],
+        [2, 1, 1],
+        [2, 2, 3],
       ],
       [1, 2]
     );
@@ -45,54 +50,55 @@ describe("SparseSolver", () => {
   it("solves_3x3_sparse_tridiagonal", () => {
     // A = [[2,-1,0],[-1,3,-1],[0,-1,2]], b = [1,2,1]
     // Analytical solution: solve by hand
-    // 2x0 - x1 = 1
-    // -x0 + 3x1 - x2 = 2
-    // -x1 + 2x2 = 1
-    // From row 0: x0 = (1 + x1) / 2
-    // From row 2: x2 = (1 + x1) / 2
-    // Sub into row 1: -(1+x1)/2 + 3x1 - (1+x1)/2 = 2
-    //   -1/2 - x1/2 + 3x1 - 1/2 - x1/2 = 2
-    //   -1 + 2x1 = 2 => x1 = 1.5
-    // x0 = 2.5/2 = 1.25, x2 = 1.25
-    const x = assembleSolve(
+    // 2x1 - x2 = 1
+    // -x1 + 3x2 - x3 = 2
+    // -x2 + 2x3 = 1
+    // From row 1: x1 = (1 + x2) / 2
+    // From row 3: x3 = (1 + x2) / 2
+    // Sub into row 2: -(1+x2)/2 + 3x2 - (1+x2)/2 = 2
+    //   -1/2 - x2/2 + 3x2 - 1/2 - x2/2 = 2
+    //   -1 + 2x2 = 2 => x2 = 1.5
+    // x1 = 2.5/2 = 1.25, x3 = 1.25
+    assembleSolve(
       3,
       [
-        [0, 0, 2],
-        [0, 1, -1],
-        [1, 0, -1],
-        [1, 1, 3],
+        [1, 1, 2],
         [1, 2, -1],
         [2, 1, -1],
-        [2, 2, 2],
+        [2, 2, 3],
+        [2, 3, -1],
+        [3, 2, -1],
+        [3, 3, 2],
       ],
       [1, 2, 1]
     );
   });
 
   it("sums_duplicate_entries", () => {
-    // stamp (0,0) with 3.0, stamp (0,0) with 2.0; total should be 5.0
-    // 1x1 system: 5*x = 10 => x = 2
+    // stamp (1,1) with 3.0, stamp (1,1) with 2.0; total should be 5.0
+    // 1x1 system: 5*x = 10 => x[1] = 2
     const solver = new SparseSolver();
     solver._initStructure(1);
-    solver.stampElement(solver.allocElement(0, 0), 3.0);
-    solver.stampElement(solver.allocElement(0, 0), 2.0);
-    solver.stampRHS(0, 10.0);
+    solver.stampElement(solver.allocElement(1, 1), 3.0);
+    solver.stampElement(solver.allocElement(1, 1), 2.0);
+    const rhs = new Float64Array(2);
+    rhs[1] += 10.0;
     const result = solver.factor();
     expect(result).toBe(0);
-    const x = new Float64Array(1);
-    solver.solve(x);
+    const x = new Float64Array(2);
+    solver.solve(rhs, x);
   });
 
   it("detects_singular_matrix", () => {
     // A = [[1,1],[1,1]] is singular
     const solver = new SparseSolver();
     solver._initStructure(2);
-    solver.stampElement(solver.allocElement(0, 0), 1);
-    solver.stampElement(solver.allocElement(0, 1), 1);
-    solver.stampElement(solver.allocElement(1, 0), 1);
     solver.stampElement(solver.allocElement(1, 1), 1);
-    solver.stampRHS(0, 1);
-    solver.stampRHS(1, 1);
+    solver.stampElement(solver.allocElement(1, 2), 1);
+    solver.stampElement(solver.allocElement(2, 1), 1);
+    solver.stampElement(solver.allocElement(2, 2), 1);
+    const rhs = new Float64Array(3);
+    rhs[1] += 1; rhs[2] += 1;
     const result = solver.factor();
     expect(result).not.toBe(0);
     expect(solver.whereSingular().row).toBeDefined();
@@ -105,12 +111,13 @@ describe("SparseSolver", () => {
     const b = [3.0, -1.5, 0.0, 7.25];
     const solver = new SparseSolver();
     solver._initStructure(n);
-    for (let i = 0; i < n; i++) solver.stampElement(solver.allocElement(i, i), 1.0);
-    for (let i = 0; i < n; i++) solver.stampRHS(i, b[i]);
+    for (let i = 1; i <= n; i++) solver.stampElement(solver.allocElement(i, i), 1.0);
+    const rhs = new Float64Array(n + 1);
+    for (let i = 0; i < n; i++) rhs[i + 1] += b[i];
     const result = solver.factor();
     expect(result).toBe(0);
-    const x = new Float64Array(n);
-    solver.solve(x);
+    const x = new Float64Array(n + 1);
+    solver.solve(rhs, x);
     for (let i = 0; i < n; i++) {
     }
   });
@@ -120,59 +127,59 @@ describe("SparseSolver", () => {
     const solver = new SparseSolver();
 
     solver._initStructure(2);
-    solver.stampElement(solver.allocElement(0, 0), 4);
-    solver.stampElement(solver.allocElement(0, 1), 1);
-    solver.stampElement(solver.allocElement(1, 0), 1);
-    solver.stampElement(solver.allocElement(1, 1), 3);
-    solver.stampRHS(0, 1);
-    solver.stampRHS(1, 2);
+    solver.stampElement(solver.allocElement(1, 1), 4);
+    solver.stampElement(solver.allocElement(1, 2), 1);
+    solver.stampElement(solver.allocElement(2, 1), 1);
+    solver.stampElement(solver.allocElement(2, 2), 3);
+    const rhs1 = new Float64Array(3);
+    rhs1[1] += 1; rhs1[2] += 2;
     const r1 = solver.factor();
     expect(r1).toBe(0);
-    const x1 = new Float64Array(2);
-    solver.solve(x1);
+    const x1 = new Float64Array(3);
+    solver.solve(rhs1, x1);
 
     // Second solve: same pattern, different values — A = [[2,1],[1,4]], b = [3,5]
-    // Analytical: det = 8-1=7; x0 = (3*4-5*1)/7 = 7/7 = 1; x1 = (2*5-3*1)/7 = 7/7 = 1
+    // Analytical: det = 8-1=7; x1 = (3*4-5*1)/7 = 7/7 = 1; x2 = (2*5-3*1)/7 = 7/7 = 1
     solver._initStructure(2);
-    solver.stampElement(solver.allocElement(0, 0), 2);
-    solver.stampElement(solver.allocElement(0, 1), 1);
-    solver.stampElement(solver.allocElement(1, 0), 1);
-    solver.stampElement(solver.allocElement(1, 1), 4);
-    solver.stampRHS(0, 3);
-    solver.stampRHS(1, 5);
+    solver.stampElement(solver.allocElement(1, 1), 2);
+    solver.stampElement(solver.allocElement(1, 2), 1);
+    solver.stampElement(solver.allocElement(2, 1), 1);
+    solver.stampElement(solver.allocElement(2, 2), 4);
+    const rhs2 = new Float64Array(3);
+    rhs2[1] += 3; rhs2[2] += 5;
     // topology should NOT be dirty — same nonzero pattern
     const r2 = solver.factor();
     expect(r2).toBe(0);
-    const x2 = new Float64Array(2);
-    solver.solve(x2);
+    const x2 = new Float64Array(3);
+    solver.solve(rhs2, x2);
   });
 
   it("invalidate_forces_resymbolize", () => {
     // First: 2x2 diagonal
     const solver = new SparseSolver();
     solver._initStructure(2);
-    solver.stampElement(solver.allocElement(0, 0), 3);
-    solver.stampElement(solver.allocElement(1, 1), 5);
-    solver.stampRHS(0, 6);
-    solver.stampRHS(1, 10);
+    solver.stampElement(solver.allocElement(1, 1), 3);
+    solver.stampElement(solver.allocElement(2, 2), 5);
+    const rhs1 = new Float64Array(3);
+    rhs1[1] += 6; rhs1[2] += 10;
     let r = solver.factor();
     expect(r).toBe(0);
-    const x1 = new Float64Array(2);
-    solver.solve(x1);
+    const x1 = new Float64Array(3);
+    solver.solve(rhs1, x1);
 
     // Invalidate topology, then change to full 2x2
     solver.invalidateTopology();
     solver._initStructure(2);
-    solver.stampElement(solver.allocElement(0, 0), 4);
-    solver.stampElement(solver.allocElement(0, 1), 1);
-    solver.stampElement(solver.allocElement(1, 0), 1);
-    solver.stampElement(solver.allocElement(1, 1), 3);
-    solver.stampRHS(0, 1);
-    solver.stampRHS(1, 2);
+    solver.stampElement(solver.allocElement(1, 1), 4);
+    solver.stampElement(solver.allocElement(1, 2), 1);
+    solver.stampElement(solver.allocElement(2, 1), 1);
+    solver.stampElement(solver.allocElement(2, 2), 3);
+    const rhs2 = new Float64Array(3);
+    rhs2[1] += 1; rhs2[2] += 2;
     r = solver.factor();
     expect(r).toBe(0);
-    const x2 = new Float64Array(2);
-    solver.solve(x2);
+    const x2 = new Float64Array(3);
+    solver.solve(rhs2, x2);
   });
 
   it("mna_resistor_divider_3x3", () => {
@@ -198,25 +205,25 @@ describe("SparseSolver", () => {
     const solver = new SparseSolver();
     solver._initStructure(3);
 
-    // Row 0, node 1: G1*(V1-V2) stamp
-    solver.stampElement(solver.allocElement(0, 0), G);   // G1 to V1
-    solver.stampElement(solver.allocElement(0, 1), -G);  // -G1 to V2
-    // Voltage source current injection into node 1
-    solver.stampElement(solver.allocElement(0, 2), 1);   // +1 for Ivs column
+    // Row 1, node 1: G1*(V1-V2) stamp + VS current injection
+    solver.stampElement(solver.allocElement(1, 1), G);   // G1 to V1
+    solver.stampElement(solver.allocElement(1, 2), -G);  // -G1 to V2
+    solver.stampElement(solver.allocElement(1, 3), 1);   // +1 for Ivs column
 
-    // Row 1, node 2: G1*(V2-V1) + G2*V2 stamp
-    solver.stampElement(solver.allocElement(1, 0), -G);  // -G1 from V1
-    solver.stampElement(solver.allocElement(1, 1), G + G); // G1+G2 for V2
+    // Row 2, node 2: G1*(V2-V1) + G2*V2 stamp
+    solver.stampElement(solver.allocElement(2, 1), -G);  // -G1 from V1
+    solver.stampElement(solver.allocElement(2, 2), G + G); // G1+G2 for V2
 
-    // Row 2, branch equation V1 = Vs
-    solver.stampElement(solver.allocElement(2, 0), 1);   // V1 coefficient
-    solver.stampRHS(2, Vs);  // RHS = Vs
+    // Row 3, branch equation V1 = Vs
+    solver.stampElement(solver.allocElement(3, 1), 1);   // V1 coefficient
+    const rhs = new Float64Array(4);
+    stampRHS(rhs, 3, Vs);  // RHS = Vs
 
     const result = solver.factor();
     expect(result).toBe(0);
 
-    const x = new Float64Array(3);
-    solver.solve(x);
+    const x = new Float64Array(4);
+    solver.solve(rhs, x);
 
     // V1=5, V2=2.5, Ivs = -V1/1000 = wait, let's compute:
     // V1=5, V2=2.5; current through R1 = (V1-V2)/R1 = 2.5mA into node 2
@@ -244,11 +251,12 @@ describe("SparseSolver", () => {
     }
     const rand = makePrng(0xdeadbeef);
 
-    // Build a random sparse matrix with ~10% density, diagonally dominant
+    // Build a random sparse matrix with ~10% density, diagonally dominant.
+    // entries use 1-based (r, c) for solver's 1-based external API.
     const entries: Array<[number, number, number]> = [];
-    for (let i = 0; i < n; i++) {
+    for (let i = 1; i <= n; i++) {
       let rowSum = 0;
-      for (let j = 0; j < n; j++) {
+      for (let j = 1; j <= n; j++) {
         if (i !== j && rand() < 0.1) {
           const v = (rand() - 0.5) * 2;
           entries.push([i, j, v]);
@@ -259,13 +267,14 @@ describe("SparseSolver", () => {
       entries.push([i, i, rowSum + 1.0]);
     }
 
-    const rhs = Array.from({ length: n }, () => rand());
+    const rhsVals = Array.from({ length: n }, () => rand());
 
     // Symbolic timing
     const t0 = performance.now();
     solver._initStructure(n);
     for (const [r, c, v] of entries) solver.stampElement(solver.allocElement(r, c), v);
-    for (let i = 0; i < n; i++) solver.stampRHS(i, rhs[i]);
+    const rhsBuf = new Float64Array(n + 1);
+    for (let i = 0; i < n; i++) rhsBuf[i + 1] += rhsVals[i];
     const tSymbolic = performance.now() - t0;
 
     // Numeric factor timing
@@ -277,8 +286,8 @@ describe("SparseSolver", () => {
 
     // Solve timing
     const t2 = performance.now();
-    const x = new Float64Array(n);
-    solver.solve(x);
+    const x = new Float64Array(n + 1);
+    solver.solve(rhsBuf, x);
     const tSolve = performance.now() - t2;
 
     // CI-relaxed performance targets (5x relaxed as per spec)
@@ -286,32 +295,33 @@ describe("SparseSolver", () => {
     expect(tFactor).toBeLessThan(5.0);    // relaxed for Markowitz overhead
     expect(tSolve).toBeLessThan(1.0);     // 0.2ms * 5
 
-    // Verify first solve residual
-    const residual1 = new Float64Array(n);
+    // Verify first solve residual (entries and x are 1-based)
+    const residual1 = new Float64Array(n + 1);
     for (const [r, c, v] of entries) residual1[r] += v * x[c];
-    for (let i = 0; i < n; i++) {
-      expect(Math.abs(residual1[i] - rhs[i])).toBeLessThan(1e-8);
+    for (let i = 1; i <= n; i++) {
+      expect(Math.abs(residual1[i] - rhsVals[i - 1])).toBeLessThan(1e-8);
     }
 
     // Warm run: re-stamp same pattern, re-factor (simulates NR iteration 2+)
     solver._initStructure(n);
     for (const [r, c, v] of entries) solver.stampElement(solver.allocElement(r, c), v);
-    for (let i = 0; i < n; i++) solver.stampRHS(i, rhs[i]);
+    const rhsBuf2 = new Float64Array(n + 1);
+    for (let i = 0; i < n; i++) rhsBuf2[i + 1] += rhsVals[i];
 
     performance.now();
     solver.factor();
     performance.now();
 
     performance.now();
-    solver.solve(x);
+    solver.solve(rhsBuf2, x);
     performance.now();
 
     // Verify solution is correct: A*x should equal b within tolerance
-    // (residual check using original entries)
-    const residual = new Float64Array(n);
+    // (residual check using original 1-based entries)
+    const residual = new Float64Array(n + 1);
     for (const [r, c, v] of entries) residual[r] += v * x[c];
-    for (let i = 0; i < n; i++) {
-      expect(Math.abs(residual[i] - rhs[i])).toBeLessThan(1e-8);
+    for (let i = 1; i <= n; i++) {
+      expect(Math.abs(residual[i] - rhsVals[i - 1])).toBeLessThan(1e-8);
     }
   });
 });
@@ -403,7 +413,6 @@ describe("SparseSolver real MNA circuit", () => {
     expect(dcResult.converged).toBe(true);
 
     // Voltage source enforces node 50 = 10V
-    const v50 = engine.getNodeVoltage(50); // MNA node ID
 
     // --- Transient simulation: 100 steps ---
     engine.configure({ maxTimeStep: 1e-6 });
@@ -466,10 +475,11 @@ describe("SparseSolver real MNA circuit", () => {
 
     performance.now();
     const xRaw = new Float64Array(matrixSize);
-    rawSolver.solve(xRaw);
+    rawSolver.solve(rawVoltages, xRaw);
     performance.now();
 
     // Warm run: re-stamp and re-factor (simulates NR iteration 2+)
+    rawVoltages.fill(0);
     rawSolver._initStructure(matrixSize);
     for (const el of elements) {
       el.load(rawCtx);
@@ -480,7 +490,7 @@ describe("SparseSolver real MNA circuit", () => {
     performance.now();
 
     performance.now();
-    rawSolver.solve(xRaw);
+    rawSolver.solve(rawVoltages, xRaw);
     performance.now();
 
     // Performance targets for a 52×52 real MNA matrix:
@@ -577,13 +587,14 @@ describe("SparseSolver preorder", () => {
     solver.stampElement(solver.allocElement(1, 2), 1);
     solver.stampElement(solver.allocElement(2, 1), 1);
     solver.stampElement(solver.allocElement(2, 2), 3);
-    solver.stampRHS(1, 1);
-    solver.stampRHS(2, 2);
+    const rhs = new Float64Array(3);
+    stampRHS(rhs, 1, 1);
+    stampRHS(rhs, 2, 2);
     solver.preorder();
     const result = solver.factor();
     expect(result).toBe(0);
     const x = new Float64Array(3);
-    solver.solve(x);
+    solver.solve(rhs, x);
   });
 
   it("preorder is idempotent — second call is a no-op", () => {
@@ -591,14 +602,15 @@ describe("SparseSolver preorder", () => {
     solver._initStructure(2);
     solver.stampElement(solver.allocElement(1, 1), 2);
     solver.stampElement(solver.allocElement(2, 2), 3);
-    solver.stampRHS(1, 4);
-    solver.stampRHS(2, 6);
+    const rhs = new Float64Array(3);
+    stampRHS(rhs, 1, 4);
+    stampRHS(rhs, 2, 6);
     solver.preorder();
     solver.preorder();
     const result = solver.factor();
     expect(result).toBe(0);
     const x = new Float64Array(3);
-    solver.solve(x);
+    solver.solve(rhs, x);
   });
 });
 
@@ -610,28 +622,30 @@ describe("SparseSolver factorWithReorder", () => {
   it("solves a 2x2 system correctly", () => {
     const solver = new SparseSolver();
     solver._initStructure(2);
-    solver.stampElement(solver.allocElement(0, 0), 4);
-    solver.stampElement(solver.allocElement(0, 1), 1);
-    solver.stampElement(solver.allocElement(1, 0), 1);
-    solver.stampElement(solver.allocElement(1, 1), 3);
-    solver.stampRHS(0, 1);
-    solver.stampRHS(1, 2);
-    const result = solver.factorWithReorder();
+    solver.stampElement(solver.allocElement(1, 1), 4);
+    solver.stampElement(solver.allocElement(1, 2), 1);
+    solver.stampElement(solver.allocElement(2, 1), 1);
+    solver.stampElement(solver.allocElement(2, 2), 3);
+    const rhs = new Float64Array(3);
+    stampRHS(rhs, 1, 1);
+    stampRHS(rhs, 2, 2);
+    const result = solver.factor();
     expect(result).toBe(0);
-    const x = new Float64Array(2);
-    solver.solve(x);
+    const x = new Float64Array(3);
+    solver.solve(rhs, x);
   });
 
   it("detects singular matrix", () => {
     const solver = new SparseSolver();
     solver._initStructure(2);
-    solver.stampElement(solver.allocElement(0, 0), 1);
-    solver.stampElement(solver.allocElement(0, 1), 1);
-    solver.stampElement(solver.allocElement(1, 0), 1);
     solver.stampElement(solver.allocElement(1, 1), 1);
-    solver.stampRHS(0, 1);
-    solver.stampRHS(1, 1);
-    const result = solver.factorWithReorder();
+    solver.stampElement(solver.allocElement(1, 2), 1);
+    solver.stampElement(solver.allocElement(2, 1), 1);
+    solver.stampElement(solver.allocElement(2, 2), 1);
+    const rhs = new Float64Array(3);
+    stampRHS(rhs, 1, 1);
+    stampRHS(rhs, 2, 1);
+    const result = solver.factor();
     expect(result).not.toBe(0);
     expect(solver.whereSingular().row).toBe(1);
   });
@@ -639,13 +653,15 @@ describe("SparseSolver factorWithReorder", () => {
   it("applies diagGmin to diagonal before factoring", () => {
     const solver = new SparseSolver();
     solver._initStructure(2);
-    solver.stampElement(solver.allocElement(0, 0), 1);
-    solver.stampElement(solver.allocElement(0, 1), 1);
-    solver.stampElement(solver.allocElement(1, 0), 1);
     solver.stampElement(solver.allocElement(1, 1), 1);
-    solver.stampRHS(0, 1);
-    solver.stampRHS(1, 1);
-    const result = solver.factorWithReorder(1.0);
+    solver.stampElement(solver.allocElement(1, 2), 1);
+    solver.stampElement(solver.allocElement(2, 1), 1);
+    solver.stampElement(solver.allocElement(2, 2), 1);
+    const rhs = new Float64Array(3);
+    stampRHS(rhs, 1, 1);
+    stampRHS(rhs, 2, 1);
+    solver.preorder();
+    const result = solver.factor(0, 1.0);  // pivTol=0, gmin=1.0
     expect(result).toBe(0);
   });
 });
@@ -654,76 +670,83 @@ describe("SparseSolver factorNumerical", () => {
   it("reuses pivot order from prior factorWithReorder", () => {
     const solver = new SparseSolver();
     solver._initStructure(2);
-    solver.stampElement(solver.allocElement(0, 0), 4);
-    solver.stampElement(solver.allocElement(0, 1), 1);
-    solver.stampElement(solver.allocElement(1, 0), 1);
-    solver.stampElement(solver.allocElement(1, 1), 3);
-    solver.stampRHS(0, 1);
-    solver.stampRHS(1, 2);
+    solver.stampElement(solver.allocElement(1, 1), 4);
+    solver.stampElement(solver.allocElement(1, 2), 1);
+    solver.stampElement(solver.allocElement(2, 1), 1);
+    solver.stampElement(solver.allocElement(2, 2), 3);
+    const rhs1 = new Float64Array(3);
+    stampRHS(rhs1, 1, 1);
+    stampRHS(rhs1, 2, 2);
 
-    const r1 = solver.factorWithReorder();
+    const r1 = solver.factor();
     expect(r1).toBe(0);
-    const x1 = new Float64Array(2);
-    solver.solve(x1);
+    const x1 = new Float64Array(3);
+    solver.solve(rhs1, x1);
 
     solver._initStructure(2);
-    solver.stampElement(solver.allocElement(0, 0), 2);
-    solver.stampElement(solver.allocElement(0, 1), 1);
-    solver.stampElement(solver.allocElement(1, 0), 1);
-    solver.stampElement(solver.allocElement(1, 1), 4);
-    solver.stampRHS(0, 3);
-    solver.stampRHS(1, 5);
+    solver.stampElement(solver.allocElement(1, 1), 2);
+    solver.stampElement(solver.allocElement(1, 2), 1);
+    solver.stampElement(solver.allocElement(2, 1), 1);
+    solver.stampElement(solver.allocElement(2, 2), 4);
+    const rhs2 = new Float64Array(3);
+    stampRHS(rhs2, 1, 3);
+    stampRHS(rhs2, 2, 5);
 
-    const r2 = solver.factorNumerical();
+    const r2 = solver.factor();
     expect(r2).toBe(0);
-    const x2 = new Float64Array(2);
-    solver.solve(x2);
+    const x2 = new Float64Array(3);
+    solver.solve(rhs2, x2);
   });
 
   it("returns failure when pivot becomes near-zero", () => {
     const solver = new SparseSolver();
     solver._initStructure(2);
-    solver.stampElement(solver.allocElement(0, 0), 4);
-    solver.stampElement(solver.allocElement(0, 1), 1);
-    solver.stampElement(solver.allocElement(1, 0), 1);
-    solver.stampElement(solver.allocElement(1, 1), 3);
-    solver.stampRHS(0, 1);
-    solver.stampRHS(1, 2);
-    solver.factorWithReorder();
+    solver.stampElement(solver.allocElement(1, 1), 4);
+    solver.stampElement(solver.allocElement(1, 2), 1);
+    solver.stampElement(solver.allocElement(2, 1), 1);
+    solver.stampElement(solver.allocElement(2, 2), 3);
+    const rhs1 = new Float64Array(3);
+    stampRHS(rhs1, 1, 1);
+    stampRHS(rhs1, 2, 2);
+    solver.factor();
 
     solver._initStructure(2);
-    solver.stampElement(solver.allocElement(0, 0), 1);
-    solver.stampElement(solver.allocElement(0, 1), 1);
-    solver.stampElement(solver.allocElement(1, 0), 1);
     solver.stampElement(solver.allocElement(1, 1), 1);
-    solver.stampRHS(0, 1);
-    solver.stampRHS(1, 1);
+    solver.stampElement(solver.allocElement(1, 2), 1);
+    solver.stampElement(solver.allocElement(2, 1), 1);
+    solver.stampElement(solver.allocElement(2, 2), 1);
+    const rhs2 = new Float64Array(3);
+    stampRHS(rhs2, 1, 1);
+    stampRHS(rhs2, 2, 1);
 
-    const r2 = solver.factorNumerical();
+    const r2 = solver.factor();
     expect(r2).not.toBe(0);
-    expect(r2.needsReorder).toBe(true);
+    // New API: factor() returns a plain numeric ngspice error code (spSINGULAR/spZERO_DIAG).
+    // A non-zero return signals reorder is needed — no .needsReorder property exists.
   });
 
   it("applies diagGmin before numerical factorization", () => {
     const solver = new SparseSolver();
     solver._initStructure(2);
-    solver.stampElement(solver.allocElement(0, 0), 4);
-    solver.stampElement(solver.allocElement(0, 1), 1);
-    solver.stampElement(solver.allocElement(1, 0), 1);
-    solver.stampElement(solver.allocElement(1, 1), 3);
-    solver.stampRHS(0, 1);
-    solver.stampRHS(1, 2);
-    solver.factorWithReorder();
+    solver.stampElement(solver.allocElement(1, 1), 4);
+    solver.stampElement(solver.allocElement(1, 2), 1);
+    solver.stampElement(solver.allocElement(2, 1), 1);
+    solver.stampElement(solver.allocElement(2, 2), 3);
+    const rhs1 = new Float64Array(3);
+    stampRHS(rhs1, 1, 1);
+    stampRHS(rhs1, 2, 2);
+    solver.factor();
 
     solver._initStructure(2);
-    solver.stampElement(solver.allocElement(0, 0), 1);
-    solver.stampElement(solver.allocElement(0, 1), 1);
-    solver.stampElement(solver.allocElement(1, 0), 1);
     solver.stampElement(solver.allocElement(1, 1), 1);
-    solver.stampRHS(0, 1);
-    solver.stampRHS(1, 1);
+    solver.stampElement(solver.allocElement(1, 2), 1);
+    solver.stampElement(solver.allocElement(2, 1), 1);
+    solver.stampElement(solver.allocElement(2, 2), 1);
+    const rhs2 = new Float64Array(3);
+    stampRHS(rhs2, 1, 1);
+    stampRHS(rhs2, 2, 1);
 
-    const result = solver.factorNumerical(1.0);
+    const result = solver.factor(0, 1.0);  // pivTol=0, gmin=1.0
     expect(result).toBe(0);
   });
 });
@@ -739,12 +762,13 @@ describe("SparseSolver factor dispatch", () => {
   it("factor() returns usedReorder=true when _needsReorder is true", () => {
     const solver = new SparseSolver();
     solver._initStructure(2);
-    solver.stampElement(solver.allocElement(0, 0), 4);
-    solver.stampElement(solver.allocElement(0, 1), 1);
-    solver.stampElement(solver.allocElement(1, 0), 1);
-    solver.stampElement(solver.allocElement(1, 1), 3);
-    solver.stampRHS(0, 1);
-    solver.stampRHS(1, 2);
+    solver.stampElement(solver.allocElement(1, 1), 4);
+    solver.stampElement(solver.allocElement(1, 2), 1);
+    solver.stampElement(solver.allocElement(2, 1), 1);
+    solver.stampElement(solver.allocElement(2, 2), 3);
+    const rhs = new Float64Array(3);
+    stampRHS(rhs, 1, 1);
+    stampRHS(rhs, 2, 2);
     solver.forceReorder();
     const result = solver.factor();
     expect(result).toBe(0);
@@ -754,27 +778,29 @@ describe("SparseSolver factor dispatch", () => {
   it("factor() returns usedReorder=false on second call (numerical path)", () => {
     const solver = new SparseSolver();
     solver._initStructure(2);
-    solver.stampElement(solver.allocElement(0, 0), 4);
-    solver.stampElement(solver.allocElement(0, 1), 1);
-    solver.stampElement(solver.allocElement(1, 0), 1);
-    solver.stampElement(solver.allocElement(1, 1), 3);
-    solver.stampRHS(0, 1);
-    solver.stampRHS(1, 2);
+    solver.stampElement(solver.allocElement(1, 1), 4);
+    solver.stampElement(solver.allocElement(1, 2), 1);
+    solver.stampElement(solver.allocElement(2, 1), 1);
+    solver.stampElement(solver.allocElement(2, 2), 3);
+    const rhs1 = new Float64Array(3);
+    stampRHS(rhs1, 1, 1);
+    stampRHS(rhs1, 2, 2);
 
     // First factor: _needsReorder starts true (allocElement sets it).
     // Force reorder explicitly then factor to establish pivot order.
     solver.forceReorder();
-    const r1 = solver.factor();
+    solver.factor();
     expect(solver.reordered).toBe(true);
 
     // Second factor with same pattern: numerical path
     solver._initStructure(2);
-    solver.stampElement(solver.allocElement(0, 0), 2);
-    solver.stampElement(solver.allocElement(0, 1), 1);
-    solver.stampElement(solver.allocElement(1, 0), 1);
-    solver.stampElement(solver.allocElement(1, 1), 4);
-    solver.stampRHS(0, 3);
-    solver.stampRHS(1, 5);
+    solver.stampElement(solver.allocElement(1, 1), 2);
+    solver.stampElement(solver.allocElement(1, 2), 1);
+    solver.stampElement(solver.allocElement(2, 1), 1);
+    solver.stampElement(solver.allocElement(2, 2), 4);
+    const rhs2 = new Float64Array(3);
+    stampRHS(rhs2, 1, 3);
+    stampRHS(rhs2, 2, 5);
     const result = solver.factor();
     expect(result).toBe(0);
     expect(solver.reordered).toBe(false);
@@ -783,33 +809,35 @@ describe("SparseSolver factor dispatch", () => {
   it("factor() solves correctly on numerical path after reorder", () => {
     const solver = new SparseSolver();
     solver._initStructure(2);
-    solver.stampElement(solver.allocElement(0, 0), 4);
-    solver.stampElement(solver.allocElement(0, 1), 1);
-    solver.stampElement(solver.allocElement(1, 0), 1);
-    solver.stampElement(solver.allocElement(1, 1), 3);
-    solver.stampRHS(0, 1);
-    solver.stampRHS(1, 2);
+    solver.stampElement(solver.allocElement(1, 1), 4);
+    solver.stampElement(solver.allocElement(1, 2), 1);
+    solver.stampElement(solver.allocElement(2, 1), 1);
+    solver.stampElement(solver.allocElement(2, 2), 3);
+    const rhs1 = new Float64Array(3);
+    stampRHS(rhs1, 1, 1);
+    stampRHS(rhs1, 2, 2);
 
     // Establish pivot order via reorder path
     solver.forceReorder();
     const r1 = solver.factor();
     expect(r1).toBe(0);
-    const x1 = new Float64Array(2);
-    solver.solve(x1);
+    const x1 = new Float64Array(3);
+    solver.solve(rhs1, x1);
 
     // Second call: numerical path, same values
     solver._initStructure(2);
-    solver.stampElement(solver.allocElement(0, 0), 4);
-    solver.stampElement(solver.allocElement(0, 1), 1);
-    solver.stampElement(solver.allocElement(1, 0), 1);
-    solver.stampElement(solver.allocElement(1, 1), 3);
-    solver.stampRHS(0, 1);
-    solver.stampRHS(1, 2);
+    solver.stampElement(solver.allocElement(1, 1), 4);
+    solver.stampElement(solver.allocElement(1, 2), 1);
+    solver.stampElement(solver.allocElement(2, 1), 1);
+    solver.stampElement(solver.allocElement(2, 2), 3);
+    const rhs2 = new Float64Array(3);
+    stampRHS(rhs2, 1, 1);
+    stampRHS(rhs2, 2, 2);
     const r2 = solver.factor();
     expect(r2).toBe(0);
     expect(solver.reordered).toBe(false);
-    const x2 = new Float64Array(2);
-    solver.solve(x2);
+    const x2 = new Float64Array(3);
+    solver.solve(rhs2, x2);
   });
 });
 
@@ -821,15 +849,16 @@ describe("SparseSolver Markowitz data structures", () => {
   it("allocates markowitzRow, markowitzCol, markowitzProd with correct length", () => {
     const solver = new SparseSolver();
     solver._initStructure(5);
-    expect(solver.markowitzRow.length).toBe(5);
-    expect(solver.markowitzCol.length).toBe(5);
-    expect(solver.markowitzProd.length).toBe(5);
+    // Markowitz arrays are sized n+1 (indices 0..n); active rows use 1..n.
+    expect(solver.markowitzRow.length).toBeGreaterThanOrEqual(5);
+    expect(solver.markowitzCol.length).toBeGreaterThanOrEqual(5);
+    expect(solver.markowitzProd.length).toBeGreaterThanOrEqual(5);
   });
 
   it("initializes all Markowitz arrays to zero on beginAssembly", () => {
     const solver = new SparseSolver();
     solver._initStructure(3);
-    for (let i = 0; i < 3; i++) {
+    for (let i = 1; i <= 3; i++) {
       expect(solver.markowitzRow[i]).toBe(0);
       expect(solver.markowitzCol[i]).toBe(0);
       expect(solver.markowitzProd[i]).toBe(0);
@@ -840,26 +869,26 @@ describe("SparseSolver Markowitz data structures", () => {
   it("re-allocates Markowitz arrays when size changes", () => {
     const solver = new SparseSolver();
     solver._initStructure(3);
-    expect(solver.markowitzRow.length).toBe(3);
+    expect(solver.markowitzRow.length).toBeGreaterThanOrEqual(3);
 
     solver._initStructure(7);
-    expect(solver.markowitzRow.length).toBe(7);
-    expect(solver.markowitzCol.length).toBe(7);
-    expect(solver.markowitzProd.length).toBe(7);
+    expect(solver.markowitzRow.length).toBeGreaterThanOrEqual(7);
+    expect(solver.markowitzCol.length).toBeGreaterThanOrEqual(7);
+    expect(solver.markowitzProd.length).toBeGreaterThanOrEqual(7);
   });
 
   it("resets Markowitz arrays to zero when same size is reused", () => {
     const solver = new SparseSolver();
     solver._initStructure(3);
-    // Manually poke values to confirm they get cleared
-    solver.markowitzRow[0] = 99;
-    solver.markowitzCol[1] = 42;
-    solver.markowitzProd[2] = 7.5;
+    // Manually poke values to confirm they get cleared (use 1-based indices)
+    solver.markowitzRow[1] = 99;
+    solver.markowitzCol[2] = 42;
+    solver.markowitzProd[3] = 7.5;
 
     solver._initStructure(3);
-    expect(solver.markowitzRow[0]).toBe(0);
-    expect(solver.markowitzCol[1]).toBe(0);
-    expect(solver.markowitzProd[2]).toBe(0);
+    expect(solver.markowitzRow[1]).toBe(0);
+    expect(solver.markowitzCol[2]).toBe(0);
+    expect(solver.markowitzProd[3]).toBe(0);
     expect(solver.singletons).toBe(0);
   });
 
@@ -872,22 +901,21 @@ describe("SparseSolver Markowitz data structures", () => {
   it("Markowitz arrays survive a full factor cycle without error", () => {
     const solver = new SparseSolver();
     solver._initStructure(3);
-    solver.stampElement(solver.allocElement(0, 0), 2);
-    solver.stampElement(solver.allocElement(0, 1), -1);
-    solver.stampElement(solver.allocElement(1, 0), -1);
-    solver.stampElement(solver.allocElement(1, 1), 3);
+    solver.stampElement(solver.allocElement(1, 1), 2);
     solver.stampElement(solver.allocElement(1, 2), -1);
     solver.stampElement(solver.allocElement(2, 1), -1);
-    solver.stampElement(solver.allocElement(2, 2), 2);
-    solver.stampRHS(0, 1);
-    solver.stampRHS(1, 2);
-    solver.stampRHS(2, 1);
+    solver.stampElement(solver.allocElement(2, 2), 3);
+    solver.stampElement(solver.allocElement(2, 3), -1);
+    solver.stampElement(solver.allocElement(3, 2), -1);
+    solver.stampElement(solver.allocElement(3, 3), 2);
+    const rhs = new Float64Array(4);
+    stampRHS(rhs, 1, 1); stampRHS(rhs, 2, 2); stampRHS(rhs, 3, 1);
     const result = solver.factor();
     expect(result).toBe(0);
 
-    expect(solver.markowitzRow.length).toBe(3);
-    expect(solver.markowitzCol.length).toBe(3);
-    expect(solver.markowitzProd.length).toBe(3);
+    expect(solver.markowitzRow.length).toBeGreaterThanOrEqual(3);
+    expect(solver.markowitzCol.length).toBeGreaterThanOrEqual(3);
+    expect(solver.markowitzProd.length).toBeGreaterThanOrEqual(3);
   });
 });
 
@@ -897,37 +925,32 @@ describe("SparseSolver Markowitz data structures", () => {
 
 describe("SparseSolver Markowitz counts from finalize", () => {
   it("counts off-diagonal nonzeros correctly for a 3x3 tridiagonal matrix", () => {
-    // Matrix:
+    // Matrix (1-based rows/cols 1..3):
     // [2, -1,  0]
     // [-1, 3, -1]
     // [0, -1,  2]
-    // Row 0: 1 off-diag (col 1)
-    // Row 1: 2 off-diag (col 0, col 2)
-    // Row 2: 1 off-diag (col 1)
-    // Col 0: 1 off-diag (row 1)
-    // Col 1: 2 off-diag (row 0, row 2)
-    // Col 2: 1 off-diag (row 1)
+    // Row 1: 1 off-diag (col 2)
+    // Row 2: 2 off-diag (col 1, col 3)
+    // Row 3: 1 off-diag (col 2)
     const solver = new SparseSolver();
     solver._initStructure(3);
-    solver.stampElement(solver.allocElement(0, 0), 2);
-    solver.stampElement(solver.allocElement(0, 1), -1);
-    solver.stampElement(solver.allocElement(1, 0), -1);
-    solver.stampElement(solver.allocElement(1, 1), 3);
+    solver.stampElement(solver.allocElement(1, 1), 2);
     solver.stampElement(solver.allocElement(1, 2), -1);
     solver.stampElement(solver.allocElement(2, 1), -1);
-    solver.stampElement(solver.allocElement(2, 2), 2);
-    solver.stampRHS(0, 1);
-    solver.stampRHS(1, 2);
-    solver.stampRHS(2, 1);
+    solver.stampElement(solver.allocElement(2, 2), 3);
+    solver.stampElement(solver.allocElement(2, 3), -1);
+    solver.stampElement(solver.allocElement(3, 2), -1);
+    solver.stampElement(solver.allocElement(3, 3), 2);
+    { const rhs = new Float64Array(4); stampRHS(rhs, 1, 1); stampRHS(rhs, 2, 2); stampRHS(rhs, 3, 1); void rhs; }
 
-    // finalize() populates Markowitz arrays from the linked structure.
-    // Total off-diagonal nonzeros: 4 entries (0,1), (1,0), (1,2), (2,1)
-    // Sum of all row counts should equal 4
+    // finalize() populates Markowitz arrays from the linked structure (1-based).
+    // Total off-diagonal nonzeros: 4 entries (1,2), (2,1), (2,3), (3,2)
+    // Sum of row counts 1..3 should equal 4
     const mRow = solver.markowitzRow;
     const mCol = solver.markowitzCol;
     let totalRowCount = 0;
     let totalColCount = 0;
-    for (let i = 0; i < 3; i++) {
+    for (let i = 1; i <= 3; i++) {
       totalRowCount += mRow[i];
       totalColCount += mCol[i];
     }
@@ -938,32 +961,30 @@ describe("SparseSolver Markowitz counts from finalize", () => {
   it("computes Markowitz products and singletons for tridiagonal matrix", () => {
     const solver = new SparseSolver();
     solver._initStructure(3);
-    solver.stampElement(solver.allocElement(0, 0), 2);
-    solver.stampElement(solver.allocElement(0, 1), -1);
-    solver.stampElement(solver.allocElement(1, 0), -1);
-    solver.stampElement(solver.allocElement(1, 1), 3);
+    solver.stampElement(solver.allocElement(1, 1), 2);
     solver.stampElement(solver.allocElement(1, 2), -1);
     solver.stampElement(solver.allocElement(2, 1), -1);
-    solver.stampElement(solver.allocElement(2, 2), 2);
-    solver.stampRHS(0, 1);
-    solver.stampRHS(1, 2);
-    solver.stampRHS(2, 1);
+    solver.stampElement(solver.allocElement(2, 2), 3);
+    solver.stampElement(solver.allocElement(2, 3), -1);
+    solver.stampElement(solver.allocElement(3, 2), -1);
+    solver.stampElement(solver.allocElement(3, 3), 2);
+    { const rhs = new Float64Array(4); stampRHS(rhs, 1, 1); stampRHS(rhs, 2, 2); stampRHS(rhs, 3, 1); void rhs; }
 
     const mProd = solver.markowitzProd;
-    // finalize() sets mRow[i] = (off-diagonal count in row i), mCol[i] similarly.
+    // finalize() sets mRow[i] = (off-diagonal count in row i), mCol[i] similarly (1-based).
     // mProd[i] = mRow[i] * mCol[i]. A singleton is any entry with mProd === 0.
-    // Tridiagonal row 0: 1 off-diag → mRow[0]=1, mCol[0]=1 → mProd[0]=1
-    // Tridiagonal row 1: 2 off-diag → mRow[1]=2, mCol[1]=2 → mProd[1]=4
-    // Tridiagonal row 2: 1 off-diag → mRow[2]=1, mCol[2]=1 → mProd[2]=1
-    expect(solver.markowitzRow[0]).toBe(1);
-    expect(solver.markowitzRow[1]).toBe(2);
-    expect(solver.markowitzRow[2]).toBe(1);
-    expect(solver.markowitzCol[0]).toBe(1);
-    expect(solver.markowitzCol[1]).toBe(2);
-    expect(solver.markowitzCol[2]).toBe(1);
+    // Tridiagonal row 1: 1 off-diag → mRow[1]=1, mCol[1]=1 → mProd[1]=1
+    // Tridiagonal row 2: 2 off-diag → mRow[2]=2, mCol[2]=2 → mProd[2]=4
+    // Tridiagonal row 3: 1 off-diag → mRow[3]=1, mCol[3]=1 → mProd[3]=1
+    expect(solver.markowitzRow[1]).toBe(1);
+    expect(solver.markowitzRow[2]).toBe(2);
+    expect(solver.markowitzRow[3]).toBe(1);
+    expect(solver.markowitzCol[1]).toBe(1);
+    expect(solver.markowitzCol[2]).toBe(2);
+    expect(solver.markowitzCol[3]).toBe(1);
 
     // All products should be non-negative
-    for (let i = 0; i < 3; i++) {
+    for (let i = 1; i <= 3; i++) {
       expect(mProd[i]).toBeGreaterThanOrEqual(0);
     }
   });
@@ -971,15 +992,13 @@ describe("SparseSolver Markowitz counts from finalize", () => {
   it("counts zero off-diagonals for a diagonal matrix", () => {
     const solver = new SparseSolver();
     solver._initStructure(3);
-    solver.stampElement(solver.allocElement(0, 0), 5);
-    solver.stampElement(solver.allocElement(1, 1), 3);
-    solver.stampElement(solver.allocElement(2, 2), 7);
-    solver.stampRHS(0, 1);
-    solver.stampRHS(1, 2);
-    solver.stampRHS(2, 3);
+    solver.stampElement(solver.allocElement(1, 1), 5);
+    solver.stampElement(solver.allocElement(2, 2), 3);
+    solver.stampElement(solver.allocElement(3, 3), 7);
+    { const rhs = new Float64Array(4); stampRHS(rhs, 1, 1); stampRHS(rhs, 2, 2); stampRHS(rhs, 3, 3); void rhs; }
 
-    // Diagonal matrix: zero off-diagonal entries per row and column
-    for (let i = 0; i < 3; i++) {
+    // Diagonal matrix: zero off-diagonal entries per row and column (1-based)
+    for (let i = 1; i <= 3; i++) {
       expect(solver.markowitzRow[i]).toBe(0);
       expect(solver.markowitzCol[i]).toBe(0);
       expect(solver.markowitzProd[i]).toBe(0);
@@ -992,16 +1011,15 @@ describe("SparseSolver Markowitz counts from finalize", () => {
     // Matrix: [[4,1],[1,3]] — each row/col has 1 off-diagonal
     const solver = new SparseSolver();
     solver._initStructure(2);
-    solver.stampElement(solver.allocElement(0, 0), 4);
-    solver.stampElement(solver.allocElement(0, 1), 1);
-    solver.stampElement(solver.allocElement(1, 0), 1);
-    solver.stampElement(solver.allocElement(1, 1), 3);
-    solver.stampRHS(0, 1);
-    solver.stampRHS(1, 2);
+    solver.stampElement(solver.allocElement(1, 1), 4);
+    solver.stampElement(solver.allocElement(1, 2), 1);
+    solver.stampElement(solver.allocElement(2, 1), 1);
+    solver.stampElement(solver.allocElement(2, 2), 3);
+    { const rhs = new Float64Array(3); stampRHS(rhs, 1, 1); stampRHS(rhs, 2, 2); void rhs; }
 
-    // Each row has 1 off-diag, each col has 1 off-diag.
+    // Each row has 1 off-diag, each col has 1 off-diag (1-based).
     // finalize() sets mRow[i]=1, mCol[i]=1, mProd[i]=1*1=1 (not a singleton).
-    for (let i = 0; i < 2; i++) {
+    for (let i = 1; i <= 2; i++) {
       expect(solver.markowitzRow[i]).toBe(1);
       expect(solver.markowitzCol[i]).toBe(1);
       expect(solver.markowitzProd[i]).toBe(1);
@@ -1019,85 +1037,81 @@ describe("SparseSolver pivot selection", () => {
   it("selects a valid pivot and produces a correct solution for a well-conditioned 3x3 matrix", () => {
     const solver = new SparseSolver();
     solver._initStructure(3);
-    solver.stampElement(solver.allocElement(0, 0), 2);
-    solver.stampElement(solver.allocElement(0, 1), -1);
-    solver.stampElement(solver.allocElement(1, 0), -1);
-    solver.stampElement(solver.allocElement(1, 1), 3);
+    solver.stampElement(solver.allocElement(1, 1), 2);
     solver.stampElement(solver.allocElement(1, 2), -1);
     solver.stampElement(solver.allocElement(2, 1), -1);
-    solver.stampElement(solver.allocElement(2, 2), 2);
-    solver.stampRHS(0, 1);
-    solver.stampRHS(1, 2);
-    solver.stampRHS(2, 1);
-    const factorResult = solver.factorWithReorder();
+    solver.stampElement(solver.allocElement(2, 2), 3);
+    solver.stampElement(solver.allocElement(2, 3), -1);
+    solver.stampElement(solver.allocElement(3, 2), -1);
+    solver.stampElement(solver.allocElement(3, 3), 2);
+    const rhs = new Float64Array(4);
+    stampRHS(rhs, 1, 1); stampRHS(rhs, 2, 2); stampRHS(rhs, 3, 1);
+    const factorResult = solver.factor();
     expect(factorResult).toBe(0);
-    const sol = new Float64Array(3);
-    solver.solve(sol);
-    // Verify Ax = b: row 0: 2*x0 - x1 = 1
-    // row 1: -x0 + 3*x1 - x2 = 2
-    // row 2: -x1 + 2*x2 = 1
+    const sol = new Float64Array(4);
+    solver.solve(rhs, sol);
+    // Verify Ax = b: row 1: 2*x1 - x2 = 1
+    // row 2: -x1 + 3*x2 - x3 = 2
+    // row 3: -x2 + 2*x3 = 1
   });
 
   it("reports singular when the matrix is rank-deficient", () => {
     const solver = new SparseSolver();
     solver._initStructure(2);
     // Singular: two identical rows
-    solver.stampElement(solver.allocElement(0, 0), 1);
-    solver.stampElement(solver.allocElement(0, 1), 1);
-    solver.stampElement(solver.allocElement(1, 0), 1);
     solver.stampElement(solver.allocElement(1, 1), 1);
-    solver.stampRHS(0, 1);
-    solver.stampRHS(1, 1);
-    const result = solver.factorWithReorder();
+    solver.stampElement(solver.allocElement(1, 2), 1);
+    solver.stampElement(solver.allocElement(2, 1), 1);
+    solver.stampElement(solver.allocElement(2, 2), 1);
+    { const rhs = new Float64Array(3); stampRHS(rhs, 1, 1); stampRHS(rhs, 2, 1); void rhs; }
+    const result = solver.factor();
     expect(result).not.toBe(0);
   });
 
   it("prefers singleton rows — singletons getter reflects matrix structure", () => {
     const solver = new SparseSolver();
     solver._initStructure(3);
-    solver.stampElement(solver.allocElement(0, 0), 5);
-    solver.stampElement(solver.allocElement(0, 1), 1);
-    solver.stampElement(solver.allocElement(1, 0), 1);
-    solver.stampElement(solver.allocElement(1, 1), 4);
+    solver.stampElement(solver.allocElement(1, 1), 5);
     solver.stampElement(solver.allocElement(1, 2), 1);
-    solver.stampElement(solver.allocElement(2, 0), 1);
     solver.stampElement(solver.allocElement(2, 1), 1);
-    solver.stampElement(solver.allocElement(2, 2), 3);
-    solver.stampRHS(0, 1);
-    solver.stampRHS(1, 1);
-    solver.stampRHS(2, 1);
-    solver.factorWithReorder();
+    solver.stampElement(solver.allocElement(2, 2), 4);
+    solver.stampElement(solver.allocElement(2, 3), 1);
+    solver.stampElement(solver.allocElement(3, 1), 1);
+    solver.stampElement(solver.allocElement(3, 2), 1);
+    solver.stampElement(solver.allocElement(3, 3), 3);
+    { const rhs = new Float64Array(4); stampRHS(rhs, 1, 1); stampRHS(rhs, 2, 1); stampRHS(rhs, 3, 1); void rhs; }
+    solver.factor();
     expect(solver.singletons).toBeGreaterThan(0);
   });
 
   it("selects the largest-magnitude pivot (fallback path) producing correct solution", () => {
     const solver = new SparseSolver();
     solver._initStructure(2);
-    // Diagonal entries with different magnitudes: larger pivot = row 1
-    solver.stampElement(solver.allocElement(0, 0), 0.5);
-    solver.stampElement(solver.allocElement(1, 1), 3.0);
-    solver.stampRHS(0, 1);
-    solver.stampRHS(1, 6);
-    const factorResult = solver.factorWithReorder();
+    // Diagonal entries with different magnitudes: larger pivot = row 2
+    solver.stampElement(solver.allocElement(1, 1), 0.5);
+    solver.stampElement(solver.allocElement(2, 2), 3.0);
+    const rhs = new Float64Array(3);
+    stampRHS(rhs, 1, 1); stampRHS(rhs, 2, 6);
+    const factorResult = solver.factor();
     expect(factorResult).toBe(0);
-    const sol = new Float64Array(2);
-    solver.solve(sol);
+    const sol = new Float64Array(3);
+    solver.solve(rhs, sol);
   });
 
   it("factorization ignores already-used pivot rows in subsequent steps", () => {
     const solver = new SparseSolver();
     solver._initStructure(2);
-    solver.stampElement(solver.allocElement(0, 0), 4);
-    solver.stampElement(solver.allocElement(0, 1), 1);
-    solver.stampElement(solver.allocElement(1, 0), 1);
-    solver.stampElement(solver.allocElement(1, 1), 3);
-    solver.stampRHS(0, 1);
-    solver.stampRHS(1, 2);
-    const factorResult = solver.factorWithReorder();
+    solver.stampElement(solver.allocElement(1, 1), 4);
+    solver.stampElement(solver.allocElement(1, 2), 1);
+    solver.stampElement(solver.allocElement(2, 1), 1);
+    solver.stampElement(solver.allocElement(2, 2), 3);
+    const rhs = new Float64Array(3);
+    stampRHS(rhs, 1, 1); stampRHS(rhs, 2, 2);
+    const factorResult = solver.factor();
     expect(factorResult).toBe(0);
-    const sol = new Float64Array(2);
-    solver.solve(sol);
-    // Ax = b: 4*x0 + x1 = 1, x0 + 3*x1 = 2
+    const sol = new Float64Array(3);
+    solver.solve(rhs, sol);
+    // Ax = b: 4*x1 + x2 = 1, x1 + 3*x2 = 2
   });
 });
 
@@ -1109,27 +1123,26 @@ describe("SparseSolver _updateMarkowitzNumbers", () => {
   it("decrements row and column counts after elimination via linked lists", () => {
     const solver = new SparseSolver();
     solver._initStructure(3);
-    solver.stampElement(solver.allocElement(0, 0), 2);
-    solver.stampElement(solver.allocElement(0, 1), -1);
-    solver.stampElement(solver.allocElement(1, 0), -1);
-    solver.stampElement(solver.allocElement(1, 1), 3);
+    solver.stampElement(solver.allocElement(1, 1), 2);
     solver.stampElement(solver.allocElement(1, 2), -1);
     solver.stampElement(solver.allocElement(2, 1), -1);
-    solver.stampElement(solver.allocElement(2, 2), 2);
-    solver.stampRHS(0, 1);
-    solver.stampRHS(1, 2);
-    solver.stampRHS(2, 1);
+    solver.stampElement(solver.allocElement(2, 2), 3);
+    solver.stampElement(solver.allocElement(2, 3), -1);
+    solver.stampElement(solver.allocElement(3, 2), -1);
+    solver.stampElement(solver.allocElement(3, 3), 2);
+    { const rhs = new Float64Array(4); stampRHS(rhs, 1, 1); stampRHS(rhs, 2, 2); stampRHS(rhs, 3, 1); void rhs; }
 
-    const initialRowSum = Array.from(solver.markowitzRow).reduce((a, b) => a + b, 0);
+    // Sum 1-based entries only
+    const initialRowSum = Array.from(solver.markowitzRow).slice(1, 4).reduce((a, b) => a + b, 0);
 
-    // Simulate elimination at step 0 with pivot at row 0
-    const pinv = new Int32Array(3).fill(-1);
-    pinv[0] = 0;
+    // Simulate elimination at step 1 with pivot at row 1 (1-based)
+    const pinv = new Int32Array(4).fill(-1);
+    pinv[1] = 0;
 
-    (solver as any)._updateMarkowitzNumbers(0, 0, pinv);
+    (solver as any)._updateMarkowitzNumbers(1, 1, pinv);
 
-    // After eliminating row 0, the remaining rows should have reduced counts
-    const postRowSum = Array.from(solver.markowitzRow).reduce((a, b) => a + b, 0);
+    // After eliminating row 1, the remaining rows should have reduced counts
+    const postRowSum = Array.from(solver.markowitzRow).slice(1, 4).reduce((a, b) => a + b, 0);
     expect(postRowSum).toBeLessThan(initialRowSum);
   });
 });
@@ -1138,53 +1151,51 @@ describe("SparseSolver factorWithReorder Markowitz pipeline", () => {
   it("factorWithReorder populates Markowitz data after factoring", () => {
     const solver = new SparseSolver();
     solver._initStructure(3);
-    solver.stampElement(solver.allocElement(0, 0), 2);
-    solver.stampElement(solver.allocElement(0, 1), -1);
-    solver.stampElement(solver.allocElement(1, 0), -1);
-    solver.stampElement(solver.allocElement(1, 1), 3);
+    solver.stampElement(solver.allocElement(1, 1), 2);
     solver.stampElement(solver.allocElement(1, 2), -1);
     solver.stampElement(solver.allocElement(2, 1), -1);
-    solver.stampElement(solver.allocElement(2, 2), 2);
-    solver.stampRHS(0, 1);
-    solver.stampRHS(1, 2);
-    solver.stampRHS(2, 1);
+    solver.stampElement(solver.allocElement(2, 2), 3);
+    solver.stampElement(solver.allocElement(2, 3), -1);
+    solver.stampElement(solver.allocElement(3, 2), -1);
+    solver.stampElement(solver.allocElement(3, 3), 2);
+    { const rhs = new Float64Array(4); stampRHS(rhs, 1, 1); stampRHS(rhs, 2, 2); stampRHS(rhs, 3, 1); void rhs; }
 
-    const result = solver.factorWithReorder();
+    const result = solver.factor();
     expect(result).toBe(0);
 
     // After factorWithReorder, Markowitz arrays should exist with proper length
-    expect(solver.markowitzRow.length).toBe(3);
-    expect(solver.markowitzCol.length).toBe(3);
-    expect(solver.markowitzProd.length).toBe(3);
+    expect(solver.markowitzRow.length).toBeGreaterThanOrEqual(3);
+    expect(solver.markowitzCol.length).toBeGreaterThanOrEqual(3);
+    expect(solver.markowitzProd.length).toBeGreaterThanOrEqual(3);
   });
 
   it("factorWithReorder produces correct solution on 3x3 tridiagonal", () => {
     const solver = new SparseSolver();
     solver._initStructure(3);
-    solver.stampElement(solver.allocElement(0, 0), 2);
-    solver.stampElement(solver.allocElement(0, 1), -1);
-    solver.stampElement(solver.allocElement(1, 0), -1);
-    solver.stampElement(solver.allocElement(1, 1), 3);
+    solver.stampElement(solver.allocElement(1, 1), 2);
     solver.stampElement(solver.allocElement(1, 2), -1);
     solver.stampElement(solver.allocElement(2, 1), -1);
-    solver.stampElement(solver.allocElement(2, 2), 2);
-    solver.stampRHS(0, 1);
-    solver.stampRHS(1, 2);
-    solver.stampRHS(2, 1);
+    solver.stampElement(solver.allocElement(2, 2), 3);
+    solver.stampElement(solver.allocElement(2, 3), -1);
+    solver.stampElement(solver.allocElement(3, 2), -1);
+    solver.stampElement(solver.allocElement(3, 3), 2);
+    const rhs = new Float64Array(4);
+    stampRHS(rhs, 1, 1); stampRHS(rhs, 2, 2); stampRHS(rhs, 3, 1);
     solver.forceReorder();
     const result = solver.factor();
     expect(result).toBe(0);
-    const x = new Float64Array(3);
-    solver.solve(x);
+    const x = new Float64Array(4);
+    solver.solve(rhs, x);
   });
 
   it("factorWithReorder solution has residual below 1e-10 on 10x10 matrix", () => {
     const n = 10;
     const solver = new SparseSolver();
+    // entries use 1-based (r, c) for solver's 1-based external API
     const entries: [number, number, number][] = [];
-    for (let i = 0; i < n; i++) {
+    for (let i = 1; i <= n; i++) {
       let rowSum = 0;
-      for (let j = 0; j < n; j++) {
+      for (let j = 1; j <= n; j++) {
         if (i !== j && (Math.abs(i - j) <= 2)) {
           const v = -(0.5 + 0.1 * ((i + j) % 3));
           entries.push([i, j, v]);
@@ -1193,22 +1204,23 @@ describe("SparseSolver factorWithReorder Markowitz pipeline", () => {
       }
       entries.push([i, i, rowSum + 1.0]);
     }
-    const rhs = Array.from({ length: n }, (_, i) => i + 1);
+    const rhsVals = Array.from({ length: n }, (_, i) => i + 1);
 
     solver._initStructure(n);
     for (const [r, c, v] of entries) solver.stampElement(solver.allocElement(r, c), v);
-    for (let i = 0; i < n; i++) solver.stampRHS(i, rhs[i]);
+    const rhsBuf = new Float64Array(n + 1);
+    for (let i = 0; i < n; i++) rhsBuf[i + 1] += rhsVals[i];
     solver.forceReorder();
     const result = solver.factor();
     expect(result).toBe(0);
-    const x = new Float64Array(n);
-    solver.solve(x);
+    const x = new Float64Array(n + 1);
+    solver.solve(rhsBuf, x);
 
-    // Residual check
-    const residual = new Float64Array(n);
+    // Residual check (1-based)
+    const residual = new Float64Array(n + 1);
     for (const [r, c, v] of entries) residual[r] += v * x[c];
-    for (let i = 0; i < n; i++) {
-      expect(Math.abs(residual[i] - rhs[i])).toBeLessThan(1e-10);
+    for (let i = 1; i <= n; i++) {
+      expect(Math.abs(residual[i] - rhsVals[i - 1])).toBeLessThan(1e-10);
     }
   });
 });
@@ -1219,7 +1231,7 @@ describe("SparseSolver factorWithReorder Markowitz pipeline", () => {
 
 describe("SparseSolver Markowitz linked structure", () => {
   it("fill-in detection: factor a matrix where fill-in is guaranteed, verify Markowitz counts increase", () => {
-    // Arrow matrix: column 0 is dense, other columns are sparse.
+    // Arrow matrix (1-based): col 1 is dense, other cols are sparse.
     // Eliminating the dense row/col creates fill-in between the sparse rows.
     //
     // A = [10, 1, 1, 1]
@@ -1228,43 +1240,39 @@ describe("SparseSolver Markowitz linked structure", () => {
     //     [ 1, 0, 0, 5]
     const solver = new SparseSolver();
     solver._initStructure(4);
-    solver.stampElement(solver.allocElement(0, 0), 10);
-    solver.stampElement(solver.allocElement(0, 1), 1);
-    solver.stampElement(solver.allocElement(0, 2), 1);
-    solver.stampElement(solver.allocElement(0, 3), 1);
-    solver.stampElement(solver.allocElement(1, 0), 1);
-    solver.stampElement(solver.allocElement(1, 1), 5);
-    solver.stampElement(solver.allocElement(2, 0), 1);
+    solver.stampElement(solver.allocElement(1, 1), 10);
+    solver.stampElement(solver.allocElement(1, 2), 1);
+    solver.stampElement(solver.allocElement(1, 3), 1);
+    solver.stampElement(solver.allocElement(1, 4), 1);
+    solver.stampElement(solver.allocElement(2, 1), 1);
     solver.stampElement(solver.allocElement(2, 2), 5);
-    solver.stampElement(solver.allocElement(3, 0), 1);
+    solver.stampElement(solver.allocElement(3, 1), 1);
     solver.stampElement(solver.allocElement(3, 3), 5);
-    solver.stampRHS(0, 1);
-    solver.stampRHS(1, 1);
-    solver.stampRHS(2, 1);
-    solver.stampRHS(3, 1);
+    solver.stampElement(solver.allocElement(4, 1), 1);
+    solver.stampElement(solver.allocElement(4, 4), 5);
+    { const rhs = new Float64Array(5); stampRHS(rhs, 1, 1); stampRHS(rhs, 2, 1); stampRHS(rhs, 3, 1); stampRHS(rhs, 4, 1); void rhs; }
 
-    // Get initial Markowitz counts from linked structure before factoring.
-    // finalize() computes these from the linked structure.
-    // Sum of all off-diagonal row counts = total off-diagonal nonzeros = 6
-    // (each of 3 sparse rows has 1 off-diag to the dense row, and the dense
-    // row has 3 off-diag).
-    const initialTotalOffDiag = Array.from(solver.markowitzRow).reduce((a, b) => a + b, 0);
+    // Get initial Markowitz counts from linked structure before factoring (1-based).
+    // Sum of off-diagonal row counts 1..4 = 6: row1 has 3, rows 2-4 have 1 each.
+    const initialTotalOffDiag = Array.from(solver.markowitzRow).slice(1, 5).reduce((a, b) => a + b, 0);
     expect(initialTotalOffDiag).toBe(6); // 3 + 1 + 1 + 1
 
     // Factor — this will detect fill-in internally and update Markowitz counts
-    const result = solver.factorWithReorder();
+    const result = solver.factor();
     expect(result).toBe(0);
 
-    // Verify the solution is correct
-    const x = new Float64Array(4);
-    solver.solve(x);
+    // Verify the solution is correct (1-based)
+    const rhsSolve = new Float64Array(5);
+    stampRHS(rhsSolve, 1, 1); stampRHS(rhsSolve, 2, 1); stampRHS(rhsSolve, 3, 1); stampRHS(rhsSolve, 4, 1);
+    const x = new Float64Array(5);
+    solver.solve(rhsSolve, x);
     const entries: [number, number, number][] = [
-      [0, 0, 10], [0, 1, 1], [0, 2, 1], [0, 3, 1],
-      [1, 0, 1], [1, 1, 5],
-      [2, 0, 1], [2, 2, 5],
-      [3, 0, 1], [3, 3, 5],
+      [1, 1, 10], [1, 2, 1], [1, 3, 1], [1, 4, 1],
+      [2, 1, 1], [2, 2, 5],
+      [3, 1, 1], [3, 3, 5],
+      [4, 1, 1], [4, 4, 5],
     ];
-    for (let i = 0; i < 4; i++) {
+    for (let i = 1; i <= 4; i++) {
       let sum = 0;
       for (const [r, c, v] of entries) {
         if (r === i) sum += v * x[c];
@@ -1274,42 +1282,40 @@ describe("SparseSolver Markowitz linked structure", () => {
   });
 
   it("Markowitz-primary pivot selection: lower product pivot preferred over higher magnitude", () => {
-    // Construct a matrix where Markowitz product differs from magnitude ranking.
-    // The diagonal-dominant entry at (0,0) has high magnitude but high Markowitz product,
+    // Construct a matrix where Markowitz product differs from magnitude ranking (1-based).
+    // The diagonal-dominant entry at (1,1) has high magnitude but high Markowitz product,
     // while a singleton row has lower magnitude but mProd=0.
     //
-    // Matrix:
-    // [2, 1, 1]    row 0: 2 off-diag → mRow=2
-    // [1, 5, 0]    row 1: 1 off-diag → mRow=1 (singleton candidate)
-    // [1, 0, 5]    row 2: 1 off-diag → mRow=1 (singleton candidate)
+    // Matrix (1-based):
+    // [2, 1, 1]    row 1: 2 off-diag → mRow=2
+    // [1, 5, 0]    row 2: 1 off-diag → mRow=1 (singleton candidate)
+    // [1, 0, 5]    row 3: 1 off-diag → mRow=1 (singleton candidate)
     //
-    // Singletons (rows 1,2) should be preferred over row 0 for first pivot
-    // even though row 0's diagonal |2| may not be largest.
+    // Singletons (rows 2,3) should be preferred over row 1 for first pivot.
     const solver = new SparseSolver();
     solver._initStructure(3);
-    solver.stampElement(solver.allocElement(0, 0), 2);
-    solver.stampElement(solver.allocElement(0, 1), 1);
-    solver.stampElement(solver.allocElement(0, 2), 1);
-    solver.stampElement(solver.allocElement(1, 0), 1);
-    solver.stampElement(solver.allocElement(1, 1), 5);
-    solver.stampElement(solver.allocElement(2, 0), 1);
+    solver.stampElement(solver.allocElement(1, 1), 2);
+    solver.stampElement(solver.allocElement(1, 2), 1);
+    solver.stampElement(solver.allocElement(1, 3), 1);
+    solver.stampElement(solver.allocElement(2, 1), 1);
     solver.stampElement(solver.allocElement(2, 2), 5);
-    solver.stampRHS(0, 1);
-    solver.stampRHS(1, 1);
-    solver.stampRHS(2, 1);
+    solver.stampElement(solver.allocElement(3, 1), 1);
+    solver.stampElement(solver.allocElement(3, 3), 5);
+    const rhs = new Float64Array(4);
+    stampRHS(rhs, 1, 1); stampRHS(rhs, 2, 1); stampRHS(rhs, 3, 1);
 
-    const result = solver.factorWithReorder();
+    const result = solver.factor();
     expect(result).toBe(0);
 
-    // Verify solution correctness — the key validation
-    const x = new Float64Array(3);
-    solver.solve(x);
+    // Verify solution correctness — the key validation (1-based)
+    const x = new Float64Array(4);
+    solver.solve(rhs, x);
     const entries: [number, number, number][] = [
-      [0, 0, 2], [0, 1, 1], [0, 2, 1],
-      [1, 0, 1], [1, 1, 5],
-      [2, 0, 1], [2, 2, 5],
+      [1, 1, 2], [1, 2, 1], [1, 3, 1],
+      [2, 1, 1], [2, 2, 5],
+      [3, 1, 1], [3, 3, 5],
     ];
-    for (let i = 0; i < 3; i++) {
+    for (let i = 1; i <= 3; i++) {
       let sum = 0;
       for (const [r, c, v] of entries) {
         if (r === i) sum += v * x[c];
@@ -1319,41 +1325,38 @@ describe("SparseSolver Markowitz linked structure", () => {
   });
 
   it("_updateMarkowitzNumbers via linked lists produces correct counts", () => {
-    // 4x4 matrix — build linked structure, do one update step, verify counts
+    // 4x4 matrix — build linked structure (1-based), do one update step, verify counts
     const solver = new SparseSolver();
     solver._initStructure(4);
-    solver.stampElement(solver.allocElement(0, 0), 5);
-    solver.stampElement(solver.allocElement(0, 1), 1);
-    solver.stampElement(solver.allocElement(0, 2), 1);
-    solver.stampElement(solver.allocElement(1, 0), 1);
     solver.stampElement(solver.allocElement(1, 1), 5);
+    solver.stampElement(solver.allocElement(1, 2), 1);
     solver.stampElement(solver.allocElement(1, 3), 1);
-    solver.stampElement(solver.allocElement(2, 0), 1);
+    solver.stampElement(solver.allocElement(2, 1), 1);
     solver.stampElement(solver.allocElement(2, 2), 5);
+    solver.stampElement(solver.allocElement(2, 4), 1);
     solver.stampElement(solver.allocElement(3, 1), 1);
     solver.stampElement(solver.allocElement(3, 3), 5);
-    solver.stampRHS(0, 1);
-    solver.stampRHS(1, 1);
-    solver.stampRHS(2, 1);
-    solver.stampRHS(3, 1);
+    solver.stampElement(solver.allocElement(4, 2), 1);
+    solver.stampElement(solver.allocElement(4, 4), 5);
+    { const rhs = new Float64Array(5); stampRHS(rhs, 1, 1); stampRHS(rhs, 2, 1); stampRHS(rhs, 3, 1); stampRHS(rhs, 4, 1); void rhs; }
 
-    const initialTotalRow = Array.from(solver.markowitzRow).reduce((a, b) => a + b, 0);
-    const initialTotalCol = Array.from(solver.markowitzCol).reduce((a, b) => a + b, 0);
+    const initialTotalRow = Array.from(solver.markowitzRow).slice(1, 5).reduce((a, b) => a + b, 0);
+    const initialTotalCol = Array.from(solver.markowitzCol).slice(1, 5).reduce((a, b) => a + b, 0);
 
-    // Simulate elimination at step 0 with pivot at row 0
-    const pinv = new Int32Array(4).fill(-1);
-    pinv[0] = 0;
-    (solver as any)._updateMarkowitzNumbers(0, 0, pinv);
+    // Simulate elimination at step 1 with pivot at row 1 (1-based)
+    const pinv = new Int32Array(5).fill(-1);
+    pinv[1] = 0;
+    (solver as any)._updateMarkowitzNumbers(1, 1, pinv);
 
-    // Row 0 is eliminated; remaining rows should have decreased counts
-    const postTotalRow = Array.from(solver.markowitzRow).reduce((a, b) => a + b, 0);
-    const postTotalCol = Array.from(solver.markowitzCol).reduce((a, b) => a + b, 0);
+    // Row 1 is eliminated; remaining rows should have decreased counts
+    const postTotalRow = Array.from(solver.markowitzRow).slice(1, 5).reduce((a, b) => a + b, 0);
+    const postTotalCol = Array.from(solver.markowitzCol).slice(1, 5).reduce((a, b) => a + b, 0);
 
     expect(postTotalRow).toBeLessThan(initialTotalRow);
     expect(postTotalCol).toBeLessThan(initialTotalCol);
 
-    // Products should be recomputed
-    for (let i = 0; i < 4; i++) {
+    // Products should be recomputed for non-eliminated rows
+    for (let i = 1; i <= 4; i++) {
       if (pinv[i] >= 0) continue;
       expect(solver.markowitzProd[i]).toBe(solver.markowitzRow[i] * solver.markowitzCol[i]);
     }
@@ -1366,37 +1369,39 @@ describe("SparseSolver Markowitz linked structure", () => {
     const solver = new SparseSolver();
     solver._initStructure(n);
 
-    // Dense lower triangle + strong diagonal
-    for (let i = 0; i < n; i++) {
+    // Dense lower triangle + strong diagonal (1-based: rows/cols 1..n)
+    for (let i = 1; i <= n; i++) {
       solver.stampElement(solver.allocElement(i, i), 100);
-      for (let j = 0; j < i; j++) {
+      for (let j = 1; j < i; j++) {
         solver.stampElement(solver.allocElement(i, j), 1);
         solver.stampElement(solver.allocElement(j, i), 1);
       }
     }
-    for (let i = 0; i < n; i++) solver.stampRHS(i, 1);
+    { const rhs = new Float64Array(n + 1); for (let i = 1; i <= n; i++) rhs[i] += 1; void rhs; }
 
     // Record initial element pool capacity
     const initialCapacity = (solver as any)._elCapacity;
 
     // Factor — this exercises the full linked-structure pipeline including fill-in
-    const result = solver.factorWithReorder();
+    const result = solver.factor();
     expect(result).toBe(0);
 
     // Verify solution
-    const x = new Float64Array(n);
-    solver.solve(x);
+    const rhsSolve = new Float64Array(n + 1);
+    for (let i = 1; i <= n; i++) rhsSolve[i] += 1;
+    const x = new Float64Array(n + 1);
+    solver.solve(rhsSolve, x);
 
-    // Build the matrix entries for residual check
+    // Build the matrix entries for residual check (1-based)
     const entries: [number, number, number][] = [];
-    for (let i = 0; i < n; i++) {
+    for (let i = 1; i <= n; i++) {
       entries.push([i, i, 100]);
-      for (let j = 0; j < i; j++) {
+      for (let j = 1; j < i; j++) {
         entries.push([i, j, 1]);
         entries.push([j, i, 1]);
       }
     }
-    for (let i = 0; i < n; i++) {
+    for (let i = 1; i <= n; i++) {
       let sum = 0;
       for (const [r, c, v] of entries) {
         if (r === i) sum += v * x[c];
@@ -1422,16 +1427,17 @@ describe("SparseSolver handle-based stamp API", () => {
   it("allocElement_returns_stable_handle", () => {
     // allocElement(r, c) twice must return the same handle.
     // allocElement with different (r, c) must return distinct handles.
+    // 1-based external API: rows/cols 1..n, 0=ground sentinel.
     const solver = new SparseSolver();
     solver._initStructure(3);
 
-    const h00a = solver.allocElement(0, 0);
-    const h00b = solver.allocElement(0, 0);
+    const h00a = solver.allocElement(1, 1);
+    const h00b = solver.allocElement(1, 1);
     expect(h00a).toBe(h00b); // same handle for same (r, c)
 
-    const h01 = solver.allocElement(0, 1);
-    const h10 = solver.allocElement(1, 0);
-    const h11 = solver.allocElement(1, 1);
+    const h01 = solver.allocElement(1, 2);
+    const h10 = solver.allocElement(2, 1);
+    const h11 = solver.allocElement(2, 2);
 
     // All four handles are distinct
     const handles = [h00a, h01, h10, h11];
@@ -1441,56 +1447,60 @@ describe("SparseSolver handle-based stamp API", () => {
 
   it("stampElement_accumulates_via_handle", () => {
     // Two stampElement calls on the same handle accumulate: total = v1 + v2
+    // 1-based external API: rows/cols 1..n.
     const solver = new SparseSolver();
     solver._initStructure(2);
 
-    const h = solver.allocElement(0, 0);
+    const h = solver.allocElement(1, 1);
     solver.stampElement(h, 3.0);
     solver.stampElement(h, 2.0);
 
-    // Verify via solve: 5*x = 10 => x = 2
-    solver.stampElement(solver.allocElement(1, 1), 1.0); // complete the matrix
-    solver.stampRHS(0, 10.0);
-    solver.stampRHS(1, 1.0);
+    // Verify via solve: 5*x[1] = 10 => x[1] = 2
+    solver.stampElement(solver.allocElement(2, 2), 1.0); // complete the matrix
+    const rhs = new Float64Array(3); // size n+1
+    stampRHS(rhs, 1, 10.0);
+    stampRHS(rhs, 2, 1.0);
     const result = solver.factor();
     expect(result).toBe(0);
-    const x = new Float64Array(2);
-    solver.solve(x);
+    const x = new Float64Array(3); // size n+1
+    solver.solve(rhs, x);
   });
 
   it("stamp_inserts_into_linked_structure", () => {
     // After beginAssembly + 4 allocElement+stampElement cycles on a 2x2 matrix
     // + finalize, the linked structure has 4 elements with correct row/col/value,
     // accessible via _rowHead/_colHead chains.
+    // 1-based external API: rows/cols 1..n, rowHead indexed 1..n.
     const solver = new SparseSolver();
     solver._initStructure(2);
 
-    const h00 = solver.allocElement(0, 0); solver.stampElement(h00, 4.0);
-    const h01 = solver.allocElement(0, 1); solver.stampElement(h01, 1.0);
-    const h10 = solver.allocElement(1, 0); solver.stampElement(h10, 1.0);
-    const h11 = solver.allocElement(1, 1); solver.stampElement(h11, 3.0);
+    const h00 = solver.allocElement(1, 1); solver.stampElement(h00, 4.0);
+    const h01 = solver.allocElement(1, 2); solver.stampElement(h01, 1.0);
+    const h10 = solver.allocElement(2, 1); solver.stampElement(h10, 1.0);
+    const h11 = solver.allocElement(2, 2); solver.stampElement(h11, 3.0);
 
-    solver.stampRHS(0, 1.0);
-    solver.stampRHS(1, 2.0);
+    const rhsStamp = new Float64Array(3); // size n+1
+    stampRHS(rhsStamp, 1, 1.0);
+    stampRHS(rhsStamp, 2, 2.0);
 
     // Check linked structure via rowHead chains — 2 elements per row
+    // rowHead is indexed 1..n (1-based)
     const rowHead = (solver as any)._rowHead as Int32Array;
     const colHead = (solver as any)._colHead as Int32Array;
     const elNextInRow = (solver as any)._elNextInRow as Int32Array;
     const elNextInCol = (solver as any)._elNextInCol as Int32Array;
     const elRow = (solver as any)._elRow as Int32Array;
     const elCol = (solver as any)._elCol as Int32Array;
-    const elVal = (solver as any)._elVal as Float64Array;
 
-    // Count elements in row 0 chain
+    // Count elements in row 1 chain
     let countRow0 = 0;
-    let e = rowHead[0];
+    let e = rowHead[1];
     while (e >= 0) { countRow0++; e = elNextInRow[e]; }
     expect(countRow0).toBe(2);
 
-    // Count elements in row 1 chain
+    // Count elements in row 2 chain
     let countRow1 = 0;
-    e = rowHead[1];
+    e = rowHead[2];
     while (e >= 0) { countRow1++; e = elNextInRow[e]; }
     expect(countRow1).toBe(2);
 
@@ -1499,28 +1509,29 @@ describe("SparseSolver handle-based stamp API", () => {
     // Verify solve correctness
     const result = solver.factor();
     expect(result).toBe(0);
-    const x = new Float64Array(2);
-    solver.solve(x);
+    const x = new Float64Array(3); // size n+1
+    solver.solve(rhsStamp, x);
 
     void colHead; void elRow; void elCol; void elNextInCol; // suppress unused
   });
 
   it("beginAssembly_zeros_values_preserves_structure", () => {
     // After a full solve cycle, calling beginAssembly again zeros all element
-    // values and RHS but linked chains remain intact (A-element count unchanged).
+    // values but linked chains remain intact (A-element count unchanged).
+    // 1-based external API: rows/cols 1..n, rowHead indexed 1..n.
     const solver = new SparseSolver();
 
     // First assembly and solve
     solver._initStructure(2);
-    const h00 = solver.allocElement(0, 0); solver.stampElement(h00, 4.0);
-    const h01 = solver.allocElement(0, 1); solver.stampElement(h01, 1.0);
-    const h10 = solver.allocElement(1, 0); solver.stampElement(h10, 1.0);
-    const h11 = solver.allocElement(1, 1); solver.stampElement(h11, 3.0);
-    solver.stampRHS(0, 1.0);
-    solver.stampRHS(1, 2.0);
+    const h00 = solver.allocElement(1, 1); solver.stampElement(h00, 4.0);
+    const h01 = solver.allocElement(1, 2); solver.stampElement(h01, 1.0);
+    const h10 = solver.allocElement(2, 1); solver.stampElement(h10, 1.0);
+    const h11 = solver.allocElement(2, 2); solver.stampElement(h11, 3.0);
+    const rhs1 = new Float64Array(3); // size n+1
+    stampRHS(rhs1, 1, 1.0); stampRHS(rhs1, 2, 2.0);
     solver.factor();
-    const x1 = new Float64Array(2);
-    solver.solve(x1);
+    const x1 = new Float64Array(3); // size n+1
+    solver.solve(rhs1, x1);
 
     // Second assembly: handles remain valid, values should be zeroed
     solver._initStructure(2);
@@ -1532,16 +1543,11 @@ describe("SparseSolver handle-based stamp API", () => {
     expect(elVal[h10]).toBe(0);
     expect(elVal[h11]).toBe(0);
 
-    // RHS zeroed
-    const rhs = (solver as any)._rhs as Float64Array;
-    expect(rhs[0]).toBe(0);
-    expect(rhs[1]).toBe(0);
-
-    // Linked chains still intact — rowHead still points to valid elements
+    // Linked chains still intact — rowHead[1] still points to valid elements
     const rowHead = (solver as any)._rowHead as Int32Array;
     const elNextInRow = (solver as any)._elNextInRow as Int32Array;
     let countRow0 = 0;
-    let e = rowHead[0];
+    let e = rowHead[1];
     while (e >= 0) { countRow0++; e = elNextInRow[e]; }
     expect(countRow0).toBe(2); // structure preserved
 
@@ -1550,13 +1556,13 @@ describe("SparseSolver handle-based stamp API", () => {
     solver.stampElement(h01, 1.0);
     solver.stampElement(h10, 1.0);
     solver.stampElement(h11, 4.0);
-    solver.stampRHS(0, 3.0);
-    solver.stampRHS(1, 5.0);
+    const rhs2 = new Float64Array(3); // size n+1
+    stampRHS(rhs2, 1, 3.0); stampRHS(rhs2, 2, 5.0);
     const r2 = solver.factor();
     expect(r2).toBe(0);
-    const x2 = new Float64Array(2);
-    solver.solve(x2);
-    // A=[[2,1],[1,4]], b=[3,5]: det=8-1=7, x0=(12-5)/7=1, x1=(10-3)/7=1
+    const x2 = new Float64Array(3); // size n+1
+    solver.solve(rhs2, x2);
+    // A=[[2,1],[1,4]], b=[3,5]: det=8-1=7, x[1]=(12-5)/7=1, x[2]=(10-3)/7=1
   });
 
   it("invalidateTopology_forces_rebuild", () => {
@@ -1564,16 +1570,16 @@ describe("SparseSolver handle-based stamp API", () => {
     // the linked structure from scratch.
     const solver = new SparseSolver();
 
-    // First topology: 2x2 diagonal
+    // First topology: 2x2 diagonal (1-based: rows/cols 1..n)
     solver._initStructure(2);
-    const h00 = solver.allocElement(0, 0); solver.stampElement(h00, 3.0);
-    const h11 = solver.allocElement(1, 1); solver.stampElement(h11, 5.0);
-    solver.stampRHS(0, 6.0);
-    solver.stampRHS(1, 10.0);
+    const h00 = solver.allocElement(1, 1); solver.stampElement(h00, 3.0);
+    const h11 = solver.allocElement(2, 2); solver.stampElement(h11, 5.0);
+    const rhsA = new Float64Array(3); // size n+1
+    stampRHS(rhsA, 1, 6.0); stampRHS(rhsA, 2, 10.0);
     let r = solver.factor();
     expect(r).toBe(0);
-    const x1 = new Float64Array(2);
-    solver.solve(x1);
+    const x1 = new Float64Array(3); // size n+1
+    solver.solve(rhsA, x1);
 
     // Invalidate topology — next beginAssembly must rebuild from scratch
     solver.invalidateTopology();
@@ -1581,25 +1587,26 @@ describe("SparseSolver handle-based stamp API", () => {
     solver._initStructure(2);
     // After invalidation, the linked structure is empty — new allocElement calls
     // allocate fresh elements. Old handles h00/h11 should not be reused implicitly.
-    const h00b = solver.allocElement(0, 0); solver.stampElement(h00b, 4.0);
-    const h01b = solver.allocElement(0, 1); solver.stampElement(h01b, 1.0);
-    const h10b = solver.allocElement(1, 0); solver.stampElement(h10b, 1.0);
-    const h11b = solver.allocElement(1, 1); solver.stampElement(h11b, 3.0);
-    solver.stampRHS(0, 1.0);
-    solver.stampRHS(1, 2.0);
+    const h00b = solver.allocElement(1, 1); solver.stampElement(h00b, 4.0);
+    const h01b = solver.allocElement(1, 2); solver.stampElement(h01b, 1.0);
+    const h10b = solver.allocElement(2, 1); solver.stampElement(h10b, 1.0);
+    const h11b = solver.allocElement(2, 2); solver.stampElement(h11b, 3.0);
+    const rhsB = new Float64Array(3); // size n+1
+    stampRHS(rhsB, 1, 1.0); stampRHS(rhsB, 2, 2.0);
 
     // Verify 4 elements in structure (full 2x2)
+    // colHead indexed 1..n (1-based)
     const colHead = (solver as any)._colHead as Int32Array;
     const elNextInCol = (solver as any)._elNextInCol as Int32Array;
     let countCol0 = 0;
-    let e = colHead[0];
+    let e = colHead[1];
     while (e >= 0) { countCol0++; e = elNextInCol[e]; }
-    expect(countCol0).toBe(2); // both rows in col 0
+    expect(countCol0).toBe(2); // both rows in col 1
 
     r = solver.factor();
     expect(r).toBe(0);
-    const x2 = new Float64Array(2);
-    solver.solve(x2);
+    const x2 = new Float64Array(3); // size n+1
+    solver.solve(rhsB, x2);
 
     void h00b; void h01b; void h10b; void h11b;
   });
@@ -1622,9 +1629,10 @@ describe("SparseSolver SMPpreOrder", () => {
     // diagonal (3,3) = 0 (not stamped)
     // add a third equation: node 2 isolated (diagonal only to make solvable)
     solver.stampElement(solver.allocElement(2, 2), 1);
-    solver.stampRHS(1, 0);   // KCL: G*v1 + I_vs = 0
-    solver.stampRHS(2, 0);   // isolated node
-    solver.stampRHS(3, 5);   // KVL: v1 = 5
+    const rhs = new Float64Array(4);
+    stampRHS(rhs, 1, 0);   // KCL: G*v1 + I_vs = 0
+    stampRHS(rhs, 2, 0);   // isolated node
+    stampRHS(rhs, 3, 5);   // KVL: v1 = 5
 
     solver.preorder();
 
@@ -1632,16 +1640,16 @@ describe("SparseSolver SMPpreOrder", () => {
     expect(result).toBe(0);
 
     const x = new Float64Array(4);
-    solver.solve(x);
+    solver.solve(rhs, x);
     // Verify A*x = b in original matrix coordinates (1-based).
     const vals: [number, number, number][] = [[1,1,1],[1,3,1],[2,2,1],[3,1,1]];
-    const rhs = [0, 0, 0, 5]; // index 0 unused
+    const rhsCheck = [0, 0, 0, 5]; // index 0 unused
     for (let i = 1; i <= 3; i++) {
       let sum = 0;
       for (const [r, c, v] of vals) {
         if (r === i) sum += v * x[c];
       }
-      expect(Math.abs(sum - rhs[i])).toBeLessThan(1e-10);
+      expect(Math.abs(sum - rhsCheck[i])).toBeLessThan(1e-10);
     }
   });
 
@@ -1660,11 +1668,12 @@ describe("SparseSolver SMPpreOrder", () => {
     solver.stampElement(solver.allocElement(2, 5), 1);
     solver.stampElement(solver.allocElement(5, 2), 1);
     solver.stampElement(solver.allocElement(3, 3), 1);
-    solver.stampRHS(1, 0);
-    solver.stampRHS(2, 0);
-    solver.stampRHS(3, 0);
-    solver.stampRHS(4, 3); // V1 = 3
-    solver.stampRHS(5, 7); // V2 = 7
+    const rhs = new Float64Array(6);
+    stampRHS(rhs, 1, 0);
+    stampRHS(rhs, 2, 0);
+    stampRHS(rhs, 3, 0);
+    stampRHS(rhs, 4, 3); // V1 = 3
+    stampRHS(rhs, 5, 7); // V2 = 7
 
     solver.preorder();
 
@@ -1672,19 +1681,19 @@ describe("SparseSolver SMPpreOrder", () => {
     expect(result).toBe(0);
 
     const x = new Float64Array(6);
-    solver.solve(x);
+    solver.solve(rhs, x);
 
     // Verify A*x = b in original (1-based) matrix coordinates.
     const entries: [number, number, number][] = [
       [1,1,1],[1,4,1],[4,1,1],[2,2,1],[2,5,1],[5,2,1],[3,3,1],
     ];
-    const rhs = [0, 0, 0, 0, 3, 7]; // index 0 unused
+    const rhsCheck = [0, 0, 0, 0, 3, 7]; // index 0 unused
     for (let i = 1; i <= 5; i++) {
       let sum = 0;
       for (const [r, c, v] of entries) {
         if (r === i) sum += v * x[c];
       }
-      expect(Math.abs(sum - rhs[i])).toBeLessThan(1e-10);
+      expect(Math.abs(sum - rhsCheck[i])).toBeLessThan(1e-10);
     }
   });
 
@@ -1697,9 +1706,10 @@ describe("SparseSolver SMPpreOrder", () => {
     solver.stampElement(solver.allocElement(1, 3), 1);
     solver.stampElement(solver.allocElement(3, 1), 1);
     solver.stampElement(solver.allocElement(2, 2), 1);
-    solver.stampRHS(1, 0);
-    solver.stampRHS(2, 0);
-    solver.stampRHS(3, 5);
+    const rhs = new Float64Array(4);
+    stampRHS(rhs, 1, 0);
+    stampRHS(rhs, 2, 0);
+    stampRHS(rhs, 3, 5);
 
     solver.preorder();
     solver.preorder();
@@ -1708,16 +1718,16 @@ describe("SparseSolver SMPpreOrder", () => {
     expect(result).toBe(0);
 
     const x = new Float64Array(4);
-    solver.solve(x);
+    solver.solve(rhs, x);
 
     const vals: [number, number, number][] = [[1,1,1],[1,3,1],[2,2,1],[3,1,1]];
-    const rhs = [0, 0, 0, 5]; // index 0 unused
+    const rhsCheck = [0, 0, 0, 5]; // index 0 unused
     for (let i = 1; i <= 3; i++) {
       let sum = 0;
       for (const [r, c, v] of vals) {
         if (r === i) sum += v * x[c];
       }
-      expect(Math.abs(sum - rhs[i])).toBeLessThan(1e-10);
+      expect(Math.abs(sum - rhsCheck[i])).toBeLessThan(1e-10);
     }
   });
 
@@ -1728,7 +1738,8 @@ describe("SparseSolver SMPpreOrder", () => {
     solver.stampElement(solver.allocElement(1, 1), 2); solver.stampElement(solver.allocElement(1, 2), -1);
     solver.stampElement(solver.allocElement(2, 1), -1); solver.stampElement(solver.allocElement(2, 2), 3); solver.stampElement(solver.allocElement(2, 3), -1);
     solver.stampElement(solver.allocElement(3, 2), -1); solver.stampElement(solver.allocElement(3, 3), 2);
-    solver.stampRHS(1, 1); solver.stampRHS(2, 2); solver.stampRHS(3, 1);
+    const rhs = new Float64Array(4);
+    stampRHS(rhs, 1, 1); stampRHS(rhs, 2, 2); stampRHS(rhs, 3, 1);
 
     // Record colHead state before preorder
     const colHeadBefore = Array.from((solver as any)._colHead as Int32Array);
@@ -1743,7 +1754,7 @@ describe("SparseSolver SMPpreOrder", () => {
     expect(result).toBe(0);
 
     const x = new Float64Array(4);
-    solver.solve(x);
+    solver.solve(rhs, x);
   });
 
   it("_elCol_preserved_after_preorder_swap", () => {
@@ -1757,9 +1768,10 @@ describe("SparseSolver SMPpreOrder", () => {
     solver.stampElement(solver.allocElement(1, 3), 1);
     solver.stampElement(solver.allocElement(3, 1), 1);
     solver.stampElement(solver.allocElement(2, 2), 1);
-    solver.stampRHS(1, 0);
-    solver.stampRHS(2, 0);
-    solver.stampRHS(3, 5);
+    const rhs = new Float64Array(4);
+    stampRHS(rhs, 1, 0);
+    stampRHS(rhs, 2, 0);
+    stampRHS(rhs, 3, 5);
 
     // Capture each element's original column BEFORE preorder.
     const elCount = (solver as any)._elCount as number;
@@ -1787,15 +1799,15 @@ describe("SparseSolver SMPpreOrder", () => {
     const result = solver.factor();
     expect(result).toBe(0);
     const x = new Float64Array(4);
-    solver.solve(x);
+    solver.solve(rhs, x);
     const entries: [number, number, number][] = [[1,1,1],[1,3,1],[2,2,1],[3,1,1]];
-    const rhs = [0, 0, 0, 5]; // index 0 unused
+    const rhsCheck = [0, 0, 0, 5]; // index 0 unused
     for (let i = 1; i <= 3; i++) {
       let sum = 0;
       for (const [r, c, v] of entries) {
         if (r === i) sum += v * x[c];
       }
-      expect(Math.abs(sum - rhs[i])).toBeLessThan(1e-10);
+      expect(Math.abs(sum - rhsCheck[i])).toBeLessThan(1e-10);
     }
   });
 });
@@ -1804,26 +1816,26 @@ describe("SparseSolver no-AMD Markowitz ordering", () => {
   it("solve_without_amd_3x3", () => {
     // A 3x3 system solved using only Markowitz pivot ordering (no AMD pre-permutation).
     // A = [[2,-1,0],[-1,3,-1],[0,-1,2]], b = [1,2,1]
-    // Solution: x0=(1+x1)/2, x2=(1+x1)/2; from row1: 2x1-1=2 => x1=3/2
-    // x0 = 5/4, x1 = 3/2, x2 = 5/4
+    // Solution: x[1]=(1+x[2])/2, x[3]=(1+x[2])/2; from row2: 2x[2]-1=2 => x[2]=3/2
+    // x[1] = 5/4, x[2] = 3/2, x[3] = 5/4
+    // 1-based external API: rows/cols 1..n.
     const solver = new SparseSolver();
     solver._initStructure(3);
-    solver.stampElement(solver.allocElement(0, 0), 2);
-    solver.stampElement(solver.allocElement(0, 1), -1);
-    solver.stampElement(solver.allocElement(1, 0), -1);
-    solver.stampElement(solver.allocElement(1, 1), 3);
+    solver.stampElement(solver.allocElement(1, 1), 2);
     solver.stampElement(solver.allocElement(1, 2), -1);
     solver.stampElement(solver.allocElement(2, 1), -1);
-    solver.stampElement(solver.allocElement(2, 2), 2);
-    solver.stampRHS(0, 1);
-    solver.stampRHS(1, 2);
-    solver.stampRHS(2, 1);
+    solver.stampElement(solver.allocElement(2, 2), 3);
+    solver.stampElement(solver.allocElement(2, 3), -1);
+    solver.stampElement(solver.allocElement(3, 2), -1);
+    solver.stampElement(solver.allocElement(3, 3), 2);
+    const rhs = new Float64Array(4); // size n+1
+    stampRHS(rhs, 1, 1); stampRHS(rhs, 2, 2); stampRHS(rhs, 3, 1);
 
-    const result = solver.factorWithReorder();
+    const result = solver.factor();
     expect(result).toBe(0);
 
-    const x = new Float64Array(3);
-    solver.solve(x);
+    const x = new Float64Array(4); // size n+1
+    solver.solve(rhs, x);
 
     // Verify no perm/permInv arrays exist on solver
     expect((solver as any)._perm).toBeUndefined();
@@ -1854,20 +1866,22 @@ describe("SparseSolver no-AMD Markowitz ordering", () => {
     //   but since Ivs enters KCL with +sign and current convention: Ivs=-5)
     //   From KCL: G*v0 + Ivs = 0 => 1*5 + Ivs = 0 => Ivs = -5
     //   From KVL: v0 = 5 => v0 = 5
+    // 1-based external API: rows/cols 1..n.
     const solver = new SparseSolver();
     solver._initStructure(2);
-    solver.stampElement(solver.allocElement(0, 0), 1);   // conductance G=1
-    solver.stampElement(solver.allocElement(0, 1), 1);   // VS KCL stamp
-    solver.stampElement(solver.allocElement(1, 0), 1);   // VS KVL stamp
-    // A[1][1] = 0 (no diagonal for branch current row)
-    solver.stampRHS(1, 5);   // V = 5
+    solver.stampElement(solver.allocElement(1, 1), 1);   // conductance G=1
+    solver.stampElement(solver.allocElement(1, 2), 1);   // VS KCL stamp
+    solver.stampElement(solver.allocElement(2, 1), 1);   // VS KVL stamp
+    // A[2][2] = 0 (no diagonal for branch current row)
+    const rhs = new Float64Array(3); // size n+1
+    stampRHS(rhs, 2, 5);   // V = 5
 
-    const result = solver.factorWithReorder();
+    const result = solver.factor();
     expect(result).toBe(0);
 
-    const x = new Float64Array(2);
-    solver.solve(x);
-    // v0 = 5, Ivs = -5
+    const x = new Float64Array(3); // size n+1
+    solver.solve(rhs, x);
+    // v[1] = 5, Ivs = -5
 
     // Verify no AMD permutation arrays
     expect((solver as any)._perm).toBeUndefined();
@@ -1880,29 +1894,31 @@ describe("SparseSolver no-AMD Markowitz ordering", () => {
     // A[0][j]=1 for j=0..4, A[j][0]=1 for j=1..4, A[j][j]=5 for j=1..4
     // b = [1,1,1,1,1]
     // Solution: solve and verify A*x = b by back-substitution.
+    // 1-based external API: rows/cols 1..n.
     const n = 5;
     const solver = new SparseSolver();
     solver._initStructure(n);
-    for (let j = 0; j < n; j++) solver.stampElement(solver.allocElement(0, j), 1);
-    for (let i = 1; i < n; i++) {
-      solver.stampElement(solver.allocElement(i, 0), 1);
+    for (let j = 1; j <= n; j++) solver.stampElement(solver.allocElement(1, j), 1);
+    for (let i = 2; i <= n; i++) {
+      solver.stampElement(solver.allocElement(i, 1), 1);
       solver.stampElement(solver.allocElement(i, i), 5);
     }
-    for (let i = 0; i < n; i++) solver.stampRHS(i, 1);
+    const rhs = new Float64Array(n + 1); // size n+1
+    for (let i = 1; i <= n; i++) rhs[i] += 1;
 
-    const result = solver.factorWithReorder();
+    const result = solver.factor();
     expect(result).toBe(0);
 
-    const x = new Float64Array(n);
-    solver.solve(x);
+    const x = new Float64Array(n + 1); // size n+1
+    solver.solve(rhs, x);
 
     // Verify A*x = b within tolerance
-    // Row 0: sum(x[j]) = 1
+    // Row 1: sum(x[j] for j=1..n) = 1
     let row0sum = 0;
-    for (let j = 0; j < n; j++) row0sum += x[j];
+    for (let j = 1; j <= n; j++) row0sum += x[j];
 
-    // Rows 1..4: x[0] + 5*x[i] = 1
-    for (let i = 1; i < n; i++) {
+    // Rows 2..n: x[1] + 5*x[i] = 1
+    for (let i = 2; i <= n; i++) {
     }
 
     // Verify no AMD permutation arrays
@@ -1916,18 +1932,17 @@ describe("SparseSolver NISHOULDREORDER lifecycle", () => {
     // After one successful factorWithReorder(), subsequent factor() calls must
     // use the numeric-only path. Stage 6.3.3 — `lastFactorUsedReorder` instance
     // field deleted; verified via `FactorResult.usedReorder` returned by factor().
+    // 1-based external API: rows/cols 1..n.
     const solver = new SparseSolver();
     solver._initStructure(3);
-    solver.stampElement(solver.allocElement(0, 0), 2);
-    solver.stampElement(solver.allocElement(0, 1), -1);
-    solver.stampElement(solver.allocElement(1, 0), -1);
-    solver.stampElement(solver.allocElement(1, 1), 3);
+    solver.stampElement(solver.allocElement(1, 1), 2);
     solver.stampElement(solver.allocElement(1, 2), -1);
     solver.stampElement(solver.allocElement(2, 1), -1);
-    solver.stampElement(solver.allocElement(2, 2), 2);
-    solver.stampRHS(0, 1);
-    solver.stampRHS(1, 2);
-    solver.stampRHS(2, 1);
+    solver.stampElement(solver.allocElement(2, 2), 3);
+    solver.stampElement(solver.allocElement(2, 3), -1);
+    solver.stampElement(solver.allocElement(3, 2), -1);
+    solver.stampElement(solver.allocElement(3, 3), 2);
+    { const rhs = new Float64Array(4); stampRHS(rhs, 1, 1); stampRHS(rhs, 2, 2); stampRHS(rhs, 3, 1); void rhs; }
 
     // First factor() must use reorder (no pivot order yet)
     const r1 = solver.factor();
@@ -1936,13 +1951,13 @@ describe("SparseSolver NISHOULDREORDER lifecycle", () => {
 
     // Re-assemble with same values
     solver._initStructure(3);
-    solver.stampElement(solver.allocElement(0, 0), 2);
-    solver.stampElement(solver.allocElement(0, 1), -1);
-    solver.stampElement(solver.allocElement(1, 0), -1);
-    solver.stampElement(solver.allocElement(1, 1), 3);
+    solver.stampElement(solver.allocElement(1, 1), 2);
     solver.stampElement(solver.allocElement(1, 2), -1);
     solver.stampElement(solver.allocElement(2, 1), -1);
-    solver.stampElement(solver.allocElement(2, 2), 2);
+    solver.stampElement(solver.allocElement(2, 2), 3);
+    solver.stampElement(solver.allocElement(2, 3), -1);
+    solver.stampElement(solver.allocElement(3, 2), -1);
+    solver.stampElement(solver.allocElement(3, 3), 2);
 
     // Second factor() must use numeric-only path (no forceReorder called)
     const r2 = solver.factor();
@@ -1953,43 +1968,44 @@ describe("SparseSolver NISHOULDREORDER lifecycle", () => {
   it("forceReorder_triggers_full_pivot_search", () => {
     // After forceReorder(), the next factor() call must use the reorder path.
     // Stage 6.3.3 — usedReorder reported on each FactorResult.
+    // 1-based external API: rows/cols 1..n.
     const solver = new SparseSolver();
     solver._initStructure(3);
-    solver.stampElement(solver.allocElement(0, 0), 2);
-    solver.stampElement(solver.allocElement(0, 1), -1);
-    solver.stampElement(solver.allocElement(1, 0), -1);
-    solver.stampElement(solver.allocElement(1, 1), 3);
+    solver.stampElement(solver.allocElement(1, 1), 2);
     solver.stampElement(solver.allocElement(1, 2), -1);
     solver.stampElement(solver.allocElement(2, 1), -1);
-    solver.stampElement(solver.allocElement(2, 2), 2);
+    solver.stampElement(solver.allocElement(2, 2), 3);
+    solver.stampElement(solver.allocElement(2, 3), -1);
+    solver.stampElement(solver.allocElement(3, 2), -1);
+    solver.stampElement(solver.allocElement(3, 3), 2);
 
     // First factor — builds pivot order
-    const r1 = solver.factor();
+    solver.factor();
     expect(solver.reordered).toBe(true);
 
     // Re-assemble
     solver._initStructure(3);
-    solver.stampElement(solver.allocElement(0, 0), 2);
-    solver.stampElement(solver.allocElement(0, 1), -1);
-    solver.stampElement(solver.allocElement(1, 0), -1);
-    solver.stampElement(solver.allocElement(1, 1), 3);
+    solver.stampElement(solver.allocElement(1, 1), 2);
     solver.stampElement(solver.allocElement(1, 2), -1);
     solver.stampElement(solver.allocElement(2, 1), -1);
-    solver.stampElement(solver.allocElement(2, 2), 2);
+    solver.stampElement(solver.allocElement(2, 2), 3);
+    solver.stampElement(solver.allocElement(2, 3), -1);
+    solver.stampElement(solver.allocElement(3, 2), -1);
+    solver.stampElement(solver.allocElement(3, 3), 2);
 
     // Second factor without forceReorder — numeric path
-    const r2 = solver.factor();
+    solver.factor();
     expect(solver.reordered).toBe(false);
 
     // Re-assemble, then forceReorder
     solver._initStructure(3);
-    solver.stampElement(solver.allocElement(0, 0), 2);
-    solver.stampElement(solver.allocElement(0, 1), -1);
-    solver.stampElement(solver.allocElement(1, 0), -1);
-    solver.stampElement(solver.allocElement(1, 1), 3);
+    solver.stampElement(solver.allocElement(1, 1), 2);
     solver.stampElement(solver.allocElement(1, 2), -1);
     solver.stampElement(solver.allocElement(2, 1), -1);
-    solver.stampElement(solver.allocElement(2, 2), 2);
+    solver.stampElement(solver.allocElement(2, 2), 3);
+    solver.stampElement(solver.allocElement(2, 3), -1);
+    solver.stampElement(solver.allocElement(3, 2), -1);
+    solver.stampElement(solver.allocElement(3, 3), 2);
     solver.forceReorder();
 
     // Third factor after forceReorder — must use full pivot search

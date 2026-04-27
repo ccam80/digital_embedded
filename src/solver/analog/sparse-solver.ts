@@ -256,28 +256,12 @@ export class SparseSolver {
   private _doRealDirect: Int32Array = new Int32Array(0);
 
   /**
-   * ngspice Matrix->MaxRowCountInLowerTri (spdefs.h:760). Reset to -1 by
-   * spOrderAndFactor (spfactor.c:257) before the reorder loop. Read by
-   * spRoundoff (sputils.c:2077) which is gated STABILITY=NO and out of
-   * scope (amendment A8); we maintain the field for structural mirror.
-   */
-  private _maxRowCountInLowerTri: number = -1;
-
-  /**
    * ngspice MatrixFrame.NumberOfInterchangesIsOdd (spdefs.h). Toggled at every
    * SwapCols (sputils.c:299) and at the Row != Step / Col != Step branches of
    * ExchangeRowsAndCols (spfactor.c:2016-2017, 2033-2034). Sign source for
    * spDeterminant.
    */
   private _numberOfInterchangesIsOdd: boolean = false;
-
-  /**
-   * ngspice MatrixFrame.PivotsOriginalRow / PivotsOriginalCol (spdefs.h).
-   * Written at the head of ExchangeRowsAndCols (spfactor.c:1995-1996),
-   * before the (Row==Step && Col==Step) early-return.
-   */
-  private _pivotsOriginalRow: number = 0;
-  private _pivotsOriginalCol: number = 0;
 
   /**
    * ngspice MatrixFrame.Reordered (spdefs.h:770). Set TRUE at
@@ -352,10 +336,6 @@ export class SparseSolver {
   // Int32Array to mirror the integer semantics including overflow promotion.
   private _markowitzProd: Int32Array = new Int32Array(0);
   private _singletons: number = 0;
-
-  // ngspice MatrixFrame.PivotSelectionMethod (spdefs.h). Written by
-  // SearchForPivot at each return site (spfactor.c:958/973/983/991).
-  private _pivotSelectionMethod: string = '';
 
   // ngspice QuicklySearchDiagonal stack array `TiedElements[MAX_MARKOWITZ_TIES + 1]`
   // (spfactor.c:1260). Allocated once as class field per architect B.42.
@@ -1305,7 +1285,6 @@ export class SparseSolver {
       // ngspice spfactor.c:254-257.
       this._countMarkowitz(step, rhs);
       this._markowitzProducts(step);
-      this._maxRowCountInLowerTri = -1;
 
       // ngspice spfactor.c:260-276 — reorder loop.
       for (; step <= size; step++) {
@@ -1760,7 +1739,6 @@ export class SparseSolver {
     if (this._singletons > 0) {
       chosenPivot = this._searchForSingleton(step);
       if (chosenPivot >= 0) {
-        this._pivotSelectionMethod = 's';
         return chosenPivot;
       }
     }
@@ -1769,19 +1747,16 @@ export class SparseSolver {
     if (diagPivoting) {
       chosenPivot = this._quicklySearchDiagonal(step);
       if (chosenPivot >= 0) {
-        this._pivotSelectionMethod = 'q';
         return chosenPivot;
       }
       chosenPivot = this._searchDiagonal(step);
       if (chosenPivot >= 0) {
-        this._pivotSelectionMethod = 'd';
         return chosenPivot;
       }
     }
 
     /* No acceptable pivot found yet, search entire matrix. */
     chosenPivot = this._searchEntireMatrix(step);
-    this._pivotSelectionMethod = 'e';
 
     return chosenPivot;
   }
@@ -2512,11 +2487,6 @@ export class SparseSolver {
     // spfactor.c:1993-1994.
     const row = this._elRow[pivotE];
     const col = this._elCol[pivotE];
-    // spfactor.c:1995-1996 — PivotsOriginalRow/Col are written BEFORE the
-    // (Row==Step && Col==Step) early-return so callers always see the
-    // pivot's original coordinates.
-    this._pivotsOriginalRow = row;
-    this._pivotsOriginalCol = col;
 
     // spfactor.c:1998.
     if (row === step && col === step) return;

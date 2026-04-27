@@ -25,7 +25,6 @@ function makeNullSolver() {
   return {
     allocElement: (_r: number, _c: number) => 0,
     stampElement: (_h: number, _v: number) => {},
-    stampRHS: (_i: number, _v: number) => {},
     stamp: (_r: number, _c: number, _v: number) => {},
   } as any;
 }
@@ -111,13 +110,12 @@ function voltages(clock: number, d: number, q = 0, qBar = 0, reset = 0): Float64
  * Build a minimal LoadContext for driving element.load() and element.accept().
  */
 function makeCtx(
-  v: Float64Array = new Float64Array(8),
+  _v: Float64Array = new Float64Array(8),
   dt = 0,
   method: IntegrationMethod = "trapezoidal",
 ): LoadContext {
   return makeLoadCtx({
     solver: makeNullSolver(),
-    voltages: v,
     dt,
     method,
     order: 1,
@@ -133,7 +131,7 @@ describe("DFF", () => {
   it("latches_d_on_rising_edge", () => {
     // D=high, clock transitions from 0V to 3.3V (rising edge)
     // After accept with rising edge, Q should be latched HIGH.
-    const { element, qPin } = buildDff();
+    const { element } = buildDff();
 
     // Initial load so pin state is initialised.
     element.load(makeCtx());
@@ -158,7 +156,7 @@ describe("DFF", () => {
   it("holds_on_falling_edge", () => {
     // First latch Q=high via rising edge, then apply falling edge with D=low
     // Q should remain HIGH
-    const { element, qPin } = buildDff();
+    const { element } = buildDff();
 
     // Initial load so pin state is initialised.
     element.load(makeCtx());
@@ -176,7 +174,7 @@ describe("DFF", () => {
 
   it("q_bar_is_complement", () => {
     // When Q=high, ~Q must be vOL; when Q=low, ~Q must be vOH
-    const { element, qPin, qBarPin } = buildDff();
+    const { element } = buildDff();
 
     // Initial state: Q=false (default)
     element.load(makeCtx());
@@ -195,12 +193,10 @@ describe("DFF", () => {
     // load() must NOT change _latchedQ — only accept() does.
     // We verify this by calling load() multiple times with clock=high, D=high
     // but without calling accept(), and confirming Q stays fixed.
-    const { element, qPin } = buildDff();
+    const { element } = buildDff();
 
     // Latch Q=false initially (default)
     element.load(makeCtx());
-
-    const initialQ = qPin.currentVoltage;
 
     // Simulate NR iterations: call load() with clock=high, D=high
     // but do NOT call accept() (which would detect the edge)
@@ -220,7 +216,7 @@ describe("DFF", () => {
   it("async_reset_forces_q_low", () => {
     // Reset pin driven such that reset is active (active-low: reset < vIL)
     // Q should be forced LOW regardless of clock/D state
-    const { element, qPin } = buildDff(true);
+    const { element } = buildDff(true);
 
     // First latch Q=high via rising edge
     element.accept(makeCtx(voltages(0.0, 3.3, 0, 0, 3.3), 1e-9, 'trapezoidal'), 0, () => {}); // clock low
@@ -281,7 +277,7 @@ describe("DFF", () => {
     expect(v2tau).toBeLessThan(0.92 * CMOS33.vOH);
 
     // Confirm the element has Q latched at vOH (not VOL)
-    const { element: el, qPin } = buildDff();
+    const { element: el } = buildDff();
     el.accept(makeCtx(voltages(0.0, 3.3), dt, 'trapezoidal'), 0, () => {});
     el.accept(makeCtx(voltages(3.3, 3.3), dt, 'trapezoidal'), 0, () => {});
     el.load(makeCtx(voltages(3.3, 3.3)));
@@ -296,10 +292,9 @@ describe("DFF", () => {
 // Task 6.4.3 — flipflop_load_delegates_to_pin_models
 // ---------------------------------------------------------------------------
 
-function makeMinimalFlipflopCtx(voltages?: Float64Array): LoadContext {
+function makeMinimalFlipflopCtx(_voltages?: Float64Array): LoadContext {
   return makeLoadCtx({
     solver: makeNullSolver(),
-    voltages: voltages ?? new Float64Array(16),
     cktMode: MODETRAN | MODEINITFLOAT,
     order: 1,
   });

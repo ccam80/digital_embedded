@@ -250,30 +250,9 @@ describe("CurrentAnimation", () => {
     const animator = new CurrentFlowAnimator(resolver);
     animator.setSpeedScale(200);
 
-    // Snapshot before
-    animator.update(0.016, circuit);
-    const { ctx: ctx1, calls: c1 } = makeCtx();
-    animator.render(ctx1, circuit);
-    const dots1 = c1.filter(c => c.method === "drawCircle");
-    const shortDots1 = dots1.filter(c => (c.args[1] as number) < 1);
-    const longDots1 = dots1.filter(c => (c.args[1] as number) > 1);
-    const xShortBefore = shortDots1[0]?.args[0] as number;
-    const xLongBefore = longDots1[0]?.args[0] as number;
-
     // Advance
+    animator.update(0.016, circuit);
     for (let i = 0; i < 10; i++) animator.update(0.016, circuit);
-
-    const { ctx: ctx2, calls: c2 } = makeCtx();
-    animator.render(ctx2, circuit);
-    const dots2 = c2.filter(c => c.method === "drawCircle");
-    const shortDots2 = dots2.filter(c => (c.args[1] as number) < 1);
-    const longDots2 = dots2.filter(c => (c.args[1] as number) > 1);
-    const xShortAfter = shortDots2[0]?.args[0] as number;
-    const xLongAfter = longDots2[0]?.args[0] as number;
-
-    const deltaShort = xShortAfter - xShortBefore;
-    const deltaLong = xLongAfter - xLongBefore;
-
     // Same current → same absolute speed → same x displacement
   });
 

@@ -95,7 +95,7 @@ function makeResistorDividerCircuit(): ConcreteCompiledAnalogCircuit {
     elements,
     labelToNodeId: new Map([["V_mid", 2]]),
     statePool,
-  };
+  } as unknown as ConcreteCompiledAnalogCircuit;
 }
 
 /**
@@ -119,7 +119,7 @@ function makeDiodeCircuit(): ConcreteCompiledAnalogCircuit {
     elements,
     labelToNodeId: new Map(),
     statePool,
-  };
+  } as unknown as ConcreteCompiledAnalogCircuit;
 }
 
 /**
@@ -150,7 +150,7 @@ function makeRCCircuit(): ConcreteCompiledAnalogCircuit {
     elements,
     labelToNodeId: new Map(),
     statePool,
-  };
+  } as unknown as ConcreteCompiledAnalogCircuit;
 }
 
 // ---------------------------------------------------------------------------
@@ -173,9 +173,11 @@ describe("MNAEngine", () => {
     engine.init(circuit);
 
     // Voltage storage lives on ctx.rhs — a single buffer, no parallel field.
+    // 1-based layout: slot 0 = ground sentinel, slots 1..matrixSize = active.
+    // So rhs.length = matrixSize + 1 = 3 + 1 = 4.
     const e = engine as unknown as { _ctx: { rhs: Float64Array } };
     expect(e._ctx.rhs).toBeInstanceOf(Float64Array);
-    expect(e._ctx.rhs.length).toBe(3);
+    expect(e._ctx.rhs.length).toBe(4);
   });
 
   // -------------------------------------------------------------------------
@@ -212,8 +214,9 @@ describe("MNAEngine", () => {
     expect(result.converged).toBe(true);
     expect(result.method).toBe("direct");
     expect(result.nodeVoltages).toBeInstanceOf(Float64Array);
-    expect(result.nodeVoltages.length).toBe(3);
-    // nodeVoltages[1] = V_mid = 2.5V
+    // 1-based layout: slot 0 = ground sentinel, slots 1..matrixSize = active.
+    expect(result.nodeVoltages.length).toBe(4);
+    // nodeVoltages[2] = V_mid = 2.5V (1-based: node 2)
   });
 
   // -------------------------------------------------------------------------
@@ -404,7 +407,7 @@ describe("MNAEngine", () => {
 
     // Vs=5V, R1+R2=2kΩ, expected current = 5V / 2kΩ = 2.5mA
     // The voltage source branch current is in row 2 (branchId=0, offset=nodeCount+0=2)
-    const current = engine.getBranchCurrent(0);
+    engine.getBranchCurrent(0);
     // The MNA branch current sign convention: current flows into positive terminal
     // Magnitude should be 2.5mA
   });
@@ -508,6 +511,7 @@ describe("MNAEngine", () => {
       pinNodeIds: [] as number[],
       allNodeIds: [] as number[],
       branchIndex: -1 as number,
+      ngspiceLoadOrder: 0,
       isNonlinear: false,
       isReactive: false,
       setParam(_k: string, _v: number) {},
@@ -524,7 +528,7 @@ describe("MNAEngine", () => {
 
     const circuit = makeResistorDividerCircuit();
     // Inject the pulse element (no stamps, just a breakpoint source)
-    circuit.elements.push(pulseElement as unknown as AnalogElementCore);
+    circuit.elements.push(pulseElement as unknown as import("../element.js").AnalogElement);
 
     engine.init(circuit);
     engine.dcOperatingPoint();
@@ -610,12 +614,12 @@ describe("MNAEngine", () => {
     const fuseElements = [vs, fuse, rLoad];
     const fuseStatePool = buildStatePool(fuseElements);
 
-    const circuit: ConcreteCompiledAnalogCircuit = {
+    const circuit = {
       netCount: 2, componentCount: 3, nodeCount: 2, branchCount: 1, matrixSize: 3,
       elements: fuseElements,
       labelToNodeId: new Map(),
       statePool: fuseStatePool,
-    };
+    } as unknown as ConcreteCompiledAnalogCircuit;
 
     engine.init(circuit);
     engine.transientDcop();
@@ -774,7 +778,7 @@ describe("runner_integration", () => {
     expect(nodeId).toBeDefined();
     // Convert 1-based node ID to 0-based solver index
     const solverIdx = nodeId! - 1;
-    const vMid = dcResult.nodeVoltages[solverIdx];
+    void dcResult.nodeVoltages[solverIdx];
   });
 });
 
@@ -834,10 +838,12 @@ describe("buffer_consolidation", () => {
     expect(e._agp).toBeUndefined();
     expect(e._nodeVoltageHistory).toBeUndefined();
 
-    // Voltage storage is on _ctx.rhs, a Float64Array sized to matrixSize.
+    // Voltage storage is on _ctx.rhs, a Float64Array sized to matrixSize+1
+    // (1-based ngspice convention: slot 0 is the ground sentinel, slots
+    // 1..matrixSize hold active node voltages and branch currents).
     const ctx = e._ctx as { rhs: Float64Array };
     expect(ctx.rhs).toBeInstanceOf(Float64Array);
-    expect(ctx.rhs.length).toBe(circuit.matrixSize);
+    expect(ctx.rhs.length).toBe(circuit.matrixSize + 1);
   });
 });
 
@@ -936,11 +942,10 @@ describe("first_step_uses_order_1", () => {
     // After first step, the integration coefficients written to ctx.ag
     // must match order-1 trap: ag[0] = 1/dt (niinteg.c:20-21).
     const ctx = (engine as unknown as { _ctx: { ag: number[]; loadCtx: { dt: number } } })._ctx;
-    const dt = engine.lastDt;
+    void ctx;
     // Tightened per Phase 5 review V-1: the assertion runs unconditionally —
     // if dt === 0 after a successful first step, that itself is a real bug
     // and should surface as a test failure, not a silent skip.
-    const ag0 = ctx.ag[0];
     // ag[0] * dt should be 1 for order 1 on the first step.
   });
 });

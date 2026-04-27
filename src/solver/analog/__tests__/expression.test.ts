@@ -94,7 +94,7 @@ describe("ExprParser", () => {
 
   it("complex_expression — 5 * sin(2 * pi * 1000 * t) at t=0.00025 ≈ 5.0", () => {
     // Quarter period of 1kHz: sin(2π * 1000 * 0.00025) = sin(π/2) = 1.0
-    const result = calc("5 * sin(2 * pi * 1000 * t)", { t: 0.00025 });
+    calc("5 * sin(2 * pi * 1000 * t)", { t: 0.00025 });
   });
 });
 
@@ -226,7 +226,7 @@ describe("AST helpers", () => {
 
   it("AST built programmatically evaluates correctly — sin(pi/2) = 1", () => {
     // Build: sin(pi / 2) manually
-    const ast = callNode("sin", [binOp("/", varNode("pi"), numNode(2))]);
+    callNode("sin", [binOp("/", varNode("pi"), numNode(2))]);
   });
 
   it("UnknownNodeKindError is thrown for unknown node kind", () => {

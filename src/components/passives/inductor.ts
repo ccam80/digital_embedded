@@ -22,6 +22,7 @@ import {
 } from "../../core/registry.js";
 import { formatSI } from "../../editor/si-format.js";
 import type { AnalogElementCore, ReactiveAnalogElementCore, IntegrationMethod, LoadContext } from "../../solver/analog/element.js";
+import { NGSPICE_LOAD_ORDER } from "../../solver/analog/element.js";
 import { cktTerr } from "../../solver/analog/ckt-terr.js";
 import { niIntegrate } from "../../solver/analog/ni-integrate.js";
 import {
@@ -177,12 +178,21 @@ const SLOT_CCAP = 1;  // ngspice INDvolt = INDstate+1 (= NIintegrate ccap)
 export class AnalogInductorElement implements ReactiveAnalogElementCore {
   pinNodeIds!: readonly number[];  // set by compiler via Object.assign after factory returns
   readonly branchIndex: number;
+  readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.IND;
   readonly isNonlinear = false;
   readonly isReactive = true;
   readonly poolBacked = true as const;
   readonly stateSchema = INDUCTOR_SCHEMA;
   readonly stateSize = INDUCTOR_SCHEMA.size;
   stateBaseOffset = -1;
+  s0: Float64Array = new Float64Array(0);
+  s1: Float64Array = new Float64Array(0);
+  s2: Float64Array = new Float64Array(0);
+  s3: Float64Array = new Float64Array(0);
+  s4: Float64Array = new Float64Array(0);
+  s5: Float64Array = new Float64Array(0);
+  s6: Float64Array = new Float64Array(0);
+  s7: Float64Array = new Float64Array(0);
 
   private _nominalL: number;
   private L: number;

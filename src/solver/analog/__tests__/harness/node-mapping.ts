@@ -131,6 +131,13 @@ function canonicalizeOurLabel(label: string): string {
  *
  * For branch currents (voltage sources), ngspice creates entries like
  * "v<label>#branch" which we match against our branch matrix rows.
+ *
+ * Both `ourIndex` and `ngspiceIndex` are 1-based slot indices: slot 0 is the
+ * ground sentinel (always 0 on both sides), nodes occupy 1..nodeCount, and
+ * branch currents occupy nodeCount+1..nodeCount+branchCount. This matches the
+ * indexing used by `ctx.rhs`/`ctx.rhsOld` (length matrixSize+1, ckt-context.ts:543-548)
+ * and by consumers that read `voltages[el.branchIndex]` directly
+ * (inductor.ts, transmission-line.ts, etc.).
  */
 export function buildDirectNodeMapping(
   ourTopology: TopologySnapshot,
@@ -140,21 +147,33 @@ export function buildDirectNodeMapping(
 ): NodeMapping[] {
   const mappings: NodeMapping[] = [];
 
-  // 1. Voltage nodes: our node ID N → ngspice node named "N"
+  // 0. Ground sentinel: both engines reserve slot 0 for ground (always 0V).
+  // Without this, reindexNgspiceSession would leave our slot 0 as NaN.
+  mappings.push({
+    ourIndex: 0,
+    ngspiceIndex: 0,
+    label: "GND",
+    ngspiceName: "0",
+  });
+
+  // 1. Voltage nodes: our node ID N → ngspice node named "N", at slot N.
   for (let nodeId = 1; nodeId <= ourTopology.nodeCount; nodeId++) {
     const ngspiceIndex = ngTopology.nodeNames.get(String(nodeId));
     if (ngspiceIndex === undefined) continue;
 
     const label = ourTopology.nodeLabels.get(nodeId) ?? `node_${nodeId}`;
     mappings.push({
-      ourIndex: nodeId - 1,       // 0-based solver row
+      ourIndex: nodeId,
       ngspiceIndex,
       label,
       ngspiceName: String(nodeId),
     });
   }
 
-  // 2. Branch currents: voltage/current source elements with branchIndex >= 0
+  // 2. Branch currents: voltage/current source elements with branchIndex >= 0.
+  // el.branchIndex is the 1-based absolute slot index `totalNodeCount + 1 + meta.branchIdx`
+  // (compiler.ts:1192-1193); consumers like inductor.ts read voltages[branchIndex]
+  // directly, so this must remain 1-based.
   for (let ei = 0; ei < elements.length; ei++) {
     const el = elements[ei];
     if (el.branchIndex < 0) continue;
@@ -166,12 +185,6 @@ export function buildDirectNodeMapping(
     const ngspiceIndex = ngTopology.nodeNames.get(ngBranchName);
     if (ngspiceIndex === undefined) continue;
 
-    // el.branchIndex is already an absolute matrix row index (set by the
-    // compiler at compiler.ts:1145-1146 as `totalNodeCount + meta.branchIdx`).
-    // Consumers like inductor.ts and transmission-line.ts index directly into
-    // the full solution vector with voltages[branchIndex], which only works
-    // if branchIndex is absolute. Do NOT add nodeCount here — that would
-    // double-count and produce out-of-range ourIndex values.
     const ourIndex = el.branchIndex;
     const label = ourTopology.nodeLabels.get(-(el.branchIndex + 1))
       ?? `${elLabel}:branch`;

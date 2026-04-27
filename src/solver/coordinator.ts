@@ -374,6 +374,7 @@ export class DefaultSimulationCoordinator implements SimulationCoordinator {
 
     if (bundle === null) {
       e.postIterationHook = null;
+      e.preFactorHook = null;
       e.stepPhaseHook = null;
       e.detailedConvergence = false;
       e.limitingCollector = null;
@@ -386,6 +387,7 @@ export class DefaultSimulationCoordinator implements SimulationCoordinator {
       this._convergenceLogPreHookState = e.convergenceLog.enabled;
     }
     e.postIterationHook = bundle.iterationHook;
+    e.preFactorHook = bundle.preFactorHook ?? null;
     e.stepPhaseHook = bundle.phaseHook;
     e.detailedConvergence = true;
     e.limitingCollector = [];

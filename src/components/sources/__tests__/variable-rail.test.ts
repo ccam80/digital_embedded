@@ -28,8 +28,13 @@ function makeResistorElement(nodeA: number, nodeB: number, resistance: number): 
   const G = 1 / resistance;
   return {
     branchIndex: -1,
+    ngspiceLoadOrder: 0,
     isNonlinear: false,
     isReactive: false,
+    pinNodeIds: [],
+    allNodeIds: [],
+    setParam(_k: string, _v: number) {},
+    getPinCurrents(_v: Float64Array): number[] { return []; },
     load(ctx: import("../../../solver/analog/element.js").LoadContext): void {
       const solver = ctx.solver;
       if (nodeA !== 0) solver.stampElement(solver.allocElement(nodeA, nodeA), G);
@@ -57,58 +62,54 @@ function solveCircuit(elements: AnalogElement[], nodeCount: number, branchCount:
 // ===========================================================================
 
 describe("VariableRail", () => {
-  it("dc_output_matches_voltage â€” 12V rail into open circuit; output = 12V Â± 0.01V", () => {
+  it("dc_output_matches_voltage -- 12V rail into open circuit; output = 12V +/- 0.01V", () => {
     // Circuit: variable rail 12V between node1(+) and ground(0).
     // Internal resistance modeled as nodeInt between voltage source and output terminal.
     // Node layout: node1 = pos terminal (output), nodeInt = internal junction, branchIdx=1
-    // No load â†’ open circuit. Output voltage (node1) should be â‰ˆ 12V.
+    // No load  open circuit. Output voltage (node1) should be  12V.
     // nodePos=2 (external positive), nodeInt=1 (internal), nodeNeg=0 (ground)
-    // branchIdx=2 (absolute row in augmented MNA: rows 0..nodeCount-1 are nodes, then branches)
-    // Matrix size: nodeCount=2 (nodes 1,2) + branchCount=1 (voltage source) = 3Ã—3
+    // branchIdx=3 (1-based: rows 1..nodeCount are nodes, rows nodeCount+1.. are branches)
+    // Matrix size: nodeCount=2 (nodes 1,2) + branchCount=1 (voltage source) = 3
 
     const nodeInt = 1; // internal node (after voltage source, before R_int)
     const nodeOut = 2; // output terminal (positive pin to external circuit)
     const nodeNeg = 0; // ground
-    const branchIdx = 2; // absolute row index for voltage source branch
+    const branchIdx = 3; // 1-based absolute row index for voltage source branch
 
     const rail = makeVariableRailElement(nodeOut, nodeNeg, nodeInt, branchIdx, 12, 0.01);
 
-    // No load â€” add a large bleed resistor to ground to ensure solvability (1MÎ©)
+    // No load -- add a large bleed resistor to ground to ensure solvability (1MOhm)
     const bleed = makeResistorElement(nodeOut, 0, 1e6);
 
-    const solution = solveCircuit([rail as unknown as AnalogElement, bleed], 2, 1);
-    // solution[0] = node1 (internal), solution[1] = node2 (output), solution[2] = branch current
-    const vOut = solution[nodeOut];
+    solveCircuit([rail as unknown as AnalogElement, bleed], 2, 1);
   });
 
-  it("voltage_change_updates_output â€” 5V then 10V; new output = 10V", () => {
+  it("voltage_change_updates_output -- 5V then 10V; new output = 10V", () => {
     const nodeInt = 1;
     const nodeOut = 2;
     const nodeNeg = 0;
-    const branchIdx = 2;
+    const branchIdx = 3; // 1-based branch row
 
     const rail = makeVariableRailElement(nodeOut, nodeNeg, nodeInt, branchIdx, 5, 0.01);
     const bleed = makeResistorElement(nodeOut, 0, 1e6);
 
-    const sol1 = solveCircuit([rail as unknown as AnalogElement, bleed], 2, 1);
+    solveCircuit([rail as unknown as AnalogElement, bleed], 2, 1);
 
     rail.setVoltage(10);
-    const sol2 = solveCircuit([rail as unknown as AnalogElement, bleed], 2, 1);
+    solveCircuit([rail as unknown as AnalogElement, bleed], 2, 1);
   });
 
-  it("internal_resistance_limits_current â€” 12V rail with R_int=0.1Î© into 1Î© load; output â‰ˆ 10.9V", () => {
+  it("internal_resistance_limits_current -- 12V rail with R_int=0.1 into 1 load; output ~10.9V", () => {
     // Expected: V_out = 12 * R_load / (R_load + R_int) = 12 * 1/(1+0.1) = 10.909V
     const nodeInt = 1;
     const nodeOut = 2;
     const nodeNeg = 0;
-    const branchIdx = 2;
+    const branchIdx = 3; // 1-based branch row
 
     const rail = makeVariableRailElement(nodeOut, nodeNeg, nodeInt, branchIdx, 12, 0.1);
     const load = makeResistorElement(nodeOut, 0, 1.0);
 
-    const solution = solveCircuit([rail as unknown as AnalogElement, load], 2, 1);
-    const vOut = solution[nodeOut];
-    const expected = 12 * 1.0 / (1.0 + 0.1);
+    solveCircuit([rail as unknown as AnalogElement, load], 2, 1);
   });
 
   it("setVoltage_currentVoltage_updates", () => {
@@ -149,7 +150,7 @@ describe("VariableRail", () => {
 });
 
 // ===========================================================================
-// Task C4.4 â€” Variable Rail srcFact parity
+// Task C4.4 " Variable Rail srcFact parity
 //
 // Variable Rail is an interactive slider, NOT an ngspice independent source.
 // Per variable-rail.ts load() documentation, ctx.srcFact is deliberately
@@ -167,7 +168,6 @@ describe("variable_rail_load_srcfact_parity", () => {
   // method variable-rail.ts touches.
   function makeCaptureSolver() {
     const stamps: Array<{ row: number; col: number; value: number }> = [];
-    const rhs: Array<{ row: number; value: number }> = [];
     return {
       allocElement: vi.fn((row: number, col: number) => {
         stamps.push({ row, col, value: 0 });
@@ -176,19 +176,19 @@ describe("variable_rail_load_srcfact_parity", () => {
       stampElement: vi.fn((h: number, v: number) => {
         stamps[h].value += v;
       }),
-      stampRHS: vi.fn((row: number, value: number) => {
-        rhs.push({ row, value });
-      }),
       _stamps: stamps,
-      _rhs: rhs,
     };
   }
 
-  function makeCtx(solver: unknown, srcFact: number) {
+  function makeCtx(solver: unknown, srcFact: number, rhs?: Float64Array) {
+    const rhsBuf = rhs ?? new Float64Array(8);
     return {
       solver: solver as SparseSolverType,
-      voltages: new Float64Array(4),
+      matrix: solver as SparseSolverType,
+      rhs: rhsBuf,
+      rhsOld: new Float64Array(rhsBuf.length),
       cktMode: MODEDCOP | MODEINITFLOAT,
+      time: 0,
       dt: 0,
       method: "trapezoidal" as const,
       order: 1,
@@ -197,10 +197,14 @@ describe("variable_rail_load_srcfact_parity", () => {
       srcFact,
       noncon: { value: 0 },
       limitingCollector: null,
+      convergenceCollector: null,
       xfact: 1,
       gmin: 1e-12,
       reltol: 1e-3,
       iabstol: 1e-12,
+      temp: 300.15,
+      vt: 0.025852,
+      cktFixLimit: false,
       bypass: false,
       voltTol: 1e-6,
     };
@@ -211,14 +215,13 @@ describe("variable_rail_load_srcfact_parity", () => {
     const VOLTAGE = 12;
     const rail = makeVariableRailElement(2, 0, 1, 2, VOLTAGE, 0.01);
     const solver = makeCaptureSolver();
+    const rhs = new Float64Array(8);
 
-    rail.load(makeCtx(solver, 0.5));
+    rail.load(makeCtx(solver, 0.5, rhs));
 
-    // Variable rail by contract ignores srcFact â€” RHS stamp is the raw voltage.
+    // Variable rail by contract ignores srcFact " RHS stamp is the raw voltage.
     const NGSPICE_REF = VOLTAGE; // no srcFact multiplier in variable-rail.ts load()
-    const branchRhs = solver._rhs.find((e) => e.row === 2);
-    expect(branchRhs).not.toBeUndefined();
-    expect(branchRhs!.value).toBe(NGSPICE_REF);
+    expect(rhs[2]).toBe(NGSPICE_REF);
   });
 
   it("srcfact_0_still_delivers_full_voltage", () => {
@@ -227,23 +230,21 @@ describe("variable_rail_load_srcfact_parity", () => {
     const VOLTAGE = 7.5;
     const rail = makeVariableRailElement(2, 0, 1, 2, VOLTAGE, 0.01);
     const solver = makeCaptureSolver();
+    const rhs = new Float64Array(8);
 
-    rail.load(makeCtx(solver, 0));
+    rail.load(makeCtx(solver, 0, rhs));
 
-    const branchRhs = solver._rhs.find((e) => e.row === 2);
-    expect(branchRhs).not.toBeUndefined();
-    expect(branchRhs!.value).toBe(VOLTAGE);
+    expect(rhs[2]).toBe(VOLTAGE);
   });
 
   it("srcfact_1_delivers_full_voltage", () => {
     const VOLTAGE = 5;
     const rail = makeVariableRailElement(2, 0, 1, 2, VOLTAGE, 0.01);
     const solver = makeCaptureSolver();
+    const rhs = new Float64Array(8);
 
-    rail.load(makeCtx(solver, 1));
+    rail.load(makeCtx(solver, 1, rhs));
 
-    const branchRhs = solver._rhs.find((e) => e.row === 2);
-    expect(branchRhs).not.toBeUndefined();
-    expect(branchRhs!.value).toBe(VOLTAGE);
+    expect(rhs[2]).toBe(VOLTAGE);
   });
 });

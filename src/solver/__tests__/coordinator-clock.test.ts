@@ -53,6 +53,7 @@ function buildAnalogOnlyCoordinator(): DefaultSimulationCoordinator {
     modelRegistry: {
       behavioral: { kind: 'inline' as const, factory: (_pinNodes: ReadonlyMap<string, number>) => ({
         branchIndex: -1 as const,
+        ngspiceLoadOrder: 0,
         isNonlinear: false, isReactive: false,
         stamp(_s: SparseSolverStamp) {},
         getPinCurrents(_v: Float64Array) { return [0]; },
@@ -84,6 +85,7 @@ function buildAnalogOnlyCoordinator(): DefaultSimulationCoordinator {
         const g = 1 / 1000;
         return {
           branchIndex: -1 as const,
+          ngspiceLoadOrder: 0,
           isNonlinear: false, isReactive: false,
           stamp(s: SparseSolverStamp) {
             if (nodeA > 0) s.stampElement(s.allocElement(nodeA, nodeA), g);

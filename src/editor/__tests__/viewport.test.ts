@@ -1,6 +1,5 @@
 import { describe, it, expect } from "vitest";
 import { Viewport } from "../viewport.js";
-import { GRID_SPACING } from "../coordinates.js";
 import type { CircuitElement } from "@/core/element";
 import type { Point, Rect, RenderContext } from "@/core/renderer-interface";
 import type { Pin } from "@/core/pin";
@@ -40,19 +39,7 @@ describe("Viewport", () => {
     const vp = new Viewport(1.0, { x: 0, y: 0 });
     const screenPoint: Point = { x: 400, y: 300 };
 
-    // World point under screenPoint before zoom
-    const worldBefore = {
-      x: (screenPoint.x - vp.pan.x) / (vp.zoom * GRID_SPACING),
-      y: (screenPoint.y - vp.pan.y) / (vp.zoom * GRID_SPACING),
-    };
-
     vp.zoomAt(screenPoint, 1.5);
-
-    // World point under same screenPoint after zoom
-    const worldAfter = {
-      x: (screenPoint.x - vp.pan.x) / (vp.zoom * GRID_SPACING),
-      y: (screenPoint.y - vp.pan.y) / (vp.zoom * GRID_SPACING),
-    };
 
   });
 
@@ -134,7 +121,7 @@ describe("Viewport", () => {
   it("getVisibleWorldRect — at zoom=1, pan=(0,0), canvas 800x600: visible rect is (0, 0, 40, 30) in grid units", () => {
     const vp = new Viewport(1.0, { x: 0, y: 0 });
     const canvasSize = { width: 800, height: 600 };
-    const rect = vp.getVisibleWorldRect(canvasSize);
+    vp.getVisibleWorldRect(canvasSize);
 
     // At zoom=1, GRID_SPACING=20: 800px / 20px = 40 grid units wide, 600px / 20px = 30 tall
   });
@@ -142,7 +129,7 @@ describe("Viewport", () => {
   it("getVisibleWorldRect at zoom=2", () => {
     const vp = new Viewport(2.0, { x: 0, y: 0 });
     const canvasSize = { width: 800, height: 600 };
-    const rect = vp.getVisibleWorldRect(canvasSize);
+    vp.getVisibleWorldRect(canvasSize);
     // At zoom=2: 800px / (2*20) = 20 grid units wide
   });
 

@@ -17,6 +17,7 @@ export type {
   SparseSolverStamp,
   StatePoolRef,
 } from "../../core/analog-types.js";
+export { NGSPICE_LOAD_ORDER } from "../../core/analog-types.js";
 
 import type { AnalogElementCore, ComplexSparseSolver, IntegrationMethod, StatePoolRef } from "../../core/analog-types.js";
 import type { StateSchema } from "./state-schema.js";
@@ -153,6 +154,16 @@ export interface AnalogElement {
    * add extra rows.
    */
   readonly branchIndex: number;
+
+  /**
+   * Position in ngspice's CKTload iteration order. Mirrored from
+   * `AnalogElementCore.ngspiceLoadOrder`; the compiler sorts the element
+   * array by this field so that per-iteration `cktLoad` walks devices in
+   * the same per-type bucket order ngspice does. See
+   * `core/analog-types.ts:NGSPICE_LOAD_ORDER` for the enum and A1 spec
+   * for why this matters.
+   */
+  readonly ngspiceLoadOrder: number;
 
   /**
    * True if this element performs nonlinear stamping inside load().

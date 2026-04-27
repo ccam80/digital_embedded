@@ -17,8 +17,8 @@ import { CKTCircuitContext } from "../ckt-context.js";
 import { makeResistor, makeVoltageSource, makeDiode, allocateStatePool } from "./test-helpers.js";
 import { DEFAULT_SIMULATION_PARAMS } from "../../../core/analog-engine-interface.js";
 import {
-  MODETRANOP, MODEUIC, MODEDCOP, MODEINITFLOAT, MODEINITJCT, MODETRAN,
-  MODEINITTRAN, MODEINITFIX, setInitf, setAnalysis, initf,
+  MODEDCOP, MODEINITFLOAT, MODEINITJCT, MODETRAN,
+  MODEINITTRAN, MODEINITFIX, setInitf, setAnalysis,
 } from "../ckt-mode.js";
 import * as fs from "fs";
 import * as path from "path";

@@ -5,7 +5,7 @@
 import { describe, it, expect, vi } from "vitest";
 import { ResistorDefinition } from "../resistor.js";
 import { PropertyBag } from "../../../core/properties.js";
-import { runDcOp, makeSimpleCtx } from "../../../solver/analog/__tests__/test-helpers.js";
+import { runDcOp, makeSimpleCtx, makeLoadCtx } from "../../../solver/analog/__tests__/test-helpers.js";
 import { makeDcVoltageSource } from "../../sources/dc-voltage-source.js";
 import type { AnalogElement } from "../../../solver/analog/element.js";
 import type { SparseSolver as SparseSolverType } from "../../../solver/analog/sparse-solver.js";
@@ -53,17 +53,17 @@ describe("Resistor", () => {
     const element = Object.assign(core, { pinNodeIds: [1, 2] as readonly number[], allNodeIds: [1, 2] as readonly number[] }) as unknown as AnalogElement;
     const { solver, stamps } = makeCaptureSolver();
 
-    const ctx = makeSimpleCtx({ elements: [element], matrixSize: 2, nodeCount: 2, solver });
-    element.load(ctx.loadCtx);
+    const ctx = makeLoadCtx({ solver });
+    element.load(ctx);
 
     expect(stamps).toHaveLength(4);
 
     const G = 1e-3;
-    // Node IDs are 1-based; factory converts to 0-based solver indices (nodeId - 1)
-    expect(stamps).toContainEqual([0, 0, G]);
+    // Node IDs are 1-based (A=1, B=2); elements stamp at the raw 1-based node indices
     expect(stamps).toContainEqual([1, 1, G]);
-    expect(stamps).toContainEqual([0, 1, -G]);
-    expect(stamps).toContainEqual([1, 0, -G]);
+    expect(stamps).toContainEqual([2, 2, G]);
+    expect(stamps).toContainEqual([1, 2, -G]);
+    expect(stamps).toContainEqual([2, 1, -G]);
   });
 
   it("resistance_from_props", () => {
@@ -72,14 +72,15 @@ describe("Resistor", () => {
     const element = Object.assign(core, { pinNodeIds: [1, 2] as readonly number[], allNodeIds: [1, 2] as readonly number[] }) as unknown as AnalogElement;
     const { solver, stamps } = makeCaptureSolver();
 
-    const ctx = makeSimpleCtx({ elements: [element], matrixSize: 2, nodeCount: 2, solver });
-    element.load(ctx.loadCtx);
+    const ctx = makeLoadCtx({ solver });
+    element.load(ctx);
 
     const G = 1 / 470;
-    expect(stamps).toContainEqual([0, 0, G]);
+    // Node IDs are 1-based (A=1, B=2); elements stamp at the raw 1-based node indices
     expect(stamps).toContainEqual([1, 1, G]);
-    expect(stamps).toContainEqual([0, 1, -G]);
-    expect(stamps).toContainEqual([1, 0, -G]);
+    expect(stamps).toContainEqual([2, 2, G]);
+    expect(stamps).toContainEqual([1, 2, -G]);
+    expect(stamps).toContainEqual([2, 1, -G]);
   });
 
   it("minimum_resistance_clamped", () => {
@@ -88,14 +89,15 @@ describe("Resistor", () => {
     const element = Object.assign(core, { pinNodeIds: [1, 2] as readonly number[], allNodeIds: [1, 2] as readonly number[] }) as unknown as AnalogElement;
     const { solver, stamps } = makeCaptureSolver();
 
-    const ctx = makeSimpleCtx({ elements: [element], matrixSize: 2, nodeCount: 2, solver });
-    element.load(ctx.loadCtx);
+    const ctx = makeLoadCtx({ solver });
+    element.load(ctx);
 
     const G = 1 / 1e-9;
-    expect(stamps).toContainEqual([0, 0, G]);
+    // Node IDs are 1-based (A=1, B=2); elements stamp at the raw 1-based node indices
     expect(stamps).toContainEqual([1, 1, G]);
-    expect(stamps).toContainEqual([0, 1, -G]);
-    expect(stamps).toContainEqual([1, 0, -G]);
+    expect(stamps).toContainEqual([2, 2, G]);
+    expect(stamps).toContainEqual([1, 2, -G]);
+    expect(stamps).toContainEqual([2, 1, -G]);
   });
 
   it("is_not_nonlinear_and_not_reactive", () => {
@@ -124,6 +126,7 @@ function makeResistor(nodeA: number, nodeB: number, resistance: number): AnalogE
     pinNodeIds: [nodeA, nodeB],
     allNodeIds: [nodeA, nodeB],
     branchIndex: -1,
+    ngspiceLoadOrder: 0,
     isNonlinear: false,
     isReactive: false,
     setParam(_key: string, _value: number): void {},
@@ -174,11 +177,6 @@ describe("Integration", () => {
     });
 
     expect(result.converged).toBe(true);
-
-    // Solution vector layout: [V(node1), V(node2), I_branch]
-    const vJunction  = result.nodeVoltages[0]; // V at R1â€“R2 junction
-    const vSourcePos = result.nodeVoltages[1]; // V at voltage source positive terminal
-    const iBranch    = result.nodeVoltages[2]; // branch current (A)
 
     // Voltage source enforces V(node2) = 10 V
 
@@ -320,15 +318,16 @@ describe("resistor_load_interface", () => {
 
     const entries = ctx.solver.getCSCNonZeros();
     // NGSPICE reference: resload.c stamps G=1/R. For R=1000, G=0.001 exactly.
+    // Nodes are 1-based: A=1, B=2. getCSCNonZeros returns raw 1-based row/col.
     const NGSPICE_G_REF = 1 / 1000;
-    const entry00 = entries.find((e) => e.row === 0 && e.col === 0);
-    expect(entry00).toBeDefined();
-    expect(entry00!.value).toBe(NGSPICE_G_REF);
     const entry11 = entries.find((e) => e.row === 1 && e.col === 1);
+    expect(entry11).toBeDefined();
     expect(entry11!.value).toBe(NGSPICE_G_REF);
-    const entry01 = entries.find((e) => e.row === 0 && e.col === 1);
-    expect(entry01!.value).toBe(-NGSPICE_G_REF);
-    const entry10 = entries.find((e) => e.row === 1 && e.col === 0);
-    expect(entry10!.value).toBe(-NGSPICE_G_REF);
+    const entry22 = entries.find((e) => e.row === 2 && e.col === 2);
+    expect(entry22!.value).toBe(NGSPICE_G_REF);
+    const entry12 = entries.find((e) => e.row === 1 && e.col === 2);
+    expect(entry12!.value).toBe(-NGSPICE_G_REF);
+    const entry21 = entries.find((e) => e.row === 2 && e.col === 1);
+    expect(entry21!.value).toBe(-NGSPICE_G_REF);
   });
 });

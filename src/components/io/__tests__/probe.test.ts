@@ -377,7 +377,10 @@ describe("Probe", () => {
 
       const ctx: LoadContext = {
         solver: captureSolver,
-        voltages: new Float64Array(8),
+        matrix: captureSolver,
+        rhs: new Float64Array(8),
+        rhsOld: new Float64Array(8),
+        time: 0,
         cktMode: MODEDCOP | MODEINITFLOAT,
         dt: 0,
         method: "trapezoidal",
@@ -387,10 +390,14 @@ describe("Probe", () => {
         srcFact: 1,
         noncon: { value: 0 },
         limitingCollector: null,
+        convergenceCollector: null,
         xfact: 1,
         gmin: 1e-12,
         reltol: 1e-3,
         iabstol: 1e-12,
+        temp: 300.15,
+        vt: 0.025852,
+        cktFixLimit: false,
         bypass: false,
         voltTol: 1e-6,
       };

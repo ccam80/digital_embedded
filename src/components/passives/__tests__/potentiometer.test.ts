@@ -17,7 +17,7 @@ import {
 } from "../potentiometer.js";
 import { PropertyBag } from "../../../core/properties.js";
 import { ComponentCategory, ComponentRegistry } from "../../../core/registry.js";
-import { makeSimpleCtx } from "../../../solver/analog/__tests__/test-helpers.js";
+import { makeSimpleCtx, makeLoadCtx, withNodeIds } from "../../../solver/analog/__tests__/test-helpers.js";
 import type { AnalogElement } from "../../../solver/analog/element.js";
 
 // ---------------------------------------------------------------------------
@@ -73,18 +73,18 @@ describe("Potentiometer", () => {
       const analogElement = Object.assign(core, { pinNodeIds: [1, 2, 3] as readonly number[], allNodeIds: [1, 2, 3] as readonly number[] }) as unknown as AnalogElement;
 
       const { solver, stamps } = makeCaptureSolver();
-      const ctx = makeSimpleCtx({ elements: [analogElement], matrixSize: 3, nodeCount: 3, solver });
-      analogElement.load(ctx.loadCtx);
+      const ctx = makeLoadCtx({ solver });
+      analogElement.load(ctx);
 
       expect(stamps.length).toBe(8);
 
-      // Factory maps [A,B,W]=[1,2,3]; load() uses pinNodeIds[0]=A(1)=idx0, pinNodeIds[1]=B(2)=idx1, pinNodeIds[2]=W(3)=idx2
-      // Top resistor: n_A(idx0) ↔ n_W(idx1)
-      const topStamps = stamps.filter((s) => (s[0] === 0 || s[0] === 1) && (s[1] === 0 || s[1] === 1));
+      // Nodes are 1-based: A=1, B=2, W=3. The capture solver records raw node IDs.
+      // Top resistor: A(1) ↔ B(2) (pinNodeIds[0] ↔ pinNodeIds[1])
+      const topStamps = stamps.filter((s) => (s[0] === 1 || s[0] === 2) && (s[1] === 1 || s[1] === 2));
       expect(topStamps.some((s) => Math.abs(s[2] - 0.0002) < 1e-6)).toBe(true);
 
-      // Bottom resistor: n_W(idx1) ↔ n_B(idx2)
-      const bottomStamps = stamps.filter((s) => (s[0] === 1 || s[0] === 2) && (s[1] === 1 || s[1] === 2));
+      // Bottom resistor: B(2) ↔ W(3) (pinNodeIds[1] ↔ pinNodeIds[2])
+      const bottomStamps = stamps.filter((s) => (s[0] === 2 || s[0] === 3) && (s[1] === 2 || s[1] === 3));
       expect(bottomStamps.some((s) => Math.abs(s[2] - 0.0002) < 1e-6)).toBe(true);
     });
   });
@@ -105,13 +105,14 @@ describe("Potentiometer", () => {
       const analogElement = Object.assign(core, { pinNodeIds: [1, 2, 3] as readonly number[], allNodeIds: [1, 2, 3] as readonly number[] }) as unknown as AnalogElement;
 
       const { solver, stamps } = makeCaptureSolver();
-      const ctx = makeSimpleCtx({ elements: [analogElement], matrixSize: 3, nodeCount: 3, solver });
-      analogElement.load(ctx.loadCtx);
+      const ctx = makeLoadCtx({ solver });
+      analogElement.load(ctx);
 
-      // Top resistance is 0, clamped to 1e-9: G_top = 1/(1e-9) = 1e9 — n_A(idx0) ↔ n_W(idx1)
-      // Bottom resistance is 10000: G_bottom = 1/10000 = 0.0001 — n_W(idx1) ↔ n_B(idx2)
-      const topStamps = stamps.filter((s) => (s[0] === 0 || s[0] === 1) && (s[1] === 0 || s[1] === 1));
-      const bottomStamps = stamps.filter((s) => (s[0] === 1 || s[0] === 2) && (s[1] === 1 || s[1] === 2));
+      // Nodes are 1-based: A=1, B=2, W=3. Top resistor: A(1) ↔ B(2). Bottom resistor: B(2) ↔ W(3).
+      // Top resistance is 0, clamped to 1e-9: G_top = 1/(1e-9) = 1e9 — A(1) ↔ B(2)
+      // Bottom resistance is 10000: G_bottom = 1/10000 = 0.0001 — B(2) ↔ W(3)
+      const topStamps = stamps.filter((s) => (s[0] === 1 || s[0] === 2) && (s[1] === 1 || s[1] === 2));
+      const bottomStamps = stamps.filter((s) => (s[0] === 2 || s[0] === 3) && (s[1] === 2 || s[1] === 3));
 
       expect(topStamps.some((s) => s[2] > 1e8)).toBe(true); // Very large G_top
       expect(bottomStamps.some((s) => Math.abs(s[2] - 0.0001) < 1e-6)).toBe(true);
@@ -134,13 +135,14 @@ describe("Potentiometer", () => {
       const analogElement = Object.assign(core, { pinNodeIds: [1, 2, 3] as readonly number[], allNodeIds: [1, 2, 3] as readonly number[] }) as unknown as AnalogElement;
 
       const { solver, stamps } = makeCaptureSolver();
-      const ctx = makeSimpleCtx({ elements: [analogElement], matrixSize: 3, nodeCount: 3, solver });
-      analogElement.load(ctx.loadCtx);
+      const ctx = makeLoadCtx({ solver });
+      analogElement.load(ctx);
 
-      // Top resistance is 10000: G_top = 1/10000 = 0.0001 — n_A(idx0) ↔ n_W(idx1)
-      // Bottom resistance is 0, clamped to 1e-9: G_bottom = 1/(1e-9) = 1e9 — n_W(idx1) ↔ n_B(idx2)
-      const topStamps = stamps.filter((s) => (s[0] === 0 || s[0] === 1) && (s[1] === 0 || s[1] === 1));
-      const bottomStamps = stamps.filter((s) => (s[0] === 1 || s[0] === 2) && (s[1] === 1 || s[1] === 2));
+      // Nodes are 1-based: A=1, B=2, W=3. Top resistor: A(1) ↔ B(2). Bottom resistor: B(2) ↔ W(3).
+      // Top resistance is 10000: G_top = 1/10000 = 0.0001 — A(1) ↔ B(2)
+      // Bottom resistance is 0, clamped to 1e-9: G_bottom = 1/(1e-9) = 1e9 — B(2) ↔ W(3)
+      const topStamps = stamps.filter((s) => (s[0] === 1 || s[0] === 2) && (s[1] === 1 || s[1] === 2));
+      const bottomStamps = stamps.filter((s) => (s[0] === 2 || s[0] === 3) && (s[1] === 2 || s[1] === 3));
 
       expect(topStamps.some((s) => Math.abs(s[2] - 0.0001) < 1e-6)).toBe(true);
       expect(bottomStamps.some((s) => s[2] > 1e8)).toBe(true); // Very large G_bottom
@@ -232,10 +234,7 @@ describe("potentiometer_load_dcop_parity", () => {
     );
     // Factory constructs AnalogPotentiometerElement([A_node, B_node, W_node], R, pos)
     // = ([1, 2, 3], 10000, 0.5) → pinNodeIds[0]=A=1, pinNodeIds[1]=B=2, pinNodeIds[2]=W=3
-    const analogElement = Object.assign(core, {
-      pinNodeIds: core.pinNodeIds ?? [1, 2, 3] as readonly number[],
-      allNodeIds: core.allNodeIds ?? [1, 2, 3] as readonly number[],
-    }) as unknown as AnalogElement;
+    const analogElement = withNodeIds(core, [1, 2, 3]);
 
     const stampCtx = makeSimpleCtx({
       elements: [analogElement],
@@ -250,36 +249,35 @@ describe("potentiometer_load_dcop_parity", () => {
     // This is a single IEEE-754 division: 1 / 5000.
     const NGSPICE_G_REF = 1 / 5000;
 
-    // Solver uses 0-based indices. Node mapping: A=1→idx0, B=2→idx1, W=3→idx2.
+    // Nodes are 1-based: A=1, B=2, W=3. getCSCNonZeros returns raw 1-based row/col.
     // Factory: new AnalogPotentiometerElement([A=1, B=2, W=3], 10000, 0.5).
-    // load() uses: n_A=pinNodeIds[0]=1, n_W(code label)=pinNodeIds[1]=2, n_B(code label)=pinNodeIds[2]=3.
-    // Top resistor stamps between A(idx0) and pinNodeIds[1]=B(idx1).
-    // Bottom resistor stamps between pinNodeIds[1]=B(idx1) and pinNodeIds[2]=W(idx2).
-    // So: diag[0]=G_top, diag[1]=G_top+G_bottom, diag[2]=G_bottom.
+    // Top resistor (A↔W in code = pinNodeIds[0]↔pinNodeIds[1] = A=1↔B=2): stamps at rows/cols 1 and 2.
+    // Bottom resistor (W↔B in code = pinNodeIds[1]↔pinNodeIds[2] = B=2↔W=3): stamps at rows/cols 2 and 3.
+    // So: diag[1]=G_top, diag[2]=G_top+G_bottom, diag[3]=G_bottom.
 
-    const eAA = stamps.find((e) => e.row === 0 && e.col === 0);
+    const eAA = stamps.find((e) => e.row === 1 && e.col === 1);
     expect(eAA).toBeDefined();
     expect(eAA!.value).toBe(NGSPICE_G_REF);
 
     // B is the middle node — receives G_top from the A–B segment and G_bottom from the B–W segment.
-    const eBB = stamps.find((e) => e.row === 1 && e.col === 1);
+    const eBB = stamps.find((e) => e.row === 2 && e.col === 2);
     expect(eBB).toBeDefined();
     expect(eBB!.value).toBe(NGSPICE_G_REF + NGSPICE_G_REF);
 
-    const eWW = stamps.find((e) => e.row === 2 && e.col === 2);
+    const eWW = stamps.find((e) => e.row === 3 && e.col === 3);
     expect(eWW).toBeDefined();
     expect(eWW!.value).toBe(NGSPICE_G_REF);
 
-    // Off-diagonal entries -G_top (A↔B cross terms, solver indices 0↔1)
-    const eAB = stamps.find((e) => e.row === 0 && e.col === 1);
+    // Off-diagonal entries -G_top (A↔B cross terms, 1-based indices 1↔2)
+    const eAB = stamps.find((e) => e.row === 1 && e.col === 2);
     expect(eAB!.value).toBe(-NGSPICE_G_REF);
-    const eBA = stamps.find((e) => e.row === 1 && e.col === 0);
+    const eBA = stamps.find((e) => e.row === 2 && e.col === 1);
     expect(eBA!.value).toBe(-NGSPICE_G_REF);
 
-    // Off-diagonal entries -G_bottom (B↔W cross terms, solver indices 1↔2)
-    const eBW = stamps.find((e) => e.row === 1 && e.col === 2);
+    // Off-diagonal entries -G_bottom (B↔W cross terms, 1-based indices 2↔3)
+    const eBW = stamps.find((e) => e.row === 2 && e.col === 3);
     expect(eBW!.value).toBe(-NGSPICE_G_REF);
-    const eWB = stamps.find((e) => e.row === 2 && e.col === 1);
+    const eWB = stamps.find((e) => e.row === 3 && e.col === 2);
     expect(eWB!.value).toBe(-NGSPICE_G_REF);
   });
 });

@@ -28,6 +28,7 @@ import {
   type ComponentDefinition,
 } from "../../core/registry.js";
 import type { IntegrationMethod, LoadContext } from "../../solver/analog/element.js";
+import { NGSPICE_LOAD_ORDER } from "../../solver/analog/element.js";
 import { stampG, stampRHS } from "../../solver/analog/stamp-helpers.js";
 import { pnjlim, fetlim } from "../../solver/analog/newton-raphson.js";
 import { cktTerr } from "../../solver/analog/ckt-terr.js";
@@ -290,6 +291,7 @@ export function createPJfetElement(
 
   return {
     branchIndex: -1,
+    ngspiceLoadOrder: NGSPICE_LOAD_ORDER.JFET,
     isNonlinear: true,
     isReactive: hasCapacitance,
     poolBacked: true as const,
@@ -376,7 +378,7 @@ export function createPJfetElement(
         // Verbatim port: xfact extrapolation of vgs/vgd plus 9-slot state copy.
         const vgs1 = s1[base + SLOT_VGS];
         const vgd1 = s1[base + SLOT_VGD];
-        const deltaOldRatio = ctx.deltaOld[1] > 0 ? ctx.delta / ctx.deltaOld[1] : 0;
+        const deltaOldRatio = ctx.deltaOld[1] > 0 ? ctx.dt / ctx.deltaOld[1] : 0;
         const xfact = deltaOldRatio;
         s0[base + SLOT_VGS] = vgs1;
         vgs = (1 + xfact) * vgs1 - xfact * s2[base + SLOT_VGS];
@@ -678,9 +680,7 @@ export function createPJfetElement(
 
       // cite: jfetload.c:498-507 â€” suppress noncon bump only when both
       // MODEINITFIX and MODEUIC are set (UIC-forced IC at init step).
-      // Bitwise `|` on operands that are already 0/1 from `!` is equivalent
-      // to logical `||` â€” same Boolean semantics in both languages, ported verbatim.
-      if ((!(mode & MODEINITFIX)) | (!(mode & MODEUIC))) {
+      if ((!(mode & MODEINITFIX)) || (!(mode & MODEUIC))) {
         const absTol = ctx.iabstol;
         const cgNoncon = Math.abs(cghat - cg)
           >= ctx.reltol * Math.max(Math.abs(cghat), Math.abs(cg)) + absTol;

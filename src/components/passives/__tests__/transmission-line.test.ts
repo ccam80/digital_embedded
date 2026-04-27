@@ -30,7 +30,7 @@ import type { LoadContext } from "../../../solver/analog/load-context.js";
 import { makeDiagnostic } from "../../../solver/analog/diagnostics.js";
 import { computeNIcomCof } from "../../../solver/analog/integration.js";
 import type { IntegrationMethod } from "../../../core/analog-types.js";
-import { MODETRAN, MODEINITTRAN, MODEINITFLOAT } from "../../../solver/analog/ckt-mode.js";
+import { MODETRAN, MODEINITTRAN } from "../../../solver/analog/ckt-mode.js";
 
 // ---------------------------------------------------------------------------
 // Helper: narrow ModelEntry to inline factory (throws if netlist kind)
@@ -101,10 +101,14 @@ function makeStubCtx(
   const ag = new Float64Array(7);
   const scratch = new Float64Array(64);
   if (dt > 0) computeNIcomCof(dt, deltaOld, order, method, ag, scratch);
+  const voltages = opts.voltages ?? new Float64Array(200);
   return {
     cktMode: opts.cktMode ?? (MODETRAN | MODEINITTRAN),
     solver: solver as unknown as import("../../../solver/analog/sparse-solver.js").SparseSolver,
-    voltages: opts.voltages ?? new Float64Array(200),
+    matrix: solver as unknown as import("../../../solver/analog/sparse-solver.js").SparseSolver,
+    rhs: voltages,
+    rhsOld: voltages,
+    time: 0,
     dt,
     method,
     order,
@@ -113,11 +117,16 @@ function makeStubCtx(
     srcFact: 1,
     noncon: { value: 0 },
     limitingCollector: null,
+    convergenceCollector: null,
     xfact: 1,
     gmin: 1e-12,
     reltol: 1e-3,
     iabstol: 1e-12,
+    temp: 300.15,
+    vt: 0.025852,
     cktFixLimit: false,
+    bypass: false,
+    voltTol: 1e-6,
   };
 }
 
@@ -248,7 +257,6 @@ describe("TLine", () => {
       const delay = 10e-9;
       const N = 10;
       const lSeg = (Z0 * delay) / N;
-      const cSeg = delay / (Z0 * N);
 
 
       // Verify these match what the element stamps by checking geq of the first

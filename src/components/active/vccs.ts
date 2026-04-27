@@ -51,6 +51,7 @@ import type { SparseSolver } from "../../solver/analog/sparse-solver.js";
 import { parseExpression } from "../../solver/analog/expression.js";
 import { differentiate, simplify } from "../../solver/analog/expression-differentiate.js";
 import { ControlledSourceElement } from "../../solver/analog/controlled-source-base.js";
+import { NGSPICE_LOAD_ORDER } from "../../solver/analog/element.js";
 import { defineModelParams } from "../../core/model-params.js";
 
 // ---------------------------------------------------------------------------
@@ -125,6 +126,7 @@ function buildVCCSPinDeclarations(): PinDeclaration[] {
  */
 class VCCSAnalogElement extends ControlledSourceElement {
   readonly branchIndex = -1;
+  readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.VCCS;
 
   private readonly _nCtrlP: number;
   private readonly _nCtrlN: number;

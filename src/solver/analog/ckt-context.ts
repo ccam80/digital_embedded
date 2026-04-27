@@ -373,6 +373,14 @@ export class CKTCircuitContext {
     convergenceFailedElements: string[],
     ctx: CKTCircuitContext,
   ) => void) | null;
+  /**
+   * Pre-factor hook for harness instrumentation. Mirrors ngspice's
+   * `ni_instrument_cb` gate at niiter.c:704 — fires AFTER cktLoad refreshes
+   * stamps and BEFORE solver.preorder()/factor() overwrite the matrix with
+   * LU values. The unique window where the assembled MNA holds post-load,
+   * pre-LU values; harness consumers read it via solver.getCSCNonZeros().
+   */
+  preFactorHook: ((ctx: CKTCircuitContext) => void) | null;
   /** When true, checkAllConvergedDetailed is called instead of checkAllConverged. */
   detailedConvergence: boolean;
 
@@ -628,6 +636,7 @@ export class CKTCircuitContext {
     this.enableBlameTracking = false;
     this.troubleNode = null;
     this.postIterationHook = null;
+    this.preFactorHook = null;
     this.detailedConvergence = false;
 
     // Bound closures

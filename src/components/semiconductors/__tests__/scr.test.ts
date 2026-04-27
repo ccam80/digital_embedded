@@ -23,9 +23,9 @@ import { makeDcVoltageSource } from "../../sources/dc-voltage-source.js";
 import { withNodeIds, runDcOp } from "../../../solver/analog/__tests__/test-helpers.js";
 import { StatePool } from "../../../solver/analog/state-pool.js";
 import { SparseSolver } from "../../../solver/analog/sparse-solver.js";
-import type { AnalogElement } from "../../../solver/analog/element.js";
+import type { AnalogElement, ReactiveAnalogElement } from "../../../solver/analog/element.js";
 import type { AnalogElementCore } from "../../../core/analog-types.js";
-import type { ReactiveAnalogElement } from "../../../solver/analog/element.js";
+import type { PoolBackedAnalogElementCore } from "../../../solver/analog/element.js";
 import type { AnalogFactory } from "../../../core/registry.js";
 import type { LimitingEvent } from "../../../solver/analog/newton-raphson.js";
 import { MODEDCOP, MODEINITFLOAT, MODEINITJCT } from "../../../solver/analog/ckt-mode.js";
@@ -86,6 +86,7 @@ function makeResistorElement(nodeA: number, nodeB: number, resistance: number): 
     pinNodeIds: [nodeA, nodeB],
     allNodeIds: [nodeA, nodeB],
     branchIndex: -1,
+    ngspiceLoadOrder: 0,
     isNonlinear: false,
     isReactive: false,
     setParam(_key: string, _value: number): void {},
@@ -153,13 +154,14 @@ function driveToOp(
   vGate: number,
   iterations = 100,
 ): Float64Array {
-  const voltages = new Float64Array(3);
-  voltages[0] = vAnode;
-  voltages[1] = vCathode;
-  voltages[2] = vGate;
+  // 1-based: node1=anode→index 1, node2=cathode→index 2, node3=gate→index 3
+  const voltages = new Float64Array(4);
+  voltages[1] = vAnode;
+  voltages[2] = vCathode;
+  voltages[3] = vGate;
   for (let i = 0; i < iterations; i++) {
     const solver = new SparseSolver();
-    solver._initStructure(3);
+    solver._initStructure(4);
     const ctx = buildUnitCtx(solver, voltages);
     element.load(ctx);
   }
@@ -183,7 +185,7 @@ function stampAndCapture(
 
   const entries = solver.getCSCNonZeros();
   const stamps: Array<[number, number, number]> = entries.map((e) => [e.row, e.col, e.value]);
-  const rhsVec = solver.getRhsSnapshot();
+  const rhsVec = ctx.rhs;
   const rhs: Array<[number, number]> = [];
   for (let i = 0; i < rhsVec.length; i++) {
     if (rhsVec[i] !== 0) rhs.push([i, rhsVec[i]]);
@@ -239,7 +241,8 @@ describe("SCR", () => {
     const scrCore = createScrElement(new Map([["A", 1], ["K", 0], ["G", 0]]), [], -1, scrProps0);
     const { element: scrEl } = withState(scrCore);
     const scr = withNodeIds(scrEl, [1, 0, 0]);
-    const vs = withNodeIds(makeDcVoltageSource(2, 0, 2, 50), [2, 0]);
+    // branchIdx=3: branch row is nodeCount+1=3 (1-based), after node rows 1 and 2
+    const vs = withNodeIds(makeDcVoltageSource(2, 0, 3, 50), [2, 0]);
     const rLoad = makeResistorElement(2, 1, 10000); // 10kÎ©
 
     const result = runDcOp({
@@ -250,10 +253,10 @@ describe("SCR", () => {
 
     expect(result.converged).toBe(true);
 
-    // V(node2) = 50V enforced by source
-
-    // With SCR blocking, most voltage drops across it
-    const iAk = (result.nodeVoltages[1] - result.nodeVoltages[0]) / 10000;
+    // V(node2) = 50V enforced by source (1-based: nodeVoltages[2])
+    // Series circuit: load current = (node2 - node1) / R = SCR current
+    // nodeVoltages is 1-based: [0]=ground, [1]=node1(anode), [2]=node2(source+)
+    const iAk = (result.nodeVoltages[2] - result.nodeVoltages[1]) / 10000;
     expect(Math.abs(iAk)).toBeLessThan(1e-3); // less than 1mA (leakage only)
   });
 
@@ -266,14 +269,15 @@ describe("SCR", () => {
     const scr = withNodeIds(scrEl, [1, 2, 3]);
 
     // Drive to operating point: 50V anode, 0V cathode, 0.65V gate
-    const voltages = new Float64Array(3);
-    voltages[0] = 50;   // anode (node1 â†’ index 0)
-    voltages[1] = 0;    // cathode (node2 â†’ index 1)
-    voltages[2] = 0.65; // gate (node3 â†’ index 2) â€” forward-biased
+    // 1-based: node1=anode->index 1, node2=cathode->index 2, node3=gate->index 3
+    const voltages = new Float64Array(4);
+    voltages[1] = 50;   // anode (node1 â†’ index 0)
+    voltages[2] = 0;    // cathode (node2 â†’ index 1)
+    voltages[3] = 0.65; // gate (node3 â†’ index 2) â€” forward-biased
 
     for (let i = 0; i < 200; i++) {
       const iterSolver = new SparseSolver();
-      iterSolver._initStructure(3);
+      iterSolver._initStructure(4);
       scr.load(buildUnitCtx(iterSolver, voltages));
     }
 
@@ -283,8 +287,7 @@ describe("SCR", () => {
     // On-state: A-K diagonal conductance at (0,0) (anode row) is pure geq.
     // (1,1) also includes gGateGeq so would be geq + gGateGeq; read (0,0) to
     // isolate the anode-cathode stamp for the 1/R_on assertion.
-    const gOn = 1 / SCR_DEFAULTS.rOn; // 100 S
-    const aaEntry = mockCalls.find((c) => c[0] === 0 && c[1] === 0);
+    const aaEntry = mockCalls.find((c) => c[0] === 1 && c[1] === 1);
     const maxG = aaEntry ? Math.abs(aaEntry[2]) : 0;
     expect(maxG).toBeGreaterThan(1.0); // >> GMIN, confirms on-state
 
@@ -301,14 +304,15 @@ describe("SCR", () => {
     driveToOp(scr, 50, 0, 0.7, 200); // gate at 0.7V drives significant gate current
 
     // Now remove gate (gate = cathode = 0V), keep high anode voltage
-    const voltages = new Float64Array(3);
-    voltages[0] = 50; // anode
-    voltages[1] = 0;  // cathode
-    voltages[2] = 0;  // gate = cathode (no gate drive)
+    // 1-based: node1=anode->index 1, node2=cathode->index 2, node3=gate->index 3
+    const voltages = new Float64Array(4);
+    voltages[1] = 50; // anode
+    voltages[2] = 0;  // cathode
+    voltages[3] = 0;  // gate = cathode (no gate drive)
 
     for (let i = 0; i < 50; i++) {
       const iterSolver = new SparseSolver();
-      iterSolver._initStructure(3);
+      iterSolver._initStructure(4);
       scr.load(buildUnitCtx(iterSolver, voltages));
     }
 
@@ -317,8 +321,7 @@ describe("SCR", () => {
     // (0,0) is the pure anode-cathode diagonal (isolated from gate junction).
     const { stamps: mockCalls } = stampAndCapture(scr, voltages);
 
-    const gOn = 1 / SCR_DEFAULTS.rOn;
-    const aaEntry = mockCalls.find((c) => c[0] === 0 && c[1] === 0);
+    const aaEntry = mockCalls.find((c) => c[0] === 1 && c[1] === 1);
     const maxG = aaEntry ? Math.abs(aaEntry[2]) : 0;
     expect(maxG).toBeGreaterThan(1.0);
   });
@@ -361,16 +364,17 @@ describe("SCR", () => {
     const scr = makeScrElement();
     driveToOp(scr, -50, 0, 0, 100);
 
-    const voltages = new Float64Array([-50, 0, 0]);
+    // 1-based: [0]=ground sentinel, [1]=anode, [2]=cathode, [3]=gate
+    const voltages = new Float64Array([0, -50, 0, 0]);
     const { stamps: mockCalls, rhs: mockRhs } = stampAndCapture(scr, voltages);
 
     // In reverse blocking, geq â‰ˆ GMIN (â‰ˆ 1e-12)
-    const aaDiag = mockCalls.find((c) => c[0] === 0 && c[1] === 0);
+    const aaDiag = mockCalls.find((c) => c[0] === 1 && c[1] === 1);
     expect(aaDiag).toBeDefined();
     expect(Math.abs(aaDiag![2])).toBeLessThan(1e-3);
 
     // Norton current at reverse bias: I â‰ˆ -I_S (tiny)
-    const rhsA = mockRhs.find((r) => r[0] === 0);
+    const rhsA = mockRhs.find((r) => r[0] === 1);
     expect(rhsA).toBeDefined();
     expect(Math.abs(rhsA![1])).toBeLessThan(1e-3);
   });
@@ -381,11 +385,11 @@ describe("SCR", () => {
 
     driveToOp(scr, 110, 0, 0, 100);
 
-    const voltages = new Float64Array([110, 0, 0]);
+    // 1-based: [0]=ground sentinel, [1]=anode, [2]=cathode, [3]=gate
+    const voltages = new Float64Array([0, 110, 0, 0]);
     const { stamps: mockCalls } = stampAndCapture(scr, voltages);
 
-    const gOn = 1 / SCR_DEFAULTS.rOn;
-    const aaEntry = mockCalls.find((c) => c[0] === 0 && c[1] === 0);
+    const aaEntry = mockCalls.find((c) => c[0] === 1 && c[1] === 1);
     const maxG = aaEntry ? Math.abs(aaEntry[2]) : 0;
     expect(maxG).toBeGreaterThan(1.0);
   });
@@ -398,16 +402,17 @@ describe("SCR", () => {
     const element = withNodeIds(stated, [1, 2, 3]);
 
     // Large forward voltage that would trigger pnjlim limiting
-    const voltages = new Float64Array([50, 0, 0.65]);
+    // 1-based: [0]=ground sentinel, [1]=anode, [2]=cathode, [3]=gate
+    const voltages = new Float64Array([0, 50, 0, 0.65]);
     const snapshot = new Float64Array(voltages);
 
     const solver = new SparseSolver();
-    solver._initStructure(3);
+    solver._initStructure(4);
     element.load(buildUnitCtx(solver, voltages));
 
-    expect(voltages[0]).toBe(snapshot[0]);
     expect(voltages[1]).toBe(snapshot[1]);
     expect(voltages[2]).toBe(snapshot[2]);
+    expect(voltages[3]).toBe(snapshot[3]);
   });
 
   it("pool_state: pool.state0 contains correct slot values after load", () => {
@@ -418,10 +423,11 @@ describe("SCR", () => {
     const element = withNodeIds(stated, [1, 2, 3]);
 
     // Converge at forward-biased gate to trigger latching
-    const voltages = new Float64Array([50, 0, 0.65]);
+    // 1-based: [0]=ground sentinel, [1]=anode, [2]=cathode, [3]=gate
+    const voltages = new Float64Array([0, 50, 0, 0.65]);
     for (let i = 0; i < 200; i++) {
       const iterSolver = new SparseSolver();
-      iterSolver._initStructure(3);
+      iterSolver._initStructure(4);
       element.load(buildUnitCtx(iterSolver, voltages));
     }
 
@@ -486,8 +492,8 @@ describe("SCR LimitingEvent instrumentation", () => {
     const core = createScrElement(new Map([["A", 1], ["K", 2], ["G", 3]]), [], -1, props) as AnalogElementCore;
     Object.defineProperty(core, "label", { value: "SCR1", writable: true, configurable: true });
     (core as { elementIndex: number }).elementIndex = 4;
-    const pool = new StatePool((core as unknown as { stateSize: number }).stateSize);
-    (core as { stateBaseOffset: number }).stateBaseOffset = 0;
+    const pool = new StatePool((core as unknown as PoolBackedAnalogElementCore).stateSize);
+    (core as unknown as PoolBackedAnalogElementCore).stateBaseOffset = 0;
     (core as unknown as ReactiveAnalogElement).initState(pool);
     return withNodeIds(core, [1, 2, 3]);
   }
@@ -506,10 +512,11 @@ describe("SCR LimitingEvent instrumentation", () => {
 
   it("pushes AK and GK pnjlim events when limitingCollector provided", () => {
     const element = makeScrWithState();
+    // 1-based: node1=A->index 1, node2=K->index 2, node3=G->index 3
     const voltages = new Float64Array(10);
-    voltages[0] = 3.0;  // A = node 1
-    voltages[1] = 0.0;  // K = node 2
-    voltages[2] = 0.5;  // G = node 3
+    voltages[1] = 3.0;  // A = node 1
+    voltages[2] = 0.0;  // K = node 2
+    voltages[3] = 0.5;  // G = node 3
 
     const collector: LimitingEvent[] = [];
     loadWithCollector(element, voltages, collector);
@@ -532,8 +539,9 @@ describe("SCR LimitingEvent instrumentation", () => {
 
   it("does not throw when limitingCollector is null", () => {
     const element = makeScrWithState();
+    // 1-based: node1=A->index 1
     const voltages = new Float64Array(10);
-    voltages[0] = 3.0;
+    voltages[1] = 3.0;
     expect(() => loadWithCollector(element, voltages, null)).not.toThrow();
   });
 });
@@ -567,14 +575,15 @@ describe("SCR TEMP", () => {
     (core as unknown as ReactiveAnalogElement).initState(pool);
     const element = withNodeIds(core, [1, 2, 3]);
 
-    const voltages = new Float64Array(3);
-    voltages[0] = 2.0;  // A
-    voltages[1] = 0.0;  // K
-    voltages[2] = 0.65; // G
+    // 1-based: node1=A->index 1, node2=K->index 2, node3=G->index 3
+    const voltages = new Float64Array(4);
+    voltages[1] = 2.0;  // A
+    voltages[2] = 0.0;  // K
+    voltages[3] = 0.65; // G
 
     const collector: LimitingEvent[] = [];
     const solver = new SparseSolver();
-    solver._initStructure(3);
+    solver._initStructure(4);
     element.load(buildUnitCtx(solver, voltages, { limitingCollector: collector }));
 
     // Compute expected pnjlim result at TEMP=400K
@@ -603,14 +612,15 @@ describe("SCR TEMP", () => {
     // Change TEMP to 400K â€” should recompute tp
     element.setParam("TEMP", 400);
 
-    const voltages = new Float64Array(3);
-    voltages[0] = 2.0;
-    voltages[1] = 0.0;
-    voltages[2] = 0.65;
+    // 1-based: node1=A->index 1, node2=K->index 2, node3=G->index 3
+    const voltages = new Float64Array(4);
+    voltages[1] = 2.0;
+    voltages[2] = 0.0;
+    voltages[3] = 0.65;
 
     const collector: LimitingEvent[] = [];
     const solver = new SparseSolver();
-    solver._initStructure(3);
+    solver._initStructure(4);
     element.load(buildUnitCtx(solver, voltages, { limitingCollector: collector }));
 
     const vt400 = 400 * KoverQ;
@@ -677,7 +687,7 @@ describe("SCR primeJunctions", () => {
 
     const solver = new SparseSolver();
     solver._initStructure(3);
-    element.load(buildUnitCtx(solver, new Float64Array(3), {
+    element.load(buildUnitCtx(solver, new Float64Array(4), {
       cktMode: MODEDCOP | MODEINITJCT,
     }));
 
@@ -692,7 +702,7 @@ describe("SCR primeJunctions", () => {
 
     const solver = new SparseSolver();
     solver._initStructure(3);
-    element.load(buildUnitCtx(solver, new Float64Array(3), {
+    element.load(buildUnitCtx(solver, new Float64Array(4), {
       cktMode: MODEDCOP | MODEINITJCT,
     }));
 

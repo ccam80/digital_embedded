@@ -29,6 +29,7 @@ class TestControlledSource extends ControlledSourceElement {
   readonly pinNodeIds: readonly number[] = [1, 0];
   readonly allNodeIds: readonly number[] = [1, 0];
   readonly branchIndex = -1;
+  readonly ngspiceLoadOrder = 0;
 
   lastValue = 0;
   lastDerivative = 0;
@@ -43,7 +44,7 @@ class TestControlledSource extends ControlledSourceElement {
     // Tests set ctx values directly; this is a no-op for unit tests.
   }
 
-  stampOutput(_solver: SparseSolver, value: number, derivative: number, ctrlValue: number): void {
+  stampOutput(_solver: SparseSolver, _rhs: Float64Array, value: number, derivative: number, ctrlValue: number): void {
     this.lastValue = value;
     this.lastDerivative = derivative;
     this.lastCtrlValue = ctrlValue;
@@ -82,7 +83,7 @@ describe("Base", () => {
     src.mutableCtx.setNodeVoltage("ctrl", 1.5);
 
     const ctx = makeSimpleCtx({ elements: [src], matrixSize: 1, nodeCount: 1 });
-    src.load(ctx);
+    src.load(ctx.loadCtx);
 
   });
 
@@ -93,7 +94,7 @@ describe("Base", () => {
     src.mutableCtx.setNodeVoltage("ctrl", 1.5);
 
     const ctx = makeSimpleCtx({ elements: [src], matrixSize: 1, nodeCount: 1 });
-    src.load(ctx);
+    src.load(ctx.loadCtx);
 
   });
 
@@ -104,7 +105,7 @@ describe("Base", () => {
     src.mutableCtx.setNodeVoltage("ctrl", 3.0);
 
     const ctx = makeSimpleCtx({ elements: [src], matrixSize: 1, nodeCount: 1 });
-    src.load(ctx);
+    src.load(ctx.loadCtx);
 
   });
 
@@ -115,7 +116,7 @@ describe("Base", () => {
     src.mutableCtx.setNodeVoltage("ctrl", 3.0);
 
     const ctx = makeSimpleCtx({ elements: [src], matrixSize: 1, nodeCount: 1 });
-    src.load(ctx);
+    src.load(ctx.loadCtx);
 
   });
 

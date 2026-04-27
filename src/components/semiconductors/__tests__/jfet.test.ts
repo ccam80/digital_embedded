@@ -45,7 +45,7 @@ import {
 import { ComponentRegistry } from "../../../core/registry.js";
 import { createTestPropertyBag } from "../../../test-fixtures/model-fixtures.js";
 import { makeDcVoltageSource } from "../../sources/dc-voltage-source.js";
-import { withNodeIds, runDcOp } from "../../../solver/analog/__tests__/test-helpers.js";
+import { withNodeIds, runDcOp, makeLoadCtx } from "../../../solver/analog/__tests__/test-helpers.js";
 import { StatePool } from "../../../solver/analog/state-pool.js";
 import { SparseSolver } from "../../../solver/analog/sparse-solver.js";
 import type { AnalogElement } from "../../../solver/analog/element.js";
@@ -129,6 +129,7 @@ function makeDcOpCtx(voltages: Float64Array, matrixSize: number): LoadContext {
   return {
     cktMode: MODEDCOP | MODEINITFLOAT,
     solver,
+    matrix: solver,
     rhsOld: voltages,
     rhs: new Float64Array(matrixSize),
     dt: 0,
@@ -140,10 +141,13 @@ function makeDcOpCtx(voltages: Float64Array, matrixSize: number): LoadContext {
     srcFact: 1,
     noncon: { value: 0 },
     limitingCollector: null,
+    convergenceCollector: null,
     xfact: 1,
     gmin: 1e-12,
     reltol: 1e-3,
     iabstol: 1e-12,
+    temp: 300.15,
+    vt: 300.15 * 1.3806226e-23 / 1.6021918e-19,
     cktFixLimit: false,
     bypass: false,
     voltTol: 1e-6,
@@ -160,6 +164,7 @@ function makeResistorElement(nodeA: number, nodeB: number, resistance: number): 
     pinNodeIds: [nodeA, nodeB],
     allNodeIds: [nodeA, nodeB],
     branchIndex: -1,
+    ngspiceLoadOrder: 0,
     isNonlinear: false,
     isReactive: false,
     setParam(_key: string, _value: number): void {},
@@ -194,16 +199,18 @@ describe("PJFET", () => {
     const core = withState(createPJfetElement(new Map([["G", 1], ["D", 2], ["S", 3]]), [], -1, propsObj));
     const element = withNodeIds(core, [1, 2, 3]);
 
-    const voltages = new Float64Array(3);
-    voltages[0] = 2;
-    voltages[1] = 0;
-    voltages[2] = 5;
+    // 1-based: slot 0=ground sentinel=0, slot 1=V(G)=2, slot 2=V(D)=0, slot 3=V(S)=5
+    const voltages = new Float64Array(4);
+    voltages[0] = 0; // ground sentinel
+    voltages[1] = 2; // V(G)
+    voltages[2] = 0; // V(D)
+    voltages[3] = 5; // V(S)
 
     for (let i = 0; i < 50; i++) {
-      element.load(makeDcOpCtx(voltages, 3));
+      element.load(makeDcOpCtx(voltages, 4));
     }
 
-    const ctx = makeDcOpCtx(voltages, 3);
+    const ctx = makeDcOpCtx(voltages, 4);
     element.load(ctx);
     const entries = ctx.solver.getCSCNonZeros();
 
@@ -214,15 +221,14 @@ describe("PJFET", () => {
       return match.reduce((s, e) => s + e.value, 0);
     };
 
-    // Row/col 0=G, 1=D, 2=S in matrix (0-based node index = nodeId - 1).
-    const gG_G = stampAt(0, 0); // (ggd + ggs): gate self-conductance
-    const gG_D = stampAt(0, 1); // -ggd
-    const gG_S = stampAt(0, 2); // -ggs
-    const gD_G = stampAt(1, 0); // gm - ggd: transconductance term
-    const gD_D = stampAt(1, 1); // gdpr + gds + ggd (+ redundant gdpr=0 here)
-    const gD_S = stampAt(1, 2); // -gds - gm: source-drain off-diagonal
-    const gS_G = stampAt(2, 0); // -ggs - gm
-    const gS_S = stampAt(2, 2); // gspr + gds + gm + ggs: source self-conductance
+    // Row/col 1=G, 2=D, 3=S in matrix (1-based node index = nodeId).
+    const gG_G = stampAt(1, 1); // (ggd + ggs): gate self-conductance
+    const gG_D = stampAt(1, 2); // -ggd
+    const gD_G = stampAt(2, 1); // gm - ggd: transconductance term
+    const gD_D = stampAt(2, 2); // gdpr + gds + ggd (+ redundant gdpr=0 here)
+    const gD_S = stampAt(2, 3); // -gds - gm: source-drain off-diagonal
+    const gS_G = stampAt(3, 1); // -ggs - gm
+    const gS_S = stampAt(3, 3); // gspr + gds + gm + ggs: source self-conductance
 
     // At least four specific stamp positions must be non-zero.
     expect(Math.abs(gG_G)).toBeGreaterThan(0);
@@ -283,10 +289,10 @@ describe("NR", () => {
     expect(result.converged).toBe(true);
     expect(result.iterations).toBeLessThanOrEqual(10);
 
-    // Node-voltage assertions â€” nodeVoltages[i-1] holds node i (1-based).
-    const vDrain = result.nodeVoltages[0];
-    const vVdd   = result.nodeVoltages[1];
-    const vGate  = result.nodeVoltages[2];
+    // Node-voltage assertions â€” nodeVoltages[i] holds node i (1-based).
+    const vDrain = result.nodeVoltages[1];
+    const vVdd   = result.nodeVoltages[2];
+    const vGate  = result.nodeVoltages[3];
 
     // VDD rail must sit at exactly 10V (voltage source).
     expect(vVdd).toBeCloseTo(10, 6);
@@ -479,33 +485,19 @@ describe("NJFET TEMP", () => {
 
     // G=node1 at 1.5V forces a pnjlim-limited VGS; vcrit differs by temperature
     // so the post-limit VGS will differ between 300.15K and 400K.
-    const rhsOld = new Float64Array([1.5, 0, 0]);
+    // 1-based: slot 0=ground sentinel, slot 1=V(G)=1.5, slot 2=V(D)=0.
+    const rhsOld = new Float64Array([0, 1.5, 0]);
 
     function makeCtx(): LoadContext {
       const solver = new SparseSolver();
       solver._initStructure(matrixSize);
-      return {
+      return makeLoadCtx({
         cktMode: MODEDCOP | MODEINITFLOAT,
         solver,
         rhsOld,
         rhs: new Float64Array(matrixSize),
         dt: 0,
-        time: 0,
-        method: "trapezoidal",
-        order: 1,
-        deltaOld: [0, 0, 0, 0, 0, 0, 0],
-        ag: new Float64Array(7),
-        srcFact: 1,
-        noncon: { value: 0 },
-        limitingCollector: null,
-        xfact: 1,
-        gmin: 1e-12,
-        reltol: 1e-3,
-        iabstol: 1e-12,
-        cktFixLimit: false,
-        bypass: false,
-        voltTol: 1e-6,
-      } as LoadContext;
+      });
     }
 
     function createAndInit(overrides: Record<string, number> = {}): { element: ReactiveAnalogElement; pool: StatePool } {
@@ -570,33 +562,19 @@ describe("PJFET TEMP", () => {
 
     // G=node1 at -1.5V, S=node3 at 0, D=node2 at 0.
     // vgsRaw = polarity * (vG - vS) = -1 * (-1.5 - 0) = 1.5 for PJFET.
-    const rhsOld = new Float64Array([-1.5, 0, 0]);
+    // 1-based: slot 0=ground sentinel, slot 1=V(G)=-1.5, slot 2=V(D)=0.
+    const rhsOld = new Float64Array([0, -1.5, 0]);
 
     function makeCtx(): LoadContext {
       const solver = new SparseSolver();
       solver._initStructure(matrixSize);
-      return {
+      return makeLoadCtx({
         cktMode: MODEDCOP | MODEINITFLOAT,
         solver,
         rhsOld,
         rhs: new Float64Array(matrixSize),
         dt: 0,
-        time: 0,
-        method: "trapezoidal",
-        order: 1,
-        deltaOld: [0, 0, 0, 0, 0, 0, 0],
-        ag: new Float64Array(7),
-        srcFact: 1,
-        noncon: { value: 0 },
-        limitingCollector: null,
-        xfact: 1,
-        gmin: 1e-12,
-        reltol: 1e-3,
-        iabstol: 1e-12,
-        cktFixLimit: false,
-        bypass: false,
-        voltTol: 1e-6,
-      } as LoadContext;
+      });
     }
 
     function createAndInitP(overrides: Record<string, number> = {}): { element: ReactiveAnalogElement; pool: StatePool } {

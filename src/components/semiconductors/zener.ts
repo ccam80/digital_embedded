@@ -25,6 +25,7 @@ import {
   type ComponentDefinition,
 } from "../../core/registry.js";
 import type { PoolBackedAnalogElementCore, LoadContext } from "../../solver/analog/element.js";
+import { NGSPICE_LOAD_ORDER } from "../../solver/analog/element.js";
 import {
   MODEINITJCT,
   MODEINITFIX,
@@ -224,6 +225,7 @@ export function createZenerElement(
 
   return {
     branchIndex: -1,
+    ngspiceLoadOrder: NGSPICE_LOAD_ORDER.DIO,
     isNonlinear: true,
     isReactive: false,
     poolBacked: true as const,

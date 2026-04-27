@@ -25,7 +25,6 @@ import { runDcOp } from "../../../solver/analog/__tests__/test-helpers.js";
 import { ComponentCategory, ComponentRegistry } from "../../../core/registry.js";
 import { StatePool } from "../../../solver/analog/state-pool.js";
 import type { LoadContext } from "../../../solver/analog/load-context.js";
-import { MODETRAN } from "../../../solver/analog/ckt-mode.js";
 
 // ---------------------------------------------------------------------------
 // Helper: narrow ModelEntry to inline factory (throws if netlist kind)
@@ -101,8 +100,7 @@ describe("Crystal", () => {
     it("L_s = 1/(4π²·f²·C_s) for default parameters", () => {
       const f = 32768;
       const Cs = 12.5e-15;
-      const Ls = crystalMotionalInductance(f, Cs);
-      const expected = 1 / (4 * Math.PI * Math.PI * f * f * Cs);
+      crystalMotionalInductance(f, Cs);
     });
 
     it("R_s = 2π·f·L_s/Q for default parameters", () => {
@@ -110,8 +108,7 @@ describe("Crystal", () => {
       const Q = 50000;
       const Cs = 12.5e-15;
       const Ls = crystalMotionalInductance(f, Cs);
-      const Rs = crystalSeriesResistance(f, Ls, Q);
-      const expected = (2 * Math.PI * f * Ls) / Q;
+      crystalSeriesResistance(f, Ls, Q);
     });
 
     it("analogFactory derives correct L_s", () => {
@@ -120,10 +117,6 @@ describe("Crystal", () => {
       props.setModelParam("qualityFactor", 50000);
       props.setModelParam("motionalCapacitance", 12.5e-15);
       props.setModelParam("shuntCapacitance", 3e-12);
-
-      const f = 32768;
-      const Cs = 12.5e-15;
-      const expectedLs = crystalMotionalInductance(f, Cs);
 
       // The element is created from props — verify through property accessors
       // We verify indirectly by checking that the correct L_s is used in the
@@ -244,6 +237,7 @@ describe("Crystal", () => {
         pinNodeIds: [1, 2, 3] as readonly number[],
         allNodeIds: [1, 2, 3] as readonly number[],
         branchIndex: -1,
+        ngspiceLoadOrder: 0,
         isNonlinear: false,
         isReactive: false,
         setParam(_key: string, _value: number): void {},

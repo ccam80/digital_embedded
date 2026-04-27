@@ -69,8 +69,10 @@ function modelEntryToMnaModel(entry: ModelEntry): MnaModel | null {
   if (entry.kind === "inline") {
     const model: MnaModel = {
       factory: entry.factory,
-      branchCount: entry.branchCount,
     };
+    if (entry.branchCount !== undefined) {
+      model.branchCount = entry.branchCount;
+    }
     if (entry.getInternalNodeCount) {
       model.getInternalNodeCount = entry.getInternalNodeCount;
     }
@@ -322,6 +324,14 @@ function compileSubcircuitToMnaModel(
 
       const core: import("../../core/analog-types.js").AnalogElementCore = {
         branchIndex: branchIdx >= 0 ? branchIdx : -1,
+        // Composite wrappers (subcircuits/behavioral) load all sub-elements
+        // inside a single load() call. Their internal stamping order is
+        // determined by the subElements array, not by the per-type sort.
+        // Pin them at VCVS as the closest analogue for a "high-level
+        // controlled-output" composite. A future flatten pass would split
+        // them into individual leaf elements that participate in the per-type
+        // sort directly.
+        ngspiceLoadOrder: 6 /* NGSPICE_LOAD_ORDER.VCVS */,
         isNonlinear: anyNonlinear,
         isReactive: anyReactive,
 
@@ -1344,6 +1354,57 @@ export function compileAnalogPartition(
     }
 
     bridgeAdaptersByGroupId.set(boundaryGroupId, adapters);
+  }
+
+  // Architectural alignment A1: stable-sort by ngspiceLoadOrder so that
+  // per-iteration cktLoad walks devices in the same per-type bucket order
+  // ngspice does (every R, every C, ..., every V, ...). The sort must run
+  // before state-pool allocation (so stateBaseOffset matches the final
+  // element index) and before the index maps are returned.
+  //
+  // V8's Array.prototype.sort is stable since 2018, so within a bucket the
+  // original element order (= partition.components order = first-seen order)
+  // is preserved. Re-key the three index maps and rewrite each element's
+  // elementIndex field so post-sort indices stay consistent.
+  const oldIndexToElement = analogElements.map((el, i) => ({ el, oldIndex: i }));
+  analogElements.sort((a, b) => a.ngspiceLoadOrder - b.ngspiceLoadOrder);
+  const oldToNewIndex = new Map<number, number>();
+  for (let newIndex = 0; newIndex < analogElements.length; newIndex++) {
+    const el = analogElements[newIndex]!;
+    const found = oldIndexToElement.find((p) => p.el === el);
+    if (found !== undefined) oldToNewIndex.set(found.oldIndex, newIndex);
+  }
+  // Rewrite elementIndex on each AnalogElement and rebuild the three keyed maps.
+  const newElementToCircuitElement = new Map<number, CircuitElement>();
+  const newElementPinVertices = new Map<number, Array<{ x: number; y: number } | null>>();
+  const newElementResolvedPins = new Map<number, ResolvedPin[]>();
+  for (const [oldIdx, val] of elementToCircuitElement) {
+    const newIdx = oldToNewIndex.get(oldIdx);
+    if (newIdx !== undefined) newElementToCircuitElement.set(newIdx, val);
+  }
+  for (const [oldIdx, val] of elementPinVertices) {
+    const newIdx = oldToNewIndex.get(oldIdx);
+    if (newIdx !== undefined) newElementPinVertices.set(newIdx, val);
+  }
+  for (const [oldIdx, val] of elementResolvedPins) {
+    const newIdx = oldToNewIndex.get(oldIdx);
+    if (newIdx !== undefined) newElementResolvedPins.set(newIdx, val);
+  }
+  elementToCircuitElement.clear();
+  for (const [k, v] of newElementToCircuitElement) elementToCircuitElement.set(k, v);
+  elementPinVertices.clear();
+  for (const [k, v] of newElementPinVertices) elementPinVertices.set(k, v);
+  elementResolvedPins.clear();
+  for (const [k, v] of newElementResolvedPins) elementResolvedPins.set(k, v);
+  // Update each element's elementIndex to its post-sort position. Bridge
+  // adapters and the synthetic composite wrapper don't currently set
+  // elementIndex (only via Object.assign during regular element construction),
+  // so guard the assignment.
+  for (let i = 0; i < analogElements.length; i++) {
+    const el = analogElements[i] as import("./element.js").AnalogElement & { elementIndex?: number };
+    if ("elementIndex" in el && typeof el.elementIndex === "number") {
+      el.elementIndex = i;
+    }
   }
 
   // Topology validation — orphan/floating nodes, source loops.

@@ -94,7 +94,7 @@ describe('CKTload', () => {
     const factorResult = ctx.solver.factor();
     expect(factorResult).toBe(0);
     const solution = new Float64Array(matrixSize);
-    ctx.solver.solve(solution);
+    ctx.solver.solve(ctx.rhs, solution);
     expect(Number.isFinite(solution[0])).toBe(true);
     expect(Number.isFinite(solution[1])).toBe(true);
   });
@@ -111,7 +111,7 @@ describe('CKTload', () => {
     const factJct = ctxJct.solver.factor();
     expect(factJct).toBe(0);
     const solJct = new Float64Array(matrixSize);
-    ctxJct.solver.solve(solJct);
+    ctxJct.solver.solve(ctxJct.rhs, solJct);
     const IS = makeCurrentSource(1, 0, 1e-3);
     // MODEDCOP | MODEINITFLOAT — nodeset must NOT be applied
     const ctxFloat = makeSimpleCtx({ elements: [IS, R], matrixSize, nodeCount, branchCount: 0 });
@@ -121,7 +121,7 @@ describe('CKTload', () => {
     const factFloat = ctxFloat.solver.factor();
     expect(factFloat).toBe(0);
     const solFloat = new Float64Array(matrixSize);
-    ctxFloat.solver.solve(solFloat);
+    ctxFloat.solver.solve(ctxFloat.rhs, solFloat);
   });
 
   it('noncon_incremented_by_device_limiting', () => {
@@ -136,8 +136,9 @@ describe('CKTload', () => {
     const ctx = makeSimpleCtx({ elements, matrixSize, nodeCount, branchCount, statePool });
     ctx.cktMode = MODEDCOP | MODEINITFLOAT;
     cktLoad(ctx);
-    // nodeAnode=2 -> voltages index 1; set anode to 5V to trigger pnjlim
-    ctx.rhsOld.set([0.0, 5.0, 0.0]);
+    // nodeAnode=2 -> 1-based slot 2; set anode to 5V to trigger pnjlim
+    // rhs is Float64Array(matrixSize+1): [ground, node1, node2, branch]
+    ctx.rhsOld.set([0.0, 0.0, 5.0, 0.0]);
     cktLoad(ctx);
     expect(ctx.noncon).toBeGreaterThan(0);
   });
@@ -151,44 +152,47 @@ describe('nodesets', () => {
   it('srcFact_scales_nodeset_rhs', () => {
     // ngspice cktload.c:96-136: nodeset RHS = CKTNS_PIN * value * srcFact
     // CKTNS_PIN = 1e10, value = 2.5, srcFact = 0.5 → expected = 1e10 * 2.5 * 0.5
+    // Node 1 is the active circuit node (1-based MNA; slot 0 = ground sentinel)
     const nodeCount = 1;
     const matrixSize = nodeCount;
     const R = makeResistor(1, 0, 1000);
     const ctx = makeSimpleCtx({ elements: [R], matrixSize, nodeCount, branchCount: 0 });
     ctx.cktMode = MODEDCOP | MODEINITJCT;
     ctx.srcFact = 0.5;
-    ctx.nodesets.set(0, 2.5);
+    ctx.nodesets.set(1, 2.5);
     cktLoad(ctx);
-    const rhs = ctx.solver.getRhsSnapshot();
-    expect(rhs[0]).toBe(1e10 * 2.5 * 0.5);
+    const rhs = ctx.rhs;
+    expect(rhs[1]).toBe(1e10 * 2.5 * 0.5);
   });
 
   it('nodeset_applied_in_MODEDCOP_MODEINITFIX', () => {
     // Gate also fires for MODEINITFIX (ngspice cktload.c:106)
+    // Node 1 is the active circuit node (1-based MNA; slot 0 = ground sentinel)
     const nodeCount = 1;
     const matrixSize = nodeCount;
     const R = makeResistor(1, 0, 1000);
     const ctx = makeSimpleCtx({ elements: [R], matrixSize, nodeCount, branchCount: 0 });
     ctx.cktMode = MODEDCOP | MODEINITFIX;
     ctx.srcFact = 1.0;
-    ctx.nodesets.set(0, 4.0);
+    ctx.nodesets.set(1, 4.0);
     cktLoad(ctx);
-    const rhs = ctx.solver.getRhsSnapshot();
-    expect(rhs[0]).toBe(1e10 * 4.0);
+    const rhs = ctx.rhs;
+    expect(rhs[1]).toBe(1e10 * 4.0);
   });
 
   it('nodeset_NOT_applied_in_MODEDCOP_MODEINITFLOAT', () => {
     // Gate must NOT fire when INITJCT|INITFIX bits are absent
+    // Node 1 is the active circuit node (1-based MNA; slot 0 = ground sentinel)
     const nodeCount = 1;
     const matrixSize = nodeCount;
     const R = makeResistor(1, 0, 1000);
     const ctx = makeSimpleCtx({ elements: [R], matrixSize, nodeCount, branchCount: 0 });
     ctx.cktMode = MODEDCOP | MODEINITFLOAT;
     ctx.srcFact = 1.0;
-    ctx.nodesets.set(0, 2.5);
+    ctx.nodesets.set(1, 2.5);
     cktLoad(ctx);
-    const rhs = ctx.solver.getRhsSnapshot();
-    expect(rhs[0]).toBe(0);
+    const rhs = ctx.rhs;
+    expect(rhs[1]).toBe(0);
   });
 });
 
@@ -201,16 +205,17 @@ describe('ics', () => {
   it('ic_stamped_in_MODETRANOP_without_MODEUIC', () => {
     // ngspice cktload.c:130-157: IC gate is MODETRANOP && !MODEUIC
     // CKTNS_PIN = 1e10, value = 1.2, srcFact = 1.0 → expected = 1e10 * 1.2
+    // Node 1 is the active circuit node (1-based MNA; slot 0 = ground sentinel)
     const nodeCount = 1;
     const matrixSize = nodeCount;
     const R = makeResistor(1, 0, 1000);
     const ctx = makeSimpleCtx({ elements: [R], matrixSize, nodeCount, branchCount: 0 });
     ctx.cktMode = MODETRANOP | MODEINITJCT;
     ctx.srcFact = 1.0;
-    ctx.ics.set(0, 1.2);
+    ctx.ics.set(1, 1.2);
     cktLoad(ctx);
-    const rhs = ctx.solver.getRhsSnapshot();
-    expect(rhs[0]).toBe(1e10 * 1.2);
+    const rhs = ctx.rhs;
+    expect(rhs[1]).toBe(1e10 * 1.2);
   });
 
   it('ic_NOT_stamped_when_MODEUIC_set', () => {
@@ -221,10 +226,10 @@ describe('ics', () => {
     const ctx = makeSimpleCtx({ elements: [R], matrixSize, nodeCount, branchCount: 0 });
     ctx.cktMode = MODETRANOP | MODEINITJCT | MODEUIC;
     ctx.srcFact = 1.0;
-    ctx.ics.set(0, 3.3);
+    ctx.ics.set(1, 3.3);
     cktLoad(ctx);
-    const rhs = ctx.solver.getRhsSnapshot();
-    expect(rhs[0]).toBe(0);
+    const rhs = ctx.rhs;
+    expect(rhs[1]).toBe(0);
   });
 
   it('ic_NOT_stamped_in_MODEDCOP', () => {
@@ -235,10 +240,10 @@ describe('ics', () => {
     const ctx = makeSimpleCtx({ elements: [R], matrixSize, nodeCount, branchCount: 0 });
     ctx.cktMode = MODEDCOP | MODEINITJCT;
     ctx.srcFact = 1.0;
-    ctx.ics.set(0, 3.3);
+    ctx.ics.set(1, 3.3);
     cktLoad(ctx);
-    const rhs = ctx.solver.getRhsSnapshot();
-    expect(rhs[0]).toBe(0);
+    const rhs = ctx.rhs;
+    expect(rhs[1]).toBe(0);
   });
 });
 
@@ -320,7 +325,9 @@ describe('E_SINGULAR', () => {
               return spSINGULAR;
             }
             const errorCode = (target as SparseSolver).factor();
-            stubWalkedReorder = (target as SparseSolver).lastFactorWalkedReorder;
+            // Latch to true: once the reorder path was walked, keep the signal
+            // even if subsequent factor calls take the cheaper reuse path.
+            stubWalkedReorder = stubWalkedReorder || (target as SparseSolver).lastFactorWalkedReorder;
             lastErrorCode = errorCode;
             return errorCode;
           };

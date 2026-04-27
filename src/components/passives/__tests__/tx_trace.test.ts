@@ -21,7 +21,10 @@ function makeTransientCtx(solver: SparseSolverType, voltages: Float64Array, dt: 
   return {
     cktMode: mode,
     solver: solver as unknown as import("../../../solver/analog/sparse-solver.js").SparseSolver,
-    voltages,
+    matrix: solver as unknown as import("../../../solver/analog/sparse-solver.js").SparseSolver,
+    rhs: voltages,
+    rhsOld: voltages,
+    time: 0,
     dt,
     method: "trapezoidal" as "trapezoidal",
     order: 1,
@@ -30,10 +33,13 @@ function makeTransientCtx(solver: SparseSolverType, voltages: Float64Array, dt: 
     srcFact: 1,
     noncon: { value: 0 },
     limitingCollector: null,
+    convergenceCollector: null,
     xfact: 1,
     gmin: 1e-12,
     reltol: 1e-3,
     iabstol: 1e-12,
+    temp: 300.15,
+    vt: 0.025852,
     cktFixLimit: false,
     bypass: false,
     voltTol: 1e-6,
@@ -57,7 +63,7 @@ function doStep(tx: AnalogTappedTransformerElement, solver: SparseSolver, voltag
     rS2Gnd.load(ctx);
     const res = solver.factor();
     if (res !== 0) return false;
-    solver.solve(voltages);
+    solver.solve(voltages, voltages);
     // Check convergence
     let conv = true;
     for (let j = 0; j < voltages.length; j++) {

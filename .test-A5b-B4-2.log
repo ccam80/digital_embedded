@@ -1,0 +1,99 @@
+
+[1m[7m[36m RUN [39m[27m[22m [36mv2.1.9 [39m[90mC:/local_working_projects/digital_in_browser[39m
+
+ [31m❯[39m src/solver/analog/__tests__/phase-3-nr-reorder.test.ts [2m([22m[2m7 tests[22m[2m | [22m[31m1 failed[39m[2m)[22m[90m 15[2mms[22m[39m
+[31m   [31m×[31m Task 3.1.2 — non-top-of-loop forceReorder citations[2m > [22mcites niiter.c:888-891 at the E_SINGULAR retry[90m 7[2mms[22m[31m[39m
+[31m     → expected false to be true // Object.is equality[39m
+ [31m❯[39m src/solver/analog/__tests__/phase-3-relay-composite.test.ts [2m([22m[2m3 tests[22m[2m | [22m[31m1 failed[39m[2m)[22m[90m 6[2mms[22m[39m
+[31m   [31m×[31m Phase 3 Task 3.3.3 -- Relay composite-child[2m > [22mSPDT relay child inductor integrates the coil current[90m 4[2mms[22m[31m[39m
+[31m     → expected 0 to be greater than 0[39m
+ [31m❯[39m src/solver/analog/__tests__/phase-3-xfact-scope-audit.test.ts [2m([22m[2m3 tests[22m[2m | [22m[31m2 failed[39m[2m)[22m[90m 42[2mms[22m[39m
+[31m   [31m×[31m Task 3.2.5 — xfact scope audit[2m > [22mhas zero unguarded xfact reads in src/components/[90m 33[2mms[22m[31m[39m
+[31m     → Unguarded xfact reads:
+semiconductors\mosfet.ts:1408: expected [ 'semiconductors\mosfet.ts:1408' ] to deeply equal [][39m
+[31m   [31m×[31m Task 3.2.5 — xfact scope audit[2m > [22mallowlist is exhaustive — no stale entries[90m 1[2mms[22m[31m[39m
+[31m     → Stale allowlist entries:
+analog-engine.ts:430: expected [ 'analog-engine.ts:430' ] to deeply equal [][39m
+
+[31m⎯⎯⎯⎯⎯⎯⎯[1m[7m Failed Tests 4 [27m[22m⎯⎯⎯⎯⎯⎯⎯[39m
+
+[31m[1m[7m FAIL [27m[22m[39m src/solver/analog/__tests__/phase-3-nr-reorder.test.ts[2m > [22mTask 3.1.2 — non-top-of-loop forceReorder citations[2m > [22mcites niiter.c:888-891 at the E_SINGULAR retry
+[31m[1mAssertionError[22m: expected false to be true // Object.is equality[39m
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[32m- true[39m
+[31m+ false[39m
+
+[36m [2m❯[22m src/solver/analog/__tests__/phase-3-nr-reorder.test.ts:[2m250:27[22m[39m
+    [90m248| [39m    }
+    [90m249| [39m
+    [90m250| [39m    [34mexpect[39m(foundCitation)[33m.[39m[34mtoBe[39m([35mtrue[39m)[33m;[39m
+    [90m   | [39m                          [31m^[39m
+    [90m251| [39m  })[33m;[39m
+    [90m252| [39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/4]⎯[22m[39m
+
+[31m[1m[7m FAIL [27m[22m[39m src/solver/analog/__tests__/phase-3-relay-composite.test.ts[2m > [22mPhase 3 Task 3.3.3 -- Relay composite-child[2m > [22mSPDT relay child inductor integrates the coil current
+[31m[1mAssertionError[22m: expected 0 to be greater than 0[39m
+[36m [2m❯[22m src/solver/analog/__tests__/phase-3-relay-composite.test.ts:[2m146:17[22m[39m
+    [90m144| [39m    [35mconst[39m base [33m=[39m inductor[33m.[39mstateBaseOffset[33m;[39m
+    [90m145| [39m    [35mconst[39m geq [33m=[39m pool[33m.[39mstates[[34m0[39m][base [33m+[39m [33mSLOT_GEQ_IDX[39m][33m;[39m
+    [90m146| [39m    [34mexpect[39m(geq)[33m.[39m[34mtoBeGreaterThan[39m([34m0[39m)[33m;[39m
+    [90m   | [39m                [31m^[39m
+    [90m147| [39m
+    [90m148| [39m    [90m// SLOT_VOLT = 5: voltage across the coil = n0v - n1v.[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/4]⎯[22m[39m
+
+[31m[1m[7m FAIL [27m[22m[39m src/solver/analog/__tests__/phase-3-xfact-scope-audit.test.ts[2m > [22mTask 3.2.5 — xfact scope audit[2m > [22mhas zero unguarded xfact reads in src/components/
+[31m[1mAssertionError[22m: Unguarded xfact reads:
+semiconductors\mosfet.ts:1408: expected [ 'semiconductors\mosfet.ts:1408' ] to deeply equal [][39m
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[32m- Array [][39m
+[31m+ Array [[39m
+[31m+   "semiconductors\\mosfet.ts:1408",[39m
+[31m+ ][39m
+
+[36m [2m❯[22m src/solver/analog/__tests__/phase-3-xfact-scope-audit.test.ts:[2m136:76[22m[39m
+    [90m134| [39m    )[33m;[39m
+    [90m135| [39m
+    [90m136| [39m    [34mexpect[39m(violations[33m,[39m [32m`Unguarded xfact reads:\n[39m[36m${[39mviolations[33m.[39m[34mjoin[39m([32m"\n"[39m…
+    [90m   | [39m                                                                           [31m^[39m
+    [90m137| [39m  })[33m;[39m
+    [90m138| [39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/4]⎯[22m[39m
+
+[31m[1m[7m FAIL [27m[22m[39m src/solver/analog/__tests__/phase-3-xfact-scope-audit.test.ts[2m > [22mTask 3.2.5 — xfact scope audit[2m > [22mallowlist is exhaustive — no stale entries
+[31m[1mAssertionError[22m: Stale allowlist entries:
+analog-engine.ts:430: expected [ 'analog-engine.ts:430' ] to deeply equal [][39m
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[32m- Array [][39m
+[31m+ Array [[39m
+[31m+   "analog-engine.ts:430",[39m
+[31m+ ][39m
+
+[36m [2m❯[22m src/solver/analog/__tests__/phase-3-xfact-scope-audit.test.ts:[2m184:74[22m[39m
+    [90m182| [39m
+    [90m183| [39m    [35mconst[39m messages [33m=[39m stale[33m.[39m[34mmap[39m((e) [33m=>[39m [32m`[39m[36m${[39me[33m.[39mfile[36m}[39m[32m:[39m[36m${[39me[33m.[39mline[36m}[39m[32m`[39m)[33m;[39m
+    [90m184| [39m    [34mexpect[39m(messages[33m,[39m [32m`Stale allowlist entries:\n[39m[36m${[39mmessages[33m.[39m[34mjoin[39m([32m"\n"[39m)[36m}[39m…
+    [90m   | [39m                                                                         [31m^[39m
+    [90m185| [39m  })[33m;[39m
+    [90m186| [39m})[33m;[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/4]⎯[22m[39m
+
+[2m Test Files [22m [1m[31m3 failed[39m[22m[90m (3)[39m
+[2m      Tests [22m [1m[31m4 failed[39m[22m[2m | [22m[1m[32m9 passed[39m[22m[90m (13)[39m
+[2m   Start at [22m 11:38:07
+[2m   Duration [22m 1.07s[2m (transform 230ms, setup 0ms, collect 345ms, tests 63ms, environment 0ms, prepare 205ms)[22m
+

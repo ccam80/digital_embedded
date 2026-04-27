@@ -34,6 +34,7 @@ import {
   type ComponentDefinition,
 } from "../../core/registry.js";
 import type { IntegrationMethod, LoadContext } from "../../solver/analog/element.js";
+import { NGSPICE_LOAD_ORDER } from "../../solver/analog/element.js";
 import { stampG, stampRHS } from "../../solver/analog/stamp-helpers.js";
 import { fetlim, limvds, pnjlim } from "../../solver/analog/newton-raphson.js";
 import { cktTerr } from "../../solver/analog/ckt-terr.js";
@@ -47,12 +48,12 @@ import {
 } from "../../solver/analog/state-schema.js";
 import {
   MODEINITFLOAT, MODEINITJCT, MODEINITFIX, MODEINITSMSIG,
-  MODEINITTRAN, MODEINITPRED, MODETRAN, MODETRANOP, MODEAC, MODEUIC,
+  MODEINITTRAN, MODEINITPRED, MODETRAN, MODETRANOP, MODEUIC,
   MODEDCOP, MODEDCTRANCURVE,
 } from "../../solver/analog/ckt-mode.js";
 
 // Phase 5 precondition: compile error if LoadContext is missing bypass or voltTol.
-type _PhaseAssert = Pick<LoadContext, "bypass" | "voltTol">;
+export type _PhaseAssert = Pick<LoadContext, "bypass" | "voltTol">;
 
 // ---------------------------------------------------------------------------
 // Physical constants (ngspice const.h / defines.h values)
@@ -829,6 +830,7 @@ export function createMosfetElement(
 
   return {
     branchIndex: -1,
+    ngspiceLoadOrder: NGSPICE_LOAD_ORDER.MOS,
     isNonlinear: true,
     isReactive: hasCapacitance,
     poolBacked: true as const,

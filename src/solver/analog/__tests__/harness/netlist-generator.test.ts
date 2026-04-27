@@ -7,7 +7,7 @@ import { generateSpiceNetlist } from "./netlist-generator.js";
 import type { ConcreteCompiledAnalogCircuit } from "../../compiled-analog-circuit.js";
 import { PropertyBag } from "../../../../core/properties.js";
 import { AbstractCircuitElement } from "../../../../core/element.js";
-import type { RenderContext } from "../../../../core/element.js";
+import type { RenderContext } from "../../../../core/renderer-interface.js";
 import type { Pin } from "../../../../core/pin.js";
 import type { AnalogElement, LoadContext } from "../../element.js";
 import type { StatePool } from "../../state-pool.js";

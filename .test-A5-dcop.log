@@ -1,0 +1,47 @@
+
+[1m[7m[36m RUN [39m[27m[22m [36mv2.1.9 [39m[90mC:/local_working_projects/digital_in_browser[39m
+
+ [31m❯[39m src/solver/analog/__tests__/dc-operating-point.test.ts [2m([22m[2m28 tests[22m[2m | [22m[31m2 failed[39m[2m)[22m[90m 23[2mms[22m[39m
+[31m   [31m×[31m DcOP[2m > [22mdiode_circuit_direct[90m 5[2mms[22m[31m[39m
+[31m     → expected 5 to be less than 0.75[39m
+[31m   [31m×[31m DcOP[2m > [22mnoOpIter_skips_all_nr_and_returns_converged[90m 2[2mms[22m[31m[39m
+[31m     → expected 3 to be 2 // Object.is equality[39m
+
+[31m⎯⎯⎯⎯⎯⎯⎯[1m[7m Failed Tests 2 [27m[22m⎯⎯⎯⎯⎯⎯⎯[39m
+
+[31m[1m[7m FAIL [27m[22m[39m src/solver/analog/__tests__/dc-operating-point.test.ts[2m > [22mDcOP[2m > [22mdiode_circuit_direct
+[31m[1mAssertionError[22m: expected 5 to be less than 0.75[39m
+[36m [2m❯[22m src/solver/analog/__tests__/dc-operating-point.test.ts:[2m278:20[22m[39m
+    [90m276| [39m    [35mconst[39m vDiode [33m=[39m ctx[33m.[39mdcopResult[33m.[39mnodeVoltages[[34m1[39m][33m;[39m
+    [90m277| [39m    [34mexpect[39m(vDiode)[33m.[39m[34mtoBeGreaterThan[39m([34m0.6[39m)[33m;[39m
+    [90m278| [39m    [34mexpect[39m(vDiode)[33m.[39m[34mtoBeLessThan[39m([34m0.75[39m)[33m;[39m
+    [90m   | [39m                   [31m^[39m
+    [90m279| [39m  })[33m;[39m
+    [90m280| [39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯[22m[39m
+
+[31m[1m[7m FAIL [27m[22m[39m src/solver/analog/__tests__/dc-operating-point.test.ts[2m > [22mDcOP[2m > [22mnoOpIter_skips_all_nr_and_returns_converged
+[31m[1mAssertionError[22m: expected 3 to be 2 // Object.is equality[39m
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[32m- 2[39m
+[31m+ 3[39m
+
+[36m [2m❯[22m src/solver/analog/__tests__/dc-operating-point.test.ts:[2m489:48[22m[39m
+    [90m487| [39m    [34mexpect[39m(ctx[33m.[39mdcopResult[33m.[39miterations)[33m.[39m[34mtoBe[39m([34m0[39m)[33m;[39m
+    [90m488| [39m    [34mexpect[39m(ctx[33m.[39mdcopResult[33m.[39mnodeVoltages)[33m.[39m[34mtoBeInstanceOf[39m([33mFloat64Array[39m)[33m;[39m
+    [90m489| [39m    [34mexpect[39m(ctx[33m.[39mdcopResult[33m.[39mnodeVoltages[33m.[39mlength)[33m.[39m[34mtoBe[39m(ctx[33m.[39mmatrixSize)[33m;[39m
+    [90m   | [39m                                               [31m^[39m
+    [90m490| [39m  })[33m;[39m
+    [90m491| [39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯[22m[39m
+
+[2m Test Files [22m [1m[31m1 failed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[31m2 failed[39m[22m[2m | [22m[1m[32m26 passed[39m[22m[90m (28)[39m
+[2m   Start at [22m 10:49:32
+[2m   Duration [22m 468ms[2m (transform 183ms, setup 0ms, collect 244ms, tests 23ms, environment 0ms, prepare 66ms)[22m
+

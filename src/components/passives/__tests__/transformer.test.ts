@@ -59,7 +59,7 @@ function getFactory(entry: ModelEntry): AnalogFactory {
 
 function makeTransientCtx(
   solver: SparseSolverType,
-  voltages: Float64Array,
+  _voltages: Float64Array,
   opts: {
     dt?: number;
     method?: IntegrationMethod;
@@ -79,7 +79,6 @@ function makeTransientCtx(
   return makeLoadCtx({
     cktMode: opts.cktMode ?? (MODETRAN | MODEINITFLOAT),
     solver: solver as unknown as import("../../../solver/analog/sparse-solver.js").SparseSolver,
-    voltages,
     dt,
     method,
     order,
@@ -237,7 +236,7 @@ describe("Transformer", () => {
       rLoad.load(ctx);
       const result = solver.factor();
       if (result !== 0) throw new Error(`Singular at step ${i}`);
-      solver.solve(voltages);
+      solver.solve(voltages, voltages);
 
       if (i >= lastCycleStart) {
         const vSec = Math.abs(voltages[1]); // node 2 is index 1
@@ -313,7 +312,7 @@ describe("Transformer", () => {
       rLoad.load(ctx);
       const result = solver.factor();
       if (result !== 0) throw new Error(`Singular at step ${i}`);
-      solver.solve(voltages);
+      solver.solve(voltages, voltages);
 
       if (i >= lastCycleStart) {
         const i1 = Math.abs(voltages[bTx1]);
@@ -390,7 +389,7 @@ describe("Transformer", () => {
       rLoad.load(ctx);
       const result = solver.factor();
       if (result !== 0) throw new Error(`Singular at step ${i}`);
-      solver.solve(voltages);
+      solver.solve(voltages, voltages);
 
       if (i >= lastCycleStart) {
         const v1 = voltages[0]; // node 1 (index 0)
@@ -468,7 +467,7 @@ describe("Transformer", () => {
         rLoad.load(ctx);
         const result = solver.factor();
         if (result !== 0) throw new Error(`Singular at step ${i}`);
-        solver.solve(voltages);
+        solver.solve(voltages, voltages);
 
         if (i >= lastCycleStart) {
           const vSec = Math.abs(voltages[1]);
@@ -538,7 +537,7 @@ describe("Transformer", () => {
       rLoad.load(ctx);
       const result = solver.factor();
       if (result !== 0) throw new Error(`Singular at step ${i}`);
-      solver.solve(voltages);
+      solver.solve(voltages, voltages);
     }
 
     // In DC steady state: secondary voltage should be near 0
@@ -575,7 +574,6 @@ describe("Transformer", () => {
 
     // Primary resistance conductance = 1/10 = 0.1 S
     // Stamps between node 1 (idx 0) and node 2 (idx 1)
-    const gPri = 1 / rPri;
     const diagN1 = stamps.find((s) => s.row === 0 && s.col === 0);
     const diagN2 = stamps.find((s) => s.row === 1 && s.col === 1);
     expect(diagN1).toBeDefined();

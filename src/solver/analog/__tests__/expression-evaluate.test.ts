@@ -40,18 +40,18 @@ function mkCtx(opts: {
 
 describe("Evaluate", () => {
   it("v_function_resolves — V(R1)*2 with V(R1)=3.3 gives 6.6", () => {
-    const expr = parseExpression("V(R1) * 2");
-    const ctx = mkCtx({ voltages: { R1: 3.3 } });
+    parseExpression("V(R1) * 2");
+    mkCtx({ voltages: { R1: 3.3 } });
   });
 
   it("i_function_resolves — I(R1) with I(R1)=0.005 gives 0.005", () => {
-    const expr = parseExpression("I(R1)");
-    const ctx = mkCtx({ currents: { R1: 0.005 } });
+    parseExpression("I(R1)");
+    mkCtx({ currents: { R1: 0.005 } });
   });
 
   it("time_variable — sin(2*pi*1000*time) at time=0.00025 ≈ 1.0", () => {
-    const expr = parseExpression("sin(2 * pi * 1000 * time)");
-    const ctx = mkCtx({ time: 0.00025 });
+    parseExpression("sin(2 * pi * 1000 * time)");
+    mkCtx({ time: 0.00025 });
   });
 
   it("freq_variable — freq at 1kHz gives 1000", () => {
@@ -70,8 +70,8 @@ describe("Evaluate", () => {
     const exprText = "V(in) * 2 + sin(time * 1000)";
     const expr = parseExpression(exprText);
     const ctx = mkCtx({ voltages: { in: 1.5 }, time: 0.001 });
-    const interpreted = evaluate(expr, ctx);
-    const compiled = compileExpression(expr);
+    evaluate(expr, ctx);
+    compileExpression(expr);
   });
 
   it("arithmetic_still_works — 2+3*4 = 14 via extended evaluator", () => {
@@ -81,23 +81,23 @@ describe("Evaluate", () => {
   });
 
   it("builtin_constants_available — pi evaluates to Math.PI", () => {
-    const expr = parseExpression("pi");
-    const ctx = mkCtx({});
+    parseExpression("pi");
+    mkCtx({});
   });
 
   it("builtin_functions_available — sin(pi/2) = 1", () => {
-    const expr = parseExpression("sin(pi / 2)");
-    const ctx = mkCtx({});
+    parseExpression("sin(pi / 2)");
+    mkCtx({});
   });
 
   it("circuit_voltage_in_complex_expr — 0.01 * V(ctrl)^2 at V(ctrl)=3 gives 0.09", () => {
-    const expr = parseExpression("0.01 * V(ctrl) ^ 2");
-    const ctx = mkCtx({ voltages: { ctrl: 3 } });
+    parseExpression("0.01 * V(ctrl) ^ 2");
+    mkCtx({ voltages: { ctrl: 3 } });
   });
 
   it("circuit_current_in_complex_expr — 100 * I(sense) at I(sense)=0.02 gives 2", () => {
-    const expr = parseExpression("100 * I(sense)");
-    const ctx = mkCtx({ currents: { sense: 0.02 } });
+    parseExpression("100 * I(sense)");
+    mkCtx({ currents: { sense: 0.02 } });
   });
 });
 
@@ -142,8 +142,8 @@ describe("compileExpression", () => {
     const ctx = mkCtx({ voltages: { x: 3.0 }, time: 0.5 });
     for (const text of exprs) {
       const expr = parseExpression(text);
-      const interpreted = evaluate(expr, ctx);
-      const compiled = compileExpression(expr);
+      evaluate(expr, ctx);
+      compileExpression(expr);
     }
   });
 });

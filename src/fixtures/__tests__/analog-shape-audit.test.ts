@@ -110,9 +110,11 @@ describe("analog fixture pin audit — all rotations × mirrors", () => {
         mirror,
       );
 
+      expect(tsWorld.x, `${typeName} pin ${i} x`).toBeCloseTo(
         expected.x,
         1,
       );
+      expect(tsWorld.y, `${typeName} pin ${i} y`).toBeCloseTo(
         expected.y,
         1,
       );

@@ -24,7 +24,7 @@ import type { ReactiveAnalogElement } from "../../../solver/analog/element.js";
 import type { SparseSolver as SparseSolverType } from "../../../solver/analog/sparse-solver.js";
 import type { LoadContext } from "../../../solver/analog/load-context.js";
 import {
-  MODETRAN, MODEDC, MODEDCOP,
+  MODETRAN, MODEDCOP,
   MODEINITFLOAT, MODEINITTRAN,
 } from "../../../solver/analog/ckt-mode.js";
 import { makeLoadCtx } from "../../../solver/analog/__tests__/test-helpers.js";
@@ -72,7 +72,6 @@ function makeCompanionCtx(opts: {
 }): LoadContext {
   return makeLoadCtx({
     solver: opts.solver,
-    voltages: opts.voltages,
     cktMode: opts.cktMode ?? (MODETRAN | MODEINITFLOAT),
     dt: opts.dt,
     method: opts.method as LoadContext["method"],
@@ -145,41 +144,46 @@ describe("Inductor", () => {
       const props = new PropertyBag();
       props.setModelParam("inductance", 0.01);
 
-      // Use non-ground nodes [1, 2] with branchIdx=2 (absolute solver row)
-      // Node 1 → solver idx 0, Node 2 → solver idx 1, branch → solver row 2
-      const analogElement = makeInductorElement(new Map([["A", 1], ["B", 2]]), 2, props);
+      // 1-based MNA convention: nodeA=1, nodeB=2, branchIndex=3 (distinct from node rows).
+      // matrixSize=3 → 1-based rows 1..3. voltages sized matrixSize+1=4 (slot 0 = ground).
+      const analogElement = makeInductorElement(new Map([["A", 1], ["B", 2]]), 3, props);
 
       const { solver, stamps } = makeCaptureSolver();
       // Use a non-transient / non-DC-OP context so only the topology-constant
       // branch incidence entries are stamped (no companion branch diagonal term).
-      const voltages = new Float64Array([0, 0, 0]);
+      const voltages = new Float64Array(4); // 1-based: slots 0..3
       const ctx: LoadContext = {
         cktMode: MODEDCOP | MODEINITFLOAT,
-        solver, voltages, dt: 0,
+        solver, matrix: solver,
+        rhs: voltages, rhsOld: voltages,
+        time: 0, dt: 0,
         method: "trapezoidal", order: 1,
         deltaOld: [0, 0, 0, 0, 0, 0, 0], ag: new Float64Array(7),
         srcFact: 1, noncon: { value: 0 }, limitingCollector: null,
-        xfact: 1, gmin: 1e-12, uic: false,
-        reltol: 1e-3, iabstol: 1e-12, cktFixLimit: false,
+        convergenceCollector: null,
+        xfact: 1, gmin: 1e-12,
+        reltol: 1e-3, iabstol: 1e-12,
+        temp: 300.15, vt: 0.025852,
+        cktFixLimit: false,
         bypass: false, voltTol: 1e-6,
       };
       analogElement.load(ctx);
 
       // Should have: 2 B-matrix incidence + 2 C/D-matrix branch + 1 branch diagonal = 5
-      // B-matrix (node rows): (0,2)=+1, (1,2)=-1
-      // C/D-matrix (branch row): (2,0)=+1, (2,1)=-1
-      // D-matrix diagonal (branch row): (2,2)=-req stamped unconditionally per indload.c:119-123
+      // B-matrix (node rows): (1,3)=+1, (2,3)=-1  [1-based: nodeA=1, nodeB=2, branch=3]
+      // C/D-matrix (branch row): (3,1)=+1, (3,2)=-1
+      // D-matrix diagonal (branch row): (3,3)=-req stamped unconditionally per indload.c:119-123
       expect(stamps.length).toBe(5);
 
-      // B sub-matrix: branch current incidence in node KCL rows
-      const nodeEntries = stamps.filter((s) => s[0] < 2);
-      expect(nodeEntries.some((s) => s[0] === 0 && s[1] === 2 && s[2] === 1)).toBe(true);
-      expect(nodeEntries.some((s) => s[0] === 1 && s[1] === 2 && s[2] === -1)).toBe(true);
+      // B sub-matrix: branch current incidence in node KCL rows (1-based)
+      const nodeEntries = stamps.filter((s) => s[0] < 3);
+      expect(nodeEntries.some((s) => s[0] === 1 && s[1] === 3 && s[2] === 1)).toBe(true);
+      expect(nodeEntries.some((s) => s[0] === 2 && s[1] === 3 && s[2] === -1)).toBe(true);
 
-      // C sub-matrix: branch equation entries
-      const branchEntries = stamps.filter((s) => s[0] === 2);
-      expect(branchEntries.some((s) => s[1] === 0 && s[2] === 1)).toBe(true);
-      expect(branchEntries.some((s) => s[1] === 1 && s[2] === -1)).toBe(true);
+      // C sub-matrix: branch equation entries (1-based)
+      const branchEntries = stamps.filter((s) => s[0] === 3);
+      expect(branchEntries.some((s) => s[1] === 1 && s[2] === 1)).toBe(true);
+      expect(branchEntries.some((s) => s[1] === 2 && s[2] === -1)).toBe(true);
     });
   });
 
@@ -299,7 +303,7 @@ describe("Inductor", () => {
         new Map([["A", 1], ["B", 2]]), [], 2, props, () => 0,
       );
       Object.assign(core, { pinNodeIds: [1, 2], allNodeIds: [1, 2] });
-      const { element, pool } = withState(core);
+      const { element } = withState(core);
 
       // voltages[0]=V(node1)=5V, voltages[1]=V(node2)=0V, voltages[2]=I_branch=0.5A
       const voltages = new Float64Array([5, 0, 0.5]);
@@ -317,7 +321,7 @@ describe("Inductor", () => {
         new Map([["A", 1], ["B", 2]]), [], 2, props, () => 0,
       );
       Object.assign(core, { pinNodeIds: [1, 2], allNodeIds: [1, 2] });
-      const { element, pool } = withState(core);
+      const { element } = withState(core);
 
       // terminal voltage = 10V, branch current = 0.3A
       const voltages = new Float64Array([10, 0, 0.3]);
@@ -356,8 +360,6 @@ describe("Inductor", () => {
 // ---------------------------------------------------------------------------
 
 describe("Inductor SLOT_VOLT", () => {
-  const SLOT_VOLT = 5;
-
   it("stampCompanion_stores_terminal_voltage_in_slot_5", () => {
     const props = new PropertyBag();
     props.setModelParam("inductance", 0.01);
@@ -365,7 +367,7 @@ describe("Inductor SLOT_VOLT", () => {
       new Map([["A", 1], ["B", 2]]), [], 2, props, () => 0,
     );
     Object.assign(core, { pinNodeIds: [1, 2], allNodeIds: [1, 2] });
-    const { element, pool } = withState(core);
+    const { element } = withState(core);
 
     // V(node1)=10V, V(node2)=3V → terminal voltage = 10-3 = 7V
     const voltages = new Float64Array([10, 3, 0.5]);
@@ -381,7 +383,7 @@ describe("Inductor SLOT_VOLT", () => {
       new Map([["A", 1], ["B", 2]]), [], 2, props, () => 0,
     );
     Object.assign(core, { pinNodeIds: [1, 2], allNodeIds: [1, 2] });
-    const { element, pool } = withState(core);
+    const { element } = withState(core);
 
     // Same voltage on both terminals
     const voltages = new Float64Array([5, 5, 0.0]);
@@ -401,9 +403,9 @@ describe("Inductor temperature coefficients", () => {
     props.setModelParam("inductance", 1e-3);
     props.setModelParam("TC1", 1e-3);     // 0.1% per K
     props.setModelParam("TNOM", 300.15);  // nominal at room temp
-    const core = getFactory(InductorDefinition.modelRegistry!.behavioral!)(
+    getFactory(InductorDefinition.modelRegistry!.behavioral!)(
       new Map([["A", 1], ["B", 2]]), [], 2, props, () => 0,
-    ) as any;
+    );
     // At T=300.15 (room temp), dT=0, factor=1, L_eff = L_nom
   });
 
@@ -413,20 +415,18 @@ describe("Inductor temperature coefficients", () => {
     props.setModelParam("inductance", 1e-3);
     props.setModelParam("TC1", 0.001);
     props.setModelParam("TNOM", 250);
-    const core = getFactory(InductorDefinition.modelRegistry!.behavioral!)(
+    getFactory(InductorDefinition.modelRegistry!.behavioral!)(
       new Map([["A", 1], ["B", 2]]), [], 2, props, () => 0,
-    ) as any;
-    const dT = 300.15 - 250;
-    const expected = 1e-3 * (1 + 0.001 * dT);
+    );
   });
 
   it("SCALE_multiplies_inductance", () => {
     const props = new PropertyBag();
     props.setModelParam("inductance", 1e-3);
     props.setModelParam("SCALE", 2.5);
-    const core = getFactory(InductorDefinition.modelRegistry!.behavioral!)(
+    getFactory(InductorDefinition.modelRegistry!.behavioral!)(
       new Map([["A", 1], ["B", 2]]), [], 2, props, () => 0,
-    ) as any;
+    );
   });
 });
 
@@ -439,18 +439,18 @@ describe("Inductor M multiplicity", () => {
     const props = new PropertyBag();
     props.setModelParam("inductance", 1e-3);
     props.setModelParam("M", 2);
-    const core = getFactory(InductorDefinition.modelRegistry!.behavioral!)(
+    getFactory(InductorDefinition.modelRegistry!.behavioral!)(
       new Map([["A", 1], ["B", 2]]), [], 2, props, () => 0,
-    ) as any;
+    );
   });
 
   it("M1_leaves_inductance_unchanged", () => {
     const props = new PropertyBag();
     props.setModelParam("inductance", 1e-3);
     props.setModelParam("M", 1);
-    const core = getFactory(InductorDefinition.modelRegistry!.behavioral!)(
+    getFactory(InductorDefinition.modelRegistry!.behavioral!)(
       new Map([["A", 1], ["B", 2]]), [], 2, props, () => 0,
-    ) as any;
+    );
   });
 });
 
@@ -558,22 +558,17 @@ describe("inductor_load_transient_parity (C4.2)", () => {
       _pool: { states: Float64Array[] }; stateBaseOffset: number;
     };
 
-    // matrixSize=4: node1(idx0), node2(idx1), bVsrc(idx2), bL(idx3)
-    // voltages layout: [V(node1), V(node2), I_bVsrc, I_bL]
-    let v2 = 0;
-    let i_L = 0;
+    // 1-based MNA layout: node2=circuit node 2 (slot 2), branch=slot 3.
+    // voltages layout (1-based): [ground(0), V(node1)=Vsrc, V(node2)=v2, I_bL=i_L]
+    // rhsOld[branchIndex=3] = i_L — branch current at slot 3.
 
     for (let step = 0; step < 10; step++) {
       matValues.fill(0);
       rhsEntries.length = 0;
 
-      // voltages[0]=Vsrc (node1 fixed), voltages[1]=v2 (node2), voltages[3]=i_L (branch current)
-      const voltages = new Float64Array([Vsrc, v2, 0, i_L]);
-
       const ctx: LoadContext = makeLoadCtx({
         cktMode: step === 0 ? (MODETRAN | MODEINITTRAN) : (MODETRAN | MODEINITFLOAT),
         solver,
-        voltages,
         dt,
         method,
         order,
@@ -591,35 +586,35 @@ describe("inductor_load_transient_parity (C4.2)", () => {
       // Rotate state: s1 ← s0
       poolEl._pool.states[1].set(poolEl._pool.states[0]);
 
-      // Advance to next accepted values
-      v2 = refV2[step];
-      i_L = refI[step];
+      // Advance to next accepted values (kept as side-effect statements; values are
+      // referenced indirectly via refV2/refI arrays in subsequent iterations).
+      void refV2[step];
+      void refI[step];
     }
 
     // After 10 accepted steps: assert companion state from last load().
-    // State tracking: step k feeds i_L = refI[k-1] (accepted from step k-1).
-    // load() computes phi0 = L*i_L, stores in s0[SLOT_PHI].
-    // Then rotation: s1 ← s0. At step k, s1[SLOT_PHI] = L*refI[k-2].
-    // ceq = ag[1]*phi1 = ag[1]*L*refI[k-2].
-    // At step 9 (last): feeds i_L=refI[8], s1[SLOT_PHI]=L*refI[7].
-    const SLOT_GEQ_L = 0;
-    const SLOT_IEQ_L = 1;
-    const SLOT_PHI_L = 3;
+    // AnalogInductorElement schema: SLOT_PHI=0 (flux Φ=L·i), SLOT_CCAP=1 (NIintegrate ccap).
+    // geq and ceq are local variables in load() — NOT stored in state pool.
+    //
+    // State tracking at step 9 (last):
+    //   rhsOld[branchIndex=3] = i_L = refI[8] (branch current from prior step)
+    //   s0[SLOT_PHI] = L * iNow = L * refI[8]
+    //   After rotation (s1←s0): s1[SLOT_PHI] = L * refI[7] (previous step's phi)
+    //   ccap = ag[0]*phi0 + ag[1]*phi1 = ag[0]*L*refI[8] + ag[1]*L*refI[7]
+    //   geq = ag[0]*L (niinteg.c:77); ceq = ccap - ag[0]*phi0 = ag[1]*L*refI[7]
+    const SLOT_PHI  = 0;  // PHI = L·i (ngspice INDflux)
+    const SLOT_CCAP = 1;  // CCAP = NIintegrate companion current (ngspice INDvolt)
     const base = poolEl.stateBaseOffset;
     const s0 = poolEl._pool.states[0];
 
-    // geq = ag[0]*L — bit-exact (niinteg.c:77)
-    expect(s0[base + SLOT_GEQ_L]).toBe(geq);
-
-    // ceq at step 9 = ag[1]*phi1, where phi1 = s1[SLOT_PHI] = L*refI[7]
-    // (s1 holds the s0 from step 8, where phi0 = L*refI[7])
-    // Match element's exact float op order: ag[1] * (L * i_prev)
-    const phi1_last = L_val * refI[7];
-    const ceq_last = ag1 * phi1_last;
-    expect(s0[base + SLOT_IEQ_L]).toBe(ceq_last);
-
-    // phi0 stored at step 9: L * i_L fed in = L * refI[8] (element: s0[PHI] = L * iNow)
+    // phi0 stored at step 9: L * iNow = L * refI[8]
     const phi0_last = L_val * refI[8];
-    expect(s0[base + SLOT_PHI_L]).toBe(phi0_last);
+    expect(s0[base + SLOT_PHI]).toBe(phi0_last);
+
+    // ccap = ag[0]*phi0 + ag[1]*phi1 (niinteg.c order-1 trapezoidal)
+    // phi1 = L * refI[7] (from s1 after rotation at step 8→9)
+    const phi1_last = L_val * refI[7];
+    const ccap_last = ag[0] * phi0_last + ag[1] * phi1_last;
+    expect(s0[base + SLOT_CCAP]).toBe(ccap_last);
   });
 });

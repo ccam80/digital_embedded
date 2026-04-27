@@ -133,7 +133,7 @@ describe("Task 3.2.5 — xfact scope audit", () => {
       (read) => !allowlistComponents.some((a) => read.includes(`${a.file}:${a.line}`))
     );
 
-    expect(violations).toEqual([], `Unguarded xfact reads:\n${violations.join("\n")}`);
+    expect(violations, `Unguarded xfact reads:\n${violations.join("\n")}`).toEqual([]);
   });
 
   it("has zero unguarded xfact reads in src/solver/analog/", () => {
@@ -155,7 +155,7 @@ describe("Task 3.2.5 — xfact scope audit", () => {
       (read) => !allowlistSolver.some((a) => read.includes(`${a.file}:${a.line}`))
     );
 
-    expect(violations).toEqual([], `Unguarded xfact reads:\n${violations.join("\n")}`);
+    expect(violations, `Unguarded xfact reads:\n${violations.join("\n")}`).toEqual([]);
   });
 
   it("allowlist is exhaustive — no stale entries", () => {
@@ -181,6 +181,6 @@ describe("Task 3.2.5 — xfact scope audit", () => {
     });
 
     const messages = stale.map((e) => `${e.file}:${e.line}`);
-    expect(messages).toEqual([], `Stale allowlist entries:\n${messages.join("\n")}`);
+    expect(messages, `Stale allowlist entries:\n${messages.join("\n")}`).toEqual([]);
   });
 });

@@ -65,7 +65,10 @@ function makeTransientCtx(solver: SparseSolverType, voltages: Float64Array, dt: 
   return {
     cktMode: MODETRAN | MODEINITFLOAT,
     solver: solver as unknown as import("../../../solver/analog/sparse-solver.js").SparseSolver,
-    voltages,
+    matrix: solver as unknown as import("../../../solver/analog/sparse-solver.js").SparseSolver,
+    rhs: voltages,
+    rhsOld: voltages,
+    time: 0,
     dt,
     method: "trapezoidal",
     order: 1,
@@ -74,10 +77,13 @@ function makeTransientCtx(solver: SparseSolverType, voltages: Float64Array, dt: 
     srcFact: 1,
     noncon: { value: 0 },
     limitingCollector: null,
+    convergenceCollector: null,
     xfact: 1,
     gmin: 1e-12,
     reltol: 1e-3,
     iabstol: 1e-12,
+    temp: 300.15,
+    vt: 0.025852,
     cktFixLimit: false,
     bypass: false,
     voltTol: 1e-6,
@@ -298,7 +304,7 @@ describe("TappedTransformer", () => {
       rGnd.load(ctx);
       const result = solver.factor();
       if (result !== 0) throw new Error(`Singular at step ${i}`);
-      solver.solve(voltages);
+      solver.solve(voltages, voltages);
       pool.rotateStateVectors();
 
       if (i >= lastCycleStart) {
@@ -464,35 +470,27 @@ describe("TappedTransformerDefinition", () => {
   it("inductance ratios are correct for N=2 (each half = primary, L2=L3=L1*(N/2)²=L1)", () => {
     const Lp = 100e-3;
     const N = 2;
-    const el = new AnalogTappedTransformerElement([1, 0, 2, 3, 4], 5, Lp, N, 0.99, 0, 0);
-    const halfRatio = N / 2; // = 1.0
-    const expectedL2 = Lp * halfRatio * halfRatio; // = Lp = 100mH for N=2
+    new AnalogTappedTransformerElement([1, 0, 2, 3, 4], 5, Lp, N, 0.99, 0, 0);
   });
 
   it("inductance ratios are correct for N=4 (each half = N/2=2, L2=L3=L1*4)", () => {
     const Lp = 50e-3;
     const N = 4;
-    const el = new AnalogTappedTransformerElement([1, 0, 2, 3, 4], 5, Lp, N, 0.99, 0, 0);
-    const halfRatio = N / 2; // = 2.0
-    const expectedL2 = Lp * halfRatio * halfRatio; // = 4 * Lp = 200mH
+    new AnalogTappedTransformerElement([1, 0, 2, 3, 4], 5, Lp, N, 0.99, 0, 0);
   });
 
   it("mutual inductance between primary and secondary half is k * sqrt(L1 * L2)", () => {
     const Lp = 100e-3;
     const N = 2;
     const k = 0.99;
-    const el = new AnalogTappedTransformerElement([1, 0, 2, 3, 4], 5, Lp, N, k, 0, 0);
-    const L2 = Lp * (N / 2) * (N / 2);
-    const expectedM = k * Math.sqrt(Lp * L2);
+    new AnalogTappedTransformerElement([1, 0, 2, 3, 4], 5, Lp, N, k, 0, 0);
   });
 
   it("mutual inductance between secondary halves is k * sqrt(L2 * L3) = k * L2 for symmetric", () => {
     const Lp = 100e-3;
     const N = 2;
     const k = 0.99;
-    const el = new AnalogTappedTransformerElement([1, 0, 2, 3, 4], 5, Lp, N, k, 0, 0);
-    const L2 = Lp * (N / 2) * (N / 2);
-    const expectedM23 = k * Math.sqrt(L2 * L2); // = k * L2
+    new AnalogTappedTransformerElement([1, 0, 2, 3, 4], 5, Lp, N, k, 0, 0);
   });
 });
 
@@ -596,7 +594,10 @@ describe("tapped_transformer_load_transient_parity (C4.2)", () => {
       const ctx: LoadContext = {
         cktMode: step === 0 ? (MODETRAN | MODEINITTRAN) : (MODETRAN | MODEINITFLOAT),
         solver,
-        voltages,
+        matrix: solver,
+        rhs: voltages,
+        rhsOld: voltages,
+        time: 0,
         dt,
         method,
         order,
@@ -605,10 +606,13 @@ describe("tapped_transformer_load_transient_parity (C4.2)", () => {
         srcFact: 1,
         noncon: { value: 0 },
         limitingCollector: null,
+        convergenceCollector: null,
         xfact: 1,
         gmin: 1e-12,
         reltol: 1e-3,
         iabstol: 1e-12,
+        temp: 300.15,
+        vt: 0.025852,
         cktFixLimit: false,
         bypass: false,
         voltTol: 1e-6,

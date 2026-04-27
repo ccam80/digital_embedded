@@ -1,0 +1,89 @@
+
+[1m[7m[36m RUN [39m[27m[22m [36mv2.1.9 [39m[90mC:/local_working_projects/digital_in_browser[39m
+
+ [31m❯[39m src/components/semiconductors/__tests__/mosfet.test.ts [2m([22m[2m78 tests[22m[2m | [22m[31m4 failed[39m[2m)[22m[90m 45[2mms[22m[39m
+[31m   [31m×[31m PMOS[2m > [22mpolarity_reversed[90m 6[2mms[22m[31m[39m
+[31m     → expected 0 to be greater than 1e-10[39m
+[31m   [31m×[31m Integration[2m > [22mcommon_source_nmos[90m 5[2mms[22m[31m[39m
+[31m     → expected false to be true // Object.is equality[39m
+[31m   [31m×[31m setParam shifts DC OP to match SPICE reference[2m > [22msetParam('VTO', 2.5) shifts DC OP to match SPICE reference[90m 1[2mms[22m[31m[39m
+[31m     → expected false to be true // Object.is equality[39m
+[31m   [31m×[31m setParam shifts DC OP to match SPICE reference[2m > [22msetParam('KP', 240Âµ) shifts DC OP to match SPICE reference[90m 1[2mms[22m[31m[39m
+[31m     → expected false to be true // Object.is equality[39m
+
+[31m⎯⎯⎯⎯⎯⎯⎯[1m[7m Failed Tests 4 [27m[22m⎯⎯⎯⎯⎯⎯⎯[39m
+
+[31m[1m[7m FAIL [27m[22m[39m src/components/semiconductors/__tests__/mosfet.test.ts[2m > [22mPMOS[2m > [22mpolarity_reversed
+[31m[1mAssertionError[22m: expected 0 to be greater than 1e-10[39m
+[36m [2m❯[22m src/components/semiconductors/__tests__/mosfet.test.ts:[2m410:20[22m[39m
+    [90m408| [39m      [35mif[39m (abs [33m>[39m maxRhs) maxRhs [33m=[39m abs[33m;[39m
+    [90m409| [39m    }
+    [90m410| [39m    [34mexpect[39m(maxRhs)[33m.[39m[34mtoBeGreaterThan[39m([34m1e-10[39m)[33m;[39m
+    [90m   | [39m                   [31m^[39m
+    [90m411| [39m
+    [90m412| [39m    [90m// PMOS conducts: drain and source RHS entries should have opposit[39m…
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/4]⎯[22m[39m
+
+[31m[1m[7m FAIL [27m[22m[39m src/components/semiconductors/__tests__/mosfet.test.ts[2m > [22mIntegration[2m > [22mcommon_source_nmos
+[31m[1mAssertionError[22m: expected false to be true // Object.is equality[39m
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[32m- true[39m
+[31m+ false[39m
+
+[36m [2m❯[22m src/components/semiconductors/__tests__/mosfet.test.ts:[2m488:30[22m[39m
+    [90m486| [39m    })[33m;[39m
+    [90m487| [39m
+    [90m488| [39m    [34mexpect[39m(result[33m.[39mconverged)[33m.[39m[34mtoBe[39m([35mtrue[39m)[33m;[39m
+    [90m   | [39m                             [31m^[39m
+    [90m489| [39m
+    [90m490| [39m    [90m// node voltages: [V(1)=Vdrain, V(2)=Vdd=5V, V(3)=Vgate=3V, I_vdd,[39m…
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/4]⎯[22m[39m
+
+[31m[1m[7m FAIL [27m[22m[39m src/components/semiconductors/__tests__/mosfet.test.ts[2m > [22msetParam shifts DC OP to match SPICE reference[2m > [22msetParam('VTO', 2.5) shifts DC OP to match SPICE reference
+[31m[1mAssertionError[22m: expected false to be true // Object.is equality[39m
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[32m- true[39m
+[31m+ false[39m
+
+[36m [2m❯[22m src/components/semiconductors/__tests__/mosfet.test.ts:[2m524:30[22m[39m
+    [90m522| [39m    [90m// Before: VTO=0.7[39m
+    [90m523| [39m    [35mconst[39m before [33m=[39m [34mrunDcOp[39m({ elements[33m,[39m matrixSize[33m,[39m nodeCount[33m:[39m [34m3[39m })[33m;[39m
+    [90m524| [39m    [34mexpect[39m(before[33m.[39mconverged)[33m.[39m[34mtoBe[39m([35mtrue[39m)[33m;[39m
+    [90m   | [39m                             [31m^[39m
+    [90m525| [39m    [34mexpectSpiceRef[39m(before[33m.[39mnodeVoltages[[34m0[39m][33m,[39m [34m1.840508e+00[39m[33m,[39m [32m"V(drain) bef[39m…
+    [90m526| [39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/4]⎯[22m[39m
+
+[31m[1m[7m FAIL [27m[22m[39m src/components/semiconductors/__tests__/mosfet.test.ts[2m > [22msetParam shifts DC OP to match SPICE reference[2m > [22msetParam('KP', 240Âµ) shifts DC OP to match SPICE reference
+[31m[1mAssertionError[22m: expected false to be true // Object.is equality[39m
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[32m- true[39m
+[31m+ false[39m
+
+[36m [2m❯[22m src/components/semiconductors/__tests__/mosfet.test.ts:[2m548:30[22m[39m
+    [90m546| [39m    [90m// Before: KP=120Âµ[39m
+    [90m547| [39m    [35mconst[39m before [33m=[39m [34mrunDcOp[39m({ elements[33m,[39m matrixSize[33m,[39m nodeCount[33m:[39m [34m3[39m })[33m;[39m
+    [90m548| [39m    [34mexpect[39m(before[33m.[39mconverged)[33m.[39m[34mtoBe[39m([35mtrue[39m)[33m;[39m
+    [90m   | [39m                             [31m^[39m
+    [90m549| [39m    [34mexpectSpiceRef[39m(before[33m.[39mnodeVoltages[[34m0[39m][33m,[39m [34m1.840508e+00[39m[33m,[39m [32m"V(drain) bef[39m…
+    [90m550| [39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/4]⎯[22m[39m
+
+[2m Test Files [22m [1m[31m1 failed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[31m4 failed[39m[22m[2m | [22m[1m[32m74 passed[39m[22m[90m (78)[39m
+[2m   Start at [22m 10:49:41
+[2m   Duration [22m 572ms[2m (transform 224ms, setup 0ms, collect 300ms, tests 45ms, environment 0ms, prepare 76ms)[22m
+

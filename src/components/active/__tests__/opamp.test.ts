@@ -92,7 +92,6 @@ describe("OpAmp", () => {
     // G[out,in+] -= gain*G_out
     // G[out,in-] += gain*G_out
     const opamp = makeOpAmp({ gain: 1e6, rOut: 75 });
-    const G_out = 1 / 75;
 
     // Set operating point with Vout in linear range (not at rail)
     const voltages = makeSolutionVector(6, {
@@ -103,27 +102,17 @@ describe("OpAmp", () => {
       5: -15,    // Vcc-
     });
 
-    const { solver, stamps, rhs } = makeCaptureSolver();
-    opamp.load(makeOpAmpParityCtx(voltages, solver));
+    const rhsBuf = new Float64Array(voltages.length > 0 ? voltages.length : 16);
+    const { solver } = makeCaptureSolver(rhsBuf);
+    opamp.load(makeOpAmpParityCtx(voltages, solver, rhsBuf));
 
-    const sumAt = (row: number, col: number): number =>
-      stamps.filter((s) => s.row === row && s.col === col).reduce((a, s) => a + s.value, 0);
-
-    // G_out on out diagonal: stamp(out-1, out-1, G_out) = stamp(2, 2, G_out)
-
-    // VCVS: G[out, in+] -= gain*G_out â†’ stamp(2, 0, -gain*G_out)
-
-    // VCVS: G[out, in-] += gain*G_out â†’ stamp(2, 1, +gain*G_out)
-
-    // Linear region: no RHS contribution at the output node
-    const rhsAtOut = rhs.filter((r) => r.row === 2);
-    expect(rhsAtOut).toHaveLength(0);
+    // Linear region: no RHS contribution at the output node (nOut=3, 1-based)
+    expect(rhsBuf[3]).toBe(0);
   });
 
   it("positive_saturation", () => {
     // When Vout >= Vcc+: saturated, load() omits VCVS and drives a Norton current to the rail.
     const opamp = makeOpAmp({ gain: 1e6, rOut: 75 });
-    const G_out = 1 / 75;
 
     // Set Vout = 20V > Vcc+ = 15V â†’ saturated
     const voltages = makeSolutionVector(6, {
@@ -134,25 +123,22 @@ describe("OpAmp", () => {
       5: -15,    // Vcc-
     });
 
-    const { solver: stampSolver, stamps: stampCapture, rhs } = makeCaptureSolver();
-    opamp.load(makeOpAmpParityCtx(voltages, stampSolver));
-    const sumAt2 = (row: number, col: number): number =>
-      stampCapture.filter((s) => s.row === row && s.col === col).reduce((a, s) => a + s.value, 0);
+    const rhsBuf = new Float64Array(voltages.length > 0 ? voltages.length : 16);
+    const { solver: stampSolver, stamps: stampCapture } = makeCaptureSolver(rhsBuf);
+    opamp.load(makeOpAmpParityCtx(voltages, stampSolver, rhsBuf));
     // No large Jacobian entries (no VCVS in saturation)
     const hasVcvsEntry = stampCapture.some(
       (s) => s.row === 2 && (s.col === 0 || s.col === 1) && Math.abs(s.value) > 1,
     );
     expect(hasVcvsEntry).toBe(false);
 
-    // Norton current to clamp output to Vcc+=15V
-    const rhsAtOut = rhs.find((r) => r.row === 2);
-    expect(rhsAtOut).toBeDefined();
+    // Norton current to clamp output to Vcc+=15V (nOut=3, 1-based)
+    expect(rhsBuf[3]).not.toBe(0);
   });
 
   it("negative_saturation", () => {
     // When Vout <= Vcc-: saturated, load() drives output to Vcc- via a Norton current.
     const opamp = makeOpAmp({ gain: 1e6, rOut: 75 });
-    const G_out = 1 / 75;
 
     // Set Vout = -20V < Vcc- = -15V â†’ saturated
     const voltages = makeSolutionVector(6, {
@@ -163,10 +149,10 @@ describe("OpAmp", () => {
       5: -15,    // Vcc-
     });
 
-    const { solver, rhs } = makeCaptureSolver();
-    opamp.load(makeOpAmpParityCtx(voltages, solver));
-    const rhsAtOut = rhs.find((r) => r.row === 2);
-    expect(rhsAtOut).toBeDefined();
+    const rhsBuf = new Float64Array(voltages.length > 0 ? voltages.length : 16);
+    const { solver } = makeCaptureSolver(rhsBuf);
+    opamp.load(makeOpAmpParityCtx(voltages, solver, rhsBuf));
+    expect(rhsBuf[3]).not.toBe(0);
   });
 
   it("output_impedance", () => {
@@ -195,6 +181,7 @@ describe("OpAmp", () => {
       branchIndex: -1, isNonlinear: false, isReactive: false,
       setParam(_key: string, _value: number): void {},
       getPinCurrents(): number[] { return []; },
+      ngspiceLoadOrder: 0,
       load(ctx): void {
         const h = ctx.solver.allocElement(nOut, nOut);
         ctx.solver.stampElement(h, G_load);
@@ -213,7 +200,6 @@ describe("OpAmp", () => {
     });
 
     expect(result.converged).toBe(true);
-    const vOut = result.nodeVoltages[nOut];
     // Vout = 2V * (75/(75+75)) = 1V Â± 0.1V
   });
 });
@@ -231,6 +217,7 @@ describe("Integration", () => {
       branchIndex: -1, isNonlinear: false, isReactive: false,
       setParam(_key: string, _value: number): void {},
       getPinCurrents(): number[] { return []; },
+      ngspiceLoadOrder: 0,
       load(ctx): void {
         const { solver } = ctx;
         if (nodeA > 0) { const h = solver.allocElement(nodeA, nodeA); solver.stampElement(h, G); }
@@ -280,7 +267,6 @@ describe("Integration", () => {
     });
 
     expect(result.converged).toBe(true);
-    const vOut = result.nodeVoltages[nOut];
     // Ideal inverting gain = -Rf/Rin = -10 â†’ Vout = -10V Â± 0.05V
   });
 
@@ -312,7 +298,6 @@ describe("Integration", () => {
     });
 
     expect(result.converged).toBe(true);
-    const vOut = result.nodeVoltages[nFeedback];
     // Voltage follower: Vout = Vin = 3.7V Â± 0.005V
   });
 });
@@ -341,18 +326,13 @@ import { MODEDCOP, MODEINITFLOAT } from "../../../solver/analog/ckt-mode.js";
 import { OpAmpDefinition as _OpAmpDefinitionForParity } from "../opamp.js";
 
 interface CaptureStamp { row: number; col: number; value: number; }
-interface CaptureRhs { row: number; value: number; }
-function makeCaptureSolver(): { solver: SparseSolverType; stamps: CaptureStamp[]; rhs: CaptureRhs[]; } {
+function makeCaptureSolver(_rhs: Float64Array): { solver: SparseSolverType; stamps: CaptureStamp[]; } {
   const stamps: CaptureStamp[] = [];
-  const rhs: CaptureRhs[] = [];
   const handles: { row: number; col: number }[] = [];
   const handleIndex = new Map<string, number>();
   const solver = {
     stamp: (row: number, col: number, value: number) => {
       stamps.push({ row, col, value });
-    },
-    stampRHS: (row: number, value: number) => {
-      rhs.push({ row, value });
     },
     allocElement: (row: number, col: number): number => {
       const key = `${row},${col}`;
@@ -369,13 +349,14 @@ function makeCaptureSolver(): { solver: SparseSolverType; stamps: CaptureStamp[]
       stamps.push({ row, col, value });
     },
   } as unknown as SparseSolverType;
-  return { solver, stamps, rhs };
+  return { solver, stamps };
 }
 
-function makeOpAmpParityCtx(voltages: Float64Array, solver: SparseSolverType): LoadContext {
+function makeOpAmpParityCtx(voltages: Float64Array, solver: SparseSolverType, rhs?: Float64Array): LoadContext {
   return makeLoadCtx({
     solver,
-    voltages,
+    rhs: rhs ?? new Float64Array(voltages.length > 0 ? voltages.length : 16),
+    rhsOld: voltages,
     cktMode: MODEDCOP | MODEINITFLOAT,
     dt: 0,
   });
@@ -398,12 +379,13 @@ describe("OpAmp parity (C4.5)", () => {
       () => 0,
     );
 
-    const voltages = new Float64Array(3);
+    const voltages = new Float64Array(nOut + 1); // size 4: indices 0..3
     voltages[nInp] = 1e-3;
     voltages[nInn] = 0;
     voltages[nOut] = 1.0; // linear region, between -15 and +15
-    const { solver, stamps, rhs } = makeCaptureSolver();
-    const ctx = makeOpAmpParityCtx(voltages, solver);
+    const rhsBuf = new Float64Array(16);
+    const { solver, stamps } = makeCaptureSolver(rhsBuf);
+    const ctx = makeOpAmpParityCtx(voltages, solver, rhsBuf);
     opamp.load(ctx);
 
     // Closed-form reference (ngspice-equivalent Norton VCVS approximation):
@@ -412,17 +394,15 @@ describe("OpAmp parity (C4.5)", () => {
     const NGSPICE_GOUT = 1 / NGSPICE_ROUT;
     const NGSPICE_EFF = NGSPICE_GAIN * 1; // srcFact = 1
 
-    // Sum stamps by (row, col) â€” element may fold stamps through handle reuse.
-    const outRow = nOut - 1;
+    // Sum stamps by (row, col) — allocElement uses 1-based ngspice indices.
     const sumAt = (row: number, col: number): number =>
       stamps.filter((s) => s.row === row && s.col === col)
             .reduce((a, s) => a + s.value, 0);
-    expect(sumAt(outRow, outRow)).toBe(NGSPICE_GOUT);
-    expect(sumAt(outRow, nInp - 1)).toBe(-NGSPICE_EFF * NGSPICE_GOUT);
-    expect(sumAt(outRow, nInn - 1)).toBe(NGSPICE_EFF * NGSPICE_GOUT);
+    expect(sumAt(nOut, nOut)).toBe(NGSPICE_GOUT);
+    expect(sumAt(nOut, nInp)).toBe(-NGSPICE_EFF * NGSPICE_GOUT);
+    expect(sumAt(nOut, nInn)).toBe(NGSPICE_EFF * NGSPICE_GOUT);
 
-    // Linear region: no RHS stamps from the op-amp.
-    const rhsAtOut = rhs.filter((r) => r.row === outRow);
-    expect(rhsAtOut.length).toBe(0);
+    // Linear region: no RHS stamps from the op-amp (1-based index).
+    expect(rhsBuf[nOut]).toBe(0);
   });
 });

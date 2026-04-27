@@ -17,13 +17,11 @@ import {
   createSpiceL1BjtElement,
   BJT_NPN_DEFAULTS,
   BJT_SPICE_L1_NPN_DEFAULTS,
-  BJT_SIMPLE_SCHEMA,
-  BJT_L1_SCHEMA,
 } from "../../../components/semiconductors/bjt.js";
-import { createDiodeElement, DIODE_PARAM_DEFAULTS, DIODE_SCHEMA } from "../../../components/semiconductors/diode.js";
+import { createDiodeElement, DIODE_PARAM_DEFAULTS } from "../../../components/semiconductors/diode.js";
 import { PropertyBag } from "../../../core/properties.js";
 import { solveDcOperatingPoint, type DcOpNRPhase, type DcOpNRAttemptOutcome } from "../dc-operating-point.js";
-import { withNodeIds, makeSimpleCtx, makeResistor, makeVoltageSource } from "./test-helpers.js";
+import { withNodeIds, makeSimpleCtx, makeResistor, makeVoltageSource, makeLoadCtx } from "./test-helpers.js";
 import { StatePool } from "../state-pool.js";
 import { createTestPropertyBag } from "../../../test-fixtures/model-fixtures.js";
 import { DefaultSimulatorFacade } from "../../../headless/default-facade.js";
@@ -57,32 +55,23 @@ function makeNullSolver(): SparseSolver {
   const zero = () => 0;
   return {
     stamp: fn,
-    stampRHS: fn,
     allocElement: zero,
     stampElement: fn,
   } as unknown as SparseSolver;
 }
 
 function makeSoloLoadCtx(voltages: Float64Array): LoadContext {
-  return {
+  const solver = makeNullSolver();
+  // rhs/rhsOld are separate buffers so that RHS stamps don't contaminate
+  // the caller's voltages array (which the tests assert stays untouched).
+  const rhs = new Float64Array(voltages.length);
+  const rhsOld = voltages;
+  return makeLoadCtx({
     cktMode: MODEDCOP | MODEINITFLOAT,
-    solver: makeNullSolver(),
-    voltages,
-    dt: 0,
-    method: "trapezoidal",
-    order: 1,
-    deltaOld: [0, 0, 0, 0, 0, 0, 0],
-    ag: new Float64Array(7),
-    srcFact: 1,
-    noncon: { value: 0 },
-    limitingCollector: null,
-    xfact: 1,
-    gmin: 1e-12,
-    reltol: 1e-3,
-    iabstol: 1e-12,
-    bypass: false,
-    voltTol: 1e-6,
-  };
+    solver,
+    rhs,
+    rhsOld,
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -154,7 +143,7 @@ describe("dcopInitJct", () => {
         -1,
         makeBjtProps(),
       );
-      const { element, pool } = withState(core);
+      const { element } = withState(core);
       withNodeIds(element, [1, 2, 3]);
 
       // Prime junctions by setting initJct mode and calling load().
@@ -165,9 +154,6 @@ describe("dcopInitJct", () => {
       ctx.cktMode = setInitf(ctx.cktMode, MODEINITFLOAT);
 
       const tVcrit = computeTVcrit(VT_ROOM, BJT_NPN_DEFAULTS.IS, BJT_NPN_DEFAULTS.AREA);
-      const base = (element as any).stateBaseOffset as number;
-      const vbeIdx = BJT_SIMPLE_SCHEMA.indexOf.get("VBE")!;
-      const vbcIdx = BJT_SIMPLE_SCHEMA.indexOf.get("VBC")!;
 
       // Primed seed landed in the device's own Vbe/Vbc slots.
       // Shared voltages vector was not touched.
@@ -195,7 +181,7 @@ describe("dcopInitJct", () => {
         -1,
         makeBjtProps(),
       );
-      const { element, pool } = withState(core);
+      const { element } = withState(core);
       withNodeIds(element, [1, 2, 3]);
 
       const voltages = new Float64Array(3);
@@ -203,11 +189,6 @@ describe("dcopInitJct", () => {
       ctx.cktMode = setInitf(ctx.cktMode, MODEINITJCT);
       element.load(ctx);
       ctx.cktMode = setInitf(ctx.cktMode, MODEINITFLOAT);
-
-      const tVcrit = computeTVcrit(VT_ROOM, BJT_NPN_DEFAULTS.IS, BJT_NPN_DEFAULTS.AREA);
-      const base = (element as any).stateBaseOffset as number;
-      const vbeIdx = BJT_SIMPLE_SCHEMA.indexOf.get("VBE")!;
-      const vbcIdx = BJT_SIMPLE_SCHEMA.indexOf.get("VBC")!;
 
     });
 
@@ -219,7 +200,7 @@ describe("dcopInitJct", () => {
         -1,
         makeBjtProps(),
       );
-      const { element, pool } = withState(core);
+      const { element } = withState(core);
       withNodeIds(element, [1, 0, 2]);
 
       const voltages = new Float64Array(2);
@@ -227,11 +208,6 @@ describe("dcopInitJct", () => {
       ctx.cktMode = setInitf(ctx.cktMode, MODEINITJCT);
       element.load(ctx);
       ctx.cktMode = setInitf(ctx.cktMode, MODEINITFLOAT);
-
-      const tVcrit = computeTVcrit(VT_ROOM, BJT_NPN_DEFAULTS.IS, BJT_NPN_DEFAULTS.AREA);
-      const base = (element as any).stateBaseOffset as number;
-      const vbeIdx = BJT_SIMPLE_SCHEMA.indexOf.get("VBE")!;
-      const vbcIdx = BJT_SIMPLE_SCHEMA.indexOf.get("VBC")!;
 
       // Key property: the seed is Vbe=+tVcrit, Vbc=0 regardless of
       // whether the collector is grounded — the old shared-vector
@@ -255,7 +231,7 @@ describe("dcopInitJct", () => {
         -1,
         props,
       );
-      const { element, pool } = withState(core);
+      const { element } = withState(core);
       withNodeIds(element, [1, 2, 3]);
 
       const voltages = new Float64Array(3);
@@ -263,11 +239,6 @@ describe("dcopInitJct", () => {
       ctx.cktMode = setInitf(ctx.cktMode, MODEINITJCT);
       element.load(ctx);
       ctx.cktMode = setInitf(ctx.cktMode, MODEINITFLOAT);
-
-      const tVcrit = computeTVcrit(VT_ROOM, BJT_SPICE_L1_NPN_DEFAULTS.IS, BJT_SPICE_L1_NPN_DEFAULTS.AREA);
-      const base = (element as any).stateBaseOffset as number;
-      const vbeIdx = BJT_L1_SCHEMA.indexOf.get("VBE")!;
-      const vbcIdx = BJT_L1_SCHEMA.indexOf.get("VBC")!;
 
       // Shared vector untouched.
       for (let i = 0; i < voltages.length; i++) expect(voltages[i]).toBe(0);
@@ -288,7 +259,7 @@ describe("dcopInitJct", () => {
         -1,
         props,
       );
-      const { element, pool } = withState(core as any);
+      const { element } = withState(core as any);
       withNodeIds(element, [1, 2]);
 
       const voltages = new Float64Array(2);
@@ -299,8 +270,6 @@ describe("dcopInitJct", () => {
 
       const nVt = DIODE_PARAM_DEFAULTS.N * VT_ROOM;
       const tVcrit = nVt * Math.log(nVt / (DIODE_PARAM_DEFAULTS.IS * Math.SQRT2));
-      const base = (element as any).stateBaseOffset as number;
-      const vdIdx = DIODE_SCHEMA.indexOf.get("VD")!;
 
       expect(voltages[0]).toBe(0);
       expect(voltages[1]).toBe(0);
@@ -320,7 +289,7 @@ describe("dcopInitJct", () => {
         -1,
         props,
       );
-      const { element, pool } = withState(core as any);
+      const { element } = withState(core as any);
       withNodeIds(element, [1, 0]);
 
       const voltages = new Float64Array(1);
@@ -328,11 +297,6 @@ describe("dcopInitJct", () => {
       ctx.cktMode = setInitf(ctx.cktMode, MODEINITJCT);
       element.load(ctx);
       ctx.cktMode = setInitf(ctx.cktMode, MODEINITFLOAT);
-
-      const nVt = DIODE_PARAM_DEFAULTS.N * VT_ROOM;
-      const tVcrit = nVt * Math.log(nVt / (DIODE_PARAM_DEFAULTS.IS * Math.SQRT2));
-      const base = (element as any).stateBaseOffset as number;
-      const vdIdx = DIODE_SCHEMA.indexOf.get("VD")!;
 
     });
   });

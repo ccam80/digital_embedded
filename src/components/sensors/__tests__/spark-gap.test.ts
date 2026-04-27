@@ -18,7 +18,7 @@ import { ComponentCategory } from "../../../core/registry.js";
 import type { AnalogFactory } from "../../../core/registry.js";
 import type { AnalogElement } from "../../../solver/analog/element.js";
 import { makeSimpleCtx, makeLoadCtx } from "../../../solver/analog/__tests__/test-helpers.js";
-import { MODETRAN, MODEINITFLOAT } from "../../../solver/analog/ckt-mode.js";
+import { MODETRAN, MODEINITFLOAT, MODEDCOP } from "../../../solver/analog/ckt-mode.js";
 import type { SparseSolver as SparseSolverType } from "../../../solver/analog/sparse-solver.js";
 import type { LoadContext } from "../../../solver/analog/load-context.js";
 
@@ -66,10 +66,9 @@ function makeCaptureSolver(): {
 // SparkGap.accept reads ctx.voltages and applies discrete state transitions.
 // ---------------------------------------------------------------------------
 
-function makeAcceptCtx(voltages: Float64Array): LoadContext {
+function makeAcceptCtx(_voltages: Float64Array): LoadContext {
   return makeLoadCtx({
     solver: undefined as unknown as SparseSolverType,
-    voltages,
     cktMode: MODETRAN | MODEINITFLOAT,
     dt: 1e-6,
     deltaOld: [1e-6, 1e-6, 1e-6, 1e-6, 1e-6, 1e-6, 1e-6],
@@ -273,11 +272,10 @@ describe("SparkGap", () => {
       applyVoltage(gap, 100);
 
       const { solver, stamps } = makeCaptureSolver();
-      const ctx = makeSimpleCtx({
+      const ctx = makeLoadCtx({
         solver,
-        elements: [gap as unknown as AnalogElement],
-        matrixSize: 2,
-        nodeCount: 2,
+        cktMode: MODEDCOP | MODEINITFLOAT,
+        dt: 0,
       });
 
       gap.load(ctx);
@@ -296,11 +294,10 @@ describe("SparkGap", () => {
       // Blocking state conductance
       applyVoltage(gap, 100);
       const { solver: solver1, stamps: stamps1 } = makeCaptureSolver();
-      const ctx1 = makeSimpleCtx({
+      const ctx1 = makeLoadCtx({
         solver: solver1,
-        elements: [gap as unknown as AnalogElement],
-        matrixSize: 2,
-        nodeCount: 2,
+        cktMode: MODEDCOP | MODEINITFLOAT,
+        dt: 0,
       });
       gap.load(ctx1);
       const G_off = stamps1.find((s) => s.row === 0 && s.col === 0)!.value;
@@ -308,11 +305,10 @@ describe("SparkGap", () => {
       // Conducting state conductance
       applyVoltage(gap, 1500);
       const { solver: solver2, stamps: stamps2 } = makeCaptureSolver();
-      const ctx2 = makeSimpleCtx({
+      const ctx2 = makeLoadCtx({
         solver: solver2,
-        elements: [gap as unknown as AnalogElement],
-        matrixSize: 2,
-        nodeCount: 2,
+        cktMode: MODEDCOP | MODEINITFLOAT,
+        dt: 0,
       });
       gap.load(ctx2);
       const G_on = stamps2.find((s) => s.row === 0 && s.col === 0)!.value;

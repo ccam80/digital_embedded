@@ -61,7 +61,6 @@ function driveFuseStep(fuse: AnalogFuseElement, dt: number, voltages: Float64Arr
   solver._initStructure(Math.max(voltages.length, 1));
   const ctx = makeLoadCtx({
     solver,
-    voltages,
     cktMode: MODETRAN | MODEINITFLOAT,
     dt,
     deltaOld: [dt, dt, dt, dt, dt, dt, dt],
@@ -296,7 +295,6 @@ describe("AnalogFuseElement", () => {
       });
 
       expect(result.converged).toBe(true);
-      const sourceCurrent = Math.abs(result.nodeVoltages[1]);
     });
 
     it("stamps near-zero conductance when blown", () => {
@@ -322,6 +320,7 @@ describe("AnalogFuseElement", () => {
         pinNodeIds: [2, 0] as readonly number[],
         allNodeIds: [2, 0] as readonly number[],
         branchIndex: -1,
+        ngspiceLoadOrder: 0,
         isNonlinear: false,
         isReactive: false,
         setParam(_key: string, _value: number): void {},
@@ -338,7 +337,6 @@ describe("AnalogFuseElement", () => {
       });
 
       expect(result.converged).toBe(true);
-      const sourceCurrent = Math.abs(result.nodeVoltages[2]);
     });
   });
 

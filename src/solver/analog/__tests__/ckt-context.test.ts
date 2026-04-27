@@ -257,8 +257,8 @@ describe("CKTCircuitContext", () => {
     expect(lc.solver).toBe(ctx.solver);
 
     // voltages — points into rhsOld
-    expect(lc.voltages).toBeInstanceOf(Float64Array);
-    expect(lc.voltages).toBe(ctx.rhsOld);
+    expect(lc.rhsOld).toBeInstanceOf(Float64Array);
+    expect(lc.rhsOld).toBe(ctx.rhsOld);
 
     // Deleted per Phase 2.5 W2.2 (C3 + D1) + A1 §Test handling rule:
     //   lc.iteration — removed by C3 (cktLoad no longer takes an iteration param;

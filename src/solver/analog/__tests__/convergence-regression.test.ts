@@ -70,7 +70,7 @@ function makeHalfWaveRectifier(): {
       elements,
       labelToNodeId: new Map(),
       statePool: pool,
-    },
+    } as unknown as ConcreteCompiledAnalogCircuit,
     pool,
   };
 }
@@ -102,7 +102,7 @@ function makeRCCircuit(): {
       elements,
       labelToNodeId: new Map(),
       statePool: pool,
-    },
+    } as unknown as ConcreteCompiledAnalogCircuit,
     pool,
   };
 }
@@ -239,7 +239,6 @@ describe("convergence regression", () => {
     expect(engine.simTime).toBeGreaterThan(0);
 
     // Voltages should remain physically plausible
-    const v1 = engine.getNodeVoltage(1);
     const v2 = engine.getNodeVoltage(2);
     expect(v2).toBeGreaterThan(0.4);
     expect(v2).toBeLessThan(1.0);

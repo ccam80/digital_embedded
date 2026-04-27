@@ -50,6 +50,7 @@ import {
   type ComponentDefinition,
 } from "../../core/registry.js";
 import type { AnalogElement, AnalogElementCore, ReactiveAnalogElement, IntegrationMethod, LoadContext } from "../../solver/analog/element.js";
+import { NGSPICE_LOAD_ORDER } from "../../solver/analog/element.js";
 import { MODEDC, MODETRAN, MODETRANOP, MODEINITPRED, MODEINITTRAN } from "../../solver/analog/ckt-mode.js";
 import { stampG, stampRHS } from "../../solver/analog/stamp-helpers.js";
 import { cktTerr } from "../../solver/analog/ckt-terr.js";
@@ -245,6 +246,7 @@ class SegmentResistorElement implements AnalogElement {
   readonly pinNodeIds: readonly number[];
   readonly allNodeIds: readonly number[];
   readonly branchIndex: number = -1;
+  readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.TRA;
   readonly isNonlinear = false;
   readonly isReactive = false;
   setParam(_key: string, _value: number): void {}
@@ -283,6 +285,7 @@ class SegmentShuntConductanceElement implements AnalogElement {
   readonly pinNodeIds: readonly number[];
   readonly allNodeIds: readonly number[];
   readonly branchIndex: number = -1;
+  readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.TRA;
   readonly isNonlinear = false;
   readonly isReactive = false;
   setParam(_key: string, _value: number): void {}
@@ -328,12 +331,21 @@ class SegmentInductorElement implements ReactiveAnalogElement {
   readonly pinNodeIds: readonly number[];
   readonly allNodeIds: readonly number[];
   readonly branchIndex: number;
+  readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.TRA;
   readonly isNonlinear = false;
   readonly isReactive = true;
   readonly poolBacked = true as const;
   readonly stateSchema = SEGMENT_INDUCTOR_SCHEMA;
   readonly stateSize = SEGMENT_INDUCTOR_SCHEMA.size;
   stateBaseOffset = -1;
+  s0: Float64Array = new Float64Array(0);
+  s1: Float64Array = new Float64Array(0);
+  s2: Float64Array = new Float64Array(0);
+  s3: Float64Array = new Float64Array(0);
+  s4: Float64Array = new Float64Array(0);
+  s5: Float64Array = new Float64Array(0);
+  s6: Float64Array = new Float64Array(0);
+  s7: Float64Array = new Float64Array(0);
   setParam(_key: string, _value: number): void {}
 
   private readonly L: number;
@@ -434,12 +446,21 @@ class SegmentCapacitorElement implements ReactiveAnalogElement {
   readonly pinNodeIds: readonly number[];
   readonly allNodeIds: readonly number[];
   readonly branchIndex: number = -1;
+  readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.TRA;
   readonly isNonlinear = false;
   readonly isReactive = true;
   readonly poolBacked = true as const;
   readonly stateSchema = SEGMENT_CAPACITOR_SCHEMA;
   readonly stateSize = SEGMENT_CAPACITOR_SCHEMA.size;
   stateBaseOffset = -1;
+  s0: Float64Array = new Float64Array(0);
+  s1: Float64Array = new Float64Array(0);
+  s2: Float64Array = new Float64Array(0);
+  s3: Float64Array = new Float64Array(0);
+  s4: Float64Array = new Float64Array(0);
+  s5: Float64Array = new Float64Array(0);
+  s6: Float64Array = new Float64Array(0);
+  s7: Float64Array = new Float64Array(0);
   setParam(_key: string, _value: number): void {}
 
   private readonly C: number;
@@ -536,12 +557,21 @@ class CombinedRLElement implements ReactiveAnalogElement {
   readonly pinNodeIds: readonly number[];
   readonly allNodeIds: readonly number[];
   readonly branchIndex: number;
+  readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.TRA;
   readonly isNonlinear = false;
   readonly isReactive = true;
   readonly poolBacked = true as const;
   readonly stateSchema = COMBINED_RL_SCHEMA;
   readonly stateSize = COMBINED_RL_SCHEMA.size;
   stateBaseOffset = -1;
+  s0: Float64Array = new Float64Array(0);
+  s1: Float64Array = new Float64Array(0);
+  s2: Float64Array = new Float64Array(0);
+  s3: Float64Array = new Float64Array(0);
+  s4: Float64Array = new Float64Array(0);
+  s5: Float64Array = new Float64Array(0);
+  s6: Float64Array = new Float64Array(0);
+  s7: Float64Array = new Float64Array(0);
   setParam(_key: string, _value: number): void {}
 
   private readonly R: number;
@@ -643,6 +673,7 @@ export class TransmissionLineElement implements AnalogElement {
   readonly pinNodeIds: readonly number[];
   readonly allNodeIds: readonly number[];
   readonly branchIndex: number;
+  readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.TRA;
   readonly isNonlinear = false;
   readonly isReactive = true;
   readonly poolBacked = true as const;

@@ -118,8 +118,8 @@ describe("exportSvg", () => {
     const svg1 = exportSvg(circuit, { scale: 1, colorScheme: lightColorScheme });
     const svg2 = exportSvg(circuit, { scale: 2, colorScheme: lightColorScheme });
 
-    const vb1 = parseViewBox(svg1);
-    const vb2 = parseViewBox(svg2);
+    parseViewBox(svg1);
+    parseViewBox(svg2);
 
     // Width and height (indices 2 and 3) should double
   });
@@ -176,8 +176,8 @@ describe("exportSvg", () => {
     const svg10 = exportSvg(circuit, { margin: 10, colorScheme: lightColorScheme });
     const svg20 = exportSvg(circuit, { margin: 20, colorScheme: lightColorScheme });
 
-    const vb10 = parseViewBox(svg10);
-    const vb20 = parseViewBox(svg20);
+    parseViewBox(svg10);
+    parseViewBox(svg20);
 
     // Each extra unit of margin adds 2 units to each dimension (both sides)
   });

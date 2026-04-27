@@ -6,7 +6,6 @@
  * element-specific convergence checking, and blame tracking.
  */
 
-import type { DiagnosticCollector } from "./diagnostics.js";
 import { makeDiagnostic } from "./diagnostics.js";
 import type { CKTCircuitContext } from "./ckt-context.js";
 import { cktLoad } from "./ckt-load.js";
@@ -359,6 +358,16 @@ export function newtonRaphson(ctx: CKTCircuitContext): void {
     // the caller seeded (predictor / DC-OP carryover); at iter K>0 the previous
     // ctx.swapRhsBuffers() rotated iter K-1's solve output into ctx.rhsOld.
     cktLoad(ctx);
+
+    // ---- STEP B+: Pre-factor instrumentation hook (ngspice niiter.c:704-842) ----
+    // Mirrors ngspice's `if (ni_instrument_cb)` block sitting between CKTload
+    // (niiter.c:667) and SMPpreOrder (niiter.c:844). The unique window where
+    // the assembled MNA holds post-load, pre-LU values — solver.preorder() may
+    // exchange columns and solver.factor() overwrites _elVal[] with LU. Harness
+    // consumers register a hook that calls solver.getCSCNonZeros() here.
+    // No-op when null; same optional-chain shape as the postIterationHook
+    // gate below.
+    ctx.preFactorHook?.(ctx);
 
     // ---- STEP D: Preorder (ngspice niiter.c:844-855, NIDIDPREORDER gate) ----
     // solver.preorder() is idempotent via solver._didPreorder; calling

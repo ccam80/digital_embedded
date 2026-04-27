@@ -22,6 +22,7 @@ import {
 } from "../../core/registry.js";
 import { formatSI } from "../../editor/si-format.js";
 import type { AnalogElementCore, ReactiveAnalogElementCore, IntegrationMethod, LoadContext } from "../../solver/analog/element.js";
+import { NGSPICE_LOAD_ORDER } from "../../solver/analog/element.js";
 import { cktTerr } from "../../solver/analog/ckt-terr.js";
 import { niIntegrate } from "../../solver/analog/ni-integrate.js";
 import {
@@ -163,12 +164,21 @@ const SLOT_CCAP = 4;
 export class AnalogCapacitorElement implements ReactiveAnalogElementCore {
   pinNodeIds!: readonly number[];
   readonly branchIndex = -1;
+  readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.CAP;
   readonly isNonlinear = false;
   readonly isReactive = true;
   readonly poolBacked = true as const;
   readonly stateSchema = CAPACITOR_SCHEMA;
   readonly stateSize = CAPACITOR_SCHEMA.size;
   stateBaseOffset = -1;
+  s0: Float64Array = new Float64Array(0);
+  s1: Float64Array = new Float64Array(0);
+  s2: Float64Array = new Float64Array(0);
+  s3: Float64Array = new Float64Array(0);
+  s4: Float64Array = new Float64Array(0);
+  s5: Float64Array = new Float64Array(0);
+  s6: Float64Array = new Float64Array(0);
+  s7: Float64Array = new Float64Array(0);
 
   private _nominalC: number;
   private C: number;

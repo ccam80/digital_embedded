@@ -11,7 +11,6 @@ import { resolve } from "path";
 import { ComparisonSession } from "./comparison-session.js";
 import type {
   CaptureSession,
-  DivergenceCategory,
 } from "./types.js";
 
 const DLL_PATH = process.env.NGSPICE_DLL_PATH ?? "";
@@ -339,22 +338,9 @@ describeGate("Stream Verification -- full pipeline (HWR square wave)", () => {
 
     for (const j of report.junctions) {
       if (Number.isFinite(j.ourPreLimit) && Number.isFinite(j.ourPostLimit)) {
-        const expectedOurDelta = j.ourPostLimit - j.ourPreLimit;
         if (j.ourPostLimit > j.ourPreLimit) {
           expect(j.ourDelta).toBeGreaterThan(0);
         }
-      }
-      if (
-        Number.isFinite(j.ngspicePreLimit) &&
-        Number.isFinite(j.ngspicePostLimit)
-      ) {
-        const expectedNgDelta = j.ngspicePostLimit - j.ngspicePreLimit;
-      }
-      if (
-        Number.isFinite(j.ourDelta) &&
-        Number.isFinite(j.ngspiceDelta)
-      ) {
-        const expectedDiff = j.ourDelta - j.ngspiceDelta;
       }
     }
   });
@@ -371,6 +357,6 @@ describeGate("Stream Verification -- full pipeline (HWR square wave)", () => {
   });
 
   it("16. step alignment: first step at time 0", () => {
-    const ourSteps = session.ourSession!.steps;
+    void session.ourSession!.steps;
   });
 });

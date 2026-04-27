@@ -36,7 +36,6 @@ import {
   MODEDCOP, MODEINITFLOAT, MODEINITFIX,
   MODETRAN, MODEINITTRAN, MODEINITJCT,
   MODEINITSMSIG, MODEINITPRED, MODEUIC,
-  MODEDCTRANCURVE, MODETRANOP,
   setInitf,
 } from "../../../solver/analog/ckt-mode.js";
 import {
@@ -148,17 +147,18 @@ function makeNmosAtVgs_Vds(
   const elementWithPins = element as unknown as AnalogElement;
 
   // Drive to operating point: vG=vgs+vS, vD=vds+vS, vS=0
-  const voltages = new Float64Array(3);
-  voltages[0] = vds;  // V(node1=D) = Vds (source at 0)
-  voltages[1] = vgs;  // V(node2=G) = Vgs
-  voltages[2] = 0;    // V(node3=S) = 0
+  // 1-based: [0]=ground, [1]=nodeD, [2]=nodeG, [3]=nodeS
+  const voltages = new Float64Array(4);
+  voltages[1] = vds;  // V(node1=D) = Vds (source at 0)
+  voltages[2] = vgs;  // V(node2=G) = Vgs
+  voltages[3] = 0;    // V(node3=S) = 0
 
   // Iterate to converge voltage limiting
   for (let i = 0; i < 50; i++) {
-    elementWithPins.load(makeDcOpCtx(voltages, 3));
-    voltages[0] = vds;
-    voltages[1] = vgs;
-    voltages[2] = 0;
+    elementWithPins.load(makeDcOpCtx(voltages, 4));
+    voltages[1] = vds;
+    voltages[2] = vgs;
+    voltages[3] = 0;
   }
   return elementWithPins;
 }
@@ -173,6 +173,7 @@ function makeResistorElement(nodeA: number, nodeB: number, resistance: number): 
     pinNodeIds: [nodeA, nodeB],
     allNodeIds: [nodeA, nodeB],
     branchIndex: -1,
+    ngspiceLoadOrder: 0,
     isNonlinear: false,
     isReactive: false,
     setParam(_key: string, _value: number): void {},
@@ -198,17 +199,19 @@ describe("NMOS", () => {
     // Vgs = 0V < VTO = 0.7V â†’ device off, Id â‰ˆ 0
     const element = makeNmosAtVgs_Vds(0, 5, NMOS_DEFAULTS);
 
-    const voltages = new Float64Array(3);
-    voltages[0] = 5;
-    voltages[1] = 0;
+    // 1-based: [0]=ground, [1]=nodeD, [2]=nodeG, [3]=nodeS
+    const voltages = new Float64Array(4);
+    voltages[1] = 5;
     voltages[2] = 0;
-    const ctx = makeDcOpCtx(voltages, 3);
+    voltages[3] = 0;
+    const ctx = makeDcOpCtx(voltages, 4);
     element.load(ctx);
-    const rhs = ctx.solver.getRhsSnapshot();
+    const rhs = ctx.rhs;
 
-    // The Norton current at drain/source should be â‰ˆ 0 (only GMIN leakage)
+    // The Norton current at drain/source should be ~ 0 (only GMIN leakage)
     // All RHS stamps will be present but very small
-    for (let i = 0; i < rhs.length; i++) {
+    // Check indices 1..3 (1-based nodes; index 0 is ground sentinel)
+    for (let i = 1; i < rhs.length; i++) {
       expect(Math.abs(rhs[i])).toBeLessThan(1e-10);
     }
   });
@@ -238,22 +241,23 @@ describe("NMOS", () => {
     const element = createMosfetElement(1, new Map([["G", 2], ["S", 3], ["D", 1]]), [], -1, propsObj);
     // pinNodeIds set by compiler in production; here we verify the factory uses pin nodes correctly
     // by checking that stamp methods work when pinNodeIds is injected (pinLayout: [G, D, S, B])
-    Object.assign(element, { pinNodeIds: [2, 1, 3, 3], allNodeIds: [2, 1, 3, 3] }); // G=2, D=1, S=3, B=S=3
+    const el = withNodeIds(element, [2, 1, 3, 3]); // G=2, D=1, S=3, B=S=3
     // pinNodeIds includes D, G, S, and bulk (= S when not specified)
-    expect(element.pinNodeIds).toContain(1); // D
-    expect(element.pinNodeIds).toContain(2); // G
-    expect(element.pinNodeIds).toContain(3); // S
+    expect(el.pinNodeIds).toContain(1); // D
+    expect(el.pinNodeIds).toContain(2); // G
+    expect(el.pinNodeIds).toContain(3); // S
   });
 
   it("stamp_nonlinear_has_conductance_entries", () => {
     // Vgs=3V, Vds=5V (saturation): load should stamp nonzero conductances
     const element = makeNmosAtVgs_Vds(3, 5, NMOS_DEFAULTS);
 
-    const voltages = new Float64Array(3);
-    voltages[0] = 5;
-    voltages[1] = 3;
-    voltages[2] = 0;
-    const ctx = makeDcOpCtx(voltages, 3);
+    // 1-based: [0]=ground, [1]=nodeD, [2]=nodeG, [3]=nodeS
+    const voltages = new Float64Array(4);
+    voltages[1] = 5;
+    voltages[2] = 3;
+    voltages[3] = 0;
+    const ctx = makeDcOpCtx(voltages, 4);
     element.load(ctx);
     const entries = ctx.solver.getCSCNonZeros();
 
@@ -271,23 +275,24 @@ describe("NMOS", () => {
     const baseline = makeNmosAtVgs_Vds(3, 5, NMOS_DEFAULTS);
     const zeroed = makeNmosAtVgs_Vds(3, 5, NMOS_DEFAULTS);
 
-    const voltages = new Float64Array(3);
-    voltages[0] = 5;
-    voltages[1] = 3;
-    voltages[2] = 0;
+    // 1-based: [0]=ground, [1]=nodeD, [2]=nodeG, [3]=nodeS
+    const voltages = new Float64Array(4);
+    voltages[1] = 5;
+    voltages[2] = 3;
+    voltages[3] = 0;
 
-    const ctxBaseline = makeDcOpCtx(voltages, 3);
+    const ctxBaseline = makeDcOpCtx(voltages, 4);
     ctxBaseline.srcFact = 1;
     baseline.load(ctxBaseline);
 
-    const ctxZero = makeDcOpCtx(voltages, 3);
+    const ctxZero = makeDcOpCtx(voltages, 4);
     ctxZero.srcFact = 0;
     zeroed.load(ctxZero);
 
     const baselineEntries = ctxBaseline.solver.getCSCNonZeros();
     const zeroEntries     = ctxZero.solver.getCSCNonZeros();
-    const baselineRhs     = ctxBaseline.solver.getRhsSnapshot();
-    const zeroRhs         = ctxZero.solver.getRhsSnapshot();
+    const baselineRhs     = ctxBaseline.rhs;
+    const zeroRhs         = ctxZero.rhs;
 
     expect(zeroEntries.length).toBe(baselineEntries.length);
     for (let i = 0; i < baselineEntries.length; i++) {
@@ -323,8 +328,8 @@ describe("NMOS", () => {
 
     const defaultEntries = ctxDefault.solver.getCSCNonZeros();
     const scaledEntries = ctxScaled.solver.getCSCNonZeros();
-    const defaultRhs = ctxDefault.solver.getRhsSnapshot();
-    const scaledRhs = ctxScaled.solver.getRhsSnapshot();
+    const defaultRhs = ctxDefault.rhs;
+    const scaledRhs = ctxScaled.rhs;
 
     expect(defaultEntries.length).toBe(scaledEntries.length);
     // Order of entries is deterministic given identical stamp sequences.
@@ -389,7 +394,7 @@ describe("PMOS", () => {
 
     const ctx = makeDcOpCtx(voltages, 3);
     element.load(ctx);
-    const rhs = ctx.solver.getRhsSnapshot();
+    const rhs = ctx.rhs;
 
     // PMOS in saturation: Id should flow from S to D (conventional positive Isd)
     // Norton current at drain node should be positive (current entering drain = Isd)
@@ -486,7 +491,6 @@ describe("Integration", () => {
     // node voltages: [V(1)=Vdrain, V(2)=Vdd=5V, V(3)=Vgate=3V, I_vdd, I_vgate]
     const vDrain = result.nodeVoltages[0];
     const vDd = result.nodeVoltages[1];
-    const vGate = result.nodeVoltages[2];
 
     // Vdd should be 5V (enforced by source)
 
@@ -695,11 +699,8 @@ describe("PMOS temperature scaling", () => {
       TNOM: 300.15,
     });
 
-    const nmos = withState(createMosfetElement(1, new Map([["G", 1], ["S", 2], ["D", 3]]), [], -1, nmosProps)) as any;
-    const pmos = withState(createMosfetElement(-1, new Map([["G", 1], ["S", 2], ["D", 3]]), [], -1, pmosProps)) as any;
-
-    const nmosTVto: number = nmos._p._tVto;
-    const pmosTVto: number = pmos._p._tVto;
+    withState(createMosfetElement(1, new Map([["G", 1], ["S", 2], ["D", 3]]), [], -1, nmosProps));
+    withState(createMosfetElement(-1, new Map([["G", 1], ["S", 2], ["D", 3]]), [], -1, pmosProps));
 
     // At nominal temperature both should be close to |VTO|=0.7
   });
@@ -853,7 +854,7 @@ describe("MOSFET LoadContext precondition", () => {
         solver,
         matrix: solver,
         rhs: new Float64Array(4),
-        rhsOld: new Float64Array([2.0, 1.5, 0.0, 0.0]),
+        rhsOld: new Float64Array([0, 2.0, 1.5, 0.0]),
         time: 0,
         dt: 0,
         method: "trapezoidal",
@@ -1087,9 +1088,7 @@ const S_CAPGS= 4,  S_QGS  = 5,  S_CQGS = 6;
 const S_CAPGD= 7,  S_QGD  = 8,  S_CQGD = 9;
 const S_CAPGB= 10, S_QGB  = 11, S_CQGB = 12;
 const S_QBD  = 13, S_CQBD = 14, S_QBS  = 15, S_CQBS = 16;
-const S_CD   = 17, S_CBD  = 18, S_CBS  = 19;
-const S_GBD  = 20, S_GBS  = 21, S_GM   = 22, S_GDS  = 23, S_GMBS = 24;
-const S_MODE = 25, S_VON  = 26, S_VDSAT= 27;
+const S_CD   = 17;
 
 // ---------------------------------------------------------------------------
 // Task 6.2.1: M-1 â€” MODEINITPRED limiting routing
@@ -1185,7 +1184,7 @@ describe("MOSFET M-1", () => {
   });
 
   it("INITJCT path still skips limiting", () => {
-    const { element, pool } = makeNmosElement62({ OFF: 0 });
+    const { element } = makeNmosElement62({ OFF: 0 });
     const ctx = makeWave62Ctx(MODEDCOP | MODEINITJCT, { limitingCollector: [] });
     element.load(ctx);
     // MODEINITJCT path seeds from IC params and does not run limiting.
@@ -1209,7 +1208,7 @@ describe("MOSFET M-2", () => {
     runA.pool.states[0][S_VGS] = 0.5; runA.pool.states[0][S_VDS] = 0.0;
     runA.pool.states[0][S_VBS] = 0.0; runA.pool.states[0][S_VBD] = 0.0;
     const ctxA = makeWave62Ctx(MODEDCOP | MODEINITSMSIG, {
-      rhsOld: new Float64Array([2.0, 1.5, 0.0, 0.0]),  // V_D=2, V_G=1.5, V_S=0 â†’ vgs=1.5
+      rhsOld: new Float64Array([0, 2.0, 1.5, 0.0]),  // V_D=2, V_G=1.5, V_S=0 â†’ vgs=1.5
     });
     runA.element.load(ctxA);
     const cdA = runA.pool.states[0][S_CD];
@@ -1219,7 +1218,7 @@ describe("MOSFET M-2", () => {
     runB.pool.states[0][S_VGS] = 0.5; runB.pool.states[0][S_VDS] = 0.0;
     runB.pool.states[0][S_VBS] = 0.0; runB.pool.states[0][S_VBD] = 0.0;
     const ctxB = makeWave62Ctx(MODEDCOP | MODEINITSMSIG, {
-      rhsOld: new Float64Array([2.0, 0.3, 0.0, 0.0]),  // V_G=0.3 â†’ vgs=0.3 (below threshold)
+      rhsOld: new Float64Array([0, 2.0, 0.3, 0.0]),  // V_G=0.3 â†’ vgs=0.3 (below threshold)
     });
     runB.element.load(ctxB);
     const cdB = runB.pool.states[0][S_CD];
@@ -1257,7 +1256,7 @@ describe("MOSFET M-2", () => {
 
     const ctx = makeWave62Ctx(MODEDCOP | MODEINITSMSIG, {
       ag,
-      rhsOld: new Float64Array([1.0, 1.5, 0.0, 0.0]),
+      rhsOld: new Float64Array([0, 1.0, 1.5, 0.0]),
     });
 
     // Should not throw; SMSIG load() must run to completion.
@@ -1280,7 +1279,7 @@ describe("MOSFET M-2", () => {
     s0[S_CQBS] = sentinel;
 
     const ctx = makeWave62Ctx(MODEDCOP | MODEINITSMSIG, {
-      rhsOld: new Float64Array([1.0, 1.5, 0.0, 0.0]),
+      rhsOld: new Float64Array([0, 1.0, 1.5, 0.0]),
     });
 
     element.load(ctx);
@@ -1297,7 +1296,7 @@ describe("MOSFET M-2", () => {
     });
 
     const ctx = makeWave62Ctx(MODEDCOP | MODEINITSMSIG, {
-      rhsOld: new Float64Array([1.0, 1.5, 0.0, 0.0]),
+      rhsOld: new Float64Array([0, 1.0, 1.5, 0.0]),
     });
 
     element.load(ctx);
@@ -1309,10 +1308,10 @@ describe("MOSFET M-2", () => {
   });
 
   it("SMSIG stamps run", () => {
-    const { element, pool } = makeNmosElement62({ VTO: 0.7, KP: 120e-6, GAMMA: 0 });
+    const { element } = makeNmosElement62({ VTO: 0.7, KP: 120e-6, GAMMA: 0 });
 
     const ctx = makeWave62Ctx(MODEDCOP | MODEINITSMSIG, {
-      rhsOld: new Float64Array([1.0, 1.5, 0.0, 0.0]),
+      rhsOld: new Float64Array([0, 1.0, 1.5, 0.0]),
     });
 
     element.load(ctx);
@@ -1404,9 +1403,9 @@ describe("MOSFET M-3", () => {
 describe("MOSFET M-4", () => {
   /** Seed state0 to a converged DC-OP at Vgs=1.5, Vds=2.0, Vbs=0.
    *  Runs several load() iterations so the state0 carries valid conductances. */
-  function seedConvergedState(element: any, pool: StatePool): void {
+  function seedConvergedState(element: any): void {
     const ctx = makeWave62Ctx(MODEDCOP | MODEINITFLOAT, {
-      rhsOld: new Float64Array([2.0, 1.5, 0.0, 0.0]),
+      rhsOld: new Float64Array([0, 2.0, 1.5, 0.0]),
       bypass: false,
     });
     for (let i = 0; i < 20; i++) {
@@ -1422,7 +1421,7 @@ describe("MOSFET M-4", () => {
     const { element, pool } = makeNmosElement62({
       VTO: 0.7, KP: 120e-6, GAMMA: 0, CBD: 0, CBS: 0,
     });
-    seedConvergedState(element, pool);
+    seedConvergedState(element);
 
     const s0Before = pool.states[0];
     const cdBefore = s0Before[S_CD];
@@ -1431,7 +1430,7 @@ describe("MOSFET M-4", () => {
     const cqgbBefore = s0Before[S_CQGB];
 
     // rhsOld matches state0 exactly â†’ delvXX = 0 â†’ bypass fires.
-    const rhsOld = new Float64Array([2.0, 1.5, 0.0, 0.0]);
+    const rhsOld = new Float64Array([0, 2.0, 1.5, 0.0]);
     const ctx = makeWave62Ctx(MODEDCOP | MODEINITFLOAT, {
       rhsOld,
       bypass: true,
@@ -1456,14 +1455,14 @@ describe("MOSFET M-4", () => {
     const { element, pool } = makeNmosElement62({
       VTO: 0.7, KP: 120e-6, GAMMA: 0, CBD: 0, CBS: 0,
     });
-    seedConvergedState(element, pool);
+    seedConvergedState(element);
 
     // Pre-write SLOT_CD to a sentinel; fresh OP eval overwrites it.
     const CD_SENTINEL = -9.9999e-42;
     pool.states[0][S_CD] = CD_SENTINEL;
 
     const ctx = makeWave62Ctx(MODEDCOP | MODETRAN | MODEINITPRED, {
-      rhsOld: new Float64Array([2.0, 1.5, 0.0, 0.0]),
+      rhsOld: new Float64Array([0, 2.0, 1.5, 0.0]),
       bypass: true,
       voltTol: 1e-6,
       dt: 1e-9,
@@ -1497,14 +1496,14 @@ describe("MOSFET M-4", () => {
     const { element, pool } = makeNmosElement62({
       VTO: 0.7, KP: 120e-6, GAMMA: 0, CBD: 0, CBS: 0,
     });
-    seedConvergedState(element, pool);
+    seedConvergedState(element);
 
     // Pre-write SLOT_CD to a sentinel; fresh OP eval overwrites it.
     const CD_SENTINEL = -7.7777e-42;
     pool.states[0][S_CD] = CD_SENTINEL;
 
     const ctx = makeWave62Ctx(MODEDCOP | MODEINITSMSIG, {
-      rhsOld: new Float64Array([2.0, 1.5, 0.0, 0.0]),
+      rhsOld: new Float64Array([0, 2.0, 1.5, 0.0]),
       bypass: true,
       voltTol: 1e-6,
     });
@@ -1531,7 +1530,7 @@ describe("MOSFET M-4", () => {
     const { element, pool } = makeNmosElement62({
       VTO: 0.7, KP: 120e-6, GAMMA: 0, CBD: 0, CBS: 0,
     });
-    seedConvergedState(element, pool);
+    seedConvergedState(element);
 
     // Set delvbs = 10 * voltTol (large deviation â†’ bypass should not fire).
     const s0 = pool.states[0];
@@ -1546,7 +1545,7 @@ describe("MOSFET M-4", () => {
     s0[S_CD] = CD_SENTINEL;
 
     const ctx = makeWave62Ctx(MODEDCOP | MODEINITFLOAT, {
-      rhsOld: new Float64Array([2.0, 1.5, 0.0, 0.0]),
+      rhsOld: new Float64Array([0, 2.0, 1.5, 0.0]),
       bypass: true,
       voltTol,
     });
@@ -1577,7 +1576,7 @@ describe("MOSFET M-4", () => {
       CGSO: cgso / 1e-6, // CGSO is per-unit-width; W=1e-6 â†’ GateSourceOverlapCap = cgso
       W: 1e-6, CGDO: 0,
     });
-    seedConvergedState(element, pool);
+    seedConvergedState(element);
 
     const s0 = pool.states[0];
     const s1 = pool.states[1];
@@ -1586,7 +1585,7 @@ describe("MOSFET M-4", () => {
 
     // Use matching rhsOld to trigger bypass (small delv).
     const ctx = makeWave62Ctx(MODEDCOP | MODETRAN | MODEINITFLOAT, {
-      rhsOld: new Float64Array([2.0, 1.5, 0.0, 0.0]),
+      rhsOld: new Float64Array([0, 2.0, 1.5, 0.0]),
       bypass: true,
       voltTol: 1e-6,
     });
@@ -1599,13 +1598,13 @@ describe("MOSFET M-4", () => {
     // noncon gate runs after bypass per mos1load.c:738 (after `bypass:` label).
     // With icheckLimited=false (MODEINITFLOAT, no pnjlim limit), noncon does not increment.
     // This test verifies that bypass does not suppress the noncon gate pathway.
-    const { element, pool } = makeNmosElement62({
+    const { element } = makeNmosElement62({
       VTO: 0.7, KP: 120e-6, GAMMA: 0, CBD: 0, CBS: 0, OFF: 0,
     });
-    seedConvergedState(element, pool);
+    seedConvergedState(element);
 
     const ctx = makeWave62Ctx(MODEDCOP | MODEINITFLOAT, {
-      rhsOld: new Float64Array([2.0, 1.5, 0.0, 0.0]),
+      rhsOld: new Float64Array([0, 2.0, 1.5, 0.0]),
       bypass: true,
       voltTol: 1e-6,
       noncon: { value: 0 },
@@ -1633,7 +1632,7 @@ describe("MOSFET M-5", () => {
 
     // rhsOld[0]=D=-0.5, rhsOld[2]=S=0 â†’ new vds = -0.5; reverse mode.
     const ctx = makeWave62Ctx(MODEDCOP | MODEINITFLOAT, {
-      rhsOld: new Float64Array([-0.5, 1.5, 0.0, 0.0]),
+      rhsOld: new Float64Array([0, -0.5, 1.5, 0.0]),
       cktFixLimit: true,
       limitingCollector: [],
     });
@@ -1655,7 +1654,7 @@ describe("MOSFET M-5", () => {
 
     // rhsOld drives a very large negative vds to ensure limvds fires.
     const ctx = makeWave62Ctx(MODEDCOP | MODEINITFLOAT, {
-      rhsOld: new Float64Array([-5.0, 1.5, 0.0, 0.0]),
+      rhsOld: new Float64Array([0, -5.0, 1.5, 0.0]),
       cktFixLimit: false,
       limitingCollector: [],
     });
@@ -1677,7 +1676,7 @@ describe("MOSFET M-5", () => {
 
     const ctx = makeWave62Ctx(MODEDCOP | MODEINITFLOAT, {
       // Drive vds to a very different value to ensure fetlim/limvds fires.
-      rhsOld: new Float64Array([10.0, 1.5, 0.0, 0.0]),
+      rhsOld: new Float64Array([0, 10.0, 1.5, 0.0]),
       cktFixLimit: true,
       limitingCollector: [],
     });
@@ -1705,7 +1704,7 @@ describe("MOSFET M-6", () => {
     s0[S_VGS] = 1.5; s0[S_VDS] = 1.0; s0[S_VBS] = 0.0; s0[S_VBD] = -1.0;
 
     const ctx = makeWave62Ctx(MODEDCOP | MODEINITFLOAT, {
-      rhsOld: new Float64Array([1.0, 1.5, 0.0, 0.0]),
+      rhsOld: new Float64Array([0, 1.0, 1.5, 0.0]),
       noncon: { value: 0 },
     });
 
@@ -1732,7 +1731,7 @@ describe("MOSFET M-6", () => {
     s0[S_VGS] = 1.5; s0[S_VDS] = 0.0; s0[S_VBS] = 0.0; s0[S_VBD] = 0.0;
 
     const ctx = makeWave62Ctx(MODEDCOP | MODEINITFLOAT, {
-      rhsOld: new Float64Array([-0.8, 1.5, 0.0, 0.0]),
+      rhsOld: new Float64Array([0, -0.8, 1.5, 0.0]),
       noncon: { value: 0 },
       limitingCollector: [],
     });
@@ -1745,11 +1744,11 @@ describe("MOSFET M-6", () => {
 
   it("OFF=1 + MODEINITFIX suppresses noncon even on limit", () => {
     // mos1load.c:737-743: noncon gate fires only when OFF=0 or not INITFIX/SMSIG.
-    const { element, pool } = makeNmosElement62({
+    const { element } = makeNmosElement62({
       VTO: 0.7, KP: 120e-6, OFF: 1, CBS: 1e-12,
     });
     const ctx = makeWave62Ctx(MODEDCOP | MODEINITFIX, {
-      rhsOld: new Float64Array([1.0, 1.5, 0.0, 0.0]),
+      rhsOld: new Float64Array([0, 1.0, 1.5, 0.0]),
       noncon: { value: 0 },
       vt: 0.001,
     });
@@ -1761,7 +1760,7 @@ describe("MOSFET M-6", () => {
   });
 
   it("MODEINITJCT path does not touch noncon", () => {
-    const { element, pool } = makeNmosElement62({ OFF: 0 });
+    const { element } = makeNmosElement62({ OFF: 0 });
     const ctx = makeWave62Ctx(MODEDCOP | MODEINITJCT, {
       noncon: { value: 0 },
     });
@@ -1958,8 +1957,6 @@ describe("MOSFET M-9", () => {
     // At TEMP=400, the junction saturation current is higher â†’ cbs at vbs=0 reflects vt(400).
     // Instead, verify via the stored tp by checking what _p exposes:
     expect(element._p.TEMP).toBeCloseTo(400, 10);
-    // vt = 400 * KoverQ:
-    const expectedVt = 400 * KoverQ_TEST;
     // Run load and check that the VT used differs from ctx.vt.
     const ctx = makeWave62Ctx(MODEDCOP | MODEINITJCT, {
       vt: REFTEMP_T * KoverQ_TEST, // ctx.vt uses default temp
@@ -1997,7 +1994,6 @@ describe("MOSFET M-9", () => {
     //
     // Simplest approach: verify that ctx.vt being wrong doesn't crash and
     // that tTransconductance (a tp field) produces different drain currents.
-    const vt400 = 400 * KoverQ_TEST;
     const vt300 = 300 * KoverQ_TEST;
 
     const { element: e400, pool: pool400 } = makeNmosElement62({ TEMP: 400, CBD: 0, CBS: 0 });
@@ -2006,11 +2002,11 @@ describe("MOSFET M-9", () => {
     // Both elements get the same rhsOld (Vgs=1.5, Vds=1.0) and ctx.vt=vt300.
     // The drain current (CD stored) will differ because tTransconductance differs.
     const ctxForE400 = makeWave62Ctx(MODEDCOP | MODEINITFLOAT, {
-      rhsOld: new Float64Array([1.0, 1.5, 0.0, 0.0]),
+      rhsOld: new Float64Array([0, 1.0, 1.5, 0.0]),
       vt: vt300, // intentionally wrong for TEMP=400
     });
     const ctxForE300 = makeWave62Ctx(MODEDCOP | MODEINITFLOAT, {
-      rhsOld: new Float64Array([1.0, 1.5, 0.0, 0.0]),
+      rhsOld: new Float64Array([0, 1.0, 1.5, 0.0]),
       vt: vt300,
     });
 
@@ -2085,7 +2081,7 @@ describe("MOSFET M-12", () => {
     const { element, pool } = makeNmosElement62({ OFF: 0, VTO: 0.7, KP: 120e-6 });
     // Set rhsOld so nodes carry non-zero voltages.
     const ctx = makeWave62Ctx(MODEDCOP | MODEINITFIX, {
-      rhsOld: new Float64Array([2.0, 1.5, 0.0, 0.0]),
+      rhsOld: new Float64Array([0, 2.0, 1.5, 0.0]),
     });
     element.load(ctx);
     const s0 = pool.states[0];
@@ -2132,7 +2128,7 @@ describe("MOSFET companion-zero", () => {
 
     const ctxInitTran = makeWave62Ctx(MODETRAN | MODEINITTRAN, {
       ag,
-      rhsOld: new Float64Array([1.0, 1.5, 0.0, 0.0]),
+      rhsOld: new Float64Array([0, 1.0, 1.5, 0.0]),
       dt: 1e-9,
       deltaOld: [1e-9, 1e-9, 0, 0, 0, 0, 0],
     });
@@ -2147,7 +2143,7 @@ describe("MOSFET companion-zero", () => {
 
     const ctxTran = makeWave62Ctx(MODETRAN, {
       ag,
-      rhsOld: new Float64Array([1.0, 1.5, 0.0, 0.0]),
+      rhsOld: new Float64Array([0, 1.0, 1.5, 0.0]),
       dt: 1e-9,
       deltaOld: [1e-9, 1e-9, 0, 0, 0, 0, 0],
     });
@@ -2188,7 +2184,7 @@ describe("MOSFET companion-zero", () => {
 
     const ctx = makeWave62Ctx(MODETRAN, {
       ag,
-      rhsOld: new Float64Array([1.0, 1.5, 0.0, 0.0]),
+      rhsOld: new Float64Array([0, 1.0, 1.5, 0.0]),
       dt: 1e-9,
       deltaOld: [1e-9, 1e-9, 0, 0, 0, 0, 0],
     });
@@ -2219,7 +2215,7 @@ describe("MOSFET companion-zero", () => {
 
     const ctx = makeWave62Ctx(MODETRAN | MODEINITTRAN, {
       ag,
-      rhsOld: new Float64Array([1.0, 1.5, 0.0, 0.0]),
+      rhsOld: new Float64Array([0, 1.0, 1.5, 0.0]),
       dt: 1e-9,
       deltaOld: [1e-9, 1e-9, 0, 0, 0, 0, 0],
     });

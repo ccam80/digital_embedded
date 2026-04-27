@@ -38,7 +38,8 @@ import {
   type AttributeMapping,
   type ComponentDefinition,
 } from "../../core/registry.js";
-import type { AnalogElementCore, ReactiveAnalogElement, IntegrationMethod, LoadContext } from "../../solver/analog/element.js";
+import type { AnalogElementCore, PoolBackedAnalogElementCore, ReactiveAnalogElement, IntegrationMethod, LoadContext } from "../../solver/analog/element.js";
+import { NGSPICE_LOAD_ORDER } from "../../solver/analog/element.js";
 import { MODETRAN, MODETRANOP, MODEINITPRED, MODEINITTRAN, MODEAC, MODEDC, MODEUIC, MODEINITJCT } from "../../solver/analog/ckt-mode.js";
 import { stampG, stampRHS } from "../../solver/analog/stamp-helpers.js";
 import type { Diagnostic } from "../../compile/types.js";
@@ -259,6 +260,7 @@ export class AnalogPolarizedCapElement implements ReactiveAnalogElement {
   readonly pinNodeIds: readonly number[];
   readonly allNodeIds: readonly number[];
   readonly branchIndex: number = -1;
+  readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.CAP;
   readonly isNonlinear: boolean = true;
   readonly isReactive = true;
   readonly poolBacked = true as const;
@@ -268,6 +270,14 @@ export class AnalogPolarizedCapElement implements ReactiveAnalogElement {
   // PC-W3-1: total state = cap-body slots + clamp diode slots (dioload.c:245-265)
   readonly stateSize = POLARIZED_CAP_SCHEMA.size + CLAMP_DIODE_STATE_SIZE; // 5 + 4 = 9 slots
   stateBaseOffset = -1;
+  s0: Float64Array = new Float64Array(0);
+  s1: Float64Array = new Float64Array(0);
+  s2: Float64Array = new Float64Array(0);
+  s3: Float64Array = new Float64Array(0);
+  s4: Float64Array = new Float64Array(0);
+  s5: Float64Array = new Float64Array(0);
+  s6: Float64Array = new Float64Array(0);
+  s7: Float64Array = new Float64Array(0);
 
   private C: number;
   private G_esr: number;
@@ -279,7 +289,7 @@ export class AnalogPolarizedCapElement implements ReactiveAnalogElement {
 
   // PC-W3-1: clamp diode sub-element (F4b composition â€” dioload.c:245-265)
   // Oriented: A=nNeg, K=nPos so it conducts when cap is reverse-biased.
-  private readonly _clampDiode: AnalogElementCore;
+  private readonly _clampDiode: PoolBackedAnalogElementCore;
 
   private readonly _emitDiagnostic: (diag: Diagnostic) => void;
   private _reverseBiasDiagEmitted: boolean = false;
@@ -346,7 +356,7 @@ export class AnalogPolarizedCapElement implements ReactiveAnalogElement {
    *   - M multiplicity applied at every stamp site (PC-W3-6 / capload.c:44).
    */
   load(ctx: LoadContext): void {
-    const { solver, voltages, ag } = ctx;
+    const { solver, rhsOld: voltages, ag } = ctx;
     const mode = ctx.cktMode;
     const nPos = this.pinNodeIds[0];
     const nNeg = this.pinNodeIds[1];

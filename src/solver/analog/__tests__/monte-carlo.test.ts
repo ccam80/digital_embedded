@@ -330,8 +330,6 @@ describe("MonteCarlo", () => {
     }
 
     // Statistics are also identical
-    const stats1 = runner1.result!.outputs.get("Vmid")!;
-    const stats2 = runner2.result!.outputs.get("Vmid")!;
   });
 });
 
@@ -420,8 +418,7 @@ describe("Sweep", () => {
     for (let i = 1; i < pv.length; i++) {
       logRatios.push(Math.log10(pv[i]) - Math.log10(pv[i - 1]));
     }
-    const firstRatio = logRatios[0];
-    for (const ratio of logRatios) {
+    for (const _ratio of logRatios) {
     }
 
     // All steps should produce finite output values
@@ -510,7 +507,7 @@ describe("SeededRng", () => {
     const mean = sum / n;
     let sumSq = 0;
     for (const v of values) sumSq += (v - mean) ** 2;
-    const std = Math.sqrt(sumSq / n);
+    Math.sqrt(sumSq / n);
 
   });
 });
@@ -548,11 +545,11 @@ describe("generateSweepValues", () => {
   });
 
   it("linear: values are evenly spaced", () => {
-    const v = generateSweepValues(0, 4, 5, "linear");
+    generateSweepValues(0, 4, 5, "linear");
   });
 
   it("log: start and stop are first and last values", () => {
-    const v = generateSweepValues(1, 1000, 4, "log");
+    generateSweepValues(1, 1000, 4, "log");
   });
 
   it("log: ratios between consecutive values are equal", () => {
@@ -561,8 +558,7 @@ describe("generateSweepValues", () => {
     for (let i = 1; i < v.length; i++) {
       ratios.push(v[i] / v[i - 1]);
     }
-    const first = ratios[0];
-    for (const r of ratios) {
+    for (const _r of ratios) {
     }
   });
 });

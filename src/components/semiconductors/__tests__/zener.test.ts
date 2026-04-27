@@ -52,10 +52,11 @@ function buildUnitCtx(
 ): LoadContext {
   return {
     solver,
+    matrix: solver,
     rhsOld: voltages,
-    rhs: voltages,
-    voltages,
+    rhs: new Float64Array(voltages.length),
     cktMode: MODEDCOP | MODEINITFLOAT,
+    time: 0,
     dt: 0,
     method: "trapezoidal",
     order: 1,
@@ -111,17 +112,19 @@ describe("Zener", () => {
     const { element } = withState(core);
     const el = withNodeIds(element, [1, 2]);
 
-    const voltages = new Float64Array([0.7, 0.0]);
+    // 1-based: [0]=ground sentinel, [1]=nodeA, [2]=nodeK
+    const voltages = new Float64Array([0, 0.7, 0.0]);
     const voltagesBefore = new Float64Array(voltages);
 
     const solver = new SparseSolver();
-    solver._initStructure(2);
+    solver._initStructure(3);
     const ctx = buildUnitCtx(solver, voltages);
     el.load(ctx);
 
     // Voltages must be completely unchanged after load()
     expect(voltages[0]).toBe(voltagesBefore[0]);
     expect(voltages[1]).toBe(voltagesBefore[1]);
+    expect(voltages[2]).toBe(voltagesBefore[2]);
   });
 
   it("setParam_accepts_known_keys", () => {

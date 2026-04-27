@@ -114,13 +114,14 @@ function cktModeToAnalysisPhase(cktMode: number): "dcop" | "tranInit" | "tranFlo
 /** Extract only the ngspice-side integration coefficients from a raw iteration. */
 function _ngspiceIntegCoeff(raw: RawNgspiceIterationEx | undefined): IntegrationCoefficients["ngspice"] {
   if (!raw) {
-    return { ag0: 0, ag1: 0, method: "backwardEuler", order: 1 };
+    return { ag0: 0, ag1: 0, method: "trapezoidal", order: 1 };
   }
-  const methodMap: Record<number, string> = { 0: "backwardEuler", 1: "trapezoidal", 2: "gear2" };
+  // ngspice integer 0 is backward Euler; we don't support BE so map to trapezoidal.
+  const methodMap: Record<number, IntegrationMethod> = { 0: "trapezoidal", 1: "trapezoidal", 2: "gear" };
   return {
     ag0: raw.ag0 ?? 0,
     ag1: raw.ag1 ?? 0,
-    method: methodMap[raw.integrateMethod ?? 0] ?? "backwardEuler",
+    method: methodMap[raw.integrateMethod ?? 1] ?? "trapezoidal",
     order: raw.order ?? 1,
   };
 }
@@ -282,6 +283,10 @@ export class NgspiceBridge {
     const NiIterationData = koffi.struct(`NiIterationData${uid}`, {
       iteration:        "int",
       matrixSize:       "int",
+      // SMPmatSize+1 — actual rhs/rhsOld/preSolveRhs slot count. Can be smaller
+      // than matrixSize when devices stamp into ground row/col via TrashCan;
+      // decoding matrixSize doubles from rhs/rhsOld then reads OOB heap.
+      rhsBufSize:       "int",
       rhs:              koffi.pointer("double"),
       rhsOld:           koffi.pointer("double"),
       preSolveRhs:      koffi.pointer("double"),
@@ -326,20 +331,27 @@ export class NgspiceBridge {
       (dataPtr: any) => {
         const d = koffi.decode(dataPtr, NiIterationData);
 
-        const { iteration, matrixSize, numStates, noncon, simTime, simTimeStart,
+        const { iteration, matrixSize, rhsBufSize, numStates, noncon, simTime, simTimeStart,
                 dt, cktMode, ag0, ag1, integrateMethod, order,
                 matrixNnz, devConvCount, numLimitEvents,
                 phaseFlags, phaseGmin, phaseSrcFact } = d;
 
+        // rhs/rhsOld/preSolveRhs are sized SMPmatSize+1 = rhsBufSize on the C
+        // side (nireinit.c:31). matrixSize = CKTmaxEqNum+1 may exceed that
+        // when devices stamp into ground row/col via TrashCan — decoding
+        // matrixSize doubles then reads OOB and returns NaN-shaped garbage.
+        // Math.min is defensive; rhsBufSize alone should already be ≤ matrixSize.
+        const rhsLen = Math.min(matrixSize, rhsBufSize);
+
         const rhs = d.rhs
-          ? Float64Array.from(koffi.decode(d.rhs, "double", matrixSize))
-          : new Float64Array(matrixSize);
+          ? Float64Array.from(koffi.decode(d.rhs, "double", rhsLen))
+          : new Float64Array(rhsLen);
         const rhsOld = d.rhsOld
-          ? Float64Array.from(koffi.decode(d.rhsOld, "double", matrixSize))
-          : new Float64Array(matrixSize);
+          ? Float64Array.from(koffi.decode(d.rhsOld, "double", rhsLen))
+          : new Float64Array(rhsLen);
         const preSolveRhs = d.preSolveRhs
-          ? Float64Array.from(koffi.decode(d.preSolveRhs, "double", matrixSize))
-          : new Float64Array(matrixSize);
+          ? Float64Array.from(koffi.decode(d.preSolveRhs, "double", rhsLen))
+          : new Float64Array(rhsLen);
         const state0 = d.state0
           ? Float64Array.from(koffi.decode(d.state0, "double", numStates))
           : new Float64Array(numStates);
@@ -395,7 +407,7 @@ export class NgspiceBridge {
         }
 
         this._iterations.push({
-          iteration, matrixSize, rhs, rhsOld, preSolveRhs,
+          iteration, matrixSize, rhsBufSize, rhs, rhsOld, preSolveRhs,
           state0, state1, state2,
           numStates, noncon, converged: d.converged !== 0,
           simTime, simTimeStart, dt, cktMode,
@@ -631,7 +643,7 @@ export class NgspiceBridge {
         ) ?? this._iterations.find(r => r.simTimeStart === step.stepStartTime),
       );
       const integCoeff: IntegrationCoefficients = {
-        ours: { ag0: 0, ag1: 0, method: "backwardEuler", order: 1 },
+        ours: { ag0: 0, ag1: 0, method: "trapezoidal", order: 1 },
         ngspice: ngspiceCoeff,
       };
 
@@ -799,6 +811,8 @@ export class NgspiceBridge {
 
       const iterSnap: IterationSnapshot = {
         iteration: raw.iteration,
+        matrixSize: raw.matrixSize,
+        rhsBufSize: raw.rhsBufSize,
         voltages: raw.rhs.slice(),
         prevVoltages: raw.rhsOld.slice(),
         preSolveRhs: raw.preSolveRhs.length > 0 ? raw.preSolveRhs.slice() : new Float64Array(0),

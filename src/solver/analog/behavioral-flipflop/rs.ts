@@ -2,8 +2,8 @@
  * Behavioral analog factory for edge-triggered RS flip-flops.
  */
 
-import type { LoadContext } from "../element.js";
-import type { StatePoolRef } from "../element.js";
+import type { LoadContext, StatePoolRef, ReactiveAnalogElementCore } from "../element.js";
+import { NGSPICE_LOAD_ORDER } from "../element.js";
 import { readMnaVoltage, delegatePinSetParam } from "../digital-pin-model.js";
 import type { DigitalInputPinModel, DigitalOutputPinModel } from "../digital-pin-model.js";
 import type { AnalogElementFactory } from "../behavioral-gate.js";
@@ -43,7 +43,7 @@ import type { StateSchema } from "../state-schema.js";
  *              currently latched Q state, then loads capacitor children.
  *   accept() — rising-edge detection, latching, and diagnostic emission.
  */
-export class BehavioralRSFlipflopElement {
+export class BehavioralRSFlipflopElement implements ReactiveAnalogElementCore {
   private readonly _sPin: DigitalInputPinModel;
   private readonly _clockPin: DigitalInputPinModel;
   private readonly _rPin: DigitalInputPinModel;
@@ -61,7 +61,9 @@ export class BehavioralRSFlipflopElement {
   private readonly _pinModelsByLabel: ReadonlyMap<string, DigitalInputPinModel | DigitalOutputPinModel>;
 
   pinNodeIds!: readonly number[];  // set by compiler via Object.assign after factory returns
+  allNodeIds!: readonly number[];  // set by compiler via Object.assign after factory returns
   readonly branchIndex: number = -1;
+  readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.VCVS;
   readonly isNonlinear: true = true;
   label?: string;
 
@@ -69,7 +71,14 @@ export class BehavioralRSFlipflopElement {
   readonly stateSchema: StateSchema = FLIPFLOP_COMPOSITE_SCHEMA;
   stateSize: number;
   stateBaseOffset = -1;
-  private _pool!: StatePoolRef;
+  s0: Float64Array<ArrayBufferLike> = new Float64Array(0) as Float64Array<ArrayBufferLike>;
+  s1: Float64Array<ArrayBufferLike> = new Float64Array(0) as Float64Array<ArrayBufferLike>;
+  s2: Float64Array<ArrayBufferLike> = new Float64Array(0) as Float64Array<ArrayBufferLike>;
+  s3: Float64Array<ArrayBufferLike> = new Float64Array(0) as Float64Array<ArrayBufferLike>;
+  s4: Float64Array<ArrayBufferLike> = new Float64Array(0) as Float64Array<ArrayBufferLike>;
+  s5: Float64Array<ArrayBufferLike> = new Float64Array(0) as Float64Array<ArrayBufferLike>;
+  s6: Float64Array<ArrayBufferLike> = new Float64Array(0) as Float64Array<ArrayBufferLike>;
+  s7: Float64Array<ArrayBufferLike> = new Float64Array(0) as Float64Array<ArrayBufferLike>;
 
   constructor(
     sPin: DigitalInputPinModel,
@@ -92,12 +101,11 @@ export class BehavioralRSFlipflopElement {
     this.stateSize = computeChildStateSize(this._childElements);
   }
 
-  get isReactive(): boolean {
-    return this._childElements.length > 0;
+  get isReactive(): true {
+    return (this._childElements.length > 0) as true;
   }
 
   initState(pool: StatePoolRef): void {
-    this._pool = pool;
     initChildState(this._childElements, this.stateBaseOffset, pool);
   }
 

@@ -42,6 +42,7 @@ import {
   type ComponentDefinition,
 } from "../../core/registry.js";
 import type { AnalogElementCore, ReactiveAnalogElement, IntegrationMethod, LoadContext } from "../../solver/analog/element.js";
+import { NGSPICE_LOAD_ORDER } from "../../solver/analog/element.js";
 import { stampRHS } from "../../solver/analog/stamp-helpers.js";
 import { MODEDC, MODEINITPRED, MODEINITTRAN } from "../../solver/analog/ckt-mode.js";
 import { niIntegrate } from "../../solver/analog/ni-integrate.js";
@@ -255,12 +256,21 @@ export class AnalogTappedTransformerElement implements ReactiveAnalogElement {
   readonly pinNodeIds: readonly number[];
   readonly allNodeIds: readonly number[];
   readonly branchIndex: number;
+  readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.MUT;
   readonly isNonlinear = false;
   readonly isReactive = true;
   readonly poolBacked = true as const;
   readonly stateSchema = TAPPED_TRANSFORMER_SCHEMA;
   readonly stateSize = TAPPED_TRANSFORMER_SCHEMA.size;
   stateBaseOffset = -1;
+  s0: Float64Array = new Float64Array(0);
+  s1: Float64Array = new Float64Array(0);
+  s2: Float64Array = new Float64Array(0);
+  s3: Float64Array = new Float64Array(0);
+  s4: Float64Array = new Float64Array(0);
+  s5: Float64Array = new Float64Array(0);
+  s6: Float64Array = new Float64Array(0);
+  s7: Float64Array = new Float64Array(0);
   // TT-W3-6: class-body setParam is intentionally a no-op. The real setParam is
   // wired by the buildTappedTransformerElement closure, which overrides this method
   // on the returned AnalogElementCore. Any consumer that constructs

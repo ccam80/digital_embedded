@@ -1,0 +1,178 @@
+
+[1m[7m[36m RUN [39m[27m[22m [36mv2.1.9 [39m[90mC:/local_working_projects/digital_in_browser[39m
+
+ [31m❯[39m src/solver/analog/__tests__/dc-operating-point.test.ts [2m([22m[2m28 tests[22m[2m | [22m[31m8 failed[39m[2m)[22m[90m 30[2mms[22m[39m
+[31m   [31m×[31m DcOP[2m > [22mdiode_circuit_direct[90m 6[2mms[22m[31m[39m
+[31m     → expected 5 to be less than 0.75[39m
+[31m   [31m×[31m DcOP[2m > [22msource_stepping_fallback[90m 2[2mms[22m[31m[39m
+[31m     → solver.stampRHS is not a function[39m
+[31m   [31m×[31m DcOP[2m > [22mnumGminSteps_1_selects_dynamicGmin[90m 1[2mms[22m[31m[39m
+[31m     → solver.stampRHS is not a function[39m
+[31m   [31m×[31m DcOP[2m > [22mnumGminSteps_10_selects_spice3Gmin[90m 0[2mms[22m[31m[39m
+[31m     → solver.stampRHS is not a function[39m
+[31m   [31m×[31m DcOP[2m > [22mspice3Src_emits_uniform_phase_parameters[90m 1[2mms[22m[31m[39m
+[31m     → solver.stampRHS is not a function[39m
+[31m   [31m×[31m DcOP[2m > [22mgshunt_nonzero_used_as_gtarget[90m 0[2mms[22m[31m[39m
+[31m     → solver.stampRHS is not a function[39m
+[31m   [31m×[31m DcOP[2m > [22mfailure_reports_blame[90m 0[2mms[22m[31m[39m
+[31m     → solver.stampRHS is not a function[39m
+[31m   [31m×[31m DcOP[2m > [22mnoOpIter_skips_all_nr_and_returns_converged[90m 2[2mms[22m[31m[39m
+[31m     → expected 3 to be 2 // Object.is equality[39m
+ [32m✓[39m src/solver/analog/__tests__/dcop-init-jct.test.ts [2m([22m[2m8 tests[22m[2m)[22m[90m 26[2mms[22m[39m
+ [32m✓[39m src/solver/analog/__tests__/digital-pin-model.test.ts [2m([22m[2m22 tests[22m[2m)[22m[90m 6[2mms[22m[39m
+ [32m✓[39m src/solver/analog/__tests__/convergence-regression.test.ts [2m([22m[2m6 tests[22m[2m)[22m[90m 15[2mms[22m[39m
+ [32m✓[39m src/solver/analog/__tests__/expression-differentiate.test.ts [2m([22m[2m24 tests[22m[2m)[22m[90m 5[2mms[22m[39m
+ [32m✓[39m src/solver/analog/__tests__/controlled-source-base.test.ts [2m([22m[2m5 tests[22m[2m)[22m[90m 5[2mms[22m[39m
+
+[31m⎯⎯⎯⎯⎯⎯⎯[1m[7m Failed Tests 8 [27m[22m⎯⎯⎯⎯⎯⎯⎯[39m
+
+[31m[1m[7m FAIL [27m[22m[39m src/solver/analog/__tests__/dc-operating-point.test.ts[2m > [22mDcOP[2m > [22mdiode_circuit_direct
+[31m[1mAssertionError[22m: expected 5 to be less than 0.75[39m
+[36m [2m❯[22m src/solver/analog/__tests__/dc-operating-point.test.ts:[2m283:20[22m[39m
+    [90m281| [39m    [35mconst[39m vDiode [33m=[39m ctx[33m.[39mdcopResult[33m.[39mnodeVoltages[[34m1[39m][33m;[39m
+    [90m282| [39m    [34mexpect[39m(vDiode)[33m.[39m[34mtoBeGreaterThan[39m([34m0.6[39m)[33m;[39m
+    [90m283| [39m    [34mexpect[39m(vDiode)[33m.[39m[34mtoBeLessThan[39m([34m0.75[39m)[33m;[39m
+    [90m   | [39m                   [31m^[39m
+    [90m284| [39m  })[33m;[39m
+    [90m285| [39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/8]⎯[22m[39m
+
+[31m[1m[7m FAIL [27m[22m[39m src/solver/analog/__tests__/dc-operating-point.test.ts[2m > [22mDcOP[2m > [22msource_stepping_fallback
+[31m[1mTypeError[22m: solver.stampRHS is not a function[39m
+[36m [2m❯[22m Object.load src/solver/analog/__tests__/dc-operating-point.test.ts:[2m229:14[22m[39m
+    [90m227| [39m      [35mif[39m (nodePos [33m!==[39m [34m0[39m) solver[33m.[39m[34mstampElement[39m(solver[33m.[39m[34mallocElement[39m(k[33m,[39m no…
+    [90m228| [39m      [35mif[39m (nodeNeg [33m!==[39m [34m0[39m) solver[33m.[39m[34mstampElement[39m(solver[33m.[39m[34mallocElement[39m(k[33m,[39m no…
+    [90m229| [39m      solver[33m.[39m[34mstampRHS[39m(k[33m,[39m voltage [33m*[39m ctx[33m.[39msrcFact)[33m;[39m
+    [90m   | [39m             [31m^[39m
+    [90m230| [39m    }[33m,[39m
+    [90m231| [39m    [34mstampAc[39m(solver[33m:[39m [35mimport[39m([32m"../sparse-solver.js"[39m)[33m.[39m[33mSparseSolver[39m)[33m:[39m [35mvoid[39m {
+[90m [2m❯[22m Module.cktLoad src/solver/analog/ckt-load.ts:[2m89:13[22m[39m
+[90m [2m❯[22m Module.newtonRaphson src/solver/analog/newton-raphson.ts:[2m360:5[22m[39m
+[90m [2m❯[22m Proxy.newtonRaphson src/solver/analog/__tests__/dc-operating-point.test.ts:[2m8:21[22m[39m
+[90m [2m❯[22m runNR src/solver/analog/dc-operating-point.ts:[2m163:3[22m[39m
+[90m [2m❯[22m cktop src/solver/analog/dc-operating-point.ts:[2m198:10[22m[39m
+[90m [2m❯[22m Module.solveDcOperatingPoint src/solver/analog/dc-operating-point.ts:[2m333:24[22m[39m
+[90m [2m❯[22m src/solver/analog/__tests__/dc-operating-point.test.ts:[2m331:5[22m[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/8]⎯[22m[39m
+
+[31m[1m[7m FAIL [27m[22m[39m src/solver/analog/__tests__/dc-operating-point.test.ts[2m > [22mDcOP[2m > [22mnumGminSteps_1_selects_dynamicGmin
+[31m[1mTypeError[22m: solver.stampRHS is not a function[39m
+[36m [2m❯[22m Object.load src/solver/analog/__tests__/dc-operating-point.test.ts:[2m229:14[22m[39m
+    [90m227| [39m      [35mif[39m (nodePos [33m!==[39m [34m0[39m) solver[33m.[39m[34mstampElement[39m(solver[33m.[39m[34mallocElement[39m(k[33m,[39m no…
+    [90m228| [39m      [35mif[39m (nodeNeg [33m!==[39m [34m0[39m) solver[33m.[39m[34mstampElement[39m(solver[33m.[39m[34mallocElement[39m(k[33m,[39m no…
+    [90m229| [39m      solver[33m.[39m[34mstampRHS[39m(k[33m,[39m voltage [33m*[39m ctx[33m.[39msrcFact)[33m;[39m
+    [90m   | [39m             [31m^[39m
+    [90m230| [39m    }[33m,[39m
+    [90m231| [39m    [34mstampAc[39m(solver[33m:[39m [35mimport[39m([32m"../sparse-solver.js"[39m)[33m.[39m[33mSparseSolver[39m)[33m:[39m [35mvoid[39m {
+[90m [2m❯[22m Module.cktLoad src/solver/analog/ckt-load.ts:[2m89:13[22m[39m
+[90m [2m❯[22m Module.newtonRaphson src/solver/analog/newton-raphson.ts:[2m360:5[22m[39m
+[90m [2m❯[22m Proxy.newtonRaphson src/solver/analog/__tests__/dc-operating-point.test.ts:[2m8:21[22m[39m
+[90m [2m❯[22m runNR src/solver/analog/dc-operating-point.ts:[2m163:3[22m[39m
+[90m [2m❯[22m cktop src/solver/analog/dc-operating-point.ts:[2m198:10[22m[39m
+[90m [2m❯[22m Module.solveDcOperatingPoint src/solver/analog/dc-operating-point.ts:[2m333:24[22m[39m
+[90m [2m❯[22m src/solver/analog/__tests__/dc-operating-point.test.ts:[2m358:5[22m[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/8]⎯[22m[39m
+
+[31m[1m[7m FAIL [27m[22m[39m src/solver/analog/__tests__/dc-operating-point.test.ts[2m > [22mDcOP[2m > [22mnumGminSteps_10_selects_spice3Gmin
+[31m[1mTypeError[22m: solver.stampRHS is not a function[39m
+[36m [2m❯[22m Object.load src/solver/analog/__tests__/dc-operating-point.test.ts:[2m229:14[22m[39m
+    [90m227| [39m      [35mif[39m (nodePos [33m!==[39m [34m0[39m) solver[33m.[39m[34mstampElement[39m(solver[33m.[39m[34mallocElement[39m(k[33m,[39m no…
+    [90m228| [39m      [35mif[39m (nodeNeg [33m!==[39m [34m0[39m) solver[33m.[39m[34mstampElement[39m(solver[33m.[39m[34mallocElement[39m(k[33m,[39m no…
+    [90m229| [39m      solver[33m.[39m[34mstampRHS[39m(k[33m,[39m voltage [33m*[39m ctx[33m.[39msrcFact)[33m;[39m
+    [90m   | [39m             [31m^[39m
+    [90m230| [39m    }[33m,[39m
+    [90m231| [39m    [34mstampAc[39m(solver[33m:[39m [35mimport[39m([32m"../sparse-solver.js"[39m)[33m.[39m[33mSparseSolver[39m)[33m:[39m [35mvoid[39m {
+[90m [2m❯[22m Module.cktLoad src/solver/analog/ckt-load.ts:[2m89:13[22m[39m
+[90m [2m❯[22m Module.newtonRaphson src/solver/analog/newton-raphson.ts:[2m360:5[22m[39m
+[90m [2m❯[22m Proxy.newtonRaphson src/solver/analog/__tests__/dc-operating-point.test.ts:[2m8:21[22m[39m
+[90m [2m❯[22m runNR src/solver/analog/dc-operating-point.ts:[2m163:3[22m[39m
+[90m [2m❯[22m cktop src/solver/analog/dc-operating-point.ts:[2m198:10[22m[39m
+[90m [2m❯[22m Module.solveDcOperatingPoint src/solver/analog/dc-operating-point.ts:[2m333:24[22m[39m
+[90m [2m❯[22m src/solver/analog/__tests__/dc-operating-point.test.ts:[2m374:5[22m[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/8]⎯[22m[39m
+
+[31m[1m[7m FAIL [27m[22m[39m src/solver/analog/__tests__/dc-operating-point.test.ts[2m > [22mDcOP[2m > [22mspice3Src_emits_uniform_phase_parameters
+[31m[1mTypeError[22m: solver.stampRHS is not a function[39m
+[36m [2m❯[22m Object.load src/solver/analog/__tests__/dc-operating-point.test.ts:[2m229:14[22m[39m
+    [90m227| [39m      [35mif[39m (nodePos [33m!==[39m [34m0[39m) solver[33m.[39m[34mstampElement[39m(solver[33m.[39m[34mallocElement[39m(k[33m,[39m no…
+    [90m228| [39m      [35mif[39m (nodeNeg [33m!==[39m [34m0[39m) solver[33m.[39m[34mstampElement[39m(solver[33m.[39m[34mallocElement[39m(k[33m,[39m no…
+    [90m229| [39m      solver[33m.[39m[34mstampRHS[39m(k[33m,[39m voltage [33m*[39m ctx[33m.[39msrcFact)[33m;[39m
+    [90m   | [39m             [31m^[39m
+    [90m230| [39m    }[33m,[39m
+    [90m231| [39m    [34mstampAc[39m(solver[33m:[39m [35mimport[39m([32m"../sparse-solver.js"[39m)[33m.[39m[33mSparseSolver[39m)[33m:[39m [35mvoid[39m {
+[90m [2m❯[22m Module.cktLoad src/solver/analog/ckt-load.ts:[2m89:13[22m[39m
+[90m [2m❯[22m Module.newtonRaphson src/solver/analog/newton-raphson.ts:[2m360:5[22m[39m
+[90m [2m❯[22m Proxy.newtonRaphson src/solver/analog/__tests__/dc-operating-point.test.ts:[2m8:21[22m[39m
+[90m [2m❯[22m runNR src/solver/analog/dc-operating-point.ts:[2m163:3[22m[39m
+[90m [2m❯[22m cktop src/solver/analog/dc-operating-point.ts:[2m198:10[22m[39m
+[90m [2m❯[22m Module.solveDcOperatingPoint src/solver/analog/dc-operating-point.ts:[2m333:24[22m[39m
+[90m [2m❯[22m src/solver/analog/__tests__/dc-operating-point.test.ts:[2m398:5[22m[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/8]⎯[22m[39m
+
+[31m[1m[7m FAIL [27m[22m[39m src/solver/analog/__tests__/dc-operating-point.test.ts[2m > [22mDcOP[2m > [22mgshunt_nonzero_used_as_gtarget
+[31m[1mTypeError[22m: solver.stampRHS is not a function[39m
+[36m [2m❯[22m Object.load src/solver/analog/__tests__/dc-operating-point.test.ts:[2m229:14[22m[39m
+    [90m227| [39m      [35mif[39m (nodePos [33m!==[39m [34m0[39m) solver[33m.[39m[34mstampElement[39m(solver[33m.[39m[34mallocElement[39m(k[33m,[39m no…
+    [90m228| [39m      [35mif[39m (nodeNeg [33m!==[39m [34m0[39m) solver[33m.[39m[34mstampElement[39m(solver[33m.[39m[34mallocElement[39m(k[33m,[39m no…
+    [90m229| [39m      solver[33m.[39m[34mstampRHS[39m(k[33m,[39m voltage [33m*[39m ctx[33m.[39msrcFact)[33m;[39m
+    [90m   | [39m             [31m^[39m
+    [90m230| [39m    }[33m,[39m
+    [90m231| [39m    [34mstampAc[39m(solver[33m:[39m [35mimport[39m([32m"../sparse-solver.js"[39m)[33m.[39m[33mSparseSolver[39m)[33m:[39m [35mvoid[39m {
+[90m [2m❯[22m Module.cktLoad src/solver/analog/ckt-load.ts:[2m89:13[22m[39m
+[90m [2m❯[22m Module.newtonRaphson src/solver/analog/newton-raphson.ts:[2m360:5[22m[39m
+[90m [2m❯[22m Proxy.newtonRaphson src/solver/analog/__tests__/dc-operating-point.test.ts:[2m8:21[22m[39m
+[90m [2m❯[22m runNR src/solver/analog/dc-operating-point.ts:[2m163:3[22m[39m
+[90m [2m❯[22m cktop src/solver/analog/dc-operating-point.ts:[2m198:10[22m[39m
+[90m [2m❯[22m Module.solveDcOperatingPoint src/solver/analog/dc-operating-point.ts:[2m333:24[22m[39m
+[90m [2m❯[22m src/solver/analog/__tests__/dc-operating-point.test.ts:[2m434:5[22m[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/8]⎯[22m[39m
+
+[31m[1m[7m FAIL [27m[22m[39m src/solver/analog/__tests__/dc-operating-point.test.ts[2m > [22mDcOP[2m > [22mfailure_reports_blame
+[31m[1mTypeError[22m: solver.stampRHS is not a function[39m
+[36m [2m❯[22m Object.load src/solver/analog/__tests__/dc-operating-point.test.ts:[2m229:14[22m[39m
+    [90m227| [39m      [35mif[39m (nodePos [33m!==[39m [34m0[39m) solver[33m.[39m[34mstampElement[39m(solver[33m.[39m[34mallocElement[39m(k[33m,[39m no…
+    [90m228| [39m      [35mif[39m (nodeNeg [33m!==[39m [34m0[39m) solver[33m.[39m[34mstampElement[39m(solver[33m.[39m[34mallocElement[39m(k[33m,[39m no…
+    [90m229| [39m      solver[33m.[39m[34mstampRHS[39m(k[33m,[39m voltage [33m*[39m ctx[33m.[39msrcFact)[33m;[39m
+    [90m   | [39m             [31m^[39m
+    [90m230| [39m    }[33m,[39m
+    [90m231| [39m    [34mstampAc[39m(solver[33m:[39m [35mimport[39m([32m"../sparse-solver.js"[39m)[33m.[39m[33mSparseSolver[39m)[33m:[39m [35mvoid[39m {
+[90m [2m❯[22m Module.cktLoad src/solver/analog/ckt-load.ts:[2m89:13[22m[39m
+[90m [2m❯[22m Module.newtonRaphson src/solver/analog/newton-raphson.ts:[2m360:5[22m[39m
+[90m [2m❯[22m Proxy.newtonRaphson src/solver/analog/__tests__/dc-operating-point.test.ts:[2m8:21[22m[39m
+[90m [2m❯[22m runNR src/solver/analog/dc-operating-point.ts:[2m163:3[22m[39m
+[90m [2m❯[22m cktop src/solver/analog/dc-operating-point.ts:[2m198:10[22m[39m
+[90m [2m❯[22m Module.solveDcOperatingPoint src/solver/analog/dc-operating-point.ts:[2m333:24[22m[39m
+[90m [2m❯[22m src/solver/analog/__tests__/dc-operating-point.test.ts:[2m447:5[22m[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[7/8]⎯[22m[39m
+
+[31m[1m[7m FAIL [27m[22m[39m src/solver/analog/__tests__/dc-operating-point.test.ts[2m > [22mDcOP[2m > [22mnoOpIter_skips_all_nr_and_returns_converged
+[31m[1mAssertionError[22m: expected 3 to be 2 // Object.is equality[39m
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[32m- 2[39m
+[31m+ 3[39m
+
+[36m [2m❯[22m src/solver/analog/__tests__/dc-operating-point.test.ts:[2m494:48[22m[39m
+    [90m492| [39m    [34mexpect[39m(ctx[33m.[39mdcopResult[33m.[39miterations)[33m.[39m[34mtoBe[39m([34m0[39m)[33m;[39m
+    [90m493| [39m    [34mexpect[39m(ctx[33m.[39mdcopResult[33m.[39mnodeVoltages)[33m.[39m[34mtoBeInstanceOf[39m([33mFloat64Array[39m)[33m;[39m
+    [90m494| [39m    [34mexpect[39m(ctx[33m.[39mdcopResult[33m.[39mnodeVoltages[33m.[39mlength)[33m.[39m[34mtoBe[39m(ctx[33m.[39mmatrixSize)[33m;[39m
+    [90m   | [39m                                               [31m^[39m
+    [90m495| [39m  })[33m;[39m
+    [90m496| [39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[8/8]⎯[22m[39m
+
+[2m Test Files [22m [1m[31m1 failed[39m[22m[2m | [22m[1m[32m5 passed[39m[22m[90m (6)[39m
+[2m      Tests [22m [1m[31m8 failed[39m[22m[2m | [22m[1m[32m85 passed[39m[22m[90m (93)[39m
+[2m   Start at [22m 10:48:03
+[2m   Duration [22m 3.83s[2m (transform 1.46s, setup 0ms, collect 2.35s, tests 88ms, environment 1ms, prepare 520ms)[22m
+

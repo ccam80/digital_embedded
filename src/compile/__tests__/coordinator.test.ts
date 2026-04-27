@@ -19,7 +19,6 @@ import type { SerializedElement } from '../../core/element.js';
 import type { RenderContext, Rect } from '../../core/renderer-interface.js';
 import type { AnalogElement } from '../../solver/analog/element.js';
 import type { LoadContext } from '../../solver/analog/load-context.js';
-import type { SparseSolver } from '../../solver/analog/sparse-solver.js';
 import type { ComplexSparseSolver } from '../../solver/analog/complex-sparse-solver.js';
 import type { SignalAddress, CompiledCircuitUnified } from '../types.js';
 import { ConcreteCompiledAnalogCircuit } from '../../solver/analog/compiled-analog-circuit.js';
@@ -124,6 +123,7 @@ function makeResistorAnalogEl(n1: number, n2: number, resistance: number): Analo
     pinNodeIds: [n1, n2],
     allNodeIds: [n1, n2],
     branchIndex: -1,
+    ngspiceLoadOrder: 0,
     isNonlinear: false,
     isReactive: false,
     stampAc(solver: ComplexSparseSolver, _omega: number, _ctx: LoadContext): void {

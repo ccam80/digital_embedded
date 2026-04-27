@@ -53,10 +53,10 @@ import type { ThemeColor } from "../../../core/renderer-interface.js";
 import { makeDcVoltageSource } from "../../sources/dc-voltage-source.js";
 import { withNodeIds, runDcOp, makeLoadCtx } from "../../../solver/analog/__tests__/test-helpers.js";
 import { StatePool } from "../../../solver/analog/state-pool.js";
-import type { AnalogElement } from "../../../solver/analog/element.js";
+import type { AnalogElement, ReactiveAnalogElement } from "../../../solver/analog/element.js";
 import type { AnalogElementCore } from "../../../core/analog-types.js";
-import type { ReactiveAnalogElement } from "../../../solver/analog/element.js";
-import type { SparseSolver as SparseSolverType } from "../../../solver/analog/sparse-solver.js";
+import type { PoolBackedAnalogElementCore } from "../../../solver/analog/element.js";
+import type { ComplexSparseSolver } from "../../../solver/analog/complex-sparse-solver.js";
 import { MODETRAN, MODEINITFLOAT, MODEINITJCT } from "../../../solver/analog/ckt-mode.js";
 import type { LimitingEvent } from "../../../solver/analog/newton-raphson.js";
 import type { LoadContext } from "../../../solver/analog/load-context.js";
@@ -742,18 +742,12 @@ function makeResistorElementForLed(nodeA: number, nodeB: number, resistance: num
     pinNodeIds: [nodeA, nodeB],
     allNodeIds: [nodeA, nodeB],
     branchIndex: -1,
+    ngspiceLoadOrder: 0,
     isNonlinear: false,
     isReactive: false,
     setParam(_key: string, _value: number): void {},
     getPinCurrents(_v: Float64Array): number[] { return []; },
-    stampAc(solver: SparseSolverType): void {
-      if (nodeA !== 0) solver.stampElement(solver.allocElement(nodeA, nodeA), G);
-      if (nodeB !== 0) solver.stampElement(solver.allocElement(nodeB, nodeB), G);
-      if (nodeA !== 0 && nodeB !== 0) {
-        solver.stampElement(solver.allocElement(nodeA, nodeB), -G);
-        solver.stampElement(solver.allocElement(nodeB, nodeA), -G);
-      }
-    },
+    stampAc(_solver: ComplexSparseSolver, _omega: number, _ctx: LoadContext): void { /* no-op */ },
     load(ctx: import("../../../solver/analog/load-context.js").LoadContext): void {
       const solver = ctx.solver;
       if (nodeA !== 0 && nodeB !== 0) {
@@ -905,8 +899,8 @@ describe("integration", () => {
     const core = getFactory(LedDefinition.modelRegistry!.red!)!(new Map([["in", 1]]), [], -1, props, () => 0);
 
     const pool = new StatePool(6);
-    (core as any).stateBaseOffset = 0;
-    core.initState(pool);
+    (core as unknown as PoolBackedAnalogElementCore).stateBaseOffset = 0;
+    (core as unknown as PoolBackedAnalogElementCore).initState(pool);
 
     // Seed SLOT_VD=0 with vd so pnjlim sees vdOld=vd and returns vdLimited=vd unchanged.
     pool.state0[0] = vd;
@@ -930,7 +924,6 @@ describe("integration", () => {
     const ctx = makeLoadCtx({
       cktMode: MODETRAN | MODEINITFLOAT,
       solver: mockSolver as unknown as import("../../../solver/analog/sparse-solver.js").SparseSolver,
-      voltages: new Float64Array([vd]),
       dt,
       method: "trapezoidal",
       order: 2,
@@ -978,9 +971,10 @@ describe("integration", () => {
 
 describe("Led", () => {
   it("cap_state_schema_has_no_cap_geq_ieq_v_slots", () => {
-    expect(LED_CAP_STATE_SCHEMA.indexOf.get("CAP_GEQ")).toBeUndefined();
-    expect(LED_CAP_STATE_SCHEMA.indexOf.get("CAP_IEQ")).toBeUndefined();
-    expect(LED_CAP_STATE_SCHEMA.indexOf.get("V")).toBeUndefined();
+    const indexMap = LED_CAP_STATE_SCHEMA.indexOf as ReadonlyMap<string, number>;
+    expect(indexMap.get("CAP_GEQ")).toBeUndefined();
+    expect(indexMap.get("CAP_IEQ")).toBeUndefined();
+    expect(indexMap.get("V")).toBeUndefined();
   });
 
   it("cap_state_size_is_six", () => {
