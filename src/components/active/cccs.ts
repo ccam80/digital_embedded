@@ -61,6 +61,7 @@ import { parseExpression } from "../../solver/analog/expression.js";
 import { differentiate, simplify } from "../../solver/analog/expression-differentiate.js";
 import { ControlledSourceElement } from "../../solver/analog/controlled-source-base.js";
 import { NGSPICE_LOAD_ORDER } from "../../solver/analog/element.js";
+import type { SetupContext } from "../../solver/analog/setup-context.js";
 import { defineModelParams } from "../../core/model-params.js";
 
 // ---------------------------------------------------------------------------
@@ -135,8 +136,10 @@ function buildCCCSPinDeclarations(): PinDeclaration[] {
  * No output branch variable (Norton stamp).
  */
 class CCCSAnalogElement extends ControlledSourceElement {
-  readonly branchIndex: number; // sense branch
+  branchIndex: number; // sense branch
   readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.CCCS;
+  _stateBase: number = -1;
+  _pinNodes: Map<string, number> = new Map();
 
   private readonly _nSenseP: number;
   private readonly _nSenseN: number;
@@ -166,6 +169,10 @@ class CCCSAnalogElement extends ControlledSourceElement {
     this._nOutN = nOutN;
     this._senseBranch = senseBranchIdx;
     this.branchIndex = senseBranchIdx;
+  }
+
+  setup(_ctx: SetupContext): void {
+    throw new Error(`PB-CCCS not yet migrated`);
   }
 
   setParam(_key: string, _value: number): void {
@@ -393,18 +400,20 @@ export const CCCSDefinition: ComponentDefinition = {
   modelRegistry: {
     "behavioral": {
       kind: "inline",
-      factory: (pinNodes, _internalNodeIds, branchIdx, props) => {
+      factory: (pinNodes, props, _getTime) => {
         const expression = props.getOrDefault<string>("expression", "I(sense)");
         const currentGain = props.getModelParam<number>("currentGain");
-        return new CCCSAnalogElement(
+        const el = new CCCSAnalogElement(
           pinNodes.get("sense+")!,
           pinNodes.get("sense-")!,
           pinNodes.get("out+")!,
           pinNodes.get("out-")!,
-          branchIdx,
+          -1,
           expression,
           currentGain,
         );
+        el._pinNodes = new Map(pinNodes);
+        return el;
       },
       paramDefs: CCCS_PARAM_DEFS,
       params: CCCS_DEFAULTS,

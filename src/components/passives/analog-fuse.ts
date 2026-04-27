@@ -1,5 +1,5 @@
 ﻿/**
- * Analog fuse MNA element â€” variable-resistance with thermal IÂ²t energy model.
+ * Analog fuse MNA element  variable-resistance with thermal IÂ²t energy model.
  *
  * Models a fuse as a resistance that transitions from R_cold (intact) to
  * R_blown (open circuit) when the accumulated IÂ²t energy exceeds the rating.
@@ -16,11 +16,11 @@
  *   R(e) = R_cold + (R_blown - R_cold) * 0.5 * (1 + tanh((e - i2t) / w))
  *
  *   where w = 0.05 * i2tRating (transition width).
- *   Below threshold R â‰ˆ R_cold; above threshold R â‰ˆ R_blown.
+ *   Below threshold R  R_cold; above threshold R  R_blown.
  *
  * Cross-engine state propagation:
  *   The factory captures the CircuitElement's PropertyBag and writes
- *   `_thermalRatio` (0â†’1) and `blown` (boolean) into it each timestep.
+ *   `_thermalRatio` (01) and `blown` (boolean) into it each timestep.
  *   The visual FuseElement.draw() reads these for heat glow and blown rendering.
  *   The digital executeFuse reads `blown` for the bus resolver closed flag.
  *
@@ -30,14 +30,15 @@
  *   branchIndex    = -1     (no branch current row)
  *
  * Unified load() pipeline (matches ngspice DEVload):
- *   load(ctx)       â€” stamps conductance 1/R(_thermalEnergy) every NR iteration
- *   accept(ctx,...) â€” integrates IÂ²Â·dt using accepted-step terminal voltages and
+ *   load(ctx)        stamps conductance 1/R(_thermalEnergy) every NR iteration
+ *   accept(ctx,...)  integrates IÂ²Â·dt using accepted-step terminal voltages and
  *                     emits the 'fuse-blown' diagnostic (info) on the first step
  *                     where _blown becomes true.
  */
 
 import type { AnalogElement, AnalogElementCore, LoadContext } from "../../solver/analog/element.js";
 import { NGSPICE_LOAD_ORDER } from "../../solver/analog/element.js";
+import type { SetupContext } from "../../solver/analog/setup-context.js";
 import type { Diagnostic } from "../../compile/types.js";
 import { PropertyBag } from "../../core/properties.js";
 import { defineModelParams } from "../../core/model-params.js";
@@ -48,8 +49,8 @@ import { defineModelParams } from "../../core/model-params.js";
 
 export const { paramDefs: ANALOG_FUSE_PARAM_DEFS, defaults: ANALOG_FUSE_DEFAULTS } = defineModelParams({
   primary: {
-    rCold:     { default: 0.01,  unit: "Î©", description: "Cold (intact) resistance in ohms", min: 1e-12 },
-    rBlown:    { default: 1e9,   unit: "Î©", description: "Blown (open) resistance in ohms", min: 1e-6 },
+    rCold:     { default: 0.01,  unit: "Î", description: "Cold (intact) resistance in ohms", min: 1e-12 },
+    rBlown:    { default: 1e9,   unit: "Î", description: "Blown (open) resistance in ohms", min: 1e-6 },
     i2tRating: { default: 1e-4,  unit: "AÂ²s", description: "IÂ²t energy rating in AÂ²Â·s", min: 1e-30 },
   },
 });
@@ -81,7 +82,7 @@ function smoothResistance(
 }
 
 // ---------------------------------------------------------------------------
-// AnalogFuseElement â€” MNA implementation
+// AnalogFuseElement  MNA implementation
 // ---------------------------------------------------------------------------
 
 export class AnalogFuseElement implements AnalogElement {
@@ -91,7 +92,13 @@ export class AnalogFuseElement implements AnalogElement {
   readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.RES;
   readonly isNonlinear: boolean = true;
   readonly isReactive: boolean = false;
+  _stateBase: number = -1;
+  _pinNodes: Map<string, number> = new Map();
   setParam(_key: string, _value: number): void {}
+
+  setup(_ctx: SetupContext): void {
+    throw new Error("PB-AFUSE not yet migrated");
+  }
 
   private _rCold: number;
   private _rBlown: number;
@@ -203,7 +210,7 @@ export class AnalogFuseElement implements AnalogElement {
     this._i2tRating = Math.max(i2tRating, 1e-30);
   }
 
-  /** Current thermal energy state â€” exposed for testing. */
+  /** Current thermal energy state  exposed for testing. */
   get thermalEnergy(): number {
     return this._thermalEnergy;
   }
@@ -213,7 +220,7 @@ export class AnalogFuseElement implements AnalogElement {
     return this._blown;
   }
 
-  /** Ratio of accumulated thermal energy to i2tRating (0â†’1). */
+  /** Ratio of accumulated thermal energy to i2tRating (01). */
   get thermalRatio(): number {
     return Math.min(this._thermalEnergy / this._i2tRating, 1);
   }
@@ -224,7 +231,7 @@ export class AnalogFuseElement implements AnalogElement {
   }
 
   getPinCurrents(rhs: Float64Array): number[] {
-    // No branch row â€” compute from constitutive equation: I = G_eff * (V_A - V_B).
+    // No branch row  compute from constitutive equation: I = G_eff * (V_A - V_B).
     // pinNodeIds[0] = n_pos (out1 pin, index 0 in pinLayout).
     // pinNodeIds[1] = n_neg (out2 pin, index 1 in pinLayout).
     const nPos = this.pinNodeIds[0];
@@ -239,7 +246,7 @@ export class AnalogFuseElement implements AnalogElement {
 }
 
 // ---------------------------------------------------------------------------
-// analogFactory â€” creates AnalogFuseElement with PropertyBag writeback
+// analogFactory  creates AnalogFuseElement with PropertyBag writeback
 // ---------------------------------------------------------------------------
 
 function buildAnalogFuseElement(
@@ -263,6 +270,7 @@ function buildAnalogFuseElement(
       }
     },
   );
+  el._pinNodes = new Map(pinNodes);
   (el as AnalogElementCore).setParam = function(key: string, value: number): void {
     if (key in p) {
       (p as Record<string, number>)[key] = value;
@@ -274,10 +282,7 @@ function buildAnalogFuseElement(
 
 export function createAnalogFuseElement(
   pinNodes: ReadonlyMap<string, number>,
-  _internalNodeIds: readonly number[],
-  _branchIdx: number,
   props: PropertyBag,
-  _getTime: () => number,
 ): AnalogElementCore {
   return buildAnalogFuseElement(
     pinNodes,

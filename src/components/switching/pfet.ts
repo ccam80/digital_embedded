@@ -25,7 +25,12 @@ import {
   type ComponentDefinition,
   type ComponentLayout,
 } from "../../core/registry.js";
+import type { AnalogElementCore } from "../../core/analog-types.js";
+import { NGSPICE_LOAD_ORDER } from "../../core/analog-types.js";
+import type { LoadContext } from "../../solver/analog/load-context.js";
+import type { SetupContext } from "../../solver/analog/setup-context.js";
 import type { FETLayout } from "./nfet.js";
+import { NFETSWSubElement } from "./nfet.js";
 
 // ---------------------------------------------------------------------------
 // Layout constants
@@ -177,12 +182,79 @@ export function executePFET(index: number, state: Uint32Array, highZs: Uint32Arr
 }
 
 // ---------------------------------------------------------------------------
+// PFETAnalogElement — AnalogElementCore implementation (composite, delegates to SW)
+//
+// PFET is structurally identical to NFET — same 4-stamp SW setup.
+// Polarity inversion: control voltage is V(S) - V(G) (inverted vs NFET).
+// ngspice anchor: ref/ngspice/src/spicelib/devices/sw/swsetup.c:47-62
+// ---------------------------------------------------------------------------
+
+export class PFETAnalogElement implements AnalogElementCore {
+  branchIndex: number = -1;
+  readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.SW;
+  readonly isNonlinear: boolean = false;
+  readonly isReactive: boolean = false;
+  _stateBase: number = -1;
+  _pinNodes: Map<string, number> = new Map();
+
+  readonly _sw: NFETSWSubElement = new NFETSWSubElement();
+
+  setup(ctx: SetupContext): void {
+    // PFET composite forwards directly to its single SW sub-element.
+    // SW sub-element uses D as posNode, S as negNode.
+    // Inverted polarity is a load-time concern only — setup is identical to NFET.
+    this._sw.setup(ctx);
+  }
+
+  load(ctx: LoadContext): void {
+    // Inverted control: PFET turns ON when source is higher than gate by |Vth|
+    // Negate vCtrl so the same SW threshold logic applies
+    const gateNode = this._pinNodes.get("G")!;
+    const sourceNode = this._pinNodes.get("S")!;
+    const vCtrl = ctx.rhsOld[sourceNode] - ctx.rhsOld[gateNode];
+    this._sw.setCtrlVoltage(vCtrl);
+    this._sw.load(ctx);
+  }
+
+  setParam(key: string, value: number): void {
+    this._sw.setParam(key, value);
+  }
+
+  getPinCurrents(_rhs: Float64Array): number[] {
+    return [0, 0, 0];
+  }
+}
+
+function pfetAnalogFactory(
+  pinNodes: ReadonlyMap<string, number>,
+  props: PropertyBag,
+  _getTime: () => number,
+): PFETAnalogElement {
+  const el = new PFETAnalogElement();
+  el._pinNodes = new Map(pinNodes);
+  el._sw._pinNodes = new Map([
+    ["D", pinNodes.get("D")!],
+    ["S", pinNodes.get("S")!],
+  ]);
+  const ron = Math.max(props.getOrDefault<number>("Ron", 1), 1e-12);
+  const roff = Math.max(props.getOrDefault<number>("Roff", 1e9), 1e-12);
+  const vth = props.getOrDefault<number>("Vth", 2.5);
+  el._sw.setParam("Ron", ron);
+  el._sw.setParam("Roff", roff);
+  el._sw.setParam("threshold", vth);
+  return el;
+}
+
+// ---------------------------------------------------------------------------
 // Attribute mappings and property definitions
 // ---------------------------------------------------------------------------
 
 export const PFET_ATTRIBUTE_MAPPINGS: AttributeMapping[] = [
   { xmlName: "Bits", propertyKey: "bitWidth", convert: (v) => parseInt(v, 10) },
   { xmlName: "Label", propertyKey: "label", convert: (v) => v },
+  { xmlName: "Ron", propertyKey: "Ron", convert: (v) => parseFloat(v) },
+  { xmlName: "Roff", propertyKey: "Roff", convert: (v) => parseFloat(v) },
+  { xmlName: "Vth", propertyKey: "Vth", convert: (v) => parseFloat(v) },
 ];
 
 const PFET_PROPERTY_DEFS: PropertyDefinition[] = [
@@ -202,6 +274,29 @@ const PFET_PROPERTY_DEFS: PropertyDefinition[] = [
     label: "Label",
     defaultValue: "",
     description: "Optional label",
+  },
+  {
+    key: "Ron",
+    type: PropertyType.FLOAT,
+    label: "Ron (Ω)",
+    defaultValue: 1,
+    min: 1e-12,
+    description: "On-state resistance in ohms",
+  },
+  {
+    key: "Roff",
+    type: PropertyType.FLOAT,
+    label: "Roff (Ω)",
+    defaultValue: 1e9,
+    min: 1,
+    description: "Off-state resistance in ohms",
+  },
+  {
+    key: "Vth",
+    type: PropertyType.FLOAT,
+    label: "Vth (V)",
+    defaultValue: 2.5,
+    description: "Gate threshold voltage in volts",
   },
 ];
 
@@ -228,5 +323,12 @@ export const PFETDefinition: ComponentDefinition = {
       defaultDelay: 0,
     },
   },
-  modelRegistry: {},
+  modelRegistry: {
+    "behavioral": {
+      kind: "inline",
+      factory: pfetAnalogFactory,
+      paramDefs: [],
+      params: { Ron: 1, Roff: 1e9, Vth: 2.5 },
+    },
+  },
 };

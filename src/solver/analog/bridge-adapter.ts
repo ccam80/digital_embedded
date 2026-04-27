@@ -1,11 +1,11 @@
 ﻿/**
- * Bridge adapter elements â€” MNA stamps for digital/analog engine boundaries.
+ * Bridge adapter elements  MNA stamps for digital/analog engine boundaries.
  *
  * BridgeOutputAdapter wraps a DigitalOutputPinModel for use at a cross-engine
  * boundary. It uses an ideal voltage source branch equation. The logic level
  * is set externally by the DefaultSimulationCoordinator after each digital
  * engine step. Re-stamping the branch equation on the next NR iteration is
- * sufficient â€” no NR convergence is required for a level change.
+ * sufficient  no NR convergence is required for a level change.
  *
  * BridgeInputAdapter wraps a DigitalInputPinModel for use at a cross-engine
  * boundary. It exposes threshold detection so the coordinator can convert
@@ -26,7 +26,7 @@ import type { AnalogCapacitorElement } from "../../components/passives/capacitor
 import { defineStateSchema } from "./state-schema.js";
 import type { StateSchema } from "./state-schema.js";
 
-// Empty composite schema for adapter elements â€” children carry their own schemas.
+// Empty composite schema for adapter elements  children carry their own schemas.
 const BRIDGE_COMPOSITE_SCHEMA: StateSchema = defineStateSchema("BridgeAdapterComposite", []);
 
 // ---------------------------------------------------------------------------
@@ -40,11 +40,11 @@ const BRIDGE_COMPOSITE_SCHEMA: StateSchema = defineStateSchema("BridgeAdapterCom
  * with role="branch". The branch variable at branchIndex carries the source
  * current. The logic level is set externally by the DefaultSimulationCoordinator.
  *
- * isNonlinear is false â€” the ideal source is linear; logic level changes are
+ * isNonlinear is false  the ideal source is linear; logic level changes are
  * handled by re-stamping the branch equation on the next load() call, not via
  * NR convergence.
  *
- * isReactive is a getter â€” true only when the capacitor child is present.
+ * isReactive is a getter  true only when the capacitor child is present.
  */
 export class BridgeOutputAdapter implements AnalogElement {
   private readonly _pinModel: DigitalOutputPinModel;
@@ -101,7 +101,7 @@ export class BridgeOutputAdapter implements AnalogElement {
   /**
    * Set the output logic level from the coordinator.
    *
-   * High â†’ vOH, low â†’ vOL. Delegates to DigitalOutputPinModel.setLogicLevel.
+   * High  vOH, low  vOL. Delegates to DigitalOutputPinModel.setLogicLevel.
    */
   setLogicLevel(high: boolean): void {
     this._pinModel.setLogicLevel(high);
@@ -148,7 +148,7 @@ export class BridgeOutputAdapter implements AnalogElement {
     return this._pinModel.nodeId;
   }
 
-  /** Output impedance (Î©) used by this adapter's pin model. */
+  /** Output impedance (Î) used by this adapter's pin model. */
   get rOut(): number {
     return this._pinModel.rOut;
   }
@@ -165,8 +165,8 @@ export class BridgeOutputAdapter implements AnalogElement {
  * threshold-detect the analog node voltage and feed the result to the inner
  * digital engine.
  *
- * isNonlinear is false â€” input loading is a linear resistor.
- * isReactive is a getter â€” true only when the capacitor child is present.
+ * isNonlinear is false  input loading is a linear resistor.
+ * isReactive is a getter  true only when the capacitor child is present.
  */
 export class BridgeInputAdapter implements AnalogElement {
   private readonly _pinModel: DigitalInputPinModel;
@@ -237,7 +237,7 @@ export class BridgeInputAdapter implements AnalogElement {
    *
    * Returns true  when voltage > vIH  (logic HIGH),
    *         false when voltage < vIL  (logic LOW),
-   *         undefined                 (indeterminate â€” between thresholds).
+   *         undefined                 (indeterminate  between thresholds).
    */
   readLogicLevel(voltage: number): boolean | undefined {
     return this._pinModel.readLogicLevel(voltage);
@@ -264,7 +264,7 @@ export class BridgeInputAdapter implements AnalogElement {
     return this._pinModel.nodeId;
   }
 
-  /** Input impedance (Î©) used by this adapter's loading conductance stamp. */
+  /** Input impedance (Î) used by this adapter's loading conductance stamp. */
   get rIn(): number {
     return this._pinModel.rIn;
   }

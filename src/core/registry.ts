@@ -106,6 +106,13 @@ export type ModelEntry =
       getInternalNodeLabels?: (props: PropertyBag) => readonly string[];
       /** SPICE-emission overrides for this model. */
       spice?: ModelEmissionSpec;
+      /** True for models that may allocate internal voltage nodes in
+       *  setup() (DIO, BJT, MOS, JFET, TLINE). Used by topology validators
+       *  to size worst-case topology. Default: false. */
+      mayCreateInternalNodes?: boolean;
+      /** Maps digiTS pin label → ngspice node-variable suffix.
+       *  Mirrors the same field on ComponentDefinition for per-model overrides. */
+      ngspiceNodeMap?: Record<string, string>;
     }
   | {
       kind: "netlist";

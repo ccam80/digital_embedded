@@ -34,10 +34,54 @@ import {
   MODEINITSMSIG, MODEINITTRAN,
 } from "../../../solver/analog/ckt-mode.js";
 import type { LimitingEvent } from "../../../solver/analog/newton-raphson.js";
+import type { SetupContext } from "../../../solver/analog/setup-context.js";
+import type { ReactiveAnalogElement } from "../../../solver/analog/element.js";
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
+
+// ---------------------------------------------------------------------------
+// runSetup: run real setup() on an element, allocating all TSTALLOC handles.
+// Must be called before load() so that matrix handles are valid.
+// ---------------------------------------------------------------------------
+
+function runSetup(core: AnalogElementCore, solver: SparseSolver): void {
+  let stateCount = 0;
+  let nodeCount = 100; // start above any pin node used in tests
+  const ctx: SetupContext = {
+    solver,
+    temp: 300.15,
+    nomTemp: 300.15,
+    copyNodesets: false,
+    makeVolt(_label: string, _suffix: string): number { return ++nodeCount; },
+    makeCur(_label: string, _suffix: string): number { return ++nodeCount; },
+    allocStates(n: number): number {
+      const off = stateCount;
+      stateCount += n;
+      return off;
+    },
+    findBranch(_label: string): number { return 0; },
+    findDevice(_label: string) { return null; },
+  };
+  (core as any).setup(ctx);
+}
+
+// ---------------------------------------------------------------------------
+// withState: run real setup() and initState on an element.
+// Returns the element cast as ReactiveAnalogElement and the bound pool.
+// ---------------------------------------------------------------------------
+
+function withState(core: AnalogElementCore): { element: ReactiveAnalogElement; pool: StatePool } {
+  const solver = new SparseSolver();
+  solver._initStructure();
+  runSetup(core, solver);
+  const re = core as ReactiveAnalogElement;
+  const pool = new StatePool(Math.max(re.stateSize, 1));
+  re.stateBaseOffset = 0;
+  re.initState!(pool);
+  return { element: re, pool };
+}
 
 function makeBjtProps(modelParams?: Record<string, number>): PropertyBag {
   const props = createTestPropertyBag();
@@ -93,31 +137,31 @@ function makeDcOpCtx(rhs: Float64Array): LoadContext {
 describe("BJT simple — interface contract", () => {
   it("isNonlinear_true", () => {
     const propsObj = makeBjtProps();
-    const element = createBjtElement(1, new Map([["B", 2], ["C", 1], ["E", 3]]), -1, propsObj);
+    const element = createBjtElement(1, new Map([["B", 2], ["C", 1], ["E", 3]]), propsObj);
     expect(element.isNonlinear).toBe(true);
   });
 
   it("isReactive_false", () => {
     const propsObj = makeBjtProps();
-    const element = createBjtElement(1, new Map([["B", 2], ["C", 1], ["E", 3]]), -1, propsObj);
+    const element = createBjtElement(1, new Map([["B", 2], ["C", 1], ["E", 3]]), propsObj);
     expect(element.isReactive).toBe(false);
   });
 
   it("pinNodeIds_correct", () => {
     const propsObj = makeBjtProps();
-    const element = withNodeIds(createBjtElement(1, new Map([["B", 3], ["C", 5], ["E", 7]]), -1, propsObj), [3, 5, 7]);
+    const element = withNodeIds(createBjtElement(1, new Map([["B", 3], ["C", 5], ["E", 7]]), propsObj), [3, 5, 7]);
     expect(element.pinNodeIds).toEqual([3, 5, 7]);
   });
 
   it("branchIndex_minus_one", () => {
     const propsObj = makeBjtProps();
-    const element = createBjtElement(1, new Map([["B", 2], ["C", 1], ["E", 3]]), -1, propsObj);
+    const element = createBjtElement(1, new Map([["B", 2], ["C", 1], ["E", 3]]), propsObj);
     expect(element.branchIndex).toBe(-1);
   });
 
   it("pnp_isNonlinear_true", () => {
     const propsObj = makeBjtProps();
-    const element = createBjtElement(-1, new Map([["B", 2], ["C", 1], ["E", 3]]), -1, propsObj);
+    const element = createBjtElement(-1, new Map([["B", 2], ["C", 1], ["E", 3]]), propsObj);
     expect(element.isNonlinear).toBe(true);
   });
 });
@@ -187,7 +231,7 @@ describe("Definitions", () => {
     const propsObj = makeBjtProps();
     const entry = NpnBjtDefinition.modelRegistry!["simple"];
     if (entry.kind !== "inline") throw new Error("expected inline");
-    const el = withNodeIds(entry.factory(new Map([["B", 1], ["C", 2], ["E", 3]]), [], -1, propsObj, () => 0), [1, 2, 3]);
+    const el = withNodeIds(entry.factory(new Map([["B", 1], ["C", 2], ["E", 3]]), propsObj, () => 0), [1, 2, 3]);
     expect(el.isNonlinear).toBe(true);
     expect(el.pinNodeIds).toEqual([1, 2, 3]);
   });
@@ -196,7 +240,7 @@ describe("Definitions", () => {
     const propsObj = makeBjtProps();
     const entry = PnpBjtDefinition.modelRegistry!["simple"];
     if (entry.kind !== "inline") throw new Error("expected inline");
-    const el = withNodeIds(entry.factory(new Map([["B", 1], ["C", 2], ["E", 3]]), [], -1, propsObj, () => 0), [1, 2, 3]);
+    const el = withNodeIds(entry.factory(new Map([["B", 1], ["C", 2], ["E", 3]]), propsObj, () => 0), [1, 2, 3]);
     expect(el.isNonlinear).toBe(true);
     expect(el.pinNodeIds).toEqual([1, 2, 3]);
   });
@@ -205,7 +249,7 @@ describe("Definitions", () => {
     const propsObj = makeSpiceL1Props();
     const entry = NpnBjtDefinition.modelRegistry!["spice"];
     if (entry.kind !== "inline") throw new Error("expected inline");
-    const el = withNodeIds(entry.factory(new Map([["B", 1], ["C", 2], ["E", 3]]), [], -1, propsObj, () => 0), [1, 2, 3]);
+    const el = withNodeIds(entry.factory(new Map([["B", 1], ["C", 2], ["E", 3]]), propsObj, () => 0), [1, 2, 3]);
     expect(el.isNonlinear).toBe(true);
     expect(el.pinNodeIds).toEqual([1, 2, 3]);
   });
@@ -214,7 +258,7 @@ describe("Definitions", () => {
     const propsObj = makeSpiceL1Props();
     const entry = PnpBjtDefinition.modelRegistry!["spice"];
     if (entry.kind !== "inline") throw new Error("expected inline");
-    const el = withNodeIds(entry.factory(new Map([["B", 1], ["C", 2], ["E", 3]]), [], -1, propsObj, () => 0), [1, 2, 3]);
+    const el = withNodeIds(entry.factory(new Map([["B", 1], ["C", 2], ["E", 3]]), propsObj, () => 0), [1, 2, 3]);
     expect(el.isNonlinear).toBe(true);
     expect(el.pinNodeIds).toEqual([1, 2, 3]);
   });
@@ -269,7 +313,7 @@ describe("ModelParams", () => {
     // Behavioural numerical correctness of setParam is validated by the
     // ngspice-comparison harness in Wave 3, not by hand-computed test values.
     const propsObj = makeBjtProps();
-    const element = createBjtElement(1, new Map([["B", 2], ["C", 1], ["E", 3]]), -1, propsObj);
+    const element = createBjtElement(1, new Map([["B", 2], ["C", 1], ["E", 3]]), propsObj);
     expect(() => element.setParam("BF", 50)).not.toThrow();
     expect(() => element.setParam("IS", 1e-12)).not.toThrow();
   });
@@ -311,14 +355,14 @@ describe("SPICE L1 model — parameter plumbing", () => {
 
   it("factory_produces_valid_element_with_zero_resistances", () => {
     const propsObj = makeSpiceL1Props();
-    const el = createSpiceL1BjtElement(1, false, new Map([["B", 2], ["C", 1], ["E", 3]]),[], -1, propsObj);
+    const el = createSpiceL1BjtElement(1, false, new Map([["B", 2], ["C", 1], ["E", 3]]), propsObj);
     expect(el.isNonlinear).toBe(true);
   });
 
   it("factory_produces_element_with_internal_nodes_when_resistances_nonzero", () => {
     const propsObj = makeSpiceL1Props({ RB: 10, RC: 1, RE: 0.5 });
     const internalNodes = [100, 101, 102];
-    const el = createSpiceL1BjtElement(1, false, new Map([["B", 2], ["C", 1], ["E", 3]]),internalNodes, -1, propsObj);
+    const el = createSpiceL1BjtElement(1, false, new Map([["B", 2], ["C", 1], ["E", 3]]), propsObj);
     expect(el.isNonlinear).toBe(true);
   });
 });
@@ -330,52 +374,52 @@ describe("SPICE L1 model — parameter plumbing", () => {
 
 describe("stateSchema — BJT simple", () => {
   it("stateSchema_declared", () => {
-    const core = createBjtElement(1, new Map([["B", 2], ["C", 1], ["E", 3]]), -1, makeBjtProps());
+    const core = createBjtElement(1, new Map([["B", 2], ["C", 1], ["E", 3]]), makeBjtProps());
     expect(core.stateSchema).toBeDefined();
   });
 
   it("stateSchema_owner_identifies_element", () => {
-    const core = createBjtElement(1, new Map([["B", 2], ["C", 1], ["E", 3]]), -1, makeBjtProps());
+    const core = createBjtElement(1, new Map([["B", 2], ["C", 1], ["E", 3]]), makeBjtProps());
     expect(core.stateSchema!.owner).toBe("BjtSimpleElement");
   });
 
   it("warmstart_NPN_VBE_seeded_to_0_6", () => {
-    const core = createBjtElement(1, new Map([["B", 2], ["C", 1], ["E", 3]]), -1, makeBjtProps());
+    const core = createBjtElement(1, new Map([["B", 2], ["C", 1], ["E", 3]]), makeBjtProps());
+    runSetup(core as AnalogElementCore, new SparseSolver());
     const pool = new StatePool(core.stateSize);
-    core.stateBaseOffset = 0;
     core.initState!(pool);
   });
 
   it("warmstart_PNP_VBE_seeded_to_minus_0_6", () => {
-    const core = createBjtElement(-1, new Map([["B", 2], ["C", 1], ["E", 3]]), -1, makeBjtProps());
+    const core = createBjtElement(-1, new Map([["B", 2], ["C", 1], ["E", 3]]), makeBjtProps());
+    runSetup(core as AnalogElementCore, new SparseSolver());
     const pool = new StatePool(core.stateSize);
-    core.stateBaseOffset = 0;
     core.initState!(pool);
   });
 });
 
 describe("stateSchema — BJT SPICE L1", () => {
   it("stateSchema_declared", () => {
-    const core = createSpiceL1BjtElement(1, false, new Map([["B", 2], ["C", 1], ["E", 3]]),[], -1, makeSpiceL1Props());
+    const core = createSpiceL1BjtElement(1, false, new Map([["B", 2], ["C", 1], ["E", 3]]), makeSpiceL1Props());
     expect(core.stateSchema).toBeDefined();
   });
 
   it("stateSchema_owner_identifies_element", () => {
-    const core = createSpiceL1BjtElement(1, false, new Map([["B", 2], ["C", 1], ["E", 3]]),[], -1, makeSpiceL1Props());
+    const core = createSpiceL1BjtElement(1, false, new Map([["B", 2], ["C", 1], ["E", 3]]), makeSpiceL1Props());
     expect(core.stateSchema!.owner).toBe("BjtSpiceL1Element");
   });
 
   it("warmstart_NPN_VBE_seeded_to_0_6", () => {
-    const core = createSpiceL1BjtElement(1, false, new Map([["B", 2], ["C", 1], ["E", 3]]),[], -1, makeSpiceL1Props());
+    const core = createSpiceL1BjtElement(1, false, new Map([["B", 2], ["C", 1], ["E", 3]]), makeSpiceL1Props());
+    runSetup(core as AnalogElementCore, new SparseSolver());
     const pool = new StatePool(core.stateSize);
-    core.stateBaseOffset = 0;
     core.initState!(pool);
   });
 
   it("warmstart_PNP_VBE_seeded_to_minus_0_6", () => {
-    const core = createSpiceL1BjtElement(-1, false, new Map([["B", 2], ["C", 1], ["E", 3]]),[], -1, makeSpiceL1Props());
+    const core = createSpiceL1BjtElement(-1, false, new Map([["B", 2], ["C", 1], ["E", 3]]), makeSpiceL1Props());
+    runSetup(core as AnalogElementCore, new SparseSolver());
     const pool = new StatePool(core.stateSize);
-    core.stateBaseOffset = 0;
     core.initState!(pool);
   });
 });
@@ -388,11 +432,11 @@ describe("stateSchema — BJT SPICE L1", () => {
 describe("BJT simple LimitingEvent instrumentation", () => {
   function makeNpnWithState(): AnalogElement {
     const props = makeBjtProps();
-    const core = createBjtElement(1, new Map([["B", 1], ["C", 2], ["E", 3]]), -1, props) as AnalogElementCore & { label?: string; elementIndex?: number };
+    const core = createBjtElement(1, new Map([["B", 1], ["C", 2], ["E", 3]]), props) as AnalogElementCore & { label?: string; elementIndex?: number };
     core.label = "Q1";
     core.elementIndex = 5;
+    runSetup(core as AnalogElementCore, new SparseSolver());
     const pool = new StatePool((core as any).stateSize);
-    (core as any).stateBaseOffset = 0;
     (core as any).initState(pool);
     return withNodeIds(core, [1, 2, 3]);
   }
@@ -439,11 +483,11 @@ describe("BJT simple LimitingEvent instrumentation", () => {
 describe("BJT L1 LimitingEvent instrumentation", () => {
   function makeL1NpnWithState(): AnalogElement {
     const props = makeSpiceL1Props();
-    const core = createSpiceL1BjtElement(1, false, new Map([["B", 1], ["C", 2], ["E", 3]]),[], -1, props) as AnalogElementCore & { label?: string; elementIndex?: number };
+    const core = createSpiceL1BjtElement(1, false, new Map([["B", 1], ["C", 2], ["E", 3]]), props) as AnalogElementCore & { label?: string; elementIndex?: number };
     core.label = "Q1";
     core.elementIndex = 5;
+    runSetup(core as AnalogElementCore, new SparseSolver());
     const pool = new StatePool((core as any).stateSize);
-    (core as any).stateBaseOffset = 0;
     (core as any).initState(pool);
     return withNodeIds(core, [1, 2, 3]);
   }
@@ -486,10 +530,13 @@ describe("BJT L0 MODEINITPRED", () => {
     const SLOT_GPI = 4, SLOT_GMU = 5, SLOT_GM = 6, SLOT_GO = 7, SLOT_GX = 8;
 
     const propsObj = makeBjtProps();
-    const core = createBjtElement(1, new Map([["B", 1], ["C", 2], ["E", 3]]), -1, propsObj) as AnalogElementCore;
+    const core = createBjtElement(1, new Map([["B", 1], ["C", 2], ["E", 3]]), propsObj) as AnalogElementCore;
     const stateSize: number = (core as any).stateSize;
+    // Setup uses solverPrime so that load() priming pass uses the same solver with valid handles.
+    const solverPrime = new SparseSolver();
+    solverPrime._initStructure();
+    runSetup(core, solverPrime);
     const pool = new StatePool(stateSize);
-    (core as any).stateBaseOffset = 0;
     (core as any).initState(pool);
 
     const s0 = pool.states[0];
@@ -504,8 +551,6 @@ describe("BJT L0 MODEINITPRED", () => {
     rhsOldPrime[1] = 0.65; // nodeB=1 → rhsOld[0]
     rhsOldPrime[2] = -1.0; // nodeC=2 → rhsOld[1]
     rhsOldPrime[3] = 0.0;  // nodeE=3 → rhsOld[2]
-    const solverPrime = new SparseSolver();
-    solverPrime._initStructure();
     const rhs = new Float64Array(10);
     const ctxPrime: LoadContext = {
       cktMode: MODEDCOP | MODEINITFLOAT,
@@ -620,12 +665,12 @@ describe("BJT L0 MODEINITPRED", () => {
 
 function makeFullLoadCtx(cktMode: number, rhsOld: Float64Array, modelParams?: Record<string, number>): { ctx: LoadContext; element: AnalogElement; s0: Float64Array; pool: StatePool } {
   const propsObj = makeBjtProps(modelParams);
-  const core = createBjtElement(1, new Map([["B", 1], ["C", 2], ["E", 3]]), -1, propsObj) as AnalogElementCore;
-  const pool = new StatePool((core as any).stateSize);
-  (core as any).stateBaseOffset = 0;
-  (core as any).initState(pool);
+  const core = createBjtElement(1, new Map([["B", 1], ["C", 2], ["E", 3]]), propsObj) as AnalogElementCore;
   const solver = new SparseSolver();
   solver._initStructure();
+  runSetup(core, solver);
+  const pool = new StatePool((core as any).stateSize);
+  (core as any).initState(pool);
   const ctx: LoadContext = {
     cktMode,
     solver,
@@ -733,12 +778,12 @@ describe("BJT L0 NOBYPASS", () => {
     limitingCollector: LimitingEvent[];
   } {
     const propsObj = makeBjtProps(modelParams);
-    const core = createBjtElement(1, new Map([["B", 1], ["C", 2], ["E", 3]]), -1, propsObj) as AnalogElementCore;
-    const pool = new StatePool((core as any).stateSize);
-    (core as any).stateBaseOffset = 0;
-    (core as any).initState(pool);
+    const core = createBjtElement(1, new Map([["B", 1], ["C", 2], ["E", 3]]), propsObj) as AnalogElementCore;
     const solver = new SparseSolver();
     solver._initStructure();
+    runSetup(core, solver);
+    const pool = new StatePool((core as any).stateSize);
+    (core as any).initState(pool);
     // Stamp-count probe: wrap SparseSolver.stampElement (the G-matrix stamp
     // primitive used by the stampG helper) and SparseSolver.stampRHS (used by
     // stampRHS helper). Both paths of the bypass gate emit stamps (the stamp
@@ -837,9 +882,9 @@ describe("BJT L0 NOBYPASS", () => {
     //   compute ran  → limitingCollector.length === 2 (BE + BC)
     //   bypass fired → limitingCollector.length === 0
     const propsObj = makeBjtProps();
-    const core = createBjtElement(1, new Map([["B", 1], ["C", 2], ["E", 3]]), -1, propsObj) as AnalogElementCore;
+    const core = createBjtElement(1, new Map([["B", 1], ["C", 2], ["E", 3]]), propsObj) as AnalogElementCore;
+    runSetup(core, new SparseSolver());
     const pool = new StatePool((core as any).stateSize);
-    (core as any).stateBaseOffset = 0;
     (core as any).initState(pool);
     const s0 = pool.states[0];
 
@@ -937,9 +982,9 @@ describe("BJT L0 NOBYPASS", () => {
     // Probe: limitingCollector populated ⇒ compute path ran (bjt.ts:932-951).
     // If bypass had (incorrectly) fired, the collector would be empty.
     const propsObj = makeBjtProps();
-    const core = createBjtElement(1, new Map([["B", 1], ["C", 2], ["E", 3]]), -1, propsObj) as AnalogElementCore;
+    const core = createBjtElement(1, new Map([["B", 1], ["C", 2], ["E", 3]]), propsObj) as AnalogElementCore;
+    runSetup(core, new SparseSolver());
     const pool = new StatePool((core as any).stateSize);
-    (core as any).stateBaseOffset = 0;
     (core as any).initState(pool);
     const s0 = pool.states[0];
     const s1 = pool.states[1];
@@ -1020,12 +1065,12 @@ describe("BJT L0 noncon", () => {
     rhsOld[2] = 3.0;
     rhsOld[3] = 0.0;
     const propsObj = makeBjtProps({ OFF: off });
-    const core = createBjtElement(1, new Map([["B", 1], ["C", 2], ["E", 3]]), -1, propsObj) as AnalogElementCore;
-    const pool = new StatePool((core as any).stateSize);
-    (core as any).stateBaseOffset = 0;
-    (core as any).initState(pool);
+    const core = createBjtElement(1, new Map([["B", 1], ["C", 2], ["E", 3]]), propsObj) as AnalogElementCore;
     const solver = new SparseSolver();
     solver._initStructure();
+    runSetup(core, solver);
+    const pool = new StatePool((core as any).stateSize);
+    (core as any).initState(pool);
     const ctx: LoadContext = {
       cktMode,
       solver,
@@ -1103,7 +1148,7 @@ describe("ModelParams", () => {
 
   it("setParam_NE_NC_no_throw", () => {
     const propsObj = makeBjtProps();
-    const element = createBjtElement(1, new Map([["B", 2], ["C", 1], ["E", 3]]), -1, propsObj);
+    const element = createBjtElement(1, new Map([["B", 2], ["C", 1], ["E", 3]]), propsObj);
     expect(() => element.setParam("NE", 1.2)).not.toThrow();
     expect(() => element.setParam("NC", 2.5)).not.toThrow();
   });
@@ -1119,9 +1164,9 @@ describe("BJT L0 MODEINITSMSIG", () => {
 
   function makeSmsigCtx(primePool?: { s0: Float64Array }): { ctx: LoadContext; element: AnalogElement; s0: Float64Array; solver: SparseSolver } {
     const propsObj = makeBjtProps();
-    const core = createBjtElement(1, new Map([["B", 1], ["C", 2], ["E", 3]]), -1, propsObj) as AnalogElementCore;
+    const core = createBjtElement(1, new Map([["B", 1], ["C", 2], ["E", 3]]), propsObj) as AnalogElementCore;
+    runSetup(core, new SparseSolver());
     const pool = new StatePool((core as any).stateSize);
-    (core as any).stateBaseOffset = 0;
     (core as any).initState(pool);
 
     // Prime s0 with valid DC-OP state so MODEINITSMSIG reads meaningful values.
@@ -1227,9 +1272,11 @@ describe("BJT L0 MODEINITTRAN", () => {
     // cite: bjtload.c:236-257 — MODEINITTRAN seeds state1 from the initial voltage read
     // so subsequent NIintegrate history has a valid t=0 prior value.
     const propsObj = makeBjtProps();
-    const core = createBjtElement(1, new Map([["B", 1], ["C", 2], ["E", 3]]), -1, propsObj) as AnalogElementCore;
+    const core = createBjtElement(1, new Map([["B", 1], ["C", 2], ["E", 3]]), propsObj) as AnalogElementCore;
+    const solver = new SparseSolver();
+    solver._initStructure();
+    runSetup(core, solver);
     const pool = new StatePool((core as any).stateSize);
-    (core as any).stateBaseOffset = 0;
     (core as any).initState(pool);
 
     const s1 = pool.states[1];
@@ -1241,9 +1288,6 @@ describe("BJT L0 MODEINITTRAN", () => {
     // load() reads from s1[VBE]/s1[VBC] and then writes them back.
     s1[SLOT_VBE] = 0.5;
     s1[SLOT_VBC] = 0.8;
-
-    const solver = new SparseSolver();
-    solver._initStructure();
     const ctx: LoadContext = {
       cktMode: MODETRAN | MODEINITTRAN,
       solver,
@@ -1280,9 +1324,9 @@ describe("BJT L1 MODEINITSMSIG", () => {
     ctx: LoadContext; element: AnalogElement; s0: Float64Array; solver: SparseSolver;
   } {
     const propsObj = makeSpiceL1Props({ CJE: 1e-12, CJC: 1e-12, ...modelParams });
-    const core = createSpiceL1BjtElement(1, false, new Map([["B", 1], ["C", 2], ["E", 3]]),[], -1, propsObj) as AnalogElementCore;
+    const core = createSpiceL1BjtElement(1, false, new Map([["B", 1], ["C", 2], ["E", 3]]), propsObj) as AnalogElementCore;
+    runSetup(core, new SparseSolver());
     const pool = new StatePool((core as any).stateSize);
-    (core as any).stateBaseOffset = 0;
     (core as any).initState(pool);
 
     // Prime s0 with a forward-active DC-OP pass so MODEINITSMSIG reads valid values.
@@ -1391,10 +1435,13 @@ describe("BJT L1 MODEINITPRED", () => {
     const SLOT_GX = 16, SLOT_VSUB = 21;
 
     const propsObj = makeSpiceL1Props();
-    const core = createSpiceL1BjtElement(1, false, new Map([["B", 1], ["C", 2], ["E", 3]]),[], -1, propsObj) as AnalogElementCore;
+    const core = createSpiceL1BjtElement(1, false, new Map([["B", 1], ["C", 2], ["E", 3]]), propsObj) as AnalogElementCore;
     const stateSize: number = (core as any).stateSize;
+    // Setup uses solverPrime so the priming load() pass uses valid handles.
+    const solverPrime = new SparseSolver();
+    solverPrime._initStructure();
+    runSetup(core, solverPrime);
     const pool = new StatePool(stateSize);
-    (core as any).stateBaseOffset = 0;
     (core as any).initState(pool);
 
     const s0 = pool.states[0];
@@ -1407,8 +1454,6 @@ describe("BJT L1 MODEINITPRED", () => {
     rhsOldPrime[1] = 0.65; // nodeB=1 → rhsOld[0]
     rhsOldPrime[2] = -1.0; // nodeC=2 → rhsOld[1]
     rhsOldPrime[3] = 0.0;  // nodeE=3 → rhsOld[2]
-    const solverPrime = new SparseSolver();
-    solverPrime._initStructure();
     const ctxPrime: LoadContext = {
       cktMode: MODEDCOP | MODEINITFLOAT,
       solver: solverPrime,
@@ -1547,12 +1592,12 @@ describe("BJT L1 NOBYPASS", () => {
     limitingCollector: LimitingEvent[];
   } {
     const propsObj = makeSpiceL1Props(modelParams);
-    const core = createSpiceL1BjtElement(1, false, new Map([["B", 1], ["C", 2], ["E", 3]]),[], -1, propsObj) as AnalogElementCore;
-    const pool = new StatePool((core as any).stateSize);
-    (core as any).stateBaseOffset = 0;
-    (core as any).initState(pool);
+    const core = createSpiceL1BjtElement(1, false, new Map([["B", 1], ["C", 2], ["E", 3]]), propsObj) as AnalogElementCore;
     const solver = new SparseSolver();
     solver._initStructure();
+    runSetup(core, solver);
+    const pool = new StatePool((core as any).stateSize);
+    (core as any).initState(pool);
     // Stamp-count probe: wrap solver.stampElement (G-matrix primitive used by
     // the stampG helper). RHS count is read from ctx.rhs after load.
     const rhsL1 = new Float64Array(10);
@@ -1623,9 +1668,9 @@ describe("BJT L1 NOBYPASS", () => {
     // emitted, (c) computeSpiceL1BjtOp NOT called on the bypass call
     // (limitingCollector length 0 — only compute path pushes).
     const propsObj = makeSpiceL1Props();
-    const core = createSpiceL1BjtElement(1, false, new Map([["B", 1], ["C", 2], ["E", 3]]),[], -1, propsObj) as AnalogElementCore;
+    const core = createSpiceL1BjtElement(1, false, new Map([["B", 1], ["C", 2], ["E", 3]]), propsObj) as AnalogElementCore;
+    runSetup(core, new SparseSolver());
     const pool = new StatePool((core as any).stateSize);
-    (core as any).stateBaseOffset = 0;
     (core as any).initState(pool);
     const s0 = pool.states[0];
 
@@ -1701,9 +1746,9 @@ describe("BJT L1 NOBYPASS", () => {
     // cite: bjtload.c:347 — !(MODEINITPRED) is part of the bypass gate; MODEINITPRED disables it.
     // Probe: limitingCollector populated ⇒ compute path ran under MODEINITPRED.
     const propsObj = makeSpiceL1Props();
-    const core = createSpiceL1BjtElement(1, false, new Map([["B", 1], ["C", 2], ["E", 3]]),[], -1, propsObj) as AnalogElementCore;
+    const core = createSpiceL1BjtElement(1, false, new Map([["B", 1], ["C", 2], ["E", 3]]), propsObj) as AnalogElementCore;
+    runSetup(core, new SparseSolver());
     const pool = new StatePool((core as any).stateSize);
-    (core as any).stateBaseOffset = 0;
     (core as any).initState(pool);
     const s0 = pool.states[0];
     const s1 = pool.states[1];
@@ -1760,12 +1805,12 @@ describe("BJT L1 noncon", () => {
     ctx: LoadContext; element: AnalogElement;
   } {
     const propsObj = makeSpiceL1Props(modelParams);
-    const core = createSpiceL1BjtElement(1, false, new Map([["B", 1], ["C", 2], ["E", 3]]),[], -1, propsObj) as AnalogElementCore;
-    const pool = new StatePool((core as any).stateSize);
-    (core as any).stateBaseOffset = 0;
-    (core as any).initState(pool);
+    const core = createSpiceL1BjtElement(1, false, new Map([["B", 1], ["C", 2], ["E", 3]]), propsObj) as AnalogElementCore;
     const solver = new SparseSolver();
     solver._initStructure();
+    runSetup(core, solver);
+    const pool = new StatePool((core as any).stateSize);
+    (core as any).initState(pool);
     // rhsOld: large voltage shift to trigger pnjlim.
     const rhsOld = new Float64Array(10);
     rhsOld[1] = 5.0; rhsOld[2] = 0.0; rhsOld[3] = 0.0;
@@ -1820,9 +1865,9 @@ describe("BJT L1 CdBE", () => {
     // With TF>0 and vbeLimited>0, cbeMod = cbe*(1+argtf)/qb where argtf depends on gbe.
     function makeL1TranEl(IS: number): { el: AnalogElement; pool: StatePool } {
       const propsObj = makeSpiceL1Props({ TF: 1e-9, CJE: 1e-12, IS });
-      const core = createSpiceL1BjtElement(1, false, new Map([["B", 1], ["C", 2], ["E", 3]]),[], -1, propsObj) as AnalogElementCore;
+      const core = createSpiceL1BjtElement(1, false, new Map([["B", 1], ["C", 2], ["E", 3]]), propsObj) as AnalogElementCore;
+      runSetup(core, new SparseSolver());
       const pool = new StatePool((core as any).stateSize);
-      (core as any).stateBaseOffset = 0;
       (core as any).initState(pool);
       return { el: withNodeIds(core, [1, 2, 3]), pool };
     }
@@ -1889,37 +1934,67 @@ describe("BJT L1 BC_cap_stamps", () => {
   it("target_colPrime", () => {
     // cite: bjtload.c:841-842 — BJTbaseColPrimePtr targets nodeC_int (colPrime), not nodeC_ext.
     // With RC>0, nodeC_int !== nodeC_ext. Verify no stamp hits (nodeB_ext, nodeC_ext).
-    // Node assignment: B=1 (ext), C=2 (ext), E=3; RC>0 creates nodeC_int=4.
-    // internalNodeIds = [4] (internal collector node from RC).
+    // Node assignment: B=1 (ext), C=2 (ext), E=3; RC>0 creates nodeC_int via ctx.makeVolt().
+    // We seed makeVolt to return 4 as the first internal node by starting nextNode at 3.
+    //
+    // After the setup/load split, load() only calls stampElement(handle, value) — never
+    // allocElement. To verify which (extRow, extCol) pairs are stamped, we:
+    //   1. Intercept allocElement during setup() to build handle → (extRow, extCol) map.
+    //   2. Intercept stampElement during load() to record which handles are written.
+    //   3. Cross-reference map + stamped handles to find the stamped node pairs.
     const propsObj = makeSpiceL1Props({ RC: 1, CJC: 1e-11 });
     const core = createSpiceL1BjtElement(
-      1, false, new Map([["B", 1], ["C", 2], ["E", 3]]), [4], -1, propsObj,
+      1, false, new Map([["B", 1], ["C", 2], ["E", 3]]), propsObj,
     ) as AnalogElementCore;
-    const pool = new StatePool((core as any).stateSize);
-    (core as any).stateBaseOffset = 0;
-    (core as any).initState(pool);
 
-    // Pre-allocate all needed matrix entries before load() (stampG calls allocElement at assembly time).
-    // stampG subtracts 1 from node IDs before calling allocElement, so node N → index N-1.
-    // We allocate entries for all node pairs that the L1 stamp block may touch.
-    // Nodes: B_ext=1, C_ext=2, E=3, C_int=4. All pairs (0-based: 0,1,2,3).
     const solver = new SparseSolver();
-    const nodeCount = 5; // 1-based nodes up to 4 → need size 5
     solver._initStructure();
 
-    // Capture all (row, col) 0-based index pairs passed to allocElement.
-    // Stored as 1-based node IDs to match the assertion logic.
-    const allocatedPairs: Array<{ row: number; col: number }> = [];
+    // Step 1: spy on allocElement during setup() to capture handle → (extRow, extCol).
+    const handleToNodes = new Map<number, { extRow: number; extCol: number }>();
     const origAllocElement = (solver as any).allocElement.bind(solver);
     (solver as any).allocElement = (row: number, col: number): number => {
-      allocatedPairs.push({ row: row + 1, col: col + 1 }); // convert 0-based → 1-based
-      return origAllocElement(row, col);
+      const handle = origAllocElement(row, col);
+      if (row !== 0 && col !== 0) {
+        handleToNodes.set(handle, { extRow: row, extCol: col });
+      }
+      return handle;
+    };
+
+    {
+      let stateCount = 0;
+      let nextNode = 3; // first makeVolt call returns ++nextNode = 4 (colPrime for RC>0)
+      const setupCtx: SetupContext = {
+        solver,
+        temp: 300.15, nomTemp: 300.15, copyNodesets: false,
+        makeVolt(_label: string, _suffix: string): number { return ++nextNode; },
+        makeCur(_label: string, _suffix: string): number { return ++nextNode; },
+        allocStates(n: number): number { const off = stateCount; stateCount += n; return off; },
+        findBranch(_label: string): number { return 0; },
+        findDevice(_label: string) { return null; },
+      };
+      (core as any).setup(setupCtx);
+    }
+    // Restore allocElement to the real implementation for load() calls.
+    (solver as any).allocElement = origAllocElement;
+
+    const pool = new StatePool((core as any).stateSize);
+    (core as any).initState(pool);
+
+    // Nodes: B_ext=1, C_ext=2, E=3, C_int=4.
+    const nodeCount = 5; // 1-based nodes up to 4 → need size 5
+
+    // Step 2: spy on stampElement during load() to record which handles are written.
+    const stampedHandles: number[] = [];
+    const origStampElement = solver.stampElement.bind(solver);
+    solver.stampElement = (handle: number, value: number): void => {
+      stampedHandles.push(handle);
+      origStampElement(handle, value);
     };
 
     const rhsOld = new Float64Array(nodeCount);
-    rhsOld[1] = 0.65; rhsOld[2] = -1.0; rhsOld[2] = 0.0;
-    // Use MODEINITTRAN so s1 QBX is seeded and NIintegrate fires on the second call.
-    // First call: MODEINITTRAN seeds QBX into state1.
+    rhsOld[1] = 0.65; rhsOld[2] = 0.0; rhsOld[3] = 0.0;
+    // First call: MODEINITTRAN seeds QBX into state1 so NIintegrate has history.
     const ctxInit: LoadContext = {
       cktMode: MODETRAN | MODEINITTRAN,
       solver, matrix: solver,
@@ -1934,8 +2009,8 @@ describe("BJT L1 BC_cap_stamps", () => {
     const el = withNodeIds(core, [1, 2, 3, 4]);
     el.load(ctxInit);
 
-    // Clear collected pairs, then run MODETRAN | MODEINITFLOAT to trigger NIintegrate + geqbx stamp.
-    allocatedPairs.length = 0;
+    // Clear collected handles, then run MODETRAN | MODEINITFLOAT to trigger NIintegrate + geqbx stamp.
+    stampedHandles.length = 0;
     const ag = new Float64Array(7);
     ag[0] = 1 / 1e-9; // trapezoidal ag[0] = 1/dt
     const ctx: LoadContext = {
@@ -1951,20 +2026,26 @@ describe("BJT L1 BC_cap_stamps", () => {
     };
     el.load(ctx);
 
+    // Step 3: cross-reference to find which (extRow, extCol) pairs were stamped.
+    const stampedPairs = stampedHandles
+      .filter(h => handleToNodes.has(h))
+      .map(h => handleToNodes.get(h)!);
+
     // nodeB_ext=1, nodeC_ext=2, nodeC_int=4.
     // No stamp should target (nodeB_ext=1, nodeC_ext=2) or (nodeC_ext=2, nodeB_ext=1).
     const nodeB_ext = 1, nodeC_ext = 2;
-    const forbidden = allocatedPairs.filter(
-      s => (s.row === nodeB_ext && s.col === nodeC_ext) ||
-           (s.row === nodeC_ext && s.col === nodeB_ext),
+    const forbidden = stampedPairs.filter(
+      s => (s.extRow === nodeB_ext && s.extCol === nodeC_ext) ||
+           (s.extRow === nodeC_ext && s.extCol === nodeB_ext),
     );
     expect(forbidden).toHaveLength(0);
 
-    // A stamp to (nodeB_ext=1, nodeC_int=4) must be present (geqbx).
+    // A stamp to (nodeB_ext=1, nodeC_int=4) or (nodeC_int=4, nodeB_ext=1) must
+    // be present (geqbx — bjtload.c:841-842 BJTbaseColPrimePtr / BJTcolPrimeBasePtr).
     const nodeC_int = 4;
-    const toColPrime = allocatedPairs.filter(
-      s => (s.row === nodeB_ext && s.col === nodeC_int) ||
-           (s.row === nodeC_int && s.col === nodeB_ext),
+    const toColPrime = stampedPairs.filter(
+      s => (s.extRow === nodeB_ext && s.extCol === nodeC_int) ||
+           (s.extRow === nodeC_int && s.extCol === nodeB_ext),
     );
     expect(toColPrime.length).toBeGreaterThan(0);
   });
@@ -2058,9 +2139,9 @@ describe("BJT L1 AREAB_AREAC", () => {
     isLateral: boolean = false,
   ): { el: AnalogElement; pool: StatePool } {
     const propsObj = makeSpiceL1Props(modelParams);
-    const core = createSpiceL1BjtElement(1, isLateral, new Map([["B", 1], ["C", 2], ["E", 3]]),[], -1, propsObj) as AnalogElementCore;
+    const core = createSpiceL1BjtElement(1, isLateral, new Map([["B", 1], ["C", 2], ["E", 3]]), propsObj) as AnalogElementCore;
+    runSetup(core, new SparseSolver());
     const pool = new StatePool((core as any).stateSize);
-    (core as any).stateBaseOffset = 0;
     (core as any).initState(pool);
     return { el: withNodeIds(core, [1, 2, 3]), pool };
   }
@@ -2072,9 +2153,9 @@ describe("BJT L1 AREAB_AREAC", () => {
     const propsObj = createTestPropertyBag();
     const defaults = { ...BJT_SPICE_L1_PNP_DEFAULTS, ...modelParams };
     propsObj.replaceModelParams(defaults);
-    const core = createSpiceL1BjtElement(-1, isLateral, new Map([["B", 1], ["C", 2], ["E", 3]]), [], -1, propsObj) as AnalogElementCore;
+    const core = createSpiceL1BjtElement(-1, isLateral, new Map([["B", 1], ["C", 2], ["E", 3]]), propsObj) as AnalogElementCore;
+    runSetup(core, new SparseSolver());
     const pool = new StatePool((core as any).stateSize);
-    (core as any).stateBaseOffset = 0;
     (core as any).initState(pool);
     return { el: withNodeIds(core, [1, 2, 3]), pool };
   }
@@ -2262,9 +2343,9 @@ describe("BJT L1 AREAB_AREAC", () => {
 
     function buildAndLoad(entry: typeof verticalEntry): number {
       const factory = (entry as any).factory;
-      const core = factory(new Map([["B", 1], ["C", 2], ["E", 3]]), [], -1, propsObj, () => 0) as AnalogElementCore;
+      const core = factory(new Map([["B", 1], ["C", 2], ["E", 3]]), propsObj, () => 0) as AnalogElementCore;
+      runSetup(core, new SparseSolver());
       const pool = new StatePool((core as any).stateSize);
-      (core as any).stateBaseOffset = 0;
       (core as any).initState(pool);
       const el = withNodeIds(core, [1, 2, 3]);
       el.load(makeDcInitCtx());
@@ -2292,9 +2373,9 @@ describe("BJT L1 MODEINITTRAN", () => {
 
   function makeL1TranInittranEl(modelParams?: Record<string, number>): { el: AnalogElement; pool: StatePool } {
     const propsObj = makeSpiceL1Props({ CJE: 1e-12, CJC: 1e-12, CJS: 1e-12, ...modelParams });
-    const core = createSpiceL1BjtElement(1, false, new Map([["B", 1], ["C", 2], ["E", 3]]),[], -1, propsObj) as AnalogElementCore;
+    const core = createSpiceL1BjtElement(1, false, new Map([["B", 1], ["C", 2], ["E", 3]]), propsObj) as AnalogElementCore;
+    runSetup(core, new SparseSolver());
     const pool = new StatePool((core as any).stateSize);
-    (core as any).stateBaseOffset = 0;
     (core as any).initState(pool);
     return { el: withNodeIds(core, [1, 2, 3]), pool };
   }
@@ -2359,9 +2440,9 @@ describe("BJT L1 excess_phase", () => {
 
   function makeExcessPhaseEl(modelParams?: Record<string, number>): { el: AnalogElement; pool: StatePool } {
     const propsObj = makeSpiceL1Props({ PTF: 15, TF: 1e-9, ...modelParams });
-    const core = createSpiceL1BjtElement(1, false, new Map([["B", 1], ["C", 2], ["E", 3]]),[], -1, propsObj) as AnalogElementCore;
+    const core = createSpiceL1BjtElement(1, false, new Map([["B", 1], ["C", 2], ["E", 3]]), propsObj) as AnalogElementCore;
+    runSetup(core, new SparseSolver());
     const pool = new StatePool((core as any).stateSize);
-    (core as any).stateBaseOffset = 0;
     (core as any).initState(pool);
     return { el: withNodeIds(core, [1, 2, 3]), pool };
   }
@@ -2483,9 +2564,9 @@ describe("BJT L1 XTF_zero", () => {
 
   function makeL1WithTfXtf(TF: number, XTF: number): { el: AnalogElement; pool: StatePool } {
     const propsObj = makeSpiceL1Props({ TF, XTF, CJE: 1e-12 });
-    const core = createSpiceL1BjtElement(1, false, new Map([["B", 1], ["C", 2], ["E", 3]]),[], -1, propsObj) as AnalogElementCore;
+    const core = createSpiceL1BjtElement(1, false, new Map([["B", 1], ["C", 2], ["E", 3]]), propsObj) as AnalogElementCore;
+    runSetup(core, new SparseSolver());
     const pool = new StatePool((core as any).stateSize);
-    (core as any).stateBaseOffset = 0;
     (core as any).initState(pool);
     return { el: withNodeIds(core, [1, 2, 3]), pool };
   }
@@ -2582,9 +2663,9 @@ describe("BJT L1 substrate", () => {
     // Read gcsub and gdsub from s0. The stamp at (substConNode, substConNode) must equal
     // m * (gcsub + gdsub). We verify by checking the sum is non-zero and finite.
     const propsObj = makeSpiceL1Props({ CJS: 1e-12, ISS: 1e-14 });
-    const core = createSpiceL1BjtElement(1, false, new Map([["B", 1], ["C", 2], ["E", 3]]),[], -1, propsObj) as AnalogElementCore;
+    const core = createSpiceL1BjtElement(1, false, new Map([["B", 1], ["C", 2], ["E", 3]]), propsObj) as AnalogElementCore;
+    runSetup(core, new SparseSolver());
     const pool = new StatePool((core as any).stateSize);
-    (core as any).stateBaseOffset = 0;
     (core as any).initState(pool);
     const el = withNodeIds(core, [1, 2, 3]);
 
@@ -2626,9 +2707,9 @@ describe("BJT L1 cap_block", () => {
 
   function makeL1Cap(modelParams?: Record<string, number>): { el: AnalogElement; pool: StatePool } {
     const propsObj = makeSpiceL1Props({ CJE: 1e-12, ...modelParams });
-    const core = createSpiceL1BjtElement(1, false, new Map([["B", 1], ["C", 2], ["E", 3]]),[], -1, propsObj) as AnalogElementCore;
+    const core = createSpiceL1BjtElement(1, false, new Map([["B", 1], ["C", 2], ["E", 3]]), propsObj) as AnalogElementCore;
+    runSetup(core, new SparseSolver());
     const pool = new StatePool((core as any).stateSize);
-    (core as any).stateBaseOffset = 0;
     (core as any).initState(pool);
     return { el: withNodeIds(core, [1, 2, 3]), pool };
   }
@@ -2705,12 +2786,12 @@ describe("BJT L1 LimitingEvent SUB", () => {
   function makeL1ElWithLabel(modelParams?: Record<string, number>): AnalogElement {
     const propsObj = makeSpiceL1Props({ ISS: 1e-14, ...modelParams });
     const core = createSpiceL1BjtElement(
-      1, false, new Map([["B", 1], ["C", 2], ["E", 3]]), [], -1, propsObj,
+      1, false, new Map([["B", 1], ["C", 2], ["E", 3]]), propsObj,
     ) as AnalogElementCore & { label?: string; elementIndex?: number };
     core.label = "Q_SUB";
     core.elementIndex = 7;
+    runSetup(core as AnalogElementCore, new SparseSolver());
     const pool = new StatePool((core as any).stateSize);
-    (core as any).stateBaseOffset = 0;
     (core as any).initState(pool);
     return withNodeIds(core, [1, 2, 3]);
   }
@@ -2780,7 +2861,7 @@ describe("BJT TEMP", () => {
   it("setParam_TEMP_no_throw", () => {
     // element.setParam("TEMP", 400) doesn't throw.
     const propsObj = makeBjtProps();
-    const element = createBjtElement(1, new Map([["B", 2], ["C", 1], ["E", 3]]), -1, propsObj);
+    const element = createBjtElement(1, new Map([["B", 2], ["C", 1], ["E", 3]]), propsObj);
     expect(() => element.setParam("TEMP", 400)).not.toThrow();
   });
 
@@ -2812,12 +2893,12 @@ describe("BJT TEMP", () => {
     const expectedTVcrit300 = computeTVcrit(300.15, 1e-16);
     const expectedTVcrit400 = computeTVcrit(400, 1e-16);
 
-    const coreDefault = createBjtElement(1, new Map([["B", 1], ["C", 2], ["E", 3]]), -1, makeBjtProps({ TEMP: 300.15 })) as any;
-    const core400 = createBjtElement(1, new Map([["B", 1], ["C", 2], ["E", 3]]), -1, makeBjtProps({ TEMP: 400 })) as any;
+    const coreDefault = createBjtElement(1, new Map([["B", 1], ["C", 2], ["E", 3]]), makeBjtProps({ TEMP: 300.15 })) as any;
+    const core400 = createBjtElement(1, new Map([["B", 1], ["C", 2], ["E", 3]]), makeBjtProps({ TEMP: 400 })) as any;
+    runSetup(coreDefault as AnalogElementCore, new SparseSolver());
+    runSetup(core400 as AnalogElementCore, new SparseSolver());
     const pool300 = new StatePool(coreDefault.stateSize);
     const pool400 = new StatePool(core400.stateSize);
-    coreDefault.stateBaseOffset = 0;
-    core400.stateBaseOffset = 0;
     coreDefault.initState(pool300);
     core400.initState(pool400);
 
@@ -2860,9 +2941,9 @@ describe("BJT TEMP", () => {
     // larger for TEMP=400 (higher tSatCur → larger cbe at same vbe).
     function makeL1AtTemp(TEMP: number): { el: any; pool: StatePool } {
       const propsObj = makeSpiceL1Props({ IS: 1e-16, XTI: 3, EG: 1.11, TNOM: 300.15, TEMP });
-      const core = createSpiceL1BjtElement(1, false, new Map([["B", 1], ["C", 2], ["E", 3]]),[], -1, propsObj) as any;
+      const core = createSpiceL1BjtElement(1, false, new Map([["B", 1], ["C", 2], ["E", 3]]), propsObj) as any;
+      runSetup(core as AnalogElementCore, new SparseSolver());
       const pool = new StatePool(core.stateSize);
-      core.stateBaseOffset = 0;
       core.initState(pool);
       return { el: withNodeIds(core, [1, 2, 3]), pool };
     }
@@ -2910,12 +2991,12 @@ describe("BJT TEMP", () => {
 
     // We probe tBetaF by checking the forward gain: in the Gummel-Poon model,
     // cb ≈ cbe / tBetaF + ...; so tBetaF changes the base current.
-    const coreXtb0 = createSpiceL1BjtElement(1, false, new Map([["B", 1], ["C", 2], ["E", 3]]),[], -1, propsXtb0) as any;
-    const coreXtb05 = createSpiceL1BjtElement(1, false, new Map([["B", 1], ["C", 2], ["E", 3]]),[], -1, propsXtb05) as any;
+    const coreXtb0 = createSpiceL1BjtElement(1, false, new Map([["B", 1], ["C", 2], ["E", 3]]), propsXtb0) as any;
+    const coreXtb05 = createSpiceL1BjtElement(1, false, new Map([["B", 1], ["C", 2], ["E", 3]]), propsXtb05) as any;
+    runSetup(coreXtb0 as AnalogElementCore, new SparseSolver());
+    runSetup(coreXtb05 as AnalogElementCore, new SparseSolver());
     const poolXtb0 = new StatePool(coreXtb0.stateSize);
     const poolXtb05 = new StatePool(coreXtb05.stateSize);
-    coreXtb0.stateBaseOffset = 0;
-    coreXtb05.stateBaseOffset = 0;
     coreXtb0.initState(poolXtb0);
     coreXtb05.initState(poolXtb05);
 
@@ -2991,9 +3072,9 @@ describe("BJT TEMP", () => {
     expect(Math.abs(expectedTVcrit400 - expectedTVcrit300)).toBeGreaterThan(0.05);
 
     const propsDefault = makeBjtProps();
-    const core = createBjtElement(1, new Map([["B", 1], ["C", 2], ["E", 3]]), -1, propsDefault) as any;
+    const core = createBjtElement(1, new Map([["B", 1], ["C", 2], ["E", 3]]), propsDefault) as any;
+    runSetup(core as AnalogElementCore, new SparseSolver());
     const pool = new StatePool(core.stateSize);
-    core.stateBaseOffset = 0;
     core.initState(pool);
     const element = withNodeIds(core, [1, 2, 3]);
 
@@ -3052,9 +3133,9 @@ describe("BJT TEMP", () => {
     expect(Math.abs(expectedTVcrit400 - expectedTVcrit300)).toBeGreaterThan(0.05);
 
     const propsDefault = makeSpiceL1Props({ IS, EG, XTI });
-    const core = createSpiceL1BjtElement(1, false, new Map([["B", 1], ["C", 2], ["E", 3]]),[], -1, propsDefault) as any;
+    const core = createSpiceL1BjtElement(1, false, new Map([["B", 1], ["C", 2], ["E", 3]]), propsDefault) as any;
+    runSetup(core as AnalogElementCore, new SparseSolver());
     const pool = new StatePool(core.stateSize);
-    core.stateBaseOffset = 0;
     core.initState(pool);
     const element = withNodeIds(core, [1, 2, 3]);
 

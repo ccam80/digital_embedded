@@ -29,7 +29,7 @@
  * after linearizing around the current operating point. Combined with the
  * Jacobian entries, the branch equation becomes:
  *   V_out+ - V_out- - f'(Vctrl0)*V_ctrl = f(Vctrl0) - f'(Vctrl0)*Vctrl0
- * which at convergence (V_ctrl = Vctrl0) gives V_out = f(Vctrl0). âœ“
+ * which at convergence (V_ctrl = Vctrl0) gives V_out = f(Vctrl0). â"
  */
 
 import { AbstractCircuitElement } from "../../core/element.js";
@@ -50,6 +50,7 @@ import { parseExpression } from "../../solver/analog/expression.js";
 import { differentiate, simplify } from "../../solver/analog/expression-differentiate.js";
 import { ControlledSourceElement } from "../../solver/analog/controlled-source-base.js";
 import { NGSPICE_LOAD_ORDER } from "../../solver/analog/element.js";
+import type { SetupContext } from "../../solver/analog/setup-context.js";
 import { defineModelParams } from "../../core/model-params.js";
 
 // ---------------------------------------------------------------------------
@@ -123,8 +124,10 @@ function buildVCVSPinDeclarations(): PinDeclaration[] {
  * branchIdx: absolute 0-based row in the MNA matrix for the output branch.
  */
 class VCVSAnalogElement extends ControlledSourceElement {
-  readonly branchIndex: number;
+  branchIndex: number;
   readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.VCVS;
+  _stateBase: number = -1;
+  _pinNodes: Map<string, number> = new Map();
 
   private readonly _nCtrlP: number;
   private readonly _nCtrlN: number;
@@ -155,6 +158,10 @@ class VCVSAnalogElement extends ControlledSourceElement {
     this._nOutN = nOutN;
     this._k = branchIdx;
     this.branchIndex = branchIdx;
+  }
+
+  setup(_ctx: SetupContext): void {
+    throw new Error(`PB-VCVS not yet migrated`);
   }
 
   setParam(_key: string, _value: number): void {
@@ -188,8 +195,8 @@ class VCVSAnalogElement extends ControlledSourceElement {
    * Branch equation: V_out+ - V_out- - f'(Vctrl)*V_ctrl = f(Vctrl0) - f'*Vctrl0
    *
    * C sub-matrix Jacobian entries (control node columns in branch row k):
-   *   C[k, nCtrlP] -= f'   â†’  âˆ‚(branch_eq)/âˆ‚V_ctrlP = -f'
-   *   C[k, nCtrlN] += f'   â†’  âˆ‚(branch_eq)/âˆ‚V_ctrlN = +f'
+   *   C[k, nCtrlP] -= f'     âˆ‚(branch_eq)/âˆ‚V_ctrlP = -f'
+   *   C[k, nCtrlN] += f'     âˆ‚(branch_eq)/âˆ‚V_ctrlN = +f'
    *
    * RHS[k] = f(Vctrl0) - f'(Vctrl0) * Vctrl0
    */
@@ -220,7 +227,7 @@ class VCVSAnalogElement extends ControlledSourceElement {
    * The control port is an ideal voltage sensor (infinite impedance), so it
    * draws zero current. The output port current is the branch variable at row
    * `_k` in the MNA solution vector. Positive = current flowing INTO the pin.
-   * KCL: 0 + 0 + I_out - I_out = 0. âœ“
+   * KCL: 0 + 0 + I_out - I_out = 0. â"
    */
   getPinCurrents(rhs: Float64Array): number[] {
     const iOut = rhs[this._k];
@@ -229,7 +236,7 @@ class VCVSAnalogElement extends ControlledSourceElement {
 }
 
 // ---------------------------------------------------------------------------
-// VCVSElement â€” CircuitElement
+// VCVSElement  CircuitElement
 // ---------------------------------------------------------------------------
 
 export class VCVSElement extends AbstractCircuitElement {
@@ -265,7 +272,7 @@ export class VCVSElement extends AbstractCircuitElement {
     ctx.save();
     ctx.setLineWidth(1);
 
-    // Body â€” open polyline box (1,-1)â†’(5,-1)â†’(5,3)â†’(1,3) (no left edge)
+    // Body  open polyline box (1,-1)(5,-1)(5,3)(1,3) (no left edge)
     ctx.setColor("COMPONENT");
     ctx.drawLine(1, -1, 5, -1);
     ctx.drawLine(5, -1, 5, 3);
@@ -340,7 +347,7 @@ export const VCVSDefinition: ComponentDefinition = {
   attributeMap: VCVS_ATTRIBUTE_MAPPINGS,
 
   helpText:
-    "Voltage-Controlled Voltage Source â€” output voltage is an expression of " +
+    "Voltage-Controlled Voltage Source  output voltage is an expression of " +
     "the control port voltage V(ctrl+ - ctrl-).",
 
   factory(props: PropertyBag): VCVSElement {
@@ -351,22 +358,25 @@ export const VCVSDefinition: ComponentDefinition = {
   modelRegistry: {
     "behavioral": {
       kind: "inline",
-      factory: (pinNodes, _internalNodeIds, branchIdx, props) => {
+      factory: (pinNodes, props, _getTime) => {
         const expression = props.getOrDefault<string>("expression", "V(ctrl)");
         const gain = props.getModelParam<number>("gain");
-        return new VCVSAnalogElement(
+        const el = new VCVSAnalogElement(
           pinNodes.get("ctrl+")!,
           pinNodes.get("ctrl-")!,
           pinNodes.get("out+")!,
           pinNodes.get("out-")!,
-          branchIdx,
+          -1,
           expression,
           gain,
         );
+        el._pinNodes = new Map(pinNodes);
+        return el;
       },
       paramDefs: VCVS_PARAM_DEFS,
       params: VCVS_DEFAULTS,
       branchCount: 1,
+      ngspiceNodeMap: { "out+": "pos", "out-": "neg", "ctrl+": "contPos", "ctrl-": "contNeg" },
     },
   },
   defaultModel: "behavioral",

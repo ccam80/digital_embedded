@@ -138,7 +138,7 @@ function buildDigitalClockCoordinator() {
 // Tests: analog-only coordinator
 // ---------------------------------------------------------------------------
 
-describe('advanceClocks() â€” analog-only coordinator', () => {
+describe('advanceClocks()  analog-only coordinator', () => {
   it('does not throw on an analog-only coordinator', () => {
     const coordinator = buildAnalogOnlyCoordinator();
     expect(() => coordinator.advanceClocks()).not.toThrow();
@@ -160,7 +160,7 @@ describe('advanceClocks() â€” analog-only coordinator', () => {
 // Tests: digital coordinator with Clock
 // ---------------------------------------------------------------------------
 
-describe('advanceClocks() â€” digital coordinator with Clock component', () => {
+describe('advanceClocks()  digital coordinator with Clock component', () => {
   it('does not throw on a digital coordinator', () => {
     const { coordinator } = buildDigitalClockCoordinator();
     expect(() => coordinator.advanceClocks()).not.toThrow();

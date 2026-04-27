@@ -19,6 +19,7 @@ import {
 } from "./digital-pin-model.js";
 import type { AnalogCapacitorElement } from "../../components/passives/capacitor.js";
 import type { AnalogElementFactory } from "./behavioral-gate.js";
+import type { SetupContext } from "./setup-context.js";
 import { defineStateSchema } from "./state-schema.js";
 import type { StateSchema } from "./state-schema.js";
 
@@ -86,6 +87,8 @@ export class BehavioralCounterElement implements ReactiveAnalogElementCore {
   readonly stateSchema: StateSchema = SEQUENTIAL_COMPOSITE_SCHEMA;
   stateSize: number;
   stateBaseOffset = -1;
+  _stateBase: number = -1;
+  _pinNodes: Map<string, number> = new Map();
   s0: Float64Array<ArrayBufferLike> = new Float64Array(0) as Float64Array<ArrayBufferLike>;
   s1: Float64Array<ArrayBufferLike> = new Float64Array(0) as Float64Array<ArrayBufferLike>;
   s2: Float64Array<ArrayBufferLike> = new Float64Array(0) as Float64Array<ArrayBufferLike>;
@@ -138,6 +141,10 @@ export class BehavioralCounterElement implements ReactiveAnalogElementCore {
 
   initVoltages(rhs: Float64Array): void {
     this._prevClockVoltage = readMnaVoltage(this._clockPin.nodeId, rhs);
+  }
+
+  setup(_ctx: SetupContext): void {
+    throw new Error("BehavioralCounterElement not yet migrated");
   }
 
   load(ctx: LoadContext): void {
@@ -275,6 +282,8 @@ export class BehavioralRegisterElement implements ReactiveAnalogElementCore {
   readonly stateSchema: StateSchema = SEQUENTIAL_COMPOSITE_SCHEMA;
   stateSize: number;
   stateBaseOffset = -1;
+  _stateBase: number = -1;
+  _pinNodes: Map<string, number> = new Map();
   s0: Float64Array<ArrayBufferLike> = new Float64Array(0) as Float64Array<ArrayBufferLike>;
   s1: Float64Array<ArrayBufferLike> = new Float64Array(0) as Float64Array<ArrayBufferLike>;
   s2: Float64Array<ArrayBufferLike> = new Float64Array(0) as Float64Array<ArrayBufferLike>;
@@ -324,6 +333,10 @@ export class BehavioralRegisterElement implements ReactiveAnalogElementCore {
 
   initVoltages(rhs: Float64Array): void {
     this._prevClockVoltage = readMnaVoltage(this._clockPin.nodeId, rhs);
+  }
+
+  setup(_ctx: SetupContext): void {
+    throw new Error("BehavioralRegisterElement not yet migrated");
   }
 
   load(ctx: LoadContext): void {
@@ -427,7 +440,7 @@ export class BehavioralRegisterElement implements ReactiveAnalogElementCore {
  *   nodeIds[3+bitWidth] = ovf output
  */
 export function makeBehavioralCounterAnalogFactory(): AnalogElementFactory {
-  return (pinNodes, _internalNodeIds, _branchIdx, props, _getTime) => {
+  return (pinNodes, props, _getTime) => {
     const pinSpecs = props.has("_pinElectrical")
       ? (props.get("_pinElectrical") as unknown as Record<string, ResolvedPinElectrical>)
       : undefined;
@@ -534,6 +547,8 @@ export class BehavioralCounterPresetElement {
   readonly stateSchema: StateSchema = SEQUENTIAL_COMPOSITE_SCHEMA;
   stateSize: number;
   stateBaseOffset = -1;
+  _stateBase: number = -1;
+  _pinNodes: Map<string, number> = new Map();
 
   constructor(
     enPin: DigitalInputPinModel,
@@ -585,6 +600,10 @@ export class BehavioralCounterPresetElement {
 
   initVoltages(rhs: Float64Array): void {
     this._prevClockVoltage = readMnaVoltage(this._clockPin.nodeId, rhs);
+  }
+
+  setup(_ctx: SetupContext): void {
+    throw new Error("BehavioralCounterPresetElement not yet migrated");
   }
 
   load(ctx: LoadContext): void {
@@ -725,7 +744,7 @@ export class BehavioralCounterPresetElement {
  * (one bus node). All per-bit pin models share the same node ID.
  */
 export function makeBehavioralCounterPresetAnalogFactory(): AnalogElementFactory {
-  return (pinNodes, _internalNodeIds, _branchIdx, props, _getTime) => {
+  return (pinNodes, props, _getTime) => {
     const pinSpecs = props.has("_pinElectrical")
       ? (props.get("_pinElectrical") as unknown as Record<string, ResolvedPinElectrical>)
       : undefined;
@@ -829,7 +848,7 @@ export function makeBehavioralCounterPresetAnalogFactory(): AnalogElementFactory
  * (one bus node). All per-bit pin models share the same node ID.
  */
 export function makeBehavioralRegisterAnalogFactory(): AnalogElementFactory {
-  return (pinNodes, _internalNodeIds, _branchIdx, props, _getTime) => {
+  return (pinNodes, props, _getTime) => {
     const pinSpecs = props.has("_pinElectrical")
       ? (props.get("_pinElectrical") as unknown as Record<string, ResolvedPinElectrical>)
       : undefined;

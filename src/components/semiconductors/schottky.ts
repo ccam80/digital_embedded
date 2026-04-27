@@ -23,7 +23,7 @@ import {
   type ComponentDefinition,
 } from "../../core/registry.js";
 import type { AnalogElementCore } from "../../solver/analog/element.js";
-import { createDiodeElement, getDiodeInternalNodeCount, getDiodeInternalNodeLabels } from "./diode.js";
+import { createDiodeElement } from "./diode.js";
 import { defineModelParams } from "../../core/model-params.js";
 
 // ---------------------------------------------------------------------------
@@ -61,11 +61,10 @@ export const { paramDefs: SCHOTTKY_PARAM_DEFS, defaults: SCHOTTKY_PARAM_DEFAULTS
  */
 export function createSchottkyElement(
   pinNodes: ReadonlyMap<string, number>,
-  internalNodeIds: readonly number[],
-  branchIdx: number,
   props: PropertyBag,
+  getTime?: () => number,
 ): AnalogElementCore {
-  return createDiodeElement(pinNodes, internalNodeIds, branchIdx, props);
+  return createDiodeElement(pinNodes, props, getTime);
 }
 
 // ---------------------------------------------------------------------------
@@ -214,6 +213,7 @@ export const SchottkyDiodeDefinition: ComponentDefinition = {
     "Schottky Diode \u2014 metal-semiconductor junction with low forward voltage.\n" +
     "Same Shockley equation as standard diode but with Schottky defaults:\n" +
     "IS=1e-8, N=1.05, BV=40V, RS=1\u03A9, CJO=1pF.",
+  ngspiceNodeMap: { A: "pos", K: "neg" },
   models: {},
   modelRegistry: {
     "spice": {
@@ -221,8 +221,8 @@ export const SchottkyDiodeDefinition: ComponentDefinition = {
       factory: createSchottkyElement,
       paramDefs: SCHOTTKY_PARAM_DEFS,
       params: SCHOTTKY_PARAM_DEFAULTS,
-      getInternalNodeCount: getDiodeInternalNodeCount,
-      getInternalNodeLabels: getDiodeInternalNodeLabels,
+      mayCreateInternalNodes: true,
+      ngspiceNodeMap: { A: "pos", K: "neg" },
     },
   },
   defaultModel: "spice",

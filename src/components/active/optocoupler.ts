@@ -46,6 +46,7 @@ import {
 } from "../../core/registry.js";
 import type { LoadContext, PoolBackedAnalogElementCore } from "../../solver/analog/element.js";
 import { NGSPICE_LOAD_ORDER } from "../../solver/analog/element.js";
+import type { SetupContext } from "../../solver/analog/setup-context.js";
 import { defineModelParams } from "../../core/model-params.js";
 import { stampG, stampRHS } from "../../solver/analog/stamp-helpers.js";
 import type { StatePoolRef } from "../../core/analog-types.js";
@@ -153,10 +154,9 @@ const BJT_STATE_SIZE   = BJT_SIMPLE_SCHEMA.size; // 8
 
 function createOptocouplerElement(
   pinNodes: ReadonlyMap<string, number>,
-  internalNodeIds: readonly number[],
-  _branchIdx: number,
   props: PropertyBag,
 ): PoolBackedAnalogElementCore {
+  const internalNodeIds: readonly number[] = [];
   const ctr = props.getModelParam<number>("ctr");
   const Is  = props.getModelParam<number>("Is");
   const n   = props.getModelParam<number>("n");
@@ -177,7 +177,7 @@ function createOptocouplerElement(
     ["K", nCathode],
   ]);
   const ledProps = makeLedProps(Is, n);
-  const ledSub = createDiodeElement(ledPinNodes, [], -1, ledProps);
+  const ledSub = createDiodeElement(ledPinNodes, ledProps);
 
   // --- Phototransistor BJT sub-element (bjtload.c:170-end) ---
   // NPN polarity. Base = internalBase; C = nCollector; E = nEmitter.
@@ -187,7 +187,7 @@ function createOptocouplerElement(
     ["E", nEmitter],
   ]);
   const bjtProps = makeBjtProps();
-  const bjtSub = createBjtElement(1 /* NPN polarity */, bjtPinNodes, -1, bjtProps);
+  const bjtSub = createBjtElement(1 /* NPN polarity */, bjtPinNodes, bjtProps);
 
   // Pool binding
   let pool: StatePoolRef;
@@ -199,6 +199,13 @@ function createOptocouplerElement(
     ngspiceLoadOrder: NGSPICE_LOAD_ORDER.DIO,
     isNonlinear: true,
     isReactive: false as const,
+    _stateBase: -1,
+    _pinNodes: new Map(pinNodes),
+
+    setup(_ctx: SetupContext): void {
+      throw new Error(`PB-Optocoupler not yet migrated`);
+    },
+
     poolBacked: true as const,
     stateSize: DIODE_STATE_SIZE + BJT_STATE_SIZE,
     stateSchema: DIODE_SCHEMA, // primary schema for diagnostics; BJT schema follows
@@ -482,8 +489,8 @@ export const OptocouplerDefinition: ComponentDefinition = {
   modelRegistry: {
     "behavioral": {
       kind: "inline",
-      factory: (pinNodes, internalNodeIds, branchIdx, props) =>
-        createOptocouplerElement(pinNodes, internalNodeIds, branchIdx, props),
+      factory: (pinNodes, props, _getTime) =>
+        createOptocouplerElement(pinNodes, props),
       paramDefs: OPTOCOUPLER_PARAM_DEFS,
       params: OPTOCOUPLER_DEFAULTS,
       getInternalNodeCount: (_props) => 1, // phototransistor base node

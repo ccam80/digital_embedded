@@ -32,7 +32,139 @@ import {
   type ComponentDefinition,
   type ComponentLayout,
 } from "../../core/registry.js";
-import { createRelayDTAnalogElement } from "../../solver/analog/behavioral-remaining.js";
+import type { LoadContext } from "../../solver/analog/element.js";
+import { NGSPICE_LOAD_ORDER } from "../../solver/analog/element.js";
+import type { SetupContext } from "../../solver/analog/setup-context.js";
+import type { PoolBackedAnalogElementCore, StatePoolRef } from "../../solver/analog/element.js";
+import { AnalogInductorElement, INDUCTOR_DEFAULTS } from "../passives/inductor.js";
+
+// ---------------------------------------------------------------------------
+// RelayDT analog constants
+// ---------------------------------------------------------------------------
+
+const RELAY_DT_R_ON = 0.01;
+const RELAY_DT_R_OFF = 1e7;
+const RELAY_DT_R_COIL_DEFAULT = 100;
+const RELAY_DT_L_DEFAULT = 0.1;
+const RELAY_DT_I_PULL_DEFAULT = 20e-3;
+
+function stampGDT(
+  solver: { allocElement(r: number, c: number): number; stampElement(h: number, v: number): void },
+  nA: number,
+  nB: number,
+  g: number,
+): void {
+  if (nA > 0) solver.stampElement(solver.allocElement(nA, nA), g);
+  if (nB > 0) solver.stampElement(solver.allocElement(nB, nB), g);
+  if (nA > 0 && nB > 0) {
+    solver.stampElement(solver.allocElement(nA, nB), -g);
+    solver.stampElement(solver.allocElement(nB, nA), -g);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// createRelayDTAnalogElement — W2 stub composite
+// ---------------------------------------------------------------------------
+
+function createRelayDTAnalogElement(
+  pinNodes: ReadonlyMap<string, number>,
+  props: PropertyBag,
+): PoolBackedAnalogElementCore & { getChildElements(): readonly AnalogInductorElement[] } {
+  const nodeCoil1 = pinNodes.get("in1")!;
+  const nodeCoil2 = pinNodes.get("in2")!;
+  const nodeCommon = pinNodes.get("A1")!;
+  const nodeThrow = pinNodes.get("B1")!;
+  const nodeRest = pinNodes.get("C1")!;
+
+  const rCoil = props.has("coilResistance")
+    ? (props.get("coilResistance") as number)
+    : RELAY_DT_R_COIL_DEFAULT;
+  const L = props.has("inductance")
+    ? (props.get("inductance") as number)
+    : RELAY_DT_L_DEFAULT;
+  const iPull = props.has("iPull")
+    ? (props.get("iPull") as number)
+    : RELAY_DT_I_PULL_DEFAULT;
+
+  const coilInductor = new AnalogInductorElement(
+    -1,
+    L,
+    INDUCTOR_DEFAULTS["IC"]!,
+    INDUCTOR_DEFAULTS["TC1"]!,
+    INDUCTOR_DEFAULTS["TC2"]!,
+    INDUCTOR_DEFAULTS["TNOM"]!,
+    INDUCTOR_DEFAULTS["SCALE"]!,
+    INDUCTOR_DEFAULTS["M"]!,
+  );
+  coilInductor.pinNodeIds = [nodeCoil1, nodeCoil2];
+
+  let energised = false;
+
+  function gThrow(): number { return energised ? 1 / RELAY_DT_R_ON : 1 / RELAY_DT_R_OFF; }
+  function gRest(): number { return energised ? 1 / RELAY_DT_R_OFF : 1 / RELAY_DT_R_ON; }
+
+  return {
+    branchIndex: -1,
+    ngspiceLoadOrder: NGSPICE_LOAD_ORDER.IND,
+    isNonlinear: true,
+    isReactive: true,
+    _stateBase: -1,
+    _pinNodes: new Map(pinNodes),
+
+    poolBacked: true as const,
+    stateSchema: coilInductor.stateSchema,
+    stateSize: coilInductor.stateSize,
+    stateBaseOffset: -1,
+    s0: new Float64Array(0),
+    s1: new Float64Array(0),
+    s2: new Float64Array(0),
+    s3: new Float64Array(0),
+    s4: new Float64Array(0),
+    s5: new Float64Array(0),
+    s6: new Float64Array(0),
+    s7: new Float64Array(0),
+
+    setup(_ctx: SetupContext): void {
+      throw new Error("PB-RELAY-DT not yet migrated");
+    },
+
+    initState(pool: StatePoolRef): void {
+      coilInductor.stateBaseOffset = this.stateBaseOffset;
+      coilInductor.initState(pool);
+    },
+
+    getChildElements(): readonly AnalogInductorElement[] {
+      return [coilInductor];
+    },
+
+    load(ctx: LoadContext): void {
+      const s = ctx.solver;
+      stampGDT(s, nodeCoil1, nodeCoil2, 1 / rCoil);
+      stampGDT(s, nodeCommon, nodeThrow, gThrow());
+      stampGDT(s, nodeCommon, nodeRest, gRest());
+      coilInductor.load(ctx);
+    },
+
+    accept(ctx: LoadContext, _simTime: number, _addBreakpoint: (t: number) => void): void {
+      const branchIdx = coilInductor.branchIndex;
+      const iCoil = branchIdx >= 0 ? ctx.rhs[branchIdx] : 0;
+      energised = Math.abs(iCoil) > iPull;
+    },
+
+    getPinCurrents(rhs: Float64Array): number[] {
+      const branchIdx = coilInductor.branchIndex;
+      const iCoil = branchIdx >= 0 ? rhs[branchIdx] : 0;
+      const vCom = rhs[nodeCommon];
+      const vThr = rhs[nodeThrow];
+      const vRst = rhs[nodeRest];
+      const iThrow = gThrow() * (vCom - vThr);
+      const iRest = gRest() * (vCom - vRst);
+      return [iCoil, -iCoil, iThrow + iRest, -iThrow, -iRest];
+    },
+
+    setParam(key: string, value: number) { coilInductor.setParam(key, value); },
+  };
+}
 
 // ---------------------------------------------------------------------------
 // Layout constants
@@ -289,10 +421,10 @@ export const RelayDTDefinition: ComponentDefinition = {
   modelRegistry: {
     "behavioral": {
       kind: "inline",
-      factory: createRelayDTAnalogElement,
+      factory: (pinNodes, props, _getTime) => createRelayDTAnalogElement(pinNodes, props),
       paramDefs: [],
       params: {},
-      branchCount: 1,
+      mayCreateInternalNodes: true,
     },
   },
   defaultModel: "digital",

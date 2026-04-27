@@ -2,7 +2,7 @@
  * Tests for the NMOS and PMOS MOSFET components.
  *
  * Covers:
- *   - Cutoff region: Id â‰ˆ 0 when Vgs < Vth
+ *   - Cutoff region: Id  0 when Vgs < Vth
  *   - Saturation region: Id = KP/2*(W/L)*(Vgs-Vth)Â²*(1+LAMBDA*Vds)
  *   - Linear region: Id = KP*(W/L)*((Vgs-Vth)*Vds - VdsÂ²/2)*(1+LAMBDA*Vds)
  *   - Body effect: Vth increases with Vsb via GAMMA parameter
@@ -43,7 +43,7 @@ import {
 } from "../mosfet.js";
 
 // ---------------------------------------------------------------------------
-// withState â€” allocate a StatePool and call initState on the element
+// withState  allocate a StatePool and call initState on the element
 // ---------------------------------------------------------------------------
 
 function withState(element: AnalogElementCore): ReactiveAnalogElement {
@@ -54,7 +54,7 @@ function withState(element: AnalogElementCore): ReactiveAnalogElement {
   return re;
 }
 
-/** Assert actual â‰ˆ expected within 0.1% relative tolerance (ngspice reference). */
+/** Assert actual  expected within 0.1% relative tolerance (ngspice reference). */
 function expectSpiceRef(actual: number, expected: number, label: string) {
   const rel = Math.abs((actual - expected) / expected);
   if (rel >= 0.001) {
@@ -84,7 +84,7 @@ const NMOS_DEFAULTS = {
 };
 
 // ---------------------------------------------------------------------------
-// DC-OP LoadContext helper â€” fresh SparseSolver sized for matrixSize rows.
+// DC-OP LoadContext helper  fresh SparseSolver sized for matrixSize rows.
 // ---------------------------------------------------------------------------
 
 function makeDcOpCtx(rhsOld: Float64Array, matrixSize: number): LoadContext {
@@ -141,8 +141,8 @@ function makeNmosAtVgs_Vds(
   modelParams: Record<string, number> = NMOS_DEFAULTS,
 ): AnalogElement {
   const propsObj = makeParamBag(modelParams);
-  const element = withState(createMosfetElement(1, new Map([["G", 2], ["S", 3], ["D", 1]]), [], -1, propsObj));
-  // pinNodeIds: pinLayout order [G, D, S, B]; B=S for 3-terminal â†’ [2, 1, 3, 3]
+  const element = withState(createMosfetElement(1, new Map([["G", 2], ["S", 3], ["D", 1]]), propsObj));
+  // pinNodeIds: pinLayout order [G, D, S, B]; B=S for 3-terminal  [2, 1, 3, 3]
   Object.assign(element, { pinNodeIds: [2, 1, 3, 3], allNodeIds: [2, 1, 3, 3] });
   const elementWithPins = element as unknown as AnalogElement;
 
@@ -196,7 +196,7 @@ function makeResistorElement(nodeA: number, nodeB: number, resistance: number): 
 
 describe("NMOS", () => {
   it("cutoff_region", () => {
-    // Vgs = 0V < VTO = 0.7V â†’ device off, Id â‰ˆ 0
+    // Vgs = 0V < VTO = 0.7V  device off, Id  0
     const element = makeNmosAtVgs_Vds(0, 5, NMOS_DEFAULTS);
 
     // 1-based: [0]=ground, [1]=nodeD, [2]=nodeG, [3]=nodeS
@@ -218,27 +218,27 @@ describe("NMOS", () => {
 
   it("isNonlinear_true", () => {
     const propsObj = makeParamBag(NMOS_DEFAULTS);
-    const element = createMosfetElement(1, new Map([["G", 2], ["S", 3], ["D", 1]]), [], -1, propsObj);
+    const element = createMosfetElement(1, new Map([["G", 2], ["S", 3], ["D", 1]]), propsObj);
     expect(element.isNonlinear).toBe(true);
   });
 
   it("isReactive_false_when_no_capacitances", () => {
     // TOX: 0 ensures oxideCap is zero; all other cap params are zero in NMOS_DEFAULTS.
     const propsObj = makeParamBag({ ...NMOS_DEFAULTS, TOX: 0 });
-    const element = createMosfetElement(1, new Map([["G", 2], ["S", 3], ["D", 1]]), [], -1, propsObj);
+    const element = createMosfetElement(1, new Map([["G", 2], ["S", 3], ["D", 1]]), propsObj);
     expect(element.isReactive).toBe(false);
   });
 
   it("isReactive_true_when_cbd_nonzero", () => {
     const paramsWithCap = { ...NMOS_DEFAULTS, CBD: 1e-12 };
     const propsObj = makeParamBag(paramsWithCap);
-    const element = createMosfetElement(1, new Map([["G", 2], ["S", 3], ["D", 1]]), [], -1, propsObj);
+    const element = createMosfetElement(1, new Map([["G", 2], ["S", 3], ["D", 1]]), propsObj);
     expect(element.isReactive).toBe(true);
   });
 
   it("three_terminal_node_indices", () => {
     const propsObj = makeParamBag(NMOS_DEFAULTS);
-    const element = createMosfetElement(1, new Map([["G", 2], ["S", 3], ["D", 1]]), [], -1, propsObj);
+    const element = createMosfetElement(1, new Map([["G", 2], ["S", 3], ["D", 1]]), propsObj);
     // pinNodeIds set by compiler in production; here we verify the factory uses pin nodes correctly
     // by checking that stamp methods work when pinNodeIds is injected (pinLayout: [G, D, S, B])
     const el = withNodeIds(element, [2, 1, 3, 3]); // G=2, D=1, S=3, B=S=3
@@ -353,7 +353,7 @@ describe("PMOS", () => {
     // The PMOS model uses polarity=-1, so it mirrors NMOS with reversed signs
     // Drain current should be nonzero and flow in the opposite direction
 
-    // For PMOS, we use Vsg=3V â†’ Vgs=-3V, Vsd=5V â†’ Vds=-5V in raw terms
+    // For PMOS, we use Vsg=3V  Vgs=-3V, Vsd=5V  Vds=-5V in raw terms
     // nodeD=1, nodeG=2, nodeS=3; vS > vD for PMOS (source at high potential)
 
     const PMOS_DEFAULTS = {
@@ -374,8 +374,8 @@ describe("PMOS", () => {
     // In MNA: nodeS at high voltage (5V), nodeD at 0V, nodeG at 2V (so Vgs = 2-5 = -3V)
     // createMosfetElement pin order: [G, S, D]
     const propsObj = makeParamBag(PMOS_DEFAULTS);
-    const core = withState(createMosfetElement(-1, new Map([["G", 2], ["S", 3], ["D", 1]]), [], -1, propsObj));
-    // pinLayout order [G, D, S, B]; B=S for 3-terminal â†’ [2, 1, 3, 3]
+    const core = withState(createMosfetElement(-1, new Map([["G", 2], ["S", 3], ["D", 1]]), propsObj));
+    // pinLayout order [G, D, S, B]; B=S for 3-terminal  [2, 1, 3, 3]
     const element = withNodeIds(core, [2, 1, 3, 3]) as unknown as AnalogElement;
 
     // vS=5V (node3), vG=2V (node2), vD=0V (node1)
@@ -398,7 +398,7 @@ describe("PMOS", () => {
 
     // PMOS in saturation: Id should flow from S to D (conventional positive Isd)
     // Norton current at drain node should be positive (current entering drain = Isd)
-    // nodes: drain=node1â†’row 0, gate=node2â†’row 1, source=node3â†’row 2
+    // nodes: drain=node1row 0, gate=node2row 1, source=node3row 2
     const drainRhs = rhs[0];
     const sourceRhs = rhs[2];
 
@@ -445,12 +445,12 @@ describe("NmosfetDefinition", () => {
 // ---------------------------------------------------------------------------
 // Integration test: common-source NMOS DC operating point
 //
-// Circuit: Vdd=5V â†’ Rd=1kÎ© â†’ NMOS drain, NMOS gate=3V, NMOS source=gnd
+// Circuit: Vdd=5V  Rd=1kÎ  NMOS drain, NMOS gate=3V, NMOS source=gnd
 // NMOS model: KP=120ÂµA/VÂ², VTO=0.7V, LAMBDA=0.02, W=10Âµ, L=1Âµ
 //
 // Expected operating point (ngspice reference):
-//   Vds â‰ˆ 1.84V
-//   Id  â‰ˆ 3.16mA
+//   Vds  1.84V
+//   Id   3.16mA
 // ---------------------------------------------------------------------------
 
 describe("Integration", () => {
@@ -471,14 +471,14 @@ describe("Integration", () => {
     // Vgate=3V: node3(+) to ground, branch at row 4
     const vgate = makeDcVoltageSource(3, 0, 4, 3) as unknown as AnalogElement;
 
-    // Rd=1kÎ©: between node2 (Vdd) and node1 (drain)
+    // Rd=1kÎ: between node2 (Vdd) and node1 (drain)
     const rd = makeResistorElement(2, 1, 1000);
 
     // NMOS: G=node3, S=ground(0), D=node1, W=10Âµ, L=1Âµ
     // createMosfetElement pin order: [G, S, D]
     const nmosParams = { ...NMOS_DEFAULTS, W: 10e-6, L: 1e-6 };
     const propsObj = makeParamBag(nmosParams);
-    const nmos = withState(withNodeIds(createMosfetElement(1, new Map([["G", 3], ["S", 0], ["D", 1]]), [], -1, propsObj), [3, 0, 1]));
+    const nmos = withState(withNodeIds(createMosfetElement(1, new Map([["G", 3], ["S", 0], ["D", 1]]), propsObj), [3, 0, 1]));
 
     const result = runDcOp({
       elements: [vdd, vgate, rd, nmos],
@@ -505,7 +505,7 @@ describe("Integration", () => {
 });
 
 // ---------------------------------------------------------------------------
-// setParam behavioral verification â€” reads mutable params object, not captured locals
+// setParam behavioral verification  reads mutable params object, not captured locals
 // ---------------------------------------------------------------------------
 
 describe("setParam shifts DC OP to match SPICE reference", () => {
@@ -516,7 +516,7 @@ describe("setParam shifts DC OP to match SPICE reference", () => {
     const rd = makeResistorElement(2, 1, 1000);
     const nmosParams = { ...NMOS_DEFAULTS, W: 10e-6, L: 1e-6 };
     const propsObj = makeParamBag(nmosParams);
-    const nmos = withState(withNodeIds(createMosfetElement(1, new Map([["G", 3], ["S", 0], ["D", 1]]), [], -1, propsObj), [3, 0, 1]));
+    const nmos = withState(withNodeIds(createMosfetElement(1, new Map([["G", 3], ["S", 0], ["D", 1]]), propsObj), [3, 0, 1]));
 
     const elements = [vdd, vgate, rd, nmos];
 
@@ -540,7 +540,7 @@ describe("setParam shifts DC OP to match SPICE reference", () => {
     const rd = makeResistorElement(2, 1, 1000);
     const nmosParams = { ...NMOS_DEFAULTS, W: 10e-6, L: 1e-6 };
     const propsObj = makeParamBag(nmosParams);
-    const nmos = withState(withNodeIds(createMosfetElement(1, new Map([["G", 3], ["S", 0], ["D", 1]]), [], -1, propsObj), [3, 0, 1]));
+    const nmos = withState(withNodeIds(createMosfetElement(1, new Map([["G", 3], ["S", 0], ["D", 1]]), propsObj), [3, 0, 1]));
 
     const elements = [vdd, vgate, rd, nmos];
 
@@ -559,7 +559,7 @@ describe("setParam shifts DC OP to match SPICE reference", () => {
 });
 
 // ---------------------------------------------------------------------------
-// LimitingEvent instrumentation tests â€” MOSFET
+// LimitingEvent instrumentation tests  MOSFET
 // ---------------------------------------------------------------------------
 
 import type { LimitingEvent } from "../../../solver/analog/newton-raphson.js";
@@ -570,11 +570,11 @@ describe("MOSFET LimitingEvent instrumentation", () => {
     propsObj.replaceModelParams({ ...MOSFET_NMOS_DEFAULTS, VTO: 1.0, KP: 2e-5, GAMMA: 0, PHI: 0.6, LAMBDA: 0, W: 1e-6, L: 1e-6 });
     // Gate=1, Drain=2, Source=3; bulk tied to source internally by factory
     const pinNodes = new Map([["G", 1], ["D", 2], ["S", 3]]);
-    const core = createMosfetElement(1, pinNodes, [], -1, propsObj);
+    const core = createMosfetElement(1, pinNodes, propsObj);
     const re = withState(core) as any;
     re.label = "M1";
     re.elementIndex = 6;
-    // pinLayout [G, D, S, B]; 3-terminal â†’ B=S â†’ [1, 2, 3, 3]
+    // pinLayout [G, D, S, B]; 3-terminal  B=S  [1, 2, 3, 3]
     const element = withNodeIds(re, [1, 2, 3, 3]) as unknown as AnalogElement;
     return element;
   }
@@ -652,7 +652,7 @@ describe("MOSFET LimitingEvent instrumentation", () => {
 });
 
 // ---------------------------------------------------------------------------
-// PMOS temperature scaling â€” type multiplier on tVbi/tVto
+// PMOS temperature scaling  type multiplier on tVbi/tVto
 // ---------------------------------------------------------------------------
 
 describe("PMOS temperature scaling", () => {
@@ -670,8 +670,8 @@ describe("PMOS temperature scaling", () => {
     const nmosProps = makeParamBag({ ...params });
     const pmosProps = makeParamBag({ ...params, VTO: -0.7 });
 
-    const nmos = withState(createMosfetElement(1, new Map([["G", 1], ["S", 2], ["D", 3]]), [], -1, nmosProps)) as any;
-    const pmos = withState(createMosfetElement(-1, new Map([["G", 1], ["S", 2], ["D", 3]]), [], -1, pmosProps)) as any;
+    const nmos = withState(createMosfetElement(1, new Map([["G", 1], ["S", 2], ["D", 3]]), nmosProps)) as any;
+    const pmos = withState(createMosfetElement(-1, new Map([["G", 1], ["S", 2], ["D", 3]]), pmosProps)) as any;
 
     const nmosTVto: number = nmos._p._tVto;
     const pmosTVto: number = pmos._p._tVto;
@@ -687,7 +687,7 @@ describe("PMOS temperature scaling", () => {
 
   it("pmos_tVto_symmetry_at_tnom_equals_reftemp", () => {
     // At TNOM = REFTEMP (300.15K), temperature correction terms vanish.
-    // Both NMOS and PMOS should yield tVto â‰ˆ their respective VTO.
+    // Both NMOS and PMOS should yield tVto  their respective VTO.
     const nmosProps = makeParamBag({
       VTO: 0.7, KP: 120e-6, LAMBDA: 0, PHI: 0.6, GAMMA: 0.37,
       CBD: 0, CBS: 0, CGDO: 0, CGSO: 0, W: 1e-6, L: 1e-6,
@@ -699,21 +699,21 @@ describe("PMOS temperature scaling", () => {
       TNOM: 300.15,
     });
 
-    withState(createMosfetElement(1, new Map([["G", 1], ["S", 2], ["D", 3]]), [], -1, nmosProps));
-    withState(createMosfetElement(-1, new Map([["G", 1], ["S", 2], ["D", 3]]), [], -1, pmosProps));
+    withState(createMosfetElement(1, new Map([["G", 1], ["S", 2], ["D", 3]]), nmosProps));
+    withState(createMosfetElement(-1, new Map([["G", 1], ["S", 2], ["D", 3]]), pmosProps));
 
     // At nominal temperature both should be close to |VTO|=0.7
   });
 });
 
 // ---------------------------------------------------------------------------
-// primeJunctions â€” MOSFET MODEINITJCT non-zero startup voltages
+// primeJunctions  MOSFET MODEINITJCT non-zero startup voltages
 // ---------------------------------------------------------------------------
 
 describe("MOSFET primeJunctions", () => {
   function makeNmosElement(params: Record<string, number> = {}): { element: any; pool: StatePool } {
     const bag = makeParamBag({ ...NMOS_DEFAULTS, ...params });
-    const core = createMosfetElement(1, new Map([["G", 2], ["S", 3], ["D", 1]]), [], -1, bag) as any;
+    const core = createMosfetElement(1, new Map([["G", 2], ["S", 3], ["D", 1]]), bag) as any;
     const pool = new StatePool(core.stateSize);
     core.stateBaseOffset = 0;
     core.initState(pool);
@@ -765,7 +765,7 @@ describe("MOSFET primeJunctions", () => {
   });
 
   it("method absent from element", () => {
-    // Task 6.1.4: primeJunctions() deleted â€” property must be absent.
+    // Task 6.1.4: primeJunctions() deleted  property must be absent.
     const { element } = makeNmosElement();
     expect(element.primeJunctions).toBeUndefined();
   });
@@ -791,7 +791,7 @@ describe("MOSFET primeJunctions", () => {
 
   it("dc-operating-point skips MOSFET", () => {
     // Task 6.1.4: dc-operating-point.ts:323-324 uses `el.primeJunctions?.()`.
-    // With the method absent, the optional-chain skips silently â€” no throw.
+    // With the method absent, the optional-chain skips silently  no throw.
     const { element } = makeNmosElement();
     expect(() => {
       if ((element as any).isNonlinear && (element as any).primeJunctions) {
@@ -802,12 +802,12 @@ describe("MOSFET primeJunctions", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Integration tests â€” inline NIintegrate migration (C2.2)
+// Integration tests  inline NIintegrate migration (C2.2)
 //
 // ngspice NIintegrate mapping (niinteg.c:28-63):
-//   CKTag[0] â†’ ag[0]    coefficient on q0 (current charge)
-//   CKTag[1] â†’ ag[1]    coefficient on q1 (previous charge)
-//   CKTag[2] â†’ ag[2]    coefficient on q2 (2 steps back, order>=2)
+//   CKTag[0]  ag[0]    coefficient on q0 (current charge)
+//   CKTag[1]  ag[1]    coefficient on q1 (previous charge)
+//   CKTag[2]  ag[2]    coefficient on q2 (2 steps back, order>=2)
 //   geq      = ag[0] * cap
 //   ccap     = ag[0]*q0 + ag[1]*q1 (+ ag[2]*q2 for order>=2)
 //   ceq      = ccap - ag[0]*q0
@@ -826,7 +826,7 @@ describe("integration", () => {
 });
 
 // ---------------------------------------------------------------------------
-// MOSFET LoadContext precondition â€” Task 6.1.3 compile-time assertion test
+// MOSFET LoadContext precondition  Task 6.1.3 compile-time assertion test
 // ---------------------------------------------------------------------------
 
 describe("MOSFET LoadContext precondition", () => {
@@ -836,7 +836,7 @@ describe("MOSFET LoadContext precondition", () => {
     // simpleGate path runs (MODEINITJCT goes through the else branch which
     // never touches the bypass gate).
     const bag = makeParamBag({ ...NMOS_DEFAULTS, CBD: 0, CBS: 0, CGSO: 0, CGDO: 0 });
-    const core = createMosfetElement(1, new Map([["G", 2], ["S", 3], ["D", 1]]), [], -1, bag) as any;
+    const core = createMosfetElement(1, new Map([["G", 2], ["S", 3], ["D", 1]]), bag) as any;
     const pool = new StatePool(core.stateSize);
     core.stateBaseOffset = 0;
     core.initState(pool);
@@ -889,7 +889,7 @@ describe("MOSFET LoadContext precondition", () => {
       core.load(seedCtx);
     }
 
-    // Second call with bypass=true and rhsOld matching state0 â€” delv's are all
+    // Second call with bypass=true and rhsOld matching state0  delv's are all
     // zero so the bypass gate fires. Spy on pnjlim + fetlim to verify the
     // limiting block is SKIPPED (proving the bypass branch was taken).
     const pnjlimSpy = vi.spyOn(NewtonRaphsonModule, "pnjlim");
@@ -899,14 +899,14 @@ describe("MOSFET LoadContext precondition", () => {
       ctx.bypass = true;
       ctx.voltTol = 1e-6;
 
-      // load() must not throw â€” bypass and voltTol are present and read.
+      // load() must not throw  bypass and voltTol are present and read.
       expect(() => core.load(ctx)).not.toThrow();
 
       // The ctx.bypass and ctx.voltTol fields are structurally present.
       expect(ctx.bypass).toBe(true);
       expect(ctx.voltTol).toBe(1e-6);
 
-      // Bypass fired â†’ limiting block was skipped â†’ pnjlim/fetlim NOT called.
+      // Bypass fired  limiting block was skipped  pnjlim/fetlim NOT called.
       expect(pnjlimSpy).not.toHaveBeenCalled();
       expect(fetlimSpy).not.toHaveBeenCalled();
     } finally {
@@ -917,7 +917,7 @@ describe("MOSFET LoadContext precondition", () => {
 });
 
 // ---------------------------------------------------------------------------
-// MOSFET schema â€” Task 6.1.1 verify-only tests
+// MOSFET schema  Task 6.1.1 verify-only tests
 // ---------------------------------------------------------------------------
 
 describe("MOSFET schema", () => {
@@ -941,14 +941,14 @@ describe("MOSFET schema", () => {
 });
 
 // ---------------------------------------------------------------------------
-// MOSFET LTE â€” Task 6.1.2 verify-only tests
+// MOSFET LTE  Task 6.1.2 verify-only tests
 // ---------------------------------------------------------------------------
 
 describe("MOSFET LTE", () => {
   it("includes QBS and QBD", () => {
-    // Construct NMOS with CBD=1pF, CBS=1pF (hasCapacitance â†’ isReactive â†’ getLteTimestep defined).
+    // Construct NMOS with CBD=1pF, CBS=1pF (hasCapacitance  isReactive  getLteTimestep defined).
     const bag = makeParamBag({ ...NMOS_DEFAULTS, CBD: 1e-12, CBS: 1e-12 });
-    const core = createMosfetElement(1, new Map([["G", 2], ["S", 3], ["D", 1]]), [], -1, bag) as any;
+    const core = createMosfetElement(1, new Map([["G", 2], ["S", 3], ["D", 1]]), bag) as any;
     const pool = new StatePool(core.stateSize);
     core.stateBaseOffset = 0;
     core.initState(pool);
@@ -979,7 +979,7 @@ describe("MOSFET LTE", () => {
     s1[iCQGS] = 0; s1[iCQGD] = 0; s1[iCQGB] = 0;
 
     // Seed QBS / CQBS with non-zero values differing between s0 and s1.
-    // Non-zero difference â†’ cktTerr returns a finite dt estimate.
+    // Non-zero difference  cktTerr returns a finite dt estimate.
     s0[iQBS]  = 1e-13;
     s1[iQBS]  = 2e-13;
     s0[iCQBS] = 1e-4;
@@ -1008,7 +1008,7 @@ describe("MOSFET LTE", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Wave 6.2 tests â€” MOSFET correctness (M-1 through M-12)
+// Wave 6.2 tests  MOSFET correctness (M-1 through M-12)
 // ---------------------------------------------------------------------------
 
 // Shared helpers for Wave 6.2 tests.
@@ -1056,7 +1056,7 @@ function makeNmosElement62(params: Record<string, number> = {}): {
   pool: StatePool;
 } {
   const bag = makeParamBag({ ...NMOS_DEFAULTS, ...params });
-  const core = createMosfetElement(1, new Map([["G", 2], ["S", 3], ["D", 1]]), [], -1, bag) as any;
+  const core = createMosfetElement(1, new Map([["G", 2], ["S", 3], ["D", 1]]), bag) as any;
   const pool = new StatePool(core.stateSize);
   core.stateBaseOffset = 0;
   core.initState(pool);
@@ -1073,7 +1073,7 @@ function makePmosElement62(params: Record<string, number> = {}): {
 } {
   const pmosBag = new PropertyBag();
   pmosBag.replaceModelParams({ ...MOSFET_PMOS_DEFAULTS, ...params });
-  const core = createMosfetElement(-1, new Map([["G", 2], ["S", 3], ["D", 1]]), [], -1, pmosBag) as any;
+  const core = createMosfetElement(-1, new Map([["G", 2], ["S", 3], ["D", 1]]), pmosBag) as any;
   const pool = new StatePool(core.stateSize);
   core.stateBaseOffset = 0;
   core.initState(pool);
@@ -1091,7 +1091,7 @@ const S_QBD  = 13, S_CQBD = 14, S_QBS  = 15, S_CQBS = 16;
 const S_CD   = 17;
 
 // ---------------------------------------------------------------------------
-// Task 6.2.1: M-1 â€” MODEINITPRED limiting routing
+// Task 6.2.1: M-1  MODEINITPRED limiting routing
 // ---------------------------------------------------------------------------
 
 describe("MOSFET M-1", () => {
@@ -1101,8 +1101,8 @@ describe("MOSFET M-1", () => {
     // mos1load.c:211-213 writes s0[VGS] = s1[VGS] BEFORE limiting reads it, so
     // vgsOldStored = s1[VGS] = 0.5. Predictor xfact=1 (dt=deltaOld[1]):
     //   vgs_pred = 2*s1[VGS] - 1*s2[VGS] = 2*0.5 - (-5) = 6.0.
-    // fetlim(vnew=6.0, vold=0.5, vto=0.7): vold<vto â†’ zone 3 (OFF), delv>0,
-    //   vtemp=vto+0.5=1.2; vnew=6.0 > vtemp â†’ clamp vnew = 1.2. wasLimited=true.
+    // fetlim(vnew=6.0, vold=0.5, vto=0.7): vold<vto  zone 3 (OFF), delv>0,
+    //   vtemp=vto+0.5=1.2; vnew=6.0 > vtemp  clamp vnew = 1.2. wasLimited=true.
     const { element, pool } = makeNmosElement62({ VTO: 0.7, KP: 120e-6, GAMMA: 0, CGSO: 0, CGDO: 0, CBD: 0, CBS: 0 });
     const s0 = pool.states[0];
     const s1 = pool.states[1];
@@ -1135,14 +1135,14 @@ describe("MOSFET M-1", () => {
 
   it("predictor voltages pass through pnjlim", () => {
     // Seed so predictor yields vbs >> sourceVcrit to trigger pnjlim forward-limit.
-    // With IS=1e-6, default temp â†’ tSatCurâ‰ˆ1e-6, vtâ‰ˆ0.02585, and
-    // sourceVcrit â‰ˆ 0.02585 * log(0.02585/(sqrt(2)*1e-6)) â‰ˆ 0.254 V.
+    // With IS=1e-6, default temp  tSatCur1e-6, vt0.02585, and
+    // sourceVcrit  0.02585 * log(0.02585/(sqrt(2)*1e-6))  0.254 V.
     // mos1load.c:211-214 writes s0[VBS] = s1[VBS] BEFORE limiting reads it, so
     // vbsOldStored = s1[VBS]. Need |vbs_pred - s1[VBS]| > 2*vt AND vbs_pred > vcrit.
-    // xfact=1: vbs_pred = 2*s1[VBS] - s2[VBS]. Pick s1=0, s2=-1 â†’ vbs_pred=1.0.
+    // xfact=1: vbs_pred = 2*s1[VBS] - s2[VBS]. Pick s1=0, s2=-1  vbs_pred=1.0.
     //   vbsOldStored = s1[VBS] = 0. pnjlim(vnew=1.0, vold=0, vt, vcrit=0.254):
-    //   1.0 > 0.254 AND |1.0-0|=1.0 > 2*vt=0.052 â†’ forward fires.
-    //   vold<=0 â†’ vnew' = vt * log(1.0/vt) â‰ˆ 0.02585*log(38.67) â‰ˆ 0.0945, limited=true.
+    //   1.0 > 0.254 AND |1.0-0|=1.0 > 2*vt=0.052  forward fires.
+    //   vold<=0  vnew' = vt * log(1.0/vt)  0.02585*log(38.67)  0.0945, limited=true.
     const { element, pool } = makeNmosElement62({
       VTO: 0.7, KP: 120e-6, GAMMA: 0, CBD: 0, CBS: 1e-12, IS: 1e-6,
     });
@@ -1165,7 +1165,7 @@ describe("MOSFET M-1", () => {
 
     element.load(ctx);
 
-    // Exactly one pnjlim event on BS (forward mode: vds_pred > 0 â†’ pnjlim on vbs).
+    // Exactly one pnjlim event on BS (forward mode: vds_pred > 0  pnjlim on vbs).
     // mos1load.c:393-406: forward path pushes DEVpnjlim(vbs,...) once.
     const pnjlimEvents = ctx.limitingCollector!.filter(
       (e: any) => e.limitType === "pnjlim",
@@ -1193,7 +1193,7 @@ describe("MOSFET M-1", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Task 6.2.2: M-2 â€” MODEINITSMSIG general-iteration path
+// Task 6.2.2: M-2  MODEINITSMSIG general-iteration path
 // ---------------------------------------------------------------------------
 
 describe("MOSFET M-2", () => {
@@ -1208,7 +1208,7 @@ describe("MOSFET M-2", () => {
     runA.pool.states[0][S_VGS] = 0.5; runA.pool.states[0][S_VDS] = 0.0;
     runA.pool.states[0][S_VBS] = 0.0; runA.pool.states[0][S_VBD] = 0.0;
     const ctxA = makeWave62Ctx(MODEDCOP | MODEINITSMSIG, {
-      rhsOld: new Float64Array([0, 2.0, 1.5, 0.0]),  // V_D=2, V_G=1.5, V_S=0 â†’ vgs=1.5
+      rhsOld: new Float64Array([0, 2.0, 1.5, 0.0]),  // V_D=2, V_G=1.5, V_S=0  vgs=1.5
     });
     runA.element.load(ctxA);
     const cdA = runA.pool.states[0][S_CD];
@@ -1218,14 +1218,14 @@ describe("MOSFET M-2", () => {
     runB.pool.states[0][S_VGS] = 0.5; runB.pool.states[0][S_VDS] = 0.0;
     runB.pool.states[0][S_VBS] = 0.0; runB.pool.states[0][S_VBD] = 0.0;
     const ctxB = makeWave62Ctx(MODEDCOP | MODEINITSMSIG, {
-      rhsOld: new Float64Array([0, 2.0, 0.3, 0.0]),  // V_G=0.3 â†’ vgs=0.3 (below threshold)
+      rhsOld: new Float64Array([0, 2.0, 0.3, 0.0]),  // V_G=0.3  vgs=0.3 (below threshold)
     });
     runB.element.load(ctxB);
     const cdB = runB.pool.states[0][S_CD];
 
-    // Contrast: rhsOld-derived vgs differs â†’ cd differs by many orders of magnitude.
+    // Contrast: rhsOld-derived vgs differs  cd differs by many orders of magnitude.
     // If load() incorrectly read from state0, both runs share state0[VGS]=0.5
-    // (below VTO=0.7) â†’ both would be in cutoff with identical bulk-leak cd.
+    // (below VTO=0.7)  both would be in cutoff with identical bulk-leak cd.
     //
     // Run A (vgs=1.5 > vth): cd dominated by saturation current in the ÂµA range.
     // Run B (vgs=0.3 < vth): cd is dominated by bulk-drain junction leakage (pA range).
@@ -1270,11 +1270,11 @@ describe("MOSFET M-2", () => {
 
   it("SMSIG skips bulk NIintegrate", () => {
     // runBulkNIintegrate = MODETRAN || (MODEINITTRAN && !MODEUIC).
-    // MODEINITSMSIG alone is neither â†’ SLOT_CQBS unchanged.
+    // MODEINITSMSIG alone is neither  SLOT_CQBS unchanged.
     const { element, pool } = makeNmosElement62({ CBD: 1e-12, CBS: 1e-12 });
     const s0 = pool.states[0];
 
-    // Seed a sentinel value in CQBS â€” if bulk NIintegrate runs it will be overwritten.
+    // Seed a sentinel value in CQBS  if bulk NIintegrate runs it will be overwritten.
     const sentinel = 42.0;
     s0[S_CQBS] = sentinel;
 
@@ -1284,7 +1284,7 @@ describe("MOSFET M-2", () => {
 
     element.load(ctx);
 
-    // CQBS must remain the sentinel â€” bulk NIintegrate did not run for SMSIG.
+    // CQBS must remain the sentinel  bulk NIintegrate did not run for SMSIG.
     expect(pool.states[0][S_CQBS]).toBe(sentinel);
   });
 
@@ -1316,14 +1316,14 @@ describe("MOSFET M-2", () => {
 
     element.load(ctx);
 
-    // Stamps must be present â€” SMSIG has no early return.
+    // Stamps must be present  SMSIG has no early return.
     const entries = ctx.solver.getCSCNonZeros();
     expect(entries.length).toBeGreaterThan(0);
   });
 });
 
 // ---------------------------------------------------------------------------
-// Task 6.2.3: M-3 â€” MODEINITJCT IC_VDS / IC_VGS / IC_VBS
+// Task 6.2.3: M-3  MODEINITJCT IC_VDS / IC_VGS / IC_VBS
 // ---------------------------------------------------------------------------
 
 describe("MOSFET M-3", () => {
@@ -1361,7 +1361,7 @@ describe("MOSFET M-3", () => {
   });
 
   it("MODEDCOP + MODEUIC with zero ICs triggers fallback", () => {
-    // MODEDCOP is in enabling set â†’ fallback fires even with MODEUIC.
+    // MODEDCOP is in enabling set  fallback fires even with MODEUIC.
     const { element, pool } = makeNmosElement62({ ICVDS: 0, ICVGS: 0, ICVBS: 0, OFF: 0 });
     const ctx = makeWave62Ctx(MODEDCOP | MODEINITJCT | MODEUIC);
     element.load(ctx);
@@ -1373,8 +1373,8 @@ describe("MOSFET M-3", () => {
   });
 
   it("pure MODEUIC with zero ICs skips fallback", () => {
-    // No MODETRAN/MODEDCOP/MODEDCTRANCURVE and MODEUIC set â†’ enabling set empty
-    // and !MODEUIC is false â†’ fallback does NOT fire. ICs stay zero.
+    // No MODETRAN/MODEDCOP/MODEDCTRANCURVE and MODEUIC set  enabling set empty
+    // and !MODEUIC is false  fallback does NOT fire. ICs stay zero.
     const { element, pool } = makeNmosElement62({ ICVDS: 0, ICVGS: 0, ICVBS: 0, OFF: 0 });
     const ctx = makeWave62Ctx(MODEINITJCT | MODEUIC);
     element.load(ctx);
@@ -1385,7 +1385,7 @@ describe("MOSFET M-3", () => {
   });
 
   it("OFF=1 forces zero", () => {
-    // OFF=1 â†’ else branch â†’ zero regardless of ICs.
+    // OFF=1  else branch  zero regardless of ICs.
     const { element, pool } = makeNmosElement62({ ICVDS: 2.5, ICVGS: 1.5, OFF: 1 });
     const ctx = makeWave62Ctx(MODEINITJCT);
     element.load(ctx);
@@ -1397,7 +1397,7 @@ describe("MOSFET M-3", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Task 6.2.4: M-4 â€” NOBYPASS bypass test
+// Task 6.2.4: M-4  NOBYPASS bypass test
 // ---------------------------------------------------------------------------
 
 describe("MOSFET M-4", () => {
@@ -1429,7 +1429,7 @@ describe("MOSFET M-4", () => {
     const cqgdBefore = s0Before[S_CQGD];
     const cqgbBefore = s0Before[S_CQGB];
 
-    // rhsOld matches state0 exactly â†’ delvXX = 0 â†’ bypass fires.
+    // rhsOld matches state0 exactly  delvXX = 0  bypass fires.
     const rhsOld = new Float64Array([0, 2.0, 1.5, 0.0]);
     const ctx = makeWave62Ctx(MODEDCOP | MODEINITFLOAT, {
       rhsOld,
@@ -1474,13 +1474,13 @@ describe("MOSFET M-4", () => {
     pool.states[1][S_VBS] = 0.0; pool.states[2][S_VBS] = 0.0;
     pool.states[1][S_VBD] = -2.0; pool.states[2][S_VBD] = -2.0;
 
-    // Spy on pnjlim/fetlim â€” MODEINITPRED excludes bypass so limiting must run.
+    // Spy on pnjlim/fetlim  MODEINITPRED excludes bypass so limiting must run.
     const pnjlimSpy = vi.spyOn(NewtonRaphsonModule, "pnjlim");
     const fetlimSpy = vi.spyOn(NewtonRaphsonModule, "fetlim");
     try {
       element.load(ctx);
 
-      // Bypass disabled â†’ compute path taken â†’ pnjlim+fetlim called.
+      // Bypass disabled  compute path taken  pnjlim+fetlim called.
       const limitingCalls = pnjlimSpy.mock.calls.length + fetlimSpy.mock.calls.length;
       expect(limitingCalls).toBeGreaterThan(0);
 
@@ -1508,13 +1508,13 @@ describe("MOSFET M-4", () => {
       voltTol: 1e-6,
     });
 
-    // Spy on pnjlim/fetlim â€” MODEINITSMSIG excludes bypass so limiting must run.
+    // Spy on pnjlim/fetlim  MODEINITSMSIG excludes bypass so limiting must run.
     const pnjlimSpy = vi.spyOn(NewtonRaphsonModule, "pnjlim");
     const fetlimSpy = vi.spyOn(NewtonRaphsonModule, "fetlim");
     try {
       element.load(ctx);
 
-      // Bypass disabled â†’ compute path taken â†’ limiting called.
+      // Bypass disabled  compute path taken  limiting called.
       const limitingCalls = pnjlimSpy.mock.calls.length + fetlimSpy.mock.calls.length;
       expect(limitingCalls).toBeGreaterThan(0);
 
@@ -1532,10 +1532,10 @@ describe("MOSFET M-4", () => {
     });
     seedConvergedState(element);
 
-    // Set delvbs = 10 * voltTol (large deviation â†’ bypass should not fire).
+    // Set delvbs = 10 * voltTol (large deviation  bypass should not fire).
     const s0 = pool.states[0];
     const prevVbs = s0[S_VBS];
-    // vbs new is derived from rhsOld (V_B - V_S) with B=S=3; both zero â†’ vbs_new=0.
+    // vbs new is derived from rhsOld (V_B - V_S) with B=S=3; both zero  vbs_new=0.
     // To get delvbs != 0, shift state0[VBS] so new-prev exceeds voltTol.
     const voltTol = 1e-6;
     s0[S_VBS] = prevVbs - 10 * voltTol;
@@ -1550,13 +1550,13 @@ describe("MOSFET M-4", () => {
       voltTol,
     });
 
-    // Spy on pnjlim/fetlim â€” delvbs exceeds voltTol so bypass must NOT fire.
+    // Spy on pnjlim/fetlim  delvbs exceeds voltTol so bypass must NOT fire.
     const pnjlimSpy = vi.spyOn(NewtonRaphsonModule, "pnjlim");
     const fetlimSpy = vi.spyOn(NewtonRaphsonModule, "fetlim");
     try {
       element.load(ctx);
 
-      // Bypass suppressed â†’ compute path â†’ limiting called.
+      // Bypass suppressed  compute path  limiting called.
       const limitingCalls = pnjlimSpy.mock.calls.length + fetlimSpy.mock.calls.length;
       expect(limitingCalls).toBeGreaterThan(0);
 
@@ -1573,7 +1573,7 @@ describe("MOSFET M-4", () => {
     const cgso = 3e-12;
     const { element, pool } = makeNmosElement62({
       VTO: 0.7, KP: 120e-6, GAMMA: 0, CBD: 0, CBS: 0,
-      CGSO: cgso / 1e-6, // CGSO is per-unit-width; W=1e-6 â†’ GateSourceOverlapCap = cgso
+      CGSO: cgso / 1e-6, // CGSO is per-unit-width; W=1e-6  GateSourceOverlapCap = cgso
       W: 1e-6, CGDO: 0,
     });
     seedConvergedState(element);
@@ -1590,7 +1590,7 @@ describe("MOSFET M-4", () => {
       voltTol: 1e-6,
     });
 
-    // Should not throw â€” bypass fires, cap totals rebuilt.
+    // Should not throw  bypass fires, cap totals rebuilt.
     expect(() => element.load(ctx)).not.toThrow();
   });
 
@@ -1612,13 +1612,13 @@ describe("MOSFET M-4", () => {
 
     element.load(ctx);
 
-    // No pnjlim limiting in bypass at convergence â†’ noncon stays 0.
+    // No pnjlim limiting in bypass at convergence  noncon stays 0.
     expect(ctx.noncon.value).toBe(0);
   });
 });
 
 // ---------------------------------------------------------------------------
-// Task 6.2.5: M-5 â€” Verify CKTfixLimit gate on reverse limvds
+// Task 6.2.5: M-5  Verify CKTfixLimit gate on reverse limvds
 // ---------------------------------------------------------------------------
 
 describe("MOSFET M-5", () => {
@@ -1630,7 +1630,7 @@ describe("MOSFET M-5", () => {
     // To get a reverse mode new vds as well, set D < S in rhsOld.
     s0[S_VDS] = -1.0; s0[S_VBS] = 0.0; s0[S_VGS] = 1.5; s0[S_VBD] = 1.0;
 
-    // rhsOld[0]=D=-0.5, rhsOld[2]=S=0 â†’ new vds = -0.5; reverse mode.
+    // rhsOld[0]=D=-0.5, rhsOld[2]=S=0  new vds = -0.5; reverse mode.
     const ctx = makeWave62Ctx(MODEDCOP | MODEINITFLOAT, {
       rhsOld: new Float64Array([0, -0.5, 1.5, 0.0]),
       cktFixLimit: true,
@@ -1642,7 +1642,7 @@ describe("MOSFET M-5", () => {
     const limvdsEvents = ctx.limitingCollector!.filter(
       (e: any) => e.limitType === "limvds" && e.wasLimited === true,
     );
-    // cktFixLimit=true â†’ reverse limvds skipped â†’ no actual limiting occurred.
+    // cktFixLimit=true  reverse limvds skipped  no actual limiting occurred.
     expect(limvdsEvents.length).toBe(0);
   });
 
@@ -1671,7 +1671,7 @@ describe("MOSFET M-5", () => {
   it("forward limvds always runs", () => {
     const { element, pool } = makeNmosElement62({ VTO: 0.7, KP: 120e-6 });
     const s0 = pool.states[0];
-    // VDS=1.0 â†’ forward mode. cktFixLimit=true but forward path is not guarded.
+    // VDS=1.0  forward mode. cktFixLimit=true but forward path is not guarded.
     s0[S_VDS] = 1.0; s0[S_VBS] = 0.0; s0[S_VGS] = 1.5; s0[S_VBD] = -1.0;
 
     const ctx = makeWave62Ctx(MODEDCOP | MODEINITFLOAT, {
@@ -1691,12 +1691,12 @@ describe("MOSFET M-5", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Task 6.2.6: M-6 â€” icheckLimited init semantics
+// Task 6.2.6: M-6  icheckLimited init semantics
 // ---------------------------------------------------------------------------
 
 describe("MOSFET M-6", () => {
-  it("no pnjlim limit â†’ icheckLimited stays false", () => {
-    // Moderate bias â€” no pnjlim limiting expected.
+  it("no pnjlim limit  icheckLimited stays false", () => {
+    // Moderate bias  no pnjlim limiting expected.
     const { element, pool } = makeNmosElement62({
       VTO: 0.7, KP: 120e-6, GAMMA: 0, OFF: 0, CBD: 0, CBS: 0,
     });
@@ -1710,24 +1710,24 @@ describe("MOSFET M-6", () => {
 
     element.load(ctx);
 
-    // No pnjlim limit â†’ icheckLimited=false â†’ noncon not incremented.
+    // No pnjlim limit  icheckLimited=false  noncon not incremented.
     expect(ctx.noncon.value).toBe(0);
   });
 
-  it("pnjlim limit â†’ noncon increments", () => {
+  it("pnjlim limit  noncon increments", () => {
     // pnjlim fires on the BD junction in reverse mode.
     // With B=S=3 (3-terminal MOSFET), vbs=0 always.
     // In reverse mode (vds < 0): vbd = vbs - vds = 0 - vds.
-    // With vds=-0.8 after limiting: vbd = 0.8 > drainVcrit â‰ˆ 0.617.
-    // pnjlim: vnew=0.8 > vcrit AND |0.8 - vbdOldStored| > 2*vt â†’ limited=true.
+    // With vds=-0.8 after limiting: vbd = 0.8 > drainVcrit  0.617.
+    // pnjlim: vnew=0.8 > vcrit AND |0.8 - vbdOldStored| > 2*vt  limited=true.
     const { element, pool } = makeNmosElement62({
       VTO: 0.7, KP: 120e-6, GAMMA: 0, OFF: 0, CBD: 1e-12, CBS: 0,
     });
     const s0 = pool.states[0];
     // prevVbd = 0 in state0, prevVds = 0.
     // rhsOld: D=node1=index0, so V_D = rhsOld[0] = -0.8.
-    // vds_new = 1*(-0.8 - 0) = -0.8 â†’ reverse mode.
-    // vbd_new = 0 - (-0.8) = 0.8 > drainVcrit â‰ˆ 0.617 â†’ pnjlim fires.
+    // vds_new = 1*(-0.8 - 0) = -0.8  reverse mode.
+    // vbd_new = 0 - (-0.8) = 0.8 > drainVcrit  0.617  pnjlim fires.
     s0[S_VGS] = 1.5; s0[S_VDS] = 0.0; s0[S_VBS] = 0.0; s0[S_VBD] = 0.0;
 
     const ctx = makeWave62Ctx(MODEDCOP | MODEINITFLOAT, {
@@ -1738,7 +1738,7 @@ describe("MOSFET M-6", () => {
 
     element.load(ctx);
 
-    // pnjlim fired on BD junction (vbd=0.8 > drainVcrit) â†’ noncon++ exactly once.
+    // pnjlim fired on BD junction (vbd=0.8 > drainVcrit)  noncon++ exactly once.
     expect(ctx.noncon.value).toBe(1);
   });
 
@@ -1755,7 +1755,7 @@ describe("MOSFET M-6", () => {
 
     element.load(ctx);
 
-    // MODEINITFIX + OFF=1 â†’ noncon gate suppressed.
+    // MODEINITFIX + OFF=1  noncon gate suppressed.
     expect(ctx.noncon.value).toBe(0);
   });
 
@@ -1772,7 +1772,7 @@ describe("MOSFET M-6", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Task 6.2.7: M-7 â€” qgs/qgd/qgb xfact extrapolation
+// Task 6.2.7: M-7  qgs/qgd/qgb xfact extrapolation
 // ---------------------------------------------------------------------------
 
 describe("MOSFET M-7", () => {
@@ -1825,7 +1825,7 @@ describe("MOSFET M-7", () => {
     s0[S_VGS] = 1.5; s0[S_VDS] = 1.0; s0[S_VBS] = 0.0;
     s0[S_VBD] = -1.0; s1[S_VBD] = -1.0;
 
-    // xfact = 1e-9/2e-9 = 0.5 â†’ q0 = 1.5*4e-12 - 0.5*2e-12 = 5e-12.
+    // xfact = 1e-9/2e-9 = 0.5  q0 = 1.5*4e-12 - 0.5*2e-12 = 5e-12.
     const ctx = makeWave62Ctx(MODETRAN | MODEINITPRED, {
       dt: 1e-9,
       deltaOld: [1e-9, 2e-9, 0, 0, 0, 0, 0],
@@ -1850,7 +1850,7 @@ describe("MOSFET M-7", () => {
     s0[S_VGS] = 1.5; s0[S_VDS] = 1.0; s0[S_VBS] = 0.0;
     s0[S_VBD] = -1.0; s1[S_VBD] = -1.0;
 
-    // xfact = 0.5 â†’ q0 = 1.5*6e-12 - 0.5*4e-12 = 7e-12.
+    // xfact = 0.5  q0 = 1.5*6e-12 - 0.5*4e-12 = 7e-12.
     const ctx = makeWave62Ctx(MODETRAN | MODEINITPRED, {
       dt: 1e-9,
       deltaOld: [1e-9, 2e-9, 0, 0, 0, 0, 0],
@@ -1862,7 +1862,7 @@ describe("MOSFET M-7", () => {
   });
 
   it("xfact=0 when deltaOld[1]=0", () => {
-    // deltaOld[1]=0 â†’ xfact=0 â†’ q0 = (1+0)*q1 - 0*q2 = q1.
+    // deltaOld[1]=0  xfact=0  q0 = (1+0)*q1 - 0*q2 = q1.
     const { element, pool } = makeXfactElement();
     const s1 = pool.states[1];
     const s2 = pool.states[2];
@@ -1903,7 +1903,7 @@ describe("MOSFET M-7", () => {
 
     s1[S_QGS] = 3e-12; s2[S_QGS] = 1e-12;
 
-    // xfact = 0.5 â†’ vgs_pred = 1.5*2 - 0.5*1 = 2.5
+    // xfact = 0.5  vgs_pred = 1.5*2 - 0.5*1 = 2.5
     //               qgs_pred = 1.5*3e-12 - 0.5*1e-12 = 4e-12
     const ctx = makeWave62Ctx(MODETRAN | MODEINITPRED, {
       dt: 1e-9,
@@ -1922,7 +1922,7 @@ describe("MOSFET M-7", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Task 6.2.8: M-8 â€” von polarity-convention comment (verify-only)
+// Task 6.2.8: M-8  von polarity-convention comment (verify-only)
 // ---------------------------------------------------------------------------
 
 describe("MOSFET M-8", () => {
@@ -1938,7 +1938,7 @@ describe("MOSFET M-8", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Task 6.2.9: M-9 â€” Per-instance TEMP parameter
+// Task 6.2.9: M-9  Per-instance TEMP parameter
 // ---------------------------------------------------------------------------
 
 describe("MOSFET M-9", () => {
@@ -1950,11 +1950,11 @@ describe("MOSFET M-9", () => {
   });
 
   it("tp.vt reflects TEMP", () => {
-    // TEMP=400 â†’ vt = 400 * KoverQ â‰ˆ 0.03447 V.
+    // TEMP=400  vt = 400 * KoverQ  0.03447 V.
     const { element } = makeNmosElement62({ TEMP: 400 });
     // Access tp via internal _tp getter (if present) or run load() and observe behavior.
     // Since _p.TEMP is set, computeTempParams uses it; we check via load() result:
-    // At TEMP=400, the junction saturation current is higher â†’ cbs at vbs=0 reflects vt(400).
+    // At TEMP=400, the junction saturation current is higher  cbs at vbs=0 reflects vt(400).
     // Instead, verify via the stored tp by checking what _p exposes:
     expect(element._p.TEMP).toBeCloseTo(400, 10);
     // Run load and check that the VT used differs from ctx.vt.
@@ -1968,14 +1968,14 @@ describe("MOSFET M-9", () => {
   it("load uses tp.vt not ctx.vt", () => {
     // Verify that load() uses tp.vt (from TEMP param) not ctx.vt.
     // The drain junction current (cbs) is computed as: IS*(exp(vbs/vt)-1).
-    // With TEMP=400 â†’ tp.vt = 400*KoverQ â‰ˆ 0.03447V.
-    // With TEMP=300 â†’ tp.vt = 300*KoverQ â‰ˆ 0.02585V.
-    // At the same vbs, a larger vt produces a smaller exp() â†’ different cbs.
+    // With TEMP=400  tp.vt = 400*KoverQ  0.03447V.
+    // With TEMP=300  tp.vt = 300*KoverQ  0.02585V.
+    // At the same vbs, a larger vt produces a smaller exp()  different cbs.
     // We test by comparing two elements: one with TEMP=400 and one with TEMP=300.
     // Both get ctx.vt = 300*KoverQ (wrong for TEMP=400).
     // The CBS stored in state0 should differ between them, proving tp.vt is used.
     //
-    // Node setup: G=2, D=1, S=3, B=3 (B=S) â†’ vbs = V(B)-V(S) = 0 always.
+    // Node setup: G=2, D=1, S=3, B=3 (B=S)  vbs = V(B)-V(S) = 0 always.
     // To get non-zero vbs we need Bâ‰ S. Create element with separate B node.
     // Actually with B=S tied, cbs at vbs=0: cbs=IS*(1-1)=0 (only GMIN*0=0).
     // Instead test via the junction formula with vbs from s0[VBS] after
@@ -1987,8 +1987,8 @@ describe("MOSFET M-9", () => {
     // Use MODEINITJCT to seed vbs=-1, then switch to MODEINITFLOAT with
     // rhsOld that produces vbs=0.4 via non-tied B and S nodes.
     // However our fixture ties B=S. Use the exposed fact that sourceVcrit
-    // (from tp) is different at 400K vs 300K â€” pnjlim uses tp.sourceVcrit,
-    // not ctx.vt. Verify that a forward-biased step from vbs=-1 â†’ vbs=0
+    // (from tp) is different at 400K vs 300K  pnjlim uses tp.sourceVcrit,
+    // not ctx.vt. Verify that a forward-biased step from vbs=-1  vbs=0
     // does NOT trigger pnjlim at TEMP=400 (sourceVcrit higher) but DOES
     // trigger at TEMP=300 (sourceVcrit lower, same step size).
     //
@@ -2016,7 +2016,7 @@ describe("MOSFET M-9", () => {
     const cd400 = pool400.states[0][S_CD];
     const cd300 = pool300.states[0][S_CD];
 
-    // tTransconductance at TEMP=400 differs from TEMP=300 â†’ different drain currents.
+    // tTransconductance at TEMP=400 differs from TEMP=300  different drain currents.
     expect(isFinite(cd400)).toBe(true);
     expect(isFinite(cd300)).toBe(true);
     // The drain currents must differ (tp.vt/tTransconductance were used, not ctx.vt).
@@ -2031,7 +2031,7 @@ describe("MOSFET M-9", () => {
     element.setParam("TEMP", 400);
     expect(element._p.TEMP).toBeCloseTo(400, 10);
 
-    // After setParam, load() should use vt(400) â€” verified by no-throw.
+    // After setParam, load() should use vt(400)  verified by no-throw.
     const ctx = makeWave62Ctx(MODEDCOP | MODEINITJCT);
     expect(() => element.load(ctx)).not.toThrow();
   });
@@ -2046,23 +2046,23 @@ describe("MOSFET M-9", () => {
     const { element: e600 } = makeNmosElement62({ KP, TNOM, TEMP: 2 * TNOM });
 
     // Run a DC-OP to populate the tempParams cache (computeTempParams is called at
-    // construction time, so no load() needed â€” we just check the stored param).
+    // construction time, so no load() needed  we just check the stored param).
     // tTransconductance is stored in the internal tp object. Access via _p._tKP.
     const tKP300 = e300._p._tKP;
     const tKP600 = e600._p._tKP;
 
-    // At TEMP=TNOM: ratio=1 â†’ tKP = KP (no correction).
+    // At TEMP=TNOM: ratio=1  tKP = KP (no correction).
     expect(tKP300).toBeCloseTo(KP, 10);
 
-    // At TEMP=2*TNOM: ratio=2, fact2=2*TNOM/REFTEMPâ‰ˆ2, ratio4=fact2^(3/2)=2*sqrt(2).
-    // tKP = KP / ratio4 â‰ˆ KP / (2*sqrt(2)).
+    // At TEMP=2*TNOM: ratio=2, fact2=2*TNOM/REFTEMP2, ratio4=fact2^(3/2)=2*sqrt(2).
+    // tKP = KP / ratio4  KP / (2*sqrt(2)).
     const expected = KP / (2 * Math.sqrt(2));
     expect(tKP600).toBeCloseTo(expected, 6);
   });
 });
 
 // ---------------------------------------------------------------------------
-// Task 6.2.10: M-12 â€” Verify MODEINITFIX+OFF â†’ zero voltages
+// Task 6.2.10: M-12  Verify MODEINITFIX+OFF  zero voltages
 // ---------------------------------------------------------------------------
 
 describe("MOSFET M-12", () => {
@@ -2085,7 +2085,7 @@ describe("MOSFET M-12", () => {
     });
     element.load(ctx);
     const s0 = pool.states[0];
-    // OFF=0 â†’ simpleGate path â†’ VGS reflects ctx.rhsOld-derived value (not zero).
+    // OFF=0  simpleGate path  VGS reflects ctx.rhsOld-derived value (not zero).
     // The value may be adjusted by fetlim but must be non-zero (proof that
     // simpleGate ran, not the default-zero OFF=1 branch).
     expect(s0[S_VGS]).not.toBe(0);
@@ -2104,18 +2104,18 @@ describe("MOSFET M-12", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Task 6.2.11: companion-zero â€” verify gate-cap zeroing gate
+// Task 6.2.11: companion-zero  verify gate-cap zeroing gate
 // ---------------------------------------------------------------------------
 
 describe("MOSFET companion-zero", () => {
   it("MODEINITTRAN zeros gate-cap companions", () => {
-    // Under MODEINITTRAN, initOrNoTran=true â†’ gcgs/gcgd/gcgb = 0 â†’ no gate-cap stamp.
+    // Under MODEINITTRAN, initOrNoTran=true  gcgs/gcgd/gcgb = 0  no gate-cap stamp.
     // The NIintegrate else branch does NOT run, so s0[CQGS] is not written by the
     // NIintegrate path. The companion variables gcgs/ceqgs are zeroed by the
     // initOrNoTran branch (not stored in state).
     // We verify by comparing G-G stamp with vs without MODEINITTRAN:
-    // With MODEINITTRAN: gcgs=0 â†’ no cap conductance stamp to G-G diagonal.
-    // With MODETRAN only: gcgs = ag[0]*capgs â†’ cap conductance stamp appears.
+    // With MODEINITTRAN: gcgs=0  no cap conductance stamp to G-G diagonal.
+    // With MODETRAN only: gcgs = ag[0]*capgs  cap conductance stamp appears.
     const ag = new Float64Array(7);
     ag[0] = 1e12; // large so gcgs is visible if it fires
 
@@ -2149,16 +2149,16 @@ describe("MOSFET companion-zero", () => {
     });
     eTran.load(ctxTran);
 
-    // With MODEINITTRAN: gcgs=0 â†’ gate-cap companions not written by NIintegrate.
+    // With MODEINITTRAN: gcgs=0  gate-cap companions not written by NIintegrate.
     // CQGS should remain at its initial 0 value (NIintegrate skipped).
     expect(poolInitTran.states[0][S_CQGS]).toBe(0);
 
-    // With MODETRAN only: gcgs = ag[0]*capgs > 0 â†’ NIintegrate ran â†’ CQGS written.
+    // With MODETRAN only: gcgs = ag[0]*capgs > 0  NIintegrate ran  CQGS written.
     expect(poolTran.states[0][S_CQGS]).not.toBe(0);
   });
 
   it("MODETRAN (no INITTRAN) integrates gate-caps", () => {
-    // MODETRAN without MODEINITTRAN: initOrNoTran=false â†’ NIintegrate runs â†’ CQGS written.
+    // MODETRAN without MODEINITTRAN: initOrNoTran=false  NIintegrate runs  CQGS written.
     // Use overlap capacitance so capgs > 0 (GateSourceOverlapCap = CGSO * W = 1e-3 F).
     // capgs = (meyerCap + prevCapgs) + GateSourceOverlapCap.
     // Seed s0[CAPGS] and s1[CAPGS] to give prevCapgs = 1e-12.
@@ -2191,7 +2191,7 @@ describe("MOSFET companion-zero", () => {
 
     element.load(ctx);
 
-    // NIintegrate ran (capgs > 0) â†’ CQGS written to non-zero.
+    // NIintegrate ran (capgs > 0)  CQGS written to non-zero.
     expect(pool.states[0][S_CQGS]).not.toBe(0);
   });
 
@@ -2222,7 +2222,7 @@ describe("MOSFET companion-zero", () => {
 
     element.load(ctx);
 
-    // runBulkNIintegrate gate fired (MODETRAN) â†’ CQBD/CQBS overwritten by NIintegrate.
+    // runBulkNIintegrate gate fired (MODETRAN)  CQBD/CQBS overwritten by NIintegrate.
     // They must not be the old sentinel 5.0/7.0 AND must not be 0 (blanket zero).
     expect(pool.states[0][S_CQBD]).not.toBe(5.0);
     expect(pool.states[0][S_CQBS]).not.toBe(7.0);

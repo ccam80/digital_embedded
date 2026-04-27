@@ -7,8 +7,8 @@
  *
  * Model summary:
  *   - Forward blocking: I = IS * (exp(V_AK/(N*VT)) - 1) / (1 - Î±â‚ - Î±â‚‚)
- *     (amplified leakage â€” small current, both alphas clamped â‰¤ 0.95)
- *   - Forward conduction (latched): diode in series with R_on, clamping V_AK â‰ˆ V_on
+ *     (amplified leakage  small current, both alphas clamped â‰¤ 0.95)
+ *   - Forward conduction (latched): diode in series with R_on, clamping V_AK  V_on
  *   - Reverse blocking: standard reverse-biased diode leakage
  *   - Triggering: when Î±â‚ + Î±â‚‚ > 0.95
  *   - Unlatching: when I_AK < I_hold
@@ -49,7 +49,7 @@ const CHARGE = 1.6021918e-19;
 /** Minimum conductance for numerical stability (GMIN). */
 const GMIN = 1e-12;
 
-/** Maximum alpha value â€” prevents division-by-zero in blocking formula. */
+/** Maximum alpha value  prevents division-by-zero in blocking formula. */
 const ALPHA_MAX = 0.95;
 
 // ---------------------------------------------------------------------------
@@ -73,8 +73,8 @@ const SLOT_IGK       = 8;
 export const { paramDefs: SCR_PARAM_DEFS, defaults: SCR_PARAM_DEFAULTS } = defineModelParams({
   primary: {
     vOn:        { default: 1.5,   unit: "V", description: "On-state forward voltage drop" },
-    iH:         { default: 5e-3,  unit: "A", description: "Holding current â€” minimum anode current to stay on" },
-    rOn:        { default: 0.01,  unit: "Î©", description: "On-state series resistance" },
+    iH:         { default: 5e-3,  unit: "A", description: "Holding current  minimum anode current to stay on" },
+    rOn:        { default: 0.01,  unit: "Î", description: "On-state series resistance" },
     vBreakover: { default: 100,   unit: "V", description: "Forward breakover voltage (triggers without gate)" },
   },
   secondary: {
@@ -91,7 +91,7 @@ export const { paramDefs: SCR_PARAM_DEFS, defaults: SCR_PARAM_DEFAULTS } = defin
 });
 
 // ---------------------------------------------------------------------------
-// Stamp helpers â€” node 0 is ground (skipped)
+// Stamp helpers  node 0 is ground (skipped)
 // ---------------------------------------------------------------------------
 
 
@@ -112,13 +112,11 @@ const SCR_STATE_SCHEMA = defineStateSchema("ScrElement", [
 ]);
 
 // ---------------------------------------------------------------------------
-// createScrElement â€” AnalogElement factory
+// createScrElement  AnalogElement factory
 // ---------------------------------------------------------------------------
 
 export function createScrElement(
   pinNodes: ReadonlyMap<string, number>,
-  _internalNodeIds: readonly number[],
-  _branchIdx: number,
   props: PropertyBag,
 ): PoolBackedAnalogElementCore {
   const nodeA = pinNodes.get("A")!; // anode
@@ -139,7 +137,7 @@ export function createScrElement(
     OFF:        props.getModelParam<number>("OFF"),
   };
 
-  // cite: dioload.c / diotemp.c â€” per-instance TEMP drives thermal voltage
+  // cite: dioload.c / diotemp.c  per-instance TEMP drives thermal voltage
   function computeScrTempParams(): { vt: number; nVt: number; vcrit: number; vcritGate: number; tVcrit: number } {
     const vt = (CONSTboltz * p.TEMP) / CHARGE;
     const nVt = p.n * vt;
@@ -150,7 +148,7 @@ export function createScrElement(
 
   let tp = computeScrTempParams();
 
-  // Pool reference â€” set by initState. State arrays accessed via pool.states[N]
+  // Pool reference  set by initState. State arrays accessed via pool.states[N]
   // at call time. No cached Float64Array refs.
   let pool: StatePoolRef;
   let base: number;
@@ -184,7 +182,7 @@ export function createScrElement(
       s0[base + SLOT_GEQ] = gOn + GMIN;
       s0[base + SLOT_IEQ] = iOn - s0[base + SLOT_GEQ] * vak;
 
-      // Check if current has dropped below holding current â†’ unlatch
+      // Check if current has dropped below holding current  unlatch
       const iAk = s0[base + SLOT_GEQ] * vak + s0[base + SLOT_IEQ];
       s0[base + SLOT_IAK] = iAk;
       if (iAk < p.iH && vak >= 0) {
@@ -213,7 +211,7 @@ export function createScrElement(
       s0[base + SLOT_IEQ] = 0;
       s0[base + SLOT_IAK] = GMIN * vak;
     } else {
-      // Reverse blocking â€” reverse-biased diode (J1 junction)
+      // Reverse blocking  reverse-biased diode (J1 junction)
       const expArg = Math.min(vak / tp.nVt, 0);
       const expVal = Math.exp(expArg);
       const iRev = p.iS * (expVal - 1);
@@ -226,6 +224,8 @@ export function createScrElement(
 
   return {
     branchIndex: -1,
+    _stateBase: -1,
+    _pinNodes: new Map(pinNodes),
     ngspiceLoadOrder: NGSPICE_LOAD_ORDER.DIO,
     isNonlinear: true,
     isReactive: false,
@@ -234,6 +234,10 @@ export function createScrElement(
     stateSchema: SCR_STATE_SCHEMA,
     stateBaseOffset: -1,
 
+    setup(_ctx: import("../../solver/analog/setup-context.js").SetupContext): void {
+      throw new Error("PB-SCR not yet migrated");
+    },
+
     initState(poolRef: StatePoolRef): void {
       pool = poolRef;
       base = this.stateBaseOffset;
@@ -241,10 +245,10 @@ export function createScrElement(
     },
 
     load(ctx: LoadContext): void {
-      // Access state arrays at call time â€” no cached Float64Array refs.
+      // Access state arrays at call time  no cached Float64Array refs.
       const s0 = pool.states[0];
 
-      // cite: dioload.c:130-138 â€” MODEINITJCT branch seeds junction voltages
+      // cite: dioload.c:130-138  MODEINITJCT branch seeds junction voltages
       // before first NR iteration. Anode-cathode seeds to tVcrit (OFF=0) or 0
       // (OFF=1); gate-cathode always seeds to 0.
       if (ctx.cktMode & MODEINITJCT) {
@@ -395,7 +399,7 @@ export function createScrElement(
 }
 
 // ---------------------------------------------------------------------------
-// ScrElement â€” CircuitElement implementation
+// ScrElement  CircuitElement implementation
 // ---------------------------------------------------------------------------
 
 export class ScrElement extends AbstractCircuitElement {
@@ -523,15 +527,14 @@ export const ScrDefinition: ComponentDefinition = {
   attributeMap: SCR_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.SEMICONDUCTORS,
   helpText:
-    "SCR â€” Silicon Controlled Rectifier.\n" +
+    "SCR  Silicon Controlled Rectifier.\n" +
     "Pins: A (anode), K (cathode), G (gate).\n" +
     "Triggers when gate current raises Î±â‚+Î±â‚‚ above 0.95. Latches until I_AK < I_hold.",
   models: {},
   modelRegistry: {
     "behavioral": {
       kind: "inline",
-      factory: (pinNodes, internalNodeIds, branchIdx, props, _getTime) =>
-        createScrElement(pinNodes, internalNodeIds, branchIdx, props),
+      factory: createScrElement,
       paramDefs: SCR_PARAM_DEFS,
       params: SCR_PARAM_DEFAULTS,
     },

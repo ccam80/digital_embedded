@@ -46,9 +46,10 @@ import { CKTCircuitContext, type DcOpResult, type NRResult } from "../ckt-contex
 import { solveDcOperatingPoint } from "../dc-operating-point.js";
 import { DiagnosticCollector } from "../diagnostics.js";
 import { DEFAULT_SIMULATION_PARAMS, type ResolvedSimulationParams } from "../../../core/analog-engine-interface.js";
+import type { SetupContext } from "../setup-context.js";
 
 // ---------------------------------------------------------------------------
-// withNodeIds â€” test helper for factory-created elements
+// withNodeIds  test helper for factory-created elements
 // ---------------------------------------------------------------------------
 
 /**
@@ -72,7 +73,7 @@ export function withNodeIds(
 }
 
 // ---------------------------------------------------------------------------
-// Internal helper â€” stamp into solver, skipping ground (node 0)
+// Internal helper  stamp into solver, skipping ground (node 0)
 // ---------------------------------------------------------------------------
 
 function G(solver: SparseSolver, row: number, col: number, val: number): void {
@@ -220,7 +221,7 @@ export function makeVoltageSource(
  * Current flows from nodeNeg to nodePos through the source (conventional
  * positive direction: into nodePos, out of nodeNeg).
  *
- * Stamps only into the RHS vector â€” no G-matrix entries.
+ * Stamps only into the RHS vector  no G-matrix entries.
  *
  * @param nodePos - Node where current enters (0 = ground)
  * @param nodeNeg - Node where current leaves (0 = ground)
@@ -287,7 +288,7 @@ const DIODE_SCHEMA: StateSchema = defineStateSchema("TestHelperDiodeElement", [
  *   geq = dId/dVd = Is Â· exp(Vd/(nÂ·Vt)) / (nÂ·Vt)   + GMIN
  *   ieq = Id - geq Â· Vd                              (Norton equivalent offset)
  *
- * `stamp()` is a no-op â€” the diode has no linear (topology-independent)
+ * `stamp()` is a no-op  the diode has no linear (topology-independent)
  * contribution. All MNA entries come from `stampNonlinear`.
  *
  * State is stored in a StatePool. Use `withState` to allocate the pool.
@@ -295,7 +296,7 @@ const DIODE_SCHEMA: StateSchema = defineStateSchema("TestHelperDiodeElement", [
  * @param nodeAnode   - Anode node ID (0 = ground, 1-based)
  * @param nodeCathode - Cathode node ID (0 = ground, 1-based)
  * @param is          - Saturation current in amperes (e.g. 1e-14)
- * @param n           - Ideality factor (typically 1.0â€“2.0)
+ * @param n           - Ideality factor (typically 1.0-2.0)
  * @returns An AnalogElement implementing the Shockley diode model
  */
 export function makeDiode(
@@ -307,7 +308,7 @@ export function makeDiode(
   const nVt = n * VT;
   const vcrit = nVt * Math.log(nVt / (is * Math.SQRT2));
 
-  // Pool binding â€” set by initState
+  // Pool binding  set by initState
   let s0: Float64Array;
   let s1: Float64Array;
   let s2: Float64Array;
@@ -405,7 +406,7 @@ export function makeDiode(
  * Create a linear capacitor test element with companion model integration.
  *
  * The capacitor is modelled as a parallel conductance (geq) and independent
- * current source (ieq) â€” the standard Norton companion model. Coefficients
+ * current source (ieq)  the standard Norton companion model. Coefficients
  * are recomputed each timestep by `stampCompanion`; `stamp` re-stamps the
  * same coefficients on every NR iteration within that timestep.
  *
@@ -425,7 +426,7 @@ export function makeCapacitor(
   nodeB: number,
   capacitance: number,
 ): AnalogElement {
-  // Companion model state â€” updated each NR iteration inside load().
+  // Companion model state  updated each NR iteration inside load().
   let geq = 0;
   let ceq = 0;
   // Charge history: q0 = current step, q1 = previous step, q2 = two steps back, q3 = three steps back.
@@ -550,7 +551,7 @@ export function makeInductor(
   inductance: number,
 ): AnalogElement {
   // Companion model state. Before transient starts, geq=0 makes branch equation
-  // V_A - V_B = 0 (short circuit) â€” correct DC operating point for inductor.
+  // V_A - V_B = 0 (short circuit)  correct DC operating point for inductor.
   let geq = 0;
   let ceq = 0;
   // Flux history: phi0 = current, phi1 = previous, phi2 = two steps back.
@@ -633,7 +634,7 @@ export function makeInductor(
 }
 
 // ---------------------------------------------------------------------------
-// createTestCapacitor / createTestInductor â€” real element wrappers
+// createTestCapacitor / createTestInductor  real element wrappers
 // ---------------------------------------------------------------------------
 
 /**
@@ -726,7 +727,7 @@ export function makeAcVoltageSource(
 }
 
 // ---------------------------------------------------------------------------
-// allocateStatePool â€” mirror compiler state-pool allocation in test fixtures
+// allocateStatePool  mirror compiler state-pool allocation in test fixtures
 // ---------------------------------------------------------------------------
 
 /**
@@ -735,7 +736,7 @@ export function makeAcVoltageSource(
  * element's `initState` hook so closure-captured `s0`/`base` are populated.
  *
  * Tests that build `ConcreteCompiledAnalogCircuit` directly (bypassing the
- * real compiler) must call this before `engine.init()` â€” otherwise pool-backed
+ * real compiler) must call this before `engine.init()`  otherwise pool-backed
  * elements arrive with `stateBaseOffset=-1` and the engine's allocation
  * assertion throws. Tests that stamp into a solver without going through the
  * engine must also call this so element closures have a valid pool reference
@@ -764,7 +765,7 @@ export function allocateStatePool(
 }
 
 // ---------------------------------------------------------------------------
-// makeSimpleCtx / runDcOp / runNR â€” minimal ctx wrappers for component tests
+// makeSimpleCtx / runDcOp / runNR  minimal ctx wrappers for component tests
 // ---------------------------------------------------------------------------
 
 export interface SimpleCtxOptions {
@@ -778,33 +779,84 @@ export interface SimpleCtxOptions {
   statePool?: StatePool;
 }
 
+/**
+ * Call setup() on every element that exposes it, using the given solver.
+ * Must be called before allocateStatePool so that allocStates offsets and
+ * internal nodes are assigned before initState reads stateBaseOffset.
+ */
+function setupElements(
+  elements: readonly (AnalogElement | AnalogElementCore)[],
+  solver: SparseSolver,
+): void {
+  let stateCount = 0;
+  let nodeCount = 1000; // start well above any test pin node
+  const ctx: SetupContext = {
+    solver,
+    temp: 300.15,
+    nomTemp: 300.15,
+    copyNodesets: false,
+    makeVolt(_label: string, _suffix: string): number { return ++nodeCount; },
+    makeCur(_label: string, _suffix: string): number { return ++nodeCount; },
+    allocStates(n: number): number {
+      const off = stateCount;
+      stateCount += n;
+      return off;
+    },
+    findBranch(_label: string): number { return 0; },
+    findDevice(_label: string) { return null; },
+  };
+  for (const el of elements) {
+    // Only call setup() on pool-backed elements (fully migrated).
+    // Non-pool-backed elements (e.g. voltage sources still in migration) call
+    // allocElement inside load() directly and must not be set up here.
+    if (isPoolBacked(el) && typeof (el as any).setup === "function") {
+      (el as any).setup(ctx);
+    }
+  }
+}
+
 export function makeSimpleCtx(opts: SimpleCtxOptions): CKTCircuitContext {
   const branchCount = opts.branchCount ?? opts.matrixSize - opts.nodeCount;
-  const statePool = opts.statePool ?? allocateStatePool(opts.elements);
   const params: ResolvedSimulationParams = { ...DEFAULT_SIMULATION_PARAMS, ...opts.params };
   const diagnostics = opts.diagnostics ?? new DiagnosticCollector();
   const solver = opts.solver ?? new SparseSolver();
+
+  // Step 1: Construct CKTCircuitContext — this calls solver._initStructure()
+  // which wipes any previously allocated sparse handles. Therefore setup()
+  // MUST be called AFTER construction, not before.
   const ctx = new CKTCircuitContext(
     {
       nodeCount: opts.nodeCount,
       branchCount,
       matrixSize: opts.matrixSize,
       elements: opts.elements,
-      statePool,
     },
     params,
     () => {},
     solver,
   );
   ctx.diagnostics = diagnostics;
-  // Production drives loads through cktLoad(), which calls beginAssembly().
-  // Tests that call element.load(ctx.loadCtx) directly skip that driver and
-  // hit an uninitialized SparseSolver, silently corrupting its linked list.
-  // Prime any real SparseSolver here so callers get a ready-to-use ctx;
-  // stub/capture solvers (without beginAssembly) are left alone.
-  if (solver instanceof SparseSolver) {
-    solver._initStructure();
+
+  // Step 2: Run setup() on pool-backed elements. The solver is now clean
+  // (post-_initStructure). Handles allocated here survive until the next
+  // _initStructure call (never happens in normal test use).
+  if (!opts.statePool) {
+    setupElements(opts.elements, solver);
   }
+
+  // Step 3: Build state pool (assigns stateBaseOffset, calls initState).
+  const statePool = opts.statePool ?? allocateStatePool(opts.elements);
+  const numStates = statePool.state0.length;
+  ctx.statePool = statePool;
+  // Mirror allocateStateBuffers: resize dcop snapshot buffers and wire loadCtx.
+  ctx.dcopSavedState0 = new Float64Array(Math.max(numStates, 1));
+  ctx.dcopOldState0   = new Float64Array(Math.max(numStates, 1));
+  ctx.loadCtx.state0  = statePool.state0;
+  ctx.loadCtx.state1  = statePool.state1;
+
+  // Step 4: Allocate row buffers so rhs / rhsOld have correct sizes.
+  ctx.allocateRowBuffers(opts.matrixSize);
+
   return ctx;
 }
 
@@ -854,7 +906,7 @@ export function runNR(opts: SimpleNROptions): NRResult {
 }
 
 // ---------------------------------------------------------------------------
-// makeLoadCtx â€” build a fully-populated LoadContext literal for unit tests
+// makeLoadCtx  build a fully-populated LoadContext literal for unit tests
 // ---------------------------------------------------------------------------
 
 export interface MakeLoadCtxOptions {
@@ -897,7 +949,7 @@ export interface MakeLoadCtxOptions {
  *
  * Defaults:
  *   - cktMode  = MODETRAN | MODEINITFLOAT (a normal NR iteration during
- *     transient â€” produces the same bit pattern an engine drives on
+ *     transient  produces the same bit pattern an engine drives on
  *     non-init iterations).
  *   - dt = 0, order = 1, method = "trapezoidal".
  *   - rhs / rhsOld both alias `voltages` unless overridden.
@@ -941,7 +993,7 @@ export function makeLoadCtx(opts: MakeLoadCtxOptions): LoadContext {
 }
 
 // ---------------------------------------------------------------------------
-// initElement â€” wire a single element to a freshly-allocated StatePool
+// initElement  wire a single element to a freshly-allocated StatePool
 // ---------------------------------------------------------------------------
 
 /**
@@ -949,7 +1001,7 @@ export function makeLoadCtx(opts: MakeLoadCtxOptions): LoadContext {
  * element's `stateBaseOffset` to 0, and call `initState(pool)`. Required
  * before driving `element.load()` directly in unit tests for any pool-backed
  * element (capacitor, inductor, BJT, MOSFET, comparator, behavioral
- * flip-flop, etc.) â€” otherwise the element's `_pool` reference is undefined
+ * flip-flop, etc.)  otherwise the element's `_pool` reference is undefined
  * and `load()` throws `Cannot read properties of undefined (reading
  * 'states')`.
  *

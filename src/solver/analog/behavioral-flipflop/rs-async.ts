@@ -8,6 +8,7 @@ import { NGSPICE_LOAD_ORDER } from "../element.js";
 import { readMnaVoltage, delegatePinSetParam } from "../digital-pin-model.js";
 import type { DigitalInputPinModel, DigitalOutputPinModel } from "../digital-pin-model.js";
 import type { AnalogElementFactory } from "../behavioral-gate.js";
+import type { SetupContext } from "../setup-context.js";
 import type { Diagnostic } from "../../../compile/types.js";
 import { makeDiagnostic } from "../diagnostics.js";
 import type { AnalogCapacitorElement } from "../../../components/passives/capacitor.js";
@@ -65,6 +66,8 @@ export class BehavioralRSAsyncLatchElement {
   readonly stateSchema: StateSchema = FLIPFLOP_COMPOSITE_SCHEMA;
   stateSize: number;
   stateBaseOffset = -1;
+  _stateBase: number = -1;
+  _pinNodes: Map<string, number> = new Map();
 
   constructor(
     sPin: DigitalInputPinModel,
@@ -102,6 +105,10 @@ export class BehavioralRSAsyncLatchElement {
 
   getDiagnostics(): Diagnostic[] {
     return this._diagnostics;
+  }
+
+  setup(_ctx: SetupContext): void {
+    throw new Error("BehavioralRSAsyncLatchElement not yet migrated");
   }
 
   load(ctx: LoadContext): void {
@@ -179,7 +186,7 @@ export class BehavioralRSAsyncLatchElement {
  *   nodeIds[0]=S, nodeIds[1]=R, nodeIds[2]=Q, nodeIds[3]=~Q
  */
 export function makeRSAsyncLatchAnalogFactory(): AnalogElementFactory {
-  return (pinNodes, _internalNodeIds, _branchIdx, props, _getTime) => {
+  return (pinNodes, props, _getTime) => {
     const pinSpecs = getPinSpecs(props);
     const pinLoading = getPinLoading(props);
 

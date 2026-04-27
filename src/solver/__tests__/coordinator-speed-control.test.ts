@@ -176,7 +176,7 @@ describe('DefaultSimulationCoordinator -- computeFrameSteps (digital-only circui
     const unified = compileUnified(circuit, registry);
     coord = new DefaultSimulationCoordinator(unified);
   });
-  it('returns null simTimeGoal â€” no continuous time model', () => {
+  it('returns null simTimeGoal  no continuous time model', () => {
     coord.speed = 1e-3;
     const result = coord.computeFrameSteps(0.016);
     expect(result.steps).toBe(0);

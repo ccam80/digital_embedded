@@ -1,9 +1,9 @@
 ﻿/**
- * DC Voltage Source â€” ideal independent voltage source for MNA simulation.
+ * DC Voltage Source  ideal independent voltage source for MNA simulation.
  *
  * Introduces one extra MNA branch row to enforce the voltage constraint.
  * Reads `ctx.srcFact` (ngspice CKTsrcFact) directly inside load() to apply
- * DC-OP source stepping â€” matches ngspice vsrcload.c:54 exactly.
+ * DC-OP source stepping  matches ngspice vsrcload.c:54 exactly.
  *
  * MNA stamp convention (1-based node IDs, solver uses 0-based):
  *   B[nodePos, k] += 1    C[k, nodePos] += 1
@@ -42,7 +42,7 @@ export const { paramDefs: DC_VOLTAGE_SOURCE_PARAM_DEFS, defaults: DC_VOLTAGE_SOU
 });
 
 // ---------------------------------------------------------------------------
-// DcVoltageSourceElement â€” CircuitElement implementation
+// DcVoltageSourceElement  CircuitElement implementation
 // ---------------------------------------------------------------------------
 
 export class DcVoltageSourceElement extends AbstractCircuitElement {
@@ -169,6 +169,12 @@ export function makeDcVoltageSource(
     ngspiceLoadOrder: NGSPICE_LOAD_ORDER.VSRC,
     isNonlinear: false,
     isReactive: false,
+    _stateBase: -1,
+    _pinNodes: new Map<string, number>([["neg", nodeNeg], ["pos", nodePos]]),
+
+    setup(_ctx: import("../../solver/analog/setup-context.js").SetupContext): void {
+      throw new Error("PB-VSRC-DC not yet migrated");
+    },
 
     setParam(key: string, value: number): void {
       if (key in p) (p as Record<string, number>)[key] = value;
@@ -192,9 +198,9 @@ export function makeDcVoltageSource(
 
     getPinCurrents(rhs: Float64Array): number[] {
       // MNA branch variable: +I means current leaves nodePos through the branch.
-      // Pin layout order: [neg, pos] â€” neg is index 0, pos is index 1.
-      // “Into element at pos” = +I (current enters element at pos terminal).
-      // “Into element at neg” = -I (current exits element at neg terminal).
+      // Pin layout order: [neg, pos]  neg is index 0, pos is index 1.
+      // "Into element at pos" = +I (current enters element at pos terminal).
+      // "Into element at neg" = -I (current exits element at neg terminal).
       // Since pin 0 = neg and pin 1 = pos, return [-I, I].
       const I = rhs[branchIdx];
       return [-I, I];
@@ -233,16 +239,14 @@ export const DcVoltageSourceDefinition: ComponentDefinition = {
       kind: "inline",
       factory(
         pinNodes: ReadonlyMap<string, number>,
-        _internalNodeIds: readonly number[],
-        branchIdx: number,
         props: PropertyBag,
       ): AnalogElementCore {
         const voltage = props.getModelParam<number>("voltage");
-        return makeDcVoltageSource(pinNodes.get("pos")!, pinNodes.get("neg")!, branchIdx, voltage);
+        return makeDcVoltageSource(pinNodes.get("pos")!, pinNodes.get("neg")!, -1, voltage);
       },
       paramDefs: DC_VOLTAGE_SOURCE_PARAM_DEFS,
       params: DC_VOLTAGE_SOURCE_DEFAULTS,
-      branchCount: 1,
+      ngspiceNodeMap: { neg: "neg", pos: "pos" },
     },
   },
   defaultModel: "behavioral",

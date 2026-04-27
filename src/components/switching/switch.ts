@@ -1,11 +1,11 @@
 ﻿/**
- * Switch component â€” SPST switch with mechanical symbol rendering.
+ * Switch component -- SPST switch with mechanical symbol rendering.
  *
  * Like PlainSwitch but with the standard mechanical switch symbol:
  * a diagonal line for open state, straight line for closed state,
  * plus a dashed lever and grip indicator.
  *
- * Additional property: switchActsAsInput â€” when true and a label is set,
+ * Additional property: switchActsAsInput -- when true and a label is set,
  * the switch can also be driven by an external digital signal (1=closed, 0=open).
  *
  * Pattern follows the And gate exemplar exactly.
@@ -26,6 +26,7 @@ import {
 } from "../../core/registry.js";
 import type { AnalogElementCore, LoadContext } from "../../solver/analog/element.js";
 import { NGSPICE_LOAD_ORDER } from "../../solver/analog/element.js";
+import type { SetupContext } from "../../solver/analog/setup-context.js";
 import type { SparseSolver } from "../../solver/analog/sparse-solver.js";
 
 // ---------------------------------------------------------------------------
@@ -73,7 +74,7 @@ function buildPinDeclarations(poles: number, bitWidth: number): PinDeclaration[]
 }
 
 // ---------------------------------------------------------------------------
-// SwitchElement â€” CircuitElement implementation
+// SwitchElement -- CircuitElement implementation
 // ---------------------------------------------------------------------------
 
 export class SwitchElement extends AbstractCircuitElement {
@@ -112,7 +113,7 @@ export class SwitchElement extends AbstractCircuitElement {
     ctx.setColor("COMPONENT");
     ctx.setLineWidth(1);
 
-    // Contact arm line: (0,0) to (1.8,-0.5) â€” angled switch arm (open state)
+    // Contact arm line: (0,0) to (1.8,-0.5) -- angled switch arm (open state)
     ctx.drawLine(0, 0, 1.8, -0.5);
 
     // Dashed linkage line: (1,-0.25) to (1,-1.25)
@@ -144,7 +145,7 @@ export class SwitchElement extends AbstractCircuitElement {
 }
 
 // ---------------------------------------------------------------------------
-// executeSwitch â€” flat simulation function
+// executeSwitch -- flat simulation function
 //
 // Switches are handled by the bus resolution subsystem (Phase 3 task 3.2.3).
 // The closed/open state is managed by the interactive engine layer.
@@ -260,7 +261,7 @@ const SWITCH_PROPERTY_DEFS: PropertyDefinition[] = [
   {
     key: "Ron",
     type: PropertyType.FLOAT,
-    label: "Ron (Î©)",
+    label: "Ron (Î)",
     defaultValue: 1,
     min: 1e-12,
     description: "On-state resistance in ohms (analog mode)",
@@ -268,7 +269,7 @@ const SWITCH_PROPERTY_DEFS: PropertyDefinition[] = [
   {
     key: "Roff",
     type: PropertyType.FLOAT,
-    label: "Roff (Î©)",
+    label: "Roff (Î)",
     defaultValue: 1e9,
     min: 1,
     description: "Off-state resistance in ohms (analog mode)",
@@ -290,7 +291,7 @@ const SWITCH_PROPERTY_DEFS: PropertyDefinition[] = [
 ];
 
 // ---------------------------------------------------------------------------
-// Analog helpers â€” SPST variable-resistance model
+// Analog helpers -- SPST variable-resistance model
 // ---------------------------------------------------------------------------
 
 function stampConductanceSpst(
@@ -313,8 +314,6 @@ export interface SpstAnalogElement extends AnalogElementCore {
 
 function createSwitchAnalogElement(
   pinNodes: ReadonlyMap<string, number>,
-  _internalNodeIds: readonly number[],
-  _branchIdx: number,
   props: PropertyBag,
 ): SpstAnalogElement {
   const nodeA = pinNodes.get("A1")!;
@@ -323,7 +322,6 @@ function createSwitchAnalogElement(
   const roff = Math.max(props.getOrDefault<number>("Roff", 1e9), 1e-12);
   const normallyClosed = props.getOrDefault<boolean>("normallyClosed", false);
   let closed = props.getOrDefault<boolean>("closed", false);
-  // Effective state: NC inverts the meaning
   let effectivelyClosed = normallyClosed ? !closed : closed;
 
   return {
@@ -331,6 +329,12 @@ function createSwitchAnalogElement(
     ngspiceLoadOrder: NGSPICE_LOAD_ORDER.SW,
     isNonlinear: false,
     isReactive: false,
+    _stateBase: -1,
+    _pinNodes: new Map(pinNodes),
+
+    setup(_ctx: SetupContext): void {
+      throw new Error("PB-SW not yet migrated");
+    },
 
     load(ctx: LoadContext): void {
       const G = effectivelyClosed ? 1 / ron : 1 / roff;
@@ -343,8 +347,6 @@ function createSwitchAnalogElement(
     },
 
     getPinCurrents(rhs: Float64Array): number[] {
-      // Pin layout order: A1, B1.
-      // I = G * (V_A - V_B); positive = current into element at A1.
       const G = effectivelyClosed ? 1 / ron : 1 / roff;
       const vA = rhs[nodeA];
       const vB = rhs[nodeB];
@@ -382,8 +384,9 @@ export const SwitchDefinition: ComponentDefinition = {
   propertyDefs: SWITCH_PROPERTY_DEFS,
   attributeMap: SWITCH_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.SWITCHING,
+  ngspiceNodeMap: { A1: "pos", B1: "neg" },
   helpText:
-    "Switch (SPST) â€” a manually controlled single-pole single-throw switch.\n" +
+    "Switch (SPST) -- a manually controlled single-pole single-throw switch.\n" +
     "When closed, terminals A and B are connected (bus nets merged).\n" +
     "When open, terminals are disconnected.\n" +
     "Click to toggle during simulation.",
@@ -400,9 +403,10 @@ export const SwitchDefinition: ComponentDefinition = {
   modelRegistry: {
     "behavioral": {
       kind: "inline",
-      factory: createSwitchAnalogElement,
+      factory: (pinNodes, props, _getTime) => createSwitchAnalogElement(pinNodes, props),
       paramDefs: [],
       params: {},
+      ngspiceNodeMap: { A1: "pos", B1: "neg" },
     },
   },
   defaultModel: "digital",

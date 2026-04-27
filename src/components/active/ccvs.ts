@@ -62,6 +62,7 @@ import { parseExpression } from "../../solver/analog/expression.js";
 import { differentiate, simplify } from "../../solver/analog/expression-differentiate.js";
 import { ControlledSourceElement } from "../../solver/analog/controlled-source-base.js";
 import { NGSPICE_LOAD_ORDER } from "../../solver/analog/element.js";
+import type { SetupContext } from "../../solver/analog/setup-context.js";
 import { defineModelParams } from "../../core/model-params.js";
 
 // ---------------------------------------------------------------------------
@@ -136,8 +137,10 @@ function buildCCVSPinDeclarations(): PinDeclaration[] {
  * outBranchIdx = branchIdx + 1: absolute 0-based output branch row.
  */
 class CCVSAnalogElement extends ControlledSourceElement {
-  readonly branchIndex: number; // sense branch (used by AnalogElement interface)
+  branchIndex: number; // sense branch (used by AnalogElement interface)
   readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.CCVS;
+  _stateBase: number = -1;
+  _pinNodes: Map<string, number> = new Map();
 
   private readonly _nSenseP: number;
   private readonly _nSenseN: number;
@@ -169,6 +172,10 @@ class CCVSAnalogElement extends ControlledSourceElement {
     this._senseBranch = senseBranchIdx;
     this._outBranch = senseBranchIdx + 1;
     this.branchIndex = senseBranchIdx;
+  }
+
+  setup(_ctx: SetupContext): void {
+    throw new Error(`PB-CCVS not yet migrated`);
   }
 
   setParam(_key: string, _value: number): void {
@@ -384,18 +391,20 @@ export const CCVSDefinition: ComponentDefinition = {
   modelRegistry: {
     "behavioral": {
       kind: "inline",
-      factory: (pinNodes, _internalNodeIds, branchIdx, props) => {
+      factory: (pinNodes, props, _getTime) => {
         const expression = props.getOrDefault<string>("expression", "I(sense)");
         const transresistance = props.getModelParam<number>("transresistance");
-        return new CCVSAnalogElement(
+        const el = new CCVSAnalogElement(
           pinNodes.get("sense+")!,
           pinNodes.get("sense-")!,
           pinNodes.get("out+")!,
           pinNodes.get("out-")!,
-          branchIdx,
+          -1,
           expression,
           transresistance,
         );
+        el._pinNodes = new Map(pinNodes);
+        return el;
       },
       paramDefs: CCVS_PARAM_DEFS,
       params: CCVS_DEFAULTS,

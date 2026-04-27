@@ -24,6 +24,7 @@ import {
 } from "./digital-pin-model.js";
 import type { AnalogCapacitorElement } from "../../components/passives/capacitor.js";
 import type { AnalogElementFactory } from "./behavioral-gate.js";
+import type { SetupContext } from "./setup-context.js";
 import { defineStateSchema } from "./state-schema.js";
 import type { StateSchema } from "./state-schema.js";
 
@@ -84,6 +85,8 @@ export class BehavioralMuxElement {
   readonly stateSchema: StateSchema = COMBINATIONAL_COMPOSITE_SCHEMA;
   stateSize: number;
   stateBaseOffset = -1;
+  _stateBase: number = -1;
+  _pinNodes: Map<string, number> = new Map();
 
   constructor(
     selPins: DigitalInputPinModel[],
@@ -119,6 +122,15 @@ export class BehavioralMuxElement {
       child.initState(pool);
       offset += child.stateSize;
     }
+  }
+
+  setup(ctx: SetupContext): void {
+    for (const pin of this._selPins) pin.setup(ctx);
+    for (const group of this._dataPins) {
+      for (const pin of group) pin.setup(ctx);
+    }
+    for (const pin of this._outPins) pin.setup(ctx);
+    for (const child of this._childElements) child.setup(ctx);
   }
 
   load(ctx: LoadContext): void {
@@ -229,6 +241,8 @@ export class BehavioralDemuxElement {
   readonly stateSchema: StateSchema = COMBINATIONAL_COMPOSITE_SCHEMA;
   stateSize: number;
   stateBaseOffset = -1;
+  _stateBase: number = -1;
+  _pinNodes: Map<string, number> = new Map();
 
   constructor(
     selPins: DigitalInputPinModel[],
@@ -263,6 +277,13 @@ export class BehavioralDemuxElement {
       child.initState(pool);
       offset += child.stateSize;
     }
+  }
+
+  setup(ctx: SetupContext): void {
+    for (const pin of this._selPins) pin.setup(ctx);
+    this._inPin.setup(ctx);
+    for (const pin of this._outPins) pin.setup(ctx);
+    for (const child of this._childElements) child.setup(ctx);
   }
 
   load(ctx: LoadContext): void {
@@ -363,6 +384,8 @@ export class BehavioralDecoderElement {
   readonly stateSchema: StateSchema = COMBINATIONAL_COMPOSITE_SCHEMA;
   stateSize: number;
   stateBaseOffset = -1;
+  _stateBase: number = -1;
+  _pinNodes: Map<string, number> = new Map();
 
   constructor(
     selPins: DigitalInputPinModel[],
@@ -394,6 +417,12 @@ export class BehavioralDecoderElement {
       child.initState(pool);
       offset += child.stateSize;
     }
+  }
+
+  setup(ctx: SetupContext): void {
+    for (const pin of this._selPins) pin.setup(ctx);
+    for (const pin of this._outPins) pin.setup(ctx);
+    for (const child of this._childElements) child.setup(ctx);
   }
 
   load(ctx: LoadContext): void {
@@ -494,7 +523,7 @@ function resolveLoaded(props: PropertyBag, pinLabel: string, defaultLoaded: bool
  * All per-bit pin model arrays share the single bus node for their label.
  */
 export function makeBehavioralMuxAnalogFactory(selectorBits: number): AnalogElementFactory {
-  return (pinNodes, _internalNodeIds, _branchIdx, props, _getTime) => {
+  return (pinNodes, props, _getTime) => {
     const bitWidth = props.has("bitWidth") ? (props.get("bitWidth") as number) : 1;
     const inputCount = 1 << selectorBits;
 
@@ -562,7 +591,7 @@ export function makeBehavioralMuxAnalogFactory(selectorBits: number): AnalogElem
  * All selector bit pins share the single "sel" bus node.
  */
 export function makeBehavioralDemuxAnalogFactory(selectorBits: number): AnalogElementFactory {
-  return (pinNodes, _internalNodeIds, _branchIdx, props, _getTime) => {
+  return (pinNodes, props, _getTime) => {
     const outputCount = 1 << selectorBits;
 
     // All selector bit pins share the single "sel" bus node
@@ -619,7 +648,7 @@ export function makeBehavioralDemuxAnalogFactory(selectorBits: number): AnalogEl
  * Decoder outputs are always 1-bit (no bitWidth property).
  */
 export function makeBehavioralDecoderAnalogFactory(selectorBits: number): AnalogElementFactory {
-  return (pinNodes, _internalNodeIds, _branchIdx, props, _getTime) => {
+  return (pinNodes, props, _getTime) => {
     const outputCount = 1 << selectorBits;
 
     // All selector bit pins share the single "sel" bus node

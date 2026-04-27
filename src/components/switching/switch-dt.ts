@@ -1,5 +1,5 @@
 ﻿/**
- * SwitchDT component â€” SPDT switch with mechanical symbol rendering.
+ * SwitchDT component -- SPDT switch with mechanical symbol rendering.
  *
  * Double-throw switch: three terminals per pole (A=common, B=upper, C=lower).
  * When closed=true: A-B are connected, A-C are disconnected.
@@ -27,6 +27,7 @@ import {
 } from "../../core/registry.js";
 import type { AnalogElementCore, LoadContext } from "../../solver/analog/element.js";
 import { NGSPICE_LOAD_ORDER } from "../../solver/analog/element.js";
+import type { SetupContext } from "../../solver/analog/setup-context.js";
 import type { SparseSolver } from "../../solver/analog/sparse-solver.js";
 
 // ---------------------------------------------------------------------------
@@ -89,7 +90,7 @@ function buildPinDeclarations(poles: number, bitWidth: number): PinDeclaration[]
 }
 
 // ---------------------------------------------------------------------------
-// SwitchDTElement â€” CircuitElement implementation
+// SwitchDTElement -- CircuitElement implementation
 // ---------------------------------------------------------------------------
 
 export class SwitchDTElement extends AbstractCircuitElement {
@@ -112,7 +113,7 @@ export class SwitchDTElement extends AbstractCircuitElement {
   getBoundingBox(): Rect {
     const poles = this._properties.getOrDefault<number>("poles", 1);
     const h = componentHeight(poles);
-    // Thin bar at (0.5,-0.75)â†’(1.5,-0.75); contact arm to (1.8,0.5); pole stub to (2,1).
+    // Thin bar at (0.5,-0.75)->(1.5,-0.75); contact arm to (1.8,0.5); pole stub to (2,1).
     // MinX=0, MaxX=2, MinY=-0.75, MaxY=max(h, 1).
     return {
       x: this.position.x,
@@ -129,7 +130,7 @@ export class SwitchDTElement extends AbstractCircuitElement {
     ctx.setColor("COMPONENT");
     ctx.setLineWidth(1);
 
-    // Pole stub (open L): (2,1) â†’ (1.75,1) â†’ (1.75,0.6) â€” use drawPath so the
+    // Pole stub (open L): (2,1) -> (1.75,1) -> (1.75,0.6) -- use drawPath so the
     // rasterizer treats it as an open polyline matching the Java fixture (closed=false).
     ctx.drawPath({ operations: [
       { op: "moveTo", x: 2, y: 1 },
@@ -168,7 +169,7 @@ export class SwitchDTElement extends AbstractCircuitElement {
 }
 
 // ---------------------------------------------------------------------------
-// executeSwitchDT â€” flat simulation function
+// executeSwitchDT -- flat simulation function
 //
 // SPDT switches are handled by the bus resolution subsystem (Phase 3).
 // The switch state is managed by the interactive engine layer.
@@ -272,7 +273,7 @@ const SWITCH_DT_PROPERTY_DEFS: PropertyDefinition[] = [
   {
     key: "Ron",
     type: PropertyType.FLOAT,
-    label: "Ron (Î©)",
+    label: "Ron (Î)",
     defaultValue: 1,
     min: 1e-12,
     description: "On-state resistance in ohms (analog mode)",
@@ -280,7 +281,7 @@ const SWITCH_DT_PROPERTY_DEFS: PropertyDefinition[] = [
   {
     key: "Roff",
     type: PropertyType.FLOAT,
-    label: "Roff (Î©)",
+    label: "Roff (Î)",
     defaultValue: 1e9,
     min: 1,
     description: "Off-state resistance in ohms (analog mode)",
@@ -302,7 +303,7 @@ const SWITCH_DT_PROPERTY_DEFS: PropertyDefinition[] = [
 ];
 
 // ---------------------------------------------------------------------------
-// Analog helpers â€” SPDT variable-resistance model
+// Analog helpers -- SPDT variable-resistance model
 // ---------------------------------------------------------------------------
 
 function stampConductanceSpdt(
@@ -325,8 +326,6 @@ export interface SpdtAnalogElement extends AnalogElementCore {
 
 function createSwitchDTAnalogElement(
   pinNodes: ReadonlyMap<string, number>,
-  _internalNodeIds: readonly number[],
-  _branchIdx: number,
   props: PropertyBag,
 ): SpdtAnalogElement {
   const nodeCommon = pinNodes.get("A1")!;
@@ -336,7 +335,6 @@ function createSwitchDTAnalogElement(
   const roff = Math.max(props.getOrDefault<number>("Roff", 1e9), 1e-12);
   const normallyClosed = props.getOrDefault<boolean>("normallyClosed", false);
   let closed = props.getOrDefault<boolean>("closed", false);
-  // Effective state: NC inverts the meaning
   let effectivelyClosed = normallyClosed ? !closed : closed;
 
   return {
@@ -344,6 +342,12 @@ function createSwitchDTAnalogElement(
     ngspiceLoadOrder: NGSPICE_LOAD_ORDER.SW,
     isNonlinear: false,
     isReactive: false,
+    _stateBase: -1,
+    _pinNodes: new Map(pinNodes),
+
+    setup(_ctx: SetupContext): void {
+      throw new Error("PB-SW-DT not yet migrated");
+    },
 
     load(ctx: LoadContext): void {
       const solver = ctx.solver;
@@ -364,10 +368,6 @@ function createSwitchDTAnalogElement(
     },
 
     getPinCurrents(rhs: Float64Array): number[] {
-      // Pin layout order: A1 (common), B1, C1.
-      // When effectivelyClosed: A-B on (Gon), A-C off (Goff).
-      // When !effectivelyClosed: A-B off (Goff), A-C on (Gon).
-      // Positive = current into element at each terminal.
       const Gon = 1 / ron;
       const Goff = 1 / roff;
       const GAB = effectivelyClosed ? Gon : Goff;
@@ -411,7 +411,7 @@ export const SwitchDTDefinition: ComponentDefinition = {
   attributeMap: SWITCH_DT_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.SWITCHING,
   helpText:
-    "Switch DT (SPDT) â€” a manually controlled single-pole double-throw switch.\n" +
+    "Switch DT (SPDT) -- a manually controlled single-pole double-throw switch.\n" +
     "Common terminal A connects to B when closed, to C when open.\n" +
     "Net merging/splitting handled by bus resolution subsystem.\n" +
     "Click to toggle during simulation.",
@@ -428,7 +428,7 @@ export const SwitchDTDefinition: ComponentDefinition = {
   modelRegistry: {
     "behavioral": {
       kind: "inline",
-      factory: createSwitchDTAnalogElement,
+      factory: (pinNodes, props, _getTime) => createSwitchDTAnalogElement(pinNodes, props),
       paramDefs: [],
       params: {},
     },

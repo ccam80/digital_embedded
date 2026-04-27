@@ -1,5 +1,5 @@
 ﻿/**
- * ComparisonSession â€” pairs an "our engine" CaptureSession against an
+ * ComparisonSession  pairs an "our engine" CaptureSession against an
  * ngspice reference CaptureSession by step index and exposes shape,
  * divergence, and trace queries over the paired result. In self-compare
  * mode the ngspice side is a deep clone of the our side for zero-drift
@@ -102,7 +102,7 @@ function _zeroDcopCoefficients(): IntegrationCoefficients {
  * Compute rhs, residual, residualInfinityNorm, and the full dense matrix
  * from an IterationSnapshot's sparse matrix entries, input voltages, and preSolveRhs.
  *
- * The input voltages are `iter.prevVoltages` â€” the iterate fed INTO this NR iteration
+ * The input voltages are `iter.prevVoltages`  the iterate fed INTO this NR iteration
  * (post-solve of iter-1, or the initial guess for iter 0). Using `iter.voltages` (the
  * POST-solve result of this iteration) would make the residual identically zero to LU
  * precision, defeating its diagnostic value.
@@ -517,7 +517,7 @@ export class ComparisonSession {
   /**
    * Run DC operating point comparison.
    *
-   * Invokes coordinator.dcOperatingPoint() â€” standalone `.op` (MODEDCOP),
+   * Invokes coordinator.dcOperatingPoint()  standalone `.op` (MODEDCOP),
    * matching ngspice `dcop.c::DCop`. The capture hook collects per-NR-iter
    * snapshots into _stepCapture; this method then closes step 0 and snapshots
    * the result as _ourSession before running the ngspice side (or deep-cloning
@@ -542,7 +542,7 @@ export class ComparisonSession {
         analysisPhase: "dcop",
         acceptedAttemptIndex: -1,
         order: this._engine.integrationOrder,
-        // cktdojob.c:117 â€” the dispatcher zeroes CKTdelta at job entry, and
+        // cktdojob.c:117  the dispatcher zeroes CKTdelta at job entry, and
         // dcop.c::DCop never writes it. The harness IS the dispatcher
         // equivalent here, so the captured CKTdelta during a standalone .op
         // step is 0. Do not read _engine.currentDt: that field belongs to
@@ -601,15 +601,15 @@ export class ComparisonSession {
     this._analysis = "tran";
     this._comparisons = null;
 
-    // ngspice CKTstep â†” our outputStep, ngspice CKTmaxStep â†” our maxTimeStep.
+    // ngspice CKTstep â†" our outputStep, ngspice CKTmaxStep â†" our maxTimeStep.
     // The two are independent ngspice .tran fields (TSTEP and TMAX) and govern
-    // different things â€” see ngspice-bridge.ts runTran() for the cite. Earlier
+    // different things  see ngspice-bridge.ts runTran() for the cite. Earlier
     // versions of this harness sent `maxStep` as TSTEP and `tStop/100` as the
     // engine's outputStep, which silently desynced ngspice's `CKTstep`-driven
     // `delta = MIN(CKTfinalTime/100, CKTstep)/10` (dctran.c:118) from our
     // `firstStep = computeFirstStep(tStop, outputStep)`. The bug is invisible
     // when `tStop/100 == maxStep` (the MIN picks the same value either way)
-    // and visible otherwise â€” most starkly on RLC where tStop/100=4e-5 but
+    // and visible otherwise  most starkly on RLC where tStop/100=4e-5 but
     // maxStep=1e-6.
     const tstep = tStop / 100;
     const cfg: Partial<SimulationParams> = { tStop, outputStep: tstep, initTime: tStart };
@@ -639,7 +639,7 @@ export class ComparisonSession {
           // _engine.currentDt was advanced to next-dt by computeNewDt
           // (analog-engine.ts:668); _engine.lastDt is the just-used value
           // (line 665). ngspice captures CKTdelta at the iteration moment,
-          // which is the used-dt â€” match that.
+          // which is the used-dt  match that.
           delta: this._engine.lastDt,
         });
         this.errors.push(`Our engine failed at step ${s}: ${e.message}`);
@@ -648,7 +648,7 @@ export class ComparisonSession {
 
       // Derive post-step time from the engine's accepted dt rather than
       // snapshotting simTime directly. `_engine.lastDt` is the dt that was
-      // actually accepted by this step() call (see MNAEngine.step() â€” set
+      // actually accepted by this step() call (see MNAEngine.step()  set
       // via `this._lastDt = dt` immediately before _timestep.accept()),
       // and `_engine.simTime` is updated at the end of step() to reflect
       // post-step committed time. Using `prevSimTime + lastDt` keeps this
@@ -671,7 +671,7 @@ export class ComparisonSession {
           // _engine.currentDt was advanced to next-dt by computeNewDt
           // (analog-engine.ts:668); _engine.lastDt is the just-used value
           // (line 665). ngspice captures CKTdelta at the iteration moment,
-          // which is the used-dt â€” match that. lteDt below carries the
+          // which is the used-dt  match that. lteDt below carries the
           // next-step proposal separately.
           delta: this._engine.lastDt,
           ...(hasLte ? { lteDt: lteDtValue } : {}),
@@ -886,7 +886,7 @@ export class ComparisonSession {
   }
 
   /**
-   * Per-iteration data for a step â€” uses accepted attempt iterations (spec Â§9.2).
+   * Per-iteration data for a step  uses accepted attempt iterations (spec Â§9.2).
    */
   getIterations(stepIndex: number): IterationReport[] {
     this._ensureRun();
@@ -1615,7 +1615,7 @@ export class ComparisonSession {
     // Pair attempts by (phase, role) composite key, then emit rows in
     // chronological order by interleaving both sequences by their absolute index.
     type Entry = { a: NRAttempt; i: number; key: string };
-    // Use role as the sole pairing key when present â€” this allows cross-phase pairing
+    // Use role as the sole pairing key when present  this allows cross-phase pairing
     // (e.g. our tranInit::tranSolve matches ngspice's tranNR::tranSolve). Fall back to
     // phase-only for untagged attempts to preserve existing DC OP pairing behaviour.
     const makeKey = (a: NRAttempt): string =>
@@ -1626,7 +1626,7 @@ export class ComparisonSession {
     const ourEntries: Entry[] = ourAtts.map((a, i) => ({ a, i, key: makeKey(a) }));
     const ngEntries:  Entry[] = ngAtts.map((a, i)  => ({ a, i, key: makeKey(a) }));
 
-    // Build a map from key â†’ list of ngspice entries (in order) for O(1) lookup
+    // Build a map from key  list of ngspice entries (in order) for O(1) lookup
     const ngByKey = new Map<string, Entry[]>();
     for (const e of ngEntries) {
       let list = ngByKey.get(e.key);
@@ -1665,7 +1665,7 @@ export class ComparisonSession {
 
         if (matchNg) {
           // Before emitting the paired row, flush any unconsumed ng entries whose
-          // absolute index is less than the match â€” preserves chronological order.
+          // absolute index is less than the match  preserves chronological order.
           while (ni < matchNg.i) {
             if (!ngConsumed.has(ni)) {
               const skipped = ngEntries[ni]!;
@@ -1714,7 +1714,7 @@ export class ComparisonSession {
 
         if (matchOurs) {
           // Before emitting the paired row, flush any unconsumed ours entries whose
-          // absolute index is less than the match â€” preserves chronological order.
+          // absolute index is less than the match  preserves chronological order.
           while (oi < matchOurs.i) {
             if (!ourConsumed.has(oi)) {
               const skipped = ourEntries[oi]!;
@@ -2906,7 +2906,7 @@ export class ComparisonSession {
     // Use the JS number's own string form so SPICE's strtod parses the same
     // IEEE-754 double we hold here. Engineering suffixes ("10u", "1m") trigger
     // SPICE-side `magnitude * 1e-N` multiplications that introduce 1-ULP
-    // mismatches against the JS literal â€” e.g. SPICE "10u" â†’ 10 * 1e-6 =
+    // mismatches against the JS literal  e.g. SPICE "10u"  10 * 1e-6 =
     // 0x3ee4f8b588e368f0, while JS `10e-6` === `1e-5` = 0x3ee4f8b588e368f1
     // (1 ULP higher). Plain decimal / scientific text round-trips exactly.
     return seconds.toString();

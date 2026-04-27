@@ -28,6 +28,9 @@ import {
   type ComponentLayout,
 } from "../../core/registry.js";
 import type { FETLayout } from "./nfet.js";
+import type { AnalogElementCore, LoadContext } from "../../solver/analog/element.js";
+import { NGSPICE_LOAD_ORDER } from "../../solver/analog/element.js";
+import type { SetupContext } from "../../solver/analog/setup-context.js";
 
 // ---------------------------------------------------------------------------
 // Layout constants
@@ -187,6 +190,49 @@ export function executeTransGate(index: number, state: Uint32Array, highZs: Uint
 }
 
 // ---------------------------------------------------------------------------
+// TransGateAnalogElement — MNA element stub
+//
+// Composite: NFET SW + PFET SW sub-elements sharing the same in↔out signal
+// path. setup() and load() are stubbed; the full migration is tracked in
+// spec/setup-load-split/components/PB-TRANSGATE.md.
+// ---------------------------------------------------------------------------
+
+class TransGateAnalogElement implements AnalogElementCore {
+  readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.SW;
+  readonly isNonlinear: boolean = true;
+  readonly isReactive: boolean = false;
+  branchIndex: number = -1;
+  _stateBase: number = -1;
+  _pinNodes: Map<string, number>;
+
+  constructor(pinNodes: ReadonlyMap<string, number>) {
+    this._pinNodes = new Map(pinNodes);
+  }
+
+  setup(_ctx: SetupContext): void {
+    throw new Error("PB-TRANSGATE not yet migrated");
+  }
+
+  load(_ctx: LoadContext): void {
+    throw new Error("PB-TRANSGATE not yet migrated");
+  }
+
+  getPinCurrents(_rhs: Float64Array): number[] {
+    return [0, 0, 0, 0];
+  }
+
+  setParam(_key: string, _value: number): void {}
+}
+
+function createTransGateAnalogElement(
+  pinNodes: ReadonlyMap<string, number>,
+  _props: PropertyBag,
+  _getTime: () => number,
+): AnalogElementCore {
+  return new TransGateAnalogElement(pinNodes);
+}
+
+// ---------------------------------------------------------------------------
 // Attribute mappings and property definitions
 // ---------------------------------------------------------------------------
 
@@ -238,5 +284,12 @@ export const TransGateDefinition: ComponentDefinition = {
       defaultDelay: 0,
     },
   },
-  modelRegistry: {},
+  modelRegistry: {
+    "behavioral": {
+      kind: "inline",
+      factory: createTransGateAnalogElement,
+      paramDefs: [],
+      params: {},
+    },
+  },
 };

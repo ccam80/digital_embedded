@@ -1,9 +1,9 @@
 ﻿/**
- * Diac analog component â€” bidirectional trigger diode.
+ * Diac analog component  bidirectional trigger diode.
  *
  * Blocks in both directions until |V| exceeds breakover voltage V_BO,
  * then conducts with a negative-resistance snap (voltage drops to V_hold).
- * Symmetric device â€” no gate terminal.
+ * Symmetric device  no gate terminal.
  *
  * I-V model (piecewise smooth with tanh for NR stability):
  *   - Blocking region (|V| < V_BO): high resistance R_off
@@ -45,15 +45,15 @@ const GMIN = 1e-12;
 
 export const { paramDefs: DIAC_PARAM_DEFS, defaults: DIAC_PARAM_DEFAULTS } = defineModelParams({
   primary: {
-    vBreakover: { default: 32,  unit: "V", description: "Breakover voltage â€” conduction threshold" },
+    vBreakover: { default: 32,  unit: "V", description: "Breakover voltage  conduction threshold" },
     vHold:      { default: 28,  unit: "V", description: "On-state holding voltage" },
-    rOn:        { default: 10,  unit: "Î©", description: "On-state resistance" },
-    rOff:       { default: 1e7, unit: "Î©", description: "Off-state resistance" },
+    rOn:        { default: 10,  unit: "Î", description: "On-state resistance" },
+    rOff:       { default: 1e7, unit: "Î", description: "Off-state resistance" },
   },
 });
 
 // ---------------------------------------------------------------------------
-// diacConductance â€” smooth piecewise model
+// diacConductance  smooth piecewise model
 // ---------------------------------------------------------------------------
 
 /**
@@ -112,13 +112,11 @@ function diacModel(
 }
 
 // ---------------------------------------------------------------------------
-// createDiacElement â€” AnalogElement factory
+// createDiacElement  AnalogElement factory
 // ---------------------------------------------------------------------------
 
 export function createDiacElement(
   pinNodes: ReadonlyMap<string, number>,
-  _internalNodeIds: readonly number[],
-  _branchIdx: number,
   props: PropertyBag,
 ): AnalogElementCore {
   const nodeA = pinNodes.get("A")!; // terminal A
@@ -150,9 +148,15 @@ export function createDiacElement(
 
   return {
     branchIndex: -1,
+    _stateBase: -1,
+    _pinNodes: new Map(pinNodes),
     ngspiceLoadOrder: NGSPICE_LOAD_ORDER.DIO,
     isNonlinear: true,
     isReactive: false,
+
+    setup(_ctx: import("../../solver/analog/setup-context.js").SetupContext): void {
+      throw new Error("PB-DIAC not yet migrated");
+    },
 
     load(ctx: LoadContext): void {
       const voltages = ctx.rhsOld;
@@ -196,7 +200,7 @@ export function createDiacElement(
 }
 
 // ---------------------------------------------------------------------------
-// DiacElement â€” CircuitElement implementation
+// DiacElement  CircuitElement implementation
 // ---------------------------------------------------------------------------
 
 export class DiacElement extends AbstractCircuitElement {
@@ -335,15 +339,14 @@ export const DiacDefinition: ComponentDefinition = {
   attributeMap: DIAC_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.SEMICONDUCTORS,
   helpText:
-    "Diac â€” bidirectional trigger diode.\n" +
+    "Diac  bidirectional trigger diode.\n" +
     "Pins: A (terminal 1), B (terminal 2).\n" +
     "Blocks until |V| > V_breakover, then snaps to V_hold.",
   models: {},
   modelRegistry: {
     "behavioral": {
       kind: "inline",
-      factory: (pinNodes, internalNodeIds, branchIdx, props, _getTime) =>
-        createDiacElement(pinNodes, internalNodeIds, branchIdx, props),
+      factory: createDiacElement,
       paramDefs: DIAC_PARAM_DEFS,
       params: DIAC_PARAM_DEFAULTS,
     },

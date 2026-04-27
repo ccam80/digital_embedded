@@ -1,5 +1,5 @@
 ﻿/**
- * NTC Thermistor â€” negative temperature coefficient temperature-dependent resistor.
+ * NTC Thermistor  negative temperature coefficient temperature-dependent resistor.
  *
  * Resistance model:
  *   B-parameter: R(T) = Râ‚€ Â· exp(B Â· (1/T - 1/Tâ‚€))
@@ -18,12 +18,14 @@
  *   branchIndex    = -1
  *
  * Unified load() pipeline:
- *   load(ctx)  â€” stamps conductance 1/R(T) between terminals every NR iteration
- *   accept(ctx, ...) â€” integrates thermal ODE after an accepted timestep when selfHeating
+ *   load(ctx)   stamps conductance 1/R(T) between terminals every NR iteration
+ *   accept(ctx, ...)  integrates thermal ODE after an accepted timestep when selfHeating
  */
 
-import type { AnalogElementCore, LoadContext } from "../../solver/analog/element.js";
-import { NGSPICE_LOAD_ORDER } from "../../solver/analog/element.js";
+import type { AnalogElementCore } from "../../core/analog-types.js";
+import { NGSPICE_LOAD_ORDER } from "../../core/analog-types.js";
+import type { LoadContext } from "../../solver/analog/load-context.js";
+import type { SetupContext } from "../../solver/analog/setup-context.js";
 import { PropertyBag, PropertyType } from "../../core/properties.js";
 import type { PropertyDefinition } from "../../core/properties.js";
 import {
@@ -43,7 +45,7 @@ import { PinDirection } from "../../core/pin.js";
 // ---------------------------------------------------------------------------
 
 const MIN_RESISTANCE = 1e-12;
-const MIN_TEMPERATURE = 1.0; // 1 K â€” prevent division by zero
+const MIN_TEMPERATURE = 1.0; // 1 K  prevent division by zero
 
 // ---------------------------------------------------------------------------
 // Model parameter declarations
@@ -51,7 +53,7 @@ const MIN_TEMPERATURE = 1.0; // 1 K â€” prevent division by zero
 
 export const { paramDefs: NTC_PARAM_DEFS, defaults: NTC_DEFAULTS } = defineModelParams({
   primary: {
-    r0:          { default: 10000,  unit: "Î©",   description: "Resistance at reference temperature Tâ‚€" },
+    r0:          { default: 10000,  unit: "Î",   description: "Resistance at reference temperature Tâ‚€" },
     beta:        { default: 3950,   unit: "K",   description: "B-parameter (material constant) in Kelvin" },
     temperature: { default: 298.15, unit: "K",   description: "Operating temperature in Kelvin" },
   },
@@ -80,21 +82,21 @@ function bParameterResistance(r0: number, beta: number, t0: number, t: number): 
  *   1/T = A + BÂ·ln(R) + CÂ·(ln(R))Â³
  *
  * Given T, we invert numerically: binary-search R such that S-H gives back T.
- * Search range: [1 Î©, 10 MÎ©] â€” covers all practical NTC values.
+ * Search range: [1 Î, 10 MÎ]  covers all practical NTC values.
  */
 function steinhartHartResistance(shA: number, shB: number, shC: number, t: number): number {
   const tClamped = Math.max(t, MIN_TEMPERATURE);
   const target = 1 / tClamped;
 
   // Binary search over ln(R)
-  let lo = Math.log(1);        // ln(1 Î©)
-  let hi = Math.log(1e7);      // ln(10 MÎ©)
+  let lo = Math.log(1);        // ln(1 Î)
+  let hi = Math.log(1e7);      // ln(10 MÎ)
 
   for (let iter = 0; iter < 60; iter++) {
     const mid = (lo + hi) / 2;
     const val = shA + shB * mid + shC * mid * mid * mid;
     if (val > target) {
-      hi = mid; // 1/T too large â†’ ln(R) too large â†’ reduce upper bound
+      hi = mid; // 1/T too large  ln(R) too large  reduce upper bound
     } else {
       lo = mid;
     }
@@ -104,7 +106,7 @@ function steinhartHartResistance(shA: number, shB: number, shC: number, t: numbe
 }
 
 // ---------------------------------------------------------------------------
-// NTCThermistorElement â€” MNA implementation
+// NTCThermistorElement  MNA implementation
 // ---------------------------------------------------------------------------
 
 export class NTCThermistorElement implements AnalogElementCore {
@@ -113,6 +115,8 @@ export class NTCThermistorElement implements AnalogElementCore {
   readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.RES;
   readonly isNonlinear: boolean = true;
   readonly isReactive: boolean;
+  _stateBase: number = -1;
+  _pinNodes: Map<string, number> = new Map();
 
   private readonly _p: Record<string, number>;
   private readonly _selfHeating: boolean;
@@ -161,6 +165,10 @@ export class NTCThermistorElement implements AnalogElementCore {
     this.isReactive = selfHeating;
   }
 
+  setup(_ctx: SetupContext): void {
+    throw new Error("PB-NTC not yet migrated");
+  }
+
   setParam(key: string, value: number): void {
     if (key in this._p) this._p[key] = value;
   }
@@ -183,7 +191,7 @@ export class NTCThermistorElement implements AnalogElementCore {
     );
   }
 
-  /** Current temperature in Kelvin â€” exposed for testing. */
+  /** Current temperature in Kelvin  exposed for testing. */
   get temperature(): number {
     return this._p.temperature;
   }
@@ -244,9 +252,7 @@ export class NTCThermistorElement implements AnalogElementCore {
 // ---------------------------------------------------------------------------
 
 export function createNTCThermistorElement(
-  _pinNodes: ReadonlyMap<string, number>,
-  _internalNodeIds: readonly number[],
-  _branchIdx: number,
+  pinNodes: ReadonlyMap<string, number>,
   props: PropertyBag,
   _getTime: () => number,
 ): AnalogElementCore {
@@ -260,7 +266,7 @@ export function createNTCThermistorElement(
   const shA = props.has("shA") ? props.getOrDefault<number>("shA", 0) : undefined;
   const shB = props.has("shB") ? props.getOrDefault<number>("shB", 0) : undefined;
   const shC = props.has("shC") ? props.getOrDefault<number>("shC", 0) : undefined;
-  return new NTCThermistorElement(
+  const el = new NTCThermistorElement(
     r0,
     beta,
     t0,
@@ -272,6 +278,8 @@ export function createNTCThermistorElement(
     shB,
     shC,
   );
+  el._pinNodes = new Map(pinNodes);
+  return el;
 }
 
 // ---------------------------------------------------------------------------
@@ -302,7 +310,7 @@ function buildNTCPinDeclarations(): PinDeclaration[] {
 }
 
 // ---------------------------------------------------------------------------
-// NTCThermistorCircuitElement â€” editor/visual layer
+// NTCThermistorCircuitElement  editor/visual layer
 // ---------------------------------------------------------------------------
 
 export class NTCThermistorCircuitElement extends AbstractCircuitElement {
@@ -339,8 +347,8 @@ export class NTCThermistorCircuitElement extends AbstractCircuitElement {
     ctx.save();
     ctx.setLineWidth(1);
 
-    // Lead lines: (0,0)â†’(1,0) and (3,0)â†’(4,0)
-    // Zigzag body spanning x=1â†’x=3, Â±0.375gu amplitude
+    // Lead lines: (0,0)(1,0) and (3,0)(4,0)
+    // Zigzag body spanning x=1x=3, Â±0.375gu amplitude
     const pts: Array<{ x: number; y: number }> = [
       { x: 0, y: 0 },
       { x: 1, y: 0 },
@@ -356,7 +364,7 @@ export class NTCThermistorCircuitElement extends AbstractCircuitElement {
       { x: 4, y: 0 },
     ];
 
-    // Zigzag gradient from posâ†’neg
+    // Zigzag gradient from posneg
     if (hasVoltage && ctx.setLinearGradient) {
       ctx.setLinearGradient(0, 0, 4, 0, [
         { offset: 0, color: signals!.voltageColor(vPos!) },
@@ -369,7 +377,7 @@ export class NTCThermistorCircuitElement extends AbstractCircuitElement {
       ctx.drawLine(pts[i].x, pts[i].y, pts[i + 1].x, pts[i + 1].y);
     }
 
-    // NTC hockey stick: horizontal then diagonal â€” temperature indicator decoration
+    // NTC hockey stick: horizontal then diagonal  temperature indicator decoration
     ctx.setColor("COMPONENT");
     ctx.drawLine(0.625, 0.75, 1.375, 0.75);
     ctx.drawLine(1.375, 0.75, 3, -0.75);
@@ -461,7 +469,7 @@ export const NTCThermistorDefinition: ComponentDefinition = {
   attributeMap: NTC_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.PASSIVES,
   helpText:
-    "NTC Thermistor â€” negative temperature coefficient resistor. " +
+    "NTC Thermistor  negative temperature coefficient resistor. " +
     "Resistance decreases exponentially with temperature (B-parameter model).",
   models: {},
   modelRegistry: {

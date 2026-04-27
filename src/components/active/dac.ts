@@ -1,5 +1,5 @@
 ﻿/**
- * DAC â€” N-bit Digital-to-Analog Converter.
+ * DAC  N-bit Digital-to-Analog Converter.
  *
  * Converts an N-bit digital input code to an analog output voltage.
  * Digital inputs are read via DigitalInputPinModel threshold detection.
@@ -10,17 +10,17 @@
  *   V_out = V_ref Â· (2Â·code/2^N - 1)   (bipolar, symmetric about 0)
  *
  * Output Norton stamp:
- *   G_out = 1/R_out  â†’ diagonal at nOut
- *   I_out = V_out Â· G_out â†’ RHS at nOut
+ *   G_out = 1/R_out   diagonal at nOut
+ *   I_out = V_out Â· G_out  RHS at nOut
  *
  * Pin order (nodeIds):
  *   [D0, D1, ..., D(N-1), VREF, OUT, GND]
  *
  * Indices in nodeIds array:
- *   0 .. N-1    â†’ digital input pins D0..D(N-1)
- *   N           â†’ VREF
- *   N+1         â†’ OUT
- *   N+2         â†’ GND
+ *   0 .. N-1     digital input pins D0..D(N-1)
+ *   N            VREF
+ *   N+1          OUT
+ *   N+2          GND
  */
 
 import { AbstractCircuitElement } from "../../core/element.js";
@@ -37,6 +37,7 @@ import {
 } from "../../core/registry.js";
 import type { LoadContext, StatePoolRef, PoolBackedAnalogElementCore } from "../../solver/analog/element.js";
 import { NGSPICE_LOAD_ORDER } from "../../solver/analog/element.js";
+import type { SetupContext } from "../../solver/analog/setup-context.js";
 import { stampRHS } from "../../solver/analog/stamp-helpers.js";
 import { collectPinModelChildren, DigitalInputPinModel } from "../../solver/analog/digital-pin-model.js";
 import type { ResolvedPinElectrical } from "../../core/pin-electrical.js";
@@ -55,26 +56,26 @@ export const { paramDefs: DAC_PARAM_DEFS, defaults: DAC_DEFAULTS } = defineModel
   primary: {
     vIH: { default: 2.0, unit: "V", description: "Input HIGH threshold voltage" },
     vIL: { default: 0.8, unit: "V", description: "Input LOW threshold voltage" },
-    rOut: { default: 100, unit: "Î©", description: "Output impedance" },
+    rOut: { default: 100, unit: "Î", description: "Output impedance" },
   },
   secondary: {
-    rIn: { default: 1e7, unit: "Î©", description: "Digital input impedance" },
+    rIn: { default: 1e7, unit: "Î", description: "Digital input impedance" },
     cIn: { default: 5e-12, unit: "F", description: "Digital input capacitance" },
   },
 });
 
 // ---------------------------------------------------------------------------
-// Pin declarations â€” variable N, built at factory time
+// Pin declarations  variable N, built at factory time
 // ---------------------------------------------------------------------------
 
 /**
  * Build pin declarations for an N-bit DAC.
  *
  * Layout:
- *   D0..D(N-1) â€” digital inputs on the left side, stacked vertically
- *   VREF       â€” voltage reference input
- *   OUT        â€” analog output (right side)
- *   GND        â€” ground reference
+ *   D0..D(N-1)  digital inputs on the left side, stacked vertically
+ *   VREF        voltage reference input
+ *   OUT         analog output (right side)
+ *   GND         ground reference
  */
 function buildDACPinDeclarations(bits: number): PinDeclaration[] {
   // Layout: D pins on left at y=0..N-1, OUT right-center,
@@ -95,7 +96,7 @@ function buildDACPinDeclarations(bits: number): PinDeclaration[] {
     });
   }
 
-  // VREF â€” top center
+  // VREF  top center
   pins.push({
     kind: "signal",
     direction: PinDirection.INPUT,
@@ -106,7 +107,7 @@ function buildDACPinDeclarations(bits: number): PinDeclaration[] {
     isClockCapable: false,
   });
 
-  // OUT â€” right side, vertically centered
+  // OUT  right side, vertically centered
   pins.push({
     kind: "signal",
     direction: PinDirection.OUTPUT,
@@ -117,7 +118,7 @@ function buildDACPinDeclarations(bits: number): PinDeclaration[] {
     isClockCapable: false,
   });
 
-  // GND â€” bottom center
+  // GND  bottom center
   pins.push({
     kind: "signal",
     direction: PinDirection.INPUT,
@@ -132,7 +133,7 @@ function buildDACPinDeclarations(bits: number): PinDeclaration[] {
 }
 
 // ---------------------------------------------------------------------------
-// DACElement â€” CircuitElement implementation
+// DACElement  CircuitElement implementation
 // ---------------------------------------------------------------------------
 
 export class DACElement extends AbstractCircuitElement {
@@ -173,19 +174,19 @@ export class DACElement extends AbstractCircuitElement {
     // Body rectangle: (1, -1) to (5, bits), width=4, height=bits+1
     ctx.drawRect(1, -1, 4, bits + 1, false);
 
-    // Left-side leads: D0..D(N-1) pin tip (0,i) â†’ body edge (1,i)
-    // (leads drawn as simple lines in COMPONENT color â€” no voltage coloring for digital inputs)
+    // Left-side leads: D0..D(N-1) pin tip (0,i)  body edge (1,i)
+    // (leads drawn as simple lines in COMPONENT color  no voltage coloring for digital inputs)
     for (let i = 0; i < bits; i++) {
       ctx.drawLine(0, i, 1, i);
     }
 
-    // VREF lead (north): pin tip (3,-2) â†’ body edge (3,-1)
+    // VREF lead (north): pin tip (3,-2)  body edge (3,-1)
     ctx.drawLine(3, -2, 3, -1);
 
-    // OUT lead (east): pin tip (6,outY) â†’ body edge (5,outY)
+    // OUT lead (east): pin tip (6,outY)  body edge (5,outY)
     ctx.drawLine(6, outY, 5, outY);
 
-    // GND lead (south): pin tip (3,bits+1) â†’ body edge (3,bits)
+    // GND lead (south): pin tip (3,bits+1)  body edge (3,bits)
     ctx.drawLine(3, bits + 1, 3, bits);
 
     // Label "DAC" centered inside
@@ -221,7 +222,7 @@ export class DACElement extends AbstractCircuitElement {
 
 /** Build the input pin spec from model params.
  *  Thresholds (vIH/vIL) and impedances (rIn/cIn) come from model params
- *  so they are hot-loadable. Output-side fields are zeroed â€” unused by
+ *  so they are hot-loadable. Output-side fields are zeroed  unused by
  *  DigitalInputPinModel.
  */
 function buildInputPinSpec(p: Record<string, number>): ResolvedPinElectrical {
@@ -239,22 +240,20 @@ function buildInputPinSpec(p: Record<string, number>): ResolvedPinElectrical {
 }
 
 // ---------------------------------------------------------------------------
-// createDACElement â€” AnalogElement factory
+// createDACElement  AnalogElement factory
 // ---------------------------------------------------------------------------
 
 /**
  * Create the MNA element for an N-bit DAC.
  *
  * Pin nodes (from pinLayout order):
- *   pinNodes.get("D0").."D(N-1)" â†’ digital input pins
- *   pinNodes.get("VREF")         â†’ VREF node (1-based)
- *   pinNodes.get("OUT")          â†’ OUT node (1-based)
- *   pinNodes.get("GND")          â†’ GND node (may be 0 if tied to MNA ground)
+ *   pinNodes.get("D0").."D(N-1)"  digital input pins
+ *   pinNodes.get("VREF")          VREF node (1-based)
+ *   pinNodes.get("OUT")           OUT node (1-based)
+ *   pinNodes.get("GND")           GND node (may be 0 if tied to MNA ground)
  */
 function createDACElement(
   pinNodes: ReadonlyMap<string, number>,
-  _internalNodeIds: readonly number[],
-  _branchIdx: number,
   props: PropertyBag,
   bipolar: boolean,
 ): PoolBackedAnalogElementCore {
@@ -273,9 +272,9 @@ function createDACElement(
   // Node IDs from pinNodes map
   const nVref = pinNodes.get("VREF") ?? 0; // VREF node (1-based)
   const nOut  = pinNodes.get("OUT")  ?? 0; // OUT node (1-based)
-  // GND node â€” not directly stamped (MNA ground handled implicitly)
+  // GND node  not directly stamped (MNA ground handled implicitly)
 
-  // DigitalInputPinModel instances â€” one per bit
+  // DigitalInputPinModel instances  one per bit
   const inputSpec = buildInputPinSpec(p);
   const inputModels: DigitalInputPinModel[] = [];
   // Collect digital bit node IDs in order D0..D(N-1)
@@ -328,6 +327,12 @@ function createDACElement(
     ngspiceLoadOrder: NGSPICE_LOAD_ORDER.VCVS,
     isNonlinear: true,
     get isReactive(): boolean { return childElements.length > 0; },
+    _stateBase: -1,
+    _pinNodes: new Map(pinNodes),
+
+    setup(_ctx: SetupContext): void {
+      throw new Error(`PB-DAC not yet migrated`);
+    },
 
     poolBacked: true as const,
     stateSchema: DAC_COMPOSITE_SCHEMA,
@@ -467,7 +472,7 @@ export const DACDefinition: ComponentDefinition = {
   attributeMap: DAC_ATTRIBUTE_MAPPINGS,
 
   helpText:
-    "N-bit DAC â€” converts digital input code to analog output voltage. " +
+    "N-bit DAC  converts digital input code to analog output voltage. " +
     "Pins: D0..D(N-1) (digital inputs), VREF, OUT, GND.",
 
   factory(props: PropertyBag): DACElement {
@@ -478,15 +483,15 @@ export const DACDefinition: ComponentDefinition = {
   modelRegistry: {
     "unipolar": {
       kind: "inline",
-      factory: (pinNodes, internalNodeIds, branchIdx, props) =>
-        createDACElement(pinNodes, internalNodeIds, branchIdx, props, false),
+      factory: (pinNodes, props, _getTime) =>
+        createDACElement(pinNodes, props, false),
       paramDefs: DAC_PARAM_DEFS,
       params: DAC_DEFAULTS,
     },
     "bipolar": {
       kind: "inline",
-      factory: (pinNodes, internalNodeIds, branchIdx, props) =>
-        createDACElement(pinNodes, internalNodeIds, branchIdx, props, true),
+      factory: (pinNodes, props, _getTime) =>
+        createDACElement(pinNodes, props, true),
       paramDefs: DAC_PARAM_DEFS,
       params: DAC_DEFAULTS,
     },

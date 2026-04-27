@@ -2,12 +2,12 @@
  * Tests for Schmitt Trigger components (Inverting and Non-Inverting).
  *
  * Tests cover:
- *   Inverting::switches_low_on_rising_threshold   â€” input ramps up â†’ output goes LOW at V_TH
- *   Inverting::switches_high_on_falling_threshold â€” input ramps down â†’ output goes HIGH at V_TL
- *   Inverting::hysteresis_prevents_oscillation    â€” input in hysteresis band â†’ output stays put
- *   NonInverting::output_follows_input_sense       â€” high input â†’ HIGH out, low input â†’ LOW out
- *   Hysteresis::noisy_sine_clean_square            â€” noisy sine produces exactly 10 transitions in 5ms
- *   Transfer::plot_matches_hysteresis_loop         â€” sweep up then down shows rectangular hysteresis loop
+ *   Inverting::switches_low_on_rising_threshold    input ramps up  output goes LOW at V_TH
+ *   Inverting::switches_high_on_falling_threshold  input ramps down  output goes HIGH at V_TL
+ *   Inverting::hysteresis_prevents_oscillation     input in hysteresis band  output stays put
+ *   NonInverting::output_follows_input_sense        high input  HIGH out, low input  LOW out
+ *   Hysteresis::noisy_sine_clean_square             noisy sine produces exactly 10 transitions in 5ms
+ *   Transfer::plot_matches_hysteresis_loop          sweep up then down shows rectangular hysteresis loop
  *
  * Testing approach: the Schmitt trigger's output is determined by load() reading
  * the current input voltage from ctx.voltages. We drive load(ctx) directly with
@@ -171,32 +171,32 @@ function driveAndReadOutput(
 
 describe("Inverting", () => {
   it("switches_low_on_rising_threshold", () => {
-    // Input starts low (0V) â†’ output should be HIGH (inverting).
-    // Ramp input above V_TH (2.0V) â†’ output should switch to LOW.
+    // Input starts low (0V)  output should be HIGH (inverting).
+    // Ramp input above V_TH (2.0V)  output should switch to LOW.
     const nIn = 1, nOut = 2;
     const rOut = 50;
     const st = makeSchmittInverting(nIn, nOut, { vTH: 2.0, vTL: 1.0, vOH: 3.3, vOL: 0.0, rOut });
 
-    // Initial state: output HIGH (inverting, input starts low â†’ _outputHigh=false â†’ drive HIGH)
+    // Initial state: output HIGH (inverting, input starts low  _outputHigh=false  drive HIGH)
     driveAndReadOutput(st, 0.0, nIn, nOut, rOut);
 
-    // Drive input just below threshold â€” no switch
+    // Drive input just below threshold  no switch
 
-    // Drive input above threshold â†’ output switches LOW
+    // Drive input above threshold  output switches LOW
   });
 
   it("switches_high_on_falling_threshold", () => {
-    // Start with input above V_TH â†’ output LOW (inverting).
-    // Ramp input below V_TL (1.0V) â†’ output switches HIGH.
+    // Start with input above V_TH  output LOW (inverting).
+    // Ramp input below V_TL (1.0V)  output switches HIGH.
     const nIn = 1, nOut = 2;
     const rOut = 50;
     makeSchmittInverting(nIn, nOut, { vTH: 2.0, vTL: 1.0, vOH: 3.3, vOL: 0.0, rOut });
 
     // Force output to LOW by driving input above V_TH
 
-    // Drive input just above V_TL â€” no switch yet
+    // Drive input just above V_TL  no switch yet
 
-    // Drive input below V_TL â†’ output switches HIGH
+    // Drive input below V_TL  output switches HIGH
   });
 
   it("hysteresis_prevents_oscillation", () => {
@@ -207,14 +207,14 @@ describe("Inverting", () => {
     const vTH = 2.0, vTL = 1.0;
     const st = makeSchmittInverting(nIn, nOut, { vTH, vTL, vOH: 3.3, vOL: 0.0, rOut });
 
-    // Start with input low â†’ output HIGH
+    // Start with input low  output HIGH
     driveAndReadOutput(st, 0.0, nIn, nOut, rOut);
 
     // Oscillate input within hysteresis band (V_TL + Îµ to V_TH - Îµ)
     const inBandValues = [1.2, 1.5, 1.8, 1.6, 1.3, 1.7, 1.4, 1.9, 1.1, 1.8];
     for (const v of inBandValues) {
       driveAndReadOutput(st, v, nIn, nOut, rOut);
-      // Output must not change â€” still HIGH
+      // Output must not change  still HIGH
     }
   });
 });
@@ -225,16 +225,16 @@ describe("Inverting", () => {
 
 describe("NonInverting", () => {
   it("output_follows_input_sense", () => {
-    // Non-inverting: input > V_TH â†’ output HIGH; input < V_TL â†’ output LOW.
+    // Non-inverting: input > V_TH  output HIGH; input < V_TL  output LOW.
     const nIn = 1, nOut = 2;
     const rOut = 50;
     makeSchmittNonInverting(nIn, nOut, { vTH: 2.0, vTL: 1.0, vOH: 3.3, vOL: 0.0, rOut });
 
     // Initial: output LOW (starts low)
 
-    // Drive input above V_TH â†’ output HIGH
+    // Drive input above V_TH  output HIGH
 
-    // Drive input back below V_TL â†’ output LOW
+    // Drive input back below V_TL  output LOW
   });
 });
 
@@ -246,7 +246,7 @@ describe("Hysteresis", () => {
   it("noisy_sine_clean_square", () => {
     // Sine wave: 1kHz, amplitude = 2V, offset = 1.65V (spanning both thresholds 1.0 and 2.3V).
     // Noise: Gaussian, std dev = 0.1V (within hysteresis band of 2.3-1.0 = 1.3V).
-    // Thresholds: V_TH=2.3, V_TL=1.0 â€” hysteresis band 1.3V >> noise std dev 0.1V.
+    // Thresholds: V_TH=2.3, V_TL=1.0  hysteresis band 1.3V >> noise std dev 0.1V.
     // Simulate 5 complete periods (5ms at 1kHz).
     // Assert exactly 10 output transitions (2 per period, no glitches from noise).
     //
@@ -260,11 +260,11 @@ describe("Hysteresis", () => {
     });
 
     const freq = 1000;       // 1kHz
-    const amplitude = 1.65;  // sine amplitude (peak) â€” ensures signal crosses both thresholds
+    const amplitude = 1.65;  // sine amplitude (peak)  ensures signal crosses both thresholds
     const offset = 1.65;     // DC offset: sine swings from 0 to 3.3V
     const noiseSd = 0.1;     // noise std dev = 0.1V (well within hysteresis band)
     const totalTime = 5e-3;  // 5ms = 5 periods
-    const numSamples = 5000; // 1Âµs sample interval â€” fine enough to catch crossings
+    const numSamples = 5000; // 1Âµs sample interval  fine enough to catch crossings
 
     // Seeded Box-Muller Gaussian noise using a simple LCG for determinism
     let lcgState = 0x12345678;
@@ -308,7 +308,7 @@ describe("Hysteresis", () => {
 
 describe("Transfer", () => {
   it("plot_matches_hysteresis_loop", () => {
-    // Sweep input from 0 â†’ 3.3V â†’ 0V.
+    // Sweep input from 0  3.3V  0V.
     // The output transitions form a rectangular hysteresis loop:
     //   Rising:  switches at V_TH
     //   Falling: switches at V_TL < V_TH
@@ -323,13 +323,13 @@ describe("Transfer", () => {
     // Start at 0V: output LOW
     driveAndReadOutput(st, 0.0, nIn, nOut, rOut);
 
-    // Rising sweep: 0 â†’ 3.3V in 0.1V steps
+    // Rising sweep: 0  3.3V in 0.1V steps
     let risingTransitionAt: number | null = null;
     for (let i = 0; i <= 33; i++) {
       const vIn = (i / 33) * 3.3;
       const vOut = driveAndReadOutput(st, vIn, nIn, nOut, rOut);
       if (risingTransitionAt === null && vOut > 1.65) {
-        // Output switched HIGH â€” record the input voltage
+        // Output switched HIGH  record the input voltage
         risingTransitionAt = vIn;
       }
     }
@@ -339,7 +339,7 @@ describe("Transfer", () => {
     expect(risingTransitionAt!).toBeGreaterThanOrEqual(vTH - 0.1);
     expect(risingTransitionAt!).toBeLessThanOrEqual(vTH + 0.2);
 
-    // Falling sweep: 3.3V â†’ 0V in 0.1V steps
+    // Falling sweep: 3.3V  0V in 0.1V steps
     let fallingTransitionAt: number | null = null;
     for (let i = 33; i >= 0; i--) {
       const vIn = (i / 33) * 3.3;
@@ -360,7 +360,7 @@ describe("Transfer", () => {
 });
 
 // ---------------------------------------------------------------------------
-// C4.5 parity test â€” schmitt_load_dcop_parity
+// C4.5 parity test  schmitt_load_dcop_parity
 // ---------------------------------------------------------------------------
 //
 // Drives the non-inverting Schmitt trigger via load(ctx) at a DC-OP operating
@@ -368,12 +368,12 @@ describe("Transfer", () => {
 // conductance and RHS entries are bit-exact.
 //
 // Reference formulas (from schmitt-trigger.ts + digital-pin-model.ts):
-//   inModel  = DigitalInputPinModel(inputSpec, true) â†’ stamps 1/rIn on nIn diag
+//   inModel  = DigitalInputPinModel(inputSpec, true)  stamps 1/rIn on nIn diag
 //              (inputSpec.rIn = 1e7)
 //   outModel = DigitalOutputPinModel(outputSpec) with role="direct", not hiZ
-//              â†’ stamps 1/rOut on nOut diag + vOLÂ·(1/rOut) on nOut RHS
+//               stamps 1/rOut on nOut diag + vOLÂ·(1/rOut) on nOut RHS
 //     (outputSpec.rOut = max(p.rOut, 1e-9); p.rOut defaults to 50)
-//   Input is below vTH and output starts low â†’ no state change â†’ stays low.
+//   Input is below vTH and output starts low  no state change  stays low.
 
 interface SchmittCaptureStamp { row: number; col: number; value: number; }
 function makeSchmittCaptureSolver(_rhs: Float64Array): {

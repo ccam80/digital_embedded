@@ -97,7 +97,7 @@ describe("OpAmp", () => {
     const voltages = makeSolutionVector(6, {
       1: 1e-6,   // in+
       2: 0,      // in-
-      3: 1.0,    // out â€” within linear range (between -15 and +15)
+      3: 1.0,    // out  within linear range (between -15 and +15)
       4: 15,     // Vcc+
       5: -15,    // Vcc-
     });
@@ -114,11 +114,11 @@ describe("OpAmp", () => {
     // When Vout >= Vcc+: saturated, load() omits VCVS and drives a Norton current to the rail.
     const opamp = makeOpAmp({ gain: 1e6, rOut: 75 });
 
-    // Set Vout = 20V > Vcc+ = 15V â†’ saturated
+    // Set Vout = 20V > Vcc+ = 15V  saturated
     const voltages = makeSolutionVector(6, {
       1: 1e-3,   // in+
       2: 0,      // in-
-      3: 20,     // out â€” above Vcc+
+      3: 20,     // out  above Vcc+
       4: 15,     // Vcc+
       5: -15,    // Vcc-
     });
@@ -140,11 +140,11 @@ describe("OpAmp", () => {
     // When Vout <= Vcc-: saturated, load() drives output to Vcc- via a Norton current.
     const opamp = makeOpAmp({ gain: 1e6, rOut: 75 });
 
-    // Set Vout = -20V < Vcc- = -15V â†’ saturated
+    // Set Vout = -20V < Vcc- = -15V  saturated
     const voltages = makeSolutionVector(6, {
       1: -1e-3,  // in+
       2: 0,      // in-
-      3: -20,    // out â€” below Vcc-
+      3: -20,    // out  below Vcc-
       4: 15,     // Vcc+
       5: -15,    // Vcc-
     });
@@ -156,11 +156,11 @@ describe("OpAmp", () => {
   });
 
   it("output_impedance", () => {
-    // Circuit: Vin=2ÂµV fixes in+, in- grounded by VS, R_load=75Î© on output.
+    // Circuit: Vin=2ÂµV fixes in+, in- grounded by VS, R_load=75Î on output.
     // Vout_open = gain * Vin = 1e6 * 2e-6 = 2V
-    // With R_load = R_out = 75Î©: Vout = 2 * R_load/(R_out+R_load) = 1V Â± 0.1V
+    // With R_load = R_out = 75Î: Vout = 2 * R_load/(R_out+R_load) = 1V Â± 0.1V
     //
-    // MNA: nodes 1..5, branches 5..8 â†’ matrixSize = 9
+    // MNA: nodes 1..5, branches 5..8  matrixSize = 9
     //   node 1 = in+, node 2 = in- (grounded via VS), node 3 = out
     //   node 4 = Vcc+, node 5 = Vcc-
     const nInp = 1, nInn = 2, nOut = 3, nVccP = 4, nVccN = 5;
@@ -173,7 +173,7 @@ describe("OpAmp", () => {
       new Map([["in+", nInp], ["in-", nInn], ["out", nOut]]), [], -1, props, () => 0,
     ), [nInn, nInp, nOut]); // pinLayout order: [in-, in+, out]
 
-    // 75Î© load on output
+    // 75Î load on output
     const G_load = 1 / 75;
     const rLoadEl: AnalogElement = {
       pinNodeIds: [nOut, 0],
@@ -231,8 +231,8 @@ describe("Integration", () => {
   }
 
   it("inverting_amplifier", () => {
-    // Inverting amplifier: gain = -Rf/Rin = -10kÎ©/1kÎ© = -10
-    // Vin = 1V â†’ Vout â‰ˆ -10V Â± 0.01V
+    // Inverting amplifier: gain = -Rf/Rin = -10kÎ/1kÎ = -10
+    // Vin = 1V  Vout  -10V Â± 0.01V
     //
     // Node assignments:
     //   node 1 = Vin terminal
@@ -241,7 +241,7 @@ describe("Integration", () => {
     //   node 4 = in+ (grounded via VS)
     //   node 5 = Vcc+
     //   node 6 = Vcc-
-    // Branch rows: 6..9 â†’ matrixSize = 10
+    // Branch rows: 6..9  matrixSize = 10
     const nVin = 1, nInn = 2, nOut = 3, nInp = 4, nVccP = 5, nVccN = 6;
     const brVin = 6, brInp = 7, brVccP = 8, brVccN = 9;
     const matrixSize = 10;
@@ -267,15 +267,15 @@ describe("Integration", () => {
     });
 
     expect(result.converged).toBe(true);
-    // Ideal inverting gain = -Rf/Rin = -10 â†’ Vout = -10V Â± 0.05V
+    // Ideal inverting gain = -Rf/Rin = -10  Vout = -10V Â± 0.05V
   });
 
   it("voltage_follower", () => {
-    // Voltage follower: in- connected to out â†’ Vout = Vin = 3.7V Â± 0.001V
+    // Voltage follower: in- connected to out  Vout = Vin = 3.7V Â± 0.001V
     //
     // Model: in- and out share the same node (node 2).
     // Node 1 = in+, node 2 = in- = out, node 3 = Vcc+, node 4 = Vcc-
-    // Branches: brVin=4, brVccP=5, brVccN=6 â†’ matrixSize = 7
+    // Branches: brVin=4, brVccP=5, brVccN=6  matrixSize = 7
     const nInp = 1, nFeedback = 2, nVccP = 3, nVccN = 4;
     const brVin = 4, brVccP = 5, brVccN = 6;
     const matrixSize = 7;
@@ -303,7 +303,7 @@ describe("Integration", () => {
 });
 
 // ---------------------------------------------------------------------------
-// C4.5 parity test â€” opamp_load_dcop_parity
+// C4.5 parity test  opamp_load_dcop_parity
 // ---------------------------------------------------------------------------
 //
 // Drives the ideal op-amp via load(ctx) at a canonical operating point (linear

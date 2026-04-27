@@ -28,8 +28,6 @@ import {
 import { defineModelParams } from "../../core/model-params.js";
 import {
   createDiodeElement,
-  getDiodeInternalNodeCount,
-  getDiodeInternalNodeLabels,
   DIODE_PARAM_DEFAULTS,
 } from "./diode.js";
 
@@ -211,6 +209,7 @@ export const VaractorDefinition: ComponentDefinition = {
     "Varactor Diode — voltage-controlled junction capacitance (ngspice DIO model).\n" +
     "C_j(V_R) = CJO / (1 - V_d/VJ)^M\n" +
     "Uses the same load path as the standard Diode with varactor-tuned defaults.",
+  ngspiceNodeMap: { A: "pos", K: "neg" },
   models: {},
   modelRegistry: {
     "spice": {
@@ -218,8 +217,8 @@ export const VaractorDefinition: ComponentDefinition = {
       factory: createDiodeElement,
       paramDefs: VARACTOR_PARAM_DEFS,
       params: VARACTOR_PARAM_DEFAULTS,
-      getInternalNodeCount: getDiodeInternalNodeCount,
-      getInternalNodeLabels: getDiodeInternalNodeLabels,
+      mayCreateInternalNodes: true,
+      ngspiceNodeMap: { A: "pos", K: "neg" },
     },
   },
   defaultModel: "spice",

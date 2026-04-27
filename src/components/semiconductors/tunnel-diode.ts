@@ -1,5 +1,5 @@
 ﻿/**
- * Tunnel Diode analog component â€” N-shaped I-V curve with NDR region.
+ * Tunnel Diode analog component  N-shaped I-V curve with NDR region.
  *
  * Implements the tunnel diode I-V model:
  *   I_tunnel(V) = I_p * (V/V_p) * exp(1 - V/V_p)           (peak at V_p)
@@ -69,7 +69,7 @@ const VX = 0.1;
 /** Maximum voltage step per NR iteration in or near NDR region. */
 const NDR_VSTEP_MAX = 0.1;
 
-/** Thermal saturation current (A) â€” default for Shockley component. */
+/** Thermal saturation current (A)  default for Shockley component. */
 const IS_THERMAL = 1e-14;
 
 // ---------------------------------------------------------------------------
@@ -91,7 +91,7 @@ export const { paramDefs: TUNNEL_DIODE_PARAM_DEFS, defaults: TUNNEL_DIODE_PARAM_
     M:    { default: 0.5,                description: "Grading coefficient" },
     TT:   { default: 0,      unit: "s",  description: "Transit time" },
     FC:   { default: 0.5,                description: "Forward-bias capacitance coefficient" },
-    // D-W3-7: tunnel current params â€” dioload.c:267-285 (consumed via diodeLoadTunnel)
+    // D-W3-7: tunnel current params  dioload.c:267-285 (consumed via diodeLoadTunnel)
     IBEQ: { default: 0,      unit: "A",  description: "Tunnel bottom saturation current (DIOtunSatCur)" },
     IBSW: { default: 0,      unit: "A",  description: "Tunnel sidewall saturation current (DIOtunSatSWCur)" },
     NB:   { default: 1,                  description: "Tunnel emission coefficient (DIOtunEmissionCoeff)" },
@@ -102,7 +102,7 @@ export const { paramDefs: TUNNEL_DIODE_PARAM_DEFS, defaults: TUNNEL_DIODE_PARAM_
 });
 
 // ---------------------------------------------------------------------------
-// tunnelDiodeIV â€” compute I(V) and dI/dV for the tunnel diode model
+// tunnelDiodeIV  compute I(V) and dI/dV for the tunnel diode model
 // ---------------------------------------------------------------------------
 
 /**
@@ -115,8 +115,8 @@ export const { paramDefs: TUNNEL_DIODE_PARAM_DEFS, defaults: TUNNEL_DIODE_PARAM_
  * @param vv     - Valley voltage (V)
  * @param iS     - Shockley saturation current (A)
  * @param nCoeff - Emission coefficient
- * @param vt     - Thermal voltage (V) â€” derived from per-instance TEMP
- * @returns { i, dIdV } â€” current and differential conductance
+ * @param vt     - Thermal voltage (V)  derived from per-instance TEMP
+ * @returns { i, dIdV }  current and differential conductance
  */
 export function tunnelDiodeIV(
   v: number,
@@ -145,7 +145,7 @@ export function tunnelDiodeIV(
   // dI_x/dV = I_v / V_x * exp((V - V_v) / V_x)
   const dIExcess = (iv / VX) * expX;
 
-  // --- Thermal (Shockley) component â€” cite: dioload.c, per-instance TEMP ---
+  // --- Thermal (Shockley) component  cite: dioload.c, per-instance TEMP ---
   const nVt = nCoeff * vt;
   const expTh = Math.exp(v / nVt);
   const iThermal = iS * (expTh - 1);
@@ -162,7 +162,7 @@ export function tunnelDiodeIV(
 // State schema declarations
 // ---------------------------------------------------------------------------
 
-// Slot index constants â€” shared between both schema variants.
+// Slot index constants  shared between both schema variants.
 const SLOT_VD = 0, SLOT_GEQ = 1, SLOT_IEQ = 2, SLOT_ID = 3;
 const SLOT_Q = 4, SLOT_CCAP = 5;
 
@@ -185,13 +185,11 @@ const TUNNEL_DIODE_CAP_STATE_SCHEMA = defineStateSchema("TunnelDiodeElement_cap"
 ]);
 
 // ---------------------------------------------------------------------------
-// createTunnelDiodeElement â€” AnalogElement factory
+// createTunnelDiodeElement  AnalogElement factory
 // ---------------------------------------------------------------------------
 
 export function createTunnelDiodeElement(
   pinNodes: ReadonlyMap<string, number>,
-  _internalNodeIds: readonly number[],
-  _branchIdx: number,
   props: PropertyBag,
 ): PoolBackedAnalogElementCore {
   const nodeAnode   = pinNodes.get("A")!;
@@ -223,10 +221,10 @@ export function createTunnelDiodeElement(
 
   const hasCapacitance = params.CJO > 0 || params.TT > 0;
 
-  // Per-instance thermal voltage â€” cite: dioload.c / diotemp.c, per-instance TEMP (maps to ngspice DIOtemp).
+  // Per-instance thermal voltage  cite: dioload.c / diotemp.c, per-instance TEMP (maps to ngspice DIOtemp).
   let vt = params.TEMP * CONSTboltz / CHARGE;
 
-  // Pool reference â€” set by initState. State arrays accessed via pool.states[N]
+  // Pool reference  set by initState. State arrays accessed via pool.states[N]
   // at call time. No cached Float64Array refs.
   let pool: StatePoolRef;
   let base: number;
@@ -253,6 +251,8 @@ export function createTunnelDiodeElement(
 
   const element: PoolBackedAnalogElementCore = {
     branchIndex: -1,
+    _stateBase: -1,
+    _pinNodes: new Map(pinNodes),
     ngspiceLoadOrder: NGSPICE_LOAD_ORDER.DIO,
     isNonlinear: true,
     isReactive: hasCapacitance,
@@ -269,6 +269,10 @@ export function createTunnelDiodeElement(
     s6: new Float64Array(0),
     s7: new Float64Array(0),
 
+    setup(_ctx: import("../../solver/analog/setup-context.js").SetupContext): void {
+      throw new Error("PB-TUNNEL not yet migrated");
+    },
+
     initState(poolRef: StatePoolRef): void {
       pool = poolRef;
       base = this.stateBaseOffset;
@@ -276,7 +280,7 @@ export function createTunnelDiodeElement(
     },
 
     load(ctx: LoadContext): void {
-      // Access state arrays at call time â€” no cached Float64Array refs.
+      // Access state arrays at call time  no cached Float64Array refs.
       const s0 = pool.states[0];
       const s1 = pool.states[1];
       const s2 = pool.states[2];
@@ -414,7 +418,7 @@ export function createTunnelDiodeElement(
 }
 
 // ---------------------------------------------------------------------------
-// TunnelDiodeElement â€” CircuitElement implementation
+// TunnelDiodeElement  CircuitElement implementation
 // ---------------------------------------------------------------------------
 
 export class TunnelDiodeElement extends AbstractCircuitElement {
@@ -469,7 +473,7 @@ export class TunnelDiodeElement extends AbstractCircuitElement {
 
     // Cathode bar
     ctx.drawLine(2.5, -0.5, 2.5, 0.5);
-    // T-wings: cath2={2.3,-0.5}â†’cath0={2.5,-0.5}; cath3={2.3,0.5}â†’cath1={2.5,0.5}
+    // T-wings: cath2={2.3,-0.5}cath0={2.5,-0.5}; cath3={2.3,0.5}cath1={2.5,0.5}
     ctx.drawLine(2.3, -0.5, 2.5, -0.5);
     ctx.drawLine(2.3,  0.5, 2.5,  0.5);
 
@@ -544,7 +548,7 @@ export const TunnelDiodeDefinition: ComponentDefinition = {
   attributeMap: TUNNEL_DIODE_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.SEMICONDUCTORS,
   helpText:
-    "Tunnel Diode â€” N-shaped I-V curve with negative differential resistance.\n" +
+    "Tunnel Diode  N-shaped I-V curve with negative differential resistance.\n" +
     "Peak current I_p at V_p, valley current I_v at V_v.\n" +
     "NDR region: V_p < V < V_v.",
   models: {},
@@ -554,6 +558,7 @@ export const TunnelDiodeDefinition: ComponentDefinition = {
       factory: createTunnelDiodeElement,
       paramDefs: TUNNEL_DIODE_PARAM_DEFS,
       params: TUNNEL_DIODE_PARAM_DEFAULTS,
+      ngspiceNodeMap: { A: "contPos", K: "contNeg" },
     },
   },
   defaultModel: "behavioral",

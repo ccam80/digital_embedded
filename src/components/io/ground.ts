@@ -27,6 +27,7 @@ import {
 } from "../../core/registry.js";
 import type { AnalogElementCore, LoadContext } from "../../solver/analog/element.js";
 import { NGSPICE_LOAD_ORDER } from "../../solver/analog/element.js";
+import type { SetupContext } from "../../solver/analog/setup-context.js";
 
 // ---------------------------------------------------------------------------
 // Pin layout

@@ -6,8 +6,8 @@
  * window), and an input offset voltage (vos).
  *
  * Open-collector model (default):
- *   - Output active (sinking):  R_sat to ground  â†’ output pulled LOW
- *   - Output inactive (off):    R_off to ground  â†’ output pulled HIGH by
+ *   - Output active (sinking):  R_sat to ground   output pulled LOW
+ *   - Output inactive (off):    R_off to ground   output pulled HIGH by
  *                                                   external resistor
  *
  * Push-pull model:
@@ -45,6 +45,7 @@ import {
 } from "../../core/registry.js";
 import type { LoadContext, StatePoolRef, PoolBackedAnalogElementCore } from "../../solver/analog/element.js";
 import { NGSPICE_LOAD_ORDER } from "../../solver/analog/element.js";
+import type { SetupContext } from "../../solver/analog/setup-context.js";
 import { stampRHS } from "../../solver/analog/stamp-helpers.js";
 import { collectPinModelChildren } from "../../solver/analog/digital-pin-model.js";
 import type { AnalogCapacitorElement } from "../passives/capacitor.js";
@@ -68,7 +69,7 @@ export const { paramDefs: COMPARATOR_PARAM_DEFS, defaults: COMPARATOR_DEFAULTS }
   primary: {
     hysteresis:   { default: 0,    unit: "V", description: "Hysteresis band width" },
     vos:          { default: 0.001, unit: "V", description: "Input offset voltage" },
-    rSat:         { default: 50,   unit: "Î©", description: "Output saturation resistance" },
+    rSat:         { default: 50,   unit: "Î", description: "Output saturation resistance" },
     responseTime: { default: 1e-6, unit: "s", description: "Propagation delay time constant" },
     vOH:          { default: 3.3,  unit: "V", description: "Output HIGH voltage" },
     vOL:          { default: 0.0,  unit: "V", description: "Output LOW voltage" },
@@ -112,7 +113,7 @@ function buildComparatorPinDeclarations(): PinDeclaration[] {
 }
 
 // ---------------------------------------------------------------------------
-// ComparatorElement â€” CircuitElement implementation
+// ComparatorElement  CircuitElement implementation
 // ---------------------------------------------------------------------------
 
 export class ComparatorElement extends AbstractCircuitElement {
@@ -146,7 +147,7 @@ export class ComparatorElement extends AbstractCircuitElement {
 
     ctx.save();
 
-    // Triangle body â€” stays COMPONENT color, thin line
+    // Triangle body  stays COMPONENT color, thin line
     ctx.setLineWidth(1);
     ctx.setColor("COMPONENT");
     ctx.drawPolygon(
@@ -164,7 +165,7 @@ export class ComparatorElement extends AbstractCircuitElement {
     // Output lead (thick)
     drawColoredLead(ctx, signals, vOut, 3.625, 0, 4, 0);
 
-    // Text labels â€” body decoration, stays COMPONENT color
+    // Text labels  body decoration, stays COMPONENT color
     ctx.setLineWidth(1);
     ctx.setColor("COMPONENT");
     ctx.setFont({ family: "sans-serif", size: 0.7 });
@@ -177,7 +178,7 @@ export class ComparatorElement extends AbstractCircuitElement {
 }
 
 // ---------------------------------------------------------------------------
-// createComparatorElement â€” AnalogElement factory
+// createComparatorElement  AnalogElement factory
 // ---------------------------------------------------------------------------
 
 /**
@@ -207,7 +208,7 @@ export function createOpenCollectorComparatorElement(
     responseTime: Math.max(props.getModelParam<number>("responseTime"), 1e-12),
   };
 
-  const R_OFF = 1e9; // open-collector off-state impedance (1 GÎ©)
+  const R_OFF = 1e9; // open-collector off-state impedance (1 GÎ)
   const G_off = 1 / R_OFF;
 
   // G_sat is computed from p.rSat at call time to support setParam hot-loading
@@ -231,11 +232,29 @@ export function createOpenCollectorComparatorElement(
   const childElements: readonly AnalogCapacitorElement[] = collectPinModelChildren([]);
   const childStateSize = childElements.reduce((s, c) => s + c.stateSize, 0);
 
+  // Cached TSTALLOC handle for output node diagonal (nOut, nOut).
+  let hOutDiag = -1;
+
   return {
     branchIndex: -1,
     ngspiceLoadOrder: NGSPICE_LOAD_ORDER.VCVS,
     isNonlinear: true,
     get isReactive(): boolean { return childElements.some(c => c.isReactive); },
+    _stateBase: -1,
+    _pinNodes: new Map(pinNodes),
+
+    setup(ctx: SetupContext): void {
+      // Allocate output diagonal handle (open-collector conductance stamp).
+      if (nOut > 0) {
+        hOutDiag = ctx.solver.allocElement(nOut, nOut);
+      }
+      // Allocate state slots for hysteresis latch + response-time weight.
+      this._stateBase = ctx.allocStates(COMPARATOR_COMPOSITE_SCHEMA.size);
+      // Child elements (capacitor companions) own their own state slots.
+      for (const child of childElements) {
+        child.setup(ctx);
+      }
+    },
 
     poolBacked: true as const,
     stateSchema: COMPARATOR_COMPOSITE_SCHEMA,
@@ -294,8 +313,8 @@ export function createOpenCollectorComparatorElement(
       s0[base + SLOT_OUTPUT_LATCH] = latchActive ? 1.0 : 0.0;
       s0[base + SLOT_OUTPUT_WEIGHT] = weight;
 
-      if (nOut > 0) {
-        solver.stampElement(solver.allocElement(nOut, nOut), computeGeff(weight));
+      if (nOut > 0 && hOutDiag >= 0) {
+        solver.stampElement(hOutDiag, computeGeff(weight));
       }
 
       for (const child of childElements) { child.load(ctx); }
@@ -314,7 +333,7 @@ export function createOpenCollectorComparatorElement(
     },
 
     getPinCurrents(rhs: Float64Array): number[] {
-      // Input pins: high-impedance load â€” implicit R_IN to ground
+      // Input pins: high-impedance load  implicit R_IN to ground
       const R_IN = 1e7;
       const vInp = readNode(rhs, nInp);
       const vInn = readNode(rhs, nInn);
@@ -337,7 +356,7 @@ export function createOpenCollectorComparatorElement(
 }
 
 // ---------------------------------------------------------------------------
-// createPushPullComparatorElement â€” push-pull output factory
+// createPushPullComparatorElement  push-pull output factory
 // ---------------------------------------------------------------------------
 
 function createPushPullComparatorElement(
@@ -375,11 +394,26 @@ function createPushPullComparatorElement(
   const childElements: readonly AnalogCapacitorElement[] = collectPinModelChildren([]);
   const childStateSize = childElements.reduce((s, c) => s + c.stateSize, 0);
 
+  // Cached TSTALLOC handle for output node diagonal (nOut, nOut).
+  let hOutDiagPP = -1;
+
   return {
     branchIndex: -1,
     ngspiceLoadOrder: NGSPICE_LOAD_ORDER.VCVS,
     isNonlinear: true,
     get isReactive(): boolean { return childElements.some(c => c.isReactive); },
+    _stateBase: -1,
+    _pinNodes: new Map(pinNodes),
+
+    setup(ctx: SetupContext): void {
+      if (nOut > 0) {
+        hOutDiagPP = ctx.solver.allocElement(nOut, nOut);
+      }
+      this._stateBase = ctx.allocStates(COMPARATOR_COMPOSITE_SCHEMA.size);
+      for (const child of childElements) {
+        child.setup(ctx);
+      }
+    },
 
     poolBacked: true as const,
     stateSchema: COMPARATOR_COMPOSITE_SCHEMA,
@@ -433,11 +467,11 @@ function createPushPullComparatorElement(
       s0[base + SLOT_OUTPUT_WEIGHT] = weight;
 
       const gEff = computeGeff(weight);
-      if (nOut > 0) {
-        solver.stampElement(solver.allocElement(nOut, nOut), gEff);
+      if (nOut > 0 && hOutDiagPP >= 0) {
+        solver.stampElement(hOutDiagPP, gEff);
         // Norton current source drives output toward vOH or vOL
         const vTarget = latchActive ? p.vOL : p.vOH;
-        stampRHS(ctx.rhs,nOut, vTarget * gEff);
+        stampRHS(ctx.rhs, nOut, vTarget * gEff);
       }
 
       for (const child of childElements) { child.load(ctx); }
@@ -522,7 +556,7 @@ export const VoltageComparatorDefinition: ComponentDefinition = {
   attributeMap: COMPARATOR_ATTRIBUTE_MAPPINGS,
 
   helpText:
-    "Analog Comparator â€” 3-terminal (in+, in-, out). " +
+    "Analog Comparator  3-terminal (in+, in-, out). " +
     "Switches output based on V+ vs V-. Open-collector output requires external pull-up. " +
     "Optional hysteresis prevents output chatter on noisy inputs.",
 
@@ -534,14 +568,14 @@ export const VoltageComparatorDefinition: ComponentDefinition = {
   modelRegistry: {
     "open-collector": {
       kind: "inline",
-      factory: (pinNodes, _internalNodeIds, _branchIdx, props) =>
+      factory: (pinNodes, props, _getTime) =>
         createOpenCollectorComparatorElement(pinNodes, props),
       paramDefs: COMPARATOR_PARAM_DEFS,
       params: COMPARATOR_DEFAULTS,
     },
     "push-pull": {
       kind: "inline",
-      factory: (pinNodes, _internalNodeIds, _branchIdx, props) =>
+      factory: (pinNodes, props, _getTime) =>
         createPushPullComparatorElement(pinNodes, props),
       paramDefs: COMPARATOR_PARAM_DEFS,
       params: COMPARATOR_DEFAULTS,

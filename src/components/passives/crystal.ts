@@ -1,15 +1,15 @@
 ﻿/**
- * Quartz crystal analog component â€” Butterworth-Van Dyke (BVD) equivalent circuit.
+ * Quartz crystal analog component  Butterworth-Van Dyke (BVD) equivalent circuit.
  *
  * The BVD model represents the mechanical resonance of a quartz crystal as a
  * series RLC branch (motional arm) in parallel with a shunt electrode capacitance:
  *
- *   Series (motional) arm: R_s â€” L_s â€” C_s  (between terminal A and B)
+ *   Series (motional) arm: R_s  L_s  C_s  (between terminal A and B)
  *   Shunt arm:             C_0               (directly across A and B)
  *
  * This produces two resonant frequencies:
  *   Series resonance:   f_s = 1 / (2Ï€ âˆš(L_s Â· C_s))
- *   Parallel resonance: f_p â‰ˆ f_s Â· âˆš(1 + C_s / C_0)   (slightly above f_s)
+ *   Parallel resonance: f_p  f_s Â· âˆš(1 + C_s / C_0)   (slightly above f_s)
  *
  * MNA topology (1-based node indices, 0 = ground):
  *   pinNodeIds[0] = n_A      external terminal A
@@ -44,8 +44,10 @@ import {
   type ComponentDefinition,
 } from "../../core/registry.js";
 import { formatSI } from "../../editor/si-format.js";
-import type { AnalogElementCore, ReactiveAnalogElement, IntegrationMethod, LoadContext } from "../../solver/analog/element.js";
-import { NGSPICE_LOAD_ORDER } from "../../solver/analog/element.js";
+import type { AnalogElementCore } from "../../core/analog-types.js";
+import { NGSPICE_LOAD_ORDER } from "../../core/analog-types.js";
+import type { ReactiveAnalogElement, IntegrationMethod, LoadContext } from "../../solver/analog/element.js";
+import type { SetupContext } from "../../solver/analog/setup-context.js";
 import { MODETRAN, MODETRANOP, MODEINITPRED, MODEINITTRAN } from "../../solver/analog/ckt-mode.js";
 import { stampG, stampRHS } from "../../solver/analog/stamp-helpers.js";
 import { defineModelParams } from "../../core/model-params.js";
@@ -61,7 +63,7 @@ import { cktTerr } from "../../solver/analog/ckt-terr.js";
 // State-pool schema
 // ---------------------------------------------------------------------------
 
-// Slot layout â€” 15 slots total (3 reactive stores Ã— 4 slots each + 3 CCAP slots).
+// Slot layout  15 slots total (3 reactive stores Ã— 4 slots each + 3 CCAP slots).
 // Previous values are read from s1/s2/s3 at the same offsets.
 const CRYSTAL_SCHEMA: StateSchema = defineStateSchema("AnalogCrystalElement", [
   // L_s (inductor motional arm)
@@ -85,7 +87,7 @@ const CRYSTAL_SCHEMA: StateSchema = defineStateSchema("AnalogCrystalElement", [
   { name: "CCAP_C0", doc: "C_0 companion current",  init: { kind: "zero" } },
 ]);
 
-// Slot indices â€” must match the layout above.
+// Slot indices  must match the layout above.
 const SLOT_GEQ_L  = 0;
 const SLOT_IEQ_L  = 1;
 const SLOT_I_L    = 2;
@@ -165,7 +167,7 @@ function buildCrystalPinDeclarations(): PinDeclaration[] {
 }
 
 // ---------------------------------------------------------------------------
-// CrystalCircuitElement â€” AbstractCircuitElement (editor/visual layer)
+// CrystalCircuitElement  AbstractCircuitElement (editor/visual layer)
 // ---------------------------------------------------------------------------
 
 export class CrystalCircuitElement extends AbstractCircuitElement {
@@ -203,15 +205,15 @@ export class CrystalCircuitElement extends AbstractCircuitElement {
     const vB = signals?.getPinVoltage("B");
     const hasVoltage = vA !== undefined && vB !== undefined;
 
-    // Left lead + plate â€” colored by pin A voltage
+    // Left lead + plate  colored by pin A voltage
     drawColoredLead(ctx, hasVoltage ? signals : undefined, vA, 0, 0, 0.6, 0);
     ctx.drawLine(0.6, -0.4, 0.6, 0.4);
 
-    // Right lead + plate â€” colored by pin B voltage
+    // Right lead + plate  colored by pin B voltage
     drawColoredLead(ctx, hasVoltage ? signals : undefined, vB, 1.4, 0, 2, 0);
     ctx.drawLine(1.4, -0.4, 1.4, 0.4);
 
-    // Rectangular crystal body between the plates â€” gradient
+    // Rectangular crystal body between the plates  gradient
     if (hasVoltage && ctx.setLinearGradient) {
       ctx.setLinearGradient(0.7, 0, 1.3, 0, [
         { offset: 0, color: signals!.voltageColor(vA) },
@@ -238,13 +240,15 @@ export class CrystalCircuitElement extends AbstractCircuitElement {
 
 
 // ---------------------------------------------------------------------------
-// AnalogCrystalElement â€” MNA implementation
+// AnalogCrystalElement  MNA implementation
 // ---------------------------------------------------------------------------
 
 export class AnalogCrystalElement implements ReactiveAnalogElement {
   readonly pinNodeIds: readonly number[];
   readonly allNodeIds: readonly number[];
-  readonly branchIndex: number;
+  branchIndex: number = -1;
+  _stateBase: number = -1;
+  _pinNodes: Map<string, number> = new Map();
   readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.CAP;
   readonly isNonlinear = false;
   readonly isReactive = true;
@@ -270,7 +274,7 @@ export class AnalogCrystalElement implements ReactiveAnalogElement {
   private C_s: number;
   private C_0: number;
 
-  // Pool reference â€” set by initState(); state arrays accessed via pool.states[N] at call time.
+  // Pool reference  set by initState(); state arrays accessed via pool.states[N] at call time.
   private _pool!: StatePoolRef;
 
   /**
@@ -283,7 +287,6 @@ export class AnalogCrystalElement implements ReactiveAnalogElement {
    */
   constructor(
     pinNodeIds: number[],
-    branchIndex: number,
     Rs: number,
     Ls: number,
     Cs: number,
@@ -291,11 +294,14 @@ export class AnalogCrystalElement implements ReactiveAnalogElement {
   ) {
     this.pinNodeIds = pinNodeIds;
     this.allNodeIds = pinNodeIds;
-    this.branchIndex = branchIndex;
     this.G_s = 1 / Math.max(Rs, 1e-12);
     this.L_s = Ls;
     this.C_s = Cs;
     this.C_0 = C0;
+  }
+
+  setup(_ctx: SetupContext): void {
+    throw new Error("PB-CRYSTAL not yet migrated");
   }
 
   initState(pool: StatePoolRef): void {
@@ -311,13 +317,13 @@ export class AnalogCrystalElement implements ReactiveAnalogElement {
   }
 
   /**
-   * Unified load() â€” BVD crystal model.
+   * Unified load()  BVD crystal model.
    *
    * Stamps in one pass:
-   *   - R_s series conductance (nA â†” n1, topology-constant).
-   *   - L_s branch incidence + NIintegrate companion (n1 â†” n2).
-   *   - C_s series capacitor companion (n2 â†” nB) via inline NIintegrate.
-   *   - C_0 shunt capacitor companion (nA â†” nB) via inline NIintegrate.
+   *   - R_s series conductance (nA â†" n1, topology-constant).
+   *   - L_s branch incidence + NIintegrate companion (n1 â†" n2).
+   *   - C_s series capacitor companion (n2 â†" nB) via inline NIintegrate.
+   *   - C_0 shunt capacitor companion (nA â†" nB) via inline NIintegrate.
    * All three reactive components use ctx.ag[] coefficients directly.
    */
   load(ctx: LoadContext): void {
@@ -330,7 +336,7 @@ export class AnalogCrystalElement implements ReactiveAnalogElement {
     const b = this.branchIndex;
     const base = this.stateBaseOffset;
 
-    // R_s conductance (nA â†” n1).
+    // R_s conductance (nA â†" n1).
     stampG(solver, nA, nA, this.G_s);
     stampG(solver, nA, n1, -this.G_s);
     stampG(solver, n1, nA, -this.G_s);
@@ -437,7 +443,7 @@ export class AnalogCrystalElement implements ReactiveAnalogElement {
       solver.stampElement(solver.allocElement(b, b), -geqL);
       stampRHS(ctx.rhs,b, ceqL);
 
-      // C_s companion stamp (n2 â†” nB).
+      // C_s companion stamp (n2 â†" nB).
       stampG(solver, n2, n2, geqCs);
       stampG(solver, n2, nB, -geqCs);
       stampG(solver, nB, n2, -geqCs);
@@ -445,7 +451,7 @@ export class AnalogCrystalElement implements ReactiveAnalogElement {
       if (n2 !== 0) stampRHS(ctx.rhs,n2, -ceqCs);
       if (nB !== 0) stampRHS(ctx.rhs,nB, ceqCs);
 
-      // C_0 companion stamp (nA â†” nB).
+      // C_0 companion stamp (nA â†" nB).
       stampG(solver, nA, nA, geqC0);
       stampG(solver, nA, nB, -geqC0);
       stampG(solver, nB, nA, -geqC0);
@@ -554,21 +560,19 @@ export class AnalogCrystalElement implements ReactiveAnalogElement {
 
 function buildCrystalElementFromParams(
   pinNodes: ReadonlyMap<string, number>,
-  internalNodeIds: readonly number[],
-  branchIdx: number,
   p: { frequency: number; qualityFactor: number; motionalCapacitance: number; shuntCapacitance: number },
 ): AnalogElementCore {
   const Ls = crystalMotionalInductance(p.frequency, p.motionalCapacitance);
   const Rs = crystalSeriesResistance(p.frequency, Ls, p.qualityFactor);
 
   const el = new AnalogCrystalElement(
-    [pinNodes.get("A")!, pinNodes.get("B")!, internalNodeIds[0], internalNodeIds[1]],
-    branchIdx,
+    [pinNodes.get("A")!, pinNodes.get("B")!, -1, -1],
     Rs,
     Ls,
     p.motionalCapacitance,
     p.shuntCapacitance,
   );
+  el._pinNodes = new Map(pinNodes);
 
   (el as AnalogElementCore).setParam = function(key: string, value: number): void {
     if (key in p) {
@@ -583,9 +587,8 @@ function buildCrystalElementFromParams(
 
 export function createCrystalElement(
   pinNodes: ReadonlyMap<string, number>,
-  internalNodeIds: readonly number[],
-  branchIdx: number,
   props: PropertyBag,
+  _getTime: () => number,
 ): AnalogElementCore {
   const p = {
     frequency:           props.getModelParam<number>("frequency"),
@@ -593,7 +596,7 @@ export function createCrystalElement(
     motionalCapacitance: props.getModelParam<number>("motionalCapacitance"),
     shuntCapacitance:    props.getModelParam<number>("shuntCapacitance"),
   };
-  return buildCrystalElementFromParams(pinNodes, internalNodeIds, branchIdx, p);
+  return buildCrystalElementFromParams(pinNodes, p);
 }
 
 // ---------------------------------------------------------------------------
@@ -679,7 +682,7 @@ export const CrystalDefinition: ComponentDefinition = {
   attributeMap: CRYSTAL_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.PASSIVES,
   helpText:
-    "Quartz crystal â€” Butterworth-Van Dyke equivalent circuit model.\n" +
+    "Quartz crystal  Butterworth-Van Dyke equivalent circuit model.\n" +
     "Series RLC motional arm in parallel with shunt electrode capacitance.",
   models: {},
   modelRegistry: {

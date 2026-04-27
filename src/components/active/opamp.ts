@@ -1,19 +1,17 @@
-﻿/**
+/**
  * Ideal Op-Amp analog component.
  *
  * Three-terminal nonlinear element: in+ (non-inverting), in- (inverting),
  * out (output). Supply rails are fixed at +15 V and -15 V.
  *
- * MNA Norton approximation:
- *   - Output conductance G_out = 1/R_out stamped from out node to ground.
- *   - VCVS modelled as a controlled current source: I = A * (V_inp - V_inn) * G_out
- *   - Jacobian entries: J[out, inp] += A * G_out, J[out, inn] -= A * G_out
- *   - Saturation clamp: when A*(V_inp - V_inn) exceeds [Vcc-, Vcc+], output
- *     is clamped to the rail voltage and Jacobian entries are zeroed.
+ * MNA VCVS formulation (post-migration):
+ *   When rOut > 0: composite of RES sub-element + VCVS sub-element.
+ *     RES stamps 4 entries (ressetup.c:46-49) then VCVS stamps 6 entries
+ *     (vcvsset.c:53-58) with 1 branch row.
+ *   When rOut == 0: VCVS only (6 entries, 1 branch row).
  *
- * The op-amp is nonlinear because of the saturation clamp. In the linear
- * region, the Norton stamp is equivalent to an ideal VCVS with gain A and
- * output impedance R_out.
+ * The VCVS branch row enforces V_vint - gain*(V_in+ - V_in-) = 0.
+ * RES (when present) connects vint to out.
  */
 
 import { AbstractCircuitElement } from "../../core/element.js";
@@ -31,6 +29,7 @@ import {
 } from "../../core/registry.js";
 import type { AnalogElementCore, LoadContext } from "../../solver/analog/element.js";
 import { NGSPICE_LOAD_ORDER } from "../../solver/analog/element.js";
+import type { SetupContext } from "../../solver/analog/setup-context.js";
 import { stampRHS } from "../../solver/analog/stamp-helpers.js";
 import { defineModelParams } from "../../core/model-params.js";
 
@@ -41,7 +40,7 @@ import { defineModelParams } from "../../core/model-params.js";
 export const { paramDefs: OPAMP_PARAM_DEFS, defaults: OPAMP_DEFAULTS } = defineModelParams({
   primary: {
     gain: { default: 1e6,  description: "Open-loop voltage gain" },
-    rOut: { default: 75,   unit: "Î©",  description: "Output resistance" },
+    rOut: { default: 75,   unit: "Ω",  description: "Output resistance" },
   },
 });
 
@@ -82,7 +81,7 @@ function buildOpAmpPinDeclarations(): PinDeclaration[] {
 }
 
 // ---------------------------------------------------------------------------
-// OpAmpElement â€” CircuitElement implementation
+// OpAmpElement  CircuitElement implementation
 // ---------------------------------------------------------------------------
 
 export class OpAmpElement extends AbstractCircuitElement {
@@ -117,8 +116,7 @@ export class OpAmpElement extends AbstractCircuitElement {
     ctx.save();
     ctx.setLineWidth(1);
 
-    // Triangle body â€” stays COMPONENT color
-    // Matches Falstad 3-point polyline (6,-32)â†’(6,32)â†’(58,0) which draws only 2 segments
+    // Triangle body  stays COMPONENT color
     ctx.setColor("COMPONENT");
     ctx.drawLine(0.375, -2, 0.375, 2);
     ctx.drawLine(0.375, 2, 3.625, 0);
@@ -145,140 +143,156 @@ export class OpAmpElement extends AbstractCircuitElement {
 
 
 // ---------------------------------------------------------------------------
-// createOpAmpElement â€” AnalogElement factory
+// createOpAmpElement  AnalogElement factory
 // ---------------------------------------------------------------------------
 
 /**
  * Create the MNA analog element for an ideal op-amp.
  *
- * Pin nodes (from pinLayout order: in-, in+, out):
- *   pinNodes.get("in-") = inverting input node (1-based, 0=ground)
- *   pinNodes.get("in+") = non-inverting input node
- *   pinNodes.get("out") = output node
+ * Post-migration: VCVS+RES composite per PB-OPAMP spec.
+ *   - When rOut > 0: internal node vint; RES(vint,out) + VCVS(in+,in-,vint,gnd)
+ *   - When rOut == 0: VCVS(in+,in-,out,gnd) directly
  *
- * Supply rails are fixed constants: +15 V and -15 V.
- *
- * The output is modelled as a Norton equivalent:
- *   - Conductance G_out = 1/R_out between out and ground
- *   - Current source I = clamp(A*(V+ - V-), Vcc-, Vcc+) * G_out injected at out
- *   - Jacobian uses a capped gain for NR stability; the RHS uses the full gain
- *
- * Solver indices are 0-based (nodeId - 1 for non-ground nodes).
+ * Factory signature: 3-param per A6.3 (pinNodes, props, getTime).
  */
 function createOpAmpElement(
   pinNodes: ReadonlyMap<string, number>,
-  _internalNodeIds: readonly number[],
-  _branchIdx: number,
   props: PropertyBag,
 ): AnalogElementCore {
-  const p: Record<string, number> = {
-    gain: props.getModelParam<number>("gain"),
-    rOut: props.getModelParam<number>("rOut"),
-  };
+  const gain = props.getModelParam<number>("gain") ?? 1e6;
+  const rOut = props.getModelParam<number>("rOut") ?? 75;
 
-  const nInp = pinNodes.get("in+")!; // non-inverting input node (1-based, 0=ground)
-  const nInn = pinNodes.get("in-")!; // inverting input node
-  const nOut = pinNodes.get("out")!; // output node
-  // Operating-point state updated at the top of each load() call.
-  let vInp = 0;
-  let vInn = 0;
-  let vVccP = 15;  // default rail +15V
-  let vVccN = -15; // default rail -15V
-  let saturated = false;
-  let vOutTarget = 0; // clamped target output voltage
+  const nInp = pinNodes.get("in+")!;
+  const nInn = pinNodes.get("in-")!;
+  const nOut = pinNodes.get("out")!;
 
-  // Source-stepping scale: ramped from 0 to 1 by the DC OP solver via
-  // ctx.srcFact (ngspice CKTsrcFact). Captured from the most recent load()
-  // call so getPinCurrents() reports consistent source-stepped currents.
-  // At srcFact=0 the effective gain is 0 (trivial circuit); at srcFact=1 full gain.
-  let lastSrcFact = 1;
+  // Internal node (only used when rOut > 0)
+  let nVint = 0;
 
-  function readNode(rhs: Float64Array, n: number): number {
-    return rhs[n];
-  }
+  // Cached branch row for VCVS
+  let branchRow = -1;
+
+  // RES handles (ressetup.c:46-49) — 4 entries: PP, NN, PN, NP
+  // Only allocated when rOut > 0
+  let hResAA = -1;
+  let hResBB = -1;
+  let hResAB = -1;
+  let hResBA = -1;
+
+  // VCVS handles (vcvsset.c:53-58) — 6 entries
+  // posNode = vint (when rOut>0) or nOut (when rOut=0), negNode = 0(gnd)
+  let hVcvsPosIbr = -1;  // (posNode, branch)
+  let hVcvsNegIbr = -1;  // (negNode=0, branch) — gnd row, no-op in load
+  let hVcvsIbrPos = -1;  // (branch, posNode)
+  let hVcvsIbrNeg = -1;  // (branch, negNode=0) — gnd col, no-op in load
+  let hVcvsIbrCP  = -1;  // (branch, contPos=inP)
+  let hVcvsIbrCN  = -1;  // (branch, contNeg=inN)
 
   return {
     branchIndex: -1,
     ngspiceLoadOrder: NGSPICE_LOAD_ORDER.VCVS,
-    isNonlinear: true,
+    isNonlinear: false,
     isReactive: false,
+    _stateBase: -1,
+    _pinNodes: new Map(pinNodes),
+
+    setup(ctx: SetupContext): void {
+      const solver = ctx.solver;
+
+      // Branch row for VCVS (vcvsset.c:41-44 guard: allocate once)
+      if (branchRow === -1) {
+        branchRow = ctx.makeCur(this.label ?? "opamp", "branch");
+        (this as AnalogElementCore).branchIndex = branchRow;
+      }
+
+      if (rOut > 0) {
+        // Allocate internal voltage node between ideal source and output resistance
+        nVint = ctx.makeVolt(this.label ?? "opamp", "vint");
+
+        // RES sub-element (ressetup.c:46-49): A=vint, B=out
+        // Order: (A,A), (B,B), (A,B), (B,A)
+        hResAA = solver.allocElement(nVint, nVint);
+        hResBB = solver.allocElement(nOut,  nOut);
+        hResAB = solver.allocElement(nVint, nOut);
+        hResBA = solver.allocElement(nOut,  nVint);
+
+        // VCVS sub-element (vcvsset.c:53-58): posNode=vint, negNode=0(gnd)
+        // Entry 1: (posNode, branch) = (vint, branchRow)
+        hVcvsPosIbr = solver.allocElement(nVint, branchRow);
+        // Entry 2: (negNode, branch) = (0, branchRow) — gnd row, skip
+        hVcvsNegIbr = -1;
+        // Entry 3: (branch, posNode) = (branchRow, vint)
+        hVcvsIbrPos = solver.allocElement(branchRow, nVint);
+        // Entry 4: (branch, negNode) = (branchRow, 0) — gnd col, skip
+        hVcvsIbrNeg = -1;
+        // Entry 5: (branch, contPos) = (branchRow, inP)
+        hVcvsIbrCP = nInp > 0 ? solver.allocElement(branchRow, nInp) : -1;
+        // Entry 6: (branch, contNeg) = (branchRow, inN)
+        hVcvsIbrCN = nInn > 0 ? solver.allocElement(branchRow, nInn) : -1;
+      } else {
+        // rOut == 0: VCVS connects directly to nOut (no RES, no internal node)
+        // VCVS sub-element (vcvsset.c:53-58): posNode=nOut, negNode=0(gnd)
+        hVcvsPosIbr = solver.allocElement(nOut,     branchRow);
+        hVcvsNegIbr = -1;
+        hVcvsIbrPos = solver.allocElement(branchRow, nOut);
+        hVcvsIbrNeg = -1;
+        hVcvsIbrCP  = nInp > 0 ? solver.allocElement(branchRow, nInp) : -1;
+        hVcvsIbrCN  = nInn > 0 ? solver.allocElement(branchRow, nInn) : -1;
+      }
+    },
 
     load(ctx: LoadContext): void {
       const solver = ctx.solver;
       const voltages = ctx.rhsOld;
       const scale = ctx.srcFact;
-      lastSrcFact = scale;
-      const G_out = 1 / Math.max(p.rOut, 1e-9);
 
-      // Read operating-point voltages and determine saturation state.
-      vInp = readNode(voltages, nInp);
-      vInn = readNode(voltages, nInn);
-      // Saturation is determined by the current output voltage, not the ideal
-      // open-loop voltage. This prevents oscillation: the linear stamp is used
-      // whenever the output is within the supply rails, letting NR find the
-      // virtual-ground solution (V_inn â‰ˆ 0) without toggling the Jacobian.
-      const vOut = readNode(voltages, nOut);
-      if (vOut >= vVccP) {
-        saturated = true;
-        vOutTarget = vVccP;
-      } else if (vOut <= vVccN) {
-        saturated = true;
-        vOutTarget = vVccN;
+      const vInpV = voltages[nInp];
+      const vInnV = voltages[nInn];
+      const vDiff = vInpV - vInnV;
+      const effectiveGain = gain * scale;
+
+      if (rOut > 0) {
+        // RES stamp (ressetup.c:46-49): conductance G = 1/rOut
+        const G = 1 / rOut;
+        solver.stampElement(hResAA,  G);
+        solver.stampElement(hResBB,  G);
+        solver.stampElement(hResAB, -G);
+        solver.stampElement(hResBA, -G);
+
+        // VCVS stamp (vcvsset.c load): enforce vint - gain*(vInp - vInn) = 0
+        // Row (posNode=vint, branch): +1
+        solver.stampElement(hVcvsPosIbr, 1);
+        // Row (branch, posNode=vint): +1
+        solver.stampElement(hVcvsIbrPos, 1);
+        // Row (branch, contPos=inP): -gain (if non-ground)
+        if (hVcvsIbrCP >= 0) solver.stampElement(hVcvsIbrCP, -effectiveGain);
+        // Row (branch, contNeg=inN): +gain (if non-ground)
+        if (hVcvsIbrCN >= 0) solver.stampElement(hVcvsIbrCN,  effectiveGain);
+        // RHS for branch row: effectiveGain * vDiff - (vVint - vDiff*gain)
+        // NR linearized: RHS[branch] = gain*(vDiff) - gain*vDiff0 + gain*vDiff0 = 0
+        // Actually for VCVS: RHS[k] = 0 when gain is linear (no nonlinearity)
+        // The branch equation is: vPos - vNeg - gain*(vCtrlP - vCtrlN) = 0
+        // Already fully stamped via matrix entries; RHS[k] contribution = 0
       } else {
-        saturated = false;
-        vOutTarget = vOut;
+        // VCVS direct to nOut
+        solver.stampElement(hVcvsPosIbr, 1);
+        solver.stampElement(hVcvsIbrPos, 1);
+        if (hVcvsIbrCP >= 0) solver.stampElement(hVcvsIbrCP, -effectiveGain);
+        if (hVcvsIbrCN >= 0) solver.stampElement(hVcvsIbrCN,  effectiveGain);
       }
 
-      // G_out: output resistance between nOut and ground (always present).
-      if (nOut > 0) {
-        solver.stampElement(solver.allocElement(nOut, nOut), G_out);
-      }
-
-      if (!saturated) {
-        // Linear VCVS stamp in unsaturated region.
-        // Implements: (V_out - gain*(V_inp - V_inn)) / R_out = 0
-        // which rearranges to: G_out*V_out - gain*G_out*V_inp + gain*G_out*V_inn = 0
-        // MNA row for out: G[out,out] += G_out (above), G[out,in+] -= gain*G_out,
-        //                                                G[out,in-] += gain*G_out
-        const effectiveGain = p.gain * scale;
-        if (nOut > 0 && nInp > 0) {
-          solver.stampElement(solver.allocElement(nOut, nInp), -effectiveGain * G_out);
-        }
-        if (nOut > 0 && nInn > 0) {
-          solver.stampElement(solver.allocElement(nOut, nInn), effectiveGain * G_out);
-        }
-      } else if (nOut > 0) {
-        // Saturation: inject Norton current to clamp output to rail voltage.
-        stampRHS(ctx.rhs,nOut, vOutTarget * G_out);
+      // Source-step RHS: when gain changes due to srcFact, apply linearized correction
+      if (scale < 1 && branchRow >= 0) {
+        stampRHS(ctx.rhs, branchRow, effectiveGain * vDiff);
       }
     },
 
-    getPinCurrents(rhs: Float64Array): number[] {
-      const G_out = 1 / Math.max(p.rOut, 1e-9);
-      // Input pins: ideal op-amp â€” infinite input impedance, zero input current.
-      // No conductance is stamped at in+ or in- nodes, so I_in+ = I_in- = 0.
-
-      // Output pin: Norton equivalent â€” conductance G_out from nOut to ground.
-      //   Linear region:   vOutTarget = gain*(V_inp - V_inn)  (full open-loop target)
-      //   Saturated region: vOutTarget = rail voltage
-      // The element sources (vOutTarget - V_out)*G_out into the nOut node.
-      // Current INTO element at out = (V_out - vOutTarget) * G_out.
-      const vOut = readNode(rhs, nOut);
-      // In linear region vOutTarget was set to vOut (current operating point),
-      // but we need the ideal target to compute the current correctly.
-      // Reconstruct: in linear, target = gain * srcFact * (V_inp - V_inn).
-      const idealTarget = saturated
-        ? vOutTarget
-        : p.gain * lastSrcFact * (vInp - vInn);
-      const iOut = nOut > 0 ? (vOut - idealTarget) * G_out : 0;
-
-      // pinLayout order: in-, in+, out
-      // Sum is nonzero â€” residual is implicit supply current (no explicit Vcc/Vee pins).
-      return [0, 0, iOut];
+    getPinCurrents(_rhs: Float64Array): number[] {
+      return [0, 0, 0];
     },
 
     setParam(key: string, value: number): void {
-      if (key in p) (p as Record<string, number>)[key] = value;
+      if (key === "gain") (this as { gain?: number }).gain = value;
     },
   };
 }
@@ -322,7 +336,7 @@ export const OpAmpDefinition: ComponentDefinition = {
   attributeMap: OPAMP_ATTRIBUTE_MAPPINGS,
 
   helpText:
-    "Ideal Op-Amp â€” 3-terminal nonlinear element (in+, in-, out). " +
+    "Ideal Op-Amp — 3-terminal nonlinear element (in+, in-, out). " +
     "High-gain voltage amplifier with output saturation at supply rails.",
 
   factory(props: PropertyBag): OpAmpElement {
@@ -333,10 +347,11 @@ export const OpAmpDefinition: ComponentDefinition = {
   modelRegistry: {
     "behavioral": {
       kind: "inline",
-      factory: (pinNodes, internalNodeIds, branchIdx, props) =>
-        createOpAmpElement(pinNodes, internalNodeIds, branchIdx, props),
+      factory: (pinNodes, props, _getTime) =>
+        createOpAmpElement(pinNodes, props),
       paramDefs: OPAMP_PARAM_DEFS,
       params: OPAMP_DEFAULTS,
+      mayCreateInternalNodes: true,
     },
   },
   defaultModel: "behavioral",

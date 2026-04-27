@@ -1,5 +1,5 @@
 ﻿/**
- * Lossy Transmission Line â€” lumped RLCG model.
+ * Lossy Transmission Line  lumped RLCG model.
  *
  * Models a transmission line as N cascaded RLCG segments. Each segment has:
  *   - Series resistance R_seg (conductor loss)
@@ -12,14 +12,14 @@
  *
  * Internal topology for N segments (segments 0..N-2 have a mid-node):
  *
- *   Port1 â”€Râ”€Lâ”€ junction[0] â”€Râ”€Lâ”€ junction[1] â”€ ... â”€Râ”€Lâ”€ Port2
+ *   Port1 €R€L€ junction[0] €R€L€ junction[1] € ... €R€L€ Port2
  *                   |                  |
  *                  G,C                G,C
  *                   |                  |
  *                  GND               GND
  *
- * Segments 0..N-2: inputNode â†’ R â†’ rlMid[k] â†’ L â†’ junction[k], shunt G+C at junction[k]
- * Segment N-1 (last): junction[N-2] â†’ CombinedRL â†’ Port2 (no shunt at Port2)
+ * Segments 0..N-2: inputNode  R  rlMid[k]  L  junction[k], shunt G+C at junction[k]
+ * Segment N-1 (last): junction[N-2]  CombinedRL  Port2 (no shunt at Port2)
  *
  * Internal node allocation (matches getInternalNodeCount = 2*(N-1)):
  *   nodeIds[0]             = Port1 (external)
@@ -31,7 +31,7 @@
  *
  * MNA stamp conventions:
  *   Inductor with nodes A, B, branch row k:
- *     B sub-matrix: G[A-1, k] += 1,  G[B-1, k] -= 1   (KCL: I_k flows Aâ†’B)
+ *     B sub-matrix: G[A-1, k] += 1,  G[B-1, k] -= 1   (KCL: I_k flows AB)
  *     C sub-matrix: G[k, A-1] += ..., G[k, B-1] -= ... (KVL + companion)
  *     D sub-matrix: G[k, k] -= geq
  *     RHS[k] += ieq
@@ -49,8 +49,10 @@ import {
   type AttributeMapping,
   type ComponentDefinition,
 } from "../../core/registry.js";
-import type { AnalogElement, AnalogElementCore, ReactiveAnalogElement, IntegrationMethod, LoadContext } from "../../solver/analog/element.js";
-import { NGSPICE_LOAD_ORDER } from "../../solver/analog/element.js";
+import type { AnalogElementCore } from "../../core/analog-types.js";
+import { NGSPICE_LOAD_ORDER } from "../../core/analog-types.js";
+import type { AnalogElement, ReactiveAnalogElement, IntegrationMethod, LoadContext } from "../../solver/analog/element.js";
+import type { SetupContext } from "../../solver/analog/setup-context.js";
 import { MODEDC, MODETRAN, MODETRANOP, MODEINITPRED, MODEINITTRAN } from "../../solver/analog/ckt-mode.js";
 import { stampG, stampRHS } from "../../solver/analog/stamp-helpers.js";
 import { cktTerr } from "../../solver/analog/ckt-terr.js";
@@ -126,7 +128,7 @@ export const { paramDefs: TRANSMISSION_LINE_PARAM_DEFS, defaults: TRANSMISSION_L
 });
 
 // ---------------------------------------------------------------------------
-// Stamp helpers â€” node 0 is ground (skipped), 1-based â†’ 0-based solver index
+// Stamp helpers  node 0 is ground (skipped), 1-based  0-based solver index
 // ---------------------------------------------------------------------------
 
 
@@ -176,7 +178,7 @@ function buildTransmissionLinePinDeclarations(): PinDeclaration[] {
 }
 
 // ---------------------------------------------------------------------------
-// TransmissionLineCircuitElement â€” CircuitElement for rendering
+// TransmissionLineCircuitElement  CircuitElement for rendering
 // ---------------------------------------------------------------------------
 
 export class TransmissionLineCircuitElement extends AbstractCircuitElement {
@@ -195,7 +197,7 @@ export class TransmissionLineCircuitElement extends AbstractCircuitElement {
   }
 
   getBoundingBox(): Rect {
-    // Falstad: fillRect(0, 0, 66, 18) px â†’ (0,0) to (4.125, 1.125) grid units
+    // Falstad: fillRect(0, 0, 66, 18) px  (0,0) to (4.125, 1.125) grid units
     // Component spans from top rail (y=0) to bottom rail (y=1), x from 0 to 4
     return {
       x: this.position.x,
@@ -239,7 +241,7 @@ export class TransmissionLineCircuitElement extends AbstractCircuitElement {
 }
 
 // ---------------------------------------------------------------------------
-// SegmentResistorElement â€” series R within one segment
+// SegmentResistorElement  series R within one segment
 // ---------------------------------------------------------------------------
 
 class SegmentResistorElement implements AnalogElement {
@@ -278,7 +280,7 @@ class SegmentResistorElement implements AnalogElement {
 }
 
 // ---------------------------------------------------------------------------
-// SegmentShuntConductanceElement â€” shunt G from junction to GND
+// SegmentShuntConductanceElement  shunt G from junction to GND
 // ---------------------------------------------------------------------------
 
 class SegmentShuntConductanceElement implements AnalogElement {
@@ -311,7 +313,7 @@ class SegmentShuntConductanceElement implements AnalogElement {
 }
 
 // ---------------------------------------------------------------------------
-// SegmentInductorElement â€” series L with proper B+C MNA stamp
+// SegmentInductorElement  series L with proper B+C MNA stamp
 //
 // Uses explicit B-sub-matrix stamping so the inductor branch current appears
 // in KCL equations at both nodes. This avoids singularity at DC (geq=0).
@@ -319,7 +321,7 @@ class SegmentShuntConductanceElement implements AnalogElement {
 // DC model (before first stampCompanion, companionActive=false):
 //   B sub-matrix: G[nA-1, b] += 1, G[nB-1, b] -= 1
 //   C sub-matrix: G[b, nA-1] = 1, G[b, nB-1] = -1
-//   (enforces V_A = V_B â€” short circuit at DC)
+//   (enforces V_A = V_B  short circuit at DC)
 //
 // Transient model (after stampCompanion):
 //   G-block:  geq contribution (conductance equivalent of companion model)
@@ -418,7 +420,7 @@ class SegmentInductorElement implements ReactiveAnalogElement {
     s0[base + SLOT_IEQ]    = ceq;
     s0[base + SLOT_I_PREV] = iNow;
 
-    // Unconditional stamps â€” indload.c:119-123 literal. DC writes req=veq=0
+    // Unconditional stamps  indload.c:119-123 literal. DC writes req=veq=0
     // to the allocated slots; the handle table preserves structural nonzeros.
     if (nA !== 0) solver.stampElement(solver.allocElement(nA, b), 1);
     if (nB !== 0) solver.stampElement(solver.allocElement(nB, b), -1);
@@ -435,7 +437,7 @@ class SegmentInductorElement implements ReactiveAnalogElement {
 }
 
 // ---------------------------------------------------------------------------
-// SegmentCapacitorElement â€” shunt C from junction to GND
+// SegmentCapacitorElement  shunt C from junction to GND
 //
 // Companion model: geq in parallel with ieq current source (Norton).
 // RHS convention at node A: KCL requires the history current to push
@@ -544,7 +546,7 @@ class SegmentCapacitorElement implements ReactiveAnalogElement {
 }
 
 // ---------------------------------------------------------------------------
-// CombinedRLElement â€” series R + L with proper B+C MNA stamp (no mid-node)
+// CombinedRLElement  series R + L with proper B+C MNA stamp (no mid-node)
 //
 // Used for the last segment. The series R is absorbed into the branch equation:
 //   V_A - V_B = (R + geqL) * I_b - ieq
@@ -646,7 +648,7 @@ class CombinedRLElement implements ReactiveAnalogElement {
     s0[base + SLOT_IEQ]    = ceq;
     s0[base + SLOT_I_PREV] = iNow;
 
-    // Unconditional stamps â€” indload.c:119-123 plus the constant -R on branch
+    // Unconditional stamps  indload.c:119-123 plus the constant -R on branch
     // diagonal. Branch equation: V(A) - V(B) - (R + geq)Â·I = ceq.
     // In DC with lossless (R=0) the diagonal stamps -= 0; handle table keeps
     // the structural nonzero so Modified Nodal Analysis stays non-singular
@@ -666,13 +668,15 @@ class CombinedRLElement implements ReactiveAnalogElement {
 }
 
 // ---------------------------------------------------------------------------
-// TransmissionLineElement â€” composite AnalogElement
+// TransmissionLineElement  composite AnalogElement
 // ---------------------------------------------------------------------------
 
 export class TransmissionLineElement implements AnalogElement {
   readonly pinNodeIds: readonly number[];
   readonly allNodeIds: readonly number[];
-  readonly branchIndex: number;
+  branchIndex: number = -1;
+  _stateBase: number = -1;
+  _pinNodes: Map<string, number> = new Map();
   readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.TRA;
   readonly isNonlinear = false;
   readonly isReactive = true;
@@ -691,7 +695,6 @@ export class TransmissionLineElement implements AnalogElement {
 
   constructor(
     nodeIds: number[],
-    firstBranchIdx: number,
     z0: number,
     delay: number,
     lossDb: number,
@@ -700,7 +703,6 @@ export class TransmissionLineElement implements AnalogElement {
   ) {
     this.pinNodeIds = nodeIds;
     this.allNodeIds = nodeIds;
-    this.branchIndex = firstBranchIdx;
 
     const N = segments;
 
@@ -712,7 +714,7 @@ export class TransmissionLineElement implements AnalogElement {
 
     // Convert dB/m loss to per-segment R and G.
     // Î± (Np/m) = lossDb Ã— ln(10) / 20
-    // R â‰ˆ 2Î± Zâ‚€ per unit length,  G â‰ˆ 2Î± / Zâ‚€ per unit length
+    // R  2Î± Zâ‚€ per unit length,  G  2Î± / Zâ‚€ per unit length
     let rSeg = 0;
     let gSeg = 0;
     if (lossDb > 0) {
@@ -735,38 +737,37 @@ export class TransmissionLineElement implements AnalogElement {
 
     for (let k = 0; k < N; k++) {
       const inputNode = k === 0 ? nodeIds[0] : junctionNodes[k - 1];
-      const branchIdxForL = firstBranchIdx + k;
 
       if (k < N - 1) {
         const rlMid = rlMidNodes[k];
         const junctionNode = junctionNodes[k];
 
-        // Series R: inputNode â†’ rlMid
+        // Series R: inputNode  rlMid
         this._subElements.push(new SegmentResistorElement(inputNode, rlMid, rSeg));
 
-        // Series L: rlMid â†’ junctionNode
+        // Series L: rlMid  junctionNode
         this._subElements.push(
-          new SegmentInductorElement(rlMid, junctionNode, branchIdxForL, lSeg),
+          new SegmentInductorElement(rlMid, junctionNode, -1, lSeg),
         );
 
-        // Shunt G: junctionNode â†’ GND (lossy only)
+        // Shunt G: junctionNode  GND (lossy only)
         if (gSeg > 0) {
           this._subElements.push(new SegmentShuntConductanceElement(junctionNode, gSeg));
         }
 
-        // Shunt C: junctionNode â†’ GND
+        // Shunt C: junctionNode  GND
         this._subElements.push(new SegmentCapacitorElement(junctionNode, cSeg));
       } else {
         // Last segment: combined RL to Port2, no shunt at Port2.
         this._subElements.push(
-          new CombinedRLElement(inputNode, nodeIds[1], branchIdxForL, rSeg, lSeg),
+          new CombinedRLElement(inputNode, nodeIds[1], -1, rSeg, lSeg),
         );
       }
     }
 
-    // Branch indices for getPinCurrents.
-    this._firstBranchIdx = firstBranchIdx;
-    this._lastBranchIdx = firstBranchIdx + N - 1;
+    // Branch indices for getPinCurrents — set to -1 until setup() assigns them.
+    this._firstBranchIdx = -1;
+    this._lastBranchIdx = -1;
 
     // Compute total state size from all reactive sub-elements.
     let totalState = 0;
@@ -778,6 +779,10 @@ export class TransmissionLineElement implements AnalogElement {
     this.stateSize = totalState;
     // stateSchema is unused for the composite but must be set; use empty schema.
     this.stateSchema = defineStateSchema("TransmissionLineElement", []);
+  }
+
+  setup(_ctx: SetupContext): void {
+    throw new Error("PB-TLINE not yet migrated");
   }
 
   initState(pool: StatePoolRef): void {
@@ -825,18 +830,18 @@ export class TransmissionLineElement implements AnalogElement {
 
   /**
    * Per-pin currents for the 4 external pins in pinLayout order:
-   *   [0] P1b â€” Port1 high side
-   *   [1] P2b â€” Port2 high side
-   *   [2] P1a â€” Port1 return (ground side)
-   *   [3] P2a â€” Port2 return (ground side)
+   *   [0] P1b  Port1 high side
+   *   [1] P2b  Port2 high side
+   *   [2] P1a  Port1 return (ground side)
+   *   [3] P2a  Port2 return (ground side)
    *
-   * Current into Port1 = branch current of first segment's inductor (rlMid0 â†’ junction0).
+   * Current into Port1 = branch current of first segment's inductor (rlMid0  junction0).
    * The series R and L in segment 0 are in series, so I_R = I_L = I_firstBranch.
    * This holds for both lossless (R=0) and lossy cases.
    *
    * Current into Port2 = -I_lastBranch: the last CombinedRL branch current flows
-   * from the last junction INTO Port2 (nAâ†’nB), so it exits the element externally
-   * at Port2 â†’ negative from the element's perspective.
+   * from the last junction INTO Port2 (nAnB), so it exits the element externally
+   * at Port2  negative from the element's perspective.
    *
    * P1a and P2a are the ground-return pins: they carry the equal-and-opposite
    * return current relative to their corresponding high-side pin.
@@ -845,7 +850,7 @@ export class TransmissionLineElement implements AnalogElement {
     // First segment inductor branch current = current entering Port1 from external.
     const iPort1 = rhs[this._firstBranchIdx];
 
-    // Last CombinedRL branch flows from last junction â†’ Port2 (exits externally).
+    // Last CombinedRL branch flows from last junction  Port2 (exits externally).
     const iPort2 = -rhs[this._lastBranchIdx];
 
     // Return pins carry equal-and-opposite ground return current.
@@ -859,8 +864,6 @@ export class TransmissionLineElement implements AnalogElement {
 
 function buildTransmissionLineElement(
   pinNodes: ReadonlyMap<string, number>,
-  internalNodeIds: readonly number[],
-  branchIdx: number,
   impedance: number,
   delay: number,
   lossPerMeter: number,
@@ -871,9 +874,9 @@ function buildTransmissionLineElement(
   const nodeIds = [
     pinNodes.get("P1b")!,
     pinNodes.get("P2b")!,
-    ...internalNodeIds,
   ];
-  const el = new TransmissionLineElement(nodeIds, branchIdx, p.impedance, p.delay, p.lossPerMeter, p.length, p.segments);
+  const el = new TransmissionLineElement(nodeIds, p.impedance, p.delay, p.lossPerMeter, p.length, p.segments);
+  el._pinNodes = new Map(pinNodes);
   (el as AnalogElementCore).setParam = function(key: string, value: number): void {
     if (key in p) {
       (p as Record<string, number>)[key] = value;
@@ -884,14 +887,11 @@ function buildTransmissionLineElement(
 
 function createTransmissionLineElement(
   pinNodes: ReadonlyMap<string, number>,
-  internalNodeIds: readonly number[],
-  branchIdx: number,
   props: PropertyBag,
+  _getTime: () => number,
 ): AnalogElementCore {
   return buildTransmissionLineElement(
     pinNodes,
-    internalNodeIds,
-    branchIdx,
     props.getModelParam<number>("impedance"),
     props.getModelParam<number>("delay"),
     props.getModelParam<number>("lossPerMeter"),
@@ -1005,7 +1005,7 @@ export const TransmissionLineDefinition: ComponentDefinition = {
   attributeMap: TRANSMISSION_LINE_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.PASSIVES,
   helpText:
-    "Lossy Transmission Line â€” lumped RLCG model.\n" +
+    "Lossy Transmission Line  lumped RLCG model.\n" +
     "N cascaded segments with series RL and shunt GC. " +
     "Parameterised by Z\u2080, propagation delay, loss, and segment count.",
   models: {},

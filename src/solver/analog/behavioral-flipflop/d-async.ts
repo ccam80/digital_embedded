@@ -8,6 +8,7 @@ import { NGSPICE_LOAD_ORDER } from "../element.js";
 import { readMnaVoltage, delegatePinSetParam } from "../digital-pin-model.js";
 import type { DigitalInputPinModel, DigitalOutputPinModel } from "../digital-pin-model.js";
 import type { AnalogElementFactory } from "../behavioral-gate.js";
+import type { SetupContext } from "../setup-context.js";
 import type { AnalogCapacitorElement } from "../../../components/passives/capacitor.js";
 import {
   FALLBACK_SPEC,
@@ -66,6 +67,8 @@ export class BehavioralDAsyncFlipflopElement {
   readonly stateSchema: StateSchema = FLIPFLOP_COMPOSITE_SCHEMA;
   stateSize: number;
   stateBaseOffset = -1;
+  _stateBase: number = -1;
+  _pinNodes: Map<string, number> = new Map();
 
   constructor(
     setPin: DigitalInputPinModel,
@@ -108,6 +111,10 @@ export class BehavioralDAsyncFlipflopElement {
 
   initVoltages(rhs: Float64Array): void {
     this._prevClockVoltage = readMnaVoltage(this._clockPin.nodeId, rhs);
+  }
+
+  setup(_ctx: SetupContext): void {
+    throw new Error("BehavioralDAsyncFlipflopElement not yet migrated");
   }
 
   load(ctx: LoadContext): void {
@@ -190,7 +197,7 @@ export class BehavioralDAsyncFlipflopElement {
  *   nodeIds[4]=Q, nodeIds[5]=~Q
  */
 export function makeDAsyncFlipflopAnalogFactory(): AnalogElementFactory {
-  return (pinNodes, _internalNodeIds, _branchIdx, props, _getTime) => {
+  return (pinNodes, props, _getTime) => {
     const pinSpecs = getPinSpecs(props);
     const pinLoading = getPinLoading(props);
 

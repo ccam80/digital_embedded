@@ -170,7 +170,7 @@ function makeRgbLed(overrides?: { label?: string }): RgbLedElement {
 
 describe("LED", () => {
   describe("onOffState", () => {
-    it("executeLed: input=1 â†’ output=1 (on)", () => {
+    it("executeLed: input=1  output=1 (on)", () => {
       const layout = makeLayout(1, 1);
       const state = makeState([1], 1);
       const highZs = new Uint32Array(state.length);
@@ -178,7 +178,7 @@ describe("LED", () => {
       expect(state[1]).toBe(1);
     });
 
-    it("executeLed: input=0 â†’ output=0 (off)", () => {
+    it("executeLed: input=0  output=0 (off)", () => {
       const layout = makeLayout(1, 1);
       const state = makeState([0], 1);
       const highZs = new Uint32Array(state.length);
@@ -186,7 +186,7 @@ describe("LED", () => {
       expect(state[1]).toBe(0);
     });
 
-    it("executeLed: non-zero input â†’ output=1 (on)", () => {
+    it("executeLed: non-zero input  output=1 (on)", () => {
       const layout = makeLayout(1, 1);
       const state = makeState([0xFF], 1);
       const highZs = new Uint32Array(state.length);
@@ -194,7 +194,7 @@ describe("LED", () => {
       expect(state[1]).toBe(1);
     });
 
-    it("executeLed: large non-zero input â†’ output=1", () => {
+    it("executeLed: large non-zero input  output=1", () => {
       const layout = makeLayout(1, 1);
       const state = makeState([0xFFFFFFFF], 1);
       const highZs = new Uint32Array(state.length);
@@ -318,7 +318,7 @@ describe("LED", () => {
 
 describe("PolarityAwareLED", () => {
   describe("onOffState", () => {
-    it("anode=1, cathode=0 â†’ output=1 (lit)", () => {
+    it("anode=1, cathode=0  output=1 (lit)", () => {
       const layout = makeLayout(2, 1);
       const state = makeState([1, 0], 1);
       const highZs = new Uint32Array(state.length);
@@ -326,7 +326,7 @@ describe("PolarityAwareLED", () => {
       expect(state[2]).toBe(1);
     });
 
-    it("anode=0, cathode=0 â†’ output=0 (not lit)", () => {
+    it("anode=0, cathode=0  output=0 (not lit)", () => {
       const layout = makeLayout(2, 1);
       const state = makeState([0, 0], 1);
       const highZs = new Uint32Array(state.length);
@@ -334,7 +334,7 @@ describe("PolarityAwareLED", () => {
       expect(state[2]).toBe(0);
     });
 
-    it("anode=1, cathode=1 â†’ output=0 (no current flow)", () => {
+    it("anode=1, cathode=1  output=0 (no current flow)", () => {
       const layout = makeLayout(2, 1);
       const state = makeState([1, 1], 1);
       const highZs = new Uint32Array(state.length);
@@ -342,7 +342,7 @@ describe("PolarityAwareLED", () => {
       expect(state[2]).toBe(0);
     });
 
-    it("anode=0, cathode=1 â†’ output=0 (reverse bias)", () => {
+    it("anode=0, cathode=1  output=0 (reverse bias)", () => {
       const layout = makeLayout(2, 1);
       const state = makeState([0, 1], 1);
       const highZs = new Uint32Array(state.length);
@@ -446,7 +446,7 @@ describe("PolarityAwareLED", () => {
 
 describe("LightBulb", () => {
   describe("onOffState", () => {
-    it("executeLightBulb: input=1 â†’ output=1 (on)", () => {
+    it("executeLightBulb: input=1  output=1 (on)", () => {
       const layout = makeLayout(1, 1);
       const state = makeState([1], 1);
       const highZs = new Uint32Array(state.length);
@@ -454,7 +454,7 @@ describe("LightBulb", () => {
       expect(state[1]).toBe(1);
     });
 
-    it("executeLightBulb: input=0 â†’ output=0 (off)", () => {
+    it("executeLightBulb: input=0  output=0 (off)", () => {
       const layout = makeLayout(1, 1);
       const state = makeState([0], 1);
       const highZs = new Uint32Array(state.length);
@@ -462,7 +462,7 @@ describe("LightBulb", () => {
       expect(state[1]).toBe(0);
     });
 
-    it("executeLightBulb: non-zero input â†’ output=1", () => {
+    it("executeLightBulb: non-zero input  output=1", () => {
       const layout = makeLayout(1, 1);
       const state = makeState([42], 1);
       const highZs = new Uint32Array(state.length);
@@ -574,7 +574,7 @@ describe("LightBulb", () => {
 
 describe("RGBLED", () => {
   describe("colorMixing", () => {
-    it("R=1, G=0, B=0 â†’ output has R bit set", () => {
+    it("R=1, G=0, B=0  output has R bit set", () => {
       const layout = makeLayout(3, 1);
       const state = makeState([1, 0, 0], 1);
       const highZs = new Uint32Array(state.length);
@@ -583,7 +583,7 @@ describe("RGBLED", () => {
       expect(state[3]).toBe(4);
     });
 
-    it("R=0, G=1, B=0 â†’ output has G bit set", () => {
+    it("R=0, G=1, B=0  output has G bit set", () => {
       const layout = makeLayout(3, 1);
       const state = makeState([0, 1, 0], 1);
       const highZs = new Uint32Array(state.length);
@@ -592,7 +592,7 @@ describe("RGBLED", () => {
       expect(state[3]).toBe(2);
     });
 
-    it("R=0, G=0, B=1 â†’ output has B bit set", () => {
+    it("R=0, G=0, B=1  output has B bit set", () => {
       const layout = makeLayout(3, 1);
       const state = makeState([0, 0, 1], 1);
       const highZs = new Uint32Array(state.length);
@@ -601,7 +601,7 @@ describe("RGBLED", () => {
       expect(state[3]).toBe(1);
     });
 
-    it("R=1, G=1, B=1 â†’ output=7 (white, all channels)", () => {
+    it("R=1, G=1, B=1  output=7 (white, all channels)", () => {
       const layout = makeLayout(3, 1);
       const state = makeState([1, 1, 1], 1);
       const highZs = new Uint32Array(state.length);
@@ -609,7 +609,7 @@ describe("RGBLED", () => {
       expect(state[3]).toBe(7);
     });
 
-    it("R=0, G=0, B=0 â†’ output=0 (off)", () => {
+    it("R=0, G=0, B=0  output=0 (off)", () => {
       const layout = makeLayout(3, 1);
       const state = makeState([0, 0, 0], 1);
       const highZs = new Uint32Array(state.length);
@@ -617,7 +617,7 @@ describe("RGBLED", () => {
       expect(state[3]).toBe(0);
     });
 
-    it("non-zero R input â†’ R channel active", () => {
+    it("non-zero R input  R channel active", () => {
       const layout = makeLayout(3, 1);
       const state = makeState([0xFF, 0, 0], 1);
       const highZs = new Uint32Array(state.length);
@@ -799,8 +799,8 @@ describe("AnalogLED", () => {
   });
 
   it("red_led_forward_drop", () => {
-    // Circuit: 5V â†’ 220Î© â†’ red LED (anode=node1, cathode=gnd) â†’ ground
-    // Red LED Vf â‰ˆ 1.8V Â± 0.15V at the operating point
+    // Circuit: 5V  220Î  red LED (anode=node1, cathode=gnd)  ground
+    // Red LED Vf  1.8V Â± 0.15V at the operating point
     //
     // MNA: node1 = LED anode / resistor junction
     //      node2 = +5V source terminal
@@ -835,8 +835,8 @@ describe("AnalogLED", () => {
   });
 
   it("blue_led_forward_drop", () => {
-    // Circuit: 5V â†’ 100Î© â†’ blue LED (anode=node1, cathode=gnd) â†’ ground
-    // Blue LED Vf â‰ˆ 3.2V Â± 0.15V
+    // Circuit: 5V  100Î  blue LED (anode=node1, cathode=gnd)  ground
+    // Blue LED Vf  3.2V Â± 0.15V
 
     const matrixSize = 3;
     const branchRow = 2;
@@ -869,15 +869,15 @@ describe("AnalogLED", () => {
 // C2.3: inline NIintegrate integration tests
 // ---------------------------------------------------------------------------
 
-// ngspice â†’ ours variable mapping (niinteg.c:28-63):
-//   ag[0] (CKTag[0])    â†’ ctx.ag[0]   coefficient on q0 (current charge)
-//   ag[1] (CKTag[1])    â†’ ctx.ag[1]   coefficient on q1 (previous charge)
-//   cap                 â†’ Ctotal      junction + transit-time cap
-//   q0                  â†’ computeJunctionCharge at vdLimited
-//   q1                  â†’ s1[SLOT_Q]  from previous accepted step
-//   ccap                â†’ ag[0]*q0 + ag[1]*q1
-//   geq                 â†’ ag[0]*Ctotal
-//   ceq                 â†’ ccap - geq*vdLimited
+// ngspice  ours variable mapping (niinteg.c:28-63):
+//   ag[0] (CKTag[0])     ctx.ag[0]   coefficient on q0 (current charge)
+//   ag[1] (CKTag[1])     ctx.ag[1]   coefficient on q1 (previous charge)
+//   cap                  Ctotal      junction + transit-time cap
+//   q0                   computeJunctionCharge at vdLimited
+//   q1                   s1[SLOT_Q]  from previous accepted step
+//   ccap                 ag[0]*q0 + ag[1]*q1
+//   geq                  ag[0]*Ctotal
+//   ceq                  ccap - geq*vdLimited
 
 describe("integration", () => {
   it("junction_cap_transient_matches_ngspice", () => {
@@ -1033,7 +1033,7 @@ describe("LED limitingCollector", () => {
   }
 
   it("pushes AK pnjlim event on non-init NR iteration", () => {
-    // Red LED: vcrit â‰ˆ 1.82 V, 2*nVt â‰ˆ 0.093 V. Drive vdRaw = 5 V from vdOld = 0
+    // Red LED: vcrit  1.82 V, 2*nVt  0.093 V. Drive vdRaw = 5 V from vdOld = 0
     // to force the pnjlim forward branch (vnew > vcrit and |vnew-vold| > 2*vt).
     const { element } = makeLedCoreWithPool({ label: "LED_push", elementIndex: 11 });
     const voltages = new Float64Array(1);

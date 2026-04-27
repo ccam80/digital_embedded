@@ -19,13 +19,15 @@ import {
   type ComponentDefinition,
 } from "../../core/registry.js";
 import { formatSI } from "../../editor/si-format.js";
-import type { AnalogElementCore, LoadContext } from "../../solver/analog/element.js";
-import { NGSPICE_LOAD_ORDER } from "../../solver/analog/element.js";
+import type { AnalogElementCore } from "../../core/analog-types.js";
+import { NGSPICE_LOAD_ORDER } from "../../core/analog-types.js";
+import type { LoadContext } from "../../solver/analog/load-context.js";
+import type { SetupContext } from "../../solver/analog/setup-context.js";
 import { stampG } from "../../solver/analog/stamp-helpers.js";
 import { defineModelParams } from "../../core/model-params.js";
 
 // ---------------------------------------------------------------------------
-// Minimum resistance clamp â€” prevents G â†’ âˆž for degenerate values
+// Minimum resistance clamp  prevents G  âˆž for degenerate values
 // ---------------------------------------------------------------------------
 
 const MIN_RESISTANCE = 1e-9;
@@ -36,7 +38,7 @@ const MIN_RESISTANCE = 1e-9;
 
 export const { paramDefs: RESISTOR_PARAM_DEFS, defaults: RESISTOR_DEFAULTS } = defineModelParams({
   primary: {
-    resistance: { default: 1000, unit: "Î©", description: "Resistance in ohms. Minimum clamped to 1e-9 Î©.", min: 1e-9 },
+    resistance: { default: 1000, unit: "Î", description: "Resistance in ohms. Minimum clamped to 1e-9 Î.", min: 1e-9 },
   },
 });
 
@@ -68,7 +70,7 @@ function buildResistorPinDeclarations(): PinDeclaration[] {
 }
 
 // ---------------------------------------------------------------------------
-// ResistorElement â€” CircuitElement implementation
+// ResistorElement  CircuitElement implementation
 // ---------------------------------------------------------------------------
 
 export class ResistorElement extends AbstractCircuitElement {
@@ -106,7 +108,7 @@ export class ResistorElement extends AbstractCircuitElement {
     const vB = signals?.getPinVoltage("B");
     const hasVoltage = vA !== undefined && vB !== undefined;
 
-    // Lead wires â€” colored by their respective node voltages
+    // Lead wires  colored by their respective node voltages
     drawColoredLead(ctx, hasVoltage ? signals : undefined, vA, 0, 0, 1, 0);
     drawColoredLead(ctx, hasVoltage ? signals : undefined, vB, 3, 0, 4, 0);
 
@@ -120,7 +122,7 @@ export class ResistorElement extends AbstractCircuitElement {
     }
     pts.push({ x: 3, y: 0 });
 
-    // Body gradient: interpolate voltage from vAâ†’vB along the zigzag
+    // Body gradient: interpolate voltage from vAvB along the zigzag
     if (hasVoltage && ctx.setLinearGradient) {
       ctx.setLinearGradient(1, 0, 3, 0, [
         { offset: 0, color: signals!.voltageColor(vA) },
@@ -134,7 +136,7 @@ export class ResistorElement extends AbstractCircuitElement {
     }
 
     // Value label below body
-    const displayLabel = label.length > 0 ? label : (this._shouldShowValue() ? formatSI(resistance, "Î©") : "");
+    const displayLabel = label.length > 0 ? label : (this._shouldShowValue() ? formatSI(resistance, "Î") : "");
     ctx.setColor("TEXT");
     ctx.setFont({ family: "sans-serif", size: 0.8 });
     ctx.drawText(displayLabel, 2, 0.75, { horizontal: "center", vertical: "top" });
@@ -145,56 +147,64 @@ export class ResistorElement extends AbstractCircuitElement {
 }
 
 // ---------------------------------------------------------------------------
-// AnalogElement factory
+// ResistorAnalogElement — AnalogElementCore class implementation
 // ---------------------------------------------------------------------------
 
+class ResistorAnalogElement implements AnalogElementCore {
+  readonly branchIndex: number = -1;
+  readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.RES;
+  readonly isNonlinear: boolean = false;
+  readonly isReactive: boolean = false;
+  _stateBase: number = -1;
+  _pinNodes: Map<string, number> = new Map();
 
-function buildResistorElement(
-  pinNodes: ReadonlyMap<string, number>,
-  resistance: number,
-): AnalogElementCore {
-  const p = { resistance };
-  let G = 1 / Math.max(p.resistance, MIN_RESISTANCE);
-  const n0 = pinNodes.get("A")!;
-  const n1 = pinNodes.get("B")!;
+  private _resistance: number;
+  private _G: number;
 
-  return {
-    branchIndex: -1,
-    ngspiceLoadOrder: NGSPICE_LOAD_ORDER.RES,
-    isNonlinear: false,
-    isReactive: false,
+  constructor(resistance: number) {
+    this._resistance = Math.max(resistance, MIN_RESISTANCE);
+    this._G = 1 / this._resistance;
+  }
 
-    setParam(key: string, value: number): void {
-      if (key in p) {
-        (p as Record<string, number>)[key] = value;
-        G = 1 / Math.max(p.resistance, MIN_RESISTANCE);
-      }
-    },
+  setup(_ctx: SetupContext): void {
+    throw new Error("PB-RES not yet migrated");
+  }
 
-    load(ctx: LoadContext): void {
-      const solver = ctx.solver;
-      stampG(solver, n0, n0, G);
-      stampG(solver, n0, n1, -G);
-      stampG(solver, n1, n0, -G);
-      stampG(solver, n1, n1, G);
-    },
+  setParam(key: string, value: number): void {
+    if (key === "resistance") {
+      this._resistance = Math.max(value, MIN_RESISTANCE);
+      this._G = 1 / this._resistance;
+    }
+  }
 
-    getPinCurrents(rhs: Float64Array): number[] {
-      const vA = rhs[n0];
-      const vB = rhs[n1];
-      const I = G * (vA - vB);
-      return [I, -I];
-    },
-  };
+  load(ctx: LoadContext): void {
+    const solver = ctx.solver;
+    const n0 = this._pinNodes.get("A")!;
+    const n1 = this._pinNodes.get("B")!;
+    stampG(solver, n0, n0, this._G);
+    stampG(solver, n0, n1, -this._G);
+    stampG(solver, n1, n0, -this._G);
+    stampG(solver, n1, n1, this._G);
+  }
+
+  getPinCurrents(rhs: Float64Array): number[] {
+    const n0 = this._pinNodes.get("A")!;
+    const n1 = this._pinNodes.get("B")!;
+    const vA = rhs[n0];
+    const vB = rhs[n1];
+    const I = this._G * (vA - vB);
+    return [I, -I];
+  }
 }
 
 function createResistorElement(
   pinNodes: ReadonlyMap<string, number>,
-  _internalNodeIds: readonly number[],
-  _branchIdx: number,
   props: PropertyBag,
+  _getTime: () => number,
 ): AnalogElementCore {
-  return buildResistorElement(pinNodes, props.getModelParam<number>("resistance"));
+  const el = new ResistorAnalogElement(props.getModelParam<number>("resistance"));
+  el._pinNodes = new Map(pinNodes);
+  return el;
 }
 
 // ---------------------------------------------------------------------------
@@ -246,9 +256,10 @@ export const ResistorDefinition: ComponentDefinition = {
   attributeMap: RESISTOR_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.PASSIVES,
   helpText:
-    "Resistor â€” stamps conductance G=1/R into the MNA matrix.\n" +
-    "Minimum resistance is clamped to 1e-9 Î©.",
+    "Resistor  stamps conductance G=1/R into the MNA matrix.\n" +
+    "Minimum resistance is clamped to 1e-9 Î.",
   models: {},
+  ngspiceNodeMap: { A: "pos", B: "neg" },
   modelRegistry: {
     "behavioral": {
       kind: "inline",

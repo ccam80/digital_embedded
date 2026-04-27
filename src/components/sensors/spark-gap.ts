@@ -1,20 +1,20 @@
 ﻿/**
- * Spark Gap â€” voltage-triggered variable resistance with hysteresis.
+ * Spark Gap  voltage-triggered variable resistance with hysteresis.
  *
  * Behaviour:
- *   - Blocking state: R = rOff (â‰ˆ 1GÎ©+) until |V| > vBreakdown
- *   - Conducting state: R = rOn (â‰ˆ 1-10Î©) until |I| < iHold
+ *   - Blocking state: R = rOff ( 1GÎ+) until |V| > vBreakdown
+ *   - Conducting state: R = rOn ( 1-10Î) until |I| < iHold
  *   - Hysteresis: once fired, stays conducting until holding current drops
  *
  * Smooth resistance transition:
  *   To avoid step discontinuities that prevent NR convergence, the resistance
  *   blends continuously via a tanh soft transition:
  *
- *   Firing transition (blocking â†’ conducting):
+ *   Firing transition (blocking  conducting):
  *     R_fire(V) = rOff + (rOn - rOff) * 0.5 * (1 + tanh((|V| - vBreakdown) / w_v))
  *     where w_v = 0.05 * vBreakdown
  *
- *   Extinction transition (conducting â†’ blocking):
+ *   Extinction transition (conducting  blocking):
  *     R_ext(I) = rOn + (rOff - rOn) * 0.5 * (1 + tanh((iHold - |I|) / w_i))
  *     where w_i = 0.05 * iHold
  *
@@ -27,15 +27,17 @@
  *   branchIndex    = -1
  *
  * Unified load() pipeline:
- *   load(ctx)       â€” stamps linearized conductance at the current operating point
+ *   load(ctx)        stamps linearized conductance at the current operating point
  *                     every NR iteration; resistance is computed from the hysteretic
  *                     _conducting state and the last accepted-step terminal voltage
- *   accept(ctx,...) â€” records the accepted-step terminal voltage and applies the
+ *   accept(ctx,...)  records the accepted-step terminal voltage and applies the
  *                     discrete conducting/blocking state transition with hysteresis
  */
 
-import type { AnalogElementCore, LoadContext } from "../../solver/analog/element.js";
-import { NGSPICE_LOAD_ORDER } from "../../solver/analog/element.js";
+import type { AnalogElementCore } from "../../core/analog-types.js";
+import { NGSPICE_LOAD_ORDER } from "../../core/analog-types.js";
+import type { LoadContext } from "../../solver/analog/load-context.js";
+import type { SetupContext } from "../../solver/analog/setup-context.js";
 import { PropertyBag, PropertyType } from "../../core/properties.js";
 import type { PropertyDefinition } from "../../core/properties.js";
 import {
@@ -64,10 +66,10 @@ const MIN_RESISTANCE = 1e-12;
 export const { paramDefs: SPARK_GAP_PARAM_DEFS, defaults: SPARK_GAP_DEFAULTS } = defineModelParams({
   primary: {
     vBreakdown: { default: 1000, unit: "V",  description: "Voltage at which the spark gap fires" },
-    rOn:        { default: 5,    unit: "Î©",  description: "Resistance when gap is conducting" },
+    rOn:        { default: 5,    unit: "Î",  description: "Resistance when gap is conducting" },
   },
   secondary: {
-    rOff:  { default: 1e10, unit: "Î©",  description: "Resistance when gap is blocking" },
+    rOff:  { default: 1e10, unit: "Î",  description: "Resistance when gap is blocking" },
     iHold: { default: 0.01, unit: "A",  description: "Minimum current to sustain conduction" },
   },
 });
@@ -78,7 +80,7 @@ export const { paramDefs: SPARK_GAP_PARAM_DEFS, defaults: SPARK_GAP_DEFAULTS } =
 
 /**
  * Smooth firing transition: blocks at low V, conducts at high V.
- * Blends from rOff â†’ rOn as |V| crosses vBreakdown.
+ * Blends from rOff  rOn as |V| crosses vBreakdown.
  */
 function firingResistance(absV: number, vBreakdown: number, rOff: number, rOn: number): number {
   const w = 0.05 * Math.max(vBreakdown, 1e-6);
@@ -88,7 +90,7 @@ function firingResistance(absV: number, vBreakdown: number, rOff: number, rOn: n
 
 /**
  * Smooth extinction transition: conducts at high I, blocks at low I.
- * Blends from rOn â†’ rOff as |I| drops below iHold.
+ * Blends from rOn  rOff as |I| drops below iHold.
  */
 function extinctionResistance(absI: number, iHold: number, rOn: number, rOff: number): number {
   const w = 0.05 * Math.max(iHold, 1e-12);
@@ -97,7 +99,7 @@ function extinctionResistance(absI: number, iHold: number, rOn: number, rOff: nu
 }
 
 // ---------------------------------------------------------------------------
-// SparkGapElement â€” MNA implementation
+// SparkGapElement  MNA implementation
 // ---------------------------------------------------------------------------
 
 export class SparkGapElement implements AnalogElementCore {
@@ -106,6 +108,8 @@ export class SparkGapElement implements AnalogElementCore {
   readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.RES;
   readonly isNonlinear: boolean = true;
   readonly isReactive: boolean = false;
+  _stateBase: number = -1;
+  _pinNodes: Map<string, number> = new Map();
 
   private readonly _p: Record<string, number>;
 
@@ -135,6 +139,10 @@ export class SparkGapElement implements AnalogElementCore {
     };
   }
 
+  setup(_ctx: SetupContext): void {
+    throw new Error("PB-SPARKGAP not yet migrated");
+  }
+
   setParam(key: string, value: number): void {
     if (key in this._p) this._p[key] = value;
   }
@@ -160,7 +168,7 @@ export class SparkGapElement implements AnalogElementCore {
     return extinctionResistance(absI, this._p.iHold, this._p.rOn, this._p.rOff);
   }
 
-  /** True if the gap is currently conducting â€” exposed for testing. */
+  /** True if the gap is currently conducting  exposed for testing. */
   get conducting(): boolean {
     return this._conducting;
   }
@@ -221,9 +229,7 @@ export class SparkGapElement implements AnalogElementCore {
 // ---------------------------------------------------------------------------
 
 export function createSparkGapElement(
-  _pinNodes: ReadonlyMap<string, number>,
-  _internalNodeIds: readonly number[],
-  _branchIdx: number,
+  pinNodes: ReadonlyMap<string, number>,
   props: PropertyBag,
   _getTime: () => number,
 ): AnalogElementCore {
@@ -233,7 +239,9 @@ export function createSparkGapElement(
     rOff:       props.getOrDefault<number>("rOff",       SPARK_GAP_DEFAULTS.rOff),
     iHold:      props.getOrDefault<number>("iHold",      SPARK_GAP_DEFAULTS.iHold),
   };
-  return new SparkGapElement(p.vBreakdown, p.rOn, p.rOff, p.iHold);
+  const el = new SparkGapElement(p.vBreakdown, p.rOn, p.rOff, p.iHold);
+  el._pinNodes = new Map(pinNodes);
+  return el;
 }
 
 // ---------------------------------------------------------------------------
@@ -264,7 +272,7 @@ function buildSparkGapPinDeclarations(): PinDeclaration[] {
 }
 
 // ---------------------------------------------------------------------------
-// SparkGapCircuitElement â€” editor/visual layer
+// SparkGapCircuitElement  editor/visual layer
 // ---------------------------------------------------------------------------
 
 export class SparkGapCircuitElement extends AbstractCircuitElement {
@@ -298,7 +306,7 @@ export class SparkGapCircuitElement extends AbstractCircuitElement {
     ctx.save();
     ctx.setLineWidth(1);
 
-    // Electrode arrows â€” body, stays COMPONENT
+    // Electrode arrows  body, stays COMPONENT
     ctx.setColor("COMPONENT");
     ctx.drawPolygon(
       [
@@ -335,7 +343,7 @@ const SPARK_GAP_PROPERTY_DEFS: PropertyDefinition[] = [
   {
     key: "rOff",
     type: PropertyType.FLOAT,
-    label: "Off Resistance (Î©)",
+    label: "Off Resistance (Î)",
     defaultValue: 1e10,
     min: 1,
     description: "Resistance when gap is blocking",
@@ -386,7 +394,7 @@ export const SparkGapDefinition: ComponentDefinition = {
   attributeMap: SPARK_GAP_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.PASSIVES,
   helpText:
-    "Spark Gap â€” voltage-triggered switch with hysteresis. " +
+    "Spark Gap  voltage-triggered switch with hysteresis. " +
     "Fires at breakdown voltage; stays on until current drops below holding threshold.",
   modelRegistry: {
     behavioral: {

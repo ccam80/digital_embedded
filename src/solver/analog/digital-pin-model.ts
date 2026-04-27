@@ -1,5 +1,5 @@
 ﻿/**
- * DigitalPinModel â€" MNA stamp helpers for digital pins.
+ * DigitalPinModel - MNA stamp helpers for digital pins.
  *
  * DigitalOutputPinModel stamps an ideal voltage source branch equation ("branch" role)
  * or a conductance+current-source ("direct" role) based on the role assigned at
@@ -62,11 +62,10 @@ export class DigitalOutputPinModel {
   /** True when in Hi-Z state. */
   private _hiZ = false;
 
-  /** AnalogCapacitorElement child â€" allocated when loaded && cOut > 0 after init(). */
+  /** AnalogCapacitorElement child - allocated when loaded && cOut > 0 after init(). */
   private _outputCap: AnalogCapacitorElement | null = null;
 
-  /** Cached matrix handles â€" allocated on first load(), keyed by role. */
-  private _handlesInit = false;
+  /** Cached matrix handles - allocated in setup(), keyed by role. */
   // branch role handles
   private _hBranchNode = -1;   // (branchIdx, nodeIdx)
   private _hBranchBranch = -1; // (branchIdx, branchIdx)
@@ -92,7 +91,6 @@ export class DigitalOutputPinModel {
   init(nodeId: number, branchIdx: number): void {
     this._nodeId = nodeId;
     this._branchIndex = branchIdx;
-    this._handlesInit = false;
     if (this._loaded && this._spec.cOut > 0 && nodeId > 0) {
       const cap = new AnalogCapacitorElement(this._spec.cOut, 0, 0, 0, 300.15, 1, 1);
       cap.pinNodeIds = [nodeId, 0];
@@ -149,22 +147,11 @@ export class DigitalOutputPinModel {
   load(ctx: LoadContext): void {
     const node = this._nodeId;
     if (node <= 0) return;
-    // node is a 1-based MNA node ID (ngspice convention: 0 = ground sentinel).
     const solver = ctx.solver;
 
     if (this._role === "branch") {
       const bIdx = this._branchIndex;
       if (bIdx < 0) return;
-
-      if (!this._handlesInit) {
-        this._hBranchNode = solver.allocElement(bIdx, node);
-        this._hBranchBranch = solver.allocElement(bIdx, bIdx);
-        this._hNodeBranch = solver.allocElement(node, bIdx);
-        if (this._loaded) {
-          this._hNodeDiag = solver.allocElement(node, node);
-        }
-        this._handlesInit = true;
-      }
 
       if (this._hiZ) {
         solver.stampElement(this._hBranchBranch, 1);
@@ -185,12 +172,6 @@ export class DigitalOutputPinModel {
       }
     } else {
       // direct role: conductance+current-source Norton equivalent.
-      // node is already 1-based; pass directly to allocElement and stampRHS.
-      if (!this._handlesInit) {
-        this._hNodeDiag = solver.allocElement(node, node);
-        this._handlesInit = true;
-      }
-
       if (this._hiZ) {
         solver.stampElement(this._hNodeDiag, 1 / this._spec.rHiZ);
       } else {
@@ -201,8 +182,22 @@ export class DigitalOutputPinModel {
     }
   }
 
-  setup(_ctx: SetupContext): void {
-    throw new Error("DigitalOutputPinModel.setup not yet migrated");
+  setup(ctx: SetupContext): void {
+    if (this._role === "branch") {
+      if (this._branchIndex <= 0 || this._nodeId <= 0) return;
+      this._hBranchNode   = ctx.solver.allocElement(this._branchIndex, this._nodeId);
+      this._hBranchBranch = ctx.solver.allocElement(this._branchIndex, this._branchIndex);
+      this._hNodeBranch   = ctx.solver.allocElement(this._nodeId,      this._branchIndex);
+      if (this._loaded) {
+        this._hNodeDiag   = ctx.solver.allocElement(this._nodeId,      this._nodeId);
+      }
+    } else {
+      if (this._nodeId <= 0) return;
+      this._hNodeDiag     = ctx.solver.allocElement(this._nodeId, this._nodeId);
+    }
+    if (this._outputCap) {
+      this._outputCap.setup(ctx);
+    }
   }
 
   /** The node ID assigned by init(). */
@@ -253,7 +248,7 @@ export class DigitalOutputPinModel {
 /**
  * Stamps the analog equivalent of one digital input pin into the MNA matrix.
  *
- * Sense-only by default â€" threshold detection is always available.
+ * Sense-only by default - threshold detection is always available.
  * When loaded, stamps 1/rIn on the node diagonal.
  * When loaded and cIn > 0 an AnalogCapacitorElement child handles companion
  * integration via the owning element's state-pool composite.
@@ -265,12 +260,11 @@ export class DigitalInputPinModel {
   /** Node this pin reads. Set by init(). */
   private _nodeId = -1;
 
-  /** AnalogCapacitorElement child â€" allocated when loaded && cIn > 0 after init(). */
+  /** AnalogCapacitorElement child - allocated when loaded && cIn > 0 after init(). */
   private _inputCap: AnalogCapacitorElement | null = null;
 
   /** Cached matrix handle for node diagonal. */
   private _hNodeDiag = -1;
-  private _handlesInit = false;
 
   constructor(spec: ResolvedPinElectrical, loaded: boolean) {
     this._spec = { ...spec };
@@ -283,7 +277,6 @@ export class DigitalInputPinModel {
    */
   init(nodeId: number, _groundNode: number): void {
     this._nodeId = nodeId;
-    this._handlesInit = false;
     if (this._loaded && this._spec.cIn > 0 && nodeId > 0) {
       const cap = new AnalogCapacitorElement(this._spec.cIn, 0, 0, 0, 300.15, 1, 1);
       cap.pinNodeIds = [nodeId, 0];
@@ -323,19 +316,15 @@ export class DigitalInputPinModel {
     if (!this._loaded) return;
     const node = this._nodeId;
     if (node <= 0) return;
-    // node is a 1-based MNA node ID (ngspice convention: 0 = ground sentinel).
-    const solver = ctx.solver;
-
-    if (!this._handlesInit) {
-      this._hNodeDiag = solver.allocElement(node, node);
-      this._handlesInit = true;
-    }
-
-    solver.stampElement(this._hNodeDiag, 1 / this._spec.rIn);
+    ctx.solver.stampElement(this._hNodeDiag, 1 / this._spec.rIn);
   }
 
-  setup(_ctx: SetupContext): void {
-    throw new Error("DigitalInputPinModel.setup not yet migrated");
+  setup(ctx: SetupContext): void {
+    if (this._nodeId <= 0) return;
+    this._hNodeDiag = ctx.solver.allocElement(this._nodeId, this._nodeId);
+    if (this._inputCap) {
+      this._inputCap.setup(ctx);
+    }
   }
 
   /**
@@ -343,7 +332,7 @@ export class DigitalInputPinModel {
    *
    * Returns true  when voltage > vIH  (logic HIGH),
    *         false when voltage < vIL  (logic LOW),
-   *         undefined               (indeterminate â€" between thresholds).
+   *         undefined               (indeterminate - between thresholds).
    */
   readLogicLevel(voltage: number): boolean | undefined {
     if (voltage > this._spec.vIH) return true;

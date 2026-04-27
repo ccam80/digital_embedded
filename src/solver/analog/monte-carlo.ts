@@ -22,7 +22,7 @@ import { SparseSolver } from "./sparse-solver.js";
 import { DEFAULT_SIMULATION_PARAMS } from "../../core/analog-engine-interface.js";
 
 // ---------------------------------------------------------------------------
-// TransientParams â€” time span for transient analysis
+// TransientParams  time span for transient analysis
 // ---------------------------------------------------------------------------
 
 /**
@@ -38,7 +38,7 @@ export interface TransientParams {
 }
 
 // ---------------------------------------------------------------------------
-// AcParams â€” frequency range for AC small-signal analysis
+// AcParams  frequency range for AC small-signal analysis
 // ---------------------------------------------------------------------------
 
 /**
@@ -56,7 +56,7 @@ export interface AcParams {
 }
 
 // ---------------------------------------------------------------------------
-// OutputSpec â€” what to measure in each trial
+// OutputSpec  what to measure in each trial
 // ---------------------------------------------------------------------------
 
 /**
@@ -78,7 +78,7 @@ export interface OutputSpec {
 }
 
 // ---------------------------------------------------------------------------
-// ParameterVariation â€” how to vary one component property
+// ParameterVariation  how to vary one component property
 // ---------------------------------------------------------------------------
 
 /**
@@ -154,7 +154,7 @@ export interface OutputStatistics {
 }
 
 // ---------------------------------------------------------------------------
-// TrialResult â€” yielded after each trial
+// TrialResult  yielded after each trial
 // ---------------------------------------------------------------------------
 
 /**
@@ -175,7 +175,7 @@ export interface TrialResult {
 }
 
 // ---------------------------------------------------------------------------
-// MonteCarloResult â€” final result after all trials
+// MonteCarloResult  final result after all trials
 // ---------------------------------------------------------------------------
 
 /**
@@ -193,7 +193,7 @@ export interface MonteCarloResult {
 }
 
 // ---------------------------------------------------------------------------
-// CircuitFactory â€” creates a fresh compiled circuit with property overrides
+// CircuitFactory  creates a fresh compiled circuit with property overrides
 // ---------------------------------------------------------------------------
 
 /**
@@ -204,7 +204,7 @@ export interface MonteCarloResult {
  * name; the value is a multiplier applied to the nominal property value
  * (e.g. 1.05 means +5%).
  *
- * The factory must produce a fully independent instance for each call â€”
+ * The factory must produce a fully independent instance for each call 
  * shared mutable state between trials causes incorrect results.
  */
 export type CircuitFactory = (
@@ -212,7 +212,7 @@ export type CircuitFactory = (
 ) => ConcreteCompiledAnalogCircuit;
 
 // ---------------------------------------------------------------------------
-// SeededRng â€” multiplicative LCG for reproducible random sampling
+// SeededRng  multiplicative LCG for reproducible random sampling
 // ---------------------------------------------------------------------------
 
 /**
@@ -315,7 +315,7 @@ export function computeOutputStatistics(values: Float64Array): OutputStatistics 
 }
 
 // ---------------------------------------------------------------------------
-// Internal DC runner â€” synchronous, no engine lifecycle
+// Internal DC runner  synchronous, no engine lifecycle
 // ---------------------------------------------------------------------------
 
 function runDcSync(compiled: ConcreteCompiledAnalogCircuit): {

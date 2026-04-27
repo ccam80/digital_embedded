@@ -18,18 +18,49 @@ import type { AnalogElementCore } from "../../../core/analog-types.js";
 import type { ReactiveAnalogElement } from "../../../solver/analog/element.js";
 import type { AnalogFactory } from "../../../core/registry.js";
 import type { LoadContext } from "../../../solver/analog/load-context.js";
+import type { SetupContext } from "../../../solver/analog/setup-context.js";
 import { MODEDCOP, MODEINITFLOAT, MODEINITJCT } from "../../../solver/analog/ckt-mode.js";
 
 // ---------------------------------------------------------------------------
-// Helper: allocate a StatePool for a single element and call initState
+// Helper: run real setup() on an element with a given solver, allocating
+// all handles. Must be called before load() so that all TSTALLOC handles are valid.
 // ---------------------------------------------------------------------------
 
-function withState(core: AnalogElementCore): { element: ReactiveAnalogElement; pool: StatePool } {
+function runSetup(core: AnalogElementCore, solver: SparseSolver): void {
+  let stateCount = 0;
+  let nodeCount = 100;
+  const ctx: SetupContext = {
+    solver,
+    temp: 300.15,
+    nomTemp: 300.15,
+    copyNodesets: false,
+    makeVolt(_label: string, _suffix: string): number { return ++nodeCount; },
+    makeCur(_label: string, _suffix: string): number { return ++nodeCount; },
+    allocStates(n: number): number {
+      const off = stateCount;
+      stateCount += n;
+      return off;
+    },
+    findBranch(_label: string): number { return 0; },
+    findDevice(_label: string) { return null; },
+  };
+  (core as any).setup(ctx);
+}
+
+// ---------------------------------------------------------------------------
+// Helper: allocate a StatePool for a single element, run real setup() to
+// allocate handles, and call initState.
+// ---------------------------------------------------------------------------
+
+function withState(core: AnalogElementCore): { element: ReactiveAnalogElement; pool: StatePool; solver: SparseSolver } {
+  const solver = new SparseSolver();
+  solver._initStructure();
+  runSetup(core, solver);
   const re = core as ReactiveAnalogElement;
   const pool = new StatePool(Math.max(re.stateSize, 1));
   re.stateBaseOffset = 0;
   re.initState(pool);
-  return { element: re, pool };
+  return { element: re, pool, solver };
 }
 
 // ---------------------------------------------------------------------------
@@ -86,14 +117,14 @@ function buildUnitCtx(
 describe("Zener", () => {
   it("isNonlinear_true", () => {
     const propsObj = makeParamBag({ IS: 1e-14, N: 1, BV: 5.1 });
-    const core = createZenerElement(new Map([["A", 1], ["K", 2]]), [], -1, propsObj);
+    const core = createZenerElement(new Map([["A", 1], ["K", 2]]),propsObj);
     const { element } = withState(core);
     expect(element.isNonlinear).toBe(true);
   });
 
   it("isReactive_false", () => {
     const propsObj = makeParamBag({ IS: 1e-14, N: 1, BV: 5.1 });
-    const core = createZenerElement(new Map([["A", 1], ["K", 2]]), [], -1, propsObj);
+    const core = createZenerElement(new Map([["A", 1], ["K", 2]]),propsObj);
     const { element } = withState(core);
     expect(element.isReactive).toBe(false);
   });
@@ -108,16 +139,15 @@ describe("Zener", () => {
   it("load_does_not_write_voltages", () => {
     // Verify that load() reads from voltages but does NOT write back.
     const propsObj = makeParamBag({ IS: 1e-14, N: 1, BV: 5.1, IBV: 1e-3 });
-    const core = createZenerElement(new Map([["A", 1], ["K", 2]]), [], -1, propsObj);
-    const { element } = withState(core);
+    const core = createZenerElement(new Map([["A", 1], ["K", 2]]),propsObj);
+    const { element, solver } = withState(core);
     const el = withNodeIds(element, [1, 2]);
 
     // 1-based: [0]=ground sentinel, [1]=nodeA, [2]=nodeK
     const voltages = new Float64Array([0, 0.7, 0.0]);
     const voltagesBefore = new Float64Array(voltages);
 
-    const solver = new SparseSolver();
-    solver._initStructure();
+    (solver as any)._resetForAssembly();
     const ctx = buildUnitCtx(solver, voltages);
     el.load(ctx);
 
@@ -130,7 +160,7 @@ describe("Zener", () => {
   it("setParam_accepts_known_keys", () => {
     // Parameter plumbing: setParam must not throw for known keys.
     const propsObj = makeParamBag({ IS: 1e-14, N: 1, BV: 5.1 });
-    const core = createZenerElement(new Map([["A", 1], ["K", 2]]), [], -1, propsObj);
+    const core = createZenerElement(new Map([["A", 1], ["K", 2]]),propsObj);
     const { element } = withState(core);
     // Engine-agnostic interface: setParam must accept recognised keys silently.
     expect(() => element.setParam("BV", 6.2)).not.toThrow();
@@ -157,7 +187,7 @@ describe("Zener primeJunctions", () => {
     // primeJunctions() must NOT exist on the element — in-load MODEINITJCT priming
     // replaces it per dioload.c:130-138.
     const propsObj = makeParamBag({ IS: 1e-14, N: 1, BV: 5.1, IBV: 1e-3, TNOM: 300.15, TEMP: 300.15 });
-    const core = createZenerElement(new Map([["A", 1], ["K", 2]]), [], -1, propsObj);
+    const core = createZenerElement(new Map([["A", 1], ["K", 2]]),propsObj);
     const { element } = withState(core);
     expect((element as unknown as Record<string, unknown>)["primeJunctions"]).toBeUndefined();
   });
@@ -169,8 +199,8 @@ describe("Zener primeJunctions", () => {
     const N = 1;
     const TEMP = 300.15;
     const propsObj = makeParamBag({ IS, N, BV: 5.1, IBV: 1e-3, TNOM: 300.15, TEMP });
-    const core = createZenerElement(new Map([["A", 1], ["K", 2]]), [], -1, propsObj);
-    const { element, pool } = withState(core);
+    const core = createZenerElement(new Map([["A", 1], ["K", 2]]),propsObj);
+    const { element, pool, solver } = withState(core);
     const el = withNodeIds(element, [1, 2]);
 
     const vt = TEMP * KoverQ;
@@ -178,8 +208,7 @@ describe("Zener primeJunctions", () => {
     const expectedTVcrit = nVt * Math.log(nVt / (IS * Math.SQRT2));
 
     const voltages = new Float64Array(2);
-    const solver = new SparseSolver();
-    solver._initStructure();
+    (solver as any)._resetForAssembly();
     const ctx = buildUnitCtx(solver, voltages, { cktMode: MODEDCOP | MODEINITJCT });
     el.load(ctx);
 
@@ -190,13 +219,12 @@ describe("Zener primeJunctions", () => {
     // load() under MODEDCOP | MODEINITJCT with OFF==1 must write s0[SLOT_VD] = 0.
     // cite: dioload.c:133-134
     const propsObj = makeParamBag({ IS: 1e-14, N: 1, BV: 5.1, IBV: 1e-3, TNOM: 300.15, TEMP: 300.15, OFF: 1 });
-    const core = createZenerElement(new Map([["A", 1], ["K", 2]]), [], -1, propsObj);
-    const { element, pool } = withState(core);
+    const core = createZenerElement(new Map([["A", 1], ["K", 2]]),propsObj);
+    const { element, pool, solver } = withState(core);
     const el = withNodeIds(element, [1, 2]);
 
     const voltages = new Float64Array(2);
-    const solver = new SparseSolver();
-    solver._initStructure();
+    (solver as any)._resetForAssembly();
     const ctx = buildUnitCtx(solver, voltages, { cktMode: MODEDCOP | MODEINITJCT });
     el.load(ctx);
 
@@ -233,8 +261,8 @@ describe("Zener TEMP", () => {
     const N = 1;
     const TEMP = 400;
     const propsObj = makeParamBag({ IS, N, BV: 5.1, IBV: 1e-3, TNOM: 300.15, TEMP });
-    const core = createZenerElement(new Map([["A", 1], ["K", 2]]), [], -1, propsObj);
-    const { element, pool } = withState(core);
+    const core = createZenerElement(new Map([["A", 1], ["K", 2]]),propsObj);
+    const { element, pool, solver } = withState(core);
     const el = withNodeIds(element, [1, 2]);
 
     const vt400 = TEMP * KoverQ;
@@ -242,8 +270,7 @@ describe("Zener TEMP", () => {
     const expectedTVcrit = nVt400 * Math.log(nVt400 / (IS * Math.SQRT2));
 
     const voltages = new Float64Array(2);
-    const solver = new SparseSolver();
-    solver._initStructure();
+    (solver as any)._resetForAssembly();
     const ctx = buildUnitCtx(solver, voltages, { cktMode: MODEDCOP | MODEINITJCT });
     el.load(ctx);
 
@@ -258,8 +285,8 @@ describe("Zener TEMP", () => {
     const IS = 1e-14;
     const N = 1;
     const propsObj = makeParamBag({ IS, N, BV: 5.1, IBV: 1e-3, TNOM: 300.15, TEMP: 300.15 });
-    const core = createZenerElement(new Map([["A", 1], ["K", 2]]), [], -1, propsObj);
-    const { element, pool } = withState(core);
+    const core = createZenerElement(new Map([["A", 1], ["K", 2]]),propsObj);
+    const { element, pool, solver } = withState(core);
     const el = withNodeIds(element, [1, 2]);
 
     // Recompute expected tVcrit at 400K
@@ -277,8 +304,7 @@ describe("Zener TEMP", () => {
     element.setParam("TEMP", 400);
 
     const voltages = new Float64Array(2);
-    const solver = new SparseSolver();
-    solver._initStructure();
+    (solver as any)._resetForAssembly();
     const ctx = buildUnitCtx(solver, voltages, { cktMode: MODEDCOP | MODEINITJCT });
     el.load(ctx);
 

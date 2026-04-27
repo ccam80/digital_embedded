@@ -7,6 +7,7 @@ import { NGSPICE_LOAD_ORDER } from "../element.js";
 import { readMnaVoltage, delegatePinSetParam } from "../digital-pin-model.js";
 import type { DigitalInputPinModel, DigitalOutputPinModel } from "../digital-pin-model.js";
 import type { AnalogElementFactory } from "../behavioral-gate.js";
+import type { SetupContext } from "../setup-context.js";
 import type { AnalogCapacitorElement } from "../../../components/passives/capacitor.js";
 import {
   FALLBACK_SPEC,
@@ -66,6 +67,8 @@ export class BehavioralJKFlipflopElement implements ReactiveAnalogElementCore {
   readonly stateSchema: StateSchema = FLIPFLOP_COMPOSITE_SCHEMA;
   stateSize: number;
   stateBaseOffset = -1;
+  _stateBase: number = -1;
+  _pinNodes: Map<string, number> = new Map();
   s0: Float64Array<ArrayBufferLike> = new Float64Array(0) as Float64Array<ArrayBufferLike>;
   s1: Float64Array<ArrayBufferLike> = new Float64Array(0) as Float64Array<ArrayBufferLike>;
   s2: Float64Array<ArrayBufferLike> = new Float64Array(0) as Float64Array<ArrayBufferLike>;
@@ -114,6 +117,10 @@ export class BehavioralJKFlipflopElement implements ReactiveAnalogElementCore {
 
   initVoltages(rhs: Float64Array): void {
     this._prevClockVoltage = readMnaVoltage(this._clockPin.nodeId, rhs);
+  }
+
+  setup(_ctx: SetupContext): void {
+    throw new Error("BehavioralJKFlipflopElement not yet migrated");
   }
 
   load(ctx: LoadContext): void {
@@ -191,7 +198,7 @@ export class BehavioralJKFlipflopElement implements ReactiveAnalogElementCore {
  *   nodeIds[0]=J, nodeIds[1]=C, nodeIds[2]=K, nodeIds[3]=Q, nodeIds[4]=~Q
  */
 export function makeJKFlipflopAnalogFactory(): AnalogElementFactory {
-  return (pinNodes, _internalNodeIds, _branchIdx, props, _getTime) => {
+  return (pinNodes, props, _getTime) => {
     const pinSpecs = getPinSpecs(props);
     const pinLoading = getPinLoading(props);
 

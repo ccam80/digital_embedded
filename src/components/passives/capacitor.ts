@@ -84,7 +84,7 @@ function buildCapacitorPinDeclarations(): PinDeclaration[] {
 }
 
 // ---------------------------------------------------------------------------
-// CapacitorElement â€” CircuitElement implementation
+// CapacitorElement  CircuitElement implementation
 // ---------------------------------------------------------------------------
 
 export class CapacitorElement extends AbstractCircuitElement {
@@ -122,11 +122,11 @@ export class CapacitorElement extends AbstractCircuitElement {
     const vB = signals?.getPinVoltage("neg");
     const hasVoltage = vA !== undefined && vB !== undefined;
 
-    // Left lead + plate â€” colored by pin A voltage
+    // Left lead + plate  colored by pin A voltage
     drawColoredLead(ctx, hasVoltage ? signals : undefined, vA, 0, 0, 1.75, 0);
     ctx.drawLine(1.75, -0.75, 1.75, 0.75);
 
-    // Right lead + plate â€” colored by pin B voltage
+    // Right lead + plate  colored by pin B voltage
     drawColoredLead(ctx, hasVoltage ? signals : undefined, vB, 2.25, 0, 4, 0);
     ctx.drawLine(2.25, -0.75, 2.25, 0.75);
 
@@ -142,10 +142,10 @@ export class CapacitorElement extends AbstractCircuitElement {
 }
 
 // ---------------------------------------------------------------------------
-// AnalogCapacitorElement â€” MNA implementation
+// AnalogCapacitorElement  MNA implementation
 // ---------------------------------------------------------------------------
 
-// Slot layout â€” 5 slots total. Previous values are read from s1/s2/s3
+// Slot layout  5 slots total. Previous values are read from s1/s2/s3
 // at the same offsets (pointer-rotation history).
 const CAPACITOR_SCHEMA: StateSchema = defineStateSchema("AnalogCapacitorElement", [
   { name: "GEQ",  doc: "Companion conductance",       init: { kind: "zero" } },
@@ -164,6 +164,12 @@ const SLOT_CCAP = 4;
 export class AnalogCapacitorElement implements ReactiveAnalogElementCore {
   pinNodeIds!: readonly number[];
   readonly branchIndex = -1;
+  _stateBase: number = -1;
+  _pinNodes: Map<string, number> = new Map();
+
+  setup(_ctx: import("../../solver/analog/setup-context.js").SetupContext): void {
+    throw new Error("PB-CAP not yet migrated");
+  }
   readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.CAP;
   readonly isNonlinear = false;
   readonly isReactive = true;
@@ -205,9 +211,9 @@ export class AnalogCapacitorElement implements ReactiveAnalogElementCore {
     this._TNOM = TNOM;
     this._SCALE = SCALE;
     this._M = M;
-    // capload.c:44 â€” CAPm is applied at stamp time, not folded into CAPcapac.
+    // capload.c:44  CAPm is applied at stamp time, not folded into CAPcapac.
     // C is raw per-instance capacitance (TC + SCALE applied); M kept separate.
-    // _pool not yet set in constructor; temperature defaults to TNOM â†’ dT = 0.
+    // _pool not yet set in constructor; temperature defaults to TNOM  dT = 0.
     const _dT0 = 300.15 - this._TNOM;
     this.C = this._nominalC * (1 + this._TC1 * _dT0 + this._TC2 * _dT0 * _dT0) * this._SCALE;
   }
@@ -241,13 +247,13 @@ export class AnalogCapacitorElement implements ReactiveAnalogElementCore {
       const dT = 300.15 - this._TNOM;
       this.C = this._nominalC * (1 + this._TC1 * dT + this._TC2 * dT * dT) * this._SCALE;
     } else if (key === "M") {
-      // capload.c:44 â€” M is applied at stamp time; C is not recomputed when M changes.
+      // capload.c:44  M is applied at stamp time; C is not recomputed when M changes.
       this._M = value;
     }
   }
 
   /**
-   * Unified load() â€” ngspice capload.c CAPload.
+   * Unified load()  ngspice capload.c CAPload.
    *
    * Reads terminal voltage, computes charge Q = C*V, NIintegrates inline using
    * ctx.ag[], and stamps the companion model (geq conductance + ceq current
@@ -258,19 +264,19 @@ export class AnalogCapacitorElement implements ReactiveAnalogElementCore {
     const n0 = this.pinNodeIds[0];
     const n1 = this.pinNodeIds[1];
     const C = this.C;
-    // capload.c:44 â€” m = CAPm; applied at every stamp site, not folded into C.
+    // capload.c:44  m = CAPm; applied at every stamp site, not folded into C.
     const m = this._M;
     const base = this.stateBaseOffset;
-    // pool.states[N] accessed at call time â€” no cached Float64Array refs (A4).
+    // pool.states[N] accessed at call time  no cached Float64Array refs (A4).
     const s0 = this._pool.states[0];
     const s1 = this._pool.states[1];
     const s2 = this._pool.states[2];
     const s3 = this._pool.states[3];
 
-    // ngspice capload.c:30 â€” participate only in MODETRAN | MODEAC | MODETRANOP.
+    // ngspice capload.c:30  participate only in MODETRAN | MODEAC | MODETRANOP.
     if (!(mode & (MODETRAN | MODEAC | MODETRANOP))) return;
 
-    // capload.c:32-36 â€” IC gate.
+    // capload.c:32-36  IC gate.
     const cond1 =
       ((mode & MODEDC) && (mode & MODEINITJCT)) ||
       ((mode & MODEUIC) && (mode & MODEINITTRAN));
@@ -337,7 +343,7 @@ export class AnalogCapacitorElement implements ReactiveAnalogElementCore {
         this._handlesInit = true;
       }
 
-      // Stamp companion model (capload.c:74-79 â€” all entries scaled by m = CAPm).
+      // Stamp companion model (capload.c:74-79  all entries scaled by m = CAPm).
       if (n0 !== 0) solver.stampElement(this._hAA, m * geq);
       if (n1 !== 0) solver.stampElement(this._hBB, m * geq);
       if (n0 !== 0 && n1 !== 0) {
@@ -392,9 +398,8 @@ export class AnalogCapacitorElement implements ReactiveAnalogElementCore {
 
 function createCapacitorElement(
   _pinNodes: ReadonlyMap<string, number>,
-  _internalNodeIds: readonly number[],
-  _branchIdx: number,
   props: PropertyBag,
+  _getTime: () => number,
 ): AnalogElementCore {
   const C     = props.getModelParam<number>("capacitance");
   const IC    = props.hasModelParam("IC")    ? props.getModelParam<number>("IC")    : CAPACITOR_DEFAULTS["IC"]!;
@@ -455,9 +460,10 @@ export const CapacitorDefinition: ComponentDefinition = {
   attributeMap: CAPACITOR_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.PASSIVES,
   helpText:
-    "Capacitor â€” reactive element with companion model.\n" +
+    "Capacitor  reactive element with companion model.\n" +
     "Stamps equivalent conductance and history current source at each timestep.",
   models: {},
+  ngspiceNodeMap: { pos: "pos", neg: "neg" },
   modelRegistry: {
     "behavioral": {
       kind: "inline",

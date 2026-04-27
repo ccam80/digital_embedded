@@ -1,5 +1,5 @@
 ﻿/**
- * Zener diode analog component â€” Shockley equation with reverse breakdown.
+ * Zener diode analog component  Shockley equation with reverse breakdown.
  *
  * Extends the standard diode with a reverse breakdown region:
  *   When Vd < -tBV: Id = -IS * exp(-(Vd + tBV) / (NBV*Vt))
@@ -8,7 +8,7 @@
  * Vd = -tBV, modeling the Zener/avalanche effect.
  *
  * cite: ref/ngspice/src/spicelib/devices/dio/dioload.c (DIOload)
- * cite: ref/ngspice/src/spicelib/devices/dio/diotemp.c (DIOtemp â€” tBV derivation)
+ * cite: ref/ngspice/src/spicelib/devices/dio/diotemp.c (DIOtemp  tBV derivation)
  */
 
 import { AbstractCircuitElement } from "../../core/element.js";
@@ -34,10 +34,10 @@ import {
   MODETRANOP,
   MODEUIC,
 } from "../../solver/analog/ckt-mode.js";
-import { stampG, stampRHS } from "../../solver/analog/stamp-helpers.js";
+import { stampRHS } from "../../solver/analog/stamp-helpers.js";
 import { pnjlim } from "../../solver/analog/newton-raphson.js";
 import { defineModelParams } from "../../core/model-params.js";
-import { createDiodeElement, getDiodeInternalNodeCount, getDiodeInternalNodeLabels } from "./diode.js";
+import { createDiodeElement } from "./diode.js";
 import type { StatePoolRef } from "../../core/analog-types.js";
 import { defineStateSchema, applyInitialValues } from "../../solver/analog/state-schema.js";
 
@@ -82,7 +82,7 @@ export const { paramDefs: ZENER_SPICE_L1_PARAM_DEFS, defaults: ZENER_SPICE_L1_DE
     N:   { default: 1,                   description: "Emission coefficient" },
   },
   secondary: {
-    RS:  { default: 0,        unit: "Î©",  description: "Ohmic (series) resistance" },
+    RS:  { default: 0,        unit: "Î",  description: "Ohmic (series) resistance" },
     CJO: { default: 0,        unit: "F",  description: "Zero-bias junction capacitance" },
     VJ:  { default: 1,        unit: "V",  description: "Junction built-in potential" },
     M:   { default: 0.5,                  description: "Grading coefficient" },
@@ -108,13 +108,13 @@ const ZENER_STATE_SCHEMA = defineStateSchema("ZenerElement", [
 ]);
 
 // ---------------------------------------------------------------------------
-// Temperature scaling â€” tBV derivation (cite: diotemp.c:206-244)
+// Temperature scaling  tBV derivation (cite: diotemp.c:206-244)
 // ---------------------------------------------------------------------------
 
 /**
  * Compute the temperature-scaled breakdown voltage (DIOtBrkdwnV) from BV and IBV.
  *
- * cite: diotemp.c:208-244 â€” temperature-adjusts BV using DIOtcv (tlev==0 path),
+ * cite: diotemp.c:208-244  temperature-adjusts BV using DIOtcv (tlev==0 path),
  * then iterates xbv to find the intersection of the forward and reverse diode
  * characteristics at the breakdown current cbv.
  *
@@ -158,14 +158,13 @@ function computeTBV(
 }
 
 // ---------------------------------------------------------------------------
-// createZenerElement â€” AnalogElement factory
+// createZenerElement  AnalogElement factory
 // ---------------------------------------------------------------------------
 
 export function createZenerElement(
   pinNodes: ReadonlyMap<string, number>,
-  _internalNodeIds: readonly number[],
-  _branchIdx: number,
   props: PropertyBag,
+  _getTime?: () => number,
 ): PoolBackedAnalogElementCore {
   const nodeAnode = pinNodes.get("A")!;
   const nodeCathode = pinNodes.get("K")!;
@@ -177,8 +176,8 @@ export function createZenerElement(
   // diosetup.c:93-95: NBV (DIObrkdEmissionCoeff) defaults to N (DIOemissionCoeff)
   if (isNaN(params.NBV)) params.NBV = params.N;
 
-  // Temperature-derived working values â€” recomputed whenever params.TEMP changes.
-  // cite: dioload.c / diotemp.c â€” per-instance TEMP (maps to ngspice DIOtemp)
+  // Temperature-derived working values  recomputed whenever params.TEMP changes.
+  // cite: dioload.c / diotemp.c  per-instance TEMP (maps to ngspice DIOtemp)
   interface ZenerTp {
     vt: number;
     nVt: number;
@@ -189,7 +188,7 @@ export function createZenerElement(
   }
 
   function computeZenerTp(): ZenerTp {
-    // cite: dioload.c / diotemp.c â€” per-instance TEMP (maps to ngspice DIOtemp)
+    // cite: dioload.c / diotemp.c  per-instance TEMP (maps to ngspice DIOtemp)
     const circuitTemp = params.TEMP;
     const dt = circuitTemp - (isFinite(params.TNOM) ? params.TNOM : REFTEMP);
     const vt = (CONSTboltz * circuitTemp) / CHARGE;
@@ -213,18 +212,20 @@ export function createZenerElement(
   // State pool slot indices
   const SLOT_VD = 0, SLOT_GEQ = 1, SLOT_IEQ = 2, SLOT_ID = 3;
 
-  // Pool binding â€” only the pool reference is retained. Individual state
+  // Pool binding  only the pool reference is retained. Individual state
   // arrays are NOT cached as member variables: every access inside load()
   // reads pool.states[N] at call time. Mirrors ngspice CKTstate0 pointer
   // access (dioload.c never caches state pointers on devices).
   let pool: StatePoolRef;
   let base: number;
 
-  // Ephemeral per-iteration pnjlim limiting flag (ngspice Check / DIOload â†’ CKTnoncon++)
+  // Ephemeral per-iteration pnjlim limiting flag (ngspice Check / DIOload  CKTnoncon++)
   let pnjlimLimited = false;
 
-  return {
+  const zenerElement = {
     branchIndex: -1,
+    _stateBase: -1,
+    _pinNodes: new Map(pinNodes),
     ngspiceLoadOrder: NGSPICE_LOAD_ORDER.DIO,
     isNonlinear: true,
     isReactive: false,
@@ -241,6 +242,43 @@ export function createZenerElement(
     s6: new Float64Array(0),
     s7: new Float64Array(0),
 
+    // Internal prime node (DIOposPrimeNode) — set during setup(), read by load()
+    _posPrimeNode: nodeAnode,
+
+    // TSTALLOC handles — set during setup(), written by load()
+    _hPosPP:  -1,
+    _hNegPP:  -1,
+    _hPPPos:  -1,
+    _hPPNeg:  -1,
+    _hPosPos: -1,
+    _hNegNeg: -1,
+    _hPPPP:   -1,
+
+    setup(ctx: import("../../solver/analog/setup-context.js").SetupContext): void {
+      const solver = ctx.solver;
+      const posNode = this._pinNodes.get("A")!;
+      const negNode = this._pinNodes.get("K")!;
+
+      // State slots — diosetup.c:198-199
+      this._stateBase = ctx.allocStates(4);
+      this.stateBaseOffset = this._stateBase;
+      base = this._stateBase;
+
+      // Internal node — diosetup.c:204-224
+      this._posPrimeNode = (params.RS === 0 || !params.RS)
+        ? posNode
+        : ctx.makeVolt(this.label ?? "Z", "internal");
+
+      // TSTALLOC sequence — diosetup.c:232-238 (identical to PB-DIO)
+      this._hPosPP  = solver.allocElement(posNode,            this._posPrimeNode); // (1)
+      this._hNegPP  = solver.allocElement(negNode,            this._posPrimeNode); // (2)
+      this._hPPPos  = solver.allocElement(this._posPrimeNode, posNode);            // (3)
+      this._hPPNeg  = solver.allocElement(this._posPrimeNode, negNode);            // (4)
+      this._hPosPos = solver.allocElement(posNode,            posNode);            // (5)
+      this._hNegNeg = solver.allocElement(negNode,            negNode);            // (6)
+      this._hPPPP   = solver.allocElement(this._posPrimeNode, this._posPrimeNode); // (7)
+    },
+
     initState(poolRef: StatePoolRef): void {
       pool = poolRef;
       base = this.stateBaseOffset;
@@ -248,7 +286,7 @@ export function createZenerElement(
     },
 
     load(ctx: LoadContext): void {
-      // Direct state-array access per call â€” no cached Float64Array refs.
+      // Direct state-array access per call  no cached Float64Array refs.
       const s0 = pool.states[0];
       const s1 = pool.states[1];
 
@@ -279,7 +317,7 @@ export function createZenerElement(
           const evrev = Math.exp(-(tp.tBV + vdOp) / tp.nbvVt);
           gdOp = params.IS * evrev / tp.nbvVt;
         }
-        // store capd (small-signal conductance) â€” dioload.c:363 stores capd here;
+        // store capd (small-signal conductance)  dioload.c:363 stores capd here;
         // for a resistive zener (no cap), we store gd for any bypass/convergence use.
         s0[base + SLOT_GEQ] = gdOp + GMIN;
         // cite: dioload.c:374: continue (skip stamps)
@@ -296,21 +334,21 @@ export function createZenerElement(
         // Z-W3-9: MODEINITTRAN seeds vd from state1  cite: dioload.c:128-129
         vdRaw = s1[base + SLOT_VD];
       } else if ((mode & MODEINITJCT) && (mode & MODETRANOP) && (mode & MODEUIC)) {
-        // dioload.c:130-132: MODEINITJCT && MODETRANOP && MODEUIC â†’ DIOinitCond
+        // dioload.c:130-132: MODEINITJCT && MODETRANOP && MODEUIC  DIOinitCond
         // Simplified model has no IC param; fall back to 0  (DIOinitCond default).
         vdRaw = 0;
       } else if ((mode & MODEINITJCT) && (params.OFF !== undefined && params.OFF !== 0)) {
-        // dioload.c:133-134: MODEINITJCT && DIOoff â†’ vd = 0
+        // dioload.c:133-134: MODEINITJCT && DIOoff  vd = 0
         vdRaw = 0;
       } else if (mode & MODEINITJCT) {
-        // dioload.c:135-136: MODEINITJCT else â†’ vd = tVcrit
+        // dioload.c:135-136: MODEINITJCT else  vd = tVcrit
         vdRaw = tp.tVcrit;
       } else if ((mode & MODEINITFIX) && (params.OFF !== undefined && params.OFF !== 0)) {
-        // dioload.c:137-138: MODEINITFIX && DIOoff â†’ vd = 0
+        // dioload.c:137-138: MODEINITFIX && DIOoff  vd = 0
         vdRaw = 0;
       } else {
         // dioload.c:151-152: vd from rhsOld (current NR iterate voltages)
-        const va = voltages[nodeAnode];
+        const va = voltages[zenerElement._posPrimeNode];
         const vc = voltages[nodeCathode];
         vdRaw = va - vc;
       }
@@ -322,11 +360,11 @@ export function createZenerElement(
       let vdLimited: number;
 
       if (mode & (MODEINITJCT | MODEINITTRAN)) {
-        // These phases set vd directly â€” no pnjlim  cite: dioload.c:126-138
+        // These phases set vd directly  no pnjlim  cite: dioload.c:126-138
         vdLimited = vdRaw;
         pnjlimLimited = false;
       } else if (isFinite(tp.tBV) && vdRaw < Math.min(0, -tp.tBV + 10 * tp.nbvVt)) {
-        // dioload.c:183-195: breakdown path â€” pnjlim in reflected domain.
+        // dioload.c:183-195: breakdown path  pnjlim in reflected domain.
         // Z-W3-6: use vcritBrk (computed from nbvVt) not tVcrit  cite: dioload.c:189-190
         const vdtemp = -(vdRaw + tp.tBV);
         const vdtempOld = -(vdOld + tp.tBV);
@@ -393,7 +431,7 @@ export function createZenerElement(
       cd += GMIN * vdLimited;  // cite: dioload.c:299: cd += CKTgmin*vd
 
       // -----------------------------------------------------------------------
-      // Z-W3-7: state0 writes â€” store GMIN-adjusted pair  cite: dioload.c:417-419
+      // Z-W3-7: state0 writes  store GMIN-adjusted pair  cite: dioload.c:417-419
       // ngspice writes the post-GMIN cd and gd to CKTstate0.
       // -----------------------------------------------------------------------
       s0[base + SLOT_VD]  = vdLimited;
@@ -405,23 +443,24 @@ export function createZenerElement(
 
       // -----------------------------------------------------------------------
       // Stamp Norton companion  cite: dioload.c:429-441
+      // Stamps through pre-allocated handles from setup()
       // -----------------------------------------------------------------------
       const solver = ctx.solver;
-      stampG(solver, nodeAnode, nodeAnode, gd);
-      stampG(solver, nodeAnode, nodeCathode, -gd);
-      stampG(solver, nodeCathode, nodeAnode, -gd);
-      stampG(solver, nodeCathode, nodeCathode, gd);
-      stampRHS(ctx.rhs, nodeAnode, -ieq);
+      solver.stampElement(zenerElement._hPPPP,   gd);
+      solver.stampElement(zenerElement._hPPNeg,  -gd);
+      solver.stampElement(zenerElement._hNegPP,  -gd);
+      solver.stampElement(zenerElement._hNegNeg, gd);
+      stampRHS(ctx.rhs, zenerElement._posPrimeNode, -ieq);
       stampRHS(ctx.rhs, nodeCathode, ieq);
     },
 
     checkConvergence(ctx: LoadContext): boolean {
       const s0 = pool.states[0];
-      // dioload.c:411-416: CKTnoncon bump on pnjlim â†’ non-convergence
+      // dioload.c:411-416: CKTnoncon bump on pnjlim  non-convergence
       if (pnjlimLimited) return false;
 
       const voltages = ctx.rhsOld;
-      const va = voltages[nodeAnode];
+      const va = voltages[zenerElement._posPrimeNode];
       const vc = voltages[nodeCathode];
       const vdRaw = va - vc;
 
@@ -448,10 +487,12 @@ export function createZenerElement(
       }
     },
   };
+
+  return zenerElement;
 }
 
 // ---------------------------------------------------------------------------
-// ZenerElement â€” CircuitElement implementation
+// ZenerElement  CircuitElement implementation
 // ---------------------------------------------------------------------------
 
 export class ZenerElement extends AbstractCircuitElement {
@@ -506,22 +547,22 @@ export class ZenerElement extends AbstractCircuitElement {
     // Body (triangle, cathode bar, wings) stays COMPONENT color
     ctx.setColor("COMPONENT");
 
-    // Filled diode triangle: lead1 â†’ lead2 tip
+    // Filled diode triangle: lead1  lead2 tip
     ctx.drawPolygon([
       { x: lead1.x, y: -hs },
       { x: lead1.x, y: hs },
       { x: lead2.x, y: 0 },
     ], true);
 
-    // Cathode bar: cath0/cath1 are perpendicular to lead1â†’lead2 at lead2
+    // Cathode bar: cath0/cath1 are perpendicular to lead1lead2 at lead2
     // direction is along y axis (perpendicular to horizontal wire)
     const cath0 = { x: lead2.x, y: -hs };
     const cath1 = { x: lead2.x, y: hs };
     ctx.drawLine(cath0.x, cath0.y, cath1.x, cath1.y);
 
-    // Zener wings: bent ends at fraction -0.2 and 1.2 along cath0â†’cath1
-    // interpPointSingle(a,b,f,g): point at fraction f along aâ†’b, offset g perpendicular (along x for vertical bar)
-    // Perpendicular to cath0â†’cath1 (which is vertical) is horizontal
+    // Zener wings: bent ends at fraction -0.2 and 1.2 along cath0cath1
+    // interpPointSingle(a,b,f,g): point at fraction f along ab, offset g perpendicular (along x for vertical bar)
+    // Perpendicular to cath0cath1 (which is vertical) is horizontal
     // Wing tips at Â±11/16 = Â±0.6875 grid units (from Falstad pixel coords Â±11 at 16px/unit)
     const wing0 = {
       x: cath0.x - hs,
@@ -614,10 +655,11 @@ export const ZenerDiodeDefinition: ComponentDefinition = {
   attributeMap: ZENER_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.SEMICONDUCTORS,
   helpText:
-    "Zener Diode â€” Shockley diode with reverse breakdown at tBV.\n" +
+    "Zener Diode  Shockley diode with reverse breakdown at tBV.\n" +
     "Forward: Id = IS * (exp(Vd/(N*Vt)) - 1)\n" +
     "Reverse-cubic: Id = -IS*(1 + (3*nVt/(vd*e))^3)\n" +
     "Breakdown (Vd < -tBV): Id = -IS * exp(-(Vd+tBV)/(NBV*Vt))",
+  ngspiceNodeMap: { A: "pos", K: "neg" },
   models: {},
   modelRegistry: {
     "spice": {
@@ -625,14 +667,15 @@ export const ZenerDiodeDefinition: ComponentDefinition = {
       factory: createDiodeElement,
       paramDefs: ZENER_SPICE_L1_PARAM_DEFS,
       params: ZENER_SPICE_L1_DEFAULTS,
-      getInternalNodeCount: getDiodeInternalNodeCount,
-      getInternalNodeLabels: getDiodeInternalNodeLabels,
+      mayCreateInternalNodes: true,
+      ngspiceNodeMap: { A: "pos", K: "neg" },
     },
     "simplified": {
       kind: "inline",
       factory: createZenerElement,
       paramDefs: ZENER_PARAM_DEFS,
       params: ZENER_PARAM_DEFAULTS,
+      ngspiceNodeMap: { A: "pos", K: "neg" },
     },
   },
   defaultModel: "spice",

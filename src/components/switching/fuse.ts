@@ -429,12 +429,14 @@ export const FuseDefinition: ComponentDefinition = {
       defaultDelay: 0,
     },
   },
+  ngspiceNodeMap: { out1: "pos", out2: "neg" },
   modelRegistry: {
     "behavioral": {
       kind: "inline",
-      factory: createAnalogFuseElement,
+      factory: (pinNodes, props, _getTime) => createAnalogFuseElement(pinNodes, props),
       paramDefs: ANALOG_FUSE_PARAM_DEFS,
       params: ANALOG_FUSE_DEFAULTS,
+      ngspiceNodeMap: { out1: "pos", out2: "neg" },
     },
   },
   defaultModel: "digital",

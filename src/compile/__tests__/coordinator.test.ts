@@ -239,7 +239,7 @@ function buildResistorDividerCircuit(): { circuit: Circuit; registry: ComponentR
 }
 
 // ===========================================================================
-// Tests â€” digital-only
+// Tests  digital-only
 // ===========================================================================
 
 describe('DefaultSimulationCoordinator - digital-only', () => {
@@ -443,7 +443,7 @@ describe('DefaultSimulationCoordinator - digital-only', () => {
 });
 
 // ===========================================================================
-// Tests â€” analog-only
+// Tests  analog-only
 // ===========================================================================
 
 describe('DefaultSimulationCoordinator - analog-only', () => {
@@ -482,7 +482,7 @@ describe('DefaultSimulationCoordinator - analog-only', () => {
 });
 
 // ===========================================================================
-// Helpers â€” mixed-signal
+// Helpers  mixed-signal
 // ===========================================================================
 
 /**
@@ -530,7 +530,7 @@ function buildMixedCompiledUnified(): CompiledCircuitUnified {
 }
 
 // ===========================================================================
-// Tests â€” mixed-signal
+// Tests  mixed-signal
 // ===========================================================================
 
 describe('DefaultSimulationCoordinator - mixed-signal', () => {
@@ -583,7 +583,7 @@ describe('DefaultSimulationCoordinator - mixed-signal', () => {
 });
 
 // ===========================================================================
-// Tests â€” analysisPhase (Item 15)
+// Tests  analysisPhase (Item 15)
 // ===========================================================================
 
 describe('DefaultSimulationCoordinator - analysisPhase', () => {

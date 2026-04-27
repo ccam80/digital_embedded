@@ -7,6 +7,7 @@ import { NGSPICE_LOAD_ORDER } from "../element.js";
 import { readMnaVoltage, delegatePinSetParam } from "../digital-pin-model.js";
 import type { DigitalInputPinModel, DigitalOutputPinModel } from "../digital-pin-model.js";
 import type { AnalogElementFactory } from "../behavioral-gate.js";
+import type { SetupContext } from "../setup-context.js";
 import type { Diagnostic } from "../../../compile/types.js";
 import { makeDiagnostic } from "../diagnostics.js";
 import type { AnalogCapacitorElement } from "../../../components/passives/capacitor.js";
@@ -71,6 +72,8 @@ export class BehavioralRSFlipflopElement implements ReactiveAnalogElementCore {
   readonly stateSchema: StateSchema = FLIPFLOP_COMPOSITE_SCHEMA;
   stateSize: number;
   stateBaseOffset = -1;
+  _stateBase: number = -1;
+  _pinNodes: Map<string, number> = new Map();
   s0: Float64Array<ArrayBufferLike> = new Float64Array(0) as Float64Array<ArrayBufferLike>;
   s1: Float64Array<ArrayBufferLike> = new Float64Array(0) as Float64Array<ArrayBufferLike>;
   s2: Float64Array<ArrayBufferLike> = new Float64Array(0) as Float64Array<ArrayBufferLike>;
@@ -119,6 +122,10 @@ export class BehavioralRSFlipflopElement implements ReactiveAnalogElementCore {
 
   initVoltages(rhs: Float64Array): void {
     this._prevClockVoltage = readMnaVoltage(this._clockPin.nodeId, rhs);
+  }
+
+  setup(_ctx: SetupContext): void {
+    throw new Error("BehavioralRSFlipflopElement not yet migrated");
   }
 
   getDiagnostics(): Diagnostic[] {
@@ -215,7 +222,7 @@ export class BehavioralRSFlipflopElement implements ReactiveAnalogElementCore {
  *   nodeIds[0]=S, nodeIds[1]=C, nodeIds[2]=R, nodeIds[3]=Q, nodeIds[4]=~Q
  */
 export function makeRSFlipflopAnalogFactory(): AnalogElementFactory {
-  return (pinNodes, _internalNodeIds, _branchIdx, props, _getTime) => {
+  return (pinNodes, props, _getTime) => {
     const pinSpecs = getPinSpecs(props);
     const pinLoading = getPinLoading(props);
 

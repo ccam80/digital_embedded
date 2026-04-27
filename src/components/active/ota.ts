@@ -9,10 +9,10 @@
  *   I_out = I_bias * tanh(V_diff / (2 * V_T))
  *
  * For small V_diff (|V_diff| << 2*V_T):
- *   tanh(x) â‰ˆ x  â†’  I_out â‰ˆ gm * V_diff  (linear region)
+ *   tanh(x)  x    I_out  gm * V_diff  (linear region)
  *
  * For large V_diff:
- *   I_out â†’ Â±I_bias  (saturated at bias current)
+ *   I_out  Â±I_bias  (saturated at bias current)
  *
  * MNA formulation:
  *   The OTA is a nonlinear VCCS. At operating point V_diff0:
@@ -20,7 +20,7 @@
  *     dI_out/dV_diff = I_bias / (2*V_T) * sechÂ²(V_diff0 / (2*V_T)) = gm_eff
  *
  *   NR-linearized Norton equivalent:
- *     I_out â‰ˆ gm_eff * V_diff + [I_out0 - gm_eff * V_diff0]
+ *     I_out  gm_eff * V_diff + [I_out0 - gm_eff * V_diff0]
  *
  *   Stamped as a VCCS from (V+,V-) controlling current into (OUT+, OUT-):
  *     G[OUT+, V+]  -= gm_eff    G[OUT+, V-]  += gm_eff
@@ -32,7 +32,7 @@
  * The I_bias value is taken as the net current flowing INTO the Iabc node
  * from an external current source; to model this, we read the node voltage
  * at the Iabc pin and convert it to a current via an external reference
- * conductance. However, per the spec, Iabc is a current INPUT pin â€” the
+ * conductance. However, per the spec, Iabc is a current INPUT pin  the
  * bias current is directly the current flowing into that node.
  *
  * Implementation note: since we cannot directly read a current at a node
@@ -42,17 +42,17 @@
  * external current source stamps the bias current into the Iabc node.
  * In practice users connect a current source to Iabc; the node voltage at
  * Iabc is determined by the external circuit. We read I_bias by summing
- * all currents into the node â€” but that requires KCL bookkeeping.
+ * all currents into the node  but that requires KCL bookkeeping.
  *
  * Simpler and correct approach: model Iabc as a voltage node representing
- * the bias current magnitude, with 1 Î© shunt to ground (so V(Iabc) = I_bias
+ * the bias current magnitude, with 1 Î shunt to ground (so V(Iabc) = I_bias
  * when a current source drives it). This is the standard VCA/OTA test setup.
  * The OTA element reads V(Iabc) directly as I_bias.
  *
  * Pins (nodeIds order):
  *   [0] = nVp   (V+, non-inverting input)
  *   [1] = nVm   (V-, inverting input)
- *   [2] = nIabc (bias current control â€” voltage here equals I_bias in amps
+ *   [2] = nIabc (bias current control  voltage here equals I_bias in amps
  *                when the Iabc node is driven by a 1 A/V current source)
  *   [3] = nOutP (OUT+ output)
  *   [4] = nOutN (OUT- output)
@@ -72,6 +72,7 @@ import {
 } from "../../core/registry.js";
 import type { AnalogElementCore, LoadContext } from "../../solver/analog/element.js";
 import { NGSPICE_LOAD_ORDER } from "../../solver/analog/element.js";
+import type { SetupContext } from "../../solver/analog/setup-context.js";
 import { stampRHS } from "../../solver/analog/stamp-helpers.js";
 import { defineModelParams } from "../../core/model-params.js";
 
@@ -146,8 +147,6 @@ function buildOTAPinDeclarations(): PinDeclaration[] {
 
 function createOTAElement(
   pinNodes: ReadonlyMap<string, number>,
-  _internalNodeIds: readonly number[],
-  _branchIdx: number,
   props: PropertyBag,
 ): AnalogElementCore {
   const p: Record<string, number> = {
@@ -175,6 +174,24 @@ function createOTAElement(
     ngspiceLoadOrder: NGSPICE_LOAD_ORDER.VCCS,
     isNonlinear: true,
     isReactive: false,
+    _stateBase: -1,
+    _pinNodes: new Map(pinNodes),
+
+    // Cached TSTALLOC handles (vccsset.c:43-46): 4 entries for VCCS
+    // Allocated once in setup(), used every NR iteration in load().
+    _hPCP: -1 as number,   // (nOutP, nVp)  — VCCSposContPosptr
+    _hPCN: -1 as number,   // (nOutP, nVm)  — VCCSposContNegptr
+    _hNCP: -1 as number,   // (nOutN, nVp)  — VCCSnegContPosptr
+    _hNCN: -1 as number,   // (nOutN, nVm)  — VCCSnegContNegptr
+
+    setup(ctx: SetupContext): void {
+      // VCCS TSTALLOC sequence (vccsset.c:43-46): 4 entries
+      // Skip entries where either node is ground (0).
+      if (nOutP > 0 && nVp > 0) this._hPCP = ctx.solver.allocElement(nOutP, nVp);
+      if (nOutP > 0 && nVm > 0) this._hPCN = ctx.solver.allocElement(nOutP, nVm);
+      if (nOutN > 0 && nVp > 0) this._hNCP = ctx.solver.allocElement(nOutN, nVp);
+      if (nOutN > 0 && nVm > 0) this._hNCN = ctx.solver.allocElement(nOutN, nVm);
+    },
 
     load(ctx: LoadContext): void {
       const solver = ctx.solver;
@@ -205,15 +222,15 @@ function createOTAElement(
       // NR constant term (Norton offset)
       const iNR = iOutNow - gmEff * vDiff;
 
-      // Stamp VCCS: current gm_eff * V_diff injected into OUT+ from (V+, V-)
-      if (nOutP !== 0 && nVp !== 0) solver.stampElement(solver.allocElement(nOutP, nVp), -gmEff);
-      if (nOutP !== 0 && nVm !== 0) solver.stampElement(solver.allocElement(nOutP, nVm), gmEff);
-      if (nOutN !== 0 && nVp !== 0) solver.stampElement(solver.allocElement(nOutN, nVp), gmEff);
-      if (nOutN !== 0 && nVm !== 0) solver.stampElement(solver.allocElement(nOutN, nVm), -gmEff);
+      // Stamp VCCS using cached handles (vccsset.c:43-46).
+      if (this._hPCP >= 0) solver.stampElement(this._hPCP, -gmEff);
+      if (this._hPCN >= 0) solver.stampElement(this._hPCN,  gmEff);
+      if (this._hNCP >= 0) solver.stampElement(this._hNCP,  gmEff);
+      if (this._hNCN >= 0) solver.stampElement(this._hNCN, -gmEff);
 
       // RHS: Norton constant
-      if (nOutP !== 0) stampRHS(ctx.rhs,nOutP, iNR);
-      if (nOutN !== 0) stampRHS(ctx.rhs,nOutN, -iNR);
+      if (nOutP !== 0) stampRHS(ctx.rhs, nOutP,  iNR);
+      if (nOutN !== 0) stampRHS(ctx.rhs, nOutN, -iNR);
     },
 
     /**
@@ -236,7 +253,7 @@ function createOTAElement(
 }
 
 // ---------------------------------------------------------------------------
-// OTAElement â€” CircuitElement
+// OTAElement  CircuitElement
 // ---------------------------------------------------------------------------
 
 export class OTAElement extends AbstractCircuitElement {
@@ -256,7 +273,7 @@ export class OTAElement extends AbstractCircuitElement {
 
   getBoundingBox(): Rect {
     // Leftmost extent: arrow triangles extend to x=-0.25
-    // Rightmost extent: OUT pin at x=5.875 + circle radius 0.55125 â‰ˆ 6.42625
+    // Rightmost extent: OUT pin at x=5.875 + circle radius 0.55125  6.42625
     // Top: y=-3 (triangle apex at V+ lead), Bottom: y=3 (triangle apex at V- lead)
     return {
       x: this.position.x - 0.25,
@@ -277,7 +294,7 @@ export class OTAElement extends AbstractCircuitElement {
     ctx.setLineWidth(1);
     ctx.setColor("COMPONENT");
 
-    // Triangle body â€” open polyline (not closed polygon)
+    // Triangle body  open polyline (not closed polygon)
     ctx.drawPolygon(
       [{ x: 0, y: -3 }, { x: 0, y: 3 }, { x: 4, y: 0 }],
       false,
@@ -365,7 +382,7 @@ export const OTADefinition: ComponentDefinition = {
   attributeMap: OTA_ATTRIBUTE_MAPPINGS,
 
   helpText:
-    "Operational Transconductance Amplifier â€” 5-terminal element (V+, V-, Iabc, OUT+, OUT). " +
+    "Operational Transconductance Amplifier  5-terminal element (V+, V-, Iabc, OUT+, OUT). " +
     "Output current = I_bias * tanh(V_diff / (2*V_T)).",
 
   factory(props: PropertyBag): OTAElement {
@@ -376,8 +393,8 @@ export const OTADefinition: ComponentDefinition = {
   modelRegistry: {
     "behavioral": {
       kind: "inline",
-      factory: (pinNodes, internalNodeIds, branchIdx, props) =>
-        createOTAElement(pinNodes, internalNodeIds, branchIdx, props),
+      factory: (pinNodes, props, _getTime) =>
+        createOTAElement(pinNodes, props),
       paramDefs: OTA_PARAM_DEFS,
       params: OTA_DEFAULTS,
     },

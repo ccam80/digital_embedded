@@ -9,7 +9,7 @@
  *     below the cathode voltage beyond a configurable reverse threshold
  *
  * Topology (MNA):
- *   pos â”€â”€â”€ ESR â”€â”€â”€ capNode â”€â”€â”€ capacitor+leakage â”€â”€â”€ neg
+ *   pos € ESR € capNode € capacitor+leakage € neg
  *
  * Three MNA nodes are used:
  *   pinNodeIds[0] = n_pos  (positive terminal / anode)
@@ -68,7 +68,7 @@ const MIN_RESISTANCE = 1e-9;
 // State schema
 // ---------------------------------------------------------------------------
 
-// Slot layout â€” 5 slots total. Previous values are read from s1/s2/s3
+// Slot layout  5 slots total. Previous values are read from s1/s2/s3
 // at the same offsets (pointer-rotation history).
 const POLARIZED_CAP_SCHEMA: StateSchema = defineStateSchema("AnalogPolarizedCapElement", [
   { name: "GEQ",  doc: "Companion conductance",       init: { kind: "zero" } },
@@ -91,15 +91,15 @@ const SLOT_CCAP = 4;
 export const { paramDefs: POLARIZED_CAP_PARAM_DEFS, defaults: POLARIZED_CAP_MODEL_DEFAULTS } = defineModelParams({
   primary: {
     capacitance:    { default: 100e-6, unit: "F", description: "Capacitance in farads", min: 1e-12 },
-    esr:            { default: 0.1,    unit: "Î©", description: "Equivalent series resistance in ohms", min: 0 },
+    esr:            { default: 0.1,    unit: "Î", description: "Equivalent series resistance in ohms", min: 0 },
   },
   secondary: {
     leakageCurrent: { default: 1e-6,  unit: "A", description: "DC leakage current at rated voltage", min: 0 },
     voltageRating:  { default: 25,    unit: "V", description: "Maximum rated voltage", min: 1 },
     reverseMax:     { default: 1.0,   unit: "V", description: "Reverse voltage threshold that triggers a polarity warning", min: 0 },
-    // PC-W3-5: IC (alias initCond) param â€” capload.c:46-51 CAPinitCond
+    // PC-W3-5: IC (alias initCond) param  capload.c:46-51 CAPinitCond
     IC:             { default: 0,     unit: "V", description: "Initial condition: junction voltage for UIC (alias: initCond)" },
-    // PC-W3-6: M multiplicity param â€” capload.c:44 CAPm, applied at stamp time per user ruling 3
+    // PC-W3-6: M multiplicity param  capload.c:44 CAPm, applied at stamp time per user ruling 3
     M:              { default: 1,                description: "Parallel-element multiplicity (applied at stamp time)" },
   },
 });
@@ -132,7 +132,7 @@ function buildPolarizedCapPinDeclarations(): PinDeclaration[] {
 }
 
 // ---------------------------------------------------------------------------
-// PolarizedCapElement â€” AbstractCircuitElement (editor/visual layer)
+// PolarizedCapElement  AbstractCircuitElement (editor/visual layer)
 // ---------------------------------------------------------------------------
 
 export class PolarizedCapElement extends AbstractCircuitElement {
@@ -170,15 +170,15 @@ export class PolarizedCapElement extends AbstractCircuitElement {
     const hasVoltage = vPos !== undefined && vNeg !== undefined;
 
     const PX = 1 / 16;
-    const plateOffset = 28 * PX; // 1.75 â€” matches Falstad lead length (28px)
+    const plateOffset = 28 * PX; // 1.75  matches Falstad lead length (28px)
 
-    // Left lead â€” colored by pos voltage
+    // Left lead  colored by pos voltage
     drawColoredLead(ctx, hasVoltage ? signals : undefined, vPos, 0, 0, plateOffset, 0);
 
-    // Right lead â€” colored by neg voltage
+    // Right lead  colored by neg voltage
     drawColoredLead(ctx, hasVoltage ? signals : undefined, vNeg, 4, 0, 4 - plateOffset, 0);
 
-    // Plate 1 â€” straight line (positive/anode plate)
+    // Plate 1  straight line (positive/anode plate)
     if (hasVoltage && ctx.setLinearGradient) {
       ctx.setLinearGradient(plateOffset, 0, 4 - plateOffset, 0, [
         { offset: 0, color: signals!.voltageColor(vPos) },
@@ -189,7 +189,7 @@ export class PolarizedCapElement extends AbstractCircuitElement {
     }
     ctx.drawLine(plateOffset, -0.75, plateOffset, 0.75);
 
-    // Plate 2 â€” curved (exact Falstad 7-segment polyline)
+    // Plate 2  curved (exact Falstad 7-segment polyline)
     // Falstad pixel coords: (41,-12),(37,-9),(36,-5),(36,-2),(36,2),(36,5),(37,9),(41,12)
     // Grid coords (Ã·16):   (2.5625,-0.75),(2.3125,-0.5625),(2.25,-0.3125),(2.25,-0.125),
     //                      (2.25,0.125),(2.25,0.3125),(2.3125,0.5625),(2.5625,0.75)
@@ -243,7 +243,7 @@ export class PolarizedCapElement extends AbstractCircuitElement {
 const CLAMP_DIODE_STATE_SIZE = DIODE_SCHEMA.size; // 4 slots
 
 /** Build a PropertyBag for the reverse-bias clamp diode sub-element.
- *  CJO=0, TT=0 â†’ no-capacitance diode schema (4 slots).
+ *  CJO=0, TT=0  no-capacitance diode schema (4 slots).
  *  IS=1e-14, N=1 are standard small-signal defaults; the clamp diode just
  *  provides a Shockley junction stamp between nPos/nNeg per F4b. */
 function makeClampDiodeProps(): PropertyBag {
@@ -253,13 +253,19 @@ function makeClampDiodeProps(): PropertyBag {
 }
 
 // ---------------------------------------------------------------------------
-// AnalogPolarizedCapElement â€” MNA implementation
+// AnalogPolarizedCapElement  MNA implementation
 // ---------------------------------------------------------------------------
 
 export class AnalogPolarizedCapElement implements ReactiveAnalogElement {
   readonly pinNodeIds: readonly number[];
   readonly allNodeIds: readonly number[];
   readonly branchIndex: number = -1;
+  _stateBase: number = -1;
+  _pinNodes: Map<string, number> = new Map();
+
+  setup(_ctx: import("../../solver/analog/setup-context.js").SetupContext): void {
+    throw new Error("PB-POLCAP not yet migrated");
+  }
   readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.CAP;
   readonly isNonlinear: boolean = true;
   readonly isReactive = true;
@@ -284,10 +290,10 @@ export class AnalogPolarizedCapElement implements ReactiveAnalogElement {
   private G_leak: number;
   private reverseMax: number;
   private _IC: number;     // PC-W3-5: capload.c:46-51 CAPinitCond
-  private _M: number;      // PC-W3-6: capload.c:44 CAPm â€” applied at stamp time
+  private _M: number;      // PC-W3-6: capload.c:44 CAPm  applied at stamp time
   private _pool!: StatePoolRef;
 
-  // PC-W3-1: clamp diode sub-element (F4b composition â€” dioload.c:245-265)
+  // PC-W3-1: clamp diode sub-element (F4b composition  dioload.c:245-265)
   // Oriented: A=nNeg, K=nPos so it conducts when cap is reverse-biased.
   private readonly _clampDiode: PoolBackedAnalogElementCore;
 
@@ -295,7 +301,7 @@ export class AnalogPolarizedCapElement implements ReactiveAnalogElement {
   private _reverseBiasDiagEmitted: boolean = false;
 
   /**
-   * @param pinNodeIds    - [n_pos, n_neg, n_cap] â€” n_cap is the internal node
+   * @param pinNodeIds    - [n_pos, n_neg, n_cap]  n_cap is the internal node
    * @param capacitance    - Capacitance in farads
    * @param esr            - Equivalent series resistance in ohms
    * @param rLeak          - Leakage resistance in ohms (V_rated / I_leak)
@@ -325,12 +331,12 @@ export class AnalogPolarizedCapElement implements ReactiveAnalogElement {
     this._emitDiagnostic = emitDiagnostic ?? (() => {});
 
     // PC-W3-1: create clamp diode sub-element (dioload.c:245-265).
-    // A = nNeg (index [1]), K = nPos (index [0]) â€” conducts when cap is reverse-biased.
+    // A = nNeg (index [1]), K = nPos (index [0])  conducts when cap is reverse-biased.
     const clampPinNodes = new Map<string, number>([
       ["A", pinNodeIds[1]], // anode = nNeg
       ["K", pinNodeIds[0]], // cathode = nPos
     ]);
-    this._clampDiode = createDiodeElement(clampPinNodes, [], -1, makeClampDiodeProps());
+    this._clampDiode = createDiodeElement(clampPinNodes, makeClampDiodeProps());
   }
 
   initState(pool: StatePoolRef): void {
@@ -342,16 +348,16 @@ export class AnalogPolarizedCapElement implements ReactiveAnalogElement {
   }
 
   /**
-   * Unified load() â€” ESR + leakage stamps + capacitor companion + clamp diode + polarity check.
+   * Unified load()  ESR + leakage stamps + capacitor companion + clamp diode + polarity check.
    *
-   * Topology: pos â”€â”€ ESR â”€â”€ nCap â”€â”€ (C || leakage) â”€â”€ neg.
+   * Topology: pos € ESR € nCap € (C || leakage) € neg.
    * Clamp diode stamps between nPos (K) and nNeg (A) per PC-W3-1 / dioload.c:245-265.
    * Stamps in one pass:
    *   - ESR conductance between nPos and nCap (topology-constant, stamped always).
    *   - Leakage conductance between nCap and nNeg (topology-constant).
    *   - PC-W3-1: Clamp diode Shockley stamp between nNeg (A) and nPos (K).
    *   - Capacitor companion (geq, ceq) between nCap and nNeg using inline
-   *     NIintegrate with ctx.ag[] â€” gated by capload.c:30 outer gate.
+   *     NIintegrate with ctx.ag[]  gated by capload.c:30 outer gate.
    *   - Polarity diagnostic when reverse-biased beyond reverseMax.
    *   - M multiplicity applied at every stamp site (PC-W3-6 / capload.c:44).
    */
@@ -363,31 +369,31 @@ export class AnalogPolarizedCapElement implements ReactiveAnalogElement {
     const nCap = this.pinNodeIds[2];
     const base = this.stateBaseOffset;
     const m = this._M; // PC-W3-6: capload.c:44 CAPm
-    // pool.states[N] accessed at call time â€” no cached Float64Array refs (A4).
+    // pool.states[N] accessed at call time  no cached Float64Array refs (A4).
     const s0 = this._pool.states[0];
     const s1 = this._pool.states[1];
     const s2 = this._pool.states[2];
     const s3 = this._pool.states[3];
 
-    // ESR conductance (nPos â†” nCap) â€” digiTS extension (no ngspice capload.c counterpart).
-    // Scaled by m (PC-W3-6: user ruling 3 â€” apply m at stamp time, not by folding into C).
+    // ESR conductance (nPos â†" nCap)  digiTS extension (no ngspice capload.c counterpart).
+    // Scaled by m (PC-W3-6: user ruling 3  apply m at stamp time, not by folding into C).
     stampG(solver, nPos, nPos, m * this.G_esr);
     stampG(solver, nPos, nCap, -m * this.G_esr);
     stampG(solver, nCap, nPos, -m * this.G_esr);
     stampG(solver, nCap, nCap, m * this.G_esr);
 
-    // Leakage conductance (nCap â†” nNeg) â€” scaled by m.
+    // Leakage conductance (nCap â†" nNeg)  scaled by m.
     stampG(solver, nCap, nCap, m * this.G_leak);
     stampG(solver, nCap, nNeg, -m * this.G_leak);
     stampG(solver, nNeg, nCap, -m * this.G_leak);
     stampG(solver, nNeg, nNeg, m * this.G_leak);
 
     // PC-W3-1: Clamp diode stamp between nNeg (A) and nPos (K).
-    // cite: dioload.c:245-265 â€” Shockley forward/reverse structure for clamp junction.
+    // cite: dioload.c:245-265  Shockley forward/reverse structure for clamp junction.
     // The diode sub-element calls dioload.c:245-265 through createDiodeElement's load().
     this._clampDiode.load(ctx);
 
-    // Polarity detection â€” check anode vs cathode voltage.
+    // Polarity detection  check anode vs cathode voltage.
     const vAnode = voltages[nPos];
     const vCathode = voltages[nNeg];
     const vDiff = vAnode - vCathode;
@@ -415,7 +421,7 @@ export class AnalogPolarizedCapElement implements ReactiveAnalogElement {
     }
 
     // Capacitor body (between nCap and nNeg).
-    // PC-W3-2: outer gate per capload.c:30 â€” MODEAC added.
+    // PC-W3-2: outer gate per capload.c:30  MODEAC added.
     // cite: capload.c:30 if(ckt->CKTmode & (MODETRAN|MODEAC|MODETRANOP))
     if (!(mode & (MODETRAN | MODETRANOP | MODEAC))) return;
     const C = this.C;
@@ -436,7 +442,7 @@ export class AnalogPolarizedCapElement implements ReactiveAnalogElement {
       vNow = vCapNode - vNegNode;
     }
 
-    // PC-W3-3: inner fork per capload.c:52 â€” MODEAC added.
+    // PC-W3-3: inner fork per capload.c:52  MODEAC added.
     // cite: capload.c:52 if(ckt->CKTmode & (MODETRAN | MODEAC))
     if (mode & (MODETRAN | MODEAC)) {
       // Charge update (capload.c:54-66 pattern).
@@ -548,7 +554,7 @@ function buildPolarizedCapFromParams(
 ): AnalogElementCore {
   const rLeak = p.leakageCurrent > 0 ? p.voltageRating / p.leakageCurrent : 1e12;
 
-  // nodeIds = [n_pos, n_neg, n_cap_internal] â€” compiler provides the internal node
+  // nodeIds = [n_pos, n_neg, n_cap_internal]  compiler provides the internal node
   const el = new AnalogPolarizedCapElement(
     [pinNodes.get("pos")!, pinNodes.get("neg")!, internalNodeIds[0]],
     p.capacitance,
@@ -581,19 +587,19 @@ function buildPolarizedCapFromParams(
 
 function createPolarizedCapElement(
   pinNodes: ReadonlyMap<string, number>,
-  internalNodeIds: readonly number[],
-  _branchIdx: number,
   props: PropertyBag,
+  _getTime: () => number,
 ): AnalogElementCore {
+  const internalNodeIds: readonly number[] = [];
   const p = {
     capacitance:    props.getModelParam<number>("capacitance"),
     esr:            props.getModelParam<number>("esr"),
     leakageCurrent: props.getModelParam<number>("leakageCurrent"),
     voltageRating:  props.getModelParam<number>("voltageRating"),
     reverseMax:     props.getModelParam<number>("reverseMax"),
-    // PC-W3-5: IC (alias initCond) â€” capload.c:46-51 CAPinitCond
+    // PC-W3-5: IC (alias initCond)  capload.c:46-51 CAPinitCond
     IC:             props.getModelParam<number>("IC"),
-    // PC-W3-6: M multiplicity â€” capload.c:44 CAPm
+    // PC-W3-6: M multiplicity  capload.c:44 CAPm
     M:              props.getModelParam<number>("M"),
   };
   return buildPolarizedCapFromParams(pinNodes, internalNodeIds, p);
@@ -696,7 +702,7 @@ export const PolarizedCapDefinition: ComponentDefinition = {
   attributeMap: POLARIZED_CAP_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.PASSIVES,
   helpText:
-    "Polarized electrolytic capacitor â€” extends the standard capacitor with ESR,\n" +
+    "Polarized electrolytic capacitor  extends the standard capacitor with ESR,\n" +
     "leakage current, and reverse-bias polarity enforcement.",
   models: {},
   modelRegistry: {

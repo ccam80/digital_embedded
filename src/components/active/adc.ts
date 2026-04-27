@@ -1,24 +1,24 @@
 ﻿/**
- * ADC â€” N-bit Analog-to-Digital Converter.
+ * ADC  N-bit Analog-to-Digital Converter.
  *
  * Behavioral SAR (successive-approximation register) or instant-conversion
  * model. On each rising clock edge the ADC samples the analog input voltage
  * and produces an N-bit unsigned binary output code.
  *
  * Pin layout (in pin-declaration order, which determines nodeIds index):
- *   0  VIN   â€” analog input (DigitalInputPinModel for loading only)
- *   1  CLK   â€” clock input (DigitalInputPinModel for loading)
- *   2  VREF  â€” reference voltage input (passive â€” read directly from MNA)
- *   3  GND   â€” ground reference (passive â€” read directly from MNA)
- *   4  EOC   â€” end-of-conversion output (DigitalOutputPinModel)
- *   5..5+N-1 D0..D(N-1) â€” digital output bits, LSB first
+ *   0  VIN    analog input (DigitalInputPinModel for loading only)
+ *   1  CLK    clock input (DigitalInputPinModel for loading)
+ *   2  VREF   reference voltage input (passive  read directly from MNA)
+ *   3  GND    ground reference (passive  read directly from MNA)
+ *   4  EOC    end-of-conversion output (DigitalOutputPinModel)
+ *   5..5+N-1 D0..D(N-1)  digital output bits, LSB first
  *
  * Conversion:
  *   code = clamp(floor((V_in - V_gnd) / (V_ref - V_gnd) Ã— 2^N), 0, 2^N - 1)
  *
  * In 'unipolar' mode: code = floor(V_in / V_ref Ã— 2^N) clamped to [0, 2^N-1]
  *   (V_gnd treated as 0).
- * In 'bipolar' mode: code = floor((V_in + V_ref/2) / V_ref Ã— 2^N) â€” midscale
+ * In 'bipolar' mode: code = floor((V_in + V_ref/2) / V_ref Ã— 2^N)  midscale
  *   offset binary: V_in=0 gives code = 2^(N-1).
  *
  * Clock-edge detection:
@@ -48,6 +48,7 @@ import {
 import { defineModelParams } from "../../core/model-params.js";
 import type { LoadContext, StatePoolRef, PoolBackedAnalogElementCore } from "../../solver/analog/element.js";
 import { NGSPICE_LOAD_ORDER } from "../../solver/analog/element.js";
+import type { SetupContext } from "../../solver/analog/setup-context.js";
 import {
   collectPinModelChildren,
   DigitalInputPinModel,
@@ -72,10 +73,10 @@ export const { paramDefs: ADC_PARAM_DEFS, defaults: ADC_DEFAULTS } = defineModel
     vOL: { default: 0.0, unit: "V", description: "Digital output LOW voltage" },
   },
   secondary: {
-    rIn:  { default: 1e7,  unit: "Î©", description: "Analog input impedance" },
+    rIn:  { default: 1e7,  unit: "Î", description: "Analog input impedance" },
     cIn:  { default: 5e-12, unit: "F", description: "Analog input capacitance" },
-    rOut: { default: 50,   unit: "Î©", description: "Digital output impedance" },
-    rHiZ: { default: 1e7,  unit: "Î©", description: "Hi-Z output impedance" },
+    rOut: { default: 50,   unit: "Î", description: "Digital output impedance" },
+    rHiZ: { default: 1e7,  unit: "Î", description: "Hi-Z output impedance" },
   },
 });
 
@@ -167,7 +168,7 @@ function buildADCPinDeclarations(bits: number): PinDeclaration[] {
     });
   }
 
-  // GND â€” bottom center
+  // GND  bottom center
   pins.push({
     direction: PinDirection.INPUT,
     label: "GND",
@@ -182,7 +183,7 @@ function buildADCPinDeclarations(bits: number): PinDeclaration[] {
 }
 
 // ---------------------------------------------------------------------------
-// ADCElement â€” CircuitElement implementation
+// ADCElement  CircuitElement implementation
 // ---------------------------------------------------------------------------
 
 export class ADCElement extends AbstractCircuitElement {
@@ -236,7 +237,7 @@ export class ADCElement extends AbstractCircuitElement {
       ctx.drawLine(5, i, 6, i);
     }
 
-    // GND lead (south): pin tip (3, rightCount+1) â†’ body edge (3, rightCount)
+    // GND lead (south): pin tip (3, rightCount+1)  body edge (3, rightCount)
     ctx.drawLine(3, rightCount + 1, 3, rightCount);
 
     // Component name centered
@@ -265,7 +266,7 @@ export class ADCElement extends AbstractCircuitElement {
 }
 
 // ---------------------------------------------------------------------------
-// createADCElement â€” AnalogElement factory
+// createADCElement  AnalogElement factory
 // ---------------------------------------------------------------------------
 
 /**
@@ -283,8 +284,6 @@ export class ADCElement extends AbstractCircuitElement {
  */
 function createADCElement(
   pinNodes: ReadonlyMap<string, number>,
-  _internalNodeIds: readonly number[],
-  _branchIdx: number,
   props: PropertyBag,
   bipolar: boolean,
   sar: boolean,
@@ -324,7 +323,7 @@ function createADCElement(
     () => new DigitalOutputPinModel(outputSpec),
   );
 
-  // Initialise pin node IDs â€” init() takes 1-based MNA node IDs
+  // Initialise pin node IDs  init() takes 1-based MNA node IDs
   if (nVin > 0) vinPin.init(nVin, -1);
   if (nClk > 0) clkPin.init(nClk, -1);
   if (nEoc > 0) eocPin.init(nEoc, -1);
@@ -381,6 +380,12 @@ function createADCElement(
     ngspiceLoadOrder: NGSPICE_LOAD_ORDER.VCVS,
     isNonlinear: true,
     get isReactive(): boolean { return childElements.length > 0; },
+    _stateBase: -1,
+    _pinNodes: new Map(pinNodes),
+
+    setup(_ctx: SetupContext): void {
+      throw new Error(`PB-ADC not yet migrated`);
+    },
 
     poolBacked: true as const,
     stateSchema: ADC_COMPOSITE_SCHEMA,
@@ -407,11 +412,11 @@ function createADCElement(
     },
 
     load(ctx: LoadContext): void {
-      // Input loading â€” VIN and CLK pins
+      // Input loading  VIN and CLK pins
       if (nVin > 0) vinPin.load(ctx);
       if (nClk > 0) clkPin.load(ctx);
 
-      // Output Norton equivalents â€” EOC and data bits
+      // Output Norton equivalents  EOC and data bits
       if (nEoc > 0) eocPin.load(ctx);
       for (let i = 0; i < bits; i++) {
         if (nDigital[i] > 0) digitalPins[i].load(ctx);
@@ -553,7 +558,7 @@ export const ADCDefinition: ComponentDefinition = {
   attributeMap: ADC_ATTRIBUTE_MAPPINGS,
 
   helpText:
-    "N-bit ADC â€” analog-to-digital converter. Samples V_in on rising CLK edge " +
+    "N-bit ADC  analog-to-digital converter. Samples V_in on rising CLK edge " +
     "and produces an N-bit unsigned binary code. EOC pin asserts when conversion completes.",
 
   factory(props: PropertyBag): ADCElement {
@@ -564,29 +569,29 @@ export const ADCDefinition: ComponentDefinition = {
   modelRegistry: {
     "unipolar-instant": {
       kind: "inline",
-      factory: (pinNodes, internalNodeIds, branchIdx, props) =>
-        createADCElement(pinNodes, internalNodeIds, branchIdx, props, false, false),
+      factory: (pinNodes, props, _getTime) =>
+        createADCElement(pinNodes, props, false, false),
       paramDefs: ADC_PARAM_DEFS,
       params: ADC_DEFAULTS,
     },
     "unipolar-sar": {
       kind: "inline",
-      factory: (pinNodes, internalNodeIds, branchIdx, props) =>
-        createADCElement(pinNodes, internalNodeIds, branchIdx, props, false, true),
+      factory: (pinNodes, props, _getTime) =>
+        createADCElement(pinNodes, props, false, true),
       paramDefs: ADC_PARAM_DEFS,
       params: ADC_DEFAULTS,
     },
     "bipolar-instant": {
       kind: "inline",
-      factory: (pinNodes, internalNodeIds, branchIdx, props) =>
-        createADCElement(pinNodes, internalNodeIds, branchIdx, props, true, false),
+      factory: (pinNodes, props, _getTime) =>
+        createADCElement(pinNodes, props, true, false),
       paramDefs: ADC_PARAM_DEFS,
       params: ADC_DEFAULTS,
     },
     "bipolar-sar": {
       kind: "inline",
-      factory: (pinNodes, internalNodeIds, branchIdx, props) =>
-        createADCElement(pinNodes, internalNodeIds, branchIdx, props, true, true),
+      factory: (pinNodes, props, _getTime) =>
+        createADCElement(pinNodes, props, true, true),
       paramDefs: ADC_PARAM_DEFS,
       params: ADC_DEFAULTS,
     },

@@ -11,14 +11,14 @@
  * `expression` is the default ("V(ctrl)"), the effective expression is
  * `transconductance * V(ctrl)`.
  *
- * MNA formulation (Norton stamp â€” no branch variable):
+ * MNA formulation (Norton stamp  no branch variable):
  *   No `_stampLinear` override (no linear topology-constant entries).
  *   `load()` (via base class) binds the control voltage, evaluates f(Vctrl)
  *   and f'(Vctrl), then calls `stampOutput()` which stamps the NR-linearized
  *   Norton equivalent:
  *
  *   Norton current source (NR linearized around Vctrl0 = current op point):
- *     I_out(Vctrl) â‰ˆ f(Vctrl0) + f'(Vctrl0) * (Vctrl - Vctrl0)
+ *     I_out(Vctrl)  f(Vctrl0) + f'(Vctrl0) * (Vctrl - Vctrl0)
  *                  = f'(Vctrl0) * Vctrl + [f(Vctrl0) - f'(Vctrl0)*Vctrl0]
  *
  *   MNA off-diagonal stamp for controlled source injecting gm*V_ctrl INTO nOutP:
@@ -31,7 +31,7 @@
  *     RHS[nOutN] -= f(Vctrl0) - f'(Vctrl0) * Vctrl0
  *
  * At convergence (Vctrl = Vctrl0) the current injected into out+ equals
- * f(Vctrl0), which is the desired output current. âœ“
+ * f(Vctrl0), which is the desired output current. â"
  */
 
 import { AbstractCircuitElement } from "../../core/element.js";
@@ -52,6 +52,7 @@ import { parseExpression } from "../../solver/analog/expression.js";
 import { differentiate, simplify } from "../../solver/analog/expression-differentiate.js";
 import { ControlledSourceElement } from "../../solver/analog/controlled-source-base.js";
 import { NGSPICE_LOAD_ORDER } from "../../solver/analog/element.js";
+import type { SetupContext } from "../../solver/analog/setup-context.js";
 import { defineModelParams } from "../../core/model-params.js";
 
 // ---------------------------------------------------------------------------
@@ -125,8 +126,10 @@ function buildVCCSPinDeclarations(): PinDeclaration[] {
  * No branch variable (Norton stamp only).
  */
 class VCCSAnalogElement extends ControlledSourceElement {
-  readonly branchIndex = -1;
+  branchIndex = -1;
   readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.VCCS;
+  _stateBase: number = -1;
+  _pinNodes: Map<string, number> = new Map();
 
   private readonly _nCtrlP: number;
   private readonly _nCtrlN: number;
@@ -155,6 +158,10 @@ class VCCSAnalogElement extends ControlledSourceElement {
     this._nOutN = nOutN;
   }
 
+  setup(_ctx: SetupContext): void {
+    throw new Error(`PB-VCCS not yet migrated`);
+  }
+
   setParam(_key: string, _value: number): void {
   }
 
@@ -177,7 +184,7 @@ class VCCSAnalogElement extends ControlledSourceElement {
    *   G[nOutP, nCtrlP] += f'    G[nOutP, nCtrlN] -= f'
    *   G[nOutN, nCtrlP] -= f'    G[nOutN, nCtrlN] += f'
    *
-   * RHS (independent current source â€” NR constant term):
+   * RHS (independent current source  NR constant term):
    *   RHS[nOutP] += f(Vctrl0) - f'(Vctrl0) * Vctrl0
    *   RHS[nOutN] -= f(Vctrl0) - f'(Vctrl0) * Vctrl0
    */
@@ -213,7 +220,7 @@ class VCCSAnalogElement extends ControlledSourceElement {
     }
 
     // RHS: NR-linearized independent current source (constant term).
-    // Positive iNR injected INTO nOutP (current enters node â†’ positive RHS).
+    // Positive iNR injected INTO nOutP (current enters node  positive RHS).
     if (this._nOutP !== 0) {
       rhs[this._nOutP] += iNR;
     }
@@ -228,7 +235,7 @@ class VCCSAnalogElement extends ControlledSourceElement {
    * The control port is an ideal voltage sensor (infinite impedance), so it
    * draws zero current. The output current is f(V_ctrl) evaluated at the
    * current operating point. Positive = current flowing INTO the pin.
-   * KCL: 0 + 0 + I_out - I_out = 0. âœ“
+   * KCL: 0 + 0 + I_out - I_out = 0. â"
    */
   getPinCurrents(_rhs: Float64Array): number[] {
     const iOut = this._compiledExpr(this._ctx);
@@ -237,7 +244,7 @@ class VCCSAnalogElement extends ControlledSourceElement {
 }
 
 // ---------------------------------------------------------------------------
-// VCCSElement â€” CircuitElement
+// VCCSElement  CircuitElement
 // ---------------------------------------------------------------------------
 
 export class VCCSElement extends AbstractCircuitElement {
@@ -273,7 +280,7 @@ export class VCCSElement extends AbstractCircuitElement {
     ctx.save();
     ctx.setLineWidth(1);
 
-    // Body â€” rect and port lines stay COMPONENT
+    // Body  rect and port lines stay COMPONENT
     ctx.setColor("COMPONENT");
     ctx.drawRect(1, -2, 4, 4, false);
 
@@ -346,7 +353,7 @@ export const VCCSDefinition: ComponentDefinition = {
   attributeMap: VCCS_ATTRIBUTE_MAPPINGS,
 
   helpText:
-    "Voltage-Controlled Current Source â€” output current is an expression of " +
+    "Voltage-Controlled Current Source  output current is an expression of " +
     "the control port voltage V(ctrl+ - ctrl-).",
 
   factory(props: PropertyBag): VCCSElement {
@@ -357,10 +364,10 @@ export const VCCSDefinition: ComponentDefinition = {
   modelRegistry: {
     "behavioral": {
       kind: "inline",
-      factory: (pinNodes, _internalNodeIds, _branchIdx, props) => {
+      factory: (pinNodes, props, _getTime) => {
         const expression = props.getOrDefault<string>("expression", "V(ctrl)");
         const transconductance = props.getModelParam<number>("transconductance");
-        return new VCCSAnalogElement(
+        const el = new VCCSAnalogElement(
           pinNodes.get("ctrl+")!,
           pinNodes.get("ctrl-")!,
           pinNodes.get("out+")!,
@@ -368,9 +375,12 @@ export const VCCSDefinition: ComponentDefinition = {
           expression,
           transconductance,
         );
+        el._pinNodes = new Map(pinNodes);
+        return el;
       },
       paramDefs: VCCS_PARAM_DEFS,
       params: VCCS_DEFAULTS,
+      ngspiceNodeMap: { "out+": "pos", "out-": "neg", "ctrl+": "contPos", "ctrl-": "contNeg" },
     },
   },
   defaultModel: "behavioral",

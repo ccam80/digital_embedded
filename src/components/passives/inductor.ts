@@ -21,8 +21,10 @@ import {
   type ComponentDefinition,
 } from "../../core/registry.js";
 import { formatSI } from "../../editor/si-format.js";
-import type { AnalogElementCore, ReactiveAnalogElementCore, IntegrationMethod, LoadContext } from "../../solver/analog/element.js";
-import { NGSPICE_LOAD_ORDER } from "../../solver/analog/element.js";
+import type { AnalogElementCore } from "../../core/analog-types.js";
+import { NGSPICE_LOAD_ORDER } from "../../core/analog-types.js";
+import type { ReactiveAnalogElementCore, IntegrationMethod, LoadContext } from "../../solver/analog/element.js";
+import type { SetupContext } from "../../solver/analog/setup-context.js";
 import { cktTerr } from "../../solver/analog/ckt-terr.js";
 import { niIntegrate } from "../../solver/analog/ni-integrate.js";
 import {
@@ -80,7 +82,7 @@ function buildInductorPinDeclarations(): PinDeclaration[] {
 }
 
 // ---------------------------------------------------------------------------
-// InductorElement â€” CircuitElement implementation
+// InductorElement  CircuitElement implementation
 // ---------------------------------------------------------------------------
 
 export class InductorElement extends AbstractCircuitElement {
@@ -100,7 +102,7 @@ export class InductorElement extends AbstractCircuitElement {
 
   getBoundingBox(): Rect {
     const r = 2 / (2 * 3); // segLen / (2 * loopCt) = 1/3
-    // Add tiny epsilon to height: sin(PI) â‰ˆ 1.22e-16, not exactly 0,
+    // Add tiny epsilon to height: sin(PI)  1.22e-16, not exactly 0,
     // so arc endpoint y is ~4e-17 above 0; bbox must cover that.
     return {
       x: this.position.x,
@@ -121,13 +123,13 @@ export class InductorElement extends AbstractCircuitElement {
     const vB = signals?.getPinVoltage("B");
     const hasVoltage = vA !== undefined && vB !== undefined;
 
-    // Left lead â€” colored by pin A voltage
+    // Left lead  colored by pin A voltage
     drawColoredLead(ctx, hasVoltage ? signals : undefined, vA, 0, 0, 1, 0);
 
-    // Right lead â€” colored by pin B voltage
+    // Right lead  colored by pin B voltage
     drawColoredLead(ctx, hasVoltage ? signals : undefined, vB, 3, 0, 4, 0);
 
-    // Coil body: 3 semicircular arcs from PI to 2*PI â€” gradient from vA to vB
+    // Coil body: 3 semicircular arcs from PI to 2*PI  gradient from vA to vB
     const loopCt = 3;
     const segLen = 2;
     const r = segLen / (2 * loopCt); // arc radius = 1/3 grid unit
@@ -155,21 +157,21 @@ export class InductorElement extends AbstractCircuitElement {
 }
 
 // ---------------------------------------------------------------------------
-// AnalogInductorElement â€” MNA implementation
+// AnalogInductorElement  MNA implementation
 // ---------------------------------------------------------------------------
 
-// State schema â€” exact ngspice INDinstance layout (inddefs.h:68-69).
+// State schema  exact ngspice INDinstance layout (inddefs.h:68-69).
 // Two slots only:
-//   INDflux = INDstate+0  â€” flux Î¦ = LÂ·i (the qcap fed to NIintegrate)
-//   INDvolt = INDstate+1  â€” NIintegrate companion-current cache. Despite the
+//   INDflux = INDstate+0   flux Î¦ = LÂ·i (the qcap fed to NIintegrate)
+//   INDvolt = INDstate+1   NIintegrate companion-current cache. Despite the
 //                            "INDvolt" name in ngspice, niinteg.c:15
 //                            (`#define ccap qcap+1`) makes this slot the
 //                            ccap recursion buffer for trap order 2.
-// No GEQ/IEQ/I/VOLT-as-node-voltage slots exist in ngspice â€” req/veq are
+// No GEQ/IEQ/I/VOLT-as-node-voltage slots exist in ngspice  req/veq are
 // indload.c locals; branch current comes from CKTrhsOld[INDbrEq], not state.
 const INDUCTOR_SCHEMA: StateSchema = defineStateSchema("AnalogInductorElement", [
-  { name: "PHI",  doc: "Flux Î¦ = LÂ·i â€” ngspice INDflux (INDstate+0)", init: { kind: "zero" } },
-  { name: "CCAP", doc: "NIintegrate companion current â€” ngspice INDvolt (INDstate+1) per niinteg.c:15 `#define ccap qcap+1`", init: { kind: "zero" } },
+  { name: "PHI",  doc: "Flux Î¦ = LÂ·i  ngspice INDflux (INDstate+0)", init: { kind: "zero" } },
+  { name: "CCAP", doc: "NIintegrate companion current  ngspice INDvolt (INDstate+1) per niinteg.c:15 `#define ccap qcap+1`", init: { kind: "zero" } },
 ]);
 
 const SLOT_PHI  = 0;  // ngspice INDflux = INDstate+0
@@ -177,7 +179,9 @@ const SLOT_CCAP = 1;  // ngspice INDvolt = INDstate+1 (= NIintegrate ccap)
 
 export class AnalogInductorElement implements ReactiveAnalogElementCore {
   pinNodeIds!: readonly number[];  // set by compiler via Object.assign after factory returns
-  readonly branchIndex: number;
+  branchIndex: number = -1;
+  _stateBase: number = -1;
+  _pinNodes: Map<string, number> = new Map();
   readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.IND;
   readonly isNonlinear = false;
   readonly isReactive = true;
@@ -204,8 +208,7 @@ export class AnalogInductorElement implements ReactiveAnalogElementCore {
   private _M: number;
   private _pool!: StatePoolRef;
 
-  constructor(branchIdx: number, inductance: number, IC: number, TC1: number, TC2: number, TNOM: number, SCALE: number, M: number) {
-    this.branchIndex = branchIdx;
+  constructor(inductance: number, IC: number, TC1: number, TC2: number, TNOM: number, SCALE: number, M: number) {
     this._nominalL = inductance;
     this._IC = IC;
     this._TC1 = TC1;
@@ -221,6 +224,10 @@ export class AnalogInductorElement implements ReactiveAnalogElementCore {
     const dT = T - this._TNOM;
     const factor = 1 + this._TC1 * dT + this._TC2 * dT * dT;
     return this._nominalL * factor * this._SCALE / this._M;
+  }
+
+  setup(_ctx: SetupContext): void {
+    throw new Error("PB-IND not yet migrated");
   }
 
   initState(pool: StatePoolRef): void {
@@ -253,23 +260,23 @@ export class AnalogInductorElement implements ReactiveAnalogElementCore {
   }
 
   /**
-   * load() â€” exact 1:1 port of ngspice indload.c INDload (lines 35-124).
+   * load()  exact 1:1 port of ngspice indload.c INDload (lines 35-124).
    *
    * Structural mirror (no extra slots, no extra helpers, no DC-OP-only branch
    * outside ngspice's MODEDC arm):
-   *   indload.c:43-51   â€” flux-from-current update, gated on !(MODEDC|MODEINITPRED)
-   *   indload.c:88-110  â€” req/veq: DC â‡’ 0, else mutually-exclusive
+   *   indload.c:43-51    flux-from-current update, gated on !(MODEDC|MODEINITPRED)
+   *   indload.c:88-110   req/veq: DC â‡’ 0, else mutually-exclusive
    *                        MODEINITPRED (s0=s1 PHI) / MODEINITTRAN (s1=s0 PHI),
    *                        then NIintegrate(geq, ceq, L, INDflux). niinteg.c:15
    *                        `#define ccap qcap+1` â‡’ NIintegrate writes
    *                        state0[INDflux+1] = state0[INDvolt] = s0[SLOT_CCAP]
    *                        and reads state1[INDvolt] = s1[SLOT_CCAP] for the
    *                        TRAP order-2 recursion buffer.
-   *   indload.c:112     â€” *(CKTrhs + INDbrEq) += veq
-   *   indload.c:114-117 â€” *(CKTstate1 + INDvolt) = *(CKTstate0 + INDvolt)
+   *   indload.c:112      *(CKTrhs + INDbrEq) += veq
+   *   indload.c:114-117  *(CKTstate1 + INDvolt) = *(CKTstate0 + INDvolt)
    *                        on MODEINITTRAN (= s1[CCAP] = s0[CCAP]; seeds the
    *                        TRAP-order-2 recursion buffer for the next step).
-   *   indload.c:119-123 â€” unconditional 5-stamp sequence: Â±1 incidence,
+   *   indload.c:119-123  unconditional 5-stamp sequence: Â±1 incidence,
    *                        -req branch diagonal.
    *
    * `m` (parallel multiplicity) and SCALE / TC1 / TC2 / TNOM are folded into
@@ -288,7 +295,7 @@ export class AnalogInductorElement implements ReactiveAnalogElementCore {
     const s2 = this._pool.states[2];
     const s3 = this._pool.states[3];
 
-    // indload.c:43-51 â€” flux-from-current update.
+    // indload.c:43-51  flux-from-current update.
     if (!(mode & (MODEDC | MODEINITPRED))) {
       if ((mode & MODEUIC) && (mode & MODEINITTRAN) && !isNaN(this._IC)) {
         // indload.c:44-46: UIC seed.
@@ -300,7 +307,7 @@ export class AnalogInductorElement implements ReactiveAnalogElementCore {
       }
     }
 
-    // indload.c:88-110 â€” req/veq.
+    // indload.c:88-110  req/veq.
     let req = 0;
     let veq = 0;
     if (mode & MODEDC) {
@@ -310,10 +317,10 @@ export class AnalogInductorElement implements ReactiveAnalogElementCore {
     } else {
       // indload.c:93-104 (#ifndef PREDICTOR): mutually-exclusive flux copies.
       if (mode & MODEINITPRED) {
-        // indload.c:94-96: predictor â€” s0[INDflux] = s1[INDflux].
+        // indload.c:94-96: predictor  s0[INDflux] = s1[INDflux].
         s0[base + SLOT_PHI] = s1[base + SLOT_PHI];
       } else if (mode & MODEINITTRAN) {
-        // indload.c:99-102: transient init â€” s1[INDflux] = s0[INDflux]
+        // indload.c:99-102: transient init  s1[INDflux] = s0[INDflux]
         // BEFORE NIintegrate so the order-2 history is seeded.
         s1[base + SLOT_PHI] = s0[base + SLOT_PHI];
       }
@@ -338,8 +345,8 @@ export class AnalogInductorElement implements ReactiveAnalogElementCore {
       s0[base + SLOT_CCAP] = ni.ccap;
     }
 
-    // indload.c:114-117: state0[INDvolt] â†’ state1[INDvolt] on MODEINITTRAN
-    // (= s0[CCAP] â†’ s1[CCAP]; seeds the trap-order-2 recursion buffer).
+    // indload.c:114-117: state0[INDvolt]  state1[INDvolt] on MODEINITTRAN
+    // (= s0[CCAP]  s1[CCAP]; seeds the trap-order-2 recursion buffer).
     if (mode & MODEINITTRAN) {
       s1[base + SLOT_CCAP] = s0[base + SLOT_CCAP];
     }
@@ -348,7 +355,7 @@ export class AnalogInductorElement implements ReactiveAnalogElementCore {
     // INDposIbrptr / INDnegIbrptr (B sub-matrix: Â±1 at (n, b)).
     if (n0 !== 0) solver.stampElement(solver.allocElement(n0, b), 1);
     if (n1 !== 0) solver.stampElement(solver.allocElement(n1, b), -1);
-    // INDibrPosptr / INDibrNegptr (C sub-matrix: Â±1 at (b, n) â€” KVL incidence).
+    // INDibrPosptr / INDibrNegptr (C sub-matrix: Â±1 at (b, n)  KVL incidence).
     if (n0 !== 0) solver.stampElement(solver.allocElement(b, n0), 1);
     if (n1 !== 0) solver.stampElement(solver.allocElement(b, n1), -1);
     // INDibrIbrptr (-req branch diagonal). Stamped even at DC where req=0 so
@@ -386,10 +393,9 @@ export class AnalogInductorElement implements ReactiveAnalogElementCore {
 }
 
 function createInductorElement(
-  _pinNodes: ReadonlyMap<string, number>,
-  _internalNodeIds: readonly number[],
-  branchIdx: number,
+  pinNodes: ReadonlyMap<string, number>,
   props: PropertyBag,
+  _getTime: () => number,
 ): AnalogElementCore {
   const L     = props.getModelParam<number>("inductance");
   const IC    = props.hasModelParam("IC")    ? props.getModelParam<number>("IC")    : INDUCTOR_DEFAULTS["IC"]!;
@@ -398,7 +404,9 @@ function createInductorElement(
   const TNOM  = props.hasModelParam("TNOM")  ? props.getModelParam<number>("TNOM")  : INDUCTOR_DEFAULTS["TNOM"]!;
   const SCALE = props.hasModelParam("SCALE") ? props.getModelParam<number>("SCALE") : INDUCTOR_DEFAULTS["SCALE"]!;
   const M     = props.hasModelParam("M")     ? props.getModelParam<number>("M")     : INDUCTOR_DEFAULTS["M"]!;
-  return new AnalogInductorElement(branchIdx, L, IC, TC1, TC2, TNOM, SCALE, M);
+  const el = new AnalogInductorElement(L, IC, TC1, TC2, TNOM, SCALE, M);
+  el._pinNodes = new Map(pinNodes);
+  return el;
 }
 
 // ---------------------------------------------------------------------------
@@ -450,16 +458,17 @@ export const InductorDefinition: ComponentDefinition = {
   attributeMap: INDUCTOR_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.PASSIVES,
   helpText:
-    "Inductor â€” reactive element with companion model and branch current.\n" +
+    "Inductor  reactive element with companion model and branch current.\n" +
     "Stamps equivalent conductance, history current, and branch incidence entries.",
   models: {},
+  ngspiceNodeMap: { A: "pos", B: "neg" },
   modelRegistry: {
     "behavioral": {
       kind: "inline",
       factory: createInductorElement,
       paramDefs: INDUCTOR_PARAM_DEFS,
       params: INDUCTOR_DEFAULTS,
-      branchCount: 1,
+      mayCreateInternalNodes: true,
     },
   },
   defaultModel: "behavioral",

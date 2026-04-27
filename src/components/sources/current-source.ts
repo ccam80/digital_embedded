@@ -1,9 +1,9 @@
 ﻿/**
- * Current Source â€” ideal independent current source for MNA simulation.
+ * Current Source  ideal independent current source for MNA simulation.
  *
- * Stamps only into the RHS vector â€” no G-matrix entries required.
+ * Stamps only into the RHS vector  no G-matrix entries required.
  * Reads `ctx.srcFact` (ngspice CKTsrcFact) directly inside load() to apply
- * DC-OP source stepping â€” matches ngspice isrcload.c exactly.
+ * DC-OP source stepping  matches ngspice isrcload.c exactly.
  *
  * MNA stamp convention (current I flows from nodeNeg to nodePos through source):
  *   RHS[nodePos] += I * srcFact   (current enters nodePos)
@@ -39,7 +39,7 @@ export const { paramDefs: CURRENT_SOURCE_PARAM_DEFS, defaults: CURRENT_SOURCE_DE
 });
 
 // ---------------------------------------------------------------------------
-// CurrentSourceElement â€” CircuitElement implementation
+// CurrentSourceElement  CircuitElement implementation
 // ---------------------------------------------------------------------------
 
 export class CurrentSourceElement extends AbstractCircuitElement {
@@ -77,10 +77,10 @@ export class CurrentSourceElement extends AbstractCircuitElement {
     ctx.save();
     ctx.setLineWidth(1);
 
-    // Lead from neg pin (x=0) to body â€” thick
+    // Lead from neg pin (x=0) to body  thick
     drawColoredLead(ctx, signals, vNeg, 0, 0, 1.1875, 0);
 
-    // Lead from pos pin (x=4) to body â€” thick
+    // Lead from pos pin (x=4) to body  thick
     drawColoredLead(ctx, signals, vPos, 2.8125, 0, 4, 0);
 
     // Body (circle and arrow) stays COMPONENT color
@@ -89,7 +89,7 @@ export class CurrentSourceElement extends AbstractCircuitElement {
     // Circle at center (32/16=2, r=11.76/16=0.735)
     ctx.drawCircle(2, 0, 0.735, false);
 
-    // Arrow shaft (25/16=1.5625 to 35/16=2.1875) â€” thick
+    // Arrow shaft (25/16=1.5625 to 35/16=2.1875)  thick
     ctx.drawLine(1.5625, 0, 2.1875, 0);
 
     // Arrow head: points (38/16,0), (34/16,-4/16), (34/16,4/16)
@@ -177,6 +177,12 @@ export function makeCurrentSource(
     ngspiceLoadOrder: NGSPICE_LOAD_ORDER.ISRC,
     isNonlinear: false,
     isReactive: false,
+    _stateBase: -1,
+    _pinNodes: new Map<string, number>([["neg", nodeNeg], ["pos", nodePos]]),
+
+    setup(_ctx: import("../../solver/analog/setup-context.js").SetupContext): void {
+      throw new Error("PB-ISRC not yet migrated");
+    },
 
     setParam(key: string, value: number): void {
       if (key in p) (p as Record<string, number>)[key] = value;
@@ -190,8 +196,8 @@ export function makeCurrentSource(
     },
 
     getPinCurrents(_rhs: Float64Array): number[] {
-      // No branch row â€” current is defined by the stamp: I = current * srcFact.
-      // Pin layout order: [neg, pos] â€” neg is index 0, pos is index 1.
+      // No branch row  current is defined by the stamp: I = current * srcFact.
+      // Pin layout order: [neg, pos]  neg is index 0, pos is index 1.
       // Conventional current flows from neg through source to pos (arrow direction).
       // Current into neg = +I (current enters element at neg from the circuit).
       // Current into pos = -I (current exits element at pos into the circuit).
@@ -214,7 +220,7 @@ export const CurrentSourceDefinition: ComponentDefinition = {
   propertyDefs: CURRENT_SOURCE_PROPERTY_DEFS,
   attributeMap: CURRENT_SOURCE_ATTRIBUTE_MAP,
 
-  helpText: "Ideal DC current source. Stamps only into the RHS vector â€” no matrix entries.",
+  helpText: "Ideal DC current source. Stamps only into the RHS vector  no matrix entries.",
 
   factory(props: PropertyBag): CurrentSourceElement {
     return new CurrentSourceElement(
@@ -232,8 +238,6 @@ export const CurrentSourceDefinition: ComponentDefinition = {
       kind: "inline",
       factory(
         pinNodes: ReadonlyMap<string, number>,
-        _internalNodeIds: readonly number[],
-        _branchIdx: number,
         props: PropertyBag,
       ): AnalogElementCore {
         const current = props.getModelParam<number>("current");
@@ -241,6 +245,7 @@ export const CurrentSourceDefinition: ComponentDefinition = {
       },
       paramDefs: CURRENT_SOURCE_PARAM_DEFS,
       params: CURRENT_SOURCE_DEFAULTS,
+      ngspiceNodeMap: { neg: "neg", pos: "pos" },
     },
   },
   defaultModel: "behavioral",
