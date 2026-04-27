@@ -166,8 +166,10 @@ export interface AnalogElementCore {
    * Assigned branch-current row index for elements that introduce extra MNA
    * rows (voltage sources, inductors). Set to -1 for elements that do not
    * add extra rows (resistors, capacitors, current sources, diodes, etc.).
+   *
+   * Mutable: setup() writes it via `this.branchIndex = ctx.makeCur(...)`.
    */
-  readonly branchIndex: number;
+  branchIndex: number;
 
   /**
    * Position in ngspice's CKTload iteration order. Mirrors the device-type
@@ -188,6 +190,43 @@ export interface AnalogElementCore {
    * "what device is this in ngspice terms?" question at registration.
    */
   readonly ngspiceLoadOrder: number;
+
+  /** Allocate every internal node, branch row, state slot, and
+   *  sparse-matrix entry this element will ever need, in the same
+   *  order as the corresponding ngspice DEVsetup. Called once per
+   *  MNAEngine._setup() invocation, before any load() call.
+   *
+   *  Implementations:
+   *   - call ctx.makeVolt() for each internal node ngspice creates with
+   *     CKTmkVolt;
+   *   - call ctx.makeCur() for each branch row ngspice creates with
+   *     CKTmkCur, storing the result in branchIndex;
+   *   - call ctx.allocStates(N) where ngspice's *setup.c does
+   *     `*states += N`;
+   *   - call solver.allocElement(row, col) for every TSTALLOC line in
+   *     line-for-line order, storing handles on `this`;
+   *   - never call solver.allocElement from load().
+   *
+   *  Order of allocElement calls determines internal-index assignment.
+   *  It MUST mirror the corresponding ngspice DEVsetup line-for-line —
+   *  including stamps that ngspice allocates unconditionally even when
+   *  their value will be zero in some operating mode.
+   */
+  setup(ctx: import("../solver/analog/setup-context.js").SetupContext): void;
+
+  /** Optional callback used by VSRC, VCVS, CCVS, IND, CRYSTAL, and RELAY elements that own
+   *  branch rows. Called by `_findBranch` when a controlling source needs lazy branch-row
+   *  allocation. Returns the branch row index (allocates if missing) or 0 if this element
+   *  doesn't own the requested branch. */
+  findBranchFor?(name: string, ctx: import("../solver/analog/setup-context.js").SetupContext): number;
+
+  /** Set during setup() via ctx.allocStates(N). Index of this element's first state-pool slot.
+   *  -1 if element has no state slots. */
+  _stateBase: number;
+
+  /** Pin-label-to-MNA-node map. Populated by the factory at construction; read-only
+   *  thereafter. setup() bodies access pin nodes by label: `this._pinNodes.get("pos")!`. */
+  _pinNodes: Map<string, number>;
 
   /**
    * Primary hot-path method. Called every NR iteration.

@@ -11,7 +11,8 @@
 
 import { SparseSolver } from "./sparse-solver.js";
 import type { AnalogElement } from "./element.js";
-import type { StatePool } from "./state-pool.js";
+import { isPoolBacked } from "./element.js";
+import { StatePool } from "./state-pool.js";
 import { DiagnosticCollector } from "./diagnostics.js";
 import type { ResolvedSimulationParams } from "../../core/analog-engine-interface.js";
 import type { LimitingEvent } from "./newton-raphson.js";
@@ -107,8 +108,6 @@ export class DcOpResult {
  */
 export interface CKTCircuitInput {
   readonly nodeCount: number;
-  readonly branchCount: number;
-  readonly matrixSize: number;
   readonly elements: readonly AnalogElement[];
   readonly statePool?: StatePool | null;
 }
@@ -267,12 +266,16 @@ export class CKTCircuitContext {
 
   /** All analog elements in the circuit. */
   elements: readonly AnalogElement[];
-  /** Total MNA matrix size: nodeCount + branchCount. */
-  matrixSize: number;
   /** Number of non-ground MNA node rows. */
   nodeCount: number;
-  /** Shared state pool for per-element state. Null for purely linear circuits. */
+  /** Shared state pool for per-element state. Null until allocateStateBuffers() is called. */
   statePool: StatePool | null;
+  /** Subset of elements that are pool-backed. Populated at construction. */
+  readonly _poolBackedElements: readonly AnalogElement[];
+  /** Pre-allocated nodeset matrix handles (node → solver handle). Populated in _setup(). */
+  nodesetHandles: Map<number, number>;
+  /** Pre-allocated IC matrix handles (node → solver handle). Populated in _setup(). */
+  icHandles: Map<number, number>;
 
   // -------------------------------------------------------------------------
   // Pre-computed element lists (eliminate .filter() calls in hot paths)
@@ -514,13 +517,11 @@ export class CKTCircuitContext {
     addBreakpoint: (t: number) => void,
     solver: SparseSolver,
   ) {
-    const { nodeCount, matrixSize, elements } = circuit;
-    const statePoolSize = circuit.statePool?.totalSlots ?? 1;
+    const { nodeCount, elements } = circuit;
 
-    this.matrixSize = matrixSize;
     this.nodeCount = nodeCount;
     this.elements = elements;
-    this.statePool = circuit.statePool ?? null;
+    this.statePool = null;
 
     // Pre-computed element lists (zero-alloc invariant per spec phase-1).
     // Populated once at construction; mirrors ngspice's per-device-type
@@ -530,32 +531,31 @@ export class CKTCircuitContext {
     this.elementsWithConvergence = elements.filter(el => el.checkConvergence !== undefined);
     this.elementsWithLte = elements.filter(el => el.getLteTimestep !== undefined);
     this.elementsWithAcceptStep = elements.filter(el => el.acceptStep !== undefined);
+    this._poolBackedElements = elements.filter(isPoolBacked);
+
+    // Nodeset / IC handles (populated by _allocateNodesetIcHandles in _setup())
+    this.nodesetHandles = new Map();
+    this.icHandles = new Map();
 
     // Matrix / solver — shared instance owned by the engine.
     // ngspice SMPnewMatrix → spCreate is called once at circuit setup.
     this.solver = solver;
     solver._initStructure();
 
-    // Caller-side buffers are length matrixSize + 1: slot 0 is the ngspice
-    // ground sentinel (always 0), slots 1..matrixSize hold the active node
-    // voltages and branch currents. solve() and stampRHS share the same
-    // 1-based external keying via IntToExtRowMap.
-    const sizePlusOne = matrixSize + 1;
-
-    // Node voltage buffers
-    this.rhsOld = new Float64Array(sizePlusOne);
-    this.rhs = new Float64Array(sizePlusOne);
-    this.rhsSpare = new Float64Array(sizePlusOne);
-
-    // Accepted solution
-    this.acceptedVoltages = new Float64Array(sizePlusOne);
-    this.prevAcceptedVoltages = new Float64Array(sizePlusOne);
-
-    // DC-OP scratch
-    this.dcopVoltages = new Float64Array(sizePlusOne);
-    this.dcopSavedVoltages = new Float64Array(sizePlusOne);
-    this.dcopSavedState0 = new Float64Array(statePoolSize);
-    this.dcopOldState0 = new Float64Array(statePoolSize);
+    // Per-row buffers allocated with zero length at construction.
+    // allocateRowBuffers(matrixSize) is called from MNAEngine._setup() after
+    // setup() calls have run and solver._size is final (A5.1).
+    this.rhsOld = new Float64Array(0);
+    this.rhs = new Float64Array(0);
+    this.rhsSpare = new Float64Array(0);
+    this.acceptedVoltages = new Float64Array(0);
+    this.prevAcceptedVoltages = new Float64Array(0);
+    this.dcopVoltages = new Float64Array(0);
+    this.dcopSavedVoltages = new Float64Array(0);
+    this.dcopSavedState0 = new Float64Array(0);
+    this.dcopOldState0 = new Float64Array(0);
+    this.lteScratch = new Float64Array(64);
+    this._ncDumpPool = [];
 
     // Integration
     this.ag = new Float64Array(7);
@@ -566,12 +566,11 @@ export class CKTCircuitContext {
     // MNAEngine.init() inherits them (shared-reference invariant).
     this.deltaOld = new Array<number>(7).fill(params.maxTimeStep);
     this.nodeVoltageHistory = new NodeVoltageHistory();
-    this.nodeVoltageHistory.initNodeVoltages(sizePlusOne);
 
     // Gear scratch (7×7 flat)
     this.gearMatScratch = new Float64Array(49);
 
-    // Results
+    // Results — point at zero-length rhs/dcopVoltages; re-pointed by allocateRowBuffers
     this.nrResult = new NRResult(this.rhs);
     this.dcopResult = new DcOpResult(this.dcopVoltages);
 
@@ -607,6 +606,8 @@ export class CKTCircuitContext {
       // cite: cktinit.c:53-55 — CKTbypass default false; CKTvoltTol default 1e-6
       bypass: false,
       voltTol: 1e-6,
+      state0: new Float64Array(0),
+      state1: new Float64Array(0),
     };
 
     // Tolerances
@@ -656,15 +657,55 @@ export class CKTCircuitContext {
     // Full params reference
     this.params = params;
 
-    // LTE scratch
-    this.lteScratch = new Float64Array(Math.max(matrixSize * 4, 64));
-
-    // Per-node non-convergence diagnostic scratch — pre-allocated entries so
-    // `cktncDump` never allocates on the failure path.
+    // Per-node non-convergence diagnostic scratch — rebuilt in allocateRowBuffers
     this.ncDumpScratch = [];
+  }
+
+  /**
+   * Allocate all per-row buffers now that solver._size is known post-setup.
+   *
+   * Port of ngspice cktsetup.c:82-84 where memory for CKTrhs/CKTrhsOld is
+   * allocated after the DEVsetup loop completes and the matrix size is final.
+   * Called from MNAEngine._setup() after all element setup() calls have run.
+   */
+  allocateRowBuffers(matrixSize: number): void {
+    const sizePlusOne = matrixSize + 1;
+    this.rhsOld               = new Float64Array(sizePlusOne);
+    this.rhs                  = new Float64Array(sizePlusOne);
+    this.rhsSpare             = new Float64Array(sizePlusOne);
+    this.acceptedVoltages     = new Float64Array(sizePlusOne);
+    this.prevAcceptedVoltages = new Float64Array(sizePlusOne);
+    this.dcopVoltages         = new Float64Array(sizePlusOne);
+    this.dcopSavedVoltages    = new Float64Array(sizePlusOne);
+    this.lteScratch           = new Float64Array(Math.max(matrixSize * 4, 64));
     this._ncDumpPool = new Array(matrixSize);
     for (let i = 0; i < matrixSize; i++) {
       this._ncDumpPool[i] = { node: 0, delta: 0, tol: 0 };
+    }
+    this.nrResult.voltages         = this.rhs;
+    this.dcopResult.nodeVoltages   = this.dcopVoltages;
+    this.loadCtx.rhs               = this.rhs;
+    this.loadCtx.rhsOld            = this.rhsOld;
+    this.nodeVoltageHistory.initNodeVoltages(sizePlusOne);
+  }
+
+  /**
+   * Construct the shared state pool after all element setup() calls have run.
+   *
+   * Port of ngspice cktsetup.c:82-84 where CKTstate0/CKTstate1 are allocated
+   * after the DEVsetup loop, so state counts from all elements are known.
+   * Called from MNAEngine._setup() before allocateRowBuffers().
+   */
+  allocateStateBuffers(numStates: number): void {
+    this.statePool             = new StatePool(numStates);
+    this.dcopSavedState0       = new Float64Array(numStates);
+    this.dcopOldState0         = new Float64Array(numStates);
+    this.loadCtx.state0        = this.statePool.state0;
+    this.loadCtx.state1        = this.statePool.state1;
+    for (const el of this._poolBackedElements) {
+      if (isPoolBacked(el)) {
+        el.initState(this.statePool);
+      }
     }
   }
 

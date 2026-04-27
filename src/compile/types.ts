@@ -136,19 +136,23 @@ import type { AnalogElementCore } from "../core/analog-types.js";
 export interface MnaModel {
   factory: (
     pinNodes: ReadonlyMap<string, number>,
-    internalNodeIds: readonly number[],
-    branchIdx: number,
     props: PropertyBag,
     getTime: () => number,
   ) => AnalogElementCore;
-  getInternalNodeCount?: (props: PropertyBag) => number;
-  /**
-   * Labels for internal nodes allocated by this model, in the SAME ORDER
-   * as `getInternalNodeCount` consumes them. Must be length-equal to
-   * `getInternalNodeCount`.
-   */
-  getInternalNodeLabels?: (props: PropertyBag) => readonly string[];
-  branchCount?: number | ((props: PropertyBag) => number);
+  /** True for models that may allocate internal voltage nodes in
+   *  setup() (DIO, BJT, MOS, JFET, TLINE). Used by
+   *  `detectVoltageSourceLoops` and `detectInductorLoops` to size
+   *  worst-case topology. Default: false. */
+  mayCreateInternalNodes?: boolean;
+  /** Optional pin-label → ngspice-node-suffix map. See
+   *  01-pin-mapping.md for the registry. */
+  ngspiceNodeMap?: Record<string, string>;
+  /** When set, this device type registers a lazy-branch finder.
+   *  Mirrors ngspice's per-device `DEVfindBranch` (e.g. VSRCfindBr).
+   *  Required for VSRC, IND, VCVS, CCVS. Should use the same
+   *  idempotent guard as setup(): if branch already allocated for
+   *  this name, return existing; else call ctx.makeCur and store. */
+  findBranchFor?(name: string, ctx: import("../solver/analog/setup-context.js").SetupContext): number;
 }
 
 // ---------------------------------------------------------------------------

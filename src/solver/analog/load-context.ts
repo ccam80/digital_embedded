@@ -129,4 +129,8 @@ export interface LoadContext {
   /** Absolute voltage convergence tolerance in volts (ngspice CKTvoltTol).
    * Used by device bypass gates. Default 1e-6 V. */
   voltTol: number;
+  /** Current-iteration state vector (ngspice CKTstate0). Indexed by `_stateBase + SLOT_X` per element. */
+  state0: Float64Array;
+  /** Previous-iteration state vector (ngspice CKTstate1). Read for predictor / time-history. */
+  state1: Float64Array;
 }

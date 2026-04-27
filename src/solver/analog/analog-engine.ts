@@ -15,6 +15,7 @@ import type {
 } from "../../core/analog-engine-interface.js";
 import type { IntegrationMethod } from "../../core/analog-types.js";
 import type { Diagnostic } from "../../compile/types.js";
+import type { SetupContext } from "./setup-context.js";
 import { DEFAULT_SIMULATION_PARAMS, resolveSimulationParams } from "../../core/analog-engine-interface.js";
 import type { ResolvedSimulationParams } from "../../core/analog-engine-interface.js";
 import { AcAnalysis } from "./ac-analysis.js";
@@ -85,6 +86,15 @@ export class MNAEngine implements AnalogEngine {
   private _devProbeRan: boolean = false;
 
   // -------------------------------------------------------------------------
+  // Setup-phase state (A4.2)
+  // -------------------------------------------------------------------------
+  private _isSetup: boolean = false;
+  private _maxEqNum: number = 0;
+  private _numStates: number = 0;
+  private _nodeTable: Array<{ name: string; number: number; type: "voltage" | "current" }> = [];
+  private _deviceMap: Map<string, AnalogElement> = new Map();
+
+  // -------------------------------------------------------------------------
   // Engine lifecycle state
   // -------------------------------------------------------------------------
   private _engineState: EngineState = EngineState.STOPPED;
@@ -129,35 +139,15 @@ export class MNAEngine implements AnalogEngine {
     this._simTime = 0;
     this._lastDt = 0;
 
-    // Validate that pool-backed elements received their offsets from the compiler.
-    //
-    // Allocation is the compiler's responsibility (see compiler.ts, the loop
-    // that assigns `stateBaseOffset` before constructing `StatePool`). Any
-    // element that arrives here with `stateBaseOffset < 0` signals a real
-    // upstream bug: a code path that produced a `CompiledAnalogCircuit`
-    // without running allocation. We throw rather than paper over it,
-    // because a silent fallback reassignment would hide future allocation
-    // regressions as numerical wrongness (flat capacitor voltages, etc.)
-    // rather than loud failures.
-    const cac = compiled as ConcreteCompiledAnalogCircuit;
-    if (cac.statePool) {
-      for (const el of elements) {
-        if (isPoolBacked(el) && el.stateBaseOffset < 0) {
-          throw new Error(
-            `MNAEngine.init(): reactive element arrived ` +
-            `with stateBaseOffset=-1. Pool-backed elements must have offsets ` +
-            `assigned at compile time (see compiler.ts state-pool allocation ` +
-            `loop). A circuit produced without running that allocation step ` +
-            `is invalid input to the engine.`,
-          );
-        }
-      }
-      // Mirror ngspice cktdojob.c:53 — `CKTmaxOrder = TSKmaxOrder` is written
-      // once at job dispatch and stays fixed for the run. The pool's rotation
-      // width depends on it (state-pool.ts rotateStateVectors), so wire it
-      // here, before any transient step rotates the ring.
-      cac.statePool.maxOrder = this._params.maxOrder ?? 2;
-    }
+    // Build the device map for findDevice/findBranch dispatch (A4.1).
+    this._deviceMap = new Map<string, AnalogElement>();
+    this._buildDeviceMap(compiled.elements, "");
+
+    // Reset setup-phase state so _setup() runs unconditionally on next analysis call.
+    this._isSetup = false;
+    this._maxEqNum = compiled.nodeCount + 1;
+    this._numStates = 0;
+    this._nodeTable = [];
 
     // Construct CKTCircuitContext for NR and DC-OP call sites.
     // Shares the same solver and elements as the rest of init().
@@ -172,10 +162,7 @@ export class MNAEngine implements AnalogEngine {
     this._ctx = new CKTCircuitContext(
       {
         nodeCount: compiled.nodeCount,
-        branchCount: compiled.branchCount,
-        matrixSize: compiled.matrixSize,
         elements: compiled.elements,
-        statePool: cac.statePool ?? null,
       },
       this._params,
       (t) => this._timestep.addBreakpoint(t),
@@ -251,6 +238,7 @@ export class MNAEngine implements AnalogEngine {
    */
   step(): void {
     if (!this._compiled) return;
+    this._setup();
     if (this._engineState === EngineState.ERROR) return;
 
     const { elements } = this._compiled;
@@ -854,6 +842,7 @@ export class MNAEngine implements AnalogEngine {
     // first getClampedDt() returns 0 → clamped to minTimeStep → two-strike
     // delmin sends the engine to ERROR.
     ctx.loadCtx.dt = 0;
+    this._setup();
     ctx._onPhaseBegin = phaseHook ? (phase: string, param?: number) => phaseHook.onAttemptBegin(phase as DcOpNRPhase, param ?? 0) : null;
     ctx._onPhaseEnd = phaseHook ? (outcome: string, converged: boolean) => phaseHook.onAttemptEnd(outcome as DcOpNRAttemptOutcome, converged) : null;
     solveDcOperatingPoint(ctx);
@@ -1007,6 +996,7 @@ export class MNAEngine implements AnalogEngine {
       };
     }
 
+    this._setup();
     const ac = new AcAnalysis(this._compiled, this._params);
     return ac.run(params);
   }
@@ -1269,6 +1259,92 @@ export class MNAEngine implements AnalogEngine {
   // -------------------------------------------------------------------------
   // Internal helpers
   // -------------------------------------------------------------------------
+
+  // -------------------------------------------------------------------------
+  // Setup-phase implementation (A4.2)
+  // -------------------------------------------------------------------------
+
+  /** Port of CKTsetup (cktsetup.c:30-131). Runs once per circuit
+   *  lifetime. Walks elements in NGSPICE_LOAD_ORDER bucket order
+   *  (matching cktsetup.c:72-81's walk of DEVices[]), calls each
+   *  element's setup(ctx). Internal early-return on _isSetup
+   *  mirroring cktsetup.c:52-53. After setup completes, freezes ctx's
+   *  per-row buffers to the now-known solver._size. */
+  private _setup(): void {
+    if (this._isSetup) return;
+    const setupCtx = this._buildSetupContext();
+    for (const el of this._elements) {  // already NGSPICE_LOAD_ORDER-sorted
+      el.setup(setupCtx);
+    }
+    // StatePool deferred construction (per A5.3).
+    this._ctx!.allocateStateBuffers(this._numStates);
+    this._ctx!.allocateRowBuffers(this._solver._size);
+    // Nodeset / IC handle pre-allocation (per A8).
+    this._allocateNodesetIcHandles();
+    this._isSetup = true;
+  }
+
+  private _buildSetupContext(): SetupContext {
+    const engine = this;
+    const params = this._params;
+    return {
+      solver: this._solver,
+      temp: params.temperature ?? 300.15,
+      nomTemp: params.nomTemp ?? 300.15,
+      copyNodesets: params.copyNodesets ?? false,
+      makeVolt(label, suffix) { return engine._makeNode(label, suffix, "voltage"); },
+      makeCur (label, suffix) { return engine._makeNode(label, suffix, "current"); },
+      allocStates(n) {
+        const off = engine._numStates;
+        engine._numStates += n;
+        return off;
+      },
+      findBranch(label) { return engine._findBranch(label, this); },
+      findDevice(label) { return engine._deviceMap.get(label) ?? null; },
+    };
+  }
+
+  /** Port of CKTnewNode (cktnewn.c:23-43). Called by both makeVolt and
+   *  makeCur with different `type` discriminators. */
+  private _makeNode(label: string, suffix: string, type: "voltage" | "current"): number {
+    const number = this._maxEqNum++;
+    this._nodeTable.push({ name: `${label}#${suffix}`, number, type });
+    return number;
+  }
+
+  private _findBranch(label: string, ctx: SetupContext): number {
+    const el = this._deviceMap.get(label);
+    if (!el) return 0;
+    if (typeof (el as any).findBranchFor === "function") {
+      return (el as any).findBranchFor(label, ctx);
+    }
+    return (el as any).branchIndex !== -1 ? (el as any).branchIndex : 0;
+  }
+
+  /** Recursive walk of compiled.elements to build _deviceMap (A4.1).
+   *  Subcircuit sub-elements are keyed as "parentLabel/childLabel". */
+  private _buildDeviceMap(elements: readonly AnalogElement[], prefix: string): void {
+    for (const el of elements) {
+      const fullLabel = prefix ? `${prefix}/${el.label}` : el.label;
+      if (fullLabel) {
+        this._deviceMap.set(fullLabel, el);
+      }
+      const subElements = (el as any)._subElements as readonly AnalogElement[] | undefined;
+      if (subElements && subElements.length > 0) {
+        this._buildDeviceMap(subElements, fullLabel ?? "");
+      }
+    }
+  }
+
+  /** Pre-allocate nodeset and IC matrix handles after the per-element setup loop (A8). */
+  private _allocateNodesetIcHandles(): void {
+    for (const [node] of this._ctx!.nodesets) {
+      this._ctx!.nodesetHandles.set(node, this._solver.allocElement(node, node));
+    }
+    for (const [node] of this._ctx!.ics) {
+      this._ctx!.icHandles.set(node, this._solver.allocElement(node, node));
+    }
+  }
 
   /**
    * Transition from converged DCOP to the first transient timestep.

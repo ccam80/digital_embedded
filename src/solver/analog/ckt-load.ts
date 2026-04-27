@@ -106,7 +106,7 @@ export function cktLoad(ctx: CKTCircuitContext): void {
   //   CKTsrcFact         → ctx.srcFact
   if ((ctx.cktMode & MODEDC) && (ctx.cktMode & (MODEINITJCT | MODEINITFIX))) {
     for (const [node, value] of ctx.nodesets) {
-      ctx.solver.stampElement(ctx.solver.allocElement(node, node), CKTNS_PIN);
+      ctx.solver.stampElement(ctx.nodesetHandles.get(node)!, CKTNS_PIN);
       stampRHS(ctx.rhs, node, CKTNS_PIN * value * ctx.srcFact);
     }
   }
@@ -121,7 +121,7 @@ export function cktLoad(ctx: CKTCircuitContext): void {
   //   CKTsrcFact         → ctx.srcFact
   if ((ctx.cktMode & MODETRANOP) && !(ctx.cktMode & MODEUIC)) {
     for (const [node, value] of ctx.ics) {
-      ctx.solver.stampElement(ctx.solver.allocElement(node, node), CKTNS_PIN);
+      ctx.solver.stampElement(ctx.icHandles.get(node)!, CKTNS_PIN);
       stampRHS(ctx.rhs, node, CKTNS_PIN * value * ctx.srcFact);
     }
   }

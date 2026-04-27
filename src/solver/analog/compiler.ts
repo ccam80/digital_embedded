@@ -70,15 +70,6 @@ function modelEntryToMnaModel(entry: ModelEntry): MnaModel | null {
     const model: MnaModel = {
       factory: entry.factory,
     };
-    if (entry.branchCount !== undefined) {
-      model.branchCount = entry.branchCount;
-    }
-    if (entry.getInternalNodeCount) {
-      model.getInternalNodeCount = entry.getInternalNodeCount;
-    }
-    if (entry.getInternalNodeLabels) {
-      model.getInternalNodeLabels = entry.getInternalNodeLabels;
-    }
     return model;
   }
   // Netlist entries are resolved separately by resolveSubcircuitModels
@@ -639,42 +630,31 @@ function extractRuntimeModels(
 /** Per-element metadata produced by Pass A for `compileAnalogPartition`. */
 type PartitionElementMeta = {
   pc: PartitionedComponent;
-  branchIdx: number;
-  internalNodeOffset: number;
-  internalNodeCount: number;
-  internalNodeLabels: readonly string[];
-};
-
-/** Result returned by `runPassA_partition`. */
-type PassAPartitionResult = {
-  elementMeta: PartitionElementMeta[];
-  branchCount: number;
-  nextInternalNode: number;
+  route: ComponentRoute;
 };
 
 /**
  * Pass A for `compileAnalogPartition`: iterate over partition components and
- * assign branch indices and internal node IDs.
+ * resolve each component's route. Branch indices and internal node IDs are
+ * allocated lazily at setup() time (per A6.1 — compile-time pre-sizing removed).
  *
  * Operates on `PartitionedComponent` entries (which already carry a resolved
  * `ComponentDefinition`) rather than raw `CircuitElement` entries.
  */
 function runPassA_partition(
   partition: SolverPartition,
-  externalNodeCount: number,
+  _externalNodeCount: number,
   _diagnostics: Diagnostic[],
   digitalPinLoading: "cross-domain" | "all" | "none" = "cross-domain",
   runtimeModelMap?: Record<string, Record<string, ModelEntry>>,
-): PassAPartitionResult {
-  let nextInternalNode = externalNodeCount + 1;
-  let branchCount = 0;
+): PartitionElementMeta[] {
   const elementMeta: PartitionElementMeta[] = [];
 
   for (const pc of partition.components) {
     const el = pc.element;
 
     if (el.typeId === "Ground" || el.typeId === "Tunnel") {
-      elementMeta.push({ pc, branchIdx: -1, internalNodeOffset: -1, internalNodeCount: 0, internalNodeLabels: [] });
+      elementMeta.push({ pc, route: { kind: 'skip' } });
       continue;
     }
 
@@ -683,7 +663,7 @@ function runPassA_partition(
 
     switch (route.kind) {
       case 'skip': {
-        elementMeta.push({ pc, branchIdx: -1, internalNodeOffset: -1, internalNodeCount: 0, internalNodeLabels: [] });
+        elementMeta.push({ pc, route });
         continue;
       }
       case 'stamp': {
@@ -695,29 +675,13 @@ function runPassA_partition(
           }
           props.replaceModelParams(merged);
         }
-        const rawBc = route.model.branchCount;
-        const modelBranchCount = typeof rawBc === 'function' ? rawBc(props) : (rawBc ?? 0);
-        const branchIdx = modelBranchCount > 0 ? branchCount : -1;
-        branchCount += modelBranchCount;
-        const internalCount = route.model.getInternalNodeCount?.(props) ?? 0;
-        const internalNodeOffset = internalCount > 0 ? nextInternalNode : -1;
-        nextInternalNode += internalCount;
-        const rawLabels = route.model.getInternalNodeLabels?.(props) ?? [];
-        if (rawLabels.length !== internalCount) {
-          throw new Error(
-            `Analog compiler: model for "${pc.definition.name}" returned ` +
-            `${rawLabels.length} internal node labels but getInternalNodeCount ` +
-            `returned ${internalCount}. getInternalNodeLabels must mirror ` +
-            `getInternalNodeCount's predicate exactly.`,
-          );
-        }
-        elementMeta.push({ pc, branchIdx, internalNodeOffset, internalNodeCount: internalCount, internalNodeLabels: rawLabels });
+        elementMeta.push({ pc, route });
         continue;
       }
     }
   }
 
-  return { elementMeta, branchCount, nextInternalNode };
+  return elementMeta;
 }
 
 /**
@@ -1075,14 +1039,12 @@ export function compileAnalogPartition(
   const runtimeModelMap: Record<string, Record<string, ModelEntry>> | undefined =
     outerCircuit?.metadata.models;
 
-  // Stage 3 (Pass A): Assign branch indices and allocate internal nodes.
-  const passA = runPassA_partition(partition, externalNodeCount, diagnostics, digitalPinLoading, runtimeModelMap);
+  // Stage 3 (Pass A): Resolve component routes. Branch indices and internal
+  // node IDs are allocated lazily at setup() time (A6.1).
+  const elementMeta = runPassA_partition(partition, externalNodeCount, diagnostics, digitalPinLoading, runtimeModelMap);
 
-  const elementMeta = passA.elementMeta;
-  let branchCount = passA.branchCount;
-  let nextInternalNode = passA.nextInternalNode;
-
-  let totalNodeCount = nextInternalNode - 1;
+  let branchCount = 0;
+  let totalNodeCount = externalNodeCount;
 
   // Build a minimal circuit-like wire lookup for resolveElementNodes.
   // We need to pass wireToNodeId and a circuit object. We create a minimal
@@ -1111,23 +1073,20 @@ export function compileAnalogPartition(
   const getTime = (): number => timeRef.value;
 
   for (const meta of elementMeta) {
-    const { pc } = meta;
+    const { pc, route } = meta;
     const el = pc.element;
 
     if (el.typeId === "Ground" || el.typeId === "Tunnel") {
       continue;
     }
 
-    const def = pc.definition;
-    const props = el.getProperties();
-
-    const route = resolveComponentRoute(def, pc, digitalPinLoading, runtimeModelMap);
-
     if (route.kind === 'skip') {
       continue;
     }
 
     // route.kind === 'stamp'
+    const def = pc.definition;
+    const props = el.getProperties();
     const activeModel = route.model;
 
     // Resolve pin → node ID bindings
@@ -1178,19 +1137,6 @@ export function compileAnalogPartition(
         pinNodes.set(lbl, pinNodeIds[pi]);
       }
     }
-
-    const internalNodeIds: number[] = [];
-    if (meta.internalNodeCount > 0) {
-      for (let i = 0; i < meta.internalNodeCount; i++) {
-        internalNodeIds.push(meta.internalNodeOffset + i);
-      }
-    }
-
-    // Solver uses ngspice 1-based slot indexing: nodes occupy 1..totalNodeCount,
-    // branches occupy totalNodeCount+1..totalNodeCount+branchCount. The +1
-    // here shifts the 0-based meta.branchIdx ordinal into that range.
-    const absoluteBranchIdx =
-      meta.branchIdx >= 0 ? totalNodeCount + 1 + meta.branchIdx : -1;
 
     if (activeModel.factory !== undefined) {
       const flatOverrides: Record<string, number> = props.has("_pinElectricalOverrides")
@@ -1263,12 +1209,11 @@ export function compileAnalogPartition(
 
     const analogFactory = activeModel.factory;
     if (!analogFactory) continue;
-    const core = analogFactory(pinNodes, internalNodeIds, absoluteBranchIdx, props, getTime);
+    const core = analogFactory(pinNodes, props, getTime);
     const elementIndex = analogElements.length;
     const element: import("./element.js").AnalogElement = Object.assign(core, {
       pinNodeIds: pinNodeIds,
-      allNodeIds: [...pinNodeIds, ...internalNodeIds],
-      internalNodeLabels: [...meta.internalNodeLabels],
+      allNodeIds: [...pinNodeIds],
       label: el.getProperties().has("label")
         ? String(el.getProperties().get("label") ?? el.instanceId)
         : el.instanceId,
@@ -1299,9 +1244,9 @@ export function compileAnalogPartition(
     }
 
     topologyInfo.push({
-      nodeIds: [...pinNodeIds, ...internalNodeIds],
-      isBranch: meta.branchIdx >= 0,
-      typeHint: meta.branchIdx >= 0
+      nodeIds: [...pinNodeIds],
+      isBranch: element.branchIndex !== -1,
+      typeHint: element.branchIndex !== -1
         ? element.isReactive
           ? "inductor"
           : "voltage"
@@ -1311,8 +1256,6 @@ export function compileAnalogPartition(
         : el.instanceId,
     });
   }
-
-  totalNodeCount = nextInternalNode - 1;
 
   // Bridge stub processing — create MNA elements for each cross-domain boundary.
   const bridgeAdaptersByGroupId = new Map<number, Array<BridgeOutputAdapter | BridgeInputAdapter>>();
@@ -1446,27 +1389,17 @@ export function compileAnalogPartition(
     }
   }
 
-  // State pool allocation — assign offsets and initialise pool slots.
-  let stateOffset = 0;
-  for (const element of analogElements) {
-    if (isPoolBacked(element)) {
-      element.stateBaseOffset = stateOffset;
-      stateOffset += element.stateSize;
-    }
-  }
-  const statePool = new StatePool(stateOffset);
-  for (const element of analogElements) {
-    if (isPoolBacked(element)) {
-      element.initState(statePool);
-    }
-  }
+  // State pool: deferred to setup time (A5.3). Compiled statePool is null;
+  // MNAEngine._setup() calls allocateStateBuffers(numStates) after all
+  // element setup() calls have run, then each pool-backed element's
+  // initState() is called from CKTCircuitContext.allocateStateBuffers().
+  const statePool = null as unknown as StatePool;
 
   // Build and return ConcreteCompiledAnalogCircuit
   const models = new Map<string, DeviceModel>();
 
   return new ConcreteCompiledAnalogCircuit({
     nodeCount: totalNodeCount,
-    branchCount,
     elements: analogElements,
     labelToNodeId,
     labelPinNodes,

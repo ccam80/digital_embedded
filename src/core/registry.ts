@@ -335,6 +335,25 @@ export interface ComponentDefinition {
   pinElectrical?: PinElectricalSpec;
   /** Per-pin overrides for bridge adapter specs. */
   pinElectricalOverrides?: Record<string, PinElectricalSpec>;
+  /** Maps digiTS pin label → ngspice node-variable suffix.
+   *  Used by the netlist generator and by setup() bodies to reach
+   *  ngspice's named view of nodes from digiTS's labelled view.
+   *
+   *  Examples:
+   *    Resistor: { A: "pos", B: "neg" }
+   *      → pinNodes.get("A") corresponds to RESposNode
+   *    MOSFET:   { G: "gate", D: "drain", S: "source", B: "bulk" }
+   *      → pinNodes.get("D") corresponds to MOS1dNode
+   *
+   *  Sub-element composites (transformer, opamp, ADC, etc.) leave this
+   *  field UNDEFINED; the composite's own setup() does not reach into
+   *  ngspice — it constructs sub-elements which carry their own
+   *  ngspiceNodeMap entries.
+   *
+   *  Sibling pattern to ParamDef.spiceName which renames param keys for
+   *  netlist emission.
+   */
+  ngspiceNodeMap?: Record<string, string>;
 }
 
 // ---------------------------------------------------------------------------

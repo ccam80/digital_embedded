@@ -59,12 +59,6 @@ export class ConcreteCompiledAnalogCircuit implements CompiledAnalogCircuit {
   /** Number of non-ground MNA nodes. */
   readonly nodeCount: number;
 
-  /** Number of branch-current rows (voltage sources, inductors). */
-  readonly branchCount: number;
-
-  /** MNA matrix dimension: nodeCount + branchCount. */
-  readonly matrixSize: number;
-
   /** All analog element instances. */
   readonly elements: AnalogElement[];
 
@@ -131,7 +125,6 @@ export class ConcreteCompiledAnalogCircuit implements CompiledAnalogCircuit {
 
   constructor(params: {
     nodeCount: number;
-    branchCount: number;
     elements: AnalogElement[];
     labelToNodeId: Map<string, number>;
     labelPinNodes?: Map<string, Array<{ pinLabel: string; nodeId: number }>>;
@@ -150,8 +143,6 @@ export class ConcreteCompiledAnalogCircuit implements CompiledAnalogCircuit {
     ics?: Map<number, number>;
   }) {
     this.nodeCount = params.nodeCount;
-    this.branchCount = params.branchCount;
-    this.matrixSize = params.nodeCount + params.branchCount;
     this.elements = params.elements;
     this.labelToNodeId = params.labelToNodeId;
     this.labelPinNodes = params.labelPinNodes ?? new Map();
