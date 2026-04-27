@@ -16,13 +16,18 @@
  *   CKTgminFactor    → ctx.params.gminFactor (default 10, cktntask.c:103)
  *   CKTdcTrcvMaxIter → ctx.dcTrcvMaxIter
  *   CKTdcMaxIter     → ctx.maxIterations
- *   CKTrhsOld        → ctx.dcopVoltages
+ *   CKTrhsOld        → ctx.rhsOld
+ *   CKTrhs           → ctx.rhs
  *   CKTstate0        → ctx.statePool.state0
  *   OldRhsOld        → ctx.dcopSavedVoltages
  *   OldCKTstate0     → ctx.dcopSavedState0
+ *
+ * `ctx.dcopVoltages` is digiTS-only — it is the destination buffer that
+ * `ctx.dcopResult.nodeVoltages` aliases, populated once at success from
+ * `ctx.rhs`. It plays no role inside any NR sub-solve and has no ngspice
+ * analogue; ngspice consumers read `CKTrhs` directly after CKTop returns.
  */
 
-import type { DiagnosticCollector } from "./diagnostics.js";
 import { makeDiagnostic } from "./diagnostics.js";
 import { newtonRaphson } from "./newton-raphson.js";
 import { cktLoad } from "./ckt-load.js";
@@ -72,43 +77,54 @@ function scaleAllSources(ctx: CKTCircuitContext, factor: number): void {
 }
 
 /**
- * Zero both the voltage vector and the state pool's state0 array.
+ * Zero CKTrhsOld and CKTstate0 once at sub-solver entry.
+ *
+ * Mirrors cktop.c:156-160 (dynamic_gmin) and cktop.c:398-402 (gillespie_src).
+ * Called from `dynamicGmin` and `gillespieSrc` only — `spice3_gmin` and
+ * `spice3_src` perform NO entry zero pass and inherit both buffers from the
+ * caller's prior NIiter exit state.
  */
-function zeroState(
-  voltages: Float64Array,
-  statePool: { state0: Float64Array } | null | undefined,
+function zeroRhsOldAndState(
+  ctx: CKTCircuitContext,
+  statePool: { state0: Float64Array } | null,
 ): void {
-  voltages.fill(0);
+  ctx.rhsOld.fill(0);
   if (statePool) {
     statePool.state0.fill(0);
   }
 }
 
 /**
- * Copy current voltages and state0 into saved buffers.
+ * Snapshot CKTrhsOld and CKTstate0 into the OldRhsOld / OldCKTstate0 buffers.
+ *
+ * Mirrors cktop.c:186-194 (dynamic_gmin) and cktop.c:463-470 / 502-509
+ * (gillespie_src), which save the post-NIiter `CKTrhsOld[n->number]` (i.e.
+ * the iter-K-1 output of the converging solve) for restoration on backtrack.
  */
 function saveSnapshot(
-  voltages: Float64Array,
+  rhsOld: Float64Array,
   saved: Float64Array,
   statePool: { state0: Float64Array } | null | undefined,
   savedState: Float64Array,
 ): void {
-  saved.set(voltages);
+  saved.set(rhsOld);
   if (statePool) {
     savedState.set(statePool.state0);
   }
 }
 
 /**
- * Restore voltages and state0 from saved buffers.
+ * Restore CKTrhsOld and CKTstate0 from the OldRhsOld / OldCKTstate0 buffers.
+ *
+ * Mirrors cktop.c:226-233 (dynamic_gmin) and cktop.c:539-545 (gillespie_src).
  */
 function restoreSnapshot(
-  voltages: Float64Array,
+  rhsOld: Float64Array,
   saved: Float64Array,
   statePool: { state0: Float64Array } | null | undefined,
   savedState: Float64Array,
 ): void {
-  voltages.set(saved);
+  rhsOld.set(saved);
   if (statePool) {
     statePool.state0.set(savedState);
   }
@@ -176,26 +192,32 @@ function runNR(
 /**
  * Run the direct-NR level of the DC-OP ladder (cktop.c:20-79).
  *
- * When params.noOpIter is true, returns immediately with converged=true
- * and zero iterations — returning the pre-existing voltage vector unchanged,
- * matching the ngspice noOpIter fast-path.
+ * Sets the firstmode INITF bits and dispatches to NIiter. Does NOT touch
+ * CKTrhsOld — ngspice cktop.c:46 passes it directly to NIiter, which inherits
+ * whatever the prior NIiter call (or NIreinit, on a fresh circuit) left
+ * there. digiTS matches: ctx.rhsOld carries forward across solveDcOperatingPoint
+ * invocations (it is a `Float64Array(sizePlusOne)` so it starts at zero on
+ * engine construction; engine.reset() re-zeroes it).
+ *
+ * When `params.noOpIter` is true (cktop.c:47-48), the direct NR attempt is
+ * skipped and the result is reported as failed (`converged=false`) so
+ * `solveDcOperatingPoint` falls through to gmin stepping. ngspice models
+ * this with `converged = 1` ("the 'go directly to gmin stepping' option").
  */
 function cktop(
   ctx: CKTCircuitContext,
   firstInitf: number,
   maxIter: number,
-  preExistingVoltages: Float64Array,
   ladder: CKTCircuitContext["nrModeLadder"],
 ): StepResult {
   ctx.cktMode = setInitf(ctx.cktMode, firstInitf);
   if (ctx.params.noOpIter) {
     return {
-      converged: true,
+      converged: false,
       iterations: 0,
-      voltages: preExistingVoltages,
+      voltages: ctx.rhs,
     };
   }
-  ctx.rhsOld.set(preExistingVoltages);
   return runNR(ctx, maxIter, ctx.diagonalGmin, ladder);
 }
 
@@ -206,46 +228,28 @@ function cktop(
 /**
  * Finalize the standalone .OP DC operating point after convergence.
  *
- * C1 (Phase 2.5 W2.2): single CKTload mirrors ngspice `DCop`
- * (dcop.c:127 mode write, dcop.c:153 CKTload call) exactly:
+ * Mirrors ngspice `DCop` (dcop.c:127 mode write, dcop.c:153 CKTload call):
  *   ckt->CKTmode = (ckt->CKTmode & MODEUIC) | MODEDCOP | MODEINITSMSIG;
  *   converged = CKTload(ckt);
  *
- * That is: one CKTmode reassignment to flip the INITF bits to MODEINITSMSIG,
- * followed by one CKTload call. No factor, no solve, no iteration, no NR.
- * The converged CKTrhsOld from the previous cktop() call is already in the
- * MNA solution vector; CKTload re-evaluates every device's small-signal
- * quantities (e.g. geqcb for capacitors) into state0 using those voltages.
+ * One CKTmode reassignment to flip INITF to MODEINITSMSIG, one CKTload call,
+ * no factor, no solve, no iteration, no NR. CKTload reads `CKTrhsOld` (which
+ * holds the iter-K-1 output of the prior NIiter exit per niiter.c:1066-1069)
+ * for bias-point voltages and re-evaluates each device's small-signal
+ * quantities (e.g. capacitor `geqcb`) into state0.
  *
- * After the load, ngspice does NOT reset CKTmode — the next consumer owns
- * it. For our engine, no consumer reads the INITF bits after standalone .OP
- * finalize (the next user call either resets, reconfigures, or transitions
- * to transient via _seedFromDcop which writes its own mode). We still clear
- * the INITF bits to MODEINITFLOAT on return so cktMode never leaks
- * MODEINITSMSIG across analysis boundaries — matches niiter.c:1070-1071's
- * post-converge INITF dispatcher landing mode (MODEINITSMSIG → MODEINITFLOAT).
+ * After the load, ngspice does NOT reset CKTmode. We clear INITF back to
+ * MODEINITFLOAT on return so cktMode never leaks MODEINITSMSIG across
+ * analysis boundaries — matches niiter.c:1070-1071's post-converge INITF
+ * landing mode.
  *
  * Runs ONLY on the standalone .OP path (!isTranOp(ctx.cktMode)). The
  * transient-boot DCOP path (dctran.c:230-346) has no smsig load and callers
  * must skip this function — gate on !isTranOp(ctx.cktMode) at each call site.
  */
-function dcopFinalize(
-  ctx: CKTCircuitContext,
-  voltages: Float64Array,
-): void {
-  // dcop.c:127 — flip INITF bits to MODEINITSMSIG; analysis bits stay as set
-  // by the caller (MODEDCOP for standalone .OP).
+function dcopFinalize(ctx: CKTCircuitContext): void {
   ctx.cktMode = setInitf(ctx.cktMode, MODEINITSMSIG);
-  // Elements read prior-iterate voltages via loadCtx.rhsOld. Seed with the
-  // converged solution so the final CKTload call sees the correct node voltages.
-  ctx.rhsOld.set(voltages);
-  // dcop.c:153 — one CKTload call. No factor, no solve, no iteration.
   cktLoad(ctx);
-  // Clear INITF bit to MODEINITFLOAT so callers never observe the smsig mode
-  // leaking across. ngspice leaves CKTmode at MODEINITSMSIG but ngspice also
-  // has no code path that reads CKTmode between the smsig CKTload and the
-  // next analysis starting. _seedFromDcop overwrites the mode unconditionally,
-  // so this is a belt-and-suspenders landing.
   ctx.cktMode = setInitf(ctx.cktMode, MODEINITFLOAT);
 }
 
@@ -302,7 +306,7 @@ export function cktncDump(
  * @param ctx - Circuit context holding all solver state, buffers, and options
  */
 export function solveDcOperatingPoint(ctx: CKTCircuitContext): void {
-  const { elements, matrixSize, statePool, params } = ctx;
+  const { matrixSize, params } = ctx;
   const diagnostics = ctx.diagnostics;
 
   ctx.dcopResult.reset();
@@ -327,15 +331,14 @@ export function solveDcOperatingPoint(ctx: CKTCircuitContext): void {
     },
   };
 
-  // Use dcopVoltages as the working buffer for this solve (zero it first)
-  const voltages = ctx.dcopVoltages;
-  voltages.fill(0);
+  // ngspice cktop.c:46 — NIiter is invoked with whatever CKTrhsOld carried
+  // from the prior call (or NIreinit's zero-fill on a fresh circuit). digiTS
+  // matches: ctx.rhsOld is left untouched here.
 
   const directResult = cktop(
     ctx,
     MODEINITJCT,
     params.maxIterations,
-    voltages,
     ladder,
   );
   if (!directResult.converged) {
@@ -343,13 +346,13 @@ export function solveDcOperatingPoint(ctx: CKTCircuitContext): void {
   }
 
   if (directResult.converged) {
-    voltages.set(directResult.voltages);
+    ctx.dcopVoltages.set(ctx.rhs);
     // ngspice DCtran (dctran.c:230-346) performs NO CKTload after the
     // transient-boot CKTop returns. The initSmsig load fires only from DCop
     // (dcop.c:127,153) on the standalone .OP path. Gate on !isTranOp(ctx.cktMode)
     // so transient-boot DCOP skips the smsig pass entirely.
     if (!isTranOp(ctx.cktMode)) {
-      dcopFinalize(ctx, voltages);
+      dcopFinalize(ctx);
     }
     diagnostics.emit(
       makeDiagnostic(
@@ -362,7 +365,6 @@ export function solveDcOperatingPoint(ctx: CKTCircuitContext): void {
     ctx.dcopResult.converged = true;
     ctx.dcopResult.method = "direct";
     ctx.dcopResult.iterations = directResult.iterations;
-    ctx.dcopResult.nodeVoltages.set(voltages);
     ctx.dcopResult.diagnostics = diagnostics.getDiagnostics();
     return;
   }
@@ -382,10 +384,10 @@ export function solveDcOperatingPoint(ctx: CKTCircuitContext): void {
   totalIterations += gminResult.iterations;
 
   if (gminResult.converged) {
-    voltages.set(gminResult.voltages);
+    ctx.dcopVoltages.set(ctx.rhs);
     // smsig load is .OP-only — skip on transient-boot DCOP (dctran.c:230-346).
     if (!isTranOp(ctx.cktMode)) {
-      dcopFinalize(ctx, voltages);
+      dcopFinalize(ctx);
     }
     const gminMethod = numGminSteps <= 1 ? "dynamic-gmin" : "spice3-gmin";
     const gminLabel = numGminSteps <= 1 ? "dynamic Gmin stepping" : "spice3 Gmin stepping";
@@ -403,7 +405,6 @@ export function solveDcOperatingPoint(ctx: CKTCircuitContext): void {
     ctx.dcopResult.converged = true;
     ctx.dcopResult.method = gminMethod;
     ctx.dcopResult.iterations = totalIterations;
-    ctx.dcopResult.nodeVoltages.set(voltages);
     ctx.dcopResult.diagnostics = diagnostics.getDiagnostics();
     return;
   }
@@ -421,10 +422,10 @@ export function solveDcOperatingPoint(ctx: CKTCircuitContext): void {
   totalIterations += srcResult.iterations;
 
   if (srcResult.converged) {
-    voltages.set(srcResult.voltages);
+    ctx.dcopVoltages.set(ctx.rhs);
     // smsig load is .OP-only — skip on transient-boot DCOP (dctran.c:230-346).
     if (!isTranOp(ctx.cktMode)) {
-      dcopFinalize(ctx, voltages);
+      dcopFinalize(ctx);
     }
     const srcMethod = numSrcSteps <= 1 ? "gillespie-src" : "spice3-src";
     const srcLabel = numSrcSteps <= 1 ? "Gillespie source stepping" : "spice3 source stepping";
@@ -442,19 +443,22 @@ export function solveDcOperatingPoint(ctx: CKTCircuitContext): void {
     ctx.dcopResult.converged = true;
     ctx.dcopResult.method = srcMethod;
     ctx.dcopResult.iterations = totalIterations;
-    ctx.dcopResult.nodeVoltages.set(voltages);
     ctx.dcopResult.diagnostics = diagnostics.getDiagnostics();
     return;
   }
 
   // -------------------------------------------------------------------------
   // Level 5 — Failure with blame attribution (cktncdump.c)
+  //
+  // ngspice CKTncDump compares the iter-K output (CKTrhs) against the
+  // iter-K-1 output (CKTrhsOld) at the moment NIiter gave up. After the last
+  // failed sub-solve, ctx.rhs and ctx.rhsOld hold exactly that pair.
   // -------------------------------------------------------------------------
   const ncNodes = cktncDump(
     ctx.ncDumpScratch,
     ctx._ncDumpPool,
-    srcResult.voltages,
-    directResult.voltages,
+    ctx.rhs,
+    ctx.rhsOld,
     params.reltol,
     params.voltTol,
     params.abstol,
@@ -494,6 +498,12 @@ export function solveDcOperatingPoint(ctx: CKTCircuitContext): void {
  *
  * Adds a diagonal conductance (diagGmin) to all MNA nodes, converges,
  * then adaptively reduces diagGmin toward params.gmin.
+ *
+ * cktop.c:156-160 zeroes CKTrhsOld and CKTstate0 ONCE at function entry.
+ * Subsequent NIiter calls inherit whatever the previous call left in
+ * CKTrhsOld (the post-NIiter swap exit invariant), with explicit
+ * OldRhsOld/OldCKTstate0 save+restore on backtrack (cktop.c:186-194 save,
+ * cktop.c:226-233 restore).
  */
 function dynamicGmin(
   ctx: CKTCircuitContext,
@@ -502,12 +512,11 @@ function dynamicGmin(
 ): StepResult {
   const { statePool, params } = ctx;
 
-  // Use ctx.dcopVoltages as the working buffer
-  const voltages = ctx.dcopVoltages;
-  zeroState(voltages, statePool);
+  // cktop.c:156-160 — single zero pass at function entry.
+  zeroRhsOldAndState(ctx, statePool);
+
   ctx.cktMode = setInitf(ctx.cktMode, MODEINITJCT);  // cktop.c:35 firstmode=MODEINITJCT
 
-  // Use ctx.dcopSavedVoltages and ctx.dcopSavedState0 for snapshots
   const savedVoltages = ctx.dcopSavedVoltages;
   const savedState0 = ctx.dcopSavedState0;
 
@@ -519,10 +528,8 @@ function dynamicGmin(
 
   while (true) {
     onPhaseBegin?.("dcopGminDynamic", diagGmin);
-    ctx.rhsOld.set(voltages);
     const result = runNR(ctx, params.dcTrcvMaxIter, diagGmin, null);
     totalIter += result.iterations;
-    voltages.set(result.voltages);
 
     if (result.converged) {
       onPhaseEnd?.("dcopSubSolveConverged", true);
@@ -531,7 +538,9 @@ function dynamicGmin(
         break;
       }
 
-      saveSnapshot(voltages, savedVoltages, statePool, savedState0);
+      // cktop.c:186-194 — save CKTrhsOld + CKTstate0 (the iter-K-1 output of
+      // the converging NIiter call, per niiter.c:1066-1069 no-swap exit).
+      saveSnapshot(ctx.rhsOld, savedVoltages, statePool, savedState0);
 
       const iterLo = (params.dcTrcvMaxIter / 4) | 0;
       const iterHi = ((3 * params.dcTrcvMaxIter / 4) | 0);
@@ -553,26 +562,27 @@ function dynamicGmin(
     } else {
       onPhaseEnd?.("nrFailedRetry", false);
       if (factor < 1.00005) {
-        return { converged: false, iterations: totalIter, voltages: ctx.dcopVoltages };
+        return { converged: false, iterations: totalIter, voltages: ctx.rhs };
       }
       factor = Math.sqrt(Math.sqrt(factor));
       diagGmin = oldGmin / factor;
-      restoreSnapshot(voltages, savedVoltages, statePool, savedState0);
+      // cktop.c:226-233 — restore CKTrhsOld + CKTstate0 from snapshot.
+      restoreSnapshot(ctx.rhsOld, savedVoltages, statePool, savedState0);
     }
   }
 
-  // Final clean solve with gshunt diagonal (ngspice cktop.c:253 uses CKTdcMaxIter = maxIterations)
+  // cktop.c:253 — final clean solve, no rhsOld touch (carries forward from
+  // the last successful NIiter exit inside the while loop).
   onPhaseBegin?.("dcopGminDynamic", 0);
-  ctx.rhsOld.set(voltages);
   const cleanResult = runNR(ctx, params.maxIterations, params.gshunt ?? 0, null);
   totalIter += cleanResult.iterations;
   onPhaseEnd?.(cleanResult.converged ? "accepted" : "finalFailure", cleanResult.converged);
 
-  if (cleanResult.converged) {
-    voltages.set(cleanResult.voltages);
-    return { converged: true, iterations: totalIter, voltages };
-  }
-  return { converged: false, iterations: totalIter, voltages: ctx.dcopVoltages };
+  return {
+    converged: cleanResult.converged,
+    iterations: totalIter,
+    voltages: ctx.rhs,
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -584,16 +594,17 @@ function dynamicGmin(
  *
  * Starts with diagGmin = params.gmin * gminFactor^numGminSteps, then ramps
  * it down by gminFactor per step, for numGminSteps+1 steps. No backtracking.
+ *
+ * NO entry zero of CKTrhsOld or CKTstate0 — both inherit from the prior
+ * NIiter exit (cktop.c:285-303 only writes CKTmode and CKTdiagGmin).
  */
 function spice3Gmin(
   ctx: CKTCircuitContext,
   onPhaseBegin?: PhaseBeginFn,
   onPhaseEnd?: PhaseEndFn,
 ): StepResult {
-  const { statePool, params } = ctx;
+  const { params } = ctx;
 
-  const voltages = ctx.dcopVoltages;
-  zeroState(voltages, statePool);
   ctx.cktMode = setInitf(ctx.cktMode, MODEINITJCT);  // cktop.c:291 firstmode=MODEINITJCT
 
   let totalIter = 0;
@@ -608,33 +619,30 @@ function spice3Gmin(
 
   for (let i = 0; i <= numGminSteps; i++) {
     onPhaseBegin?.("dcopGminSpice3", diagGmin);
-    ctx.rhsOld.set(voltages);
     const result = runNR(ctx, params.dcTrcvMaxIter, diagGmin, null);
     totalIter += result.iterations;
 
     if (!result.converged) {
       onPhaseEnd?.("nrFailedRetry", false);
-      return { converged: false, iterations: totalIter, voltages: ctx.dcopVoltages };
+      return { converged: false, iterations: totalIter, voltages: ctx.rhs };
     }
 
     onPhaseEnd?.("dcopSubSolveConverged", true);
     ctx.cktMode = setInitf(ctx.cktMode, MODEINITFLOAT);  // cktop.c:319 continuemode=MODEINITFLOAT
-    voltages.set(result.voltages);
     diagGmin /= gminFactor;
   }
 
-  // Final clean solve with gshunt diagonal
+  // cktop.c:338 — final clean solve, no rhsOld touch.
   onPhaseBegin?.("dcopGminSpice3", 0);
-  ctx.rhsOld.set(voltages);
   const cleanResult = runNR(ctx, params.dcTrcvMaxIter, params.gshunt ?? 0, null);
   totalIter += cleanResult.iterations;
   onPhaseEnd?.(cleanResult.converged ? "accepted" : "finalFailure", cleanResult.converged);
 
-  if (cleanResult.converged) {
-    voltages.set(cleanResult.voltages);
-    return { converged: true, iterations: totalIter, voltages };
-  }
-  return { converged: false, iterations: totalIter, voltages: ctx.dcopVoltages };
+  return {
+    converged: cleanResult.converged,
+    iterations: totalIter,
+    voltages: ctx.rhs,
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -644,16 +652,17 @@ function spice3Gmin(
 /**
  * spice3 source stepping (cktop.c:583-628).
  * Uniform linear source ramp with no backtracking.
+ *
+ * NO entry zero of CKTrhsOld or CKTstate0 — both inherit from the prior
+ * NIiter exit (cktop.c:583-595 only writes CKTmode).
  */
 function spice3Src(
   ctx: CKTCircuitContext,
   onPhaseBegin?: PhaseBeginFn,
   onPhaseEnd?: PhaseEndFn,
 ): StepResult {
-  const { statePool, params } = ctx;
+  const { params } = ctx;
 
-  const voltages = ctx.dcopVoltages;
-  zeroState(voltages, statePool);
   ctx.cktMode = setInitf(ctx.cktMode, MODEINITJCT);  // cktop.c:591 firstmode=MODEINITJCT
   let totalIter = 0;
   const numSrcSteps = params.numSrcSteps ?? 1;
@@ -662,21 +671,19 @@ function spice3Src(
     const srcFact = i / numSrcSteps;
     scaleAllSources(ctx, srcFact);
     onPhaseBegin?.("dcopSrcSweep", srcFact);
-    ctx.rhsOld.set(voltages);
     const result = runNR(ctx, params.dcTrcvMaxIter, 0, null);
     totalIter += result.iterations;
     if (!result.converged) {
       onPhaseEnd?.("nrFailedRetry", false);
       scaleAllSources(ctx, 1);
-      return { converged: false, iterations: totalIter, voltages: ctx.dcopVoltages };
+      return { converged: false, iterations: totalIter, voltages: ctx.rhs };
     }
     onPhaseEnd?.("dcopSubSolveConverged", true);
     ctx.cktMode = setInitf(ctx.cktMode, MODEINITFLOAT);  // cktop.c:603 continuemode=MODEINITFLOAT
-    voltages.set(result.voltages);
   }
 
   scaleAllSources(ctx, 1);
-  return { converged: true, iterations: totalIter, voltages };
+  return { converged: true, iterations: totalIter, voltages: ctx.rhs };
 }
 
 // ---------------------------------------------------------------------------
@@ -688,6 +695,11 @@ function spice3Src(
  *
  * Scales independent sources from 0 to 1 adaptively, using each converged
  * solution as the initial guess for the next step.
+ *
+ * cktop.c:398-402 zeroes CKTrhsOld and CKTstate0 ONCE at function entry.
+ * After the zero-source (or gmin bootstrap) converges, cktop.c:463-470
+ * captures the converged-state snapshot. Subsequent main-loop iterations
+ * save on success (cktop.c:502-509) and restore on retry (cktop.c:539-545).
  */
 function gillespieSrc(
   ctx: CKTCircuitContext,
@@ -696,34 +708,31 @@ function gillespieSrc(
 ): StepResult {
   const { statePool, params } = ctx;
 
-  const voltages = ctx.dcopVoltages;
-  zeroState(voltages, statePool);
   ctx.cktMode = setInitf(ctx.cktMode, MODEINITJCT);  // cktop.c:381 firstmode=MODEINITJCT
   scaleAllSources(ctx, 0);
+
+  // cktop.c:398-402 — single zero pass at function entry.
+  zeroRhsOldAndState(ctx, statePool);
 
   const savedVoltages = ctx.dcopSavedVoltages;
   const savedState0 = ctx.dcopSavedState0;
 
   let totalIter = 0;
 
-  // cktop.c:406-409: zero-source NR solve
+  // cktop.c:406-409: zero-source NR solve.
   onPhaseBegin?.("dcopSrcSweep", 0);
-  ctx.rhsOld.set(voltages);
   const zeroResult = runNR(ctx, params.dcTrcvMaxIter, 0, null);
   totalIter += zeroResult.iterations;
-  voltages.set(zeroResult.voltages);
 
   if (!zeroResult.converged) {
     onPhaseEnd?.("nrFailedRetry", false);
-    // cktop.c:413-458: gmin bootstrap for zero-source circuit
+    // cktop.c:413-458: gmin bootstrap for zero-source circuit.
     let diagGmin = params.gmin * 1e10;
     let bootstrapConverged = false;
     for (let decade = 0; decade <= 10; decade++) {
       onPhaseBegin?.("dcopSrcSweep", 0);
-      ctx.rhsOld.set(voltages);
       const bResult = runNR(ctx, params.dcTrcvMaxIter, diagGmin, null);
       totalIter += bResult.iterations;
-      voltages.set(bResult.voltages);
       if (!bResult.converged) {
         onPhaseEnd?.("nrFailedRetry", false);
         break;
@@ -737,14 +746,20 @@ function gillespieSrc(
     }
     if (!bootstrapConverged) {
       scaleAllSources(ctx, 1);
-      return { converged: false, iterations: totalIter, voltages: ctx.dcopVoltages };
+      return { converged: false, iterations: totalIter, voltages: ctx.rhs };
     }
   } else {
     onPhaseEnd?.("dcopSubSolveConverged", true);
     ctx.cktMode = setInitf(ctx.cktMode, MODEINITFLOAT);  // cktop.c:453-497 continuemode=MODEINITFLOAT
   }
 
-  // cktop.c:385-387: initialise stepping parameters
+  // cktop.c:463-470 — save initial converged state (after either the direct
+  // zero-source solve or the gmin bootstrap path) before entering the main
+  // ramp loop. Required so the first main-loop retry has a snapshot to
+  // restore from.
+  saveSnapshot(ctx.rhsOld, savedVoltages, statePool, savedState0);
+
+  // cktop.c:385-387: initialise stepping parameters.
   let raise = 0.001;
   let convFact = 0;
   let srcFact = raise;
@@ -752,19 +767,19 @@ function gillespieSrc(
   const srcIterLo = (params.dcTrcvMaxIter / 4) | 0;
   const srcIterHi = ((3 * params.dcTrcvMaxIter / 4) | 0);
 
-  // cktop.c:428-538: main source stepping loop
+  // cktop.c:478-552: main source stepping loop.
   while (raise >= 1e-7 && convFact < 1) {
     scaleAllSources(ctx, srcFact);
     onPhaseBegin?.("dcopSrcSweep", srcFact);
-    ctx.rhsOld.set(voltages);
     const stepResult = runNR(ctx, params.dcTrcvMaxIter, params.gshunt ?? 0, null);
     totalIter += stepResult.iterations;
 
     if (stepResult.converged) {
       onPhaseEnd?.("dcopSubSolveConverged", true);
       ctx.cktMode = setInitf(ctx.cktMode, MODEINITFLOAT);  // cktop.c:497 continuemode=MODEINITFLOAT
-      voltages.set(stepResult.voltages);
-      saveSnapshot(voltages, savedVoltages, statePool, savedState0);
+      // cktop.c:502-509 — save CKTrhsOld + CKTstate0 (iter-K-1 output of
+      // the just-converged NIiter call) for restoration on a future retry.
+      saveSnapshot(ctx.rhsOld, savedVoltages, statePool, savedState0);
       convFact = srcFact;
 
       srcFact = convFact + raise;
@@ -783,7 +798,8 @@ function gillespieSrc(
       if (raise > 0.01) {
         raise = 0.01;
       }
-      restoreSnapshot(voltages, savedVoltages, statePool, savedState0);
+      // cktop.c:539-545 — restore CKTrhsOld + CKTstate0 from snapshot.
+      restoreSnapshot(ctx.rhsOld, savedVoltages, statePool, savedState0);
       srcFact = convFact + raise;
     }
 
@@ -794,9 +810,9 @@ function gillespieSrc(
 
   scaleAllSources(ctx, 1);
 
-  if (convFact >= 1) {
-    return { converged: true, iterations: totalIter, voltages };
-  }
-
-  return { converged: false, iterations: totalIter, voltages: ctx.dcopVoltages };
+  return {
+    converged: convFact >= 1,
+    iterations: totalIter,
+    voltages: ctx.rhs,
+  };
 }
