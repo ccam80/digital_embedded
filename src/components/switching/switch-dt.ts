@@ -1,4 +1,4 @@
-﻿/**
+/**
  * SwitchDT component -- SPDT switch with mechanical symbol rendering.
  *
  * Double-throw switch: three terminals per pole (A=common, B=upper, C=lower).
@@ -28,7 +28,7 @@ import {
 import type { AnalogElementCore, LoadContext } from "../../solver/analog/element.js";
 import { NGSPICE_LOAD_ORDER } from "../../solver/analog/element.js";
 import type { SetupContext } from "../../solver/analog/setup-context.js";
-import type { SparseSolver } from "../../solver/analog/sparse-solver.js";
+import { SwitchAnalogElement } from "./switch.js";
 
 // ---------------------------------------------------------------------------
 // Layout constants
@@ -303,89 +303,102 @@ const SWITCH_DT_PROPERTY_DEFS: PropertyDefinition[] = [
 ];
 
 // ---------------------------------------------------------------------------
-// Analog helpers -- SPDT variable-resistance model
+// SwitchDTAnalogElement -- W3 migrated SPDT composite analog element
+//
+// Composite: two SW sub-elements (SW_AB and SW_AC) per PB-SW-DT spec.
+// setup() forwards to sub-elements in order: swAB first, swAC second.
+// Port of ngspice SW device applied twice:
+//   setup: swsetup.c:47-62 (applied to each sub-element)
+//   load:  swload.c (applied to each sub-element)
 // ---------------------------------------------------------------------------
-
-function stampConductanceSpdt(
-  solver: SparseSolver,
-  nodeA: number,
-  nodeB: number,
-  G: number,
-): void {
-  if (nodeA !== 0) solver.stampElement(solver.allocElement(nodeA, nodeA), G);
-  if (nodeB !== 0) solver.stampElement(solver.allocElement(nodeB, nodeB), G);
-  if (nodeA !== 0 && nodeB !== 0) {
-    solver.stampElement(solver.allocElement(nodeA, nodeB), -G);
-    solver.stampElement(solver.allocElement(nodeB, nodeA), -G);
-  }
-}
 
 export interface SpdtAnalogElement extends AnalogElementCore {
   setClosed(closed: boolean): void;
 }
 
-function createSwitchDTAnalogElement(
-  pinNodes: ReadonlyMap<string, number>,
-  props: PropertyBag,
-): SpdtAnalogElement {
-  const nodeCommon = pinNodes.get("A1")!;
-  const nodeB = pinNodes.get("B1")!;
-  const nodeC = pinNodes.get("C1")!;
-  const ron = Math.max(props.getOrDefault<number>("Ron", 1), 1e-12);
-  const roff = Math.max(props.getOrDefault<number>("Roff", 1e9), 1e-12);
-  const normallyClosed = props.getOrDefault<boolean>("normallyClosed", false);
-  let closed = props.getOrDefault<boolean>("closed", false);
-  let effectivelyClosed = normallyClosed ? !closed : closed;
+export class SwitchDTAnalogElement implements SpdtAnalogElement {
+  readonly branchIndex: number = -1;
+  readonly ngspiceLoadOrder: number = NGSPICE_LOAD_ORDER.SW;
+  readonly isNonlinear: boolean = false;
+  readonly isReactive: boolean = false;
+  _stateBase: number = -1;
+  _pinNodes: Map<string, number>;
 
-  return {
-    branchIndex: -1,
-    ngspiceLoadOrder: NGSPICE_LOAD_ORDER.SW,
-    isNonlinear: false,
-    isReactive: false,
-    _stateBase: -1,
-    _pinNodes: new Map(pinNodes),
+  readonly swAB: SwitchAnalogElement;
+  readonly swAC: SwitchAnalogElement;
 
-    setup(_ctx: SetupContext): void {
-      throw new Error("PB-SW-DT not yet migrated");
-    },
+  constructor(pinNodes: ReadonlyMap<string, number>, props: PropertyBag) {
+    this._pinNodes = new Map(pinNodes);
 
-    load(ctx: LoadContext): void {
-      const solver = ctx.solver;
-      const Gon = 1 / ron;
-      const Goff = 1 / roff;
-      if (effectivelyClosed) {
-        stampConductanceSpdt(solver, nodeCommon, nodeB, Gon);
-        stampConductanceSpdt(solver, nodeCommon, nodeC, Goff);
-      } else {
-        stampConductanceSpdt(solver, nodeCommon, nodeB, Goff);
-        stampConductanceSpdt(solver, nodeCommon, nodeC, Gon);
-      }
-    },
+    const a1 = pinNodes.get("A1")!;
+    const b1 = pinNodes.get("B1")!;
+    const c1 = pinNodes.get("C1")!;
 
-    setClosed(c: boolean): void {
-      closed = c;
-      effectivelyClosed = normallyClosed ? !closed : closed;
-    },
+    const closed = props.getOrDefault<boolean>("closed", false);
 
-    getPinCurrents(rhs: Float64Array): number[] {
-      const Gon = 1 / ron;
-      const Goff = 1 / roff;
-      const GAB = effectivelyClosed ? Gon : Goff;
-      const GAC = effectivelyClosed ? Goff : Gon;
-      const vA = rhs[nodeCommon];
-      const vB = rhs[nodeB];
-      const vC = rhs[nodeC];
-      const iAB = GAB * (vA - vB);
-      const iAC = GAC * (vA - vC);
-      return [iAB + iAC, -iAB, -iAC];
-    },
+    // SW_AB: A1 (pos) ↔ B1 (neg)
+    const propAB = new PropertyBag();
+    propAB.set("Ron", props.getOrDefault<number>("Ron", 1));
+    propAB.set("Roff", props.getOrDefault<number>("Roff", 1e9));
+    propAB.set("normallyClosed", props.getOrDefault<boolean>("normallyClosed", false));
+    propAB.set("closed", closed);
+    this.swAB = new SwitchAnalogElement(
+      new Map([["A1", a1], ["B1", b1]]),
+      propAB,
+    );
 
-    setParam(key: string, value: number) {
-      if (key === 'closed') {
-        this.setClosed(!!value);
-      }
-    },
-  };
+    // SW_AC: A1 (pos) ↔ C1 (neg)
+    // When closed=true: AB is on (Ron), AC is off (Roff).
+    // When closed=false: AB is off (Roff), AC is on (Ron).
+    // So SW_AC is the complement: it starts as !closed.
+    const propAC = new PropertyBag();
+    propAC.set("Ron", props.getOrDefault<number>("Ron", 1));
+    propAC.set("Roff", props.getOrDefault<number>("Roff", 1e9));
+    propAC.set("normallyClosed", props.getOrDefault<boolean>("normallyClosed", false));
+    propAC.set("closed", !closed);
+    this.swAC = new SwitchAnalogElement(
+      new Map([["A1", a1], ["B1", c1]]),
+      propAC,
+    );
+  }
+
+  setup(ctx: SetupContext): void {
+    // Composite forwards to sub-elements in subElements[] order.
+    // swAB runs first (A1↔B1), swAC runs second (A1↔C1).
+    this.swAB.setup(ctx);  // allocates SW_AB's 2 state slots + 4 matrix handles
+    this.swAC.setup(ctx);  // allocates SW_AC's 2 state slots + 4 matrix handles
+  }
+
+  load(ctx: LoadContext): void {
+    this.swAB.load(ctx);  // stamps SW_AB conductance onto A1/B1 nodes
+    this.swAC.load(ctx);  // stamps SW_AC conductance onto A1/C1 nodes
+  }
+
+  setClosed(closed: boolean): void {
+    // SPDT: AB is on when closed, AC is on when NOT closed
+    this.swAB.setClosed(closed);
+    this.swAC.setClosed(!closed);
+  }
+
+  getPinCurrents(rhs: Float64Array): number[] {
+    const a1 = this._pinNodes.get("A1")!;
+    const b1 = this._pinNodes.get("B1")!;
+    const c1 = this._pinNodes.get("C1")!;
+    const [iAB_a, iAB_b] = this.swAB.getPinCurrents(rhs);
+    const [iAC_a, iAC_c] = this.swAC.getPinCurrents(rhs);
+    void a1; void b1; void c1;
+    return [iAB_a + iAC_a, iAB_b, iAC_c];
+  }
+
+  setParam(key: string, value: unknown): void {
+    if (key === "ron" || key === "roff" || key === "Ron" || key === "Roff") {
+      this.swAB.setParam(key, value);
+      this.swAC.setParam(key, value);
+    }
+    if (key === "closed") {
+      this.setClosed(!!value);
+    }
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -428,7 +441,7 @@ export const SwitchDTDefinition: ComponentDefinition = {
   modelRegistry: {
     "behavioral": {
       kind: "inline",
-      factory: (pinNodes, props, _getTime) => createSwitchDTAnalogElement(pinNodes, props),
+      factory: (pinNodes, props, _getTime) => new SwitchDTAnalogElement(pinNodes, props),
       paramDefs: [],
       params: {},
     },

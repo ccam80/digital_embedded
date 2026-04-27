@@ -1,32 +1,46 @@
 /**
  * Tests for Voltage-Controlled Voltage Source (VCVS) analog element.
  *
- * All tests use hand-built ConcreteCompiledAnalogCircuit and drive the
- * MNAEngine directly, verifying DC operating-point results.
+ * All tests use the real factory path: instantiate via factory, let
+ * MNAEngine._setup() allocate the branch row and matrix handles,
+ * then verify DC operating-point results.
  *
  * MNA solution vector layout:
- *   indices 0..nodeCount-1      — node voltages (MNA node IDs 1-based)
- *   indices nodeCount..size-1   — branch currents (voltage source / inductor)
+ *   indices 1..nodeCount   — node voltages (1-based MNA node IDs)
+ *   indices >nodeCount     — branch currents (allocated by engine._setup())
  */
 
 import { describe, it, expect } from "vitest";
-import { ConcreteCompiledAnalogCircuit } from "../../../solver/analog/compiled-analog-circuit.js";
-import { StatePool } from "../../../solver/analog/state-pool.js";
 import { MNAEngine } from "../../../solver/analog/analog-engine.js";
 import { makeResistor, makeVoltageSource, withNodeIds } from "../../../solver/analog/__tests__/test-helpers.js";
 import { VCVSDefinition } from "../vcvs.js";
 import { PropertyBag } from "../../../core/properties.js";
 import type { AnalogElement } from "../../../solver/analog/element.js";
+import type { ModelEntry, AnalogFactory } from "../../../core/registry.js";
+import type { ConcreteCompiledAnalogCircuit } from "../../../solver/analog/analog-engine.js";
 
 // ---------------------------------------------------------------------------
-// Helper: narrow ModelEntry to inline factory (throws if netlist kind)
+// Helper: narrow ModelEntry to inline factory
 // ---------------------------------------------------------------------------
-import type { ModelEntry, AnalogFactory } from "../../../core/registry.js";
+
 function getFactory(entry: ModelEntry): AnalogFactory {
   if (entry.kind !== "inline") throw new Error("Expected inline ModelEntry");
   return entry.factory;
 }
 
+// ---------------------------------------------------------------------------
+// withSetup — add a no-op setup() stub to test-helper elements that predate
+// the setup/load split. makeVoltageSource/makeResistor stamp in load(), so
+// their setup() is a no-op. The engine requires setup() on every element.
+// ---------------------------------------------------------------------------
+
+function withSetup(el: AnalogElement): AnalogElement {
+  return Object.assign(el, {
+    _stateBase: -1,
+    _pinNodes: new Map<string, number>(),
+    setup(_ctx: unknown): void {},
+  });
+}
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -37,7 +51,6 @@ function makeVCVSElement(
   nCtrlN: number,
   nOutP: number,
   nOutN: number,
-  branchIdx: number,
   opts: { gain?: number; expression?: string } = {},
 ): AnalogElement {
   const gain = opts.gain ?? 1.0;
@@ -50,8 +63,6 @@ function makeVCVSElement(
   return withNodeIds(
     getFactory(VCVSDefinition.modelRegistry!["behavioral"]!)(
       new Map([["ctrl+", nCtrlP], ["ctrl-", nCtrlN], ["out+", nOutP], ["out-", nOutN]]),
-      [],
-      branchIdx,
       props,
       () => 0,
     ),
@@ -61,19 +72,26 @@ function makeVCVSElement(
 
 function buildCircuit(opts: {
   nodeCount: number;
-  branchCount: number;
   elements: AnalogElement[];
 }): ConcreteCompiledAnalogCircuit {
-  return new ConcreteCompiledAnalogCircuit({
+  return {
     nodeCount: opts.nodeCount,
-    branchCount: opts.branchCount,
     elements: opts.elements,
     labelToNodeId: new Map(),
+    labelPinNodes: new Map(),
     wireToNodeId: new Map(),
     models: new Map(),
+    statePool: null,
+    componentCount: opts.elements.length,
+    netCount: opts.nodeCount,
+    diagnostics: [],
+    branchCount: 0,
+    matrixSize: opts.nodeCount,
+    bridgeOutputAdapters: [],
+    bridgeInputAdapters: [],
     elementToCircuitElement: new Map(),
-    statePool: new StatePool(0),
-  });
+    resolvedPins: [],
+  } as unknown as ConcreteCompiledAnalogCircuit;
 }
 
 // ---------------------------------------------------------------------------
@@ -85,17 +103,16 @@ describe("VCVS", () => {
     // Circuit: Vs=3.3V → node1; VCVS(ctrl+=node1, ctrl-=GND, out+=node2, out-=GND, gain=1)
     // Expected: V(node2) = 3.3V
     //
-    // nodeCount=2:  node1=ctrl voltage, node2=output voltage
-    // branchCount=2: row2=Vs branch, row3=VCVS branch
+    // nodeCount=2: node1=ctrl voltage, node2=output voltage
+    // engine._setup() allocates VCVS branch at maxEqNum=nodeCount+1=3 (1-based).
+    // makeVoltageSource branchIdx: helper uses k=branchIdx+1 internally.
+    // Pass nodeCount+1 so k=nodeCount+2=4 (1-based), avoiding collision with VCVS branch=3.
     const nodeCount = 2;
-    const branchCount = 2;
-    const vsBranch = nodeCount + 0;   // absolute row 2
-    const vcvsBranch = nodeCount + 1; // absolute row 3
 
-    const vs   = makeVoltageSource(1, 0, vsBranch, 3.3);
-    const vcvs = makeVCVSElement(1, 0, 2, 0, vcvsBranch, { gain: 1.0 });
+    const vs   = withSetup(makeVoltageSource(1, 0, nodeCount + 1, 3.3));
+    const vcvs = makeVCVSElement(1, 0, 2, 0, { gain: 1.0 });
 
-    const compiled = buildCircuit({ nodeCount, branchCount, elements: [vs, vcvs] });
+    const compiled = buildCircuit({ nodeCount, elements: [vs, vcvs] });
     const engine = new MNAEngine();
     engine.init(compiled);
     const result = engine.dcOperatingPoint();
@@ -106,14 +123,11 @@ describe("VCVS", () => {
   it("gain_of_10", () => {
     // Vs=0.5V, VCVS gain=10 → output = 5.0V
     const nodeCount = 2;
-    const branchCount = 2;
-    const vsBranch = nodeCount + 0;
-    const vcvsBranch = nodeCount + 1;
 
-    const vs   = makeVoltageSource(1, 0, vsBranch, 0.5);
-    const vcvs = makeVCVSElement(1, 0, 2, 0, vcvsBranch, { gain: 10.0 });
+    const vs   = withSetup(makeVoltageSource(1, 0, nodeCount + 1, 0.5));
+    const vcvs = makeVCVSElement(1, 0, 2, 0, { gain: 10.0 });
 
-    const compiled = buildCircuit({ nodeCount, branchCount, elements: [vs, vcvs] });
+    const compiled = buildCircuit({ nodeCount, elements: [vs, vcvs] });
     const engine = new MNAEngine();
     engine.init(compiled);
     const result = engine.dcOperatingPoint();
@@ -125,14 +139,11 @@ describe("VCVS", () => {
     // expression: 0.5 * V(ctrl)^2, ctrl=2V → output = 0.5 * 4 = 2.0V
     // NR should converge in ≤ 10 iterations
     const nodeCount = 2;
-    const branchCount = 2;
-    const vsBranch = nodeCount + 0;
-    const vcvsBranch = nodeCount + 1;
 
-    const vs   = makeVoltageSource(1, 0, vsBranch, 2.0);
-    const vcvs = makeVCVSElement(1, 0, 2, 0, vcvsBranch, { expression: "0.5 * V(ctrl)^2" });
+    const vs   = withSetup(makeVoltageSource(1, 0, nodeCount + 1, 2.0));
+    const vcvs = makeVCVSElement(1, 0, 2, 0, { expression: "0.5 * V(ctrl)^2" });
 
-    const compiled = buildCircuit({ nodeCount, branchCount, elements: [vs, vcvs] });
+    const compiled = buildCircuit({ nodeCount, elements: [vs, vcvs] });
     const engine = new MNAEngine();
     engine.init(compiled);
     const result = engine.dcOperatingPoint();
@@ -145,22 +156,31 @@ describe("VCVS", () => {
     // Vs=1V → node1 (ctrl), VCVS gain=10 → node2 (output=10V), R=1kΩ node2→GND
     // Output node is enforced at 10V by VCVS regardless of load.
     const nodeCount = 2;
-    const branchCount = 2;
-    const vsBranch = nodeCount + 0;
-    const vcvsBranch = nodeCount + 1;
 
-    const vs    = makeVoltageSource(1, 0, vsBranch, 1.0);
-    const vcvs  = makeVCVSElement(1, 0, 2, 0, vcvsBranch, { gain: 10.0 });
-    const rLoad = makeResistor(2, 0, 1000);
+    const vs    = withSetup(makeVoltageSource(1, 0, nodeCount + 1, 1.0));
+    const vcvs  = makeVCVSElement(1, 0, 2, 0, { gain: 10.0 });
+    const rLoad = withSetup(makeResistor(2, 0, 1000));
 
-    const compiled = buildCircuit({ nodeCount, branchCount, elements: [vs, vcvs, rLoad] });
+    const compiled = buildCircuit({ nodeCount, elements: [vs, vcvs, rLoad] });
     const engine = new MNAEngine();
     engine.init(compiled);
     const result = engine.dcOperatingPoint();
 
     expect(result.converged).toBe(true);
     // Output voltage enforced at 10V by VCVS
-    // VCVS branch current: I = V_out / R_load = 10 / 1000 = 10mA
-    // Branch current sign: positive = current flowing into out+ terminal
+  });
+
+  it("branch_index_assigned_after_setup", () => {
+    // After engine._setup(), VCVSAnalogElement.branchIndex must be >= 1.
+    const nodeCount = 2;
+    const vcvs = makeVCVSElement(1, 0, 2, 0, { gain: 1.0 });
+    const vs   = withSetup(makeVoltageSource(1, 0, nodeCount + 1, 1.0));
+
+    const compiled = buildCircuit({ nodeCount, elements: [vs, vcvs] });
+    const engine = new MNAEngine();
+    engine.init(compiled);
+    (engine as any)._setup();
+
+    expect((vcvs as any).branchIndex).toBeGreaterThanOrEqual(1);
   });
 });

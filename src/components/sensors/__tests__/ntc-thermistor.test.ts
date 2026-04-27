@@ -24,6 +24,31 @@ import type { AnalogElement } from "../../../solver/analog/element.js";
 import { makeSimpleCtx, makeLoadCtx } from "../../../solver/analog/__tests__/test-helpers.js";
 import { MODETRAN, MODEINITFLOAT } from "../../../solver/analog/ckt-mode.js";
 import type { SparseSolver as SparseSolverType } from "../../../solver/analog/sparse-solver.js";
+import type { SetupContext } from "../../../solver/analog/setup-context.js";
+
+// ---------------------------------------------------------------------------
+// Minimal setup context for calling element.setup() in unit tests.
+// ---------------------------------------------------------------------------
+
+function makeSetupCtx(solver: SparseSolverType): SetupContext {
+  let nodeCount = 1000;
+  let stateCount = 0;
+  return {
+    solver,
+    temp: 300.15,
+    nomTemp: 300.15,
+    copyNodesets: false,
+    makeVolt(_label: string, _suffix: string): number { return ++nodeCount; },
+    makeCur(_label: string, _suffix: string): number { return ++nodeCount; },
+    allocStates(n: number): number {
+      const off = stateCount;
+      stateCount += n;
+      return off;
+    },
+    findBranch(_label: string): number { return 0; },
+    findDevice(_label: string) { return null; },
+  };
+}
 
 // ---------------------------------------------------------------------------
 // Capture solver — records stamp tuples via the real allocElement/stampElement
@@ -70,12 +95,13 @@ function makeCaptureSolver(): {
 // ctx.dt and ctx.voltages; no solver stamps occur inside accept.
 // ---------------------------------------------------------------------------
 
-function makeAcceptCtx(_rhs: Float64Array, dt: number): import("../../../solver/analog/load-context.js").LoadContext {
+function makeAcceptCtx(rhs: Float64Array, dt: number): import("../../../solver/analog/load-context.js").LoadContext {
   return makeLoadCtx({
     solver: undefined as unknown as SparseSolverType,
     cktMode: MODETRAN | MODEINITFLOAT,
     dt,
     deltaOld: [dt, dt, dt, dt, dt, dt, dt],
+    rhs,
   });
 }
 
@@ -107,8 +133,14 @@ function makeNTC(overrides: Partial<{
     overrides.shB,
     overrides.shC,
   );
+  el._pinNodes = new Map([["pos", 1], ["neg", 2]]);
   Object.assign(el, { pinNodeIds: [1, 2], allNodeIds: [1, 2] });
   return el;
+}
+
+// Call setup() on an element using a capture solver so handles are valid.
+function setupNTC(el: NTCThermistorElement, solver: SparseSolverType): void {
+  el.setup(makeSetupCtx(solver));
 }
 
 // ---------------------------------------------------------------------------
@@ -262,6 +294,7 @@ describe("NTC", () => {
     it("stamps conductance between nodes", () => {
       const ntc = makeNTC({ r0: 10000, temperature: 298.15 });
       const { solver, stamps } = makeCaptureSolver();
+      setupNTC(ntc, solver);
       const ctx = makeSimpleCtx({
         solver,
         elements: [ntc as unknown as AnalogElement],
@@ -299,7 +332,7 @@ describe("NTC", () => {
     it("analogFactory creates an NTCThermistorElement", () => {
       const props = new PropertyBag();
       props.replaceModelParams(NTC_DEFAULTS);
-      const element = createNTCThermistorElement(new Map([["pos", 1], ["neg", 2]]), [], -1, props, () => 0);
+      const element = createNTCThermistorElement(new Map([["pos", 1], ["neg", 2]]), props, () => 0);
       expect(element).toBeInstanceOf(NTCThermistorElement);
       expect(element.isNonlinear).toBe(true);
     });
@@ -331,8 +364,6 @@ describe("ntc_load_dcop_parity", () => {
 
     const core = createNTCThermistorElement(
       new Map([["pos", 1], ["neg", 2]]),
-      [],
-      -1,
       props,
       () => 0,
     );
@@ -346,6 +377,9 @@ describe("ntc_load_dcop_parity", () => {
       matrixSize: 2,
       nodeCount: 2,
     });
+    // Call setup() directly — element is not poolBacked so makeSimpleCtx
+    // does not call it automatically. setup() must run before load().
+    (core as unknown as NTCThermistorElement).setup(makeSetupCtx(stampCtx.solver));
     analogElement.load(stampCtx.loadCtx);
     const stamps = stampCtx.solver.getCSCNonZeros();
 

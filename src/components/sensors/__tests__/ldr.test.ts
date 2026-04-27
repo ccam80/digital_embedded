@@ -18,6 +18,32 @@ import type { AnalogFactory } from "../../../core/registry.js";
 import type { AnalogElement } from "../../../solver/analog/element.js";
 import { makeSimpleCtx } from "../../../solver/analog/__tests__/test-helpers.js";
 import type { SparseSolver as SparseSolverType } from "../../../solver/analog/sparse-solver.js";
+import type { SetupContext } from "../../../solver/analog/setup-context.js";
+
+// ---------------------------------------------------------------------------
+// Minimal setup context for calling element.setup() in unit tests.
+// Allocates handles into a capture solver so load() can write through them.
+// ---------------------------------------------------------------------------
+
+function makeSetupCtx(solver: SparseSolverType): SetupContext {
+  let nodeCount = 1000;
+  let stateCount = 0;
+  return {
+    solver,
+    temp: 300.15,
+    nomTemp: 300.15,
+    copyNodesets: false,
+    makeVolt(_label: string, _suffix: string): number { return ++nodeCount; },
+    makeCur(_label: string, _suffix: string): number { return ++nodeCount; },
+    allocStates(n: number): number {
+      const off = stateCount;
+      stateCount += n;
+      return off;
+    },
+    findBranch(_label: string): number { return 0; },
+    findDevice(_label: string) { return null; },
+  };
+}
 
 // ---------------------------------------------------------------------------
 // Capture solver — records stamp tuples via the real allocElement/stampElement
@@ -76,8 +102,14 @@ function makeLDR(overrides: Partial<{
     overrides.gamma ?? 0.7,
     overrides.lux ?? 500,
   );
+  el._pinNodes = new Map([["pos", 1], ["neg", 2]]);
   Object.assign(el, { pinNodeIds: [1, 2], allNodeIds: [1, 2] });
   return el;
+}
+
+// Call setup() on an element using a capture solver so handles are valid.
+function setupLDR(el: LDRElement, solver: SparseSolverType): void {
+  el.setup(makeSetupCtx(solver));
 }
 
 // ---------------------------------------------------------------------------
@@ -150,6 +182,7 @@ describe("LDR", () => {
 
       ldr.setLux(2000);
       const { solver, stamps } = makeCaptureSolver();
+      setupLDR(ldr, solver);
       const ctx = makeSimpleCtx({
         solver,
         elements: [ldr as unknown as AnalogElement],
@@ -168,6 +201,7 @@ describe("LDR", () => {
     it("stamps conductance between the two nodes", () => {
       const ldr = makeLDR({ rDark: 1e6, luxRef: 1000, gamma: 0.7, lux: 1000 });
       const { solver, stamps } = makeCaptureSolver();
+      setupLDR(ldr, solver);
       const ctx = makeSimpleCtx({
         solver,
         elements: [ldr as unknown as AnalogElement],
@@ -190,6 +224,7 @@ describe("LDR", () => {
       const rDark = 1e6;
       const ldr = makeLDR({ rDark, lux: 0 });
       const { solver, stamps } = makeCaptureSolver();
+      setupLDR(ldr, solver);
       const ctx = makeSimpleCtx({
         solver,
         elements: [ldr as unknown as AnalogElement],
@@ -224,7 +259,7 @@ describe("LDR", () => {
     it("analogFactory creates an LDRElement", () => {
       const props = new PropertyBag();
       props.replaceModelParams(LDR_DEFAULTS);
-      const element = createLDRElement(new Map([["pos", 1], ["neg", 2]]), [], -1, props, () => 0);
+      const element = createLDRElement(new Map([["pos", 1], ["neg", 2]]), props, () => 0);
       expect(element).toBeInstanceOf(LDRElement);
       expect(element.isNonlinear).toBe(true);
       expect(element.isReactive).toBe(false);
@@ -258,8 +293,6 @@ describe("ldr_load_dcop_parity", () => {
 
     const core = createLDRElement(
       new Map([["pos", 1], ["neg", 2]]),
-      [],
-      -1,
       props,
       () => 0,
     );
@@ -273,6 +306,9 @@ describe("ldr_load_dcop_parity", () => {
       matrixSize: 2,
       nodeCount: 2,
     });
+    // Call setup() directly — element is not poolBacked so makeSimpleCtx
+    // does not call it automatically. setup() must run before load().
+    (core as unknown as LDRElement).setup(makeSetupCtx(stampCtx.solver));
     analogElement.load(stampCtx.loadCtx);
     const stamps = stampCtx.solver.getCSCNonZeros();
 

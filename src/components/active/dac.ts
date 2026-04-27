@@ -1,17 +1,19 @@
-﻿/**
+/**
  * DAC  N-bit Digital-to-Analog Converter.
  *
  * Converts an N-bit digital input code to an analog output voltage.
  * Digital inputs are read via DigitalInputPinModel threshold detection.
- * The analog output is modelled as a Norton equivalent (voltage source
- * with output resistance R_out):
  *
- *   V_out = V_ref Â· code / 2^N          (unipolar)
- *   V_out = V_ref Â· (2Â·code/2^N - 1)   (bipolar, symmetric about 0)
+ * Architecture: composite decomposing into 1× VCVS sub-element (output drive)
+ * + N× DigitalInputPinModel (D0..D{N-1}) + 1× DigitalInputPinModel (VREF loading).
+ * VCVS gain = code / 2^N (unipolar) is updated each load() from decoded inputs.
  *
- * Output Norton stamp:
- *   G_out = 1/R_out   diagonal at nOut
- *   I_out = V_out Â· G_out  RHS at nOut
+ *   V_out = V_ref · code / 2^N          (unipolar)
+ *   V_out = V_ref · (2·code/2^N - 1)   (bipolar, symmetric about 0)
+ *
+ * VCVS sub-element pin assignments:
+ *   ctrl+ = VREF,  ctrl- = GND,  out+ = OUT,  out- = GND
+ * The VCVS gain encodes code/2^N; output voltage = gain * (V_VREF - V_GND).
  *
  * Pin order (nodeIds):
  *   [D0, D1, ..., D(N-1), VREF, OUT, GND]
@@ -56,10 +58,10 @@ export const { paramDefs: DAC_PARAM_DEFS, defaults: DAC_DEFAULTS } = defineModel
   primary: {
     vIH: { default: 2.0, unit: "V", description: "Input HIGH threshold voltage" },
     vIL: { default: 0.8, unit: "V", description: "Input LOW threshold voltage" },
-    rOut: { default: 100, unit: "Î", description: "Output impedance" },
+    rOut: { default: 100, unit: "Ω", description: "Output impedance" },
   },
   secondary: {
-    rIn: { default: 1e7, unit: "Î", description: "Digital input impedance" },
+    rIn: { default: 1e7, unit: "Ω", description: "Digital input impedance" },
     cIn: { default: 5e-12, unit: "F", description: "Digital input capacitance" },
   },
 });
@@ -175,7 +177,6 @@ export class DACElement extends AbstractCircuitElement {
     ctx.drawRect(1, -1, 4, bits + 1, false);
 
     // Left-side leads: D0..D(N-1) pin tip (0,i)  body edge (1,i)
-    // (leads drawn as simple lines in COMPONENT color  no voltage coloring for digital inputs)
     for (let i = 0; i < bits; i++) {
       ctx.drawLine(0, i, 1, i);
     }
@@ -265,14 +266,13 @@ function createDACElement(
     rIn:  props.getModelParam<number>("rIn"),
     cIn:  props.getModelParam<number>("cIn"),
   };
-  const G_out  = 1 / Math.max(p.rOut, 1e-9);
 
   const maxCode = Math.pow(2, bits);
 
   // Node IDs from pinNodes map
-  const nVref = pinNodes.get("VREF") ?? 0; // VREF node (1-based)
-  const nOut  = pinNodes.get("OUT")  ?? 0; // OUT node (1-based)
-  // GND node  not directly stamped (MNA ground handled implicitly)
+  const nVref = pinNodes.get("VREF") ?? 0;
+  const nOut  = pinNodes.get("OUT")  ?? 0;
+  const nGnd  = pinNodes.get("GND")  ?? 0;
 
   // DigitalInputPinModel instances  one per bit
   const inputSpec = buildInputPinSpec(p);
@@ -291,35 +291,25 @@ function createDACElement(
     inputModels.push(model);
   }
 
-  // Current output voltage (updated each load() pass)
-  let _vOut = 0;
+  // VREF loading pin model
+  const vrefModel = new DigitalInputPinModel(inputSpec, true);
+  if (nVref > 0) vrefModel.init(nVref, 0);
 
-  function readNode(rhs: Float64Array, n: number): number {
-    return rhs[n];
-  }
+  // VCVS sub-element cached handles (vcvsset.c:53-58):
+  //   ctrl+(nVref), ctrl-(nGnd), out+(nOut), out-(nGnd)
+  //   branch row allocated by setup() via ctx.makeCur
+  let _vcvsBranch = -1;
+  let _hVCVSPosIbr  = -1;  // (nOut,   branch) — VCVSposIbrptr
+  let _hVCVSNegIbr  = -1;  // (nGnd,   branch) — VCVSnegIbrptr  (skip if nGnd=0)
+  let _hVCVSIbrPos  = -1;  // (branch, nOut)   — VCVSibrPosptr
+  let _hVCVSIbrNeg  = -1;  // (branch, nGnd)   — VCVSibrNegptr  (skip if nGnd=0)
+  let _hVCVSIbrContPos = -1; // (branch, nVref) — VCVSibrContPosptr
+  let _hVCVSIbrContNeg = -1; // (branch, nGnd)  — VCVSibrContNegptr  (skip if nGnd=0)
 
-  function computeOutputVoltage(rhs: Float64Array): number {
-    const vRefNow = readNode(rhs, nVref);
-
-    // Build digital code from input pin threshold detection
-    let code = 0;
-    for (let i = 0; i < bits; i++) {
-      const nD = nDigitalBits[i];
-      const vD = readNode(rhs, nD);
-      const logic = inputModels[i].readLogicLevel(vD);
-      // Treat undefined (indeterminate) as LOW for DAC conversion
-      const bit = logic === true ? 1 : 0;
-      code |= (bit << i);
-    }
-
-    if (bipolar) {
-      return vRefNow * (2 * code / maxCode - 1);
-    } else {
-      return vRefNow * code / maxCode;
-    }
-  }
-
-  const childElements: readonly AnalogCapacitorElement[] = collectPinModelChildren(inputModels);
+  const childElements: readonly AnalogCapacitorElement[] = collectPinModelChildren([
+    ...inputModels,
+    vrefModel,
+  ]);
   const stateSize = childElements.reduce((s, c) => s + c.stateSize, 0);
 
   return {
@@ -330,8 +320,47 @@ function createDACElement(
     _stateBase: -1,
     _pinNodes: new Map(pinNodes),
 
-    setup(_ctx: SetupContext): void {
-      throw new Error(`PB-DAC not yet migrated`);
+    setup(ctx: SetupContext): void {
+      // Allocate VCVS branch row (vcvsset.c:41-44 guard pattern)
+      if (_vcvsBranch === -1) {
+        _vcvsBranch = ctx.makeCur("DAC_vcvs1", "branch");
+      }
+      this.branchIndex = _vcvsBranch;
+
+      // VCVS TSTALLOC sequence (vcvsset.c:53-58):
+      //   ctrl+(nVref), ctrl-(nGnd), out+(nOut), out-(nGnd)
+      // Per A6.6 ground-node guard policy for composite sub-elements that may
+      // receive node 0 from parent's pinNodeIds reassignment.
+      if (nOut > 0) {
+        _hVCVSPosIbr = ctx.solver.allocElement(nOut,        _vcvsBranch);  // (1) VCVSposIbrptr
+      }
+      if (nGnd > 0) {
+        _hVCVSNegIbr = ctx.solver.allocElement(nGnd,        _vcvsBranch);  // (2) VCVSnegIbrptr
+      }
+      if (nOut > 0) {
+        _hVCVSIbrPos = ctx.solver.allocElement(_vcvsBranch, nOut);          // (3) VCVSibrPosptr
+      }
+      if (nGnd > 0) {
+        _hVCVSIbrNeg = ctx.solver.allocElement(_vcvsBranch, nGnd);          // (4) VCVSibrNegptr
+      }
+      if (nVref > 0) {
+        _hVCVSIbrContPos = ctx.solver.allocElement(_vcvsBranch, nVref);     // (5) VCVSibrContPosptr
+      }
+      if (nGnd > 0) {
+        _hVCVSIbrContNeg = ctx.solver.allocElement(_vcvsBranch, nGnd);      // (6) VCVSibrContNegptr
+      }
+
+      // Digital input pin models — each allocates their own handle entries
+      for (let i = 0; i < bits; i++) {
+        const nD = nDigitalBits[i];
+        if (nD > 0) inputModels[i].setup(ctx);
+      }
+      if (nVref > 0) vrefModel.setup(ctx);
+
+      // Forward to CAP children of pin models (transient capacitance)
+      for (const child of childElements) {
+        child.setup(ctx);
+      }
     },
 
     poolBacked: true as const,
@@ -350,34 +379,64 @@ function createDACElement(
     initState(_pool: StatePoolRef): void {
       this.s0 = _pool.state0; this.s1 = _pool.state1; this.s2 = _pool.state2; this.s3 = _pool.state3;
       this.s4 = _pool.state4; this.s5 = _pool.state5; this.s6 = _pool.state6; this.s7 = _pool.state7;
-      let offset = this.stateBaseOffset;
+      // Child cap elements have their stateBaseOffset set during setup() via
+      // ctx.allocStates(). Just wire them to the pool — do not override offsets.
       for (const child of childElements) {
-        child.stateBaseOffset = offset;
         child.initState(_pool);
-        offset += child.stateSize;
       }
     },
 
     load(ctx: LoadContext): void {
-      const solver = ctx.solver;
       const voltages = ctx.rhsOld;
+      const nGndV = nGnd > 0 ? voltages[nGnd] : 0;
 
-      _vOut = computeOutputVoltage(voltages);
-
-      // Stamp G_out from OUT to GND (Norton output resistance)
-      if (nOut > 0) {
-        solver.stampElement(solver.allocElement(nOut, nOut), G_out);
-        // Norton current source: I = V_out Â· G_out injected at OUT node
-        stampRHS(ctx.rhs,nOut, _vOut * G_out);
-      }
-      // Stamp input loading for each digital input pin
+      // Decode digital inputs using threshold comparison
+      let code = 0;
       for (let i = 0; i < bits; i++) {
-        if (nDigitalBits[i] > 0) {
-          inputModels[i].load(ctx);
+        const nD = nDigitalBits[i];
+        if (nD > 0) {
+          const vD = voltages[nD];
+          if (vD >= p.vIH) code |= (1 << i);
         }
       }
 
+      // Compute VCVS gain = code / 2^N (unipolar) or (2*code/2^N - 1) (bipolar)
+      const gain = bipolar
+        ? (2 * code / maxCode - 1)
+        : code / maxCode;
+
+      // Stamp VCVS branch equation using cached handles (vcvsset.c:53-58):
+      // Branch equation: V_out+ - V_out- - gain*(V_ctrl+ - V_ctrl-) = 0
+      // V_out+ = nOut,  V_out- = nGnd,  V_ctrl+ = nVref,  V_ctrl- = nGnd
+      const solver = ctx.solver;
+
+      // B sub-matrix (incidence: output port KCL rows)
+      if (_hVCVSPosIbr !== -1) solver.stampElement(_hVCVSPosIbr,  1);  // B[nOut, branch]
+      if (_hVCVSNegIbr !== -1) solver.stampElement(_hVCVSNegIbr, -1);  // B[nGnd, branch]
+
+      // C sub-matrix (output branch constraint equation)
+      if (_hVCVSIbrPos !== -1) solver.stampElement(_hVCVSIbrPos,   1); // C[branch, nOut]
+      if (_hVCVSIbrNeg !== -1) solver.stampElement(_hVCVSIbrNeg,  -1); // C[branch, nGnd]
+
+      // Control port Jacobian (gain terms)
+      if (_hVCVSIbrContPos !== -1) solver.stampElement(_hVCVSIbrContPos, -gain); // C[branch, nVref]
+      if (_hVCVSIbrContNeg !== -1) solver.stampElement(_hVCVSIbrContNeg,  gain); // C[branch, nGnd]
+
+      // RHS: linearized NR constant = f(Vctrl0) - f'*Vctrl0 = 0 for linear VCVS
+      // For a linear VCVS: f(Vctrl) = gain*Vctrl, f'=gain, so RHS term = 0
+      // No RHS stamp needed for linear VCVS (value - derivative * ctrlValue = 0)
+
+      // Forward to input pin models (resistive loading stamps)
+      for (let i = 0; i < bits; i++) {
+        const nD = nDigitalBits[i];
+        if (nD > 0) inputModels[i].load(ctx);
+      }
+      if (nVref > 0) vrefModel.load(ctx);
+
+      // CAP children
       for (const child of childElements) { child.load(ctx); }
+
+      void nGndV; // used only for clarity; nGnd is used directly in stamps
     },
 
     accept(_ctx: LoadContext, _simTime: number, _addBreakpoint: (t: number) => void): void {},
@@ -387,14 +446,15 @@ function createDACElement(
 
       const rIn = p.rIn;
       for (let i = 0; i < bits; i++) {
-        const v = readNode(rhs, nDigitalBits[i]);
+        const v = nDigitalBits[i] > 0 ? rhs[nDigitalBits[i]] : 0;
         currents.push(nDigitalBits[i] > 0 ? v / rIn : 0);
       }
 
       currents.push(0); // VREF
 
-      const vOut = readNode(rhs, nOut);
-      currents.push(nOut > 0 ? (vOut - _vOut) * G_out : 0);
+      // OUT: branch current is at branch row index
+      const iOut = _vcvsBranch > 0 ? rhs[_vcvsBranch] : 0;
+      currents.push(iOut);
 
       currents.push(0); // GND
 
@@ -407,6 +467,7 @@ function createDACElement(
         // Forward input threshold/impedance changes to all pin models
         if (key === "vIH" || key === "vIL" || key === "rIn" || key === "cIn") {
           for (const m of inputModels) m.setParam(key, value);
+          vrefModel.setParam(key, value);
         }
       }
     },
@@ -433,7 +494,7 @@ const DAC_PROPERTY_DEFS: PropertyDefinition[] = [
     type: PropertyType.INT,
     label: "Settling time (s)",
     defaultValue: 1e-6,
-    description: "Settling time to final value after code change. Default 1 Âµs.",
+    description: "Settling time to final value after code change. Default 1 µs.",
   },
   {
     key: "label",
@@ -487,6 +548,7 @@ export const DACDefinition: ComponentDefinition = {
         createDACElement(pinNodes, props, false),
       paramDefs: DAC_PARAM_DEFS,
       params: DAC_DEFAULTS,
+      mayCreateInternalNodes: false,
     },
     "bipolar": {
       kind: "inline",
@@ -494,6 +556,7 @@ export const DACDefinition: ComponentDefinition = {
         createDACElement(pinNodes, props, true),
       paramDefs: DAC_PARAM_DEFS,
       params: DAC_DEFAULTS,
+      mayCreateInternalNodes: false,
     },
   },
   defaultModel: "unipolar",

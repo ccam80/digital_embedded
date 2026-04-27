@@ -29,7 +29,7 @@ import {
 } from "../../core/registry.js";
 import type { IntegrationMethod, LoadContext } from "../../solver/analog/element.js";
 import { NGSPICE_LOAD_ORDER } from "../../solver/analog/element.js";
-import { stampG, stampRHS } from "../../solver/analog/stamp-helpers.js";
+import { stampRHS } from "../../solver/analog/stamp-helpers.js";
 import { pnjlim, fetlim } from "../../solver/analog/newton-raphson.js";
 import { cktTerr } from "../../solver/analog/ckt-terr.js";
 import type { LteParams } from "../../solver/analog/ckt-terr.js";
@@ -272,6 +272,7 @@ export function computeJfetTempParams(p: JfetParams): JfetTempParams {
 export function createNJfetElement(
   pinNodes: ReadonlyMap<string, number>,
   props: PropertyBag,
+  _getTime: () => number = () => 0,
 ) {
   // N-channel polarity literal (jfetdefs.h:234 `#define NJF 1`).
   const polarity: 1 = 1;
@@ -400,8 +401,6 @@ export function createNJfetElement(
       const m = params.M;
 
       const nodeG = this._pinNodes.get("G")!;
-      const nodeD = this._pinNodes.get("D")!;
-      const nodeS = this._pinNodes.get("S")!;
 
       // jfetload.c:95-98: dc model parameters (area-scaled).
       const beta = tp.tBeta * params.AREA;
@@ -484,11 +483,11 @@ export function createNJfetElement(
         //   vgs = type * (rhsOld[gate] - rhsOld[sourcePrime]);
         //   vgd = type * (rhsOld[gate] - rhsOld[drainPrime]);
         // N-channel polarity = +1  raw difference.
-        const vG = voltages[nodeG];
-        const vD = voltages[nodeD];
-        const vS = voltages[nodeS];
-        const vgsRaw = polarity * (vG - vS);
-        const vgdRaw = polarity * (vG - vD);
+        const vG  = voltages[nodeG];
+        const vSP = voltages[this._sourcePrimeNode];
+        const vDP = voltages[this._drainPrimeNode];
+        const vgsRaw = polarity * (vG - vSP);
+        const vgdRaw = polarity * (vG - vDP);
         vgs = vgsRaw;
         vgd = vgdRaw;
 
@@ -797,31 +796,39 @@ export function createNJfetElement(
       s0[base + SLOT_GGD] = ggd;
 
       // jfetload.c:521-532: RHS stamps (polarity = JFETtype).
+      // RHS entries go to gate, drainPrime, sourcePrime (not external D/S when
+      // internal nodes exist).
       const ceqgd = polarity * (cgd - ggd * vgd);
       const ceqgs = polarity * ((cg - cgd) - ggs * vgs);
       const cdreq = polarity * ((cd + cgd) - gds * vds - gm * vgs);
 
-      stampRHS(ctx.rhs, nodeG, m * (-ceqgs - ceqgd));
-      stampRHS(ctx.rhs, nodeD, m * (-cdreq + ceqgd));
-      stampRHS(ctx.rhs, nodeS, m * (cdreq + ceqgs));
+      const sp = this._sourcePrimeNode;
+      const dp = this._drainPrimeNode;
 
-      // jfetload.c:534-550: Y-matrix stamps. With no RD/RS internal nodes,
-      // the "prime" nodes collapse to the external pins.
-      // jfetload.c:536-544: off-diagonal + prime-node stamps (cross terms).
-      stampG(solver, nodeG, nodeG, m * (ggd + ggs));
-      stampG(solver, nodeG, nodeD, m * (-ggd));
-      stampG(solver, nodeG, nodeS, m * (-ggs));
-      stampG(solver, nodeD, nodeG, m * (gm - ggd));
-      stampG(solver, nodeD, nodeD, m * (gdpr + gds + ggd));
-      stampG(solver, nodeD, nodeS, m * (-gds - gm));
-      stampG(solver, nodeS, nodeG, m * (-ggs - gm));
-      stampG(solver, nodeS, nodeD, m * (-gds));
-      stampG(solver, nodeS, nodeS, m * (gspr + gds + gm + ggs));
-      // jfetload.c:546,548: external drain/source self-stamps (gdpr/gspr).
-      // J-W3-3: collapsed primeâ†"external nodes  2 additional self-stamps.
-      // ngspice: JFETdrainDrainPtr += m*(gdpr); JFETsourceSourcePtr += m*(gspr).
-      if (gdpr > 0) stampG(solver, nodeD, nodeD, m * gdpr);
-      if (gspr > 0) stampG(solver, nodeS, nodeS, m * gspr);
+      stampRHS(ctx.rhs, nodeG, m * (-ceqgs - ceqgd));
+      stampRHS(ctx.rhs, dp,    m * (-cdreq + ceqgd));
+      stampRHS(ctx.rhs, sp,    m * (cdreq + ceqgs));
+
+      // jfetload.c:534-550: Y-matrix stamps via cached TSTALLOC handles.
+      // jfetload.c:536-544: off-diagonal + prime-node cross terms.
+      solver.stampElement(this._hGG,   m * (ggd + ggs));          // JFETgateGatePtr
+      solver.stampElement(this._hGDP,  m * (-ggd));               // JFETgateDrainPrimePtr
+      solver.stampElement(this._hGSP,  m * (-ggs));               // JFETgateSourcePrimePtr
+      solver.stampElement(this._hDPG,  m * (gm - ggd));           // JFETdrainPrimeGatePtr
+      solver.stampElement(this._hDPDP, m * (gdpr + gds + ggd));   // JFETdrainPrimeDrainPrimePtr
+      solver.stampElement(this._hDPSP, m * (-gds - gm));          // JFETdrainPrimeSourcePrimePtr
+      solver.stampElement(this._hSPG,  m * (-ggs - gm));          // JFETsourcePrimeGatePtr
+      solver.stampElement(this._hSPDP, m * (-gds));               // JFETsourcePrimeDrainPrimePtr
+      solver.stampElement(this._hSPSP, m * (gspr + gds + gm + ggs)); // JFETsourcePrimeSourcePrimePtr
+      // jfetload.c:546-550: ohmic resistance stamps (drain/source series Rs).
+      // JFETdrainDrainPrimePtr, JFETdrainPrimeDrainPtr, JFETdrainDrainPtr.
+      solver.stampElement(this._hDDP,  m * (-gdpr));              // JFETdrainDrainPrimePtr
+      solver.stampElement(this._hDPD,  m * (-gdpr));              // JFETdrainPrimeDrainPtr
+      solver.stampElement(this._hDD,   m * gdpr);                 // JFETdrainDrainPtr
+      // JFETsourceSourcePrimePtr, JFETsourcePrimeSourcePtr, JFETsourceSourcePtr.
+      solver.stampElement(this._hSSP,  m * (-gspr));              // JFETsourceSourcePrimePtr
+      solver.stampElement(this._hSPS,  m * (-gspr));              // JFETsourcePrimeSourcePtr
+      solver.stampElement(this._hSS,   m * gspr);                 // JFETsourceSourcePtr
     },
 
     getPinCurrents(_rhs: Float64Array): number[] {
@@ -1033,6 +1040,7 @@ export const NJfetDefinition: ComponentDefinition = {
       paramDefs: NJFET_PARAM_DEFS,
       params: NJFET_PARAM_DEFAULTS,
       ngspiceNodeMap: { G: "gate", S: "source", D: "drain" },
+      mayCreateInternalNodes: true,
     },
   },
   defaultModel: "spice",

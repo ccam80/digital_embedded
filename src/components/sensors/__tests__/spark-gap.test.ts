@@ -21,6 +21,31 @@ import { makeSimpleCtx, makeLoadCtx } from "../../../solver/analog/__tests__/tes
 import { MODETRAN, MODEINITFLOAT, MODEDCOP } from "../../../solver/analog/ckt-mode.js";
 import type { SparseSolver as SparseSolverType } from "../../../solver/analog/sparse-solver.js";
 import type { LoadContext } from "../../../solver/analog/load-context.js";
+import type { SetupContext } from "../../../solver/analog/setup-context.js";
+
+// ---------------------------------------------------------------------------
+// Minimal setup context for calling element.setup() in unit tests.
+// ---------------------------------------------------------------------------
+
+function makeSetupCtx(solver: SparseSolverType): SetupContext {
+  let nodeCount = 1000;
+  let stateCount = 0;
+  return {
+    solver,
+    temp: 300.15,
+    nomTemp: 300.15,
+    copyNodesets: false,
+    makeVolt(_label: string, _suffix: string): number { return ++nodeCount; },
+    makeCur(_label: string, _suffix: string): number { return ++nodeCount; },
+    allocStates(n: number): number {
+      const off = stateCount;
+      stateCount += n;
+      return off;
+    },
+    findBranch(_label: string): number { return 0; },
+    findDevice(_label: string) { return null; },
+  };
+}
 
 // ---------------------------------------------------------------------------
 // Capture solver — records stamp tuples via the real allocElement/stampElement
@@ -92,8 +117,14 @@ function makeSparkGap(overrides: Partial<{
     overrides.rOff ?? 1e10,
     overrides.iHold ?? 0.01,
   );
+  el._pinNodes = new Map([["pos", 1], ["neg", 2]]);
   Object.assign(el, { pinNodeIds: [1, 2], allNodeIds: [1, 2] });
   return el;
+}
+
+// Call setup() on an element using a capture solver so handles are valid.
+function setupSparkGap(el: SparkGapElement, solver: SparseSolverType): void {
+  el.setup(makeSetupCtx(solver));
 }
 
 /**
@@ -275,6 +306,7 @@ describe("SparkGap", () => {
       applyVoltage(gap, 100);
 
       const { solver, stamps } = makeCaptureSolver();
+      setupSparkGap(gap, solver);
       const ctx = makeLoadCtx({
         solver,
         cktMode: MODEDCOP | MODEINITFLOAT,
@@ -298,6 +330,7 @@ describe("SparkGap", () => {
       // Blocking state conductance
       applyVoltage(gap, 100);
       const { solver: solver1, stamps: stamps1 } = makeCaptureSolver();
+      setupSparkGap(gap, solver1);
       const ctx1 = makeLoadCtx({
         solver: solver1,
         cktMode: MODEDCOP | MODEINITFLOAT,
@@ -306,15 +339,17 @@ describe("SparkGap", () => {
       gap.load(ctx1);
       const G_off = stamps1.find((s) => s.row === 1 && s.col === 1)!.value;
 
-      // Conducting state conductance
-      applyVoltage(gap, 1500);
+      // Conducting state conductance — need new element to get fresh handles
+      const gap2 = makeSparkGap({ vBreakdown: 1000, rOn: 5, rOff: 1e10 });
+      applyVoltage(gap2, 1500);
       const { solver: solver2, stamps: stamps2 } = makeCaptureSolver();
+      setupSparkGap(gap2, solver2);
       const ctx2 = makeLoadCtx({
         solver: solver2,
         cktMode: MODEDCOP | MODEINITFLOAT,
         dt: 0,
       });
-      gap.load(ctx2);
+      gap2.load(ctx2);
       const G_on = stamps2.find((s) => s.row === 1 && s.col === 1)!.value;
 
       expect(G_on).toBeGreaterThan(G_off);
@@ -339,7 +374,7 @@ describe("SparkGap", () => {
     it("analogFactory creates a SparkGapElement", () => {
       const props = new PropertyBag();
       props.replaceModelParams(SPARK_GAP_DEFAULTS);
-      const element = createSparkGapElement(new Map([["pos", 1], ["neg", 2]]), [], -1, props, () => 0);
+      const element = createSparkGapElement(new Map([["pos", 1], ["neg", 2]]), props, () => 0);
       expect(element).toBeInstanceOf(SparkGapElement);
       expect(element.isNonlinear).toBe(true);
       expect(element.isReactive).toBe(false);
@@ -374,8 +409,6 @@ describe("spark_gap_load_dcop_parity", () => {
 
     const core = createSparkGapElement(
       new Map([["pos", 1], ["neg", 2]]),
-      [],
-      -1,
       props,
       () => 0,
     );
@@ -392,6 +425,9 @@ describe("spark_gap_load_dcop_parity", () => {
       nodeCount: 2,
     });
     stampCtx.solver._initStructure();
+    // Call setup() directly — element is not poolBacked so makeSimpleCtx
+    // does not call it automatically. setup() must run before load().
+    (core as unknown as SparkGapElement).setup(makeSetupCtx(stampCtx.solver));
     analogElement.load(stampCtx.loadCtx);
     const stamps = stampCtx.solver.getCSCNonZeros();
 

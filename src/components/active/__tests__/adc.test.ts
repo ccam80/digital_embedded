@@ -110,7 +110,7 @@ function makeAdc(
   ]);
   bag.replaceModelParams({ ...ADC_DEFAULTS, ...paramOverrides });
   return getFactory(ADCDefinition.modelRegistry![modelKey]!)(
-    makeNodeIds(), [], -1, bag, () => 0,
+    makeNodeIds(), bag, () => 0,
   ) as ADCElementExt;
 }
 
@@ -340,23 +340,48 @@ function makeAdcParityCtx(rhs: Float64Array, solver: SparseSolverType): LoadCont
 describe("ADC parity (C4.5)", () => {
   it("adc_load_dcop_parity", () => {
     // 8-bit unipolar-instant ADC. Nodes as defined at top of file.
+    // Real path: setup() must be called first to allocate matrix handles,
+    // then load() uses those handles.
     const props = new PropertyBag([["bits", BITS]]);
     props.replaceModelParams({ ...ADC_DEFAULTS });
     const adc = getFactory(ADCDefinition.modelRegistry!["unipolar-instant"]!)(
-      makeNodeIds(), [], -1, props, () => 0,
+      makeNodeIds(), props, () => 0,
     );
+
+    const { solver, stamps, rhs } = makeAdcCaptureSolver();
+
+    // Step 1: Run setup() to allocate matrix handles via the capture solver.
+    // SetupContext mirrors what MNAEngine._buildSetupContext() provides.
+    let stateCount = 0;
+    let nodeCount = 1000;
+    const setupCtx = {
+      solver,
+      temp: 300.15,
+      nomTemp: 300.15,
+      copyNodesets: false,
+      makeVolt(_label: string, _suffix: string): number { return ++nodeCount; },
+      makeCur(_label: string, _suffix: string): number { return ++nodeCount; },
+      allocStates(n: number): number { const off = stateCount; stateCount += n; return off; },
+      findBranch(_label: string): number { return 0; },
+      findDevice(_label: string) { return null; },
+    };
+    (adc as unknown as { setup: (ctx: typeof setupCtx) => void }).setup(setupCtx);
+
     initElement(adc as unknown as import("../../../solver/analog/element.js").ReactiveAnalogElement);
+
+    // Step 2: Reset stamps accumulated during setup() so we only see load() stamps.
+    stamps.length = 0;
 
     // Canonical: VIN=2.5V, CLK=0V (no edge), VREF=5V, all others 0.
     const voltages = makeVoltages({ [N_VIN]: 2.5, [N_CLK]: 0.0 });
 
-    const { solver, stamps, rhs } = makeAdcCaptureSolver();
     const ctx = makeAdcParityCtx(voltages, solver);
     // Wire the owned rhs buffer into ctx so stampRHS(ctx.rhs, ...) writes to it.
     (ctx as unknown as { rhs: Float64Array }).rhs = rhs;
     adc.load(ctx);
 
     // Closed-form reference:
+    // Pin models stamp at 1-based MNA node IDs (ngspice convention: 0=ground sentinel).
     const NGSPICE_RIN  = ADC_DEFAULTS.rIn;
     const NGSPICE_ROUT = ADC_DEFAULTS.rOut;
     const NGSPICE_GIN  = 1 / NGSPICE_RIN;
@@ -368,19 +393,22 @@ describe("ADC parity (C4.5)", () => {
       stamps.filter((s) => s.row === row && s.col === col)
             .reduce((a, s) => a + s.value, 0);
 
-    // Analog input loading: VIN and CLK each stamp 1/rIn on their diagonal
-    expect(sumAt(N_VIN - 1, N_VIN - 1)).toBe(NGSPICE_GIN);
-    expect(sumAt(N_CLK - 1, N_CLK - 1)).toBe(NGSPICE_GIN);
+    // Analog input loading: VIN and CLK each stamp 1/rIn on their diagonal.
+    // Stamps use 1-based node IDs (N_VIN=1, N_CLK=2).
+    expect(sumAt(N_VIN, N_VIN)).toBe(NGSPICE_GIN);
+    expect(sumAt(N_CLK, N_CLK)).toBe(NGSPICE_GIN);
 
-    // EOC output pin (initially low): 1/rOut diag + vOL*G_out RHS
-    expect(sumAt(N_EOC - 1, N_EOC - 1)).toBe(NGSPICE_GOUT);
-    expect(rhs[N_EOC - 1]).toBe(NGSPICE_RHS_LOW);
+    // EOC output pin (initially low): 1/rOut diag + vOL*G_out RHS.
+    // 1-based: N_EOC=4.
+    expect(sumAt(N_EOC, N_EOC)).toBe(NGSPICE_GOUT);
+    expect(rhs[N_EOC]).toBe(NGSPICE_RHS_LOW);
 
-    // D0..D7 output pins (all initially low): 1/rOut diag + vOL*G_out RHS per bit
+    // D0..D7 output pins (all initially low): 1/rOut diag + vOL*G_out RHS per bit.
+    // 1-based: D0=N_D0=5, D1=6, ..., D7=12.
     for (let i = 0; i < BITS; i++) {
-      const idx = N_D0 + i - 1;
-      expect(sumAt(idx, idx)).toBe(NGSPICE_GOUT);
-      expect(rhs[idx]).toBe(NGSPICE_RHS_LOW);
+      const nodeId = N_D0 + i;
+      expect(sumAt(nodeId, nodeId)).toBe(NGSPICE_GOUT);
+      expect(rhs[nodeId]).toBe(NGSPICE_RHS_LOW);
     }
   });
 });

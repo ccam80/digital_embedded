@@ -56,12 +56,29 @@ import type { LoadContext } from "../../../solver/analog/load-context.js";
 import { MODEDCOP, MODEINITFLOAT } from "../../../solver/analog/ckt-mode.js";
 
 // ---------------------------------------------------------------------------
-// withState  allocate a StatePool and call initState on the element
+// withState  allocate a StatePool and call initState on the element.
+// Also calls setup() so that TSTALLOC handles are valid for load().
 // ---------------------------------------------------------------------------
 
-function withState(element: AnalogElementCore): ReactiveAnalogElement {
+function withState(element: AnalogElementCore, solver?: SparseSolver): ReactiveAnalogElement {
   const re = element as ReactiveAnalogElement;
   re.stateBaseOffset = 0;
+  if (solver && typeof (re as any).setup === "function") {
+    let stateCount = 0;
+    let nodeCount = 1000;
+    const ctx = {
+      solver,
+      temp: 300.15,
+      nomTemp: 300.15,
+      copyNodesets: false,
+      makeVolt(_l: string, _s: string): number { return ++nodeCount; },
+      makeCur(_l: string, _s: string): number { return ++nodeCount; },
+      allocStates(n: number): number { const off = stateCount; stateCount += n; return off; },
+      findBranch(_l: string): number { return 0; },
+      findDevice(_l: string) { return null; },
+    };
+    (re as any).setup(ctx);
+  }
   const pool = new StatePool(re.stateSize);
   re.initState(pool);
   return re;
@@ -123,9 +140,8 @@ const PJFET_PARAMS = {
 // DC-OP LoadContext helper.
 // ---------------------------------------------------------------------------
 
-function makeDcOpCtx(rhsOld: Float64Array, matrixSize: number): LoadContext {
-  const solver = new SparseSolver();
-  solver._initStructure();
+function makeDcOpCtx(rhsOld: Float64Array, matrixSize: number, existingSolver?: SparseSolver): LoadContext {
+  const solver = existingSolver ?? (() => { const s = new SparseSolver(); s._initStructure(); return s; })();
   return {
     cktMode: MODEDCOP | MODEINITFLOAT,
     solver,
@@ -196,7 +212,10 @@ describe("PJFET", () => {
     // Node map: G=node1 (col/row 0), D=node2 (col/row 1), S=node3 (col/row 2).
     const propsObj = createTestPropertyBag();
     propsObj.replaceModelParams(PJFET_PARAMS);
-    const core = withState(createPJfetElement(new Map([["G", 1], ["D", 2], ["S", 3]]), [], -1, propsObj));
+    // Create a persistent solver for setup+load so TSTALLOC handles remain valid.
+    const sharedSolver = new SparseSolver();
+    sharedSolver._initStructure();
+    const core = withState(createPJfetElement(new Map([["G", 1], ["D", 2], ["S", 3]]), propsObj), sharedSolver);
     const element = withNodeIds(core, [1, 2, 3]);
 
     // 1-based: slot 0=ground sentinel=0, slot 1=V(G)=2, slot 2=V(D)=0, slot 3=V(S)=5
@@ -207,10 +226,10 @@ describe("PJFET", () => {
     voltages[3] = 5; // V(S)
 
     for (let i = 0; i < 50; i++) {
-      element.load(makeDcOpCtx(voltages, 4));
+      element.load(makeDcOpCtx(voltages, 4, sharedSolver));
     }
 
-    const ctx = makeDcOpCtx(voltages, 4);
+    const ctx = makeDcOpCtx(voltages, 4, sharedSolver);
     element.load(ctx);
     const entries = ctx.solver.getCSCNonZeros();
 
@@ -274,7 +293,7 @@ describe("NR", () => {
 
     const propsObj = createTestPropertyBag();
     propsObj.replaceModelParams(NJFET_PARAMS);
-    const jfet = withState(withNodeIds(createNJfetElement(new Map([["G", 3], ["S", 0], ["D", 1]]), [], -1, propsObj), [3, 0, 1]));
+    const jfet = withNodeIds(createNJfetElement(new Map([["G", 3], ["S", 0], ["D", 1]]), propsObj) as unknown as AnalogElementCore, [3, 0, 1]) as unknown as ReactiveAnalogElement;
     const rd = makeResistorElement(2, 1, 10000);
     const vdd = makeDcVoltageSource(2, 0, 3, 10.0) as unknown as AnalogElement;
     const vgate = makeDcVoltageSource(3, 0, 4, 0.0) as unknown as AnalogElement;
@@ -488,36 +507,38 @@ describe("NJFET TEMP", () => {
     // 1-based: slot 0=ground sentinel, slot 1=V(G)=1.5, slot 2=V(D)=0.
     const rhsOld = new Float64Array([0, 1.5, 0]);
 
-    function makeCtx(): LoadContext {
+    function createAndInit(overrides: Record<string, number> = {}): { element: ReactiveAnalogElement; pool: StatePool; solver: SparseSolver } {
+      const propsObj = makeNjfetProps(overrides);
+      const core = createNJfetElement(new Map([["G", 1], ["S", 0], ["D", 2]]), propsObj) as unknown as ReactiveAnalogElement;
+      core.stateBaseOffset = 0;
       const solver = new SparseSolver();
       solver._initStructure();
-      return makeLoadCtx({
-        cktMode: MODEDCOP | MODEINITFLOAT,
+      let stateCount = 0;
+      let nodeCount = 1000;
+      const setupCtx = {
         solver,
-        rhsOld,
-        rhs: new Float64Array(matrixSize),
-        dt: 0,
-      });
-    }
-
-    function createAndInit(overrides: Record<string, number> = {}): { element: ReactiveAnalogElement; pool: StatePool } {
-      const propsObj = makeNjfetProps(overrides);
-      const core = createNJfetElement(new Map([["G", 1], ["S", 0], ["D", 2]]), [], -1, propsObj) as unknown as ReactiveAnalogElement;
-      core.stateBaseOffset = 0;
+        temp: 300.15, nomTemp: 300.15, copyNodesets: false,
+        makeVolt(_l: string, _s: string): number { return ++nodeCount; },
+        makeCur(_l: string, _s: string): number { return ++nodeCount; },
+        allocStates(n: number): number { const off = stateCount; stateCount += n; return off; },
+        findBranch(_l: string): number { return 0; },
+        findDevice(_l: string) { return null; },
+      };
+      (core as any).setup(setupCtx);
       const pool = new StatePool(core.stateSize);
       core.initState(pool);
-      return { element: core, pool };
+      return { element: core, pool, solver };
     }
 
     // Element at 300.15K
-    const { element: el300, pool: pool300 } = createAndInit({ TEMP: 300.15 });
-    el300.load(makeCtx());
+    const { element: el300, pool: pool300, solver: solver300 } = createAndInit({ TEMP: 300.15 });
+    el300.load(makeLoadCtx({ cktMode: MODEDCOP | MODEINITFLOAT, solver: solver300, rhsOld, rhs: new Float64Array(matrixSize), dt: 0 }));
     const vgs300 = pool300.state0[SLOT_VGS];
 
     // Element at 300.15K, setParam to 400K before load
-    const { element: el400, pool: pool400 } = createAndInit({ TEMP: 300.15 });
+    const { element: el400, pool: pool400, solver: solver400 } = createAndInit({ TEMP: 300.15 });
     (el400 as unknown as { setParam: (k: string, v: number) => void }).setParam("TEMP", 400);
-    el400.load(makeCtx());
+    el400.load(makeLoadCtx({ cktMode: MODEDCOP | MODEINITFLOAT, solver: solver400, rhsOld, rhs: new Float64Array(matrixSize), dt: 0 }));
     const vgs400 = pool400.state0[SLOT_VGS];
 
     expect(vgs300).not.toBe(vgs400);
@@ -565,38 +586,40 @@ describe("PJFET TEMP", () => {
     // 1-based: slot 0=ground sentinel, slot 1=V(G)=-1.5, slot 2=V(D)=0.
     const rhsOld = new Float64Array([0, -1.5, 0]);
 
-    function makeCtx(): LoadContext {
+    function createAndInitP(overrides: Record<string, number> = {}): { element: ReactiveAnalogElement; pool: StatePool; solver: SparseSolver } {
+      const propsObj = makePjfetProps(overrides);
+      const core = createPJfetElement(new Map([["G", 1], ["S", 0], ["D", 2]]), propsObj) as unknown as ReactiveAnalogElement;
+      core.stateBaseOffset = 0;
       const solver = new SparseSolver();
       solver._initStructure();
-      return makeLoadCtx({
-        cktMode: MODEDCOP | MODEINITFLOAT,
+      let stateCount = 0;
+      let nodeCount = 1000;
+      const setupCtx = {
         solver,
-        rhsOld,
-        rhs: new Float64Array(matrixSize),
-        dt: 0,
-      });
-    }
-
-    function createAndInitP(overrides: Record<string, number> = {}): { element: ReactiveAnalogElement; pool: StatePool } {
-      const propsObj = makePjfetProps(overrides);
-      const core = createPJfetElement(new Map([["G", 1], ["S", 0], ["D", 2]]), [], -1, propsObj) as unknown as ReactiveAnalogElement;
-      core.stateBaseOffset = 0;
+        temp: 300.15, nomTemp: 300.15, copyNodesets: false,
+        makeVolt(_l: string, _s: string): number { return ++nodeCount; },
+        makeCur(_l: string, _s: string): number { return ++nodeCount; },
+        allocStates(n: number): number { const off = stateCount; stateCount += n; return off; },
+        findBranch(_l: string): number { return 0; },
+        findDevice(_l: string) { return null; },
+      };
+      (core as any).setup(setupCtx);
       const pool = new StatePool(core.stateSize);
       core.initState(pool);
-      return { element: core, pool };
+      return { element: core, pool, solver };
     }
 
     const PSLOT_VGS = 0;
 
     // Element at 300.15K
-    const { element: el300, pool: pool300 } = createAndInitP({ TEMP: 300.15 });
-    el300.load(makeCtx());
+    const { element: el300, pool: pool300, solver: solver300 } = createAndInitP({ TEMP: 300.15 });
+    el300.load(makeLoadCtx({ cktMode: MODEDCOP | MODEINITFLOAT, solver: solver300, rhsOld, rhs: new Float64Array(matrixSize), dt: 0 }));
     const vgs300 = pool300.state0[PSLOT_VGS];
 
     // Element at 300.15K, setParam to 400K before load
-    const { element: el400, pool: pool400 } = createAndInitP({ TEMP: 300.15 });
+    const { element: el400, pool: pool400, solver: solver400 } = createAndInitP({ TEMP: 300.15 });
     (el400 as unknown as { setParam: (k: string, v: number) => void }).setParam("TEMP", 400);
-    el400.load(makeCtx());
+    el400.load(makeLoadCtx({ cktMode: MODEDCOP | MODEINITFLOAT, solver: solver400, rhsOld, rhs: new Float64Array(matrixSize), dt: 0 }));
     const vgs400 = pool400.state0[PSLOT_VGS];
 
     expect(vgs300).not.toBe(vgs400);

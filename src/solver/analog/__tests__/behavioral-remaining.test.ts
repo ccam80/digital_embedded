@@ -128,9 +128,12 @@ describe("Driver", () => {
    */
   it("tri_state_high", () => {
     const props = new PropertyBag();
+    // Disable capacitive loading on all pins so AnalogCapacitorElement children
+    // are not created — avoids hitting PB-CAP stub during setup().
+    props.set("_pinLoading", { in: false, sel: false, out: false } as unknown as import("../../../core/properties.js").PropertyValue);
     // nodeIds are 1-based MNA node IDs: nodeIn=1, nodeSel=2, nodeOut=3
     const driver = createDriverAnalogElement(
-      new Map([["in", 1], ["sel", 2], ["out", 3]]), [], -1, props,
+      new Map([["in", 1], ["sel", 2], ["out", 3]]), props,
     );
 
     // Circuit node 1 (1-based) = solver row 0 = nodeIn; branch row 3
@@ -161,8 +164,11 @@ describe("Driver", () => {
    */
   it("tri_state_hiz", () => {
     const props = new PropertyBag();
+    // Disable capacitive loading on all pins so AnalogCapacitorElement children
+    // are not created — avoids hitting PB-CAP stub during setup().
+    props.set("_pinLoading", { in: false, sel: false, out: false } as unknown as import("../../../core/properties.js").PropertyValue);
     const driver = createDriverAnalogElement(
-      new Map([["in", 1], ["sel", 2], ["out", 3]]), [], -1, props,
+      new Map([["in", 1], ["sel", 2], ["out", 3]]), props,
     );
 
     const vsIn  = makeVoltageSource(1, 0, 3, VDD);  // data input HIGH
@@ -269,7 +275,7 @@ describe("SevenSeg", () => {
     // 8 segment anodes: circuit nodes 1..8 (1-based)
     const sevenSeg = createSevenSegAnalogElement(
       new Map([["a", 1], ["b", 2], ["c", 3], ["d", 4], ["e", 5], ["f", 6], ["g", 7], ["dp", 8]]),
-      [], -1, props,
+      props,
     );
 
     // Digit "7": a=on, b=on, c=on, d=off, e=off, f=off, g=off, dp=off
@@ -336,7 +342,7 @@ describe("Relay", () => {
     const inductorBranchIdx = 8; // 1-based MNA row for inductor branch current
     const relay = createRelayAnalogElement(
       new Map([["in1", 1], ["in2", 2], ["A1", 3], ["B1", 4]]),
-      [], inductorBranchIdx, props,
+      props,
     );
 
     // Initialise relay state pool (child inductor requires initState before load)
@@ -455,10 +461,17 @@ describe("Registration", () => {
 describe("Task 6.4.3  remaining pin loading propagates", () => {
   it("remaining_pin_loading_propagates", () => {
     // Driver element: pins "in"=node 1, "sel"=node 2, "out"=node 3.
-    // Set _pinLoading: "in"=true, "sel"=false.
-    // Verify via allocElement spy:
-    //   in  (MNA node 1  nodeIdx 0)  allocElement called at (0,0)
-    //   sel (MNA node 2  nodeIdx 1)  NO call at (1,1)
+    // Set _pinLoading: "in"=true, "sel"=false, "out"=false.
+    //
+    // Per the setup/load split contract:
+    //   - setup() calls allocElement for ALL pins regardless of loaded flag
+    //     (DigitalInputPinModel.setup always allocates the diagonal handle)
+    //   - load() calls stampElement only for loaded pins ("in"=loaded → stamps;
+    //     "sel"=not-loaded → no-op in load())
+    //
+    // Verify via setup()/load() call capture:
+    //   setup() allocCalls includes (1,1) for "in" and (2,2) for "sel" (both allocated)
+    //   load() stampCalls includes handle for node 1 ("in" loaded) but NOT node 2 ("sel" unloaded)
     const pinLoading: Record<string, boolean> = {
       "in": true,
       "sel": false,
@@ -469,34 +482,68 @@ describe("Task 6.4.3  remaining pin loading propagates", () => {
 
     const element = createDriverAnalogElement(
       new Map([["in", 1], ["sel", 2], ["out", 3]]),
-      [], -1, props,
+      props,
     );
     Object.assign(element, { pinNodeIds: [1, 2, 3], allNodeIds: [1, 2, 3] });
-    initElement(element as unknown as import("../element.js").ReactiveAnalogElement);
 
-    const allocCalls: Array<[number, number]> = [];
-    const solver = {
-      allocElement(r: number, c: number) { allocCalls.push([r, c]); return allocCalls.length - 1; },
+    // Phase 1: setup() — capture allocElement calls to assign handles
+    const setupAllocCalls: Array<[number, number]> = [];
+    const handleToRC = new Map<number, [number, number]>();
+    const setupSolver = {
+      allocElement(r: number, c: number) {
+        const h = setupAllocCalls.length;
+        setupAllocCalls.push([r, c]);
+        handleToRC.set(h, [r, c]);
+        return h;
+      },
       stampElement(_h: number, _v: number) {},
       stampRHS(_i: number, _v: number) {},
     };
+    const setupCtx = {
+      solver: setupSolver as any,
+      temp: 300.15,
+      nomTemp: 300.15,
+      copyNodesets: false,
+      makeVolt(_l: string, _s: string) { return 100; },
+      makeCur(_l: string, _s: string) { return 100; },
+      allocStates(n: number) { return 0; },
+      findBranch(_l: string) { return 0; },
+      findDevice(_l: string) { return null; },
+    };
+    (element as any).setup(setupCtx);
 
-    const ctx: LoadContext = makeLoadCtx({
-      solver: solver as any,
+    // Both "in" (node 1) and "sel" (node 2) diagonal handles are allocated in setup()
+    const inSetup  = setupAllocCalls.some(([r, c]) => r === 1 && c === 1);
+    const selSetup = setupAllocCalls.some(([r, c]) => r === 2 && c === 2);
+    expect(inSetup).toBe(true);
+    expect(selSetup).toBe(true);
+
+    // Phase 2: load() — verify only the loaded "in" pin stamps (not "sel")
+    const stampedHandles: number[] = [];
+    const loadSolver = {
+      allocElement(_r: number, _c: number) { return -1; },
+      stampElement(h: number, _v: number) { stampedHandles.push(h); },
+      stampRHS(_i: number, _v: number) {},
+    };
+    const rhs = new Float64Array(10);
+    const loadCtx: LoadContext = makeLoadCtx({
+      solver: loadSolver as any,
+      rhs,
+      rhsOld: rhs,
       cktMode: MODETRAN | MODEINITFLOAT,
       dt: 0,
       method: "trapezoidal",
       order: 1,
     });
+    element.load(loadCtx);
 
-    element.load(ctx);
+    // "in" pin is loaded → its diagonal handle (allocated at (1,1) in setup) IS stamped
+    const inHandle  = setupAllocCalls.findIndex(([r, c]) => r === 1 && c === 1);
+    const selHandle = setupAllocCalls.findIndex(([r, c]) => r === 2 && c === 2);
+    const inStamped  = stampedHandles.includes(inHandle);
+    const selStamped = stampedHandles.includes(selHandle);
 
-    // in (MNA node 1, 1-based) should produce an allocElement call at (1,1) since loaded=true
-    const inDiag = allocCalls.some(([r, c]) => r === 1 && c === 1);
-    // sel (MNA node 2, 1-based) should NOT produce any allocElement call (loaded=false → no-op)
-    const selDiag = allocCalls.some(([r, c]) => r === 2 && c === 2);
-
-    expect(inDiag).toBe(true);
-    expect(selDiag).toBe(false);
+    expect(inStamped).toBe(true);
+    expect(selStamped).toBe(false);
   });
 });

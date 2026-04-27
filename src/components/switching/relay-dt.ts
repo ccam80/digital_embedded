@@ -12,9 +12,9 @@
  * Pins:
  *   Inputs (coil): in1, in2 (1-bit each)
  *   Bidirectional (contacts per pole):
- *     C{n} — common terminal
- *     T{n} — throw (normally open, connects when coil energised)
- *     R{n} — rest (normally closed, connects when coil de-energised)
+ *     A{n} — common terminal
+ *     B{n} — throw (normally open, connects when coil energised)
+ *     C{n} — rest (normally closed, connects when coil de-energised)
  *
  * internalStateCount: 1 (energised flag, read by bus resolver)
  */
@@ -35,8 +35,9 @@ import {
 import type { LoadContext } from "../../solver/analog/element.js";
 import { NGSPICE_LOAD_ORDER } from "../../solver/analog/element.js";
 import type { SetupContext } from "../../solver/analog/setup-context.js";
-import type { PoolBackedAnalogElementCore, StatePoolRef } from "../../solver/analog/element.js";
-import { AnalogInductorElement, INDUCTOR_DEFAULTS } from "../passives/inductor.js";
+import type { AnalogElementCore } from "../../core/analog-types.js";
+import { SwitchAnalogElement } from "./switch.js";
+import { RelayInductorSubElement, RelayResSubElement } from "./relay.js";
 
 // ---------------------------------------------------------------------------
 // RelayDT analog constants
@@ -48,122 +49,150 @@ const RELAY_DT_R_COIL_DEFAULT = 100;
 const RELAY_DT_L_DEFAULT = 0.1;
 const RELAY_DT_I_PULL_DEFAULT = 20e-3;
 
-function stampGDT(
-  solver: { allocElement(r: number, c: number): number; stampElement(h: number, v: number): void },
-  nA: number,
-  nB: number,
-  g: number,
-): void {
-  if (nA > 0) solver.stampElement(solver.allocElement(nA, nA), g);
-  if (nB > 0) solver.stampElement(solver.allocElement(nB, nB), g);
-  if (nA > 0 && nB > 0) {
-    solver.stampElement(solver.allocElement(nA, nB), -g);
-    solver.stampElement(solver.allocElement(nB, nA), -g);
+// ---------------------------------------------------------------------------
+// RelayDTAnalogElement — W3 migrated composite class
+//
+// Architecture: coilL (IND) + coilR (RES) + swNO (SW, normally-open) + swNC (SW, normally-closed)
+// ngspice anchors:
+//   coilL: indsetup.c:84-100, indload.c
+//   coilR: ressetup.c:46-49, resload.c
+//   swNO:  swsetup.c:47-62, swload.c
+//   swNC:  swsetup.c:47-62, swload.c
+// ---------------------------------------------------------------------------
+
+class RelayDTAnalogElement implements AnalogElementCore {
+  branchIndex: number = -1;
+  readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.IND;
+  readonly isNonlinear = true;
+  readonly isReactive = true;
+  _stateBase: number = -1;
+  _pinNodes: Map<string, number>;
+
+  readonly _coilL: RelayInductorSubElement;
+  readonly _coilR: RelayResSubElement;
+  readonly _swNO: SwitchAnalogElement;
+  readonly _swNC: SwitchAnalogElement;
+
+  private _nCoilMid: number = -1;
+  private readonly _label: string;
+  private readonly _iPull: number;
+
+  constructor(label: string, pinNodes: ReadonlyMap<string, number>, props: PropertyBag) {
+    this._label = label;
+    this._pinNodes = new Map(pinNodes);
+    this._iPull = props.has("iPull") ? (props.get("iPull") as number) : RELAY_DT_I_PULL_DEFAULT;
+
+    const in1node = pinNodes.get("in1")!;
+    const in2node = pinNodes.get("in2")!;
+    const A1node = pinNodes.get("A1")!;
+    const B1node = pinNodes.get("B1")!;
+    const C1node = pinNodes.get("C1")!;
+
+    const inductance = props.has("inductance") ? (props.get("inductance") as number) : RELAY_DT_L_DEFAULT;
+    const coilResistance = props.has("coilResistance") ? (props.get("coilResistance") as number) : RELAY_DT_R_COIL_DEFAULT;
+
+    // coilL: in1 → coilMid (B node will be set in setup() after makeVolt)
+    this._coilL = new RelayInductorSubElement(`${label}/_coilL`, inductance);
+    this._coilL._pinNodes = new Map([["A", in1node], ["B", -1]]);
+
+    // coilR: coilMid → in2 (A node will be set in setup() after makeVolt)
+    this._coilR = new RelayResSubElement(new Map([["A", -1], ["B", in2node]]), coilResistance);
+
+    // swNO (normally-open): A1 ↔ B1 — starts open, closes when energised
+    const swNOProps = new PropertyBag();
+    swNOProps.set("Ron", RELAY_DT_R_ON);
+    swNOProps.set("Roff", RELAY_DT_R_OFF);
+    swNOProps.set("normallyClosed", false);
+    swNOProps.set("closed", false);
+    this._swNO = new SwitchAnalogElement(new Map([["A1", A1node], ["B1", B1node]]), swNOProps);
+
+    // swNC (normally-closed): A1 ↔ C1 — starts closed, opens when energised
+    const swNCProps = new PropertyBag();
+    swNCProps.set("Ron", RELAY_DT_R_ON);
+    swNCProps.set("Roff", RELAY_DT_R_OFF);
+    swNCProps.set("normallyClosed", true);
+    swNCProps.set("closed", false);
+    this._swNC = new SwitchAnalogElement(new Map([["A1", A1node], ["B1", C1node]]), swNCProps);
+  }
+
+  setup(ctx: SetupContext): void {
+    // Allocate mid-node between coilL and coilR
+    this._nCoilMid = ctx.makeVolt(this._label, "coilMid");
+
+    // Wire coilL: in1 → coilMid
+    this._coilL._pinNodes.set("B", this._nCoilMid);
+
+    // Wire coilR: coilMid → in2
+    this._coilR._pinNodes.set("A", this._nCoilMid);
+
+    // Sub-element setup in NGSPICE_LOAD_ORDER (IND=27 < RES=40 < SW=42)
+    this._coilL.setup(ctx);  // 2 IND state slots + branch row + 5 IND handles
+    this._coilR.setup(ctx);  // 0 state slots + 4 RES handles
+    this._swNO.setup(ctx);   // 2 SW state slots + 4 SW handles (A1↔B1, normally-open)
+    this._swNC.setup(ctx);   // 2 SW state slots + 4 SW handles (A1↔C1, normally-closed)
+
+    // Store coilL's stateBase as the composite's state base
+    this._stateBase = this._coilL._stateBase;
+
+    // Expose branch index (coilL's branch)
+    this.branchIndex = this._coilL.branchIndex;
+  }
+
+  findBranchFor(name: string, ctx: SetupContext): number {
+    return this._coilL.findBranchFor(name, ctx);
+  }
+
+  load(ctx: LoadContext): void {
+    this._coilL.load(ctx);  // IND Thevenin equivalent (req, veq)
+    this._coilR.load(ctx);  // RES conductance stamp (coilResistance)
+    this._swNO.load(ctx);   // normally-open: ON when |I_coil| > pickupCurrent
+    this._swNC.load(ctx);   // normally-closed: OFF when |I_coil| > pickupCurrent (inverted)
+  }
+
+  accept(ctx: LoadContext, _simTime: number, _addBreakpoint: (t: number) => void): void {
+    const b = this._coilL.branchIndex;
+    const iCoil = b >= 0 ? ctx.rhs[b] : 0;
+    const energised = Math.abs(iCoil) > this._iPull;
+    // swNO: ON when energised
+    this._swNO.setSwState(energised);
+    // swNC: ON when NOT energised (normally closed inverts)
+    this._swNC.setSwState(!energised);
+  }
+
+  getPinCurrents(rhs: Float64Array): number[] {
+    const b = this._coilL.branchIndex;
+    const iCoil = b >= 0 ? rhs[b] : 0;
+    const noCurrents = this._swNO.getPinCurrents(rhs);
+    const ncCurrents = this._swNC.getPinCurrents(rhs);
+    return [iCoil, -iCoil, noCurrents[0] + ncCurrents[0], -noCurrents[0], -ncCurrents[0]];
+  }
+
+  setParam(key: string, value: number): void {
+    if (key === "inductance") {
+      this._coilL.setParam("inductance", value);
+    } else if (key === "coilResistance") {
+      this._coilR.setParam("resistance", value);
+    } else if (key === "ron") {
+      this._swNO.setParam("Ron", value);
+      this._swNC.setParam("Ron", value);
+    } else if (key === "roff") {
+      this._swNO.setParam("Roff", value);
+      this._swNC.setParam("Roff", value);
+    }
   }
 }
 
 // ---------------------------------------------------------------------------
-// createRelayDTAnalogElement — W2 stub composite
+// createRelayDTAnalogElement — factory
 // ---------------------------------------------------------------------------
 
 function createRelayDTAnalogElement(
   pinNodes: ReadonlyMap<string, number>,
   props: PropertyBag,
-): PoolBackedAnalogElementCore & { getChildElements(): readonly AnalogInductorElement[] } {
-  const nodeCoil1 = pinNodes.get("in1")!;
-  const nodeCoil2 = pinNodes.get("in2")!;
-  const nodeCommon = pinNodes.get("A1")!;
-  const nodeThrow = pinNodes.get("B1")!;
-  const nodeRest = pinNodes.get("C1")!;
-
-  const rCoil = props.has("coilResistance")
-    ? (props.get("coilResistance") as number)
-    : RELAY_DT_R_COIL_DEFAULT;
-  const L = props.has("inductance")
-    ? (props.get("inductance") as number)
-    : RELAY_DT_L_DEFAULT;
-  const iPull = props.has("iPull")
-    ? (props.get("iPull") as number)
-    : RELAY_DT_I_PULL_DEFAULT;
-
-  const coilInductor = new AnalogInductorElement(
-    -1,
-    L,
-    INDUCTOR_DEFAULTS["IC"]!,
-    INDUCTOR_DEFAULTS["TC1"]!,
-    INDUCTOR_DEFAULTS["TC2"]!,
-    INDUCTOR_DEFAULTS["TNOM"]!,
-    INDUCTOR_DEFAULTS["SCALE"]!,
-    INDUCTOR_DEFAULTS["M"]!,
-  );
-  coilInductor.pinNodeIds = [nodeCoil1, nodeCoil2];
-
-  let energised = false;
-
-  function gThrow(): number { return energised ? 1 / RELAY_DT_R_ON : 1 / RELAY_DT_R_OFF; }
-  function gRest(): number { return energised ? 1 / RELAY_DT_R_OFF : 1 / RELAY_DT_R_ON; }
-
-  return {
-    branchIndex: -1,
-    ngspiceLoadOrder: NGSPICE_LOAD_ORDER.IND,
-    isNonlinear: true,
-    isReactive: true,
-    _stateBase: -1,
-    _pinNodes: new Map(pinNodes),
-
-    poolBacked: true as const,
-    stateSchema: coilInductor.stateSchema,
-    stateSize: coilInductor.stateSize,
-    stateBaseOffset: -1,
-    s0: new Float64Array(0),
-    s1: new Float64Array(0),
-    s2: new Float64Array(0),
-    s3: new Float64Array(0),
-    s4: new Float64Array(0),
-    s5: new Float64Array(0),
-    s6: new Float64Array(0),
-    s7: new Float64Array(0),
-
-    setup(_ctx: SetupContext): void {
-      throw new Error("PB-RELAY-DT not yet migrated");
-    },
-
-    initState(pool: StatePoolRef): void {
-      coilInductor.stateBaseOffset = this.stateBaseOffset;
-      coilInductor.initState(pool);
-    },
-
-    getChildElements(): readonly AnalogInductorElement[] {
-      return [coilInductor];
-    },
-
-    load(ctx: LoadContext): void {
-      const s = ctx.solver;
-      stampGDT(s, nodeCoil1, nodeCoil2, 1 / rCoil);
-      stampGDT(s, nodeCommon, nodeThrow, gThrow());
-      stampGDT(s, nodeCommon, nodeRest, gRest());
-      coilInductor.load(ctx);
-    },
-
-    accept(ctx: LoadContext, _simTime: number, _addBreakpoint: (t: number) => void): void {
-      const branchIdx = coilInductor.branchIndex;
-      const iCoil = branchIdx >= 0 ? ctx.rhs[branchIdx] : 0;
-      energised = Math.abs(iCoil) > iPull;
-    },
-
-    getPinCurrents(rhs: Float64Array): number[] {
-      const branchIdx = coilInductor.branchIndex;
-      const iCoil = branchIdx >= 0 ? rhs[branchIdx] : 0;
-      const vCom = rhs[nodeCommon];
-      const vThr = rhs[nodeThrow];
-      const vRst = rhs[nodeRest];
-      const iThrow = gThrow() * (vCom - vThr);
-      const iRest = gRest() * (vCom - vRst);
-      return [iCoil, -iCoil, iThrow + iRest, -iThrow, -iRest];
-    },
-
-    setParam(key: string, value: number) { coilInductor.setParam(key, value); },
-  };
+  _getTime: () => number,
+): AnalogElementCore {
+  const label = (props.has("label") ? (props.get("label") as string) : undefined) ?? "RelayDT";
+  return new RelayDTAnalogElement(label, pinNodes, props);
 }
 
 // ---------------------------------------------------------------------------
@@ -421,7 +450,7 @@ export const RelayDTDefinition: ComponentDefinition = {
   modelRegistry: {
     "behavioral": {
       kind: "inline",
-      factory: (pinNodes, props, _getTime) => createRelayDTAnalogElement(pinNodes, props),
+      factory: createRelayDTAnalogElement,
       paramDefs: [],
       params: {},
       mayCreateInternalNodes: true,

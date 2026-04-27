@@ -1,20 +1,20 @@
-﻿/**
- * 555 Timer IC  F4b pool-backed composite analog model.
+/**
+ * 555 Timer IC composite analog model.
  *
  * Textbook internal schematic (NE555 / LM555 datasheet):
  *
  *   VCC
- *    ‚
- *   [R=5kÎ]  â† upper divider arm
- *    ‚
- *    € CTRL pin (2/3 VCC when CTRL floating)
- *    ‚         "€ Comparator 1 in- (threshold reference)
- *   [R=5kÎ]  â† middle divider arm
- *    ‚
- *    € nLower (internal, 1/3 VCC)
- *    ‚         "€ Comparator 2 in- (trigger reference)
- *   [R=5kÎ]  â† lower divider arm
- *    ‚
+ *    |
+ *   [R=5kΩ]  ← upper divider arm
+ *    |
+ *    • CTRL pin (2/3 VCC when CTRL floating)
+ *    |         └→ Comparator 1 in- (threshold reference)
+ *   [R=5kΩ]  ← middle divider arm
+ *    |
+ *    • nLower (internal, 1/3 VCC)
+ *    |         └→ Comparator 2 in- (trigger reference)
+ *   [R=5kΩ]  ← lower divider arm
+ *    |
  *   GND
  *
  *   Comparator 1 (threshold): in+ = THR,    in- = CTRL    RESET when THR > CTRL
@@ -26,51 +26,32 @@
  *     RESET=0, SET=0   hold
  *     RESET=1, SET=1   Q=0 (RESET dominates per NE555 spec)
  *
- *   Active-low RESET pin: RST < GND+0.7V overrides flip-flop  forces Q=0
+ *   Active-low RESET pin: RST < GND+0.7V overrides flip-flop → forces Q=0
  *
- *   Q=1 (SET):   OUTPUT = VCC âˆ’ vDrop (high), DISCHARGE = Hi-Z
- *   Q=0 (RESET): OUTPUT  GND + 0.1V (low),  DISCHARGE = transistor ON
+ *   Q=1 (SET):   OUTPUT = VCC − vDrop (high), DISCHARGE = Hi-Z
+ *   Q=0 (RESET): OUTPUT ≈ GND + 0.1V (low),  DISCHARGE = transistor ON
  *
- * Composition architecture (F4b pool-backed composite  matches optocoupler.ts
- * pattern from W1.8a commit 130ddd8a):
+ * Architecture (composite per PB-TIMER555 spec):
  *
- *   createTimer555Element returns a PoolBackedAnalogElementCore.
- *   Sub-elements instantiated at factory time:
- *     - comp1Sub: createOpenCollectorComparatorElement (comparator.ts F4c)
- *     - comp2Sub: createOpenCollectorComparatorElement (comparator.ts F4c)
- *     - bjtSub:   createBjtElement (bjt.ts  bjtload.c, NPN L0 Gummel-Poon)
+ *   Sub-elements (in NGSPICE_LOAD_ORDER ascending):
+ *     rDiv1, rDiv2, rDiv3 — RES sub-elements (NGSPICE_LOAD_ORDER.RES)
+ *     comp1, comp2        — VCVS sub-elements, high-gain 1e6 (NGSPICE_LOAD_ORDER.VCVS)
+ *     bjtDis              — BJT NPN sub-element (NGSPICE_LOAD_ORDER.BJT)
+ *     outModel            — DigitalOutputPinModel (behavioral)
  *
- *   R-divider: inline stampG calls  mechanical four-entry conductance stamp
- *   matching resload.c primitive resistor (cite: resload.c  G=1/R stamped at
- *   [nA,nA], [nA,nB], [nB,nA], [nB,nB]).
+ *   Internal nodes (4, allocated in setup()):
+ *     nLower         — R-divider lower tap (1/3 VCC)
+ *     nComp1Out      — threshold comparator output node
+ *     nComp2Out      — trigger comparator output node
+ *     nDisBase       — discharge BJT base node (driven by RS-FF glue)
  *
- *   RS flip-flop: behavioral boolean _flipflopQ advanced in accept() once per
- *   accepted timestep. No analog RS-FF primitive exists in digiTS.
+ *   State:
+ *     1 slot for SR latch (0.0 = Q reset, 1.0 = Q set)
+ *     BJT sub-element: 24 slots (bjtsetup.c:366-367)
+ *     comp1/comp2: pool-backed via createOpenCollectorComparatorElement
+ *     outModel CAP children: own state slots
  *
- *   RS-FF  BJT base drive: digiTS composition glue  translates _flipflopQ
- *   boolean to a physical base voltage via G/RHS stamps into nDischargeBase.
- *   Not cited to ngspice  there is no corresponding ngspice primitive for
- *   this inter-element coupling.
- *
- *   Output stage: DigitalOutputPinModel (F4c behavioral, no ngspice primitive).
- *
- * Internal nodes (4 allocated via getInternalNodeCount = () => 4):
- *   internalNodeIds[0] = nLower          (R-divider lower tap, 1/3 VCC)
- *   internalNodeIds[1] = nComp1Out       (threshold comparator OC output)
- *   internalNodeIds[2] = nComp2Out       (trigger comparator OC output)
- *   internalNodeIds[3] = nDischargeBase  (BJT base  driven by RS-FF glue)
- *
- * State pool layout:
- *   [0 .. BJT_SIMPLE_SCHEMA.size-1]                          discharge BJT slots (bjtload.c)
- *   [bjtEnd .. bjtEnd + comp1.stateSize-1]                   comparator 1 (threshold)
- *   [comp1End .. comp1End + comp2.stateSize-1]               comparator 2 (trigger)
- *   [comp2End ..]                                            capacitor children from output pin
- *
- * Comparators are F4c behavioral and pool-backed (latch + soft-weight slots
- * for hysteresis & responseTime integration); the parent allocates their
- * slot ranges and calls their initState in initState().
- *
- * Pins (nodeIds order): [DIS, TRIG, THR, VCC, CTRL, OUT, RST, GND]
+ * Pins (pinLayout order): [DIS, TRIG, THR, VCC, CTRL, OUT, RST, GND]
  */
 
 import { AbstractCircuitElement } from "../../core/element.js";
@@ -90,23 +71,24 @@ import type { LoadContext, PoolBackedAnalogElementCore } from "../../solver/anal
 import { NGSPICE_LOAD_ORDER } from "../../solver/analog/element.js";
 import type { SetupContext } from "../../solver/analog/setup-context.js";
 import { defineModelParams } from "../../core/model-params.js";
-import { stampG, stampRHS } from "../../solver/analog/stamp-helpers.js";
 import {
   DigitalOutputPinModel,
   collectPinModelChildren,
 } from "../../solver/analog/digital-pin-model.js";
 import type { StatePoolRef } from "../../core/analog-types.js";
 import type { AnalogCapacitorElement } from "../passives/capacitor.js";
+import type { AnalogElementCore } from "../../core/analog-types.js";
 
-// Sub-element: discharge BJT  bjtload.c:170-end (L0 Gummel-Poon)
+// Sub-element: discharge BJT — bjtsetup.c:347-465 (NPN Gummel-Poon)
 import {
   createBjtElement,
-  BJT_SIMPLE_SCHEMA,
   BJT_NPN_DEFAULTS,
 } from "../semiconductors/bjt.js";
 
-// Sub-element: comparators  comparator.ts F4c behavioral (no ngspice primitive)
-import { createOpenCollectorComparatorElement } from "./comparator.js";
+// Sub-element: comparators as VCVS (vcvsset.c:53-58, high-gain 1e6)
+import { VCVSAnalogElement } from "./vcvs.js";
+import { parseExpression } from "../../solver/analog/expression.js";
+import { differentiate, simplify } from "../../solver/analog/expression-differentiate.js";
 
 // ---------------------------------------------------------------------------
 // Model parameter declarations
@@ -115,7 +97,7 @@ import { createOpenCollectorComparatorElement } from "./comparator.js";
 export const { paramDefs: TIMER555_PARAM_DEFS, defaults: TIMER555_DEFAULTS } = defineModelParams({
   primary: {
     vDrop:      { default: 1.5, unit: "V", description: "Voltage drop from VCC for high output state" },
-    rDischarge: { default: 10,  unit: "Î", description: "Saturation resistance of the discharge transistor" },
+    rDischarge: { default: 10,  unit: "Ω", description: "Saturation resistance of the discharge transistor" },
   },
 });
 
@@ -123,23 +105,93 @@ export const { paramDefs: TIMER555_PARAM_DEFS, defaults: TIMER555_DEFAULTS } = d
 // Internal constants
 // ---------------------------------------------------------------------------
 
-/** Three equal divider arms (5kÎ each) from VCC to GND  textbook NE555. */
-const R_DIV = 5000;   // Î
+/** Three equal divider arms (5kΩ each) from VCC to GND — textbook NE555. */
+const R_DIV = 5000;
 
 /** Output drive resistance (Norton equivalent, internal). */
-const R_OUT = 10;     // Î
+const R_OUT = 10;
+
+/** High-gain VCVS comparator gain (1e6). */
+const COMP_GAIN = 1e6;
+
+// ---------------------------------------------------------------------------
+// Helpers to build VCVS expression for high-gain comparators
+// ---------------------------------------------------------------------------
+
+function makeVcvsComparatorExpression(): { expr: ReturnType<typeof parseExpression>; deriv: ReturnType<typeof parseExpression> } {
+  const raw = parseExpression(`${COMP_GAIN} * V(ctrl)`);
+  const d = simplify(differentiate(raw, "V(ctrl)"));
+  return { expr: raw, deriv: d };
+}
+
+// ---------------------------------------------------------------------------
+// Minimal RES sub-element — ressetup.c:46-49 TSTALLOC pattern
+//
+// Used as the three R-divider arms inside the Timer555 composite.
+// Cannot import ResistorAnalogElement (not exported from resistor.ts);
+// implement the same 4-entry TSTALLOC and stampG pattern here.
+// ---------------------------------------------------------------------------
+
+class Timer555ResElement implements AnalogElementCore {
+  branchIndex: number = -1;
+  readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.RES;
+  readonly isNonlinear: boolean = false;
+  readonly isReactive: boolean = false;
+  _stateBase: number = -1;
+  _pinNodes: Map<string, number> = new Map();
+
+  private _G: number;
+
+  // TSTALLOC handles — 4 entries per ressetup.c:46-49
+  private _hAA: number = -1;
+  private _hAB: number = -1;
+  private _hBA: number = -1;
+  private _hBB: number = -1;
+
+  constructor(resistance: number) {
+    this._G = 1 / resistance;
+  }
+
+  setup(ctx: SetupContext): void {
+    const nA = this._pinNodes.get("A")!;
+    const nB = this._pinNodes.get("B")!;
+    // ressetup.c:46-49 — 4 TSTALLOC entries unconditionally (series element)
+    this._hAA = ctx.solver.allocElement(nA, nA);
+    this._hAB = ctx.solver.allocElement(nA, nB);
+    this._hBA = ctx.solver.allocElement(nB, nA);
+    this._hBB = ctx.solver.allocElement(nB, nB);
+  }
+
+  setParam(key: string, value: number): void {
+    if (key === "resistance") {
+      this._G = 1 / Math.max(value, 1e-9);
+    }
+  }
+
+  load(ctx: LoadContext): void {
+    ctx.solver.stampElement(this._hAA,  this._G);
+    ctx.solver.stampElement(this._hAB, -this._G);
+    ctx.solver.stampElement(this._hBA, -this._G);
+    ctx.solver.stampElement(this._hBB,  this._G);
+  }
+
+  getPinCurrents(rhs: Float64Array): number[] {
+    const nA = this._pinNodes.get("A")!;
+    const nB = this._pinNodes.get("B")!;
+    const I = this._G * ((rhs[nA] ?? 0) - (rhs[nB] ?? 0));
+    return [I, -I];
+  }
+}
 
 // ---------------------------------------------------------------------------
 // Pin declarations
 // ---------------------------------------------------------------------------
 
-// Pin index  nodeIds[i] mapping:
+// Pin index → nodeIds[i] mapping:
 //   0: DIS      1: TRIG     2: THR      3: VCC
 //   4: CTRL     5: OUT      6: RST      7: GND
 
 function buildTimer555PinDeclarations(): PinDeclaration[] {
-  // Compact IC layout: body (1,0)(5,6), VCC top-center, GND bottom-center,
-  // 3 left pins and 3 right pins evenly spaced at y=1,3,5.
   return [
     {
       direction: PinDirection.INPUT,
@@ -217,7 +269,7 @@ function buildTimer555PinDeclarations(): PinDeclaration[] {
 }
 
 // ---------------------------------------------------------------------------
-// Timer555Element  CircuitElement implementation
+// Timer555Element — CircuitElement implementation
 // ---------------------------------------------------------------------------
 
 export class Timer555Element extends AbstractCircuitElement {
@@ -261,20 +313,20 @@ export class Timer555Element extends AbstractCircuitElement {
     ctx.setColor("COMPONENT");
     ctx.drawRect(1, 0, 4, 6, false);
 
-    // Left-side leads: pin tip (0,y)  body edge (1,y)
+    // Left-side leads: pin tip (0,y) → body edge (1,y)
     drawColoredLead(ctx, signals, vDis,  0, 1, 1, 1);
     drawColoredLead(ctx, signals, vTrig, 0, 3, 1, 3);
     drawColoredLead(ctx, signals, vThr,  0, 5, 1, 5);
 
-    // Right-side leads: pin tip (6,y)  body edge (5,y)
+    // Right-side leads: pin tip (6,y) → body edge (5,y)
     drawColoredLead(ctx, signals, vRst,  6, 1, 5, 1);
     drawColoredLead(ctx, signals, vOut,  6, 3, 5, 3);
     drawColoredLead(ctx, signals, vCtrl, 6, 5, 5, 5);
 
-    // VCC lead (north): pin tip (3,-1)  body edge (3,0)
+    // VCC lead (north): pin tip (3,-1) → body edge (3,0)
     drawColoredLead(ctx, signals, vVcc, 3, -1, 3, 0);
 
-    // GND lead (south): pin tip (3,7)  body edge (3,6)
+    // GND lead (south): pin tip (3,7) → body edge (3,6)
     drawColoredLead(ctx, signals, vGnd, 3, 7, 3, 6);
 
     // Component name centered between top and middle pin rows
@@ -298,14 +350,6 @@ export class Timer555Element extends AbstractCircuitElement {
 }
 
 // ---------------------------------------------------------------------------
-// State pool sizing
-// ---------------------------------------------------------------------------
-
-// Only the BJT sub-element contributes pool state.
-// Comparators are F4c behavioral  no pool state.
-const BJT_STATE_SIZE = BJT_SIMPLE_SCHEMA.size; // 8 slots
-
-// ---------------------------------------------------------------------------
 // PropertyBag builder for BJT sub-element
 // ---------------------------------------------------------------------------
 
@@ -316,128 +360,374 @@ function makeBjtProps(): PropertyBag {
 }
 
 // ---------------------------------------------------------------------------
-// PropertyBag builder for comparator sub-elements
+// Timer555CompositeElement — pool-backed composite AnalogElementCore
+//
+// Implements the PB-TIMER555 spec: setup() + load() per spec contract.
 // ---------------------------------------------------------------------------
 
-function makeCompProps(): PropertyBag {
-  const bag = new PropertyBag(new Map<string, number>().entries());
-  // Use comparator defaults (hysteresis=0, vos=0.001, rSat=50, responseTime=1e-6)
-  bag.replaceModelParams({
-    hysteresis: 0,
-    vos: 0,
-    rSat: 50,
-    responseTime: 1e-9,
-  });
-  return bag;
+interface Timer555Props {
+  vDrop: number;
+  rDischarge: number;
+}
+
+class Timer555CompositeElement implements PoolBackedAnalogElementCore {
+  branchIndex: number = -1;
+  readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.VCVS;
+  readonly isNonlinear: boolean = true;
+  get isReactive(): boolean { return this._childElements.length > 0; }
+  _stateBase: number = -1;
+  readonly _pinNodes: Map<string, number>;
+
+  // Pool-backed fields
+  readonly poolBacked: true = true;
+  readonly stateSchema = { size: 0, name: "Timer555Composite", slots: [] } as any;
+  get stateSize(): number {
+    return 1 + // SR latch slot
+      this._bjtDis.stateSize +
+      (this._comp1 as unknown as { stateSize: number }).stateSize +
+      (this._comp2 as unknown as { stateSize: number }).stateSize +
+      this._childElements.reduce((s, c) => s + c.stateSize, 0);
+  }
+  stateBaseOffset: number = -1;
+  s0: Float64Array = new Float64Array(0);
+  s1: Float64Array = new Float64Array(0);
+  s2: Float64Array = new Float64Array(0);
+  s3: Float64Array = new Float64Array(0);
+  s4: Float64Array = new Float64Array(0);
+  s5: Float64Array = new Float64Array(0);
+  s6: Float64Array = new Float64Array(0);
+  s7: Float64Array = new Float64Array(0);
+
+  // Sub-elements (constructed at factory time, pin nodes assigned in setup())
+  readonly _rDiv1: Timer555ResElement;
+  readonly _rDiv2: Timer555ResElement;
+  readonly _rDiv3: Timer555ResElement;
+  readonly _comp1: VCVSAnalogElement;
+  readonly _comp2: VCVSAnalogElement;
+  // BJT is recreated in setup() once nDisBase internal node is known.
+  // Stored mutable so setup() can replace the factory placeholder.
+  _bjtDis: PoolBackedAnalogElementCore;
+  readonly _bjtProps: PropertyBag;
+  readonly _outModel: DigitalOutputPinModel;
+  readonly _childElements: AnalogCapacitorElement[];
+
+  // Composite-owned handles (allocated in setup(), after sub-element setups)
+  private _hDisBaseDisBase: number = -1;
+  // Pull-down handles for comparator output nodes (needed for DC convergence)
+  private _hComp1OutComp1Out: number = -1;
+  private _hComp2OutComp2Out: number = -1;
+
+  // Internal node indices (assigned in setup())
+  private _nLower: number = -1;
+  private _nComp1Out: number = -1;
+  private _nComp2Out: number = -1;
+  private _nDisBase: number = -1;
+
+  // SR latch state slot base
+  private _stateBase_latch: number = -1;
+
+  // Props
+  private readonly _p: Timer555Props;
+
+  constructor(opts: {
+    rDiv1: Timer555ResElement;
+    rDiv2: Timer555ResElement;
+    rDiv3: Timer555ResElement;
+    comp1: VCVSAnalogElement;
+    comp2: VCVSAnalogElement;
+    bjtDis: PoolBackedAnalogElementCore;
+    bjtProps: PropertyBag;
+    outModel: DigitalOutputPinModel;
+    childElements: AnalogCapacitorElement[];
+    pinNodes: ReadonlyMap<string, number>;
+    props: Timer555Props;
+  }) {
+    this._rDiv1 = opts.rDiv1;
+    this._rDiv2 = opts.rDiv2;
+    this._rDiv3 = opts.rDiv3;
+    this._comp1 = opts.comp1;
+    this._comp2 = opts.comp2;
+    this._bjtDis = opts.bjtDis;
+    this._bjtProps = opts.bjtProps;
+    this._outModel = opts.outModel;
+    this._childElements = opts.childElements;
+    this._pinNodes = new Map(opts.pinNodes);
+    this._p = { ...opts.props };
+  }
+
+  // ---------------------------------------------------------------------------
+  // setup() — allocate internal nodes, states, TSTALLOC entries
+  //
+  // Sub-element ordering per A6.4 (NGSPICE_LOAD_ORDER ascending):
+  //   1. RES (rDiv1, rDiv2, rDiv3) — NGSPICE_LOAD_ORDER.RES = 40
+  //   2. VCVS (comp1, comp2) — NGSPICE_LOAD_ORDER.VCVS = 47
+  //   3. BJT (bjtDis) — NGSPICE_LOAD_ORDER.BJT = 2
+  //      (BJT ordinal < RES/VCVS; but composite's own internal ordering
+  //       follows the spec's explicit ordering: RES → VCVS → BJT → behavioral)
+  //   4. Behavioral (outModel, CAP children)
+  //   5. Composite-owned glue handle (last)
+  // ---------------------------------------------------------------------------
+  setup(ctx: SetupContext): void {
+    const nVcc  = this._pinNodes.get("VCC")!;
+    const nCtrl = this._pinNodes.get("CTRL")!;
+    const nGnd  = this._pinNodes.get("GND")!;
+    const nThr  = this._pinNodes.get("THR")!;
+    const nTrig = this._pinNodes.get("TRIG")!;
+    const nDis  = this._pinNodes.get("DIS")!;
+    const nOut  = this._pinNodes.get("OUT")!;
+
+    // Allocate internal nodes
+    this._nLower    = ctx.makeVolt(this.label ?? "timer555", "nLower");
+    this._nComp1Out = ctx.makeVolt(this.label ?? "timer555", "nComp1Out");
+    this._nComp2Out = ctx.makeVolt(this.label ?? "timer555", "nComp2Out");
+    this._nDisBase  = ctx.makeVolt(this.label ?? "timer555", "nDisBase");
+
+    // Composite SR latch state (1 slot)
+    this._stateBase_latch = ctx.allocStates(1);
+    this._stateBase = this._stateBase_latch;
+
+    // R-divider resistors (RES TSTALLOC: 4 entries each, ressetup.c:46-49)
+    this._rDiv1._pinNodes = new Map([["A", nVcc], ["B", nCtrl]]);
+    this._rDiv1.setup(ctx);
+
+    this._rDiv2._pinNodes = new Map([["A", nCtrl], ["B", this._nLower]]);
+    this._rDiv2.setup(ctx);
+
+    this._rDiv3._pinNodes = new Map([["A", this._nLower], ["B", nGnd]]);
+    this._rDiv3.setup(ctx);
+
+    // Threshold comparator VCVS (vcvsset.c:53-58, 1 branch + 6 TSTALLOC)
+    // comp1: in+ = THR, in- = CTRL, out+ = nComp1Out, out- = GND
+    this._comp1._pinNodes = new Map([
+      ["ctrl+", nThr],
+      ["ctrl-", nCtrl],
+      ["out+",  this._nComp1Out],
+      ["out-",  nGnd],
+    ]);
+    this._comp1.setup(ctx);
+
+    // Trigger comparator VCVS (vcvsset.c:53-58, 1 branch + 6 TSTALLOC)
+    // comp2: in+ = nLower, in- = TRIG, out+ = nComp2Out, out- = GND
+    this._comp2._pinNodes = new Map([
+      ["ctrl+", this._nLower],
+      ["ctrl-", nTrig],
+      ["out+",  this._nComp2Out],
+      ["out-",  nGnd],
+    ]);
+    this._comp2.setup(ctx);
+
+    // Discharge BJT NPN (bjtsetup.c:347-465, 24 states, 23 TSTALLOC)
+    // Recreate with real nDisBase (only known after internal node allocation above).
+    // The factory placeholder had B=0; replace with the now-known base node.
+    this._bjtDis = createBjtElement(
+      1,
+      new Map([["B", this._nDisBase], ["C", nDis], ["E", nGnd]]),
+      this._bjtProps,
+    ) as PoolBackedAnalogElementCore;
+    this._bjtDis.setup(ctx);
+
+    // Output pin model (behavioral, DigitalOutputPinModel)
+    if (nOut > 0) { this._outModel.setup(ctx); }
+
+    // CAP children of outModel
+    for (const child of this._childElements) { child.setup(ctx); }
+
+    // RS-FF glue handle: composite-owned allocation comes AFTER all sub-element
+    // setups, since it wires pre-existing nodes rather than introducing new
+    // sub-element structure. (PB-TIMER555 spec §"setup() body")
+    this._hDisBaseDisBase = ctx.solver.allocElement(this._nDisBase, this._nDisBase);
+  }
+
+  // ---------------------------------------------------------------------------
+  // initState() — partition state pool across sub-elements
+  // ---------------------------------------------------------------------------
+  initState(poolRef: StatePoolRef): void {
+    this.stateBaseOffset = this._stateBase_latch;
+    this.s0 = poolRef.state0; this.s1 = poolRef.state1;
+    this.s2 = poolRef.state2; this.s3 = poolRef.state3;
+    this.s4 = poolRef.state4; this.s5 = poolRef.state5;
+    this.s6 = poolRef.state6; this.s7 = poolRef.state7;
+
+    // BJT occupies the block starting after the latch slot
+    const bjtBase = this._stateBase_latch + 1;
+    this._bjtDis.stateBaseOffset = bjtBase;
+    this._bjtDis.initState(poolRef);
+
+    // Comparators follow — each is poolBacked with its own stateSize
+    let offset = bjtBase + this._bjtDis.stateSize;
+
+    const comp1 = this._comp1 as unknown as {
+      stateSize: number;
+      stateBaseOffset: number;
+      initState: (p: StatePoolRef) => void;
+    };
+    if (typeof comp1.stateSize === "number") {
+      comp1.stateBaseOffset = offset;
+      comp1.initState(poolRef);
+      offset += comp1.stateSize;
+    }
+
+    const comp2 = this._comp2 as unknown as {
+      stateSize: number;
+      stateBaseOffset: number;
+      initState: (p: StatePoolRef) => void;
+    };
+    if (typeof comp2.stateSize === "number") {
+      comp2.stateBaseOffset = offset;
+      comp2.initState(poolRef);
+      offset += comp2.stateSize;
+    }
+
+    // Capacitor children from the output pin model
+    for (const child of this._childElements) {
+      child.stateBaseOffset = offset;
+      child.initState(poolRef);
+      offset += child.stateSize;
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // load() — composite forwards with RS latch coupling (PB-TIMER555 spec)
+  // ---------------------------------------------------------------------------
+  load(ctx: LoadContext): void {
+    // R-divider stamps (resload.c pattern — G stamped at 4 entries)
+    this._rDiv1.load(ctx);
+    this._rDiv2.load(ctx);
+    this._rDiv3.load(ctx);
+
+    // Comparator stamps (VCVS load — vcvsload.c pattern)
+    this._comp1.load(ctx);
+    this._comp2.load(ctx);
+
+    // RS-FF glue: read comparator outputs from rhsOld, compute latch state
+    const nComp1Out = this._nComp1Out;
+    const nComp2Out = this._nComp2Out;
+    const nRst  = this._pinNodes.get("RST")!;
+    const nGnd  = this._pinNodes.get("GND")!;
+    const nVcc  = this._pinNodes.get("VCC")!;
+
+    const vComp1Out = ctx.rhsOld[nComp1Out];
+    const vComp2Out = ctx.rhsOld[nComp2Out];
+    const vRst      = nRst > 0 ? ctx.rhsOld[nRst] : 5;
+    const vGnd      = nGnd > 0 ? ctx.rhsOld[nGnd] : 0;
+
+    // Active-low RST: if RST < GND + 0.7V → force Q=0
+    const rstActive = vRst < vGnd + 0.7;
+    let q = ctx.state0[this._stateBase_latch] >= 0.5;
+
+    const resetSignal = vComp1Out > 0.5 || rstActive;
+    const setSignal   = vComp2Out > 0.5 && !resetSignal;
+
+    if (resetSignal) q = false;
+    else if (setSignal) q = true;
+
+    ctx.state0[this._stateBase_latch] = q ? 1.0 : 0.0;
+
+    // Drive discharge BJT base: Q=0 → BJT ON (saturated); Q=1 → BJT OFF
+    const bjtBaseV = q ? 0.0 : 5.0;
+    const G_base = 1.0 / 100.0;
+    ctx.solver.stampElement(this._hDisBaseDisBase, G_base);
+    ctx.rhs[this._nDisBase] += bjtBaseV * G_base;
+
+    // Discharge BJT stamp (bjtload.c)
+    this._bjtDis.load(ctx);
+
+    // Output stage: Q=1 → OUT = VCC - vDrop; Q=0 → OUT ≈ GND + 0.1V
+    const vVcc = nVcc > 0 ? ctx.rhsOld[nVcc] : 5;
+    const vOut = q ? vVcc - this._p.vDrop : vGnd + 0.1;
+    this._outModel.setParam("vOH", vOut);
+    this._outModel.setLogicLevel(q);
+    this._outModel.load(ctx);
+
+    // CAP children
+    for (const child of this._childElements) { child.load(ctx); }
+  }
+
+  accept(ctx: LoadContext, simTime: number, addBreakpoint: (t: number) => void): void {
+    // Forward accept() to sub-elements for responseTime/reactive integration
+    (this._bjtDis as any).accept?.(ctx, simTime, addBreakpoint);
+    (this._comp1 as any).accept?.(ctx, simTime, addBreakpoint);
+    (this._comp2 as any).accept?.(ctx, simTime, addBreakpoint);
+  }
+
+  getPinCurrents(rhs: Float64Array): number[] {
+    const nVcc  = this._pinNodes.get("VCC")!;
+    const nGnd  = this._pinNodes.get("GND")!;
+    const nCtrl = this._pinNodes.get("CTRL")!;
+    const nDis  = this._pinNodes.get("DIS")!;
+
+    const vVccV  = rhs[nVcc]  ?? 0;
+    const vGndV  = rhs[nGnd]  ?? 0;
+    const vCtrlV = rhs[nCtrl] ?? 0;
+    const vLower = this._nLower > 0 ? (rhs[this._nLower] ?? 0) : (vCtrlV + vGndV) / 2;
+    const vDis   = rhs[nDis]  ?? 0;
+
+    const G_DIV = 1 / R_DIV;
+    const gOut  = 1 / R_OUT;
+    const vOutTarget = this._outModel.currentVoltage;
+    const vOutNode = rhs[this._pinNodes.get("OUT")! ] ?? 0;
+
+    const iVcc  = G_DIV * (vVccV - vCtrlV);
+    const iCtrl = G_DIV * (vCtrlV - vVccV) + G_DIV * (vCtrlV - vLower);
+    const iOut  = gOut * vOutNode - vOutTarget * gOut;
+
+    return [
+      G_DIV * (vDis - vGndV),  // DIS — discharge current (BJT CE path)
+      0,                        // TRIG
+      0,                        // THR
+      iVcc,                     // VCC (into divider upper arm)
+      iCtrl,                    // CTRL
+      iOut,                     // OUT
+      0,                        // RST
+      -(iVcc + iOut),           // GND — satisfies KCL at composite boundary
+    ];
+  }
+
+  setParam(key: string, value: number): void {
+    if (key === "vDrop" || key === "rDischarge") {
+      (this._p as any)[key] = value;
+    }
+  }
+
+  label?: string;
 }
 
 // ---------------------------------------------------------------------------
-// createTimer555Element  AnalogElementCore factory (F4b pool-backed composite)
+// createTimer555Element — factory (3-param signature per A6.3)
 // ---------------------------------------------------------------------------
 
-/**
- * F4b pool-backed composite 555 timer MNA element.
- *
- * Follows the optocoupler.ts pattern (W1.8a, commit 130ddd8a):
- *   - Sub-elements instantiated at factory time
- *   - initState() partitions pool across sub-elements
- *   - load() delegates to each sub-element's load() in sequence
- *   - Inter-element coupling (RS-FF  BJT base) stamped as digiTS glue
- *
- * Load() body shape:
- *   1. R-divider sub-components (three stampG arms  resload.c)
- *   2. Comparator 1 sub-element load (comp1Sub.load  comparator.ts F4c)
- *   3. Comparator 2 sub-element load (comp2Sub.load  comparator.ts F4c)
- *   4. RS-FF  BJT base drive glue stamps (digiTS composition, no ngspice cite)
- *   5. Discharge BJT sub-element load (bjtSub.load  bjtload.c:170-end)
- *   6. Output stage (DigitalOutputPinModel  F4c behavioral)
- */
 function createTimer555Element(
   pinNodes: ReadonlyMap<string, number>,
   props: PropertyBag,
   _getTime?: () => number,
 ): PoolBackedAnalogElementCore {
-  const internalNodeIds: readonly number[] = [];
-  const p: Record<string, number> = {
+  const p: Timer555Props = {
     vDrop:      props.getModelParam<number>("vDrop"),
     rDischarge: props.getModelParam<number>("rDischarge"),
   };
 
-  const nDis  = pinNodes.get("DIS")!;
-  const nTrig = pinNodes.get("TRIG")!;
-  const nThr  = pinNodes.get("THR")!;
-  const nVcc  = pinNodes.get("VCC")!;
-  const nCtrl = pinNodes.get("CTRL")!;
-  const nOut  = pinNodes.get("OUT")!;
-  const nRst  = pinNodes.get("RST")!;
-  const nGnd  = pinNodes.get("GND")!;
+  const nOutNode = pinNodes.get("OUT")!;
 
-  // Internal nodes (allocated by compiler via getInternalNodeCount = () => 4):
-  //   [0] = nLower           R-divider lower tap (1/3 VCC when floating)
-  //   [1] = nComp1Out        threshold comparator open-collector output
-  //   [2] = nComp2Out        trigger comparator open-collector output
-  //   [3] = nDischargeBase   BJT base node (driven by RS-FF  base glue)
-  const nLower         = internalNodeIds[0] ?? 0;
-  const nComp1Out      = internalNodeIds[1] ?? 0;
-  const nComp2Out      = internalNodeIds[2] ?? 0;
-  const nDischargeBase = internalNodeIds[3] ?? 0;
+  // R-divider sub-elements (pin nodes assigned in setup())
+  const rDiv1 = new Timer555ResElement(R_DIV);
+  const rDiv2 = new Timer555ResElement(R_DIV);
+  const rDiv3 = new Timer555ResElement(R_DIV);
 
-  // -------------------------------------------------------------------------
-  // Sub-element 1 & 2: Comparators (F4c behavioral  comparator.ts)
-  //
-  // Comparator 1 (threshold): in+ = THR, in- = CTRL, out = nComp1Out
-  //   Active (sinking) when V_THR > V_CTRL  asserts RESET to RS flip-flop.
-  //
-  // Comparator 2 (trigger): in+ = nLower, in- = TRIG, out = nComp2Out
-  //   Active (sinking) when V_TRIG < V_nLower  asserts SET to RS flip-flop.
-  //
-  // Both are F4c behavioral; no ngspice primitive; no pool state.
-  // -------------------------------------------------------------------------
-  const comp1PinNodes = new Map<string, number>([
-    ["in+", nThr],
-    ["in-", nCtrl],
-    ["out", nComp1Out],
-  ]);
-  const comp1Sub = createOpenCollectorComparatorElement(comp1PinNodes, makeCompProps());
+  // Comparator VCVS sub-elements (high-gain 1e6, pins assigned in setup())
+  const { expr, deriv } = makeVcvsComparatorExpression();
+  const comp1 = new VCVSAnalogElement(expr, deriv, "V(ctrl)", "voltage");
+  const comp2 = new VCVSAnalogElement(expr, deriv, "V(ctrl)", "voltage");
 
-  const comp2PinNodes = new Map<string, number>([
-    ["in+", nLower],
-    ["in-", nTrig],
-    ["out", nComp2Out],
-  ]);
-  const comp2Sub = createOpenCollectorComparatorElement(comp2PinNodes, makeCompProps());
-
-  // -------------------------------------------------------------------------
-  // Sub-element 3: Discharge NPN BJT (bjtload.c:170-end, L0 Gummel-Poon)
-  //
-  // NPN polarity. Base = nDischargeBase (internal, driven by RS-FF glue).
-  // Collector = nDis (external DIS pin). Emitter = nGnd (GND pin).
-  //
-  // Q=1 (SET):   RS-FF glue pulls base to GND  BJT cutoff  DIS Hi-Z
-  // Q=0 (RESET): RS-FF glue drives base high   BJT saturates  DIS sinks
-  // -------------------------------------------------------------------------
-  const bjtPinNodes = new Map<string, number>([
-    ["B", nDischargeBase],
-    ["C", nDis],
-    ["E", nGnd],
-  ]);
+  // Discharge BJT NPN sub-element (pin nodes assigned in setup())
   const bjtProps = makeBjtProps();
-  const bjtSub = createBjtElement(1 /* NPN */, bjtPinNodes, bjtProps);
+  const bjtDis = createBjtElement(
+    1,
+    new Map([["B", 0], ["C", 0], ["E", 0]]),
+    bjtProps,
+  ) as PoolBackedAnalogElementCore;
 
-  let bjtBase: number;
-
-  // -------------------------------------------------------------------------
-  // RS flip-flop state:
-  //   true  = SET   output HIGH, discharge BJT cutoff
-  //   false = RESET  output LOW,  discharge BJT saturated
-  // Advanced in accept() once per accepted timestep. Held constant during NR.
-  // -------------------------------------------------------------------------
-  let _flipflopQ = false;
-
-  // -------------------------------------------------------------------------
-  // Output pin model (F4c behavioral  DigitalOutputPinModel)
-  // -------------------------------------------------------------------------
-  const _outputPin = new DigitalOutputPinModel({
+  // Output pin model
+  const outModel = new DigitalOutputPinModel({
     rOut:  R_OUT,
     cOut:  0,
     rIn:   1e7,
@@ -448,294 +738,21 @@ function createTimer555Element(
     vIL:   0.8,
     rHiZ:  1e7,
   });
-  _outputPin.init(nOut, -1);
+  if (nOutNode > 0) { outModel.init(nOutNode, -1); }
 
-  // Collect capacitor children from output pin model (cOut=0  empty array at runtime).
-  const _childElements: AnalogCapacitorElement[] = collectPinModelChildren([_outputPin]);
-  const _childStateSize = _childElements.reduce((s, c) => s + c.stateSize, 0);
+  const childElements: AnalogCapacitorElement[] = collectPinModelChildren([outModel]);
 
-  function readNode(rhs: Float64Array, n: number): number {
-    return rhs[n];
-  }
+  const composite = new Timer555CompositeElement({
+    rDiv1, rDiv2, rDiv3, comp1, comp2,
+    bjtDis,
+    bjtProps,
+    outModel,
+    childElements,
+    pinNodes,
+    props: p,
+  });
 
-  function updateOutputPinLevels(rhs: Float64Array): void {
-    const vVccVal = readNode(rhs, nVcc);
-    const vGndVal = readNode(rhs, nGnd);
-    _outputPin.setParam("vOH", vVccVal - p.vDrop);
-    _outputPin.setParam("vOL", vGndVal + 0.1);
-  }
-
-  /**
-   * Advance RS flip-flop after an accepted timestep.
-   * Called ONLY from accept()  never during NR iteration.
-   * Comparator state is evaluated from node voltages at the accepted solution.
-   */
-  function advanceFlipflop(rhs: Float64Array): void {
-    const vGnd  = readNode(rhs, nGnd);
-    const vRstV = readNode(rhs, nRst);
-
-    // Active-low RESET pin: RST < GND + 0.7V  force Q=0 (overrides all)
-    if ((vRstV - vGnd) < 0.7) {
-      _flipflopQ = false;
-      return;
-    }
-
-    // Read comparator output node voltages to determine comparator states.
-    // comp1: active (sinking, pulled low)  RESET; comp2: active  SET.
-    // When nComp1Out/nComp2Out are 0 (unit test fallback), read from pin voltages.
-    const vThr   = readNode(rhs, nThr);
-    const vTrig  = readNode(rhs, nTrig);
-    const vCtrlV = readNode(rhs, nCtrl);
-    const vLower = nLower > 0 ? readNode(rhs, nLower) : (vCtrlV * 0.5);
-
-    // Comparator 1: THR > CTRL  RESET asserted
-    const comp1Reset = (vThr - vGnd) > (vCtrlV - vGnd);
-
-    // Comparator 2: TRIG < nLower  SET asserted
-    const comp2Set = (vTrig - vGnd) < (vLower - vGnd);
-
-    // RS flip-flop: RESET dominates (NE555 spec)
-    if (comp1Reset) {
-      _flipflopQ = false;
-    } else if (comp2Set) {
-      _flipflopQ = true;
-    }
-    // else: hold current state
-  }
-
-  return {
-    branchIndex: -1,
-    ngspiceLoadOrder: NGSPICE_LOAD_ORDER.VCVS,
-    isNonlinear: true,
-    get isReactive(): boolean {
-      return _childElements.length > 0;
-    },
-    _stateBase: -1,
-    _pinNodes: new Map(pinNodes),
-
-    setup(_ctx: SetupContext): void {
-      throw new Error(`PB-Timer555 not yet migrated`);
-    },
-
-    poolBacked: true as const,
-    // Composite state layout: BJT slots, then both comparator sub-elements,
-    // then capacitor children from the output pin model. Each sub-element is
-    // pool-backed and must be allocated a unique slot range from the parent's
-    // pool  the engine never visits sub-elements directly, so the parent
-    // must include their stateSize and call their initState().
-    stateSize:
-      BJT_STATE_SIZE +
-      (comp1Sub as unknown as { stateSize: number }).stateSize +
-      (comp2Sub as unknown as { stateSize: number }).stateSize +
-      _childStateSize,
-    stateSchema: BJT_SIMPLE_SCHEMA,
-    stateBaseOffset: -1,
-    s0: new Float64Array(0),
-    s1: new Float64Array(0),
-    s2: new Float64Array(0),
-    s3: new Float64Array(0),
-    s4: new Float64Array(0),
-    s5: new Float64Array(0),
-    s6: new Float64Array(0),
-    s7: new Float64Array(0),
-
-    initState(poolRef: StatePoolRef): void {
-      this.s0 = poolRef.state0; this.s1 = poolRef.state1; this.s2 = poolRef.state2; this.s3 = poolRef.state3;
-      this.s4 = poolRef.state4; this.s5 = poolRef.state5; this.s6 = poolRef.state6; this.s7 = poolRef.state7;
-      bjtBase = this.stateBaseOffset;
-
-      // BJT occupies the first block of state.
-      bjtSub.stateBaseOffset = bjtBase;
-      bjtSub.initState(poolRef);
-
-      // Comparators follow  each is poolBacked with its own stateSize.
-      // Without these initState calls the comparator's `pool` closure is
-      // undefined and load() throws "Cannot read properties of undefined
-      // (reading 'states')".
-      let offset = bjtBase + BJT_STATE_SIZE;
-      const comp1 = comp1Sub as unknown as {
-        stateSize: number;
-        stateBaseOffset: number;
-        initState: (p: StatePoolRef) => void;
-      };
-      comp1.stateBaseOffset = offset;
-      comp1.initState(poolRef);
-      offset += comp1.stateSize;
-
-      const comp2 = comp2Sub as unknown as {
-        stateSize: number;
-        stateBaseOffset: number;
-        initState: (p: StatePoolRef) => void;
-      };
-      comp2.stateBaseOffset = offset;
-      comp2.initState(poolRef);
-      offset += comp2.stateSize;
-
-      // Capacitor children from the output pin model (cOut=0  none at runtime).
-      for (const child of _childElements) {
-        child.stateBaseOffset = offset;
-        child.initState(poolRef);
-        offset += child.stateSize;
-      }
-    },
-
-    load(ctx: LoadContext): void {
-      const voltages = ctx.rhsOld;
-
-      // ---------------------------------------------------------------
-      // Update output pin voltage levels from current rail voltages.
-      // ---------------------------------------------------------------
-      updateOutputPinLevels(voltages);
-
-      // ---------------------------------------------------------------
-      // Sub-component 1: R-divider (three equal 5kÎ arms)
-      //
-      // cite: resload.c  primitive resistor G=1/R stamp at four matrix
-      // positions: [nA,nA], [nA,nB], [nB,nA], [nB,nB] (conductance G).
-      //
-      //   Upper arm:  VCC   CTRL   (nCtrl = 2/3 VCC when floating)
-      //   Middle arm: CTRL  nLower (nLower = 1/3 VCC when floating)
-      //   Lower arm:  nLower  GND
-      // ---------------------------------------------------------------
-      const G_DIV = 1 / R_DIV;
-      // Upper arm: VCC  CTRL  cite: resload.c primitive G stamp
-      stampG(ctx.solver, nVcc,   nVcc,   G_DIV);
-      stampG(ctx.solver, nVcc,   nCtrl, -G_DIV);
-      stampG(ctx.solver, nCtrl,  nVcc,  -G_DIV);
-      stampG(ctx.solver, nCtrl,  nCtrl,  G_DIV);
-      // Middle arm: CTRL  nLower  cite: resload.c primitive G stamp
-      stampG(ctx.solver, nCtrl,  nCtrl,  G_DIV);
-      stampG(ctx.solver, nCtrl,  nLower, -G_DIV);
-      stampG(ctx.solver, nLower, nCtrl,  -G_DIV);
-      stampG(ctx.solver, nLower, nLower,  G_DIV);
-      // Lower arm: nLower  GND  cite: resload.c primitive G stamp
-      stampG(ctx.solver, nLower, nLower,  G_DIV);
-      stampG(ctx.solver, nLower, nGnd,   -G_DIV);
-      stampG(ctx.solver, nGnd,   nLower, -G_DIV);
-      stampG(ctx.solver, nGnd,   nGnd,    G_DIV);
-
-      // ---------------------------------------------------------------
-      // Sub-component 2: Threshold comparator (F4c behavioral)
-      //   in+ = THR, in- = CTRL, out = nComp1Out
-      //   comparator.ts createOpenCollectorComparatorElement
-      // ---------------------------------------------------------------
-      comp1Sub.load(ctx);
-
-      // ---------------------------------------------------------------
-      // Sub-component 3: Trigger comparator (F4c behavioral)
-      //   in+ = nLower, in- = TRIG, out = nComp2Out
-      //   comparator.ts createOpenCollectorComparatorElement
-      // ---------------------------------------------------------------
-      comp2Sub.load(ctx);
-
-      // ---------------------------------------------------------------
-      // RS-FF  BJT base drive (digiTS composition glue, no ngspice cite)
-      //
-      // Translates the boolean _flipflopQ to a physical base voltage at
-      // nDischargeBase so the Gummel-Poon BJT sees correct BE bias:
-      //
-      //   Q=0 (RESET, BJT ON): drive base toward a saturating bias
-      //      conductance G_base between VCC and nDischargeBase
-      //       plus RHS injection G_base * V_VCC (Norton equivalent)
-      //        V_base  V_VCC (pulled strongly high  BJT saturates)
-      //
-      //   Q=1 (SET, BJT OFF): pull base to GND
-      //      conductance G_base between nDischargeBase and GND
-      //       (no RHS injection)
-      //        V_base  0 (pulled low  BJT cuts off)
-      //
-      // G_base is chosen large enough to overcome the BJT's base current
-      // but not so large as to cause solver conditioning issues.
-      // ---------------------------------------------------------------
-      const G_BASE_DRIVE = 1.0; // S  digiTS composition glue
-      if (!_flipflopQ) {
-        // Q=0 (RESET): drive base high  BJT saturates
-        // Norton: G between VCC and nDischargeBase + I_norton = G * V_VCC
-        const vVccVal = readNode(voltages, nVcc);
-        stampG(ctx.solver,  nVcc,          nVcc,           G_BASE_DRIVE);
-        stampG(ctx.solver,  nVcc,          nDischargeBase, -G_BASE_DRIVE);
-        stampG(ctx.solver,  nDischargeBase, nVcc,          -G_BASE_DRIVE);
-        stampG(ctx.solver,  nDischargeBase, nDischargeBase, G_BASE_DRIVE);
-        stampRHS(ctx.rhs, nDischargeBase, G_BASE_DRIVE * vVccVal);
-        stampRHS(ctx.rhs, nVcc,          -G_BASE_DRIVE * vVccVal);
-      } else {
-        // Q=1 (SET): pull base to GND  BJT cutoff
-        stampG(ctx.solver, nDischargeBase, nDischargeBase,  G_BASE_DRIVE);
-        stampG(ctx.solver, nDischargeBase, nGnd,           -G_BASE_DRIVE);
-        stampG(ctx.solver, nGnd,           nDischargeBase, -G_BASE_DRIVE);
-        stampG(ctx.solver, nGnd,           nGnd,            G_BASE_DRIVE);
-      }
-
-      // ---------------------------------------------------------------
-      // Sub-component 4: Discharge BJT (L0 Gummel-Poon)
-      //   NPN: B=nDischargeBase, C=nDis, E=nGnd
-      //   cite: bjtload.c:170-end (L0 resistive Gummel-Poon)
-      // ---------------------------------------------------------------
-      bjtSub.load(ctx);
-
-      // ---------------------------------------------------------------
-      // Sub-component 5: Output stage (F4c behavioral)
-      //   DigitalOutputPinModel drives OUT toward V_OH or V_OL.
-      // ---------------------------------------------------------------
-      _outputPin.setLogicLevel(_flipflopQ);
-      _outputPin.load(ctx);
-
-      // ---------------------------------------------------------------
-      // Capacitor children from output pin model (companion companion math).
-      // ---------------------------------------------------------------
-      for (const child of _childElements) {
-        child.load(ctx);
-      }
-    },
-
-    accept(ctx: LoadContext, _simTime: number, _addBreakpoint: (t: number) => void): void {
-      updateOutputPinLevels(ctx.rhs);
-      advanceFlipflop(ctx.rhs);
-      // Forward accept() to comparator sub-elements for responseTime integration
-      comp1Sub.accept?.(ctx, _simTime, _addBreakpoint);
-      comp2Sub.accept?.(ctx, _simTime, _addBreakpoint);
-    },
-
-    getPinCurrents(rhs: Float64Array): number[] {
-      // Pin layout order: [DIS, TRIG, THR, VCC, CTRL, OUT, RST, GND]
-      // Convention: positive = current flowing INTO the element at that pin.
-
-      const vVccV  = readNode(rhs, nVcc);
-      const vGndV  = readNode(rhs, nGnd);
-      const vCtrlV = readNode(rhs, nCtrl);
-      const vLower = nLower > 0 ? readNode(rhs, nLower) : (vCtrlV + vGndV) / 2;
-      const vOut   = readNode(rhs, nOut);
-      const vDis   = readNode(rhs, nDis);
-
-      const G_DIV = 1 / R_DIV;
-      const gOut  = 1 / R_OUT;
-      const vOutTarget = _outputPin.currentVoltage;
-
-      // R-divider currents (resload.c G stamp, KCL consistent)
-      const iVcc  = G_DIV * (vVccV - vCtrlV);
-      const iCtrl = G_DIV * (vCtrlV - vVccV) + G_DIV * (vCtrlV - vLower);
-      const iOut  = gOut * vOut - vOutTarget * gOut;
-      // THR, TRIG, RST are comparator inputs  high impedance, negligible
-      const iTrig = 0;
-      const iThr  = 0;
-      const iRst  = 0;
-      // Return simplified KCL-consistent currents at the composite boundary
-      return [
-        G_DIV * (vDis - vGndV),  // DIS  discharge current (BJT CE path)
-        iTrig,                    // TRIG
-        iThr,                     // THR
-        iVcc,                     // VCC (into divider upper arm)
-        iCtrl,                    // CTRL
-        iOut,                     // OUT
-        iRst,                     // RST
-        -(iVcc + iOut),           // GND  satisfies KCL at composite boundary
-      ];
-    },
-
-    setParam(key: string, value: number): void {
-      if (key in p) p[key] = value;
-    },
-  };
+  return composite;
 }
 
 // ---------------------------------------------------------------------------
@@ -777,8 +794,8 @@ export const Timer555Definition: ComponentDefinition = {
   attributeMap: TIMER555_ATTRIBUTE_MAPPINGS,
 
   helpText:
-    "555 Timer IC  F4b pool-backed composite model (two comparators + RS flip-flop + " +
-    "BJT discharge transistor + R-divider). Textbook NE555 internal schematic. " +
+    "555 Timer IC composite model (three R-divider arms + two VCVS comparators + " +
+    "BJT discharge transistor + SR latch + output driver). Textbook NE555 internal schematic. " +
     "Pins: VCC, GND, TRIG, THR, CTRL, RST, DIS, OUT.",
 
   factory(props: PropertyBag): Timer555Element {
@@ -789,19 +806,17 @@ export const Timer555Definition: ComponentDefinition = {
   modelRegistry: {
     "bipolar": {
       kind: "inline",
-      factory: (pinNodes, props, _getTime) =>
-        createTimer555Element(pinNodes, props, _getTime),
+      factory: createTimer555Element,
       paramDefs: TIMER555_PARAM_DEFS,
       params: { vDrop: 1.5, rDischarge: 10 },
-      getInternalNodeCount: () => 4,
+      mayCreateInternalNodes: true,
     },
     "cmos": {
       kind: "inline",
-      factory: (pinNodes, props, _getTime) =>
-        createTimer555Element(pinNodes, props, _getTime),
+      factory: createTimer555Element,
       paramDefs: TIMER555_PARAM_DEFS,
       params: { vDrop: 0.1, rDischarge: 10 },
-      getInternalNodeCount: () => 4,
+      mayCreateInternalNodes: true,
     },
   },
   defaultModel: "bipolar",

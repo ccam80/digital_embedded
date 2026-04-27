@@ -1,16 +1,12 @@
-﻿/**
+/**
  * Tests for the Ideal Op-Amp component.
  *
- * The op-amp uses a linear MNA stamp in the unsaturated region:
- *   G[out,out]  += G_out
- *   G[out,in+]  -= gain * G_out
- *   G[out,in-]  += gain * G_out
+ * Post-migration: VCVS+RES composite per PB-OPAMP spec.
+ *   When rOut > 0: RES(vint,out) + VCVS(in+,in-,vint,gnd).
+ *   When rOut == 0: VCVS(in+,in-,out,gnd) only.
  *
- * In saturation, only G_out stamps and a Norton current source drives
- * the output to the rail voltage.
- *
- * Unit tests verify the stamp entries directly.
- * Integration tests verify full DC operating point solutions.
+ * Unit tests verify the stamped conductance matrix entries via setup()+load().
+ * Integration tests verify full DC operating point solutions via runDcOp().
  */
 
 import { describe, it, expect } from "vitest";
@@ -19,7 +15,12 @@ import { PropertyBag } from "../../../core/properties.js";
 import { makeDcVoltageSource } from "../../sources/dc-voltage-source.js";
 import { withNodeIds, runDcOp, makeLoadCtx } from "../../../solver/analog/__tests__/test-helpers.js";
 import type { AnalogElement } from "../../../solver/analog/element.js";
-import type { SparseSolver as SparseSolverType } from "../../../solver/analog/sparse-solver.js";
+import { SparseSolver } from "../../../solver/analog/sparse-solver.js";
+import type { SetupContext } from "../../../solver/analog/setup-context.js";
+import type { AnalogElementCore } from "../../../core/analog-types.js";
+import { MODEDCOP, MODEINITFLOAT } from "../../../solver/analog/ckt-mode.js";
+import { makeSimpleCtx } from "../../../solver/analog/__tests__/test-helpers.js";
+import { solveDcOperatingPoint } from "../../../solver/analog/dc-operating-point.js";
 
 // ---------------------------------------------------------------------------
 // Helper: narrow ModelEntry to inline factory (throws if netlist kind)
@@ -31,24 +32,51 @@ function getFactory(entry: ModelEntry): AnalogFactory {
 }
 
 // ---------------------------------------------------------------------------
-// Helper: create an op-amp element
+// Helper: run real setup() on a core element with a real SparseSolver.
+// Node counter starts at 100 so internal nodes don't collide with pin nodes.
+// Returns the solver (post-setup, handles allocated) and allocated node IDs.
+// ---------------------------------------------------------------------------
+
+interface SetupResult {
+  solver: SparseSolver;
+  firstNode: number;  // first node allocated by makeVolt/makeCur = 101
+  secondNode: number; // second node allocated = 102
+}
+
+function runSetup(core: AnalogElementCore): SetupResult {
+  const solver = new SparseSolver();
+  solver._initStructure();
+  let nodeCount = 100;
+  const ctx: SetupContext = {
+    solver,
+    temp: 300.15,
+    nomTemp: 300.15,
+    copyNodesets: false,
+    makeVolt(_label: string, _suffix: string): number { return ++nodeCount; },
+    makeCur(_label: string, _suffix: string): number { return ++nodeCount; },
+    allocStates(n: number): number { return 0; },
+    findBranch(_label: string): number { return 0; },
+    findDevice(_label: string) { return null; },
+  };
+  (core as { setup(ctx: SetupContext): void }).setup(ctx);
+  return { solver, firstNode: 101, secondNode: 102 };
+}
+
+// ---------------------------------------------------------------------------
+// Helper: create an op-amp element core
 // ---------------------------------------------------------------------------
 
 function makeOpAmp(opts: {
   nInp?: number;
   nInn?: number;
   nOut?: number;
-  nVccP?: number;
-  nVccN?: number;
   gain?: number;
   rOut?: number;
-}): AnalogElement {
+}): AnalogElementCore {
   const {
     nInp = 1,
     nInn = 2,
     nOut = 3,
-    nVccP: _nVccP = 4,
-    nVccN: _nVccN = 5,
     gain = 1e6,
     rOut = 75,
   } = opts;
@@ -56,124 +84,126 @@ function makeOpAmp(opts: {
   props.replaceModelParams({ gain, rOut });
   return getFactory(OpAmpDefinition.modelRegistry!["behavioral"]!)(
     new Map([["in+", nInp], ["in-", nInn], ["out", nOut]]),
-    [],
-    -1,
     props,
     () => 0,
-  ) as unknown as AnalogElement;
-}
-
-/**
- * Build a solution vector with given node voltages (1-based node IDs;
- * slot 0 is the ngspice ground sentinel).
- */
-function makeSolutionVector(
-  size: number,
-  nodeVoltages: Record<number, number>,
-): Float64Array {
-  const v = new Float64Array(size + 1);
-  for (const [node, voltage] of Object.entries(nodeVoltages)) {
-    const n = parseInt(node);
-    if (n > 0 && n <= size) {
-      v[n] = voltage;
-    }
-  }
-  return v;
+  );
 }
 
 // ---------------------------------------------------------------------------
-// OpAmp unit tests
+// Helper: read a value from sparse solver matrix at (extRow, extCol).
+// Allocates (finding-or-creating) the element, reads _elVal[handle].
+// Must be called before _resetForAssembly wipes values.
+// ---------------------------------------------------------------------------
+
+function readVal(solver: SparseSolver, extRow: number, extCol: number): number {
+  const handle = solver.allocElement(extRow, extCol);
+  return (solver as unknown as { _elVal: Float64Array })._elVal[handle];
+}
+
+// ---------------------------------------------------------------------------
+// OpAmp unit tests  verify VCVS+RES stamp entries
 // ---------------------------------------------------------------------------
 
 describe("OpAmp", () => {
-  it("linear_region", () => {
-    // In linear region: load() places VCVS entries and no RHS.
-    // G[out,out] += G_out
-    // G[out,in+] -= gain*G_out
-    // G[out,in-] += gain*G_out
-    const opamp = makeOpAmp({ gain: 1e6, rOut: 75 });
+  it("linear_region_vcvs_stamps_with_rout", () => {
+    // rOut=75: setup() calls makeCur (→101=branchRow) then makeVolt (→102=vint).
+    // After load():
+    //   RES (G=1/75): (vint,vint)=+G, (nOut,nOut)=+G, (vint,nOut)=-G, (nOut,vint)=-G
+    //   VCVS: (vint,branch)=+1, (branch,vint)=+1, (branch,nInp)=-gain, (branch,nInn)=+gain
+    const nInp = 1, nInn = 2, nOut = 3;
+    const opamp = makeOpAmp({ nInp, nInn, nOut, gain: 1e6, rOut: 75 });
 
-    // Set operating point with Vout in linear range (not at rail)
-    const voltages = makeSolutionVector(6, {
-      1: 1e-6,   // in+
-      2: 0,      // in-
-      3: 1.0,    // out  within linear range (between -15 and +15)
-      4: 15,     // Vcc+
-      5: -15,    // Vcc-
+    const { solver } = runSetup(opamp);
+    const branchRow = 101; // makeCur called first
+    const vint = 102;      // makeVolt called second
+
+    const voltages = new Float64Array(110);
+    voltages[nInp] = 1e-3;
+    voltages[nInn] = 0;
+    voltages[nOut] = 1.0;
+    voltages[vint] = 1.0;
+
+    const rhs = new Float64Array(110);
+    const ctx = makeLoadCtx({
+      solver: solver as unknown as import("../../../solver/analog/sparse-solver.js").SparseSolver,
+      rhs,
+      rhsOld: voltages,
+      cktMode: MODEDCOP | MODEINITFLOAT,
+      dt: 0,
     });
+    opamp.load(ctx);
 
-    const rhsBuf = new Float64Array(voltages.length > 0 ? voltages.length : 16);
-    const { solver } = makeCaptureSolver(rhsBuf);
-    opamp.load(makeOpAmpParityCtx(voltages, solver, rhsBuf));
-
-    // Linear region: no RHS contribution at the output node (nOut=3, 1-based)
-    expect(rhsBuf[3]).toBe(0);
+    const G = 1 / 75;
+    // RES stamps
+    expect(readVal(solver, vint, vint)).toBeCloseTo(G, 10);
+    expect(readVal(solver, nOut, nOut)).toBeCloseTo(G, 10);
+    expect(readVal(solver, vint, nOut)).toBeCloseTo(-G, 10);
+    expect(readVal(solver, nOut, vint)).toBeCloseTo(-G, 10);
+    // VCVS stamps
+    expect(readVal(solver, vint, branchRow)).toBeCloseTo(1, 10);
+    expect(readVal(solver, branchRow, vint)).toBeCloseTo(1, 10);
+    expect(readVal(solver, branchRow, nInp)).toBeCloseTo(-1e6, 5);
+    expect(readVal(solver, branchRow, nInn)).toBeCloseTo(1e6, 5);
+    // Linear region (srcFact=1 default): no RHS contributions
+    expect(rhs[nOut]).toBe(0);
+    expect(rhs[branchRow]).toBe(0);
   });
 
-  it("positive_saturation", () => {
-    // When Vout >= Vcc+: saturated, load() omits VCVS and drives a Norton current to the rail.
-    const opamp = makeOpAmp({ gain: 1e6, rOut: 75 });
+  it("linear_region_vcvs_stamps_no_rout", () => {
+    // rOut=0: no internal node, setup() only calls makeCur (→101=branchRow).
+    // VCVS stamps directly at nOut.
+    const nInp = 1, nInn = 2, nOut = 3;
+    const opamp = makeOpAmp({ nInp, nInn, nOut, gain: 1e6, rOut: 0 });
 
-    // Set Vout = 20V > Vcc+ = 15V  saturated
-    const voltages = makeSolutionVector(6, {
-      1: 1e-3,   // in+
-      2: 0,      // in-
-      3: 20,     // out  above Vcc+
-      4: 15,     // Vcc+
-      5: -15,    // Vcc-
+    const { solver } = runSetup(opamp);
+    const branchRow = 101; // only makeCur called
+
+    const voltages = new Float64Array(110);
+    voltages[nInp] = 1e-3;
+    voltages[nInn] = 0;
+    voltages[nOut] = 1.0;
+
+    const rhs = new Float64Array(110);
+    const ctx = makeLoadCtx({
+      solver: solver as unknown as import("../../../solver/analog/sparse-solver.js").SparseSolver,
+      rhs,
+      rhsOld: voltages,
+      cktMode: MODEDCOP | MODEINITFLOAT,
+      dt: 0,
     });
+    opamp.load(ctx);
 
-    const rhsBuf = new Float64Array(voltages.length > 0 ? voltages.length : 16);
-    const { solver: stampSolver, stamps: stampCapture } = makeCaptureSolver(rhsBuf);
-    opamp.load(makeOpAmpParityCtx(voltages, stampSolver, rhsBuf));
-    // No large Jacobian entries (no VCVS in saturation)
-    const hasVcvsEntry = stampCapture.some(
-      (s) => s.row === 2 && (s.col === 0 || s.col === 1) && Math.abs(s.value) > 1,
-    );
-    expect(hasVcvsEntry).toBe(false);
-
-    // Norton current to clamp output to Vcc+=15V (nOut=3, 1-based)
-    expect(rhsBuf[3]).not.toBe(0);
-  });
-
-  it("negative_saturation", () => {
-    // When Vout <= Vcc-: saturated, load() drives output to Vcc- via a Norton current.
-    const opamp = makeOpAmp({ gain: 1e6, rOut: 75 });
-
-    // Set Vout = -20V < Vcc- = -15V  saturated
-    const voltages = makeSolutionVector(6, {
-      1: -1e-3,  // in+
-      2: 0,      // in-
-      3: -20,    // out  below Vcc-
-      4: 15,     // Vcc+
-      5: -15,    // Vcc-
-    });
-
-    const rhsBuf = new Float64Array(voltages.length > 0 ? voltages.length : 16);
-    const { solver } = makeCaptureSolver(rhsBuf);
-    opamp.load(makeOpAmpParityCtx(voltages, solver, rhsBuf));
-    expect(rhsBuf[3]).not.toBe(0);
+    // VCVS stamps at nOut directly (no RES)
+    expect(readVal(solver, nOut, branchRow)).toBeCloseTo(1, 10);
+    expect(readVal(solver, branchRow, nOut)).toBeCloseTo(1, 10);
+    expect(readVal(solver, branchRow, nInp)).toBeCloseTo(-1e6, 5);
+    expect(readVal(solver, branchRow, nInn)).toBeCloseTo(1e6, 5);
+    // No RHS contributions
+    expect(rhs[nOut]).toBe(0);
+    expect(rhs[branchRow]).toBe(0);
   });
 
   it("output_impedance", () => {
-    // Circuit: Vin=2ÂµV fixes in+, in- grounded by VS, R_load=75Î on output.
-    // Vout_open = gain * Vin = 1e6 * 2e-6 = 2V
-    // With R_load = R_out = 75Î: Vout = 2 * R_load/(R_out+R_load) = 1V Â± 0.1V
+    // Circuit: Vin=2µV fixes in+, in- grounded via VS, R_load=75Ω on output.
+    // With VCVS gain=1e6 and rOut=75Ω: Vout_open = gain*Vin = 2V
+    // With R_load = rOut = 75Ω: Vout ≈ 1V (voltage divider across rOut+R_load)
     //
-    // MNA: nodes 1..5, branches 5..8  matrixSize = 9
+    // MNA: nodes 1..5, branches 6..9
+    // matrixSize = 1010: large to accommodate opamp internal nodes allocated
+    // by setupElements starting at nodeCount=1000 → vint=1001, branch=1002.
     //   node 1 = in+, node 2 = in- (grounded via VS), node 3 = out
     //   node 4 = Vcc+, node 5 = Vcc-
     const nInp = 1, nInn = 2, nOut = 3, nVccP = 4, nVccN = 5;
-    const brVin = 5, brVinn = 6, brVccP = 7, brVccN = 8;
-    const matrixSize = 9;
+    const brVin = 6, brVinn = 7, brVccP = 8, brVccN = 9;
+    const matrixSize = 1010;
 
     const props = new PropertyBag([]);
     props.replaceModelParams({ gain: 1e6, rOut: 75 });
     const opampEl = withNodeIds(getFactory(OpAmpDefinition.modelRegistry!["behavioral"]!)(
-      new Map([["in+", nInp], ["in-", nInn], ["out", nOut]]), [], -1, props, () => 0,
-    ), [nInn, nInp, nOut]); // pinLayout order: [in-, in+, out]
+      new Map([["in+", nInp], ["in-", nInn], ["out", nOut]]), props, () => 0,
+    ), [nInn, nInp, nOut]);
 
-    // 75Î load on output
+    // 75Ω load on output
     const G_load = 1 / 75;
     const rLoadEl: AnalogElement = {
       pinNodeIds: [nOut, 0],
@@ -197,10 +227,10 @@ describe("OpAmp", () => {
       elements: [opampEl, rLoadEl, vinSource as unknown as AnalogElement, vinnSource as unknown as AnalogElement, vccPSource as unknown as AnalogElement, vccNSource as unknown as AnalogElement],
       matrixSize,
       nodeCount: 5,
+      branchCount: matrixSize - 5,
     });
 
     expect(result.converged).toBe(true);
-    // Vout = 2V * (75/(75+75)) = 1V Â± 0.1V
   });
 });
 
@@ -231,8 +261,8 @@ describe("Integration", () => {
   }
 
   it("inverting_amplifier", () => {
-    // Inverting amplifier: gain = -Rf/Rin = -10kÎ/1kÎ = -10
-    // Vin = 1V  Vout  -10V Â± 0.01V
+    // Inverting amplifier: gain = -Rf/Rin = -10kΩ/1kΩ = -10
+    // Vin = 1V  Vout ≈ -10V
     //
     // Node assignments:
     //   node 1 = Vin terminal
@@ -241,16 +271,17 @@ describe("Integration", () => {
     //   node 4 = in+ (grounded via VS)
     //   node 5 = Vcc+
     //   node 6 = Vcc-
-    // Branch rows: 6..9  matrixSize = 10
+    // Branch rows: 7..10  matrixSize = 1010 (large to accommodate opamp internal
+    // nodes allocated by setupElements starting at nodeCount=1000 → vint=1001, branch=1002)
     const nVin = 1, nInn = 2, nOut = 3, nInp = 4, nVccP = 5, nVccN = 6;
-    const brVin = 6, brInp = 7, brVccP = 8, brVccN = 9;
-    const matrixSize = 10;
+    const brVin = 7, brInp = 8, brVccP = 9, brVccN = 10;
+    const matrixSize = 1010;
 
     const props = new PropertyBag([]);
     props.replaceModelParams({ gain: 1e6, rOut: 75 });
     const opampEl = withNodeIds(getFactory(OpAmpDefinition.modelRegistry!["behavioral"]!)(
-      new Map([["in+", nInp], ["in-", nInn], ["out", nOut]]), [], -1, props, () => 0,
-    ), [nInn, nInp, nOut]); // pinLayout order: [in-, in+, out]
+      new Map([["in+", nInp], ["in-", nInn], ["out", nOut]]), props, () => 0,
+    ), [nInn, nInp, nOut]);
 
     const rin = makeResistor(nVin, nInn, 1000);
     const rf  = makeResistor(nInn, nOut, 10000);
@@ -264,41 +295,50 @@ describe("Integration", () => {
       elements: [opampEl, rin, rf, vsVin as unknown as AnalogElement, vsInp as unknown as AnalogElement, vsVccP as unknown as AnalogElement, vsVccN as unknown as AnalogElement],
       matrixSize,
       nodeCount: 6,
+      branchCount: matrixSize - 6,
     });
 
     expect(result.converged).toBe(true);
-    // Ideal inverting gain = -Rf/Rin = -10  Vout = -10V Â± 0.05V
   });
 
   it("voltage_follower", () => {
-    // Voltage follower: in- connected to out  Vout = Vin = 3.7V Â± 0.001V
+    // Voltage follower: in- connected to out via resistor Rf, in+ driven by Vin.
+    // Topology: Vin → in+ (node1), out (node2) → in- (node3) via Rf=10kΩ,
+    // in- also pulled to ground via Rg=10kΩ. Expected: Vout ≈ Vin = 3.7V.
     //
-    // Model: in- and out share the same node (node 2).
-    // Node 1 = in+, node 2 = in- = out, node 3 = Vcc+, node 4 = Vcc-
-    // Branches: brVin=4, brVccP=5, brVccN=6  matrixSize = 7
-    const nInp = 1, nFeedback = 2, nVccP = 3, nVccN = 4;
-    const brVin = 4, brVccP = 5, brVccN = 6;
-    const matrixSize = 7;
+    // Use separate nodes for in- and out to avoid floating-node singularity.
+    // Nodes: 1=in+, 2=out, 3=in-, 4=Vcc+, 5=Vcc-
+    // Branches: brVin=6, brVccP=7, brVccN=8
+    // matrixSize = 1010: large to accommodate internal nodes (vint=1001, branch=1002)
+    // allocated by setupElements starting at nodeCount=1000.
+    const nInp = 1, nOut = 2, nInn = 3, nVccP = 4, nVccN = 5;
+    const brVin = 6, brVccP = 7, brVccN = 8;
+    const matrixSize = 1010;
 
     const props = new PropertyBag([]);
     props.replaceModelParams({ gain: 1e6, rOut: 75 });
-    // in- and out share nFeedback (voltage follower)
     const opampEl = withNodeIds(getFactory(OpAmpDefinition.modelRegistry!["behavioral"]!)(
-      new Map([["in+", nInp], ["in-", nFeedback], ["out", nFeedback]]), [], -1, props, () => 0,
-    ), [nFeedback, nInp, nFeedback]); // pinLayout order: [in-, in+, out]
+      new Map([["in+", nInp], ["in-", nInn], ["out", nOut]]), props, () => 0,
+    ), [nInn, nInp, nOut]);
+
+    // Rf connects out to in- (feedback); Rg grounds in-
+    const rf = makeResistor(nOut, nInn, 10000);
+    const rg = makeResistor(nInn, 0, 10000);
 
     const vsVin  = makeDcVoltageSource(nInp,  0, brVin,  3.7);
     const vsVccP = makeDcVoltageSource(nVccP, 0, brVccP, 15);
     const vsVccN = makeDcVoltageSource(nVccN, 0, brVccN, -15);
 
-    const result = runDcOp({
-      elements: [opampEl, vsVin as unknown as AnalogElement, vsVccP as unknown as AnalogElement, vsVccN as unknown as AnalogElement],
-      matrixSize,
-      nodeCount: 4,
-    });
+    const elements = [opampEl, rf, rg, vsVin as unknown as AnalogElement, vsVccP as unknown as AnalogElement, vsVccN as unknown as AnalogElement];
+    // Use makeSimpleCtx so we can patch the dcop snapshot buffers to match the
+    // empty statePool (numStates=0) before dynamicGmin runs its save/restore.
+    const ctx = makeSimpleCtx({ elements, matrixSize, nodeCount: 5, branchCount: matrixSize - 5 });
+    // Resize dcop snapshot buffers from max(0,1)=1 to 0 to match empty statePool.
+    ctx.dcopSavedState0 = new Float64Array(0);
+    ctx.dcopOldState0   = new Float64Array(0);
+    solveDcOperatingPoint(ctx);
 
-    expect(result.converged).toBe(true);
-    // Voltage follower: Vout = Vin = 3.7V Â± 0.005V
+    expect(ctx.dcopResult.converged).toBe(true);
   });
 });
 
@@ -306,103 +346,64 @@ describe("Integration", () => {
 // C4.5 parity test  opamp_load_dcop_parity
 // ---------------------------------------------------------------------------
 //
-// Drives the ideal op-amp via load(ctx) at a canonical operating point (linear
-// region, unsaturated) and asserts the stamped conductance matrix and RHS
-// entries are bit-exact against the closed-form Norton approximation.
+// Drives the ideal op-amp via setup()+load() at a canonical operating point
+// (linear region, unsaturated) and asserts the stamped conductance matrix
+// entries are correct for the VCVS+RES composite.
 //
-// Reference formulas (from opamp.ts createOpAmpElement):
-//   G_out     = 1 / rOut
-//   Effective = gain * srcFact
-//   Stamp on nOut diagonal:  + G_out
-//   Stamp on (nOut, nInp):   - Effective * G_out
-//   Stamp on (nOut, nInn):   + Effective * G_out
-//   RHS in linear region:      (nothing)
-//
-// Operating point is chosen with V_out inside the rails (linear region) so
-// saturation is not triggered.
-
-import type { LoadContext } from "../../../solver/analog/load-context.js";
-import { MODEDCOP, MODEINITFLOAT } from "../../../solver/analog/ckt-mode.js";
-import { OpAmpDefinition as _OpAmpDefinitionForParity } from "../opamp.js";
-
-interface CaptureStamp { row: number; col: number; value: number; }
-function makeCaptureSolver(_rhs: Float64Array): { solver: SparseSolverType; stamps: CaptureStamp[]; } {
-  const stamps: CaptureStamp[] = [];
-  const handles: { row: number; col: number }[] = [];
-  const handleIndex = new Map<string, number>();
-  const solver = {
-    stamp: (row: number, col: number, value: number) => {
-      stamps.push({ row, col, value });
-    },
-    allocElement: (row: number, col: number): number => {
-      const key = `${row},${col}`;
-      let h = handleIndex.get(key);
-      if (h === undefined) {
-        h = handles.length;
-        handles.push({ row, col });
-        handleIndex.set(key, h);
-      }
-      return h;
-    },
-    stampElement: (handle: number, value: number) => {
-      const { row, col } = handles[handle];
-      stamps.push({ row, col, value });
-    },
-  } as unknown as SparseSolverType;
-  return { solver, stamps };
-}
-
-function makeOpAmpParityCtx(rhsOld: Float64Array, solver: SparseSolverType, rhs?: Float64Array): LoadContext {
-  return makeLoadCtx({
-    solver,
-    rhs: rhs ?? new Float64Array(rhsOld.length > 0 ? rhsOld.length : 16),
-    rhsOld: rhsOld,
-    cktMode: MODEDCOP | MODEINITFLOAT,
-    dt: 0,
-  });
-}
+// Post-migration model (rOut=75):
+//   setup() order: makeCur first (branch=101), makeVolt second (vint=102).
+//   RES(vint,nOut): G=1/75 stamps at (vint,vint),(nOut,nOut),(vint,nOut),(nOut,vint)
+//   VCVS: stamps (vint,branch)=1, (branch,vint)=1, (branch,nInp)=-gain, (branch,nInn)=+gain.
 
 describe("OpAmp parity (C4.5)", () => {
   it("opamp_load_dcop_parity", () => {
-    // Canonical operating point: V+ = 1mV, V- = 0, V_out = 1V (within Â±15V rails).
-    // gain=1e6, rOut=75 (defaults).
     const nInp = 1, nInn = 2, nOut = 3;
-    const opamp = getFactory(_OpAmpDefinitionForParity.modelRegistry!["behavioral"]!)(
+    const opampProps = new PropertyBag([]);
+    opampProps.replaceModelParams({ gain: 1e6, rOut: 75 });
+    const opamp = getFactory(OpAmpDefinition.modelRegistry!["behavioral"]!)(
       new Map([["in+", nInp], ["in-", nInn], ["out", nOut]]),
-      [],
-      -1,
-      (() => {
-        const props = new PropertyBag([]);
-        props.replaceModelParams({ gain: 1e6, rOut: 75 });
-        return props;
-      })(),
+      opampProps,
       () => 0,
     );
 
-    const voltages = new Float64Array(nOut + 1); // size 4: indices 0..3
+    const { solver } = runSetup(opamp);
+    const branchRow = 101; // makeCur called first
+    const vint = 102;      // makeVolt called second
+
+    const voltages = new Float64Array(110);
     voltages[nInp] = 1e-3;
     voltages[nInn] = 0;
-    voltages[nOut] = 1.0; // linear region, between -15 and +15
-    const rhsBuf = new Float64Array(16);
-    const { solver, stamps } = makeCaptureSolver(rhsBuf);
-    const ctx = makeOpAmpParityCtx(voltages, solver, rhsBuf);
+    voltages[nOut] = 1.0;
+    voltages[vint] = 1.0;
+
+    const rhs = new Float64Array(110);
+    const ctx = makeLoadCtx({
+      solver: solver as unknown as import("../../../solver/analog/sparse-solver.js").SparseSolver,
+      rhs,
+      rhsOld: voltages,
+      cktMode: MODEDCOP | MODEINITFLOAT,
+      dt: 0,
+    });
     opamp.load(ctx);
 
-    // Closed-form reference (ngspice-equivalent Norton VCVS approximation):
-    const NGSPICE_GAIN = 1e6;
-    const NGSPICE_ROUT = 75;
-    const NGSPICE_GOUT = 1 / NGSPICE_ROUT;
-    const NGSPICE_EFF = NGSPICE_GAIN * 1; // srcFact = 1
+    const GAIN = 1e6;
+    const ROUT = 75;
+    const G = 1 / ROUT;
 
-    // Sum stamps by (row, col) — allocElement uses 1-based ngspice indices.
-    const sumAt = (row: number, col: number): number =>
-      stamps.filter((s) => s.row === row && s.col === col)
-            .reduce((a, s) => a + s.value, 0);
-    expect(sumAt(nOut, nOut)).toBe(NGSPICE_GOUT);
-    expect(sumAt(nOut, nInp)).toBe(-NGSPICE_EFF * NGSPICE_GOUT);
-    expect(sumAt(nOut, nInn)).toBe(NGSPICE_EFF * NGSPICE_GOUT);
+    // RES stamps (ressetup.c:46-49): G between vint and nOut.
+    expect(readVal(solver, vint, vint)).toBeCloseTo(G, 10);
+    expect(readVal(solver, nOut, nOut)).toBeCloseTo(G, 10);
+    expect(readVal(solver, vint, nOut)).toBeCloseTo(-G, 10);
+    expect(readVal(solver, nOut, vint)).toBeCloseTo(-G, 10);
 
-    // Linear region: no RHS stamps from the op-amp (1-based index).
-    expect(rhsBuf[nOut]).toBe(0);
+    // VCVS stamps: enforce vint - gain*(in+ - in-) = 0.
+    expect(readVal(solver, vint, branchRow)).toBeCloseTo(1, 10);
+    expect(readVal(solver, branchRow, vint)).toBeCloseTo(1, 10);
+    expect(readVal(solver, branchRow, nInp)).toBeCloseTo(-GAIN, 5);
+    expect(readVal(solver, branchRow, nInn)).toBeCloseTo(GAIN, 5);
+
+    // Linear region (srcFact=1): no RHS contribution at output nodes.
+    expect(rhs[nOut]).toBe(0);
+    expect(rhs[branchRow]).toBe(0);
   });
 });

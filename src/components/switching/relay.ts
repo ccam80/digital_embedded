@@ -39,8 +39,9 @@ import {
 import type { LoadContext } from "../../solver/analog/element.js";
 import { NGSPICE_LOAD_ORDER } from "../../solver/analog/element.js";
 import type { SetupContext } from "../../solver/analog/setup-context.js";
-import type { PoolBackedAnalogElementCore, StatePoolRef } from "../../solver/analog/element.js";
+import type { AnalogElementCore } from "../../core/analog-types.js";
 import { AnalogInductorElement, INDUCTOR_DEFAULTS } from "../passives/inductor.js";
+import { SwitchAnalogElement } from "./switch.js";
 
 // ---------------------------------------------------------------------------
 // Relay analog constants
@@ -52,123 +53,259 @@ const RELAY_R_COIL_DEFAULT = 100;
 const RELAY_L_DEFAULT = 0.1;
 const RELAY_I_PULL_DEFAULT = 20e-3;
 
-function stampG(
-  solver: { allocElement(r: number, c: number): number; stampElement(h: number, v: number): void },
-  nA: number,
-  nB: number,
-  g: number,
-): void {
-  if (nA > 0) solver.stampElement(solver.allocElement(nA, nA), g);
-  if (nB > 0) solver.stampElement(solver.allocElement(nB, nB), g);
-  if (nA > 0 && nB > 0) {
-    solver.stampElement(solver.allocElement(nA, nB), -g);
-    solver.stampElement(solver.allocElement(nB, nA), -g);
+// ---------------------------------------------------------------------------
+// RelayInductorSubElement — IND sub-element for relay coil
+//
+// Extends AnalogInductorElement with a real setup() body.
+// ngspice anchor: indsetup.c:84-100
+// ---------------------------------------------------------------------------
+
+export class RelayInductorSubElement extends AnalogInductorElement {
+  // Handle fields — port of indsetup.c:96-100 TSTALLOC sequence
+  _hPIbr: number = -1;   // (INDposNode, INDbrEq)
+  _hNIbr: number = -1;   // (INDnegNode, INDbrEq)
+  _hIbrN: number = -1;   // (INDbrEq, INDnegNode)
+  _hIbrP: number = -1;   // (INDbrEq, INDposNode)
+  _hIbrIbr: number = -1; // (INDbrEq, INDbrEq)
+
+  private readonly _elementLabel: string;
+
+  constructor(label: string, inductance: number) {
+    super(
+      inductance,
+      INDUCTOR_DEFAULTS["IC"]!,
+      INDUCTOR_DEFAULTS["TC1"]!,
+      INDUCTOR_DEFAULTS["TC2"]!,
+      INDUCTOR_DEFAULTS["TNOM"]!,
+      INDUCTOR_DEFAULTS["SCALE"]!,
+      INDUCTOR_DEFAULTS["M"]!,
+    );
+    this._elementLabel = label;
+  }
+
+  setup(ctx: SetupContext): void {
+    const posNode = this._pinNodes.get("A")!;
+    const negNode = this._pinNodes.get("B")!;
+
+    // indsetup.c:78-79: *states += 2
+    this._stateBase = ctx.allocStates(2);
+    this.stateBaseOffset = this._stateBase;
+
+    // indsetup.c:84-87: idempotent branch-row guard
+    if (this.branchIndex === -1) {
+      this.branchIndex = ctx.makeCur(this._elementLabel, "branch");
+    }
+    const b = this.branchIndex;
+
+    // indsetup.c:96-100: TSTALLOC sequence (5 entries, line-for-line)
+    this._hPIbr   = ctx.solver.allocElement(posNode, b); // (INDposNode, INDbrEq)
+    this._hNIbr   = ctx.solver.allocElement(negNode, b); // (INDnegNode, INDbrEq)
+    this._hIbrN   = ctx.solver.allocElement(b, negNode); // (INDbrEq, INDnegNode)
+    this._hIbrP   = ctx.solver.allocElement(b, posNode); // (INDbrEq, INDposNode)
+    this._hIbrIbr = ctx.solver.allocElement(b, b);       // (INDbrEq, INDbrEq)
+  }
+
+  findBranchFor(_name: string, ctx: SetupContext): number {
+    if (this.branchIndex === -1) {
+      this.branchIndex = ctx.makeCur(this._elementLabel, "branch");
+    }
+    return this.branchIndex;
   }
 }
 
 // ---------------------------------------------------------------------------
-// createRelayAnalogElement — W2 stub composite
+// RelayResSubElement — RES sub-element for relay coil resistance
+//
+// ngspice anchor: ressetup.c:46-49
+// ---------------------------------------------------------------------------
+
+export class RelayResSubElement implements AnalogElementCore {
+  readonly branchIndex: number = -1;
+  readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.RES;
+  readonly isNonlinear = false;
+  readonly isReactive = false;
+  _stateBase: number = -1;
+  _pinNodes: Map<string, number>;
+
+  // Handle fields — port of ressetup.c:46-49 TSTALLOC sequence
+  _hPP: number = -1; // (RESposNode, RESposNode)
+  _hNN: number = -1; // (RESnegNode, RESnegNode)
+  _hPN: number = -1; // (RESposNode, RESnegNode)
+  _hNP: number = -1; // (RESnegNode, RESposNode)
+
+  private _resistance: number;
+  private _G: number;
+
+  constructor(pinNodes: Map<string, number>, resistance: number) {
+    this._pinNodes = pinNodes;
+    this._resistance = Math.max(resistance, 1e-9);
+    this._G = 1 / this._resistance;
+  }
+
+  setup(ctx: SetupContext): void {
+    const posNode = this._pinNodes.get("A")!;
+    const negNode = this._pinNodes.get("B")!;
+
+    // ressetup.c: NG_IGNORE(state) — no state slots
+
+    // ressetup.c:46-49: TSTALLOC sequence (4 entries, line-for-line)
+    this._hPP = ctx.solver.allocElement(posNode, posNode); // (RESposNode, RESposNode)
+    this._hNN = ctx.solver.allocElement(negNode, negNode); // (RESnegNode, RESnegNode)
+    this._hPN = ctx.solver.allocElement(posNode, negNode); // (RESposNode, RESnegNode)
+    this._hNP = ctx.solver.allocElement(negNode, posNode); // (RESnegNode, RESposNode)
+  }
+
+  load(ctx: LoadContext): void {
+    // resload.c: stamp conductance through cached handles
+    ctx.solver.stampElement(this._hPP, +this._G);
+    ctx.solver.stampElement(this._hNN, +this._G);
+    ctx.solver.stampElement(this._hPN, -this._G);
+    ctx.solver.stampElement(this._hNP, -this._G);
+  }
+
+  getPinCurrents(rhs: Float64Array): number[] {
+    const posNode = this._pinNodes.get("A")!;
+    const negNode = this._pinNodes.get("B")!;
+    const I = this._G * (rhs[posNode] - rhs[negNode]);
+    return [I, -I];
+  }
+
+  setParam(key: string, value: number): void {
+    if (key === "resistance") {
+      this._resistance = Math.max(value, 1e-9);
+      this._G = 1 / this._resistance;
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// RelayAnalogElement — W3 migrated composite class
+//
+// Architecture: coilL (IND) + coilR (RES) + contactSW (SW)
+// ngspice anchors:
+//   coilL: indsetup.c:84-100, indload.c
+//   coilR: ressetup.c:46-49, resload.c
+//   contactSW: swsetup.c:47-62, swload.c
+// ---------------------------------------------------------------------------
+
+class RelayAnalogElement implements AnalogElementCore {
+  branchIndex: number = -1;
+  readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.IND;
+  readonly isNonlinear = true;
+  readonly isReactive = true;
+  _stateBase: number = -1;
+  _pinNodes: Map<string, number>;
+
+  readonly _coilL: RelayInductorSubElement;
+  readonly _coilR: RelayResSubElement;
+  readonly _contactSW: SwitchAnalogElement;
+
+  private _nCoilMid: number = -1;
+  private readonly _label: string;
+  private readonly _iPull: number;
+  private readonly _normallyClosed: boolean;
+
+  constructor(label: string, pinNodes: ReadonlyMap<string, number>, props: PropertyBag) {
+    this._label = label;
+    this._pinNodes = new Map(pinNodes);
+    this._iPull = props.has("iPull") ? (props.get("iPull") as number) : RELAY_I_PULL_DEFAULT;
+    this._normallyClosed = props.has("normallyClosed") ? (props.get("normallyClosed") as boolean) : false;
+
+    const in1node = pinNodes.get("in1")!;
+    const in2node = pinNodes.get("in2")!;
+    const A1node = pinNodes.get("A1")!;
+    const B1node = pinNodes.get("B1")!;
+
+    const inductance = props.has("inductance") ? (props.get("inductance") as number) : RELAY_L_DEFAULT;
+    const coilResistance = props.has("coilResistance") ? (props.get("coilResistance") as number) : RELAY_R_COIL_DEFAULT;
+
+    // coilL: in1 → coilMid (B node will be set in setup() after makeVolt)
+    this._coilL = new RelayInductorSubElement(`${label}/_coilL`, inductance);
+    this._coilL._pinNodes = new Map([["A", in1node], ["B", -1]]);
+
+    // coilR: coilMid → in2 (A node will be set in setup() after makeVolt)
+    this._coilR = new RelayResSubElement(new Map([["A", -1], ["B", in2node]]), coilResistance);
+
+    // contactSW: A1 ↔ B1
+    const swProps = new PropertyBag();
+    swProps.set("Ron", RELAY_R_ON);
+    swProps.set("Roff", RELAY_R_OFF);
+    swProps.set("normallyClosed", this._normallyClosed);
+    swProps.set("closed", false);
+    this._contactSW = new SwitchAnalogElement(new Map([["A1", A1node], ["B1", B1node]]), swProps);
+  }
+
+  setup(ctx: SetupContext): void {
+    // Allocate mid-node between coilL and coilR
+    this._nCoilMid = ctx.makeVolt(this._label, "coilMid");
+
+    // Wire coilL: in1 → coilMid
+    this._coilL._pinNodes.set("B", this._nCoilMid);
+
+    // Wire coilR: coilMid → in2
+    this._coilR._pinNodes.set("A", this._nCoilMid);
+
+    // Sub-element setup in NGSPICE_LOAD_ORDER (IND=27 < RES=40 < SW=42)
+    this._coilL.setup(ctx);      // 2 IND state slots + branch row + 5 IND handles
+    this._coilR.setup(ctx);      // 0 state slots + 4 RES handles
+    this._contactSW.setup(ctx);  // 2 SW state slots + 4 SW handles
+
+    // Store coilL's stateBase as the composite's state base
+    this._stateBase = this._coilL._stateBase;
+
+    // Expose branch index (coilL's branch)
+    this.branchIndex = this._coilL.branchIndex;
+  }
+
+  findBranchFor(name: string, ctx: SetupContext): number {
+    return this._coilL.findBranchFor(name, ctx);
+  }
+
+  load(ctx: LoadContext): void {
+    this._coilL.load(ctx);      // IND Thevenin equivalent (req, veq)
+    this._coilR.load(ctx);      // RES conductance stamp (coilResistance)
+    this._contactSW.load(ctx);  // SW conductance based on coil current state
+  }
+
+  accept(ctx: LoadContext, _simTime: number, _addBreakpoint: (t: number) => void): void {
+    const b = this._coilL.branchIndex;
+    const iCoil = b >= 0 ? ctx.rhs[b] : 0;
+    const energised = Math.abs(iCoil) > this._iPull;
+    const contactClosed = this._normallyClosed ? !energised : energised;
+    this._contactSW.setSwState(contactClosed);
+  }
+
+  getPinCurrents(rhs: Float64Array): number[] {
+    const b = this._coilL.branchIndex;
+    const iCoil = b >= 0 ? rhs[b] : 0;
+    const contactCurrents = this._contactSW.getPinCurrents(rhs);
+    return [iCoil, -iCoil, contactCurrents[0], contactCurrents[1]];
+  }
+
+  setParam(key: string, value: number): void {
+    if (key === "inductance") {
+      this._coilL.setParam("inductance", value);
+    } else if (key === "coilResistance") {
+      this._coilR.setParam("resistance", value);
+    } else if (key === "ron") {
+      this._contactSW.setParam("Ron", value);
+    } else if (key === "roff") {
+      this._contactSW.setParam("Roff", value);
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// createRelayAnalogElement — factory
 // ---------------------------------------------------------------------------
 
 function createRelayAnalogElement(
   pinNodes: ReadonlyMap<string, number>,
   props: PropertyBag,
-): PoolBackedAnalogElementCore & { getChildElements(): readonly AnalogInductorElement[] } {
-  const nodeCoil1 = pinNodes.get("in1")!;
-  const nodeCoil2 = pinNodes.get("in2")!;
-  const nodeContactA = pinNodes.get("A1")!;
-  const nodeContactB = pinNodes.get("B1")!;
-
-  const rCoil = props.has("coilResistance")
-    ? (props.get("coilResistance") as number)
-    : RELAY_R_COIL_DEFAULT;
-  const L = props.has("inductance")
-    ? (props.get("inductance") as number)
-    : RELAY_L_DEFAULT;
-  const iPull = props.has("iPull")
-    ? (props.get("iPull") as number)
-    : RELAY_I_PULL_DEFAULT;
-  const normallyClosed = props.has("normallyClosed")
-    ? (props.get("normallyClosed") as boolean)
-    : false;
-
-  const coilInductor = new AnalogInductorElement(
-    -1,
-    L,
-    INDUCTOR_DEFAULTS["IC"]!,
-    INDUCTOR_DEFAULTS["TC1"]!,
-    INDUCTOR_DEFAULTS["TC2"]!,
-    INDUCTOR_DEFAULTS["TNOM"]!,
-    INDUCTOR_DEFAULTS["SCALE"]!,
-    INDUCTOR_DEFAULTS["M"]!,
-  );
-  coilInductor.pinNodeIds = [nodeCoil1, nodeCoil2];
-
-  let contactClosed = normallyClosed;
-
-  function contactG(): number {
-    return contactClosed ? 1 / RELAY_R_ON : 1 / RELAY_R_OFF;
-  }
-
-  return {
-    branchIndex: -1,
-    ngspiceLoadOrder: NGSPICE_LOAD_ORDER.IND,
-    isNonlinear: true,
-    isReactive: true,
-    _stateBase: -1,
-    _pinNodes: new Map(pinNodes),
-
-    poolBacked: true as const,
-    stateSchema: coilInductor.stateSchema,
-    stateSize: coilInductor.stateSize,
-    stateBaseOffset: -1,
-    s0: new Float64Array(0),
-    s1: new Float64Array(0),
-    s2: new Float64Array(0),
-    s3: new Float64Array(0),
-    s4: new Float64Array(0),
-    s5: new Float64Array(0),
-    s6: new Float64Array(0),
-    s7: new Float64Array(0),
-
-    setup(_ctx: SetupContext): void {
-      throw new Error("PB-RELAY not yet migrated");
-    },
-
-    initState(pool: StatePoolRef): void {
-      coilInductor.stateBaseOffset = this.stateBaseOffset;
-      coilInductor.initState(pool);
-    },
-
-    getChildElements(): readonly AnalogInductorElement[] {
-      return [coilInductor];
-    },
-
-    load(ctx: LoadContext): void {
-      const s = ctx.solver;
-      stampG(s, nodeCoil1, nodeCoil2, 1 / rCoil);
-      stampG(s, nodeContactA, nodeContactB, contactG());
-      coilInductor.load(ctx);
-    },
-
-    accept(ctx: LoadContext, _simTime: number, _addBreakpoint: (t: number) => void): void {
-      const branchIdx = coilInductor.branchIndex;
-      const iCoil = branchIdx >= 0 ? ctx.rhs[branchIdx] : 0;
-      const energised = Math.abs(iCoil) > iPull;
-      contactClosed = normallyClosed ? !energised : energised;
-    },
-
-    getPinCurrents(rhs: Float64Array): number[] {
-      const branchIdx = coilInductor.branchIndex;
-      const iCoil = branchIdx >= 0 ? rhs[branchIdx] : 0;
-      const vA = rhs[nodeContactA];
-      const vB = rhs[nodeContactB];
-      const iContact = contactG() * (vA - vB);
-      return [iCoil, -iCoil, iContact, -iContact];
-    },
-
-    setParam(key: string, value: number) { coilInductor.setParam(key, value); },
-  };
+  _getTime: () => number,
+): AnalogElementCore {
+  const label = (props.has("label") ? (props.get("label") as string) : undefined) ?? "Relay";
+  return new RelayAnalogElement(label, pinNodes, props);
 }
 
 // ---------------------------------------------------------------------------
@@ -440,7 +577,7 @@ export const RelayDefinition: ComponentDefinition = {
   modelRegistry: {
     "behavioral": {
       kind: "inline",
-      factory: (pinNodes, props, _getTime) => createRelayAnalogElement(pinNodes, props),
+      factory: createRelayAnalogElement,
       paramDefs: [],
       params: {},
       mayCreateInternalNodes: true,

@@ -12,6 +12,10 @@
  *   Bidirectional: B   (bitWidth)
  *
  * internalStateCount: 1 (closedFlag, read by bus resolver)
+ *
+ * Analog model: composite of two SW sub-elements sharing the same in↔out
+ * signal path. NFET SW uses ctrl pin; PFET SW uses ctrlN pin (inverted).
+ * ngspice anchor: ref/ngspice/src/spicelib/devices/sw/swsetup.c:47-62
  */
 
 import { AbstractCircuitElement } from "../../core/element.js";
@@ -28,8 +32,10 @@ import {
   type ComponentLayout,
 } from "../../core/registry.js";
 import type { FETLayout } from "./nfet.js";
-import type { AnalogElementCore, LoadContext } from "../../solver/analog/element.js";
-import { NGSPICE_LOAD_ORDER } from "../../solver/analog/element.js";
+import { NFETSWSubElement } from "./nfet.js";
+import type { AnalogElementCore } from "../../core/analog-types.js";
+import { NGSPICE_LOAD_ORDER } from "../../core/analog-types.js";
+import type { LoadContext } from "../../solver/analog/load-context.js";
 import type { SetupContext } from "../../solver/analog/setup-context.js";
 
 // ---------------------------------------------------------------------------
@@ -190,14 +196,22 @@ export function executeTransGate(index: number, state: Uint32Array, highZs: Uint
 }
 
 // ---------------------------------------------------------------------------
-// TransGateAnalogElement — MNA element stub
+// TransGateAnalogElement — MNA composite element
 //
-// Composite: NFET SW + PFET SW sub-elements sharing the same in↔out signal
-// path. setup() and load() are stubbed; the full migration is tracked in
-// spec/setup-load-split/components/PB-TRANSGATE.md.
+// Composite: two SW sub-elements sharing the same in↔out signal path.
+//   _nfetSW: posNode=inNode, negNode=outNode, control=p1 (ctrl pin)
+//            ON when V(p1) > Vth_n
+//   _pfetSW: posNode=inNode, negNode=outNode, control=p2 (ctrlN pin, inverted)
+//            ON when V(p2) < Vth_p (implemented as inverted control voltage)
+//
+// setup() calls _nfetSW.setup(ctx) then _pfetSW.setup(ctx) — NFET first per
+// A6.4 sub-element ordering rule (both are SW, same NGSPICE_LOAD_ORDER; NFET
+// sub-element is first by construction order, matching PB-TRANSGATE TSTALLOC table).
+//
+// ngspice anchor: ref/ngspice/src/spicelib/devices/sw/swsetup.c:47-62 (applied twice)
 // ---------------------------------------------------------------------------
 
-class TransGateAnalogElement implements AnalogElementCore {
+export class TransGateAnalogElement implements AnalogElementCore {
   readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.SW;
   readonly isNonlinear: boolean = true;
   readonly isReactive: boolean = false;
@@ -205,31 +219,82 @@ class TransGateAnalogElement implements AnalogElementCore {
   _stateBase: number = -1;
   _pinNodes: Map<string, number>;
 
+  readonly _nfetSW: NFETSWSubElement;
+  readonly _pfetSW: NFETSWSubElement;
+
   constructor(pinNodes: ReadonlyMap<string, number>) {
     this._pinNodes = new Map(pinNodes);
+
+    const inNode = pinNodes.get("out1")!;
+    const outNode = pinNodes.get("out2")!;
+
+    this._nfetSW = new NFETSWSubElement();
+    this._nfetSW._pinNodes = new Map([
+      ["D", inNode],
+      ["S", outNode],
+    ]);
+
+    this._pfetSW = new NFETSWSubElement();
+    this._pfetSW._pinNodes = new Map([
+      ["D", inNode],
+      ["S", outNode],
+    ]);
   }
 
-  setup(_ctx: SetupContext): void {
-    throw new Error("PB-TRANSGATE not yet migrated");
+  setup(ctx: SetupContext): void {
+    // Both sub-elements share the same signal path (in=out1, out=out2).
+    // NFET's SW setup runs first, PFET's SW setup runs second.
+    // Per PB-TRANSGATE TSTALLOC table: entries 1-4 are NFET SW, 5-8 are PFET SW.
+    // Per A6.4: sub-elements in NGSPICE_LOAD_ORDER ascending (both SW = same order;
+    // NFET first by construction, matching ngspice swsetup.c applied twice).
+    this._nfetSW.setup(ctx);
+    this._pfetSW.setup(ctx);
   }
 
-  load(_ctx: LoadContext): void {
-    throw new Error("PB-TRANSGATE not yet migrated");
+  load(ctx: LoadContext): void {
+    // NFET SW: ON when V(p1) - V(0) > Vth_n (p1 is ctrl pin, active-high)
+    const ctrlNode = this._pinNodes.get("p1")!;
+    const vCtrlN = ctx.rhsOld[ctrlNode] ?? 0;
+    this._nfetSW.setCtrlVoltage(vCtrlN);
+    this._nfetSW.load(ctx);
+
+    // PFET SW: ON when V(0) - V(p2) > |Vth_p| (p2 is ctrlN pin, active-low)
+    // Invert: present as positive control voltage when p2 is low.
+    const ctrlNNode = this._pinNodes.get("p2")!;
+    const vCtrlP = -(ctx.rhsOld[ctrlNNode] ?? 0);
+    this._pfetSW.setCtrlVoltage(vCtrlP);
+    this._pfetSW.load(ctx);
   }
 
   getPinCurrents(_rhs: Float64Array): number[] {
     return [0, 0, 0, 0];
   }
 
-  setParam(_key: string, _value: number): void {}
+  setParam(key: string, value: number): void {
+    this._nfetSW.setParam(key, value);
+    this._pfetSW.setParam(key, value);
+  }
 }
 
 function createTransGateAnalogElement(
   pinNodes: ReadonlyMap<string, number>,
-  _props: PropertyBag,
+  props: PropertyBag,
   _getTime: () => number,
-): AnalogElementCore {
-  return new TransGateAnalogElement(pinNodes);
+): TransGateAnalogElement {
+  const el = new TransGateAnalogElement(pinNodes);
+
+  const ron = Math.max(props.getOrDefault<number>("Ron", 1), 1e-12);
+  const roff = Math.max(props.getOrDefault<number>("Roff", 1e9), 1e-12);
+  const vth = props.getOrDefault<number>("Vth", 2.5);
+
+  el._nfetSW.setParam("Ron", ron);
+  el._nfetSW.setParam("Roff", roff);
+  el._nfetSW.setParam("threshold", vth);
+  el._pfetSW.setParam("Ron", ron);
+  el._pfetSW.setParam("Roff", roff);
+  el._pfetSW.setParam("threshold", vth);
+
+  return el;
 }
 
 // ---------------------------------------------------------------------------
@@ -239,6 +304,9 @@ function createTransGateAnalogElement(
 export const TRANS_GATE_ATTRIBUTE_MAPPINGS: AttributeMapping[] = [
   { xmlName: "Bits", propertyKey: "bitWidth", convert: (v) => parseInt(v, 10) },
   { xmlName: "Label", propertyKey: "label", convert: (v) => v },
+  { xmlName: "Ron", propertyKey: "Ron", convert: (v) => parseFloat(v) },
+  { xmlName: "Roff", propertyKey: "Roff", convert: (v) => parseFloat(v) },
+  { xmlName: "Vth", propertyKey: "Vth", convert: (v) => parseFloat(v) },
 ];
 
 const TRANS_GATE_PROPERTY_DEFS: PropertyDefinition[] = [
@@ -258,6 +326,29 @@ const TRANS_GATE_PROPERTY_DEFS: PropertyDefinition[] = [
     label: "Label",
     defaultValue: "",
     description: "Optional label",
+  },
+  {
+    key: "Ron",
+    type: PropertyType.FLOAT,
+    label: "Ron (Ω)",
+    defaultValue: 1,
+    min: 1e-12,
+    description: "On-state resistance in ohms",
+  },
+  {
+    key: "Roff",
+    type: PropertyType.FLOAT,
+    label: "Roff (Ω)",
+    defaultValue: 1e9,
+    min: 1,
+    description: "Off-state resistance in ohms",
+  },
+  {
+    key: "Vth",
+    type: PropertyType.FLOAT,
+    label: "Vth (V)",
+    defaultValue: 2.5,
+    description: "Gate threshold voltage in volts",
   },
 ];
 
@@ -289,7 +380,7 @@ export const TransGateDefinition: ComponentDefinition = {
       kind: "inline",
       factory: createTransGateAnalogElement,
       paramDefs: [],
-      params: {},
+      params: { Ron: 1, Roff: 1e9, Vth: 2.5 },
     },
   },
 };

@@ -167,9 +167,6 @@ export class AnalogCapacitorElement implements ReactiveAnalogElementCore {
   _stateBase: number = -1;
   _pinNodes: Map<string, number> = new Map();
 
-  setup(_ctx: import("../../solver/analog/setup-context.js").SetupContext): void {
-    throw new Error("PB-CAP not yet migrated");
-  }
   readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.CAP;
   readonly isNonlinear = false;
   readonly isReactive = true;
@@ -196,12 +193,11 @@ export class AnalogCapacitorElement implements ReactiveAnalogElementCore {
   private _M: number;
   private _pool!: StatePoolRef;
 
-  // Cached matrix-entry handles (allocated lazily on first load()).
-  private _hAA: number = -1;
-  private _hBB: number = -1;
-  private _hAB: number = -1;
-  private _hBA: number = -1;
-  private _handlesInit: boolean = false;
+  // Cached matrix-entry handles — allocated in setup() per capsetup.c:114-117.
+  private _hPP: number = -1;
+  private _hNN: number = -1;
+  private _hPN: number = -1;
+  private _hNP: number = -1;
 
   constructor(capacitance: number, IC: number, TC1: number, TC2: number, TNOM: number, SCALE: number, M: number) {
     this._nominalC = capacitance;
@@ -216,6 +212,27 @@ export class AnalogCapacitorElement implements ReactiveAnalogElementCore {
     // _pool not yet set in constructor; temperature defaults to TNOM  dT = 0.
     const _dT0 = 300.15 - this._TNOM;
     this.C = this._nominalC * (1 + this._TC1 * _dT0 + this._TC2 * _dT0 * _dT0) * this._SCALE;
+  }
+
+  setup(ctx: import("../../solver/analog/setup-context.js").SetupContext): void {
+    const posNode = this.pinNodeIds[0];  // CAPposNode
+    const negNode = this.pinNodeIds[1];  // CAPnegNode
+
+    // capsetup.c:102-103  *states += 2 (CAPqcap slot).
+    // digiTS uses stateSize slots (GEQ, IEQ, V, Q, CCAP) to cover all
+    // companion-model state; ngspice uses only 2 (q, ccap) because it
+    // derives GEQ/IEQ/V on the fly from state. Allocate full stateSize so
+    // the pool covers every field load() reads/writes.
+    this._stateBase = ctx.allocStates(this.stateSize);
+    this.stateBaseOffset = this._stateBase;
+
+    // capsetup.c:114-117  TSTALLOC sequence, line-for-line, with ground guards.
+    if (posNode !== 0) this._hPP = ctx.solver.allocElement(posNode, posNode);
+    if (negNode !== 0) this._hNN = ctx.solver.allocElement(negNode, negNode);
+    if (posNode !== 0 && negNode !== 0) {
+      this._hPN = ctx.solver.allocElement(posNode, negNode);
+      this._hNP = ctx.solver.allocElement(negNode, posNode);
+    }
   }
 
   initState(pool: StatePoolRef): void {
@@ -332,23 +349,12 @@ export class AnalogCapacitorElement implements ReactiveAnalogElementCore {
       s0[base + SLOT_IEQ] = ceq;
       s0[base + SLOT_V] = vcap;
 
-      // Allocate matrix handles once (ngspice spGetElement pattern).
-      if (!this._handlesInit) {
-        if (n0 !== 0) this._hAA = solver.allocElement(n0, n0);
-        if (n1 !== 0) this._hBB = solver.allocElement(n1, n1);
-        if (n0 !== 0 && n1 !== 0) {
-          this._hAB = solver.allocElement(n0, n1);
-          this._hBA = solver.allocElement(n1, n0);
-        }
-        this._handlesInit = true;
-      }
-
       // Stamp companion model (capload.c:74-79  all entries scaled by m = CAPm).
-      if (n0 !== 0) solver.stampElement(this._hAA, m * geq);
-      if (n1 !== 0) solver.stampElement(this._hBB, m * geq);
+      if (n0 !== 0) solver.stampElement(this._hPP, m * geq);
+      if (n1 !== 0) solver.stampElement(this._hNN, m * geq);
       if (n0 !== 0 && n1 !== 0) {
-        solver.stampElement(this._hAB, -m * geq);
-        solver.stampElement(this._hBA, -m * geq);
+        solver.stampElement(this._hPN, -m * geq);
+        solver.stampElement(this._hNP, -m * geq);
       }
       if (n0 !== 0) stampRHS(ctx.rhs,n0, -m * ceq);
       if (n1 !== 0) stampRHS(ctx.rhs,n1, m * ceq);

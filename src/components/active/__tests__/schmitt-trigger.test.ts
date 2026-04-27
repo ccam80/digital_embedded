@@ -21,12 +21,14 @@ import {
   SchmittInvertingDefinition,
   SchmittNonInvertingDefinition,
 } from "../schmitt-trigger.js";
+import { AnalogCapacitorElement } from "../../passives/capacitor.js";
 import { PropertyBag } from "../../../core/properties.js";
 import type { AnalogElement } from "../../../solver/analog/element.js";
 import type { SparseSolver as SparseSolverType } from "../../../solver/analog/sparse-solver.js";
 import type { LoadContext } from "../../../solver/analog/load-context.js";
 import { MODEDCOP, MODEINITFLOAT } from "../../../solver/analog/ckt-mode.js";
 import { makeLoadCtx, initElement } from "../../../solver/analog/__tests__/test-helpers.js";
+import type { SetupContext } from "../../../solver/analog/setup-context.js";
 
 // ---------------------------------------------------------------------------
 // Helper: narrow ModelEntry to inline factory (throws if netlist kind)
@@ -112,8 +114,6 @@ function makeSchmittInverting(
 ): AnalogElement {
   const el = getFactory(SchmittInvertingDefinition.modelRegistry!["behavioral"]!)(
     new Map([["in", nIn], ["out", nOut]]),
-    [],
-    -1,
     makeProps(overrides),
     () => 0,
   ) as unknown as AnalogElement;
@@ -128,13 +128,32 @@ function makeSchmittNonInverting(
 ): AnalogElement {
   const el = getFactory(SchmittNonInvertingDefinition.modelRegistry!["behavioral"]!)(
     new Map([["in", nIn], ["out", nOut]]),
-    [],
-    -1,
     makeProps(overrides),
     () => 0,
   ) as unknown as AnalogElement;
   initElement(el);
   return el;
+}
+
+/**
+ * Build a minimal SetupContext wrapping a recording solver.
+ * Calls setup() on the element so handles are allocated before load() runs.
+ * Must be called with the SAME solver that will be passed to load().
+ */
+function runSchmittSetup(element: AnalogElement, solver: SparseSolverType): void {
+  let stateCount = 0;
+  const ctx: SetupContext = {
+    solver: solver as unknown as import("../../../solver/analog/sparse-solver.js").SparseSolver,
+    temp: 300.15,
+    nomTemp: 300.15,
+    copyNodesets: false,
+    makeVolt(_label: string, _suffix: string): number { return 100; },
+    makeCur(_label: string, _suffix: string): number { return 100; },
+    allocStates(n: number): number { const off = stateCount; stateCount += n; return off; },
+    findBranch(_label: string): number { return 0; },
+    findDevice(_label: string) { return null; },
+  };
+  (element as unknown as { setup(ctx: SetupContext): void }).setup(ctx);
 }
 
 /**
@@ -157,6 +176,8 @@ function driveAndReadOutput(
   const voltages = new Float64Array(size);
   if (nIn > 0) voltages[nIn] = vIn;
   const { solver, rhs } = makeRecordingSolver(size);
+  // Run setup() with the same solver so all handles are valid before load().
+  runSchmittSetup(element, solver);
   const ctx = makeSchmittLoadCtx(voltages, solver, rhs);
   element.load(ctx);
   const outRhs = rhs[nOut - 1];
@@ -429,6 +450,8 @@ describe("SchmittTrigger parity (C4.5)", () => {
 
     const rhsBuf = new Float64Array(16);
     const { solver, stamps } = makeSchmittCaptureSolver(rhsBuf);
+    // Run setup() with the same solver before load() so all handles are valid.
+    runSchmittSetup(schmitt, solver);
     const ctx = makeSchmittParityCtx(voltages, solver, rhsBuf);
     schmitt.load(ctx);
 

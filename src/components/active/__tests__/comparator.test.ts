@@ -20,6 +20,8 @@ import { PropertyBag } from "../../../core/properties.js";
 import type { AnalogElement } from "../../../solver/analog/element.js";
 import type { SparseSolver as SparseSolverType } from "../../../solver/analog/sparse-solver.js";
 import { makeLoadCtx, initElement } from "../../../solver/analog/__tests__/test-helpers.js";
+import { StatePool } from "../../../solver/analog/state-pool.js";
+import type { SetupContext } from "../../../solver/analog/setup-context.js";
 
 // ---------------------------------------------------------------------------
 // Helper: narrow ModelEntry to inline factory (throws if netlist kind)
@@ -58,16 +60,14 @@ function makeComparator(
   nInn: number,
   nOut: number,
   overrides: Record<string, number | string> = {},
-): AnalogElement {
+): { element: AnalogElement; pool: StatePool } {
   const el = getFactory(VoltageComparatorDefinition.modelRegistry!["open-collector"]!)(
     new Map([["in+", nInp], ["in-", nInn], ["out", nOut]]),
-    [],
-    -1,
     makeProps(overrides),
     () => 0,
   ) as unknown as AnalogElement;
-  initElement(el as unknown as import("../../../solver/analog/element.js").ReactiveAnalogElement);
-  return el;
+  const pool = initElement(el as unknown as import("../../../solver/analog/element.js").ReactiveAnalogElement);
+  return { element: el, pool };
 }
 
 function makeVoltages(size: number, nodeVoltages: Record<number, number>): Float64Array {
@@ -81,6 +81,26 @@ function makeVoltages(size: number, nodeVoltages: Record<number, number>): Float
 }
 
 /**
+ * Build a minimal SetupContext wrapping a capture solver.
+ * Calls setup() on the element so handles are allocated before load() runs.
+ */
+function runComparatorSetup(element: AnalogElement, solver: SparseSolverType): void {
+  let stateCount = 0;
+  const ctx: SetupContext = {
+    solver: solver as unknown as import("../../../solver/analog/sparse-solver.js").SparseSolver,
+    temp: 300.15,
+    nomTemp: 300.15,
+    copyNodesets: false,
+    makeVolt(_label: string, _suffix: string): number { return 100; },
+    makeCur(_label: string, _suffix: string): number { return 100; },
+    allocStates(n: number): number { const off = stateCount; stateCount += n; return off; },
+    findBranch(_label: string): number { return 0; },
+    findDevice(_label: string) { return null; },
+  };
+  (element as unknown as { setup(ctx: SetupContext): void }).setup(ctx);
+}
+
+/**
  * Stamp the element once via load(ctx) at the given voltages and return the
  * total conductance on the output node's diagonal.
  */
@@ -90,6 +110,8 @@ function readTotalOutputConductance(
   rhs: Float64Array,
 ): number {
   const { solver, stamps, rhs: rhsBuf } = makeComparatorCaptureSolver();
+  // Run setup() with the same solver so handles are valid before load().
+  runComparatorSetup(element, solver);
   const ctx = makeComparatorParityCtx(rhs, solver);
   (ctx as unknown as { rhs: Float64Array }).rhs = rhsBuf;
   element.load(ctx);
@@ -109,7 +131,7 @@ describe("Comparator", () => {
     // Active state: stamps G_sat = 1/50 = 0.02 S on the output node.
     const nInp = 1, nInn = 2, nOut = 3;
     const rSat = 50;
-    const cmp = makeComparator(nInp, nInn, nOut, { rSat, hysteresis: 0, vos: 0 });
+    const { element: cmp } = makeComparator(nInp, nInn, nOut, { rSat, hysteresis: 0, vos: 0 });
 
     // Set V+ = 2V, V- = 1V  output should activate
     const voltages = makeVoltages(3, { 1: 2.0, 2: 1.0, 3: 0.0 });
@@ -123,7 +145,7 @@ describe("Comparator", () => {
     // Inactive state: stamps G_off = 1/1e9  1e-9 S on the output node.
     const nInp = 1, nInn = 2, nOut = 3;
     const rSat = 50;
-    const cmp = makeComparator(nInp, nInn, nOut, { rSat, hysteresis: 0, vos: 0 });
+    const { element: cmp } = makeComparator(nInp, nInn, nOut, { rSat, hysteresis: 0, vos: 0 });
 
     // Set V+ = 1V, V- = 2V  output should be inactive (high-impedance)
     const voltages = makeVoltages(3, { 1: 1.0, 2: 2.0, 3: 0.0 });
@@ -138,7 +160,7 @@ describe("Comparator", () => {
     // below -5mV (> -5mV needed to reset). Output must not toggle.
     const nInp = 1, nInn = 2, nOut = 3;
     const hysteresis = 0.010; // 10mV
-    const cmp = makeComparator(nInp, nInn, nOut, { hysteresis, vos: 0, rSat: 50 });
+    const { element: cmp } = makeComparator(nInp, nInn, nOut, { hysteresis, vos: 0, rSat: 50 });
 
     // Start with output inactive (V+ < V-)
     const vRef = 1.0; // reference on V-
@@ -165,7 +187,7 @@ describe("Comparator", () => {
     // Transition: V+ negative  output inactive; V+ positive  output active.
     const nInp = 1, nInn = 2, nOut = 3;
     const rSat = 50;
-    const cmp = makeComparator(nInp, nInn, nOut, { hysteresis: 0, vos: 0, rSat });
+    const { element: cmp } = makeComparator(nInp, nInn, nOut, { hysteresis: 0, vos: 0, rSat });
 
     const R_OFF = 1e9;
     const G_off = 1 / R_OFF;
@@ -186,34 +208,39 @@ describe("Comparator", () => {
 
   it("response_time", () => {
     // Step input: V+ goes from 0V to 3V at t=0 (V- = 1V).
-    // responseTime = 1s. After 5 time constants (5s) the output weight
-    // should have settled to > 99% of its final value (fully active).
+    // responseTime = 1us. After 10 steps of dt=0.5us each (= 5 time constants),
+    // the output weight should have settled to > 99% of its final value.
     //
     // accept(ctx) advances _outputWeight toward the target using a first-order
-    // filter: alpha = dt/(tau+dt). After N accepted timesteps of dt each, the
-    // weight should be  0.99.
+    // filter: alpha = dt/(tau+dt). After each accepted step the pool must be
+    // rotated (state0 -> state1) so that the next load() reads the updated weight
+    // from state1 — mirroring what the engine's rotateStateVectors() does.
     const nInp = 1, nInn = 2, nOut = 3;
-    const responseTime = 1e-6; // 1 s
+    const responseTime = 1e-6; // 1 us
     const rSat = 50;
-    const cmp = makeComparator(nInp, nInn, nOut, { responseTime, rSat, hysteresis: 0, vos: 0 });
+    const { element: cmp, pool } = makeComparator(nInp, nInn, nOut, { responseTime, rSat, hysteresis: 0, vos: 0 });
 
     // Step: V+ = 3V, V- = 1V  activates immediately on first load()
     const voltages = makeVoltages(3, { 1: 3.0, 2: 1.0, 3: 0.0 });
 
-    // Advance via accept() for 10 steps of 0.5s each = 5s total.
-    // load(ctx) each iteration to update _outputActive, then accept(ctx) to
-    // advance the first-order filter state by dt.
-    const dt = 0.5e-6;
-    const steps = 10;
+    // Setup once with the solver used for load() in the loop.
+    const { solver: tranSolver, rhs: tranRhs } = makeComparatorCaptureSolver();
+    runComparatorSetup(cmp, tranSolver);
+
+    const dt = 0.5e-6; // half a time constant per step
+    const steps = 10;  // 5 time constants total
     for (let i = 0; i < steps; i++) {
-      const { solver, rhs } = makeComparatorCaptureSolver();
-      const ctx = makeComparatorTransientCtx(voltages, solver, dt);
-      (ctx as unknown as { rhs: Float64Array }).rhs = rhs;
+      const ctx = makeComparatorTransientCtx(voltages, tranSolver, dt);
+      (ctx as unknown as { rhs: Float64Array }).rhs = tranRhs;
       cmp.load(ctx);
       cmp.accept?.(ctx, i * dt, () => {});
+      // Rotate pool: promotes s0 -> s1 so the next load() reads the updated weight.
+      pool.rotateStateVectors();
     }
 
-    // After 5 the weight should be > 99% active  conductance near G_sat
+    // After 5 time constants the weight in s1 should be > 99% active.
+    // readTotalOutputConductance creates a fresh solver, calls setup+load,
+    // and reads the stamped conductance from the current s1.
     const G_sat = 1 / rSat;
     const G_off = 1 / 1e9;
     const gFinal = readTotalOutputConductance(cmp, nOut, voltages);
@@ -274,21 +301,23 @@ function makeComparatorCaptureSolver(rhsSize = 16): {
   return { solver, stamps, rhs };
 }
 
-function makeComparatorParityCtx(_rhs: Float64Array, solver: SparseSolverType): LoadContext {
+function makeComparatorParityCtx(rhsOld: Float64Array, solver: SparseSolverType): LoadContext {
   return makeLoadCtx({
     solver,
+    rhsOld,
     cktMode: MODEDCOP | MODEINITFLOAT,
     dt: 0,
   });
 }
 
 function makeComparatorTransientCtx(
-  _rhs: Float64Array,
+  rhsOld: Float64Array,
   solver: SparseSolverType,
   dt: number,
 ): LoadContext {
   return makeLoadCtx({
     solver,
+    rhsOld,
     cktMode: MODETRAN | MODEINITFLOAT,
     dt,
     deltaOld: [dt, dt, dt, dt, dt, dt, dt],
@@ -302,7 +331,7 @@ describe("Comparator parity (C4.5)", () => {
     // _outputWeight becomes 1.0  G_eff = G_sat = 1/50 = 0.02 S.
     const nInp = 1, nInn = 2, nOut = 3;
     const rSat = 50;
-    const cmp = makeComparator(nInp, nInn, nOut, { rSat, hysteresis: 0, vos: 0 });
+    const { element: cmp } = makeComparator(nInp, nInn, nOut, { rSat, hysteresis: 0, vos: 0 });
 
     const voltages = new Float64Array(4);  // 1-based: slot 0 = ground sentinel, slots 1-3 = nodes
     voltages[nInp] = 2;
@@ -310,6 +339,8 @@ describe("Comparator parity (C4.5)", () => {
     voltages[nOut] = 0;
 
     const { solver, stamps, rhs } = makeComparatorCaptureSolver();
+    // Run setup() with the same solver before load() so hOutDiag handle is valid.
+    runComparatorSetup(cmp, solver);
     const ctx = makeComparatorParityCtx(voltages, solver);
     // Wire the owned rhs buffer into ctx so stampRHS(ctx.rhs, ...) writes to it.
     (ctx as unknown as { rhs: Float64Array }).rhs = rhs;

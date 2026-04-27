@@ -16,7 +16,6 @@
 import { describe, it, expect } from "vitest";
 import { OptocouplerDefinition } from "../optocoupler.js";
 import { PropertyBag } from "../../../core/properties.js";
-import { StatePool } from "../../../solver/analog/state-pool.js";
 import type { ModelEntry, AnalogFactory } from "../../../core/registry.js";
 
 // ---------------------------------------------------------------------------
@@ -33,7 +32,7 @@ function makeOptocouplerCore(
   nCathode: number,
   nCollector: number,
   nEmitter: number,
-  nBase: number,
+  _nBase: number,
   opts: { ctr?: number; Is?: number; n?: number } = {},
 ) {
   const ctr = opts.ctr ?? 1.0;
@@ -50,8 +49,6 @@ function makeOptocouplerCore(
       ["anode", nAnode], ["cathode", nCathode],
       ["collector", nCollector], ["emitter", nEmitter],
     ]),
-    [nBase],   // internalNodeIds — phototransistor base
-    -1,
     props,
     () => 0,
   );
@@ -80,25 +77,27 @@ describe("Optocoupler parameter plumbing", () => {
 // Engine-agnostic interface contracts
 // ---------------------------------------------------------------------------
 
-describe("Optocoupler pool-backed interface", () => {
-  it("is poolBacked with combined diode+BJT stateSize", () => {
+describe("Optocoupler composite interface (PB-OPTO)", () => {
+  it("is not pool-backed at the composite level (state delegated to sub-elements)", () => {
     const el = makeOptocouplerCore(1, 2, 3, 4, 5);
-    // Composition: DIODE_SCHEMA.size (4) + BJT_SIMPLE_SCHEMA.size (8) = 12
-    expect((el as any).poolBacked).toBe(true);
-    expect((el as any).stateSize).toBe(12);
+    // The composite delegates all state management to DIO and BJT sub-elements.
+    // The composite itself has no stateSize or poolBacked flag.
+    expect((el as any).poolBacked).toBeFalsy();
   });
 
-  it("initState assigns pool without throwing", () => {
+  it("branchIndex is -1 (no extra MNA row at composite level)", () => {
     const el = makeOptocouplerCore(1, 2, 3, 4, 5);
-    const pool = new StatePool(12);
-    (el as any).stateBaseOffset = 0;
-    expect(() => (el as any).initState(pool)).not.toThrow();
+    expect(el.branchIndex).toBe(-1);
   });
 
-  it("modelRegistry behavioral entry has getInternalNodeCount=1", () => {
+  it("isNonlinear is true (DIO and BJT sub-elements are nonlinear)", () => {
+    const el = makeOptocouplerCore(1, 2, 3, 4, 5);
+    expect(el.isNonlinear).toBe(true);
+  });
+
+  it("modelRegistry behavioral entry has mayCreateInternalNodes=true", () => {
     const entry = OptocouplerDefinition.modelRegistry!["behavioral"]!;
     if (entry.kind !== "inline") throw new Error("Expected inline");
-    const count = entry.getInternalNodeCount?.(new PropertyBag(new Map().entries()));
-    expect(count).toBe(1);
+    expect(entry.mayCreateInternalNodes).toBe(true);
   });
 });

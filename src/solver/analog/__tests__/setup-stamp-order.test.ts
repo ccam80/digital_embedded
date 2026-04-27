@@ -31,6 +31,17 @@ import { createBjtElement, BJT_NPN_DEFAULTS } from "../../../components/semicond
 import { createDiodeElement, DIODE_PARAM_DEFAULTS } from "../../../components/semiconductors/diode.js";
 import { createZenerElement, ZENER_PARAM_DEFAULTS } from "../../../components/semiconductors/zener.js";
 import { createMosfetElement } from "../../../components/semiconductors/mosfet.js";
+import { createNJfetElement, NJFET_PARAM_DEFAULTS } from "../../../components/semiconductors/njfet.js";
+import { VCCSAnalogElement } from "../../../components/active/vccs.js";
+import { VCVSAnalogElement } from "../../../components/active/vcvs.js";
+import { Timer555Definition } from "../../../components/active/timer-555.js";
+import { SwitchAnalogElement } from "../../../components/switching/switch.js";
+import { SwitchDTAnalogElement } from "../../../components/switching/switch-dt.js";
+import { LDRElement } from "../../../components/sensors/ldr.js";
+import { NTCThermistorElement } from "../../../components/sensors/ntc-thermistor.js";
+import { SparkGapElement } from "../../../components/sensors/spark-gap.js";
+import { parseExpression } from "../expression.js";
+import { differentiate, simplify } from "../expression-differentiate.js";
 import { PropertyBag } from "../../../core/properties.js";
 import { createTestPropertyBag } from "../../../test-fixtures/model-fixtures.js";
 
@@ -324,7 +335,25 @@ describe("setup-stamp-order", () => {
   it.todo("PB-FUSE TSTALLOC sequence");
   it.todo("PB-IND TSTALLOC sequence");
   it.todo("PB-ISRC TSTALLOC sequence");
-  it.todo("PB-LDR TSTALLOC sequence");
+  it("PB-LDR TSTALLOC sequence", () => {
+    // ngspice anchor: ressetup.c:46-49 — 4 TSTALLOC entries, RES pattern.
+    // Nodes: posNode=1, negNode=2.
+    // Expected order: (1,1), (2,2), (1,2), (2,1) — PP, NN, PN, NP
+    const el = new LDRElement(1e6, 100, 0.7, 500);
+    el._pinNodes = new Map([["pos", 1], ["neg", 2]]);
+    Object.assign(el, { pinNodeIds: [1, 2] });
+    const circuit = makeMinimalCircuit([el as unknown as AnalogElement], 2);
+    const engine = new MNAEngine();
+    engine.init(circuit);
+    (engine as any)._setup();
+    const order = (engine as any)._solver._getInsertionOrder();
+    expect(order).toEqual([
+      { extRow: 1, extCol: 1 }, // (posNode, posNode) — ressetup.c:46
+      { extRow: 2, extCol: 2 }, // (negNode, negNode) — ressetup.c:47
+      { extRow: 1, extCol: 2 }, // (posNode, negNode) — ressetup.c:48
+      { extRow: 2, extCol: 1 }, // (negNode, posNode) — ressetup.c:49
+    ]);
+  });
   it.todo("PB-MEMR TSTALLOC sequence");
 
   it("PB-NFET TSTALLOC sequence", () => {
@@ -345,7 +374,52 @@ describe("setup-stamp-order", () => {
     ]);
   });
 
-  it.todo("PB-NJFET TSTALLOC sequence");
+  it("PB-NJFET TSTALLOC sequence", () => {
+    // ngspice anchor: jfetset.c:166-180 — 15 TSTALLOC entries.
+    // Nodes: G=1, D=2, S=3. RS=RD=0 (defaults) → sp=sourceNode=3, dp=drainNode=2.
+    //
+    // TSTALLOC sequence (jfetset.c:166-180, all unconditional):
+    //  1. (drainNode=2, dp=2)       → (2,2)  _hDDP
+    //  2. (gateNode=1,  dp=2)       → (1,2)  _hGDP
+    //  3. (gateNode=1,  sp=3)       → (1,3)  _hGSP
+    //  4. (sourceNode=3, sp=3)      → (3,3)  _hSSP
+    //  5. (dp=2, drainNode=2)       → (2,2)  _hDPD
+    //  6. (dp=2, gateNode=1)        → (2,1)  _hDPG
+    //  7. (dp=2, sp=3)              → (2,3)  _hDPSP
+    //  8. (sp=3, gateNode=1)        → (3,1)  _hSPG
+    //  9. (sp=3, sourceNode=3)      → (3,3)  _hSPS
+    // 10. (sp=3, dp=2)              → (3,2)  _hSPDP
+    // 11. (drainNode=2, drainNode=2)→ (2,2)  _hDD
+    // 12. (gateNode=1,  gateNode=1) → (1,1)  _hGG
+    // 13. (sourceNode=3, sourceNode=3) → (3,3) _hSS
+    // 14. (dp=2, dp=2)              → (2,2)  _hDPDP
+    // 15. (sp=3, sp=3)              → (3,3)  _hSPSP
+    const props = new PropertyBag();
+    props.replaceModelParams({ ...NJFET_PARAM_DEFAULTS });
+    const el = createNJfetElement(new Map([["G", 1], ["D", 2], ["S", 3]]), props);
+    const circuit = makeMinimalCircuit([el as unknown as AnalogElement], 3);
+    const engine = new MNAEngine();
+    engine.init(circuit);
+    (engine as any)._setup();
+    const order = (engine as any)._solver._getInsertionOrder();
+    expect(order).toEqual([
+      { extRow: 2, extCol: 2 },  // (1)  drainNode, dp  — _hDDP
+      { extRow: 1, extCol: 2 },  // (2)  gateNode, dp   — _hGDP
+      { extRow: 1, extCol: 3 },  // (3)  gateNode, sp   — _hGSP
+      { extRow: 3, extCol: 3 },  // (4)  sourceNode, sp — _hSSP
+      { extRow: 2, extCol: 2 },  // (5)  dp, drainNode  — _hDPD
+      { extRow: 2, extCol: 1 },  // (6)  dp, gateNode   — _hDPG
+      { extRow: 2, extCol: 3 },  // (7)  dp, sp         — _hDPSP
+      { extRow: 3, extCol: 1 },  // (8)  sp, gateNode   — _hSPG
+      { extRow: 3, extCol: 3 },  // (9)  sp, sourceNode — _hSPS
+      { extRow: 3, extCol: 2 },  // (10) sp, dp         — _hSPDP
+      { extRow: 2, extCol: 2 },  // (11) drainNode, drainNode — _hDD
+      { extRow: 1, extCol: 1 },  // (12) gateNode, gateNode  — _hGG
+      { extRow: 3, extCol: 3 },  // (13) sourceNode, sourceNode — _hSS
+      { extRow: 2, extCol: 2 },  // (14) dp, dp         — _hDPDP
+      { extRow: 3, extCol: 3 },  // (15) sp, sp         — _hSPSP
+    ]);
+  });
   it("PB-NMOS TSTALLOC sequence", () => {
     // ngspice anchor: mos1set.c:186-207 — 22 TSTALLOC entries (all unconditional).
     // Nodes: G=3, S=2, D=1.  B=S=2 (body tied to source, 3-terminal).
@@ -393,7 +467,25 @@ describe("setup-stamp-order", () => {
       { extRow: 2, extCol: 1 },  // (22) sp, dp = (sNode, dNode) — RS=RD=0
     ]);
   });
-  it.todo("PB-NTC TSTALLOC sequence");
+  it("PB-NTC TSTALLOC sequence", () => {
+    // ngspice anchor: ressetup.c:46-49 — 4 TSTALLOC entries, RES pattern.
+    // Nodes: posNode=1, negNode=2.
+    // Expected order: (1,1), (2,2), (1,2), (2,1) — PP, NN, PN, NP
+    const el = new NTCThermistorElement(10000, 3950, 298.15, 298.15, false, 50, 0.01);
+    el._pinNodes = new Map([["pos", 1], ["neg", 2]]);
+    Object.assign(el, { pinNodeIds: [1, 2] });
+    const circuit = makeMinimalCircuit([el as unknown as AnalogElement], 2);
+    const engine = new MNAEngine();
+    engine.init(circuit);
+    (engine as any)._setup();
+    const order = (engine as any)._solver._getInsertionOrder();
+    expect(order).toEqual([
+      { extRow: 1, extCol: 1 }, // (posNode, posNode) — ressetup.c:46
+      { extRow: 2, extCol: 2 }, // (negNode, negNode) — ressetup.c:47
+      { extRow: 1, extCol: 2 }, // (posNode, negNode) — ressetup.c:48
+      { extRow: 2, extCol: 1 }, // (negNode, posNode) — ressetup.c:49
+    ]);
+  });
   it.todo("PB-OPAMP TSTALLOC sequence");
   it.todo("PB-OPTO TSTALLOC sequence");
   it.todo("PB-OTA TSTALLOC sequence");
@@ -512,12 +604,251 @@ describe("setup-stamp-order", () => {
       { extRow: 3, extCol: 3 },  // (7) _posPrimeNode, _posPrimeNode
     ]);
   });
-  it.todo("PB-SPARK TSTALLOC sequence");
+  it("PB-SPARK TSTALLOC sequence", () => {
+    // ngspice anchor: swsetup.c:59-62 — 4 TSTALLOC entries, SW pattern.
+    // Note: SW ordering differs from RES — cross terms come before NN diagonal.
+    // Nodes: posNode=1 (SWposNode), negNode=2 (SWnegNode).
+    // Expected order: (1,1), (1,2), (2,1), (2,2) — PP, PN, NP, NN
+    const el = new SparkGapElement(1000, 5, 1e10, 0.01);
+    el._pinNodes = new Map([["pos", 1], ["neg", 2]]);
+    Object.assign(el, { pinNodeIds: [1, 2] });
+    const circuit = makeMinimalCircuit([el as unknown as AnalogElement], 2);
+    const engine = new MNAEngine();
+    engine.init(circuit);
+    (engine as any)._setup();
+    const order = (engine as any)._solver._getInsertionOrder();
+    expect(order).toEqual([
+      { extRow: 1, extCol: 1 }, // (SWposNode, SWposNode) — swsetup.c:59
+      { extRow: 1, extCol: 2 }, // (SWposNode, SWnegNode) — swsetup.c:60
+      { extRow: 2, extCol: 1 }, // (SWnegNode, SWposNode) — swsetup.c:61
+      { extRow: 2, extCol: 2 }, // (SWnegNode, SWnegNode) — swsetup.c:62
+    ]);
+  });
   it.todo("PB-SUBCKT TSTALLOC sequence");
-  it.todo("PB-SW TSTALLOC sequence");
-  it.todo("PB-SW-DT TSTALLOC sequence");
+  it("PB-SW TSTALLOC sequence", () => {
+    // ngspice anchor: swsetup.c:59-62 — 4 TSTALLOC entries, SW pattern.
+    // Nodes: posNode=A1=1, negNode=B1=2.
+    // TSTALLOC sequence (swsetup.c:59-62, line-for-line):
+    //  1. (SWposNode=1, SWposNode=1) → (1,1)  _hPP
+    //  2. (SWposNode=1, SWnegNode=2) → (1,2)  _hPN
+    //  3. (SWnegNode=2, SWposNode=1) → (2,1)  _hNP
+    //  4. (SWnegNode=2, SWnegNode=2) → (2,2)  _hNN
+    const props = new PropertyBag();
+    props.set("Ron", 1);
+    props.set("Roff", 1e9);
+    props.set("normallyClosed", false);
+    props.set("closed", false);
+    const el = new SwitchAnalogElement(new Map([["A1", 1], ["B1", 2]]), props);
+    const circuit = makeMinimalCircuit([el as unknown as AnalogElement], 2);
+    const engine = new MNAEngine();
+    engine.init(circuit);
+    (engine as any)._setup();
+    const order = (engine as any)._solver._getInsertionOrder();
+    expect(order).toEqual([
+      { extRow: 1, extCol: 1 },  // (1) SWposNode, SWposNode — swsetup.c:59
+      { extRow: 1, extCol: 2 },  // (2) SWposNode, SWnegNode — swsetup.c:60
+      { extRow: 2, extCol: 1 },  // (3) SWnegNode, SWposNode — swsetup.c:61
+      { extRow: 2, extCol: 2 },  // (4) SWnegNode, SWnegNode — swsetup.c:62
+    ]);
+  });
+  it("PB-SW-DT TSTALLOC sequence", () => {
+    // ngspice anchor: swsetup.c:59-62 applied twice (composite SW_AB + SW_AC).
+    // Nodes: A1=1 (common), B1=2 (upper), C1=3 (lower).
+    // SW_AB sub-element runs first (A1↔B1): posNode=1, negNode=2.
+    // SW_AC sub-element runs second (A1↔C1): posNode=1, negNode=3.
+    // Total: 8 entries.
+    //
+    // SW_AB TSTALLOC (swsetup.c:59-62):
+    //  1. (A1=1, A1=1) → (1,1)  swAB._hPP
+    //  2. (A1=1, B1=2) → (1,2)  swAB._hPN
+    //  3. (B1=2, A1=1) → (2,1)  swAB._hNP
+    //  4. (B1=2, B1=2) → (2,2)  swAB._hNN
+    // SW_AC TSTALLOC (swsetup.c:59-62):
+    //  5. (A1=1, A1=1) → (1,1)  swAC._hPP
+    //  6. (A1=1, C1=3) → (1,3)  swAC._hPN
+    //  7. (C1=3, A1=1) → (3,1)  swAC._hNP
+    //  8. (C1=3, C1=3) → (3,3)  swAC._hNN
+    const props = new PropertyBag();
+    props.set("Ron", 1);
+    props.set("Roff", 1e9);
+    props.set("normallyClosed", false);
+    props.set("closed", false);
+    const el = new SwitchDTAnalogElement(new Map([["A1", 1], ["B1", 2], ["C1", 3]]), props);
+    const circuit = makeMinimalCircuit([el as unknown as AnalogElement], 3);
+    const engine = new MNAEngine();
+    engine.init(circuit);
+    (engine as any)._setup();
+    const order = (engine as any)._solver._getInsertionOrder();
+    expect(order).toEqual([
+      // SW_AB (A1↔B1)
+      { extRow: 1, extCol: 1 },  // (1) A1, A1 — swAB._hPP
+      { extRow: 1, extCol: 2 },  // (2) A1, B1 — swAB._hPN
+      { extRow: 2, extCol: 1 },  // (3) B1, A1 — swAB._hNP
+      { extRow: 2, extCol: 2 },  // (4) B1, B1 — swAB._hNN
+      // SW_AC (A1↔C1)
+      { extRow: 1, extCol: 1 },  // (5) A1, A1 — swAC._hPP
+      { extRow: 1, extCol: 3 },  // (6) A1, C1 — swAC._hPN
+      { extRow: 3, extCol: 1 },  // (7) C1, A1 — swAC._hNP
+      { extRow: 3, extCol: 3 },  // (8) C1, C1 — swAC._hNN
+    ]);
+  });
   it.todo("PB-TAPXFMR TSTALLOC sequence");
-  it.todo("PB-TIMER555 TSTALLOC sequence");
+  it("PB-TIMER555 TSTALLOC sequence", () => {
+    // Timer555 composite: setup() calls sub-elements in NGSPICE_LOAD_ORDER order,
+    // then allocates the RS-FF glue handle last.
+    //
+    // Pin assignment (pinLayout: DIS, TRIG, THR, VCC, CTRL, OUT, RST, GND):
+    //   DIS=1, TRIG=2, THR=3, VCC=4, CTRL=5, OUT=6, RST=7, GND=8  nodeCount=8
+    //
+    // Internal nodes (allocated in setup(), _maxEqNum starts at 9):
+    //   nLower=9, nComp1Out=10, nComp2Out=11, nDisBase=12
+    //
+    // VCVS branch rows (allocated via makeCur inside vcvsset.c setup):
+    //   comp1 branch=13, comp2 branch=14
+    //
+    // Sub-element TSTALLOC sequence:
+    //
+    // rDiv1 (RES, A=VCC=4, B=CTRL=5) — ressetup.c:46-49 — 4 entries:
+    //   (4,4), (4,5), (5,4), (5,5)
+    //
+    // rDiv2 (RES, A=CTRL=5, B=nLower=9) — 4 entries:
+    //   (5,5), (5,9), (9,5), (9,9)
+    //
+    // rDiv3 (RES, A=nLower=9, B=GND=8) — 4 entries:
+    //   (9,9), (9,8), (8,9), (8,8)
+    //
+    // comp1 (VCVS, ctrl+=THR=3, ctrl-=CTRL=5, out+=nComp1Out=10, out-=GND=8) — vcvsset.c:53-58 — 6 entries:
+    //   branch=13 (first makeCur call)
+    //   1. (out+=10, branch=13)   :53
+    //   2. (out-=8,  branch=13)   :54
+    //   3. (branch=13, out+=10)   :55
+    //   4. (branch=13, out-=8)    :56
+    //   5. (branch=13, ctrl+=3)   :57
+    //   6. (branch=13, ctrl-=5)   :58
+    //
+    // comp2 (VCVS, ctrl+=nLower=9, ctrl-=TRIG=2, out+=nComp2Out=11, out-=GND=8) — vcvsset.c:53-58 — 6 entries:
+    //   branch=14 (second makeCur call)
+    //   1. (out+=11, branch=14)   :53
+    //   2. (out-=8,  branch=14)   :54
+    //   3. (branch=14, out+=11)   :55
+    //   4. (branch=14, out-=8)    :56
+    //   5. (branch=14, ctrl+=9)   :57
+    //   6. (branch=14, ctrl-=2)   :58
+    //
+    // bjtDis (BJT NPN, B=nDisBase=12, C=DIS=1, E=GND=8) — bjtsetup.c:435-464 — 23 calls:
+    //   bp=12, cp=1, ep=8, substNode=0 (TrashCan, entries 19-21 skipped)
+    //   sc=cp=1 (VERTICAL). 20 entries recorded:
+    //   1. (cp=1,  cp=1)    _hCCP
+    //   2. (bp=12, bp=12)   _hBBP
+    //   3. (ep=8,  ep=8)    _hEEP
+    //   4. (cp=1,  cp=1)    _hCPC
+    //   5. (cp=1,  bp=12)   _hCPBP
+    //   6. (cp=1,  ep=8)    _hCPEP
+    //   7. (bp=12, bp=12)   _hBPB
+    //   8. (bp=12, cp=1)    _hBPCP
+    //   9. (bp=12, ep=8)    _hBPEP
+    //  10. (ep=8,  ep=8)    _hEPE
+    //  11. (ep=8,  cp=1)    _hEPCP
+    //  12. (ep=8,  bp=12)   _hEPBP
+    //  13. (cp=1,  cp=1)    _hCC
+    //  14. (bp=12, bp=12)   _hBB
+    //  15. (ep=8,  ep=8)    _hEE
+    //  16. (cp=1,  cp=1)    _hCPCP
+    //  17. (bp=12, bp=12)   _hBPBP
+    //  18. (ep=8,  ep=8)    _hEPEP
+    //  19. (substNode=0, substNode=0) → TrashCan, not recorded
+    //  20. (sc=1,  substNode=0) → TrashCan, not recorded
+    //  21. (substNode=0, sc=1) → TrashCan, not recorded
+    //  22. (bp=12, cp=1)    _hBCP
+    //  23. (cp=1,  bp=12)   _hCPB
+    //
+    // RS-FF glue (composite-owned, allocated last in setup()):
+    //   (nDisBase=12, nDisBase=12)
+    const entry = Timer555Definition.modelRegistry!["bipolar"]!;
+    if (entry.kind !== "inline") throw new Error("Expected inline model");
+    const factory = entry.factory;
+    const pinNodes = new Map<string, number>([
+      ["DIS",  1],
+      ["TRIG", 2],
+      ["THR",  3],
+      ["VCC",  4],
+      ["CTRL", 5],
+      ["OUT",  6],
+      ["RST",  7],
+      ["GND",  8],
+    ]);
+    const props = new PropertyBag();
+    props.replaceModelParams({ vDrop: 1.5, rDischarge: 10 });
+    const core = factory(pinNodes, props, () => 0);
+    const el = Object.assign(core, {
+      pinNodeIds: [1, 2, 3, 4, 5, 6, 7, 8],
+      allNodeIds:  [1, 2, 3, 4, 5, 6, 7, 8],
+    }) as unknown as AnalogElement;
+
+    const circuit = makeMinimalCircuit([el], 8);
+    const engine = new MNAEngine();
+    engine.init(circuit);
+    (engine as any)._setup();
+    const order = (engine as any)._solver._getInsertionOrder();
+
+    expect(order).toEqual([
+      // rDiv1: VCC=4, CTRL=5
+      { extRow: 4, extCol: 4 },
+      { extRow: 4, extCol: 5 },
+      { extRow: 5, extCol: 4 },
+      { extRow: 5, extCol: 5 },
+      // rDiv2: CTRL=5, nLower=9
+      { extRow: 5, extCol: 5 },
+      { extRow: 5, extCol: 9 },
+      { extRow: 9, extCol: 5 },
+      { extRow: 9, extCol: 9 },
+      // rDiv3: nLower=9, GND=8
+      { extRow: 9, extCol: 9 },
+      { extRow: 9, extCol: 8 },
+      { extRow: 8, extCol: 9 },
+      { extRow: 8, extCol: 8 },
+      // comp1 VCVS: out+=10, out-=8, branch=13, ctrl+=3, ctrl-=5
+      { extRow: 10, extCol: 13 },
+      { extRow:  8, extCol: 13 },
+      { extRow: 13, extCol: 10 },
+      { extRow: 13, extCol:  8 },
+      { extRow: 13, extCol:  3 },
+      { extRow: 13, extCol:  5 },
+      // comp2 VCVS: out+=11, out-=8, branch=14, ctrl+=9, ctrl-=2
+      { extRow: 11, extCol: 14 },
+      { extRow:  8, extCol: 14 },
+      { extRow: 14, extCol: 11 },
+      { extRow: 14, extCol:  8 },
+      { extRow: 14, extCol:  9 },
+      { extRow: 14, extCol:  2 },
+      // bjtDis: B=nDisBase=12, C=DIS=1, E=GND=8
+      { extRow:  1, extCol:  1 },  // _hCCP
+      { extRow: 12, extCol: 12 },  // _hBBP
+      { extRow:  8, extCol:  8 },  // _hEEP
+      { extRow:  1, extCol:  1 },  // _hCPC
+      { extRow:  1, extCol: 12 },  // _hCPBP
+      { extRow:  1, extCol:  8 },  // _hCPEP
+      { extRow: 12, extCol: 12 },  // _hBPB
+      { extRow: 12, extCol:  1 },  // _hBPCP
+      { extRow: 12, extCol:  8 },  // _hBPEP
+      { extRow:  8, extCol:  8 },  // _hEPE
+      { extRow:  8, extCol:  1 },  // _hEPCP
+      { extRow:  8, extCol: 12 },  // _hEPBP
+      { extRow:  1, extCol:  1 },  // _hCC
+      { extRow: 12, extCol: 12 },  // _hBB
+      { extRow:  8, extCol:  8 },  // _hEE
+      { extRow:  1, extCol:  1 },  // _hCPCP
+      { extRow: 12, extCol: 12 },  // _hBPBP
+      { extRow:  8, extCol:  8 },  // _hEPEP
+      // entries 19-21: substNode=0 → TrashCan, not recorded
+      { extRow: 12, extCol:  1 },  // _hBCP
+      { extRow:  1, extCol: 12 },  // _hCPB
+      // outModel (DigitalOutputPinModel) setup: OUT=6 self-stamp
+      { extRow:  6, extCol:  6 },
+      // RS-FF glue handle (composite-owned, last)
+      { extRow: 12, extCol: 12 },
+    ]);
+  });
   it.todo("PB-TLINE TSTALLOC sequence");
   it.todo("PB-TRANSGATE TSTALLOC sequence");
   it.todo("PB-TRIAC TSTALLOC sequence");
@@ -546,8 +877,63 @@ describe("setup-stamp-order", () => {
       { extRow: 1, extCol: 1 },  // (7) _posPrimeNode, _posPrimeNode
     ]);
   });
-  it.todo("PB-VCCS TSTALLOC sequence");
-  it.todo("PB-VCVS TSTALLOC sequence");
+  it("PB-VCCS TSTALLOC sequence", () => {
+    // ngspice anchor: vccsset.c:43-46 — 4 TSTALLOC entries.
+    // Nodes: ctrl+=1 (ctrlPosNode), ctrl-=2 (ctrlNegNode), out+=3 (posNode), out-=4 (negNode).
+    // No branch row, no internal nodes.
+    //
+    // TSTALLOC sequence (vccsset.c:43-46):
+    //  1. (posNode=3, ctrlPosNode=1)   :43
+    //  2. (posNode=3, ctrlNegNode=2)   :44
+    //  3. (negNode=4, ctrlPosNode=1)   :45
+    //  4. (negNode=4, ctrlNegNode=2)   :46
+    const rawExpr = parseExpression("0.001 * V(ctrl)");
+    const deriv = simplify(differentiate(rawExpr, "V(ctrl)"));
+    const el = new VCCSAnalogElement(rawExpr, deriv, "V(ctrl)", "voltage");
+    el._pinNodes = new Map([["ctrl+", 1], ["ctrl-", 2], ["out+", 3], ["out-", 4]]);
+    const circuit = makeMinimalCircuit([el as unknown as AnalogElement], 4);
+    const engine = new MNAEngine();
+    engine.init(circuit);
+    (engine as any)._setup();
+    const order = (engine as any)._solver._getInsertionOrder();
+    expect(order).toEqual([
+      { extRow: 3, extCol: 1 },  // (1) posNode, ctrlPosNode   :43
+      { extRow: 3, extCol: 2 },  // (2) posNode, ctrlNegNode   :44
+      { extRow: 4, extCol: 1 },  // (3) negNode, ctrlPosNode   :45
+      { extRow: 4, extCol: 2 },  // (4) negNode, ctrlNegNode   :46
+    ]);
+  });
+  it("PB-VCVS TSTALLOC sequence", () => {
+    // ngspice anchor: vcvsset.c:53-58 — 6 TSTALLOC entries.
+    // Nodes: ctrl+=1 (ctrlPosNode), ctrl-=2 (ctrlNegNode), out+=3 (posNode), out-=4 (negNode).
+    // Branch row allocated by engine._setup() at maxEqNum = nodeCount+1 = 5.
+    //
+    // TSTALLOC sequence (vcvsset.c:53-58):
+    //  1. (posNode=3, branch=5)       :53
+    //  2. (negNode=4, branch=5)       :54
+    //  3. (branch=5, posNode=3)       :55
+    //  4. (branch=5, negNode=4)       :56
+    //  5. (branch=5, ctrlPosNode=1)   :57
+    //  6. (branch=5, ctrlNegNode=2)   :58
+    const rawExpr = parseExpression("1.0 * V(ctrl)");
+    const deriv = simplify(differentiate(rawExpr, "V(ctrl)"));
+    const el = new VCVSAnalogElement(rawExpr, deriv, "V(ctrl)", "voltage");
+    el._pinNodes = new Map([["ctrl+", 1], ["ctrl-", 2], ["out+", 3], ["out-", 4]]);
+    el.label = "vcvs1";
+    const circuit = makeMinimalCircuit([el as unknown as AnalogElement], 4);
+    const engine = new MNAEngine();
+    engine.init(circuit);
+    (engine as any)._setup();
+    const order = (engine as any)._solver._getInsertionOrder();
+    expect(order).toEqual([
+      { extRow: 3, extCol: 5 },  // (1) posNode, branch    :53
+      { extRow: 4, extCol: 5 },  // (2) negNode, branch    :54
+      { extRow: 5, extCol: 3 },  // (3) branch,  posNode   :55
+      { extRow: 5, extCol: 4 },  // (4) branch,  negNode   :56
+      { extRow: 5, extCol: 1 },  // (5) branch,  ctrlPos   :57
+      { extRow: 5, extCol: 2 },  // (6) branch,  ctrlNeg   :58
+    ]);
+  });
   it.todo("PB-VSRC-AC TSTALLOC sequence");
   it.todo("PB-VSRC-DC TSTALLOC sequence");
   it.todo("PB-VSRC-VAR TSTALLOC sequence");

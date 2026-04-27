@@ -23,10 +23,10 @@ import {
   MOSFET_SCHEMA,
 } from "../mosfet.js";
 import { PropertyBag } from "../../../core/properties.js";
-import { makeDcVoltageSource } from "../../sources/dc-voltage-source.js";
-import { withNodeIds, runDcOp } from "../../../solver/analog/__tests__/test-helpers.js";
+import { withNodeIds, runDcOp, makeVoltageSource } from "../../../solver/analog/__tests__/test-helpers.js";
 import { StatePool } from "../../../solver/analog/state-pool.js";
 import { SparseSolver } from "../../../solver/analog/sparse-solver.js";
+import type { SetupContext } from "../../../solver/analog/setup-context.js";
 import type { AnalogElement } from "../../../solver/analog/element.js";
 import type { AnalogElementCore } from "../../../core/analog-types.js";
 import type { ReactiveAnalogElement } from "../../../solver/analog/element.js";
@@ -43,15 +43,77 @@ import {
 } from "../mosfet.js";
 
 // ---------------------------------------------------------------------------
-// withState  allocate a StatePool and call initState on the element
+// setupElementWithSolver — call setup() then allocate state pool.
+// Returns the element (promoted to AnalogElement) and the solver used.
+// The same solver must be passed to makeDcOpCtxWithSolver for load() calls.
 // ---------------------------------------------------------------------------
 
-function withState(element: AnalogElementCore): ReactiveAnalogElement {
+function setupElementWithSolver(
+  element: AnalogElementCore,
+  pinNodeIds: number[],
+  maxExternalNode: number = 1000,
+): { element: AnalogElement; solver: SparseSolver } {
+  const solver = new SparseSolver();
+  solver._initStructure();
+  let stateCount = 0;
+  let nodeIdx = maxExternalNode;
+  const ctx: SetupContext = {
+    solver,
+    temp: 300.15,
+    nomTemp: 300.15,
+    copyNodesets: false,
+    makeVolt(_label: string, _suffix: string): number { return ++nodeIdx; },
+    makeCur(_label: string, _suffix: string): number { return ++nodeIdx; },
+    allocStates(n: number): number {
+      const off = stateCount;
+      stateCount += n;
+      return off;
+    },
+    findBranch(_label: string): number { return 0; },
+    findDevice(_label: string) { return null; },
+  };
+  (element as any).setup(ctx);
   const re = element as ReactiveAnalogElement;
   re.stateBaseOffset = 0;
   const pool = new StatePool(re.stateSize);
   re.initState(pool);
-  return re;
+  const el = re as unknown as AnalogElement;
+  Object.assign(el, { pinNodeIds, allNodeIds: pinNodeIds });
+  return { element: el, solver };
+}
+
+// ---------------------------------------------------------------------------
+// withState — run real setup() and initState on an element, return the element.
+// The element has its handles allocated on the returned solver.
+// Callers that need matrix stamps must pass this solver to their LoadContext.
+// ---------------------------------------------------------------------------
+
+function withState(core: AnalogElementCore): AnalogElement {
+  const solver = new SparseSolver();
+  solver._initStructure();
+  let stateCount = 0;
+  let nodeIdx = 1000;
+  const ctx: SetupContext = {
+    solver,
+    temp: 300.15,
+    nomTemp: 300.15,
+    copyNodesets: false,
+    makeVolt(_label: string, _suffix: string): number { return ++nodeIdx; },
+    makeCur(_label: string, _suffix: string): number { return ++nodeIdx; },
+    allocStates(n: number): number {
+      const off = stateCount;
+      stateCount += n;
+      return off;
+    },
+    findBranch(_label: string): number { return 0; },
+    findDevice(_label: string) { return null; },
+  };
+  (core as any).setup(ctx);
+  const re = core as ReactiveAnalogElement;
+  re.stateBaseOffset = 0;
+  const pool = new StatePool(Math.max(re.stateSize, 1));
+  re.initState!(pool);
+  return re as unknown as AnalogElement;
 }
 
 /** Assert actual  expected within 0.1% relative tolerance (ngspice reference). */
@@ -87,15 +149,14 @@ const NMOS_DEFAULTS = {
 // DC-OP LoadContext helper  fresh SparseSolver sized for matrixSize rows.
 // ---------------------------------------------------------------------------
 
-function makeDcOpCtx(rhsOld: Float64Array, matrixSize: number): LoadContext {
-  const solver = new SparseSolver();
-  solver._initStructure();
+function makeDcOpCtx(rhsOld: Float64Array, matrixSize: number, solver?: SparseSolver): LoadContext {
+  const s = solver ?? (() => { const s2 = new SparseSolver(); s2._initStructure(); return s2; })();
   const KoverQ_local = 1.3806226e-23 / 1.6021918e-19;
   const temp = 300.15;
   return {
     cktMode: MODEDCOP | MODEINITFLOAT,
-    solver,
-    matrix: solver,
+    solver: s,
+    matrix: s,
     rhs: new Float64Array(matrixSize),
     rhsOld: rhsOld,
     time: 0,
@@ -117,6 +178,8 @@ function makeDcOpCtx(rhsOld: Float64Array, matrixSize: number): LoadContext {
     cktFixLimit: false,
     bypass: false,
     voltTol: 1e-6,
+    state0: new Float64Array(0),
+    state1: new Float64Array(0),
   };
 }
 
@@ -139,12 +202,15 @@ function makeNmosAtVgs_Vds(
   vgs: number,
   vds: number,
   modelParams: Record<string, number> = NMOS_DEFAULTS,
-): AnalogElement {
+): { element: AnalogElement; solver: SparseSolver } {
   const propsObj = makeParamBag(modelParams);
-  const element = withState(createMosfetElement(1, new Map([["G", 2], ["S", 3], ["D", 1]]), propsObj));
-  // pinNodeIds: pinLayout order [G, D, S, B]; B=S for 3-terminal  [2, 1, 3, 3]
-  Object.assign(element, { pinNodeIds: [2, 1, 3, 3], allNodeIds: [2, 1, 3, 3] });
-  const elementWithPins = element as unknown as AnalogElement;
+  // pinLayout order [G, D, S, B]; B=S for 3-terminal — [2, 1, 3, 3]
+  // nodeG=2, nodeS_ext=3, nodeD_ext=1; maxExternalNode=3 so makeVolt starts at 4
+  const { element: elementWithPins, solver } = setupElementWithSolver(
+    createMosfetElement(1, new Map([["G", 2], ["S", 3], ["D", 1]]), propsObj),
+    [2, 1, 3, 3],
+    3,
+  );
 
   // Drive to operating point: vG=vgs+vS, vD=vds+vS, vS=0
   // 1-based: [0]=ground, [1]=nodeD, [2]=nodeG, [3]=nodeS
@@ -153,19 +219,23 @@ function makeNmosAtVgs_Vds(
   voltages[2] = vgs;  // V(node2=G) = Vgs
   voltages[3] = 0;    // V(node3=S) = 0
 
-  // Iterate to converge voltage limiting
+  // Iterate to converge voltage limiting — reuse same solver across calls
   for (let i = 0; i < 50; i++) {
-    elementWithPins.load(makeDcOpCtx(voltages, 4));
+    elementWithPins.load(makeDcOpCtx(voltages, 4, solver));
     voltages[1] = vds;
     voltages[2] = vgs;
     voltages[3] = 0;
   }
-  return elementWithPins;
+  return { element: elementWithPins, solver };
 }
 
 // ---------------------------------------------------------------------------
 // Helper: inline resistor element for integration tests
 // ---------------------------------------------------------------------------
+
+function makeDcVoltageSource(nodePos: number, nodeNeg: number, branchIdx: number, voltage: number): AnalogElement {
+  return makeVoltageSource(nodePos, nodeNeg, branchIdx, voltage);
+}
 
 function makeResistorElement(nodeA: number, nodeB: number, resistance: number): AnalogElement {
   const G = 1 / resistance;
@@ -197,14 +267,14 @@ function makeResistorElement(nodeA: number, nodeB: number, resistance: number): 
 describe("NMOS", () => {
   it("cutoff_region", () => {
     // Vgs = 0V < VTO = 0.7V  device off, Id  0
-    const element = makeNmosAtVgs_Vds(0, 5, NMOS_DEFAULTS);
+    const { element, solver } = makeNmosAtVgs_Vds(0, 5, NMOS_DEFAULTS);
 
     // 1-based: [0]=ground, [1]=nodeD, [2]=nodeG, [3]=nodeS
     const voltages = new Float64Array(4);
     voltages[1] = 5;
     voltages[2] = 0;
     voltages[3] = 0;
-    const ctx = makeDcOpCtx(voltages, 4);
+    const ctx = makeDcOpCtx(voltages, 4, solver);
     element.load(ctx);
     const rhs = ctx.rhs;
 
@@ -250,14 +320,14 @@ describe("NMOS", () => {
 
   it("stamp_nonlinear_has_conductance_entries", () => {
     // Vgs=3V, Vds=5V (saturation): load should stamp nonzero conductances
-    const element = makeNmosAtVgs_Vds(3, 5, NMOS_DEFAULTS);
+    const { element, solver } = makeNmosAtVgs_Vds(3, 5, NMOS_DEFAULTS);
 
     // 1-based: [0]=ground, [1]=nodeD, [2]=nodeG, [3]=nodeS
     const voltages = new Float64Array(4);
     voltages[1] = 5;
     voltages[2] = 3;
     voltages[3] = 0;
-    const ctx = makeDcOpCtx(voltages, 4);
+    const ctx = makeDcOpCtx(voltages, 4, solver);
     element.load(ctx);
     const entries = ctx.solver.getCSCNonZeros();
 
@@ -272,8 +342,8 @@ describe("NMOS", () => {
     // ngspice parity: MOSFETs (mos1load.c) do not reference CKTsrcFact.
     // Device conductance and Norton RHS must be identical at srcFact=0 and srcFact=1.
     // Source-stepping scales only Vsrc/Isrc (vsrcload.c, isrcload.c) and nodeset/IC targets (cktload.c).
-    const baseline = makeNmosAtVgs_Vds(3, 5, NMOS_DEFAULTS);
-    const zeroed = makeNmosAtVgs_Vds(3, 5, NMOS_DEFAULTS);
+    const { element: baseline, solver: solverBaseline } = makeNmosAtVgs_Vds(3, 5, NMOS_DEFAULTS);
+    const { element: zeroed, solver: solverZeroed } = makeNmosAtVgs_Vds(3, 5, NMOS_DEFAULTS);
 
     // 1-based: [0]=ground, [1]=nodeD, [2]=nodeG, [3]=nodeS
     const voltages = new Float64Array(4);
@@ -281,11 +351,11 @@ describe("NMOS", () => {
     voltages[2] = 3;
     voltages[3] = 0;
 
-    const ctxBaseline = makeDcOpCtx(voltages, 4);
+    const ctxBaseline = makeDcOpCtx(voltages, 4, solverBaseline);
     ctxBaseline.srcFact = 1;
     baseline.load(ctxBaseline);
 
-    const ctxZero = makeDcOpCtx(voltages, 4);
+    const ctxZero = makeDcOpCtx(voltages, 4, solverZeroed);
     ctxZero.srcFact = 0;
     zeroed.load(ctxZero);
 
@@ -311,18 +381,18 @@ describe("NMOS", () => {
   it("srcFact_default_equals_one", () => {
     // ngspice parity: CKTsrcFact defaults to 1 (cktinit.c:75). Omitting ctx.srcFact
     // must produce identical stamps and RHS to explicit srcFact=1.
-    const elementDefault = makeNmosAtVgs_Vds(3, 5, NMOS_DEFAULTS);
-    const elementScaled = makeNmosAtVgs_Vds(3, 5, NMOS_DEFAULTS);
+    const { element: elementDefault, solver: solverDefault } = makeNmosAtVgs_Vds(3, 5, NMOS_DEFAULTS);
+    const { element: elementScaled, solver: solverScaled } = makeNmosAtVgs_Vds(3, 5, NMOS_DEFAULTS);
 
     const voltages = new Float64Array(3);
     voltages[0] = 5;
     voltages[1] = 3;
     voltages[2] = 0;
 
-    const ctxDefault = makeDcOpCtx(voltages, 3);
+    const ctxDefault = makeDcOpCtx(voltages, 3, solverDefault);
     elementDefault.load(ctxDefault);
 
-    const ctxScaled = makeDcOpCtx(voltages, 3);
+    const ctxScaled = makeDcOpCtx(voltages, 3, solverScaled);
     ctxScaled.srcFact = 1;
     elementScaled.load(ctxScaled);
 
@@ -372,35 +442,38 @@ describe("PMOS", () => {
 
     // PMOS is on when Vgs < VTO (negative): use Vgs=-3V, Vds=-5V
     // In MNA: nodeS at high voltage (5V), nodeD at 0V, nodeG at 2V (so Vgs = 2-5 = -3V)
-    // createMosfetElement pin order: [G, S, D]
+    // PMOS pin order: [G, S, D]; nodeG=2, nodeS_ext=3, nodeD_ext=1; maxExternalNode=3
     const propsObj = makeParamBag(PMOS_DEFAULTS);
-    const core = withState(createMosfetElement(-1, new Map([["G", 2], ["S", 3], ["D", 1]]), propsObj));
-    // pinLayout order [G, D, S, B]; B=S for 3-terminal  [2, 1, 3, 3]
-    const element = withNodeIds(core, [2, 1, 3, 3]) as unknown as AnalogElement;
+    const { element, solver: pmosSolver } = setupElementWithSolver(
+      createMosfetElement(-1, new Map([["G", 2], ["S", 3], ["D", 1]]), propsObj),
+      [2, 1, 3, 3],
+      3,
+    );
 
     // vS=5V (node3), vG=2V (node2), vD=0V (node1)
     // Vgs = 2-5 = -3V, Vds = 0-5 = -5V
-    const voltages = new Float64Array(3);
-    voltages[0] = 0;  // V(D)=0
-    voltages[1] = 2;  // V(G)=2
-    voltages[2] = 5;  // V(S)=5
+    // 1-based: [0]=ground, [1]=nodeD, [2]=nodeG, [3]=nodeS
+    const voltages = new Float64Array(4);
+    voltages[1] = 0;  // V(D)=0
+    voltages[2] = 2;  // V(G)=2
+    voltages[3] = 5;  // V(S)=5
 
     for (let i = 0; i < 50; i++) {
-      element.load(makeDcOpCtx(voltages, 3));
-      voltages[0] = 0;
-      voltages[1] = 2;
-      voltages[2] = 5;
+      element.load(makeDcOpCtx(voltages, 4, pmosSolver));
+      voltages[1] = 0;
+      voltages[2] = 2;
+      voltages[3] = 5;
     }
 
-    const ctx = makeDcOpCtx(voltages, 3);
+    const ctx = makeDcOpCtx(voltages, 4, pmosSolver);
     element.load(ctx);
     const rhs = ctx.rhs;
 
     // PMOS in saturation: Id should flow from S to D (conventional positive Isd)
     // Norton current at drain node should be positive (current entering drain = Isd)
-    // nodes: drain=node1row 0, gate=node2row 1, source=node3row 2
-    const drainRhs = rhs[0];
-    const sourceRhs = rhs[2];
+    // 1-based: rhs[1]=drain, rhs[2]=gate, rhs[3]=source
+    const drainRhs = rhs[1];
+    const sourceRhs = rhs[3];
 
     // At least one RHS entry should be nonzero (device is conducting)
     let maxRhs = 0;
@@ -1016,9 +1089,9 @@ describe("MOSFET LTE", () => {
 const KoverQ_TEST = 1.3806226e-23 / 1.6021918e-19;
 
 /** Build a full LoadContext for Wave 6.2 tests. */
-function makeWave62Ctx(cktMode: number, overrides: Partial<LoadContext> = {}): LoadContext {
-  const solver = new SparseSolver();
-  solver._initStructure();
+function makeWave62Ctx(cktMode: number, overrides: Partial<LoadContext> & { setupSolver?: SparseSolver } = {}): LoadContext {
+  const { setupSolver, ...rest } = overrides;
+  const solver = setupSolver ?? (() => { const s = new SparseSolver(); s._initStructure(); return s; })();
   const temp = 300.15;
   return {
     cktMode,
@@ -1045,41 +1118,79 @@ function makeWave62Ctx(cktMode: number, overrides: Partial<LoadContext> = {}): L
     cktFixLimit: false,
     bypass: false,
     voltTol: 1e-6,
-    ...overrides,
+    ...rest,
   };
 }
 
-/** Create an NMOS element with a fresh StatePool.
- *  pinNodeIds = [G=2, D=1, S=3, B=3], matrixSize=4. */
+/** Create an NMOS element with real setup() and a bound StatePool.
+ *  pinNodeIds = [G=2, D=1, S=3, B=3], matrixSize=4.
+ *  The returned solver is the one setup() ran on — pass it to makeWave62Ctx
+ *  via setupSolver when the test checks matrix entries. */
 function makeNmosElement62(params: Record<string, number> = {}): {
   element: any;
   pool: StatePool;
+  solver: SparseSolver;
 } {
   const bag = makeParamBag({ ...NMOS_DEFAULTS, ...params });
-  const core = createMosfetElement(1, new Map([["G", 2], ["S", 3], ["D", 1]]), bag) as any;
-  const pool = new StatePool(core.stateSize);
+  const pinNodes = new Map([["G", 2], ["S", 3], ["D", 1]]);
+  const core = createMosfetElement(1, pinNodes, bag) as any;
+  // Run real setup to allocate handles on the solver.
+  const solver = new SparseSolver();
+  solver._initStructure();
+  let stateCount = 0;
+  let nodeIdx = 3;
+  const ctx: SetupContext = {
+    solver,
+    temp: 300.15,
+    nomTemp: 300.15,
+    copyNodesets: false,
+    makeVolt(_label: string, _suffix: string): number { return ++nodeIdx; },
+    makeCur(_label: string, _suffix: string): number { return ++nodeIdx; },
+    allocStates(n: number): number { const off = stateCount; stateCount += n; return off; },
+    findBranch(_label: string): number { return 0; },
+    findDevice(_label: string) { return null; },
+  };
+  core.setup(ctx);
   core.stateBaseOffset = 0;
+  const pool = new StatePool(Math.max(core.stateSize, 1));
   core.initState(pool);
   core.pinNodeIds = [2, 1, 3, 3];
   core.allNodeIds = [2, 1, 3, 3];
-  return { element: core, pool };
+  return { element: core, pool, solver };
 }
 
-/** Create a PMOS element with a fresh StatePool.
+/** Create a PMOS element with real setup() and a bound StatePool.
  *  pinNodeIds = [G=2, D=1, S=3, B=3], matrixSize=4. */
 function makePmosElement62(params: Record<string, number> = {}): {
   element: any;
   pool: StatePool;
+  solver: SparseSolver;
 } {
   const pmosBag = new PropertyBag();
   pmosBag.replaceModelParams({ ...MOSFET_PMOS_DEFAULTS, ...params });
   const core = createMosfetElement(-1, new Map([["G", 2], ["S", 3], ["D", 1]]), pmosBag) as any;
-  const pool = new StatePool(core.stateSize);
+  const solver = new SparseSolver();
+  solver._initStructure();
+  let stateCount = 0;
+  let nodeIdx = 3;
+  const ctx: SetupContext = {
+    solver,
+    temp: 300.15,
+    nomTemp: 300.15,
+    copyNodesets: false,
+    makeVolt(_label: string, _suffix: string): number { return ++nodeIdx; },
+    makeCur(_label: string, _suffix: string): number { return ++nodeIdx; },
+    allocStates(n: number): number { const off = stateCount; stateCount += n; return off; },
+    findBranch(_label: string): number { return 0; },
+    findDevice(_label: string) { return null; },
+  };
+  core.setup(ctx);
   core.stateBaseOffset = 0;
+  const pool = new StatePool(Math.max(core.stateSize, 1));
   core.initState(pool);
   core.pinNodeIds = [2, 1, 3, 3];
   core.allNodeIds = [2, 1, 3, 3];
-  return { element: core, pool };
+  return { element: core, pool, solver };
 }
 
 // Slot index constants matching MOSFET_SCHEMA order (mirrored from mosfet.ts).
@@ -1308,10 +1419,11 @@ describe("MOSFET M-2", () => {
   });
 
   it("SMSIG stamps run", () => {
-    const { element } = makeNmosElement62({ VTO: 0.7, KP: 120e-6, GAMMA: 0 });
+    const { element, solver } = makeNmosElement62({ VTO: 0.7, KP: 120e-6, GAMMA: 0 });
 
     const ctx = makeWave62Ctx(MODEDCOP | MODEINITSMSIG, {
       rhsOld: new Float64Array([0, 1.0, 1.5, 0.0]),
+      setupSolver: solver,
     });
 
     element.load(ctx);
@@ -1418,7 +1530,7 @@ describe("MOSFET M-4", () => {
   }
 
   it("bypass fires when within tolerances", () => {
-    const { element, pool } = makeNmosElement62({
+    const { element, pool, solver } = makeNmosElement62({
       VTO: 0.7, KP: 120e-6, GAMMA: 0, CBD: 0, CBS: 0,
     });
     seedConvergedState(element);
@@ -1435,6 +1547,7 @@ describe("MOSFET M-4", () => {
       rhsOld,
       bypass: true,
       voltTol: 1e-6,
+      setupSolver: solver,
     });
     element.load(ctx);
 

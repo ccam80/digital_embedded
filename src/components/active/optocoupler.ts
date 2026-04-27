@@ -1,34 +1,26 @@
 /**
  * Optocoupler (opto-isolator) analog component — F4b composition.
  *
- * Composed from ngspice primitives per spec §F4b:
- *   - LED (input side): diode.ts → dioload.c (LED junction)
- *   - CCCS coupling: CTR * I_LED drives the phototransistor base
- *   - Phototransistor (output side): bjt.ts → bjtload.c (NPN BJT)
+ * Decomposes into 4 sub-elements at compile time per PB-OPTO spec:
+ *   dLed      (DIO)  — LED input diode, diosetup.c:198-238
+ *   vSense    (VSRC) — 0-volt sense source in series with dLed, vsrcset.c:40-55
+ *   cccsCouple(CCCS) — CTR × I_LED injected to phototransistor base, cccsset.c:30-50
+ *   bjtPhoto  (BJT NPN) — phototransistor output, bjtsetup.c:347-465
  *
- * Composition architecture (sub-element delegation):
- *   optocoupler.load() calls:
- *     1. ledSub.load(ctx)           — LED diode stamp on anode/cathode; dioload.c:120-441
- *     2. CCCS stamp                 — injects CTR*I_LED as Norton source into internalBase
- *     3. bjtSub.load(ctx)           — BJT stamp on (internalBase, collector, emitter); bjtload.c:170-end
+ * Internal nodes allocated in setup():
+ *   _nSenseMid: mid-node between dLed cathode and vSense positive terminal
+ *   _nBase:     phototransistor base node (no external pin)
  *
- * Galvanic isolation:
- *   No shared MNA nodes between input (anode/cathode) and output (collector/emitter).
- *   The CCCS coupling is purely algebraic — off-diagonal Jacobian entries only in
- *   output rows, representing the controlled-source dependence on input voltage.
+ * Galvanic isolation: no shared MNA nodes between input (anode/cathode) and
+ * output (collector/emitter). The CCCS coupling is algebraic only.
  *
- * Internal node:
- *   [internalNodeIds[0]] = phototransistor base (no external pin)
- *
- * Pins (nodeIds order):
- *   [0] = nAnode     (LED anode, input+)
- *   [1] = nCathode   (LED cathode, input-)
- *   [2] = nCollector (phototransistor collector, output+)
- *   [3] = nEmitter   (phototransistor emitter, output-)
- *
- * State pool layout:
- *   [0 .. DIODE_SCHEMA.size-1]                             — LED diode slots
- *   [DIODE_SCHEMA.size .. DIODE_SCHEMA.size+BJT_SIMPLE_SCHEMA.size-1] — BJT slots
+ * Setup order (NGSPICE_LOAD_ORDER ascending):
+ *   1. ctx.makeVolt(label, "senseMid") — allocate LED/sense-source mid-node
+ *   2. ctx.makeVolt(label, "base")     — allocate phototransistor base node
+ *   3. dLed.setup(ctx)        — DIO TSTALLOC (diosetup.c:232-238, 7 entries)
+ *   4. vSense.setup(ctx)      — VSRC TSTALLOC (vsrcset.c:52-55, 4 entries)
+ *   5. cccsCouple.setup(ctx)  — CCCS TSTALLOC (cccsset.c:49-50, 2 entries)
+ *   6. bjtPhoto.setup(ctx)    — BJT TSTALLOC (bjtsetup.c:435-464, 23 entries)
  */
 
 import { AbstractCircuitElement } from "../../core/element.js";
@@ -44,23 +36,19 @@ import {
   type AttributeMapping,
   type ComponentDefinition,
 } from "../../core/registry.js";
-import type { LoadContext, PoolBackedAnalogElementCore } from "../../solver/analog/element.js";
-import { NGSPICE_LOAD_ORDER } from "../../solver/analog/element.js";
+import type { AnalogElementCore } from "../../core/analog-types.js";
+import { NGSPICE_LOAD_ORDER } from "../../core/analog-types.js";
+import type { LoadContext } from "../../solver/analog/load-context.js";
 import type { SetupContext } from "../../solver/analog/setup-context.js";
 import { defineModelParams } from "../../core/model-params.js";
-import { stampG, stampRHS } from "../../solver/analog/stamp-helpers.js";
-import type { StatePoolRef } from "../../core/analog-types.js";
+import { stampRHS } from "../../solver/analog/stamp-helpers.js";
 
-// Sub-element factories and schemas — LED — dioload.c:120-441
 import {
   createDiodeElement,
-  DIODE_SCHEMA,
   DIODE_PARAM_DEFAULTS,
 } from "../semiconductors/diode.js";
-// Sub-element factories and schemas — phototransistor — bjtload.c:170-end
 import {
   createBjtElement,
-  BJT_SIMPLE_SCHEMA,
   BJT_NPN_DEFAULTS,
 } from "../semiconductors/bjt.js";
 
@@ -75,11 +63,6 @@ export const { paramDefs: OPTOCOUPLER_PARAM_DEFS, defaults: OPTOCOUPLER_DEFAULTS
     n:   { default: 1.0,              description: "LED emission coefficient (dioload.c N)" },
   },
 });
-
-// Diode slot offsets within the combined state block (from DIODE_SCHEMA).
-// SLOT_GEQ=1 (NR companion conductance), SLOT_ID=3 (diode current) — dioload.c CKTstate0.
-const DIODE_SLOT_GEQ = 1;
-const DIODE_SLOT_ID  = 3;
 
 // ---------------------------------------------------------------------------
 // Pin layout
@@ -130,7 +113,6 @@ function buildOptocouplerPinDeclarations(): PinDeclaration[] {
 // Helpers to build PropertyBag for sub-elements
 // ---------------------------------------------------------------------------
 
-/** Build a PropertyBag for the LED diode sub-element with optocoupler-derived params. */
 function makeLedProps(Is: number, n: number): PropertyBag {
   const bag = new PropertyBag(new Map<string, number>().entries());
   const merged: Record<string, number> = { ...DIODE_PARAM_DEFAULTS, IS: Is, N: n };
@@ -138,7 +120,6 @@ function makeLedProps(Is: number, n: number): PropertyBag {
   return bag;
 }
 
-/** Build a PropertyBag for the phototransistor BJT sub-element (NPN, default L0 params). */
 function makeBjtProps(): PropertyBag {
   const bag = new PropertyBag(new Map<string, number>().entries());
   bag.replaceModelParams({ ...BJT_NPN_DEFAULTS });
@@ -146,17 +127,263 @@ function makeBjtProps(): PropertyBag {
 }
 
 // ---------------------------------------------------------------------------
-// OptocouplerAnalogElement factory — F4b composition
+// VsenseSubElement — 0-volt sense source in series with dLed
+//
+// Inline implementation per PB-VSRC-DC (vsrcset.c:40-55, vsrcload.c).
+// Instantiated only inside OptocouplerCompositeElement. The sense source
+// measures I_LED via its branch variable; cccsCouple reads that branch.
 // ---------------------------------------------------------------------------
 
-const DIODE_STATE_SIZE = DIODE_SCHEMA.size;  // 4 (no capacitance)
-const BJT_STATE_SIZE   = BJT_SIMPLE_SCHEMA.size; // 8
+class VsenseSubElement implements AnalogElementCore {
+  branchIndex: number = -1;
+  readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.VSRC;
+  readonly isNonlinear: boolean = false;
+  readonly isReactive: boolean = false;
+  _stateBase: number = -1;
+  _pinNodes: Map<string, number>;
+
+  label: string;
+
+  private _hPosBr: number = -1;
+  private _hNegBr: number = -1;
+  private _hBrNeg: number = -1;
+  private _hBrPos: number = -1;
+
+  constructor(label: string, posNode: number, negNode: number) {
+    this.label = label;
+    this._pinNodes = new Map([["pos", posNode], ["neg", negNode]]);
+  }
+
+  setPinNode(label: string, node: number): void {
+    this._pinNodes.set(label, node);
+  }
+
+  setup(ctx: SetupContext): void {
+    const posNode = this._pinNodes.get("pos")!;
+    const negNode = this._pinNodes.get("neg")!;
+
+    // vsrcset.c:40-43 — idempotent branch allocation
+    if (this.branchIndex === -1) {
+      this.branchIndex = ctx.makeCur(this.label, "branch");
+    }
+    const branchNode = this.branchIndex;
+
+    // vsrcset.c:52-55 — TSTALLOC sequence (line-for-line)
+    this._hPosBr = ctx.solver.allocElement(posNode,    branchNode);
+    this._hNegBr = ctx.solver.allocElement(negNode,    branchNode);
+    this._hBrNeg = ctx.solver.allocElement(branchNode, negNode);
+    this._hBrPos = ctx.solver.allocElement(branchNode, posNode);
+  }
+
+  findBranchFor(_name: string, ctx: SetupContext): number {
+    // Mirrors VSRCfindBr (vsrc/vsrcfbr.c:26-39). Lazily allocates branch.
+    if (this.branchIndex === -1) {
+      this.branchIndex = ctx.makeCur(this.label, "branch");
+    }
+    return this.branchIndex;
+  }
+
+  load(ctx: LoadContext): void {
+    const branchNode = this.branchIndex;
+
+    // vsrcload.c:43-46 — KVL/KCL matrix stamps via cached handles
+    ctx.solver.stampElement(this._hPosBr, +1.0);
+    ctx.solver.stampElement(this._hNegBr, -1.0);
+    ctx.solver.stampElement(this._hBrPos, +1.0);
+    ctx.solver.stampElement(this._hBrNeg, -1.0);
+
+    // vsrcload.c RHS — 0-volt source: no RHS contribution (V=0)
+    // Suppress unused-variable warning — branchNode used for clarity only.
+    void branchNode;
+  }
+
+  setParam(_key: string, _value: number): void {
+    // No user-settable params on the 0-volt sense source.
+  }
+
+  getPinCurrents(rhs: Float64Array): number[] {
+    const I = rhs[this.branchIndex];
+    return [-I, I];
+  }
+}
+
+// ---------------------------------------------------------------------------
+// CccsSubElement — CTR × I_LED CCCS coupling into phototransistor base
+//
+// Inline implementation per PB-CCCS (cccsset.c:30-50, cccsload.c).
+// Reads the sense branch current from vSense and injects CTR * I_LED
+// into the phototransistor base node.
+// ---------------------------------------------------------------------------
+
+class CccsSubElement implements AnalogElementCore {
+  branchIndex: number = -1;
+  readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.CCCS;
+  readonly isNonlinear: boolean = false;
+  readonly isReactive: boolean = false;
+  _stateBase: number = -1;
+  _pinNodes: Map<string, number>;
+
+  label: string;
+  private readonly _gain: number;
+  private readonly _senseLabel: string;
+
+  private _contBranch: number = -1;
+  private _hPCtBr: number = -1;
+  private _hNCtBr: number = -1;
+
+  constructor(label: string, posNode: number, negNode: number, gain: number, senseLabel: string) {
+    this.label = label;
+    this._gain = gain;
+    this._senseLabel = senseLabel;
+    this._pinNodes = new Map([["pos", posNode], ["neg", negNode]]);
+  }
+
+  setPinNode(label: string, node: number): void {
+    this._pinNodes.set(label, node);
+  }
+
+  setup(ctx: SetupContext): void {
+    const posNode = this._pinNodes.get("pos")!;
+    const negNode = this._pinNodes.get("neg")!;
+
+    // cccsset.c:36 — resolve controlling branch (lazy-allocating via findBranchFor)
+    const contBranch = ctx.findBranch(this._senseLabel);
+    if (contBranch === 0) {
+      throw new Error(
+        `CCCS '${this.label}': unknown controlling source '${this._senseLabel}'`,
+      );
+    }
+    this._contBranch = contBranch;
+
+    // cccsset.c:49-50 — TSTALLOC sequence (line-for-line)
+    this._hPCtBr = ctx.solver.allocElement(posNode, contBranch);
+    this._hNCtBr = ctx.solver.allocElement(negNode, contBranch);
+  }
+
+  load(ctx: LoadContext): void {
+    const iSense = ctx.rhsOld[this._contBranch];
+    const gm = this._gain;
+    const iNR = gm * iSense - gm * iSense;  // NR constant = 0 for linear CCCS
+
+    ctx.solver.stampElement(this._hPCtBr, -gm);
+    ctx.solver.stampElement(this._hNCtBr, +gm);
+
+    const posNode = this._pinNodes.get("pos")!;
+    const negNode = this._pinNodes.get("neg")!;
+    if (iNR !== 0) {
+      stampRHS(ctx.rhs, posNode,  iNR);
+      stampRHS(ctx.rhs, negNode, -iNR);
+    }
+  }
+
+  setParam(_key: string, _value: number): void {
+    // No user-settable params on the composite-internal CCCS.
+  }
+
+  getPinCurrents(_rhs: Float64Array): number[] {
+    return [0, 0];
+  }
+}
+
+// ---------------------------------------------------------------------------
+// OptocouplerCompositeElement — composite AnalogElementCore
+// ---------------------------------------------------------------------------
+
+class OptocouplerCompositeElement implements AnalogElementCore {
+  branchIndex: number = -1;
+  readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.DIO;
+  readonly isNonlinear: boolean = true;
+  readonly isReactive: boolean = false;
+  _stateBase: number = -1;
+  _pinNodes: Map<string, number>;
+
+  readonly _dLed: ReturnType<typeof createDiodeElement>;
+  readonly _vSense: VsenseSubElement;
+  readonly _cccsCouple: CccsSubElement;
+  readonly _bjtPhoto: ReturnType<typeof createBjtElement>;
+
+  constructor(
+    pinNodes: ReadonlyMap<string, number>,
+    dLed: ReturnType<typeof createDiodeElement>,
+    vSense: VsenseSubElement,
+    cccsCouple: CccsSubElement,
+    bjtPhoto: ReturnType<typeof createBjtElement>,
+  ) {
+    this._pinNodes = new Map(pinNodes);
+    this._dLed = dLed;
+    this._vSense = vSense;
+    this._cccsCouple = cccsCouple;
+    this._bjtPhoto = bjtPhoto;
+  }
+
+  setup(ctx: SetupContext): void {
+    const nAnode     = this._pinNodes.get("anode")!;
+    const nCathode   = this._pinNodes.get("cathode")!;
+    const nCollector = this._pinNodes.get("collector")!;
+    const nEmitter   = this._pinNodes.get("emitter")!;
+
+    // Allocate internal nodes
+    const nSenseMid = ctx.makeVolt(this._vSense.label.replace(/_vSense$/, ""), "senseMid");
+    const nBase     = ctx.makeVolt(this._vSense.label.replace(/_vSense$/, ""), "base");
+
+    // Wire dLed: anode → senseMid (K = senseMid, was 0 at construction)
+    (this._dLed as any)._pinNodes.set("K", nSenseMid);
+
+    // Wire vSense: senseMid → cathode (0-volt sense source)
+    this._vSense.setPinNode("pos", nSenseMid);
+    this._vSense.setPinNode("neg", nCathode);
+
+    // Wire cccsCouple output: nBase → emitter
+    this._cccsCouple.setPinNode("pos", nBase);
+    this._cccsCouple.setPinNode("neg", nEmitter);
+
+    // Wire bjtPhoto base
+    (this._bjtPhoto as any)._pinNodes.set("B", nBase);
+
+    // Suppress unused variable warnings for nodes used only in wiring
+    void nAnode; void nCollector;
+
+    // Sub-element setup in NGSPICE_LOAD_ORDER (ascending):
+    // DIO(7) < VSRC(8) < CCCS(15) < BJT(40)
+    this._dLed.setup(ctx);         // DIO: diosetup.c:232-238, 7 entries
+    this._vSense.setup(ctx);       // VSRC: vsrcset.c:52-55, 4 entries
+    this._cccsCouple.setup(ctx);   // CCCS: cccsset.c:49-50, 2 entries (after vSense branch allocated)
+    this._bjtPhoto.setup(ctx);     // BJT: bjtsetup.c:435-464, 23 entries
+  }
+
+  load(ctx: LoadContext): void {
+    // 1. LED diode stamp — dioload.c:120-441
+    this._dLed.load(ctx);
+
+    // 2. Zero-volt sense source stamp — vsrcload.c
+    this._vSense.load(ctx);
+
+    // 3. CCCS coupling: CTR × I_vSense injected as photo-current to bjtPhoto base
+    this._cccsCouple.load(ctx);
+
+    // 4. BJT phototransistor stamp — bjtload.c
+    this._bjtPhoto.load(ctx);
+  }
+
+  setParam(_key: string, _value: number): void {
+    // Optocoupler-level param update; sub-element params are fixed at construction.
+  }
+
+  getPinCurrents(_rhs: Float64Array): number[] {
+    // Pin order: [anode, cathode, collector, emitter]
+    return [0, 0, 0, 0];
+  }
+}
+
+// ---------------------------------------------------------------------------
+// createOptocouplerElement factory — PB-OPTO F4b composition
+// ---------------------------------------------------------------------------
 
 function createOptocouplerElement(
   pinNodes: ReadonlyMap<string, number>,
   props: PropertyBag,
-): PoolBackedAnalogElementCore {
-  const internalNodeIds: readonly number[] = [];
+  label: string,
+): OptocouplerCompositeElement {
   const ctr = props.getModelParam<number>("ctr");
   const Is  = props.getModelParam<number>("Is");
   const n   = props.getModelParam<number>("n");
@@ -166,139 +393,32 @@ function createOptocouplerElement(
   const nCollector = pinNodes.get("collector")!;
   const nEmitter   = pinNodes.get("emitter")!;
 
-  // Internal base node for the phototransistor — no external pin.
-  // Allocated by the compiler via getInternalNodeCount=1.
-  const nBase = internalNodeIds[0]!;
-
-  // --- LED diode sub-element (dioload.c:120-441) ---
-  // Pin map uses diode's expected pin names "A" and "K".
-  const ledPinNodes = new Map<string, number>([
-    ["A", nAnode],
-    ["K", nCathode],
-  ]);
+  // dLed: anode → _nSenseMid (K overwritten in setup() once _nSenseMid is allocated)
   const ledProps = makeLedProps(Is, n);
-  const ledSub = createDiodeElement(ledPinNodes, ledProps);
+  const dLed = createDiodeElement(
+    new Map([["A", nAnode], ["K", 0]]),
+    ledProps,
+  );
+  (dLed as any).label = `${label}_dLed`;
 
-  // --- Phototransistor BJT sub-element (bjtload.c:170-end) ---
-  // NPN polarity. Base = internalBase; C = nCollector; E = nEmitter.
-  const bjtPinNodes = new Map<string, number>([
-    ["B", nBase],
+  // vSense: 0-volt sense source; pos/_nSenseMid overwritten in setup()
+  const vSenseLbl = `${label}_vSense`;
+  const vSense = new VsenseSubElement(vSenseLbl, 0, nCathode);
+
+  // cccsCouple: sense = vSense branch; output pos/_nBase overwritten in setup()
+  const cccsCoupLbl = `${label}_cccsCouple`;
+  const cccsCouple = new CccsSubElement(cccsCoupLbl, 0, nEmitter, ctr, vSenseLbl);
+
+  // bjtPhoto: base/_nBase overwritten in setup(); C = collector, E = emitter
+  const bjtProps = makeBjtProps();
+  const bjtPhoto = createBjtElement(1 /* NPN */, new Map([
+    ["B", 0],
     ["C", nCollector],
     ["E", nEmitter],
-  ]);
-  const bjtProps = makeBjtProps();
-  const bjtSub = createBjtElement(1 /* NPN polarity */, bjtPinNodes, bjtProps);
+  ]), bjtProps);
+  (bjtPhoto as any).label = `${label}_bjtPhoto`;
 
-  // Pool binding
-  let pool: StatePoolRef;
-  let diodeBase: number;
-  let bjtBase: number;
-
-  return {
-    branchIndex: -1,
-    ngspiceLoadOrder: NGSPICE_LOAD_ORDER.DIO,
-    isNonlinear: true,
-    isReactive: false as const,
-    _stateBase: -1,
-    _pinNodes: new Map(pinNodes),
-
-    setup(_ctx: SetupContext): void {
-      throw new Error(`PB-Optocoupler not yet migrated`);
-    },
-
-    poolBacked: true as const,
-    stateSize: DIODE_STATE_SIZE + BJT_STATE_SIZE,
-    stateSchema: DIODE_SCHEMA, // primary schema for diagnostics; BJT schema follows
-    stateBaseOffset: -1,
-    s0: new Float64Array(0),
-    s1: new Float64Array(0),
-    s2: new Float64Array(0),
-    s3: new Float64Array(0),
-    s4: new Float64Array(0),
-    s5: new Float64Array(0),
-    s6: new Float64Array(0),
-    s7: new Float64Array(0),
-
-    initState(poolRef: StatePoolRef): void {
-      pool = poolRef;
-      this.s0 = poolRef.state0; this.s1 = poolRef.state1; this.s2 = poolRef.state2; this.s3 = poolRef.state3;
-      this.s4 = poolRef.state4; this.s5 = poolRef.state5; this.s6 = poolRef.state6; this.s7 = poolRef.state7;
-      diodeBase = this.stateBaseOffset;
-      bjtBase   = this.stateBaseOffset + DIODE_STATE_SIZE;
-
-      // Wire sub-elements to their partitioned state regions.
-      ledSub.stateBaseOffset = diodeBase;
-      ledSub.initState(poolRef);
-
-      bjtSub.stateBaseOffset = bjtBase;
-      bjtSub.initState(poolRef);
-    },
-
-    load(ctx: LoadContext): void {
-      // 1. LED diode stamp — dioload.c:120-441
-      ledSub.load(ctx);
-
-      // 2. CCCS stamp — CTR * I_LED injected as Norton source into internalBase.
-      //
-      // After ledSub.load(), pool.states[0][diodeBase + SLOT_ID] = I_LED (dioload.c DIOcurrent).
-      //                        pool.states[0][diodeBase + SLOT_GEQ] = geq_LED (NR companion conductance).
-      //
-      // The CCCS injects I_base = CTR * I_LED into nBase.
-      // NR linearization (Norton equivalent at operating point):
-      //   I_base(Vd) = CTR * I_LED(Vd) ≈ CTR * geq_LED * Vd + CTR * ieq_LED
-      //
-      // Since I_LED = geq_LED * Vd - ieq_LED_offset, the Norton stamp into nBase is:
-      //   Conductance coupling:
-      //     G[nBase, nAnode]   += CTR * geq_LED
-      //     G[nBase, nCathode] -= CTR * geq_LED
-      //   Norton current (constant term from diode's ieq = id - geq*vd):
-      //     iBase_nr = CTR * I_LED  (full operating-point current, not the ieq offset)
-      //
-      // Use the stored I_LED directly as the Norton injection (current source value at OP).
-      // The conductance Jacobian links input (anode/cathode) columns to base row.
-      const s0       = pool.states[0];
-      const iLed     = s0[diodeBase + DIODE_SLOT_ID];
-      const geqLed   = s0[diodeBase + DIODE_SLOT_GEQ];
-      const iBase    = ctr * iLed;
-      const gmCtr    = ctr * geqLed; // dI_base / dV_d
-
-      // Conductance Jacobian: base row coupled to input voltage.
-      // ngspice cccs/F source stamps: input branch column → output node rows.
-      // Here the LED current is a voltage-controlled quantity (via the diode junction),
-      // so we stamp as a conductance coupling from input nodes to base row.
-      stampG(ctx.solver, nBase, nAnode,   gmCtr);
-      stampG(ctx.solver, nBase, nCathode, -gmCtr);
-
-      // Norton current source into base (RHS injection at operating point).
-      // Jacobian reference current: iBase - gmCtr * (vA - vK) — linear part already
-      // covered by stampG above, so the constant term is:
-      //   iBase_norton = iBase - gmCtr * vd  where vd = vA - vK
-      const vA = ctx.rhsOld[nAnode];
-      const vK = ctx.rhsOld[nCathode];
-      const vd = vA - vK;
-      const iBaseNorton = iBase - gmCtr * vd;
-      stampRHS(ctx.rhs, nBase, iBaseNorton);
-
-      // 3. Phototransistor BJT stamp — bjtload.c:170-end
-      bjtSub.load(ctx);
-    },
-
-    setParam(key: string, value: number): void {
-      // Optocoupler-level param update; sub-element params are immutable
-      // after construction (no hot-reload path needed for composite).
-      void key; void value;
-    },
-
-    getPinCurrents(_rhs: Float64Array): number[] {
-      // Pin order: [anode, cathode, collector, emitter]
-      const s0   = pool.states[0];
-      const iLed = s0[diodeBase + DIODE_SLOT_ID];
-      const iC   = ctr * iLed;
-      // LED side: I into anode = I_LED (positive = conventional current in)
-      // BJT side: collector current ≈ CTR * I_LED (simplification at OP)
-      return [iLed, -iLed, -iC, iC];
-    },
-  };
+  return new OptocouplerCompositeElement(pinNodes, dLed, vSense, cccsCouple, bjtPhoto);
 }
 
 // ---------------------------------------------------------------------------
@@ -340,20 +460,18 @@ export class OptocouplerElement extends AbstractCircuitElement {
     ctx.save();
     ctx.setLineWidth(1);
 
-    // Body: rectangle, isolation barrier, LED triangle/bar, light arrows, transistor body — all COMPONENT
     ctx.setColor("COMPONENT");
     ctx.drawRect(0, -2, 4, 4, false);
     ctx.drawLine(2, -2, 2, 2);
 
-    const ledHs = 8 * PX; // 0.5
+    const ledHs = 8 * PX;
     const triTop  = { x: 0.5, y: -ledHs };
     const triBtm  = { x: 0.5, y: ledHs };
     const triTip  = { x: 1.5, y: 0 };
-    ctx.drawPolygon([triTop, triBtm, triTip], false);  // LED triangle
+    ctx.drawPolygon([triTop, triBtm, triTip], false);
     ctx.drawLine(triTip.x - ledHs, triTip.y + ledHs,
-                 triTip.x + ledHs, triTip.y - ledHs); // cathode bar
+                 triTip.x + ledHs, triTip.y - ledHs);
 
-    // Two light arrows
     for (let i = 0; i < 2; i++) {
       const ay = -0.2 + i * 0.4;
       const aBase = { x: 1.7, y: ay };
@@ -375,12 +493,10 @@ export class OptocouplerElement extends AbstractCircuitElement {
       ctx.drawLine(aBase.x, aBase.y, aTip.x - 5 * PX * 0.7, aTip.y + 5 * PX * 0.7);
     }
 
-    // NPN phototransistor body: circle, base bar, base lead — all COMPONENT
     ctx.drawCircle(3, 0, 0.7, false);
-    ctx.drawLine(2.75, -0.5, 2.75, 0.5);  // base bar
-    ctx.drawLine(2, 0, 2.75, 0);           // base lead (internal, no external pin)
+    ctx.drawLine(2.75, -0.5, 2.75, 0.5);
+    ctx.drawLine(2, 0, 2.75, 0);
 
-    // Emitter arrow (body decoration, stays COMPONENT)
     const emDx = 4 - 2.75;
     const emDy = 1 - 0.5;
     const emLen = Math.sqrt(emDx * emDx + emDy * emDy);
@@ -396,19 +512,11 @@ export class OptocouplerElement extends AbstractCircuitElement {
       true,
     );
 
-    // anode lead
     drawColoredLead(ctx, signals, vAnode, 0, -1, triTop.x, triTop.y);
-
-    // cathode lead
     drawColoredLead(ctx, signals, vCathode, 0, 1, triBtm.x, triBtm.y);
-
-    // collector lead
     drawColoredLead(ctx, signals, vCollector, 2.75, -0.5, 4, -1);
-
-    // emitter lead
     drawColoredLead(ctx, signals, vEmitter, 2.75, 0.5, 4, 1);
 
-    // Pin labels outside body near pin tips
     ctx.setColor("TEXT");
     ctx.setFont({ family: "sans-serif", size: 0.5 });
     ctx.drawText("A", 0.15, -1.4, { horizontal: "left", vertical: "bottom" });
@@ -478,7 +586,7 @@ export const OptocouplerDefinition: ComponentDefinition = {
 
   helpText:
     "Optocoupler — 4-terminal element (anode, cathode, collector, emitter). " +
-    "LED input (dioload.c) + CCCS coupling (CTR) + phototransistor output (bjtload.c). " +
+    "LED input (dioload.c) + 0V sense source (vsrcload.c) + CCCS coupling (CTR) + phototransistor output (bjtload.c). " +
     "I_collector ≈ CTR * I_LED. Galvanic isolation between LED and phototransistor.",
 
   factory(props: PropertyBag): OptocouplerElement {
@@ -489,12 +597,13 @@ export const OptocouplerDefinition: ComponentDefinition = {
   modelRegistry: {
     "behavioral": {
       kind: "inline",
-      factory: (pinNodes, props, _getTime) =>
-        createOptocouplerElement(pinNodes, props),
+      factory: (pinNodes, props, _getTime) => {
+        const label = "Optocoupler";
+        return createOptocouplerElement(pinNodes, props, label);
+      },
       paramDefs: OPTOCOUPLER_PARAM_DEFS,
       params: OPTOCOUPLER_DEFAULTS,
-      getInternalNodeCount: (_props) => 1, // phototransistor base node
-      getInternalNodeLabels: (_props) => ["B'"], // internal base label for diagnostics
+      mayCreateInternalNodes: true,
     },
   },
   defaultModel: "behavioral",

@@ -118,6 +118,11 @@ export class NTCThermistorElement implements AnalogElementCore {
   _stateBase: number = -1;
   _pinNodes: Map<string, number> = new Map();
 
+  private _hPP: number = -1; // (posNode, posNode) — ressetup.c:46
+  private _hNN: number = -1; // (negNode, negNode) — ressetup.c:47
+  private _hPN: number = -1; // (posNode, negNode) — ressetup.c:48
+  private _hNP: number = -1; // (negNode, posNode) — ressetup.c:49
+
   private readonly _p: Record<string, number>;
   private readonly _selfHeating: boolean;
   private readonly _shA: number | undefined;
@@ -165,8 +170,16 @@ export class NTCThermistorElement implements AnalogElementCore {
     this.isReactive = selfHeating;
   }
 
-  setup(_ctx: SetupContext): void {
-    throw new Error("PB-NTC not yet migrated");
+  setup(ctx: SetupContext): void {
+    const solver = ctx.solver;
+    const posNode = this._pinNodes.get("pos")!; // RESposNode
+    const negNode = this._pinNodes.get("neg")!; // RESnegNode
+
+    // TSTALLOC sequence: ressetup.c:46-49, line-for-line
+    this._hPP = solver.allocElement(posNode, posNode); // :46 (RESposNode, RESposNode)
+    this._hNN = solver.allocElement(negNode, negNode); // :47 (RESnegNode, RESnegNode)
+    this._hPN = solver.allocElement(posNode, negNode); // :48 (RESposNode, RESnegNode)
+    this._hNP = solver.allocElement(negNode, posNode); // :49 (RESnegNode, RESposNode)
   }
 
   setParam(key: string, value: number): void {
@@ -197,22 +210,11 @@ export class NTCThermistorElement implements AnalogElementCore {
   }
 
   load(ctx: LoadContext): void {
-    const solver = ctx.solver;
-    const nPos = this.pinNodeIds[0];
-    const nNeg = this.pinNodeIds[1];
-
-    const G = 1 / this.resistance();
-
-    if (nPos !== 0 && nNeg !== 0) {
-      solver.stampElement(solver.allocElement(nPos, nPos), G);
-      solver.stampElement(solver.allocElement(nPos, nNeg), -G);
-      solver.stampElement(solver.allocElement(nNeg, nPos), -G);
-      solver.stampElement(solver.allocElement(nNeg, nNeg), G);
-    } else if (nPos !== 0) {
-      solver.stampElement(solver.allocElement(nPos, nPos), G);
-    } else if (nNeg !== 0) {
-      solver.stampElement(solver.allocElement(nNeg, nNeg), G);
-    }
+    const G = 1 / Math.max(this.resistance(), MIN_RESISTANCE);
+    ctx.solver.stampElement(this._hPP,  G);
+    ctx.solver.stampElement(this._hNN,  G);
+    ctx.solver.stampElement(this._hPN, -G);
+    ctx.solver.stampElement(this._hNP, -G);
   }
 
   getPinCurrents(rhs: Float64Array): number[] {
@@ -478,6 +480,7 @@ export const NTCThermistorDefinition: ComponentDefinition = {
       factory: createNTCThermistorElement,
       paramDefs: NTC_PARAM_DEFS,
       params: NTC_DEFAULTS,
+      ngspiceNodeMap: { pos: "pos", neg: "neg" },
     },
   },
   defaultModel: "behavioral",

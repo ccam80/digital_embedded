@@ -26,9 +26,11 @@
 import { describe, it, expect } from "vitest";
 import { DACDefinition, DAC_DEFAULTS } from "../dac.js";
 import { PropertyBag } from "../../../core/properties.js";
-import { withNodeIds, runDcOp, makeLoadCtx, initElement } from "../../../solver/analog/__tests__/test-helpers.js";
+import { withNodeIds, makeLoadCtx, initElement } from "../../../solver/analog/__tests__/test-helpers.js";
 import { makeDcVoltageSource } from "../../sources/dc-voltage-source.js";
 import type { AnalogElement } from "../../../solver/analog/element.js";
+import { MNAEngine } from "../../../solver/analog/analog-engine.js";
+import type { ConcreteCompiledAnalogCircuit } from "../../../solver/analog/analog-engine.js";
 
 // ---------------------------------------------------------------------------
 // Helper: narrow ModelEntry to inline factory (throws if netlist kind)
@@ -70,18 +72,13 @@ function solveDac(
   //   node BITS+2     OUT node
   //   node 0          GND (implicit MNA ground)
   //
-  // Voltage sources:
-  //   branchRows BITS+2 .. 2*BITS+1   one per digital input (BITS sources)
-  //   branchRow  2*BITS+2             VREF source
-  //
-  // matrixSize = numNodes + numBranches = (BITS+2) + (BITS+1)
+  // MNAEngine allocates the DAC's VCVS branch row during _setup() starting
+  // from nodeCount+1 = 11. Voltage sources use fixed branch rows that must
+  // not collide with that VCVS branch — start them at nodeCount+2 = 12.
 
   const nNodes = BITS + 2;
   const nVRefNode = BITS + 1;
   const nOutNode  = BITS + 2;
-
-  const nBranches = BITS + 1;  // BITS digital input VSes + 1 VREF VS
-  const matrixSize = nNodes + nBranches;
 
   // Build pinNodes Map for DAC: D0..D7, VREF, OUT, GND
   const dacPinNodes = new Map<string, number>();
@@ -102,28 +99,63 @@ function solveDac(
   dacPinNodeIds.push(nOutNode);   // OUT
   dacPinNodeIds.push(0);          // GND
   const dacEl = withNodeIds(
-    getFactory(DACDefinition.modelRegistry!["unipolar"]!)(dacPinNodes, [], -1, props, () => 0),
+    getFactory(DACDefinition.modelRegistry!["unipolar"]!)(dacPinNodes, props, () => 0),
     dacPinNodeIds,
   );
 
-  // Digital input voltage sources: HIGH = driveHigh, LOW = 0
+  // Digital input voltage sources: HIGH = driveHigh, LOW = 0.
+  // Branch rows start at nNodes+2=12 to avoid colliding with DAC VCVS branch=11.
+  // Each VS needs a setup() that pre-allocates its matrix handles so that
+  // MNAEngine._setup() sizes the solver matrix to include all branch rows before
+  // allocateRowBuffers() is called.
   const elements: AnalogElement[] = [dacEl];
+  const vsStartBranch = nNodes + 2;  // 12
   for (let i = 0; i < BITS; i++) {
     const nDi = i + 1;  // node for Di
-    const branchRow = nNodes + i;  // branch rows start after node rows
+    const branchRow = vsStartBranch + i;
     const v = inputBits[i] ? driveHigh : 0.0;
-    elements.push(makeDcVoltageSource(nDi, 0, branchRow, v) as unknown as AnalogElement);
+    const vs = makeDcVoltageSource(nDi, 0, branchRow, v) as unknown as AnalogElement;
+    (vs as any).setup = (ctx: { solver: { allocElement: (r: number, c: number) => number } }) => {
+      ctx.solver.allocElement(nDi, branchRow);
+      ctx.solver.allocElement(branchRow, nDi);
+    };
+    elements.push(vs);
   }
 
   // VREF voltage source
-  const vRefBranchRow = nNodes + BITS;
-  elements.push(makeDcVoltageSource(nVRefNode, 0, vRefBranchRow, vRef) as unknown as AnalogElement);
+  const vRefBranchRow = vsStartBranch + BITS;
+  const vrefVs = makeDcVoltageSource(nVRefNode, 0, vRefBranchRow, vRef) as unknown as AnalogElement;
+  (vrefVs as any).setup = (ctx: { solver: { allocElement: (r: number, c: number) => number } }) => {
+    ctx.solver.allocElement(nVRefNode, vRefBranchRow);
+    ctx.solver.allocElement(vRefBranchRow, nVRefNode);
+  };
+  elements.push(vrefVs);
 
-  const result = runDcOp({
-    elements,
-    matrixSize,
+  // Use MNAEngine so that _setup() allocates the DAC's VCVS branch row
+  // correctly (starting from nodeCount+1) and sizes the solver matrix after
+  // all setup() calls have run.
+  const compiled: ConcreteCompiledAnalogCircuit = {
     nodeCount: nNodes,
-  });
+    elements,
+    labelToNodeId: new Map(),
+    labelPinNodes: new Map(),
+    wireToNodeId: new Map(),
+    models: new Map(),
+    statePool: null,
+    componentCount: elements.length,
+    netCount: nNodes,
+    diagnostics: [],
+    branchCount: 0,
+    matrixSize: nNodes,
+    bridgeOutputAdapters: [],
+    bridgeInputAdapters: [],
+    elementToCircuitElement: new Map(),
+    resolvedPins: [],
+  } as unknown as ConcreteCompiledAnalogCircuit;
+
+  const engine = new MNAEngine();
+  engine.init(compiled);
+  const result = engine.dcOperatingPoint();
 
   return {
     converged: result.converged,
@@ -181,12 +213,16 @@ describe("DAC", () => {
     for (const code of steps) {
       const { converged, vOut } = solveDac(codeToBits(code));
       expect(converged).toBe(true);
+      if (code > 0) {
+        // Non-zero code must produce positive output
+        expect(vOut).toBeGreaterThan(0);
+      }
       voltages.push(vOut);
     }
 
-    // Assert monotonically increasing
+    // Assert monotonically increasing (skip code=0 vs code=0 degenerate case)
     for (let i = 1; i < voltages.length; i++) {
-      expect(voltages[i]).toBeGreaterThan(voltages[i]!);
+      expect(voltages[i]).toBeGreaterThan(voltages[i - 1]!);
     }
   });
 
@@ -316,6 +352,22 @@ function makeDacParityCtx(rhs: Float64Array, solver: SparseSolverType): LoadCont
 describe("DAC parity (C4.5)", () => {
   it("dac_load_dcop_parity", () => {
     // 8-bit unipolar DAC. Nodes: D0=1..D7=8, VREF=9, OUT=10, GND=0.
+    // Real path: setup() must be called first to allocate VCVS branch row and
+    // matrix handles, then load() uses those handles to stamp VCVS equations.
+    //
+    // New architecture: VCVS sub-element replaces Norton output stamp.
+    //   VCVS: ctrl+(VREF=9), ctrl-(GND=0), out+(OUT=10), out-(GND=0)
+    //   gain = code / 2^N.  D0=HIGH → code=1 → gain=1/256.
+    //   Branch row allocated during setup() as the first new node above nodeCount.
+    //
+    // VCVS stamps (vcvsset.c:53-58), with nGnd=0 entries skipped:
+    //   B[nOut, branch]   = 1    (VCVSposIbrptr)
+    //   C[branch, nOut]   = 1    (VCVSibrPosptr)
+    //   C[branch, nVref]  = -gain (VCVSibrContPosptr, Jacobian control)
+    //
+    // Digital input loading: DigitalInputPinModel stamps 1/rIn on each bit diagonal.
+    //   D0=node1, D1=node2, ..., D7=node8 at 1-based node IDs.
+
     const bits = 8;
     const dacPinNodes = new Map<string, number>();
     for (let i = 0; i < bits; i++) dacPinNodes.set(`D${i}`, i + 1);
@@ -327,47 +379,75 @@ describe("DAC parity (C4.5)", () => {
     const props = new PropertyBag([["bits", bits]]);
     props.replaceModelParams({ ...DAC_DEFAULTS });
     const dac = getFactory(DACDefinition.modelRegistry!["unipolar"]!)(
-      dacPinNodes, [], -1, props, () => 0,
+      dacPinNodes, props, () => 0,
     );
+
+    const { solver, stamps, rhs } = makeDacCaptureSolver();
+
+    // Step 1: Run setup() to allocate VCVS branch row and matrix handles.
+    let stateCount = 0;
+    let allocNodeCount = 10; // start above max pin node (nOut=10)
+    const setupCtx = {
+      solver,
+      temp: 300.15,
+      nomTemp: 300.15,
+      copyNodesets: false,
+      makeVolt(_label: string, _suffix: string): number { return ++allocNodeCount; },
+      makeCur(_label: string, _suffix: string): number { return ++allocNodeCount; },
+      allocStates(n: number): number { const off = stateCount; stateCount += n; return off; },
+      findBranch(_label: string): number { return 0; },
+      findDevice(_label: string) { return null; },
+    };
+    (dac as unknown as { setup: (ctx: typeof setupCtx) => void }).setup(setupCtx);
+
+    // Branch row is the first node allocated after nOut=10, so branchRow = 11.
+    const branchRow = 11;
+
     initElement(dac as unknown as import("../../../solver/analog/element.js").ReactiveAnalogElement);
+
+    // Step 2: Reset stamps accumulated during setup() so we only see load() stamps.
+    stamps.length = 0;
 
     // Drive D0 HIGH above vIH threshold (2.0), others low. VREF=5V.
     // 1-based: slot 0 = ground sentinel, D0=node1..D7=node8, VREF=node9, OUT=node10
-    const matrixSize = 10; // 10 real nodes
+    const matrixSize = 12; // nodes 1..10 + branch row 11
     const voltages = new Float64Array(matrixSize + 1); // +1 for ground sentinel at index 0
     voltages[1] = 3.3;                     // D0 HIGH (node 1)
     for (let i = 2; i <= bits; i++) voltages[i] = 0;  // D1..D7 LOW (nodes 2-8)
     voltages[nVref] = 5.0;
     voltages[nOut]  = 0;
 
-    const { solver, stamps, rhs } = makeDacCaptureSolver();
     const ctx = makeDacParityCtx(voltages, solver);
-    // Wire the owned rhs buffer into ctx so stampRHS(ctx.rhs, ...) writes to it.
     (ctx as unknown as { rhs: Float64Array }).rhs = rhs;
     dac.load(ctx);
 
-    // Closed-form reference:
-    const NGSPICE_ROUT = Math.max(DAC_DEFAULTS.rOut, 1e-9);
-    const NGSPICE_GOUT = 1 / NGSPICE_ROUT;
-    const NGSPICE_CODE = 1;                     // only D0 HIGH
-    const NGSPICE_VREF = 5.0;
-    const NGSPICE_VOUT = NGSPICE_VREF * NGSPICE_CODE / 256;
-    const NGSPICE_RHS_OUT = NGSPICE_VOUT * NGSPICE_GOUT;
+    // Closed-form reference (VCVS architecture):
+    // code=1 (D0 HIGH only), gain = 1/256
+    const NGSPICE_CODE = 1;
+    const NGSPICE_GAIN = NGSPICE_CODE / 256;
     const NGSPICE_GIN = 1 / DAC_DEFAULTS.rIn;
 
     const sumAt = (row: number, col: number): number =>
       stamps.filter((s) => s.row === row && s.col === col)
             .reduce((a, s) => a + s.value, 0);
 
-    // Output stamps on nOut diagonal (bit-exact).
-    // DAC output uses 1-based nOut directly in allocElement (not nodeIdx=nOut-1),
-    // so stamps are recorded at (nOut, nOut) and stampRHS writes to rhs[nOut].
-    expect(sumAt(nOut, nOut)).toBe(NGSPICE_GOUT);
-    expect(rhs[nOut]).toBe(NGSPICE_RHS_OUT);
+    // VCVS incidence stamps (B sub-matrix):
+    //   B[nOut=10, branch=11] = 1
+    expect(sumAt(nOut, branchRow)).toBe(1);
 
-    // Digital input loading: 1/rIn on each bit's diagonal
+    // VCVS branch equation stamps (C sub-matrix):
+    //   C[branch=11, nOut=10] = 1
+    expect(sumAt(branchRow, nOut)).toBe(1);
+    //   C[branch=11, nVref=9] = -gain (control Jacobian)
+    expect(sumAt(branchRow, nVref)).toBe(-NGSPICE_GAIN);
+
+    // Digital input loading: 1/rIn on each bit diagonal (1-based node IDs).
     for (let i = 0; i < bits; i++) {
-      expect(sumAt(i, i)).toBe(NGSPICE_GIN);
+      const nodeId = i + 1; // D0=1, D1=2, ..., D7=8
+      expect(sumAt(nodeId, nodeId)).toBe(NGSPICE_GIN);
     }
+
+    // VREF loading: 1/rIn on nVref diagonal
+    expect(sumAt(nVref, nVref)).toBe(NGSPICE_GIN);
   });
 });

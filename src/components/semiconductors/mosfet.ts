@@ -35,7 +35,7 @@ import {
 } from "../../core/registry.js";
 import type { IntegrationMethod, LoadContext } from "../../solver/analog/element.js";
 import { NGSPICE_LOAD_ORDER } from "../../solver/analog/element.js";
-import { stampG, stampRHS } from "../../solver/analog/stamp-helpers.js";
+import { stampRHS } from "../../solver/analog/stamp-helpers.js";
 import { fetlim, limvds, pnjlim } from "../../solver/analog/newton-raphson.js";
 import { cktTerr } from "../../solver/analog/ckt-terr.js";
 import type { LteParams } from "../../solver/analog/ckt-terr.js";
@@ -1613,67 +1613,42 @@ export function createMosfetElement(
       stampRHS(ctx.rhs, nodeS, (cdreq + ceqbs + polarity * ceqgs));
 
       // RS/RD external terminal stamps (mos1load.c linear model pieces).
+      // Uses pre-allocated handles from setup() — no allocElement calls.
       if (params.RD > 0 && nodeD !== nodeD_ext) {
         const gRD = 1 / params.RD;
-        stampG(solver, nodeD_ext, nodeD_ext, gRD);
-        stampG(solver, nodeD_ext, nodeD, -gRD);
-        stampG(solver, nodeD, nodeD_ext, -gRD);
-        stampG(solver, nodeD, nodeD, gRD);
+        solver.stampElement(_hDD,   gRD);   // (dNode, dNode)
+        solver.stampElement(_hDDP,  -gRD);  // (dNode, dp)
+        solver.stampElement(_hDPD,  -gRD);  // (dp, dNode)
+        solver.stampElement(_hDPDP, gRD);   // (dp, dp)
       }
       if (params.RS > 0 && nodeS !== nodeS_ext) {
         const gRS = 1 / params.RS;
-        stampG(solver, nodeS_ext, nodeS_ext, gRS);
-        stampG(solver, nodeS_ext, nodeS, -gRS);
-        stampG(solver, nodeS, nodeS_ext, -gRS);
-        stampG(solver, nodeS, nodeS, gRS);
+        solver.stampElement(_hSS,   gRS);   // (sNode, sNode)
+        solver.stampElement(_hSSP,  -gRS);  // (sNode, sp)
+        solver.stampElement(_hSPS,  -gRS);  // (sp, sNode)
+        solver.stampElement(_hSPSP, gRS);   // (sp, sp)
       }
 
-      // Y-matrix stamps. The first-touch order of distinct (row, col) pairs
-      // here determines int-index assignment in the sparse solver and MUST
-      // mirror ngspice's mos1set.c:186-207 SMPmakeElt sequence so that our
-      // matrix int-indices match ngspice's bit-exact. The VALUES are from
-      // mos1load.c:929-956. With RD=0/RS=0 the prime nodes collapse to the
-      // external pins (nodeD_ext == nodeD, nodeS_ext == nodeS).
-      //
-      // mos1set.c TSTALLOC sequence (effective with RD=RS=0):
-      //   1:  (D, D)        15: (Dp, D)   = duplicate of (D, D)
-      //   2:  (G, G)        16: (B, G)
-      //   3:  (S, S)        17: (Dp, G)   = (D, G)
-      //   4:  (B, B)        18: (Sp, G)   = (S, G)
-      //   5:  (Dp, Dp)      19: (Sp, S)   = duplicate
-      //   6:  (Sp, Sp)      20: (Dp, B)   = (D, B)
-      //   7:  (D, Dp)       21: (Sp, B)   = (S, B)
-      //   8:  (G, B)        22: (Sp, Dp)  = (S, D)
-      //   9:  (G, Dp)       = (G, D)
-      //   10: (G, Sp)       = (G, S)
-      //   11: (S, Sp)       = duplicate
-      //   12: (B, Dp)       = (B, D)
-      //   13: (B, Sp)       = (B, S)
-      //   14: (Dp, Sp)      = (D, S)
-      //
-      // KNOWN ISSUE: when RD>0 or RS>0, our nodeD/nodeS_ext branches at
-      // lines 1546-1559 above stamp (D_ext, D_ext), (D_ext, Dp), (Dp, D_ext),
-      // (Dp, Dp) before this block runs. That order doesn't match the
-      // ngspice setup sequence (which places (G, G) at position 2, before
-      // (Dp, Dp) at position 5). Until component models are restructured
-      // into separate setup() and load() phases, MOSFET parity is only
-      // guaranteed for RD=RS=0.
-      stampG(solver, nodeD, nodeD, gdsNR + gbd + xrev * (gmNR + gmbsNR) + gcgd);  // 1: (D, D)  [also DPdp when RD=0]
-      stampG(solver, nodeG, nodeG, gcgd + gcgs + gcgb);                            // 2: (G, G)
-      stampG(solver, nodeS, nodeS, gdsNR + gbs + xnrm * (gmNR + gmbsNR) + gcgs);  // 3: (S, S)  [also SPsp when RS=0]
-      stampG(solver, nodeB, nodeB, gbd + gbs + gcgb);                              // 4: (B, B)
-      stampG(solver, nodeG, nodeB, -gcgb);                                         // 8: (G, B)
-      stampG(solver, nodeG, nodeD, -gcgd);                                         // 9: (G, Dp) = (G, D)
-      stampG(solver, nodeG, nodeS, -gcgs);                                         // 10: (G, Sp) = (G, S)
-      stampG(solver, nodeB, nodeD, -gbd);                                          // 12: (B, Dp) = (B, D)
-      stampG(solver, nodeB, nodeS, -gbs);                                          // 13: (B, Sp) = (B, S)
-      stampG(solver, nodeD, nodeS, -gdsNR - xnrm * (gmNR + gmbsNR));               // 14: (Dp, Sp) = (D, S)
-      stampG(solver, nodeB, nodeG, -gcgb);                                         // 16: (B, G)
-      stampG(solver, nodeD, nodeG, (xnrm - xrev) * gmNR - gcgd);                   // 17: (Dp, G) = (D, G)
-      stampG(solver, nodeS, nodeG, -(xnrm - xrev) * gmNR - gcgs);                  // 18: (Sp, G) = (S, G)
-      stampG(solver, nodeD, nodeB, -gbd + (xnrm - xrev) * gmbsNR);                 // 20: (Dp, B) = (D, B)
-      stampG(solver, nodeS, nodeB, -gbs - (xnrm - xrev) * gmbsNR);                 // 21: (Sp, B) = (S, B)
-      stampG(solver, nodeS, nodeD, -gdsNR - xrev * (gmNR + gmbsNR));               // 22: (Sp, Dp) = (S, D)
+      // Y-matrix stamps — mos1load.c:929-956 via cached handles (no allocElement).
+      // Handle names match mos1set.c TSTALLOC sequence (setup() entries 1-22).
+      // With RD=RS=0: dp=dNode, sp=sNode, so duplicate-position handles alias
+      // the same matrix cell; stampElement is idempotent for repeated handles.
+      solver.stampElement(_hDPDP, gdsNR + gbd + xrev * (gmNR + gmbsNR) + gcgd);  // (5/1) D',D'
+      solver.stampElement(_hGG,   gcgd + gcgs + gcgb);                             // (2)   G,G
+      solver.stampElement(_hSPSP, gdsNR + gbs + xnrm * (gmNR + gmbsNR) + gcgs);  // (6/3) S',S'
+      solver.stampElement(_hBB,   gbd + gbs + gcgb);                               // (4)   B,B
+      solver.stampElement(_hGB,   -gcgb);                                           // (8)   G,B
+      solver.stampElement(_hGDP,  -gcgd);                                           // (9)   G,D'
+      solver.stampElement(_hGSP,  -gcgs);                                           // (10)  G,S'
+      solver.stampElement(_hBDP,  -gbd);                                            // (12)  B,D'
+      solver.stampElement(_hBSP,  -gbs);                                            // (13)  B,S'
+      solver.stampElement(_hDPSP, -gdsNR - xnrm * (gmNR + gmbsNR));               // (14)  D',S'
+      solver.stampElement(_hBG,   -gcgb);                                           // (16)  B,G
+      solver.stampElement(_hDPG,  (xnrm - xrev) * gmNR - gcgd);                   // (17)  D',G
+      solver.stampElement(_hSPG,  -(xnrm - xrev) * gmNR - gcgs);                  // (18)  S',G
+      solver.stampElement(_hDPB,  -gbd + (xnrm - xrev) * gmbsNR);                 // (20)  D',B
+      solver.stampElement(_hSPB,  -gbs - (xnrm - xrev) * gmbsNR);                 // (21)  S',B
+      solver.stampElement(_hSPDP, -gdsNR - xrev * (gmNR + gmbsNR));               // (22)  S',D'
 
       // mos1load.c:737-743: noncon gated on OFF==0 || !(MODEINITFIX|MODEINITSMSIG).
       if (icheckLimited && (params.OFF === 0 || !(mode & (MODEINITFIX | MODEINITSMSIG)))) {

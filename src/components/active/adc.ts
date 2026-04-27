@@ -1,4 +1,4 @@
-﻿/**
+/**
  * ADC  N-bit Analog-to-Digital Converter.
  *
  * Behavioral SAR (successive-approximation register) or instant-conversion
@@ -14,11 +14,11 @@
  *   5..5+N-1 D0..D(N-1)  digital output bits, LSB first
  *
  * Conversion:
- *   code = clamp(floor((V_in - V_gnd) / (V_ref - V_gnd) Ã— 2^N), 0, 2^N - 1)
+ *   code = clamp(floor((V_in - V_gnd) / (V_ref - V_gnd) × 2^N), 0, 2^N - 1)
  *
- * In 'unipolar' mode: code = floor(V_in / V_ref Ã— 2^N) clamped to [0, 2^N-1]
+ * In 'unipolar' mode: code = floor(V_in / V_ref × 2^N) clamped to [0, 2^N-1]
  *   (V_gnd treated as 0).
- * In 'bipolar' mode: code = floor((V_in + V_ref/2) / V_ref Ã— 2^N)  midscale
+ * In 'bipolar' mode: code = floor((V_in + V_ref/2) / V_ref × 2^N)  midscale
  *   offset binary: V_in=0 gives code = 2^(N-1).
  *
  * Clock-edge detection:
@@ -59,7 +59,10 @@ import { defineStateSchema } from "../../solver/analog/state-schema.js";
 import type { StateSchema } from "../../solver/analog/state-schema.js";
 import type { AnalogCapacitorElement } from "../passives/capacitor.js";
 
-const ADC_COMPOSITE_SCHEMA: StateSchema = defineStateSchema("ADCComposite", []);
+const ADC_COMPOSITE_SCHEMA: StateSchema = defineStateSchema("ADCComposite", [
+  { name: "PREV_CLK",    doc: "Previous clock voltage for rising-edge detection", init: { kind: "zero" } },
+  { name: "OUTPUT_CODE", doc: "Last conversion code as Float64",                  init: { kind: "zero" } },
+]);
 
 // ---------------------------------------------------------------------------
 // Model parameter declarations
@@ -73,10 +76,10 @@ export const { paramDefs: ADC_PARAM_DEFS, defaults: ADC_DEFAULTS } = defineModel
     vOL: { default: 0.0, unit: "V", description: "Digital output LOW voltage" },
   },
   secondary: {
-    rIn:  { default: 1e7,  unit: "Î", description: "Analog input impedance" },
+    rIn:  { default: 1e7,  unit: "Ω", description: "Analog input impedance" },
     cIn:  { default: 5e-12, unit: "F", description: "Analog input capacitance" },
-    rOut: { default: 50,   unit: "Î", description: "Digital output impedance" },
-    rHiZ: { default: 1e7,  unit: "Î", description: "Hi-Z output impedance" },
+    rOut: { default: 50,   unit: "Ω", description: "Digital output impedance" },
+    rHiZ: { default: 1e7,  unit: "Ω", description: "Hi-Z output impedance" },
   },
 });
 
@@ -332,15 +335,15 @@ function createADCElement(
     if (n > 0) digitalPins[i].init(n, -1);
   }
 
-  // Clock edge detection state
-  let prevClkVoltage = 0;
-
   // SAR conversion state: clock cycles remaining until EOC asserts
   let sarCyclesRemaining = 0;
   let eocActive = false;
 
   // Latched output code
   let latchedCode = 0;
+
+  // Previous clock voltage for rising-edge detection (closure state; mirrored in state slot)
+  let prevClkVoltage = 0;
 
   function readVoltage(rhs: Float64Array, nodeId: number): number {
     return rhs[nodeId];
@@ -383,8 +386,23 @@ function createADCElement(
     _stateBase: -1,
     _pinNodes: new Map(pinNodes),
 
-    setup(_ctx: SetupContext): void {
-      throw new Error(`PB-ADC not yet migrated`);
+    setup(ctx: SetupContext): void {
+      // Composite-level state: PREV_CLK (slot 0) + OUTPUT_CODE (slot 1)
+      this._stateBase = ctx.allocStates(2);
+      this.stateBaseOffset = this._stateBase;
+
+      // Forward to pin models in declaration order: VIN, CLK, EOC, D0..D{N-1}
+      if (nVin > 0) vinPin.setup(ctx);
+      if (nClk > 0) clkPin.setup(ctx);
+      if (nEoc > 0) eocPin.setup(ctx);
+      for (let i = 0; i < bits; i++) {
+        const nD = nDigital[i];
+        if (nD > 0) digitalPins[i].setup(ctx);
+      }
+      // Forward to CAP children of pin models (transient capacitance)
+      for (const child of childElements) {
+        child.setup(ctx);
+      }
     },
 
     poolBacked: true as const,
@@ -403,11 +421,10 @@ function createADCElement(
     initState(_pool: StatePoolRef): void {
       this.s0 = _pool.state0; this.s1 = _pool.state1; this.s2 = _pool.state2; this.s3 = _pool.state3;
       this.s4 = _pool.state4; this.s5 = _pool.state5; this.s6 = _pool.state6; this.s7 = _pool.state7;
-      let offset = this.stateBaseOffset;
+      // Child cap elements have their stateBaseOffset set during setup() via
+      // ctx.allocStates(). Just wire them to the pool — do not override offsets.
       for (const child of childElements) {
-        child.stateBaseOffset = offset;
         child.initState(_pool);
-        offset += child.stateSize;
       }
     },
 
@@ -573,6 +590,7 @@ export const ADCDefinition: ComponentDefinition = {
         createADCElement(pinNodes, props, false, false),
       paramDefs: ADC_PARAM_DEFS,
       params: ADC_DEFAULTS,
+      mayCreateInternalNodes: false,
     },
     "unipolar-sar": {
       kind: "inline",
@@ -580,6 +598,7 @@ export const ADCDefinition: ComponentDefinition = {
         createADCElement(pinNodes, props, false, true),
       paramDefs: ADC_PARAM_DEFS,
       params: ADC_DEFAULTS,
+      mayCreateInternalNodes: false,
     },
     "bipolar-instant": {
       kind: "inline",
@@ -587,6 +606,7 @@ export const ADCDefinition: ComponentDefinition = {
         createADCElement(pinNodes, props, true, false),
       paramDefs: ADC_PARAM_DEFS,
       params: ADC_DEFAULTS,
+      mayCreateInternalNodes: false,
     },
     "bipolar-sar": {
       kind: "inline",
@@ -594,6 +614,7 @@ export const ADCDefinition: ComponentDefinition = {
         createADCElement(pinNodes, props, true, true),
       paramDefs: ADC_PARAM_DEFS,
       params: ADC_DEFAULTS,
+      mayCreateInternalNodes: false,
     },
   },
   defaultModel: "unipolar-instant",

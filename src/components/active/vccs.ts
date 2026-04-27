@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Voltage-Controlled Current Source (VCCS) analog component.
  *
  * Four-terminal element: ctrl+ and ctrl- sense the control voltage;
@@ -11,14 +11,12 @@
  * `expression` is the default ("V(ctrl)"), the effective expression is
  * `transconductance * V(ctrl)`.
  *
- * MNA formulation (Norton stamp  no branch variable):
- *   No `_stampLinear` override (no linear topology-constant entries).
- *   `load()` (via base class) binds the control voltage, evaluates f(Vctrl)
- *   and f'(Vctrl), then calls `stampOutput()` which stamps the NR-linearized
- *   Norton equivalent:
+ * MNA formulation (Norton stamp — no branch variable):
+ *   setup() allocates 4 off-diagonal matrix handles (vccsset.c:43-46 port).
+ *   load() stamps the NR-linearized Norton equivalent using cached handles:
  *
  *   Norton current source (NR linearized around Vctrl0 = current op point):
- *     I_out(Vctrl)  f(Vctrl0) + f'(Vctrl0) * (Vctrl - Vctrl0)
+ *     I_out(Vctrl) = f(Vctrl0) + f'(Vctrl0) * (Vctrl - Vctrl0)
  *                  = f'(Vctrl0) * Vctrl + [f(Vctrl0) - f'(Vctrl0)*Vctrl0]
  *
  *   MNA off-diagonal stamp for controlled source injecting gm*V_ctrl INTO nOutP:
@@ -31,7 +29,7 @@
  *     RHS[nOutN] -= f(Vctrl0) - f'(Vctrl0) * Vctrl0
  *
  * At convergence (Vctrl = Vctrl0) the current injected into out+ equals
- * f(Vctrl0), which is the desired output current. â"
+ * f(Vctrl0), which is the desired output current. ∎
  */
 
 import { AbstractCircuitElement } from "../../core/element.js";
@@ -117,57 +115,62 @@ function buildVCCSPinDeclarations(): PinDeclaration[] {
 /**
  * MNA analog element for a Voltage-Controlled Current Source.
  *
- * Node layout in nodeIds (from analogFactory):
- *   [0] = nCtrlP  (ctrl+ node)
- *   [1] = nCtrlN  (ctrl- node)
- *   [2] = nOutP   (out+ node)
- *   [3] = nOutN   (out- node)
+ * pinNodeIds index ordering (pinLayout order):
+ *   [0] = ctrl+ node  (VCCScontPosNode)
+ *   [1] = ctrl- node  (VCCScontNegNode)
+ *   [2] = out+  node  (VCCSposNode)
+ *   [3] = out-  node  (VCCSnegNode)
  *
  * No branch variable (Norton stamp only).
  */
-class VCCSAnalogElement extends ControlledSourceElement {
+export class VCCSAnalogElement extends ControlledSourceElement {
   branchIndex = -1;
   readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.VCCS;
   _stateBase: number = -1;
   _pinNodes: Map<string, number> = new Map();
 
-  private readonly _nCtrlP: number;
-  private readonly _nCtrlN: number;
-  private readonly _nOutP: number;
-  private readonly _nOutN: number;
+  // TSTALLOC handles — allocated in setup(), written in load()
+  // vccsset.c:43-46 line-for-line
+  private _hPCtP: number = -1; // G[posNode, ctrlPosNode]  :43
+  private _hPCtN: number = -1; // G[posNode, ctrlNegNode]  :44
+  private _hNCtP: number = -1; // G[negNode, ctrlPosNode]  :45
+  private _hNCtN: number = -1; // G[negNode, ctrlNegNode]  :46
 
-  constructor(
-    nCtrlP: number,
-    nCtrlN: number,
-    nOutP: number,
-    nOutN: number,
-    expressionStr: string,
-    transconductance: number,
-  ) {
-    // Build expression: if default "V(ctrl)", apply transconductance multiplier
-    const rawExpr = parseExpression(expressionStr === "V(ctrl)"
-      ? `${transconductance} * V(ctrl)`
-      : expressionStr);
-    const deriv = simplify(differentiate(rawExpr, "V(ctrl)"));
+  setup(ctx: SetupContext): void {
+    const solver = ctx.solver;
+    const posNode     = this._pinNodes.get("out+")!;   // VCCSposNode
+    const negNode     = this._pinNodes.get("out-")!;   // VCCSnegNode
+    const ctrlPosNode = this._pinNodes.get("ctrl+")!;  // VCCScontPosNode
+    const ctrlNegNode = this._pinNodes.get("ctrl-")!;  // VCCScontNegNode
 
-    super(rawExpr, deriv, "V(ctrl)", "voltage");
-
-    this._nCtrlP = nCtrlP;
-    this._nCtrlN = nCtrlN;
-    this._nOutP = nOutP;
-    this._nOutN = nOutN;
+    // TSTALLOC sequence: vccsset.c:43-46, line-for-line
+    this._hPCtP = solver.allocElement(posNode, ctrlPosNode); // :43
+    this._hPCtN = solver.allocElement(posNode, ctrlNegNode); // :44
+    this._hNCtP = solver.allocElement(negNode, ctrlPosNode); // :45
+    this._hNCtN = solver.allocElement(negNode, ctrlNegNode); // :46
   }
 
-  setup(_ctx: SetupContext): void {
-    throw new Error(`PB-VCCS not yet migrated`);
+  /**
+   * Readonly accessor for composites (PB-TUNNEL, PB-TRIODE) that stamp
+   * through the VCCS without owning the handle fields directly.
+   */
+  get stamps(): { pCtP: number; pCtN: number; nCtP: number; nCtN: number } {
+    return {
+      pCtP: this._hPCtP,
+      pCtN: this._hPCtN,
+      nCtP: this._hNCtP,
+      nCtN: this._hNCtN,
+    };
   }
 
   setParam(_key: string, _value: number): void {
   }
 
   protected override _bindContext(rhsOld: Float64Array): void {
-    const vCtrlP = this._nCtrlP > 0 ? rhsOld[this._nCtrlP] : 0;
-    const vCtrlN = this._nCtrlN > 0 ? rhsOld[this._nCtrlN] : 0;
+    const ctrlPosNode = this._pinNodes.get("ctrl+")!;
+    const ctrlNegNode = this._pinNodes.get("ctrl-")!;
+    const vCtrlP = ctrlPosNode > 0 ? rhsOld[ctrlPosNode] : 0;
+    const vCtrlN = ctrlNegNode > 0 ? rhsOld[ctrlNegNode] : 0;
     const vCtrl = vCtrlP - vCtrlN;
 
     this._ctx.setNodeVoltage("ctrl", vCtrl);
@@ -175,18 +178,12 @@ class VCCSAnalogElement extends ControlledSourceElement {
   }
 
   /**
-   * Stamp the Norton equivalent for the controlled current source.
+   * Stamp the Norton transconductance matrix using cached handles.
+   * Port of vccsload.c, value-side only — no allocElement calls.
    *
-   * Linearized around Vctrl0:
-   *   I_out = f'(Vctrl0) * Vctrl + [f(Vctrl0) - f'(Vctrl0) * Vctrl0]
-   *
-   * G sub-matrix (transconductance Jacobian from ctrl to out):
-   *   G[nOutP, nCtrlP] += f'    G[nOutP, nCtrlN] -= f'
-   *   G[nOutN, nCtrlP] -= f'    G[nOutN, nCtrlN] += f'
-   *
-   * RHS (independent current source  NR constant term):
-   *   RHS[nOutP] += f(Vctrl0) - f'(Vctrl0) * Vctrl0
-   *   RHS[nOutN] -= f(Vctrl0) - f'(Vctrl0) * Vctrl0
+   * Signs follow the MNA Norton convention: current gm*Vctrl injected
+   * INTO posNode requires G[posNode, ctrlPosNode] = -gm so the KCL
+   * term is -gm*VctrlP.
    */
   override stampOutput(
     solver: SparseSolver,
@@ -195,38 +192,18 @@ class VCCSAnalogElement extends ControlledSourceElement {
     derivative: number,
     ctrlValue: number,
   ): void {
-    const gm = derivative;
+    const gm  = derivative;
     const iNR = value - derivative * ctrlValue; // NR constant term
 
-    // G sub-matrix: transconductance Jacobian.
-    //
-    // In MNA the KCL equation at nOutP is:
-    //   G_load * V_out - gm * V_ctrl = 0  (for positive current into nOutP)
-    //
-    // Off-diagonal conductance stamp convention: G[outP, ctrlP] = -gm so that
-    // the term appears as -gm * V_ctrlP in the KCL row, i.e. current gm*V_ctrl
-    // is injected INTO nOutP (enters the node).
-    if (this._nOutP !== 0 && this._nCtrlP !== 0) {
-      solver.stampElement(solver.allocElement(this._nOutP, this._nCtrlP), -gm);
-    }
-    if (this._nOutP !== 0 && this._nCtrlN !== 0) {
-      solver.stampElement(solver.allocElement(this._nOutP, this._nCtrlN), gm);
-    }
-    if (this._nOutN !== 0 && this._nCtrlP !== 0) {
-      solver.stampElement(solver.allocElement(this._nOutN, this._nCtrlP), gm);
-    }
-    if (this._nOutN !== 0 && this._nCtrlN !== 0) {
-      solver.stampElement(solver.allocElement(this._nOutN, this._nCtrlN), -gm);
-    }
+    solver.stampElement(this._hPCtP, -gm); // G[posNode, ctrlPosNode]
+    solver.stampElement(this._hPCtN,  gm); // G[posNode, ctrlNegNode]
+    solver.stampElement(this._hNCtP,  gm); // G[negNode, ctrlPosNode]
+    solver.stampElement(this._hNCtN, -gm); // G[negNode, ctrlNegNode]
 
-    // RHS: NR-linearized independent current source (constant term).
-    // Positive iNR injected INTO nOutP (current enters node  positive RHS).
-    if (this._nOutP !== 0) {
-      rhs[this._nOutP] += iNR;
-    }
-    if (this._nOutN !== 0) {
-      rhs[this._nOutN] += -iNR;
-    }
+    const posNode = this._pinNodes.get("out+")!;
+    const negNode = this._pinNodes.get("out-")!;
+    if (posNode !== 0) rhs[posNode] += iNR;
+    if (negNode !== 0) rhs[negNode] -= iNR;
   }
 
   /**
@@ -235,7 +212,7 @@ class VCCSAnalogElement extends ControlledSourceElement {
    * The control port is an ideal voltage sensor (infinite impedance), so it
    * draws zero current. The output current is f(V_ctrl) evaluated at the
    * current operating point. Positive = current flowing INTO the pin.
-   * KCL: 0 + 0 + I_out - I_out = 0. â"
+   * KCL: 0 + 0 + I_out - I_out = 0. ∎
    */
   getPinCurrents(_rhs: Float64Array): number[] {
     const iOut = this._compiledExpr(this._ctx);
@@ -244,7 +221,7 @@ class VCCSAnalogElement extends ControlledSourceElement {
 }
 
 // ---------------------------------------------------------------------------
-// VCCSElement  CircuitElement
+// VCCSElement — CircuitElement
 // ---------------------------------------------------------------------------
 
 export class VCCSElement extends AbstractCircuitElement {
@@ -280,7 +257,7 @@ export class VCCSElement extends AbstractCircuitElement {
     ctx.save();
     ctx.setLineWidth(1);
 
-    // Body  rect and port lines stay COMPONENT
+    // Body — rect and port lines stay COMPONENT
     ctx.setColor("COMPONENT");
     ctx.drawRect(1, -2, 4, 4, false);
 
@@ -300,9 +277,9 @@ export class VCCSElement extends AbstractCircuitElement {
     ctx.setColor("TEXT");
     ctx.setFont({ family: "sans-serif", size: 0.6 });
     ctx.drawText("ctrl+", 1.2, -1, { horizontal: "left", vertical: "middle" });
-    ctx.drawText("ctrl\u2212", 1.2, 1, { horizontal: "left", vertical: "middle" });
+    ctx.drawText("ctrl−", 1.2, 1, { horizontal: "left", vertical: "middle" });
     ctx.drawText("out+",  4.8, -1, { horizontal: "right", vertical: "middle" });
-    ctx.drawText("out\u2212",  4.8, 1, { horizontal: "right", vertical: "middle" });
+    ctx.drawText("out−",  4.8, 1, { horizontal: "right", vertical: "middle" });
 
     ctx.restore();
   }
@@ -353,7 +330,7 @@ export const VCCSDefinition: ComponentDefinition = {
   attributeMap: VCCS_ATTRIBUTE_MAPPINGS,
 
   helpText:
-    "Voltage-Controlled Current Source  output current is an expression of " +
+    "Voltage-Controlled Current Source — output current is an expression of " +
     "the control port voltage V(ctrl+ - ctrl-).",
 
   factory(props: PropertyBag): VCCSElement {
@@ -367,14 +344,11 @@ export const VCCSDefinition: ComponentDefinition = {
       factory: (pinNodes, props, _getTime) => {
         const expression = props.getOrDefault<string>("expression", "V(ctrl)");
         const transconductance = props.getModelParam<number>("transconductance");
-        const el = new VCCSAnalogElement(
-          pinNodes.get("ctrl+")!,
-          pinNodes.get("ctrl-")!,
-          pinNodes.get("out+")!,
-          pinNodes.get("out-")!,
-          expression,
-          transconductance,
-        );
+        const rawExpr = parseExpression(expression === "V(ctrl)"
+          ? `${transconductance} * V(ctrl)`
+          : expression);
+        const deriv = simplify(differentiate(rawExpr, "V(ctrl)"));
+        const el = new VCCSAnalogElement(rawExpr, deriv, "V(ctrl)", "voltage");
         el._pinNodes = new Map(pinNodes);
         return el;
       },

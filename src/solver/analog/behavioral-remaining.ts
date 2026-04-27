@@ -16,7 +16,6 @@
  * modeled as a variable resistance updated at each accepted timestep.
  */
 
-import type { SparseSolver } from "./sparse-solver.js";
 import type { AnalogElementCore, PoolBackedAnalogElementCore, LoadContext, StatePoolRef, IntegrationMethod } from "./element.js";
 import { NGSPICE_LOAD_ORDER } from "./element.js";
 import type { LteParams } from "./ckt-terr.js";
@@ -67,24 +66,6 @@ function getPinLoadingFlag(props: PropertyBag, label: string, defaultValue: bool
   if (!props.has("_pinLoading")) return defaultValue;
   const pinLoading = props.get("_pinLoading") as unknown as Record<string, boolean>;
   return pinLoading[label] ?? defaultValue;
-}
-
-// ---------------------------------------------------------------------------
-// Helper: stamp a conductance between two MNA nodes (ground = node 0 not stamped)
-// ---------------------------------------------------------------------------
-
-function stampG(
-  solver: SparseSolver,
-  nA: number,
-  nB: number,
-  g: number,
-): void {
-  if (nA > 0) solver.stampElement(solver.allocElement(nA, nA), g);
-  if (nB > 0) solver.stampElement(solver.allocElement(nB, nB), g);
-  if (nA > 0 && nB > 0) {
-    solver.stampElement(solver.allocElement(nA, nB), -g);
-    solver.stampElement(solver.allocElement(nB, nA), -g);
-  }
 }
 
 function stampRHS(rhs: Float64Array, n: number, val: number): void {

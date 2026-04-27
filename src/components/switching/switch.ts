@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Switch component -- SPST switch with mechanical symbol rendering.
  *
  * Like PlainSwitch but with the standard mechanical switch symbol:
@@ -27,7 +27,6 @@ import {
 import type { AnalogElementCore, LoadContext } from "../../solver/analog/element.js";
 import { NGSPICE_LOAD_ORDER } from "../../solver/analog/element.js";
 import type { SetupContext } from "../../solver/analog/setup-context.js";
-import type { SparseSolver } from "../../solver/analog/sparse-solver.js";
 
 // ---------------------------------------------------------------------------
 // Layout constants
@@ -291,75 +290,106 @@ const SWITCH_PROPERTY_DEFS: PropertyDefinition[] = [
 ];
 
 // ---------------------------------------------------------------------------
-// Analog helpers -- SPST variable-resistance model
+// SwitchAnalogElement -- W3 migrated analog element class
+//
+// Port of ngspice SW device:
+//   setup: swsetup.c:47-62
+//   load:  swload.c
 // ---------------------------------------------------------------------------
-
-function stampConductanceSpst(
-  solver: SparseSolver,
-  nodeA: number,
-  nodeB: number,
-  G: number,
-): void {
-  if (nodeA !== 0) solver.stampElement(solver.allocElement(nodeA, nodeA), G);
-  if (nodeB !== 0) solver.stampElement(solver.allocElement(nodeB, nodeB), G);
-  if (nodeA !== 0 && nodeB !== 0) {
-    solver.stampElement(solver.allocElement(nodeA, nodeB), -G);
-    solver.stampElement(solver.allocElement(nodeB, nodeA), -G);
-  }
-}
 
 export interface SpstAnalogElement extends AnalogElementCore {
   setClosed(closed: boolean): void;
+  setCtrlVoltage(v: number): void;
+  setSwState(on: boolean): void;
 }
 
-function createSwitchAnalogElement(
-  pinNodes: ReadonlyMap<string, number>,
-  props: PropertyBag,
-): SpstAnalogElement {
-  const nodeA = pinNodes.get("A1")!;
-  const nodeB = pinNodes.get("B1")!;
-  const ron = Math.max(props.getOrDefault<number>("Ron", 1), 1e-12);
-  const roff = Math.max(props.getOrDefault<number>("Roff", 1e9), 1e-12);
-  const normallyClosed = props.getOrDefault<boolean>("normallyClosed", false);
-  let closed = props.getOrDefault<boolean>("closed", false);
-  let effectivelyClosed = normallyClosed ? !closed : closed;
+export class SwitchAnalogElement implements SpstAnalogElement {
+  readonly branchIndex: number = -1;
+  readonly ngspiceLoadOrder: number = NGSPICE_LOAD_ORDER.SW;
+  readonly isNonlinear: boolean = false;
+  readonly isReactive: boolean = false;
+  _stateBase: number = -1;
+  _pinNodes: Map<string, number>;
 
-  return {
-    branchIndex: -1,
-    ngspiceLoadOrder: NGSPICE_LOAD_ORDER.SW,
-    isNonlinear: false,
-    isReactive: false,
-    _stateBase: -1,
-    _pinNodes: new Map(pinNodes),
+  private readonly _ron: number;
+  private readonly _roff: number;
+  private readonly _normallyClosed: boolean;
+  private _closed: boolean;
+  private _effectivelyClosed: boolean;
 
-    setup(_ctx: SetupContext): void {
-      throw new Error("PB-SW not yet migrated");
-    },
+  private _pendingCtrlVoltage: number = 0;
+  private _forcedState: boolean | null = null;
 
-    load(ctx: LoadContext): void {
-      const G = effectivelyClosed ? 1 / ron : 1 / roff;
-      stampConductanceSpst(ctx.solver, nodeA, nodeB, G);
-    },
+  // Matrix handles allocated in setup() — port of swsetup.c:59-62 TSTALLOC sequence
+  _hPP: number = -1;
+  _hPN: number = -1;
+  _hNP: number = -1;
+  _hNN: number = -1;
 
-    setClosed(c: boolean): void {
-      closed = c;
-      effectivelyClosed = normallyClosed ? !closed : closed;
-    },
+  constructor(pinNodes: ReadonlyMap<string, number>, props: PropertyBag) {
+    this._pinNodes = new Map(pinNodes);
+    this._ron = Math.max(props.getOrDefault<number>("Ron", 1), 1e-12);
+    this._roff = Math.max(props.getOrDefault<number>("Roff", 1e9), 1e-12);
+    this._normallyClosed = props.getOrDefault<boolean>("normallyClosed", false);
+    this._closed = props.getOrDefault<boolean>("closed", false);
+    this._effectivelyClosed = this._normallyClosed ? !this._closed : this._closed;
+  }
 
-    getPinCurrents(rhs: Float64Array): number[] {
-      const G = effectivelyClosed ? 1 / ron : 1 / roff;
-      const vA = rhs[nodeA];
-      const vB = rhs[nodeB];
-      const I = G * (vA - vB);
-      return [I, -I];
-    },
+  setup(ctx: SetupContext): void {
+    const posNode = this._pinNodes.get("A1")!;
+    const negNode = this._pinNodes.get("B1")!;
 
-    setParam(key: string, value: number) {
-      if (key === 'closed') {
-        this.setClosed(!!value);
-      }
-    },
-  };
+    // Port of swsetup.c:47-48 — state slot allocation
+    this._stateBase = ctx.allocStates(2);  // SW_NUM_STATES = 2
+
+    // Port of swsetup.c:59-62 — TSTALLOC sequence (line-for-line)
+    this._hPP = ctx.solver.allocElement(posNode, posNode); // SWposNode, SWposNode
+    this._hPN = ctx.solver.allocElement(posNode, negNode); // SWposNode, SWnegNode
+    this._hNP = ctx.solver.allocElement(negNode, posNode); // SWnegNode, SWposNode
+    this._hNN = ctx.solver.allocElement(negNode, negNode); // SWnegNode, SWnegNode
+  }
+
+  load(ctx: LoadContext): void {
+    const on = this._forcedState !== null ? this._forcedState : this._effectivelyClosed;
+    this._forcedState = null;
+    const G = on ? 1 / this._ron : 1 / this._roff;
+
+    // Port of swload.c:149-152 — stamp through cached handles
+    ctx.solver.stampElement(this._hPP, +G);
+    ctx.solver.stampElement(this._hPN, -G);
+    ctx.solver.stampElement(this._hNP, -G);
+    ctx.solver.stampElement(this._hNN, +G);
+  }
+
+  setClosed(closed: boolean): void {
+    this._closed = closed;
+    this._effectivelyClosed = this._normallyClosed ? !this._closed : this._closed;
+  }
+
+  setCtrlVoltage(v: number): void {
+    this._pendingCtrlVoltage = v;
+  }
+
+  setSwState(on: boolean): void {
+    this._forcedState = on;
+  }
+
+  getPinCurrents(rhs: Float64Array): number[] {
+    const posNode = this._pinNodes.get("A1")!;
+    const negNode = this._pinNodes.get("B1")!;
+    const on = this._effectivelyClosed;
+    const G = on ? 1 / this._ron : 1 / this._roff;
+    const vA = rhs[posNode];
+    const vB = rhs[negNode];
+    const I = G * (vA - vB);
+    return [I, -I];
+  }
+
+  setParam(key: string, value: unknown): void {
+    if (key === "closed") {
+      this.setClosed(!!value);
+    }
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -403,7 +433,7 @@ export const SwitchDefinition: ComponentDefinition = {
   modelRegistry: {
     "behavioral": {
       kind: "inline",
-      factory: (pinNodes, props, _getTime) => createSwitchAnalogElement(pinNodes, props),
+      factory: (pinNodes, props, _getTime) => new SwitchAnalogElement(pinNodes, props),
       paramDefs: [],
       params: {},
       ngspiceNodeMap: { A1: "pos", B1: "neg" },

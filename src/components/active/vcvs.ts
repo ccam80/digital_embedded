@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Voltage-Controlled Voltage Source (VCVS) analog component.
  *
  * Four-terminal element: ctrl+ and ctrl- sense the control voltage;
@@ -14,22 +14,22 @@
  *   The VCVS introduces one branch variable (the output current) via a
  *   dedicated branch row in the MNA matrix.
  *
- *   `_stampLinear()` places the B/C incidence for the output port:
+ *   setup() allocates the branch row via ctx.makeCur (vcvsset.c:41-44 port)
+ *   and 6 matrix handles (vcvsset.c:53-58 port).
+ *
+ *   load() (via base class) stamps the B/C incidence for the output port and
+ *   evaluates f(Vctrl)/f'(Vctrl), then calls stampOutput():
  *     B[nOutP, k] += 1   C[k, nOutP] += 1
  *     B[nOutN, k] -= 1   C[k, nOutN] -= 1
- *
- *   `load()` (via base class) binds the control voltage, calls `_stampLinear`,
- *   evaluates f(Vctrl) and f'(Vctrl), then calls `stampOutput()` which stamps
- *   the Jacobian and NR-linearized RHS:
  *     C[k, nCtrlP] -= f'(Vctrl)   (Jacobian)
  *     C[k, nCtrlN] += f'(Vctrl)   (Jacobian)
- *     RHS[k]        = f(Vctrl) - f'(Vctrl) * Vctrl
+ *     RHS[k] = f(Vctrl) - f'(Vctrl) * Vctrl
  *
  * The RHS formula `f(Vctrl0) - f'(Vctrl0) * Vctrl0` is the constant term
  * after linearizing around the current operating point. Combined with the
  * Jacobian entries, the branch equation becomes:
  *   V_out+ - V_out- - f'(Vctrl0)*V_ctrl = f(Vctrl0) - f'(Vctrl0)*Vctrl0
- * which at convergence (V_ctrl = Vctrl0) gives V_out = f(Vctrl0). â"
+ * which at convergence (V_ctrl = Vctrl0) gives V_out = f(Vctrl0). ∎
  */
 
 import { AbstractCircuitElement } from "../../core/element.js";
@@ -115,53 +115,49 @@ function buildVCVSPinDeclarations(): PinDeclaration[] {
 /**
  * MNA analog element for a Voltage-Controlled Voltage Source.
  *
- * Node layout in nodeIds (from analogFactory):
- *   [0] = nCtrlP  (ctrl+ node)
- *   [1] = nCtrlN  (ctrl- node)
- *   [2] = nOutP   (out+ node)
- *   [3] = nOutN   (out- node)
+ * pinNodeIds index ordering (pinLayout order):
+ *   [0] = ctrl+ node  (VCVScontPosNode)
+ *   [1] = ctrl- node  (VCVScontNegNode)
+ *   [2] = out+  node  (VCVSposNode)
+ *   [3] = out-  node  (VCVSnegNode)
  *
- * branchIdx: absolute 0-based row in the MNA matrix for the output branch.
+ * branchIndex: set during setup() via ctx.makeCur; -1 before setup().
  */
-class VCVSAnalogElement extends ControlledSourceElement {
-  branchIndex: number;
+export class VCVSAnalogElement extends ControlledSourceElement {
+  branchIndex: number = -1;
   readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.VCVS;
   _stateBase: number = -1;
   _pinNodes: Map<string, number> = new Map();
 
-  private readonly _nCtrlP: number;
-  private readonly _nCtrlN: number;
-  private readonly _nOutP: number;
-  private readonly _nOutN: number;
-  private readonly _k: number; // branch row (absolute 0-based)
+  // TSTALLOC handles — allocated in setup(), written in load()
+  // vcvsset.c:53-58 line-for-line
+  private _hPIbr:   number = -1; // B[posNode, branch]      :53
+  private _hNIbr:   number = -1; // B[negNode, branch]      :54
+  private _hIbrP:   number = -1; // C[branch,  posNode]     :55
+  private _hIbrN:   number = -1; // C[branch,  negNode]     :56
+  private _hIbrCtP: number = -1; // C[branch,  ctrlPosNode] :57
+  private _hIbrCtN: number = -1; // C[branch,  ctrlNegNode] :58
 
-  constructor(
-    nCtrlP: number,
-    nCtrlN: number,
-    nOutP: number,
-    nOutN: number,
-    branchIdx: number,
-    expressionStr: string,
-    gain: number,
-  ) {
-    // Build expression: if default "V(ctrl)", apply gain multiplier
-    const rawExpr = parseExpression(expressionStr === "V(ctrl)"
-      ? `${gain} * V(ctrl)`
-      : expressionStr);
-    const deriv = simplify(differentiate(rawExpr, "V(ctrl)"));
+  setup(ctx: SetupContext): void {
+    const solver = ctx.solver;
+    const posNode     = this._pinNodes.get("out+")!;   // VCVSposNode
+    const negNode     = this._pinNodes.get("out-")!;   // VCVSnegNode
+    const ctrlPosNode = this._pinNodes.get("ctrl+")!;  // VCVScontPosNode
+    const ctrlNegNode = this._pinNodes.get("ctrl-")!;  // VCVScontNegNode
 
-    super(rawExpr, deriv, "V(ctrl)", "voltage");
+    // Branch row allocation: vcvsset.c:41-44 (idempotent guard)
+    if (this.branchIndex === -1) {
+      this.branchIndex = ctx.makeCur(this.label ?? "vcvs", "branch");
+    }
+    const branch = this.branchIndex;
 
-    this._nCtrlP = nCtrlP;
-    this._nCtrlN = nCtrlN;
-    this._nOutP = nOutP;
-    this._nOutN = nOutN;
-    this._k = branchIdx;
-    this.branchIndex = branchIdx;
-  }
-
-  setup(_ctx: SetupContext): void {
-    throw new Error(`PB-VCVS not yet migrated`);
+    // TSTALLOC sequence: vcvsset.c:53-58, line-for-line
+    this._hPIbr   = solver.allocElement(posNode,     branch);      // :53
+    this._hNIbr   = solver.allocElement(negNode,     branch);      // :54
+    this._hIbrP   = solver.allocElement(branch,      posNode);     // :55
+    this._hIbrN   = solver.allocElement(branch,      negNode);     // :56
+    this._hIbrCtP = solver.allocElement(branch,      ctrlPosNode); // :57
+    this._hIbrCtN = solver.allocElement(branch,      ctrlNegNode); // :58
   }
 
   setParam(_key: string, _value: number): void {
@@ -169,20 +165,17 @@ class VCVSAnalogElement extends ControlledSourceElement {
 
   /** Stamp the linear B/C incidence for the output voltage source branch. */
   protected override _stampLinear(solver: SparseSolver): void {
-    const k = this._k;
-    if (this._nOutP !== 0) {
-      solver.stampElement(solver.allocElement(this._nOutP, k), 1);   // B[nOutP, k]
-      solver.stampElement(solver.allocElement(k, this._nOutP), 1);   // C[k, nOutP]
-    }
-    if (this._nOutN !== 0) {
-      solver.stampElement(solver.allocElement(this._nOutN, k), -1);  // B[nOutN, k]
-      solver.stampElement(solver.allocElement(k, this._nOutN), -1);  // C[k, nOutN]
-    }
+    solver.stampElement(this._hPIbr,  1);  // B[posNode, branch]
+    solver.stampElement(this._hNIbr, -1);  // B[negNode, branch]
+    solver.stampElement(this._hIbrP,  1);  // C[branch,  posNode]
+    solver.stampElement(this._hIbrN, -1);  // C[branch,  negNode]
   }
 
   protected override _bindContext(rhsOld: Float64Array): void {
-    const vCtrlP = this._nCtrlP > 0 ? rhsOld[this._nCtrlP] : 0;
-    const vCtrlN = this._nCtrlN > 0 ? rhsOld[this._nCtrlN] : 0;
+    const ctrlPosNode = this._pinNodes.get("ctrl+")!;
+    const ctrlNegNode = this._pinNodes.get("ctrl-")!;
+    const vCtrlP = ctrlPosNode > 0 ? rhsOld[ctrlPosNode] : 0;
+    const vCtrlN = ctrlNegNode > 0 ? rhsOld[ctrlNegNode] : 0;
     const vCtrl = vCtrlP - vCtrlN;
 
     this._ctx.setNodeVoltage("ctrl", vCtrl);
@@ -191,12 +184,13 @@ class VCVSAnalogElement extends ControlledSourceElement {
 
   /**
    * Stamp the Jacobian and NR-linearized RHS for the output branch.
+   * Port of vcvsload.c, value-side only — no allocElement calls.
    *
    * Branch equation: V_out+ - V_out- - f'(Vctrl)*V_ctrl = f(Vctrl0) - f'*Vctrl0
    *
    * C sub-matrix Jacobian entries (control node columns in branch row k):
-   *   C[k, nCtrlP] -= f'     âˆ‚(branch_eq)/âˆ‚V_ctrlP = -f'
-   *   C[k, nCtrlN] += f'     âˆ‚(branch_eq)/âˆ‚V_ctrlN = +f'
+   *   C[k, nCtrlP] -= f'     ∂(branch_eq)/∂V_ctrlP = -f'
+   *   C[k, nCtrlN] += f'     ∂(branch_eq)/∂V_ctrlN = +f'
    *
    * RHS[k] = f(Vctrl0) - f'(Vctrl0) * Vctrl0
    */
@@ -207,36 +201,29 @@ class VCVSAnalogElement extends ControlledSourceElement {
     derivative: number,
     ctrlValue: number,
   ): void {
-    const k = this._k;
+    solver.stampElement(this._hIbrCtP, -derivative); // C[branch, ctrlPosNode]
+    solver.stampElement(this._hIbrCtN,  derivative); // C[branch, ctrlNegNode]
 
-    // Jacobian: C[k, ctrl] entries
-    if (this._nCtrlP !== 0) {
-      solver.stampElement(solver.allocElement(k, this._nCtrlP), -derivative);
-    }
-    if (this._nCtrlN !== 0) {
-      solver.stampElement(solver.allocElement(k, this._nCtrlN), derivative);
-    }
-
-    // NR-linearized RHS: constant term after factoring out Jacobian
-    rhs[k] += value - derivative * ctrlValue;
+    const branch = this.branchIndex;
+    rhs[branch] += value - derivative * ctrlValue;
   }
 
   /**
    * Per-pin currents in pinLayout order: [ctrl+, ctrl-, out+, out-].
    *
    * The control port is an ideal voltage sensor (infinite impedance), so it
-   * draws zero current. The output port current is the branch variable at row
-   * `_k` in the MNA solution vector. Positive = current flowing INTO the pin.
-   * KCL: 0 + 0 + I_out - I_out = 0. â"
+   * draws zero current. The output port current is the branch variable.
+   * Positive = current flowing INTO the pin.
+   * KCL: 0 + 0 + I_out - I_out = 0. ∎
    */
   getPinCurrents(rhs: Float64Array): number[] {
-    const iOut = rhs[this._k];
+    const iOut = rhs[this.branchIndex];
     return [0, 0, iOut, -iOut];
   }
 }
 
 // ---------------------------------------------------------------------------
-// VCVSElement  CircuitElement
+// VCVSElement — CircuitElement
 // ---------------------------------------------------------------------------
 
 export class VCVSElement extends AbstractCircuitElement {
@@ -272,7 +259,7 @@ export class VCVSElement extends AbstractCircuitElement {
     ctx.save();
     ctx.setLineWidth(1);
 
-    // Body  open polyline box (1,-1)(5,-1)(5,3)(1,3) (no left edge)
+    // Body — open polyline box (1,-1)(5,-1)(5,3)(1,3) (no left edge)
     ctx.setColor("COMPONENT");
     ctx.drawLine(1, -1, 5, -1);
     ctx.drawLine(5, -1, 5, 3);
@@ -294,9 +281,9 @@ export class VCVSElement extends AbstractCircuitElement {
     ctx.setColor("TEXT");
     ctx.setFont({ family: "sans-serif", size: 0.6 });
     ctx.drawText("ctrl+", 1.2, 0, { horizontal: "left", vertical: "middle" });
-    ctx.drawText("ctrl\u2212", 1.2, 2, { horizontal: "left", vertical: "middle" });
+    ctx.drawText("ctrl−", 1.2, 2, { horizontal: "left", vertical: "middle" });
     ctx.drawText("out+",  4.8, 0, { horizontal: "right", vertical: "middle" });
-    ctx.drawText("out\u2212",  4.8, 2, { horizontal: "right", vertical: "middle" });
+    ctx.drawText("out−",  4.8, 2, { horizontal: "right", vertical: "middle" });
 
     ctx.restore();
   }
@@ -347,7 +334,7 @@ export const VCVSDefinition: ComponentDefinition = {
   attributeMap: VCVS_ATTRIBUTE_MAPPINGS,
 
   helpText:
-    "Voltage-Controlled Voltage Source  output voltage is an expression of " +
+    "Voltage-Controlled Voltage Source — output voltage is an expression of " +
     "the control port voltage V(ctrl+ - ctrl-).",
 
   factory(props: PropertyBag): VCVSElement {
@@ -361,22 +348,26 @@ export const VCVSDefinition: ComponentDefinition = {
       factory: (pinNodes, props, _getTime) => {
         const expression = props.getOrDefault<string>("expression", "V(ctrl)");
         const gain = props.getModelParam<number>("gain");
-        const el = new VCVSAnalogElement(
-          pinNodes.get("ctrl+")!,
-          pinNodes.get("ctrl-")!,
-          pinNodes.get("out+")!,
-          pinNodes.get("out-")!,
-          -1,
-          expression,
-          gain,
-        );
+        const rawExpr = parseExpression(expression === "V(ctrl)"
+          ? `${gain} * V(ctrl)`
+          : expression);
+        const deriv = simplify(differentiate(rawExpr, "V(ctrl)"));
+        const el = new VCVSAnalogElement(rawExpr, deriv, "V(ctrl)", "voltage");
         el._pinNodes = new Map(pinNodes);
         return el;
       },
       paramDefs: VCVS_PARAM_DEFS,
       params: VCVS_DEFAULTS,
-      branchCount: 1,
       ngspiceNodeMap: { "out+": "pos", "out-": "neg", "ctrl+": "contPos", "ctrl-": "contNeg" },
+      findBranchFor(name: string, ctx: SetupContext): number {
+        const el = ctx.findDevice(name);
+        if (!el) return 0;
+        const vcvs = el as unknown as VCVSAnalogElement;
+        if (vcvs.branchIndex === -1) {
+          vcvs.branchIndex = ctx.makeCur(name, "branch");
+        }
+        return vcvs.branchIndex;
+      },
     },
   },
   defaultModel: "behavioral",

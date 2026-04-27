@@ -1,8 +1,8 @@
 /**
  * Tests for Voltage-Controlled Current Source (VCCS) analog element.
  *
- * All tests use hand-built ConcreteCompiledAnalogCircuit and drive the
- * MNAEngine directly, verifying DC operating-point results.
+ * All tests use the real factory path: instantiate via factory, let
+ * MNAEngine._setup() allocate handles, then verify DC operating-point results.
  *
  * VCCS circuit pattern:
  *   - Voltage source Vs sets the control voltage V_ctrl at node_ctrl.
@@ -12,23 +12,36 @@
  */
 
 import { describe, it, expect } from "vitest";
-import { ConcreteCompiledAnalogCircuit } from "../../../solver/analog/compiled-analog-circuit.js";
-import { StatePool } from "../../../solver/analog/state-pool.js";
 import { MNAEngine } from "../../../solver/analog/analog-engine.js";
 import { makeResistor, makeVoltageSource, withNodeIds } from "../../../solver/analog/__tests__/test-helpers.js";
 import { VCCSDefinition } from "../vccs.js";
 import { PropertyBag } from "../../../core/properties.js";
 import type { AnalogElement } from "../../../solver/analog/element.js";
+import type { ModelEntry, AnalogFactory } from "../../../core/registry.js";
+import type { ConcreteCompiledAnalogCircuit } from "../../../solver/analog/analog-engine.js";
 
 // ---------------------------------------------------------------------------
-// Helper: narrow ModelEntry to inline factory (throws if netlist kind)
+// Helper: narrow ModelEntry to inline factory
 // ---------------------------------------------------------------------------
-import type { ModelEntry, AnalogFactory } from "../../../core/registry.js";
+
 function getFactory(entry: ModelEntry): AnalogFactory {
   if (entry.kind !== "inline") throw new Error("Expected inline ModelEntry");
   return entry.factory;
 }
 
+// ---------------------------------------------------------------------------
+// withSetup — add a no-op setup() stub to test-helper elements that predate
+// the setup/load split. makeVoltageSource/makeResistor stamp in load(), so
+// their setup() is a no-op. The engine requires setup() on every element.
+// ---------------------------------------------------------------------------
+
+function withSetup(el: AnalogElement): AnalogElement {
+  return Object.assign(el, {
+    _stateBase: -1,
+    _pinNodes: new Map<string, number>(),
+    setup(_ctx: unknown): void {},
+  });
+}
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -51,8 +64,6 @@ function makeVCCSElement(
   return withNodeIds(
     getFactory(VCCSDefinition.modelRegistry!["behavioral"]!)(
       new Map([["ctrl+", nCtrlP], ["ctrl-", nCtrlN], ["out+", nOutP], ["out-", nOutN]]),
-      [],
-      -1,
       props,
       () => 0,
     ),
@@ -62,19 +73,26 @@ function makeVCCSElement(
 
 function buildCircuit(opts: {
   nodeCount: number;
-  branchCount: number;
   elements: AnalogElement[];
 }): ConcreteCompiledAnalogCircuit {
-  return new ConcreteCompiledAnalogCircuit({
+  return {
     nodeCount: opts.nodeCount,
-    branchCount: opts.branchCount,
     elements: opts.elements,
     labelToNodeId: new Map(),
+    labelPinNodes: new Map(),
     wireToNodeId: new Map(),
     models: new Map(),
+    statePool: null,
+    componentCount: opts.elements.length,
+    netCount: opts.nodeCount,
+    diagnostics: [],
+    branchCount: 0,
+    matrixSize: opts.nodeCount,
+    bridgeOutputAdapters: [],
+    bridgeInputAdapters: [],
     elementToCircuitElement: new Map(),
-    statePool: new StatePool(0),
-  });
+    resolvedPins: [],
+  } as unknown as ConcreteCompiledAnalogCircuit;
 }
 
 // ---------------------------------------------------------------------------
@@ -86,21 +104,21 @@ describe("VCCS", () => {
     // gm=0.01 S, V_ctrl=1V → I_out=10mA, R_load=100Ω → V_out=1V
     //
     // Circuit:
-    //   Vs=1V: node1 (+), GND (-)  [branch row 2]
+    //   Vs=1V: node1 (+), GND (-)
     //   VCCS: ctrl+=node1, ctrl-=GND, out+=node2, out-=GND, gm=0.01S
     //   R=100Ω: node2→GND
     //
     // nodeCount=2: node1=ctrl, node2=output
-    // branchCount=1: row2=Vs branch (VCCS has no branch)
+    // makeVoltageSource branchIdx: 0-based branch index; helper uses k=branchIdx+1 internally.
+    // Pass branchIdx=nodeCount+0 so k=nodeCount+1=3 (1-based row in a 2-node matrix).
     const nodeCount = 2;
-    const branchCount = 1;
-    const vsBranch = nodeCount + 0; // absolute row 2
+    const vsBranch = nodeCount + 0; // k = vsBranch+1 = 3 in makeVoltageSource
 
-    const vs   = makeVoltageSource(1, 0, vsBranch, 1.0);
+    const vs   = withSetup(makeVoltageSource(1, 0, vsBranch, 1.0));
     const vccs = makeVCCSElement(1, 0, 2, 0, { transconductance: 0.01 });
-    const r    = makeResistor(2, 0, 100);
+    const r    = withSetup(makeResistor(2, 0, 100));
 
-    const compiled = buildCircuit({ nodeCount, branchCount, elements: [vs, vccs, r] });
+    const compiled = buildCircuit({ nodeCount, elements: [vs, vccs, r] });
     const engine = new MNAEngine();
     engine.init(compiled);
     const result = engine.dcOperatingPoint();
@@ -112,14 +130,13 @@ describe("VCCS", () => {
   it("zero_control_zero_output", () => {
     // V_ctrl=0 → I_out=0 → V_out=0 across any load
     const nodeCount = 2;
-    const branchCount = 1;
     const vsBranch = nodeCount + 0;
 
-    const vs   = makeVoltageSource(1, 0, vsBranch, 0.0);
+    const vs   = withSetup(makeVoltageSource(1, 0, vsBranch, 0.0));
     const vccs = makeVCCSElement(1, 0, 2, 0, { transconductance: 0.01 });
-    const r    = makeResistor(2, 0, 1000);
+    const r    = withSetup(makeResistor(2, 0, 1000));
 
-    const compiled = buildCircuit({ nodeCount, branchCount, elements: [vs, vccs, r] });
+    const compiled = buildCircuit({ nodeCount, elements: [vs, vccs, r] });
     const engine = new MNAEngine();
     engine.init(compiled);
     const result = engine.dcOperatingPoint();
@@ -131,19 +148,39 @@ describe("VCCS", () => {
     // expression: 0.001 * V(ctrl)^2; V_ctrl=3V → I_out = 0.001*9 = 9mA
     // R_load=100Ω → V_out = 9mA * 100 = 0.9V
     const nodeCount = 2;
-    const branchCount = 1;
     const vsBranch = nodeCount + 0;
 
-    const vs   = makeVoltageSource(1, 0, vsBranch, 3.0);
+    const vs   = withSetup(makeVoltageSource(1, 0, vsBranch, 3.0));
     const vccs = makeVCCSElement(1, 0, 2, 0, { expression: "0.001 * V(ctrl)^2" });
-    const r    = makeResistor(2, 0, 100);
+    const r    = withSetup(makeResistor(2, 0, 100));
 
-    const compiled = buildCircuit({ nodeCount, branchCount, elements: [vs, vccs, r] });
+    const compiled = buildCircuit({ nodeCount, elements: [vs, vccs, r] });
     const engine = new MNAEngine();
     engine.init(compiled);
     const result = engine.dcOperatingPoint();
 
     expect(result.converged).toBe(true);
     // I_out = 0.001 * 9 = 9mA; V_out = 9mA * 100Ω = 0.9V
+  });
+
+  it("stamps_accessor_returns_valid_handles_after_setup", () => {
+    // After engine._setup(), VCCSAnalogElement.stamps must return 4 non-negative handles.
+    const nodeCount = 2;
+    const vccs = makeVCCSElement(1, 0, 2, 0, { transconductance: 0.01 });
+    const r    = withSetup(makeResistor(2, 0, 100));
+    const vs   = withSetup(makeVoltageSource(1, 0, nodeCount + 0, 1.0));
+
+    const compiled = buildCircuit({ nodeCount, elements: [vs, vccs, r] });
+    const engine = new MNAEngine();
+    engine.init(compiled);
+    (engine as any)._setup();
+
+    const s = (vccs as any).stamps;
+    // Handles are indices >= 0 (TrashCan is handle 0; real handles start at 1 but
+    // ground-adjacent entries may return TrashCan=0). Non-(-1) means allocated.
+    expect(s.pCtP).not.toBe(-1);
+    expect(s.pCtN).not.toBe(-1);
+    expect(s.nCtP).not.toBe(-1);
+    expect(s.nCtN).not.toBe(-1);
   });
 });

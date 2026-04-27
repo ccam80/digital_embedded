@@ -111,6 +111,11 @@ export class SparkGapElement implements AnalogElementCore {
   _stateBase: number = -1;
   _pinNodes: Map<string, number> = new Map();
 
+  private _hPP: number = -1; // (posNode, posNode) — swsetup.c:59
+  private _hPN: number = -1; // (posNode, negNode) — swsetup.c:60
+  private _hNP: number = -1; // (negNode, posNode) — swsetup.c:61
+  private _hNN: number = -1; // (negNode, negNode) — swsetup.c:62
+
   private readonly _p: Record<string, number>;
 
   /** True when the spark gap is in the conducting state. */
@@ -139,8 +144,19 @@ export class SparkGapElement implements AnalogElementCore {
     };
   }
 
-  setup(_ctx: SetupContext): void {
-    throw new Error("PB-SPARKGAP not yet migrated");
+  setup(ctx: SetupContext): void {
+    const solver = ctx.solver;
+    const posNode = this._pinNodes.get("pos")!; // SWposNode
+    const negNode = this._pinNodes.get("neg")!; // SWnegNode
+
+    // State allocation: swsetup.c:47-48
+    this._stateBase = ctx.allocStates(2); // SW_NUM_STATES = 2 (swdefs.h:56)
+
+    // TSTALLOC sequence: swsetup.c:59-62, line-for-line
+    this._hPP = solver.allocElement(posNode, posNode); // :59 (SWposNode, SWposNode)
+    this._hPN = solver.allocElement(posNode, negNode); // :60 (SWposNode, SWnegNode)
+    this._hNP = solver.allocElement(negNode, posNode); // :61 (SWnegNode, SWposNode)
+    this._hNN = solver.allocElement(negNode, negNode); // :62 (SWnegNode, SWnegNode)
   }
 
   setParam(key: string, value: number): void {
@@ -174,22 +190,11 @@ export class SparkGapElement implements AnalogElementCore {
   }
 
   load(ctx: LoadContext): void {
-    const solver = ctx.solver;
-    const nPos = this.pinNodeIds[0];
-    const nNeg = this.pinNodeIds[1];
-
     const G = 1 / Math.max(this.resistance(), MIN_RESISTANCE);
-
-    if (nPos !== 0 && nNeg !== 0) {
-      solver.stampElement(solver.allocElement(nPos, nPos), G);
-      solver.stampElement(solver.allocElement(nPos, nNeg), -G);
-      solver.stampElement(solver.allocElement(nNeg, nPos), -G);
-      solver.stampElement(solver.allocElement(nNeg, nNeg), G);
-    } else if (nPos !== 0) {
-      solver.stampElement(solver.allocElement(nPos, nPos), G);
-    } else if (nNeg !== 0) {
-      solver.stampElement(solver.allocElement(nNeg, nNeg), G);
-    }
+    ctx.solver.stampElement(this._hPP,  G);
+    ctx.solver.stampElement(this._hPN, -G);
+    ctx.solver.stampElement(this._hNP, -G);
+    ctx.solver.stampElement(this._hNN,  G);
   }
 
   getPinCurrents(rhs: Float64Array): number[] {
@@ -402,6 +407,7 @@ export const SparkGapDefinition: ComponentDefinition = {
       factory: createSparkGapElement,
       paramDefs: SPARK_GAP_PARAM_DEFS,
       params: SPARK_GAP_DEFAULTS,
+      ngspiceNodeMap: { pos: "pos", neg: "neg" },
     },
   },
   models: {},
