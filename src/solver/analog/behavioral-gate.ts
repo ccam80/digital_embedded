@@ -16,6 +16,7 @@
 
 import type { AnalogElementCore, LoadContext, StatePoolRef } from "./element.js";
 import { NGSPICE_LOAD_ORDER } from "./element.js";
+import type { SetupContext } from "./setup-context.js";
 import type { PropertyBag } from "../../core/properties.js";
 import type { ResolvedPinElectrical } from "../../core/pin-electrical.js";
 import {
@@ -47,16 +48,10 @@ export type GateTruthTable = (inputs: boolean[]) => boolean;
  * Factory function signature for analog element creation.
  *
  * Called by the analog compiler for each component instance.
- *   pinNodes       — label → MNA node ID map, one entry per pin in pinLayout order.
- *   internalNodeIds — factory-private MNA node IDs (not pins); positional indexing
- *                    within this array is acceptable because the factory both
- *                    declared the count and consumes them.
- *   branchIdx      — MNA branch-current row index (-1 if none).
+ *   pinNodes — label → MNA node ID map, one entry per pin in pinLayout order.
  */
 export type AnalogElementFactory = (
   pinNodes: ReadonlyMap<string, number>,
-  internalNodeIds: readonly number[],
-  branchIdx: number,
   props: PropertyBag,
   getTime: () => number,
 ) => AnalogElementCore;
@@ -119,6 +114,12 @@ export class BehavioralGateElement implements AnalogElementCore {
       child.initState(pool);
       offset += child.stateSize;
     }
+  }
+
+  setup(ctx: SetupContext): void {
+    for (const pin of this._inputs) pin.setup(ctx);
+    this._output.setup(ctx);
+    for (const child of this._childElements) child.setup(ctx);
   }
 
   load(ctx: LoadContext): void {
@@ -298,7 +299,7 @@ function buildGateElement(
  * Returns an analogFactory closure for NOT gates (always 1 input).
  */
 export function makeNotAnalogFactory(): AnalogElementFactory {
-  return (pinNodes, _internalNodeIds, _branchIdx, props, _getTime) =>
+  return (pinNodes, props, _getTime) =>
     buildGateElement(pinNodes, 1, notTruth, props);
 }
 
@@ -309,7 +310,7 @@ export function makeNotAnalogFactory(): AnalogElementFactory {
  * at instantiation time (supports variable-input-count gates in the registry).
  */
 export function makeAndAnalogFactory(inputCount: number): AnalogElementFactory {
-  return (pinNodes, _internalNodeIds, _branchIdx, props, _getTime) =>
+  return (pinNodes, props, _getTime) =>
     buildGateElement(pinNodes, inputCount, andTruth, props);
 }
 
@@ -319,7 +320,7 @@ export function makeAndAnalogFactory(inputCount: number): AnalogElementFactory {
 export function makeNandAnalogFactory(
   inputCount: number,
 ): AnalogElementFactory {
-  return (pinNodes, _internalNodeIds, _branchIdx, props, _getTime) =>
+  return (pinNodes, props, _getTime) =>
     buildGateElement(pinNodes, inputCount, nandTruth, props);
 }
 
@@ -327,7 +328,7 @@ export function makeNandAnalogFactory(
  * Returns an analogFactory closure for OR gates.
  */
 export function makeOrAnalogFactory(inputCount: number): AnalogElementFactory {
-  return (pinNodes, _internalNodeIds, _branchIdx, props, _getTime) =>
+  return (pinNodes, props, _getTime) =>
     buildGateElement(pinNodes, inputCount, orTruth, props);
 }
 
@@ -335,7 +336,7 @@ export function makeOrAnalogFactory(inputCount: number): AnalogElementFactory {
  * Returns an analogFactory closure for NOR gates.
  */
 export function makeNorAnalogFactory(inputCount: number): AnalogElementFactory {
-  return (pinNodes, _internalNodeIds, _branchIdx, props, _getTime) =>
+  return (pinNodes, props, _getTime) =>
     buildGateElement(pinNodes, inputCount, norTruth, props);
 }
 
@@ -343,7 +344,7 @@ export function makeNorAnalogFactory(inputCount: number): AnalogElementFactory {
  * Returns an analogFactory closure for XOR gates.
  */
 export function makeXorAnalogFactory(inputCount: number): AnalogElementFactory {
-  return (pinNodes, _internalNodeIds, _branchIdx, props, _getTime) =>
+  return (pinNodes, props, _getTime) =>
     buildGateElement(pinNodes, inputCount, xorTruth, props);
 }
 
@@ -356,6 +357,6 @@ export function makeXorAnalogFactory(inputCount: number): AnalogElementFactory {
 export function makeXnorAnalogFactory(
   inputCount: number,
 ): AnalogElementFactory {
-  return (pinNodes, _internalNodeIds, _branchIdx, props, _getTime) =>
+  return (pinNodes, props, _getTime) =>
     buildGateElement(pinNodes, inputCount, xnorTruth, props);
 }

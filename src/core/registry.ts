@@ -20,8 +20,6 @@ import type { PinElectricalSpec } from "./pin-electrical.js";
 
 export type AnalogFactory = (
   pinNodes: ReadonlyMap<string, number>,
-  internalNodeIds: readonly number[],
-  branchIdx: number,
   props: PropertyBag,
   getTime: () => number,
 ) => AnalogElementCore;

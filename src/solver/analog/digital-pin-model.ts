@@ -16,6 +16,7 @@
  */
 
 import type { LoadContext } from "./load-context.js";
+import type { SetupContext } from "./setup-context.js";
 import type { ResolvedPinElectrical } from "../../core/pin-electrical.js";
 import { AnalogCapacitorElement } from "../../components/passives/capacitor.js";
 import { stampRHS } from "./stamp-helpers.js";
@@ -53,7 +54,7 @@ export class DigitalOutputPinModel {
   private _nodeId = -1;
 
   /** Absolute branch row/col in the augmented matrix. Set by init(). */
-  private _branchIdx = -1;
+  private _branchIndex = -1;
 
   /** True when logic level is high. */
   private _high = false;
@@ -62,7 +63,7 @@ export class DigitalOutputPinModel {
   private _hiZ = false;
 
   /** AnalogCapacitorElement child â€" allocated when loaded && cOut > 0 after init(). */
-  private _capacitorChild: AnalogCapacitorElement | null = null;
+  private _outputCap: AnalogCapacitorElement | null = null;
 
   /** Cached matrix handles â€" allocated on first load(), keyed by role. */
   private _handlesInit = false;
@@ -90,14 +91,14 @@ export class DigitalOutputPinModel {
    */
   init(nodeId: number, branchIdx: number): void {
     this._nodeId = nodeId;
-    this._branchIdx = branchIdx;
+    this._branchIndex = branchIdx;
     this._handlesInit = false;
     if (this._loaded && this._spec.cOut > 0 && nodeId > 0) {
       const cap = new AnalogCapacitorElement(this._spec.cOut, 0, 0, 0, 300.15, 1, 1);
       cap.pinNodeIds = [nodeId, 0];
-      this._capacitorChild = cap;
+      this._outputCap = cap;
     } else {
-      this._capacitorChild = null;
+      this._outputCap = null;
     }
   }
 
@@ -126,8 +127,8 @@ export class DigitalOutputPinModel {
    * Non-empty only when loaded && cOut > 0 and init() has been called.
    */
   getChildElements(): readonly AnalogCapacitorElement[] {
-    if (this._capacitorChild !== null) {
-      return [this._capacitorChild];
+    if (this._outputCap !== null) {
+      return [this._outputCap];
     }
     return [];
   }
@@ -152,7 +153,7 @@ export class DigitalOutputPinModel {
     const solver = ctx.solver;
 
     if (this._role === "branch") {
-      const bIdx = this._branchIdx;
+      const bIdx = this._branchIndex;
       if (bIdx < 0) return;
 
       if (!this._handlesInit) {
@@ -200,6 +201,10 @@ export class DigitalOutputPinModel {
     }
   }
 
+  setup(_ctx: SetupContext): void {
+    throw new Error("DigitalOutputPinModel.setup not yet migrated");
+  }
+
   /** The node ID assigned by init(). */
   get nodeId(): number {
     return this._nodeId;
@@ -207,7 +212,7 @@ export class DigitalOutputPinModel {
 
   /** The branch index assigned by init(). */
   get branchIndex(): number {
-    return this._branchIdx;
+    return this._branchIndex;
   }
 
   /** The target output voltage (vOH or vOL). */
@@ -261,7 +266,7 @@ export class DigitalInputPinModel {
   private _nodeId = -1;
 
   /** AnalogCapacitorElement child â€" allocated when loaded && cIn > 0 after init(). */
-  private _capacitorChild: AnalogCapacitorElement | null = null;
+  private _inputCap: AnalogCapacitorElement | null = null;
 
   /** Cached matrix handle for node diagonal. */
   private _hNodeDiag = -1;
@@ -282,9 +287,9 @@ export class DigitalInputPinModel {
     if (this._loaded && this._spec.cIn > 0 && nodeId > 0) {
       const cap = new AnalogCapacitorElement(this._spec.cIn, 0, 0, 0, 300.15, 1, 1);
       cap.pinNodeIds = [nodeId, 0];
-      this._capacitorChild = cap;
+      this._inputCap = cap;
     } else {
-      this._capacitorChild = null;
+      this._inputCap = null;
     }
   }
 
@@ -303,8 +308,8 @@ export class DigitalInputPinModel {
    * Non-empty only when loaded && cIn > 0 and init() has been called.
    */
   getChildElements(): readonly AnalogCapacitorElement[] {
-    if (this._capacitorChild !== null) {
-      return [this._capacitorChild];
+    if (this._inputCap !== null) {
+      return [this._inputCap];
     }
     return [];
   }
@@ -327,6 +332,10 @@ export class DigitalInputPinModel {
     }
 
     solver.stampElement(this._hNodeDiag, 1 / this._spec.rIn);
+  }
+
+  setup(_ctx: SetupContext): void {
+    throw new Error("DigitalInputPinModel.setup not yet migrated");
   }
 
   /**
