@@ -276,7 +276,7 @@ describe("Memristor", () => {
       const mem = makeMemristor();
 
       const solver = new SparseSolver();
-      solver._initStructure(2);
+      solver._initStructure();
       const ctx: LoadContext = {
         solver,
         matrix: solver,

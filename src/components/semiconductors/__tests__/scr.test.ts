@@ -161,7 +161,7 @@ function driveToOp(
   voltages[3] = vGate;
   for (let i = 0; i < iterations; i++) {
     const solver = new SparseSolver();
-    solver._initStructure(4);
+    solver._initStructure();
     const ctx = buildUnitCtx(solver, voltages);
     element.load(ctx);
   }
@@ -177,9 +177,8 @@ function stampAndCapture(
   element: AnalogElement,
   rhs: Float64Array,
 ): { stamps: Array<[number, number, number]>; rhs: Array<[number, number]> } {
-  const matrixSize = Math.max(rhs.length, element.pinNodeIds.length);
   const solver = new SparseSolver();
-  solver._initStructure(matrixSize);
+  solver._initStructure();
   const ctx = buildUnitCtx(solver, rhs);
   element.load(ctx);
 
@@ -277,7 +276,7 @@ describe("SCR", () => {
 
     for (let i = 0; i < 200; i++) {
       const iterSolver = new SparseSolver();
-      iterSolver._initStructure(4);
+      iterSolver._initStructure();
       scr.load(buildUnitCtx(iterSolver, voltages));
     }
 
@@ -312,7 +311,7 @@ describe("SCR", () => {
 
     for (let i = 0; i < 50; i++) {
       const iterSolver = new SparseSolver();
-      iterSolver._initStructure(4);
+      iterSolver._initStructure();
       scr.load(buildUnitCtx(iterSolver, voltages));
     }
 
@@ -348,7 +347,7 @@ describe("SCR", () => {
 
     for (let i = 0; i < 100; i++) {
       const iterSolver = new SparseSolver();
-      iterSolver._initStructure(3);
+      iterSolver._initStructure();
       scr.load(buildUnitCtx(iterSolver, voltages));
     }
 
@@ -407,7 +406,7 @@ describe("SCR", () => {
     const snapshot = new Float64Array(voltages);
 
     const solver = new SparseSolver();
-    solver._initStructure(4);
+    solver._initStructure();
     element.load(buildUnitCtx(solver, voltages));
 
     expect(voltages[1]).toBe(snapshot[1]);
@@ -427,7 +426,7 @@ describe("SCR", () => {
     const voltages = new Float64Array([0, 50, 0, 0.65]);
     for (let i = 0; i < 200; i++) {
       const iterSolver = new SparseSolver();
-      iterSolver._initStructure(4);
+      iterSolver._initStructure();
       element.load(buildUnitCtx(iterSolver, voltages));
     }
 
@@ -462,7 +461,7 @@ describe("SCR", () => {
     const voltages = new Float64Array([10, 0, 0]);
     for (let i = 0; i < 50; i++) {
       const iterSolver = new SparseSolver();
-      iterSolver._initStructure(3);
+      iterSolver._initStructure();
       element.load(buildUnitCtx(iterSolver, voltages));
     }
 
@@ -504,7 +503,7 @@ describe("SCR LimitingEvent instrumentation", () => {
     collector: LimitingEvent[] | null,
   ): void {
     const solver = new SparseSolver();
-    solver._initStructure(3);
+    solver._initStructure();
     element.load(buildUnitCtx(solver, rhs, {
       limitingCollector: collector,
     }));
@@ -583,7 +582,7 @@ describe("SCR TEMP", () => {
 
     const collector: LimitingEvent[] = [];
     const solver = new SparseSolver();
-    solver._initStructure(4);
+    solver._initStructure();
     element.load(buildUnitCtx(solver, voltages, { limitingCollector: collector }));
 
     // Compute expected pnjlim result at TEMP=400K
@@ -620,7 +619,7 @@ describe("SCR TEMP", () => {
 
     const collector: LimitingEvent[] = [];
     const solver = new SparseSolver();
-    solver._initStructure(4);
+    solver._initStructure();
     element.load(buildUnitCtx(solver, voltages, { limitingCollector: collector }));
 
     const vt400 = 400 * KoverQ;
@@ -686,7 +685,7 @@ describe("SCR primeJunctions", () => {
     const tVcrit = nVt * Math.log(nVt / (SCR_DEFAULTS.iS * Math.SQRT2));
 
     const solver = new SparseSolver();
-    solver._initStructure(3);
+    solver._initStructure();
     element.load(buildUnitCtx(solver, new Float64Array(4), {
       cktMode: MODEDCOP | MODEINITJCT,
     }));
@@ -701,7 +700,7 @@ describe("SCR primeJunctions", () => {
     const { element, pool } = makeScrWithPool({ OFF: 1 } as Parameters<typeof makeScrWithPool>[0]);
 
     const solver = new SparseSolver();
-    solver._initStructure(3);
+    solver._initStructure();
     element.load(buildUnitCtx(solver, new Float64Array(4), {
       cktMode: MODEDCOP | MODEINITJCT,
     }));

@@ -162,7 +162,7 @@ describe("Integration", () => {
     //   ground = node 0
     //   branch row = absolute solver index 3 (after the 2 node rows; 1-indexed: nodes at 1,2, branch at 3)
     //
-    // matrixSize = nodeCount(2) + branchCount(1) = 3  (_initStructure(3) allocates slots 0..3)
+    // matrixSize = nodeCount(2) + branchCount(1) = 3  (_initStructure() allocates slots 0..3)
 
     const matrixSize = 3;
     const branchRow = 3; // absolute 1-indexed solver row for branch current
@@ -254,7 +254,7 @@ describe("resistor_load_dcop_parity", () => {
       matrixSize,
       nodeCount: 3,
     });
-    stampCtx.solver._initStructure(matrixSize);
+    stampCtx.solver._initStructure();
     // NR iter 0: voltages are zero, so element.load() sees no bias.
     r1.load(stampCtx.loadCtx);
     r2.load(stampCtx.loadCtx);
@@ -315,7 +315,7 @@ describe("resistor_load_interface", () => {
       matrixSize: 2,
       nodeCount: 2,
     });
-    ctx.solver._initStructure(2);
+    ctx.solver._initStructure();
     element.load(ctx.loadCtx);
 
     const entries = ctx.solver.getCSCNonZeros();

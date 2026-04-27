@@ -76,7 +76,7 @@ function makeTriac(overrides: Partial<typeof TRIAC_DEFAULTS> = {}): AnalogElemen
  */
 function makeDcOpCtx(rhs: Float64Array): LoadContext {
   const solver = new SparseSolver();
-  solver._initStructure(3);
+  solver._initStructure();
   return makeLoadCtx({
     solver,
     rhs: new Float64Array(rhs.length), // separate buffer — stampRHS must not modify caller's buffer

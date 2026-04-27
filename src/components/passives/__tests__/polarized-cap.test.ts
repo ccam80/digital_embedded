@@ -252,7 +252,7 @@ describe("PolarizedCap", () => {
         voltTol: 1e-6,
       };
 
-      solver._initStructure(matrixSize);
+      solver._initStructure();
       vs.load(ctx);
       cap.load(ctx);
       const factorResult = solver.factor();
@@ -346,7 +346,7 @@ describe("PolarizedCap", () => {
           voltTol: 1e-6,
         };
 
-        solver._initStructure(matrixSize);
+        solver._initStructure();
         vs.load(ctx);
         rSeries.load(ctx);
         cap.load(ctx);
@@ -395,7 +395,7 @@ describe("PolarizedCap", () => {
       // V(node1) = -5V â†’ reverse biased by 5V
       const voltagesReverse = new Float64Array([-5, 0]);
       const solver = new SparseSolver();
-      solver._initStructure(2);
+      solver._initStructure();
       capReverse.load(makeDiagnosticCtx(solver, voltagesReverse));
 
       expect(diagnostics.length).toBeGreaterThanOrEqual(1);
@@ -420,7 +420,7 @@ describe("PolarizedCap", () => {
       // V(node1) = +5V â†’ forward biased
       const voltages = new Float64Array([5, 0]);
       const solver = new SparseSolver();
-      solver._initStructure(2);
+      solver._initStructure();
       cap.load(makeDiagnosticCtx(solver, voltages));
 
       expect(diagnostics.length).toBe(0);
@@ -485,7 +485,7 @@ describe("PolarizedCap", () => {
       const { pool } = withState(el);
       const voltages = new Float64Array([5, 0]); // node1=5V, node2=0V
       const solver = new SparseSolver();
-      solver._initStructure(2);
+      solver._initStructure();
       el.load(makeSlotLoadCtx(solver, voltages, 1e-6, "trapezoidal", 1, MODETRAN | MODEINITTRAN));
       expect(pool.state0[0]).toBeGreaterThan(0); // GEQ = C/dt > 0
       // IEQ = ceq = 0 on first step (zero charge history): ccap = C*vNow/dt, geq*vNow = C*vNow/dt â†’ ceq=0
@@ -497,7 +497,7 @@ describe("PolarizedCap", () => {
       // nCap=2 (1-based), nNeg=0 â†’ vCapNode = voltages[1], vNeg = 0
       const voltages = new Float64Array([0, 3]); // node1=0, node2=3V
       const solver = new SparseSolver();
-      solver._initStructure(2);
+      solver._initStructure();
       el.load(makeSlotLoadCtx(solver, voltages, 1e-6, "trapezoidal", 1, MODETRAN | MODEINITTRAN));
     });
 

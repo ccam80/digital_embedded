@@ -241,7 +241,7 @@ describe("Transformer", () => {
       const vsrc = makeVoltageSource(1, 0, bVsrc, vSrc);
 
       rhs.fill(0);
-      solver._initStructure(matrixSize);
+      solver._initStructure();
       const ctx = makeTransientCtx(solver as unknown as SparseSolverType, voltages, {
         dt,
         method: "trapezoidal",
@@ -326,7 +326,7 @@ describe("Transformer", () => {
       const vsrc = makeVoltageSource(1, 0, bVsrc, vSrc);
 
       rhs.fill(0);
-      solver._initStructure(matrixSize);
+      solver._initStructure();
       const ctx = makeTransientCtx(solver as unknown as SparseSolverType, voltages, {
         dt,
         method: "trapezoidal",
@@ -424,7 +424,7 @@ describe("Transformer", () => {
       const vsrc = makeVoltageSource(1, 0, bVsrc, vSrc);
 
       rhs.fill(0);
-      solver._initStructure(matrixSize);
+      solver._initStructure();
       const ctx = makeTransientCtx(solver as unknown as SparseSolverType, voltages, {
         dt,
         method: "trapezoidal",
@@ -510,7 +510,7 @@ describe("Transformer", () => {
         const vsrc = makeVoltageSource(1, 0, bVsrc, vSrc);
 
         rhs.fill(0);
-        solver._initStructure(matrixSize);
+        solver._initStructure();
         const ctx = makeTransientCtx(solver as unknown as SparseSolverType, voltages, {
           dt,
           method: "trapezoidal",

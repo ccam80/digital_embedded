@@ -75,7 +75,7 @@ function buildCtx(
   overrides: Partial<LoadContext> = {},
 ): LoadContext {
   const solver = new SparseSolver();
-  solver._initStructure(3);
+  solver._initStructure();
   const voltages = rhsOld ?? new Float64Array(3);
   return {
     solver,
@@ -339,7 +339,7 @@ function buildBjtCtx(
   overrides: Partial<LoadContext> = {},
 ): LoadContext {
   const solver = new SparseSolver();
-  solver._initStructure(4);
+  solver._initStructure();
   const voltages = rhsOld ?? new Float64Array(4);
   return {
     solver,

@@ -137,10 +137,9 @@ function driveToOp(
   iterations: number,
   opts: { matrixSize?: number; limitingCollector?: LimitingEvent[] | null } = {},
 ): void {
-  const matrixSize = opts.matrixSize ?? Math.max(rhs.length, element.pinNodeIds.length, 1);
   for (let i = 0; i < iterations; i++) {
     const solver = new SparseSolver();
-    solver._initStructure(matrixSize);
+    solver._initStructure();
     const ctx = buildUnitCtx(solver, rhs, {
       limitingCollector: opts.limitingCollector ?? null,
     });
@@ -226,7 +225,7 @@ describe("Diode", () => {
       order: 1,
       deltaOld: [1e-6, 1e-6, 1e-6, 1e-6, 1e-6, 1e-6, 1e-6],
     });
-    capSolver._initStructure(3);
+    capSolver._initStructure();
     element.load(capCtx);
 
     // Verify Cj computation: CJO / (1 - Vd/VJ)^M at Vd = -2V
@@ -276,14 +275,14 @@ describe("Diode", () => {
     voltages[1] = 5; // would give Vd=5V without OFF, but initJct+OFF overrides
     voltages[1] = 0;
     const solver = new SparseSolver();
-    solver._initStructure(3);
+    solver._initStructure();
     el.load(buildUnitCtx(solver, voltages, { cktMode: MODEDCOP | MODEINITJCT }));
 
     // After initJct load with OFF=1, SLOT_VD (index 0) must be 0.
 
     // checkConvergence with initFix mode must return true (OFF suppresses noncon).
     const convSolver = new SparseSolver();
-    convSolver._initStructure(3);
+    convSolver._initStructure();
     const converged = el.checkConvergence!(buildUnitCtx(convSolver, voltages, { cktMode: MODEDCOP | MODEINITFIX }));
     expect(converged).toBe(true);
   });
@@ -446,7 +445,7 @@ describe("Diode LimitingEvent instrumentation", () => {
 
   function loadOnce(element: AnalogElement, rhs: Float64Array, collector: LimitingEvent[] | null): void {
     const solver = new SparseSolver();
-    solver._initStructure(Math.max(rhs.length, element.pinNodeIds.length));
+    solver._initStructure();
     element.load(buildUnitCtx(solver, rhs, { limitingCollector: collector }));
   }
 
@@ -791,7 +790,7 @@ describe("integration", () => {
 
     // Real SparseSolver â€” anode=node 1 mapped to row 1 (1-based), cathode=ground.
     const solver = new SparseSolver();
-    solver._initStructure(2);
+    solver._initStructure();
 
     const ctx = buildUnitCtx(solver, new Float64Array([0, vd]), {
       cktMode: MODETRAN | MODEINITFLOAT,
@@ -898,7 +897,7 @@ describe("diode_load_dcop_parity", () => {
 
     // Real 3Ã—3 SparseSolver (1-based: anode=node1â†'row1, cathode=node2â†'row2).
     const solver = new SparseSolver();
-    solver._initStructure(3);
+    solver._initStructure();
 
     const voltages = new Float64Array([0, VD, 0]);
     const rhs = new Float64Array(3); // separate rhs so stampRHS writes start from 0
@@ -964,7 +963,7 @@ describe("diode_load_transient_parity", () => {
     // Real SparseSolver â€” diode between node 1 (anode) and ground (node 0
     // mapped to no row). matrixSize = 2 (1-based: anode=node1â†'row1).
     const solver = new SparseSolver();
-    solver._initStructure(2);
+    solver._initStructure();
 
     const ctx = makeParityCtx(solver, new Float64Array([0, VD]), {
       cktMode: MODETRAN | MODEINITFLOAT,
@@ -1016,7 +1015,7 @@ describe("diode MODEINITSMSIG seeding (dioload.c:126-127)", () => {
     pool.state0[0] = 0.4;
 
     const solver = new SparseSolver();
-    solver._initStructure(3);
+    solver._initStructure();
     const voltages = new Float64Array([0, 2.0, 0]); // would give Vd=2V if iterated
 
     core.load(makeLoadCtx({
@@ -1043,7 +1042,7 @@ describe("diode MODEINITSMSIG seeding (dioload.c:126-127)", () => {
     pool.state1[0] = 0.35;
 
     const solver = new SparseSolver();
-    solver._initStructure(3);
+    solver._initStructure();
     const voltages = new Float64Array([0, 3.0, 0]);
 
     core.load(makeLoadCtx({
@@ -1072,7 +1071,7 @@ describe("diode MODEINITSMSIG seeding (dioload.c:126-127)", () => {
     pool.state0[0] = 0.3; // reasonable operating point in state0
 
     const solver = new SparseSolver();
-    solver._initStructure(2);
+    solver._initStructure();
     const noncon = { value: 0 };
 
     core.load(makeLoadCtx({
@@ -1102,7 +1101,7 @@ describe("diode MODEINITSMSIG seeding (dioload.c:126-127)", () => {
     computeNIcomCof(1e-9, [1e-9, 1e-9, 1e-9, 1e-9, 1e-9, 1e-9, 1e-9], 1, "trapezoidal", ag, scratch);
 
     const solver = new SparseSolver();
-    solver._initStructure(2);
+    solver._initStructure();
 
     core.load(makeLoadCtx({
       solver,
@@ -1134,7 +1133,7 @@ describe("diode MODEINITSMSIG seeding (dioload.c:126-127)", () => {
     computeNIcomCof(1e-9, [1e-9, 1e-9, 1e-9, 1e-9, 1e-9, 1e-9, 1e-9], 1, "trapezoidal", ag, scratch);
 
     const solver = new SparseSolver();
-    solver._initStructure(3);
+    solver._initStructure();
 
     core.load(makeLoadCtx({
       solver,
@@ -1162,7 +1161,7 @@ describe("diode MODEINITSMSIG seeding (dioload.c:126-127)", () => {
     pool.state0[0] = 0.3;
 
     const solver = new SparseSolver();
-    solver._initStructure(2);
+    solver._initStructure();
 
     core.load(makeLoadCtx({
       solver,
@@ -1188,7 +1187,7 @@ describe("diode checkConvergence A7 fix (MODEINITFIX | MODEINITSMSIG)", () => {
     const el = withNodeIds(core, [1, 2]);
 
     const solver = new SparseSolver();
-    solver._initStructure(3);
+    solver._initStructure();
     const result = el.checkConvergence!(buildUnitCtx(solver, new Float64Array(3), { cktMode: MODEDCOP | MODEINITFIX }));
     expect(result).toBe(true);
   });
@@ -1204,7 +1203,7 @@ describe("diode checkConvergence A7 fix (MODEINITFIX | MODEINITSMSIG)", () => {
     const el = withNodeIds(core, [1, 2]);
 
     const solver = new SparseSolver();
-    solver._initStructure(3);
+    solver._initStructure();
     const result = el.checkConvergence!(buildUnitCtx(solver, new Float64Array(3), { cktMode: MODEDCOP | MODEINITSMSIG }));
     expect(result).toBe(true);
   });
@@ -1222,7 +1221,7 @@ describe("diode checkConvergence A7 fix (MODEINITFIX | MODEINITSMSIG)", () => {
     const el = withNodeIds(core, [1, 2]);
 
     const solver = new SparseSolver();
-    solver._initStructure(3);
+    solver._initStructure();
     // Voltages match state0 exactly â†’ should converge.
     const convergedVoltages = new Float64Array([0, 0.3, 0]);
     const result = el.checkConvergence!(buildUnitCtx(solver, convergedVoltages, { cktMode: MODEDCOP | MODEINITSMSIG }));
@@ -1314,7 +1313,7 @@ describe("Diode TEMP", () => {
 
     // Invoke load() under MODEINITJCT with OFF=0
     const solver = new SparseSolver();
-    solver._initStructure(3);
+    solver._initStructure();
     core.load(buildUnitCtx(solver, new Float64Array(3), { cktMode: MODEDCOP | MODEINITJCT }));
 
     // s0[SLOT_VD=0] must equal the 400K tVcrit (set by MODEINITJCT path, no pnjlim)

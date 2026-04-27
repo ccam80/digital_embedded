@@ -59,7 +59,7 @@ function makeFuseElement(opts: {
 function driveFuseStep(fuse: AnalogFuseElement, dt: number, rhs: Float64Array): void {
   const solver = new SparseSolver();
   // rhs is 1-indexed: length = nodeCount + 1 (slot 0 = ground).
-  solver._initStructure(rhs.length - 1);
+  solver._initStructure();
   const ctx = makeLoadCtx({
     solver,
     rhs: rhs,
@@ -392,7 +392,7 @@ describe("AnalogFuseElement", () => {
         matrixSize: 1,
         nodeCount: 1,
       });
-      stampCtx.solver._initStructure(1);
+      stampCtx.solver._initStructure();
       fuse.load(stampCtx.loadCtx as unknown as LoadContext);
       const stamps = stampCtx.solver.getCSCNonZeros();
 

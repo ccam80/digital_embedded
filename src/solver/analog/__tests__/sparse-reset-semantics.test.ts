@@ -10,7 +10,7 @@ function buildAndFactor(
   entries: Array<[number, number, number]>
 ): SparseSolver {
   const solver = new SparseSolver();
-  solver._initStructure(3);
+  solver._initStructure();
   for (const [r, c, v] of entries) {
     solver.stampElement(solver.allocElement(r, c), v);
   }
@@ -101,7 +101,7 @@ describe("SparseSolver._resetForAssembly semantics", () => {
       [3, 1, 1],             [3, 3, 2],
     ];
     const solver = new SparseSolver();
-    solver._initStructure(3);
+    solver._initStructure();
     for (const [r, c, v] of entries) {
       solver.stampElement(solver.allocElement(r, c), v);
     }

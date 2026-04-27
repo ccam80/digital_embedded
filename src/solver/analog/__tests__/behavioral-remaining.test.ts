@@ -381,7 +381,7 @@ describe("Relay", () => {
 
     for (let step = 0; step < steps; step++) {
       const ctx = makeTransientCtx(currentVoltages, step === 0);
-      solver._initStructure(matrixSize);
+      solver._initStructure();
       for (const el of allElements) el.load(ctx);
       const factored = solver.factor();
       expect(factored).toBe(0);
@@ -395,7 +395,7 @@ describe("Relay", () => {
     // After 10 Ã— 100Âµs, coil current >> 20mA â†’ contact should be closed.
     // Verify by solving again with the updated contact state.
     const finalCtx = makeTransientCtx(currentVoltages, false);
-    solver._initStructure(matrixSize);
+    solver._initStructure();
     for (const el of allElements) el.load(finalCtx);
     solver.factor();
     solver.solve(currentVoltages, currentVoltages);

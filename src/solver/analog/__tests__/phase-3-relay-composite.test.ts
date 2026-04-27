@@ -112,7 +112,7 @@ describe("Phase 3 Task 3.3.3 -- Relay composite-child", () => {
 
     function makeCtx(cktMode: number): LoadContext {
       const solver = new SparseSolver();
-      solver._initStructure(matrixSize);
+      solver._initStructure();
       const rhs = new Float64Array(matrixSize);
       const rhsOld = new Float64Array(matrixSize);
       rhsOld[branchIdx] = I_TEST;  // branch row carries current, not voltage

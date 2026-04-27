@@ -391,7 +391,7 @@ describe("spark_gap_load_dcop_parity", () => {
       matrixSize: 3,
       nodeCount: 2,
     });
-    stampCtx.solver._initStructure(3);
+    stampCtx.solver._initStructure();
     analogElement.load(stampCtx.loadCtx);
     const stamps = stampCtx.solver.getCSCNonZeros();
 

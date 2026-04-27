@@ -796,9 +796,9 @@ describe("NR E_SINGULAR recovery via continue", () => {
           };
         }
         if (prop === "beginAssembly") {
-          return (...args: unknown[]) => {
+          return () => {
             if (singularIterationSeen) beginAssemblyAfterFailure++;
-            return (target as SparseSolver)._initStructure(...(args as [number]));
+            return (target as SparseSolver)._initStructure();
           };
         }
         const val = (target as unknown as Record<string | symbol, unknown>)[prop];
@@ -863,9 +863,9 @@ describe("NR E_SINGULAR recovery via continue", () => {
           };
         }
         if (prop === "beginAssembly") {
-          return (...args: unknown[]) => {
+          return () => {
             if (singularSeen) beginAssemblyAfterFailure++;
-            return (target as SparseSolver)._initStructure(...(args as [number]));
+            return (target as SparseSolver)._initStructure();
           };
         }
         const val = (target as unknown as Record<string | symbol, unknown>)[prop];

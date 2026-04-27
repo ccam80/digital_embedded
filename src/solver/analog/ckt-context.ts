@@ -534,7 +534,7 @@ export class CKTCircuitContext {
     // Matrix / solver — shared instance owned by the engine.
     // ngspice SMPnewMatrix → spCreate is called once at circuit setup.
     this.solver = solver;
-    solver._initStructure(matrixSize);
+    solver._initStructure();
 
     // Caller-side buffers are length matrixSize + 1: slot 0 is the ngspice
     // ground sentinel (always 0), slots 1..matrixSize hold the active node

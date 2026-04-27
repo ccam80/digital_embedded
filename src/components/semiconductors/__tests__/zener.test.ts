@@ -117,7 +117,7 @@ describe("Zener", () => {
     const voltagesBefore = new Float64Array(voltages);
 
     const solver = new SparseSolver();
-    solver._initStructure(3);
+    solver._initStructure();
     const ctx = buildUnitCtx(solver, voltages);
     el.load(ctx);
 
@@ -179,7 +179,7 @@ describe("Zener primeJunctions", () => {
 
     const voltages = new Float64Array(2);
     const solver = new SparseSolver();
-    solver._initStructure(2);
+    solver._initStructure();
     const ctx = buildUnitCtx(solver, voltages, { cktMode: MODEDCOP | MODEINITJCT });
     el.load(ctx);
 
@@ -196,7 +196,7 @@ describe("Zener primeJunctions", () => {
 
     const voltages = new Float64Array(2);
     const solver = new SparseSolver();
-    solver._initStructure(2);
+    solver._initStructure();
     const ctx = buildUnitCtx(solver, voltages, { cktMode: MODEDCOP | MODEINITJCT });
     el.load(ctx);
 
@@ -243,7 +243,7 @@ describe("Zener TEMP", () => {
 
     const voltages = new Float64Array(2);
     const solver = new SparseSolver();
-    solver._initStructure(2);
+    solver._initStructure();
     const ctx = buildUnitCtx(solver, voltages, { cktMode: MODEDCOP | MODEINITJCT });
     el.load(ctx);
 
@@ -278,7 +278,7 @@ describe("Zener TEMP", () => {
 
     const voltages = new Float64Array(2);
     const solver = new SparseSolver();
-    solver._initStructure(2);
+    solver._initStructure();
     const ctx = buildUnitCtx(solver, voltages, { cktMode: MODEDCOP | MODEINITJCT });
     el.load(ctx);
 

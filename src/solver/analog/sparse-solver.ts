@@ -78,6 +78,11 @@ const DEFAULT_PIVOT_ABS_THRESHOLD = 0.0;
 /** ngspice spconfig.h:332 — DIAG_PIVOTING_AS_DEFAULT YES. */
 const DIAG_PIVOTING_AS_DEFAULT = true;
 
+/** ngspice spconfig.h:336 — MINIMUM_ALLOCATED_SIZE 6. */
+const MINIMUM_ALLOCATED_SIZE = 6;
+/** ngspice spconfig.h:337 — EXPANSION_FACTOR 1.5. */
+const EXPANSION_FACTOR = 1.5;
+
 // ngspice spmatrix.h:143-146 — spPartition mode codes.
 const spDEFAULT_PARTITION = 0;
 const spDIRECT_PARTITION = 1;
@@ -176,9 +181,16 @@ export class SparseSolver {
   private _fillins: number = 0;
 
   // =========================================================================
-  // Dimension
+  // Dimension — ngspice MatrixFrame Size / AllocatedSize / ExtSize / AllocatedExtSize
   // =========================================================================
-  private _n = 0;
+  /** ngspice Matrix->Size — live loop bound; bumped by _enlargeMatrix. */
+  private _size: number = 0;
+  /** ngspice Matrix->AllocatedSize — heap capacity for _diag/_rowHead/_colHead/_intToExtRow/_intToExtCol. */
+  private _allocatedSize: number = 0;
+  /** ngspice Matrix->AllocatedExtSize — heap capacity for _extToIntRow/_extToIntCol. */
+  private _allocatedExtSize: number = 0;
+  /** Insertion order for _getInsertionOrder() — test-only debug field. */
+  private _insertionOrder: Array<{ extRow: number; extCol: number }> = [];
 
 
   // =========================================================================
@@ -370,8 +382,8 @@ export class SparseSolver {
     if (row === 0 || col === 0) return 0;
     // ngspice spbuild.c:280 (TRANSLATE) — translate BOTH Row and Col.
     const translated = this._translate(row, col);
-    const intRow = translated.row;
-    const intCol = translated.col;
+    const intRow = translated.intRow;
+    const intCol = translated.intCol;
     // ngspice spbuild.c:306-316 — Diag[Row] fast-path. When the element is
     // on the diagonal AND already exists, skip the column-chain walk.
     if (intRow === intCol) {
@@ -391,16 +403,32 @@ export class SparseSolver {
    *   index N also sets IntToExt[CurrentSize] = N, building both
    *   permutation directions in lockstep.
    *
-   * digiTS divergence: spbuild.c:445-455 ExpandTranslationArrays /
-   * ExtSize tracking is omitted (EXPANDABLE compiles off in stock
-   * ngspice — spconfig.h:226). Caller-side `_initStructure(n)` fixes the
-   * external dimension upfront.
+   * One _insertionOrder entry is pushed per call (one allocElement call =
+   * one entry). Index-assignment side-effects (row-new / col-new branches)
+   * do NOT push additional entries.
    */
-  private _translate(extRow: number, extCol: number): { row: number; col: number } {
+  private _translate(extRow: number, extCol: number): { intRow: number; intCol: number } {
+    // Record this allocElement call in insertion order (one entry per call).
+    this._insertionOrder.push({ extRow, extCol });
+
+    // Grow external translation arrays if needed (spbuild.c:1047-1081).
+    const maxExt = extRow > extCol ? extRow : extCol;
+    if (maxExt > this._allocatedExtSize) {
+      this._expandTranslationArrays(maxExt);
+    }
+    // Grow internal arrays if ext index exceeds internal allocation (spbuild.c:968-970).
+    if (maxExt > this._allocatedSize) {
+      this._enlargeMatrix(maxExt);
+    }
+
     // ngspice spbuild.c:458-477 — translate ExtRow.
     let intRow = this._extToIntRow[extRow];
     if (intRow === -1) {
       this._currentSize++;
+      // Grow internal arrays if needed (spbuild.c:957-1019).
+      if (this._currentSize > this._allocatedSize) {
+        this._enlargeMatrix(this._currentSize);
+      }
       this._extToIntRow[extRow] = this._currentSize;
       this._extToIntCol[extRow] = this._currentSize;
       intRow = this._currentSize;
@@ -412,6 +440,10 @@ export class SparseSolver {
     let intCol = this._extToIntCol[extCol];
     if (intCol === -1) {
       this._currentSize++;
+      // Grow internal arrays if needed.
+      if (this._currentSize > this._allocatedSize) {
+        this._enlargeMatrix(this._currentSize);
+      }
       this._extToIntRow[extCol] = this._currentSize;
       this._extToIntCol[extCol] = this._currentSize;
       intCol = this._currentSize;
@@ -419,7 +451,13 @@ export class SparseSolver {
       this._intToExtCol[intCol] = extCol;
     }
 
-    return { row: intRow, col: intCol };
+    // Update live Size (spbuild.c:963 via EnlargeMatrix called above).
+    // Size is the max internal slot assigned so far.
+    if (this._currentSize > this._size) {
+      this._enlargeMatrix(this._currentSize);
+    }
+
+    return { intRow, intCol };
   }
 
   /**
@@ -641,7 +679,7 @@ export class SparseSolver {
 
     // ngspice spsolve.c:145-146.
     const b = this._intermediate;
-    const n = this._n;
+    const n = this._size;
     const intToExtRow = this._intToExtRow;
     const intToExtCol = this._intToExtCol;
     const diag = this._diag;
@@ -750,7 +788,7 @@ export class SparseSolver {
     this._elCount = 1;
     // ngspice sputils.c:1135-1144 — `for (I = 1; I <= Size; I++)` resets
     // FirstInRow / FirstInCol / Diag.
-    const n = this._n;
+    const n = this._size;
     for (let i = 1; i <= n; i++) {
       this._rowHead[i] = -1;
       this._colHead[i] = -1;
@@ -798,7 +836,7 @@ export class SparseSolver {
     // sputils.c:185 — assert( IS_VALID(Matrix) && !Matrix->Factored ).
     // sputils.c:187.
     if (this._rowsLinked) return;
-    const size = this._n;
+    const size = this._size;
     // sputils.c:189 — Matrix->Reordered = YES.
     this._reordered = true;
 
@@ -853,7 +891,7 @@ export class SparseSolver {
   /** ngspice spcLinkRows (spbuild.c:907-932) — line-for-line port. */
   private _linkRows(): void {
     // ngspice spbuild.c:917 — `for (Col = Matrix->Size; Col >= 1; Col--)`.
-    for (let col = this._n; col >= 1; col--) {
+    for (let col = this._size; col >= 1; col--) {
       let pElement = this._colHead[col];
       while (pElement >= 0) {
         // ngspice spbuild.c:923 — pElement->Col = Col (refresh after SwapCols).
@@ -963,7 +1001,15 @@ export class SparseSolver {
   // =========================================================================
 
   /** @instrumentation Test-only. Use SparseSolverInstrumentation in new code. */
-  get dimension(): number { return this._n; }
+  get dimension(): number { return this._size; }
+
+  /** Test-only: return (extRow, extCol) pairs in the order Translate
+   *  first encountered them. Used by setup-stamp-order invariant tests
+   *  to verify TSTALLOC ordering against ngspice's *setup.c line
+   *  ordering. Not part of the runtime API. */
+  _getInsertionOrder(): ReadonlyArray<{ extRow: number; extCol: number }> {
+    return this._insertionOrder;
+  }
   /** @instrumentation Test-only. Use SparseSolverInstrumentation in new code. */
   get markowitzRow(): Int32Array { return this._markowitzRow; }
   /** @instrumentation Test-only. Use SparseSolverInstrumentation in new code. */
@@ -983,7 +1029,7 @@ export class SparseSolver {
    * externally if needed).
    */
   getCSCNonZeros(): Array<{ row: number; col: number; value: number }> {
-    const n = this._n;
+    const n = this._size;
     const result: Array<{ row: number; col: number; value: number }> = [];
     // Walk slots 1..n; slot 0 is the ground sentinel and never linked.
     for (let col = 1; col <= n; col++) {
@@ -1001,10 +1047,14 @@ export class SparseSolver {
   // =========================================================================
 
   /** ngspice spCreate (spalloc.c:117-277) — line-for-line port (real-only). */
-  _initStructure(n: number): void {
-    this._n = n;
+  _initStructure(): void {
+    const initialAlloc = MINIMUM_ALLOCATED_SIZE; // 6 per spconfig.h:336
 
     // ngspice spalloc.c:164-198 — MatrixFrame field init.
+    this._size = 0;
+    this._currentSize = 0;                        // mirrors ngspice CurrentSize
+    this._allocatedSize = initialAlloc;
+    this._allocatedExtSize = initialAlloc;
     this._factored = false;
     this._elements = 0;
     this._error = spOKAY;
@@ -1017,39 +1067,23 @@ export class SparseSolver {
     this._internalVectorsAllocated = false;
     this._singularCol = 0;
     this._singularRow = 0;
-    // ngspice spalloc.c:181 — CurrentSize starts at 0; Translate bumps it.
-    this._currentSize = 0;
 
-    // ngspice spalloc.c:215, 220, 225 — SP_CALLOC zero-inits Diag /
-    // FirstInCol / FirstInRow over Size + 1 slots. digiTS uses -1 sentinel
-    // (Bucket A.1 — Int32Array cannot store NULL).
-    this._rowHead = new Int32Array(n + 1).fill(-1);
-    this._colHead = new Int32Array(n + 1).fill(-1);
-    this._diag = new Int32Array(n + 1).fill(-1);
-
-    // ngspice spalloc.c:238-241 — IntToExt{Col,Row}Map[I] = I for I in
-    // 1..AllocatedSize. Slot 0 is unused but we set it to 0 for cleanliness.
-    this._intToExtCol = new Int32Array(n + 1);
-    this._intToExtRow = new Int32Array(n + 1);
-    for (let i = 0; i <= n; i++) {
-      this._intToExtCol[i] = i;
-      this._intToExtRow[i] = i;
-    }
-
-    // ngspice spalloc.c:254-259 (TRANSLATE branch, always on per amendment
-    // A3): ExtToInt{Col,Row}Map[I] = -1 for I in 1..AllocatedSize, then
-    // ExtToInt{Col,Row}Map[0] = 0 forces ground to map to slot 0.
-    this._extToIntCol = new Int32Array(n + 1).fill(-1);
-    this._extToIntRow = new Int32Array(n + 1).fill(-1);
+    this._intToExtCol = new Int32Array(initialAlloc + 1);
+    this._intToExtRow = new Int32Array(initialAlloc + 1);
+    this._extToIntCol = new Int32Array(initialAlloc + 1).fill(-1);
+    this._extToIntRow = new Int32Array(initialAlloc + 1).fill(-1);
     this._extToIntCol[0] = 0;
     this._extToIntRow[0] = 0;
+    this._diag = new Int32Array(initialAlloc + 1).fill(-1);
+    this._rowHead = new Int32Array(initialAlloc + 1).fill(-1);
+    this._colHead = new Int32Array(initialAlloc + 1).fill(-1);
+    for (let i = 1; i <= initialAlloc; i++) {
+      this._intToExtRow[i] = i;
+      this._intToExtCol[i] = i;
+    }
 
-    // ngspice spalloc.c:263 — InitializeElementBlocks. Pool slot 0 is the
-    // TrashCan element (spalloc.c:204-211 + amendment A2); first real
-    // handle is 1. spalloc.c:204-209 zero-initialises the TrashCan; we
-    // mirror via the implicit Float64Array zero plus -1 chain pointers
-    // that are never read (TrashCan is never linked into any chain).
-    const elCap = Math.max((n + 1) * 4, 64);
+    // Element pool sized 6 * AllocatedSize per spalloc.c:263-264.
+    const elCap = Math.max(6 * initialAlloc, 64);
     this._elRow = new Int32Array(elCap);
     this._elCol = new Int32Array(elCap);
     this._elVal = new Float64Array(elCap);
@@ -1064,6 +1098,7 @@ export class SparseSolver {
     this._markowitzProd = new Int32Array(0);
     this._intermediate = new Float64Array(0);
     this._doRealDirect = new Int32Array(0);
+    this._insertionOrder = [];                    // for _getInsertionOrder
   }
 
   /**
@@ -1075,17 +1110,69 @@ export class SparseSolver {
    * the previous factor left them — `spClear` zeros only element values.
    *
    * Variable map (ngspice → digiTS):
-   *   Matrix->Size            → this._n
+   *   Matrix->Size            → this._size
    *   Matrix->FirstInCol[I]   → this._colHead[i]
    *   pElement->NextInCol     → this._elNextInCol[e]
    *   pElement->Real          → this._elVal[e]
    *   Matrix->Factored        → this._factored
    *   Matrix->SingularRow/Col → (deferred to Stage 6A)
    */
+  /** ngspice EnlargeMatrix (spbuild.c:957-1019) — line-for-line port. */
+  private _enlargeMatrix(newSize: number): void {
+    const oldAllocatedSize = this._allocatedSize;       // spbuild.c:960
+    this._size = newSize;                               // spbuild.c:963
+    if (newSize <= oldAllocatedSize) return;            // spbuild.c:965-966
+
+    newSize = Math.max(newSize, Math.ceil(EXPANSION_FACTOR * oldAllocatedSize));
+    this._allocatedSize = newSize;
+
+    this._intToExtCol = this._growInt32(this._intToExtCol, newSize + 1);
+    this._intToExtRow = this._growInt32(this._intToExtRow, newSize + 1);
+    this._diag        = this._growInt32(this._diag,        newSize + 1, -1);
+    this._rowHead     = this._growInt32(this._rowHead,     newSize + 1, -1);
+    this._colHead     = this._growInt32(this._colHead,     newSize + 1, -1);
+
+    // spbuild.c:1000-1006 — drop Markowitz/Intermediate workspace.
+    this._markowitzRow  = new Int32Array(0);
+    this._markowitzCol  = new Int32Array(0);
+    this._markowitzProd = new Int32Array(0);
+    this._doRealDirect  = new Int32Array(0);
+    this._intermediate  = new Float64Array(0);
+    this._internalVectorsAllocated = false;
+
+    // spbuild.c:1009-1016 — initialise the new portion (identity map).
+    for (let I = oldAllocatedSize + 1; I <= newSize; I++) {
+      this._intToExtRow[I] = I;
+      this._intToExtCol[I] = I;
+    }
+  }
+
+  /** ngspice ExpandTranslationArrays (spbuild.c:1047-1081) — line-for-line port. */
+  private _expandTranslationArrays(newSize: number): void {
+    const oldAllocatedSize = this._allocatedExtSize;
+    if (newSize <= oldAllocatedSize) return;              // spbuild.c:1055-1056
+
+    newSize = Math.max(newSize, Math.ceil(EXPANSION_FACTOR * oldAllocatedSize));
+    this._allocatedExtSize = newSize;
+
+    this._extToIntRow = this._growInt32(this._extToIntRow, newSize + 1, -1);
+    this._extToIntCol = this._growInt32(this._extToIntCol, newSize + 1, -1);
+    this._extToIntRow[0] = 0;     // ground-pin re-pin (defensive)
+    this._extToIntCol[0] = 0;
+  }
+
+  /** Grow an Int32Array to newLen, preserving existing data. Fill new slots with `fill`. */
+  private _growInt32(arr: Int32Array, newLen: number, fill = 0): Int32Array {
+    const next = new Int32Array(newLen);
+    if (fill !== 0) next.fill(fill);
+    next.set(arr.subarray(0, Math.min(arr.length, newLen)));
+    return next;
+  }
+
   /** ngspice spClear (spbuild.c:96-142) — line-for-line port (real-only). */
   _resetForAssembly(): void {
     // ngspice spbuild.c:121-129 (real branch) — `for (I = Size; I > 0; I--)`.
-    for (let i = this._n; i >= 1; i--) {
+    for (let i = this._size; i >= 1; i--) {
       let e = this._colHead[i];
       while (e >= 0) {
         this._elVal[e] = 0.0;
@@ -1201,7 +1288,7 @@ export class SparseSolver {
   /** ngspice spcCreateInternalVectors (spfactor.c:706-747) — line-for-line port (real-only). */
   private _allocateWorkspace(): void {
     if (this._internalVectorsAllocated) return;
-    const n = this._n;
+    const n = this._size;
     // ngspice spfactor.c:715-726 — MarkowitzRow / MarkowitzCol /
     // MarkowitzProd. Allocated length Size + 2 to host the dual-purpose
     // [Size+1] slot used by SearchForSingleton / QuicklySearchDiagonal.
@@ -1236,7 +1323,7 @@ export class SparseSolver {
   ): number {
     // ngspice spfactor.c:202.
     this._error = spOKAY;
-    const size = this._n;
+    const size = this._size;
 
     // ngspice spfactor.c:204-208.
     if (relThreshold <= 0.0) relThreshold = this._relThreshold;
@@ -1327,7 +1414,7 @@ export class SparseSolver {
     if (!this._partitioned) this._spPartition(spDEFAULT_PARTITION);
     // ngspice spfactor.c:338-339 — complex branch out of scope.
 
-    const size = this._n;
+    const size = this._size;
 
     // ngspice spfactor.c:343-346.
     if (size === 0) {
@@ -1427,7 +1514,7 @@ export class SparseSolver {
   private _spPartition(mode: number): void {
     // ngspice spfactor.c:589.
     if (this._partitioned) return;
-    const size = this._n;
+    const size = this._size;
     const doRealDirect = this._doRealDirect;
     // ngspice spfactor.c:594.
     this._partitioned = true;
@@ -1663,7 +1750,7 @@ export class SparseSolver {
    * RHS itself is not permuted by row exchanges.
    */
   private _countMarkowitz(step: number, rhs: Float64Array | null): void {
-    const n = this._n;
+    const n = this._size;
     const mRow = this._markowitzRow;
     const mCol = this._markowitzCol;
 
@@ -1706,7 +1793,7 @@ export class SparseSolver {
    * ngspice's behaviour even though our matrices fit comfortably.
    */
   private _markowitzProducts(step: number): void {
-    const n = this._n;
+    const n = this._size;
     this._singletons = 0;
     // ngspice spfactor.c:880 — `for (I = Step; I <= Size; I++)`.
     for (let i = step; i <= n; i++) {
@@ -1776,7 +1863,7 @@ export class SparseSolver {
    * ngspice's UB dereference on circuits that exercise the bug.
    */
   private _searchForSingleton(step: number): number {
-    const n = this._n;
+    const n = this._size;
     const mProd = this._markowitzProd;
 
     /* Initialize pointer that is to scan through MarkowitzProduct vector. */
@@ -1875,7 +1962,7 @@ export class SparseSolver {
    * tie-break on Magnitude/LargestInCol ratio.
    */
   private _quicklySearchDiagonal(step: number): number {
-    const n = this._n;
+    const n = this._size;
     const mProd = this._markowitzProd;
     const tiedElements = this._tiedElements;
 
@@ -1983,7 +2070,7 @@ export class SparseSolver {
    * ngspice SearchDiagonal (spfactor.c:1604-1663) — line-for-line port.
    */
   private _searchDiagonal(step: number): number {
-    const n = this._n;
+    const n = this._size;
     const mProd = this._markowitzProd;
     let numberOfTies = 0;
 
@@ -2048,7 +2135,7 @@ export class SparseSolver {
    * when no acceptable pivot meets RelThreshold * LargestInCol.
    */
   private _searchEntireMatrix(step: number): number {
-    const n = this._n;
+    const n = this._size;
     let numberOfTies = 0;
     let minMarkowitzProduct: number;
     let chosenPivot: number;
@@ -2606,7 +2693,7 @@ export class SparseSolver {
     // ngspice spsmp.c:432.
     if (gmin !== 0.0) {
       // ngspice spsmp.c:434-436.
-      for (let i = this._n; i > 0; i--) {
+      for (let i = this._size; i > 0; i--) {
         const diag = this._diag[i];
         if (diag >= 0) this._elVal[diag] += gmin;
       }

@@ -241,7 +241,7 @@ describe("potentiometer_load_dcop_parity", () => {
       matrixSize: 3,
       nodeCount: 3,
     });
-    stampCtx.solver._initStructure(3);
+    stampCtx.solver._initStructure();
     analogElement.load(stampCtx.loadCtx);
     const stamps = stampCtx.solver.getCSCNonZeros();
 

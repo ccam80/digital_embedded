@@ -275,7 +275,7 @@ export class ComplexSparseSolver implements IComplexSparseSolver {
     }
 
     if (this._structureEmpty) {
-      this._initStructure(n);
+      this._initStructure();
     } else {
       this._resetForAssembly();
     }
@@ -530,7 +530,8 @@ export class ComplexSparseSolver implements IComplexSparseSolver {
   // Internal: structure initialization
   // =========================================================================
 
-  private _initStructure(n: number): void {
+  private _initStructure(): void {
+    const n = this._n;
     this._rhsRe = new Float64Array(n);
     this._rhsIm = new Float64Array(n);
 

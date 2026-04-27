@@ -55,7 +55,7 @@ function doStep(tx: AnalogTappedTransformerElement, solver: SparseSolver, rhs: F
     const rLoad = makeResistor(2, 4, Rload);
     const rCtGnd = makeResistor(3, 0, 1e6);
     const rS2Gnd = makeResistor(4, 0, 1e6);
-    solver._initStructure(matrixSize);
+    solver._initStructure();
     vsrc.load(ctx);
     tx.load(ctx);
     rLoad.load(ctx);

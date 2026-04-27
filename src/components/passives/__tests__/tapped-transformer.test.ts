@@ -294,7 +294,7 @@ describe("TappedTransformer", () => {
       const vSrc = Vpeak * Math.sin(2 * Math.PI * freq * t);
       const vsrc = makeVoltageSource(1, 0, bVsrc, vSrc);
 
-      solver._initStructure(matrixSize);
+      solver._initStructure();
       const ctx = makeTransientCtx(solver as unknown as SparseSolverType, voltages, dt);
       if (i === 0) ctx.cktMode = MODETRAN | MODEINITTRAN;
       vsrc.load(ctx);

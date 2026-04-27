@@ -16,7 +16,7 @@ function assembleSolve(
   // entries and rhsVals are 1-based: entry [r, c, v] stamps at row r, col c (1..n).
   // rhs array is sized n+1; rhs[0] unused (ground sentinel).
   const solver = new SparseSolver();
-  solver._initStructure(n);
+  solver._initStructure();
   for (const [r, c, v] of entries) solver.stampElement(solver.allocElement(r, c), v);
   const rhs = new Float64Array(n + 1);
   for (let i = 0; i < rhsVals.length; i++) rhs[i + 1] += rhsVals[i];
@@ -78,7 +78,7 @@ describe("SparseSolver", () => {
     // stamp (1,1) with 3.0, stamp (1,1) with 2.0; total should be 5.0
     // 1x1 system: 5*x = 10 => x[1] = 2
     const solver = new SparseSolver();
-    solver._initStructure(1);
+    solver._initStructure();
     solver.stampElement(solver.allocElement(1, 1), 3.0);
     solver.stampElement(solver.allocElement(1, 1), 2.0);
     const rhs = new Float64Array(2);
@@ -92,7 +92,7 @@ describe("SparseSolver", () => {
   it("detects_singular_matrix", () => {
     // A = [[1,1],[1,1]] is singular
     const solver = new SparseSolver();
-    solver._initStructure(2);
+    solver._initStructure();
     solver.stampElement(solver.allocElement(1, 1), 1);
     solver.stampElement(solver.allocElement(1, 2), 1);
     solver.stampElement(solver.allocElement(2, 1), 1);
@@ -110,7 +110,7 @@ describe("SparseSolver", () => {
     const n = 4;
     const b = [3.0, -1.5, 0.0, 7.25];
     const solver = new SparseSolver();
-    solver._initStructure(n);
+    solver._initStructure();
     for (let i = 1; i <= n; i++) solver.stampElement(solver.allocElement(i, i), 1.0);
     const rhs = new Float64Array(n + 1);
     for (let i = 0; i < n; i++) rhs[i + 1] += b[i];
@@ -126,7 +126,7 @@ describe("SparseSolver", () => {
     // First solve: A = [[4,1],[1,3]], b = [1,2]
     const solver = new SparseSolver();
 
-    solver._initStructure(2);
+    solver._initStructure();
     solver.stampElement(solver.allocElement(1, 1), 4);
     solver.stampElement(solver.allocElement(1, 2), 1);
     solver.stampElement(solver.allocElement(2, 1), 1);
@@ -140,7 +140,7 @@ describe("SparseSolver", () => {
 
     // Second solve: same pattern, different values — A = [[2,1],[1,4]], b = [3,5]
     // Analytical: det = 8-1=7; x1 = (3*4-5*1)/7 = 7/7 = 1; x2 = (2*5-3*1)/7 = 7/7 = 1
-    solver._initStructure(2);
+    solver._initStructure();
     solver.stampElement(solver.allocElement(1, 1), 2);
     solver.stampElement(solver.allocElement(1, 2), 1);
     solver.stampElement(solver.allocElement(2, 1), 1);
@@ -157,7 +157,7 @@ describe("SparseSolver", () => {
   it("invalidate_forces_resymbolize", () => {
     // First: 2x2 diagonal
     const solver = new SparseSolver();
-    solver._initStructure(2);
+    solver._initStructure();
     solver.stampElement(solver.allocElement(1, 1), 3);
     solver.stampElement(solver.allocElement(2, 2), 5);
     const rhs1 = new Float64Array(3);
@@ -169,7 +169,7 @@ describe("SparseSolver", () => {
 
     // Invalidate topology, then change to full 2x2
     solver.invalidateTopology();
-    solver._initStructure(2);
+    solver._initStructure();
     solver.stampElement(solver.allocElement(1, 1), 4);
     solver.stampElement(solver.allocElement(1, 2), 1);
     solver.stampElement(solver.allocElement(2, 1), 1);
@@ -203,7 +203,7 @@ describe("SparseSolver", () => {
     const Vs = 5.0;
 
     const solver = new SparseSolver();
-    solver._initStructure(3);
+    solver._initStructure();
 
     // Row 1, node 1: G1*(V1-V2) stamp + VS current injection
     solver.stampElement(solver.allocElement(1, 1), G);   // G1 to V1
@@ -271,7 +271,7 @@ describe("SparseSolver", () => {
 
     // Symbolic timing
     const t0 = performance.now();
-    solver._initStructure(n);
+    solver._initStructure();
     for (const [r, c, v] of entries) solver.stampElement(solver.allocElement(r, c), v);
     const rhsBuf = new Float64Array(n + 1);
     for (let i = 0; i < n; i++) rhsBuf[i + 1] += rhsVals[i];
@@ -303,7 +303,7 @@ describe("SparseSolver", () => {
     }
 
     // Warm run: re-stamp same pattern, re-factor (simulates NR iteration 2+)
-    solver._initStructure(n);
+    solver._initStructure();
     for (const [r, c, v] of entries) solver.stampElement(solver.allocElement(r, c), v);
     const rhsBuf2 = new Float64Array(n + 1);
     for (let i = 0; i < n; i++) rhsBuf2[i + 1] += rhsVals[i];
@@ -460,7 +460,7 @@ describe("SparseSolver real MNA circuit", () => {
       voltTol: 1e-6,
     };
 
-    rawSolver._initStructure(matrixSize);
+    rawSolver._initStructure();
     for (const el of elements) {
       el.load(rawCtx);
     }
@@ -480,7 +480,7 @@ describe("SparseSolver real MNA circuit", () => {
 
     // Warm run: re-stamp and re-factor (simulates NR iteration 2+)
     rawVoltages.fill(0);
-    rawSolver._initStructure(matrixSize);
+    rawSolver._initStructure();
     for (const el of elements) {
       el.load(rawCtx);
     }
@@ -511,7 +511,7 @@ describe("SparseSolver real MNA circuit", () => {
 describe("SparseSolver pre-solve RHS capture", () => {
   it("getPreSolveRhsSnapshot returns zero-length array when capture disabled", () => {
     const solver = new SparseSolver();
-    solver._initStructure(2);
+    solver._initStructure();
     solver.stampElement(solver.allocElement(0, 0), 1);
     solver.stampElement(solver.allocElement(1, 1), 1);
     solver.stampRHS(0, 3);
@@ -523,7 +523,7 @@ describe("SparseSolver pre-solve RHS capture", () => {
   it("enablePreSolveRhsCapture causes finalize to snapshot the RHS before factorization", () => {
     const solver = new SparseSolver();
     solver.enablePreSolveRhsCapture(true);
-    solver._initStructure(2);
+    solver._initStructure();
     solver.stampElement(solver.allocElement(0, 0), 4);
     solver.stampElement(solver.allocElement(0, 1), 1);
     solver.stampElement(solver.allocElement(1, 0), 1);
@@ -538,7 +538,7 @@ describe("SparseSolver pre-solve RHS capture", () => {
     // RHS = [5, 0]; after solve, solution differs from RHS
     const solver = new SparseSolver();
     solver.enablePreSolveRhsCapture(true);
-    solver._initStructure(2);
+    solver._initStructure();
     solver.stampElement(solver.allocElement(0, 0), 2);
     solver.stampElement(solver.allocElement(0, 1), 1);
     solver.stampElement(solver.allocElement(1, 0), 1);
@@ -556,7 +556,7 @@ describe("SparseSolver pre-solve RHS capture", () => {
   it("disabling capture after enable stops updating snapshot", () => {
     const solver = new SparseSolver();
     solver.enablePreSolveRhsCapture(true);
-    solver._initStructure(2);
+    solver._initStructure();
     solver.stampElement(solver.allocElement(0, 0), 1);
     solver.stampElement(solver.allocElement(1, 1), 1);
     solver.stampRHS(0, 11);
@@ -564,7 +564,7 @@ describe("SparseSolver pre-solve RHS capture", () => {
     const first = solver.getPreSolveRhsSnapshot().slice();
 
     solver.enablePreSolveRhsCapture(false);
-    solver._initStructure(2);
+    solver._initStructure();
     solver.stampElement(solver.allocElement(0, 0), 1);
     solver.stampElement(solver.allocElement(1, 1), 1);
     solver.stampRHS(0, 99);
@@ -582,7 +582,7 @@ describe("SparseSolver pre-solve RHS capture", () => {
 describe("SparseSolver preorder", () => {
   it("preorder can be called before factor without error", () => {
     const solver = new SparseSolver();
-    solver._initStructure(2);
+    solver._initStructure();
     solver.stampElement(solver.allocElement(1, 1), 4);
     solver.stampElement(solver.allocElement(1, 2), 1);
     solver.stampElement(solver.allocElement(2, 1), 1);
@@ -599,7 +599,7 @@ describe("SparseSolver preorder", () => {
 
   it("preorder is idempotent — second call is a no-op", () => {
     const solver = new SparseSolver();
-    solver._initStructure(2);
+    solver._initStructure();
     solver.stampElement(solver.allocElement(1, 1), 2);
     solver.stampElement(solver.allocElement(2, 2), 3);
     const rhs = new Float64Array(3);
@@ -621,7 +621,7 @@ describe("SparseSolver preorder", () => {
 describe("SparseSolver factorWithReorder", () => {
   it("solves a 2x2 system correctly", () => {
     const solver = new SparseSolver();
-    solver._initStructure(2);
+    solver._initStructure();
     solver.stampElement(solver.allocElement(1, 1), 4);
     solver.stampElement(solver.allocElement(1, 2), 1);
     solver.stampElement(solver.allocElement(2, 1), 1);
@@ -637,7 +637,7 @@ describe("SparseSolver factorWithReorder", () => {
 
   it("detects singular matrix", () => {
     const solver = new SparseSolver();
-    solver._initStructure(2);
+    solver._initStructure();
     solver.stampElement(solver.allocElement(1, 1), 1);
     solver.stampElement(solver.allocElement(1, 2), 1);
     solver.stampElement(solver.allocElement(2, 1), 1);
@@ -652,7 +652,7 @@ describe("SparseSolver factorWithReorder", () => {
 
   it("applies diagGmin to diagonal before factoring", () => {
     const solver = new SparseSolver();
-    solver._initStructure(2);
+    solver._initStructure();
     solver.stampElement(solver.allocElement(1, 1), 1);
     solver.stampElement(solver.allocElement(1, 2), 1);
     solver.stampElement(solver.allocElement(2, 1), 1);
@@ -669,7 +669,7 @@ describe("SparseSolver factorWithReorder", () => {
 describe("SparseSolver factorNumerical", () => {
   it("reuses pivot order from prior factorWithReorder", () => {
     const solver = new SparseSolver();
-    solver._initStructure(2);
+    solver._initStructure();
     solver.stampElement(solver.allocElement(1, 1), 4);
     solver.stampElement(solver.allocElement(1, 2), 1);
     solver.stampElement(solver.allocElement(2, 1), 1);
@@ -683,7 +683,7 @@ describe("SparseSolver factorNumerical", () => {
     const x1 = new Float64Array(3);
     solver.solve(rhs1, x1);
 
-    solver._initStructure(2);
+    solver._initStructure();
     solver.stampElement(solver.allocElement(1, 1), 2);
     solver.stampElement(solver.allocElement(1, 2), 1);
     solver.stampElement(solver.allocElement(2, 1), 1);
@@ -700,7 +700,7 @@ describe("SparseSolver factorNumerical", () => {
 
   it("returns failure when pivot becomes near-zero", () => {
     const solver = new SparseSolver();
-    solver._initStructure(2);
+    solver._initStructure();
     solver.stampElement(solver.allocElement(1, 1), 4);
     solver.stampElement(solver.allocElement(1, 2), 1);
     solver.stampElement(solver.allocElement(2, 1), 1);
@@ -710,7 +710,7 @@ describe("SparseSolver factorNumerical", () => {
     stampRHS(rhs1, 2, 2);
     solver.factor();
 
-    solver._initStructure(2);
+    solver._initStructure();
     solver.stampElement(solver.allocElement(1, 1), 1);
     solver.stampElement(solver.allocElement(1, 2), 1);
     solver.stampElement(solver.allocElement(2, 1), 1);
@@ -727,7 +727,7 @@ describe("SparseSolver factorNumerical", () => {
 
   it("applies diagGmin before numerical factorization", () => {
     const solver = new SparseSolver();
-    solver._initStructure(2);
+    solver._initStructure();
     solver.stampElement(solver.allocElement(1, 1), 4);
     solver.stampElement(solver.allocElement(1, 2), 1);
     solver.stampElement(solver.allocElement(2, 1), 1);
@@ -737,7 +737,7 @@ describe("SparseSolver factorNumerical", () => {
     stampRHS(rhs1, 2, 2);
     solver.factor();
 
-    solver._initStructure(2);
+    solver._initStructure();
     solver.stampElement(solver.allocElement(1, 1), 1);
     solver.stampElement(solver.allocElement(1, 2), 1);
     solver.stampElement(solver.allocElement(2, 1), 1);
@@ -761,7 +761,7 @@ describe("SparseSolver factorNumerical", () => {
 describe("SparseSolver factor dispatch", () => {
   it("factor() returns usedReorder=true when _needsReorder is true", () => {
     const solver = new SparseSolver();
-    solver._initStructure(2);
+    solver._initStructure();
     solver.stampElement(solver.allocElement(1, 1), 4);
     solver.stampElement(solver.allocElement(1, 2), 1);
     solver.stampElement(solver.allocElement(2, 1), 1);
@@ -777,7 +777,7 @@ describe("SparseSolver factor dispatch", () => {
 
   it("factor() returns usedReorder=false on second call (numerical path)", () => {
     const solver = new SparseSolver();
-    solver._initStructure(2);
+    solver._initStructure();
     solver.stampElement(solver.allocElement(1, 1), 4);
     solver.stampElement(solver.allocElement(1, 2), 1);
     solver.stampElement(solver.allocElement(2, 1), 1);
@@ -808,7 +808,7 @@ describe("SparseSolver factor dispatch", () => {
 
   it("factor() solves correctly on numerical path after reorder", () => {
     const solver = new SparseSolver();
-    solver._initStructure(2);
+    solver._initStructure();
     solver.stampElement(solver.allocElement(1, 1), 4);
     solver.stampElement(solver.allocElement(1, 2), 1);
     solver.stampElement(solver.allocElement(2, 1), 1);
@@ -851,7 +851,7 @@ describe("SparseSolver Markowitz data structures", () => {
     // first factor() reorder pass (ngspice spcCreateInternalVectors). They do not
     // exist after _initStructure alone — trigger allocation via factor().
     const solver = new SparseSolver();
-    solver._initStructure(5);
+    solver._initStructure();
     for (let i = 1; i <= 5; i++) solver.stampElement(solver.allocElement(i, i), 1.0);
     solver.factor();
     // After factor(), arrays are sized n+2 (ngspice spfactor.c:715-726).
@@ -867,7 +867,7 @@ describe("SparseSolver Markowitz data structures", () => {
     // which JS zero-initializes. Verify via a factor call on a diagonal matrix
     // (cleanest post-factor Markowitz state: all off-diagonal counts = 0).
     const solver = new SparseSolver();
-    solver._initStructure(3);
+    solver._initStructure();
     solver.stampElement(solver.allocElement(1, 1), 1);
     solver.stampElement(solver.allocElement(2, 2), 1);
     solver.stampElement(solver.allocElement(3, 3), 1);
@@ -884,14 +884,14 @@ describe("SparseSolver Markowitz data structures", () => {
   it("re-allocates Markowitz arrays when size changes", () => {
     // Arrays only exist after factor() runs _allocateWorkspace internally.
     const solver = new SparseSolver();
-    solver._initStructure(3);
+    solver._initStructure();
     for (let i = 1; i <= 3; i++) solver.stampElement(solver.allocElement(i, i), 1.0);
     solver.factor();
     expect(solver.markowitzRow.length).toBeGreaterThanOrEqual(3);
 
     // Invalidate so next _initStructure+factor() re-allocates for the new size.
     solver.invalidateTopology();
-    solver._initStructure(7);
+    solver._initStructure();
     for (let i = 1; i <= 7; i++) solver.stampElement(solver.allocElement(i, i), 1.0);
     solver.factor();
     expect(solver.markowitzRow.length).toBeGreaterThanOrEqual(7);
@@ -907,7 +907,7 @@ describe("SparseSolver Markowitz data structures", () => {
     const solver = new SparseSolver();
 
     // First factor — establishes off-diagonal Markowitz counts.
-    solver._initStructure(3);
+    solver._initStructure();
     solver.stampElement(solver.allocElement(1, 1), 2);
     solver.stampElement(solver.allocElement(1, 2), -1);
     solver.stampElement(solver.allocElement(2, 1), -1);
@@ -920,7 +920,7 @@ describe("SparseSolver Markowitz data structures", () => {
     // (Values are post-elimination so are consumed, but count should be >= 0.)
 
     // Second assembly: diagonal-only — Markowitz counts should reset to 0.
-    solver._initStructure(3);
+    solver._initStructure();
     solver.stampElement(solver.allocElement(1, 1), 5);
     solver.stampElement(solver.allocElement(2, 2), 3);
     solver.stampElement(solver.allocElement(3, 3), 7);
@@ -935,13 +935,13 @@ describe("SparseSolver Markowitz data structures", () => {
 
   it("singletons is zero after beginAssembly", () => {
     const solver = new SparseSolver();
-    solver._initStructure(4);
+    solver._initStructure();
     expect(solver.singletons).toBe(0);
   });
 
   it("Markowitz arrays survive a full factor cycle without error", () => {
     const solver = new SparseSolver();
-    solver._initStructure(3);
+    solver._initStructure();
     solver.stampElement(solver.allocElement(1, 1), 2);
     solver.stampElement(solver.allocElement(1, 2), -1);
     solver.stampElement(solver.allocElement(2, 1), -1);
@@ -977,7 +977,7 @@ describe("SparseSolver Markowitz counts from finalize", () => {
     // Markowitz arrays are populated by _countMarkowitz() inside factor().
     // Read them after factor() completes.
     const solver = new SparseSolver();
-    solver._initStructure(3);
+    solver._initStructure();
     solver.stampElement(solver.allocElement(1, 1), 2);
     solver.stampElement(solver.allocElement(1, 2), -1);
     solver.stampElement(solver.allocElement(2, 1), -1);
@@ -1011,7 +1011,7 @@ describe("SparseSolver Markowitz counts from finalize", () => {
     // This test verifies: (a) arrays exist after factor(), (b) products are non-negative,
     // (c) the factor succeeds (solver is correct).
     const solver = new SparseSolver();
-    solver._initStructure(3);
+    solver._initStructure();
     solver.stampElement(solver.allocElement(1, 1), 2);
     solver.stampElement(solver.allocElement(1, 2), -1);
     solver.stampElement(solver.allocElement(2, 1), -1);
@@ -1037,7 +1037,7 @@ describe("SparseSolver Markowitz counts from finalize", () => {
     // For a purely diagonal matrix every row/col has 0 off-diagonals.
     // Post-factor the counts remain 0 (no elimination updates needed for a diagonal).
     const solver = new SparseSolver();
-    solver._initStructure(3);
+    solver._initStructure();
     solver.stampElement(solver.allocElement(1, 1), 5);
     solver.stampElement(solver.allocElement(2, 2), 3);
     solver.stampElement(solver.allocElement(3, 3), 7);
@@ -1064,7 +1064,7 @@ describe("SparseSolver Markowitz counts from finalize", () => {
     // (a) factor succeeds, (b) arrays exist and have non-negative values,
     // (c) singletons counter is non-negative integer.
     const solver = new SparseSolver();
-    solver._initStructure(2);
+    solver._initStructure();
     solver.stampElement(solver.allocElement(1, 1), 4);
     solver.stampElement(solver.allocElement(1, 2), 1);
     solver.stampElement(solver.allocElement(2, 1), 1);
@@ -1093,7 +1093,7 @@ describe("SparseSolver Markowitz counts from finalize", () => {
 describe("SparseSolver pivot selection", () => {
   it("selects a valid pivot and produces a correct solution for a well-conditioned 3x3 matrix", () => {
     const solver = new SparseSolver();
-    solver._initStructure(3);
+    solver._initStructure();
     solver.stampElement(solver.allocElement(1, 1), 2);
     solver.stampElement(solver.allocElement(1, 2), -1);
     solver.stampElement(solver.allocElement(2, 1), -1);
@@ -1114,7 +1114,7 @@ describe("SparseSolver pivot selection", () => {
 
   it("reports singular when the matrix is rank-deficient", () => {
     const solver = new SparseSolver();
-    solver._initStructure(2);
+    solver._initStructure();
     // Singular: two identical rows
     solver.stampElement(solver.allocElement(1, 1), 1);
     solver.stampElement(solver.allocElement(1, 2), 1);
@@ -1133,7 +1133,7 @@ describe("SparseSolver pivot selection", () => {
     // factorisation succeeds (correct pivot selection) rather than by reading the
     // post-factor singleton count (which is always 0 after elimination).
     const solver = new SparseSolver();
-    solver._initStructure(3);
+    solver._initStructure();
     solver.stampElement(solver.allocElement(1, 1), 5);
     solver.stampElement(solver.allocElement(1, 2), 1);
     solver.stampElement(solver.allocElement(2, 1), 1);
@@ -1162,7 +1162,7 @@ describe("SparseSolver pivot selection", () => {
 
   it("selects the largest-magnitude pivot (fallback path) producing correct solution", () => {
     const solver = new SparseSolver();
-    solver._initStructure(2);
+    solver._initStructure();
     // Diagonal entries with different magnitudes: larger pivot = row 2
     solver.stampElement(solver.allocElement(1, 1), 0.5);
     solver.stampElement(solver.allocElement(2, 2), 3.0);
@@ -1176,7 +1176,7 @@ describe("SparseSolver pivot selection", () => {
 
   it("factorization ignores already-used pivot rows in subsequent steps", () => {
     const solver = new SparseSolver();
-    solver._initStructure(2);
+    solver._initStructure();
     solver.stampElement(solver.allocElement(1, 1), 4);
     solver.stampElement(solver.allocElement(1, 2), 1);
     solver.stampElement(solver.allocElement(2, 1), 1);
@@ -1202,7 +1202,7 @@ describe("SparseSolver _updateMarkowitzNumbers", () => {
     // matrix succeeds (returns 0) and produces a correct solution, which is only
     // possible if Markowitz counts are tracked correctly throughout elimination.
     const solver = new SparseSolver();
-    solver._initStructure(3);
+    solver._initStructure();
     solver.stampElement(solver.allocElement(1, 1), 2);
     solver.stampElement(solver.allocElement(1, 2), -1);
     solver.stampElement(solver.allocElement(2, 1), -1);
@@ -1233,7 +1233,7 @@ describe("SparseSolver _updateMarkowitzNumbers", () => {
 describe("SparseSolver factorWithReorder Markowitz pipeline", () => {
   it("factorWithReorder populates Markowitz data after factoring", () => {
     const solver = new SparseSolver();
-    solver._initStructure(3);
+    solver._initStructure();
     solver.stampElement(solver.allocElement(1, 1), 2);
     solver.stampElement(solver.allocElement(1, 2), -1);
     solver.stampElement(solver.allocElement(2, 1), -1);
@@ -1254,7 +1254,7 @@ describe("SparseSolver factorWithReorder Markowitz pipeline", () => {
 
   it("factorWithReorder produces correct solution on 3x3 tridiagonal", () => {
     const solver = new SparseSolver();
-    solver._initStructure(3);
+    solver._initStructure();
     solver.stampElement(solver.allocElement(1, 1), 2);
     solver.stampElement(solver.allocElement(1, 2), -1);
     solver.stampElement(solver.allocElement(2, 1), -1);
@@ -1289,7 +1289,7 @@ describe("SparseSolver factorWithReorder Markowitz pipeline", () => {
     }
     const rhsVals = Array.from({ length: n }, (_, i) => i + 1);
 
-    solver._initStructure(n);
+    solver._initStructure();
     for (const [r, c, v] of entries) solver.stampElement(solver.allocElement(r, c), v);
     const rhsBuf = new Float64Array(n + 1);
     for (let i = 0; i < n; i++) rhsBuf[i + 1] += rhsVals[i];
@@ -1322,7 +1322,7 @@ describe("SparseSolver Markowitz linked structure", () => {
     //     [ 1, 0, 5, 0]
     //     [ 1, 0, 0, 5]
     const solver = new SparseSolver();
-    solver._initStructure(4);
+    solver._initStructure();
     solver.stampElement(solver.allocElement(1, 1), 10);
     solver.stampElement(solver.allocElement(1, 2), 1);
     solver.stampElement(solver.allocElement(1, 3), 1);
@@ -1374,7 +1374,7 @@ describe("SparseSolver Markowitz linked structure", () => {
     //
     // Singletons (rows 2,3) should be preferred over row 1 for first pivot.
     const solver = new SparseSolver();
-    solver._initStructure(3);
+    solver._initStructure();
     solver.stampElement(solver.allocElement(1, 1), 2);
     solver.stampElement(solver.allocElement(1, 2), 1);
     solver.stampElement(solver.allocElement(1, 3), 1);
@@ -1410,7 +1410,7 @@ describe("SparseSolver Markowitz linked structure", () => {
     // Its effect is verified indirectly: factor() on a 4x4 sparse matrix succeeds and
     // produces a correct solution, demonstrating that Markowitz tracking works end-to-end.
     const solver = new SparseSolver();
-    solver._initStructure(4);
+    solver._initStructure();
     solver.stampElement(solver.allocElement(1, 1), 5);
     solver.stampElement(solver.allocElement(1, 2), 1);
     solver.stampElement(solver.allocElement(1, 3), 1);
@@ -1452,7 +1452,7 @@ describe("SparseSolver Markowitz linked structure", () => {
     // Dense lower-triangular + diagonal forces fill-in in upper triangle.
     const n = 8;
     const solver = new SparseSolver();
-    solver._initStructure(n);
+    solver._initStructure();
 
     // Dense lower triangle + strong diagonal (1-based: rows/cols 1..n)
     for (let i = 1; i <= n; i++) {
@@ -1514,7 +1514,7 @@ describe("SparseSolver handle-based stamp API", () => {
     // allocElement with different (r, c) must return distinct handles.
     // 1-based external API: rows/cols 1..n, 0=ground sentinel.
     const solver = new SparseSolver();
-    solver._initStructure(3);
+    solver._initStructure();
 
     const h00a = solver.allocElement(1, 1);
     const h00b = solver.allocElement(1, 1);
@@ -1534,7 +1534,7 @@ describe("SparseSolver handle-based stamp API", () => {
     // Two stampElement calls on the same handle accumulate: total = v1 + v2
     // 1-based external API: rows/cols 1..n.
     const solver = new SparseSolver();
-    solver._initStructure(2);
+    solver._initStructure();
 
     const h = solver.allocElement(1, 1);
     solver.stampElement(h, 3.0);
@@ -1557,7 +1557,7 @@ describe("SparseSolver handle-based stamp API", () => {
     // accessible via _rowHead/_colHead chains.
     // 1-based external API: rows/cols 1..n, rowHead indexed 1..n.
     const solver = new SparseSolver();
-    solver._initStructure(2);
+    solver._initStructure();
 
     const h00 = solver.allocElement(1, 1); solver.stampElement(h00, 4.0);
     const h01 = solver.allocElement(1, 2); solver.stampElement(h01, 1.0);
@@ -1606,7 +1606,7 @@ describe("SparseSolver handle-based stamp API", () => {
     const solver = new SparseSolver();
 
     // First assembly and solve
-    solver._initStructure(2);
+    solver._initStructure();
     const h00 = solver.allocElement(1, 1); solver.stampElement(h00, 4.0);
     const h01 = solver.allocElement(1, 2); solver.stampElement(h01, 1.0);
     const h10 = solver.allocElement(2, 1); solver.stampElement(h10, 1.0);
@@ -1657,7 +1657,7 @@ describe("SparseSolver handle-based stamp API", () => {
     const solver = new SparseSolver();
 
     // First topology: 2x2 diagonal (1-based: rows/cols 1..n)
-    solver._initStructure(2);
+    solver._initStructure();
     const h00 = solver.allocElement(1, 1); solver.stampElement(h00, 3.0);
     const h11 = solver.allocElement(2, 2); solver.stampElement(h11, 5.0);
     const rhsA = new Float64Array(3); // size n+1
@@ -1670,7 +1670,7 @@ describe("SparseSolver handle-based stamp API", () => {
     // Invalidate topology — next beginAssembly must rebuild from scratch
     solver.invalidateTopology();
 
-    solver._initStructure(2);
+    solver._initStructure();
     // After invalidation, the linked structure is empty — new allocElement calls
     // allocate fresh elements. Old handles h00/h11 should not be reused implicitly.
     const h00b = solver.allocElement(1, 1); solver.stampElement(h00b, 4.0);
@@ -1708,7 +1708,7 @@ describe("SparseSolver SMPpreOrder", () => {
     //   Diagonal (3,3) = 0 — structural zero; preorder must swap cols 1 and 3
     //   to expose the (3,1) twin entry on the new diagonal.
     const solver = new SparseSolver();
-    solver._initStructure(3);
+    solver._initStructure();
     solver.stampElement(solver.allocElement(1, 1), 1);   // conductance
     solver.stampElement(solver.allocElement(1, 3), 1);   // VS KCL stamp
     solver.stampElement(solver.allocElement(3, 1), 1);   // VS KVL stamp
@@ -1746,7 +1746,7 @@ describe("SparseSolver SMPpreOrder", () => {
     //   node 3: G=1 at (3,3) isolated
     //   Branch rows 4,5 have zero diagonal initially.
     const solver = new SparseSolver();
-    solver._initStructure(5);
+    solver._initStructure();
     solver.stampElement(solver.allocElement(1, 1), 1);
     solver.stampElement(solver.allocElement(1, 4), 1);
     solver.stampElement(solver.allocElement(4, 1), 1);
@@ -1787,7 +1787,7 @@ describe("SparseSolver SMPpreOrder", () => {
     // Calling preorder() twice produces the same result as calling it once.
     // ngspice 1-based: same VS-style fixture as preorder_fixes_zero_diagonal_*.
     const solver = new SparseSolver();
-    solver._initStructure(3);
+    solver._initStructure();
     solver.stampElement(solver.allocElement(1, 1), 1);
     solver.stampElement(solver.allocElement(1, 3), 1);
     solver.stampElement(solver.allocElement(3, 1), 1);
@@ -1820,7 +1820,7 @@ describe("SparseSolver SMPpreOrder", () => {
   it("preorder_no_swap_when_diagonal_nonzero", () => {
     // ngspice 1-based: 3x3 tridiagonal — all diagonals non-zero, preorder no-op.
     const solver = new SparseSolver();
-    solver._initStructure(3);
+    solver._initStructure();
     solver.stampElement(solver.allocElement(1, 1), 2); solver.stampElement(solver.allocElement(1, 2), -1);
     solver.stampElement(solver.allocElement(2, 1), -1); solver.stampElement(solver.allocElement(2, 2), 3); solver.stampElement(solver.allocElement(2, 3), -1);
     solver.stampElement(solver.allocElement(3, 2), -1); solver.stampElement(solver.allocElement(3, 3), 2);
@@ -1849,7 +1849,7 @@ describe("SparseSolver SMPpreOrder", () => {
     // first factor. Preorder swap must leave _elCol values untouched.
     // 1-based 3x3 MNA: zero diagonal at (3,3) → preorder swaps cols 1 and 3.
     const solver = new SparseSolver();
-    solver._initStructure(3);
+    solver._initStructure();
     solver.stampElement(solver.allocElement(1, 1), 1);
     solver.stampElement(solver.allocElement(1, 3), 1);
     solver.stampElement(solver.allocElement(3, 1), 1);
@@ -1906,7 +1906,7 @@ describe("SparseSolver no-AMD Markowitz ordering", () => {
     // x[1] = 5/4, x[2] = 3/2, x[3] = 5/4
     // 1-based external API: rows/cols 1..n.
     const solver = new SparseSolver();
-    solver._initStructure(3);
+    solver._initStructure();
     solver.stampElement(solver.allocElement(1, 1), 2);
     solver.stampElement(solver.allocElement(1, 2), -1);
     solver.stampElement(solver.allocElement(2, 1), -1);
@@ -1954,7 +1954,7 @@ describe("SparseSolver no-AMD Markowitz ordering", () => {
     //   From KVL: v0 = 5 => v0 = 5
     // 1-based external API: rows/cols 1..n.
     const solver = new SparseSolver();
-    solver._initStructure(2);
+    solver._initStructure();
     solver.stampElement(solver.allocElement(1, 1), 1);   // conductance G=1
     solver.stampElement(solver.allocElement(1, 2), 1);   // VS KCL stamp
     solver.stampElement(solver.allocElement(2, 1), 1);   // VS KVL stamp
@@ -1983,7 +1983,7 @@ describe("SparseSolver no-AMD Markowitz ordering", () => {
     // 1-based external API: rows/cols 1..n.
     const n = 5;
     const solver = new SparseSolver();
-    solver._initStructure(n);
+    solver._initStructure();
     for (let j = 1; j <= n; j++) solver.stampElement(solver.allocElement(1, j), 1);
     for (let i = 2; i <= n; i++) {
       solver.stampElement(solver.allocElement(i, 1), 1);
@@ -2020,7 +2020,7 @@ describe("SparseSolver NISHOULDREORDER lifecycle", () => {
     // field deleted; verified via `FactorResult.usedReorder` returned by factor().
     // 1-based external API: rows/cols 1..n.
     const solver = new SparseSolver();
-    solver._initStructure(3);
+    solver._initStructure();
     solver.stampElement(solver.allocElement(1, 1), 2);
     solver.stampElement(solver.allocElement(1, 2), -1);
     solver.stampElement(solver.allocElement(2, 1), -1);
@@ -2057,7 +2057,7 @@ describe("SparseSolver NISHOULDREORDER lifecycle", () => {
     // Stage 6.3.3 — usedReorder reported on each FactorResult.
     // 1-based external API: rows/cols 1..n.
     const solver = new SparseSolver();
-    solver._initStructure(3);
+    solver._initStructure();
     solver.stampElement(solver.allocElement(1, 1), 2);
     solver.stampElement(solver.allocElement(1, 2), -1);
     solver.stampElement(solver.allocElement(2, 1), -1);
