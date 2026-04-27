@@ -8,7 +8,7 @@
 
 `ngspiceNodeMap = { out1: "pos", out2: "neg" }` (from the Switching — primitive table in 01-pin-mapping.md)
 
-Fuse is a composite that decomposes to a single variable-resistance RES sub-element. The composite has no `ngspiceNodeMap` of its own; the RES sub-element carries the map.
+`FuseElement` is a flat element (not a composite). It owns its conductance handles directly — there is no `ResElement` sub-element.
 
 | digiTS pin label | ngspice node variable | pinNodes.get() key |
 |---|---|---|
@@ -29,62 +29,65 @@ none — RES stamps a conductance, not a branch row.
 
 ## TSTALLOC sequence (line-for-line port)
 
-`ressetup.c:46-49` — 4 allocations, in order:
+`ressetup.c:46-49` — 4 allocations, in order, on `FuseElement` directly:
 
 | Position | ngspice pair | digiTS pair | handle field name |
 |---|---|---|---|
-| 1 | `(RESposNode, RESposNode)` | `(posNode, posNode)` | `res._hPP` |
-| 2 | `(RESnegNode, RESnegNode)` | `(negNode, negNode)` | `res._hNN` |
-| 3 | `(RESposNode, RESnegNode)` | `(posNode, negNode)` | `res._hPN` |
-| 4 | `(RESnegNode, RESposNode)` | `(negNode, posNode)` | `res._hNP` |
+| 1 | `(RESposNode, RESposNode)` | `(posNode, posNode)` | `_hPP` |
+| 2 | `(RESnegNode, RESnegNode)` | `(negNode, negNode)` | `_hNN` |
+| 3 | `(RESposNode, RESnegNode)` | `(posNode, negNode)` | `_hPN` |
+| 4 | `(RESnegNode, RESposNode)` | `(negNode, posNode)` | `_hNP` |
 
 ## setup() body — alloc only
 
 ```typescript
 setup(ctx: SetupContext): void {
-  // Fuse composite forwards directly to its single RES sub-element.
-  this._res.setup(ctx);
+  const solver = ctx.solver;
+  const posNode = this._pinNodes.get("out1")!;  // RESposNode
+  const negNode = this._pinNodes.get("out2")!;  // RESnegNode
+
+  // Port of ressetup.c:46-49 — TSTALLOC sequence (line-for-line)
+  this._hPP = solver.allocElement(posNode, posNode);  // (RESposNode, RESposNode)
+  this._hNN = solver.allocElement(negNode, negNode);  // (RESnegNode, RESnegNode)
+  this._hPN = solver.allocElement(posNode, negNode);  // (RESposNode, RESnegNode)
+  this._hNP = solver.allocElement(negNode, posNode);  // (RESnegNode, RESposNode)
 }
 ```
 
-The RES sub-element's setup() body:
+Fields to add to `FuseElement`:
 ```typescript
-// Inside ResElement.setup():
-setup(ctx: SetupContext): void {
-  const posNode = this.pinNodes.get("out1")!;
-  const negNode = this.pinNodes.get("out2")!;
-
-  // Port of ressetup.c:46-49 — TSTALLOC sequence (line-for-line)
-  this._hPP = ctx.solver.allocElement(posNode, posNode); // RESposNode, RESposNode
-  this._hNN = ctx.solver.allocElement(negNode, negNode); // RESnegNode, RESnegNode
-  this._hPN = ctx.solver.allocElement(posNode, negNode); // RESposNode, RESnegNode
-  this._hNP = ctx.solver.allocElement(negNode, posNode); // RESnegNode, RESposNode
-}
+private _hPP: number = -1;
+private _hNN: number = -1;
+private _hPN: number = -1;
+private _hNP: number = -1;
+private _conduct: number = 1;  // = 1/R, updated by accept()
 ```
 
 ## load() body — value writes only
 
 Implementer ports value-side from `resload.c` line-for-line, stamping through cached handles. No allocElement calls.
 
-The fuse resistance `R` is updated each accepted timestep by the composite's `accept()` method based on the I²t integral. The RES sub-element's `setParam("R", newR)` updates `RESconduct = 1/R` before the next load() call.
-
-Key stamps (resload.c:34-37):
 ```typescript
-// resload.c:34-37
-const g = this._res.conduct;  // = 1/R, updated by accept()
-solver.stampElement(this._res._hPP, +g);
-solver.stampElement(this._res._hNN, +g);
-solver.stampElement(this._res._hPN, -g);
-solver.stampElement(this._res._hNP, -g);
+load(ctx: LoadContext): void {
+  const g = this._conduct;  // = 1/R, updated by accept()
+  ctx.solver.stampElement(this._hPP, +g);
+  ctx.solver.stampElement(this._hNN, +g);
+  ctx.solver.stampElement(this._hPN, -g);
+  ctx.solver.stampElement(this._hNP, -g);
+}
 ```
 
-The `accept()` body on the composite (called by the engine after each accepted timestep):
+The `accept()` body reads current from `(ctx.rhs[posNode] - ctx.rhs[negNode]) * g` for the blow check, then recomputes resistance:
+
 ```typescript
 accept(ctx: AcceptContext): void {
-  const iSquared = this._res.current ** 2;
-  this._i2tAccum += iSquared * ctx.dt;
+  const posNode = this._pinNodes.get("out1")!;
+  const negNode = this._pinNodes.get("out2")!;
+  const v = ctx.rhs[posNode] - ctx.rhs[negNode];
+  const i = v * this._conduct;
+  this._i2tAccum += i * i * ctx.dt;
   const newR = computeFuseResistance(this._i2tAccum, this._params);
-  this._res.setParam("R", newR);
+  this._conduct = 1 / newR;
 }
 ```
 
@@ -96,13 +99,13 @@ RES has no branch row.
 
 - Drop `internalNodeIds`, `branchIdx` from factory signature.
 - Drop `branchCount`, `getInternalNodeCount` from MnaModel registration.
-- Add `hasBranchRow: false`.
-- Add `ngspiceNodeMap: { out1: "pos", out2: "neg" }` on the RES sub-element registration.
+- Add `ngspiceNodeMap: { out1: "pos", out2: "neg" }` to `FuseElement`'s `ComponentDefinition` directly (flat element, no sub-element).
 - No `findBranchFor` callback.
-- Composite carries `{ _res: ResElement }` as a direct ref.
+- Remove all references to `ResElement` as a sub-element — `FuseElement` is now flat and owns its own handles.
 
 ## Verification gate
 
 1. `setup-stamp-order.test.ts` row for PB-FUSE is GREEN (4-entry sequence matching ressetup.c:46-49).
 2. `src/components/switching/__tests__/fuse.test.ts` is GREEN.
+   - **Setup-mocking removal**: the implementer MUST audit the test file for any pattern that fakes the migrated `setup()` process (e.g., manually constructing element handles, stub solver objects that bypass the real allocation path, or directly calling `load()` without going through `_setup()` first). Every such pattern MUST be replaced with the real path: instantiate the element via its factory, call `_setup()` on the engine to allocate handles, then exercise `load()`/`accept()`. Tests that pass only because they bypass the new setup contract are NOT a valid GREEN signal — those tests are themselves a defect to be fixed in this same task.
 3. No banned closing verdicts.

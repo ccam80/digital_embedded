@@ -67,7 +67,7 @@ load(ctx: LoadContext): void {
   // Inverted control: PFET turns ON when source is higher than gate by |Vth|
   // Negate vCtrl so the same SW threshold logic applies
   const vCtrl = ctx.rhsOld[sourceNode] - ctx.rhsOld[gateNode];  // inverted
-  this._sw.setControlVoltage(vCtrl);  // internal load-time setter
+  this._sw.setCtrlVoltage(vCtrl);  // Defined in PB-SW §"setCtrlVoltage(v) — for composite use only"
   this._sw.load(ctx);  // stamps g_now onto D/S nodes
 }
 ```
@@ -80,7 +80,6 @@ SW has no branch row.
 
 - Drop `internalNodeIds`, `branchIdx` from factory signature.
 - Drop `branchCount`, `getInternalNodeCount` from MnaModel registration.
-- Add `hasBranchRow: false`.
 - Composite has no `ngspiceNodeMap` (sub-element carries its own: `{ D: "pos", S: "neg" }`).
 - No `findBranchFor` callback.
 - Composite carries `{ _sw: SwitchElement }` as a direct ref.
@@ -88,5 +87,6 @@ SW has no branch row.
 ## Verification gate
 
 1. `setup-stamp-order.test.ts` row for PB-PFET is GREEN (4-entry sequence matching SW anchor, identical to NFET).
-2. `src/components/switching/__tests__/switches.test.ts` is GREEN.
+2. `src/components/switching/__tests__/fets.test.ts` is GREEN.
+   - **Setup-mocking removal**: the implementer MUST audit the test file for any pattern that fakes the migrated `setup()` process (e.g., manually constructing element handles, stub solver objects that bypass the real allocation path, or directly calling `load()` without going through `_setup()` first). Every such pattern MUST be replaced with the real path: instantiate the element via its factory, call `_setup()` on the engine to allocate handles, then exercise `load()`/`accept()`. Tests that pass only because they bypass the new setup contract are NOT a valid GREEN signal — those tests are themselves a defect to be fixed in this same task.
 3. No banned closing verdicts.

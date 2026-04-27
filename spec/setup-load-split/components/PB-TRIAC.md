@@ -161,25 +161,23 @@ setup(ctx: SetupContext): void {
   this._vint1Node = ctx.makeVolt(this.label, "latch1");
   this._vint2Node = ctx.makeVolt(this.label, "latch2");
 
-  // Bind Q1 pin nodes (NPN SCR1: B=G, C=Vint1, E=MT1)
-  this._q1.setPinNode("B", this._gNode);
-  this._q1.setPinNode("C", this._vint1Node);
-  this._q1.setPinNode("E", this._mt1Node);
+  // Bind sub-element pin nodes using direct pinNodeIds array assignment.
+  // Sub-element pin rebinding uses direct pinNodeIds array assignment
+  // (consistent with PB-OPTO, PB-DAC, PB-OPAMP, PB-TIMER555). No setPinNode API is added
+  // to AnalogElementCore.
+  // BJT pin order [B, C, E] per buildBJTPinDeclarations().
 
-  // Bind Q2 pin nodes (PNP SCR1: B=Vint1, C=G, E=MT2)
-  this._q2.setPinNode("B", this._vint1Node);
-  this._q2.setPinNode("C", this._gNode);
-  this._q2.setPinNode("E", this._mt2Node);
+  // Q1 NPN SCR1: B=G, C=Vint1, E=MT1
+  this._q1.pinNodeIds = [this._gNode, this._vint1Node, this._mt1Node];
 
-  // Bind Q3 pin nodes (NPN SCR2: B=G, C=Vint2, E=MT2)
-  this._q3.setPinNode("B", this._gNode);
-  this._q3.setPinNode("C", this._vint2Node);
-  this._q3.setPinNode("E", this._mt2Node);
+  // Q2 PNP SCR1: B=Vint1, C=G, E=MT2
+  this._q2.pinNodeIds = [this._vint1Node, this._gNode, this._mt2Node];
 
-  // Bind Q4 pin nodes (PNP SCR2: B=Vint2, C=G, E=MT1)
-  this._q4.setPinNode("B", this._vint2Node);
-  this._q4.setPinNode("C", this._gNode);
-  this._q4.setPinNode("E", this._mt1Node);
+  // Q3 NPN SCR2: B=G, C=Vint2, E=MT2
+  this._q3.pinNodeIds = [this._gNode, this._vint2Node, this._mt2Node];
+
+  // Q4 PNP SCR2: B=Vint2, C=G, E=MT1
+  this._q4.pinNodeIds = [this._vint2Node, this._gNode, this._mt1Node];
 
   // Forward to each BJT sub-element in order
   this._q1.setup(ctx);   // 23× TSTALLOC
@@ -209,7 +207,6 @@ Not applicable.
 
 - Drop `internalNodeIds`, `branchIdx` from factory.
 - Drop `branchCount`, `getInternalNodeCount` from MnaModel.
-- Add `hasBranchRow: false`.
 - Add `mayCreateInternalNodes: true`.
 - Composite does not carry `ngspiceNodeMap` — sub-elements carry their own.
 
@@ -217,4 +214,5 @@ Not applicable.
 
 1. `setup-stamp-order.test.ts` row for PB-TRIAC is GREEN (verifies Vint1, Vint2 alloc then Q1–Q4 TSTALLOC order).
 2. `src/components/semiconductors/__tests__/triac.test.ts` is GREEN.
+   - **Setup-mocking removal**: the implementer MUST audit the test file for any pattern that fakes the migrated `setup()` process (e.g., manually constructing element handles, stub solver objects that bypass the real allocation path, or directly calling `load()` without going through `_setup()` first). Every such pattern MUST be replaced with the real path: instantiate the element via its factory, call `_setup()` on the engine to allocate handles, then exercise `load()`/`accept()`. Tests that pass only because they bypass the new setup contract are NOT a valid GREEN signal — those tests are themselves a defect to be fixed in this same task.
 3. No banned closing verdicts.

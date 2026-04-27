@@ -23,8 +23,6 @@ None. VCVS has no internal voltage nodes.
 
 1 branch row — the output current branch.
 
-`hasBranchRow: true`
-
 Allocated via `ctx.makeCur(this.label, "branch")`, mirroring vcvsset.c:41-44:
 ```c
 if(here->VCVSbranch == 0) {
@@ -32,9 +30,6 @@ if(here->VCVSbranch == 0) {
     here->VCVSbranch = tmp->number;
 }
 ```
-
-The idempotent guard (`if (branch == 0)`) is mirrored by `ctx.makeCur` being
-idempotent for the same (label, suffix) pair (per 00-engine.md §A2).
 
 ## State slots
 
@@ -61,8 +56,10 @@ setup(ctx: SetupContext): void {
   const ctrlPosNode = this.pinNodeIds[0]; // pinNodes.get("ctrl+") — VCVScontPosNode
   const ctrlNegNode = this.pinNodeIds[1]; // pinNodes.get("ctrl-") — VCVScontNegNode
 
-  // Branch row allocation: vcvsset.c:41-44 (idempotent guard)
-  this.branchIndex = ctx.makeCur(this.label, "branch");
+  // Branch row allocation: vcvsset.c:41-44 (idempotent guard — vcvsset.c:41-44)
+  if (this.branchIndex === -1) {
+    this.branchIndex = ctx.makeCur(this.label, "branch");
+  }
   const branch = this.branchIndex;
 
   // TSTALLOC sequence: vcvsset.c:53-58, line-for-line
@@ -107,19 +104,14 @@ that sense the VCVS output current can lazily resolve it. Mirrors
 
 ```typescript
 findBranchFor(name: string, ctx: SetupContext): number {
-  // Walk all registered VCVS instances; find the one whose label matches `name`.
-  // This callback is registered on the MnaModel, not on a single element.
-  // The engine dispatches findBranch(label) → findBranchFor(label, ctx) per model.
-  //
-  // Lazy-allocating idempotent guard (mirrors VSRCfindBr):
+  // Look up the device by namespaced label (auto-registered per 00-engine.md §A4.1 recursive _deviceMap walk).
   const el = ctx.findDevice(name);
-  if (!el || el.ngspiceLoadOrder !== NGSPICE_LOAD_ORDER.VCVS) return 0;
-  const vcvs = el as VCVSAnalogElement;
-  if (vcvs.branchIndex === -1) {
-    // Branch not yet allocated by setup() — allocate now.
-    vcvs.branchIndex = ctx.makeCur(name, "branch");
+  if (!el) return 0;
+  // The element owns its branch row. Lazy-allocate if needed.
+  if (el.branchIndex === -1) {
+    el.branchIndex = ctx.makeCur(name, "branch");
   }
-  return vcvs.branchIndex;
+  return el.branchIndex;
 }
 ```
 
@@ -138,7 +130,6 @@ Not applicable.
   `VCVSDefinition.modelRegistry["behavioral"]`). New signature:
   `factory(pinNodes, props, getTime): AnalogElementCore`.
 - Drop `branchCount: 1` from MnaModel registration.
-- Add `hasBranchRow: true`.
 - Add `ngspiceNodeMap: { "out+": "pos", "out-": "neg", "ctrl+": "contPos", "ctrl-": "contNeg" }`.
 - Add `findBranchFor` callback (see above).
 
@@ -148,4 +139,4 @@ Not applicable.
    `[(posNode,branch), (negNode,branch), (branch,posNode), (branch,negNode),
      (branch,ctrlPosNode), (branch,ctrlNegNode)]`.
 2. `src/components/active/__tests__/vcvs.test.ts` is GREEN.
-3. No banned closing verdicts.
+- **Setup-mocking removal**: the implementer MUST audit the test file for any pattern that fakes the migrated `setup()` process (e.g., manually constructing element handles, stub solver objects that bypass the real allocation path, or directly calling `load()` without going through `_setup()` first). Every such pattern MUST be replaced with the real path: instantiate the element via its factory, call `_setup()` on the engine to allocate handles, then exercise `load()`/`accept()`. Tests that pass only because they bypass the new setup contract are NOT a valid GREEN signal — those tests are themselves a defect to be fixed in this same task.

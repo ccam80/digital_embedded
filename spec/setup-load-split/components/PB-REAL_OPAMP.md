@@ -91,6 +91,18 @@ factory(pinNodes, props, getTime): AnalogElementCore {
 }
 ```
 
+The composite class declares cached field references for the input nodes (populated from constructor arguments `inP` and `inN`):
+
+```ts
+private readonly _inP: number;
+private readonly _inN: number;
+// In constructor:
+this._inP = inP;
+this._inN = inN;
+```
+
+These replace all inline `this._pinNodes.get("in+")!` and `this._pinNodes.get("in-")!` calls in `load()`. The `load()` body reads `this._inP` and `this._inN` directly.
+
 ## setup() body — composite forwards in NGSPICE_LOAD_ORDER order
 
 ```ts
@@ -157,14 +169,14 @@ load(ctx: LoadContext): void {
     const maxDelta = this._p.slewRate * dt;
     const vIntOld  = ctx.rhsOld[this._nVint];
     const vIntIdeal = this._p.aol * (
-      (this._pinNodes.get("in+")! > 0 ? ctx.rhsOld[this._pinNodes.get("in+")!] : 0) -
-      (this._pinNodes.get("in-")! > 0 ? ctx.rhsOld[this._pinNodes.get("in-")!] : 0) +
+      (this._inP > 0 ? ctx.rhsOld[this._inP] : 0) -
+      (this._inN > 0 ? ctx.rhsOld[this._inN] : 0) +
       this._p.vos
     );
     const vIntTarget = Math.max(vIntOld - maxDelta, Math.min(vIntOld + maxDelta, vIntIdeal));
     // Update VCVS gain to achieve clamped target
-    const vDiff = (this._pinNodes.get("in+")! > 0 ? ctx.rhsOld[this._pinNodes.get("in+")!] : 0) -
-                  (this._pinNodes.get("in-")! > 0 ? ctx.rhsOld[this._pinNodes.get("in-")!] : 0);
+    const vDiff = (this._inP > 0 ? ctx.rhsOld[this._inP] : 0) -
+                  (this._inN > 0 ? ctx.rhsOld[this._inN] : 0);
     const clampedGain = Math.abs(vDiff) > 1e-12 ? vIntTarget / vDiff : this._p.aol;
     this._vcvs1.setParam("gain", clampedGain);
   }
@@ -202,7 +214,6 @@ Not needed. Direct refs to all sub-elements.
 
 - Drop `internalNodeIds`, `branchIdx` from factory signature.
 - Drop `getInternalNodeCount` (was 1 for `V_int`) — replaced by `mayCreateInternalNodes: true`.
-- Add `hasBranchRow: false` on the composite's `MnaModel`.
 - Add `mayCreateInternalNodes: true` (`nVint` allocated in `setup()`).
 - Leave `ngspiceNodeMap` undefined on `RealOpAmpDefinition`.
 
@@ -210,5 +221,6 @@ Not needed. Direct refs to all sub-elements.
 
 1. `setup-stamp-order.test.ts` row for PB-REAL_OPAMP is GREEN (stamp order: resOut 4×RES, capComp 4×CAP, dClampP 7×DIO, dClampN 7×DIO, vcvs1 6×VCVS).
 2. `src/components/active/__tests__/real-opamp.test.ts` is GREEN.
+   - **Setup-mocking removal**: the implementer MUST audit the test file for any pattern that fakes the migrated `setup()` process (e.g., manually constructing element handles, stub solver objects that bypass the real allocation path, or directly calling `load()` without going through `_setup()` first). Every such pattern MUST be replaced with the real path: instantiate the element via its factory, call `_setup()` on the engine to allocate handles, then exercise `load()`/`accept()`. Tests that pass only because they bypass the new setup contract are NOT a valid GREEN signal — those tests are themselves a defect to be fixed in this same task.
 3. The pin-map-coverage test allows the composite to lack `ngspiceNodeMap`.
 4. No banned closing verdicts.

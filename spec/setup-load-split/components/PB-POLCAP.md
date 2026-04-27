@@ -29,7 +29,7 @@ None (no `CKTmkCur` calls).
 The composite calls `ctx.allocStates` for its pool-backed state. Current implementation has `stateSize = POLARIZED_CAP_SCHEMA.size + CLAMP_DIODE_STATE_SIZE` = 9 slots. After the setup/load split, state allocation moves to `setup()`:
 
 ```ts
-this._stateOffset = ctx.allocStates(this.stateSize);  // 9 slots total
+this._stateBase = ctx.allocStates(this.stateSize);  // 9 slots total
 ```
 
 ## TSTALLOC sequence (line-for-line port)
@@ -54,9 +54,20 @@ The PolarizedCap composite is NOT a direct ngspice primitive — it has no match
 | 7 | `(RESposNode, RESnegNode)` | `(nCap, negNode)` | `_hLEAK_PN` |
 | 8 | `(RESnegNode, RESposNode)` | `(negNode, nCap)` | `_hLEAK_NP` |
 
-**Clamp DIO** (`diosetup.c` pattern, negNode ↔ posNode — anode = neg, cathode = pos):
+**Clamp DIO** (`diosetup.c` pattern, anode = negNode, cathode = posNode — reverse-mounted clamp):
 
-Refer to the `PB-DIO.md` spec for the exact DIO TSTALLOC sequence. The clamp diode sub-element's `setup()` allocates its own handles.
+Clamp diode TSTALLOC sequence inlined here for self-containment (mirrors PB-DIO §setup() body for the standalone DIO).
+
+The clamp diode has an internal `posPrime_clamp` node (DIO cathode-side ohmic resistance junction). Polarity-reverse rule: anode = `negNode`, cathode = `posNode`.
+
+| # | ngspice pointer | digiTS pair | handle field |
+|---|---|---|---|
+| 5 | `DIOposPrimePosPrimePtr` | `(posPrime_clamp, posPrime_clamp)` | `_hDIO_PP_clamp` |
+| 6 | `DIOnegNegPtr` | `(negNode, negNode)` | `_hDIO_NN_clamp` |
+| 7 | `DIOposPrimeNegPtr` | `(posPrime_clamp, negNode)` | `_hDIO_PN_clamp` |
+| 8 | `DIOnegPosPrimePtr` | `(negNode, posPrime_clamp)` | `_hDIO_NP_clamp` |
+
+The clamp diode sub-element's `setup()` allocates these handles and stores `posPrime_clamp` via `ctx.makeVolt`.
 
 **CAP body** (`capsetup.c:114-117` pattern, n_cap ↔ neg):
 
@@ -72,8 +83,8 @@ Refer to the `PB-DIO.md` spec for the exact DIO TSTALLOC sequence. The clamp dio
 ```ts
 setup(ctx: SetupContext): void {
   const solver = ctx.solver;
-  const posNode = this.pinNodeIds[0];  // pos pin
-  const negNode = this.pinNodeIds[1];  // neg pin
+  const posNode = this._pinNodes.get("pos")!;  // pos pin
+  const negNode = this._pinNodes.get("neg")!;  // neg pin
 
   // Allocate internal node n_cap (junction between ESR and cap body).
   // No ngspice primitive equivalent — digiTS-internal topology extension.
@@ -81,7 +92,7 @@ setup(ctx: SetupContext): void {
   this._nCap = nCap;
 
   // State slots — 9 total (5 cap body + 4 clamp diode).
-  this._stateOffset = ctx.allocStates(this.stateSize);
+  this._stateBase = ctx.allocStates(this.stateSize);
 
   // ESR RES stamps (ressetup.c:46-49, pos ↔ nCap).
   this._hESR_PP = solver.allocElement(posNode, posNode);
@@ -109,13 +120,15 @@ setup(ctx: SetupContext): void {
 Fields to add to `AnalogPolarizedCapElement`:
 ```ts
 private _nCap: number = -1;
-private _stateOffset: number = -1;
-private _hESR_PP: number = -1;  private _hESR_NN: number = -1;
-private _hESR_PN: number = -1;  private _hESR_NP: number = -1;
-private _hLEAK_PP: number = -1; private _hLEAK_NN: number = -1;
-private _hLEAK_PN: number = -1; private _hLEAK_NP: number = -1;
-private _hCAP_PP: number = -1;  private _hCAP_NN: number = -1;
-private _hCAP_PN: number = -1;  private _hCAP_NP: number = -1;
+private _stateBase: number = -1;
+private _hESR_PP: number = -1;      private _hESR_NN: number = -1;
+private _hESR_PN: number = -1;      private _hESR_NP: number = -1;
+private _hLEAK_PP: number = -1;     private _hLEAK_NN: number = -1;
+private _hLEAK_PN: number = -1;     private _hLEAK_NP: number = -1;
+private _hDIO_PP_clamp: number = -1; private _hDIO_NN_clamp: number = -1;
+private _hDIO_PN_clamp: number = -1; private _hDIO_NP_clamp: number = -1;
+private _hCAP_PP: number = -1;      private _hCAP_NN: number = -1;
+private _hCAP_PN: number = -1;      private _hCAP_NP: number = -1;
 ```
 
 The clamp diode sub-element is constructed at factory time (not setup time), so it exists before `setup()` is called.
@@ -128,7 +141,6 @@ Implementer ports value-side equations from `ref/ngspice/src/spicelib/devices/ca
 
 - Drop `internalNodeIds` and `branchIdx` parameters from `createPolarizedCapElement` factory signature (per A6.3). The internal node `n_cap` is allocated in `setup()`, not passed from the compiler.
 - Remove `getInternalNodeCount: 1` from `MnaModel` registration (per A6.2).
-- Add `hasBranchRow: false` to `MnaModel` registration.
 - Add `mayCreateInternalNodes: true` to `MnaModel` registration (creates `n_cap` in setup).
 - The composite `ComponentDefinition` leaves `ngspiceNodeMap` undefined (composite decomposes — sub-elements carry their own maps).
 - No `findBranchFor` callback (no branch row).
@@ -136,5 +148,6 @@ Implementer ports value-side equations from `ref/ngspice/src/spicelib/devices/ca
 ## Verification gate
 
 1. `setup-stamp-order.test.ts` row for PB-POLCAP is GREEN.
-2. `src/components/passives/__tests__/analog-fuse.test.ts` and any polarized-cap test file are GREEN.
+2. `src/components/passives/__tests__/polarized-cap.test.ts` are GREEN.
+   - **Setup-mocking removal**: the implementer MUST audit the test file for any pattern that fakes the migrated `setup()` process (e.g., manually constructing element handles, stub solver objects that bypass the real allocation path, or directly calling `load()` without going through `_setup()` first). Every such pattern MUST be replaced with the real path: instantiate the element via its factory, call `_setup()` on the engine to allocate handles, then exercise `load()`/`accept()`. Tests that pass only because they bypass the new setup contract are NOT a valid GREEN signal — those tests are themselves a defect to be fixed in this same task.
 3. No banned closing verdicts (mapping/tolerance/equivalent-to/pre-existing/intentional-divergence) used in any commit message or report.

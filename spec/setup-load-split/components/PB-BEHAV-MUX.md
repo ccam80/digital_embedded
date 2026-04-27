@@ -78,16 +78,21 @@ Example (selectorBits=2, bitWidth=1): 2 + 4 + 1 = **7 TSTALLOCs** (before capaci
 
 - Drop `internalNodeIds` and `branchIdx` from the `makeBehavioralMuxAnalogFactory` closure signature (per A6.3). The factory currently ignores them (`_internalNodeIds`, `_branchIdx`); remove the parameters entirely once A6.3 lands.
 - `ComponentDefinition`: `ngspiceNodeMap` left `undefined` (behavioral — per 02-behavioral.md §"Pin-map field on behavioral models").
-- `MnaModel`: `hasBranchRow: false`, `mayCreateInternalNodes: false`.
+- `MnaModel`: `mayCreateInternalNodes: false`.
 - `BehavioralMuxElement` adds a `setup(ctx: SetupContext): void` method per Shape rule 3.
 
 ## State pool
 
-`BehavioralMuxElement.stateSize` aggregates `_childElements[].stateSize` (capacitor children only; `COMBINATIONAL_COMPOSITE_SCHEMA` is empty). `stateBaseOffset` is set by `MNAEngine._setup()` via `allocateStateBuffers` per `00-engine.md` §A5.1. `initState(pool)` distributes offsets to children (existing pattern in `BehavioralMuxElement.initState` preserved unchanged).
+The combinational composite element schema declares no state slots of its own — all state comes from capacitor children. setup() does not call `ctx.allocStates(...)` for the composite itself; child capacitor sub-elements call `ctx.allocStates(2)` each (per indsetup.c-style state allocation for inductors / capsetup.c-style for caps; see PB-CAP §State slots for the per-capacitor count).
+
+If you need to verify the existing source constant name (e.g., `COMBINATIONAL_COMPOSITE_SCHEMA`), the spec author should pin it down here — leave the implementer with a behavioral description, not a source-name reference.
+
+`BehavioralMuxElement.stateSize` aggregates `_childElements[].stateSize`. `stateBaseOffset` is set by `MNAEngine._setup()` via `allocateStateBuffers` per `00-engine.md` §A5.1. `initState(pool)` distributes offsets to children (existing pattern in `BehavioralMuxElement.initState` preserved unchanged).
 
 ## Verification gate
 
 1. `src/solver/analog/__tests__/behavioral-combinational.test.ts` (or equivalent test file) is GREEN after the migration.
+   - **Setup-mocking removal**: the implementer MUST audit the test file for any pattern that fakes the migrated `setup()` process (e.g., manually constructing element handles, stub solver objects that bypass the real allocation path, or directly calling `load()` without going through `_setup()` first). Every such pattern MUST be replaced with the real path: instantiate the element via its factory, call `_setup()` on the engine to allocate handles, then exercise `load()`/`accept()`. Tests that pass only because they bypass the new setup contract are NOT a valid GREEN signal — those tests are themselves a defect to be fixed in this same task.
 2. `Grep "allocElement" src/solver/analog/behavioral-combinational.ts` returns only matches inside the `setup()` method body (zero matches in `load()`).
 3. Composite `setup()` forward order is selector pins → data pins → output pins → children (per Shape rule 3, inputs before outputs before children).
 4. No banned closing verdicts in review comments or commit messages.

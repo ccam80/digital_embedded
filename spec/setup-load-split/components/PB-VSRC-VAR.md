@@ -80,13 +80,14 @@ ctx.rhs[this.branchIndex] += this._voltage;
 // Registered on the MnaModel for VariableRail.
 // Mirrors VSRCfindBr (vsrc/vsrcfbr.c:26-39).
 findBranchFor(name: string, ctx: SetupContext): number {
-  if (instance.label === name) {
-    if (instance.branchIndex === -1) {
-      instance.branchIndex = ctx.makeCur(instance.label, "branch");
-    }
-    return instance.branchIndex;
+  // Look up the device by namespaced label (auto-registered per 00-engine.md §A4.1 recursive _deviceMap walk).
+  const el = ctx.findDevice(name);
+  if (!el) return 0;
+  // The element owns its branch row. Lazy-allocate if needed.
+  if (el.branchIndex === -1) {
+    el.branchIndex = ctx.makeCur(name, "branch");
   }
-  return 0;
+  return el.branchIndex;
 }
 ```
 
@@ -94,7 +95,6 @@ findBranchFor(name: string, ctx: SetupContext): number {
 
 - Drop `internalNodeIds`, `branchIdx` from factory signature.
 - Drop `branchCount`, `getInternalNodeCount` from MnaModel registration.
-- Add `hasBranchRow: true`.
 - Add `ngspiceNodeMap: { pos: "pos" }` (neg is implicit ground — no pin entry).
 - Add `findBranchFor` callback (see above).
 
@@ -102,4 +102,4 @@ findBranchFor(name: string, ctx: SetupContext): number {
 
 1. `setup-stamp-order.test.ts` row for PB-VSRC-VAR is GREEN.
 2. `src/components/sources/__tests__/variable-rail.test.ts` is GREEN.
-3. No banned closing verdicts.
+- **Setup-mocking removal**: the implementer MUST audit the test file for any pattern that fakes the migrated `setup()` process (e.g., manually constructing element handles, stub solver objects that bypass the real allocation path, or directly calling `load()` without going through `_setup()` first). Every such pattern MUST be replaced with the real path: instantiate the element via its factory, call `_setup()` on the engine to allocate handles, then exercise `load()`/`accept()`. Tests that pass only because they bypass the new setup contract are NOT a valid GREEN signal — those tests are themselves a defect to be fixed in this same task.

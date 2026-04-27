@@ -50,7 +50,7 @@ None. Ground allocates zero matrix entries in setup().
 
 - Drop `internalNodeIds`, `branchIdx` parameters from factory signature (new 3-param form per A6.3).
 - `ngspiceNodeMap` left undefined (behavioral — per 02-behavioral.md §Pin-map field).
-- `hasBranchRow: false`, `mayCreateInternalNodes: false`.
+- `mayCreateInternalNodes: false`.
 - No `findBranchFor` callback.
 - `ngspiceLoadOrder` is currently `NGSPICE_LOAD_ORDER.RES` (lowest bucket, since ordinal is irrelevant for a no-op stamper). This is correct and unchanged.
 
@@ -62,10 +62,12 @@ None. Ground allocates zero matrix entries in setup().
 
 Ground is not just an empty behavioral element — it is architecturally a sentinel. The compiler maps the output pin's wired node to MNA node 0 at compile time. Ground's `load()` does nothing because the "constraint" is baked into the node numbering, not into matrix stamps. This is the correct final state and requires no further action beyond adding the empty `setup()` method.
 
-The `ngspiceLoadOrder: NGSPICE_LOAD_ORDER.RES` declaration is intentional (documented in the existing source comment at `ground.ts:117-119`): every `AnalogElementCore` must declare an ordinal, and RES is the lowest-priority bucket, ensuring Ground loads before any elements that depend on node voltages being established.
+Every `AnalogElementCore` must declare a load-order ordinal; `RES` is the lowest-priority bucket, appropriate for a no-op element.
 
 ## Verification gate
 
 1. Any test exercising Ground in analog mode remains GREEN (no regression from adding an empty `setup()` method).
-2. `Grep "allocElement" src/components/io/ground.ts` returns zero matches — Ground has never called `allocElement` and must not start now.
-3. No banned closing verdicts.
+2. Existing test file `src/solver/analog/__tests__/behavioral-remaining.test.ts` is GREEN (per 02-behavioral.md per-task verification gate table — Ground falls into the per-group default test file since no dedicated `behavioral-ground.test.ts` exists).
+   - **Setup-mocking removal**: the implementer MUST audit the test file for any pattern that fakes the migrated `setup()` process (e.g., manually constructing element handles, stub solver objects that bypass the real allocation path, or directly calling `load()` without going through `_setup()` first). Every such pattern MUST be replaced with the real path: instantiate the element via its factory, call `_setup()` on the engine to allocate handles, then exercise `load()`/`accept()`. Tests that pass only because they bypass the new setup contract are NOT a valid GREEN signal — those tests are themselves a defect to be fixed in this same task.
+3. `Grep "allocElement" src/components/io/ground.ts` returns zero matches — Ground has never called `allocElement` and must not start now.
+4. No banned closing verdicts.

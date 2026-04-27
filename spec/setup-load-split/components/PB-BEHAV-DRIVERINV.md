@@ -36,7 +36,7 @@ setup(ctx: SetupContext): void {
 },
 ```
 
-Forward order: **inputs → sel → output → children** per 02-behavioral.md Shape rule 3.
+Forward order: **inputs (data, enable) → output → children** per 02-behavioral.md Shape rule 3.
 
 `DigitalInputPinModel.setup(ctx)` allocates `(nodeId, nodeId)` per Shape rule 1.
 `DigitalOutputPinModel.setup(ctx)` allocates `(nodeId, nodeId)` for role="direct" per Shape rule 2.
@@ -88,7 +88,7 @@ Allocated by sub-element setup() calls:
 
 - Drop `internalNodeIds`, `branchIdx` parameters from factory signature (new 3-param form per A6.3).
 - `ngspiceNodeMap` left undefined (behavioral — no ngspice pin map per 02-behavioral.md §Pin-map field).
-- `hasBranchRow: false`, `mayCreateInternalNodes: false`.
+- `mayCreateInternalNodes: false`.
 - No `findBranchFor` callback.
 
 ## State pool
@@ -98,6 +98,7 @@ Allocated by sub-element setup() calls:
 ## Verification gate
 
 1. Existing test file `src/solver/analog/__tests__/behavioral-remaining.test.ts` is GREEN.
+   - **Setup-mocking removal**: the implementer MUST audit the test file for any pattern that fakes the migrated `setup()` process (e.g., manually constructing element handles, stub solver objects that bypass the real allocation path, or directly calling `load()` without going through `_setup()` first). Every such pattern MUST be replaced with the real path: instantiate the element via its factory, call `_setup()` on the engine to allocate handles, then exercise `load()`/`accept()`. Tests that pass only because they bypass the new setup contract are NOT a valid GREEN signal — those tests are themselves a defect to be fixed in this same task.
 2. No `allocElement` call in load() body. Verified by: `Grep "allocElement" src/solver/analog/behavioral-remaining.ts` returns only matches inside `setup()` method bodies.
 3. `setup()` forward order is inputs → outputs → children (Shape rule 3).
 4. No banned closing verdicts.

@@ -55,7 +55,7 @@ None.
 `*states += 5` at `diosetup.c:199`. Identical to PB-DIO.
 
 ```ts
-this._stateOffset = ctx.allocStates(5);
+this._stateBase = ctx.allocStates(5);
 ```
 
 ## TSTALLOC sequence (line-for-line port)
@@ -83,7 +83,7 @@ setup(ctx: SetupContext): void {
   const negNode = this._pinNodes.get("K")!;
 
   // State slots — diosetup.c:198-199
-  this._stateOffset = ctx.allocStates(5);
+  this._stateBase = ctx.allocStates(5);
 
   // Internal node — diosetup.c:204-224
   this._posPrimeNode = (this._model.RS === 0)
@@ -105,6 +105,8 @@ setup(ctx: SetupContext): void {
 
 Implementer ports value-side from `ref/ngspice/src/spicelib/devices/dio/dioload.c` line-for-line, stamping through cached handles. No allocElement calls.
 
+- Preserve multiplicity scaling: all current and conductance stamps are multiplied by the instance `M` parameter (default 1.0). ngspice anchor: `dioload.c` / `mos1load.c` / `bjtload.c` / `jfetload.c` use `here->{DIO|MOS1|BJT|JFET}m` for this scaling. The instance `M` parameter is partition: "instance" per the in-progress phase-instance-vs-model-param-partition work.
+
 ## findBranchFor (if applicable)
 
 Not applicable.
@@ -113,12 +115,19 @@ Not applicable.
 
 - Drop `internalNodeIds`, `branchIdx` from factory.
 - Drop `branchCount`, `getInternalNodeCount` from MnaModel.
-- Add `hasBranchRow: false`.
 - Add `mayCreateInternalNodes: true`.
 - Add `ngspiceNodeMap: { A: "pos", K: "neg" }`.
 
 ## Verification gate
 
 1. `setup-stamp-order.test.ts` row for PB-SCHOTTKY is GREEN.
-2. `src/components/semiconductors/__tests__/schottky.test.ts` is GREEN.
+2. Implementer creates `src/components/semiconductors/__tests__/schottky.test.ts` (the file does not currently exist) and the file is GREEN. Required assertions:
+
+   - Forward voltage: a Schottky diode with default params, biased at I=1mA forward, settles at V_F between 0.20V and 0.40V (matches typical Schottky barrier physics — lower than silicon's ~0.7V).
+   - RS-conditional internal node: when `RS > 0`, the diode allocates an internal posPrime node (verified by walking `_setup()` output and asserting one extra `makeVolt` call); when `RS = 0`, no internal node is allocated.
+   - TSTALLOC ordering: `solver._getInsertionOrder()` after `_setup()` returns the diode's TSTALLOC sequence in the same order as `dio/diosetup.c` (4 entries when RS=0; 7 entries when RS>0).
+   - Pattern after `src/components/semiconductors/__tests__/diode.test.ts` — reuse helpers and circuit-build patterns.
+
+   The test file's existence and GREEN status is the W3 verification gate for PB-SCHOTTKY.
+   - **Setup-mocking removal**: the implementer MUST audit the test file for any pattern that fakes the migrated `setup()` process (e.g., manually constructing element handles, stub solver objects that bypass the real allocation path, or directly calling `load()` without going through `_setup()` first). Every such pattern MUST be replaced with the real path: instantiate the element via its factory, call `_setup()` on the engine to allocate handles, then exercise `load()`/`accept()`. Tests that pass only because they bypass the new setup contract are NOT a valid GREEN signal — those tests are themselves a defect to be fixed in this same task.
 3. No banned closing verdicts.

@@ -33,7 +33,7 @@ Two branch rows — one per inductor winding:
 - `L1.branchIndex`: allocated via `ctx.makeCur(l1.label, "branch")` in `L1.setup(ctx)`
 - `L2.branchIndex`: allocated via `ctx.makeCur(l2.label, "branch")` in `L2.setup(ctx)`
 
-`MUT.setup(ctx, l1, l2)` reads `l1.branchIndex` and `l2.branchIndex` directly (the composite owns the refs, so `findDevice` is not needed).
+`MUT.setup(ctx)` reads `this._l1.branchIndex` and `this._l2.branchIndex` directly from its constructor-stored refs (the composite owns the refs, so `findDevice` is not needed).
 
 ## State slots
 
@@ -87,13 +87,16 @@ MUT reads `MUTind1->INDbrEq` = `L1.branchIndex` and `MUTind2->INDbrEq` = `L2.bra
 ```ts
 setup(ctx: SetupContext): void {
   // Composite setup: call sub-elements in order L1, L2, MUT.
-  // mut.setup reads l1.branchIndex and l2.branchIndex directly —
-  // no findDevice needed since composite owns refs.
+  // Ordering invariant: _l1.setup() and _l2.setup() MUST complete before
+  // _mut.setup() is called, because _mut reads _l1.branchIndex and
+  // _l2.branchIndex (set during IND setup) directly — no findDevice needed.
   this._l1.setup(ctx);
   this._l2.setup(ctx);
-  this._mut.setup(ctx, this._l1, this._l2);
+  this._mut.setup(ctx);
 }
 ```
+
+`_mut` is constructed at factory time as `new MutualInductorElement(coupling, _l1, _l2)`, so it already holds refs to `_l1` and `_l2` by the time `setup()` is called.
 
 ### New class `InductorSubElement` (in `mutual-inductor.ts`)
 
@@ -108,7 +111,7 @@ export class InductorSubElement {
   private _hIbrN:   number = -1;
   private _hIbrP:   number = -1;
   private _hIbrIbr: number = -1;
-  private _stateOffset: number = -1;
+  private _stateBase: number = -1;
 
   constructor(
     private readonly _posNode: number,  // INDposNode
@@ -122,7 +125,7 @@ export class InductorSubElement {
     const negNode = this._negNode;
 
     // indsetup.c:78-79 — *states += 2
-    this._stateOffset = ctx.allocStates(2);
+    this._stateBase = ctx.allocStates(2);
 
     // indsetup.c:84-88 — CKTmkCur (idempotent guard)
     if (this.branchIndex === -1) {
@@ -155,14 +158,21 @@ export class MutualInductorElement {
   private _hBr1Br2: number = -1;
   private _hBr2Br1: number = -1;
 
-  constructor(private readonly _coupling: number) {}
+  constructor(
+    private readonly _coupling: number,
+    private readonly _l1: InductorSubElement,
+    private readonly _l2: InductorSubElement,
+  ) {}
 
-  setup(ctx: SetupContext, l1: InductorSubElement, l2: InductorSubElement): void {
+  setup(ctx: SetupContext): void {
     const solver = ctx.solver;
     // mutsetup.c:44-57 — resolve inductor references via direct refs (no CKTfndDev needed).
     // mutsetup.c:66-67 — TSTALLOC sequence.
-    const b1 = l1.branchIndex;
-    const b2 = l2.branchIndex;
+    const b1 = this._l1.branchIndex;
+    const b2 = this._l2.branchIndex;
+    if (b1 === -1 || b2 === -1) {
+      throw new Error("MutualInductorElement.setup(): branchIndex not yet allocated on sub-inductor");
+    }
 
     this._hBr1Br2 = solver.allocElement(b1, b2);  // (MUTind1->INDbrEq, MUTind2->INDbrEq)
     this._hBr2Br1 = solver.allocElement(b2, b1);  // (MUTind2->INDbrEq, MUTind1->INDbrEq)
@@ -183,11 +193,11 @@ The existing `AnalogTransformerElement` (a monolithic class stamping all entries
 - Keys starting with `L2.` → `this._l2.setParam(key.slice(3), value)`
 - Keys `K` or `coupling` → `this._mut.setParam(key, value)`
 - Keys `primaryInductance`, `turnsRatio` → recompute L1/L2 and coupling, delegate accordingly.
+- All other (unrecognized) keys → throw `Error(`Unrecognized setParam key: ${key}`)`
 
 Factory signature changes:
 - Drop `internalNodeIds` and `branchIdx` parameters (per A6.3).
 - Remove `branchCount: 2` from `MnaModel` registration (per A6.2).
-- Add `hasBranchRow: true`.
 - `mayCreateInternalNodes` omitted.
 - `ComponentDefinition.ngspiceNodeMap` left undefined (composite).
 - Add `findBranchFor` callback that delegates to `l1.findBranchFor` and `l2.findBranchFor`.
@@ -196,4 +206,5 @@ Factory signature changes:
 
 1. `setup-stamp-order.test.ts` row for PB-XFMR is GREEN (insertion order: L1×5, L2×5, MUT×2 = 12 total).
 2. `src/components/passives/__tests__/transformer.test.ts` is GREEN.
+   - **Setup-mocking removal**: the implementer MUST audit the test file for any pattern that fakes the migrated `setup()` process (e.g., manually constructing element handles, stub solver objects that bypass the real allocation path, or directly calling `load()` without going through `_setup()` first). Every such pattern MUST be replaced with the real path: instantiate the element via its factory, call `_setup()` on the engine to allocate handles, then exercise `load()`/`accept()`. Tests that pass only because they bypass the new setup contract are NOT a valid GREEN signal — those tests are themselves a defect to be fixed in this same task.
 3. No banned closing verdicts (mapping/tolerance/equivalent-to/pre-existing/intentional-divergence) used in any commit message or report.

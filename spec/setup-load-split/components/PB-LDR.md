@@ -24,7 +24,7 @@ None. RES has no internal nodes.
 
 ## Branch rows
 
-None. `hasBranchRow: false`.
+None (branchIndex remains -1 post-setup).
 
 ## State slots
 
@@ -44,8 +44,8 @@ None. `hasBranchRow: false`.
 ```typescript
 setup(ctx: SetupContext): void {
   const solver = ctx.solver;
-  const posNode = this.pinNodeIds[0]; // pinNodes.get("pos") — RESposNode
-  const negNode = this.pinNodeIds[1]; // pinNodes.get("neg") — RESnegNode
+  const posNode = this._pinNodes.get("pos")!; // RESposNode
+  const negNode = this._pinNodes.get("neg")!; // RESnegNode
 
   // TSTALLOC sequence: ressetup.c:46-49, line-for-line
   this._hPP = solver.allocElement(posNode, posNode); // :46 (RESposNode, RESposNode)
@@ -89,7 +89,6 @@ Not applicable.
 
 - Drop `internalNodeIds`, `branchIdx` from factory (`createLDRElement`).
 - Drop `branchCount`, `getInternalNodeCount` from MnaModel registration.
-- Add `hasBranchRow: false`.
 - Add `ngspiceNodeMap: { pos: "pos", neg: "neg" }` to the `behavioral` model
   registration and to `LDRDefinition`.
 - No `findBranchFor` callback.
@@ -99,4 +98,5 @@ Not applicable.
 1. `setup-stamp-order.test.ts` row for PB-LDR is GREEN: insertion order
    must be `[(posNode,posNode), (negNode,negNode), (posNode,negNode), (negNode,posNode)]`.
 2. `src/components/sensors/__tests__/ldr.test.ts` is GREEN.
+   - **Setup-mocking removal**: the implementer MUST audit the test file for any pattern that fakes the migrated `setup()` process (e.g., manually constructing element handles, stub solver objects that bypass the real allocation path, or directly calling `load()` without going through `_setup()` first). Every such pattern MUST be replaced with the real path: instantiate the element via its factory, call `_setup()` on the engine to allocate handles, then exercise `load()`/`accept()`. Tests that pass only because they bypass the new setup contract are NOT a valid GREEN signal — those tests are themselves a defect to be fixed in this same task.
 3. No banned closing verdicts.

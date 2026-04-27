@@ -24,11 +24,11 @@ None. SW has no internal nodes.
 
 ## Branch rows
 
-None. `hasBranchRow: false`.
+None (branchIndex remains -1 post-setup).
 
 ## State slots
 
-2. `swsetup.c:47-48`:
+`swsetup.c:47-48`:
 ```c
 here->SWstate = *states;
 *states += SW_NUM_STATES;   // SW_NUM_STATES = 2 per swdefs.h:56
@@ -36,7 +36,7 @@ here->SWstate = *states;
 
 In setup():
 ```typescript
-this._stateOffset = ctx.allocStates(2); // SW_NUM_STATES = 2
+this._stateBase = ctx.allocStates(2); // SW_NUM_STATES = 2
 ```
 
 ## TSTALLOC sequence (line-for-line port from swsetup.c:59-62)
@@ -61,7 +61,7 @@ setup(ctx: SetupContext): void {
   const negNode = this.pinNodeIds[1]; // pinNodes.get("neg") — SWnegNode
 
   // State allocation: swsetup.c:47-48
-  this._stateOffset = ctx.allocStates(2); // SW_NUM_STATES = 2 (swdefs.h:56)
+  this._stateBase = ctx.allocStates(2); // SW_NUM_STATES = 2 (swdefs.h:56)
 
   // TSTALLOC sequence: swsetup.c:59-62, line-for-line
   this._hPP = solver.allocElement(posNode, posNode); // :59 (SWposNode, SWposNode)
@@ -71,7 +71,7 @@ setup(ctx: SetupContext): void {
 }
 ```
 
-Handles `_hPP`, `_hPN`, `_hNP`, `_hNN` stored on instance. `_stateOffset` stores
+Handles `_hPP`, `_hPN`, `_hNP`, `_hNN` stored on instance. `_stateBase` stores
 the state slot base returned by `allocStates`. `allocElement` is NEVER called from
 `load()`.
 
@@ -99,8 +99,8 @@ The `resistance()` method computes the smooth tanh-blended resistance based on
 `_conducting` state and `_vTerminal` (updated each `accept()` call).
 
 State slots: ngspice uses `SWstate` to store the on/off state across NR
-iterations; digiTS maps this to `_stateOffset + 0` (current state) and
-`_stateOffset + 1` (previous state) within the StatePool. The `accept()` method
+iterations; digiTS maps this to `_stateBase + 0` (current state) and
+`_stateBase + 1` (previous state) within the StatePool. The `accept()` method
 writes the accepted discrete state into the pool; `load()` reads it back.
 
 ## findBranchFor (if applicable)
@@ -115,7 +115,6 @@ Not applicable.
 
 - Drop `internalNodeIds`, `branchIdx` from factory (`createSparkGapElement`).
 - Drop `branchCount`, `getInternalNodeCount` from MnaModel registration.
-- Add `hasBranchRow: false`.
 - Add `ngspiceNodeMap: { pos: "pos", neg: "neg" }` to the `behavioral` model
   registration and to `SparkGapDefinition`.
 - No `findBranchFor` callback.
@@ -125,4 +124,5 @@ Not applicable.
 1. `setup-stamp-order.test.ts` row for PB-SPARK is GREEN: insertion order
    must be `[(posNode,posNode), (posNode,negNode), (negNode,posNode), (negNode,negNode)]`.
 2. `src/components/sensors/__tests__/spark-gap.test.ts` is GREEN.
+   - **Setup-mocking removal**: the implementer MUST audit the test file for any pattern that fakes the migrated `setup()` process (e.g., manually constructing element handles, stub solver objects that bypass the real allocation path, or directly calling `load()` without going through `_setup()` first). Every such pattern MUST be replaced with the real path: instantiate the element via its factory, call `_setup()` on the engine to allocate handles, then exercise `load()`/`accept()`. Tests that pass only because they bypass the new setup contract are NOT a valid GREEN signal — those tests are themselves a defect to be fixed in this same task.
 3. No banned closing verdicts.

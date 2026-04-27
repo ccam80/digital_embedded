@@ -47,7 +47,11 @@ none — neither MOS nor CAP allocates a branch row.
 
 MOS1numStates (from mos1set.c:96-97: `here->MOS1states = *states; *states += MOS1numStates`) + 2 (CAP: `here->CAPqcap = *states; *states += 2`).
 
-Setup order: CAP setup runs first, then MOS setup (in `subElements[]` order sorted by `ngspiceLoadOrder`).
+**Setup order**: sub-elements are sorted by `ngspiceLoadOrder` and processed in ascending order. Concrete values (from `src/core/analog-types.ts`):
+- `NGSPICE_LOAD_ORDER.CAP = 17`
+- `NGSPICE_LOAD_ORDER.MOS = 35`
+
+Since 17 < 35, the floating-gate CAP sub-element's `setup()` runs before the MOS sub-element's `setup()`. This determines the state-slot offsets: CAP slots are allocated first (lower offsets), MOS slots second (higher offsets). Composite implementers MUST NOT hard-code the order in the setup() body — sort by `ngspiceLoadOrder` so the order remains correct if either anchor's value moves.
 
 ## TSTALLOC sequence (line-for-line port)
 
@@ -99,9 +103,13 @@ setup(ctx: SetupContext): void {
   // MOS gate and CAP positive terminal both reference this node.
   this._fgNode = ctx.makeVolt(this.label, "fg");
 
-  // CAP setup first (lower ngspiceLoadOrder), then MOS.
-  this._cap.setup(ctx);  // CAP pos=fgNode, neg=0; allocates 2 state slots + 4 handles
-  this._mos.setup(ctx);  // MOS gate=fgNode, D/S/B per above; allocates MOS1numStates + 22 handles
+  // Sort sub-elements by ngspiceLoadOrder; ascending order = ngspice cktLoad order.
+  // CAP (17) loads before MOS (35), so CAP's state slots and handles come first.
+  // Do NOT hard-code the order — sort so this remains correct if either anchor's
+  // NGSPICE_LOAD_ORDER value moves.
+  for (const sub of [this._cap, this._mos].sort((a, b) => a.ngspiceLoadOrder - b.ngspiceLoadOrder)) {
+    sub.setup(ctx);
+  }
 }
 ```
 
@@ -118,6 +126,8 @@ load(ctx: LoadContext): void {
 }
 ```
 
+- Preserve multiplicity scaling: the MOS sub-element's load() multiplies all current and conductance stamps by the instance `M` parameter (default 1.0). ngspice anchor: `mos1load.c` uses `here->MOS1m` for this scaling. The instance `M` parameter is partition: "instance" per the in-progress phase-instance-vs-model-param-partition work.
+
 ## findBranchFor (not applicable)
 
 Neither MOS nor CAP has a branch row.
@@ -126,7 +136,6 @@ Neither MOS nor CAP has a branch row.
 
 - Drop `internalNodeIds`, `branchIdx` from factory signature.
 - Drop `branchCount`, `getInternalNodeCount` from MnaModel registration.
-- Add `hasBranchRow: false`.
 - Add `mayCreateInternalNodes: true` (allocates the floating-gate node).
 - Composite has no `ngspiceNodeMap` (sub-elements carry their own).
 - No `findBranchFor` callback.
@@ -135,5 +144,6 @@ Neither MOS nor CAP has a branch row.
 ## Verification gate
 
 1. `setup-stamp-order.test.ts` row for PB-FGNFET is GREEN (26-entry sequence: 4 CAP + 22 MOS).
-2. `src/components/switching/__tests__/switches.test.ts` is GREEN.
+2. `src/components/switching/__tests__/fets.test.ts` is GREEN.
+   - **Setup-mocking removal**: the implementer MUST audit the test file for any pattern that fakes the migrated `setup()` process (e.g., manually constructing element handles, stub solver objects that bypass the real allocation path, or directly calling `load()` without going through `_setup()` first). Every such pattern MUST be replaced with the real path: instantiate the element via its factory, call `_setup()` on the engine to allocate handles, then exercise `load()`/`accept()`. Tests that pass only because they bypass the new setup contract are NOT a valid GREEN signal — those tests are themselves a defect to be fixed in this same task.
 3. No banned closing verdicts.

@@ -38,7 +38,7 @@ Three branch rows — one per inductor winding:
 - `L2.branchIndex`: allocated via `ctx.makeCur(l2.label, "branch")` in `L2.setup(ctx)`
 - `L3.branchIndex`: allocated via `ctx.makeCur(l3.label, "branch")` in `L3.setup(ctx)`
 
-Each `MUTij.setup(ctx, li, lj)` reads `li.branchIndex` and `lj.branchIndex` directly. No `findDevice` needed — composite owns refs.
+Each `MUTij.setup(ctx)` reads `this._li.branchIndex` and `this._lj.branchIndex` from its constructor-stored refs directly. No `findDevice` needed — composite owns refs.
 
 ## State slots
 
@@ -118,9 +118,11 @@ setup(ctx: SetupContext): void {
   this._l3.setup(ctx);   // indsetup.c pattern: allocStates(2) + makeCur + 5×allocElement
 
   // MUT instances require INDbrEq to be set on both inductors before calling setup.
-  this._mut12.setup(ctx, this._l1, this._l2);  // mutsetup.c: 2×allocElement
-  this._mut13.setup(ctx, this._l1, this._l3);  // mutsetup.c: 2×allocElement
-  this._mut23.setup(ctx, this._l2, this._l3);  // mutsetup.c: 2×allocElement
+  // Ordering invariant: all three IND setup() calls MUST complete before any MUT setup() call.
+  // Each MutualInductorElement holds refs to its two inductors (stored at construction time).
+  this._mut12.setup(ctx);  // mutsetup.c: 2×allocElement
+  this._mut13.setup(ctx);  // mutsetup.c: 2×allocElement
+  this._mut23.setup(ctx);  // mutsetup.c: 2×allocElement
 }
 ```
 
@@ -128,9 +130,9 @@ Sub-element classes reuse `InductorSubElement` and `MutualInductorElement` from 
 - `_l1 = new InductorSubElement(p1Node, p2Node, label + "_L1")`
 - `_l2 = new InductorSubElement(s1Node, ctNode, label + "_L2")`
 - `_l3 = new InductorSubElement(ctNode, s2Node, label + "_L3")`
-- `_mut12 = new MutualInductorElement(m12_coupling)`
-- `_mut13 = new MutualInductorElement(m13_coupling)`
-- `_mut23 = new MutualInductorElement(m23_coupling)`
+- `_mut12 = new MutualInductorElement(m12_coupling, _l1, _l2)`
+- `_mut13 = new MutualInductorElement(m13_coupling, _l1, _l3)`
+- `_mut23 = new MutualInductorElement(m23_coupling, _l2, _l3)`
 
 ## load() body — value writes only
 
@@ -153,7 +155,6 @@ load(ctx: LoadContext): void {
 
 - Drop `internalNodeIds` and `branchIdx` parameters from `createTappedTransformerElement` factory signature (per A6.3).
 - Remove `branchCount: 3` from `MnaModel` registration (per A6.2).
-- Add `hasBranchRow: true`.
 - `mayCreateInternalNodes` omitted.
 - `ComponentDefinition.ngspiceNodeMap` left undefined (composite).
 - Add `findBranchFor` callback that delegates to `l1.findBranchFor`, `l2.findBranchFor`, `l3.findBranchFor` (first non-zero wins).
@@ -163,10 +164,13 @@ load(ctx: LoadContext): void {
 - `L2.*` → `this._l2.setParam(key.slice(3), value)`
 - `L3.*` → `this._l3.setParam(key.slice(3), value)`
 - `K12`, `K13`, `K23` → respective MUT elements
-- `primaryInductance`, `turnsRatio`, `couplingCoefficient` → recompute all derived params and call `updateDerivedParams` on affected sub-elements.
+- `primaryInductance`: recompute `L1 = primaryInductance`, `L2 = primaryInductance × turnsRatio²`, `L3 = primaryInductance × turnsRatio²`, then call `this._l1.setParam("L", L1)`, `this._l2.setParam("L", L2)`, `this._l3.setParam("L", L3)`.
+- `turnsRatio`: recompute `L2 = primaryInductance × turnsRatio²`, `L3 = primaryInductance × turnsRatio²`, then call `this._l2.setParam("L", L2)`, `this._l3.setParam("L", L3)`.
+- `couplingCoefficient`: call `this._mut12.setParam("coupling", value)`, `this._mut13.setParam("coupling", value)`, `this._mut23.setParam("coupling", value)`.
 
 ## Verification gate
 
 1. `setup-stamp-order.test.ts` row for PB-TAPXFMR is GREEN (insertion order: L1×5, L2×5, L3×5, MUT12×2, MUT13×2, MUT23×2 = 21 total).
-2. `src/components/passives/__tests__/transformer.test.ts` (shared file) or dedicated tapped transformer test file is GREEN.
+2. `src/components/passives/__tests__/tapped-transformer.test.ts` is GREEN (create this file if it does not exist).
+   - **Setup-mocking removal**: the implementer MUST audit the test file for any pattern that fakes the migrated `setup()` process (e.g., manually constructing element handles, stub solver objects that bypass the real allocation path, or directly calling `load()` without going through `_setup()` first). Every such pattern MUST be replaced with the real path: instantiate the element via its factory, call `_setup()` on the engine to allocate handles, then exercise `load()`/`accept()`. Tests that pass only because they bypass the new setup contract are NOT a valid GREEN signal — those tests are themselves a defect to be fixed in this same task.
 3. No banned closing verdicts (mapping/tolerance/equivalent-to/pre-existing/intentional-divergence) used in any commit message or report.

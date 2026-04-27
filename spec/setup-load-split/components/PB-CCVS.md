@@ -40,9 +40,7 @@ None. CCVS has no internal voltage nodes.
 
 1 own branch row — the output voltage source current branch.
 
-`hasBranchRow: true`
-
-Allocated via `ctx.makeCur(this.label, "branch")`, mirroring ccvsset.c:40-43:
+Branch allocated via `ctx.makeCur(this.label, "branch")`, mirroring ccvsset.c:40-43:
 ```c
 if(here->CCVSbranch==0) {
     error = CKTmkCur(ckt, &tmp, here->CCVSname, "branch");
@@ -83,8 +81,10 @@ setup(ctx: SetupContext): void {
   const posNode = this.pinNodeIds[2]; // pinNodes.get("out+") — CCVSposNode
   const negNode = this.pinNodeIds[3]; // pinNodes.get("out-") — CCVSnegNode
 
-  // Own branch row: ccvsset.c:40-43 (idempotent guard via ctx.makeCur)
-  this.branchIndex = ctx.makeCur(this.label, "branch");
+  // Own branch row: ccvsset.c:58-62 (idempotent guard)
+  if (this.branchIndex === -1) {
+    this.branchIndex = ctx.makeCur(this.label, "branch");
+  }
   const ownBranch = this.branchIndex;
 
   // Resolve controlling branch: ccvsset.c:45
@@ -152,14 +152,14 @@ Mirrors VSRCfindBr (`vsrc/vsrcfbr.c:26-39`):
 
 ```typescript
 findBranchFor(name: string, ctx: SetupContext): number {
+  // Look up the device by namespaced label (auto-registered per 00-engine.md §A4.1 recursive _deviceMap walk).
   const el = ctx.findDevice(name);
-  if (!el || el.ngspiceLoadOrder !== NGSPICE_LOAD_ORDER.CCVS) return 0;
-  const ccvs = el as CCVSAnalogElement;
-  if (ccvs.branchIndex === -1) {
-    // Lazy allocation: setup() has not run yet for this element.
-    ccvs.branchIndex = ctx.makeCur(name, "branch");
+  if (!el) return 0;
+  // The element owns its branch row. Lazy-allocate if needed.
+  if (el.branchIndex === -1) {
+    el.branchIndex = ctx.makeCur(name, "branch");
   }
-  return ccvs.branchIndex;
+  return el.branchIndex;
 }
 ```
 
@@ -187,15 +187,6 @@ CCVS does NOT wait for the controlling source's setup() to have executed.
 The only precondition is that the controlling source is registered in the device
 map (populated at compile time, before any setup() runs).
 
-The current digiTS implementation uses a different mechanism (sense branch as a
-separate branch row allocated by CCVS itself, `branchCount: 2`). Under the
-new architecture, the sense branch belongs to the controlling VSRC exclusively,
-and CCVS holds only its one own output branch row. This is a breaking change
-from the current `branchIdx` / `branchIdx + 1` pattern — the implementer must
-replace `_senseBranch = branchIdx` and `_outBranch = branchIdx + 1` with:
-- `this.branchIndex = ctx.makeCur(this.label, "branch")` (own output branch)
-- `this._contBranch = ctx.findBranch(this._senseSourceLabel)` (controlling branch)
-
 ## Factory cleanup
 
 - Drop `internalNodeIds`, `branchIdx` from factory (the inline factory in
@@ -204,7 +195,6 @@ replace `_senseBranch = branchIdx` and `_outBranch = branchIdx + 1` with:
 - Drop `branchCount: 2` from MnaModel registration (CCVS now has 1 own branch
   row only; the old second branch was the sense branch which belongs to the
   controlling VSRC).
-- Add `hasBranchRow: true`.
 - Add `ngspiceNodeMap: { "out+": "pos", "out-": "neg" }`.
 - Add `findBranchFor` callback (see above).
 
@@ -216,4 +206,4 @@ replace `_senseBranch = branchIdx` and `_outBranch = branchIdx + 1` with:
    where `contBranch` is the branch row number allocated by the controlling
    VSRC's `findBranchFor`.
 2. `src/components/active/__tests__/ccvs.test.ts` is GREEN.
-3. No banned closing verdicts.
+- **Setup-mocking removal**: the implementer MUST audit the test file for any pattern that fakes the migrated `setup()` process (e.g., manually constructing element handles, stub solver objects that bypass the real allocation path, or directly calling `load()` without going through `_setup()` first). Every such pattern MUST be replaced with the real path: instantiate the element via its factory, call `_setup()` on the engine to allocate handles, then exercise `load()`/`accept()`. Tests that pass only because they bypass the new setup contract are NOT a valid GREEN signal — those tests are themselves a defect to be fixed in this same task.

@@ -100,7 +100,7 @@ setup(ctx: SetupContext): void {
   this._nDisBase  = ctx.makeVolt(this.label, "nDisBase");
 
   // Composite SR latch state (1 slot: 0.0 = Q reset, 1.0 = Q set)
-  this._stateOffset = ctx.allocStates(1);
+  this._stateBase = ctx.allocStates(1);
 
   // R-divider resistors (RES TSTALLOC: 4 entries each, ressetup.c:46-49)
   this._rDiv1.pinNodeIds = [nVcc, nCtrl];
@@ -129,22 +129,23 @@ setup(ctx: SetupContext): void {
   // Output pin model (behavioral, DigitalOutputPinModel)
   if (nOut > 0) this._outModel.setup(ctx);
 
-  // RS-FF glue handles: drive nDisBase from latch state
-  // allocate entries for the base-drive stamp in load()
-  this._hDisBaseDisBase = ctx.solver.allocElement(this._nDisBase, this._nDisBase);
-
   // CAP children of outModel
   for (const child of this._childElements) { child.setup(ctx); }
+
+  // RS-FF glue handle: composite-owned allocation comes AFTER all sub-element setups,
+  // since it wires pre-existing nodes rather than introducing new sub-element structure.
+  this._hDisBaseDisBase = ctx.solver.allocElement(this._nDisBase, this._nDisBase);
 }
 ```
 
 ### Setup ordering rationale
 
-Sub-elements are set up in ascending `ngspiceLoadOrder` bucket order, matching `cktsetup.c:72-81`:
+Sub-elements are set up in ascending `ngspiceLoadOrder` bucket order, matching `cktsetup.c:72-81`, followed by composite-owned allocElement calls:
 1. RES (rDiv1, rDiv2, rDiv3) — `NGSPICE_LOAD_ORDER.RES`
 2. VCVS (comp1, comp2) — `NGSPICE_LOAD_ORDER.VCVS`
 3. BJT (bjtDis) — `NGSPICE_LOAD_ORDER.BJT`
 4. Behavioral (outModel, CAP children)
+5. Composite-owned glue handle (RS-FF `_hDisBaseDisBase`) — allocated last, after all sub-element setups, since it wires pre-existing nodes
 
 ## load() body — composite forwards with RS latch coupling
 
@@ -170,8 +171,7 @@ load(ctx: LoadContext): void {
 
   // Active-low RST: if RST < GND + 0.7V → force Q=0
   const rstActive = vRst < vGnd + 0.7;
-  const s0 = pool.states[0];
-  let q = s0[this._stateOffset] >= 0.5;  // current latch state
+  let q = ctx.state0[this._stateBase] >= 0.5;  // current latch state
 
   const resetSignal = vComp1Out > 0.5 || rstActive;  // RESET dominant
   const setSignal   = vComp2Out > 0.5 && !resetSignal;
@@ -180,7 +180,7 @@ load(ctx: LoadContext): void {
   else if (setSignal) q = true;
   // else hold
 
-  s0[this._stateOffset] = q ? 1.0 : 0.0;
+  ctx.state0[this._stateBase] = q ? 1.0 : 0.0;
 
   // Drive discharge BJT base: Q=0 → BJT ON (saturated); Q=1 → BJT OFF
   const bjtBaseV = q ? 0.0 : 5.0;  // drive to rail to turn ON/OFF
@@ -194,7 +194,11 @@ load(ctx: LoadContext): void {
   // Output stage: Q=1 → OUT = VCC - vDrop; Q=0 → OUT ≈ GND + 0.1V
   const vVcc = nVcc > 0 ? ctx.rhsOld[nVcc] : 5;
   const vOut = q ? vVcc - this._p.vDrop : vGnd + 0.1;
-  this._outModel.setOutputVoltage(vOut);
+  // Output tracks VCC dynamically: update vOH each load() cycle, then drive logic level.
+  // This pattern keeps DigitalOutputPinModel API minimal; vOH is hot-loadable per the
+  // project's hot-loadable-params requirement (see CLAUDE.md ref).
+  this._outModel.setParam("vOH", vOut);
+  this._outModel.setLogicLevel(q);  // q is the RS-FF state already computed
   this._outModel.load(ctx);
 
   // CAP children
@@ -224,13 +228,13 @@ Not needed. Direct refs to all sub-elements.
 
 - Drop `internalNodeIds`, `branchIdx` from factory signature.
 - Drop `getInternalNodeCount` (was 4) — replaced by `mayCreateInternalNodes: true`.
-- Add `hasBranchRow: false` on the composite's `MnaModel` (VCVS sub-elements have `hasBranchRow: true`).
 - Add `mayCreateInternalNodes: true` (4 internal nodes in `setup()`).
 - Leave `ngspiceNodeMap` undefined on `Timer555Definition`.
 
 ## Verification gate
 
-1. `setup-stamp-order.test.ts` row for PB-TIMER555 is GREEN (stamp order: rDiv1 4×RES, rDiv2 4×RES, rDiv3 4×RES, comp1 6×VCVS, comp2 6×VCVS, bjtDis 23×BJT, then RS-FF glue handle, then outModel).
+1. `setup-stamp-order.test.ts` row for PB-TIMER555 is GREEN (stamp order: rDiv1 4×RES, rDiv2 4×RES, rDiv3 4×RES, comp1 6×VCVS, comp2 6×VCVS, bjtDis 23×BJT, outModel setup, CAP children, then RS-FF glue handle (composite-owned, last)).
 2. `src/components/active/__tests__/timer-555.test.ts` is GREEN.
+   - **Setup-mocking removal**: the implementer MUST audit the test file for any pattern that fakes the migrated `setup()` process (e.g., manually constructing element handles, stub solver objects that bypass the real allocation path, or directly calling `load()` without going through `_setup()` first). Every such pattern MUST be replaced with the real path: instantiate the element via its factory, call `_setup()` on the engine to allocate handles, then exercise `load()`/`accept()`. Tests that pass only because they bypass the new setup contract are NOT a valid GREEN signal — those tests are themselves a defect to be fixed in this same task.
 3. The pin-map-coverage test allows the composite to lack `ngspiceNodeMap`.
 4. No banned closing verdicts.

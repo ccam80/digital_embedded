@@ -29,7 +29,7 @@ here->CAPqcap = *states;
 *states += 2;
 ```
 
-Two state slots allocated. digiTS port: `this._stateOffset = ctx.allocStates(2)`.
+Two state slots allocated. digiTS port: `this._stateBase = ctx.allocStates(2)`.
 
 Note: the sensitivity `*states += 2 * SENparms` block at line 104-106 is conditional on `CKTsenInfo` which digiTS does not implement — omit.
 
@@ -53,7 +53,7 @@ setup(ctx: SetupContext): void {
   const negNode = pinNodes.get("neg")!;  // CAPnegNode
 
   // capsetup.c:102-103 — *states += 2 (CAPqcap slot)
-  this._stateOffset = ctx.allocStates(2);
+  this._stateBase = ctx.allocStates(2);
 
   // capsetup.c:114-117 — TSTALLOC sequence, line-for-line.
   this._hPP = solver.allocElement(posNode, posNode);  // (CAPposNode, CAPposNode)
@@ -65,7 +65,7 @@ setup(ctx: SetupContext): void {
 
 Fields to add to `AnalogCapacitorElement`:
 ```ts
-private _stateOffset: number = -1;
+private _stateBase: number = -1;
 private _hPP: number = -1;
 private _hNN: number = -1;
 private _hPN: number = -1;
@@ -82,7 +82,6 @@ Implementer ports value-side equations from `ref/ngspice/src/spicelib/devices/ca
 
 - Drop `internalNodeIds` and `branchIdx` parameters from `createCapacitorElement` factory signature (per A6.3).
 - Drop any `branchCount` or `getInternalNodeCount` from `MnaModel` registration if present — confirm neither exists; neither needs adding.
-- Add `hasBranchRow: false` to `MnaModel` registration.
 - `mayCreateInternalNodes` omitted (no internal nodes).
 - Add `ngspiceNodeMap: { pos: "pos", neg: "neg" }` to `ComponentDefinition` (`CapacitorDefinition`).
 - No `findBranchFor` callback (no branch row).
@@ -91,4 +90,5 @@ Implementer ports value-side equations from `ref/ngspice/src/spicelib/devices/ca
 
 1. `setup-stamp-order.test.ts` row for PB-CAP is GREEN (insertion order: PP, NN, PN, NP).
 2. `src/components/passives/__tests__/capacitor.test.ts` (or equivalent) is GREEN.
+   - **Setup-mocking removal**: the implementer MUST audit the test file for any pattern that fakes the migrated `setup()` process (e.g., manually constructing element handles, stub solver objects that bypass the real allocation path, or directly calling `load()` without going through `_setup()` first). Every such pattern MUST be replaced with the real path: instantiate the element via its factory, call `_setup()` on the engine to allocate handles, then exercise `load()`/`accept()`. Tests that pass only because they bypass the new setup contract are NOT a valid GREEN signal — those tests are themselves a defect to be fixed in this same task.
 3. No banned closing verdicts (mapping/tolerance/equivalent-to/pre-existing/intentional-divergence) used in any commit message or report.

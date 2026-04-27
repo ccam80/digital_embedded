@@ -79,7 +79,7 @@ Subcircuits MAY need `findDevice` for cross-element references within the subcir
 
 The subcircuit composite holds direct refs to sub-elements in `_subElements`; it does NOT call `findDevice` for sub-element traversal. `findDevice` is only needed when a sub-element's own setup logic requires cross-device lookup by label.
 
-**`_deviceMap` population:** `MNAEngine.init()` populates `_deviceMap` from `compiled.elements` keyed by element label (per A4.1). For subcircuit sub-elements, their labels are set by `compileSubcircuitToMnaModel` as `${subcktLabel}_${innerLabel}` (namespaced). The `findDevice` lookup uses the namespaced label. This matches ngspice's `DEVnameHash` which is populated per-instance with the full hierarchical name.
+**`_deviceMap` population:** Subcircuit sub-elements are auto-inserted into `_deviceMap` with namespaced labels by the engine's recursive `init()` walk (see `00-engine.md` §A4.1). Internal cross-device references inside the subcircuit (e.g., a CCCS whose `senseSourceLabel` is `mySubckt/innerVSRC`) resolve via `ctx.findDevice("mySubckt/innerVSRC")` — note the `/` separator matching the project's addressing scheme. The compiler's `compileSubcircuitToMnaModel` should emit the namespaced label using `/` (not `_`) to match the engine's `_deviceMap` keying.
 
 ## Port-binding mechanism (compiler.ts:262)
 
@@ -104,7 +104,6 @@ setParam(key: string, value: number): void {
 
 - Drop `internalNodeIds`, `branchIdx` from the factory signature returned by `compileSubcircuitToMnaModel` (per A6.3).
 - The compiled subcircuit's factory signature becomes `(pinNodes, props, getTime)`.
-- `hasBranchRow: false` on the composite's `MnaModel` (sub-elements with branch rows register their own `hasBranchRow: true`).
 - `mayCreateInternalNodes: true` — subcircuits commonly contain DIO, BJT, MOS sub-elements that create internal nodes in their own `setup()`.
 - Leave `ngspiceNodeMap` undefined on the `SubcircuitDefinition` composite.
 - No compile-time `matrixSize`, `branchCount`, or `internalNodeCount` computation (per A6.1-A6.2). All matrix structure deferred to `setup()`.
@@ -113,6 +112,6 @@ setParam(key: string, value: number): void {
 
 1. `setup-stamp-order.test.ts` row for PB-SUBCKT is GREEN. The test builds a minimal subcircuit (e.g., a resistor inside a subcircuit boundary) and verifies that `solver._getInsertionOrder()` after `_setup()` matches the expected TSTALLOC sequence for the inner element.
 2. Subcircuit integration tests in `src/components/subcircuit/__tests__/subcircuit.test.ts` are GREEN.
+   - **Setup-mocking removal**: the implementer MUST audit the test file for any pattern that fakes the migrated `setup()` process (e.g., manually constructing element handles, stub solver objects that bypass the real allocation path, or directly calling `load()` without going through `_setup()` first). Every such pattern MUST be replaced with the real path: instantiate the element via its factory, call `_setup()` on the engine to allocate handles, then exercise `load()`/`accept()`. Tests that pass only because they bypass the new setup contract are NOT a valid GREEN signal — those tests are themselves a defect to be fixed in this same task.
 3. The pin-map-coverage test allows the composite to lack `ngspiceNodeMap` (composite rule from `01-pin-mapping.md`).
 4. Nested subcircuits (subcircuit within subcircuit) also pass: `setup()` is recursive via the sub-element forwarding.
-5. No banned closing verdicts.

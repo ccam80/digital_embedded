@@ -76,7 +76,7 @@ Example (selectorBits=2): 2 + 1 + 4 = **7 TSTALLOCs** (before capacitors).
 
 - Drop `internalNodeIds` and `branchIdx` from the `makeBehavioralDemuxAnalogFactory` closure signature (per A6.3). The factory currently ignores them (`_internalNodeIds`, `_branchIdx`); remove the parameters entirely once A6.3 lands.
 - `ComponentDefinition`: `ngspiceNodeMap` left `undefined` (behavioral — per 02-behavioral.md §"Pin-map field on behavioral models").
-- `MnaModel`: `hasBranchRow: false`, `mayCreateInternalNodes: false`.
+- `MnaModel`: `mayCreateInternalNodes: false`.
 - `BehavioralDemuxElement` adds a `setup(ctx: SetupContext): void` method per Shape rule 3.
 
 ## State pool
@@ -86,6 +86,7 @@ Example (selectorBits=2): 2 + 1 + 4 = **7 TSTALLOCs** (before capacitors).
 ## Verification gate
 
 1. `src/solver/analog/__tests__/behavioral-combinational.test.ts` (or equivalent test file) is GREEN after the migration.
+   - **Setup-mocking removal**: the implementer MUST audit the test file for any pattern that fakes the migrated `setup()` process (e.g., manually constructing element handles, stub solver objects that bypass the real allocation path, or directly calling `load()` without going through `_setup()` first). Every such pattern MUST be replaced with the real path: instantiate the element via its factory, call `_setup()` on the engine to allocate handles, then exercise `load()`/`accept()`. Tests that pass only because they bypass the new setup contract are NOT a valid GREEN signal — those tests are themselves a defect to be fixed in this same task.
 2. `Grep "allocElement" src/solver/analog/behavioral-combinational.ts` returns only matches inside the `setup()` method body (zero matches in `load()`).
 3. Composite `setup()` forward order is selector pins → input pin → output pins → children (per Shape rule 3, inputs before outputs before children).
 4. No banned closing verdicts in review comments or commit messages.

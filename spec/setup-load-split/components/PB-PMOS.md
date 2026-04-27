@@ -65,7 +65,7 @@ None.
 `*states += MOS1numStates` at `mos1set.c:97`. `MOS1numStates = 17`.
 
 ```ts
-this._stateOffset = ctx.allocStates(17);
+this._stateBase = ctx.allocStates(17);
 ```
 
 ## TSTALLOC sequence (line-for-line port)
@@ -114,7 +114,7 @@ setup(ctx: SetupContext): void {
   const instance = this._instance;
 
   // State slots — mos1set.c:96-97
-  this._stateOffset = ctx.allocStates(17);
+  this._stateBase = ctx.allocStates(17);
 
   // Internal nodes — mos1set.c:131-178 (drain prime before source prime)
   const needDrainPrime = (model.RD !== 0) ||
@@ -164,6 +164,8 @@ Implementer ports value-side from `ref/ngspice/src/spicelib/devices/mos1/mos1loa
 line-for-line, applying P-channel polarity (`MOS1type = -1`), stamping through
 cached handles. No allocElement calls.
 
+- Preserve multiplicity scaling: all current and conductance stamps are multiplied by the instance `M` parameter (default 1.0). ngspice anchor: `dioload.c` / `mos1load.c` / `bjtload.c` / `jfetload.c` use `here->{DIO|MOS1|BJT|JFET}m` for this scaling. The instance `M` parameter is partition: "instance" per the in-progress phase-instance-vs-model-param-partition work.
+
 ## findBranchFor (if applicable)
 
 Not applicable. MOS1 has no branch row.
@@ -172,7 +174,6 @@ Not applicable. MOS1 has no branch row.
 
 - Drop `internalNodeIds`, `branchIdx` from factory.
 - Drop `branchCount`, `getInternalNodeCount` from MnaModel.
-- Add `hasBranchRow: false`.
 - Add `mayCreateInternalNodes: true`.
 - Add `ngspiceNodeMap: { G: "gate", D: "drain", S: "source" }`.
 
@@ -180,4 +181,5 @@ Not applicable. MOS1 has no branch row.
 
 1. `setup-stamp-order.test.ts` row for PB-PMOS is GREEN.
 2. `src/components/semiconductors/__tests__/mosfet.test.ts` is GREEN (PMOS case).
+   - **Setup-mocking removal**: the implementer MUST audit the test file for any pattern that fakes the migrated `setup()` process (e.g., manually constructing element handles, stub solver objects that bypass the real allocation path, or directly calling `load()` without going through `_setup()` first). Every such pattern MUST be replaced with the real path: instantiate the element via its factory, call `_setup()` on the engine to allocate handles, then exercise `load()`/`accept()`. Tests that pass only because they bypass the new setup contract are NOT a valid GREEN signal — those tests are themselves a defect to be fixed in this same task.
 3. No banned closing verdicts.

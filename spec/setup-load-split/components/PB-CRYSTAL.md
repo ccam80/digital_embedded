@@ -45,17 +45,7 @@ Replaces the current `branchIdx` parameter passed to the factory (A6.3 cleanup).
 
 ## State slots
 
-The crystal has 15 state slots (matching the existing `CRYSTAL_SCHEMA`), allocated as a single block:
-```ts
-this._stateOffset = ctx.allocStates(15);
-```
-
-The 15 slots derive from three reactive components:
-- Ls (IND pattern — indsetup.c:78-79): contributes 4 slots (GEQ_L, IEQ_L, I_L, PHI_L) + 1 CCAP slot
-- Cs (CAP pattern — capsetup.c:102-103): contributes 4 slots (GEQ_CS, IEQ_CS, V_CS, Q_CS) + 1 CCAP slot
-- C0 (CAP pattern — capsetup.c:102-103): contributes 4 slots (GEQ_C0, IEQ_C0, V_C0, Q_C0) + 1 CCAP slot
-
-The crystal allocates them as a monolithic 15-slot block (not three separate `allocStates(5)` calls) because all slots are declared in a single `CRYSTAL_SCHEMA` and are accessed via a single `stateBaseOffset`. The implementer must call `ctx.allocStates(15)` once in `setup()` and store the result as `this._stateBaseOffset`.
+**State slots: 15 total.** This count matches the existing `CRYSTAL_SCHEMA` declaration. Allocate as a single block: `this._stateBase = ctx.allocStates(15)`. Per-slot semantics are defined by the existing CRYSTAL_SCHEMA in source — this spec does not re-derive them.
 
 ## TSTALLOC sequence (line-for-line port)
 
@@ -76,7 +66,7 @@ The crystal applies sub-element setup patterns in the order: Rs, Ls, Cs, C0.
 
 ### Ls setup — indsetup.c:78-100 (n1=posNode, n2=negNode, b=branchRow)
 
-State allocation: `ctx.allocStates(15)` covers Ls state slots (slots 0-4 in CRYSTAL_SCHEMA).
+State allocation: `ctx.allocStates(15)` covers all crystal state slots (per CRYSTAL_SCHEMA).
 Branch allocation: `b = ctx.makeCur(label, "Ls_branch")` (idempotent guard).
 
 | # | ngspice pair | digiTS pair | handle field |
@@ -96,11 +86,11 @@ State slots for Cs are included in the monolithic 15-slot `allocStates(15)` call
 | # | ngspice pair | digiTS pair | handle field |
 |---|---|---|---|
 | 10 | `(CAPposNode, CAPposNode)` | `(n2Node, n2Node)` | `_hCs_PP` |
-| 11 | `(CAPnegNode, CAPnegNode)` | `(bNode, bNode)` | `_hCs_NN` |
-| 12 | `(CAPposNode, CAPnegNode)` | `(n2Node, bNode)` | `_hCs_PN` |
-| 13 | `(CAPnegNode, CAPposNode)` | `(bNode, n2Node)` | `_hCs_NP` |
+| 11 | `(CAPnegNode, CAPnegNode)` | `(extBNode, extBNode)` | `_hCs_NN` |
+| 12 | `(CAPposNode, CAPnegNode)` | `(n2Node, extBNode)` | `_hCs_PN` |
+| 13 | `(CAPnegNode, CAPposNode)` | `(extBNode, n2Node)` | `_hCs_NP` |
 
-Where `bNode` = `pinNodes.get("B")` (external terminal B). The existing `load()` uses `stampG(solver, n2, nB, ...)` without explicit ground checks, but `stampG` skips ground internally. In `setup()`, apply explicit ground guards on `bNode` and `n2Node`.
+Where `extBNode` = `pinNodes.get("B")` (external terminal B). The existing `load()` uses `stampG(solver, n2, nB, ...)` without explicit ground checks, but `stampG` skips ground internally. In `setup()`, apply explicit ground guards on `extBNode` and `n2Node`.
 
 ### C0 setup — capsetup.c:114-117 (A=posNode, B=negNode)
 
@@ -126,8 +116,7 @@ setup(ctx: SetupContext): void {
   const bNode = this.pinNodeIds[1];  // external terminal B
 
   // Allocate 15 state slots as a monolithic block (CRYSTAL_SCHEMA).
-  // Covers Ls (slots 0-4), Cs (slots 4-8), C0 (slots 8-12), CCAP (slots 12-14).
-  this._stateOffset = ctx.allocStates(15);
+  this._stateBase = ctx.allocStates(15);
 
   // Allocate internal nodes — replace internalNodeIds[0], internalNodeIds[1].
   const n1Node = ctx.makeVolt(this._label, "n1");  // Rs↔Ls junction
@@ -170,7 +159,7 @@ setup(ctx: SetupContext): void {
 
 Fields to add to `AnalogCrystalElement`:
 ```ts
-private _stateOffset: number = -1;
+private _stateBase: number = -1;
 private _n1Node: number = -1;
 private _n2Node: number = -1;
 private _branchIndex: number = -1;
@@ -208,21 +197,22 @@ The crystal exposes a branch row for Ls and must implement `findBranchFor` so CC
 
 ```ts
 findBranchFor(name: string, ctx: SetupContext): number {
-  if (name !== this._label + "_Ls_branch") return 0;
-  if (this._branchIndex === -1) {
-    this._branchIndex = ctx.makeCur(this._label, "Ls_branch");
+  // Look up the device by namespaced label (auto-registered per 00-engine.md §A4.1 recursive _deviceMap walk).
+  const el = ctx.findDevice(name);
+  if (!el) return 0;
+  // The element owns its branch row (Ls branch). Lazy-allocate if needed.
+  if (el.branchIndex === -1) {
+    el.branchIndex = ctx.makeCur(name, "Ls_branch");
   }
-  return this._branchIndex;
+  return el.branchIndex;
 }
 ```
-
-The label convention `_label + "_Ls_branch"` must match whatever `ctx.makeCur` uses — implementer should verify the exact name against the compiler's branch-name lookup convention.
 
 ## Factory cleanup
 
 - Drop `internalNodeIds` and `branchIdx` parameters from `createCrystalElement` factory signature (per A6.3). Both are now allocated in `setup()`.
 - Remove `branchCount: 1` from `modelRegistry` entry (per A6.2).
-- Add `hasBranchRow: true` to `modelRegistry` entry.
+- Add `findBranchFor` callback to `modelRegistry` entry (branch allocation is the source of truth; no boolean flag needed).
 - Add `mayCreateInternalNodes: true` to `modelRegistry` entry.
 - `ComponentDefinition.ngspiceNodeMap` left undefined (composite decomposes).
 - Add `findBranchFor` callback to `MnaModel` entry (delegates to `AnalogCrystalElement.findBranchFor`).
@@ -231,4 +221,5 @@ The label convention `_label + "_Ls_branch"` must match whatever `ctx.makeCur` u
 
 1. `setup-stamp-order.test.ts` row for PB-CRYSTAL is GREEN (insertion order: Rs×4, Ls×5, Cs×4, C0×4 = 17 total; note `(bNode,bNode)` appears at position 11 for Cs and position 15 for C0 and returns the same handle; note `(aNode,aNode)` appears at position 1 for Rs and position 14 for C0 and returns the same handle).
 2. Crystal test file is GREEN.
+   - **Setup-mocking removal**: the implementer MUST audit the test file for any pattern that fakes the migrated `setup()` process (e.g., manually constructing element handles, stub solver objects that bypass the real allocation path, or directly calling `load()` without going through `_setup()` first). Every such pattern MUST be replaced with the real path: instantiate the element via its factory, call `_setup()` on the engine to allocate handles, then exercise `load()`/`accept()`. Tests that pass only because they bypass the new setup contract are NOT a valid GREEN signal — those tests are themselves a defect to be fixed in this same task.
 3. No banned closing verdicts (mapping/tolerance/equivalent-to/pre-existing/intentional-divergence) used in any commit message or report.

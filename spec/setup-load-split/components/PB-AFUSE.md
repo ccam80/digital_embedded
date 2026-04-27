@@ -45,8 +45,8 @@ Total: 4 TSTALLOC entries (matching ressetup.c:46-49 exactly; subject to ground-
 ```ts
 setup(ctx: SetupContext): void {
   const solver = ctx.solver;
-  const posNode = this.pinNodeIds[0];  // out1 — RESposNode
-  const negNode = this.pinNodeIds[1];  // out2 — RESnegNode
+  const posNode = this._pinNodes.get("out1")!;  // RESposNode
+  const negNode = this._pinNodes.get("out2")!;  // RESnegNode
 
   // ressetup.c:46-49 — TSTALLOC sequence, line-for-line.
   // Ground-skip guards mirror the existing load() checks.
@@ -90,7 +90,6 @@ No `solver.allocElement` calls in `load()`. The `accept()` method (I²t integrat
 
 - Drop `internalNodeIds` and `branchIdx` parameters from `createAnalogFuseElement` factory signature (per A6.3). The current factory already ignores them (`_internalNodeIds`, `_branchIdx`).
 - No `branchCount` existed on this `modelRegistry` entry — no removal needed.
-- Add `hasBranchRow: false` to `MnaModel` registration.
 - `mayCreateInternalNodes` omitted.
 - Add `ngspiceNodeMap: { out1: "pos", out2: "neg" }` to `ComponentDefinition`.
 - No `findBranchFor` callback (no branch row).
@@ -99,4 +98,5 @@ No `solver.allocElement` calls in `load()`. The `accept()` method (I²t integrat
 
 1. `setup-stamp-order.test.ts` row for PB-AFUSE is GREEN (insertion order: PP, NN, PN, NP = 4 total; ground-skip applied when either pin is ground).
 2. Analog fuse test file (if it exists; see `src/components/passives/__tests__/analog-fuse.test.ts`) is GREEN.
+   - **Setup-mocking removal**: the implementer MUST audit the test file for any pattern that fakes the migrated `setup()` process (e.g., manually constructing element handles, stub solver objects that bypass the real allocation path, or directly calling `load()` without going through `_setup()` first). Every such pattern MUST be replaced with the real path: instantiate the element via its factory, call `_setup()` on the engine to allocate handles, then exercise `load()`/`accept()`. Tests that pass only because they bypass the new setup contract are NOT a valid GREEN signal — those tests are themselves a defect to be fixed in this same task.
 3. No banned closing verdicts (mapping/tolerance/equivalent-to/pre-existing/intentional-divergence) used in any commit message or report.

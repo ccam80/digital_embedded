@@ -286,8 +286,8 @@
   "hotPaths": [
     {
       "path": "",
-      "accessCount": 70,
-      "lastAccessed": 1777268543507,
+      "accessCount": 88,
+      "lastAccessed": 1777280878329,
       "type": "directory"
     },
     {
@@ -301,6 +301,12 @@
       "accessCount": 34,
       "lastAccessed": 1777258971270,
       "type": "file"
+    },
+    {
+      "path": "src",
+      "accessCount": 30,
+      "lastAccessed": 1777284447296,
+      "type": "directory"
     },
     {
       "path": "src\\solver\\analog\\sparse-solver.ts",
@@ -321,12 +327,6 @@
       "type": "file"
     },
     {
-      "path": "src",
-      "accessCount": 25,
-      "lastAccessed": 1777268552951,
-      "type": "directory"
-    },
-    {
       "path": "src\\solver\\analog\\analog-engine.ts",
       "accessCount": 22,
       "lastAccessed": 1777268545858,
@@ -334,8 +334,8 @@
     },
     {
       "path": "src\\core\\analog-types.ts",
-      "accessCount": 20,
-      "lastAccessed": 1777268463438,
+      "accessCount": 21,
+      "lastAccessed": 1777284473286,
       "type": "file"
     },
     {
@@ -363,6 +363,12 @@
       "type": "file"
     },
     {
+      "path": "src\\solver\\analog\\element.ts",
+      "accessCount": 12,
+      "lastAccessed": 1777284466986,
+      "type": "file"
+    },
+    {
       "path": "src\\solver\\analog\\dc-operating-point.ts",
       "accessCount": 11,
       "lastAccessed": 1777264360530,
@@ -381,16 +387,16 @@
       "type": "file"
     },
     {
-      "path": "src\\solver\\analog\\element.ts",
-      "accessCount": 10,
-      "lastAccessed": 1777268449506,
-      "type": "file"
-    },
-    {
       "path": "ref\\ngspice\\src\\spicelib\\devices\\mos1\\mos1set.c",
       "accessCount": 10,
       "lastAccessed": 1777268496246,
       "type": "file"
+    },
+    {
+      "path": "src\\solver\\analog",
+      "accessCount": 10,
+      "lastAccessed": 1777284456018,
+      "type": "directory"
     },
     {
       "path": "ref\\ngspice\\src\\spicelib\\devices\\bjt\\bjtsetup.c",
@@ -399,10 +405,10 @@
       "type": "file"
     },
     {
-      "path": "src\\solver\\analog",
-      "accessCount": 9,
-      "lastAccessed": 1777268543005,
-      "type": "directory"
+      "path": "src\\solver\\analog\\load-context.ts",
+      "accessCount": 8,
+      "lastAccessed": 1777275775928,
+      "type": "file"
     },
     {
       "path": "src\\solver\\coordinator.ts",
@@ -435,9 +441,9 @@
       "type": "file"
     },
     {
-      "path": "src\\solver\\analog\\load-context.ts",
-      "accessCount": 6,
-      "lastAccessed": 1777263261561,
+      "path": "ref\\ngspice\\src\\spicelib\\devices\\sw\\swsetup.c",
+      "accessCount": 7,
+      "lastAccessed": 1777282709605,
       "type": "file"
     },
     {
@@ -450,12 +456,6 @@
       "path": "ref\\ngspice\\src\\spicelib\\devices\\ccvs\\ccvsset.c",
       "accessCount": 6,
       "lastAccessed": 1777268386309,
-      "type": "file"
-    },
-    {
-      "path": "ref\\ngspice\\src\\spicelib\\devices\\sw\\swsetup.c",
-      "accessCount": 6,
-      "lastAccessed": 1777268432042,
       "type": "file"
     },
     {
@@ -513,15 +513,21 @@
       "type": "file"
     },
     {
+      "path": "ref\\ngspice\\src\\spicelib\\devices\\dio\\diosetup.c",
+      "accessCount": 4,
+      "lastAccessed": 1777285318530,
+      "type": "file"
+    },
+    {
       "path": "ref\\ngspice\\src\\spicelib\\devices\\ind\\mutsetup.c",
       "accessCount": 3,
       "lastAccessed": 1777265326644,
       "type": "file"
     },
     {
-      "path": "ref\\ngspice\\src\\spicelib\\devices\\dio\\diosetup.c",
+      "path": "ref\\ngspice\\src\\spicelib\\devices\\tra\\trasetup.c",
       "accessCount": 3,
-      "lastAccessed": 1777268401374,
+      "lastAccessed": 1777280846069,
       "type": "file"
     },
     {
@@ -535,12 +541,6 @@
       "accessCount": 2,
       "lastAccessed": 1777264062404,
       "type": "directory"
-    },
-    {
-      "path": "ref\\ngspice\\src\\spicelib\\devices\\tra\\trasetup.c",
-      "accessCount": 2,
-      "lastAccessed": 1777265325982,
-      "type": "file"
     },
     {
       "path": ".vitest-failures.json",

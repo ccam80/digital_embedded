@@ -14,9 +14,10 @@ Composite pin labels (from `buildOpAmpPinDeclarations()`):
 
 ## Sub-element decomposition
 
-| Sub-element label | Class | ngspice anchor | Pin assignments (parent pin → sub-element pin) | setParam routing |
-|---|---|---|---|---|
-| `vcvs1` | VCVSElement | `vcvs/vcvsset.c:53-58` | `in+` → `ctrl+`, `in-` → `ctrl-`, `out` → `out+`, ground(0) → `out-` | `"gain"` → vcvs1 |
+| Sub-element label | Class | ngspice anchor | Pin assignments | setParam routing | Conditional |
+|---|---|---|---|---|---|
+| `vcvs1` | VCVSElement | `vcvs/vcvsset.c:53-58` | `in+`→`ctrl+`, `in-`→`ctrl-`, `vint`(internal)→`out+`, `0`→`out-` | `"gain"` → vcvs1 | Always present |
+| `res1` | RESElement | `res/ressetup.c:46-49` | `vint`(internal)→`A`, `out`→`B` | `"rOut"` → res1 | Present only when `rOut > 0`; omitted entirely when `rOut = 0` (and `vint` is not allocated; `vcvs1` connects directly to `nOut`) |
 
 Sub-element `ngspiceNodeMap`:
 ```
@@ -30,18 +31,7 @@ vcvs1.ngspiceNodeMap = {
 
 The ideal op-amp output negative node is ground (0). The VCVS stamps `(out, 0)` as `(posNode, negNode)`.
 
-The current implementation uses a Norton approximation (conductance + current source). After migration, the output stage switches to a true VCVS stamp matching `vcvsset.c:53-58` so that `setup-stamp-order.test.ts` passes. The existing `rOut` parameter becomes the series output resistance modelled via an additional RES sub-element (`res1`) if `rOut > 0`.
-
-### Extended decomposition with rOut
-
-| Sub-element label | Class | ngspice anchor | Pin assignments | setParam routing |
-|---|---|---|---|---|
-| `vcvs1` | VCVSElement | `vcvs/vcvsset.c:53-58` | `in+`→`ctrl+`, `in-`→`ctrl-`, `vint`(internal)→`out+`, `0`→`out-` | `"gain"` → vcvs1 |
-| `res1` | RESElement | `res/ressetup.c:46-49` | `vint`(internal)→`A`, `out`→`B` | `"rOut"` → res1 |
-
 Where `vint` is an internal node allocated by `ctx.makeVolt(label, "vint")` during `setup()`. This node serves as the ideal voltage source output; `res1` drops the output impedance between `vint` and `out`.
-
-**Simplified model (rOut == 0):** `vint` collapses to `out`; `res1` omitted.
 
 ## Construction (factory body sketch)
 
@@ -64,7 +54,25 @@ factory(pinNodes, props, getTime): AnalogElementCore {
 }
 ```
 
+**Default rOut=75 — behavioral change warning (FOPAMP-D2 resolution)**
+
+Default `rOut=75` introduces a 75Ω series output resistance that is NOT present in the current Norton-based PB-OPAMP implementation. Any test circuit with a load at `out` will see ~75Ω·I_load voltage drop post-migration. The implementer must:
+
+1. Run `opamp.test.ts` BEFORE making any change. Record which assertions pass.
+2. After applying this spec, run `opamp.test.ts` again.
+3. For each test that fails because of the 75Ω drop, the implementer REPORTS (not silently fixes) the regression. The user decides whether to:
+   - Update the test assertion to expect the post-migration behavior (`actualVoltage = expectedVoltage - rOut * loadCurrent`), OR
+   - Change the default to `rOut=0` (no series resistance unless user opts in), OR
+   - Some other resolution.
+
+The 75Ω value is from the existing OPAMP implementation's modeling intent (real op-amps have nonzero output impedance). It is preserved here so that circuits using realistic OPAMP defaults benefit from the corrected output-impedance model. The trade-off (test regression vs. behavioral fidelity) is the user's to make.
+
+```ts
+```
+
 ## setup() body — composite forwards
+
+Sub-element ordering follows the engine's §A6.4 'Sub-element ordering rule' (NGSPICE_LOAD_ORDER ordinal ascending).
 
 ```ts
 setup(ctx: SetupContext): void {
@@ -75,12 +83,12 @@ setup(ctx: SetupContext): void {
   if (this._rOut > 0) {
     // Allocate internal voltage node between ideal source and output resistance
     this._vint = ctx.makeVolt(this.label, "vint");
-    // vcvs1: ctrl+(in+), ctrl-(in-), out+(vint), out-(0)
-    this._vcvs1.pinNodeIds = [inP, inN, this._vint, 0];
-    this._vcvs1.setup(ctx);
-    // res1: A(vint), B(out)
+    // RES first (NGSPICE_LOAD_ORDER.RES = 1): res1: A(vint), B(out)
     this._res1!.pinNodeIds = [this._vint, nOut];
     this._res1!.setup(ctx);
+    // VCVS last (NGSPICE_LOAD_ORDER.VCVS = 47): vcvs1: ctrl+(in+), ctrl-(in-), out+(vint), out-(0)
+    this._vcvs1.pinNodeIds = [inP, inN, this._vint, 0];
+    this._vcvs1.setup(ctx);
   } else {
     // vcvs1: ctrl+(in+), ctrl-(in-), out+(out), out-(0)
     this._vcvs1.pinNodeIds = [inP, inN, nOut, 0];
@@ -112,10 +120,9 @@ Not needed. Composite holds direct refs to `_vcvs1` and `_res1`.
 ## Factory cleanup
 
 - Drop `internalNodeIds`, `branchIdx` from factory signature.
-- Add `hasBranchRow: false` on the composite's `MnaModel` (sub-elements register their own `hasBranchRow: true`).
 - Add `mayCreateInternalNodes: true` (when `rOut > 0`, `setup()` calls `ctx.makeVolt`).
 - Leave `ngspiceNodeMap` undefined on the composite `ComponentDefinition`.
-- `defaultModel: "behavioral"` remains for initial placement only.
+- Set `defaultModel: "behavioral"`.
 
 ## VCVS TSTALLOC sequence (vcvsset.c:53-58) — for stamp-order verification
 
@@ -132,9 +139,16 @@ When `vcvs1.setup(ctx)` runs with nodes `(ctrl+, ctrl-, out+, out-)` = `(inP, in
 
 Branch row allocated via `ctx.makeCur(label+"_vcvs1", "branch")` before TSTALLOC.
 
+## Pre-implementation checklist (W3 implementer)
+
+1. Run `npm run test:q -- opamp` — capture baseline pass/fail counts.
+2. Identify any `expect(vOut).toBeCloseTo(...)` assertions for circuits with non-trivial load at `out`. The 75Ω rOut may shift these by `75Ω * loadCurrent`.
+3. After implementation, re-run; report any new failures for user review. Do NOT silently update assertions to match new behavior — escalate.
+
 ## Verification gate
 
-1. `setup-stamp-order.test.ts` row for PB-OPAMP is GREEN.
+1. `setup-stamp-order.test.ts` row for PB-OPAMP is GREEN (stamp order: when rOut > 0, RES 4 entries followed by VCVS 6 entries; when rOut == 0, just VCVS 6 entries).
 2. `src/components/active/__tests__/opamp.test.ts` is GREEN.
+   - **Setup-mocking removal**: the implementer MUST audit the test file for any pattern that fakes the migrated `setup()` process (e.g., manually constructing element handles, stub solver objects that bypass the real allocation path, or directly calling `load()` without going through `_setup()` first). Every such pattern MUST be replaced with the real path: instantiate the element via its factory, call `_setup()` on the engine to allocate handles, then exercise `load()`/`accept()`. Tests that pass only because they bypass the new setup contract are NOT a valid GREEN signal — those tests are themselves a defect to be fixed in this same task.
 3. The pin-map-coverage test allows the composite to lack `ngspiceNodeMap`.
 4. No banned closing verdicts.

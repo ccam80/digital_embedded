@@ -24,7 +24,7 @@ It decomposes into 2× DIO sub-elements (antiparallel, both with breakdown).
 | Label | `${parentLabel}#D_fwd` |
 | Anode (`DIOposNode`) | `pinNodes.get("A")!` |
 | Cathode (`DIOnegNode`) | `pinNodes.get("B")!` |
-| `ngspiceNodeMap` | `{ A: "pos", K: "neg" }` (A=anode maps to pos, B=cathode maps to neg) |
+| `ngspiceNodeMap` | `{ A: "pos", B: "neg" }` (A=anode maps to pos, B=cathode maps to neg) |
 | Breakdown enabled | Yes — `BV` set to DIAC breakover voltage (e.g. 30 V) |
 | `RS` | As per DIAC model (small series resistance) |
 
@@ -36,7 +36,7 @@ It decomposes into 2× DIO sub-elements (antiparallel, both with breakdown).
 | Label | `${parentLabel}#D_rev` |
 | Anode (`DIOposNode`) | `pinNodes.get("B")!` |
 | Cathode (`DIOnegNode`) | `pinNodes.get("A")!` |
-| `ngspiceNodeMap` | `{ A: "pos", K: "neg" }` (B=anode maps to pos, A=cathode maps to neg) |
+| `ngspiceNodeMap` | `{ B: "pos", A: "neg" }` (B=anode maps to pos, A=cathode maps to neg) |
 | Breakdown enabled | Yes — same `BV` as D_fwd |
 | `RS` | Same as D_fwd |
 
@@ -60,6 +60,32 @@ Each sub-element may create one internal node when its `RS ≠ 0`:
 
 Managed by each sub-element's own `setup()` — the parent DIAC composite does
 not call `ctx.makeVolt()` directly.
+
+### RS=0 alias rule (per ngspice `dio/diosetup.c:204-208`)
+
+When the diode model has `RS = 0`, ngspice sets `DIOposPrimeNode = DIOposNode`
+directly — no internal node is allocated via `CKTmkVolt`. When `RS > 0` (and
+`DIOposPrimeNode == 0`, i.e. not yet allocated), ngspice calls
+`CKTmkVolt(ckt, &tmp, here->DIOname, "internal")` to create a private internal
+node and stores its number on `DIOposPrimeNode`.
+
+Translation to digiTS for D_fwd / D_rev sub-elements:
+
+- If `this._params.RS === 0`: skip the `ctx.makeVolt(this._label, "posPrime")`
+  call. Set `this._posPrimeNode = posNode` (the external positive pin's node
+  ID, taken from `pinNodes.get("A")` for D_fwd or `pinNodes.get("B")` for
+  D_rev). The 4 TSTALLOC entries that reference posPrimeNode then degenerate:
+  `(posPrime, posPrime) → (pos, pos)`, `(posPrime, neg) → (pos, neg)`,
+  `(pos, posPrime) → (pos, pos)`, `(neg, posPrime) → (neg, pos)`. The two
+  `(pos, pos)` entries collapse to the same handle (`allocElement` is
+  idempotent on identical row/col pairs per 00-engine.md §A6 — confirm with
+  the engine spec).
+- If `this._params.RS > 0`: call
+  `this._posPrimeNode = ctx.makeVolt(this._label, "posPrime")` and allocate
+  the full TSTALLOC sequence with the distinct internal node.
+
+The setup() body code block (if present) for each sub-element branches on
+`RS === 0` and emits the appropriate alloc sequence.
 
 ## Branch rows
 
@@ -145,7 +171,6 @@ Not applicable.
 
 - Drop `internalNodeIds`, `branchIdx` from factory.
 - Drop `branchCount`, `getInternalNodeCount` from MnaModel.
-- Add `hasBranchRow: false`.
 - Add `mayCreateInternalNodes: true` (sub-elements may create internal nodes).
 - Composite does not carry `ngspiceNodeMap` — sub-elements carry their own.
 
@@ -153,4 +178,5 @@ Not applicable.
 
 1. `setup-stamp-order.test.ts` row for PB-DIAC is GREEN (verifies D_fwd then D_rev TSTALLOC order).
 2. `src/components/semiconductors/__tests__/diac.test.ts` is GREEN.
+   - **Setup-mocking removal**: the implementer MUST audit the test file for any pattern that fakes the migrated `setup()` process (e.g., manually constructing element handles, stub solver objects that bypass the real allocation path, or directly calling `load()` without going through `_setup()` first). Every such pattern MUST be replaced with the real path: instantiate the element via its factory, call `_setup()` on the engine to allocate handles, then exercise `load()`/`accept()`. Tests that pass only because they bypass the new setup contract are NOT a valid GREEN signal — those tests are themselves a defect to be fixed in this same task.
 3. No banned closing verdicts.

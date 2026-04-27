@@ -68,11 +68,13 @@ No `allocElement` calls remain in load() after migration.
 
 Total matrix entries added by setup(): up to 2 (one for output pin, one for LED diode anode diagonal).
 
+The `if (nodeCathode > 0)` guard is required because ButtonLED's cathode is structurally allowed to be ground (and is, in the current implementation). Per BATCH1-D2 Option C (engine spec §A6.6), shunt-to-ground-possible elements MUST guard their allocElement calls. This guard is not optional and is not removable in future variants.
+
 ## Factory cleanup
 
 - Drop `internalNodeIds`, `branchIdx` parameters from factory signature (new 3-param form per A6.3).
 - `ngspiceNodeMap` left undefined (behavioral — per 02-behavioral.md §Pin-map field).
-- `hasBranchRow: false`, `mayCreateInternalNodes: false`.
+- `mayCreateInternalNodes: false`.
 - No `findBranchFor` callback.
 
 ## State pool
@@ -81,11 +83,12 @@ The current implementation returns a plain `AnalogElementCore` — no `poolBacke
 
 ## Dependency on SEVENSEG migration
 
-`SegmentDiodeElement.setup()` is defined once inside `createSegmentDiodeElement` in `behavioral-remaining.ts`. The SEVENSEG migration task adds that method. ButtonLED uses the same helper, so the SEVENSEG agent's work on `createSegmentDiodeElement` covers ButtonLED's LED diode automatically. The ButtonLED agent must confirm `createSegmentDiodeElement` has a `setup(ctx)` method before marking GREEN.
+**Dependency on createSegmentDiodeElement.setup()**: the helper's `setup()` body lands in W2 per W2.6 (see plan.md §"Wave plan" and 00-engine.md §A3.2). The PB-BEHAV-BUTTONLED W3 task does NOT write the helper — it only confirms the helper has a `setup` property. This eliminates the previously-documented race with PB-BEHAV-SEVENSEG.
 
 ## Verification gate
 
 1. Existing test file `src/solver/analog/__tests__/behavioral-remaining.test.ts` is GREEN.
+- **Setup-mocking removal**: the implementer MUST audit the test file for any pattern that fakes the migrated `setup()` process (e.g., manually constructing element handles, stub solver objects that bypass the real allocation path, or directly calling `load()` without going through `_setup()` first). Every such pattern MUST be replaced with the real path: instantiate the element via its factory, call `_setup()` on the engine to allocate handles, then exercise `load()`/`accept()`. Tests that pass only because they bypass the new setup contract are NOT a valid GREEN signal — those tests are themselves a defect to be fixed in this same task.
 2. No `allocElement` call in load() body. Verified by: `Grep "allocElement" src/solver/analog/behavioral-remaining.ts` returns only matches inside `setup()` method bodies.
 3. `setup()` forward order is output pin → LED diode (Shape rule 8).
 4. `SegmentDiodeElement.setup()` exists (dependency on SEVENSEG migration).

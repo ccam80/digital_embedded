@@ -114,7 +114,7 @@ None.
 `bjtdefs.h:313`.
 
 ```ts
-this._stateOffset = ctx.allocStates(24);
+this._stateBase = ctx.allocStates(24);
 ```
 
 ## TSTALLOC sequence (line-for-line port)
@@ -172,7 +172,7 @@ setup(ctx: SetupContext): void {
   const model    = this._model;
 
   // State slots — bjtsetup.c:366-367
-  this._stateOffset = ctx.allocStates(24);
+  this._stateBase = ctx.allocStates(24);
 
   // Internal nodes — bjtsetup.c:372-428
   this._colPrimeNode  = (model.RC === 0) ? colNode  : ctx.makeVolt(this.label, "collector");
@@ -203,7 +203,7 @@ setup(ctx: SetupContext): void {
   this._hBPBP = solver.allocElement(bp,       bp);      // (17)
   this._hEPEP = solver.allocElement(ep,       ep);      // (18)
 
-  // Substrate stamps — bjtsetup.c:453 (entries 19-21, substNode=0)
+  // Substrate stamps — bjtsetup.c:453 (entry 19), :461-462 (entries 20-21, substNode=0)
   this._hSS   = solver.allocElement(substNode, substNode); // (19)
   // Substrate alias — bjtsetup.c:454-460
   let sc: number;
@@ -229,6 +229,8 @@ setup(ctx: SetupContext): void {
 Implementer ports value-side from `ref/ngspice/src/spicelib/devices/bjt/bjtload.c`
 line-for-line, stamping through cached handles. No allocElement calls.
 
+- Preserve multiplicity scaling: all current and conductance stamps are multiplied by the instance `M` parameter (default 1.0). ngspice anchor: `dioload.c` / `mos1load.c` / `bjtload.c` / `jfetload.c` use `here->{DIO|MOS1|BJT|JFET}m` for this scaling. The instance `M` parameter is partition: "instance" per the in-progress phase-instance-vs-model-param-partition work.
+
 ## findBranchFor (if applicable)
 
 Not applicable. BJT has no branch row.
@@ -237,7 +239,6 @@ Not applicable. BJT has no branch row.
 
 - Drop `internalNodeIds`, `branchIdx` from factory.
 - Drop `branchCount`, `getInternalNodeCount` from MnaModel.
-- Add `hasBranchRow: false`.
 - Add `mayCreateInternalNodes: true`.
 - Add `ngspiceNodeMap: { B: "base", C: "col", E: "emit" }`.
 
@@ -246,4 +247,5 @@ Not applicable. BJT has no branch row.
 1. `setup-stamp-order.test.ts` row for PB-BJT is GREEN (covers both NPN and PNP
    — same stamp sequence, same node order).
 2. `src/components/semiconductors/__tests__/bjt.test.ts` is GREEN.
+   - **Setup-mocking removal**: the implementer MUST audit the test file for any pattern that fakes the migrated `setup()` process (e.g., manually constructing element handles, stub solver objects that bypass the real allocation path, or directly calling `load()` without going through `_setup()` first). Every such pattern MUST be replaced with the real path: instantiate the element via its factory, call `_setup()` on the engine to allocate handles, then exercise `load()`/`accept()`. Tests that pass only because they bypass the new setup contract are NOT a valid GREEN signal — those tests are themselves a defect to be fixed in this same task.
 3. No banned closing verdicts.

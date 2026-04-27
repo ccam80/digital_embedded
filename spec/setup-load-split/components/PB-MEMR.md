@@ -13,7 +13,7 @@
 | `A` | `pinNodes.get("A")` | `RESposNode` |
 | `B` | `pinNodes.get("B")` | `RESnegNode` |
 
-**Implementation note:** `01-pin-mapping.md` describes the memristor as "1× VCCS (state-dependent g)". The actual implementation in `memristor.ts` is a direct conductance stamp (four `stampG` calls in `load()`), structurally identical to a RES with a dynamically computed conductance `G(w)`. This is the correct pattern — there is no VCCS sub-element in the implementation. The setup pattern follows `ressetup.c:46-49` (the RES TSTALLOC sequence), not `vccssetup.c`. The W3 implementer should use the actual code as the reference, not the 01-pin-mapping.md VCCS description.
+**Note for coordinator:** `01-pin-mapping.md` describes the memristor as "1× VCCS (state-dependent g)" but the correct pattern is 1× RES (state-dependent G). The TSTALLOC table above gives the correct RES sequence. `01-pin-mapping.md` may need to be corrected separately to change MEMR from 1× VCCS to 1× RES (state-dependent G). Coordinator should flag this for separate fix.
 
 ## Internal nodes
 
@@ -47,8 +47,8 @@ Total: 4 TSTALLOC entries (matching ressetup.c:46-49 exactly; subject to ground-
 ```ts
 setup(ctx: SetupContext): void {
   const solver = ctx.solver;
-  const aNode = this.pinNodeIds[0];  // A pin — RESposNode
-  const bNode = this.pinNodeIds[1];  // B pin — RESnegNode
+  const aNode = this._pinNodes.get("A")!;  // A pin — RESposNode
+  const bNode = this._pinNodes.get("B")!;  // B pin — RESnegNode
 
   // ressetup.c:46-49 — TSTALLOC sequence, line-for-line.
   if (aNode !== 0) this._hPP = solver.allocElement(aNode, aNode);
@@ -68,7 +68,7 @@ private _hPN: number = -1;
 private _hNP: number = -1;
 ```
 
-**Note on pinNodeIds:** The current `MemristorElement` has `pinNodeIds!: readonly number[]` (non-null asserted, set via `Object.assign` after factory returns). After migration, the factory receives `pinNodes: ReadonlyMap<string, number>` and sets `pinNodeIds = [pinNodes.get("A")!, pinNodes.get("B")!]` directly in the constructor or factory. The `setup()` reads from `this.pinNodeIds[0]` and `this.pinNodeIds[1]` as normal.
+**Note on _pinNodes:** The current `MemristorElement` has `pinNodeIds!: readonly number[]` (non-null asserted, set via `Object.assign` after factory returns). After migration, the factory receives `pinNodes: ReadonlyMap<string, number>` and stores it as `this._pinNodes = pinNodes` directly in the constructor. The `setup()` reads from `this._pinNodes.get("A")!` and `this._pinNodes.get("B")!` as shown above.
 
 ## load() body — value writes only
 
@@ -87,7 +87,6 @@ No `solver.allocElement` calls in `load()`. The `accept()` method (Euler forward
 - Drop `internalNodeIds` and `branchIdx` parameters from `createMemristorElement` factory signature (per A6.3). The current factory already ignores them (`_internalNodeIds`, `_branchIdx`).
 - Add `pinNodes` usage: construct `MemristorElement` with `pinNodeIds = [pinNodes.get("A")!, pinNodes.get("B")!]` set at construction time rather than via `Object.assign`.
 - No `branchCount` existed on this `modelRegistry` entry — no removal needed.
-- Add `hasBranchRow: false` to `MnaModel` registration.
 - `mayCreateInternalNodes` omitted.
 - Add `ngspiceNodeMap: { A: "pos", B: "neg" }` to `ComponentDefinition`.
 - No `findBranchFor` callback (no branch row).
@@ -96,4 +95,5 @@ No `solver.allocElement` calls in `load()`. The `accept()` method (Euler forward
 
 1. `setup-stamp-order.test.ts` row for PB-MEMR is GREEN (insertion order: PP, NN, PN, NP = 4 total; ground-skip applied when either pin is ground).
 2. Memristor test file (if it exists) is GREEN.
+   - **Setup-mocking removal**: the implementer MUST audit the test file for any pattern that fakes the migrated `setup()` process (e.g., manually constructing element handles, stub solver objects that bypass the real allocation path, or directly calling `load()` without going through `_setup()` first). Every such pattern MUST be replaced with the real path: instantiate the element via its factory, call `_setup()` on the engine to allocate handles, then exercise `load()`/`accept()`. Tests that pass only because they bypass the new setup contract are NOT a valid GREEN signal — those tests are themselves a defect to be fixed in this same task.
 3. No banned closing verdicts (mapping/tolerance/equivalent-to/pre-existing/intentional-divergence) used in any commit message or report.

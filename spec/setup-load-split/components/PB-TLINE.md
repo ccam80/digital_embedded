@@ -1,147 +1,211 @@
-# Task PB-TLINE
+# Task PB-TLINE — Ideal lossless transmission line
 
 **digiTS file:** `src/components/passives/transmission-line.ts`
 **ngspice setup anchor:** `ref/ngspice/src/spicelib/devices/tra/trasetup.c:37-92`
 **ngspice load anchor:** `ref/ngspice/src/spicelib/devices/tra/traload.c`
 
-## Pin mapping (from 01-pin-mapping.md)
+## Architecture
 
-`ngspiceNodeMap = { P1a: "posNode1", P1b: "negNode1", P2a: "posNode2", P2b: "negNode2" }`.
+This component is a flat element (no composite sub-elements). It directly ports the ngspice ideal
+lossless TRA primitive from `trasetup.c`. The previous lumped RLCG segmented model is removed in
+its entirety. Any circuits using the old lossy-line behavior will lose that capability; a separate
+`transmission-line-lossy` component would be needed for lossy-line modeling (not in this scope).
 
-| digiTS pin label | pinNodes key | ngspice node variable |
+## Pin layout
+
+4 pins, matching ngspice TRA node names:
+
+| digiTS pin label | ngspiceNodeMap key | ngspice variable |
 |---|---|---|
-| `P1a` | `pinNodes.get("P1a")` | `TRAposNode1` |
-| `P1b` | `pinNodes.get("P1b")` | `TRAnegNode1` |
-| `P2a` | `pinNodes.get("P2a")` | `TRAposNode2` |
-| `P2b` | `pinNodes.get("P2b")` | `TRAnegNode2` |
+| `inP` | `pos1` | `TRAposNode1` |
+| `inN` | `neg1` | `TRAnegNode1` |
+| `outP` | `pos2` | `TRAposNode2` |
+| `outN` | `neg2` | `TRAnegNode2` |
 
-**Note on pin layout vs ngspice anchor:** The digiTS transmission line uses a lumped RLCG model (N cascaded segments) rather than the ngspice ideal lossless TRA model. The ngspice `trasetup.c` anchor provides the reference for the TSTALLOC ordering for a single ideal segment. The digiTS composite creates `N` segments with internal nodes per segment, each following the inductor TSTALLOC pattern internally. See the Port Error note below.
+```ts
+ngspiceNodeMap = { inP: "pos1", inN: "neg1", outP: "pos2", outN: "neg2" }
+```
 
-## Port Error
+## Sub-elements
 
-**Structural divergence from ngspice TRA model that must be escalated before W3 implementation proceeds:**
+NONE. This is a flat element; all handles owned directly.
 
-The digiTS `TransmissionLineElement` is a lumped RLCG model (N cascaded RLC segments), not an ideal lossless transmission line as implemented by `trasetup.c`. The ngspice TRA model:
-- Allocates exactly 4 internal nodes (`TRAbrEq1`, `TRAbrEq2`, `TRAintNode1`, `TRAintNode2`) regardless of length or parameters (trasetup.c:37-59).
-- Uses 22 unconditional TSTALLOC stamps (trasetup.c:71-92).
-- The TSTALLOC sequence is fixed and paramater-independent.
+## Internal nodes (trasetup.c:37-59)
 
-The digiTS model:
-- Allocates `2*(N-1)` internal nodes and `N` branch rows, where `N = segments` parameter (default 10).
-- Each of the N inductor sub-elements has 5 TSTALLOC stamps (following indsetup.c:96-100).
-- Each of the N-1 capacitor sub-elements has 4 TSTALLOC stamps (following capsetup.c:114-117).
-- The total TSTALLOC count is `5*N + 4*(N-1)` = `9N - 4`, which for N=10 is 86 stamps.
-- This is architecturally different from trasetup.c's 22 stamps.
+4 internal nodes, allocated with `CKTmkVolt` in `setup()`:
 
-**Consequence for setup-stamp-order.test.ts:** The test row for PB-TLINE cannot assert a fixed 22-entry sequence matching trasetup.c lines 71-92. The correct assertion is: per-sub-element ordering is maintained (each SegmentInductorElement follows indsetup.c:96-100; each SegmentCapacitorElement follows capsetup.c:114-117), with the sub-elements stamped in segment order (R₀, L₀, G₀/C₀, R₁, L₁, G₁/C₁, ..., RL_{N-1}).
+| digiTS name | ngspice variable | trasetup.c line | Allocation call |
+|---|---|---|---|
+| `_brEq1` | `TRAbrEq1` | 38-41 | `ctx.makeCur(label, "i1")` |
+| `_brEq2` | `TRAbrEq2` | 43-46 | `ctx.makeCur(label, "i2")` |
+| `_intNode1` | `TRAintNode1` | 48-51 | `ctx.makeVolt(label, "int1")` |
+| `_intNode2` | `TRAintNode2` | 53-56 | `ctx.makeVolt(label, "int2")` |
 
-**This divergence is architectural and must be recorded in `spec/architectural-alignment.md` before any W3 agent implements PB-TLINE.** Do not proceed with implementation without user approval of the architectural record. The user action required: add an entry to `spec/architectural-alignment.md` documenting that digiTS uses lumped RLCG (N segments) instead of the ideal lossless TRA model, with the explicit ngspice file (`trasetup.c`), the digiTS file (`transmission-line.ts`), and the quantity difference (22 fixed stamps vs 9N-4 parameterized stamps).
-
----
-
-The following sections document what the setup() body WOULD look like for the lumped model, assuming the architectural divergence is approved.
-
-## Internal nodes
-
-For N segments, `2*(N-1)` internal nodes:
-- `rlMid[k]` for k=0..N-2: RL mid-nodes (between series R and series L in each non-final segment)
-- `junc[k]` for k=0..N-2: junction nodes (output of each non-final segment's L, where shunt G/C attach)
-
-Allocated in `setup()` via `N-1` calls to `ctx.makeVolt(label, "rlMid{k}")` and `N-1` calls to `ctx.makeVolt(label, "junc{k}")`.
-
-## Branch rows
-
-N branch rows (one per inductor sub-element), allocated via `ctx.makeCur(label, "ibr{k}")` for k=0..N-1.
+Note: ngspice uses `CKTmkVolt` for all four (the "branch" rows `TRAbrEq1`/`TRAbrEq2` are voltage
+nodes in the ngspice TRA formulation, allocated via `CKTmkVolt` with suffixes `"i1"` and `"i2"`).
+digiTS maps them as `ctx.makeCur` calls since they function as branch rows in the MNA sense.
 
 ## State slots
 
-State slots allocated per reactive sub-element:
-- Each `SegmentInductorElement`: `ctx.allocStates(2)` (PHI + CCAP, per indsetup.c:78-79)
-- Each `SegmentCapacitorElement`: `ctx.allocStates(2)` (Q + CCAP, per capsetup.c:102-103)
-- Each `CombinedRLElement`: `ctx.allocStates(2)` (PHI + CCAP)
+Per `trasetup.c`: the TRA model allocates a delay table (`here->TRAdelays = TMALLOC(double, 15)`)
+at trasetup.c:62-63 rather than using the standard `*states` mechanism. The digiTS port allocates
+a delay buffer of 15 doubles via `ctx.allocStates(15)` to maintain the same per-instance storage.
+State offset stored in `_stateBase`.
 
-Total: `2*N + 2*(N-1)` = `4N - 2` state slots for N=10: 38 slots.
+## TSTALLOC sequence (22 entries — trasetup.c:71-92, line-for-line)
 
-## TSTALLOC sequence (line-for-line port)
+All 22 entries are unconditional. Node abbreviations: `b1`=`_brEq1`, `b2`=`_brEq2`,
+`n1`=`_intNode1`, `n2`=`_intNode2`, `p1`=`inP pin node`, `q1`=`inN pin node`,
+`p2`=`outP pin node`, `q2`=`outN pin node`.
 
-Per-sub-element ordering, in segment iteration order k=0..N-1:
+| # | trasetup.c line | ngspice pair | digiTS pair | handle field |
+|---|---|---|---|---|
+| 1 | 71 | `(TRAbrEq1, TRAbrEq2)` | `(_brEq1, _brEq2)` | `_hIbr1Ibr2` |
+| 2 | 72 | `(TRAbrEq1, TRAintNode1)` | `(_brEq1, _intNode1)` | `_hIbr1Int1` |
+| 3 | 73 | `(TRAbrEq1, TRAnegNode1)` | `(_brEq1, inN)` | `_hIbr1Neg1` |
+| 4 | 74 | `(TRAbrEq1, TRAnegNode2)` | `(_brEq1, outN)` | `_hIbr1Neg2` |
+| 5 | 75 | `(TRAbrEq1, TRAposNode2)` | `(_brEq1, outP)` | `_hIbr1Pos2` |
+| 6 | 76 | `(TRAbrEq2, TRAbrEq1)` | `(_brEq2, _brEq1)` | `_hIbr2Ibr1` |
+| 7 | 77 | `(TRAbrEq2, TRAintNode2)` | `(_brEq2, _intNode2)` | `_hIbr2Int2` |
+| 8 | 78 | `(TRAbrEq2, TRAnegNode1)` | `(_brEq2, inN)` | `_hIbr2Neg1` |
+| 9 | 79 | `(TRAbrEq2, TRAnegNode2)` | `(_brEq2, outN)` | `_hIbr2Neg2` |
+| 10 | 80 | `(TRAbrEq2, TRAposNode1)` | `(_brEq2, inP)` | `_hIbr2Pos1` |
+| 11 | 81 | `(TRAintNode1, TRAbrEq1)` | `(_intNode1, _brEq1)` | `_hInt1Ibr1` |
+| 12 | 82 | `(TRAintNode1, TRAintNode1)` | `(_intNode1, _intNode1)` | `_hInt1Int1` |
+| 13 | 83 | `(TRAintNode1, TRAposNode1)` | `(_intNode1, inP)` | `_hInt1Pos1` |
+| 14 | 84 | `(TRAintNode2, TRAbrEq2)` | `(_intNode2, _brEq2)` | `_hInt2Ibr2` |
+| 15 | 85 | `(TRAintNode2, TRAintNode2)` | `(_intNode2, _intNode2)` | `_hInt2Int2` |
+| 16 | 86 | `(TRAintNode2, TRAposNode2)` | `(_intNode2, outP)` | `_hInt2Pos2` |
+| 17 | 87 | `(TRAnegNode1, TRAbrEq1)` | `(inN, _brEq1)` | `_hNeg1Ibr1` |
+| 18 | 88 | `(TRAnegNode2, TRAbrEq2)` | `(outN, _brEq2)` | `_hNeg2Ibr2` |
+| 19 | 89 | `(TRAposNode1, TRAintNode1)` | `(inP, _intNode1)` | `_hPos1Int1` |
+| 20 | 90 | `(TRAposNode1, TRAposNode1)` | `(inP, inP)` | `_hPos1Pos1` |
+| 21 | 91 | `(TRAposNode2, TRAintNode2)` | `(outP, _intNode2)` | `_hPos2Int2` |
+| 22 | 92 | `(TRAposNode2, TRAposNode2)` | `(outP, outP)` | `_hPos2Pos2` |
 
-**For segment k < N-1** (non-final segments):
-
-SegmentResistorElement (k) — ressetup.c:46-49 pattern (inputNode ↔ rlMid[k]):
-| `(inputNode, inputNode)` | `_hR[k]_PP` |
-| `(rlMid[k], rlMid[k])` | `_hR[k]_NN` |
-| `(inputNode, rlMid[k])` | `_hR[k]_PN` |
-| `(rlMid[k], inputNode)` | `_hR[k]_NP` |
-
-SegmentInductorElement (k) — indsetup.c:96-100 pattern (rlMid[k] ↔ junc[k], ibr[k]):
-| `(rlMid[k], ibr[k])` | `_hL[k]_PIbr` |
-| `(junc[k], ibr[k])` | `_hL[k]_NIbr` |
-| `(ibr[k], junc[k])` | `_hL[k]_IbrN` |
-| `(ibr[k], rlMid[k])` | `_hL[k]_IbrP` |
-| `(ibr[k], ibr[k])` | `_hL[k]_IbrIbr` |
-
-SegmentCapacitorElement (k) — capsetup.c:114-117 pattern (junc[k] ↔ gnd=0):
-| `(junc[k], junc[k])` | `_hC[k]_PP` |
-(ground-skipped entries omitted; junc[k]↔0 means only the (junc[k],junc[k]) entry is non-ground)
-
-**For segment N-1** (final segment — CombinedRLElement):
-
-CombinedRLElement — indsetup.c:96-100 pattern (junc[N-2] ↔ port2, ibr[N-1]):
-| `(junc[N-2], ibr[N-1])` | `_hCRL_PIbr` |
-| `(port2, ibr[N-1])` | `_hCRL_NIbr` |
-| `(ibr[N-1], junc[N-2])` | `_hCRL_IbrP` |
-| `(ibr[N-1], port2)` | `_hCRL_IbrN` |
-| `(ibr[N-1], ibr[N-1])` | `_hCRL_IbrIbr` |
-
-## setup() body — alloc only
+## setup() body
 
 ```ts
 setup(ctx: SetupContext): void {
   const solver = ctx.solver;
-  const port1 = pinNodes.get("P1b")!;  // TRAnegNode1 (digiTS: positive rail port 1)
-  const port2 = pinNodes.get("P2b")!;  // TRAnegNode2 (digiTS: positive rail port 2)
-  const N = this._segments;
+  const inP  = this._pinNodes.get("inP")!;   // TRAposNode1
+  const inN  = this._pinNodes.get("inN")!;   // TRAnegNode1
+  const outP = this._pinNodes.get("outP")!;  // TRAposNode2
+  const outN = this._pinNodes.get("outN")!;  // TRAnegNode2
 
-  // Allocate internal nodes: rlMid[0..N-2] then junc[0..N-2]
-  // trasetup.c:49-59 pattern (CKTmkVolt for internal nodes).
-  const rlMidNodes: number[] = [];
-  const juncNodes: number[] = [];
-  for (let k = 0; k < N - 1; k++) {
-    rlMidNodes.push(ctx.makeVolt(this._label, `rlMid${k}`));
-    juncNodes.push(ctx.makeVolt(this._label, `junc${k}`));
+  // trasetup.c:37-59 — allocate 4 internal nodes (idempotent guards)
+  if (this._brEq1 === 0) {
+    this._brEq1 = ctx.makeCur(this._label, "i1");
+  }
+  if (this._brEq2 === 0) {
+    this._brEq2 = ctx.makeCur(this._label, "i2");
+  }
+  if (this._intNode1 === 0) {
+    this._intNode1 = ctx.makeVolt(this._label, "int1");
+  }
+  if (this._intNode2 === 0) {
+    this._intNode2 = ctx.makeVolt(this._label, "int2");
   }
 
-  // Allocate branch rows and matrix elements for each sub-element.
-  // indsetup.c:78-88 / capsetup.c:102-103 patterns applied per sub-element.
-  for (let k = 0; k < N; k++) {
-    const inputNode = k === 0 ? port1 : juncNodes[k - 1];
-    const brIdx = ctx.makeCur(this._label, `ibr${k}`);
-    this._subElements[k].setup(ctx);  // delegates to sub-element's own setup()
-  }
+  // trasetup.c:62-63 — delay table (15 doubles)
+  this._stateBase = ctx.allocStates(15);
 
-  // State slot allocation happens inside each sub-element's setup() call.
+  const b1 = this._brEq1;
+  const b2 = this._brEq2;
+  const n1 = this._intNode1;
+  const n2 = this._intNode2;
+
+  // trasetup.c:71-92 — 22 unconditional TSTALLOC calls, line-for-line
+  this._hIbr1Ibr2 = solver.allocElement(b1, b2);   // line 71
+  this._hIbr1Int1 = solver.allocElement(b1, n1);   // line 72
+  this._hIbr1Neg1 = solver.allocElement(b1, inN);  // line 73
+  this._hIbr1Neg2 = solver.allocElement(b1, outN); // line 74
+  this._hIbr1Pos2 = solver.allocElement(b1, outP); // line 75
+  this._hIbr2Ibr1 = solver.allocElement(b2, b1);   // line 76
+  this._hIbr2Int2 = solver.allocElement(b2, n2);   // line 77
+  this._hIbr2Neg1 = solver.allocElement(b2, inN);  // line 78
+  this._hIbr2Neg2 = solver.allocElement(b2, outN); // line 79
+  this._hIbr2Pos1 = solver.allocElement(b2, inP);  // line 80
+  this._hInt1Ibr1 = solver.allocElement(n1, b1);   // line 81
+  this._hInt1Int1 = solver.allocElement(n1, n1);   // line 82
+  this._hInt1Pos1 = solver.allocElement(n1, inP);  // line 83
+  this._hInt2Ibr2 = solver.allocElement(n2, b2);   // line 84
+  this._hInt2Int2 = solver.allocElement(n2, n2);   // line 85
+  this._hInt2Pos2 = solver.allocElement(n2, outP); // line 86
+  this._hNeg1Ibr1 = solver.allocElement(inN, b1);  // line 87
+  this._hNeg2Ibr2 = solver.allocElement(outN, b2); // line 88
+  this._hPos1Int1 = solver.allocElement(inP, n1);  // line 89
+  this._hPos1Pos1 = solver.allocElement(inP, inP); // line 90
+  this._hPos2Int2 = solver.allocElement(outP, n2); // line 91
+  this._hPos2Pos2 = solver.allocElement(outP, outP); // line 92
 }
 ```
 
-Note: The composite forwards `setup(ctx)` to each sub-element in order. Each `SegmentInductorElement`, `SegmentCapacitorElement`, and `CombinedRLElement` implements its own `setup()` following the patterns specified in PB-IND and PB-CAP respectively.
+Fields to add to element class:
+```ts
+private _brEq1:    number = 0;
+private _brEq2:    number = 0;
+private _intNode1: number = 0;
+private _intNode2: number = 0;
+private _stateBase: number = -1;
+private _hIbr1Ibr2: number = -1;
+private _hIbr1Int1: number = -1;
+private _hIbr1Neg1: number = -1;
+private _hIbr1Neg2: number = -1;
+private _hIbr1Pos2: number = -1;
+private _hIbr2Ibr1: number = -1;
+private _hIbr2Int2: number = -1;
+private _hIbr2Neg1: number = -1;
+private _hIbr2Neg2: number = -1;
+private _hIbr2Pos1: number = -1;
+private _hInt1Ibr1: number = -1;
+private _hInt1Int1: number = -1;
+private _hInt1Pos1: number = -1;
+private _hInt2Ibr2: number = -1;
+private _hInt2Int2: number = -1;
+private _hInt2Pos2: number = -1;
+private _hNeg1Ibr1: number = -1;
+private _hNeg2Ibr2: number = -1;
+private _hPos1Int1: number = -1;
+private _hPos1Pos1: number = -1;
+private _hPos2Int2: number = -1;
+private _hPos2Pos2: number = -1;
+```
 
-## load() body — value writes only
+## load() body
 
-Implementer ports value-side equations from `ref/ngspice/src/spicelib/devices/tra/traload.c` (ideal TRA reference) and `ref/ngspice/src/spicelib/devices/ind/indload.c` / `ref/ngspice/src/spicelib/devices/cap/capload.c` (for RLCG sub-elements), stamping through cached handles only. No `solver.allocElement` calls.
+Implementer ports value-side equations from `ref/ngspice/src/spicelib/devices/tra/traload.c`
+line-for-line, stamping through the 22 cached handles only. No `solver.allocElement` calls.
+
+The TRA load uses a history-based (method-of-characteristics) formulation: the delayed voltage and
+current at one port drive the other. The delay table (`_stateBase` buffer) stores past port
+values at discrete time points for interpolation.
 
 ## Factory cleanup
 
-- Drop `internalNodeIds`, `branchIdx` parameters from `createTransmissionLineElement` factory signature (per A6.3). Internal nodes and branch rows allocated in `setup()`.
-- Remove `branchCount`, `getInternalNodeCount`, `getInternalNodeLabels` from `MnaModel` registration (per A6.2).
-- Add `hasBranchRow: true` (N branch rows per instance).
-- Add `mayCreateInternalNodes: true`.
-- The `ComponentDefinition` leaves `ngspiceNodeMap` undefined (composite decomposes — sub-elements carry their own maps per segment).
-- No `findBranchFor` callback needed at the composite level (sub-element inductors expose their own `findBranchFor` via the sub-element registry if needed).
+- Pin labels renamed from `P1a`/`P1b`/`P2a`/`P2b` to `inP`/`inN`/`outP`/`outN`.
+- `ngspiceNodeMap: { inP: "pos1", inN: "neg1", outP: "pos2", outN: "neg2" }` added to
+  `ComponentDefinition`.
+- Drop `internalNodeIds`, `branchIdx`, `segments` parameters from factory signature.
+- Drop `branchCount`, `getInternalNodeCount`, `getInternalNodeLabels` from `MnaModel`.
+- Add `mayCreateInternalNodes: true` (four nodes allocated in `setup()`).
+- No `findBranchFor` callback (TRA does not appear as a sense element for CCCS/CCVS in standard
+  usage).
 
 ## Verification gate
 
-1. `setup-stamp-order.test.ts` row for PB-TLINE is GREEN (per-sub-element ordering verified for N=2 minimal case).
-2. Transmission line test file is GREEN.
-3. No banned closing verdicts (mapping/tolerance/equivalent-to/pre-existing/intentional-divergence) used in any commit message or report.
-4. **Prerequisite:** Architectural divergence entry exists in `spec/architectural-alignment.md` before implementation begins.
+1. `src/components/passives/__tests__/transmission-line.test.ts` is GREEN. The test must be
+   rewritten to match ideal-TRA behavior (delay-based port equations from `traload.c`); the old
+   lumped RLCG assertions are removed with the old model.
+   - **Setup-mocking removal**: the implementer MUST audit the test file for any pattern that fakes the migrated `setup()` process (e.g., manually constructing element handles, stub solver objects that bypass the real allocation path, or directly calling `load()` without going through `_setup()` first). Every such pattern MUST be replaced with the real path: instantiate the element via its factory, call `_setup()` on the engine to allocate handles, then exercise `load()`/`accept()`. Tests that pass only because they bypass the new setup contract are NOT a valid GREEN signal — those tests are themselves a defect to be fixed in this same task.
+2. `setup-stamp-order.test.ts` row for PB-TLINE asserts the exact 22-entry sequence from
+   trasetup.c:71-92 in that order.
+3. No banned closing verdicts (mapping/tolerance/equivalent-to/pre-existing/intentional-divergence)
+   used in any commit message or report.
+
+## Migration impact
+
+The previous lumped RLCG model (`N` cascaded segments, `segments` parameter, `9N-4` stamps) is
+removed. Existing circuits using `transmission-line` for lossy lines lose that capability. A
+separate `transmission-line-lossy` component handles lossy-line modeling when needed (not in this
+scope).

@@ -55,7 +55,7 @@ setup(ctx: SetupContext): void {
   const negNode = this.pinNodes.get("B1")!;
 
   // Port of swsetup.c:47-48 — state slot allocation
-  this._stateOffset = ctx.allocStates(2);  // SW_NUM_STATES = 2
+  this._stateBase = ctx.allocStates(2);  // SW_NUM_STATES = 2
 
   // Port of swsetup.c:59-62 — TSTALLOC sequence (line-for-line)
   this._hPP = ctx.solver.allocElement(posNode, posNode); // SWposNode, SWposNode
@@ -87,12 +87,32 @@ SW has no branch row.
 
 - Drop `internalNodeIds`, `branchIdx` from factory signature.
 - Drop `branchCount`, `getInternalNodeCount` from MnaModel registration.
-- Add `hasBranchRow: false`.
 - Add `ngspiceNodeMap: { A1: "pos", B1: "neg" }`.
 - No `findBranchFor` callback.
+
+## Public API
+
+### `setCtrlVoltage(v: number): void` — for composite use only
+
+Stores `v` as the pending control voltage for the next `load()` call. The composite caller (e.g., AnalogSwitch, NFET, PFET) reads its own control input voltage and pushes it into the SW sub-element via this setter before calling `sw.load(ctx)`. Used because the SW sub-element does not know about its parent composite's control wiring.
+
+Spec:
+- `setCtrlVoltage(v: number): void` — stores `v` in `this._pendingCtrlVoltage`. Default initial value: 0.
+- `load(ctx)` reads `this._pendingCtrlVoltage` (instead of computing control voltage from a node) when running the SW state machine (vThreshold / vHysteresis comparison).
+- This is a digiTS extension; no ngspice anchor (ngspice SW reads control directly from CKTrhsOld via positive/negative control nodes — our composites need this indirection because the control source isn't always a node).
+
+Add field: `private _pendingCtrlVoltage: number = 0;`
+
+### `setSwState(on: boolean): void` — for composite use only
+
+Forces the SW state machine into the given on/off state, skipping the threshold comparison for the next `load()` call. Used by composites (e.g., AnalogSwitch SPDT) that compute ON/OFF externally and need to drive each sub-switch independently.
+
+Spec:
+- `setSwState(on: boolean): void` — stores the forced state in an internal field (e.g., `this._forcedState: boolean | null`). When non-null, `load()` uses this state directly instead of evaluating `_pendingCtrlVoltage` against vThreshold/vHysteresis; resets to `null` after each `load()` call.
+- Default: `null` (no forced state — threshold comparison applies).
 
 ## Verification gate
 
 1. `setup-stamp-order.test.ts` row for PB-SW is GREEN.
 2. `src/components/switching/__tests__/switches.test.ts` is GREEN.
-3. No banned closing verdicts.
+   - **Setup-mocking removal**: the implementer MUST audit the test file for any pattern that fakes the migrated `setup()` process (e.g., manually constructing element handles, stub solver objects that bypass the real allocation path, or directly calling `load()` without going through `_setup()` first). Every such pattern MUST be replaced with the real path: instantiate the element via its factory, call `_setup()` on the engine to allocate handles, then exercise `load()`/`accept()`. Tests that pass only because they bypass the new setup contract are NOT a valid GREEN signal — those tests are themselves a defect to be fixed in this same task.

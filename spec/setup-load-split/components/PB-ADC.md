@@ -68,7 +68,7 @@ setup(ctx: SetupContext): void {
 
   // Composite-level state: prevClkVoltage (1 slot) + N-bit output register (ceil(N/64) slots)
   // Simplest layout: 1 slot for prevClk, 1 slot for the integer code (as Float64)
-  this._stateOffset = ctx.allocStates(2);
+  this._stateBase = ctx.allocStates(2);
 
   // Forward to pin models — each calls their own TSTALLOC entries
   if (nVin > 0) this._vinModel.setup(ctx);
@@ -93,6 +93,7 @@ load(ctx: LoadContext): void {
   const nVref = this._pinNodes.get("VREF")!;
   const nGnd  = this._pinNodes.get("GND")!;
   const nClk  = this._pinNodes.get("CLK")!;
+  const nEoc  = this._pinNodes.get("EOC")!;
 
   // Analog loads from pin models (resistive loading, no conversion logic here)
   if (nVin > 0) this._vinModel.load(ctx);
@@ -113,14 +114,13 @@ accept(ctx: LoadContext, simTime: number, addBreakpoint: (t: number) => void): v
   const nGnd  = this._pinNodes.get("GND")!;
   const nClk  = this._pinNodes.get("CLK")!;
 
-  const s0       = pool.states[0];
-  const prevClk  = s0[this._stateOffset + 0];
+  const prevClk  = ctx.state0[this._stateBase + 0];
   const currClk  = nClk > 0 ? ctx.rhs[nClk] : 0;
   const vIH      = this._p.vIH;
 
   // Rising edge detection
   const risingEdge = prevClk < vIH && currClk >= vIH;
-  s0[this._stateOffset + 0] = currClk;  // save for next step
+  ctx.state0[this._stateBase + 0] = currClk;  // save for next step
 
   if (risingEdge) {
     const vIn  = nVin  > 0 ? ctx.rhs[nVin]  : 0;
@@ -131,7 +131,7 @@ accept(ctx: LoadContext, simTime: number, addBreakpoint: (t: number) => void): v
     const code = span > 0
       ? Math.max(0, Math.min(maxCode, Math.floor((vIn - vGnd) / span * (1 << this._bits))))
       : 0;
-    s0[this._stateOffset + 1] = code;
+    ctx.state0[this._stateBase + 1] = code;
 
     // Drive output bits
     for (let i = 0; i < this._bits; i++) {
@@ -143,6 +143,8 @@ accept(ctx: LoadContext, simTime: number, addBreakpoint: (t: number) => void): v
   }
 }
 ```
+
+**FADC-D3 — no-edge behavior:** If CLK is wired to a constant-high source, no rising edges occur and EOC never fires. This is correct clock-driven behavior; do not add a workaround DC conversion mode.
 
 ## State slots
 
@@ -162,7 +164,6 @@ Not needed. Direct refs to `_vinModel`, `_clkModel`, `_eocModel`, `_dBits[]`.
 ## Factory cleanup
 
 - Drop `internalNodeIds`, `branchIdx` from factory signature.
-- Add `hasBranchRow: false` on the composite's `MnaModel`.
 - Add `mayCreateInternalNodes: false`.
 - Leave `ngspiceNodeMap` undefined on `ADCDefinition`.
 - The existing `ADC_COMPOSITE_SCHEMA` (currently empty in source) gains the 2-slot declaration.
@@ -171,5 +172,6 @@ Not needed. Direct refs to `_vinModel`, `_clkModel`, `_eocModel`, `_dBits[]`.
 
 1. `setup-stamp-order.test.ts` row for PB-ADC is GREEN (stamp order from pin models in declaration order: VIN input model, CLK input model, EOC output model, D0..D{N-1} output models).
 2. `src/components/active/__tests__/adc.test.ts` is GREEN.
+   - **Setup-mocking removal**: the implementer MUST audit the test file for any pattern that fakes the migrated `setup()` process (e.g., manually constructing element handles, stub solver objects that bypass the real allocation path, or directly calling `load()` without going through `_setup()` first). Every such pattern MUST be replaced with the real path: instantiate the element via its factory, call `_setup()` on the engine to allocate handles, then exercise `load()`/`accept()`. Tests that pass only because they bypass the new setup contract are NOT a valid GREEN signal — those tests are themselves a defect to be fixed in this same task.
 3. The pin-map-coverage test allows the composite to lack `ngspiceNodeMap`.
 4. No banned closing verdicts.

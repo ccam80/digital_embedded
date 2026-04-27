@@ -131,7 +131,6 @@ Not needed. Direct ref to `_vccs1`.
 ## Factory cleanup
 
 - Drop `internalNodeIds`, `branchIdx` from factory signature.
-- Add `hasBranchRow: false` on the composite's `MnaModel` (VCCS has no branch row).
 - Add `mayCreateInternalNodes: false`.
 - Leave `ngspiceNodeMap` undefined on `OTADefinition`.
 
@@ -139,5 +138,6 @@ Not needed. Direct ref to `_vccs1`.
 
 1. `setup-stamp-order.test.ts` row for PB-OTA is GREEN (4 VCCS TSTALLOC entries in vccsset.c order).
 2. `src/components/active/__tests__/ota.test.ts` is GREEN.
+   - **Setup-mocking removal**: the implementer MUST audit the test file for any pattern that fakes the migrated `setup()` process (e.g., manually constructing element handles, stub solver objects that bypass the real allocation path, or directly calling `load()` without going through `_setup()` first). Every such pattern MUST be replaced with the real path: instantiate the element via its factory, call `_setup()` on the engine to allocate handles, then exercise `load()`/`accept()`. Tests that pass only because they bypass the new setup contract are NOT a valid GREEN signal — those tests are themselves a defect to be fixed in this same task.
 3. The pin-map-coverage test allows the composite to lack `ngspiceNodeMap`.
 4. No banned closing verdicts.

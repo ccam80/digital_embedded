@@ -61,7 +61,6 @@ ISRC has no branch row; `findBranchFor` is not registered.
 
 - Drop `internalNodeIds`, `branchIdx` from factory signature.
 - Drop `branchCount`, `getInternalNodeCount` from MnaModel registration.
-- Add `hasBranchRow: false`.
 - Add `ngspiceNodeMap: { neg: "neg", pos: "pos" }`.
 - No `findBranchFor` callback.
 
@@ -69,4 +68,4 @@ ISRC has no branch row; `findBranchFor` is not registered.
 
 1. `setup-stamp-order.test.ts` row for PB-ISRC is GREEN (empty sequence — zero allocElement calls).
 2. `src/components/sources/__tests__/current-source.test.ts` is GREEN.
-3. No banned closing verdicts.
+- **Setup-mocking removal**: the implementer MUST audit the test file for any pattern that fakes the migrated `setup()` process (e.g., manually constructing element handles, stub solver objects that bypass the real allocation path, or directly calling `load()` without going through `_setup()` first). Every such pattern MUST be replaced with the real path: instantiate the element via its factory, call `_setup()` on the engine to allocate handles, then exercise `load()`/`accept()`. Tests that pass only because they bypass the new setup contract are NOT a valid GREEN signal — those tests are themselves a defect to be fixed in this same task.

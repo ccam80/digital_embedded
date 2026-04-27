@@ -62,10 +62,10 @@ VCCS setup: `NG_IGNORE(states)` at vccsset.c:27 — zero states allocated.
 
 | # | ngspice pointer | row | col | digiTS handle |
 |---|---|---|---|---|
-| 1 | `VCCSposContPosptr` | `VCCSposNode` | `VCCScontPosNode` | `this._hPosCPos` |
-| 2 | `VCCSposContNegptr` | `VCCSposNode` | `VCCScontNegNode` | `this._hPosCNeg` |
-| 3 | `VCCSnegContPosptr` | `VCCSnegNode` | `VCCScontPosNode` | `this._hNegCPos` |
-| 4 | `VCCSnegContNegptr` | `VCCSnegNode` | `VCCScontNegNode` | `this._hNegCNeg` |
+| 1 | `VCCSposContPosptr` | `VCCSposNode` | `VCCScontPosNode` | `this._hPCtP` |
+| 2 | `VCCSposContNegptr` | `VCCSposNode` | `VCCScontNegNode` | `this._hPCtN` |
+| 3 | `VCCSnegContPosptr` | `VCCSnegNode` | `VCCScontPosNode` | `this._hNCtP` |
+| 4 | `VCCSnegContNegptr` | `VCCSnegNode` | `VCCScontNegNode` | `this._hNCtN` |
 
 Because `posNode = contPosNode = pinNodes.get("A")` and
 `negNode = contNegNode = pinNodes.get("K")`, all four entries collapse to
@@ -73,10 +73,10 @@ the four corners of the 2×2 (A,K) sub-matrix:
 
 | # | Effective call | Handle |
 |---|---|---|
-| 1 | `allocElement(A, A)` | `this._hPosCPos` |
-| 2 | `allocElement(A, K)` | `this._hPosCNeg` |
-| 3 | `allocElement(K, A)` | `this._hNegCPos` |
-| 4 | `allocElement(K, K)` | `this._hNegCNeg` |
+| 1 | `allocElement(A, A)` | `this._hPCtP` |
+| 2 | `allocElement(A, K)` | `this._hPCtN` |
+| 3 | `allocElement(K, A)` | `this._hNCtP` |
+| 4 | `allocElement(K, K)` | `this._hNCtN` |
 
 `allocElement` is idempotent; repeated (A,A) or (K,K) calls return the existing
 handle. No special case in the port.
@@ -92,25 +92,7 @@ setup(ctx: SetupContext): void {
 }
 ```
 
-The VccsAnalogElement.setup() body (to be implemented in the VCCS spec, PB-VCCS):
-
-```ts
-// VccsAnalogElement.setup() — called for this sub-element with
-// posNode = contPosNode = A, negNode = contNegNode = K
-setup(ctx: SetupContext): void {
-  const solver      = ctx.solver;
-  const posNode     = this._posNode;      // A
-  const negNode     = this._negNode;      // K
-  const contPosNode = this._contPosNode;  // A
-  const contNegNode = this._contNegNode;  // K
-
-  // TSTALLOC sequence — vccsset.c:43-46
-  this._hPosCPos = solver.allocElement(posNode,  contPosNode); // (1)
-  this._hPosCNeg = solver.allocElement(posNode,  contNegNode); // (2)
-  this._hNegCPos = solver.allocElement(negNode,  contPosNode); // (3)
-  this._hNegCNeg = solver.allocElement(negNode,  contNegNode); // (4)
-}
-```
+VccsAnalogElement.setup() body: see PB-VCCS.md §setup() body — this composite forwards directly to that body via this._vccs.setup(ctx).
 
 ## load() body — value writes only
 
@@ -124,11 +106,19 @@ g(V_AK)    = dI/dV_AK                  // linearized conductance
 ieq         = I(V_AK) - g * V_AK       // Norton equivalent
 ```
 
+Destructure the VCCS sub-element's TSTALLOC handles once at the top of `load()`
+via the readonly `stamps` accessor (see PB-VCCS § "VccsAnalogElement.stamps —
+readonly accessor for composite users"):
+
+```ts
+const { pCtP, pCtN, nCtP, nCtN } = this._vccs.stamps;
+```
+
 Stamps:
-- `solver.stampElement(this._vccs._hPosCPos, +g)`
-- `solver.stampElement(this._vccs._hPosCNeg, -g)`
-- `solver.stampElement(this._vccs._hNegCPos, -g)`
-- `solver.stampElement(this._vccs._hNegCNeg, +g)`
+- `solver.stampElement(pCtP, +g)`
+- `solver.stampElement(pCtN, -g)`
+- `solver.stampElement(nCtP, -g)`
+- `solver.stampElement(nCtN, +g)`
 - RHS stamps for Norton current `ieq` at nodes A and K.
 
 No allocElement calls.
@@ -145,7 +135,6 @@ Not applicable. VCCS has no branch row.
 
 - Drop `internalNodeIds`, `branchIdx` from factory.
 - Drop `branchCount`, `getInternalNodeCount` from MnaModel.
-- Add `hasBranchRow: false`.
 - `mayCreateInternalNodes` omitted (false).
 - Composite does not carry `ngspiceNodeMap` — the VCCS sub-element carries its own.
 
@@ -153,4 +142,5 @@ Not applicable. VCCS has no branch row.
 
 1. `setup-stamp-order.test.ts` row for PB-TUNNEL is GREEN.
 2. `src/components/semiconductors/__tests__/tunnel-diode.test.ts` is GREEN.
+- **Setup-mocking removal**: the implementer MUST audit the test file for any pattern that fakes the migrated `setup()` process (e.g., manually constructing element handles, stub solver objects that bypass the real allocation path, or directly calling `load()` without going through `_setup()` first). Every such pattern MUST be replaced with the real path: instantiate the element via its factory, call `_setup()` on the engine to allocate handles, then exercise `load()`/`accept()`. Tests that pass only because they bypass the new setup contract are NOT a valid GREEN signal — those tests are themselves a defect to be fixed in this same task.
 3. No banned closing verdicts.

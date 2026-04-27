@@ -101,8 +101,22 @@ and `allocElement(K,K)` are distinct positions. No collapse beyond what
 ```ts
 // Triode composite setup()
 setup(ctx: SetupContext): void {
-  this._vccs.setup(ctx);   // forwards to VccsAnalogElement.setup()
+  this._vccs.setup(ctx);   // forwards to VccsAnalogElement.setup() — 4 entries
+  const solver = ctx.solver;
+  const nP = this._vccs._posNode;  // plate node
+  const nK = this._vccs._negNode;  // cathode node
+
+  // gds stamps — 2 additional entries (6 total for Triode).
+  // Triode setup() unconditionally allocates 6 entries (4 VCCS + 2 gds, gds always nonzero per Koren formula).
+  this._hPP_gds = solver.allocElement(nP, nP);  // (plate, plate)
+  this._hKP_gds = solver.allocElement(nK, nP);  // (cathode, plate)
 }
+```
+
+Fields to add to `TriodeElement`:
+```ts
+private _hPP_gds: number = -1;
+private _hKP_gds: number = -1;
 ```
 
 The VccsAnalogElement.setup() for this instance (P=plate, G=grid, K=cathode):
@@ -140,7 +154,7 @@ gm  = dIp/dVgk   (partial derivative wrt grid voltage)
 gds = dIp/dVpk   (partial derivative wrt plate voltage)
 ```
 
-Stamps via the 4 VCCS handles:
+Stamps via the 4 VCCS handles plus 2 composite-owned gds handles:
 
 ```
 // Transconductance gm stamps (ctrl+ = G, ctrl- = K):
@@ -149,15 +163,9 @@ solver.stampElement(_hPosCNeg, -gm)   // (P,K): -gm
 solver.stampElement(_hNegCPos, -gm)   // (K,G): -gm
 solver.stampElement(_hNegCNeg, +gm)   // (K,K): +gm
 
-// Output conductance gds stamps require additional handles (P,P), (P,K), (K,P), (K,K)
-// These are the VCCS output pair stamps — if the VCCS class carries separate
-// output-conductance handles, those are used. If not, the Triode load() allocates
-// them in setup() as additional allocElement calls beyond the 4 VCCS entries.
-// IMPLEMENTER NOTE: if gds ≠ 0 requires stamps at (P,P) and (K,P), add
-// two additional allocElement calls in setup():
-//   this._hPP = solver.allocElement(P, P);   // output self-conductance
-//   this._hKP = solver.allocElement(K, P);   // output cross-conductance
-// This is in addition to the 4 VCCS entries — total 6 handles for Triode.
+// Output conductance gds stamps (composite-owned handles allocated in setup()):
+ctx.solver.stampElement(this._hPP_gds, +gds);  // (P,P): +gds
+ctx.solver.stampElement(this._hKP_gds, -gds);  // (K,P): -gds
 ```
 
 **RHS Norton current:**
@@ -178,12 +186,12 @@ Not applicable.
 
 - Drop `internalNodeIds`, `branchIdx` from factory.
 - Drop `branchCount`, `getInternalNodeCount` from MnaModel.
-- Add `hasBranchRow: false`.
 - `mayCreateInternalNodes` omitted (false).
 - Composite does not carry `ngspiceNodeMap` — the VCCS sub-element carries its own.
 
 ## Verification gate
 
-1. `setup-stamp-order.test.ts` row for PB-TRIODE is GREEN.
+1. `setup-stamp-order.test.ts` row for PB-TRIODE is GREEN (6 entries: 4 VCCS + 2 gds at end).
 2. `src/components/semiconductors/__tests__/triode.test.ts` is GREEN.
+   - **Setup-mocking removal**: the implementer MUST audit the test file for any pattern that fakes the migrated `setup()` process (e.g., manually constructing element handles, stub solver objects that bypass the real allocation path, or directly calling `load()` without going through `_setup()` first). Every such pattern MUST be replaced with the real path: instantiate the element via its factory, call `_setup()` on the engine to allocate handles, then exercise `load()`/`accept()`. Tests that pass only because they bypass the new setup contract are NOT a valid GREEN signal — those tests are themselves a defect to be fixed in this same task.
 3. No banned closing verdicts.

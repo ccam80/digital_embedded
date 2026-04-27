@@ -157,16 +157,15 @@ setup(ctx: SetupContext): void {
   // Create the shared internal latch node first
   this._vintNode = ctx.makeVolt(this.label, "latch");
 
-  // Bind sub-element pin nodes using the resolved Vint
-  // (sub-elements were constructed at compile time with placeholder nodes;
-  //  the composite rebinds them here before setup() is called)
-  this._q1.setPinNode("B", this._gNode);     // Q1: base = G
-  this._q1.setPinNode("C", this._vintNode);  // Q1: collector = Vint
-  this._q1.setPinNode("E", this._kNode);     // Q1: emitter = K
+  // Bind sub-element pin nodes using the resolved Vint.
+  // Sub-element pin rebinding uses direct pinNodeIds array assignment
+  // (consistent with PB-OPTO, PB-DAC, PB-OPAMP, PB-TIMER555). No setPinNode API is added
+  // to AnalogElementCore.
+  // Q1 NPN: BJT pin order [B, C, E] per buildBJTPinDeclarations()
+  this._q1.pinNodeIds = [this._gNode, this._vintNode, this._kNode];    // B=G, C=Vint, E=K
 
-  this._q2.setPinNode("B", this._vintNode);  // Q2: base = Vint
-  this._q2.setPinNode("C", this._gNode);     // Q2: collector = G
-  this._q2.setPinNode("E", this._aNode);     // Q2: emitter = A
+  // Q2 PNP: BJT pin order [B, C, E] per buildBJTPinDeclarations()
+  this._q2.pinNodeIds = [this._vintNode, this._gNode, this._aNode];    // B=Vint, C=G, E=A
 
   // Forward to each BJT sub-element (Q1 then Q2)
   this._q1.setup(ctx);   // NPN: 23× TSTALLOC per bjtsetup.c:435-464
@@ -195,7 +194,6 @@ Not applicable.
 
 - Drop `internalNodeIds`, `branchIdx` from factory.
 - Drop `branchCount`, `getInternalNodeCount` from MnaModel.
-- Add `hasBranchRow: false`.
 - Add `mayCreateInternalNodes: true`.
 - Composite does not carry `ngspiceNodeMap` — sub-elements carry their own.
 
@@ -203,4 +201,5 @@ Not applicable.
 
 1. `setup-stamp-order.test.ts` row for PB-SCR is GREEN (verifies Vint alloc then Q1 then Q2 TSTALLOC order).
 2. `src/components/semiconductors/__tests__/scr.test.ts` is GREEN.
+   - **Setup-mocking removal**: the implementer MUST audit the test file for any pattern that fakes the migrated `setup()` process (e.g., manually constructing element handles, stub solver objects that bypass the real allocation path, or directly calling `load()` without going through `_setup()` first). Every such pattern MUST be replaced with the real path: instantiate the element via its factory, call `_setup()` on the engine to allocate handles, then exercise `load()`/`accept()`. Tests that pass only because they bypass the new setup contract are NOT a valid GREEN signal — those tests are themselves a defect to be fixed in this same task.
 3. No banned closing verdicts.

@@ -36,32 +36,17 @@ Each `DigitalInputPinModel.setup(ctx)` allocates `(nodeId, nodeId)` per Shape ru
 Each `DigitalOutputPinModel.setup(ctx)` allocates `(nodeId, nodeId)` for role="direct" per Shape rule 2.
 Each `AnalogCapacitorElement.setup(ctx)` allocates 4 entries per PB-CAP.md.
 
-## load() body — value writes only
+## load() body — behavioral description
 
-Existing load() body kept verbatim minus any `solver.allocElement` calls. Per-pin-model `load()` stamps through cached handles. The latch array `latchedLevels[]` is unchanged:
+The Splitter element's load() does the following per cycle:
+1. For each input pin, read the current node voltage from `ctx.rhsOld[inputPin.nodeId]` (or whatever the post-W2.5 field name is for the resolved nodeId — see 02-behavioral.md Shape rule 1).
+2. Convert each voltage to a logic level using the input pin's `readLogicLevel(voltage)` method (existing API on DigitalInputPinModel).
+3. Latch the logic levels into the splitter's internal latch state.
+4. For each output pin, drive the output via `outputPin.setLogicLevel(latchedLevel)` (existing API on DigitalOutputPinModel).
 
-```ts
-load(ctx: LoadContext): void {
-  const v = ctx.rhsOld;
+The exact field names (`inputPins`, `outputPins`, `latchedLevels`) are the post-W2.5 class-based field names per 02-behavioral.md §Shape rule 3. If the existing source uses different names pre-W2.5, the W2.5 wave renames them; W3 implementer agents see the post-W2.5 names.
 
-  for (const p of inputPins) p.load(ctx);
-
-  for (let i = 0; i < numIn; i++) {
-    const nodeId = inputPins[i].nodeId;
-    const voltage = readMnaVoltage(nodeId, v);
-    const level = inputPins[i].readLogicLevel(voltage);
-    if (level !== undefined) latchedLevels[i] = level;
-  }
-  for (let i = 0; i < numOut; i++) {
-    outputPins[i].setLogicLevel(latchedLevels[i] ?? false);
-    outputPins[i].load(ctx);
-  }
-
-  for (const child of childElements) { child.load(ctx); }
-},
-```
-
-No `allocElement` calls remain in load() after migration.
+No new methods on DigitalInputPinModel or DigitalOutputPinModel are needed — readLogicLevel and setLogicLevel already exist.
 
 ## Pin model TSTALLOCs
 
@@ -79,7 +64,7 @@ Total entry count is variable and determined entirely by numIn, numOut, and whic
 
 - Drop `internalNodeIds`, `branchIdx` parameters from factory signature (new 3-param form per A6.3).
 - `ngspiceNodeMap` left undefined (behavioral — per 02-behavioral.md §Pin-map field).
-- `hasBranchRow: false`, `mayCreateInternalNodes: false`.
+- `mayCreateInternalNodes: false`.
 - No `findBranchFor` callback.
 
 ## State pool
@@ -89,6 +74,7 @@ Total entry count is variable and determined entirely by numIn, numOut, and whic
 ## Verification gate
 
 1. Existing test file `src/solver/analog/__tests__/behavioral-remaining.test.ts` is GREEN.
+   - **Setup-mocking removal**: the implementer MUST audit the test file for any pattern that fakes the migrated `setup()` process (e.g., manually constructing element handles, stub solver objects that bypass the real allocation path, or directly calling `load()` without going through `_setup()` first). Every such pattern MUST be replaced with the real path: instantiate the element via its factory, call `_setup()` on the engine to allocate handles, then exercise `load()`/`accept()`. Tests that pass only because they bypass the new setup contract are NOT a valid GREEN signal — those tests are themselves a defect to be fixed in this same task.
 2. No `allocElement` call in load() body. Verified by: `Grep "allocElement" src/solver/analog/behavioral-remaining.ts` returns only matches inside `setup()` method bodies.
 3. `setup()` forward order is inputs → outputs → children (Shape rule 3 / Shape rule 6).
 4. No banned closing verdicts.

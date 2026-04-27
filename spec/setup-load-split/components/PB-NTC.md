@@ -24,7 +24,7 @@ None. RES has no internal nodes.
 
 ## Branch rows
 
-None. `hasBranchRow: false`.
+None (branchIndex remains -1 post-setup).
 
 ## State slots
 
@@ -44,8 +44,8 @@ None. `hasBranchRow: false`.
 ```typescript
 setup(ctx: SetupContext): void {
   const solver = ctx.solver;
-  const posNode = this.pinNodeIds[0]; // pinNodes.get("pos") — RESposNode
-  const negNode = this.pinNodeIds[1]; // pinNodes.get("neg") — RESnegNode
+  const posNode = this._pinNodes.get("pos")!; // RESposNode
+  const negNode = this._pinNodes.get("neg")!; // RESnegNode
 
   // TSTALLOC sequence: ressetup.c:46-49, line-for-line
   this._hPP = solver.allocElement(posNode, posNode); // :46 (RESposNode, RESposNode)
@@ -77,9 +77,8 @@ The `resistance()` method computes R from the current `temperature` field using
 the B-parameter model (or Steinhart-Hart when shA/shB/shC are all set). The
 temperature field is updated by `accept()` using the self-heating ODE when
 `selfHeating` is true. When `selfHeating` is false, `temperature` is read
-directly from `ctx.temp` (the circuit ambient temperature from SetupContext)
-at each load call — this requires that `load()` reads `ctx.temp` rather than
-a cached field. The `setParam("temperature", ...)` route updates the fixed
+directly from `ctx.temp` (LoadContext field; ngspice CKTtemp; see 00-engine.md §A4 LoadContext interface).
+The `setParam("temperature", ...)` route updates the fixed
 operating temperature for the non-self-heating case.
 
 ## findBranchFor (if applicable)
@@ -94,7 +93,6 @@ Not applicable.
 
 - Drop `internalNodeIds`, `branchIdx` from factory (`createNTCThermistorElement`).
 - Drop `branchCount`, `getInternalNodeCount` from MnaModel registration.
-- Add `hasBranchRow: false`.
 - Add `ngspiceNodeMap: { pos: "pos", neg: "neg" }` to the `behavioral` model
   registration and to `NTCThermistorDefinition`.
 - No `findBranchFor` callback.
@@ -104,4 +102,5 @@ Not applicable.
 1. `setup-stamp-order.test.ts` row for PB-NTC is GREEN: insertion order
    must be `[(posNode,posNode), (negNode,negNode), (posNode,negNode), (negNode,posNode)]`.
 2. `src/components/sensors/__tests__/ntc-thermistor.test.ts` is GREEN.
+   - **Setup-mocking removal**: the implementer MUST audit the test file for any pattern that fakes the migrated `setup()` process (e.g., manually constructing element handles, stub solver objects that bypass the real allocation path, or directly calling `load()` without going through `_setup()` first). Every such pattern MUST be replaced with the real path: instantiate the element via its factory, call `_setup()` on the engine to allocate handles, then exercise `load()`/`accept()`. Tests that pass only because they bypass the new setup contract are NOT a valid GREEN signal — those tests are themselves a defect to be fixed in this same task.
 3. No banned closing verdicts.

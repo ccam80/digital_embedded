@@ -40,8 +40,6 @@ None. CCCS has no internal voltage nodes.
 
 None (own). CCCS does NOT allocate its own branch row.
 
-`hasBranchRow: false`
-
 The controlling branch referenced by `CCCScontBranch` belongs to the controlling
 source (a VSRC, IND, VCVS, or CCVS). CCCS only reads that branch column; it does
 not allocate it.
@@ -146,10 +144,7 @@ map (populated at compile time, before any setup() runs).
 - Drop `internalNodeIds`, `branchIdx` from factory (the inline factory in
   `CCCSDefinition.modelRegistry["behavioral"]`). New signature:
   `factory(pinNodes, props, getTime): AnalogElementCore`.
-- Drop `branchCount: 1` from MnaModel registration (CCCS has NO own branch row;
-  the existing `branchCount: 1` in the current code is wrong — it referred to the
-  sense branch which belongs to the controlling VSRC, not to CCCS itself).
-- Add `hasBranchRow: false`.
+- Drop `branchCount: 1` from MnaModel registration.
 - Add `ngspiceNodeMap: { "out+": "pos", "out-": "neg" }`.
 - No `findBranchFor` callback.
 - Add `mayCreateInternalNodes: false` (omit — default is false).
@@ -160,4 +155,4 @@ map (populated at compile time, before any setup() runs).
    `[(posNode, contBranch), (negNode, contBranch)]` where `contBranch` is the
    branch row number allocated by the controlling VSRC's `findBranchFor`.
 2. `src/components/active/__tests__/cccs.test.ts` is GREEN.
-3. No banned closing verdicts.
+- **Setup-mocking removal**: the implementer MUST audit the test file for any pattern that fakes the migrated `setup()` process (e.g., manually constructing element handles, stub solver objects that bypass the real allocation path, or directly calling `load()` without going through `_setup()` first). Every such pattern MUST be replaced with the real path: instantiate the element via its factory, call `_setup()` on the engine to allocate handles, then exercise `load()`/`accept()`. Tests that pass only because they bypass the new setup contract are NOT a valid GREEN signal — those tests are themselves a defect to be fixed in this same task.

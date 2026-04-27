@@ -40,7 +40,7 @@ here->INDflux = *states;
 
 Two state slots allocated (INDflux = state+0, INDvolt = state+1). digiTS port:
 ```ts
-this._stateOffset = ctx.allocStates(2);
+this._stateBase = ctx.allocStates(2);
 ```
 
 ## TSTALLOC sequence (line-for-line port)
@@ -64,7 +64,7 @@ setup(ctx: SetupContext): void {
   const negNode = pinNodes.get("B")!;  // INDnegNode
 
   // indsetup.c:78-79 — *states += 2 (INDflux = state+0, INDvolt = state+1)
-  this._stateOffset = ctx.allocStates(2);
+  this._stateBase = ctx.allocStates(2);
 
   // indsetup.c:84-88 — CKTmkCur guard (idempotent, mirrors VSRCfindBr pattern).
   if (this.branchIndex === -1) {
@@ -83,7 +83,7 @@ setup(ctx: SetupContext): void {
 
 Fields to add to `AnalogInductorElement`:
 ```ts
-private _stateOffset: number = -1;
+private _stateBase: number = -1;
 private _hPIbr:   number = -1;
 private _hNIbr:   number = -1;
 private _hIbrN:   number = -1;
@@ -117,7 +117,6 @@ This callback is registered on the `MnaModel` and called by `MNAEngine._findBran
 
 - Drop `internalNodeIds` and `branchIdx` parameters from `createInductorElement` factory signature (per A6.3). `branchIndex` starts at `-1`; `setup()` populates it.
 - Remove `branchCount: 1` from `MnaModel` registration (per A6.2).
-- Add `hasBranchRow: true` to `MnaModel` registration.
 - `mayCreateInternalNodes` omitted (no internal nodes).
 - Add `ngspiceNodeMap: { A: "pos", B: "neg" }` to `ComponentDefinition` (`InductorDefinition`).
 - Add `findBranchFor` callback to `MnaModel` entry.
@@ -126,4 +125,5 @@ This callback is registered on the `MnaModel` and called by `MNAEngine._findBran
 
 1. `setup-stamp-order.test.ts` row for PB-IND is GREEN (insertion order: P-Ibr, N-Ibr, Ibr-N, Ibr-P, Ibr-Ibr).
 2. `src/components/passives/__tests__/` inductor test file is GREEN.
+   - **Setup-mocking removal**: the implementer MUST audit the test file for any pattern that fakes the migrated `setup()` process (e.g., manually constructing element handles, stub solver objects that bypass the real allocation path, or directly calling `load()` without going through `_setup()` first). Every such pattern MUST be replaced with the real path: instantiate the element via its factory, call `_setup()` on the engine to allocate handles, then exercise `load()`/`accept()`. Tests that pass only because they bypass the new setup contract are NOT a valid GREEN signal — those tests are themselves a defect to be fixed in this same task.
 3. No banned closing verdicts (mapping/tolerance/equivalent-to/pre-existing/intentional-divergence) used in any commit message or report.

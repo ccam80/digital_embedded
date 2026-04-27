@@ -60,11 +60,8 @@ Note on handle sharing: `_hAW_NN` and `_hWB_PP` both address `(wNode, wNode)`. `
 setup(ctx: SetupContext): void {
   const solver = ctx.solver;
   const aNode = this.pinNodeIds[0];  // A pin — R_AW posNode
-  const bNode = this.pinNodeIds[1];  // B pin — R_WB negNode (note: potentiometer.ts
-                                     //   factory passes [A, B, W] but the AnalogPotentiometerElement
-                                     //   constructor receives [A, W, B] reordering — verify against
-                                     //   the createPotentiometerElement call in potentiometer.ts:266)
-  const wNode = this.pinNodeIds[2];  // W pin — shared wiper node
+  const wNode = this.pinNodeIds[1];  // W pin — shared wiper node
+  const bNode = this.pinNodeIds[2];  // B pin — R_WB negNode
 
   // R_AW — ressetup.c:46-49 (A as posNode, W as negNode)
   this._hAW_PP = solver.allocElement(aNode, aNode);  // (RESposNode, RESposNode)
@@ -80,7 +77,7 @@ setup(ctx: SetupContext): void {
 }
 ```
 
-**Pin order verification note:** The existing `createPotentiometerElement` at potentiometer.ts:266 passes `[pinNodes.get("A")!, pinNodes.get("B")!, pinNodes.get("W")!]` to `AnalogPotentiometerElement`, but the `load()` code treats `pinNodeIds[0]=n_A`, `pinNodeIds[1]=n_W`, `pinNodeIds[2]=n_B` — there is a label mismatch between the constructor comment and the actual ordering. The implementer must verify the actual pin index → node mapping in the current code before writing the setup body, and correct the field naming accordingly.
+**Pin layout (authoritative):** `pinNodeIds[0] = A`, `pinNodeIds[1] = W` (wiper), `pinNodeIds[2] = B`. This is the A-Wiper-B order matching the typical pot symbol. If the source diverges, it must be corrected by the spec author, not worked around by the implementer.
 
 Fields to add to `AnalogPotentiometerElement`:
 ```ts
@@ -102,7 +99,6 @@ Implementer ports value-side equations from `ref/ngspice/src/spicelib/devices/re
 
 - Drop `internalNodeIds` and `branchIdx` parameters from `createPotentiometerElement` factory signature (per A6.3).
 - No `branchCount` or `getInternalNodeCount` existed; no removal needed.
-- Add `hasBranchRow: false` to `MnaModel` registration.
 - `mayCreateInternalNodes` omitted.
 - `ComponentDefinition.ngspiceNodeMap` left undefined (composite decomposes).
 - No `findBranchFor` callback.
@@ -110,5 +106,6 @@ Implementer ports value-side equations from `ref/ngspice/src/spicelib/devices/re
 ## Verification gate
 
 1. `setup-stamp-order.test.ts` row for PB-POT is GREEN (insertion order: R_AW×4, R_WB×4 = 8 total; note (wNode,wNode) appears at positions 2 and 5 and returns the same handle).
-2. Potentiometer test file is GREEN.
+2. `src/components/passives/__tests__/potentiometer.test.ts` is GREEN.
+   - **Setup-mocking removal**: the implementer MUST audit the test file for any pattern that fakes the migrated `setup()` process (e.g., manually constructing element handles, stub solver objects that bypass the real allocation path, or directly calling `load()` without going through `_setup()` first). Every such pattern MUST be replaced with the real path: instantiate the element via its factory, call `_setup()` on the engine to allocate handles, then exercise `load()`/`accept()`. Tests that pass only because they bypass the new setup contract are NOT a valid GREEN signal — those tests are themselves a defect to be fixed in this same task.
 3. No banned closing verdicts (mapping/tolerance/equivalent-to/pre-existing/intentional-divergence) used in any commit message or report.

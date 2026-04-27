@@ -49,7 +49,7 @@ None.
 `*states += 5` at `diosetup.c:199`. Offset stored in `here->DIOstate` at line 198.
 
 ```ts
-this._stateOffset = ctx.allocStates(5);
+this._stateBase = ctx.allocStates(5);
 ```
 
 ## TSTALLOC sequence (line-for-line port)
@@ -77,7 +77,7 @@ setup(ctx: SetupContext): void {
   const negNode  = this._pinNodes.get("K")!;
 
   // State slots — diosetup.c:198-199
-  this._stateOffset = ctx.allocStates(5);
+  this._stateBase = ctx.allocStates(5);
 
   // Internal node — diosetup.c:204-224
   this._posPrimeNode = (this._model.RS === 0)
@@ -99,6 +99,8 @@ setup(ctx: SetupContext): void {
 
 Implementer ports value-side from `ref/ngspice/src/spicelib/devices/dio/dioload.c` line-for-line, stamping through cached handles. No allocElement calls.
 
+- Preserve multiplicity scaling: all current and conductance stamps are multiplied by the instance `M` parameter (default 1.0). ngspice anchor: `dioload.c` / `mos1load.c` / `bjtload.c` / `jfetload.c` use `here->{DIO|MOS1|BJT|JFET}m` for this scaling. The instance `M` parameter is partition: "instance" per the in-progress phase-instance-vs-model-param-partition work.
+
 ## findBranchFor (if applicable)
 
 Not applicable. DIO has no branch row.
@@ -107,7 +109,6 @@ Not applicable. DIO has no branch row.
 
 - Drop `internalNodeIds`, `branchIdx` from factory.
 - Drop `branchCount`, `getInternalNodeCount` from MnaModel.
-- Add `hasBranchRow: false`.
 - Add `mayCreateInternalNodes: true`.
 - Add `ngspiceNodeMap: { A: "pos", K: "neg" }`.
 
@@ -115,4 +116,5 @@ Not applicable. DIO has no branch row.
 
 1. `setup-stamp-order.test.ts` row for PB-DIO is GREEN.
 2. `src/components/semiconductors/__tests__/diode.test.ts` is GREEN.
+   - **Setup-mocking removal**: the implementer MUST audit the test file for any pattern that fakes the migrated `setup()` process (e.g., manually constructing element handles, stub solver objects that bypass the real allocation path, or directly calling `load()` without going through `_setup()` first). Every such pattern MUST be replaced with the real path: instantiate the element via its factory, call `_setup()` on the engine to allocate handles, then exercise `load()`/`accept()`. Tests that pass only because they bypass the new setup contract are NOT a valid GREEN signal — those tests are themselves a defect to be fixed in this same task.
 3. No banned closing verdicts.

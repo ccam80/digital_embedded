@@ -39,7 +39,7 @@ A new optional field is added in two places:
 ngspiceNodeMap?: Record<string, string>;
 ```
 
-### `src/solver/analog/types.ts` (or wherever `MnaModel` lives) — `MnaModel`
+### `src/compile/types.ts` — `MnaModel`
 
 Same field shape — see `00-engine.md` §A3.1. Each model registration
 duplicates the map from its `ComponentDefinition` so setup() can read
@@ -123,8 +123,8 @@ for digiTS-internal primitives).
 | BJT PNP (`bjt.ts`) | `B`, `C`, `E` | `{ B: "base", C: "col", E: "emit" }` | `bjt/bjtsetup.c` |
 | NJfet (`njfet.ts`) | `G`, `S`, `D` | `{ G: "gate", S: "source", D: "drain" }` | `jfet/jfetset.c` |
 | PJfet (`pjfet.ts`) | `G`, `D`, `S` | `{ G: "gate", D: "drain", S: "source" }` | `jfet/jfetset.c` |
-| NMOSFET (`mosfet.ts`) | `G`, `S`, `D` | `{ G: "gate", S: "source", D: "drain" }` (bulk B internal — set to `pinNodes.get("S")` for 3-terminal) | `mos1/mos1set.c` |
-| PMOSFET (`mosfet.ts`) | `G`, `D`, `S` | `{ G: "gate", D: "drain", S: "source" }` (bulk B internal — set to `pinNodes.get("S")`) | `mos1/mos1set.c` |
+| NMOSFET (`mosfet.ts`) | `G`, `S`, `D` | `{ G: "g", S: "s", D: "d" }` (bulk B internal — corresponds to MOS1bNode aka `b`; for 3-terminal the bulk pin is wired to S internally) | `mos1/mos1set.c` |
+| PMOSFET (`mosfet.ts`) | `G`, `D`, `S` | `{ G: "g", D: "d", S: "s" }` (bulk B internal — corresponds to MOS1bNode aka `b`; for 3-terminal the bulk pin is wired to S internally) | `mos1/mos1set.c` |
 
 ### Semiconductors — composites (decomposed; no native ngspice anchor)
 
@@ -148,8 +148,8 @@ for digiTS-internal primitives).
 | Component | Decomposition | Per-sub-element |
 |---|---|---|
 | SwitchDT (`switch-dt.ts`) | 2× SW per pole (`SW_AB`, `SW_AC`) | `SW_AB: { A1: "pos", B1: "neg" }`, `SW_AC: { A1: "pos", C1: "neg" }` |
-| NFET (`nfet.ts`) | 1× SW (gate threshold) | `{ G: "ctrl", D: "pos", S: "neg" }` (control-pin not in SW anchor — handled in load() body) |
-| PFET (`pfet.ts`) | 1× SW (inverted) | `{ G: "ctrl", D: "pos", S: "neg" }` |
+| NFET (`nfet.ts`) | 1× SW (gate threshold) | `{ G: "contPos", D: "pos", S: "neg" }` (G uses VCVS/VCCS controlling-pair vocabulary; ngspice SW has no control-node TSTALLOC entries — control voltage is read in load() via the composite's `setCtrlVoltage` forwarding to the SW sub-element. S serves dual roles: SWnegNode for stamps + implicit contNeg reference for the gate-source control voltage) |
+| PFET (`pfet.ts`) | 1× SW (inverted) | `{ G: "contPos", D: "pos", S: "neg" }` (G uses VCVS/VCCS controlling-pair vocabulary; ngspice SW has no control-node TSTALLOC entries — control voltage is read in load() via the composite's `setCtrlVoltage` forwarding to the SW sub-element. S serves dual roles: SWnegNode for stamps + implicit contNeg reference for the gate-source control voltage) |
 | FGNFET (`fgnfet.ts`) | MOS + CAP (floating-gate) | per `components/PB-FGNFET.md` |
 | FGPFET (`fgpfet.ts`) | MOS + CAP (floating-gate) | per `components/PB-FGPFET.md` |
 | TransGate (`trans-gate.ts`) | NFET + PFET (shared signal path) | per `components/PB-TRANSGATE.md` |
@@ -223,7 +223,7 @@ is preserved unchanged from current code.
 
 ## Verification
 
-A1.7's `setup-stamp-order.test.ts` (per `00-engine.md` §A9) implicitly
+A9's `setup-stamp-order.test.ts` (per `00-engine.md` §A9) implicitly
 verifies every pin-map entry: if the map names the wrong ngspice node,
 the resulting TSTALLOC sequence's `(extRow, extCol)` pairs will diverge
 from the ngspice anchor and the test row turns red.
@@ -240,4 +240,9 @@ component listed in `components/PB-*.md`, this test asserts:
    from the anchor's `*setup.c` (e.g., `"pos"`, `"neg"`, `"drain"`,
    `"gate"`, `"source"`, `"bulk"`, `"col"`, `"base"`, `"emit"`,
    `"posNode1"`, `"negNode1"`, `"posNode2"`, `"negNode2"`, `"contPos"`,
-   `"contNeg"`).
+   `"contNeg"`, `"d"`, `"g"`, `"s"`, `"b"`). The allowlist legitimately
+   covers both naming conventions: JFET still uses the long names
+   (`"drain"`, `"gate"`, `"source"`, `"bulk"`) per `jfet/jfetset.c`,
+   while MOSFET uses the single-letter names (`"d"`, `"g"`, `"s"`, `"b"`)
+   per `mos1/mos1set.c` — the project keeps both verbatim per the
+   corresponding ngspice anchor.

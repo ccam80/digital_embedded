@@ -68,7 +68,6 @@ Implementer ports value-side equations from `ref/ngspice/src/spicelib/devices/re
 
 - Drop `internalNodeIds` and `branchIdx` parameters from `createResistorElement` factory signature (per A6.3).
 - Drop `branchCount` and `getInternalNodeCount` from `MnaModel` registration (per A6.2) — neither was present; confirm no addition needed.
-- Add `hasBranchRow: false` to `MnaModel` registration.
 - `mayCreateInternalNodes` omitted (no internal nodes).
 - Add `ngspiceNodeMap: { A: "pos", B: "neg" }` to `ComponentDefinition` (`ResistorDefinition`).
 - No `findBranchFor` callback (no branch row).
@@ -77,4 +76,5 @@ Implementer ports value-side equations from `ref/ngspice/src/spicelib/devices/re
 
 1. `setup-stamp-order.test.ts` row for PB-RES is GREEN (insertion order: PP, NN, PN, NP).
 2. `src/components/passives/__tests__/resistor.test.ts` is GREEN.
+   - **Setup-mocking removal**: the implementer MUST audit the test file for any pattern that fakes the migrated `setup()` process (e.g., manually constructing element handles, stub solver objects that bypass the real allocation path, or directly calling `load()` without going through `_setup()` first). Every such pattern MUST be replaced with the real path: instantiate the element via its factory, call `_setup()` on the engine to allocate handles, then exercise `load()`/`accept()`. Tests that pass only because they bypass the new setup contract are NOT a valid GREEN signal — those tests are themselves a defect to be fixed in this same task.
 3. No banned closing verdicts (mapping/tolerance/equivalent-to/pre-existing/intentional-divergence) used in any commit message or report.

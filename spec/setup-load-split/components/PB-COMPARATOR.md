@@ -34,6 +34,16 @@ vcvs1.ngspiceNodeMap = {
 
 The comparator is a high-gain VCVS (gain ~1e6) with output clamping in `load()`. The VCVS sub-element provides the matrix structure; the output saturation is a behavioral override applied in `load()` by clamping the RHS injection when the output would exceed `vOH`/`vOL`.
 
+**Behavioral regression risk (FCOMP-D1, FCOMP-D2 resolution)**
+
+The current PB-COMPARATOR implementation uses a Norton output stage (conductance-only stamps, no VCVS branch). This spec rewrites the output as VCVS+RES. Because `comparator.test.ts` was authored against the Norton model, some assertions may produce different output voltages post-migration. The implementer must:
+
+1. Run `comparator.test.ts` BEFORE making any change. Record which assertions pass.
+2. After applying this spec, run `comparator.test.ts` again. Any newly-failing assertion is a regression.
+3. For each regression, the implementer must REPORT (not silently fix) before declaring the task complete. The user will decide whether the regression is acceptable (high-gain VCVS saturation behavior is provably equivalent to Norton at steady state) or whether the architecture needs to revert to Norton (Option B from FCOMP-D1).
+
+**Hot field declarations** (FCOMP-D2 resolved): `this._latchActive` is derived in `load()` by reading `ctx.state0[this._stateBase + OUTPUT_LATCH] >= 0.5` — no separate cached field is needed; the value is re-read from state each `load()` call. `this._p.rSat` is declared as a model parameter on PB-COMPARATOR with default `1.0` Ω; users can override via setParam. Add `rSat` to the comparator's parameter list alongside `vOH`, `vOL`, `hysteresis`, and `vos`.
+
 The current open-collector and push-pull implementations use a conductance-only stamp (no VCVS branch). After migration, the VCVS sub-element provides the branch row for the stamp-order test. The saturation behavior is preserved: when `|gain * (V_in+ - V_in-)| > vOH`, the VCVS gain is effectively frozen and a Norton clamp current is injected.
 
 ## Construction (factory body sketch)
@@ -65,7 +75,7 @@ setup(ctx: SetupContext): void {
   this._vcvs1.setup(ctx);
 
   // Composite-level state: hysteresis latch + response-time weight
-  this._stateOffset = ctx.allocStates(2);
+  this._stateBase = ctx.allocStates(2);
 }
 ```
 
@@ -78,15 +88,16 @@ load(ctx: LoadContext): void {
   const vDiff = vInP - vInN - this._p.vos;
   const halfHyst = this._p.hysteresis / 2;
 
-  // Update hysteresis latch (pool-backed state)
+  // Update hysteresis latch (state0-backed state)
   // ... latch logic per current comparator.ts:282-295 ...
+  // Write updated latch value back: ctx.state0[this._stateBase + OUTPUT_LATCH] = newLatch ? 1.0 : 0.0;
 
   // Forward to sub-element (stamps VCVS matrix entries)
   this._vcvs1.load(ctx);
 
-  // Apply output clamp: if latch active → override RHS at nOut
-  // (saturated region: clamp output between vOL and vOH)
-  if (this._latchActive) {
+  // Apply output clamp: read latch state from ctx.state0
+  const latchActive = ctx.state0[this._stateBase + OUTPUT_LATCH] >= 0.5;
+  if (latchActive) {
     // Override: inject Norton source to clamp to vOL
     // G[out,out] already stamped by vcvs1; add RHS offset
     ctx.rhs[this._nOut] += this._p.vOL * (1.0 / this._p.rSat);
@@ -112,7 +123,6 @@ Not needed. Direct ref to `_vcvs1`.
 ## Factory cleanup
 
 - Drop `internalNodeIds`, `branchIdx` from factory signature.
-- Add `hasBranchRow: false` on the composite's `MnaModel` (vcvs1 has `hasBranchRow: true`).
 - Add `mayCreateInternalNodes: false` (no internal nodes on the comparator composite).
 - Leave `ngspiceNodeMap` undefined on the composite `ComponentDefinition`.
 - Models `"open-collector"` and `"push-pull"` both decompose to VCVSElement; behavioral difference is in `load()` RHS override.
@@ -132,9 +142,16 @@ With nodes `(inP, inN, nOut, 0)`:
 
 Note: entry (2) `(0, branch)` — ground row is node 0; `allocElement(0, branch)` is a no-op (ground row not stamped). Entry (4) similarly skipped. VCVSElement.setup() must handle node-0 entries correctly (skip, as ngspice does — ground row is never explicitly stored).
 
+## Pre-implementation checklist (W3 implementer)
+
+1. Run `npm run test:q -- comparator` — capture baseline pass/fail counts.
+2. Identify any `expect(out).toBeCloseTo(...)` assertions where the expected value depends on saturation behavior. The Norton→VCVS swap may shift these by µV-to-mV depending on circuit load.
+3. After implementation, re-run; report any new failures for user review.
+
 ## Verification gate
 
 1. `setup-stamp-order.test.ts` row for PB-COMPARATOR is GREEN.
 2. `src/components/active/__tests__/comparator.test.ts` is GREEN.
+   - **Setup-mocking removal**: the implementer MUST audit the test file for any pattern that fakes the migrated `setup()` process (e.g., manually constructing element handles, stub solver objects that bypass the real allocation path, or directly calling `load()` without going through `_setup()` first). Every such pattern MUST be replaced with the real path: instantiate the element via its factory, call `_setup()` on the engine to allocate handles, then exercise `load()`/`accept()`. Tests that pass only because they bypass the new setup contract are NOT a valid GREEN signal — those tests are themselves a defect to be fixed in this same task.
 3. The pin-map-coverage test allows the composite to lack `ngspiceNodeMap`.
 4. No banned closing verdicts.

@@ -87,7 +87,6 @@ Neither SW sub-element has a branch row.
 
 - Drop `internalNodeIds`, `branchIdx` from factory signature.
 - Drop `branchCount`, `getInternalNodeCount` from MnaModel registration.
-- Add `hasBranchRow: false`.
 - Composite has no `ngspiceNodeMap`.
 - No `findBranchFor` callback.
 - Composite carries `{ _nfetSW: SwitchElement, _pfetSW: SwitchElement }` as direct refs.
@@ -96,4 +95,4 @@ Neither SW sub-element has a branch row.
 
 1. `setup-stamp-order.test.ts` row for PB-TRANSGATE is GREEN (8-entry sequence: NFET SW's 4 then PFET SW's 4).
 2. `src/components/switching/__tests__/switches.test.ts` is GREEN.
-3. No banned closing verdicts.
+   - **Setup-mocking removal**: the implementer MUST audit the test file for any pattern that fakes the migrated `setup()` process (e.g., manually constructing element handles, stub solver objects that bypass the real allocation path, or directly calling `load()` without going through `_setup()` first). Every such pattern MUST be replaced with the real path: instantiate the element via its factory, call `_setup()` on the engine to allocate handles, then exercise `load()`/`accept()`. Tests that pass only because they bypass the new setup contract are NOT a valid GREEN signal — those tests are themselves a defect to be fixed in this same task.

@@ -52,7 +52,7 @@ setup(ctx: SetupContext): void {
   const nOut = this._pinNodes.get("out")!;
 
   // Composite-level hysteresis state: 1 slot
-  this._stateOffset = ctx.allocStates(1);
+  this._stateBase = ctx.allocStates(1);
 
   // Forward to pin models (they allocate their own TSTALLOC entries)
   if (nIn  > 0) this._inModel.setup(ctx);
@@ -71,14 +71,14 @@ setup(ctx: SetupContext): void {
 load(ctx: LoadContext): void {
   const vIn = ctx.rhsOld[this._nIn];
 
-  // Apply hysteresis state machine (reads/writes _stateOffset slot)
-  const outputHigh = this._pool.states[0][this._stateOffset] >= 0.5;
+  // Apply hysteresis state machine (reads/writes _stateBase slot)
+  const outputHigh = ctx.state0[this._stateBase] >= 0.5;
   let nextHigh = outputHigh;
   if (outputHigh && vIn < this._p.vTL) { nextHigh = false; }
   else if (!outputHigh && vIn > this._p.vTH) { nextHigh = true; }
 
   if (nextHigh !== outputHigh) {
-    this._pool.states[0][this._stateOffset] = nextHigh ? 1.0 : 0.0;
+    ctx.state0[this._stateBase] = nextHigh ? 1.0 : 0.0;
     const driveHigh = this._inverting ? !nextHigh : nextHigh;
     this._outModel.setLogicLevel(driveHigh);
   }
@@ -109,7 +109,6 @@ Not needed. Direct refs to `_inModel`, `_outModel`, and `_childElements`.
 ## Factory cleanup
 
 - Drop `internalNodeIds`, `branchIdx` from factory signature.
-- Add `hasBranchRow: false` on the composite's `MnaModel`.
 - Add `mayCreateInternalNodes: false`.
 - Leave `ngspiceNodeMap` undefined on both `SchmittInvertingDefinition` and `SchmittNonInvertingDefinition`.
 - Both `"behavioral"` models (inverting/non-inverting) follow this same setup structure; the `inverting` flag is captured at construction time, not in state.
@@ -118,5 +117,6 @@ Not needed. Direct refs to `_inModel`, `_outModel`, and `_childElements`.
 
 1. `setup-stamp-order.test.ts` row for PB-SCHMITT is GREEN (stamp order from pin models).
 2. `src/components/active/__tests__/schmitt-trigger.test.ts` is GREEN.
+   - **Setup-mocking removal**: the implementer MUST audit the test file for any pattern that fakes the migrated `setup()` process (e.g., manually constructing element handles, stub solver objects that bypass the real allocation path, or directly calling `load()` without going through `_setup()` first). Every such pattern MUST be replaced with the real path: instantiate the element via its factory, call `_setup()` on the engine to allocate handles, then exercise `load()`/`accept()`. Tests that pass only because they bypass the new setup contract are NOT a valid GREEN signal — those tests are themselves a defect to be fixed in this same task.
 3. The pin-map-coverage test allows the composite to lack `ngspiceNodeMap`.
 4. No banned closing verdicts.

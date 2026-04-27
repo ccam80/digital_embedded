@@ -48,6 +48,10 @@ divergence.
 
 ---
 
+**Pre-requisite — W2.5 wave.** Shape rules 2 and 3 below reference field names (`_branchIndex`, `_outputCap`, `_inputPins`, `_outputPins`, `_subElements`, `_childElements`) and a class-based element structure that do not exist in the pre-W2.5 source. Per `plan.md` §Wave plan, the W2.5 wave (a) renames source fields in `src/solver/analog/digital-pin-model.ts` to match the spec names and (b) converts factory-closure analog elements to classes with the listed instance fields. This file describes the **post-W2.5 target architecture**. W3 implementer agents must not start any PB-BEHAV-* component before W2.5 is complete; running PB-BEHAV-* against pre-W2.5 source produces TypeScript compile errors at every setup() body.
+
+**Pin-node access**: per `00-engine.md` §A3, every behavioral element class stores `_pinNodes: Map<string, number>` as an instance field. Shape rules below reference `this._pinNodes.get("label")!` consistently; if a Shape rule code block uses bare `pinNodes` or `pinNodeIds[N]`, treat it as a typo and use `this._pinNodes.get("label")!`.
+
 ## Shape rule 1 — `DigitalInputPinModel.setup(ctx)`
 
 **File:** `src/solver/analog/digital-pin-model.ts`
@@ -56,8 +60,8 @@ Add a new method:
 
 ```ts
 setup(ctx: SetupContext): void {
-  if (!this._loaded) return;            // unloaded inputs do not stamp
   if (this._nodeId <= 0) return;        // ground or unset
+  // _loaded is a load-time-only flag — controls stamp value (1/rIn ≈ 0 for unloaded), never gates allocation. Matches ngspice unconditional TSTALLOC.
 
   // TSTALLOC: (node, node) — input loading conductance 1/rIn
   this._hNodeDiag = ctx.solver.allocElement(this._nodeId, this._nodeId);
@@ -68,6 +72,8 @@ setup(ctx: SetupContext): void {
   }
 }
 ```
+
+> **Why no `_loaded` guard at setup time**: ngspice elements always allocate their full TSTALLOC pattern in *setup() regardless of whether the surrounding circuit has loaded the device. The matrix entries exist; load() decides what to stamp. digiTS follows this pattern: setup() always allocates the diagonal handle, and `_loaded`'s only consumer is the load() body, which stamps a near-zero conductance (1/rIn) when the pin is unloaded.
 
 Also add a `setup(ctx)` method to `AnalogCapacitorElement` per the
 `PB-CAP.md` spec (calls `solver.allocElement` 4× for the capacitor's
@@ -112,13 +118,15 @@ The `init(nodeId, branchIdx)` method continues to do its existing job
 `load()` body trusts that `setup()` has run before the first
 `load()` call (engine guarantee per `00-engine.md` §A4.3).
 
+**Composite sub-element registration.** Composites do not need to call `ctx.registerDevice` from their `setup()`. Sub-elements are auto-registered in `_deviceMap` by the engine's recursive walk during `init()` (see `00-engine.md` §A4.1). The composite's `setup()` only forwards `setup(ctx)` to each sub-element for matrix-entry allocation — discovery is already done.
+
 ## Shape rule 3 — Composite behavioral element `setup(ctx)`
 
 Every behavioral composite (BehavioralGateElement, BehavioralMuxElement,
 BehavioralDemuxElement, BehavioralDecoderElement, Driver, DriverInv,
 Splitter, SevenSeg, ButtonLED, RelayElement, RelayDTElement,
 TransGateElement, NFETElement, PFETElement, FGNFETElement,
-FGPFETElement) implements:
+FGPFETElement. All elements above are class-based as of W2.5; pre-W2.5 closure factories (`createDriverAnalogElement`, etc.) are converted to classes in W2.5.) implements:
 
 ```ts
 setup(ctx: SetupContext): void {
@@ -136,6 +144,18 @@ setup(ctx: SetupContext): void {
 Forward order does not matter for correctness (composite owns all sub-
 elements; no cross-device label lookup is needed) but should be:
 **inputs → outputs → children → other sub-elements** for readability.
+
+**Concrete field names per composite class** (P-behav-D8 resolution):
+
+| Class | Input pins field | Output pins field | Selector pins field | Children/sub-elements field |
+|---|---|---|---|---|
+| BehavioralGateElement | `_inputs` | `_output` (single) | n/a | `_childElements` |
+| BehavioralMuxElement | `_dataPins` (2D: `DigitalInputPinModel[][]` indexed by data-input group, then bit) | `_outPins` | `_selPins` | `_childElements` |
+| BehavioralDemuxElement | `_inPin` (single `DigitalInputPinModel`) | `_outPins` | `_selPins` | `_childElements` |
+| BehavioralDecoderElement | (merged into `_selPins`) — decoder has no separate data input; selector is the only input | `_outPins` | `_selPins` | `_childElements` |
+| Driver / DriverInv / Splitter / SevenSeg / ButtonLED / Relay / RelayDT | factory closures — local variables, not class fields (see Shape rule 3 closure variant) |
+
+The Shape rule 3 generic body (`for (const pin of this._inputPins) ...`) is a TEMPLATE. Per-class implementers substitute the actual field name from this table.
 
 ## Shape rule 4 — Variable-input gates (AND, OR, NAND, NOR, XOR, XNOR)
 
@@ -273,7 +293,17 @@ For implementer reference. Each row links to its component spec file
 
 For behavioral components:
 
-1. Component's existing test file (`src/solver/analog/__tests__/<file>.test.ts` or `src/components/<dir>/__tests__/<file>.test.ts`) is GREEN.
+1. The component's existing test file is GREEN. Concrete test-file mapping:
+
+   | Component group | Test file |
+   |---|---|
+   | Gates: NOT, AND, NAND, OR, NOR, XOR, XNOR | `src/solver/analog/__tests__/behavioral-gate.test.ts` |
+   | Combinational: Mux, Demux, Decoder | `src/solver/analog/__tests__/behavioral-combinational.test.ts` |
+   | Closure-based: Driver, DriverInv, Splitter, SevenSeg, SevenSegHex, ButtonLED, Relay, RelayDT | `src/solver/analog/__tests__/behavioral-remaining.test.ts` |
+   | Switching: TransGate, NFET, PFET, FGNFET, FGPFET | `src/components/switching/__tests__/fets.test.ts` (FETs) and `src/components/switching/__tests__/relay.test.ts` (Relay variants) |
+   | Ground | `src/solver/analog/__tests__/behavioral-ground.test.ts` if it exists; otherwise the gate is satisfied by `behavioral-remaining.test.ts` not regressing |
+
+   The implementer marks the W3 row green only when the listed file passes after migration.
 2. The component's `setup()` body alloc-only (no value writes) and `load()` body stamp-only (no `solver.allocElement` calls). Verified by `Grep "allocElement" <component-file>` returning only setup() matches.
 3. The behavioral element's setup() forward order matches Shape rule 3 (inputs → outputs → children → others).
 

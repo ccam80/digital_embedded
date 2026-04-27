@@ -23,8 +23,6 @@ None. VCCS has no internal voltage nodes.
 
 None. VCCS uses a Norton stamp — no branch variable.
 
-`hasBranchRow: false`
-
 ## State slots
 
 0. `NG_IGNORE(states)` — vccsset.c performs no `*states +=` increment.
@@ -62,6 +60,23 @@ index 0 = `ctrl+`, index 1 = `ctrl-`, index 2 = `out+`, index 3 = `out-`.
 
 All 4 handles stored on the element instance. `allocElement` NEVER called from
 `load()`.
+
+## VccsAnalogElement.stamps — readonly accessor for composite users
+
+VccsAnalogElement exposes its four TSTALLOC handles via a readonly accessor for composites that need to stamp through the VCCS without owning the handle fields directly:
+
+```ts
+get stamps(): { pCtP: number; pCtN: number; nCtP: number; nCtN: number } {
+  return {
+    pCtP: this._hPCtP,
+    pCtN: this._hPCtN,
+    nCtP: this._hNCtP,
+    nCtN: this._hNCtN,
+  };
+}
+```
+
+The accessor returns a fresh object on every call — composite consumers (PB-TUNNEL, PB-TRIODE) typically destructure once into local consts at the start of `load()` rather than calling per-iteration. Renaming or restructuring private handle fields does NOT break composite consumers as long as the accessor's return shape is preserved.
 
 ## load() body — value writes only
 
@@ -103,7 +118,6 @@ Not applicable.
   `VCCSDefinition.modelRegistry["behavioral"]`). New signature:
   `factory(pinNodes, props, getTime): AnalogElementCore`.
 - Drop any `branchCount` field (was absent; confirm it stays absent).
-- Add `hasBranchRow: false`.
 - Add `ngspiceNodeMap: { "out+": "pos", "out-": "neg", "ctrl+": "contPos", "ctrl-": "contNeg" }`.
 - No `findBranchFor` callback.
 
@@ -112,4 +126,4 @@ Not applicable.
 1. `setup-stamp-order.test.ts` row for PB-VCCS is GREEN: insertion order must be
    `[(posNode,ctrlPosNode), (posNode,ctrlNegNode), (negNode,ctrlPosNode), (negNode,ctrlNegNode)]`.
 2. `src/components/active/__tests__/vccs.test.ts` is GREEN.
-3. No banned closing verdicts.
+- **Setup-mocking removal**: the implementer MUST audit the test file for any pattern that fakes the migrated `setup()` process (e.g., manually constructing element handles, stub solver objects that bypass the real allocation path, or directly calling `load()` without going through `_setup()` first). Every such pattern MUST be replaced with the real path: instantiate the element via its factory, call `_setup()` on the engine to allocate handles, then exercise `load()`/`accept()`. Tests that pass only because they bypass the new setup contract are NOT a valid GREEN signal — those tests are themselves a defect to be fixed in this same task.

@@ -131,7 +131,7 @@ load(ctx: LoadContext): void {
   const vCtrl = nCtrl > 0 ? ctx.rhsOld[nCtrl] : 0;
 
   // Pass control voltage to SW sub-element for state machine evaluation
-  this._sw1.setCtrlVoltage(vCtrl);
+  this._sw1.setCtrlVoltage(vCtrl);  // Defined in PB-SW §"setCtrlVoltage(v) — for composite use only"
   this._sw1.load(ctx);
 }
 ```
@@ -144,11 +144,15 @@ load(ctx: LoadContext): void {
   const vCtrl = nCtrl > 0 ? ctx.rhsOld[nCtrl] : 0;
 
   // NO path: normal polarity
-  this._swNO.setCtrlVoltage(vCtrl);
+  this._swNO.setCtrlVoltage(vCtrl);  // Defined in PB-SW §"setCtrlVoltage(v) — for composite use only"
   this._swNO.load(ctx);
 
-  // NC path: inverted polarity (ctrl negated relative to threshold)
-  this._swNC.setCtrlVoltage(-vCtrl);  // inversion via negation
+  // NC path: inverted polarity — explicit ON/OFF based on threshold comparison
+  // (Option A from FANALOG_SWITCH-D2: avoids -vCtrl negation pattern)
+  const vThreshold = this._props.getModelParam("vThreshold") ?? 2.5;
+  const vHyst      = this._props.getModelParam("vHysteresis") ?? 0.5;
+  const ncOn = vCtrl < vThreshold - vHyst / 2;
+  this._swNC.setSwState(ncOn);  // Defined in PB-SW §"setSwState(on) — for composite use only"
   this._swNC.load(ctx);
 }
 ```
@@ -182,7 +186,7 @@ With nodes `(nPos, nNeg)`:
 
 State allocation (`swsetup.c:47-48`) precedes TSTALLOC calls:
 ```ts
-this._stateOffset = ctx.allocStates(2);  // before allocElement calls
+this._stateBase = ctx.allocStates(2);  // before allocElement calls
 ```
 
 ## findDevice usage
@@ -192,7 +196,6 @@ Not needed. Direct refs to `_sw1` (SPST) or `_swNO`/`_swNC` (SPDT).
 ## Factory cleanup
 
 - Drop `internalNodeIds`, `branchIdx` from factory signature.
-- Add `hasBranchRow: false` on the composite's `MnaModel` (SW has no branch row).
 - Add `mayCreateInternalNodes: false`.
 - Leave `ngspiceNodeMap` undefined on both `AnalogSwitchSPSTDefinition` and `AnalogSwitchSPDTDefinition`.
 - The SPDT `"inverted polarity"` for `swNC` is a digiTS extension beyond `sw/swsetup.c` — it is not a new ngspice anchor. The SPDT composite is documented as a digiTS-specific composition of two standard SW primitives, each anchored at `sw/swsetup.c`.
@@ -203,5 +206,5 @@ Not needed. Direct refs to `_sw1` (SPST) or `_swNO`/`_swNC` (SPDT).
    - SPST: `allocStates(2)` then 4×SW TSTALLOC.
    - SPDT: `swNO.setup` (allocStates(2) + 4×SW), then `swNC.setup` (allocStates(2) + 4×SW).
 2. `src/components/active/__tests__/analog-switch.test.ts` is GREEN.
+   - **Setup-mocking removal**: the implementer MUST audit the test file for any pattern that fakes the migrated `setup()` process (e.g., manually constructing element handles, stub solver objects that bypass the real allocation path, or directly calling `load()` without going through `_setup()` first). Every such pattern MUST be replaced with the real path: instantiate the element via its factory, call `_setup()` on the engine to allocate handles, then exercise `load()`/`accept()`. Tests that pass only because they bypass the new setup contract are NOT a valid GREEN signal — those tests are themselves a defect to be fixed in this same task.
 3. The pin-map-coverage test allows both composites to lack `ngspiceNodeMap`.
-4. No banned closing verdicts.

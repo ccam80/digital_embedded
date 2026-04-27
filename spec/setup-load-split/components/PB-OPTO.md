@@ -1,7 +1,8 @@
 # Task PB-OPTO
 
 **digiTS file:** `src/components/active/optocoupler.ts`
-**Architecture:** composite. Decomposes into 1× DIO (LED) + 1× BJT NPN (phototransistor) at compile time. Photo-current coupling is handled in composite `load()`.
+**Architecture:** composite. Decomposes into 4 sub-elements at compile time:
+  `dLed` (DIO) + `vSense` (VSRC) + `cccsCouple` (CCCS) + `bjtPhoto` (BJT NPN).
 
 ## Pin mapping (from 01-pin-mapping.md)
 
@@ -13,22 +14,31 @@ Composite pin labels (from `buildOptocouplerPinDeclarations()`):
 - `collector` — phototransistor collector, output+ (pinLayout index 2)
 - `emitter` — phototransistor emitter, output- (pinLayout index 3)
 
-Internal node: phototransistor base (no external pin). Allocated by `ctx.makeVolt(label, "base")` in `setup()`.
+Internal nodes allocated in `setup()`:
+- `_nBase`: phototransistor base (no external pin). `ctx.makeVolt(label, "base")`
+- `_nSenseMid`: mid-node between `dLed` cathode and `vSense` (so `vSense` sits in series with
+  `dLed`). `ctx.makeVolt(label, "senseMid")`
 
 ## Sub-element decomposition
 
-| Sub-element label | Class | ngspice anchor | Pin assignments (parent pin → sub-element pin) | setParam routing |
+The LED input side is: `anode` → `dLed` → `_nSenseMid` → `vSense` (0 V sense source) → `cathode`.
+The `vSense` branch current equals the LED forward current. `cccsCouple` reads that branch and
+injects `CTR × I_LED` into the phototransistor base node.
+
+| Sub-element | Class | ngspice anchor | Pin assignments | setParam routing |
 |---|---|---|---|---|
-| `ledSub` | DIOElement | `dio/diosetup.c:198-238` | `anode`→`A`, `cathode`→`K` | `"Is"` → ledSub, `"n"` → ledSub |
-| `bjtSub` | BJTElement (NPN) | `bjt/bjtsetup.c:347-465` | `nBase`(internal)→`B`, `collector`→`C`, `emitter`→`E` | (fixed NPN L0 defaults, no user setParam) |
+| `dLed` | DIOElement | `dio/diosetup.c:198-238` | `anode`→`A`, `_nSenseMid`→`K` | `"Is"` → dLed, `"n"` → dLed |
+| `vSense` | VSRCElement (DC 0 V) | `vsrc/vsrcsetup.c` | `_nSenseMid`→`pos`, `cathode`→`neg` | (fixed 0 V, no user setParam) |
+| `cccsCouple` | CCCSElement | `cccs/cccssetup.c` | sense branch = `vSense` branch; output `pos`=`_nBase`, `neg`=`emitter` | `"CTR"` → cccsCouple (gain) |
+| `bjtPhoto` | BJTElement (NPN) | `bjt/bjtsetup.c:347-465` | `_nBase`→`B`, `collector`→`C`, `emitter`→`E` | (fixed NPN L0 defaults, no user setParam) |
 
 Sub-element `ngspiceNodeMap`:
 ```
-ledSub.ngspiceNodeMap  = { A: "pos", K: "neg" }
-bjtSub.ngspiceNodeMap  = { B: "base", C: "col", E: "emit" }
+dLed.ngspiceNodeMap        = { A: "pos", K: "neg" }
+vSense.ngspiceNodeMap      = { pos: "pos", neg: "neg" }
+cccsCouple.ngspiceNodeMap  = { pos: "pos", neg: "neg" }
+bjtPhoto.ngspiceNodeMap    = { B: "base", C: "col", E: "emit" }
 ```
-
-The phototransistor base node `nBase` is an internal node with no external pin. It is allocated in `setup()` and wired as `B` for `bjtSub`.
 
 ## Construction (factory body sketch)
 
@@ -39,24 +49,40 @@ factory(pinNodes, props, getTime): AnalogElementCore {
   const nCollector = pinNodes.get("collector")!;
   const nEmitter   = pinNodes.get("emitter")!;
 
-  const ledProps = makeLedProps(props.getModelParam("Is"), props.getModelParam("n"));
-  const bjtProps = makeBjtProps();
-
-  const ledSub = createDiodeElement(
-    new Map([["A", nAnode], ["K", nCathode]]),
-    ledProps,
+  // dLed: anode → _nSenseMid (K assigned at setup() once _nSenseMid is allocated)
+  const dLed = createDiodeElement(
+    new Map([["A", nAnode], ["K", 0]]),   // K overwritten in setup()
+    makeLedProps(props.getModelParam("Is"), props.getModelParam("n")),
   );
-  ledSub.label = `${label}_ledSub`;
+  dLed.label = `${label}_dLed`;
 
-  // bjtSub base node resolved at setup() time — placeholder 0 here
-  const bjtSub = createBjtElement(1 /* NPN */, new Map([
+  // vSense: 0-volt sense source in series with dLed
+  // pos = _nSenseMid (overwritten in setup()), neg = cathode
+  const vSense = createVsrcElement(
+    new Map([["pos", 0], ["neg", nCathode]]),
+    { dc: 0 },
+  );
+  vSense.label = `${label}_vSense`;
+
+  // cccsCouple: sense = vSense branch; output pos = _nBase (overwritten in setup()), neg = emitter
+  const cccsCouple = createCccsElement(
+    new Map([["pos", 0], ["neg", nEmitter]]),
+    { gain: props.getModelParam("CTR") ?? 1.0 },
+  );
+  cccsCouple.label = `${label}_cccsCouple`;
+
+  // bjtPhoto: base = _nBase (overwritten in setup()), C = collector, E = emitter
+  const bjtPhoto = createBjtElement(1 /* NPN */, new Map([
     ["B", 0],   // overwritten in setup()
     ["C", nCollector],
     ["E", nEmitter],
-  ]), bjtProps);
-  bjtSub.label = `${label}_bjtSub`;
+  ]), makeBjtProps());
+  bjtPhoto.label = `${label}_bjtPhoto`;
 
-  return new OptocouplerCompositeElement({ ledSub, bjtSub, nAnode, nCathode, nCollector, nEmitter, props });
+  return new OptocouplerCompositeElement({
+    dLed, vSense, cccsCouple, bjtPhoto,
+    nAnode, nCathode, nCollector, nEmitter, props,
+  });
 }
 ```
 
@@ -69,67 +95,66 @@ setup(ctx: SetupContext): void {
   const nCollector = this._pinNodes.get("collector")!;
   const nEmitter   = this._pinNodes.get("emitter")!;
 
-  // Allocate internal base node (no external pin) — diosetup.c-style CKTmkVolt
-  this._nBase = ctx.makeVolt(this.label, "base");
+  // Allocate internal nodes
+  this._nSenseMid = ctx.makeVolt(this.label, "senseMid");
+  this._nBase     = ctx.makeVolt(this.label, "base");
 
-  // LED diode sub-element setup (diosetup.c:198-238)
-  this._ledSub.pinNodeIds = [nAnode, nCathode];
-  this._ledSub.setup(ctx);
+  // Wire dLed: anode → senseMid
+  this._dLed.setPinNode("K", this._nSenseMid);
 
-  // BJT phototransistor sub-element setup (bjtsetup.c:347-465)
-  // base = internal node, C = collector, E = emitter
-  this._bjtSub.pinNodeIds = [this._nBase, nCollector, nEmitter];
-  this._bjtSub.setup(ctx);
+  // Wire vSense: senseMid → cathode (0-volt sense source)
+  this._vSense.setPinNode("pos", this._nSenseMid);
 
-  // Composite state: none (sub-elements own all state slots)
-  // ledSub.setup calls ctx.allocStates(5) — diosetup.c:199
-  // bjtSub.setup calls ctx.allocStates(BJTnumStates=24) — bjtsetup.c:366-367
+  // Wire cccsCouple output: nBase → emitter
+  this._cccsCouple.setPinNode("pos", this._nBase);
 
-  // CCCS coupling Jacobian handles — allocated here for use in load()
-  // Stamp coupling: G[nBase, nAnode] += CTR*geqLed, G[nBase, nCathode] -= CTR*geqLed
-  this._hBaseAnode   = ctx.solver.allocElement(this._nBase, nAnode);
-  this._hBaseCathode = ctx.solver.allocElement(this._nBase, nCathode);
+  // Wire bjtPhoto base
+  this._bjtPhoto.setPinNode("B", this._nBase);
+
+  // Sub-element setup in NGSPICE_LOAD_ORDER
+  this._dLed.setup(ctx);        // DIO TSTALLOC (diosetup.c:232-238, 7 entries)
+  this._vSense.setup(ctx);      // VSRC TSTALLOC (vsrcsetup.c, 4 entries)
+  this._cccsCouple.setup(ctx);  // CCCS TSTALLOC (cccssetup.c); also resolves vSense branch
+  this._bjtPhoto.setup(ctx);    // BJT TSTALLOC (bjtsetup.c:435-464, 23 entries)
 }
 ```
 
 ### Setup order
 
 Setup order within composite's `setup()` call:
-1. `ctx.makeVolt(label, "base")` — allocate internal base node
-2. `ledSub.setup(ctx)` — DIO TSTALLOC sequence (7 entries, diosetup.c:232-238)
-3. `bjtSub.setup(ctx)` — BJT TSTALLOC sequence (23 entries, bjtsetup.c:435-464)
-4. `ctx.solver.allocElement(nBase, nAnode)` — CCCS Jacobian coupling (anode column)
-5. `ctx.solver.allocElement(nBase, nCathode)` — CCCS Jacobian coupling (cathode column)
+1. `ctx.makeVolt(label, "senseMid")` — allocate LED/sense-source mid-node
+2. `ctx.makeVolt(label, "base")` — allocate phototransistor base node
+3. `dLed.setup(ctx)` — DIO TSTALLOC sequence (7 entries, diosetup.c:232-238)
+4. `vSense.setup(ctx)` — VSRC TSTALLOC sequence (4 entries, vsrcsetup.c)
+5. `cccsCouple.setup(ctx)` — CCCS TSTALLOC sequence (cccssetup.c); resolves vSense branch via
+   `ctx.findDevice(vSense.label).branchIndex`
+6. `bjtPhoto.setup(ctx)` — BJT TSTALLOC sequence (23 entries, bjtsetup.c:435-464)
 
-Steps 4–5 are composite-level allocations (not delegated to a named sub-element class). They follow all sub-element TSTALLOCs so that `setup-stamp-order.test.ts` can verify the full sequence.
+Every stamp is owned by a named sub-element with an ngspice anchor. No composite-level
+`allocElement` calls.
 
-## load() body — composite with photo-current coupling
+## load() body — forwards to sub-elements in order
 
 ```ts
 load(ctx: LoadContext): void {
   // 1. LED diode stamp — dioload.c:120-441
-  this._ledSub.load(ctx);
+  this._dLed.load(ctx);
 
-  // 2. CCCS coupling — CTR * I_LED injected into nBase (photo-current)
-  const s0     = pool.states[0];
-  const iLed   = s0[diodeBase + DIODE_SLOT_ID];   // dioload.c DIOcurrent
-  const geqLed = s0[diodeBase + DIODE_SLOT_GEQ];   // NR companion conductance
-  const ctr    = this._ctr;
-  const gmCtr  = ctr * geqLed;
+  // 2. Zero-volt sense source stamp — vsrcload.c
+  //    The vSense branch current is I_LED (sense-source in series with dLed).
+  this._vSense.load(ctx);
 
-  // Jacobian: coupling from input voltage to base row
-  ctx.solver.stampElement(this._hBaseAnode,   gmCtr);
-  ctx.solver.stampElement(this._hBaseCathode, -gmCtr);
+  // 3. CCCS coupling: CTR × I_vSense injected as photo-current to bjtPhoto base
+  //    cccsload.c stamps gain × I_sense into output nodes; sense branch = vSense.
+  this._cccsCouple.load(ctx);
 
-  // Norton current: iBase - gmCtr * vd (constant term)
-  const vd         = ctx.rhsOld[nAnode] - ctx.rhsOld[nCathode];
-  const iBaseNorton = ctr * iLed - gmCtr * vd;
-  ctx.rhs[this._nBase] += iBaseNorton;
-
-  // 3. BJT phototransistor stamp — bjtload.c:170-end
-  this._bjtSub.load(ctx);
+  // 4. BJT phototransistor stamp — bjtload.c
+  this._bjtPhoto.load(ctx);
 }
 ```
+
+State access in sub-elements uses `ctx.state0`/`ctx.state1` (per R5). No raw pool array indexing
+at the composite level.
 
 ## State slots
 
@@ -137,28 +162,32 @@ Composite has none of its own. All state slots owned by sub-elements:
 
 | Sub-element | State slots | Source |
 |---|---|---|
-| `ledSub` (DIO) | 5 slots | `diosetup.c:199`: `*states += 5` |
-| `bjtSub` (BJT NPN) | 24 slots | `bjtsetup.c:366-367`: `*states += BJTnumStates` (24) |
+| `dLed` (DIO) | 5 slots | `diosetup.c:199`: `*states += 5` |
+| `vSense` (VSRC) | 0 slots | `vsrcsetup.c`: no state allocation |
+| `cccsCouple` (CCCS) | 0 slots | `cccssetup.c`: no state allocation |
+| `bjtPhoto` (BJT NPN) | 24 slots | `bjtsetup.c:366-367`: `*states += BJTnumStates` (24) |
 
-Total state size: 29 slots. State layout:
-- `[0 .. 4]` — LED diode state (diodeBase = composite stateBaseOffset)
-- `[5 .. 28]` — BJT phototransistor state (bjtBase = diodeBase + 5)
+Total state size: 29 slots.
 
 ## findDevice usage
 
-Not needed. Direct refs to `_ledSub` and `_bjtSub`.
+Not needed. Direct refs to `_dLed`, `_vSense`, `_cccsCouple`, `_bjtPhoto`.
 
 ## Factory cleanup
 
 - Drop `internalNodeIds`, `branchIdx` from factory signature.
-- Drop `getInternalNodeCount` and `getInternalNodeLabels` from `MnaModel` registration (replaced by `mayCreateInternalNodes: true`).
-- Add `hasBranchRow: false` on the composite's `MnaModel`.
-- Add `mayCreateInternalNodes: true` (base node allocated in `setup()`).
+- Drop `getInternalNodeCount` and `getInternalNodeLabels` from `MnaModel` registration (replaced
+  by `mayCreateInternalNodes: true`).
+- Drop the digiTS-internal coupling handle fields `_hBaseAnode` and `_hBaseCathode` entirely.
+- Add `mayCreateInternalNodes: true` (senseMid and base nodes allocated in `setup()`).
 - Leave `ngspiceNodeMap` undefined on `OptocouplerDefinition`.
 
 ## Verification gate
 
-1. `setup-stamp-order.test.ts` row for PB-OPTO is GREEN (DIO 7 entries, BJT 23 entries, then 2 CCCS coupling entries, in that order).
+1. `setup-stamp-order.test.ts` row for PB-OPTO is GREEN. Sequence: DIO 7 entries, VSRC 4 entries,
+   CCCS entries (per cccssetup.c), BJT 23 entries — in that order. No composite-level allocElement
+   entries appear.
 2. `src/components/active/__tests__/optocoupler.test.ts` is GREEN.
+   - **Setup-mocking removal**: the implementer MUST audit the test file for any pattern that fakes the migrated `setup()` process (e.g., manually constructing element handles, stub solver objects that bypass the real allocation path, or directly calling `load()` without going through `_setup()` first). Every such pattern MUST be replaced with the real path: instantiate the element via its factory, call `_setup()` on the engine to allocate handles, then exercise `load()`/`accept()`. Tests that pass only because they bypass the new setup contract are NOT a valid GREEN signal — those tests are themselves a defect to be fixed in this same task.
 3. The pin-map-coverage test allows the composite to lack `ngspiceNodeMap`.
 4. No banned closing verdicts.

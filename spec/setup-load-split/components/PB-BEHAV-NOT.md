@@ -49,8 +49,8 @@ For NOT (1 input + 1 output): total TSTALLOC count = **2** (when both loaded). C
 
 - Drop `internalNodeIds` and `branchIdx` from the `makeNotAnalogFactory` closure signature (per A6.3). The factory currently ignores them (`_internalNodeIds`, `_branchIdx`); remove the parameters entirely once A6.3 lands.
 - `ComponentDefinition`: `ngspiceNodeMap` left `undefined` (behavioral — per 02-behavioral.md §"Pin-map field on behavioral models").
-- `MnaModel`: `hasBranchRow: false`, `mayCreateInternalNodes: false`.
-- `BehavioralGateElement` adds a `setup(ctx: SetupContext): void` method per Shape rule 3.
+- `MnaModel`: `mayCreateInternalNodes: false`.
+- **`BehavioralGateElement.setup()` ownership**: the shared method's body lands in W2 per W2.7 (see plan.md §"Wave plan" and 00-engine.md §A3.2). This W3 task does NOT write the method — it CONFIRMS the method exists and that the class still imports correctly. The factory-cleanup work for this gate type (drop legacy fields per the standard PB-* factory-cleanup contract) remains in scope for this W3 task.
 
 ## State pool
 
@@ -58,7 +58,8 @@ For NOT (1 input + 1 output): total TSTALLOC count = **2** (when both loaded). C
 
 ## Verification gate
 
-1. `src/solver/analog/__tests__/behavioral-gate.test.ts` (or equivalent test file for gates) is GREEN after the migration.
+1. `src/solver/analog/__tests__/behavioral-gate.test.ts` is GREEN after the migration.
+- **Setup-mocking removal**: the implementer MUST audit the test file for any pattern that fakes the migrated `setup()` process (e.g., manually constructing element handles, stub solver objects that bypass the real allocation path, or directly calling `load()` without going through `_setup()` first). Every such pattern MUST be replaced with the real path: instantiate the element via its factory, call `_setup()` on the engine to allocate handles, then exercise `load()`/`accept()`. Tests that pass only because they bypass the new setup contract are NOT a valid GREEN signal — those tests are themselves a defect to be fixed in this same task.
 2. `Grep "allocElement" src/solver/analog/behavioral-gate.ts` returns only matches inside the `setup()` method body (zero matches in `load()`).
 3. Composite `setup()` forward order is inputs → output → children (per Shape rule 3).
 4. No banned closing verdicts in review comments or commit messages.
