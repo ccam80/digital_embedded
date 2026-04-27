@@ -106,7 +106,7 @@ export class ComplexSparseSolver implements IComplexSparseSolver {
   // =========================================================================
   // Dimension
   // =========================================================================
-  private _n = 0;
+  private _size = 0;
 
   // =========================================================================
   // CSC L/U for forward/backward substitution (complex)
@@ -203,7 +203,7 @@ export class ComplexSparseSolver implements IComplexSparseSolver {
    */
   allocComplexElement(row: number, col: number): number {
     // Fast path: handle table lookup
-    if (this._n > 0 && this._n <= this._handleTableN) {
+    if (this._size > 0 && this._size <= this._handleTableN) {
       const idx = row * this._handleTableN + col;
       const stored = this._handleTable[idx];
       if (stored > 0) return stored - 1;
@@ -215,7 +215,7 @@ export class ComplexSparseSolver implements IComplexSparseSolver {
     let e = this._colHead[internalCol];
     while (e >= 0) {
       if (this._elRow[e] === row) {
-        if (this._n <= this._handleTableN) {
+        if (this._size <= this._handleTableN) {
           this._handleTable[row * this._handleTableN + col] = e + 1;
         }
         return e;
@@ -231,7 +231,7 @@ export class ComplexSparseSolver implements IComplexSparseSolver {
     // ngspice spbuild.c:788: NeedsOrdering = YES when a new element is inserted.
     this._needsReorderComplex = true;
 
-    if (this._n <= this._handleTableN) {
+    if (this._size <= this._handleTableN) {
       this._handleTable[row * this._handleTableN + col] = newE + 1;
     }
 
@@ -269,8 +269,8 @@ export class ComplexSparseSolver implements IComplexSparseSolver {
    * Zero allocations in steady state.
    */
   beginAssembly(n: number): void {
-    if (n !== this._n) {
-      this._n = n;
+    if (n !== this._size) {
+      this._size = n;
       this._structureEmpty = true;
     }
 
@@ -281,8 +281,8 @@ export class ComplexSparseSolver implements IComplexSparseSolver {
     }
 
     // Zero RHS
-    this._rhsRe.fill(0, 0, this._n);
-    this._rhsIm.fill(0, 0, this._n);
+    this._rhsRe.fill(0, 0, this._size);
+    this._rhsIm.fill(0, 0, this._size);
 
     // Reset Markowitz arrays
     if (this._markowitzRow.length !== n) {
@@ -302,7 +302,7 @@ export class ComplexSparseSolver implements IComplexSparseSolver {
    * linked structure for the upcoming factor call.
    */
   finalize(): void {
-    const n = this._n;
+    const n = this._size;
     const mRow = this._markowitzRow;
     const mCol = this._markowitzCol;
     const mProd = this._markowitzProd;
@@ -374,7 +374,7 @@ export class ComplexSparseSolver implements IComplexSparseSolver {
    *   4. Apply preorder inverse permutation: x[_preorderComplexColPerm[k]] = b[k]
    */
   solve(xRe: Float64Array, xIm: Float64Array): void {
-    const n = this._n;
+    const n = this._size;
     if (n === 0) return;
 
     const pinv = this._pinv;
@@ -458,7 +458,7 @@ export class ComplexSparseSolver implements IComplexSparseSolver {
     let didSwap = true;
     while (didSwap) {
       didSwap = false;
-      for (let col = startAt; col < this._n; col++) {
+      for (let col = startAt; col < this._size; col++) {
         const diagE = this._diag[col];
         if (diagE >= 0) {
           const dRe = this._elRe[diagE];
@@ -531,7 +531,7 @@ export class ComplexSparseSolver implements IComplexSparseSolver {
   // =========================================================================
 
   private _initStructure(): void {
-    const n = this._n;
+    const n = this._size;
     this._rhsRe = new Float64Array(n);
     this._rhsIm = new Float64Array(n);
 
@@ -607,7 +607,7 @@ export class ComplexSparseSolver implements IComplexSparseSolver {
    * Zero allocations — fill-in entries are returned to the free-list.
    */
   private _resetForAssembly(): void {
-    const n = this._n;
+    const n = this._size;
 
     for (let col = 0; col < n; col++) {
       let e = this._colHead[col];
@@ -727,7 +727,7 @@ export class ComplexSparseSolver implements IComplexSparseSolver {
   // =========================================================================
 
   private _allocateComplexWorkspace(): void {
-    const n = this._n;
+    const n = this._size;
     if (n === 0) return;
     if (n === this._workspaceN) return;
     this._workspaceN = n;
@@ -774,7 +774,7 @@ export class ComplexSparseSolver implements IComplexSparseSolver {
   // =========================================================================
 
   private _reach(k: number): number {
-    const n = this._n;
+    const n = this._size;
     const pinv = this._pinv;
     const mark = this._reachMark;
     const stack = this._reachStack;
@@ -830,7 +830,7 @@ export class ComplexSparseSolver implements IComplexSparseSolver {
   // =========================================================================
 
   private _numericLUMarkowitz(): boolean {
-    const n = this._n;
+    const n = this._size;
     if (n === 0) return true;
 
     const xRe = this._xRe;
@@ -1032,7 +1032,7 @@ export class ComplexSparseSolver implements IComplexSparseSolver {
    * ngspice: spFactor (spfactor.c), complex variant.
    */
   private _numericLUReusePivots(): boolean {
-    const n = this._n;
+    const n = this._size;
     if (n === 0) return true;
 
     const xRe = this._xRe;
@@ -1300,7 +1300,7 @@ export class ComplexSparseSolver implements IComplexSparseSolver {
     }
 
     let singletons = 0;
-    for (let i = 0; i < this._n; i++) {
+    for (let i = 0; i < this._size; i++) {
       if (pinv[i] >= 0) continue;
       mProd[i] = mRow[i] * mCol[i];
       if (mProd[i] === 0) singletons++;
@@ -1351,7 +1351,7 @@ export class ComplexSparseSolver implements IComplexSparseSolver {
   /** Count of non-fill-in elements in the linked structure. */
   get elementCount(): number {
     let count = 0;
-    const n = this._n;
+    const n = this._size;
     for (let col = 0; col < n; col++) {
       let e = this._colHead[col];
       while (e >= 0) {
@@ -1372,5 +1372,5 @@ export class ComplexSparseSolver implements IComplexSparseSolver {
   get elNextInRow(): Int32Array { return this._elNextInRow; }
   get elNextInCol(): Int32Array { return this._elNextInCol; }
   get diag(): Int32Array { return this._diag; }
-  get dimension(): number { return this._n; }
+  get dimension(): number { return this._size; }
 }

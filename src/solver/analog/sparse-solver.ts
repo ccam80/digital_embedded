@@ -187,6 +187,8 @@ export class SparseSolver {
   private _size: number = 0;
   /** ngspice Matrix->AllocatedSize — heap capacity for _diag/_rowHead/_colHead/_intToExtRow/_intToExtCol. */
   private _allocatedSize: number = 0;
+  /** ngspice Matrix->ExtSize — largest external index seen. */
+  private _extSize: number = 0;
   /** ngspice Matrix->AllocatedExtSize — heap capacity for _extToIntRow/_extToIntCol. */
   private _allocatedExtSize: number = 0;
   /** Insertion order for _getInsertionOrder() — test-only debug field. */
@@ -413,7 +415,7 @@ export class SparseSolver {
 
     // Grow external translation arrays if needed (spbuild.c:1047-1081).
     const maxExt = extRow > extCol ? extRow : extCol;
-    if (maxExt > this._allocatedExtSize) {
+    if (maxExt > this._extSize) {
       this._expandTranslationArrays(maxExt);
     }
     // Grow internal arrays if ext index exceeds internal allocation (spbuild.c:968-970).
@@ -1053,6 +1055,7 @@ export class SparseSolver {
     // ngspice spalloc.c:164-198 — MatrixFrame field init.
     this._size = 0;
     this._currentSize = 0;                        // mirrors ngspice CurrentSize
+    this._extSize = 0;
     this._allocatedSize = initialAlloc;
     this._allocatedExtSize = initialAlloc;
     this._factored = false;
@@ -1150,6 +1153,7 @@ export class SparseSolver {
   /** ngspice ExpandTranslationArrays (spbuild.c:1047-1081) — line-for-line port. */
   private _expandTranslationArrays(newSize: number): void {
     const oldAllocatedSize = this._allocatedExtSize;
+    this._extSize = newSize;
     if (newSize <= oldAllocatedSize) return;              // spbuild.c:1055-1056
 
     newSize = Math.max(newSize, Math.ceil(EXPANSION_FACTOR * oldAllocatedSize));
