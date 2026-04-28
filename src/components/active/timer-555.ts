@@ -613,7 +613,13 @@ class Timer555CompositeElement implements PoolBackedAnalogElementCore {
 
     // Active-low RST: if RST < GND + 0.7V → force Q=0
     const rstActive = vRst < vGnd + 0.7;
-    let q = ctx.state0[this._stateBase_latch] >= 0.5;
+    // Read latch state from state1 (previous accepted) so Q is stable across
+    // all NR iterations within a single step. Writing to state0 only; state1
+    // holds the last-accepted value and is only updated at step-acceptance via
+    // rotateStateVectors(). Without this, the latch writes to state0 on iter N
+    // and reads it back on iter N+1, creating intra-NR feedback that causes
+    // the latch to toggle each NR iteration and prevents convergence.
+    let q = ctx.state1[this._stateBase_latch] >= 0.5;
 
     const resetSignal = vComp1Out > 0.5 || rstActive;
     const setSignal   = vComp2Out > 0.5 && !resetSignal;

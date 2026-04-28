@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-04-27T10:54:49.191Z",
+  "updatedAt": "2026-04-28T01:50:45.960Z",
   "missions": [
     {
       "id": "session:95dd67bd-3c4a-4ee1-b08f-6b318a4b374b:team",
@@ -7442,6 +7442,1432 @@
           "agent": "claude-orchestrator:wave-verifier:a0c6b1e",
           "detail": "completed",
           "sourceKey": "session-stop:a0c6b1e581f6d98cb"
+        }
+      ]
+    },
+    {
+      "id": "session:551832c7-e568-451f-978f-c11a8f8b9630:none",
+      "source": "session",
+      "name": "none",
+      "objective": "Session mission",
+      "createdAt": "2026-04-27T11:12:28.504Z",
+      "updatedAt": "2026-04-27T13:44:56.786Z",
+      "status": "running",
+      "workerCount": 29,
+      "taskCounts": {
+        "total": 29,
+        "pending": 0,
+        "blocked": 0,
+        "inProgress": 6,
+        "completed": 23,
+        "failed": 0
+      },
+      "agents": [
+        {
+          "name": "general-purpose:a8169ae",
+          "role": "general-purpose",
+          "ownership": "a8169aeffc8d611fa",
+          "status": "done",
+          "currentStep": null,
+          "latestUpdate": "completed",
+          "completedSummary": null,
+          "updatedAt": "2026-04-27T13:44:56.786Z"
+        },
+        {
+          "name": "claude-orchestrator:implementer:a1d90d3",
+          "role": "claude-orchestrator:implementer",
+          "ownership": "a1d90d391d9162885",
+          "status": "done",
+          "currentStep": null,
+          "latestUpdate": "completed",
+          "completedSummary": null,
+          "updatedAt": "2026-04-27T11:14:45.080Z"
+        },
+        {
+          "name": "claude-orchestrator:implementer:ae5fe79",
+          "role": "claude-orchestrator:implementer",
+          "ownership": "ae5fe793da8522c76",
+          "status": "done",
+          "currentStep": null,
+          "latestUpdate": "completed",
+          "completedSummary": null,
+          "updatedAt": "2026-04-27T11:17:03.106Z"
+        },
+        {
+          "name": "claude-orchestrator:wave-verifier:a02d69c",
+          "role": "claude-orchestrator:wave-verifier",
+          "ownership": "a02d69c5ada1eaba5",
+          "status": "done",
+          "currentStep": null,
+          "latestUpdate": "completed",
+          "completedSummary": null,
+          "updatedAt": "2026-04-27T11:24:19.290Z"
+        },
+        {
+          "name": "claude-orchestrator:implementer:a2e671f",
+          "role": "claude-orchestrator:implementer",
+          "ownership": "a2e671fc26756ef40",
+          "status": "running",
+          "currentStep": null,
+          "latestUpdate": null,
+          "completedSummary": null,
+          "updatedAt": "2026-04-27T11:30:19.939Z"
+        },
+        {
+          "name": "claude-orchestrator:implementer:a77291c",
+          "role": "claude-orchestrator:implementer",
+          "ownership": "a77291cdf4048b1c8",
+          "status": "done",
+          "currentStep": null,
+          "latestUpdate": "completed",
+          "completedSummary": null,
+          "updatedAt": "2026-04-27T11:57:17.599Z"
+        },
+        {
+          "name": "claude-orchestrator:implementer:a334c44",
+          "role": "claude-orchestrator:implementer",
+          "ownership": "a334c445cb316f8ef",
+          "status": "done",
+          "currentStep": null,
+          "latestUpdate": "completed",
+          "completedSummary": null,
+          "updatedAt": "2026-04-27T11:56:22.182Z"
+        },
+        {
+          "name": "claude-orchestrator:implementer:a2e389f",
+          "role": "claude-orchestrator:implementer",
+          "ownership": "a2e389f98204ec45f",
+          "status": "done",
+          "currentStep": null,
+          "latestUpdate": "completed",
+          "completedSummary": null,
+          "updatedAt": "2026-04-27T12:04:16.022Z"
+        },
+        {
+          "name": "claude-orchestrator:wave-verifier:a841d53",
+          "role": "claude-orchestrator:wave-verifier",
+          "ownership": "a841d53516bfdd951",
+          "status": "done",
+          "currentStep": null,
+          "latestUpdate": "completed",
+          "completedSummary": null,
+          "updatedAt": "2026-04-27T12:11:52.362Z"
+        },
+        {
+          "name": "claude-orchestrator:implementer:afd229a",
+          "role": "claude-orchestrator:implementer",
+          "ownership": "afd229a651e4cbee7",
+          "status": "done",
+          "currentStep": null,
+          "latestUpdate": "completed",
+          "completedSummary": null,
+          "updatedAt": "2026-04-27T12:19:25.207Z"
+        },
+        {
+          "name": "claude-orchestrator:wave-verifier:a3bd7cb",
+          "role": "claude-orchestrator:wave-verifier",
+          "ownership": "a3bd7cbac4bda7408",
+          "status": "done",
+          "currentStep": null,
+          "latestUpdate": "completed",
+          "completedSummary": null,
+          "updatedAt": "2026-04-27T12:22:55.520Z"
+        },
+        {
+          "name": "claude-orchestrator:implementer:a12adb2",
+          "role": "claude-orchestrator:implementer",
+          "ownership": "a12adb23f33b18c91",
+          "status": "running",
+          "currentStep": null,
+          "latestUpdate": null,
+          "completedSummary": null,
+          "updatedAt": "2026-04-27T12:25:37.775Z"
+        },
+        {
+          "name": "claude-orchestrator:implementer:a5aa4c5",
+          "role": "claude-orchestrator:implementer",
+          "ownership": "a5aa4c5e5c48d0053",
+          "status": "done",
+          "currentStep": null,
+          "latestUpdate": "completed",
+          "completedSummary": null,
+          "updatedAt": "2026-04-27T12:46:53.677Z"
+        },
+        {
+          "name": "claude-orchestrator:wave-verifier:a4f4066",
+          "role": "claude-orchestrator:wave-verifier",
+          "ownership": "a4f4066359607ca4b",
+          "status": "done",
+          "currentStep": null,
+          "latestUpdate": "completed",
+          "completedSummary": null,
+          "updatedAt": "2026-04-27T12:54:36.005Z"
+        },
+        {
+          "name": "claude-orchestrator:implementer:acbca17",
+          "role": "claude-orchestrator:implementer",
+          "ownership": "acbca17b9903c0f35",
+          "status": "done",
+          "currentStep": null,
+          "latestUpdate": "completed",
+          "completedSummary": null,
+          "updatedAt": "2026-04-27T13:20:30.637Z"
+        },
+        {
+          "name": "claude-orchestrator:wave-verifier:a081a2e",
+          "role": "claude-orchestrator:wave-verifier",
+          "ownership": "a081a2e19e50aa1d1",
+          "status": "done",
+          "currentStep": null,
+          "latestUpdate": "completed",
+          "completedSummary": null,
+          "updatedAt": "2026-04-27T13:25:40.031Z"
+        },
+        {
+          "name": "claude-orchestrator:implementer:ad83656",
+          "role": "claude-orchestrator:implementer",
+          "ownership": "ad83656cb7d1eec58",
+          "status": "done",
+          "currentStep": null,
+          "latestUpdate": "completed",
+          "completedSummary": null,
+          "updatedAt": "2026-04-27T13:35:46.729Z"
+        },
+        {
+          "name": "claude-orchestrator:implementer:a8d2863",
+          "role": "claude-orchestrator:implementer",
+          "ownership": "a8d286382fc3ea853",
+          "status": "running",
+          "currentStep": null,
+          "latestUpdate": null,
+          "completedSummary": null,
+          "updatedAt": "2026-04-27T13:26:58.142Z"
+        },
+        {
+          "name": "claude-orchestrator:implementer:a2f77c2",
+          "role": "claude-orchestrator:implementer",
+          "ownership": "a2f77c2d0908f8fca",
+          "status": "done",
+          "currentStep": null,
+          "latestUpdate": "completed",
+          "completedSummary": null,
+          "updatedAt": "2026-04-27T13:32:25.870Z"
+        },
+        {
+          "name": "claude-orchestrator:implementer:af6d673",
+          "role": "claude-orchestrator:implementer",
+          "ownership": "af6d673d23ca66028",
+          "status": "done",
+          "currentStep": null,
+          "latestUpdate": "completed",
+          "completedSummary": null,
+          "updatedAt": "2026-04-27T13:33:50.401Z"
+        },
+        {
+          "name": "claude-orchestrator:implementer:aa1d232",
+          "role": "claude-orchestrator:implementer",
+          "ownership": "aa1d2328abdd8719b",
+          "status": "done",
+          "currentStep": null,
+          "latestUpdate": "completed",
+          "completedSummary": null,
+          "updatedAt": "2026-04-27T13:33:44.282Z"
+        },
+        {
+          "name": "claude-orchestrator:implementer:a263210",
+          "role": "claude-orchestrator:implementer",
+          "ownership": "a2632109072a4c33b",
+          "status": "done",
+          "currentStep": null,
+          "latestUpdate": "completed",
+          "completedSummary": null,
+          "updatedAt": "2026-04-27T13:34:53.726Z"
+        },
+        {
+          "name": "claude-orchestrator:implementer:acdba91",
+          "role": "claude-orchestrator:implementer",
+          "ownership": "acdba91e734428257",
+          "status": "done",
+          "currentStep": null,
+          "latestUpdate": "completed",
+          "completedSummary": null,
+          "updatedAt": "2026-04-27T13:34:25.453Z"
+        },
+        {
+          "name": "claude-orchestrator:implementer:a0d224c",
+          "role": "claude-orchestrator:implementer",
+          "ownership": "a0d224c4a76040610",
+          "status": "running",
+          "currentStep": null,
+          "latestUpdate": null,
+          "completedSummary": null,
+          "updatedAt": "2026-04-27T13:27:47.227Z"
+        },
+        {
+          "name": "claude-orchestrator:implementer:a3b5ec5",
+          "role": "claude-orchestrator:implementer",
+          "ownership": "a3b5ec576a7c36740",
+          "status": "done",
+          "currentStep": null,
+          "latestUpdate": "completed",
+          "completedSummary": null,
+          "updatedAt": "2026-04-27T13:31:08.537Z"
+        },
+        {
+          "name": "claude-orchestrator:implementer:a51b27e",
+          "role": "claude-orchestrator:implementer",
+          "ownership": "a51b27eb608db7c0a",
+          "status": "running",
+          "currentStep": null,
+          "latestUpdate": null,
+          "completedSummary": null,
+          "updatedAt": "2026-04-27T13:28:13.713Z"
+        },
+        {
+          "name": "claude-orchestrator:implementer:afcb473",
+          "role": "claude-orchestrator:implementer",
+          "ownership": "afcb4736d498096b8",
+          "status": "running",
+          "currentStep": null,
+          "latestUpdate": null,
+          "completedSummary": null,
+          "updatedAt": "2026-04-27T13:28:23.464Z"
+        },
+        {
+          "name": "claude-orchestrator:implementer:a444caf",
+          "role": "claude-orchestrator:implementer",
+          "ownership": "a444caf5bee6d774d",
+          "status": "done",
+          "currentStep": null,
+          "latestUpdate": "completed",
+          "completedSummary": null,
+          "updatedAt": "2026-04-27T13:33:08.031Z"
+        },
+        {
+          "name": "claude-orchestrator:implementer:a1f5bbb",
+          "role": "claude-orchestrator:implementer",
+          "ownership": "a1f5bbb01322659cb",
+          "status": "done",
+          "currentStep": null,
+          "latestUpdate": "completed",
+          "completedSummary": null,
+          "updatedAt": "2026-04-27T13:34:09.472Z"
+        }
+      ],
+      "timeline": [
+        {
+          "id": "session-start:afcb4736d498096b8:2026-04-27T13:28:23.464Z",
+          "at": "2026-04-27T13:28:23.464Z",
+          "kind": "update",
+          "agent": "claude-orchestrator:implementer:afcb473",
+          "detail": "started claude-orchestrator:implementer:afcb473",
+          "sourceKey": "session-start:afcb4736d498096b8"
+        },
+        {
+          "id": "session-start:a444caf5bee6d774d:2026-04-27T13:28:35.916Z",
+          "at": "2026-04-27T13:28:35.916Z",
+          "kind": "update",
+          "agent": "claude-orchestrator:implementer:a444caf",
+          "detail": "started claude-orchestrator:implementer:a444caf",
+          "sourceKey": "session-start:a444caf5bee6d774d"
+        },
+        {
+          "id": "session-start:a1f5bbb01322659cb:2026-04-27T13:28:55.157Z",
+          "at": "2026-04-27T13:28:55.157Z",
+          "kind": "update",
+          "agent": "claude-orchestrator:implementer:a1f5bbb",
+          "detail": "started claude-orchestrator:implementer:a1f5bbb",
+          "sourceKey": "session-start:a1f5bbb01322659cb"
+        },
+        {
+          "id": "session-stop:a3b5ec576a7c36740:2026-04-27T13:31:08.537Z",
+          "at": "2026-04-27T13:31:08.537Z",
+          "kind": "completion",
+          "agent": "claude-orchestrator:implementer:a3b5ec5",
+          "detail": "completed",
+          "sourceKey": "session-stop:a3b5ec576a7c36740"
+        },
+        {
+          "id": "session-stop:acad3a54f9e3c9037:2026-04-27T13:32:15.091Z",
+          "at": "2026-04-27T13:32:15.091Z",
+          "kind": "completion",
+          "agent": "general-purpose:a8169ae",
+          "detail": "completed",
+          "sourceKey": "session-stop:acad3a54f9e3c9037"
+        },
+        {
+          "id": "session-stop:a2f77c2d0908f8fca:2026-04-27T13:32:25.870Z",
+          "at": "2026-04-27T13:32:25.870Z",
+          "kind": "completion",
+          "agent": "claude-orchestrator:implementer:a2f77c2",
+          "detail": "completed",
+          "sourceKey": "session-stop:a2f77c2d0908f8fca"
+        },
+        {
+          "id": "session-stop:a444caf5bee6d774d:2026-04-27T13:33:08.031Z",
+          "at": "2026-04-27T13:33:08.031Z",
+          "kind": "completion",
+          "agent": "claude-orchestrator:implementer:a444caf",
+          "detail": "completed",
+          "sourceKey": "session-stop:a444caf5bee6d774d"
+        },
+        {
+          "id": "session-stop:aa1d2328abdd8719b:2026-04-27T13:33:44.282Z",
+          "at": "2026-04-27T13:33:44.282Z",
+          "kind": "completion",
+          "agent": "claude-orchestrator:implementer:aa1d232",
+          "detail": "completed",
+          "sourceKey": "session-stop:aa1d2328abdd8719b"
+        },
+        {
+          "id": "session-stop:af6d673d23ca66028:2026-04-27T13:33:50.401Z",
+          "at": "2026-04-27T13:33:50.401Z",
+          "kind": "completion",
+          "agent": "claude-orchestrator:implementer:af6d673",
+          "detail": "completed",
+          "sourceKey": "session-stop:af6d673d23ca66028"
+        },
+        {
+          "id": "session-stop:a1f5bbb01322659cb:2026-04-27T13:34:09.472Z",
+          "at": "2026-04-27T13:34:09.472Z",
+          "kind": "completion",
+          "agent": "claude-orchestrator:implementer:a1f5bbb",
+          "detail": "completed",
+          "sourceKey": "session-stop:a1f5bbb01322659cb"
+        },
+        {
+          "id": "session-stop:acdba91e734428257:2026-04-27T13:34:25.453Z",
+          "at": "2026-04-27T13:34:25.453Z",
+          "kind": "completion",
+          "agent": "claude-orchestrator:implementer:acdba91",
+          "detail": "completed",
+          "sourceKey": "session-stop:acdba91e734428257"
+        },
+        {
+          "id": "session-stop:a2632109072a4c33b:2026-04-27T13:34:53.726Z",
+          "at": "2026-04-27T13:34:53.726Z",
+          "kind": "completion",
+          "agent": "claude-orchestrator:implementer:a263210",
+          "detail": "completed",
+          "sourceKey": "session-stop:a2632109072a4c33b"
+        },
+        {
+          "id": "session-stop:ad83656cb7d1eec58:2026-04-27T13:35:46.729Z",
+          "at": "2026-04-27T13:35:46.729Z",
+          "kind": "completion",
+          "agent": "claude-orchestrator:implementer:ad83656",
+          "detail": "completed",
+          "sourceKey": "session-stop:ad83656cb7d1eec58"
+        },
+        {
+          "id": "session-stop:a25a84d278ff38a1f:2026-04-27T13:37:57.090Z",
+          "at": "2026-04-27T13:37:57.090Z",
+          "kind": "completion",
+          "agent": "general-purpose:a8169ae",
+          "detail": "completed",
+          "sourceKey": "session-stop:a25a84d278ff38a1f"
+        },
+        {
+          "id": "session-stop:ab299fb5aa2027081:2026-04-27T13:41:22.340Z",
+          "at": "2026-04-27T13:41:22.340Z",
+          "kind": "completion",
+          "agent": "general-purpose:a8169ae",
+          "detail": "completed",
+          "sourceKey": "session-stop:ab299fb5aa2027081"
+        },
+        {
+          "id": "session-stop:a0483a45c64e7bdab:2026-04-27T13:44:56.786Z",
+          "at": "2026-04-27T13:44:56.786Z",
+          "kind": "completion",
+          "agent": "general-purpose:a8169ae",
+          "detail": "completed",
+          "sourceKey": "session-stop:a0483a45c64e7bdab"
+        }
+      ]
+    },
+    {
+      "id": "session:84883cc7-f08f-4570-8133-676a2dcfdc98:none",
+      "source": "session",
+      "name": "none",
+      "objective": "Session mission",
+      "createdAt": "2026-04-27T19:05:28.062Z",
+      "updatedAt": "2026-04-27T19:52:30.745Z",
+      "status": "done",
+      "workerCount": 12,
+      "taskCounts": {
+        "total": 12,
+        "pending": 0,
+        "blocked": 0,
+        "inProgress": 0,
+        "completed": 12,
+        "failed": 0
+      },
+      "agents": [
+        {
+          "name": "claude-orchestrator:wave-verifier:a9271ef",
+          "role": "claude-orchestrator:wave-verifier",
+          "ownership": "a9271ef0ca594c3f5",
+          "status": "done",
+          "currentStep": null,
+          "latestUpdate": "completed",
+          "completedSummary": null,
+          "updatedAt": "2026-04-27T19:52:30.745Z"
+        },
+        {
+          "name": "claude-orchestrator:implementer:a9ac16b",
+          "role": "claude-orchestrator:implementer",
+          "ownership": "a9ac16b0b34cf243a",
+          "status": "done",
+          "currentStep": null,
+          "latestUpdate": "completed",
+          "completedSummary": null,
+          "updatedAt": "2026-04-27T19:11:15.087Z"
+        },
+        {
+          "name": "claude-orchestrator:implementer:a9e4c2e",
+          "role": "claude-orchestrator:implementer",
+          "ownership": "a9e4c2ea979fe0964",
+          "status": "done",
+          "currentStep": null,
+          "latestUpdate": "completed",
+          "completedSummary": null,
+          "updatedAt": "2026-04-27T19:11:57.489Z"
+        },
+        {
+          "name": "claude-orchestrator:implementer:a9ebe1c",
+          "role": "claude-orchestrator:implementer",
+          "ownership": "a9ebe1c843bffe91d",
+          "status": "done",
+          "currentStep": null,
+          "latestUpdate": "completed",
+          "completedSummary": null,
+          "updatedAt": "2026-04-27T19:15:03.521Z"
+        },
+        {
+          "name": "claude-orchestrator:implementer:ae4f4f9",
+          "role": "claude-orchestrator:implementer",
+          "ownership": "ae4f4f952ef185d95",
+          "status": "done",
+          "currentStep": null,
+          "latestUpdate": "completed",
+          "completedSummary": null,
+          "updatedAt": "2026-04-27T19:15:56.385Z"
+        },
+        {
+          "name": "claude-orchestrator:wave-verifier:a8ea56b",
+          "role": "claude-orchestrator:wave-verifier",
+          "ownership": "a8ea56babb2a3f9e5",
+          "status": "done",
+          "currentStep": null,
+          "latestUpdate": "completed",
+          "completedSummary": null,
+          "updatedAt": "2026-04-27T19:19:43.180Z"
+        },
+        {
+          "name": "claude-orchestrator:implementer:ac4cfff",
+          "role": "claude-orchestrator:implementer",
+          "ownership": "ac4cfff6f49fd3708",
+          "status": "done",
+          "currentStep": null,
+          "latestUpdate": "completed",
+          "completedSummary": null,
+          "updatedAt": "2026-04-27T19:37:31.223Z"
+        },
+        {
+          "name": "claude-orchestrator:implementer:a733d41",
+          "role": "claude-orchestrator:implementer",
+          "ownership": "a733d41d9c0e87df3",
+          "status": "done",
+          "currentStep": null,
+          "latestUpdate": "completed",
+          "completedSummary": null,
+          "updatedAt": "2026-04-27T19:25:56.166Z"
+        },
+        {
+          "name": "claude-orchestrator:implementer:aac494b",
+          "role": "claude-orchestrator:implementer",
+          "ownership": "aac494b115159d3b3",
+          "status": "done",
+          "currentStep": null,
+          "latestUpdate": "completed",
+          "completedSummary": null,
+          "updatedAt": "2026-04-27T19:37:45.596Z"
+        },
+        {
+          "name": "claude-orchestrator:implementer:a56dd3b",
+          "role": "claude-orchestrator:implementer",
+          "ownership": "a56dd3bdbcf2dcb04",
+          "status": "done",
+          "currentStep": null,
+          "latestUpdate": "completed",
+          "completedSummary": null,
+          "updatedAt": "2026-04-27T19:26:00.103Z"
+        },
+        {
+          "name": "claude-orchestrator:wave-verifier:a8b9345",
+          "role": "claude-orchestrator:wave-verifier",
+          "ownership": "a8b9345ea3aaf89a8",
+          "status": "done",
+          "currentStep": null,
+          "latestUpdate": "completed",
+          "completedSummary": null,
+          "updatedAt": "2026-04-27T19:45:19.364Z"
+        },
+        {
+          "name": "claude-orchestrator:wave-verifier:aa5cb01",
+          "role": "claude-orchestrator:wave-verifier",
+          "ownership": "aa5cb016d8929e30b",
+          "status": "done",
+          "currentStep": null,
+          "latestUpdate": "completed",
+          "completedSummary": null,
+          "updatedAt": "2026-04-27T19:47:30.067Z"
+        }
+      ],
+      "timeline": [
+        {
+          "id": "session-start:a8b9345ea3aaf89a8:2026-04-27T19:38:43.197Z",
+          "at": "2026-04-27T19:38:43.197Z",
+          "kind": "update",
+          "agent": "claude-orchestrator:wave-verifier:a8b9345",
+          "detail": "started claude-orchestrator:wave-verifier:a8b9345",
+          "sourceKey": "session-start:a8b9345ea3aaf89a8"
+        },
+        {
+          "id": "session-stop:a8b9345ea3aaf89a8:2026-04-27T19:45:19.364Z",
+          "at": "2026-04-27T19:45:19.364Z",
+          "kind": "completion",
+          "agent": "claude-orchestrator:wave-verifier:a8b9345",
+          "detail": "completed",
+          "sourceKey": "session-stop:a8b9345ea3aaf89a8"
+        },
+        {
+          "id": "session-start:aa5cb016d8929e30b:2026-04-27T19:46:20.733Z",
+          "at": "2026-04-27T19:46:20.733Z",
+          "kind": "update",
+          "agent": "claude-orchestrator:wave-verifier:aa5cb01",
+          "detail": "started claude-orchestrator:wave-verifier:aa5cb01",
+          "sourceKey": "session-start:aa5cb016d8929e30b"
+        },
+        {
+          "id": "session-stop:aa5cb016d8929e30b:2026-04-27T19:47:30.067Z",
+          "at": "2026-04-27T19:47:30.067Z",
+          "kind": "completion",
+          "agent": "claude-orchestrator:wave-verifier:aa5cb01",
+          "detail": "completed",
+          "sourceKey": "session-stop:aa5cb016d8929e30b"
+        },
+        {
+          "id": "session-stop:a3643647b3e607ff8:2026-04-27T19:52:30.745Z",
+          "at": "2026-04-27T19:52:30.745Z",
+          "kind": "completion",
+          "agent": "claude-orchestrator:wave-verifier:a9271ef",
+          "detail": "completed",
+          "sourceKey": "session-stop:a3643647b3e607ff8"
+        }
+      ]
+    },
+    {
+      "id": "session:221f3da0-7da5-46b3-85e5-c3bdc009bac9:none",
+      "source": "session",
+      "name": "none",
+      "objective": "Session mission",
+      "createdAt": "2026-04-27T19:55:11.615Z",
+      "updatedAt": "2026-04-27T23:19:02.451Z",
+      "status": "running",
+      "workerCount": 45,
+      "taskCounts": {
+        "total": 45,
+        "pending": 0,
+        "blocked": 0,
+        "inProgress": 5,
+        "completed": 40,
+        "failed": 0
+      },
+      "agents": [
+        {
+          "name": "claude-orchestrator:implementer:a31e42e",
+          "role": "claude-orchestrator:implementer",
+          "ownership": "a31e42ed9ac5c076f",
+          "status": "done",
+          "currentStep": null,
+          "latestUpdate": "completed",
+          "completedSummary": null,
+          "updatedAt": "2026-04-27T23:19:02.451Z"
+        },
+        {
+          "name": "claude-orchestrator:implementer:a84075a",
+          "role": "claude-orchestrator:implementer",
+          "ownership": "a84075a5ea8be8afe",
+          "status": "done",
+          "currentStep": null,
+          "latestUpdate": "completed",
+          "completedSummary": null,
+          "updatedAt": "2026-04-27T20:12:51.099Z"
+        },
+        {
+          "name": "claude-orchestrator:implementer:a86345d",
+          "role": "claude-orchestrator:implementer",
+          "ownership": "a86345d4ab5201952",
+          "status": "done",
+          "currentStep": null,
+          "latestUpdate": "completed",
+          "completedSummary": null,
+          "updatedAt": "2026-04-27T19:58:22.233Z"
+        },
+        {
+          "name": "claude-orchestrator:implementer:ab2ba5c",
+          "role": "claude-orchestrator:implementer",
+          "ownership": "ab2ba5c9cfd36e71d",
+          "status": "running",
+          "currentStep": null,
+          "latestUpdate": null,
+          "completedSummary": null,
+          "updatedAt": "2026-04-27T19:55:43.811Z"
+        },
+        {
+          "name": "claude-orchestrator:implementer:a3379d4",
+          "role": "claude-orchestrator:implementer",
+          "ownership": "a3379d4f6489ab968",
+          "status": "done",
+          "currentStep": null,
+          "latestUpdate": "completed",
+          "completedSummary": null,
+          "updatedAt": "2026-04-27T20:01:09.646Z"
+        },
+        {
+          "name": "claude-orchestrator:implementer:aa2c6a6",
+          "role": "claude-orchestrator:implementer",
+          "ownership": "aa2c6a63ae4f93407",
+          "status": "done",
+          "currentStep": null,
+          "latestUpdate": "completed",
+          "completedSummary": null,
+          "updatedAt": "2026-04-27T19:59:02.459Z"
+        },
+        {
+          "name": "claude-orchestrator:implementer:a107f6a",
+          "role": "claude-orchestrator:implementer",
+          "ownership": "a107f6a7fe7ce23ee",
+          "status": "done",
+          "currentStep": null,
+          "latestUpdate": "completed",
+          "completedSummary": null,
+          "updatedAt": "2026-04-27T20:02:12.375Z"
+        },
+        {
+          "name": "claude-orchestrator:implementer:afbfc79",
+          "role": "claude-orchestrator:implementer",
+          "ownership": "afbfc79c6e583e00e",
+          "status": "done",
+          "currentStep": null,
+          "latestUpdate": "completed",
+          "completedSummary": null,
+          "updatedAt": "2026-04-27T20:06:11.739Z"
+        },
+        {
+          "name": "claude-orchestrator:implementer:afa4c51",
+          "role": "claude-orchestrator:implementer",
+          "ownership": "afa4c51edde07c601",
+          "status": "done",
+          "currentStep": null,
+          "latestUpdate": "completed",
+          "completedSummary": null,
+          "updatedAt": "2026-04-27T20:06:20.469Z"
+        },
+        {
+          "name": "claude-orchestrator:wave-verifier:a35cbb3",
+          "role": "claude-orchestrator:wave-verifier",
+          "ownership": "a35cbb35e4a02516d",
+          "status": "done",
+          "currentStep": null,
+          "latestUpdate": "completed",
+          "completedSummary": null,
+          "updatedAt": "2026-04-27T20:48:11.280Z"
+        },
+        {
+          "name": "claude-orchestrator:implementer:aad61fd",
+          "role": "claude-orchestrator:implementer",
+          "ownership": "aad61fd5aefa3e18d",
+          "status": "done",
+          "currentStep": null,
+          "latestUpdate": "completed",
+          "completedSummary": null,
+          "updatedAt": "2026-04-27T21:00:29.278Z"
+        },
+        {
+          "name": "claude-orchestrator:implementer:a7d700f",
+          "role": "claude-orchestrator:implementer",
+          "ownership": "a7d700f41b01ca0b5",
+          "status": "done",
+          "currentStep": null,
+          "latestUpdate": "completed",
+          "completedSummary": null,
+          "updatedAt": "2026-04-27T21:04:24.917Z"
+        },
+        {
+          "name": "claude-orchestrator:implementer:a608bd9",
+          "role": "claude-orchestrator:implementer",
+          "ownership": "a608bd9139cad5b17",
+          "status": "done",
+          "currentStep": null,
+          "latestUpdate": "completed",
+          "completedSummary": null,
+          "updatedAt": "2026-04-27T20:52:12.669Z"
+        },
+        {
+          "name": "claude-orchestrator:implementer:a7d125a",
+          "role": "claude-orchestrator:implementer",
+          "ownership": "a7d125a76f6fab211",
+          "status": "running",
+          "currentStep": null,
+          "latestUpdate": null,
+          "completedSummary": null,
+          "updatedAt": "2026-04-27T20:50:49.744Z"
+        },
+        {
+          "name": "claude-orchestrator:implementer:a069fb9",
+          "role": "claude-orchestrator:implementer",
+          "ownership": "a069fb9ab215824a8",
+          "status": "running",
+          "currentStep": null,
+          "latestUpdate": null,
+          "completedSummary": null,
+          "updatedAt": "2026-04-27T20:51:05.688Z"
+        },
+        {
+          "name": "claude-orchestrator:implementer:a6698f9",
+          "role": "claude-orchestrator:implementer",
+          "ownership": "a6698f90fef2ad844",
+          "status": "done",
+          "currentStep": null,
+          "latestUpdate": "completed",
+          "completedSummary": null,
+          "updatedAt": "2026-04-27T20:56:54.606Z"
+        },
+        {
+          "name": "claude-orchestrator:wave-verifier:abde02c",
+          "role": "claude-orchestrator:wave-verifier",
+          "ownership": "abde02c5381b9b227",
+          "status": "done",
+          "currentStep": null,
+          "latestUpdate": "completed",
+          "completedSummary": null,
+          "updatedAt": "2026-04-27T21:23:40.452Z"
+        },
+        {
+          "name": "claude-orchestrator:wave-verifier:a8586cc",
+          "role": "claude-orchestrator:wave-verifier",
+          "ownership": "a8586cc8d8d3175ee",
+          "status": "done",
+          "currentStep": null,
+          "latestUpdate": "completed",
+          "completedSummary": null,
+          "updatedAt": "2026-04-27T21:27:53.429Z"
+        },
+        {
+          "name": "claude-orchestrator:implementer:a1e2880",
+          "role": "claude-orchestrator:implementer",
+          "ownership": "a1e288007b4003e3d",
+          "status": "done",
+          "currentStep": null,
+          "latestUpdate": "completed",
+          "completedSummary": null,
+          "updatedAt": "2026-04-27T21:33:37.659Z"
+        },
+        {
+          "name": "claude-orchestrator:implementer:a84bff5",
+          "role": "claude-orchestrator:implementer",
+          "ownership": "a84bff592648adaca",
+          "status": "done",
+          "currentStep": null,
+          "latestUpdate": "completed",
+          "completedSummary": null,
+          "updatedAt": "2026-04-27T21:41:31.759Z"
+        },
+        {
+          "name": "claude-orchestrator:implementer:a081f08",
+          "role": "claude-orchestrator:implementer",
+          "ownership": "a081f08e935f5f665",
+          "status": "done",
+          "currentStep": null,
+          "latestUpdate": "completed",
+          "completedSummary": null,
+          "updatedAt": "2026-04-27T21:39:45.753Z"
+        },
+        {
+          "name": "claude-orchestrator:implementer:a0b971c",
+          "role": "claude-orchestrator:implementer",
+          "ownership": "a0b971cb5e63c9a0c",
+          "status": "done",
+          "currentStep": null,
+          "latestUpdate": "completed",
+          "completedSummary": null,
+          "updatedAt": "2026-04-27T21:35:19.235Z"
+        },
+        {
+          "name": "claude-orchestrator:implementer:a932ac1",
+          "role": "claude-orchestrator:implementer",
+          "ownership": "a932ac1ef7818808c",
+          "status": "done",
+          "currentStep": null,
+          "latestUpdate": "completed",
+          "completedSummary": null,
+          "updatedAt": "2026-04-27T21:41:45.580Z"
+        },
+        {
+          "name": "claude-orchestrator:implementer:a108aa6",
+          "role": "claude-orchestrator:implementer",
+          "ownership": "a108aa604f419c48d",
+          "status": "done",
+          "currentStep": null,
+          "latestUpdate": "completed",
+          "completedSummary": null,
+          "updatedAt": "2026-04-27T21:32:31.555Z"
+        },
+        {
+          "name": "claude-orchestrator:implementer:a1d188d",
+          "role": "claude-orchestrator:implementer",
+          "ownership": "a1d188d0975dfb0bc",
+          "status": "done",
+          "currentStep": null,
+          "latestUpdate": "completed",
+          "completedSummary": null,
+          "updatedAt": "2026-04-27T21:52:24.103Z"
+        },
+        {
+          "name": "claude-orchestrator:implementer:a5e9e9e",
+          "role": "claude-orchestrator:implementer",
+          "ownership": "a5e9e9e42bac05812",
+          "status": "done",
+          "currentStep": null,
+          "latestUpdate": "completed",
+          "completedSummary": null,
+          "updatedAt": "2026-04-27T21:42:55.221Z"
+        },
+        {
+          "name": "claude-orchestrator:implementer:a4c5227",
+          "role": "claude-orchestrator:implementer",
+          "ownership": "a4c5227c635a5bb7c",
+          "status": "running",
+          "currentStep": null,
+          "latestUpdate": null,
+          "completedSummary": null,
+          "updatedAt": "2026-04-27T21:29:43.621Z"
+        },
+        {
+          "name": "claude-orchestrator:implementer:afc51e2",
+          "role": "claude-orchestrator:implementer",
+          "ownership": "afc51e2f84923270c",
+          "status": "done",
+          "currentStep": null,
+          "latestUpdate": "completed",
+          "completedSummary": null,
+          "updatedAt": "2026-04-27T21:38:51.978Z"
+        },
+        {
+          "name": "claude-orchestrator:implementer:a932379",
+          "role": "claude-orchestrator:implementer",
+          "ownership": "a9323798ff6d8ad11",
+          "status": "done",
+          "currentStep": null,
+          "latestUpdate": "completed",
+          "completedSummary": null,
+          "updatedAt": "2026-04-27T21:34:47.070Z"
+        },
+        {
+          "name": "claude-orchestrator:implementer:adbc329",
+          "role": "claude-orchestrator:implementer",
+          "ownership": "adbc329630defa17e",
+          "status": "done",
+          "currentStep": null,
+          "latestUpdate": "completed",
+          "completedSummary": null,
+          "updatedAt": "2026-04-27T21:35:25.430Z"
+        },
+        {
+          "name": "claude-orchestrator:implementer:ae43fc9",
+          "role": "claude-orchestrator:implementer",
+          "ownership": "ae43fc9b695c5c721",
+          "status": "done",
+          "currentStep": null,
+          "latestUpdate": "completed",
+          "completedSummary": null,
+          "updatedAt": "2026-04-27T21:33:44.062Z"
+        },
+        {
+          "name": "claude-orchestrator:implementer:ac93a5e",
+          "role": "claude-orchestrator:implementer",
+          "ownership": "ac93a5e6a2f14743a",
+          "status": "done",
+          "currentStep": null,
+          "latestUpdate": "completed",
+          "completedSummary": null,
+          "updatedAt": "2026-04-27T21:36:38.168Z"
+        },
+        {
+          "name": "claude-orchestrator:implementer:a1cf462",
+          "role": "claude-orchestrator:implementer",
+          "ownership": "a1cf46228af8ad09e",
+          "status": "done",
+          "currentStep": null,
+          "latestUpdate": "completed",
+          "completedSummary": null,
+          "updatedAt": "2026-04-27T21:33:00.247Z"
+        },
+        {
+          "name": "claude-orchestrator:implementer:a27027e",
+          "role": "claude-orchestrator:implementer",
+          "ownership": "a27027ebdb08f7474",
+          "status": "done",
+          "currentStep": null,
+          "latestUpdate": "completed",
+          "completedSummary": null,
+          "updatedAt": "2026-04-27T21:48:43.972Z"
+        },
+        {
+          "name": "claude-orchestrator:implementer:a30177a",
+          "role": "claude-orchestrator:implementer",
+          "ownership": "a30177a8e12eb938e",
+          "status": "done",
+          "currentStep": null,
+          "latestUpdate": "completed",
+          "completedSummary": null,
+          "updatedAt": "2026-04-27T21:38:27.098Z"
+        },
+        {
+          "name": "claude-orchestrator:wave-verifier:a3c7bbe",
+          "role": "claude-orchestrator:wave-verifier",
+          "ownership": "a3c7bbe1ead30fe02",
+          "status": "done",
+          "currentStep": null,
+          "latestUpdate": "completed",
+          "completedSummary": null,
+          "updatedAt": "2026-04-27T22:03:01.109Z"
+        },
+        {
+          "name": "claude-orchestrator:implementer:a3b6e97",
+          "role": "claude-orchestrator:implementer",
+          "ownership": "a3b6e971a8a2113c5",
+          "status": "done",
+          "currentStep": null,
+          "latestUpdate": "completed",
+          "completedSummary": null,
+          "updatedAt": "2026-04-27T22:55:30.085Z"
+        },
+        {
+          "name": "claude-orchestrator:implementer:a284385",
+          "role": "claude-orchestrator:implementer",
+          "ownership": "a284385e3a4de4066",
+          "status": "done",
+          "currentStep": null,
+          "latestUpdate": "completed",
+          "completedSummary": null,
+          "updatedAt": "2026-04-27T22:22:15.633Z"
+        },
+        {
+          "name": "claude-orchestrator:implementer:a03644e",
+          "role": "claude-orchestrator:implementer",
+          "ownership": "a03644e63b951f5d7",
+          "status": "done",
+          "currentStep": null,
+          "latestUpdate": "completed",
+          "completedSummary": null,
+          "updatedAt": "2026-04-27T22:22:24.061Z"
+        },
+        {
+          "name": "claude-orchestrator:implementer:a389c4d",
+          "role": "claude-orchestrator:implementer",
+          "ownership": "a389c4d32a463d54d",
+          "status": "done",
+          "currentStep": null,
+          "latestUpdate": "completed",
+          "completedSummary": null,
+          "updatedAt": "2026-04-27T22:12:08.018Z"
+        },
+        {
+          "name": "claude-orchestrator:implementer:a26b77c",
+          "role": "claude-orchestrator:implementer",
+          "ownership": "a26b77cb59a4f548a",
+          "status": "done",
+          "currentStep": null,
+          "latestUpdate": "completed",
+          "completedSummary": null,
+          "updatedAt": "2026-04-27T22:19:58.265Z"
+        },
+        {
+          "name": "claude-orchestrator:implementer:af39a8d",
+          "role": "claude-orchestrator:implementer",
+          "ownership": "af39a8d3b2a314f6d",
+          "status": "running",
+          "currentStep": null,
+          "latestUpdate": null,
+          "completedSummary": null,
+          "updatedAt": "2026-04-27T22:09:48.307Z"
+        },
+        {
+          "name": "claude-orchestrator:implementer:a8760ef",
+          "role": "claude-orchestrator:implementer",
+          "ownership": "a8760efdc30378e2f",
+          "status": "done",
+          "currentStep": null,
+          "latestUpdate": "completed",
+          "completedSummary": null,
+          "updatedAt": "2026-04-27T22:39:59.311Z"
+        },
+        {
+          "name": "claude-orchestrator:implementer:ab51d5c",
+          "role": "claude-orchestrator:implementer",
+          "ownership": "ab51d5c0b0da875f3",
+          "status": "done",
+          "currentStep": null,
+          "latestUpdate": "completed",
+          "completedSummary": null,
+          "updatedAt": "2026-04-27T22:26:44.132Z"
+        },
+        {
+          "name": "general-purpose:a9b4962",
+          "role": "general-purpose",
+          "ownership": "a9b4962b05e22ff6d",
+          "status": "done",
+          "currentStep": null,
+          "latestUpdate": "completed",
+          "completedSummary": null,
+          "updatedAt": "2026-04-27T23:15:03.270Z"
+        }
+      ],
+      "timeline": [
+        {
+          "id": "session-stop:a3b6e971a8a2113c5:2026-04-27T22:55:30.085Z",
+          "at": "2026-04-27T22:55:30.085Z",
+          "kind": "completion",
+          "agent": "claude-orchestrator:implementer:a3b6e97",
+          "detail": "completed",
+          "sourceKey": "session-stop:a3b6e971a8a2113c5"
+        },
+        {
+          "id": "session-stop:aa4a24b38e305a05f:2026-04-27T23:06:58.817Z",
+          "at": "2026-04-27T23:06:58.817Z",
+          "kind": "completion",
+          "agent": "claude-orchestrator:implementer:a31e42e",
+          "detail": "completed",
+          "sourceKey": "session-stop:aa4a24b38e305a05f"
+        },
+        {
+          "id": "session-start:a9b4962b05e22ff6d:2026-04-27T23:12:16.164Z",
+          "at": "2026-04-27T23:12:16.164Z",
+          "kind": "update",
+          "agent": "general-purpose:a9b4962",
+          "detail": "started general-purpose:a9b4962",
+          "sourceKey": "session-start:a9b4962b05e22ff6d"
+        },
+        {
+          "id": "session-stop:a9b4962b05e22ff6d:2026-04-27T23:15:03.270Z",
+          "at": "2026-04-27T23:15:03.270Z",
+          "kind": "completion",
+          "agent": "general-purpose:a9b4962",
+          "detail": "completed",
+          "sourceKey": "session-stop:a9b4962b05e22ff6d"
+        },
+        {
+          "id": "session-stop:a1e35ff00fad49b9f:2026-04-27T23:19:02.451Z",
+          "at": "2026-04-27T23:19:02.451Z",
+          "kind": "completion",
+          "agent": "claude-orchestrator:implementer:a31e42e",
+          "detail": "completed",
+          "sourceKey": "session-stop:a1e35ff00fad49b9f"
+        }
+      ]
+    },
+    {
+      "id": "session:f88172d3-c396-4797-90de-42ee64f35b97:none",
+      "source": "session",
+      "name": "none",
+      "objective": "Session mission",
+      "createdAt": "2026-04-27T23:44:02.282Z",
+      "updatedAt": "2026-04-28T01:50:45.960Z",
+      "status": "running",
+      "workerCount": 23,
+      "taskCounts": {
+        "total": 23,
+        "pending": 0,
+        "blocked": 0,
+        "inProgress": 2,
+        "completed": 21,
+        "failed": 0
+      },
+      "agents": [
+        {
+          "name": "executor:a9af2a1",
+          "role": "executor",
+          "ownership": "a9af2a15439b2f370",
+          "status": "done",
+          "currentStep": null,
+          "latestUpdate": "completed",
+          "completedSummary": null,
+          "updatedAt": "2026-04-28T01:03:56.456Z"
+        },
+        {
+          "name": "executor:a623010",
+          "role": "executor",
+          "ownership": "a623010cafbc7fed2",
+          "status": "done",
+          "currentStep": null,
+          "latestUpdate": "completed",
+          "completedSummary": null,
+          "updatedAt": "2026-04-27T23:45:47.393Z"
+        },
+        {
+          "name": "executor:afafb2b",
+          "role": "executor",
+          "ownership": "afafb2b06b7b286be",
+          "status": "done",
+          "currentStep": null,
+          "latestUpdate": "completed",
+          "completedSummary": null,
+          "updatedAt": "2026-04-27T23:46:58.900Z"
+        },
+        {
+          "name": "executor:a43ebe9",
+          "role": "executor",
+          "ownership": "a43ebe9544a2379c3",
+          "status": "done",
+          "currentStep": null,
+          "latestUpdate": "completed",
+          "completedSummary": null,
+          "updatedAt": "2026-04-27T23:47:45.825Z"
+        },
+        {
+          "name": "executor:a76c65d",
+          "role": "executor",
+          "ownership": "a76c65d2ce592ba71",
+          "status": "done",
+          "currentStep": null,
+          "latestUpdate": "completed",
+          "completedSummary": null,
+          "updatedAt": "2026-04-27T23:52:49.841Z"
+        },
+        {
+          "name": "executor:a2be055",
+          "role": "executor",
+          "ownership": "a2be055ff2db8e5c6",
+          "status": "done",
+          "currentStep": null,
+          "latestUpdate": "completed",
+          "completedSummary": null,
+          "updatedAt": "2026-04-27T23:53:53.088Z"
+        },
+        {
+          "name": "executor:a0d07e5",
+          "role": "executor",
+          "ownership": "a0d07e52cd78c8783",
+          "status": "done",
+          "currentStep": null,
+          "latestUpdate": "completed",
+          "completedSummary": null,
+          "updatedAt": "2026-04-28T00:09:10.488Z"
+        },
+        {
+          "name": "executor:a230d65",
+          "role": "executor",
+          "ownership": "a230d657599b41c24",
+          "status": "done",
+          "currentStep": null,
+          "latestUpdate": "completed",
+          "completedSummary": null,
+          "updatedAt": "2026-04-28T00:27:08.849Z"
+        },
+        {
+          "name": "executor:aa32df1",
+          "role": "executor",
+          "ownership": "aa32df1af65ff6296",
+          "status": "done",
+          "currentStep": null,
+          "latestUpdate": "completed",
+          "completedSummary": null,
+          "updatedAt": "2026-04-28T00:29:32.693Z"
+        },
+        {
+          "name": "executor:aa7e8a7",
+          "role": "executor",
+          "ownership": "aa7e8a7564c602894",
+          "status": "done",
+          "currentStep": null,
+          "latestUpdate": "completed",
+          "completedSummary": null,
+          "updatedAt": "2026-04-28T00:28:12.266Z"
+        },
+        {
+          "name": "executor:a1e59c4",
+          "role": "executor",
+          "ownership": "a1e59c40b3b547c5f",
+          "status": "done",
+          "currentStep": null,
+          "latestUpdate": "completed",
+          "completedSummary": null,
+          "updatedAt": "2026-04-28T00:28:50.972Z"
+        },
+        {
+          "name": "executor:aac3fb4",
+          "role": "executor",
+          "ownership": "aac3fb48afc72ed9f",
+          "status": "done",
+          "currentStep": null,
+          "latestUpdate": "completed",
+          "completedSummary": null,
+          "updatedAt": "2026-04-28T00:28:29.647Z"
+        },
+        {
+          "name": "executor:a2e3bb0",
+          "role": "executor",
+          "ownership": "a2e3bb04a8836ebcb",
+          "status": "done",
+          "currentStep": null,
+          "latestUpdate": "completed",
+          "completedSummary": null,
+          "updatedAt": "2026-04-28T00:29:24.063Z"
+        },
+        {
+          "name": "executor:a129ad8",
+          "role": "executor",
+          "ownership": "a129ad86edbc31e7b",
+          "status": "done",
+          "currentStep": null,
+          "latestUpdate": "completed",
+          "completedSummary": null,
+          "updatedAt": "2026-04-28T00:29:42.573Z"
+        },
+        {
+          "name": "executor:a9676c8",
+          "role": "executor",
+          "ownership": "a9676c88bde3b5de8",
+          "status": "done",
+          "currentStep": null,
+          "latestUpdate": "completed",
+          "completedSummary": null,
+          "updatedAt": "2026-04-28T00:28:37.059Z"
+        },
+        {
+          "name": "executor:a5603ac",
+          "role": "executor",
+          "ownership": "a5603aca08533c94f",
+          "status": "done",
+          "currentStep": null,
+          "latestUpdate": "completed",
+          "completedSummary": null,
+          "updatedAt": "2026-04-28T00:29:15.231Z"
+        },
+        {
+          "name": "executor:a6e76c5",
+          "role": "executor",
+          "ownership": "a6e76c53db1f1e84c",
+          "status": "done",
+          "currentStep": null,
+          "latestUpdate": "completed",
+          "completedSummary": null,
+          "updatedAt": "2026-04-28T01:06:41.607Z"
+        },
+        {
+          "name": "executor:a774e84",
+          "role": "executor",
+          "ownership": "a774e843a36895628",
+          "status": "done",
+          "currentStep": null,
+          "latestUpdate": "completed",
+          "completedSummary": null,
+          "updatedAt": "2026-04-28T01:00:05.843Z"
+        },
+        {
+          "name": "executor:a6762a2",
+          "role": "executor",
+          "ownership": "a6762a23b3fe17839",
+          "status": "done",
+          "currentStep": null,
+          "latestUpdate": "completed",
+          "completedSummary": null,
+          "updatedAt": "2026-04-28T01:00:39.776Z"
+        },
+        {
+          "name": "executor:a0e1d01",
+          "role": "executor",
+          "ownership": "a0e1d016409879590",
+          "status": "running",
+          "currentStep": null,
+          "latestUpdate": null,
+          "completedSummary": null,
+          "updatedAt": "2026-04-28T01:36:59.480Z"
+        },
+        {
+          "name": "executor:ab6ed9d",
+          "role": "executor",
+          "ownership": "ab6ed9d1ea677a8ca",
+          "status": "running",
+          "currentStep": null,
+          "latestUpdate": null,
+          "completedSummary": null,
+          "updatedAt": "2026-04-28T01:37:20.525Z"
+        },
+        {
+          "name": "executor:a295106",
+          "role": "executor",
+          "ownership": "a2951064f463c0972",
+          "status": "done",
+          "currentStep": null,
+          "latestUpdate": "completed",
+          "completedSummary": null,
+          "updatedAt": "2026-04-28T01:50:45.960Z"
+        },
+        {
+          "name": "executor:affd239",
+          "role": "executor",
+          "ownership": "affd2394d4d523772",
+          "status": "done",
+          "currentStep": null,
+          "latestUpdate": "completed",
+          "completedSummary": null,
+          "updatedAt": "2026-04-28T01:46:15.086Z"
+        }
+      ],
+      "timeline": [
+        {
+          "id": "session-start:ab6ed9d1ea677a8ca:2026-04-28T01:37:20.525Z",
+          "at": "2026-04-28T01:37:20.525Z",
+          "kind": "update",
+          "agent": "executor:ab6ed9d",
+          "detail": "started executor:ab6ed9d",
+          "sourceKey": "session-start:ab6ed9d1ea677a8ca"
+        },
+        {
+          "id": "session-start:a2951064f463c0972:2026-04-28T01:45:07.077Z",
+          "at": "2026-04-28T01:45:07.077Z",
+          "kind": "update",
+          "agent": "executor:a295106",
+          "detail": "started executor:a295106",
+          "sourceKey": "session-start:a2951064f463c0972"
+        },
+        {
+          "id": "session-start:affd2394d4d523772:2026-04-28T01:45:28.766Z",
+          "at": "2026-04-28T01:45:28.766Z",
+          "kind": "update",
+          "agent": "executor:affd239",
+          "detail": "started executor:affd239",
+          "sourceKey": "session-start:affd2394d4d523772"
+        },
+        {
+          "id": "session-stop:affd2394d4d523772:2026-04-28T01:46:15.086Z",
+          "at": "2026-04-28T01:46:15.086Z",
+          "kind": "completion",
+          "agent": "executor:affd239",
+          "detail": "completed",
+          "sourceKey": "session-stop:affd2394d4d523772"
+        },
+        {
+          "id": "session-stop:a2951064f463c0972:2026-04-28T01:50:45.960Z",
+          "at": "2026-04-28T01:50:45.960Z",
+          "kind": "completion",
+          "agent": "executor:a295106",
+          "detail": "completed",
+          "sourceKey": "session-stop:a2951064f463c0972"
         }
       ]
     }

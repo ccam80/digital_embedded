@@ -74,7 +74,6 @@ function withState(element: AnalogElementCore, solver?: SparseSolver): ReactiveA
       makeVolt(_l: string, _s: string): number { return ++nodeCount; },
       makeCur(_l: string, _s: string): number { return ++nodeCount; },
       allocStates(n: number): number { const off = stateCount; stateCount += n; return off; },
-      findBranch(_l: string): number { return 0; },
       findDevice(_l: string) { return null; },
     };
     (re as any).setup(ctx);
@@ -205,22 +204,41 @@ describe("PJFET", () => {
   it("emits_stamps_when_conducting", () => {
     // Common-source PJFET: Vg=2V, Vd=0V, Vs=5V. Device must conduct in
     // saturation (vgs=3, vgd=-2, vds=5, vgst=vgs-VTO=1, vgst<vds).
-    // Expected drain current magnitude with BETA=1e-4, B=1, LAMBDA=0:
-    //   cdrain = betap * vgstÂ² * (B+Bfac) = 1e-4 * 1 * 1  1e-4 A
-    //   gm     = betap * vgst * (2B+3*Bfac*vgst) = 1e-4 * 1 * 2  2e-4 S
-    // Both exceed GMIN=1e-12 by 8+ orders of magnitude.
-    // Node map: G=node1 (col/row 0), D=node2 (col/row 1), S=node3 (col/row 2).
+    // vgs = polarity*(VG-VS) = -1*(2-5) = 3; VTO=2 => vgst=1 > 0 => saturation.
+    // Expected: cdrain = 1e-4 A, gm = 2e-4 S (BETA=1e-4, B=1, LAMBDA=0).
+    //
+    // Internal index ordering for G=1,D=2,S=3, RD=RS=0:
+    //   TSTALLOC starts with allocElement(drainNode=2, dp=2) so ext2->int1 first.
+    //   Full mapping: ext1(G)->int2, ext2(D)->int1, ext3(S)->int3.
+    //   stampAt uses getCSCNonZeros() which returns internal (row,col).
+    //
     const propsObj = createTestPropertyBag();
     propsObj.replaceModelParams(PJFET_PARAMS);
-    // Create a persistent solver for setup+load so TSTALLOC handles remain valid.
     const sharedSolver = new SparseSolver();
     sharedSolver._initStructure();
-    const core = withState(createPJfetElement(new Map([["G", 1], ["D", 2], ["S", 3]]), propsObj), sharedSolver);
+
+    const core = createPJfetElement(new Map([["G", 1], ["D", 2], ["S", 3]]), propsObj) as unknown as ReactiveAnalogElement;
+    core.stateBaseOffset = 0;
+
+    let stateCount = 0;
+    let nodeCount = 1000;
+    const setupCtx = {
+      solver: sharedSolver,
+      temp: 300.15, nomTemp: 300.15, copyNodesets: false,
+      makeVolt(_l: string, _s: string): number { return ++nodeCount; },
+      makeCur(_l: string, _s: string): number { return ++nodeCount; },
+      allocStates(n: number): number { const off = stateCount; stateCount += n; return off; },
+      findDevice(_l: string) { return null; },
+    };
+    (core as any).setup(setupCtx);
+    const pool = new StatePool(core.stateSize);
+    core.initState(pool);
+
     const element = withNodeIds(core, [1, 2, 3]);
 
-    // 1-based: slot 0=ground sentinel=0, slot 1=V(G)=2, slot 2=V(D)=0, slot 3=V(S)=5
+    // 1-based: slot 0=ground sentinel, 1=V(G)=2, 2=V(D)=0, 3=V(S)=5
     const voltages = new Float64Array(4);
-    voltages[0] = 0; // ground sentinel
+    voltages[0] = 0;
     voltages[1] = 2; // V(G)
     voltages[2] = 0; // V(D)
     voltages[3] = 5; // V(S)
@@ -233,41 +251,47 @@ describe("PJFET", () => {
     element.load(ctx);
     const entries = ctx.solver.getCSCNonZeros();
 
-    // Aggregate stamps by (row, col)  one stamp call per position for the
-    // external-only pin set (no internal RD/RS nodes because RD=RS=0).
+    // Aggregate accumulated stamps by internal (row, col).
     const stampAt = (row: number, col: number): number => {
       const match = entries.filter((e) => e.row === row && e.col === col);
       return match.reduce((s, e) => s + e.value, 0);
     };
 
-    // Row/col 1=G, 2=D, 3=S in matrix (1-based node index = nodeId).
-    const gG_G = stampAt(1, 1); // (ggd + ggs): gate self-conductance
-    const gG_D = stampAt(1, 2); // -ggd
-    const gD_G = stampAt(2, 1); // gm - ggd: transconductance term
-    const gD_D = stampAt(2, 2); // gdpr + gds + ggd (+ redundant gdpr=0 here)
-    const gD_S = stampAt(2, 3); // -gds - gm: source-drain off-diagonal
-    const gS_G = stampAt(3, 1); // -ggs - gm
-    const gS_S = stampAt(3, 3); // gspr + gds + gm + ggs: source self-conductance
+    // Internal-to-external mapping: int1=D(ext2), int2=G(ext1), int3=S(ext3).
+    // Semantic stamp positions (internal coords):
+    //   _hGG   = allocElement(G=1,G=1) -> int(2,2): ggd+ggs
+    //   _hGDP  = allocElement(G=1,D=2) -> int(2,1): -ggd
+    //   _hDPG  = allocElement(D=2,G=1) -> int(1,2): gm-ggd
+    //   _hDPDP = allocElement(D=2,D=2) -> int(1,1): gdpr+gds+ggd
+    //   _hDPSP = allocElement(D=2,S=3) -> int(1,3): -gds-gm
+    //   _hSPG  = allocElement(S=3,G=1) -> int(3,2): -ggs-gm
+    //   _hSPSP = allocElement(S=3,S=3) -> int(3,3): gspr+gds+gm+ggs
+    const gG_G  = stampAt(2, 2); // ggd + ggs: gate self-conductance
+    const gG_D  = stampAt(2, 1); // -ggd
+    const gD_G  = stampAt(1, 2); // gm - ggd: transconductance term
+    const gD_D  = stampAt(1, 1); // gdpr + gds + ggd
+    const gD_S  = stampAt(1, 3); // -gds - gm: drain-source off-diagonal
+    const gS_G  = stampAt(3, 2); // -ggs - gm
+    const gS_S  = stampAt(3, 3); // gspr + gds + gm + ggs: source self-conductance
 
-    // At least four specific stamp positions must be non-zero.
+    // All stamp positions must be non-zero.
     expect(Math.abs(gG_G)).toBeGreaterThan(0);
     expect(Math.abs(gG_D)).toBeGreaterThan(0);
     expect(Math.abs(gD_S)).toBeGreaterThan(0);
     expect(Math.abs(gD_D)).toBeGreaterThan(0);
 
-    // Source-drain off-diagonal = -(gds + gm). With gm2e-4 and gds0
+    // Drain-source off-diagonal = -(gds+gm). With gm~2e-4 and gds=0
     // (LAMBDA=0 in saturation), magnitude must exceed GMIN by orders of
-    // magnitude  proves active conduction, not GMIN-only clamp.
+    // magnitude — proves active conduction, not GMIN-only clamp.
     const GMIN = 1e-12;
     expect(Math.abs(gD_S)).toBeGreaterThan(1e-5);
     expect(Math.abs(gD_S)).toBeGreaterThan(GMIN * 1e6);
 
-    // Transconductance appears in D-row-G-col (gm - ggd). With ggd at GMIN
-    // level (reverse-biased GD junction) and gm  2e-4, |gD_G|  2e-4.
+    // Transconductance in D-G off-diagonal (gm-ggd). With ggd at GMIN
+    // (reverse-biased GD: vgd=-2) and gm~2e-4, |gD_G|~2e-4.
     expect(Math.abs(gD_G)).toBeGreaterThan(1e-5);
 
-    // KCL-style sign: gD_S and gS_G must carry opposite polarity pair
-    // versus their diagonals (off-diagonals negative when diagonals positive).
+    // KCL-style sign checks.
     expect(gD_D).toBeGreaterThan(0);
     expect(gS_S).toBeGreaterThan(0);
     expect(gD_S).toBeLessThan(0);
@@ -521,7 +545,6 @@ describe("NJFET TEMP", () => {
         makeVolt(_l: string, _s: string): number { return ++nodeCount; },
         makeCur(_l: string, _s: string): number { return ++nodeCount; },
         allocStates(n: number): number { const off = stateCount; stateCount += n; return off; },
-        findBranch(_l: string): number { return 0; },
         findDevice(_l: string) { return null; },
       };
       (core as any).setup(setupCtx);
@@ -600,7 +623,6 @@ describe("PJFET TEMP", () => {
         makeVolt(_l: string, _s: string): number { return ++nodeCount; },
         makeCur(_l: string, _s: string): number { return ++nodeCount; },
         allocStates(n: number): number { const off = stateCount; stateCount += n; return off; },
-        findBranch(_l: string): number { return 0; },
         findDevice(_l: string) { return null; },
       };
       (core as any).setup(setupCtx);

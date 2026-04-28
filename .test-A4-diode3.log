@@ -81,7 +81,7 @@
 [31m[1m[7m FAIL [27m[22m[39m src/components/semiconductors/__tests__/diode.test.ts[2m > [22mIKF/IKR high-injection correction[2m > [22mIKF correction reduces gd compared to IKF=Infinity at same Vd
 [31m[1mAssertionError[22m: expected 1e-12 to be less than NaN[39m
 [36m [2m❯[22m src/components/semiconductors/__tests__/diode.test.ts:[2m644:23[22m[39m
-    [90m642| [39m    [90m// IKF = 1mA: id at vd=0.7 is ~4mA, so id/ikf = 4 â€” strong corre[39m…
+    [90m642| [39m    [90m// IKF = 1mA: id at vd=0.7 is ~4mA, so id/ikf = 4 ” strong corre[39m…
     [90m643| [39m    [35mconst[39m gdWithIkf [33m=[39m [34mdiodeGd[39m(vd[33m,[39m { [33mIKF[39m[33m:[39m [34m1e-3[39m })[33m;[39m
     [90m644| [39m    [34mexpect[39m(gdWithIkf)[33m.[39m[34mtoBeLessThan[39m(gdNoIkf)[33m;[39m
     [90m   | [39m                      [31m^[39m

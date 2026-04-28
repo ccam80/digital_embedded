@@ -16,7 +16,6 @@ import { makeDcVoltageSource } from "../../sources/dc-voltage-source.js";
 import { withNodeIds, runDcOp, makeLoadCtx } from "../../../solver/analog/__tests__/test-helpers.js";
 import type { AnalogElement } from "../../../solver/analog/element.js";
 import { SparseSolver } from "../../../solver/analog/sparse-solver.js";
-import type { SetupContext } from "../../../solver/analog/setup-context.js";
 import type { AnalogElementCore } from "../../../core/analog-types.js";
 import { MODEDCOP, MODEINITFLOAT } from "../../../solver/analog/ckt-mode.js";
 import { makeSimpleCtx } from "../../../solver/analog/__tests__/test-helpers.js";
@@ -31,36 +30,6 @@ function getFactory(entry: ModelEntry): AnalogFactory {
   return entry.factory;
 }
 
-// ---------------------------------------------------------------------------
-// Helper: run real setup() on a core element with a real SparseSolver.
-// Node counter starts at 100 so internal nodes don't collide with pin nodes.
-// Returns the solver (post-setup, handles allocated) and allocated node IDs.
-// ---------------------------------------------------------------------------
-
-interface SetupResult {
-  solver: SparseSolver;
-  firstNode: number;  // first node allocated by makeVolt/makeCur = 101
-  secondNode: number; // second node allocated = 102
-}
-
-function runSetup(core: AnalogElementCore): SetupResult {
-  const solver = new SparseSolver();
-  solver._initStructure();
-  let nodeCount = 100;
-  const ctx: SetupContext = {
-    solver,
-    temp: 300.15,
-    nomTemp: 300.15,
-    copyNodesets: false,
-    makeVolt(_label: string, _suffix: string): number { return ++nodeCount; },
-    makeCur(_label: string, _suffix: string): number { return ++nodeCount; },
-    allocStates(n: number): number { return 0; },
-    findBranch(_label: string): number { return 0; },
-    findDevice(_label: string) { return null; },
-  };
-  (core as { setup(ctx: SetupContext): void }).setup(ctx);
-  return { solver, firstNode: 101, secondNode: 102 };
-}
 
 // ---------------------------------------------------------------------------
 // Helper: create an op-amp element core
@@ -113,7 +82,6 @@ describe("OpAmp", () => {
     const nInp = 1, nInn = 2, nOut = 3;
     const opamp = makeOpAmp({ nInp, nInn, nOut, gain: 1e6, rOut: 75 });
 
-    const { solver } = runSetup(opamp);
     const branchRow = 101; // makeCur called first
     const vint = 102;      // makeVolt called second
 
@@ -155,7 +123,6 @@ describe("OpAmp", () => {
     const nInp = 1, nInn = 2, nOut = 3;
     const opamp = makeOpAmp({ nInp, nInn, nOut, gain: 1e6, rOut: 0 });
 
-    const { solver } = runSetup(opamp);
     const branchRow = 101; // only makeCur called
 
     const voltages = new Float64Array(110);
@@ -366,7 +333,6 @@ describe("OpAmp parity (C4.5)", () => {
       () => 0,
     );
 
-    const { solver } = runSetup(opamp);
     const branchRow = 101; // makeCur called first
     const vint = 102;      // makeVolt called second
 

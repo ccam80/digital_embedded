@@ -122,6 +122,8 @@ export function makeResistor(
     isNonlinear: false,
     isReactive: false,
 
+    setup(_ctx: SetupContext): void {},
+
     load(ctx: LoadContext): void {
       const { solver } = ctx;
       G(solver, nodeA, nodeA, G_val);

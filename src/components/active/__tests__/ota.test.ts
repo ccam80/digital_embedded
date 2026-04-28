@@ -23,8 +23,6 @@ import { OTADefinition } from "../ota.js";
 import { PropertyBag } from "../../../core/properties.js";
 import type { AnalogElement } from "../../../solver/analog/element.js";
 import { SparseSolver } from "../../../solver/analog/sparse-solver.js";
-import type { SetupContext } from "../../../solver/analog/setup-context.js";
-import type { AnalogElementCore } from "../../../core/analog-types.js";
 import { MODEDCOP, MODEINITFLOAT } from "../../../solver/analog/ckt-mode.js";
 import { makeSimpleCtx } from "../../../solver/analog/__tests__/test-helpers.js";
 import { solveDcOperatingPoint } from "../../../solver/analog/dc-operating-point.js";
@@ -38,29 +36,6 @@ function getFactory(entry: ModelEntry): AnalogFactory {
   return entry.factory;
 }
 
-// ---------------------------------------------------------------------------
-// Helper: run real setup() on a core element with a real SparseSolver.
-// Node counter starts at 100 so internal nodes don't collide with pin nodes.
-// ---------------------------------------------------------------------------
-
-function runSetup(core: AnalogElementCore): SparseSolver {
-  const solver = new SparseSolver();
-  solver._initStructure();
-  let nodeCount = 100;
-  const ctx: SetupContext = {
-    solver,
-    temp: 300.15,
-    nomTemp: 300.15,
-    copyNodesets: false,
-    makeVolt(_label: string, _suffix: string): number { return ++nodeCount; },
-    makeCur(_label: string, _suffix: string): number { return ++nodeCount; },
-    allocStates(n: number): number { return 0; },
-    findBranch(_label: string): number { return 0; },
-    findDevice(_label: string) { return null; },
-  };
-  (core as { setup(ctx: SetupContext): void }).setup(ctx);
-  return solver;
-}
 
 // ---------------------------------------------------------------------------
 // Helper: read a value from sparse solver matrix at (extRow, extCol).
@@ -291,9 +266,6 @@ describe("OTA parity (C4.5)", () => {
       props,
       () => 0,
     );
-
-    // Run real setup() to allocate handles.
-    const solver = runSetup(ota);
 
     const voltages = new Float64Array(110);
     voltages[nVp]   = vDiff;

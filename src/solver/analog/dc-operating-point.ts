@@ -306,7 +306,8 @@ export function cktncDump(
  * @param ctx - Circuit context holding all solver state, buffers, and options
  */
 export function solveDcOperatingPoint(ctx: CKTCircuitContext): void {
-  const { matrixSize, params } = ctx;
+  const { params } = ctx;
+  const matrixSize = ctx.solver._size;
   const diagnostics = ctx.diagnostics;
 
   ctx.dcopResult.reset();

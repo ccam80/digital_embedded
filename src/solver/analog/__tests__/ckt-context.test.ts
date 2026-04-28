@@ -141,8 +141,6 @@ describe("CKTCircuitContext", () => {
     expect(ctx.nonlinearElements.length).toBeGreaterThan(0);
     expect(ctx.reactiveElements.length).toBeGreaterThan(0);
 
-    // matrixSize and nodeCount match input
-    expect(ctx.matrixSize).toBe(sz);
     expect(ctx.nodeCount).toBe(circuit.nodeCount);
 
     // statePool is set

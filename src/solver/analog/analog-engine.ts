@@ -347,6 +347,12 @@ export class MNAEngine implements AnalogEngine {
     // Elements read/write states[0] during NR; states[1] holds the last accepted state.
     if (statePool) {
       statePool.rotateStateVectors();
+      // Refresh loadCtx.state0/state1 after rotation so elements that access
+      // the state ring via ctx.state0/ctx.state1 (e.g. Timer555 SR latch) see
+      // the correct post-rotation slot arrays. Without this, ctx.state0/state1
+      // remain stale (captured by allocateStateBuffers before the first step)
+      // and elements write into the wrong ring slot.
+      ctx.refreshStatePointers();
     }
 
     for (;;) {

@@ -87,8 +87,8 @@ function computeFuseResistance(
 // ---------------------------------------------------------------------------
 
 export class AnalogFuseElement implements AnalogElement {
-  readonly pinNodeIds: readonly number[];
-  readonly allNodeIds: readonly number[];
+  pinNodeIds: readonly number[] = [];
+  allNodeIds: readonly number[] = [];
   readonly branchIndex: number = -1;
   readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.RES;
   readonly isNonlinear: boolean = true;
@@ -117,7 +117,6 @@ export class AnalogFuseElement implements AnalogElement {
   private readonly _onStateChange: ((blown: boolean, thermalRatio: number) => void) | null;
 
   /**
-   * @param pinNodeIds    - [n_pos, n_neg]
    * @param rCold          - Cold (intact) resistance in ohms
    * @param rBlown         - Blown (open) resistance in ohms
    * @param i2tRating      - I²t energy rating in A²·s
@@ -125,15 +124,12 @@ export class AnalogFuseElement implements AnalogElement {
    * @param onStateChange  - Callback invoked each timestep with blown flag and thermal ratio
    */
   constructor(
-    pinNodeIds: number[],
     rCold: number,
     rBlown: number,
     i2tRating: number,
     emitDiagnostic?: (diag: Diagnostic) => void,
     onStateChange?: (blown: boolean, thermalRatio: number) => void,
   ) {
-    this.pinNodeIds = pinNodeIds;
-    this.allNodeIds = pinNodeIds;
     this._rCold = Math.max(rCold, 1e-12);
     this._rBlown = Math.max(rBlown, 1e-6);
     this._i2tRating = Math.max(i2tRating, 1e-30);
@@ -265,7 +261,6 @@ function buildAnalogFuseElement(
 ): AnalogElementCore {
   const p = { rCold, rBlown, i2tRating };
   const el = new AnalogFuseElement(
-    [pinNodes.get("out1")!, pinNodes.get("out2")!],
     p.rCold,
     p.rBlown,
     p.i2tRating,
@@ -278,6 +273,8 @@ function buildAnalogFuseElement(
     },
   );
   el._pinNodes = new Map(pinNodes);
+  el.pinNodeIds = [pinNodes.get("out1")!, pinNodes.get("out2")!];
+  el.allNodeIds = el.pinNodeIds;
   (el as AnalogElementCore).setParam = function(key: string, value: number): void {
     if (key in p) {
       (p as Record<string, number>)[key] = value;
@@ -290,6 +287,7 @@ function buildAnalogFuseElement(
 export function createAnalogFuseElement(
   pinNodes: ReadonlyMap<string, number>,
   props: PropertyBag,
+  _getTime?: () => number,
 ): AnalogElementCore {
   return buildAnalogFuseElement(
     pinNodes,

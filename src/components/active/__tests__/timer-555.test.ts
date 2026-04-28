@@ -132,16 +132,37 @@ import {
 import type { SetupContext } from "../../../solver/analog/setup-context.js";
 
 /**
- * Add W3-compatible setup() stub + required _stateBase/_pinNodes fields to
- * non-migrated test-helper elements (makeVoltageSource, makeResistor, etc.)
- * so the MNAEngine._setup() loop doesn't throw "el.setup is not a function".
- * These elements allocate in load() — their setup() is a no-op.
+ * Wrap makeVoltageSource with a real setup() that pre-allocates matrix entries.
+ *
+ * makeVoltageSource uses k = branchIdx + 1 as the 1-based branch row. This
+ * wrapper's setup() calls ctx.solver.allocElement for those entries before
+ * allocateRowBuffers() finalises rhs size, so the branch row is included in
+ * the solver._size count and the rhs buffer is large enough when load() runs.
+ *
+ * branchIdx must be chosen to not collide with any internal nodes or branch
+ * rows that the Timer555 composite allocates during its own setup(). The
+ * Timer555 allocates nodeCount+1 through nodeCount+6 (4 voltage nodes + 2
+ * VCVS branch rows). A safe branchIdx is nodeCount+6 or higher.
  */
-function withSetupStub(el: AnalogElement): AnalogElement {
-  return Object.assign(el, {
+function makeVsElement(
+  nodePos: number,
+  nodeNeg: number,
+  branchIdx: number,
+  voltage: number,
+): AnalogElement {
+  const base = makeVoltageSource(nodePos, nodeNeg, branchIdx, voltage);
+  const k = branchIdx + 1; // 1-based branch row — same as load() uses
+  let _hPosK = -1, _hKPos = -1;
+  let _hNegK = -1, _hKNeg = -1;
+  return Object.assign(base, {
     _stateBase: -1,
     _pinNodes: new Map<string, number>(),
-    setup(_ctx: SetupContext): void {},
+    setup(ctx: SetupContext): void {
+      if (nodePos !== 0) { _hPosK = ctx.solver.allocElement(nodePos, k); _hKPos = ctx.solver.allocElement(k, nodePos); }
+      if (nodeNeg !== 0) { _hNegK = ctx.solver.allocElement(nodeNeg, k); _hKNeg = ctx.solver.allocElement(k, nodeNeg); }
+      // Diagonal slot keeps the row in the solver index even if unused in load()
+      ctx.solver.allocElement(k, k);
+    },
   });
 }
 
@@ -174,18 +195,21 @@ describe("Timer555", () => {
     const VCC = 5;
     const nVcc = 1, nGnd = 0, nTrig = 0, nThr = 0, nCtrl = 2;
     const nRst = 1; // RST tied to VCC
-    const nDis = 0, nOut = 3;
-    const brVcc = 3; // branch row index (absolute, 0-based) = nodeCount + 0 = 3
-    const matrixSize = 4; // nodeCount=3 (VCC, CTRL, OUT), branchCount=1
+    const nDis = 0, nOut = 0; // OUT grounded — not relevant for this test
+    // nodeCount=2 (VCC=1, CTRL=2). Timer555 allocates indices 3-8 internally
+    // (nLower=3, nComp1Out=4, nComp2Out=5, nDisBase=6, comp1_br=7, comp2_br=8).
+    // VCC voltage source branch: brVcc=8 → k=9 (above all timer internal allocs).
+    const nodeCount = 2;
+    const brVcc = 8; // safe: k=brVcc+1=9, above timer's internal range 3-8
 
     const timer = make555(
       { vcc: nVcc, gnd: nGnd, trig: nTrig, thr: nThr, ctrl: nCtrl, rst: nRst, dis: nDis, out: nOut },
     );
 
-    const vsVcc = withSetupStub(makeVoltageSource(nVcc, nGnd, brVcc, VCC));
+    const vsVcc = makeVsElement(nVcc, nGnd, brVcc, VCC);
 
     const elements = [timer, vsVcc];
-    const compiled = buildHandCircuit({ nodeCount: 3, elements });
+    const compiled = buildHandCircuit({ nodeCount, elements });
     const engine = new MNAEngine();
     engine.init(compiled);
     const result = engine.dcOperatingPoint();
@@ -266,18 +290,20 @@ function buildAstableCircuit(R1: number, R2: number, C: number, VCC: number, vDr
   const nCap  = 3; // capacitor top / THR / TRIG
   const nOut  = 4; // output
   const nCtrl = 5; // CTRL (floating via internal divider)
-  const brVcc = 5; // branch row index (0-based absolute) = nodeCount
 
   const nodeCount  = 5;
+  // Timer555 allocates nodeCount+1..nodeCount+6 internally (4 voltage + 2 VCVS branches).
+  // nodeCount=5 → timer range 6-11. Safe VCC branch: brVcc=11 → k=12.
+  const brVcc = 11;
 
   const timer = make555(
     { vcc: nVcc, gnd: 0, trig: nCap, thr: nCap, ctrl: nCtrl, rst: nVcc, dis: nDis, out: nOut },
     { vDrop },
   );
 
-  const vsVcc  = withSetupStub(makeVoltageSource(nVcc, 0, brVcc, VCC));
-  const r1El   = withSetupStub(makeResistor(nVcc, nDis, R1));
-  const r2El   = withSetupStub(makeResistor(nDis, nCap, R2));
+  const vsVcc  = makeVsElement(nVcc, 0, brVcc, VCC);
+  const r1El   = makeResistor(nVcc, nDis, R1);
+  const r2El   = makeResistor(nDis, nCap, R2);
   const capEl  = createTestCapacitor(C, nCap, 0);
 
   const elements = [timer, vsVcc, r1El, r2El, capEl];
@@ -477,21 +503,25 @@ function buildMonostableCircuit(R: number, Cval: number, VCC: number): {
   const nTrig = 3;
   const nOut  = 4;
   const nCtrl = 5;
-  const brVcc  = 5; // absolute branch row
-  const brTrig = 6; // absolute branch row
 
   const nodeCount   = 5;
+  // Timer555 allocates nodeCount+1..nodeCount+6 internally (4 voltage + 2 VCVS branches).
+  // nodeCount=5 → timer range 6-11. Safe VCC branch: brVcc=11 → k=12. vsTrig: k=13.
+  const brVcc  = 11; // k = brVcc+1 = 12 (used by makeVoltageSource/makeVsElement)
+  const brTrig = 13; // k = brTrig = 13 (used directly by vsTrig.load())
 
   const timer = make555(
     { vcc: nVcc, gnd: 0, trig: nTrig, thr: nThr, ctrl: nCtrl, rst: nVcc, dis: nThr, out: nOut },
   );
 
-  const vsVcc  = withSetupStub(makeVoltageSource(nVcc, 0, brVcc, VCC));
-  const rEl    = withSetupStub(makeResistor(nVcc, nThr, R));
+  const vsVcc  = makeVsElement(nVcc, 0, brVcc, VCC);
+  const rEl    = makeResistor(nVcc, nThr, R);
   const capEl  = createTestCapacitor(Cval, nThr, 0);
 
-  // Mutable trigger voltage source (test stub — non-migrated, allocElement in load() is acceptable for test-only stubs)
+  // Mutable trigger voltage source with real setup() to pre-allocate its branch row.
+  // Uses k=brTrig directly (1-based) for its matrix entries.
   let _trigVoltage = VCC; // starts HIGH (idle)
+  let _hTrigK = -1, _hKTrig = -1;
   const vsTrig: AnalogElement = {
     pinNodeIds: [nTrig, 0],
     allNodeIds: [nTrig, 0],
@@ -501,15 +531,22 @@ function buildMonostableCircuit(R: number, Cval: number, VCC: number): {
     isReactive: false,
     _stateBase: -1,
     _pinNodes: new Map<string, number>([["pos", nTrig], ["neg", 0]]),
-    setup(_ctx: SetupContext): void {},
+    setup(ctx: SetupContext): void {
+      const k = brTrig;
+      if (nTrig > 0) {
+        _hTrigK = ctx.solver.allocElement(nTrig, k);
+        _hKTrig = ctx.solver.allocElement(k, nTrig);
+      }
+      ctx.solver.allocElement(k, k); // ensure branch row in solver index
+    },
     setParam(_key: string, _value: number): void {},
     getPinCurrents(_v: Float64Array): number[] { return []; },
     load(ctx): void {
       const { solver, rhs } = ctx;
       const k = brTrig;
       if (nTrig > 0) {
-        const h1 = solver.allocElement(nTrig, k); solver.stampElement(h1, 1);
-        const h2 = solver.allocElement(k, nTrig); solver.stampElement(h2, 1);
+        solver.stampElement(_hTrigK, 1);
+        solver.stampElement(_hKTrig, 1);
       }
       stampRHS(rhs, k, _trigVoltage);
     },

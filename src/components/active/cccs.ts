@@ -11,36 +11,22 @@
  * `expression` is the default ("I(sense)"), the effective expression is
  * `currentGain * I(sense)`.
  *
- * MNA formulation:
- *   Current sensing uses a 0V voltage source (same as CCVS). One branch
- *   variable is required for the sense source at `senseBranchIdx = branchIdx`.
+ * MNA formulation (port of ngspice cccsset.c / cccsload.c):
+ *   CCCS has no own branch row. Current sensing relies on a 0V VSRC
+ *   (the sense source) whose branch is resolved via ctx.findBranch at
+ *   setup time. Two matrix handles are allocated (cccsset.c:49-50):
+ *     _hPCtBr = G[posNode, contBranch]
+ *     _hNCtBr = G[negNode, contBranch]
  *
- *   Sense port (0V source):
- *     B[nSenseP, senseBranch] += 1   C[senseBranch, nSenseP] += 1
- *     B[nSenseN, senseBranch] -= 1   C[senseBranch, nSenseN] -= 1
- *     RHS[senseBranch] = 0  (0V)
+ *   load() reads the controlling branch current from rhsOld and stamps
+ *   the NR-linearized Norton equivalent:
+ *     G[posNode, contBranch] = -gm
+ *     G[negNode, contBranch] =  gm
+ *     RHS[posNode] += iNR
+ *     RHS[negNode] -= iNR
  *
- *   Output port (Norton stamp — no branch variable):
- *     The NR-linearized Norton equivalent at operating point I0:
- *       I_out ≈ f'(I0) * I_sense + [f(I0) - f'(I0) * I0]
- *
- *     In MNA, I_sense is a branch variable at row senseBranch. The current
- *     flowing out of row senseBranch (i.e., through the sense 0V source into
- *     nSenseP) appears in the solution as voltages[senseBranch]. To inject this
- *     into the output nodes as a controlled current source:
- *
- *     G sub-matrix (linking sense branch variable column to output node rows):
- *       G[nOutP, senseBranch] -= f'(I0)   (inject f' * I_sense into nOutP)
- *       G[nOutN, senseBranch] += f'(I0)
- *
- *     RHS (NR constant term, independent current source):
- *       RHS[nOutP] += f(I0) - f'(I0) * I0
- *       RHS[nOutN] -= f(I0) - f'(I0) * I0
- *
- * At convergence (I_sense = I0) the current injected into out+ equals f(I0). ✓
- *
- * Note: the `analogFactory` receives `branchIdx` as the sense branch row.
- * Tests must allocate at least 1 branch row for CCCS in the circuit's branchCount.
+ * senseSourceLabel MUST be set via setParam("senseSourceLabel", ...) at
+ * compile time before setup() runs.
  */
 
 import { AbstractCircuitElement } from "../../core/element.js";
@@ -56,12 +42,13 @@ import {
   type AttributeMapping,
   type ComponentDefinition,
 } from "../../core/registry.js";
-import type { SparseSolver } from "../../solver/analog/sparse-solver.js";
 import { parseExpression } from "../../solver/analog/expression.js";
 import { differentiate, simplify } from "../../solver/analog/expression-differentiate.js";
 import { ControlledSourceElement } from "../../solver/analog/controlled-source-base.js";
 import { NGSPICE_LOAD_ORDER } from "../../solver/analog/element.js";
 import type { SetupContext } from "../../solver/analog/setup-context.js";
+import type { SparseSolver } from "../../solver/analog/sparse-solver.js";
+import type { LoadContext } from "../../solver/analog/load-context.js";
 import { defineModelParams } from "../../core/model-params.js";
 
 // ---------------------------------------------------------------------------
@@ -126,127 +113,86 @@ function buildCCCSPinDeclarations(): PinDeclaration[] {
 /**
  * MNA analog element for a Current-Controlled Current Source.
  *
- * Node layout in nodeIds (from analogFactory):
- *   [0] = nSenseP  (sense+ node)
- *   [1] = nSenseN  (sense- node)
- *   [2] = nOutP    (out+ node)
- *   [3] = nOutN    (out- node)
+ * pinNodeIds index ordering (pinLayout order):
+ *   [0] = sense+ node  (not used directly in stamps — sense via contBranch)
+ *   [1] = sense- node  (not used directly in stamps)
+ *   [2] = out+   node  (CCCSposNode)
+ *   [3] = out-   node  (CCCSnegNode)
  *
- * branchIdx: absolute 0-based sense branch row (for the 0V sense source).
- * No output branch variable (Norton stamp).
+ * No own branch row. Controlling branch resolved at setup() time.
  */
-class CCCSAnalogElement extends ControlledSourceElement {
-  branchIndex: number; // sense branch
+export class CCCSAnalogElement extends ControlledSourceElement {
+  branchIndex: number = -1;
   readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.CCCS;
   _stateBase: number = -1;
   _pinNodes: Map<string, number> = new Map();
 
-  private readonly _nSenseP: number;
-  private readonly _nSenseN: number;
-  private readonly _nOutP: number;
-  private readonly _nOutN: number;
-  private readonly _senseBranch: number;
+  // senseSourceLabel — the label of the controlling VSRC/CCVS/VCVS/IND.
+  // Must be set via setParam("senseSourceLabel", label) before setup() runs.
+  private _senseSourceLabel: string = "";
 
-  constructor(
-    nSenseP: number,
-    nSenseN: number,
-    nOutP: number,
-    nOutN: number,
-    senseBranchIdx: number,
-    expressionStr: string,
-    currentGain: number,
-  ) {
-    const rawExpr = parseExpression(expressionStr === "I(sense)"
-      ? `${currentGain} * I(sense)`
-      : expressionStr);
-    const deriv = simplify(differentiate(rawExpr, "I(sense)"));
+  // Resolved controlling branch index (filled in setup()).
+  private _contBranch: number = -1;
 
-    super(rawExpr, deriv, "I(sense)", "current");
+  // TSTALLOC handles — allocated in setup(), written in load()
+  // cccsset.c:49-50 line-for-line
+  private _hPCtBr: number = -1; // G[posNode, contBranch]  :49
+  private _hNCtBr: number = -1; // G[negNode, contBranch]  :50
 
-    this._nSenseP = nSenseP;
-    this._nSenseN = nSenseN;
-    this._nOutP = nOutP;
-    this._nOutN = nOutN;
-    this._senseBranch = senseBranchIdx;
-    this.branchIndex = senseBranchIdx;
-  }
+  setup(ctx: SetupContext): void {
+    const solver = ctx.solver;
+    const posNode = this._pinNodes.get("out+")!;  // CCCSposNode  (pinNodeIds[2])
+    const negNode = this._pinNodes.get("out-")!;  // CCCSnegNode  (pinNodeIds[3])
 
-  setup(_ctx: SetupContext): void {
-    throw new Error(`PB-CCCS not yet migrated`);
-  }
-
-  setParam(_key: string, _value: number): void {
-  }
-
-  /**
-   * Stamp linear B/C incidence for the sense 0V source branch.
-   *
-   *   B[nSenseP, senseBranch] += 1   C[senseBranch, nSenseP] += 1
-   *   B[nSenseN, senseBranch] -= 1   C[senseBranch, nSenseN] -= 1
-   *   RHS[senseBranch] = 0  (0V, not explicitly stamped — zeros from beginAssembly)
-   */
-  protected override _stampLinear(solver: SparseSolver): void {
-    const ks = this._senseBranch;
-
-    if (this._nSenseP !== 0) {
-      solver.stampElement(solver.allocElement(this._nSenseP, ks), 1);
-      solver.stampElement(solver.allocElement(ks, this._nSenseP), 1);
+    // Resolve controlling branch: cccsset.c:36
+    // ctx.findBranch dispatches to the controlling source's findBranchFor
+    // callback (lazy-allocating per 00-engine.md §A2/A4.2).
+    if (!this._senseSourceLabel) {
+      throw new Error(`CCCS '${this.label}': senseSourceLabel not set before setup()`);
     }
-    if (this._nSenseN !== 0) {
-      solver.stampElement(solver.allocElement(this._nSenseN, ks), -1);
-      solver.stampElement(solver.allocElement(ks, this._nSenseN), -1);
+    const contBranch = ctx.findBranch(this._senseSourceLabel);
+    if (contBranch === 0) {
+      throw new Error(
+        `CCCS '${this.label}': unknown controlling source '${this._senseSourceLabel}'`,
+      );
     }
+    this._contBranch = contBranch;
+
+    // TSTALLOC sequence: cccsset.c:49-50, line-for-line
+    this._hPCtBr = solver.allocElement(posNode, contBranch); // :49
+    this._hNCtBr = solver.allocElement(negNode, contBranch); // :50
+  }
+
+  setParam(key: string, value: number | string): void {
+    if (key === "senseSourceLabel" && typeof value === "string") {
+      this._senseSourceLabel = value;
+    }
+  }
+
+  protected override _stampLinear(_solver: SparseSolver): void {
+    // CCCS has no linear (topology-constant) stamps of its own.
+    // The sense 0V source is a separate VSRC element in the netlist.
   }
 
   protected override _bindContext(rhsOld: Float64Array): void {
-    const iSense = rhsOld[this._senseBranch];
-    this._ctx.setBranchCurrentByIndex("sense", this._senseBranch, rhsOld);
+    const iSense = rhsOld[this._contBranch];
+    this._ctx.setBranchCurrentByIndex("sense", this._contBranch, rhsOld);
     this._ctrlValue = iSense;
   }
 
   /**
-   * Per-pin currents in pinLayout order: [sense+, sense-, out+, out-].
-   *
-   * Positive = current flowing INTO the element at that pin.
-   *
-   * Sense port: the 0V branch current I_sense flows into sense+ and out of
-   * sense-. voltages[senseBranch] is the branch current (into nSenseP).
-   *
-   * Output port: the controlled current f(I_sense) is injected INTO nOutP
-   * and extracted FROM nOutN. From the element's perspective this means
-   * I_out+ = -f(I_sense)  (current leaves nOutP, so element sinks it)
-   * I_out- = +f(I_sense)  (current enters nOutN via the source)
-   *
-   * KCL: I_senseP + I_senseN + I_outP + I_outN = 0 ✓
-   *   (iSense) + (-iSense) + (-fI) + (fI) = 0
-   */
-  getPinCurrents(rhs: Float64Array): number[] {
-    const iSense = rhs[this._senseBranch];
-    const fI = this._compiledExpr(this._ctx); // f(I_sense) at current operating point
-    return [
-      iSense,   // sense+: I_sense flows in
-      -iSense,  // sense-: I_sense flows out
-      -fI,      // out+: current is sourced into the net, so element gives it out
-      fI,       // out-: current is sunk from the net back into element
-    ];
-  }
-
-  /**
    * Stamp NR-linearized Norton equivalent for the controlled current output.
+   * Port of cccsload.c value-side — no allocElement calls.
    *
-   * I_out ≈ f'(I0) * I_sense + [f(I0) - f'*I0]
+   * I_out ≈ f'(I0) * I_sense + [f(I0) - f'(I0)*I0]
    *
-   * The I_sense term is a branch variable (column senseBranch in the MNA matrix).
-   * Norton constant: iNR = f(I0) - f'(I0) * I0
-   *
-   * G sub-matrix: link sense branch COLUMN to output node ROWS.
-   * For current injected INTO nOutP from the sense branch variable:
-   *   G[nOutP, senseBranch] -= f'   (negative: contributes -f'*I_sense to KCL row)
-   *   G[nOutN, senseBranch] += f'
+   * G sub-matrix (controlling branch COLUMN linked to output node ROWS):
+   *   G[posNode, contBranch] -= gm    (−gm stamps so current flows INTO posNode)
+   *   G[negNode, contBranch] += gm
    *
    * RHS (Norton constant term):
-   *   RHS[nOutP] += iNR
-   *   RHS[nOutN] -= iNR
+   *   RHS[posNode] += iNR
+   *   RHS[negNode] -= iNR
    */
   override stampOutput(
     solver: SparseSolver,
@@ -255,24 +201,47 @@ class CCCSAnalogElement extends ControlledSourceElement {
     derivative: number,
     ctrlValue: number,
   ): void {
-    const ks = this._senseBranch;
+    const gm  = derivative;
     const iNR = value - derivative * ctrlValue;
 
-    // G sub-matrix: sense branch variable → output node rows
-    if (this._nOutP !== 0) {
-      solver.stampElement(solver.allocElement(this._nOutP, ks), -derivative);
-    }
-    if (this._nOutN !== 0) {
-      solver.stampElement(solver.allocElement(this._nOutN, ks), derivative);
-    }
+    solver.stampElement(this._hPCtBr, -gm); // G[posNode, contBranch]
+    solver.stampElement(this._hNCtBr,  gm); // G[negNode, contBranch]
 
-    // RHS: Norton constant term
-    if (this._nOutP !== 0) {
-      rhs[this._nOutP] += iNR;
-    }
-    if (this._nOutN !== 0) {
-      rhs[this._nOutN] += -iNR;
-    }
+    const posNode = this._pinNodes.get("out+")!;
+    const negNode = this._pinNodes.get("out-")!;
+    if (posNode !== 0) rhs[posNode] += iNR;
+    if (negNode !== 0) rhs[negNode] -= iNR;
+  }
+
+  /**
+   * Per-pin currents in pinLayout order: [sense+, sense-, out+, out-].
+   *
+   * The sense port is wired through an external VSRC whose branch variable
+   * holds the sensed current. CCCS itself injects the controlled current at
+   * the output port. Positive = current flowing INTO the pin.
+   */
+  getPinCurrents(rhs: Float64Array): number[] {
+    const iSense = this._contBranch >= 0 ? rhs[this._contBranch] : 0;
+    const fI = this._compiledExpr(this._ctx);
+    return [
+      iSense,   // sense+: I_sense flows in (through the external sense VSRC)
+      -iSense,  // sense-: I_sense flows out
+      -fI,      // out+: current is sourced into the net (element gives it out)
+      fI,       // out-: current is sunk back into element
+    ];
+  }
+
+  /**
+   * Override load() to use cached handles instead of allocating in load().
+   * Calls _bindContext, evaluates expression, then calls stampOutput with
+   * the cached handle-based stamps.
+   */
+  override load(ctx: LoadContext): void {
+    this._bindContext(ctx.rhsOld);
+    this._stampLinear(ctx.solver);
+    const value = this._compiledExpr(this._ctx);
+    const deriv = this._compiledDeriv(this._ctx);
+    this.stampOutput(ctx.solver, ctx.rhs, value, deriv, this._ctrlValue);
   }
 }
 
@@ -336,9 +305,9 @@ export class CCCSElement extends AbstractCircuitElement {
     ctx.setColor("TEXT");
     ctx.setFont({ family: "sans-serif", size: 0.6 });
     ctx.drawText("sense+", 1.2, 0, { horizontal: "left", vertical: "middle" });
-    ctx.drawText("sense\u2212", 1.2, 2, { horizontal: "left", vertical: "middle" });
+    ctx.drawText("sense−", 1.2, 2, { horizontal: "left", vertical: "middle" });
     ctx.drawText("out+",   4.8, 0, { horizontal: "right", vertical: "middle" });
-    ctx.drawText("out\u2212",   4.8, 2, { horizontal: "right", vertical: "middle" });
+    ctx.drawText("out−",   4.8, 2, { horizontal: "right", vertical: "middle" });
 
     ctx.restore();
   }
@@ -403,21 +372,17 @@ export const CCCSDefinition: ComponentDefinition = {
       factory: (pinNodes, props, _getTime) => {
         const expression = props.getOrDefault<string>("expression", "I(sense)");
         const currentGain = props.getModelParam<number>("currentGain");
-        const el = new CCCSAnalogElement(
-          pinNodes.get("sense+")!,
-          pinNodes.get("sense-")!,
-          pinNodes.get("out+")!,
-          pinNodes.get("out-")!,
-          -1,
-          expression,
-          currentGain,
-        );
+        const rawExpr = parseExpression(expression === "I(sense)"
+          ? `${currentGain} * I(sense)`
+          : expression);
+        const deriv = simplify(differentiate(rawExpr, "I(sense)"));
+        const el = new CCCSAnalogElement(rawExpr, deriv, "I(sense)", "current");
         el._pinNodes = new Map(pinNodes);
         return el;
       },
       paramDefs: CCCS_PARAM_DEFS,
       params: CCCS_DEFAULTS,
-      branchCount: 1,
+      ngspiceNodeMap: { "out+": "pos", "out-": "neg" },
     },
   },
   defaultModel: "behavioral",

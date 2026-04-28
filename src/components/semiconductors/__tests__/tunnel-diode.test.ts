@@ -449,9 +449,6 @@ describe("TunnelDiode TEMP", () => {
     const pool = new StatePool(Math.max(core.stateSize, 1));
     (core as any).stateBaseOffset = 0;
     core.initState(pool);
-    // Seed SLOT_VD=v so vdOld=v; NDR step clamp sees zero delta and does not clamp.
-    pool.state0[0] = v;
-
     // 1-based: [0]=ground sentinel, [1]=nodeA, [2]=nodeK
     const solver = new SparseSolver();
     solver._initStructure();
@@ -477,9 +474,6 @@ describe("TunnelDiode TEMP", () => {
     const pool = new StatePool(Math.max(core.stateSize, 1));
     (core as any).stateBaseOffset = 0;
     core.initState(pool);
-    // Seed SLOT_VD=v so the NDR step clamp sees zero delta and does not clamp.
-    pool.state0[0] = v;
-
     // First load at 300.15K
     // 1-based: [0]=ground sentinel, [1]=nodeA, [2]=nodeK
     const solver1 = new SparseSolver();
@@ -548,10 +542,6 @@ describe("integration", () => {
     const pool = new StatePool(6);
     (core as any).stateBaseOffset = 0;
     core.initState(pool);
-
-    // Seed SLOT_VD=0 with vd so vdOld=vd; prevents NDR voltage-step limiting
-    // from clamping vdNew away from vd (which would make expected values wrong).
-    pool.state0[0] = vd;
 
     // Seed previous-step charge in s1[SLOT_Q=4]
     const prevVd = 0.18;

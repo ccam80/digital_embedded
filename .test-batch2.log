@@ -406,7 +406,7 @@
 [31m     → expected false to be true // Object.is equality[39m
 [31m   [31m×[31m Factory[2m > [22mnand_factory_correct_truth_table[90m 1[2mms[22m[31m[39m
 [31m     → expected false to be true // Object.is equality[39m
-[31m   [31m×[31m Task 6.4.3 â€” _pinLoading propagation and delegation[2m > [22mgate_output_uses_direct_role[90m 0[2mms[22m[31m[39m
+[31m   [31m×[31m Task 6.4.3 ” _pinLoading propagation and delegation[2m > [22mgate_output_uses_direct_role[90m 0[2mms[22m[31m[39m
 [31m     → expected true to be false // Object.is equality[39m
  [31m❯[39m src/components/semiconductors/__tests__/phase-3-xfact-predictor.test.ts [2m([22m[2m17 tests[22m[2m | [22m[31m3 failed[39m[2m)[22m[90m 18[2mms[22m[39m
 [31m   [31m×[31m Task 3.2.1 — Diode MODEINITPRED xfact[2m > [22mfalls through to rhsOld when MODEINITPRED is not set[90m 6[2mms[22m[31m[39m

@@ -11,37 +11,23 @@
  * `expression` is the default ("I(sense)"), the effective expression is
  * `transresistance * I(sense)`.
  *
- * MNA formulation:
- *   Current sensing is accomplished by inserting a 0V voltage source in series
- *   with the sense port. This creates a dedicated branch variable at row
- *   `senseBranchIdx` whose value equals the sensed current. The expression
- *   binds `I(sense)` to this branch variable via `getBranchCurrent("sense")`.
+ * MNA formulation (port of ngspice ccvsset.c / ccvsload.c):
+ *   CCVS has one own branch row (the output voltage source current).
+ *   setup() allocates it via ctx.makeCur (ccvsset.c:40-43), resolves the
+ *   controlling branch via ctx.findBranch, then allocates 5 handles
+ *   (ccvsset.c:58-62):
+ *     _hPIbr    = G[posNode,   ownBranch]   :58
+ *     _hNIbr    = G[negNode,   ownBranch]   :59
+ *     _hIbrN    = G[ownBranch, negNode]     :60
+ *     _hIbrP    = G[ownBranch, posNode]     :61
+ *     _hIbrCtBr = G[ownBranch, contBranch]  :62
  *
- *   Two branch variables are required:
- *     senseBranchIdx = branchIdx     (0V sense source)
- *     outBranchIdx   = branchIdx + 1 (output voltage source)
+ *   load() stamps B/C incidence for the output voltage source branch and
+ *   the Jacobian linking the output branch equation to the controlling
+ *   branch variable.
  *
- *   Sense port (0V source, nodes sense+ / sense-):
- *     B[nSenseP, senseBranch] += 1   C[senseBranch, nSenseP] += 1
- *     B[nSenseN, senseBranch] -= 1   C[senseBranch, nSenseN] -= 1
- *     RHS[senseBranch] = 0  (0V)
- *
- *   Output port (dependent voltage source, nodes out+ / out-):
- *     `_stampLinear()` places B/C incidence for out branch (and the sense 0V
- *     source incidence above).
- *     `load()` (via base class) binds I_sense, calls `_stampLinear`, evaluates
- *     f(I_sense) and f'(I_sense), then calls `stampOutput()` which fills the
- *     Jacobian and NR-linearized RHS:
- *       C[outBranch, senseBranch] -= f'(I_sense)  (Jacobian: dV_out/dI_sense)
- *       RHS[outBranch] = f(I0) - f'(I0) * I0
- *
- * At convergence the output branch equation is:
- *   V_out+ - V_out- - f'*I_sense = f(I0) - f'*I0
- * which gives V_out = f(I0) when I_sense = I0. ✓
- *
- * Note: the `analogFactory` receives `branchIdx` as the first (sense) branch.
- * The output branch is at `branchIdx + 1`. Tests must allocate 2 branch rows
- * for CCVS in the circuit's branchCount.
+ * senseSourceLabel MUST be set via setParam("senseSourceLabel", ...) at
+ * compile time before setup() runs.
  */
 
 import { AbstractCircuitElement } from "../../core/element.js";
@@ -57,12 +43,13 @@ import {
   type AttributeMapping,
   type ComponentDefinition,
 } from "../../core/registry.js";
-import type { SparseSolver } from "../../solver/analog/sparse-solver.js";
 import { parseExpression } from "../../solver/analog/expression.js";
 import { differentiate, simplify } from "../../solver/analog/expression-differentiate.js";
 import { ControlledSourceElement } from "../../solver/analog/controlled-source-base.js";
 import { NGSPICE_LOAD_ORDER } from "../../solver/analog/element.js";
 import type { SetupContext } from "../../solver/analog/setup-context.js";
+import type { SparseSolver } from "../../solver/analog/sparse-solver.js";
+import type { LoadContext } from "../../solver/analog/load-context.js";
 import { defineModelParams } from "../../core/model-params.js";
 
 // ---------------------------------------------------------------------------
@@ -127,114 +114,99 @@ function buildCCVSPinDeclarations(): PinDeclaration[] {
 /**
  * MNA analog element for a Current-Controlled Voltage Source.
  *
- * Node layout in nodeIds (from analogFactory):
- *   [0] = nSenseP  (sense+ node)
- *   [1] = nSenseN  (sense- node)
- *   [2] = nOutP    (out+ node)
- *   [3] = nOutN    (out- node)
+ * pinNodeIds index ordering (pinLayout order):
+ *   [0] = sense+ node  (not used directly in stamps — sense via contBranch)
+ *   [1] = sense- node  (not used directly in stamps)
+ *   [2] = out+   node  (CCVSposNode)
+ *   [3] = out-   node  (CCVSnegNode)
  *
- * branchIdx (the value passed to analogFactory): absolute 0-based sense branch row.
- * outBranchIdx = branchIdx + 1: absolute 0-based output branch row.
+ * branchIndex: own output voltage source branch, set during setup().
  */
-class CCVSAnalogElement extends ControlledSourceElement {
-  branchIndex: number; // sense branch (used by AnalogElement interface)
+export class CCVSAnalogElement extends ControlledSourceElement {
+  branchIndex: number = -1;
   readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.CCVS;
   _stateBase: number = -1;
   _pinNodes: Map<string, number> = new Map();
 
-  private readonly _nSenseP: number;
-  private readonly _nSenseN: number;
-  private readonly _nOutP: number;
-  private readonly _nOutN: number;
-  private readonly _senseBranch: number; // absolute MNA row for 0V sense source
-  private readonly _outBranch: number;   // absolute MNA row for output voltage source
+  // senseSourceLabel — label of the controlling VSRC/CCVS/VCVS/IND.
+  // Must be set via setParam("senseSourceLabel", label) before setup() runs.
+  private _senseSourceLabel: string = "";
 
-  constructor(
-    nSenseP: number,
-    nSenseN: number,
-    nOutP: number,
-    nOutN: number,
-    senseBranchIdx: number,
-    expressionStr: string,
-    transresistance: number,
-  ) {
-    const rawExpr = parseExpression(expressionStr === "I(sense)"
-      ? `${transresistance} * I(sense)`
-      : expressionStr);
-    const deriv = simplify(differentiate(rawExpr, "I(sense)"));
+  // Resolved controlling branch index (filled in setup()).
+  private _contBranch: number = -1;
 
-    super(rawExpr, deriv, "I(sense)", "current");
+  // TSTALLOC handles — allocated in setup(), written in load()
+  // ccvsset.c:58-62 line-for-line
+  private _hPIbr:    number = -1; // G[posNode,   ownBranch]   :58
+  private _hNIbr:    number = -1; // G[negNode,   ownBranch]   :59
+  private _hIbrN:    number = -1; // G[ownBranch, negNode]     :60
+  private _hIbrP:    number = -1; // G[ownBranch, posNode]     :61
+  private _hIbrCtBr: number = -1; // G[ownBranch, contBranch]  :62
 
-    this._nSenseP = nSenseP;
-    this._nSenseN = nSenseN;
-    this._nOutP = nOutP;
-    this._nOutN = nOutN;
-    this._senseBranch = senseBranchIdx;
-    this._outBranch = senseBranchIdx + 1;
-    this.branchIndex = senseBranchIdx;
+  setup(ctx: SetupContext): void {
+    const solver = ctx.solver;
+    const posNode = this._pinNodes.get("out+")!;  // CCVSposNode  (pinNodeIds[2])
+    const negNode = this._pinNodes.get("out-")!;  // CCVSnegNode  (pinNodeIds[3])
+
+    // Own branch row: ccvsset.c:40-43 (idempotent guard)
+    if (this.branchIndex === -1) {
+      this.branchIndex = ctx.makeCur(this.label ?? "ccvs", "branch");
+    }
+    const ownBranch = this.branchIndex;
+
+    // Resolve controlling branch: ccvsset.c:45
+    // ctx.findBranch dispatches to the controlling source's findBranchFor
+    // callback (lazy-allocating per 00-engine.md §A2/A4.2).
+    if (!this._senseSourceLabel) {
+      throw new Error(`CCVS '${this.label}': senseSourceLabel not set before setup()`);
+    }
+    const contBranch = ctx.findBranch(this._senseSourceLabel);
+    if (contBranch === 0) {
+      throw new Error(
+        `CCVS '${this.label}': unknown controlling source '${this._senseSourceLabel}'`,
+      );
+    }
+    this._contBranch = contBranch;
+
+    // TSTALLOC sequence: ccvsset.c:58-62, line-for-line
+    this._hPIbr    = solver.allocElement(posNode,   ownBranch);  // :58
+    this._hNIbr    = solver.allocElement(negNode,   ownBranch);  // :59
+    this._hIbrN    = solver.allocElement(ownBranch, negNode);    // :60
+    this._hIbrP    = solver.allocElement(ownBranch, posNode);    // :61
+    this._hIbrCtBr = solver.allocElement(ownBranch, contBranch); // :62
   }
 
-  setup(_ctx: SetupContext): void {
-    throw new Error(`PB-CCVS not yet migrated`);
+  setParam(key: string, value: number | string): void {
+    if (key === "senseSourceLabel" && typeof value === "string") {
+      this._senseSourceLabel = value;
+    }
   }
 
-  setParam(_key: string, _value: number): void {
-  }
-
-  /**
-   * Stamp linear B/C incidence for both branch variables.
-   *
-   * Sense 0V source (enforces V_senseP - V_senseN = 0):
-   *   B[nSenseP, senseBranch] += 1   C[senseBranch, nSenseP] += 1
-   *   B[nSenseN, senseBranch] -= 1   C[senseBranch, nSenseN] -= 1
-   *   RHS[senseBranch] = 0
-   *
-   * Output voltage source (incidence only; Jacobian stamped in stampOutput):
-   *   B[nOutP, outBranch] += 1   C[outBranch, nOutP] += 1
-   *   B[nOutN, outBranch] -= 1   C[outBranch, nOutN] -= 1
-   */
   protected override _stampLinear(solver: SparseSolver): void {
-    const ks = this._senseBranch;
-    const ko = this._outBranch;
-
-    // Sense 0V source incidence
-    if (this._nSenseP !== 0) {
-      solver.stampElement(solver.allocElement(this._nSenseP, ks), 1);
-      solver.stampElement(solver.allocElement(ks, this._nSenseP), 1);
-    }
-    if (this._nSenseN !== 0) {
-      solver.stampElement(solver.allocElement(this._nSenseN, ks), -1);
-      solver.stampElement(solver.allocElement(ks, this._nSenseN), -1);
-    }
-    // RHS = 0V for sense source (no explicit stamp needed — beginAssembly zeros RHS)
-
-    // Output voltage source incidence
-    if (this._nOutP !== 0) {
-      solver.stampElement(solver.allocElement(this._nOutP, ko), 1);
-      solver.stampElement(solver.allocElement(ko, this._nOutP), 1);
-    }
-    if (this._nOutN !== 0) {
-      solver.stampElement(solver.allocElement(this._nOutN, ko), -1);
-      solver.stampElement(solver.allocElement(ko, this._nOutN), -1);
-    }
+    // Stamp B/C incidence for the own output voltage source branch.
+    // Values are constant topology entries (±1); stamp every load() call.
+    solver.stampElement(this._hPIbr,  1);  // B[posNode, ownBranch]
+    solver.stampElement(this._hNIbr, -1);  // B[negNode, ownBranch]
+    solver.stampElement(this._hIbrN, -1);  // C[ownBranch, negNode]
+    solver.stampElement(this._hIbrP,  1);  // C[ownBranch, posNode]
   }
 
   protected override _bindContext(rhsOld: Float64Array): void {
-    // Read sense current from the sense branch variable
-    const iSense = rhsOld[this._senseBranch];
-    this._ctx.setBranchCurrentByIndex("sense", this._senseBranch, rhsOld);
+    const iSense = rhsOld[this._contBranch];
+    this._ctx.setBranchCurrentByIndex("sense", this._contBranch, rhsOld);
     this._ctrlValue = iSense;
   }
 
   /**
    * Stamp Jacobian and NR-linearized RHS for the output branch.
+   * Port of ccvsload.c value-side — no allocElement calls.
    *
-   * Output branch equation: V_out+ - V_out- - f'(I0)*I_sense = f(I0) - f'*I0
+   * Output branch equation: V_out+ - V_out- - rm*I_sense = f(I0) - rm*I0
    *
-   * The Jacobian entry links the output branch row to the sense branch variable:
-   *   C[outBranch, senseBranch] -= f'(I0)
+   * Jacobian entry linking output branch row to controlling branch variable:
+   *   G[ownBranch, contBranch] = -rm
    *
-   * RHS: f(I0) - f'(I0) * I0
+   * RHS[ownBranch] += f(I0) - f'(I0)*I0  (NR-linearized constant term)
    */
   override stampOutput(
     solver: SparseSolver,
@@ -243,28 +215,51 @@ class CCVSAnalogElement extends ControlledSourceElement {
     derivative: number,
     ctrlValue: number,
   ): void {
-    const ko = this._outBranch;
-    const ks = this._senseBranch;
+    const rm  = derivative;
+    const vNR = value - derivative * ctrlValue;
 
-    // Jacobian: dV_out/dI_sense — links output branch equation to sense branch variable
-    solver.stampElement(solver.allocElement(ko, ks), -derivative);
+    solver.stampElement(this._hIbrCtBr, -rm); // C[ownBranch, contBranch]
 
-    // NR-linearized RHS
-    rhs[ko] += value - derivative * ctrlValue;
+    rhs[this.branchIndex] += vNR;
   }
 
   /**
    * Per-pin currents in pinLayout order: [sense+, sense-, out+, out-].
    *
-   * The sense port is a 0V voltage source whose branch variable holds the
-   * sensed current. The output port is a dependent voltage source whose
-   * branch variable holds the output current. Positive = current INTO the pin.
-   * KCL: I_senseP + I_senseN + I_outP + I_outN = I - I + J - J = 0. ✓
+   * The sense port current flows through the external sense VSRC.
+   * The output port current is the own branch variable.
+   * Positive = current flowing INTO the pin.
    */
   getPinCurrents(rhs: Float64Array): number[] {
-    const iSense = rhs[this._senseBranch];
-    const iOut   = rhs[this._outBranch];
+    const iSense = this._contBranch >= 0 ? rhs[this._contBranch] : 0;
+    const iOut   = this.branchIndex >= 0  ? rhs[this.branchIndex]  : 0;
     return [iSense, -iSense, iOut, -iOut];
+  }
+
+  /**
+   * Lazy-branch finder for downstream CCCS/CCVS elements that sense this CCVS
+   * output current. Mirrors VSRCfindBr (vsrc/vsrcfbr.c:26-39).
+   *
+   * Called by ctx.findBranch when a downstream element resolves this CCVS by
+   * label before CCVS's own setup() has run. Allocates the branch row via
+   * ctx.makeCur if not yet allocated.
+   */
+  findBranchFor(_name: string, ctx: SetupContext): number {
+    if (this.branchIndex === -1) {
+      this.branchIndex = ctx.makeCur(this.label ?? "ccvs", "branch");
+    }
+    return this.branchIndex;
+  }
+
+  /**
+   * Override load() to use cached handles — no allocElement calls.
+   */
+  override load(ctx: LoadContext): void {
+    this._bindContext(ctx.rhsOld);
+    this._stampLinear(ctx.solver);
+    const value = this._compiledExpr(this._ctx);
+    const deriv = this._compiledDeriv(this._ctx);
+    this.stampOutput(ctx.solver, ctx.rhs, value, deriv, this._ctrlValue);
   }
 }
 
@@ -327,9 +322,9 @@ export class CCVSElement extends AbstractCircuitElement {
     ctx.setColor("TEXT");
     ctx.setFont({ family: "sans-serif", size: 0.6 });
     ctx.drawText("sense+", 1.2, 0, { horizontal: "left", vertical: "middle" });
-    ctx.drawText("sense\u2212", 1.2, 2, { horizontal: "left", vertical: "middle" });
+    ctx.drawText("sense−", 1.2, 2, { horizontal: "left", vertical: "middle" });
     ctx.drawText("out+",   4.8, 0, { horizontal: "right", vertical: "middle" });
-    ctx.drawText("out\u2212",   4.8, 2, { horizontal: "right", vertical: "middle" });
+    ctx.drawText("out−",   4.8, 2, { horizontal: "right", vertical: "middle" });
 
     ctx.restore();
   }
@@ -394,21 +389,26 @@ export const CCVSDefinition: ComponentDefinition = {
       factory: (pinNodes, props, _getTime) => {
         const expression = props.getOrDefault<string>("expression", "I(sense)");
         const transresistance = props.getModelParam<number>("transresistance");
-        const el = new CCVSAnalogElement(
-          pinNodes.get("sense+")!,
-          pinNodes.get("sense-")!,
-          pinNodes.get("out+")!,
-          pinNodes.get("out-")!,
-          -1,
-          expression,
-          transresistance,
-        );
+        const rawExpr = parseExpression(expression === "I(sense)"
+          ? `${transresistance} * I(sense)`
+          : expression);
+        const deriv = simplify(differentiate(rawExpr, "I(sense)"));
+        const el = new CCVSAnalogElement(rawExpr, deriv, "I(sense)", "current");
         el._pinNodes = new Map(pinNodes);
         return el;
       },
       paramDefs: CCVS_PARAM_DEFS,
       params: CCVS_DEFAULTS,
-      branchCount: 2,
+      ngspiceNodeMap: { "out+": "pos", "out-": "neg" },
+      findBranchFor(name: string, ctx: SetupContext): number {
+        const el = ctx.findDevice(name);
+        if (!el) return 0;
+        const ccvs = el as unknown as CCVSAnalogElement;
+        if (ccvs.branchIndex === -1) {
+          ccvs.branchIndex = ctx.makeCur(name, "branch");
+        }
+        return ccvs.branchIndex;
+      },
     },
   },
   defaultModel: "behavioral",

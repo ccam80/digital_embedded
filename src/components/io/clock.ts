@@ -257,6 +257,11 @@ export function makeAnalogClockElement(
 ): AnalogClockElement & { stampAtTime(rhs: Float64Array, t: number): void } {
   const halfPeriod = 1 / (2 * frequency);
 
+  let _hPosBranch = -1;
+  let _hNegBranch = -1;
+  let _hBranchPos = -1;
+  let _hBranchNeg = -1;
+
   const element: AnalogClockElement & { stampAtTime(rhs: Float64Array, t: number): void } = {
     branchIndex: branchIdx,
     ngspiceLoadOrder: NGSPICE_LOAD_ORDER.VSRC,
@@ -265,8 +270,12 @@ export function makeAnalogClockElement(
     _stateBase: -1,
     _pinNodes: new Map<string, number>([["out", nodePos]]),
 
-    setup(_ctx: import("../../solver/analog/setup-context.js").SetupContext): void {
-      throw new Error("PB-CLOCK not yet migrated");
+    setup(ctx: import("../../solver/analog/setup-context.js").SetupContext): void {
+      const k = branchIdx;
+      if (nodePos !== 0) _hPosBranch = ctx.solver.allocElement(nodePos, k);
+      if (nodeNeg !== 0) _hNegBranch = ctx.solver.allocElement(nodeNeg, k);
+      if (nodePos !== 0) _hBranchPos = ctx.solver.allocElement(k, nodePos);
+      if (nodeNeg !== 0) _hBranchNeg = ctx.solver.allocElement(k, nodeNeg);
     },
 
     setParam(_key: string, _value: number): void {
@@ -276,11 +285,11 @@ export function makeAnalogClockElement(
       const solver = ctx.solver;
       const k = branchIdx;
 
-      // Branch incidence (B and C sub-matrices).
-      if (nodePos !== 0) solver.stampElement(solver.allocElement(nodePos, k), 1);
-      if (nodeNeg !== 0) solver.stampElement(solver.allocElement(nodeNeg, k), -1);
-      if (nodePos !== 0) solver.stampElement(solver.allocElement(k, nodePos), 1);
-      if (nodeNeg !== 0) solver.stampElement(solver.allocElement(k, nodeNeg), -1);
+      // Branch incidence (B and C sub-matrices) — handles allocated in setup().
+      if (nodePos !== 0) solver.stampElement(_hPosBranch, 1);
+      if (nodeNeg !== 0) solver.stampElement(_hNegBranch, -1);
+      if (nodePos !== 0) solver.stampElement(_hBranchPos, 1);
+      if (nodeNeg !== 0) solver.stampElement(_hBranchNeg, -1);
 
       // Square-wave voltage value at current simulation time.
       const t = getTime();

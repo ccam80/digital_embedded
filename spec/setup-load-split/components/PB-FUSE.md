@@ -1,6 +1,19 @@
 # Task PB-FUSE
 
-**digiTS file:** `src/components/switching/fuse.ts`
+> **Spec-doc duplication note (added during remediation-pass-1):** The analog
+> `FuseElement` lives in `src/components/passives/analog-fuse.ts` and is owned by
+> `PB-AFUSE.md`. `src/components/switching/fuse.ts` is the digital-side
+> wrapper — its `FuseDefinition.modelRegistry["behavioral"]` imports
+> `createAnalogFuseElement` from `passives/analog-fuse.ts`. There is no separate
+> "PB-FUSE" analog implementation. PB-FUSE.md and PB-AFUSE.md describe the same
+> setup() / load() bodies. When the W3 owner exercises the analog migration, it
+> happens once (in `analog-fuse.ts`) and both specs are satisfied. This file is
+> retained for historical traceability; consolidation with PB-AFUSE.md is
+> deferred.
+
+**digiTS file:** `src/components/switching/fuse.ts` (digital wrapper) →
+delegates analog work to `src/components/passives/analog-fuse.ts` (see
+PB-AFUSE.md)
 **ngspice setup anchor:** `ref/ngspice/src/spicelib/devices/res/ressetup.c:46-49`
 **ngspice load anchor:** `ref/ngspice/src/spicelib/devices/res/resload.c`
 

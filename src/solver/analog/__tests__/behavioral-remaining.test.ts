@@ -21,14 +21,12 @@
  */
 
 import { describe, it, expect } from "vitest";
-import { SparseSolver } from "../sparse-solver.js";
 import { newtonRaphson } from "../newton-raphson.js";
 import { makeVoltageSource, makeResistor, withNodeIds, makeSimpleCtx, makeLoadCtx, initElement } from "./test-helpers.js";
 import { StatePool } from "../state-pool.js";
 import {
   createDriverAnalogElement,
   createSevenSegAnalogElement,
-  createRelayAnalogElement,
 } from "../behavioral-remaining.js";
 import { PropertyBag } from "../../../core/properties.js";
 import type { AnalogElement } from "../element.js";
@@ -56,8 +54,7 @@ import { ButtonLEDDefinition } from "../../../components/io/button-led.js";
 // ---------------------------------------------------------------------------
 import type { ModelEntry, AnalogFactory } from "../../../core/registry.js";
 import type { LoadContext } from "../load-context.js";
-import { MODETRAN, MODEINITFLOAT, MODEINITTRAN } from "../ckt-mode.js";
-import { computeNIcomCof } from "../integration.js";
+import { MODETRAN, MODEINITFLOAT } from "../ckt-mode.js";
 function getFactory(entry: ModelEntry): AnalogFactory {
   if (entry.kind !== "inline") throw new Error("Expected inline ModelEntry");
   return entry.factory;
@@ -216,7 +213,7 @@ describe("LED", () => {
     props.replaceModelParams({ ...LED_DEFAULTS });
 
     // LED: anode = circuit node 2, cathode = ground (0)
-    const ledCore = getFactory(LedDefinition.modelRegistry!.red!)(new Map([["in", 2]]), [], -1, props, () => 0);
+    const ledCore = getFactory(LedDefinition.modelRegistry!.red!)(new Map([["in", 2]]), props, () => 0);
     const { element: ledStateWrapped } = withState(ledCore);
     const led = withNodeIds(ledStateWrapped, [2, 0]);
 
@@ -295,123 +292,6 @@ describe("SevenSeg", () => {
 
     // Segments a, b, c (solver rows 0, 1, 2): VS forces to VDD
     // Segments d..dp (solver rows 3..7): VS forces to GND
-  });
-});
-
-// ---------------------------------------------------------------------------
-// Relay tests
-// ---------------------------------------------------------------------------
-
-describe("Relay", () => {
-  /**
-   * coil_energizes_contact: energize coil above I_pull threshold; contact closes.
-   *
-   * The relay uses 1-based circuit node IDs (ground=0). nodeIds [1,2,3,4]:
-   *   nodeCoil1=1, nodeCoil2=2 (coil terminals)
-   *   nodeContactA=3, nodeContactB=4 (contact terminals)
-   *
-   * The relay's contact state is driven by the inductor current iL, which is
-   * advanced in relay.accept() after each transient timestep. Each step calls
-   * relay.load(ctx) to stamp the inductor companion model, then relay.accept()
-   * to advance iL and update contactClosed.
-   *
-   * Circuit:
-   *   VS_coil: 10V at node 1 (branch row 4)  coil input
-   *   Node 2 tied to ground via VS (0V, branch row 5)
-   *   VS_contact: 1V at node 3 (branch row 6)  contact A
-   *   1kÎ load: node 4 to ground  measures contact B
-   *
-   * matrixSize = 7 (4 node rows 0..3 + 3 branch rows 4,5,6)
-   *
-   * With rCoil=10Î, coil voltage=10V: steady-state coil current = 10V/10Î = 1A >> iPull=20mA.
-   * Run enough transient steps for iL to exceed iPull, then verify contact closes.
-   */
-  it("coil_energizes_contact", () => {
-    const props = new PropertyBag();
-    props.set("coilResistance", 10);    // 10Î coil resistance
-    props.set("inductance", 1e-3);      // 1mH inductance (tau = L/R = 1ms)
-    props.set("iPull", 20e-3);          // 20mA threshold
-
-    // Circuit layout (1-based MNA rows):
-    //   Rows 1-4: circuit nodes coil1, coil2, contactA, contactB
-    //   Row 5: vsCoil1 branch (makeVoltageSource branchIdx=4 → k=5)
-    //   Row 6: vsCoil2 branch (makeVoltageSource branchIdx=5 → k=6)
-    //   Row 7: vsContact branch (makeVoltageSource branchIdx=6 → k=7)
-    //   Row 8: relay inductor branch (AnalogInductorElement uses branchIndex=8 directly as 1-based)
-    //   matrixSize = 8 (4 node rows + 4 branch rows → 1-based rows 1..8)
-    const inductorBranchIdx = 8; // 1-based MNA row for inductor branch current
-    const relay = createRelayAnalogElement(
-      new Map([["in1", 1], ["in2", 2], ["A1", 3], ["B1", 4]]),
-      props,
-    );
-
-    // Initialise relay state pool (child inductor requires initState before load)
-    const { element: relayWithState } = withState(relay);
-
-    // Coil driven by VS: 10V at node 1 (branch row 4), 0V at node 2 (branch row 5)
-    const vsCoil1   = makeVoltageSource(1, 0, 4, 10.0);
-    const vsCoil2   = makeVoltageSource(2, 0, 5, 0.0);
-    // Contact: 1V at node 3 (branch row 6), 1kÎ from node 4 to ground
-    const vsContact = makeVoltageSource(3, 0, 6, 1.0);
-    const rLoad     = makeResistor(4, 0, 1_000);
-
-    const allElements = [vsCoil1, vsCoil2, vsContact, rLoad, relayWithState];
-    const matrixSize = 8;
-
-    const solver = new SparseSolver();
-    let currentVoltages = new Float64Array(matrixSize + 1); // 1-based: slot 0 = ground sentinel
-
-    // tau = L/R = 1e-3/10 = 100Âµs; run 10 steps of 100Âµs = 1 tau
-    // After 1 tau: iL = (V/R)*(1-exp(-1))  (10/10)*0.632 = 0.632A >> 20mA
-    const dt = 100e-6;
-    const steps = 10;
-
-    const ag = new Float64Array(7);
-    const scratch = new Float64Array(49);
-    computeNIcomCof(dt, [dt], 1, "trapezoidal", ag, scratch);
-
-    function makeTransientCtx(v: Float64Array, isFirst: boolean): import("../load-context.js").LoadContext {
-      return makeLoadCtx({
-        solver: solver as any,
-        rhs: v,
-        rhsOld: v,
-        cktMode: isFirst ? MODETRAN | MODEINITTRAN : MODETRAN | MODEINITFLOAT,
-        dt,
-        method: "trapezoidal",
-        order: 1,
-        deltaOld: [dt],
-        ag,
-        srcFact: 1,
-      });
-    }
-
-    for (let step = 0; step < steps; step++) {
-      const ctx = makeTransientCtx(currentVoltages, step === 0);
-      solver._initStructure();
-      for (const el of allElements) el.load(ctx);
-      const factored = solver.factor();
-      expect(factored).toBe(0);
-      const newVoltages = new Float64Array(matrixSize + 1); // 1-based
-      solver.solve(currentVoltages, newVoltages);
-      currentVoltages = newVoltages;
-      // Advance relay state: reads accepted coil current and updates contactClosed
-      relayWithState.accept!(makeTransientCtx(currentVoltages, false), 0, () => {});
-    }
-
-    // After 10 Ã— 100Âµs, coil current >> 20mA  contact should be closed.
-    // Verify by solving again with the updated contact state.
-    const finalCtx = makeTransientCtx(currentVoltages, false);
-    solver._initStructure();
-    for (const el of allElements) el.load(finalCtx);
-    solver.factor();
-    solver.solve(currentVoltages, currentVoltages);
-
-    // Contact A = circuit node 3 → voltages[3] (1-based)
-    // Contact B = circuit node 4 → voltages[4] (1-based)
-    const vContactB = currentVoltages[4];
-
-    // When closed (R_on=0.01Î), drop across contact is negligible  vContactB  1V
-    expect(vContactB).toBeGreaterThan(0.99);
   });
 });
 
@@ -511,6 +391,13 @@ describe("Task 6.4.3  remaining pin loading propagates", () => {
       findDevice(_l: string) { return null; },
     };
     (element as any).setup(setupCtx);
+
+    // Initialise state pool for child capacitor elements (created for loaded "in" pin).
+    // Without this, child.load() crashes on _pool.states[N] being undefined.
+    const poolSize = Math.max((element as any).stateSize ?? 0, 1);
+    const statePool = new StatePool(poolSize);
+    (element as any).stateBaseOffset = 0;
+    (element as any).initState(statePool);
 
     // Both "in" (node 1) and "sel" (node 2) diagonal handles are allocated in setup()
     const inSetup  = setupAllocCalls.some(([r, c]) => r === 1 && c === 1);

@@ -139,15 +139,6 @@ function makeTransGateAnalogElement(
     ["out2", outNode],
   ]);
   const el = new TransGateAnalogElement(pinNodes);
-  const ron = overrides?.ron ?? 1;
-  const roff = overrides?.roff ?? 1e9;
-  const vth = overrides?.vth ?? 2.5;
-  el._nfetSW.setParam("Ron", ron);
-  el._nfetSW.setParam("Roff", roff);
-  el._nfetSW.setParam("threshold", vth);
-  el._pfetSW.setParam("Ron", ron);
-  el._pfetSW.setParam("Roff", roff);
-  el._pfetSW.setParam("threshold", vth);
   return el;
 }
 

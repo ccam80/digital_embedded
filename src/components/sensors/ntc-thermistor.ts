@@ -256,7 +256,7 @@ export class NTCThermistorElement implements AnalogElementCore {
 export function createNTCThermistorElement(
   pinNodes: ReadonlyMap<string, number>,
   props: PropertyBag,
-  _getTime: () => number,
+  _getTime?: () => number,
 ): AnalogElementCore {
   const r0 = props.getModelParam<number>("r0");
   const beta = props.getModelParam<number>("beta");
@@ -281,6 +281,7 @@ export function createNTCThermistorElement(
     shC,
   );
   el._pinNodes = new Map(pinNodes);
+  el.pinNodeIds = [pinNodes.get("pos")!, pinNodes.get("neg")!];
   return el;
 }
 

@@ -359,18 +359,6 @@ Then call as your FINAL bash command:
   - `src/components/switching/relay-dt.ts`
   - `src/components/switching/fuse.ts`
 - **PB specs:** `PB-RELAY.md`, `PB-RELAY-DT.md`, `PB-FUSE.md`
-- **Notes for agent — STAMP-G CLEANUP RESPONSIBILITY:**
-  - Per plan.md "W3-final-cleanup — `stampG()` helper removal", the LAST
-    relay-family W3 task to land owns this cleanup. Since you own BOTH
-    PB-RELAY and PB-RELAY-DT, run the cleanup AFTER you finish both.
-  - Steps:
-    1. Finish setup() bodies for relay.ts, relay-dt.ts, fuse.ts.
-    2. Grep for `stampG\(` across `src/solver/analog/behavioral-remaining.ts`.
-    3. If ZERO callers remain → delete the `stampG()` function definition
-       from that file in the same commit/return.
-    4. If callers REMAIN → DO NOT delete; report the surviving call sites
-       (file/line) in your progress.md entry as a SURFACE item. The next
-       owner (likely the in-flight wave-2 agent or a follow-up) handles it.
 - **Test files:** matching `__tests__/{relay,relay-dt,fuse}.test.ts`. Note
   that `relay.test.ts` already exists per directory listing.
 
@@ -414,20 +402,25 @@ Then call as your FINAL bash command:
 
 - **Owned files:**
   - `src/components/passives/resistor.ts`
-  - `src/components/passives/capacitor.ts`
   - `src/components/passives/inductor.ts`
   - `src/components/passives/polarized-cap.ts`
   - `src/components/passives/potentiometer.ts`
   - `src/components/passives/analog-fuse.ts`
-- **PB specs:** `PB-RES.md`, `PB-CAP.md`, `PB-IND.md`, `PB-POLCAP.md`,
-  `PB-POT.md`, `PB-AFUSE.md`
+- **PB specs:** `PB-RES.md`, `PB-IND.md`, `PB-POLCAP.md`, `PB-POT.md`, `PB-AFUSE.md`
+- **Inherited complete (do not re-migrate):**
+  - `src/components/passives/capacitor.ts` / `PB-CAP.md` — migrated by 5.B.adc-dac as a blocking
+    dependency (cross-batch). Verified spec-compliant during remediation-pass-1: 4 TSTALLOC entries
+    with ground guards, `ctx.allocStates(stateSize)`, handles cached as `_hPP`/`_hNN`/`_hPN`/`_hNP`.
+    The `5.B.passives-simple` agent MUST NOT re-migrate this file. Audit only.
+  - `src/components/passives/analog-fuse.ts` / `PB-AFUSE.md` — migrated by 5.B.fuse. Verified
+    spec-compliant. The same analog `FuseElement` also serves PB-FUSE (see PB-FUSE.md note);
+    `switching/fuse.ts` is the digital-side wrapper that imports `createAnalogFuseElement` from
+    here. Audit only; no re-migration.
 - **Notes for agent:**
-  - PB-RES is the canonical 4-stamp passive. Other 5 are extensions:
-    - CAP / POLCAP — adds 1 state slot (charge), 0 internal nodes
+  - PB-RES is the canonical 4-stamp passive. Remaining items are extensions:
     - IND — adds 1 branch row, `findBranchFor` callback
+    - POLCAP — adds 1 state slot (charge), 0 internal nodes
     - POT — 3-pin (A/B/Wiper) → typically 2 RES sub-elements (composite)
-    - AFUSE — adds open-state conductance switching
-  - Six-component file group; mostly small per-file work.
 - **Test files:** matching `__tests__/*.test.ts`.
 
 ### 5.B.passives-complex

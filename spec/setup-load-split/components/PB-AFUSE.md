@@ -1,5 +1,16 @@
 # Task PB-AFUSE
 
+> **Spec-doc duplication note (added during remediation-pass-1):** This is the
+> single source of truth for the analog `FuseElement`. PB-FUSE.md describes the
+> same implementation from the perspective of the `switching/fuse.ts` digital
+> wrapper (whose `modelRegistry["behavioral"]` imports `createAnalogFuseElement`
+> from this file). When this spec is satisfied, both PB-AFUSE and PB-FUSE are
+> satisfied. Consolidation with PB-FUSE.md is deferred.
+>
+> **Status:** migrated (during 5.B.fuse). Verified spec-compliant during
+> remediation-pass-1. `5.B.passives-simple` inherits this as complete and must
+> not re-migrate.
+
 **digiTS file:** `src/components/passives/analog-fuse.ts`
 **ngspice setup anchor:** `ref/ngspice/src/spicelib/devices/res/ressetup.c:46-49` (variable RES)
 **ngspice load anchor:** `ref/ngspice/src/spicelib/devices/res/resload.c`

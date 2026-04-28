@@ -66,10 +66,10 @@ setup(ctx: SetupContext): void {
   // TSTALLOC: (node, node) — input loading conductance 1/rIn
   this._hNodeDiag = ctx.solver.allocElement(this._nodeId, this._nodeId);
 
-  // Forward to capacitor child (created by init() when loaded && cIn > 0)
-  if (this._inputCap) {
-    this._inputCap.setup(ctx);
-  }
+  // The capacitor child is forwarded by the OWNING composite's setup()
+  // via its `_childElements` iteration (Shape rule 3). The pin model
+  // does NOT forward to its own cap — that would double-fire setup()
+  // on the same element.
 }
 ```
 
@@ -102,10 +102,10 @@ setup(ctx: SetupContext): void {
     this._hNodeDiag     = ctx.solver.allocElement(this._nodeId, this._nodeId);
   }
 
-  // Forward to capacitor child (created by init() when loaded && cOut > 0)
-  if (this._outputCap) {
-    this._outputCap.setup(ctx);
-  }
+  // The capacitor child is forwarded by the OWNING composite's setup()
+  // via its `_childElements` iteration (Shape rule 3). The pin model
+  // does NOT forward to its own cap — that would double-fire setup()
+  // on the same element.
 }
 ```
 
@@ -124,9 +124,9 @@ The `init(nodeId, branchIdx)` method continues to do its existing job
 
 Every behavioral composite (BehavioralGateElement, BehavioralMuxElement,
 BehavioralDemuxElement, BehavioralDecoderElement, Driver, DriverInv,
-Splitter, SevenSeg, ButtonLED, RelayElement, RelayDTElement,
+Splitter, SevenSeg, ButtonLED,
 TransGateElement, NFETElement, PFETElement, FGNFETElement,
-FGPFETElement. All elements above are class-based as of W2.5; pre-W2.5 closure factories (`createDriverAnalogElement`, etc.) are converted to classes in W2.5.) implements:
+FGPFETElement. All elements above are class-based as of W2.5; pre-W2.5 closure factories (`createDriverAnalogElement`, etc.) are converted to classes in W2.5. Relay / RelayDT have ngspice anchors via sub-element decomposition and live in `components/PB-RELAY.md` / `PB-RELAY-DT.md`, not here.) implements:
 
 ```ts
 setup(ctx: SetupContext): void {
@@ -153,7 +153,7 @@ elements; no cross-device label lookup is needed) but should be:
 | BehavioralMuxElement | `_dataPins` (2D: `DigitalInputPinModel[][]` indexed by data-input group, then bit) | `_outPins` | `_selPins` | `_childElements` |
 | BehavioralDemuxElement | `_inPin` (single `DigitalInputPinModel`) | `_outPins` | `_selPins` | `_childElements` |
 | BehavioralDecoderElement | (merged into `_selPins`) — decoder has no separate data input; selector is the only input | `_outPins` | `_selPins` | `_childElements` |
-| Driver / DriverInv / Splitter / SevenSeg / ButtonLED / Relay / RelayDT | factory closures — local variables, not class fields (see Shape rule 3 closure variant) |
+| Driver / DriverInv / Splitter / SevenSeg / ButtonLED | factory closures — local variables, not class fields (see Shape rule 3 closure variant) |
 
 The Shape rule 3 generic body (`for (const pin of this._inputPins) ...`) is a TEMPLATE. Per-class implementers substitute the actual field name from this table.
 
@@ -221,30 +221,7 @@ its setup() body comes from Shape rule 7.
 
 ## Shape rule 9 — Relay / RelayDT
 
-Listed in `01-pin-mapping.md` as Switching composites. Their setup()
-forwards to `coilInductor.setup(ctx)` (which carries the IND anchor
-from `PB-IND.md`) and stamps the contact-conductance allocs directly:
-
-```ts
-setup(ctx: SetupContext): void {
-  // Coil DC resistance: stamp between coil1 and coil2 (mirror RES TSTALLOC)
-  this._hC1C1 = ctx.solver.allocElement(nodeCoil1, nodeCoil1);
-  this._hC2C2 = ctx.solver.allocElement(nodeCoil2, nodeCoil2);
-  this._hC1C2 = ctx.solver.allocElement(nodeCoil1, nodeCoil2);
-  this._hC2C1 = ctx.solver.allocElement(nodeCoil2, nodeCoil1);
-  // Contact: variable resistance, same TSTALLOC quartet
-  this._hCAA = ctx.solver.allocElement(nodeContactA, nodeContactA);
-  this._hCBB = ctx.solver.allocElement(nodeContactB, nodeContactB);
-  this._hCAB = ctx.solver.allocElement(nodeContactA, nodeContactB);
-  this._hCBA = ctx.solver.allocElement(nodeContactB, nodeContactA);
-  // Coil inductor branch + state (delegated to AnalogInductorElement)
-  this._coilInductor.setup(ctx);
-}
-```
-
-`load()` body becomes pure stamps through the cached handles.
-
-RelayDT adds a third contact pair for the C1 (rest) terminal.
+Out of scope here. Relay and RelayDT have ngspice anchors via sub-element decomposition (coilL=IND + coilR=RES + contactSW=SW). Their setup() bodies are specified in `components/PB-RELAY.md` and `components/PB-RELAY-DT.md`. The composite forward in those files is the source of truth; previous behavioral-spec text has been removed to keep a single owner.
 
 ## Shape rule 10 — TransGate / NFET / PFET / FGNFET / FGPFET
 
@@ -299,7 +276,7 @@ For behavioral components:
    |---|---|
    | Gates: NOT, AND, NAND, OR, NOR, XOR, XNOR | `src/solver/analog/__tests__/behavioral-gate.test.ts` |
    | Combinational: Mux, Demux, Decoder | `src/solver/analog/__tests__/behavioral-combinational.test.ts` |
-   | Closure-based: Driver, DriverInv, Splitter, SevenSeg, SevenSegHex, ButtonLED, Relay, RelayDT | `src/solver/analog/__tests__/behavioral-remaining.test.ts` |
+   | Closure-based: Driver, DriverInv, Splitter, SevenSeg, SevenSegHex, ButtonLED | `src/solver/analog/__tests__/behavioral-remaining.test.ts` |
    | Switching: TransGate, NFET, PFET, FGNFET, FGPFET | `src/components/switching/__tests__/fets.test.ts` (FETs) and `src/components/switching/__tests__/relay.test.ts` (Relay variants) |
    | Ground | `src/solver/analog/__tests__/behavioral-ground.test.ts` if it exists; otherwise the gate is satisfied by `behavioral-remaining.test.ts` not regressing |
 

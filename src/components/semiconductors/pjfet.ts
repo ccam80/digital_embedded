@@ -764,26 +764,33 @@ export function createPJfetElement(
       const ceqgs = polarity * ((cg - cgd) - ggs * vgs);
       const cdreq = polarity * ((cd + cgd) - gds * vds - gm * vgs);
 
-      stampRHS(ctx.rhs, nodeG, m * (-ceqgs - ceqgd));
-      stampRHS(ctx.rhs, nodeD, m * (-cdreq + ceqgd));
-      stampRHS(ctx.rhs, nodeS, m * (cdreq + ceqgs));
+      const sp = this._sourcePrimeNode;
+      const dp = this._drainPrimeNode;
 
-      // jfetload.c:534-550: Y-matrix stamps.
-      // jfetload.c:536-544: off-diagonal + prime-node stamps (cross terms).
-      stampG(solver, nodeG, nodeG, m * (ggd + ggs));
-      stampG(solver, nodeG, nodeD, m * (-ggd));
-      stampG(solver, nodeG, nodeS, m * (-ggs));
-      stampG(solver, nodeD, nodeG, m * (gm - ggd));
-      stampG(solver, nodeD, nodeD, m * (gdpr + gds + ggd));
-      stampG(solver, nodeD, nodeS, m * (-gds - gm));
-      stampG(solver, nodeS, nodeG, m * (-ggs - gm));
-      stampG(solver, nodeS, nodeD, m * (-gds));
-      stampG(solver, nodeS, nodeS, m * (gspr + gds + gm + ggs));
-      // jfetload.c:546,548: external drain/source self-stamps (gdpr/gspr).
-      // J-W3-3: collapsed primeâ†"external nodes  2 additional self-stamps.
-      // ngspice: JFETdrainDrainPtr += m*(gdpr); JFETsourceSourcePtr += m*(gspr).
-      if (gdpr > 0) stampG(solver, nodeD, nodeD, m * gdpr);
-      if (gspr > 0) stampG(solver, nodeS, nodeS, m * gspr);
+      stampRHS(ctx.rhs, nodeG, m * (-ceqgs - ceqgd));
+      stampRHS(ctx.rhs, dp,    m * (-cdreq + ceqgd));
+      stampRHS(ctx.rhs, sp,    m * (cdreq + ceqgs));
+
+      // jfetload.c:534-550: Y-matrix stamps via cached TSTALLOC handles.
+      // jfetload.c:536-544: off-diagonal + prime-node cross terms.
+      solver.stampElement(this._hGG,   m * (ggd + ggs));          // JFETgateGatePtr
+      solver.stampElement(this._hGDP,  m * (-ggd));               // JFETgateDrainPrimePtr
+      solver.stampElement(this._hGSP,  m * (-ggs));               // JFETgateSourcePrimePtr
+      solver.stampElement(this._hDPG,  m * (gm - ggd));           // JFETdrainPrimeGatePtr
+      solver.stampElement(this._hDPDP, m * (gdpr + gds + ggd));   // JFETdrainPrimeDrainPrimePtr
+      solver.stampElement(this._hDPSP, m * (-gds - gm));          // JFETdrainPrimeSourcePrimePtr
+      solver.stampElement(this._hSPG,  m * (-ggs - gm));          // JFETsourcePrimeGatePtr
+      solver.stampElement(this._hSPDP, m * (-gds));               // JFETsourcePrimeDrainPrimePtr
+      solver.stampElement(this._hSPSP, m * (gspr + gds + gm + ggs)); // JFETsourcePrimeSourcePrimePtr
+      // jfetload.c:546-550: ohmic resistance stamps (drain/source series Rs).
+      // JFETdrainDrainPrimePtr, JFETdrainPrimeDrainPtr, JFETdrainDrainPtr.
+      solver.stampElement(this._hDDP,  m * (-gdpr));              // JFETdrainDrainPrimePtr
+      solver.stampElement(this._hDPD,  m * (-gdpr));              // JFETdrainPrimeDrainPtr
+      solver.stampElement(this._hDD,   m * gdpr);                 // JFETdrainDrainPtr
+      // JFETsourceSourcePrimePtr, JFETsourcePrimeSourcePtr, JFETsourceSourcePtr.
+      solver.stampElement(this._hSSP,  m * (-gspr));              // JFETsourceSourcePrimePtr
+      solver.stampElement(this._hSPS,  m * (-gspr));              // JFETsourcePrimeSourcePtr
+      solver.stampElement(this._hSS,   m * gspr);                 // JFETsourceSourcePtr
     },
 
     getPinCurrents(_rhs: Float64Array): number[] {
@@ -994,6 +1001,7 @@ export const PJfetDefinition: ComponentDefinition = {
       paramDefs: PJFET_PARAM_DEFS,
       params: PJFET_PARAM_DEFAULTS,
       ngspiceNodeMap: { G: "gate", D: "drain", S: "source" },
+      mayCreateInternalNodes: true,
     },
   },
   defaultModel: "spice",

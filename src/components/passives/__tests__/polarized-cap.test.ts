@@ -564,7 +564,6 @@ describe("polarized_cap_load_transient_parity (C4.2)", () => {
 
     // Allocate state pool and init
     const pool = new StatePool(Math.max(element.stateSize, 1));
-    element.stateBaseOffset = 0;
     element.initState(pool);
 
     const poolEl = element as unknown as {
@@ -686,7 +685,6 @@ describe("polarized_cap_F4b_clamp_diode_stamp (PC-W3-4)", () => {
     );
 
     const pool = new StatePool(Math.max(element.stateSize, 1));
-    element.stateBaseOffset = 0;
     element.initState(pool);
 
     // Track matrix entries by (row,col)  accumulate across stamps.

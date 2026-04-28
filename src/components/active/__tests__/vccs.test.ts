@@ -30,20 +30,6 @@ function getFactory(entry: ModelEntry): AnalogFactory {
 }
 
 // ---------------------------------------------------------------------------
-// withSetup — add a no-op setup() stub to test-helper elements that predate
-// the setup/load split. makeVoltageSource/makeResistor stamp in load(), so
-// their setup() is a no-op. The engine requires setup() on every element.
-// ---------------------------------------------------------------------------
-
-function withSetup(el: AnalogElement): AnalogElement {
-  return Object.assign(el, {
-    _stateBase: -1,
-    _pinNodes: new Map<string, number>(),
-    setup(_ctx: unknown): void {},
-  });
-}
-
-// ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
@@ -114,9 +100,9 @@ describe("VCCS", () => {
     const nodeCount = 2;
     const vsBranch = nodeCount + 0; // k = vsBranch+1 = 3 in makeVoltageSource
 
-    const vs   = withSetup(makeVoltageSource(1, 0, vsBranch, 1.0));
+    const vs   = makeVoltageSource(1, 0, vsBranch, 1.0);
     const vccs = makeVCCSElement(1, 0, 2, 0, { transconductance: 0.01 });
-    const r    = withSetup(makeResistor(2, 0, 100));
+    const r    = makeResistor(2, 0, 100);
 
     const compiled = buildCircuit({ nodeCount, elements: [vs, vccs, r] });
     const engine = new MNAEngine();
@@ -132,9 +118,9 @@ describe("VCCS", () => {
     const nodeCount = 2;
     const vsBranch = nodeCount + 0;
 
-    const vs   = withSetup(makeVoltageSource(1, 0, vsBranch, 0.0));
+    const vs   = makeVoltageSource(1, 0, vsBranch, 0.0);
     const vccs = makeVCCSElement(1, 0, 2, 0, { transconductance: 0.01 });
-    const r    = withSetup(makeResistor(2, 0, 1000));
+    const r    = makeResistor(2, 0, 1000);
 
     const compiled = buildCircuit({ nodeCount, elements: [vs, vccs, r] });
     const engine = new MNAEngine();
@@ -150,9 +136,9 @@ describe("VCCS", () => {
     const nodeCount = 2;
     const vsBranch = nodeCount + 0;
 
-    const vs   = withSetup(makeVoltageSource(1, 0, vsBranch, 3.0));
+    const vs   = makeVoltageSource(1, 0, vsBranch, 3.0);
     const vccs = makeVCCSElement(1, 0, 2, 0, { expression: "0.001 * V(ctrl)^2" });
-    const r    = withSetup(makeResistor(2, 0, 100));
+    const r    = makeResistor(2, 0, 100);
 
     const compiled = buildCircuit({ nodeCount, elements: [vs, vccs, r] });
     const engine = new MNAEngine();
@@ -167,8 +153,8 @@ describe("VCCS", () => {
     // After engine._setup(), VCCSAnalogElement.stamps must return 4 non-negative handles.
     const nodeCount = 2;
     const vccs = makeVCCSElement(1, 0, 2, 0, { transconductance: 0.01 });
-    const r    = withSetup(makeResistor(2, 0, 100));
-    const vs   = withSetup(makeVoltageSource(1, 0, nodeCount + 0, 1.0));
+    const r    = makeResistor(2, 0, 100);
+    const vs   = makeVoltageSource(1, 0, nodeCount + 0, 1.0);
 
     const compiled = buildCircuit({ nodeCount, elements: [vs, vccs, r] });
     const engine = new MNAEngine();

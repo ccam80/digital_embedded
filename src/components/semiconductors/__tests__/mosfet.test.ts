@@ -41,6 +41,8 @@ import {
 import {
   MOSFET_PMOS_DEFAULTS,
 } from "../mosfet.js";
+import { MNAEngine } from "../../../solver/analog/analog-engine.js";
+import type { ConcreteCompiledAnalogCircuit } from "../../../solver/analog/analog-engine.js";
 
 // ---------------------------------------------------------------------------
 // setupElementWithSolver — call setup() then allocate state pool.
@@ -561,9 +563,9 @@ describe("Integration", () => {
 
     expect(result.converged).toBe(true);
 
-    // node voltages: [V(1)=Vdrain, V(2)=Vdd=5V, V(3)=Vgate=3V, I_vdd, I_vgate]
-    const vDrain = result.nodeVoltages[0];
-    const vDd = result.nodeVoltages[1];
+    // node voltages (1-indexed): [0]=ground, [1]=V(node1)=Vdrain, [2]=V(node2)=Vdd=5V, [3]=V(node3)=Vgate=3V
+    const vDrain = result.nodeVoltages[1];
+    const vDd = result.nodeVoltages[2];
 
     // Vdd should be 5V (enforced by source)
 
@@ -596,14 +598,14 @@ describe("setParam shifts DC OP to match SPICE reference", () => {
     // Before: VTO=0.7
     const before = runDcOp({ elements, matrixSize, nodeCount: 3 });
     expect(before.converged).toBe(true);
-    expectSpiceRef(before.nodeVoltages[0], 1.840508e+00, "V(drain) before");
+    expectSpiceRef(before.nodeVoltages[1], 1.840508e+00, "V(drain) before");
 
     // setParam and re-solve
     nmos.setParam("VTO", 2.5);
     const after = runDcOp({ elements, matrixSize, nodeCount: 3 });
     expect(after.converged).toBe(true);
-    expectSpiceRef(after.nodeVoltages[0], 4.835494e+00, "V(drain) after VTO=2.5");
-    expectSpiceRef((after.nodeVoltages[1] - after.nodeVoltages[0]) / 1000, 1.645065e-04, "Id after VTO=2.5");
+    expectSpiceRef(after.nodeVoltages[1], 4.835494e+00, "V(drain) after VTO=2.5");
+    expectSpiceRef((after.nodeVoltages[2] - after.nodeVoltages[1]) / 1000, 1.645065e-04, "Id after VTO=2.5");
   });
 
   it("setParam('KP', 240Âµ) shifts DC OP to match SPICE reference", () => {
@@ -620,14 +622,14 @@ describe("setParam shifts DC OP to match SPICE reference", () => {
     // Before: KP=120Âµ
     const before = runDcOp({ elements, matrixSize, nodeCount: 3 });
     expect(before.converged).toBe(true);
-    expectSpiceRef(before.nodeVoltages[0], 1.840508e+00, "V(drain) before");
+    expectSpiceRef(before.nodeVoltages[1], 1.840508e+00, "V(drain) before");
 
     // setParam and re-solve
     nmos.setParam("KP", 240e-6);
     const after = runDcOp({ elements, matrixSize, nodeCount: 3 });
     expect(after.converged).toBe(true);
-    expectSpiceRef(after.nodeVoltages[0], 9.071396e-01, "V(drain) after KP=240Âµ");
-    expectSpiceRef((after.nodeVoltages[1] - after.nodeVoltages[0]) / 1000, 4.092860e-03, "Id after KP=240Âµ");
+    expectSpiceRef(after.nodeVoltages[1], 9.071396e-01, "V(drain) after KP=240Âµ");
+    expectSpiceRef((after.nodeVoltages[2] - after.nodeVoltages[1]) / 1000, 4.092860e-03, "Id after KP=240Âµ");
   });
 });
 
@@ -1159,8 +1161,8 @@ function makeNmosElement62(params: Record<string, number> = {}): {
   return { element: core, pool, solver };
 }
 
-/** Create a PMOS element with real setup() and a bound StatePool.
- *  pinNodeIds = [G=2, D=1, S=3, B=3], matrixSize=4. */
+/** Create a PMOS element via the real engine path (factory → engine.init → engine._setup).
+ *  pinNodes: G=2, D=1, S=3, B=3 (body tied to source), matrixSize=4. */
 function makePmosElement62(params: Record<string, number> = {}): {
   element: any;
   pool: StatePool;
@@ -1168,29 +1170,31 @@ function makePmosElement62(params: Record<string, number> = {}): {
 } {
   const pmosBag = new PropertyBag();
   pmosBag.replaceModelParams({ ...MOSFET_PMOS_DEFAULTS, ...params });
-  const core = createMosfetElement(-1, new Map([["G", 2], ["S", 3], ["D", 1]]), pmosBag) as any;
-  const solver = new SparseSolver();
-  solver._initStructure();
-  let stateCount = 0;
-  let nodeIdx = 3;
-  const ctx: SetupContext = {
-    solver,
-    temp: 300.15,
-    nomTemp: 300.15,
-    copyNodesets: false,
-    makeVolt(_label: string, _suffix: string): number { return ++nodeIdx; },
-    makeCur(_label: string, _suffix: string): number { return ++nodeIdx; },
-    allocStates(n: number): number { const off = stateCount; stateCount += n; return off; },
-    findBranch(_label: string): number { return 0; },
-    findDevice(_label: string) { return null; },
-  };
-  core.setup(ctx);
-  core.stateBaseOffset = 0;
-  const pool = new StatePool(Math.max(core.stateSize, 1));
-  core.initState(pool);
-  core.pinNodeIds = [2, 1, 3, 3];
-  core.allNodeIds = [2, 1, 3, 3];
-  return { element: core, pool, solver };
+  const core = createMosfetElement(-1, new Map([["G", 2], ["S", 3], ["D", 1]]), pmosBag);
+  const circuit = {
+    nodeCount: 3,
+    elements: [core as unknown as AnalogElement],
+    labelToNodeId: new Map(),
+    labelPinNodes: new Map(),
+    wireToNodeId: new Map(),
+    models: new Map(),
+    statePool: null,
+    componentCount: 1,
+    netCount: 3,
+    diagnostics: [],
+    branchCount: 0,
+    matrixSize: 3,
+    bridgeOutputAdapters: [],
+    bridgeInputAdapters: [],
+    elementToCircuitElement: new Map(),
+    resolvedPins: [],
+  } as unknown as ConcreteCompiledAnalogCircuit;
+  const engine = new MNAEngine();
+  engine.init(circuit);
+  (engine as any)._setup();
+  const pool = engine.statePool!;
+  const solver = (engine as any)._solver as SparseSolver;
+  return { element: core as any, pool, solver };
 }
 
 // Slot index constants matching MOSFET_SCHEMA order (mirrored from mosfet.ts).

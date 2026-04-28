@@ -36,7 +36,7 @@ The W3 SEVENSEG task is responsible only for the composite forward (next section
 
 Note: the existing `stampG()` call in the current load() body calls `solver.allocElement` on every NR iteration. After migration, `stampG()` is replaced by the direct `stampElement(_hXX, ...)` calls (`if (_hAA >= 0) ctx.solver.stampElement(_hAA, geq);` etc.).
 
-**`stampG()` retention rationale**: the helper is currently called by `RelayElement.load()` (behavioral-remaining.ts:692,694) and `RelayDTElement.load()` (lines 819-821). Per plan.md §"Wave plan" → W3-final-cleanup, the LAST Relay-family W3 task is responsible for deleting `stampG()` from behavioral-remaining.ts when zero callers remain. PB-BEHAV-SEVENSEG's W3 task does NOT touch `stampG()`; it only removes calls from segment-diode load() bodies in this same task.
+The shared `stampG()` helper (in `src/solver/analog/stamp-helpers.ts`) is still consumed by other components (resistor, polarized-cap, transmission-line, etc.) and is NOT deleted by this task. PB-BEHAV-SEVENSEG only removes the `stampG()` calls inside the segment-diode load() body.
 
 ## Composite SevenSeg setup() body
 

@@ -895,7 +895,6 @@ describe("TransmissionLine", () => {
       const N = 3;
       const el = makeEl(N);
       const pool = new StatePool(Math.max((el as any).stateSize, 1));
-      (el as any).stateBaseOffset = 0;
       el.initState!(pool);
       const voltages = new Float64Array(2 + 2 * (N - 1) + N);
       const { solver } = makeStubSolver();
@@ -938,7 +937,6 @@ describe("TransmissionLine", () => {
       const N = 4;
       const el = makeEl(N);
       const pool = new StatePool(Math.max((el as any).stateSize, 1));
-      (el as any).stateBaseOffset = 0;
       el.initState!(pool);
       const subEls = (el as unknown as { _subElements: { stateSize?: number; stateBaseOffset?: number }[] })._subElements;
       const reactive = subEls.filter(s => (s.stateSize ?? 0) > 0);
@@ -951,7 +949,6 @@ describe("TransmissionLine", () => {
       const N = 4;
       const el = makeEl(N);
       const pool = new StatePool(Math.max((el as any).stateSize, 1));
-      (el as any).stateBaseOffset = 0;
       el.initState!(pool);
       const subEls = (el as unknown as { _subElements: { stateSize?: number; stateBaseOffset?: number }[] })._subElements;
       const reactive = subEls.filter(s => (s.stateSize ?? 0) > 0);

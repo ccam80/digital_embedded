@@ -1,0 +1,1121 @@
+{
+  "circuit": {
+    "name": "SAR ADC 4-bit (DSL spike)",
+    "description": "4-bit SAR ADC: VIN → comparator → SAR write-gate → 4× D-FF → R-2R DAC → comparator (feedback). 2-bit down-counter sequences MSB→LSB. Generated from inline DSL spec; subcircuits are interface-only stubs.",
+    "elements": [
+      {
+        "id": "24595a24-5364-4a88-9e01-bfa9e5fbb76e",
+        "position": {
+          "x": 2,
+          "y": 10
+        },
+        "rotation": 90,
+        "type": "DcVoltageSource",
+        "properties": {
+          "label": "VIN",
+          "voltage": 1.5
+        }
+      },
+      {
+        "id": "19f41064-9c0b-43db-b87f-b692eb382d6e",
+        "position": {
+          "x": 8,
+          "y": 10
+        },
+        "rotation": 0,
+        "type": "VoltageComparator",
+        "properties": {
+          "label": "U1"
+        }
+      },
+      {
+        "id": "e11486ab-0912-41e8-9e2e-2acbe33f6ab1",
+        "position": {
+          "x": 18,
+          "y": 10
+        },
+        "rotation": 0,
+        "type": "sar_write_gate_4",
+        "properties": {
+          "label": "WGATE"
+        }
+      },
+      {
+        "id": "a8e7bb7b-891a-4487-a7e7-2431ff96a195",
+        "position": {
+          "x": 25,
+          "y": 10
+        },
+        "rotation": 0,
+        "type": "D_FF",
+        "properties": {
+          "label": "FF0"
+        }
+      },
+      {
+        "id": "b49ee888-5c3d-475f-ba13-85832964c433",
+        "position": {
+          "x": 29,
+          "y": 10
+        },
+        "rotation": 0,
+        "type": "D_FF",
+        "properties": {
+          "label": "FF1"
+        }
+      },
+      {
+        "id": "6d217cec-5963-4508-87ed-58fa5fa724ff",
+        "position": {
+          "x": 33,
+          "y": 10
+        },
+        "rotation": 0,
+        "type": "D_FF",
+        "properties": {
+          "label": "FF2"
+        }
+      },
+      {
+        "id": "0d6fc0e5-5b17-471e-af1f-7a8ec516b217",
+        "position": {
+          "x": 37,
+          "y": 10
+        },
+        "rotation": 0,
+        "type": "D_FF",
+        "properties": {
+          "label": "FF3"
+        }
+      },
+      {
+        "id": "c6bc0a54-59ed-4933-ae5a-221c1cd66b82",
+        "position": {
+          "x": 25,
+          "y": 15
+        },
+        "rotation": 270,
+        "type": "Resistor",
+        "properties": {
+          "label": "R0",
+          "resistance": 20000
+        }
+      },
+      {
+        "id": "ce0fb3f5-153f-43b7-9444-339ee0176d1f",
+        "position": {
+          "x": 29,
+          "y": 15
+        },
+        "rotation": 270,
+        "type": "Resistor",
+        "properties": {
+          "label": "R1",
+          "resistance": 20000
+        }
+      },
+      {
+        "id": "f960275a-58c9-41f8-8f75-35c197df290a",
+        "position": {
+          "x": 33,
+          "y": 15
+        },
+        "rotation": 270,
+        "type": "Resistor",
+        "properties": {
+          "label": "R2",
+          "resistance": 20000
+        }
+      },
+      {
+        "id": "56206aaf-f855-4f64-a146-a4c61704fb8a",
+        "position": {
+          "x": 37,
+          "y": 15
+        },
+        "rotation": 270,
+        "type": "Resistor",
+        "properties": {
+          "label": "R3",
+          "resistance": 20000
+        }
+      },
+      {
+        "id": "0c9344d2-c2ed-45d6-ad95-e81c6da074a2",
+        "position": {
+          "x": 25,
+          "y": 19
+        },
+        "rotation": 0,
+        "type": "Resistor",
+        "properties": {
+          "label": "Ra",
+          "resistance": 10000
+        }
+      },
+      {
+        "id": "d00743fd-7a09-479e-8320-59be3320f188",
+        "position": {
+          "x": 29,
+          "y": 19
+        },
+        "rotation": 0,
+        "type": "Resistor",
+        "properties": {
+          "label": "Rb",
+          "resistance": 10000
+        }
+      },
+      {
+        "id": "8978f649-e98c-4c3e-b08b-670f50b527e9",
+        "position": {
+          "x": 33,
+          "y": 19
+        },
+        "rotation": 0,
+        "type": "Resistor",
+        "properties": {
+          "label": "Rc",
+          "resistance": 10000
+        }
+      },
+      {
+        "id": "c36e5c1c-0e1a-467f-9a49-d155ef1fd514",
+        "position": {
+          "x": 25,
+          "y": 19
+        },
+        "rotation": 270,
+        "type": "Resistor",
+        "properties": {
+          "label": "RT",
+          "resistance": 20000
+        }
+      },
+      {
+        "id": "01a5cdfc-51f5-4339-9739-62102a7ab3b5",
+        "position": {
+          "x": 60,
+          "y": 30
+        },
+        "rotation": 0,
+        "type": "down_counter_2b",
+        "properties": {
+          "label": "CTR"
+        }
+      },
+      {
+        "id": "0706e0c6-2666-4c0e-84ce-e1c643c82c0c",
+        "position": {
+          "x": 6,
+          "y": 11
+        },
+        "rotation": 0,
+        "type": "Tunnel",
+        "properties": {
+          "NetName": "DAC_OUT",
+          "bitWidth": 1
+        }
+      },
+      {
+        "id": "33bff78e-15c2-46c8-bc83-9677a8ad2460",
+        "position": {
+          "x": 14,
+          "y": 10
+        },
+        "rotation": 0,
+        "type": "Tunnel",
+        "properties": {
+          "NetName": "DECISION",
+          "bitWidth": 1
+        }
+      },
+      {
+        "id": "ff5e6cd4-cc25-4b7e-8ebd-5ccd31ab33e6",
+        "position": {
+          "x": 18,
+          "y": 8
+        },
+        "rotation": 0,
+        "type": "Tunnel",
+        "properties": {
+          "NetName": "DECISION",
+          "bitWidth": 1
+        }
+      },
+      {
+        "id": "40d981f4-a6ee-4300-bf16-69c1ee9475f6",
+        "position": {
+          "x": 16,
+          "y": 11
+        },
+        "rotation": 0,
+        "type": "Tunnel",
+        "properties": {
+          "NetName": "CNT",
+          "bitWidth": 2
+        }
+      },
+      {
+        "id": "99ee99a0-134e-491b-9cbd-5a530411b30b",
+        "position": {
+          "x": 21,
+          "y": 8
+        },
+        "rotation": 0,
+        "type": "Tunnel",
+        "properties": {
+          "NetName": "WD_0",
+          "bitWidth": 1
+        }
+      },
+      {
+        "id": "34a951a8-f627-4989-a88a-25316e843411",
+        "position": {
+          "x": 23,
+          "y": 11
+        },
+        "rotation": 0,
+        "type": "Tunnel",
+        "properties": {
+          "NetName": "WD_1",
+          "bitWidth": 1
+        }
+      },
+      {
+        "id": "5e32e6b8-b526-4010-83e3-7d22cf8d7fe4",
+        "position": {
+          "x": 23,
+          "y": 12
+        },
+        "rotation": 0,
+        "type": "Tunnel",
+        "properties": {
+          "NetName": "WD_2",
+          "bitWidth": 1
+        }
+      },
+      {
+        "id": "296f7628-b4c1-411f-87bf-f97ba9b5184f",
+        "position": {
+          "x": 23,
+          "y": 13
+        },
+        "rotation": 0,
+        "type": "Tunnel",
+        "properties": {
+          "NetName": "WD_3",
+          "bitWidth": 1
+        }
+      },
+      {
+        "id": "26570536-760c-4434-b141-b35ad979b42b",
+        "position": {
+          "x": 23,
+          "y": 10
+        },
+        "rotation": 0,
+        "type": "Tunnel",
+        "properties": {
+          "NetName": "WD_0",
+          "bitWidth": 1
+        }
+      },
+      {
+        "id": "ad97b422-945d-4b2d-ad60-d468490b5417",
+        "position": {
+          "x": 23,
+          "y": 11
+        },
+        "rotation": 0,
+        "type": "Tunnel",
+        "properties": {
+          "NetName": "CLK",
+          "bitWidth": 1
+        }
+      },
+      {
+        "id": "0c745b3f-e513-4b45-8d14-05b58e9d8c44",
+        "position": {
+          "x": 30,
+          "y": 10
+        },
+        "rotation": 0,
+        "type": "Tunnel",
+        "properties": {
+          "NetName": "BIT_0",
+          "bitWidth": 1
+        }
+      },
+      {
+        "id": "39670a01-5d15-4b85-980b-868a560287df",
+        "position": {
+          "x": 27,
+          "y": 10
+        },
+        "rotation": 0,
+        "type": "Tunnel",
+        "properties": {
+          "NetName": "WD_1",
+          "bitWidth": 1
+        }
+      },
+      {
+        "id": "9653b6c1-6194-44be-b095-0309c292153e",
+        "position": {
+          "x": 27,
+          "y": 11
+        },
+        "rotation": 0,
+        "type": "Tunnel",
+        "properties": {
+          "NetName": "CLK",
+          "bitWidth": 1
+        }
+      },
+      {
+        "id": "406b4715-ccfe-4514-b36a-41b78efde4a7",
+        "position": {
+          "x": 34,
+          "y": 10
+        },
+        "rotation": 0,
+        "type": "Tunnel",
+        "properties": {
+          "NetName": "BIT_1",
+          "bitWidth": 1
+        }
+      },
+      {
+        "id": "afb6e4f6-3233-47dc-889b-3fde08e5aaad",
+        "position": {
+          "x": 31,
+          "y": 10
+        },
+        "rotation": 0,
+        "type": "Tunnel",
+        "properties": {
+          "NetName": "WD_2",
+          "bitWidth": 1
+        }
+      },
+      {
+        "id": "f7e4d3fc-30f9-4037-b2bc-466594e8058c",
+        "position": {
+          "x": 31,
+          "y": 11
+        },
+        "rotation": 0,
+        "type": "Tunnel",
+        "properties": {
+          "NetName": "CLK",
+          "bitWidth": 1
+        }
+      },
+      {
+        "id": "288440d3-f1af-40cc-ae0a-6053d77b3df2",
+        "position": {
+          "x": 38,
+          "y": 10
+        },
+        "rotation": 0,
+        "type": "Tunnel",
+        "properties": {
+          "NetName": "BIT_2",
+          "bitWidth": 1
+        }
+      },
+      {
+        "id": "5217f5b5-55e8-44f3-b2d7-59fdb92e1593",
+        "position": {
+          "x": 35,
+          "y": 10
+        },
+        "rotation": 0,
+        "type": "Tunnel",
+        "properties": {
+          "NetName": "WD_3",
+          "bitWidth": 1
+        }
+      },
+      {
+        "id": "2a1ef0bb-aa68-43f4-868c-4a2155c8f7bc",
+        "position": {
+          "x": 35,
+          "y": 11
+        },
+        "rotation": 0,
+        "type": "Tunnel",
+        "properties": {
+          "NetName": "CLK",
+          "bitWidth": 1
+        }
+      },
+      {
+        "id": "b8bbe2cb-6e91-4e00-842e-d1a0601b5a71",
+        "position": {
+          "x": 42,
+          "y": 10
+        },
+        "rotation": 0,
+        "type": "Tunnel",
+        "properties": {
+          "NetName": "BIT_3",
+          "bitWidth": 1
+        }
+      },
+      {
+        "id": "104acb74-75d1-4fe8-8a36-5bc457407365",
+        "position": {
+          "x": 25,
+          "y": 13
+        },
+        "rotation": 0,
+        "type": "Tunnel",
+        "properties": {
+          "NetName": "BIT_0",
+          "bitWidth": 1
+        }
+      },
+      {
+        "id": "d701e159-0e89-4e3d-a2a2-163476b6ae12",
+        "position": {
+          "x": 29,
+          "y": 13
+        },
+        "rotation": 0,
+        "type": "Tunnel",
+        "properties": {
+          "NetName": "BIT_1",
+          "bitWidth": 1
+        }
+      },
+      {
+        "id": "aba872a6-4200-4a77-8151-44241d0f8a53",
+        "position": {
+          "x": 33,
+          "y": 13
+        },
+        "rotation": 0,
+        "type": "Tunnel",
+        "properties": {
+          "NetName": "BIT_2",
+          "bitWidth": 1
+        }
+      },
+      {
+        "id": "fb60137d-8dbb-471d-b2af-2e3154f32178",
+        "position": {
+          "x": 37,
+          "y": 13
+        },
+        "rotation": 0,
+        "type": "Tunnel",
+        "properties": {
+          "NetName": "BIT_3",
+          "bitWidth": 1
+        }
+      },
+      {
+        "id": "77c0f296-f839-439c-95f9-b90ee8a19954",
+        "position": {
+          "x": 37,
+          "y": 21
+        },
+        "rotation": 0,
+        "type": "Tunnel",
+        "properties": {
+          "NetName": "DAC_OUT",
+          "bitWidth": 1
+        }
+      },
+      {
+        "id": "bb5ce9d4-2be0-45a0-b9ec-0fb811e46fe1",
+        "position": {
+          "x": 58,
+          "y": 30
+        },
+        "rotation": 0,
+        "type": "Tunnel",
+        "properties": {
+          "NetName": "CLK",
+          "bitWidth": 1
+        }
+      },
+      {
+        "id": "bb970fd7-764a-4818-9840-cbd588a33c33",
+        "position": {
+          "x": 58,
+          "y": 32
+        },
+        "rotation": 0,
+        "type": "Tunnel",
+        "properties": {
+          "NetName": "RESET",
+          "bitWidth": 1
+        }
+      },
+      {
+        "id": "84570b29-d14d-4e8b-b808-465186d6ae64",
+        "position": {
+          "x": 65,
+          "y": 31
+        },
+        "rotation": 0,
+        "type": "Tunnel",
+        "properties": {
+          "NetName": "CNT",
+          "bitWidth": 2
+        }
+      },
+      {
+        "id": "e20dff15-2d6e-4716-a7a0-80023b4f6599",
+        "position": {
+          "x": -1,
+          "y": 27
+        },
+        "rotation": 0,
+        "type": "Ground",
+        "properties": {
+          "label": "GND_anchor"
+        }
+      }
+    ],
+    "wires": [
+      {
+        "points": [
+          {
+            "x": 8,
+            "y": 11
+          },
+          {
+            "x": 6,
+            "y": 11
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 12,
+            "y": 10
+          },
+          {
+            "x": 14,
+            "y": 10
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 18,
+            "y": 10
+          },
+          {
+            "x": 18,
+            "y": 8
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 18,
+            "y": 11
+          },
+          {
+            "x": 16,
+            "y": 11
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 21,
+            "y": 10
+          },
+          {
+            "x": 21,
+            "y": 8
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 21,
+            "y": 11
+          },
+          {
+            "x": 23,
+            "y": 11
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 21,
+            "y": 12
+          },
+          {
+            "x": 23,
+            "y": 12
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 21,
+            "y": 13
+          },
+          {
+            "x": 23,
+            "y": 13
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 25,
+            "y": 10
+          },
+          {
+            "x": 23,
+            "y": 10
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 25,
+            "y": 11
+          },
+          {
+            "x": 23,
+            "y": 11
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 28,
+            "y": 10
+          },
+          {
+            "x": 30,
+            "y": 10
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 29,
+            "y": 10
+          },
+          {
+            "x": 27,
+            "y": 10
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 29,
+            "y": 11
+          },
+          {
+            "x": 27,
+            "y": 11
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 32,
+            "y": 10
+          },
+          {
+            "x": 34,
+            "y": 10
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 33,
+            "y": 10
+          },
+          {
+            "x": 31,
+            "y": 10
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 33,
+            "y": 11
+          },
+          {
+            "x": 31,
+            "y": 11
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 36,
+            "y": 10
+          },
+          {
+            "x": 38,
+            "y": 10
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 37,
+            "y": 10
+          },
+          {
+            "x": 35,
+            "y": 10
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 37,
+            "y": 11
+          },
+          {
+            "x": 35,
+            "y": 11
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 40,
+            "y": 10
+          },
+          {
+            "x": 42,
+            "y": 10
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 25,
+            "y": 15
+          },
+          {
+            "x": 25,
+            "y": 13
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 29,
+            "y": 15
+          },
+          {
+            "x": 29,
+            "y": 13
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 33,
+            "y": 15
+          },
+          {
+            "x": 33,
+            "y": 13
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 37,
+            "y": 15
+          },
+          {
+            "x": 37,
+            "y": 13
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 37,
+            "y": 19
+          },
+          {
+            "x": 37,
+            "y": 21
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 60,
+            "y": 30
+          },
+          {
+            "x": 58,
+            "y": 30
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 60,
+            "y": 32
+          },
+          {
+            "x": 58,
+            "y": 32
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 63,
+            "y": 31
+          },
+          {
+            "x": 65,
+            "y": 31
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": -1,
+            "y": 27
+          },
+          {
+            "x": 2,
+            "y": 27
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 2,
+            "y": 27
+          },
+          {
+            "x": 25,
+            "y": 27
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 2,
+            "y": 10
+          },
+          {
+            "x": 2,
+            "y": 27
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 25,
+            "y": 23
+          },
+          {
+            "x": 25,
+            "y": 27
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 8,
+            "y": 9
+          },
+          {
+            "x": 2,
+            "y": 9
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 2,
+            "y": 9
+          },
+          {
+            "x": 2,
+            "y": 6
+          }
+        ]
+      }
+    ]
+  },
+  "format": "dts",
+  "version": 1,
+  "subcircuitDefinitions": {
+    "down_counter_2b": {
+      "name": "down_counter_2b",
+      "elements": [
+        {
+          "id": "525aa927-ae3e-4e42-977f-59467ba5730e",
+          "position": {
+            "x": 0,
+            "y": 1
+          },
+          "rotation": 0,
+          "type": "In",
+          "properties": {
+            "label": "CLK"
+          }
+        },
+        {
+          "id": "a24ff34d-a858-4978-80db-bf7fe2548444",
+          "position": {
+            "x": 0,
+            "y": 3
+          },
+          "rotation": 0,
+          "type": "In",
+          "properties": {
+            "label": "RST"
+          }
+        },
+        {
+          "id": "b1ee5962-3a1c-41f9-977f-df74b3371258",
+          "position": {
+            "x": 6,
+            "y": 1
+          },
+          "rotation": 0,
+          "type": "Out",
+          "properties": {
+            "label": "Q",
+            "bitWidth": 2
+          }
+        }
+      ],
+      "wires": []
+    },
+    "sar_write_gate_4": {
+      "name": "sar_write_gate_4",
+      "elements": [
+        {
+          "id": "a6028a1f-ef9d-4170-b9bd-9bf748152d32",
+          "position": {
+            "x": 0,
+            "y": 1
+          },
+          "rotation": 0,
+          "type": "In",
+          "properties": {
+            "label": "DEC"
+          }
+        },
+        {
+          "id": "59e6d0dd-5882-42bf-be38-a47105820534",
+          "position": {
+            "x": 0,
+            "y": 3
+          },
+          "rotation": 0,
+          "type": "In",
+          "properties": {
+            "label": "SEL",
+            "bitWidth": 2
+          }
+        },
+        {
+          "id": "9942528d-d403-45b8-8a64-f14987e660f8",
+          "position": {
+            "x": 6,
+            "y": 1
+          },
+          "rotation": 0,
+          "type": "Out",
+          "properties": {
+            "label": "D0"
+          }
+        },
+        {
+          "id": "fcff73a9-e3db-4698-af11-0f1ac3a2d372",
+          "position": {
+            "x": 6,
+            "y": 3
+          },
+          "rotation": 0,
+          "type": "Out",
+          "properties": {
+            "label": "D1"
+          }
+        },
+        {
+          "id": "fb733139-02e1-437a-9878-8e98347b32e4",
+          "position": {
+            "x": 6,
+            "y": 5
+          },
+          "rotation": 0,
+          "type": "Out",
+          "properties": {
+            "label": "D2"
+          }
+        },
+        {
+          "id": "d27c97ea-b303-41b6-939a-f4d28ee5b041",
+          "position": {
+            "x": 6,
+            "y": 7
+          },
+          "rotation": 0,
+          "type": "Out",
+          "properties": {
+            "label": "D3"
+          }
+        }
+      ],
+      "wires": []
+    }
+  }
+}

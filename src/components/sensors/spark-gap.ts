@@ -236,7 +236,7 @@ export class SparkGapElement implements AnalogElementCore {
 export function createSparkGapElement(
   pinNodes: ReadonlyMap<string, number>,
   props: PropertyBag,
-  _getTime: () => number,
+  _getTime?: () => number,
 ): AnalogElementCore {
   const p: Record<string, number> = {
     vBreakdown: props.getModelParam<number>("vBreakdown"),
@@ -246,6 +246,7 @@ export function createSparkGapElement(
   };
   const el = new SparkGapElement(p.vBreakdown, p.rOn, p.rOff, p.iHold);
   el._pinNodes = new Map(pinNodes);
+  el.pinNodeIds = [pinNodes.get("pos")!, pinNodes.get("neg")!];
   return el;
 }
 

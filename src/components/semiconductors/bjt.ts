@@ -590,21 +590,19 @@ export function createBjtElement(
 
     setup(ctx: import("../../solver/analog/setup-context.js").SetupContext): void {
       const solver   = ctx.solver;
-      const baseNode = nodeB;
-      const colNode  = nodeC;
-      const emitNode = nodeE;
+      const baseNode = this._pinNodes.get("B")!;
+      const colNode  = this._pinNodes.get("C")!;
+      const emitNode = this._pinNodes.get("E")!;
       const substNode = 0;
       const model    = params;
 
       // State slots — bjtsetup.c:366-367
       this._stateBase = ctx.allocStates(24);
 
-      // L0 always has RC=RB=RE=0, so prime nodes alias external nodes.
-      // model.RC/RB/RE are not in L0's params record; use ?? 0 to treat
-      // undefined (absent key) as 0, matching bjtsetup.c:410-433 logic.
-      _colPrimeNode  = ((model.RC ?? 0) === 0) ? colNode  : ctx.makeVolt(this.label ?? "bjt", "collector");
-      _basePrimeNode = ((model.RB ?? 0) === 0) ? baseNode : ctx.makeVolt(this.label ?? "bjt", "base");
-      _emitPrimeNode = ((model.RE ?? 0) === 0) ? emitNode : ctx.makeVolt(this.label ?? "bjt", "emitter");
+      // L0 has no resistors — prime nodes alias external nodes.
+      _colPrimeNode  = colNode;
+      _basePrimeNode = baseNode;
+      _emitPrimeNode = emitNode;
 
       const cp = _colPrimeNode;
       const bp = _basePrimeNode;
@@ -1231,9 +1229,9 @@ export function createSpiceL1BjtElement(
 
     setup(ctx: import("../../solver/analog/setup-context.js").SetupContext): void {
       const solver    = ctx.solver;
-      const baseNode  = nodeB_ext;
-      const colNode   = nodeC_ext;
-      const emitNode  = nodeE_ext;
+      const baseNode  = this._pinNodes.get("B")!;
+      const colNode   = this._pinNodes.get("C")!;
+      const emitNode  = this._pinNodes.get("E")!;
       const substNode = 0;
       const model     = params;
 

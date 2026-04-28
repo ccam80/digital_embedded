@@ -195,9 +195,6 @@ export class DigitalOutputPinModel {
       if (this._nodeId <= 0) return;
       this._hNodeDiag     = ctx.solver.allocElement(this._nodeId, this._nodeId);
     }
-    if (this._outputCap) {
-      this._outputCap.setup(ctx);
-    }
   }
 
   /** The node ID assigned by init(). */
@@ -322,9 +319,6 @@ export class DigitalInputPinModel {
   setup(ctx: SetupContext): void {
     if (this._nodeId <= 0) return;
     this._hNodeDiag = ctx.solver.allocElement(this._nodeId, this._nodeId);
-    if (this._inputCap) {
-      this._inputCap.setup(ctx);
-    }
   }
 
   /**
