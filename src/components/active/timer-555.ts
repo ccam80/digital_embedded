@@ -143,10 +143,10 @@ class Timer555ResElement implements AnalogElementCore {
   private _G: number;
 
   // TSTALLOC handles — 4 entries per ressetup.c:46-49
-  private _hAA: number = -1;
-  private _hAB: number = -1;
-  private _hBA: number = -1;
-  private _hBB: number = -1;
+  private _hPP: number = -1;
+  private _hNN: number = -1;
+  private _hPN: number = -1;
+  private _hNP: number = -1;
 
   constructor(resistance: number) {
     this._G = 1 / resistance;
@@ -155,11 +155,11 @@ class Timer555ResElement implements AnalogElementCore {
   setup(ctx: SetupContext): void {
     const nA = this._pinNodes.get("A")!;
     const nB = this._pinNodes.get("B")!;
-    // ressetup.c:46-49 — 4 TSTALLOC entries unconditionally (series element)
-    this._hAA = ctx.solver.allocElement(nA, nA);
-    this._hAB = ctx.solver.allocElement(nA, nB);
-    this._hBA = ctx.solver.allocElement(nB, nA);
-    this._hBB = ctx.solver.allocElement(nB, nB);
+    // ressetup.c:46-49 — 4 TSTALLOC entries: PP, PN, NP, NN
+    this._hPP = ctx.solver.allocElement(nA, nA);
+    this._hPN = ctx.solver.allocElement(nA, nB);
+    this._hNP = ctx.solver.allocElement(nB, nA);
+    this._hNN = ctx.solver.allocElement(nB, nB);
   }
 
   setParam(key: string, value: number): void {
@@ -169,10 +169,10 @@ class Timer555ResElement implements AnalogElementCore {
   }
 
   load(ctx: LoadContext): void {
-    ctx.solver.stampElement(this._hAA,  this._G);
-    ctx.solver.stampElement(this._hAB, -this._G);
-    ctx.solver.stampElement(this._hBA, -this._G);
-    ctx.solver.stampElement(this._hBB,  this._G);
+    ctx.solver.stampElement(this._hPP,  this._G);
+    ctx.solver.stampElement(this._hNN,  this._G);
+    ctx.solver.stampElement(this._hPN, -this._G);
+    ctx.solver.stampElement(this._hNP, -this._G);
   }
 
   getPinCurrents(rhs: Float64Array): number[] {

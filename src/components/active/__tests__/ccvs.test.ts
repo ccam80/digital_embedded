@@ -29,6 +29,7 @@ import { MNAEngine } from "../../../solver/analog/analog-engine.js";
 import { makeResistor, makeVoltageSource } from "../../../solver/analog/__tests__/test-helpers.js";
 import { CCVSDefinition } from "../ccvs.js";
 import { CCVSAnalogElement } from "../ccvs.js";
+import type { SetupContext } from "../../../solver/analog/setup-context.js";
 import { PropertyBag } from "../../../core/properties.js";
 import type { AnalogElement } from "../../../solver/analog/element.js";
 import { NGSPICE_LOAD_ORDER } from "../../../solver/analog/element.js";
@@ -47,6 +48,19 @@ function getFactory(entry: ModelEntry): AnalogFactory {
 }
 
 // ---------------------------------------------------------------------------
+// withSetup — add a no-op setup() to elements that lack one.
+//
+// makeVoltageSource from test-helpers does not have setup() because it stamps
+// directly from load() using allocElement. The engine's _setup() calls
+// el.setup(ctx) on every element, so we need a no-op to satisfy the contract.
+// ---------------------------------------------------------------------------
+function withSetup<T extends AnalogElement>(el: T): T {
+  return Object.assign(el, {
+    setup(_ctx: SetupContext): void {},
+  });
+}
+
+// ---------------------------------------------------------------------------
 // makeSenseVsrc — minimal sense VSRC with findBranchFor on the instance.
 //
 // CCVS has NGSPICE_LOAD_ORDER=19, which runs BEFORE VSRC (48). So when CCVS
@@ -60,6 +74,11 @@ function makeSenseVsrc(
   label: string,
 ): AnalogElement & { branchIndex: number; findBranchFor(name: string, ctx: SetupContext): number } {
   let branchIndex = -1;
+  // Handles allocated in setup(), written through in load().
+  let hPIbr = -1; // B[nodePlus, k]
+  let hNIbr = -1; // B[nodeMinus, k]
+  let hIbrP = -1; // C[k, nodePlus]
+  let hIbrN = -1; // C[k, nodeMinus]
   return {
     pinNodeIds: [nodePlus, nodeMinus],
     allNodeIds: [nodePlus, nodeMinus],
@@ -75,6 +94,12 @@ function makeSenseVsrc(
       if (branchIndex === -1) {
         branchIndex = ctx.makeCur(label, "branch");
       }
+      const k = branchIndex;
+      const { solver } = ctx;
+      if (nodePlus !== 0)   hPIbr = solver.allocElement(nodePlus,  k);
+      if (nodeMinus !== 0)  hNIbr = solver.allocElement(nodeMinus, k);
+      if (nodePlus !== 0)   hIbrP = solver.allocElement(k, nodePlus);
+      if (nodeMinus !== 0)  hIbrN = solver.allocElement(k, nodeMinus);
     },
 
     findBranchFor(_name: string, ctx: SetupContext): number {
@@ -88,14 +113,10 @@ function makeSenseVsrc(
       const k = branchIndex;
       if (k <= 0) return;
       const { solver, rhs } = ctx;
-      const h1 = solver.allocElement(nodePlus !== 0 ? nodePlus : 0, k);
-      if (nodePlus !== 0) solver.stampElement(h1, 1);
-      const h2 = solver.allocElement(nodeMinus !== 0 ? nodeMinus : 0, k);
-      if (nodeMinus !== 0) solver.stampElement(h2, -1);
-      const h3 = solver.allocElement(k, nodePlus !== 0 ? nodePlus : 0);
-      if (nodePlus !== 0) solver.stampElement(h3, 1);
-      const h4 = solver.allocElement(k, nodeMinus !== 0 ? nodeMinus : 0);
-      if (nodeMinus !== 0) solver.stampElement(h4, -1);
+      if (hPIbr !== -1) solver.stampElement(hPIbr,  1);
+      if (hNIbr !== -1) solver.stampElement(hNIbr, -1);
+      if (hIbrP !== -1) solver.stampElement(hIbrP,  1);
+      if (hIbrN !== -1) solver.stampElement(hIbrN, -1);
       rhs[k] += 0; // 0V sense source
     },
 
@@ -192,7 +213,7 @@ function makeTransresistanceCircuit(opts: { transresistance?: number; expression
   const branchCount = 3;
   const vsBranch = nodeCount + 1; // 4 (1-based)
 
-  const vs        = makeVoltageSource(1, 0, vsBranch, 5.0);
+  const vs        = withSetup(makeVoltageSource(1, 0, vsBranch, 5.0));
   vs.label = "vs1";
   const rSense    = makeResistor(1, 2, 5000);
   const senseVsrc = makeSenseVsrc(2, 0, "senseVsrc");
@@ -222,7 +243,7 @@ describe("CCVS", () => {
     const branchCount = 3;
     const vsBranch = nodeCount + 1;
 
-    const vs        = makeVoltageSource(1, 0, vsBranch, 0.0);
+    const vs        = withSetup(makeVoltageSource(1, 0, vsBranch, 0.0));
     vs.label = "vs1";
     const rSense    = makeResistor(1, 2, 5000);
     const senseVsrc = makeSenseVsrc(2, 0, "senseVsrc");

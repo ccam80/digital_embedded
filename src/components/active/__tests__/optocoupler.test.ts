@@ -32,6 +32,19 @@ function getFactory(entry: ModelEntry): AnalogFactory {
   return entry.factory;
 }
 
+/**
+ * Wrap an AnalogElement that lacks a setup() method with a no-op setup().
+ * MNAEngine._setup() calls el.setup() on every element; helpers produced by
+ * makeVoltageSource do not define setup(), so they must be wrapped before
+ * passing into the engine.
+ */
+function withSetup(el: AnalogElement): AnalogElement {
+  if (typeof (el as any).setup === "function") return el;
+  return Object.assign(el, {
+    setup(_ctx: import("../../../solver/analog/setup-context.js").SetupContext): void {},
+  });
+}
+
 function makeOptocouplerCore(
   nAnode: number,
   nCathode: number,
@@ -132,10 +145,28 @@ function makeOptocouplerElement(
   // vForward and rLed are pre-composition PWL params; the post-composition
   // model accepts only ctr, Is, n. They are forwarded here for salvage
   // continuity but the new model ignores them.
-  return withNodeIds(
-    makeOptocouplerCore(nAnode, nCathode, nCollector, nEmitter, 0, opts) as unknown as AnalogElement,
-    [nAnode, nCathode, nCollector, nEmitter],
-  );
+  const core = makeOptocouplerCore(nAnode, nCathode, nCollector, nEmitter, 0, opts) as any;
+  // Expose _subElements so MNAEngine._buildDeviceMap registers the sub-elements
+  // (including _vSense) in _deviceMap, enabling ctx.findBranch to resolve the
+  // CCCS controlling source during setup().
+  if (!core._subElements) {
+    core._subElements = [core._dLed, core._vSense, core._cccsCouple, core._bjtPhoto].filter(Boolean);
+  }
+  // Mark as pool-backed so the engine calls initState on this composite, which
+  // then delegates to pool-backed sub-elements (_dLed, _bjtPhoto). Without this,
+  // the engine's initState loop never reaches the sub-elements and their pool
+  // reference is undefined when load() fires.
+  core.poolBacked = true;
+  const origInitState = core.initState?.bind(core);
+  core.initState = function(poolRef: import("../../../core/analog-types.js").StatePoolRef) {
+    if (origInitState) origInitState(poolRef);
+    for (const sub of core._subElements) {
+      if (sub && typeof sub.initState === "function") {
+        sub.initState(poolRef);
+      }
+    }
+  };
+  return withNodeIds(core as unknown as AnalogElement, [nAnode, nCathode, nCollector, nEmitter]);
 }
 
 function buildCircuit(opts: {
@@ -170,7 +201,7 @@ describe("Optocoupler (salvaged behavioural tests — pre-composition)", () => {
     const vF    = 1.2;
     const rLoad = 1000;
 
-    const vs   = makeVoltageSource(1, 0, vsBranch, vIn);
+    const vs   = withSetup(makeVoltageSource(1, 0, vsBranch, vIn));
     const opto = makeOptocouplerElement(1, 0, 2, 0, { ctr: 1.0, vForward: vF, rLed });
     const rL   = makeResistor(2, 0, rLoad);
 
@@ -199,7 +230,7 @@ describe("Optocoupler (salvaged behavioural tests — pre-composition)", () => {
       const branchCount = 1;
       const vsBranch    = nodeCount + 0;
 
-      const vs   = makeVoltageSource(1, 0, vsBranch, vIn);
+      const vs   = withSetup(makeVoltageSource(1, 0, vsBranch, vIn));
       const opto = makeOptocouplerElement(1, 0, 2, 0, { ctr: 1.0, vForward: vF, rLed });
       const rL   = makeResistor(2, 0, rLoad);
 
@@ -217,8 +248,8 @@ describe("Optocoupler (salvaged behavioural tests — pre-composition)", () => {
       const vsBranchIn      = nodeCount + 0; // row 3
       const vsBranchEmitter = nodeCount + 1; // row 4
 
-      const vsIn      = makeVoltageSource(1, 0, vsBranchIn,      vIn);
-      const vsEmitter = makeVoltageSource(3, 0, vsBranchEmitter, 100);
+      const vsIn      = withSetup(makeVoltageSource(1, 0, vsBranchIn,      vIn));
+      const vsEmitter = withSetup(makeVoltageSource(3, 0, vsBranchEmitter, 100));
       const opto      = makeOptocouplerElement(1, 0, 2, 3, { ctr: 1.0, vForward: vF, rLed });
       const rL        = makeResistor(2, 3, rLoad);
 
@@ -245,7 +276,7 @@ describe("Optocoupler (salvaged behavioural tests — pre-composition)", () => {
     const branchCount = 1;
     const vsBranch    = nodeCount + 0;
 
-    const vsBelow = makeVoltageSource(1, 0, vsBranch, 0.5);
+    const vsBelow = withSetup(makeVoltageSource(1, 0, vsBranch, 0.5));
     const opto    = makeOptocouplerElement(1, 0, 2, 0, { ctr: 1.0, vForward: 1.2, rLed: 10 });
     const rLoad   = makeResistor(2, 0, 1000);
 
@@ -264,7 +295,7 @@ describe("Optocoupler (salvaged behavioural tests — pre-composition)", () => {
     const branchCount = 1;
     const vsBranch    = nodeCount + 0;
 
-    const vs    = makeVoltageSource(1, 0, vsBranch, 0.0);
+    const vs    = withSetup(makeVoltageSource(1, 0, vsBranch, 0.0));
     const opto  = makeOptocouplerElement(1, 0, 2, 0, { ctr: 1.0, vForward: 1.2, rLed: 10 });
     const rLoad = makeResistor(2, 0, 1000);
 
@@ -289,7 +320,7 @@ describe("Optocoupler (salvaged behavioural tests — pre-composition)", () => {
     const rLed  = 10;
     const rLoad = 1000;
 
-    const vs    = makeVoltageSource(1, 0, vsBranch, vIn);
+    const vs    = withSetup(makeVoltageSource(1, 0, vsBranch, vIn));
     const opto  = makeOptocouplerElement(1, 0, 2, 0, { ctr: 0.5, vForward: vF, rLed });
     const rL    = makeResistor(2, 0, rLoad);
 

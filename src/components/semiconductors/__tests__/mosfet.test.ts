@@ -41,8 +41,6 @@ import {
 import {
   MOSFET_PMOS_DEFAULTS,
 } from "../mosfet.js";
-import { MNAEngine } from "../../../solver/analog/analog-engine.js";
-import type { ConcreteCompiledAnalogCircuit } from "../../../solver/analog/analog-engine.js";
 
 // ---------------------------------------------------------------------------
 // setupElementWithSolver — call setup() then allocate state pool.
@@ -1161,8 +1159,10 @@ function makeNmosElement62(params: Record<string, number> = {}): {
   return { element: core, pool, solver };
 }
 
-/** Create a PMOS element via the real engine path (factory → engine.init → engine._setup).
- *  pinNodes: G=2, D=1, S=3, B=3 (body tied to source), matrixSize=4. */
+/** Create a PMOS element with real setup() and a bound StatePool.
+ *  pinNodeIds = [G=2, D=1, S=3, B=3], matrixSize=4.
+ *  The returned solver is the one setup() ran on — pass it to makeWave62Ctx
+ *  via setupSolver when the test checks matrix entries. */
 function makePmosElement62(params: Record<string, number> = {}): {
   element: any;
   pool: StatePool;
@@ -1170,31 +1170,31 @@ function makePmosElement62(params: Record<string, number> = {}): {
 } {
   const pmosBag = new PropertyBag();
   pmosBag.replaceModelParams({ ...MOSFET_PMOS_DEFAULTS, ...params });
-  const core = createMosfetElement(-1, new Map([["G", 2], ["S", 3], ["D", 1]]), pmosBag);
-  const circuit = {
-    nodeCount: 3,
-    elements: [core as unknown as AnalogElement],
-    labelToNodeId: new Map(),
-    labelPinNodes: new Map(),
-    wireToNodeId: new Map(),
-    models: new Map(),
-    statePool: null,
-    componentCount: 1,
-    netCount: 3,
-    diagnostics: [],
-    branchCount: 0,
-    matrixSize: 3,
-    bridgeOutputAdapters: [],
-    bridgeInputAdapters: [],
-    elementToCircuitElement: new Map(),
-    resolvedPins: [],
-  } as unknown as ConcreteCompiledAnalogCircuit;
-  const engine = new MNAEngine();
-  engine.init(circuit);
-  (engine as any)._setup();
-  const pool = engine.statePool!;
-  const solver = (engine as any)._solver as SparseSolver;
-  return { element: core as any, pool, solver };
+  const pinNodes = new Map([["G", 2], ["S", 3], ["D", 1]]);
+  const core = createMosfetElement(-1, pinNodes, pmosBag) as any;
+  // Run real setup to allocate handles on the solver.
+  const solver = new SparseSolver();
+  solver._initStructure();
+  let stateCount = 0;
+  let nodeIdx = 3;
+  const ctx: SetupContext = {
+    solver,
+    temp: 300.15,
+    nomTemp: 300.15,
+    copyNodesets: false,
+    makeVolt(_label: string, _suffix: string): number { return ++nodeIdx; },
+    makeCur(_label: string, _suffix: string): number { return ++nodeIdx; },
+    allocStates(n: number): number { const off = stateCount; stateCount += n; return off; },
+    findBranch(_label: string): number { return 0; },
+    findDevice(_label: string) { return null; },
+  };
+  core.setup(ctx);
+  core.stateBaseOffset = 0;
+  const pool = new StatePool(Math.max(core.stateSize, 1));
+  core.initState(pool);
+  core.pinNodeIds = [2, 1, 3, 3];
+  core.allNodeIds = [2, 1, 3, 3];
+  return { element: core, pool, solver };
 }
 
 // Slot index constants matching MOSFET_SCHEMA order (mirrored from mosfet.ts).

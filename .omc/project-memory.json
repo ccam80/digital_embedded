@@ -43,7 +43,7 @@
   },
   "build": {
     "buildCommand": "cd \"C:/local_working_projects/digital_in_browser\" && npx tsc --noEmit --skipLibCheck 2>&1 | head -60",
-    "testCommand": "cd \"C:/local_working_projects/digital_in_browser\" && npx vitest run --reporter=verbose \"src/components/active/__tests__/timer-555-debug.test.ts\" 2>&1 | tail -80",
+    "testCommand": "cd \"C:/local_working_projects/digital_in_browser\" && npx vitest run --testTimeout=120000 \"src/components/semiconductors/__tests__/mosfet.test.ts\" 2>&1 | tail -20",
     "lintCommand": "npm run lint",
     "devCommand": "npm run dev",
     "scripts": {
@@ -286,20 +286,20 @@
   "hotPaths": [
     {
       "path": "",
-      "accessCount": 249,
-      "lastAccessed": 1777335699061,
+      "accessCount": 250,
+      "lastAccessed": 1777341372402,
       "type": "directory"
     },
     {
       "path": "src\\solver\\analog\\sparse-solver.ts",
-      "accessCount": 229,
-      "lastAccessed": 1777334022515,
+      "accessCount": 230,
+      "lastAccessed": 1777342467605,
       "type": "file"
     },
     {
       "path": "src\\solver\\analog\\__tests__\\test-helpers.ts",
-      "accessCount": 203,
-      "lastAccessed": 1777330540140,
+      "accessCount": 211,
+      "lastAccessed": 1777342355699,
       "type": "directory"
     },
     {
@@ -310,14 +310,14 @@
     },
     {
       "path": "src",
-      "accessCount": 141,
-      "lastAccessed": 1777340155136,
+      "accessCount": 142,
+      "lastAccessed": 1777342442101,
       "type": "directory"
     },
     {
       "path": "src\\solver\\analog\\analog-engine.ts",
-      "accessCount": 133,
-      "lastAccessed": 1777340916814,
+      "accessCount": 141,
+      "lastAccessed": 1777342492117,
       "type": "file"
     },
     {
@@ -345,9 +345,15 @@
       "type": "file"
     },
     {
+      "path": "src\\components\\active\\cccs.ts",
+      "accessCount": 44,
+      "lastAccessed": 1777342296227,
+      "type": "directory"
+    },
+    {
       "path": "src\\components\\active\\adc.ts",
-      "accessCount": 39,
-      "lastAccessed": 1777328815370,
+      "accessCount": 41,
+      "lastAccessed": 1777341629971,
       "type": "directory"
     },
     {
@@ -363,15 +369,9 @@
       "type": "file"
     },
     {
-      "path": "src\\components\\active\\cccs.ts",
-      "accessCount": 36,
-      "lastAccessed": 1777336470587,
-      "type": "directory"
-    },
-    {
       "path": "src\\components\\sources\\dc-voltage-source.ts",
-      "accessCount": 35,
-      "lastAccessed": 1777335477000,
+      "accessCount": 36,
+      "lastAccessed": 1777342355262,
       "type": "file"
     },
     {
@@ -396,6 +396,12 @@
       "path": "src\\solver\\analog\\compiled-analog-circuit.ts",
       "accessCount": 22,
       "lastAccessed": 1777327981917,
+      "type": "file"
+    },
+    {
+      "path": "src\\components\\active\\__tests__\\cccs.test.ts",
+      "accessCount": 21,
+      "lastAccessed": 1777342370432,
       "type": "file"
     },
     {
@@ -432,12 +438,6 @@
       "path": "ref\\ngspice\\src\\spicelib\\devices\\bjt\\bjtsetup.c",
       "accessCount": 9,
       "lastAccessed": 1777268481112,
-      "type": "file"
-    },
-    {
-      "path": "src\\components\\active\\__tests__\\cccs.test.ts",
-      "accessCount": 8,
-      "lastAccessed": 1777328177303,
       "type": "file"
     },
     {

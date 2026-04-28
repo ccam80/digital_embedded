@@ -1,10 +1,47 @@
 {
   "summary": {
-    "passed": 30,
-    "failed": 0,
+    "passed": 8,
+    "failed": 3,
     "skipped": 0,
     "totalFiles": 1,
-    "durationSeconds": 1.2
+    "durationSeconds": 0.7
   },
-  "failures": []
+  "failures": [
+    {
+      "message": "expected 5.176990116559687e-19 to be close to 10.000000000000009, received difference is 10.000000000000009, but expected 0.005",
+      "count": 1,
+      "locations": [
+        {
+          "file": "src\\components\\active\\__tests__\\optocoupler.test.ts",
+          "test": "current_transfer",
+          "line": 217,
+          "column": 36
+        }
+      ]
+    },
+    {
+      "message": "expected 5.176990116559687e-22 to be close to 0.010000000000000009, received difference is 0.010000000000000009, but expected 0.0005",
+      "count": 1,
+      "locations": [
+        {
+          "file": "src\\components\\active\\__tests__\\optocoupler.test.ts",
+          "test": "galvanic_isolation",
+          "line": 269,
+          "column": 17
+        }
+      ]
+    },
+    {
+      "message": "expected 5.176990116559687e-19 to be close to 9.999999999999998, received difference is 9.999999999999998, but expected 0.005",
+      "count": 1,
+      "locations": [
+        {
+          "file": "src\\components\\active\\__tests__\\optocoupler.test.ts",
+          "test": "ctr_scaling",
+          "line": 338,
+          "column": 36
+        }
+      ]
+    }
+  ]
 }

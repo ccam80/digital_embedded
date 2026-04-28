@@ -313,14 +313,14 @@ describe("NR", () => {
     //   Vdrop  = cdrain * Rd = 4e-4 * 1e4 = 4V
     //   VDS    = VDD - Vdrop = 10 - 4 = 6V  (still in saturation: VDS > vgst)
     //   node1 (drain)  6V, node2 (vdd) = 10V, node3 (gate) = 0V.
-    const matrixSize = 5;
+    const matrixSize = 6;
 
     const propsObj = createTestPropertyBag();
     propsObj.replaceModelParams(NJFET_PARAMS);
     const jfet = withNodeIds(createNJfetElement(new Map([["G", 3], ["S", 0], ["D", 1]]), propsObj) as unknown as AnalogElementCore, [3, 0, 1]) as unknown as ReactiveAnalogElement;
     const rd = makeResistorElement(2, 1, 10000);
-    const vdd = makeDcVoltageSource(2, 0, 3, 10.0) as unknown as AnalogElement;
-    const vgate = makeDcVoltageSource(3, 0, 4, 0.0) as unknown as AnalogElement;
+    const vdd = makeDcVoltageSource(2, 0, 4, 10.0) as unknown as AnalogElement;
+    const vgate = makeDcVoltageSource(3, 0, 5, 0.0) as unknown as AnalogElement;
 
     const result = runDcOp({
       elements: [vdd, vgate, rd, jfet],

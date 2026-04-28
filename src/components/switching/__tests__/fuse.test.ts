@@ -26,7 +26,7 @@ import { PropertyBag } from "../../../core/properties.js";
 import { PinDirection } from "../../../core/pin.js";
 import { ComponentCategory } from "../../../core/registry.js";
 import type { ComponentLayout } from "../../../core/registry.js";
-import { AnalogFuseElement } from "../../passives/analog-fuse.js";
+import { AnalogFuseElement, createAnalogFuseElement } from "../../passives/analog-fuse.js";
 import { MNAEngine } from "../../../solver/analog/analog-engine.js";
 import type { ConcreteCompiledAnalogCircuit } from "../../../solver/analog/analog-engine.js";
 import type { AnalogElement } from "../../../solver/analog/element.js";
@@ -88,15 +88,24 @@ function makeMinimalCircuit(
 /**
  * Build an AnalogFuseElement with known pin nodes for engine tests.
  * posNode=1 (out1), negNode=2 (out2).
+ *
+ * Uses the real factory path: createAnalogFuseElement(pinNodes, props) so that
+ * the element is constructed identically to the compiler path. Then stamps
+ * pinNodeIds/allNodeIds so the engine can route signals to the correct nodes.
+ * This is the local equivalent of the withNodeIds pattern in test-helpers.ts.
  */
 function makeFuseAnalogElement(
   rCold = 0.01,
   rBlown = 1e9,
   i2tRating = 1e-4,
 ): AnalogFuseElement {
-  const el = new AnalogFuseElement([1, 2], rCold, rBlown, i2tRating);
-  el._pinNodes = new Map([["out1", 1], ["out2", 2]]);
-  return el;
+  const pinNodes = new Map([["out1", 1], ["out2", 2]]);
+  const props = new PropertyBag();
+  props.replaceModelParams({ rCold, rBlown, i2tRating });
+  const core = createAnalogFuseElement(pinNodes, props);
+  core.pinNodeIds = [1, 2];
+  core.allNodeIds = [1, 2];
+  return core as AnalogFuseElement;
 }
 
 // ---------------------------------------------------------------------------
