@@ -318,6 +318,7 @@ export const JKAsyncDefinition: ComponentDefinition = {
       factory: makeJKAsyncFlipflopAnalogFactory(),
       paramDefs: [],
       params: {},
+      mayCreateInternalNodes: false,
     },
   },
   models: {

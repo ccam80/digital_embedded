@@ -25,7 +25,7 @@ import {
   type ComponentDefinition,
   type ComponentLayout,
 } from "../../core/registry.js";
-import type { AnalogElementCore, PoolBackedAnalogElementCore } from "../../solver/analog/element.js";
+import type { AnalogElementCore } from "../../solver/analog/element.js";
 import {
   createDiodeElement,
   DIODE_PARAM_DEFS,
@@ -165,18 +165,16 @@ function createLedAnalogElementViaDiode(
   // Delegate to the existing diode factory. Diode handles setup/load/state.
   const diodeElement = createDiodeElement(remappedPinNodes, props, getTime);
 
-  // Attach LED-specific visible-lit accessor.
-  // color is a component property (not a model param) — read via getOrDefault.
-  const litThreshold = getLitThreshold(props.getOrDefault<string>("color", "red"));
-  Object.assign(diodeElement, {
-    getVisibleLit(): boolean {
-      // SLOT_VD = 0 in DIODE_SCHEMA / DIODE_CAP_SCHEMA.
-      const vd = (diodeElement as PoolBackedAnalogElementCore).s0[
-        (diodeElement as PoolBackedAnalogElementCore).stateBaseOffset + 0
-      ];
-      return vd > litThreshold;
-    },
-  });
+  // NOTE: a previous getVisibleLit() helper was attached here that read the
+  // diode's SLOT_VD via `(diodeElement as PoolBackedAnalogElementCore).s0`.
+  // The cast read the empty placeholder element-side field, never the live
+  // ring slot (s0..s7 on PoolBackedAnalogElementCore was a dead contract).
+  // The helper had no source-level callers, so the latent bug was invisible.
+  // Removed as part of spec/loadcontext-state-getter-fix.md (Tier 3) — if a
+  // renderer ever needs the diode's forward voltage, restore via a
+  // getVd()-style accessor exposed by the diode element itself.
+  void getLitThreshold;
+  void props;
 
   return diodeElement;
 }
@@ -251,19 +249,19 @@ export const LedDefinition: ComponentDefinition = {
   modelRegistry: {
     red:    { kind: "inline", factory: createLedAnalogElementViaDiode, paramDefs: DIODE_PARAM_DEFS,
               params: { IS: 3.17e-19, N: 1.8, RS: 0, CJO: 0, TT: 0, BV: Infinity, IBV: 1e-3,
-                        VJ: 1, M: 0.5, FC: 0.5 } },
+                        VJ: 1, M: 0.5, FC: 0.5, color: "red" } },
     green:  { kind: "inline", factory: createLedAnalogElementViaDiode, paramDefs: DIODE_PARAM_DEFS,
               params: { IS: 1e-21, N: 2.0, RS: 0, CJO: 0, TT: 0, BV: Infinity, IBV: 1e-3,
-                        VJ: 1, M: 0.5, FC: 0.5 } },
+                        VJ: 1, M: 0.5, FC: 0.5, color: "green" } },
     blue:   { kind: "inline", factory: createLedAnalogElementViaDiode, paramDefs: DIODE_PARAM_DEFS,
               params: { IS: 6.26e-24, N: 2.5, RS: 0, CJO: 0, TT: 0, BV: Infinity, IBV: 1e-3,
-                        VJ: 1, M: 0.5, FC: 0.5 } },
+                        VJ: 1, M: 0.5, FC: 0.5, color: "blue" } },
     yellow: { kind: "inline", factory: createLedAnalogElementViaDiode, paramDefs: DIODE_PARAM_DEFS,
               params: { IS: 1e-20, N: 1.9, RS: 0, CJO: 0, TT: 0, BV: Infinity, IBV: 1e-3,
-                        VJ: 1, M: 0.5, FC: 0.5 } },
+                        VJ: 1, M: 0.5, FC: 0.5, color: "yellow" } },
     white:  { kind: "inline", factory: createLedAnalogElementViaDiode, paramDefs: DIODE_PARAM_DEFS,
               params: { IS: 6.26e-24, N: 2.5, RS: 0, CJO: 0, TT: 0, BV: Infinity, IBV: 1e-3,
-                        VJ: 1, M: 0.5, FC: 0.5 } },
+                        VJ: 1, M: 0.5, FC: 0.5, color: "white" } },
   },
   defaultModel: "digital",
 };

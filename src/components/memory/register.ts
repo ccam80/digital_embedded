@@ -234,6 +234,7 @@ export const RegisterDefinition: ComponentDefinition = {
     behavioral: {
       kind: "inline",
       factory: makeBehavioralRegisterAnalogFactory(),
+      mayCreateInternalNodes: false,
       paramDefs: [],
       params: {},
     },

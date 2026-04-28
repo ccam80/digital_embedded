@@ -529,7 +529,7 @@ export function makeBehavioralCounterAnalogFactory(): AnalogElementFactory {
  * dir=0 → count up; dir=1 → count down.
  * ovf=1 when: counting up and count==maxValue, or counting down and count==0.
  */
-export class BehavioralCounterPresetElement {
+export class BehavioralCounterPresetElement implements ReactiveAnalogElementCore {
   private readonly _enPin: DigitalInputPinModel;
   private readonly _clockPin: DigitalInputPinModel;
   private readonly _dirPin: DigitalInputPinModel;

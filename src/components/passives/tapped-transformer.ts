@@ -298,9 +298,9 @@ export class AnalogTappedTransformerElement implements ReactiveAnalogElement {
     this._l1.load(ctx);
     this._l2.load(ctx);
     this._l3.load(ctx);
-    this._mut12.load(ctx, this._l1, this._l2);
-    this._mut13.load(ctx, this._l1, this._l3);
-    this._mut23.load(ctx, this._l2, this._l3);
+    this._mut12.load(ctx);
+    this._mut13.load(ctx);
+    this._mut23.load(ctx);
   }
 
   getLteTimestep(
@@ -325,25 +325,6 @@ export class AnalogTappedTransformerElement implements ReactiveAnalogElement {
     return [i1, -i1, i2, i3 - i2, -i3];
   }
 
-  /** Primary inductance for test access. */
-  get primaryInductance(): number {
-    return this._l1.inductance;
-  }
-
-  /** Secondary half inductance for test access. */
-  get secondaryHalfInductance(): number {
-    return this._l2.inductance;
-  }
-
-  /** Mutual inductance between primary and each secondary half for test access. */
-  get mutualInductancePriSec(): number {
-    return this._mut12.coupling;
-  }
-
-  /** Mutual inductance between the two secondary halves for test access. */
-  get mutualInductanceSecSec(): number {
-    return this._mut23.coupling;
-  }
 }
 
 // ---------------------------------------------------------------------------

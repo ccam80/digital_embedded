@@ -809,7 +809,6 @@ function setupElements(
 }
 
 export function makeSimpleCtx(opts: SimpleCtxOptions): CKTCircuitContext {
-  const branchCount = opts.branchCount ?? opts.matrixSize - opts.nodeCount;
   const params: ResolvedSimulationParams = { ...DEFAULT_SIMULATION_PARAMS, ...opts.params };
   const diagnostics = opts.diagnostics ?? new DiagnosticCollector();
   const solver = opts.solver ?? new SparseSolver();
@@ -820,7 +819,6 @@ export function makeSimpleCtx(opts: SimpleCtxOptions): CKTCircuitContext {
   const ctx = new CKTCircuitContext(
     {
       nodeCount: opts.nodeCount,
-      branchCount,
       matrixSize: opts.matrixSize,
       elements: opts.elements,
     },
@@ -873,7 +871,6 @@ export interface SimpleNROptions {
 }
 
 export function runNR(opts: SimpleNROptions): NRResult {
-  const branchCount = opts.branchCount ?? opts.matrixSize - opts.nodeCount;
   const statePool = opts.statePool ?? allocateStatePool(opts.elements);
   const params: ResolvedSimulationParams = { ...DEFAULT_SIMULATION_PARAMS, ...opts.params };
   const diagnostics = opts.diagnostics ?? new DiagnosticCollector();
@@ -881,7 +878,6 @@ export function runNR(opts: SimpleNROptions): NRResult {
   const ctx = new CKTCircuitContext(
     {
       nodeCount: opts.nodeCount,
-      branchCount,
       matrixSize: opts.matrixSize,
       elements: opts.elements,
       statePool,

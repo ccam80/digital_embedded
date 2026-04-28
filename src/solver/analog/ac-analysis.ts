@@ -49,7 +49,6 @@ export type { AcParams, AcResult };
  */
 export interface AcCompiledCircuit {
   readonly nodeCount: number;
-  readonly branchCount: number;
   readonly matrixSize: number;
   readonly elements: readonly AnalogElement[];
   readonly labelToNodeId: Map<string, number>;

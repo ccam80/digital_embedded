@@ -362,6 +362,7 @@ export const CounterPresetDefinition: ComponentDefinition = {
     behavioral: {
       kind: "inline",
       factory: makeBehavioralCounterPresetAnalogFactory(),
+      mayCreateInternalNodes: false,
       paramDefs: [],
       params: {},
     },

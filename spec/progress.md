@@ -1670,3 +1670,47 @@ After fix the NR runs 7 iterations and converges to V(drain)=1.8405076 (within 0
   8. No `solver.allocElement()` calls in any `load()` body — all use `solver.stampElement` with cached handles.
   9. `MnaModel` behavioral entry has `mayCreateInternalNodes: true`; `branchCount`, `getInternalNodeCount`, `getInternalNodeLabels` removed; `findBranchFor` added on composite element.
   10. TypeScript compiles with zero errors in transmission-line.ts (remaining errors are pre-existing in other files).
+
+## Task 7.BEHAV-FF-T: T Flip-Flop behavioral model factory cleanup (FIX ROUND)
+- **Status**: complete
+- **Agent**: implementer
+- **Files modified**: src/components/flipflops/t.ts (line 283)
+- **Tests**: N/A (spec-compliance only per CLAUDE.md W3 test policy)
+- **Fix**: Added `mayCreateInternalNodes: false` to the `behavioral` MnaModel entry in `TDefinition.modelRegistry` (lines 277-284) per PB-BEHAV-FF-T §"Factory cleanup" requirement line 95.
+- **Verification**: Source code matches spec line-for-line.
+
+## Task 7.BEHAV-FF-JK: Factory cleanup — mayCreateInternalNodes flag
+- **Status**: complete
+- **Agent**: implementer
+- **Files modified**: 
+  - src/components/flipflops/jk.ts (line 287: added `mayCreateInternalNodes: false` to behavioral model entry)
+  - src/components/flipflops/jk-async.ts (line 321: added `mayCreateInternalNodes: false` to behavioral model entry)
+- **Tests**: N/A (per CLAUDE.md "Test Policy During W3 Setup-Load-Split" — spec-compliance verification only, no test execution)
+- **Verification**: Both behavioral MnaModel entries now comply with PB-BEHAV-FF-JK §"Factory cleanup" requirement: `mayCreateInternalNodes: false` flag present on both entries, matching the spec line-for-line.
+
+## Task 7.BEHAV-SEQ: Fix behavioral-sequential MnaModel flags and implements clause
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: none
+- **Files modified**:
+  - src/components/memory/counter.ts
+  - src/components/memory/counter-preset.ts
+  - src/components/memory/register.ts
+  - src/solver/analog/behavioral-sequential.ts
+- **Tests**: N/A (test policy: spec-compliance only, no tests run)
+- **Changes**:
+  - Failure 1: Added `mayCreateInternalNodes: false` to behavioral MnaModel entry in CounterDefinition.modelRegistry
+  - Failure 2: Added `mayCreateInternalNodes: false` to behavioral MnaModel entry in CounterPresetDefinition.modelRegistry
+  - Failure 3: Added `mayCreateInternalNodes: false` to behavioral MnaModel entry in RegisterDefinition.modelRegistry
+  - Failure 4: Added `implements ReactiveAnalogElementCore` to BehavioralCounterPresetElement class declaration for structural parity with BehavioralCounterElement and BehavioralRegisterElement
+
+## Task 7.TAPXFMR-RESPAWN: PB-TAPXFMR fix round — mut.load() signature + salvaged getter removal
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: none
+- **Files modified**: src/components/passives/tapped-transformer.ts
+- **Tests**: N/A (test policy prohibits running tests during W3 setup-load-split)
+- **Spec compliance verified**:
+  1. Fixed `load()` body: changed all three `_mut*.load(ctx, li, lj)` 3-argument calls to single-argument `_mut*.load(ctx)` form per PB-TAPXFMR.md §"load() body" explicit mandate. The spec states "Use the single-argument form" and calls out the 3-arg pattern as incorrect.
+  2. Deleted all four out-of-spec salvaged getters from `AnalogTappedTransformerElement`: `primaryInductance`, `secondaryHalfInductance`, `mutualInductancePriSec`, `mutualInductanceSecSec`. These referenced non-existent fields (`_l1.inductance`, `_l2.inductance`, `_mut12.coupling`, `_mut23.coupling`) and were flagged by the verifier as "salvaged fragments from the prior partial PB-TAPXFMR run." Acceptance criterion "no salvaged fragments remain" now met.
+  3. Progress.md entry (this entry) written per required format.

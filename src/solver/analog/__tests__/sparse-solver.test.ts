@@ -357,8 +357,7 @@ describe("SparseSolver real MNA circuit", () => {
     // ~70 elements, ~150 nonzeros, ~5.5% density (realistic MNA)
 
     const nodeCount = 50;
-    const branchCount = 2;
-    const matrixSize = nodeCount + branchCount;
+    const matrixSize = nodeCount + 2;
     const elements: import("../element.js").AnalogElement[] = [];
 
     // Voltage source: node 50 → GND, branch row = 50
@@ -393,7 +392,6 @@ describe("SparseSolver real MNA circuit", () => {
     const statePool = allocateStatePool(elements);
     const compiled = new ConcreteCompiledAnalogCircuit({
       nodeCount,
-      branchCount,
       elements,
       labelToNodeId: new Map(),
       wireToNodeId: new Map(),

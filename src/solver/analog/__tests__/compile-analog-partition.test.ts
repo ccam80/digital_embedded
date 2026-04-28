@@ -369,7 +369,6 @@ describe("compileAnalogPartition", () => {
     // 3 non-ground nodes: In_1 at (10,0), In_2 at (20,0), out at (30,0)
     // Ground at (0,0) is node 0 (not counted in nodeCount).
     expect(compiled.nodeCount).toBe(3);
-    expect(compiled.branchCount).toBe(0);
     expect(compiled.matrixSize).toBe(3);
   });
 
@@ -494,14 +493,6 @@ describe("compileAnalogPartition", () => {
     const groundDiags = compiled.diagnostics.filter((d) => d.code === "no-ground");
     expect(groundDiags.length).toBeGreaterThan(0);
     expect(groundDiags[0]!.severity).toBe("warning");
-  });
-
-  it("matrixSize_equals_nodeCount_plus_branchCount", () => {
-    const propsMap = new Map<string, PropertyValue>([["model", "behavioral"]]);
-    const { partition, registry } = buildAndGatePartition(propsMap);
-    const compiled = compileAnalogPartition(partition, registry);
-
-    expect(compiled.matrixSize).toBe(compiled.nodeCount + compiled.branchCount);
   });
 
   it("pin_node_ids_passed_to_factory_match_group_node_ids", () => {

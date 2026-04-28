@@ -156,7 +156,6 @@ function makeRcLowpassCircuit(R: number, C: number): AcCompiledCircuit {
 
   return {
     nodeCount: 2,
-    branchCount: 0,
     matrixSize: 2,
     elements,
     labelToNodeId,
@@ -186,7 +185,6 @@ function makeRlcSeriesCircuit(R: number, L: number, C: number): AcCompiledCircui
 
   return {
     nodeCount: 3,
-    branchCount: 0,
     matrixSize: 3,
     elements,
     labelToNodeId,
@@ -433,7 +431,6 @@ describe("AC", () => {
 
     const circuit: AcCompiledCircuit = {
       nodeCount: 2,
-      branchCount: 0,
       matrixSize: 2,
       elements,
       labelToNodeId,

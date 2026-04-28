@@ -291,10 +291,7 @@ describe("AnalogCompiler", () => {
     // 2 non-ground nodes: node at x=10 (Vs+/R1-A) and node at x=20 (R1-B/R2-A)
     expect(compiled.nodeCount).toBe(2);
 
-    // 1 branch row from the voltage source
-    expect(compiled.branchCount).toBe(1);
-
-    // matrixSize = nodeCount + branchCount = 3
+    // matrixSize = 3
     expect(compiled.matrixSize).toBe(3);
   });
 
@@ -399,9 +396,8 @@ describe("AnalogCompiler", () => {
     expect(() => compileUnified(circuit, registry)).not.toThrow();
 
     const compiled = compileUnified(circuit, registry).analog!;
-    // Both voltage sources are compiled; branchCount = 2
+    // Both voltage sources are compiled
     expect(compiled.elements.length).toBe(2);
-    expect(compiled.branchCount).toBe(2);
   });
 
   it("detects_missing_ground", () => {
@@ -509,13 +505,6 @@ describe("AnalogCompiler", () => {
     for (const wire of circuit.wires) {
       expect(compiled.wireToNodeId.has(wire)).toBe(true);
     }
-  });
-
-  it("matrixSize_equals_nodeCount_plus_branchCount", () => {
-    const { circuit, registry } = buildResistorDividerCircuit();
-    const compiled = compileUnified(circuit, registry).analog!;
-
-    expect(compiled.matrixSize).toBe(compiled.nodeCount + compiled.branchCount);
   });
 
   it("netCount_equals_nodeCount", () => {
