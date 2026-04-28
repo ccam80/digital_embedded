@@ -150,8 +150,8 @@ export interface StatePoolRef {
  * The single contract every analog circuit element satisfies.
  *
  * Reactivity is method-presence: an element is "reactive" iff
- * `typeof el.getLteTimestep === "function"`. There is no `isReactive` /
- * `isNonlinear` flag, no Core / non-Core split, no post-compile type
+ * `typeof el.getLteTimestep === "function"`. There are no boolean
+ * device-class flags, no Core / non-Core split, no post-compile type
  * promotion. Pin topology is carried entirely by `_pinNodes`; allocation of
  * internal nodes / branch rows / state slots / TSTALLOC handles all happens
  * inside `setup(ctx)`, never at construction time.
@@ -314,7 +314,7 @@ export interface AnalogElement {
    * timestep controller calls `getLteTimestep` only on elements that implement
    * it; the conditional guard form
    *   `if (typeof el.getLteTimestep === "function") ...`
-   * replaces the former `if (el.isReactive) ...` guard.
+   * is the sole reactivity gate.
    *
    * Elements implementing this method call cktTerr() internally for each
    * reactive junction, passing charge values as individual scalars (not arrays)

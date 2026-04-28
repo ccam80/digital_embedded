@@ -1,47 +1,22 @@
-﻿/**
- * Engine-internal test fixture elements for MNA infrastructure testing.
+/**
+ * Solver-test infrastructure helpers.
  *
- * These are minimal AnalogElement implementations used only in unit tests.
- * They are not ComponentDefinition registrations and do not appear in the
- * component palette. Phase 2 delivers the full registered component set.
- *
- * MNA stamp conventions (standard SPICE Modified Nodal Analysis):
- *
- *   Resistor (nodes A, B, conductance G = 1/R):
- *     G[A,A] += G    G[A,B] -= G
- *     G[B,A] -= G    G[B,B] += G
- *
- *   Voltage source (nodes pos, neg, branch row k, voltage V):
- *     B[pos,k] += 1   C[k,pos] += 1
- *     B[neg,k] -= 1   C[k,neg] -= 1
- *     RHS[k]   += V
- *
- *   Current source (nodes pos, neg, current I flowing from neg to pos):
- *     RHS[pos] += I
- *     RHS[neg] -= I
- *
- * Node 0 is ground; stamps into ground rows/cols are suppressed (ground is
- * not a free variable in the MNA system).
+ * The legacy positional-argument element builders and the post-construction
+ * node-id stamping helper were removed in the setup-load cleanup wave. Tests
+ * construct elements via the production factories (e.g.
+ * `makeDcVoltageSource(new Map([...]), props, () => 0)`) and invoke
+ * `setupAll(elements, ctx)` against a `SetupContext` produced by
+ * `makeTestSetupContext`. See spec/setup-load-cleanup.md §A.19.
  */
 
 import { SparseSolver } from "../sparse-solver.js";
-import { stampRHS } from "../stamp-helpers.js";
-import type { AnalogElement, AnalogElementCore, ReactiveAnalogElement } from "../element.js";
-import { isPoolBacked, NGSPICE_LOAD_ORDER } from "../element.js";
+import type { AnalogElement, PoolBackedAnalogElement } from "../element.js";
+import { isPoolBacked } from "../element.js";
 import type { LoadContext } from "../load-context.js";
-import { MODETRAN, MODEINITPRED, MODEINITTRAN, MODEINITFLOAT } from "../ckt-mode.js";
+import { MODETRAN, MODEINITFLOAT } from "../ckt-mode.js";
 import type { IntegrationMethod } from "../../../core/analog-types.js";
-import { pnjlim, newtonRaphson } from "../newton-raphson.js";
-import { niIntegrate } from "../ni-integrate.js";
+import { newtonRaphson } from "../newton-raphson.js";
 import { StatePool } from "../state-pool.js";
-import type { StatePoolRef } from "../../../core/analog-types.js";
-import { AnalogCapacitorElement } from "../../../components/passives/capacitor.js";
-import { AnalogInductorElement } from "../../../components/passives/inductor.js";
-import {
-  defineStateSchema,
-  applyInitialValues,
-  type StateSchema,
-} from "../state-schema.js";
 import { CKTCircuitContext, LoadCtxImpl, type DcOpResult, type NRResult } from "../ckt-context.js";
 import { solveDcOperatingPoint } from "../dc-operating-point.js";
 import { DiagnosticCollector } from "../diagnostics.js";
@@ -49,760 +24,186 @@ import { DEFAULT_SIMULATION_PARAMS, type ResolvedSimulationParams } from "../../
 import type { SetupContext } from "../setup-context.js";
 
 // ---------------------------------------------------------------------------
-// withNodeIds  test helper for factory-created elements
+// makeTestSetupContext — produce a SetupContext driving the four allocation
+// streams (internal nodes, branch rows, state slots, peer lookup) deterministically.
 // ---------------------------------------------------------------------------
 
 /**
- * Stamp pinNodeIds and allNodeIds onto an AnalogElementCore, promoting it
- * to a full AnalogElement. Used by tests that call component factories
- * directly (bypassing the compiler which normally sets these fields).
+ * Build a `SetupContext` for use by `setupAll` in unit tests. The four
+ * allocation streams behave as follows:
  *
- * @param core - Factory return value (AnalogElementCore)
- * @param pinNodeIds - Pin node IDs in pinLayout order
- * @param internalNodeIds - Optional internal node IDs (default: none)
+ *   - `makeVolt(label, suffix)` — returns sequential ids starting at
+ *     `opts.startNode`, incrementing per call. THROWS if `startNode` is
+ *     unset and any element calls `makeVolt`. The throw is intentional —
+ *     tests whose elements allocate internal nodes must declare their
+ *     starting node id rather than silently defaulting to 0 and propagating
+ *     off-by-one errors.
+ *
+ *   - `makeCur(label, suffix)` — same shape as `makeVolt` but for branch
+ *     row indices, gated on `opts.startBranch`. Same throw semantics.
+ *
+ *   - `allocStates(n)` — sequential, always available; counter starts at 0.
+ *
+ *   - `findBranch(label)` / `findDevice(label)` — resolve against
+ *     `opts.elements` by `el.label` match. `findBranch` dispatches to the
+ *     element's `findBranchFor(label, ctx)` if present; otherwise returns
+ *     the element's existing `branchIndex` or 0. Mirrors the engine-side
+ *     `_findBranch` composition (per spec A.6).
  */
-export function withNodeIds(
-  core: AnalogElementCore,
-  pinNodeIds: readonly number[],
-  internalNodeIds: readonly number[] = [],
-): AnalogElement {
-  return Object.assign(core, {
-    pinNodeIds,
-    allNodeIds: [...pinNodeIds, ...internalNodeIds],
-  }) as AnalogElement;
-}
+export function makeTestSetupContext(opts: {
+  solver: SparseSolver;
+  /** First branch-row id; required if any element calls `ctx.makeCur`. */
+  startBranch?: number;
+  /** First internal-node id; required if any element calls `ctx.makeVolt`. */
+  startNode?: number;
+  /** Operating temperature in Kelvin. Default 300.15. */
+  temp?: number;
+  /** Nominal model temperature in Kelvin. Default 300.15. */
+  nomTemp?: number;
+  /** ngspice CKTcopyNodesets. Default false. */
+  copyNodesets?: boolean;
+  /** Elements registered for `findDevice` / `findBranch` dispatch. */
+  elements?: AnalogElement[];
+}): SetupContext {
+  const elements = opts.elements ?? [];
+  let nextBranch = opts.startBranch ?? -1;
+  let nextNode = opts.startNode ?? -1;
+  let stateCounter = 0;
 
-// ---------------------------------------------------------------------------
-// Internal helper  stamp into solver, skipping ground (node 0)
-// ---------------------------------------------------------------------------
+  const ctx: SetupContext = {
+    solver: opts.solver,
+    temp: opts.temp ?? 300.15,
+    nomTemp: opts.nomTemp ?? 300.15,
+    copyNodesets: opts.copyNodesets ?? false,
 
-function G(solver: SparseSolver, row: number, col: number, val: number): void {
-  if (row !== 0 && col !== 0) {
-    const h = solver.allocElement(row, col);
-    solver.stampElement(h, val);
-  }
-}
-
-/** Unguarded stamp at absolute solver-space (row, col). */
-function S(solver: SparseSolver, row: number, col: number, val: number): void {
-  const h = solver.allocElement(row, col);
-  solver.stampElement(h, val);
-}
-
-function RHS(rhs: Float64Array, row: number, val: number): void {
-  if (row !== 0) rhs[row] += val;
-}
-
-// ---------------------------------------------------------------------------
-// makeResistor
-// ---------------------------------------------------------------------------
-
-/**
- * Create a linear resistor test element.
- *
- * Stamps a conductance G = 1/resistance into the G sub-matrix of the MNA
- * system. Both nodes are in the standard 1-based scheme (0 = ground).
- *
- * @param nodeA      - First terminal node ID (0 = ground)
- * @param nodeB      - Second terminal node ID (0 = ground)
- * @param resistance - Resistance in ohms (must be > 0)
- * @returns An AnalogElement that stamps resistor contributions
- */
-export function makeResistor(
-  nodeA: number,
-  nodeB: number,
-  resistance: number,
-): AnalogElement {
-  const G_val = 1 / resistance;
-  // Sparse-matrix handles registered in setup() (W3 contract: allocElement
-  // calls happen at setup time, stampElement uses captured handles in load).
-  // allocElement returns 0 for ground (row/col == 0); stampElement(0, val)
-  // writes to the trashcan slot per sparse-solver.ts:386-388.
-  let h_AA = 0, h_AB = 0, h_BA = 0, h_BB = 0;
-  return {
-    pinNodeIds: [nodeA, nodeB],
-    allNodeIds: [nodeA, nodeB],
-    branchIndex: -1,
-    ngspiceLoadOrder: NGSPICE_LOAD_ORDER.RES,
-    isNonlinear: false,
-    isReactive: false,
-
-    setup(ctx: SetupContext): void {
-      h_AA = ctx.solver.allocElement(nodeA, nodeA);
-      h_AB = ctx.solver.allocElement(nodeA, nodeB);
-      h_BA = ctx.solver.allocElement(nodeB, nodeA);
-      h_BB = ctx.solver.allocElement(nodeB, nodeB);
-    },
-
-    load(ctx: LoadContext): void {
-      const { solver } = ctx;
-      solver.stampElement(h_AA, G_val);
-      solver.stampElement(h_AB, -G_val);
-      solver.stampElement(h_BA, -G_val);
-      solver.stampElement(h_BB, G_val);
-    },
-
-    setParam(_key: string, _value: number): void {},
-
-    getPinCurrents(rhs: Float64Array): number[] {
-      const vA = rhs[nodeA];
-      const vB = rhs[nodeB];
-      const I = G_val * (vA - vB);
-      return [I, -I];
-    },
-  };
-}
-
-// ---------------------------------------------------------------------------
-// makeVoltageSource
-// ---------------------------------------------------------------------------
-
-/**
- * Create an ideal voltage source test element.
- *
- * Introduces one extra MNA branch row at `branchIdx` (0-based within the
- * branch block, i.e. actual matrix row = nodeCount + branchIdx).
- *
- * The caller is responsible for ensuring `beginAssembly` was called with
- * `matrixSize = nodeCount + branchCount` so the branch row exists.
- *
- * Stamp convention (1-based node IDs, solver uses 0-based indices):
- *   B[nodePos, k] += 1    C[k, nodePos] += 1
- *   B[nodeNeg, k] -= 1    C[k, nodeNeg] -= 1
- *   RHS[k]        += voltage
- *
- * where k = nodeCount + branchIdx (0-based in solver).
- *
- * @param nodePos   - Positive terminal node ID (0 = ground)
- * @param nodeNeg   - Negative terminal node ID (0 = ground)
- * @param branchIdx - 0-based branch index within the branch block; the
- *                    actual solver row is nodeCount + branchIdx
- * @param voltage   - Source voltage in volts
- * @returns An AnalogElement that stamps voltage source contributions
- */
-export function makeVoltageSource(
-  nodePos: number,
-  nodeNeg: number,
-  branchIdx: number,
-  voltage: number,
-): AnalogElement {
-  const k = branchIdx + 1; // 1-based solver row for the branch
-  let h_PK = 0, h_NK = 0, h_KP = 0, h_KN = 0;
-  return {
-    pinNodeIds: [nodePos, nodeNeg],
-    allNodeIds: [nodePos, nodeNeg],
-    branchIndex: branchIdx,
-    ngspiceLoadOrder: NGSPICE_LOAD_ORDER.VSRC,
-    isNonlinear: false,
-    isReactive: false,
-    setup(ctx: SetupContext): void {
-      // B sub-matrix: node rows, branch column k.
-      h_PK = ctx.solver.allocElement(nodePos, k);
-      h_NK = ctx.solver.allocElement(nodeNeg, k);
-      // C sub-matrix: branch row k, node columns.
-      h_KP = ctx.solver.allocElement(k, nodePos);
-      h_KN = ctx.solver.allocElement(k, nodeNeg);
-    },
-    setParam(_key: string, _value: number): void {},
-
-    load(ctx: LoadContext): void {
-      const { solver, rhs } = ctx;
-      solver.stampElement(h_PK, 1);
-      solver.stampElement(h_NK, -1);
-      solver.stampElement(h_KP, 1);
-      solver.stampElement(h_KN, -1);
-      // RHS voltage constraint, scaled by ctx.srcFact (ngspice CKTsrcFact).
-      stampRHS(rhs, k, voltage * ctx.srcFact);
-    },
-
-    getPinCurrents(rhs: Float64Array): number[] {
-      const I = rhs[k];
-      return [I, -I];
-    },
-  };
-}
-
-// ---------------------------------------------------------------------------
-// makeCurrentSource
-// ---------------------------------------------------------------------------
-
-/**
- * Create an ideal independent current source test element.
- *
- * Current flows from nodeNeg to nodePos through the source (conventional
- * positive direction: into nodePos, out of nodeNeg).
- *
- * Stamps only into the RHS vector  no G-matrix entries.
- *
- * @param nodePos - Node where current enters (0 = ground)
- * @param nodeNeg - Node where current leaves (0 = ground)
- * @param current - Source current in amperes (positive = into nodePos)
- * @returns An AnalogElement that stamps current source contributions
- */
-export function makeCurrentSource(
-  nodePos: number,
-  nodeNeg: number,
-  current: number,
-): AnalogElement {
-  let lastSrcFact = 1;
-  return {
-    pinNodeIds: [nodePos, nodeNeg],
-    allNodeIds: [nodePos, nodeNeg],
-    branchIndex: -1,
-    ngspiceLoadOrder: NGSPICE_LOAD_ORDER.ISRC,
-    isNonlinear: false,
-    isReactive: false,
-    setup(_ctx: SetupContext): void {},
-    setParam(_key: string, _value: number): void {},
-
-    load(ctx: LoadContext): void {
-      const { rhs } = ctx;
-      lastSrcFact = ctx.srcFact;
-      RHS(rhs, nodePos, current * ctx.srcFact);
-      RHS(rhs, nodeNeg, -(current * ctx.srcFact));
-    },
-
-    getPinCurrents(): number[] {
-      const I = current * lastSrcFact;
-      return [I, -I];
-    },
-  };
-}
-
-// ---------------------------------------------------------------------------
-// makeDiode
-// ---------------------------------------------------------------------------
-
-/** Thermal voltage at 300 K (kT/q in volts). */
-const VT = 0.02585;
-
-/** Minimum conductance added for numerical stability (GMIN). */
-const GMIN = 1e-12;
-
-// State pool slot indices
-const SLOT_VD = 0, SLOT_GEQ = 1, SLOT_IEQ = 2, SLOT_ID = 3;
-
-/** Schema for test helper diode (4 slots). */
-const DIODE_SCHEMA: StateSchema = defineStateSchema("TestHelperDiodeElement", [
-  { name: "VD",  doc: "Diode voltage (anode minus cathode)",            init: { kind: "zero" } },
-  { name: "GEQ", doc: "Equivalent conductance (linearized)",             init: { kind: "constant", value: GMIN } },
-  { name: "IEQ", doc: "Norton equivalent current source",               init: { kind: "zero" } },
-  { name: "ID",  doc: "Diode current (anode to cathode)",               init: { kind: "zero" } },
-]);
-
-/**
- * Create a Shockley diode test element with NR linearization.
- *
- * Models the ideal diode equation: Id = Is Â· (exp(Vd / (nÂ·Vt)) - 1)
- *
- * The companion model at each NR iteration linearizes the exponential as a
- * parallel conductance (geq) and independent current source (ieq):
- *   geq = dId/dVd = Is Â· exp(Vd/(nÂ·Vt)) / (nÂ·Vt)   + GMIN
- *   ieq = Id - geq Â· Vd                              (Norton equivalent offset)
- *
- * `stamp()` is a no-op  the diode has no linear (topology-independent)
- * contribution. All MNA entries come from `stampNonlinear`.
- *
- * State is stored in a StatePool. Use `withState` to allocate the pool.
- *
- * @param nodeAnode   - Anode node ID (0 = ground, 1-based)
- * @param nodeCathode - Cathode node ID (0 = ground, 1-based)
- * @param is          - Saturation current in amperes (e.g. 1e-14)
- * @param n           - Ideality factor (typically 1.0-2.0)
- * @returns An AnalogElement implementing the Shockley diode model
- */
-export function makeDiode(
-  nodeAnode: number,
-  nodeCathode: number,
-  is: number,
-  n: number,
-): ReactiveAnalogElement {
-  const nVt = n * VT;
-  const vcrit = nVt * Math.log(nVt / (is * Math.SQRT2));
-
-  // Pool binding  set by initState
-  let s0: Float64Array;
-  let s1: Float64Array;
-  let s2: Float64Array;
-  let s3: Float64Array;
-  let base: number;
-
-  let h_AA = 0, h_AC = 0, h_CA = 0, h_CC = 0;
-
-  return {
-    pinNodeIds: [nodeAnode, nodeCathode],
-    allNodeIds: [nodeAnode, nodeCathode],
-    branchIndex: -1,
-    ngspiceLoadOrder: NGSPICE_LOAD_ORDER.DIO,
-    isNonlinear: true,
-    isReactive: true,
-    poolBacked: true as const,
-    stateSize: 4,
-    stateBaseOffset: -1,
-    stateSchema: DIODE_SCHEMA,
-
-    setup(ctx: SetupContext): void {
-      h_AA = ctx.solver.allocElement(nodeAnode, nodeAnode);
-      h_AC = ctx.solver.allocElement(nodeAnode, nodeCathode);
-      h_CA = ctx.solver.allocElement(nodeCathode, nodeAnode);
-      h_CC = ctx.solver.allocElement(nodeCathode, nodeCathode);
-      // Register state slots so the engine's allocateStateBuffers builds a
-      // pool the right size and rewires our closures via initState. The
-      // test-side buildStatePool also sets stateBaseOffset to the same value
-      // (0 for a single pool-backed element) — both paths agree.
-      this.stateBaseOffset = ctx.allocStates(this.stateSize);
-    },
-
-    initState(pool: StatePoolRef): void {
-      s0 = pool.state0;
-      s1 = pool.state1;
-      s2 = pool.state2;
-      s3 = pool.state3;
-      base = this.stateBaseOffset;
-      applyInitialValues(DIODE_SCHEMA, pool, base, {});
-    },
-
-    setParam(_key: string, _value: number): void {},
-
-    load(ctx: LoadContext): void {
-      const { solver, rhs, rhsOld, noncon } = ctx;
-
-      // Update operating point: read rhsOld (prior NR iterate), limit, compute Shockley model.
-      const va = rhsOld[nodeAnode];
-      const vc = rhsOld[nodeCathode];
-      const vdRaw = va - vc;
-      const vdOld = s0[base + SLOT_VD];
-      const limResult = pnjlim(vdRaw, vdOld, nVt, vcrit);
-      const vdLimited = limResult.value;
-      if (limResult.limited) noncon.value++;
-      s0[base + SLOT_VD] = vdLimited;
-
-      const expArg = vdLimited / nVt;
-      const expVal = Math.exp(expArg);
-      const id = is * (expVal - 1);
-      s0[base + SLOT_ID] = id;
-      s0[base + SLOT_GEQ] = (is * expVal) / nVt + GMIN;
-      s0[base + SLOT_IEQ] = id - s0[base + SLOT_GEQ] * vdLimited;
-
-      // Stamp companion model: conductance geq in parallel, Norton offset ieq.
-      const geq = s0[base + SLOT_GEQ];
-      const ieq = s0[base + SLOT_IEQ];
-      solver.stampElement(h_AA, geq);
-      solver.stampElement(h_AC, -geq);
-      solver.stampElement(h_CA, -geq);
-      solver.stampElement(h_CC, geq);
-      RHS(rhs, nodeAnode, -ieq);
-      RHS(rhs, nodeCathode, ieq);
-    },
-
-    checkConvergence(ctx: LoadContext): boolean {
-      const { rhsOld } = ctx;
-      const va = rhsOld[nodeAnode];
-      const vc = rhsOld[nodeCathode];
-      const vdRaw = va - vc;
-      const vdLim = s0[base + SLOT_VD];
-      return Math.abs(vdLim - vdRaw) <= 2 * nVt;
-    },
-
-    getPinCurrents(rhs: Float64Array): number[] {
-      const va = rhs[nodeAnode];
-      const vc = rhs[nodeCathode];
-      const geq = s0[base + SLOT_GEQ];
-      const ieq = s0[base + SLOT_IEQ];
-      const I = geq * (va - vc) - ieq;
-      return [I, -I];
-    },
-  };
-}
-
-// ---------------------------------------------------------------------------
-// makeCapacitor
-// ---------------------------------------------------------------------------
-
-/**
- * Create a linear capacitor test element with companion model integration.
- *
- * The capacitor is modelled as a parallel conductance (geq) and independent
- * current source (ieq)  the standard Norton companion model. Coefficients
- * are recomputed each timestep by `stampCompanion`; `stamp` re-stamps the
- * same coefficients on every NR iteration within that timestep.
- *
- * Stamp convention (nodes A, B):
- *   G[A,A] += geq    G[A,B] -= geq
- *   G[B,A] -= geq    G[B,B] += geq
- *   RHS[A]  += ieq   (current source: ieq flows from B to A through element)
- *   RHS[B]  -= ieq
- *
- * @param nodeA       - First terminal node ID (0 = ground)
- * @param nodeB       - Second terminal node ID (0 = ground)
- * @param capacitance - Capacitance in farads (must be > 0)
- * @returns An AnalogElement implementing the capacitor companion model
- */
-export function makeCapacitor(
-  nodeA: number,
-  nodeB: number,
-  capacitance: number,
-): AnalogElement {
-  // Companion model state  updated each NR iteration inside load().
-  let geq = 0;
-  let ceq = 0;
-  // Charge history: q0 = current step, q1 = previous step, q2 = two steps back, q3 = three steps back.
-  let q0 = 0;
-  let q1 = 0;
-  let q2 = 0;
-  let q3 = 0;
-  // Companion current history for TRAP order 2 recursion (niinteg.c:32).
-  let ccapPrev = 0;
-  let firstTranStep = true;
-
-  let h_AA = 0, h_AB = 0, h_BA = 0, h_BB = 0;
-
-  return {
-    pinNodeIds: [nodeA, nodeB],
-    allNodeIds: [nodeA, nodeB],
-    branchIndex: -1,
-    ngspiceLoadOrder: NGSPICE_LOAD_ORDER.CAP,
-    isNonlinear: false,
-    isReactive: true,
-    setup(ctx: SetupContext): void {
-      h_AA = ctx.solver.allocElement(nodeA, nodeA);
-      h_AB = ctx.solver.allocElement(nodeA, nodeB);
-      h_BA = ctx.solver.allocElement(nodeB, nodeA);
-      h_BB = ctx.solver.allocElement(nodeB, nodeB);
-    },
-    setParam(_key: string, _value: number): void {},
-
-    load(ctx: LoadContext): void {
-      const { solver, rhs, rhsOld, ag } = ctx;
-      const mode = ctx.cktMode;
-
-      if (!(mode & MODETRAN)) return;
-
-      const vA = rhsOld[nodeA];
-      const vB = rhsOld[nodeB];
-      const vcap = vA - vB;
-
-      if (mode & MODEINITPRED) {
-        q0 = q1;
-      } else {
-        q0 = capacitance * vcap;
-        if (mode & MODEINITTRAN) {
-          q1 = q0;
-          firstTranStep = false;
-        }
+    makeVolt(_label: string, _suffix: string): number {
+      if (nextNode < 0) {
+        throw new Error(
+          "makeTestSetupContext: makeVolt() called but startNode is unset. " +
+          "Pass startNode in opts so internal-node allocation has a deterministic origin.",
+        );
       }
-
-      // NIintegrate via shared helper (niinteg.c:17-80).
-      const result = niIntegrate(
-        ctx.method,
-        ctx.order,
-        capacitance,
-        ag,
-        q0, q1,
-        [q2, q3, 0, 0, 0],
-        ccapPrev,
-      );
-      geq = result.geq;
-      ceq = result.ceq;
-
-      if (!firstTranStep) {
-        solver.stampElement(h_AA, geq);
-        solver.stampElement(h_AB, -geq);
-        solver.stampElement(h_BA, -geq);
-        solver.stampElement(h_BB, geq);
-        RHS(rhs, nodeA, -ceq);
-        RHS(rhs, nodeB, ceq);
+      return nextNode++;
+    },
+    makeCur(_label: string, _suffix: string): number {
+      if (nextBranch < 0) {
+        throw new Error(
+          "makeTestSetupContext: makeCur() called but startBranch is unset. " +
+          "Pass startBranch in opts so branch-row allocation has a deterministic origin.",
+        );
       }
-      // DC operating point: no matrix stamp (capacitor is open in DC).
+      return nextBranch++;
     },
-
-    accept(ctx: LoadContext): void {
-      // Advance history: q2 becomes q3, q1 becomes q2, current q0 becomes q1.
-      // Also roll ccap into ccapPrev so TRAP order 2 recursion (niinteg.c:32) works.
-      const { rhs } = ctx;
-      const vA = rhs[nodeA];
-      const vB = rhs[nodeB];
-      q3 = q2;
-      q2 = q1;
-      q1 = capacitance * (vA - vB);
-      ccapPrev = ceq + geq * (vA - vB); // ccap = ceq + ag[0]*q0 = ceq + geq*v
-      firstTranStep = false;
+    allocStates(slotCount: number): number {
+      const off = stateCounter;
+      stateCounter += slotCount;
+      return off;
     },
-
-    getLteTimestep(): number { return Infinity; },
-
-    getPinCurrents(rhs: Float64Array): number[] {
-      const vA = rhs[nodeA];
-      const vB = rhs[nodeB];
-      const I = geq * (vA - vB) + ceq;
-      return [I, -I];
-    },
-  };
-}
-
-// ---------------------------------------------------------------------------
-// makeInductor
-// ---------------------------------------------------------------------------
-
-/**
- * Create a linear inductor test element with companion model integration.
- *
- * An inductor introduces an extra MNA branch row to track branch current.
- * The companion model replaces it with a conductance (geq) and current source
- * (ieq) in the branch equation.
- *
- * MNA stamp for an inductor with nodes A, B and branch row k:
- *   In DC (before first stampCompanion): stamp as short circuit (voltage source V=0).
- *   After stampCompanion: the branch equation becomes:
- *     geq * V_AB - I_k = -ieq
- *   which in matrix form:
- *     B[A,k] +=  1   B[B,k] -= 1   (incidence: current into A, out of B)
- *     C[k,A] -= geq  C[k,B] += geq (branch equation)
- *     RHS[k] += -ieq
- *
- * For the test element, the inductor uses the companion model approach where
- * the branch row represents the inductor current directly.
- *
- * @param nodeA      - First terminal node ID (0 = ground)
- * @param nodeB      - Second terminal node ID (0 = ground)
- * @param branchIdx  - 0-based absolute branch row index in the MNA matrix
- * @param inductance - Inductance in henries (must be > 0)
- * @returns An AnalogElement implementing the inductor companion model
- */
-export function makeInductor(
-  nodeA: number,
-  nodeB: number,
-  branchIdx: number,
-  inductance: number,
-): AnalogElement {
-  // Companion model state. Before transient starts, geq=0 makes branch equation
-  // V_A - V_B = 0 (short circuit)  correct DC operating point for inductor.
-  let geq = 0;
-  let ceq = 0;
-  // Flux history: phi0 = current, phi1 = previous, phi2 = two steps back.
-  let phi0 = 0;
-  let phi1 = 0;
-  let phi2 = 0;
-  let companionActive = false;
-
-  const k = branchIdx + 1; // 1-based solver row for the branch
-  let h_AK = 0, h_BK = 0, h_KA = 0, h_KB = 0, h_KK = 0;
-
-  return {
-    pinNodeIds: [nodeA, nodeB],
-    allNodeIds: [nodeA, nodeB],
-    branchIndex: branchIdx,
-    ngspiceLoadOrder: NGSPICE_LOAD_ORDER.IND,
-    isNonlinear: false,
-    isReactive: true,
-    setup(ctx: SetupContext): void {
-      // Branch incidence (always stamped).
-      h_AK = ctx.solver.allocElement(nodeA, k);
-      h_BK = ctx.solver.allocElement(nodeB, k);
-      // Branch equation (DC short and transient companion both use these).
-      h_KA = ctx.solver.allocElement(k, nodeA);
-      h_KB = ctx.solver.allocElement(k, nodeB);
-      // Self-coupling on the branch row, only stamped under transient
-      // companion. ngspice allocates this unconditionally during DEVsetup
-      // (indsetup.c TSTALLOC) regardless of operating mode — match that.
-      h_KK = ctx.solver.allocElement(k, k);
-    },
-    setParam(_key: string, _value: number): void {},
-
-    load(ctx: LoadContext): void {
-      const { solver, rhs, rhsOld, ag } = ctx;
-      const mode = ctx.cktMode;
-
-      // Topology-constant branch incidence stamps (always).
-      solver.stampElement(h_AK, 1);
-      solver.stampElement(h_BK, -1);
-
-      if (mode & MODETRAN) {
-        const iNow = rhsOld[k];
-
-        if (mode & MODEINITPRED) {
-          phi0 = phi1;
-        } else {
-          phi0 = inductance * iNow;
-          if (mode & MODEINITTRAN) {
-            phi1 = phi0;
-            companionActive = true;
-          }
-        }
-
-        if (companionActive) {
-          // NIintegrate inline using ctx.ag[] (dual of capacitor pattern).
-          const cflux = ag[0] * phi0 + ag[1] * phi1 + (ag.length > 2 ? ag[2] * phi2 : 0);
-          geq = ag[0] * inductance;
-          ceq = cflux - ag[0] * phi0;
-
-          // Branch equation: V_A - V_B - geq * I_k = ceq
-          solver.stampElement(h_KA, 1);
-          solver.stampElement(h_KB, -1);
-          solver.stampElement(h_KK, -geq);
-          stampRHS(rhs, k, ceq);
-        } else {
-          // DC short-circuit model: V_A - V_B = 0
-          solver.stampElement(h_KA, 1);
-          solver.stampElement(h_KB, -1);
-        }
-      } else {
-        // DC: short circuit
-        solver.stampElement(h_KA, 1);
-        solver.stampElement(h_KB, -1);
+    findBranch(label: string): number {
+      const el = elements.find((e) => e.label === label);
+      if (!el) return 0;
+      if (typeof el.findBranchFor === "function") {
+        return el.findBranchFor(label, ctx);
       }
+      return el.branchIndex !== -1 ? el.branchIndex : 0;
     },
-
-    accept(ctx: LoadContext): void {
-      const { rhs } = ctx;
-      const iNow = rhs[branchIdx + 1]; // 1-based slot for branch current
-      phi2 = phi1;
-      phi1 = inductance * iNow;
-      companionActive = true;
-    },
-
-    getLteTimestep(): number { return Infinity; },
-
-    getPinCurrents(rhs: Float64Array): number[] {
-      const I = rhs[branchIdx + 1]; // 1-based slot for branch current
-      return [I, -I];
+    findDevice(label: string): AnalogElement | null {
+      return elements.find((e) => e.label === label) ?? null;
     },
   };
+
+  return ctx;
 }
 
 // ---------------------------------------------------------------------------
-// createTestCapacitor / createTestInductor  real element wrappers
+// setupAll — sort elements by ngspiceLoadOrder, call setup() on each.
 // ---------------------------------------------------------------------------
 
 /**
- * Create a real AnalogCapacitorElement for use in tests.
- * Parameter order differs from makeCapacitor: capacitance first, then nodes.
- */
-export function createTestCapacitor(capacitance: number, nodeA: number, nodeB: number): AnalogElement {
-  const el = new AnalogCapacitorElement(capacitance, NaN, 0, 0, 300.15, 1, 1);
-  return withNodeIds(el, [nodeA, nodeB]);
-}
-
-/**
- * Create a real AnalogInductorElement for use in tests.
- * Parameter order differs from makeInductor: inductance first, then nodes, then branch.
- */
-export function createTestInductor(inductance: number, nodeA: number, nodeB: number, branchIdx: number): AnalogElement {
-  const el = new AnalogInductorElement(branchIdx, inductance, NaN, 0, 0, 300.15, 1, 1);
-  return withNodeIds(el, [nodeA, nodeB]);
-}
-
-// ---------------------------------------------------------------------------
-// makeAcVoltageSource
-// ---------------------------------------------------------------------------
-
-/**
- * Create a time-varying sinusoidal voltage source test element.
+ * Sort `elements` by `ngspiceLoadOrder` ascending and invoke `setup(ctx)`
+ * on each. Mirrors the per-type bucket order ngspice uses (every R, then
+ * every C, ..., then every V, ...) — see `core/analog-types.ts` /
+ * NGSPICE_LOAD_ORDER for the rationale.
  *
- * Identical to `makeVoltageSource` except the RHS voltage is
- *   V(t) = dcOffset + amplitude Â· sin(2Ï€ Â· frequency Â· t + phase)
- *
- * The caller supplies a `getTime` callback that returns the current
- * simulation time in seconds. For MNAEngine integration, pass
- * `() => timeRef.value` where `timeRef` is shared with the compiled circuit.
- *
- * @param nodePos   - Positive terminal node ID (0 = ground)
- * @param nodeNeg   - Negative terminal node ID (0 = ground)
- * @param branchIdx - 0-based absolute branch row index in the MNA matrix
- * @param amplitude - Peak amplitude in volts
- * @param frequency - Frequency in Hz
- * @param phase     - Phase offset in radians (default 0)
- * @param dcOffset  - DC offset in volts (default 0)
- * @param getTime   - Callback returning current simulation time in seconds
- * @returns An AnalogElement that stamps AC voltage source contributions
+ * No opt-out: tests that need to inject element-private state must do so
+ * by reaching into element fields *after* this call, never by skipping it.
  */
-export function makeAcVoltageSource(
-  nodePos: number,
-  nodeNeg: number,
-  branchIdx: number,
-  amplitude: number,
-  frequency: number,
-  phase: number,
-  dcOffset: number,
-  getTime: () => number,
-): AnalogElement {
-  const k = branchIdx + 1; // 1-based solver row for the branch
-  let h_PK = 0, h_NK = 0, h_KP = 0, h_KN = 0;
-  return {
-    pinNodeIds: [nodePos, nodeNeg],
-    allNodeIds: [nodePos, nodeNeg],
-    branchIndex: branchIdx,
-    ngspiceLoadOrder: NGSPICE_LOAD_ORDER.VSRC,
-    isNonlinear: false,
-    isReactive: false,
-    setup(ctx: SetupContext): void {
-      h_PK = ctx.solver.allocElement(nodePos, k);
-      h_NK = ctx.solver.allocElement(nodeNeg, k);
-      h_KP = ctx.solver.allocElement(k, nodePos);
-      h_KN = ctx.solver.allocElement(k, nodeNeg);
-    },
-    setParam(_key: string, _value: number): void {},
-
-    load(ctx: LoadContext): void {
-      const { solver, rhs } = ctx;
-      const t = getTime();
-      const v =
-        (dcOffset + amplitude * Math.sin(2 * Math.PI * frequency * t + phase)) *
-        ctx.srcFact;
-      solver.stampElement(h_PK, 1);
-      solver.stampElement(h_NK, -1);
-      solver.stampElement(h_KP, 1);
-      solver.stampElement(h_KN, -1);
-      stampRHS(rhs, k, v);
-    },
-
-    getPinCurrents(rhs: Float64Array): number[] {
-      const I = rhs[k];
-      return [I, -I];
-    },
-  };
+export function setupAll(elements: AnalogElement[], ctx: SetupContext): void {
+  const sorted = [...elements].sort(
+    (a, b) => a.ngspiceLoadOrder - b.ngspiceLoadOrder,
+  );
+  for (const el of sorted) el.setup(ctx);
 }
 
 // ---------------------------------------------------------------------------
-// allocateStatePool  mirror compiler state-pool allocation in test fixtures
+// allocateStatePool — assign _stateBase sequentially and build a sized pool
 // ---------------------------------------------------------------------------
 
 /**
- * Assign `stateBaseOffset` sequentially to every element with `stateSize > 0`,
- * construct a `StatePool` sized to the total slot count, and invoke each
- * element's `initState` hook so closure-captured `s0`/`base` are populated.
+ * Assign `_stateBase` sequentially to every pool-backed element, construct
+ * a `StatePool` sized to the total slot count, and invoke each element's
+ * `initState` hook so closure-captured pool refs and slot bases are
+ * populated.
  *
  * Tests that build `ConcreteCompiledAnalogCircuit` directly (bypassing the
- * real compiler) must call this before `engine.init()`  otherwise pool-backed
- * elements arrive with `stateBaseOffset=-1` and the engine's allocation
- * assertion throws. Tests that stamp into a solver without going through the
- * engine must also call this so element closures have a valid pool reference
- * to read/write.
+ * real compiler) must call this before `engine.init()` — otherwise pool-
+ * backed elements arrive with `_stateBase=-1` and the engine's allocation
+ * assertion throws.
  *
  * Mirrors the allocation loop in `src/compile/compiler.ts` that the real
  * compiler runs when building a production `CompiledAnalogCircuit`.
  */
 export function allocateStatePool(
-  elements: readonly (AnalogElement | AnalogElementCore)[],
+  elements: readonly AnalogElement[],
 ): StatePool {
   let offset = 0;
   for (const el of elements) {
     if (isPoolBacked(el)) {
-      el.stateBaseOffset = offset;
+      (el as PoolBackedAnalogElement & { _stateBase: number })._stateBase = offset;
       offset += el.stateSize;
     }
   }
   const pool = new StatePool(offset);
   for (const el of elements) {
     if (isPoolBacked(el)) {
-      (el as ReactiveAnalogElement).initState(pool);
+      el.initState(pool);
     }
   }
   return pool;
 }
 
 // ---------------------------------------------------------------------------
-// makeSimpleCtx / runDcOp / runNR  minimal ctx wrappers for component tests
+// initElement — wire a single element to a freshly-allocated StatePool
+// ---------------------------------------------------------------------------
+
+/**
+ * Allocate a `StatePool` sized to the element's `stateSize`, set the
+ * element's `_stateBase` to 0, and call `initState(pool)`. Required before
+ * driving `element.load()` directly in unit tests for any pool-backed
+ * element (capacitor, inductor, BJT, MOSFET, comparator, behavioral
+ * flip-flop, etc.) — otherwise the element's `_pool` reference is undefined
+ * and `load()` throws.
+ *
+ * Mirrors the engine's compile path: compile.ts walks every analog element
+ * with `poolBacked: true`, assigns consecutive offsets, builds a single
+ * `StatePool`, then calls each element's `initState(pool)`.
+ *
+ * Returns the allocated pool so callers can seed slots before `load()`
+ * (e.g. `pool.state1[base + SLOT_PHI] = ...` to fake prior-step state).
+ */
+export function initElement(element: AnalogElement): StatePool {
+  if (!isPoolBacked(element)) {
+    return new StatePool(0);
+  }
+  const size = Math.max(element.stateSize ?? 0, 1);
+  const pool = new StatePool(size);
+  (element as PoolBackedAnalogElement & { _stateBase: number })._stateBase = 0;
+  element.initState(pool);
+  return pool;
+}
+
+// ---------------------------------------------------------------------------
+// makeSimpleCtx / runDcOp / runNR — minimal CKTCircuitContext wrappers
 // ---------------------------------------------------------------------------
 
 export interface SimpleCtxOptions {
@@ -811,42 +212,16 @@ export interface SimpleCtxOptions {
   matrixSize: number;
   nodeCount: number;
   branchCount?: number;
+  /** First branch-row id seen by element setup(). When unset, defaults to
+   *  `nodeCount + 1` so branch rows land just above the main-node block. */
+  startBranch?: number;
+  /** First internal-node id seen by element setup(). When unset, defaults
+   *  to `matrixSize + 1` so internal nodes do not collide with branch rows
+   *  in matrices sized `nodeCount + branchCount`. */
+  startNode?: number;
   params?: Partial<ResolvedSimulationParams>;
   diagnostics?: DiagnosticCollector;
   statePool?: StatePool;
-}
-
-/**
- * Call setup() on every element that exposes it, using the given solver.
- * Must be called before allocateStatePool so that allocStates offsets and
- * internal nodes are assigned before initState reads stateBaseOffset.
- */
-function setupElements(
-  elements: readonly (AnalogElement | AnalogElementCore)[],
-  solver: SparseSolver,
-): void {
-  let stateCount = 0;
-  let nodeCount = 1000; // start well above any test pin node
-  const ctx: SetupContext = {
-    solver,
-    temp: 300.15,
-    nomTemp: 300.15,
-    copyNodesets: false,
-    makeVolt(_label: string, _suffix: string): number { return ++nodeCount; },
-    makeCur(_label: string, _suffix: string): number { return ++nodeCount; },
-    allocStates(n: number): number {
-      const off = stateCount;
-      stateCount += n;
-      return off;
-    },
-    findBranch(_label: string): number { return 0; },
-    findDevice(_label: string) { return null; },
-  };
-  for (const el of elements) {
-    if (typeof (el as { setup?: (ctx: SetupContext) => void }).setup === "function") {
-      (el as { setup: (ctx: SetupContext) => void }).setup(ctx);
-    }
-  }
 }
 
 export function makeSimpleCtx(opts: SimpleCtxOptions): CKTCircuitContext {
@@ -868,21 +243,27 @@ export function makeSimpleCtx(opts: SimpleCtxOptions): CKTCircuitContext {
   );
   ctx.diagnostics = diagnostics;
 
-  // Step 2: Run setup() on pool-backed elements. The solver is now clean
+  // Step 2: Run setup() via the new shared helper. The solver is now clean
   // (post-_initStructure). Handles allocated here survive until the next
   // _initStructure call (never happens in normal test use).
   if (!opts.statePool) {
-    setupElements(opts.elements, solver);
+    const setupCtx = makeTestSetupContext({
+      solver,
+      startBranch: opts.startBranch ?? opts.nodeCount + 1,
+      startNode: opts.startNode ?? opts.matrixSize + 1,
+      elements: [...opts.elements],
+    });
+    setupAll([...opts.elements], setupCtx);
   }
 
-  // Step 3: Build state pool (assigns stateBaseOffset, calls initState).
+  // Step 3: Build state pool (assigns _stateBase, calls initState).
   const statePool = opts.statePool ?? allocateStatePool(opts.elements);
   const numStates = statePool.state0.length;
   ctx.statePool = statePool;
   // Mirror allocateStateBuffers: resize dcop snapshot buffers and bind the
   // live state-ring reference into loadCtx (no snapshot — getter-based).
   ctx.dcopSavedState0 = new Float64Array(Math.max(numStates, 1));
-  ctx.dcopOldState0   = new Float64Array(Math.max(numStates, 1));
+  ctx.dcopOldState0 = new Float64Array(Math.max(numStates, 1));
   ctx.loadCtx.setStatePool(statePool);
 
   // Step 4: Allocate row buffers so rhs / rhsOld have correct sizes.
@@ -943,9 +324,6 @@ export function runNR(opts: SimpleNROptions): NRResult {
  * whose elements drive their own state via closure-captured pool refs and
  * never read ctx.stateN. If a test does need a real state pool, pass it in
  * as the second arg.
- *
- * Mechanical migration shim for the architectural state-getter change in
- * spec/loadcontext-state-getter-fix.md (Tier 1).
  */
 export function loadCtxFromFields(
   fields: Omit<LoadContext, "state0" | "state1" | "state2" | "state3">,
@@ -955,7 +333,7 @@ export function loadCtxFromFields(
 }
 
 // ---------------------------------------------------------------------------
-// makeLoadCtx  build a fully-populated LoadContext literal for unit tests
+// makeLoadCtx — build a fully-populated LoadContext literal for unit tests
 // ---------------------------------------------------------------------------
 
 export interface MakeLoadCtxOptions {
@@ -998,7 +376,7 @@ export interface MakeLoadCtxOptions {
  *
  * Defaults:
  *   - cktMode  = MODETRAN | MODEINITFLOAT (a normal NR iteration during
- *     transient  produces the same bit pattern an engine drives on
+ *     transient — produces the same bit pattern an engine drives on
  *     non-init iterations).
  *   - dt = 0, order = 1, method = "trapezoidal".
  *   - rhs / rhsOld both alias `voltages` unless overridden.
@@ -1042,36 +420,4 @@ export function makeLoadCtx(opts: MakeLoadCtxOptions): LoadContext {
     (ctx as unknown as { uic: boolean }).uic = opts.uic;
   }
   return ctx;
-}
-
-// ---------------------------------------------------------------------------
-// initElement  wire a single element to a freshly-allocated StatePool
-// ---------------------------------------------------------------------------
-
-/**
- * Allocate a `StatePool` sized to the element's `stateSize`, set the
- * element's `stateBaseOffset` to 0, and call `initState(pool)`. Required
- * before driving `element.load()` directly in unit tests for any pool-backed
- * element (capacitor, inductor, BJT, MOSFET, comparator, behavioral
- * flip-flop, etc.)  otherwise the element's `_pool` reference is undefined
- * and `load()` throws `Cannot read properties of undefined (reading
- * 'states')`.
- *
- * Mirrors the engine's compile path:
- *   - compile.ts walks every analog element with `poolBacked: true`, assigns
- *     consecutive offsets, builds a single `StatePool`, then calls each
- *     element's `initState(pool)`.
- *
- * Returns the allocated pool so callers can seed slots before `load()`
- * (e.g. `pool.state1[base + SLOT_PHI] = ...` to fake prior-step state).
- */
-export function initElement(
-  element: ReactiveAnalogElement | AnalogElement,
-): StatePool {
-  const re = element as ReactiveAnalogElement;
-  const size = Math.max(re.stateSize ?? 0, 1);
-  const pool = new StatePool(size);
-  re.stateBaseOffset = 0;
-  re.initState?.(pool);
-  return pool;
 }

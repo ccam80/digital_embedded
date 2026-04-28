@@ -292,14 +292,14 @@
   "hotPaths": [
     {
       "path": "",
-      "accessCount": 289,
-      "lastAccessed": 1777364677139,
+      "accessCount": 293,
+      "lastAccessed": 1777373185135,
       "type": "directory"
     },
     {
       "path": "src\\solver\\analog\\__tests__\\test-helpers.ts",
-      "accessCount": 255,
-      "lastAccessed": 1777372305804,
+      "accessCount": 257,
+      "lastAccessed": 1777373177213,
       "type": "directory"
     },
     {
@@ -328,14 +328,14 @@
     },
     {
       "path": "src\\core\\analog-types.ts",
-      "accessCount": 110,
-      "lastAccessed": 1777372849486,
+      "accessCount": 112,
+      "lastAccessed": 1777373167455,
       "type": "file"
     },
     {
       "path": "src\\solver\\analog\\element.ts",
-      "accessCount": 102,
-      "lastAccessed": 1777372864075,
+      "accessCount": 103,
+      "lastAccessed": 1777373170556,
       "type": "file"
     },
     {

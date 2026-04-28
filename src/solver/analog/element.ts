@@ -4,7 +4,7 @@
  *
  * Reactivity is method-presence: an element is "reactive" iff
  *   typeof el.getLteTimestep === "function"
- * There is no Core / non-Core split, no isReactive / isNonlinear flag, and
+ * There is no Core / non-Core split, no boolean device-class flags, and
  * no post-compile type promotion. See `core/analog-types.ts` for the full
  * `AnalogElement` and `PoolBackedAnalogElement` contracts.
  */
