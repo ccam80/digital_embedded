@@ -585,6 +585,13 @@ class Timer555CompositeElement implements PoolBackedAnalogElementCore {
   // load() — composite forwards with RS latch coupling (PB-TIMER555 spec)
   // ---------------------------------------------------------------------------
   load(ctx: LoadContext): void {
+    // ngspice DEVload-local register promotion of CKTstate0/CKTstate1
+    // (cktdefs.h:82-85). The getters resolve through pool.states[i] live;
+    // hoist once per load() entry to fold the property load out of the
+    // per-element-access path.
+    const s0 = ctx.state0;
+    const s1 = ctx.state1;
+
     // R-divider stamps (resload.c pattern — G stamped at 4 entries)
     this._rDiv1.load(ctx);
     this._rDiv2.load(ctx);
@@ -614,7 +621,7 @@ class Timer555CompositeElement implements PoolBackedAnalogElementCore {
     // rotateStateVectors(). Without this, the latch writes to state0 on iter N
     // and reads it back on iter N+1, creating intra-NR feedback that causes
     // the latch to toggle each NR iteration and prevents convergence.
-    let q = ctx.state1[this._stateBase_latch] >= 0.5;
+    let q = s1[this._stateBase_latch] >= 0.5;
 
     const resetSignal = vComp1Out > 0.5 || rstActive;
     const setSignal   = vComp2Out > 0.5 && !resetSignal;
@@ -622,7 +629,7 @@ class Timer555CompositeElement implements PoolBackedAnalogElementCore {
     if (resetSignal) q = false;
     else if (setSignal) q = true;
 
-    ctx.state0[this._stateBase_latch] = q ? 1.0 : 0.0;
+    s0[this._stateBase_latch] = q ? 1.0 : 0.0;
 
     // Drive discharge BJT base: Q=0 → BJT ON (saturated); Q=1 → BJT OFF
     const bjtBaseV = q ? 0.0 : 5.0;

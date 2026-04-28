@@ -525,7 +525,10 @@ class FGPFETMosSubElement implements AnalogElementCore {
     const solver = ctx.solver;
     const s0 = ctx.state0;
     const s1 = ctx.state1;
-    const s2 = ctx.state1;  // order-2 Gear/TRAP uses state2; default to state1 for order-1
+    // ngspice integrates over CKTstate2 for order-2 Gear/TRAP (niinteg.c).
+    // Now a live getter into pool.states[2] (cktdefs.h:82-85), no longer a
+    // ctx.state1 placeholder.
+    const s2 = ctx.state2;
     const base = this._stateBase;
 
     // mos1load.c:107: vt = CONSTKoverQ * MOS1temp.
