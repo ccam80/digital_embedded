@@ -298,8 +298,8 @@
     },
     {
       "path": "src\\solver\\analog\\sparse-solver.ts",
-      "accessCount": 230,
-      "lastAccessed": 1777342467605,
+      "accessCount": 231,
+      "lastAccessed": 1777348229642,
       "type": "file"
     },
     {
@@ -310,8 +310,8 @@
     },
     {
       "path": "src\\solver\\analog\\ckt-context.ts",
-      "accessCount": 169,
-      "lastAccessed": 1777346694220,
+      "accessCount": 170,
+      "lastAccessed": 1777348233565,
       "type": "file"
     },
     {
@@ -334,14 +334,14 @@
     },
     {
       "path": "src\\solver\\analog",
-      "accessCount": 74,
-      "lastAccessed": 1777346682450,
+      "accessCount": 76,
+      "lastAccessed": 1777348233075,
       "type": "directory"
     },
     {
       "path": "src\\solver\\analog\\element.ts",
-      "accessCount": 65,
-      "lastAccessed": 1777338331114,
+      "accessCount": 68,
+      "lastAccessed": 1777348271504,
       "type": "file"
     },
     {
@@ -352,8 +352,8 @@
     },
     {
       "path": "src\\components\\active\\cccs.ts",
-      "accessCount": 44,
-      "lastAccessed": 1777342296227,
+      "accessCount": 46,
+      "lastAccessed": 1777348008949,
       "type": "directory"
     },
     {

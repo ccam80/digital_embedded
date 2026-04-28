@@ -1215,3 +1215,10 @@ After fix the NR runs 7 iterations and converges to V(drain)=1.8405076 (within 0
 - **Files modified**: 74 PB-*.md files in spec/setup-load-split/components/
 - **Files skipped (no Verification gate section)**: none
 - **Verification**: every modified file's "## Verification gate" section now contains the 8-item spec-compliance body verbatim
+
+## Task 5.B.timer555-bjtDis-fix:
+- **Status**: complete
+- **Files modified**: src/components/active/timer-555.ts
+- **Spec-compliance audit**: _bjtDis recreate-block at lines 521-527 replaced with spec-mandated assign-then-setup pair per PB-TIMER555 lines 125-127
+- **Surfaced issues**: none
+- **Banned-verdict audit**: confirmed-clean

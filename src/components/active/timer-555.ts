@@ -517,13 +517,8 @@ class Timer555CompositeElement implements PoolBackedAnalogElementCore {
     this._comp2.setup(ctx);
 
     // Discharge BJT NPN (bjtsetup.c:347-465, 24 states, 23 TSTALLOC)
-    // Recreate with real nDisBase (only known after internal node allocation above).
-    // The factory placeholder had B=0; replace with the now-known base node.
-    this._bjtDis = createBjtElement(
-      1,
-      new Map([["B", this._nDisBase], ["C", nDis], ["E", nGnd]]),
-      this._bjtProps,
-    ) as PoolBackedAnalogElementCore;
+    // Assign pin nodes now that nDisBase internal node is known, then set up.
+    (this._bjtDis as any)._pinNodes = new Map([["B", this._nDisBase], ["C", nDis], ["E", nGnd]]);
     this._bjtDis.setup(ctx);
 
     // Output pin model (behavioral, DigitalOutputPinModel)
