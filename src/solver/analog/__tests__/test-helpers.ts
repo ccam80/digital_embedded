@@ -42,7 +42,7 @@ import {
   applyInitialValues,
   type StateSchema,
 } from "../state-schema.js";
-import { CKTCircuitContext, type DcOpResult, type NRResult } from "../ckt-context.js";
+import { CKTCircuitContext, LoadCtxImpl, type DcOpResult, type NRResult } from "../ckt-context.js";
 import { solveDcOperatingPoint } from "../dc-operating-point.js";
 import { DiagnosticCollector } from "../diagnostics.js";
 import { DEFAULT_SIMULATION_PARAMS, type ResolvedSimulationParams } from "../../../core/analog-engine-interface.js";
@@ -850,11 +850,11 @@ export function makeSimpleCtx(opts: SimpleCtxOptions): CKTCircuitContext {
   const statePool = opts.statePool ?? allocateStatePool(opts.elements);
   const numStates = statePool.state0.length;
   ctx.statePool = statePool;
-  // Mirror allocateStateBuffers: resize dcop snapshot buffers and wire loadCtx.
+  // Mirror allocateStateBuffers: resize dcop snapshot buffers and bind the
+  // live state-ring reference into loadCtx (no snapshot — getter-based).
   ctx.dcopSavedState0 = new Float64Array(Math.max(numStates, 1));
   ctx.dcopOldState0   = new Float64Array(Math.max(numStates, 1));
-  ctx.loadCtx.state0  = statePool.state0;
-  ctx.loadCtx.state1  = statePool.state1;
+  ctx.loadCtx.setStatePool(statePool);
 
   // Step 4: Allocate row buffers so rhs / rhsOld have correct sizes.
   ctx.allocateRowBuffers(opts.matrixSize);
@@ -962,7 +962,10 @@ export function makeLoadCtx(opts: MakeLoadCtxOptions): LoadContext {
   const fallback = new Float64Array(0);
   const rhs = opts.rhs ?? fallback;
   const rhsOld = opts.rhsOld ?? fallback;
-  const ctx: LoadContext = {
+  // Empty StatePool: tests built via makeLoadCtx don't exercise state-ring
+  // reads. Call sites that need real state should construct via
+  // makeSimpleCtx (which wires the pool through CKTCircuitContext).
+  const ctx = new LoadCtxImpl(new StatePool(0), {
     cktMode: opts.cktMode ?? (MODETRAN | MODEINITFLOAT),
     solver: opts.solver,
     matrix: opts.solver,
@@ -987,7 +990,7 @@ export function makeLoadCtx(opts: MakeLoadCtxOptions): LoadContext {
     cktFixLimit: opts.cktFixLimit ?? false,
     bypass: opts.bypass ?? false,
     voltTol: opts.voltTol ?? 1e-6,
-  };
+  });
   if (opts.uic !== undefined) {
     (ctx as unknown as { uic: boolean }).uic = opts.uic;
   }

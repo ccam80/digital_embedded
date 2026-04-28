@@ -129,8 +129,21 @@ export interface LoadContext {
   /** Absolute voltage convergence tolerance in volts (ngspice CKTvoltTol).
    * Used by device bypass gates. Default 1e-6 V. */
   voltTol: number;
-  /** Current-iteration state vector (ngspice CKTstate0). Indexed by `_stateBase + SLOT_X` per element. */
-  state0: Float64Array;
-  /** Previous-iteration state vector (ngspice CKTstate1). Read for predictor / time-history. */
-  state1: Float64Array;
+  /**
+   * Current-iteration state vector (ngspice CKTstate0). Live reference —
+   * re-resolves through the backing StatePool.states[] ring on every access,
+   * so callers see post-rotation arrays without any refresh step.
+   *
+   * Mirrors the ngspice macro `#define CKTstate0 CKTstates[0]`
+   * (cktdefs.h:82-85). There is no snapshot to invalidate; the LoadContext
+   * impl resolves states[i] through its captured StatePool reference, exactly
+   * as ngspice resolves CKTstates[i] through the captured CKTcircuit pointer.
+   */
+  readonly state0: Float64Array;
+  /** Previous-iteration state vector (ngspice CKTstate1). Live reference. See state0. */
+  readonly state1: Float64Array;
+  /** Two-iterations-back state vector (ngspice CKTstate2). Live reference. Used by order-2 integration. */
+  readonly state2: Float64Array;
+  /** Three-iterations-back state vector (ngspice CKTstate3). Live reference. Used by order-2 integration history. */
+  readonly state3: Float64Array;
 }

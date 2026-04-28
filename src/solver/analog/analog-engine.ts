@@ -345,14 +345,11 @@ export class MNAEngine implements AnalogEngine {
     // ngspice dctran.c:715-723 — rotate state vectors BEFORE retry loop.
     // Pointer swap: states[0] is fresh recycled storage, states[1] = previous accepted.
     // Elements read/write states[0] during NR; states[1] holds the last accepted state.
+    // No post-rotation refresh needed — loadCtx.state0..state3 are live getters
+    // that resolve through StatePool.states[] on every access (cktdefs.h:82-85
+    // CKTstateN macro semantics).
     if (statePool) {
       statePool.rotateStateVectors();
-      // Refresh loadCtx.state0/state1 after rotation so elements that access
-      // the state ring via ctx.state0/ctx.state1 (e.g. Timer555 SR latch) see
-      // the correct post-rotation slot arrays. Without this, ctx.state0/state1
-      // remain stale (captured by allocateStateBuffers before the first step)
-      // and elements write into the wrong ring slot.
-      ctx.refreshStatePointers();
     }
 
     for (;;) {

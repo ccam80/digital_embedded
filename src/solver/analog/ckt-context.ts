@@ -18,8 +18,85 @@ import type { ResolvedSimulationParams } from "../../core/analog-engine-interfac
 import type { LimitingEvent } from "./newton-raphson.js";
 import { NodeVoltageHistory } from "./integration.js";
 export type { LoadContext } from "./load-context.js";
-import type { LoadContext } from "./load-context.js";
+import type { LoadContext, ConvergenceEvent } from "./load-context.js";
+import type { IntegrationMethod } from "../../core/analog-types.js";
 import { MODEDCOP, MODEINITFLOAT } from "./ckt-mode.js";
+
+// ---------------------------------------------------------------------------
+// LoadCtxImpl — concrete LoadContext with live state-ring access
+// ---------------------------------------------------------------------------
+
+/**
+ * Implementation of the LoadContext interface used at runtime.
+ *
+ * Holds a private reference to the backing StatePool. The state0..state3
+ * properties are getters that resolve `_statePool.states[i]` on every access,
+ * exactly mirroring ngspice's `#define CKTstate0 CKTstates[0]` macro
+ * indirection (cktdefs.h:82-85). After StatePool.rotateStateVectors() swaps
+ * the ring, the next read of `loadCtx.state0` returns the post-rotation
+ * array without any explicit refresh step — there is no snapshot to
+ * invalidate.
+ *
+ * Other LoadContext fields (cktMode, solver, rhs, dt, etc.) are plain
+ * mutable fields. They are mutated in place by the engine each NR iteration
+ * and have no ring rotation, so a snapshot would be correct — and is what
+ * the engine writes to.
+ */
+export class LoadCtxImpl implements LoadContext {
+  cktMode!: number;
+  solver!: SparseSolver;
+  matrix!: SparseSolver;
+  rhs!: Float64Array;
+  rhsOld!: Float64Array;
+  time!: number;
+  dt!: number;
+  method!: IntegrationMethod;
+  order!: number;
+  deltaOld!: readonly number[];
+  ag!: Float64Array;
+  srcFact!: number;
+  noncon!: { value: number };
+  limitingCollector!: LimitingEvent[] | null;
+  convergenceCollector!: ConvergenceEvent[] | null;
+  xfact!: number;
+  gmin!: number;
+  reltol!: number;
+  iabstol!: number;
+  temp!: number;
+  vt!: number;
+  cktFixLimit!: boolean;
+  bypass!: boolean;
+  voltTol!: number;
+
+  /**
+   * Live ring reference. Identity is stable for the lifetime of the engine
+   * (replaced once via `setStatePool` after deferred allocation in
+   * CKTCircuitContext.allocateStateBuffers). Rotation in
+   * StatePool.rotateStateVectors() permutes `_statePool.states[i]` in place
+   * — the getters below see post-rotation arrays automatically.
+   */
+  private _statePool: StatePool;
+
+  constructor(statePool: StatePool, init: Omit<LoadContext, "state0" | "state1" | "state2" | "state3">) {
+    this._statePool = statePool;
+    Object.assign(this, init);
+  }
+
+  /**
+   * Late-bind the backing StatePool. Used once by
+   * CKTCircuitContext.allocateStateBuffers after the real pool is sized
+   * from the post-setup state count.
+   */
+  setStatePool(pool: StatePool): void {
+    this._statePool = pool;
+  }
+
+  // cite cktdefs.h:82-85 — `#define CKTstate0 CKTstates[0]` (macro, live).
+  get state0(): Float64Array { return this._statePool.states[0]; }
+  get state1(): Float64Array { return this._statePool.states[1]; }
+  get state2(): Float64Array { return this._statePool.states[2]; }
+  get state3(): Float64Array { return this._statePool.states[3]; }
+}
 
 // ---------------------------------------------------------------------------
 // NRResult — mutable result class for Newton-Raphson iterations
@@ -222,8 +299,13 @@ export class CKTCircuitContext {
   // Load context (Phase 6 Wave 6.1 populates fields; Phase 1 allocates shell)
   // -------------------------------------------------------------------------
 
-  /** Per-iteration context passed to element.load() calls. */
-  loadCtx: LoadContext;
+  /**
+   * Per-iteration context passed to element.load() calls.
+   * Typed as the concrete LoadCtxImpl so allocateStateBuffers can rebind
+   * the live state-ring reference without a cast. Public consumers see it
+   * through the LoadContext interface (LoadCtxImpl implements LoadContext).
+   */
+  loadCtx: LoadCtxImpl;
 
   // -------------------------------------------------------------------------
   // Assembler state
@@ -580,7 +662,13 @@ export class CKTCircuitContext {
     const ctxTemp = 300.15;
     // vt = k*T/q where k=1.380649e-23, q=1.602176634e-19
     const ctxVt = (1.380649e-23 * ctxTemp) / 1.602176634e-19;
-    this.loadCtx = {
+    // LoadCtxImpl gets a placeholder empty StatePool here; the real pool is
+    // bound in allocateStateBuffers via setStatePool(). The state0..state3
+    // getters resolve through whichever pool is currently bound, so post-
+    // rotation reads always see the live ring (cktdefs.h:82-85 macro
+    // semantics). cite: cktinit.c:53-55 — CKTbypass default false;
+    // CKTvoltTol default 1e-6.
+    this.loadCtx = new LoadCtxImpl(new StatePool(0), {
       cktMode: MODEDCOP | MODEINITFLOAT,
       solver: this._solver,
       matrix: this._solver,
@@ -603,12 +691,9 @@ export class CKTCircuitContext {
       temp: ctxTemp,
       vt: ctxVt,
       cktFixLimit: false,
-      // cite: cktinit.c:53-55 — CKTbypass default false; CKTvoltTol default 1e-6
       bypass: false,
       voltTol: 1e-6,
-      state0: new Float64Array(0),
-      state1: new Float64Array(0),
-    };
+    });
 
     // Tolerances
     this.reltol = params.reltol;
@@ -700,8 +785,10 @@ export class CKTCircuitContext {
     this.statePool             = new StatePool(numStates);
     this.dcopSavedState0       = new Float64Array(numStates);
     this.dcopOldState0         = new Float64Array(numStates);
-    this.loadCtx.state0        = this.statePool.state0;
-    this.loadCtx.state1        = this.statePool.state1;
+    // Bind the live ring reference. From this call onward, ctx.loadCtx.stateN
+    // resolves to this.statePool.states[N] on every access — no snapshot,
+    // matches ngspice CKTstateN macro semantics (cktdefs.h:82-85).
+    this.loadCtx.setStatePool(this.statePool);
     for (const el of this._poolBackedElements) {
       if (isPoolBacked(el)) {
         el.initState(this.statePool);
