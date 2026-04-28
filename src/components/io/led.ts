@@ -1,22 +1,20 @@
 /**
- * LED component  single-color indicator.
+ * LED component — single-color indicator.
  *
- * Circle shape, configurable color, lights up when input is non-zero.
- * 1-bit input: on when input = 1, off when input = 0.
+ * Renders as a circle with configurable color. Lit state derives from the
+ * analog forward voltage compared against a per-color illumination
+ * threshold; the digital model treats it as a 1-bit indicator.
  *
- * Analog model: LED is a single-port diode with cathode wired to ground (node 0).
- * The five color model-registry entries delegate to createDiodeElement with
- * per-color IS/N parameter overrides. getVisibleLit() reads SLOT_VD from the
- * diode state pool and compares against a per-color threshold.
+ * Analog model: single-port diode with cathode wired to ground (node 0).
+ * The five color modelRegistry entries delegate to createDiodeElement with
+ * per-color IS/N parameter overrides.
  */
 
 import { AbstractCircuitElement } from "../../core/element.js";
-import type { RenderContext } from "../../core/renderer-interface.js";
-import type { Rect } from "../../core/renderer-interface.js";
+import type { RenderContext, Rect } from "../../core/renderer-interface.js";
+import type { PinVoltageAccess } from "../../core/pin-voltage-access.js";
 import type { Pin, PinDeclaration, Rotation } from "../../core/pin.js";
-import {
-  PinDirection,
-} from "../../core/pin.js";
+import { PinDirection } from "../../core/pin.js";
 import { PropertyBag, PropertyType } from "../../core/properties.js";
 import type { PropertyDefinition } from "../../core/properties.js";
 import {
@@ -29,14 +27,7 @@ import type { AnalogElementCore } from "../../solver/analog/element.js";
 import {
   createDiodeElement,
   DIODE_PARAM_DEFS,
-  DIODE_PARAM_DEFAULTS,
 } from "../semiconductors/diode.js";
-
-// ---------------------------------------------------------------------------
-// Re-exports for external consumers (rerouted to diode equivalents)
-// ---------------------------------------------------------------------------
-
-export { DIODE_PARAM_DEFS as LED_PARAM_DEFS, DIODE_PARAM_DEFAULTS as LED_DEFAULTS };
 
 // ---------------------------------------------------------------------------
 // Pin layout
@@ -57,7 +48,23 @@ function buildLedPinDeclarations(): PinDeclaration[] {
 }
 
 // ---------------------------------------------------------------------------
-// LedElement  CircuitElement implementation
+// Per-color VD illumination-perception threshold
+// ---------------------------------------------------------------------------
+
+const LIT_THRESHOLD_TABLE: Record<string, number> = {
+  red:    1.6,
+  yellow: 1.9,
+  green:  2.1,
+  blue:   2.6,
+  white:  2.6,
+};
+
+export function getLitThreshold(color: string): number {
+  return LIT_THRESHOLD_TABLE[color] ?? LIT_THRESHOLD_TABLE.red;
+}
+
+// ---------------------------------------------------------------------------
+// LedElement — UI-facing CircuitElement
 // ---------------------------------------------------------------------------
 
 export class LedElement extends AbstractCircuitElement {
@@ -73,6 +80,18 @@ export class LedElement extends AbstractCircuitElement {
 
   get color(): string {
     return this._properties.getOrDefault<string>("color", "red");
+  }
+
+  /**
+   * Lit-state getter for the renderer. Cathode is wired to ground (node 0)
+   * by the analog adapter, so the "in" pin voltage equals the diode's
+   * forward voltage Vd. Returns true when Vd exceeds the per-color
+   * illumination threshold.
+   */
+  isLit(signals: PinVoltageAccess | undefined): boolean {
+    const v = signals?.getPinVoltage("in");
+    if (v === undefined || !Number.isFinite(v)) return false;
+    return v > getLitThreshold(this.color);
   }
 
   getPins(): readonly Pin[] {
@@ -91,8 +110,9 @@ export class LedElement extends AbstractCircuitElement {
     };
   }
 
-  draw(ctx: RenderContext): void {
+  draw(ctx: RenderContext, signals?: PinVoltageAccess): void {
     const label = this._visibleLabel();
+    const lit = this.isLit(signals);
 
     ctx.save();
 
@@ -101,8 +121,14 @@ export class LedElement extends AbstractCircuitElement {
     ctx.setLineWidth(1);
     ctx.drawCircle(0.8, 0, 0.75, true);
 
-    // Inner color zone circle at (0.8, 0) r=0.65 (OTHER/filled)
+    // Inner color zone circle at (0.8, 0) r=0.65
     ctx.drawCircle(0.8, 0, 0.65, true);
+
+    // Bright central highlight when lit — visual indication that Vd has
+    // crossed the per-color threshold.
+    if (lit) {
+      ctx.drawCircle(0.8, 0, 0.3, true);
+    }
 
     // Label to the right
     ctx.setColor("TEXT");
@@ -117,7 +143,7 @@ export class LedElement extends AbstractCircuitElement {
 }
 
 // ---------------------------------------------------------------------------
-// executeLed  reads input, writes to output slot for display state
+// executeLed — reads input, writes to output slot for display state
 // ---------------------------------------------------------------------------
 
 export function executeLed(
@@ -132,23 +158,7 @@ export function executeLed(
 }
 
 // ---------------------------------------------------------------------------
-// getLitThreshold  per-color VD illumination-perception threshold
-// ---------------------------------------------------------------------------
-
-const LIT_THRESHOLD_TABLE: Record<string, number> = {
-  red:    1.6,
-  yellow: 1.9,
-  green:  2.1,
-  blue:   2.6,
-  white:  2.6,
-};
-
-function getLitThreshold(color: string): number {
-  return LIT_THRESHOLD_TABLE[color] ?? LIT_THRESHOLD_TABLE.red;
-}
-
-// ---------------------------------------------------------------------------
-// createLedAnalogElementViaDiode  LED factory adapter
+// createLedAnalogElementViaDiode — pin-remap adapter
 // ---------------------------------------------------------------------------
 
 function createLedAnalogElementViaDiode(
@@ -156,27 +166,12 @@ function createLedAnalogElementViaDiode(
   props: PropertyBag,
   getTime?: () => number,
 ): AnalogElementCore {
-  // Inject K=0; remap "in" → "A".
+  // Inject K=0 (cathode → ground); remap "in" → "A".
   const remappedPinNodes = new Map<string, number>([
     ["A", pinNodes.get("in")!],
     ["K", 0],
   ]);
-
-  // Delegate to the existing diode factory. Diode handles setup/load/state.
-  const diodeElement = createDiodeElement(remappedPinNodes, props, getTime);
-
-  // NOTE: a previous getVisibleLit() helper was attached here that read the
-  // diode's SLOT_VD via `(diodeElement as PoolBackedAnalogElementCore).s0`.
-  // The cast read the empty placeholder element-side field, never the live
-  // ring slot (s0..s7 on PoolBackedAnalogElementCore was a dead contract).
-  // The helper had no source-level callers, so the latent bug was invisible.
-  // Removed as part of spec/loadcontext-state-getter-fix.md (Tier 3) — if a
-  // renderer ever needs the diode's forward voltage, restore via a
-  // getVd()-style accessor exposed by the diode element itself.
-  void getLitThreshold;
-  void props;
-
-  return diodeElement;
+  return createDiodeElement(remappedPinNodes, props, getTime);
 }
 
 // ---------------------------------------------------------------------------
@@ -249,19 +244,19 @@ export const LedDefinition: ComponentDefinition = {
   modelRegistry: {
     red:    { kind: "inline", factory: createLedAnalogElementViaDiode, paramDefs: DIODE_PARAM_DEFS,
               params: { IS: 3.17e-19, N: 1.8, RS: 0, CJO: 0, TT: 0, BV: Infinity, IBV: 1e-3,
-                        VJ: 1, M: 0.5, FC: 0.5, color: "red" } },
+                        VJ: 1, M: 0.5, FC: 0.5 } },
     green:  { kind: "inline", factory: createLedAnalogElementViaDiode, paramDefs: DIODE_PARAM_DEFS,
               params: { IS: 1e-21, N: 2.0, RS: 0, CJO: 0, TT: 0, BV: Infinity, IBV: 1e-3,
-                        VJ: 1, M: 0.5, FC: 0.5, color: "green" } },
+                        VJ: 1, M: 0.5, FC: 0.5 } },
     blue:   { kind: "inline", factory: createLedAnalogElementViaDiode, paramDefs: DIODE_PARAM_DEFS,
               params: { IS: 6.26e-24, N: 2.5, RS: 0, CJO: 0, TT: 0, BV: Infinity, IBV: 1e-3,
-                        VJ: 1, M: 0.5, FC: 0.5, color: "blue" } },
+                        VJ: 1, M: 0.5, FC: 0.5 } },
     yellow: { kind: "inline", factory: createLedAnalogElementViaDiode, paramDefs: DIODE_PARAM_DEFS,
               params: { IS: 1e-20, N: 1.9, RS: 0, CJO: 0, TT: 0, BV: Infinity, IBV: 1e-3,
-                        VJ: 1, M: 0.5, FC: 0.5, color: "yellow" } },
+                        VJ: 1, M: 0.5, FC: 0.5 } },
     white:  { kind: "inline", factory: createLedAnalogElementViaDiode, paramDefs: DIODE_PARAM_DEFS,
               params: { IS: 6.26e-24, N: 2.5, RS: 0, CJO: 0, TT: 0, BV: Infinity, IBV: 1e-3,
-                        VJ: 1, M: 0.5, FC: 0.5, color: "white" } },
+                        VJ: 1, M: 0.5, FC: 0.5 } },
   },
   defaultModel: "digital",
 };

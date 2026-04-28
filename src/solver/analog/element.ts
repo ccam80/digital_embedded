@@ -1,17 +1,17 @@
 /**
- * AnalogElement interface — the sole contract that all analog circuit
- * components program against.
+ * Re-exports of the canonical analog element types defined in
+ * `src/core/analog-types.ts`. Solver-side code may import either path.
  *
- * A single load(ctx: LoadContext) method replaces the former split of stamp /
- * stampNonlinear / updateOperatingPoint / stampCompanion / stampReactiveCompanion.
- * This matches ngspice's DEVload dispatch: one call per element per NR iteration
- * that reads voltages, evaluates device equations, and stamps the MNA matrix.
+ * Reactivity is method-presence: an element is "reactive" iff
+ *   typeof el.getLteTimestep === "function"
+ * There is no Core / non-Core split, no isReactive / isNonlinear flag, and
+ * no post-compile type promotion. See `core/analog-types.ts` for the full
+ * `AnalogElement` and `PoolBackedAnalogElement` contracts.
  */
 
-// Core analog types are defined in core/analog-types.ts to avoid solver→core
-// circular dependency.
 export type {
-  AnalogElementCore,
+  AnalogElement,
+  PoolBackedAnalogElement,
   ComplexSparseSolver,
   IntegrationMethod,
   SparseSolverStamp,
@@ -19,249 +19,13 @@ export type {
 } from "../../core/analog-types.js";
 export { NGSPICE_LOAD_ORDER } from "../../core/analog-types.js";
 
-import type { AnalogElementCore, ComplexSparseSolver, IntegrationMethod, StatePoolRef } from "../../core/analog-types.js";
-import type { StateSchema } from "./state-schema.js";
+import type { AnalogElement, PoolBackedAnalogElement } from "../../core/analog-types.js";
+
 export type { LoadContext } from "./load-context.js";
-import type { LoadContext } from "./load-context.js";
 
-// ---------------------------------------------------------------------------
-// AnalogElement
-// ---------------------------------------------------------------------------
-
-/**
- * Contract for every analog circuit element that stamps into the MNA matrix.
- *
- * Two-terminal passive elements (resistors, capacitors, inductors) connect
- * two nodes. Three-terminal (BJT base/emitter/collector) and four-terminal
- * (MOSFET gate/drain/source/bulk) elements carry more entries in pinNodeIds.
- *
- * Elements that introduce extra MNA rows (voltage sources, inductors as
- * branch currents) set `branchIndex` to their assigned row offset above the
- * node block. All other elements set `branchIndex` to -1.
- */
-export interface AnalogElement {
-  /**
-   * Primary hot-path method. Called every NR iteration.
-   *
-   * Reads terminal voltages from ctx.rhsOld, evaluates device equations,
-   * and stamps conductance and RHS contributions into ctx.solver. For reactive
-   * elements, also integrates charge/flux inline using ctx.ag[]. Matches
-   * ngspice DEVload.
-   */
-  load(ctx: LoadContext): void;
-
-  /**
-   * Post-acceptance work: update companion state and schedule next breakpoint.
-   *
-   * Called once per accepted timestep — never on a rejected LTE retry and
-   * never inside the NR convergence loop. Absorbs the former updateCompanion
-   * and updateState responsibilities. ctx provides dt, method, and voltages
-   * needed for companion/state updates.
-   */
-  accept?(ctx: LoadContext, simTime: number, addBreakpoint: (t: number) => void): void;
-
-  /**
-   * Element-specific convergence check beyond the global node-voltage criterion.
-   *
-   * Called after every NR iteration. Return true if this element considers
-   * the current solution converged; false to signal that iteration must
-   * continue. Tolerances reltol and iabstol are available on ctx.
-   */
-  checkConvergence?(ctx: LoadContext): boolean;
-
-  /**
-   * CKTterr-based LTE timestep proposal. Returns the maximum allowable
-   * timestep for this element based on charge history divided differences.
-   *
-   * Elements implementing this method call cktTerr() internally for each
-   * reactive junction, passing charge values as individual scalars (not arrays)
-   * to avoid hot-path allocations.
-   */
-  getLteTimestep?(
-    dt: number,
-    deltaOld: readonly number[],
-    order: number,
-    method: IntegrationMethod,
-    lteParams: import("./ckt-terr.js").LteParams,
-  ): number;
-
-  /**
-   * Update a mutable parameter on a live compiled element without
-   * recompilation. Called by the coordinator for slider/property-panel
-   * hot-patching.
-   */
-  setParam(key: string, value: number): void;
-
-  /**
-   * Stamp the element's frequency-domain small-signal model for AC analysis.
-   *
-   * Called once per frequency point during an AC sweep. Resistors stamp
-   * conductance (same as DC); capacitors stamp jωC admittance; inductors
-   * stamp 1/(jωL) admittance; nonlinear elements stamp linearized
-   * small-signal conductances at the DC operating point.
-   *
-   * D4: receives the shared LoadContext (ngspice re-uses CKTcircuit in
-   * ACload()). The MODEUIC bit is preserved across the AC-mode mask
-   * (acan.c:285) and may be tested via `(ctx.cktMode & MODEUIC) !== 0`.
-   * Element sites that do not need the context should simply ignore the
-   * third parameter.
-   */
-  stampAc?(solver: ComplexSparseSolver, omega: number, ctx: LoadContext): void;
-
-  /**
-   * Compute per-pin currents for this element.
-   *
-   * Returns an array of currents in pinLayout order (same as pinNodeIds),
-   * one per visible pin. Positive means current flowing into the element.
-   * The array must satisfy KCL: the sum of all entries is zero.
-   */
-  getPinCurrents(rhs: Float64Array): number[];
-
-  /**
-   * Pin node IDs in pinLayout order.
-   *
-   * For elements created via the analog compiler, this array is in the same
-   * order as the component's pinLayout declaration. Index 0 corresponds to
-   * pinLayout[0], index 1 to pinLayout[1], etc.
-   *
-   * Set by the compiler from resolved pins — never by factory functions.
-   * Length 2 for two-terminal elements, 3 for BJTs, 4 for MOSFETs.
-   * Each entry is a non-negative integer; 0 is ground.
-   */
-  readonly pinNodeIds: readonly number[];
-
-  /**
-   * All node IDs for this element: [...pinNodeIds, ...internalNodeIds].
-   *
-   * Pin nodes appear first in pinLayout order, followed by any internal
-   * nodes allocated by the factory. Used by topology validators that must
-   * account for all nodes an element participates in.
-   *
-   * Set by the compiler — never by factory functions.
-   */
-  readonly allNodeIds: readonly number[];
-
-  /**
-   * Labels for internal nodes allocated by this element's model, in the
-   * same order as the internal portion of allNodeIds. Absent or empty when
-   * the model allocates no internal nodes.
-   */
-  readonly internalNodeLabels?: readonly string[];
-
-  /**
-   * Assigned branch-current row index for elements that introduce extra MNA
-   * rows (voltage sources, inductors). Set to -1 for elements that do not
-   * add extra rows.
-   */
-  readonly branchIndex: number;
-
-  /**
-   * Position in ngspice's CKTload iteration order. Mirrored from
-   * `AnalogElementCore.ngspiceLoadOrder`; the compiler sorts the element
-   * array by this field so that per-iteration `cktLoad` walks devices in
-   * the same per-type bucket order ngspice does. See
-   * `core/analog-types.ts:NGSPICE_LOAD_ORDER` for the enum and A1 spec
-   * for why this matters.
-   */
-  readonly ngspiceLoadOrder: number;
-
-  /**
-   * True if this element performs nonlinear stamping inside load().
-   *
-   * The engine reads this flag to decide whether to call load() for
-   * nonlinear elements during NR iteration or only once per timestep.
-   */
-  readonly isNonlinear: boolean;
-
-  /**
-   * True if this element integrates reactive state (charge/flux) inside load().
-   *
-   * The timestep controller reads this flag to decide whether to call
-   * getLteTimestep() for reactive element handling.
-   */
-  readonly isReactive: boolean;
-
-  /**
-   * Optional display label for diagnostic attribution.
-   *
-   * When present, used in Diagnostic.involvedElements descriptions
-   * to identify which element triggered a convergence failure or anomaly.
-   */
-  label?: string;
-
-  /**
-   * Element index in the compiled circuit's element array.
-   *
-   * Set by the compiler after factory construction via Object.assign.
-   * Used by elements when pushing LimitingEvent records so the harness
-   * can correlate events back to specific circuit elements.
-   */
-  elementIndex?: number;
-
-  /**
-   * Return the strictly-next breakpoint strictly greater than afterTime, or
-   * null if the source has no more breakpoints. Called once per accepted
-   * step on which this source's breakpoint was consumed.
-   */
-  nextBreakpoint?(afterTime: number): number | null;
-
-  /**
-   * Called once per accepted timestep so the element can schedule its next
-   * waveform edge as a timestep breakpoint. Mirrors ngspice's per-device
-   * DEVaccept dispatch (vsrcacct.c VSRCaccept).
-   *
-   * `atBreakpoint` is the engine's CKTbreak flag: true when the just-accepted
-   * step landed via a breakpoint clamp. ngspice gates every CKTsetBreak inside
-   * VSRCaccept on this flag (see `if(ckt->CKTbreak && ...)` throughout the
-   * PULSE/PWL/TRNOISE/TRRANDOM switch) so non-boundary acceptances register
-   * nothing. Sources that ignore this flag will register stale breakpoints on
-   * every step, diverging from ngspice queue contents.
-   */
-  acceptStep?(
-    simTime: number,
-    addBreakpoint: (t: number) => void,
-    atBreakpoint: boolean,
-  ): void;
-}
-
-/**
- * AnalogElementCore extended with state-pool-backed fields.
- * For components that use the shared state pool but do NOT necessarily
- * implement companion models for transient integration.
- */
-export interface PoolBackedAnalogElementCore extends AnalogElementCore {
-  readonly poolBacked: true;
-  readonly stateSize: number;
-  stateBaseOffset: number;
-  readonly stateSchema: StateSchema;
-  initState(pool: StatePoolRef): void;
-}
-
-/**
- * AnalogElementCore extended with state-pool-backed reactive fields.
- *
- * This is the factory return type for components that use the shared
- * state pool (capacitors, diodes, BJTs, etc.). It does NOT include
- * pinNodeIds / allNodeIds — those are set by the compiler after
- * factory construction.
- */
-export interface ReactiveAnalogElementCore extends PoolBackedAnalogElementCore {
-  readonly isReactive: true;
-}
-
-/**
- * Post-compilation pool-backed element with compiler-assigned node IDs.
- */
-export type PoolBackedAnalogElement = PoolBackedAnalogElementCore & AnalogElement;
-
-/**
- * Post-compilation reactive element with both compiler-assigned node IDs
- * and state-pool fields. Used by the engine and post-compilation code.
- */
-export type ReactiveAnalogElement = ReactiveAnalogElementCore & AnalogElement;
-
-export function isPoolBacked(el: AnalogElement): el is PoolBackedAnalogElement;
-export function isPoolBacked(el: AnalogElementCore): el is PoolBackedAnalogElementCore;
-export function isPoolBacked(el: AnalogElementCore): el is PoolBackedAnalogElementCore {
-  return (el as any).poolBacked === true;
+/** Runtime type-guard discriminating pool-backed elements from leaf
+ *  AnalogElements. The single `poolBacked: true` literal is the only flag
+ *  that survives the cleanup. */
+export function isPoolBacked(el: AnalogElement): el is PoolBackedAnalogElement {
+  return (el as Partial<PoolBackedAnalogElement>).poolBacked === true;
 }

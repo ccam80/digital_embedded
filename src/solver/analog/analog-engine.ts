@@ -41,7 +41,7 @@ import type { StatePool } from "./state-pool.js";
 import { assertPoolIsSoleMutableState } from "../../solver/analog/state-schema.js";
 import {
   MODEUIC, MODEDCOP, MODETRAN, MODETRANOP,
-  MODEINITJCT, MODEINITTRAN, MODEINITPRED,
+  MODEINITJCT, MODEINITTRAN, MODEINITPRED, MODEINITSMSIG,
 } from "./ckt-mode.js";
 
 // ---------------------------------------------------------------------------
@@ -89,6 +89,13 @@ export class MNAEngine implements AnalogEngine {
   // Setup-phase state (A4.2)
   // -------------------------------------------------------------------------
   private _isSetup: boolean = false;
+  /**
+   * Mirrors ngspice dctran.c `firsttime` (line 189). Flips false → true on
+   * the first step() after init/reset, gating the warm-start transient DCOP
+   * (dctran.c:117-360 `if(restart || CKTtime==0)` block). Cleared by
+   * init()/reset()/dispose() so a fresh transient run re-runs the DCOP.
+   */
+  private _firstStep: boolean = false;
   private _maxEqNum: number = 0;
   private _numStates: number = 0;
   private _nodeTable: Array<{ name: string; number: number; type: "voltage" | "current" }> = [];
@@ -145,6 +152,7 @@ export class MNAEngine implements AnalogEngine {
 
     // Reset setup-phase state so _setup() runs unconditionally on next analysis call.
     this._isSetup = false;
+    this._firstStep = false;
     this._maxEqNum = compiled.nodeCount + 1;
     this._numStates = 0;
     this._nodeTable = [];
@@ -185,6 +193,7 @@ export class MNAEngine implements AnalogEngine {
     }
     this._history.reset();
     this._simTime = 0;
+    this._firstStep = false;
     const cac = this._compiled as ConcreteCompiledAnalogCircuit | undefined;
     if (cac?.timeRef) cac.timeRef.value = 0;
     if (cac?.statePool) {
@@ -222,6 +231,8 @@ export class MNAEngine implements AnalogEngine {
     this._history = new HistoryStore(0);
     this._diagnostics.clear();
     this._changeListeners = [];
+    this._isSetup = false;
+    this._firstStep = false;
   }
 
   /**
@@ -240,6 +251,19 @@ export class MNAEngine implements AnalogEngine {
     if (!this._compiled) return;
     this._setup();
     if (this._engineState === EngineState.ERROR) return;
+
+    // ngspice dctran.c:117-360 — `if(restart || CKTtime==0)` firsttime block.
+    // The transient driver runs the warm-start DCOP (CKTop with MODETRANOP|
+    // MODEINITJCT) before falling through into the first nextTime: iteration.
+    // We mirror that structure here: _transientDcop() is the warm-start
+    // (analog-engine.ts equivalent of dctran.c:230-350), then control falls
+    // through into the existing transient body (equivalent of dctran.c's
+    // for(;;) loop). _firstStep gates this so subsequent step() calls skip
+    // straight into transient stepping.
+    if (!this._firstStep) {
+      this._transientDcop();
+      this._firstStep = true;
+    }
 
     const { elements } = this._compiled;
     const params = this._params;
@@ -809,14 +833,6 @@ export class MNAEngine implements AnalogEngine {
     this._diagnostics.clear();
 
     const cac = this._compiled as ConcreteCompiledAnalogCircuit;
-    if (cac.statePool) {
-      cac.statePool.reset();
-      for (const el of this._elements) {
-        if (isPoolBacked(el)) {
-          el.initState(cac.statePool);
-        }
-      }
-    }
 
     const phaseHook = this.stepPhaseHook;
     const ctx = this._ctx!;
@@ -885,7 +901,21 @@ export class MNAEngine implements AnalogEngine {
     }
 
     if (result.converged) {
-      this._seedFromDcop(result, elements, cac);
+      // dcop.c:127 — `.op` leaves the circuit in MODEDCOP|MODEINITSMSIG.
+      // NO transient seeding (no MODEINITTRAN, no ag[]=0, no state0->state1
+      // copy — those are dctran.c:346-350, exclusive to the transient-boot
+      // path in _transientDcop). Mirror only what dcop.c:127 + dcop.c:153
+      // actually do here: write rhs from the DCOP solution, refresh
+      // element-side voltage caches, set the post-CKTop mode.
+      ctx.rhs.set(result.nodeVoltages);
+      for (const el of elements) {
+        const initVoltages = (el as { initVoltages?: (rhs: Float64Array) => void }).initVoltages;
+        if (typeof initVoltages === "function") {
+          initVoltages.call(el, ctx.rhs);
+        }
+      }
+      const uic = ctx.cktMode & MODEUIC;
+      ctx.cktMode = uic | MODEDCOP | MODEINITSMSIG;
     }
 
     return result;
@@ -903,7 +933,7 @@ export class MNAEngine implements AnalogEngine {
    *
    * @returns DcOpResult — same shape as dcOperatingPoint()
    */
-  _transientDcop(): DcOpResult {
+  private _transientDcop(): DcOpResult {
     if (!this._compiled) {
       return {
         converged: false,
@@ -918,14 +948,6 @@ export class MNAEngine implements AnalogEngine {
     this._diagnostics.clear();
 
     const cac = this._compiled as ConcreteCompiledAnalogCircuit;
-    if (cac.statePool) {
-      cac.statePool.reset();
-      for (const el of this._elements) {
-        if (isPoolBacked(el)) {
-          el.initState(cac.statePool);
-        }
-      }
-    }
 
     const phaseHook = this.stepPhaseHook;
     const ctx = this._ctx!;
@@ -970,11 +992,6 @@ export class MNAEngine implements AnalogEngine {
     return result;
   }
 
-  /** Public entry point for transient DC-op. Delegates to _transientDcop(). */
-  transientDcop(): DcOpResult {
-    return this._transientDcop();
-  }
-
   /**
    * Run an AC small-signal frequency sweep analysis.
    *
@@ -1000,13 +1017,27 @@ export class MNAEngine implements AnalogEngine {
     }
 
     this._setup();
-    const ac = new AcAnalysis(this._compiled, this._params);
+    // Adapt the compiled circuit to AcCompiledCircuit, supplying matrixSize
+    // from the post-setup solver (mirrors ngspice CKTmaxEqNum + 1).
+    const adapted = {
+      nodeCount: this._compiled.nodeCount,
+      matrixSize: this._solver.matrixSize,
+      elements: this._compiled.elements,
+      labelToNodeId: this._compiled.labelToNodeId,
+    };
+    const ac = new AcAnalysis(adapted, this._params);
     return ac.run(params);
   }
 
   // -------------------------------------------------------------------------
   // AnalogEngine interface — Simulation time
   // -------------------------------------------------------------------------
+
+  /** MNA matrix dimension after _setup() has discovered all equations
+   *  (mirrors ngspice CKTmaxEqNum + 1). Returns 0 before init+setup runs. */
+  get matrixSize(): number {
+    return this._solver.matrixSize;
+  }
 
   /** Current simulation time in seconds. */
   get simTime(): number {
@@ -1279,9 +1310,14 @@ export class MNAEngine implements AnalogEngine {
     for (const el of this._elements) {  // already NGSPICE_LOAD_ORDER-sorted
       el.setup(setupCtx);
     }
-    // StatePool deferred construction (per A5.3).
-    this._ctx!.allocateStateBuffers(this._numStates);
-    this._ctx!.allocateRowBuffers(this._solver._size);
+    // Single state pool ownership invariant: cac.statePool and ctx.statePool
+    // must reference the same object after _setup. allocateStateBuffers adopts
+    // a pre-built pool if its size matches; otherwise it allocates one and we
+    // write it back here. Either way, both references converge.
+    const cac = this._compiled as ConcreteCompiledAnalogCircuit;
+    this._ctx!.allocateStateBuffers(this._numStates, cac.statePool ?? null);
+    cac.statePool = this._ctx!.statePool!;
+    this._ctx!.allocateRowBuffers(this._solver.matrixSize);
     // Nodeset / IC handle pre-allocation (per A8).
     this._allocateNodesetIcHandles();
     this._isSetup = true;

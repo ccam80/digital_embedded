@@ -185,6 +185,10 @@ export class SparseSolver {
   // =========================================================================
   /** ngspice Matrix->Size — live loop bound; bumped by _enlargeMatrix. */
   private _size: number = 0;
+  /** Public accessor for the current matrix dimension (mirrors ngspice
+   *  Matrix->Size). After CKTsetup-equivalent calls have run, this is the
+   *  number of MNA equations including ground row 0. */
+  get matrixSize(): number { return this._size; }
   /** ngspice Matrix->AllocatedSize — heap capacity for _diag/_rowHead/_colHead/_intToExtRow/_intToExtCol. */
   private _allocatedSize: number = 0;
   /** ngspice Matrix->ExtSize — largest external index seen. */

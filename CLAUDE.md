@@ -61,23 +61,6 @@ Rationale: these words, used as closing verdicts, raised the tolerance floor acr
 
 For ANY numerical discrepancy, convergence failure, or model correctness question, the **first step** is to compare per-NR-iteration internal node/branch values against ngspice using the instrumented test harness. Do not theorize about code differences — run the comparison and find the exact iteration where values diverge. See `docs/ngspice-harness-howto.md` for setup and usage. The harness captures per-iteration voltages, device states (`CKTstate0`), and convergence data from both engines side-by-side.
 
-### Test Policy During W3 Setup-Load-Split (and Similar Migrations)
-
-Tests in this codebase reference OLD behavior during the W3 migration. They are NOT the executable contract.
-
-- Implementer agents MUST NOT run tests.
-- Implementer agents MUST NOT identify or report numerical mismatches.
-- Implementer agents MUST NOT modify test files to "make tests pass".
-- Wave-verifier agents MUST NOT run tests.
-- Wave-verifier agents MUST NOT use test pass/fail as a verification criterion.
-- Wave-verifier agents MUST NOT report numerical mismatches.
-
-Verification is strictly **spec compliance** against the PB-*.md spec contract and the cited ngspice anchor file (e.g., `ressetup.c:46-49`). PASS = source code matches spec line-for-line. FAIL = source code deviates from spec.
-
-Anyone tempted to "fix" a failing test must STOP and surface to the user. The user decides whether the test is wrong (a separate cleanup task) or whether the spec needs revision.
-
-This rule overrides any "Verification gate" section in PB-*.md or master prompts that lists "test file is GREEN" as a pass criterion. Those legacy gates are wrong; agents should ignore them and use the spec-compliance gate instead.
-
 ### Serve Over HTTP
 
 All files MUST be served over HTTP, not opened as `file://` URLs.

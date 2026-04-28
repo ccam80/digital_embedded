@@ -343,8 +343,10 @@ function runTransientSync(
   engine.init(compiled);
 
   const dcResult = engine.dcOperatingPoint();
+  // matrixSize is only known after engine setup discovers branch rows
+  // (ngspice CKTmaxEqNum + 1 pattern).
   if (!dcResult.converged) {
-    return { converged: false, nodeVoltages: new Float64Array(compiled.matrixSize + 1) };
+    return { converged: false, nodeVoltages: new Float64Array(engine.matrixSize + 1) };
   }
 
   let steps = 0;
@@ -353,14 +355,14 @@ function runTransientSync(
     engine.step();
     steps++;
     if (engine.getState() === EngineState.ERROR) {
-      return { converged: false, nodeVoltages: new Float64Array(compiled.matrixSize + 1) };
+      return { converged: false, nodeVoltages: new Float64Array(engine.matrixSize + 1) };
     }
   }
 
   // Public nodeVoltages mirrors the ngspice 1-based layout: slot 0 is the
   // ground sentinel (always 0), slots 1..nodeCount hold node voltages, and
   // any remaining slots up to matrixSize are reserved for branch currents.
-  const voltages = new Float64Array(compiled.matrixSize + 1);
+  const voltages = new Float64Array(engine.matrixSize + 1);
   for (let n = 1; n <= compiled.nodeCount; n++) {
     voltages[n] = engine.getNodeVoltage(n);
   }

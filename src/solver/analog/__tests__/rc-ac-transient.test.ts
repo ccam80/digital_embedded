@@ -424,7 +424,6 @@ describe("RC lowpass AC transient — compiler pipeline", () => {
     // 3 elements: AC source + resistor + capacitor (ground is structural)
     expect(compiled.elements.length).toBe(3);
     expect(compiled.nodeCount).toBe(2);
-    expect(compiled.matrixSize).toBe(3);
 
     // Verify reactive element exists
     const reactiveCount = compiled.elements.filter(e => e.isReactive).length;

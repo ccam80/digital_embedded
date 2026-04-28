@@ -52,11 +52,11 @@ function makeHWRCircuit(): { circuit: ConcreteCompiledAnalogCircuit; pool: State
   const pool = buildStatePool(elements);
   return {
     circuit: {
-      netCount: 2, componentCount: 3, nodeCount: 2, matrixSize: 3,
+      netCount: 2, componentCount: 3, nodeCount: 2,
       elements,
       labelToNodeId: new Map([["Vs", 1], ["R1:B", 2]]),
       statePool: pool,
-    } as ConcreteCompiledAnalogCircuit,
+    } as unknown as ConcreteCompiledAnalogCircuit,
     pool,
   };
 }

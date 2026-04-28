@@ -82,12 +82,6 @@ export class DefaultSimulationCoordinator implements SimulationCoordinator {
   /** Reusable Map for getPinVoltages() to avoid per-call allocation. */
   private readonly _pinVoltageResult = new Map<string, number>();
   private _analysisPhase: "dcop" | "tranInit" | "tranFloat" = "dcop";
-  /**
-   * One-shot guard for the transient-boot DCOP. Set to true the first time
-   * step() runs the MODETRANOP|MODEINITJCT warm-start (matches ngspice
-   * dctran.c:230-233 firsttime path). Cleared by reset().
-   */
-  private _transientSeeded: boolean = false;
   private _convergenceLogPreHookState: boolean = false;
   private _captureHookInstalled: boolean = false;
 
@@ -175,7 +169,6 @@ export class DefaultSimulationCoordinator implements SimulationCoordinator {
     this._stepCount = 0;
     this._voltageMin = Infinity;
     this._voltageMax = -Infinity;
-    this._transientSeeded = false;
     this._analysisPhase = "dcop";
     for (const obs of this._observers) obs.onReset();
   }
@@ -187,16 +180,11 @@ export class DefaultSimulationCoordinator implements SimulationCoordinator {
   }
 
   step(): void {
-    // Lazy transient-boot DCOP — matches ngspice dctran.c:230-233 firsttime
-    // path. The transient stepping path requires _seedFromDcop to have run
-    // (state vectors populated, ctx.cktMode = MODEINITTRAN). We invoke it on
-    // the first step() so consumers that only ever want a standalone .op
-    // (via dcOperatingPoint()) don't pay for it.
-    if (this._analog !== null && !this._transientSeeded) {
-      (this._analog as MNAEngine).transientDcop();
-      this._transientSeeded = true;
-    }
-
+    // The warm-start transient DCOP (ngspice dctran.c:230-360 firsttime block)
+    // is owned by MNAEngine.step() — it runs the DCOP and falls through into
+    // the first transient iteration on the first call after init/reset, then
+    // skips the DCOP on subsequent calls. The coordinator is the digital/
+    // analog bridge layer and has no ngspice analog here.
     const analogTimeBefore = this._analog?.simTime ?? 0;
 
     if (this._analog !== null && this._analysisPhase === "dcop") {

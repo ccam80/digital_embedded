@@ -112,8 +112,14 @@ export class ConcreteCompiledAnalogCircuit implements CompiledAnalogCircuit {
    *  `timeRef.value` each timestep so elements see the current simulation time. */
   readonly timeRef: { value: number };
 
-  /** Shared state pool for all elements in this compiled circuit. */
-  readonly statePool: StatePool;
+  /** Shared state pool for all elements in this compiled circuit.
+   *
+   *  Lifecycle: the analog compiler initialises this to a placeholder (or null
+   *  cast) because per-element state counts aren't known until each element's
+   *  setup() runs. MNAEngine._setup() then either adopts the pre-built pool
+   *  (test path that pre-allocated) or allocates one and writes back here.
+   *  Post-_setup, cac.statePool === ctx.statePool — single-ownership invariant. */
+  statePool: StatePool;
 
   /** Nodeset constraints: map of MNA nodeId → target voltage. */
   readonly nodesets?: Map<number, number>;

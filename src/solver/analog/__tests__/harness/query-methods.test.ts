@@ -59,9 +59,9 @@ function makeHWR() {
   const pool = buildStatePool(elements);
   return {
     circuit: {
-      netCount: 2, componentCount: 3, nodeCount: 2, matrixSize: 3,
+      netCount: 2, componentCount: 3, nodeCount: 2,
       elements, labelToNodeId: new Map([["Vs", 1], ["R1:B", 2]]), statePool: pool,
-    } as ConcreteCompiledAnalogCircuit,
+    } as unknown as ConcreteCompiledAnalogCircuit,
     pool,
   };
 }
@@ -244,7 +244,7 @@ describe("captureTopology — type field population", () => {
   it("18. type is a non-empty string for all elements after captureTopology", () => {
     const { circuit } = makeHWR();
     const elementLabels = buildElementLabelMap(circuit);
-    const topo = captureTopology(circuit, elementLabels);
+    const topo = captureTopology(circuit, 3, elementLabels);
     for (const el of topo.elements) {
       expect(typeof el.type).toBe("string");
       expect(el.type!.length).toBeGreaterThan(0);

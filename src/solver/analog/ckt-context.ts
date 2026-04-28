@@ -780,9 +780,16 @@ export class CKTCircuitContext {
    * Port of ngspice cktsetup.c:82-84 where CKTstate0/CKTstate1 are allocated
    * after the DEVsetup loop, so state counts from all elements are known.
    * Called from MNAEngine._setup() before allocateRowBuffers().
+   *
+   * If `existingPool` is provided and matches numStates, it is adopted as the
+   * authoritative pool — single-ownership invariant: cac.statePool and
+   * ctx.statePool always reference the same object. Otherwise a fresh pool is
+   * allocated.
    */
-  allocateStateBuffers(numStates: number): void {
-    this.statePool             = new StatePool(numStates);
+  allocateStateBuffers(numStates: number, existingPool: StatePool | null = null): void {
+    this.statePool = (existingPool && existingPool.totalSlots === numStates)
+      ? existingPool
+      : new StatePool(numStates);
     this.dcopSavedState0       = new Float64Array(numStates);
     this.dcopOldState0         = new Float64Array(numStates);
     // Bind the live ring reference. From this call onward, ctx.loadCtx.stateN

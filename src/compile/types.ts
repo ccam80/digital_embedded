@@ -126,33 +126,26 @@ export interface Diagnostic {
 // ---------------------------------------------------------------------------
 
 import type { PropertyBag } from "../core/properties.js";
-import type { AnalogElementCore } from "../core/analog-types.js";
+import type { AnalogElement } from "../core/analog-types.js";
 
 /**
  * Compiler-internal representation of an analog model that can be stamped
  * into the MNA matrix. The compiler resolves ModelEntry (from modelRegistry)
  * into this shape before the stamp loop.
+ *
+ * `findBranchFor` lives on the constructed element (per spec A.6), not on
+ * the model. The engine resolves a branch by `findDevice(label)` then
+ * dispatching `el.findBranchFor?.(name, ctx)`.
  */
 export interface MnaModel {
   factory: (
     pinNodes: ReadonlyMap<string, number>,
     props: PropertyBag,
     getTime: () => number,
-  ) => AnalogElementCore;
-  /** True for models that may allocate internal voltage nodes in
-   *  setup() (DIO, BJT, MOS, JFET, TLINE). Used by
-   *  `detectVoltageSourceLoops` and `detectInductorLoops` to size
-   *  worst-case topology. Default: false. */
-  mayCreateInternalNodes?: boolean;
+  ) => AnalogElement;
   /** Optional pin-label → ngspice-node-suffix map. See
    *  01-pin-mapping.md for the registry. */
   ngspiceNodeMap?: Record<string, string>;
-  /** When set, this device type registers a lazy-branch finder.
-   *  Mirrors ngspice's per-device `DEVfindBranch` (e.g. VSRCfindBr).
-   *  Required for VSRC, IND, VCVS, CCVS. Should use the same
-   *  idempotent guard as setup(): if branch already allocated for
-   *  this name, return existing; else call ctx.makeCur and store. */
-  findBranchFor?(name: string, ctx: import("../solver/analog/setup-context.js").SetupContext): number;
 }
 
 // ---------------------------------------------------------------------------

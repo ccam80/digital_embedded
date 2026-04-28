@@ -10,7 +10,7 @@ import type { CircuitElement } from "./element.js";
 import type { PinDeclaration } from "./pin.js";
 import { PropertyBag, PropertyType } from "./properties.js";
 import type { PropertyDefinition, PropertyValue } from "./properties.js";
-import type { AnalogElementCore } from "./analog-types.js";
+import type { AnalogElement } from "./analog-types.js";
 import type { MnaSubcircuitNetlist } from "./mna-subcircuit-netlist.js";
 import type { PinElectricalSpec } from "./pin-electrical.js";
 
@@ -22,7 +22,7 @@ export type AnalogFactory = (
   pinNodes: ReadonlyMap<string, number>,
   props: PropertyBag,
   getTime: () => number,
-) => AnalogElementCore;
+) => AnalogElement;
 
 // ---------------------------------------------------------------------------
 // ParamDef — schema entry for one model parameter
@@ -95,21 +95,8 @@ export type ModelEntry =
       paramDefs: ParamDef[];
       params: Record<string, number>;
       branchCount?: number | ((props: PropertyBag) => number);
-      getInternalNodeCount?: (props: PropertyBag) => number;
-      /**
-       * Labels for internal nodes allocated by this model, in the SAME ORDER
-       * as `getInternalNodeCount` consumes them. Must be length-equal to
-       * `getInternalNodeCount`. Used for diagnostics (e.g. harness node
-       * labeling like `Q1:B'`). Returned labels are short tags (no element
-       * prefix).
-       */
-      getInternalNodeLabels?: (props: PropertyBag) => readonly string[];
       /** SPICE-emission overrides for this model. */
       spice?: ModelEmissionSpec;
-      /** True for models that may allocate internal voltage nodes in
-       *  setup() (DIO, BJT, MOS, JFET, TLINE). Used by topology validators
-       *  to size worst-case topology. Default: false. */
-      mayCreateInternalNodes?: boolean;
       /** Maps digiTS pin label → ngspice node-variable suffix.
        *  Mirrors the same field on ComponentDefinition for per-model overrides. */
       ngspiceNodeMap?: Record<string, string>;

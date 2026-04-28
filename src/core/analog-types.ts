@@ -37,7 +37,7 @@ export type IntegrationMethod = "trapezoidal" | "gear";
  * Per-type cktLoad ordinals matching `ref/ngspice/src/spicelib/devices/dev.c`
  * `DEVices[]` registration order. Lower ordinal = loaded first.
  *
- * Each `make*` analog factory must set its returned `AnalogElementCore.ngspiceLoadOrder`
+ * Each `make*` analog factory must set its returned `AnalogElement.ngspiceLoadOrder`
  * to one of these constants. The compiler sorts `analogElements` by this field
  * before handing it to the engine so that the per-iteration `cktLoad` walks
  * devices in the same per-type bucket order ngspice does (every R, every C,
@@ -128,11 +128,6 @@ export interface StatePoolRef {
   readonly totalSlots: number;
   /** Number of accepted transient steps. 0 = MODEINITTRAN equivalent. */
   readonly tranStep: number;
-  // Phase 2.5 W2.3: `initMode` string union deleted. INITF state lives in
-  // the `cktMode` bitfield (LoadContext.cktMode) — read via
-  // `initf(cktMode) === MODEINIT...` and written via
-  // `setInitf(cktMode, MODEINIT...)` per cktdefs.h:177-182. For diagnostic
-  // labels use `bitsToName(cktMode)` from ckt-mode.ts.
   /**
    * Current transient integration timestep written by the engine before each
    * stamp pass. 0 during DC-OP. Used by elements to derive ag0 locally
@@ -148,28 +143,31 @@ export interface StatePoolRef {
 }
 
 // ---------------------------------------------------------------------------
-// AnalogElementCore
+// AnalogElement
 // ---------------------------------------------------------------------------
 
 /**
- * The return type of analog factory functions — the contract that all analog
- * circuit component implementations must satisfy. Excludes pinNodeIds and
- * allNodeIds which are set by the compiler after factory construction.
+ * The single contract every analog circuit element satisfies.
  *
- * Standalone definition equivalent to:
- *   Omit<AnalogElement, 'pinNodeIds' | 'allNodeIds'>
- *
- * where AnalogElement is defined in solver/analog/element.ts.
+ * Reactivity is method-presence: an element is "reactive" iff
+ * `typeof el.getLteTimestep === "function"`. There is no `isReactive` /
+ * `isNonlinear` flag, no Core / non-Core split, no post-compile type
+ * promotion. Pin topology is carried entirely by `_pinNodes`; allocation of
+ * internal nodes / branch rows / state slots / TSTALLOC handles all happens
+ * inside `setup(ctx)`, never at construction time.
  */
-export interface AnalogElementCore {
+export interface AnalogElement {
+  // -------------------------------------------------------------------------
+  // Identity
+  // -------------------------------------------------------------------------
+
   /**
-   * Assigned branch-current row index for elements that introduce extra MNA
-   * rows (voltage sources, inductors). Set to -1 for elements that do not
-   * add extra rows (resistors, capacitors, current sources, diodes, etc.).
-   *
-   * Mutable: setup() writes it via `this.branchIndex = ctx.makeCur(...)`.
+   * Optional display label for diagnostic attribution. Initialized to "" by
+   * every factory; overwritten by the compiler with the instance label via
+   * Object.assign before setup() runs. Required (not optional) so setup-body
+   * sites that read `this.label` / `el.label` type-check cleanly.
    */
-  branchIndex: number;
+  label: string;
 
   /**
    * Position in ngspice's CKTload iteration order. Mirrors the device-type
@@ -182,7 +180,7 @@ export interface AnalogElementCore {
    * iteration's `cktLoad`. The order in which devices stamp therefore
    * determines internal numbering — and the only way to match ngspice's
    * internal layout bit-exact is to load devices in the same per-type bucket
-   * order ngspice uses (every R, then every C, ..., then every V, ...).
+   * order ngspice uses.
    *
    * Set this on every `make*` analog factory return value via the
    * `NGSPICE_LOAD_ORDER` enum in this file. Required, not defaulted —
@@ -190,6 +188,50 @@ export interface AnalogElementCore {
    * "what device is this in ngspice terms?" question at registration.
    */
   readonly ngspiceLoadOrder: number;
+
+  /**
+   * Element index in the compiled circuit's element array.
+   *
+   * Set by the compiler after factory construction via Object.assign.
+   * Used by elements when pushing LimitingEvent records so the harness
+   * can correlate events back to specific circuit elements.
+   */
+  elementIndex?: number;
+
+  // -------------------------------------------------------------------------
+  // Topology
+  // -------------------------------------------------------------------------
+
+  /**
+   * Pin-label-to-MNA-node map. The single source of truth for pin topology.
+   * Populated by the factory at construction; treated as frozen thereafter.
+   * `setup()` and `load()` bodies access pin nodes by label:
+   *   `this._pinNodes.get("pos")!`
+   * Insertion order matches the component's pinLayout order; iterate
+   * `_pinNodes.values()` to get pinLayout-ordered node IDs.
+   */
+  _pinNodes: Map<string, number>;
+
+  /**
+   * Assigned branch-current row index for elements that introduce extra MNA
+   * rows (voltage sources, inductors, etc.). -1 means "no branch row";
+   * setup() / findBranchFor lazily allocate via ctx.makeCur and assign here.
+   *
+   * The "not-yet-allocated" sentinel is -1, not ngspice's 0. Compare with
+   * `=== -1`, not `=== 0` or falsy checks — branch row 0 is a valid index
+   * in our signed Float64Array layout.
+   */
+  branchIndex: number;
+
+  /**
+   * Index of this element's first state-pool slot, set during setup() via
+   * `ctx.allocStates(N)`. -1 if the element has no state slots.
+   */
+  _stateBase: number;
+
+  // -------------------------------------------------------------------------
+  // Lifecycle
+  // -------------------------------------------------------------------------
 
   /** Allocate every internal node, branch row, state slot, and
    *  sparse-matrix entry this element will ever need, in the same
@@ -200,11 +242,12 @@ export interface AnalogElementCore {
    *   - call ctx.makeVolt() for each internal node ngspice creates with
    *     CKTmkVolt;
    *   - call ctx.makeCur() for each branch row ngspice creates with
-   *     CKTmkCur, storing the result in branchIndex;
+   *     CKTmkCur, storing the result in branchIndex (idempotent on -1);
    *   - call ctx.allocStates(N) where ngspice's *setup.c does
    *     `*states += N`;
    *   - call solver.allocElement(row, col) for every TSTALLOC line in
-   *     line-for-line order, storing handles on `this`;
+   *     line-for-line order, storing handles in closure-locals or
+   *     `private` class fields (never on the returned object literal);
    *   - never call solver.allocElement from load().
    *
    *  Order of allocElement calls determines internal-index assignment.
@@ -213,20 +256,6 @@ export interface AnalogElementCore {
    *  their value will be zero in some operating mode.
    */
   setup(ctx: import("../solver/analog/setup-context.js").SetupContext): void;
-
-  /** Optional callback used by VSRC, VCVS, CCVS, IND, CRYSTAL, and RELAY elements that own
-   *  branch rows. Called by `_findBranch` when a controlling source needs lazy branch-row
-   *  allocation. Returns the branch row index (allocates if missing) or 0 if this element
-   *  doesn't own the requested branch. */
-  findBranchFor?(name: string, ctx: import("../solver/analog/setup-context.js").SetupContext): number;
-
-  /** Set during setup() via ctx.allocStates(N). Index of this element's first state-pool slot.
-   *  -1 if element has no state slots. */
-  _stateBase: number;
-
-  /** Pin-label-to-MNA-node map. Populated by the factory at construction; read-only
-   *  thereafter. setup() bodies access pin nodes by label: `this._pinNodes.get("pos")!`. */
-  _pinNodes: Map<string, number>;
 
   /**
    * Primary hot-path method. Called every NR iteration.
@@ -245,7 +274,28 @@ export interface AnalogElementCore {
    * never inside the NR convergence loop. ctx provides dt, method, and
    * voltages needed for companion/state updates.
    */
-  accept?(ctx: import("../solver/analog/load-context.js").LoadContext, simTime: number, addBreakpoint: (t: number) => void): void;
+  accept?(
+    ctx: import("../solver/analog/load-context.js").LoadContext,
+    simTime: number,
+    addBreakpoint: (t: number) => void,
+  ): void;
+
+  /**
+   * Called once per accepted timestep so the element can schedule its next
+   * waveform edge as a timestep breakpoint. Mirrors ngspice's per-device
+   * DEVaccept dispatch (vsrcacct.c VSRCaccept).
+   *
+   * `atBreakpoint` is the engine's CKTbreak flag: true when the just-accepted
+   * step landed via a breakpoint clamp. ngspice gates every CKTsetBreak inside
+   * VSRCaccept on this flag so non-boundary acceptances register nothing.
+   * Sources that ignore this flag will register stale breakpoints on every
+   * step, diverging from ngspice queue contents.
+   */
+  acceptStep?(
+    simTime: number,
+    addBreakpoint: (t: number) => void,
+    atBreakpoint: boolean,
+  ): void;
 
   /**
    * Element-specific convergence check beyond the global node-voltage criterion.
@@ -260,7 +310,13 @@ export interface AnalogElementCore {
    * CKTterr-based LTE timestep proposal. Returns the maximum allowable
    * timestep for this element based on charge/flux history divided differences.
    *
-   * Elements implementing this method call `cktTerr()` internally for each
+   * Method-presence on this method IS the reactivity discriminant. The engine's
+   * timestep controller calls `getLteTimestep` only on elements that implement
+   * it; the conditional guard form
+   *   `if (typeof el.getLteTimestep === "function") ...`
+   * replaces the former `if (el.isReactive) ...` guard.
+   *
+   * Elements implementing this method call cktTerr() internally for each
    * reactive junction, passing charge values as individual scalars (not arrays)
    * to avoid hot-path allocations.
    */
@@ -273,15 +329,12 @@ export interface AnalogElementCore {
   ): number;
 
   /**
-   * Update a mutable parameter on a live compiled element without
-   * recompilation. Called by the coordinator for slider/property-panel
-   * hot-patching. All compiled elements must implement this method.
-   */
-  setParam(key: string, value: number): void;
-
-  /**
    * Stamp the element's frequency-domain small-signal model for AC analysis.
-   * D4: receives LoadContext; see src/solver/analog/element.ts for semantics.
+   *
+   * Receives the shared LoadContext (ngspice re-uses CKTcircuit in ACload()).
+   * The MODEUIC bit is preserved across the AC-mode mask (acan.c:285) and
+   * may be tested via `(ctx.cktMode & MODEUIC) !== 0`. Element sites that do
+   * not need the context should simply ignore the third parameter.
    */
   stampAc?(
     solver: ComplexSparseSolver,
@@ -290,65 +343,72 @@ export interface AnalogElementCore {
   ): void;
 
   /**
-   * True if this element performs nonlinear stamping inside load().
-   *
-   * The engine reads this flag to decide whether to call load() for
-   * nonlinear elements during NR iteration or only once per timestep.
-   */
-  readonly isNonlinear: boolean;
-
-  /**
-   * True if this element integrates reactive state (charge/flux) inside load().
-   *
-   * The timestep controller reads this flag to decide whether to call
-   * getLteTimestep() for reactive element handling.
-   */
-  readonly isReactive: boolean;
-
-  /**
-   * Compute per-pin currents for this element.
-   *
-   * Returns an array of currents in pinLayout order (same as pinNodeIds),
-   * one per visible pin. Positive means current flowing into the element.
-   * The array must satisfy KCL: the sum of all entries is zero.
-   */
-  getPinCurrents(rhs: Float64Array): number[];
-
-  /**
-   * Optional display label for diagnostic attribution.
-   */
-  label?: string;
-
-  /**
-   * Element index in the compiled circuit's element array.
-   *
-   * Set by the compiler after factory construction via Object.assign.
-   * Used by elements when pushing LimitingEvent records so the harness
-   * can correlate events back to specific circuit elements.
-   */
-  elementIndex?: number;
-
-  /**
    * Return the strictly-next breakpoint strictly greater than afterTime, or
    * null if the source has no more breakpoints. Called once per accepted
    * step on which this source's breakpoint was consumed.
    */
   nextBreakpoint?(afterTime: number): number | null;
 
-  /**
-   * Called once per accepted timestep so the element can schedule its next
-   * waveform edge as a timestep breakpoint. Mirrors ngspice's per-device
-   * DEVaccept dispatch (vsrcacct.c VSRCaccept).
-   *
-   * `atBreakpoint` is the engine's CKTbreak flag: true when the just-accepted
-   * step landed via a breakpoint clamp.
-   */
-  acceptStep?(
-    simTime: number,
-    addBreakpoint: (t: number) => void,
-    atBreakpoint: boolean,
-  ): void;
+  // -------------------------------------------------------------------------
+  // Engine queries
+  // -------------------------------------------------------------------------
 
+  /** Optional callback used by VSRC, VCVS, CCVS, IND, CRYSTAL, RELAY, and
+   *  tapped-transformer winding elements that own branch rows. Called by the
+   *  engine when a controlling source needs lazy branch-row allocation.
+   *  Returns the branch row index (allocates if missing). The body uses the
+   *  same idempotent makeCur as setup():
+   *    if (el.branchIndex === -1) el.branchIndex = ctx.makeCur(...);
+   *    return el.branchIndex;
+   */
+  findBranchFor?(
+    name: string,
+    ctx: import("../solver/analog/setup-context.js").SetupContext,
+  ): number;
+
+  /**
+   * Compute per-pin currents for this element.
+   *
+   * Returns an array of currents in pinLayout order (same as
+   * `_pinNodes.values()` insertion order), one per visible pin. Positive
+   * means current flowing into the element. The array must satisfy KCL:
+   * the sum of all entries is zero.
+   */
+  getPinCurrents(rhs: Float64Array): number[];
+
+  /**
+   * Update a mutable parameter on a live compiled element without
+   * recompilation. Called by the coordinator for slider/property-panel
+   * hot-patching. All compiled elements must implement this method.
+   */
+  setParam(key: string, value: number): void;
+}
+
+// ---------------------------------------------------------------------------
+// PoolBackedAnalogElement
+// ---------------------------------------------------------------------------
+
+import type { StateSchema } from "../solver/analog/state-schema.js";
+
+/**
+ * AnalogElement extended with state-pool-backed fields. For components that
+ * use the shared state pool — capacitors, diodes, BJTs, MOSFETs, JFETs,
+ * transformers, behavioral composites, etc.
+ */
+export interface PoolBackedAnalogElement extends AnalogElement {
+  readonly poolBacked: true;
+  readonly stateSize: number;
+  readonly stateSchema: StateSchema;
+  initState(pool: StatePoolRef): void;
+
+  /**
+   * Diagnostic introspection. Returns labels for internal nodes allocated
+   * during this element's setup(), in allocation order. Harness consumers
+   * call this post-setup to label diagnostic nodes (e.g. `Q1:B'`). Optional
+   * — pool-backed elements that allocate no internal nodes do not implement
+   * it.
+   */
+  getInternalNodeLabels?(): readonly string[];
 }
 
 // ---------------------------------------------------------------------------

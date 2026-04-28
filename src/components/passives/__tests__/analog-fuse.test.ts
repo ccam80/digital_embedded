@@ -157,42 +157,39 @@ describe("AnalogFuseElement", () => {
     });
   });
 
-  describe("resistance_transition_smooth", () => {
-    it("resistance changes continuously without step discontinuity near blow threshold", () => {
+  describe("resistance_switches_at_threshold", () => {
+    it("resistance is rCold below threshold and rBlown at/above threshold", () => {
+      // Abrupt model: no smooth blend. At threshold-cross, resistance jumps
+      // from rCold to rBlown in one accept(). The engine relies on the
+      // breakpoint scheduled by accept() to land exactly on the trip instant
+      // so the discontinuity never falls inside an integration step.
       const rCold = 0.01;
       const rBlown = 1e9;
       const i2tRating = 1.0;
 
-      const resistances: number[] = [];
-      const N = 1000;
+      // Below threshold: drive low energy, expect rCold.
+      const intactFuse = new AnalogFuseElement(rCold, rBlown, i2tRating);
+      intactFuse._pinNodes = new Map([["out1", 1], ["out2", 0]]);
+      intactFuse.pinNodeIds = [1, 0];
+      intactFuse.allNodeIds = [1, 0];
+      const lowEnergyV = Math.sqrt(0.5 * i2tRating) * rCold;
+      const vLow = new Float64Array(2);
+      vLow[1] = lowEnergyV;
+      driveFuseStep(intactFuse, 1.0, vLow);
+      expect(intactFuse.blown).toBe(false);
+      expect(intactFuse.currentResistance).toBe(rCold);
 
-      for (let i = 0; i <= N; i++) {
-        const energy = 0.5 * i2tRating + (i2tRating * i) / N;
-        const testFuse = new AnalogFuseElement(rCold, rBlown, i2tRating);
-        testFuse._pinNodes = new Map([["out1", 1], ["out2", 0]]);
-        testFuse.pinNodeIds = [1, 0];
-        testFuse.allNodeIds = [1, 0];
-        const dt = 1.0;
-        const current = Math.sqrt(energy);
-        const v = current * rCold;
-        // 1-indexed: slot 0 = ground, slot 1 = node 1.
-        const vArr = new Float64Array(2);
-        vArr[1] = v;
-        driveFuseStep(testFuse, dt, vArr);
-        resistances.push(testFuse.currentResistance);
-      }
-
-      // Monotonic increase
-      for (let i = 1; i < resistances.length; i++) {
-        expect(resistances[i]).toBeGreaterThanOrEqual(resistances[i - 1] * 0.9999);
-      }
-
-      // No single step exceeds 10% of range
-      const maxAllowedStep = 0.1 * (rBlown - rCold);
-      for (let i = 1; i < resistances.length; i++) {
-        const step = resistances[i] - resistances[i - 1];
-        expect(step).toBeLessThanOrEqual(maxAllowedStep);
-      }
+      // At/above threshold: drive enough energy to trip in one step.
+      const blownFuse = new AnalogFuseElement(rCold, rBlown, i2tRating);
+      blownFuse._pinNodes = new Map([["out1", 1], ["out2", 0]]);
+      blownFuse.pinNodeIds = [1, 0];
+      blownFuse.allNodeIds = [1, 0];
+      const highEnergyV = Math.sqrt(2 * i2tRating) * rCold;
+      const vHigh = new Float64Array(2);
+      vHigh[1] = highEnergyV;
+      driveFuseStep(blownFuse, 1.0, vHigh);
+      expect(blownFuse.blown).toBe(true);
+      expect(blownFuse.currentResistance).toBe(rBlown);
     });
   });
 
@@ -371,34 +368,19 @@ describe("AnalogFuseElement", () => {
   });
 
   describe("fuse_load_dcop_parity", () => {
-    // fuse_load_dcop_parity — C4.1 / Task 6.2.1
-    //
-    // Fuse in un-blown state (thermalEnergy=0). rCold=0.01, rBlown=1e9, i2tRating=1e-4.
-    // smoothResistance(0, 1e-4, 0.01, 1e9):
-    //   width = 0.05 * 1e-4 = 5e-6
-    //   x = (0 - 1e-4) / 5e-6 = -20
-    //   blend = 0.5 * (1 + tanh(-20)) ≈ 0 (tanh(-20) ≈ -1 to 53-bit precision)
-    //   R ≈ 0.01 + (1e9 - 0.01) * blend ≈ 0.01
-    // G = 1 / max(R, 1e-12) = 1 / R_from_smooth_formula (bit-exact).
-    //
-    // NGSPICE reference: ngspice resload.c stamps G=1/R using a single division.
-    // The test inlines the same smoothResistance computation as AnalogFuseElement.load().
-    // Nodes: pos=1 → idx 0, neg=0 (ground). matrixSize=1, nodeCount=1.
-    it("un-blown fuse stamps G=1/smoothResistance(0) bit-exact", () => {
-      // Inline closed-form — same IEEE-754 operations as AnalogFuseElement.load()
-      // with smoothResistance(thermalEnergy=0, i2tRating=1e-4, rCold=0.01, rBlown=1e9):
+    // Abrupt fuse model — un-blown stamps G = 1/rCold (single division, like
+    // ngspice resload.c). Bit-exact equality with the closed-form scalar.
+    // Nodes: pos=1 → row/col 1, neg=0 (ground, stamps suppressed).
+    // makeSimpleCtx already runs _initStructure() in its CKTCircuitContext
+    // ctor and then calls setup() to allocate handles; tests must NOT call
+    // _initStructure again or the cached handles go stale.
+    it("un-blown fuse stamps G=1/rCold bit-exact", () => {
       const rCold = 0.01;
       const rBlown = 1e9;
       const i2tRating = 1e-4;
-      const thermalEnergy = 0;
-      const width = 0.05 * i2tRating;
-      const x = (thermalEnergy - i2tRating) / Math.max(width, 1e-30);
-      const blend = 0.5 * (1 + Math.tanh(x));
-      const R_REF = rCold + (rBlown - rCold) * blend;
       const MIN_RESISTANCE = 1e-12;
-      const NGSPICE_G_REF = 1 / Math.max(R_REF, MIN_RESISTANCE);
+      const NGSPICE_G_REF = 1 / Math.max(rCold, MIN_RESISTANCE);
 
-      // Construct fuse with out1=1, out2=0 (pos=1 above ground).
       const fuseProps = new PropertyBag();
       fuseProps.setModelParam("rCold", rCold);
       fuseProps.setModelParam("rBlown", rBlown);
@@ -410,12 +392,10 @@ describe("AnalogFuseElement", () => {
         matrixSize: 1,
         nodeCount: 1,
       });
-      stampCtx.solver._initStructure();
+      stampCtx.solver._resetForAssembly();
       fuse.load(stampCtx.loadCtx as unknown as LoadContext);
       const stamps = stampCtx.solver.getCSCNonZeros();
 
-      // Only the pos diagonal is stamped (neg=0 is ground, suppressed).
-      // Under 1-indexed nodes: node 1 (pos) maps to matrix row/col 1.
       const e00 = stamps.find((e) => e.row === 1 && e.col === 1);
       expect(e00).toBeDefined();
       expect(e00!.value).toBe(NGSPICE_G_REF);

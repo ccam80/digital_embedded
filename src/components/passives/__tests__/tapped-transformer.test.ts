@@ -206,7 +206,6 @@ describe("TappedTransformer", () => {
 
     engine.init(compiled);
     engine.configure({ maxTimeStep: period / 100 });
-    engine.transientDcop();
 
     let maxVS1CT = 0;
     let maxVCTS2 = 0;
@@ -375,7 +374,6 @@ describe("TappedTransformer", () => {
 
     engine.init(compiled);
     engine.configure({ maxTimeStep: period / 100 });
-    engine.transientDcop();
 
     while (engine.simTime < numCycles * period && engine.getState() !== EngineState.ERROR) {
       engine.step();

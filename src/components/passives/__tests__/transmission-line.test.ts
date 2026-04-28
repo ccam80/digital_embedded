@@ -489,7 +489,6 @@ describe("TLine", () => {
       const engine = new MNAEngine();
       engine.init(compiled);
       engine.configure({ maxTimeStep: tau / 10 });
-      engine.transientDcop();
 
       // Run to steady state (many τ)
       let steps = 0;
@@ -674,7 +673,6 @@ describe("TLine", () => {
       const engine = new MNAEngine();
       engine.init(compiled);
       engine.configure({ maxTimeStep: tau / 20 });
-      engine.transientDcop();
 
       // Run to steady state (open circuit → voltage rises to Vs = 1V at Port2)
       let steps = 0;

@@ -42,8 +42,8 @@
     "runtime": null
   },
   "build": {
-    "buildCommand": "rm -f tsc-mat-temp.txt",
-    "testCommand": "cat > C:/local_working_projects/digital_in_browser/spec/test-baseline.md << 'EOF'\n# Test Baseline\n\n- **Timestamp**: 2026-04-28T17:45:00Z\n- **Phase**: 3.5 (W3.5 Component Spec Gaps)\n- **Command**: `npm run test:q` (vitest run --reporter=verbose)\n- **Result**: 8294/9438 passing, 1144 failing, 0 errors\n\n## Summary\n\nThe test suite includes unit/integration tests (vitest) and was executed during the W3.5 component spec gaps phase. Per CLAUDE.md \"Test Policy During W3 Setup-Load-Split\", this baseline is **informational only** — implementers and verifiers in W3.5 do NOT consult test results for verification decisions. Verification is strictly **spec compliance** against the PB-*.md spec contract and cited ngspice anchor files.\n\n## Pre-existing Failures (Sample)\n\nThe failing tests include:\n\n| Test File | Test Count | Categories |\n|-----------|-----------|------------|\n| src/editor/__tests__/wire-current-resolver.test.ts | 4 | Wire current resolution (KCL conservation) |\n| src/components/passives/__tests__/transmission-line.test.ts | 14 | Transmission line parameters, loss, reflection |\n| src/components/semiconductors/__tests__/diode.test.ts | 3 | Diode DC OP, parameter sensitivity |\n| src/solver/analog/__tests__/dc-operating-point.test.ts | 6 | DC operating point, Gmin stepping, convergence |\n| src/solver/analog/__tests__/sparse-solver.test.ts | 1 | MNA matrix structure performance |\n| src/components/semiconductors/__tests__/mosfet.test.ts | 4+ | MOSFET biasing regions, nonlinear stamps |\n| src/components/active/__tests__/vccs.test.ts | 4 | VCCS setup method not found (W3 migration) |\n| src/components/active/__tests__/vcvs.test.ts | 5 | VCVS setup method not found (W3 migration) |\n| src/solver/analog/__tests__/ngspice-parity/*.test.ts | 15+ | Matrix structural divergence (A1 MNA-layout errors) |\n| src/headless/__tests__/rc-rl-diagnostic.test.ts | 2 | State undefined (engine setup incomplete) |\n\n### Key Patterns\n\n1. **W3 Migration Setup Method Failures** (VCCS, VCVS, etc.): `el.setup is not a function` — components awaiting W3 implementation per the setup-load-split plan.\n\n2. **Matrix Structural Divergence (A1 MNA-layout)**: Multiple parity tests report `matrixSize = 0 (ours) vs 5-7 (ngspice)`. This is a known pre-W3 state — setup() bodies are stubs, so no equations are allocated.\n\n3. **State Undefined**: Some diagnostic tests fail with `Cannot read properties of undefined (reading 'states')` — indicates engine state not fully initialized post-setup.\n\n4. **Transmission Line & Wire Current Tests**: These test components whose setup() and load() bodies are under W3.5 implementation scope.\n\n5. **Xfact Scope Audit Failures**: Stale allowlist entries and unguarded reads in `mosfet.ts:1480`.\n\n## Notes\n\n- Tests were run **without E2E (Playwright)** due to process timeout on full `npm run test:q`. The unit/integration vitest suite completed successfully.\n- Per project policy, these failures are **expected during W3/W3.5** because stub setup() methods throw or remain incomplete.\n- Implementer/verifier decisions are based on **spec compliance**, not test pass/fail status during the migration.\n- Full test suite (including E2E) can be run post-W3.5 once all setup() bodies are implemented and the engine is fully initialized.\nEOF\necho \"Test baseline written successfully\"\n",
+    "buildCommand": "if [ -f tsc-errors.log ]; then wc -l tsc-errors.log; head -1 tsc-errors.log; { while IFS= read -r line; do case \"$line\" in *analog-engine*|*coordinator*|*transmission-line.test*|*tapped-transformer.test*) echo \"$line\";; esac; done; } < tsc-errors.log | head -40; fi",
+    "testCommand": "npx vitest run src/solver/analog/__tests__/analog-engine.test.ts src/components/passives/__tests__/analog-fuse.test.ts --reporter=basic > .vitest-fix8.log 2>&1; tail -10 .vitest-fix8.log",
     "lintCommand": "npm run lint",
     "devCommand": "npm run dev",
     "scripts": {
@@ -292,74 +292,74 @@
   "hotPaths": [
     {
       "path": "",
-      "accessCount": 279,
-      "lastAccessed": 1777355720924,
+      "accessCount": 289,
+      "lastAccessed": 1777364677139,
+      "type": "directory"
+    },
+    {
+      "path": "src\\solver\\analog\\__tests__\\test-helpers.ts",
+      "accessCount": 255,
+      "lastAccessed": 1777372305804,
       "type": "directory"
     },
     {
       "path": "src\\solver\\analog\\sparse-solver.ts",
-      "accessCount": 233,
-      "lastAccessed": 1777352141272,
-      "type": "file"
-    },
-    {
-      "path": "src\\solver\\analog\\__tests__\\test-helpers.ts",
-      "accessCount": 230,
-      "lastAccessed": 1777356248794,
-      "type": "directory"
-    },
-    {
-      "path": "src\\solver\\analog\\ckt-context.ts",
-      "accessCount": 178,
-      "lastAccessed": 1777355417533,
+      "accessCount": 239,
+      "lastAccessed": 1777371120785,
       "type": "file"
     },
     {
       "path": "src",
-      "accessCount": 172,
-      "lastAccessed": 1777355974348,
+      "accessCount": 205,
+      "lastAccessed": 1777370299998,
       "type": "directory"
     },
     {
       "path": "src\\solver\\analog\\analog-engine.ts",
-      "accessCount": 150,
-      "lastAccessed": 1777356057665,
+      "accessCount": 197,
+      "lastAccessed": 1777370917362,
+      "type": "file"
+    },
+    {
+      "path": "src\\solver\\analog\\ckt-context.ts",
+      "accessCount": 185,
+      "lastAccessed": 1777367896840,
       "type": "file"
     },
     {
       "path": "src\\core\\analog-types.ts",
-      "accessCount": 105,
-      "lastAccessed": 1777355159826,
+      "accessCount": 110,
+      "lastAccessed": 1777372849486,
       "type": "file"
     },
     {
       "path": "src\\solver\\analog\\element.ts",
-      "accessCount": 96,
-      "lastAccessed": 1777356284764,
+      "accessCount": 102,
+      "lastAccessed": 1777372864075,
       "type": "file"
     },
     {
       "path": "src\\solver\\analog",
-      "accessCount": 83,
-      "lastAccessed": 1777353950892,
+      "accessCount": 87,
+      "lastAccessed": 1777367627914,
       "type": "directory"
     },
     {
-      "path": "src\\solver\\analog\\dc-operating-point.ts",
-      "accessCount": 54,
-      "lastAccessed": 1777333541691,
+      "path": "src\\components\\sources\\dc-voltage-source.ts",
+      "accessCount": 61,
+      "lastAccessed": 1777371250413,
       "type": "file"
     },
     {
-      "path": "src\\components\\sources\\dc-voltage-source.ts",
-      "accessCount": 54,
-      "lastAccessed": 1777354829134,
+      "path": "src\\solver\\analog\\dc-operating-point.ts",
+      "accessCount": 56,
+      "lastAccessed": 1777358227311,
       "type": "file"
     },
     {
       "path": "src\\components\\active\\cccs.ts",
-      "accessCount": 46,
-      "lastAccessed": 1777348008949,
+      "accessCount": 47,
+      "lastAccessed": 1777367869261,
       "type": "directory"
     },
     {
@@ -370,14 +370,14 @@
     },
     {
       "path": "src\\components\\active\\adc.ts",
-      "accessCount": 44,
-      "lastAccessed": 1777355669098,
+      "accessCount": 46,
+      "lastAccessed": 1777370430580,
       "type": "directory"
     },
     {
       "path": "src\\solver\\analog\\newton-raphson.ts",
-      "accessCount": 39,
-      "lastAccessed": 1777333478204,
+      "accessCount": 45,
+      "lastAccessed": 1777365055007,
       "type": "file"
     },
     {
@@ -394,14 +394,20 @@
     },
     {
       "path": "src\\solver\\analog\\load-context.ts",
-      "accessCount": 31,
-      "lastAccessed": 1777352135446,
+      "accessCount": 33,
+      "lastAccessed": 1777363373457,
+      "type": "file"
+    },
+    {
+      "path": "src\\solver\\analog\\__tests__\\analog-engine.test.ts",
+      "accessCount": 28,
+      "lastAccessed": 1777368608428,
       "type": "file"
     },
     {
       "path": "src\\solver\\analog\\compiled-analog-circuit.ts",
-      "accessCount": 24,
-      "lastAccessed": 1777355639751,
+      "accessCount": 27,
+      "lastAccessed": 1777367903165,
       "type": "file"
     },
     {
@@ -420,6 +426,12 @@
       "path": "src\\components\\active\\__tests__\\adc.test.ts",
       "accessCount": 17,
       "lastAccessed": 1777327852510,
+      "type": "file"
+    },
+    {
+      "path": "src\\solver\\coordinator.ts",
+      "accessCount": 13,
+      "lastAccessed": 1777364836277,
       "type": "file"
     },
     {
@@ -442,9 +454,15 @@
     },
     {
       "path": "ref\\ngspice\\src\\spicelib\\devices\\bjt\\bjtsetup.c",
-      "accessCount": 9,
-      "lastAccessed": 1777268481112,
+      "accessCount": 10,
+      "lastAccessed": 1777367810998,
       "type": "file"
+    },
+    {
+      "path": "src\\solver",
+      "accessCount": 9,
+      "lastAccessed": 1777367609317,
+      "type": "directory"
     },
     {
       "path": ".vitest-failures.json",
@@ -453,15 +471,9 @@
       "type": "file"
     },
     {
-      "path": "src\\solver",
+      "path": "ref\\ngspice\\src\\spicelib\\devices\\vsrc\\vsrcset.c",
       "accessCount": 8,
-      "lastAccessed": 1777352149918,
-      "type": "directory"
-    },
-    {
-      "path": "src\\solver\\coordinator.ts",
-      "accessCount": 7,
-      "lastAccessed": 1777259325564,
+      "lastAccessed": 1777367809940,
       "type": "file"
     },
     {
@@ -477,12 +489,6 @@
       "type": "file"
     },
     {
-      "path": "ref\\ngspice\\src\\spicelib\\devices\\vsrc\\vsrcset.c",
-      "accessCount": 7,
-      "lastAccessed": 1777268474436,
-      "type": "file"
-    },
-    {
       "path": "ref\\ngspice\\src\\spicelib\\devices\\sw\\swsetup.c",
       "accessCount": 7,
       "lastAccessed": 1777282709605,
@@ -490,8 +496,8 @@
     },
     {
       "path": "ref\\ngspice\\src\\spicelib\\devices\\ccvs\\ccvsset.c",
-      "accessCount": 6,
-      "lastAccessed": 1777268386309,
+      "accessCount": 7,
+      "lastAccessed": 1777367859937,
       "type": "file"
     },
     {
@@ -514,26 +520,32 @@
     },
     {
       "path": "ref\\ngspice\\src\\spicelib\\devices\\vcvs\\vcvsset.c",
-      "accessCount": 5,
-      "lastAccessed": 1777268391734,
+      "accessCount": 6,
+      "lastAccessed": 1777367859577,
       "type": "file"
     },
     {
       "path": "src\\solver\\analog\\__tests__",
-      "accessCount": 5,
-      "lastAccessed": 1777331615332,
+      "accessCount": 6,
+      "lastAccessed": 1777367867147,
       "type": "directory"
+    },
+    {
+      "path": "src/solver/analog/analog-engine.ts",
+      "accessCount": 5,
+      "lastAccessed": 1777363077575,
+      "type": "directory"
+    },
+    {
+      "path": "ref\\ngspice\\src\\spicelib\\devices\\ind\\indsetup.c",
+      "accessCount": 5,
+      "lastAccessed": 1777367858900,
+      "type": "file"
     },
     {
       "path": "ref\\ngspice\\src\\spicelib\\devices\\cap\\capsetup.c",
       "accessCount": 4,
       "lastAccessed": 1777265516066,
-      "type": "file"
-    },
-    {
-      "path": "ref\\ngspice\\src\\spicelib\\devices\\ind\\indsetup.c",
-      "accessCount": 4,
-      "lastAccessed": 1777268399231,
       "type": "file"
     },
     {
@@ -552,12 +564,6 @@
       "path": "ref\\ngspice\\src\\spicelib\\devices\\tra\\trasetup.c",
       "accessCount": 3,
       "lastAccessed": 1777280846069,
-      "type": "file"
-    },
-    {
-      "path": "src\\solver\\analog\\__tests__\\analog-engine.test.ts",
-      "accessCount": 3,
-      "lastAccessed": 1777319993180,
       "type": "file"
     },
     {
@@ -582,12 +588,6 @@
       "path": "src/components/semiconductors/mosfet.ts",
       "accessCount": 1,
       "lastAccessed": 1777258183706,
-      "type": "directory"
-    },
-    {
-      "path": "src/solver/analog/analog-engine.ts",
-      "accessCount": 1,
-      "lastAccessed": 1777258190041,
       "type": "directory"
     }
   ],

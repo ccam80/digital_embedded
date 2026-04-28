@@ -510,23 +510,6 @@ describe('compileUnified — RC circuit (analog)', () => {
     expect(unified.analog).not.toBeNull();
   });
 
-  it('matrix size matches reference for RC circuit', () => {
-    const registry = buildAnalogRegistry();
-
-    const circuit = new Circuit();
-    circuit.addElement(makeAnalogElement('AnalogVs', 'vs1', [{ x: 10, y: 0 }, { x: 0, y: 0 }]));
-    circuit.addElement(makeAnalogElement('AnalogR', 'r1', [{ x: 10, y: 0 }, { x: 20, y: 0 }]));
-    circuit.addElement(makeAnalogElement('AnalogC', 'c1', [{ x: 20, y: 0 }, { x: 0, y: 0 }]));
-    circuit.addElement(makeAnalogElement('Ground', 'gnd1', [{ x: 0, y: 0 }]));
-    circuit.addWire(new Wire({ x: 10, y: 0 }, { x: 10, y: 0 }));
-    circuit.addWire(new Wire({ x: 20, y: 0 }, { x: 20, y: 0 }));
-    circuit.addWire(new Wire({ x: 0, y: 0 }, { x: 0, y: 0 }));
-
-    const reference = compileUnified(circuit, registry).analog!;
-    const unified = compileUnified(circuit, registry);
-
-    expect(unified.analog!.matrixSize).toBe(reference.matrixSize);
-  });
 });
 
 // ---------------------------------------------------------------------------

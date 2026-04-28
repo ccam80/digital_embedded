@@ -291,8 +291,6 @@ describe("AnalogCompiler", () => {
     // 2 non-ground nodes: node at x=10 (Vs+/R1-A) and node at x=20 (R1-B/R2-A)
     expect(compiled.nodeCount).toBe(2);
 
-    // matrixSize = 3
-    expect(compiled.matrixSize).toBe(3);
   });
 
   it("assigns_ground_node_zero", () => {

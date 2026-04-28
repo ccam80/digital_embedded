@@ -1,22 +1,21 @@
 /**
- * Analog fuse MNA element — variable-resistance with thermal I²t energy model.
+ * Analog fuse MNA element — switching resistance with thermal I²t energy model.
  *
- * Models a fuse as a resistance that transitions from R_cold (intact) to
- * R_blown (open circuit) when the accumulated I²t energy exceeds the rating.
+ * Models a fuse as a resistance that switches abruptly from R_cold (intact) to
+ * R_blown (open circuit) when the accumulated I²t energy reaches the rating.
  *
  * Thermal model:
  *   _i2tAccum accumulates I²·dt each accepted timestep via accept().
- *   When _i2tAccum exceeds i2tRating the fuse is permanently blown.
+ *   When _i2tAccum >= i2tRating the fuse is permanently blown — _conduct
+ *   switches in one step from 1/rCold to 1/rBlown.
  *
- * Smooth resistance transition:
- *   To prevent discontinuous resistance changes that would prevent NR convergence,
- *   the resistance is blended through a soft tanh transition over a small energy
- *   range near the blow threshold. The transition width is 5% of i2tRating.
- *
- *   R(e) = R_cold + (R_blown - R_cold) * 0.5 * (1 + tanh((e - i2t) / w))
- *
- *   where w = 0.05 * i2tRating (transition width).
- *   Below threshold R ≈ R_cold; above threshold R ≈ R_blown.
+ * Trip-time breakpoint scheduling:
+ *   Each accepted step predicts the time-to-blow from the current operating
+ *   point (t_blow = (rating - accum) / i²) and registers it via the engine's
+ *   addBreakpoint callback. The transient controller then lands the next step
+ *   exactly on the predicted blow instant, so the rCold→rBlown jump never
+ *   happens mid-step. This avoids LTE rejection / dt collapse from a
+ *   discontinuity inside an integration interval.
  *
  * Cross-engine state propagation:
  *   The factory captures the CircuitElement's PropertyBag and writes
@@ -61,26 +60,6 @@ export const { paramDefs: ANALOG_FUSE_PARAM_DEFS, defaults: ANALOG_FUSE_DEFAULTS
 // ---------------------------------------------------------------------------
 
 const MIN_RESISTANCE = 1e-12;
-
-// ---------------------------------------------------------------------------
-// Resistance helper
-// ---------------------------------------------------------------------------
-
-/**
- * Compute blended resistance using a tanh soft transition near the blow threshold.
- * Ensures NR convergence by avoiding a step discontinuity in conductance.
- */
-function computeFuseResistance(
-  i2tAccum: number,
-  i2tRating: number,
-  rCold: number,
-  rBlown: number,
-): number {
-  const width = 0.05 * i2tRating;
-  const x = (i2tAccum - i2tRating) / Math.max(width, 1e-30);
-  const blend = 0.5 * (1 + Math.tanh(x));
-  return rCold + (rBlown - rCold) * blend;
-}
 
 // ---------------------------------------------------------------------------
 // AnalogFuseElement — MNA implementation
@@ -150,11 +129,9 @@ export class AnalogFuseElement implements AnalogElement {
     this._hPN = solver.allocElement(posNode, negNode);  // (RESposNode, RESnegNode)
     this._hNP = solver.allocElement(negNode, posNode);  // (RESnegNode, RESposNode)
 
-    // Sync conductance from current accumulated energy state
-    this._conduct = 1 / Math.max(
-      computeFuseResistance(this._i2tAccum, this._i2tRating, this._rCold, this._rBlown),
-      MIN_RESISTANCE,
-    );
+    // Sync conductance from current blown state. Abrupt model — no smooth blend.
+    const r = this._blown ? this._rBlown : this._rCold;
+    this._conduct = 1 / Math.max(r, MIN_RESISTANCE);
   }
 
   load(ctx: LoadContext): void {
@@ -166,21 +143,42 @@ export class AnalogFuseElement implements AnalogElement {
     ctx.solver.stampElement(this._hNP, -g);
   }
 
-  accept(ctx: LoadContext, _simTime: number, _addBreakpoint: (t: number) => void): void {
+  accept(ctx: LoadContext, simTime: number, addBreakpoint: (t: number) => void): void {
     const dt = ctx.dt;
     const posNode = this._pinNodes.get("out1")!;
     const negNode = this._pinNodes.get("out2")!;
     const v = ctx.rhs[posNode] - ctx.rhs[negNode];
     const i = v * this._conduct;
 
-    // Integrate I²·dt
-    this._i2tAccum += i * i * dt;
-    const newR = computeFuseResistance(this._i2tAccum, this._i2tRating, this._rCold, this._rBlown);
-    this._conduct = 1 / Math.max(newR, MIN_RESISTANCE);
+    if (!this._blown) {
+      // Integrate I²·dt
+      this._i2tAccum += i * i * dt;
 
-    // Check blow condition after integration
-    if (!this._blown && this._i2tAccum >= this._i2tRating) {
-      this._blown = true;
+      if (this._i2tAccum >= this._i2tRating) {
+        // Hard trip: switch resistance from rCold to rBlown next step.
+        this._blown = true;
+        this._conduct = 1 / Math.max(this._rBlown, MIN_RESISTANCE);
+      } else {
+        // Schedule a breakpoint at the predicted blow instant so the engine
+        // lands exactly on the trip and avoids a discontinuity inside a step.
+        //
+        // Two guards keep the breakpoint queue bounded:
+        //   - i² > 0: no impending trip when the load is open.
+        //   - tBlow within a small lookahead of current dt: only schedule
+        //     when blow is imminent. Far from blow the prediction is
+        //     speculative; with varying current each accept() would push a
+        //     distinct tBlow that the engine's dedup window (≈ 5e-5 ×
+        //     maxTimeStep) is too tight to absorb. Within the lookahead,
+        //     successive predictions stay close enough to coalesce.
+        const i2 = i * i;
+        if (i2 > 0) {
+          const tBlow = simTime + (this._i2tRating - this._i2tAccum) / i2;
+          const lookahead = 16 * dt;
+          if (tBlow - simTime < lookahead) {
+            addBreakpoint(tBlow);
+          }
+        }
+      }
     }
 
     // Propagate state to the visual/digital layer
@@ -231,9 +229,9 @@ export class AnalogFuseElement implements AnalogElement {
     return Math.min(this._i2tAccum / this._i2tRating, 1);
   }
 
-  /** Current effective resistance given accumulated I²t energy. */
+  /** Current effective resistance — abrupt switch on blow. */
   get currentResistance(): number {
-    return computeFuseResistance(this._i2tAccum, this._i2tRating, this._rCold, this._rBlown);
+    return this._blown ? this._rBlown : this._rCold;
   }
 
   getPinCurrents(rhs: Float64Array): number[] {
@@ -241,7 +239,7 @@ export class AnalogFuseElement implements AnalogElement {
     const nNeg = this.pinNodeIds[1];
     const vPos = rhs[nPos];
     const vNeg = rhs[nNeg];
-    const R = computeFuseResistance(this._i2tAccum, this._i2tRating, this._rCold, this._rBlown);
+    const R = this._blown ? this._rBlown : this._rCold;
     const G = 1 / Math.max(R, MIN_RESISTANCE);
     const I = G * (vPos - vNeg);
     return [I, -I];

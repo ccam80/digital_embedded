@@ -27,7 +27,7 @@ describe('buckbjt NR iteration probe', () => {
 
     // Print topology mapping
     const compiled = engine.compiled as ConcreteCompiledAnalogCircuit;
-    const topo = captureTopology(compiled);
+    const topo = captureTopology(compiled, engine.matrixSize);
     console.log('\n=== TOPOLOGY ===');
     console.log(`Nodes: ${topo.nodeCount}, MatrixSize: ${topo.matrixSize}`);
     for (const [nodeId, label] of topo.nodeLabels) {

@@ -81,9 +81,14 @@ export function buildElementLabelMap(
 
 /**
  * Capture the circuit topology from a compiled circuit.
+ *
+ * `matrixSize` must be supplied from the engine post-setup
+ * (ngspice CKTmaxEqNum + 1) since ConcreteCompiledAnalogCircuit no longer
+ * carries it.
  */
 export function captureTopology(
   compiled: ConcreteCompiledAnalogCircuit,
+  matrixSize: number,
   elementLabels?: Map<number, string>,
 ): TopologySnapshot {
   const nodeLabels = new Map<number, string>();
@@ -154,7 +159,7 @@ export function captureTopology(
   }
 
   return {
-    matrixSize: compiled.matrixSize,
+    matrixSize,
     nodeCount: compiled.nodeCount,
     elementCount: compiled.elements.length,
     elements: compiled.elements.map((el, i) => {

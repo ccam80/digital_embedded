@@ -114,6 +114,11 @@ export function makeResistor(
   resistance: number,
 ): AnalogElement {
   const G_val = 1 / resistance;
+  // Sparse-matrix handles registered in setup() (W3 contract: allocElement
+  // calls happen at setup time, stampElement uses captured handles in load).
+  // allocElement returns 0 for ground (row/col == 0); stampElement(0, val)
+  // writes to the trashcan slot per sparse-solver.ts:386-388.
+  let h_AA = 0, h_AB = 0, h_BA = 0, h_BB = 0;
   return {
     pinNodeIds: [nodeA, nodeB],
     allNodeIds: [nodeA, nodeB],
@@ -122,14 +127,19 @@ export function makeResistor(
     isNonlinear: false,
     isReactive: false,
 
-    setup(_ctx: SetupContext): void {},
+    setup(ctx: SetupContext): void {
+      h_AA = ctx.solver.allocElement(nodeA, nodeA);
+      h_AB = ctx.solver.allocElement(nodeA, nodeB);
+      h_BA = ctx.solver.allocElement(nodeB, nodeA);
+      h_BB = ctx.solver.allocElement(nodeB, nodeB);
+    },
 
     load(ctx: LoadContext): void {
       const { solver } = ctx;
-      G(solver, nodeA, nodeA, G_val);
-      G(solver, nodeA, nodeB, -G_val);
-      G(solver, nodeB, nodeA, -G_val);
-      G(solver, nodeB, nodeB, G_val);
+      solver.stampElement(h_AA, G_val);
+      solver.stampElement(h_AB, -G_val);
+      solver.stampElement(h_BA, -G_val);
+      solver.stampElement(h_BB, G_val);
     },
 
     setParam(_key: string, _value: number): void {},
@@ -176,6 +186,8 @@ export function makeVoltageSource(
   branchIdx: number,
   voltage: number,
 ): AnalogElement {
+  const k = branchIdx + 1; // 1-based solver row for the branch
+  let h_PK = 0, h_NK = 0, h_KP = 0, h_KN = 0;
   return {
     pinNodeIds: [nodePos, nodeNeg],
     allNodeIds: [nodePos, nodeNeg],
@@ -183,31 +195,28 @@ export function makeVoltageSource(
     ngspiceLoadOrder: NGSPICE_LOAD_ORDER.VSRC,
     isNonlinear: false,
     isReactive: false,
+    setup(ctx: SetupContext): void {
+      // B sub-matrix: node rows, branch column k.
+      h_PK = ctx.solver.allocElement(nodePos, k);
+      h_NK = ctx.solver.allocElement(nodeNeg, k);
+      // C sub-matrix: branch row k, node columns.
+      h_KP = ctx.solver.allocElement(k, nodePos);
+      h_KN = ctx.solver.allocElement(k, nodeNeg);
+    },
     setParam(_key: string, _value: number): void {},
 
     load(ctx: LoadContext): void {
-      const { solver } = ctx;
-      // branchIdx is the 0-based matrix position; solver and rhs use 1-based
-      // external indices (ngspice convention: 0 = ground/TrashCan, 1..Size active).
-      const k = branchIdx + 1; // 1-based solver row for the branch
-
-      // B sub-matrix (node rows, branch column k) — 1-based node IDs
-      if (nodePos !== 0) S(solver, nodePos, k, 1);
-      if (nodeNeg !== 0) S(solver, nodeNeg, k, -1);
-
-      // C sub-matrix (branch row k, node columns) — 1-based node IDs
-      if (nodePos !== 0) S(solver, k, nodePos, 1);
-      if (nodeNeg !== 0) S(solver, k, nodeNeg, -1);
-
-      // RHS entry for the voltage constraint (scaled by source stepping factor
-      // via ctx.srcFact — ngspice CKTsrcFact). k is already 1-based.
-      const { rhs } = ctx;
+      const { solver, rhs } = ctx;
+      solver.stampElement(h_PK, 1);
+      solver.stampElement(h_NK, -1);
+      solver.stampElement(h_KP, 1);
+      solver.stampElement(h_KN, -1);
+      // RHS voltage constraint, scaled by ctx.srcFact (ngspice CKTsrcFact).
       stampRHS(rhs, k, voltage * ctx.srcFact);
     },
 
     getPinCurrents(rhs: Float64Array): number[] {
-      // Branch current is stored at 1-based slot branchIdx+1 in the rhs buffer.
-      const I = rhs[branchIdx + 1];
+      const I = rhs[k];
       return [I, -I];
     },
   };
@@ -243,6 +252,7 @@ export function makeCurrentSource(
     ngspiceLoadOrder: NGSPICE_LOAD_ORDER.ISRC,
     isNonlinear: false,
     isReactive: false,
+    setup(_ctx: SetupContext): void {},
     setParam(_key: string, _value: number): void {},
 
     load(ctx: LoadContext): void {
@@ -317,6 +327,8 @@ export function makeDiode(
   let s3: Float64Array;
   let base: number;
 
+  let h_AA = 0, h_AC = 0, h_CA = 0, h_CC = 0;
+
   return {
     pinNodeIds: [nodeAnode, nodeCathode],
     allNodeIds: [nodeAnode, nodeCathode],
@@ -328,6 +340,18 @@ export function makeDiode(
     stateSize: 4,
     stateBaseOffset: -1,
     stateSchema: DIODE_SCHEMA,
+
+    setup(ctx: SetupContext): void {
+      h_AA = ctx.solver.allocElement(nodeAnode, nodeAnode);
+      h_AC = ctx.solver.allocElement(nodeAnode, nodeCathode);
+      h_CA = ctx.solver.allocElement(nodeCathode, nodeAnode);
+      h_CC = ctx.solver.allocElement(nodeCathode, nodeCathode);
+      // Register state slots so the engine's allocateStateBuffers builds a
+      // pool the right size and rewires our closures via initState. The
+      // test-side buildStatePool also sets stateBaseOffset to the same value
+      // (0 for a single pool-backed element) — both paths agree.
+      this.stateBaseOffset = ctx.allocStates(this.stateSize);
+    },
 
     initState(pool: StatePoolRef): void {
       s0 = pool.state0;
@@ -363,10 +387,10 @@ export function makeDiode(
       // Stamp companion model: conductance geq in parallel, Norton offset ieq.
       const geq = s0[base + SLOT_GEQ];
       const ieq = s0[base + SLOT_IEQ];
-      G(solver, nodeAnode, nodeAnode, geq);
-      G(solver, nodeAnode, nodeCathode, -geq);
-      G(solver, nodeCathode, nodeAnode, -geq);
-      G(solver, nodeCathode, nodeCathode, geq);
+      solver.stampElement(h_AA, geq);
+      solver.stampElement(h_AC, -geq);
+      solver.stampElement(h_CA, -geq);
+      solver.stampElement(h_CC, geq);
       RHS(rhs, nodeAnode, -ieq);
       RHS(rhs, nodeCathode, ieq);
     },
@@ -431,6 +455,8 @@ export function makeCapacitor(
   let ccapPrev = 0;
   let firstTranStep = true;
 
+  let h_AA = 0, h_AB = 0, h_BA = 0, h_BB = 0;
+
   return {
     pinNodeIds: [nodeA, nodeB],
     allNodeIds: [nodeA, nodeB],
@@ -438,6 +464,12 @@ export function makeCapacitor(
     ngspiceLoadOrder: NGSPICE_LOAD_ORDER.CAP,
     isNonlinear: false,
     isReactive: true,
+    setup(ctx: SetupContext): void {
+      h_AA = ctx.solver.allocElement(nodeA, nodeA);
+      h_AB = ctx.solver.allocElement(nodeA, nodeB);
+      h_BA = ctx.solver.allocElement(nodeB, nodeA);
+      h_BB = ctx.solver.allocElement(nodeB, nodeB);
+    },
     setParam(_key: string, _value: number): void {},
 
     load(ctx: LoadContext): void {
@@ -474,10 +506,10 @@ export function makeCapacitor(
       ceq = result.ceq;
 
       if (!firstTranStep) {
-        G(solver, nodeA, nodeA, geq);
-        G(solver, nodeA, nodeB, -geq);
-        G(solver, nodeB, nodeA, -geq);
-        G(solver, nodeB, nodeB, geq);
+        solver.stampElement(h_AA, geq);
+        solver.stampElement(h_AB, -geq);
+        solver.stampElement(h_BA, -geq);
+        solver.stampElement(h_BB, geq);
         RHS(rhs, nodeA, -ceq);
         RHS(rhs, nodeB, ceq);
       }
@@ -553,6 +585,9 @@ export function makeInductor(
   let phi2 = 0;
   let companionActive = false;
 
+  const k = branchIdx + 1; // 1-based solver row for the branch
+  let h_AK = 0, h_BK = 0, h_KA = 0, h_KB = 0, h_KK = 0;
+
   return {
     pinNodeIds: [nodeA, nodeB],
     allNodeIds: [nodeA, nodeB],
@@ -560,20 +595,30 @@ export function makeInductor(
     ngspiceLoadOrder: NGSPICE_LOAD_ORDER.IND,
     isNonlinear: false,
     isReactive: true,
+    setup(ctx: SetupContext): void {
+      // Branch incidence (always stamped).
+      h_AK = ctx.solver.allocElement(nodeA, k);
+      h_BK = ctx.solver.allocElement(nodeB, k);
+      // Branch equation (DC short and transient companion both use these).
+      h_KA = ctx.solver.allocElement(k, nodeA);
+      h_KB = ctx.solver.allocElement(k, nodeB);
+      // Self-coupling on the branch row, only stamped under transient
+      // companion. ngspice allocates this unconditionally during DEVsetup
+      // (indsetup.c TSTALLOC) regardless of operating mode — match that.
+      h_KK = ctx.solver.allocElement(k, k);
+    },
     setParam(_key: string, _value: number): void {},
 
     load(ctx: LoadContext): void {
       const { solver, rhs, rhsOld, ag } = ctx;
       const mode = ctx.cktMode;
-      // branchIdx is 0-based; solver and rhs use 1-based external indices.
-      const k = branchIdx + 1; // 1-based solver row for the branch
 
-      // Topology-constant branch incidence stamps (always) — 1-based node IDs.
-      if (nodeA !== 0) S(solver, nodeA, k, 1);
-      if (nodeB !== 0) S(solver, nodeB, k, -1);
+      // Topology-constant branch incidence stamps (always).
+      solver.stampElement(h_AK, 1);
+      solver.stampElement(h_BK, -1);
 
       if (mode & MODETRAN) {
-        const iNow = rhsOld[k]; // 1-based rhs slot for branch current
+        const iNow = rhsOld[k];
 
         if (mode & MODEINITPRED) {
           phi0 = phi1;
@@ -591,21 +636,20 @@ export function makeInductor(
           geq = ag[0] * inductance;
           ceq = cflux - ag[0] * phi0;
 
-          // Branch equation: V_A - V_B - geq * I_k = ceq — 1-based node IDs
-          if (nodeA !== 0) S(solver, k, nodeA, 1);
-          if (nodeB !== 0) S(solver, k, nodeB, -1);
-          S(solver, k, k, -geq);
-          // k is already 1-based.
+          // Branch equation: V_A - V_B - geq * I_k = ceq
+          solver.stampElement(h_KA, 1);
+          solver.stampElement(h_KB, -1);
+          solver.stampElement(h_KK, -geq);
           stampRHS(rhs, k, ceq);
         } else {
           // DC short-circuit model: V_A - V_B = 0
-          if (nodeA !== 0) S(solver, k, nodeA, 1);
-          if (nodeB !== 0) S(solver, k, nodeB, -1);
+          solver.stampElement(h_KA, 1);
+          solver.stampElement(h_KB, -1);
         }
       } else {
         // DC: short circuit
-        if (nodeA !== 0) S(solver, k, nodeA, 1);
-        if (nodeB !== 0) S(solver, k, nodeB, -1);
+        solver.stampElement(h_KA, 1);
+        solver.stampElement(h_KB, -1);
       }
     },
 
@@ -682,6 +726,8 @@ export function makeAcVoltageSource(
   dcOffset: number,
   getTime: () => number,
 ): AnalogElement {
+  const k = branchIdx + 1; // 1-based solver row for the branch
+  let h_PK = 0, h_NK = 0, h_KP = 0, h_KN = 0;
   return {
     pinNodeIds: [nodePos, nodeNeg],
     allNodeIds: [nodePos, nodeNeg],
@@ -689,31 +735,29 @@ export function makeAcVoltageSource(
     ngspiceLoadOrder: NGSPICE_LOAD_ORDER.VSRC,
     isNonlinear: false,
     isReactive: false,
+    setup(ctx: SetupContext): void {
+      h_PK = ctx.solver.allocElement(nodePos, k);
+      h_NK = ctx.solver.allocElement(nodeNeg, k);
+      h_KP = ctx.solver.allocElement(k, nodePos);
+      h_KN = ctx.solver.allocElement(k, nodeNeg);
+    },
     setParam(_key: string, _value: number): void {},
 
     load(ctx: LoadContext): void {
       const { solver, rhs } = ctx;
-      // branchIdx is 0-based; solver and rhs use 1-based external indices.
-      const k = branchIdx + 1; // 1-based solver row for the branch
       const t = getTime();
       const v =
         (dcOffset + amplitude * Math.sin(2 * Math.PI * frequency * t + phase)) *
         ctx.srcFact;
-
-      // B sub-matrix (node rows, branch column k) — 1-based node IDs
-      if (nodePos !== 0) S(solver, nodePos, k, 1);
-      if (nodeNeg !== 0) S(solver, nodeNeg, k, -1);
-
-      // C sub-matrix (branch row k, node columns) — 1-based node IDs
-      if (nodePos !== 0) S(solver, k, nodePos, 1);
-      if (nodeNeg !== 0) S(solver, k, nodeNeg, -1);
-
-      // RHS voltage constraint — k is already 1-based
+      solver.stampElement(h_PK, 1);
+      solver.stampElement(h_NK, -1);
+      solver.stampElement(h_KP, 1);
+      solver.stampElement(h_KN, -1);
       stampRHS(rhs, k, v);
     },
 
     getPinCurrents(rhs: Float64Array): number[] {
-      const I = rhs[branchIdx + 1]; // 1-based slot for branch current
+      const I = rhs[k];
       return [I, -I];
     },
   };
@@ -799,11 +843,8 @@ function setupElements(
     findDevice(_label: string) { return null; },
   };
   for (const el of elements) {
-    // Only call setup() on pool-backed elements (fully migrated).
-    // Non-pool-backed elements (e.g. voltage sources still in migration) call
-    // allocElement inside load() directly and must not be set up here.
-    if (isPoolBacked(el) && typeof (el as any).setup === "function") {
-      (el as any).setup(ctx);
+    if (typeof (el as { setup?: (ctx: SetupContext) => void }).setup === "function") {
+      (el as { setup: (ctx: SetupContext) => void }).setup(ctx);
     }
   }
 }
@@ -819,7 +860,6 @@ export function makeSimpleCtx(opts: SimpleCtxOptions): CKTCircuitContext {
   const ctx = new CKTCircuitContext(
     {
       nodeCount: opts.nodeCount,
-      matrixSize: opts.matrixSize,
       elements: opts.elements,
     },
     params,
@@ -878,7 +918,6 @@ export function runNR(opts: SimpleNROptions): NRResult {
   const ctx = new CKTCircuitContext(
     {
       nodeCount: opts.nodeCount,
-      matrixSize: opts.matrixSize,
       elements: opts.elements,
       statePool,
     },

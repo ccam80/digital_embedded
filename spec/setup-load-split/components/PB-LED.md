@@ -23,10 +23,14 @@ specifies:
    discarded by the solver, leaving only the structurally-meaningful
    `(anode, anode)` entry plus internal-node entries when RS > 0 (LED
    sets RS = 0, so no internal node is created).
-4. A `getVisibleLit(): boolean` accessor that reads `VD` from the diode's
-   state pool and compares to a per-color threshold. The accessor lives on
-   an LED-side wrapper or is attached to the returned diode element by
-   `Object.assign` in the LED factory adapter.
+4. An `isLit(signals: PinVoltageAccess | undefined): boolean` accessor on
+   `LedElement` (the UI-facing component class) that reads the `"in"` pin
+   voltage via `PinVoltageAccess.getPinVoltage("in")` and compares it to a
+   per-color threshold. Cathode is wired to ground (node 0) by the adapter,
+   so the `"in"` pin voltage is exactly the diode's forward voltage `Vd`.
+   The accessor lives on `LedElement` and is invoked from `LedElement.draw`
+   to render lit-state visuals; the analog adapter is engine-agnostic and
+   does not attach any state-pool readers to the returned diode element.
 
 ## Pin mapping
 
@@ -57,13 +61,13 @@ None.
 
 ## State slots
 
-5 slots, inherited from `DIODE_SCHEMA` (resistive) or 7 slots from
+4 slots, inherited from `DIODE_SCHEMA` (resistive) or 7 slots from
 `DIODE_CAP_SCHEMA` (capacitive). LED-side schemas (`LED_STATE_SCHEMA`,
 `LED_CAP_STATE_SCHEMA`) are deleted. The diode chooses its schema
 based on `(CJO > 0 || TT > 0)` exactly as it does today.
 
-LED's `getVisibleLit()` reads slot index `SLOT_VD = 0` from the diode's
-schema (constant defined in `src/components/semiconductors/diode.ts`).
+LED has no need to reach into the diode's state pool. Lit-state is computed
+from the `"in"` pin voltage via `PinVoltageAccess`, not from `SLOT_VD`.
 
 ## TSTALLOC sequence
 
@@ -83,7 +87,7 @@ identical to PB-DIO's. The `_hPosPos` handle is the only one whose
 
 LED has no `setup()` of its own. The diode element's `setup()` runs
 verbatim per PB-DIO §setup() body. The LED factory adapter (replacing
-`createLedAnalogElement`) is:
+`createLedAnalogElement`) is a pure pin remap:
 
 ```ts
 function createLedAnalogElementViaDiode(
@@ -91,39 +95,26 @@ function createLedAnalogElementViaDiode(
   props: PropertyBag,
   getTime?: () => number,
 ): AnalogElementCore {
-  // Inject K=0; remap "in" → "A".
+  // Inject K=0 (cathode → ground); remap "in" → "A".
   const remappedPinNodes = new Map<string, number>([
     ["A", pinNodes.get("in")!],
     ["K", 0],
   ]);
-
-  // Delegate to the existing diode factory. Diode handles setup/load/state.
-  const diodeElement = createDiodeElement(remappedPinNodes, props, getTime);
-
-  // Attach LED-specific visible-lit accessor.
-  const litThreshold = getLitThreshold(props.getModelParam<string>("color") ?? "red");
-  Object.assign(diodeElement, {
-    getVisibleLit(): boolean {
-      // SLOT_VD = 0 in DIODE_SCHEMA / DIODE_CAP_SCHEMA.
-      const vd = (diodeElement as PoolBackedAnalogElementCore).s0[
-        (diodeElement as PoolBackedAnalogElementCore).stateBaseOffset + 0
-      ];
-      return vd > litThreshold;
-    },
-  });
-
-  return diodeElement;
+  return createDiodeElement(remappedPinNodes, props, getTime);
 }
 ```
 
 The factory adapter lives in `src/components/io/led.ts`. It does not
-create or mutate matrix entries — that's the diode element's job.
+create or mutate matrix entries, attach accessors, or read solver state —
+that's the diode element's job. Lit-state is the UI's concern and is
+computed by `LedElement.isLit(signals)` from `PinVoltageAccess`, not from
+the analog element.
 
 ## Lit-state threshold table
 
 `getLitThreshold(color)` returns:
 
-| Color | VD threshold (V) | Rationale |
+| Color | Vd threshold (V) | Rationale |
 |---|---|---|
 | red | 1.6 | Typical red LED forward-voltage threshold |
 | yellow | 1.9 | Typical yellow LED forward-voltage threshold |
@@ -136,7 +127,9 @@ color-specific table avoids false-negative "off" reads on blue/white LEDs
 biased at red-LED-on voltages.
 
 The table lives in `led.ts` as a `const Record<string, number>` and is
-accessed by `getLitThreshold`.
+accessed by the exported `getLitThreshold(color)` helper, which is called
+from `LedElement.isLit`. The `color` is read from the regular property bag
+(`PropertyType.COLOR` definition), not from analog model params.
 
 ## load() body — value writes only
 
@@ -155,7 +148,9 @@ In `src/components/io/led.ts`:
   `SLOT_Q`, `SLOT_CCAP` (LED-side copies). The diode-side constants in
   `diode.ts` are the single source of truth.
 - **Add** `createLedAnalogElementViaDiode` factory adapter (per setup body
-  block above) and the `getLitThreshold` helper.
+  block above) and the exported `getLitThreshold` helper.
+- **Add** `LedElement.isLit(signals)` accessor that reads the `"in"` pin
+  voltage via `PinVoltageAccess` and compares it to `getLitThreshold(color)`.
 - **Rewrite** `LedDefinition.modelRegistry` so each color entry calls the
   diode factory with parameter overrides:
 
@@ -163,30 +158,30 @@ In `src/components/io/led.ts`:
 modelRegistry: {
   red:    { kind: "inline", factory: createLedAnalogElementViaDiode, paramDefs: DIODE_PARAM_DEFS,
             params: { IS: 3.17e-19, N: 1.8, RS: 0, CJO: 0, TT: 0, BV: Infinity, IBV: 1e-3,
-                      VJ: 1, M: 0.5, FC: 0.5, color: "red" } },
+                      VJ: 1, M: 0.5, FC: 0.5 } },
   green:  { kind: "inline", factory: createLedAnalogElementViaDiode, paramDefs: DIODE_PARAM_DEFS,
             params: { IS: 1e-21, N: 2.0, RS: 0, CJO: 0, TT: 0, BV: Infinity, IBV: 1e-3,
-                      VJ: 1, M: 0.5, FC: 0.5, color: "green" } },
+                      VJ: 1, M: 0.5, FC: 0.5 } },
   blue:   { kind: "inline", factory: createLedAnalogElementViaDiode, paramDefs: DIODE_PARAM_DEFS,
             params: { IS: 6.26e-24, N: 2.5, RS: 0, CJO: 0, TT: 0, BV: Infinity, IBV: 1e-3,
-                      VJ: 1, M: 0.5, FC: 0.5, color: "blue" } },
+                      VJ: 1, M: 0.5, FC: 0.5 } },
   yellow: { kind: "inline", factory: createLedAnalogElementViaDiode, paramDefs: DIODE_PARAM_DEFS,
             params: { IS: 1e-20, N: 1.9, RS: 0, CJO: 0, TT: 0, BV: Infinity, IBV: 1e-3,
-                      VJ: 1, M: 0.5, FC: 0.5, color: "yellow" } },
+                      VJ: 1, M: 0.5, FC: 0.5 } },
   white:  { kind: "inline", factory: createLedAnalogElementViaDiode, paramDefs: DIODE_PARAM_DEFS,
             params: { IS: 6.26e-24, N: 2.5, RS: 0, CJO: 0, TT: 0, BV: Infinity, IBV: 1e-3,
-                      VJ: 1, M: 0.5, FC: 0.5, color: "white" } },
+                      VJ: 1, M: 0.5, FC: 0.5 } },
 }
 ```
 
-`color` is passed as a non-numerical model param consumed by the factory
-adapter to look up the lit-state threshold. The diode element ignores
-unrecognized keys via its existing `setParam` guard.
+`color` is NOT in the model-param surface — it's a regular property
+(`PropertyType.COLOR`) on `LedDefinition.propertyDefs`, read via
+`PropertyBag.getOrDefault("color", "red")` from `LedElement` and consumed
+exclusively by `isLit`.
 
 - `paramDefs: DIODE_PARAM_DEFS` replaces the deleted `LED_PARAM_DEFS`.
-  `LED_PARAM_DEFS` and `LED_DEFAULTS` exports are deleted (verify no
-  external consumers via Grep before deletion; if present, they get
-  rerouted to `DIODE_PARAM_DEFS`).
+  `LED_PARAM_DEFS` and `LED_DEFAULTS` exports are deleted; external
+  consumers are rerouted to `DIODE_PARAM_DEFS` / `DIODE_PARAM_DEFAULTS`.
 - `defaultModel: "digital"` unchanged (digital model selection, separate
   axis from analog modelRegistry).
 - `executeLed` (digital function) unchanged — operates on digital wiring
@@ -198,22 +193,27 @@ Not applicable. Diode has no branch row; LED inherits this.
 
 ## Verification gate
 
-Per CLAUDE.md "Test Policy During W3 Setup-Load-Split", verification is
-spec compliance only. DO NOT run tests; DO NOT use test results.
-
 1. `createLedAnalogElement`, `LED_STATE_SCHEMA`, `LED_CAP_STATE_SCHEMA`,
    `LED_GMIN`, slot constants, and the embedded `getLteTimestep` attach
    block are deleted from `src/components/io/led.ts`.
-2. `createLedAnalogElementViaDiode` factory adapter present, body matches
-   the spec block line-for-line.
+2. `createLedAnalogElementViaDiode` factory adapter present and is a pure
+   pin remap (no `Object.assign`, no accessor attachment, no state-pool
+   reads). Body matches the spec block line-for-line.
 3. `LedDefinition.modelRegistry` rewritten per the spec block; all 5 color
-   entries delegate to the diode factory with the listed parameter sets.
-4. `getLitThreshold` helper and per-color VD-threshold table present.
-5. The diode element returned by the adapter has a `getVisibleLit()`
-   method attached via `Object.assign`.
-6. PB-DIO compliance applies — diode element setup/load bodies are
+   entries delegate to the diode factory with the listed parameter sets
+   (no `color` key in `params`).
+4. Exported `getLitThreshold(color: string): number` helper and per-color
+   Vd-threshold table present.
+5. `LedElement.isLit(signals: PinVoltageAccess | undefined): boolean`
+   accessor present, reads `"in"` pin voltage and compares to
+   `getLitThreshold(this.color)`. `LedElement.draw(ctx, signals?)` uses the
+   accessor.
+6. `LED_PARAM_DEFS` and `LED_DEFAULTS` re-export shims are deleted.
+   External consumers (tests) import `DIODE_PARAM_DEFS` /
+   `DIODE_PARAM_DEFAULTS` directly.
+7. PB-DIO compliance applies — diode element setup/load bodies are
    unchanged from PB-DIO. PB-LED introduces no diode-side mutations.
-7. `executeLed` digital execution path unchanged.
-8. No banned closing verdicts (mapping/tolerance/equivalent-to/pre-existing/
+8. `executeLed` digital execution path unchanged.
+9. No banned closing verdicts (mapping/tolerance/equivalent-to/pre-existing/
    intentional-divergence/citation-divergence/partial) used in any commit
    message or report.

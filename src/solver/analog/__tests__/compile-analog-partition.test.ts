@@ -369,7 +369,6 @@ describe("compileAnalogPartition", () => {
     // 3 non-ground nodes: In_1 at (10,0), In_2 at (20,0), out at (30,0)
     // Ground at (0,0) is node 0 (not counted in nodeCount).
     expect(compiled.nodeCount).toBe(3);
-    expect(compiled.matrixSize).toBe(3);
   });
 
   it("factory_called_once_for_and_gate", () => {

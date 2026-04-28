@@ -307,7 +307,7 @@ export function cktncDump(
  */
 export function solveDcOperatingPoint(ctx: CKTCircuitContext): void {
   const { params } = ctx;
-  const matrixSize = ctx.solver._size;
+  const matrixSize = ctx.solver.matrixSize;
   const diagnostics = ctx.diagnostics;
 
   ctx.dcopResult.reset();

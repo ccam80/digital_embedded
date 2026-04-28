@@ -14,6 +14,9 @@ import { describe, it, expect } from "vitest";
 import {
   computeJunctionCapacitance,
   computeJunctionCharge,
+  DIODE_CAP_SCHEMA,
+  DIODE_PARAM_DEFS,
+  DIODE_PARAM_DEFAULTS,
 } from "../../semiconductors/diode.js";
 import { computeNIcomCof } from "../../../solver/analog/integration.js";
 import { VT as LED_VT } from "../../../core/constants.js";
@@ -22,9 +25,6 @@ import {
   executeLed,
   LedDefinition,
   LED_ATTRIBUTE_MAPPINGS,
-  LED_CAP_STATE_SCHEMA,
-  LED_PARAM_DEFS,
-  LED_DEFAULTS,
 } from "../led.js";
 import {
   PolarityLedElement,
@@ -791,8 +791,8 @@ describe("AnalogLED", () => {
   it("analog_factory_produces_nonlinear_element", () => {
     const props = new PropertyBag();
     props.set("color", "red");
-    props.replaceModelParams({ ...LED_DEFAULTS });
-    const core = getFactory(LedDefinition.modelRegistry!.red!)!(new Map([["in", 1]]), [], -1, props, () => 0);
+    props.replaceModelParams({ ...DIODE_PARAM_DEFAULTS });
+    const core = getFactory(LedDefinition.modelRegistry!.red!)!(new Map([["in", 1]]), props, () => 0);
     const { element } = withState(core);
     expect(element.isNonlinear).toBe(true);
     expect(element.isReactive).toBe(false);
@@ -808,15 +808,14 @@ describe("AnalogLED", () => {
     //      matrixSize = 3
 
     const matrixSize = 3;
-    const branchRow = 2;
 
-    const vs = withNodeIds(makeDcVoltageSource(2, 0, branchRow, 5), [2, 0]);
+    const vs = withNodeIds(makeDcVoltageSource(new Map([["pos", 2], ["neg", 0]]), 5), [2, 0]);
     const r = makeResistorElementForLed(1, 2, 220);
 
     const props = new PropertyBag();
     props.set("color", "red");
-    props.replaceModelParams({ ...LED_DEFAULTS });
-    const ledCore = getFactory(LedDefinition.modelRegistry!.red!)!(new Map([["in", 1]]), [], -1, props, () => 0);
+    props.replaceModelParams({ ...DIODE_PARAM_DEFAULTS });
+    const ledCore = getFactory(LedDefinition.modelRegistry!.red!)!(new Map([["in", 1]]), props, () => 0);
     const { element: ledStateWrapped } = withState(ledCore);
     const led = withNodeIds(ledStateWrapped, [1, 0]);
 
@@ -839,15 +838,14 @@ describe("AnalogLED", () => {
     // Blue LED Vf  3.2V Â± 0.15V
 
     const matrixSize = 3;
-    const branchRow = 2;
 
-    const vs = withNodeIds(makeDcVoltageSource(2, 0, branchRow, 5), [2, 0]);
+    const vs = withNodeIds(makeDcVoltageSource(new Map([["pos", 2], ["neg", 0]]), 5), [2, 0]);
     const r = makeResistorElementForLed(1, 2, 100);
 
     const props = new PropertyBag();
     props.set("color", "blue");
-    props.replaceModelParams({ ...LED_DEFAULTS, IS: 6.26e-24, N: 2.5 });
-    const ledCore = getFactory(LedDefinition.modelRegistry!.blue!)!(new Map([["in", 1]]), [], -1, props, () => 0);
+    props.replaceModelParams({ ...DIODE_PARAM_DEFAULTS, IS: 6.26e-24, N: 2.5 });
+    const ledCore = getFactory(LedDefinition.modelRegistry!.blue!)!(new Map([["in", 1]]), props, () => 0);
     const { element: ledStateWrapped } = withState(ledCore);
     const led = withNodeIds(ledStateWrapped, [1, 0]);
 
@@ -895,22 +893,24 @@ describe("integration", () => {
 
     const props = new PropertyBag();
     props.set("color", "red");
-    props.replaceModelParams({ ...LED_DEFAULTS, IS, N, CJO, VJ, M, TT, FC });
-    const core = getFactory(LedDefinition.modelRegistry!.red!)!(new Map([["in", 1]]), [], -1, props, () => 0);
+    props.replaceModelParams({ ...DIODE_PARAM_DEFAULTS, IS, N, CJO, VJ, M, TT, FC });
+    const core = getFactory(LedDefinition.modelRegistry!.red!)!(new Map([["in", 1]]), props, () => 0);
 
-    const pool = new StatePool(6);
+    const slotVD = DIODE_CAP_SCHEMA.indexOf.get("VD")!;
+    const slotQ  = DIODE_CAP_SCHEMA.indexOf.get("Q")!;
+    const pool = new StatePool(DIODE_CAP_SCHEMA.size);
     (core as unknown as PoolBackedAnalogElementCore).stateBaseOffset = 0;
     (core as unknown as PoolBackedAnalogElementCore).initState(pool);
 
-    // Seed SLOT_VD=0 with vd so pnjlim sees vdOld=vd and returns vdLimited=vd unchanged.
-    pool.state0[0] = vd;
+    // Seed VD with vd so pnjlim sees vdOld=vd and returns vdLimited=vd unchanged.
+    pool.state0[slotVD] = vd;
 
-    // Seed previous-step charge in s1[SLOT_Q=4]
+    // Seed previous-step charge in s1[Q]
     const nVt = N * LED_VT;
     const prevVd = 1.75;
     const prevIdRaw = IS * (Math.exp(prevVd / nVt) - 1);
     const q1_val = computeJunctionCharge(prevVd, CJO, VJ, M, FC, TT, prevIdRaw);
-    pool.state1[4] = q1_val;
+    pool.state1[slotQ] = q1_val;
 
     const stamps: Array<[number, number, number]> = [];
     const rhs: Array<[number, number]> = [];
@@ -950,7 +950,7 @@ describe("integration", () => {
 
     // Verify the element stamped the correct total at diagonal (0,0)
     const total00 = stamps.filter(([r, c]) => r === 0 && c === 0).reduce((sum, s) => sum + s[2], 0);
-    const gd_junction = gdRaw + 1e-12; // LED_GMIN added in load()
+    const gd_junction = gdRaw + 1e-12; // GMIN added in diode load()
     expect(total00).toBe(gd_junction + capGeq_expected);
   });
 
@@ -966,23 +966,6 @@ describe("integration", () => {
 });
 
 // ---------------------------------------------------------------------------
-// LED cap state schema tests (Task 0.2.2)
-// ---------------------------------------------------------------------------
-
-describe("Led", () => {
-  it("cap_state_schema_has_no_cap_geq_ieq_v_slots", () => {
-    const indexMap = LED_CAP_STATE_SCHEMA.indexOf as ReadonlyMap<string, number>;
-    expect(indexMap.get("CAP_GEQ")).toBeUndefined();
-    expect(indexMap.get("CAP_IEQ")).toBeUndefined();
-    expect(indexMap.get("V")).toBeUndefined();
-  });
-
-  it("cap_state_size_is_six", () => {
-    expect(LED_CAP_STATE_SCHEMA.size).toBe(6);
-  });
-});
-
-// ---------------------------------------------------------------------------
 // LED limitingCollector tests (Phase 4 Task 4.2.1)
 // ---------------------------------------------------------------------------
 
@@ -990,8 +973,8 @@ describe("LED limitingCollector", () => {
   function makeLedCoreWithPool(overrides?: { label?: string; elementIndex?: number }) {
     const props = new PropertyBag();
     props.set("color", "red");
-    props.replaceModelParams({ ...LED_DEFAULTS });
-    const core = getFactory(LedDefinition.modelRegistry!.red!)!(new Map([["in", 1]]), [], -1, props, () => 0);
+    props.replaceModelParams({ ...DIODE_PARAM_DEFAULTS });
+    const core = getFactory(LedDefinition.modelRegistry!.red!)!(new Map([["in", 1]]), props, () => 0);
     (core as unknown as { label: string }).label = overrides?.label ?? "LED1";
     (core as unknown as { elementIndex: number }).elementIndex = overrides?.elementIndex ?? 7;
     const { element, pool } = withState(core as AnalogElementCore);
@@ -1003,33 +986,13 @@ describe("LED limitingCollector", () => {
     rhs: Float64Array,
     overrides: Partial<LoadContext> = {},
   ): LoadContext {
-    return {
-      solver,
-      matrix: solver,
-      rhsOld: rhs,
-      rhs: rhs,
+    return makeLoadCtx({
       cktMode: MODEINITFLOAT,
-      time: 0,
-      dt: 0,
-      method: "trapezoidal",
-      order: 1,
-      deltaOld: [0, 0, 0, 0, 0, 0, 0],
-      ag: new Float64Array(7),
-      srcFact: 1,
-      noncon: { value: 0 },
-      limitingCollector: null,
-      convergenceCollector: null,
-      xfact: 1,
-      gmin: 1e-12,
-      reltol: 1e-3,
-      iabstol: 1e-12,
-      temp: 300.15,
-      vt: 0.02585,
-      cktFixLimit: false,
-      bypass: false,
-      voltTol: 1e-6,
+      solver,
+      rhs,
+      rhsOld: rhs,
       ...overrides,
-    };
+    });
   }
 
   it("pushes AK pnjlim event on non-init NR iteration", () => {
@@ -1118,7 +1081,7 @@ describe("LED TEMP", () => {
   function makeLedProps(overrides?: Record<string, number>): PropertyBag {
     const props = new PropertyBag();
     props.set("color", "red");
-    const defaults = { ...LED_DEFAULTS, ...overrides };
+    const defaults = { ...DIODE_PARAM_DEFAULTS, ...overrides };
     props.replaceModelParams(defaults);
     return props;
   }
@@ -1127,8 +1090,6 @@ describe("LED TEMP", () => {
     const props = makeLedProps(overrides);
     const core = getFactory(LedDefinition.modelRegistry!.red!)!(
       new Map([["in", 1]]),
-      [],
-      -1,
       props,
       () => 0,
     );
@@ -1139,33 +1100,13 @@ describe("LED TEMP", () => {
   function buildTempLoadCtx(overrides: Partial<LoadContext> = {}): LoadContext {
     const solver = new SparseSolver();
     solver._initStructure();
-    return {
-      solver,
-      matrix: solver,
-      rhsOld: new Float64Array(1),
-      rhs: new Float64Array(1),
+    return makeLoadCtx({
       cktMode: MODEINITJCT,
-      time: 0,
-      dt: 0,
-      method: "trapezoidal",
-      order: 1,
-      deltaOld: [0, 0, 0, 0, 0, 0, 0],
-      ag: new Float64Array(7),
-      srcFact: 1,
-      noncon: { value: 0 },
-      limitingCollector: null,
-      convergenceCollector: null,
-      xfact: 1,
-      gmin: 1e-12,
-      reltol: 1e-3,
-      iabstol: 1e-12,
-      temp: 300.15,
-      vt: 0.02585,
-      cktFixLimit: false,
-      bypass: false,
-      voltTol: 1e-6,
+      solver,
+      rhs: new Float64Array(1),
+      rhsOld: new Float64Array(1),
       ...overrides,
-    };
+    });
   }
 
   it("TEMP_default_300_15", () => {
@@ -1174,7 +1115,7 @@ describe("LED TEMP", () => {
   });
 
   it("paramDefs_include_TEMP", () => {
-    const keys = LED_PARAM_DEFS.map((d) => d.key);
+    const keys = DIODE_PARAM_DEFS.map((d) => d.key);
     expect(keys).toContain("TEMP");
   });
 

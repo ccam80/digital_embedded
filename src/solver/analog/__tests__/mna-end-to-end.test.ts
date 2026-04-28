@@ -195,7 +195,9 @@ describe("End-to-end: full pipeline", () => {
     const result = engine.dcOperatingPoint();
 
     expect(result.converged).toBe(true);
-    expect(result.nodeVoltages.length).toBe(compiled.matrixSize);
+    // 1-based ngspice convention: nodeVoltages.length = matrixSize + 1
+    // (slot 0 is the ground sentinel; slots 1..matrixSize are active rows).
+    expect(result.nodeVoltages.length).toBe(engine.matrixSize + 1);
 
     // We don't know exact node assignment order, so check all node voltages
     // Midpoint = 2.5V, top = 5.0V
@@ -243,7 +245,8 @@ describe("End-to-end: full pipeline", () => {
 
     expect(result.converged).toBe(true);
 
-    const voltages = Array.from(result.nodeVoltages).slice(0, compiled.nodeCount);
+    // 1-based: skip slot 0 (ground sentinel), take slots 1..nodeCount.
+    const voltages = Array.from(result.nodeVoltages).slice(1, compiled.nodeCount + 1);
     const sorted = [...voltages].sort((a, b) => a - b);
 
     // Lower voltage = diode anode ≈ 0.6–0.75V
@@ -648,8 +651,9 @@ describe("MOSFET through compiler", () => {
     // Node voltages (non-ground): VDD top=5V, drain≈3.99V, gate=2V
     // Sort descending: [5V, ≈3.99V, 2V]
     // The drain node is the one between supply and gate voltage
+    // 1-based: skip slot 0 (ground sentinel), take slots 1..nodeCount.
     const voltages = Array.from(result.nodeVoltages)
-      .slice(0, compiled.nodeCount)
+      .slice(1, compiled.nodeCount + 1)
       .sort((a, b) => b - a);
 
     // VDD node = 5V
@@ -723,8 +727,9 @@ describe("MOSFET through compiler", () => {
     expect(result.converged).toBe(true);
 
     // Sort node voltages descending: [5V(VDD), 3V(gate), drain(small)]
+    // 1-based: skip slot 0 (ground sentinel), take slots 1..nodeCount.
     const voltages = Array.from(result.nodeVoltages)
-      .slice(0, compiled.nodeCount)
+      .slice(1, compiled.nodeCount + 1)
       .sort((a, b) => b - a);
 
     // VDD = 5V
@@ -801,8 +806,9 @@ describe("MOSFET through compiler", () => {
     expect(result.converged).toBe(true);
 
     // Sort node voltages descending: [5V(VDD/source), 3V(gate), drain(~0.5V)]
+    // 1-based: skip slot 0 (ground sentinel), take slots 1..nodeCount.
     const voltages = Array.from(result.nodeVoltages)
-      .slice(0, compiled.nodeCount)
+      .slice(1, compiled.nodeCount + 1)
       .sort((a, b) => b - a);
 
     // VDD/source node = 5V

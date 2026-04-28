@@ -1,0 +1,110 @@
+
+[1m[7m[36m RUN [39m[27m[22m [36mv2.1.9 [39m[90mC:/local_working_projects/digital_in_browser[39m
+
+ [31m❯[39m src/solver/analog/__tests__/analog-engine.test.ts [2m([22m[2m29 tests[22m[2m | [22m[31m6 failed[39m[2m)[22m[90m 44[2mms[22m[39m
+[31m   [31m×[31m MNAEngine[2m > [22minit_allocates_correct_size[90m 10[2mms[22m[31m[39m
+[31m     → expected +0 to be 4 // Object.is equality[39m
+[31m   [31m×[31m MNAEngine[2m > [22mpredictor_off_rc_regression[90m 1[2mms[22m[31m[39m
+[31m     → expected 'ERROR' not to be 'ERROR' // Object.is equality[39m
+[31m   [31m×[31m MNAEngine[2m > [22mtransient_fuse_blows_under_overcurrent[90m 1[2mms[22m[31m[39m
+[31m     → expected NaN to be less than 2[39m
+[31m   [31m×[31m rc_transient_without_separate_loops[2m > [22mrc_transient_without_separate_loops[90m 1[2mms[22m[31m[39m
+[31m     → expected 'ERROR' not to be 'ERROR' // Object.is equality[39m
+[31m   [31m×[31m buffer_consolidation[2m > [22mno_parallel_voltage_buffer[90m 1[2mms[22m[31m[39m
+[31m     → expected +0 to be 1 // Object.is equality[39m
+[31m   [31m×[31m method_stable_across_ringing[2m > [22mmethod_stable_across_ringing[90m 1[2mms[22m[31m[39m
+[31m     → expected 'ERROR' not to be 'ERROR' // Object.is equality[39m
+
+[31m⎯⎯⎯⎯⎯⎯⎯[1m[7m Failed Tests 6 [27m[22m⎯⎯⎯⎯⎯⎯⎯[39m
+
+[31m[1m[7m FAIL [27m[22m[39m src/solver/analog/__tests__/analog-engine.test.ts[2m > [22mMNAEngine[2m > [22minit_allocates_correct_size
+[31m[1mAssertionError[22m: expected +0 to be 4 // Object.is equality[39m
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[32m- 4[39m
+[31m+ 0[39m
+
+[36m [2m❯[22m src/solver/analog/__tests__/analog-engine.test.ts:[2m180:31[22m[39m
+    [90m178| [39m    [35mconst[39m e [33m=[39m engine [35mas[39m unknown [35mas[39m { _ctx[33m:[39m { rhs[33m:[39m [33mFloat64Array[39m } }[33m;[39m
+    [90m179| [39m    [34mexpect[39m(e[33m.[39m_ctx[33m.[39mrhs)[33m.[39m[34mtoBeInstanceOf[39m([33mFloat64Array[39m)[33m;[39m
+    [90m180| [39m    [34mexpect[39m(e[33m.[39m_ctx[33m.[39mrhs[33m.[39mlength)[33m.[39m[34mtoBe[39m([34m4[39m)[33m;[39m
+    [90m   | [39m                              [31m^[39m
+    [90m181| [39m  })[33m;[39m
+    [90m182| [39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/6]⎯[22m[39m
+
+[31m[1m[7m FAIL [27m[22m[39m src/solver/analog/__tests__/analog-engine.test.ts[2m > [22mMNAEngine[2m > [22mpredictor_off_rc_regression
+[31m[1mAssertionError[22m: expected 'ERROR' not to be 'ERROR' // Object.is equality[39m
+[36m [2m❯[22m src/solver/analog/__tests__/analog-engine.test.ts:[2m567:35[22m[39m
+    [90m565| [39m    }
+    [90m566| [39m
+    [90m567| [39m    [34mexpect[39m(engine[33m.[39m[34mgetState[39m())[33m.[39mnot[33m.[39m[34mtoBe[39m([33mEngineState[39m[33m.[39m[33mERROR[39m)[33m;[39m
+    [90m   | [39m                                  [31m^[39m
+    [90m568| [39m    [90m// With Vs still connected, V(node2) should stay near 5V (source c[39m…
+    [90m569| [39m    [35mconst[39m v2 [33m=[39m engine[33m.[39m[34mgetNodeVoltage[39m([34m2[39m)[33m;[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/6]⎯[22m[39m
+
+[31m[1m[7m FAIL [27m[22m[39m src/solver/analog/__tests__/analog-engine.test.ts[2m > [22mMNAEngine[2m > [22mtransient_fuse_blows_under_overcurrent
+[31m[1mAssertionError[22m: expected NaN to be less than 2[39m
+[36m [2m❯[22m src/solver/analog/__tests__/analog-engine.test.ts:[2m597:36[22m[39m
+    [90m595| [39m    [90m// Before transient: fuse should be intact[39m
+    [90m596| [39m    [34mexpect[39m(fuse[33m.[39mblown)[33m.[39m[34mtoBe[39m([35mfalse[39m)[33m;[39m
+    [90m597| [39m    [34mexpect[39m(fuse[33m.[39mcurrentResistance)[33m.[39m[34mtoBeLessThan[39m([34m2[39m)[33m;[39m [90m// close to rCold=[39m…
+    [90m   | [39m                                   [31m^[39m
+    [90m598| [39m
+    [90m599| [39m    [90m// Run a few transient steps — fuse should blow almost immediately[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/6]⎯[22m[39m
+
+[31m[1m[7m FAIL [27m[22m[39m src/solver/analog/__tests__/analog-engine.test.ts[2m > [22mrc_transient_without_separate_loops[2m > [22mrc_transient_without_separate_loops
+[31m[1mAssertionError[22m: expected 'ERROR' not to be 'ERROR' // Object.is equality[39m
+[36m [2m❯[22m src/solver/analog/__tests__/analog-engine.test.ts:[2m773:37[22m[39m
+    [90m771| [39m    [35mfor[39m ([35mlet[39m i [33m=[39m [34m0[39m[33m;[39m i [33m<[39m [34m100[39m[33m;[39m i[33m++[39m) {
+    [90m772| [39m      engine[33m.[39m[34mstep[39m()[33m;[39m
+    [90m773| [39m      [34mexpect[39m(engine[33m.[39m[34mgetState[39m())[33m.[39mnot[33m.[39m[34mtoBe[39m([33mEngineState[39m[33m.[39m[33mERROR[39m)[33m;[39m
+    [90m   | [39m                                    [31m^[39m
+    [90m774| [39m    }
+    [90m775| [39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/6]⎯[22m[39m
+
+[31m[1m[7m FAIL [27m[22m[39m src/solver/analog/__tests__/analog-engine.test.ts[2m > [22mbuffer_consolidation[2m > [22mno_parallel_voltage_buffer
+[31m[1mAssertionError[22m: expected +0 to be 1 // Object.is equality[39m
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[32m- 1[39m
+[31m+ 0[39m
+
+[36m [2m❯[22m src/solver/analog/__tests__/analog-engine.test.ts:[2m813:28[22m[39m
+    [90m811| [39m    [35mconst[39m ctx [33m=[39m e[33m.[39m_ctx [35mas[39m { rhs[33m:[39m [33mFloat64Array[39m }[33m;[39m
+    [90m812| [39m    [34mexpect[39m(ctx[33m.[39mrhs)[33m.[39m[34mtoBeInstanceOf[39m([33mFloat64Array[39m)[33m;[39m
+    [90m813| [39m    [34mexpect[39m(ctx[33m.[39mrhs[33m.[39mlength)[33m.[39m[34mtoBe[39m(engine[33m.[39mmatrixSize [33m+[39m [34m1[39m)[33m;[39m
+    [90m   | [39m                           [31m^[39m
+    [90m814| [39m  })[33m;[39m
+    [90m815| [39m})[33m;[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/6]⎯[22m[39m
+
+[31m[1m[7m FAIL [27m[22m[39m src/solver/analog/__tests__/analog-engine.test.ts[2m > [22mmethod_stable_across_ringing[2m > [22mmethod_stable_across_ringing
+[31m[1mAssertionError[22m: expected 'ERROR' not to be 'ERROR' // Object.is equality[39m
+[36m [2m❯[22m src/solver/analog/__tests__/analog-engine.test.ts:[2m868:37[22m[39m
+    [90m866| [39m    [35mfor[39m ([35mlet[39m i [33m=[39m [34m0[39m[33m;[39m i [33m<[39m [34m50[39m[33m;[39m i[33m++[39m) {
+    [90m867| [39m      engine[33m.[39m[34mstep[39m()[33m;[39m
+    [90m868| [39m      [34mexpect[39m(engine[33m.[39m[34mgetState[39m())[33m.[39mnot[33m.[39m[34mtoBe[39m([33mEngineState[39m[33m.[39m[33mERROR[39m)[33m;[39m
+    [90m   | [39m                                    [31m^[39m
+    [90m869| [39m    }
+    [90m870| [39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/6]⎯[22m[39m
+
+[2m Test Files [22m [1m[31m1 failed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[31m6 failed[39m[22m[2m | [22m[1m[32m23 passed[39m[22m[90m (29)[39m
+[2m   Start at [22m 20:52:37
+[2m   Duration [22m 1.18s[2m (transform 489ms, setup 0ms, collect 664ms, tests 44ms, environment 0ms, prepare 201ms)[22m
+

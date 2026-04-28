@@ -1,0 +1,43 @@
+
+[1m[7m[36m RUN [39m[27m[22m [36mv2.1.9 [39m[90mC:/local_working_projects/digital_in_browser[39m
+
+ [31m❯[39m src/components/passives/__tests__/analog-fuse.test.ts [2m([22m[2m19 tests[22m[2m | [22m[31m2 failed[39m[2m)[22m[90m 19[2mms[22m[39m
+[31m   [31m×[31m AnalogFuseElement[2m > [22mstamp_nonlinear[2m > [22mstamps conductance into MNA solver when intact[90m 5[2mms[22m[31m[39m
+[31m     → number 1 is not iterable (cannot read property Symbol(Symbol.iterator))[39m
+[31m   [31m×[31m AnalogFuseElement[2m > [22mdc_operating_point[2m > [22mintact fuse in series with load resistor: current = V / (R_cold + R_load)[90m 1[2mms[22m[31m[39m
+[31m     → number 1 is not iterable (cannot read property Symbol(Symbol.iterator))[39m
+ [32m✓[39m src/solver/analog/__tests__/analog-engine.test.ts [2m([22m[2m25 tests[22m[2m)[22m[90m 39[2mms[22m[39m
+
+[31m⎯⎯⎯⎯⎯⎯⎯[1m[7m Failed Tests 2 [27m[22m⎯⎯⎯⎯⎯⎯⎯[39m
+
+[31m[1m[7m FAIL [27m[22m[39m src/components/passives/__tests__/analog-fuse.test.ts[2m > [22mAnalogFuseElement[2m > [22mstamp_nonlinear[2m > [22mstamps conductance into MNA solver when intact
+[31m[1mTypeError[22m: number 1 is not iterable (cannot read property Symbol(Symbol.iterator))[39m
+[36m [2m❯[22m Module.makeDcVoltageSource src/components/sources/dc-voltage-source.ts:[2m174:16[22m[39m
+    [90m172| [39m    isReactive[33m:[39m [35mfalse[39m[33m,[39m
+    [90m173| [39m    _stateBase[33m:[39m [33m-[39m[34m1[39m[33m,[39m
+    [90m174| [39m    _pinNodes[33m:[39m [35mnew[39m [33mMap[39m[33m<[39mstring[33m,[39m number[33m>[39m(pinNodes)[33m,[39m
+    [90m   | [39m               [31m^[39m
+    [90m175| [39m    label[33m:[39m [32m""[39m[33m,[39m
+    [90m176| [39m
+[90m [2m❯[22m src/components/passives/__tests__/analog-fuse.test.ts:[2m309:18[22m[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯[22m[39m
+
+[31m[1m[7m FAIL [27m[22m[39m src/components/passives/__tests__/analog-fuse.test.ts[2m > [22mAnalogFuseElement[2m > [22mdc_operating_point[2m > [22mintact fuse in series with load resistor: current = V / (R_cold + R_load)
+[31m[1mTypeError[22m: number 1 is not iterable (cannot read property Symbol(Symbol.iterator))[39m
+[36m [2m❯[22m Module.makeDcVoltageSource src/components/sources/dc-voltage-source.ts:[2m174:16[22m[39m
+    [90m172| [39m    isReactive[33m:[39m [35mfalse[39m[33m,[39m
+    [90m173| [39m    _stateBase[33m:[39m [33m-[39m[34m1[39m[33m,[39m
+    [90m174| [39m    _pinNodes[33m:[39m [35mnew[39m [33mMap[39m[33m<[39mstring[33m,[39m number[33m>[39m(pinNodes)[33m,[39m
+    [90m   | [39m               [31m^[39m
+    [90m175| [39m    label[33m:[39m [32m""[39m[33m,[39m
+    [90m176| [39m
+[90m [2m❯[22m src/components/passives/__tests__/analog-fuse.test.ts:[2m342:18[22m[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯[22m[39m
+
+[2m Test Files [22m [1m[31m1 failed[39m[22m[2m | [22m[1m[32m1 passed[39m[22m[90m (2)[39m
+[2m      Tests [22m [1m[31m2 failed[39m[22m[2m | [22m[1m[32m42 passed[39m[22m[90m (44)[39m
+[2m   Start at [22m 22:17:05
+[2m   Duration [22m 1.05s[2m (transform 578ms, setup 0ms, collect 919ms, tests 57ms, environment 0ms, prepare 303ms)[22m
+

@@ -40,7 +40,8 @@ import { DriverDefinition } from "../../../components/wiring/driver.js";
 import { DriverInvSelDefinition } from "../../../components/wiring/driver-inv.js";
 import { SplitterDefinition } from "../../../components/wiring/splitter.js";
 import { BusSplitterDefinition } from "../../../components/wiring/bus-splitter.js";
-import { LedDefinition, LED_DEFAULTS } from "../../../components/io/led.js";
+import { LedDefinition } from "../../../components/io/led.js";
+import { DIODE_PARAM_DEFAULTS } from "../../../components/semiconductors/diode.js";
 import { SevenSegDefinition } from "../../../components/io/seven-seg.js";
 import { SevenSegHexDefinition } from "../../../components/io/seven-seg-hex.js";
 import { RelayDefinition } from "../../../components/switching/relay.js";
@@ -210,7 +211,7 @@ describe("LED", () => {
    */
   it("forward_current_lights", () => {
     const props = new PropertyBag();
-    props.replaceModelParams({ ...LED_DEFAULTS });
+    props.replaceModelParams({ ...DIODE_PARAM_DEFAULTS });
 
     // LED: anode = circuit node 2, cathode = ground (0)
     const ledCore = getFactory(LedDefinition.modelRegistry!.red!)(new Map([["in", 2]]), props, () => 0);

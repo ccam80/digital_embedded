@@ -519,7 +519,7 @@ export function newtonRaphson(ctx: CKTCircuitContext): void {
 
     if (ctx.noncon === 0 && iteration > 0) {
       globalConverged = true;
-      for (let i = 0; i < solver._size; i++) {
+      for (let i = 0; i < solver.matrixSize; i++) {
         const delta = Math.abs(ctx.rhs[i] - ctx.rhsOld[i]);
         if (delta > largestChangeMag) {
           largestChangeMag = delta;
@@ -614,7 +614,7 @@ export function newtonRaphson(ctx: CKTCircuitContext): void {
         if (!el.isNonlinear) continue;
         let elDelta = 0;
         for (const ni of el.pinNodeIds) {
-          if (ni > 0 && ni <= solver._size) {
+          if (ni > 0 && ni <= solver.matrixSize) {
             const d = Math.abs(ctx.rhs[ni] - ctx.rhsOld[ni]);
             if (d > elDelta) elDelta = d;
           }
