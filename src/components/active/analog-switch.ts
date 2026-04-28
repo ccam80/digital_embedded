@@ -292,8 +292,6 @@ function createSwitchSPSTElement(
     stateSize: SW_SCHEMA.size,   // 2 (SW_NUM_STATES, swdefs.h:56)
     stateSchema: SW_SCHEMA,
     stateBaseOffset: -1,         // set by compiler (compiler.ts:1388)
-    s0: new Float64Array(0), s1: new Float64Array(0), s2: new Float64Array(0), s3: new Float64Array(0),
-    s4: new Float64Array(0), s5: new Float64Array(0), s6: new Float64Array(0), s7: new Float64Array(0),
 
     initState(poolRef: StatePoolRef): void {
       pool = poolRef;
@@ -409,20 +407,10 @@ function createSwitchSPDTElement(
     stateSize: SPDT_SCHEMA.size,   // 4 (two SW paths × 2 slots each)
     stateSchema: SPDT_SCHEMA,
     stateBaseOffset: -1,
-    s0: new Float64Array(0),
-    s1: new Float64Array(0),
-    s2: new Float64Array(0),
-    s3: new Float64Array(0),
-    s4: new Float64Array(0),
-    s5: new Float64Array(0),
-    s6: new Float64Array(0),
-    s7: new Float64Array(0),
 
     initState(poolRef: StatePoolRef): void {
       pool = poolRef;
       base = this.stateBaseOffset;
-      this.s0 = poolRef.state0; this.s1 = poolRef.state1; this.s2 = poolRef.state2; this.s3 = poolRef.state3;
-      this.s4 = poolRef.state4; this.s5 = poolRef.state5; this.s6 = poolRef.state6; this.s7 = poolRef.state7;
       applyInitialValues(SPDT_SCHEMA, pool, base, p);
     },
 

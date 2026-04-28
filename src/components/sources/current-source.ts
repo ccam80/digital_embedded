@@ -23,6 +23,7 @@ import {
   type ComponentDefinition,
 } from "../../core/registry.js";
 import { formatSI } from "../../editor/si-format.js";
+import type { SetupContext } from "../../solver/analog/setup-context.js";
 import type { AnalogElementCore, LoadContext } from "../../solver/analog/element.js";
 import { NGSPICE_LOAD_ORDER } from "../../solver/analog/element.js";
 import { stampRHS } from "../../solver/analog/stamp-helpers.js";
@@ -180,8 +181,9 @@ export function makeCurrentSource(
     _stateBase: -1,
     _pinNodes: new Map<string, number>([["neg", nodeNeg], ["pos", nodePos]]),
 
-    setup(_ctx: import("../../solver/analog/setup-context.js").SetupContext): void {
-      throw new Error("PB-ISRC not yet migrated");
+    setup(_ctx: SetupContext): void {
+      // ISRC has no *set.c in ngspice. No TSTALLOC, no internal nodes,
+      // no branch row, no state slots. Body is intentionally empty.
     },
 
     setParam(key: string, value: number): void {

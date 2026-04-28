@@ -126,30 +126,94 @@ setup(ctx: SetupContext): void {
 }
 ```
 
-Sub-element classes reuse `InductorSubElement` and `MutualInductorElement` from `src/components/passives/mutual-inductor.ts` (introduced by PB-XFMR). The tapped transformer composite constructs:
-- `_l1 = new InductorSubElement(p1Node, p2Node, label + "_L1")`
-- `_l2 = new InductorSubElement(s1Node, ctNode, label + "_L2")`
-- `_l3 = new InductorSubElement(ctNode, s2Node, label + "_L3")`
+Sub-element classes reuse `InductorSubElement` and `MutualInductorElement`
+from `src/components/passives/mutual-inductor.ts` (introduced by PB-XFMR).
+The tapped transformer composite constructs:
+
+- `_l1 = new InductorSubElement(p1Node, p2Node, label + "_L1", primaryInductance)`
+- `_l2 = new InductorSubElement(s1Node, ctNode, label + "_L2", primaryInductance × turnsRatio²)`
+- `_l3 = new InductorSubElement(ctNode, s2Node, label + "_L3", primaryInductance × turnsRatio²)`
 - `_mut12 = new MutualInductorElement(m12_coupling, _l1, _l2)`
 - `_mut13 = new MutualInductorElement(m13_coupling, _l1, _l3)`
 - `_mut23 = new MutualInductorElement(m23_coupling, _l2, _l3)`
 
+The 4th constructor arg to `InductorSubElement` is the `inductance: number`
+value (per patched PB-XFMR.md `InductorSubElement` constructor signature).
+For the secondary windings, `L = primaryInductance × turnsRatio²` reflects
+the standard transformer turn-ratio relationship; the value is recomputed
+in `setParam("primaryInductance", ...)` and `setParam("turnsRatio", ...)`
+and pushed to sub-inductors via `this._l2.setParam("L", L2)` etc.
+
+`MutualInductorElement` is NOT pool-backed (per patched PB-XFMR.md). Each
+sub-inductor IS pool-backed — the engine's `_poolBackedElements` filter at
+`ckt-context.ts:616` picks them up automatically because composite
+construction adds sub-inductors to the recursive element walk performed
+during `init()` per `00-engine.md` §A4.1.
+
 ## load() body — value writes only
 
-Implementer ports value-side equations from `ref/ngspice/src/spicelib/devices/ind/indload.c` (for L1, L2, L3) and `ref/ngspice/src/spicelib/devices/ind/mutload.c` (for MUT12, MUT13, MUT23), stamping through cached handles only. No `solver.allocElement` calls.
-
-The existing `AnalogTappedTransformerElement.load()` monolithic implementation is replaced by delegated calls to each sub-element's `load()`. The composite `load()` body:
+The composite `AnalogTappedTransformerElement.load(ctx)` body delegates to
+each sub-element's `load(ctx)`:
 
 ```ts
 load(ctx: LoadContext): void {
+  // Each sub-inductor's load() body is specified in PB-XFMR.md
+  // §InductorSubElement.load (line-for-line indload.c port). It stamps
+  // through the 5 cached _hXXX handles populated in setup().
   this._l1.load(ctx);
   this._l2.load(ctx);
   this._l3.load(ctx);
-  this._mut12.load(ctx, this._l1, this._l2);
-  this._mut13.load(ctx, this._l1, this._l3);
-  this._mut23.load(ctx, this._l2, this._l3);
+
+  // Each MUT's load() body is specified in PB-XFMR.md
+  // §MutualInductorElement.load (line-for-line mutload.c port). It
+  // stamps through the 2 cached _hBrXBrY handles populated in setup()
+  // and reads sub-inductor inductance/state via the package-internal
+  // getters specified in PB-XFMR.md.
+  this._mut12.load(ctx);
+  this._mut13.load(ctx);
+  this._mut23.load(ctx);
 }
 ```
+
+`MutualInductorElement.load(ctx)` takes only `ctx`; it reads its paired
+inductors from constructor-stored refs (`this._l1` / `this._l2` per the
+patched PB-XFMR.md §MutualInductorElement.load). The previous PB-TAPXFMR
+draft showed `this._mut12.load(ctx, this._l1, this._l2)` — that signature
+is incorrect. Use the single-argument form.
+
+The existing monolithic `AnalogTappedTransformerElement.load()` body is
+fully replaced by these 6 delegated calls. No `solver.allocElement` or
+`solver.stampElement` calls remain inside the composite's `load()` body
+itself.
+
+## Composite getLteTimestep
+
+```ts
+getLteTimestep(
+  dt: number,
+  deltaOld: readonly number[],
+  order: number,
+  method: IntegrationMethod,
+  lteParams: LteParams,
+): number {
+  // 3-way min across the three sub-inductors. MUT elements contribute
+  // no LTE constraint of their own (per PB-XFMR.md §MutualInductorElement).
+  return Math.min(
+    this._l1.getLteTimestep(dt, deltaOld, order, method, lteParams),
+    this._l2.getLteTimestep(dt, deltaOld, order, method, lteParams),
+    this._l3.getLteTimestep(dt, deltaOld, order, method, lteParams),
+  );
+}
+```
+
+## Composite `_pinNodes` ownership
+
+`AnalogTappedTransformerElement` owns `_pinNodes: Map<string, number>`
+per the A3 invariant. Sub-elements (the three `InductorSubElement`s and
+three `MutualInductorElement`s) do NOT carry their own `_pinNodes` maps —
+sub-inductors store node ids via constructor args; MUTs read sub-inductor
+refs. The composite's `_pinNodes` is populated at construction with all
+five user-facing pin labels (`P1`, `P2`, `S1`, `CT`, `S2`).
 
 ## Factory cleanup
 

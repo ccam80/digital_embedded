@@ -31,7 +31,6 @@ import {
 } from "../../core/registry.js";
 import type { AnalogElementCore, LoadContext } from "../../solver/analog/element.js";
 import { NGSPICE_LOAD_ORDER } from "../../solver/analog/element.js";
-import { stampRHS } from "../../solver/analog/stamp-helpers.js";
 import { parseExpression, evaluateExpression, ExprParseError } from "../../solver/analog/expression.js";
 import type { ExprNode } from "../../solver/analog/expression.js";
 import { defineModelParams } from "../../core/model-params.js";
@@ -548,12 +547,13 @@ export interface AcVoltageSourceAnalogElement extends AnalogElementCore {
 
 function createAcVoltageSourceElement(
   pinNodes: ReadonlyMap<string, number>,
-  branchIdx: number,
   props: PropertyBag,
   getTime: () => number,
 ): AcVoltageSourceAnalogElement {
-  const nodePos = pinNodes.get("pos")!;
-  const nodeNeg = pinNodes.get("neg")!;
+  let _hPosBr = -1;
+  let _hNegBr = -1;
+  let _hBrNeg = -1;
+  let _hBrPos = -1;
   const p: Record<string, number> = {
     amplitude: props.getModelParam<number>("amplitude"),
     frequency: props.getModelParam<number>("frequency"),
@@ -567,8 +567,8 @@ function createAcVoltageSourceElement(
   let frequency = p.frequency;
   let phase = p.phase;
   let dcOffset = p.dcOffset;
-  let riseTime = p.riseTime;
-  let fallTime = p.fallTime;
+  let riseTime  = p.riseTime;
+  let fallTime  = p.fallTime;
   let noiseSampleTime = p.noiseSampleTime;
   const waveform = props.getOrDefault<string>("waveform", "sine") as Waveform;
   const ext: ExtendedWaveformParams = {
@@ -596,16 +596,30 @@ function createAcVoltageSourceElement(
     }
   }
 
-  const element: AcVoltageSourceAnalogElement = {
-    branchIndex: branchIdx,
+  const element: AcVoltageSourceAnalogElement & { label: string } = {
+    branchIndex: -1,
     ngspiceLoadOrder: NGSPICE_LOAD_ORDER.VSRC,
     isNonlinear: false,
     isReactive: false,
     _stateBase: -1,
     _pinNodes: new Map<string, number>(pinNodes),
+    label: "",
 
-    setup(_ctx: import("../../solver/analog/setup-context.js").SetupContext): void {
-      throw new Error("PB-VSRC-AC not yet migrated");
+    setup(ctx: import("../../solver/analog/setup-context.js").SetupContext): void {
+      const posNode    = element._pinNodes.get("pos")!;
+      const negNode    = element._pinNodes.get("neg")!;
+
+      // Port of vsrcset.c:40-43 — idempotent branch allocation
+      if (element.branchIndex === -1) {
+        element.branchIndex = ctx.makeCur(element.label, "branch");
+      }
+      const branchNode = element.branchIndex;
+
+      // Port of vsrcset.c:52-55 — TSTALLOC sequence (line-for-line)
+      _hPosBr = ctx.solver.allocElement(posNode,    branchNode); // VSRCposNode, VSRCbranch
+      _hNegBr = ctx.solver.allocElement(negNode,    branchNode); // VSRCnegNode, VSRCbranch
+      _hBrNeg = ctx.solver.allocElement(branchNode, negNode);    // VSRCbranch,  VSRCnegNode
+      _hBrPos = ctx.solver.allocElement(branchNode, posNode);    // VSRCbranch,  VSRCposNode
     },
 
     _parsedExpr: parsedExpr,
@@ -629,7 +643,6 @@ function createAcVoltageSourceElement(
 
     load(ctx: LoadContext): void {
       const solver = ctx.solver;
-      const k = branchIdx;
       const t = getTime();
 
       let v: number;
@@ -643,25 +656,22 @@ function createAcVoltageSourceElement(
         v = computeWaveformValue(waveform, amplitude, frequency, phase, dcOffset, t, ext) * ctx.srcFact;
       }
 
-      // B sub-matrix: node rows, branch column k
-      if (nodePos !== 0) solver.stampElement(solver.allocElement(nodePos, k), 1);
-      if (nodeNeg !== 0) solver.stampElement(solver.allocElement(nodeNeg, k), -1);
-
-      // C sub-matrix: branch row k, node columns
-      if (nodePos !== 0) solver.stampElement(solver.allocElement(k, nodePos), 1);
-      if (nodeNeg !== 0) solver.stampElement(solver.allocElement(k, nodeNeg), -1);
-
-      // RHS voltage constraint (ctx.srcFact folded in above).
-      stampRHS(ctx.rhs,k, v);
+      // vsrcload.c:43-46
+      solver.stampElement(_hPosBr, +1.0);
+      solver.stampElement(_hNegBr, -1.0);
+      solver.stampElement(_hBrPos, +1.0);
+      solver.stampElement(_hBrNeg, -1.0);
+      // vsrcload.c:416 — RHS
+      ctx.rhs[element.branchIndex] += v;
     },
 
     getPinCurrents(rhs: Float64Array): number[] {
-      // MNA branch variable: rhs[branchIdx] = I flowing from nodeNeg
+      // MNA branch variable: rhs[branchIndex] = I flowing from nodeNeg
       // through source to nodePos.
       // Pin layout order: [neg, pos].
       // "Into element at neg" = -I (current exits neg into external circuit).
       // "Into element at pos" = +I (current enters pos from external circuit).
-      const I = rhs[branchIdx];
+      const I = rhs[element.branchIndex];
       return [-I, I];
     },
 
@@ -926,11 +936,20 @@ export const AcVoltageSourceDefinition: ComponentDefinition = {
         props: PropertyBag,
         getTime: () => number,
       ): AnalogElementCore {
-        return createAcVoltageSourceElement(pinNodes, -1, props, getTime);
+        return createAcVoltageSourceElement(pinNodes, props, getTime);
       },
       paramDefs: AC_VOLTAGE_SOURCE_PARAM_DEFS,
       params: AC_VOLTAGE_SOURCE_DEFAULTS,
       ngspiceNodeMap: { neg: "neg", pos: "pos" },
+      findBranchFor(name: string, ctx: import("../../solver/analog/setup-context.js").SetupContext): number {
+        // Mirrors VSRCfindBr (vsrc/vsrcfbr.c:26-39).
+        const el = ctx.findDevice(name);
+        if (!el) return 0;
+        if (el.branchIndex === -1) {
+          el.branchIndex = ctx.makeCur(name, "branch");
+        }
+        return el.branchIndex;
+      },
     },
   },
   defaultModel: "behavioral",

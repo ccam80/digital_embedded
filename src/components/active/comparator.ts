@@ -260,20 +260,9 @@ export function createOpenCollectorComparatorElement(
     stateSchema: COMPARATOR_COMPOSITE_SCHEMA,
     stateSize: COMPARATOR_COMPOSITE_SCHEMA.size + childStateSize,
     stateBaseOffset: -1,
-    s0: new Float64Array(0),
-    s1: new Float64Array(0),
-    s2: new Float64Array(0),
-    s3: new Float64Array(0),
-    s4: new Float64Array(0),
-    s5: new Float64Array(0),
-    s6: new Float64Array(0),
-    s7: new Float64Array(0),
-
     initState(poolRef: StatePoolRef): void {
       pool = poolRef;
       base = this.stateBaseOffset;
-      this.s0 = poolRef.state0; this.s1 = poolRef.state1; this.s2 = poolRef.state2; this.s3 = poolRef.state3;
-      this.s4 = poolRef.state4; this.s5 = poolRef.state5; this.s6 = poolRef.state6; this.s7 = poolRef.state7;
       applyInitialValues(COMPARATOR_COMPOSITE_SCHEMA, pool, base, {});
       let offset = base + COMPARATOR_COMPOSITE_SCHEMA.size;
       for (const child of childElements) {
@@ -419,20 +408,9 @@ function createPushPullComparatorElement(
     stateSchema: COMPARATOR_COMPOSITE_SCHEMA,
     stateSize: COMPARATOR_COMPOSITE_SCHEMA.size + childStateSize,
     stateBaseOffset: -1,
-    s0: new Float64Array(0),
-    s1: new Float64Array(0),
-    s2: new Float64Array(0),
-    s3: new Float64Array(0),
-    s4: new Float64Array(0),
-    s5: new Float64Array(0),
-    s6: new Float64Array(0),
-    s7: new Float64Array(0),
-
     initState(poolRef: StatePoolRef): void {
       pool = poolRef;
       base = this.stateBaseOffset;
-      this.s0 = poolRef.state0; this.s1 = poolRef.state1; this.s2 = poolRef.state2; this.s3 = poolRef.state3;
-      this.s4 = poolRef.state4; this.s5 = poolRef.state5; this.s6 = poolRef.state6; this.s7 = poolRef.state7;
       applyInitialValues(COMPARATOR_COMPOSITE_SCHEMA, pool, base, {});
       let offset = base + COMPARATOR_COMPOSITE_SCHEMA.size;
       for (const child of childElements) {

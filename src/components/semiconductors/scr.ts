@@ -1,18 +1,13 @@
-﻿/**
+/**
  * SCR (Silicon Controlled Rectifier) analog component.
  *
- * Implements a thyristor using the two-transistor alpha-dependent model.
- * The device blocks forward and reverse conduction until triggered by
- * gate current, at which point it latches into a low-resistance on-state.
+ * Composite of two BJT sub-elements in a two-transistor latch configuration
+ * per PB-SCR spec (bjtsetup.c:347-465 per sub-element).
  *
- * Model summary:
- *   - Forward blocking: I = IS * (exp(V_AK/(N*VT)) - 1) / (1 - Î±â‚ - Î±â‚‚)
- *     (amplified leakage  small current, both alphas clamped â‰¤ 0.95)
- *   - Forward conduction (latched): diode in series with R_on, clamping V_AK  V_on
- *   - Reverse blocking: standard reverse-biased diode leakage
- *   - Triggering: when Î±â‚ + Î±â‚‚ > 0.95
- *   - Unlatching: when I_AK < I_hold
- *   - Breakover: when V_AK > V_breakover (triggers without gate)
+ *   Q1 — NPN (polarity = +1): B=G, C=Vint, E=K
+ *   Q2 — PNP (polarity = -1): B=Vint, C=G, E=A
+ *
+ * Internal node: Vint (latch node) — created once by the composite in setup().
  */
 
 import { AbstractCircuitElement } from "../../core/element.js";
@@ -28,43 +23,17 @@ import {
   type AttributeMapping,
   type ComponentDefinition,
 } from "../../core/registry.js";
-import type { PoolBackedAnalogElementCore, LoadContext } from "../../solver/analog/element.js";
-import { NGSPICE_LOAD_ORDER } from "../../solver/analog/element.js";
-import { MODEINITJCT } from "../../solver/analog/ckt-mode.js";
-import { stampG, stampRHS } from "../../solver/analog/stamp-helpers.js";
-import { pnjlim } from "../../solver/analog/newton-raphson.js";
+import type { AnalogElementCore } from "../../core/analog-types.js";
+import { NGSPICE_LOAD_ORDER } from "../../core/analog-types.js";
+import type { LoadContext } from "../../solver/analog/load-context.js";
+import type { SetupContext } from "../../solver/analog/setup-context.js";
 import { defineModelParams } from "../../core/model-params.js";
-import type { StatePoolRef } from "../../core/analog-types.js";
-import { defineStateSchema, applyInitialValues } from "../../solver/analog/state-schema.js";
 
-// ---------------------------------------------------------------------------
-// Physical constants (ngspice const.h values)
-// ---------------------------------------------------------------------------
-
-/** Boltzmann constant (CONSTboltz). */
-const CONSTboltz = 1.3806226e-23;
-/** Electron charge (CHARGE). */
-const CHARGE = 1.6021918e-19;
-
-/** Minimum conductance for numerical stability (GMIN). */
-const GMIN = 1e-12;
-
-/** Maximum alpha value  prevents division-by-zero in blocking formula. */
-const ALPHA_MAX = 0.95;
-
-// ---------------------------------------------------------------------------
-// State pool slot indices
-// ---------------------------------------------------------------------------
-
-const SLOT_VAK       = 0;
-const SLOT_VGK       = 1;
-const SLOT_GEQ       = 2;
-const SLOT_IEQ       = 3;
-const SLOT_G_GATE_GEQ = 4;
-const SLOT_G_GATE_IEQ = 5;
-const SLOT_LATCHED   = 6;
-const SLOT_IAK       = 7;
-const SLOT_IGK       = 8;
+import {
+  createBjtElement,
+  BJT_NPN_DEFAULTS,
+  BJT_PNP_DEFAULTS,
+} from "./bjt.js";
 
 // ---------------------------------------------------------------------------
 // Model parameter declarations
@@ -72,334 +41,162 @@ const SLOT_IGK       = 8;
 
 export const { paramDefs: SCR_PARAM_DEFS, defaults: SCR_PARAM_DEFAULTS } = defineModelParams({
   primary: {
-    vOn:        { default: 1.5,   unit: "V", description: "On-state forward voltage drop" },
-    iH:         { default: 5e-3,  unit: "A", description: "Holding current  minimum anode current to stay on" },
-    rOn:        { default: 0.01,  unit: "Î", description: "On-state series resistance" },
-    vBreakover: { default: 100,   unit: "V", description: "Forward breakover voltage (triggers without gate)" },
+    BF: { default: 100,   description: "NPN forward current gain (Q1)" },
+    BR: { default: 100,   description: "PNP reverse current gain (Q2)" },
+    IS: { default: 1e-16, unit: "A", description: "Saturation current (shared)" },
   },
   secondary: {
-    iS:      { default: 1e-12,  unit: "A", description: "Reverse saturation current" },
-    alpha1:  { default: 0.5,               description: "PNP transistor current gain (fixed)" },
-    alpha2_0:{ default: 0.3,               description: "NPN off-state current gain" },
-    i_ref:   { default: 1e-3,   unit: "A", description: "Gate current scale factor for Î±â‚‚ modulation" },
-    n:       { default: 1,                 description: "Emission coefficient" },
+    RC: { default: 0,     unit: "Ω", description: "Collector resistance (shared)" },
+    RB: { default: 0,     unit: "Ω", description: "Base resistance (shared)" },
+    RE: { default: 0,     unit: "Ω", description: "Emitter resistance (shared)" },
   },
   instance: {
-    TEMP:    { default: 300.15, unit: "K", description: "Per-instance operating temperature" },
-    OFF:     { default: 0, emit: "flag",   description: "Initial off-state flag (0 = normal, 1 = forced off)" },
+    AREA: { default: 1,      description: "Device area factor" },
+    TEMP: { default: 300.15, unit: "K", description: "Per-instance operating temperature" },
   },
 });
 
 // ---------------------------------------------------------------------------
-// Stamp helpers  node 0 is ground (skipped)
+// Helpers to build PropertyBag for sub-elements
 // ---------------------------------------------------------------------------
 
+function makeNpnProps(BF: number, IS: number, RC: number, RB: number, RE: number, AREA: number, TEMP: number): PropertyBag {
+  const bag = new PropertyBag(new Map<string, number>().entries());
+  bag.replaceModelParams({ ...BJT_NPN_DEFAULTS, BF, IS, RC, RB, RE, AREA, TEMP });
+  return bag;
+}
 
-// ---------------------------------------------------------------------------
-// State schema declaration
-// ---------------------------------------------------------------------------
-
-const SCR_STATE_SCHEMA = defineStateSchema("ScrElement", [
-  { name: "VAK", doc: "Anode-cathode voltage, pnjlim-limited (V)", init: { kind: "zero" } },
-  { name: "VGK", doc: "Gate-cathode voltage, pnjlim-limited (V)", init: { kind: "zero" } },
-  { name: "GEQ", doc: "Linearized anode-cathode conductance (S)", init: { kind: "constant", value: 1e-12 } },
-  { name: "IEQ", doc: "Linearized anode-cathode current source (A)", init: { kind: "zero" } },
-  { name: "G_GATE_GEQ", doc: "Gate junction conductance (S)", init: { kind: "constant", value: 1e-12 } },
-  { name: "G_GATE_IEQ", doc: "Gate junction current source (A)", init: { kind: "zero" } },
-  { name: "LATCHED", doc: "Latch state flag (0=off, 1=on)", init: { kind: "zero" } },
-  { name: "IAK", doc: "Anode current (A)", init: { kind: "zero" } },
-  { name: "IGK", doc: "Gate current (A)", init: { kind: "zero" } },
-]);
-
-// ---------------------------------------------------------------------------
-// createScrElement  AnalogElement factory
-// ---------------------------------------------------------------------------
-
-export function createScrElement(
-  pinNodes: ReadonlyMap<string, number>,
-  props: PropertyBag,
-): PoolBackedAnalogElementCore {
-  const nodeA = pinNodes.get("A")!; // anode
-  const nodeK = pinNodes.get("K")!; // cathode
-  const nodeG = pinNodes.get("G")!; // gate
-
-  const p = {
-    vOn:        props.getModelParam<number>("vOn"),
-    iH:         props.getModelParam<number>("iH"),
-    rOn:        props.getModelParam<number>("rOn"),
-    vBreakover: props.getModelParam<number>("vBreakover"),
-    iS:         props.getModelParam<number>("iS"),
-    alpha1:     props.getModelParam<number>("alpha1"),
-    alpha2_0:   props.getModelParam<number>("alpha2_0"),
-    i_ref:      props.getModelParam<number>("i_ref"),
-    n:          props.getModelParam<number>("n"),
-    TEMP:       props.getModelParam<number>("TEMP"),
-    OFF:        props.getModelParam<number>("OFF"),
-  };
-
-  // cite: dioload.c / diotemp.c  per-instance TEMP drives thermal voltage
-  function computeScrTempParams(): { vt: number; nVt: number; vcrit: number; vcritGate: number; tVcrit: number } {
-    const vt = (CONSTboltz * p.TEMP) / CHARGE;
-    const nVt = p.n * vt;
-    const vcrit = nVt * Math.log(nVt / (p.iS * Math.SQRT2));
-    const vcritGate = nVt * Math.log(nVt / (p.iS * Math.SQRT2));
-    return { vt, nVt, vcrit, vcritGate, tVcrit: vcrit };
-  }
-
-  let tp = computeScrTempParams();
-
-  // Pool reference  set by initState. State arrays accessed via pool.states[N]
-  // at call time. No cached Float64Array refs.
-  let pool: StatePoolRef;
-  let base: number;
-
-  // Ephemeral per-iteration pnjlim limiting flag
-  let pnjlimLimited = false;
-
-  function computeAlpha2(iGate: number): number {
-    const raw = 1 - (1 - p.alpha2_0) * Math.exp(-Math.abs(iGate) / p.i_ref);
-    return Math.min(raw, ALPHA_MAX);
-  }
-
-  function computeOperatingPoint(s0: Float64Array, vak: number, vgk: number): void {
-    // Gate current through a small forward-biased junction (simplified model)
-    const iGate = p.iS * (Math.exp(vgk / tp.nVt) - 1) + GMIN * vgk;
-
-    const a2 = computeAlpha2(iGate);
-    const a1clamped = Math.min(p.alpha1, ALPHA_MAX);
-    const a2clamped = Math.min(a2, ALPHA_MAX);
-    const alphaSum = a1clamped + a2clamped;
-
-    // Check triggering: alpha sum > 0.95
-    if (s0[base + SLOT_LATCHED] === 0.0 && alphaSum > 0.95) {
-      s0[base + SLOT_LATCHED] = 1.0;
-    }
-
-    if (s0[base + SLOT_LATCHED] !== 0.0) {
-      // On-state: model as diode (V_on forward voltage) in series with R_on
-      const gOn = 1.0 / p.rOn;
-      const iOn = (vak - p.vOn) / p.rOn;
-      s0[base + SLOT_GEQ] = gOn + GMIN;
-      s0[base + SLOT_IEQ] = iOn - s0[base + SLOT_GEQ] * vak;
-
-      // Check if current has dropped below holding current  unlatch
-      const iAk = s0[base + SLOT_GEQ] * vak + s0[base + SLOT_IEQ];
-      s0[base + SLOT_IAK] = iAk;
-      if (iAk < p.iH && vak >= 0) {
-        s0[base + SLOT_LATCHED] = 0.0;
-        // Re-compute in blocking mode
-        computeBlockingMode(s0, vak, alphaSum);
-      }
-    } else {
-      computeBlockingMode(s0, vak, alphaSum);
-    }
-
-    // Gate junction model: forward-biased diode linearized at the (already
-    // pnjlim-limited) vgk operating point.
-    const expVgk = Math.exp(vgk / tp.nVt);
-    const gGate = (p.iS * expVgk) / tp.nVt + GMIN;
-    const iGateCurrent = p.iS * (expVgk - 1);
-    s0[base + SLOT_G_GATE_GEQ] = gGate;
-    s0[base + SLOT_G_GATE_IEQ] = iGateCurrent - gGate * vgk;
-    s0[base + SLOT_IGK] = iGateCurrent;
-  }
-
-  function computeBlockingMode(s0: Float64Array, vak: number, _alphaSum: number): void {
-    if (vak >= 0) {
-      // Forward blocking: high-resistance path
-      s0[base + SLOT_GEQ] = GMIN;
-      s0[base + SLOT_IEQ] = 0;
-      s0[base + SLOT_IAK] = GMIN * vak;
-    } else {
-      // Reverse blocking  reverse-biased diode (J1 junction)
-      const expArg = Math.min(vak / tp.nVt, 0);
-      const expVal = Math.exp(expArg);
-      const iRev = p.iS * (expVal - 1);
-      const gRev = (p.iS * expVal) / tp.nVt + GMIN;
-      s0[base + SLOT_GEQ] = gRev;
-      s0[base + SLOT_IEQ] = iRev - gRev * vak;
-      s0[base + SLOT_IAK] = iRev;
-    }
-  }
-
-  return {
-    branchIndex: -1,
-    _stateBase: -1,
-    _pinNodes: new Map(pinNodes),
-    ngspiceLoadOrder: NGSPICE_LOAD_ORDER.DIO,
-    isNonlinear: true,
-    isReactive: false,
-    poolBacked: true as const,
-    stateSize: 9,
-    stateSchema: SCR_STATE_SCHEMA,
-    stateBaseOffset: -1,
-
-    setup(_ctx: import("../../solver/analog/setup-context.js").SetupContext): void {
-      throw new Error("PB-SCR not yet migrated");
-    },
-
-    initState(poolRef: StatePoolRef): void {
-      pool = poolRef;
-      base = this.stateBaseOffset;
-      applyInitialValues(SCR_STATE_SCHEMA, pool, base, {});
-    },
-
-    load(ctx: LoadContext): void {
-      // Access state arrays at call time  no cached Float64Array refs.
-      const s0 = pool.states[0];
-
-      // cite: dioload.c:130-138  MODEINITJCT branch seeds junction voltages
-      // before first NR iteration. Anode-cathode seeds to tVcrit (OFF=0) or 0
-      // (OFF=1); gate-cathode always seeds to 0.
-      if (ctx.cktMode & MODEINITJCT) {
-        s0[base + SLOT_VAK] = p.OFF === 0 ? tp.tVcrit : 0;
-        s0[base + SLOT_VGK] = 0;
-        return;
-      }
-
-      const voltages = ctx.rhsOld;
-      const vA = voltages[nodeA];
-      const vK = voltages[nodeK];
-      const vGateNode = voltages[nodeG];
-      const vakRaw = vA - vK;
-      const vgkRaw = vGateNode - vK;
-
-      // Check breakover using raw voltage before pnjlim.
-      if (s0[base + SLOT_LATCHED] === 0.0 && vakRaw > p.vBreakover) {
-        s0[base + SLOT_LATCHED] = 1.0;
-      }
-
-      let vakLimited: number;
-      let vgkLimited: number;
-      {
-        // Apply pnjlim to anode-cathode junction voltage for NR stability
-        const vakResult = pnjlim(vakRaw, s0[base + SLOT_VAK], tp.nVt, tp.vcrit);
-        vakLimited = vakResult.value;
-
-        // Apply pnjlim to gate-cathode junction voltage for NR stability
-        const vgkResult = pnjlim(vgkRaw, s0[base + SLOT_VGK], tp.nVt, tp.vcritGate);
-        vgkLimited = vgkResult.value;
-        pnjlimLimited = vakResult.limited || vgkResult.limited;
-
-        if (ctx.limitingCollector) {
-          ctx.limitingCollector.push({
-            elementIndex: (this as any).elementIndex ?? -1,
-            label: (this as any).label ?? "",
-            junction: "AK",
-            limitType: "pnjlim",
-            vBefore: vakRaw,
-            vAfter: vakLimited,
-            wasLimited: vakResult.limited,
-          });
-          ctx.limitingCollector.push({
-            elementIndex: (this as any).elementIndex ?? -1,
-            label: (this as any).label ?? "",
-            junction: "GK",
-            limitType: "pnjlim",
-            vBefore: vgkRaw,
-            vAfter: vgkLimited,
-            wasLimited: vgkResult.limited,
-          });
-        }
-      }
-
-      if (pnjlimLimited) ctx.noncon.value++;
-
-      s0[base + SLOT_VAK] = vakLimited;
-      s0[base + SLOT_VGK] = vgkLimited;
-
-      computeOperatingPoint(s0, vakLimited, vgkLimited);
-
-      const solver = ctx.solver;
-      const geq      = s0[base + SLOT_GEQ];
-      const ieq      = s0[base + SLOT_IEQ];
-      const gGateGeq = s0[base + SLOT_G_GATE_GEQ];
-      const gGateIeq = s0[base + SLOT_G_GATE_IEQ];
-
-      // Anode-cathode path
-      stampG(solver, nodeA, nodeA, geq);
-      stampG(solver, nodeA, nodeK, -geq);
-      stampG(solver, nodeK, nodeA, -geq);
-      stampG(solver, nodeK, nodeK, geq);
-      stampRHS(ctx.rhs, nodeA, -ieq);
-      stampRHS(ctx.rhs, nodeK, ieq);
-
-      // Gate-cathode path (gate junction)
-      stampG(solver, nodeG, nodeG, gGateGeq);
-      stampG(solver, nodeG, nodeK, -gGateGeq);
-      stampG(solver, nodeK, nodeG, -gGateGeq);
-      stampG(solver, nodeK, nodeK, gGateGeq);
-      stampRHS(ctx.rhs, nodeG, -gGateIeq);
-      stampRHS(ctx.rhs, nodeK, gGateIeq);
-    },
-
-    checkConvergence(ctx: LoadContext): boolean {
-      // If voltage was limited in load(), declare non-convergence immediately.
-      if (pnjlimLimited) return false;
-
-      const s0 = pool.states[0];
-      const voltages = ctx.rhsOld;
-      const vA = voltages[nodeA];
-      const vK = voltages[nodeK];
-      const vG = voltages[nodeG];
-
-      // Current-prediction convergence test on anode-cathode junction
-      const vakRaw = vA - vK;
-      const delvak = vakRaw - s0[base + SLOT_VAK];
-      const iak = s0[base + SLOT_IAK];
-      const gak = s0[base + SLOT_GEQ];
-      const cakhat = iak + gak * delvak;
-      const tolAK = ctx.reltol * Math.max(Math.abs(cakhat), Math.abs(iak)) + ctx.iabstol;
-
-      // Current-prediction convergence test on gate-cathode junction
-      const vgkRaw = vG - vK;
-      const delvgk = vgkRaw - s0[base + SLOT_VGK];
-      const igk = s0[base + SLOT_IGK];
-      const ggk = s0[base + SLOT_G_GATE_GEQ];
-      const cgkhat = igk + ggk * delvgk;
-      const tolGK = ctx.reltol * Math.max(Math.abs(cgkhat), Math.abs(igk)) + ctx.iabstol;
-
-      return Math.abs(cakhat - iak) <= tolAK && Math.abs(cgkhat - igk) <= tolGK;
-    },
-
-    getPinCurrents(rhs: Float64Array): number[] {
-      // pinLayout order: [A(0), K(1), G(2)]
-      const s0 = pool.states[0];
-      const vA = rhs[nodeA];
-      const vK = rhs[nodeK];
-      const vG = rhs[nodeG];
-
-      const iAK = s0[base + SLOT_GEQ] * (vA - vK) + s0[base + SLOT_IEQ];
-      const iGK = s0[base + SLOT_G_GATE_GEQ] * (vG - vK) + s0[base + SLOT_G_GATE_IEQ];
-
-      const iA = iAK;
-      const iG = iGK;
-      const iK = -(iA + iG);
-
-      // Return in pinLayout order [A, K, G]
-      return [iA, iK, iG];
-    },
-
-    setParam(key: string, value: number): void {
-      if (key in p) {
-        (p as Record<string, number>)[key] = value;
-        tp = computeScrTempParams();
-      }
-    },
-
-    get label(): string | undefined {
-      return props.getOrDefault<string>("label", "");
-    },
-
-    // Expose latch state for testing
-    get _latchedState(): boolean {
-      return pool.states[0][base + SLOT_LATCHED] !== 0.0;
-    },
-  } as PoolBackedAnalogElementCore & { _latchedState: boolean };
+function makePnpProps(BR: number, IS: number, RC: number, RB: number, RE: number, AREA: number, TEMP: number): PropertyBag {
+  const bag = new PropertyBag(new Map<string, number>().entries());
+  bag.replaceModelParams({ ...BJT_PNP_DEFAULTS, BR, IS, RC, RB, RE, AREA, TEMP });
+  return bag;
 }
 
 // ---------------------------------------------------------------------------
-// ScrElement  CircuitElement implementation
+// ScrCompositeElement — composite AnalogElementCore
+// ---------------------------------------------------------------------------
+
+class ScrCompositeElement implements AnalogElementCore {
+  branchIndex: number = -1;
+  readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.BJT;
+  readonly isNonlinear: boolean = true;
+  readonly isReactive: boolean = false;
+  _stateBase: number = -1;
+  _pinNodes: Map<string, number>;
+
+  label: string;
+
+  private _aNode: number;
+  private _kNode: number;
+  private _gNode: number;
+  private _vintNode: number = -1;
+
+  readonly _q1: ReturnType<typeof createBjtElement>;  // NPN: B=G, C=Vint, E=K
+  readonly _q2: ReturnType<typeof createBjtElement>;  // PNP: B=Vint, C=G, E=A
+
+  constructor(
+    label: string,
+    pinNodes: ReadonlyMap<string, number>,
+    q1: ReturnType<typeof createBjtElement>,
+    q2: ReturnType<typeof createBjtElement>,
+  ) {
+    this.label = label;
+    this._pinNodes = new Map(pinNodes);
+    this._aNode = pinNodes.get("A")!;
+    this._kNode = pinNodes.get("K")!;
+    this._gNode = pinNodes.get("G")!;
+    this._q1 = q1;
+    this._q2 = q2;
+  }
+
+  setup(ctx: SetupContext): void {
+    // Create the shared internal latch node first
+    this._vintNode = ctx.makeVolt(this.label, "latch");
+
+    // Bind sub-element pin nodes using the resolved Vint.
+    // Sub-element pin rebinding uses direct pinNodeIds array assignment
+    // (consistent with PB-OPTO, PB-DAC, PB-OPAMP, PB-TIMER555). No setPinNode API is added
+    // to AnalogElementCore.
+    // Q1 NPN: BJT pin order [B, C, E] per buildBJTPinDeclarations()
+    (this._q1 as any)._pinNodes.set("B", this._gNode);    // B=G
+    (this._q1 as any)._pinNodes.set("C", this._vintNode); // C=Vint
+    (this._q1 as any)._pinNodes.set("E", this._kNode);    // E=K
+
+    // Q2 PNP: BJT pin order [B, C, E] per buildBJTPinDeclarations()
+    (this._q2 as any)._pinNodes.set("B", this._vintNode); // B=Vint
+    (this._q2 as any)._pinNodes.set("C", this._gNode);    // C=G
+    (this._q2 as any)._pinNodes.set("E", this._aNode);    // E=A
+
+    // Forward to each BJT sub-element (Q1 then Q2)
+    this._q1.setup(ctx);   // NPN: 23× TSTALLOC per bjtsetup.c:435-464
+    this._q2.setup(ctx);   // PNP: 23× TSTALLOC per bjtsetup.c:435-464
+  }
+
+  load(ctx: LoadContext): void {
+    this._q1.load(ctx);   // NPN BJT load per bjtload.c
+    this._q2.load(ctx);   // PNP BJT load per bjtload.c (polarity = -1)
+  }
+
+  setParam(key: string, value: number): void {
+    if (key === "BF") {
+      this._q1.setParam("BF", value);
+    } else if (key === "BR") {
+      this._q2.setParam("BR", value);
+    } else if (key === "IS" || key === "RC" || key === "RB" || key === "RE" || key === "AREA" || key === "TEMP") {
+      this._q1.setParam(key, value);
+      this._q2.setParam(key, value);
+    }
+  }
+
+  getPinCurrents(_rhs: Float64Array): number[] {
+    return [0, 0, 0];
+  }
+}
+
+// ---------------------------------------------------------------------------
+// createScrElement — composite factory
+// ---------------------------------------------------------------------------
+
+function createScrElement(
+  pinNodes: ReadonlyMap<string, number>,
+  props: PropertyBag,
+  _getTime: () => number,
+): ScrCompositeElement {
+  const label = props.getOrDefault<string>("label", "") || "SCR";
+
+  const BF   = props.getModelParam<number>("BF");
+  const BR   = props.getModelParam<number>("BR");
+  const IS   = props.getModelParam<number>("IS");
+  const RC   = props.getModelParam<number>("RC");
+  const RB   = props.getModelParam<number>("RB");
+  const RE   = props.getModelParam<number>("RE");
+  const AREA = props.getModelParam<number>("AREA");
+  const TEMP = props.getModelParam<number>("TEMP");
+
+  const npnProps = makeNpnProps(BF, IS, RC, RB, RE, AREA, TEMP);
+  const pnpProps = makePnpProps(BR, IS, RC, RB, RE, AREA, TEMP);
+
+  // Q1 NPN: B=G, C=Vint, E=K — Vint not known yet; overwritten in setup()
+  const q1 = createBjtElement(
+    1,  // NPN polarity
+    new Map([["B", pinNodes.get("G")!], ["C", 0], ["E", pinNodes.get("K")!]]),
+    npnProps,
+  );
+  (q1 as any).label = `${label}#Q1`;
+
+  // Q2 PNP: B=Vint, C=G, E=A — Vint not known yet; overwritten in setup()
+  const q2 = createBjtElement(
+    -1,  // PNP polarity
+    new Map([["B", 0], ["C", pinNodes.get("G")!], ["E", pinNodes.get("A")!]]),
+    pnpProps,
+  );
+  (q2 as any).label = `${label}#Q2`;
+
+  return new ScrCompositeElement(label, pinNodes, q1, q2);
+}
+
+// ---------------------------------------------------------------------------
+// ScrElement — CircuitElement implementation
 // ---------------------------------------------------------------------------
 
 export class ScrElement extends AbstractCircuitElement {
@@ -527,9 +324,9 @@ export const ScrDefinition: ComponentDefinition = {
   attributeMap: SCR_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.SEMICONDUCTORS,
   helpText:
-    "SCR  Silicon Controlled Rectifier.\n" +
+    "SCR — Silicon Controlled Rectifier.\n" +
     "Pins: A (anode), K (cathode), G (gate).\n" +
-    "Triggers when gate current raises Î±â‚+Î±â‚‚ above 0.95. Latches until I_AK < I_hold.",
+    "Two-transistor latch model: Q1 NPN (B=G, C=Vint, E=K) + Q2 PNP (B=Vint, C=G, E=A).",
   models: {},
   modelRegistry: {
     "behavioral": {
@@ -537,6 +334,7 @@ export const ScrDefinition: ComponentDefinition = {
       factory: createScrElement,
       paramDefs: SCR_PARAM_DEFS,
       params: SCR_PARAM_DEFAULTS,
+      mayCreateInternalNodes: true,
     },
   },
   defaultModel: "behavioral",

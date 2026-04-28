@@ -82,7 +82,7 @@ type CEMap = Map<number, import("../../../../core/element.js").CircuitElement>;
 
 function makeCompiled(elements: AnalogElement[], ce: CEMap): ConcreteCompiledAnalogCircuit {
   return {
-    nodeCount: 3, branchCount: 1, matrixSize: 4,
+    nodeCount: 3, matrixSize: 4,
     elements, labelToNodeId: new Map(), labelPinNodes: new Map(),
     wireToNodeId: new Map(), models: new Map(), elementToCircuitElement: ce,
     elementPinVertices: new Map(), elementResolvedPins: new Map(),

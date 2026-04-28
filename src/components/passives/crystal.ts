@@ -49,7 +49,7 @@ import { NGSPICE_LOAD_ORDER } from "../../core/analog-types.js";
 import type { ReactiveAnalogElement, IntegrationMethod, LoadContext } from "../../solver/analog/element.js";
 import type { SetupContext } from "../../solver/analog/setup-context.js";
 import { MODETRAN, MODETRANOP, MODEINITPRED, MODEINITTRAN } from "../../solver/analog/ckt-mode.js";
-import { stampG, stampRHS } from "../../solver/analog/stamp-helpers.js";
+import { stampRHS } from "../../solver/analog/stamp-helpers.js";
 import { defineModelParams } from "../../core/model-params.js";
 import type { StatePoolRef } from "../../core/analog-types.js";
 import {
@@ -246,9 +246,9 @@ export class CrystalCircuitElement extends AbstractCircuitElement {
 export class AnalogCrystalElement implements ReactiveAnalogElement {
   readonly pinNodeIds: readonly number[];
   readonly allNodeIds: readonly number[];
-  branchIndex: number = -1;
   _stateBase: number = -1;
   _pinNodes: Map<string, number> = new Map();
+  _label: string = "";
   readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.CAP;
   readonly isNonlinear = false;
   readonly isReactive = true;
@@ -256,14 +256,6 @@ export class AnalogCrystalElement implements ReactiveAnalogElement {
   readonly stateSchema = CRYSTAL_SCHEMA;
   readonly stateSize = CRYSTAL_SCHEMA.size;
   stateBaseOffset = -1;
-  s0: Float64Array = new Float64Array(0);
-  s1: Float64Array = new Float64Array(0);
-  s2: Float64Array = new Float64Array(0);
-  s3: Float64Array = new Float64Array(0);
-  s4: Float64Array = new Float64Array(0);
-  s5: Float64Array = new Float64Array(0);
-  s6: Float64Array = new Float64Array(0);
-  s7: Float64Array = new Float64Array(0);
   setParam(_key: string, _value: number): void {}
 
   // Series resistance
@@ -277,9 +269,27 @@ export class AnalogCrystalElement implements ReactiveAnalogElement {
   // Pool reference  set by initState(); state arrays accessed via pool.states[N] at call time.
   private _pool!: StatePoolRef;
 
+  // Internal nodes and branch — populated in setup()
+  _n1Node: number = -1;
+  _n2Node: number = -1;
+  _branchIndex: number = -1;
+
+  // Rs handles
+  private _hRs_PP: number = -1;  private _hRs_NN: number = -1;
+  private _hRs_PN: number = -1;  private _hRs_NP: number = -1;
+  // Ls handles
+  private _hLs_PIbr:   number = -1;  private _hLs_NIbr:   number = -1;
+  private _hLs_IbrN:   number = -1;  private _hLs_IbrP:   number = -1;
+  private _hLs_IbrIbr: number = -1;
+  // Cs handles
+  private _hCs_PP: number = -1;  private _hCs_NN: number = -1;
+  private _hCs_PN: number = -1;  private _hCs_NP: number = -1;
+  // C0 handles
+  private _hC0_PP: number = -1;  private _hC0_NN: number = -1;
+  private _hC0_PN: number = -1;  private _hC0_NP: number = -1;
+
   /**
-   * @param pinNodeIds - [n_A, n_B, n1, n2] where n1 and n2 are internal nodes
-   * @param branchIndex - Absolute MNA row index for L_s branch current
+   * @param pinNodeIds - [n_A, n_B] external terminals only; n1 and n2 allocated in setup()
    * @param Rs          - Series (motional) resistance in ohms
    * @param Ls          - Motional inductance in henries
    * @param Cs          - Motional capacitance in farads
@@ -300,8 +310,62 @@ export class AnalogCrystalElement implements ReactiveAnalogElement {
     this.C_0 = C0;
   }
 
-  setup(_ctx: SetupContext): void {
-    throw new Error("PB-CRYSTAL not yet migrated");
+  setup(ctx: SetupContext): void {
+    const solver = ctx.solver;
+    const aNode = this.pinNodeIds[0];  // external terminal A
+    const bNode = this.pinNodeIds[1];  // external terminal B
+
+    // Allocate 15 state slots as a monolithic block (CRYSTAL_SCHEMA).
+    this._stateBase = ctx.allocStates(15);
+
+    // Allocate internal nodes — replace internalNodeIds[0], internalNodeIds[1].
+    const n1Node = ctx.makeVolt(this._label, "n1");  // Rs↔Ls junction
+    const n2Node = ctx.makeVolt(this._label, "n2");  // Ls↔Cs junction
+    this._n1Node = n1Node;
+    this._n2Node = n2Node;
+
+    // Allocate Ls branch row — indsetup.c:84-88 idempotent guard.
+    if (this._branchIndex === -1) {
+      this._branchIndex = ctx.makeCur(this._label, "Ls_branch");
+    }
+    const b = this._branchIndex;
+
+    // Rs — ressetup.c:46-49 (aNode=pos, n1Node=neg)
+    this._hRs_PP = solver.allocElement(aNode, aNode);
+    this._hRs_NN = solver.allocElement(n1Node, n1Node);
+    this._hRs_PN = solver.allocElement(aNode, n1Node);
+    this._hRs_NP = solver.allocElement(n1Node, aNode);
+
+    // Ls — indsetup.c:96-100 (n1Node=pos, n2Node=neg, b=branch)
+    if (n1Node !== 0) this._hLs_PIbr = solver.allocElement(n1Node, b);
+    if (n2Node !== 0) this._hLs_NIbr = solver.allocElement(n2Node, b);
+    if (n2Node !== 0) this._hLs_IbrN = solver.allocElement(b, n2Node);
+    if (n1Node !== 0) this._hLs_IbrP = solver.allocElement(b, n1Node);
+    this._hLs_IbrIbr = solver.allocElement(b, b);
+
+    // Cs — capsetup.c:114-117 (n2Node=pos, bNode=neg)
+    if (n2Node !== 0) this._hCs_PP = solver.allocElement(n2Node, n2Node);
+    if (bNode !== 0)  this._hCs_NN = solver.allocElement(bNode, bNode);
+    if (n2Node !== 0 && bNode !== 0) this._hCs_PN = solver.allocElement(n2Node, bNode);
+    if (bNode !== 0 && n2Node !== 0) this._hCs_NP = solver.allocElement(bNode, n2Node);
+
+    // C0 — capsetup.c:114-117 (aNode=pos, bNode=neg)
+    if (aNode !== 0) this._hC0_PP = solver.allocElement(aNode, aNode);
+    if (bNode !== 0) this._hC0_NN = solver.allocElement(bNode, bNode);
+    if (aNode !== 0 && bNode !== 0) this._hC0_PN = solver.allocElement(aNode, bNode);
+    if (bNode !== 0 && aNode !== 0) this._hC0_NP = solver.allocElement(bNode, aNode);
+
+    this.stateBaseOffset = this._stateBase;
+  }
+
+  findBranchFor(name: string, ctx: SetupContext): number {
+    const el = ctx.findDevice(name);
+    if (!el) return 0;
+    const crystal = el as AnalogCrystalElement;
+    if (crystal._branchIndex === -1) {
+      crystal._branchIndex = ctx.makeCur(name, "Ls_branch");
+    }
+    return crystal._branchIndex;
   }
 
   initState(pool: StatePoolRef): void {
@@ -331,23 +395,23 @@ export class AnalogCrystalElement implements ReactiveAnalogElement {
     const mode = ctx.cktMode;
     const nA = this.pinNodeIds[0];
     const nB = this.pinNodeIds[1];
-    const n1 = this.pinNodeIds[2];
-    const n2 = this.pinNodeIds[3];
-    const b = this.branchIndex;
+    const n1 = this._n1Node;
+    const n2 = this._n2Node;
+    const b = this._branchIndex;
     const base = this.stateBaseOffset;
 
-    // R_s conductance (nA â†" n1).
-    stampG(solver, nA, nA, this.G_s);
-    stampG(solver, nA, n1, -this.G_s);
-    stampG(solver, n1, nA, -this.G_s);
-    stampG(solver, n1, n1, this.G_s);
+    // R_s conductance (nA ↔ n1) — via cached handles.
+    solver.stampElement(this._hRs_PP, this.G_s);
+    solver.stampElement(this._hRs_PN, -this.G_s);
+    solver.stampElement(this._hRs_NP, -this.G_s);
+    solver.stampElement(this._hRs_NN, this.G_s);
 
-    // L_s branch incidence (B sub-matrix).
-    if (n1 !== 0) solver.stampElement(solver.allocElement(n1, b), 1);
-    if (n2 !== 0) solver.stampElement(solver.allocElement(n2, b), -1);
-    // L_s KVL incidence (C sub-matrix).
-    if (n1 !== 0) solver.stampElement(solver.allocElement(b, n1), 1);
-    if (n2 !== 0) solver.stampElement(solver.allocElement(b, n2), -1);
+    // L_s branch incidence (B sub-matrix) — via cached handles.
+    if (n1 !== 0) solver.stampElement(this._hLs_PIbr, 1);
+    if (n2 !== 0) solver.stampElement(this._hLs_NIbr, -1);
+    // L_s KVL incidence (C sub-matrix) — via cached handles.
+    if (n2 !== 0) solver.stampElement(this._hLs_IbrN, -1);
+    if (n1 !== 0) solver.stampElement(this._hLs_IbrP, 1);
 
     if (!(mode & (MODETRAN | MODETRANOP))) return;
 
@@ -439,25 +503,25 @@ export class AnalogCrystalElement implements ReactiveAnalogElement {
         s1[base + SLOT_CCAP_C0] = ccapC0;
       }
 
-      // L_s companion stamp on branch row.
-      solver.stampElement(solver.allocElement(b, b), -geqL);
-      stampRHS(ctx.rhs,b, ceqL);
+      // L_s companion stamp on branch row — via cached handle.
+      solver.stampElement(this._hLs_IbrIbr, -geqL);
+      stampRHS(ctx.rhs, b, ceqL);
 
-      // C_s companion stamp (n2 â†" nB).
-      stampG(solver, n2, n2, geqCs);
-      stampG(solver, n2, nB, -geqCs);
-      stampG(solver, nB, n2, -geqCs);
-      stampG(solver, nB, nB, geqCs);
-      if (n2 !== 0) stampRHS(ctx.rhs,n2, -ceqCs);
-      if (nB !== 0) stampRHS(ctx.rhs,nB, ceqCs);
+      // C_s companion stamp (n2 ↔ nB) — via cached handles.
+      if (n2 !== 0) solver.stampElement(this._hCs_PP, geqCs);
+      if (nB !== 0) solver.stampElement(this._hCs_NN, geqCs);
+      if (n2 !== 0 && nB !== 0) solver.stampElement(this._hCs_PN, -geqCs);
+      if (nB !== 0 && n2 !== 0) solver.stampElement(this._hCs_NP, -geqCs);
+      if (n2 !== 0) stampRHS(ctx.rhs, n2, -ceqCs);
+      if (nB !== 0) stampRHS(ctx.rhs, nB, ceqCs);
 
-      // C_0 companion stamp (nA â†" nB).
-      stampG(solver, nA, nA, geqC0);
-      stampG(solver, nA, nB, -geqC0);
-      stampG(solver, nB, nA, -geqC0);
-      stampG(solver, nB, nB, geqC0);
-      if (nA !== 0) stampRHS(ctx.rhs,nA, -ceqC0);
-      if (nB !== 0) stampRHS(ctx.rhs,nB, ceqC0);
+      // C_0 companion stamp (nA ↔ nB) — via cached handles.
+      if (nA !== 0) solver.stampElement(this._hC0_PP, geqC0);
+      if (nB !== 0) solver.stampElement(this._hC0_NN, geqC0);
+      if (nA !== 0 && nB !== 0) solver.stampElement(this._hC0_PN, -geqC0);
+      if (nB !== 0 && nA !== 0) solver.stampElement(this._hC0_NP, -geqC0);
+      if (nA !== 0) stampRHS(ctx.rhs, nA, -ceqC0);
+      if (nB !== 0) stampRHS(ctx.rhs, nB, ceqC0);
 
       // Cache.
       s0[base + SLOT_GEQ_L]  = geqL;
@@ -489,7 +553,7 @@ export class AnalogCrystalElement implements ReactiveAnalogElement {
   getPinCurrents(rhs: Float64Array): number[] {
     const nA = this.pinNodeIds[0];
     const nB = this.pinNodeIds[1];
-    const n1 = this.pinNodeIds[2];
+    const n1 = this._n1Node;
 
     // Current through the series R_s (from pin A into the motional arm):
     // I_Rs = G_s * (V_A - V_n1). By KCL at n1 this equals the L_s branch current.
@@ -566,7 +630,7 @@ function buildCrystalElementFromParams(
   const Rs = crystalSeriesResistance(p.frequency, Ls, p.qualityFactor);
 
   const el = new AnalogCrystalElement(
-    [pinNodes.get("A")!, pinNodes.get("B")!, -1, -1],
+    [pinNodes.get("A")!, pinNodes.get("B")!],
     Rs,
     Ls,
     p.motionalCapacitance,
@@ -691,7 +755,16 @@ export const CrystalDefinition: ComponentDefinition = {
       factory: createCrystalElement,
       paramDefs: CRYSTAL_PARAM_DEFS,
       params: CRYSTAL_DEFAULTS,
-      branchCount: 1,
+      mayCreateInternalNodes: true,
+      findBranchFor(name: string, ctx: import("../../solver/analog/setup-context.js").SetupContext): number {
+        const el = ctx.findDevice(name);
+        if (!el) return 0;
+        const crystal = el as AnalogCrystalElement;
+        if (crystal._branchIndex === -1) {
+          crystal._branchIndex = ctx.makeCur(name, "Ls_branch");
+        }
+        return crystal._branchIndex;
+      },
     },
   },
   defaultModel: "behavioral",

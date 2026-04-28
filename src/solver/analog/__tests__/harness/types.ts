@@ -137,7 +137,6 @@ export interface NgspiceTopology {
 export interface TopologySnapshot {
   matrixSize: number;
   nodeCount: number;
-  branchCount: number;
   elementCount: number;
   elements: Array<{
     index: number;

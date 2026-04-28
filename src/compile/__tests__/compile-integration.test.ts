@@ -508,7 +508,6 @@ describe('compileUnified — RC circuit (analog)', () => {
     const unified = compileUnified(circuit, registry);
 
     expect(unified.analog).not.toBeNull();
-    expect(unified.analog!.branchCount).toBe(reference.branchCount);
   });
 
   it('matrix size matches reference for RC circuit', () => {

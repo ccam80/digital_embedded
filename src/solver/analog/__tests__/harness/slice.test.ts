@@ -35,7 +35,7 @@ function makeTopology(): TopologySnapshot {
     { index: 1, label: "R1", type: "resistor", isNonlinear: false, isReactive: false, pinNodeIds: [1, 2] as readonly number[] },
     { index: 2, label: "V1", type: "voltageSource", isNonlinear: false, isReactive: false, pinNodeIds: [1, 0] as readonly number[] },
   ];
-  return { matrixSize: 7, nodeCount: 6, branchCount: 1, elementCount: 3, elements, nodeLabels, matrixRowLabels, matrixColLabels };
+  return { matrixSize: 7, nodeCount: 6, elementCount: 3, elements, nodeLabels, matrixRowLabels, matrixColLabels };
 }
 
 function makeSide(n: number): IterationSideData {
@@ -67,11 +67,11 @@ describe("resolveNodeToMatrixIndex", () => {
   it("returns null for negative numeric id", () => { expect(resolveNodeToMatrixIndex(-1, topo)).toBeNull(); });
   it("returns null for numeric id beyond nodeLabels", () => { expect(resolveNodeToMatrixIndex(99, topo)).toBeNull(); });
   it("segment match resolves when unambiguous", () => {
-    const topoSeg: TopologySnapshot = { ...topo, nodeLabels: new Map([[1, "A/B"]]), matrixRowLabels: new Map([[0, "A/B"]]), matrixColLabels: new Map([[0, "A/B"]]), elements: [], nodeCount: 1, branchCount: 0, elementCount: 0, matrixSize: 1 };
+    const topoSeg: TopologySnapshot = { ...topo, nodeLabels: new Map([[1, "A/B"]]), matrixRowLabels: new Map([[0, "A/B"]]), matrixColLabels: new Map([[0, "A/B"]]), elements: [], nodeCount: 1, elementCount: 0, matrixSize: 1 };
     expect(resolveNodeToMatrixIndex("B", topoSeg)).toBe(0);
   });
   it("throws on ambiguous segment match", () => {
-    const topoAmb: TopologySnapshot = { ...topo, nodeLabels: new Map([[1, "X/B"], [2, "Y/B"]]), matrixRowLabels: new Map([[0, "X/B"], [1, "Y/B"]]), matrixColLabels: new Map([[0, "X/B"], [1, "Y/B"]]), elements: [], nodeCount: 2, branchCount: 0, elementCount: 0, matrixSize: 2 };
+    const topoAmb: TopologySnapshot = { ...topo, nodeLabels: new Map([[1, "X/B"], [2, "Y/B"]]), matrixRowLabels: new Map([[0, "X/B"], [1, "Y/B"]]), matrixColLabels: new Map([[0, "X/B"], [1, "Y/B"]]), elements: [], nodeCount: 2, elementCount: 0, matrixSize: 2 };
     expect(() => resolveNodeToMatrixIndex("B", topoAmb)).toThrow("ambiguous");
   });
 });

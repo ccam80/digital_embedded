@@ -3,6 +3,18 @@
 **digiTS file:** `src/components/active/dac.ts`
 **Architecture:** composite. Decomposes into 1× VCVS (output drive) + N× `DigitalInputPinModel` (D0..D{N-1}) + 1× `DigitalInputPinModel` (VREF passive loading). VCVS gain is updated each `load()` based on decoded digital inputs.
 
+> **Spec status note (2026-04-28):** This PB describes a target architecture in
+> which the DAC owns a concrete `VCVSElement` sub-element object and rebinds it
+> via `pinNodeIds = [...]` in `setup()`. The current `dac.ts` implementation
+> does **not** instantiate that sub-element — it inlines the VCVS TSTALLOC
+> sequence (`_hVCVSPosIbr`, `_hVCVSIbrPos`, etc.) directly into a single
+> closure-backed `AnalogElementCore`. The `pinNodeIds = [...]` listing in the
+> "setup() body" section below is therefore aspirational; it will become
+> reachable code only once the sub-element refactor lands. For sub-element
+> wiring of any element whose `setup()` reads from `_pinNodes` (BJT in
+> particular), the canonical pattern is `_pinNodes.set(...)` direct
+> mutation — see PB-OPTO, PB-TIMER555, PB-SCR.
+
 ## Pin mapping (from 01-pin-mapping.md)
 
 The composite itself has no `ngspiceNodeMap`. Sub-elements carry their own maps.

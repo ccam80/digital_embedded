@@ -25,6 +25,7 @@ import type { RenderContext, Point, TextAnchor, FontSpec, PathData } from "../..
 import type { ThemeColor } from "../../../core/renderer-interface.js";
 import type { SparseSolver as SparseSolverType } from "../../../solver/analog/sparse-solver.js";
 import type { LoadContext } from "../../../solver/analog/load-context.js";
+import { loadCtxFromFields } from "../../../solver/analog/__tests__/test-helpers.js";
 import { MODEDCOP, MODEINITFLOAT } from "../../../solver/analog/ckt-mode.js";
 
 // ---------------------------------------------------------------------------
@@ -375,7 +376,7 @@ describe("Probe", () => {
         stampRHS: (row: number, value: number): void => { stampRHSCalls.push([row, value]); },
       } as unknown as SparseSolverType;
 
-      const ctx: LoadContext = {
+      const ctx = loadCtxFromFields({
         solver: captureSolver,
         matrix: captureSolver,
         rhs: new Float64Array(8),
@@ -400,7 +401,7 @@ describe("Probe", () => {
         cktFixLimit: false,
         bypass: false,
         voltTol: 1e-6,
-      };
+      });
 
       const analogElement = getFactory(ProbeDefinition.modelRegistry!.behavioral!)(
         new Map([["in", 3]]),

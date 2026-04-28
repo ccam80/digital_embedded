@@ -202,6 +202,7 @@ export const RSAsyncDefinition: ComponentDefinition = {
       factory: makeRSAsyncLatchAnalogFactory(),
       paramDefs: [],
       params: {},
+      mayCreateInternalNodes: false,
     },
   },
   models: {

@@ -872,7 +872,7 @@ export class NgspiceBridge {
     if (!this._topology) {
       return {
         matrixSize: this._iterations[0]?.matrixSize ?? 0,
-        nodeCount: 0, branchCount: 0, elementCount: 0,
+        nodeCount: 0, elementCount: 0,
         elements: [],
         nodeLabels: new Map(), matrixRowLabels: new Map(), matrixColLabels: new Map(),
       };
@@ -899,7 +899,6 @@ export class NgspiceBridge {
     return {
       matrixSize: this._topology.matrixSize,
       nodeCount: this._topology.nodeNames.size,
-      branchCount: 0,
       elementCount: this._topology.devices.length,
       elements, nodeLabels, matrixRowLabels, matrixColLabels,
     };

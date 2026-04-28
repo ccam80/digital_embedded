@@ -50,6 +50,7 @@ for historical reference but are no longer the implementation contract.
 - **W2.7 — `BehavioralGateElement.setup()` body** (added to resolve BATCH5-D1 W3 race across all 7 gates): the class at `src/solver/analog/behavioral-gate.ts` receives its real `setup(ctx)` body — not a throwing stub — during W2. Body specified in 00-engine.md §A3.2 W2.7 paragraph. Once W2.7 lands, the 7 gate W3 tasks (NOT/AND/NAND/OR/NOR/XOR/XNOR) all become parallel because none of them write the shared method.
 
 | **W3** | All Part B per-component tasks land in parallel — implementer agents read `components/PB-*.md` and replace the W2 stub `setup()` with the real body. | Per-component gates: `setup-stamp-order.test.ts` row green for that component; component's own test file green. Three-surface coverage (CLAUDE.md): the setup/load split is an internal refactor and adds no new user-facing API surface. The existing E2E suite, if it remains green at W4, satisfies the three-surface rule for this work. No per-component MCP or E2E assertion is required at W3. |
+| **W3.5** | Component-spec gaps not covered by the original 74 PB-*.md set: PB-LED (diode-subclass refactor), PB-BEHAV-FF-D / -JK / -RS / -T (7 flipflop classes across 4 specs), PB-BEHAV-SEQUENTIAL (3 sequential composites), PB-TLINE (Option A — keep lumped per-segment, IND/CAP/RES anchors per sub-element). Plus PB-XFMR.md and PB-TAPXFMR.md spec patches that close 5 inter-PB class-API gaps (constructor inductance arg, sub-element load() bodies, getLteTimestep, pool-backed declaration, _pinNodes ownership) followed by PB-TAPXFMR implementer re-spawn against the patched spec. See `spec/phase-3.5-component-spec-gaps.md` for the full task list. | Per-component spec-compliance gates per CLAUDE.md "Test Policy During W3 Setup-Load-Split". PB-TAPXFMR re-spawn pre-condition: PB-XFMR.md and PB-TAPXFMR.md patches landed and committed. |
 | **W4** | Parity sweep. | **W4 gate**: the resistive-divider parity fixture (the first/simplest of the planned parity circuits) passes — first-iteration matrix entries match ngspice. The remaining parity fixtures are NOT a gate for this implementation; they are walked through manually by the user in a follow-up debugging pass. |
 
 ---
@@ -104,6 +105,7 @@ gate fires only after every W3 row is green.
 | W2 | `00-engine.md` §A2–A9 line-for-line. Cross-references to `01-pin-mapping.md` (new `MnaModel` field) and `02-behavioral.md` (pin-model setup interface). |
 | W2.5 | `02-behavioral.md` §Shape rules 2 & 3 (the field names and class structure are the post-rename, post-conversion target). Plus a checklist of every file containing `_branchIdx`, `_capacitorChild`, or one of the named factory closures. |
 | W3 | One `components/PB-*.md` file per implementer agent. Cross-references to `00-engine.md` §A2 (SetupContext interface) and `01-pin-mapping.md` (component's pin map). |
+| W3.5 | `spec/phase-3.5-component-spec-gaps.md` for the task list. Per-task PB files: `components/PB-LED.md`, `components/PB-BEHAV-FF-{D,JK,RS,T}.md`, `components/PB-BEHAV-SEQUENTIAL.md`, `components/PB-TLINE.md`, plus the patched `components/PB-XFMR.md` / `components/PB-TAPXFMR.md`. PB-LED references PB-DIO.md.
 | W4 | No implementation work — runs the parity test suite. |
 
 W3 implementer agents are forbidden from reading existing digiTS
@@ -115,24 +117,6 @@ source if a divergence is suspected.
 
 ## Open blockers
 
-### PB-TLINE — architectural divergence (gates only the W3 row for transmission line)
-
-digiTS `TransmissionLineElement` is a lumped RLCG model with N cascaded
-segments (default N=10). ngspice `tra/trasetup.c` is an ideal lossless
-transmission line with a fixed 22-stamp structure. These topologies
-cannot produce bit-exact matrix entries by definition.
-
-Three resolution options:
-
-| Option | Action | Trade-off |
-|---|---|---|
-| A | Add an entry to `spec/architectural-alignment.md` documenting the divergence. PB-TLINE proceeds with per-sub-element ordering (each segment uses IND/CAP/RES anchors). | Preserves digiTS lossy-line capability. Setup-stamp-order test asserts per-segment ordering instead of fixed 22-stamp sequence. |
-| B | Replace digiTS lumped model with an ideal-TRA port. Refactor `transmission-line.ts` from scratch. | Bit-exact parity. Loses lossy-line modeling. Larger blast radius across any test using `transmission-line`. |
-| C | Add BOTH models — keep lumped as `transmission-line-lumped.ts`, add `transmission-line.ts` ideal port. User picks per circuit. | Most flexible; most work. |
-
-Per CLAUDE.md hard rule, agents do not add `architectural-alignment.md`
-entries. User decision required before PB-TLINE W3 row can land. Does
-NOT block W0/W1/W2 or any other W3 component.
 
 ### PB-BEHAV-SEVENSEGHEX — implementer note (NOT blocking)
 
@@ -157,8 +141,9 @@ Recommended order (with parallelisation opportunities flagged):
    on W1 — `_initStructure()` no-arg signature is in W1.
 3.5. **W2.5** (1 PR, ~1500 LOC across `digital-pin-model.ts`, `behavioral-remaining.ts`, `behavioral-gate.ts`, `behavioral-combinational.ts`, switching factories, and all call sites). Depends on W2 — the stub `setup()` methods are still in place. Mechanical refactor: no behavior change.
 4. **W3** (50+ parallel implementations, can be split across many
-   agents). Depends on W2.5 complete — W3 specs assume post-rename, post-class-conversion architecture; running W3 against the pre-W2.5 codebase will produce TypeScript compile errors at every PB-BEHAV-* setup() body. PB-TLINE blocked on architectural-alignment decision.
-5. **W4** (1 verification run). Depends on W3 complete.
+   agents). Depends on W2.5 complete — W3 specs assume post-rename, post-class-conversion architecture; running W3 against the pre-W2.5 codebase will produce TypeScript compile errors at every PB-BEHAV-* setup() body.
+4.5. **W3.5** — component-spec gaps (~7 implementer tasks plus 2 spec-patch tasks plus PB-TAPXFMR re-spawn). Depends on W3 complete (PB-XFMR / PB-DIO / PB-IND / PB-CAP / PB-RES must be landed because W3.5 specs reference them as frozen contracts). Tasks: PB-LED (depends on PB-DIO), 4 PB-BEHAV-FF specs, PB-BEHAV-SEQUENTIAL, PB-TLINE , PB-XFMR.md spec patch (5 inter-PB gap closures), PB-TAPXFMR.md spec patch (mirror), PB-TAPXFMR implementer re-spawn (depends on the two patches landing first). Phase spec: `spec/phase-3.5-component-spec-gaps.md` — ephemeral, delete after execution.
+5. **W4** (1 verification run). Depends on W3 and W3.5 both complete.
 
 Suggested batching for W3: same categories as the spec-writing agents —
 passives, sources+switches, semiconductors, sensors+controlled-sources,

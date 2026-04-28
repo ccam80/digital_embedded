@@ -71,7 +71,6 @@ function buildDividerCircuit(
 
   return new ConcreteCompiledAnalogCircuit({
     nodeCount: 2,
-    branchCount: 1,
     elements: [vs, r1El, r2El],
     labelToNodeId,
     wireToNodeId: new Map(),
@@ -104,7 +103,6 @@ function buildSweepDividerFactory(nominalR2: number = 1000): SweepCircuitFactory
 
     return new ConcreteCompiledAnalogCircuit({
       nodeCount: 2,
-      branchCount: 1,
       elements: [vs, r1El, r2El],
       labelToNodeId,
       wireToNodeId: new Map(),
@@ -149,7 +147,6 @@ function buildRcSweepFactory(_c: number = 1e-9): SweepCircuitFactory {
 
     return new ConcreteCompiledAnalogCircuit({
       nodeCount: 2,
-      branchCount: 1,
       elements: [vs, rEl, r2El],
       labelToNodeId,
       wireToNodeId: new Map(),

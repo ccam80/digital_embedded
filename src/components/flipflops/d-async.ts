@@ -289,6 +289,7 @@ export const DAsyncDefinition: ComponentDefinition = {
       factory: makeDAsyncFlipflopAnalogFactory(),
       paramDefs: [],
       params: {},
+      mayCreateInternalNodes: false,
     },
   },
   models: {

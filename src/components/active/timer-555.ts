@@ -389,14 +389,6 @@ class Timer555CompositeElement implements PoolBackedAnalogElementCore {
       this._childElements.reduce((s, c) => s + c.stateSize, 0);
   }
   stateBaseOffset: number = -1;
-  s0: Float64Array = new Float64Array(0);
-  s1: Float64Array = new Float64Array(0);
-  s2: Float64Array = new Float64Array(0);
-  s3: Float64Array = new Float64Array(0);
-  s4: Float64Array = new Float64Array(0);
-  s5: Float64Array = new Float64Array(0);
-  s6: Float64Array = new Float64Array(0);
-  s7: Float64Array = new Float64Array(0);
 
   // Sub-elements (constructed at factory time, pin nodes assigned in setup())
   readonly _rDiv1: Timer555ResElement;
@@ -538,10 +530,6 @@ class Timer555CompositeElement implements PoolBackedAnalogElementCore {
   // ---------------------------------------------------------------------------
   initState(poolRef: StatePoolRef): void {
     this.stateBaseOffset = this._stateBase_latch;
-    this.s0 = poolRef.state0; this.s1 = poolRef.state1;
-    this.s2 = poolRef.state2; this.s3 = poolRef.state3;
-    this.s4 = poolRef.state4; this.s5 = poolRef.state5;
-    this.s6 = poolRef.state6; this.s7 = poolRef.state7;
 
     // BJT occupies the block starting after the latch slot
     const bjtBase = this._stateBase_latch + 1;

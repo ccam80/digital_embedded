@@ -218,6 +218,7 @@ export const RSDefinition: ComponentDefinition = {
       factory: makeRSFlipflopAnalogFactory(),
       paramDefs: [],
       params: {},
+      mayCreateInternalNodes: false,
     },
   },
   models: {

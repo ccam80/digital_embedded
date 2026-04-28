@@ -1,17 +1,14 @@
-﻿/**
- * Diac analog component  bidirectional trigger diode.
+/**
+ * Diac analog component — bidirectional trigger diode.
  *
  * Blocks in both directions until |V| exceeds breakover voltage V_BO,
- * then conducts with a negative-resistance snap (voltage drops to V_hold).
- * Symmetric device  no gate terminal.
+ * then conducts with negative-resistance snap.
+ * Symmetric device — no gate terminal.
  *
- * I-V model (piecewise smooth with tanh for NR stability):
- *   - Blocking region (|V| < V_BO): high resistance R_off
- *   - Conducting region (|V| > V_hold): low resistance R_on with V_hold offset
- *   - Smooth transition via tanh to avoid NR discontinuity
- *
- * The transition sharpness parameter controls the snap width. A sharper snap
- * better models real diac behavior; a moderate value ensures NR convergence.
+ * Implemented as a composite of two antiparallel DIO sub-elements:
+ *   D_fwd: posNode=A, negNode=B  (conducts for positive V(A,B))
+ *   D_rev: posNode=B, negNode=A  (conducts for negative V(A,B))
+ * Both sub-elements have breakdown enabled (BV = DIAC breakover voltage).
  */
 
 import { AbstractCircuitElement } from "../../core/element.js";
@@ -29,87 +26,12 @@ import {
 } from "../../core/registry.js";
 import type { AnalogElementCore, LoadContext } from "../../solver/analog/element.js";
 import { NGSPICE_LOAD_ORDER } from "../../solver/analog/element.js";
-import { stampG, stampRHS } from "../../solver/analog/stamp-helpers.js";
-import { defineModelParams } from "../../core/model-params.js";
-
-// ---------------------------------------------------------------------------
-// Physical constants
-// ---------------------------------------------------------------------------
-
-/** Minimum conductance for numerical stability (GMIN). */
-const GMIN = 1e-12;
-
-// ---------------------------------------------------------------------------
-// Model parameter declarations
-// ---------------------------------------------------------------------------
-
-export const { paramDefs: DIAC_PARAM_DEFS, defaults: DIAC_PARAM_DEFAULTS } = defineModelParams({
-  primary: {
-    vBreakover: { default: 32,  unit: "V", description: "Breakover voltage  conduction threshold" },
-    vHold:      { default: 28,  unit: "V", description: "On-state holding voltage" },
-    rOn:        { default: 10,  unit: "Î", description: "On-state resistance" },
-    rOff:       { default: 1e7, unit: "Î", description: "Off-state resistance" },
-  },
-});
-
-// ---------------------------------------------------------------------------
-// diacConductance  smooth piecewise model
-// ---------------------------------------------------------------------------
-
-/**
- * Compute the linearized conductance and Norton current for the diac I-V model.
- *
- * Model: I(V) = V / R_off + (V/|V|) * I_on_extra * smooth_transition(|V|)
- * where smooth_transition uses tanh to provide a smooth snap from blocking to
- * conducting regions.
- *
- * The total current is:
- *   I(V) = (g_off + g_extra * s(|V|)) * V - sign(V) * V_hold * g_extra * s(|V|)
- *
- * where s(x) = 0.5 * (1 + tanh((x - V_BO) / sharpness))
- */
-function diacModel(
-  v: number,
-  vBreakover: number,
-  vHold: number,
-  rOn: number,
-  rOff: number,
-  sharpness: number,
-): { i: number; geq: number; ieq: number } {
-  const gOff = 1.0 / rOff;
-  const gOn  = 1.0 / rOn;
-  const gExtra = gOn - gOff;
-
-  const absV = Math.abs(v);
-  const signV = v >= 0 ? 1 : -1;
-
-  // Smooth transition: s(|V|) = 0.5*(1 + tanh((|V| - V_BO) / sharpness))
-  const arg = (absV - vBreakover) / sharpness;
-  const tanhVal = Math.tanh(arg);
-  const s = 0.5 * (1 + tanhVal);
-  // ds/d|V| = 0.5 * (1 - tanhÂ²(arg)) / sharpness = 0.5 * sechÂ²(arg) / sharpness
-  const sech2 = 1 - tanhVal * tanhVal;
-  const dsDAbsV = 0.5 * sech2 / sharpness;
-
-  // Total conductance (symmetric): G(v) = g_off + g_extra * s(|V|)
-  const gTot = gOff + gExtra * s;
-
-  // In conducting region, effective voltage is reduced by V_hold offset:
-  // I = G_tot * V - sign(V) * V_hold * g_extra * s(|V|)
-  const iOffset = signV * vHold * gExtra * s;
-  const iTotal = gTot * v - iOffset;
-
-  // Jacobian: dI/dV
-  // dI/dV = g_off + g_extra*s + (g_extra * v * sign(V) - sign(V)*v_hold*g_extra) * dsDAbsV
-  //       = gTot + g_extra * (v - sign(V)*vHold) * sign(V) * dsDAbsV
-  const dIdV = gTot + gExtra * (v - signV * vHold) * signV * dsDAbsV + GMIN;
-
-  // Norton equivalent: I = geq * V + ieq where ieq = I - geq*V
-  const geq = dIdV;
-  const ieq = iTotal - geq * v;
-
-  return { i: iTotal, geq, ieq };
-}
+import {
+  createDiodeElement,
+  DIODE_PARAM_DEFS,
+  DIODE_PARAM_DEFAULTS,
+} from "./diode.js";
+import type { SetupContext } from "../../solver/analog/setup-context.js";
 
 // ---------------------------------------------------------------------------
 // createDiacElement  AnalogElement factory
@@ -118,33 +40,33 @@ function diacModel(
 export function createDiacElement(
   pinNodes: ReadonlyMap<string, number>,
   props: PropertyBag,
+  getTime: () => number,
 ): AnalogElementCore {
   const nodeA = pinNodes.get("A")!; // terminal A
   const nodeB = pinNodes.get("B")!; // terminal B
 
-  const p = {
-    vBreakover: props.getModelParam<number>("vBreakover"),
-    vHold:      props.getModelParam<number>("vHold"),
-    rOn:        props.getModelParam<number>("rOn"),
-    rOff:       props.getModelParam<number>("rOff"),
-  };
+  // D_fwd: A=anode(pos), B=cathode(neg)  ngspiceNodeMap: { A: "pos", B: "neg" }
+  const fwdNodes: ReadonlyMap<string, number> = new Map([
+    ["A", nodeA],
+    ["K", nodeB],
+  ]);
 
-  // Sharpness of the tanh transition: smaller = sharper snap.
-  // V_BO - V_hold gives the snap width; use ~0.5V for good NR convergence.
-  const sharpness = 0.5;
+  // D_rev: B=anode(pos), A=cathode(neg)  ngspiceNodeMap: { B: "pos", A: "neg" }
+  const revNodes: ReadonlyMap<string, number> = new Map([
+    ["A", nodeB],
+    ["K", nodeA],
+  ]);
 
-  // Cached NR linearization
-  let _v = 0;
-  let _geq = 1.0 / p.rOff + GMIN;
-  let _ieq = 0;
-  let _id = 0; // cached device current for getPinCurrents
+  const parentLabel = props.getOrDefault<string>("label", "D");
+  const fwdLabel = `${parentLabel}#D_fwd`;
+  const revLabel = `${parentLabel}#D_rev`;
 
-  function recompute(v: number): void {
-    const { i, geq, ieq } = diacModel(v, p.vBreakover, p.vHold, p.rOn, p.rOff, sharpness);
-    _id = i;
-    _geq = geq;
-    _ieq = ieq;
-  }
+  const dFwd = createDiodeElement(fwdNodes, props, getTime);
+  const dRev = createDiodeElement(revNodes, props, getTime);
+
+  // Attach labels so setup()/load() diagnostics attribute correctly
+  dFwd.label = fwdLabel;
+  dRev.label = revLabel;
 
   return {
     branchIndex: -1,
@@ -154,47 +76,39 @@ export function createDiacElement(
     isNonlinear: true,
     isReactive: false,
 
-    setup(_ctx: import("../../solver/analog/setup-context.js").SetupContext): void {
-      throw new Error("PB-DIAC not yet migrated");
+    setup(ctx: SetupContext): void {
+      dFwd.setup(ctx);   // D_fwd: DIO with posNode=A, negNode=B
+      dRev.setup(ctx);   // D_rev: DIO with posNode=B, negNode=A
     },
 
     load(ctx: LoadContext): void {
-      const voltages = ctx.rhsOld;
-      const vA = voltages[nodeA];
-      const vB = voltages[nodeB];
-      _v = vA - vB;
-      recompute(_v);
-
-      const solver = ctx.solver;
-      stampG(solver, nodeA, nodeA, _geq);
-      stampG(solver, nodeA, nodeB, -_geq);
-      stampG(solver, nodeB, nodeA, -_geq);
-      stampG(solver, nodeB, nodeB, _geq);
-      stampRHS(ctx.rhs, nodeA, -_ieq);
-      stampRHS(ctx.rhs, nodeB, _ieq);
+      dFwd.load(ctx);
+      dRev.load(ctx);
     },
 
     checkConvergence(ctx: LoadContext): boolean {
-      const voltages = ctx.rhsOld;
-      const vA = voltages[nodeA];
-      const vB = voltages[nodeB];
-      const vRaw = vA - vB;
-
-      const delvd = vRaw - _v;
-      const cdhat = _id + _geq * delvd;
-      const tol = ctx.reltol * Math.max(Math.abs(cdhat), Math.abs(_id)) + ctx.iabstol;
-      return Math.abs(cdhat - _id) <= tol;
+      const fwdOk = dFwd.checkConvergence ? dFwd.checkConvergence(ctx) : true;
+      const revOk = dRev.checkConvergence ? dRev.checkConvergence(ctx) : true;
+      return fwdOk && revOk;
     },
 
     getPinCurrents(_rhs: Float64Array): number[] {
       // pinLayout order: [A (terminal 1), B (terminal 2)]
-      // Positive = current flowing INTO element at that pin.
-      // Current flows from A to B through the device: into A, out of B.
-      return [_id, -_id];
+      const fwdCurrents = dFwd.getPinCurrents ? dFwd.getPinCurrents(_rhs) : [0, 0];
+      const revCurrents = dRev.getPinCurrents ? dRev.getPinCurrents(_rhs) : [0, 0];
+      // D_fwd: A-pin current from A→B, D_rev: A-pin current from B→A
+      // Net current at A = fwd[0] + rev[1] (rev[1] is current at D_rev's K=nodeA)
+      // Net current at B = fwd[1] + rev[0]
+      return [
+        fwdCurrents[0] + revCurrents[1],
+        fwdCurrents[1] + revCurrents[0],
+      ];
     },
 
     setParam(key: string, value: number): void {
-      if (key in p) (p as Record<string, number>)[key] = value;
+      // Forward shared model parameters to both sub-elements
+      dFwd.setParam?.(key, value);
+      dRev.setParam?.(key, value);
     },
   };
 }
@@ -339,17 +253,18 @@ export const DiacDefinition: ComponentDefinition = {
   attributeMap: DIAC_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.SEMICONDUCTORS,
   helpText:
-    "Diac  bidirectional trigger diode.\n" +
+    "Diac — bidirectional trigger diode.\n" +
     "Pins: A (terminal 1), B (terminal 2).\n" +
-    "Blocks until |V| > V_breakover, then snaps to V_hold.",
+    "Blocks until |V| > BV (breakover voltage), then conducts bidirectionally.",
   models: {},
   modelRegistry: {
-    "behavioral": {
+    "spice": {
       kind: "inline",
       factory: createDiacElement,
-      paramDefs: DIAC_PARAM_DEFS,
-      params: DIAC_PARAM_DEFAULTS,
+      paramDefs: DIODE_PARAM_DEFS,
+      params: DIODE_PARAM_DEFAULTS,
+      mayCreateInternalNodes: true,
     },
   },
-  defaultModel: "behavioral",
+  defaultModel: "spice",
 };

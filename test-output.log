@@ -1,52 +1,22 @@
-FF....F.FF..........FFF..............FFF...........................F......................................................................................FF..............................................................F.......FFFFF.................F.FFFFF........F....F...................
 
-============================================================
-  206 passed  16 failed  0 skipped  (0.7s)
-  4 test files
-============================================================
+> digits-sim@0.1.0 test:q
+> node scripts/run-all-tests.mjs -q
 
-Failures grouped by error:
+vs: no DC value, transient time 0 value usedvs: no DC value, transient time 0 value usedv1: no DC value, transient time 0 value usedv1: no DC value, transient time 0 value usedv1: no DC value, transient time 0 value usedv1: no DC value, transient time 0 value usedv1: no DC value, transient time 0 value usedvac: no DC value, transient time 0 value usedv_in: no DC value, transient time 0 value usedv_in: no DC value, transient time 0 value usedvin: no DC value, transient time 0 value usedv1: no DC value, transient time 0 value usedv1: no DC value, transient time 0 value usedv1: no DC value, transient time 0 value usedvs: no DC value, transient time 0 value usedv1: no DC value, transient time 0 value usedvs: no DC value, transient time 0 value used[run-all-tests] vitest exceeded 600s wall-clock timeout and was killed.
+node:fs:1206
+  return binding.rmSync(getValidatedPath(path), opts.maxRetries, opts.recursive, opts.retryDelay);
+                 ^
 
-  [1] expected 0 to be greater than 0  (x3)
-      src\components\semiconductors\__tests__\bjt.test.ts:1969:31  "target_colPrime"
-      src\solver\analog\__tests__\newton-raphson.test.ts:817:39  "e_singular_recovers_via_continue"
-      src\solver\analog\__tests__\newton-raphson.test.ts:883:39  "e_singular_recovery_reloads_and_refactors"
+Error: EPERM, Permission denied: \\?\C:\local_working_projects\digital_in_browser\.playwright-tmp '\\?\C:\local_working_projects\digital_in_browser\.playwright-tmp'
+    at rmSync (node:fs:1206:18)
+    at file:///C:/local_working_projects/digital_in_browser/scripts/run-all-tests.mjs:86:3
+    at ModuleJob.run (node:internal/modules/esm/module_job:437:25)
+    at async node:internal/modules/esm/loader:639:26
+    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:101:5) {
+  errno: 1,
+  code: 'EPERM',
+  path: '\\\\?\\C:\\local_working_projects\\digital_in_browser\\.playwright-tmp',
+  syscall: 'rm'
+}
 
-  [2] V(diode): relative error 100.0000% exceeds 0.1% (actual=0, expected=0.692891)  (x1)
-      src\components\semiconductors\__tests__\diode.test.ts:59:11  "diode_resistor_dc_op"
-
-  [3] V(diode) before: relative error 100.0000% exceeds 0.1% (actual=0, expected=0.692891)  (x2)
-      src\components\semiconductors\__tests__\diode.test.ts:59:11  "setParam('IS', 1e-11) shifts DC OP to match SPICE reference"
-      src\components\semiconductors\__tests__\diode.test.ts:59:11  "setParam('N', 2) shifts DC OP to match SPICE reference"
-
-  [4] expected 1e-12 to be less than NaN  (x1)
-      src\components\semiconductors\__tests__\diode.test.ts:643:23  "IKF correction reduces gd compared to IKF=Infinity at same Vd"
-
-  [5] expected 1.0559414757189065e-12 to be less than 1.0559414757189065e-12  (x1)
-      src\components\semiconductors\__tests__\diode.test.ts:650:23  "IKR correction reduces gd for reverse-biased diode with finite IKR"
-
-  [6] expected NaN to be less than 0.000001  (x1)
-      src\components\semiconductors\__tests__\diode.test.ts:676:58  "AREA=1 (default) gives same result as no AREA override"
-
-  [7] expected NaN to be greater than 1.9  (x1)
-      src\components\semiconductors\__tests__\diode.test.ts:683:29  "AREA=2 doubles IS and thus id (and gd) relative to AREA=1"
-
-  [8] expected NaN to be greater than 0  (x1)
-      src\components\semiconductors\__tests__\diode.test.ts:1150:28  "cap gate fires under MODETRANOP | MODEUIC (dioload.c:316-317)"
-
-  [9] expected 4 to be 3 // Object.is equality  (x1)
-      src\solver\analog\__tests__\newton-raphson.test.ts:153:42  "writes_into_ctx_nrResult"
-
-  [10] expected 5 to be less than 0.75  (x1)
-      src\solver\analog\__tests__\newton-raphson.test.ts:214:16  "diode_circuit_converges"
-
-  [11] expected 0.005 to be less than 1e-11  (x1)
-      src\solver\analog\__tests__\newton-raphson.test.ts:232:21  "diode_reverse_bias"
-
-  [12] expected 0.838698003514509 to be 0.7895470511246272 // Object.is equality  (x1)
-      src\solver\analog\__tests__\newton-raphson.test.ts:396:26  "pnjlim_matches_ngspice_forward_bias"
-
-  [13] expected 0.4062106161985045 to be 0.3 // Object.is equality  (x1)
-      src\solver\analog\__tests__\newton-raphson.test.ts:410:26  "pnjlim_matches_ngspice_arg_le_zero_branch"
-
-Structured report: .vitest-failures.json
+Node.js v25.9.0

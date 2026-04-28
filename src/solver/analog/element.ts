@@ -235,18 +235,6 @@ export interface PoolBackedAnalogElementCore extends AnalogElementCore {
   stateBaseOffset: number;
   readonly stateSchema: StateSchema;
   initState(pool: StatePoolRef): void;
-  refreshSubElementRefs?(
-    newS0: Float64Array, newS1: Float64Array, newS2: Float64Array, newS3: Float64Array,
-    newS4: Float64Array, newS5: Float64Array, newS6: Float64Array, newS7: Float64Array,
-  ): void;
-  s0: Float64Array;
-  s1: Float64Array;
-  s2: Float64Array;
-  s3: Float64Array;
-  s4: Float64Array;
-  s5: Float64Array;
-  s6: Float64Array;
-  s7: Float64Array;
 }
 
 /**

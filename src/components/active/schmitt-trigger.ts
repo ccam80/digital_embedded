@@ -187,20 +187,10 @@ function createSchmittTriggerElement(
     stateSchema: SCHMITT_COMPOSITE_SCHEMA,
     stateSize: totalStateSize,
     stateBaseOffset: -1,
-    s0: new Float64Array(0),
-    s1: new Float64Array(0),
-    s2: new Float64Array(0),
-    s3: new Float64Array(0),
-    s4: new Float64Array(0),
-    s5: new Float64Array(0),
-    s6: new Float64Array(0),
-    s7: new Float64Array(0),
 
     initState(_pool: StatePoolRef): void {
       _schmittPool = _pool;
       _schmittBase = this.stateBaseOffset;
-      this.s0 = _pool.state0; this.s1 = _pool.state1; this.s2 = _pool.state2; this.s3 = _pool.state3;
-      this.s4 = _pool.state4; this.s5 = _pool.state5; this.s6 = _pool.state6; this.s7 = _pool.state7;
       // Initialize OUTPUT_HIGH slot to 0 (output starts low).
       _pool.state0[_schmittBase] = 0.0;
       let offset = _schmittBase + SCHMITT_COMPOSITE_SCHEMA.size;
@@ -215,8 +205,12 @@ function createSchmittTriggerElement(
       const voltages = ctx.rhsOld;
       const vIn = readNode(voltages, nIn);
 
+      // ngspice DEVload-local register promotion of CKTstate0 (cktdefs.h:82-85).
+      // Hoist the live ring slot once per load() entry.
+      const s0 = _schmittPool.states[0];
+
       // Read hysteresis state from pool (state0 = current NR iterate).
-      const outputHigh = _schmittPool.state0[_schmittBase] >= 0.5;
+      const outputHigh = s0[_schmittBase] >= 0.5;
       let nextHigh = outputHigh;
       if (outputHigh && vIn < p.vTL) {
         nextHigh = false;
@@ -225,7 +219,7 @@ function createSchmittTriggerElement(
       }
 
       if (nextHigh !== outputHigh) {
-        _schmittPool.state0[_schmittBase] = nextHigh ? 1.0 : 0.0;
+        s0[_schmittBase] = nextHigh ? 1.0 : 0.0;
         _outputHigh = nextHigh;
         updateOutputLevel();
       }

@@ -350,6 +350,7 @@ export const DDefinition: ComponentDefinition = {
       factory: makeDFlipflopAnalogFactory(),
       paramDefs: [],
       params: {},
+      mayCreateInternalNodes: false,
     },
     cmos: {
       kind: "netlist",

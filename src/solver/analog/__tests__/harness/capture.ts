@@ -156,7 +156,6 @@ export function captureTopology(
   return {
     matrixSize: compiled.matrixSize,
     nodeCount: compiled.nodeCount,
-    branchCount: compiled.branchCount,
     elementCount: compiled.elements.length,
     elements: compiled.elements.map((el, i) => {
       const ce = compiled.elementToCircuitElement?.get(i);

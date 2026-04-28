@@ -18,7 +18,7 @@ import { SparseSolver } from "../../../solver/analog/sparse-solver.js";
 import type { AnalogElement } from "../../../solver/analog/element.js";
 import type { LoadContext } from "../../../solver/analog/load-context.js";
 import { MODETRAN, MODEINITFLOAT, MODEDCOP, MODEINITTRAN } from "../../../solver/analog/ckt-mode.js";
-import { makeLoadCtx } from "../../../solver/analog/__tests__/test-helpers.js";
+import { makeLoadCtx, loadCtxFromFields } from "../../../solver/analog/__tests__/test-helpers.js";
 
 // ---------------------------------------------------------------------------
 // Test defaults matching MemristorDefinition
@@ -277,7 +277,7 @@ describe("Memristor", () => {
 
       const solver = new SparseSolver();
       solver._initStructure();
-      const ctx: LoadContext = {
+      const ctx = loadCtxFromFields({
         solver,
         matrix: solver,
         rhs: new Float64Array(2),
@@ -302,7 +302,7 @@ describe("Memristor", () => {
         cktFixLimit: false,
         bypass: false,
         voltTol: 1e-6,
-      };
+      });
       (mem as unknown as AnalogElement).load(ctx);
 
       const G = mem.conductance();
@@ -428,7 +428,7 @@ describe("memristor_load_transient_parity (C4.2)", () => {
     for (let step = 0; step < 10; step++) {
       matValues.fill(0);
 
-      const ctx: LoadContext = {
+      const ctx = loadCtxFromFields({
         solver,
         matrix: solver,
         rhs: voltages,
@@ -453,7 +453,7 @@ describe("memristor_load_transient_parity (C4.2)", () => {
         cktFixLimit: false,
         bypass: false,
         voltTol: 1e-6,
-      };
+      });
 
       mem.load(ctx);
 

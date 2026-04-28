@@ -3,6 +3,18 @@
 **digiTS file:** `src/components/active/opamp.ts`
 **Architecture:** composite. Decomposes into 1 sub-element at compile time.
 
+> **Spec status note (2026-04-28):** This PB describes a target architecture in
+> which the op-amp owns concrete `VCVSElement` and `RESElement` sub-element
+> objects and rebinds them via `pinNodeIds = [...]` in `setup()`. The current
+> `opamp.ts` implementation does **not** instantiate those sub-element objects —
+> it inlines the VCVS+RES TSTALLOC sequences directly into a single closure-
+> backed `AnalogElementCore`. The `pinNodeIds = [...]` listing in the
+> "setup() body" section below is therefore aspirational; it will become
+> reachable code only once the sub-element refactor lands. For sub-element
+> wiring of any element whose `setup()` reads from `_pinNodes` (BJT in
+> particular), the canonical pattern is `_pinNodes.set(...)` direct
+> mutation — see PB-OPTO, PB-TIMER555, PB-SCR.
+
 ## Pin mapping (from 01-pin-mapping.md)
 
 The composite itself has no `ngspiceNodeMap` (composites don't stamp directly). Each sub-element carries its own map; listed below.

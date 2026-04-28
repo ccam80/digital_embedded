@@ -23,7 +23,7 @@ import {
   MOSFET_SCHEMA,
 } from "../mosfet.js";
 import { PropertyBag } from "../../../core/properties.js";
-import { withNodeIds, runDcOp, makeVoltageSource } from "../../../solver/analog/__tests__/test-helpers.js";
+import { withNodeIds, runDcOp, makeVoltageSource, loadCtxFromFields } from "../../../solver/analog/__tests__/test-helpers.js";
 import { StatePool } from "../../../solver/analog/state-pool.js";
 import { SparseSolver } from "../../../solver/analog/sparse-solver.js";
 import type { SetupContext } from "../../../solver/analog/setup-context.js";
@@ -153,7 +153,7 @@ function makeDcOpCtx(rhsOld: Float64Array, matrixSize: number, solver?: SparseSo
   const s = solver ?? (() => { const s2 = new SparseSolver(); s2._initStructure(); return s2; })();
   const KoverQ_local = 1.3806226e-23 / 1.6021918e-19;
   const temp = 300.15;
-  return {
+  return loadCtxFromFields({
     cktMode: MODEDCOP | MODEINITFLOAT,
     solver: s,
     matrix: s,
@@ -180,7 +180,7 @@ function makeDcOpCtx(rhsOld: Float64Array, matrixSize: number, solver?: SparseSo
     voltTol: 1e-6,
     state0: new Float64Array(0),
     state1: new Float64Array(0),
-  };
+  });
 }
 
 
@@ -800,7 +800,7 @@ describe("MOSFET primeJunctions", () => {
     solver._initStructure();
     const KoverQ = 1.3806226e-23 / 1.6021918e-19;
     const temp = 300.15;
-    return {
+    return loadCtxFromFields({
       cktMode,
       solver,
       matrix: solver,
@@ -825,7 +825,7 @@ describe("MOSFET primeJunctions", () => {
       cktFixLimit: false,
       bypass: false,
       voltTol: 1e-6,
-    };
+    });
   }
 
   it("checkConvergence_returns_true_during_initFix_when_OFF", () => {
@@ -1093,7 +1093,7 @@ function makeWave62Ctx(cktMode: number, overrides: Partial<LoadContext> & { setu
   const { setupSolver, ...rest } = overrides;
   const solver = setupSolver ?? (() => { const s = new SparseSolver(); s._initStructure(); return s; })();
   const temp = 300.15;
-  return {
+  return loadCtxFromFields({
     cktMode,
     solver,
     matrix: solver,
@@ -1119,7 +1119,7 @@ function makeWave62Ctx(cktMode: number, overrides: Partial<LoadContext> & { setu
     bypass: false,
     voltTol: 1e-6,
     ...rest,
-  };
+  });
 }
 
 /** Create an NMOS element with real setup() and a bound StatePool.

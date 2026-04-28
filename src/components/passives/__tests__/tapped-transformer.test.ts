@@ -27,7 +27,7 @@ import {
 import { PropertyBag } from "../../../core/properties.js";
 import { ComponentCategory, ComponentRegistry } from "../../../core/registry.js";
 import { SparseSolver } from "../../../solver/analog/sparse-solver.js";
-import { makeVoltageSource, makeResistor, makeDiode, makeCapacitor, makeAcVoltageSource, allocateStatePool } from "../../../solver/analog/__tests__/test-helpers.js";
+import { makeVoltageSource, makeResistor, makeDiode, makeCapacitor, makeAcVoltageSource, allocateStatePool, loadCtxFromFields } from "../../../solver/analog/__tests__/test-helpers.js";
 import type { AnalogElementCore } from "../../../solver/analog/element.js";
 import type { AnalogElement } from "../../../solver/analog/element.js";
 import type { LoadContext } from "../../../solver/analog/load-context.js";
@@ -62,7 +62,7 @@ function makeTransientCtx(solver: SparseSolverType, rhs: Float64Array, dt: numbe
     ag[0] = 1 / dt;
     ag[1] = -1 / dt;
   }
-  return {
+  return loadCtxFromFields({
     cktMode: MODETRAN | MODEINITFLOAT,
     solver: solver as unknown as import("../../../solver/analog/sparse-solver.js").SparseSolver,
     matrix: solver as unknown as import("../../../solver/analog/sparse-solver.js").SparseSolver,
@@ -87,7 +87,7 @@ function makeTransientCtx(solver: SparseSolverType, rhs: Float64Array, dt: numbe
     cktFixLimit: false,
     bypass: false,
     voltTol: 1e-6,
-  };
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -96,7 +96,6 @@ function makeTransientCtx(solver: SparseSolverType, rhs: Float64Array, dt: numbe
 
 function buildTxCircuit(opts: {
   nodeCount: number;
-  branchCount: number;
   elements: AnalogElement[];
 }): ConcreteCompiledAnalogCircuit {
   let offset = 0;
@@ -115,7 +114,6 @@ function buildTxCircuit(opts: {
   }
   return new ConcreteCompiledAnalogCircuit({
     nodeCount: opts.nodeCount,
-    branchCount: opts.branchCount,
     elements: opts.elements,
     labelToNodeId: new Map(),
     wireToNodeId: new Map(),
@@ -203,7 +201,6 @@ describe("TappedTransformer", () => {
 
     const compiled = buildTxCircuit({
       nodeCount,
-      branchCount: 4,
       elements: [vsrc, tx as unknown as AnalogElement, rLoad, rCtGnd, rS2Gnd],
     });
 
@@ -373,7 +370,6 @@ describe("TappedTransformer", () => {
 
     const compiled = buildTxCircuit({
       nodeCount,
-      branchCount: 4,
       elements: [vsrc, tx as unknown as AnalogElement, rCtGnd, d1, d2, cFilter, rLoadEl],
     });
 
@@ -591,7 +587,7 @@ describe("tapped_transformer_load_transient_parity (C4.2)", () => {
     for (let step = 0; step < 10; step++) {
       matValues.fill(0);
 
-      const ctx: LoadContext = {
+      const ctx = loadCtxFromFields({
         cktMode: step === 0 ? (MODETRAN | MODEINITTRAN) : (MODETRAN | MODEINITFLOAT),
         solver,
         matrix: solver,
@@ -616,7 +612,7 @@ describe("tapped_transformer_load_transient_parity (C4.2)", () => {
         cktFixLimit: false,
         bypass: false,
         voltTol: 1e-6,
-      };
+      });
 
       el.load(ctx);
 

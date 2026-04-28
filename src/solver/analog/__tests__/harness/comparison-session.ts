@@ -217,7 +217,7 @@ function getDllPath(opts: ComparisonSessionOptions): string {
 
 function emptyTopology(): TopologySnapshot {
   return {
-    matrixSize: 0, nodeCount: 0, branchCount: 0, elementCount: 0,
+    matrixSize: 0, nodeCount: 0, elementCount: 0,
     elements: [],
     nodeLabels: new Map(),
     matrixRowLabels: new Map(),

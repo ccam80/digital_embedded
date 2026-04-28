@@ -22,7 +22,7 @@ import { computeNIcomCof } from "../../../solver/analog/integration.js";
 import { PropertyBag } from "../../../core/properties.js";
 import { SparseSolver } from "../../../solver/analog/sparse-solver.js";
 import { DiagnosticCollector } from "../../../solver/analog/diagnostics.js";
-import { withNodeIds, runNR, makeLoadCtx } from "../../../solver/analog/__tests__/test-helpers.js";
+import { withNodeIds, runNR, makeLoadCtx, loadCtxFromFields } from "../../../solver/analog/__tests__/test-helpers.js";
 import { StatePool } from "../../../solver/analog/state-pool.js";
 import type { AnalogElement, AnalogElementCore, ReactiveAnalogElement } from "../../../solver/analog/element.js";
 import type { AnalogFactory } from "../../../core/registry.js";
@@ -396,7 +396,7 @@ function buildTempCtx(
   solver: SparseSolver,
   rhsOld: Float64Array,
 ): import("../../../solver/analog/load-context.js").LoadContext {
-  return {
+  return loadCtxFromFields({
     cktMode: MODEDCOP | MODEINITFLOAT,
     solver,
     matrix: solver,
@@ -421,7 +421,7 @@ function buildTempCtx(
     cktFixLimit: false,
     bypass: false,
     voltTol: 1e-6,
-  };
+  });
 }
 
 describe("TunnelDiode TEMP", () => {

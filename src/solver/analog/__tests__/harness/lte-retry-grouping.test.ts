@@ -56,7 +56,7 @@ function makeRCCircuit(): { circuit: ConcreteCompiledAnalogCircuit; pool: StateP
   const pool = buildStatePool(elements);
   return {
     circuit: {
-      netCount: 2, componentCount: 3, nodeCount: 2, branchCount: 1, matrixSize: 3,
+      netCount: 2, componentCount: 3, nodeCount: 2, matrixSize: 3,
       elements,
       labelToNodeId: new Map([["Vs", 1], ["C1:A", 2]]),
       statePool: pool,

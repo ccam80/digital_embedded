@@ -313,7 +313,7 @@ describe("matrix semantic join: _buildMatrixMaps routes BJT internal nodes via n
 
       sAny._ngSession = {
         source: "ngspice",
-        topology: { matrixSize: 5, nodeCount: 4, branchCount: 0, elementCount: 0, elements: [], nodeLabels: new Map(), matrixRowLabels: new Map(), matrixColLabels: new Map() },
+        topology: { matrixSize: 5, nodeCount: 4, elementCount: 0, elements: [], nodeLabels: new Map(), matrixRowLabels: new Map(), matrixColLabels: new Map() },
         steps: [{
           ...ourStep,
           iterations: [{

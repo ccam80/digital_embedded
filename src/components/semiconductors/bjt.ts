@@ -579,15 +579,6 @@ export function createBjtElement(
     stateSchema: BJT_SIMPLE_SCHEMA,
     stateSize: BJT_SIMPLE_SCHEMA.size,
     stateBaseOffset: -1,
-    s0: new Float64Array(0) as Float64Array<ArrayBufferLike>,
-    s1: new Float64Array(0) as Float64Array<ArrayBufferLike>,
-    s2: new Float64Array(0) as Float64Array<ArrayBufferLike>,
-    s3: new Float64Array(0) as Float64Array<ArrayBufferLike>,
-    s4: new Float64Array(0) as Float64Array<ArrayBufferLike>,
-    s5: new Float64Array(0) as Float64Array<ArrayBufferLike>,
-    s6: new Float64Array(0) as Float64Array<ArrayBufferLike>,
-    s7: new Float64Array(0) as Float64Array<ArrayBufferLike>,
-
     setup(ctx: import("../../solver/analog/setup-context.js").SetupContext): void {
       const solver   = ctx.solver;
       const baseNode = this._pinNodes.get("B")!;
@@ -652,8 +643,6 @@ export function createBjtElement(
       pool = poolRef;
       this.stateBaseOffset = this._stateBase;
       base = this.stateBaseOffset;
-      this.s0 = poolRef.state0 as Float64Array<ArrayBufferLike>; this.s1 = poolRef.state1 as Float64Array<ArrayBufferLike>; this.s2 = poolRef.state2 as Float64Array<ArrayBufferLike>; this.s3 = poolRef.state3 as Float64Array<ArrayBufferLike>;
-      this.s4 = poolRef.state4 as Float64Array<ArrayBufferLike>; this.s5 = poolRef.state5 as Float64Array<ArrayBufferLike>; this.s6 = poolRef.state6 as Float64Array<ArrayBufferLike>; this.s7 = poolRef.state7 as Float64Array<ArrayBufferLike>;
       applyInitialValues(BJT_SIMPLE_SCHEMA, pool, base, { polarity });
     },
 
@@ -1218,15 +1207,6 @@ export function createSpiceL1BjtElement(
     stateSchema: BJT_L1_SCHEMA,
     stateSize: BJT_L1_SCHEMA.size,
     stateBaseOffset: -1,
-    s0: new Float64Array(0) as Float64Array<ArrayBufferLike>,
-    s1: new Float64Array(0) as Float64Array<ArrayBufferLike>,
-    s2: new Float64Array(0) as Float64Array<ArrayBufferLike>,
-    s3: new Float64Array(0) as Float64Array<ArrayBufferLike>,
-    s4: new Float64Array(0) as Float64Array<ArrayBufferLike>,
-    s5: new Float64Array(0) as Float64Array<ArrayBufferLike>,
-    s6: new Float64Array(0) as Float64Array<ArrayBufferLike>,
-    s7: new Float64Array(0) as Float64Array<ArrayBufferLike>,
-
     setup(ctx: import("../../solver/analog/setup-context.js").SetupContext): void {
       const solver    = ctx.solver;
       const baseNode  = this._pinNodes.get("B")!;
@@ -1297,8 +1277,6 @@ export function createSpiceL1BjtElement(
       pool = poolRef;
       this.stateBaseOffset = this._stateBase;
       base = this.stateBaseOffset;
-      this.s0 = poolRef.state0 as Float64Array<ArrayBufferLike>; this.s1 = poolRef.state1 as Float64Array<ArrayBufferLike>; this.s2 = poolRef.state2 as Float64Array<ArrayBufferLike>; this.s3 = poolRef.state3 as Float64Array<ArrayBufferLike>;
-      this.s4 = poolRef.state4 as Float64Array<ArrayBufferLike>; this.s5 = poolRef.state5 as Float64Array<ArrayBufferLike>; this.s6 = poolRef.state6 as Float64Array<ArrayBufferLike>; this.s7 = poolRef.state7 as Float64Array<ArrayBufferLike>;
       applyInitialValues(BJT_L1_SCHEMA, pool, base, { polarity, RB: params.RB });
     },
 

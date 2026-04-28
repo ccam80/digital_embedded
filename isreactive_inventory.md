@@ -322,6 +322,53 @@ Grep evidence: `refreshSubElementRefs` matches in exactly one location — its o
 
 **Caveat:** `spice?: ModelEmissionSpec` is an extension point; deleting `modelCardPrefix` may be enough without removing the wrapper if other emission overrides are anticipated. Recommend deleting just `modelCardPrefix` and leaving `ModelEmissionSpec` as an empty (or near-empty) struct only if there are pending fields to add.
 
+#### D. `PoolBackedAnalogElementCore.poolBacked: true` discriminator
+**Status:** Same redundancy pattern as `isReactive` — a boolean that duplicates a structural method's presence.
+
+**Current shape:**
+```ts
+// element.ts:233
+export interface PoolBackedAnalogElementCore extends AnalogElementCore {
+  readonly poolBacked: true;          // ← discriminator
+  readonly stateSize: number;
+  stateBaseOffset: number;
+  readonly stateSchema: StateSchema;
+  initState(pool: StatePoolRef): void;
+  ...
+}
+
+// element.ts:275–278
+export function isPoolBacked(el: AnalogElement): el is PoolBackedAnalogElement {
+  return (el as any).poolBacked === true;
+}
+```
+
+Every `isPoolBacked(el)` call site (`analog-engine.ts:193, 263, 815, 924`, `ckt-context.ts:793`, `harness/capture.ts:196`, `test-helpers.ts:755, 762, 814`) immediately uses the narrowed element to call `initState`, read `stateSchema`, or read `stateBaseOffset`. The boolean adds nothing the method-presence check doesn't already enforce.
+
+**Behavioral wrappers are the most flagrant case:** their `*_COMPOSITE_SCHEMA` is literally empty (`defineStateSchema("BehavioralCombinationalComposite", [])`, line 32 of `behavioral-combinational.ts`). The wrapper carries zero state of its own — `poolBacked: true` exists purely so the engine's pool-init pass calls the wrapper's `initState()`, which then forwards offsets to children. But the same redundancy applies to every leaf pool-backed element (capacitor, diode, BJT, etc.) — they all carry both the boolean AND `initState`.
+
+**Replacement:** Use the method-presence test as the runtime discriminator and drop the boolean.
+
+```ts
+// new isPoolBacked
+export function isPoolBacked(el: AnalogElementCore): el is PoolBackedAnalogElementCore {
+  return typeof (el as any).initState === "function";
+}
+```
+
+**Files (~50):**
+
+| Bucket | Action |
+|--------|--------|
+| `solver/analog/element.ts:233` | Delete `readonly poolBacked: true;` from `PoolBackedAnalogElementCore`. |
+| `solver/analog/element.ts:275–278` | Rewrite `isPoolBacked` to test `initState` presence. |
+| Behavioral wrappers (10 occurrences across `behavioral-gate.ts:86`, `behavioral-combinational.ts:84/240/383`, `behavioral-sequential.ts:86/281/546`, `behavioral-flipflop.ts:102`, `behavioral-flipflop/{d,jk,jk-async,rs,rs-async,t}-async.ts`, `behavioral-remaining.ts:89/236/388`) | Delete `readonly poolBacked = true as const;` |
+| `bridge-adapter.ts:61, 183` | Delete the two declarations. |
+| Pool-backed leaf components (~30 across passives, semiconductors, switching, active, IO) | Delete `poolBacked: true as const,` from each factory's element literal or class body. Files: `capacitor.ts:173`, `inductor.ts:189`, `polarized-cap.ts:270`, `crystal.ts:255`, `transmission-line.ts:339/454/565/683`, `transformer.ts:235`, `tapped-transformer.ts:227`, `diode.ts:536`, `bjt.ts:578/1217`, `mosfet.ts:854`, `pjfet.ts:300`, `njfet.ts:322`, `tunnel-diode.ts:277`, `zener.ts:232`, `timer-555.ts:382`, `schmitt-trigger.ts:186`, `analog-switch.ts:291/408`, `comparator.ts:259/418`, `adc.ts:408`, `dac.ts:366`, `led.ts:240` |
+| `test-helpers.ts:327` | Delete one fixture entry. |
+
+Risk: zero. The `isPoolBacked` rewrite preserves runtime semantics exactly (every current `poolBacked: true` element also has `initState`; no non-pool-backed element has it).
+
 ### Borderline — propose deletion, but flag for user decision
 
 #### C. `AnalogElement.allNodeIds` + `AnalogElement.internalNodeLabels` + `ModelEntry.getInternalNodeLabels`

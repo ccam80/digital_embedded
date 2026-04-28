@@ -129,13 +129,11 @@ function addWire(circuit: Circuit, x1: number, y1: number, x2: number, y2: numbe
 
 function buildHandCircuit(opts: {
   nodeCount: number;
-  branchCount: number;
   elements: import("../element.js").AnalogElement[];
 }): ConcreteCompiledAnalogCircuit {
   const statePool = allocateStatePool(opts.elements);
   return new ConcreteCompiledAnalogCircuit({
     nodeCount: opts.nodeCount,
-    branchCount: opts.branchCount,
     elements: opts.elements,
     labelToNodeId: new Map(),
     wireToNodeId: new Map(),
@@ -268,7 +266,7 @@ describe("End-to-end: tight transient tolerances", () => {
     const cap = createTestCapacitor(1e-6, 2, 0);
 
     const compiled = buildHandCircuit({
-      nodeCount: 2, branchCount: 1, elements: [vs, r, cap],
+      nodeCount: 2, elements: [vs, r, cap],
     });
 
     const engine = new MNAEngine();
@@ -299,7 +297,7 @@ describe("End-to-end: tight transient tolerances", () => {
     const cap = createTestCapacitor(1e-6, 2, 0);
 
     const compiled = buildHandCircuit({
-      nodeCount: 2, branchCount: 1, elements: [vs, r, cap],
+      nodeCount: 2, elements: [vs, r, cap],
     });
 
     const engine = new MNAEngine();
@@ -336,7 +334,7 @@ describe("End-to-end: tight transient tolerances", () => {
     const ind = makeInductor(2, 0, 3, 10e-3);
 
     const compiled = buildHandCircuit({
-      nodeCount: 2, branchCount: 2, elements: [vs, r, ind],
+      nodeCount: 2, elements: [vs, r, ind],
     });
 
     const engine = new MNAEngine();
@@ -382,7 +380,7 @@ describe("End-to-end: multi-nonlinear convergence", () => {
     const d2 = makeDiode(3, 0, 1e-14, 1.0);
 
     const compiled = buildHandCircuit({
-      nodeCount: 3, branchCount: 1, elements: [vs, r, d1, d2],
+      nodeCount: 3, elements: [vs, r, d1, d2],
     });
 
     const engine = new MNAEngine();
@@ -416,7 +414,7 @@ describe("End-to-end: multi-nonlinear convergence", () => {
     const d2 = makeDiode(2, 0, 1e-14, 1.0);
 
     const compiled = buildHandCircuit({
-      nodeCount: 2, branchCount: 1, elements: [vs, r, d1, d2],
+      nodeCount: 2, elements: [vs, r, d1, d2],
     });
 
     const engine = new MNAEngine();
@@ -441,7 +439,7 @@ describe("End-to-end: multi-nonlinear convergence", () => {
     const d1 = makeDiode(2, 0, 1e-14, 1.0);
 
     const compiled = buildHandCircuit({
-      nodeCount: 2, branchCount: 1, elements: [vs, r1, r2, d1],
+      nodeCount: 2, elements: [vs, r1, r2, d1],
     });
 
     const engine = new MNAEngine();
@@ -466,7 +464,7 @@ describe("End-to-end: multi-nonlinear convergence", () => {
     const d2 = makeDiode(0, 2, 1e-14, 1.0);   // reverse
 
     const compiled = buildHandCircuit({
-      nodeCount: 2, branchCount: 1, elements: [vs, r, d1, d2],
+      nodeCount: 2, elements: [vs, r, d1, d2],
     });
 
     const engine = new MNAEngine();
@@ -493,7 +491,7 @@ describe("End-to-end: analytical verification", () => {
     const r2 = makeResistor(2, 0, 1000);
 
     const compiled = buildHandCircuit({
-      nodeCount: 2, branchCount: 1, elements: [vs, r1, r2],
+      nodeCount: 2, elements: [vs, r1, r2],
     });
 
     const engine = new MNAEngine();
@@ -519,7 +517,7 @@ describe("End-to-end: analytical verification", () => {
     const d = makeDiode(2, 0, Is, n);
 
     const compiled = buildHandCircuit({
-      nodeCount: 2, branchCount: 1, elements: [vs, r, d],
+      nodeCount: 2, elements: [vs, r, d],
     });
 
     const engine = new MNAEngine();
@@ -554,7 +552,7 @@ describe("End-to-end: analytical verification", () => {
     const r3 = makeResistor(2, 0, 1000);
 
     const compiled = buildHandCircuit({
-      nodeCount: 3, branchCount: 2, elements: [v1, v2, r1, r2, r3],
+      nodeCount: 3, elements: [v1, v2, r1, r2, r3],
     });
 
     const engine = new MNAEngine();

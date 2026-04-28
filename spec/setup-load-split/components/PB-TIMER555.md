@@ -102,28 +102,41 @@ setup(ctx: SetupContext): void {
   // Composite SR latch state (1 slot: 0.0 = Q reset, 1.0 = Q set)
   this._stateBase = ctx.allocStates(1);
 
+  // Sub-element wiring uses direct _pinNodes mutation. Sub-elements are not
+  // compiler-augmented (only top-level elements get pinNodeIds set by the
+  // compiler), so each sub-element's setup() reads node IDs from _pinNodes.
+
   // R-divider resistors (RES TSTALLOC: 4 entries each, ressetup.c:46-49)
-  this._rDiv1.pinNodeIds = [nVcc, nCtrl];
+  this._rDiv1._pinNodes = new Map([["A", nVcc], ["B", nCtrl]]);
   this._rDiv1.setup(ctx);
 
-  this._rDiv2.pinNodeIds = [nCtrl, this._nLower];
+  this._rDiv2._pinNodes = new Map([["A", nCtrl], ["B", this._nLower]]);
   this._rDiv2.setup(ctx);
 
-  this._rDiv3.pinNodeIds = [this._nLower, nGnd];
+  this._rDiv3._pinNodes = new Map([["A", this._nLower], ["B", nGnd]]);
   this._rDiv3.setup(ctx);
 
   // Threshold comparator VCVS (vcvsset.c:53-58, 1 branch + 6 TSTALLOC)
-  // comp1: in+ = THR, in- = CTRL, out+ = nComp1Out, out- = GND
-  this._comp1.pinNodeIds = [nThr, nCtrl, this._nComp1Out, nGnd];
+  // comp1: ctrl+ = THR, ctrl- = CTRL, out+ = nComp1Out, out- = GND
+  this._comp1._pinNodes = new Map([
+    ["ctrl+", nThr], ["ctrl-", nCtrl],
+    ["out+", this._nComp1Out], ["out-", nGnd],
+  ]);
   this._comp1.setup(ctx);
 
   // Trigger comparator VCVS (vcvsset.c:53-58, 1 branch + 6 TSTALLOC)
-  // comp2: in+ = nLower, in- = TRIG, out+ = nComp2Out, out- = GND
-  this._comp2.pinNodeIds = [this._nLower, nTrig, this._nComp2Out, nGnd];
+  // comp2: ctrl+ = nLower, ctrl- = TRIG, out+ = nComp2Out, out- = GND
+  this._comp2._pinNodes = new Map([
+    ["ctrl+", this._nLower], ["ctrl-", nTrig],
+    ["out+", this._nComp2Out], ["out-", nGnd],
+  ]);
   this._comp2.setup(ctx);
 
   // Discharge BJT NPN (bjtsetup.c:347-465, 24 states, 23 TSTALLOC)
-  this._bjtDis.pinNodeIds = [this._nDisBase, nDis, nGnd];
+  // BJT reads node IDs from _pinNodes.get("B"|"C"|"E"); pinNodeIds is irrelevant.
+  (this._bjtDis as any)._pinNodes = new Map([
+    ["B", this._nDisBase], ["C", nDis], ["E", nGnd],
+  ]);
   this._bjtDis.setup(ctx);
 
   // Output pin model (behavioral, DigitalOutputPinModel)

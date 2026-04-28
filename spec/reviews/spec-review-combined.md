@@ -109,13 +109,7 @@ These ~15 decisions, if resolved, automatically resolve a large fraction of the 
   - **A** — Add `_insertionOrder = []` to `_resetForAssembly()`; A9 test reads order between `_setup()` and first NR.
   - **B** — Restrict `_insertionOrder` lifetime to setup-only; remove `_resetForAssembly` reset claim.
 
-### R10 — `spec/architectural-alignment.md` does not exist (cross: TLINE + OPTO + RELAY)
-
-- **Findings affected**: FTLINE-D1, FOPTO-D2, BATCH2-D2 (Relay coil-R positions 6–9)
-- **Problem**: Multiple specs cite "add architectural-alignment.md entry" as their resolution. The file doesn't exist on disk. Per CLAUDE.md, only the user creates entries there. Three specs are blocked on this file.
-- **Options** (user action required per CLAUDE.md hard rule):
-  - **A** — User creates `spec/architectural-alignment.md` with entries for: TLINE topology choice, Optocoupler CCCS coupling, Relay coil-resistance positions.
-  - **B** — Rewrite affected specs to avoid divergence (e.g., PB-TLINE: choose option B/C from plan; PB-OPTO: replace coupling with VSRC+CCCS sub-elements; PB-RELAY: extract coil-R to separate sub-element).
+.
 
 ### R11 — 02-behavioral Shape rule 2 wrong field names (critical) + Shape rule 3 class-vs-closure mismatch (critical)
 

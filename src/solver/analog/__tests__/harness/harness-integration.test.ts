@@ -39,7 +39,7 @@ function makeHWR() {
   const elements = [vs, r, diode];
   const pool = buildStatePool(elements);
   return {
-    circuit: { netCount: 2, componentCount: 3, nodeCount: 2, branchCount: 1, matrixSize: 3, elements, labelToNodeId: new Map([["Vs", 1], ["R1:B", 2]]), statePool: pool } as ConcreteCompiledAnalogCircuit,
+    circuit: { netCount: 2, componentCount: 3, nodeCount: 2, matrixSize: 3, elements, labelToNodeId: new Map([["Vs", 1], ["R1:B", 2]]), statePool: pool } as ConcreteCompiledAnalogCircuit,
     pool,
   };
 }
@@ -51,7 +51,7 @@ function makeRC() {
   const elements = [vs, r, cap];
   const pool = buildStatePool(elements);
   return {
-    circuit: { netCount: 2, componentCount: 3, nodeCount: 2, branchCount: 1, matrixSize: 3, elements, labelToNodeId: new Map([["Vs", 1], ["C1:A", 2]]), statePool: pool } as ConcreteCompiledAnalogCircuit,
+    circuit: { netCount: 2, componentCount: 3, nodeCount: 2, matrixSize: 3, elements, labelToNodeId: new Map([["Vs", 1], ["C1:A", 2]]), statePool: pool } as ConcreteCompiledAnalogCircuit,
     pool,
   };
 }
@@ -65,7 +65,6 @@ describe("harness integration", () => {
     const topo = captureTopology(circuit);
     expect(topo.matrixSize).toBe(3);
     expect(topo.nodeCount).toBe(2);
-    expect(topo.branchCount).toBe(1);
     expect(topo.elementCount).toBe(3);
     expect(topo.elements).toHaveLength(3);
     expect(topo.nodeLabels.size).toBeGreaterThan(0);
@@ -402,7 +401,7 @@ describe("harness integration", () => {
 describe("time-alignment: compareSnapshots with alignment map", () => {
   function makeMinimalTopology() {
     return {
-      matrixSize: 1, nodeCount: 1, branchCount: 0, elementCount: 0,
+      matrixSize: 1, nodeCount: 1, elementCount: 0,
       elements: [],
       nodeLabels: new Map<number, string>([[1, "N1"]]),
       matrixRowLabels: new Map<number, string>([[0, "N1"]]),

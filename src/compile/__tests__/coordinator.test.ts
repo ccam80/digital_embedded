@@ -492,7 +492,6 @@ describe('DefaultSimulationCoordinator - analog-only', () => {
 function buildMinimalAnalogDomain(): ConcreteCompiledAnalogCircuit {
   return new ConcreteCompiledAnalogCircuit({
     nodeCount: 1,
-    branchCount: 0,
     elements: [makeResistorAnalogEl(1, 0, 1e6)],
     labelToNodeId: new Map(),
     wireToNodeId: new Map(),

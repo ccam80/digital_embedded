@@ -99,8 +99,15 @@ setup(ctx: SetupContext): void {
   this._nSenseMid = ctx.makeVolt(this.label, "senseMid");
   this._nBase     = ctx.makeVolt(this.label, "base");
 
+  // Wire sub-elements by mutating their _pinNodes map directly.
+  // Sub-elements are not compiler-augmented, so each sub-element's setup()
+  // reads node IDs from its _pinNodes map. There is no setPinNode API on
+  // AnalogElementCore; VsenseSubElement and CccsSubElement expose a thin
+  // setPinNode helper for internal use only — the canonical pattern is
+  // direct _pinNodes.set(...) and the BJT sub-element only supports that form.
+
   // Wire dLed: anode → senseMid
-  this._dLed.setPinNode("K", this._nSenseMid);
+  (this._dLed as any)._pinNodes.set("K", this._nSenseMid);
 
   // Wire vSense: senseMid → cathode (0-volt sense source)
   this._vSense.setPinNode("pos", this._nSenseMid);
@@ -108,8 +115,8 @@ setup(ctx: SetupContext): void {
   // Wire cccsCouple output: nBase → emitter
   this._cccsCouple.setPinNode("pos", this._nBase);
 
-  // Wire bjtPhoto base
-  this._bjtPhoto.setPinNode("B", this._nBase);
+  // Wire bjtPhoto base — BJT reads from _pinNodes, not pinNodeIds
+  (this._bjtPhoto as any)._pinNodes.set("B", this._nBase);
 
   // Sub-element setup in NGSPICE_LOAD_ORDER
   this._dLed.setup(ctx);        // DIO TSTALLOC (diosetup.c:232-238, 7 entries)

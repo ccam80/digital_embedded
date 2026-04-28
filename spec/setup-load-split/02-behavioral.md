@@ -24,7 +24,13 @@ Components covered by this file:
 | Bus | Splitter / BusSplitter | `behavioral-remaining.ts` |
 | Visual | SevenSeg, SevenSegHex | `behavioral-remaining.ts` |
 | ButtonLED | ButtonLED | `behavioral-remaining.ts` |
+| Flipflops (W3.5) | D, D-async, JK, JK-async, RS, RS-async-latch, T | `behavioral-flipflop.ts`, `behavioral-flipflop/{d-async,jk,jk-async,rs,rs-async,t}.ts` |
+| Sequential (W3.5) | Counter, Register, CounterPreset | `behavioral-sequential.ts` |
 | (Reused-by-composite) | DigitalInputPinModel, DigitalOutputPinModel, AnalogCapacitorElement (child) | `digital-pin-model.ts`, `passives/capacitor.ts` |
+
+**Note:** LED is **not** in this scope. Per W3.5 PB-LED.md, LED becomes
+ngspice-anchored via PB-DIO (single-port diode with cathode wired to
+ground); it is not a behavioral primitive.
 
 Note: Relay / RelayDT are listed in `01-pin-mapping.md` as composites
 under "Switching" (IND coil + SW contact) — they have ngspice anchors
@@ -126,7 +132,12 @@ Every behavioral composite (BehavioralGateElement, BehavioralMuxElement,
 BehavioralDemuxElement, BehavioralDecoderElement, Driver, DriverInv,
 Splitter, SevenSeg, ButtonLED,
 TransGateElement, NFETElement, PFETElement, FGNFETElement,
-FGPFETElement. All elements above are class-based as of W2.5; pre-W2.5 closure factories (`createDriverAnalogElement`, etc.) are converted to classes in W2.5. Relay / RelayDT have ngspice anchors via sub-element decomposition and live in `components/PB-RELAY.md` / `PB-RELAY-DT.md`, not here.) implements:
+FGPFETElement, plus the W3.5 elements: BehavioralDFlipflopElement,
+BehavioralDAsyncFlipflopElement, BehavioralJKFlipflopElement,
+BehavioralJKAsyncFlipflopElement, BehavioralRSFlipflopElement,
+BehavioralRSAsyncLatchElement, BehavioralTFlipflopElement,
+BehavioralCounterElement, BehavioralRegisterElement,
+BehavioralCounterPresetElement. All elements above are class-based as of W2.5; pre-W2.5 closure factories (`createDriverAnalogElement`, etc.) are converted to classes in W2.5. Relay / RelayDT have ngspice anchors via sub-element decomposition and live in `components/PB-RELAY.md` / `PB-RELAY-DT.md`, not here.) implements:
 
 ```ts
 setup(ctx: SetupContext): void {
@@ -154,8 +165,20 @@ elements; no cross-device label lookup is needed) but should be:
 | BehavioralDemuxElement | `_inPin` (single `DigitalInputPinModel`) | `_outPins` | `_selPins` | `_childElements` |
 | BehavioralDecoderElement | (merged into `_selPins`) — decoder has no separate data input; selector is the only input | `_outPins` | `_selPins` | `_childElements` |
 | Driver / DriverInv / Splitter / SevenSeg / ButtonLED | factory closures — local variables, not class fields (see Shape rule 3 closure variant) |
+| BehavioralDFlipflopElement (W3.5) | `_dPin`, `_clockPin` (plus nullable `_setPin`/`_resetPin` always null in sync factory) | `_qPin`, `_qBarPin` | n/a | `_childElements` |
+| BehavioralDAsyncFlipflopElement (W3.5) | `_setPin`, `_dPin`, `_clockPin`, `_clrPin` | `_qPin`, `_qBarPin` | n/a | `_childElements` |
+| BehavioralJKFlipflopElement (W3.5) | `_jPin`, `_clockPin`, `_kPin` | `_qPin`, `_qBarPin` | n/a | `_childElements` |
+| BehavioralJKAsyncFlipflopElement (W3.5) | `_setPin`, `_jPin`, `_clockPin`, `_kPin`, `_clrPin` | `_qPin`, `_qBarPin` | n/a | `_childElements` |
+| BehavioralRSFlipflopElement (W3.5) | `_sPin`, `_clockPin`, `_rPin` | `_qPin`, `_qBarPin` | n/a | `_childElements` |
+| BehavioralRSAsyncLatchElement (W3.5) | `_sPin`, `_rPin` (level-sensitive — no clock pin) | `_qPin`, `_qBarPin` | n/a | `_childElements` |
+| BehavioralTFlipflopElement (W3.5) | `_tPin` (nullable per `withEnable`), `_clockPin` | `_qPin`, `_qBarPin` | n/a | `_childElements` |
+| BehavioralCounterElement (W3.5) | `_enPin`, `_clockPin`, `_clrPin` | `_outBitPins[]` (bus-shared node), `_ovfPin` | n/a | `_childElements` |
+| BehavioralRegisterElement (W3.5) | `_dataPins[]` (bus-shared D), `_clockPin`, `_enPin` | `_outBitPins[]` (bus-shared Q) | n/a | `_childElements` |
+| BehavioralCounterPresetElement (W3.5) | `_enPin`, `_clockPin`, `_dirPin`, `_inBitPins[]` (bus-shared in), `_ldPin`, `_clrPin` | `_outBitPins[]` (bus-shared out), `_ovfPin` | n/a | `_childElements` |
 
 The Shape rule 3 generic body (`for (const pin of this._inputPins) ...`) is a TEMPLATE. Per-class implementers substitute the actual field name from this table.
+
+**Bus-shared-node `allocElement` idempotence (W3.5 sequential elements).** Multi-bit bus pin layouts (e.g. `BehavioralRegisterElement._dataPins[]` all on the single `D` bus node, `BehavioralCounterElement._outBitPins[]` all on the `out` bus node, `BehavioralCounterPresetElement._inBitPins[]` and `_outBitPins[]`) have multiple `DigitalInputPinModel` / `DigitalOutputPinModel` instances pointing at the same MNA node id. Each per-bit pin model independently calls `solver.allocElement(busNode, busNode)` during its own `setup()`. `SparseSolver.allocElement` returns the existing handle on subsequent calls to the same coordinates (idempotent — same mechanism used in PB-DIO §RS=0 collapse). Each pin model still needs its own `_hNodeDiag` populated, so de-duplication at the spec level is not permitted; the iteration `for (const pin of this._outBitPins) pin.setup(ctx)` is the canonical pattern.
 
 ## Shape rule 4 — Variable-input gates (AND, OR, NAND, NOR, XOR, XNOR)
 
@@ -261,6 +284,16 @@ For implementer reference. Each row links to its component spec file
 | SevenSegHex | same as SevenSeg | same | `PB-BEHAV-SEVENSEGHEX.md` |
 | ButtonLED | `out`, `in` | 1× DigitalOutputPinModel + 1× SegmentDiodeElement (LED) | `PB-BEHAV-BUTTONLED.md` |
 | Ground | `out` | None — Ground is a pure node-zero sentinel; setup() is empty (returns immediately) | `PB-BEHAV-GROUND.md` |
+| D flip-flop (W3.5) | `D`, `C`, `Q`, `~Q` | 2× DigitalInputPinModel + 2× DigitalOutputPinModel + childCaps | `PB-BEHAV-FF-D.md` |
+| D flip-flop async (W3.5) | `Set`, `D`, `C`, `Clr`, `Q`, `~Q` | 4× DigitalInputPinModel + 2× DigitalOutputPinModel + childCaps | `PB-BEHAV-FF-D.md` |
+| JK flip-flop (W3.5) | `J`, `C`, `K`, `Q`, `~Q` | 3× DigitalInputPinModel + 2× DigitalOutputPinModel + childCaps | `PB-BEHAV-FF-JK.md` |
+| JK flip-flop async (W3.5) | `Set`, `J`, `C`, `K`, `Clr`, `Q`, `~Q` | 5× DigitalInputPinModel + 2× DigitalOutputPinModel + childCaps | `PB-BEHAV-FF-JK.md` |
+| RS flip-flop (W3.5) | `S`, `C`, `R`, `Q`, `~Q` | 3× DigitalInputPinModel + 2× DigitalOutputPinModel + childCaps | `PB-BEHAV-FF-RS.md` |
+| RS latch async (W3.5, level-sensitive — no clock pin) | `S`, `R`, `Q`, `~Q` | 2× DigitalInputPinModel + 2× DigitalOutputPinModel + childCaps | `PB-BEHAV-FF-RS.md` |
+| T flip-flop (W3.5) | `T`,`C`,`Q`,`~Q` (withEnable) or `C`,`Q`,`~Q` (no enable) | 1-2× DigitalInputPinModel + 2× DigitalOutputPinModel + childCaps | `PB-BEHAV-FF-T.md` |
+| Counter N-bit (W3.5) | `en`, `C`, `clr`, `out` (multi-bit bus), `ovf` | 3× DigitalInputPinModel + (bitWidth+1)× DigitalOutputPinModel + childCaps | `PB-BEHAV-SEQUENTIAL.md` |
+| Register N-bit (W3.5) | `D` (multi-bit bus), `C`, `en`, `Q` (multi-bit bus) | (bitWidth+2)× DigitalInputPinModel + bitWidth× DigitalOutputPinModel + childCaps | `PB-BEHAV-SEQUENTIAL.md` |
+| CounterPreset N-bit (W3.5) | `en`, `C`, `dir`, `in` (multi-bit bus), `ld`, `clr`, `out` (multi-bit bus), `ovf` | (5+bitWidth)× DigitalInputPinModel + (bitWidth+1)× DigitalOutputPinModel + childCaps | `PB-BEHAV-SEQUENTIAL.md` |
 
 **Variable-N gates:** the per-component spec file applies to every N-input variant of that gate. Implementer agent uses the same file for AND-2, AND-3, AND-4, etc.
 

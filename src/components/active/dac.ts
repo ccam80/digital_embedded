@@ -367,18 +367,8 @@ function createDACElement(
     stateSchema: DAC_COMPOSITE_SCHEMA,
     stateSize,
     stateBaseOffset: -1,
-    s0: new Float64Array(0),
-    s1: new Float64Array(0),
-    s2: new Float64Array(0),
-    s3: new Float64Array(0),
-    s4: new Float64Array(0),
-    s5: new Float64Array(0),
-    s6: new Float64Array(0),
-    s7: new Float64Array(0),
 
     initState(_pool: StatePoolRef): void {
-      this.s0 = _pool.state0; this.s1 = _pool.state1; this.s2 = _pool.state2; this.s3 = _pool.state3;
-      this.s4 = _pool.state4; this.s5 = _pool.state5; this.s6 = _pool.state6; this.s7 = _pool.state7;
       // Child cap elements have their stateBaseOffset set during setup() via
       // ctx.allocStates(). Just wire them to the pool — do not override offsets.
       for (const child of childElements) {

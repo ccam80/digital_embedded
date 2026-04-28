@@ -41,7 +41,6 @@ import type { AnalogElementCore } from "../../core/analog-types.js";
 import { NGSPICE_LOAD_ORDER } from "../../core/analog-types.js";
 import type { LoadContext } from "../../solver/analog/load-context.js";
 import type { SetupContext } from "../../solver/analog/setup-context.js";
-import { stampG } from "../../solver/analog/stamp-helpers.js";
 import { defineModelParams } from "../../core/model-params.js";
 
 // ---------------------------------------------------------------------------
@@ -66,13 +65,17 @@ export const { paramDefs: MEMRISTOR_PARAM_DEFS, defaults: MEMRISTOR_DEFAULTS } =
 // ---------------------------------------------------------------------------
 
 export class MemristorElement implements AnalogElementCore {
-  pinNodeIds!: readonly number[];  // set by compiler via Object.assign after factory returns
   readonly branchIndex: number = -1;
   readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.RES;
   readonly isNonlinear: boolean = true;
   readonly isReactive: boolean = false;
   _stateBase: number = -1;
   _pinNodes: Map<string, number> = new Map();
+
+  private _hPP: number = -1;
+  private _hNN: number = -1;
+  private _hPN: number = -1;
+  private _hNP: number = -1;
 
   private rOn: number;
   private rOff: number;
@@ -120,8 +123,18 @@ export class MemristorElement implements AnalogElementCore {
     return this._w;
   }
 
-  setup(_ctx: SetupContext): void {
-    throw new Error("PB-MEM not yet migrated");
+  setup(ctx: SetupContext): void {
+    const solver = ctx.solver;
+    const aNode = this._pinNodes.get("A")!;  // A pin — RESposNode
+    const bNode = this._pinNodes.get("B")!;  // B pin — RESnegNode
+
+    // ressetup.c:46-49 — TSTALLOC sequence, line-for-line.
+    if (aNode !== 0) this._hPP = solver.allocElement(aNode, aNode);
+    if (bNode !== 0) this._hNN = solver.allocElement(bNode, bNode);
+    if (aNode !== 0 && bNode !== 0) {
+      this._hPN = solver.allocElement(aNode, bNode);
+      this._hNP = solver.allocElement(bNode, aNode);
+    }
   }
 
   setParam(key: string, value: number): void {
@@ -141,15 +154,12 @@ export class MemristorElement implements AnalogElementCore {
    */
   load(ctx: LoadContext): void {
     const solver = ctx.solver;
-    const nA = this.pinNodeIds[0];
-    const nB = this.pinNodeIds[1];
     const G = this.conductance();
 
-    stampG(solver, nA, nA, G);
-    stampG(solver, nA, nB, -G);
-    stampG(solver, nB, nA, -G);
-    stampG(solver, nB, nB, G);
-    // Pure conductance  no RHS offset needed (matches resistor Norton stamp).
+    if (this._hPP !== -1) solver.stampElement(this._hPP, G);
+    if (this._hNN !== -1) solver.stampElement(this._hNN, G);
+    if (this._hPN !== -1) solver.stampElement(this._hPN, -G);
+    if (this._hNP !== -1) solver.stampElement(this._hNP, -G);
   }
 
   /**
@@ -161,8 +171,8 @@ export class MemristorElement implements AnalogElementCore {
    *   f_p(w) = 1 âˆ’ (2w âˆ’ 1)^(2p)
    */
   accept(ctx: LoadContext, _simTime: number, _addBreakpoint: (t: number) => void): void {
-    const nA = this.pinNodeIds[0];
-    const nB = this.pinNodeIds[1];
+    const nA = this._pinNodes.get("A")!;
+    const nB = this._pinNodes.get("B")!;
     const voltages = ctx.rhs;
     const vA = voltages[nA];
     const vB = voltages[nB];
@@ -178,8 +188,8 @@ export class MemristorElement implements AnalogElementCore {
   }
 
   getPinCurrents(rhs: Float64Array): number[] {
-    const nA = this.pinNodeIds[0];
-    const nB = this.pinNodeIds[1];
+    const nA = this._pinNodes.get("A")!;
+    const nB = this._pinNodes.get("B")!;
     const vA = rhs[nA];
     const vB = rhs[nB];
     const I = this.conductance() * (vA - vB);
@@ -402,4 +412,5 @@ export const MemristorDefinition: ComponentDefinition = {
     },
   },
   defaultModel: "behavioral",
+  ngspiceNodeMap: { A: "pos", B: "neg" },
 };

@@ -393,7 +393,7 @@ None found.
 
 ##### FTLINE-D1 — Spec does not acknowledge the plan.md blocker (major)
 - **Location**: PB-TLINE.md, overall document
-- **Problem**: The plan.md §"Open blockers" states: "PB-TLINE — architectural divergence (gates only the W3 row for transmission line)" and "User decision required before PB-TLINE W3 row can land. Does NOT block W0/W1/W2 or any other W3 component." PB-TLINE.md does not reproduce this blocker prominently. The spec presents full setup() body, TSTALLOC sequence, factory cleanup, and a verification gate that includes "Prerequisite: Architectural divergence entry exists in `spec/architectural-alignment.md` before implementation begins" — but `spec/architectural-alignment.md` does not currently exist (verified by search). An implementer reading PB-TLINE.md sees a complete spec with a gate they cannot satisfy, but no indication that the W3 row is actively blocked pending user decision.
+- **Problem**: The plan.md §"Open blockers" states: "PB-TLINE — architectural divergence (gates only the W3 row for transmission line)" and "User decision required before PB-TLINE W3 row can land. Does NOT block W0/W1/W2 or any other W3 component." PB-TLINE.md does not reproduce this blocker prominently. The spec presents full setup() body, TSTALLOC sequence, factory cleanup, and a verification gate that includes
 - **Why decision-required**: The spec must explicitly state at the top (not buried in a "Port Error" section mid-document) that this task is BLOCKED and must not be started until the user makes a decision per plan.md. The framing and placement of the blocker notice is a decision.
 - **Options**:
   - **Option A — Add a prominent BLOCKED banner at the top**: Insert after the header:

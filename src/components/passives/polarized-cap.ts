@@ -40,8 +40,9 @@ import {
 } from "../../core/registry.js";
 import type { AnalogElementCore, PoolBackedAnalogElementCore, ReactiveAnalogElement, IntegrationMethod, LoadContext } from "../../solver/analog/element.js";
 import { NGSPICE_LOAD_ORDER } from "../../solver/analog/element.js";
+import type { SetupContext } from "../../solver/analog/setup-context.js";
 import { MODETRAN, MODETRANOP, MODEINITPRED, MODEINITTRAN, MODEAC, MODEDC, MODEUIC, MODEINITJCT } from "../../solver/analog/ckt-mode.js";
-import { stampG, stampRHS } from "../../solver/analog/stamp-helpers.js";
+import { stampRHS } from "../../solver/analog/stamp-helpers.js";
 import type { Diagnostic } from "../../compile/types.js";
 import { defineModelParams } from "../../core/model-params.js";
 import {
@@ -257,33 +258,31 @@ function makeClampDiodeProps(): PropertyBag {
 // ---------------------------------------------------------------------------
 
 export class AnalogPolarizedCapElement implements ReactiveAnalogElement {
-  readonly pinNodeIds: readonly number[];
-  readonly allNodeIds: readonly number[];
+  pinNodeIds!: readonly number[];
+  allNodeIds!: readonly number[];
   readonly branchIndex: number = -1;
   _stateBase: number = -1;
   _pinNodes: Map<string, number> = new Map();
 
-  setup(_ctx: import("../../solver/analog/setup-context.js").SetupContext): void {
-    throw new Error("PB-POLCAP not yet migrated");
-  }
   readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.CAP;
   readonly isNonlinear: boolean = true;
   readonly isReactive = true;
   readonly poolBacked = true as const;
-  setParam(_key: string, _value: number): void {}
 
   readonly stateSchema = POLARIZED_CAP_SCHEMA;
   // PC-W3-1: total state = cap-body slots + clamp diode slots (dioload.c:245-265)
   readonly stateSize = POLARIZED_CAP_SCHEMA.size + CLAMP_DIODE_STATE_SIZE; // 5 + 4 = 9 slots
   stateBaseOffset = -1;
-  s0: Float64Array = new Float64Array(0);
-  s1: Float64Array = new Float64Array(0);
-  s2: Float64Array = new Float64Array(0);
-  s3: Float64Array = new Float64Array(0);
-  s4: Float64Array = new Float64Array(0);
-  s5: Float64Array = new Float64Array(0);
-  s6: Float64Array = new Float64Array(0);
-  s7: Float64Array = new Float64Array(0);
+
+  private _nCap: number = -1;
+  private _hESR_PP: number = -1;      private _hESR_NN: number = -1;
+  private _hESR_PN: number = -1;      private _hESR_NP: number = -1;
+  private _hLEAK_PP: number = -1;     private _hLEAK_NN: number = -1;
+  private _hLEAK_PN: number = -1;     private _hLEAK_NP: number = -1;
+  private _hDIO_PP_clamp: number = -1; private _hDIO_NN_clamp: number = -1;
+  private _hDIO_PN_clamp: number = -1; private _hDIO_NP_clamp: number = -1;
+  private _hCAP_PP: number = -1;      private _hCAP_NN: number = -1;
+  private _hCAP_PN: number = -1;      private _hCAP_NP: number = -1;
 
   private C: number;
   private G_esr: number;
@@ -300,8 +299,9 @@ export class AnalogPolarizedCapElement implements ReactiveAnalogElement {
   private readonly _emitDiagnostic: (diag: Diagnostic) => void;
   private _reverseBiasDiagEmitted: boolean = false;
 
+  label?: string;
+
   /**
-   * @param pinNodeIds    - [n_pos, n_neg, n_cap]  n_cap is the internal node
    * @param capacitance    - Capacitance in farads
    * @param esr            - Equivalent series resistance in ohms
    * @param rLeak          - Leakage resistance in ohms (V_rated / I_leak)
@@ -309,52 +309,82 @@ export class AnalogPolarizedCapElement implements ReactiveAnalogElement {
    * @param emitDiagnostic - Callback invoked when polarity violation is detected
    * @param IC             - PC-W3-5: Initial condition voltage (capload.c:46-51)
    * @param M              - PC-W3-6: Multiplicity factor (capload.c:44)
+   * @param clampDiode     - Pre-constructed clamp diode sub-element
    */
   constructor(
-    pinNodeIds: number[],
     capacitance: number,
     esr: number,
     rLeak: number,
     reverseMax: number,
-    emitDiagnostic?: (diag: Diagnostic) => void,
-    IC: number = 0,
-    M: number = 1,
+    emitDiagnostic: (diag: Diagnostic) => void,
+    IC: number,
+    M: number,
+    clampDiode: PoolBackedAnalogElementCore,
   ) {
-    this.pinNodeIds = pinNodeIds;
-    this.allNodeIds = pinNodeIds;
     this.C = capacitance;
     this.G_esr = 1 / Math.max(esr, MIN_RESISTANCE);
     this.G_leak = 1 / Math.max(rLeak, MIN_RESISTANCE);
     this.reverseMax = reverseMax;
     this._IC = IC;
     this._M = M;
-    this._emitDiagnostic = emitDiagnostic ?? (() => {});
+    this._emitDiagnostic = emitDiagnostic;
+    this._clampDiode = clampDiode;
+  }
 
-    // PC-W3-1: create clamp diode sub-element (dioload.c:245-265).
-    // A = nNeg (index [1]), K = nPos (index [0])  conducts when cap is reverse-biased.
-    const clampPinNodes = new Map<string, number>([
-      ["A", pinNodeIds[1]], // anode = nNeg
-      ["K", pinNodeIds[0]], // cathode = nPos
-    ]);
-    this._clampDiode = createDiodeElement(clampPinNodes, makeClampDiodeProps());
+  setup(ctx: SetupContext): void {
+    const solver = ctx.solver;
+    const posNode = this._pinNodes.get("pos")!;  // pos pin
+    const negNode = this._pinNodes.get("neg")!;  // neg pin
+
+    // Allocate internal node n_cap (junction between ESR and cap body).
+    // No ngspice primitive equivalent — digiTS-internal topology extension.
+    const nCap = ctx.makeVolt(this.label ?? "", "cap");
+    this._nCap = nCap;
+
+    // State slots — 9 total (5 cap body + 4 clamp diode).
+    this._stateBase = ctx.allocStates(this.stateSize);
+
+    // ESR RES stamps (ressetup.c:46-49, pos ↔ nCap).
+    this._hESR_PP = solver.allocElement(posNode, posNode);
+    this._hESR_NN = solver.allocElement(nCap,    nCap);
+    this._hESR_PN = solver.allocElement(posNode, nCap);
+    this._hESR_NP = solver.allocElement(nCap,    posNode);
+
+    // Leakage RES stamps (ressetup.c:46-49, nCap ↔ neg).
+    this._hLEAK_PP = solver.allocElement(nCap,    nCap);
+    this._hLEAK_NN = solver.allocElement(negNode, negNode);
+    this._hLEAK_PN = solver.allocElement(nCap,    negNode);
+    this._hLEAK_NP = solver.allocElement(negNode, nCap);
+
+    // Clamp diode sub-element setup (diosetup.c pattern, anode=neg, cathode=pos).
+    this._clampDiode.setup(ctx);
+
+    // CAP body stamps (capsetup.c:114-117, nCap ↔ neg).
+    this._hCAP_PP = solver.allocElement(nCap,    nCap);
+    this._hCAP_NN = solver.allocElement(negNode, negNode);
+    this._hCAP_PN = solver.allocElement(nCap,    negNode);
+    this._hCAP_NP = solver.allocElement(negNode, nCap);
   }
 
   initState(pool: StatePoolRef): void {
     this._pool = pool;
+    this.stateBaseOffset = this._stateBase;
     applyInitialValues(POLARIZED_CAP_SCHEMA, pool, this.stateBaseOffset, {});
     // PC-W3-1: wire clamp diode to its partitioned state region (after cap-body slots).
     this._clampDiode.stateBaseOffset = this.stateBaseOffset + POLARIZED_CAP_SCHEMA.size;
     this._clampDiode.initState(pool);
   }
 
+  setParam(_key: string, _value: number): void {}
+
   /**
    * Unified load()  ESR + leakage stamps + capacitor companion + clamp diode + polarity check.
    *
-   * Topology: pos € ESR € nCap € (C || leakage) € neg.
-   * Clamp diode stamps between nPos (K) and nNeg (A) per PC-W3-1 / dioload.c:245-265.
+   * Topology: pos ─ ESR ─ nCap ─ (C || leakage) ─ neg.
+   * Clamp diode stamps between nNeg (A) and nPos (K) per PC-W3-1 / dioload.c:245-265.
    * Stamps in one pass:
-   *   - ESR conductance between nPos and nCap (topology-constant, stamped always).
-   *   - Leakage conductance between nCap and nNeg (topology-constant).
+   *   - ESR conductance between nPos and nCap (cached handles).
+   *   - Leakage conductance between nCap and nNeg (cached handles).
    *   - PC-W3-1: Clamp diode Shockley stamp between nNeg (A) and nPos (K).
    *   - Capacitor companion (geq, ceq) between nCap and nNeg using inline
    *     NIintegrate with ctx.ag[]  gated by capload.c:30 outer gate.
@@ -364,9 +394,9 @@ export class AnalogPolarizedCapElement implements ReactiveAnalogElement {
   load(ctx: LoadContext): void {
     const { solver, rhsOld: voltages, ag } = ctx;
     const mode = ctx.cktMode;
-    const nPos = this.pinNodeIds[0];
-    const nNeg = this.pinNodeIds[1];
-    const nCap = this.pinNodeIds[2];
+    const nPos = this._pinNodes.get("pos")!;
+    const nNeg = this._pinNodes.get("neg")!;
+    const nCap = this._nCap;
     const base = this.stateBaseOffset;
     const m = this._M; // PC-W3-6: capload.c:44 CAPm
     // pool.states[N] accessed at call time  no cached Float64Array refs (A4).
@@ -375,22 +405,21 @@ export class AnalogPolarizedCapElement implements ReactiveAnalogElement {
     const s2 = this._pool.states[2];
     const s3 = this._pool.states[3];
 
-    // ESR conductance (nPos â†" nCap)  digiTS extension (no ngspice capload.c counterpart).
+    // ESR conductance (nPos ↔ nCap)  cached handles.
     // Scaled by m (PC-W3-6: user ruling 3  apply m at stamp time, not by folding into C).
-    stampG(solver, nPos, nPos, m * this.G_esr);
-    stampG(solver, nPos, nCap, -m * this.G_esr);
-    stampG(solver, nCap, nPos, -m * this.G_esr);
-    stampG(solver, nCap, nCap, m * this.G_esr);
+    solver.stampElement(this._hESR_PP,  m * this.G_esr);
+    solver.stampElement(this._hESR_NN,  m * this.G_esr);
+    solver.stampElement(this._hESR_PN, -m * this.G_esr);
+    solver.stampElement(this._hESR_NP, -m * this.G_esr);
 
-    // Leakage conductance (nCap â†" nNeg)  scaled by m.
-    stampG(solver, nCap, nCap, m * this.G_leak);
-    stampG(solver, nCap, nNeg, -m * this.G_leak);
-    stampG(solver, nNeg, nCap, -m * this.G_leak);
-    stampG(solver, nNeg, nNeg, m * this.G_leak);
+    // Leakage conductance (nCap ↔ nNeg)  cached handles, scaled by m.
+    solver.stampElement(this._hLEAK_PP,  m * this.G_leak);
+    solver.stampElement(this._hLEAK_NN,  m * this.G_leak);
+    solver.stampElement(this._hLEAK_PN, -m * this.G_leak);
+    solver.stampElement(this._hLEAK_NP, -m * this.G_leak);
 
     // PC-W3-1: Clamp diode stamp between nNeg (A) and nPos (K).
     // cite: dioload.c:245-265  Shockley forward/reverse structure for clamp junction.
-    // The diode sub-element calls dioload.c:245-265 through createDiodeElement's load().
     this._clampDiode.load(ctx);
 
     // Polarity detection  check anode vs cathode voltage.
@@ -448,21 +477,21 @@ export class AnalogPolarizedCapElement implements ReactiveAnalogElement {
       // Charge update (capload.c:54-66 pattern).
       if (mode & MODEINITPRED) {
         // cite: capload.c:55-56 state0[CAPqcap] = state1[CAPqcap]
-        s0[base +SLOT_Q] = s1[base +SLOT_Q];
+        s0[base + SLOT_Q] = s1[base + SLOT_Q];
       } else {
         // cite: capload.c:59 state0[CAPqcap] = here->CAPcapac * vcap
-        s0[base +SLOT_Q] = C * vNow;
+        s0[base + SLOT_Q] = C * vNow;
         if (mode & MODEINITTRAN) {
           // cite: capload.c:60-62 state1[CAPqcap] = state0[CAPqcap]
-          s1[base +SLOT_Q] = s0[base +SLOT_Q];
+          s1[base + SLOT_Q] = s0[base + SLOT_Q];
         }
       }
 
-      const q0 = s0[base +SLOT_Q];
-      const q1 = s1[base +SLOT_Q];
-      const q2 = s2[base +SLOT_Q];
-      const q3 = s3[base +SLOT_Q];
-      const ccapPrev = s1[base +SLOT_CCAP];
+      const q0 = s0[base + SLOT_Q];
+      const q1 = s1[base + SLOT_Q];
+      const q2 = s2[base + SLOT_Q];
+      const q3 = s3[base + SLOT_Q];
+      const ccapPrev = s1[base + SLOT_CCAP];
       // cite: capload.c:67-69 NIintegrate(ckt,&geq,&ceq,here->CAPcapac,here->CAPqcap)
       const { ccap, ceq, geq } = niIntegrate(
         ctx.method,
@@ -473,38 +502,38 @@ export class AnalogPolarizedCapElement implements ReactiveAnalogElement {
         [q2, q3, 0, 0, 0],
         ccapPrev,
       );
-      s0[base +SLOT_CCAP] = ccap;
+      s0[base + SLOT_CCAP] = ccap;
 
       if (mode & MODEINITTRAN) {
         // cite: capload.c:70-72 state1[CAPccap] = state0[CAPccap]
-        s1[base +SLOT_CCAP] = s0[base +SLOT_CCAP];
+        s1[base + SLOT_CCAP] = s0[base + SLOT_CCAP];
       }
 
-      s0[base +SLOT_GEQ] = geq;
-      s0[base +SLOT_IEQ] = ceq;
-      s0[base +SLOT_V]   = vNow;
+      s0[base + SLOT_GEQ] = geq;
+      s0[base + SLOT_IEQ] = ceq;
+      s0[base + SLOT_V]   = vNow;
 
-      // Stamp companion between nCap and nNeg, scaled by m (PC-W3-6).
+      // Stamp companion between nCap and nNeg via cached handles, scaled by m (PC-W3-6).
       // cite: capload.c:74-79 *(ptr) += m * geq / *(rhs) -= m * ceq
-      stampG(solver, nCap, nCap, m * geq);
-      stampG(solver, nCap, nNeg, -m * geq);
-      stampG(solver, nNeg, nCap, -m * geq);
-      stampG(solver, nNeg, nNeg, m * geq);
-      if (nCap !== 0) stampRHS(ctx.rhs,nCap, -m * ceq);
-      if (nNeg !== 0) stampRHS(ctx.rhs,nNeg, m * ceq);
+      solver.stampElement(this._hCAP_PP,  m * geq);
+      solver.stampElement(this._hCAP_NN,  m * geq);
+      solver.stampElement(this._hCAP_PN, -m * geq);
+      solver.stampElement(this._hCAP_NP, -m * geq);
+      if (nCap !== 0) stampRHS(ctx.rhs, nCap, -m * ceq);
+      if (nNeg !== 0) stampRHS(ctx.rhs, nNeg,  m * ceq);
     } else {
       // DC operating point.
       // cite: capload.c:81 state0[CAPqcap] = here->CAPcapac * vcap
-      s0[base +SLOT_Q] = C * vNow;
-      s0[base +SLOT_V] = vNow;
-      s0[base +SLOT_GEQ] = 0;
-      s0[base +SLOT_IEQ] = 0;
+      s0[base + SLOT_Q] = C * vNow;
+      s0[base + SLOT_V] = vNow;
+      s0[base + SLOT_GEQ] = 0;
+      s0[base + SLOT_IEQ] = 0;
     }
   }
 
   getPinCurrents(rhs: Float64Array): number[] {
-    const nPos = this.pinNodeIds[0];
-    const nCap = this.pinNodeIds[2];
+    const nPos = this._pinNodes.get("pos")!;
+    const nCap = this._nCap;
     const vPos = rhs[nPos];
     const vCap = rhs[nCap];
     // Current into pos pin = current through ESR flowing into the element
@@ -541,32 +570,55 @@ export class AnalogPolarizedCapElement implements ReactiveAnalogElement {
     const ccap1 = s1[base + SLOT_CCAP];
     return cktTerr(dt, deltaOld, order, method, q0, q1, q2, q3, ccap0, ccap1, lteParams);
   }
+
 }
 
 // ---------------------------------------------------------------------------
 // analogFactory
 // ---------------------------------------------------------------------------
 
-function buildPolarizedCapFromParams(
+function createPolarizedCapElement(
   pinNodes: ReadonlyMap<string, number>,
-  internalNodeIds: readonly number[],
-  p: { capacitance: number; esr: number; leakageCurrent: number; voltageRating: number; reverseMax: number; IC: number; M: number },
+  props: PropertyBag,
+  _getTime: () => number,
 ): AnalogElementCore {
+  const p = {
+    capacitance:    props.getModelParam<number>("capacitance"),
+    esr:            props.getModelParam<number>("esr"),
+    leakageCurrent: props.getModelParam<number>("leakageCurrent"),
+    voltageRating:  props.getModelParam<number>("voltageRating"),
+    reverseMax:     props.getModelParam<number>("reverseMax"),
+    // PC-W3-5: IC (alias initCond)  capload.c:46-51 CAPinitCond
+    IC:             props.getModelParam<number>("IC"),
+    // PC-W3-6: M multiplicity  capload.c:44 CAPm
+    M:              props.getModelParam<number>("M"),
+  };
   const rLeak = p.leakageCurrent > 0 ? p.voltageRating / p.leakageCurrent : 1e12;
 
-  // nodeIds = [n_pos, n_neg, n_cap_internal]  compiler provides the internal node
+  // PC-W3-1: construct clamp diode sub-element at factory time.
+  // A = nNeg, K = nPos  conducts when cap is reverse-biased.
+  const clampPinNodes = new Map<string, number>([
+    ["A", pinNodes.get("neg")!], // anode = nNeg
+    ["K", pinNodes.get("pos")!], // cathode = nPos
+  ]);
+  const clampDiode = createDiodeElement(clampPinNodes, makeClampDiodeProps()) as PoolBackedAnalogElementCore;
+
   const el = new AnalogPolarizedCapElement(
-    [pinNodes.get("pos")!, pinNodes.get("neg")!, internalNodeIds[0]],
     p.capacitance,
     p.esr,
     rLeak,
     p.reverseMax,
-    undefined,
+    () => {},
     p.IC,
     p.M,
+    clampDiode,
   );
 
-  (el as AnalogElementCore).setParam = function(key: string, value: number): void {
+  el._pinNodes = new Map(pinNodes);
+  el.pinNodeIds = [pinNodes.get("pos")!, pinNodes.get("neg")!];
+  el.allNodeIds = el.pinNodeIds;
+
+  el.setParam = function(key: string, value: number): void {
     if (key in p) {
       (p as Record<string, number>)[key] = value;
       const newRLeak = p.leakageCurrent > 0 ? p.voltageRating / p.leakageCurrent : 1e12;
@@ -583,26 +635,6 @@ function buildPolarizedCapFromParams(
     }
   };
   return el;
-}
-
-function createPolarizedCapElement(
-  pinNodes: ReadonlyMap<string, number>,
-  props: PropertyBag,
-  _getTime: () => number,
-): AnalogElementCore {
-  const internalNodeIds: readonly number[] = [];
-  const p = {
-    capacitance:    props.getModelParam<number>("capacitance"),
-    esr:            props.getModelParam<number>("esr"),
-    leakageCurrent: props.getModelParam<number>("leakageCurrent"),
-    voltageRating:  props.getModelParam<number>("voltageRating"),
-    reverseMax:     props.getModelParam<number>("reverseMax"),
-    // PC-W3-5: IC (alias initCond)  capload.c:46-51 CAPinitCond
-    IC:             props.getModelParam<number>("IC"),
-    // PC-W3-6: M multiplicity  capload.c:44 CAPm
-    M:              props.getModelParam<number>("M"),
-  };
-  return buildPolarizedCapFromParams(pinNodes, internalNodeIds, p);
 }
 
 // ---------------------------------------------------------------------------
@@ -711,6 +743,7 @@ export const PolarizedCapDefinition: ComponentDefinition = {
       factory: createPolarizedCapElement,
       paramDefs: POLARIZED_CAP_PARAM_DEFS,
       params: POLARIZED_CAP_MODEL_DEFAULTS,
+      mayCreateInternalNodes: true,
     },
   },
   defaultModel: "behavioral",

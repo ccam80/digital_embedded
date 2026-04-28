@@ -1,26 +1,16 @@
-﻿/**
+/**
  * Variable Rail  user-adjustable DC voltage source.
  *
  * Designed for live parameter slider integration: changing the rail voltage
  * only requires updating the RHS of the MNA system (numeric re-factorization),
- * not a topology change. The source voltage is updated via setVoltage().
+ * not a topology change. The source voltage is updated via setParam("voltage", v).
  *
- * Models internal resistance as a series resistor: the output node is the
- * junction between the ideal voltage source and the internal resistance,
- * which connects to the external load. This requires one internal MNA node.
+ * MNA stamp (port of vsrcset.c:52-55 / vsrcload.c):
+ *   B[posNode, branch] += 1    B[negNode, branch] -= 1
+ *   C[branch, negNode] -= 1    C[branch, posNode]  += 1
+ *   RHS[branch]               = voltage
  *
- * MNA stamp (voltage source portion  same as DC voltage source):
- *   B[nodePos, k] += 1    C[k, nodePos] += 1
- *   B[nodeInt, k] -= 1    C[k, nodeInt] -= 1
- *   RHS[k]        = V
- *
- * Resistor portion (internal node  output terminal):
- *   G[nodeInt, nodeInt] += 1/R_int
- *   G[nodeOut, nodeOut] += 1/R_int
- *   G[nodeInt, nodeOut] -= 1/R_int
- *   G[nodeOut, nodeInt] -= 1/R_int
- *
- * where nodeInt is an allocated internal node.
+ * negNode is permanently wired to ground (0) — variable rail has no neg pin.
  */
 
 import { AbstractCircuitElement } from "../../core/element.js";
@@ -39,8 +29,8 @@ import {
 } from "../../core/registry.js";
 import type { AnalogElementCore, LoadContext } from "../../solver/analog/element.js";
 import { NGSPICE_LOAD_ORDER } from "../../solver/analog/element.js";
-import { stampRHS } from "../../solver/analog/stamp-helpers.js";
 import { defineModelParams } from "../../core/model-params.js";
+import type { SetupContext } from "../../solver/analog/setup-context.js";
 
 // ---------------------------------------------------------------------------
 // Model parameter declarations
@@ -48,8 +38,7 @@ import { defineModelParams } from "../../core/model-params.js";
 
 export const { paramDefs: VARIABLE_RAIL_PARAM_DEFS, defaults: VARIABLE_RAIL_DEFAULTS } = defineModelParams({
   primary: {
-    voltage:    { default: 5,    unit: "V", description: "Output voltage in volts" },
-    resistance: { default: 0.01, unit: "Î", description: "Internal series resistance" },
+    voltage: { default: 5, unit: "V", description: "Output voltage in volts" },
   },
 });
 
@@ -150,7 +139,6 @@ const VARIABLE_RAIL_ATTRIBUTE_MAP: AttributeMapping[] = [
   { xmlName: "Voltage",    propertyKey: "voltage",    convert: (v) => parseFloat(v), modelParam: true },
   { xmlName: "MinVoltage", propertyKey: "minVoltage", convert: (v) => parseFloat(v) },
   { xmlName: "MaxVoltage", propertyKey: "maxVoltage", convert: (v) => parseFloat(v) },
-  { xmlName: "Resistance", propertyKey: "resistance", convert: (v) => parseFloat(v), modelParam: true },
   { xmlName: "Label",      propertyKey: "label",      convert: (v) => v },
 ];
 
@@ -168,65 +156,68 @@ export interface VariableRailAnalogElement extends AnalogElementCore {
 }
 
 export function makeVariableRailElement(
-  nodePos: number,
-  nodeNeg: number,
-  nodeInt: number,
-  branchIdx: number,
+  pinNodes: ReadonlyMap<string, number>,
   initialVoltage: number,
-  resistance: number,
 ): VariableRailAnalogElement {
-  const p: Record<string, number> = { voltage: initialVoltage, resistance };
+  let _voltage = initialVoltage;
+
+  // Cached handles — populated in setup(), consumed in load()
+  let _hPosBr = -1;
+  let _hNegBr = -1;
+  let _hBrNeg = -1;
+  let _hBrPos = -1;
 
   const element: VariableRailAnalogElement = {
-    branchIndex: branchIdx,
+    branchIndex: -1,
     ngspiceLoadOrder: NGSPICE_LOAD_ORDER.VSRC,
     isNonlinear: false,
     isReactive: false,
     _stateBase: -1,
-    _pinNodes: new Map<string, number>([["pos", nodePos]]),
+    _pinNodes: new Map<string, number>(pinNodes),
+    label: "",
 
-    setup(_ctx: import("../../solver/analog/setup-context.js").SetupContext): void {
-      throw new Error("PB-VSRC-VAR not yet migrated");
+    setup(ctx: SetupContext): void {
+      const posNode    = (element._pinNodes as Map<string, number>).get("pos")!;
+      const negNode    = 0;  // ground — variable rail has no neg pin
+
+      // Port of vsrcset.c:40-43 — idempotent branch allocation
+      if (element.branchIndex === -1) {
+        element.branchIndex = ctx.makeCur(element.label, "branch");
+      }
+      const branchNode = element.branchIndex;
+
+      // Port of vsrcset.c:52-55 — TSTALLOC sequence (line-for-line)
+      _hPosBr = ctx.solver.allocElement(posNode,    branchNode); // VSRCposNode, VSRCbranch
+      _hNegBr = ctx.solver.allocElement(negNode,    branchNode); // VSRCnegNode(=0), VSRCbranch
+      _hBrNeg = ctx.solver.allocElement(branchNode, negNode);    // VSRCbranch,  VSRCnegNode(=0)
+      _hBrPos = ctx.solver.allocElement(branchNode, posNode);    // VSRCbranch,  VSRCposNode
     },
 
-    get currentVoltage() { return p.voltage; },
+    get currentVoltage() { return _voltage; },
 
     setVoltage(v: number): void {
-      p.voltage = v;
+      _voltage = v;
     },
 
     setParam(key: string, value: number): void {
-      if (key in p) (p as Record<string, number>)[key] = value;
+      if (key === "voltage") _voltage = value;
     },
 
     getPinCurrents(rhs: Float64Array): number[] {
       // Branch current = current delivered by the ideal voltage source (into pos terminal).
-      return [rhs[branchIdx]];
+      return [rhs[element.branchIndex]];
     },
 
     load(ctx: LoadContext): void {
       const solver = ctx.solver;
-      const k = branchIdx;
-      const G = p.resistance > 0 ? 1 / p.resistance : 1e9;
 
-      // Ideal voltage source: nodePos  nodeInt (internal node before R_int).
-      // Variable rail is a user-facing interactive slider, not an ngspice
-      // independent source: ctx.srcFact is deliberately ignored so slider
-      // changes take effect immediately and are unaffected by DC-OP source
-      // stepping. See VARIABLE_RAIL_PROPERTY_DEFS for the slider definition.
-      if (nodePos !== 0) solver.stampElement(solver.allocElement(nodePos, k), 1);
-      if (nodeInt !== 0) solver.stampElement(solver.allocElement(nodeInt, k), -1);
-      if (nodePos !== 0) solver.stampElement(solver.allocElement(k, nodePos), 1);
-      if (nodeInt !== 0) solver.stampElement(solver.allocElement(k, nodeInt), -1);
-      stampRHS(ctx.rhs,k, p.voltage);
-
-      // Internal resistance: nodeInt  nodeNeg.
-      if (nodeInt !== 0) solver.stampElement(solver.allocElement(nodeInt, nodeInt), G);
-      if (nodeNeg !== 0) solver.stampElement(solver.allocElement(nodeNeg, nodeNeg), G);
-      if (nodeInt !== 0 && nodeNeg !== 0) {
-        solver.stampElement(solver.allocElement(nodeInt, nodeNeg), -G);
-        solver.stampElement(solver.allocElement(nodeNeg, nodeInt), -G);
-      }
+      // vsrcload.c:43-46
+      solver.stampElement(_hPosBr, +1.0);
+      solver.stampElement(_hNegBr, -1.0);
+      solver.stampElement(_hBrPos, +1.0);
+      solver.stampElement(_hBrNeg, -1.0);
+      // vsrcload.c:416 — RHS (DC value path: MODEDCOP | MODEDCTRANCURVE with dcGiven)
+      ctx.rhs[element.branchIndex] += _voltage;
     },
   };
 
@@ -246,7 +237,7 @@ export const VariableRailDefinition: ComponentDefinition = {
   propertyDefs: VARIABLE_RAIL_PROPERTY_DEFS,
   attributeMap: VARIABLE_RAIL_ATTRIBUTE_MAP,
 
-  helpText: "Variable Rail  adjustable DC voltage source with internal resistance.",
+  helpText: "Variable Rail  adjustable DC voltage source.",
 
   factory(props: PropertyBag): VariableRailElement {
     return new VariableRailElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
@@ -261,14 +252,22 @@ export const VariableRailDefinition: ComponentDefinition = {
         props: PropertyBag,
       ): AnalogElementCore {
         const voltage = props.getModelParam<number>("voltage");
-        const resistance = props.getModelParam<number>("resistance");
-        const nodePos = pinNodes.get("pos")!;
-        const nodeNeg = 0;
-        return makeVariableRailElement(nodePos, nodeNeg, nodePos, -1, voltage, resistance);
+        return makeVariableRailElement(pinNodes, voltage);
       },
       paramDefs: VARIABLE_RAIL_PARAM_DEFS,
       params: VARIABLE_RAIL_DEFAULTS,
       ngspiceNodeMap: { pos: "pos" },
+      findBranchFor(name: string, ctx: SetupContext): number {
+        // Mirrors VSRCfindBr (vsrc/vsrcfbr.c:26-39).
+        // Look up the device by namespaced label (auto-registered per 00-engine.md §A4.1 recursive _deviceMap walk).
+        const el = ctx.findDevice(name);
+        if (!el) return 0;
+        // The element owns its branch row. Lazy-allocate if needed.
+        if (el.branchIndex === -1) {
+          el.branchIndex = ctx.makeCur(name, "branch");
+        }
+        return el.branchIndex;
+      },
     },
   },
   defaultModel: "behavioral",

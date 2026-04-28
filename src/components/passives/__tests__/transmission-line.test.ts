@@ -24,7 +24,7 @@ import { ConcreteCompiledAnalogCircuit } from "../../../solver/analog/compiled-a
 import { StatePool } from "../../../solver/analog/state-pool.js";
 import { MNAEngine } from "../../../solver/analog/analog-engine.js";
 import { EngineState } from "../../../core/engine-interface.js";
-import { makeVoltageSource, makeResistor } from "../../../solver/analog/__tests__/test-helpers.js";
+import { makeVoltageSource, makeResistor, loadCtxFromFields } from "../../../solver/analog/__tests__/test-helpers.js";
 import type { SparseSolver as SparseSolverType } from "../../../solver/analog/sparse-solver.js";
 import type { LoadContext } from "../../../solver/analog/load-context.js";
 import { makeDiagnostic } from "../../../solver/analog/diagnostics.js";
@@ -102,7 +102,7 @@ function makeStubCtx(
   const scratch = new Float64Array(64);
   if (dt > 0) computeNIcomCof(dt, deltaOld, order, method, ag, scratch);
   const voltages = opts.voltages ?? new Float64Array(200);
-  return {
+  return loadCtxFromFields({
     cktMode: opts.cktMode ?? (MODETRAN | MODEINITTRAN),
     solver: solver as unknown as import("../../../solver/analog/sparse-solver.js").SparseSolver,
     matrix: solver as unknown as import("../../../solver/analog/sparse-solver.js").SparseSolver,
@@ -127,12 +127,11 @@ function makeStubCtx(
     cktFixLimit: false,
     bypass: false,
     voltTol: 1e-6,
-  };
+  });
 }
 
 function buildTLineCircuit(opts: {
   nodeCount: number;
-  branchCount: number;
   elements: (import("../../../solver/analog/element.js").AnalogElement | import("../../../core/analog-types.js").AnalogElementCore)[];
 }): ConcreteCompiledAnalogCircuit {
   // Allocate state pool for all pool-backed elements before creating the compiled circuit.
@@ -154,7 +153,6 @@ function buildTLineCircuit(opts: {
 
   return new ConcreteCompiledAnalogCircuit({
     nodeCount: opts.nodeCount,
-    branchCount: opts.branchCount,
     elements: allElements,
     labelToNodeId: new Map(),
     wireToNodeId: new Map(),
@@ -373,10 +371,8 @@ describe("TLine", () => {
       // Load resistor: Port2 (node2) to GND with R = Z0
       const rLoad = makeResistor(2, 0, Z0);
 
-      const branchCount = 1 + N; // Vs + N inductors
       const compiled = buildTLineCircuit({
         nodeCount,
-        branchCount,
         elements: [vs, tlineEl, rLoad],
       });
 
@@ -404,7 +400,6 @@ describe("TLine", () => {
       // Re-build from zero initial conditions by not running DC OP.
       const compiled2 = buildTLineCircuit({
         nodeCount,
-        branchCount,
         elements: [vs, tlineEl, rLoad],
       });
       const engine2 = new MNAEngine();
@@ -488,7 +483,6 @@ describe("TLine", () => {
 
       const compiled = buildTLineCircuit({
         nodeCount: nc2,
-        branchCount: 1 + N,
         elements: [vs2, rSrc, tlineEl2, rLoad],
       });
 
@@ -542,7 +536,6 @@ describe("TLine", () => {
 
         const compiled = buildTLineCircuit({
           nodeCount,
-          branchCount: 1 + N,
           elements: [vs, tlineEl, rLoad],
         });
 
@@ -603,7 +596,6 @@ describe("TLine", () => {
 
         const compiled = buildTLineCircuit({
           nodeCount,
-          branchCount: 1 + N,
           elements: [vs, tlineEl, rLoad],
         });
 
@@ -676,7 +668,6 @@ describe("TLine", () => {
 
       const compiled = buildTLineCircuit({
         nodeCount,
-        branchCount: 1 + N,
         elements: [vs, rSrc, tlineEl, rOpen],
       });
 

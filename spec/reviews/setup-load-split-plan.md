@@ -16,9 +16,8 @@
 | W0 — A0 wrong-comment delete | yes | §A0 in 00-engine.md; exit criterion 1 matches. |
 | W1 — A1 SparseSolver expandable matrix | yes | §A1.1–A1.9 in 00-engine.md; exit criterion 2 matches. |
 | W2 — A2–A9 engine restructure | yes | §A2–A9 in 00-engine.md; exit criteria 3–11 match. |
-| W3 — 74 per-component PB-*.md tasks | yes | 74 files confirmed. W3 gate defined; PB-TLINE blocker documented. |
+| W3 — 74 per-component PB-*.md tasks | yes | 74 files confirmed. W3 gate defined;  |
 | W4 — parity sweep | yes | Gate defined; 8 fixtures named. |
-| PB-TLINE open blocker | yes | Three options presented with trade-offs; user decision required. |
 | PB-BEHAV-SEVENSEGHEX implementer note | yes | Marked NOT blocking; verified at W3. |
 
 ## Findings

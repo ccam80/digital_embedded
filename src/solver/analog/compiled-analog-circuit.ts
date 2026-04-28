@@ -43,8 +43,6 @@ export interface DeviceModel {
  *
  * Fields:
  * - `nodeCount`         — number of non-ground MNA nodes (IDs 1…nodeCount)
- * - `branchCount`       — number of voltage-source / inductor branch rows
- * - `matrixSize`        — nodeCount + branchCount (MNA matrix dimension)
  * - `elements`          — all AnalogElement instances with stamp functions
  * - `labelToNodeId`     — maps component labels to MNA node IDs (runner label resolution)
  * - `wireToNodeId`      — maps Wire objects to MNA node IDs (wire renderer)

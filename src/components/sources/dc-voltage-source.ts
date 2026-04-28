@@ -28,7 +28,6 @@ import {
 import { formatSI } from "../../editor/si-format.js";
 import type { AnalogElementCore, LoadContext } from "../../solver/analog/element.js";
 import { NGSPICE_LOAD_ORDER } from "../../solver/analog/element.js";
-import { stampRHS } from "../../solver/analog/stamp-helpers.js";
 import { defineModelParams } from "../../core/model-params.js";
 
 // ---------------------------------------------------------------------------
@@ -157,23 +156,39 @@ const DC_VOLTAGE_SOURCE_ATTRIBUTE_MAP: AttributeMapping[] = [
 // ---------------------------------------------------------------------------
 
 export function makeDcVoltageSource(
-  nodePos: number,
-  nodeNeg: number,
-  branchIdx: number,
+  pinNodes: ReadonlyMap<string, number>,
   voltage: number,
 ): AnalogElementCore {
   const p: Record<string, number> = { voltage };
+  let _hPosBr = -1;
+  let _hNegBr = -1;
+  let _hBrNeg = -1;
+  let _hBrPos = -1;
 
-  return {
-    branchIndex: branchIdx,
+  const el: AnalogElementCore & { label: string } = {
+    branchIndex: -1,
     ngspiceLoadOrder: NGSPICE_LOAD_ORDER.VSRC,
     isNonlinear: false,
     isReactive: false,
     _stateBase: -1,
-    _pinNodes: new Map<string, number>([["neg", nodeNeg], ["pos", nodePos]]),
+    _pinNodes: new Map<string, number>(pinNodes),
+    label: "",
 
-    setup(_ctx: import("../../solver/analog/setup-context.js").SetupContext): void {
-      throw new Error("PB-VSRC-DC not yet migrated");
+    setup(ctx: import("../../solver/analog/setup-context.js").SetupContext): void {
+      const posNode    = el._pinNodes.get("pos")!;
+      const negNode    = el._pinNodes.get("neg")!;
+
+      // Port of vsrcset.c:40-43 — idempotent branch allocation
+      if (el.branchIndex === -1) {
+        el.branchIndex = ctx.makeCur(el.label, "branch");
+      }
+      const branchNode = el.branchIndex;
+
+      // Port of vsrcset.c:52-55 — TSTALLOC sequence (line-for-line)
+      _hPosBr = ctx.solver.allocElement(posNode,    branchNode); // VSRCposNode, VSRCbranch
+      _hNegBr = ctx.solver.allocElement(negNode,    branchNode); // VSRCnegNode, VSRCbranch
+      _hBrNeg = ctx.solver.allocElement(branchNode, negNode);    // VSRCbranch,  VSRCnegNode
+      _hBrPos = ctx.solver.allocElement(branchNode, posNode);    // VSRCbranch,  VSRCposNode
     },
 
     setParam(key: string, value: number): void {
@@ -182,30 +197,22 @@ export function makeDcVoltageSource(
 
     load(ctx: LoadContext): void {
       const solver = ctx.solver;
-      const k = branchIdx;
 
-      // B sub-matrix: node rows, branch column k
-      if (nodePos !== 0) solver.stampElement(solver.allocElement(nodePos, k), 1);
-      if (nodeNeg !== 0) solver.stampElement(solver.allocElement(nodeNeg, k), -1);
-
-      // C sub-matrix: branch row k, node columns
-      if (nodePos !== 0) solver.stampElement(solver.allocElement(k, nodePos), 1);
-      if (nodeNeg !== 0) solver.stampElement(solver.allocElement(k, nodeNeg), -1);
-
-      // RHS voltage constraint scaled by ctx.srcFact (CKTsrcFact) for DC source stepping.
-      stampRHS(ctx.rhs,k, p.voltage * ctx.srcFact);
+      // vsrcload.c:43-46
+      solver.stampElement(_hPosBr, +1.0);
+      solver.stampElement(_hNegBr, -1.0);
+      solver.stampElement(_hBrPos, +1.0);
+      solver.stampElement(_hBrNeg, -1.0);
+      // vsrcload.c:416 — RHS
+      ctx.rhs[el.branchIndex] += p.voltage * ctx.srcFact;
     },
 
     getPinCurrents(rhs: Float64Array): number[] {
-      // MNA branch variable: +I means current leaves nodePos through the branch.
-      // Pin layout order: [neg, pos]  neg is index 0, pos is index 1.
-      // "Into element at pos" = +I (current enters element at pos terminal).
-      // "Into element at neg" = -I (current exits element at neg terminal).
-      // Since pin 0 = neg and pin 1 = pos, return [-I, I].
-      const I = rhs[branchIdx];
+      const I = rhs[el.branchIndex];
       return [-I, I];
     },
   };
+  return el;
 }
 
 // ---------------------------------------------------------------------------
@@ -242,11 +249,19 @@ export const DcVoltageSourceDefinition: ComponentDefinition = {
         props: PropertyBag,
       ): AnalogElementCore {
         const voltage = props.getModelParam<number>("voltage");
-        return makeDcVoltageSource(pinNodes.get("pos")!, pinNodes.get("neg")!, -1, voltage);
+        return makeDcVoltageSource(pinNodes, voltage);
       },
       paramDefs: DC_VOLTAGE_SOURCE_PARAM_DEFS,
       params: DC_VOLTAGE_SOURCE_DEFAULTS,
       ngspiceNodeMap: { neg: "neg", pos: "pos" },
+      findBranchFor(name: string, ctx: import("../../solver/analog/setup-context.js").SetupContext): number {
+        const found = ctx.findDevice(name);
+        if (!found) return 0;
+        if (found.branchIndex === -1) {
+          found.branchIndex = ctx.makeCur(name, "branch");
+        }
+        return found.branchIndex;
+      },
     },
   },
   defaultModel: "behavioral",

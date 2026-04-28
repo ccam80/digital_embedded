@@ -23,7 +23,6 @@ import type { AnalogElementCore } from "../../core/analog-types.js";
 import { NGSPICE_LOAD_ORDER } from "../../core/analog-types.js";
 import type { LoadContext } from "../../solver/analog/load-context.js";
 import type { SetupContext } from "../../solver/analog/setup-context.js";
-import { stampG } from "../../solver/analog/stamp-helpers.js";
 import { defineModelParams } from "../../core/model-params.js";
 
 // ---------------------------------------------------------------------------
@@ -161,13 +160,29 @@ class ResistorAnalogElement implements AnalogElementCore {
   private _resistance: number;
   private _G: number;
 
+  // Cached element-pool handles allocated in setup() and consumed by
+  // load() via solver.stampElement. Mirror ngspice RES instance pointers
+  // RESposPosptr / RESnegNegptr / RESposNegptr / RESnegPosptr.
+  private _hPP: number = -1;
+  private _hNN: number = -1;
+  private _hPN: number = -1;
+  private _hNP: number = -1;
+
   constructor(resistance: number) {
     this._resistance = Math.max(resistance, MIN_RESISTANCE);
     this._G = 1 / this._resistance;
   }
 
-  setup(_ctx: SetupContext): void {
-    throw new Error("PB-RES not yet migrated");
+  setup(ctx: SetupContext): void {
+    const solver = ctx.solver;
+    const posNode = this._pinNodes.get("A")!;  // RESposNode
+    const negNode = this._pinNodes.get("B")!;  // RESnegNode
+
+    // ressetup.c:46-49 — TSTALLOC sequence, line-for-line.
+    this._hPP = solver.allocElement(posNode, posNode);  // (RESposNode, RESposNode)
+    this._hNN = solver.allocElement(negNode, negNode);  // (RESnegNode, RESnegNode)
+    this._hPN = solver.allocElement(posNode, negNode);  // (RESposNode, RESnegNode)
+    this._hNP = solver.allocElement(negNode, posNode);  // (RESnegNode, RESposNode)
   }
 
   setParam(key: string, value: number): void {
@@ -179,12 +194,11 @@ class ResistorAnalogElement implements AnalogElementCore {
 
   load(ctx: LoadContext): void {
     const solver = ctx.solver;
-    const n0 = this._pinNodes.get("A")!;
-    const n1 = this._pinNodes.get("B")!;
-    stampG(solver, n0, n0, this._G);
-    stampG(solver, n0, n1, -this._G);
-    stampG(solver, n1, n0, -this._G);
-    stampG(solver, n1, n1, this._G);
+    // resload.c:34-37 — value-side stamps through cached handles.
+    solver.stampElement(this._hPP, this._G);
+    solver.stampElement(this._hNN, this._G);
+    solver.stampElement(this._hPN, -this._G);
+    solver.stampElement(this._hNP, -this._G);
   }
 
   getPinCurrents(rhs: Float64Array): number[] {

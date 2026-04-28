@@ -116,8 +116,20 @@ export class BehavioralJKAsyncFlipflopElement {
     this._prevClockVoltage = readMnaVoltage(this._clockPin.nodeId, rhs);
   }
 
-  setup(_ctx: SetupContext): void {
-    throw new Error("BehavioralJKAsyncFlipflopElement not yet migrated");
+  setup(ctx: SetupContext): void {
+    // Forward to every input pin model
+    this._setPin.setup(ctx);
+    this._jPin.setup(ctx);
+    this._clockPin.setup(ctx);
+    this._kPin.setup(ctx);
+    this._clrPin.setup(ctx);
+
+    // Forward to every output pin model (role "direct")
+    this._qPin.setup(ctx);
+    this._qBarPin.setup(ctx);
+
+    // Forward to every capacitor child collected from pin models
+    for (const child of this._childElements) child.setup(ctx);
   }
 
   load(ctx: LoadContext): void {

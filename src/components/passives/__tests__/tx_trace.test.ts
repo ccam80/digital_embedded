@@ -2,7 +2,7 @@ import { describe, it } from "vitest";
 import { AnalogTappedTransformerElement } from "../tapped-transformer.js";
 import { SparseSolver } from "../../../solver/analog/sparse-solver.js";
 import { MODETRAN, MODEINITTRAN, MODEINITFLOAT } from "../../../solver/analog/ckt-mode.js";
-import { allocateStatePool, makeVoltageSource, makeResistor } from "../../../solver/analog/__tests__/test-helpers.js";
+import { allocateStatePool, makeVoltageSource, makeResistor, loadCtxFromFields } from "../../../solver/analog/__tests__/test-helpers.js";
 import type { AnalogElementCore } from "../../../solver/analog/element.js";
 import type { LoadContext } from "../../../solver/analog/load-context.js";
 import type { SparseSolver as SparseSolverType } from "../../../solver/analog/sparse-solver.js";
@@ -18,7 +18,7 @@ const matrixSize = nodeCount + 4;
 function makeTransientCtx(solver: SparseSolverType, rhs: Float64Array, dt: number, mode: number): LoadContext {
   const ag = new Float64Array(7);
   if (dt > 0) { ag[0] = 1/dt; ag[1] = -1/dt; }
-  return {
+  return loadCtxFromFields({
     cktMode: mode,
     solver: solver as unknown as import("../../../solver/analog/sparse-solver.js").SparseSolver,
     matrix: solver as unknown as import("../../../solver/analog/sparse-solver.js").SparseSolver,
@@ -43,7 +43,7 @@ function makeTransientCtx(solver: SparseSolverType, rhs: Float64Array, dt: numbe
     cktFixLimit: false,
     bypass: false,
     voltTol: 1e-6,
-  };
+  });
 }
 
 function doStep(tx: AnalogTappedTransformerElement, solver: SparseSolver, rhs: Float64Array, vSrc: number, mode: number): boolean {

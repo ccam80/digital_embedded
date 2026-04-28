@@ -179,8 +179,13 @@ class AnalogPotentiometerElement implements AnalogElement {
 
   private R: number;
   private pos: number;
-  private G_top: number;
-  private G_bottom: number;
+  private G_AW: number;
+  private G_WB: number;
+
+  private _hAW_PP: number = -1;  private _hAW_NN: number = -1;
+  private _hAW_PN: number = -1;  private _hAW_NP: number = -1;
+  private _hWB_PP: number = -1;  private _hWB_NN: number = -1;
+  private _hWB_PN: number = -1;  private _hWB_NP: number = -1;
 
   constructor(pinNodeIds: number[], resistance: number, position: number) {
     this.pinNodeIds = pinNodeIds;
@@ -188,77 +193,71 @@ class AnalogPotentiometerElement implements AnalogElement {
     this.R = resistance;
     this.pos = Math.max(0, Math.min(1, position));
 
-    const R_top = Math.max(this.R * this.pos, MIN_RESISTANCE);
-    const R_bottom = Math.max(this.R * (1 - this.pos), MIN_RESISTANCE);
-    this.G_top = 1 / R_top;
-    this.G_bottom = 1 / R_bottom;
+    const R_AW = Math.max(this.R * this.pos, MIN_RESISTANCE);
+    const R_WB = Math.max(this.R * (1 - this.pos), MIN_RESISTANCE);
+    this.G_AW = 1 / R_AW;
+    this.G_WB = 1 / R_WB;
   }
 
-  setup(_ctx: SetupContext): void {
-    throw new Error("PB-POT not yet migrated");
+  setup(ctx: SetupContext): void {
+    const solver = ctx.solver;
+    const aNode = this.pinNodeIds[0];  // A pin — R_AW posNode
+    const wNode = this.pinNodeIds[1];  // W pin — shared wiper node
+    const bNode = this.pinNodeIds[2];  // B pin — R_WB negNode
+
+    // R_AW — ressetup.c:46-49 (A as posNode, W as negNode)
+    this._hAW_PP = solver.allocElement(aNode, aNode);  // (RESposNode, RESposNode)
+    this._hAW_NN = solver.allocElement(wNode, wNode);  // (RESnegNode, RESnegNode)
+    this._hAW_PN = solver.allocElement(aNode, wNode);  // (RESposNode, RESnegNode)
+    this._hAW_NP = solver.allocElement(wNode, aNode);  // (RESnegNode, RESposNode)
+
+    // R_WB — ressetup.c:46-49 (W as posNode, B as negNode)
+    this._hWB_PP = solver.allocElement(wNode, wNode);  // (RESposNode, RESposNode)
+    this._hWB_NN = solver.allocElement(bNode, bNode);  // (RESnegNode, RESnegNode)
+    this._hWB_PN = solver.allocElement(wNode, bNode);  // (RESposNode, RESnegNode)
+    this._hWB_NP = solver.allocElement(bNode, wNode);  // (RESnegNode, RESposNode)
   }
 
   setParam(key: string, value: number): void {
     if (key === "resistance") this.R = value;
     else if (key === "position") this.pos = Math.max(0, Math.min(1, value));
     else return;
-    const R_top = Math.max(this.R * this.pos, MIN_RESISTANCE);
-    const R_bottom = Math.max(this.R * (1 - this.pos), MIN_RESISTANCE);
-    this.G_top = 1 / R_top;
-    this.G_bottom = 1 / R_bottom;
+    const R_AW = Math.max(this.R * this.pos, MIN_RESISTANCE);
+    const R_WB = Math.max(this.R * (1 - this.pos), MIN_RESISTANCE);
+    this.G_AW = 1 / R_AW;
+    this.G_WB = 1 / R_WB;
   }
 
   load(ctx: LoadContext): void {
     const solver = ctx.solver;
-    const n_A = this.pinNodeIds[0]; // top
-    const n_W = this.pinNodeIds[1]; // wiper
-    const n_B = this.pinNodeIds[2]; // bottom
 
-    // Stamp helper: 1-based node IDs, skip ground (node 0), -1 for solver index
-    const stamp = (r: number, c: number, v: number): void => {
-      if (r !== 0 && c !== 0) solver.stampElement(solver.allocElement(r, c), v);
-    };
+    // R_AW stamps (resload.c: G at pos/pos, neg/neg, pos/neg, neg/pos)
+    solver.stampElement(this._hAW_PP,  this.G_AW);
+    solver.stampElement(this._hAW_NN,  this.G_AW);
+    solver.stampElement(this._hAW_PN, -this.G_AW);
+    solver.stampElement(this._hAW_NP, -this.G_AW);
 
-    // Top resistor (R_top) stamps: G_top at (A,A), (W,W), (A,W), (W,A)
-    stamp(n_A, n_A, this.G_top);
-    stamp(n_W, n_W, this.G_top);
-    stamp(n_A, n_W, -this.G_top);
-    stamp(n_W, n_A, -this.G_top);
-
-    // Bottom resistor (R_bottom) stamps: G_bottom at (W,W), (B,B), (W,B), (B,W)
-    stamp(n_W, n_W, this.G_bottom);
-    stamp(n_B, n_B, this.G_bottom);
-    stamp(n_W, n_B, -this.G_bottom);
-    stamp(n_B, n_W, -this.G_bottom);
+    // R_WB stamps (resload.c: G at pos/pos, neg/neg, pos/neg, neg/pos)
+    solver.stampElement(this._hWB_PP,  this.G_WB);
+    solver.stampElement(this._hWB_NN,  this.G_WB);
+    solver.stampElement(this._hWB_PN, -this.G_WB);
+    solver.stampElement(this._hWB_NP, -this.G_WB);
   }
 
   getPinCurrents(rhs: Float64Array): number[] {
-    // Factory passes nodes as [A, B, W] matching pinLayout order [A(0), B(1), W(2)].
-    // Stamp variables: n_A=pinNodeIds[0] (A), n_W=pinNodeIds[1] (B pin node),
-    // n_B=pinNodeIds[2] (W pin node)  the stamp variable names are inverted from
-    // the constructor call, but the physics is consistent: top resistor between
-    // pinNodeIds[0] and pinNodeIds[1], bottom between pinNodeIds[1] and pinNodeIds[2].
-    //
-    // Treat as: segment-top = pinNodeIds[0]â†"pinNodeIds[1], segment-bottom = pinNodeIds[1]â†"pinNodeIds[2].
-    // pinLayout: [A, B, W]  must return [I_A, I_B, I_W].
-    const n0 = this.pinNodeIds[0]; // A pin
-    const n1 = this.pinNodeIds[1]; // middle node (stamp calls this n_W)
-    const n2 = this.pinNodeIds[2]; // far end (stamp calls this n_B)
+    const aNode = this.pinNodeIds[0];  // A pin
+    const wNode = this.pinNodeIds[1];  // W (wiper) pin
+    const bNode = this.pinNodeIds[2];  // B pin
 
-    const v0 = rhs[n0];
-    const v1 = rhs[n1];
-    const v2 = rhs[n2];
+    const vA = rhs[aNode];
+    const vW = rhs[wNode];
+    const vB = rhs[bNode];
 
-    // Current into pin at n0 through top resistor: G_top * (V_n0 - V_n1)
-    const i0 = this.G_top * (v0 - v1);
-    // Current into pin at n2 through bottom resistor: G_bottom * (V_n2 - V_n1)
-    const i2 = this.G_bottom * (v2 - v1);
-    // KCL at middle node n1: i1 = -(i0 + i2)
-    const i1 = -(i0 + i2);
+    const i_A = this.G_AW * (vA - vW);
+    const i_B = this.G_WB * (vB - vW);
+    const i_W = -(i_A + i_B);
 
-    // Return in pinLayout order [A, B, W] = [pinNodeIds[0], pinNodeIds[1], pinNodeIds[2]]
-    // pinLayout[0]=A  i0, pinLayout[1]=B  i1 (middle), pinLayout[2]=W  i2
-    return [i0, i1, i2];
+    return [i_A, i_W, i_B];
   }
 }
 
@@ -270,7 +269,7 @@ function createPotentiometerElement(
   const R = props.getModelParam<number>("resistance");
   const position = props.getModelParam<number>("position");
   const el = new AnalogPotentiometerElement(
-    [pinNodes.get("A")!, pinNodes.get("B")!, pinNodes.get("W")!],
+    [pinNodes.get("A")!, pinNodes.get("W")!, pinNodes.get("B")!],
     R,
     position,
   );

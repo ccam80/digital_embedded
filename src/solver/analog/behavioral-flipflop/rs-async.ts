@@ -107,8 +107,17 @@ export class BehavioralRSAsyncLatchElement {
     return this._diagnostics;
   }
 
-  setup(_ctx: SetupContext): void {
-    throw new Error("BehavioralRSAsyncLatchElement not yet migrated");
+  setup(ctx: SetupContext): void {
+    // Forward to every input pin model (level-sensitive — no clock pin)
+    this._sPin.setup(ctx);
+    this._rPin.setup(ctx);
+
+    // Forward to every output pin model (role "direct")
+    this._qPin.setup(ctx);
+    this._qBarPin.setup(ctx);
+
+    // Forward to every capacitor child collected from pin models
+    for (const child of this._childElements) child.setup(ctx);
   }
 
   load(ctx: LoadContext): void {

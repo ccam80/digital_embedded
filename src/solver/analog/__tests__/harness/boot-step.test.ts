@@ -53,7 +53,7 @@ function makeHWRCircuit(): { circuit: ConcreteCompiledAnalogCircuit; pool: State
   const pool = buildStatePool(elements);
   return {
     circuit: {
-      netCount: 2, componentCount: 3, nodeCount: 2, branchCount: 1, matrixSize: 3,
+      netCount: 2, componentCount: 3, nodeCount: 2, matrixSize: 3,
       elements,
       labelToNodeId: new Map([["Vs", 1], ["R1:B", 2]]),
       statePool: pool,

@@ -12,7 +12,6 @@ This document holds the full prompt body for each W3 implementer agent. The hybr
 - **Wave B — `batch-5`**, 9 task_groups (concurrent, all sonnet, all `run_in_background:true`). Spawns only after batch-4 fully verifies (every group_status == "passed").
 
 **Excluded from this batch:**
-- `PB-TLINE` / `transmission-line.ts` — architectural decision pending per `plan.md` Open Blockers (lossy-N-segment vs ideal-TRA). Not in either wave.
 - `PB-SUBCKT` / `subcircuit/*` — special structural decomposition path, not in standard component layer.
 - `PB-BEHAV-{AND,NAND,NOT,NOR,OR,XOR,XNOR}` — already served by W2.7 `BehavioralGateElement.setup()` body landed in batch-3 group 3.A1. Per-gate `ngspiceNodeMap` registration is in scope of the in-flight wave-2 agent. Not in either wave.
 

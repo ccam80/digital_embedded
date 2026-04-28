@@ -27,7 +27,7 @@ import {
   MODETRAN, MODEDCOP,
   MODEINITFLOAT, MODEINITTRAN,
 } from "../../../solver/analog/ckt-mode.js";
-import { makeLoadCtx } from "../../../solver/analog/__tests__/test-helpers.js";
+import { makeLoadCtx, loadCtxFromFields } from "../../../solver/analog/__tests__/test-helpers.js";
 
 // ---------------------------------------------------------------------------
 // companion context builder — replaces the deleted stampCompanion(dt, method,
@@ -152,7 +152,7 @@ describe("Inductor", () => {
       // Use a non-transient / non-DC-OP context so only the topology-constant
       // branch incidence entries are stamped (no companion branch diagonal term).
       const voltages = new Float64Array(4); // 1-based: slots 0..3
-      const ctx: LoadContext = {
+      const ctx = loadCtxFromFields({
         cktMode: MODEDCOP | MODEINITFLOAT,
         solver, matrix: solver,
         rhs: voltages, rhsOld: voltages,
@@ -166,7 +166,7 @@ describe("Inductor", () => {
         temp: 300.15, vt: 0.025852,
         cktFixLimit: false,
         bypass: false, voltTol: 1e-6,
-      };
+      });
       analogElement.load(ctx);
 
       // Should have: 2 B-matrix incidence + 2 C/D-matrix branch + 1 branch diagonal = 5

@@ -157,15 +157,21 @@ setup(ctx: SetupContext): void {
   // Create the shared internal latch node first
   this._vintNode = ctx.makeVolt(this.label, "latch");
 
-  // Bind sub-element pin nodes using the resolved Vint.
-  // Sub-element pin rebinding uses direct pinNodeIds array assignment
-  // (consistent with PB-OPTO, PB-DAC, PB-OPAMP, PB-TIMER555). No setPinNode API is added
-  // to AnalogElementCore.
-  // Q1 NPN: BJT pin order [B, C, E] per buildBJTPinDeclarations()
-  this._q1.pinNodeIds = [this._gNode, this._vintNode, this._kNode];    // B=G, C=Vint, E=K
+  // Bind sub-element pin nodes by mutating each BJT's _pinNodes map.
+  // BJT sub-elements are not compiler-augmented, so pinNodeIds is unset on
+  // them and bjt.ts::setup() reads node IDs from this._pinNodes.get("B"|"C"|"E").
+  // pinNodeIds is irrelevant for sub-elements; this matches the actual working
+  // pattern in optocoupler.ts and timer-555.ts.
 
-  // Q2 PNP: BJT pin order [B, C, E] per buildBJTPinDeclarations()
-  this._q2.pinNodeIds = [this._vintNode, this._gNode, this._aNode];    // B=Vint, C=G, E=A
+  // Q1 NPN: B=G, C=Vint, E=K
+  (this._q1 as any)._pinNodes.set("B", this._gNode);
+  (this._q1 as any)._pinNodes.set("C", this._vintNode);
+  (this._q1 as any)._pinNodes.set("E", this._kNode);
+
+  // Q2 PNP: B=Vint, C=G, E=A
+  (this._q2 as any)._pinNodes.set("B", this._vintNode);
+  (this._q2 as any)._pinNodes.set("C", this._gNode);
+  (this._q2 as any)._pinNodes.set("E", this._aNode);
 
   // Forward to each BJT sub-element (Q1 then Q2)
   this._q1.setup(ctx);   // NPN: 23× TSTALLOC per bjtsetup.c:435-464

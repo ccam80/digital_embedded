@@ -328,21 +328,12 @@ export function makeDiode(
     stateSize: 4,
     stateBaseOffset: -1,
     stateSchema: DIODE_SCHEMA,
-    s0: new Float64Array(0) as Float64Array<ArrayBufferLike>,
-    s1: new Float64Array(0) as Float64Array<ArrayBufferLike>,
-    s2: new Float64Array(0) as Float64Array<ArrayBufferLike>,
-    s3: new Float64Array(0) as Float64Array<ArrayBufferLike>,
-    s4: new Float64Array(0) as Float64Array<ArrayBufferLike>,
-    s5: new Float64Array(0) as Float64Array<ArrayBufferLike>,
-    s6: new Float64Array(0) as Float64Array<ArrayBufferLike>,
-    s7: new Float64Array(0) as Float64Array<ArrayBufferLike>,
 
     initState(pool: StatePoolRef): void {
       s0 = pool.state0;
       s1 = pool.state1;
       s2 = pool.state2;
       s3 = pool.state3;
-      this.s0 = s0; this.s1 = s1; this.s2 = s2; this.s3 = s3;
       base = this.stateBaseOffset;
       applyInitialValues(DIODE_SCHEMA, pool, base, {});
     },
@@ -905,6 +896,27 @@ export function runNR(opts: SimpleNROptions): NRResult {
   }
   newtonRaphson(ctx);
   return ctx.nrResult;
+}
+
+// ---------------------------------------------------------------------------
+// loadCtxFromFields — wrap a LoadContext literal (sans state0..state3)
+// ---------------------------------------------------------------------------
+
+/**
+ * Wrap a literal-shape LoadContext (every field except state0..state3) into a
+ * LoadCtxImpl backed by an empty placeholder StatePool. Used by unit tests
+ * whose elements drive their own state via closure-captured pool refs and
+ * never read ctx.stateN. If a test does need a real state pool, pass it in
+ * as the second arg.
+ *
+ * Mechanical migration shim for the architectural state-getter change in
+ * spec/loadcontext-state-getter-fix.md (Tier 1).
+ */
+export function loadCtxFromFields(
+  fields: Omit<LoadContext, "state0" | "state1" | "state2" | "state3">,
+  statePool: StatePool = new StatePool(0),
+): LoadContext {
+  return new LoadCtxImpl(statePool, fields);
 }
 
 // ---------------------------------------------------------------------------

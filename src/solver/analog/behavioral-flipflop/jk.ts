@@ -69,14 +69,6 @@ export class BehavioralJKFlipflopElement implements ReactiveAnalogElementCore {
   stateBaseOffset = -1;
   _stateBase: number = -1;
   _pinNodes: Map<string, number> = new Map();
-  s0: Float64Array<ArrayBufferLike> = new Float64Array(0) as Float64Array<ArrayBufferLike>;
-  s1: Float64Array<ArrayBufferLike> = new Float64Array(0) as Float64Array<ArrayBufferLike>;
-  s2: Float64Array<ArrayBufferLike> = new Float64Array(0) as Float64Array<ArrayBufferLike>;
-  s3: Float64Array<ArrayBufferLike> = new Float64Array(0) as Float64Array<ArrayBufferLike>;
-  s4: Float64Array<ArrayBufferLike> = new Float64Array(0) as Float64Array<ArrayBufferLike>;
-  s5: Float64Array<ArrayBufferLike> = new Float64Array(0) as Float64Array<ArrayBufferLike>;
-  s6: Float64Array<ArrayBufferLike> = new Float64Array(0) as Float64Array<ArrayBufferLike>;
-  s7: Float64Array<ArrayBufferLike> = new Float64Array(0) as Float64Array<ArrayBufferLike>;
 
   constructor(
     jPin: DigitalInputPinModel,
@@ -119,8 +111,18 @@ export class BehavioralJKFlipflopElement implements ReactiveAnalogElementCore {
     this._prevClockVoltage = readMnaVoltage(this._clockPin.nodeId, rhs);
   }
 
-  setup(_ctx: SetupContext): void {
-    throw new Error("BehavioralJKFlipflopElement not yet migrated");
+  setup(ctx: SetupContext): void {
+    // Forward to every input pin model
+    this._jPin.setup(ctx);
+    this._clockPin.setup(ctx);
+    this._kPin.setup(ctx);
+
+    // Forward to every output pin model (role "direct")
+    this._qPin.setup(ctx);
+    this._qBarPin.setup(ctx);
+
+    // Forward to every capacitor child collected from pin models
+    for (const child of this._childElements) child.setup(ctx);
   }
 
   load(ctx: LoadContext): void {

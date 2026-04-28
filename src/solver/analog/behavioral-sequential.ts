@@ -89,14 +89,6 @@ export class BehavioralCounterElement implements ReactiveAnalogElementCore {
   stateBaseOffset = -1;
   _stateBase: number = -1;
   _pinNodes: Map<string, number> = new Map();
-  s0: Float64Array<ArrayBufferLike> = new Float64Array(0) as Float64Array<ArrayBufferLike>;
-  s1: Float64Array<ArrayBufferLike> = new Float64Array(0) as Float64Array<ArrayBufferLike>;
-  s2: Float64Array<ArrayBufferLike> = new Float64Array(0) as Float64Array<ArrayBufferLike>;
-  s3: Float64Array<ArrayBufferLike> = new Float64Array(0) as Float64Array<ArrayBufferLike>;
-  s4: Float64Array<ArrayBufferLike> = new Float64Array(0) as Float64Array<ArrayBufferLike>;
-  s5: Float64Array<ArrayBufferLike> = new Float64Array(0) as Float64Array<ArrayBufferLike>;
-  s6: Float64Array<ArrayBufferLike> = new Float64Array(0) as Float64Array<ArrayBufferLike>;
-  s7: Float64Array<ArrayBufferLike> = new Float64Array(0) as Float64Array<ArrayBufferLike>;
 
   constructor(
     enPin: DigitalInputPinModel,
@@ -143,8 +135,22 @@ export class BehavioralCounterElement implements ReactiveAnalogElementCore {
     this._prevClockVoltage = readMnaVoltage(this._clockPin.nodeId, rhs);
   }
 
-  setup(_ctx: SetupContext): void {
-    throw new Error("BehavioralCounterElement not yet migrated");
+  setup(ctx: SetupContext): void {
+    // Forward to every input pin model
+    this._enPin.setup(ctx);
+    this._clockPin.setup(ctx);
+    this._clrPin.setup(ctx);
+
+    // Forward to every output pin model. The bitWidth out-bit pin models
+    // all share one MNA node (the "out" bus node); each independently calls
+    // allocElement(busNode, busNode) during its own setup. allocElement is
+    // idempotent for repeated coordinates, so all bit-pin models receive
+    // the same handle in their _hNodeDiag fields.
+    for (const pin of this._outBitPins) pin.setup(ctx);
+    this._ovfPin.setup(ctx);
+
+    // Forward to every capacitor child collected from all pin models
+    for (const child of this._childElements) child.setup(ctx);
   }
 
   load(ctx: LoadContext): void {
@@ -284,14 +290,6 @@ export class BehavioralRegisterElement implements ReactiveAnalogElementCore {
   stateBaseOffset = -1;
   _stateBase: number = -1;
   _pinNodes: Map<string, number> = new Map();
-  s0: Float64Array<ArrayBufferLike> = new Float64Array(0) as Float64Array<ArrayBufferLike>;
-  s1: Float64Array<ArrayBufferLike> = new Float64Array(0) as Float64Array<ArrayBufferLike>;
-  s2: Float64Array<ArrayBufferLike> = new Float64Array(0) as Float64Array<ArrayBufferLike>;
-  s3: Float64Array<ArrayBufferLike> = new Float64Array(0) as Float64Array<ArrayBufferLike>;
-  s4: Float64Array<ArrayBufferLike> = new Float64Array(0) as Float64Array<ArrayBufferLike>;
-  s5: Float64Array<ArrayBufferLike> = new Float64Array(0) as Float64Array<ArrayBufferLike>;
-  s6: Float64Array<ArrayBufferLike> = new Float64Array(0) as Float64Array<ArrayBufferLike>;
-  s7: Float64Array<ArrayBufferLike> = new Float64Array(0) as Float64Array<ArrayBufferLike>;
 
   constructor(
     dataPins: DigitalInputPinModel[],
@@ -335,8 +333,22 @@ export class BehavioralRegisterElement implements ReactiveAnalogElementCore {
     this._prevClockVoltage = readMnaVoltage(this._clockPin.nodeId, rhs);
   }
 
-  setup(_ctx: SetupContext): void {
-    throw new Error("BehavioralRegisterElement not yet migrated");
+  setup(ctx: SetupContext): void {
+    // Forward to every data pin model. All bitWidth pin models share the
+    // single "D" bus node; each independently calls allocElement(D, D)
+    // during its setup, all returning the same handle (idempotent).
+    for (const pin of this._dataPins) pin.setup(ctx);
+
+    // Single-node input pins
+    this._clockPin.setup(ctx);
+    this._enPin.setup(ctx);
+
+    // Forward to every output pin model. All bitWidth out-bit models share
+    // the single "Q" bus node.
+    for (const pin of this._outBitPins) pin.setup(ctx);
+
+    // Forward to every capacitor child collected from all pin models
+    for (const child of this._childElements) child.setup(ctx);
   }
 
   load(ctx: LoadContext): void {
@@ -538,6 +550,7 @@ export class BehavioralCounterPresetElement {
   private readonly _pinModelsByLabel: ReadonlyMap<string, DigitalInputPinModel | DigitalOutputPinModel>;
 
   pinNodeIds!: readonly number[];  // set by compiler via Object.assign after factory returns
+  allNodeIds!: readonly number[];  // set by compiler via Object.assign after factory returns
   readonly branchIndex: number = -1;
   readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.VCVS;
   readonly isNonlinear: true = true;
@@ -602,8 +615,23 @@ export class BehavioralCounterPresetElement {
     this._prevClockVoltage = readMnaVoltage(this._clockPin.nodeId, rhs);
   }
 
-  setup(_ctx: SetupContext): void {
-    throw new Error("BehavioralCounterPresetElement not yet migrated");
+  setup(ctx: SetupContext): void {
+    // Forward to every input pin model
+    this._enPin.setup(ctx);
+    this._clockPin.setup(ctx);
+    this._dirPin.setup(ctx);
+    // bitWidth in-bit pin models all share the "in" bus node.
+    for (const pin of this._inBitPins) pin.setup(ctx);
+    this._ldPin.setup(ctx);
+    this._clrPin.setup(ctx);
+
+    // Forward to every output pin model. bitWidth out-bit models share the
+    // "out" bus node. ovf has its own node.
+    for (const pin of this._outBitPins) pin.setup(ctx);
+    this._ovfPin.setup(ctx);
+
+    // Forward to every capacitor child collected from all pin models
+    for (const child of this._childElements) child.setup(ctx);
   }
 
   load(ctx: LoadContext): void {

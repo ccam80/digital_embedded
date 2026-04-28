@@ -182,6 +182,7 @@ export class AnalogInductorElement implements ReactiveAnalogElementCore {
   branchIndex: number = -1;
   _stateBase: number = -1;
   _pinNodes: Map<string, number> = new Map();
+  _label: string = "";
   readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.IND;
   readonly isNonlinear = false;
   readonly isReactive = true;
@@ -189,14 +190,6 @@ export class AnalogInductorElement implements ReactiveAnalogElementCore {
   readonly stateSchema = INDUCTOR_SCHEMA;
   readonly stateSize = INDUCTOR_SCHEMA.size;
   stateBaseOffset = -1;
-  s0: Float64Array = new Float64Array(0);
-  s1: Float64Array = new Float64Array(0);
-  s2: Float64Array = new Float64Array(0);
-  s3: Float64Array = new Float64Array(0);
-  s4: Float64Array = new Float64Array(0);
-  s5: Float64Array = new Float64Array(0);
-  s6: Float64Array = new Float64Array(0);
-  s7: Float64Array = new Float64Array(0);
 
   private _nominalL: number;
   private L: number;
@@ -207,6 +200,11 @@ export class AnalogInductorElement implements ReactiveAnalogElementCore {
   private _SCALE: number;
   private _M: number;
   private _pool!: StatePoolRef;
+  private _hPIbr:   number = -1;
+  private _hNIbr:   number = -1;
+  private _hIbrN:   number = -1;
+  private _hIbrP:   number = -1;
+  private _hIbrIbr: number = -1;
 
   constructor(inductance: number, IC: number, TC1: number, TC2: number, TNOM: number, SCALE: number, M: number) {
     this._nominalL = inductance;
@@ -226,8 +224,35 @@ export class AnalogInductorElement implements ReactiveAnalogElementCore {
     return this._nominalL * factor * this._SCALE / this._M;
   }
 
-  setup(_ctx: SetupContext): void {
-    throw new Error("PB-IND not yet migrated");
+  setup(ctx: SetupContext): void {
+    const solver = ctx.solver;
+    const pinNodes = this._pinNodes;
+    const posNode = pinNodes.get("A")!;  // INDposNode
+    const negNode = pinNodes.get("B")!;  // INDnegNode
+
+    // indsetup.c:78-79 — *states += 2 (INDflux = state+0, INDvolt = state+1)
+    this._stateBase = ctx.allocStates(2);
+
+    // indsetup.c:84-88 — CKTmkCur guard (idempotent, mirrors VSRCfindBr pattern).
+    if (this.branchIndex === -1) {
+      this.branchIndex = ctx.makeCur(this._label, "branch");
+    }
+    const b = this.branchIndex;
+
+    // indsetup.c:96-100 — TSTALLOC sequence, line-for-line.
+    this._hPIbr   = solver.allocElement(posNode, b);  // (INDposNode, INDbrEq)
+    this._hNIbr   = solver.allocElement(negNode, b);  // (INDnegNode, INDbrEq)
+    this._hIbrN   = solver.allocElement(b, negNode);  // (INDbrEq,    INDnegNode)
+    this._hIbrP   = solver.allocElement(b, posNode);  // (INDbrEq,    INDposNode)
+    this._hIbrIbr = solver.allocElement(b, b);        // (INDbrEq,    INDbrEq)
+  }
+
+  findBranchFor(name: string, ctx: SetupContext): number {
+    if (name !== this._label) return 0;
+    if (this.branchIndex === -1) {
+      this.branchIndex = ctx.makeCur(this._label, "branch");
+    }
+    return this.branchIndex;
   }
 
   initState(pool: StatePoolRef): void {
@@ -285,8 +310,6 @@ export class AnalogInductorElement implements ReactiveAnalogElementCore {
    */
   load(ctx: LoadContext): void {
     const { solver, rhsOld, ag, cktMode: mode } = ctx;
-    const n0 = this.pinNodeIds[0];
-    const n1 = this.pinNodeIds[1];
     const b = this.branchIndex;
     const L = this.L;
     const base = this.stateBaseOffset;
@@ -351,18 +374,18 @@ export class AnalogInductorElement implements ReactiveAnalogElementCore {
       s1[base + SLOT_CCAP] = s0[base + SLOT_CCAP];
     }
 
-    // indload.c:119-123: unconditional 5-stamp sequence.
-    // INDposIbrptr / INDnegIbrptr (B sub-matrix: Â±1 at (n, b)).
-    if (n0 !== 0) solver.stampElement(solver.allocElement(n0, b), 1);
-    if (n1 !== 0) solver.stampElement(solver.allocElement(n1, b), -1);
-    // INDibrPosptr / INDibrNegptr (C sub-matrix: Â±1 at (b, n)  KVL incidence).
-    if (n0 !== 0) solver.stampElement(solver.allocElement(b, n0), 1);
-    if (n1 !== 0) solver.stampElement(solver.allocElement(b, n1), -1);
+    // indload.c:119-123: unconditional 5-stamp sequence through cached handles.
+    // INDposIbrptr / INDnegIbrptr (B sub-matrix: ±1 at (n, b)).
+    solver.stampElement(this._hPIbr, 1);   // *(INDposIbrptr) += 1
+    solver.stampElement(this._hNIbr, -1);  // *(INDnegIbrptr) -= 1
+    // INDibrPosptr / INDibrNegptr (C sub-matrix: ±1 at (b, n) — KVL incidence).
+    solver.stampElement(this._hIbrP, 1);   // *(INDibrPosptr) += 1
+    solver.stampElement(this._hIbrN, -1);  // *(INDibrNegptr) -= 1
     // INDibrIbrptr (-req branch diagonal). Stamped even at DC where req=0 so
     // the structural nonzero is preserved across the handle table.
-    solver.stampElement(solver.allocElement(b, b), -req);
+    solver.stampElement(this._hIbrIbr, -req);  // *(INDibrIbrptr) -= req
     // indload.c:112: *(CKTrhs + INDbrEq) += veq.
-    stampRHS(ctx.rhs,b, veq);
+    stampRHS(ctx.rhs, b, veq);
   }
 
   getPinCurrents(rhs: Float64Array): number[] {
@@ -468,7 +491,15 @@ export const InductorDefinition: ComponentDefinition = {
       factory: createInductorElement,
       paramDefs: INDUCTOR_PARAM_DEFS,
       params: INDUCTOR_DEFAULTS,
-      mayCreateInternalNodes: true,
+      findBranchFor(name: string, ctx: import("../../solver/analog/setup-context.js").SetupContext): number {
+        const el = ctx.findDevice(name);
+        if (!el) return 0;
+        const ind = el as unknown as AnalogInductorElement;
+        if (ind.branchIndex === -1) {
+          ind.branchIndex = ctx.makeCur(name, "branch");
+        }
+        return ind.branchIndex;
+      },
     },
   },
   defaultModel: "behavioral",

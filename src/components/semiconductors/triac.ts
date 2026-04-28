@@ -1,21 +1,23 @@
-﻿/**
+/**
  * Triac analog component  bidirectional thyristor.
  *
- * Implements two anti-parallel SCR paths sharing a gate terminal.
- * Conducts in both directions when triggered by gate current, and latches
- * until the main terminal current crosses zero (drops below I_hold).
+ * Composite: two anti-parallel SCRs sharing a gate terminal, each built from
+ * the NPN+PNP two-transistor latch per PB-SCR / PB-BJT.
+ *
+ * Sub-elements (NGSPICE_LOAD_ORDER ascending, all BJT=2):
+ *   Q1 — NPN SCR1: B=G, C=Vint1, E=MT1
+ *   Q2 — PNP SCR1: B=Vint1, C=G, E=MT2
+ *   Q3 — NPN SCR2: B=G, C=Vint2, E=MT2
+ *   Q4 — PNP SCR2: B=Vint2, C=G, E=MT1
+ *
+ * Internal nodes:
+ *   Vint1 — SCR1 latch node (created in setup())
+ *   Vint2 — SCR2 latch node (created in setup())
  *
  * Terminal convention:
  *   MT1  Main Terminal 1 (reference terminal for gate control)
  *   MT2  Main Terminal 2
  *   G    Gate
- *
- * Model: two independent latch states (forward path MT2MT1, reverse path MT1MT2).
- * The active path is selected based on the sign of V_MT2-MT1. Gate current in
- * either polarity triggers the corresponding SCR path.
- *
- * LATCHED slot encoding: 1.0 = forward path latched, -1.0 = reverse path latched,
- * 0.0 = neither latched. Forward and reverse are mutually exclusive.
  */
 
 import { AbstractCircuitElement } from "../../core/element.js";
@@ -31,41 +33,17 @@ import {
   type AttributeMapping,
   type ComponentDefinition,
 } from "../../core/registry.js";
-import type { PoolBackedAnalogElementCore, LoadContext } from "../../solver/analog/element.js";
-import { NGSPICE_LOAD_ORDER } from "../../solver/analog/element.js";
-import { stampG, stampRHS } from "../../solver/analog/stamp-helpers.js";
-import { pnjlim } from "../../solver/analog/newton-raphson.js";
+import type { AnalogElementCore } from "../../core/analog-types.js";
+import { NGSPICE_LOAD_ORDER } from "../../core/analog-types.js";
+import type { LoadContext } from "../../solver/analog/load-context.js";
+import type { SetupContext } from "../../solver/analog/setup-context.js";
 import { defineModelParams } from "../../core/model-params.js";
-import type { StatePoolRef } from "../../core/analog-types.js";
-import { VT } from "../../core/constants.js";
-import { defineStateSchema, applyInitialValues } from "../../solver/analog/state-schema.js";
-import { MODEINITJCT } from "../../solver/analog/ckt-mode.js";
 
-// ---------------------------------------------------------------------------
-// Physical constants
-// ---------------------------------------------------------------------------
-
-// VT (thermal voltage) imported from ../../core/constants.js
-
-/** Minimum conductance for numerical stability (GMIN). */
-const GMIN = 1e-12;
-
-/** Maximum alpha value  prevents division-by-zero. */
-const ALPHA_MAX = 0.95;
-
-// ---------------------------------------------------------------------------
-// State pool slot indices
-// ---------------------------------------------------------------------------
-
-const SLOT_VAK        = 0; // V_MT2 - V_MT1 (main terminal voltage, pnjlim-limited)
-const SLOT_VGK        = 1; // V_G - V_MT1 (gate-MT1 voltage, pnjlim-limited)
-const SLOT_GEQ        = 2;
-const SLOT_IEQ        = 3;
-const SLOT_G_GATE_GEQ = 4;
-const SLOT_G_GATE_IEQ = 5;
-const SLOT_LATCHED    = 6; // 1.0 = fwd latched, -1.0 = rev latched, 0.0 = none
-const SLOT_IAK        = 7;
-const SLOT_IGK        = 8;
+import {
+  createBjtElement,
+  BJT_NPN_DEFAULTS,
+  BJT_PNP_DEFAULTS,
+} from "./bjt.js";
 
 // ---------------------------------------------------------------------------
 // Model parameter declarations
@@ -73,334 +51,180 @@ const SLOT_IGK        = 8;
 
 export const { paramDefs: TRIAC_PARAM_DEFS, defaults: TRIAC_PARAM_DEFAULTS } = defineModelParams({
   primary: {
-    vOn:  { default: 1.5,   unit: "V", description: "On-state forward voltage drop" },
-    iH:   { default: 10e-3, unit: "A", description: "Holding current  minimum main current to stay on" },
-    rOn:  { default: 0.01,  unit: "Î", description: "On-state series resistance" },
-    iS:   { default: 1e-12, unit: "A", description: "Reverse saturation current" },
+    BF:  { default: BJT_NPN_DEFAULTS.BF,  description: "Forward current gain (NPN, Q1/Q3)" },
+    IS:  { default: BJT_NPN_DEFAULTS.IS,  unit: "A", description: "Saturation current (all sub-BJTs)" },
   },
   secondary: {
-    alpha1:   { default: 0.5,  description: "PNP transistor current gain (fixed)" },
-    alpha2_0: { default: 0.3,  description: "NPN off-state current gain" },
-    i_ref:    { default: 1e-3, unit: "A", description: "Gate current scale factor for Î±â‚‚ modulation" },
-    n:        { default: 1,               description: "Emission coefficient" },
+    BR:  { default: BJT_PNP_DEFAULTS.BR,  description: "Reverse current gain (PNP, Q2/Q4)" },
+    RC:  { default: 0,                     unit: "Ω", description: "Collector resistance" },
+    RB:  { default: 0,                     unit: "Ω", description: "Base resistance" },
+    RE:  { default: 0,                     unit: "Ω", description: "Emitter resistance" },
+    AREA: { default: 1,                    description: "Device area factor" },
+    TEMP: { default: 300.15,               unit: "K", description: "Operating temperature" },
   },
 });
 
 // ---------------------------------------------------------------------------
-// State schema declaration
+// TriacCompositeElement — composite AnalogElementCore
 // ---------------------------------------------------------------------------
 
-const TRIAC_STATE_SCHEMA = defineStateSchema("TriacElement", [
-  { name: "VAK", doc: "MT2-MT1 voltage, pnjlim-limited (V)", init: { kind: "zero" } },
-  { name: "VGK", doc: "Gate-MT1 voltage, pnjlim-limited (V)", init: { kind: "zero" } },
-  { name: "GEQ", doc: "Linearized MT1-MT2 conductance (S)", init: { kind: "constant", value: 1e-12 } },
-  { name: "IEQ", doc: "Linearized MT1-MT2 current source (A)", init: { kind: "zero" } },
-  { name: "G_GATE_GEQ", doc: "Gate junction conductance (S)", init: { kind: "constant", value: 1e-12 } },
-  { name: "G_GATE_IEQ", doc: "Gate junction current source (A)", init: { kind: "zero" } },
-  { name: "LATCHED", doc: "Latch state (1.0=fwd, -1.0=rev, 0.0=none)", init: { kind: "zero" } },
-  { name: "IAK", doc: "Main terminal current (A)", init: { kind: "zero" } },
-  { name: "IGK", doc: "Gate current (A)", init: { kind: "zero" } },
-]);
+class TriacCompositeElement implements AnalogElementCore {
+  branchIndex: number = -1;
+  readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.BJT;
+  readonly isNonlinear: boolean = true;
+  readonly isReactive: boolean = false;
+  _stateBase: number = -1;
+  _pinNodes: Map<string, number>;
+
+  readonly _q1: ReturnType<typeof createBjtElement>;
+  readonly _q2: ReturnType<typeof createBjtElement>;
+  readonly _q3: ReturnType<typeof createBjtElement>;
+  readonly _q4: ReturnType<typeof createBjtElement>;
+
+  _mt1Node: number = 0;
+  _mt2Node: number = 0;
+  _gNode:   number = 0;
+  _vint1Node: number = 0;
+  _vint2Node: number = 0;
+
+  readonly label: string;
+
+  constructor(
+    pinNodes: ReadonlyMap<string, number>,
+    q1: ReturnType<typeof createBjtElement>,
+    q2: ReturnType<typeof createBjtElement>,
+    q3: ReturnType<typeof createBjtElement>,
+    q4: ReturnType<typeof createBjtElement>,
+    label: string,
+  ) {
+    this._pinNodes = new Map(pinNodes);
+    this._mt1Node = pinNodes.get("MT1")!;
+    this._mt2Node = pinNodes.get("MT2")!;
+    this._gNode   = pinNodes.get("G")!;
+    this._q1 = q1;
+    this._q2 = q2;
+    this._q3 = q3;
+    this._q4 = q4;
+    this.label = label;
+  }
+
+  setup(ctx: SetupContext): void {
+    // Create internal latch nodes before sub-elements
+    this._vint1Node = ctx.makeVolt(this.label, "latch1");  // SCR1 latch
+    this._vint2Node = ctx.makeVolt(this.label, "latch2");  // SCR2 latch
+
+    // Bind sub-element pin nodes by mutating each BJT's _pinNodes map.
+    // BJT sub-elements are not compiler-augmented, so pinNodeIds is unset on
+    // them and bjt.ts::setup() reads node IDs from this._pinNodes.get("B"|"C"|"E").
+
+    // Q1 NPN SCR1: B=G, C=Vint1, E=MT1
+    (this._q1 as any)._pinNodes.set("B", this._gNode);
+    (this._q1 as any)._pinNodes.set("C", this._vint1Node);
+    (this._q1 as any)._pinNodes.set("E", this._mt1Node);
+
+    // Q2 PNP SCR1: B=Vint1, C=G, E=MT2
+    (this._q2 as any)._pinNodes.set("B", this._vint1Node);
+    (this._q2 as any)._pinNodes.set("C", this._gNode);
+    (this._q2 as any)._pinNodes.set("E", this._mt2Node);
+
+    // Q3 NPN SCR2: B=G, C=Vint2, E=MT2
+    (this._q3 as any)._pinNodes.set("B", this._gNode);
+    (this._q3 as any)._pinNodes.set("C", this._vint2Node);
+    (this._q3 as any)._pinNodes.set("E", this._mt2Node);
+
+    // Q4 PNP SCR2: B=Vint2, C=G, E=MT1
+    (this._q4 as any)._pinNodes.set("B", this._vint2Node);
+    (this._q4 as any)._pinNodes.set("C", this._gNode);
+    (this._q4 as any)._pinNodes.set("E", this._mt1Node);
+
+    // Forward to each BJT sub-element in order
+    this._q1.setup(ctx);   // 23× TSTALLOC
+    this._q2.setup(ctx);   // 23× TSTALLOC
+    this._q3.setup(ctx);   // 23× TSTALLOC
+    this._q4.setup(ctx);   // 23× TSTALLOC
+  }
+
+  load(ctx: LoadContext): void {
+    this._q1.load(ctx);   // NPN bjtload.c
+    this._q2.load(ctx);   // PNP bjtload.c (polarity = -1)
+    this._q3.load(ctx);   // NPN bjtload.c
+    this._q4.load(ctx);   // PNP bjtload.c (polarity = -1)
+  }
+
+  setParam(key: string, value: number): void {
+    if (key === "BF") {
+      // BF routes to Q1 and Q3 (NPN forward gain)
+      this._q1.setParam("BF", value);
+      this._q3.setParam("BF", value);
+    } else if (key === "BR") {
+      // BR routes to Q2 and Q4 (PNP reverse gain)
+      this._q2.setParam("BR", value);
+      this._q4.setParam("BR", value);
+    } else if (key === "IS" || key === "RC" || key === "RB" || key === "RE" || key === "AREA" || key === "TEMP") {
+      // Shared model parameters route to all four sub-elements
+      this._q1.setParam(key, value);
+      this._q2.setParam(key, value);
+      this._q3.setParam(key, value);
+      this._q4.setParam(key, value);
+    }
+  }
+
+  getPinCurrents(_rhs: Float64Array): number[] {
+    // Pin order: [MT2(0), MT1(1), G(2)]
+    return [0, 0, 0];
+  }
+}
 
 // ---------------------------------------------------------------------------
-// Stamp helpers  node 0 is ground (skipped)
+// createTriacElement  AnalogElementCore factory
 // ---------------------------------------------------------------------------
 
-
-// ---------------------------------------------------------------------------
-// createTriacElement  AnalogElement factory
-// ---------------------------------------------------------------------------
-
-export function createTriacElement(
+function createTriacElement(
   pinNodes: ReadonlyMap<string, number>,
   props: PropertyBag,
-): PoolBackedAnalogElementCore {
-  const nodeMT2 = pinNodes.get("MT2")!; // Main Terminal 2
-  const nodeMT1 = pinNodes.get("MT1")!; // Main Terminal 1
-  const nodeG   = pinNodes.get("G")!;   // Gate
+  label: string,
+): TriacCompositeElement {
+  const mt1Node = pinNodes.get("MT1")!;
+  const mt2Node = pinNodes.get("MT2")!;
+  const gNode   = pinNodes.get("G")!;
 
-  const p = {
-    vOn:      props.getModelParam<number>("vOn"),
-    iH:       props.getModelParam<number>("iH"),
-    rOn:      props.getModelParam<number>("rOn"),
-    iS:       props.getModelParam<number>("iS"),
-    alpha1:   props.getModelParam<number>("alpha1"),
-    alpha2_0: props.getModelParam<number>("alpha2_0"),
-    i_ref:    props.getModelParam<number>("i_ref"),
-    n:        props.getModelParam<number>("n"),
-  };
+  // Q1 NPN SCR1: B=G, C=Vint1(placeholder 0), E=MT1
+  const q1 = createBjtElement(
+    1,
+    new Map([["B", gNode], ["C", 0], ["E", mt1Node]]),
+    props,
+  );
+  (q1 as any).label = `${label}#Q1`;
+  (q1 as any).ngspiceNodeMap = { B: "base", C: "col", E: "emit" };
 
-  let nVt = p.n * VT;
-  let vcritMain = nVt * Math.log(nVt / (p.iS * Math.SQRT2));
-  let vcritGate = nVt * Math.log(nVt / (p.iS * Math.SQRT2));
+  // Q2 PNP SCR1: B=Vint1(placeholder 0), C=G, E=MT2
+  const q2 = createBjtElement(
+    -1,
+    new Map([["B", 0], ["C", gNode], ["E", mt2Node]]),
+    props,
+  );
+  (q2 as any).label = `${label}#Q2`;
+  (q2 as any).ngspiceNodeMap = { B: "base", C: "col", E: "emit" };
 
-  // Pool reference  set by initState. State arrays accessed via pool.states[N]
-  // at call time inside load(). No cached Float64Array refs.
-  let pool: StatePoolRef;
-  let base: number;
+  // Q3 NPN SCR2: B=G, C=Vint2(placeholder 0), E=MT2
+  const q3 = createBjtElement(
+    1,
+    new Map([["B", gNode], ["C", 0], ["E", mt2Node]]),
+    props,
+  );
+  (q3 as any).label = `${label}#Q3`;
+  (q3 as any).ngspiceNodeMap = { B: "base", C: "col", E: "emit" };
 
-  // Ephemeral per-iteration pnjlim limiting flag
-  let pnjlimLimited = false;
+  // Q4 PNP SCR2: B=Vint2(placeholder 0), C=G, E=MT1
+  const q4 = createBjtElement(
+    -1,
+    new Map([["B", 0], ["C", gNode], ["E", mt1Node]]),
+    props,
+  );
+  (q4 as any).label = `${label}#Q4`;
+  (q4 as any).ngspiceNodeMap = { B: "base", C: "col", E: "emit" };
 
-  function recomputeDerivedConstants(): void {
-    nVt = p.n * VT;
-    vcritMain = nVt * Math.log(nVt / (p.iS * Math.SQRT2));
-    vcritGate = nVt * Math.log(nVt / (p.iS * Math.SQRT2));
-  }
-
-  function computeAlpha2(iGate: number): number {
-    const raw = 1 - (1 - p.alpha2_0) * Math.exp(-Math.abs(iGate) / p.i_ref);
-    return Math.min(raw, ALPHA_MAX);
-  }
-
-  function computeOnState(s0: Float64Array, vmt: number): void {
-    const gOn = 1.0 / p.rOn;
-    const iOn = (vmt - p.vOn) / p.rOn;
-    s0[base + SLOT_GEQ] = gOn + GMIN;
-    s0[base + SLOT_IEQ] = iOn - s0[base + SLOT_GEQ] * vmt;
-  }
-
-  function computeBlockingState(s0: Float64Array): void {
-    s0[base + SLOT_GEQ] = GMIN;
-    s0[base + SLOT_IEQ] = 0;
-  }
-
-  function computeOperatingPoint(s0: Float64Array, vmt: number, vg1: number): void {
-    // Gate current (forward-biased gate-MT1 junction)
-    const iGate = p.iS * (Math.exp(vg1 / nVt) - 1) + GMIN * vg1;
-
-    const a2 = computeAlpha2(iGate);
-    const a1c = Math.min(p.alpha1, ALPHA_MAX);
-    const a2c = Math.min(a2, ALPHA_MAX);
-    const alphaSum = a1c + a2c;
-    const triggered = alphaSum > 0.95;
-
-    const latched = s0[base + SLOT_LATCHED];
-
-    if (vmt >= 0) {
-      // Forward path (MT2MT1)
-      if (latched !== 1.0 && triggered) {
-        s0[base + SLOT_LATCHED] = 1.0;
-      }
-      if (s0[base + SLOT_LATCHED] === 1.0) {
-        computeOnState(s0, vmt);
-        const iMt = s0[base + SLOT_GEQ] * vmt + s0[base + SLOT_IEQ];
-        s0[base + SLOT_IAK] = iMt;
-        if (iMt < p.iH) {
-          s0[base + SLOT_LATCHED] = 0.0;
-          computeBlockingState(s0);
-          s0[base + SLOT_IAK] = GMIN * vmt;
-        }
-      } else {
-        computeBlockingState(s0);
-        s0[base + SLOT_IAK] = GMIN * vmt;
-      }
-      // Reset reverse latch when polarity changes
-      if (s0[base + SLOT_LATCHED] === -1.0) {
-        s0[base + SLOT_LATCHED] = 0.0;
-      }
-    } else {
-      // Reverse path (MT1MT2, vmt < 0)
-      if (latched !== -1.0 && triggered) {
-        s0[base + SLOT_LATCHED] = -1.0;
-      }
-      if (s0[base + SLOT_LATCHED] === -1.0) {
-        // Mirror: current flows MT1MT2, V_drop = -V_on
-        const gOn = 1.0 / p.rOn;
-        const iOn = (vmt + p.vOn) / p.rOn;
-        s0[base + SLOT_GEQ] = gOn + GMIN;
-        s0[base + SLOT_IEQ] = iOn - s0[base + SLOT_GEQ] * vmt;
-        const iMt = s0[base + SLOT_GEQ] * vmt + s0[base + SLOT_IEQ];
-        s0[base + SLOT_IAK] = iMt;
-        if (iMt > -p.iH) {
-          s0[base + SLOT_LATCHED] = 0.0;
-          computeBlockingState(s0);
-          s0[base + SLOT_IAK] = GMIN * vmt;
-        }
-      } else {
-        computeBlockingState(s0);
-        s0[base + SLOT_IAK] = GMIN * vmt;
-      }
-      // Reset forward latch when polarity changes
-      if (s0[base + SLOT_LATCHED] === 1.0) {
-        s0[base + SLOT_LATCHED] = 0.0;
-      }
-    }
-
-    // Gate junction: linearized at (already pnjlim-limited) vg1
-    const expVg = Math.exp(vg1 / nVt);
-    const gGate = (p.iS * expVg) / nVt + GMIN;
-    const iGateCurrent = p.iS * (expVg - 1);
-    s0[base + SLOT_G_GATE_GEQ] = gGate;
-    s0[base + SLOT_G_GATE_IEQ] = iGateCurrent - gGate * vg1;
-    s0[base + SLOT_IGK] = iGateCurrent;
-  }
-
-  return {
-    branchIndex: -1,
-    _stateBase: -1,
-    _pinNodes: new Map(pinNodes),
-    ngspiceLoadOrder: NGSPICE_LOAD_ORDER.DIO,
-    isNonlinear: true,
-    isReactive: false,
-    poolBacked: true as const,
-    stateSize: 9,
-    stateSchema: TRIAC_STATE_SCHEMA,
-    stateBaseOffset: -1,
-    s0: new Float64Array(0),
-    s1: new Float64Array(0),
-    s2: new Float64Array(0),
-    s3: new Float64Array(0),
-    s4: new Float64Array(0),
-    s5: new Float64Array(0),
-    s6: new Float64Array(0),
-    s7: new Float64Array(0),
-
-    setup(_ctx: import("../../solver/analog/setup-context.js").SetupContext): void {
-      throw new Error("PB-TRIAC not yet migrated");
-    },
-
-    initState(poolRef: StatePoolRef): void {
-      pool = poolRef;
-      base = this.stateBaseOffset;
-      applyInitialValues(TRIAC_STATE_SCHEMA, pool, base, {});
-    },
-
-    load(ctx: LoadContext): void {
-      // Access state arrays at call time  no cached Float64Array refs.
-      const s0 = pool.states[0];
-
-      const voltages = ctx.rhsOld;
-      const v1 = voltages[nodeMT1];
-      const v2 = voltages[nodeMT2];
-      const vG = voltages[nodeG];
-
-      const vmtRaw = v2 - v1;
-      const vg1Raw = vG - v1;
-
-      let vmtLimited: number;
-      let vg1Limited: number;
-      let vmtWasLimited = false;
-      let vg1WasLimited = false;
-      if (ctx.cktMode & MODEINITJCT) {
-        // Triac MODEINITJCT: seed junction voltages from vcrit  standard
-        // thyristor initialization, avoids pnjlim on cold start.
-        vmtLimited = vcritMain;
-        vg1Limited = vcritGate;
-        pnjlimLimited = false;
-      } else {
-        const vmtResult = pnjlim(vmtRaw, s0[base + SLOT_VAK], nVt, vcritMain);
-        vmtLimited = vmtResult.value;
-        vmtWasLimited = vmtResult.limited;
-        const vg1Result = pnjlim(vg1Raw, s0[base + SLOT_VGK], nVt, vcritGate);
-        vg1Limited = vg1Result.value;
-        vg1WasLimited = vg1Result.limited;
-        pnjlimLimited = vmtWasLimited || vg1WasLimited;
-        if (pnjlimLimited) ctx.noncon.value++;
-      }
-
-      if (ctx.limitingCollector) {
-        ctx.limitingCollector.push({
-          elementIndex: (this as any).elementIndex ?? -1,
-          label: (this as any).label ?? "",
-          junction: "MT2-MT1",
-          limitType: "pnjlim",
-          vBefore: vmtRaw,
-          vAfter: vmtLimited,
-          wasLimited: vmtWasLimited,
-        });
-        ctx.limitingCollector.push({
-          elementIndex: (this as any).elementIndex ?? -1,
-          label: (this as any).label ?? "",
-          junction: "G-MT1",
-          limitType: "pnjlim",
-          vBefore: vg1Raw,
-          vAfter: vg1Limited,
-          wasLimited: vg1WasLimited,
-        });
-      }
-
-      s0[base + SLOT_VAK] = vmtLimited;
-      s0[base + SLOT_VGK] = vg1Limited;
-
-      computeOperatingPoint(s0, vmtLimited, vg1Limited);
-
-      const solver = ctx.solver;
-      const geq      = s0[base + SLOT_GEQ];
-      const ieq      = s0[base + SLOT_IEQ];
-      const gGateGeq = s0[base + SLOT_G_GATE_GEQ];
-      const gGateIeq = s0[base + SLOT_G_GATE_IEQ];
-
-      // MT1-MT2 main path
-      stampG(solver, nodeMT2, nodeMT2, geq);
-      stampG(solver, nodeMT2, nodeMT1, -geq);
-      stampG(solver, nodeMT1, nodeMT2, -geq);
-      stampG(solver, nodeMT1, nodeMT1, geq);
-      stampRHS(ctx.rhs, nodeMT2, -ieq);
-      stampRHS(ctx.rhs, nodeMT1, ieq);
-
-      // Gate-MT1 path
-      stampG(solver, nodeG,   nodeG,   gGateGeq);
-      stampG(solver, nodeG,   nodeMT1, -gGateGeq);
-      stampG(solver, nodeMT1, nodeG,   -gGateGeq);
-      stampG(solver, nodeMT1, nodeMT1, gGateGeq);
-      stampRHS(ctx.rhs, nodeG,   -gGateIeq);
-      stampRHS(ctx.rhs, nodeMT1, gGateIeq);
-    },
-
-    checkConvergence(ctx: LoadContext): boolean {
-      // If voltage was limited in load(), declare non-convergence immediately.
-      if (pnjlimLimited) return false;
-
-      const s0 = pool.states[0];
-      const voltages = ctx.rhsOld;
-      const v1 = voltages[nodeMT1];
-      const v2 = voltages[nodeMT2];
-      const vG = voltages[nodeG];
-
-      // Current-prediction convergence test on MT2-MT1 junction
-      const vmtRaw = v2 - v1;
-      const delvmt = vmtRaw - s0[base + SLOT_VAK];
-      const imt = s0[base + SLOT_IAK];
-      const gmt = s0[base + SLOT_GEQ];
-      const cmthat = imt + gmt * delvmt;
-      const tolMT = ctx.reltol * Math.max(Math.abs(cmthat), Math.abs(imt)) + ctx.iabstol;
-
-      // Current-prediction convergence test on gate-MT1 junction
-      const vg1Raw = vG - v1;
-      const delvg1 = vg1Raw - s0[base + SLOT_VGK];
-      const ig1 = s0[base + SLOT_IGK];
-      const gg1 = s0[base + SLOT_G_GATE_GEQ];
-      const cg1hat = ig1 + gg1 * delvg1;
-      const tolG1 = ctx.reltol * Math.max(Math.abs(cg1hat), Math.abs(ig1)) + ctx.iabstol;
-
-      return Math.abs(cmthat - imt) <= tolMT && Math.abs(cg1hat - ig1) <= tolG1;
-    },
-
-    getPinCurrents(rhs: Float64Array): number[] {
-      // pinLayout order: [MT2(0), MT1(1), G(2)]
-      const s0 = pool.states[0];
-      const v1 = rhs[nodeMT1];
-      const v2 = rhs[nodeMT2];
-      const vG = rhs[nodeG];
-
-      const iMT = s0[base + SLOT_GEQ] * (v2 - v1) + s0[base + SLOT_IEQ];
-      const iG  = s0[base + SLOT_G_GATE_GEQ] * (vG - v1) + s0[base + SLOT_G_GATE_IEQ];
-
-      const iMT2 = iMT;
-      const iMT1 = -(iMT2 + iG);
-
-      // Return in pinLayout order [MT2, MT1, G]
-      return [iMT2, iMT1, iG];
-    },
-
-    setParam(key: string, value: number): void {
-      if (key in p) {
-        (p as Record<string, number>)[key] = value;
-        recomputeDerivedConstants();
-      }
-    },
-  };
+  return new TriacCompositeElement(pinNodes, q1, q2, q3, q4, label);
 }
 
 // ---------------------------------------------------------------------------
@@ -557,9 +381,13 @@ export const TriacDefinition: ComponentDefinition = {
   modelRegistry: {
     "behavioral": {
       kind: "inline",
-      factory: createTriacElement,
+      factory: (pinNodes, props, _getTime) => {
+        const label = (props as any).getOrDefault?.("label", "Triac") ?? "Triac";
+        return createTriacElement(pinNodes, props, label);
+      },
       paramDefs: TRIAC_PARAM_DEFS,
       params: TRIAC_PARAM_DEFAULTS,
+      mayCreateInternalNodes: true,
     },
   },
   defaultModel: "behavioral",

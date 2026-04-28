@@ -174,14 +174,6 @@ export class AnalogCapacitorElement implements ReactiveAnalogElementCore {
   readonly stateSchema = CAPACITOR_SCHEMA;
   readonly stateSize = CAPACITOR_SCHEMA.size;
   stateBaseOffset = -1;
-  s0: Float64Array = new Float64Array(0);
-  s1: Float64Array = new Float64Array(0);
-  s2: Float64Array = new Float64Array(0);
-  s3: Float64Array = new Float64Array(0);
-  s4: Float64Array = new Float64Array(0);
-  s5: Float64Array = new Float64Array(0);
-  s6: Float64Array = new Float64Array(0);
-  s7: Float64Array = new Float64Array(0);
 
   private _nominalC: number;
   private C: number;

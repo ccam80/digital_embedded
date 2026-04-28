@@ -18,7 +18,7 @@ import {
 } from "../polarized-cap.js";
 import { PropertyBag } from "../../../core/properties.js";
 import { SparseSolver } from "../../../solver/analog/sparse-solver.js";
-import { runDcOp, makeLoadCtx } from "../../../solver/analog/__tests__/test-helpers.js";
+import { runDcOp, makeLoadCtx, loadCtxFromFields } from "../../../solver/analog/__tests__/test-helpers.js";
 import { makeDcVoltageSource } from "../../sources/dc-voltage-source.js";
 import type { Diagnostic } from "../../../compile/types.js";
 import { StatePool } from "../../../solver/analog/state-pool.js";
@@ -225,7 +225,7 @@ describe("PolarizedCap", () => {
       const scratch = new Float64Array(64);
       computeNIcomCof(dt, deltaOld, 1, "trapezoidal", ag, scratch);
 
-      const ctx: LoadContext = {
+      const ctx = loadCtxFromFields({
         cktMode: MODETRAN | MODEINITTRAN,
         solver,
         matrix: solver,
@@ -250,7 +250,7 @@ describe("PolarizedCap", () => {
         cktFixLimit: false,
         bypass: false,
         voltTol: 1e-6,
-      };
+      });
 
       solver._initStructure();
       vs.load(ctx);
@@ -319,7 +319,7 @@ describe("PolarizedCap", () => {
         const solver = new SparseSolver();
 
         const cktMode = step === 0 ? (MODETRAN | MODEINITTRAN) : (MODETRAN | MODEINITFLOAT);
-        const ctx: LoadContext = {
+        const ctx = loadCtxFromFields({
           cktMode,
           solver,
           matrix: solver,
@@ -344,7 +344,7 @@ describe("PolarizedCap", () => {
           cktFixLimit: false,
           bypass: false,
           voltTol: 1e-6,
-        };
+        });
 
         solver._initStructure();
         vs.load(ctx);
@@ -603,7 +603,7 @@ describe("polarized_cap_load_transient_parity (C4.2)", () => {
     for (let step = 0; step < 10; step++) {
       matValues.fill(0);
 
-      const ctx: LoadContext = {
+      const ctx = loadCtxFromFields({
         cktMode: step === 0 ? (MODETRAN | MODEINITTRAN) : (MODETRAN | MODEINITFLOAT),
         solver,
         matrix: solver,
@@ -628,7 +628,7 @@ describe("polarized_cap_load_transient_parity (C4.2)", () => {
         cktFixLimit: false,
         bypass: false,
         voltTol: 1e-6,
-      };
+      });
 
       element.load(ctx);
 
@@ -711,7 +711,7 @@ describe("polarized_cap_F4b_clamp_diode_stamp (PC-W3-4)", () => {
     ag[1] = -1 / dt;
     const voltages = new Float64Array(3); // all zero
 
-    const ctx: LoadContext = {
+    const ctx = loadCtxFromFields({
       cktMode: MODETRAN | MODEINITTRAN,
       solver: recSolver,
       matrix: recSolver,
@@ -736,7 +736,7 @@ describe("polarized_cap_F4b_clamp_diode_stamp (PC-W3-4)", () => {
       cktFixLimit: false,
       bypass: false,
       voltTol: 1e-6,
-    };
+    });
 
     element.load(ctx);
 

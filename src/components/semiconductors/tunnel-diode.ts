@@ -38,7 +38,7 @@ import type { PoolBackedAnalogElementCore, LoadContext } from "../../solver/anal
 import { NGSPICE_LOAD_ORDER } from "../../solver/analog/element.js";
 import type { IntegrationMethod } from "../../solver/analog/element.js";
 import { MODETRAN, MODEAC } from "../../solver/analog/ckt-mode.js";
-import { stampG, stampRHS } from "../../solver/analog/stamp-helpers.js";
+import { stampRHS } from "../../solver/analog/stamp-helpers.js";
 import {
   computeJunctionCapacitance,
   computeJunctionCharge,
@@ -50,6 +50,10 @@ import type { LteParams } from "../../solver/analog/ckt-terr.js";
 import { defineModelParams } from "../../core/model-params.js";
 import type { StatePoolRef } from "../../core/analog-types.js";
 import { defineStateSchema, applyInitialValues } from "../../solver/analog/state-schema.js";
+import { VCCSAnalogElement } from "../active/vccs.js";
+import { parseExpression } from "../../solver/analog/expression.js";
+import { differentiate, simplify } from "../../solver/analog/expression-differentiate.js";
+import type { SetupContext } from "../../solver/analog/setup-context.js";
 
 // ---------------------------------------------------------------------------
 // Physical constants
@@ -191,6 +195,7 @@ const TUNNEL_DIODE_CAP_STATE_SCHEMA = defineStateSchema("TunnelDiodeElement_cap"
 export function createTunnelDiodeElement(
   pinNodes: ReadonlyMap<string, number>,
   props: PropertyBag,
+  _getTime: () => number,
 ): PoolBackedAnalogElementCore {
   const nodeAnode   = pinNodes.get("A")!;
   const nodeCathode = pinNodes.get("K")!;
@@ -221,6 +226,19 @@ export function createTunnelDiodeElement(
 
   const hasCapacitance = params.CJO > 0 || params.TT > 0;
 
+  // VCCS sub-element: self-controlled — control pair aliases output pair (A,K).
+  // Constructing with a unity expression; the actual I-V stamping is done in
+  // load() using the sub-element's cached TSTALLOC handles via this._vccs.stamps.
+  const vccsExpr = parseExpression("V(ctrl)");
+  const vccsDeriv = simplify(differentiate(vccsExpr, "V(ctrl)"));
+  const vccsElement = new VCCSAnalogElement(vccsExpr, vccsDeriv, "V(ctrl)", "voltage");
+  vccsElement._pinNodes = new Map([
+    ["ctrl+", nodeAnode],
+    ["ctrl-", nodeCathode],
+    ["out+",  nodeAnode],
+    ["out-",  nodeCathode],
+  ]);
+
   // Per-instance thermal voltage  cite: dioload.c / diotemp.c, per-instance TEMP (maps to ngspice DIOtemp).
   let vt = params.TEMP * CONSTboltz / CHARGE;
 
@@ -249,7 +267,7 @@ export function createTunnelDiodeElement(
     return v > params.VP * 0.8 && v < params.VV * 1.2;
   }
 
-  const element: PoolBackedAnalogElementCore = {
+  const element: PoolBackedAnalogElementCore & { _vccs: VCCSAnalogElement } = {
     branchIndex: -1,
     _stateBase: -1,
     _pinNodes: new Map(pinNodes),
@@ -268,9 +286,10 @@ export function createTunnelDiodeElement(
     s5: new Float64Array(0),
     s6: new Float64Array(0),
     s7: new Float64Array(0),
+    _vccs: vccsElement,
 
-    setup(_ctx: import("../../solver/analog/setup-context.js").SetupContext): void {
-      throw new Error("PB-TUNNEL not yet migrated");
+    setup(ctx: SetupContext): void {
+      this._vccs.setup(ctx);
     },
 
     initState(poolRef: StatePoolRef): void {
@@ -316,10 +335,11 @@ export function createTunnelDiodeElement(
       const geq = s0[base + SLOT_GEQ];
       const ieq = s0[base + SLOT_IEQ];
       const solver = ctx.solver;
-      stampG(solver, nodeAnode,   nodeAnode,   geq);
-      stampG(solver, nodeAnode,   nodeCathode, -geq);
-      stampG(solver, nodeCathode, nodeAnode,   -geq);
-      stampG(solver, nodeCathode, nodeCathode, geq);
+      const { pCtP, pCtN, nCtP, nCtN } = this._vccs.stamps;
+      solver.stampElement(pCtP, +geq);
+      solver.stampElement(pCtN, -geq);
+      solver.stampElement(nCtP, -geq);
+      solver.stampElement(nCtN, +geq);
       stampRHS(ctx.rhs, nodeAnode,   -ieq);
       stampRHS(ctx.rhs, nodeCathode, ieq);
 
@@ -353,10 +373,10 @@ export function createTunnelDiodeElement(
         s0[base + SLOT_CCAP] = ccap;
 
         if (capGeq !== 0 || capIeq !== 0) {
-          stampG(solver, nodeAnode,   nodeAnode,   capGeq);
-          stampG(solver, nodeAnode,   nodeCathode, -capGeq);
-          stampG(solver, nodeCathode, nodeAnode,   -capGeq);
-          stampG(solver, nodeCathode, nodeCathode, capGeq);
+          solver.stampElement(pCtP, +capGeq);
+          solver.stampElement(pCtN, -capGeq);
+          solver.stampElement(nCtP, -capGeq);
+          solver.stampElement(nCtN, +capGeq);
           stampRHS(ctx.rhs, nodeAnode,   -capIeq);
           stampRHS(ctx.rhs, nodeCathode, capIeq);
         }
@@ -558,7 +578,6 @@ export const TunnelDiodeDefinition: ComponentDefinition = {
       factory: createTunnelDiodeElement,
       paramDefs: TUNNEL_DIODE_PARAM_DEFS,
       params: TUNNEL_DIODE_PARAM_DEFAULTS,
-      ngspiceNodeMap: { A: "contPos", K: "contNeg" },
     },
   },
   defaultModel: "behavioral",

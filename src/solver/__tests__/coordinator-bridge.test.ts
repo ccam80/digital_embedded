@@ -180,7 +180,6 @@ function buildBridgeFixture(
 
   const compiledAnalog = new ConcreteCompiledAnalogCircuit({
     nodeCount: 1,
-    branchCount: 1,
     elements: [],
     labelToNodeId: new Map(),
     wireToNodeId: new Map(),

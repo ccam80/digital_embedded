@@ -25,6 +25,7 @@ import type { LoadContext } from "../../../solver/analog/load-context.js";
 import {
   MODETRAN, MODEINITFLOAT, MODEINITTRAN, MODEINITPRED,
 } from "../../../solver/analog/ckt-mode.js";
+import { loadCtxFromFields } from "../../../solver/analog/__tests__/test-helpers.js";
 
 // ---------------------------------------------------------------------------
 // companionLoadCtx — build a transient LoadContext matching the ag[] that
@@ -70,7 +71,7 @@ function makeCompanionCtx(opts: {
 }): LoadContext {
   // Default: MODETRAN | MODEINITFLOAT (normal transient NR iteration).
   const cktMode = opts.cktMode ?? (MODETRAN | MODEINITFLOAT);
-  return {
+  return loadCtxFromFields({
     cktMode,
     solver: opts.solver,
     matrix: opts.solver,
@@ -95,7 +96,7 @@ function makeCompanionCtx(opts: {
     cktFixLimit: false,
     bypass: false,
     voltTol: 1e-6,
-  };
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -548,7 +549,7 @@ describe("Capacitor trap-order-2 xmu parity (C4.6)", () => {
     ag[0] = ag0;
     ag[1] = ag1;
 
-    const ctx: LoadContext = {
+    const ctx = loadCtxFromFields({
       cktMode: MODETRAN | MODEINITFLOAT,
       solver: mockSolver,
       matrix: mockSolver,
@@ -573,7 +574,7 @@ describe("Capacitor trap-order-2 xmu parity (C4.6)", () => {
       cktFixLimit: false,
       bypass: false,
       voltTol: 1e-6,
-    };
+    });
 
     element.load(ctx);
 
@@ -712,7 +713,7 @@ describe("capacitor_load_transient_parity (C4.2)", () => {
       rhsEntries.length = 0;
 
       const stepVoltages = new Float64Array([Vsrc, v2, 0]);
-      const ctx: LoadContext = {
+      const ctx = loadCtxFromFields({
         cktMode: step === 0 ? (MODETRAN | MODEINITTRAN) : (MODETRAN | MODEINITFLOAT),
         solver,
         matrix: solver,
@@ -737,7 +738,7 @@ describe("capacitor_load_transient_parity (C4.2)", () => {
         cktFixLimit: false,
         bypass: false,
         voltTol: 1e-6,
-      };
+      });
 
       element.load(ctx);
 

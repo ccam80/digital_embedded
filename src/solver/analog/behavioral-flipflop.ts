@@ -105,14 +105,6 @@ export class BehavioralDFlipflopElement implements ReactiveAnalogElementCore {
   stateBaseOffset = -1;
   _stateBase: number = -1;
   _pinNodes: Map<string, number> = new Map();
-  s0: Float64Array<ArrayBufferLike> = new Float64Array(0) as Float64Array<ArrayBufferLike>;
-  s1: Float64Array<ArrayBufferLike> = new Float64Array(0) as Float64Array<ArrayBufferLike>;
-  s2: Float64Array<ArrayBufferLike> = new Float64Array(0) as Float64Array<ArrayBufferLike>;
-  s3: Float64Array<ArrayBufferLike> = new Float64Array(0) as Float64Array<ArrayBufferLike>;
-  s4: Float64Array<ArrayBufferLike> = new Float64Array(0) as Float64Array<ArrayBufferLike>;
-  s5: Float64Array<ArrayBufferLike> = new Float64Array(0) as Float64Array<ArrayBufferLike>;
-  s6: Float64Array<ArrayBufferLike> = new Float64Array(0) as Float64Array<ArrayBufferLike>;
-  s7: Float64Array<ArrayBufferLike> = new Float64Array(0) as Float64Array<ArrayBufferLike>;
 
   constructor(
     clockPin: DigitalInputPinModel,
@@ -160,8 +152,22 @@ export class BehavioralDFlipflopElement implements ReactiveAnalogElementCore {
     this._prevClockVoltage = readMnaVoltage(this._clockPin.nodeId, rhs);
   }
 
-  setup(_ctx: SetupContext): void {
-    throw new Error("BehavioralDFlipflopElement not yet migrated");
+  setup(ctx: SetupContext): void {
+    // Forward to every input pin model (DigitalInputPinModel.setup per Shape rule 1)
+    this._clockPin.setup(ctx);
+    this._dPin.setup(ctx);
+
+    // (Optional defensive forward — _setPin and _resetPin are null in the
+    //  sync factory but the field exists on the class.)
+    if (this._setPin !== null) this._setPin.setup(ctx);
+    if (this._resetPin !== null) this._resetPin.setup(ctx);
+
+    // Forward to every output pin model (DigitalOutputPinModel.setup per Shape rule 2, role "direct")
+    this._qPin.setup(ctx);
+    this._qBarPin.setup(ctx);
+
+    // Forward to every capacitor child collected from pin models
+    for (const child of this._childElements) child.setup(ctx);
   }
 
   load(ctx: LoadContext): void {

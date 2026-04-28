@@ -22,7 +22,7 @@ import {
 } from "../bjt.js";
 import type { LoadContext } from "../../../solver/analog/element.js";
 import { PropertyBag } from "../../../core/properties.js";
-import { withNodeIds } from "../../../solver/analog/__tests__/test-helpers.js";
+import { withNodeIds, loadCtxFromFields } from "../../../solver/analog/__tests__/test-helpers.js";
 import { StatePool } from "../../../solver/analog/state-pool.js";
 import { SparseSolver } from "../../../solver/analog/sparse-solver.js";
 import type { AnalogElement } from "../../../solver/analog/element.js";
@@ -102,7 +102,7 @@ function makeSpiceL1Props(modelParams?: Record<string, number>): PropertyBag {
 function makeDcOpCtx(rhs: Float64Array): LoadContext {
   const solver = new SparseSolver();
   solver._initStructure();
-  return {
+  return loadCtxFromFields({
     cktMode: MODEDCOP | MODEINITFLOAT,
     solver,
     matrix: solver,
@@ -127,7 +127,7 @@ function makeDcOpCtx(rhs: Float64Array): LoadContext {
     cktFixLimit: false,
     bypass: false,
     voltTol: 1e-6,
-  };
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -552,7 +552,7 @@ describe("BJT L0 MODEINITPRED", () => {
     rhsOldPrime[2] = -1.0; // nodeC=2 → rhsOld[1]
     rhsOldPrime[3] = 0.0;  // nodeE=3 → rhsOld[2]
     const rhs = new Float64Array(10);
-    const ctxPrime: LoadContext = {
+    const ctxPrime = loadCtxFromFields({
       cktMode: MODEDCOP | MODEINITFLOAT,
       solver: solverPrime,
       matrix: solverPrime,
@@ -577,7 +577,7 @@ describe("BJT L0 MODEINITPRED", () => {
       cktFixLimit: false,
       bypass: false,
       voltTol: 1e-6,
-    };
+    });
     const element = withNodeIds(core, [1, 2, 3]);
     element.load(ctxPrime);
 
@@ -615,7 +615,7 @@ describe("BJT L0 MODEINITPRED", () => {
     const solver = new SparseSolver();
     solver._initStructure();
     const rhsOld = new Float64Array(10);
-    const ctx: LoadContext = {
+    const ctx = loadCtxFromFields({
       cktMode: MODETRAN | MODEINITPRED,
       solver,
       matrix: solver,
@@ -640,7 +640,7 @@ describe("BJT L0 MODEINITPRED", () => {
       cktFixLimit: false,
       bypass: false,
       voltTol: 1e-6,
-    };
+    });
     element.load(ctx);
 
     // All 9 slots in s0 must equal the corresponding s1 sentinels.
@@ -671,7 +671,7 @@ function makeFullLoadCtx(cktMode: number, rhsOld: Float64Array, modelParams?: Re
   runSetup(core, solver);
   const pool = new StatePool((core as any).stateSize);
   (core as any).initState(pool);
-  const ctx: LoadContext = {
+  const ctx = loadCtxFromFields({
     cktMode,
     solver,
     matrix: solver,
@@ -696,7 +696,7 @@ function makeFullLoadCtx(cktMode: number, rhsOld: Float64Array, modelParams?: Re
     cktFixLimit: false,
     bypass: false,
     voltTol: 1e-6,
-  };
+  });
   const element = withNodeIds(core, [1, 2, 3]);
   return { ctx, element, s0: pool.states[0], pool };
 }
@@ -802,7 +802,7 @@ describe("BJT L0 NOBYPASS", () => {
       get rhs() { return Array.from(rhs).filter((v) => v !== 0).length; },
     };
     const limitingCollector: LimitingEvent[] = [];
-    const ctx: LoadContext = {
+    const ctx = loadCtxFromFields({
       cktMode,
       solver,
       matrix: solver,
@@ -827,7 +827,7 @@ describe("BJT L0 NOBYPASS", () => {
       cktFixLimit: false,
       bypass,
       voltTol: 1e-6,
-    };
+    });
     const element = withNodeIds(core, [1, 2, 3]);
     return { ctx, element, s0: pool.states[0], pool, stampCount, limitingCollector };
   }
@@ -907,7 +907,7 @@ describe("BJT L0 NOBYPASS", () => {
         get g() { return _gCount2; },
         get rhs() { return Array.from(rhsBuf).filter((v) => v !== 0).length; },
       };
-      const ctx: LoadContext = {
+      const ctx = loadCtxFromFields({
         cktMode: MODEDCOP | MODEINITFLOAT,
         solver,
         matrix: solver,
@@ -932,7 +932,7 @@ describe("BJT L0 NOBYPASS", () => {
         cktFixLimit: false,
         bypass,
         voltTol: 1e-6,
-      };
+      });
       return { ctx, stampCount };
     }
 
@@ -998,7 +998,7 @@ describe("BJT L0 NOBYPASS", () => {
     ): LoadContext {
       const solver = new SparseSolver();
       solver._initStructure();
-      return {
+      return loadCtxFromFields({
         cktMode,
         solver,
         matrix: solver,
@@ -1023,7 +1023,7 @@ describe("BJT L0 NOBYPASS", () => {
         cktFixLimit: false,
         bypass,
         voltTol: 1e-6,
-      };
+      });
     }
 
     // Prime s0 at forward-active bias.
@@ -1071,7 +1071,7 @@ describe("BJT L0 noncon", () => {
     runSetup(core, solver);
     const pool = new StatePool((core as any).stateSize);
     (core as any).initState(pool);
-    const ctx: LoadContext = {
+    const ctx = loadCtxFromFields({
       cktMode,
       solver,
       matrix: solver,
@@ -1096,7 +1096,7 @@ describe("BJT L0 noncon", () => {
       cktFixLimit: false,
       bypass: false,
       voltTol: 1e-6,
-    };
+    });
     return { ctx, element: withNodeIds(core, [1, 2, 3]), s0: pool.states[0] };
   }
 
@@ -1180,7 +1180,7 @@ describe("BJT L0 MODEINITSMSIG", () => {
       primeSolver._initStructure();
       const rhsPrime = new Float64Array(10);
       rhsPrime[1] = 0.65; rhsPrime[2] = 3.0; rhsPrime[3] = 0.0;
-      const primeCtx: LoadContext = {
+      const primeCtx = loadCtxFromFields({
         cktMode: MODEDCOP | MODEINITFLOAT,
         solver: primeSolver,
         matrix: primeSolver,
@@ -1192,13 +1192,13 @@ describe("BJT L0 MODEINITSMSIG", () => {
         noncon: { value: 0 }, limitingCollector: null, convergenceCollector: null,
         xfact: 1, gmin: 1e-12, reltol: 1e-3, iabstol: 1e-12,
         temp: 300.15, vt: 0.025852, cktFixLimit: false, bypass: false, voltTol: 1e-6,
-      };
+      });
       withNodeIds(core, [1, 2, 3]).load(primeCtx);
     }
 
     const solver = new SparseSolver();
     solver._initStructure();
-    const ctx: LoadContext = {
+    const ctx = loadCtxFromFields({
       cktMode: MODEDCOP | MODEINITSMSIG,
       solver,
       matrix: solver,
@@ -1210,7 +1210,7 @@ describe("BJT L0 MODEINITSMSIG", () => {
       noncon: { value: 0 }, limitingCollector: null, convergenceCollector: null,
       xfact: 1, gmin: 1e-12, reltol: 1e-3, iabstol: 1e-12,
       temp: 300.15, vt: 0.025852, cktFixLimit: false, bypass: false, voltTol: 1e-6,
-    };
+    });
     return { ctx, element: withNodeIds(core, [1, 2, 3]), s0: pool.states[0], solver };
   }
 
@@ -1288,7 +1288,7 @@ describe("BJT L0 MODEINITTRAN", () => {
     // load() reads from s1[VBE]/s1[VBC] and then writes them back.
     s1[SLOT_VBE] = 0.5;
     s1[SLOT_VBC] = 0.8;
-    const ctx: LoadContext = {
+    const ctx = loadCtxFromFields({
       cktMode: MODETRAN | MODEINITTRAN,
       solver,
       matrix: solver,
@@ -1300,7 +1300,7 @@ describe("BJT L0 MODEINITTRAN", () => {
       noncon: { value: 0 }, limitingCollector: null, convergenceCollector: null,
       xfact: 1, gmin: 1e-12, reltol: 1e-3, iabstol: 1e-12,
       temp: 300.15, vt: 0.025852, cktFixLimit: false, bypass: false, voltTol: 1e-6,
-    };
+    });
 
     withNodeIds(core, [1, 2, 3]).load(ctx);
 
@@ -1334,7 +1334,7 @@ describe("BJT L1 MODEINITSMSIG", () => {
     primeSolver._initStructure();
     const rhsPrime = new Float64Array(10);
     rhsPrime[1] = 0.65; rhsPrime[2] = 3.0; rhsPrime[3] = 0.0;
-    const primeCtx: LoadContext = {
+    const primeCtx = loadCtxFromFields({
       cktMode: MODEDCOP | MODEINITFLOAT,
       solver: primeSolver,
       matrix: primeSolver,
@@ -1346,14 +1346,14 @@ describe("BJT L1 MODEINITSMSIG", () => {
       noncon: { value: 0 }, limitingCollector: null, convergenceCollector: null,
       xfact: 1, gmin: 1e-12, reltol: 1e-3, iabstol: 1e-12,
       temp: 300.15, vt: 0.025852, cktFixLimit: false, bypass: false, voltTol: 1e-6,
-    };
+    });
     withNodeIds(core, [1, 2, 3]).load(primeCtx);
 
     const solver = new SparseSolver();
     solver._initStructure();
     // MODEINITSMSIG reads vbeRaw/vbcRaw from s0, so rhsOld is only used for vbx/vsub.
     // Use same voltages as prime so vbx/vsub are consistent.
-    const ctx: LoadContext = {
+    const ctx = loadCtxFromFields({
       cktMode: MODEDCOP | MODEINITSMSIG,
       solver,
       matrix: solver,
@@ -1365,7 +1365,7 @@ describe("BJT L1 MODEINITSMSIG", () => {
       noncon: { value: 0 }, limitingCollector: null, convergenceCollector: null,
       xfact: 1, gmin: 1e-12, reltol: 1e-3, iabstol: 1e-12,
       temp: 300.15, vt: 0.025852, cktFixLimit: false, bypass: false, voltTol: 1e-6,
-    };
+    });
     return { ctx, element: withNodeIds(core, [1, 2, 3]), s0: pool.states[0], solver };
   }
 
@@ -1454,7 +1454,7 @@ describe("BJT L1 MODEINITPRED", () => {
     rhsOldPrime[1] = 0.65; // nodeB=1 → rhsOld[0]
     rhsOldPrime[2] = -1.0; // nodeC=2 → rhsOld[1]
     rhsOldPrime[3] = 0.0;  // nodeE=3 → rhsOld[2]
-    const ctxPrime: LoadContext = {
+    const ctxPrime = loadCtxFromFields({
       cktMode: MODEDCOP | MODEINITFLOAT,
       solver: solverPrime,
       matrix: solverPrime,
@@ -1479,7 +1479,7 @@ describe("BJT L1 MODEINITPRED", () => {
       cktFixLimit: false,
       bypass: false,
       voltTol: 1e-6,
-    };
+    });
     const element = withNodeIds(core, [1, 2, 3]);
     element.load(ctxPrime);
 
@@ -1520,7 +1520,7 @@ describe("BJT L1 MODEINITPRED", () => {
     // this keeps pnjlim a no-op and the op writeback identical to the prime result.
     const solver = new SparseSolver();
     solver._initStructure();
-    const ctx: LoadContext = {
+    const ctx = loadCtxFromFields({
       cktMode: MODETRAN | MODEINITPRED,
       solver,
       matrix: solver,
@@ -1545,7 +1545,7 @@ describe("BJT L1 MODEINITPRED", () => {
       cktFixLimit: false,
       bypass: false,
       voltTol: 1e-6,
-    };
+    });
     element.load(ctx);
 
     // All 10 slots in s0 must equal the corresponding s1 sentinels.
@@ -1611,7 +1611,7 @@ describe("BJT L1 NOBYPASS", () => {
       get n() { return _nCount + Array.from(rhsL1).filter((v) => v !== 0).length; },
     };
     const limitingCollector: LimitingEvent[] = [];
-    const ctx: LoadContext = {
+    const ctx = loadCtxFromFields({
       cktMode,
       solver,
       matrix: solver,
@@ -1625,7 +1625,7 @@ describe("BJT L1 NOBYPASS", () => {
       xfact: 1, gmin: 1e-12, reltol: 1e-3, iabstol: 1e-12,
       temp: 300.15, vt: 0.025852, cktFixLimit: false,
       bypass, voltTol: 1e-6,
-    };
+    });
     const element = withNodeIds(core, [1, 2, 3]);
     return { ctx, element, s0: pool.states[0], pool, stampCount, limitingCollector };
   }
@@ -1692,7 +1692,7 @@ describe("BJT L1 NOBYPASS", () => {
       const stampCount = {
         get n() { return _nCount2 + Array.from(rhsBuf2).filter((v) => v !== 0).length; },
       };
-      const ctx: LoadContext = {
+      const ctx = loadCtxFromFields({
         cktMode: MODEDCOP | MODEINITFLOAT,
         solver, matrix: solver,
         rhs: rhsBuf2, rhsOld,
@@ -1703,7 +1703,7 @@ describe("BJT L1 NOBYPASS", () => {
         xfact: 1, gmin: 1e-12, reltol: 1e-3, iabstol: 1e-12,
         temp: 300.15, vt: 0.025852, cktFixLimit: false,
         bypass, voltTol: 1e-6,
-      };
+      });
       return { ctx, stampCount };
     }
 
@@ -1762,7 +1762,7 @@ describe("BJT L1 NOBYPASS", () => {
     ): LoadContext {
       const solver = new SparseSolver();
       solver._initStructure();
-      return {
+      return loadCtxFromFields({
         cktMode, solver, matrix: solver,
         rhs: new Float64Array(10), rhsOld,
         time: 1e-9, dt: 1e-9, method: "trapezoidal", order: 1,
@@ -1772,7 +1772,7 @@ describe("BJT L1 NOBYPASS", () => {
         xfact: 0, gmin: 1e-12, reltol: 1e-3, iabstol: 1e-12,
         temp: 300.15, vt: 0.025852, cktFixLimit: false,
         bypass, voltTol: 1e-6,
-      };
+      });
     }
 
     const element = withNodeIds(core, [1, 2, 3]);
@@ -1814,7 +1814,7 @@ describe("BJT L1 noncon", () => {
     // rhsOld: large voltage shift to trigger pnjlim.
     const rhsOld = new Float64Array(10);
     rhsOld[1] = 5.0; rhsOld[2] = 0.0; rhsOld[3] = 0.0;
-    const ctx: LoadContext = {
+    const ctx = loadCtxFromFields({
       cktMode,
       solver, matrix: solver,
       rhs: new Float64Array(10), rhsOld,
@@ -1824,7 +1824,7 @@ describe("BJT L1 noncon", () => {
       noncon: { value: 0 }, limitingCollector: null, convergenceCollector: null,
       xfact: 1, gmin: 1e-12, reltol: 1e-3, iabstol: 1e-12,
       temp: 300.15, vt: 0.025852, cktFixLimit: false, bypass: false, voltTol: 1e-6,
-    };
+    });
     return { ctx, element: withNodeIds(core, [1, 2, 3]) };
   }
 
@@ -1877,7 +1877,7 @@ describe("BJT L1 CdBE", () => {
       solver._initStructure();
       const rhsOld = new Float64Array(10);
       rhsOld[1] = 0.65; rhsOld[2] = 3.0; rhsOld[3] = 0.0;
-      return {
+      return loadCtxFromFields({
         cktMode: MODEDCOP | MODEINITSMSIG,
         solver, matrix: solver,
         rhs: new Float64Array(10), rhsOld,
@@ -1887,7 +1887,7 @@ describe("BJT L1 CdBE", () => {
         noncon: { value: 0 }, limitingCollector: null, convergenceCollector: null,
         xfact: 1, gmin: 1e-12, reltol: 1e-3, iabstol: 1e-12,
         temp: 300.15, vt: 0.025852, cktFixLimit: false, bypass: false, voltTol: 1e-6,
-      };
+      });
     }
 
     const { el: el1, pool: pool1 } = makeL1TranEl(1e-16);
@@ -1896,7 +1896,7 @@ describe("BJT L1 CdBE", () => {
     // Prime s0 with MODEDCOP|MODEINITFLOAT first so MODEINITSMSIG reads valid op state.
     const primeSolver = new SparseSolver(); primeSolver._initStructure();
     const rhsPrime = new Float64Array(10); rhsPrime[1] = 0.65; rhsPrime[2] = 3.0;
-    const primeCtx: LoadContext = {
+    const primeCtx = loadCtxFromFields({
       cktMode: MODEDCOP | MODEINITFLOAT,
       solver: primeSolver, matrix: primeSolver,
       rhs: new Float64Array(10), rhsOld: rhsPrime,
@@ -1906,7 +1906,7 @@ describe("BJT L1 CdBE", () => {
       noncon: { value: 0 }, limitingCollector: null, convergenceCollector: null,
       xfact: 1, gmin: 1e-12, reltol: 1e-3, iabstol: 1e-12,
       temp: 300.15, vt: 0.025852, cktFixLimit: false, bypass: false, voltTol: 1e-6,
-    };
+    });
     // Need separate prime solvers.
     const primeSolver2 = new SparseSolver(); primeSolver2._initStructure();
     el1.load({ ...primeCtx });
@@ -1995,7 +1995,7 @@ describe("BJT L1 BC_cap_stamps", () => {
     const rhsOld = new Float64Array(nodeCount);
     rhsOld[1] = 0.65; rhsOld[2] = 0.0; rhsOld[3] = 0.0;
     // First call: MODEINITTRAN seeds QBX into state1 so NIintegrate has history.
-    const ctxInit: LoadContext = {
+    const ctxInit = loadCtxFromFields({
       cktMode: MODETRAN | MODEINITTRAN,
       solver, matrix: solver,
       rhs: new Float64Array(nodeCount), rhsOld,
@@ -2005,7 +2005,7 @@ describe("BJT L1 BC_cap_stamps", () => {
       noncon: { value: 0 }, limitingCollector: null, convergenceCollector: null,
       xfact: 1, gmin: 1e-12, reltol: 1e-3, iabstol: 1e-12,
       temp: 300.15, vt: 0.025852, cktFixLimit: false, bypass: false, voltTol: 1e-6,
-    };
+    });
     const el = withNodeIds(core, [1, 2, 3, 4]);
     el.load(ctxInit);
 
@@ -2013,7 +2013,7 @@ describe("BJT L1 BC_cap_stamps", () => {
     stampedHandles.length = 0;
     const ag = new Float64Array(7);
     ag[0] = 1 / 1e-9; // trapezoidal ag[0] = 1/dt
-    const ctx: LoadContext = {
+    const ctx = loadCtxFromFields({
       cktMode: MODETRAN | MODEINITFLOAT,
       solver, matrix: solver,
       rhs: new Float64Array(nodeCount), rhsOld,
@@ -2023,7 +2023,7 @@ describe("BJT L1 BC_cap_stamps", () => {
       noncon: { value: 0 }, limitingCollector: null, convergenceCollector: null,
       xfact: 1, gmin: 1e-12, reltol: 1e-3, iabstol: 1e-12,
       temp: 300.15, vt: 0.025852, cktFixLimit: false, bypass: false, voltTol: 1e-6,
-    };
+    });
     el.load(ctx);
 
     // Step 3: cross-reference to find which (extRow, extCol) pairs were stamped.
@@ -2170,7 +2170,7 @@ describe("BJT L1 AREAB_AREAC", () => {
     const rhsOld = new Float64Array(10);
     rhsOld[1] = 0.65;  // VB: VBE forward
     rhsOld[2] = 0.0;   // VC=0 → vbc = VB - VC = 0.65 (forward-biased, cbcn fires)
-    return {
+    return loadCtxFromFields({
       cktMode: MODEDCOP | MODEINITFLOAT,
       solver, matrix: solver,
       rhs: new Float64Array(10), rhsOld,
@@ -2180,7 +2180,7 @@ describe("BJT L1 AREAB_AREAC", () => {
       noncon: { value: 0 }, limitingCollector: null, convergenceCollector: null,
       xfact: 1, gmin: 1e-12, reltol: 1e-3, iabstol: 1e-12,
       temp: 300.15, vt: 0.025852, cktFixLimit: false, bypass: false, voltTol: 1e-6,
-    };
+    });
   }
 
   function makeTranCtx(): LoadContext {
@@ -2191,7 +2191,7 @@ describe("BJT L1 AREAB_AREAC", () => {
     rhsOld[2] = -1.0;
     const ag = new Float64Array(7);
     ag[0] = 1 / 1e-9;
-    return {
+    return loadCtxFromFields({
       cktMode: MODETRAN | MODEINITTRAN,
       solver, matrix: solver,
       rhs: new Float64Array(10), rhsOld,
@@ -2201,7 +2201,7 @@ describe("BJT L1 AREAB_AREAC", () => {
       noncon: { value: 0 }, limitingCollector: null, convergenceCollector: null,
       xfact: 1, gmin: 1e-12, reltol: 1e-3, iabstol: 1e-12,
       temp: 300.15, vt: 0.025852, cktFixLimit: false, bypass: false, voltTol: 1e-6,
-    };
+    });
   }
 
   const SLOT_CB = 3;
@@ -2312,7 +2312,7 @@ describe("BJT L1 AREAB_AREAC", () => {
     const rhsOld = new Float64Array(10);
     rhsOld[1] = 0.65; // VB
     rhsOld[2] = 0.0;  // VC
-    return {
+    return loadCtxFromFields({
       cktMode: MODEDCOP | MODEINITFLOAT,
       solver, matrix: solver,
       rhs: new Float64Array(10), rhsOld,
@@ -2322,7 +2322,7 @@ describe("BJT L1 AREAB_AREAC", () => {
       noncon: { value: 0 }, limitingCollector: null, convergenceCollector: null,
       xfact: 1, gmin: 1e-12, reltol: 1e-3, iabstol: 1e-12,
       temp: 300.15, vt: 0.025852, cktFixLimit: false, bypass: false, voltTol: 1e-6,
-    };
+    });
   }
 
   // ---------------------------------------------------------------------------
@@ -2387,7 +2387,7 @@ describe("BJT L1 MODEINITTRAN", () => {
     rhsOld[1] = 0.65; rhsOld[2] = -1.0;
     const ag = new Float64Array(7);
     ag[0] = 1 / 1e-9;
-    return {
+    return loadCtxFromFields({
       cktMode: MODETRAN | MODEINITTRAN,
       solver, matrix: solver,
       rhs: new Float64Array(10), rhsOld,
@@ -2397,7 +2397,7 @@ describe("BJT L1 MODEINITTRAN", () => {
       noncon: { value: 0 }, limitingCollector: null, convergenceCollector: null,
       xfact: 1, gmin: 1e-12, reltol: 1e-3, iabstol: 1e-12,
       temp: 300.15, vt: 0.025852, cktFixLimit: false, bypass: false, voltTol: 1e-6,
-    };
+    });
   }
 
   it("copies_qbe_qbc_qbx_qsub_to_state1", () => {
@@ -2454,7 +2454,7 @@ describe("BJT L1 excess_phase", () => {
     rhsOld[1] = 0.65; rhsOld[2] = -1.0;
     const ag = new Float64Array(7);
     ag[0] = 1 / 1e-9;
-    return {
+    return loadCtxFromFields({
       cktMode: MODETRAN | MODEINITTRAN,
       solver, matrix: solver,
       rhs: new Float64Array(10), rhsOld,
@@ -2464,7 +2464,7 @@ describe("BJT L1 excess_phase", () => {
       noncon: { value: 0 }, limitingCollector: null, convergenceCollector: null,
       xfact: 1, gmin: 1e-12, reltol: 1e-3, iabstol: 1e-12,
       temp: 300.15, vt: 0.025852, cktFixLimit: false, bypass: false, voltTol: 1e-6,
-    };
+    });
   }
 
   it("initTran_seeds_cexbc_state1_state2", () => {
@@ -2474,7 +2474,7 @@ describe("BJT L1 excess_phase", () => {
     // Prime: run DC-OP pass so s0[VBE] = 0.65 (computed and stored).
     const primeSolver = new SparseSolver(); primeSolver._initStructure();
     const rhsPrime = new Float64Array(10); rhsPrime[1] = 0.65; rhsPrime[2] = -1.0;
-    el.load({
+    el.load(loadCtxFromFields({
       cktMode: MODEDCOP | MODEINITFLOAT, solver: primeSolver, matrix: primeSolver,
       rhs: new Float64Array(10), rhsOld: rhsPrime,
       time: 0, dt: 0, method: "trapezoidal", order: 1,
@@ -2482,7 +2482,7 @@ describe("BJT L1 excess_phase", () => {
       noncon: { value: 0 }, limitingCollector: null, convergenceCollector: null,
       xfact: 1, gmin: 1e-12, reltol: 1e-3, iabstol: 1e-12,
       temp: 300.15, vt: 0.025852, cktFixLimit: false, bypass: false, voltTol: 1e-6,
-    });
+    }));
     // Copy s0[VBE] → s1[VBE] so MODEINITTRAN branch reads a non-zero vbe.
     pool.states[1][0] = pool.states[0][0]; // SLOT_VBE = 0
     el.load(makeInittranCtx());
@@ -2515,7 +2515,7 @@ describe("BJT L1 excess_phase", () => {
       rhsOld[1] = 0.65; rhsOld[2] = -1.0;
       const ag = new Float64Array(7);
       ag[0] = 1 / 1e-9;
-      return {
+      return loadCtxFromFields({
         cktMode: MODETRAN | MODEINITFLOAT,
         solver, matrix: solver,
         rhs: new Float64Array(10), rhsOld,
@@ -2525,7 +2525,7 @@ describe("BJT L1 excess_phase", () => {
         noncon: { value: 0 }, limitingCollector: null, convergenceCollector: null,
         xfact: 1, gmin: 1e-12, reltol: 1e-3, iabstol: 1e-12,
         temp: 300.15, vt: 0.025852, cktFixLimit: false, bypass: false, voltTol: 1e-6,
-      };
+      });
     }
 
     el1.load(makeTranCtxWith(1e-6));
@@ -2576,7 +2576,7 @@ describe("BJT L1 XTF_zero", () => {
     solver._initStructure();
     const rhsOld = new Float64Array(10);
     rhsOld[1] = 0.65; rhsOld[2] = -1.0;
-    return {
+    return loadCtxFromFields({
       cktMode: MODEDCOP | MODEINITSMSIG,
       solver, matrix: solver,
       rhs: new Float64Array(10), rhsOld,
@@ -2586,7 +2586,7 @@ describe("BJT L1 XTF_zero", () => {
       noncon: { value: 0 }, limitingCollector: null, convergenceCollector: null,
       xfact: 1, gmin: 1e-12, reltol: 1e-3, iabstol: 1e-12,
       temp: 300.15, vt: 0.025852, cktFixLimit: false, bypass: false, voltTol: 1e-6,
-    };
+    });
   }
 
   it("cbeMod_computed_when_tf_nonzero_xtf_zero", () => {
@@ -2599,7 +2599,7 @@ describe("BJT L1 XTF_zero", () => {
     const primeSolver1 = new SparseSolver(); primeSolver1._initStructure();
     const primeSolver2 = new SparseSolver(); primeSolver2._initStructure();
     const rhsOld = new Float64Array(10); rhsOld[1] = 0.65; rhsOld[2] = -1.0;
-    const primeCtx1: LoadContext = {
+    const primeCtx1 = loadCtxFromFields({
       cktMode: MODEDCOP | MODEINITFLOAT, solver: primeSolver1, matrix: primeSolver1,
       rhs: new Float64Array(10), rhsOld,
       time: 0, dt: 0, method: "trapezoidal", order: 1,
@@ -2607,7 +2607,7 @@ describe("BJT L1 XTF_zero", () => {
       noncon: { value: 0 }, limitingCollector: null, convergenceCollector: null,
       xfact: 1, gmin: 1e-12, reltol: 1e-3, iabstol: 1e-12,
       temp: 300.15, vt: 0.025852, cktFixLimit: false, bypass: false, voltTol: 1e-6,
-    };
+    });
     elTf.load(primeCtx1);
     elNoTf.load({ ...primeCtx1, solver: primeSolver2, matrix: primeSolver2 });
 
@@ -2631,7 +2631,7 @@ describe("BJT L1 XTF_zero", () => {
     // Prime.
     const primeSolver = new SparseSolver(); primeSolver._initStructure();
     const rhsOld = new Float64Array(10); rhsOld[1] = 0.65; rhsOld[2] = -1.0;
-    el.load({
+    el.load(loadCtxFromFields({
       cktMode: MODEDCOP | MODEINITFLOAT, solver: primeSolver, matrix: primeSolver,
       rhs: new Float64Array(10), rhsOld,
       time: 0, dt: 0, method: "trapezoidal", order: 1,
@@ -2639,7 +2639,7 @@ describe("BJT L1 XTF_zero", () => {
       noncon: { value: 0 }, limitingCollector: null, convergenceCollector: null,
       xfact: 1, gmin: 1e-12, reltol: 1e-3, iabstol: 1e-12,
       temp: 300.15, vt: 0.025852, cktFixLimit: false, bypass: false, voltTol: 1e-6,
-    });
+    }));
 
     el.load(makeSmsigCtx());
 
@@ -2674,7 +2674,7 @@ describe("BJT L1 substrate", () => {
     const rhsOld = new Float64Array(10);
     rhsOld[1] = 0.65; rhsOld[2] = -1.0;
     const solver = new SparseSolver(); solver._initStructure();
-    const ctx: LoadContext = {
+    const ctx = loadCtxFromFields({
       cktMode: MODETRAN | MODEINITTRAN,
       solver, matrix: solver,
       rhs: new Float64Array(10), rhsOld,
@@ -2684,7 +2684,7 @@ describe("BJT L1 substrate", () => {
       noncon: { value: 0 }, limitingCollector: null, convergenceCollector: null,
       xfact: 1, gmin: 1e-12, reltol: 1e-3, iabstol: 1e-12,
       temp: 300.15, vt: 0.025852, cktFixLimit: false, bypass: false, voltTol: 1e-6,
-    };
+    });
     el.load(ctx);
 
     const s0 = pool.states[0];
@@ -2721,7 +2721,7 @@ describe("BJT L1 cap_block", () => {
     rhsOld[1] = 0.65; rhsOld[2] = -1.0;
     const ag = new Float64Array(7);
     if (dt > 0) ag[0] = 1 / dt;
-    return {
+    return loadCtxFromFields({
       cktMode,
       solver, matrix: solver,
       rhs: new Float64Array(10), rhsOld,
@@ -2731,7 +2731,7 @@ describe("BJT L1 cap_block", () => {
       noncon: { value: 0 }, limitingCollector: null, convergenceCollector: null,
       xfact: 1, gmin: 1e-12, reltol: 1e-3, iabstol: 1e-12,
       temp: 300.15, vt: 0.025852, cktFixLimit: false, bypass: false, voltTol: 1e-6,
-    };
+    });
   }
 
   it("skipped_under_pure_dcop", () => {
@@ -2762,7 +2762,7 @@ describe("BJT L1 cap_block", () => {
     // Prime s0 first with a DC-OP so MODEINITSMSIG reads valid op values.
     const primeSolver = new SparseSolver(); primeSolver._initStructure();
     const rhsOld = new Float64Array(10); rhsOld[1] = 0.65; rhsOld[2] = -1.0;
-    el.load({
+    el.load(loadCtxFromFields({
       cktMode: MODEDCOP | MODEINITFLOAT, solver: primeSolver, matrix: primeSolver,
       rhs: new Float64Array(10), rhsOld,
       time: 0, dt: 0, method: "trapezoidal", order: 1,
@@ -2770,7 +2770,7 @@ describe("BJT L1 cap_block", () => {
       noncon: { value: 0 }, limitingCollector: null, convergenceCollector: null,
       xfact: 1, gmin: 1e-12, reltol: 1e-3, iabstol: 1e-12,
       temp: 300.15, vt: 0.025852, cktFixLimit: false, bypass: false, voltTol: 1e-6,
-    });
+    }));
     el.load(makeCtxWith(MODEDCOP | MODEINITSMSIG, 0));
     // MODEINITSMSIG stores cap value in CQBE slot.
     expect(pool.states[0][SLOT_CQBE]).toBeGreaterThan(0);
@@ -2805,7 +2805,7 @@ describe("BJT L1 LimitingEvent SUB", () => {
     solver._initStructure();
     const rhsOld = new Float64Array(10);
     rhsOld[1] = 5.0;  // VBE very large — triggers pnjlim on BE and limits.
-    return {
+    return loadCtxFromFields({
       cktMode: MODEDCOP | MODEINITFLOAT,
       solver, matrix: solver,
       rhs: new Float64Array(10), rhsOld,
@@ -2815,7 +2815,7 @@ describe("BJT L1 LimitingEvent SUB", () => {
       noncon: { value: 0 }, limitingCollector: collector, convergenceCollector: null,
       xfact: 1, gmin: 1e-12, reltol: 1e-3, iabstol: 1e-12,
       temp: 300.15, vt: 0.025852, cktFixLimit: false, bypass: false, voltTol: 1e-6,
-    };
+    });
   }
 
   it("pushes_SUB_event_when_collector_present", () => {
@@ -2905,7 +2905,7 @@ describe("BJT TEMP", () => {
     function makeJctCtx(): LoadContext {
       const solver = new SparseSolver();
       solver._initStructure();
-      return {
+      return loadCtxFromFields({
         cktMode: MODEINITJCT,
         solver, matrix: solver,
         rhs: new Float64Array(10), rhsOld: new Float64Array(10),
@@ -2915,7 +2915,7 @@ describe("BJT TEMP", () => {
         noncon: { value: 0 }, limitingCollector: null, convergenceCollector: null,
         xfact: 1, gmin: 1e-12, reltol: 1e-3, iabstol: 1e-12,
         temp: 300.15, vt: 0.025852, cktFixLimit: false, bypass: false, voltTol: 1e-6,
-      };
+      });
     }
 
     withNodeIds(coreDefault, [1, 2, 3]).load(makeJctCtx());
@@ -2955,7 +2955,7 @@ describe("BJT TEMP", () => {
       rhsOld[1] = 0.65; // VB
       rhsOld[2] = 3.0;  // VC
       rhsOld[3] = 0.0;  // VE
-      return {
+      return loadCtxFromFields({
         cktMode: MODEDCOP | MODEINITFLOAT,
         solver, matrix: solver,
         rhs: new Float64Array(10), rhsOld,
@@ -2965,7 +2965,7 @@ describe("BJT TEMP", () => {
         noncon: { value: 0 }, limitingCollector: null, convergenceCollector: null,
         xfact: 1, gmin: 1e-12, reltol: 1e-3, iabstol: 1e-12,
         temp: 300.15, vt: 0.025852, cktFixLimit: false, bypass: false, voltTol: 1e-6,
-      };
+      });
     }
 
     const { el: el300, pool: pool300 } = makeL1AtTemp(300.15);
@@ -3005,7 +3005,7 @@ describe("BJT TEMP", () => {
       solver._initStructure();
       const rhsOld = new Float64Array(10);
       rhsOld[1] = 0.65; rhsOld[2] = 3.0; rhsOld[3] = 0.0;
-      return {
+      return loadCtxFromFields({
         cktMode: MODEDCOP | MODEINITFLOAT,
         solver, matrix: solver,
         rhs: new Float64Array(10), rhsOld,
@@ -3015,7 +3015,7 @@ describe("BJT TEMP", () => {
         noncon: { value: 0 }, limitingCollector: null, convergenceCollector: null,
         xfact: 1, gmin: 1e-12, reltol: 1e-3, iabstol: 1e-12,
         temp: 300.15, vt: 0.025852, cktFixLimit: false, bypass: false, voltTol: 1e-6,
-      };
+      });
     }
 
     withNodeIds(coreXtb0, [1, 2, 3]).load(makeCtx());
@@ -3081,7 +3081,7 @@ describe("BJT TEMP", () => {
     function makeJctCtx(): LoadContext {
       const solver = new SparseSolver();
       solver._initStructure();
-      return {
+      return loadCtxFromFields({
         cktMode: MODEINITJCT,
         solver, matrix: solver,
         rhs: new Float64Array(10), rhsOld: new Float64Array(10),
@@ -3091,7 +3091,7 @@ describe("BJT TEMP", () => {
         noncon: { value: 0 }, limitingCollector: null, convergenceCollector: null,
         xfact: 1, gmin: 1e-12, reltol: 1e-3, iabstol: 1e-12,
         temp: 300.15, vt: 0.025852, cktFixLimit: false, bypass: false, voltTol: 1e-6,
-      };
+      });
     }
 
     // First load at 300.15K — tVcrit should match expectedTVcrit300.
@@ -3142,7 +3142,7 @@ describe("BJT TEMP", () => {
     function makeJctCtx(): LoadContext {
       const solver = new SparseSolver();
       solver._initStructure();
-      return {
+      return loadCtxFromFields({
         cktMode: MODEINITJCT,
         solver, matrix: solver,
         rhs: new Float64Array(10), rhsOld: new Float64Array(10),
@@ -3152,7 +3152,7 @@ describe("BJT TEMP", () => {
         noncon: { value: 0 }, limitingCollector: null, convergenceCollector: null,
         xfact: 1, gmin: 1e-12, reltol: 1e-3, iabstol: 1e-12,
         temp: 300.15, vt: 0.025852, cktFixLimit: false, bypass: false, voltTol: 1e-6,
-      };
+      });
     }
 
     // Load at default 300.15K.

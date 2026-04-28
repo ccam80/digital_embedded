@@ -1,18 +1,21 @@
-﻿/**
+/**
  * Two-winding transformer component.
  *
- * Wraps a CoupledInductorPair to present a 4-terminal device:
- *   P1 (primary+), P2 (primaryâˆ’), S1 (secondary+), S2 (secondaryâˆ’)
+ * Wraps InductorSubElement (L1) + InductorSubElement (L2) + MutualInductorElement (K)
+ * to present a 4-terminal device:
+ *   P1 (primary+), P2 (primary−), S1 (secondary+), S2 (secondary−)
  *
  * Derived parameters:
- *   L_secondary = L_primary Â· NÂ²
- *   M = k Â· âˆš(L_primary Â· L_secondary) = k Â· L_primary Â· N
+ *   L_secondary = L_primary · N²
+ *   M = k · √(L_primary · L_secondary) = k · L_primary · N
  *
  * Each winding includes a series winding resistance for ohmic loss modelling.
  *
- * The MNA stamp follows the "pre-compute then stamp" pattern from inductor.ts:
- * stampCompanion() recomputes the companion coefficients and updates history
- * state; stamp() applies the stored coefficients to the solver.
+ * ngspice anchors:
+ *   indsetup.c:84-100  — IND branch allocation and TSTALLOC sequence
+ *   mutsetup.c:30-70   — MUT branch resolution and TSTALLOC sequence
+ *   indload.c          — IND load (companion model)
+ *   mutload.c          — MUT load (off-diagonal coupling stamps)
  */
 
 import { AbstractCircuitElement } from "../../core/element.js";
@@ -40,6 +43,7 @@ import type { StatePoolRef } from "../../core/analog-types.js";
 import { defineStateSchema, applyInitialValues } from "../../solver/analog/state-schema.js";
 import type { StateSchema } from "../../solver/analog/state-schema.js";
 import { cktTerr } from "../../solver/analog/ckt-terr.js";
+import { InductorSubElement, MutualInductorElement } from "./mutual-inductor.js";
 
 // ---------------------------------------------------------------------------
 // Model parameter declarations
@@ -52,8 +56,8 @@ export const { paramDefs: TRANSFORMER_PARAM_DEFS, defaults: TRANSFORMER_DEFAULTS
     couplingCoefficient: { default: 0.99,  description: "Magnetic coupling coefficient (0 = no coupling, 1 = ideal)", min: 0, max: 1 },
   },
   secondary: {
-    primaryResistance:   { default: 1.0,   unit: "Î", description: "Primary winding series resistance in ohms", min: 0 },
-    secondaryResistance: { default: 1.0,   unit: "Î", description: "Secondary winding series resistance in ohms", min: 0 },
+    primaryResistance:   { default: 1.0,   unit: "Ω", description: "Primary winding series resistance in ohms", min: 0 },
+    secondaryResistance: { default: 1.0,   unit: "Ω", description: "Secondary winding series resistance in ohms", min: 0 },
     IC1:  { default: NaN, unit: "A", description: "Initial condition current for primary winding (UIC)" },
     IC2:  { default: NaN, unit: "A", description: "Initial condition current for secondary winding (UIC)" },
     M:    { default: 1,               description: "Parallel multiplicity factor (applied at stamp time per indload.c:41,107)" },
@@ -64,8 +68,6 @@ export const { paramDefs: TRANSFORMER_PARAM_DEFS, defaults: TRANSFORMER_DEFAULTS
 // State pool schema  13 slots
 // ---------------------------------------------------------------------------
 
-// Slot layout  13 slots total. Previous values are read from s1/s2/s3
-// at the same offsets (pointer-rotation history).
 const TRANSFORMER_SCHEMA: StateSchema = defineStateSchema("AnalogLinearTransformerElement", [
   { name: "G11",   doc: "Companion conductance self-1",                               init: { kind: "zero" } },
   { name: "G22",   doc: "Companion conductance self-2",                               init: { kind: "zero" } },
@@ -161,7 +163,6 @@ export class TransformerElement extends AbstractCircuitElement {
   }
 
   getBoundingBox(): Rect {
-    // Pins at y=0 and y=2 (grid units); bounding box spans full extent
     return {
       x: this.position.x,
       y: this.position.y,
@@ -171,48 +172,34 @@ export class TransformerElement extends AbstractCircuitElement {
   }
 
   draw(ctx: RenderContext, _signals?: PinVoltageAccess): void {
-    // Falstad reference (64Ã—32px bounding box, 16px = 1 grid unit):
-    //   Two vertical coil columns: primary at x=21px, secondary at x=43px
-    //   Each column has 3 arcs stacked vertically at cy=5.333, 16, 26.667px
-    //   All arcs: start=3Ï€/2 (top), end=5Ï€/2 (bottom+wrap)  right-facing semicircles
-    //   Vertical connecting lines at x=21 and x=43 between arc segments
-    //   Core: two vertical lines at x=30 and x=34, y=0 to y=32
-    //   Lead lines: (0,0)(21,0), (0,32)(21,32), (64,0)(43,0), (64,32)(43,32)
-
     ctx.save();
     ctx.setColor("COMPONENT");
     ctx.setLineWidth(1);
 
-    const r = 5.333333 / 16; // arc radius in grid units
-    const arcStart = (3 * Math.PI) / 2; // 4.71238898038469
-    const arcEnd   = (5 * Math.PI) / 2; // 7.85398163397448
+    const r = 5.333333 / 16;
+    const arcStart = (3 * Math.PI) / 2;
+    const arcEnd   = (5 * Math.PI) / 2;
 
-    // Lead lines  horizontal from pins to coil columns
     ctx.drawLine(0, 0, 21 / 16, 0);
     ctx.drawLine(4, 0, 43 / 16, 0);
     ctx.drawLine(0, 2, 21 / 16, 2);
     ctx.drawLine(4, 2, 43 / 16, 2);
 
-    // Coil arc centers (cy) in grid units
     const coilCy = [5.333333 / 16, 16 / 16, 26.666667 / 16];
-    // Vertical segment endpoints between arcs (top of col, between arcs, bottom of col)
     const segY = [0, 10.666667 / 16, 21.333333 / 16, 2];
 
-    // Primary coil  vertical column at cx=21/16
     const priCx = 21 / 16;
     for (let i = 0; i < 3; i++) {
       ctx.drawArc(priCx, coilCy[i], r, arcStart, arcEnd);
       ctx.drawLine(priCx, segY[i], priCx, segY[i + 1]);
     }
 
-    // Secondary coil  vertical column at cx=43/16
     const secCx = 43 / 16;
     for (let i = 0; i < 3; i++) {
       ctx.drawArc(secCx, coilCy[i], r, arcStart, arcEnd);
       ctx.drawLine(secCx, segY[i], secCx, segY[i + 1]);
     }
 
-    // Iron core  two vertical parallel lines
     ctx.drawLine(30 / 16, 0, 30 / 16, 2);
     ctx.drawLine(34 / 16, 0, 34 / 16, 2);
 
@@ -227,14 +214,14 @@ export class TransformerElement extends AbstractCircuitElement {
 /**
  * MNA element for the two-winding transformer.
  *
- * Uses two consecutive branch rows: branch1 (primary) and branch1+1
- * (secondary). The element pre-computes companion coefficients in
- * stampCompanion() and applies them in stamp()  identical to the pattern
- * used by AnalogInductorElement in inductor.ts.
+ * Composed of three sub-elements:
+ *   _l1  (InductorSubElement) — primary winding, pins P1/P2
+ *   _l2  (InductorSubElement) — secondary winding, pins S1/S2
+ *   _mut (MutualInductorElement) — coupling K element
  *
  * Node layout (pinNodeIds array positions):
- *   [0] = P1 (primary+)   [1] = P2 (primaryâˆ’)
- *   [2] = S1 (secondary+) [3] = S2 (secondaryâˆ’)
+ *   [0] = P1 (primary+)   [1] = P2 (primary−)
+ *   [2] = S1 (secondary+) [3] = S2 (secondary−)
  */
 export class AnalogTransformerElement implements ReactiveAnalogElement {
   readonly pinNodeIds: readonly number[];
@@ -249,23 +236,37 @@ export class AnalogTransformerElement implements ReactiveAnalogElement {
   readonly stateSchema = TRANSFORMER_SCHEMA;
   readonly stateSize = TRANSFORMER_SCHEMA.size;
   stateBaseOffset = -1;
-  s0: Float64Array = new Float64Array(0);
-  s1: Float64Array = new Float64Array(0);
-  s2: Float64Array = new Float64Array(0);
-  s3: Float64Array = new Float64Array(0);
-  s4: Float64Array = new Float64Array(0);
-  s5: Float64Array = new Float64Array(0);
-  s6: Float64Array = new Float64Array(0);
-  s7: Float64Array = new Float64Array(0);
 
+  private readonly _l1: InductorSubElement;
+  private readonly _l2: InductorSubElement;
+  private readonly _mut: MutualInductorElement;
   private _pair: CoupledInductorPair;
-  private readonly _branch2: number;
   private _rPri: number;
   private _rSec: number;
   private _IC1: number;
   private _IC2: number;
   private _M: number;
   private _pool!: StatePoolRef;
+
+  // Cached handles for winding resistance stamps (allocated in setup, used in load)
+  private _hRP1P1: number = -1;
+  private _hRP2P2: number = -1;
+  private _hRP1P2: number = -1;
+  private _hRP2P1: number = -1;
+  private _hRS1S1: number = -1;
+  private _hRS2S2: number = -1;
+  private _hRS1S2: number = -1;
+  private _hRS2S1: number = -1;
+
+  // Cached handles for B/C sub-matrix stamps (from load TSTALLOC in original code)
+  private _hP1B1: number = -1;
+  private _hP2B1: number = -1;
+  private _hS1B2: number = -1;
+  private _hS2B2: number = -1;
+  private _hB1P1: number = -1;
+  private _hB1P2: number = -1;
+  private _hB2S1: number = -1;
+  private _hB2S2: number = -1;
 
   constructor(
     pinNodeIds: number[],
@@ -274,15 +275,13 @@ export class AnalogTransformerElement implements ReactiveAnalogElement {
     k: number,
     rPri: number,
     rSec: number,
+    label: string,
     IC1: number = NaN,
     IC2: number = NaN,
     multiplicity: number = 1,
   ) {
     this.pinNodeIds = pinNodeIds;
     this.allNodeIds = pinNodeIds;
-    this._branch2 = -1;
-    // turnsRatio = N_primary / N_secondary (e.g. 10 means 10:1 step-down)
-    // L_secondary = L_primary / NÂ² so that V_sec = V_pri / N for ideal coupling
     const lSecondary = lPrimary / (turnsRatio * turnsRatio);
     this._pair = new CoupledInductorPair(lPrimary, lSecondary, k);
     this._rPri = rPri;
@@ -290,10 +289,57 @@ export class AnalogTransformerElement implements ReactiveAnalogElement {
     this._IC1 = IC1;
     this._IC2 = IC2;
     this._M = multiplicity;
+
+    const [p1, p2, s1, s2] = pinNodeIds;
+    this._l1 = new InductorSubElement(p1, p2, `${label}.L1`);
+    this._l2 = new InductorSubElement(s1, s2, `${label}.L2`);
+    this._mut = new MutualInductorElement(k, this._l1, this._l2);
   }
 
-  setup(_ctx: SetupContext): void {
-    throw new Error("PB-XFMR not yet migrated");
+  setup(ctx: SetupContext): void {
+    // Composite setup: call sub-elements in order L1, L2, MUT.
+    // Ordering invariant: _l1.setup() and _l2.setup() MUST complete before
+    // _mut.setup() is called, because _mut reads _l1.branchIndex and
+    // _l2.branchIndex (set during IND setup) directly — no findDevice needed.
+    this._l1.setup(ctx);
+    this._l2.setup(ctx);
+    this._mut.setup(ctx);
+
+    // Cache branch indices for use in load()
+    this.branchIndex = this._l1.branchIndex;
+
+    // Allocate handles for winding resistance stamps
+    const solver = ctx.solver;
+    const [p1, p2, sec1, sec2] = this.pinNodeIds;
+    const b1 = this._l1.branchIndex;
+    const b2 = this._l2.branchIndex;
+
+    if (this._rPri > 0) {
+      if (p1 !== 0) this._hRP1P1 = solver.allocElement(p1, p1);
+      if (p2 !== 0) this._hRP2P2 = solver.allocElement(p2, p2);
+      if (p1 !== 0 && p2 !== 0) {
+        this._hRP1P2 = solver.allocElement(p1, p2);
+        this._hRP2P1 = solver.allocElement(p2, p1);
+      }
+    }
+    if (this._rSec > 0) {
+      if (sec1 !== 0) this._hRS1S1 = solver.allocElement(sec1, sec1);
+      if (sec2 !== 0) this._hRS2S2 = solver.allocElement(sec2, sec2);
+      if (sec1 !== 0 && sec2 !== 0) {
+        this._hRS1S2 = solver.allocElement(sec1, sec2);
+        this._hRS2S1 = solver.allocElement(sec2, sec1);
+      }
+    }
+
+    // Allocate handles for B/C sub-matrix stamps (KCL/KVL incidence)
+    if (p1 !== 0) this._hP1B1 = solver.allocElement(p1, b1);
+    if (p2 !== 0) this._hP2B1 = solver.allocElement(p2, b1);
+    if (sec1 !== 0) this._hS1B2 = solver.allocElement(sec1, b2);
+    if (sec2 !== 0) this._hS2B2 = solver.allocElement(sec2, b2);
+    if (p1 !== 0) this._hB1P1 = solver.allocElement(b1, p1);
+    if (p2 !== 0) this._hB1P2 = solver.allocElement(b1, p2);
+    if (sec1 !== 0) this._hB2S1 = solver.allocElement(b2, sec1);
+    if (sec2 !== 0) this._hB2S2 = solver.allocElement(b2, sec2);
   }
 
   initState(pool: StatePoolRef): void {
@@ -301,20 +347,36 @@ export class AnalogTransformerElement implements ReactiveAnalogElement {
     applyInitialValues(TRANSFORMER_SCHEMA, pool, this.stateBaseOffset, {});
   }
 
-  setParam(_key: string, _value: number): void {}
-
-  updateDerivedParams(lPrimary: number, turnsRatio: number, k: number, rPri: number, rSec: number, IC1: number = NaN, IC2: number = NaN, multiplicity: number = 1): void {
-    const lSecondary = lPrimary / (turnsRatio * turnsRatio);
-    this._pair = new CoupledInductorPair(lPrimary, lSecondary, k);
-    this._rPri = rPri;
-    this._rSec = rSec;
-    this._IC1 = IC1;
-    this._IC2 = IC2;
-    this._M = multiplicity;
-    if (!this._pool) {
-      throw new Error("AnalogTransformerElement.updateDerivedParams called before initState");
+  setParam(key: string, value: number): void {
+    if (key.startsWith("L1.")) {
+      const subKey = key.slice(3);
+      if (subKey === "inductance") {
+        const lPrimary = value;
+        const lSecondary = lPrimary / (this._pair.k > 0 ? (this._pair.l1 / this._pair.l2) : 1);
+        this._pair = new CoupledInductorPair(lPrimary, this._pair.l2, this._pair.k);
+      }
+    } else if (key.startsWith("L2.")) {
+      const subKey = key.slice(3);
+      if (subKey === "inductance") {
+        this._pair = new CoupledInductorPair(this._pair.l1, value, this._pair.k);
+      }
+    } else if (key === "K" || key === "coupling") {
+      this._pair = new CoupledInductorPair(this._pair.l1, this._pair.l2, value);
+    } else if (key === "primaryInductance") {
+      const lPrimary = value;
+      const turnsRatio = Math.sqrt(this._pair.l1 / this._pair.l2);
+      const lSecondary = lPrimary / (turnsRatio * turnsRatio);
+      this._pair = new CoupledInductorPair(lPrimary, lSecondary, this._pair.k);
+    } else if (key === "turnsRatio") {
+      const lPrimary = this._pair.l1;
+      const lSecondary = lPrimary / (value * value);
+      this._pair = new CoupledInductorPair(lPrimary, lSecondary, this._pair.k);
+    } else {
+      throw new Error(`Unrecognized setParam key: ${key}`);
     }
-    applyInitialValues(TRANSFORMER_SCHEMA, this._pool, this.stateBaseOffset, {});
+    if (this._pool) {
+      applyInitialValues(TRANSFORMER_SCHEMA, this._pool, this.stateBaseOffset, {});
+    }
   }
 
   /**
@@ -323,27 +385,20 @@ export class AnalogTransformerElement implements ReactiveAnalogElement {
    * Mirrors indload.c:INDload for each winding plus the inline MUTUAL block
    * (indload.c:52-77) for off-diagonal coupling stamps.
    *
-   * T-W3-2: Integration gate is !(MODEDC) per indload.c:88, not MODETRAN.
-   * T-W3-3: Two niIntegrate() calls (one per winding); SLOT_CCAP1/CCAP2 tracked.
-   *         Mutual companion: g12 = ag[0] * M per indload.c:74-75.
-   * T-W3-4: UIC flux seed per indload.c:44-46 (IC1/IC2 params).
-   * T-W3-5: M (multiplicity) applied at stamp time per indload.c:41,107 (user ruling 3).
-   * T-W3-6: SLOT_VOLT1/VOLT2 + MODEINITTRAN copy per indload.c:114-116.
+   * All solver entries written through cached handles from setup() only.
+   * No solver.allocElement() calls inside load().
    */
   load(ctx: LoadContext): void {
     const solver = ctx.solver;
     const [p1, p2, sec1, sec2] = this.pinNodeIds;
-    const b1 = this.branchIndex;
-    const b2 = this._branch2;
+    const b1 = this._l1.branchIndex;
+    const b2 = this._l2.branchIndex;
     const mode = ctx.cktMode;
     const ag = ctx.ag;
 
-    // T-W3-5: multiplicity factor m per indload.c:41 (m = INDm).
-    // Applied at stamp time: newmind = L/m (indload.c:107).
     const m = this._M;
     const L1 = this._pair.l1 / m;
     const L2 = this._pair.l2 / m;
-    // Mutual factor scales by m too: MUTfactor = k*sqrt(L1_raw*L2_raw)/m = M_raw/m.
     const Mcoup = this._pair.m / m;
 
     const voltages = ctx.rhsOld;
@@ -353,40 +408,35 @@ export class AnalogTransformerElement implements ReactiveAnalogElement {
     const s2 = this._pool.states[2];
     const s3 = this._pool.states[3];
 
-    // Winding resistances (topology-constant, always stamped).
+    // Winding resistances — stamped through cached handles
     if (this._rPri > 0) {
       const gPri = 1 / this._rPri;
-      if (p1 !== 0) solver.stampElement(solver.allocElement(p1, p1), gPri);
-      if (p2 !== 0) solver.stampElement(solver.allocElement(p2, p2), gPri);
-      if (p1 !== 0 && p2 !== 0) {
-        solver.stampElement(solver.allocElement(p1, p2), -gPri);
-        solver.stampElement(solver.allocElement(p2, p1), -gPri);
-      }
+      if (this._hRP1P1 !== -1) solver.stampElement(this._hRP1P1, gPri);
+      if (this._hRP2P2 !== -1) solver.stampElement(this._hRP2P2, gPri);
+      if (this._hRP1P2 !== -1) solver.stampElement(this._hRP1P2, -gPri);
+      if (this._hRP2P1 !== -1) solver.stampElement(this._hRP2P1, -gPri);
     }
     if (this._rSec > 0) {
       const gSec = 1 / this._rSec;
-      if (sec1 !== 0) solver.stampElement(solver.allocElement(sec1, sec1), gSec);
-      if (sec2 !== 0) solver.stampElement(solver.allocElement(sec2, sec2), gSec);
-      if (sec1 !== 0 && sec2 !== 0) {
-        solver.stampElement(solver.allocElement(sec1, sec2), -gSec);
-        solver.stampElement(solver.allocElement(sec2, sec1), -gSec);
-      }
+      if (this._hRS1S1 !== -1) solver.stampElement(this._hRS1S1, gSec);
+      if (this._hRS2S2 !== -1) solver.stampElement(this._hRS2S2, gSec);
+      if (this._hRS1S2 !== -1) solver.stampElement(this._hRS1S2, -gSec);
+      if (this._hRS2S1 !== -1) solver.stampElement(this._hRS2S1, -gSec);
     }
 
-    // B sub-matrix: branch current incidence in KCL node rows.
-    if (p1 !== 0) solver.stampElement(solver.allocElement(p1, b1), 1);
-    if (p2 !== 0) solver.stampElement(solver.allocElement(p2, b1), -1);
-    if (sec1 !== 0) solver.stampElement(solver.allocElement(sec1, b2), 1);
-    if (sec2 !== 0) solver.stampElement(solver.allocElement(sec2, b2), -1);
+    // B sub-matrix: branch current incidence in KCL node rows — cached handles
+    if (this._hP1B1 !== -1) solver.stampElement(this._hP1B1, 1);
+    if (this._hP2B1 !== -1) solver.stampElement(this._hP2B1, -1);
+    if (this._hS1B2 !== -1) solver.stampElement(this._hS1B2, 1);
+    if (this._hS2B2 !== -1) solver.stampElement(this._hS2B2, -1);
 
-    // C sub-matrix: KVL voltage incidence (topology-constant Â±1 entries).
-    if (p1 !== 0) solver.stampElement(solver.allocElement(b1, p1), 1);
-    if (p2 !== 0) solver.stampElement(solver.allocElement(b1, p2), -1);
-    if (sec1 !== 0) solver.stampElement(solver.allocElement(b2, sec1), 1);
-    if (sec2 !== 0) solver.stampElement(solver.allocElement(b2, sec2), -1);
+    // C sub-matrix: KVL voltage incidence — cached handles
+    if (this._hB1P1 !== -1) solver.stampElement(this._hB1P1, 1);
+    if (this._hB1P2 !== -1) solver.stampElement(this._hB1P2, -1);
+    if (this._hB2S1 !== -1) solver.stampElement(this._hB2S1, 1);
+    if (this._hB2S2 !== -1) solver.stampElement(this._hB2S2, -1);
 
-    // T-W3-4: UIC branch current override for flux seeding  indload.c:44-46.
-    // Applied only when (MODEUIC && MODEINITTRAN) and IC is finite.
+    // UIC branch current override for flux seeding — indload.c:44-46
     let i1Now = voltages[b1];
     let i2Now = voltages[b2];
     if ((mode & MODEUIC) && (mode & MODEINITTRAN)) {
@@ -394,8 +444,7 @@ export class AnalogTransformerElement implements ReactiveAnalogElement {
       if (isFinite(this._IC2)) i2Now = this._IC2;
     }
 
-    // Flux-state update gated on !(MODEDC | MODEINITPRED), per indload.c:43.
-    // T-W3-4: UIC path seeds phi1 = L1*IC1 (indload.c:45-46 flux = L/m * initCond).
+    // Flux-state update gated on !(MODEDC | MODEINITPRED), per indload.c:43
     if (!(mode & (MODEDC | MODEINITPRED))) {
       s0[base + SLOT_PHI1] = L1 * i1Now + Mcoup * i2Now;
       s0[base + SLOT_PHI2] = L2 * i2Now + Mcoup * i1Now;
@@ -408,10 +457,7 @@ export class AnalogTransformerElement implements ReactiveAnalogElement {
       s0[base + SLOT_PHI2] = s1[base + SLOT_PHI2];
     }
 
-    // Companion coefficients  zero at DC; niIntegrate-derived otherwise.
-    // T-W3-2: gate is !(MODEDC) per indload.c:88, not MODETRAN.
-    // T-W3-3: two niIntegrate() calls per winding; SLOT_CCAP1/CCAP2 tracked.
-    //         Mutual companion g12 = ag[0]*M per indload.c:74-75.
+    // Companion coefficients — zero at DC; niIntegrate-derived otherwise
     let g11 = 0, g22 = 0, g12 = 0, hist1 = 0, hist2 = 0;
     if (!(mode & MODEDC)) {
       const phi1_0 = s0[base + SLOT_PHI1];
@@ -440,32 +486,27 @@ export class AnalogTransformerElement implements ReactiveAnalogElement {
 
       s0[base + SLOT_CCAP1] = ni1.ccap;
       s0[base + SLOT_CCAP2] = ni2.ccap;
-      // T-W3-3: MODEINITTRAN seeds ccap history per indload.c:114-116 pattern
-      // (state1 â† state0 for the integration history slot).
       if (mode & MODEINITTRAN) {
         s1[base + SLOT_CCAP1] = ni1.ccap;
         s1[base + SLOT_CCAP2] = ni2.ccap;
       }
 
-      g11  = ni1.geq;                // ag[0] * L1
-      g22  = ni2.geq;                // ag[0] * L2
-      g12  = ag[0] * Mcoup;          // indload.c:74-75: MUTbr1br2 -= MUTfactor*ag[0]
+      g11  = ni1.geq;
+      g22  = ni2.geq;
+      g12  = ag[0] * Mcoup;
       hist1 = ni1.ceq;
       hist2 = ni2.ceq;
     }
 
-    // Unconditional 2Ã—2 branch block stamp  matches indload.c:119-123 twice
-    // (self-inductance diagonals) plus indload.c:74-75 (mutual off-diagonals).
-    // Pattern is stable across modes; allocElement handle table is idempotent.
-    solver.stampElement(solver.allocElement(b1, b1), -g11);
-    solver.stampElement(solver.allocElement(b1, b2), -g12);
-    solver.stampElement(solver.allocElement(b2, b1), -g12);
-    solver.stampElement(solver.allocElement(b2, b2), -g22);
-    stampRHS(ctx.rhs,b1, hist1);
-    stampRHS(ctx.rhs,b2, hist2);
+    // 2×2 branch block stamp — cached handles from sub-elements
+    solver.stampElement(this._l1.hIbrIbr, -g11);
+    solver.stampElement(this._mut.hBr1Br2, -g12);
+    solver.stampElement(this._mut.hBr2Br1, -g12);
+    solver.stampElement(this._l2.hIbrIbr, -g22);
+    stampRHS(ctx.rhs, b1, hist1);
+    stampRHS(ctx.rhs, b2, hist2);
 
-    // T-W3-6: SLOT_VOLT1/VOLT2  terminal voltage state, MODEINITTRAN copy
-    // per indload.c:114-116 (state1[INDvolt] = state0[INDvolt]).
+    // SLOT_VOLT1/VOLT2 — terminal voltage state, MODEINITTRAN copy
     const v1Now = (voltages[p1]) - (voltages[p2]);
     const v2Now = (voltages[sec1]) - (voltages[sec2]);
     s0[base + SLOT_VOLT1] = v1Now;
@@ -475,7 +516,7 @@ export class AnalogTransformerElement implements ReactiveAnalogElement {
       s1[base + SLOT_VOLT2] = v2Now;
     }
 
-    // Diagnostic cache (mode-invariant bookkeeping).
+    // Diagnostic cache
     s0[base + SLOT_G11]   = g11;
     s0[base + SLOT_G22]   = g22;
     s0[base + SLOT_G12]   = g12;
@@ -497,7 +538,6 @@ export class AnalogTransformerElement implements ReactiveAnalogElement {
     const s1 = this._pool.states[1];
     const s2 = this._pool.states[2];
     const s3 = this._pool.states[3];
-    // Winding 1 flux  mirrors inductor.ts getLteTimestep pattern with ccap history.
     const phi1_0 = s0[base + SLOT_PHI1];
     const phi1_1 = s1[base + SLOT_PHI1];
     const phi1_2 = s2[base + SLOT_PHI1];
@@ -505,7 +545,6 @@ export class AnalogTransformerElement implements ReactiveAnalogElement {
     const ccap1_0 = s0[base + SLOT_CCAP1];
     const ccap1_1 = s1[base + SLOT_CCAP1];
     const dt1 = cktTerr(dt, deltaOld, order, method, phi1_0, phi1_1, phi1_2, phi1_3, ccap1_0, ccap1_1, lteParams);
-    // Winding 2 flux.
     const phi2_0 = s0[base + SLOT_PHI2];
     const phi2_1 = s1[base + SLOT_PHI2];
     const phi2_2 = s2[base + SLOT_PHI2];
@@ -517,30 +556,29 @@ export class AnalogTransformerElement implements ReactiveAnalogElement {
   }
 
   getPinCurrents(rhs: Float64Array): number[] {
-    const iPri = rhs[this.branchIndex];
-    const iSec = rhs[this._branch2];
-    // pinLayout order: P1, P2, S1, S2
-    // Primary current enters at P1 (+) and exits at P2 (-)
-    // Secondary current enters at S1 (+) and exits at S2 (-)
+    const iPri = rhs[this._l1.branchIndex];
+    const iSec = rhs[this._l2.branchIndex];
     return [iPri, -iPri, iSec, -iSec];
   }
 
-  /** Second branch index (secondary winding current). */
-  get branch2(): number {
-    return this._branch2;
+  findBranchFor(name: string, ctx: SetupContext): number {
+    const r1 = this._l1.findBranchFor(name, ctx);
+    if (r1 !== 0) return r1;
+    return this._l2.findBranchFor(name, ctx);
   }
 
-  /** Mutual inductance for test access. */
+  get branch2(): number {
+    return this._l2.branchIndex;
+  }
+
   get mutualInductance(): number {
     return this._pair.m;
   }
 
-  /** Primary inductance. */
   get primaryInductance(): number {
     return this._pair.l1;
   }
 
-  /** Secondary inductance. */
   get secondaryInductance(): number {
     return this._pair.l2;
   }
@@ -550,64 +588,35 @@ export class AnalogTransformerElement implements ReactiveAnalogElement {
 // analogFactory
 // ---------------------------------------------------------------------------
 
-function buildTransformerElement(
-  pinNodes: ReadonlyMap<string, number>,
-  primaryInductance: number,
-  turnsRatio: number,
-  couplingCoefficient: number,
-  primaryResistance: number,
-  secondaryResistance: number,
-  IC1: number = NaN,
-  IC2: number = NaN,
-  M: number = 1,
-): AnalogElementCore {
-  const p = { primaryInductance, turnsRatio, couplingCoefficient, primaryResistance, secondaryResistance, IC1, IC2, M };
-  const el = new AnalogTransformerElement(
-    [pinNodes.get("P1")!, pinNodes.get("P2")!, pinNodes.get("S1")!, pinNodes.get("S2")!],
-    p.primaryInductance,
-    p.turnsRatio,
-    p.couplingCoefficient,
-    p.primaryResistance,
-    p.secondaryResistance,
-    p.IC1,
-    p.IC2,
-    p.M,
-  );
-  el._pinNodes = new Map(pinNodes);
-  (el as AnalogElementCore).setParam = function(key: string, value: number): void {
-    if (key in p) {
-      (p as Record<string, number>)[key] = value;
-      el.updateDerivedParams(
-        p.primaryInductance,
-        p.turnsRatio,
-        p.couplingCoefficient,
-        p.primaryResistance,
-        p.secondaryResistance,
-        p.IC1,
-        p.IC2,
-        p.M,
-      );
-    }
-  };
-  return el;
-}
-
 function createTransformerElement(
   pinNodes: ReadonlyMap<string, number>,
   props: PropertyBag,
   _getTime: () => number,
 ): AnalogElementCore {
-  return buildTransformerElement(
-    pinNodes,
-    props.getModelParam<number>("primaryInductance"),
-    props.getModelParam<number>("turnsRatio"),
-    props.getModelParam<number>("couplingCoefficient"),
-    props.getModelParam<number>("primaryResistance"),
-    props.getModelParam<number>("secondaryResistance"),
-    props.hasModelParam("IC1") ? props.getModelParam<number>("IC1") : NaN,
-    props.hasModelParam("IC2") ? props.getModelParam<number>("IC2") : NaN,
-    props.hasModelParam("M") ? props.getModelParam<number>("M") : 1,
+  const primaryInductance    = props.getModelParam<number>("primaryInductance");
+  const turnsRatio           = props.getModelParam<number>("turnsRatio");
+  const couplingCoefficient  = props.getModelParam<number>("couplingCoefficient");
+  const primaryResistance    = props.getModelParam<number>("primaryResistance");
+  const secondaryResistance  = props.getModelParam<number>("secondaryResistance");
+  const IC1 = props.hasModelParam("IC1") ? props.getModelParam<number>("IC1") : NaN;
+  const IC2 = props.hasModelParam("IC2") ? props.getModelParam<number>("IC2") : NaN;
+  const M   = props.hasModelParam("M")   ? props.getModelParam<number>("M")   : 1;
+
+  const label = props.getOrDefault<string>("label", "T");
+  const el = new AnalogTransformerElement(
+    [pinNodes.get("P1")!, pinNodes.get("P2")!, pinNodes.get("S1")!, pinNodes.get("S2")!],
+    primaryInductance,
+    turnsRatio,
+    couplingCoefficient,
+    primaryResistance,
+    secondaryResistance,
+    label,
+    IC1,
+    IC2,
+    M,
   );
+  el._pinNodes = new Map(pinNodes);
+  return el;
 }
 
 // ---------------------------------------------------------------------------
@@ -618,8 +627,8 @@ const TRANSFORMER_PROPERTY_DEFS: PropertyDefinition[] = [
   {
     key: "primaryResistance",
     type: PropertyType.FLOAT,
-    label: "Primary Resistance (Î)",
-    unit: "Î",
+    label: "Primary Resistance (Ω)",
+    unit: "Ω",
     defaultValue: 1.0,
     min: 0,
     description: "Primary winding series resistance in ohms",
@@ -627,8 +636,8 @@ const TRANSFORMER_PROPERTY_DEFS: PropertyDefinition[] = [
   {
     key: "secondaryResistance",
     type: PropertyType.FLOAT,
-    label: "Secondary Resistance (Î)",
-    unit: "Î",
+    label: "Secondary Resistance (Ω)",
+    unit: "Ω",
     defaultValue: 1.0,
     min: 0,
     description: "Secondary winding series resistance in ohms",
@@ -699,7 +708,6 @@ export const TransformerDefinition: ComponentDefinition = {
       factory: createTransformerElement,
       paramDefs: TRANSFORMER_PARAM_DEFS,
       params: TRANSFORMER_DEFAULTS,
-      branchCount: 2,
     },
   },
   defaultModel: "behavioral",
