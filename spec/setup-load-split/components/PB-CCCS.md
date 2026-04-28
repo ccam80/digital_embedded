@@ -151,8 +151,13 @@ map (populated at compile time, before any setup() runs).
 
 ## Verification gate
 
-1. `setup-stamp-order.test.ts` row for PB-CCCS is GREEN: insertion order must be
-   `[(posNode, contBranch), (negNode, contBranch)]` where `contBranch` is the
-   branch row number allocated by the controlling VSRC's `findBranchFor`.
-2. `src/components/active/__tests__/cccs.test.ts` is GREEN.
-- **Setup-mocking removal**: the implementer MUST audit the test file for any pattern that fakes the migrated `setup()` process (e.g., manually constructing element handles, stub solver objects that bypass the real allocation path, or directly calling `load()` without going through `_setup()` first). Every such pattern MUST be replaced with the real path: instantiate the element via its factory, call `_setup()` on the engine to allocate handles, then exercise `load()`/`accept()`. Tests that pass only because they bypass the new setup contract are NOT a valid GREEN signal — those tests are themselves a defect to be fixed in this same task.
+Per CLAUDE.md "Test Policy During W3 Setup-Load-Split", verification is spec compliance only. DO NOT run tests; DO NOT use test results.
+
+1. `setup()` body in the implementation file matches the "setup() body — alloc only" listing in this PB line-for-line.
+2. TSTALLOC sequence in `setup()` matches the order in the cited ngspice anchor file (see top of this PB, e.g. `ressetup.c:46-49`).
+3. Factory cleanup applied per the "Factory cleanup" section above.
+4. `ngspiceNodeMap` registered per the "Pin mapping" section above (or omitted for composites where the spec says so).
+5. `load()` writes through cached handles only — zero `solver.allocElement(...)` calls inside `load()`, `accept()`, or any non-`setup()` method.
+6. `mayCreateInternalNodes` flag set per spec.
+7. `findBranchFor` callback present where spec says (V-output sources, IND, etc.).
+8. No banned closing verdicts (mapping/tolerance/equivalent-to/pre-existing/intentional-divergence/citation-divergence/partial) used in any commit message or report.

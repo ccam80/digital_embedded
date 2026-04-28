@@ -92,8 +92,13 @@ Allocated by sub-element setup() calls — not by the composite directly:
 
 ## Verification gate
 
-1. Existing test file `src/solver/analog/__tests__/behavioral-remaining.test.ts` is GREEN.
-   - **Setup-mocking removal**: the implementer MUST audit the test file for any pattern that fakes the migrated `setup()` process (e.g., manually constructing element handles, stub solver objects that bypass the real allocation path, or directly calling `load()` without going through `_setup()` first). Every such pattern MUST be replaced with the real path: instantiate the element via its factory, call `_setup()` on the engine to allocate handles, then exercise `load()`/`accept()`. Tests that pass only because they bypass the new setup contract are NOT a valid GREEN signal — those tests are themselves a defect to be fixed in this same task.
-2. No `allocElement` call in load() body. Verified by: `Grep "allocElement" src/solver/analog/behavioral-remaining.ts` returns only matches inside `setup()` method bodies.
-3. `setup()` forward order is inputs → outputs → children (Shape rule 3).
-4. No banned closing verdicts.
+Per CLAUDE.md "Test Policy During W3 Setup-Load-Split", verification is spec compliance only. DO NOT run tests; DO NOT use test results.
+
+1. `setup()` body in the implementation file matches the "setup() body — alloc only" listing in this PB line-for-line.
+2. TSTALLOC sequence in `setup()` matches the order in the cited ngspice anchor file (see top of this PB, e.g. `ressetup.c:46-49`).
+3. Factory cleanup applied per the "Factory cleanup" section above.
+4. `ngspiceNodeMap` registered per the "Pin mapping" section above (or omitted for composites where the spec says so).
+5. `load()` writes through cached handles only — zero `solver.allocElement(...)` calls inside `load()`, `accept()`, or any non-`setup()` method.
+6. `mayCreateInternalNodes` flag set per spec.
+7. `findBranchFor` callback present where spec says (V-output sources, IND, etc.).
+8. No banned closing verdicts (mapping/tolerance/equivalent-to/pre-existing/intentional-divergence/citation-divergence/partial) used in any commit message or report.

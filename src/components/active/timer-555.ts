@@ -155,11 +155,11 @@ class Timer555ResElement implements AnalogElementCore {
   setup(ctx: SetupContext): void {
     const nA = this._pinNodes.get("A")!;
     const nB = this._pinNodes.get("B")!;
-    // ressetup.c:46-49 — 4 TSTALLOC entries: PP, PN, NP, NN
-    this._hPP = ctx.solver.allocElement(nA, nA);
-    this._hPN = ctx.solver.allocElement(nA, nB);
-    this._hNP = ctx.solver.allocElement(nB, nA);
-    this._hNN = ctx.solver.allocElement(nB, nB);
+    // ressetup.c:46-49 — 4 TSTALLOC entries: PP, NN, PN, NP
+    this._hPP = ctx.solver.allocElement(nA, nA);  // ressetup.c:46 — (RESposNode, RESposNode)
+    this._hNN = ctx.solver.allocElement(nB, nB);  // ressetup.c:47 — (RESnegNode, RESnegNode)
+    this._hPN = ctx.solver.allocElement(nA, nB);  // ressetup.c:48 — (RESposNode, RESnegNode)
+    this._hNP = ctx.solver.allocElement(nB, nA);  // ressetup.c:49 — (RESnegNode, RESposNode)
   }
 
   setParam(key: string, value: number): void {

@@ -1,6 +1,6 @@
 {
   "version": "1.0.0",
-  "lastScanned": 1777258050365,
+  "lastScanned": 1777345237057,
   "projectRoot": "C:\\local_working_projects\\digital_in_browser",
   "techStack": {
     "languages": [
@@ -42,8 +42,8 @@
     "runtime": null
   },
   "build": {
-    "buildCommand": "cd \"C:/local_working_projects/digital_in_browser\" && npx tsc --noEmit --skipLibCheck 2>&1 | head -60",
-    "testCommand": "cd \"C:/local_working_projects/digital_in_browser\" && npx vitest run --testTimeout=120000 \"src/components/semiconductors/__tests__/mosfet.test.ts\" 2>&1 | tail -20",
+    "buildCommand": "npm run build",
+    "testCommand": "npm test",
     "lintCommand": "npm run lint",
     "devCommand": "npm run dev",
     "scripts": {
@@ -84,27 +84,34 @@
       "path": "app",
       "purpose": "Application code",
       "fileCount": 0,
-      "lastAccessed": 1777258050303,
+      "lastAccessed": 1777345236989,
       "keyFiles": []
     },
     "circuits": {
       "path": "circuits",
       "purpose": null,
-      "fileCount": 5,
-      "lastAccessed": 1777258050303,
+      "fileCount": 6,
+      "lastAccessed": 1777345236989,
       "keyFiles": [
         "and-gate.dig",
         "half-adder.dig",
         "R2R-DAC-8bit.dts",
-        "shift-add-multiplier.dig",
-        "sr-latch.dig"
+        "sar_adc_4bit_from_dsl.dts",
+        "shift-add-multiplier.dig"
       ]
+    },
+    "Clocal_working_projectsdigital_in_browserspecsetup-load-splitcomponents": {
+      "path": "Clocal_working_projectsdigital_in_browserspecsetup-load-splitcomponents",
+      "purpose": null,
+      "fileCount": 0,
+      "lastAccessed": 1777345236990,
+      "keyFiles": []
     },
     "dist": {
       "path": "dist",
       "purpose": "Distribution/build output",
       "fileCount": 1,
-      "lastAccessed": 1777258050303,
+      "lastAccessed": 1777345237035,
       "keyFiles": [
         "index.html"
       ]
@@ -113,21 +120,21 @@
       "path": "docs",
       "purpose": "Documentation",
       "fileCount": 0,
-      "lastAccessed": 1777258050303,
+      "lastAccessed": 1777345237036,
       "keyFiles": []
     },
     "e2e": {
       "path": "e2e",
       "purpose": null,
       "fileCount": 0,
-      "lastAccessed": 1777258050304,
+      "lastAccessed": 1777345237036,
       "keyFiles": []
     },
     "fixtures": {
       "path": "fixtures",
       "purpose": "Test fixtures",
       "fileCount": 16,
-      "lastAccessed": 1777258050304,
+      "lastAccessed": 1777345237036,
       "keyFiles": [
         "analog-rc-workflow.dig",
         "broken_chain.dig",
@@ -140,28 +147,28 @@
       "path": "lib",
       "purpose": "Library code",
       "fileCount": 0,
-      "lastAccessed": 1777258050304,
+      "lastAccessed": 1777345237037,
       "keyFiles": []
     },
     "modules": {
       "path": "modules",
       "purpose": null,
       "fileCount": 0,
-      "lastAccessed": 1777258050304,
+      "lastAccessed": 1777345237037,
       "keyFiles": []
     },
     "ref": {
       "path": "ref",
       "purpose": null,
       "fileCount": 0,
-      "lastAccessed": 1777258050304,
+      "lastAccessed": 1777345237037,
       "keyFiles": []
     },
     "scripts": {
       "path": "scripts",
       "purpose": "Build/utility scripts",
-      "fileCount": 17,
-      "lastAccessed": 1777258050305,
+      "fileCount": 19,
+      "lastAccessed": 1777345237037,
       "keyFiles": [
         "circuit-mcp-server.ts",
         "diag-diode-bridge-hang.ts",
@@ -173,21 +180,21 @@
     "spec": {
       "path": "spec",
       "purpose": "Test specifications",
-      "fileCount": 12,
-      "lastAccessed": 1777258050305,
+      "fileCount": 6,
+      "lastAccessed": 1777345237038,
       "keyFiles": [
-        "lazy-row-link-port.md",
-        "markowitz-pivoting-port.md",
-        "ngspice-netlist-generator-architecture.md",
-        "phase-instance-vs-model-param-partition.md",
-        "progress.md"
+        "progress.md",
+        "spice-import-pipeline-gaps.md",
+        "spice-import-pipeline-plan.md",
+        "test-baseline.md",
+        "timed-simulation.md"
       ]
     },
     "src": {
       "path": "src",
       "purpose": "Source code",
       "fileCount": 1,
-      "lastAccessed": 1777258050305,
+      "lastAccessed": 1777345237038,
       "keyFiles": [
         "main.ts"
       ]
@@ -195,18 +202,17 @@
     "test-results": {
       "path": "test-results",
       "purpose": null,
-      "fileCount": 3,
-      "lastAccessed": 1777258050305,
+      "fileCount": 2,
+      "lastAccessed": 1777345237039,
       "keyFiles": [
-        "playwright-failures.json",
-        "test-failures.json"
+        "playwright-failures.json"
       ]
     },
     "tmp-hang-circuits": {
       "path": "tmp-hang-circuits",
       "purpose": null,
       "fileCount": 5,
-      "lastAccessed": 1777258050346,
+      "lastAccessed": 1777345237039,
       "keyFiles": [
         "rc-ac-lowpass.dts",
         "rc-step.dts",
@@ -219,7 +225,7 @@
       "path": "tutorials",
       "purpose": null,
       "fileCount": 1,
-      "lastAccessed": 1777258050347,
+      "lastAccessed": 1777345237040,
       "keyFiles": [
         "index.json"
       ]
@@ -228,14 +234,14 @@
       "path": "dist\\app",
       "purpose": "Application code",
       "fileCount": 0,
-      "lastAccessed": 1777258050348,
+      "lastAccessed": 1777345237041,
       "keyFiles": []
     },
     "dist\\assets": {
       "path": "dist\\assets",
       "purpose": "Static assets",
       "fileCount": 5,
-      "lastAccessed": 1777258050348,
+      "lastAccessed": 1777345237041,
       "keyFiles": [
         "main-DuWHuFk1.js",
         "memory-editor-DEA45Iu0.js",
@@ -246,7 +252,7 @@
       "path": "e2e\\fixtures",
       "purpose": "Test fixtures",
       "fileCount": 8,
-      "lastAccessed": 1777258050348,
+      "lastAccessed": 1777345237042,
       "keyFiles": [
         "harness.html",
         "master1-digital.dts",
@@ -257,7 +263,7 @@
       "path": "src\\app",
       "purpose": "Application code",
       "fileCount": 25,
-      "lastAccessed": 1777258050350,
+      "lastAccessed": 1777345237043,
       "keyFiles": [
         "analysis-dialogs.ts",
         "app-context.ts",
@@ -268,7 +274,7 @@
       "path": "src\\components",
       "purpose": "UI components",
       "fileCount": 4,
-      "lastAccessed": 1777258050350,
+      "lastAccessed": 1777345237044,
       "keyFiles": [
         "draw-helpers.ts",
         "generic-shape.ts",
@@ -279,15 +285,15 @@
       "path": "src\\fixtures",
       "purpose": "Test fixtures",
       "fileCount": 0,
-      "lastAccessed": 1777258050350,
+      "lastAccessed": 1777345237044,
       "keyFiles": []
     }
   },
   "hotPaths": [
     {
       "path": "",
-      "accessCount": 250,
-      "lastAccessed": 1777341372402,
+      "accessCount": 251,
+      "lastAccessed": 1777347188941,
       "type": "directory"
     },
     {
@@ -304,14 +310,14 @@
     },
     {
       "path": "src\\solver\\analog\\ckt-context.ts",
-      "accessCount": 168,
-      "lastAccessed": 1777340922687,
+      "accessCount": 169,
+      "lastAccessed": 1777346694220,
       "type": "file"
     },
     {
       "path": "src",
-      "accessCount": 142,
-      "lastAccessed": 1777342442101,
+      "accessCount": 144,
+      "lastAccessed": 1777346883643,
       "type": "directory"
     },
     {
@@ -328,8 +334,8 @@
     },
     {
       "path": "src\\solver\\analog",
-      "accessCount": 73,
-      "lastAccessed": 1777335187548,
+      "accessCount": 74,
+      "lastAccessed": 1777346682450,
       "type": "directory"
     },
     {
@@ -352,8 +358,8 @@
     },
     {
       "path": "src\\components\\active\\adc.ts",
-      "accessCount": 41,
-      "lastAccessed": 1777341629971,
+      "accessCount": 42,
+      "lastAccessed": 1777347026326,
       "type": "directory"
     },
     {
@@ -388,8 +394,8 @@
     },
     {
       "path": "src\\solver\\analog\\load-context.ts",
-      "accessCount": 27,
-      "lastAccessed": 1777329769223,
+      "accessCount": 28,
+      "lastAccessed": 1777346687010,
       "type": "file"
     },
     {
@@ -496,14 +502,14 @@
     },
     {
       "path": "ref\\ngspice\\src\\spicelib\\devices\\res\\ressetup.c",
-      "accessCount": 5,
-      "lastAccessed": 1777268358993,
+      "accessCount": 6,
+      "lastAccessed": 1777345438324,
       "type": "file"
     },
     {
       "path": "ref\\ngspice\\src\\spicelib\\analysis\\cktsetup.c",
-      "accessCount": 5,
-      "lastAccessed": 1777268379406,
+      "accessCount": 6,
+      "lastAccessed": 1777346114663,
       "type": "file"
     },
     {

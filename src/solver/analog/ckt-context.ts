@@ -750,31 +750,6 @@ export class CKTCircuitContext {
   }
 
   /**
-   * Re-point loadCtx.state0 and loadCtx.state1 at the current statePool
-   * slot arrays. Must be called after every rotateStateVectors() and after
-   * _seedFromDcop (which copies state0→state1 via pool array references).
-   *
-   * Background: allocateStateBuffers() captures the pool's states[0] and
-   * states[1] array references by value into loadCtx.state0/state1. After
-   * rotateStateVectors() the pool rotates its internal pointer ring, so
-   * pool.states[0] and pool.states[1] point to different Float64Arrays than
-   * what loadCtx captured. Elements that read ctx.state0/state1 via loadCtx
-   * (e.g. Timer555 SR latch, BJT operating-point state) would otherwise read
-   * from stale (post-rotation) slots and write accepted state into the wrong
-   * ring slot, corrupting the NR working buffer.
-   *
-   * ngspice equivalent: CKTstate0/CKTstate1 are plain pointers on CKTcircuit
-   * that rotate with the ring (dctran.c:719-723 swaps the pointers directly),
-   * so no refresh step exists there. Our loadCtx is a separate cached struct,
-   * so the refresh must be explicit.
-   */
-  refreshStatePointers(): void {
-    if (!this.statePool) return;
-    this.loadCtx.state0 = this.statePool.states[0];
-    this.loadCtx.state1 = this.statePool.states[1];
-  }
-
-  /**
    * Atomically swap the rhs / rhsOld buffer pointers, mirroring ngspice
    * niiter.c:1087-1090:
    *

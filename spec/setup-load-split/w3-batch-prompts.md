@@ -121,29 +121,40 @@ spec/architectural-alignment.md (architectural divergence) or
 spec/fix-list-phase-2-audit.md (numerical bug), not as an in-line
 justification. Agents do not edit architectural-alignment.md.
 
-## Test verification — targeted only
+## Test policy — DO NOT RUN TESTS
 
-Run only the targeted tests for your owned files:
+Per CLAUDE.md "Test Policy During W3 Setup-Load-Split":
 
-  npx vitest run --testTimeout=120000 \
-    src/solver/analog/__tests__/setup-stamp-order.test.ts \
-    {your component test files}
+- DO NOT run tests. The full suite is RED by design at this stage of W3.
+- DO NOT report numerical mismatches.
+- DO NOT modify test files to "make tests pass".
 
-DO NOT run the full suite. Per the user's standing memory directive
-(reference_targeted_tests_only), agents must run only targeted tests for
-engine changes, not the full suite. The full suite is RED by design at this
-stage of W3.
+Verification is strictly **spec compliance** against the PB-*.md spec
+contract and the cited ngspice anchor file (e.g., `ressetup.c:46-49`).
+PASS = your source code matches spec line-for-line. FAIL = source code
+deviates from spec.
 
-Your green-gate, per the PB-*.md "Verification gate" section of every
-component you own:
+Your green-gate (replaces any "Verification gate" item in PB-*.md that
+mentions test files — those are legacy and being mass-edited out):
 
-1. The setup-stamp-order row(s) for your component(s) are GREEN.
-2. Your component's own test file is GREEN, AFTER the setup-mocking-removal
-   audit (PB-*.md "Setup-mocking removal" subsection of the verification
-   gate). Tests that pass only because they bypass the new setup contract
-   are themselves a defect to fix in this same task — replace stub solver
-   patterns with the real path: instantiate via factory, call _setup() on
-   the engine, then exercise load()/accept().
+1. `setup()` body matches the PB-*.md "setup() body — alloc only" listing
+   line-for-line.
+2. TSTALLOC sequence in your `setup()` matches the order in the cited
+   ngspice anchor file (e.g., `ressetup.c:46-49` -> PP, NN, PN, NP).
+3. Factory cleanup applied per PB-*.md "Factory cleanup": 3-param signature
+   `(pinNodes, props, getTime)`, no `internalNodeIds`/`branchIdx`, drop
+   `branchCount`/`getInternalNodeCount` if present.
+4. `ngspiceNodeMap` registered per `01-pin-mapping.md` and PB-*.md
+   "Pin mapping" section.
+5. `load()` writes through cached handles only — zero `allocElement` calls.
+6. `mayCreateInternalNodes` flag set per spec.
+7. `findBranchFor` callback present where spec says (V-output sources, IND,
+   etc.).
+8. No banned closing verdicts in any commit/report.
+
+Anyone tempted to "fix" a failing test must STOP and call
+`stop-for-clarification.sh`. The user decides whether the test is wrong
+(separate cleanup task) or whether the spec needs revision.
 
 ## Reporting
 
@@ -153,7 +164,7 @@ When finished, append a section to `spec/progress.md`:
   - **Status**: complete | clarification-needed
   - **Files modified**: {list}
   - **PB-* specs ported**: {list}
-  - **Tests**: {your component test result}, {setup-stamp-order rows green}
+  - **Spec-compliance audit**: {green-gate items 1-8 confirmed, or which failed}
   - **Surfaced issues**: {list of CLARIFICATION NEEDED items, or "none"}
   - **Unexpected flow-on**: {list, or "none"}
   - **Banned-verdict audit**: confirmed-clean | {what slipped}

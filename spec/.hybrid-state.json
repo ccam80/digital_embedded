@@ -439,8 +439,8 @@
           "src/components/semiconductors/mosfet.ts"
         ]
       },
-      "spawned": 31,
-      "completed": 23,
+      "spawned": 33,
+      "completed": 25,
       "verifications_passed": 11,
       "verifications_failed": 13,
       "stops_for_clarification": 2,
@@ -711,7 +711,7 @@
       "_behav_serialization_note": "All 7 behav-* task_groups (3 in batch-5 + 4 in batch-6) lock the same shared file src/solver/analog/behavioral-remaining.ts. Per the lock-protocol, only one will hold that file at a time within a wave; the others queue. Each agent owns ONE PB-BEHAV-* spec only (one model per agent) for runtime-budget safety after 2 consecutive deaths on the 7-PB combined scope. Agents may also touch their associated component file (driver.ts / splitter.ts / ground.ts / seven-seg.ts / etc.)."
     }
   ],
-  "last_updated": "2026-04-28T02:16:56.742Z",
+  "last_updated": "2026-04-28T03:43:49.198Z",
   "_excluded_from_w3_batch4_5": {
     "PB-TLINE": "Architectural decision pending per plan.md Open Blockers (lossy-N-segment vs ideal-TRA refactor). User must add to architectural-alignment.md or pick refactor option before this can land. Excluded from both wave-A and wave-B.",
     "PB-SUBCKT": "Special structural decomposition path, not in standard component layer. Excluded from both wave-A and wave-B.",

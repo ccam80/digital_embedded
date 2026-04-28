@@ -1111,7 +1111,7 @@ After fix the NR runs 7 iterations and converges to V(drain)=1.8405076 (within 0
   - `5.B.cccs-ccvs` — original task killed; phantom CCCS/CCVS sequence rows in `setup-stamp-order.test.ts:300,379,447,492` were removed in the A1–A15 sweep. Respawn is pending — fresh task assignment needed since the phantom tests no longer exist.
   - `5.B.timer555` — original task killed mid-edit; lock still present. Respawn pending.
   - `5.B.behav-driver` — original task killed mid-thought; lock still present. Respawn pending.
-  - `5.B.pjfet` — original task blocked by stale lock; respawn pending. (PJFET cold-start `pool.state0[0] = 2.5` pre-load was removed in A1–A15; PJFET will need a real cold-start solution as part of the respawn.)
+  - `5.B.pjfet` — original task blocked by stale lock; respawn pending. Scope is exactly PB-PJFET.md: port setup() body, port load() body line-for-line from `jfetload.c` (type = -1), factory cleanup. The PJFET cold-start `pool.state0[0] = 2.5` pre-load was removed in A1–A15 as a test softening; if convergence then surfaces as a test failure under the standard NR path, that is a separate item out of PB-PJFET scope, raised to the user — not for the respawn agent to investigate.
   - Salvaged `optocoupler.test.ts` numerical tests need expected-value re-derivation against the post-composition (DIO + VSRC + CCCS + BJT) topology, separate from this remediation pass.
 
 ## Spec doc cleanup (post-remediation)
@@ -1201,3 +1201,17 @@ After fix the NR runs 7 iterations and converges to V(drain)=1.8405076 (within 0
   - Root cause of assertion failures: salvaged tests use vForward/rLed PWL params that the post-composition model ignores. The circuit has no current-limiting resistor; the voltage source is wired directly to the LED anode. The ngspice diode equation with default Is=1e-14, n=1.0, V_input=1.3V produces near-zero collector current (BJT stays off). The expected values were derived from the old PWL model (vForward=1.2V, rLed=10Ω) which is no longer implemented.
   - These assertion failures were masked before by the `el.setup is not a function` crash. They are NOT caused by the setup-mocking fix.
   - Per spec/test-baseline.md policy: "report failures verbatim — the user distinguishes pre-existing from regression at review time."
+
+## Task 5.B.timer555-retighten:
+- **Status**: complete
+- **Files modified**: src/components/active/timer-555.ts
+- **Spec-compliance audit**: TSTALLOC order reordered to PP, NN, PN, NP per ressetup.c:46-49. Handle field names unchanged. load() unchanged.
+- **Surfaced issues**: none
+- **Banned-verdict audit**: confirmed-clean
+
+## Task pb-spec-mass-edit: Replace test-green verification gates with spec-compliance gates
+- **Status**: complete
+- **Agent**: implementer
+- **Files modified**: 74 PB-*.md files in spec/setup-load-split/components/
+- **Files skipped (no Verification gate section)**: none
+- **Verification**: every modified file's "## Verification gate" section now contains the 8-item spec-compliance body verbatim

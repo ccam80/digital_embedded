@@ -379,8 +379,7 @@ export class SparseSolver {
    * TrashCan (amendment A2): stamps to ground rows/cols write into
    * `_elVal[0]` which is reset by _resetForAssembly per spbuild.c:133.
    */
-  allocElement(row: number, col: number): number {
-    this._insertionOrder.push({ extRow: row, extCol: col });
+   allocElement(row: number, col: number): number {
     // ngspice spbuild.c:272-273 — Row == 0 || Col == 0 → TrashCan handle.
     if (row === 0 || col === 0) return 0;
     // ngspice spbuild.c:280 (TRANSLATE) — translate BOTH Row and Col.
@@ -406,9 +405,13 @@ export class SparseSolver {
    *   index N also sets IntToExt[CurrentSize] = N, building both
    *   permutation directions in lockstep.
    *
+   * One _insertionOrder entry is pushed per call (one allocElement call =
+   * one entry). Index-assignment side-effects (row-new / col-new branches)
+   * do NOT push additional entries.
    */
   private _translate(extRow: number, extCol: number): { intRow: number; intCol: number } {
-    // Grow external translation arrays if needed (spbuild.c:1047-1081).
+    // Record this allocElement call in insertion order (one entry per call).
+    this._insertionOrder.push({ extRow, extCol });
     const maxExt = extRow > extCol ? extRow : extCol;
     if (maxExt > this._extSize) {
       this._expandTranslationArrays(maxExt);
