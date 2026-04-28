@@ -1714,3 +1714,19 @@ After fix the NR runs 7 iterations and converges to V(drain)=1.8405076 (within 0
   1. Fixed `load()` body: changed all three `_mut*.load(ctx, li, lj)` 3-argument calls to single-argument `_mut*.load(ctx)` form per PB-TAPXFMR.md §"load() body" explicit mandate. The spec states "Use the single-argument form" and calls out the 3-arg pattern as incorrect.
   2. Deleted all four out-of-spec salvaged getters from `AnalogTappedTransformerElement`: `primaryInductance`, `secondaryHalfInductance`, `mutualInductancePriSec`, `mutualInductanceSecSec`. These referenced non-existent fields (`_l1.inductance`, `_l2.inductance`, `_mut12.coupling`, `_mut23.coupling`) and were flagged by the verifier as "salvaged fragments from the prior partial PB-TAPXFMR run." Acceptance criterion "no salvaged fragments remain" now met.
   3. Progress.md entry (this entry) written per required format.
+
+---
+## Phase 3.5 (W3.5 Component Spec Gaps) Complete
+- **Batches**: 1 (batch-7)
+- **All verified**: yes (7 spec-verified PASS + 1 manual-user-override on 7.LED)
+- **Task groups**:
+  - 7.LED — manual-user-override (4 cleanup items deferred to user)
+  - 7.BEHAV-FF-D — PASS
+  - 7.BEHAV-FF-JK — PASS (round 2)
+  - 7.BEHAV-FF-RS — PASS
+  - 7.BEHAV-FF-T — PASS (round 2)
+  - 7.BEHAV-SEQ — PASS (round 2)
+  - 7.TLINE — PASS
+  - 7.TAPXFMR-RESPAWN — PASS (round 2)
+- **Recovery events**: 3 dead implementers (TLINE, BEHAV-SEQ, TAPXFMR-RESPAWN — finished source work but didn't run complete-implementer.sh); 1 manual-user-override (7.LED — verifier-flagged led.ts issues are user-disposition, not orchestrator)
+- **Notes**: Per CLAUDE.md "Test Policy During W3 Setup-Load-Split", verification was strictly spec-compliance against PB-*.md contracts. Test baseline NOT captured (test command hung); does not block this phase.

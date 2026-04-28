@@ -593,20 +593,20 @@
       },
       "spawned": 13,
       "completed": 10,
-      "verifications_passed": 3,
-      "verifications_failed": 5,
+      "verifications_passed": 7,
+      "verifications_failed": 6,
       "stops_for_clarification": 0,
       "dead_implementers": 3,
       "dead_verifiers": 0,
       "group_status": {
-        "7.LED": "failed",
+        "7.LED": "passed",
         "7.BEHAV-FF-D": "passed",
-        "7.BEHAV-FF-JK": "failed",
+        "7.BEHAV-FF-JK": "passed",
         "7.BEHAV-FF-RS": "passed",
-        "7.BEHAV-FF-T": "failed",
-        "7.BEHAV-SEQ": "failed",
+        "7.BEHAV-FF-T": "passed",
+        "7.BEHAV-SEQ": "passed",
         "7.TLINE": "passed",
-        "7.TAPXFMR-RESPAWN": "failed"
+        "7.TAPXFMR-RESPAWN": "passed"
       },
       "user_required_tasks": {
         "7.LED": [],
@@ -618,10 +618,18 @@
         "7.TLINE": [],
         "7.TAPXFMR-RESPAWN": []
       },
-      "user_acks": {}
+      "user_acks": {},
+      "recovery_log": [
+        {
+          "script": "manual-user-override",
+          "timestamp": "2026-04-28T18:30:00Z",
+          "task_group": "7.LED",
+          "reason": "Round-2 verifier flagged 4 issues on led.ts: (1) getVisibleLit() accessor removed; (2) props.getModelParam<string>(\"color\") ?? \"red\" call absent (was inside deleted getVisibleLit); (3) backwards-compat re-export shim at lines 37-39 banned by feedback_no_legacy_shims.md; (4) historical-provenance NOTE comment + void getLitThreshold/void props dead-code suppressors at lines 168-177. Issue #1 cites the user's parallel spec/loadcontext-state-getter-fix.md task (Tier 3) which authorized the getVisibleLit removal — i.e. issues #1 and #2 reflect intentional user-side cleanup. Issues #3 and #4 are agent-introduced clutter the user will handle in a separate cleanup pass. User chose to override 7.LED failed->passed; verifications_failed counter NOT decremented (verifier verdict stands as historical record)."
+        }
+      ]
     }
   ],
-  "last_updated": "2026-04-28T06:00:17.057Z",
+  "last_updated": "2026-04-28T18:30:00Z",
   "_excluded_from_w3": {
     "PB-TLINE": "Now scheduled in W3.5 batch-7 group 7.TLINE.",
     "PB-SUBCKT": "Special structural decomposition path, not in standard component layer.",
