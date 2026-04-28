@@ -80,13 +80,14 @@ function makeElement(
 }
 
 function makeStubElement(nodeIds: number[]): AnalogElement {
+  const pinEntries: [string, number][] = nodeIds.map((id, i) => [`p${i}`, id]);
   return {
-    pinNodeIds: nodeIds,
-    allNodeIds: nodeIds,
+    label: "",
+    _pinNodes: new Map(pinEntries),
+    _stateBase: -1,
     branchIndex: -1,
     ngspiceLoadOrder: 0,
-    isNonlinear: false,
-    isReactive: false,
+    setup(_ctx): void { /* no-op */ },
     load(_ctx: LoadContext): void { /* no-op */ },
     stampAc(_solver: ComplexSparseSolver, _omega: number, _ctx: LoadContext): void { /* no-op */ },
     setParam(_key: string, _value: number): void {},
@@ -528,13 +529,13 @@ describe("compileAnalogPartition", () => {
     expect(compiled.statePool.totalSlots).toBe(0);
   });
 
-  it("elements without stateSize get stateBaseOffset -1 after compilation", () => {
+  it("elements without stateSize get _stateBase -1 after compilation", () => {
     const propsMap = new Map<string, PropertyValue>([["model", "behavioral"]]);
     const { partition, registry } = buildAndGatePartition(propsMap);
     const compiled = compileAnalogPartition(partition, registry);
 
     for (const element of compiled.elements) {
-      expect(element.isReactive).toBe(false);
+      expect(typeof element.getLteTimestep).not.toBe("function");
     }
   });
 
@@ -547,7 +548,7 @@ describe("compileAnalogPartition", () => {
     expect(compiled1.statePool).not.toBe(compiled2.statePool);
   });
 
-  it("elements with stateSize get contiguous stateBaseOffset values assigned by compiler", () => {
+  it("elements with stateSize get contiguous _stateBase values assigned by compiler", () => {
     // Build a registry with an element that declares stateSize
     const registry = new ComponentRegistry();
     registry.register({
@@ -559,24 +560,23 @@ describe("compileAnalogPartition", () => {
     const elementWithState = {
       poolBacked: true as const,
       stateSize: 7,
-      stateBaseOffset: -1,
+      label: "",
+      _pinNodes: new Map<string, number>(),
+      _stateBase: -1,
       branchIndex: -1,
       ngspiceLoadOrder: 0,
-      isNonlinear: false,
-      isReactive: true,
-      pinNodeIds: [] as number[],
-      allNodeIds: [] as number[],
-      stamp(_s: import("../sparse-solver.js").SparseSolver) { /* no-op */ },
+      setup(_ctx: import("../setup-context.js").SetupContext): void { /* no-op */ },
+      load(_ctx: LoadContext): void { /* no-op */ },
       setParam(_key: string, _value: number): void {},
       getPinCurrents(_v: Float64Array) { return []; },
       initState(pool: StatePool): void {
-        assignedBase = this.stateBaseOffset;
-        pool.state0[this.stateBaseOffset] = 99.0;
+        assignedBase = this._stateBase;
+        pool.state0[this._stateBase] = 99.0;
       },
     };
 
     const factoryReturningStateElement = vi.fn((_pinNodes: ReadonlyMap<string, number>) => {
-      // Return the element that has state — pinNodeIds/allNodeIds set by compiler
+      // Return the element that has state — _pinNodes set by compiler
       return elementWithState;
     });
 

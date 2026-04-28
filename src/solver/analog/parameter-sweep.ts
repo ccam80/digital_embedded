@@ -14,9 +14,6 @@
 import type { ConcreteCompiledAnalogCircuit } from "./compiled-analog-circuit.js";
 import { EngineState } from "../../core/engine-interface.js";
 import { MNAEngine } from "./analog-engine.js";
-import { solveDcOperatingPoint } from "./dc-operating-point.js";
-import { CKTCircuitContext } from "./ckt-context.js";
-import { SparseSolver } from "./sparse-solver.js";
 import { DEFAULT_SIMULATION_PARAMS } from "../../core/analog-engine-interface.js";
 import type { OutputSpec, AcParams, TransientParams } from "./monte-carlo.js";
 
@@ -129,9 +126,20 @@ function runDcSync(compiled: ConcreteCompiledAnalogCircuit): {
   converged: boolean;
   nodeVoltages: Float64Array;
 } {
-  const ctx = new CKTCircuitContext(compiled, DEFAULT_SIMULATION_PARAMS, () => {}, new SparseSolver());
-  solveDcOperatingPoint(ctx);
-  return { converged: ctx.dcopResult.converged, nodeVoltages: ctx.dcopResult.nodeVoltages };
+  // MNAEngine.init() calls _setup() which registers TSTALLOC handles on the
+  // engine-owned solver before any load() call. Using CKTCircuitContext directly
+  // skips _setup() and leaves element handles uninitialized.
+  const engine = new MNAEngine();
+  engine.init(compiled);
+  const dcResult = engine.dcOperatingPoint();
+  if (!dcResult.converged) {
+    return { converged: false, nodeVoltages: new Float64Array(engine.matrixSize + 1) };
+  }
+  const voltages = new Float64Array(engine.matrixSize + 1);
+  for (let n = 1; n <= compiled.nodeCount; n++) {
+    voltages[n] = engine.getNodeVoltage(n);
+  }
+  return { converged: true, nodeVoltages: voltages };
 }
 
 function runTransientSync(

@@ -43,7 +43,7 @@ import {
   type AttributeMapping,
   type ComponentDefinition,
 } from "../../core/registry.js";
-import type { LoadContext, StatePoolRef, PoolBackedAnalogElementCore } from "../../solver/analog/element.js";
+import type { LoadContext, StatePoolRef, PoolBackedAnalogElement } from "../../solver/analog/element.js";
 import { NGSPICE_LOAD_ORDER } from "../../solver/analog/element.js";
 import type { SetupContext } from "../../solver/analog/setup-context.js";
 import { stampRHS } from "../../solver/analog/stamp-helpers.js";
@@ -200,7 +200,8 @@ export class ComparatorElement extends AbstractCircuitElement {
 export function createOpenCollectorComparatorElement(
   pinNodes: ReadonlyMap<string, number>,
   props: PropertyBag,
-): PoolBackedAnalogElementCore {
+  _getTime: () => number,
+): PoolBackedAnalogElement {
   const p: Record<string, number> = {
     hysteresis:   Math.max(props.getModelParam<number>("hysteresis"),   0),
     vos:          props.getModelParam<number>("vos"),
@@ -235,11 +236,10 @@ export function createOpenCollectorComparatorElement(
   // Cached TSTALLOC handle for output node diagonal (nOut, nOut).
   let hOutDiag = -1;
 
-  return {
+  const el: PoolBackedAnalogElement = {
+    label: "",
     branchIndex: -1,
     ngspiceLoadOrder: NGSPICE_LOAD_ORDER.VCVS,
-    isNonlinear: true,
-    get isReactive(): boolean { return childElements.some(c => c.isReactive); },
     _stateBase: -1,
     _pinNodes: new Map(pinNodes),
 
@@ -249,7 +249,7 @@ export function createOpenCollectorComparatorElement(
         hOutDiag = ctx.solver.allocElement(nOut, nOut);
       }
       // Allocate state slots for hysteresis latch + response-time weight.
-      this._stateBase = ctx.allocStates(COMPARATOR_COMPOSITE_SCHEMA.size);
+      el._stateBase = ctx.allocStates(COMPARATOR_COMPOSITE_SCHEMA.size);
       // Child elements (capacitor companions) own their own state slots.
       for (const child of childElements) {
         child.setup(ctx);
@@ -259,14 +259,13 @@ export function createOpenCollectorComparatorElement(
     poolBacked: true as const,
     stateSchema: COMPARATOR_COMPOSITE_SCHEMA,
     stateSize: COMPARATOR_COMPOSITE_SCHEMA.size + childStateSize,
-    stateBaseOffset: -1,
     initState(poolRef: StatePoolRef): void {
       pool = poolRef;
-      base = this.stateBaseOffset;
+      base = el._stateBase;
       applyInitialValues(COMPARATOR_COMPOSITE_SCHEMA, pool, base, {});
       let offset = base + COMPARATOR_COMPOSITE_SCHEMA.size;
       for (const child of childElements) {
-        child.stateBaseOffset = offset;
+        child._stateBase = offset;
         child.initState(pool);
         offset += child.stateSize;
       }
@@ -342,6 +341,8 @@ export function createOpenCollectorComparatorElement(
       if (key in p) (p as Record<string, number>)[key] = value;
     },
   };
+
+  return el;
 }
 
 // ---------------------------------------------------------------------------
@@ -351,7 +352,8 @@ export function createOpenCollectorComparatorElement(
 function createPushPullComparatorElement(
   pinNodes: ReadonlyMap<string, number>,
   props: PropertyBag,
-): PoolBackedAnalogElementCore {
+  _getTime: () => number,
+): PoolBackedAnalogElement {
   const p: Record<string, number> = {
     hysteresis:   Math.max(props.getModelParam<number>("hysteresis"),   0),
     vos:          props.getModelParam<number>("vos"),
@@ -386,11 +388,10 @@ function createPushPullComparatorElement(
   // Cached TSTALLOC handle for output node diagonal (nOut, nOut).
   let hOutDiagPP = -1;
 
-  return {
+  const elPP: PoolBackedAnalogElement = {
+    label: "",
     branchIndex: -1,
     ngspiceLoadOrder: NGSPICE_LOAD_ORDER.VCVS,
-    isNonlinear: true,
-    get isReactive(): boolean { return childElements.some(c => c.isReactive); },
     _stateBase: -1,
     _pinNodes: new Map(pinNodes),
 
@@ -398,7 +399,7 @@ function createPushPullComparatorElement(
       if (nOut > 0) {
         hOutDiagPP = ctx.solver.allocElement(nOut, nOut);
       }
-      this._stateBase = ctx.allocStates(COMPARATOR_COMPOSITE_SCHEMA.size);
+      elPP._stateBase = ctx.allocStates(COMPARATOR_COMPOSITE_SCHEMA.size);
       for (const child of childElements) {
         child.setup(ctx);
       }
@@ -407,14 +408,13 @@ function createPushPullComparatorElement(
     poolBacked: true as const,
     stateSchema: COMPARATOR_COMPOSITE_SCHEMA,
     stateSize: COMPARATOR_COMPOSITE_SCHEMA.size + childStateSize,
-    stateBaseOffset: -1,
     initState(poolRef: StatePoolRef): void {
       pool = poolRef;
-      base = this.stateBaseOffset;
+      base = elPP._stateBase;
       applyInitialValues(COMPARATOR_COMPOSITE_SCHEMA, pool, base, {});
       let offset = base + COMPARATOR_COMPOSITE_SCHEMA.size;
       for (const child of childElements) {
-        child.stateBaseOffset = offset;
+        child._stateBase = offset;
         child.initState(pool);
         offset += child.stateSize;
       }
@@ -491,6 +491,8 @@ function createPushPullComparatorElement(
       if (key in p) (p as Record<string, number>)[key] = value;
     },
   };
+
+  return elPP;
 }
 
 // ---------------------------------------------------------------------------
@@ -546,15 +548,15 @@ export const VoltageComparatorDefinition: ComponentDefinition = {
   modelRegistry: {
     "open-collector": {
       kind: "inline",
-      factory: (pinNodes, props, _getTime) =>
-        createOpenCollectorComparatorElement(pinNodes, props),
+      factory: (pinNodes, props, getTime) =>
+        createOpenCollectorComparatorElement(pinNodes, props, getTime),
       paramDefs: COMPARATOR_PARAM_DEFS,
       params: COMPARATOR_DEFAULTS,
     },
     "push-pull": {
       kind: "inline",
-      factory: (pinNodes, props, _getTime) =>
-        createPushPullComparatorElement(pinNodes, props),
+      factory: (pinNodes, props, getTime) =>
+        createPushPullComparatorElement(pinNodes, props, getTime),
       paramDefs: COMPARATOR_PARAM_DEFS,
       params: COMPARATOR_DEFAULTS,
     },

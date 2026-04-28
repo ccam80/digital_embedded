@@ -12,13 +12,11 @@
 import { describe, it, expect } from "vitest";
 import { OpAmpDefinition } from "../opamp.js";
 import { PropertyBag } from "../../../core/properties.js";
-import { makeDcVoltageSource } from "../../sources/dc-voltage-source.js";
-import { withNodeIds, runDcOp, makeLoadCtx } from "../../../solver/analog/__tests__/test-helpers.js";
+import { makeDcVoltageSource, DC_VOLTAGE_SOURCE_DEFAULTS } from "../../sources/dc-voltage-source.js";
+import { runDcOp, makeLoadCtx, makeSimpleCtx } from "../../../solver/analog/__tests__/test-helpers.js";
 import type { AnalogElement } from "../../../solver/analog/element.js";
 import { SparseSolver } from "../../../solver/analog/sparse-solver.js";
-import type { AnalogElementCore } from "../../../core/analog-types.js";
 import { MODEDCOP, MODEINITFLOAT } from "../../../solver/analog/ckt-mode.js";
-import { makeSimpleCtx } from "../../../solver/analog/__tests__/test-helpers.js";
 import { solveDcOperatingPoint } from "../../../solver/analog/dc-operating-point.js";
 
 // ---------------------------------------------------------------------------
@@ -32,7 +30,7 @@ function getFactory(entry: ModelEntry): AnalogFactory {
 
 
 // ---------------------------------------------------------------------------
-// Helper: create an op-amp element core
+// Helper: create an op-amp element
 // ---------------------------------------------------------------------------
 
 function makeOpAmp(opts: {
@@ -41,7 +39,7 @@ function makeOpAmp(opts: {
   nOut?: number;
   gain?: number;
   rOut?: number;
-}): AnalogElementCore {
+}): AnalogElement {
   const {
     nInp = 1,
     nInn = 2,
@@ -69,6 +67,12 @@ function readVal(solver: SparseSolver, extRow: number, extCol: number): number {
   return (solver as unknown as { _elVal: Float64Array })._elVal[handle];
 }
 
+function makeVsrc(posNode: number, negNode: number, voltage: number): AnalogElement {
+  const props = new PropertyBag();
+  props.replaceModelParams({ ...DC_VOLTAGE_SOURCE_DEFAULTS, voltage });
+  return makeDcVoltageSource(new Map([["pos", posNode], ["neg", negNode]]), props, () => 0);
+}
+
 // ---------------------------------------------------------------------------
 // OpAmp unit tests  verify VCVS+RES stamp entries
 // ---------------------------------------------------------------------------
@@ -84,6 +88,9 @@ describe("OpAmp", () => {
 
     const branchRow = 101; // makeCur called first
     const vint = 102;      // makeVolt called second
+
+    const simCtx = makeSimpleCtx({ elements: [opamp], matrixSize: 200, nodeCount: 3, startBranch: branchRow, startNode: vint });
+    const solver = simCtx.solver;
 
     const voltages = new Float64Array(110);
     voltages[nInp] = 1e-3;
@@ -125,6 +132,9 @@ describe("OpAmp", () => {
 
     const branchRow = 101; // only makeCur called
 
+    const simCtx = makeSimpleCtx({ elements: [opamp], matrixSize: 200, nodeCount: 3, startBranch: branchRow });
+    const solver = simCtx.solver;
+
     const voltages = new Float64Array(110);
     voltages[nInp] = 1e-3;
     voltages[nInn] = 0;
@@ -161,37 +171,38 @@ describe("OpAmp", () => {
     //   node 1 = in+, node 2 = in- (grounded via VS), node 3 = out
     //   node 4 = Vcc+, node 5 = Vcc-
     const nInp = 1, nInn = 2, nOut = 3, nVccP = 4, nVccN = 5;
-    const brVin = 6, brVinn = 7, brVccP = 8, brVccN = 9;
     const matrixSize = 1010;
 
     const props = new PropertyBag([]);
     props.replaceModelParams({ gain: 1e6, rOut: 75 });
-    const opampEl = withNodeIds(getFactory(OpAmpDefinition.modelRegistry!["behavioral"]!)(
+    const opampEl = getFactory(OpAmpDefinition.modelRegistry!["behavioral"]!)(
       new Map([["in+", nInp], ["in-", nInn], ["out", nOut]]), props, () => 0,
-    ), [nInn, nInp, nOut]);
+    );
 
     // 75Ω load on output
     const G_load = 1 / 75;
     const rLoadEl: AnalogElement = {
-      pinNodeIds: [nOut, 0],
-      allNodeIds: [nOut, 0],
-      branchIndex: -1, isNonlinear: false, isReactive: false,
+      label: "",
+      _pinNodes: new Map([["pos", nOut], ["neg", 0]]),
+      _stateBase: -1,
+      branchIndex: -1,
+      ngspiceLoadOrder: 40,
       setParam(_key: string, _value: number): void {},
       getPinCurrents(): number[] { return []; },
-      ngspiceLoadOrder: 0,
+      setup(_ctx): void {},
       load(ctx): void {
         const h = ctx.solver.allocElement(nOut, nOut);
         ctx.solver.stampElement(h, G_load);
       },
     };
 
-    const vinSource  = makeDcVoltageSource(nInp,  0, brVin,  2e-6);
-    const vinnSource = makeDcVoltageSource(nInn,  0, brVinn, 0);
-    const vccPSource = makeDcVoltageSource(nVccP, 0, brVccP, 15);
-    const vccNSource = makeDcVoltageSource(nVccN, 0, brVccN, -15);
+    const vinSource  = makeVsrc(nInp,  0, 2e-6);
+    const vinnSource = makeVsrc(nInn,  0, 0);
+    const vccPSource = makeVsrc(nVccP, 0, 15);
+    const vccNSource = makeVsrc(nVccN, 0, -15);
 
     const result = runDcOp({
-      elements: [opampEl, rLoadEl, vinSource as unknown as AnalogElement, vinnSource as unknown as AnalogElement, vccPSource as unknown as AnalogElement, vccNSource as unknown as AnalogElement],
+      elements: [opampEl, rLoadEl, vinSource, vinnSource, vccPSource, vccNSource],
       matrixSize,
       nodeCount: 5,
       branchCount: matrixSize - 5,
@@ -209,12 +220,14 @@ describe("Integration", () => {
   function makeResistor(nodeA: number, nodeB: number, resistance: number): AnalogElement {
     const G = 1 / resistance;
     return {
-      pinNodeIds: [nodeA, nodeB],
-      allNodeIds: [nodeA, nodeB],
-      branchIndex: -1, isNonlinear: false, isReactive: false,
+      label: "",
+      _pinNodes: new Map([["a", nodeA], ["b", nodeB]]),
+      _stateBase: -1,
+      branchIndex: -1,
+      ngspiceLoadOrder: 40,
       setParam(_key: string, _value: number): void {},
       getPinCurrents(): number[] { return []; },
-      ngspiceLoadOrder: 0,
+      setup(_ctx): void {},
       load(ctx): void {
         const { solver } = ctx;
         if (nodeA > 0) { const h = solver.allocElement(nodeA, nodeA); solver.stampElement(h, G); }
@@ -241,25 +254,24 @@ describe("Integration", () => {
     // Branch rows: 7..10  matrixSize = 1010 (large to accommodate opamp internal
     // nodes allocated by setupElements starting at nodeCount=1000 → vint=1001, branch=1002)
     const nVin = 1, nInn = 2, nOut = 3, nInp = 4, nVccP = 5, nVccN = 6;
-    const brVin = 7, brInp = 8, brVccP = 9, brVccN = 10;
     const matrixSize = 1010;
 
     const props = new PropertyBag([]);
     props.replaceModelParams({ gain: 1e6, rOut: 75 });
-    const opampEl = withNodeIds(getFactory(OpAmpDefinition.modelRegistry!["behavioral"]!)(
+    const opampEl = getFactory(OpAmpDefinition.modelRegistry!["behavioral"]!)(
       new Map([["in+", nInp], ["in-", nInn], ["out", nOut]]), props, () => 0,
-    ), [nInn, nInp, nOut]);
+    );
 
     const rin = makeResistor(nVin, nInn, 1000);
     const rf  = makeResistor(nInn, nOut, 10000);
 
-    const vsVin  = makeDcVoltageSource(nVin,  0, brVin,  1.0);
-    const vsInp  = makeDcVoltageSource(nInp,  0, brInp,  0.0);
-    const vsVccP = makeDcVoltageSource(nVccP, 0, brVccP, 15);
-    const vsVccN = makeDcVoltageSource(nVccN, 0, brVccN, -15);
+    const vsVin  = makeVsrc(nVin,  0, 1.0);
+    const vsInp  = makeVsrc(nInp,  0, 0.0);
+    const vsVccP = makeVsrc(nVccP, 0, 15);
+    const vsVccN = makeVsrc(nVccN, 0, -15);
 
     const result = runDcOp({
-      elements: [opampEl, rin, rf, vsVin as unknown as AnalogElement, vsInp as unknown as AnalogElement, vsVccP as unknown as AnalogElement, vsVccN as unknown as AnalogElement],
+      elements: [opampEl, rin, rf, vsVin, vsInp, vsVccP, vsVccN],
       matrixSize,
       nodeCount: 6,
       branchCount: matrixSize - 6,
@@ -279,24 +291,23 @@ describe("Integration", () => {
     // matrixSize = 1010: large to accommodate internal nodes (vint=1001, branch=1002)
     // allocated by setupElements starting at nodeCount=1000.
     const nInp = 1, nOut = 2, nInn = 3, nVccP = 4, nVccN = 5;
-    const brVin = 6, brVccP = 7, brVccN = 8;
     const matrixSize = 1010;
 
     const props = new PropertyBag([]);
     props.replaceModelParams({ gain: 1e6, rOut: 75 });
-    const opampEl = withNodeIds(getFactory(OpAmpDefinition.modelRegistry!["behavioral"]!)(
+    const opampEl = getFactory(OpAmpDefinition.modelRegistry!["behavioral"]!)(
       new Map([["in+", nInp], ["in-", nInn], ["out", nOut]]), props, () => 0,
-    ), [nInn, nInp, nOut]);
+    );
 
     // Rf connects out to in- (feedback); Rg grounds in-
     const rf = makeResistor(nOut, nInn, 10000);
     const rg = makeResistor(nInn, 0, 10000);
 
-    const vsVin  = makeDcVoltageSource(nInp,  0, brVin,  3.7);
-    const vsVccP = makeDcVoltageSource(nVccP, 0, brVccP, 15);
-    const vsVccN = makeDcVoltageSource(nVccN, 0, brVccN, -15);
+    const vsVin  = makeVsrc(nInp,  0, 3.7);
+    const vsVccP = makeVsrc(nVccP, 0, 15);
+    const vsVccN = makeVsrc(nVccN, 0, -15);
 
-    const elements = [opampEl, rf, rg, vsVin as unknown as AnalogElement, vsVccP as unknown as AnalogElement, vsVccN as unknown as AnalogElement];
+    const elements = [opampEl, rf, rg, vsVin, vsVccP, vsVccN];
     // Use makeSimpleCtx so we can patch the dcop snapshot buffers to match the
     // empty statePool (numStates=0) before dynamicGmin runs its save/restore.
     const ctx = makeSimpleCtx({ elements, matrixSize, nodeCount: 5, branchCount: matrixSize - 5 });
@@ -335,6 +346,9 @@ describe("OpAmp parity (C4.5)", () => {
 
     const branchRow = 101; // makeCur called first
     const vint = 102;      // makeVolt called second
+
+    const simCtx = makeSimpleCtx({ elements: [opamp], matrixSize: 200, nodeCount: 3, startBranch: branchRow, startNode: vint });
+    const solver = simCtx.solver;
 
     const voltages = new Float64Array(110);
     voltages[nInp] = 1e-3;

@@ -43,9 +43,9 @@ import {
   type AttributeMapping,
   type ComponentDefinition,
 } from "../../core/registry.js";
-import type { AnalogElementCore } from "../../core/analog-types.js";
+import type { AnalogElement } from "../../core/analog-types.js";
 import { NGSPICE_LOAD_ORDER } from "../../core/analog-types.js";
-import type { AnalogElement, ReactiveAnalogElementCore, IntegrationMethod, LoadContext } from "../../solver/analog/element.js";
+import type { PoolBackedAnalogElement, IntegrationMethod, LoadContext } from "../../solver/analog/element.js";
 import type { SetupContext } from "../../solver/analog/setup-context.js";
 import { MODEDC, MODETRAN, MODETRANOP, MODEINITPRED, MODEINITTRAN } from "../../solver/analog/ckt-mode.js";
 import { stampRHS } from "../../solver/analog/stamp-helpers.js";
@@ -232,14 +232,11 @@ export class TransmissionLineCircuitElement extends AbstractCircuitElement {
 // ---------------------------------------------------------------------------
 
 class SegmentResistorElement implements AnalogElement {
-  readonly pinNodeIds: readonly number[];
-  readonly allNodeIds: readonly number[];
-  readonly branchIndex: number = -1;
+  label: string = "";
+  branchIndex: number = -1;
   readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.TRA;
-  readonly isNonlinear = false;
-  readonly isReactive = false;
   _stateBase: number = -1;
-  _pinNodes: Map<string, number> = new Map();
+  _pinNodes: Map<string, number>;
   setParam(_key: string, _value: number): void {}
 
   private readonly G: number;
@@ -251,15 +248,14 @@ class SegmentResistorElement implements AnalogElement {
   private _hBB: number = -1;
 
   constructor(nA: number, nB: number, resistance: number) {
-    this.pinNodeIds = [nA, nB];
-    this.allNodeIds = [nA, nB];
+    this._pinNodes = new Map([["A", nA], ["B", nB]]);
     this.G = resistance > 0 ? 1 / resistance : SHORT_CIRCUIT_CONDUCTANCE;
   }
 
   setup(ctx: SetupContext): void {
     const solver = ctx.solver;
-    const nA = this.pinNodeIds[0];
-    const nB = this.pinNodeIds[1];
+    const nA = this._pinNodes.get("A")!;
+    const nB = this._pinNodes.get("B")!;
 
     // ressetup.c:46-49 — TSTALLOC sequence, 4 entries.
     this._hAA = solver.allocElement(nA, nA);
@@ -278,8 +274,8 @@ class SegmentResistorElement implements AnalogElement {
   }
 
   getPinCurrents(rhs: Float64Array): number[] {
-    const nA = this.pinNodeIds[0];
-    const nB = this.pinNodeIds[1];
+    const nA = this._pinNodes.get("A")!;
+    const nB = this._pinNodes.get("B")!;
     const vA = rhs[nA];
     const vB = rhs[nB];
     const I = this.G * (vA - vB);
@@ -292,14 +288,11 @@ class SegmentResistorElement implements AnalogElement {
 // ---------------------------------------------------------------------------
 
 class SegmentShuntConductanceElement implements AnalogElement {
-  readonly pinNodeIds: readonly number[];
-  readonly allNodeIds: readonly number[];
-  readonly branchIndex: number = -1;
+  label: string = "";
+  branchIndex: number = -1;
   readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.TRA;
-  readonly isNonlinear = false;
-  readonly isReactive = false;
   _stateBase: number = -1;
-  _pinNodes: Map<string, number> = new Map();
+  _pinNodes: Map<string, number>;
   setParam(_key: string, _value: number): void {}
 
   private readonly G: number;
@@ -308,14 +301,13 @@ class SegmentShuntConductanceElement implements AnalogElement {
   private _hNN: number = -1;
 
   constructor(node: number, G: number) {
-    this.pinNodeIds = [node, 0];
-    this.allNodeIds = [node, 0];
+    this._pinNodes = new Map([["N", node], ["GND", 0]]);
     this.G = Math.max(G, MIN_CONDUCTANCE);
   }
 
   setup(ctx: SetupContext): void {
     const solver = ctx.solver;
-    const n = this.pinNodeIds[0];
+    const n = this._pinNodes.get("N")!;
     // Single TSTALLOC: (n, n). The (0, 0), (n, 0), (0, n) entries that
     // would exist if the cathode were a real node fall on row/col 0
     // (ground discard) and are not allocated.
@@ -327,7 +319,7 @@ class SegmentShuntConductanceElement implements AnalogElement {
   }
 
   getPinCurrents(rhs: Float64Array): number[] {
-    const n0 = this.pinNodeIds[0];
+    const n0 = this._pinNodes.get("N")!;
     const v = rhs[n0];
     const I = this.G * v;
     return [I, -I];
@@ -351,23 +343,18 @@ class SegmentShuntConductanceElement implements AnalogElement {
 //   C sub-matrix: V_A - V_B - geq*I_b = ieq
 // ---------------------------------------------------------------------------
 
-class SegmentInductorElement implements ReactiveAnalogElementCore {
-  pinNodeIds: readonly number[];
-  allNodeIds: readonly number[];
+class SegmentInductorElement implements PoolBackedAnalogElement {
+  label: string = "";
+  _pinNodes: Map<string, number>;
   branchIndex: number = -1;
   readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.TRA;
-  readonly isNonlinear = false;
-  readonly isReactive = true as const;
   readonly poolBacked = true as const;
   readonly stateSchema = SEGMENT_INDUCTOR_SCHEMA;
   readonly stateSize = SEGMENT_INDUCTOR_SCHEMA.size;
-  stateBaseOffset = -1;
   _stateBase: number = -1;
-  _pinNodes: Map<string, number> = new Map();
   setParam(_key: string, _value: number): void {}
 
   private readonly L: number;
-  private readonly _label: string;
   private _pool!: StatePoolRef;
 
   // indsetup.c:96-100 — cached TSTALLOC handles, 5 entries.
@@ -378,20 +365,19 @@ class SegmentInductorElement implements ReactiveAnalogElementCore {
   private _hIbrIbr: number = -1;
 
   constructor(nA: number, nB: number, label: string, inductance: number) {
-    this.pinNodeIds = [nA, nB];
-    this.allNodeIds = [nA, nB];
-    this._label = label;
+    this._pinNodes = new Map([["A", nA], ["B", nB]]);
+    this.label = label;
     this.L = inductance;
   }
 
   setup(ctx: SetupContext): void {
     const solver = ctx.solver;
-    const posNode = this.pinNodeIds[0];
-    const negNode = this.pinNodeIds[1];
+    const posNode = this._pinNodes.get("A")!;
+    const negNode = this._pinNodes.get("B")!;
 
     // Branch row allocation per indsetup.c:84-88 — idempotent guard.
     if (this.branchIndex === -1) {
-      this.branchIndex = ctx.makeCur(this._label, "branch");
+      this.branchIndex = ctx.makeCur(this.label, "branch");
     }
     const b = this.branchIndex;
 
@@ -404,23 +390,23 @@ class SegmentInductorElement implements ReactiveAnalogElementCore {
   }
 
   findBranchFor(name: string, ctx: SetupContext): number {
-    if (name !== this._label) return 0;
+    if (name !== this.label) return 0;
     if (this.branchIndex === -1) {
-      this.branchIndex = ctx.makeCur(this._label, "branch");
+      this.branchIndex = ctx.makeCur(this.label, "branch");
     }
     return this.branchIndex;
   }
 
   initState(pool: StatePoolRef): void {
     this._pool = pool;
-    applyInitialValues(SEGMENT_INDUCTOR_SCHEMA, pool, this.stateBaseOffset, {});
+    applyInitialValues(SEGMENT_INDUCTOR_SCHEMA, pool, this._stateBase, {});
   }
 
   load(ctx: LoadContext): void {
     const solver = ctx.solver;
     const b = this.branchIndex;
     const L = this.L;
-    const base = this.stateBaseOffset;
+    const base = this._stateBase;
     const s0 = this._pool.states[0];
     const s1 = this._pool.states[1];
     const s2 = this._pool.states[2];
@@ -492,19 +478,15 @@ class SegmentInductorElement implements ReactiveAnalogElementCore {
 // charge onto the node, so the sign is -ieq (current leaving node A via cap).
 // ---------------------------------------------------------------------------
 
-class SegmentCapacitorElement implements ReactiveAnalogElementCore {
-  pinNodeIds: readonly number[];
-  allNodeIds: readonly number[];
-  readonly branchIndex: number = -1;
+class SegmentCapacitorElement implements PoolBackedAnalogElement {
+  label: string = "";
+  branchIndex: number = -1;
   readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.TRA;
-  readonly isNonlinear = false;
-  readonly isReactive = true as const;
   readonly poolBacked = true as const;
   readonly stateSchema = SEGMENT_CAPACITOR_SCHEMA;
   readonly stateSize = SEGMENT_CAPACITOR_SCHEMA.size;
-  stateBaseOffset = -1;
   _stateBase: number = -1;
-  _pinNodes: Map<string, number> = new Map();
+  _pinNodes: Map<string, number>;
   setParam(_key: string, _value: number): void {}
 
   private readonly C: number;
@@ -514,14 +496,13 @@ class SegmentCapacitorElement implements ReactiveAnalogElementCore {
   private _hNN: number = -1;
 
   constructor(node: number, capacitance: number) {
-    this.pinNodeIds = [node, 0];
-    this.allNodeIds = [node, 0];
+    this._pinNodes = new Map([["N", node], ["GND", 0]]);
     this.C = capacitance;
   }
 
   setup(ctx: SetupContext): void {
     const solver = ctx.solver;
-    const n = this.pinNodeIds[0];
+    const n = this._pinNodes.get("N")!;
     // Single TSTALLOC: (n, n). The capsetup pattern's (pos, pos), (neg,
     // neg), (pos, neg), (neg, pos) collapses to (n, n) only because
     // negNode = 0 (ground), and all (neg, *) / (*, neg) entries are
@@ -531,17 +512,17 @@ class SegmentCapacitorElement implements ReactiveAnalogElementCore {
 
   initState(pool: StatePoolRef): void {
     this._pool = pool;
-    applyInitialValues(SEGMENT_CAPACITOR_SCHEMA, pool, this.stateBaseOffset, {});
+    applyInitialValues(SEGMENT_CAPACITOR_SCHEMA, pool, this._stateBase, {});
   }
 
   load(ctx: LoadContext): void {
     const mode = ctx.cktMode;
     if (!(mode & (MODETRAN | MODETRANOP))) return;
     const solver = ctx.solver;
-    const n0 = this.pinNodeIds[0];
+    const n0 = this._pinNodes.get("N")!;
     const vNow = ctx.rhsOld[n0];
     const C = this.C;
-    const base = this.stateBaseOffset;
+    const base = this._stateBase;
     const s0 = this._pool.states[0];
     const s1 = this._pool.states[1];
     const s2 = this._pool.states[2];
@@ -591,9 +572,9 @@ class SegmentCapacitorElement implements ReactiveAnalogElementCore {
   }
 
   getPinCurrents(rhs: Float64Array): number[] {
-    const n0 = this.pinNodeIds[0];
+    const n0 = this._pinNodes.get("N")!;
     const v = rhs[n0];
-    const base = this.stateBaseOffset;
+    const base = this._stateBase;
     const s0 = this._pool.states[0];
     const I = s0[base + SLOT_GEQ] * v + s0[base + SLOT_IEQ];
     return [I, -I];
@@ -610,24 +591,19 @@ class SegmentCapacitorElement implements ReactiveAnalogElementCore {
 // diagonal only during transient.
 // ---------------------------------------------------------------------------
 
-class CombinedRLElement implements ReactiveAnalogElementCore {
-  pinNodeIds: readonly number[];
-  allNodeIds: readonly number[];
+class CombinedRLElement implements PoolBackedAnalogElement {
+  label: string = "";
+  _pinNodes: Map<string, number>;
   branchIndex: number = -1;
   readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.TRA;
-  readonly isNonlinear = false;
-  readonly isReactive = true as const;
   readonly poolBacked = true as const;
   readonly stateSchema = COMBINED_RL_SCHEMA;
   readonly stateSize = COMBINED_RL_SCHEMA.size;
-  stateBaseOffset = -1;
   _stateBase: number = -1;
-  _pinNodes: Map<string, number> = new Map();
   setParam(_key: string, _value: number): void {}
 
   private readonly R: number;
   private readonly L: number;
-  private readonly _label: string;
   private _pool!: StatePoolRef;
 
   // 5 TSTALLOC entries — same shape as SegmentInductorElement.
@@ -638,21 +614,20 @@ class CombinedRLElement implements ReactiveAnalogElementCore {
   private _hIbrIbr: number = -1;
 
   constructor(nA: number, nB: number, label: string, resistance: number, inductance: number) {
-    this.pinNodeIds = [nA, nB];
-    this.allNodeIds = [nA, nB];
-    this._label = label;
+    this._pinNodes = new Map([["A", nA], ["B", nB]]);
+    this.label = label;
     this.R = resistance;
     this.L = inductance;
   }
 
   setup(ctx: SetupContext): void {
     const solver = ctx.solver;
-    const nA = this.pinNodeIds[0];
-    const nB = this.pinNodeIds[1];
+    const nA = this._pinNodes.get("A")!;
+    const nB = this._pinNodes.get("B")!;
 
     // Branch row allocation — same idempotent pattern as SegmentInductorElement.
     if (this.branchIndex === -1) {
-      this.branchIndex = ctx.makeCur(this._label, "branch");
+      this.branchIndex = ctx.makeCur(this.label, "branch");
     }
     const b = this.branchIndex;
 
@@ -668,23 +643,23 @@ class CombinedRLElement implements ReactiveAnalogElementCore {
   }
 
   findBranchFor(name: string, ctx: SetupContext): number {
-    if (name !== this._label) return 0;
+    if (name !== this.label) return 0;
     if (this.branchIndex === -1) {
-      this.branchIndex = ctx.makeCur(this._label, "branch");
+      this.branchIndex = ctx.makeCur(this.label, "branch");
     }
     return this.branchIndex;
   }
 
   initState(pool: StatePoolRef): void {
     this._pool = pool;
-    applyInitialValues(COMBINED_RL_SCHEMA, pool, this.stateBaseOffset, {});
+    applyInitialValues(COMBINED_RL_SCHEMA, pool, this._stateBase, {});
   }
 
   load(ctx: LoadContext): void {
     const solver = ctx.solver;
     const b = this.branchIndex;
     const L = this.L;
-    const base = this.stateBaseOffset;
+    const base = this._stateBase;
     const s0 = this._pool.states[0];
     const s1 = this._pool.states[1];
     const s2 = this._pool.states[2];
@@ -753,18 +728,14 @@ class CombinedRLElement implements ReactiveAnalogElementCore {
 // TransmissionLineElement  composite AnalogElement
 // ---------------------------------------------------------------------------
 
-export class TransmissionLineElement implements AnalogElementCore {
-  pinNodeIds: readonly number[];
-  allNodeIds: readonly number[];
+export class TransmissionLineElement implements PoolBackedAnalogElement {
+  label: string = "";
+  _pinNodes: Map<string, number> = new Map();
   branchIndex: number = -1;
   _stateBase: number = -1;
-  _pinNodes: Map<string, number> = new Map();
   readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.TRA;
-  readonly isNonlinear = false;
-  readonly isReactive = true;
   readonly poolBacked = true as const;
   stateSize: number = 0;
-  stateBaseOffset = -1;
   readonly stateSchema: StateSchema;
   private _pool!: StatePoolRef;
   setParam(_key: string, _value: number): void {}
@@ -776,12 +747,12 @@ export class TransmissionLineElement implements AnalogElementCore {
   /** Branch index of the first segment's inductor (= firstBranchIdx). */
   private _firstBranchIdx: number = -1;
 
+  private _internalLabels: string[] = [];
   private readonly _segments: number;
   private readonly _rSeg: number;
   private readonly _lSeg: number;
   private readonly _gSeg: number;
   private readonly _cSeg: number;
-  label?: string;
 
   constructor(
     nodeIds: number[],
@@ -792,8 +763,7 @@ export class TransmissionLineElement implements AnalogElementCore {
     segments: number,
     label?: string,
   ) {
-    this.pinNodeIds = nodeIds;
-    this.allNodeIds = nodeIds;
+    this._pinNodes = new Map([["P1b", nodeIds[0]], ["P2b", nodeIds[1]]]);
     if (label !== undefined) this.label = label;
 
     const N = segments;
@@ -822,22 +792,27 @@ export class TransmissionLineElement implements AnalogElementCore {
 
   setup(ctx: SetupContext): void {
     const N = this._segments;
-    const nodeIds = this.pinNodeIds;  // [P1b, P2b] from constructor
+    const p1bNode = this._pinNodes.get("P1b")!;
+    const p2bNode = this._pinNodes.get("P2b")!;
+    const elLabel = this.label || "tline";
 
     // Allocate (N-1) rlMid internal nodes and (N-1) junction internal nodes.
+    this._internalLabels = [];
     const rlMidNodes: number[] = [];
     const junctionNodes: number[] = [];
     for (let k = 0; k < N - 1; k++) {
-      rlMidNodes.push(ctx.makeVolt(this.label ?? "tline", `rlMid${k}`));
+      this._internalLabels.push(`rlMid${k}`);
+      rlMidNodes.push(ctx.makeVolt(elLabel, `rlMid${k}`));
     }
     for (let k = 0; k < N - 1; k++) {
-      junctionNodes.push(ctx.makeVolt(this.label ?? "tline", `junc${k}`));
+      this._internalLabels.push(`junc${k}`);
+      junctionNodes.push(ctx.makeVolt(elLabel, `junc${k}`));
     }
 
     // Construct the segment-chain sub-elements with allocated internal node ids.
     this._subElements = [];
     for (let k = 0; k < N; k++) {
-      const inputNode = k === 0 ? nodeIds[0] : junctionNodes[k - 1];
+      const inputNode = k === 0 ? p1bNode : junctionNodes[k - 1];
 
       if (k < N - 1) {
         const rlMid = rlMidNodes[k];
@@ -849,7 +824,7 @@ export class TransmissionLineElement implements AnalogElementCore {
         // Series L: rlMid → junctionNode (label drives makeCur in L.setup)
         this._subElements.push(new SegmentInductorElement(
           rlMid, junctionNode,
-          `${this.label ?? "tline"}_seg${k}_L`,
+          `${elLabel}_seg${k}_L`,
           this._lSeg,
         ));
 
@@ -863,8 +838,8 @@ export class TransmissionLineElement implements AnalogElementCore {
       } else {
         // Last segment: combined RL to Port2, no shunt at Port2.
         this._subElements.push(new CombinedRLElement(
-          inputNode, nodeIds[1],
-          `${this.label ?? "tline"}_seg${k}_RL`,
+          inputNode, p2bNode,
+          `${elLabel}_seg${k}_RL`,
           this._rSeg, this._lSeg,
         ));
       }
@@ -877,11 +852,12 @@ export class TransmissionLineElement implements AnalogElementCore {
       el.setup(ctx);
     }
 
-    // Compute total state size from all reactive sub-elements (now that they exist).
+    // Compute total state size from all pool-backed sub-elements (now that they exist).
     let totalState = 0;
     for (const el of this._subElements) {
-      if (el.isReactive) {
-        totalState += (el as ReactiveAnalogElementCore).stateSize;
+      const pb = el as Partial<PoolBackedAnalogElement>;
+      if (pb.poolBacked === true) {
+        totalState += pb.stateSize ?? 0;
       }
     }
     this.stateSize = totalState;
@@ -907,15 +883,19 @@ export class TransmissionLineElement implements AnalogElementCore {
     return (last as CombinedRLElement).branchIndex;
   }
 
+  getInternalNodeLabels(): readonly string[] {
+    return this._internalLabels;
+  }
+
   initState(pool: StatePoolRef): void {
     this._pool = pool;
-    let offset = this.stateBaseOffset;
+    let offset = this._stateBase;
     for (const el of this._subElements) {
-      if (el.isReactive) {
-        const re = el as ReactiveAnalogElementCore;
-        re.stateBaseOffset = offset;
-        re.initState(pool);
-        offset += re.stateSize;
+      const pb = el as Partial<PoolBackedAnalogElement> & { _stateBase?: number };
+      if (pb.poolBacked === true && typeof pb.initState === "function") {
+        pb._stateBase = offset;
+        pb.initState(pool);
+        offset += pb.stateSize ?? 0;
       }
     }
   }
@@ -935,9 +915,10 @@ export class TransmissionLineElement implements AnalogElementCore {
     const s2 = this._pool.states[2];
     const s3 = this._pool.states[3];
     for (const el of this._subElements) {
-      if (!el.isReactive) continue;
-      const re = el as ReactiveAnalogElementCore;
-      const base = re.stateBaseOffset;
+      if (typeof (el as AnalogElement).getLteTimestep !== "function") continue;
+      const pb = el as Partial<PoolBackedAnalogElement> & { _stateBase?: number };
+      const base = pb._stateBase ?? -1;
+      if (base < 0) continue;
       const ccap0 = s0[base + SLOT_CCAP_SUB];
       const ccap1 = s1[base + SLOT_CCAP_SUB];
       const q0 = s0[base + SLOT_Q_PHI];
@@ -1003,7 +984,7 @@ function buildTransmissionLineElement(
   length: number,
   segments: number,
   label?: string,
-): AnalogElementCore {
+): AnalogElement {
   const p = { impedance, delay, lossPerMeter, length, segments };
   const nodeIds = [
     pinNodes.get("P1b")!,
@@ -1011,7 +992,7 @@ function buildTransmissionLineElement(
   ];
   const el = new TransmissionLineElement(nodeIds, p.impedance, p.delay, p.lossPerMeter, p.length, p.segments, label);
   el._pinNodes = new Map(pinNodes);
-  (el as AnalogElementCore).setParam = function(key: string, value: number): void {
+  el.setParam = function(key: string, value: number): void {
     if (key in p) {
       (p as Record<string, number>)[key] = value;
     }
@@ -1023,7 +1004,7 @@ function createTransmissionLineElement(
   pinNodes: ReadonlyMap<string, number>,
   props: PropertyBag,
   _getTime: () => number,
-): AnalogElementCore {
+): AnalogElement {
   const label = props.hasModelParam("label") ? props.getModelParam<string>("label") : undefined;
   return buildTransmissionLineElement(
     pinNodes,
@@ -1151,7 +1132,6 @@ export const TransmissionLineDefinition: ComponentDefinition = {
       factory: createTransmissionLineElement,
       paramDefs: TRANSMISSION_LINE_PARAM_DEFS,
       params: TRANSMISSION_LINE_DEFAULTS,
-      mayCreateInternalNodes: true,
     },
   },
   defaultModel: "behavioral",

@@ -33,7 +33,7 @@ import {
   type AttributeMapping,
   type ComponentDefinition,
 } from "../../core/registry.js";
-import type { AnalogElementCore } from "../../core/analog-types.js";
+import type { AnalogElement } from "../../core/analog-types.js";
 import { NGSPICE_LOAD_ORDER } from "../../core/analog-types.js";
 import type { LoadContext } from "../../solver/analog/load-context.js";
 import type { SetupContext } from "../../solver/analog/setup-context.js";
@@ -41,6 +41,7 @@ import { defineModelParams } from "../../core/model-params.js";
 
 import {
   createBjtElement,
+  createPnpBjtElement,
   BJT_NPN_DEFAULTS,
   BJT_PNP_DEFAULTS,
 } from "./bjt.js";
@@ -65,14 +66,13 @@ export const { paramDefs: TRIAC_PARAM_DEFS, defaults: TRIAC_PARAM_DEFAULTS } = d
 });
 
 // ---------------------------------------------------------------------------
-// TriacCompositeElement — composite AnalogElementCore
+// TriacCompositeElement — composite AnalogElement
 // ---------------------------------------------------------------------------
 
-class TriacCompositeElement implements AnalogElementCore {
+class TriacCompositeElement implements AnalogElement {
+  label: string = "";
   branchIndex: number = -1;
   readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.BJT;
-  readonly isNonlinear: boolean = true;
-  readonly isReactive: boolean = false;
   _stateBase: number = -1;
   _pinNodes: Map<string, number>;
 
@@ -87,7 +87,7 @@ class TriacCompositeElement implements AnalogElementCore {
   _vint1Node: number = 0;
   _vint2Node: number = 0;
 
-  readonly label: string;
+  private readonly _internalLabels: string[] = [];
 
   constructor(
     pinNodes: ReadonlyMap<string, number>,
@@ -95,7 +95,6 @@ class TriacCompositeElement implements AnalogElementCore {
     q2: ReturnType<typeof createBjtElement>,
     q3: ReturnType<typeof createBjtElement>,
     q4: ReturnType<typeof createBjtElement>,
-    label: string,
   ) {
     this._pinNodes = new Map(pinNodes);
     this._mt1Node = pinNodes.get("MT1")!;
@@ -105,13 +104,14 @@ class TriacCompositeElement implements AnalogElementCore {
     this._q2 = q2;
     this._q3 = q3;
     this._q4 = q4;
-    this.label = label;
   }
 
   setup(ctx: SetupContext): void {
     // Create internal latch nodes before sub-elements
     this._vint1Node = ctx.makeVolt(this.label, "latch1");  // SCR1 latch
+    this._internalLabels.push("latch1");
     this._vint2Node = ctx.makeVolt(this.label, "latch2");  // SCR2 latch
+    this._internalLabels.push("latch2");
 
     // Bind sub-element pin nodes by mutating each BJT's _pinNodes map.
     // BJT sub-elements are not compiler-augmented, so pinNodeIds is unset on
@@ -151,6 +151,10 @@ class TriacCompositeElement implements AnalogElementCore {
     this._q4.load(ctx);   // PNP bjtload.c (polarity = -1)
   }
 
+  getInternalNodeLabels(): readonly string[] {
+    return this._internalLabels;
+  }
+
   setParam(key: string, value: number): void {
     if (key === "BF") {
       // BF routes to Q1 and Q3 (NPN forward gain)
@@ -176,55 +180,51 @@ class TriacCompositeElement implements AnalogElementCore {
 }
 
 // ---------------------------------------------------------------------------
-// createTriacElement  AnalogElementCore factory
+// createTriacElement  AnalogElement factory (3-arg signature per A.3)
 // ---------------------------------------------------------------------------
 
 function createTriacElement(
   pinNodes: ReadonlyMap<string, number>,
   props: PropertyBag,
-  label: string,
-): TriacCompositeElement {
+  _getTime: () => number,
+): AnalogElement {
   const mt1Node = pinNodes.get("MT1")!;
   const mt2Node = pinNodes.get("MT2")!;
   const gNode   = pinNodes.get("G")!;
 
   // Q1 NPN SCR1: B=G, C=Vint1(placeholder 0), E=MT1
   const q1 = createBjtElement(
-    1,
     new Map([["B", gNode], ["C", 0], ["E", mt1Node]]),
     props,
+    () => 0,
   );
-  (q1 as any).label = `${label}#Q1`;
   (q1 as any).ngspiceNodeMap = { B: "base", C: "col", E: "emit" };
 
   // Q2 PNP SCR1: B=Vint1(placeholder 0), C=G, E=MT2
-  const q2 = createBjtElement(
-    -1,
+  const q2 = createPnpBjtElement(
     new Map([["B", 0], ["C", gNode], ["E", mt2Node]]),
     props,
+    () => 0,
   );
-  (q2 as any).label = `${label}#Q2`;
   (q2 as any).ngspiceNodeMap = { B: "base", C: "col", E: "emit" };
 
   // Q3 NPN SCR2: B=G, C=Vint2(placeholder 0), E=MT2
   const q3 = createBjtElement(
-    1,
     new Map([["B", gNode], ["C", 0], ["E", mt2Node]]),
     props,
+    () => 0,
   );
-  (q3 as any).label = `${label}#Q3`;
   (q3 as any).ngspiceNodeMap = { B: "base", C: "col", E: "emit" };
 
   // Q4 PNP SCR2: B=Vint2(placeholder 0), C=G, E=MT1
-  const q4 = createBjtElement(
-    -1,
+  const q4 = createPnpBjtElement(
     new Map([["B", 0], ["C", gNode], ["E", mt1Node]]),
     props,
+    () => 0,
   );
-  (q4 as any).label = `${label}#Q4`;
   (q4 as any).ngspiceNodeMap = { B: "base", C: "col", E: "emit" };
 
-  return new TriacCompositeElement(pinNodes, q1, q2, q3, q4, label);
+  return new TriacCompositeElement(pinNodes, q1, q2, q3, q4);
 }
 
 // ---------------------------------------------------------------------------
@@ -381,13 +381,9 @@ export const TriacDefinition: ComponentDefinition = {
   modelRegistry: {
     "behavioral": {
       kind: "inline",
-      factory: (pinNodes, props, _getTime) => {
-        const label = (props as any).getOrDefault?.("label", "Triac") ?? "Triac";
-        return createTriacElement(pinNodes, props, label);
-      },
+      factory: createTriacElement,
       paramDefs: TRIAC_PARAM_DEFS,
       params: TRIAC_PARAM_DEFAULTS,
-      mayCreateInternalNodes: true,
     },
   },
   defaultModel: "behavioral",

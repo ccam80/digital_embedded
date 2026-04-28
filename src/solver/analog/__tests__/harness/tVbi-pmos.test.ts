@@ -96,6 +96,8 @@ function makePmosParams(overrides: Partial<ResolvedMosfetParams> = {}): Resolved
     M: 1, OFF: 0,
     ICVDS: 0, ICVGS: 0, ICVBS: 0,
     TEMP: REFTEMP,
+    drainSquares: 1,
+    sourceSquares: 1,
     ...overrides,
   };
 }

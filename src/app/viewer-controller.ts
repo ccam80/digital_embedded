@@ -460,9 +460,9 @@ export function initViewerController(ctx: AppContext, renderPipeline: RenderPipe
       }
 
       const existingPanels = getPanelList();
-      const pinNodeIds = (analogEl as unknown as { pinNodeIds: number[] }).pinNodeIds ?? [];
-      const firstNodeAddr: SignalAddress = pinNodeIds.length > 0
-        ? { domain: 'analog' as const, nodeId: pinNodeIds[0]! }
+      const firstPinNodeId = analogEl._pinNodes.values().next().value as number | undefined;
+      const firstNodeAddr: SignalAddress = firstPinNodeId !== undefined
+        ? { domain: 'analog' as const, nodeId: firstPinNodeId }
         : { domain: 'analog' as const, nodeId: 0 };
 
       // Helper: add a voltage trace to a specific panel
@@ -805,9 +805,9 @@ export function initViewerController(ctx: AppContext, renderPipeline: RenderPipe
             if (ce && _elementLabel(ce) === sig.elementLabel) {
               sig.elementIndex = i;
               // Also refresh the addr anchor from the element's pin nodes
-              const pinNodeIds = resolverCtx.elements[i].pinNodeIds ?? [];
-              if (pinNodeIds.length > 0) {
-                sig.addr = { domain: 'analog', nodeId: pinNodeIds[0]! };
+              const firstPinNodeId = resolverCtx.elements[i]._pinNodes.values().next().value as number | undefined;
+              if (firstPinNodeId !== undefined) {
+                sig.addr = { domain: 'analog', nodeId: firstPinNodeId };
               }
               break;
             }
@@ -849,9 +849,9 @@ export function initViewerController(ctx: AppContext, renderPipeline: RenderPipe
             const ce = resolverCtx.elementToCircuitElement.get(i);
             if (ce && _elementLabel(ce) === trace.elementLabel) {
               elementIndex = i;
-              const pinNodeIds = resolverCtx.elements[i].pinNodeIds ?? [];
-              if (pinNodeIds.length > 0) {
-                addr = { domain: 'analog', nodeId: pinNodeIds[0]! };
+              const firstPinNodeId = resolverCtx.elements[i]._pinNodes.values().next().value as number | undefined;
+              if (firstPinNodeId !== undefined) {
+                addr = { domain: 'analog', nodeId: firstPinNodeId };
               }
               break;
             }

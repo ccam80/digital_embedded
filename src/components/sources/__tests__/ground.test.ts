@@ -9,7 +9,7 @@ import { PinDirection } from "../../../core/pin.js";
 import type { SparseSolver as SparseSolverType } from "../../../solver/analog/sparse-solver.js";
 import type { LoadContext } from "../../../solver/analog/load-context.js";
 import { MODEDCOP, MODEINITFLOAT } from "../../../solver/analog/ckt-mode.js";
-import { makeLoadCtx as makeLoadCtxHelper } from "../../../solver/analog/__tests__/test-helpers.js";
+import { makeLoadCtx as makeLoadCtxHelper, makeTestSetupContext, setupAll } from "../../../solver/analog/__tests__/test-helpers.js";
 
 // ---------------------------------------------------------------------------
 // Helper: narrow ModelEntry to inline factory (throws if netlist kind)
@@ -55,12 +55,12 @@ describe("Ground", () => {
     const props = new PropertyBag();
     const element = getFactory(GroundDefinition.modelRegistry!.behavioral!)(
       new Map([["out", 3]]),
-      [],
-      -1,
       props,
       () => 0,
     );
     const { solver, allocCalls, stampElementCalls, stampRHSCalls } = makeCaptureSolver();
+    const setupCtx = makeTestSetupContext({ solver });
+    setupAll([element], setupCtx);
     const ctx = makeLoadCtx(solver);
 
     element.load(ctx);
@@ -86,45 +86,28 @@ describe("Ground", () => {
     expect((GroundDefinition.modelRegistry?.behavioral as {kind:"inline";factory:AnalogFactory}|undefined)?.factory).toBeDefined();
   });
 
-  it("element_is_not_nonlinear_and_not_reactive", () => {
-    const props = new PropertyBag();
-    const element = getFactory(GroundDefinition.modelRegistry!.behavioral!)(
-      new Map([["out", 0]]),
-      [],
-      -1,
-      props,
-      () => 0,
-    );
-
-    expect(element.isNonlinear).toBe(false);
-    expect(element.isReactive).toBe(false);
-  });
-
   it("element_branch_index_is_minus_one", () => {
     const props = new PropertyBag();
     const element = getFactory(GroundDefinition.modelRegistry!.behavioral!)(
       new Map([["out", 2]]),
-      [],
-      -1,
       props,
       () => 0,
     );
+    const { solver } = makeCaptureSolver();
+    const setupCtx = makeTestSetupContext({ solver });
+    setupAll([element], setupCtx);
 
     expect(element.branchIndex).toBe(-1);
   });
 
-  it("element_node_indices_matches_input", () => {
+  it("element_pin_nodes_matches_input", () => {
     const props = new PropertyBag();
     const element = getFactory(GroundDefinition.modelRegistry!.behavioral!)(
       new Map([["out", 5]]),
-      [],
-      -1,
       props,
       () => 0,
     );
-    Object.assign(element, { pinNodeIds: [5], allNodeIds: [5] });
-    const elementWithPins = element as typeof element & { pinNodeIds: number[] };
 
-    expect(elementWithPins.pinNodeIds).toEqual([5]);
+    expect(element._pinNodes.get("out")).toBe(5);
   });
 });

@@ -729,13 +729,46 @@ describe("RegistryAliases", () => {
 
 import { SparseSolver } from "../../../solver/analog/sparse-solver.js";
 import {
-  makeResistor,
-  makeVoltageSource,
   makeSimpleCtx,
 } from "../../../solver/analog/__tests__/test-helpers.js";
-import { StatePool } from "../../../solver/analog/state-pool.js";
+import { makeDcVoltageSource, DC_VOLTAGE_SOURCE_DEFAULTS } from "../../../components/sources/dc-voltage-source.js";
+import { NGSPICE_LOAD_ORDER } from "../../../core/analog-types.js";
 import type { AnalogElement } from "../../../solver/analog/element.js";
 import type { SetupContext } from "../../../solver/analog/setup-context.js";
+
+// ---------------------------------------------------------------------------
+// Inline resistor helper — §A.13 contract shape (no exported factory exists).
+// ---------------------------------------------------------------------------
+function makeResistor(nodeA: number, nodeB: number, resistance: number): AnalogElement {
+  const G = 1 / resistance;
+  let _hAA = -1, _hBB = -1, _hAB = -1, _hBA = -1;
+  const el: AnalogElement = {
+    label: "",
+    ngspiceLoadOrder: NGSPICE_LOAD_ORDER.RES,
+    _pinNodes: new Map([["A", nodeA], ["B", nodeB]]),
+    _stateBase: -1,
+    branchIndex: -1,
+    setup(ctx: SetupContext): void {
+      const a = el._pinNodes.get("A")!;
+      const b = el._pinNodes.get("B")!;
+      if (a !== 0) _hAA = ctx.solver.allocElement(a, a);
+      if (b !== 0) _hBB = ctx.solver.allocElement(b, b);
+      if (a !== 0 && b !== 0) {
+        _hAB = ctx.solver.allocElement(a, b);
+        _hBA = ctx.solver.allocElement(b, a);
+      }
+    },
+    load(ctx): void {
+      if (_hAA !== -1) ctx.solver.stampElement(_hAA,  G);
+      if (_hBB !== -1) ctx.solver.stampElement(_hBB,  G);
+      if (_hAB !== -1) ctx.solver.stampElement(_hAB, -G);
+      if (_hBA !== -1) ctx.solver.stampElement(_hBA, -G);
+    },
+    setParam(_key: string, _value: number): void {},
+    getPinCurrents(_rhs: Float64Array): number[] { return [0, 0]; },
+  };
+  return el;
+}
 
 // ---------------------------------------------------------------------------
 // Helper: build a SetupContext backed by a real SparseSolver.
@@ -781,6 +814,15 @@ function makeSpstProps(overrides: {
   return props;
 }
 
+// ---------------------------------------------------------------------------
+// makeVsrc — DC voltage source helper
+// ---------------------------------------------------------------------------
+function makeVsrc(posNode: number, negNode: number, voltage: number): AnalogElement {
+  const props = new PropertyBag();
+  props.replaceModelParams({ ...DC_VOLTAGE_SOURCE_DEFAULTS, voltage });
+  return makeDcVoltageSource(new Map([["pos", posNode], ["neg", negNode]]), props, () => 0);
+}
+
 describe("AnalogSwitch", () => {
   it("definition_has_engine_type_both", () => {
     expect(SwitchDefinition.models?.digital).toBeDefined();
@@ -801,11 +843,9 @@ describe("AnalogSwitch", () => {
     const order = (solver as any)._getInsertionOrder() as Array<{ extRow: number; extCol: number }>;
     expect(order).toHaveLength(4); // PP, PN, NP, NN
 
-    // Handles are allocated after setup — verify they are valid (>= 1).
-    expect(el._hPP).toBeGreaterThanOrEqual(1);
-    expect(el._hPN).toBeGreaterThanOrEqual(1);
-    expect(el._hNP).toBeGreaterThanOrEqual(1);
-    expect(el._hNN).toBeGreaterThanOrEqual(1);
+    // Handles are private (§A.9); verify setup ran via observable state fields.
+    expect(el._stateBase).toBeGreaterThanOrEqual(0);
+    expect(el.branchIndex).toBe(-1); // SW has no branch row
   });
 
   it("open_stamps_roff_conductance_is_smaller", () => {
@@ -847,8 +887,10 @@ describe("AnalogSwitch", () => {
     const loadCtxOpen = makeSimpleCtx({ solver, elements: [], nodeCount: 2, matrixSize: 2 });
     el.load(loadCtxOpen.loadCtx);
 
-    // After toggle, _forcedState=null and _effectivelyClosed=false, so Roff applies
-    expect(el._hPP).toBeGreaterThanOrEqual(0);
+    // After toggle, _forcedState=null and _effectivelyClosed=false, so Roff applies.
+    // Verify setup ran (public field) and no branch row allocated (SW topology).
+    expect(el._stateBase).toBeGreaterThanOrEqual(0);
+    expect(el.branchIndex).toBe(-1);
   });
 
   it("normallyClosed_inverts_analog_conductance", () => {
@@ -998,9 +1040,8 @@ describe("AnalogSPDT", () => {
 //
 // SwitchAnalogElement.setup() is called after CKTCircuitContext construction
 // (which calls _initStructure), ensuring handles are valid before load().
-// makeResistor/makeVoltageSource are test infrastructure that call allocElement
-// in load() — this is acceptable for test helpers that have not yet been
-// migrated to the setup/load split.
+// makeDcVoltageSource and the local makeResistor follow the §A.13 contract:
+// handles are allocated in setup(), stamped in load().
 // ---------------------------------------------------------------------------
 
 import { solveDcOperatingPoint } from "../../../solver/analog/dc-operating-point.js";
@@ -1009,6 +1050,9 @@ describe("Integration", () => {
   it("switched_resistor_divider", () => {
     // 10V → SPST switch (closed, Ron=1Ω) → 1kΩ → ground
     // DC OP: V across R = 10 * 1000/1001 ≈ 9.99V
+    //
+    // matrixSize=3: node1(1), node2(2), branch-row for vs(3).
+    // startBranch=3 so makeCur() assigns row 3 to the voltage source.
 
     const switchProps = makeSpstProps({ closed: true, Ron: 1, Roff: 1e9 });
     const swEl = new SwitchAnalogElement(
@@ -1016,39 +1060,22 @@ describe("Integration", () => {
       switchProps,
     ) as SpstAnalogElement;
 
-    // nodeCount=2 (node1, node2), branchCount=1, matrixSize=3
-    const vs = makeVoltageSource(1, 0, 2, 10);  // 10V: node1→gnd, branch at row 2
+    const vs = makeVsrc(1, 0, 10);  // 10V: node1→gnd
     const r = makeResistor(2, 0, 1000);          // 1kΩ: node2→gnd
 
     const solver = new SparseSolver();
 
-    // Build ctx first — constructor calls _initStructure() which resets the solver.
-    // setup() must be called AFTER construction so handles survive.
+    // makeSimpleCtx constructs CKTCircuitContext (calls _initStructure), then runs
+    // setupAll on all elements. startBranch=3 places the voltage-source branch row
+    // at index 3, matching matrixSize=3.
     const ctx = makeSimpleCtx({
       solver,
       elements: [vs as unknown as AnalogElement, swEl as unknown as AnalogElement, r as unknown as AnalogElement],
       nodeCount: 2,
       matrixSize: 3,
       branchCount: 1,
-      statePool: new StatePool(0),
+      startBranch: 3,
     });
-
-    // Call setup() on swEl after ctx is built (solver is now clean post-_initStructure).
-    // Use the already-initialized solver directly — do NOT call _initStructure() again.
-    let swStates = 0;
-    let swNodeMax = 100;
-    const swSetupCtx: SetupContext = {
-      solver: ctx.solver,
-      temp: 300.15,
-      nomTemp: 300.15,
-      copyNodesets: false,
-      makeVolt(_l: string, _s: string): number { return ++swNodeMax; },
-      makeCur(_l: string, _s: string): number { return ++swNodeMax; },
-      allocStates(n: number): number { const off = swStates; swStates += n; return off; },
-      findBranch(_l: string): number { return 0; },
-      findDevice(_l: string) { return null; },
-    };
-    swEl.setup(swSetupCtx);
 
     solveDcOperatingPoint(ctx);
 

@@ -1,10 +1,10 @@
-﻿/**
+/**
  * Potentiometer analog component.
  *
  * A three-terminal linear element modelled as two series resistors sharing a
  * common wiper node. The wiper position (0.0-1.0) determines the resistance split:
- *   R_top = R Ã— position
- *   R_bottom = R Ã— (1 - position)
+ *   R_top = R × position
+ *   R_bottom = R × (1 - position)
  *
  * Both resistances are clamped to a minimum to prevent division by zero.
  */
@@ -21,9 +21,9 @@ import {
   type AttributeMapping,
   type ComponentDefinition,
 } from "../../core/registry.js";
-import type { AnalogElementCore } from "../../core/analog-types.js";
+import type { AnalogElement } from "../../core/analog-types.js";
 import { NGSPICE_LOAD_ORDER } from "../../core/analog-types.js";
-import type { AnalogElement, LoadContext } from "../../solver/analog/element.js";
+import type { LoadContext } from "../../solver/analog/element.js";
 import type { SetupContext } from "../../solver/analog/setup-context.js";
 import { defineModelParams } from "../../core/model-params.js";
 
@@ -39,7 +39,7 @@ const MIN_RESISTANCE = 1e-9;
 
 export const { paramDefs: POTENTIOMETER_PARAM_DEFS, defaults: POTENTIOMETER_DEFAULTS } = defineModelParams({
   primary: {
-    resistance: { default: 10000, unit: "Î", description: "Total resistance in ohms", min: 1e-9 },
+    resistance: { default: 10000, unit: "Ω", description: "Total resistance in ohms", min: 1e-9 },
     position:   { default: 0.5,              description: "Wiper position (0.0 = full bottom, 1.0 = full top)", min: 0, max: 1 },
   },
 });
@@ -121,7 +121,7 @@ export class PotentiometerElement extends AbstractCircuitElement {
 
     // Falstad PotElm: total span (0,0)(64,0) px = (0,0)(4,0) gu.
     // Lead wires: 0..16px and 48..64px = 0..1 gu and 3..4 gu.
-    // Zigzag body: 16 segments spanning x=16..48 px = 1..3 gu, y peaks Â±8px = Â±0.5 gu.
+    // Zigzag body: 16 segments spanning x=16..48 px = 1..3 gu, y peaks ±8px = ±0.5 gu.
     // Wiper pin W at (32,-16) px = (2,-1) gu.
     const PX = 1 / 16;
     const hs = 8 * PX; // 0.5 gu
@@ -168,14 +168,11 @@ export class PotentiometerElement extends AbstractCircuitElement {
 // ---------------------------------------------------------------------------
 
 class AnalogPotentiometerElement implements AnalogElement {
-  readonly pinNodeIds: readonly number[];
-  readonly allNodeIds: readonly number[];
-  readonly branchIndex: number = -1;
-  readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.RES;
-  readonly isNonlinear: boolean = false;
-  readonly isReactive: boolean = false;
-  _stateBase: number = -1;
+  label: string = "";
   _pinNodes: Map<string, number> = new Map();
+  _stateBase: number = -1;
+  branchIndex: number = -1;
+  readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.RES;
 
   private R: number;
   private pos: number;
@@ -187,9 +184,8 @@ class AnalogPotentiometerElement implements AnalogElement {
   private _hWB_PP: number = -1;  private _hWB_NN: number = -1;
   private _hWB_PN: number = -1;  private _hWB_NP: number = -1;
 
-  constructor(pinNodeIds: number[], resistance: number, position: number) {
-    this.pinNodeIds = pinNodeIds;
-    this.allNodeIds = pinNodeIds;
+  constructor(pinNodes: ReadonlyMap<string, number>, resistance: number, position: number) {
+    this._pinNodes = new Map(pinNodes);
     this.R = resistance;
     this.pos = Math.max(0, Math.min(1, position));
 
@@ -201,9 +197,9 @@ class AnalogPotentiometerElement implements AnalogElement {
 
   setup(ctx: SetupContext): void {
     const solver = ctx.solver;
-    const aNode = this.pinNodeIds[0];  // A pin — R_AW posNode
-    const wNode = this.pinNodeIds[1];  // W pin — shared wiper node
-    const bNode = this.pinNodeIds[2];  // B pin — R_WB negNode
+    const aNode = this._pinNodes.get("A")!;  // A pin — R_AW posNode
+    const wNode = this._pinNodes.get("W")!;  // W pin — shared wiper node
+    const bNode = this._pinNodes.get("B")!;  // B pin — R_WB negNode
 
     // R_AW — ressetup.c:46-49 (A as posNode, W as negNode)
     this._hAW_PP = solver.allocElement(aNode, aNode);  // (RESposNode, RESposNode)
@@ -245,9 +241,9 @@ class AnalogPotentiometerElement implements AnalogElement {
   }
 
   getPinCurrents(rhs: Float64Array): number[] {
-    const aNode = this.pinNodeIds[0];  // A pin
-    const wNode = this.pinNodeIds[1];  // W (wiper) pin
-    const bNode = this.pinNodeIds[2];  // B pin
+    const aNode = this._pinNodes.get("A")!;  // A pin
+    const wNode = this._pinNodes.get("W")!;  // W (wiper) pin
+    const bNode = this._pinNodes.get("B")!;  // B pin
 
     const vA = rhs[aNode];
     const vW = rhs[wNode];
@@ -265,16 +261,10 @@ function createPotentiometerElement(
   pinNodes: ReadonlyMap<string, number>,
   props: PropertyBag,
   _getTime: () => number,
-): AnalogElementCore {
+): AnalogElement {
   const R = props.getModelParam<number>("resistance");
   const position = props.getModelParam<number>("position");
-  const el = new AnalogPotentiometerElement(
-    [pinNodes.get("A")!, pinNodes.get("W")!, pinNodes.get("B")!],
-    R,
-    position,
-  );
-  el._pinNodes = new Map(pinNodes);
-  return el;
+  return new AnalogPotentiometerElement(pinNodes, R, position);
 }
 
 // ---------------------------------------------------------------------------

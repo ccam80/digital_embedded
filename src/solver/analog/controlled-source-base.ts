@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Base class for expression-driven controlled analog sources.
  *
  * All four controlled source types (VCVS, VCCS, CCVS, CCCS) share a common
@@ -23,7 +23,9 @@
  */
 
 import type { SparseSolver } from "./sparse-solver.js";
-import type { AnalogElementCore, LoadContext } from "./element.js";
+import type { AnalogElement } from "../../core/analog-types.js";
+import type { LoadContext } from "./element.js";
+import type { SetupContext } from "./setup-context.js";
 import type { ExprNode } from "./expression.js";
 import { compileExpression } from "./expression-evaluate.js";
 import type { ExpressionContext } from "./expression-evaluate.js";
@@ -73,7 +75,8 @@ export class MutableExpressionContext implements ExpressionContext {
  * Abstract base for expression-driven controlled sources.
  *
  * Concrete subclasses supply:
- *   - `pinNodeIds` and `branchIndex`
+ *   - `_pinNodes` initialization in the constructor
+ *   - `abstract readonly branchIndex` (or mutable field)
  *   - `_bindContext(voltages)` to populate ctx with the relevant control values
  *     and set `_ctrlValue`.
  *   - `_stampLinear(solver)` for linear topology-constant entries. Default
@@ -84,19 +87,20 @@ export class MutableExpressionContext implements ExpressionContext {
  * quantity at the current operating point (V_ctrl for voltage-controlled,
  * I_sense for current-controlled). Subclasses use it to compute the correct
  * NR linearized RHS: `value - derivative * ctrlValue`.
+ *
+ * Sources that own a branch row (VCVS, CCVS) inherit the shared
+ * `findBranchFor` implementation from this base class (per §A.6).
  */
-export abstract class ControlledSourceElement implements AnalogElementCore {
-  pinNodeIds!: readonly number[];  // set by compiler via Object.assign after factory returns
-  allNodeIds!: readonly number[];  // set by compiler via Object.assign after factory returns
-  abstract readonly branchIndex: number;
+export abstract class ControlledSourceElement implements AnalogElement {
+  label: string = "";
+  _pinNodes: Map<string, number> = new Map();
+  _stateBase: number = -1;
+  branchIndex: number = -1;
+
   abstract readonly ngspiceLoadOrder: number;
   abstract getPinCurrents(rhs: Float64Array): number[];
 
-  readonly isNonlinear = true as const;
-  readonly isReactive = false as const;
   setParam(_key: string, _value: number): void {}
-
-  label?: string;
 
   protected readonly _compiledExpr: (ctx: ExpressionContext) => number;
   protected readonly _compiledDeriv: (ctx: ExpressionContext) => number;
@@ -121,6 +125,22 @@ export abstract class ControlledSourceElement implements AnalogElementCore {
   ) {
     this._compiledExpr = compileExpression(expression);
     this._compiledDeriv = compileExpression(derivative);
+  }
+
+  /**
+   * Idempotent branch-row allocation shared by VCVS and CCVS.
+   *
+   * VCVS/CCVS call this from their `setup()` and also expose it as
+   * `findBranchFor` so that CCCS/CCVS controlling elements can lazy-allocate
+   * the branch row when a name match is found.
+   *
+   * Matches the idempotent makeCur pattern in §A.5 and §A.6.
+   */
+  findBranchFor(_name: string, ctx: SetupContext): number {
+    if (this.branchIndex === -1) {
+      this.branchIndex = ctx.makeCur(this.label, "branch");
+    }
+    return this.branchIndex;
   }
 
   /**
@@ -179,6 +199,15 @@ export abstract class ControlledSourceElement implements AnalogElementCore {
     derivative: number,
     ctrlValue: number,
   ): void;
+
+  /**
+   * `setup()` is a no-op in the base class. Subclasses that introduce branch
+   * rows or TSTALLOC entries override this and call `findBranchFor` followed
+   * by TSTALLOC allocations. The pattern follows §A.5 idempotent allocation.
+   */
+  setup(_ctx: SetupContext): void {
+    // base: no allocation — subclasses override
+  }
 }
 
 // ---------------------------------------------------------------------------

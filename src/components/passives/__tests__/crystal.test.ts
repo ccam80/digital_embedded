@@ -21,7 +21,8 @@ import {
 } from "../crystal.js";
 import { PropertyBag } from "../../../core/properties.js";
 import { makeDcVoltageSource } from "../../sources/dc-voltage-source.js";
-import { runDcOp } from "../../../solver/analog/__tests__/test-helpers.js";
+import { runDcOp, makeTestSetupContext, setupAll, makeLoadCtx } from "../../../solver/analog/__tests__/test-helpers.js";
+import { SparseSolver } from "../../../solver/analog/sparse-solver.js";
 import { ComponentCategory, ComponentRegistry } from "../../../core/registry.js";
 import { StatePool } from "../../../solver/analog/state-pool.js";
 import type { LoadContext } from "../../../solver/analog/load-context.js";
@@ -31,7 +32,7 @@ import type { LoadContext } from "../../../solver/analog/load-context.js";
 // ---------------------------------------------------------------------------
 import type { ModelEntry, AnalogFactory } from "../../../core/registry.js";
 import type { AnalogElement } from "../../../solver/analog/element.js";
-import type { AnalogElementCore, ReactiveAnalogElement } from "../../../solver/analog/element.js";
+import type { PoolBackedAnalogElement } from "../../../core/analog-types.js";
 function getFactory(entry: ModelEntry): AnalogFactory {
   if (entry.kind !== "inline") throw new Error("Expected inline ModelEntry");
   return entry.factory;
@@ -40,12 +41,12 @@ function getFactory(entry: ModelEntry): AnalogFactory {
 // ---------------------------------------------------------------------------
 // withState: allocate a StatePool for a single element and call initState
 // ---------------------------------------------------------------------------
-function withState(core: AnalogElementCore): { element: ReactiveAnalogElement; pool: StatePool } {
-  const re = core as ReactiveAnalogElement;
-  const pool = new StatePool(Math.max(re.stateSize, 1));
-  re.stateBaseOffset = 0;
-  re.initState(pool);
-  return { element: re, pool };
+function withState(core: AnalogElement): { element: PoolBackedAnalogElement; pool: StatePool } {
+  const pb = core as unknown as PoolBackedAnalogElement;
+  const pool = new StatePool(Math.max(pb.stateSize, 1));
+  pb._stateBase = 0;
+  pb.initState(pool);
+  return { element: pb, pool };
 }
 
 
@@ -225,23 +226,24 @@ describe("Crystal", () => {
       props.setModelParam("motionalCapacitance", Cs);
       props.setModelParam("shuntCapacitance", C0);
 
-      const crystalCore = createCrystalElement(new Map([["A", 1], ["B", 0]]), [2, 3], 3, props);
+      const crystalCore = createCrystalElement(new Map([["A", 1], ["B", 0]]), props, () => 0);
       const { element: crystalEl } = withState(crystalCore);
       const crystal = crystalEl as unknown as AnalogElement;
-      const vs = makeDcVoltageSource(1, 0, 4, 1.0) as unknown as AnalogElement;
+      const vsProps = new PropertyBag(); vsProps.setModelParam("voltage", 1.0);
+      const vs = makeDcVoltageSource(new Map([["pos", 1], ["neg", 0]]), vsProps, () => 0) as unknown as AnalogElement;
 
       // 1GΩ gmin shunts on all non-ground nodes (1,2,3) to prevent floating nodes
       // at DC where all capacitors have geq=0.
       const G_bleed = 1e-9; // 1nS = 1GΩ
       const gminShunts: AnalogElement = {
-        pinNodeIds: [1, 2, 3] as readonly number[],
-        allNodeIds: [1, 2, 3] as readonly number[],
+        _pinNodes: new Map([["1", 1], ["2", 2], ["3", 3]]),
         branchIndex: -1,
+        _stateBase: -1,
         ngspiceLoadOrder: 0,
-        isNonlinear: false,
-        isReactive: false,
+        label: "",
         setParam(_key: string, _value: number): void {},
         getPinCurrents(_v: Float64Array): number[] { return []; },
+        setup(_ctx: import("../../../solver/analog/setup-context.js").SetupContext): void {},
         load(ctx: LoadContext): void {
           const solver = ctx.solver;
           solver.stampElement(solver.allocElement(0, 0), G_bleed); // node1 → solver[0]
@@ -334,41 +336,78 @@ describe("Crystal", () => {
       expect(CrystalDefinition.name).toBe("QuartzCrystal");
     });
 
-    it("CrystalDefinition has analog model", () => {
-      expect(CrystalDefinition.modelRegistry?.behavioral).toBeDefined();
-    });
-
-    it("CrystalDefinition has analogFactory", () => {
-      expect((CrystalDefinition.modelRegistry?.behavioral as {kind:"inline";factory:AnalogFactory}|undefined)?.factory).toBeDefined();
-    });
-
-    it("CrystalDefinition branchCount is 1", () => {
-      expect((CrystalDefinition.modelRegistry?.behavioral as {kind:"inline";factory:AnalogFactory;branchCount?:number}|undefined)?.branchCount).toBe(1);
-    });
-
-    it("CrystalDefinition has branchCount 1 (requires 2 internal nodes)", () => {
-      // Crystal uses 2 internal nodes; branchCount reflects the motional arm branch
-      expect((CrystalDefinition.modelRegistry?.behavioral as {kind:"inline";factory:AnalogFactory;branchCount?:number}|undefined)?.branchCount).toBe(1);
-    });
-
-    it("CrystalDefinition isReactive", () => {
+    it("factory creates element with 2 external pins and correct branchIndex after setup", () => {
       const props = new PropertyBag();
       props.setModelParam("frequency", 1e6);
       props.setModelParam("qualityFactor", 1000);
       props.setModelParam("motionalCapacitance", 20e-15);
       props.setModelParam("shuntCapacitance", 5e-12);
-      const el = getFactory(CrystalDefinition.modelRegistry!.behavioral!)(new Map([["A", 1], ["B", 0]]), [2, 3], 3, props, () => 0);
-      expect(el.isReactive).toBe(true);
+      const el = createCrystalElement(new Map([["A", 1], ["B", 0]]), props, () => 0);
+      expect(el._pinNodes.size).toBe(2);
+
+      const solver = new SparseSolver();
+      solver._initStructure();
+      const setupCtx = makeTestSetupContext({ solver, startNode: 2, startBranch: 3 });
+      const { element } = withState(el as AnalogElement);
+      setupAll([element], setupCtx);
+      expect(element.branchIndex).toBe(3);
     });
 
-    it("CrystalDefinition isNonlinear is false", () => {
+    it("factory creates element that stamps R_s conductance at A-node diagonal after setup", () => {
+      const f0 = 1e6;
+      const Q = 1000;
+      const Cs = 20e-15;
+      const C0 = 5e-12;
+      const Ls = crystalMotionalInductance(f0, Cs);
+      const Rs = crystalSeriesResistance(f0, Ls, Q);
+
       const props = new PropertyBag();
-      props.setModelParam("frequency", 1e6);
-      props.setModelParam("qualityFactor", 1000);
-      props.setModelParam("motionalCapacitance", 20e-15);
-      props.setModelParam("shuntCapacitance", 5e-12);
-      const el = getFactory(CrystalDefinition.modelRegistry!.behavioral!)(new Map([["A", 1], ["B", 0]]), [2, 3], 3, props, () => 0);
-      expect(el.isNonlinear).toBe(false);
+      props.setModelParam("frequency", f0);
+      props.setModelParam("qualityFactor", Q);
+      props.setModelParam("motionalCapacitance", Cs);
+      props.setModelParam("shuntCapacitance", C0);
+      const el = createCrystalElement(new Map([["A", 1], ["B", 0]]), props, () => 0);
+      const { element } = withState(el as AnalogElement);
+
+      const handles: { row: number; col: number }[] = [];
+      const handleIndex = new Map<string, number>();
+      const matValues: number[] = [];
+      const captureSolver = {
+        allocElement: (row: number, col: number): number => {
+          const key = `${row},${col}`;
+          let h = handleIndex.get(key);
+          if (h === undefined) { h = handles.length; handles.push({ row, col }); handleIndex.set(key, h); matValues.push(0); }
+          return h;
+        },
+        stampElement: (h: number, v: number): void => { matValues[h] += v; },
+        stampRHS: (_r: number, _v: number): void => {},
+      } as unknown as SparseSolver;
+
+      const setupCtx = makeTestSetupContext({ solver: captureSolver, startNode: 2, startBranch: 3 });
+      setupAll([element], setupCtx);
+      expect(element.branchIndex).toBe(3);
+
+      const dt = 1e-6;
+      const ag = new Float64Array(7);
+      ag[0] = 1 / dt;
+      ag[1] = -1 / dt;
+      const ctx = makeLoadCtx({
+        solver: captureSolver as unknown as import("../../../solver/analog/sparse-solver.js").SparseSolver,
+        dt,
+        ag,
+        method: "trapezoidal",
+        order: 1,
+      });
+      element.load(ctx);
+
+      const G_s_expected = 1 / Math.max(Rs, 1e-12);
+      // C_0 shunt cap also stamps geqC0 = ag[0]*C_0 at the A-node diagonal
+      const geqC0 = ag[0] * C0;
+      const diagIdx = handleIndex.get("1,1");
+      expect(diagIdx).toBeDefined();
+      const diagVal = matValues[diagIdx!];
+      expect(diagVal).toBeGreaterThan(0);
+      expect(diagVal).toBeCloseTo(G_s_expected + geqC0, 6);
     });
 
     it("CrystalDefinition category is PASSIVES", () => {
@@ -393,14 +432,14 @@ describe("Crystal", () => {
       expect(m!.propertyKey).toBe("frequency");
     });
 
-    it("stateBaseOffset is -1 before compiler assigns it", () => {
+    it("_stateBase is -1 before compiler assigns it", () => {
       const props = new PropertyBag();
       props.setModelParam("frequency", 1e6);
       props.setModelParam("qualityFactor", 1000);
       props.setModelParam("motionalCapacitance", 20e-15);
       props.setModelParam("shuntCapacitance", 5e-12);
-      const el = getFactory(CrystalDefinition.modelRegistry!.behavioral!)(new Map([["A", 1], ["B", 0]]), [2, 3], 3, props, () => 0);
-      expect((el as ReactiveAnalogElement).stateBaseOffset).toBe(-1);
+      const el = getFactory(CrystalDefinition.modelRegistry!.behavioral!)(new Map([["A", 1], ["B", 0]]), props, () => 0);
+      expect((el as unknown as PoolBackedAnalogElement)._stateBase).toBe(-1);
     });
 
 

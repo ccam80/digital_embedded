@@ -19,32 +19,20 @@ import {
   BJT_SPICE_L1_NPN_DEFAULTS,
 } from "../../../components/semiconductors/bjt.js";
 import { createDiodeElement, DIODE_PARAM_DEFAULTS } from "../../../components/semiconductors/diode.js";
+import { makeDcVoltageSource, DC_VOLTAGE_SOURCE_DEFAULTS } from "../../../components/sources/dc-voltage-source.js";
+import { ResistorDefinition, RESISTOR_DEFAULTS } from "../../../components/passives/resistor.js";
 import { PropertyBag } from "../../../core/properties.js";
 import { solveDcOperatingPoint, type DcOpNRPhase, type DcOpNRAttemptOutcome } from "../dc-operating-point.js";
-import { withNodeIds, makeSimpleCtx, makeResistor, makeVoltageSource, makeLoadCtx } from "./test-helpers.js";
-import { StatePool } from "../state-pool.js";
+import { makeSimpleCtx, initElement, makeLoadCtx } from "./test-helpers.js";
 import { createTestPropertyBag } from "../../../test-fixtures/model-fixtures.js";
 import { DefaultSimulatorFacade } from "../../../headless/default-facade.js";
 import { createDefaultRegistry } from "../../../components/register-all.js";
-import type { AnalogElement, AnalogElementCore } from "../element.js";
-import type { ReactiveAnalogElement } from "../element.js";
+import type { AnalogElement, PoolBackedAnalogElement } from "../element.js";
 import type { LoadContext } from "../load-context.js";
 import type { SparseSolver } from "../sparse-solver.js";
 import { MODEDCOP, MODEINITFLOAT, MODEINITJCT, setInitf } from "../ckt-mode.js";
 
 const registry = createDefaultRegistry();
-
-// ---------------------------------------------------------------------------
-// Helper: allocate state pool for a single element
-// ---------------------------------------------------------------------------
-
-function withState(core: AnalogElementCore): { element: ReactiveAnalogElement; pool: StatePool } {
-  const re = core as ReactiveAnalogElement;
-  const pool = new StatePool(Math.max(re.stateSize, 1));
-  re.stateBaseOffset = 0;
-  re.initState(pool);
-  return { element: re, pool };
-}
 
 // ---------------------------------------------------------------------------
 // Helper: build a LoadContext for a single element driven directly.
@@ -118,6 +106,12 @@ const Q = 1.6021918e-19;
 const T = 300.15;
 const VT_ROOM = T * K / Q; // thermal voltage at 300.15 K ≈ 0.02585 V
 
+function makeVsrc(posNode: number, negNode: number, voltage: number): AnalogElement {
+  const props = new PropertyBag();
+  props.replaceModelParams({ ...DC_VOLTAGE_SOURCE_DEFAULTS, voltage });
+  return makeDcVoltageSource(new Map([["pos", posNode], ["neg", negNode]]), props, () => 0);
+}
+
 // ---------------------------------------------------------------------------
 // tVcrit formula (matching computeBjtTempParams and diode primeJunctions)
 // ---------------------------------------------------------------------------
@@ -136,14 +130,12 @@ describe("dcopInitJct", () => {
 
   describe("BJT simple (L0) primeJunctions", () => {
     it("NPN: arms Vbe=tVcrit, Vbc=0 as per-device local override", () => {
-      const core = createBjtElement(
+      const element = createBjtElement(
         1, // NPN
         new Map([["B", 1], ["C", 2], ["E", 3]]),
-        -1,
         makeBjtProps(),
       );
-      const { element } = withState(core);
-      withNodeIds(element, [1, 2, 3]);
+      initElement(element as unknown as PoolBackedAnalogElement);
 
       // Prime junctions by setting initJct mode and calling load().
       const voltages = new Float64Array(3); // shared MNA vector stays at zero
@@ -164,8 +156,10 @@ describe("dcopInitJct", () => {
       // (still-zero) shared voltages array.
       element.load(ctx);
 
-      expect(tVcrit).toBeGreaterThan(0.6);
-      expect(tVcrit).toBeLessThan(0.85);
+      // Exact ngspice-derived value: vt * ln(vt / (sqrt(2) * IS * AREA))
+      // VT_ROOM = 300.15 * K / Q ≈ 0.025852 V, IS = 1e-16, AREA = 1
+      const expectedBjtTVcrit = VT_ROOM * Math.log(VT_ROOM / (Math.SQRT2 * BJT_NPN_DEFAULTS.IS * BJT_NPN_DEFAULTS.AREA));
+      expect(tVcrit).toBeCloseTo(expectedBjtTVcrit, 9);
     });
 
     it("PNP: arms Vbe=+tVcrit, Vbc=0 (same forward-bias magnitude as NPN)", () => {
@@ -174,14 +168,12 @@ describe("dcopInitJct", () => {
       // produce +tVcrit because load() computes vbeRaw as
       // polarity * (vB - vE) and that expression is always positive for a
       // forward-biased junction regardless of NPN/PNP convention.
-      const core = createBjtElement(
+      const element = createBjtElement(
         -1, // PNP
         new Map([["B", 1], ["C", 2], ["E", 3]]),
-        -1,
         makeBjtProps(),
       );
-      const { element } = withState(core);
-      withNodeIds(element, [1, 2, 3]);
+      initElement(element as unknown as PoolBackedAnalogElement);
 
       const voltages = new Float64Array(3);
       const ctx = makeSoloLoadCtx(voltages);
@@ -193,14 +185,12 @@ describe("dcopInitJct", () => {
 
     it("grounded collector (nodeC=0): priming is independent of node topology", () => {
       // This is the PNP-CC-style topology the old shared-vector scheme broke on.
-      const core = createBjtElement(
+      const element = createBjtElement(
         -1, // PNP
         new Map([["B", 1], ["C", 0], ["E", 2]]),
-        -1,
         makeBjtProps(),
       );
-      const { element } = withState(core);
-      withNodeIds(element, [1, 0, 2]);
+      initElement(element as unknown as PoolBackedAnalogElement);
 
       const voltages = new Float64Array(2);
       const ctx = makeSoloLoadCtx(voltages);
@@ -222,16 +212,13 @@ describe("dcopInitJct", () => {
   describe("BJT SPICE L1 primeJunctions", () => {
     it("NPN L1: arms Vbe=tVcrit, Vbc=0 as per-device local override", () => {
       const props = makeSpiceL1Props();
-      const core = createSpiceL1BjtElement(
+      const element = createSpiceL1BjtElement(
         1,
         false,
         new Map([["B", 1], ["C", 2], ["E", 3]]),
-        [],
-        -1,
         props,
       );
-      const { element } = withState(core);
-      withNodeIds(element, [1, 2, 3]);
+      initElement(element as unknown as PoolBackedAnalogElement);
 
       const voltages = new Float64Array(3);
       const ctx = makeSoloLoadCtx(voltages);
@@ -252,14 +239,12 @@ describe("dcopInitJct", () => {
   describe("Diode primeJunctions", () => {
     it("arms Vd=tVcrit as per-device local override", () => {
       const props = makeDiodeProps();
-      const core = createDiodeElement(
+      const element = createDiodeElement(
         new Map([["A", 1], ["K", 2]]),
-        [],
-        -1,
         props,
+        () => 0,
       );
-      const { element } = withState(core as any);
-      withNodeIds(element, [1, 2]);
+      initElement(element as unknown as PoolBackedAnalogElement);
 
       const voltages = new Float64Array(2);
       const ctx = makeSoloLoadCtx(voltages);
@@ -276,20 +261,20 @@ describe("dcopInitJct", () => {
       // Seed is one-shot.
       element.load(ctx);
 
-      expect(tVcrit).toBeGreaterThan(0.3);
-      expect(tVcrit).toBeLessThan(0.9);
+      // Exact ngspice-derived value: nVt * ln(nVt / (IS * sqrt(2)))
+      // N = 1, VT_ROOM ≈ 0.025852 V, IS = 1e-14
+      const expectedDiodeTVcrit = nVt * Math.log(nVt / (DIODE_PARAM_DEFAULTS.IS * Math.SQRT2));
+      expect(tVcrit).toBeCloseTo(expectedDiodeTVcrit, 9);
     });
 
     it("grounded cathode: priming is independent of node topology", () => {
       const props = makeDiodeProps();
-      const core = createDiodeElement(
+      const element = createDiodeElement(
         new Map([["A", 1], ["K", 0]]),
-        [],
-        -1,
         props,
+        () => 0,
       );
-      const { element } = withState(core as any);
-      withNodeIds(element, [1, 0]);
+      initElement(element as unknown as PoolBackedAnalogElement);
 
       const voltages = new Float64Array(1);
       const ctx = makeSoloLoadCtx(voltages);
@@ -307,14 +292,20 @@ describe("dcopInitJct", () => {
       // Simple resistor divider — no nonlinear elements.
       // Phase marker must still be emitted (even though no priming happens).
       const matrixSize = 3;
-      const branchRow = 2;
 
-      // Build V=5V → R1(1kΩ) → node2 → R2(1kΩ) → GND using the canonical
-      // load()-backed factories from test-helpers.
+      // Build V=5V → R1(1kΩ) → node2 → R2(1kΩ) → GND using production factories.
+      const resistorEntry = ResistorDefinition.modelRegistry!["behavioral"]!;
+      if (resistorEntry.kind !== "inline") throw new Error("Expected inline ModelEntry");
+      const resistorFactory = resistorEntry.factory;
+      const resistorProps1 = createTestPropertyBag();
+      resistorProps1.replaceModelParams({ ...RESISTOR_DEFAULTS, resistance: 1000 });
+      const resistorProps2 = createTestPropertyBag();
+      resistorProps2.replaceModelParams({ ...RESISTOR_DEFAULTS, resistance: 1000 });
+
       const elements: AnalogElement[] = [
-        makeVoltageSource(1, 0, branchRow, 5),
-        makeResistor(1, 2, 1000),
-        makeResistor(2, 0, 1000),
+        makeVsrc(1, 0, 5) as unknown as AnalogElement,
+        resistorFactory(new Map([["pos", 1], ["neg", 2]]), resistorProps1, () => 0) as unknown as AnalogElement,
+        resistorFactory(new Map([["pos", 2], ["neg", 0]]), resistorProps2, () => 0) as unknown as AnalogElement,
       ];
 
       const phases: DcOpNRPhase[] = [];

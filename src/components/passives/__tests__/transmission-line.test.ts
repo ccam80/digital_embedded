@@ -24,7 +24,10 @@ import { ConcreteCompiledAnalogCircuit } from "../../../solver/analog/compiled-a
 import { StatePool } from "../../../solver/analog/state-pool.js";
 import { MNAEngine } from "../../../solver/analog/analog-engine.js";
 import { EngineState } from "../../../core/engine-interface.js";
-import { makeVoltageSource, makeResistor, loadCtxFromFields } from "../../../solver/analog/__tests__/test-helpers.js";
+import { loadCtxFromFields, allocateStatePool, setupAll, makeTestSetupContext } from "../../../solver/analog/__tests__/test-helpers.js";
+import { makeDcVoltageSource, DC_VOLTAGE_SOURCE_DEFAULTS } from "../../sources/dc-voltage-source.js";
+import { NGSPICE_LOAD_ORDER } from "../../../core/analog-types.js";
+import { SparseSolver } from "../../../solver/analog/sparse-solver.js";
 import type { SparseSolver as SparseSolverType } from "../../../solver/analog/sparse-solver.js";
 import type { LoadContext } from "../../../solver/analog/load-context.js";
 import { makeDiagnostic } from "../../../solver/analog/diagnostics.js";
@@ -46,6 +49,12 @@ function getFactory(entry: ModelEntry): AnalogFactory {
 // Helpers
 // ---------------------------------------------------------------------------
 
+function makeVsrc(posNode: number, negNode: number, voltage: number): import("../../../solver/analog/element.js").AnalogElement {
+  const props = new PropertyBag();
+  props.replaceModelParams({ ...DC_VOLTAGE_SOURCE_DEFAULTS, voltage });
+  return makeDcVoltageSource(new Map([["pos", posNode], ["neg", negNode]]), props, () => 0);
+}
+
 interface StampCall {
   row: number;
   col: number;
@@ -55,6 +64,42 @@ interface StampCall {
 interface RHSCall {
   row: number;
   value: number;
+}
+
+function makeResistor(posNode: number, negNode: number, R: number): import("../../../solver/analog/element.js").AnalogElement {
+  const G = 1 / R;
+  let _hPP = -1, _hNN = -1, _hPN = -1, _hNP = -1;
+  const el: import("../../../solver/analog/element.js").AnalogElement = {
+    label: "",
+    ngspiceLoadOrder: NGSPICE_LOAD_ORDER.RES,
+    _pinNodes: new Map([["pos", posNode], ["neg", negNode]]),
+    _stateBase: -1,
+    branchIndex: -1,
+    setup(ctx: import("../../../solver/analog/setup-context.js").SetupContext): void {
+      const p = el._pinNodes.get("pos")!;
+      const n = el._pinNodes.get("neg")!;
+      _hPP = ctx.solver.allocElement(p, p);
+      _hNN = ctx.solver.allocElement(n, n);
+      _hPN = ctx.solver.allocElement(p, n);
+      _hNP = ctx.solver.allocElement(n, p);
+    },
+    load(ctx: import("../../../solver/analog/load-context.js").LoadContext): void {
+      ctx.solver.stampElement(_hPP, G);
+      ctx.solver.stampElement(_hNN, G);
+      ctx.solver.stampElement(_hPN, -G);
+      ctx.solver.stampElement(_hNP, -G);
+    },
+    getPinCurrents(rhs: Float64Array): number[] {
+      const p = el._pinNodes.get("pos")!;
+      const n = el._pinNodes.get("neg")!;
+      const I = (rhs[p] - rhs[n]) * G;
+      return [I, -I];
+    },
+    setParam(key: string, value: number): void {
+      if (key === "resistance") { const newG = 1 / value; Object.assign(el, { _G: newG }); }
+    },
+  };
+  return el;
 }
 
 function makeStubSolver(): { solver: SparseSolverType; stamps: StampCall[]; rhsStamps: RHSCall[] } {
@@ -132,24 +177,18 @@ function makeStubCtx(
 
 function buildTLineCircuit(opts: {
   nodeCount: number;
-  elements: (import("../../../solver/analog/element.js").AnalogElement | import("../../../core/analog-types.js").AnalogElementCore)[];
+  elements: import("../../../solver/analog/element.js").AnalogElement[];
 }): ConcreteCompiledAnalogCircuit {
-  // Allocate state pool for all pool-backed elements before creating the compiled circuit.
-  // This mirrors what the real compiler does in src/solver/analog/compiler.ts.
-  const allElements = opts.elements as import("../../../solver/analog/element.js").AnalogElement[];
-  let offset = 0;
-  for (const el of allElements) {
-    if ((el as any).poolBacked) {
-      (el as any).stateBaseOffset = offset;
-      offset += (el as any).stateSize ?? 0;
-    }
-  }
-  const statePool = new StatePool(Math.max(offset, 1));
-  for (const el of allElements) {
-    if ((el as any).poolBacked && (el as any).initState) {
-      (el as any).initState(statePool);
-    }
-  }
+  const allElements = opts.elements;
+
+  // Run setup() on all elements using a test SetupContext so TSTALLOC handles
+  // and branch rows are allocated before the engine builds its matrix.
+  const solver = new SparseSolver();
+  const setupCtx = makeTestSetupContext({ solver, startBranch: opts.nodeCount, startNode: opts.nodeCount + 100 });
+  setupAll(allElements, setupCtx);
+
+  // Allocate and initialise state pool for all pool-backed elements.
+  const statePool = allocateStatePool(allElements);
 
   return new ConcreteCompiledAnalogCircuit({
     nodeCount: opts.nodeCount,
@@ -205,19 +244,23 @@ describe("TLine", () => {
 
       const N = 3;
       const nodeIds = buildNodeIds(1, 2, 3, N);
-      // Branch indices: first N consecutive rows above node block.
       // nodeCount = 2 + 2*(N-1) = 2 + 4 = 6. Branches start at index 6.
-      const firstBranch = 6;
+      const nodeCount3 = 6;
 
-      const el = getFactory(TransmissionLineDefinition.modelRegistry!.behavioral!)(new Map([["P1b", nodeIds[0]], ["P2b", nodeIds[1]], ["P1a", 0], ["P2a", 0]]), nodeIds.slice(2), firstBranch, props, () => 0);
-
-      // Pool setup required before load (pool-backed architecture)
-      { const re = el as import("../../../solver/analog/element.js").ReactiveAnalogElement;
-        const pool = new StatePool(Math.max(re.stateSize, 1));
-        re.stateBaseOffset = 0; re.initState(pool); }
+      const el = getFactory(TransmissionLineDefinition.modelRegistry!.behavioral!)(
+        new Map([["P1b", nodeIds[0]], ["P2b", nodeIds[1]], ["P1a", 0], ["P2a", 0]]), props, () => 0,
+      );
 
       const voltages = new Float64Array(6 + N);
       const { solver, stamps } = makeStubSolver();
+
+      // Setup (using the same stub solver so TSTALLOC handles are valid for load)
+      { const setupCtx = makeTestSetupContext({ solver: solver as unknown as SparseSolver, startBranch: nodeCount3, startNode: nodeCount3 + 10 });
+        el.setup(setupCtx);
+        const pb = el as import("../../../core/analog-types.js").PoolBackedAnalogElement;
+        const pool = new StatePool(Math.max(pb.stateSize, 1));
+        pb._stateBase = 0; pb.initState(pool); }
+
       el.load(makeStubCtx(solver, { voltages, dt: 1e-9, method: "trapezoidal", order: 1, cktMode: MODETRAN | MODEINITTRAN }));
 
       // For a lossless line all resistive stamps (R_seg) should be zero conductance
@@ -232,10 +275,6 @@ describe("TLine", () => {
 
       // The practical assertion: internal node count = 2*(N-1) = 4
       expect(2 * (N - 1)).toBe(4);
-
-      // isReactive true, isNonlinear false
-      expect(el.isReactive).toBe(true);
-      expect(el.isNonlinear).toBe(false);
 
       // All stamps should be finite (no NaN or Infinity from zero division)
       for (const s of stamps) {
@@ -269,20 +308,22 @@ describe("TLine", () => {
       const nodeIds = buildNodeIds(1, 2, 3, N);
       const internalCount = 2 * (N - 1); // 18
       const nodeCount = 2 + internalCount; // 20
-      const firstBranch = nodeCount;
 
       const el = getFactory(TransmissionLineDefinition.modelRegistry!.behavioral!)(
-        new Map([["P1b", nodeIds[0]], ["P2b", nodeIds[1]], ["P1a", 0], ["P2a", 0]]), nodeIds.slice(2), firstBranch, props, () => 0,
+        new Map([["P1b", nodeIds[0]], ["P2b", nodeIds[1]], ["P1a", 0], ["P2a", 0]]), props, () => 0,
       );
-
-      // Pool setup required before load (pool-backed architecture)
-      { const re = el as import("../../../solver/analog/element.js").ReactiveAnalogElement;
-        const pool = new StatePool(Math.max(re.stateSize, 1));
-        re.stateBaseOffset = 0; re.initState(pool); }
 
       const dt = 1e-9;
       const voltages = new Float64Array(nodeCount + N);
       const { solver, stamps } = makeStubSolver();
+
+      // Setup (using the same stub solver so TSTALLOC handles are valid for load)
+      { const setupCtx = makeTestSetupContext({ solver: solver as unknown as SparseSolver, startBranch: nodeCount, startNode: nodeCount + 10 });
+        el.setup(setupCtx);
+        const pb = el as import("../../../core/analog-types.js").PoolBackedAnalogElement;
+        const pool = new StatePool(Math.max(pb.stateSize, 1));
+        pb._stateBase = 0; pb.initState(pool); }
+
       el.load(makeStubCtx(solver, { voltages, dt, method: "trapezoidal", order: 1, cktMode: MODETRAN | MODEINITTRAN }));
 
       // order-1 trap geq = L/dt. For each segment's inductor (SegmentInductorElement):
@@ -350,10 +391,7 @@ describe("TLine", () => {
       const N = 20;
       const internalCount = 2 * (N - 1); // 38
       const nodeCount = 2 + internalCount; // 40
-      const vsBranchIdx = nodeCount; // absolute row 40
-      const firstLBranch = nodeCount + 1; // absolute row 41
 
-      const nodeIds = buildNodeIds(1, 2, 3, N);
       const props = new PropertyBag();
       props.setModelParam("impedance", Z0);
       props.setModelParam("delay", tau);
@@ -362,11 +400,11 @@ describe("TLine", () => {
       props.setModelParam("segments", N);
 
       const tlineEl = getFactory(TransmissionLineDefinition.modelRegistry!.behavioral!)(
-        new Map([["P1b", nodeIds[0]], ["P2b", nodeIds[1]], ["P1a", 0], ["P2a", 0]]), nodeIds.slice(2), firstLBranch, props, () => 0,
+        new Map([["P1b", 1], ["P2b", 2], ["P1a", 0], ["P2a", 0]]), props, () => 0,
       );
 
       // Voltage source: 1V step on Port1 (node1 vs GND)
-      const vs = makeVoltageSource(1, 0, vsBranchIdx, 1.0);
+      const vs = makeVsrc(1, 0, 1.0);
 
       // Load resistor: Port2 (node2) to GND with R = Z0
       const rLoad = makeResistor(2, 0, Z0);
@@ -464,21 +502,17 @@ describe("TLine", () => {
       const nodeVs = 1;
       const port1 = 2;
       const port2 = 3;
-      const firstInt = 4;
 
-      const nodeIds2 = [port1, port2, ...Array.from({ length: 2 * (N - 1) }, (_, k) => firstInt + k)];
-      // Solver nodes: nodeVs=1, port1=2, port2=3, internals=4..4+2*(N-1)-1
+      // Solver nodes: nodeVs=1, port1=2, port2=3 (+ internal nodes allocated by setup)
       // nodeCount = 3 + 2*(N-1) = 3 + 18 = 21 for N=10
       const nc2 = 3 + 2 * (N - 1);
-      const vsBranch2 = nc2;     // absolute row for Vs
-      const firstL2 = nc2 + 1;  // absolute rows for N inductors
 
-      const vs2 = makeVoltageSource(nodeVs, 0, vsBranch2, 1.0);
+      const vs2 = makeVsrc(nodeVs, 0, 1.0);
       const rSrc = makeResistor(nodeVs, port1, Z0);
       const rLoad = makeResistor(port2, 0, Z0);
 
       const tlineEl2 = getFactory(TransmissionLineDefinition.modelRegistry!.behavioral!)(
-        new Map([["P1b", nodeIds2[0]], ["P2b", nodeIds2[1]], ["P1a", 0], ["P2a", 0]]), nodeIds2.slice(2), firstL2, props, () => 0,
+        new Map([["P1b", port1], ["P2b", port2], ["P1a", 0], ["P2a", 0]]), props, () => 0,
       );
 
       const compiled = buildTLineCircuit({
@@ -516,10 +550,8 @@ describe("TLine", () => {
       const N = 10;
       const internalCount = 2 * (N - 1);
       const nodeCount = 2 + internalCount;
-      const firstLBranch = nodeCount + 1;
 
       function buildLineCircuit(lossDb: number): { engine: MNAEngine; nodeCount: number } {
-        const nodeIds = buildNodeIds(1, 2, 3, N);
         const props = new PropertyBag();
         props.setModelParam("impedance", Z0);
         props.setModelParam("delay", tau);
@@ -528,9 +560,9 @@ describe("TLine", () => {
         props.setModelParam("segments", N);
 
         const tlineEl = getFactory(TransmissionLineDefinition.modelRegistry!.behavioral!)(
-          new Map([["P1b", nodeIds[0]], ["P2b", nodeIds[1]], ["P1a", 0], ["P2a", 0]]), nodeIds.slice(2), firstLBranch, props, () => 0,
+          new Map([["P1b", 1], ["P2b", 2], ["P1a", 0], ["P2a", 0]]), props, () => 0,
         );
-        const vs = makeVoltageSource(1, 0, nodeCount, 1.0);
+        const vs = makeVsrc(1, 0, 1.0);
         const rLoad = makeResistor(2, 0, Z0);
 
         const compiled = buildTLineCircuit({
@@ -577,9 +609,7 @@ describe("TLine", () => {
       function buildLineAtTime(N: number, evalTime: number): number {
         const internalCount = 2 * (N - 1);
         const nodeCount = 2 + internalCount;
-        const firstLBranch = nodeCount + 1;
 
-        const nodeIds = buildNodeIds(1, 2, 3, N);
         const props = new PropertyBag();
         props.setModelParam("impedance", Z0);
         props.setModelParam("delay", tau);
@@ -588,9 +618,9 @@ describe("TLine", () => {
         props.setModelParam("segments", N);
 
         const tlineEl = getFactory(TransmissionLineDefinition.modelRegistry!.behavioral!)(
-          new Map([["P1b", nodeIds[0]], ["P2b", nodeIds[1]], ["P1a", 0], ["P2a", 0]]), nodeIds.slice(2), firstLBranch, props, () => 0,
+          new Map([["P1b", 1], ["P2b", 2], ["P1a", 0], ["P2a", 0]]), props, () => 0,
         );
-        const vs = makeVoltageSource(1, 0, nodeCount, 1.0);
+        const vs = makeVsrc(1, 0, 1.0);
         const rLoad = makeResistor(2, 0, Z0);
 
         const compiled = buildTLineCircuit({
@@ -643,9 +673,7 @@ describe("TLine", () => {
       const N = 20;
       const internalCount = 2 * (N - 1);
       const nodeCount = 2 + internalCount;
-      const firstLBranch = nodeCount + 1;
 
-      const nodeIds = buildNodeIds(1, 2, 3, N);
       const props = new PropertyBag();
       props.setModelParam("impedance", Z0);
       props.setModelParam("delay", tau);
@@ -654,10 +682,10 @@ describe("TLine", () => {
       props.setModelParam("segments", N);
 
       const tlineEl = getFactory(TransmissionLineDefinition.modelRegistry!.behavioral!)(
-        new Map([["P1b", nodeIds[0]], ["P2b", nodeIds[1]], ["P1a", 0], ["P2a", 0]]), nodeIds.slice(2), firstLBranch, props, () => 0,
+        new Map([["P1b", 1], ["P2b", 2], ["P1a", 0], ["P2a", 0]]), props, () => 0,
       );
 
-      const vs = makeVoltageSource(1, 0, nodeCount, 1.0);
+      const vs = makeVsrc(1, 0, 1.0);
       const rSrc = makeResistor(1, 0, Z0);
 
       // No load resistor at Port2 — open circuit
@@ -712,7 +740,7 @@ describe("TransmissionLine", () => {
     });
 
     it("requires branch row", () => {
-      type BehavioralEntry = {kind:"inline";factory:AnalogFactory;branchCount?:number|((props:PropertyBag)=>number);getInternalNodeCount?:(props:PropertyBag)=>number};
+      type BehavioralEntry = {kind:"inline";factory:AnalogFactory;branchCount?:number|((props:PropertyBag)=>number)};
       const behavioral = TransmissionLineDefinition.modelRegistry?.behavioral as BehavioralEntry|undefined;
       expect(typeof behavioral?.branchCount).toBe("function");
       const props10 = new PropertyBag();
@@ -721,9 +749,6 @@ describe("TransmissionLine", () => {
       props1.setModelParam("segments", 1);
       expect((behavioral?.branchCount as (props:PropertyBag)=>number)(props10)).toBe(10);
       expect((behavioral?.branchCount as (props:PropertyBag)=>number)(props1)).toBe(1);
-      expect(typeof behavioral?.getInternalNodeCount).toBe("function");
-      expect(behavioral?.getInternalNodeCount?.(props10)).toBe(18);
-      expect(behavioral?.getInternalNodeCount?.(props1)).toBe(0);
     });
 
     it("has behavioral model entry", () => {
@@ -779,30 +804,6 @@ describe("TransmissionLine", () => {
   });
 
   describe("analog_element", () => {
-    it("isReactive is true", () => {
-      const props = new PropertyBag();
-      props.setModelParam("segments", 5);
-      props.setModelParam("impedance", 50);
-      props.setModelParam("delay", 10e-9);
-      props.setModelParam("lossPerMeter", 0);
-      props.setModelParam("length", 1.0);
-      const nodeIds = buildNodeIds(1, 2, 3, 5);
-      const el = getFactory(TransmissionLineDefinition.modelRegistry!.behavioral!)(new Map([["P1b", nodeIds[0]], ["P2b", nodeIds[1]], ["P1a", 0], ["P2a", 0]]), nodeIds.slice(2), 10, props, () => 0);
-      expect(el.isReactive).toBe(true);
-    });
-
-    it("isNonlinear is false", () => {
-      const props = new PropertyBag();
-      props.setModelParam("segments", 5);
-      props.setModelParam("impedance", 50);
-      props.setModelParam("delay", 10e-9);
-      props.setModelParam("lossPerMeter", 0);
-      props.setModelParam("length", 1.0);
-      const nodeIds = buildNodeIds(1, 2, 3, 5);
-      const el = getFactory(TransmissionLineDefinition.modelRegistry!.behavioral!)(new Map([["P1b", nodeIds[0]], ["P2b", nodeIds[1]], ["P1a", 0], ["P2a", 0]]), nodeIds.slice(2), 10, props, () => 0);
-      expect(el.isNonlinear).toBe(false);
-    });
-
     it("stamp produces entries into solver", () => {
       const props = new PropertyBag();
       props.setModelParam("segments", 3);
@@ -810,19 +811,22 @@ describe("TransmissionLine", () => {
       props.setModelParam("delay", 1e-9);
       props.setModelParam("lossPerMeter", 0);
       props.setModelParam("length", 1.0);
-      const nodeIds = buildNodeIds(1, 2, 3, 3);
       const internalCount = 2 * 2; // (N-1)*2 = 4
       const nodeCount = 2 + internalCount; // 6
-      const firstBranch = nodeCount;
-      const el = getFactory(TransmissionLineDefinition.modelRegistry!.behavioral!)(new Map([["P1b", nodeIds[0]], ["P2b", nodeIds[1]], ["P1a", 0], ["P2a", 0]]), nodeIds.slice(2), firstBranch, props, () => 0);
-
-      // Pool setup required before load (pool-backed architecture)
-      { const re = el as import("../../../solver/analog/element.js").ReactiveAnalogElement;
-        const pool = new StatePool(Math.max(re.stateSize, 1));
-        re.stateBaseOffset = 0; re.initState(pool); }
+      const el = getFactory(TransmissionLineDefinition.modelRegistry!.behavioral!)(
+        new Map([["P1b", 1], ["P2b", 2], ["P1a", 0], ["P2a", 0]]), props, () => 0,
+      );
 
       const voltages = new Float64Array(nodeCount + 3);
       const { solver, stamps } = makeStubSolver();
+
+      // Setup (same solver so TSTALLOC handles are valid for load)
+      { const setupCtx = makeTestSetupContext({ solver: solver as unknown as SparseSolver, startBranch: nodeCount, startNode: nodeCount + 10 });
+        el.setup(setupCtx);
+        const pb = el as import("../../../core/analog-types.js").PoolBackedAnalogElement;
+        const pool = new StatePool(Math.max(pb.stateSize, 1));
+        pb._stateBase = 0; pb.initState(pool); }
+
       el.load(makeStubCtx(solver, { voltages, dt: 1e-9, method: "trapezoidal", order: 1, cktMode: MODETRAN | MODEINITTRAN }));
       expect(stamps.length).toBeGreaterThan(0);
     });
@@ -834,8 +838,9 @@ describe("TransmissionLine", () => {
       props.setModelParam("delay", 10e-9);
       props.setModelParam("lossPerMeter", 0);
       props.setModelParam("length", 1.0);
-      const nodeIds = buildNodeIds(1, 2, 3, 3);
-      const el = getFactory(TransmissionLineDefinition.modelRegistry!.behavioral!)(new Map([["P1b", nodeIds[0]], ["P2b", nodeIds[1]], ["P1a", 0], ["P2a", 0]]), nodeIds.slice(2), 6, props, () => 0);
+      const el = getFactory(TransmissionLineDefinition.modelRegistry!.behavioral!)(
+        new Map([["P1b", 1], ["P2b", 2], ["P1a", 0], ["P2a", 0]]), props, () => 0,
+      );
       expect(el.load).toBeDefined();
     });
   });
@@ -859,10 +864,8 @@ describe("TransmissionLine", () => {
   describe("state_pool_infrastructure", () => {
     function makeEl(N: number): TransmissionLineElement {
       const nodeIds = buildNodeIds(1, 2, 3, N);
-      const firstBranch = 2 + 2 * (N - 1);
       return new TransmissionLineElement(
         nodeIds,
-        firstBranch,
         50,
         10e-9,
         0,
@@ -921,27 +924,27 @@ describe("TransmissionLine", () => {
       expect(combRL[0].stateSchema!.size).toBe(5);
     });
 
-    it("all reactive sub-elements have stateBaseOffset >= 0 after initState", () => {
-      // Sub-elements get stateBaseOffset assigned during initState, not construction.
+    it("all reactive sub-elements have _stateBase >= 0 after initState", () => {
+      // Sub-elements get _stateBase assigned during initState, not construction.
       const N = 4;
       const el = makeEl(N);
       const pool = new StatePool(Math.max((el as any).stateSize, 1));
       el.initState!(pool);
-      const subEls = (el as unknown as { _subElements: { stateSize?: number; stateBaseOffset?: number }[] })._subElements;
+      const subEls = (el as unknown as { _subElements: { stateSize?: number; _stateBase?: number }[] })._subElements;
       const reactive = subEls.filter(s => (s.stateSize ?? 0) > 0);
       for (const sub of reactive) {
-        expect(sub.stateBaseOffset).toBeGreaterThanOrEqual(0);
+        expect(sub._stateBase).toBeGreaterThanOrEqual(0);
       }
     });
 
-    it("reactive sub-elements have non-overlapping stateBaseOffset values", () => {
+    it("reactive sub-elements have non-overlapping _stateBase values", () => {
       const N = 4;
       const el = makeEl(N);
       const pool = new StatePool(Math.max((el as any).stateSize, 1));
       el.initState!(pool);
-      const subEls = (el as unknown as { _subElements: { stateSize?: number; stateBaseOffset?: number }[] })._subElements;
+      const subEls = (el as unknown as { _subElements: { stateSize?: number; _stateBase?: number }[] })._subElements;
       const reactive = subEls.filter(s => (s.stateSize ?? 0) > 0);
-      const offsets = reactive.map(s => s.stateBaseOffset!);
+      const offsets = reactive.map(s => s._stateBase!);
       const uniqueOffsets = new Set(offsets);
       expect(uniqueOffsets.size).toBe(offsets.length);
     });

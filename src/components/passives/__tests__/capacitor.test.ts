@@ -5,7 +5,6 @@
  *   - Companion model coefficient computation (all three integration methods)
  *   - updateCompanion() recomputation at each timestep
  *   - stamp() application of geq and ieq
- *   - isReactive flag
  *   - Component definition completeness
  *   - RC step response integration test
  */
@@ -18,8 +17,7 @@ import {
 import { PropertyBag } from "../../../core/properties.js";
 import { ComponentCategory, ComponentRegistry } from "../../../core/registry.js";
 import { StatePool } from "../../../solver/analog/state-pool.js";
-import type { AnalogElementCore } from "../../../core/analog-types.js";
-import type { ReactiveAnalogElement } from "../../../solver/analog/element.js";
+import type { AnalogElement, PoolBackedAnalogElement } from "../../../core/analog-types.js";
 import type { SparseSolver as SparseSolverType } from "../../../solver/analog/sparse-solver.js";
 import type { LoadContext } from "../../../solver/analog/load-context.js";
 import {
@@ -112,10 +110,10 @@ function getFactory(entry: ModelEntry): AnalogFactory {
 // withState: allocate a StatePool for a single element and call initState
 // ---------------------------------------------------------------------------
 
-function withState(core: AnalogElementCore): { element: ReactiveAnalogElement; pool: StatePool } {
-  const re = core as ReactiveAnalogElement;
+function withState(core: AnalogElement): { element: PoolBackedAnalogElement; pool: StatePool } {
+  const re = core as PoolBackedAnalogElement;
   const pool = new StatePool(Math.max(re.stateSize, 1));
-  re.stateBaseOffset = 0;
+  re._stateBase = 0;
   re.initState(pool);
   return { element: re, pool };
 }
@@ -143,10 +141,9 @@ function makeCaptureSolver(): { solver: SparseSolverType; stamps: [number, numbe
   return { solver, stamps, rhsStamps };
 }
 
-/** Call analogFactory, inject pinNodeIds, and wire up state pool (simulating what the compiler does). */
+/** Call analogFactory and wire up state pool (simulating what the compiler does). */
 function makeCapacitorElement(pinNodes: Map<string, number>, props: PropertyBag) {
-  const core = getFactory(CapacitorDefinition.modelRegistry!.behavioral!)(pinNodes, [], -1, props, () => 0);
-  Object.assign(core, { pinNodeIds: Array.from(pinNodes.values()), allNodeIds: Array.from(pinNodes.values()) });
+  const core = getFactory(CapacitorDefinition.modelRegistry!.behavioral!)(pinNodes, props, () => 0);
   const { element } = withState(core);
   return element;
 }
@@ -214,27 +211,56 @@ describe("Capacitor", () => {
     });
   });
 
-  describe("is_reactive_true", () => {
-    it("declares isReactive === true", () => {
-      const props = new PropertyBag();
-      props.setModelParam("capacitance", 1e-6);
-      const analogElement = makeCapacitorElement(new Map([["pos", 1], ["neg", 2]]), props);
-
-      expect(analogElement.isReactive).toBe(true);
-    });
-  });
-
   describe("definition", () => {
     it("CapacitorDefinition name is 'Capacitor'", () => {
       expect(CapacitorDefinition.name).toBe("Capacitor");
     });
 
-    it("CapacitorDefinition has analog model", () => {
-      expect(CapacitorDefinition.modelRegistry?.behavioral).toBeDefined();
-    });
-
-    it("CapacitorDefinition has analogFactory", () => {
-      expect((CapacitorDefinition.modelRegistry?.behavioral as {kind:"inline";factory:AnalogFactory}|undefined)?.factory).toBeDefined();
+    it("CapacitorDefinition behavioral factory produces element that stamps G=C/dt on diagonal", () => {
+      const C = 1e-6;
+      const dt = 1e-6;
+      const props = new PropertyBag();
+      props.setModelParam("capacitance", C);
+      const core = getFactory(CapacitorDefinition.modelRegistry!.behavioral!)(
+        new Map([["pos", 1], ["neg", 0]]), props, () => 0,
+      );
+      const { element } = withState(core);
+      const { solver, stamps, rhsStamps } = makeCaptureSolver();
+      const ag = new Float64Array(7);
+      ag[0] = 1 / dt;
+      ag[1] = -1 / dt;
+      const ctx = loadCtxFromFields({
+        cktMode: MODETRAN | MODEINITTRAN,
+        solver,
+        matrix: solver,
+        rhs: new Float64Array(2),
+        rhsOld: new Float64Array(2),
+        time: 0,
+        dt,
+        method: "trapezoidal",
+        order: 1,
+        deltaOld: [dt, dt, dt, dt, dt, dt, dt],
+        ag,
+        srcFact: 1,
+        noncon: { value: 0 },
+        limitingCollector: null,
+        convergenceCollector: null,
+        xfact: 1,
+        gmin: 1e-12,
+        reltol: 1e-3,
+        iabstol: 1e-12,
+        temp: 300.15,
+        vt: 0.025852,
+        cktFixLimit: false,
+        bypass: false,
+        voltTol: 1e-6,
+      });
+      element.load(ctx);
+      const geqExpected = C / dt;
+      const diagStamp = stamps.find((s) => s[0] === 1 && s[1] === 1);
+      expect(diagStamp).toBeDefined();
+      expect(diagStamp![2]).toBe(geqExpected);
+      void rhsStamps;
     });
 
     it("CapacitorDefinition category is PASSIVES", () => {
@@ -271,22 +297,21 @@ describe("Capacitor", () => {
   });
 
   describe("statePool", () => {
-    it("stateBaseOffset is -1 before compiler assigns it", () => {
+    it("_stateBase is -1 before compiler assigns it", () => {
       const props = new PropertyBag();
       props.setModelParam("capacitance", 1e-6);
       const core = getFactory(CapacitorDefinition.modelRegistry!.behavioral!)(
-        new Map([["pos", 1], ["neg", 2]]), [], -1, props, () => 0,
+        new Map([["pos", 1], ["neg", 2]]), props, () => 0,
       );
-      expect((core as ReactiveAnalogElement).stateBaseOffset).toBe(-1);
+      expect((core as PoolBackedAnalogElement)._stateBase).toBe(-1);
     });
 
     it("stampCompanion writes GEQ and IEQ to pool slots 0 and 1", () => {
       const props = new PropertyBag();
       props.setModelParam("capacitance", 1e-6);
       const core = getFactory(CapacitorDefinition.modelRegistry!.behavioral!)(
-        new Map([["pos", 1], ["neg", 2]]), [], -1, props, () => 0,
+        new Map([["pos", 1], ["neg", 2]]), props, () => 0,
       );
-      Object.assign(core, { pinNodeIds: [1, 2], allNodeIds: [1, 2] });
       const { element } = withState(core);
 
       const voltages = new Float64Array([5, 0]);
@@ -302,9 +327,8 @@ describe("Capacitor", () => {
       const props = new PropertyBag();
       props.setModelParam("capacitance", 1e-6);
       const core = getFactory(CapacitorDefinition.modelRegistry!.behavioral!)(
-        new Map([["pos", 1], ["neg", 2]]), [], -1, props, () => 0,
+        new Map([["pos", 1], ["neg", 2]]), props, () => 0,
       );
-      Object.assign(core, { pinNodeIds: [1, 2], allNodeIds: [1, 2] });
       const { element } = withState(core);
       const { solver } = makeCaptureSolver();
 
@@ -319,9 +343,8 @@ describe("Capacitor", () => {
       const props = new PropertyBag();
       props.setModelParam("capacitance", 1e-6);
       const core = getFactory(CapacitorDefinition.modelRegistry!.behavioral!)(
-        new Map([["pos", 1], ["neg", 2]]), [], -1, props, () => 0,
+        new Map([["pos", 1], ["neg", 2]]), props, () => 0,
       );
-      Object.assign(core, { pinNodeIds: [1, 2], allNodeIds: [1, 2] });
       const { element, pool } = withState(core);
 
       const { solver } = makeCaptureSolver();
@@ -339,9 +362,8 @@ describe("Capacitor", () => {
       const props = new PropertyBag();
       props.setModelParam("capacitance", C);
       const core = getFactory(CapacitorDefinition.modelRegistry!.behavioral!)(
-        new Map([["pos", 1], ["neg", 2]]), [], -1, props, () => 0,
+        new Map([["pos", 1], ["neg", 2]]), props, () => 0,
       );
-      Object.assign(core, { pinNodeIds: [1, 2], allNodeIds: [1, 2] });
       const { element, pool } = withState(core);
 
       // First call: v1 = 3V — rotate pool so v=3 lands in s1
@@ -362,9 +384,8 @@ describe("Capacitor", () => {
       const props = new PropertyBag();
       props.setModelParam("capacitance", C);
       const core = getFactory(CapacitorDefinition.modelRegistry!.behavioral!)(
-        new Map([["pos", 1], ["neg", 2]]), [], -1, props, () => 0,
+        new Map([["pos", 1], ["neg", 2]]), props, () => 0,
       );
-      Object.assign(core, { pinNodeIds: [1, 2], allNodeIds: [1, 2] });
       const { element, pool } = withState(core);
 
       // First call: v1 = 5V (non-zero) — rotate so v=5 lands in s1
@@ -391,9 +412,8 @@ describe("Capacitor initPred", () => {
     const props = new PropertyBag();
     props.setModelParam("capacitance", C);
     const core = getFactory(CapacitorDefinition.modelRegistry!.behavioral!)(
-      new Map([["pos", 1], ["neg", 2]]), [], -1, props, () => 0,
+      new Map([["pos", 1], ["neg", 2]]), props, () => 0,
     );
-    Object.assign(core, { pinNodeIds: [1, 2], allNodeIds: [1, 2] });
     const { element, pool } = withState(core);
 
     // First step: v=3V, accepted — charge C*3 lands in s1 after rotateStateVectors
@@ -431,7 +451,7 @@ describe("Capacitor temperature coefficients", () => {
     props.setModelParam("capacitance", 1e-6);
     props.setModelParam("TNOM", 300.15);
     getFactory(CapacitorDefinition.modelRegistry!.behavioral!)(
-      new Map([["pos", 1], ["neg", 2]]), [], -1, props, () => 0,
+      new Map([["pos", 1], ["neg", 2]]), props, () => 0,
     );
   });
 
@@ -442,7 +462,7 @@ describe("Capacitor temperature coefficients", () => {
     props.setModelParam("TC1", 0.001);
     props.setModelParam("TNOM", 250);
     getFactory(CapacitorDefinition.modelRegistry!.behavioral!)(
-      new Map([["pos", 1], ["neg", 2]]), [], -1, props, () => 0,
+      new Map([["pos", 1], ["neg", 2]]), props, () => 0,
     );
   });
 
@@ -451,7 +471,7 @@ describe("Capacitor temperature coefficients", () => {
     props.setModelParam("capacitance", 1e-6);
     props.setModelParam("SCALE", 3);
     getFactory(CapacitorDefinition.modelRegistry!.behavioral!)(
-      new Map([["pos", 1], ["neg", 2]]), [], -1, props, () => 0,
+      new Map([["pos", 1], ["neg", 2]]), props, () => 0,
     );
   });
 });
@@ -466,7 +486,7 @@ describe("Capacitor M multiplicity", () => {
     props.setModelParam("capacitance", 1e-6);
     props.setModelParam("M", 2);
     getFactory(CapacitorDefinition.modelRegistry!.behavioral!)(
-      new Map([["pos", 1], ["neg", 2]]), [], -1, props, () => 0,
+      new Map([["pos", 1], ["neg", 2]]), props, () => 0,
     );
   });
 
@@ -475,7 +495,7 @@ describe("Capacitor M multiplicity", () => {
     props.setModelParam("capacitance", 1e-6);
     props.setModelParam("M", 1);
     getFactory(CapacitorDefinition.modelRegistry!.behavioral!)(
-      new Map([["pos", 1], ["neg", 2]]), [], -1, props, () => 0,
+      new Map([["pos", 1], ["neg", 2]]), props, () => 0,
     );
   });
 });
@@ -523,8 +543,8 @@ describe("Capacitor trap-order-2 xmu parity (C4.6)", () => {
     const element = makeCapacitorElement(new Map([["pos", 1], ["neg", 2]]), props);
 
     // Seed previous-step state via pool.states[1] (s1 field deleted per A4).
-    const re = element as unknown as { _pool: { states: Float64Array[] }; stateBaseOffset: number };
-    const base = re.stateBaseOffset;
+    const re = element as unknown as { _pool: { states: Float64Array[] }; _stateBase: number };
+    const base = re._stateBase;
     re._pool.states[1][base + SLOT_Q_CAP]    = q1;
     re._pool.states[1][base + SLOT_CCAP_CAP] = ccapPrev;
 
@@ -589,6 +609,7 @@ describe("Capacitor trap-order-2 xmu parity (C4.6)", () => {
     expect(actualCcap).toBe(expectedCcap);
   });
 });
+
 
 // ---------------------------------------------------------------------------
 // C4.2 — Capacitor transient parity (10-step RC circuit)
@@ -660,7 +681,6 @@ describe("capacitor_load_transient_parity (C4.2)", () => {
     const geq = ag0 * C_val;
     const G_R = 1 / R_val;
 
-    // Element setup: cap between node 2 (pos) and gnd (0), pinNodeIds=[2,0]
     const props = new PropertyBag();
     props.setModelParam("capacitance", C_val);
     const element = makeCapacitorElement(new Map([["pos", 2], ["neg", 0]]), props);
@@ -703,7 +723,7 @@ describe("capacitor_load_transient_parity (C4.2)", () => {
     }
 
     const poolEl = element as unknown as {
-      _pool: { states: Float64Array[] }; stateBaseOffset: number;
+      _pool: { states: Float64Array[] }; _stateBase: number;
     };
 
     // 10-step transient loop
@@ -768,7 +788,7 @@ describe("capacitor_load_transient_parity (C4.2)", () => {
     // ceq_step9 = ag[1]*C*refV2[7].
     const SLOT_GEQ_F = 0;  // SLOT_GEQ = 0 in CAPACITOR_SCHEMA
     const SLOT_IEQ_F = 1;  // SLOT_IEQ = 1 in CAPACITOR_SCHEMA
-    const base = poolEl.stateBaseOffset;
+    const base = poolEl._stateBase;
     const s0 = poolEl._pool.states[0];
 
     // geq = ag[0]*C — bit-exact (niinteg.c:77)

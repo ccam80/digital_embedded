@@ -3,20 +3,20 @@ import { defineModelParams } from "../core/model-params.js";
 import type { AnalogFactory, ModelEntry } from "../core/registry.js";
 
 /**
- * Stub AnalogFactory that returns a minimal AnalogElementCore.
+ * Stub AnalogFactory that returns a minimal AnalogElement.
  * For use in tests that need a valid factory reference without real MNA logic.
  */
 export const STUB_ANALOG_FACTORY: AnalogFactory = (
-  _pinNodes,
-  _internalNodeIds,
-  _branchIdx,
+  pinNodes,
   _props,
   _getTime,
 ) => ({
-  branchIndex: -1,
+  label: "",
   ngspiceLoadOrder: 0,
-  isNonlinear: false,
-  isReactive: false,
+  _pinNodes: new Map(pinNodes),
+  _stateBase: -1,
+  branchIndex: -1,
+  setup: (_ctx: unknown) => {},
   load: (_ctx: unknown) => {},
   getPinCurrents: () => [],
   setParam: (_key: string, _value: number) => {},

@@ -23,7 +23,7 @@ import {
   type ComponentDefinition,
   type ComponentLayout,
 } from "../../core/registry.js";
-import type { AnalogElementCore } from "../../solver/analog/element.js";
+import type { AnalogElement } from "../../core/analog-types.js";
 import {
   createDiodeElement,
   DIODE_PARAM_DEFS,
@@ -164,8 +164,8 @@ export function executeLed(
 function createLedAnalogElementViaDiode(
   pinNodes: ReadonlyMap<string, number>,
   props: PropertyBag,
-  getTime?: () => number,
-): AnalogElementCore {
+  getTime: () => number,
+): AnalogElement {
   // Inject K=0 (cathode → ground); remap "in" → "A".
   const remappedPinNodes = new Map<string, number>([
     ["A", pinNodes.get("in")!],

@@ -33,7 +33,7 @@ import {
   type AttributeMapping,
   type ComponentDefinition,
 } from "../../core/registry.js";
-import type { IntegrationMethod, LoadContext } from "../../solver/analog/element.js";
+import type { AnalogElement, IntegrationMethod, LoadContext } from "../../solver/analog/element.js";
 import { NGSPICE_LOAD_ORDER } from "../../solver/analog/element.js";
 import { stampRHS } from "../../solver/analog/stamp-helpers.js";
 import { fetlim, limvds, pnjlim } from "../../solver/analog/newton-raphson.js";
@@ -749,13 +749,16 @@ const SLOT_VDSAT = 27;
 // createMosfetElement  AnalogElement factory (closure-based, BJT pattern)
 // Single load() ported from mos1load.c line-by-line.
 // No cached Float64Array state refs  pool.states[N] at call time.
+//
+// Internal 3-arg helper carrying the polarity flag. Public 3-arg
+// AnalogFactory entry points (createMosfetElement / createPmosfetElement)
+// wrap this and live below the function body.
 // ---------------------------------------------------------------------------
 
-export function createMosfetElement(
+function _createMosfetElementWithPolarity(
   polarity: 1 | -1,
   pinNodes: ReadonlyMap<string, number>,
   props: PropertyBag,
-  kpDefault: number = 2e-5,
 ) {
   const nodeG = pinNodes.get("G")!;
   const nodeS_ext = pinNodes.get("S")!;
@@ -813,7 +816,7 @@ export function createMosfetElement(
     sourceSquares: props.getModelParam<number>("sourceSquares"),
   };
 
-  const params = resolveParams(rawParams, kpDefault);
+  const params = resolveParams(rawParams, 2e-5);
   // VTO is used signed (ngspice mos1temp.c stores signed MOS1vt0 directly).
   // For PMOS, VTO is typically negative (e.g., -1.0). computeTempParams applies
   // polarity at the tVbi/tVto evaluation sites per mos1temp.c:170-176.
@@ -828,10 +831,12 @@ export function createMosfetElement(
   const ld = params.LD;
   const effectiveLength = params.L - 2 * ld;
   const oxideCapProbe = params.TOX > 0 ? (EPS_OX * EPS0 / params.TOX) * effectiveLength * params.W : 0;
-  const hasCapacitance = params.CBD > 0 || params.CBS > 0
+  // hasCapacitance: latent-stamp-gap — computed but not yet used to gate cap-companion
+  // stamps. Preserved per §A.20 (TS6133 surfaced, not deleted).
+  void (params.CBD > 0 || params.CBS > 0
     || params.CJ > 0 || params.CJSW > 0
     || params.CGDO > 0 || params.CGSO > 0 || params.CGBO > 0
-    || oxideCapProbe > 0;
+    || oxideCapProbe > 0);
 
   let pool: StatePoolRef;
   let base: number;
@@ -844,17 +849,21 @@ export function createMosfetElement(
   let _hDPD = -1, _hBG = -1, _hDPG = -1, _hSPG = -1;
   let _hSPS = -1, _hDPB = -1, _hSPB = -1, _hSPDP = -1;
 
-  return {
+  const internalLabels: string[] = [];
+
+  const el: import("../../solver/analog/element.js").PoolBackedAnalogElement & { readonly _p: ResolvedMosfetParams } = {
+    label: "",
     branchIndex: -1,
     _stateBase: -1,
     _pinNodes: new Map(pinNodes),
     ngspiceLoadOrder: NGSPICE_LOAD_ORDER.MOS,
-    isNonlinear: true,
-    isReactive: hasCapacitance,
     poolBacked: true as const,
     stateSchema: MOSFET_SCHEMA,
     stateSize: MOSFET_SCHEMA.size,
-    stateBaseOffset: -1,
+
+    getInternalNodeLabels(): readonly string[] {
+      return internalLabels;
+    },
 
     setup(ctx: import("../../solver/analog/setup-context.js").SetupContext): void {
       const solver = ctx.solver;
@@ -865,20 +874,27 @@ export function createMosfetElement(
 
       // State slots — mos1set.c:96-97 (MOS1numStates=17) plus digiTS DC-op scalars (slots 17-27).
       base = ctx.allocStates(MOSFET_SCHEMA.size);
-      this.stateBaseOffset = base;
+      el._stateBase = base;
 
       // Internal nodes — mos1set.c:131-178
+      internalLabels.length = 0;
       const needDrainPrime = (params.RD !== 0) ||
         (params.RSH !== 0 && params.drainSquares !== 0);
-      nodeD = needDrainPrime
-        ? ctx.makeVolt(this.label ?? "M", "drain")
-        : dNode;
+      if (needDrainPrime) {
+        nodeD = ctx.makeVolt(el.label || "M", "drain");
+        internalLabels.push("drain");
+      } else {
+        nodeD = dNode;
+      }
 
       const needSourcePrime = (params.RS !== 0) ||
         (params.RSH !== 0 && params.sourceSquares !== 0);
-      nodeS = needSourcePrime
-        ? ctx.makeVolt(this.label ?? "M", "source")
-        : sNode;
+      if (needSourcePrime) {
+        nodeS = ctx.makeVolt(el.label || "M", "source");
+        internalLabels.push("source");
+      } else {
+        nodeS = sNode;
+      }
 
       const dp = nodeD;
       const sp = nodeS;
@@ -910,7 +926,7 @@ export function createMosfetElement(
 
     initState(poolRef: StatePoolRef): void {
       pool = poolRef;
-      base = this.stateBaseOffset;
+      base = el._stateBase;
       applyInitialValues(MOSFET_SCHEMA, pool, base, {});
     },
 
@@ -1101,15 +1117,15 @@ export function createMosfetElement(
 
             if (ctx.limitingCollector) {
               ctx.limitingCollector.push({
-                elementIndex: (this as any).elementIndex ?? -1,
-                label: (this as any).label ?? "",
+                elementIndex: el.elementIndex ?? -1,
+                label: el.label,
                 junction: "GS", limitType: "fetlim",
                 vBefore: vgsBefore, vAfter: vgs,
                 wasLimited: vgs !== vgsBefore,
               });
               ctx.limitingCollector.push({
-                elementIndex: (this as any).elementIndex ?? -1,
-                label: (this as any).label ?? "",
+                elementIndex: el.elementIndex ?? -1,
+                label: el.label,
                 junction: "DS", limitType: "limvds",
                 vBefore: vdsBefore, vAfter: vds,
                 wasLimited: vds !== vdsBefore,
@@ -1130,15 +1146,15 @@ export function createMosfetElement(
 
             if (ctx.limitingCollector) {
               ctx.limitingCollector.push({
-                elementIndex: (this as any).elementIndex ?? -1,
-                label: (this as any).label ?? "",
+                elementIndex: el.elementIndex ?? -1,
+                label: el.label,
                 junction: "GS", limitType: "fetlim",
                 vBefore: vgdBefore, vAfter: vgd,
                 wasLimited: vgd !== vgdBefore,
               });
               ctx.limitingCollector.push({
-                elementIndex: (this as any).elementIndex ?? -1,
-                label: (this as any).label ?? "",
+                elementIndex: el.elementIndex ?? -1,
+                label: el.label,
                 junction: "DS", limitType: "limvds",
                 vBefore: vdsBefore, vAfter: vds,
                 wasLimited: vds !== vdsBefore,
@@ -1159,8 +1175,8 @@ export function createMosfetElement(
             icheckLimited = icheckLimited || vbsResult.limited;
             if (ctx.limitingCollector) {
               ctx.limitingCollector.push({
-                elementIndex: (this as any).elementIndex ?? -1,
-                label: (this as any).label ?? "",
+                elementIndex: el.elementIndex ?? -1,
+                label: el.label,
                 junction: "BS", limitType: "pnjlim",
                 vBefore: vbsBefore, vAfter: vbs,
                 wasLimited: vbsResult.limited,
@@ -1177,8 +1193,8 @@ export function createMosfetElement(
             icheckLimited = icheckLimited || vbdResult.limited;
             if (ctx.limitingCollector) {
               ctx.limitingCollector.push({
-                elementIndex: (this as any).elementIndex ?? -1,
-                label: (this as any).label ?? "",
+                elementIndex: el.elementIndex ?? -1,
+                label: el.label,
                 junction: "BD", limitType: "pnjlim",
                 vBefore: vbdBefore, vAfter: vbd,
                 wasLimited: vbdResult.limited,
@@ -1766,22 +1782,38 @@ export function createMosfetElement(
       return minDt;
     },
   };
+
+  return el;
 }
 
 // ---------------------------------------------------------------------------
-// getMosfetInternalNodeCount / Labels
+// Public 3-arg AnalogFactory entry points (spec §A.3).
+//
+// createMosfetElement   — NMOS polarity (default for tests / Nmosfet registry)
+// createPmosfetElement  — PMOS polarity (Pmosfet registry)
 // ---------------------------------------------------------------------------
 
-/**
- * Returns the number of internal nodes allocated for a MOSFET instance.
- * 1 per non-zero RD, 1 per non-zero RS; bulk is tied to source (no extra node).
- */
-export function getMosfetInternalNodeCount(props: PropertyBag): number {
-  let count = 0;
-  if (props.getModelParam<number>("RD") > 0) count++;
-  if (props.getModelParam<number>("RS") > 0) count++;
-  return count;
+export function createMosfetElement(
+  pinNodes: ReadonlyMap<string, number>,
+  props: PropertyBag,
+  _getTime: () => number = () => 0,
+): AnalogElement {
+  void _getTime;
+  return _createMosfetElementWithPolarity(1, pinNodes, props) as unknown as AnalogElement;
 }
+
+export function createPmosfetElement(
+  pinNodes: ReadonlyMap<string, number>,
+  props: PropertyBag,
+  _getTime: () => number = () => 0,
+): AnalogElement {
+  void _getTime;
+  return _createMosfetElementWithPolarity(-1, pinNodes, props) as unknown as AnalogElement;
+}
+
+// ---------------------------------------------------------------------------
+// getMosfetInternalNodeLabels (public helper for tests / registry consumers)
+// ---------------------------------------------------------------------------
 
 /**
  * Internal node labels in allocation order: D' (RD>0), S' (RS>0).
@@ -1988,56 +2020,50 @@ export const NmosfetDefinition: ComponentDefinition = {
   modelRegistry: {
     "spice-l1": {
       kind: "inline",
-      factory: (pinNodes, props, _getTime) =>
-        createMosfetElement(1, pinNodes, props, 2e-5),
+      factory: createMosfetElement,
       paramDefs: MOSFET_NMOS_PARAM_DEFS,
       params: MOSFET_NMOS_DEFAULTS,
-      mayCreateInternalNodes: true,
+
       ngspiceNodeMap: { G: "g", S: "s", D: "d" },
     },
     "2N7000": {
       kind: "inline",
-      factory: (pinNodes, props, _getTime) =>
-        createMosfetElement(1, pinNodes, props, 2e-5),
+      factory: createMosfetElement,
       paramDefs: MOSFET_NMOS_PARAM_DEFS,
       params: NMOS_2N7000,
-      mayCreateInternalNodes: true,
+
       ngspiceNodeMap: { G: "g", S: "s", D: "d" },
     },
     "BS170": {
       kind: "inline",
-      factory: (pinNodes, props, _getTime) =>
-        createMosfetElement(1, pinNodes, props, 2e-5),
+      factory: createMosfetElement,
       paramDefs: MOSFET_NMOS_PARAM_DEFS,
       params: NMOS_BS170,
-      mayCreateInternalNodes: true,
+
       ngspiceNodeMap: { G: "g", S: "s", D: "d" },
     },
     "IRF530N": {
       kind: "inline",
-      factory: (pinNodes, props, _getTime) =>
-        createMosfetElement(1, pinNodes, props, 2e-5),
+      factory: createMosfetElement,
       paramDefs: MOSFET_NMOS_PARAM_DEFS,
       params: NMOS_IRF530N,
-      mayCreateInternalNodes: true,
+
       ngspiceNodeMap: { G: "g", S: "s", D: "d" },
     },
     "IRF540N": {
       kind: "inline",
-      factory: (pinNodes, props, _getTime) =>
-        createMosfetElement(1, pinNodes, props, 2e-5),
+      factory: createMosfetElement,
       paramDefs: MOSFET_NMOS_PARAM_DEFS,
       params: NMOS_IRF540N,
-      mayCreateInternalNodes: true,
+
       ngspiceNodeMap: { G: "g", S: "s", D: "d" },
     },
     "IRFZ44N": {
       kind: "inline",
-      factory: (pinNodes, props, _getTime) =>
-        createMosfetElement(1, pinNodes, props, 2e-5),
+      factory: createMosfetElement,
       paramDefs: MOSFET_NMOS_PARAM_DEFS,
       params: NMOS_IRFZ44N,
-      mayCreateInternalNodes: true,
+
       ngspiceNodeMap: { G: "g", S: "s", D: "d" },
     },
   },
@@ -2062,56 +2088,50 @@ export const PmosfetDefinition: ComponentDefinition = {
   modelRegistry: {
     "spice-l1": {
       kind: "inline",
-      factory: (pinNodes, props, _getTime) =>
-        createMosfetElement(-1, pinNodes, props, 1e-5),
+      factory: createPmosfetElement,
       paramDefs: MOSFET_PMOS_PARAM_DEFS,
       params: MOSFET_PMOS_DEFAULTS,
-      mayCreateInternalNodes: true,
+
       ngspiceNodeMap: { G: "g", D: "d", S: "s" },
     },
     "BS250": {
       kind: "inline",
-      factory: (pinNodes, props, _getTime) =>
-        createMosfetElement(-1, pinNodes, props, 1e-5),
+      factory: createPmosfetElement,
       paramDefs: MOSFET_PMOS_PARAM_DEFS,
       params: PMOS_BS250,
-      mayCreateInternalNodes: true,
+
       ngspiceNodeMap: { G: "g", D: "d", S: "s" },
     },
     "IRF9520": {
       kind: "inline",
-      factory: (pinNodes, props, _getTime) =>
-        createMosfetElement(-1, pinNodes, props, 1e-5),
+      factory: createPmosfetElement,
       paramDefs: MOSFET_PMOS_PARAM_DEFS,
       params: PMOS_IRF9520,
-      mayCreateInternalNodes: true,
+
       ngspiceNodeMap: { G: "g", D: "d", S: "s" },
     },
     "IRFP9240": {
       kind: "inline",
-      factory: (pinNodes, props, _getTime) =>
-        createMosfetElement(-1, pinNodes, props, 1e-5),
+      factory: createPmosfetElement,
       paramDefs: MOSFET_PMOS_PARAM_DEFS,
       params: PMOS_IRFP9240,
-      mayCreateInternalNodes: true,
+
       ngspiceNodeMap: { G: "g", D: "d", S: "s" },
     },
     "IRF5210": {
       kind: "inline",
-      factory: (pinNodes, props, _getTime) =>
-        createMosfetElement(-1, pinNodes, props, 1e-5),
+      factory: createPmosfetElement,
       paramDefs: MOSFET_PMOS_PARAM_DEFS,
       params: PMOS_IRF5210,
-      mayCreateInternalNodes: true,
+
       ngspiceNodeMap: { G: "g", D: "d", S: "s" },
     },
     "IRF4905": {
       kind: "inline",
-      factory: (pinNodes, props, _getTime) =>
-        createMosfetElement(-1, pinNodes, props, 1e-5),
+      factory: createPmosfetElement,
       paramDefs: MOSFET_PMOS_PARAM_DEFS,
       params: PMOS_IRF4905,
-      mayCreateInternalNodes: true,
+
       ngspiceNodeMap: { G: "g", D: "d", S: "s" },
     },
   },

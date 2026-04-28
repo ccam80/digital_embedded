@@ -36,7 +36,7 @@ import {
   type AttributeMapping,
   type ComponentDefinition,
 } from "../../core/registry.js";
-import type { AnalogElementCore } from "../../core/analog-types.js";
+import type { AnalogElement } from "../../core/analog-types.js";
 import { NGSPICE_LOAD_ORDER } from "../../core/analog-types.js";
 import type { LoadContext } from "../../solver/analog/load-context.js";
 import type { SetupContext } from "../../solver/analog/setup-context.js";
@@ -134,15 +134,12 @@ function makeBjtProps(): PropertyBag {
 // measures I_LED via its branch variable; cccsCouple reads that branch.
 // ---------------------------------------------------------------------------
 
-class VsenseSubElement implements AnalogElementCore {
+class VsenseSubElement implements AnalogElement {
+  label: string = "";
   branchIndex: number = -1;
   readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.VSRC;
-  readonly isNonlinear: boolean = false;
-  readonly isReactive: boolean = false;
   _stateBase: number = -1;
   _pinNodes: Map<string, number>;
-
-  label: string;
 
   private _hPosBr: number = -1;
   private _hNegBr: number = -1;
@@ -215,15 +212,12 @@ class VsenseSubElement implements AnalogElementCore {
 // into the phototransistor base node.
 // ---------------------------------------------------------------------------
 
-class CccsSubElement implements AnalogElementCore {
+class CccsSubElement implements AnalogElement {
+  label: string = "";
   branchIndex: number = -1;
   readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.CCCS;
-  readonly isNonlinear: boolean = false;
-  readonly isReactive: boolean = false;
   _stateBase: number = -1;
   _pinNodes: Map<string, number>;
-
-  label: string;
   private readonly _gain: number;
   private readonly _senseLabel: string;
 
@@ -286,16 +280,21 @@ class CccsSubElement implements AnalogElementCore {
 }
 
 // ---------------------------------------------------------------------------
-// OptocouplerCompositeElement — composite AnalogElementCore
+// OptocouplerCompositeElement — composite AnalogElement
 // ---------------------------------------------------------------------------
 
-class OptocouplerCompositeElement implements AnalogElementCore {
+class OptocouplerCompositeElement implements AnalogElement {
+  label: string = "";
   branchIndex: number = -1;
   readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.DIO;
-  readonly isNonlinear: boolean = true;
-  readonly isReactive: boolean = false;
   _stateBase: number = -1;
   _pinNodes: Map<string, number>;
+
+  private _internalLabels: string[] = [];
+
+  getInternalNodeLabels(): readonly string[] {
+    return this._internalLabels;
+  }
 
   readonly _dLed: ReturnType<typeof createDiodeElement>;
   readonly _vSense: VsenseSubElement;
@@ -322,9 +321,13 @@ class OptocouplerCompositeElement implements AnalogElementCore {
     const nCollector = this._pinNodes.get("collector")!;
     const nEmitter   = this._pinNodes.get("emitter")!;
 
-    // Allocate internal nodes
-    const nSenseMid = ctx.makeVolt(this._vSense.label.replace(/_vSense$/, ""), "senseMid");
-    const nBase     = ctx.makeVolt(this._vSense.label.replace(/_vSense$/, ""), "base");
+    // Allocate internal nodes; record labels for getInternalNodeLabels()
+    this._internalLabels = [];
+    const deviceLabel = this._vSense.label.replace(/_vSense$/, "") || this.label || "optocoupler";
+    const nSenseMid = ctx.makeVolt(deviceLabel, "senseMid");
+    this._internalLabels.push("senseMid");
+    const nBase     = ctx.makeVolt(deviceLabel, "base");
+    this._internalLabels.push("base");
 
     // Wire dLed: anode → senseMid (K = senseMid, was 0 at construction)
     (this._dLed as any)._pinNodes.set("K", nSenseMid);
@@ -382,7 +385,7 @@ class OptocouplerCompositeElement implements AnalogElementCore {
 function createOptocouplerElement(
   pinNodes: ReadonlyMap<string, number>,
   props: PropertyBag,
-  label: string,
+  _getTime: () => number,
 ): OptocouplerCompositeElement {
   const ctr = props.getModelParam<number>("ctr");
   const Is  = props.getModelParam<number>("Is");
@@ -393,20 +396,23 @@ function createOptocouplerElement(
   const nCollector = pinNodes.get("collector")!;
   const nEmitter   = pinNodes.get("emitter")!;
 
+  const instanceLabel = "Optocoupler";
+
   // dLed: anode → _nSenseMid (K overwritten in setup() once _nSenseMid is allocated)
   const ledProps = makeLedProps(Is, n);
   const dLed = createDiodeElement(
     new Map([["A", nAnode], ["K", 0]]),
     ledProps,
+    _getTime,
   );
-  (dLed as any).label = `${label}_dLed`;
+  (dLed as any).label = `${instanceLabel}_dLed`;
 
   // vSense: 0-volt sense source; pos/_nSenseMid overwritten in setup()
-  const vSenseLbl = `${label}_vSense`;
+  const vSenseLbl = `${instanceLabel}_vSense`;
   const vSense = new VsenseSubElement(vSenseLbl, 0, nCathode);
 
   // cccsCouple: sense = vSense branch; output pos/_nBase overwritten in setup()
-  const cccsCoupLbl = `${label}_cccsCouple`;
+  const cccsCoupLbl = `${instanceLabel}_cccsCouple`;
   const cccsCouple = new CccsSubElement(cccsCoupLbl, 0, nEmitter, ctr, vSenseLbl);
 
   // bjtPhoto: base/_nBase overwritten in setup(); C = collector, E = emitter
@@ -416,7 +422,7 @@ function createOptocouplerElement(
     ["C", nCollector],
     ["E", nEmitter],
   ]), bjtProps);
-  (bjtPhoto as any).label = `${label}_bjtPhoto`;
+  (bjtPhoto as any).label = `${instanceLabel}_bjtPhoto`;
 
   return new OptocouplerCompositeElement(pinNodes, dLed, vSense, cccsCouple, bjtPhoto);
 }
@@ -597,13 +603,9 @@ export const OptocouplerDefinition: ComponentDefinition = {
   modelRegistry: {
     "behavioral": {
       kind: "inline",
-      factory: (pinNodes, props, _getTime) => {
-        const label = "Optocoupler";
-        return createOptocouplerElement(pinNodes, props, label);
-      },
+      factory: createOptocouplerElement,
       paramDefs: OPTOCOUPLER_PARAM_DEFS,
       params: OPTOCOUPLER_DEFAULTS,
-      mayCreateInternalNodes: true,
     },
   },
   defaultModel: "behavioral",

@@ -21,9 +21,8 @@ import {
   type ComponentDefinition,
 } from "../../core/registry.js";
 import { formatSI } from "../../editor/si-format.js";
-import type { AnalogElementCore } from "../../core/analog-types.js";
+import type { AnalogElement, PoolBackedAnalogElement, IntegrationMethod, LoadContext } from "../../solver/analog/element.js";
 import { NGSPICE_LOAD_ORDER } from "../../core/analog-types.js";
-import type { ReactiveAnalogElementCore, IntegrationMethod, LoadContext } from "../../solver/analog/element.js";
 import type { SetupContext } from "../../solver/analog/setup-context.js";
 import { cktTerr } from "../../solver/analog/ckt-terr.js";
 import { niIntegrate } from "../../solver/analog/ni-integrate.js";
@@ -177,19 +176,15 @@ const INDUCTOR_SCHEMA: StateSchema = defineStateSchema("AnalogInductorElement", 
 const SLOT_PHI  = 0;  // ngspice INDflux = INDstate+0
 const SLOT_CCAP = 1;  // ngspice INDvolt = INDstate+1 (= NIintegrate ccap)
 
-export class AnalogInductorElement implements ReactiveAnalogElementCore {
-  pinNodeIds!: readonly number[];  // set by compiler via Object.assign after factory returns
+export class AnalogInductorElement implements PoolBackedAnalogElement {
+  label: string = "";
   branchIndex: number = -1;
   _stateBase: number = -1;
-  _pinNodes: Map<string, number> = new Map();
-  _label: string = "";
+  _pinNodes: Map<string, number>;
   readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.IND;
-  readonly isNonlinear = false;
-  readonly isReactive = true;
   readonly poolBacked = true as const;
   readonly stateSchema = INDUCTOR_SCHEMA;
   readonly stateSize = INDUCTOR_SCHEMA.size;
-  stateBaseOffset = -1;
 
   private _nominalL: number;
   private L: number;
@@ -200,20 +195,21 @@ export class AnalogInductorElement implements ReactiveAnalogElementCore {
   private _SCALE: number;
   private _M: number;
   private _pool!: StatePoolRef;
-  private _hPIbr:   number = -1;
-  private _hNIbr:   number = -1;
-  private _hIbrN:   number = -1;
-  private _hIbrP:   number = -1;
-  private _hIbrIbr: number = -1;
+  protected _hPIbr:   number = -1;
+  protected _hNIbr:   number = -1;
+  protected _hIbrN:   number = -1;
+  protected _hIbrP:   number = -1;
+  protected _hIbrIbr: number = -1;
 
-  constructor(inductance: number, IC: number, TC1: number, TC2: number, TNOM: number, SCALE: number, M: number) {
-    this._nominalL = inductance;
-    this._IC = IC;
-    this._TC1 = TC1;
-    this._TC2 = TC2;
-    this._TNOM = TNOM;
-    this._SCALE = SCALE;
-    this._M = M;
+  constructor(pinNodes: ReadonlyMap<string, number>, props: PropertyBag) {
+    this._pinNodes = new Map(pinNodes);
+    this._nominalL = props.getModelParam<number>("inductance");
+    this._IC    = props.hasModelParam("IC")    ? props.getModelParam<number>("IC")    : INDUCTOR_DEFAULTS["IC"]!;
+    this._TC1   = props.hasModelParam("TC1")   ? props.getModelParam<number>("TC1")   : INDUCTOR_DEFAULTS["TC1"]!;
+    this._TC2   = props.hasModelParam("TC2")   ? props.getModelParam<number>("TC2")   : INDUCTOR_DEFAULTS["TC2"]!;
+    this._TNOM  = props.hasModelParam("TNOM")  ? props.getModelParam<number>("TNOM")  : INDUCTOR_DEFAULTS["TNOM"]!;
+    this._SCALE = props.hasModelParam("SCALE") ? props.getModelParam<number>("SCALE") : INDUCTOR_DEFAULTS["SCALE"]!;
+    this._M     = props.hasModelParam("M")     ? props.getModelParam<number>("M")     : INDUCTOR_DEFAULTS["M"]!;
     this.L = this._computeEffectiveL();
   }
 
@@ -235,7 +231,7 @@ export class AnalogInductorElement implements ReactiveAnalogElementCore {
 
     // indsetup.c:84-88 — CKTmkCur guard (idempotent, mirrors VSRCfindBr pattern).
     if (this.branchIndex === -1) {
-      this.branchIndex = ctx.makeCur(this._label, "branch");
+      this.branchIndex = ctx.makeCur(this.label, "branch");
     }
     const b = this.branchIndex;
 
@@ -248,16 +244,16 @@ export class AnalogInductorElement implements ReactiveAnalogElementCore {
   }
 
   findBranchFor(name: string, ctx: SetupContext): number {
-    if (name !== this._label) return 0;
+    if (name !== this.label) return 0;
     if (this.branchIndex === -1) {
-      this.branchIndex = ctx.makeCur(this._label, "branch");
+      this.branchIndex = ctx.makeCur(this.label, "branch");
     }
     return this.branchIndex;
   }
 
   initState(pool: StatePoolRef): void {
     this._pool = pool;
-    applyInitialValues(INDUCTOR_SCHEMA, pool, this.stateBaseOffset, {});
+    applyInitialValues(INDUCTOR_SCHEMA, pool, this._stateBase, {});
   }
 
   setParam(key: string, value: number): void {
@@ -312,7 +308,7 @@ export class AnalogInductorElement implements ReactiveAnalogElementCore {
     const { solver, rhsOld, ag, cktMode: mode } = ctx;
     const b = this.branchIndex;
     const L = this.L;
-    const base = this.stateBaseOffset;
+    const base = this._stateBase;
     const s0 = this._pool.states[0];
     const s1 = this._pool.states[1];
     const s2 = this._pool.states[2];
@@ -400,7 +396,7 @@ export class AnalogInductorElement implements ReactiveAnalogElementCore {
     method: IntegrationMethod,
     lteParams: import("../../solver/analog/ckt-terr.js").LteParams,
   ): number {
-    const base = this.stateBaseOffset;
+    const base = this._stateBase;
     const s0 = this._pool.states[0];
     const s1 = this._pool.states[1];
     const s2 = this._pool.states[2];
@@ -419,17 +415,8 @@ function createInductorElement(
   pinNodes: ReadonlyMap<string, number>,
   props: PropertyBag,
   _getTime: () => number,
-): AnalogElementCore {
-  const L     = props.getModelParam<number>("inductance");
-  const IC    = props.hasModelParam("IC")    ? props.getModelParam<number>("IC")    : INDUCTOR_DEFAULTS["IC"]!;
-  const TC1   = props.hasModelParam("TC1")   ? props.getModelParam<number>("TC1")   : INDUCTOR_DEFAULTS["TC1"]!;
-  const TC2   = props.hasModelParam("TC2")   ? props.getModelParam<number>("TC2")   : INDUCTOR_DEFAULTS["TC2"]!;
-  const TNOM  = props.hasModelParam("TNOM")  ? props.getModelParam<number>("TNOM")  : INDUCTOR_DEFAULTS["TNOM"]!;
-  const SCALE = props.hasModelParam("SCALE") ? props.getModelParam<number>("SCALE") : INDUCTOR_DEFAULTS["SCALE"]!;
-  const M     = props.hasModelParam("M")     ? props.getModelParam<number>("M")     : INDUCTOR_DEFAULTS["M"]!;
-  const el = new AnalogInductorElement(L, IC, TC1, TC2, TNOM, SCALE, M);
-  el._pinNodes = new Map(pinNodes);
-  return el;
+): AnalogElement {
+  return new AnalogInductorElement(pinNodes, props);
 }
 
 // ---------------------------------------------------------------------------
@@ -491,15 +478,6 @@ export const InductorDefinition: ComponentDefinition = {
       factory: createInductorElement,
       paramDefs: INDUCTOR_PARAM_DEFS,
       params: INDUCTOR_DEFAULTS,
-      findBranchFor(name: string, ctx: import("../../solver/analog/setup-context.js").SetupContext): number {
-        const el = ctx.findDevice(name);
-        if (!el) return 0;
-        const ind = el as unknown as AnalogInductorElement;
-        if (ind.branchIndex === -1) {
-          ind.branchIndex = ctx.makeCur(name, "branch");
-        }
-        return ind.branchIndex;
-      },
     },
   },
   defaultModel: "behavioral",

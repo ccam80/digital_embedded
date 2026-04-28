@@ -70,7 +70,7 @@ import {
   type AttributeMapping,
   type ComponentDefinition,
 } from "../../core/registry.js";
-import type { AnalogElementCore, LoadContext } from "../../solver/analog/element.js";
+import type { AnalogElement, LoadContext } from "../../solver/analog/element.js";
 import { NGSPICE_LOAD_ORDER } from "../../solver/analog/element.js";
 import type { SetupContext } from "../../solver/analog/setup-context.js";
 import { stampRHS } from "../../solver/analog/stamp-helpers.js";
@@ -148,7 +148,8 @@ function buildOTAPinDeclarations(): PinDeclaration[] {
 function createOTAElement(
   pinNodes: ReadonlyMap<string, number>,
   props: PropertyBag,
-): AnalogElementCore {
+  _getTime: () => number,
+): AnalogElement {
   const p: Record<string, number> = {
     gmMax: props.getModelParam<number>("gmMax"),
     vt:    props.getModelParam<number>("vt"),
@@ -165,32 +166,31 @@ function createOTAElement(
   let iBias = 0;
   let iOut = 0; // cached output current for getPinCurrents
 
+  // Cached TSTALLOC handles (vccsset.c:43-46): 4 entries for VCCS
+  // Closure-locals per §A.9; allocated once in setup(), used every NR iteration in load().
+  let _hPCP = -1;  // (nOutP, nVp)  — VCCSposContPosptr
+  let _hPCN = -1;  // (nOutP, nVm)  — VCCSposContNegptr
+  let _hNCP = -1;  // (nOutN, nVp)  — VCCSnegContPosptr
+  let _hNCN = -1;  // (nOutN, nVm)  — VCCSnegContNegptr
+
   function readNode(rhs: Float64Array, n: number): number {
     return rhs[n];
   }
 
   return {
+    label: "",
     branchIndex: -1,
     ngspiceLoadOrder: NGSPICE_LOAD_ORDER.VCCS,
-    isNonlinear: true,
-    isReactive: false,
     _stateBase: -1,
     _pinNodes: new Map(pinNodes),
-
-    // Cached TSTALLOC handles (vccsset.c:43-46): 4 entries for VCCS
-    // Allocated once in setup(), used every NR iteration in load().
-    _hPCP: -1 as number,   // (nOutP, nVp)  — VCCSposContPosptr
-    _hPCN: -1 as number,   // (nOutP, nVm)  — VCCSposContNegptr
-    _hNCP: -1 as number,   // (nOutN, nVp)  — VCCSnegContPosptr
-    _hNCN: -1 as number,   // (nOutN, nVm)  — VCCSnegContNegptr
 
     setup(ctx: SetupContext): void {
       // VCCS TSTALLOC sequence (vccsset.c:43-46): 4 entries
       // Skip entries where either node is ground (0).
-      if (nOutP > 0 && nVp > 0) this._hPCP = ctx.solver.allocElement(nOutP, nVp);
-      if (nOutP > 0 && nVm > 0) this._hPCN = ctx.solver.allocElement(nOutP, nVm);
-      if (nOutN > 0 && nVp > 0) this._hNCP = ctx.solver.allocElement(nOutN, nVp);
-      if (nOutN > 0 && nVm > 0) this._hNCN = ctx.solver.allocElement(nOutN, nVm);
+      if (nOutP > 0 && nVp > 0) _hPCP = ctx.solver.allocElement(nOutP, nVp);
+      if (nOutP > 0 && nVm > 0) _hPCN = ctx.solver.allocElement(nOutP, nVm);
+      if (nOutN > 0 && nVp > 0) _hNCP = ctx.solver.allocElement(nOutN, nVp);
+      if (nOutN > 0 && nVm > 0) _hNCN = ctx.solver.allocElement(nOutN, nVm);
     },
 
     load(ctx: LoadContext): void {
@@ -213,8 +213,8 @@ function createOTAElement(
       const iOutNow = iBias * tanhX;
       iOut = iOutNow;
 
-      // Effective transconductance: dI_out/dV_diff = I_bias/(2*V_T) * sechÂ²(x)
-      // sechÂ²(x) = 1 - tanhÂ²(x)
+      // Effective transconductance: dI_out/dV_diff = I_bias/(2*V_T) * sech²(x)
+      // sech²(x) = 1 - tanh²(x)
       const sech2 = 1 - tanhX * tanhX;
       const gmRaw = (iBias / twoVt) * sech2;
       const gmEff = Math.min(Math.abs(gmRaw), p.gmMax);
@@ -223,10 +223,10 @@ function createOTAElement(
       const iNR = iOutNow - gmEff * vDiff;
 
       // Stamp VCCS using cached handles (vccsset.c:43-46).
-      if (this._hPCP >= 0) solver.stampElement(this._hPCP, -gmEff);
-      if (this._hPCN >= 0) solver.stampElement(this._hPCN,  gmEff);
-      if (this._hNCP >= 0) solver.stampElement(this._hNCP,  gmEff);
-      if (this._hNCN >= 0) solver.stampElement(this._hNCN, -gmEff);
+      if (_hPCP >= 0) solver.stampElement(_hPCP, -gmEff);
+      if (_hPCN >= 0) solver.stampElement(_hPCN,  gmEff);
+      if (_hNCP >= 0) solver.stampElement(_hNCP,  gmEff);
+      if (_hNCN >= 0) solver.stampElement(_hNCN, -gmEff);
 
       // RHS: Norton constant
       if (nOutP !== 0) stampRHS(ctx.rhs, nOutP,  iNR);
@@ -393,8 +393,8 @@ export const OTADefinition: ComponentDefinition = {
   modelRegistry: {
     "behavioral": {
       kind: "inline",
-      factory: (pinNodes, props, _getTime) =>
-        createOTAElement(pinNodes, props),
+      factory: (pinNodes, props, getTime) =>
+        createOTAElement(pinNodes, props, getTime),
       paramDefs: OTA_PARAM_DEFS,
       params: OTA_DEFAULTS,
     },

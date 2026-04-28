@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Quartz crystal analog component  Butterworth-Van Dyke (BVD) equivalent circuit.
  *
  * The BVD model represents the mechanical resonance of a quartz crystal as a
@@ -8,15 +8,15 @@
  *   Shunt arm:             C_0               (directly across A and B)
  *
  * This produces two resonant frequencies:
- *   Series resonance:   f_s = 1 / (2Ï€ âˆš(L_s Â· C_s))
- *   Parallel resonance: f_p  f_s Â· âˆš(1 + C_s / C_0)   (slightly above f_s)
+ *   Series resonance:   f_s = 1 / (2π √(L_s · C_s))
+ *   Parallel resonance: f_p  f_s · √(1 + C_s / C_0)   (slightly above f_s)
  *
  * MNA topology (1-based node indices, 0 = ground):
- *   pinNodeIds[0] = n_A      external terminal A
- *   pinNodeIds[1] = n_B      external terminal B
- *   pinNodeIds[2] = n1       junction between R_s and L_s
- *   pinNodeIds[3] = n2       junction between L_s and C_s
- *   branchIndex               branch current row for L_s
+ *   _pinNodes.get("A")  = n_A      external terminal A
+ *   _pinNodes.get("B")  = n_B      external terminal B
+ *   n1                             junction between R_s and L_s (internal)
+ *   n2                             junction between L_s and C_s (internal)
+ *   branchIndex                    branch current row for L_s
  *
  * Elements stamped:
  *   R_s: conductance G_s = 1/R_s between n_A and n1
@@ -25,8 +25,8 @@
  *   C_0: companion model (geq_c0, ieq_c0) between n_A and n_B
  *
  * Derived parameters from user-specified frequency, Q, C_s, C_0:
- *   L_s = 1 / (4Ï€Â² Â· fÂ² Â· C_s)
- *   R_s = 2Ï€ Â· f Â· L_s / Q
+ *   L_s = 1 / (4π² · f² · C_s)
+ *   R_s = 2π · f · L_s / Q
  */
 
 import { AbstractCircuitElement } from "../../core/element.js";
@@ -44,9 +44,9 @@ import {
   type ComponentDefinition,
 } from "../../core/registry.js";
 import { formatSI } from "../../editor/si-format.js";
-import type { AnalogElementCore } from "../../core/analog-types.js";
+import type { PoolBackedAnalogElement } from "../../core/analog-types.js";
 import { NGSPICE_LOAD_ORDER } from "../../core/analog-types.js";
-import type { ReactiveAnalogElement, IntegrationMethod, LoadContext } from "../../solver/analog/element.js";
+import type { IntegrationMethod, LoadContext } from "../../solver/analog/element.js";
 import type { SetupContext } from "../../solver/analog/setup-context.js";
 import { MODETRAN, MODETRANOP, MODEINITPRED, MODEINITTRAN } from "../../solver/analog/ckt-mode.js";
 import { stampRHS } from "../../solver/analog/stamp-helpers.js";
@@ -63,7 +63,7 @@ import { cktTerr } from "../../solver/analog/ckt-terr.js";
 // State-pool schema
 // ---------------------------------------------------------------------------
 
-// Slot layout  15 slots total (3 reactive stores Ã— 4 slots each + 3 CCAP slots).
+// Slot layout  15 slots total (3 reactive stores × 4 slots each + 3 CCAP slots).
 // Previous values are read from s1/s2/s3 at the same offsets.
 const CRYSTAL_SCHEMA: StateSchema = defineStateSchema("AnalogCrystalElement", [
   // L_s (inductor motional arm)
@@ -110,7 +110,7 @@ const SLOT_CCAP_C0 = 14;
 
 /**
  * Compute motional inductance from series resonant frequency and motional capacitance.
- * L_s = 1 / (4Ï€Â² Â· fÂ² Â· C_s)
+ * L_s = 1 / (4π² · f² · C_s)
  */
 export function crystalMotionalInductance(freqHz: number, Cs: number): number {
   return 1 / (4 * Math.PI * Math.PI * freqHz * freqHz * Cs);
@@ -118,7 +118,7 @@ export function crystalMotionalInductance(freqHz: number, Cs: number): number {
 
 /**
  * Compute series resistance from frequency, motional inductance, and quality factor.
- * R_s = 2Ï€ Â· f Â· L_s / Q
+ * R_s = 2π · f · L_s / Q
  */
 export function crystalSeriesResistance(freqHz: number, Ls: number, Q: number): number {
   return (2 * Math.PI * freqHz * Ls) / Q;
@@ -243,20 +243,15 @@ export class CrystalCircuitElement extends AbstractCircuitElement {
 // AnalogCrystalElement  MNA implementation
 // ---------------------------------------------------------------------------
 
-export class AnalogCrystalElement implements ReactiveAnalogElement {
-  readonly pinNodeIds: readonly number[];
-  readonly allNodeIds: readonly number[];
-  _stateBase: number = -1;
+export class AnalogCrystalElement implements PoolBackedAnalogElement {
+  label: string = "";
   _pinNodes: Map<string, number> = new Map();
-  _label: string = "";
+  _stateBase: number = -1;
+  branchIndex: number = -1;
   readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.CAP;
-  readonly isNonlinear = false;
-  readonly isReactive = true;
   readonly poolBacked = true as const;
   readonly stateSchema = CRYSTAL_SCHEMA;
   readonly stateSize = CRYSTAL_SCHEMA.size;
-  stateBaseOffset = -1;
-  setParam(_key: string, _value: number): void {}
 
   // Series resistance
   private G_s: number;
@@ -269,10 +264,9 @@ export class AnalogCrystalElement implements ReactiveAnalogElement {
   // Pool reference  set by initState(); state arrays accessed via pool.states[N] at call time.
   private _pool!: StatePoolRef;
 
-  // Internal nodes and branch — populated in setup()
-  _n1Node: number = -1;
-  _n2Node: number = -1;
-  _branchIndex: number = -1;
+  // Internal nodes — populated in setup()
+  private _n1Node: number = -1;
+  private _n2Node: number = -1;
 
   // Rs handles
   private _hRs_PP: number = -1;  private _hRs_NN: number = -1;
@@ -288,22 +282,24 @@ export class AnalogCrystalElement implements ReactiveAnalogElement {
   private _hC0_PP: number = -1;  private _hC0_NN: number = -1;
   private _hC0_PN: number = -1;  private _hC0_NP: number = -1;
 
+  // Internal-node label tracking for getInternalNodeLabels()
+  private readonly _internalLabels: string[] = [];
+
   /**
-   * @param pinNodeIds - [n_A, n_B] external terminals only; n1 and n2 allocated in setup()
+   * @param pinNodes - ReadonlyMap with "A" and "B" external terminals
    * @param Rs          - Series (motional) resistance in ohms
    * @param Ls          - Motional inductance in henries
    * @param Cs          - Motional capacitance in farads
    * @param C0          - Shunt electrode capacitance in farads
    */
   constructor(
-    pinNodeIds: number[],
+    pinNodes: ReadonlyMap<string, number>,
     Rs: number,
     Ls: number,
     Cs: number,
     C0: number,
   ) {
-    this.pinNodeIds = pinNodeIds;
-    this.allNodeIds = pinNodeIds;
+    this._pinNodes = new Map(pinNodes);
     this.G_s = 1 / Math.max(Rs, 1e-12);
     this.L_s = Ls;
     this.C_s = Cs;
@@ -312,23 +308,25 @@ export class AnalogCrystalElement implements ReactiveAnalogElement {
 
   setup(ctx: SetupContext): void {
     const solver = ctx.solver;
-    const aNode = this.pinNodeIds[0];  // external terminal A
-    const bNode = this.pinNodeIds[1];  // external terminal B
+    const aNode = this._pinNodes.get("A")!;  // external terminal A
+    const bNode = this._pinNodes.get("B")!;  // external terminal B
 
     // Allocate 15 state slots as a monolithic block (CRYSTAL_SCHEMA).
     this._stateBase = ctx.allocStates(15);
 
-    // Allocate internal nodes — replace internalNodeIds[0], internalNodeIds[1].
-    const n1Node = ctx.makeVolt(this._label, "n1");  // Rs↔Ls junction
-    const n2Node = ctx.makeVolt(this._label, "n2");  // Ls↔Cs junction
+    // Allocate internal nodes — n1 (Rs↔Ls junction), n2 (Ls↔Cs junction).
+    const n1Node = ctx.makeVolt(this.label, "n1");
+    this._internalLabels.push("n1");
+    const n2Node = ctx.makeVolt(this.label, "n2");
+    this._internalLabels.push("n2");
     this._n1Node = n1Node;
     this._n2Node = n2Node;
 
     // Allocate Ls branch row — indsetup.c:84-88 idempotent guard.
-    if (this._branchIndex === -1) {
-      this._branchIndex = ctx.makeCur(this._label, "Ls_branch");
+    if (this.branchIndex === -1) {
+      this.branchIndex = ctx.makeCur(this.label, "Ls_branch");
     }
-    const b = this._branchIndex;
+    const b = this.branchIndex;
 
     // Rs — ressetup.c:46-49 (aNode=pos, n1Node=neg)
     this._hRs_PP = solver.allocElement(aNode, aNode);
@@ -354,23 +352,22 @@ export class AnalogCrystalElement implements ReactiveAnalogElement {
     if (bNode !== 0) this._hC0_NN = solver.allocElement(bNode, bNode);
     if (aNode !== 0 && bNode !== 0) this._hC0_PN = solver.allocElement(aNode, bNode);
     if (bNode !== 0 && aNode !== 0) this._hC0_NP = solver.allocElement(bNode, aNode);
-
-    this.stateBaseOffset = this._stateBase;
   }
 
-  findBranchFor(name: string, ctx: SetupContext): number {
-    const el = ctx.findDevice(name);
-    if (!el) return 0;
-    const crystal = el as AnalogCrystalElement;
-    if (crystal._branchIndex === -1) {
-      crystal._branchIndex = ctx.makeCur(name, "Ls_branch");
+  findBranchFor(_name: string, ctx: SetupContext): number {
+    if (this.branchIndex === -1) {
+      this.branchIndex = ctx.makeCur(this.label, "Ls_branch");
     }
-    return crystal._branchIndex;
+    return this.branchIndex;
+  }
+
+  getInternalNodeLabels(): readonly string[] {
+    return this._internalLabels;
   }
 
   initState(pool: StatePoolRef): void {
     this._pool = pool;
-    applyInitialValues(CRYSTAL_SCHEMA, pool, this.stateBaseOffset, {});
+    applyInitialValues(CRYSTAL_SCHEMA, pool, this._stateBase, {});
   }
 
   updateDerivedParams(Rs: number, Ls: number, Cs: number, C0: number): void {
@@ -384,21 +381,21 @@ export class AnalogCrystalElement implements ReactiveAnalogElement {
    * Unified load()  BVD crystal model.
    *
    * Stamps in one pass:
-   *   - R_s series conductance (nA â†" n1, topology-constant).
-   *   - L_s branch incidence + NIintegrate companion (n1 â†" n2).
-   *   - C_s series capacitor companion (n2 â†" nB) via inline NIintegrate.
-   *   - C_0 shunt capacitor companion (nA â†" nB) via inline NIintegrate.
+   *   - R_s series conductance (nA ↔ n1, topology-constant).
+   *   - L_s branch incidence + NIintegrate companion (n1 ↔ n2).
+   *   - C_s series capacitor companion (n2 ↔ nB) via inline NIintegrate.
+   *   - C_0 shunt capacitor companion (nA ↔ nB) via inline NIintegrate.
    * All three reactive components use ctx.ag[] coefficients directly.
    */
   load(ctx: LoadContext): void {
     const { solver, rhsOld: voltages, ag } = ctx;
     const mode = ctx.cktMode;
-    const nA = this.pinNodeIds[0];
-    const nB = this.pinNodeIds[1];
+    const nA = this._pinNodes.get("A")!;
+    const nB = this._pinNodes.get("B")!;
     const n1 = this._n1Node;
     const n2 = this._n2Node;
-    const b = this._branchIndex;
-    const base = this.stateBaseOffset;
+    const b = this.branchIndex;
+    const base = this._stateBase;
 
     // R_s conductance (nA ↔ n1) — via cached handles.
     solver.stampElement(this._hRs_PP, this.G_s);
@@ -551,8 +548,8 @@ export class AnalogCrystalElement implements ReactiveAnalogElement {
   }
 
   getPinCurrents(rhs: Float64Array): number[] {
-    const nA = this.pinNodeIds[0];
-    const nB = this.pinNodeIds[1];
+    const nA = this._pinNodes.get("A")!;
+    const nB = this._pinNodes.get("B")!;
     const n1 = this._n1Node;
 
     // Current through the series R_s (from pin A into the motional arm):
@@ -564,7 +561,7 @@ export class AnalogCrystalElement implements ReactiveAnalogElement {
     // C_0 shunt current flowing into pin A: I = geqC0 * (vA - vB) + ieqC0
     const vB = rhs[nB];
     const s0 = this._pool.states[0];
-    const base = this.stateBaseOffset;
+    const base = this._stateBase;
     const geqC0 = s0[base + SLOT_GEQ_C0];
     const ieqC0 = s0[base + SLOT_IEQ_C0];
     const iShunt = geqC0 * (vA - vB) + ieqC0;
@@ -585,7 +582,7 @@ export class AnalogCrystalElement implements ReactiveAnalogElement {
     const s1 = this._pool.states[1];
     const s2 = this._pool.states[2];
     const s3 = this._pool.states[3];
-    const base = this.stateBaseOffset;
+    const base = this._stateBase;
 
     // L_s (flux-based): use stored ccap from s0 and s1
     const phi0 = s0[base + SLOT_PHI_L];
@@ -616,6 +613,8 @@ export class AnalogCrystalElement implements ReactiveAnalogElement {
 
     return Math.min(dtL, dtCs, dtC0);
   }
+
+  setParam(_key: string, _value: number): void {}
 }
 
 // ---------------------------------------------------------------------------
@@ -625,20 +624,19 @@ export class AnalogCrystalElement implements ReactiveAnalogElement {
 function buildCrystalElementFromParams(
   pinNodes: ReadonlyMap<string, number>,
   p: { frequency: number; qualityFactor: number; motionalCapacitance: number; shuntCapacitance: number },
-): AnalogElementCore {
+): AnalogCrystalElement {
   const Ls = crystalMotionalInductance(p.frequency, p.motionalCapacitance);
   const Rs = crystalSeriesResistance(p.frequency, Ls, p.qualityFactor);
 
   const el = new AnalogCrystalElement(
-    [pinNodes.get("A")!, pinNodes.get("B")!],
+    pinNodes,
     Rs,
     Ls,
     p.motionalCapacitance,
     p.shuntCapacitance,
   );
-  el._pinNodes = new Map(pinNodes);
 
-  (el as AnalogElementCore).setParam = function(key: string, value: number): void {
+  el.setParam = function(key: string, value: number): void {
     if (key in p) {
       (p as Record<string, number>)[key] = value;
       const newLs = crystalMotionalInductance(p.frequency, p.motionalCapacitance);
@@ -653,7 +651,7 @@ export function createCrystalElement(
   pinNodes: ReadonlyMap<string, number>,
   props: PropertyBag,
   _getTime: () => number,
-): AnalogElementCore {
+): AnalogCrystalElement {
   const p = {
     frequency:           props.getModelParam<number>("frequency"),
     qualityFactor:       props.getModelParam<number>("qualityFactor"),
@@ -755,16 +753,6 @@ export const CrystalDefinition: ComponentDefinition = {
       factory: createCrystalElement,
       paramDefs: CRYSTAL_PARAM_DEFS,
       params: CRYSTAL_DEFAULTS,
-      mayCreateInternalNodes: true,
-      findBranchFor(name: string, ctx: import("../../solver/analog/setup-context.js").SetupContext): number {
-        const el = ctx.findDevice(name);
-        if (!el) return 0;
-        const crystal = el as AnalogCrystalElement;
-        if (crystal._branchIndex === -1) {
-          crystal._branchIndex = ctx.makeCur(name, "Ls_branch");
-        }
-        return crystal._branchIndex;
-      },
     },
   },
   defaultModel: "behavioral",

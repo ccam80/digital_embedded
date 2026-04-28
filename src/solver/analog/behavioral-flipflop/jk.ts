@@ -2,13 +2,12 @@
  * Behavioral analog factory for edge-triggered JK flip-flops.
  */
 
-import type { LoadContext, StatePoolRef, ReactiveAnalogElementCore } from "../element.js";
+import type { AnalogElement } from "../../../core/analog-types.js";
+import type { LoadContext } from "../load-context.js";
 import { NGSPICE_LOAD_ORDER } from "../element.js";
 import { readMnaVoltage, delegatePinSetParam } from "../digital-pin-model.js";
 import type { DigitalInputPinModel, DigitalOutputPinModel } from "../digital-pin-model.js";
 import type { AnalogElementFactory } from "../behavioral-gate.js";
-import type { SetupContext } from "../setup-context.js";
-import type { AnalogCapacitorElement } from "../../../components/passives/capacitor.js";
 import {
   FALLBACK_SPEC,
   getPinSpecs,
@@ -17,12 +16,11 @@ import {
   makeOutputPin,
   FLIPFLOP_COMPOSITE_SCHEMA,
   buildChildElements,
-  computeChildStateSize,
-  initChildState,
-  loadChildren,
   checkChildConvergence,
 } from "./shared.js";
 import type { StateSchema } from "../state-schema.js";
+import type { AnalogCapacitorElement } from "../../../components/passives/capacitor.js";
+import { CompositeElement } from "../composite-element.js";
 
 // ---------------------------------------------------------------------------
 // BehavioralJKFlipflopElement
@@ -42,7 +40,7 @@ import type { StateSchema } from "../state-schema.js";
  *              currently latched Q state, then loads capacitor children.
  *   accept() — rising-edge detection and JK latching/toggling.
  */
-export class BehavioralJKFlipflopElement implements ReactiveAnalogElementCore {
+export class BehavioralJKFlipflopElement extends CompositeElement {
   private readonly _jPin: DigitalInputPinModel;
   private readonly _clockPin: DigitalInputPinModel;
   private readonly _kPin: DigitalInputPinModel;
@@ -56,19 +54,8 @@ export class BehavioralJKFlipflopElement implements ReactiveAnalogElementCore {
 
   private readonly _pinModelsByLabel: ReadonlyMap<string, DigitalInputPinModel | DigitalOutputPinModel>;
 
-  pinNodeIds!: readonly number[];  // set by compiler via Object.assign after factory returns
-  allNodeIds!: readonly number[];  // set by compiler via Object.assign after factory returns
-  readonly branchIndex: number = -1;
   readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.VCVS;
-  readonly isNonlinear: true = true;
-  label?: string;
-
-  readonly poolBacked = true as const;
   readonly stateSchema: StateSchema = FLIPFLOP_COMPOSITE_SCHEMA;
-  stateSize: number;
-  stateBaseOffset = -1;
-  _stateBase: number = -1;
-  _pinNodes: Map<string, number> = new Map();
 
   constructor(
     jPin: DigitalInputPinModel,
@@ -80,6 +67,7 @@ export class BehavioralJKFlipflopElement implements ReactiveAnalogElementCore {
     _vIL: number,
     pinModelsByLabel: ReadonlyMap<string, DigitalInputPinModel | DigitalOutputPinModel>,
   ) {
+    super();
     this._jPin = jPin;
     this._clockPin = clockPin;
     this._kPin = kPin;
@@ -88,15 +76,17 @@ export class BehavioralJKFlipflopElement implements ReactiveAnalogElementCore {
     this._vIH = vIH;
     this._pinModelsByLabel = pinModelsByLabel;
     this._childElements = buildChildElements([jPin, clockPin, kPin, qPin, qBarPin]);
-    this.stateSize = computeChildStateSize(this._childElements);
   }
 
-  get isReactive(): true {
-    return (this._childElements.length > 0) as true;
-  }
-
-  initState(pool: StatePoolRef): void {
-    initChildState(this._childElements, this.stateBaseOffset, pool);
+  protected getSubElements(): readonly AnalogElement[] {
+    return [
+      this._jPin as unknown as AnalogElement,
+      this._clockPin as unknown as AnalogElement,
+      this._kPin as unknown as AnalogElement,
+      this._qPin as unknown as AnalogElement,
+      this._qBarPin as unknown as AnalogElement,
+      ...this._childElements as unknown as AnalogElement[],
+    ];
   }
 
   checkConvergence(ctx: LoadContext): boolean {
@@ -111,32 +101,10 @@ export class BehavioralJKFlipflopElement implements ReactiveAnalogElementCore {
     this._prevClockVoltage = readMnaVoltage(this._clockPin.nodeId, rhs);
   }
 
-  setup(ctx: SetupContext): void {
-    // Forward to every input pin model
-    this._jPin.setup(ctx);
-    this._clockPin.setup(ctx);
-    this._kPin.setup(ctx);
-
-    // Forward to every output pin model (role "direct")
-    this._qPin.setup(ctx);
-    this._qBarPin.setup(ctx);
-
-    // Forward to every capacitor child collected from pin models
-    for (const child of this._childElements) child.setup(ctx);
-  }
-
   load(ctx: LoadContext): void {
-    // Delegate input stamping to pin models
-    this._jPin.load(ctx);
-    this._clockPin.load(ctx);
-    this._kPin.load(ctx);
-
     this._qPin.setLogicLevel(this._latchedQ);
     this._qBarPin.setLogicLevel(!this._latchedQ);
-    this._qPin.load(ctx);
-    this._qBarPin.load(ctx);
-
-    loadChildren(this._childElements, ctx);
+    super.load(ctx);
   }
 
   /**
@@ -224,9 +192,11 @@ export function makeJKFlipflopAnalogFactory(): AnalogElementFactory {
       ["~Q", qBarPin],
     ]);
 
-    return new BehavioralJKFlipflopElement(
+    const el = new BehavioralJKFlipflopElement(
       jPin, clockPin, kPin, qPin, qBarPin,
       cSpec.vIH, cSpec.vIL, pinModelsByLabel,
     );
+    el._pinNodes = new Map(pinNodes);
+    return el;
   };
 }

@@ -24,8 +24,9 @@ import {
 } from "../../core/registry.js";
 import { formatSI } from "../../editor/si-format.js";
 import type { SetupContext } from "../../solver/analog/setup-context.js";
-import type { AnalogElementCore, LoadContext } from "../../solver/analog/element.js";
+import type { AnalogElement } from "../../solver/analog/element.js";
 import { NGSPICE_LOAD_ORDER } from "../../solver/analog/element.js";
+import type { LoadContext } from "../../solver/analog/load-context.js";
 import { stampRHS } from "../../solver/analog/stamp-helpers.js";
 import { defineModelParams } from "../../core/model-params.js";
 
@@ -163,23 +164,22 @@ const CURRENT_SOURCE_ATTRIBUTE_MAP: AttributeMapping[] = [
 // ---------------------------------------------------------------------------
 
 export function makeCurrentSource(
-  nodePos: number,
-  nodeNeg: number,
-  current: number,
-): AnalogElementCore {
-  const p: Record<string, number> = { current };
+  pinNodes: ReadonlyMap<string, number>,
+  props: PropertyBag,
+  _getTime: () => number,
+): AnalogElement {
+  const p: Record<string, number> = { current: props.getModelParam<number>("current") };
   // Captures the srcFact seen on the most recent load() call so that
   // getPinCurrents can report consistent DC-OP source-stepped currents
   // to diagnostic readouts between iterations.
   let lastSrcFact = 1;
 
-  return {
+  const el: AnalogElement = {
+    label: "",
     branchIndex: -1,
     ngspiceLoadOrder: NGSPICE_LOAD_ORDER.ISRC,
-    isNonlinear: false,
-    isReactive: false,
     _stateBase: -1,
-    _pinNodes: new Map<string, number>([["neg", nodeNeg], ["pos", nodePos]]),
+    _pinNodes: new Map(pinNodes),
 
     setup(_ctx: SetupContext): void {
       // ISRC has no *set.c in ngspice. No TSTALLOC, no internal nodes,
@@ -192,14 +192,16 @@ export function makeCurrentSource(
 
     load(ctx: LoadContext): void {
       lastSrcFact = ctx.srcFact;
+      const nodePos = el._pinNodes.get("pos")!;
+      const nodeNeg = el._pinNodes.get("neg")!;
       const I = p.current * ctx.srcFact;
-      if (nodePos !== 0) stampRHS(ctx.rhs,nodePos, I);
-      if (nodeNeg !== 0) stampRHS(ctx.rhs,nodeNeg, -I);
+      if (nodePos !== 0) stampRHS(ctx.rhs, nodePos, I);
+      if (nodeNeg !== 0) stampRHS(ctx.rhs, nodeNeg, -I);
     },
 
     getPinCurrents(_rhs: Float64Array): number[] {
-      // No branch row  current is defined by the stamp: I = current * srcFact.
-      // Pin layout order: [neg, pos]  neg is index 0, pos is index 1.
+      // No branch row — current is defined by the stamp: I = current * srcFact.
+      // Pin layout order: [neg, pos] — neg is index 0, pos is index 1.
       // Conventional current flows from neg through source to pos (arrow direction).
       // Current into neg = +I (current enters element at neg from the circuit).
       // Current into pos = -I (current exits element at pos into the circuit).
@@ -207,6 +209,8 @@ export function makeCurrentSource(
       return [I, -I];
     },
   };
+
+  return el;
 }
 
 // ---------------------------------------------------------------------------
@@ -238,13 +242,7 @@ export const CurrentSourceDefinition: ComponentDefinition = {
   modelRegistry: {
     "behavioral": {
       kind: "inline",
-      factory(
-        pinNodes: ReadonlyMap<string, number>,
-        props: PropertyBag,
-      ): AnalogElementCore {
-        const current = props.getModelParam<number>("current");
-        return makeCurrentSource(pinNodes.get("pos")!, pinNodes.get("neg")!, current);
-      },
+      factory: makeCurrentSource,
       paramDefs: CURRENT_SOURCE_PARAM_DEFS,
       params: CURRENT_SOURCE_DEFAULTS,
       ngspiceNodeMap: { neg: "neg", pos: "pos" },

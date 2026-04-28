@@ -33,8 +33,9 @@ import {
   type AttributeMapping,
   type ComponentDefinition,
 } from "../../core/registry.js";
-import type { LoadContext, StatePoolRef, PoolBackedAnalogElementCore } from "../../solver/analog/element.js";
+import type { LoadContext, PoolBackedAnalogElement } from "../../solver/analog/element.js";
 import { NGSPICE_LOAD_ORDER } from "../../solver/analog/element.js";
+import type { StatePoolRef } from "../../core/analog-types.js";
 import type { SetupContext } from "../../solver/analog/setup-context.js";
 import { collectPinModelChildren, DigitalOutputPinModel, DigitalInputPinModel } from "../../solver/analog/digital-pin-model.js";
 import type { ResolvedPinElectrical } from "../../core/pin-electrical.js";
@@ -114,7 +115,7 @@ function createSchmittTriggerElement(
   pinNodes: ReadonlyMap<string, number>,
   props: PropertyBag,
   inverting: boolean,
-): PoolBackedAnalogElementCore {
+): PoolBackedAnalogElement {
   const p: Record<string, number> = {
     vTH:  props.getModelParam<number>("vTH"),
     vTL:  props.getModelParam<number>("vTL"),
@@ -164,10 +165,9 @@ function createSchmittTriggerElement(
   let _schmittBase = 0;
 
   return {
+    label: "",
     branchIndex: -1,
     ngspiceLoadOrder: NGSPICE_LOAD_ORDER.VCVS,
-    isNonlinear: true,
-    get isReactive(): boolean { return childElements.length > 0; },
     _stateBase: -1,
     _pinNodes: new Map(pinNodes),
 
@@ -186,16 +186,15 @@ function createSchmittTriggerElement(
     poolBacked: true as const,
     stateSchema: SCHMITT_COMPOSITE_SCHEMA,
     stateSize: totalStateSize,
-    stateBaseOffset: -1,
 
     initState(_pool: StatePoolRef): void {
       _schmittPool = _pool;
-      _schmittBase = this.stateBaseOffset;
+      _schmittBase = this._stateBase;
       // Initialize OUTPUT_HIGH slot to 0 (output starts low).
       _pool.state0[_schmittBase] = 0.0;
       let offset = _schmittBase + SCHMITT_COMPOSITE_SCHEMA.size;
       for (const child of childElements) {
-        child.stateBaseOffset = offset;
+        child._stateBase = offset;
         child.initState(_pool);
         offset += child.stateSize;
       }

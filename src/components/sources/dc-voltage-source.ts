@@ -1,4 +1,4 @@
-﻿/**
+/**
  * DC Voltage Source  ideal independent voltage source for MNA simulation.
  *
  * Introduces one extra MNA branch row to enforce the voltage constraint.
@@ -26,8 +26,10 @@ import {
   type ComponentDefinition,
 } from "../../core/registry.js";
 import { formatSI } from "../../editor/si-format.js";
-import type { AnalogElementCore, LoadContext } from "../../solver/analog/element.js";
+import type { AnalogElement, LoadContext } from "../../solver/analog/element.js";
 import { NGSPICE_LOAD_ORDER } from "../../solver/analog/element.js";
+import type { SetupContext } from "../../solver/analog/setup-context.js";
+import { MODEDCOP, MODEDCTRANCURVE, MODETRANOP } from "../../solver/analog/ckt-mode.js";
 import { defineModelParams } from "../../core/model-params.js";
 
 // ---------------------------------------------------------------------------
@@ -152,43 +154,54 @@ const DC_VOLTAGE_SOURCE_ATTRIBUTE_MAP: AttributeMapping[] = [
 ];
 
 // ---------------------------------------------------------------------------
-// analogFactory helper (exported for tests)
+// makeDcVoltageSource — canonical inline-factory (§A.13 / §A.3: 3-arg form)
 // ---------------------------------------------------------------------------
 
+/**
+ * Constructs a DC voltage source analog element.
+ *
+ * Canonical inline-factory pattern per §A.13. Three-arg form per §A.3.
+ */
 export function makeDcVoltageSource(
   pinNodes: ReadonlyMap<string, number>,
-  voltage: number,
-): AnalogElementCore {
-  const p: Record<string, number> = { voltage };
-  let _hPosBr = -1;
-  let _hNegBr = -1;
-  let _hBrNeg = -1;
-  let _hBrPos = -1;
+  props: PropertyBag,
+  _getTime: () => number,
+): AnalogElement {
+  const p = { voltage: props.getModelParam<number>("voltage") };
 
-  const el: AnalogElementCore & { label: string } = {
-    branchIndex: -1,
-    ngspiceLoadOrder: NGSPICE_LOAD_ORDER.VSRC,
-    isNonlinear: false,
-    isReactive: false,
-    _stateBase: -1,
-    _pinNodes: new Map<string, number>(pinNodes),
+  // TSTALLOC handles — closure-local, NOT object fields.
+  let _hPosBr = -1, _hNegBr = -1, _hBrNeg = -1, _hBrPos = -1;
+
+  const el: AnalogElement = {
     label: "",
+    ngspiceLoadOrder: NGSPICE_LOAD_ORDER.VSRC,
 
-    setup(ctx: import("../../solver/analog/setup-context.js").SetupContext): void {
-      const posNode    = el._pinNodes.get("pos")!;
-      const negNode    = el._pinNodes.get("neg")!;
+    _pinNodes: new Map(pinNodes),
+    _stateBase: -1,
+    branchIndex: -1,
+
+    setup(ctx: SetupContext): void {
+      const posNode = el._pinNodes.get("pos")!;
+      const negNode = el._pinNodes.get("neg")!;
 
       // Port of vsrcset.c:40-43 — idempotent branch allocation
       if (el.branchIndex === -1) {
         el.branchIndex = ctx.makeCur(el.label, "branch");
       }
-      const branchNode = el.branchIndex;
+      const k = el.branchIndex;
 
       // Port of vsrcset.c:52-55 — TSTALLOC sequence (line-for-line)
-      _hPosBr = ctx.solver.allocElement(posNode,    branchNode); // VSRCposNode, VSRCbranch
-      _hNegBr = ctx.solver.allocElement(negNode,    branchNode); // VSRCnegNode, VSRCbranch
-      _hBrNeg = ctx.solver.allocElement(branchNode, negNode);    // VSRCbranch,  VSRCnegNode
-      _hBrPos = ctx.solver.allocElement(branchNode, posNode);    // VSRCbranch,  VSRCposNode
+      _hPosBr = ctx.solver.allocElement(posNode, k);    // VSRCposNode, VSRCbranch
+      _hNegBr = ctx.solver.allocElement(negNode, k);    // VSRCnegNode, VSRCbranch
+      _hBrNeg = ctx.solver.allocElement(k, negNode);    // VSRCbranch,  VSRCnegNode
+      _hBrPos = ctx.solver.allocElement(k, posNode);    // VSRCbranch,  VSRCposNode
+    },
+
+    findBranchFor(_name: string, ctx: SetupContext): number {
+      if (el.branchIndex === -1) {
+        el.branchIndex = ctx.makeCur(el.label, "branch");
+      }
+      return el.branchIndex;
     },
 
     setParam(key: string, value: number): void {
@@ -197,21 +210,26 @@ export function makeDcVoltageSource(
 
     load(ctx: LoadContext): void {
       const solver = ctx.solver;
-
       // vsrcload.c:43-46
       solver.stampElement(_hPosBr, +1.0);
       solver.stampElement(_hNegBr, -1.0);
       solver.stampElement(_hBrPos, +1.0);
       solver.stampElement(_hBrNeg, -1.0);
-      // vsrcload.c:416 — RHS
-      ctx.rhs[el.branchIndex] += p.voltage * ctx.srcFact;
+      // ngspice srcFact gating: applied in MODEDCOP|MODEDCTRANCURVE (vsrcload.c:47-55)
+      // and MODETRANOP (vsrcload.c:405-413). Outside these modes the source value
+      // is applied directly. Match this gating; do not multiply unconditionally.
+      const ramp = (ctx.cktMode & (MODEDCOP | MODEDCTRANCURVE | MODETRANOP))
+        ? ctx.srcFact
+        : 1.0;
+      ctx.rhs[el.branchIndex] += p.voltage * ramp;
     },
 
     getPinCurrents(rhs: Float64Array): number[] {
       const I = rhs[el.branchIndex];
-      return [-I, I];
+      return [-I, I];   // pinLayout order ["neg", "pos"]
     },
   };
+
   return el;
 }
 
@@ -244,24 +262,10 @@ export const DcVoltageSourceDefinition: ComponentDefinition = {
   modelRegistry: {
     "behavioral": {
       kind: "inline",
-      factory(
-        pinNodes: ReadonlyMap<string, number>,
-        props: PropertyBag,
-      ): AnalogElementCore {
-        const voltage = props.getModelParam<number>("voltage");
-        return makeDcVoltageSource(pinNodes, voltage);
-      },
+      factory: makeDcVoltageSource,
       paramDefs: DC_VOLTAGE_SOURCE_PARAM_DEFS,
       params: DC_VOLTAGE_SOURCE_DEFAULTS,
       ngspiceNodeMap: { neg: "neg", pos: "pos" },
-      findBranchFor(name: string, ctx: import("../../solver/analog/setup-context.js").SetupContext): number {
-        const found = ctx.findDevice(name);
-        if (!found) return 0;
-        if (found.branchIndex === -1) {
-          found.branchIndex = ctx.makeCur(name, "branch");
-        }
-        return found.branchIndex;
-      },
     },
   },
   defaultModel: "behavioral",

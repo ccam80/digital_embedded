@@ -17,8 +17,8 @@ import {
 } from "../potentiometer.js";
 import { PropertyBag } from "../../../core/properties.js";
 import { ComponentCategory, ComponentRegistry } from "../../../core/registry.js";
-import { makeSimpleCtx, makeLoadCtx, withNodeIds } from "../../../solver/analog/__tests__/test-helpers.js";
-import type { AnalogElement } from "../../../solver/analog/element.js";
+import { makeSimpleCtx, makeLoadCtx, makeTestSetupContext } from "../../../solver/analog/__tests__/test-helpers.js";
+
 
 // ---------------------------------------------------------------------------
 // Helper: narrow ModelEntry to inline factory (throws if netlist kind)
@@ -63,28 +63,27 @@ describe("Potentiometer", () => {
       props.setModelParam("resistance", 10000);
       props.setModelParam("position", 0.5);
 
-      const core = getFactory(PotentiometerDefinition.modelRegistry!.behavioral!)(
+      const analogElement = getFactory(PotentiometerDefinition.modelRegistry!.behavioral!)(
         new Map([["A", 1], ["B", 2], ["W", 3]]),
-        [],
-        -1,
         props,
         () => 0,
       );
-      const analogElement = Object.assign(core, { pinNodeIds: [1, 2, 3] as readonly number[], allNodeIds: [1, 2, 3] as readonly number[] }) as unknown as AnalogElement;
 
       const { solver, stamps } = makeCaptureSolver();
+      const setupCtx = makeTestSetupContext({ solver });
+      analogElement.setup(setupCtx);
       const ctx = makeLoadCtx({ solver });
       analogElement.load(ctx);
 
       expect(stamps.length).toBe(8);
 
       // Nodes are 1-based: A=1, B=2, W=3. The capture solver records raw node IDs.
-      // Top resistor: A(1) ↔ B(2) (pinNodeIds[0] ↔ pinNodeIds[1])
-      const topStamps = stamps.filter((s) => (s[0] === 1 || s[0] === 2) && (s[1] === 1 || s[1] === 2));
+      // Top resistor: A(1) ↔ W(3) (A↔W)
+      const topStamps = stamps.filter((s) => (s[0] === 1 || s[0] === 3) && (s[1] === 1 || s[1] === 3));
       expect(topStamps.some((s) => Math.abs(s[2] - 0.0002) < 1e-6)).toBe(true);
 
-      // Bottom resistor: B(2) ↔ W(3) (pinNodeIds[1] ↔ pinNodeIds[2])
-      const bottomStamps = stamps.filter((s) => (s[0] === 2 || s[0] === 3) && (s[1] === 2 || s[1] === 3));
+      // Bottom resistor: W(3) ↔ B(2) (W↔B)
+      const bottomStamps = stamps.filter((s) => (s[0] === 3 || s[0] === 2) && (s[1] === 3 || s[1] === 2));
       expect(bottomStamps.some((s) => Math.abs(s[2] - 0.0002) < 1e-6)).toBe(true);
     });
   });
@@ -95,24 +94,23 @@ describe("Potentiometer", () => {
       props.setModelParam("resistance", 10000);
       props.setModelParam("position", 0);
 
-      const core = getFactory(PotentiometerDefinition.modelRegistry!.behavioral!)(
+      const analogElement = getFactory(PotentiometerDefinition.modelRegistry!.behavioral!)(
         new Map([["A", 1], ["B", 2], ["W", 3]]),
-        [],
-        -1,
         props,
         () => 0,
       );
-      const analogElement = Object.assign(core, { pinNodeIds: [1, 2, 3] as readonly number[], allNodeIds: [1, 2, 3] as readonly number[] }) as unknown as AnalogElement;
 
       const { solver, stamps } = makeCaptureSolver();
+      const setupCtx = makeTestSetupContext({ solver });
+      analogElement.setup(setupCtx);
       const ctx = makeLoadCtx({ solver });
       analogElement.load(ctx);
 
-      // Nodes are 1-based: A=1, B=2, W=3. Top resistor: A(1) ↔ B(2). Bottom resistor: B(2) ↔ W(3).
-      // Top resistance is 0, clamped to 1e-9: G_top = 1/(1e-9) = 1e9 — A(1) ↔ B(2)
-      // Bottom resistance is 10000: G_bottom = 1/10000 = 0.0001 — B(2) ↔ W(3)
-      const topStamps = stamps.filter((s) => (s[0] === 1 || s[0] === 2) && (s[1] === 1 || s[1] === 2));
-      const bottomStamps = stamps.filter((s) => (s[0] === 2 || s[0] === 3) && (s[1] === 2 || s[1] === 3));
+      // Nodes are 1-based: A=1, W=3, B=2. Top resistor (R_AW): A(1) ↔ W(3). Bottom resistor (R_WB): W(3) ↔ B(2).
+      // Top resistance is 0, clamped to 1e-9: G_AW = 1/(1e-9) = 1e9 — A(1) ↔ W(3)
+      // Bottom resistance is 10000: G_WB = 1/10000 = 0.0001 — W(3) ↔ B(2)
+      const topStamps = stamps.filter((s) => (s[0] === 1 || s[0] === 3) && (s[1] === 1 || s[1] === 3));
+      const bottomStamps = stamps.filter((s) => (s[0] === 3 || s[0] === 2) && (s[1] === 3 || s[1] === 2));
 
       expect(topStamps.some((s) => s[2] > 1e8)).toBe(true); // Very large G_top
       expect(bottomStamps.some((s) => Math.abs(s[2] - 0.0001) < 1e-6)).toBe(true);
@@ -125,27 +123,26 @@ describe("Potentiometer", () => {
       props.setModelParam("resistance", 10000);
       props.setModelParam("position", 1);
 
-      const core = getFactory(PotentiometerDefinition.modelRegistry!.behavioral!)(
+      const analogElement = getFactory(PotentiometerDefinition.modelRegistry!.behavioral!)(
         new Map([["A", 1], ["B", 2], ["W", 3]]),
-        [],
-        -1,
         props,
         () => 0,
       );
-      const analogElement = Object.assign(core, { pinNodeIds: [1, 2, 3] as readonly number[], allNodeIds: [1, 2, 3] as readonly number[] }) as unknown as AnalogElement;
 
       const { solver, stamps } = makeCaptureSolver();
+      const setupCtx = makeTestSetupContext({ solver });
+      analogElement.setup(setupCtx);
       const ctx = makeLoadCtx({ solver });
       analogElement.load(ctx);
 
-      // Nodes are 1-based: A=1, B=2, W=3. Top resistor: A(1) ↔ B(2). Bottom resistor: B(2) ↔ W(3).
-      // Top resistance is 10000: G_top = 1/10000 = 0.0001 — A(1) ↔ B(2)
-      // Bottom resistance is 0, clamped to 1e-9: G_bottom = 1/(1e-9) = 1e9 — B(2) ↔ W(3)
-      const topStamps = stamps.filter((s) => (s[0] === 1 || s[0] === 2) && (s[1] === 1 || s[1] === 2));
-      const bottomStamps = stamps.filter((s) => (s[0] === 2 || s[0] === 3) && (s[1] === 2 || s[1] === 3));
+      // Nodes are 1-based: A=1, W=3, B=2. Top resistor (R_AW): A(1) ↔ W(3). Bottom resistor (R_WB): W(3) ↔ B(2).
+      // Top resistance is 10000: G_AW = 1/10000 = 0.0001 — A(1) ↔ W(3)
+      // Bottom resistance is 0, clamped to 1e-9: G_WB = 1/(1e-9) = 1e9 — W(3) ↔ B(2)
+      const topStamps = stamps.filter((s) => (s[0] === 1 || s[0] === 3) && (s[1] === 1 || s[1] === 3));
+      const bottomStamps = stamps.filter((s) => (s[0] === 3 || s[0] === 2) && (s[1] === 3 || s[1] === 2));
 
       expect(topStamps.some((s) => Math.abs(s[2] - 0.0001) < 1e-6)).toBe(true);
-      expect(bottomStamps.some((s) => s[2] > 1e8)).toBe(true); // Very large G_bottom
+      expect(bottomStamps.some((s) => s[2] > 1e8)).toBe(true); // Very large G_WB
     });
   });
 
@@ -225,23 +222,19 @@ describe("potentiometer_load_dcop_parity", () => {
     props.setModelParam("resistance", 10000);
     props.setModelParam("position", 0.5);
 
-    const core = getFactory(PotentiometerDefinition.modelRegistry!.behavioral!)(
+    // Factory constructs AnalogPotentiometerElement([A_node, B_node, W_node], R, pos)
+    // = ([1, 2, 3], 10000, 0.5) → _pinNodes: A=1, B=2, W=3
+    const analogElement = getFactory(PotentiometerDefinition.modelRegistry!.behavioral!)(
       new Map([["A", 1], ["B", 2], ["W", 3]]),
-      [],
-      -1,
       props,
       () => 0,
     );
-    // Factory constructs AnalogPotentiometerElement([A_node, B_node, W_node], R, pos)
-    // = ([1, 2, 3], 10000, 0.5) → pinNodeIds[0]=A=1, pinNodeIds[1]=B=2, pinNodeIds[2]=W=3
-    const analogElement = withNodeIds(core, [1, 2, 3]);
 
     const stampCtx = makeSimpleCtx({
       elements: [analogElement],
       matrixSize: 3,
       nodeCount: 3,
     });
-    stampCtx.solver._initStructure();
     analogElement.load(stampCtx.loadCtx);
     const stamps = stampCtx.solver.getCSCNonZeros();
 

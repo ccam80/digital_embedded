@@ -67,7 +67,7 @@ import {
   type AttributeMapping,
   type ComponentDefinition,
 } from "../../core/registry.js";
-import type { LoadContext, PoolBackedAnalogElementCore } from "../../solver/analog/element.js";
+import type { LoadContext, PoolBackedAnalogElement } from "../../solver/analog/element.js";
 import { NGSPICE_LOAD_ORDER } from "../../solver/analog/element.js";
 import type { SetupContext } from "../../solver/analog/setup-context.js";
 import { defineModelParams } from "../../core/model-params.js";
@@ -75,9 +75,8 @@ import {
   DigitalOutputPinModel,
   collectPinModelChildren,
 } from "../../solver/analog/digital-pin-model.js";
-import type { StatePoolRef } from "../../core/analog-types.js";
+import type { AnalogElement, StatePoolRef } from "../../core/analog-types.js";
 import type { AnalogCapacitorElement } from "../passives/capacitor.js";
-import type { AnalogElementCore } from "../../core/analog-types.js";
 
 // Sub-element: discharge BJT — bjtsetup.c:347-465 (NPN Gummel-Poon)
 import {
@@ -132,11 +131,10 @@ function makeVcvsComparatorExpression(): { expr: ReturnType<typeof parseExpressi
 // implement the same 4-entry TSTALLOC and stampG pattern here.
 // ---------------------------------------------------------------------------
 
-class Timer555ResElement implements AnalogElementCore {
+class Timer555ResElement implements AnalogElement {
+  label: string = "";
   branchIndex: number = -1;
   readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.RES;
-  readonly isNonlinear: boolean = false;
-  readonly isReactive: boolean = false;
   _stateBase: number = -1;
   _pinNodes: Map<string, number> = new Map();
 
@@ -360,7 +358,7 @@ function makeBjtProps(): PropertyBag {
 }
 
 // ---------------------------------------------------------------------------
-// Timer555CompositeElement — pool-backed composite AnalogElementCore
+// Timer555CompositeElement — pool-backed composite AnalogElement
 //
 // Implements the PB-TIMER555 spec: setup() + load() per spec contract.
 // ---------------------------------------------------------------------------
@@ -370,11 +368,9 @@ interface Timer555Props {
   rDischarge: number;
 }
 
-class Timer555CompositeElement implements PoolBackedAnalogElementCore {
+class Timer555CompositeElement implements PoolBackedAnalogElement {
   branchIndex: number = -1;
   readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.VCVS;
-  readonly isNonlinear: boolean = true;
-  get isReactive(): boolean { return this._childElements.length > 0; }
   _stateBase: number = -1;
   readonly _pinNodes: Map<string, number>;
 
@@ -384,11 +380,10 @@ class Timer555CompositeElement implements PoolBackedAnalogElementCore {
   get stateSize(): number {
     return 1 + // SR latch slot
       this._bjtDis.stateSize +
-      (this._comp1 as unknown as { stateSize: number }).stateSize +
-      (this._comp2 as unknown as { stateSize: number }).stateSize +
+      (this._comp1 as unknown as PoolBackedAnalogElement).stateSize +
+      (this._comp2 as unknown as PoolBackedAnalogElement).stateSize +
       this._childElements.reduce((s, c) => s + c.stateSize, 0);
   }
-  stateBaseOffset: number = -1;
 
   // Sub-elements (constructed at factory time, pin nodes assigned in setup())
   readonly _rDiv1: Timer555ResElement;
@@ -398,16 +393,13 @@ class Timer555CompositeElement implements PoolBackedAnalogElementCore {
   readonly _comp2: VCVSAnalogElement;
   // BJT is recreated in setup() once nDisBase internal node is known.
   // Stored mutable so setup() can replace the factory placeholder.
-  _bjtDis: PoolBackedAnalogElementCore;
+  _bjtDis: PoolBackedAnalogElement;
   readonly _bjtProps: PropertyBag;
   readonly _outModel: DigitalOutputPinModel;
   readonly _childElements: AnalogCapacitorElement[];
 
   // Composite-owned handles (allocated in setup(), after sub-element setups)
   private _hDisBaseDisBase: number = -1;
-  // Pull-down handles for comparator output nodes (needed for DC convergence)
-  private _hComp1OutComp1Out: number = -1;
-  private _hComp2OutComp2Out: number = -1;
 
   // Internal node indices (assigned in setup())
   private _nLower: number = -1;
@@ -427,7 +419,7 @@ class Timer555CompositeElement implements PoolBackedAnalogElementCore {
     rDiv3: Timer555ResElement;
     comp1: VCVSAnalogElement;
     comp2: VCVSAnalogElement;
-    bjtDis: PoolBackedAnalogElementCore;
+    bjtDis: PoolBackedAnalogElement;
     bjtProps: PropertyBag;
     outModel: DigitalOutputPinModel;
     childElements: AnalogCapacitorElement[];
@@ -445,6 +437,13 @@ class Timer555CompositeElement implements PoolBackedAnalogElementCore {
     this._childElements = opts.childElements;
     this._pinNodes = new Map(opts.pinNodes);
     this._p = { ...opts.props };
+  }
+
+  // Internal node labels recorded during setup() for getInternalNodeLabels()
+  private _internalLabels: string[] = [];
+
+  getInternalNodeLabels(): readonly string[] {
+    return this._internalLabels;
   }
 
   // ---------------------------------------------------------------------------
@@ -468,11 +467,16 @@ class Timer555CompositeElement implements PoolBackedAnalogElementCore {
     const nDis  = this._pinNodes.get("DIS")!;
     const nOut  = this._pinNodes.get("OUT")!;
 
-    // Allocate internal nodes
-    this._nLower    = ctx.makeVolt(this.label ?? "timer555", "nLower");
-    this._nComp1Out = ctx.makeVolt(this.label ?? "timer555", "nComp1Out");
-    this._nComp2Out = ctx.makeVolt(this.label ?? "timer555", "nComp2Out");
-    this._nDisBase  = ctx.makeVolt(this.label ?? "timer555", "nDisBase");
+    // Allocate internal nodes; record labels for getInternalNodeLabels()
+    this._internalLabels = [];
+    this._nLower    = ctx.makeVolt(this.label || "timer555", "nLower");
+    this._internalLabels.push("nLower");
+    this._nComp1Out = ctx.makeVolt(this.label || "timer555", "nComp1Out");
+    this._internalLabels.push("nComp1Out");
+    this._nComp2Out = ctx.makeVolt(this.label || "timer555", "nComp2Out");
+    this._internalLabels.push("nComp2Out");
+    this._nDisBase  = ctx.makeVolt(this.label || "timer555", "nDisBase");
+    this._internalLabels.push("nDisBase");
 
     // Composite SR latch state (1 slot)
     this._stateBase_latch = ctx.allocStates(1);
@@ -529,41 +533,31 @@ class Timer555CompositeElement implements PoolBackedAnalogElementCore {
   // initState() — partition state pool across sub-elements
   // ---------------------------------------------------------------------------
   initState(poolRef: StatePoolRef): void {
-    this.stateBaseOffset = this._stateBase_latch;
-
     // BJT occupies the block starting after the latch slot
     const bjtBase = this._stateBase_latch + 1;
-    this._bjtDis.stateBaseOffset = bjtBase;
+    this._bjtDis._stateBase = bjtBase;
     this._bjtDis.initState(poolRef);
 
     // Comparators follow — each is poolBacked with its own stateSize
     let offset = bjtBase + this._bjtDis.stateSize;
 
-    const comp1 = this._comp1 as unknown as {
-      stateSize: number;
-      stateBaseOffset: number;
-      initState: (p: StatePoolRef) => void;
-    };
+    const comp1 = this._comp1 as unknown as PoolBackedAnalogElement;
     if (typeof comp1.stateSize === "number") {
-      comp1.stateBaseOffset = offset;
+      comp1._stateBase = offset;
       comp1.initState(poolRef);
       offset += comp1.stateSize;
     }
 
-    const comp2 = this._comp2 as unknown as {
-      stateSize: number;
-      stateBaseOffset: number;
-      initState: (p: StatePoolRef) => void;
-    };
+    const comp2 = this._comp2 as unknown as PoolBackedAnalogElement;
     if (typeof comp2.stateSize === "number") {
-      comp2.stateBaseOffset = offset;
+      comp2._stateBase = offset;
       comp2.initState(poolRef);
       offset += comp2.stateSize;
     }
 
     // Capacitor children from the output pin model
     for (const child of this._childElements) {
-      child.stateBaseOffset = offset;
+      child._stateBase = offset;
       child.initState(poolRef);
       offset += child.stateSize;
     }
@@ -685,7 +679,7 @@ class Timer555CompositeElement implements PoolBackedAnalogElementCore {
     }
   }
 
-  label?: string;
+  label: string = "";
 }
 
 // ---------------------------------------------------------------------------
@@ -695,8 +689,8 @@ class Timer555CompositeElement implements PoolBackedAnalogElementCore {
 function createTimer555Element(
   pinNodes: ReadonlyMap<string, number>,
   props: PropertyBag,
-  _getTime?: () => number,
-): PoolBackedAnalogElementCore {
+  _getTime: () => number,
+): PoolBackedAnalogElement {
   const p: Timer555Props = {
     vDrop:      props.getModelParam<number>("vDrop"),
     rDischarge: props.getModelParam<number>("rDischarge"),
@@ -720,7 +714,7 @@ function createTimer555Element(
     1,
     new Map([["B", 0], ["C", 0], ["E", 0]]),
     bjtProps,
-  ) as PoolBackedAnalogElementCore;
+  ) as PoolBackedAnalogElement;
 
   // Output pin model
   const outModel = new DigitalOutputPinModel({
@@ -805,14 +799,12 @@ export const Timer555Definition: ComponentDefinition = {
       factory: createTimer555Element,
       paramDefs: TIMER555_PARAM_DEFS,
       params: { vDrop: 1.5, rDischarge: 10 },
-      mayCreateInternalNodes: true,
     },
     "cmos": {
       kind: "inline",
       factory: createTimer555Element,
       paramDefs: TIMER555_PARAM_DEFS,
       params: { vDrop: 0.1, rDischarge: 10 },
-      mayCreateInternalNodes: true,
     },
   },
   defaultModel: "bipolar",

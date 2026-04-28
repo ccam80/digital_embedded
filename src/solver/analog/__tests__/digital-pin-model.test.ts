@@ -12,10 +12,6 @@
  *  - loaded_getter_reads_private_field
  *  - handle_cache_stable_across_iterations
  *
- * Task 6.4.4 — legacy stamp methods deleted:
- *  - legacy_stamp_methods_deleted_output
- *  - legacy_stamp_methods_deleted_input
- *
  * Task 0.2.3 — DigitalPinModel refactored to use AnalogCapacitorElement child:
  *  - no_prev_voltage_field
  *  - accept_method_removed
@@ -36,6 +32,7 @@ import {
 import type { ResolvedPinElectrical } from "../../../core/pin-electrical.js";
 import type { LoadContext } from "../load-context.js";
 import { MODEINITFLOAT, MODETRAN } from "../ckt-mode.js";
+import { loadCtxFromFields } from "./test-helpers.js";
 
 // ---------------------------------------------------------------------------
 // Mock SparseSolver — records allocElement / stampElement calls
@@ -90,7 +87,7 @@ function makeCtx(overrides: Omit<Partial<LoadContext>, "solver"> & { solver?: Mo
   const voltages = new Float64Array(16);
   const rhs = rest.rhs ?? voltages;
   const rhsOld = rest.rhsOld ?? voltages;
-  return {
+  return loadCtxFromFields({
     solver: solver as any,
     matrix: solver as any,
     rhs,
@@ -116,7 +113,7 @@ function makeCtx(overrides: Omit<Partial<LoadContext>, "solver"> & { solver?: Mo
     bypass: false,
     voltTol: 1e-6,
     ...rest,
-  };
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -244,10 +241,10 @@ describe("DigitalOutputPinModel", () => {
 
     const children = pin.getChildElements();
     expect(children.length).toBe(1);
-    // The child is an AnalogCapacitorElement with pinNodeIds set
+    // The child is an AnalogCapacitorElement with _pinNodes set
     const child = children[0];
     expect(child).toBeDefined();
-    expect(child.pinNodeIds).toEqual([NODE, 0]);
+    expect([...child._pinNodes.values()]).toEqual([NODE, 0]);
   });
 
   it("loaded_getter_reads_private_field", () => {
@@ -361,27 +358,6 @@ describe("DigitalInputPinModel", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Task 6.4.4 — legacy stamp methods deleted
-// ---------------------------------------------------------------------------
-
-describe("legacy stamp methods deleted", () => {
-  it("legacy_stamp_methods_deleted_output", () => {
-    const pin = new DigitalOutputPinModel(CMOS_3V3, false, "direct");
-    expect((pin as any).stamp).toBeUndefined();
-    expect((pin as any).stampOutput).toBeUndefined();
-    expect((pin as any).stampCompanion).toBeUndefined();
-    expect((pin as any).updateCompanion).toBeUndefined();
-  });
-
-  it("legacy_stamp_methods_deleted_input", () => {
-    const pin = new DigitalInputPinModel(CMOS_3V3, false);
-    expect((pin as any).stamp).toBeUndefined();
-    expect((pin as any).stampCompanion).toBeUndefined();
-    expect((pin as any).updateCompanion).toBeUndefined();
-  });
-});
-
-// ---------------------------------------------------------------------------
 // Task 0.2.3 — DigitalPinModel refactored to use AnalogCapacitorElement child
 // ---------------------------------------------------------------------------
 
@@ -413,8 +389,8 @@ describe("Task 0.2.3 — DigitalPinModel capacitor child refactor", () => {
     pin.init(1, -1);
     const children = pin.getChildElements();
     expect(children.length).toBe(1);
-    // Child has pinNodeIds set to [nodeId, 0]
-    expect(children[0].pinNodeIds).toEqual([1, 0]);
+    // Child has _pinNodes set to pos=1, neg=0
+    expect([...children[0]._pinNodes.values()]).toEqual([1, 0]);
   });
 
   it("getChildElements_empty_for_unloaded_output", () => {
@@ -440,7 +416,7 @@ describe("Task 0.2.3 — DigitalPinModel capacitor child refactor", () => {
     pin.init(2, 0);
     const children = pin.getChildElements();
     expect(children.length).toBe(1);
-    expect(children[0].pinNodeIds).toEqual([2, 0]);
+    expect([...children[0]._pinNodes.values()]).toEqual([2, 0]);
   });
 
   it("getChildElements_empty_for_input_with_zero_cin", () => {

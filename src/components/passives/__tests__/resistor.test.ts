@@ -6,7 +6,6 @@ import { describe, it, expect, vi } from "vitest";
 import { ResistorDefinition } from "../resistor.js";
 import { PropertyBag } from "../../../core/properties.js";
 import { runDcOp, makeSimpleCtx, makeLoadCtx } from "../../../solver/analog/__tests__/test-helpers.js";
-import { makeDcVoltageSource } from "../../sources/dc-voltage-source.js";
 import type { AnalogElement } from "../../../solver/analog/element.js";
 import type { SparseSolver as SparseSolverType } from "../../../solver/analog/sparse-solver.js";
 
@@ -49,8 +48,8 @@ function makeCaptureSolver() {
 describe("Resistor", () => {
   it("stamp_places_four_conductance_entries", () => {
     const props = new PropertyBag(); props.replaceModelParams({ resistance: 1000 });
-    const core = getFactory(ResistorDefinition.modelRegistry!.behavioral!)(new Map([["A", 1], ["B", 2]]), [], -1, props, () => 0);
-    const element = Object.assign(core, { pinNodeIds: [1, 2] as readonly number[], allNodeIds: [1, 2] as readonly number[] }) as unknown as AnalogElement;
+    const core = getFactory(ResistorDefinition.modelRegistry!.behavioral!)(new Map([["A", 1], ["B", 2]]), props, () => 0);
+    const element = core as unknown as AnalogElement;
     const { solver, stamps } = makeCaptureSolver();
 
     const ctx = makeLoadCtx({ solver });
@@ -68,8 +67,8 @@ describe("Resistor", () => {
 
   it("resistance_from_props", () => {
     const props = new PropertyBag(); props.replaceModelParams({ resistance: 470 });
-    const core = getFactory(ResistorDefinition.modelRegistry!.behavioral!)(new Map([["A", 1], ["B", 2]]), [], -1, props, () => 0);
-    const element = Object.assign(core, { pinNodeIds: [1, 2] as readonly number[], allNodeIds: [1, 2] as readonly number[] }) as unknown as AnalogElement;
+    const core = getFactory(ResistorDefinition.modelRegistry!.behavioral!)(new Map([["A", 1], ["B", 2]]), props, () => 0);
+    const element = core as unknown as AnalogElement;
     const { solver, stamps } = makeCaptureSolver();
 
     const ctx = makeLoadCtx({ solver });
@@ -85,8 +84,8 @@ describe("Resistor", () => {
 
   it("minimum_resistance_clamped", () => {
     const props = new PropertyBag(); props.replaceModelParams({ resistance: 0 });
-    const core = getFactory(ResistorDefinition.modelRegistry!.behavioral!)(new Map([["A", 1], ["B", 2]]), [], -1, props, () => 0);
-    const element = Object.assign(core, { pinNodeIds: [1, 2] as readonly number[], allNodeIds: [1, 2] as readonly number[] }) as unknown as AnalogElement;
+    const core = getFactory(ResistorDefinition.modelRegistry!.behavioral!)(new Map([["A", 1], ["B", 2]]), props, () => 0);
+    const element = core as unknown as AnalogElement;
     const { solver, stamps } = makeCaptureSolver();
 
     const ctx = makeLoadCtx({ solver });
@@ -100,17 +99,9 @@ describe("Resistor", () => {
     expect(stamps).toContainEqual([2, 1, -G]);
   });
 
-  it("is_not_nonlinear_and_not_reactive", () => {
-    const props = new PropertyBag(); props.replaceModelParams({ resistance: 1000 });
-    const element = getFactory(ResistorDefinition.modelRegistry!.behavioral!)(new Map([["A", 1], ["B", 2]]), [], -1, props, () => 0);
-
-    expect(element.isNonlinear).toBe(false);
-    expect(element.isReactive).toBe(false);
-  });
-
   it("branch_index_is_minus_one", () => {
     const props = new PropertyBag(); props.replaceModelParams({ resistance: 1000 });
-    const element = getFactory(ResistorDefinition.modelRegistry!.behavioral!)(new Map([["A", 1], ["B", 2]]), [], -1, props, () => 0);
+    const element = getFactory(ResistorDefinition.modelRegistry!.behavioral!)(new Map([["A", 1], ["B", 2]]), props, () => 0);
 
     expect(element.branchIndex).toBe(-1);
   });
@@ -123,14 +114,14 @@ describe("Resistor", () => {
 function makeResistor(nodeA: number, nodeB: number, resistance: number): AnalogElement {
   const G = 1 / resistance;
   return {
-    pinNodeIds: [nodeA, nodeB],
-    allNodeIds: [nodeA, nodeB],
+    _pinNodes: new Map([["A", nodeA], ["B", nodeB]]),
+    label: "",
     branchIndex: -1,
+    _stateBase: -1,
     ngspiceLoadOrder: 0,
-    isNonlinear: false,
-    isReactive: false,
     setParam(_key: string, _value: number): void {},
     getPinCurrents(_v: Float64Array): number[] { return []; },
+    setup(_ctx: import("../../../solver/analog/setup-context.js").SetupContext): void {},
     load(ctx: import("../../../solver/analog/load-context.js").LoadContext): void {
       const { solver } = ctx;
       // Ground (node 0) is the trashcan row under 1-indexed scheme — suppress stamps into it.
@@ -167,7 +158,7 @@ describe("Integration", () => {
     const matrixSize = 3;
     const branchRow = 3; // absolute 1-indexed solver row for branch current
 
-    const vs = makeDcVoltageSource(2, 0, branchRow, 10) as unknown as AnalogElement; // 10V: node2(+) to gnd(-)
+    const vs = makeInlineVoltageSource(2, 0, branchRow, 10); // 10V: node2(+) to gnd(-)
     const r1 = makeResistor(1, 2, 1000);                  // 1kÎ: node1 â†" node2
     const r2 = makeResistor(1, 0, 2000);                  // 2kÎ: node1 â†" ground
 
@@ -201,11 +192,62 @@ describe("Integration", () => {
 // converged node voltages are V1 = Vs, V2 = 2*Vs/3, V3 = Vs/3 exactly.
 // ---------------------------------------------------------------------------
 
-import {
-  makeResistor as makeResistorLoadCtx,
-  makeVoltageSource as makeVoltageSourceLoadCtx,
-} from "../../../solver/analog/__tests__/test-helpers.js";
-import type { AnalogElementCore } from "../../../solver/analog/element.js";
+// ---------------------------------------------------------------------------
+// Inline test helpers (replaces removed makeResistor / makeVoltageSource from
+// test-helpers — §A.19).
+// ---------------------------------------------------------------------------
+
+/** Minimal inline resistor — same stamp logic as production AnalogResistorElement. */
+function makeInlineResistor(nodeA: number, nodeB: number, resistance: number): AnalogElement {
+  const G = 1 / Math.max(resistance, 1e-9);
+  return {
+    label: "",
+    _pinNodes: new Map([["A", nodeA], ["B", nodeB]]),
+    branchIndex: -1,
+    _stateBase: -1,
+    ngspiceLoadOrder: 0,
+    setParam(_key: string, _value: number): void {},
+    getPinCurrents(_v: Float64Array): number[] { return []; },
+    setup(_ctx: import("../../../solver/analog/setup-context.js").SetupContext): void {},
+    load(ctx: import("../../../solver/analog/load-context.js").LoadContext): void {
+      const { solver } = ctx;
+      if (nodeA !== 0) solver.stampElement(solver.allocElement(nodeA, nodeA), G);
+      if (nodeB !== 0) solver.stampElement(solver.allocElement(nodeB, nodeB), G);
+      if (nodeA !== 0 && nodeB !== 0) {
+        solver.stampElement(solver.allocElement(nodeA, nodeB), -G);
+        solver.stampElement(solver.allocElement(nodeB, nodeA), -G);
+      }
+    },
+  };
+}
+
+/** Minimal inline voltage source with a fixed branch row. */
+function makeInlineVoltageSource(posNode: number, negNode: number, branchRow: number, voltage: number): AnalogElement {
+  let _hPosBr = -1, _hNegBr = -1, _hBrPos = -1, _hBrNeg = -1;
+  const el: AnalogElement = {
+    label: "",
+    _pinNodes: new Map([["pos", posNode], ["neg", negNode]]),
+    branchIndex: branchRow,
+    _stateBase: -1,
+    ngspiceLoadOrder: 10,
+    setParam(_key: string, _value: number): void {},
+    getPinCurrents(_v: Float64Array): number[] { return []; },
+    setup(ctx: import("../../../solver/analog/setup-context.js").SetupContext): void {
+      _hPosBr = ctx.solver.allocElement(posNode, branchRow);
+      _hNegBr = ctx.solver.allocElement(negNode, branchRow);
+      _hBrPos = ctx.solver.allocElement(branchRow, posNode);
+      _hBrNeg = ctx.solver.allocElement(branchRow, negNode);
+    },
+    load(ctx: import("../../../solver/analog/load-context.js").LoadContext): void {
+      ctx.solver.stampElement(_hPosBr, +1.0);
+      ctx.solver.stampElement(_hNegBr, -1.0);
+      ctx.solver.stampElement(_hBrPos, +1.0);
+      ctx.solver.stampElement(_hBrNeg, -1.0);
+      ctx.rhs[branchRow] += voltage;
+    },
+  };
+  return el;
+}
 
 describe("resistor_load_dcop_parity", () => {
   it("3-resistor divider Vs=5V R=1k/1k/1k matches ngspice bit-exact", () => {
@@ -233,10 +275,10 @@ describe("resistor_load_dcop_parity", () => {
     const matrixSize = 4;
     const branchRow = 3;
 
-    const vs = makeVoltageSourceLoadCtx(1, 0, branchRow, 5.0);
-    const r1 = makeResistorLoadCtx(1, 2, 1000);
-    const r2 = makeResistorLoadCtx(2, 3, 1000);
-    const r3 = makeResistorLoadCtx(3, 0, 1000);
+    const vs = makeInlineVoltageSource(1, 0, branchRow, 5.0);
+    const r1 = makeInlineResistor(1, 2, 1000);
+    const r2 = makeInlineResistor(2, 3, 1000);
+    const r3 = makeInlineResistor(3, 0, 1000);
 
     const result = runDcOp({
       elements: [vs, r1, r2, r3],
@@ -298,17 +340,11 @@ describe("resistor_load_interface", () => {
   it("load(ctx) stamps G=1/R bit-exact for R=1kÎ", () => {
     const props = new PropertyBag();
     props.replaceModelParams({ resistance: 1000 });
-    const core = getFactory(ResistorDefinition.modelRegistry!.behavioral!)(
+    const element = getFactory(ResistorDefinition.modelRegistry!.behavioral!)(
       new Map([["A", 1], ["B", 2]]),
-      [],
-      -1,
       props,
       () => 0,
-    ) as AnalogElementCore;
-    const element = Object.assign(core, {
-      pinNodeIds: [1, 2] as readonly number[],
-      allNodeIds: [1, 2] as readonly number[],
-    }) as unknown as Parameters<typeof makeSimpleCtx>[0]["elements"][number];
+    ) as unknown as Parameters<typeof makeSimpleCtx>[0]["elements"][number];
 
     const ctx = makeSimpleCtx({
       elements: [element],

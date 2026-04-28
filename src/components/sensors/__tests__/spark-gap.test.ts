@@ -118,7 +118,6 @@ function makeSparkGap(overrides: Partial<{
     overrides.iHold ?? 0.01,
   );
   el._pinNodes = new Map([["pos", 1], ["neg", 2]]);
-  Object.assign(el, { pinNodeIds: [1, 2], allNodeIds: [1, 2] });
   return el;
 }
 
@@ -376,8 +375,6 @@ describe("SparkGap", () => {
       props.replaceModelParams(SPARK_GAP_DEFAULTS);
       const element = createSparkGapElement(new Map([["pos", 1], ["neg", 2]]), props, () => 0);
       expect(element).toBeInstanceOf(SparkGapElement);
-      expect(element.isNonlinear).toBe(true);
-      expect(element.isReactive).toBe(false);
     });
 
     it("branchCount is false", () => {
@@ -412,10 +409,7 @@ describe("spark_gap_load_dcop_parity", () => {
       props,
       () => 0,
     );
-    const analogElement = Object.assign(core, {
-      pinNodeIds: [1, 2] as readonly number[],
-      allNodeIds: [1, 2] as readonly number[],
-    }) as unknown as AnalogElement;
+    const analogElement = core as unknown as AnalogElement;
 
     // Under 1-indexed nodes: pinNodeIds=[1,2] → matrix rows/cols 1 and 2.
     // matrixSize must be nodeCount+1 to accommodate 1-based indexing.

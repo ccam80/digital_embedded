@@ -30,9 +30,9 @@ import {
   type AttributeMapping,
   type ComponentDefinition,
 } from "../../core/registry.js";
-import type { AnalogElementCore } from "../../core/analog-types.js";
+import type { AnalogElement, PoolBackedAnalogElement } from "../../core/analog-types.js";
 import { NGSPICE_LOAD_ORDER } from "../../core/analog-types.js";
-import type { ReactiveAnalogElement, IntegrationMethod, LoadContext } from "../../solver/analog/element.js";
+import type { IntegrationMethod, LoadContext } from "../../solver/analog/element.js";
 import type { SetupContext } from "../../solver/analog/setup-context.js";
 import { stampRHS } from "../../solver/analog/stamp-helpers.js";
 import { niIntegrate } from "../../solver/analog/ni-integrate.js";
@@ -223,19 +223,15 @@ export class TransformerElement extends AbstractCircuitElement {
  *   [0] = P1 (primary+)   [1] = P2 (primary−)
  *   [2] = S1 (secondary+) [3] = S2 (secondary−)
  */
-export class AnalogTransformerElement implements ReactiveAnalogElement {
-  readonly pinNodeIds: readonly number[];
-  readonly allNodeIds: readonly number[];
+export class AnalogTransformerElement implements PoolBackedAnalogElement {
+  label: string = "";
   branchIndex: number = -1;
   _stateBase: number = -1;
   _pinNodes: Map<string, number> = new Map();
   readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.MUT;
-  readonly isNonlinear = false;
-  readonly isReactive = true;
   readonly poolBacked = true as const;
   readonly stateSchema = TRANSFORMER_SCHEMA;
   readonly stateSize = TRANSFORMER_SCHEMA.size;
-  stateBaseOffset = -1;
 
   private readonly _l1: InductorSubElement;
   private readonly _l2: InductorSubElement;
@@ -269,19 +265,18 @@ export class AnalogTransformerElement implements ReactiveAnalogElement {
   private _hB2S2: number = -1;
 
   constructor(
-    pinNodeIds: number[],
+    pinNodes: ReadonlyMap<string, number>,
     lPrimary: number,
     turnsRatio: number,
     k: number,
     rPri: number,
     rSec: number,
-    label: string,
+    elementLabel: string,
     IC1: number = NaN,
     IC2: number = NaN,
     multiplicity: number = 1,
   ) {
-    this.pinNodeIds = pinNodeIds;
-    this.allNodeIds = pinNodeIds;
+    this._pinNodes = new Map(pinNodes);
     const lSecondary = lPrimary / (turnsRatio * turnsRatio);
     this._pair = new CoupledInductorPair(lPrimary, lSecondary, k);
     this._rPri = rPri;
@@ -290,9 +285,12 @@ export class AnalogTransformerElement implements ReactiveAnalogElement {
     this._IC2 = IC2;
     this._M = multiplicity;
 
-    const [p1, p2, s1, s2] = pinNodeIds;
-    this._l1 = new InductorSubElement(p1, p2, `${label}.L1`);
-    this._l2 = new InductorSubElement(s1, s2, `${label}.L2`);
+    const p1 = pinNodes.get("P1")!;
+    const p2 = pinNodes.get("P2")!;
+    const s1 = pinNodes.get("S1")!;
+    const s2 = pinNodes.get("S2")!;
+    this._l1 = new InductorSubElement(p1, p2, `${elementLabel}.L1`);
+    this._l2 = new InductorSubElement(s1, s2, `${elementLabel}.L2`);
     this._mut = new MutualInductorElement(k, this._l1, this._l2);
   }
 
@@ -310,7 +308,10 @@ export class AnalogTransformerElement implements ReactiveAnalogElement {
 
     // Allocate handles for winding resistance stamps
     const solver = ctx.solver;
-    const [p1, p2, sec1, sec2] = this.pinNodeIds;
+    const p1   = this._pinNodes.get("P1")!;
+    const p2   = this._pinNodes.get("P2")!;
+    const sec1 = this._pinNodes.get("S1")!;
+    const sec2 = this._pinNodes.get("S2")!;
     const b1 = this._l1.branchIndex;
     const b2 = this._l2.branchIndex;
 
@@ -344,7 +345,7 @@ export class AnalogTransformerElement implements ReactiveAnalogElement {
 
   initState(pool: StatePoolRef): void {
     this._pool = pool;
-    applyInitialValues(TRANSFORMER_SCHEMA, pool, this.stateBaseOffset, {});
+    applyInitialValues(TRANSFORMER_SCHEMA, pool, this._stateBase, {});
   }
 
   setParam(key: string, value: number): void {
@@ -352,7 +353,6 @@ export class AnalogTransformerElement implements ReactiveAnalogElement {
       const subKey = key.slice(3);
       if (subKey === "inductance") {
         const lPrimary = value;
-        const lSecondary = lPrimary / (this._pair.k > 0 ? (this._pair.l1 / this._pair.l2) : 1);
         this._pair = new CoupledInductorPair(lPrimary, this._pair.l2, this._pair.k);
       }
     } else if (key.startsWith("L2.")) {
@@ -375,7 +375,7 @@ export class AnalogTransformerElement implements ReactiveAnalogElement {
       throw new Error(`Unrecognized setParam key: ${key}`);
     }
     if (this._pool) {
-      applyInitialValues(TRANSFORMER_SCHEMA, this._pool, this.stateBaseOffset, {});
+      applyInitialValues(TRANSFORMER_SCHEMA, this._pool, this._stateBase, {});
     }
   }
 
@@ -390,7 +390,10 @@ export class AnalogTransformerElement implements ReactiveAnalogElement {
    */
   load(ctx: LoadContext): void {
     const solver = ctx.solver;
-    const [p1, p2, sec1, sec2] = this.pinNodeIds;
+    const p1   = this._pinNodes.get("P1")!;
+    const p2   = this._pinNodes.get("P2")!;
+    const sec1 = this._pinNodes.get("S1")!;
+    const sec2 = this._pinNodes.get("S2")!;
     const b1 = this._l1.branchIndex;
     const b2 = this._l2.branchIndex;
     const mode = ctx.cktMode;
@@ -402,7 +405,7 @@ export class AnalogTransformerElement implements ReactiveAnalogElement {
     const Mcoup = this._pair.m / m;
 
     const voltages = ctx.rhsOld;
-    const base = this.stateBaseOffset;
+    const base = this._stateBase;
     const s0 = this._pool.states[0];
     const s1 = this._pool.states[1];
     const s2 = this._pool.states[2];
@@ -533,7 +536,7 @@ export class AnalogTransformerElement implements ReactiveAnalogElement {
     method: IntegrationMethod,
     lteParams: import("../../solver/analog/ckt-terr.js").LteParams,
   ): number {
-    const base = this.stateBaseOffset;
+    const base = this._stateBase;
     const s0 = this._pool.states[0];
     const s1 = this._pool.states[1];
     const s2 = this._pool.states[2];
@@ -592,7 +595,7 @@ function createTransformerElement(
   pinNodes: ReadonlyMap<string, number>,
   props: PropertyBag,
   _getTime: () => number,
-): AnalogElementCore {
+): AnalogElement {
   const primaryInductance    = props.getModelParam<number>("primaryInductance");
   const turnsRatio           = props.getModelParam<number>("turnsRatio");
   const couplingCoefficient  = props.getModelParam<number>("couplingCoefficient");
@@ -603,8 +606,8 @@ function createTransformerElement(
   const M   = props.hasModelParam("M")   ? props.getModelParam<number>("M")   : 1;
 
   const label = props.getOrDefault<string>("label", "T");
-  const el = new AnalogTransformerElement(
-    [pinNodes.get("P1")!, pinNodes.get("P2")!, pinNodes.get("S1")!, pinNodes.get("S2")!],
+  return new AnalogTransformerElement(
+    pinNodes,
     primaryInductance,
     turnsRatio,
     couplingCoefficient,
@@ -615,8 +618,6 @@ function createTransformerElement(
     IC2,
     M,
   );
-  el._pinNodes = new Map(pinNodes);
-  return el;
 }
 
 // ---------------------------------------------------------------------------

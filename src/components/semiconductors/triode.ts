@@ -32,8 +32,9 @@ import {
   type AttributeMapping,
   type ComponentDefinition,
 } from "../../core/registry.js";
-import type { AnalogElementCore, LoadContext } from "../../solver/analog/element.js";
-import { NGSPICE_LOAD_ORDER } from "../../solver/analog/element.js";
+import type { AnalogElement } from "../../core/analog-types.js";
+import { NGSPICE_LOAD_ORDER } from "../../core/analog-types.js";
+import type { LoadContext } from "../../solver/analog/load-context.js";
 import { stampRHS } from "../../solver/analog/stamp-helpers.js";
 import { defineModelParams } from "../../core/model-params.js";
 import { VCCSAnalogElement } from "../active/vccs.js";
@@ -138,13 +139,12 @@ function computeTriodeOp(
 // TriodeElement — composite analog element
 // ---------------------------------------------------------------------------
 
-class TriodeElement implements AnalogElementCore {
+class TriodeElement implements AnalogElement {
+  label: string = "";
   branchIndex: number = -1;
   _stateBase: number = -1;
-  _pinNodes: ReadonlyMap<string, number>;
-  ngspiceLoadOrder = NGSPICE_LOAD_ORDER.BJT;
-  isNonlinear = true;
-  isReactive = false;
+  _pinNodes: Map<string, number>;
+  readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.BJT;
 
   /** VCCS sub-element carrying the 4 transconductance handles. */
   private readonly _vccs: VCCSAnalogElement;
@@ -340,14 +340,14 @@ class TriodeElement implements AnalogElementCore {
 }
 
 // ---------------------------------------------------------------------------
-// createTriodeElement — AnalogElement factory (3-param signature per A6)
+// createTriodeElement — AnalogElement factory (3-arg signature per A.3)
 // ---------------------------------------------------------------------------
 
 export function createTriodeElement(
   pinNodes: ReadonlyMap<string, number>,
   props: PropertyBag,
-  _ngspiceNodeMap?: Record<string, string>,
-): AnalogElementCore {
+  _getTime: () => number,
+): AnalogElement {
   return new TriodeElement(pinNodes, props);
 }
 
@@ -480,8 +480,6 @@ function triodeCircuitFactory(props: PropertyBag): TriodeCircuitElement {
   return new TriodeCircuitElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
 }
 
-// Per PB-TRIODE "Factory cleanup": the composite does not carry
-// ngspiceNodeMap — the VCCS sub-element carries its own.
 export const TriodeDefinition: ComponentDefinition = {
   name: "Triode",
   typeId: -1,

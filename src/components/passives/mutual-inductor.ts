@@ -12,9 +12,9 @@
  *   mutload.c          — MUT load (off-diagonal coupling stamps)
  */
 
-import type { AnalogElementCore, StatePoolRef } from "../../core/analog-types.js";
+import type { PoolBackedAnalogElement, AnalogElement } from "../../core/analog-types.js";
 import { NGSPICE_LOAD_ORDER } from "../../core/analog-types.js";
-import type { PoolBackedAnalogElementCore } from "../../core/analog-types.js";
+import type { StatePoolRef } from "../../core/analog-types.js";
 import type { IntegrationMethod, LoadContext } from "../../solver/analog/element.js";
 import type { SetupContext } from "../../solver/analog/setup-context.js";
 import { defineStateSchema, applyInitialValues } from "../../solver/analog/state-schema.js";
@@ -48,25 +48,17 @@ const SLOT_CCAP = 1;  // ngspice INDvolt = INDstate+1 (= NIintegrate ccap)
  * Implements the same setup/load/state/LTE behavior as AnalogInductorElement
  * (PB-IND) but is not registered as a top-level MNA model.
  *
- * Pool-backed per PoolBackedAnalogElementCore interface.
+ * Pool-backed per PoolBackedAnalogElement interface.
  */
-export class InductorSubElement implements PoolBackedAnalogElementCore {
+export class InductorSubElement implements PoolBackedAnalogElement {
+  label: string = "";
+  _pinNodes: Map<string, number>;
+  _stateBase: number = -1;
   branchIndex: number = -1;
   readonly poolBacked = true as const;
   readonly stateSchema: StateSchema = INDUCTOR_SUB_SCHEMA;
   readonly stateSize: number = 2;
-  stateBaseOffset: number = -1;
   readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.IND;
-  readonly isNonlinear: false = false;
-  readonly isReactive: true = true;
-  s0: Float64Array<ArrayBufferLike> = new Float64Array(0);
-  s1: Float64Array<ArrayBufferLike> = new Float64Array(0);
-  s2: Float64Array<ArrayBufferLike> = new Float64Array(0);
-  s3: Float64Array<ArrayBufferLike> = new Float64Array(0);
-  s4: Float64Array<ArrayBufferLike> = new Float64Array(0);
-  s5: Float64Array<ArrayBufferLike> = new Float64Array(0);
-  s6: Float64Array<ArrayBufferLike> = new Float64Array(0);
-  s7: Float64Array<ArrayBufferLike> = new Float64Array(0);
 
   private _hPIbr:   number = -1;
   private _hNIbr:   number = -1;
@@ -74,22 +66,33 @@ export class InductorSubElement implements PoolBackedAnalogElementCore {
   private _hIbrP:   number = -1;
   private _hIbrIbr: number = -1;
   private _pool!: StatePoolRef;
+  private readonly _label: string;
+  private _inductance: number;
+
+  // Package-internal getter for AnalogTransformerElement.load() — exposes the
+  // branch-diagonal handle allocated during setup() so the parent composite can
+  // stamp it directly without calling this sub-element's own load().
+  get hIbrIbr(): number { return this._hIbrIbr; }
 
   constructor(
-    private readonly _posNode: number,    // INDposNode
-    private readonly _negNode: number,    // INDnegNode
-    private readonly _label: string,      // unique branch label
-    private _inductance: number,          // L value at construction time
-  ) {}
+    posNode: number,    // INDposNode
+    negNode: number,    // INDnegNode
+    label: string,      // unique branch label
+    inductance: number = 0,  // L value at construction time
+  ) {
+    this._pinNodes = new Map([["pos", posNode], ["neg", negNode]]);
+    this._label = label;
+    this._inductance = inductance;
+  }
 
   setup(ctx: SetupContext): void {
     const solver = ctx.solver;
-    const posNode = this._posNode;
-    const negNode = this._negNode;
+    const posNode = this._pinNodes.get("pos")!;
+    const negNode = this._pinNodes.get("neg")!;
 
     // indsetup.c:78-79 — *states += 2 (INDflux = state+0, INDvolt = state+1)
-    if (this.stateBaseOffset === -1) {
-      this.stateBaseOffset = ctx.allocStates(2);
+    if (this._stateBase === -1) {
+      this._stateBase = ctx.allocStates(2);
     }
 
     // indsetup.c:84-88 — CKTmkCur guard (idempotent)
@@ -108,14 +111,14 @@ export class InductorSubElement implements PoolBackedAnalogElementCore {
 
   initState(pool: StatePoolRef): void {
     this._pool = pool;
-    applyInitialValues(INDUCTOR_SUB_SCHEMA, pool, this.stateBaseOffset, {});
+    applyInitialValues(INDUCTOR_SUB_SCHEMA, pool, this._stateBase, {});
   }
 
   load(ctx: LoadContext): void {
     const { solver, rhsOld, ag, cktMode: mode } = ctx;
     const b = this.branchIndex;
     const L = this._inductance;
-    const base = this.stateBaseOffset;
+    const base = this._stateBase;
     const s0 = this._pool.states[0];
     const s1 = this._pool.states[1];
     const s2 = this._pool.states[2];
@@ -190,7 +193,7 @@ export class InductorSubElement implements PoolBackedAnalogElementCore {
     method: IntegrationMethod,
     lteParams: LteParams,
   ): number {
-    const base = this.stateBaseOffset;
+    const base = this._stateBase;
     const s0 = this._pool.states[0];
     const s1 = this._pool.states[1];
     const s2 = this._pool.states[2];
@@ -210,23 +213,26 @@ export class InductorSubElement implements PoolBackedAnalogElementCore {
     }
   }
 
-  findBranchFor(name: string, ctx: SetupContext): number {
-    if (name !== this._label) return 0;
+  getPinCurrents(_rhs: Float64Array): number[] {
+    return [];
+  }
+
+  findBranchFor(_name: string, ctx: SetupContext): number {
     if (this.branchIndex === -1) {
       this.branchIndex = ctx.makeCur(this._label, "branch");
     }
     return this.branchIndex;
   }
 
-  // Package-internal getters for MutualInductorElement.load() only.
+  // Package-internal accessors for MutualInductorElement.load() and transformer composites.
   get inductanceForMut(): number { return this._inductance; }
-  get statePoolForMut(): { s0: Float64Array; s1: Float64Array; s2: Float64Array; s3: Float64Array; stateBaseOffset: number } {
+  get statePoolForMut(): { s0: Float64Array; s1: Float64Array; s2: Float64Array; s3: Float64Array; base: number } {
     return {
       s0: this._pool.states[0],
       s1: this._pool.states[1],
       s2: this._pool.states[2],
       s3: this._pool.states[3],
-      stateBaseOffset: this.stateBaseOffset,
+      base: this._stateBase,
     };
   }
 }
@@ -240,14 +246,21 @@ export class InductorSubElement implements PoolBackedAnalogElementCore {
  * Reads branch indices from its paired InductorSubElement refs directly.
  * NOT pool-backed (MUT allocates no state slots — mutsetup.c:28 NG_IGNORE(states)).
  */
-export class MutualInductorElement implements AnalogElementCore {
-  branchIndex: number = -1;   // unused; satisfies AnalogElementCore interface
+export class MutualInductorElement implements AnalogElement {
+  label: string = "";
+  _pinNodes: Map<string, number> = new Map();
+  _stateBase: number = -1;
+  branchIndex: number = -1;
   readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.MUT;
-  readonly isNonlinear: false = false;
-  readonly isReactive: false = false;
 
   private _hBr1Br2: number = -1;
   private _hBr2Br1: number = -1;
+
+  // Package-internal getters for AnalogTransformerElement.load() — expose the
+  // off-diagonal handles allocated during setup() so the parent composite can
+  // stamp mutual coupling directly without calling this sub-element's own load().
+  get hBr1Br2(): number { return this._hBr1Br2; }
+  get hBr2Br1(): number { return this._hBr2Br1; }
 
   constructor(
     private _coupling: number,                   // K coupling coefficient (mutable)
@@ -292,15 +305,19 @@ export class MutualInductorElement implements AnalogElementCore {
       const pool1 = this._l1.statePoolForMut;
       const pool2 = this._l2.statePoolForMut;
       // CKTstate0[l1.INDflux] += MUTfactor * CKTrhsOld[l2.INDbrEq]
-      pool1.s0[pool1.stateBaseOffset + SLOT_PHI] += mutFactor * rhsOld[b2];
+      pool1.s0[pool1.base + SLOT_PHI] += mutFactor * rhsOld[b2];
       // CKTstate0[l2.INDflux] += MUTfactor * CKTrhsOld[l1.INDbrEq]
-      pool2.s0[pool2.stateBaseOffset + SLOT_PHI] += mutFactor * rhsOld[b1];
+      pool2.s0[pool2.base + SLOT_PHI] += mutFactor * rhsOld[b1];
     }
 
     // *(MUTbr1br2) -= MUTfactor * CKTag[0]
     ctx.solver.stampElement(this._hBr1Br2, -mutFactor * ag[0]);
     // *(MUTbr2br1) -= MUTfactor * CKTag[0]
     ctx.solver.stampElement(this._hBr2Br1, -mutFactor * ag[0]);
+  }
+
+  getPinCurrents(_rhs: Float64Array): number[] {
+    return [];
   }
 
   setParam(key: string, value: number): void {

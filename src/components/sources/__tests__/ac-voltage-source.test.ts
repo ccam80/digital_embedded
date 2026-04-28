@@ -16,10 +16,12 @@ import { PropertyBag } from "../../../core/properties.js";
 import type { SparseSolver } from "../../../solver/analog/sparse-solver.js";
 import { MODEDCOP, MODEINITFLOAT, MODEINITJCT } from "../../../solver/analog/ckt-mode.js";
 import {
-  makeResistor,
-  createTestCapacitor,
   allocateStatePool,
+  makeTestSetupContext,
+  setupAll,
+  loadCtxFromFields,
 } from "../../../solver/analog/__tests__/test-helpers.js";
+import { CapacitorDefinition } from "../../passives/capacitor.js";
 import { MNAEngine } from "../../../solver/analog/analog-engine.js";
 import type { ConcreteCompiledAnalogCircuit } from "../../../solver/analog/analog-engine.js";
 
@@ -56,20 +58,25 @@ function makeMockSolver(rhsSize = 8) {
   return solver;
 }
 
-function makeMinimalCtx(solver: ReturnType<typeof makeMockSolver>, _time = 0, srcFact = 1) {
-  return {
+function makeMinimalCtx(
+  solver: ReturnType<typeof makeMockSolver>,
+  _time = 0,
+  srcFact = 1,
+  overrides?: Partial<{ cktMode: number; srcFact: number }>,
+) {
+  return loadCtxFromFields({
     solver: solver as unknown as SparseSolver,
     matrix: solver as unknown as SparseSolver,
     rhs: solver._rhs,
     rhsOld: new Float64Array(solver._rhs.length),
-    cktMode: MODEDCOP | MODEINITFLOAT,
+    cktMode: overrides?.cktMode ?? (MODEDCOP | MODEINITFLOAT),
     time: _time,
     dt: 0,
     method: "trapezoidal" as const,
     order: 1,
     deltaOld: [0, 0, 0, 0, 0, 0, 0],
     ag: new Float64Array(7),
-    srcFact,
+    srcFact: overrides?.srcFact ?? srcFact,
     noncon: { value: 0 },
     limitingCollector: null,
     convergenceCollector: null,
@@ -82,7 +89,7 @@ function makeMinimalCtx(solver: ReturnType<typeof makeMockSolver>, _time = 0, sr
     cktFixLimit: false,
     bypass: false,
     voltTol: 1e-6,
-  };
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -99,7 +106,7 @@ function makeAcElement(
   },
   nodePos = 1,
   nodeNeg = 0,
-  branchIdx = 2,
+  _branchIdx = 2,
   time = 0,
 ): AcVoltageSourceAnalogElement {
   const props = new PropertyBag();
@@ -114,8 +121,6 @@ function makeAcElement(
 
   const el = getFactory(AcVoltageSourceDefinition.modelRegistry!.behavioral!)(
     new Map([["pos", nodePos], ["neg", nodeNeg]]),
-    [],
-    branchIdx,
     props,
     getTime,
   ) as AcVoltageSourceAnalogElement;
@@ -126,6 +131,22 @@ function makeAcElement(
   };
 
   return el;
+}
+
+// ---------------------------------------------------------------------------
+// Helper — setup an AC element and assign its branch index
+// ---------------------------------------------------------------------------
+
+function setupAcElement(
+  el: AcVoltageSourceAnalogElement,
+  solver: ReturnType<typeof makeMockSolver>,
+  branchIdx: number,
+): void {
+  const ctx = makeTestSetupContext({
+    solver: solver as unknown as SparseSolver,
+    startBranch: branchIdx,
+  });
+  setupAll([el as unknown as import("../../../solver/analog/element.js").AnalogElement], ctx);
 }
 
 // ---------------------------------------------------------------------------
@@ -174,6 +195,7 @@ describe("AcSource", () => {
   it("sine_at_t_zero", () => {
     const el = makeAcElement({ amplitude: 5, frequency: 1000, waveform: "sine" }, 1, 0, 2, 0);
     const solver = makeMockSolver();
+    setupAcElement(el, solver, 2);
     el.load(makeMinimalCtx(solver));
     // RHS at branch row 2: V(t=0) = 5 * sin(0) = 0
     expect(solver._rhs[2]).toBeCloseTo(0, 8);
@@ -182,6 +204,7 @@ describe("AcSource", () => {
   it("sine_at_quarter_period", () => {
     const el = makeAcElement({ amplitude: 5, frequency: 1000, waveform: "sine" }, 1, 0, 2, 0.25e-3);
     const solver = makeMockSolver();
+    setupAcElement(el, solver, 2);
     el.load(makeMinimalCtx(solver));
     // RHS at branch row 2: V(t=0.25ms) = 5 * sin(π/2) = 5.0
     expect(solver._rhs[2]).toBeCloseTo(5.0, 4);
@@ -191,6 +214,7 @@ describe("AcSource", () => {
     // Use t=0.75ms (3/4 period) where sin = -1, firmly in the negative half cycle
     const el = makeAcElement({ amplitude: 5, frequency: 1000, waveform: "square" }, 1, 0, 2, 0.75e-3);
     const solver = makeMockSolver();
+    setupAcElement(el, solver, 2);
     el.load(makeMinimalCtx(solver));
     // At t=0.75ms: sin(2π*1000*0.75e-3) = sin(3π/2) = -1 → V = -5
     expect(solver._rhs[2]).toBeCloseTo(-5.0, 4);
@@ -199,6 +223,7 @@ describe("AcSource", () => {
   it("triangle_linearity", () => {
     const el = makeAcElement({ amplitude: 5, frequency: 1000, waveform: "triangle" }, 1, 0, 2, 0.125e-3);
     const solver = makeMockSolver();
+    setupAcElement(el, solver, 2);
     el.load(makeMinimalCtx(solver));
     // PULSE-aligned triangle: at t=0 wave is at V1 = -5V rising. At t = period/8
     // (quarter of the rise half-period) value = V1 + (V2-V1)*(1/4) = -2.5V.
@@ -211,6 +236,7 @@ describe("AcSource", () => {
       1, 0, 2, 0,
     );
     const solver = makeMockSolver();
+    setupAcElement(el, solver, 2);
     el.load(makeMinimalCtx(solver));
     // At t=0: sin(0)=0, so RHS = 0*scale + 2 = 2.0
     expect(solver._rhs[2]).toBeCloseTo(2.0, 8);
@@ -247,7 +273,7 @@ describe("Integration", () => {
   it("rc_lowpass", () => {
     // Build circuit using test-elements: AC source + R + C
     // Nodes: node1=Vs+ (1), node2=mid RC (2), gnd=0
-    // Elements: AcSource(1,0,branch=2), R=1kΩ(1,2), C=1µF(2,0)
+    // Elements: AcSource(1,0,branch=3), R=1kΩ(1,2), C=1µF(2,0)
 
     const props = new PropertyBag();
     props.setModelParam("amplitude", 5);
@@ -262,14 +288,37 @@ describe("Integration", () => {
     // 1-based: nodeCount=2, branchCount=1, matrixSize=3. Branch row = nodeCount+1 = 3.
     const acSrc = getFactory(AcVoltageSourceDefinition.modelRegistry!.behavioral!)(
       new Map([["pos", 1], ["neg", 0]]),
-      [],
-      3,
       props,
       getTime,
     ) as AcVoltageSourceAnalogElement;
 
-    const r = makeResistor(1, 2, 1000);
-    const cap = createTestCapacitor(1e-6, 2, 0);
+    // Build resistor as an inline element (1kΩ, node1→node2)
+    const G = 1 / 1000;
+    const r: import("../../../solver/analog/element.js").AnalogElement = {
+      label: "",
+      branchIndex: -1,
+      _stateBase: -1,
+      ngspiceLoadOrder: 10,
+      _pinNodes: new Map([["A", 1], ["B", 2]]),
+      setup(_ctx) {},
+      setParam(_k, _v) {},
+      getPinCurrents(_v) { return []; },
+      load(ctx) {
+        ctx.solver.stampElement(ctx.solver.allocElement(1, 1), G);
+        ctx.solver.stampElement(ctx.solver.allocElement(2, 2), G);
+        ctx.solver.stampElement(ctx.solver.allocElement(1, 2), -G);
+        ctx.solver.stampElement(ctx.solver.allocElement(2, 1), -G);
+      },
+    };
+
+    // Build capacitor using the production factory (1µF, node2→gnd)
+    const capProps = new PropertyBag();
+    capProps.replaceModelParams({ capacitance: 1e-6 });
+    const cap = getFactory(CapacitorDefinition.modelRegistry!.behavioral!)(
+      new Map([["pos", 2], ["neg", 0]]),
+      capProps,
+      () => 0,
+    );
 
     const acElements = [acSrc as unknown as import("../../../solver/analog/element.js").AnalogElement, r, cap];
     const acStatePool = allocateStatePool(acElements);
@@ -334,8 +383,6 @@ function makeExprElement(
   let simTime = time;
   const el = getFactory(AcVoltageSourceDefinition.modelRegistry!.behavioral!)(
     new Map([["pos", 1], ["neg", 0]]),
-    [],
-    2,
     props,
     () => simTime,
   ) as AcVoltageSourceAnalogElement;
@@ -353,6 +400,7 @@ describe("ExprWaveform", () => {
     // sin(2π * 500 * 0.001) = sin(2π * 0.5) = sin(π) ≈ 0
     const el = makeExprElement("3 * sin(2 * pi * 500 * t)", 0.001);
     const solver = makeMockSolver();
+    setupAcElement(el, solver, 2);
     el.load(makeMinimalCtx(solver));
     expect(solver._rhs[2]).toBeCloseTo(0, 5);
   });
@@ -361,6 +409,7 @@ describe("ExprWaveform", () => {
     // "5 * t" at t=0.001 → RHS = 5 * 0.001 = 0.005V
     const el = makeExprElement("5 * t", 0.001);
     const solver = makeMockSolver();
+    setupAcElement(el, solver, 2);
     el.load(makeMinimalCtx(solver));
     expect(solver._rhs[2]).toBeCloseTo(0.005, 8);
   });
@@ -375,6 +424,7 @@ describe("ExprWaveform", () => {
 
     // load should not throw and should produce RHS = 0
     const solver = makeMockSolver();
+    setupAcElement(el, solver, 2);
     expect(() => el.load(makeMinimalCtx(solver))).not.toThrow();
     expect(solver._rhs[2]).toBe(0);
   });
@@ -385,8 +435,11 @@ describe("ExprWaveform", () => {
     const firstRef = el._parsedExpr;
 
     const solver1 = makeMockSolver();
+    setupAcElement(el, solver1, 2);
     el.load(makeMinimalCtx(solver1));
     const solver2 = makeMockSolver();
+    // Re-setup with solver2 so allocElement is called on solver2
+    setupAcElement(el, solver2, 2);
     el.load(makeMinimalCtx(solver2));
 
     expect(el._parsedExpr).toBe(firstRef);
@@ -411,8 +464,9 @@ describe("ac_vsource_load_srcfact_parity", () => {
 
     const el = makeAcElement({ amplitude: AMPLITUDE, frequency: FREQUENCY, waveform: "sine" }, 1, 0, 2, T);
     const solver = makeMockSolver();
+    setupAcElement(el, solver, 2);
 
-    el.load({ ...makeMinimalCtx(solver), srcFact: SRC_FACT });
+    el.load(makeMinimalCtx(solver, 0, SRC_FACT));
 
     // NGSPICE_REF: V(t=0.25ms) * srcFact = amplitude * sin(2π*1000*0.25e-3) * 0.5.
     const NGSPICE_REF =
@@ -428,8 +482,9 @@ describe("ac_vsource_load_srcfact_parity", () => {
 
     const el = makeAcElement({ amplitude: AMPLITUDE, frequency: FREQUENCY, waveform: "square" }, 1, 0, 2, T);
     const solver = makeMockSolver();
+    setupAcElement(el, solver, 2);
 
-    el.load({ ...makeMinimalCtx(solver), srcFact: SRC_FACT });
+    el.load(makeMinimalCtx(solver, 0, SRC_FACT));
 
     // NGSPICE_REF: square waveform with default riseTime/fallTime = 1ps (AC_VOLTAGE_SOURCE_DEFAULTS).
     // At t=0.75ms (well past halfPeriod + fallTime of 0.5ms+1ps), we are firmly in the
@@ -443,8 +498,9 @@ describe("ac_vsource_load_srcfact_parity", () => {
   it("srcfact_0_zeroes_rhs_but_leaves_incidence", () => {
     const el = makeAcElement({ amplitude: 5, frequency: 1000, waveform: "sine" }, 1, 2, 3, 0.25e-3);
     const solver = makeMockSolver();
+    setupAcElement(el, solver, 3);
 
-    el.load({ ...makeMinimalCtx(solver), cktMode: MODEDCOP | MODEINITJCT, srcFact: 0 });
+    el.load(makeMinimalCtx(solver, 0, 1, { cktMode: MODEDCOP | MODEINITJCT, srcFact: 0 }));
 
     // NGSPICE_REF at srcFact=0 → RHS entry exactly 0 (independent of waveform value).
     expect(solver._rhs[3]).toBe(0);

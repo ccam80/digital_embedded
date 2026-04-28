@@ -23,12 +23,85 @@
 import { describe, it, expect } from "vitest";
 import { MNAEngine } from "../analog-engine.js";
 import type { ConcreteCompiledAnalogCircuit } from "../analog-engine.js";
-import {
-  makeResistor,
-  createTestCapacitor,
-  makeAcVoltageSource,
-  allocateStatePool,
-} from "./test-helpers.js";
+import { allocateStatePool } from "./test-helpers.js";
+import { makeAcVoltageSourceElement } from "../../../components/sources/ac-voltage-source.js";
+import { AnalogCapacitorElement, CAPACITOR_DEFAULTS } from "../../../components/passives/capacitor.js";
+import { PropertyBag } from "../../../core/properties.js";
+import { NGSPICE_LOAD_ORDER } from "../../../core/analog-types.js";
+import type { AnalogElement } from "../element.js";
+import type { LoadContext } from "../load-context.js";
+import type { SetupContext } from "../setup-context.js";
+
+// ---------------------------------------------------------------------------
+// Inline §A-compliant element factories for this test file
+// ---------------------------------------------------------------------------
+
+function makeResistor(nodeA: number, nodeB: number, resistance: number): AnalogElement {
+  const G = 1 / resistance;
+  let _hPP = -1, _hNN = -1, _hPN = -1, _hNP = -1;
+  const el: AnalogElement = {
+    label: "",
+    ngspiceLoadOrder: NGSPICE_LOAD_ORDER.RES,
+    _pinNodes: new Map([["A", nodeA], ["B", nodeB]]),
+    _stateBase: -1,
+    branchIndex: -1,
+    setup(ctx: SetupContext): void {
+      const s = ctx.solver;
+      if (nodeA !== 0) _hPP = s.allocElement(nodeA, nodeA);
+      if (nodeB !== 0) _hNN = s.allocElement(nodeB, nodeB);
+      if (nodeA !== 0 && nodeB !== 0) {
+        _hPN = s.allocElement(nodeA, nodeB);
+        _hNP = s.allocElement(nodeB, nodeA);
+      }
+    },
+    load(ctx: LoadContext): void {
+      const s = ctx.solver;
+      if (_hPP !== -1) s.stampElement(_hPP,  G);
+      if (_hNN !== -1) s.stampElement(_hNN,  G);
+      if (_hPN !== -1) s.stampElement(_hPN, -G);
+      if (_hNP !== -1) s.stampElement(_hNP, -G);
+    },
+    getPinCurrents(rhs: Float64Array): number[] {
+      const vA = rhs[nodeA] ?? 0;
+      const vB = rhs[nodeB] ?? 0;
+      return [G * (vA - vB), G * (vB - vA)];
+    },
+    setParam(_key: string, _value: number): void {},
+  };
+  return el;
+}
+
+function createTestCapacitor(capacitance: number, nodePos: number, nodeNeg: number): AnalogElement {
+  return new AnalogCapacitorElement(
+    new Map([["pos", nodePos], ["neg", nodeNeg]]),
+    capacitance,
+    CAPACITOR_DEFAULTS["IC"] as number,
+    CAPACITOR_DEFAULTS["TC1"] as number,
+    CAPACITOR_DEFAULTS["TC2"] as number,
+    CAPACITOR_DEFAULTS["TNOM"] as number,
+    CAPACITOR_DEFAULTS["SCALE"] as number,
+    CAPACITOR_DEFAULTS["M"] as number,
+  );
+}
+
+function makeAcVoltageSource(
+  posNode: number,
+  negNode: number,
+  _branchRow: number,
+  amplitude: number,
+  frequency: number,
+  phase: number,
+  dcOffset: number,
+  getTime: () => number,
+): AnalogElement {
+  const props = new PropertyBag([]);
+  props.replaceModelParams({ amplitude, frequency, phase, dcOffset });
+  return makeAcVoltageSourceElement(
+    new Map([["pos", posNode], ["neg", negNode]]),
+    props,
+    getTime,
+  );
+}
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -303,7 +376,6 @@ import { Circuit, Wire } from "../../../core/circuit.js";
 import type { CircuitElement } from "../../../core/element.js";
 import type { Pin } from "../../../core/pin.js";
 import { PinDirection } from "../../../core/pin.js";
-import { PropertyBag } from "../../../core/properties.js";
 import type { PropertyValue } from "../../../core/properties.js";
 import type { Rect, RenderContext } from "../../../core/renderer-interface.js";
 import type { SerializedElement } from "../../../core/element.js";
@@ -425,13 +497,17 @@ describe("RC lowpass AC transient — compiler pipeline", () => {
     expect(compiled.elements.length).toBe(3);
     expect(compiled.nodeCount).toBe(2);
 
-    // Verify reactive element exists
-    const reactiveCount = compiled.elements.filter(e => e.isReactive).length;
+    // Verify reactive element exists (reactive = has getLteTimestep method)
+    const reactiveCount = compiled.elements.filter(
+      e => typeof (e as { getLteTimestep?: unknown }).getLteTimestep === "function",
+    ).length;
     expect(reactiveCount).toBe(1);
 
     // Verify capacitor node assignment: one node should be ground (0)
-    const capEl = compiled.elements.find(e => e.isReactive)!;
-    const capNodes = capEl.pinNodeIds;
+    const capEl = compiled.elements.find(
+      e => typeof (e as { getLteTimestep?: unknown }).getLteTimestep === "function",
+    )!;
+    const capNodes = [...capEl._pinNodes.values()];
     expect(capNodes).toHaveLength(2);
     // One node should be ground (0), the other should be non-zero
     const hasGround = capNodes[0] === 0 || capNodes[1] === 0;

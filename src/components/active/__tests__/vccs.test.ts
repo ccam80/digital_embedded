@@ -13,12 +13,13 @@
 
 import { describe, it, expect } from "vitest";
 import { MNAEngine } from "../../../solver/analog/analog-engine.js";
-import { makeResistor, makeVoltageSource, withNodeIds } from "../../../solver/analog/__tests__/test-helpers.js";
 import { VCCSDefinition } from "../vccs.js";
 import { PropertyBag } from "../../../core/properties.js";
 import type { AnalogElement } from "../../../solver/analog/element.js";
 import type { ModelEntry, AnalogFactory } from "../../../core/registry.js";
 import type { ConcreteCompiledAnalogCircuit } from "../../../solver/analog/analog-engine.js";
+import { makeDcVoltageSource } from "../../sources/dc-voltage-source.js";
+import { ResistorDefinition, RESISTOR_DEFAULTS } from "../../passives/resistor.js";
 
 // ---------------------------------------------------------------------------
 // Helper: narrow ModelEntry to inline factory
@@ -27,6 +28,34 @@ import type { ConcreteCompiledAnalogCircuit } from "../../../solver/analog/analo
 function getFactory(entry: ModelEntry): AnalogFactory {
   if (entry.kind !== "inline") throw new Error("Expected inline ModelEntry");
   return entry.factory;
+}
+
+// ---------------------------------------------------------------------------
+// makeResistor — create a resistor element between two nodes.
+// ---------------------------------------------------------------------------
+
+function makeResistor(nodeA: number, nodeB: number, resistance: number): AnalogElement {
+  const props = new PropertyBag([]);
+  props.replaceModelParams({ ...RESISTOR_DEFAULTS, resistance });
+  return getFactory(ResistorDefinition.modelRegistry!["behavioral"]!)(
+    new Map([["A", nodeA], ["B", nodeB]]),
+    props,
+    () => 0,
+  );
+}
+
+// ---------------------------------------------------------------------------
+// makeVsrc — create a DC voltage source element between two nodes.
+// ---------------------------------------------------------------------------
+
+function makeVsrc(posNode: number, negNode: number, voltage: number): AnalogElement {
+  const props = new PropertyBag([]);
+  props.replaceModelParams({ voltage });
+  return makeDcVoltageSource(
+    new Map([["pos", posNode], ["neg", negNode]]),
+    props,
+    () => 0,
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -47,13 +76,10 @@ function makeVCCSElement(
     ["label", ""],
   ]).entries());
   props.replaceModelParams({ transconductance: gm });
-  return withNodeIds(
-    getFactory(VCCSDefinition.modelRegistry!["behavioral"]!)(
-      new Map([["ctrl+", nCtrlP], ["ctrl-", nCtrlN], ["out+", nOutP], ["out-", nOutN]]),
-      props,
-      () => 0,
-    ),
-    [nCtrlP, nCtrlN, nOutP, nOutN],
+  return getFactory(VCCSDefinition.modelRegistry!["behavioral"]!)(
+    new Map([["ctrl+", nCtrlP], ["ctrl-", nCtrlN], ["out+", nOutP], ["out-", nOutN]]),
+    props,
+    () => 0,
   );
 }
 
@@ -95,12 +121,9 @@ describe("VCCS", () => {
     //   R=100Ω: node2→GND
     //
     // nodeCount=2: node1=ctrl, node2=output
-    // makeVoltageSource branchIdx: 0-based branch index; helper uses k=branchIdx+1 internally.
-    // Pass branchIdx=nodeCount+0 so k=nodeCount+1=3 (1-based row in a 2-node matrix).
     const nodeCount = 2;
-    const vsBranch = nodeCount + 0; // k = vsBranch+1 = 3 in makeVoltageSource
 
-    const vs   = makeVoltageSource(1, 0, vsBranch, 1.0);
+    const vs   = makeVsrc(1, 0, 1.0);
     const vccs = makeVCCSElement(1, 0, 2, 0, { transconductance: 0.01 });
     const r    = makeResistor(2, 0, 100);
 
@@ -116,9 +139,8 @@ describe("VCCS", () => {
   it("zero_control_zero_output", () => {
     // V_ctrl=0 → I_out=0 → V_out=0 across any load
     const nodeCount = 2;
-    const vsBranch = nodeCount + 0;
 
-    const vs   = makeVoltageSource(1, 0, vsBranch, 0.0);
+    const vs   = makeVsrc(1, 0, 0.0);
     const vccs = makeVCCSElement(1, 0, 2, 0, { transconductance: 0.01 });
     const r    = makeResistor(2, 0, 1000);
 
@@ -134,9 +156,8 @@ describe("VCCS", () => {
     // expression: 0.001 * V(ctrl)^2; V_ctrl=3V → I_out = 0.001*9 = 9mA
     // R_load=100Ω → V_out = 9mA * 100 = 0.9V
     const nodeCount = 2;
-    const vsBranch = nodeCount + 0;
 
-    const vs   = makeVoltageSource(1, 0, vsBranch, 3.0);
+    const vs   = makeVsrc(1, 0, 3.0);
     const vccs = makeVCCSElement(1, 0, 2, 0, { expression: "0.001 * V(ctrl)^2" });
     const r    = makeResistor(2, 0, 100);
 
@@ -154,7 +175,7 @@ describe("VCCS", () => {
     const nodeCount = 2;
     const vccs = makeVCCSElement(1, 0, 2, 0, { transconductance: 0.01 });
     const r    = makeResistor(2, 0, 100);
-    const vs   = makeVoltageSource(1, 0, nodeCount + 0, 1.0);
+    const vs   = makeVsrc(1, 0, 1.0);
 
     const compiled = buildCircuit({ nodeCount, elements: [vs, vccs, r] });
     const engine = new MNAEngine();

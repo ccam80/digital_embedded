@@ -363,16 +363,8 @@ export class CKTCircuitContext {
   // Pre-computed element lists (eliminate .filter() calls in hot paths)
   // -------------------------------------------------------------------------
 
-  /** Elements with isNonlinear === true. */
-  nonlinearElements: readonly AnalogElement[];
-  /** Elements with isReactive === true. */
-  reactiveElements: readonly AnalogElement[];
   /** Elements that implement checkConvergence() for element-level convergence. */
   elementsWithConvergence: readonly AnalogElement[];
-  /** Elements that implement getLteTimestep() for LTE control. */
-  elementsWithLte: readonly AnalogElement[];
-  /** Elements that implement acceptStep() for post-acceptance work. */
-  elementsWithAcceptStep: readonly AnalogElement[];
 
   // -------------------------------------------------------------------------
   // Tolerances
@@ -608,11 +600,7 @@ export class CKTCircuitContext {
     // Pre-computed element lists (zero-alloc invariant per spec phase-1).
     // Populated once at construction; mirrors ngspice's per-device-type
     // CKThead[] linked lists assembled at parse time, never rebuilt.
-    this.nonlinearElements = elements.filter(el => el.isNonlinear);
-    this.reactiveElements = elements.filter(el => el.isReactive);
     this.elementsWithConvergence = elements.filter(el => el.checkConvergence !== undefined);
-    this.elementsWithLte = elements.filter(el => el.getLteTimestep !== undefined);
-    this.elementsWithAcceptStep = elements.filter(el => el.acceptStep !== undefined);
     this._poolBackedElements = elements.filter(isPoolBacked);
 
     // Nodeset / IC handles (populated by _allocateNodesetIcHandles in _setup())

@@ -44,43 +44,24 @@ import {
 } from "../pjfet.js";
 import { ComponentRegistry } from "../../../core/registry.js";
 import { createTestPropertyBag } from "../../../test-fixtures/model-fixtures.js";
-import { makeDcVoltageSource } from "../../sources/dc-voltage-source.js";
-import { withNodeIds, runDcOp, makeLoadCtx } from "../../../solver/analog/__tests__/test-helpers.js";
+import { makeDcVoltageSource, DC_VOLTAGE_SOURCE_DEFAULTS } from "../../sources/dc-voltage-source.js";
+import { PropertyBag } from "../../../core/properties.js";
+import { runDcOp, makeLoadCtx, loadCtxFromFields } from "../../../solver/analog/__tests__/test-helpers.js";
 import { StatePool } from "../../../solver/analog/state-pool.js";
 import { SparseSolver } from "../../../solver/analog/sparse-solver.js";
-import type { AnalogElement } from "../../../solver/analog/element.js";
-import type { AnalogElementCore } from "../../../core/analog-types.js";
-import type { ReactiveAnalogElement } from "../../../solver/analog/element.js";
+import type { AnalogElement, PoolBackedAnalogElement } from "../../../solver/analog/element.js";
 import type { AnalogFactory } from "../../../core/registry.js";
 import type { LoadContext } from "../../../solver/analog/load-context.js";
 import { MODEDCOP, MODEINITFLOAT } from "../../../solver/analog/ckt-mode.js";
 
 // ---------------------------------------------------------------------------
-// withState  allocate a StatePool and call initState on the element.
-// Also calls setup() so that TSTALLOC handles are valid for load().
+// Helper: create a DC voltage source using the 3-arg production factory.
 // ---------------------------------------------------------------------------
 
-function withState(element: AnalogElementCore, solver?: SparseSolver): ReactiveAnalogElement {
-  const re = element as ReactiveAnalogElement;
-  re.stateBaseOffset = 0;
-  if (solver && typeof (re as any).setup === "function") {
-    let stateCount = 0;
-    let nodeCount = 1000;
-    const ctx = {
-      solver,
-      temp: 300.15,
-      nomTemp: 300.15,
-      copyNodesets: false,
-      makeVolt(_l: string, _s: string): number { return ++nodeCount; },
-      makeCur(_l: string, _s: string): number { return ++nodeCount; },
-      allocStates(n: number): number { const off = stateCount; stateCount += n; return off; },
-      findDevice(_l: string) { return null; },
-    };
-    (re as any).setup(ctx);
-  }
-  const pool = new StatePool(re.stateSize);
-  re.initState(pool);
-  return re;
+function makeVsrc(posNode: number, negNode: number, voltage: number): AnalogElement {
+  const props = new PropertyBag();
+  props.replaceModelParams({ ...DC_VOLTAGE_SOURCE_DEFAULTS, voltage });
+  return makeDcVoltageSource(new Map([["pos", posNode], ["neg", negNode]]), props, () => 0) as unknown as AnalogElement;
 }
 
 // ---------------------------------------------------------------------------
@@ -141,7 +122,7 @@ const PJFET_PARAMS = {
 
 function makeDcOpCtx(rhsOld: Float64Array, matrixSize: number, existingSolver?: SparseSolver): LoadContext {
   const solver = existingSolver ?? (() => { const s = new SparseSolver(); s._initStructure(); return s; })();
-  return {
+  return loadCtxFromFields({
     cktMode: MODEDCOP | MODEINITFLOAT,
     solver,
     matrix: solver,
@@ -166,7 +147,7 @@ function makeDcOpCtx(rhsOld: Float64Array, matrixSize: number, existingSolver?: 
     cktFixLimit: false,
     bypass: false,
     voltTol: 1e-6,
-  } as LoadContext;
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -176,12 +157,12 @@ function makeDcOpCtx(rhsOld: Float64Array, matrixSize: number, existingSolver?: 
 function makeResistorElement(nodeA: number, nodeB: number, resistance: number): AnalogElement {
   const G = 1 / resistance;
   return {
-    pinNodeIds: [nodeA, nodeB],
-    allNodeIds: [nodeA, nodeB],
+    label: "",
+    _pinNodes: new Map([["A", nodeA], ["B", nodeB]]),
     branchIndex: -1,
+    _stateBase: -1,
     ngspiceLoadOrder: 0,
-    isNonlinear: false,
-    isReactive: false,
+    setup(_ctx): void {},
     setParam(_key: string, _value: number): void {},
     getPinCurrents(_v: Float64Array): number[] { return []; },
     load(ctx: LoadContext): void {
@@ -217,8 +198,8 @@ describe("PJFET", () => {
     const sharedSolver = new SparseSolver();
     sharedSolver._initStructure();
 
-    const core = createPJfetElement(new Map([["G", 1], ["D", 2], ["S", 3]]), propsObj) as unknown as ReactiveAnalogElement;
-    core.stateBaseOffset = 0;
+    const core = createPJfetElement(new Map([["G", 1], ["D", 2], ["S", 3]]), propsObj, () => 0) as unknown as PoolBackedAnalogElement;
+    (core as unknown as { _stateBase: number })._stateBase = 0;
 
     let stateCount = 0;
     let nodeCount = 1000;
@@ -234,7 +215,7 @@ describe("PJFET", () => {
     const pool = new StatePool(core.stateSize);
     core.initState(pool);
 
-    const element = withNodeIds(core, [1, 2, 3]);
+    const element = core as unknown as AnalogElement;
 
     // 1-based: slot 0=ground sentinel, 1=V(G)=2, 2=V(D)=0, 3=V(S)=5
     const voltages = new Float64Array(4);
@@ -317,10 +298,10 @@ describe("NR", () => {
 
     const propsObj = createTestPropertyBag();
     propsObj.replaceModelParams(NJFET_PARAMS);
-    const jfet = withNodeIds(createNJfetElement(new Map([["G", 3], ["S", 0], ["D", 1]]), propsObj) as unknown as AnalogElementCore, [3, 0, 1]) as unknown as ReactiveAnalogElement;
+    const jfet = createNJfetElement(new Map([["G", 3], ["S", 0], ["D", 1]]), propsObj, () => 0) as unknown as AnalogElement;
     const rd = makeResistorElement(2, 1, 10000);
-    const vdd = makeDcVoltageSource(2, 0, 4, 10.0) as unknown as AnalogElement;
-    const vgate = makeDcVoltageSource(3, 0, 5, 0.0) as unknown as AnalogElement;
+    const vdd = makeVsrc(2, 0, 10.0);
+    const vgate = makeVsrc(3, 0, 0.0);
 
     const result = runDcOp({
       elements: [vdd, vgate, rd, jfet],
@@ -531,10 +512,10 @@ describe("NJFET TEMP", () => {
     // 1-based: slot 0=ground sentinel, slot 1=V(G)=1.5, slot 2=V(D)=0.
     const rhsOld = new Float64Array([0, 1.5, 0]);
 
-    function createAndInit(overrides: Record<string, number> = {}): { element: ReactiveAnalogElement; pool: StatePool; solver: SparseSolver } {
+    function createAndInit(overrides: Record<string, number> = {}): { element: PoolBackedAnalogElement; pool: StatePool; solver: SparseSolver } {
       const propsObj = makeNjfetProps(overrides);
-      const core = createNJfetElement(new Map([["G", 1], ["S", 0], ["D", 2]]), propsObj) as unknown as ReactiveAnalogElement;
-      core.stateBaseOffset = 0;
+      const core = createNJfetElement(new Map([["G", 1], ["S", 0], ["D", 2]]), propsObj, () => 0) as unknown as PoolBackedAnalogElement;
+      (core as unknown as { _stateBase: number })._stateBase = 0;
       const solver = new SparseSolver();
       solver._initStructure();
       let stateCount = 0;
@@ -609,10 +590,10 @@ describe("PJFET TEMP", () => {
     // 1-based: slot 0=ground sentinel, slot 1=V(G)=-1.5, slot 2=V(D)=0.
     const rhsOld = new Float64Array([0, -1.5, 0]);
 
-    function createAndInitP(overrides: Record<string, number> = {}): { element: ReactiveAnalogElement; pool: StatePool; solver: SparseSolver } {
+    function createAndInitP(overrides: Record<string, number> = {}): { element: PoolBackedAnalogElement; pool: StatePool; solver: SparseSolver } {
       const propsObj = makePjfetProps(overrides);
-      const core = createPJfetElement(new Map([["G", 1], ["S", 0], ["D", 2]]), propsObj) as unknown as ReactiveAnalogElement;
-      core.stateBaseOffset = 0;
+      const core = createPJfetElement(new Map([["G", 1], ["S", 0], ["D", 2]]), propsObj, () => 0) as unknown as PoolBackedAnalogElement;
+      (core as unknown as { _stateBase: number })._stateBase = 0;
       const solver = new SparseSolver();
       solver._initStructure();
       let stateCount = 0;

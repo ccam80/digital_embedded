@@ -14,6 +14,7 @@ import { describe, it } from 'vitest';
 import { makeBridgeOutputAdapter } from '../analog/bridge-adapter.js';
 import type { ResolvedPinElectrical } from '../../core/pin-electrical.js';
 import { MODEDCOP, MODEINITFLOAT } from '../analog/ckt-mode.js';
+import { loadCtxFromFields } from '../analog/__tests__/test-helpers.js';
 
 const CMOS: ResolvedPinElectrical = {
   rOut: 50, cOut: 0, rIn: 1e7, cIn: 0,
@@ -42,9 +43,8 @@ class MockSolver {
 
 function makeCtx(solver: MockSolver, rhs?: Float64Array) {
   const rhsBuf = rhs ?? new Float64Array(8);
-  return {
+  return loadCtxFromFields({
     solver: solver as any,
-    voltages: new Float64Array(8),
     rhs: rhsBuf,
     rhsOld: rhsBuf,
     matrix: solver as any,
@@ -68,7 +68,7 @@ function makeCtx(solver: MockSolver, rhs?: Float64Array) {
     cktFixLimit: false,
     bypass: false,
     voltTol: 1e-6,
-  };
+  });
 }
 
 // ---------------------------------------------------------------------------

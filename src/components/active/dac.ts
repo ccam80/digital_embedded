@@ -37,15 +37,16 @@ import {
   type AttributeMapping,
   type ComponentDefinition,
 } from "../../core/registry.js";
-import type { LoadContext, StatePoolRef, PoolBackedAnalogElementCore } from "../../solver/analog/element.js";
+import type { LoadContext } from "../../solver/analog/element.js";
 import { NGSPICE_LOAD_ORDER } from "../../solver/analog/element.js";
 import type { SetupContext } from "../../solver/analog/setup-context.js";
-import { stampRHS } from "../../solver/analog/stamp-helpers.js";
 import { collectPinModelChildren, DigitalInputPinModel } from "../../solver/analog/digital-pin-model.js";
 import type { ResolvedPinElectrical } from "../../core/pin-electrical.js";
 import { defineModelParams } from "../../core/model-params.js";
 import { defineStateSchema } from "../../solver/analog/state-schema.js";
 import type { StateSchema } from "../../solver/analog/state-schema.js";
+import type { AnalogElement } from "../../core/analog-types.js";
+import { CompositeElement } from "../../solver/analog/composite-element.js";
 import type { AnalogCapacitorElement } from "../passives/capacitor.js";
 
 const DAC_COMPOSITE_SCHEMA: StateSchema = defineStateSchema("DACComposite", []);
@@ -241,227 +242,191 @@ function buildInputPinSpec(p: Record<string, number>): ResolvedPinElectrical {
 }
 
 // ---------------------------------------------------------------------------
-// createDACElement  AnalogElement factory
+// DACAnalogElement  CompositeElement class
 // ---------------------------------------------------------------------------
 
-/**
- * Create the MNA element for an N-bit DAC.
- *
- * Pin nodes (from pinLayout order):
- *   pinNodes.get("D0").."D(N-1)"  digital input pins
- *   pinNodes.get("VREF")          VREF node (1-based)
- *   pinNodes.get("OUT")           OUT node (1-based)
- *   pinNodes.get("GND")           GND node (may be 0 if tied to MNA ground)
- */
-function createDACElement(
-  pinNodes: ReadonlyMap<string, number>,
-  props: PropertyBag,
-  bipolar: boolean,
-): PoolBackedAnalogElementCore {
-  const bits   = Math.max(1, Math.min(32, props.getOrDefault<number>("bits", 8)));
-  const p: Record<string, number> = {
-    vIH:  props.getModelParam<number>("vIH"),
-    vIL:  props.getModelParam<number>("vIL"),
-    rOut: props.getModelParam<number>("rOut"),
-    rIn:  props.getModelParam<number>("rIn"),
-    cIn:  props.getModelParam<number>("cIn"),
-  };
+class DACAnalogElement extends CompositeElement {
+  readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.VCVS;
+  readonly stateSchema = DAC_COMPOSITE_SCHEMA;
 
-  const maxCode = Math.pow(2, bits);
+  private readonly _bits: number;
+  private readonly _bipolar: boolean;
+  private readonly _p: Record<string, number>;
 
-  // Node IDs from pinNodes map
-  const nVref = pinNodes.get("VREF") ?? 0;
-  const nOut  = pinNodes.get("OUT")  ?? 0;
-  const nGnd  = pinNodes.get("GND")  ?? 0;
+  private readonly _nVref: number;
+  private readonly _nOut: number;
+  private readonly _nGnd: number;
+  private readonly _nDigitalBits: number[];
 
-  // DigitalInputPinModel instances  one per bit
-  const inputSpec = buildInputPinSpec(p);
-  const inputModels: DigitalInputPinModel[] = [];
-  // Collect digital bit node IDs in order D0..D(N-1)
-  const nDigitalBits: number[] = [];
-  for (let i = 0; i < bits; i++) {
-    nDigitalBits.push(pinNodes.get(`D${i}`) ?? 0);
-  }
-  for (let i = 0; i < bits; i++) {
-    const model = new DigitalInputPinModel(inputSpec, true);
-    const nD = nDigitalBits[i];
-    if (nD > 0) {
-      model.init(nD, 0);
+  private readonly _inputModels: DigitalInputPinModel[];
+  private readonly _vrefModel: DigitalInputPinModel;
+  private readonly _childElements: readonly AnalogCapacitorElement[];
+
+  // VCVS branch row and TSTALLOC handles (allocated in setup())
+  private _vcvsBranch = -1;
+  private _hVCVSPosIbr  = -1;
+  private _hVCVSNegIbr  = -1;
+  private _hVCVSIbrPos  = -1;
+  private _hVCVSIbrNeg  = -1;
+  private _hVCVSIbrContPos = -1;
+  private _hVCVSIbrContNeg = -1;
+
+  constructor(
+    pinNodes: ReadonlyMap<string, number>,
+    props: PropertyBag,
+    bipolar: boolean,
+  ) {
+    super();
+    this._pinNodes = new Map(pinNodes);
+
+    this._bits = Math.max(1, Math.min(32, props.getOrDefault<number>("bits", 8)));
+    this._bipolar = bipolar;
+    this._p = {
+      vIH:  props.getModelParam<number>("vIH"),
+      vIL:  props.getModelParam<number>("vIL"),
+      rOut: props.getModelParam<number>("rOut"),
+      rIn:  props.getModelParam<number>("rIn"),
+      cIn:  props.getModelParam<number>("cIn"),
+    };
+
+    this._nVref = pinNodes.get("VREF") ?? 0;
+    this._nOut  = pinNodes.get("OUT")  ?? 0;
+    this._nGnd  = pinNodes.get("GND")  ?? 0;
+
+    this._nDigitalBits = [];
+    for (let i = 0; i < this._bits; i++) {
+      this._nDigitalBits.push(pinNodes.get(`D${i}`) ?? 0);
     }
-    inputModels.push(model);
+
+    const inputSpec = buildInputPinSpec(this._p);
+    this._inputModels = [];
+    for (let i = 0; i < this._bits; i++) {
+      const model = new DigitalInputPinModel(inputSpec, true);
+      const nD = this._nDigitalBits[i];
+      if (nD > 0) {
+        model.init(nD, 0);
+      }
+      this._inputModels.push(model);
+    }
+
+    this._vrefModel = new DigitalInputPinModel(inputSpec, true);
+    if (this._nVref > 0) this._vrefModel.init(this._nVref, 0);
+
+    this._childElements = collectPinModelChildren([
+      ...this._inputModels,
+      this._vrefModel,
+    ]);
   }
 
-  // VREF loading pin model
-  const vrefModel = new DigitalInputPinModel(inputSpec, true);
-  if (nVref > 0) vrefModel.init(nVref, 0);
+  protected getSubElements(): readonly AnalogElement[] {
+    return [
+      ...this._inputModels,
+      this._vrefModel,
+      ...this._childElements,
+    ] as unknown as readonly AnalogElement[];
+  }
 
-  // VCVS sub-element cached handles (vcvsset.c:53-58):
-  //   ctrl+(nVref), ctrl-(nGnd), out+(nOut), out-(nGnd)
-  //   branch row allocated by setup() via ctx.makeCur
-  let _vcvsBranch = -1;
-  let _hVCVSPosIbr  = -1;  // (nOut,   branch) — VCVSposIbrptr
-  let _hVCVSNegIbr  = -1;  // (nGnd,   branch) — VCVSnegIbrptr  (skip if nGnd=0)
-  let _hVCVSIbrPos  = -1;  // (branch, nOut)   — VCVSibrPosptr
-  let _hVCVSIbrNeg  = -1;  // (branch, nGnd)   — VCVSibrNegptr  (skip if nGnd=0)
-  let _hVCVSIbrContPos = -1; // (branch, nVref) — VCVSibrContPosptr
-  let _hVCVSIbrContNeg = -1; // (branch, nGnd)  — VCVSibrContNegptr  (skip if nGnd=0)
+  override setup(ctx: SetupContext): void {
+    // Establish _stateBase (DAC_COMPOSITE_SCHEMA has 0 slots; allocStates(0)
+    // returns the current offset without advancing, giving children a valid base).
+    this._stateBase = ctx.allocStates(0);
 
-  const childElements: readonly AnalogCapacitorElement[] = collectPinModelChildren([
-    ...inputModels,
-    vrefModel,
-  ]);
-  const stateSize = childElements.reduce((s, c) => s + c.stateSize, 0);
+    // Allocate VCVS branch row (vcvsset.c:41-44 guard pattern)
+    if (this._vcvsBranch === -1) {
+      this._vcvsBranch = ctx.makeCur("DAC_vcvs1", "branch");
+    }
+    this.branchIndex = this._vcvsBranch;
 
-  return {
-    branchIndex: -1,
-    ngspiceLoadOrder: NGSPICE_LOAD_ORDER.VCVS,
-    isNonlinear: true,
-    get isReactive(): boolean { return childElements.length > 0; },
-    _stateBase: -1,
-    _pinNodes: new Map(pinNodes),
+    // VCVS TSTALLOC sequence (vcvsset.c:53-58):
+    //   ctrl+(nVref), ctrl-(nGnd), out+(nOut), out-(nGnd)
+    if (this._nOut > 0) {
+      this._hVCVSPosIbr = ctx.solver.allocElement(this._nOut, this._vcvsBranch);
+    }
+    if (this._nGnd > 0) {
+      this._hVCVSNegIbr = ctx.solver.allocElement(this._nGnd, this._vcvsBranch);
+    }
+    if (this._nOut > 0) {
+      this._hVCVSIbrPos = ctx.solver.allocElement(this._vcvsBranch, this._nOut);
+    }
+    if (this._nGnd > 0) {
+      this._hVCVSIbrNeg = ctx.solver.allocElement(this._vcvsBranch, this._nGnd);
+    }
+    if (this._nVref > 0) {
+      this._hVCVSIbrContPos = ctx.solver.allocElement(this._vcvsBranch, this._nVref);
+    }
+    if (this._nGnd > 0) {
+      this._hVCVSIbrContNeg = ctx.solver.allocElement(this._vcvsBranch, this._nGnd);
+    }
 
-    setup(ctx: SetupContext): void {
-      // Allocate VCVS branch row (vcvsset.c:41-44 guard pattern)
-      if (_vcvsBranch === -1) {
-        _vcvsBranch = ctx.makeCur("DAC_vcvs1", "branch");
+    // Forward child setup via base class
+    super.setup(ctx);
+  }
+
+  override load(ctx: LoadContext): void {
+    const voltages = ctx.rhsOld;
+
+    // Decode digital inputs using threshold comparison
+    let code = 0;
+    for (let i = 0; i < this._bits; i++) {
+      const nD = this._nDigitalBits[i];
+      if (nD > 0) {
+        const vD = voltages[nD];
+        if (vD >= this._p.vIH) code |= (1 << i);
       }
-      this.branchIndex = _vcvsBranch;
+    }
 
-      // VCVS TSTALLOC sequence (vcvsset.c:53-58):
-      //   ctrl+(nVref), ctrl-(nGnd), out+(nOut), out-(nGnd)
-      // Per A6.6 ground-node guard policy for composite sub-elements that may
-      // receive node 0 from parent's pinNodeIds reassignment.
-      if (nOut > 0) {
-        _hVCVSPosIbr = ctx.solver.allocElement(nOut,        _vcvsBranch);  // (1) VCVSposIbrptr
+    const maxCode = Math.pow(2, this._bits);
+    const gain = this._bipolar
+      ? (2 * code / maxCode - 1)
+      : code / maxCode;
+
+    const solver = ctx.solver;
+
+    // B sub-matrix (incidence: output port KCL rows)
+    if (this._hVCVSPosIbr !== -1) solver.stampElement(this._hVCVSPosIbr,  1);
+    if (this._hVCVSNegIbr !== -1) solver.stampElement(this._hVCVSNegIbr, -1);
+
+    // C sub-matrix (output branch constraint equation)
+    if (this._hVCVSIbrPos !== -1) solver.stampElement(this._hVCVSIbrPos,   1);
+    if (this._hVCVSIbrNeg !== -1) solver.stampElement(this._hVCVSIbrNeg,  -1);
+
+    // Control port Jacobian (gain terms)
+    if (this._hVCVSIbrContPos !== -1) solver.stampElement(this._hVCVSIbrContPos, -gain);
+    if (this._hVCVSIbrContNeg !== -1) solver.stampElement(this._hVCVSIbrContNeg,  gain);
+
+    // Forward child loads via base class
+    super.load(ctx);
+  }
+
+  getPinCurrents(rhs: Float64Array): number[] {
+    const currents: number[] = [];
+
+    const rIn = this._p.rIn;
+    for (let i = 0; i < this._bits; i++) {
+      const v = this._nDigitalBits[i] > 0 ? rhs[this._nDigitalBits[i]] : 0;
+      currents.push(this._nDigitalBits[i] > 0 ? v / rIn : 0);
+    }
+
+    currents.push(0); // VREF
+
+    // OUT: branch current is at branch row index
+    const iOut = this._vcvsBranch > 0 ? rhs[this._vcvsBranch] : 0;
+    currents.push(iOut);
+
+    currents.push(0); // GND
+
+    return currents;
+  }
+
+  setParam(key: string, value: number): void {
+    if (key in this._p) {
+      this._p[key] = value;
+      if (key === "vIH" || key === "vIL" || key === "rIn" || key === "cIn") {
+        for (const m of this._inputModels) m.setParam(key, value);
+        this._vrefModel.setParam(key, value);
       }
-      if (nGnd > 0) {
-        _hVCVSNegIbr = ctx.solver.allocElement(nGnd,        _vcvsBranch);  // (2) VCVSnegIbrptr
-      }
-      if (nOut > 0) {
-        _hVCVSIbrPos = ctx.solver.allocElement(_vcvsBranch, nOut);          // (3) VCVSibrPosptr
-      }
-      if (nGnd > 0) {
-        _hVCVSIbrNeg = ctx.solver.allocElement(_vcvsBranch, nGnd);          // (4) VCVSibrNegptr
-      }
-      if (nVref > 0) {
-        _hVCVSIbrContPos = ctx.solver.allocElement(_vcvsBranch, nVref);     // (5) VCVSibrContPosptr
-      }
-      if (nGnd > 0) {
-        _hVCVSIbrContNeg = ctx.solver.allocElement(_vcvsBranch, nGnd);      // (6) VCVSibrContNegptr
-      }
-
-      // Digital input pin models — each allocates their own handle entries
-      for (let i = 0; i < bits; i++) {
-        const nD = nDigitalBits[i];
-        if (nD > 0) inputModels[i].setup(ctx);
-      }
-      if (nVref > 0) vrefModel.setup(ctx);
-
-      // Forward to CAP children of pin models (transient capacitance)
-      for (const child of childElements) {
-        child.setup(ctx);
-      }
-    },
-
-    poolBacked: true as const,
-    stateSchema: DAC_COMPOSITE_SCHEMA,
-    stateSize,
-    stateBaseOffset: -1,
-
-    initState(_pool: StatePoolRef): void {
-      // Child cap elements have their stateBaseOffset set during setup() via
-      // ctx.allocStates(). Just wire them to the pool — do not override offsets.
-      for (const child of childElements) {
-        child.initState(_pool);
-      }
-    },
-
-    load(ctx: LoadContext): void {
-      const voltages = ctx.rhsOld;
-      const nGndV = nGnd > 0 ? voltages[nGnd] : 0;
-
-      // Decode digital inputs using threshold comparison
-      let code = 0;
-      for (let i = 0; i < bits; i++) {
-        const nD = nDigitalBits[i];
-        if (nD > 0) {
-          const vD = voltages[nD];
-          if (vD >= p.vIH) code |= (1 << i);
-        }
-      }
-
-      // Compute VCVS gain = code / 2^N (unipolar) or (2*code/2^N - 1) (bipolar)
-      const gain = bipolar
-        ? (2 * code / maxCode - 1)
-        : code / maxCode;
-
-      // Stamp VCVS branch equation using cached handles (vcvsset.c:53-58):
-      // Branch equation: V_out+ - V_out- - gain*(V_ctrl+ - V_ctrl-) = 0
-      // V_out+ = nOut,  V_out- = nGnd,  V_ctrl+ = nVref,  V_ctrl- = nGnd
-      const solver = ctx.solver;
-
-      // B sub-matrix (incidence: output port KCL rows)
-      if (_hVCVSPosIbr !== -1) solver.stampElement(_hVCVSPosIbr,  1);  // B[nOut, branch]
-      if (_hVCVSNegIbr !== -1) solver.stampElement(_hVCVSNegIbr, -1);  // B[nGnd, branch]
-
-      // C sub-matrix (output branch constraint equation)
-      if (_hVCVSIbrPos !== -1) solver.stampElement(_hVCVSIbrPos,   1); // C[branch, nOut]
-      if (_hVCVSIbrNeg !== -1) solver.stampElement(_hVCVSIbrNeg,  -1); // C[branch, nGnd]
-
-      // Control port Jacobian (gain terms)
-      if (_hVCVSIbrContPos !== -1) solver.stampElement(_hVCVSIbrContPos, -gain); // C[branch, nVref]
-      if (_hVCVSIbrContNeg !== -1) solver.stampElement(_hVCVSIbrContNeg,  gain); // C[branch, nGnd]
-
-      // RHS: linearized NR constant = f(Vctrl0) - f'*Vctrl0 = 0 for linear VCVS
-      // For a linear VCVS: f(Vctrl) = gain*Vctrl, f'=gain, so RHS term = 0
-      // No RHS stamp needed for linear VCVS (value - derivative * ctrlValue = 0)
-
-      // Forward to input pin models (resistive loading stamps)
-      for (let i = 0; i < bits; i++) {
-        const nD = nDigitalBits[i];
-        if (nD > 0) inputModels[i].load(ctx);
-      }
-      if (nVref > 0) vrefModel.load(ctx);
-
-      // CAP children
-      for (const child of childElements) { child.load(ctx); }
-
-      void nGndV; // used only for clarity; nGnd is used directly in stamps
-    },
-
-    accept(_ctx: LoadContext, _simTime: number, _addBreakpoint: (t: number) => void): void {},
-
-    getPinCurrents(rhs: Float64Array): number[] {
-      const currents: number[] = [];
-
-      const rIn = p.rIn;
-      for (let i = 0; i < bits; i++) {
-        const v = nDigitalBits[i] > 0 ? rhs[nDigitalBits[i]] : 0;
-        currents.push(nDigitalBits[i] > 0 ? v / rIn : 0);
-      }
-
-      currents.push(0); // VREF
-
-      // OUT: branch current is at branch row index
-      const iOut = _vcvsBranch > 0 ? rhs[_vcvsBranch] : 0;
-      currents.push(iOut);
-
-      currents.push(0); // GND
-
-      return currents;
-    },
-
-    setParam(key: string, value: number): void {
-      if (key in p) {
-        p[key] = value;
-        // Forward input threshold/impedance changes to all pin models
-        if (key === "vIH" || key === "vIL" || key === "rIn" || key === "cIn") {
-          for (const m of inputModels) m.setParam(key, value);
-          vrefModel.setParam(key, value);
-        }
-      }
-    },
-  };
+    }
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -535,18 +500,16 @@ export const DACDefinition: ComponentDefinition = {
     "unipolar": {
       kind: "inline",
       factory: (pinNodes, props, _getTime) =>
-        createDACElement(pinNodes, props, false),
+        new DACAnalogElement(pinNodes, props, false),
       paramDefs: DAC_PARAM_DEFS,
       params: DAC_DEFAULTS,
-      mayCreateInternalNodes: false,
     },
     "bipolar": {
       kind: "inline",
       factory: (pinNodes, props, _getTime) =>
-        createDACElement(pinNodes, props, true),
+        new DACAnalogElement(pinNodes, props, true),
       paramDefs: DAC_PARAM_DEFS,
       params: DAC_DEFAULTS,
-      mayCreateInternalNodes: false,
     },
   },
   defaultModel: "unipolar",

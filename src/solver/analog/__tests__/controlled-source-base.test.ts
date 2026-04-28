@@ -26,8 +26,7 @@ import { makeSimpleCtx } from "./test-helpers.js";
  * what was passed from the load() dispatch.
  */
 class TestControlledSource extends ControlledSourceElement {
-  readonly pinNodeIds: readonly number[] = [1, 0];
-  readonly allNodeIds: readonly number[] = [1, 0];
+  _pinNodes: Map<string, number> = new Map([["pos", 1], ["neg", 0]]);
   readonly branchIndex = -1;
   readonly ngspiceLoadOrder = 0;
 

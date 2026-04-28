@@ -10,9 +10,9 @@
  * children of the pin models.
  */
 
-import type { LoadContext } from "./element.js";
+import type { AnalogElement } from "../../core/analog-types.js";
 import { NGSPICE_LOAD_ORDER } from "./element.js";
-import type { StatePoolRef } from "./element.js";
+import type { LoadContext } from "./load-context.js";
 import type { PropertyBag } from "../../core/properties.js";
 import type { ResolvedPinElectrical } from "../../core/pin-electrical.js";
 import {
@@ -24,9 +24,9 @@ import {
 } from "./digital-pin-model.js";
 import type { AnalogCapacitorElement } from "../../components/passives/capacitor.js";
 import type { AnalogElementFactory } from "./behavioral-gate.js";
-import type { SetupContext } from "./setup-context.js";
 import { defineStateSchema } from "./state-schema.js";
 import type { StateSchema } from "./state-schema.js";
+import { CompositeElement } from "./composite-element.js";
 
 // Empty composite schema — children carry their own schemas.
 const COMBINATIONAL_COMPOSITE_SCHEMA: StateSchema = defineStateSchema("BehavioralCombinationalComposite", []);
@@ -67,7 +67,7 @@ const FALLBACK_SPEC: ResolvedPinElectrical = {
  * The sel pin nodeId is treated as the first node; additional selector bit
  * nodes follow immediately.
  */
-export class BehavioralMuxElement {
+export class BehavioralMuxElement extends CompositeElement {
   private readonly _selPins: DigitalInputPinModel[];
   private readonly _dataPins: DigitalInputPinModel[][];
   private readonly _outPins: DigitalOutputPinModel[];
@@ -75,18 +75,8 @@ export class BehavioralMuxElement {
   private readonly _pinModelsByLabel: ReadonlyMap<string, DigitalInputPinModel | DigitalOutputPinModel>;
   private readonly _childElements: AnalogCapacitorElement[];
 
-  pinNodeIds!: readonly number[];  // set by compiler via Object.assign after factory returns
-  readonly branchIndex: number = -1;
   readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.VCVS;
-  readonly isNonlinear: true = true;
-  label?: string;
-
-  readonly poolBacked = true as const;
   readonly stateSchema: StateSchema = COMBINATIONAL_COMPOSITE_SCHEMA;
-  stateSize: number;
-  stateBaseOffset = -1;
-  _stateBase: number = -1;
-  _pinNodes: Map<string, number> = new Map();
 
   constructor(
     selPins: DigitalInputPinModel[],
@@ -96,6 +86,7 @@ export class BehavioralMuxElement {
     bitWidth: number,
     pinModelsByLabel: ReadonlyMap<string, DigitalInputPinModel | DigitalOutputPinModel>,
   ) {
+    super();
     this._selPins = selPins;
     this._dataPins = dataPins;
     this._outPins = outPins;
@@ -108,29 +99,15 @@ export class BehavioralMuxElement {
       ...outPins,
     ];
     this._childElements = collectPinModelChildren(allPins);
-    this.stateSize = this._childElements.reduce((s, c) => s + c.stateSize, 0);
   }
 
-  get isReactive(): boolean {
-    return this._childElements.length > 0;
-  }
-
-  initState(pool: StatePoolRef): void {
-    let offset = this.stateBaseOffset;
-    for (const child of this._childElements) {
-      child.stateBaseOffset = offset;
-      child.initState(pool);
-      offset += child.stateSize;
-    }
-  }
-
-  setup(ctx: SetupContext): void {
-    for (const pin of this._selPins) pin.setup(ctx);
-    for (const group of this._dataPins) {
-      for (const pin of group) pin.setup(ctx);
-    }
-    for (const pin of this._outPins) pin.setup(ctx);
-    for (const child of this._childElements) child.setup(ctx);
+  protected getSubElements(): readonly AnalogElement[] {
+    return [
+      ...this._selPins,
+      ...this._dataPins.flat(),
+      ...this._outPins,
+      ...this._childElements,
+    ] as unknown as readonly AnalogElement[];
   }
 
   load(ctx: LoadContext): void {
@@ -223,7 +200,7 @@ export class BehavioralMuxElement {
  * The selected output receives the input signal level; all other outputs
  * are driven LOW (vOL).
  */
-export class BehavioralDemuxElement {
+export class BehavioralDemuxElement extends CompositeElement {
   private readonly _selPins: DigitalInputPinModel[];
   private readonly _inPin: DigitalInputPinModel;
   private readonly _outPins: DigitalOutputPinModel[];
@@ -231,18 +208,8 @@ export class BehavioralDemuxElement {
   private readonly _pinModelsByLabel: ReadonlyMap<string, DigitalInputPinModel | DigitalOutputPinModel>;
   private readonly _childElements: AnalogCapacitorElement[];
 
-  pinNodeIds!: readonly number[];  // set by compiler via Object.assign after factory returns
-  readonly branchIndex: number = -1;
   readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.VCVS;
-  readonly isNonlinear: true = true;
-  label?: string;
-
-  readonly poolBacked = true as const;
   readonly stateSchema: StateSchema = COMBINATIONAL_COMPOSITE_SCHEMA;
-  stateSize: number;
-  stateBaseOffset = -1;
-  _stateBase: number = -1;
-  _pinNodes: Map<string, number> = new Map();
 
   constructor(
     selPins: DigitalInputPinModel[],
@@ -251,6 +218,7 @@ export class BehavioralDemuxElement {
     outputCount: number,
     pinModelsByLabel: ReadonlyMap<string, DigitalInputPinModel | DigitalOutputPinModel>,
   ) {
+    super();
     this._selPins = selPins;
     this._inPin = inPin;
     this._outPins = outPins;
@@ -263,27 +231,15 @@ export class BehavioralDemuxElement {
       ...outPins,
     ];
     this._childElements = collectPinModelChildren(allPins);
-    this.stateSize = this._childElements.reduce((s, c) => s + c.stateSize, 0);
   }
 
-  get isReactive(): boolean {
-    return this._childElements.length > 0;
-  }
-
-  initState(pool: StatePoolRef): void {
-    let offset = this.stateBaseOffset;
-    for (const child of this._childElements) {
-      child.stateBaseOffset = offset;
-      child.initState(pool);
-      offset += child.stateSize;
-    }
-  }
-
-  setup(ctx: SetupContext): void {
-    for (const pin of this._selPins) pin.setup(ctx);
-    this._inPin.setup(ctx);
-    for (const pin of this._outPins) pin.setup(ctx);
-    for (const child of this._childElements) child.setup(ctx);
+  protected getSubElements(): readonly AnalogElement[] {
+    return [
+      ...this._selPins,
+      this._inPin,
+      ...this._outPins,
+      ...this._childElements,
+    ] as unknown as readonly AnalogElement[];
   }
 
   load(ctx: LoadContext): void {
@@ -367,25 +323,15 @@ export class BehavioralDemuxElement {
  * Exactly one output is driven HIGH (the one indexed by the selector value);
  * all others are driven LOW.
  */
-export class BehavioralDecoderElement {
+export class BehavioralDecoderElement extends CompositeElement {
   private readonly _selPins: DigitalInputPinModel[];
   private readonly _outPins: DigitalOutputPinModel[];
   private readonly _outputCount: number;
   private readonly _pinModelsByLabel: ReadonlyMap<string, DigitalInputPinModel | DigitalOutputPinModel>;
   private readonly _childElements: AnalogCapacitorElement[];
 
-  pinNodeIds!: readonly number[];  // set by compiler via Object.assign after factory returns
-  readonly branchIndex: number = -1;
   readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.VCVS;
-  readonly isNonlinear: true = true;
-  label?: string;
-
-  readonly poolBacked = true as const;
   readonly stateSchema: StateSchema = COMBINATIONAL_COMPOSITE_SCHEMA;
-  stateSize: number;
-  stateBaseOffset = -1;
-  _stateBase: number = -1;
-  _pinNodes: Map<string, number> = new Map();
 
   constructor(
     selPins: DigitalInputPinModel[],
@@ -393,6 +339,7 @@ export class BehavioralDecoderElement {
     outputCount: number,
     pinModelsByLabel: ReadonlyMap<string, DigitalInputPinModel | DigitalOutputPinModel>,
   ) {
+    super();
     this._selPins = selPins;
     this._outPins = outPins;
     this._outputCount = outputCount;
@@ -403,26 +350,14 @@ export class BehavioralDecoderElement {
       ...outPins,
     ];
     this._childElements = collectPinModelChildren(allPins);
-    this.stateSize = this._childElements.reduce((s, c) => s + c.stateSize, 0);
   }
 
-  get isReactive(): boolean {
-    return this._childElements.length > 0;
-  }
-
-  initState(pool: StatePoolRef): void {
-    let offset = this.stateBaseOffset;
-    for (const child of this._childElements) {
-      child.stateBaseOffset = offset;
-      child.initState(pool);
-      offset += child.stateSize;
-    }
-  }
-
-  setup(ctx: SetupContext): void {
-    for (const pin of this._selPins) pin.setup(ctx);
-    for (const pin of this._outPins) pin.setup(ctx);
-    for (const child of this._childElements) child.setup(ctx);
+  protected getSubElements(): readonly AnalogElement[] {
+    return [
+      ...this._selPins,
+      ...this._outPins,
+      ...this._childElements,
+    ] as unknown as readonly AnalogElement[];
   }
 
   load(ctx: LoadContext): void {
@@ -459,7 +394,7 @@ export class BehavioralDecoderElement {
   }
 
   /**
-   * Per-pin currents in pinNodeIds (pinLayout) order:
+   * Per-pin currents in _pinNodes insertion order:
    *   [sel, out_0, out_1, ..., out_(N-1)]
    *
    * sel is an input: I = V_node / rIn (current into element).
@@ -572,7 +507,9 @@ export function makeBehavioralMuxAnalogFactory(selectorBits: number): AnalogElem
     }
     pinModelsByLabel.set("out", outPins[0]);
 
-    return new BehavioralMuxElement(selPins, dataPins, outPins, inputCount, bitWidth, pinModelsByLabel);
+    const el = new BehavioralMuxElement(selPins, dataPins, outPins, inputCount, bitWidth, pinModelsByLabel);
+    el._pinNodes = new Map(pinNodes);
+    return el;
   };
 }
 
@@ -629,7 +566,9 @@ export function makeBehavioralDemuxAnalogFactory(selectorBits: number): AnalogEl
       pinModelsByLabel.set(`out_${i}`, outPins[i]);
     }
 
-    return new BehavioralDemuxElement(selPins, inPin, outPins, outputCount, pinModelsByLabel);
+    const el = new BehavioralDemuxElement(selPins, inPin, outPins, outputCount, pinModelsByLabel);
+    el._pinNodes = new Map(pinNodes);
+    return el;
   };
 }
 
@@ -679,6 +618,8 @@ export function makeBehavioralDecoderAnalogFactory(selectorBits: number): Analog
       pinModelsByLabel.set(`out_${i}`, outPins[i]);
     }
 
-    return new BehavioralDecoderElement(selPins, outPins, outputCount, pinModelsByLabel);
+    const el = new BehavioralDecoderElement(selPins, outPins, outputCount, pinModelsByLabel);
+    el._pinNodes = new Map(pinNodes);
+    return el;
   };
 }

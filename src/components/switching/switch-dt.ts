@@ -25,7 +25,7 @@ import {
   type ComponentDefinition,
   type ComponentLayout,
 } from "../../core/registry.js";
-import type { AnalogElementCore, LoadContext } from "../../solver/analog/element.js";
+import type { AnalogElement, LoadContext } from "../../solver/analog/element.js";
 import { NGSPICE_LOAD_ORDER } from "../../solver/analog/element.js";
 import type { SetupContext } from "../../solver/analog/setup-context.js";
 import { SwitchAnalogElement } from "./switch.js";
@@ -303,8 +303,6 @@ const SWITCH_DT_PROPERTY_DEFS: PropertyDefinition[] = [
 ];
 
 // ---------------------------------------------------------------------------
-// SwitchDTAnalogElement -- W3 migrated SPDT composite analog element
-//
 // Composite: two SW sub-elements (SW_AB and SW_AC) per PB-SW-DT spec.
 // setup() forwards to sub-elements in order: swAB first, swAC second.
 // Port of ngspice SW device applied twice:
@@ -312,15 +310,14 @@ const SWITCH_DT_PROPERTY_DEFS: PropertyDefinition[] = [
 //   load:  swload.c (applied to each sub-element)
 // ---------------------------------------------------------------------------
 
-export interface SpdtAnalogElement extends AnalogElementCore {
+export interface SpdtAnalogElement extends AnalogElement {
   setClosed(closed: boolean): void;
 }
 
 export class SwitchDTAnalogElement implements SpdtAnalogElement {
-  readonly branchIndex: number = -1;
+  label: string = "";
+  branchIndex: number = -1;
   readonly ngspiceLoadOrder: number = NGSPICE_LOAD_ORDER.SW;
-  readonly isNonlinear: boolean = false;
-  readonly isReactive: boolean = false;
   _stateBase: number = -1;
   _pinNodes: Map<string, number>;
 

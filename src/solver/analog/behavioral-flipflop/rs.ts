@@ -2,12 +2,11 @@
  * Behavioral analog factory for edge-triggered RS flip-flops.
  */
 
-import type { LoadContext, StatePoolRef, ReactiveAnalogElementCore } from "../element.js";
+import type { LoadContext } from "../element.js";
 import { NGSPICE_LOAD_ORDER } from "../element.js";
 import { readMnaVoltage, delegatePinSetParam } from "../digital-pin-model.js";
 import type { DigitalInputPinModel, DigitalOutputPinModel } from "../digital-pin-model.js";
 import type { AnalogElementFactory } from "../behavioral-gate.js";
-import type { SetupContext } from "../setup-context.js";
 import type { Diagnostic } from "../../../compile/types.js";
 import { makeDiagnostic } from "../diagnostics.js";
 import type { AnalogCapacitorElement } from "../../../components/passives/capacitor.js";
@@ -19,12 +18,10 @@ import {
   makeOutputPin,
   FLIPFLOP_COMPOSITE_SCHEMA,
   buildChildElements,
-  computeChildStateSize,
-  initChildState,
-  loadChildren,
-  checkChildConvergence,
 } from "./shared.js";
 import type { StateSchema } from "../state-schema.js";
+import type { AnalogElement } from "../element.js";
+import { CompositeElement } from "../composite-element.js";
 
 // ---------------------------------------------------------------------------
 // BehavioralRSFlipflopElement
@@ -44,7 +41,10 @@ import type { StateSchema } from "../state-schema.js";
  *              currently latched Q state, then loads capacitor children.
  *   accept() — rising-edge detection, latching, and diagnostic emission.
  */
-export class BehavioralRSFlipflopElement implements ReactiveAnalogElementCore {
+export class BehavioralRSFlipflopElement extends CompositeElement {
+  readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.VCVS;
+  readonly stateSchema: StateSchema = FLIPFLOP_COMPOSITE_SCHEMA;
+
   private readonly _sPin: DigitalInputPinModel;
   private readonly _clockPin: DigitalInputPinModel;
   private readonly _rPin: DigitalInputPinModel;
@@ -61,20 +61,6 @@ export class BehavioralRSFlipflopElement implements ReactiveAnalogElementCore {
 
   private readonly _pinModelsByLabel: ReadonlyMap<string, DigitalInputPinModel | DigitalOutputPinModel>;
 
-  pinNodeIds!: readonly number[];  // set by compiler via Object.assign after factory returns
-  allNodeIds!: readonly number[];  // set by compiler via Object.assign after factory returns
-  readonly branchIndex: number = -1;
-  readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.VCVS;
-  readonly isNonlinear: true = true;
-  label?: string;
-
-  readonly poolBacked = true as const;
-  readonly stateSchema: StateSchema = FLIPFLOP_COMPOSITE_SCHEMA;
-  stateSize: number;
-  stateBaseOffset = -1;
-  _stateBase: number = -1;
-  _pinNodes: Map<string, number> = new Map();
-
   constructor(
     sPin: DigitalInputPinModel,
     clockPin: DigitalInputPinModel,
@@ -85,6 +71,7 @@ export class BehavioralRSFlipflopElement implements ReactiveAnalogElementCore {
     _vIL: number,
     pinModelsByLabel: ReadonlyMap<string, DigitalInputPinModel | DigitalOutputPinModel>,
   ) {
+    super();
     this._sPin = sPin;
     this._clockPin = clockPin;
     this._rPin = rPin;
@@ -93,19 +80,17 @@ export class BehavioralRSFlipflopElement implements ReactiveAnalogElementCore {
     this._vIH = vIH;
     this._pinModelsByLabel = pinModelsByLabel;
     this._childElements = buildChildElements([sPin, clockPin, rPin, qPin, qBarPin]);
-    this.stateSize = computeChildStateSize(this._childElements);
   }
 
-  get isReactive(): true {
-    return (this._childElements.length > 0) as true;
-  }
-
-  initState(pool: StatePoolRef): void {
-    initChildState(this._childElements, this.stateBaseOffset, pool);
-  }
-
-  checkConvergence(ctx: LoadContext): boolean {
-    return checkChildConvergence(this._childElements, ctx);
+  protected getSubElements(): readonly AnalogElement[] {
+    return [
+      this._sPin as unknown as AnalogElement,
+      this._clockPin as unknown as AnalogElement,
+      this._rPin as unknown as AnalogElement,
+      this._qPin as unknown as AnalogElement,
+      this._qBarPin as unknown as AnalogElement,
+      ...this._childElements,
+    ];
   }
 
   setParam(key: string, value: number): void {
@@ -116,25 +101,11 @@ export class BehavioralRSFlipflopElement implements ReactiveAnalogElementCore {
     this._prevClockVoltage = readMnaVoltage(this._clockPin.nodeId, rhs);
   }
 
-  setup(ctx: SetupContext): void {
-    // Forward to every input pin model
-    this._sPin.setup(ctx);
-    this._clockPin.setup(ctx);
-    this._rPin.setup(ctx);
-
-    // Forward to every output pin model (role "direct")
-    this._qPin.setup(ctx);
-    this._qBarPin.setup(ctx);
-
-    // Forward to every capacitor child collected from pin models
-    for (const child of this._childElements) child.setup(ctx);
-  }
-
   getDiagnostics(): Diagnostic[] {
     return this._diagnostics;
   }
 
-  load(ctx: LoadContext): void {
+  override load(ctx: LoadContext): void {
     // Delegate input stamping to pin models
     this._sPin.load(ctx);
     this._clockPin.load(ctx);
@@ -147,7 +118,8 @@ export class BehavioralRSFlipflopElement implements ReactiveAnalogElementCore {
     this._qPin.load(ctx);
     this._qBarPin.load(ctx);
 
-    loadChildren(this._childElements, ctx);
+    // Forward to capacitor children
+    for (const child of this._childElements) child.load(ctx);
   }
 
   /**
@@ -248,9 +220,11 @@ export function makeRSFlipflopAnalogFactory(): AnalogElementFactory {
       ["~Q", qBarPin],
     ]);
 
-    return new BehavioralRSFlipflopElement(
+    const el = new BehavioralRSFlipflopElement(
       sPin, clockPin, rPin, qPin, qBarPin,
       cSpec.vIH, cSpec.vIL, pinModelsByLabel,
     );
+    el._pinNodes = new Map(pinNodes);
+    return el;
   };
 }

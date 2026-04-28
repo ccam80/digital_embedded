@@ -10,13 +10,110 @@
 import { describe, it, expect } from 'vitest';
 import { cktLoad } from '../ckt-load.js';
 import {
-  makeResistor,
-  makeVoltageSource,
-  makeCurrentSource,
-  makeDiode,
   makeSimpleCtx,
   allocateStatePool,
 } from './test-helpers.js';
+import { makeDcVoltageSource } from '../../../components/sources/dc-voltage-source.js';
+import { makeCurrentSource as makeCurrentSourceProduction } from '../../../components/sources/current-source.js';
+import { PropertyBag } from '../../../core/properties.js';
+import { NGSPICE_LOAD_ORDER } from '../../../core/analog-types.js';
+import type { AnalogElement } from '../element.js';
+import type { LoadContext } from '../load-context.js';
+import type { SetupContext } from '../setup-context.js';
+
+function makeResistor(nodeA: number, nodeB: number, resistance: number): AnalogElement {
+  const G = 1 / resistance;
+  let _hPP = -1, _hNN = -1, _hPN = -1, _hNP = -1;
+  const el: AnalogElement = {
+    label: "",
+    ngspiceLoadOrder: NGSPICE_LOAD_ORDER.RES,
+    _pinNodes: new Map([["A", nodeA], ["B", nodeB]]),
+    _stateBase: -1,
+    branchIndex: -1,
+    setup(ctx: SetupContext): void {
+      const s = ctx.solver;
+      if (nodeA !== 0) _hPP = s.allocElement(nodeA, nodeA);
+      if (nodeB !== 0) _hNN = s.allocElement(nodeB, nodeB);
+      if (nodeA !== 0 && nodeB !== 0) {
+        _hPN = s.allocElement(nodeA, nodeB);
+        _hNP = s.allocElement(nodeB, nodeA);
+      }
+    },
+    load(ctx: LoadContext): void {
+      const s = ctx.solver;
+      if (_hPP !== -1) s.stampElement(_hPP,  G);
+      if (_hNN !== -1) s.stampElement(_hNN,  G);
+      if (_hPN !== -1) s.stampElement(_hPN, -G);
+      if (_hNP !== -1) s.stampElement(_hNP, -G);
+    },
+    getPinCurrents(rhs: Float64Array): number[] {
+      const vA = rhs[nodeA] ?? 0;
+      const vB = rhs[nodeB] ?? 0;
+      return [G * (vA - vB), G * (vB - vA)];
+    },
+    setParam(_key: string, _value: number): void {},
+  };
+  return el;
+}
+
+function makeVoltageSource(posNode: number, negNode: number, _branchRow: number, voltage: number): AnalogElement {
+  const props = new PropertyBag([]);
+  props.replaceModelParams({ voltage });
+  return makeDcVoltageSource(
+    new Map([["pos", posNode], ["neg", negNode]]),
+    props,
+    () => 0,
+  );
+}
+
+function makeCurrentSource(posNode: number, negNode: number, current: number): AnalogElement {
+  const props = new PropertyBag([]);
+  props.replaceModelParams({ current });
+  return makeCurrentSourceProduction(
+    new Map([["pos", posNode], ["neg", negNode]]),
+    props,
+    () => 0,
+  );
+}
+
+function makeDiode(nodeAnode: number, nodeCathode: number, IS: number, N: number): AnalogElement {
+  const VT = 0.025852;
+  let _hAA = -1, _hKK = -1, _hAK = -1, _hKA = -1;
+  const el: AnalogElement = {
+    label: "",
+    ngspiceLoadOrder: NGSPICE_LOAD_ORDER.DIO,
+    _pinNodes: new Map([["A", nodeAnode], ["K", nodeCathode]]),
+    _stateBase: -1,
+    branchIndex: -1,
+    setup(ctx: SetupContext): void {
+      const s = ctx.solver;
+      if (nodeAnode !== 0) _hAA = s.allocElement(nodeAnode, nodeAnode);
+      if (nodeCathode !== 0) _hKK = s.allocElement(nodeCathode, nodeCathode);
+      if (nodeAnode !== 0 && nodeCathode !== 0) {
+        _hAK = s.allocElement(nodeAnode, nodeCathode);
+        _hKA = s.allocElement(nodeCathode, nodeAnode);
+      }
+    },
+    load(ctx: LoadContext): void {
+      const vA = ctx.rhsOld[nodeAnode] ?? 0;
+      const vK = ctx.rhsOld[nodeCathode] ?? 0;
+      const vD = Math.min(vA - vK, 0.7);
+      const Id = IS * (Math.exp(vD / (N * VT)) - 1);
+      const Gd = IS / (N * VT) * Math.exp(vD / (N * VT));
+      const Ieq = Id - Gd * vD;
+      const s = ctx.solver;
+      if (_hAA !== -1) s.stampElement(_hAA,  Gd);
+      if (_hKK !== -1) s.stampElement(_hKK,  Gd);
+      if (_hAK !== -1) s.stampElement(_hAK, -Gd);
+      if (_hKA !== -1) s.stampElement(_hKA, -Gd);
+      if (nodeAnode !== 0) ctx.rhs[nodeAnode] -= Ieq;
+      if (nodeCathode !== 0) ctx.rhs[nodeCathode] += Ieq;
+    },
+    getPinCurrents(_rhs: Float64Array): number[] { return [0, 0]; },
+    setParam(_key: string, _value: number): void {},
+  };
+  return el;
+}
 import { newtonRaphson } from '../newton-raphson.js';
 import { SparseSolver, spSINGULAR } from '../sparse-solver.js';
 import {

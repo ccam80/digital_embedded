@@ -9,35 +9,55 @@ import { describe, it, expect, beforeEach } from "vitest";
 import { MNAEngine } from "../analog-engine.js";
 import type { ConcreteCompiledAnalogCircuit } from "../analog-engine.js";
 import { EngineState } from "../../../core/engine-interface.js";
-import {
-  makeResistor,
-  makeVoltageSource,
-  createTestCapacitor,
-  makeDiode,
-} from "./test-helpers.js";
+import { allocateStatePool } from "./test-helpers.js";
 import { StatePool } from "../state-pool.js";
-import type { AnalogElementCore, ReactiveAnalogElement } from "../element.js";
-import { isPoolBacked } from "../element.js";
+import type { AnalogElement, PoolBackedAnalogElement } from "../element.js";
+import { makeDcVoltageSource } from "../../../components/sources/dc-voltage-source.js";
+import { PropertyBag } from "../../../core/properties.js";
+import { ResistorDefinition } from "../../../components/passives/resistor.js";
+import { AnalogCapacitorElement, CAPACITOR_DEFAULTS } from "../../../components/passives/capacitor.js";
+import { createDiodeElement, DIODE_PARAM_DEFAULTS } from "../../../components/semiconductors/diode.js";
 
 // ---------------------------------------------------------------------------
-// State pool helper (mirrors analog-engine.test.ts)
+// Inline circuit-element builders using production factories
 // ---------------------------------------------------------------------------
 
-function buildStatePool(elements: AnalogElementCore[]): StatePool {
-  let offset = 0;
-  for (const el of elements) {
-    if (isPoolBacked(el)) {
-      el.stateBaseOffset = offset;
-      offset += el.stateSize;
-    }
-  }
-  const pool = new StatePool(offset);
-  for (const el of elements) {
-    if (isPoolBacked(el)) {
-      el.initState(pool);
-    }
-  }
-  return pool;
+function makeResistor(nodeA: number, nodeB: number, resistance: number): AnalogElement {
+  const pinNodes = new Map([["A", nodeA], ["B", nodeB]]);
+  const props = new PropertyBag();
+  props.replaceModelParams({ resistance });
+  const factory = (ResistorDefinition.modelRegistry!["behavioral"] as { factory: (p: ReadonlyMap<string, number>, pr: PropertyBag, g: () => number) => AnalogElement }).factory;
+  return factory(pinNodes, props, () => 0);
+}
+
+function makeVoltageSource(posNode: number, negNode: number, voltage: number): AnalogElement {
+  const props = new PropertyBag();
+  props.replaceModelParams({ voltage });
+  return makeDcVoltageSource(new Map([["pos", posNode], ["neg", negNode]]), props, () => 0);
+}
+
+function createTestCapacitor(capacitance: number, posNode: number, negNode: number): PoolBackedAnalogElement {
+  return new AnalogCapacitorElement(
+    new Map([["pos", posNode], ["neg", negNode]]),
+    capacitance,
+    CAPACITOR_DEFAULTS["IC"] as number,
+    CAPACITOR_DEFAULTS["TC1"] as number,
+    CAPACITOR_DEFAULTS["TC2"] as number,
+    CAPACITOR_DEFAULTS["TNOM"] as number,
+    CAPACITOR_DEFAULTS["SCALE"] as number,
+    CAPACITOR_DEFAULTS["M"] as number,
+  );
+}
+
+function makeDiode(anodeNode: number, cathodeNode: number, IS: number, N: number): PoolBackedAnalogElement {
+  const props = new PropertyBag();
+  const params: Record<string, number> = { ...DIODE_PARAM_DEFAULTS, IS, N };
+  props.replaceModelParams(params);
+  return createDiodeElement(
+    new Map([["A", anodeNode], ["K", cathodeNode]]),
+    props,
+    () => 0,
+  ) as PoolBackedAnalogElement;
 }
 
 // ---------------------------------------------------------------------------
@@ -54,11 +74,11 @@ function makeHalfWaveRectifier(): {
   circuit: ConcreteCompiledAnalogCircuit;
   pool: StatePool;
 } {
-  const vs = makeVoltageSource(1, 0, 2, 5.0);
+  const vs = makeVoltageSource(1, 0, 5.0);
   const r = makeResistor(1, 2, 1000);
   const diode = makeDiode(2, 0, 1e-14, 1.0);
   const elements = [vs, r, diode];
-  const pool = buildStatePool(elements);
+  const pool = allocateStatePool(elements);
 
   return {
     circuit: {
@@ -86,11 +106,11 @@ function makeRCCircuit(): {
   circuit: ConcreteCompiledAnalogCircuit;
   pool: StatePool;
 } {
-  const vs = makeVoltageSource(1, 0, 2, 5.0);
+  const vs = makeVoltageSource(1, 0, 5.0);
   const r = makeResistor(1, 2, 1000);
   const cap = createTestCapacitor(1e-6, 2, 0);
   const elements = [vs, r, cap];
-  const pool = buildStatePool(elements);
+  const pool = allocateStatePool(elements);
 
   return {
     circuit: {
@@ -173,9 +193,10 @@ describe("convergence regression", () => {
     engine.init(circuit);
 
     // Before DC op, state0 should have GMIN at the diode's GEQ slot
-    // (set by initState). Diode is element[2], stateBaseOffset should be 0
+    // (set by initState). Diode is element[2], _stateBase should be 0
     // (vs and r have stateSize 0).
-    const diodeBase = (circuit.elements[2] as ReactiveAnalogElement).stateBaseOffset;
+    const diodeEl = circuit.elements[2] as PoolBackedAnalogElement;
+    const diodeBase = diodeEl._stateBase;
     expect(diodeBase).toBeGreaterThanOrEqual(0);
 
     // SLOT_GEQ = 1 — should be GMIN (1e-12) after initState
@@ -203,7 +224,8 @@ describe("convergence regression", () => {
     engine.init(circuit);
     engine.dcOperatingPoint();
 
-    const diodeBase = (circuit.elements[2] as ReactiveAnalogElement).stateBaseOffset;
+    const diodeEl = circuit.elements[2] as PoolBackedAnalogElement;
+    const diodeBase = diodeEl._stateBase;
 
     // After DC op, state1 should have been initialized from state0
     const state1VdAfterDc = pool.state1[diodeBase + 0];
@@ -253,7 +275,8 @@ describe("convergence regression", () => {
     engine.init(circuit);
     engine.dcOperatingPoint();
 
-    const diodeBase = (circuit.elements[2] as ReactiveAnalogElement).stateBaseOffset;
+    const diodeEl = circuit.elements[2] as PoolBackedAnalogElement;
+    const diodeBase = diodeEl._stateBase;
     expect(pool.state0[diodeBase + 0]).toBeGreaterThan(0); // has data
 
     engine.reset();

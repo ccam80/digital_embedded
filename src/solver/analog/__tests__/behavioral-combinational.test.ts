@@ -15,7 +15,8 @@
  */
 
 import { describe, it, expect } from "vitest";
-import { makeVoltageSource, makeResistor, withNodeIds, runNR, initElement, makeLoadCtx } from "./test-helpers.js";
+import { makeSimpleCtx, initElement, makeLoadCtx } from "./test-helpers.js";
+import { newtonRaphson } from "../newton-raphson.js";
 import {
   BehavioralMuxElement,
   BehavioralDemuxElement,
@@ -37,6 +38,8 @@ import { MODETRAN, MODEINITFLOAT } from "../ckt-mode.js";
 import { MuxDefinition } from "../../../components/wiring/mux.js";
 import { DemuxDefinition } from "../../../components/wiring/demux.js";
 import { DecoderDefinition } from "../../../components/wiring/decoder.js";
+import { makeDcVoltageSource, DC_VOLTAGE_SOURCE_DEFAULTS } from "../../../components/sources/dc-voltage-source.js";
+import { ResistorDefinition } from "../../../components/passives/resistor.js";
 
 // ---------------------------------------------------------------------------
 // Shared test constants
@@ -60,21 +63,39 @@ const LOAD_R = 10_000;
 const NR_OPTS = { maxIterations: 50, reltol: 1e-3, abstol: 1e-6, iabstol: 1e-12 };
 
 // ---------------------------------------------------------------------------
+// Local element builders
+// ---------------------------------------------------------------------------
+
+/**
+ * Build a DC voltage source element.
+ * posNode / negNode are 1-based MNA node IDs (0 = ground sentinel).
+ */
+function makeVoltageSource(posNode: number, negNode: number, voltage: number): AnalogElement {
+  const props = new PropertyBag();
+  props.replaceModelParams({ ...DC_VOLTAGE_SOURCE_DEFAULTS, voltage });
+  return makeDcVoltageSource(new Map([["pos", posNode], ["neg", negNode]]), props, () => 0);
+}
+
+/**
+ * Build a resistor element using the production ResistorDefinition factory.
+ * nodeA / nodeB are 1-based MNA node IDs.
+ */
+function makeResistor(nodeA: number, nodeB: number, resistance: number): AnalogElement {
+  const pinNodes = new Map([["A", nodeA], ["B", nodeB]]);
+  const props = new PropertyBag();
+  props.replaceModelParams({ resistance });
+  const factory = (ResistorDefinition.modelRegistry!["behavioral"] as { factory: (p: ReadonlyMap<string, number>, pr: PropertyBag, g: () => number) => AnalogElement }).factory;
+  return factory(pinNodes, props, () => 0);
+}
+
+// ---------------------------------------------------------------------------
 // Solve helper
 // ---------------------------------------------------------------------------
 
-function solve(elements: AnalogElement[], matrixSize: number) {
-  // nodeCount = number of actual circuit nodes (matrixSize minus branch rows).
-  // The test builders set branch rows starting at nodeCount, so we derive
-  // nodeCount by counting unique non-zero node IDs across all elements.
-  const nodeIds = new Set<number>();
-  for (const el of elements) {
-    for (const n of el.allNodeIds) {
-      if (n > 0) nodeIds.add(n);
-    }
-  }
-  const nodeCount = nodeIds.size;
-  return runNR({ elements, matrixSize, nodeCount, params: NR_OPTS, isDcOp: true });
+function solve(elements: AnalogElement[], matrixSize: number, nodeCount: number) {
+  const ctx = makeSimpleCtx({ elements, matrixSize, nodeCount, params: NR_OPTS });
+  newtonRaphson(ctx);
+  return ctx.nrResult;
 }
 
 // ---------------------------------------------------------------------------
@@ -120,24 +141,25 @@ describe("Mux", () => {
     outPin.init(7, -1);
 
     const mux = new BehavioralMuxElement([selPin0, selPin1], dataPins, [outPin], 4, 1, new Map());
+    mux._pinNodes = new Map([["sel", 1], ["sel_1", 2], ["in_0", 3], ["in_1", 4], ["in_2", 5], ["in_3", 6], ["out", 7]]);
 
-    // Voltage sources — 1-based circuit nodes, branch indices 7..12 (0-based)
-    const vsSel0 = makeVoltageSource(1, 0, 7, vSel0);   // circuit node 1, branch row 7
-    const vsSel1 = makeVoltageSource(2, 0, 8, vSel1);   // circuit node 2, branch row 8
-    const vsIn0  = makeVoltageSource(3, 0, 9,  inputVoltages[0]);
-    const vsIn1  = makeVoltageSource(4, 0, 10, inputVoltages[1]);
-    const vsIn2  = makeVoltageSource(5, 0, 11, inputVoltages[2]);
-    const vsIn3  = makeVoltageSource(6, 0, 12, inputVoltages[3]);
-    const rLoad  = makeResistor(7, 0, LOAD_R);           // output at circuit node 7
+    // Voltage sources — 1-based circuit nodes
+    const vsSel0 = makeVoltageSource(1, 0, vSel0);
+    const vsSel1 = makeVoltageSource(2, 0, vSel1);
+    const vsIn0  = makeVoltageSource(3, 0, inputVoltages[0]);
+    const vsIn1  = makeVoltageSource(4, 0, inputVoltages[1]);
+    const vsIn2  = makeVoltageSource(5, 0, inputVoltages[2]);
+    const vsIn3  = makeVoltageSource(6, 0, inputVoltages[3]);
+    const rLoad  = makeResistor(7, 0, LOAD_R);
 
-    const elements: AnalogElement[] = [vsSel0, vsSel1, vsIn0, vsIn1, vsIn2, vsIn3, rLoad, withNodeIds(mux, [1, 2, 3, 4, 5, 6, 7])];
-    return { elements, matrixSize: 13 };
+    const elements: AnalogElement[] = [vsSel0, vsSel1, vsIn0, vsIn1, vsIn2, vsIn3, rLoad, mux];
+    return { elements, matrixSize: 13, nodeCount: 7 };
   }
 
   it("selects_correct_input", () => {
     // selector = 2, data: in_0=LOW, in_1=LOW, in_2=HIGH, in_3=LOW
-    const { elements, matrixSize } = buildMux4to1(2, [GND, GND, VDD, GND]);
-    const result = solve(elements, matrixSize);
+    const { elements, matrixSize, nodeCount } = buildMux4to1(2, [GND, GND, VDD, GND]);
+    const result = solve(elements, matrixSize, nodeCount);
 
     expect(result.converged).toBe(true);
     // out at circuit node 7 (result.voltages[7] in 1-based layout)
@@ -146,8 +168,8 @@ describe("Mux", () => {
 
   it("selects_low_input", () => {
     // selector = 1, data: in_0=HIGH, in_1=LOW, in_2=HIGH, in_3=HIGH
-    const { elements, matrixSize } = buildMux4to1(1, [VDD, GND, VDD, VDD]);
-    const result = solve(elements, matrixSize);
+    const { elements, matrixSize, nodeCount } = buildMux4to1(1, [VDD, GND, VDD, VDD]);
+    const result = solve(elements, matrixSize, nodeCount);
 
     expect(result.converged).toBe(true);
     expect(result.voltages[7]).toBeLessThan(CMOS_3V3.vIL);
@@ -158,11 +180,11 @@ describe("Mux", () => {
     for (let selVal = 0; selVal < 4; selVal++) {
       const inputVoltages = [GND, GND, GND, GND];
       inputVoltages[selVal] = VDD;
-      const { elements, matrixSize } = buildMux4to1(selVal, inputVoltages);
-      const result = solve(elements, matrixSize);
+      const { elements, matrixSize, nodeCount } = buildMux4to1(selVal, inputVoltages);
+      const result = solve(elements, matrixSize, nodeCount);
 
       expect(result.converged).toBe(true);
-      expect(result.voltages[6]).toBeGreaterThan(CMOS_3V3.vIH);
+      expect(result.voltages[7]).toBeGreaterThan(CMOS_3V3.vIH);
     }
   });
 });
@@ -209,24 +231,25 @@ describe("Demux", () => {
     inPin.init(7, 0);
 
     const demux = new BehavioralDemuxElement([selPin0, selPin1], inPin, outPins, 4, new Map());
+    demux._pinNodes = new Map([["sel", 1], ["sel_1", 2], ["out_0", 3], ["out_1", 4], ["out_2", 5], ["out_3", 6], ["in", 7]]);
 
-    const vsSel0 = makeVoltageSource(1, 0, 7, vSel0);
-    const vsSel1 = makeVoltageSource(2, 0, 8, vSel1);
-    const vsIn   = makeVoltageSource(7, 0, 9, inputLevel); // circuit node 7
+    const vsSel0 = makeVoltageSource(1, 0, vSel0);
+    const vsSel1 = makeVoltageSource(2, 0, vSel1);
+    const vsIn   = makeVoltageSource(7, 0, inputLevel);
 
     const loads: AnalogElement[] = [];
     for (let i = 0; i < 4; i++) {
-      loads.push(makeResistor(3 + i, 0, LOAD_R));  // circuit nodes 3..6
+      loads.push(makeResistor(3 + i, 0, LOAD_R));
     }
 
-    const elements: AnalogElement[] = [vsSel0, vsSel1, vsIn, ...loads, withNodeIds(demux, [1, 2, 3, 4, 5, 6, 7])];
-    return { elements, matrixSize: 10 };
+    const elements: AnalogElement[] = [vsSel0, vsSel1, vsIn, ...loads, demux];
+    return { elements, matrixSize: 10, nodeCount: 7 };
   }
 
   it("routes_to_correct_output", () => {
     // selector = 3, input = HIGH → only out_3 should be HIGH
-    const { elements, matrixSize } = buildDemux1to4(3, VDD);
-    const result = solve(elements, matrixSize);
+    const { elements, matrixSize, nodeCount } = buildDemux1to4(3, VDD);
+    const result = solve(elements, matrixSize, nodeCount);
 
     expect(result.converged).toBe(true);
     // out_0..out_3 = circuit nodes 3..6 → voltages[3..6] (1-based)
@@ -238,8 +261,8 @@ describe("Demux", () => {
 
   it("all_outputs_low_when_input_low", () => {
     // selector = 2, input = LOW → all outputs LOW
-    const { elements, matrixSize } = buildDemux1to4(2, GND);
-    const result = solve(elements, matrixSize);
+    const { elements, matrixSize, nodeCount } = buildDemux1to4(2, GND);
+    const result = solve(elements, matrixSize, nodeCount);
 
     expect(result.converged).toBe(true);
     for (let i = 0; i < 4; i++) {
@@ -249,8 +272,8 @@ describe("Demux", () => {
 
   it("routes_each_selector_value", () => {
     for (let selVal = 0; selVal < 4; selVal++) {
-      const { elements, matrixSize } = buildDemux1to4(selVal, VDD);
-      const result = solve(elements, matrixSize);
+      const { elements, matrixSize, nodeCount } = buildDemux1to4(selVal, VDD);
+      const result = solve(elements, matrixSize, nodeCount);
 
       expect(result.converged).toBe(true);
       for (let i = 0; i < 4; i++) {
@@ -301,23 +324,24 @@ describe("Decoder", () => {
     }
 
     const decoder = new BehavioralDecoderElement([selPin0, selPin1], outPins, 4, new Map());
+    decoder._pinNodes = new Map([["sel", 1], ["sel_1", 2], ["out_0", 3], ["out_1", 4], ["out_2", 5], ["out_3", 6]]);
 
-    const vsSel0 = makeVoltageSource(1, 0, 6, vSel0);
-    const vsSel1 = makeVoltageSource(2, 0, 7, vSel1);
+    const vsSel0 = makeVoltageSource(1, 0, vSel0);
+    const vsSel1 = makeVoltageSource(2, 0, vSel1);
 
     const loads: AnalogElement[] = [];
     for (let i = 0; i < 4; i++) {
-      loads.push(makeResistor(3 + i, 0, LOAD_R));  // circuit nodes 3..6
+      loads.push(makeResistor(3 + i, 0, LOAD_R));
     }
 
-    const elements: AnalogElement[] = [vsSel0, vsSel1, ...loads, withNodeIds(decoder, [1, 2, 3, 4, 5, 6])];
-    return { elements, matrixSize: 8 };
+    const elements: AnalogElement[] = [vsSel0, vsSel1, ...loads, decoder];
+    return { elements, matrixSize: 8, nodeCount: 6 };
   }
 
   it("one_hot_output", () => {
     // 2-bit decoder, input=01 (selVal=1) → out_1 = V_OH, all others = V_OL
-    const { elements, matrixSize } = buildDecoder2bit(1);
-    const result = solve(elements, matrixSize);
+    const { elements, matrixSize, nodeCount } = buildDecoder2bit(1);
+    const result = solve(elements, matrixSize, nodeCount);
 
     expect(result.converged).toBe(true);
     expect(result.voltages[3]).toBeLessThan(CMOS_3V3.vIL);   // out_0 LOW  (node 3)
@@ -328,8 +352,8 @@ describe("Decoder", () => {
 
   it("all_selector_values_produce_one_hot", () => {
     for (let selVal = 0; selVal < 4; selVal++) {
-      const { elements, matrixSize } = buildDecoder2bit(selVal);
-      const result = solve(elements, matrixSize);
+      const { elements, matrixSize, nodeCount } = buildDecoder2bit(selVal);
+      const result = solve(elements, matrixSize, nodeCount);
 
       expect(result.converged).toBe(true);
       for (let i = 0; i < 4; i++) {
@@ -364,40 +388,28 @@ describe("Registration", () => {
     expect(typeof (DecoderDefinition.modelRegistry?.behavioral as {kind:"inline";factory:AnalogFactory}|undefined)?.factory).toBe("function");
   });
 
-  it("factory_produces_nonlinear_element", () => {
+  it("factory_produces_element_with_pin_nodes", () => {
     const props = new PropertyBag([]);
     // 2:1 mux (selectorBits=1): pins "sel", "in_0", "in_1", "out"
     const factory = makeBehavioralMuxAnalogFactory(1);
-    const element = withNodeIds(
-      factory(new Map([["sel", 1], ["in_0", 2], ["in_1", 3], ["out", 4]]), [], -1, props, () => 0),
-      [1, 2, 3, 4],
-    );
-    expect(element.isNonlinear).toBe(true);
-    expect(element.isReactive).toBe(true);
+    const element = factory(new Map([["sel", 1], ["in_0", 2], ["in_1", 3], ["out", 4]]), props, () => 0);
+    expect(element._pinNodes.size).toBe(4);
   });
 
-  it("demux_factory_produces_nonlinear_element", () => {
+  it("demux_factory_produces_element_with_pin_nodes", () => {
     const props = new PropertyBag([]);
     // 1:2 demux (selectorBits=1): pins "sel", "out_0", "out_1", "in"
     const factory = makeBehavioralDemuxAnalogFactory(1);
-    const element = withNodeIds(
-      factory(new Map([["sel", 1], ["out_0", 2], ["out_1", 3], ["in", 4]]), [], -1, props, () => 0),
-      [1, 2, 3, 4],
-    );
-    expect(element.isNonlinear).toBe(true);
-    expect(element.isReactive).toBe(true);
+    const element = factory(new Map([["sel", 1], ["out_0", 2], ["out_1", 3], ["in", 4]]), props, () => 0);
+    expect(element._pinNodes.size).toBe(4);
   });
 
-  it("decoder_factory_produces_nonlinear_element", () => {
+  it("decoder_factory_produces_element_with_pin_nodes", () => {
     const props = new PropertyBag([]);
     // 1-bit decoder (selectorBits=1): pins "sel", "out_0", "out_1"
     const factory = makeBehavioralDecoderAnalogFactory(1);
-    const element = withNodeIds(
-      factory(new Map([["sel", 1], ["out_0", 2], ["out_1", 3]]), [], -1, props, () => 0),
-      [1, 2, 3],
-    );
-    expect(element.isNonlinear).toBe(true);
-    expect(element.isReactive).toBe(true);
+    const element = factory(new Map([["sel", 1], ["out_0", 2], ["out_1", 3]]), props, () => 0);
+    expect(element._pinNodes.size).toBe(3);
   });
 });
 
@@ -421,10 +433,7 @@ describe("Task 6.4.3 — combinational pin loading propagates", () => {
     props.set("_pinLoading", pinLoading as unknown as import("../../../core/properties.js").PropertyValue);
 
     const factory = makeBehavioralMuxAnalogFactory(1);
-    const element = withNodeIds(
-      factory(new Map([["sel", 1], ["in_0", 2], ["in_1", 3], ["out", 4]]), [], -1, props, () => 0),
-      [1, 2, 3, 4],
-    );
+    const element = factory(new Map([["sel", 1], ["in_0", 2], ["in_1", 3], ["out", 4]]), props, () => 0);
     initElement(element);
 
     const allocCalls: Array<[number, number]> = [];

@@ -23,7 +23,7 @@ import {
   type AttributeMapping,
   type ComponentDefinition,
 } from "../../core/registry.js";
-import type { AnalogElementCore } from "../../core/analog-types.js";
+import type { AnalogElement } from "../../core/analog-types.js";
 import { NGSPICE_LOAD_ORDER } from "../../core/analog-types.js";
 import type { LoadContext } from "../../solver/analog/load-context.js";
 import type { SetupContext } from "../../solver/analog/setup-context.js";
@@ -31,6 +31,7 @@ import { defineModelParams } from "../../core/model-params.js";
 
 import {
   createBjtElement,
+  createPnpBjtElement,
   BJT_NPN_DEFAULTS,
   BJT_PNP_DEFAULTS,
 } from "./bjt.js";
@@ -76,20 +77,18 @@ function makePnpProps(BR: number, IS: number, RC: number, RB: number, RE: number
 // ScrCompositeElement — composite AnalogElementCore
 // ---------------------------------------------------------------------------
 
-class ScrCompositeElement implements AnalogElementCore {
+class ScrCompositeElement implements AnalogElement {
+  label: string = "";
   branchIndex: number = -1;
   readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.BJT;
-  readonly isNonlinear: boolean = true;
-  readonly isReactive: boolean = false;
   _stateBase: number = -1;
   _pinNodes: Map<string, number>;
-
-  label: string;
 
   private _aNode: number;
   private _kNode: number;
   private _gNode: number;
   private _vintNode: number = -1;
+  private _internalLabels: string[] = [];
 
   readonly _q1: ReturnType<typeof createBjtElement>;  // NPN: B=G, C=Vint, E=K
   readonly _q2: ReturnType<typeof createBjtElement>;  // PNP: B=Vint, C=G, E=A
@@ -109,9 +108,15 @@ class ScrCompositeElement implements AnalogElementCore {
     this._q2 = q2;
   }
 
+  getInternalNodeLabels(): readonly string[] {
+    return this._internalLabels;
+  }
+
   setup(ctx: SetupContext): void {
+    this._internalLabels = [];
     // Create the shared internal latch node first
     this._vintNode = ctx.makeVolt(this.label, "latch");
+    this._internalLabels.push("latch");
 
     // Bind sub-element pin nodes using the resolved Vint.
     // Sub-element pin rebinding uses direct pinNodeIds array assignment
@@ -178,17 +183,17 @@ function createScrElement(
 
   // Q1 NPN: B=G, C=Vint, E=K — Vint not known yet; overwritten in setup()
   const q1 = createBjtElement(
-    1,  // NPN polarity
     new Map([["B", pinNodes.get("G")!], ["C", 0], ["E", pinNodes.get("K")!]]),
     npnProps,
+    () => 0,
   );
   (q1 as any).label = `${label}#Q1`;
 
   // Q2 PNP: B=Vint, C=G, E=A — Vint not known yet; overwritten in setup()
-  const q2 = createBjtElement(
-    -1,  // PNP polarity
+  const q2 = createPnpBjtElement(
     new Map([["B", 0], ["C", pinNodes.get("G")!], ["E", pinNodes.get("A")!]]),
     pnpProps,
+    () => 0,
   );
   (q2 as any).label = `${label}#Q2`;
 
@@ -334,7 +339,6 @@ export const ScrDefinition: ComponentDefinition = {
       factory: createScrElement,
       paramDefs: SCR_PARAM_DEFS,
       params: SCR_PARAM_DEFAULTS,
-      mayCreateInternalNodes: true,
     },
   },
   defaultModel: "behavioral",

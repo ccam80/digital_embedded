@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Bridge adapter elements  MNA stamps for digital/analog engine boundaries.
  *
  * BridgeOutputAdapter wraps a DigitalOutputPinModel for use at a cross-engine
@@ -14,7 +14,6 @@
  */
 
 import type { AnalogElement } from "./element.js";
-import type { LoadContext, StatePoolRef } from "./element.js";
 import { NGSPICE_LOAD_ORDER } from "./element.js";
 import type { ResolvedPinElectrical } from "../../core/pin-electrical.js";
 import {
@@ -22,7 +21,7 @@ import {
   DigitalInputPinModel,
   collectPinModelChildren,
 } from "./digital-pin-model.js";
-import type { AnalogCapacitorElement } from "../../components/passives/capacitor.js";
+import { CompositeElement } from "./composite-element.js";
 import { defineStateSchema } from "./state-schema.js";
 import type { StateSchema } from "./state-schema.js";
 
@@ -40,62 +39,32 @@ const BRIDGE_COMPOSITE_SCHEMA: StateSchema = defineStateSchema("BridgeAdapterCom
  * with role="branch". The branch variable at branchIndex carries the source
  * current. The logic level is set externally by the DefaultSimulationCoordinator.
  *
- * isNonlinear is false  the ideal source is linear; logic level changes are
- * handled by re-stamping the branch equation on the next load() call, not via
- * NR convergence.
+ * The element is linear; logic level changes are handled by re-stamping the
+ * branch equation on the next load() call, not via NR convergence.
  *
- * isReactive is a getter  true only when the capacitor child is present.
+ * Reactivity is method-presence: this element is reactive iff any child
+ * element exposes getLteTimestep (delegated via CompositeElement base).
  */
-export class BridgeOutputAdapter implements AnalogElement {
+export class BridgeOutputAdapter extends CompositeElement {
   private readonly _pinModel: DigitalOutputPinModel;
-  private readonly _childElements: AnalogCapacitorElement[];
+  private readonly _childElements: AnalogElement[];
 
-  readonly pinNodeIds: readonly number[];
-  readonly allNodeIds: readonly number[];
-  readonly internalNodeLabels: readonly string[];
-  readonly branchIndex: number;
   readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.VSRC;
-  readonly isNonlinear: false = false;
-  label?: string;
-
-  readonly poolBacked = true as const;
   readonly stateSchema: StateSchema = BRIDGE_COMPOSITE_SCHEMA;
-  stateSize: number;
-  stateBaseOffset = -1;
 
-  /**
-   * @param pinModel  - Initialised DigitalOutputPinModel for this bridge pin
-   *                    with role="branch". The caller must have already called
-   *                    pinModel.init() with the correct MNA node ID and branch index.
-   * @param branchIdx - Absolute branch row/col in the augmented MNA matrix.
-   */
   constructor(
     pinModel: DigitalOutputPinModel,
     branchIdx: number,
   ) {
+    super();
     this._pinModel = pinModel;
     this.branchIndex = branchIdx;
-    this.pinNodeIds = [pinModel.nodeId];
-    this.allNodeIds = [pinModel.nodeId];
-    this.internalNodeLabels = [];
+    this._pinNodes = new Map([["out", pinModel.nodeId]]);
     this._childElements = collectPinModelChildren([pinModel]);
-    this.stateSize = this._childElements.reduce((s, c) => s + c.stateSize, 0);
   }
 
-  /**
-   * True only when the capacitor child is present (loaded and cOut > 0).
-   */
-  get isReactive(): boolean {
-    return this._childElements.length > 0;
-  }
-
-  initState(pool: StatePoolRef): void {
-    let offset = this.stateBaseOffset;
-    for (const child of this._childElements) {
-      child.stateBaseOffset = offset;
-      child.initState(pool);
-      offset += child.stateSize;
-    }
+  protected getSubElements(): readonly AnalogElement[] {
+    return [this._pinModel as unknown as AnalogElement, ...this._childElements];
   }
 
   /**
@@ -120,18 +89,6 @@ export class BridgeOutputAdapter implements AnalogElement {
   }
 
   /**
-   * Unified per-NR-iteration load. Stamps the ideal voltage source branch
-   * equation (vOH/vOL or Hi-Z) and, during transient solves, the C_out
-   * companion model via child elements.
-   */
-  load(ctx: LoadContext): void {
-    this._pinModel.load(ctx);
-    for (const child of this._childElements) {
-      child.load(ctx);
-    }
-  }
-
-  /**
    * Per-pin current for the single output node.
    *
    * With an ideal voltage source, the branch variable at branchIndex carries
@@ -148,7 +105,7 @@ export class BridgeOutputAdapter implements AnalogElement {
     return this._pinModel.nodeId;
   }
 
-  /** Output impedance (Î) used by this adapter's pin model. */
+  /** Output impedance (Ω) used by this adapter's pin model. */
   get rOut(): number {
     return this._pinModel.rOut;
   }
@@ -165,71 +122,30 @@ export class BridgeOutputAdapter implements AnalogElement {
  * threshold-detect the analog node voltage and feed the result to the inner
  * digital engine.
  *
- * isNonlinear is false  input loading is a linear resistor.
- * isReactive is a getter  true only when the capacitor child is present.
+ * Input loading is a linear resistor. Reactivity is method-presence:
+ * this element is reactive iff any child element exposes getLteTimestep.
  */
-export class BridgeInputAdapter implements AnalogElement {
+export class BridgeInputAdapter extends CompositeElement {
   private readonly _pinModel: DigitalInputPinModel;
-  private readonly _childElements: AnalogCapacitorElement[];
+  private readonly _childElements: AnalogElement[];
 
-  readonly pinNodeIds: readonly number[];
-  readonly allNodeIds: readonly number[];
-  readonly internalNodeLabels: readonly string[];
-  readonly branchIndex: number = -1;
   readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.ISRC;
-  readonly isNonlinear: false = false;
-  label?: string;
-
-  readonly poolBacked = true as const;
   readonly stateSchema: StateSchema = BRIDGE_COMPOSITE_SCHEMA;
-  stateSize: number;
-  stateBaseOffset = -1;
 
-  /**
-   * @param pinModel - Initialised DigitalInputPinModel for this bridge pin.
-   *                   The caller must have already called pinModel.init() with
-   *                   the correct MNA node ID.
-   */
   constructor(pinModel: DigitalInputPinModel) {
+    super();
     this._pinModel = pinModel;
-    this.pinNodeIds = [pinModel.nodeId];
-    this.allNodeIds = [pinModel.nodeId];
-    this.internalNodeLabels = [];
+    this._pinNodes = new Map([["in", pinModel.nodeId]]);
     this._childElements = collectPinModelChildren([pinModel]);
-    this.stateSize = this._childElements.reduce((s, c) => s + c.stateSize, 0);
   }
 
-  /**
-   * True only when the capacitor child is present (loaded and cIn > 0).
-   */
-  get isReactive(): boolean {
-    return this._childElements.length > 0;
-  }
-
-  initState(pool: StatePoolRef): void {
-    let offset = this.stateBaseOffset;
-    for (const child of this._childElements) {
-      child.stateBaseOffset = offset;
-      child.initState(pool);
-      offset += child.stateSize;
-    }
+  protected getSubElements(): readonly AnalogElement[] {
+    return [this._pinModel as unknown as AnalogElement, ...this._childElements];
   }
 
   /** Hot-update a single electrical parameter on the underlying pin model. */
   setParam(key: string, value: number): void {
     this._pinModel.setParam(key, value);
-  }
-
-  /**
-   * Unified per-NR-iteration load. Stamps the input loading conductance
-   * 1/rIn (no-op when unloaded) and, during transient solves, the C_in
-   * companion model via child elements.
-   */
-  load(ctx: LoadContext): void {
-    this._pinModel.load(ctx);
-    for (const child of this._childElements) {
-      child.load(ctx);
-    }
   }
 
   /**
@@ -264,7 +180,7 @@ export class BridgeInputAdapter implements AnalogElement {
     return this._pinModel.nodeId;
   }
 
-  /** Input impedance (Î) used by this adapter's loading conductance stamp. */
+  /** Input impedance (Ω) used by this adapter's loading conductance stamp. */
   get rIn(): number {
     return this._pinModel.rIn;
   }

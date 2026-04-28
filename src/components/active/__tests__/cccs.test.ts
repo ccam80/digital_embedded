@@ -21,7 +21,6 @@
 
 import { describe, it, expect } from "vitest";
 import { MNAEngine } from "../../../solver/analog/analog-engine.js";
-import { makeResistor, makeVoltageSource } from "../../../solver/analog/__tests__/test-helpers.js";
 import { CCCSDefinition } from "../cccs.js";
 import { CCCSAnalogElement } from "../cccs.js";
 import { PropertyBag } from "../../../core/properties.js";
@@ -31,6 +30,8 @@ import type { SetupContext } from "../../../solver/analog/setup-context.js";
 import type { LoadContext } from "../../../solver/analog/load-context.js";
 import type { ConcreteCompiledAnalogCircuit } from "../../../solver/analog/compiled-analog-circuit.js";
 import { StatePool } from "../../../solver/analog/state-pool.js";
+import { makeDcVoltageSource, DC_VOLTAGE_SOURCE_DEFAULTS } from "../../sources/dc-voltage-source.js";
+import { ResistorDefinition, RESISTOR_DEFAULTS } from "../../passives/resistor.js";
 
 // ---------------------------------------------------------------------------
 // Helper: narrow ModelEntry to inline factory
@@ -42,19 +43,25 @@ function getFactory(entry: ModelEntry): AnalogFactory {
 }
 
 // ---------------------------------------------------------------------------
-// withSetup — wrap an AnalogElement that lacks setup() with a no-op setup.
-//
-// makeVoltageSource from test-helpers does not declare setup() because it
-// is a minimal fixture. MNAEngine._setup() calls el.setup(ctx) on every
-// element, so all elements entering the engine must expose the method.
-// This local wrapper adds a no-op setup() without touching the shared helper.
+// makeResistor — create a resistor element between two nodes.
 // ---------------------------------------------------------------------------
+function makeResistor(nodeA: number, nodeB: number, resistance: number): AnalogElement {
+  const props = new PropertyBag([]);
+  props.replaceModelParams({ ...RESISTOR_DEFAULTS, resistance });
+  return getFactory(ResistorDefinition.modelRegistry!["behavioral"]!)(
+    new Map([["A", nodeA], ["B", nodeB]]),
+    props,
+    () => 0,
+  );
+}
 
-function withSetup<T extends AnalogElement>(el: T): T {
-  if (typeof (el as any).setup !== "function") {
-    (el as any).setup = (_ctx: SetupContext): void => {};
-  }
-  return el;
+// ---------------------------------------------------------------------------
+// makeVsrc — DC voltage source helper
+// ---------------------------------------------------------------------------
+function makeVsrc(posNode: number, negNode: number, voltage: number): AnalogElement {
+  const props = new PropertyBag();
+  props.replaceModelParams({ ...DC_VOLTAGE_SOURCE_DEFAULTS, voltage });
+  return makeDcVoltageSource(new Map([["pos", posNode], ["neg", negNode]]), props, () => 0);
 }
 
 // ---------------------------------------------------------------------------
@@ -92,13 +99,11 @@ function makeSenseVsrc(
   }
 
   return {
-    pinNodeIds: [nodePlus, nodeMinus],
-    allNodeIds: [nodePlus, nodeMinus],
     get branchIndex(): number { return branchIndex; },
     set branchIndex(v: number) { branchIndex = v; },
     ngspiceLoadOrder: NGSPICE_LOAD_ORDER.VSRC,
-    isNonlinear: false,
-    isReactive: false,
+    _pinNodes: new Map([[String(nodePlus), nodePlus], [String(nodeMinus), nodeMinus]]),
+    _stateBase: -1,
     label,
     setParam(_key: string, _value: number): void {},
 
@@ -187,10 +192,6 @@ function makeCCCSElement(
   const el = core as CCCSAnalogElement;
   el.label = "cccs1";
   el.setParam("senseSourceLabel", senseSourceLabel);
-  Object.assign(el, {
-    pinNodeIds: [nSenseP, nSenseN, nOutP, nOutN],
-    allNodeIds: [nSenseP, nSenseN, nOutP, nOutN],
-  });
   return el;
 }
 
@@ -217,9 +218,8 @@ function makeGainCircuit(
 ): ConcreteCompiledAnalogCircuit {
   const nodeCount = 3;
   const branchCount = 2;
-  const vsBranch = nodeCount + 1; // 4 (1-based)
 
-  const vs        = withSetup(makeVoltageSource(1, 0, vsBranch, vsVoltage));
+  const vs        = makeVsrc(1, 0, vsVoltage);
   vs.label = "vs1";
   const rS        = makeResistor(1, 2, rSense);
   const senseVsrc = makeSenseVsrc(2, 0, "senseVsrc");
@@ -282,10 +282,6 @@ describe("CCCS", () => {
     );
     const el = core as CCCSAnalogElement;
     el.label = "cccs_bad";
-    Object.assign(el, {
-      pinNodeIds: [1, 0, 2, 0],
-      allNodeIds: [1, 0, 2, 0],
-    });
     // Do NOT call setParam("senseSourceLabel", ...) — should throw in setup()
 
     const senseVsrc = makeSenseVsrc(1, 0, "senseVsrc");

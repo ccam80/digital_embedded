@@ -2,12 +2,11 @@
  * Behavioral analog factory for edge-triggered T flip-flops.
  */
 
-import type { LoadContext, StatePoolRef, ReactiveAnalogElementCore } from "../element.js";
+import type { LoadContext } from "../element.js";
 import { NGSPICE_LOAD_ORDER } from "../element.js";
 import { readMnaVoltage, delegatePinSetParam } from "../digital-pin-model.js";
 import type { DigitalInputPinModel, DigitalOutputPinModel } from "../digital-pin-model.js";
 import type { AnalogElementFactory } from "../behavioral-gate.js";
-import type { SetupContext } from "../setup-context.js";
 import type { AnalogCapacitorElement } from "../../../components/passives/capacitor.js";
 import {
   FALLBACK_SPEC,
@@ -17,12 +16,10 @@ import {
   makeOutputPin,
   FLIPFLOP_COMPOSITE_SCHEMA,
   buildChildElements,
-  computeChildStateSize,
-  initChildState,
-  loadChildren,
-  checkChildConvergence,
 } from "./shared.js";
 import type { StateSchema } from "../state-schema.js";
+import type { AnalogElement } from "../element.js";
+import { CompositeElement } from "../composite-element.js";
 
 // ---------------------------------------------------------------------------
 // BehavioralTFlipflopElement
@@ -43,7 +40,10 @@ import type { StateSchema } from "../state-schema.js";
  *              currently latched Q state, then loads capacitor children.
  *   accept() — rising-edge detection and conditional toggle.
  */
-export class BehavioralTFlipflopElement implements ReactiveAnalogElementCore {
+export class BehavioralTFlipflopElement extends CompositeElement {
+  readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.VCVS;
+  readonly stateSchema: StateSchema = FLIPFLOP_COMPOSITE_SCHEMA;
+
   private readonly _tPin: DigitalInputPinModel | null;
   private readonly _clockPin: DigitalInputPinModel;
   private readonly _qPin: DigitalOutputPinModel;
@@ -56,20 +56,6 @@ export class BehavioralTFlipflopElement implements ReactiveAnalogElementCore {
 
   private readonly _pinModelsByLabel: ReadonlyMap<string, DigitalInputPinModel | DigitalOutputPinModel>;
 
-  pinNodeIds!: readonly number[];  // set by compiler via Object.assign after factory returns
-  allNodeIds!: readonly number[];  // set by compiler via Object.assign after factory returns
-  readonly branchIndex: number = -1;
-  readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.VCVS;
-  readonly isNonlinear: true = true;
-  label?: string;
-
-  readonly poolBacked = true as const;
-  readonly stateSchema: StateSchema = FLIPFLOP_COMPOSITE_SCHEMA;
-  stateSize: number;
-  stateBaseOffset = -1;
-  _stateBase: number = -1;
-  _pinNodes: Map<string, number> = new Map();
-
   constructor(
     tPin: DigitalInputPinModel | null,
     clockPin: DigitalInputPinModel,
@@ -79,6 +65,7 @@ export class BehavioralTFlipflopElement implements ReactiveAnalogElementCore {
     _vIL: number,
     pinModelsByLabel: ReadonlyMap<string, DigitalInputPinModel | DigitalOutputPinModel>,
   ) {
+    super();
     this._tPin = tPin;
     this._clockPin = clockPin;
     this._qPin = qPin;
@@ -86,19 +73,15 @@ export class BehavioralTFlipflopElement implements ReactiveAnalogElementCore {
     this._vIH = vIH;
     this._pinModelsByLabel = pinModelsByLabel;
     this._childElements = buildChildElements([tPin, clockPin, qPin, qBarPin]);
-    this.stateSize = computeChildStateSize(this._childElements);
   }
 
-  get isReactive(): true {
-    return (this._childElements.length > 0) as true;
-  }
-
-  initState(pool: StatePoolRef): void {
-    initChildState(this._childElements, this.stateBaseOffset, pool);
-  }
-
-  checkConvergence(ctx: LoadContext): boolean {
-    return checkChildConvergence(this._childElements, ctx);
+  protected getSubElements(): readonly AnalogElement[] {
+    const pins: AnalogElement[] = [];
+    if (this._tPin !== null) pins.push(this._tPin as unknown as AnalogElement);
+    pins.push(this._clockPin as unknown as AnalogElement);
+    pins.push(this._qPin as unknown as AnalogElement);
+    pins.push(this._qBarPin as unknown as AnalogElement);
+    return [...pins, ...this._childElements];
   }
 
   setParam(key: string, value: number): void {
@@ -109,21 +92,7 @@ export class BehavioralTFlipflopElement implements ReactiveAnalogElementCore {
     this._prevClockVoltage = readMnaVoltage(this._clockPin.nodeId, rhs);
   }
 
-  setup(ctx: SetupContext): void {
-    // Forward to every input pin model. _tPin is null when withEnable=false;
-    // skip the forward in that case.
-    if (this._tPin !== null) this._tPin.setup(ctx);
-    this._clockPin.setup(ctx);
-
-    // Forward to every output pin model (role "direct")
-    this._qPin.setup(ctx);
-    this._qBarPin.setup(ctx);
-
-    // Forward to every capacitor child collected from pin models
-    for (const child of this._childElements) child.setup(ctx);
-  }
-
-  load(ctx: LoadContext): void {
+  override load(ctx: LoadContext): void {
     // Delegate input stamping to pin models
     if (this._tPin !== null) this._tPin.load(ctx);
     this._clockPin.load(ctx);
@@ -133,7 +102,8 @@ export class BehavioralTFlipflopElement implements ReactiveAnalogElementCore {
     this._qPin.load(ctx);
     this._qBarPin.load(ctx);
 
-    loadChildren(this._childElements, ctx);
+    // Forward to capacitor children
+    for (const child of this._childElements) child.load(ctx);
   }
 
   /**
@@ -218,10 +188,12 @@ export function makeTFlipflopAnalogFactory(): AnalogElementFactory {
         ["~Q", qBarPin],
       ]);
 
-      return new BehavioralTFlipflopElement(
+      const el = new BehavioralTFlipflopElement(
         tPin, clockPin, qPin, qBarPin,
         cSpec.vIH, cSpec.vIL, pinModelsByLabel,
       );
+      el._pinNodes = new Map(pinNodes);
+      return el;
     } else {
       const cSpec = pinSpecs?.["C"] ?? FALLBACK_SPEC;
       const qSpec = pinSpecs?.["Q"] ?? FALLBACK_SPEC;
@@ -237,10 +209,12 @@ export function makeTFlipflopAnalogFactory(): AnalogElementFactory {
         ["~Q", qBarPin],
       ]);
 
-      return new BehavioralTFlipflopElement(
+      const el = new BehavioralTFlipflopElement(
         null, clockPin, qPin, qBarPin,
         cSpec.vIH, cSpec.vIL, pinModelsByLabel,
       );
+      el._pinNodes = new Map(pinNodes);
+      return el;
     }
   };
 }

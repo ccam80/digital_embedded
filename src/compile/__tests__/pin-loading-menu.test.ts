@@ -52,12 +52,12 @@ function makeAnalogPin(x: number, y: number): Pin {
 
 function makeResistorElement(nodeA: number, nodeB: number): AnalogElement {
   return {
-    pinNodeIds: [nodeA, nodeB],
-    allNodeIds: [nodeA, nodeB],
+    label: "",
+    _pinNodes: new Map([["a", nodeA], ["b", nodeB]]),
+    _stateBase: -1,
     branchIndex: -1,
     ngspiceLoadOrder: 0,
-    isNonlinear: false,
-    isReactive: false,
+    setup(_ctx) {},
     load(_ctx: LoadContext): void { /* no-op for static test fixture */ },
     stampAc(_s: ComplexSparseSolver, _omega: number, _ctx: LoadContext) {},
     getPinCurrents(_v: Float64Array) { return [0, 0]; },

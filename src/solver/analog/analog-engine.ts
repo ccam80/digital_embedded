@@ -1124,8 +1124,11 @@ export class MNAEngine implements AnalogEngine {
     if (!el || !this._ctx) return 0;
     const currents = el.getPinCurrents(this._ctx.rhs);
     let power = 0;
-    for (let i = 0; i < currents.length && i < el.pinNodeIds.length; i++) {
-      power += this.getNodeVoltage(el.pinNodeIds[i]) * currents[i];
+    let i = 0;
+    for (const nodeId of el._pinNodes.values()) {
+      if (i >= currents.length) break;
+      power += this.getNodeVoltage(nodeId) * currents[i];
+      i++;
     }
     return power;
   }
@@ -1328,7 +1331,7 @@ export class MNAEngine implements AnalogEngine {
     const params = this._params;
     return {
       solver: this._solver,
-      temp: params.temperature ?? 300.15,
+      temp: params.temp ?? 300.15,
       nomTemp: params.nomTemp ?? 300.15,
       copyNodesets: params.copyNodesets ?? false,
       makeVolt(label, suffix) { return engine._makeNode(label, suffix, "voltage"); },

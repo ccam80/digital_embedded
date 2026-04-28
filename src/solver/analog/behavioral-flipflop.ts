@@ -12,8 +12,9 @@
  *              accepted timestep.
  */
 
-import type { LoadContext, StatePoolRef, ReactiveAnalogElementCore } from "./element.js";
+import type { AnalogElement } from "../../core/analog-types.js";
 import { NGSPICE_LOAD_ORDER } from "./element.js";
+import type { LoadContext } from "./load-context.js";
 import type { ResolvedPinElectrical } from "../../core/pin-electrical.js";
 import {
   DigitalInputPinModel,
@@ -21,18 +22,14 @@ import {
   readMnaVoltage,
   delegatePinSetParam,
 } from "./digital-pin-model.js";
-import type { SetupContext } from "./setup-context.js";
 import type { AnalogCapacitorElement } from "../../components/passives/capacitor.js";
 import {
   FLIPFLOP_COMPOSITE_SCHEMA,
   buildChildElements,
-  computeChildStateSize,
-  initChildState,
-  loadChildren,
-  checkChildConvergence,
 } from "./behavioral-flipflop/shared.js";
 import type { StateSchema } from "./state-schema.js";
 import type { AnalogElementFactory } from "./behavioral-gate.js";
+import { CompositeElement } from "./composite-element.js";
 
 // ---------------------------------------------------------------------------
 // BehavioralDFlipflopElement
@@ -54,7 +51,7 @@ import type { AnalogElementFactory } from "./behavioral-gate.js";
  * when voltage < vIL (active-low, matching standard CMOS CDRST). The set pin
  * uses the opposite active-high convention.
  */
-export class BehavioralDFlipflopElement implements ReactiveAnalogElementCore {
+export class BehavioralDFlipflopElement extends CompositeElement {
   private readonly _clockPin: DigitalInputPinModel;
   private readonly _dPin: DigitalInputPinModel;
   private readonly _qPin: DigitalOutputPinModel;
@@ -81,8 +78,8 @@ export class BehavioralDFlipflopElement implements ReactiveAnalogElementCore {
    * Threshold for rising-edge detection — taken from the clock pin's vIH.
    * Stored at construction so edge detection does not re-read spec on hot path.
    */
-  private readonly _vIH: number;
-  private readonly _vIL: number;
+  private _vIH: number;
+  private _vIL: number;
 
   /**
    * resetActiveLevel: 'low' means reset asserts when reset pin voltage < vIL.
@@ -92,19 +89,8 @@ export class BehavioralDFlipflopElement implements ReactiveAnalogElementCore {
 
   private readonly _pinModelsByLabel: ReadonlyMap<string, DigitalInputPinModel | DigitalOutputPinModel>;
 
-  pinNodeIds!: readonly number[];  // set by compiler via Object.assign after factory returns
-  allNodeIds!: readonly number[];  // set by compiler via Object.assign after factory returns
-  readonly branchIndex: number = -1;
   readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.VCVS;
-  readonly isNonlinear: true = true;
-  label?: string;
-
-  readonly poolBacked = true as const;
   readonly stateSchema: StateSchema = FLIPFLOP_COMPOSITE_SCHEMA;
-  stateSize: number;
-  stateBaseOffset = -1;
-  _stateBase: number = -1;
-  _pinNodes: Map<string, number> = new Map();
 
   constructor(
     clockPin: DigitalInputPinModel,
@@ -116,6 +102,7 @@ export class BehavioralDFlipflopElement implements ReactiveAnalogElementCore {
     resetActiveLevel: 'high' | 'low' = 'low',
     pinModelsByLabel: ReadonlyMap<string, DigitalInputPinModel | DigitalOutputPinModel> = new Map(),
   ) {
+    super();
     this._clockPin = clockPin;
     this._dPin = dPin;
     this._qPin = qPin;
@@ -125,71 +112,41 @@ export class BehavioralDFlipflopElement implements ReactiveAnalogElementCore {
     this._resetActiveLevel = resetActiveLevel;
     this._pinModelsByLabel = pinModelsByLabel;
 
-    this._vIH = 2.0; // overwritten by factory via _setThresholds
+    this._vIH = 2.0;
     this._vIL = 0.8;
 
     this._childElements = buildChildElements([clockPin, dPin, qPin, qBarPin, setPin, resetPin]);
-    this.stateSize = computeChildStateSize(this._childElements);
+  }
+
+  protected getSubElements(): readonly AnalogElement[] {
+    const pins: AnalogElement[] = [
+      this._clockPin as unknown as AnalogElement,
+      this._dPin as unknown as AnalogElement,
+      this._qPin as unknown as AnalogElement,
+      this._qBarPin as unknown as AnalogElement,
+    ];
+    if (this._setPin !== null) pins.push(this._setPin as unknown as AnalogElement);
+    if (this._resetPin !== null) pins.push(this._resetPin as unknown as AnalogElement);
+    return [...pins, ...this._childElements as unknown as AnalogElement[]];
   }
 
   /**
    * Override threshold values — called by the factory after construction.
    * Necessary because DigitalInputPinModel keeps spec fields private.
    */
-  _setThresholds(vIH: number, _vIL: number): void {
-    (this as unknown as { _vIH: number })._vIH = vIH;
-  }
-
-  get isReactive(): true {
-    return (this._childElements.length > 0) as true;
-  }
-
-  initState(pool: StatePoolRef): void {
-    initChildState(this._childElements, this.stateBaseOffset, pool);
+  _setThresholds(vIH: number, vIL: number): void {
+    this._vIH = vIH;
+    this._vIL = vIL;
   }
 
   initVoltages(rhs: Float64Array): void {
     this._prevClockVoltage = readMnaVoltage(this._clockPin.nodeId, rhs);
   }
 
-  setup(ctx: SetupContext): void {
-    // Forward to every input pin model (DigitalInputPinModel.setup per Shape rule 1)
-    this._clockPin.setup(ctx);
-    this._dPin.setup(ctx);
-
-    // (Optional defensive forward — _setPin and _resetPin are null in the
-    //  sync factory but the field exists on the class.)
-    if (this._setPin !== null) this._setPin.setup(ctx);
-    if (this._resetPin !== null) this._resetPin.setup(ctx);
-
-    // Forward to every output pin model (DigitalOutputPinModel.setup per Shape rule 2, role "direct")
-    this._qPin.setup(ctx);
-    this._qBarPin.setup(ctx);
-
-    // Forward to every capacitor child collected from pin models
-    for (const child of this._childElements) child.setup(ctx);
-  }
-
   load(ctx: LoadContext): void {
-    // Delegate stamping to pin models
-    this._clockPin.load(ctx);
-    this._dPin.load(ctx);
-    if (this._setPin !== null) this._setPin.load(ctx);
-    if (this._resetPin !== null) this._resetPin.load(ctx);
-
-    // Stamp output Norton equivalents from the currently latched Q state.
-    // Logic evaluation happens only in accept() to prevent mid-NR latching.
     this._qPin.setLogicLevel(this._latchedQ);
     this._qBarPin.setLogicLevel(!this._latchedQ);
-    this._qPin.load(ctx);
-    this._qBarPin.load(ctx);
-
-    // Stamp capacitor children.
-    loadChildren(this._childElements, ctx);
-  }
-
-  checkConvergence(ctx: LoadContext): boolean {
-    return checkChildConvergence(this._childElements, ctx);
+    super.load(ctx);
   }
 
   /**
@@ -250,7 +207,7 @@ export class BehavioralDFlipflopElement implements ReactiveAnalogElementCore {
   }
 
   /**
-   * Per-pin currents in pinNodeIds (pinLayout) order:
+   * Per-pin currents in _pinNodes insertion order:
    *   [D, C, Q, ~Q] (and optionally set, reset if present)
    *
    * Input pins (D, C, set, reset): I = V_node / rIn.
@@ -366,6 +323,7 @@ export function makeDFlipflopAnalogFactory(): AnalogElementFactory {
       'low',
       pinModelsByLabel,
     );
+    element._pinNodes = new Map(pinNodes);
     element._setThresholds(cSpec.vIH, cSpec.vIL);
     return element;
   };

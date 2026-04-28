@@ -17,15 +17,101 @@
 import { describe, it, expect } from "vitest";
 import { MNAEngine } from "../../analog-engine.js";
 import type { ConcreteCompiledAnalogCircuit } from "../../compiled-analog-circuit.js";
-import { isPoolBacked } from "../../element.js";
-import type { AnalogElementCore } from "../../element.js";
-import { StatePool } from "../../state-pool.js";
-import { makeResistor, makeVoltageSource, makeCapacitor } from "../test-helpers.js";
+import type { AnalogElement } from "../../element.js";
+import { makeDcVoltageSource, DC_VOLTAGE_SOURCE_DEFAULTS } from "../../../../components/sources/dc-voltage-source.js";
+import { PropertyBag } from "../../../../core/properties.js";
+import { makeTestSetupContext, setupAll, allocateStatePool } from "../test-helpers.js";
+import { SparseSolver } from "../../sparse-solver.js";
+import { NGSPICE_LOAD_ORDER } from "../../element.js";
+import type { SetupContext } from "../../setup-context.js";
+import type { LoadContext } from "../../load-context.js";
 import {
   buildElementLabelMap,
   createStepCaptureHook,
 } from "./capture.js";
 import type { IntegrationCoefficients, NRPhase, NRAttemptOutcome } from "./types.js";
+
+// ---------------------------------------------------------------------------
+// Minimal inline factories (production pattern per §A.13)
+// ---------------------------------------------------------------------------
+
+function makeResistor(
+  pinNodes: ReadonlyMap<string, number>,
+  resistance: number,
+): AnalogElement {
+  let _hAA = -1, _hBB = -1, _hAB = -1, _hBA = -1;
+  const el: AnalogElement = {
+    label: "",
+    ngspiceLoadOrder: NGSPICE_LOAD_ORDER.RES,
+    _pinNodes: new Map(pinNodes),
+    _stateBase: -1,
+    branchIndex: -1,
+    setup(ctx: SetupContext): void {
+      const a = el._pinNodes.get("A")!;
+      const b = el._pinNodes.get("B")!;
+      _hAA = ctx.solver.allocElement(a, a);
+      _hBB = ctx.solver.allocElement(b, b);
+      _hAB = ctx.solver.allocElement(a, b);
+      _hBA = ctx.solver.allocElement(b, a);
+    },
+    load(ctx: LoadContext): void {
+      const G = 1.0 / Math.max(resistance, 1e-12);
+      ctx.solver.stampElement(_hAA, G);
+      ctx.solver.stampElement(_hBB, G);
+      ctx.solver.stampElement(_hAB, -G);
+      ctx.solver.stampElement(_hBA, -G);
+    },
+    getPinCurrents(rhs: Float64Array): number[] {
+      const a = el._pinNodes.get("A")!;
+      const b = el._pinNodes.get("B")!;
+      const Vab = rhs[a] - rhs[b];
+      const I = Vab / Math.max(resistance, 1e-12);
+      return [I, -I];
+    },
+    setParam(key: string, value: number): void {
+      if (key === "resistance") resistance = value;
+    },
+  };
+  return el;
+}
+
+function makeCapacitor(
+  pinNodes: ReadonlyMap<string, number>,
+  capacitance: number,
+): AnalogElement {
+  let _hPP = -1, _hNN = -1, _hPN = -1, _hNP = -1;
+  const el: AnalogElement = {
+    label: "",
+    ngspiceLoadOrder: NGSPICE_LOAD_ORDER.CAP,
+    _pinNodes: new Map(pinNodes),
+    _stateBase: -1,
+    branchIndex: -1,
+    setup(ctx: SetupContext): void {
+      const p = el._pinNodes.get("pos")!;
+      const n = el._pinNodes.get("neg")!;
+      _hPP = ctx.solver.allocElement(p, p);
+      _hNN = ctx.solver.allocElement(n, n);
+      _hPN = ctx.solver.allocElement(p, n);
+      _hNP = ctx.solver.allocElement(n, p);
+    },
+    load(ctx: LoadContext): void {
+      if (ctx.dt > 0) {
+        const Geq = capacitance * ctx.ag[0];
+        ctx.solver.stampElement(_hPP, Geq);
+        ctx.solver.stampElement(_hNN, Geq);
+        ctx.solver.stampElement(_hPN, -Geq);
+        ctx.solver.stampElement(_hNP, -Geq);
+      }
+    },
+    getPinCurrents(_rhs: Float64Array): number[] {
+      return [0, 0];
+    },
+    setParam(key: string, value: number): void {
+      if (key === "capacitance") capacitance = value;
+    },
+  };
+  return el;
+}
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -36,24 +122,32 @@ const TRAN_INTEG_COEFF: IntegrationCoefficients = {
   ngspice: { ag0: 2e9, ag1: 2e9, method: "trapezoidal", order: 2 },
 };
 
-function buildStatePool(elements: AnalogElementCore[]): StatePool {
-  let offset = 0;
-  for (const el of elements) {
-    if (isPoolBacked(el)) { el.stateBaseOffset = offset; offset += el.stateSize; }
-  }
-  const pool = new StatePool(offset);
-  for (const el of elements) {
-    if (isPoolBacked(el)) el.initState(pool);
-  }
-  return pool;
+function makeVsrc(posNode: number, negNode: number, voltage: number) {
+  const props = new PropertyBag();
+  props.replaceModelParams({ ...DC_VOLTAGE_SOURCE_DEFAULTS, voltage });
+  return makeDcVoltageSource(new Map([["pos", posNode], ["neg", negNode]]), props, () => 0);
 }
 
-function makeRCCircuit(): { circuit: ConcreteCompiledAnalogCircuit; pool: StatePool } {
-  const vs = makeVoltageSource(1, 0, 2, 5.0);
-  const r = makeResistor(1, 2, 1000);
-  const cap = makeCapacitor(2, 0, 1e-6);
+function makeRCCircuit(): { circuit: ConcreteCompiledAnalogCircuit; pool: ReturnType<typeof allocateStatePool> } {
+  const solver = new SparseSolver();
+  const vs = makeVsrc(1, 0, 5.0);
+  const r = makeResistor(new Map([["A", 1], ["B", 2]]), 1000);
+  const cap = makeCapacitor(new Map([["pos", 2], ["neg", 0]]), 1e-6);
   const elements = [vs, r, cap];
-  const pool = buildStatePool(elements);
+
+  vs.label = "Vs";
+  r.label = "R1";
+  cap.label = "C1";
+
+  const ctx = makeTestSetupContext({
+    solver,
+    startBranch: 3,
+    startNode: 10,
+    elements,
+  });
+  setupAll(elements, ctx);
+
+  const pool = allocateStatePool(elements);
   return {
     circuit: {
       netCount: 2, componentCount: 3, nodeCount: 2,

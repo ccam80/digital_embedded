@@ -14,9 +14,9 @@
  * threshold.
  */
 
-import type { AnalogElementCore, LoadContext, StatePoolRef } from "./element.js";
+import type { AnalogElement } from "../../core/analog-types.js";
 import { NGSPICE_LOAD_ORDER } from "./element.js";
-import type { SetupContext } from "./setup-context.js";
+import type { LoadContext } from "./load-context.js";
 import type { PropertyBag } from "../../core/properties.js";
 import type { ResolvedPinElectrical } from "../../core/pin-electrical.js";
 import {
@@ -29,6 +29,7 @@ import {
 import type { AnalogCapacitorElement } from "../../components/passives/capacitor.js";
 import { defineStateSchema } from "./state-schema.js";
 import type { StateSchema } from "./state-schema.js";
+import { CompositeElement } from "./composite-element.js";
 
 // Empty composite schema — children carry their own schemas.
 const GATE_COMPOSITE_SCHEMA: StateSchema = defineStateSchema("BehavioralGateComposite", []);
@@ -54,7 +55,7 @@ export type AnalogElementFactory = (
   pinNodes: ReadonlyMap<string, number>,
   props: PropertyBag,
   getTime: () => number,
-) => AnalogElementCore;
+) => AnalogElement;
 
 // ---------------------------------------------------------------------------
 // BehavioralGateElement
@@ -67,7 +68,7 @@ export type AnalogElementFactory = (
  *   load()   — delegates input/output pin stamping to pin models, evaluates
  *              the truth table from current NR-iterate voltages.
  */
-export class BehavioralGateElement implements AnalogElementCore {
+export class BehavioralGateElement extends CompositeElement {
   private readonly _inputs: DigitalInputPinModel[];
   private readonly _output: DigitalOutputPinModel;
   private readonly _truthTable: GateTruthTable;
@@ -77,16 +78,8 @@ export class BehavioralGateElement implements AnalogElementCore {
   /** Latched logic levels per input — persist across timesteps. */
   private readonly _latchedLevels: boolean[];
 
-  pinNodeIds!: readonly number[];  // set by compiler via Object.assign after factory returns
-  readonly branchIndex: number = -1;
   readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.VCVS;
-  readonly isNonlinear: true = true;
-  label?: string;
-
-  readonly poolBacked = true as const;
   readonly stateSchema: StateSchema = GATE_COMPOSITE_SCHEMA;
-  stateSize: number;
-  stateBaseOffset = -1;
 
   constructor(
     inputs: DigitalInputPinModel[],
@@ -94,32 +87,17 @@ export class BehavioralGateElement implements AnalogElementCore {
     truthTable: GateTruthTable,
     pinModelsByLabel: ReadonlyMap<string, DigitalInputPinModel | DigitalOutputPinModel>,
   ) {
+    super();
     this._inputs = inputs;
     this._output = output;
     this._truthTable = truthTable;
     this._latchedLevels = new Array<boolean>(inputs.length).fill(false);
     this._pinModelsByLabel = pinModelsByLabel;
     this._childElements = collectPinModelChildren([...inputs, output]);
-    this.stateSize = this._childElements.reduce((s, c) => s + c.stateSize, 0);
   }
 
-  get isReactive(): boolean {
-    return this._childElements.length > 0;
-  }
-
-  initState(pool: StatePoolRef): void {
-    let offset = this.stateBaseOffset;
-    for (const child of this._childElements) {
-      child.stateBaseOffset = offset;
-      child.initState(pool);
-      offset += child.stateSize;
-    }
-  }
-
-  setup(ctx: SetupContext): void {
-    for (const pin of this._inputs) pin.setup(ctx);
-    this._output.setup(ctx);
-    for (const child of this._childElements) child.setup(ctx);
+  protected getSubElements(): readonly AnalogElement[] {
+    return [...this._inputs, this._output, ...this._childElements] as unknown as readonly AnalogElement[];
   }
 
   load(ctx: LoadContext): void {
@@ -149,13 +127,6 @@ export class BehavioralGateElement implements AnalogElementCore {
     for (const child of this._childElements) {
       child.load(ctx);
     }
-  }
-
-  checkConvergence(ctx: LoadContext): boolean {
-    return this._childElements.every(c => {
-      const fn = (c as { checkConvergence?: (ctx: LoadContext) => boolean }).checkConvergence;
-      return !fn || fn.call(c, ctx);
-    });
   }
 
   /**
@@ -288,7 +259,9 @@ function buildGateElement(
   outputPin.init(pinNodes.get("out") ?? 0, -1);
   pinModelsByLabel.set("out", outputPin);
 
-  return new BehavioralGateElement(inputPins, outputPin, truthTable, pinModelsByLabel);
+  const el = new BehavioralGateElement(inputPins, outputPin, truthTable, pinModelsByLabel);
+  el._pinNodes = new Map(pinNodes);
+  return el;
 }
 
 // ---------------------------------------------------------------------------

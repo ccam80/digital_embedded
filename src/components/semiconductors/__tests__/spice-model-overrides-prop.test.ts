@@ -50,6 +50,7 @@ describe("modelRegistry on semiconductor components", () => {
 
     it(`${def.name}: has modelRegistry with default model entry`, () => {
       expect(def.modelRegistry).toBeDefined();
+      expect(def.modelRegistry).toHaveProperty(modelKey);
       expect(def.modelRegistry![modelKey]).toBeDefined();
     });
 
@@ -61,14 +62,18 @@ describe("modelRegistry on semiconductor components", () => {
       expect(typeof getFactory(def.modelRegistry![modelKey]!)).toBe("function");
     });
 
-    it(`${def.name}: default model entry has params record`, () => {
-      expect(def.modelRegistry![modelKey]!.params).toBeDefined();
-      expect(typeof def.modelRegistry![modelKey]!.params).toBe("object");
+    it(`${def.name}: default model entry has params record with TEMP key`, () => {
+      const params = def.modelRegistry![modelKey]!.params as Record<string, number>;
+      expect(params).toBeDefined();
+      expect(typeof params).toBe("object");
+      // Every semiconductor model carries TEMP (per-instance operating temperature).
+      expect(params).toHaveProperty("TEMP");
+      expect(typeof params["TEMP"]).toBe("number");
+      expect(params["TEMP"]).toBeGreaterThan(0);
     });
 
-    it(`${def.name}: legacy model override property does not appear in propertyDefs`, () => {
-      const legacyKey = ["_spice", "Model", "Overrides"].join("");
-      const found = def.propertyDefs.find((pd) => pd.key === legacyKey);
+    it(`${def.name}: _spiceModelOverrides does not appear in propertyDefs`, () => {
+      const found = def.propertyDefs.find((pd) => pd.key === "_spiceModelOverrides");
       expect(found).toBeUndefined();
     });
   }

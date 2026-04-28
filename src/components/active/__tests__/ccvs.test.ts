@@ -26,15 +26,15 @@
 
 import { describe, it, expect } from "vitest";
 import { MNAEngine } from "../../../solver/analog/analog-engine.js";
-import { makeResistor, makeVoltageSource } from "../../../solver/analog/__tests__/test-helpers.js";
 import { CCVSDefinition } from "../ccvs.js";
 import { CCVSAnalogElement } from "../ccvs.js";
-import type { SetupContext } from "../../../solver/analog/setup-context.js";
 import { PropertyBag } from "../../../core/properties.js";
 import type { AnalogElement } from "../../../solver/analog/element.js";
 import { NGSPICE_LOAD_ORDER } from "../../../solver/analog/element.js";
 import type { SetupContext } from "../../../solver/analog/setup-context.js";
 import type { LoadContext } from "../../../solver/analog/load-context.js";
+import { makeDcVoltageSource, DC_VOLTAGE_SOURCE_DEFAULTS } from "../../sources/dc-voltage-source.js";
+import { ResistorDefinition, RESISTOR_DEFAULTS } from "../../passives/resistor.js";
 import type { ConcreteCompiledAnalogCircuit } from "../../../solver/analog/compiled-analog-circuit.js";
 import { StatePool } from "../../../solver/analog/state-pool.js";
 
@@ -48,16 +48,26 @@ function getFactory(entry: ModelEntry): AnalogFactory {
 }
 
 // ---------------------------------------------------------------------------
-// withSetup — add a no-op setup() to elements that lack one.
-//
-// makeVoltageSource from test-helpers does not have setup() because it stamps
-// directly from load() using allocElement. The engine's _setup() calls
-// el.setup(ctx) on every element, so we need a no-op to satisfy the contract.
+// makeResistor — create a resistor element between two nodes.
 // ---------------------------------------------------------------------------
-function withSetup<T extends AnalogElement>(el: T): T {
-  return Object.assign(el, {
-    setup(_ctx: SetupContext): void {},
-  });
+function makeResistor(nodeA: number, nodeB: number, resistance: number): AnalogElement {
+  const props = new PropertyBag([]);
+  props.replaceModelParams({ ...RESISTOR_DEFAULTS, resistance });
+  const el = getFactory(ResistorDefinition.modelRegistry!["behavioral"]!)(
+    new Map([["A", nodeA], ["B", nodeB]]),
+    props,
+    () => 0,
+  );
+  return el;
+}
+
+// ---------------------------------------------------------------------------
+// makeVsrc — DC voltage source helper
+// ---------------------------------------------------------------------------
+function makeVsrc(posNode: number, negNode: number, voltage: number): AnalogElement {
+  const props = new PropertyBag();
+  props.replaceModelParams({ ...DC_VOLTAGE_SOURCE_DEFAULTS, voltage });
+  return makeDcVoltageSource(new Map([["pos", posNode], ["neg", negNode]]), props, () => 0);
 }
 
 // ---------------------------------------------------------------------------
@@ -80,13 +90,11 @@ function makeSenseVsrc(
   let hIbrP = -1; // C[k, nodePlus]
   let hIbrN = -1; // C[k, nodeMinus]
   return {
-    pinNodeIds: [nodePlus, nodeMinus],
-    allNodeIds: [nodePlus, nodeMinus],
     get branchIndex(): number { return branchIndex; },
     set branchIndex(v: number) { branchIndex = v; },
     ngspiceLoadOrder: NGSPICE_LOAD_ORDER.VSRC,
-    isNonlinear: false,
-    isReactive: false,
+    _pinNodes: new Map([[String(nodePlus), nodePlus], [String(nodeMinus), nodeMinus]]),
+    _stateBase: -1,
     label,
     setParam(_key: string, _value: number): void {},
 
@@ -185,10 +193,6 @@ function makeCCVSElement(
   const el = core as CCVSAnalogElement;
   el.label = "ccvs1";
   el.setParam("senseSourceLabel", senseSourceLabel);
-  Object.assign(el, {
-    pinNodeIds: [nSenseP, nSenseN, nOutP, nOutN],
-    allNodeIds: [nSenseP, nSenseN, nOutP, nOutN],
-  });
   return el;
 }
 
@@ -211,9 +215,8 @@ function makeCCVSElement(
 function makeTransresistanceCircuit(opts: { transresistance?: number; expression?: string }) {
   const nodeCount = 3;
   const branchCount = 3;
-  const vsBranch = nodeCount + 1; // 4 (1-based)
 
-  const vs        = withSetup(makeVoltageSource(1, 0, vsBranch, 5.0));
+  const vs        = makeVsrc(1, 0, 5.0);
   vs.label = "vs1";
   const rSense    = makeResistor(1, 2, 5000);
   const senseVsrc = makeSenseVsrc(2, 0, "senseVsrc");
@@ -241,9 +244,8 @@ describe("CCVS", () => {
     // Vs=0V → I_sense=0 → V_out=0
     const nodeCount = 3;
     const branchCount = 3;
-    const vsBranch = nodeCount + 1;
 
-    const vs        = withSetup(makeVoltageSource(1, 0, vsBranch, 0.0));
+    const vs        = makeVsrc(1, 0, 0.0);
     vs.label = "vs1";
     const rSense    = makeResistor(1, 2, 5000);
     const senseVsrc = makeSenseVsrc(2, 0, "senseVsrc");
@@ -283,10 +285,6 @@ describe("CCVS", () => {
     );
     const el = core as CCVSAnalogElement;
     el.label = "ccvs_bad";
-    Object.assign(el, {
-      pinNodeIds: [1, 0, 2, 0],
-      allNodeIds: [1, 0, 2, 0],
-    });
     // Do NOT call setParam("senseSourceLabel", ...) — should throw in setup()
 
     const senseVsrc = makeSenseVsrc(1, 0, "senseVsrc");

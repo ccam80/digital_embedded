@@ -142,8 +142,6 @@ export interface TopologySnapshot {
     index: number;
     label: string;
     type: string;
-    isNonlinear: boolean;
-    isReactive: boolean;
     pinNodeIds: readonly number[];
   }>;
   nodeLabels: Map<number, string>;
@@ -212,8 +210,6 @@ export interface IterationSnapshot {
    *   - "MODETRAN|MODEINITFLOAT"
    *   - "MODETRAN"
    *   - "MODE_NONE"
-   * Phase 2.5 W2.3 replaced the former string union (initJct / initFix / …)
-   * with this bitfield-derived label.
    */
   initMode: string;
   /**

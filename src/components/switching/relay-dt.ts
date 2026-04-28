@@ -35,7 +35,7 @@ import {
 import type { LoadContext } from "../../solver/analog/element.js";
 import { NGSPICE_LOAD_ORDER } from "../../solver/analog/element.js";
 import type { SetupContext } from "../../solver/analog/setup-context.js";
-import type { AnalogElementCore } from "../../core/analog-types.js";
+import type { AnalogElement } from "../../core/analog-types.js";
 import { SwitchAnalogElement } from "./switch.js";
 import { RelayInductorSubElement, RelayResSubElement } from "./relay.js";
 
@@ -50,8 +50,6 @@ const RELAY_DT_L_DEFAULT = 0.1;
 const RELAY_DT_I_PULL_DEFAULT = 20e-3;
 
 // ---------------------------------------------------------------------------
-// RelayDTAnalogElement — W3 migrated composite class
-//
 // Architecture: coilL (IND) + coilR (RES) + swNO (SW, normally-open) + swNC (SW, normally-closed)
 // ngspice anchors:
 //   coilL: indsetup.c:84-100, indload.c
@@ -60,11 +58,10 @@ const RELAY_DT_I_PULL_DEFAULT = 20e-3;
 //   swNC:  swsetup.c:47-62, swload.c
 // ---------------------------------------------------------------------------
 
-class RelayDTAnalogElement implements AnalogElementCore {
+class RelayDTAnalogElement implements AnalogElement {
+  label: string = "";
   branchIndex: number = -1;
   readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.IND;
-  readonly isNonlinear = true;
-  readonly isReactive = true;
   _stateBase: number = -1;
   _pinNodes: Map<string, number>;
 
@@ -76,6 +73,7 @@ class RelayDTAnalogElement implements AnalogElementCore {
   private _nCoilMid: number = -1;
   private readonly _label: string;
   private readonly _iPull: number;
+  private readonly _internalLabels: string[] = [];
 
   constructor(label: string, pinNodes: ReadonlyMap<string, number>, props: PropertyBag) {
     this._label = label;
@@ -118,6 +116,7 @@ class RelayDTAnalogElement implements AnalogElementCore {
   setup(ctx: SetupContext): void {
     // Allocate mid-node between coilL and coilR
     this._nCoilMid = ctx.makeVolt(this._label, "coilMid");
+    this._internalLabels.push("coilMid");
 
     // Wire coilL: in1 → coilMid
     this._coilL._pinNodes.set("B", this._nCoilMid);
@@ -136,6 +135,10 @@ class RelayDTAnalogElement implements AnalogElementCore {
 
     // Expose branch index (coilL's branch)
     this.branchIndex = this._coilL.branchIndex;
+  }
+
+  getInternalNodeLabels(): readonly string[] {
+    return this._internalLabels;
   }
 
   findBranchFor(name: string, ctx: SetupContext): number {
@@ -190,7 +193,7 @@ function createRelayDTAnalogElement(
   pinNodes: ReadonlyMap<string, number>,
   props: PropertyBag,
   _getTime: () => number,
-): AnalogElementCore {
+): AnalogElement {
   const label = (props.has("label") ? (props.get("label") as string) : undefined) ?? "RelayDT";
   return new RelayDTAnalogElement(label, pinNodes, props);
 }
@@ -453,7 +456,6 @@ export const RelayDTDefinition: ComponentDefinition = {
       factory: createRelayDTAnalogElement,
       paramDefs: [],
       params: {},
-      mayCreateInternalNodes: true,
     },
   },
   defaultModel: "digital",

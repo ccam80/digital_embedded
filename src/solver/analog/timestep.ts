@@ -395,8 +395,6 @@ export class TimestepController {
 
     for (let i = 0; i < elements.length; i++) {
       const el = elements[i];
-      if (!el.isReactive) continue;
-
       if (typeof el.getLteTimestep === "function") {
         const proposed = el.getLteTimestep(dt, deltaOld, order, method, lteParams);
         if (proposed < minProposedDt) {
@@ -404,7 +402,6 @@ export class TimestepController {
           minProposedIdx = i;
         }
       }
-      // Elements without getLteTimestep contribute no LTE constraint.
     }
 
     this._largestErrorElement = minProposedIdx >= 0 ? minProposedIdx : undefined;
@@ -676,7 +673,6 @@ export class TimestepController {
     let rawTrialDt = Infinity;
     for (let i = 0; i < elements.length; i++) {
       const el = elements[i];
-      if (!el.isReactive) continue;
       if (typeof el.getLteTimestep === "function") {
         const proposed = el.getLteTimestep(
           executedDt, this._deltaOld, 2, "trapezoidal", this._lteParams,

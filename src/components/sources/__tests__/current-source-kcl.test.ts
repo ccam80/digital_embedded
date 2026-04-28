@@ -15,24 +15,50 @@
 
 import { describe, it, expect } from "vitest";
 import { makeCurrentSource as makeCurrentSourceElement } from "../current-source.js";
-import {
-  makeResistor,
-  withNodeIds,
-} from "../../../solver/analog/__tests__/test-helpers.js";
+import { PropertyBag } from "../../../core/properties.js";
 import { MNAEngine } from "../../../solver/analog/analog-engine.js";
 import type { ConcreteCompiledAnalogCircuit } from "../../../solver/analog/analog-engine.js";
+import type { AnalogElement } from "../../../solver/analog/element.js";
+
+// Inline resistor element (replaces removed makeResistor helper)
+function makeResistorElement(nodeA: number, nodeB: number, resistance: number): AnalogElement {
+  const G = 1 / resistance;
+  return {
+    label: "",
+    branchIndex: -1,
+    _stateBase: -1,
+    ngspiceLoadOrder: 10,
+    _pinNodes: new Map([["A", nodeA], ["B", nodeB]]),
+    setup(_ctx) {},
+    setParam(_k, _v) {},
+    getPinCurrents(_v) { return []; },
+    load(ctx) {
+      if (nodeA !== 0) ctx.solver.stampElement(ctx.solver.allocElement(nodeA, nodeA), G);
+      if (nodeB !== 0) ctx.solver.stampElement(ctx.solver.allocElement(nodeB, nodeB), G);
+      if (nodeA !== 0 && nodeB !== 0) {
+        ctx.solver.stampElement(ctx.solver.allocElement(nodeA, nodeB), -G);
+        ctx.solver.stampElement(ctx.solver.allocElement(nodeB, nodeA), -G);
+      }
+    },
+  };
+}
 
 describe("CurrentSource — getPinCurrents KCL integration", () => {
   it("pin index 0 (neg) carries +I, pin index 1 (pos) carries -I", () => {
     const I_src = 0.002; // 2 mA
     const R_val = 1000;  // 1 kΩ
 
-    // Build elements using the real component factory (same as compiler output).
+    // Build elements using the production factory (3-arg form per A.3).
     // nodePos=1 (pos terminal), nodeNeg=0 (ground / neg terminal).
-    const srcCore = makeCurrentSourceElement(1, 0, I_src);
-    const src = withNodeIds(srcCore, [0, 1]); // pinNodeIds: [neg=node0, pos=node1]
+    const srcProps = new PropertyBag();
+    srcProps.replaceModelParams({ current: I_src });
+    const src = makeCurrentSourceElement(
+      new Map([["pos", 1], ["neg", 0]]),
+      srcProps,
+      () => 0,
+    );
 
-    const res = makeResistor(1, 0, R_val); // node1 → ground
+    const res = makeResistorElement(1, 0, R_val); // node1 → ground
 
     const compiled = {
       netCount: 1,
@@ -64,9 +90,14 @@ describe("CurrentSource — getPinCurrents KCL integration", () => {
   });
 
   it("setParam current update propagates to getPinCurrents", () => {
-    const srcCore = makeCurrentSourceElement(1, 0, 0.001);
-    const src = withNodeIds(srcCore, [0, 1]);
-    const res = makeResistor(1, 0, 1000);
+    const srcProps = new PropertyBag();
+    srcProps.replaceModelParams({ current: 0.001 });
+    const src = makeCurrentSourceElement(
+      new Map([["pos", 1], ["neg", 0]]),
+      srcProps,
+      () => 0,
+    );
+    const res = makeResistorElement(1, 0, 1000);
 
     const compiled = {
       netCount: 1, componentCount: 2,

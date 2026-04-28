@@ -27,7 +27,7 @@ import {
   type AttributeMapping,
   type ComponentDefinition,
 } from "../../core/registry.js";
-import type { AnalogElementCore, LoadContext } from "../../solver/analog/element.js";
+import type { AnalogElement, LoadContext } from "../../solver/analog/element.js";
 import { NGSPICE_LOAD_ORDER } from "../../solver/analog/element.js";
 import type { SetupContext } from "../../solver/analog/setup-context.js";
 import { stampRHS } from "../../solver/analog/stamp-helpers.js";
@@ -158,9 +158,14 @@ export class OpAmpElement extends AbstractCircuitElement {
 function createOpAmpElement(
   pinNodes: ReadonlyMap<string, number>,
   props: PropertyBag,
-): AnalogElementCore {
-  const gain = props.getModelParam<number>("gain") ?? 1e6;
-  const rOut = props.getModelParam<number>("rOut") ?? 75;
+  _getTime: () => number,
+): AnalogElement {
+  const p: Record<string, number> = {
+    gain: props.getModelParam<number>("gain") ?? 1e6,
+    rOut: props.getModelParam<number>("rOut") ?? 75,
+  };
+
+  const rOut = p.rOut;
 
   const nInp = pinNodes.get("in+")!;
   const nInn = pinNodes.get("in-")!;
@@ -169,9 +174,6 @@ function createOpAmpElement(
   // Internal node (only used when rOut > 0)
   let nVint = 0;
 
-  // Cached branch row for VCVS
-  let branchRow = -1;
-
   // RES handles (ressetup.c:46-49) — 4 entries: PP, NN, PN, NP
   // Only allocated when rOut > 0
   let hResAA = -1;
@@ -179,20 +181,28 @@ function createOpAmpElement(
   let hResAB = -1;
   let hResBA = -1;
 
-  // VCVS handles (vcvsset.c:53-58) — 6 entries
-  // posNode = vint (when rOut>0) or nOut (when rOut=0), negNode = 0(gnd)
+  // VCVS handles (vcvsset.c:53-58) — 4 entries kept (entries 2 and 4 omitted).
+  //
+  // Ground-row/column suppression: ngspice's spbuild.c skips row/col 0 (the
+  // grounded node) at the sparse-matrix layer (Translate, lines 436-504).
+  // digiTS mirrors this in SparseSolver: stamps against node 0 are no-ops.
+  // The vcvsset.c TSTALLOC entries `(negNode=0, branch)` and `(branch,
+  // negNode=0)` therefore degenerate to no-ops because this opamp wires the
+  // VCVS negative terminal to the global ground reference. Skipping their
+  // allocation here matches ngspice's effective stamp output bit-for-bit
+  // while avoiding two TSTALLOC handles that would never be consumed.
   let hVcvsPosIbr = -1;  // (posNode, branch)
-  let hVcvsNegIbr = -1;  // (negNode=0, branch) — gnd row, no-op in load
   let hVcvsIbrPos = -1;  // (branch, posNode)
-  let hVcvsIbrNeg = -1;  // (branch, negNode=0) — gnd col, no-op in load
   let hVcvsIbrCP  = -1;  // (branch, contPos=inP)
   let hVcvsIbrCN  = -1;  // (branch, contNeg=inN)
 
-  return {
+  // Internal-node labels recorded during setup() for diagnostic introspection.
+  const internalLabels: string[] = [];
+
+  const el: AnalogElement = {
+    label: "",
     branchIndex: -1,
     ngspiceLoadOrder: NGSPICE_LOAD_ORDER.VCVS,
-    isNonlinear: false,
-    isReactive: false,
     _stateBase: -1,
     _pinNodes: new Map(pinNodes),
 
@@ -200,14 +210,16 @@ function createOpAmpElement(
       const solver = ctx.solver;
 
       // Branch row for VCVS (vcvsset.c:41-44 guard: allocate once)
-      if (branchRow === -1) {
-        branchRow = ctx.makeCur(this.label ?? "opamp", "branch");
-        (this as AnalogElementCore).branchIndex = branchRow;
+      if (el.branchIndex === -1) {
+        el.branchIndex = ctx.makeCur(el.label ?? "opamp", "branch");
       }
+
+      const k = el.branchIndex;
 
       if (rOut > 0) {
         // Allocate internal voltage node between ideal source and output resistance
-        nVint = ctx.makeVolt(this.label ?? "opamp", "vint");
+        nVint = ctx.makeVolt(el.label ?? "opamp", "vint");
+        internalLabels.push("vint");
 
         // RES sub-element (ressetup.c:46-49): A=vint, B=out
         // Order: (A,A), (B,B), (A,B), (B,A)
@@ -217,28 +229,28 @@ function createOpAmpElement(
         hResBA = solver.allocElement(nOut,  nVint);
 
         // VCVS sub-element (vcvsset.c:53-58): posNode=vint, negNode=0(gnd)
-        // Entry 1: (posNode, branch) = (vint, branchRow)
-        hVcvsPosIbr = solver.allocElement(nVint, branchRow);
-        // Entry 2: (negNode, branch) = (0, branchRow) — gnd row, skip
-        hVcvsNegIbr = -1;
-        // Entry 3: (branch, posNode) = (branchRow, vint)
-        hVcvsIbrPos = solver.allocElement(branchRow, nVint);
-        // Entry 4: (branch, negNode) = (branchRow, 0) — gnd col, skip
-        hVcvsIbrNeg = -1;
-        // Entry 5: (branch, contPos) = (branchRow, inP)
-        hVcvsIbrCP = nInp > 0 ? solver.allocElement(branchRow, nInp) : -1;
-        // Entry 6: (branch, contNeg) = (branchRow, inN)
-        hVcvsIbrCN = nInn > 0 ? solver.allocElement(branchRow, nInn) : -1;
+        // Entries 2 and 4 (negNode rows/cols) skipped — solver-level gnd suppression.
+        // Entry 1: (posNode, branch) = (vint, k)
+        hVcvsPosIbr = solver.allocElement(nVint, k);
+        // Entry 3: (branch, posNode) = (k, vint)
+        hVcvsIbrPos = solver.allocElement(k, nVint);
+        // Entry 5: (branch, contPos) = (k, inP)
+        hVcvsIbrCP = nInp > 0 ? solver.allocElement(k, nInp) : -1;
+        // Entry 6: (branch, contNeg) = (k, inN)
+        hVcvsIbrCN = nInn > 0 ? solver.allocElement(k, nInn) : -1;
       } else {
         // rOut == 0: VCVS connects directly to nOut (no RES, no internal node)
         // VCVS sub-element (vcvsset.c:53-58): posNode=nOut, negNode=0(gnd)
-        hVcvsPosIbr = solver.allocElement(nOut,     branchRow);
-        hVcvsNegIbr = -1;
-        hVcvsIbrPos = solver.allocElement(branchRow, nOut);
-        hVcvsIbrNeg = -1;
-        hVcvsIbrCP  = nInp > 0 ? solver.allocElement(branchRow, nInp) : -1;
-        hVcvsIbrCN  = nInn > 0 ? solver.allocElement(branchRow, nInn) : -1;
+        // Entries 2 and 4 (negNode rows/cols) skipped — solver-level gnd suppression.
+        hVcvsPosIbr = solver.allocElement(nOut, k);
+        hVcvsIbrPos = solver.allocElement(k, nOut);
+        hVcvsIbrCP  = nInp > 0 ? solver.allocElement(k, nInp) : -1;
+        hVcvsIbrCN  = nInn > 0 ? solver.allocElement(k, nInn) : -1;
       }
+    },
+
+    getInternalNodeLabels(): readonly string[] {
+      return internalLabels;
     },
 
     load(ctx: LoadContext): void {
@@ -249,7 +261,7 @@ function createOpAmpElement(
       const vInpV = voltages[nInp];
       const vInnV = voltages[nInn];
       const vDiff = vInpV - vInnV;
-      const effectiveGain = gain * scale;
+      const effectiveGain = p.gain * scale;
 
       if (rOut > 0) {
         // RES stamp (ressetup.c:46-49): conductance G = 1/rOut
@@ -282,8 +294,8 @@ function createOpAmpElement(
       }
 
       // Source-step RHS: when gain changes due to srcFact, apply linearized correction
-      if (scale < 1 && branchRow >= 0) {
-        stampRHS(ctx.rhs, branchRow, effectiveGain * vDiff);
+      if (scale < 1 && el.branchIndex >= 0) {
+        stampRHS(ctx.rhs, el.branchIndex, effectiveGain * vDiff);
       }
     },
 
@@ -292,9 +304,11 @@ function createOpAmpElement(
     },
 
     setParam(key: string, value: number): void {
-      if (key === "gain") (this as { gain?: number }).gain = value;
+      if (key in p) p[key] = value;
     },
   };
+
+  return el;
 }
 
 
@@ -347,11 +361,10 @@ export const OpAmpDefinition: ComponentDefinition = {
   modelRegistry: {
     "behavioral": {
       kind: "inline",
-      factory: (pinNodes, props, _getTime) =>
-        createOpAmpElement(pinNodes, props),
+      factory: (pinNodes, props, getTime) =>
+        createOpAmpElement(pinNodes, props, getTime),
       paramDefs: OPAMP_PARAM_DEFS,
       params: OPAMP_DEFAULTS,
-      mayCreateInternalNodes: true,
     },
   },
   defaultModel: "behavioral",

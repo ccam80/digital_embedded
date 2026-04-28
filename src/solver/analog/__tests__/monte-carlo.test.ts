@@ -27,7 +27,28 @@ import {
 } from "../parameter-sweep.js";
 import { ConcreteCompiledAnalogCircuit } from "../compiled-analog-circuit.js";
 import { StatePool } from "../state-pool.js";
-import { makeResistor, makeVoltageSource } from "./test-helpers.js";
+import { PropertyBag } from "../../../core/properties.js";
+import { ResistorDefinition, RESISTOR_DEFAULTS } from "../../../components/passives/resistor.js";
+import { makeDcVoltageSource, DC_VOLTAGE_SOURCE_DEFAULTS } from "../../../components/sources/dc-voltage-source.js";
+import type { AnalogFactory } from "../../../core/registry.js";
+import type { AnalogElement } from "../element.js";
+
+// ---------------------------------------------------------------------------
+// Production-factory wrappers
+// ---------------------------------------------------------------------------
+
+function makeResistor(nodeA: number, nodeB: number, resistance: number): AnalogElement {
+  const props = new PropertyBag();
+  props.replaceModelParams({ ...RESISTOR_DEFAULTS, resistance });
+  const factory = (ResistorDefinition.modelRegistry!["behavioral"] as { kind: "inline"; factory: AnalogFactory }).factory;
+  return factory(new Map([["A", nodeA], ["B", nodeB]]), props, () => 0);
+}
+
+function makeVoltageSource(posNode: number, negNode: number, voltage: number): AnalogElement {
+  const props = new PropertyBag();
+  props.replaceModelParams({ ...DC_VOLTAGE_SOURCE_DEFAULTS, voltage });
+  return makeDcVoltageSource(new Map([["pos", posNode], ["neg", negNode]]), props, () => 0);
+}
 
 // ---------------------------------------------------------------------------
 // Circuit factory helpers
@@ -40,9 +61,6 @@ import { makeResistor, makeVoltageSource } from "./test-helpers.js";
  *   node1 — Vs+ (top)
  *   node2 — midpoint (R1-R2 junction)
  *   ground — Vs-, R2 bottom
- *
- * Branch layout:
- *   branch row 2 — voltage source (absolute index = nodeCount + 0 = 2)
  *
  * overrides: { "R1" => { "resistance" => multiplier }, "R2" => ... }
  * multiplier applied to nominal resistance.
@@ -59,8 +77,7 @@ function buildDividerCircuit(
   const r2 = nominalR2 * r2Mult;
 
   // Nodes: 1 = top (Vs+), 2 = midpoint
-  // Branch index 2 = absolute row for voltage source (nodeCount=2, branchIdx=2)
-  const vs = makeVoltageSource(1, 0, 2, voltage);
+  const vs = makeVoltageSource(1, 0, voltage);
   const r1El = makeResistor(1, 2, r1);
   const r2El = makeResistor(2, 0, r2);
 
@@ -92,7 +109,7 @@ function buildSweepDividerFactory(nominalR2: number = 1000): SweepCircuitFactory
     const r1Abs = overrides.get("R1")?.get("resistance") ?? nominalR2;
     const r2 = nominalR2;
 
-    const vs = makeVoltageSource(1, 0, 2, 5);
+    const vs = makeVoltageSource(1, 0, 5);
     const r1El = makeResistor(1, 2, r1Abs);
     const r2El = makeResistor(2, 0, r2);
 
@@ -136,7 +153,7 @@ function buildRcSweepFactory(_c: number = 1e-9): SweepCircuitFactory {
 
     // Resistor divider: Vs=1V, R on top, 1kΩ fixed on bottom
     // Varying R changes midpoint voltage in DC OP.
-    const vs = makeVoltageSource(1, 0, 2, 1.0);
+    const vs = makeVoltageSource(1, 0, 1.0);
     const rEl = makeResistor(1, 2, rAbs);
     const r2El = makeResistor(2, 0, 1000);
 

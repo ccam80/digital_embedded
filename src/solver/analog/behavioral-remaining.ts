@@ -6,21 +6,15 @@
  *   - DriverInvSel (inverting tri-state buffer)
  *   - Splitter / BusSplitter (pass-through per bit)
  *   - SevenSeg / SevenSegHex (7 parallel LED diode models)
- *   - Relay / RelayDT (coil inductor + variable resistance contact)
- *   - Switch / SwitchDT (variable resistance)
  *   - ButtonLED (switch + LED diode)
- *
- * LED diode parameters and the LED analog model are imported from the LED
- * component which already defines createLedAnalogElement. The relay coil
- * uses a companion-model inductor plus DC winding resistance. Contacts are
- * modeled as a variable resistance updated at each accepted timestep.
  */
 
-import type { AnalogElementCore, PoolBackedAnalogElementCore, LoadContext, StatePoolRef } from "./element.js";
+import type { AnalogElement, PoolBackedAnalogElement } from "./element.js";
 import { NGSPICE_LOAD_ORDER } from "./element.js";
 import type { PropertyBag } from "../../core/properties.js";
 import type { ResolvedPinElectrical } from "../../core/pin-electrical.js";
 import type { SetupContext } from "./setup-context.js";
+import type { LoadContext } from "./load-context.js";
 import {
   collectPinModelChildren,
   delegatePinSetParam,
@@ -30,34 +24,23 @@ import {
 } from "./digital-pin-model.js";
 import { defineStateSchema } from "./state-schema.js";
 import type { StateSchema } from "./state-schema.js";
-import type { AnalogCapacitorElement } from "../../components/passives/capacitor.js";
+import { CompositeElement } from "./composite-element.js";
 
 const REMAINING_COMPOSITE_SCHEMA: StateSchema = defineStateSchema("BehavioralRemainingComposite", []);
-
-// ---------------------------------------------------------------------------
-// Shared electrical fallback spec
-// ---------------------------------------------------------------------------
-
-const CMOS_3V3_FALLBACK: ResolvedPinElectrical = {
-  rOut: 50,
-  cOut: 5e-12,
-  rIn: 1e7,
-  cIn: 5e-12,
-  vOH: 3.3,
-  vOL: 0.0,
-  vIH: 2.0,
-  vIL: 0.8,
-  rHiZ: 1e7,
-};
 
 function getPinSpec(
   props: PropertyBag,
   label: string,
 ): ResolvedPinElectrical {
-  const pinSpecs = props.has("_pinElectrical")
-    ? (props.get("_pinElectrical") as unknown as Record<string, ResolvedPinElectrical>)
-    : undefined;
-  return pinSpecs?.[label] ?? CMOS_3V3_FALLBACK;
+  if (!props.has("_pinElectrical")) {
+    throw new Error(`getPinSpec: _pinElectrical not set in props (pin "${label}")`);
+  }
+  const pinSpecs = props.get("_pinElectrical") as unknown as Record<string, ResolvedPinElectrical>;
+  const spec = pinSpecs[label];
+  if (spec === undefined) {
+    throw new Error(`getPinSpec: no electrical spec for pin "${label}"`);
+  }
+  return spec;
 }
 
 function getPinLoadingFlag(props: PropertyBag, label: string, defaultValue: boolean): boolean {
@@ -82,20 +65,9 @@ function stampRHS(rhs: Float64Array, n: number, val: number): void {
 // When sel < vIL: output in Hi-Z mode (R_HiZ to ground)
 // ---------------------------------------------------------------------------
 
-class DriverAnalogElement implements PoolBackedAnalogElementCore {
-  readonly branchIndex = -1;
+class DriverAnalogElement extends CompositeElement {
   readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.VCVS;
-  readonly isNonlinear = true;
-  readonly poolBacked = true as const;
-  readonly stateSchema = REMAINING_COMPOSITE_SCHEMA;
-
-  _stateBase: number = -1;
-  _pinNodes: Map<string, number>;
-
-  readonly _inputPins: readonly DigitalInputPinModel[];
-  readonly _outputPins: readonly DigitalOutputPinModel[];
-  readonly _subElements: readonly AnalogElementCore[] = [];
-  readonly _childElements: readonly AnalogCapacitorElement[];
+  readonly stateSchema: StateSchema = REMAINING_COMPOSITE_SCHEMA;
 
   private readonly inputPin: DigitalInputPinModel;
   private readonly selPin: DigitalInputPinModel;
@@ -104,17 +76,7 @@ class DriverAnalogElement implements PoolBackedAnalogElementCore {
   private readonly nodeSel: number;
   private readonly nodeOut: number;
   private readonly pinModelsByLabel: Map<string, DigitalInputPinModel | DigitalOutputPinModel>;
-
-  readonly stateSize: number;
-  stateBaseOffset = -1;
-  s0 = new Float64Array(0);
-  s1 = new Float64Array(0);
-  s2 = new Float64Array(0);
-  s3 = new Float64Array(0);
-  s4 = new Float64Array(0);
-  s5 = new Float64Array(0);
-  s6 = new Float64Array(0);
-  s7 = new Float64Array(0);
+  private readonly _allSubElements: AnalogElement[];
 
   private latchedIn = false;
   private latchedSel = false;
@@ -123,6 +85,7 @@ class DriverAnalogElement implements PoolBackedAnalogElementCore {
     pinNodes: ReadonlyMap<string, number>,
     props: PropertyBag,
   ) {
+    super();
     this._pinNodes = new Map(pinNodes);
     this.nodeIn = pinNodes.get("in") ?? 0;
     this.nodeSel = pinNodes.get("sel") ?? 0;
@@ -148,35 +111,19 @@ class DriverAnalogElement implements PoolBackedAnalogElementCore {
       ["out", this.outputPin],
     ]);
 
-    this._inputPins = [this.inputPin, this.selPin];
-    this._outputPins = [this.outputPin];
-    this._childElements = collectPinModelChildren([this.inputPin, this.selPin, this.outputPin]);
-    this.stateSize = this._childElements.reduce((s, c) => s + c.stateSize, 0);
+    const childCaps = collectPinModelChildren([this.inputPin, this.selPin, this.outputPin]);
+    this._allSubElements = [
+      this.inputPin, this.selPin, this.outputPin,
+      ...childCaps,
+    ] as unknown as AnalogElement[];
   }
 
-  get isReactive(): boolean { return this._childElements.length > 0; }
-
-  setup(ctx: SetupContext): void {
-    this.inputPin.setup(ctx);
-    this.selPin.setup(ctx);
-    this.outputPin.setup(ctx);
-    for (const child of this._childElements) child.setup(ctx);
-  }
-
-  initState(pool: StatePoolRef): void {
-    let offset = this.stateBaseOffset;
-    for (const child of this._childElements) {
-      child.stateBaseOffset = offset;
-      child.initState(pool);
-      offset += child.stateSize;
-    }
+  protected getSubElements(): readonly AnalogElement[] {
+    return this._allSubElements;
   }
 
   load(ctx: LoadContext): void {
     const v = ctx.rhsOld;
-
-    this.inputPin.load(ctx);
-    this.selPin.load(ctx);
 
     const vIn = readMnaVoltage(this.nodeIn, v);
     const vSel = readMnaVoltage(this.nodeSel, v);
@@ -189,9 +136,8 @@ class DriverAnalogElement implements PoolBackedAnalogElementCore {
 
     this.outputPin.setHighZ(!this.latchedSel);
     this.outputPin.setLogicLevel(this.latchedIn);
-    this.outputPin.load(ctx);
 
-    for (const child of this._childElements) { child.load(ctx); }
+    super.load(ctx);
   }
 
   accept(_ctx: LoadContext, _simTime: number, _addBreakpoint: (t: number) => void): void {}
@@ -218,31 +164,20 @@ export function createDriverAnalogElement(
   pinNodes: ReadonlyMap<string, number>,
   props: PropertyBag,
   _getTime?: () => number,
-): PoolBackedAnalogElementCore {
+): PoolBackedAnalogElement {
   return new DriverAnalogElement(pinNodes, props);
 }
 
 // ---------------------------------------------------------------------------
 // DriverInvSel analog factory - inverting tri-state (active-low enable)
 //
-// Same as Driver but enable logic is inverted: sel=0 â†' driven, sel=1 â†' Hi-Z
+// Same as Driver but enable logic is inverted: sel=0 → driven, sel=1 → Hi-Z
 // Pin labels: "in", "sel", "out" (matching buildDriverPinDeclarations)
 // ---------------------------------------------------------------------------
 
-class DriverInvAnalogElement implements PoolBackedAnalogElementCore {
-  readonly branchIndex = -1;
+class DriverInvAnalogElement extends CompositeElement {
   readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.VCVS;
-  readonly isNonlinear = true;
-  readonly poolBacked = true as const;
-  readonly stateSchema = REMAINING_COMPOSITE_SCHEMA;
-
-  _stateBase: number = -1;
-  _pinNodes: Map<string, number>;
-
-  readonly _inputPins: readonly DigitalInputPinModel[];
-  readonly _outputPins: readonly DigitalOutputPinModel[];
-  readonly _subElements: readonly AnalogElementCore[] = [];
-  readonly _childElements: readonly AnalogCapacitorElement[];
+  readonly stateSchema: StateSchema = REMAINING_COMPOSITE_SCHEMA;
 
   private readonly inputPin: DigitalInputPinModel;
   private readonly selPin: DigitalInputPinModel;
@@ -251,17 +186,7 @@ class DriverInvAnalogElement implements PoolBackedAnalogElementCore {
   private readonly nodeSel: number;
   private readonly nodeOut: number;
   private readonly pinModelsByLabel: Map<string, DigitalInputPinModel | DigitalOutputPinModel>;
-
-  readonly stateSize: number;
-  stateBaseOffset = -1;
-  s0 = new Float64Array(0);
-  s1 = new Float64Array(0);
-  s2 = new Float64Array(0);
-  s3 = new Float64Array(0);
-  s4 = new Float64Array(0);
-  s5 = new Float64Array(0);
-  s6 = new Float64Array(0);
-  s7 = new Float64Array(0);
+  private readonly _allSubElements: AnalogElement[];
 
   private latchedIn = false;
   private latchedSel = false;
@@ -270,6 +195,7 @@ class DriverInvAnalogElement implements PoolBackedAnalogElementCore {
     pinNodes: ReadonlyMap<string, number>,
     props: PropertyBag,
   ) {
+    super();
     this._pinNodes = new Map(pinNodes);
     this.nodeIn = pinNodes.get("in") ?? 0;
     this.nodeSel = pinNodes.get("sel") ?? 0;
@@ -295,35 +221,19 @@ class DriverInvAnalogElement implements PoolBackedAnalogElementCore {
       ["out", this.outputPin],
     ]);
 
-    this._inputPins = [this.inputPin, this.selPin];
-    this._outputPins = [this.outputPin];
-    this._childElements = collectPinModelChildren([this.inputPin, this.selPin, this.outputPin]);
-    this.stateSize = this._childElements.reduce((s, c) => s + c.stateSize, 0);
+    const childCaps = collectPinModelChildren([this.inputPin, this.selPin, this.outputPin]);
+    this._allSubElements = [
+      this.inputPin, this.selPin, this.outputPin,
+      ...childCaps,
+    ] as unknown as AnalogElement[];
   }
 
-  get isReactive(): boolean { return this._childElements.length > 0; }
-
-  setup(ctx: SetupContext): void {
-    this.inputPin.setup(ctx);
-    this.selPin.setup(ctx);
-    this.outputPin.setup(ctx);
-    for (const child of this._childElements) child.setup(ctx);
-  }
-
-  initState(pool: StatePoolRef): void {
-    let offset = this.stateBaseOffset;
-    for (const child of this._childElements) {
-      child.stateBaseOffset = offset;
-      child.initState(pool);
-      offset += child.stateSize;
-    }
+  protected getSubElements(): readonly AnalogElement[] {
+    return this._allSubElements;
   }
 
   load(ctx: LoadContext): void {
     const v = ctx.rhsOld;
-
-    this.inputPin.load(ctx);
-    this.selPin.load(ctx);
 
     const vIn = readMnaVoltage(this.nodeIn, v);
     const vSel = readMnaVoltage(this.nodeSel, v);
@@ -336,9 +246,8 @@ class DriverInvAnalogElement implements PoolBackedAnalogElementCore {
 
     this.outputPin.setHighZ(this.latchedSel);
     this.outputPin.setLogicLevel(this.latchedIn);
-    this.outputPin.load(ctx);
 
-    for (const child of this._childElements) { child.load(ctx); }
+    super.load(ctx);
   }
 
   accept(_ctx: LoadContext, _simTime: number, _addBreakpoint: (t: number) => void): void {}
@@ -365,7 +274,7 @@ export function createDriverInvAnalogElement(
   pinNodes: ReadonlyMap<string, number>,
   props: PropertyBag,
   _getTime?: () => number,
-): PoolBackedAnalogElementCore {
+): PoolBackedAnalogElement {
   return new DriverInvAnalogElement(pinNodes, props);
 }
 
@@ -381,42 +290,22 @@ export function createDriverInvAnalogElement(
 // connected and remaining ports are driven LOW.
 // ---------------------------------------------------------------------------
 
-class SplitterAnalogElement implements PoolBackedAnalogElementCore {
-  readonly branchIndex = -1;
+class SplitterAnalogElement extends CompositeElement {
   readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.VCVS;
-  readonly isNonlinear = true;
-  readonly poolBacked = true as const;
-  readonly stateSchema = REMAINING_COMPOSITE_SCHEMA;
-
-  _stateBase: number = -1;
-  _pinNodes: Map<string, number>;
-
-  readonly _inputPins: readonly DigitalInputPinModel[];
-  readonly _outputPins: readonly DigitalOutputPinModel[];
-  readonly _subElements: readonly AnalogElementCore[] = [];
-  readonly _childElements: readonly AnalogCapacitorElement[];
+  readonly stateSchema: StateSchema = REMAINING_COMPOSITE_SCHEMA;
 
   private readonly inputPins: DigitalInputPinModel[];
   private readonly outputPins: DigitalOutputPinModel[];
   private readonly latchedLevels: boolean[];
   private readonly numIn: number;
   private readonly numOut: number;
-
-  readonly stateSize: number;
-  stateBaseOffset = -1;
-  s0 = new Float64Array(0);
-  s1 = new Float64Array(0);
-  s2 = new Float64Array(0);
-  s3 = new Float64Array(0);
-  s4 = new Float64Array(0);
-  s5 = new Float64Array(0);
-  s6 = new Float64Array(0);
-  s7 = new Float64Array(0);
+  private readonly _allSubElements: AnalogElement[];
 
   constructor(
     pinNodes: ReadonlyMap<string, number>,
     props: PropertyBag,
   ) {
+    super();
     this._pinNodes = new Map(pinNodes);
     this.numIn = props.has("_inputCount") ? (props.get("_inputCount") as number) : 1;
     this.numOut = props.has("_outputCount") ? (props.get("_outputCount") as number) : 1;
@@ -446,33 +335,19 @@ class SplitterAnalogElement implements PoolBackedAnalogElementCore {
       this.outputPins.push(pin);
     }
 
-    this._inputPins = this.inputPins;
-    this._outputPins = this.outputPins;
-    this._childElements = collectPinModelChildren([...this.inputPins, ...this.outputPins]);
-    this.stateSize = this._childElements.reduce((s, c) => s + c.stateSize, 0);
+    const childCaps = collectPinModelChildren([...this.inputPins, ...this.outputPins]);
+    this._allSubElements = [
+      ...this.inputPins, ...this.outputPins,
+      ...childCaps,
+    ] as unknown as AnalogElement[];
   }
 
-  get isReactive(): boolean { return this._childElements.length > 0; }
-
-  setup(ctx: SetupContext): void {
-    for (const pin of this.inputPins) pin.setup(ctx);
-    for (const pin of this.outputPins) pin.setup(ctx);
-    for (const child of this._childElements) child.setup(ctx);
-  }
-
-  initState(_pool: StatePoolRef): void {
-    let offset = this.stateBaseOffset;
-    for (const child of this._childElements) {
-      child.stateBaseOffset = offset;
-      child.initState(_pool);
-      offset += child.stateSize;
-    }
+  protected getSubElements(): readonly AnalogElement[] {
+    return this._allSubElements;
   }
 
   load(ctx: LoadContext): void {
     const v = ctx.rhsOld;
-
-    for (const p of this.inputPins) p.load(ctx);
 
     for (let i = 0; i < this.numIn; i++) {
       const nodeId = this.inputPins[i].nodeId;
@@ -482,10 +357,9 @@ class SplitterAnalogElement implements PoolBackedAnalogElementCore {
     }
     for (let i = 0; i < this.numOut; i++) {
       this.outputPins[i].setLogicLevel(this.latchedLevels[i] ?? false);
-      this.outputPins[i].load(ctx);
     }
 
-    for (const child of this._childElements) { child.load(ctx); }
+    super.load(ctx);
   }
 
   accept(_ctx: LoadContext, _simTime: number, _addBreakpoint: (t: number) => void): void {}
@@ -509,7 +383,7 @@ export function createSplitterAnalogElement(
   pinNodes: ReadonlyMap<string, number>,
   props: PropertyBag,
   _getTime?: () => number,
-): PoolBackedAnalogElementCore {
+): PoolBackedAnalogElement {
   return new SplitterAnalogElement(pinNodes, props);
 }
 
@@ -519,20 +393,20 @@ export function createSplitterAnalogElement(
 // Each of the 8 segment inputs (a, b, c, d, e, f, g, dp) drives an independent
 // LED diode model. nodeIds order matches pin declaration order (a, b, c, d, e, f, g, dp).
 // Each segment diode is modeled as a simplified forward-biased diode
-// (piecewise linear: R_on=50Î when forward-biased, R_off=10MÎ otherwise).
+// (piecewise linear: R_on=50Ω when forward-biased, R_off=10MΩ otherwise).
 //
 // For the analog model, each segment pin is treated as a DigitalInputPinModel
 // (reading from the driving circuit) with an LED-style diode load. The cathode
 // of each segment is implicitly at ground (common cathode configuration).
 // ---------------------------------------------------------------------------
 
-/** Piecewise-linear LED diode: Vf  2.0V, R_on = 50Î, R_off = 10MÎ */
+/** Piecewise-linear LED diode: Vf ≈ 2.0V, R_on = 50Ω, R_off = 10MΩ */
 const LED_VF = 2.0;
 const LED_RON = 50;
 const LED_ROFF = 1e7;
 const LED_GMIN = 1e-12;
 
-type SegmentDiodeElement = AnalogElementCore & {
+type SegmentDiodeElement = AnalogElement & {
   /** Unified load entry point - stamps linearized diode equations. */
   load(ctx: LoadContext): void;
   /** NR-iteration convergence test. */
@@ -557,10 +431,9 @@ function createSegmentDiodeElement(
   let _hCA = -1;
 
   return {
+    label: "",
     branchIndex: -1,
     ngspiceLoadOrder: NGSPICE_LOAD_ORDER.VCVS,
-    isNonlinear: true,
-    isReactive: false,
     _stateBase: -1,
     _pinNodes: new Map<string, number>(),
 
@@ -639,36 +512,22 @@ function createSegmentDiodeElement(
   };
 }
 
-class SevenSegAnalogElement implements AnalogElementCore {
-  readonly branchIndex = -1;
+class SevenSegAnalogElement extends CompositeElement {
   readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.VCVS;
-  readonly isNonlinear = true;
-  readonly isReactive = false;
-
-  _stateBase: number = -1;
-  _pinNodes: Map<string, number>;
-
-  readonly _inputPins: readonly DigitalInputPinModel[] = [];
-  readonly _outputPins: readonly DigitalOutputPinModel[] = [];
-  readonly _subElements: readonly SegmentDiodeElement[];
-  readonly _childElements: readonly AnalogCapacitorElement[] = [];
+  readonly stateSchema: StateSchema = REMAINING_COMPOSITE_SCHEMA;
 
   private readonly segDiodes: readonly SegmentDiodeElement[];
 
   constructor(pinNodes: ReadonlyMap<string, number>) {
+    super();
     this._pinNodes = new Map(pinNodes);
     const segLabels = ["a", "b", "c", "d", "e", "f", "g", "dp"] as const;
     const segNodes = segLabels.map((lbl) => pinNodes.get(lbl)!);
     this.segDiodes = segNodes.map((n) => createSegmentDiodeElement(n, 0));
-    this._subElements = this.segDiodes;
   }
 
-  setup(ctx: SetupContext): void {
-    for (const d of this.segDiodes) d.setup(ctx);
-  }
-
-  load(ctx: LoadContext): void {
-    for (const d of this.segDiodes) d.load(ctx);
+  protected getSubElements(): readonly AnalogElement[] {
+    return this.segDiodes as unknown as AnalogElement[];
   }
 
   checkConvergence(ctx: LoadContext): boolean {
@@ -686,7 +545,7 @@ export function createSevenSegAnalogElement(
   pinNodes: ReadonlyMap<string, number>,
   _props: PropertyBag,
   _getTime?: () => number,
-): AnalogElementCore {
+): PoolBackedAnalogElement {
   return new SevenSegAnalogElement(pinNodes);
 }
 
@@ -701,19 +560,9 @@ export function createSevenSegAnalogElement(
 // The LED input is a forward-biased diode from nodeIds[1] to ground.
 // ---------------------------------------------------------------------------
 
-class ButtonLEDAnalogElement implements AnalogElementCore {
-  readonly branchIndex = -1;
+class ButtonLEDAnalogElement extends CompositeElement {
   readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.VCVS;
-  readonly isNonlinear = true;
-  readonly isReactive = false;
-
-  _stateBase: number = -1;
-  _pinNodes: Map<string, number>;
-
-  readonly _inputPins: readonly DigitalInputPinModel[] = [];
-  readonly _outputPins: readonly DigitalOutputPinModel[];
-  readonly _subElements: readonly SegmentDiodeElement[];
-  readonly _childElements: readonly AnalogCapacitorElement[] = [];
+  readonly stateSchema: StateSchema = REMAINING_COMPOSITE_SCHEMA;
 
   private readonly outputPin: DigitalOutputPinModel;
   private readonly ledDiode: SegmentDiodeElement;
@@ -724,6 +573,7 @@ class ButtonLEDAnalogElement implements AnalogElementCore {
     pinNodes: ReadonlyMap<string, number>,
     props: PropertyBag,
   ) {
+    super();
     this._pinNodes = new Map(pinNodes);
     this.nodeOut = pinNodes.get("out")!;
     const nodeLedIn = pinNodes.get("in")!;
@@ -738,19 +588,10 @@ class ButtonLEDAnalogElement implements AnalogElementCore {
     this.pinModelsByLabel = new Map<string, DigitalInputPinModel | DigitalOutputPinModel>([
       ["out", this.outputPin],
     ]);
-
-    this._outputPins = [this.outputPin];
-    this._subElements = [this.ledDiode];
   }
 
-  setup(ctx: SetupContext): void {
-    this.outputPin.setup(ctx);
-    this.ledDiode.setup(ctx);
-  }
-
-  load(ctx: LoadContext): void {
-    this.outputPin.load(ctx);
-    this.ledDiode.load(ctx);
+  protected getSubElements(): readonly AnalogElement[] {
+    return [this.outputPin, this.ledDiode] as unknown as AnalogElement[];
   }
 
   checkConvergence(ctx: LoadContext): boolean {
@@ -773,6 +614,6 @@ export function createButtonLEDAnalogElement(
   pinNodes: ReadonlyMap<string, number>,
   props: PropertyBag,
   _getTime?: () => number,
-): AnalogElementCore {
+): PoolBackedAnalogElement {
   return new ButtonLEDAnalogElement(pinNodes, props);
 }

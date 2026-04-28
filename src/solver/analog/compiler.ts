@@ -7,12 +7,10 @@
  * Steps:
  *  1. Build node map (wire groups → MNA node IDs, ground = 0)
  *  2. Resolve subcircuit-backed models into MnaModel factories
- *  3. Assign sequential branch indices using branchCount
- *  4. Allocate internal nodes via getInternalNodeCount
- *  5. Resolve pin→node bindings for each element
- *  6. Call factory for each element
- *  7. Topology validation (floating nodes, voltage-source loops, inductor loops)
- *  8. Return ConcreteCompiledAnalogCircuit
+ *  3. Resolve pin→node bindings for each element
+ *  4. Call factory for each element
+ *  5. Topology validation (floating nodes, voltage-source loops, inductor loops)
+ *  6. Return ConcreteCompiledAnalogCircuit
  */
 
 import { Circuit } from "../../core/circuit.js";
@@ -38,7 +36,11 @@ import type { LogicFamilyConfig } from "../../core/logic-family.js";
 import type { SolverPartition, PartitionedComponent, DigitalCompilerFn, ComponentDefinition, MnaModel } from "../../compile/types.js";
 import type { ModelEntry } from "../../core/registry.js";
 import { StatePool } from "./state-pool.js";
-import { isPoolBacked } from "./element.js";
+import { CompositeElement } from "./composite-element.js";
+import type { AnalogElement } from "../../core/analog-types.js";
+import { NGSPICE_LOAD_ORDER, getNgspiceLoadOrderByTypeId, TYPE_ID_TO_DECK_PIN_LABEL_ORDER } from "../../core/analog-types.js";
+import { defineStateSchema } from "./state-schema.js";
+import type { StateSchema } from "./state-schema.js";
 
 // ---------------------------------------------------------------------------
 // Component routing — shared decision logic for Pass A and Pass B
@@ -182,56 +184,73 @@ function resolveSubcircuitModels(
 }
 
 /**
+ * A thin leaf element that allocates a single internal MNA node during setup()
+ * and records the allocated node ID into a shared mutable slot. Used by
+ * compileSubcircuitToMnaModel so that internal-net allocation belongs to leaf
+ * children (per §A.7) rather than to the composite's setup() body.
+ *
+ * The allocator element has no stamps — its sole purpose is calling
+ * ctx.makeVolt() and writing the result into `slot.nodeId` so that sibling
+ * sub-elements sharing the same internal net can read the resolved ID
+ * during their own setup() calls (which run after the allocator's setup()).
+ *
+ * `labelRef` is a shared mutable object whose `.value` is set to the composite
+ * element's label before `super.setup(ctx)` is called, so that diagnostic node
+ * names are attributed to the correct parent instance.
+ */
+function makeInternalNetAllocator(
+  labelRef: { value: string },
+  suffix: string,
+  slot: { nodeId: number },
+): AnalogElement {
+  const el: AnalogElement = {
+    label: "",
+    ngspiceLoadOrder: NGSPICE_LOAD_ORDER.VCVS,
+    _pinNodes: new Map(),
+    _stateBase: -1,
+    branchIndex: -1,
+
+    setup(ctx: import("./setup-context.js").SetupContext): void {
+      slot.nodeId = ctx.makeVolt(labelRef.value, suffix);
+      el._pinNodes.set(suffix, slot.nodeId);
+    },
+
+    load(_ctx: import("./load-context.js").LoadContext): void {
+      // No stamps — allocator only.
+    },
+
+    getPinCurrents(_rhs: Float64Array): number[] {
+      return [];
+    },
+
+    setParam(_key: string, _value: number): void {
+      // No params.
+    },
+  };
+  return el;
+}
+
+/**
  * Compile an MnaSubcircuitNetlist into an MnaModel with a composite factory.
  *
- * The factory returns a single AnalogElementCore that internally aggregates
- * stamps from all sub-elements. The compiler treats it like any other single
- * element.
+ * The factory returns a single AnalogElement that internally aggregates
+ * stamps from all sub-elements via an anonymous class extending CompositeElement.
+ * Internal-net allocation is performed by thin leaf allocator elements (per §A.7),
+ * not by the composite's own setup() body.
+ * The compiler treats the returned element like any other single element.
  */
 function compileSubcircuitToMnaModel(
   netlist: MnaSubcircuitNetlist,
   _pc: PartitionedComponent,
   registry: ComponentRegistry,
 ): MnaModel {
-  let totalBranches = 0;
-  for (const subEl of netlist.elements) {
-    totalBranches += subEl.branchCount ?? 0;
-  }
-
   return {
     factory(
       pinNodes: ReadonlyMap<string, number>,
-      internalNodeIds: readonly number[],
-      branchIdx: number,
-      _props: PropertyBag,
+      props: PropertyBag,
       getTime: () => number,
-    ): import("../../core/analog-types.js").AnalogElementCore {
-      const portLabelToNode = new Map<string, number>();
-      for (const [label, nodeId] of pinNodes) {
-        portLabelToNode.set(label, nodeId);
-      }
-
-      const netRemap = new Map<number, number>();
-      for (let portIdx = 0; portIdx < netlist.ports.length; portIdx++) {
-        const portLabel = netlist.ports[portIdx];
-        const outerNode = portLabelToNode.get(portLabel);
-        if (outerNode !== undefined) {
-          netRemap.set(portIdx, outerNode);
-        }
-      }
-
-      const internalBase = netlist.ports.length;
-      for (let i = 0; i < netlist.internalNetCount; i++) {
-        if (i < internalNodeIds.length) {
-          netRemap.set(internalBase + i, internalNodeIds[i]);
-        }
-      }
-
-      function remapNet(netIdx: number): number {
-        const mapped = netRemap.get(netIdx);
-        if (mapped !== undefined) return mapped;
-        return -1;
-      }
+    ): AnalogElement {
+      const portLabelToNode = new Map<string, number>(pinNodes);
 
       // Resolve subcircuit-level params: netlist defaults, then instance overrides.
       const resolvedSubcktParams = new Map<string, number>();
@@ -240,25 +259,70 @@ function compileSubcircuitToMnaModel(
           resolvedSubcktParams.set(k, v);
         }
       }
-      // Instance-level overrides from the outer component's PropertyBag
       for (const [k] of resolvedSubcktParams) {
-        if (_props.hasModelParam(k)) {
-          resolvedSubcktParams.set(k, _props.getModelParam<number>(k));
+        if (props.hasModelParam(k)) {
+          resolvedSubcktParams.set(k, props.getModelParam<number>(k));
         }
+      }
+
+      // Allocate one mutable slot per internal net. Leaf allocator elements
+      // write to these slots during setup(); sub-elements that share the
+      // same internal net read the resolved node ID from the same slot
+      // during their own setup() calls, which run after the allocators.
+      const internalNetSlots: Array<{ nodeId: number }> = [];
+      for (let i = 0; i < netlist.internalNetCount; i++) {
+        internalNetSlots.push({ nodeId: -1 });
       }
 
       // Binding map: subcircuit param name → [{element, elementParamKey}]
       // Used by setParam to route subcircuit-level changes to the correct
       // sub-element param (e.g. "WP" → PMOS elements' "W" param).
-      const bindings = new Map<string, Array<{ el: import("../../core/analog-types.js").AnalogElementCore; key: string }>>();
+      const bindings = new Map<string, Array<{ el: AnalogElement; key: string }>>();
 
-      const subElements: import("../../core/analog-types.js").AnalogElementCore[] = [];
-      let subBranchOffset = 0;
+      // All child elements: allocators first (so slots are populated before
+      // sub-elements run setup()), then the real leaf elements.
+      const allChildren: AnalogElement[] = [];
+      const subElements: AnalogElement[] = [];
+
+      // Helper: resolve a netlist net index to a node ID or a slot reference.
+      // Port nets resolve immediately; internal nets resolve via slot.nodeId
+      // (populated by the allocator during setup()).
+      function resolveNetToNode(netIdx: number): number {
+        if (netIdx < netlist.ports.length) {
+          const portLabel = netlist.ports[netIdx];
+          return portLabel !== undefined ? (portLabelToNode.get(portLabel) ?? -1) : -1;
+        }
+        // Internal net — slot will be populated by the allocator's setup().
+        // Return the slot's current value; after all allocator setup() calls
+        // run, slot.nodeId holds the real node ID.
+        const slotIdx = netIdx - netlist.ports.length;
+        return internalNetSlots[slotIdx]?.nodeId ?? -1;
+      }
+
+      // Helpers for creating proxy _pinNodes maps that read slot values lazily.
+      // Each sub-element receives a Map whose values for internal nets are
+      // resolved at setup() time (after allocators run), not at construction.
+      // We accomplish this by giving sub-elements Maps pre-populated with -1
+      // for internal nets, then the allocator elements write the resolved IDs
+      // back into the shared slot object. Since the sub-element's _pinNodes Map
+      // holds the node ID directly (it is not a live reference to the slot),
+      // we must patch the Map entries before the sub-element's setup() runs.
+      //
+      // The patching is done by a dedicated patcher element inserted between
+      // the allocators and the real sub-elements. The patcher's setup() reads
+      // all slot values (now populated) and writes the final node IDs into
+      // each sub-element's _pinNodes.
+
+      // Record which sub-element _pinNodes entries need patching and which slot.
+      const patchWork: Array<{
+        target: Map<string, number>;
+        pinLabel: string;
+        slot: { nodeId: number };
+      }> = [];
 
       for (let elIdx = 0; elIdx < netlist.elements.length; elIdx++) {
         const subEl = netlist.elements[elIdx];
         const connectivity = netlist.netlist[elIdx];
-        const remappedNodes = connectivity.map(remapNet);
 
         const leafDef = registry.get(subEl.typeId);
         const leafModelKey = subEl.params?.model as string | undefined ?? leafDef?.defaultModel ?? "";
@@ -285,18 +349,31 @@ function compileSubcircuitToMnaModel(
           }
         }
 
-        // Build pin-label-keyed Map from positional connectivity array
+        // Build pin-label-keyed Map for the sub-element.
+        // Port nets resolve immediately; internal nets start as -1 and are
+        // patched by the patcher element before this sub-element's setup() runs.
         const subPinNodes = new Map<string, number>();
         if (leafDef) {
-          for (let pi = 0; pi < leafDef.pinLayout.length && pi < remappedNodes.length; pi++) {
-            subPinNodes.set(leafDef.pinLayout[pi]!.label, remappedNodes[pi]);
+          for (let pi = 0; pi < leafDef.pinLayout.length && pi < connectivity.length; pi++) {
+            const netIdx = connectivity[pi];
+            if (netIdx === undefined) continue;
+            const pinLabel = leafDef.pinLayout[pi]!.label;
+            if (netIdx < netlist.ports.length) {
+              subPinNodes.set(pinLabel, resolveNetToNode(netIdx));
+            } else {
+              // Internal net — will be patched before this element's setup()
+              const slotIdx = netIdx - netlist.ports.length;
+              const slot = internalNetSlots[slotIdx];
+              if (slot !== undefined) {
+                subPinNodes.set(pinLabel, -1);
+                patchWork.push({ target: subPinNodes, pinLabel, slot });
+              }
+            }
           }
         }
 
-        const subBranchIdx = branchIdx >= 0 ? branchIdx + subBranchOffset : -1;
-        const core = leafFactory(subPinNodes, [], subBranchIdx, subProps, getTime);
-        if (core.branchIndex >= 0) subBranchOffset++;
-        subElements.push(core);
+        const childEl = leafFactory(subPinNodes, subProps, getTime);
+        subElements.push(childEl);
 
         // Record string-ref bindings for setParam routing
         if (subEl.params) {
@@ -304,68 +381,105 @@ function compileSubcircuitToMnaModel(
             if (typeof v === "string") {
               let arr = bindings.get(v);
               if (!arr) { arr = []; bindings.set(v, arr); }
-              arr.push({ el: core, key: k });
+              arr.push({ el: childEl, key: k });
             }
           }
         }
       }
 
-      const anyNonlinear = subElements.some(e => e.isNonlinear);
-      const anyReactive = subElements.some(e => e.isReactive);
+      // Determine which internal net slots actually need an allocator
+      // (only those referenced by at least one sub-element).
+      const usedSlotIndices = new Set(
+        patchWork.map(pw => internalNetSlots.indexOf(pw.slot)),
+      );
 
-      const core: import("../../core/analog-types.js").AnalogElementCore = {
-        branchIndex: branchIdx >= 0 ? branchIdx : -1,
-        // Composite wrappers (subcircuits/behavioral) load all sub-elements
-        // inside a single load() call. Their internal stamping order is
-        // determined by the subElements array, not by the per-type sort.
-        // Pin them at VCVS as the closest analogue for a "high-level
-        // controlled-output" composite. A future flatten pass would split
-        // them into individual leaf elements that participate in the per-type
-        // sort directly.
-        ngspiceLoadOrder: 6 /* NGSPICE_LOAD_ORDER.VCVS */,
-        isNonlinear: anyNonlinear,
-        isReactive: anyReactive,
+      // The composite label is set by the compiler after construction.
+      // Allocators must capture the label lazily — they read it from
+      // the composite's label field at setup() time via a shared ref.
+      const labelRef = { value: "" };
 
-        load(ctx: import("./load-context.js").LoadContext): void {
-          for (const sub of subElements) sub.load(ctx);
+      for (let i = 0; i < netlist.internalNetCount; i++) {
+        if (!usedSlotIndices.has(i)) continue;
+        const slot = internalNetSlots[i]!;
+        const suffix = `int${i}`;
+        allChildren.push(makeInternalNetAllocator(labelRef, suffix, slot));
+      }
+
+      // Patcher leaf element: runs after allocators, before real sub-elements,
+      // to write resolved internal-node IDs into each sub-element's _pinNodes.
+      const patcher: AnalogElement = {
+        label: "",
+        ngspiceLoadOrder: NGSPICE_LOAD_ORDER.VCVS,
+        _pinNodes: new Map(),
+        _stateBase: -1,
+        branchIndex: -1,
+
+        setup(_ctx: import("./setup-context.js").SetupContext): void {
+          for (const { target, pinLabel, slot } of patchWork) {
+            target.set(pinLabel, slot.nodeId);
+          }
         },
+
+        load(_ctx: import("./load-context.js").LoadContext): void {
+          // No stamps — patcher only.
+        },
+
+        getPinCurrents(_rhs: Float64Array): number[] {
+          return [];
+        },
+
+        setParam(_key: string, _value: number): void {
+          // No params.
+        },
+      };
+
+      if (patchWork.length > 0) {
+        allChildren.push(patcher);
+      }
+
+      allChildren.push(...subElements);
+
+      const SUBCIRCUIT_COMPOSITE_SCHEMA: StateSchema = defineStateSchema("SubcircuitComposite", []);
+
+      const composite = new class extends CompositeElement {
+        readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.VCVS;
+        readonly stateSchema: StateSchema = SUBCIRCUIT_COMPOSITE_SCHEMA;
+
+        constructor() {
+          super();
+          this._pinNodes = new Map(pinNodes);
+        }
+
+        protected getSubElements(): readonly AnalogElement[] {
+          return allChildren;
+        }
+
+        setup(ctx: import("./setup-context.js").SetupContext): void {
+          // Update the label ref so allocators read the correct label.
+          labelRef.value = this.label;
+          super.setup(ctx);
+        }
 
         getPinCurrents(rhs: Float64Array): number[] {
           const currents: number[] = [];
           for (const sub of subElements) {
-            if (sub.getPinCurrents) {
-              currents.push(...sub.getPinCurrents(rhs));
-            }
+            currents.push(...sub.getPinCurrents(rhs));
           }
           return currents;
-        },
+        }
 
         setParam(key: string, value: number): void {
           const bound = bindings.get(key);
           if (bound) {
-            // Subcircuit-level param: route to bound sub-elements
             for (const { el, key: elKey } of bound) el.setParam(elKey, value);
           } else {
-            // Direct element param (no binding): broadcast to all
             for (const sub of subElements) sub.setParam(key, value);
           }
-        },
-      };
+        }
+      }();
 
-      return core;
+      return composite;
     },
-
-    getInternalNodeCount(_props: PropertyBag): number {
-      return netlist.internalNetCount;
-    },
-
-    getInternalNodeLabels(_props: PropertyBag): readonly string[] {
-      const labels: string[] = [];
-      for (let i = 0; i < netlist.internalNetCount; i++) labels.push(`int${i}`);
-      return labels;
-    },
-
-    branchCount: totalBranches,
   };
 }
 
@@ -905,14 +1019,92 @@ function buildAnalogNodeMapFromPartition(
     // Boundary groups will be assigned node IDs starting at 1 below.
   }
 
-  // Assign node IDs: ground groups → 0, others → 1, 2, 3, …
+  // Assign node IDs: ground groups → 0; remaining groups → 1, 2, 3, … in
+  // ngspice deck-line first-encounter order.
+  //
+  // ngspice numbers MNA nodes during deck PARSE (not during CKTsetup). Each
+  // element line is parsed top-to-bottom; each new external node name on a
+  // line gets the next sequential integer (cktnewn.c, cktlnkeq.c:32 via
+  // INPtermInsert from the per-type `INP2*` parsers, e.g. inp2r.c:60-64).
+  //
+  // Our deck (generated by `__tests__/harness/netlist-generator.ts`) emits
+  // elements in (ngspiceLoadOrder ASC, original-index ASC) — forward within
+  // bucket. So to match ngspice's parse-time numbering bit-exactly, we walk
+  // `partition.components` in the same order here and assign node IDs as we
+  // encounter each component's pins.
+  //
+  // We use the typeId→loadOrder lookup `getNgspiceLoadOrderByTypeId`
+  // (`core/analog-types.ts`) — load order is a per-DEVICE-TYPE concept in
+  // ngspice (its position in `DEVices[]`), not per-model or per-instance, so
+  // the typeId is the right key. This avoids the chicken-and-egg of needing
+  // a constructed AnalogElement to know its load order.
   const groupToNodeId = new Map<number, number>();
-  let nextNodeId = 1;
   for (const g of groups) {
     if (groundGroupIds.has(g.groupId)) {
       groupToNodeId.set(g.groupId, 0);
     }
   }
+  // Build a position → groupId index for O(1) lookup as we walk pins.
+  const positionToGroupId = new Map<string, number>();
+  for (const g of groups) {
+    for (const gp of g.pins) {
+      positionToGroupId.set(`${gp.worldPosition.x},${gp.worldPosition.y}`, g.groupId);
+    }
+  }
+  // Sort partition.components in deck-emission order and walk pins for
+  // first-encounter numbering. Ground components are walked too — their pins
+  // resolve to groupId 0, which is already mapped, so they're no-ops.
+  const componentsInDeckOrder = partition.components
+    .map((pc, originalIndex) => ({ pc, originalIndex }))
+    .sort((a, b) => {
+      const lhs = getNgspiceLoadOrderByTypeId(a.pc.element.typeId);
+      const rhs = getNgspiceLoadOrderByTypeId(b.pc.element.typeId);
+      if (lhs !== rhs) return lhs - rhs;
+      return a.originalIndex - b.originalIndex;
+    });
+  let nextNodeId = 1;
+  for (const { pc } of componentsInDeckOrder) {
+    // Visit pins in SPICE deck-emission order. ngspice numbers nodes during
+    // PARSE, in the order each new node name appears on each element line.
+    // Our deck pin order is typeId-specific (e.g. Vname has [pos, neg] but
+    // pinLayout is [neg, pos]; M card is [D, G, S, B] but pinLayout for NMOS
+    // is [G, S, D]). The TYPE_ID_TO_DECK_PIN_LABEL_ORDER table mirrors what
+    // netlist-generator emits.
+    const deckLabels = TYPE_ID_TO_DECK_PIN_LABEL_ORDER[pc.element.typeId];
+    const visitPin = (rp: ResolvedPin): void => {
+      const key = `${rp.worldPosition.x},${rp.worldPosition.y}`;
+      const gid = positionToGroupId.get(key);
+      if (gid === undefined) return;
+      if (groupToNodeId.has(gid)) return;
+      groupToNodeId.set(gid, nextNodeId++);
+    };
+    if (deckLabels !== undefined) {
+      // Build a label → ResolvedPin index lookup for this component.
+      const labelToPinIdx = new Map<string, number>();
+      for (let pi = 0; pi < pc.resolvedPins.length; pi++) {
+        labelToPinIdx.set(pc.resolvedPins[pi]!.pinLabel, pi);
+      }
+      for (const lbl of deckLabels) {
+        const idx = labelToPinIdx.get(lbl);
+        if (idx === undefined) continue;
+        visitPin(pc.resolvedPins[idx]!);
+      }
+      // Walk any pinLayout-only pins (not listed in deckLabels) afterward —
+      // typically only digital-domain pins on cross-domain components, which
+      // never affect ngspice numbering.
+      for (let pi = 0; pi < pc.resolvedPins.length; pi++) {
+        const rp = pc.resolvedPins[pi]!;
+        if (!deckLabels.includes(rp.pinLabel)) visitPin(rp);
+      }
+    } else {
+      // Unknown typeId (composite or non-ngspice element): fall back to
+      // pinLayout order. ngspice-parity is not currently established for
+      // these, so the walk order doesn't have to match a SPICE deck.
+      for (const rp of pc.resolvedPins) visitPin(rp);
+    }
+  }
+  // Any groups not visited by any component pin (floating wire-only nets)
+  // get assigned at the tail of the range so node IDs stay contiguous.
   for (const g of groups) {
     if (!groupToNodeId.has(g.groupId)) {
       groupToNodeId.set(g.groupId, nextNodeId++);
@@ -1212,8 +1404,6 @@ export function compileAnalogPartition(
     const core = analogFactory(pinNodes, props, getTime);
     const elementIndex = analogElements.length;
     const element: import("./element.js").AnalogElement = Object.assign(core, {
-      pinNodeIds: pinNodeIds,
-      allNodeIds: [...pinNodeIds],
       label: el.getProperties().has("label")
         ? String(el.getProperties().get("label") ?? el.instanceId)
         : el.instanceId,
@@ -1247,7 +1437,7 @@ export function compileAnalogPartition(
       nodeIds: [...pinNodeIds],
       isBranch: element.branchIndex !== -1,
       typeHint: element.branchIndex !== -1
-        ? element.isReactive
+        ? typeof element.getLteTimestep === "function"
           ? "inductor"
           : "voltage"
         : "other",
@@ -1299,18 +1489,30 @@ export function compileAnalogPartition(
     bridgeAdaptersByGroupId.set(boundaryGroupId, adapters);
   }
 
-  // Architectural alignment A1: stable-sort by ngspiceLoadOrder so that
+  // Architectural alignment A1: sort by ngspiceLoadOrder so that
   // per-iteration cktLoad walks devices in the same per-type bucket order
-  // ngspice does (every R, every C, ..., every V, ...). The sort must run
-  // before state-pool allocation (so stateBaseOffset matches the final
-  // element index) and before the index maps are returned.
+  // ngspice does (every R, every C, ..., every V, ...). Within each bucket,
+  // walk in REVERSE deck order: ngspice's `cktcrte.c:63-65` prepends every
+  // parsed instance to the model's GENinstances linked list, so when CKTsetup
+  // walks that list head→tail it visits instances in reverse-deck order. To
+  // mirror that, we sort by (ngspiceLoadOrder ASC, originalIndex DESC). The
+  // netlist generator emits the deck back in forward-within-bucket order
+  // (see netlist-generator.ts) so that ngspice's prepend re-reverses to
+  // match our walk. The sort must run before state-pool allocation and
+  // before the index maps are returned.
   //
-  // V8's Array.prototype.sort is stable since 2018, so within a bucket the
-  // original element order (= partition.components order = first-seen order)
-  // is preserved. Re-key the three index maps and rewrite each element's
-  // elementIndex field so post-sort indices stay consistent.
-  const oldIndexToElement = analogElements.map((el, i) => ({ el, oldIndex: i }));
-  analogElements.sort((a, b) => a.ngspiceLoadOrder - b.ngspiceLoadOrder);
+  // Re-key the three index maps and rewrite each element's elementIndex field
+  // so post-sort indices stay consistent.
+  const oldIndexByEl = new Map<import("./element.js").AnalogElement, number>();
+  const oldIndexToElement = analogElements.map((el, i) => {
+    oldIndexByEl.set(el, i);
+    return { el, oldIndex: i };
+  });
+  analogElements.sort((a, b) => {
+    const orderDiff = a.ngspiceLoadOrder - b.ngspiceLoadOrder;
+    if (orderDiff !== 0) return orderDiff;
+    return oldIndexByEl.get(b)! - oldIndexByEl.get(a)!;
+  });
   const oldToNewIndex = new Map<number, number>();
   for (let newIndex = 0; newIndex < analogElements.length; newIndex++) {
     const el = analogElements[newIndex]!;

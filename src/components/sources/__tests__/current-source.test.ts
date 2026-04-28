@@ -3,10 +3,11 @@
  */
 
 import { describe, it, expect, vi } from "vitest";
-import { makeCurrentSource, CurrentSourceDefinition, CURRENT_SOURCE_DEFAULTS } from "../current-source.js";
+import { CurrentSourceDefinition, CURRENT_SOURCE_DEFAULTS } from "../current-source.js";
 import { PropertyBag } from "../../../core/properties.js";
 import type { SparseSolver } from "../../../solver/analog/sparse-solver.js";
 import { MODEDCOP, MODEINITFLOAT, MODEINITJCT } from "../../../solver/analog/ckt-mode.js";
+import { makeTestSetupContext, setupAll, loadCtxFromFields } from "../../../solver/analog/__tests__/test-helpers.js";
 
 // ---------------------------------------------------------------------------
 // Helper: narrow ModelEntry to inline factory (throws if netlist kind)
@@ -41,20 +42,23 @@ function makeMockSolver(rhsSize = 8) {
   return solver;
 }
 
-function makeMinimalCtx(solver: ReturnType<typeof makeMockSolver>) {
-  return {
+function makeMinimalCtx(
+  solver: ReturnType<typeof makeMockSolver>,
+  overrides?: Partial<{ srcFact: number; cktMode: number }>,
+) {
+  return loadCtxFromFields({
     solver: solver as unknown as SparseSolver,
     matrix: solver as unknown as SparseSolver,
     rhs: solver._rhs,
     rhsOld: new Float64Array(solver._rhs.length),
-    cktMode: MODEDCOP | MODEINITFLOAT,
+    cktMode: overrides?.cktMode ?? (MODEDCOP | MODEINITFLOAT),
     time: 0,
     dt: 0,
     method: "trapezoidal" as const,
     order: 1,
     deltaOld: [0, 0, 0, 0, 0, 0, 0],
     ag: new Float64Array(7),
-    srcFact: 1,
+    srcFact: overrides?.srcFact ?? 1,
     noncon: { value: 0 },
     limitingCollector: null,
     convergenceCollector: null,
@@ -67,7 +71,21 @@ function makeMinimalCtx(solver: ReturnType<typeof makeMockSolver>) {
     cktFixLimit: false,
     bypass: false,
     voltTol: 1e-6,
-  };
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Helper — build a current source element from pin map + current value
+// ---------------------------------------------------------------------------
+
+function makeCurrentSourceEl(nodePos: number, nodeNeg: number, current: number) {
+  const props = new PropertyBag();
+  props.replaceModelParams({ current });
+  return getFactory(CurrentSourceDefinition.modelRegistry!.behavioral!)(
+    new Map([["pos", nodePos], ["neg", nodeNeg]]),
+    props,
+    () => 0,
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -77,8 +95,11 @@ function makeMinimalCtx(solver: ReturnType<typeof makeMockSolver>) {
 describe("CurrentSource", () => {
   it("stamp_rhs_only", () => {
     // 10mA source: current flows from nodeNeg(2) to nodePos(1) through source
-    const src = makeCurrentSource(1, 2, 0.01);
+    const src = makeCurrentSourceEl(1, 2, 0.01);
     const solver = makeMockSolver();
+
+    const setupCtx = makeTestSetupContext({ solver: solver as unknown as SparseSolver });
+    setupAll([src], setupCtx);
 
     src.load(makeMinimalCtx(solver));
 
@@ -94,10 +115,13 @@ describe("CurrentSource", () => {
   it("set_scale_modifies_current", () => {
     // ngspice vsrcload.c:54 — value = here->VSRCdcValue * ckt->CKTsrcFact
     // Sources read ctx.srcFact directly during load(); no per-element scale method.
-    const src = makeCurrentSource(1, 2, 0.01);
+    const src = makeCurrentSourceEl(1, 2, 0.01);
 
     const solver = makeMockSolver();
-    const ctx = { ...makeMinimalCtx(solver), srcFact: 0.3 };
+    const setupCtx = makeTestSetupContext({ solver: solver as unknown as SparseSolver });
+    setupAll([src], setupCtx);
+
+    const ctx = makeMinimalCtx(solver, { srcFact: 0.3 });
     src.load(ctx);
 
     // No matrix stamps
@@ -110,8 +134,11 @@ describe("CurrentSource", () => {
 
   it("ground_node_rhs_suppressed", () => {
     // pos at node 1, neg at ground (0)
-    const src = makeCurrentSource(1, 0, 0.01);
+    const src = makeCurrentSourceEl(1, 0, 0.01);
     const solver = makeMockSolver();
+
+    const setupCtx = makeTestSetupContext({ solver: solver as unknown as SparseSolver });
+    setupAll([src], setupCtx);
 
     src.load(makeMinimalCtx(solver));
 
@@ -121,14 +148,11 @@ describe("CurrentSource", () => {
   });
 
   it("branch_index_is_minus_one", () => {
-    const src = makeCurrentSource(1, 2, 0.01);
+    const src = makeCurrentSourceEl(1, 2, 0.01);
+    const solver = makeMockSolver();
+    const setupCtx = makeTestSetupContext({ solver: solver as unknown as SparseSolver });
+    setupAll([src], setupCtx);
     expect(src.branchIndex).toBe(-1);
-  });
-
-  it("is_not_nonlinear_or_reactive", () => {
-    const src = makeCurrentSource(1, 2, 0.01);
-    expect(src.isNonlinear).toBe(false);
-    expect(src.isReactive).toBe(false);
   });
 
   it("definition_engine_type_analog", () => {
@@ -144,13 +168,14 @@ describe("CurrentSource", () => {
     props.replaceModelParams(CURRENT_SOURCE_DEFAULTS);
     const el = getFactory(CurrentSourceDefinition.modelRegistry!.behavioral!)(
       new Map([["pos", 1], ["neg", 2]]),
-      [],
-      -1,
       props,
       () => 0,
     );
 
     const solver = makeMockSolver();
+    const setupCtx = makeTestSetupContext({ solver: solver as unknown as SparseSolver });
+    setupAll([el], setupCtx);
+
     el.load(makeMinimalCtx(solver));
 
     // Default current is 0.01 A; nodePos=1 → rhs[1], nodeNeg=2 → rhs[2]
@@ -171,10 +196,13 @@ describe("isource_load_srcfact_parity", () => {
   it("srcfact_03_scales_rhs_bit_exact", () => {
     const CURRENT = 0.01;
     const SRC_FACT = 0.3;
-    const src = makeCurrentSource(1, 2, CURRENT);
+    const src = makeCurrentSourceEl(1, 2, CURRENT);
     const solver = makeMockSolver();
 
-    src.load({ ...makeMinimalCtx(solver), srcFact: SRC_FACT });
+    const setupCtx = makeTestSetupContext({ solver: solver as unknown as SparseSolver });
+    setupAll([src], setupCtx);
+
+    src.load(makeMinimalCtx(solver, { srcFact: SRC_FACT }));
 
     // NGSPICE_REF: I * srcFact, bit-exact IEEE-754 product.
     const NGSPICE_REF_POS = CURRENT * SRC_FACT;
@@ -189,10 +217,13 @@ describe("isource_load_srcfact_parity", () => {
   it("srcfact_0_zeroes_rhs_both_rows", () => {
     const CURRENT = 0.015;
     const SRC_FACT = 0;
-    const src = makeCurrentSource(1, 2, CURRENT);
+    const src = makeCurrentSourceEl(1, 2, CURRENT);
     const solver = makeMockSolver();
 
-    src.load({ ...makeMinimalCtx(solver), cktMode: MODEDCOP | MODEINITJCT, srcFact: SRC_FACT });
+    const setupCtx = makeTestSetupContext({ solver: solver as unknown as SparseSolver });
+    setupAll([src], setupCtx);
+
+    src.load(makeMinimalCtx(solver, { cktMode: MODEDCOP | MODEINITJCT, srcFact: SRC_FACT }));
 
     expect(solver._rhs[1]).toBe(0);
     expect(solver._rhs[2]).toBe(0);
@@ -200,8 +231,11 @@ describe("isource_load_srcfact_parity", () => {
 
   it("srcfact_1_preserves_full_current", () => {
     const CURRENT = 0.02;
-    const src = makeCurrentSource(1, 0, CURRENT);
+    const src = makeCurrentSourceEl(1, 0, CURRENT);
     const solver = makeMockSolver();
+
+    const setupCtx = makeTestSetupContext({ solver: solver as unknown as SparseSolver });
+    setupAll([src], setupCtx);
 
     src.load(makeMinimalCtx(solver));
 

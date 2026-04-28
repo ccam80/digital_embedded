@@ -274,7 +274,6 @@ export const CounterDefinition: ComponentDefinition = {
     behavioral: {
       kind: "inline",
       factory: makeBehavioralCounterAnalogFactory(),
-      mayCreateInternalNodes: false,
       paramDefs: [],
       params: {},
     },

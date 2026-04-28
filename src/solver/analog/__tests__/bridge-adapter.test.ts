@@ -19,6 +19,7 @@ import {
 } from "../bridge-adapter.js";
 import type { ResolvedPinElectrical } from "../../../core/pin-electrical.js";
 import { StatePool } from "../state-pool.js";
+import { loadCtxFromFields } from "./test-helpers.js";
 
 // ---------------------------------------------------------------------------
 // Test helper — records stamp() and stampRHS() calls
@@ -64,9 +65,8 @@ class MockSolver {
 
 function makeCtx(solver: MockSolver, rhs?: Float64Array) {
   const rhsBuf = rhs ?? new Float64Array(8);
-  return {
+  return loadCtxFromFields({
     solver: solver as any,
-    voltages: new Float64Array(8),
     rhs: rhsBuf,
     rhsOld: rhsBuf,
     matrix: solver as any,
@@ -90,7 +90,7 @@ function makeCtx(solver: MockSolver, rhs?: Float64Array) {
     cktFixLimit: false,
     bypass: false,
     voltTol: 1e-6,
-  };
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -163,7 +163,7 @@ describe("BridgeOutputAdapter", () => {
   it("loaded output adapter stamps rOut conductance on node diagonal", () => {
     const adapter = makeBridgeOutputAdapter(CMOS_3V3, NODE, BRANCH_IDX, true);
     const pool = new StatePool(adapter.stateSize);
-    adapter.stateBaseOffset = 0;
+    adapter._stateBase = 0;
     adapter.initState(pool);
     adapter.load(makeCtx(solver));
 
@@ -191,7 +191,7 @@ describe("BridgeOutputAdapter", () => {
   it("input adapter loaded stamps rIn on node diagonal", () => {
     const adapter = makeBridgeInputAdapter(CMOS_3V3, NODE, true);
     const pool = new StatePool(adapter.stateSize);
-    adapter.stateBaseOffset = 0;
+    adapter._stateBase = 0;
     adapter.initState(pool);
     const rhs = new Float64Array(8);
     adapter.load(makeCtx(solver, rhs));
@@ -213,7 +213,7 @@ describe("BridgeOutputAdapter", () => {
   it("setParam('rOut', 50) hot-updates output adapter conductance", () => {
     const adapter = makeBridgeOutputAdapter(CMOS_3V3, NODE, BRANCH_IDX, true);
     const pool = new StatePool(adapter.stateSize);
-    adapter.stateBaseOffset = 0;
+    adapter._stateBase = 0;
     adapter.initState(pool);
     adapter.load(makeCtx(solver));
 

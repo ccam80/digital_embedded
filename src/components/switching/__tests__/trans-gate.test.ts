@@ -130,7 +130,7 @@ function makeTransGateAnalogElement(
   outNode: number,
   ctrlNode: number,
   ctrlNNode: number,
-  overrides?: { ron?: number; roff?: number; vth?: number },
+  _overrides?: { ron?: number; roff?: number; vth?: number },
 ): TransGateAnalogElement {
   const pinNodes = new Map<string, number>([
     ["p1", ctrlNode],
@@ -511,15 +511,5 @@ describe("TransGateAnalogElement", () => {
     });
   });
 
-  describe("isNonlinear and isReactive", () => {
-    it("isNonlinear is true (switch is nonlinear)", () => {
-      const el = makeTransGateAnalogElement(1, 2, 3, 4);
-      expect(el.isNonlinear).toBe(true);
-    });
 
-    it("isReactive is false", () => {
-      const el = makeTransGateAnalogElement(1, 2, 3, 4);
-      expect(el.isReactive).toBe(false);
-    });
-  });
 });

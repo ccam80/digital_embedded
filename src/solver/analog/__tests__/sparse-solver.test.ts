@@ -87,6 +87,7 @@ describe("SparseSolver", () => {
     expect(result).toBe(0);
     const x = new Float64Array(2);
     solver.solve(rhs, x);
+    expect(x[1]).toBeCloseTo(2, 9);
   });
 
   it("detects_singular_matrix", () => {
@@ -119,6 +120,7 @@ describe("SparseSolver", () => {
     const x = new Float64Array(n + 1);
     solver.solve(rhs, x);
     for (let i = 0; i < n; i++) {
+      expect(x[i + 1]).toBeCloseTo(b[i], 9);
     }
   });
 
@@ -137,6 +139,8 @@ describe("SparseSolver", () => {
     expect(r1).toBe(0);
     const x1 = new Float64Array(3);
     solver.solve(rhs1, x1);
+    expect(x1[1]).toBeCloseTo(1 / 11, 12);
+    expect(x1[2]).toBeCloseTo(7 / 11, 12);
 
     // Second solve: same pattern, different values — A = [[2,1],[1,4]], b = [3,5]
     // Analytical: det = 8-1=7; x1 = (3*4-5*1)/7 = 7/7 = 1; x2 = (2*5-3*1)/7 = 7/7 = 1
@@ -152,6 +156,8 @@ describe("SparseSolver", () => {
     expect(r2).toBe(0);
     const x2 = new Float64Array(3);
     solver.solve(rhs2, x2);
+    expect(x2[1]).toBeCloseTo(1, 12);
+    expect(x2[2]).toBeCloseTo(1, 12);
   });
 
   it("invalidate_forces_resymbolize", () => {
@@ -166,6 +172,9 @@ describe("SparseSolver", () => {
     expect(r).toBe(0);
     const x1 = new Float64Array(3);
     solver.solve(rhs1, x1);
+    // Diagonal: x[1]=6/3=2, x[2]=10/5=2
+    expect(x1[1]).toBeCloseTo(2, 12);
+    expect(x1[2]).toBeCloseTo(2, 12);
 
     // Invalidate topology, then change to full 2x2
     solver.invalidateTopology();
@@ -180,6 +189,9 @@ describe("SparseSolver", () => {
     expect(r).toBe(0);
     const x2 = new Float64Array(3);
     solver.solve(rhs2, x2);
+    // A=[[4,1],[1,3]], b=[1,2]: x[1]=1/11, x[2]=7/11
+    expect(x2[1]).toBeCloseTo(1 / 11, 12);
+    expect(x2[2]).toBeCloseTo(7 / 11, 12);
   });
 
   it("mna_resistor_divider_3x3", () => {
@@ -231,6 +243,9 @@ describe("SparseSolver", () => {
     // Current through Vs source: flows from node 1 to ground through the source branch
     // Ivs = -(V1-V2)/R1 = branch current, by KCL at node 1:
     // G1*(V1-V2) + Ivs = 0 => 0.001*2.5 + Ivs = 0 => Ivs = -0.0025A
+    expect(x[1]).toBeCloseTo(5, 9);
+    expect(x[2]).toBeCloseTo(2.5, 9);
+    expect(x[3]).toBeCloseTo(-0.0025, 9);
   });
 
   it("performance_50_node", () => {
@@ -331,16 +346,175 @@ describe("SparseSolver", () => {
 // ---------------------------------------------------------------------------
 
 import {
-  makeResistor,
-  makeVoltageSource,
-  makeCapacitor,
-  makeDiode,
-  makeInductor,
   allocateStatePool,
+  makeTestSetupContext,
+  setupAll,
+  loadCtxFromFields,
 } from "./test-helpers.js";
+import { makeDcVoltageSource, DC_VOLTAGE_SOURCE_DEFAULTS } from "../../../components/sources/dc-voltage-source.js";
+import { PropertyBag } from "../../../core/properties.js";
 import { ConcreteCompiledAnalogCircuit } from "../compiled-analog-circuit.js";
 import { MNAEngine } from "../analog-engine.js";
 import { EngineState } from "../../../core/engine-interface.js";
+import type { AnalogElement } from "../element.js";
+import { NGSPICE_LOAD_ORDER } from "../../../core/analog-types.js";
+
+// ---------------------------------------------------------------------------
+// Local benchmark element factories — §A-compliant shape (_pinNodes, label:"")
+// §A-compliant shape: _pinNodes Map, label:"", no dead flag fields.
+// setup() allocates TSTALLOC handles on the provided solver.
+// load() stamps via the pre-allocated handles.
+// ---------------------------------------------------------------------------
+
+function benchMakeResistor(nodeA: number, nodeB: number, resistance: number): AnalogElement {
+  const G = 1 / resistance;
+  let _hPP = -1, _hNN = -1, _hPN = -1, _hNP = -1;
+  const el: AnalogElement = {
+    label: "",
+    ngspiceLoadOrder: NGSPICE_LOAD_ORDER.RES,
+    _pinNodes: new Map([["A", nodeA], ["B", nodeB]]),
+    _stateBase: -1,
+    branchIndex: -1,
+    setup(ctx) {
+      const s = ctx.solver;
+      if (nodeA !== 0) _hPP = s.allocElement(nodeA, nodeA);
+      if (nodeB !== 0) _hNN = s.allocElement(nodeB, nodeB);
+      if (nodeA !== 0 && nodeB !== 0) {
+        _hPN = s.allocElement(nodeA, nodeB);
+        _hNP = s.allocElement(nodeB, nodeA);
+      }
+    },
+    load(ctx) {
+      const s = ctx.solver;
+      if (_hPP !== -1) s.stampElement(_hPP,  G);
+      if (_hNN !== -1) s.stampElement(_hNN,  G);
+      if (_hPN !== -1) s.stampElement(_hPN, -G);
+      if (_hNP !== -1) s.stampElement(_hNP, -G);
+    },
+    getPinCurrents(rhs) {
+      const vA = rhs[nodeA] ?? 0;
+      const vB = rhs[nodeB] ?? 0;
+      const I = G * (vA - vB);
+      return [I, -I];
+    },
+    setParam(key, value) {
+      if (key === "resistance") {
+        const newG = 1 / Math.max(value, 1e-12);
+        (el as unknown as { _G: number })._G = newG;
+      }
+    },
+  };
+  return el;
+}
+
+function benchMakeCapacitor(nodeA: number, nodeB: number, _C: number): AnalogElement {
+  let _hPP = -1, _hNN = -1, _hPN = -1, _hNP = -1;
+  const el: AnalogElement = {
+    label: "",
+    ngspiceLoadOrder: NGSPICE_LOAD_ORDER.CAP,
+    _pinNodes: new Map([["pos", nodeA], ["neg", nodeB]]),
+    _stateBase: -1,
+    branchIndex: -1,
+    setup(ctx) {
+      const s = ctx.solver;
+      if (nodeA !== 0) _hPP = s.allocElement(nodeA, nodeA);
+      if (nodeB !== 0) _hNN = s.allocElement(nodeB, nodeB);
+      if (nodeA !== 0 && nodeB !== 0) {
+        _hPN = s.allocElement(nodeA, nodeB);
+        _hNP = s.allocElement(nodeB, nodeA);
+      }
+    },
+    load(ctx) {
+      const s = ctx.solver;
+      if (_hPP !== -1) s.stampElement(_hPP,  0);
+      if (_hNN !== -1) s.stampElement(_hNN,  0);
+      if (_hPN !== -1) s.stampElement(_hPN,  0);
+      if (_hNP !== -1) s.stampElement(_hNP,  0);
+    },
+    getPinCurrents(_rhs) { return [0, 0]; },
+    setParam(_key, _value) {},
+  };
+  return el;
+}
+
+function benchMakeDiode(nodeA: number, nodeK: number, IS: number, N: number): AnalogElement {
+  const VT = 0.025852;
+  let _hAA = -1, _hKK = -1, _hAK = -1, _hKA = -1;
+  const el: AnalogElement = {
+    label: "",
+    ngspiceLoadOrder: NGSPICE_LOAD_ORDER.DIO,
+    _pinNodes: new Map([["A", nodeA], ["K", nodeK]]),
+    _stateBase: -1,
+    branchIndex: -1,
+    setup(ctx) {
+      const s = ctx.solver;
+      if (nodeA !== 0) _hAA = s.allocElement(nodeA, nodeA);
+      if (nodeK !== 0) _hKK = s.allocElement(nodeK, nodeK);
+      if (nodeA !== 0 && nodeK !== 0) {
+        _hAK = s.allocElement(nodeA, nodeK);
+        _hKA = s.allocElement(nodeK, nodeA);
+      }
+    },
+    load(ctx) {
+      const vA = ctx.rhs[nodeA] ?? 0;
+      const vK = ctx.rhs[nodeK] ?? 0;
+      const vD = Math.min(vA - vK, 0.7);
+      const Id = IS * (Math.exp(vD / (N * VT)) - 1);
+      const Gd = IS / (N * VT) * Math.exp(vD / (N * VT));
+      const Ieq = Id - Gd * vD;
+      const s = ctx.solver;
+      if (_hAA !== -1) s.stampElement(_hAA,  Gd);
+      if (_hKK !== -1) s.stampElement(_hKK,  Gd);
+      if (_hAK !== -1) s.stampElement(_hAK, -Gd);
+      if (_hKA !== -1) s.stampElement(_hKA, -Gd);
+      if (nodeA !== 0) ctx.rhs[nodeA] -= Ieq;
+      if (nodeK !== 0) ctx.rhs[nodeK] += Ieq;
+    },
+    getPinCurrents(_rhs) { return [0, 0]; },
+    setParam(_key, _value) {},
+  };
+  return el;
+}
+
+function benchMakeInductor(nodeA: number, nodeB: number, branchRow: number, _L: number): AnalogElement {
+  let _hPIbr = -1, _hNIbr = -1, _hIbrP = -1, _hIbrN = -1, _hIbrIbr = -1;
+  const el: AnalogElement = {
+    label: "",
+    ngspiceLoadOrder: NGSPICE_LOAD_ORDER.IND,
+    _pinNodes: new Map([["A", nodeA], ["B", nodeB]]),
+    _stateBase: -1,
+    branchIndex: branchRow,
+    setup(ctx) {
+      const s = ctx.solver;
+      const b = el.branchIndex;
+      if (nodeA !== 0) _hPIbr = s.allocElement(nodeA, b);
+      if (nodeB !== 0) _hNIbr = s.allocElement(nodeB, b);
+      _hIbrP = s.allocElement(b, nodeA);
+      if (nodeB !== 0) _hIbrN = s.allocElement(b, nodeB);
+      _hIbrIbr = s.allocElement(b, b);
+    },
+    load(ctx) {
+      const s = ctx.solver;
+      if (_hPIbr  !== -1) s.stampElement(_hPIbr,   1);
+      if (_hNIbr  !== -1) s.stampElement(_hNIbr,  -1);
+      if (_hIbrP  !== -1) s.stampElement(_hIbrP,   1);
+      if (_hIbrN  !== -1) s.stampElement(_hIbrN,  -1);
+      if (_hIbrIbr !== -1) s.stampElement(_hIbrIbr, 0);
+    },
+    getPinCurrents(rhs) {
+      const I = rhs[el.branchIndex];
+      return [I, -I];
+    },
+    setParam(_key, _value) {},
+  };
+  return el;
+}
+
+function makeVsrc(posNode: number, negNode: number, voltage: number): AnalogElement {
+  const props = new PropertyBag();
+  props.replaceModelParams({ ...DC_VOLTAGE_SOURCE_DEFAULTS, voltage });
+  return makeDcVoltageSource(new Map([["pos", posNode], ["neg", negNode]]), props, () => 0);
+}
 
 describe("SparseSolver real MNA circuit", () => {
   it("mna_50node_realistic_circuit_performance", () => {
@@ -358,36 +532,38 @@ describe("SparseSolver real MNA circuit", () => {
 
     const nodeCount = 50;
     const matrixSize = nodeCount + 2;
-    const elements: import("../element.js").AnalogElement[] = [];
+    const elements: AnalogElement[] = [];
 
     // Voltage source: node 50 → GND, branch row = 50
-    elements.push(makeVoltageSource(50, 0, 50, 10.0));
+    const vs = makeVsrc(50, 0, 10.0);
+    vs.branchIndex = 50;
+    elements.push(vs);
 
     // Resistor chain: node i → node i-1, with node 1 → GND
     for (let i = 50; i >= 2; i--) {
-      elements.push(makeResistor(i, i - 1, 1000 + i * 10));
+      elements.push(benchMakeResistor(i, i - 1, 1000 + i * 10));
     }
-    elements.push(makeResistor(1, 0, 1000)); // node 1 → GND
+    elements.push(benchMakeResistor(1, 0, 1000)); // node 1 → GND
 
     // Shunt capacitors: every 5th node to GND
     for (let i = 5; i <= 50; i += 5) {
-      elements.push(makeCapacitor(i, 0, 100e-9));
+      elements.push(benchMakeCapacitor(i, 0, 100e-9));
     }
 
     // Shunt diodes: every 7th node to GND
     for (let i = 7; i <= 49; i += 7) {
-      elements.push(makeDiode(i, 0, 1e-14, 1.0));
+      elements.push(benchMakeDiode(i, 0, 1e-14, 1.0));
     }
 
     // Inductor: node 25 → GND, branch row = 51
-    elements.push(makeInductor(25, 0, 51, 1e-3));
+    elements.push(benchMakeInductor(25, 0, 51, 1e-3));
 
     // Cross-link resistors (feedback paths across the chain)
-    elements.push(makeResistor(10, 40, 10000));
-    elements.push(makeResistor(15, 35, 10000));
-    elements.push(makeResistor(20, 30, 10000));
-    elements.push(makeResistor(5, 45, 10000));
-    elements.push(makeResistor(12, 38, 10000));
+    elements.push(benchMakeResistor(10, 40, 10000));
+    elements.push(benchMakeResistor(15, 35, 10000));
+    elements.push(benchMakeResistor(20, 30, 10000));
+    elements.push(benchMakeResistor(5, 45, 10000));
+    elements.push(benchMakeResistor(12, 38, 10000));
 
     const statePool = allocateStatePool(elements);
     const compiled = new ConcreteCompiledAnalogCircuit({
@@ -427,11 +603,26 @@ describe("SparseSolver real MNA circuit", () => {
     expect(transientSteps).toBe(100);
 
     // --- Isolated solver timing (apples-to-apples with performance_50_node) ---
-    // Stamp all elements into a raw SparseSolver via the load(ctx) interface.
+    // Build a fresh element set and setup on rawSolver so handles target rawSolver.
+    const rawElements: AnalogElement[] = [];
+    const rawVs = makeVsrc(50, 0, 10.0);
+    rawVs.branchIndex = 50;
+    rawElements.push(rawVs);
+    for (let i = 50; i >= 2; i--) rawElements.push(benchMakeResistor(i, i - 1, 1000 + i * 10));
+    rawElements.push(benchMakeResistor(1, 0, 1000));
+    for (let i = 5; i <= 50; i += 5) rawElements.push(benchMakeCapacitor(i, 0, 100e-9));
+    for (let i = 7; i <= 49; i += 7) rawElements.push(benchMakeDiode(i, 0, 1e-14, 1.0));
+    rawElements.push(benchMakeInductor(25, 0, 51, 1e-3));
+    rawElements.push(benchMakeResistor(10, 40, 10000));
+    rawElements.push(benchMakeResistor(15, 35, 10000));
+    rawElements.push(benchMakeResistor(20, 30, 10000));
+    rawElements.push(benchMakeResistor(5, 45, 10000));
+    rawElements.push(benchMakeResistor(12, 38, 10000));
+
     const rawSolver = new SparseSolver();
     const rawVoltages = new Float64Array(matrixSize);
     const rawAg = new Float64Array(7);
-    const rawCtx: import("../load-context.js").LoadContext = {
+    const rawCtx = loadCtxFromFields({
       solver: rawSolver,
       matrix: rawSolver,
       rhs: rawVoltages,
@@ -456,10 +647,12 @@ describe("SparseSolver real MNA circuit", () => {
       cktFixLimit: false,
       bypass: false,
       voltTol: 1e-6,
-    };
+    });
 
     rawSolver._initStructure();
-    for (const el of elements) {
+    const rawSetupCtx = makeTestSetupContext({ solver: rawSolver, startBranch: nodeCount + 1 });
+    setupAll(rawElements, rawSetupCtx);
+    for (const el of rawElements) {
       el.load(rawCtx);
     }
 
@@ -479,7 +672,9 @@ describe("SparseSolver real MNA circuit", () => {
     // Warm run: re-stamp and re-factor (simulates NR iteration 2+)
     rawVoltages.fill(0);
     rawSolver._initStructure();
-    for (const el of elements) {
+    const rawSetupCtx2 = makeTestSetupContext({ solver: rawSolver, startBranch: nodeCount + 1 });
+    setupAll(rawElements, rawSetupCtx2);
+    for (const el of rawElements) {
       el.load(rawCtx);
     }
 

@@ -46,12 +46,12 @@ function makeAcResistor(nodeA: number, nodeB: number, resistance: number): Analo
   }
 
   return {
-    pinNodeIds: [nodeA, nodeB],
-    allNodeIds: [nodeA, nodeB],
+    label: "",
+    _pinNodes: new Map([["A", nodeA], ["B", nodeB]]),
+    _stateBase: -1,
     branchIndex: -1,
     ngspiceLoadOrder: 0,
-    isNonlinear: false,
-    isReactive: false,
+    setup(_ctx): void {},
     load(_ctx: LoadContext): void {},
     setParam(_key: string, _value: number): void {},
     getPinCurrents(_v: Float64Array): number[] { return [0, 0]; },
@@ -76,12 +76,12 @@ function makeAcResistor(nodeA: number, nodeB: number, resistance: number): Analo
  */
 function makeAcCapacitor(nodeA: number, nodeB: number, capacitance: number): AnalogElement {
   return {
-    pinNodeIds: [nodeA, nodeB],
-    allNodeIds: [nodeA, nodeB],
+    label: "",
+    _pinNodes: new Map([["A", nodeA], ["B", nodeB]]),
+    _stateBase: -1,
     branchIndex: -1,
     ngspiceLoadOrder: 0,
-    isNonlinear: false,
-    isReactive: true,
+    setup(_ctx): void {},
     load(_ctx: LoadContext): void {},
     setParam(_key: string, _value: number): void {},
     getPinCurrents(_v: Float64Array): number[] { return [0, 0]; },
@@ -105,12 +105,12 @@ function makeAcCapacitor(nodeA: number, nodeB: number, capacitance: number): Ana
  */
 function makeAcInductor(nodeA: number, nodeB: number, inductance: number): AnalogElement {
   return {
-    pinNodeIds: [nodeA, nodeB],
-    allNodeIds: [nodeA, nodeB],
+    label: "",
+    _pinNodes: new Map([["A", nodeA], ["B", nodeB]]),
+    _stateBase: -1,
     branchIndex: -1,
     ngspiceLoadOrder: 0,
-    isNonlinear: false,
-    isReactive: true,
+    setup(_ctx): void {},
     load(_ctx: LoadContext): void {},
     setParam(_key: string, _value: number): void {},
     getPinCurrents(_v: Float64Array): number[] { return [0, 0]; },

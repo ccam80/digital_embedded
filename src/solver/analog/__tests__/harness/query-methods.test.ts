@@ -28,35 +28,120 @@ import { captureTopology, buildElementLabelMap } from "./capture.js";
 import { ComparisonSession } from "./comparison-session.js";
 import type { ComparedValue } from "./types.js";
 import type { ConcreteCompiledAnalogCircuit } from "../../analog-engine.js";
-import { isPoolBacked } from "../../element.js";
-import type { AnalogElementCore } from "../../element.js";
-import { StatePool } from "../../state-pool.js";
-import { makeResistor, makeVoltageSource, makeDiode } from "../test-helpers.js";
+import { allocateStatePool, makeSimpleCtx } from "../test-helpers.js";
+import { makeDcVoltageSource, DC_VOLTAGE_SOURCE_DEFAULTS } from "../../../../components/sources/dc-voltage-source.js";
+import { PropertyBag } from "../../../../core/properties.js";
+import type { AnalogElement } from "../../element.js";
+import type { SetupContext } from "../../setup-context.js";
+import type { LoadContext } from "../../load-context.js";
+import { NGSPICE_LOAD_ORDER } from "../../../../core/analog-types.js";
 import type { ComponentRegistry } from "../../../../core/registry.js";
 import { DefaultSimulatorFacade } from "../../../../headless/default-facade.js";
 
 // ---------------------------------------------------------------------------
-// Test helpers — copied from harness-integration.test.ts
+// Minimal inline element factories — implement the new AnalogElement contract.
+// These exist only to give the engine a functioning circuit; they are NOT
+// testing element correctness.
 // ---------------------------------------------------------------------------
 
-function buildStatePool(elements: AnalogElementCore[]): StatePool {
-  let offset = 0;
-  for (const el of elements) {
-    if (isPoolBacked(el)) { el.stateBaseOffset = offset; offset += el.stateSize; }
-  }
-  const pool = new StatePool(offset);
-  for (const el of elements) {
-    if (isPoolBacked(el)) el.initState(pool);
-  }
-  return pool;
+function makeResistorEl(nodeA: number, nodeB: number, resistance: number): AnalogElement {
+  let _hPP = -1, _hNN = -1, _hPN = -1, _hNP = -1;
+  const G = 1 / resistance;
+  const el: AnalogElement = {
+    label: "",
+    ngspiceLoadOrder: NGSPICE_LOAD_ORDER.RES,
+    _pinNodes: new Map([["A", nodeA], ["B", nodeB]]),
+    _stateBase: -1,
+    branchIndex: -1,
+    setup(ctx: SetupContext) {
+      const s = ctx.solver;
+      const p = el._pinNodes.get("A")!;
+      const n = el._pinNodes.get("B")!;
+      _hPP = s.allocElement(p, p);
+      _hNN = s.allocElement(n, n);
+      _hPN = s.allocElement(p, n);
+      _hNP = s.allocElement(n, p);
+    },
+    load(ctx: LoadContext) {
+      ctx.solver.stampElement(_hPP, G);
+      ctx.solver.stampElement(_hNN, G);
+      ctx.solver.stampElement(_hPN, -G);
+      ctx.solver.stampElement(_hNP, -G);
+    },
+    getPinCurrents(_rhs: Float64Array): number[] { return []; },
+    setParam(_key: string, _value: number): void {},
+  };
+  return el;
 }
 
+function makeDiodeEl(nodeA: number, nodeK: number, IS: number, N: number): AnalogElement {
+  let _hAA = -1, _hKK = -1, _hAK = -1, _hKA = -1;
+  const VT = 0.025852;
+  let _vd = 0;
+  const el: AnalogElement = {
+    label: "",
+    ngspiceLoadOrder: NGSPICE_LOAD_ORDER.DIO,
+    _pinNodes: new Map([["A", nodeA], ["K", nodeK]]),
+    _stateBase: -1,
+    branchIndex: -1,
+    setup(ctx: SetupContext) {
+      const s = ctx.solver;
+      _hAA = s.allocElement(nodeA, nodeA);
+      _hKK = s.allocElement(nodeK, nodeK);
+      _hAK = s.allocElement(nodeA, nodeK);
+      _hKA = s.allocElement(nodeK, nodeA);
+    },
+    load(ctx: LoadContext) {
+      const vA = ctx.rhsOld[nodeA] ?? 0;
+      const vK = ctx.rhsOld[nodeK] ?? 0;
+      _vd = vA - vK;
+      const expArg = Math.min(_vd / (N * VT), 40);
+      const Id = IS * (Math.exp(expArg) - 1);
+      const Gd = IS * Math.exp(expArg) / (N * VT);
+      const Ieq = Id - Gd * _vd;
+      ctx.solver.stampElement(_hAA, Gd);
+      ctx.solver.stampElement(_hKK, Gd);
+      ctx.solver.stampElement(_hAK, -Gd);
+      ctx.solver.stampElement(_hKA, -Gd);
+      ctx.rhs[nodeA] -= Ieq;
+      ctx.rhs[nodeK] += Ieq;
+    },
+    checkConvergence(ctx: LoadContext): boolean {
+      const vA = ctx.rhsOld[nodeA] ?? 0;
+      const vK = ctx.rhsOld[nodeK] ?? 0;
+      const vdNew = vA - vK;
+      return Math.abs(vdNew - _vd) < ctx.voltTol + ctx.reltol * Math.abs(vdNew);
+    },
+    getPinCurrents(_rhs: Float64Array): number[] { return []; },
+    setParam(_key: string, _value: number): void {},
+  };
+  return el;
+}
+
+// Helper: create a DC voltage source using the 3-arg production factory.
+
+function makeVsrc(posNode: number, negNode: number, voltage: number) {
+  const props = new PropertyBag();
+  props.replaceModelParams({ ...DC_VOLTAGE_SOURCE_DEFAULTS, voltage });
+  return makeDcVoltageSource(new Map([["pos", posNode], ["neg", negNode]]), props, () => 0);
+}
+
+// HWR circuit: V1(5V) — R1(1kΩ) — D1 in series
+// Node 1: V+ / R-top   Node 2: R-bottom / D-anode   Node 0: ground / D-cathode
+// matrixSize=3  (2 nodes + branch row at index 2 for voltage source)
+
 function makeHWR() {
-  const vs = makeVoltageSource(1, 0, 2, 5.0);
-  const r = makeResistor(1, 2, 1000);
-  const diode = makeDiode(2, 0, 1e-14, 1.0);
+  const vs = makeVsrc(1, 0, 5.0);
+  vs.label = "Vs";
+  const r = makeResistorEl(1, 2, 1000);
+  r.label = "R1";
+  const diode = makeDiodeEl(2, 0, 1e-14, 1.0);
+  diode.label = "D1";
+
+  const matrixSize = 3;
   const elements = [vs, r, diode];
-  const pool = buildStatePool(elements);
+  makeSimpleCtx({ elements, matrixSize, nodeCount: 2, startBranch: 2 });
+  const pool = allocateStatePool(elements);
   return {
     circuit: {
       netCount: 2, componentCount: 3, nodeCount: 2,
@@ -648,6 +733,15 @@ describe("toJSON", () => {
     // No Float64Array or Map in output (would fail JSON.stringify)
     const parsed = JSON.parse(str);
     expect(typeof parsed).toBe("object");
+    // Required top-level keys from the toJSON contract
+    expect(typeof parsed.analysis).toBe("string");
+    expect(parsed.analysis === "dcop" || parsed.analysis === "tran").toBe(true);
+    expect(typeof parsed.stepCount).toBe("object");
+    expect(typeof parsed.stepCount.ours).toBe("number");
+    expect(typeof parsed.stepCount.ngspice).toBe("number");
+    expect(Array.isArray(parsed.steps)).toBe(true);
+    // stepCount.ours must be positive (HWR session has at least 1 step)
+    expect(parsed.stepCount.ours).toBeGreaterThan(0);
   });
 
   it("52. opts.includeAllSteps:true includes step entries; default includes none for self-comparison (no divergences)", async () => {

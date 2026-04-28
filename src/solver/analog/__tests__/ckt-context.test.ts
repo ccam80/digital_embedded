@@ -4,15 +4,122 @@
  * Verifies:
  *   1. All Float64Array fields have correct lengths after construction.
  *   2. nrResult and dcopResult exist as mutable class instances with default values.
- *   3. Pre-computed element lists are populated correctly.
- *   4. Zero Float64Array allocations after initial construction (monkey-patch pattern).
+ *   3. Zero Float64Array allocations after initial construction (monkey-patch pattern).
  */
 
 import { describe, it, expect } from "vitest";
 import { CKTCircuitContext, NRResult, DcOpResult } from "../ckt-context.js";
-import { makeResistor, makeDiode, makeCapacitor, allocateStatePool } from "./test-helpers.js";
+import { allocateStatePool } from "./test-helpers.js";
 import { DEFAULT_SIMULATION_PARAMS } from "../../../core/analog-engine-interface.js";
 import { SparseSolver } from "../sparse-solver.js";
+import { NGSPICE_LOAD_ORDER } from "../../../core/analog-types.js";
+import type { AnalogElement } from "../element.js";
+import type { LoadContext } from "../load-context.js";
+import type { SetupContext } from "../setup-context.js";
+
+function makeResistor(nodeA: number, nodeB: number, resistance: number): AnalogElement {
+  const G = 1 / resistance;
+  let _hPP = -1, _hNN = -1, _hPN = -1, _hNP = -1;
+  const el: AnalogElement = {
+    label: "",
+    ngspiceLoadOrder: NGSPICE_LOAD_ORDER.RES,
+    _pinNodes: new Map([["A", nodeA], ["B", nodeB]]),
+    _stateBase: -1,
+    branchIndex: -1,
+    setup(ctx: SetupContext): void {
+      const s = ctx.solver;
+      if (nodeA !== 0) _hPP = s.allocElement(nodeA, nodeA);
+      if (nodeB !== 0) _hNN = s.allocElement(nodeB, nodeB);
+      if (nodeA !== 0 && nodeB !== 0) {
+        _hPN = s.allocElement(nodeA, nodeB);
+        _hNP = s.allocElement(nodeB, nodeA);
+      }
+    },
+    load(ctx: LoadContext): void {
+      const s = ctx.solver;
+      if (_hPP !== -1) s.stampElement(_hPP,  G);
+      if (_hNN !== -1) s.stampElement(_hNN,  G);
+      if (_hPN !== -1) s.stampElement(_hPN, -G);
+      if (_hNP !== -1) s.stampElement(_hNP, -G);
+    },
+    getPinCurrents(rhs: Float64Array): number[] {
+      const vA = rhs[nodeA] ?? 0;
+      const vB = rhs[nodeB] ?? 0;
+      return [G * (vA - vB), G * (vB - vA)];
+    },
+    setParam(_key: string, _value: number): void {},
+  };
+  return el;
+}
+
+function makeDiode(nodeAnode: number, nodeCathode: number, IS: number, N: number): AnalogElement {
+  const VT = 0.025852;
+  let _hAA = -1, _hKK = -1, _hAK = -1, _hKA = -1;
+  const el: AnalogElement = {
+    label: "",
+    ngspiceLoadOrder: NGSPICE_LOAD_ORDER.DIO,
+    _pinNodes: new Map([["A", nodeAnode], ["K", nodeCathode]]),
+    _stateBase: -1,
+    branchIndex: -1,
+    setup(ctx: SetupContext): void {
+      const s = ctx.solver;
+      if (nodeAnode !== 0) _hAA = s.allocElement(nodeAnode, nodeAnode);
+      if (nodeCathode !== 0) _hKK = s.allocElement(nodeCathode, nodeCathode);
+      if (nodeAnode !== 0 && nodeCathode !== 0) {
+        _hAK = s.allocElement(nodeAnode, nodeCathode);
+        _hKA = s.allocElement(nodeCathode, nodeAnode);
+      }
+    },
+    load(ctx: LoadContext): void {
+      const vA = ctx.rhsOld[nodeAnode] ?? 0;
+      const vK = ctx.rhsOld[nodeCathode] ?? 0;
+      const vD = Math.min(vA - vK, 0.7);
+      const Id = IS * (Math.exp(vD / (N * VT)) - 1);
+      const Gd = IS / (N * VT) * Math.exp(vD / (N * VT));
+      const Ieq = Id - Gd * vD;
+      const s = ctx.solver;
+      if (_hAA !== -1) s.stampElement(_hAA,  Gd);
+      if (_hKK !== -1) s.stampElement(_hKK,  Gd);
+      if (_hAK !== -1) s.stampElement(_hAK, -Gd);
+      if (_hKA !== -1) s.stampElement(_hKA, -Gd);
+      if (nodeAnode !== 0) ctx.rhs[nodeAnode] -= Ieq;
+      if (nodeCathode !== 0) ctx.rhs[nodeCathode] += Ieq;
+    },
+    getPinCurrents(_rhs: Float64Array): number[] { return [0, 0]; },
+    setParam(_key: string, _value: number): void {},
+  };
+  return el;
+}
+
+function makeCapacitor(nodePos: number, nodeNeg: number, _capacitance: number): AnalogElement {
+  let _hPP = -1, _hNN = -1, _hPN = -1, _hNP = -1;
+  const el: AnalogElement = {
+    label: "",
+    ngspiceLoadOrder: NGSPICE_LOAD_ORDER.CAP,
+    _pinNodes: new Map([["pos", nodePos], ["neg", nodeNeg]]),
+    _stateBase: -1,
+    branchIndex: -1,
+    setup(ctx: SetupContext): void {
+      const s = ctx.solver;
+      if (nodePos !== 0) _hPP = s.allocElement(nodePos, nodePos);
+      if (nodeNeg !== 0) _hNN = s.allocElement(nodeNeg, nodeNeg);
+      if (nodePos !== 0 && nodeNeg !== 0) {
+        _hPN = s.allocElement(nodePos, nodeNeg);
+        _hNP = s.allocElement(nodeNeg, nodePos);
+      }
+    },
+    load(ctx: LoadContext): void {
+      const s = ctx.solver;
+      if (_hPP !== -1) s.stampElement(_hPP,  0);
+      if (_hNN !== -1) s.stampElement(_hNN,  0);
+      if (_hPN !== -1) s.stampElement(_hPN,  0);
+      if (_hNP !== -1) s.stampElement(_hNP,  0);
+    },
+    getPinCurrents(_rhs: Float64Array): number[] { return [0, 0]; },
+    setParam(_key: string, _value: number): void {},
+  };
+  return el;
+}
 
 // ---------------------------------------------------------------------------
 // Test circuit factories
@@ -21,16 +128,14 @@ import { SparseSolver } from "../sparse-solver.js";
 /**
  * Build a minimal 10-node circuit for buffer-size assertions.
  * 9 nodes + 1 branch = matrixSize 10.
- * Includes 1 nonlinear element (diode), 1 reactive element (capacitor).
  */
 function makeTestCircuit(nodeCount = 9, branchCount = 1) {
   const matrixSize = nodeCount + branchCount;
 
-  // Elements with varying flags for pre-computed list tests
-  const r1 = makeResistor(1, 2, 1000);   // linear, non-reactive
+  const r1 = makeResistor(1, 2, 1000);
   const r2 = makeResistor(2, 3, 2000);
-  const d1 = makeDiode(3, 0, 1e-14, 1); // nonlinear + reactive, pool-backed, has checkConvergence
-  const cap = makeCapacitor(4, 0, 1e-9); // reactive, has getLteTimestep + acceptStep is absent
+  const d1 = makeDiode(3, 0, 1e-14, 1);
+  const cap = makeCapacitor(4, 0, 1e-9);
   const elements = [r1, r2, d1, cap];
 
   const pool = allocateStatePool(elements);
@@ -39,26 +144,6 @@ function makeTestCircuit(nodeCount = 9, branchCount = 1) {
     nodeCount,
     branchCount,
     matrixSize,
-    elements,
-    statePool: pool,
-  };
-}
-
-/**
- * Build a circuit with explicit element flags for list-matching tests.
- */
-function makeListTestCircuit() {
-  const r = makeResistor(1, 2, 100);    // isNonlinear=false, isReactive=false
-  const d = makeDiode(2, 0, 1e-14, 1); // isNonlinear=true, isReactive=true, poolBacked=true
-  const c = makeCapacitor(1, 0, 1e-6); // isNonlinear=false, isReactive=true
-  const elements = [r, d, c];
-
-  const pool = allocateStatePool(elements);
-
-  return {
-    nodeCount: 2,
-    branchCount: 0,
-    matrixSize: 2,
     elements,
     statePool: pool,
   };
@@ -137,10 +222,6 @@ describe("CKTCircuitContext", () => {
     expect(ctx.dcopResult.iterations).toBe(0);
     expect(ctx.dcopResult.nodeVoltages).toBeInstanceOf(Float64Array);
 
-    // Pre-computed element lists are populated
-    expect(ctx.nonlinearElements.length).toBeGreaterThan(0);
-    expect(ctx.reactiveElements.length).toBeGreaterThan(0);
-
     expect(ctx.nodeCount).toBe(circuit.nodeCount);
 
     // statePool is set
@@ -188,56 +269,6 @@ describe("CKTCircuitContext", () => {
     } finally {
       // Always restore, even if assertion throws
       globalThis.Float64Array = RealF64;
-    }
-  });
-
-  // -------------------------------------------------------------------------
-  // Test: precomputed_lists_match_element_flags
-  // -------------------------------------------------------------------------
-
-  it("precomputed_lists_match_element_flags", () => {
-    const circuit = makeListTestCircuit();
-    const ctx = new CKTCircuitContext(circuit, defaultParams, noopBreakpoint, new SparseSolver());
-
-    // nonlinearElements: exactly elements with isNonlinear === true
-    const expectedNonlinear = circuit.elements.filter(el => el.isNonlinear);
-    expect(ctx.nonlinearElements.length).toBe(expectedNonlinear.length);
-    for (const el of expectedNonlinear) {
-      expect(ctx.nonlinearElements).toContain(el);
-    }
-
-    // reactiveElements: exactly elements with isReactive === true
-    const expectedReactive = circuit.elements.filter(el => el.isReactive);
-    expect(ctx.reactiveElements.length).toBe(expectedReactive.length);
-    for (const el of expectedReactive) {
-      expect(ctx.reactiveElements).toContain(el);
-    }
-
-    // elementsWithConvergence: elements implementing checkConvergence()
-    const expectedWithConvergence = circuit.elements.filter(
-      el => typeof (el as { checkConvergence?: unknown }).checkConvergence === "function",
-    );
-    expect(ctx.elementsWithConvergence.length).toBe(expectedWithConvergence.length);
-    for (const el of expectedWithConvergence) {
-      expect(ctx.elementsWithConvergence).toContain(el);
-    }
-
-    // elementsWithLte: elements implementing getLteTimestep()
-    const expectedWithLte = circuit.elements.filter(
-      el => typeof (el as { getLteTimestep?: unknown }).getLteTimestep === "function",
-    );
-    expect(ctx.elementsWithLte.length).toBe(expectedWithLte.length);
-    for (const el of expectedWithLte) {
-      expect(ctx.elementsWithLte).toContain(el);
-    }
-
-    // elementsWithAcceptStep: elements implementing acceptStep()
-    const expectedWithAcceptStep = circuit.elements.filter(
-      el => typeof (el as { acceptStep?: unknown }).acceptStep === "function",
-    );
-    expect(ctx.elementsWithAcceptStep.length).toBe(expectedWithAcceptStep.length);
-    for (const el of expectedWithAcceptStep) {
-      expect(ctx.elementsWithAcceptStep).toContain(el);
     }
   });
 

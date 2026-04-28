@@ -38,7 +38,7 @@ import {
   type AttributeMapping,
   type ComponentDefinition,
 } from "../../core/registry.js";
-import type { AnalogElementCore, PoolBackedAnalogElementCore, ReactiveAnalogElement, IntegrationMethod, LoadContext } from "../../solver/analog/element.js";
+import type { AnalogElement, PoolBackedAnalogElement, IntegrationMethod, LoadContext } from "../../solver/analog/element.js";
 import { NGSPICE_LOAD_ORDER } from "../../solver/analog/element.js";
 import type { SetupContext } from "../../solver/analog/setup-context.js";
 import { MODETRAN, MODETRANOP, MODEINITPRED, MODEINITTRAN, MODEAC, MODEDC, MODEUIC, MODEINITJCT } from "../../solver/analog/ckt-mode.js";
@@ -257,30 +257,25 @@ function makeClampDiodeProps(): PropertyBag {
 // AnalogPolarizedCapElement  MNA implementation
 // ---------------------------------------------------------------------------
 
-export class AnalogPolarizedCapElement implements ReactiveAnalogElement {
-  pinNodeIds!: readonly number[];
-  allNodeIds!: readonly number[];
-  readonly branchIndex: number = -1;
+export class AnalogPolarizedCapElement implements PoolBackedAnalogElement {
+  label: string = "";
+  branchIndex: number = -1;
   _stateBase: number = -1;
   _pinNodes: Map<string, number> = new Map();
 
   readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.CAP;
-  readonly isNonlinear: boolean = true;
-  readonly isReactive = true;
   readonly poolBacked = true as const;
 
   readonly stateSchema = POLARIZED_CAP_SCHEMA;
   // PC-W3-1: total state = cap-body slots + clamp diode slots (dioload.c:245-265)
   readonly stateSize = POLARIZED_CAP_SCHEMA.size + CLAMP_DIODE_STATE_SIZE; // 5 + 4 = 9 slots
-  stateBaseOffset = -1;
 
   private _nCap: number = -1;
+  private readonly _internalLabels: string[] = [];
   private _hESR_PP: number = -1;      private _hESR_NN: number = -1;
   private _hESR_PN: number = -1;      private _hESR_NP: number = -1;
   private _hLEAK_PP: number = -1;     private _hLEAK_NN: number = -1;
   private _hLEAK_PN: number = -1;     private _hLEAK_NP: number = -1;
-  private _hDIO_PP_clamp: number = -1; private _hDIO_NN_clamp: number = -1;
-  private _hDIO_PN_clamp: number = -1; private _hDIO_NP_clamp: number = -1;
   private _hCAP_PP: number = -1;      private _hCAP_NN: number = -1;
   private _hCAP_PN: number = -1;      private _hCAP_NP: number = -1;
 
@@ -294,12 +289,10 @@ export class AnalogPolarizedCapElement implements ReactiveAnalogElement {
 
   // PC-W3-1: clamp diode sub-element (F4b composition  dioload.c:245-265)
   // Oriented: A=nNeg, K=nPos so it conducts when cap is reverse-biased.
-  private readonly _clampDiode: PoolBackedAnalogElementCore;
+  private readonly _clampDiode: PoolBackedAnalogElement;
 
   private readonly _emitDiagnostic: (diag: Diagnostic) => void;
   private _reverseBiasDiagEmitted: boolean = false;
-
-  label?: string;
 
   /**
    * @param capacitance    - Capacitance in farads
@@ -319,7 +312,7 @@ export class AnalogPolarizedCapElement implements ReactiveAnalogElement {
     emitDiagnostic: (diag: Diagnostic) => void,
     IC: number,
     M: number,
-    clampDiode: PoolBackedAnalogElementCore,
+    clampDiode: PoolBackedAnalogElement,
   ) {
     this.C = capacitance;
     this.G_esr = 1 / Math.max(esr, MIN_RESISTANCE);
@@ -338,8 +331,10 @@ export class AnalogPolarizedCapElement implements ReactiveAnalogElement {
 
     // Allocate internal node n_cap (junction between ESR and cap body).
     // No ngspice primitive equivalent — digiTS-internal topology extension.
-    const nCap = ctx.makeVolt(this.label ?? "", "cap");
+    const nCap = ctx.makeVolt(this.label, "cap");
     this._nCap = nCap;
+    this._internalLabels.length = 0;
+    this._internalLabels.push("cap");
 
     // State slots — 9 total (5 cap body + 4 clamp diode).
     this._stateBase = ctx.allocStates(this.stateSize);
@@ -356,6 +351,12 @@ export class AnalogPolarizedCapElement implements ReactiveAnalogElement {
     this._hLEAK_PN = solver.allocElement(nCap,    negNode);
     this._hLEAK_NP = solver.allocElement(negNode, nCap);
 
+    // Pre-partition the clamp diode's state region inside the composite's
+    // 9-slot allocation (5 cap-body + 4 diode). The diode's setup has an
+    // idempotent guard so it skips its own allocStates when _stateBase is
+    // already set. C.4 fix — eliminates the per-step state-base patching
+    // dance previously needed in tests.
+    this._clampDiode._stateBase = this._stateBase + POLARIZED_CAP_SCHEMA.size;
     // Clamp diode sub-element setup (diosetup.c pattern, anode=neg, cathode=pos).
     this._clampDiode.setup(ctx);
 
@@ -367,15 +368,21 @@ export class AnalogPolarizedCapElement implements ReactiveAnalogElement {
   }
 
   initState(pool: StatePoolRef): void {
+    if (this._stateBase === -1) {
+      throw new Error("AnalogPolarizedCapElement.initState called before setup()");
+    }
     this._pool = pool;
-    this.stateBaseOffset = this._stateBase;
-    applyInitialValues(POLARIZED_CAP_SCHEMA, pool, this.stateBaseOffset, {});
-    // PC-W3-1: wire clamp diode to its partitioned state region (after cap-body slots).
-    this._clampDiode.stateBaseOffset = this.stateBaseOffset + POLARIZED_CAP_SCHEMA.size;
+    applyInitialValues(POLARIZED_CAP_SCHEMA, pool, this._stateBase, {});
+    // _clampDiode._stateBase was pre-partitioned inside setup() (C.4 fix);
+    // initState only needs to forward to the diode now.
     this._clampDiode.initState(pool);
   }
 
   setParam(_key: string, _value: number): void {}
+
+  getInternalNodeLabels(): readonly string[] {
+    return this._internalLabels;
+  }
 
   /**
    * Unified load()  ESR + leakage stamps + capacitor companion + clamp diode + polarity check.
@@ -397,7 +404,7 @@ export class AnalogPolarizedCapElement implements ReactiveAnalogElement {
     const nPos = this._pinNodes.get("pos")!;
     const nNeg = this._pinNodes.get("neg")!;
     const nCap = this._nCap;
-    const base = this.stateBaseOffset;
+    const base = this._stateBase;
     const m = this._M; // PC-W3-6: capload.c:44 CAPm
     // pool.states[N] accessed at call time  no cached Float64Array refs (A4).
     const s0 = this._pool.states[0];
@@ -557,7 +564,7 @@ export class AnalogPolarizedCapElement implements ReactiveAnalogElement {
     method: IntegrationMethod,
     lteParams: import("../../solver/analog/ckt-terr.js").LteParams,
   ): number {
-    const base = this.stateBaseOffset;
+    const base = this._stateBase;
     const s0 = this._pool.states[0];
     const s1 = this._pool.states[1];
     const s2 = this._pool.states[2];
@@ -581,7 +588,7 @@ function createPolarizedCapElement(
   pinNodes: ReadonlyMap<string, number>,
   props: PropertyBag,
   _getTime: () => number,
-): AnalogElementCore {
+): AnalogElement {
   const p = {
     capacitance:    props.getModelParam<number>("capacitance"),
     esr:            props.getModelParam<number>("esr"),
@@ -601,7 +608,7 @@ function createPolarizedCapElement(
     ["A", pinNodes.get("neg")!], // anode = nNeg
     ["K", pinNodes.get("pos")!], // cathode = nPos
   ]);
-  const clampDiode = createDiodeElement(clampPinNodes, makeClampDiodeProps()) as PoolBackedAnalogElementCore;
+  const clampDiode = createDiodeElement(clampPinNodes, makeClampDiodeProps(), () => 0) as PoolBackedAnalogElement;
 
   const el = new AnalogPolarizedCapElement(
     p.capacitance,
@@ -615,8 +622,6 @@ function createPolarizedCapElement(
   );
 
   el._pinNodes = new Map(pinNodes);
-  el.pinNodeIds = [pinNodes.get("pos")!, pinNodes.get("neg")!];
-  el.allNodeIds = el.pinNodeIds;
 
   el.setParam = function(key: string, value: number): void {
     if (key in p) {
@@ -743,7 +748,6 @@ export const PolarizedCapDefinition: ComponentDefinition = {
       factory: createPolarizedCapElement,
       paramDefs: POLARIZED_CAP_PARAM_DEFS,
       params: POLARIZED_CAP_MODEL_DEFAULTS,
-      mayCreateInternalNodes: true,
     },
   },
   defaultModel: "behavioral",

@@ -113,19 +113,12 @@ function buildCCCSPinDeclarations(): PinDeclaration[] {
 /**
  * MNA analog element for a Current-Controlled Current Source.
  *
- * pinNodeIds index ordering (pinLayout order):
- *   [0] = sense+ node  (not used directly in stamps — sense via contBranch)
- *   [1] = sense- node  (not used directly in stamps)
- *   [2] = out+   node  (CCCSposNode)
- *   [3] = out-   node  (CCCSnegNode)
- *
- * No own branch row. Controlling branch resolved at setup() time.
+ * sense+ and sense- form the current sense port; out+ and out- are the output
+ * current source terminals. No own branch row — controlling branch resolved
+ * at setup() time.
  */
 export class CCCSAnalogElement extends ControlledSourceElement {
-  branchIndex: number = -1;
   readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.CCCS;
-  _stateBase: number = -1;
-  _pinNodes: Map<string, number> = new Map();
 
   // senseSourceLabel — the label of the controlling VSRC/CCVS/VCVS/IND.
   // Must be set via setParam("senseSourceLabel", label) before setup() runs.

@@ -19,15 +19,15 @@
  * calibrated, i.e. when rLight == rDark).
  *
  * MNA topology:
- *   pinNodeIds[0] = n_pos
- *   pinNodeIds[1] = n_neg
+ *   _pinNodes["pos"] = n_pos
+ *   _pinNodes["neg"] = n_neg
  *   branchIndex    = -1
  *
  * Unified load() pipeline (matches ngspice DEVload):
  *   load(ctx)  stamps conductance 1/R(lux) between terminals every NR iteration
  */
 
-import type { AnalogElementCore } from "../../core/analog-types.js";
+import type { AnalogElement } from "../../core/analog-types.js";
 import { NGSPICE_LOAD_ORDER } from "../../core/analog-types.js";
 import type { LoadContext } from "../../solver/analog/load-context.js";
 import type { SetupContext } from "../../solver/analog/setup-context.js";
@@ -70,12 +70,10 @@ export const { paramDefs: LDR_PARAM_DEFS, defaults: LDR_DEFAULTS } = defineModel
 // LDRElement  MNA implementation
 // ---------------------------------------------------------------------------
 
-export class LDRElement implements AnalogElementCore {
-  pinNodeIds!: readonly number[];  // set by compiler via Object.assign after factory returns
-  readonly branchIndex: number = -1;
+export class LDRElement implements AnalogElement {
+  label: string = "";
+  branchIndex: number = -1;
   readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.RES;
-  readonly isNonlinear: boolean = true;
-  readonly isReactive: boolean = false;
   _stateBase: number = -1;
   _pinNodes: Map<string, number> = new Map();
 
@@ -150,11 +148,8 @@ export class LDRElement implements AnalogElementCore {
   }
 
   getPinCurrents(rhs: Float64Array): number[] {
-    // No branch row  compute from constitutive equation: I = G * (V_pos - V_neg).
-    // pinNodeIds[0] = n_pos (pos pin, index 0 in pinLayout).
-    // pinNodeIds[1] = n_neg (neg pin, index 1 in pinLayout).
-    const nPos = this.pinNodeIds[0];
-    const nNeg = this.pinNodeIds[1];
+    const nPos = this._pinNodes.get("pos")!;
+    const nNeg = this._pinNodes.get("neg")!;
     const vPos = rhs[nPos];
     const vNeg = rhs[nNeg];
     const G = 1 / this.resistance();
@@ -170,15 +165,14 @@ export class LDRElement implements AnalogElementCore {
 export function createLDRElement(
   pinNodes: ReadonlyMap<string, number>,
   props: PropertyBag,
-  _getTime?: () => number,
-): AnalogElementCore {
+  _getTime: () => number,
+): AnalogElement {
   const rDark = props.getModelParam<number>("rDark");
   const luxRef = props.getModelParam<number>("luxRef");
   const gamma = props.getModelParam<number>("gamma");
   const lux = props.getModelParam<number>("lux");
   const el = new LDRElement(rDark, luxRef, gamma, lux);
   el._pinNodes = new Map(pinNodes);
-  el.pinNodeIds = [pinNodes.get("pos")!, pinNodes.get("neg")!];
   return el;
 }
 

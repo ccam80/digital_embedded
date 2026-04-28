@@ -27,7 +27,47 @@ import {
   fuseCircuit,
   wrapHandElements,
 } from "./fixtures/analog-fixtures.js";
-import { makeResistor, makeVoltageSource } from "./test-helpers.js";
+import { makeDcVoltageSource } from "../../../components/sources/dc-voltage-source.js";
+import { PropertyBag } from "../../../core/properties.js";
+import { NGSPICE_LOAD_ORDER } from "../../../core/analog-types.js";
+import type { AnalogElement } from "../element.js";
+import type { LoadContext } from "../load-context.js";
+import type { SetupContext } from "../setup-context.js";
+
+function makeResistor(nodeA: number, nodeB: number, resistance: number): AnalogElement {
+  const G = 1 / resistance;
+  let _hPP = -1, _hNN = -1, _hPN = -1, _hNP = -1;
+  const el: AnalogElement = {
+    label: "",
+    ngspiceLoadOrder: NGSPICE_LOAD_ORDER.RES,
+    _pinNodes: new Map([["A", nodeA], ["B", nodeB]]),
+    _stateBase: -1,
+    branchIndex: -1,
+    setup(ctx: SetupContext): void {
+      const s = ctx.solver;
+      if (nodeA !== 0) _hPP = s.allocElement(nodeA, nodeA);
+      if (nodeB !== 0) _hNN = s.allocElement(nodeB, nodeB);
+      if (nodeA !== 0 && nodeB !== 0) {
+        _hPN = s.allocElement(nodeA, nodeB);
+        _hNP = s.allocElement(nodeB, nodeA);
+      }
+    },
+    load(ctx: LoadContext): void {
+      const s = ctx.solver;
+      if (_hPP !== -1) s.stampElement(_hPP,  G);
+      if (_hNN !== -1) s.stampElement(_hNN,  G);
+      if (_hPN !== -1) s.stampElement(_hPN, -G);
+      if (_hNP !== -1) s.stampElement(_hNP, -G);
+    },
+    getPinCurrents(rhs: Float64Array): number[] {
+      const vA = rhs[nodeA] ?? 0;
+      const vB = rhs[nodeB] ?? 0;
+      return [G * (vA - vB), G * (vB - vA)];
+    },
+    setParam(_key: string, _value: number): void {},
+  };
+  return el;
+}
 
 // ---------------------------------------------------------------------------
 // MNAEngine — core behaviour
@@ -270,12 +310,11 @@ describe("MNAEngine", () => {
     const scheduledEdges: number[] = [];
 
     const pulseElement = {
-      pinNodeIds: [] as number[],
-      allNodeIds: [] as number[],
+      label: "",
+      _pinNodes: new Map<string, number>(),
+      _stateBase: -1 as number,
       branchIndex: -1 as number,
       ngspiceLoadOrder: 0,
-      isNonlinear: false,
-      isReactive: false,
       setup(_ctx: unknown) {},
       setParam(_k: string, _v: number) {},
       load(_ctx: unknown) {},
@@ -290,7 +329,7 @@ describe("MNAEngine", () => {
     const compiled = wrapHandElements({
       nodeCount: 2,
       elements: [
-        makeVoltageSource(1, 0, 2, 5.0),
+        makeDcVoltageSource(new Map([["pos", 1], ["neg", 0]]), new PropertyBag([["voltage", 5.0]]), () => 0),
         makeResistor(1, 2, 1000),
         makeResistor(2, 0, 1000),
         pulseElement as unknown as import("../element.js").AnalogElement,

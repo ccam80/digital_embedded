@@ -25,7 +25,7 @@ import {
   type ComponentDefinition,
   type ComponentLayout,
 } from "../../core/registry.js";
-import type { AnalogElementCore } from "../../core/analog-types.js";
+import type { AnalogElement } from "../../core/analog-types.js";
 import { NGSPICE_LOAD_ORDER } from "../../core/analog-types.js";
 import type { LoadContext } from "../../solver/analog/load-context.js";
 import type { SetupContext } from "../../solver/analog/setup-context.js";
@@ -182,18 +182,17 @@ export function executePFET(index: number, state: Uint32Array, highZs: Uint32Arr
 }
 
 // ---------------------------------------------------------------------------
-// PFETAnalogElement — AnalogElementCore implementation (composite, delegates to SW)
+// PFETAnalogElement — AnalogElement implementation (composite, delegates to SW)
 //
 // PFET is structurally identical to NFET — same 4-stamp SW setup.
 // Polarity inversion: control voltage is V(S) - V(G) (inverted vs NFET).
 // ngspice anchor: ref/ngspice/src/spicelib/devices/sw/swsetup.c:47-62
 // ---------------------------------------------------------------------------
 
-export class PFETAnalogElement implements AnalogElementCore {
+export class PFETAnalogElement implements AnalogElement {
+  label: string = "";
   branchIndex: number = -1;
   readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.SW;
-  readonly isNonlinear: boolean = false;
-  readonly isReactive: boolean = false;
   _stateBase: number = -1;
   _pinNodes: Map<string, number> = new Map();
 

@@ -39,7 +39,7 @@ import {
 import type { LoadContext } from "../../solver/analog/element.js";
 import { NGSPICE_LOAD_ORDER } from "../../solver/analog/element.js";
 import type { SetupContext } from "../../solver/analog/setup-context.js";
-import type { AnalogElementCore } from "../../core/analog-types.js";
+import type { AnalogElement } from "../../core/analog-types.js";
 import { AnalogInductorElement, INDUCTOR_DEFAULTS } from "../passives/inductor.js";
 import { SwitchAnalogElement } from "./switch.js";
 
@@ -61,25 +61,15 @@ const RELAY_I_PULL_DEFAULT = 20e-3;
 // ---------------------------------------------------------------------------
 
 export class RelayInductorSubElement extends AnalogInductorElement {
-  // Handle fields — port of indsetup.c:96-100 TSTALLOC sequence
-  _hPIbr: number = -1;   // (INDposNode, INDbrEq)
-  _hNIbr: number = -1;   // (INDnegNode, INDbrEq)
-  _hIbrN: number = -1;   // (INDbrEq, INDnegNode)
-  _hIbrP: number = -1;   // (INDbrEq, INDposNode)
-  _hIbrIbr: number = -1; // (INDbrEq, INDbrEq)
+  // Handle fields (_hPIbr, _hNIbr, _hIbrN, _hIbrP, _hIbrIbr) are inherited
+  // from AnalogInductorElement (protected) — port of indsetup.c:96-100 TSTALLOC sequence.
 
   private readonly _elementLabel: string;
 
   constructor(label: string, inductance: number) {
-    super(
-      inductance,
-      INDUCTOR_DEFAULTS["IC"]!,
-      INDUCTOR_DEFAULTS["TC1"]!,
-      INDUCTOR_DEFAULTS["TC2"]!,
-      INDUCTOR_DEFAULTS["TNOM"]!,
-      INDUCTOR_DEFAULTS["SCALE"]!,
-      INDUCTOR_DEFAULTS["M"]!,
-    );
+    const props = new PropertyBag();
+    props.replaceModelParams({ ...INDUCTOR_DEFAULTS, inductance });
+    super(new Map<string, number>(), props);
     this._elementLabel = label;
   }
 
@@ -89,7 +79,6 @@ export class RelayInductorSubElement extends AnalogInductorElement {
 
     // indsetup.c:78-79: *states += 2
     this._stateBase = ctx.allocStates(2);
-    this.stateBaseOffset = this._stateBase;
 
     // indsetup.c:84-87: idempotent branch-row guard
     if (this.branchIndex === -1) {
@@ -119,11 +108,10 @@ export class RelayInductorSubElement extends AnalogInductorElement {
 // ngspice anchor: ressetup.c:46-49
 // ---------------------------------------------------------------------------
 
-export class RelayResSubElement implements AnalogElementCore {
-  readonly branchIndex: number = -1;
+export class RelayResSubElement implements AnalogElement {
+  label: string = "";
+  branchIndex: number = -1;
   readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.RES;
-  readonly isNonlinear = false;
-  readonly isReactive = false;
   _stateBase: number = -1;
   _pinNodes: Map<string, number>;
 
@@ -179,7 +167,7 @@ export class RelayResSubElement implements AnalogElementCore {
 }
 
 // ---------------------------------------------------------------------------
-// RelayAnalogElement — W3 migrated composite class
+// RelayAnalogElement — composite AnalogElement
 //
 // Architecture: coilL (IND) + coilR (RES) + contactSW (SW)
 // ngspice anchors:
@@ -188,11 +176,10 @@ export class RelayResSubElement implements AnalogElementCore {
 //   contactSW: swsetup.c:47-62, swload.c
 // ---------------------------------------------------------------------------
 
-class RelayAnalogElement implements AnalogElementCore {
+class RelayAnalogElement implements AnalogElement {
+  label: string = "";
   branchIndex: number = -1;
   readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.IND;
-  readonly isNonlinear = true;
-  readonly isReactive = true;
   _stateBase: number = -1;
   _pinNodes: Map<string, number>;
 
@@ -204,6 +191,7 @@ class RelayAnalogElement implements AnalogElementCore {
   private readonly _label: string;
   private readonly _iPull: number;
   private readonly _normallyClosed: boolean;
+  private readonly _internalLabels: string[] = [];
 
   constructor(label: string, pinNodes: ReadonlyMap<string, number>, props: PropertyBag) {
     this._label = label;
@@ -238,6 +226,7 @@ class RelayAnalogElement implements AnalogElementCore {
   setup(ctx: SetupContext): void {
     // Allocate mid-node between coilL and coilR
     this._nCoilMid = ctx.makeVolt(this._label, "coilMid");
+    this._internalLabels.push("coilMid");
 
     // Wire coilL: in1 → coilMid
     this._coilL._pinNodes.set("B", this._nCoilMid);
@@ -255,6 +244,10 @@ class RelayAnalogElement implements AnalogElementCore {
 
     // Expose branch index (coilL's branch)
     this.branchIndex = this._coilL.branchIndex;
+  }
+
+  getInternalNodeLabels(): readonly string[] {
+    return this._internalLabels;
   }
 
   findBranchFor(name: string, ctx: SetupContext): number {
@@ -303,7 +296,7 @@ function createRelayAnalogElement(
   pinNodes: ReadonlyMap<string, number>,
   props: PropertyBag,
   _getTime: () => number,
-): AnalogElementCore {
+): AnalogElement {
   const label = (props.has("label") ? (props.get("label") as string) : undefined) ?? "Relay";
   return new RelayAnalogElement(label, pinNodes, props);
 }
@@ -580,7 +573,6 @@ export const RelayDefinition: ComponentDefinition = {
       factory: createRelayAnalogElement,
       paramDefs: [],
       params: {},
-      mayCreateInternalNodes: true,
     },
   },
   defaultModel: "digital",

@@ -115,19 +115,12 @@ function buildVCVSPinDeclarations(): PinDeclaration[] {
 /**
  * MNA analog element for a Voltage-Controlled Voltage Source.
  *
- * pinNodeIds index ordering (pinLayout order):
- *   [0] = ctrl+ node  (VCVScontPosNode)
- *   [1] = ctrl- node  (VCVScontNegNode)
- *   [2] = out+  node  (VCVSposNode)
- *   [3] = out-  node  (VCVSnegNode)
- *
+ * ctrl+ and ctrl- sense the control voltage; out+ and out- are the output
+ * voltage source terminals.
  * branchIndex: set during setup() via ctx.makeCur; -1 before setup().
  */
 export class VCVSAnalogElement extends ControlledSourceElement {
-  branchIndex: number = -1;
   readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.VCVS;
-  _stateBase: number = -1;
-  _pinNodes: Map<string, number> = new Map();
 
   // TSTALLOC handles — allocated in setup(), written in load()
   // vcvsset.c:53-58 line-for-line
@@ -359,15 +352,6 @@ export const VCVSDefinition: ComponentDefinition = {
       paramDefs: VCVS_PARAM_DEFS,
       params: VCVS_DEFAULTS,
       ngspiceNodeMap: { "out+": "pos", "out-": "neg", "ctrl+": "contPos", "ctrl-": "contNeg" },
-      findBranchFor(name: string, ctx: SetupContext): number {
-        const el = ctx.findDevice(name);
-        if (!el) return 0;
-        const vcvs = el as unknown as VCVSAnalogElement;
-        if (vcvs.branchIndex === -1) {
-          vcvs.branchIndex = ctx.makeCur(name, "branch");
-        }
-        return vcvs.branchIndex;
-      },
     },
   },
   defaultModel: "behavioral",

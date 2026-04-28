@@ -60,12 +60,11 @@ import {
   type AttributeMapping,
   type ComponentDefinition,
 } from "../../core/registry.js";
-import type { AnalogElementCore, LoadContext } from "../../solver/analog/element.js";
+import type { AnalogElement, LoadContext } from "../../solver/analog/element.js";
 import { NGSPICE_LOAD_ORDER } from "../../solver/analog/element.js";
 import type { SetupContext } from "../../solver/analog/setup-context.js";
 import { stampRHS } from "../../solver/analog/stamp-helpers.js";
 import { MODETRAN } from "../../solver/analog/ckt-mode.js";
-import type { SparseSolver } from "../../solver/analog/sparse-solver.js";
 import { defineModelParams } from "../../core/model-params.js";
 
 // ---------------------------------------------------------------------------
@@ -332,7 +331,8 @@ export class RealOpAmpElement extends AbstractCircuitElement {
 export function createRealOpAmpElement(
   pinNodes: ReadonlyMap<string, number>,
   props: PropertyBag,
-): AnalogElementCore {
+  _getTime: () => number,
+): AnalogElement {
   // Extract parameters from model param partition
   const p: Record<string, number> = {
     aol:      props.getModelParam<number>("aol"),
@@ -406,20 +406,6 @@ export function createRealOpAmpElement(
     return rhs[n];
   }
 
-  function stampCond(
-    solver: SparseSolver,
-    nA: number,
-    nB: number,
-    g: number,
-  ): void {
-    if (nA > 0) solver.stampElement(solver.allocElement(nA, nA), g);
-    if (nB > 0) solver.stampElement(solver.allocElement(nB, nB), g);
-    if (nA > 0 && nB > 0) {
-      solver.stampElement(solver.allocElement(nA, nB), -g);
-      solver.stampElement(solver.allocElement(nB, nA), -g);
-    }
-  }
-
   // Cached TSTALLOC handles — allocated once in setup(), used every NR iteration.
   let hInpInp = -1;  // (nInp, nInp) — input resistance G_in diagonal
   let hInnInn = -1;  // (nInn, nInn) — input resistance G_in diagonal
@@ -430,10 +416,9 @@ export function createRealOpAmpElement(
   let hOutInn  = -1; // (nOut, nInn)  — gain-stage Jacobian coupling
 
   return {
+    label: "",
     branchIndex: -1,
     ngspiceLoadOrder: NGSPICE_LOAD_ORDER.VCVS,
-    isNonlinear: true,
-    isReactive: true,
     _stateBase: -1,
     _pinNodes: new Map(pinNodes),
 
@@ -719,8 +704,8 @@ export const RealOpAmpDefinition: ComponentDefinition = {
   modelRegistry: {
     "behavioral": {
       kind: "inline",
-      factory: (pinNodes, props, _getTime) =>
-        createRealOpAmpElement(pinNodes, props),
+      factory: (pinNodes, props, getTime) =>
+        createRealOpAmpElement(pinNodes, props, getTime),
       paramDefs: REAL_OPAMP_PARAM_DEFS,
       params: REAL_OPAMP_DEFAULTS,
     },
@@ -729,8 +714,8 @@ export const RealOpAmpDefinition: ComponentDefinition = {
         name,
         {
           kind: "inline" as const,
-          factory: (pinNodes: ReadonlyMap<string, number>, props: PropertyBag, _getTime: () => number) =>
-            createRealOpAmpElement(pinNodes, props),
+          factory: (pinNodes: ReadonlyMap<string, number>, props: PropertyBag, getTime: () => number) =>
+            createRealOpAmpElement(pinNodes, props, getTime),
           paramDefs: REAL_OPAMP_PARAM_DEFS,
           params,
         },

@@ -3,12 +3,10 @@
  */
 
 import type { LoadContext } from "../element.js";
-import type { StatePoolRef } from "../element.js";
 import { NGSPICE_LOAD_ORDER } from "../element.js";
 import { readMnaVoltage, delegatePinSetParam } from "../digital-pin-model.js";
 import type { DigitalInputPinModel, DigitalOutputPinModel } from "../digital-pin-model.js";
 import type { AnalogElementFactory } from "../behavioral-gate.js";
-import type { SetupContext } from "../setup-context.js";
 import type { Diagnostic } from "../../../compile/types.js";
 import { makeDiagnostic } from "../diagnostics.js";
 import type { AnalogCapacitorElement } from "../../../components/passives/capacitor.js";
@@ -20,12 +18,10 @@ import {
   makeOutputPin,
   FLIPFLOP_COMPOSITE_SCHEMA,
   buildChildElements,
-  computeChildStateSize,
-  initChildState,
-  loadChildren,
-  checkChildConvergence,
 } from "./shared.js";
 import type { StateSchema } from "../state-schema.js";
+import type { AnalogElement } from "../element.js";
+import { CompositeElement } from "../composite-element.js";
 
 // ---------------------------------------------------------------------------
 // BehavioralRSAsyncLatchElement (level-sensitive SR latch, no clock)
@@ -43,7 +39,10 @@ import type { StateSchema } from "../state-schema.js";
  *              currently latched Q state, then loads capacitor children.
  *   accept() — level-sensitive latching and diagnostic emission.
  */
-export class BehavioralRSAsyncLatchElement {
+export class BehavioralRSAsyncLatchElement extends CompositeElement {
+  readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.VCVS;
+  readonly stateSchema: StateSchema = FLIPFLOP_COMPOSITE_SCHEMA;
+
   private readonly _sPin: DigitalInputPinModel;
   private readonly _rPin: DigitalInputPinModel;
   private readonly _qPin: DigitalOutputPinModel;
@@ -56,19 +55,6 @@ export class BehavioralRSAsyncLatchElement {
 
   private readonly _pinModelsByLabel: ReadonlyMap<string, DigitalInputPinModel | DigitalOutputPinModel>;
 
-  pinNodeIds!: readonly number[];  // set by compiler via Object.assign after factory returns
-  readonly branchIndex: number = -1;
-  readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.VCVS;
-  readonly isNonlinear: true = true;
-  label?: string;
-
-  readonly poolBacked = true as const;
-  readonly stateSchema: StateSchema = FLIPFLOP_COMPOSITE_SCHEMA;
-  stateSize: number;
-  stateBaseOffset = -1;
-  _stateBase: number = -1;
-  _pinNodes: Map<string, number> = new Map();
-
   constructor(
     sPin: DigitalInputPinModel,
     rPin: DigitalInputPinModel,
@@ -78,25 +64,23 @@ export class BehavioralRSAsyncLatchElement {
     _vIL: number,
     pinModelsByLabel: ReadonlyMap<string, DigitalInputPinModel | DigitalOutputPinModel>,
   ) {
+    super();
     this._sPin = sPin;
     this._rPin = rPin;
     this._qPin = qPin;
     this._qBarPin = qBarPin;
     this._pinModelsByLabel = pinModelsByLabel;
     this._childElements = buildChildElements([sPin, rPin, qPin, qBarPin]);
-    this.stateSize = computeChildStateSize(this._childElements);
   }
 
-  get isReactive(): boolean {
-    return this._childElements.length > 0;
-  }
-
-  initState(pool: StatePoolRef): void {
-    initChildState(this._childElements, this.stateBaseOffset, pool);
-  }
-
-  checkConvergence(ctx: LoadContext): boolean {
-    return checkChildConvergence(this._childElements, ctx);
+  protected getSubElements(): readonly AnalogElement[] {
+    return [
+      this._sPin as unknown as AnalogElement,
+      this._rPin as unknown as AnalogElement,
+      this._qPin as unknown as AnalogElement,
+      this._qBarPin as unknown as AnalogElement,
+      ...this._childElements,
+    ];
   }
 
   setParam(key: string, value: number): void {
@@ -107,20 +91,7 @@ export class BehavioralRSAsyncLatchElement {
     return this._diagnostics;
   }
 
-  setup(ctx: SetupContext): void {
-    // Forward to every input pin model (level-sensitive — no clock pin)
-    this._sPin.setup(ctx);
-    this._rPin.setup(ctx);
-
-    // Forward to every output pin model (role "direct")
-    this._qPin.setup(ctx);
-    this._qBarPin.setup(ctx);
-
-    // Forward to every capacitor child collected from pin models
-    for (const child of this._childElements) child.setup(ctx);
-  }
-
-  load(ctx: LoadContext): void {
+  override load(ctx: LoadContext): void {
     // Delegate input stamping to pin models
     this._sPin.load(ctx);
     this._rPin.load(ctx);
@@ -130,7 +101,8 @@ export class BehavioralRSAsyncLatchElement {
     this._qPin.load(ctx);
     this._qBarPin.load(ctx);
 
-    loadChildren(this._childElements, ctx);
+    // Forward to capacitor children
+    for (const child of this._childElements) child.load(ctx);
   }
 
   /**
@@ -216,9 +188,11 @@ export function makeRSAsyncLatchAnalogFactory(): AnalogElementFactory {
       ["~Q", qBarPin],
     ]);
 
-    return new BehavioralRSAsyncLatchElement(
+    const el = new BehavioralRSAsyncLatchElement(
       sPin, rPin, qPin, qBarPin,
       sSpec.vIH, sSpec.vIL, pinModelsByLabel,
     );
+    el._pinNodes = new Map(pinNodes);
+    return el;
   };
 }

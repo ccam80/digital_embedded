@@ -18,13 +18,12 @@
 
 import { describe, it, expect } from "vitest";
 import { makeDcVoltageSource } from "../../sources/dc-voltage-source.js";
-import { withNodeIds, runDcOp, makeLoadCtx } from "../../../solver/analog/__tests__/test-helpers.js";
+import { makeLoadCtx, makeSimpleCtx } from "../../../solver/analog/__tests__/test-helpers.js";
 import { OTADefinition } from "../ota.js";
 import { PropertyBag } from "../../../core/properties.js";
 import type { AnalogElement } from "../../../solver/analog/element.js";
 import { SparseSolver } from "../../../solver/analog/sparse-solver.js";
 import { MODEDCOP, MODEINITFLOAT } from "../../../solver/analog/ckt-mode.js";
-import { makeSimpleCtx } from "../../../solver/analog/__tests__/test-helpers.js";
 import { solveDcOperatingPoint } from "../../../solver/analog/dc-operating-point.js";
 
 // ---------------------------------------------------------------------------
@@ -62,13 +61,10 @@ function makeOTAElement(
   const vt = opts.vt ?? 0.026;
   const props = new PropertyBag([]);
   props.replaceModelParams({ gmMax, vt });
-  return withNodeIds(
-    getFactory(OTADefinition.modelRegistry!["behavioral"]!)(
-      new Map([["V+", nVp], ["V-", nVm], ["Iabc", nIabc], ["OUT+", nOutP], ["OUT", nOutN]]),
-      props,
-      () => 0,
-    ),
-    [nVp, nVm, nIabc, nOutP, nOutN],
+  return getFactory(OTADefinition.modelRegistry!["behavioral"]!)(
+    new Map([["V+", nVp], ["V-", nVm], ["Iabc", nIabc], ["OUT+", nOutP], ["OUT", nOutN]]),
+    props,
+    () => 0,
   );
 }
 
@@ -79,12 +75,14 @@ function makeOTAElement(
 function makeInlineResistor(nodeA: number, nodeB: number, resistance: number): AnalogElement {
   const G = 1 / resistance;
   return {
-    pinNodeIds: [nodeA, nodeB],
-    allNodeIds: [nodeA, nodeB],
-    branchIndex: -1, isNonlinear: false, isReactive: false,
+    label: "",
+    _pinNodes: new Map<string, number>([["A", nodeA], ["B", nodeB]]),
+    _stateBase: -1,
+    branchIndex: -1,
     setParam(_key: string, _value: number): void {},
     getPinCurrents(): number[] { return []; },
     ngspiceLoadOrder: 0,
+    setup(_ctx): void {},
     load(ctx): void {
       const { solver } = ctx;
       if (nodeA > 0) { const h = solver.allocElement(nodeA, nodeA); solver.stampElement(h, G); }
@@ -98,6 +96,21 @@ function makeInlineResistor(nodeA: number, nodeB: number, resistance: number): A
 }
 
 // ---------------------------------------------------------------------------
+// Helper: create a DC voltage source via the production 3-arg factory.
+// Branch row is allocated during setup() via makeSimpleCtx's startBranch counter.
+// ---------------------------------------------------------------------------
+
+function makeVsrc(nodePos: number, nodeNeg: number, voltage: number): AnalogElement {
+  const props = new PropertyBag([]);
+  props.replaceModelParams({ voltage });
+  return makeDcVoltageSource(
+    new Map([["pos", nodePos], ["neg", nodeNeg]]),
+    props,
+    () => 0,
+  );
+}
+
+// ---------------------------------------------------------------------------
 // OTA tests
 // ---------------------------------------------------------------------------
 
@@ -107,9 +120,8 @@ describe("OTA", () => {
     // I_out = gm * V_diff ≈ 19.23 µA; R_load=1kΩ → V_out ≈ 19.23mV
     //
     // Nodes: 1=vp, 2=vm, 3=iabc, 4=outP; OUT-=gnd(0)
-    // Branches: 5=Vs_vp, 6=Vs_vm, 7=Vs_iabc; matrixSize=1010 (OTA setup uses nodeCount≥1000)
+    // Branches: allocated during setup() starting at nodeCount+1=5
     const nVp = 1, nVm = 2, nIabc = 3, nOutP = 4;
-    const brVp = 5, brVm = 6, brIabc = 7;
     const matrixSize = 1010;
 
     const vt = 0.026;
@@ -117,13 +129,13 @@ describe("OTA", () => {
     const vDiff = 1e-3;
     const rLoad = 1000;
 
-    const vsVp   = makeDcVoltageSource(nVp,   0, brVp,   vDiff);
-    const vsVm   = makeDcVoltageSource(nVm,   0, brVm,   0);
-    const vsIabc = makeDcVoltageSource(nIabc, 0, brIabc, iBias);
+    const vsVp   = makeVsrc(nVp,   0, vDiff);
+    const vsVm   = makeVsrc(nVm,   0, 0);
+    const vsIabc = makeVsrc(nIabc, 0, iBias);
     const ota    = makeOTAElement(nVp, nVm, nIabc, nOutP, 0, { vt });
     const rL     = makeInlineResistor(nOutP, 0, rLoad);
 
-    const elements = [ota, rL, vsVp as unknown as AnalogElement, vsVm as unknown as AnalogElement, vsIabc as unknown as AnalogElement];
+    const elements = [ota, rL, vsVp, vsVm, vsIabc];
     const ctx = makeSimpleCtx({ elements, matrixSize, nodeCount: 4, branchCount: matrixSize - 4 });
     ctx.dcopSavedState0 = new Float64Array(0);
     ctx.dcopOldState0   = new Float64Array(0);
@@ -136,7 +148,6 @@ describe("OTA", () => {
     // Large V_diff = 1V >> 2*V_T; I_out saturates to ≈ I_bias = 5mA
     // V_out ≈ I_bias * R_load = 5V ± 1%
     const nVp = 1, nVm = 2, nIabc = 3, nOutP = 4;
-    const brVp = 5, brVm = 6, brIabc = 7;
     const matrixSize = 1010;
 
     const vt = 0.026;
@@ -144,13 +155,13 @@ describe("OTA", () => {
     const vDiff = 1.0;
     const rLoad = 1000;
 
-    const vsVp   = makeDcVoltageSource(nVp,   0, brVp,   vDiff);
-    const vsVm   = makeDcVoltageSource(nVm,   0, brVm,   0);
-    const vsIabc = makeDcVoltageSource(nIabc, 0, brIabc, iBias);
+    const vsVp   = makeVsrc(nVp,   0, vDiff);
+    const vsVm   = makeVsrc(nVm,   0, 0);
+    const vsIabc = makeVsrc(nIabc, 0, iBias);
     const ota    = makeOTAElement(nVp, nVm, nIabc, nOutP, 0, { vt });
     const rL     = makeInlineResistor(nOutP, 0, rLoad);
 
-    const elements = [ota, rL, vsVp as unknown as AnalogElement, vsVm as unknown as AnalogElement, vsIabc as unknown as AnalogElement];
+    const elements = [ota, rL, vsVp, vsVm, vsIabc];
     const ctx = makeSimpleCtx({ elements, matrixSize, nodeCount: 4, branchCount: matrixSize - 4 });
     ctx.dcopSavedState0 = new Float64Array(0);
     ctx.dcopOldState0   = new Float64Array(0);
@@ -171,16 +182,15 @@ describe("OTA", () => {
 
     function runWithIbias(iBias: number): number {
       const nVp = 1, nVm = 2, nIabc = 3, nOutP = 4;
-      const brVp = 5, brVm = 6, brIabc = 7;
       const matrixSize = 1010;
 
-      const vsVp   = makeDcVoltageSource(nVp,   0, brVp,   vDiff);
-      const vsVm   = makeDcVoltageSource(nVm,   0, brVm,   0);
-      const vsIabc = makeDcVoltageSource(nIabc, 0, brIabc, iBias);
+      const vsVp   = makeVsrc(nVp,   0, vDiff);
+      const vsVm   = makeVsrc(nVm,   0, 0);
+      const vsIabc = makeVsrc(nIabc, 0, iBias);
       const ota    = makeOTAElement(nVp, nVm, nIabc, nOutP, 0, { vt });
       const rL     = makeInlineResistor(nOutP, 0, rLoad);
 
-      const elements = [ota, rL, vsVp as unknown as AnalogElement, vsVm as unknown as AnalogElement, vsIabc as unknown as AnalogElement];
+      const elements = [ota, rL, vsVp, vsVm, vsIabc];
       const ctx = makeSimpleCtx({ elements, matrixSize, nodeCount: 4, branchCount: matrixSize - 4 });
       ctx.dcopSavedState0 = new Float64Array(0);
       ctx.dcopOldState0   = new Float64Array(0);
@@ -204,16 +214,15 @@ describe("OTA", () => {
 
     function gainAtIbias(iBias: number): number {
       const nVp = 1, nVm = 2, nIabc = 3, nOutP = 4;
-      const brVp = 5, brVm = 6, brIabc = 7;
       const matrixSize = 1010;
 
-      const vsVp   = makeDcVoltageSource(nVp,   0, brVp,   vDiff);
-      const vsVm   = makeDcVoltageSource(nVm,   0, brVm,   0);
-      const vsIabc = makeDcVoltageSource(nIabc, 0, brIabc, iBias);
+      const vsVp   = makeVsrc(nVp,   0, vDiff);
+      const vsVm   = makeVsrc(nVm,   0, 0);
+      const vsIabc = makeVsrc(nIabc, 0, iBias);
       const ota    = makeOTAElement(nVp, nVm, nIabc, nOutP, 0, { vt });
       const rL     = makeInlineResistor(nOutP, 0, rLoad);
 
-      const elements = [ota, rL, vsVp as unknown as AnalogElement, vsVm as unknown as AnalogElement, vsIabc as unknown as AnalogElement];
+      const elements = [ota, rL, vsVp, vsVm, vsIabc];
       const ctx = makeSimpleCtx({ elements, matrixSize, nodeCount: 4, branchCount: matrixSize - 4 });
       ctx.dcopSavedState0 = new Float64Array(0);
       ctx.dcopOldState0   = new Float64Array(0);
@@ -266,6 +275,10 @@ describe("OTA parity (C4.5)", () => {
       props,
       () => 0,
     );
+
+    // Build solver and run setup() so TSTALLOC handles are allocated.
+    const simCtx = makeSimpleCtx({ elements: [ota], matrixSize: 110, nodeCount: 4 });
+    const solver = simCtx.solver;
 
     const voltages = new Float64Array(110);
     voltages[nVp]   = vDiff;

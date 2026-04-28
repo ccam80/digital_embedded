@@ -16,7 +16,6 @@ import { ComponentCategory } from "../../../core/registry.js";
 import type { AnalogFactory } from "../../../core/registry.js";
 import { SparseSolver } from "../../../solver/analog/sparse-solver.js";
 import type { AnalogElement } from "../../../solver/analog/element.js";
-import type { LoadContext } from "../../../solver/analog/load-context.js";
 import { MODETRAN, MODEINITFLOAT, MODEDCOP, MODEINITTRAN } from "../../../solver/analog/ckt-mode.js";
 import { makeLoadCtx, loadCtxFromFields } from "../../../solver/analog/__tests__/test-helpers.js";
 
@@ -39,7 +38,8 @@ function makeMemristor(overrides: Partial<{
   deviceLength: number;
   windowOrder: number;
 }> = {}): MemristorElement {
-  const el = new MemristorElement(
+  return new MemristorElement(
+    new Map([["A", 1], ["B", 2]]),
     overrides.rOn ?? R_ON,
     overrides.rOff ?? R_OFF,
     overrides.initialState ?? INITIAL_W,
@@ -47,8 +47,6 @@ function makeMemristor(overrides: Partial<{
     overrides.deviceLength ?? DEVICE_LENGTH,
     overrides.windowOrder ?? WINDOW_ORDER,
   );
-  Object.assign(el, { pinNodeIds: [1, 2], allNodeIds: [1, 2] });
-  return el;
 }
 
 /**
@@ -343,10 +341,8 @@ describe("Memristor", () => {
     it("analogFactory creates a MemristorElement", () => {
       const props = new PropertyBag();
       props.replaceModelParams(MEMRISTOR_DEFAULTS);
-      const element = createMemristorElement(new Map([["A", 1], ["B", 2]]), [], -1, props);
+      const element = createMemristorElement(new Map([["A", 1], ["B", 2]]), props, () => 0);
       expect(element).toBeInstanceOf(MemristorElement);
-      expect(element.isNonlinear).toBe(true);
-      expect(element.isReactive).toBe(false);
     });
 
     it("branchCount is false", () => {
@@ -358,10 +354,10 @@ describe("Memristor", () => {
 // ---------------------------------------------------------------------------
 // C4.2 — Transient parity test
 //
-// Circuit: Memristor with pinNodeIds=[A=1, B=0(gnd)].
+// Circuit: Memristor with _pinNodes=[A=1, B=0(gnd)].
 // All voltages zero throughout → vAB=0 → current=0 → dw/dt=0 → w=w0 constant.
 //
-// The memristor is nonlinear but NOT reactive (isReactive=false, no state pool).
+// The memristor is nonlinear (checkConvergence present) with no state pool.
 // load() stamps a pure conductance G(w) = w*(1/R_on - 1/R_off) + 1/R_off.
 // accept() integrates w forward via Euler: w_new = w + dWdt*dt.
 // With zero voltage, current=0 → dWdt=0 → w is constant every step.
@@ -392,9 +388,8 @@ describe("memristor_load_transient_parity (C4.2)", () => {
     //   G(w) = w*(1/R_on − 1/R_off) + 1/R_off
     const G_ref = w0 * (1 / rOn - 1 / rOff) + 1 / rOff;
 
-    // Build element: pinNodeIds=[A=1, B=0(gnd)]
-    const mem = new MemristorElement(rOn, rOff, w0, mobility, deviceLen, windowOrder);
-    Object.assign(mem, { pinNodeIds: [1, 0], allNodeIds: [1, 0] });
+    // Build element: _pinNodes=[A=1, B=0(gnd)]
+    const mem = new MemristorElement(new Map([["A", 1], ["B", 0]]), rOn, rOff, w0, mobility, deviceLen, windowOrder);
 
     // Handle-based capture solver (persistent handles across steps)
     const handles: { row: number; col: number }[] = [];

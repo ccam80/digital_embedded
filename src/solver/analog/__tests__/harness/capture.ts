@@ -98,8 +98,9 @@ export function captureTopology(
     const el = compiled.elements[i];
     const elLabel = elementLabels?.get(i) ?? `element_${i}`;
     const resolvedPins = compiled.elementResolvedPins?.get(i);
-    for (let p = 0; p < el.pinNodeIds.length; p++) {
-      const nodeId = el.pinNodeIds[p];
+    const pinNodeValues = [...el._pinNodes.values()];
+    for (let p = 0; p < pinNodeValues.length; p++) {
+      const nodeId = pinNodeValues[p];
       if (nodeId === 0) continue;
       const pinLabel = resolvedPins?.[p]?.label ?? `p${p}`;
       const tag = `${elLabel}:${pinLabel}`;
@@ -111,11 +112,15 @@ export function captureTopology(
       }
     }
 
-    // Internal (prime) nodes — label from the model's getInternalNodeLabels.
-    const pinCount = el.pinNodeIds.length;
-    const internalLabels = el.internalNodeLabels ?? [];
+    // Internal (prime) nodes — labels from getInternalNodeLabels(); IDs are
+    // allocated in order starting at _pinNodes.size (allocation offset per §A.23).
+    const pinCount = el._pinNodes.size;
+    const internalLabels = (el as any).getInternalNodeLabels?.() ?? [];
     for (let p = 0; p < internalLabels.length; p++) {
-      const nodeId = el.allNodeIds[pinCount + p];
+      // Internal node IDs follow pin nodes in allocation order: offset = pinCount + p.
+      // The element's own nodeId bookkeeping is not on the public interface, so we
+      // derive the ID from the allocation offset as specified in §A.23.
+      const nodeId = pinCount + p;
       if (nodeId === 0) continue;
       const tag = `${elLabel}:${internalLabels[p]}`;
       const existing = perNode.get(nodeId);
@@ -169,9 +174,7 @@ export function captureTopology(
         index: i,
         label: elementLabels?.get(i) ?? el.label ?? `element_${i}`,
         type: normalizeDeviceType(typeId),
-        isNonlinear: el.isNonlinear,
-        isReactive: el.isReactive,
-        pinNodeIds: el.pinNodeIds,
+        pinNodeIds: [...el._pinNodes.values()],
       };
     }),
     nodeLabels,
@@ -200,7 +203,7 @@ export function captureElementStates(
     if (!isPoolBacked(el)) continue;
 
     const schema = el.stateSchema;
-    const base = el.stateBaseOffset;
+    const base = el._stateBase;
     const slots: Record<string, number> = {};
     const state1Slots: Record<string, number> = {};
     const state2Slots: Record<string, number> = {};

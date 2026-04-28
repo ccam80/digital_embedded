@@ -22,8 +22,8 @@
  *   State variable `_conducting` switches based on thresholds to avoid chattering.
  *
  * MNA topology:
- *   pinNodeIds[0] = n_pos
- *   pinNodeIds[1] = n_neg
+ *   _pinNodes["pos"] = n_pos
+ *   _pinNodes["neg"] = n_neg
  *   branchIndex    = -1
  *
  * Unified load() pipeline:
@@ -34,7 +34,7 @@
  *                     discrete conducting/blocking state transition with hysteresis
  */
 
-import type { AnalogElementCore } from "../../core/analog-types.js";
+import type { AnalogElement } from "../../core/analog-types.js";
 import { NGSPICE_LOAD_ORDER } from "../../core/analog-types.js";
 import type { LoadContext } from "../../solver/analog/load-context.js";
 import type { SetupContext } from "../../solver/analog/setup-context.js";
@@ -102,12 +102,10 @@ function extinctionResistance(absI: number, iHold: number, rOn: number, rOff: nu
 // SparkGapElement  MNA implementation
 // ---------------------------------------------------------------------------
 
-export class SparkGapElement implements AnalogElementCore {
-  pinNodeIds!: readonly number[];  // set by compiler via Object.assign after factory returns
-  readonly branchIndex: number = -1;
+export class SparkGapElement implements AnalogElement {
+  label: string = "";
+  branchIndex: number = -1;
   readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.RES;
-  readonly isNonlinear: boolean = true;
-  readonly isReactive: boolean = false;
   _stateBase: number = -1;
   _pinNodes: Map<string, number> = new Map();
 
@@ -198,8 +196,8 @@ export class SparkGapElement implements AnalogElementCore {
   }
 
   getPinCurrents(rhs: Float64Array): number[] {
-    const nPos = this.pinNodeIds[0];
-    const nNeg = this.pinNodeIds[1];
+    const nPos = this._pinNodes.get("pos")!;
+    const nNeg = this._pinNodes.get("neg")!;
     const vPos = rhs[nPos];
     const vNeg = rhs[nNeg];
     const G = 1 / Math.max(this.resistance(), MIN_RESISTANCE);
@@ -209,8 +207,8 @@ export class SparkGapElement implements AnalogElementCore {
 
   accept(ctx: LoadContext, _simTime: number, _addBreakpoint: (t: number) => void): void {
     const voltages = ctx.rhs;
-    const nPos = this.pinNodeIds[0];
-    const nNeg = this.pinNodeIds[1];
+    const nPos = this._pinNodes.get("pos")!;
+    const nNeg = this._pinNodes.get("neg")!;
     const vPos = voltages[nPos];
     const vNeg = voltages[nNeg];
     this._vTerminal = vPos - vNeg;
@@ -236,8 +234,8 @@ export class SparkGapElement implements AnalogElementCore {
 export function createSparkGapElement(
   pinNodes: ReadonlyMap<string, number>,
   props: PropertyBag,
-  _getTime?: () => number,
-): AnalogElementCore {
+  _getTime: () => number,
+): AnalogElement {
   const p: Record<string, number> = {
     vBreakdown: props.getModelParam<number>("vBreakdown"),
     rOn:        props.getModelParam<number>("rOn"),
@@ -246,7 +244,6 @@ export function createSparkGapElement(
   };
   const el = new SparkGapElement(p.vBreakdown, p.rOn, p.rOff, p.iHold);
   el._pinNodes = new Map(pinNodes);
-  el.pinNodeIds = [pinNodes.get("pos")!, pinNodes.get("neg")!];
   return el;
 }
 

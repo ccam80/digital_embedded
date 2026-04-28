@@ -236,7 +236,6 @@ export const DriverInvSelDefinition: ComponentDefinition = {
       factory: createDriverInvAnalogElement,
       paramDefs: [],
       params: {},
-      mayCreateInternalNodes: false,
     },
   },
   defaultModel: "digital",

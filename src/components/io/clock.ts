@@ -21,8 +21,9 @@ import {
   type ComponentDefinition,
   type ComponentLayout,
 } from "../../core/registry.js";
-import type { AnalogElementCore, LoadContext } from "../../solver/analog/element.js";
-import { NGSPICE_LOAD_ORDER } from "../../solver/analog/element.js";
+import type { AnalogElement } from "../../core/analog-types.js";
+import { NGSPICE_LOAD_ORDER } from "../../core/analog-types.js";
+import type { LoadContext } from "../../solver/analog/load-context.js";
 import { stampRHS } from "../../solver/analog/stamp-helpers.js";
 
 // ---------------------------------------------------------------------------
@@ -231,7 +232,7 @@ function clockFactory(props: PropertyBag): ClockElement {
 // Analog clock element factory
 // ---------------------------------------------------------------------------
 
-export interface AnalogClockElement extends AnalogElementCore {
+export interface AnalogClockElement extends AnalogElement {
   /** Returns edge breakpoints within [tStart, tEnd] for the timestep controller. */
   getBreakpoints(tStart: number, tEnd: number): number[];
   /** Returns the strictly-next breakpoint strictly after afterTime. Clock is infinite; never returns null. */
@@ -262,20 +263,29 @@ export function makeAnalogClockElement(
   let _hBranchPos = -1;
   let _hBranchNeg = -1;
 
-  const element: AnalogClockElement & { stampAtTime(rhs: Float64Array, t: number): void } = {
+  const el: AnalogClockElement & { stampAtTime(rhs: Float64Array, t: number): void } = {
+    label: "",
     branchIndex: branchIdx,
     ngspiceLoadOrder: NGSPICE_LOAD_ORDER.VSRC,
-    isNonlinear: false,
-    isReactive: false,
     _stateBase: -1,
     _pinNodes: new Map<string, number>([["out", nodePos]]),
 
     setup(ctx: import("../../solver/analog/setup-context.js").SetupContext): void {
-      const k = branchIdx;
+      if (el.branchIndex === -1) {
+        el.branchIndex = ctx.makeCur(el.label, "branch");
+      }
+      const k = el.branchIndex;
       if (nodePos !== 0) _hPosBranch = ctx.solver.allocElement(nodePos, k);
       if (nodeNeg !== 0) _hNegBranch = ctx.solver.allocElement(nodeNeg, k);
       if (nodePos !== 0) _hBranchPos = ctx.solver.allocElement(k, nodePos);
       if (nodeNeg !== 0) _hBranchNeg = ctx.solver.allocElement(k, nodeNeg);
+    },
+
+    findBranchFor(_name: string, ctx: import("../../solver/analog/setup-context.js").SetupContext): number {
+      if (el.branchIndex === -1) {
+        el.branchIndex = ctx.makeCur(el.label, "branch");
+      }
+      return el.branchIndex;
     },
 
     setParam(_key: string, _value: number): void {
@@ -283,7 +293,7 @@ export function makeAnalogClockElement(
 
     load(ctx: LoadContext): void {
       const solver = ctx.solver;
-      const k = branchIdx;
+      const k = el.branchIndex;
 
       // Branch incidence (B and C sub-matrices) — handles allocated in setup().
       if (nodePos !== 0) solver.stampElement(_hPosBranch, 1);
@@ -295,14 +305,11 @@ export function makeAnalogClockElement(
       const t = getTime();
       const halfPeriods = Math.floor(t / halfPeriod);
       const v = halfPeriods % 2 === 0 ? vdd : 0;
-      stampRHS(ctx.rhs,k, v * ctx.srcFact);
+      stampRHS(ctx.rhs, k, v * ctx.srcFact);
     },
 
-    // stampAtTime retained for callers that drive the engine's time loop
-    // directly (ClockManager / waveform playback paths); stamps only the RHS
-    // value so incidence must be set via load().
     stampAtTime(rhs: Float64Array, t: number): void {
-      const k = branchIdx;
+      const k = el.branchIndex;
       const halfPeriods = Math.floor(t / halfPeriod);
       const v = halfPeriods % 2 === 0 ? vdd : 0;
       stampRHS(rhs, k, v);
@@ -354,7 +361,7 @@ export function makeAnalogClockElement(
       const out: number[] = [];
       let t = tStart;
       while (true) {
-        const next = element.nextBreakpoint(t);
+        const next = el.nextBreakpoint(t);
         if (next === null || next >= tEnd) break;
         if (next <= t) {
           throw new Error(`nextBreakpoint returned non-monotonic value: ${next} <= ${t}`);
@@ -366,15 +373,12 @@ export function makeAnalogClockElement(
     },
 
     getPinCurrents(rhs: Float64Array): number[] {
-      // Pin layout: [out] - positive terminal; negative terminal is implicit ground.
-      // Branch current I = rhs[branchIdx] flows from neg to pos through source.
-      // Current INTO element at out = -I (conventional: exits at positive terminal).
-      const I = rhs[branchIdx];
+      const I = rhs[el.branchIndex];
       return [-I];
     },
   };
 
-  return element;
+  return el;
 }
 
 // ---------------------------------------------------------------------------
@@ -404,7 +408,7 @@ export const ClockDefinition: ComponentDefinition = {
         pinNodes: ReadonlyMap<string, number>,
         props: PropertyBag,
         getTime: () => number,
-      ): AnalogElementCore {
+      ): AnalogElement {
         const frequency = props.getOrDefault<number>("Frequency", 1);
         const vdd = props.getOrDefault<number>("vdd", 3.3);
         const nodePos = pinNodes.get("out")!;

@@ -24,9 +24,9 @@
  *   The digital executeFuse reads `blown` for the bus resolver closed flag.
  *
  * MNA topology:
- *   pinNodeIds[0] = n_pos  (positive terminal, out1 pin)
- *   pinNodeIds[1] = n_neg  (negative terminal, out2 pin)
- *   branchIndex    = -1     (no branch current row — RES topology)
+ *   _pinNodes.get("out1") = n_pos  (positive terminal)
+ *   _pinNodes.get("out2") = n_neg  (negative terminal)
+ *   branchIndex            = -1    (no branch current row — RES topology)
  *
  * Setup/load split (ngspice anchor: res/ressetup.c, res/resload.c):
  *   setup(ctx)   allocates 4 matrix handles (_hPP, _hNN, _hPN, _hNP) via
@@ -36,8 +36,9 @@
  *                exceeded, and emits the 'fuse-blown' diagnostic once.
  */
 
-import type { AnalogElement, AnalogElementCore, LoadContext } from "../../solver/analog/element.js";
-import { NGSPICE_LOAD_ORDER } from "../../solver/analog/element.js";
+import type { AnalogElement } from "../../core/analog-types.js";
+import { NGSPICE_LOAD_ORDER } from "../../core/analog-types.js";
+import type { LoadContext } from "../../solver/analog/element.js";
 import type { SetupContext } from "../../solver/analog/setup-context.js";
 import type { Diagnostic } from "../../compile/types.js";
 import { PropertyBag } from "../../core/properties.js";
@@ -66,14 +67,11 @@ const MIN_RESISTANCE = 1e-12;
 // ---------------------------------------------------------------------------
 
 export class AnalogFuseElement implements AnalogElement {
-  pinNodeIds: readonly number[] = [];
-  allNodeIds: readonly number[] = [];
-  readonly branchIndex: number = -1;
-  readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.RES;
-  readonly isNonlinear: boolean = true;
-  readonly isReactive: boolean = false;
-  _stateBase: number = -1;
+  label: string = "";
   _pinNodes: Map<string, number> = new Map();
+  _stateBase: number = -1;
+  branchIndex: number = -1;
+  readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.RES;
   setParam(_key: string, _value: number): void {}
 
   // Handle fields allocated in setup() — port of ressetup.c:46-49
@@ -96,6 +94,7 @@ export class AnalogFuseElement implements AnalogElement {
   private readonly _onStateChange: ((blown: boolean, thermalRatio: number) => void) | null;
 
   /**
+   * @param pinNodes       - Pin map with "out1" (positive) and "out2" (negative) terminals
    * @param rCold          - Cold (intact) resistance in ohms
    * @param rBlown         - Blown (open) resistance in ohms
    * @param i2tRating      - I²t energy rating in A²·s
@@ -103,18 +102,19 @@ export class AnalogFuseElement implements AnalogElement {
    * @param onStateChange  - Callback invoked each timestep with blown flag and thermal ratio
    */
   constructor(
+    pinNodes: ReadonlyMap<string, number>,
     rCold: number,
     rBlown: number,
     i2tRating: number,
     emitDiagnostic?: (diag: Diagnostic) => void,
     onStateChange?: (blown: boolean, thermalRatio: number) => void,
   ) {
+    this._pinNodes = new Map(pinNodes);
     this._rCold = Math.max(rCold, 1e-12);
     this._rBlown = Math.max(rBlown, 1e-6);
     this._i2tRating = Math.max(i2tRating, 1e-30);
     this._emitDiagnostic = emitDiagnostic ?? (() => {});
     this._onStateChange = onStateChange ?? null;
-    // Initialise conductance from cold resistance
     this._conduct = 1 / Math.max(this._rCold, MIN_RESISTANCE);
   }
 
@@ -235,8 +235,8 @@ export class AnalogFuseElement implements AnalogElement {
   }
 
   getPinCurrents(rhs: Float64Array): number[] {
-    const nPos = this.pinNodeIds[0];
-    const nNeg = this.pinNodeIds[1];
+    const nPos = this._pinNodes.get("out1")!;
+    const nNeg = this._pinNodes.get("out2")!;
     const vPos = rhs[nPos];
     const vNeg = rhs[nNeg];
     const R = this._blown ? this._rBlown : this._rCold;
@@ -256,9 +256,10 @@ function buildAnalogFuseElement(
   rCold: number,
   rBlown: number,
   i2tRating: number,
-): AnalogElementCore {
+): AnalogElement {
   const p = { rCold, rBlown, i2tRating };
   const el = new AnalogFuseElement(
+    pinNodes,
     p.rCold,
     p.rBlown,
     p.i2tRating,
@@ -270,10 +271,7 @@ function buildAnalogFuseElement(
       }
     },
   );
-  el._pinNodes = new Map(pinNodes);
-  el.pinNodeIds = [pinNodes.get("out1")!, pinNodes.get("out2")!];
-  el.allNodeIds = el.pinNodeIds;
-  (el as AnalogElementCore).setParam = function(key: string, value: number): void {
+  el.setParam = function(key: string, value: number): void {
     if (key in p) {
       (p as Record<string, number>)[key] = value;
       el.updatePhysicalParams(p.rCold, p.rBlown, p.i2tRating);
@@ -285,8 +283,8 @@ function buildAnalogFuseElement(
 export function createAnalogFuseElement(
   pinNodes: ReadonlyMap<string, number>,
   props: PropertyBag,
-  _getTime?: () => number,
-): AnalogElementCore {
+  _getTime: () => number,
+): AnalogElement {
   return buildAnalogFuseElement(
     pinNodes,
     props,

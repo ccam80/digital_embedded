@@ -26,9 +26,8 @@
  */
 
 import { describe, it, expect } from "vitest";
-import { ADCDefinition, ADC_DEFAULTS } from "../adc.js";
+import { ADCDefinition, ADC_DEFAULTS, ADCAnalogElement } from "../adc.js";
 import { PropertyBag } from "../../../core/properties.js";
-import type { AnalogElement } from "../../../solver/analog/element.js";
 import type { LoadContext } from "../../../solver/analog/load-context.js";
 import { makeLoadCtx, initElement } from "../../../solver/analog/__tests__/test-helpers.js";
 import { MODEDCOP, MODEINITFLOAT, MODETRAN } from "../../../solver/analog/ckt-mode.js";
@@ -97,12 +96,10 @@ function makeVoltages(overrides: Partial<Record<string, number>> = {}): Float64A
 // ADC factory helper
 // ---------------------------------------------------------------------------
 
-type ADCElementExt = AnalogElement & { latchedCode: number; eocActive: boolean };
-
 function makeAdc(
   componentProps?: Record<string, number | string>,
   paramOverrides?: Record<string, number>,
-): ADCElementExt {
+): ADCAnalogElement {
   const modelKey = (componentProps?.model as string) ?? "unipolar-instant";
   const bag = new PropertyBag([
     ["bits",           BITS],
@@ -111,7 +108,7 @@ function makeAdc(
   bag.replaceModelParams({ ...ADC_DEFAULTS, ...paramOverrides });
   return getFactory(ADCDefinition.modelRegistry![modelKey]!)(
     makeNodeIds(), bag, () => 0,
-  ) as ADCElementExt;
+  ) as ADCAnalogElement;
 }
 
 // ---------------------------------------------------------------------------
@@ -142,7 +139,7 @@ function makeAcceptCtx(rhs: Float64Array, dt: number): LoadContext {
  *   2. Drive CLK HIGH  accept() detects the rising edge and converts.
  */
 function applyClockEdge(
-  adc: ADCElementExt,
+  adc: ADCAnalogElement,
   vIn: number,
   vRef: number = V_REF,
   clkHigh?: number,
@@ -288,7 +285,7 @@ describe("ADC", () => {
 // accept() rising-edge latch, all digital outputs are at their initial low
 // state, EOC is low, and analog inputs stamp only their loading conductance.
 //
-// Reference formulas (from adc.ts createADCElement + digital-pin-model.ts):
+// Reference formulas (from adc.ts createADCAnalogElement + digital-pin-model.ts):
 //   inputSpec.rIn  = p.rIn   VIN and CLK diagonal stamps = 1/rIn
 //   outputSpec.rOut = p.rOut  EOC and D0..D(N-1) diagonal stamps = 1/rOut,
 //                              RHS = vOL(1/rOut) (all initially low  stays at vOL)
@@ -367,7 +364,7 @@ describe("ADC parity (C4.5)", () => {
     };
     (adc as unknown as { setup: (ctx: typeof setupCtx) => void }).setup(setupCtx);
 
-    initElement(adc as unknown as import("../../../solver/analog/element.js").ReactiveAnalogElement);
+    initElement(adc);
 
     // Step 2: Reset stamps accumulated during setup() so we only see load() stamps.
     stamps.length = 0;

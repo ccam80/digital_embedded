@@ -7,6 +7,7 @@ import { makeAnalogClockElement, ClockDefinition } from "../clock.js";
 import { PropertyBag } from "../../../core/properties.js";
 import type { SparseSolver } from "../../../solver/analog/sparse-solver.js";
 import { MODEDCOP, MODEINITFLOAT } from "../../../solver/analog/ckt-mode.js";
+import { loadCtxFromFields } from "../../../solver/analog/__tests__/test-helpers.js";
 
 // ---------------------------------------------------------------------------
 // Helper: narrow ModelEntry to inline factory (throws if netlist kind)
@@ -147,18 +148,16 @@ describe("AnalogClock", () => {
     const props = new PropertyBag();
     props.set("Frequency", 1000);
     props.set("vdd", 3.3);
-    const el = getFactory(ClockDefinition.modelRegistry!.behavioral!)!(new Map([["out", 1]]), [], 1, props, () => 0);
+    const el = getFactory(ClockDefinition.modelRegistry!.behavioral!)!(new Map([["out", 1]]), props, () => 0);
     expect(el).toBeDefined();
-    expect(el.isNonlinear).toBe(false);
-    expect(el.isReactive).toBe(false);
-    expect(el.branchIndex).toBe(1);
+    expect(el.branchIndex).toBe(-1);
   });
 
   it("stamp_produces_incidence_entries — voltage source topology", () => {
     const clk = makeAnalogClockElement(1, 0, 1, 1000, 3.3, () => 0);
     const solver = makeMockSolver();
     const rhs = new Float64Array(3);
-    clk.load({
+    clk.load(loadCtxFromFields({
       solver: solver as unknown as SparseSolver,
       matrix: solver as unknown as SparseSolver,
       rhs,
@@ -183,7 +182,7 @@ describe("AnalogClock", () => {
       cktFixLimit: false,
       bypass: false,
       voltTol: 1e-6,
-    });
+    }));
     // nodePos=1, nodeNeg=0 (ground), branchIdx=1
     // B[nodePos,k] = allocElement(1, 1) → stampElement(h, 1)
     // C[k,nodePos] = allocElement(1, 1) → stampElement(h, 1) (same slot, accumulated)
@@ -207,7 +206,7 @@ describe("AnalogClock", () => {
 
 describe("clock_load_srcfact_parity", () => {
   function makeCtx(solver: unknown, rhs: Float64Array, srcFact: number) {
-    return {
+    return loadCtxFromFields({
       solver: solver as SparseSolver,
       matrix: solver as SparseSolver,
       rhs,
@@ -232,7 +231,7 @@ describe("clock_load_srcfact_parity", () => {
       cktFixLimit: false,
       bypass: false,
       voltTol: 1e-6,
-    };
+    });
   }
 
   it("srcfact_05_halves_rhs_at_high_phase_bit_exact", () => {

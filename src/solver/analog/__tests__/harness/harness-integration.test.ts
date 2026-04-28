@@ -5,10 +5,15 @@ import { describe, it, expect, beforeEach } from "vitest";
 import { MNAEngine } from "../../analog-engine.js";
 import type { ConcreteCompiledAnalogCircuit } from "../../compiled-analog-circuit.js";
 import { EngineState } from "../../../../core/engine-interface.js";
-import { makeResistor, makeVoltageSource, makeDiode, makeCapacitor } from "../test-helpers.js";
-import { StatePool } from "../../state-pool.js";
-import type { AnalogElementCore } from "../../element.js";
-import { isPoolBacked } from "../../element.js";
+import { allocateStatePool, makeSimpleCtx } from "../test-helpers.js";
+import { makeDcVoltageSource, DC_VOLTAGE_SOURCE_DEFAULTS } from "../../../../components/sources/dc-voltage-source.js";
+import { PropertyBag } from "../../../../core/properties.js";
+import type { AnalogElement, PoolBackedAnalogElement } from "../../element.js";
+import type { SetupContext } from "../../setup-context.js";
+import type { LoadContext } from "../../load-context.js";
+import { NGSPICE_LOAD_ORDER } from "../../../../core/analog-types.js";
+import type { StateSchema } from "../../state-schema.js";
+import type { StatePoolRef } from "../../../../core/analog-types.js";
 import { captureTopology, captureElementStates, createIterationCaptureHook, createStepCaptureHook } from "./capture.js";
 import { convergenceSummary, nodeVoltageTrajectory, findLargestDelta, querySteps } from "./query.js";
 import { compareSnapshots, formatComparison, findFirstDivergence } from "./compare.js";
@@ -20,38 +25,213 @@ const ZERO_INTEG_COEFF: IntegrationCoefficients = {
   ngspice: { ag0: 0, ag1: 0, method: "trapezoidal", order: 1 },
 };
 
-function buildStatePool(elements: AnalogElementCore[]): StatePool {
-  let offset = 0;
-  for (const el of elements) {
-    if (isPoolBacked(el)) { el.stateBaseOffset = offset; offset += el.stateSize; }
-  }
-  const pool = new StatePool(offset);
-  for (const el of elements) {
-    if (isPoolBacked(el)) el.initState(pool);
-  }
-  return pool;
+// ---------------------------------------------------------------------------
+// Minimal inline element factories — implement the new AnalogElement contract.
+// These exist only to give the engine a functioning circuit; they are NOT
+// testing element correctness.
+// ---------------------------------------------------------------------------
+
+function makeResistorEl(nodeA: number, nodeB: number, resistance: number): AnalogElement {
+  let _hPP = -1, _hNN = -1, _hPN = -1, _hNP = -1;
+  const G = 1 / resistance;
+  const el: AnalogElement = {
+    label: "",
+    ngspiceLoadOrder: NGSPICE_LOAD_ORDER.RES,
+    _pinNodes: new Map([["A", nodeA], ["B", nodeB]]),
+    _stateBase: -1,
+    branchIndex: -1,
+    setup(ctx: SetupContext) {
+      const s = ctx.solver;
+      const p = el._pinNodes.get("A")!;
+      const n = el._pinNodes.get("B")!;
+      _hPP = s.allocElement(p, p);
+      _hNN = s.allocElement(n, n);
+      _hPN = s.allocElement(p, n);
+      _hNP = s.allocElement(n, p);
+    },
+    load(ctx: LoadContext) {
+      ctx.solver.stampElement(_hPP, G);
+      ctx.solver.stampElement(_hNN, G);
+      ctx.solver.stampElement(_hPN, -G);
+      ctx.solver.stampElement(_hNP, -G);
+    },
+    getPinCurrents(_rhs: Float64Array): number[] { return []; },
+    setParam(_key: string, _value: number): void {},
+  };
+  return el;
 }
 
+function makeDiodeEl(nodeA: number, nodeK: number, IS: number, N: number): AnalogElement {
+  let _hAA = -1, _hKK = -1, _hAK = -1, _hKA = -1;
+  const VT = 0.025852;
+  let _vd = 0;
+  const el: AnalogElement = {
+    label: "",
+    ngspiceLoadOrder: NGSPICE_LOAD_ORDER.DIO,
+    _pinNodes: new Map([["A", nodeA], ["K", nodeK]]),
+    _stateBase: -1,
+    branchIndex: -1,
+    setup(ctx: SetupContext) {
+      const s = ctx.solver;
+      _hAA = s.allocElement(nodeA, nodeA);
+      _hKK = s.allocElement(nodeK, nodeK);
+      _hAK = s.allocElement(nodeA, nodeK);
+      _hKA = s.allocElement(nodeK, nodeA);
+    },
+    load(ctx: LoadContext) {
+      const vA = ctx.rhsOld[nodeA] ?? 0;
+      const vK = ctx.rhsOld[nodeK] ?? 0;
+      _vd = vA - vK;
+      const expArg = Math.min(_vd / (N * VT), 40);
+      const Id = IS * (Math.exp(expArg) - 1);
+      const Gd = IS * Math.exp(expArg) / (N * VT);
+      const Ieq = Id - Gd * _vd;
+      ctx.solver.stampElement(_hAA, Gd);
+      ctx.solver.stampElement(_hKK, Gd);
+      ctx.solver.stampElement(_hAK, -Gd);
+      ctx.solver.stampElement(_hKA, -Gd);
+      ctx.rhs[nodeA] -= Ieq;
+      ctx.rhs[nodeK] += Ieq;
+    },
+    checkConvergence(ctx: LoadContext): boolean {
+      const vA = ctx.rhsOld[nodeA] ?? 0;
+      const vK = ctx.rhsOld[nodeK] ?? 0;
+      const vdNew = vA - vK;
+      return Math.abs(vdNew - _vd) < ctx.voltTol + ctx.reltol * Math.abs(vdNew);
+    },
+    getPinCurrents(_rhs: Float64Array): number[] { return []; },
+    setParam(_key: string, _value: number): void {},
+  };
+  return el;
+}
+
+const CAP_SCHEMA: StateSchema = {
+  owner: "TestCapacitor",
+  slots: [
+    { name: "QCAP", doc: "Capacitor charge", init: { kind: "zero" } },
+    { name: "VCAP", doc: "Capacitor voltage", init: { kind: "zero" } },
+  ],
+  size: 2,
+  indexOf: new Map([["QCAP", 0], ["VCAP", 1]]),
+};
+
+function makeCapacitorEl(nodePos: number, nodeNeg: number, capacitance: number): PoolBackedAnalogElement {
+  let _hPP = -1, _hNN = -1, _hPN = -1, _hNP = -1;
+  let _pool: StatePoolRef | null = null;
+  let _base = -1;
+  const SLOT_Q = 0, SLOT_V = 1;
+
+  const el: PoolBackedAnalogElement = {
+    label: "",
+    ngspiceLoadOrder: NGSPICE_LOAD_ORDER.CAP,
+    _pinNodes: new Map([["pos", nodePos], ["neg", nodeNeg]]),
+    _stateBase: -1,
+    branchIndex: -1,
+    poolBacked: true as const,
+    stateSchema: CAP_SCHEMA,
+    stateSize: CAP_SCHEMA.size,
+
+    setup(ctx: SetupContext) {
+      _base = ctx.allocStates(CAP_SCHEMA.size);
+      el._stateBase = _base;
+      const s = ctx.solver;
+      _hPP = s.allocElement(nodePos, nodePos);
+      _hNN = s.allocElement(nodeNeg, nodeNeg);
+      _hPN = s.allocElement(nodePos, nodeNeg);
+      _hNP = s.allocElement(nodeNeg, nodePos);
+    },
+
+    initState(pool: StatePoolRef) {
+      _pool = pool;
+      _base = el._stateBase;
+      pool.state0[_base + SLOT_Q] = 0;
+      pool.state0[_base + SLOT_V] = 0;
+    },
+
+    load(ctx: LoadContext) {
+      if (!_pool) return;
+      const { ag, dt } = ctx;
+      const Geq = ag[0] * capacitance;
+      const vOld = _pool.state1[_base + SLOT_V] ?? 0;
+      const Ieq = ag[1] * capacitance * vOld;
+      ctx.solver.stampElement(_hPP, Geq);
+      ctx.solver.stampElement(_hNN, Geq);
+      ctx.solver.stampElement(_hPN, -Geq);
+      ctx.solver.stampElement(_hNP, -Geq);
+      const vPos = ctx.rhsOld[nodePos] ?? 0;
+      const vNeg = ctx.rhsOld[nodeNeg] ?? 0;
+      void vPos; void vNeg; void dt; void Ieq;
+      ctx.rhs[nodePos] -= Ieq;
+      ctx.rhs[nodeNeg] += Ieq;
+    },
+
+    accept(ctx: LoadContext, _simTime: number, _addBp: (t: number) => void) {
+      if (!_pool) return;
+      const vPos = ctx.rhs[nodePos] ?? 0;
+      const vNeg = ctx.rhs[nodeNeg] ?? 0;
+      const v = vPos - vNeg;
+      _pool.state0[_base + SLOT_V] = v;
+      _pool.state0[_base + SLOT_Q] = capacitance * v;
+    },
+
+    getPinCurrents(_rhs: Float64Array): number[] { return []; },
+    setParam(_key: string, _value: number): void {},
+  };
+  return el;
+}
+
+// ---------------------------------------------------------------------------
+// Helper: create a DC voltage source using the 3-arg production factory.
+// ---------------------------------------------------------------------------
+
+function makeVsrc(posNode: number, negNode: number, voltage: number) {
+  const props = new PropertyBag();
+  props.replaceModelParams({ ...DC_VOLTAGE_SOURCE_DEFAULTS, voltage });
+  return makeDcVoltageSource(new Map([["pos", posNode], ["neg", negNode]]), props, () => 0);
+}
+
+// ---------------------------------------------------------------------------
+// Circuit builders
+// ---------------------------------------------------------------------------
+
 function makeHWR() {
-  const vs = makeVoltageSource(1, 0, 2, 5.0);
-  const r = makeResistor(1, 2, 1000);
-  const diode = makeDiode(2, 0, 1e-14, 1.0);
+  const vs = makeVsrc(1, 0, 5.0);
+  vs.label = "Vs";
+  const r = makeResistorEl(1, 2, 1000);
+  r.label = "R1";
+  const diode = makeDiodeEl(2, 0, 1e-14, 1.0);
+  diode.label = "D1";
+
+  const matrixSize = 3;
   const elements = [vs, r, diode];
-  const pool = buildStatePool(elements);
+  makeSimpleCtx({ elements, matrixSize, nodeCount: 2, startBranch: 2 });
+  const pool = allocateStatePool(elements);
   return {
-    circuit: { netCount: 2, componentCount: 3, nodeCount: 2, elements, labelToNodeId: new Map([["Vs", 1], ["R1:B", 2]]), statePool: pool } as unknown as ConcreteCompiledAnalogCircuit,
+    circuit: {
+      netCount: 2, componentCount: 3, nodeCount: 2,
+      elements, labelToNodeId: new Map([["Vs", 1], ["R1:B", 2]]), statePool: pool,
+    } as unknown as ConcreteCompiledAnalogCircuit,
     pool,
   };
 }
 
 function makeRC() {
-  const vs = makeVoltageSource(1, 0, 2, 5.0);
-  const r = makeResistor(1, 2, 1000);
-  const cap = makeCapacitor(2, 0, 1e-6);
+  const vs = makeVsrc(1, 0, 5.0);
+  vs.label = "Vs";
+  const r = makeResistorEl(1, 2, 1000);
+  r.label = "R1";
+  const cap = makeCapacitorEl(2, 0, 1e-6);
+  cap.label = "C1";
+
+  const matrixSize = 3;
   const elements = [vs, r, cap];
-  const pool = buildStatePool(elements);
+  makeSimpleCtx({ elements, matrixSize, nodeCount: 2, startBranch: 2 });
+  const pool = allocateStatePool(elements);
   return {
-    circuit: { netCount: 2, componentCount: 3, nodeCount: 2, elements, labelToNodeId: new Map([["Vs", 1], ["C1:A", 2]]), statePool: pool } as unknown as ConcreteCompiledAnalogCircuit,
+    circuit: {
+      netCount: 2, componentCount: 3, nodeCount: 2,
+      elements, labelToNodeId: new Map([["Vs", 1], ["C1:A", 2]]), statePool: pool,
+    } as unknown as ConcreteCompiledAnalogCircuit,
     pool,
   };
 }
@@ -304,11 +484,10 @@ describe("harness integration", () => {
     const capture = createStepCaptureHook(engine.solver!, engine.elements, pool);
     engine.postIterationHook = capture.iterationHook;
 
-    // Simulate a failed attempt followed by a successful one using the phase-aware API
     capture.setStepStartTime(0);
     capture.beginAttempt("dcopDirect", 1e-9);
     engine.dcOperatingPoint();
-    capture.endAttempt("nrFailedRetry", false); // failed attempt
+    capture.endAttempt("nrFailedRetry", false);
 
     capture.beginAttempt("dcopDirect", 5e-10);
     engine.dcOperatingPoint();
@@ -319,7 +498,6 @@ describe("harness integration", () => {
     const steps = capture.getSteps();
     expect(steps.length).toBe(1);
     expect(steps[0].converged).toBe(true);
-    // Should have attempts array with 2 entries (failed + accepted)
     expect(steps[0].attempts.length).toBe(2);
     expect(steps[0].attempts[0].converged).toBe(false);
     expect(steps[0].attempts[0].outcome).toBe("nrFailedRetry");
@@ -343,7 +521,6 @@ describe("harness integration", () => {
     engine.postIterationHook = null;
     const steps = capture.getSteps();
     expect(steps.length).toBe(1);
-    // With phase-aware API, attempts array is always present
     expect(steps[0].attempts.length).toBeGreaterThanOrEqual(1);
   });
 
@@ -392,9 +569,17 @@ describe("harness integration", () => {
     engine.stepPhaseHook = null;
     engine.postIterationHook = null;
     const session: CaptureSession = { source: "ours", topology: captureTopology(circuit, 3), steps: capture.getSteps() };
-    const result = findLargestDelta(session, 1);
+    // Node 2 is the diode anode — it changes between NR iterations as the nonlinear diode converges.
+    const result = findLargestDelta(session, 2);
     expect(result).not.toBeNull();
+    // stepIndex must be 0 (only one step — DCOP)
+    expect(result!.stepIndex).toBe(0);
+    // iterationIndex must be 0 (largest delta is always on the first NR iteration from zero initial conditions)
+    expect(result!.iterationIndex).toBe(0);
+    // Node 2 (diode anode) starts at 0V; first iteration drives it toward the diode drop (~0.6–0.7V),
+    // so the largest delta is in the range (0, 5].
     expect(result!.delta).toBeGreaterThan(0);
+    expect(result!.delta).toBeLessThanOrEqual(5.0);
   });
 });
 
@@ -410,10 +595,6 @@ describe("time-alignment: compareSnapshots with alignment map", () => {
   }
 
   function makeStep(stepStartTime: number, dt: number, voltage: number): import("./types.js").StepSnapshot {
-    // Synthetic fixture for map-level ordering/query tests — numeric fields are
-    // driven by topology, not by real engine state. initMode is the diagnostic
-    // label produced by `bitsToName(cktMode)` (ckt-mode.ts). For a free-running
-    // transient step cktMode has MODETRAN set, so the label is "MODETRAN".
     const iter: import("./types.js").IterationSnapshot = {
       iteration: 0,
       matrixSize: 1,
@@ -485,16 +666,14 @@ describe("time-alignment: compareSnapshots with alignment map", () => {
     const ref: CaptureSession = {
       source: "ngspice", topology: topo,
       steps: [
-        makeStep(0, 1e-9, 999.0), // index 0 — different voltage
-        makeStep(1e-9, 1e-9, 5.0), // index 1 — same voltage
+        makeStep(0, 1e-9, 999.0),
+        makeStep(1e-9, 1e-9, 5.0),
       ],
     };
-    // Index pairing: our[0] pairs with ref[0], voltages differ → not within tol
     const results = compareSnapshots(ours, ref);
     expect(results[0].voltageDiffs[0].ours).toBe(5.0);
     expect(results[0].voltageDiffs[0].theirs).toBe(999.0);
     expect(results[0].allWithinTol).toBe(false);
-    // ref[1] has no ours pair → presence: "ngspiceOnly"
     expect(results[1].presence).toBe("ngspiceOnly");
   });
 
@@ -509,11 +688,8 @@ describe("time-alignment: compareSnapshots with alignment map", () => {
       steps: [makeStep(1e-9, 1e-9, 1.0), makeStep(2e-9, 1e-9, 2.0)],
     };
     const results = compareSnapshots(ours, ref);
-    // our[0] → ref[0]: voltage match
     expect(results.find(r => r.stepIndex === 0)?.allWithinTol).toBe(true);
-    // our[1] → ref[1]: voltage match
     expect(results.find(r => r.stepIndex === 1)?.allWithinTol).toBe(true);
-    // our[2] has no ref pair → presence: "oursOnly"
     expect(results.find(r => r.stepIndex === 2)?.presence).toBe("oursOnly");
   });
 
@@ -565,7 +741,7 @@ describe("node mapping", () => {
   it("canonicalizeNgspiceName returns null for ground and unparseable names", () => {
     expect(canonicalizeNgspiceName("0")).toBeNull();
     expect(canonicalizeNgspiceName("")).toBeNull();
-    expect(canonicalizeNgspiceName("3")).toBeNull(); // bare net number
+    expect(canonicalizeNgspiceName("3")).toBeNull();
   });
 
   it("canonicalizeOurLabel uppercases", () => {

@@ -22,7 +22,7 @@ import {
   type AttributeMapping,
   type ComponentDefinition,
 } from "../../core/registry.js";
-import type { AnalogElementCore } from "../../solver/analog/element.js";
+import type { AnalogElement } from "../../solver/analog/element.js";
 import { createDiodeElement } from "./diode.js";
 import { defineModelParams } from "../../core/model-params.js";
 
@@ -62,8 +62,8 @@ export const { paramDefs: SCHOTTKY_PARAM_DEFS, defaults: SCHOTTKY_PARAM_DEFAULTS
 export function createSchottkyElement(
   pinNodes: ReadonlyMap<string, number>,
   props: PropertyBag,
-  getTime?: () => number,
-): AnalogElementCore {
+  getTime: () => number,
+): AnalogElement {
   return createDiodeElement(pinNodes, props, getTime);
 }
 
@@ -221,7 +221,6 @@ export const SchottkyDiodeDefinition: ComponentDefinition = {
       factory: createSchottkyElement,
       paramDefs: SCHOTTKY_PARAM_DEFS,
       params: SCHOTTKY_PARAM_DEFAULTS,
-      mayCreateInternalNodes: true,
       ngspiceNodeMap: { A: "pos", K: "neg" },
     },
   },

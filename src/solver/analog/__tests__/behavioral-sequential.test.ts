@@ -266,7 +266,7 @@ describe("Counter", () => {
     const factory = makeBehavioralCounterAnalogFactory();
     const element = factory(
       new Map([["en", 1], ["C", 2], ["clr", 3], ["out", 4], ["ovf", 8]]),
-      [], -1, props, () => 0,
+      props, () => 0,
     ) as BehavioralCounterElement;
     initElement(element);
 
@@ -399,40 +399,26 @@ describe("Registration", () => {
 
   it("counter_analog_factory_returns_analog_element", () => {
     const factory = getFactory(CounterDefinition.modelRegistry!.behavioral!);
-    const props = {
-      has: (k: string) => k === "bitWidth",
-      get: (k: string) => k === "bitWidth" ? 4 : undefined,
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    } as any;
-    // pinNodes: en=1, C=2, clr=3, out=4 (bus node), ovf=5
+    const props = new PropertyBag();
+    props.set("bitWidth", 4 as unknown as import("../../../core/properties.js").PropertyValue);
     const element = factory(
       new Map([["en", 1], ["C", 2], ["clr", 3], ["out", 4], ["ovf", 5]]),
-      [], -1, props, () => 0,
+      props, () => 0,
     );
-    const el1 = Object.assign(element, { pinNodeIds: [1, 2, 3, 4, 5], allNodeIds: [1, 2, 3, 4, 5] });
-    expect(el1.isNonlinear).toBe(true);
-    expect(el1.isReactive).toBe(true);
-    expect(el1.branchIndex).toBe(-1);
-    expect(el1.pinNodeIds.length).toBe(5);
+    expect(element.branchIndex).toBe(-1);
+    expect(element._pinNodes.size).toBe(5);
   });
 
   it("register_analog_factory_returns_analog_element", () => {
     const factory = getFactory(RegisterDefinition.modelRegistry!.behavioral!);
-    const props = {
-      has: (k: string) => k === "bitWidth",
-      get: (k: string) => k === "bitWidth" ? 8 : undefined,
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    } as any;
-    // pinNodes: D=1 (bus), C=2, en=3, Q=4 (bus)
+    const props = new PropertyBag();
+    props.set("bitWidth", 8 as unknown as import("../../../core/properties.js").PropertyValue);
     const element = factory(
       new Map([["D", 1], ["C", 2], ["en", 3], ["Q", 4]]),
-      [], -1, props, () => 0,
+      props, () => 0,
     );
-    const el2 = Object.assign(element, { pinNodeIds: [1, 2, 3, 4], allNodeIds: [1, 2, 3, 4] });
-    expect(el2.isNonlinear).toBe(true);
-    expect(el2.isReactive).toBe(true);
-    expect(el2.branchIndex).toBe(-1);
-    expect(el2.pinNodeIds.length).toBe(4);
+    expect(element.branchIndex).toBe(-1);
+    expect(element._pinNodes.size).toBe(4);
   });
 });
 
@@ -461,10 +447,9 @@ describe("Task 6.4.3 — sequential pin loading propagates", () => {
     const factory = getFactory(CounterDefinition.modelRegistry!.behavioral!);
     const element = factory(
       new Map([["en", 1], ["C", 2], ["clr", 3], ["out", 4], ["ovf", 5]]),
-      [], -1, props, () => 0,
+      props, () => 0,
     );
-    Object.assign(element, { pinNodeIds: [1, 2, 3, 4, 5], allNodeIds: [1, 2, 3, 4, 5] });
-    initElement(element as unknown as import("../element.js").ReactiveAnalogElement);
+    initElement(element);
 
     const allocCalls: Array<[number, number]> = [];
     const solver = {

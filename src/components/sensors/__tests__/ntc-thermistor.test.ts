@@ -134,7 +134,6 @@ function makeNTC(overrides: Partial<{
     overrides.shC,
   );
   el._pinNodes = new Map([["pos", 1], ["neg", 2]]);
-  Object.assign(el, { pinNodeIds: [1, 2], allNodeIds: [1, 2] });
   return el;
 }
 
@@ -334,7 +333,6 @@ describe("NTC", () => {
       props.replaceModelParams(NTC_DEFAULTS);
       const element = createNTCThermistorElement(new Map([["pos", 1], ["neg", 2]]), props, () => 0);
       expect(element).toBeInstanceOf(NTCThermistorElement);
-      expect(element.isNonlinear).toBe(true);
     });
 
     it("branchCount is false", () => {
@@ -367,10 +365,7 @@ describe("ntc_load_dcop_parity", () => {
       props,
       () => 0,
     );
-    const analogElement = Object.assign(core, {
-      pinNodeIds: [1, 2] as readonly number[],
-      allNodeIds: [1, 2] as readonly number[],
-    }) as unknown as AnalogElement;
+    const analogElement = core as unknown as AnalogElement;
 
     const stampCtx = makeSimpleCtx({
       elements: [analogElement],

@@ -27,7 +27,7 @@ import {
   type AttributeMapping,
   type ComponentDefinition,
 } from "../../core/registry.js";
-import type { AnalogElementCore, LoadContext } from "../../solver/analog/element.js";
+import type { AnalogElement, LoadContext } from "../../solver/analog/element.js";
 import { NGSPICE_LOAD_ORDER } from "../../solver/analog/element.js";
 import { defineModelParams } from "../../core/model-params.js";
 import type { SetupContext } from "../../solver/analog/setup-context.js";
@@ -146,7 +146,7 @@ const VARIABLE_RAIL_ATTRIBUTE_MAP: AttributeMapping[] = [
 // VariableRailAnalogElement  AnalogElement with mutable voltage
 // ---------------------------------------------------------------------------
 
-export interface VariableRailAnalogElement extends AnalogElementCore {
+export interface VariableRailAnalogElement extends AnalogElement {
   /** Update the rail voltage. Takes effect from the next stamp() call. */
   setVoltage(v: number): void;
   /** Current rail voltage. */
@@ -157,9 +157,10 @@ export interface VariableRailAnalogElement extends AnalogElementCore {
 
 export function makeVariableRailElement(
   pinNodes: ReadonlyMap<string, number>,
-  initialVoltage: number,
+  props: PropertyBag,
+  _getTime: () => number,
 ): VariableRailAnalogElement {
-  let _voltage = initialVoltage;
+  let _voltage = props.getModelParam<number>("voltage");
 
   // Cached handles — populated in setup(), consumed in load()
   let _hPosBr = -1;
@@ -168,17 +169,15 @@ export function makeVariableRailElement(
   let _hBrPos = -1;
 
   const element: VariableRailAnalogElement = {
+    label: "",
     branchIndex: -1,
     ngspiceLoadOrder: NGSPICE_LOAD_ORDER.VSRC,
-    isNonlinear: false,
-    isReactive: false,
     _stateBase: -1,
-    _pinNodes: new Map<string, number>(pinNodes),
-    label: "",
+    _pinNodes: new Map(pinNodes),
 
     setup(ctx: SetupContext): void {
-      const posNode    = (element._pinNodes as Map<string, number>).get("pos")!;
-      const negNode    = 0;  // ground — variable rail has no neg pin
+      const posNode = element._pinNodes.get("pos")!;
+      const negNode = 0;  // ground — variable rail has no neg pin
 
       // Port of vsrcset.c:40-43 — idempotent branch allocation
       if (element.branchIndex === -1) {
@@ -191,6 +190,13 @@ export function makeVariableRailElement(
       _hNegBr = ctx.solver.allocElement(negNode,    branchNode); // VSRCnegNode(=0), VSRCbranch
       _hBrNeg = ctx.solver.allocElement(branchNode, negNode);    // VSRCbranch,  VSRCnegNode(=0)
       _hBrPos = ctx.solver.allocElement(branchNode, posNode);    // VSRCbranch,  VSRCposNode
+    },
+
+    findBranchFor(_name: string, ctx: SetupContext): number {
+      if (element.branchIndex === -1) {
+        element.branchIndex = ctx.makeCur(element.label, "branch");
+      }
+      return element.branchIndex;
     },
 
     get currentVoltage() { return _voltage; },
@@ -247,27 +253,10 @@ export const VariableRailDefinition: ComponentDefinition = {
   modelRegistry: {
     "behavioral": {
       kind: "inline",
-      factory(
-        pinNodes: ReadonlyMap<string, number>,
-        props: PropertyBag,
-      ): AnalogElementCore {
-        const voltage = props.getModelParam<number>("voltage");
-        return makeVariableRailElement(pinNodes, voltage);
-      },
+      factory: makeVariableRailElement,
       paramDefs: VARIABLE_RAIL_PARAM_DEFS,
       params: VARIABLE_RAIL_DEFAULTS,
       ngspiceNodeMap: { pos: "pos" },
-      findBranchFor(name: string, ctx: SetupContext): number {
-        // Mirrors VSRCfindBr (vsrc/vsrcfbr.c:26-39).
-        // Look up the device by namespaced label (auto-registered per 00-engine.md §A4.1 recursive _deviceMap walk).
-        const el = ctx.findDevice(name);
-        if (!el) return 0;
-        // The element owns its branch row. Lazy-allocate if needed.
-        if (el.branchIndex === -1) {
-          el.branchIndex = ctx.makeCur(name, "branch");
-        }
-        return el.branchIndex;
-      },
     },
   },
   defaultModel: "behavioral",

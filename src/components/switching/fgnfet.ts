@@ -27,7 +27,7 @@ import {
   type ComponentDefinition,
   type ComponentLayout,
 } from "../../core/registry.js";
-import type { AnalogElementCore } from "../../core/analog-types.js";
+import type { AnalogElement } from "../../core/analog-types.js";
 import { NGSPICE_LOAD_ORDER } from "../../core/analog-types.js";
 import type { SetupContext } from "../../solver/analog/setup-context.js";
 import type { LoadContext } from "../../solver/analog/load-context.js";
@@ -102,6 +102,13 @@ const MOS_SLOT_GMBS  = 24;
 const MOS_SLOT_MODE  = 25;
 const MOS_SLOT_VON   = 26;
 const MOS_SLOT_VDSAT = 27;
+
+// latent-stamp-gap: MOS_SLOT_CQBD and MOS_SLOT_CQBS are reserved for the
+// NIintegrate companion-current write-back of bulk junction caps (mos1load.c:
+// capbd/capbs integration path). Currently zero for the digital 3-terminal model
+// (CBD=CBS=CJ=0), but the slots are retained for when full bulk caps are implemented.
+void MOS_SLOT_CQBD;
+void MOS_SLOT_CQBS;
 
 // ---------------------------------------------------------------------------
 // CAP state slot indices — matches AnalogCapacitorElement slots
@@ -316,11 +323,10 @@ const FGNFET_PROPERTY_DEFS: PropertyDefinition[] = [
 // internal node; negative terminal wired to ground (0).
 // ---------------------------------------------------------------------------
 
-class FGNFETCapSubElement implements AnalogElementCore {
-  readonly branchIndex: number = -1;
+class FGNFETCapSubElement implements AnalogElement {
+  label: string = "";
+  branchIndex: number = -1;
   readonly ngspiceLoadOrder: number = NGSPICE_LOAD_ORDER.CAP;
-  readonly isNonlinear: boolean = false;
-  readonly isReactive: boolean = true;
   _stateBase: number = -1;
   _pinNodes: Map<string, number>;
 
@@ -436,11 +442,10 @@ class FGNFETCapSubElement implements AnalogElementCore {
 // sNodePrime=sNode (the conditional CKTmkVolt at mos1set.c:134-178 is skipped).
 // ---------------------------------------------------------------------------
 
-class FGNFETMosSubElement implements AnalogElementCore {
-  readonly branchIndex: number = -1;
+class FGNFETMosSubElement implements AnalogElement {
+  label: string = "";
+  branchIndex: number = -1;
   readonly ngspiceLoadOrder: number = NGSPICE_LOAD_ORDER.MOS;
-  readonly isNonlinear: boolean = true;
-  readonly isReactive: boolean = false;
   _stateBase: number = -1;
   _pinNodes: Map<string, number>;
 
@@ -540,8 +545,11 @@ class FGNFETMosSubElement implements AnalogElementCore {
     const GateSourceOverlapCap = 0.0;
     const GateDrainOverlapCap  = 0.0;
     const GateBulkOverlapCap   = 0.0;
-    // OxideCap zero (no TOX set in digital model).
+    // latent-stamp-gap: OxideCap is zero for the digital 3-terminal model (no TOX).
+    // Retained for the DEVqmeyer cap computation path (mos1load.c:759+) when full
+    // oxide-cap model is implemented. void-reference suppresses TS6133.
     const OxideCap = 0.0;
+    void OxideCap;
 
     // Node indices.
     const nodeG = this._pinNodes.get("G")!;  // floating-gate node
@@ -775,6 +783,8 @@ class FGNFETMosSubElement implements AnalogElementCore {
       capGate = (mode & (MODETRAN | MODETRANOP | MODEINITSMSIG)) !== 0;
 
       // mos1load.c:586-694: bulk depletion caps — zero for digital model (CBD=CBS=CJ=0).
+      // latent-stamp-gap: capbd/capbs retained for the NIintegrate bulk-junction stamp
+      // (mos1load.c:701-725). Currently no-ops since CBD=CBS=CJ=0 for digital model.
       let capbd = 0, capbs = 0;
       if (capGate) {
         s0[base + MOS_SLOT_QBS] = 0;
@@ -788,6 +798,8 @@ class FGNFETMosSubElement implements AnalogElementCore {
         if (runBulkNI) {
           // capbd=capbs=0 so geq=0, ccap=ag[0]*0=0 — bulk integrations are no-ops.
         }
+        // void-references suppress TS6199 (assigned but never consumed downstream).
+        void capbd; void capbs;
       }
 
       // mos1load.c:750-753: save state.
@@ -941,14 +953,15 @@ class FGNFETMosSubElement implements AnalogElementCore {
 // bucket sorts after capacitors in cktLoad order.
 // ---------------------------------------------------------------------------
 
-export class FGNFETAnalogElement implements AnalogElementCore {
-  readonly branchIndex: number = -1;
+export class FGNFETAnalogElement implements AnalogElement {
+  label: string = "";
+  branchIndex: number = -1;
   readonly ngspiceLoadOrder: number = NGSPICE_LOAD_ORDER.MOS;
-  readonly isNonlinear: boolean = true;
-  readonly isReactive: boolean = true;
   _stateBase: number = -1;
   _pinNodes: Map<string, number>;
   _fgNode: number = -1;
+
+  private readonly _internalLabels: string[] = [];
 
   readonly _cap: FGNFETCapSubElement;
   readonly _mos: FGNFETMosSubElement;
@@ -978,6 +991,7 @@ export class FGNFETAnalogElement implements AnalogElementCore {
     // Allocate the floating-gate internal node first.
     // MOS gate and CAP positive terminal both reference this node.
     this._fgNode = ctx.makeVolt(this.label ?? "FGNFET", "fg");
+    this._internalLabels.push("fg");
 
     // Patch fgNode into sub-element pin maps before calling their setup().
     this._cap._pinNodes.set("pos", this._fgNode);
@@ -989,6 +1003,10 @@ export class FGNFETAnalogElement implements AnalogElementCore {
     for (const sub of [this._cap, this._mos].sort((a, b) => a.ngspiceLoadOrder - b.ngspiceLoadOrder)) {
       sub.setup(ctx);
     }
+  }
+
+  getInternalNodeLabels(): readonly string[] {
+    return this._internalLabels;
   }
 
   load(ctx: LoadContext): void {
@@ -1007,7 +1025,7 @@ const fgnfetAnalogFactory: AnalogFactory = (
   pinNodes: ReadonlyMap<string, number>,
   _props: PropertyBag,
   _getTime: () => number,
-): AnalogElementCore => new FGNFETAnalogElement(pinNodes);
+): AnalogElement => new FGNFETAnalogElement(pinNodes);
 
 function fgnfetFactory(props: PropertyBag): FGNFETElement {
   return new FGNFETElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
@@ -1038,7 +1056,6 @@ export const FGNFETDefinition: ComponentDefinition = {
       factory: fgnfetAnalogFactory,
       paramDefs: [],
       params: {},
-      mayCreateInternalNodes: true,
     },
   },
 };

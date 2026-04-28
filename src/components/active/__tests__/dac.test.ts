@@ -26,8 +26,8 @@
 import { describe, it, expect } from "vitest";
 import { DACDefinition, DAC_DEFAULTS } from "../dac.js";
 import { PropertyBag } from "../../../core/properties.js";
-import { withNodeIds, makeLoadCtx, initElement } from "../../../solver/analog/__tests__/test-helpers.js";
-import { makeDcVoltageSource } from "../../sources/dc-voltage-source.js";
+import { makeLoadCtx, initElement } from "../../../solver/analog/__tests__/test-helpers.js";
+import { makeDcVoltageSource, DC_VOLTAGE_SOURCE_DEFAULTS } from "../../sources/dc-voltage-source.js";
 import type { AnalogElement } from "../../../solver/analog/element.js";
 import { MNAEngine } from "../../../solver/analog/analog-engine.js";
 import type { ConcreteCompiledAnalogCircuit } from "../../../solver/analog/analog-engine.js";
@@ -41,6 +41,15 @@ function getFactory(entry: ModelEntry): AnalogFactory {
   return entry.factory;
 }
 
+
+// ---------------------------------------------------------------------------
+// makeVsrc — DC voltage source helper
+// ---------------------------------------------------------------------------
+function makeVsrc(posNode: number, negNode: number, voltage: number): AnalogElement {
+  const props = new PropertyBag();
+  props.replaceModelParams({ ...DC_VOLTAGE_SOURCE_DEFAULTS, voltage });
+  return makeDcVoltageSource(new Map([["pos", posNode], ["neg", negNode]]), props, () => 0);
+}
 
 // ---------------------------------------------------------------------------
 // Circuit builder helpers
@@ -93,42 +102,20 @@ function solveDac(
   ]);
   props.replaceModelParams({ ...DAC_DEFAULTS, ...paramOverrides });
 
-  const dacPinNodeIds: number[] = [];
-  for (let i = 0; i < BITS; i++) dacPinNodeIds.push(i + 1);  // D0=1..D7=8
-  dacPinNodeIds.push(nVRefNode);  // VREF
-  dacPinNodeIds.push(nOutNode);   // OUT
-  dacPinNodeIds.push(0);          // GND
-  const dacEl = withNodeIds(
-    getFactory(DACDefinition.modelRegistry!["unipolar"]!)(dacPinNodes, props, () => 0),
-    dacPinNodeIds,
-  );
+  const dacEl = getFactory(DACDefinition.modelRegistry!["unipolar"]!)(dacPinNodes, props, () => 0);
 
   // Digital input voltage sources: HIGH = driveHigh, LOW = 0.
-  // Branch rows start at nNodes+2=12 to avoid colliding with DAC VCVS branch=11.
-  // Each VS needs a setup() that pre-allocates its matrix handles so that
-  // MNAEngine._setup() sizes the solver matrix to include all branch rows before
-  // allocateRowBuffers() is called.
+  // Production makeDcVoltageSource allocates its own branch row during setup().
   const elements: AnalogElement[] = [dacEl];
-  const vsStartBranch = nNodes + 2;  // 12
   for (let i = 0; i < BITS; i++) {
     const nDi = i + 1;  // node for Di
-    const branchRow = vsStartBranch + i;
     const v = inputBits[i] ? driveHigh : 0.0;
-    const vs = makeDcVoltageSource(nDi, 0, branchRow, v) as unknown as AnalogElement;
-    (vs as any).setup = (ctx: { solver: { allocElement: (r: number, c: number) => number } }) => {
-      ctx.solver.allocElement(nDi, branchRow);
-      ctx.solver.allocElement(branchRow, nDi);
-    };
+    const vs = makeVsrc(nDi, 0, v);
     elements.push(vs);
   }
 
   // VREF voltage source
-  const vRefBranchRow = vsStartBranch + BITS;
-  const vrefVs = makeDcVoltageSource(nVRefNode, 0, vRefBranchRow, vRef) as unknown as AnalogElement;
-  (vrefVs as any).setup = (ctx: { solver: { allocElement: (r: number, c: number) => number } }) => {
-    ctx.solver.allocElement(nVRefNode, vRefBranchRow);
-    ctx.solver.allocElement(vRefBranchRow, nVRefNode);
-  };
+  const vrefVs = makeVsrc(nVRefNode, 0, vRef);
   elements.push(vrefVs);
 
   // Use MNAEngine so that _setup() allocates the DAC's VCVS branch row
@@ -403,7 +390,7 @@ describe("DAC parity (C4.5)", () => {
     // Branch row is the first node allocated after nOut=10, so branchRow = 11.
     const branchRow = 11;
 
-    initElement(dac as unknown as import("../../../solver/analog/element.js").ReactiveAnalogElement);
+    initElement(dac);
 
     // Step 2: Reset stamps accumulated during setup() so we only see load() stamps.
     stamps.length = 0;

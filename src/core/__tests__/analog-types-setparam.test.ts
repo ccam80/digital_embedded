@@ -1,28 +1,32 @@
 import { describe, it, expect } from "vitest";
-import type { AnalogElementCore } from "../analog-types.js";
+import type { AnalogElement } from "../analog-types.js";
 
-describe("AnalogElementCore.setParam", () => {
+describe("AnalogElement.setParam", () => {
   it("is required on the interface (not optional)", () => {
     // @ts-expect-error - missing setParam should be a type error
-    const _bad: AnalogElementCore = {
-      branchIndex: -1,
+    const _bad: AnalogElement = {
+      label: "",
       ngspiceLoadOrder: 0,
-      isNonlinear: false,
-      isReactive: false,
-      stampAc() {},
+      branchIndex: -1,
+      _stateBase: -1,
+      _pinNodes: new Map(),
+      setup(_ctx: unknown) {},
+      load(_ctx: unknown) {},
       getPinCurrents() { return []; },
     };
     // If this compiles without the @ts-expect-error triggering,
-    // setParam is still optional  that is a bug.
+    // setParam is still optional — that is a bug.
     expect(_bad).toBeDefined();
   });
 
   it("accepts a conforming object with setParam", () => {
-    const good: AnalogElementCore = {
-      branchIndex: -1,
+    const good: AnalogElement = {
+      label: "",
       ngspiceLoadOrder: 0,
-      isNonlinear: false,
-      isReactive: false,
+      branchIndex: -1,
+      _stateBase: -1,
+      _pinNodes: new Map(),
+      setup(_ctx: unknown) {},
       load(_ctx: unknown) {},
       getPinCurrents() { return []; },
       setParam(_key: string, _value: number) {},

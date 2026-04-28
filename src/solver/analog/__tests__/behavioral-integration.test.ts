@@ -31,11 +31,13 @@ import type { ConcreteCompiledAnalogCircuit } from "../analog-engine.js";
 import { StatePool } from "../state-pool.js";
 import { EngineState } from "../../../core/engine-interface.js";
 import {
-  makeVoltageSource,
-  makeResistor,
-  withNodeIds,
+  allocateStatePool,
   makeLoadCtx,
 } from "./test-helpers.js";
+import { makeDcVoltageSource, DC_VOLTAGE_SOURCE_DEFAULTS } from "../../../components/sources/dc-voltage-source.js";
+import { ResistorDefinition } from "../../../components/passives/resistor.js";
+import { PropertyBag } from "../../../core/properties.js";
+import type { AnalogFactory } from "../../../core/registry.js";
 import {
   BehavioralGateElement,
   makeAndAnalogFactory,
@@ -50,33 +52,33 @@ import {
 } from "../digital-pin-model.js";
 import type { ResolvedPinElectrical } from "../../../core/pin-electrical.js";
 import type { AnalogElement } from "../element.js";
-import { isPoolBacked } from "../element.js";
-import { PropertyBag } from "../../../core/properties.js";
 import { MODETRAN, MODEINITFLOAT } from "../ckt-mode.js";
 
 /**
  * Allocate a StatePool sized for all pool-backed elements in the array,
- * assign stateBaseOffset to each, and call initState. Mirrors the compiler's
- * state-pool allocation loop so integration tests that build circuits manually
- * produce valid CompiledAnalogCircuit objects.
+ * assign _stateBase sequentially, and call initState. Delegates to
+ * allocateStatePool from test-helpers which mirrors the compiler's allocation
+ * loop.
  */
 function makeStatePool(elements: AnalogElement[]): StatePool {
-  let totalSize = 0;
-  for (const el of elements) {
-    if (isPoolBacked(el)) {
-      totalSize += el.stateSize;
-    }
-  }
-  const pool = new StatePool(totalSize);
-  let offset = 0;
-  for (const el of elements) {
-    if (isPoolBacked(el)) {
-      el.stateBaseOffset = offset;
-      el.initState(pool);
-      offset += el.stateSize;
-    }
-  }
-  return pool;
+  return allocateStatePool(elements);
+}
+
+/**
+ * Build a resistor element via the production ResistorDefinition factory.
+ * Pin labels are "A" (nodeA) and "B" (nodeB) matching ResistorDefinition.
+ */
+function makeTestResistor(nodeA: number, nodeB: number, resistance: number): AnalogElement {
+  const props = new PropertyBag();
+  props.replaceModelParams({ resistance });
+  const factory = (ResistorDefinition.modelRegistry!.behavioral as { kind: "inline"; factory: AnalogFactory }).factory;
+  return factory(new Map([["A", nodeA], ["B", nodeB]]), props, () => 0);
+}
+
+function makeVsrc(posNode: number, negNode: number, voltage: number): AnalogElement {
+  const props = new PropertyBag();
+  props.replaceModelParams({ ...DC_VOLTAGE_SOURCE_DEFAULTS, voltage });
+  return makeDcVoltageSource(new Map([["pos", posNode], ["neg", negNode]]), props, () => 0);
 }
 
 // ---------------------------------------------------------------------------
@@ -152,14 +154,14 @@ function buildAndGateCircuit(
     new Map(),
   );
 
-  // Ideal voltage sources driving input nodes (branch rows are absolute 0-based)
-  const vsA = makeVoltageSource(1, 0, 3, vA); // node1  branch row 3
-  const vsB = makeVoltageSource(2, 0, 4, vB); // node2  branch row 4
+  // Ideal voltage sources driving input nodes
+  const vsA = makeVsrc(1, 0, vA); // node1
+  const vsB = makeVsrc(2, 0, vB); // node2
 
-  // Load resistor on output (10kÎ from node 3 to ground)
-  const rLoad = makeResistor(3, 0, LOAD_R);
+  // Load resistor on output (10kΩ from node 3 to ground)
+  const rLoad = makeTestResistor(3, 0, LOAD_R);
 
-  const elements: AnalogElement[] = [vsA, vsB, rLoad, withNodeIds(andGate, [1, 2, 3])];
+  const elements: AnalogElement[] = [vsA, vsB, rLoad, andGate];
 
   return {
     netCount: 3,
@@ -209,18 +211,18 @@ function buildHighImpedanceSourceCircuit(): ConcreteCompiledAnalogCircuit {
     new Map(),
   );
 
-  // Ideal 3.3V source at node 4 (solver node 3), branch row 4 (absolute)
-  const vsA = makeVoltageSource(4, 0, 4, 3.3);
-  // 100kÎ from node 4 to node 1 (high-impedance source path)
-  const rSource = makeResistor(4, 1, 100_000);
+  // Ideal 3.3V source at node 4
+  const vsA = makeVsrc(4, 0, 3.3);
+  // 100kΩ from node 4 to node 1 (high-impedance source path)
+  const rSource = makeTestResistor(4, 1, 100_000);
 
-  // Ideal 3.3V source at node 2 (input B), branch row 5
-  const vsB = makeVoltageSource(2, 0, 5, 3.3);
+  // Ideal 3.3V source at node 2 (input B)
+  const vsB = makeVsrc(2, 0, 3.3);
 
   // Load resistor on output
-  const rLoad = makeResistor(3, 0, LOAD_R);
+  const rLoad = makeTestResistor(3, 0, LOAD_R);
 
-  const elements: AnalogElement[] = [vsA, rSource, vsB, rLoad, withNodeIds(andGate, [1, 2, 3])];
+  const elements: AnalogElement[] = [vsA, rSource, vsB, rLoad, andGate];
 
   return {
     netCount: 4,
@@ -284,9 +286,9 @@ function buildDffToggleCircuit(): {
   element._setThresholds(CMOS_3V3.vIH, CMOS_3V3.vIL);
 
   // Load resistors on Q and ~Q for stable node voltages
-  const rLoadQ = makeResistor(3, 0, LOAD_R);    // 10kÎ from ~Q to ground
+  const rLoadQ = makeTestResistor(3, 0, LOAD_R);    // 10kΩ from ~Q to ground
 
-  const elements: AnalogElement[] = [rLoadQ, withNodeIds(element, [1, 4, 3, 4])];
+  const elements: AnalogElement[] = [rLoadQ, element];
 
   const circuit = {
     netCount: 4,
@@ -443,11 +445,11 @@ describe("Integration", () => {
     );
 
     // Input A = 1.5V (indeterminate), Input B = 3.3V (HIGH for TTL)
-    const vsA = makeVoltageSource(1, 0, 3, 1.5);
-    const vsB = makeVoltageSource(2, 0, 4, 3.3);
-    const rLoad = makeResistor(3, 0, LOAD_R);
+    const vsA = makeVsrc(1, 0, 1.5);
+    const vsB = makeVsrc(2, 0, 3.3);
+    const rLoad = makeTestResistor(3, 0, LOAD_R);
 
-    const elements = [vsA, vsB, rLoad, withNodeIds(andGate, [1, 2, 3])];
+    const elements = [vsA, vsB, rLoad, andGate];
     const circuit = {
       netCount: 3,
       componentCount: 4,
@@ -590,14 +592,11 @@ describe("Integration", () => {
     const factory = makeAndAnalogFactory(2);
     const props = new PropertyBag();
     // nodeIds: 1-based MNA node IDs
-    const andGate = withNodeIds(
-      factory(new Map([["In_1", 1], ["In_2", 2], ["out", 3]]), [], -1, props, () => 0),
-      [1, 2, 3],
-    );
+    const andGate = factory(new Map([["In_1", 1], ["In_2", 2], ["out", 3]]), props, () => 0);
 
-    const vsA = makeVoltageSource(1, 0, 3, 3.3);
-    const vsB = makeVoltageSource(2, 0, 4, 3.3);
-    const rLoad = makeResistor(3, 0, LOAD_R);
+    const vsA = makeVsrc(1, 0, 3.3);
+    const vsB = makeVsrc(2, 0, 3.3);
+    const rLoad = makeTestResistor(3, 0, LOAD_R);
 
     const elements = [vsA, vsB, rLoad, andGate];
     const circuit = {
@@ -632,14 +631,11 @@ describe("Integration", () => {
     // nodeIds: [D=1, C=2, Q=3, ~Q=4] (1-based MNA node IDs)
     const factory = makeDFlipflopAnalogFactory();
     const props = new PropertyBag();
-    const dff = withNodeIds(
-      factory(new Map([["D", 1], ["C", 2], ["Q", 3], ["~Q", 4]]), [], -1, props, () => 0),
-      [1, 2, 3, 4],
-    );
+    const dff = factory(new Map([["D", 1], ["C", 2], ["Q", 3], ["~Q", 4]]), props, () => 0);
 
     // Load resistors on Q and ~Q for stable voltage nodes
-    const rLoadQ = makeResistor(3, 0, LOAD_R);
-    const rLoadQBar = makeResistor(4, 0, LOAD_R);
+    const rLoadQ = makeTestResistor(3, 0, LOAD_R);
+    const rLoadQBar = makeTestResistor(4, 0, LOAD_R);
 
     const elements = [rLoadQ, rLoadQBar, dff];
     const circuit = {

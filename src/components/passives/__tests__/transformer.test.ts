@@ -34,12 +34,11 @@ import {
 import { PropertyBag } from "../../../core/properties.js";
 import { ComponentCategory, ComponentRegistry } from "../../../core/registry.js";
 import { SparseSolver } from "../../../solver/analog/sparse-solver.js";
-import { makeVoltageSource, makeResistor, makeLoadCtx, runDcOp } from "../../../solver/analog/__tests__/test-helpers.js";
+import { makeLoadCtx, runDcOp, makeTestSetupContext, setupAll } from "../../../solver/analog/__tests__/test-helpers.js";
 import { makeDcVoltageSource } from "../../sources/dc-voltage-source.js";
 import type { AnalogElement } from "../../../solver/analog/element.js";
 import { StatePool } from "../../../solver/analog/state-pool.js";
-import type { AnalogElementCore } from "../../../core/analog-types.js";
-import type { ReactiveAnalogElement } from "../../../solver/analog/element.js";
+import type { PoolBackedAnalogElement } from "../../../core/analog-types.js";
 import type { LoadContext } from "../../../solver/analog/load-context.js";
 import type { SparseSolver as SparseSolverType } from "../../../solver/analog/sparse-solver.js";
 import { computeNIcomCof } from "../../../solver/analog/integration.js";
@@ -53,6 +52,76 @@ import type { ModelEntry, AnalogFactory } from "../../../core/registry.js";
 function getFactory(entry: ModelEntry): AnalogFactory {
   if (entry.kind !== "inline") throw new Error("Expected inline ModelEntry");
   return entry.factory;
+}
+
+// ---------------------------------------------------------------------------
+// Local test helpers (replaces removed makeResistor / makeVoltageSource —
+// §A.19).
+// ---------------------------------------------------------------------------
+
+/** Minimal inline resistor for test use — stamps 4 conductance entries. */
+function makeResistor(nodeA: number, nodeB: number, resistance: number): AnalogElement {
+  const G = 1 / Math.max(resistance, 1e-9);
+  let _hAA = -1, _hBB = -1, _hAB = -1, _hBA = -1;
+  return {
+    label: "",
+    _pinNodes: new Map([["A", nodeA], ["B", nodeB]]),
+    branchIndex: -1,
+    _stateBase: -1,
+    ngspiceLoadOrder: 0,
+    setParam(_key: string, _value: number): void {},
+    getPinCurrents(_v: Float64Array): number[] { return []; },
+    setup(ctx: import("../../../solver/analog/setup-context.js").SetupContext): void {
+      if (nodeA !== 0) _hAA = ctx.solver.allocElement(nodeA, nodeA);
+      if (nodeB !== 0) _hBB = ctx.solver.allocElement(nodeB, nodeB);
+      if (nodeA !== 0 && nodeB !== 0) {
+        _hAB = ctx.solver.allocElement(nodeA, nodeB);
+        _hBA = ctx.solver.allocElement(nodeB, nodeA);
+      }
+    },
+    load(ctx: LoadContext): void {
+      const { solver } = ctx;
+      if (_hAA !== -1) solver.stampElement(_hAA, G);
+      if (_hBB !== -1) solver.stampElement(_hBB, G);
+      if (_hAB !== -1) solver.stampElement(_hAB, -G);
+      if (_hBA !== -1) solver.stampElement(_hBA, -G);
+    },
+  };
+}
+
+/**
+ * Build a DC voltage source for use in a transient loop where the voltage
+ * changes each step. Call setup() once (after _initStructure, before the
+ * loop), then call setVoltage(v) + load(ctx) each step.
+ */
+function makeStepVsrc(posNode: number, negNode: number): { element: AnalogElement; setVoltage(v: number): void } {
+  let _hPosBr = -1, _hNegBr = -1, _hBrPos = -1, _hBrNeg = -1;
+  let _voltage = 0;
+  const el: AnalogElement = {
+    label: "",
+    _pinNodes: new Map([["pos", posNode], ["neg", negNode]]),
+    branchIndex: -1,
+    _stateBase: -1,
+    ngspiceLoadOrder: 10,
+    setParam(key: string, value: number): void { if (key === "voltage") _voltage = value; },
+    getPinCurrents(_v: Float64Array): number[] { return []; },
+    setup(ctx: import("../../../solver/analog/setup-context.js").SetupContext): void {
+      el.branchIndex = ctx.makeCur(el.label, "branch");
+      const k = el.branchIndex;
+      _hPosBr = ctx.solver.allocElement(posNode, k);
+      _hNegBr = ctx.solver.allocElement(negNode, k);
+      _hBrPos = ctx.solver.allocElement(k, posNode);
+      _hBrNeg = ctx.solver.allocElement(k, negNode);
+    },
+    load(ctx: LoadContext): void {
+      ctx.solver.stampElement(_hPosBr, +1.0);
+      ctx.solver.stampElement(_hNegBr, -1.0);
+      ctx.solver.stampElement(_hBrPos, +1.0);
+      ctx.solver.stampElement(_hBrNeg, -1.0);
+      ctx.rhs[el.branchIndex] += _voltage;
+    },
+  };
+  return { element: el, setVoltage: (v: number) => { _voltage = v; } };
 }
 
 // ---------------------------------------------------------------------------
@@ -133,38 +202,89 @@ function makeCaptureSolver(): { solver: SparseSolverType; stamps: CaptureStamp[]
 // withState: allocate a StatePool for a single element and call initState
 // ---------------------------------------------------------------------------
 
-function withState(core: AnalogElementCore): { element: ReactiveAnalogElement; pool: StatePool } {
-  const re = core as ReactiveAnalogElement;
-  const pool = new StatePool(Math.max(re.stateSize, 1));
-  re.stateBaseOffset = 0;
-  re.initState(pool);
-  return { element: re, pool };
+function withState(core: PoolBackedAnalogElement): { element: PoolBackedAnalogElement; pool: StatePool } {
+  const pb = core as PoolBackedAnalogElement & { _stateBase: number };
+  const pool = new StatePool(Math.max(pb.stateSize, 1));
+  pb._stateBase = 0;
+  pb.initState(pool);
+  return { element: pb, pool };
 }
 
 // ---------------------------------------------------------------------------
 // Transformer element construction helper
 // ---------------------------------------------------------------------------
 
+/**
+ * Build a transformer element.
+ *
+ * Does NOT call setup() — callers that use runDcOp rely on makeSimpleCtx
+ * calling setupAll internally. Callers that run manual transient loops must
+ * call setupTransformerForLoop() to allocate handles before the loop starts.
+ */
 function makeTransformerElement(opts: {
   pinNodeIds: number[];
-  branch1: number;
+  branch1?: number;
   lPrimary?: number;
   turnsRatio?: number;
   k?: number;
   rPri?: number;
   rSec?: number;
-}): { element: AnalogTransformerElement; pool: StatePool } {
+}): { element: AnalogTransformerElement; pool: StatePool; solver: SparseSolver } {
+  const pinNodes = new Map<string, number>([
+    ["P1", opts.pinNodeIds[0]],
+    ["P2", opts.pinNodeIds[1]],
+    ["S1", opts.pinNodeIds[2]],
+    ["S2", opts.pinNodeIds[3]],
+  ]);
   const el = new AnalogTransformerElement(
-    opts.pinNodeIds,
-    opts.branch1,
+    pinNodes,
     opts.lPrimary ?? 10e-3,
     opts.turnsRatio ?? 1.0,
     opts.k ?? 0.99,
     opts.rPri ?? 0.0,
     opts.rSec ?? 0.0,
+    "T",
   );
   const { pool } = withState(el);
-  return { element: el, pool };
+  const solver = new SparseSolver();
+  solver._initStructure();
+  if (opts.branch1 !== undefined) {
+    // Set up the transformer on the shared solver when branch1 is supplied.
+    // Call sites that use runDcOp / makeSimpleCtx must NOT pass branch1 here
+    // (those paths run their own setupAll internally).
+    // Call sites that use setupTransformerForLoop must NOT pass branch1 here
+    // (that function runs _initStructure + setupAll itself on a fresh solver).
+    const setupCtx = makeTestSetupContext({ solver, startBranch: opts.branch1 });
+    setupAll([el], setupCtx);
+  }
+  return { element: el, pool, solver };
+}
+
+/**
+ * Set up a transformer + companion elements on a solver for use in a
+ * manual transient loop. Calls _initStructure() once then setup() on all
+ * elements with startBranch=branch1 (transformer) and startBranch=vsrcBranch
+ * (vsrc + resistors). Returns the shared solver and the vsrc element.
+ *
+ * Per-step: call solver._resetForAssembly() + rhs.fill(0), NOT _initStructure().
+ */
+function setupTransformerForLoop(opts: {
+  transformer: AnalogTransformerElement;
+  branch1: number;
+  vsrcBranch: number;
+  posNode: number;
+  resistors: AnalogElement[];
+}): { solver: SparseSolver; vsrcEl: AnalogElement; setVoltage(v: number): void } {
+  const solver = new SparseSolver();
+  solver._initStructure();
+  // Setup transformer at startBranch=branch1
+  const txCtx = makeTestSetupContext({ solver, startBranch: opts.branch1 });
+  setupAll([opts.transformer], txCtx);
+  // Setup vsrc + resistors at startBranch=vsrcBranch
+  const { element: vsrcEl, setVoltage } = makeStepVsrc(opts.posNode, 0);
+  const auxCtx = makeTestSetupContext({ solver, startBranch: opts.vsrcBranch });
+  setupAll([vsrcEl, ...opts.resistors], auxCtx);
+  return { solver, vsrcEl, setVoltage };
 }
 
 // ---------------------------------------------------------------------------
@@ -214,7 +334,6 @@ describe("Transformer", () => {
 
     const { element: transformer, pool: txPool } = makeTransformerElement({
       pinNodeIds: [1, 0, 2, 0],
-      branch1: bTx1,
       lPrimary: Lp,
       turnsRatio: N,
       k,
@@ -222,6 +341,13 @@ describe("Transformer", () => {
       rSec: 0,
     });
     const rLoad = makeResistor(2, 0, Rload);
+    const { solver, vsrcEl, setVoltage } = setupTransformerForLoop({
+      transformer,
+      branch1: bTx1,
+      vsrcBranch: bVsrc,
+      posNode: 1,
+      resistors: [rLoad],
+    });
 
     // 1-indexed: voltages[0]=ground sentinel, voltages[1..matrixSize] are active.
     // Two-buffer pattern: voltages=rhsOld (prior solution read by elements),
@@ -230,18 +356,16 @@ describe("Transformer", () => {
 
     // Collect secondary voltages over last cycle to find peak
     const lastCycleStart = (numCycles - 1) * 200;
-    const solver = new SparseSolver();
     let voltages = new Float64Array(bufSize);
     const rhs = new Float64Array(bufSize);
     let maxSecondary = 0;
 
     for (let i = 0; i < steps; i++) {
       const t = i * dt;
-      const vSrc = Vpeak * Math.sin(2 * Math.PI * freq * t);
-      const vsrc = makeVoltageSource(1, 0, bVsrc, vSrc);
+      setVoltage(Vpeak * Math.sin(2 * Math.PI * freq * t));
 
       rhs.fill(0);
-      solver._initStructure();
+      solver._resetForAssembly();
       const ctx = makeTransientCtx(solver as unknown as SparseSolverType, voltages, {
         dt,
         method: "trapezoidal",
@@ -249,7 +373,7 @@ describe("Transformer", () => {
         cktMode: i === 0 ? (MODETRAN | MODEINITTRAN) : (MODETRAN | MODEINITFLOAT),
         rhs,
       });
-      vsrc.load(ctx);
+      vsrcEl.load(ctx);
       transformer.load(ctx);
       rLoad.load(ctx);
       const result = solver.factor();
@@ -299,7 +423,7 @@ describe("Transformer", () => {
     const bTx2 = nodeCount + 3;   // transformer secondary at 1-based row nodeCount+3
     const matrixSize = nodeCount + 3;
 
-    const { element: transformer, pool: txPool } = makeTransformerElement({
+    const { element: transformer, pool: txPool, solver } = makeTransformerElement({
       pinNodeIds: [1, 0, 2, 0],
       branch1: bTx1,
       lPrimary: Lp,
@@ -308,8 +432,11 @@ describe("Transformer", () => {
       rPri: 0,
       rSec: 0,
     });
+    const { element: vsrcEl, setVoltage } = makeStepVsrc(1, 0);
     const rLoad = makeResistor(2, 0, Rload);
-    const solver = new SparseSolver();
+    const extraSetupCtx = makeTestSetupContext({ solver, startBranch: bVsrc });
+    setupAll([vsrcEl, rLoad], extraSetupCtx);
+
     // 1-indexed: voltages[0]=ground sentinel, voltages[1..matrixSize] are active.
     // Two-buffer pattern: voltages=rhsOld, rhs=fresh stamp accumulation buffer.
     const bufSize = matrixSize + 1;
@@ -322,11 +449,10 @@ describe("Transformer", () => {
 
     for (let i = 0; i < steps; i++) {
       const t = i * dt;
-      const vSrc = Vpeak * Math.sin(2 * Math.PI * freq * t);
-      const vsrc = makeVoltageSource(1, 0, bVsrc, vSrc);
+      setVoltage(Vpeak * Math.sin(2 * Math.PI * freq * t));
 
       rhs.fill(0);
-      solver._initStructure();
+      solver._resetForAssembly();
       const ctx = makeTransientCtx(solver as unknown as SparseSolverType, voltages, {
         dt,
         method: "trapezoidal",
@@ -334,7 +460,7 @@ describe("Transformer", () => {
         cktMode: i === 0 ? (MODETRAN | MODEINITTRAN) : (MODETRAN | MODEINITFLOAT),
         rhs,
       });
-      vsrc.load(ctx);
+      vsrcEl.load(ctx);
       transformer.load(ctx);
       rLoad.load(ctx);
       const result = solver.factor();
@@ -398,7 +524,7 @@ describe("Transformer", () => {
     // bVsrcAbs = bVsrc+1 = nodeCount+1: absolute row of the vsrc branch in voltages[].
     const bVsrcAbs = nodeCount + 1;
 
-    const { element: transformer, pool: txPool } = makeTransformerElement({
+    const { element: transformer, pool: txPool, solver } = makeTransformerElement({
       pinNodeIds: [1, 0, 2, 0],
       branch1: bTx1,
       lPrimary: Lp,
@@ -407,8 +533,11 @@ describe("Transformer", () => {
       rPri: 0,
       rSec: 0,
     });
+    const { element: vsrcEl, setVoltage } = makeStepVsrc(1, 0);
     const rLoad = makeResistor(2, 0, Rload);
-    const solver = new SparseSolver();
+    const extraSetupCtx = makeTestSetupContext({ solver, startBranch: bVsrc });
+    setupAll([vsrcEl, rLoad], extraSetupCtx);
+
     const bufSize = matrixSize + 1;
     let voltages = new Float64Array(bufSize);
     const rhs = new Float64Array(bufSize);
@@ -421,10 +550,10 @@ describe("Transformer", () => {
     for (let i = 0; i < steps; i++) {
       const t = i * dt;
       const vSrc = Vpeak * Math.sin(2 * Math.PI * freq * t);
-      const vsrc = makeVoltageSource(1, 0, bVsrc, vSrc);
+      setVoltage(vSrc);
 
       rhs.fill(0);
-      solver._initStructure();
+      solver._resetForAssembly();
       const ctx = makeTransientCtx(solver as unknown as SparseSolverType, voltages, {
         dt,
         method: "trapezoidal",
@@ -432,7 +561,7 @@ describe("Transformer", () => {
         cktMode: i === 0 ? (MODETRAN | MODEINITTRAN) : (MODETRAN | MODEINITFLOAT),
         rhs,
       });
-      vsrc.load(ctx);
+      vsrcEl.load(ctx);
       transformer.load(ctx);
       rLoad.load(ctx);
       const factorResult = solver.factor();
@@ -446,8 +575,7 @@ describe("Transformer", () => {
         // Secondary delivered power via v²/R (sign-invariant).
         sumV2sq += v2 * v2;
         // Source supplied power: vSrc drives current iVsrc into the circuit.
-        // makeVoltageSource KVL convention: iVsrc is the branch current leaving
-        // the + terminal, so P_src = vSrc * iVsrc is positive when delivering power.
+        // The vsrc branch current convention: iVsrc is the branch current.
         sumPsrc += vSrc * iVsrc;
         sampleCount++;
       }
@@ -485,7 +613,7 @@ describe("Transformer", () => {
       const bTx1 = nodeCount + 2;   // transformer primary at 1-based row nodeCount+2
       const matrixSize = nodeCount + 3;
 
-      const { element: transformer, pool: txPool } = makeTransformerElement({
+      const { element: transformer, pool: txPool, solver } = makeTransformerElement({
         pinNodeIds: [1, 0, 2, 0],
         branch1: bTx1,
         lPrimary: Lp,
@@ -494,8 +622,11 @@ describe("Transformer", () => {
         rPri: 0,
         rSec: 0,
       });
+      const { element: vsrcEl2, setVoltage: setV2 } = makeStepVsrc(1, 0);
       const rLoad = makeResistor(2, 0, Rload);
-      const solver = new SparseSolver();
+      const sc2 = makeTestSetupContext({ solver, startBranch: bVsrc });
+      setupAll([vsrcEl2, rLoad], sc2);
+
       // 1-indexed: voltages[0]=ground sentinel, voltages[1..matrixSize] are active.
       // Two-buffer pattern: voltages=rhsOld, rhs=fresh stamp accumulation buffer.
       const bufSize = matrixSize + 1;
@@ -506,11 +637,10 @@ describe("Transformer", () => {
 
       for (let i = 0; i < steps; i++) {
         const t = i * dt;
-        const vSrc = Vpeak * Math.sin(2 * Math.PI * freq * t);
-        const vsrc = makeVoltageSource(1, 0, bVsrc, vSrc);
+        setV2(Vpeak * Math.sin(2 * Math.PI * freq * t));
 
         rhs.fill(0);
-        solver._initStructure();
+        solver._resetForAssembly();
         const ctx = makeTransientCtx(solver as unknown as SparseSolverType, voltages, {
           dt,
           method: "trapezoidal",
@@ -518,7 +648,7 @@ describe("Transformer", () => {
           cktMode: i === 0 ? (MODETRAN | MODEINITTRAN) : (MODETRAN | MODEINITFLOAT),
           rhs,
         });
-        vsrc.load(ctx);
+        vsrcEl2.load(ctx);
         transformer.load(ctx);
         rLoad.load(ctx);
         const result = solver.factor();
@@ -573,15 +703,11 @@ describe("Transformer", () => {
 
     // 3 active nodes + 3 branches = matrixSize 6.
     const nodeCount = 3;
-    // DC branches (1-based absolute rows, used directly by makeDcVoltageSource):
-    const bVsrc = nodeCount + 1; // row 4: voltage source (node1→0)
-    const bTx1  = nodeCount + 2; // row 5: transformer primary (node2→0, shorted in DC)
-    // bTx2 = bTx1 + 1 = row 6: transformer secondary (node3→0, shorted in DC)
     const matrixSize = nodeCount + 3; // rows 1..6
 
     const { element: transformer } = makeTransformerElement({
-      pinNodeIds: [2, 0, 3, 0], // P1=node2, P2=gnd, S1=node3, S2=gnd
-      branch1: bTx1,
+      pinNodeIds: [2, 0, 3, 0],
+      // branch1 intentionally omitted: runDcOp/makeSimpleCtx runs setupAll internally.
       lPrimary: Lp,
       turnsRatio: N,
       k,
@@ -591,7 +717,9 @@ describe("Transformer", () => {
     const rSeries = makeResistor(1, 2, Rseries); // node1 → node2
     const rLoad   = makeResistor(3, 0, Rload);   // node3 → ground
     // makeDcVoltageSource uses branchIdx directly as 1-based absolute row.
-    const vsrc = makeDcVoltageSource(1, 0, bVsrc, Vdc) as unknown as AnalogElement;
+    const vsrcProps = new PropertyBag();
+    vsrcProps.setModelParam("voltage", Vdc);
+    const vsrc = makeDcVoltageSource(new Map([["pos", 1], ["neg", 0]]), vsrcProps, () => 0) as unknown as AnalogElement;
 
     const result = runDcOp({
       elements: [vsrc, transformer as unknown as AnalogElement, rSeries, rLoad],
@@ -619,7 +747,7 @@ describe("Transformer", () => {
     const rPri = 10.0;
     const { element: transformer } = makeTransformerElement({
       pinNodeIds: [1, 2, 3, 4],
-      branch1: 4, // absolute branch rows
+      // branch1 omitted: load() is called directly with capSolver without setup.
       lPrimary: 10e-3,
       turnsRatio: 1,
       k: 0.99,
@@ -650,22 +778,17 @@ describe("Transformer", () => {
 // ---------------------------------------------------------------------------
 
 describe("AnalogTransformerElement state pool", () => {
-  it("stateBaseOffset defaults to -1 before initState", () => {
-    const el = new AnalogTransformerElement([1, 0, 2, 0], 2, 10e-3, 1.0, 0.99, 0, 0);
-    expect(el.stateBaseOffset).toBe(-1);
+  it("_stateBase defaults to -1 before initState", () => {
+    const el = new AnalogTransformerElement(new Map([["P1", 1], ["P2", 0], ["S1", 2], ["S2", 0]]), 10e-3, 1.0, 0.99, 0, 0, "T");
+    expect((el as unknown as { _stateBase: number })._stateBase).toBe(-1);
   });
 
   it("initState binds pool and zero-initialises all 13 slots", () => {
-    const el = new AnalogTransformerElement([1, 0, 2, 0], 2, 10e-3, 1.0, 0.99, 0, 0);
+    const el = new AnalogTransformerElement(new Map([["P1", 1], ["P2", 0], ["S1", 2], ["S2", 0]]), 10e-3, 1.0, 0.99, 0, 0, "T");
     const { pool } = withState(el);
     for (let i = 0; i < 13; i++) {
       expect(pool.state0[i]).toBe(0);
     }
-  });
-
-  it("isReactive is true", () => {
-    const el = new AnalogTransformerElement([1, 0, 2, 0], 2, 10e-3, 1.0, 0.99, 0, 0);
-    expect(el.isReactive).toBe(true);
   });
 
 });
@@ -712,7 +835,7 @@ describe("TransformerDefinition", () => {
     props.setModelParam("primaryResistance", 0);
     props.setModelParam("secondaryResistance", 0);
 
-    const el = getFactory(TransformerDefinition.modelRegistry!.behavioral!)(new Map([["P1", 1], ["P2", 0], ["S1", 2], ["S2", 0]]), [], 5, props, () => 0) as AnalogTransformerElement;
+    const el = getFactory(TransformerDefinition.modelRegistry!.behavioral!)(new Map([["P1", 1], ["P2", 0], ["S1", 2], ["S2", 0]]), props, () => 0) as AnalogTransformerElement;
     expect(el.branchIndex).toBe(5);
     expect(el.branch2).toBe(6);
   });

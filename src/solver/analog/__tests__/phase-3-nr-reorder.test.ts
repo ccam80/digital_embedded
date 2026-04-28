@@ -10,12 +10,16 @@
  */
 
 import { describe, it, expect, vi } from "vitest";
-import { SparseSolver } from "../sparse-solver.js";
 import { DiagnosticCollector } from "../diagnostics.js";
 import { newtonRaphson } from "../newton-raphson.js";
 import { CKTCircuitContext } from "../ckt-context.js";
-import { makeResistor, makeVoltageSource, makeDiode, allocateStatePool } from "./test-helpers.js";
-import { DEFAULT_SIMULATION_PARAMS } from "../../../core/analog-engine-interface.js";
+import { makeSimpleCtx } from "./test-helpers.js";
+import { PropertyBag } from "../../../core/properties.js";
+import { ResistorDefinition, RESISTOR_DEFAULTS } from "../../../components/passives/resistor.js";
+import { makeDcVoltageSource, DC_VOLTAGE_SOURCE_DEFAULTS } from "../../../components/sources/dc-voltage-source.js";
+import { createDiodeElement, DIODE_PARAM_DEFAULTS } from "../../../components/semiconductors/diode.js";
+import type { AnalogFactory } from "../../../core/registry.js";
+import type { AnalogElement } from "../element.js";
 import {
   MODEDCOP, MODEINITFLOAT, MODEINITJCT, MODETRAN,
   MODEINITTRAN, MODEINITFIX, setInitf, setAnalysis,
@@ -23,7 +27,32 @@ import {
 import * as fs from "fs";
 import * as path from "path";
 
-const noopBreakpoint = (_t: number): void => {};
+// ---------------------------------------------------------------------------
+// Production-factory wrappers
+// ---------------------------------------------------------------------------
+
+function makeResistor(nodeA: number, nodeB: number, resistance: number): AnalogElement {
+  const props = new PropertyBag();
+  props.replaceModelParams({ ...RESISTOR_DEFAULTS, resistance });
+  const factory = (ResistorDefinition.modelRegistry!["behavioral"] as { kind: "inline"; factory: AnalogFactory }).factory;
+  return factory(new Map([["A", nodeA], ["B", nodeB]]), props, () => 0);
+}
+
+function makeVoltageSource(posNode: number, negNode: number, voltage: number): AnalogElement {
+  const props = new PropertyBag();
+  props.replaceModelParams({ ...DC_VOLTAGE_SOURCE_DEFAULTS, voltage });
+  return makeDcVoltageSource(new Map([["pos", posNode], ["neg", negNode]]), props, () => 0);
+}
+
+function makeDiode(anodeNode: number, cathodeNode: number, IS: number, N: number): AnalogElement {
+  const props = new PropertyBag();
+  props.replaceModelParams({ ...DIODE_PARAM_DEFAULTS, IS, N });
+  return createDiodeElement(new Map([["A", anodeNode], ["K", cathodeNode]]), props, () => 0);
+}
+
+// ---------------------------------------------------------------------------
+// Context builder
+// ---------------------------------------------------------------------------
 
 /**
  * Build a CKTCircuitContext for the diode+resistor+voltage-source circuit.
@@ -38,21 +67,18 @@ const noopBreakpoint = (_t: number): void => {};
  *   matrixSize = 3 (2 nodes + 1 branch)
  */
 function makeDiodeCtx(sourceVoltage: number): CKTCircuitContext {
-  const vs = makeVoltageSource(1, 0, 2, sourceVoltage);
+  const vs = makeVoltageSource(1, 0, sourceVoltage);
   const r = makeResistor(1, 2, 1000);
   const d = makeDiode(2, 0, 1e-14, 1);
   const elements = [vs, r, d];
-  const pool = allocateStatePool(elements);
 
-  const circuit = {
-    nodeCount: 2,
-    branchCount: 1,
-    matrixSize: 3,
+  const ctx = makeSimpleCtx({
     elements,
-    statePool: pool,
-  };
-
-  const ctx = new CKTCircuitContext(circuit, DEFAULT_SIMULATION_PARAMS, noopBreakpoint, new SparseSolver());
+    nodeCount: 2,
+    matrixSize: 3,
+    branchCount: 1,
+    startBranch: 2,
+  });
   ctx.diagnostics = new DiagnosticCollector();
   return ctx;
 }

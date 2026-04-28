@@ -120,12 +120,12 @@ function makeAnalogElementObj(
 
 function makeResistorAnalogEl(n1: number, n2: number, resistance: number): AnalogElement {
   return {
-    pinNodeIds: [n1, n2],
-    allNodeIds: [n1, n2],
+    label: "",
+    _pinNodes: new Map([["p1", n1], ["p2", n2]]),
+    _stateBase: -1,
     branchIndex: -1,
     ngspiceLoadOrder: 0,
-    isNonlinear: false,
-    isReactive: false,
+    setup(_ctx) {},
     stampAc(solver: ComplexSparseSolver, _omega: number, _ctx: LoadContext): void {
       const g = 1 / resistance;
       if (n1 !== 0) {
@@ -168,7 +168,7 @@ function makeAnalogDef(
 ): ComponentDefinition {
   return {
     name,
-    typeId: -1 as unknown as number,
+    typeId: -1,
     factory: () => makeAnalogElementObj(name, crypto.randomUUID(), pinPairs),
     pinLayout: pinPairs.map((p, i) => ({
       direction: PinDirection.BIDIRECTIONAL,
@@ -177,6 +177,7 @@ function makeAnalogDef(
       position: p,
       isNegatable: false,
       isClockCapable: false,
+      kind: "signal" as const,
     })),
     propertyDefs: [],
     attributeMap: [],
@@ -185,35 +186,39 @@ function makeAnalogDef(
     pinElectrical: {},
     defaultModel: 'behavioral',
     models: {},
-    modelRegistry: { behavioral: { kind: 'inline' as const, factory: (pinNodes: ReadonlyMap<string, number>) => mnaFactory(pinNodes), paramDefs: [], params: {} } },
-  } as unknown as ComponentDefinition;
+    modelRegistry: { behavioral: { kind: 'inline' as const, factory: (pinNodes: ReadonlyMap<string, number>, _props: PropertyBag, _getTime: () => number) => mnaFactory(pinNodes), paramDefs: [], params: {} } },
+  } as ComponentDefinition;
 }
 
 function makeGroundDef(): ComponentDefinition {
   return {
     name: 'Ground',
-    typeId: -1 as unknown as number,
+    typeId: -1,
     factory: () => makeAnalogElementObj('Ground', crypto.randomUUID(), [{ x: 0, y: 0, label: 'gnd' }]),
     pinLayout: [{
       direction: PinDirection.BIDIRECTIONAL, label: 'gnd', defaultBitWidth: 1,
       position: { x: 0, y: 0 }, isNegatable: false, isClockCapable: false,
+      kind: "signal" as const,
     }],
     propertyDefs: [],
     attributeMap: [],
     category: ComponentCategory.MISC,
     helpText: '',
-    pinElectrical: {},
-    defaultModel: 'behavioral',
     models: {},
     modelRegistry: {
-      behavioral: { kind: 'inline' as const, factory: (_pinNodes: ReadonlyMap<string, number>) => ({
-        pinNodeIds: [], allNodeIds: [], branchIndex: -1,
-        isNonlinear: false, isReactive: false,
+      behavioral: { kind: 'inline' as const, factory: (_pinNodes: ReadonlyMap<string, number>, _props: PropertyBag, _getTime: () => number) => ({
+        label: "",
+        _pinNodes: new Map<string, number>(),
+        _stateBase: -1,
+        branchIndex: -1,
+        ngspiceLoadOrder: 0,
+        setup(_ctx: import('../../solver/analog/setup-context.js').SetupContext) {},
         load(_ctx: LoadContext): void {},
         getPinCurrents(_v: Float64Array) { return [0]; },
+        setParam(_key: string, _value: number) {},
       }), paramDefs: [], params: {} },
     },
-  } as unknown as ComponentDefinition;
+  } as ComponentDefinition;
 }
 
 function buildResistorDividerCircuit(): { circuit: Circuit; registry: ComponentRegistry } {

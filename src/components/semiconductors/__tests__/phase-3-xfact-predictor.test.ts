@@ -26,6 +26,7 @@ import {
 import { SparseSolver } from "../../../solver/analog/sparse-solver.js";
 import type { LoadContext } from "../../../solver/analog/load-context.js";
 import * as NewtonRaphsonModule from "../../../solver/analog/newton-raphson.js";
+import type { PoolBackedAnalogElement } from "../../../solver/analog/element.js";
 
 // ---------------------------------------------------------------------------
 // Slot indices (mirror diode.ts internal ordering)
@@ -51,15 +52,15 @@ function makeParamBag(overrides: Record<string, number> = {}): PropertyBag {
 function makeDiode(paramOverrides: Record<string, number> = {}) {
   const pinNodes = new Map<string, number>([["A", 1], ["K", 2]]);
   const props = makeParamBag(paramOverrides);
-  return createDiodeElement(pinNodes, [], -1, props);
+  return createDiodeElement(pinNodes, props, () => 0);
 }
 
 /**
  * Allocate a StatePool for the given element and call initState.
  */
-function initPool(element: ReturnType<typeof makeDiode>): StatePool {
+function initPool(element: PoolBackedAnalogElement): StatePool {
   const pool = new StatePool(Math.max(element.stateSize, 1));
-  element.stateBaseOffset = 0;
+  (element as PoolBackedAnalogElement & { _stateBase: number })._stateBase = 0;
   element.initState(pool);
   return pool;
 }
@@ -309,7 +310,7 @@ function makeBjtL0(paramOverrides: Record<string, number> = {}) {
   const pinNodes = new Map<string, number>([["B", 1], ["C", 2], ["E", 3]]);
   const bag = new PropertyBag();
   bag.replaceModelParams({ ...BJT_NPN_DEFAULTS, ...paramOverrides });
-  return createBjtElement(1, pinNodes, -1, bag);
+  return createBjtElement(pinNodes, bag, () => 0);
 }
 
 /**
@@ -319,12 +320,12 @@ function makeBjtL1(paramOverrides: Record<string, number> = {}) {
   const pinNodes = new Map<string, number>([["B", 1], ["C", 2], ["E", 3]]);
   const bag = new PropertyBag();
   bag.replaceModelParams({ ...BJT_SPICE_L1_NPN_DEFAULTS, ...paramOverrides });
-  return createSpiceL1BjtElement(1, false, pinNodes, [], -1, bag);
+  return createSpiceL1BjtElement(1, false, pinNodes, bag);
 }
 
 function initBjtPool(element: ReturnType<typeof makeBjtL0> | ReturnType<typeof makeBjtL1>): StatePool {
   const pool = new StatePool(Math.max(element.stateSize, 1));
-  element.stateBaseOffset = 0;
+  (element as { _stateBase: number })._stateBase = 0;
   element.initState(pool);
   return pool;
 }

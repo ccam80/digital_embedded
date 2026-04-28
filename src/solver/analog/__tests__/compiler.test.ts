@@ -94,12 +94,12 @@ function makeElement(
 
 function makeTestResistorElement(nodeA: number, nodeB: number): AnalogElement {
   return {
-    pinNodeIds: [nodeA, nodeB],
-    allNodeIds: [nodeA, nodeB],
+    label: "",
+    _pinNodes: new Map([["A", nodeA], ["B", nodeB]]),
+    _stateBase: -1,
     branchIndex: -1,
     ngspiceLoadOrder: 0,
-    isNonlinear: false,
-    isReactive: false,
+    setup(_ctx): void {},
     load(_ctx: LoadContext): void {},
     stampAc(_solver: ComplexSparseSolver, _omega: number, _ctx: LoadContext): void { /* no-op */ },
     setParam(_key: string, _value: number): void {},
@@ -109,12 +109,12 @@ function makeTestResistorElement(nodeA: number, nodeB: number): AnalogElement {
 
 function makeTestVsElement(nodePos: number, nodeNeg: number, branchIdx: number): AnalogElement {
   return {
-    pinNodeIds: [nodePos, nodeNeg],
-    allNodeIds: [nodePos, nodeNeg],
+    label: "",
+    _pinNodes: new Map([["pos", nodePos], ["neg", nodeNeg]]),
+    _stateBase: -1,
     branchIndex: branchIdx,
     ngspiceLoadOrder: 0,
-    isNonlinear: false,
-    isReactive: false,
+    setup(_ctx): void {},
     load(_ctx: LoadContext): void {},
     stampAc(_solver: ComplexSparseSolver, _omega: number, _ctx: LoadContext): void { /* no-op */ },
     setParam(_key: string, _value: number): void {},
@@ -124,12 +124,12 @@ function makeTestVsElement(nodePos: number, nodeNeg: number, branchIdx: number):
 
 function makeTestInductorElement(nodeA: number, nodeB: number, branchIdx: number): AnalogElement {
   return {
-    pinNodeIds: [nodeA, nodeB],
-    allNodeIds: [nodeA, nodeB],
+    label: "",
+    _pinNodes: new Map([["A", nodeA], ["B", nodeB]]),
+    _stateBase: -1,
     branchIndex: branchIdx,
     ngspiceLoadOrder: 0,
-    isNonlinear: false,
-    isReactive: true,
+    setup(_ctx): void {},
     load(_ctx: LoadContext): void {},
     stampAc(_solver: ComplexSparseSolver, _omega: number, _ctx: LoadContext): void { /* no-op */ },
     setParam(_key: string, _value: number): void {},
@@ -166,9 +166,9 @@ function buildTestRegistry(): ComponentRegistry {
     ...makeBaseDef("AnalogVs"),
     models: {},
     modelRegistry: {
-      behavioral: { kind: 'inline' as const, branchCount: 1, factory(pinNodes, _internalNodeIds, branchIdx, _props, _getTime) {
+      behavioral: { kind: 'inline' as const, factory(pinNodes, _props, _getTime) {
         const [n0, n1] = [...pinNodes.values()];
-        return makeTestVsElement(n0 ?? 0, n1 ?? 0, branchIdx);
+        return makeTestVsElement(n0 ?? 0, n1 ?? 0, -1);
       }, paramDefs: [], params: {} },
     },
   });
@@ -177,7 +177,7 @@ function buildTestRegistry(): ComponentRegistry {
     ...makeBaseDef("AnalogR"),
     models: {},
     modelRegistry: {
-      behavioral: { kind: 'inline' as const, branchCount: 0, factory(pinNodes, _internalNodeIds, _branchIdx, _props, _getTime) {
+      behavioral: { kind: 'inline' as const, factory(pinNodes, _props, _getTime) {
         const [n0, n1] = [...pinNodes.values()];
         return makeTestResistorElement(n0 ?? 0, n1 ?? 0);
       }, paramDefs: [], params: {} },
@@ -189,9 +189,9 @@ function buildTestRegistry(): ComponentRegistry {
     defaultModel: 'behavioral',
     models: {},
     modelRegistry: {
-      behavioral: { kind: 'inline' as const, branchCount: 1, factory(pinNodes, _internalNodeIds, branchIdx, _props, _getTime) {
+      behavioral: { kind: 'inline' as const, factory(pinNodes, _props, _getTime) {
         const [n0, n1] = [...pinNodes.values()];
-        return makeTestInductorElement(n0 ?? 0, n1 ?? 0, branchIdx);
+        return makeTestInductorElement(n0 ?? 0, n1 ?? 0, -1);
       }, paramDefs: [], params: {} },
     },
   });
@@ -208,7 +208,7 @@ function buildTestRegistry(): ComponentRegistry {
     defaultModel: 'behavioral',
     models: {},
     modelRegistry: {
-      behavioral: { kind: 'inline' as const, factory(pinNodes, _internalNodeIds, _branchIdx, _props, _getTime) {
+      behavioral: { kind: 'inline' as const, factory(pinNodes, _props, _getTime) {
         const [n0] = [...pinNodes.values()];
         return makeTestResistorElement(n0 ?? 0, 0);
       }, paramDefs: [], params: {} },
@@ -220,7 +220,7 @@ function buildTestRegistry(): ComponentRegistry {
     defaultModel: 'behavioral',
     models: {},
     modelRegistry: {
-      behavioral: { kind: 'inline' as const, factory(pinNodes, _internalNodeIds, _branchIdx, _props, _getTime) {
+      behavioral: { kind: 'inline' as const, factory(pinNodes, _props, _getTime) {
         const [n0] = [...pinNodes.values()];
         return makeTestResistorElement(n0 ?? 0, 0);
       }, paramDefs: [], params: {} },
@@ -299,7 +299,7 @@ describe("AnalogCompiler", () => {
 
     // The voltage source element should have one terminal at ground (node 0)
     const vsElement = compiled.elements[0];
-    expect(vsElement.pinNodeIds).toContain(0);
+    expect([...vsElement._pinNodes.values()]).toContain(0);
   });
 
   it("maps_labels_to_nodes", () => {
@@ -418,9 +418,9 @@ describe("AnalogCompiler", () => {
     const registry = new ComponentRegistry();
 
     const factorySpy = vi.fn(
-      (pinNodes: ReadonlyMap<string, number>, _internalNodeIds: readonly number[], branchIdx: number, _props: PropertyBag, _getTime: () => number) => {
+      (pinNodes: ReadonlyMap<string, number>, _props: PropertyBag, _getTime: () => number) => {
         const [n0, n1] = [...pinNodes.values()];
-        return makeTestVsElement(n0 ?? 0, n1 ?? 0, branchIdx);
+        return makeTestVsElement(n0 ?? 0, n1 ?? 0, -1);
       },
     );
 
@@ -433,7 +433,7 @@ describe("AnalogCompiler", () => {
       defaultModel: 'behavioral',
       models: {},
       modelRegistry: {
-        behavioral: { kind: 'inline' as const, branchCount: 1, factory: factorySpy, paramDefs: [], params: {} },
+        behavioral: { kind: 'inline' as const, factory: factorySpy, paramDefs: [], params: {} },
       },
     });
 
@@ -458,15 +458,12 @@ describe("AnalogCompiler", () => {
 
     expect(factorySpy).toHaveBeenCalledOnce();
 
-    const [pinNodes, _internalNodeIds, branchIdx, , getTime] = factorySpy.mock.calls[0]!;
+    const [pinNodes, , getTime] = factorySpy.mock.calls[0]!;
 
     // pos terminal should map to a non-ground node (>0); neg should be 0 (ground)
     const nodeValues = [...(pinNodes as ReadonlyMap<string, number>).values()];
     expect(nodeValues).toContain(0);
     expect(nodeValues.some((n: number) => n > 0)).toBe(true);
-
-    // branchIdx is the absolute branch row: totalNodeCount + 0 = 1
-    expect(branchIdx).toBeGreaterThanOrEqual(0);
 
     // getTime must be a function returning a number
     expect(typeof getTime).toBe("function");
@@ -554,7 +551,7 @@ function buildPinLoadingTestRegistry(
     defaultModel: "behavioral",
     models: {},
     modelRegistry: {
-      behavioral: { kind: "inline" as const, factory: (pinNodes) => {
+      behavioral: { kind: "inline" as const, factory: (pinNodes, _props, _getTime) => {
         const [n0, n1] = [...pinNodes.values()];
         return makeTestResistorElement(n0 ?? 0, n1 ?? 0);
       }, paramDefs: [], params: {} },
@@ -574,7 +571,7 @@ function buildPinLoadingTestRegistry(
     defaultModel: "behavioral",
     models: { digital: { executeFn: noopExecuteFn as unknown as import("../../../core/registry.js").ExecuteFunction } },
     modelRegistry: {
-      behavioral: { kind: "inline" as const, factory: (pinNodes, _internalNodeIds, _branchIdx, props, _getTime) => {
+      behavioral: { kind: "inline" as const, factory: (pinNodes, props, _getTime) => {
         onFactory?.(props, pinNodes);
         const [n0, , n2] = [...pinNodes.values()];
         return makeTestResistorElement(n0 ?? 1, n2 ?? 3);

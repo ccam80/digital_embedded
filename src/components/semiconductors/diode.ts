@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Diode analog component  Shockley equation with NR linearization.
  *
  * Implements the ideal diode equation:
@@ -28,7 +28,7 @@ import {
   type AttributeMapping,
   type ComponentDefinition,
 } from "../../core/registry.js";
-import type { IntegrationMethod, LoadContext, PoolBackedAnalogElementCore } from "../../solver/analog/element.js";
+import type { IntegrationMethod, LoadContext, PoolBackedAnalogElement } from "../../solver/analog/element.js";
 import { NGSPICE_LOAD_ORDER } from "../../solver/analog/element.js";
 import { stampRHS } from "../../solver/analog/stamp-helpers.js";
 import {
@@ -439,8 +439,8 @@ export function diodeLoadTunnel(
 export function createDiodeElement(
   pinNodes: ReadonlyMap<string, number>,
   props: PropertyBag,
-  _getTime?: () => number,
-) {
+  _getTime: () => number,
+): PoolBackedAnalogElement {
   const nodeAnode = pinNodes.get("A")!;
   const nodeCathode = pinNodes.get("K")!;
 
@@ -526,63 +526,77 @@ export function createDiodeElement(
   // Ephemeral per-iteration pnjlim limiting flag (ngspice icheck, DIOload sets CKTnoncon++)
   let pnjlimLimited = false;
 
-  const element = {
-    branchIndex: -1,
-    _stateBase: -1,
-    _pinNodes: new Map(pinNodes),
+  // Internal prime node (DIOposPrimeNode) — set during setup(), read by load()
+  let _posPrimeNode = nodeAnode;
+
+  // TSTALLOC handles — closure-local, set during setup(), read inside load()
+  let _hPosPP  = -1;
+  let _hNegPP  = -1;
+  let _hPPPos  = -1;
+  let _hPPNeg  = -1;
+  let _hPosPos = -1;
+  let _hNegNeg = -1;
+  let _hPPPP   = -1;
+
+  // Internal node labels — recorded during setup() when RS > 0
+  const internalLabels: string[] = [];
+
+  const element: PoolBackedAnalogElement = {
+    label: "",
     ngspiceLoadOrder: NGSPICE_LOAD_ORDER.DIO,
-    isNonlinear: true,
-    isReactive: hasCapacitance,
+
+    _pinNodes: new Map(pinNodes),
+    _stateBase: -1,
+    branchIndex: -1,
+
     poolBacked: true as const,
     stateSize: hasCapacitance ? 7 : 4,
     stateSchema: hasCapacitance ? DIODE_CAP_SCHEMA : DIODE_SCHEMA,
-    stateBaseOffset: -1,
-
-    // Internal prime node (DIOposPrimeNode) — set during setup(), read by load()
-    _posPrimeNode: nodeAnode,
-
-    // TSTALLOC handles — set during setup(), written by load()
-    _hPosPP:  -1,
-    _hNegPP:  -1,
-    _hPPPos:  -1,
-    _hPPNeg:  -1,
-    _hPosPos: -1,
-    _hNegNeg: -1,
-    _hPPPP:   -1,
 
     setup(ctx: import("../../solver/analog/setup-context.js").SetupContext): void {
       const solver = ctx.solver;
-      const posNode = this._pinNodes.get("A")!;
-      const negNode = this._pinNodes.get("K")!;
+      const posNode = element._pinNodes.get("A")!;
+      const negNode = element._pinNodes.get("K")!;
 
       // State slots — diosetup.c:198-199 (*states += DIOstateCount; here->DIOstate = *states)
-      // digiTS uses stateSize (4 resistive, 7 capacitive) to cover Q and CCAP slots.
-      this._stateBase = ctx.allocStates(this.stateSize);
-      this.stateBaseOffset = this._stateBase;
-      base = this._stateBase;
+      // Idempotent guard mirrors mutual-inductor.ts:94-95. When a composite
+      // (e.g. polarized-cap) pre-partitions _stateBase into its own state
+      // region before forwarding setup(), don't re-allocate and waste slots.
+      if (element._stateBase === -1) {
+        element._stateBase = ctx.allocStates(element.stateSize);
+      }
+      base = element._stateBase;
 
       // Internal node — diosetup.c:204-224
-      this._posPrimeNode = (params.RS === 0)
-        ? posNode
-        : ctx.makeVolt(this.label ?? "D", "internal");
+      // ngspice gating: RC (series resistance) > 0 → allocate anode-prime node
+      if (params.RS === 0) {
+        _posPrimeNode = posNode;
+      } else {
+        _posPrimeNode = ctx.makeVolt(element.label ?? "D", "internal");
+        internalLabels.push("internal");
+      }
 
       // TSTALLOC sequence — diosetup.c:232-238
-      this._hPosPP  = solver.allocElement(posNode,            this._posPrimeNode); // (1)
-      this._hNegPP  = solver.allocElement(negNode,            this._posPrimeNode); // (2)
-      this._hPPPos  = solver.allocElement(this._posPrimeNode, posNode);            // (3)
-      this._hPPNeg  = solver.allocElement(this._posPrimeNode, negNode);            // (4)
-      this._hPosPos = solver.allocElement(posNode,            posNode);            // (5)
-      this._hNegNeg = solver.allocElement(negNode,            negNode);            // (6)
-      this._hPPPP   = solver.allocElement(this._posPrimeNode, this._posPrimeNode); // (7)
+      _hPosPP  = solver.allocElement(posNode,       _posPrimeNode); // (1)
+      _hNegPP  = solver.allocElement(negNode,       _posPrimeNode); // (2)
+      _hPPPos  = solver.allocElement(_posPrimeNode, posNode);       // (3)
+      _hPPNeg  = solver.allocElement(_posPrimeNode, negNode);       // (4)
+      _hPosPos = solver.allocElement(posNode,       posNode);       // (5)
+      _hNegNeg = solver.allocElement(negNode,       negNode);       // (6)
+      _hPPPP   = solver.allocElement(_posPrimeNode, _posPrimeNode); // (7)
+    },
+
+    getInternalNodeLabels(): readonly string[] {
+      return internalLabels;
     },
 
     initState(poolRef: StatePoolRef): void {
       pool = poolRef;
-      base = this.stateBaseOffset;
-      applyInitialValues(this.stateSchema, pool, base, params);
+      base = element._stateBase;
+      applyInitialValues(element.stateSchema, pool, base, params);
     },
 
-    load(this: PoolBackedAnalogElementCore, ctx: LoadContext): void {
+    load(ctx: LoadContext): void {
       // Direct state-array access per call  no cached Float64Array refs.
       // Mirrors ngspice CKTstate0/1/2/3 pointer semantics in dioload.c.
       const s0 = pool.states[0];
@@ -592,7 +606,7 @@ export function createDiodeElement(
 
       const voltages = ctx.rhsOld;
       const mode = ctx.cktMode;   // F4: bitfield (ckt-mode.ts)
-      const nodeJunction = element._posPrimeNode;
+      const nodeJunction = _posPrimeNode;
 
       // Select linearization voltage according to ngspice dioload.c:126-155.
       let vdRaw: number;
@@ -659,8 +673,8 @@ export function createDiodeElement(
 
       if (ctx.limitingCollector) {
         ctx.limitingCollector.push({
-          elementIndex: this.elementIndex ?? -1,
-          label: this.label ?? "",
+          elementIndex: element.elementIndex ?? -1,
+          label: element.label ?? "",
           junction: "AK",
           limitType: "pnjlim",
           vBefore: vdRaw,
@@ -757,19 +771,19 @@ export function createDiodeElement(
 
       // dioload.c:435: DIOposPosPtr += gspr (series resistance conductance)
       // Stamps through pre-allocated handles from setup()
-      if (params.RS > 0 && nodeJunction !== nodeAnode) {
+      if (params.RS > 0 && _posPrimeNode !== nodeAnode) {
         const gRS = 1 / params.RS;
-        solver.stampElement(element._hPosPos, gRS);
-        solver.stampElement(element._hPosPP,  -gRS);
-        solver.stampElement(element._hPPPos,  -gRS);
-        solver.stampElement(element._hPPPP,   gRS);
+        solver.stampElement(_hPosPos, gRS);
+        solver.stampElement(_hPosPP,  -gRS);
+        solver.stampElement(_hPPPos,  -gRS);
+        solver.stampElement(_hPPPP,   gRS);
       }
 
       // dioload.c:429-441: load current vector + junction conductance stamps.
-      solver.stampElement(element._hPPPP,   gd);
-      solver.stampElement(element._hPPNeg,  -gd);
-      solver.stampElement(element._hNegPP,  -gd);
-      solver.stampElement(element._hNegNeg, gd);
+      solver.stampElement(_hPPPP,   gd);
+      solver.stampElement(_hPPNeg,  -gd);
+      solver.stampElement(_hNegPP,  -gd);
+      solver.stampElement(_hNegNeg, gd);
       stampRHS(ctx.rhs, nodeJunction, -ieq);
       stampRHS(ctx.rhs, nodeCathode, ieq);
 
@@ -841,10 +855,10 @@ export function createDiodeElement(
         s0[base + SLOT_CAP_CURRENT] = ccap;
 
         if (capGeq !== 0 || capIeq !== 0) {
-          solver.stampElement(element._hPPPP,   capGeq);
-          solver.stampElement(element._hPPNeg,  -capGeq);
-          solver.stampElement(element._hNegPP,  -capGeq);
-          solver.stampElement(element._hNegNeg, capGeq);
+          solver.stampElement(_hPPPP,   capGeq);
+          solver.stampElement(_hPPNeg,  -capGeq);
+          solver.stampElement(_hNegPP,  -capGeq);
+          solver.stampElement(_hNegNeg, capGeq);
           stampRHS(ctx.rhs, nodeJunction, -capIeq);
           stampRHS(ctx.rhs, nodeCathode, capIeq);
         }
@@ -859,7 +873,7 @@ export function createDiodeElement(
       if (pnjlimLimited) return false;
 
       const voltages = ctx.rhsOld;
-      const va = voltages[element._posPrimeNode];
+      const va = voltages[_posPrimeNode];
       const vc = voltages[nodeCathode];
       const vdRaw = va - vc;
 
@@ -879,24 +893,14 @@ export function createDiodeElement(
       return [id, -id];
     },
 
-
-    setParam(key: string, value: number): void {
-      if (key in params) {
-        params[key] = value;
-        recomputeTemp();
-      }
-    },
-  };
-
-  // Attach getLteTimestep only when junction capacitance is present
-  if (hasCapacitance) {
-    (element as unknown as { getLteTimestep: (dt: number, deltaOld: readonly number[], order: number, method: IntegrationMethod, lteParams: LteParams) => number }).getLteTimestep = function (
+    getLteTimestep(
       dt: number,
       deltaOld: readonly number[],
       order: number,
       method: IntegrationMethod,
       lteParams: LteParams,
     ): number {
+      if (!hasCapacitance) return Infinity;
       const s0 = pool.states[0];
       const s1 = pool.states[1];
       const s2 = pool.states[2];
@@ -908,18 +912,17 @@ export function createDiodeElement(
       const ccap0 = s0[base + SLOT_CCAP];
       const ccap1 = s1[base + SLOT_CCAP];
       return cktTerr(dt, deltaOld, order, method, _q0, _q1, _q2, _q3, ccap0, ccap1, lteParams);
-    };
-  }
+    },
+
+    setParam(key: string, value: number): void {
+      if (key in params) {
+        params[key] = value;
+        recomputeTemp();
+      }
+    },
+  };
 
   return element;
-}
-
-// ---------------------------------------------------------------------------
-// getDiodeInternalNodeCount  returns 1 when RS > 0, else 0
-// ---------------------------------------------------------------------------
-
-export function getDiodeInternalNodeCount(props: PropertyBag): number {
-  return props.getModelParam<number>("RS") > 0 ? 1 : 0;
 }
 
 // ---------------------------------------------------------------------------
@@ -929,12 +932,11 @@ export function getDiodeInternalNodeCount(props: PropertyBag): number {
 /**
  * Returns internal node labels for a diode instance.
  *
- * MUST use the same predicate as `getDiodeInternalNodeCount`: when RS > 0
- * we allocate a single internal anode-prime node between the external anode
- * pin and the junction ("A'").
+ * When RS > 0 we allocate a single internal anode-prime node between the
+ * external anode pin and the junction ("internal").
  */
 export function getDiodeInternalNodeLabels(props: PropertyBag): readonly string[] {
-  return props.getModelParam<number>("RS") > 0 ? ["A'"] : [];
+  return props.getModelParam<number>("RS") > 0 ? ["internal"] : [];
 }
 
 // ---------------------------------------------------------------------------
@@ -1083,7 +1085,6 @@ export const DiodeDefinition: ComponentDefinition = {
       factory: createDiodeElement,
       paramDefs: DIODE_PARAM_DEFS,
       params: DIODE_PARAM_DEFAULTS,
-      mayCreateInternalNodes: true,
       ngspiceNodeMap: { A: "pos", K: "neg" },
     },
   },

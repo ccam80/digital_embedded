@@ -24,7 +24,7 @@ import type { ComponentLayout } from "../../../core/registry.js";
 import type { RenderContext, Point, TextAnchor, FontSpec, PathData } from "../../../core/renderer-interface.js";
 import type { ThemeColor } from "../../../core/renderer-interface.js";
 import type { SparseSolver as SparseSolverType } from "../../../solver/analog/sparse-solver.js";
-import type { LoadContext } from "../../../solver/analog/load-context.js";
+
 import { loadCtxFromFields } from "../../../solver/analog/__tests__/test-helpers.js";
 import { MODEDCOP, MODEINITFLOAT } from "../../../solver/analog/ckt-mode.js";
 
@@ -405,12 +405,9 @@ describe("Probe", () => {
 
       const analogElement = getFactory(ProbeDefinition.modelRegistry!.behavioral!)(
         new Map([["in", 3]]),
-        [],
-        -1,
         props,
         () => 0,
       );
-      Object.assign(analogElement, { pinNodeIds: [3], allNodeIds: [3] });
 
       analogElement.load(ctx);
 
@@ -423,12 +420,9 @@ describe("Probe", () => {
       const props = new PropertyBag();
       const analogElement = getFactory(ProbeDefinition.modelRegistry!.behavioral!)(
         new Map([["in", 3]]),
-        [],
-        -1,
         props,
         () => 0,
       );
-      Object.assign(analogElement, { pinNodeIds: [3], allNodeIds: [3] });
 
       const voltages = new Float64Array(5);
       voltages[3] = 4.72;
@@ -460,18 +454,12 @@ describe("Probe", () => {
       const props = new PropertyBag();
       const analogElement = getFactory(ProbeDefinition.modelRegistry!.behavioral!)(
         new Map([["in", 5]]),
-        [],
-        -1,
         props,
         () => 0,
       );
-      Object.assign(analogElement, { pinNodeIds: [5], allNodeIds: [5] });
-      const elWithPins = analogElement as typeof analogElement & { pinNodeIds: number[] };
 
-      expect(elWithPins.pinNodeIds).toEqual([5]);
+      expect(analogElement._pinNodes.get("in")).toBe(5);
       expect(analogElement.branchIndex).toBe(-1);
-      expect(analogElement.isNonlinear).toBe(false);
-      expect(analogElement.isReactive).toBe(false);
     });
   });
 });

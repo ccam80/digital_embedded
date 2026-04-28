@@ -6,7 +6,6 @@
  *   - Companion model coefficient computation (all three integration methods)
  *   - updateCompanion() recomputation at each timestep
  *   - stamp() application of geq, ieq, and branch entries
- *   - isReactive flag
  *   - Component definition completeness
  *   - RL step response integration test
  */
@@ -19,8 +18,7 @@ import {
 import { PropertyBag } from "../../../core/properties.js";
 import { ComponentCategory, ComponentRegistry } from "../../../core/registry.js";
 import { StatePool } from "../../../solver/analog/state-pool.js";
-import type { AnalogElementCore } from "../../../core/analog-types.js";
-import type { ReactiveAnalogElement } from "../../../solver/analog/element.js";
+import type { AnalogElement, PoolBackedAnalogElement } from "../../../core/analog-types.js";
 import type { SparseSolver as SparseSolverType } from "../../../solver/analog/sparse-solver.js";
 import type { LoadContext } from "../../../solver/analog/load-context.js";
 import {
@@ -95,10 +93,10 @@ function getFactory(entry: ModelEntry): AnalogFactory {
 // withState: allocate a StatePool for a single element and call initState
 // ---------------------------------------------------------------------------
 
-function withState(core: AnalogElementCore): { element: ReactiveAnalogElement; pool: StatePool } {
-  const re = core as ReactiveAnalogElement;
+function withState(core: AnalogElement): { element: PoolBackedAnalogElement; pool: StatePool } {
+  const re = core as PoolBackedAnalogElement;
   const pool = new StatePool(Math.max(re.stateSize, 1));
-  re.stateBaseOffset = 0;
+  re._stateBase = 0;
   re.initState(pool);
   return { element: re, pool };
 }
@@ -126,10 +124,9 @@ function makeCaptureSolver(): { solver: SparseSolverType; stamps: [number, numbe
   return { solver, stamps, rhsStamps };
 }
 
-/** Call analogFactory, inject pinNodeIds, and wire up state pool (simulating what the compiler does). */
-function makeInductorElement(pinNodes: Map<string, number>, branchIdx: number, props: PropertyBag) {
-  const core = getFactory(InductorDefinition.modelRegistry!.behavioral!)(pinNodes, [], branchIdx, props, () => 0);
-  Object.assign(core, { pinNodeIds: Array.from(pinNodes.values()), allNodeIds: Array.from(pinNodes.values()) });
+/** Call analogFactory and wire up state pool (simulating what the compiler does). */
+function makeInductorElement(pinNodes: Map<string, number>, _branchIdx: number, props: PropertyBag) {
+  const core = getFactory(InductorDefinition.modelRegistry!.behavioral!)(pinNodes, props, () => 0);
   const { element } = withState(core);
   return element;
 }
@@ -226,16 +223,6 @@ describe("Inductor", () => {
     });
   });
 
-  describe("is_reactive_true", () => {
-    it("declares isReactive === true", () => {
-      const props = new PropertyBag();
-      props.setModelParam("inductance", 1e-3);
-      const analogElement = makeInductorElement(new Map([["A", 1], ["B", 2]]), 2, props);
-
-      expect(analogElement.isReactive).toBe(true);
-    });
-  });
-
   describe("definition", () => {
     it("InductorDefinition name is 'Inductor'", () => {
       expect(InductorDefinition.name).toBe("Inductor");
@@ -287,22 +274,21 @@ describe("Inductor", () => {
   });
 
   describe("statePool", () => {
-    it("stateBaseOffset is -1 before compiler assigns it", () => {
+    it("_stateBase is -1 before compiler assigns it", () => {
       const props = new PropertyBag();
       props.setModelParam("inductance", 0.01);
       const core = getFactory(InductorDefinition.modelRegistry!.behavioral!)(
-        new Map([["A", 1], ["B", 2]]), [], 2, props, () => 0,
+        new Map([["A", 1], ["B", 2]]), props, () => 0,
       );
-      expect((core as ReactiveAnalogElement).stateBaseOffset).toBe(-1);
+      expect((core as PoolBackedAnalogElement)._stateBase).toBe(-1);
     });
 
     it("stampCompanion writes GEQ and IEQ to pool slots 0 and 1, I_PREV to slot 2", () => {
       const props = new PropertyBag();
       props.setModelParam("inductance", 0.01);
       const core = getFactory(InductorDefinition.modelRegistry!.behavioral!)(
-        new Map([["A", 1], ["B", 2]]), [], 2, props, () => 0,
+        new Map([["A", 1], ["B", 2]]), props, () => 0,
       );
-      Object.assign(core, { pinNodeIds: [1, 2], allNodeIds: [1, 2] });
       const { element } = withState(core);
 
       // voltages[0]=V(node1)=5V, voltages[1]=V(node2)=0V, voltages[2]=I_branch=0.5A
@@ -318,9 +304,8 @@ describe("Inductor", () => {
       const props = new PropertyBag();
       props.setModelParam("inductance", 0.01);
       const core = getFactory(InductorDefinition.modelRegistry!.behavioral!)(
-        new Map([["A", 1], ["B", 2]]), [], 2, props, () => 0,
+        new Map([["A", 1], ["B", 2]]), props, () => 0,
       );
-      Object.assign(core, { pinNodeIds: [1, 2], allNodeIds: [1, 2] });
       const { element } = withState(core);
 
       // terminal voltage = 10V, branch current = 0.3A
@@ -335,9 +320,8 @@ describe("Inductor", () => {
       const props = new PropertyBag();
       props.setModelParam("inductance", 0.01);
       const core = getFactory(InductorDefinition.modelRegistry!.behavioral!)(
-        new Map([["A", 1], ["B", 2]]), [], 2, props, () => 0,
+        new Map([["A", 1], ["B", 2]]), props, () => 0,
       );
-      Object.assign(core, { pinNodeIds: [1, 2], allNodeIds: [1, 2] });
       const { element, pool } = withState(core);
 
       // First call establishes i=0.5 in s0, then rotate so it lands in s1
@@ -364,9 +348,8 @@ describe("Inductor SLOT_VOLT", () => {
     const props = new PropertyBag();
     props.setModelParam("inductance", 0.01);
     const core = getFactory(InductorDefinition.modelRegistry!.behavioral!)(
-      new Map([["A", 1], ["B", 2]]), [], 2, props, () => 0,
+      new Map([["A", 1], ["B", 2]]), props, () => 0,
     );
-    Object.assign(core, { pinNodeIds: [1, 2], allNodeIds: [1, 2] });
     const { element } = withState(core);
 
     // V(node1)=10V, V(node2)=3V → terminal voltage = 10-3 = 7V
@@ -380,9 +363,8 @@ describe("Inductor SLOT_VOLT", () => {
     const props = new PropertyBag();
     props.setModelParam("inductance", 0.01);
     const core = getFactory(InductorDefinition.modelRegistry!.behavioral!)(
-      new Map([["A", 1], ["B", 2]]), [], 2, props, () => 0,
+      new Map([["A", 1], ["B", 2]]), props, () => 0,
     );
-    Object.assign(core, { pinNodeIds: [1, 2], allNodeIds: [1, 2] });
     const { element } = withState(core);
 
     // Same voltage on both terminals
@@ -404,7 +386,7 @@ describe("Inductor temperature coefficients", () => {
     props.setModelParam("TC1", 1e-3);     // 0.1% per K
     props.setModelParam("TNOM", 300.15);  // nominal at room temp
     getFactory(InductorDefinition.modelRegistry!.behavioral!)(
-      new Map([["A", 1], ["B", 2]]), [], 2, props, () => 0,
+      new Map([["A", 1], ["B", 2]]), props, () => 0,
     );
     // At T=300.15 (room temp), dT=0, factor=1, L_eff = L_nom
   });
@@ -416,7 +398,7 @@ describe("Inductor temperature coefficients", () => {
     props.setModelParam("TC1", 0.001);
     props.setModelParam("TNOM", 250);
     getFactory(InductorDefinition.modelRegistry!.behavioral!)(
-      new Map([["A", 1], ["B", 2]]), [], 2, props, () => 0,
+      new Map([["A", 1], ["B", 2]]), props, () => 0,
     );
   });
 
@@ -425,7 +407,7 @@ describe("Inductor temperature coefficients", () => {
     props.setModelParam("inductance", 1e-3);
     props.setModelParam("SCALE", 2.5);
     getFactory(InductorDefinition.modelRegistry!.behavioral!)(
-      new Map([["A", 1], ["B", 2]]), [], 2, props, () => 0,
+      new Map([["A", 1], ["B", 2]]), props, () => 0,
     );
   });
 });
@@ -440,7 +422,7 @@ describe("Inductor M multiplicity", () => {
     props.setModelParam("inductance", 1e-3);
     props.setModelParam("M", 2);
     getFactory(InductorDefinition.modelRegistry!.behavioral!)(
-      new Map([["A", 1], ["B", 2]]), [], 2, props, () => 0,
+      new Map([["A", 1], ["B", 2]]), props, () => 0,
     );
   });
 
@@ -449,7 +431,7 @@ describe("Inductor M multiplicity", () => {
     props.setModelParam("inductance", 1e-3);
     props.setModelParam("M", 1);
     getFactory(InductorDefinition.modelRegistry!.behavioral!)(
-      new Map([["A", 1], ["B", 2]]), [], 2, props, () => 0,
+      new Map([["A", 1], ["B", 2]]), props, () => 0,
     );
   });
 });
@@ -501,8 +483,6 @@ describe("inductor_load_transient_parity (C4.2)", () => {
     const geq = ag0 * L_val;  // = 1e6 * 1e-3 = 1000
     const G_R = 1 / R_val;    // = 0.001
 
-    // Element setup: inductor nodes A=2(node2), B=0(gnd), branchIdx=3 (absolute row)
-    // pinNodeIds=[2,0], branchIndex=3
     const props = new PropertyBag();
     props.setModelParam("inductance", L_val);
     const element = makeInductorElement(new Map([["A", 2], ["B", 0]]), 3, props);
@@ -555,7 +535,7 @@ describe("inductor_load_transient_parity (C4.2)", () => {
     }
 
     const poolEl = element as unknown as {
-      _pool: { states: Float64Array[] }; stateBaseOffset: number;
+      _pool: { states: Float64Array[] }; _stateBase: number;
     };
 
     // 1-based MNA layout: node2=circuit node 2 (slot 2), branch=slot 3.
@@ -604,7 +584,7 @@ describe("inductor_load_transient_parity (C4.2)", () => {
     //   geq = ag[0]*L (niinteg.c:77); ceq = ccap - ag[0]*phi0 = ag[1]*L*refI[7]
     const SLOT_PHI  = 0;  // PHI = L·i (ngspice INDflux)
     const SLOT_CCAP = 1;  // CCAP = NIintegrate companion current (ngspice INDvolt)
-    const base = poolEl.stateBaseOffset;
+    const base = poolEl._stateBase;
     const s0 = poolEl._pool.states[0];
 
     // phi0 stored at step 9: L * iNow = L * refI[8]

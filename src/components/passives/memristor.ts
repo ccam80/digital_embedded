@@ -1,28 +1,28 @@
-﻿/**
+/**
  * Memristor analog component  Joglekar window function model.
  *
  * The memristor's resistance depends on an internal state variable w
  * (normalised, 0 to 1) representing the boundary between doped and undoped
  * regions. The state evolves with current:
  *
- *   dw/dt = Âµ_v Â· R_on / DÂ² Â· i(t) Â· f_p(w)
+ *   dw/dt = µ_v · R_on / D² · i(t) · f_p(w)
  *
- * where f_p(w) = 1 âˆ’ (2w âˆ’ 1)^(2p) is the Joglekar window function of
- * order p, enforcing 0 â‰¤ w â‰¤ 1. The resistance is:
+ * where f_p(w) = 1 − (2w − 1)^(2p) is the Joglekar window function of
+ * order p, enforcing 0 ≤ w ≤ 1. The resistance is:
  *
- *   R(w) = R_on Â· w + R_off Â· (1 âˆ’ w)
+ *   R(w) = R_on · w + R_off · (1 − w)
  *
  * which can equivalently be written using conductance:
  *
- *   G(w) = w Â· (1/R_on âˆ’ 1/R_off) + 1/R_off
+ *   G(w) = w · (1/R_on − 1/R_off) + 1/R_off
  *
  * The memristor stamps its state-dependent conductance inside load() every
  * NR iteration. The engine calls accept() once per accepted timestep to
  * integrate w forward by Euler forward.
  *
  * MNA topology:
- *   pinNodeIds[0] = node_A  (positive terminal)
- *   pinNodeIds[1] = node_B  (negative terminal)
+ *   _pinNodes.get("A") = node_A  (positive terminal)
+ *   _pinNodes.get("B") = node_B  (negative terminal)
  */
 
 import { AbstractCircuitElement } from "../../core/element.js";
@@ -37,7 +37,7 @@ import {
   type AttributeMapping,
   type ComponentDefinition,
 } from "../../core/registry.js";
-import type { AnalogElementCore } from "../../core/analog-types.js";
+import type { AnalogElement } from "../../core/analog-types.js";
 import { NGSPICE_LOAD_ORDER } from "../../core/analog-types.js";
 import type { LoadContext } from "../../solver/analog/load-context.js";
 import type { SetupContext } from "../../solver/analog/setup-context.js";
@@ -49,12 +49,12 @@ import { defineModelParams } from "../../core/model-params.js";
 
 export const { paramDefs: MEMRISTOR_PARAM_DEFS, defaults: MEMRISTOR_DEFAULTS } = defineModelParams({
   primary: {
-    rOn:         { default: 100,    unit: "Î",       description: "Resistance of fully doped (on) state in ohms", min: 1e-3 },
-    rOff:        { default: 16000,  unit: "Î",       description: "Resistance of fully undoped (off) state in ohms", min: 1e-3 },
+    rOn:         { default: 100,    unit: "Ω",       description: "Resistance of fully doped (on) state in ohms", min: 1e-3 },
+    rOff:        { default: 16000,  unit: "Ω",       description: "Resistance of fully undoped (off) state in ohms", min: 1e-3 },
     initialState:{ default: 0.5,                     description: "Initial normalised doped-region boundary (0=undoped, 1=fully doped)", min: 0 },
   },
   secondary: {
-    mobility:    { default: 1e-14,                   description: "Ionic mobility in mÂ² per VÂ·s", min: 1e-20 },
+    mobility:    { default: 1e-14,                   description: "Ionic mobility in m² per V·s", min: 1e-20 },
     deviceLength:{ default: 10e-9,                   description: "Device thickness in metres", min: 1e-12 },
     windowOrder: { default: 1,                       description: "Joglekar window function order p (integer >= 1)", min: 1 },
   },
@@ -64,13 +64,12 @@ export const { paramDefs: MEMRISTOR_PARAM_DEFS, defaults: MEMRISTOR_DEFAULTS } =
 // MemristorElement  AnalogElement implementation
 // ---------------------------------------------------------------------------
 
-export class MemristorElement implements AnalogElementCore {
-  readonly branchIndex: number = -1;
-  readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.RES;
-  readonly isNonlinear: boolean = true;
-  readonly isReactive: boolean = false;
-  _stateBase: number = -1;
+export class MemristorElement implements AnalogElement {
+  label: string = "";
   _pinNodes: Map<string, number> = new Map();
+  _stateBase: number = -1;
+  branchIndex: number = -1;
+  readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.RES;
 
   private _hPP: number = -1;
   private _hNN: number = -1;
@@ -87,6 +86,7 @@ export class MemristorElement implements AnalogElementCore {
   private _w: number;
 
   constructor(
+    pinNodes: ReadonlyMap<string, number>,
     rOn: number,
     rOff: number,
     initialState: number,
@@ -94,6 +94,7 @@ export class MemristorElement implements AnalogElementCore {
     deviceLength: number,
     windowOrder: number,
   ) {
+    this._pinNodes = new Map(pinNodes);
     this.rOn = rOn;
     this.rOff = rOff;
     this._w = Math.max(0, Math.min(1, initialState));
@@ -104,7 +105,7 @@ export class MemristorElement implements AnalogElementCore {
 
   /**
    * Resistance at current state.
-   * R(w) = R_on Â· w + R_off Â· (1 âˆ’ w)
+   * R(w) = R_on · w + R_off · (1 − w)
    */
   resistance(): number {
     return this.rOn * this._w + this.rOff * (1 - this._w);
@@ -112,7 +113,7 @@ export class MemristorElement implements AnalogElementCore {
 
   /**
    * Conductance at current state.
-   * G(w) = w Â· (1/R_on âˆ’ 1/R_off) + 1/R_off
+   * G(w) = w · (1/R_on − 1/R_off) + 1/R_off
    */
   conductance(): number {
     return this._w * (1 / this.rOn - 1 / this.rOff) + 1 / this.rOff;
@@ -167,8 +168,8 @@ export class MemristorElement implements AnalogElementCore {
    * The engine calls accept() exactly once per accepted step with the converged
    * terminal voltages on ctx.rhs.
    *
-   *   dw/dt = Âµ_v Â· R_on / DÂ² Â· i(t) Â· f_p(w)
-   *   f_p(w) = 1 âˆ’ (2w âˆ’ 1)^(2p)
+   *   dw/dt = µ_v · R_on / D² · i(t) · f_p(w)
+   *   f_p(w) = 1 − (2w − 1)^(2p)
    */
   accept(ctx: LoadContext, _simTime: number, _addBreakpoint: (t: number) => void): void {
     const nA = this._pinNodes.get("A")!;
@@ -261,11 +262,11 @@ export class MemristorCircuitElement extends AbstractCircuitElement {
     const vB = signals?.getPinVoltage("B");
     const hasVoltage = vA !== undefined && vB !== undefined;
 
-    // Falstad MemristorElm: total width 4 grid units (64px Ã· 16).
-    // calcLeads(32): lead1=(0,0), lead2=(3,0) in grid units (48px Ã· 16 = 3).
-    // Body spans x=13 (16px leads on each end), hs=10pxÃ·16=0.625 grid units.
+    // Falstad MemristorElm: total width 4 grid units (64px ÷ 16).
+    // calcLeads(32): lead1=(0,0), lead2=(3,0) in grid units (48px ÷ 16 = 3).
+    // Body spans x=13 (16px leads on each end), hs=10px÷16=0.625 grid units.
     // Zigzag body: 4 full teeth, each 8px = 0.5 grid units wide.
-    // Segment x positions (px Ã· 16): 1, 1.3125, 1.6875, 2, 2.3125, 2.6875, 3
+    // Segment x positions (px ÷ 16): 1, 1.3125, 1.6875, 2, 2.3125, 2.6875, 3
     // (body subdivided into 8 half-teeth of 5px = 0.3125 grid units)
 
     if (hasVoltage && ctx.setLinearGradient) {
@@ -311,7 +312,7 @@ export function createMemristorElement(
   pinNodes: ReadonlyMap<string, number>,
   props: PropertyBag,
   _getTime: () => number,
-): AnalogElementCore {
+): AnalogElement {
   const rOn = props.getModelParam<number>("rOn");
   const rOff = props.getModelParam<number>("rOff");
   const initialState = props.getModelParam<number>("initialState");
@@ -320,6 +321,7 @@ export function createMemristorElement(
   const windowOrder = props.getModelParam<number>("windowOrder");
 
   const el = new MemristorElement(
+    pinNodes,
     rOn,
     rOff,
     initialState,
@@ -327,7 +329,6 @@ export function createMemristorElement(
     deviceLength,
     windowOrder,
   );
-  el._pinNodes = new Map(pinNodes);
   return el;
 }
 
@@ -339,10 +340,10 @@ const MEMRISTOR_PROPERTY_DEFS: PropertyDefinition[] = [
   {
     key: "mobility",
     type: PropertyType.FLOAT,
-    label: "Mobility Âµ_v (mÂ²/VÂ·s)",
+    label: "Mobility µ_v (m²/V·s)",
     defaultValue: 1e-14,
     min: 1e-20,
-    description: "Ionic mobility in mÂ² per VÂ·s",
+    description: "Ionic mobility in m² per V·s",
   },
   {
     key: "deviceLength",
@@ -358,7 +359,7 @@ const MEMRISTOR_PROPERTY_DEFS: PropertyDefinition[] = [
     label: "Window order p",
     defaultValue: 1,
     min: 1,
-    description: "Joglekar window function order p (integer â‰¥ 1)",
+    description: "Joglekar window function order p (integer ≥ 1)",
   },
   {
     key: "label",

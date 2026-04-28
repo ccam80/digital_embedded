@@ -24,7 +24,7 @@ import {
   type ComponentDefinition,
   type ComponentLayout,
 } from "../../core/registry.js";
-import type { AnalogElementCore, LoadContext } from "../../solver/analog/element.js";
+import type { AnalogElement, LoadContext } from "../../solver/analog/element.js";
 import { NGSPICE_LOAD_ORDER } from "../../solver/analog/element.js";
 
 // ---------------------------------------------------------------------------
@@ -214,21 +214,26 @@ const PROBE_PROPERTY_DEFS: PropertyDefinition[] = [
 // Analog probe factory and element
 // ---------------------------------------------------------------------------
 
-class AnalogProbeElement implements AnalogElementCore {
-  pinNodeIds!: readonly number[];  // set by compiler via Object.assign after factory returns
-  readonly branchIndex: number = -1;
+class AnalogProbeElement implements AnalogElement {
+  _pinNodes: Map<string, number> = new Map();
+  label: string = "";
+  branchIndex: number = -1;
+  _stateBase: number = -1;
   // Probe is a pure voltage measurement — no MNA contribution. Ordinal is
-  // therefore irrelevant for parity, but every AnalogElementCore must declare one.
+  // therefore irrelevant for parity, but every AnalogElement must declare one.
   readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.RES;
-  readonly isNonlinear: boolean = false;
-  readonly isReactive: boolean = false;
+
+  setup(): void {
+    // Probe is a pure voltage measurement — no allocation needed.
+  }
 
   load(_ctx: LoadContext): void {
     // Probe is a pure voltage measurement — no MNA contribution.
   }
 
   getVoltage(rhs: Float64Array): number {
-    return rhs[this.pinNodeIds[0]];
+    const posNode = this._pinNodes.get("in");
+    return posNode !== undefined ? rhs[posNode] : 0;
   }
 
   setParam(_key: string, _value: number): void {}
@@ -241,13 +246,13 @@ class AnalogProbeElement implements AnalogElementCore {
 }
 
 function probeAnalogFactory(
-  _pinNodes: ReadonlyMap<string, number>,
-  _internalNodeIds: readonly number[],
-  _branchIdx: number,
+  pinNodes: ReadonlyMap<string, number>,
   _props: PropertyBag,
   _getTime: () => number,
-): AnalogElementCore {
-  return new AnalogProbeElement();
+): AnalogElement {
+  const el = new AnalogProbeElement();
+  el._pinNodes = new Map(pinNodes);
+  return el;
 }
 
 // ---------------------------------------------------------------------------

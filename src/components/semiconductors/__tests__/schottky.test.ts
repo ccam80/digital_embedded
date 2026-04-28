@@ -17,8 +17,8 @@ import { DIODE_PARAM_DEFAULTS } from "../diode.js";
 import { PropertyBag } from "../../../core/properties.js";
 import { SparseSolver } from "../../../solver/analog/sparse-solver.js";
 import { StatePool } from "../../../solver/analog/state-pool.js";
-import type { AnalogElementCore } from "../../../core/analog-types.js";
-import type { ReactiveAnalogElement } from "../../../solver/analog/element.js";
+import type { AnalogElement as AnalogElementCore } from "../../../core/analog-types.js";
+import type { PoolBackedAnalogElement } from "../../../solver/analog/element.js";
 import type { AnalogFactory } from "../../../core/registry.js";
 import type { LoadContext } from "../../../solver/analog/load-context.js";
 import type { SetupContext } from "../../../solver/analog/setup-context.js";
@@ -62,13 +62,13 @@ function runSetup(core: AnalogElementCore, solver: SparseSolver): void {
 // and call initState.
 // ---------------------------------------------------------------------------
 
-function withState(core: AnalogElementCore): { element: ReactiveAnalogElement; pool: StatePool; solver: SparseSolver } {
+function withState(core: AnalogElementCore): { element: PoolBackedAnalogElement; pool: StatePool; solver: SparseSolver } {
   const solver = new SparseSolver();
   solver._initStructure();
   runSetup(core, solver);
-  const re = core as ReactiveAnalogElement;
+  const re = core as PoolBackedAnalogElement;
   const pool = new StatePool(Math.max(re.stateSize, 1));
-  re.stateBaseOffset = 0;
+  (re as unknown as { _stateBase: number })._stateBase = 0;
   re.initState(pool);
   return { element: re, pool, solver };
 }
@@ -157,19 +157,6 @@ describe("Schottky", () => {
     expect((SchottkyDiodeDefinition.modelRegistry?.["spice"] as { kind: "inline"; factory: AnalogFactory } | undefined)?.factory).toBeDefined();
   });
 
-  it("isNonlinear_true", () => {
-    const propsObj = makeParamBag({});
-    const core = createSchottkyElement(new Map([["A", 1], ["K", 2]]), propsObj);
-    expect(core.isNonlinear).toBe(true);
-  });
-
-  it("isReactive_true_when_cjo_nonzero", () => {
-    // SCHOTTKY_PARAM_DEFAULTS has CJO=1e-12 (1pF) → reactive
-    const propsObj = makeParamBag({});
-    const core = createSchottkyElement(new Map([["A", 1], ["K", 2]]), propsObj);
-    expect(core.isReactive).toBe(true);
-  });
-
   // ---------------------------------------------------------------------------
   // Forward voltage: Schottky at 1mA forward must settle between 0.20V and 0.40V
   // ---------------------------------------------------------------------------
@@ -182,7 +169,7 @@ describe("Schottky", () => {
     const IS = 1e-8;
     const N = 1.05;
     const propsObj = makeParamBag({ IS, N, RS: 0, CJO: 0, TT: 0 });
-    const core = createSchottkyElement(new Map([["A", 1], ["K", 2]]), propsObj);
+    const core = createSchottkyElement(new Map([["A", 1], ["K", 2]]), propsObj, () => 0);
     const { element, pool, solver } = withState(core);
 
     // Run MODEINITJCT to seed state, then drive to 0.3V operating point
@@ -213,7 +200,7 @@ describe("Schottky", () => {
   it("RS_zero_no_internal_node", () => {
     // When RS=0, posPrimeNode must alias posNode — no makeVolt call
     let makeVoltCalls = 0;
-    const core = createSchottkyElement(new Map([["A", 1], ["K", 2]]), makeParamBag({ RS: 0, CJO: 0 }));
+    const core = createSchottkyElement(new Map([["A", 1], ["K", 2]]), makeParamBag({ RS: 0, CJO: 0 }), () => 0);
     const solver = new SparseSolver();
     solver._initStructure();
     let stateCount = 0;
@@ -243,7 +230,7 @@ describe("Schottky", () => {
   it("RS_nonzero_allocates_internal_node", () => {
     // When RS > 0, makeVolt must be called exactly once for the internal prime node
     let makeVoltCalls = 0;
-    const core = createSchottkyElement(new Map([["A", 1], ["K", 2]]), makeParamBag({ RS: 1 }));
+    const core = createSchottkyElement(new Map([["A", 1], ["K", 2]]), makeParamBag({ RS: 1 }), () => 0);
     const solver = new SparseSolver();
     solver._initStructure();
     let stateCount = 0;
@@ -293,7 +280,7 @@ describe("Schottky", () => {
       NBV: NaN, IKF: Infinity, IKR: Infinity, AREA: 1, OFF: 0, IC: NaN,
       ISW: 0, NSW: NaN, TEMP: 300.15, TNOM: 300.15,
     });
-    const el = createSchottkyElement(new Map([["A", 1], ["K", 2]]), props);
+    const el = createSchottkyElement(new Map([["A", 1], ["K", 2]]), props, () => 0);
     const circuit = makeMinimalCircuit([el as unknown as AnalogElement], 2);
     const engine = new MNAEngine();
     engine.init(circuit);
@@ -322,7 +309,7 @@ describe("Schottky", () => {
       NBV: NaN, IKF: Infinity, IKR: Infinity, AREA: 1, OFF: 0, IC: NaN,
       ISW: 0, NSW: NaN, TEMP: 300.15, TNOM: 300.15,
     });
-    const el = createSchottkyElement(new Map([["A", 1], ["K", 2]]), props);
+    const el = createSchottkyElement(new Map([["A", 1], ["K", 2]]), props, () => 0);
     const circuit = makeMinimalCircuit([el as unknown as AnalogElement], 2);
     const engine = new MNAEngine();
     engine.init(circuit);

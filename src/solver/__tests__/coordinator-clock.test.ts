@@ -17,7 +17,6 @@ import { PinDirection } from '../../core/pin.js';
 import { ComponentRegistry } from '../../core/registry.js';
 import { ComponentCategory } from '../../core/registry.js';
 import type { ComponentDefinition } from '../../core/registry.js';
-import type { SparseSolverStamp } from '../../core/analog-types.js';
 import { TestElement, makePin } from '../../test-fixtures/test-element.js';
 
 function makeAnalogElementObj(
@@ -51,11 +50,14 @@ function buildAnalogOnlyCoordinator(): DefaultSimulationCoordinator {
     pinElectrical: {},
     models: {},
     modelRegistry: {
-      behavioral: { kind: 'inline' as const, factory: (_pinNodes: ReadonlyMap<string, number>) => ({
+      behavioral: { kind: 'inline' as const, factory: (gndPinNodes: ReadonlyMap<string, number>) => ({
+        label: "",
+        _pinNodes: new Map(gndPinNodes),
+        _stateBase: -1,
         branchIndex: -1 as const,
         ngspiceLoadOrder: 0,
-        isNonlinear: false, isReactive: false,
-        stamp(_s: SparseSolverStamp) {},
+        setup(_ctx: import('../analog/setup-context.js').SetupContext): void {},
+        load(_ctx: import('../analog/load-context.js').LoadContext): void {},
         getPinCurrents(_v: Float64Array) { return [0]; },
         setParam(_key: string, _value: number) {},
       }), paramDefs: [], params: {} },
@@ -84,13 +86,16 @@ function buildAnalogOnlyCoordinator(): DefaultSimulationCoordinator {
         const nodeB = pinNodes.get('p2') ?? 0;
         const g = 1 / 1000;
         return {
+          label: "",
+          _pinNodes: new Map(pinNodes),
+          _stateBase: -1,
           branchIndex: -1 as const,
           ngspiceLoadOrder: 0,
-          isNonlinear: false, isReactive: false,
-          stamp(s: SparseSolverStamp) {
-            if (nodeA > 0) s.stampElement(s.allocElement(nodeA, nodeA), g);
-            if (nodeB > 0) s.stampElement(s.allocElement(nodeB, nodeB), g);
-            if (nodeA > 0 && nodeB > 0) { s.stampElement(s.allocElement(nodeA, nodeB), -g); s.stampElement(s.allocElement(nodeB, nodeA), -g); }
+          setup(_ctx: import('../analog/setup-context.js').SetupContext): void {},
+          load(ctx: import('../analog/load-context.js').LoadContext): void {
+            if (nodeA > 0) ctx.solver.stampElement(ctx.solver.allocElement(nodeA, nodeA), g);
+            if (nodeB > 0) ctx.solver.stampElement(ctx.solver.allocElement(nodeB, nodeB), g);
+            if (nodeA > 0 && nodeB > 0) { ctx.solver.stampElement(ctx.solver.allocElement(nodeA, nodeB), -g); ctx.solver.stampElement(ctx.solver.allocElement(nodeB, nodeA), -g); }
           },
           getPinCurrents(_v: Float64Array) { return [0, 0]; },
           setParam(_key: string, _value: number) {},

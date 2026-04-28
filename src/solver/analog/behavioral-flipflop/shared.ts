@@ -10,7 +10,7 @@ import {
 } from "../digital-pin-model.js";
 import type { AnalogCapacitorElement } from "../../../components/passives/capacitor.js";
 import type { PropertyBag } from "../../../core/properties.js";
-import type { StatePoolRef } from "../element.js";
+
 import { defineStateSchema } from "../state-schema.js";
 import type { StateSchema } from "../state-schema.js";
 
@@ -74,43 +74,6 @@ export function buildChildElements(
 ): AnalogCapacitorElement[] {
   const nonNull = pinModels.filter((p): p is DigitalInputPinModel | DigitalOutputPinModel => p !== null);
   return collectPinModelChildren(nonNull);
-}
-
-/**
- * Compute total stateSize from an array of capacitor children.
- */
-export function computeChildStateSize(children: AnalogCapacitorElement[]): number {
-  return children.reduce((s, c) => s + c.stateSize, 0);
-}
-
-/**
- * initState for a pool-backed composite element.
- * Assigns consecutive stateBaseOffsets to each child starting from the
- * element's own stateBaseOffset, then calls each child's initState.
- */
-export function initChildState(
-  children: AnalogCapacitorElement[],
-  elementBaseOffset: number,
-  pool: StatePoolRef,
-): void {
-  let offset = elementBaseOffset;
-  for (const child of children) {
-    child.stateBaseOffset = offset;
-    child.initState(pool);
-    offset += child.stateSize;
-  }
-}
-
-/**
- * Load all capacitor children in ctx.
- */
-export function loadChildren(
-  children: AnalogCapacitorElement[],
-  ctx: import("../load-context.js").LoadContext,
-): void {
-  for (const child of children) {
-    child.load(ctx);
-  }
 }
 
 /**

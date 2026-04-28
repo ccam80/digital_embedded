@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Zener diode analog component  Shockley equation with reverse breakdown.
  *
  * Extends the standard diode with a reverse breakdown region:
@@ -24,7 +24,7 @@ import {
   type AttributeMapping,
   type ComponentDefinition,
 } from "../../core/registry.js";
-import type { PoolBackedAnalogElementCore, LoadContext } from "../../solver/analog/element.js";
+import type { PoolBackedAnalogElement, LoadContext } from "../../solver/analog/element.js";
 import { NGSPICE_LOAD_ORDER } from "../../solver/analog/element.js";
 import {
   MODEINITJCT,
@@ -48,7 +48,7 @@ import { defineStateSchema, applyInitialValues } from "../../solver/analog/state
 const CONSTboltz = 1.3806226e-23;
 const CHARGE = 1.6021918e-19;
 const CONSTe = Math.E;          // used in cubic approximation (dioload.c:254)
-const REFTEMP = 300.15;         // 27 Â°C reference temperature
+const REFTEMP = 300.15;         // 27 °C reference temperature
 
 /** Minimum conductance for numerical stability (GMIN). */
 const GMIN = 1e-12;
@@ -64,7 +64,7 @@ export const { paramDefs: ZENER_PARAM_DEFS, defaults: ZENER_PARAM_DEFAULTS } = d
     BV:  { default: 5.1,  unit: "V", description: "Reverse breakdown voltage" },
     NBV: { default: NaN,              description: "Breakdown emission coefficient (defaults to N)" },
     IBV: { default: 1e-3, unit: "A", description: "Current at breakdown voltage" },
-    TCV: { default: 0,    unit: "V/Â°C", description: "Breakdown voltage temperature coefficient" },
+    TCV: { default: 0,    unit: "V/°C", description: "Breakdown voltage temperature coefficient" },
     TNOM:{ default: 300.15, unit: "K",  description: "Parameter measurement temperature" },
   },
   secondary: {
@@ -124,7 +124,7 @@ const ZENER_STATE_SCHEMA = defineStateSchema("ZenerElement", [
  * @param IS    Temperature-scaled saturation current (DIOtSatCur)
  * @param vt    Thermal voltage at circuit temperature
  * @param TCV   Voltage temperature coefficient (DIOtcv), default 0
- * @param dt    Temperature deviation from TNOM in Â°C (T - TNOM)
+ * @param dt    Temperature deviation from TNOM in °C (T - TNOM)
  */
 function computeTBV(
   BV: number,
@@ -164,8 +164,8 @@ function computeTBV(
 export function createZenerElement(
   pinNodes: ReadonlyMap<string, number>,
   props: PropertyBag,
-  _getTime?: () => number,
-): PoolBackedAnalogElementCore {
+  _getTime: () => number,
+): PoolBackedAnalogElement {
   const nodeAnode = pinNodes.get("A")!;
   const nodeCathode = pinNodes.get("K")!;
 
@@ -222,58 +222,68 @@ export function createZenerElement(
   // Ephemeral per-iteration pnjlim limiting flag (ngspice Check / DIOload  CKTnoncon++)
   let pnjlimLimited = false;
 
-  const zenerElement = {
-    branchIndex: -1,
-    _stateBase: -1,
-    _pinNodes: new Map(pinNodes),
+  // Internal prime node (DIOposPrimeNode) — set during setup(), read by load()
+  let _posPrimeNode = nodeAnode;
+
+  // TSTALLOC handles — closure-local, set during setup(), read inside load()
+  let _hPosPP  = -1;
+  let _hNegPP  = -1;
+  let _hPPPos  = -1;
+  let _hPPNeg  = -1;
+  let _hPosPos = -1;
+  let _hNegNeg = -1;
+  let _hPPPP   = -1;
+
+  // Internal node labels — recorded during setup() when RS > 0
+  const internalLabels: string[] = [];
+
+  const zenerElement: PoolBackedAnalogElement = {
+    label: "",
     ngspiceLoadOrder: NGSPICE_LOAD_ORDER.DIO,
-    isNonlinear: true,
-    isReactive: false,
+
+    _pinNodes: new Map(pinNodes),
+    _stateBase: -1,
+    branchIndex: -1,
+
     poolBacked: true as const,
     stateSize: 4,
     stateSchema: ZENER_STATE_SCHEMA,
-    stateBaseOffset: -1,
-
-    // Internal prime node (DIOposPrimeNode) — set during setup(), read by load()
-    _posPrimeNode: nodeAnode,
-
-    // TSTALLOC handles — set during setup(), written by load()
-    _hPosPP:  -1,
-    _hNegPP:  -1,
-    _hPPPos:  -1,
-    _hPPNeg:  -1,
-    _hPosPos: -1,
-    _hNegNeg: -1,
-    _hPPPP:   -1,
 
     setup(ctx: import("../../solver/analog/setup-context.js").SetupContext): void {
       const solver = ctx.solver;
-      const posNode = this._pinNodes.get("A")!;
-      const negNode = this._pinNodes.get("K")!;
+      const posNode = zenerElement._pinNodes.get("A")!;
+      const negNode = zenerElement._pinNodes.get("K")!;
 
       // State slots — diosetup.c:198-199
-      this._stateBase = ctx.allocStates(4);
-      this.stateBaseOffset = this._stateBase;
-      base = this._stateBase;
+      zenerElement._stateBase = ctx.allocStates(4);
+      base = zenerElement._stateBase;
 
       // Internal node — diosetup.c:204-224
-      this._posPrimeNode = (params.RS === 0 || !params.RS)
-        ? posNode
-        : ctx.makeVolt(this.label ?? "Z", "internal");
+      // ngspice gating: RS > 0 → allocate anode-prime node
+      if (params.RS === 0 || !params.RS) {
+        _posPrimeNode = posNode;
+      } else {
+        _posPrimeNode = ctx.makeVolt(zenerElement.label ?? "Z", "internal");
+        internalLabels.push("internal");
+      }
 
       // TSTALLOC sequence — diosetup.c:232-238 (identical to PB-DIO)
-      this._hPosPP  = solver.allocElement(posNode,            this._posPrimeNode); // (1)
-      this._hNegPP  = solver.allocElement(negNode,            this._posPrimeNode); // (2)
-      this._hPPPos  = solver.allocElement(this._posPrimeNode, posNode);            // (3)
-      this._hPPNeg  = solver.allocElement(this._posPrimeNode, negNode);            // (4)
-      this._hPosPos = solver.allocElement(posNode,            posNode);            // (5)
-      this._hNegNeg = solver.allocElement(negNode,            negNode);            // (6)
-      this._hPPPP   = solver.allocElement(this._posPrimeNode, this._posPrimeNode); // (7)
+      _hPosPP  = solver.allocElement(posNode,       _posPrimeNode); // (1)
+      _hNegPP  = solver.allocElement(negNode,       _posPrimeNode); // (2)
+      _hPPPos  = solver.allocElement(_posPrimeNode, posNode);       // (3)
+      _hPPNeg  = solver.allocElement(_posPrimeNode, negNode);       // (4)
+      _hPosPos = solver.allocElement(posNode,       posNode);       // (5)
+      _hNegNeg = solver.allocElement(negNode,       negNode);       // (6)
+      _hPPPP   = solver.allocElement(_posPrimeNode, _posPrimeNode); // (7)
+    },
+
+    getInternalNodeLabels(): readonly string[] {
+      return internalLabels;
     },
 
     initState(poolRef: StatePoolRef): void {
       pool = poolRef;
-      base = this.stateBaseOffset;
+      base = zenerElement._stateBase;
       applyInitialValues(ZENER_STATE_SCHEMA, pool, base, {});
     },
 
@@ -340,7 +350,7 @@ export function createZenerElement(
         vdRaw = 0;
       } else {
         // dioload.c:151-152: vd from rhsOld (current NR iterate voltages)
-        const va = voltages[zenerElement._posPrimeNode];
+        const va = voltages[_posPrimeNode];
         const vc = voltages[nodeCathode];
         vdRaw = va - vc;
       }
@@ -374,8 +384,8 @@ export function createZenerElement(
 
       if (ctx.limitingCollector) {
         ctx.limitingCollector.push({
-          elementIndex: (this as any).elementIndex ?? -1,
-          label: (this as any).label ?? "",
+          elementIndex: zenerElement.elementIndex ?? -1,
+          label: zenerElement.label ?? "",
           junction: "AK",
           limitType: "pnjlim",
           vBefore: vdRaw,
@@ -436,14 +446,35 @@ export function createZenerElement(
       // -----------------------------------------------------------------------
       // Stamp Norton companion  cite: dioload.c:429-441
       // Stamps through pre-allocated handles from setup()
+      //
+      // Series-resistance T-model (gspr) gating mirrors dioload.c:98 and the
+      // setup-side gating at diosetup.c:204 (DIOresist == 0 → no prime node).
+      // When RS == 0, _posPrimeNode aliases the external anode (zener.ts:264)
+      // and the prime-side stamps collapse to no-ops — gspr is skipped to match.
+      // When RS > 0, the seven stamps below mirror dioload.c:431-441 line for
+      // line: gd contributes to (PP,PP), (Neg,Neg), (PP,Neg), (Neg,PP) and gspr
+      // contributes to (PP,PP), (Pos,Pos), (Pos,PP), (PP,Pos). The (PP,PP)
+      // diagonal carries gd+gspr per dioload.c:431.
+      //
+      // gspr = DIOtConductance * AREA (dioload.c:98). DIOtConductance = 1/RS
+      // baseline (diotemp.c:72), with optional polynomial scaling by
+      // DIOresistTemp1/2 (diotemp.c:253-257) — not yet applied here; tracked
+      // for future bit-exact temp parity.
       // -----------------------------------------------------------------------
       const solver = ctx.solver;
-      solver.stampElement(zenerElement._hPPPP,   gd);
-      solver.stampElement(zenerElement._hPPNeg,  -gd);
-      solver.stampElement(zenerElement._hNegPP,  -gd);
-      solver.stampElement(zenerElement._hNegNeg, gd);
-      stampRHS(ctx.rhs, zenerElement._posPrimeNode, -ieq);
-      stampRHS(ctx.rhs, nodeCathode, ieq);
+      const gspr = params.RS > 0 ? (params.AREA ?? 1) / params.RS : 0;
+
+      solver.stampElement(_hPPPP,   gd + gspr);   // dioload.c:431
+      solver.stampElement(_hPPNeg,  -gd);         // dioload.c:436
+      solver.stampElement(_hNegPP,  -gd);         // dioload.c:437
+      solver.stampElement(_hNegNeg, gd);          // dioload.c:432
+      if (gspr > 0) {
+        solver.stampElement(_hPosPos, gspr);      // dioload.c:433
+        solver.stampElement(_hPosPP,  -gspr);     // dioload.c:434
+        solver.stampElement(_hPPPos,  -gspr);     // dioload.c:435
+      }
+      stampRHS(ctx.rhs, _posPrimeNode, -ieq);     // dioload.c:439 (cdeq sign-flipped)
+      stampRHS(ctx.rhs, nodeCathode, ieq);        // dioload.c:440
     },
 
     checkConvergence(ctx: LoadContext): boolean {
@@ -452,7 +483,7 @@ export function createZenerElement(
       if (pnjlimLimited) return false;
 
       const voltages = ctx.rhsOld;
-      const va = voltages[zenerElement._posPrimeNode];
+      const va = voltages[_posPrimeNode];
       const vc = voltages[nodeCathode];
       const vdRaw = va - vc;
 
@@ -555,7 +586,7 @@ export class ZenerElement extends AbstractCircuitElement {
     // Zener wings: bent ends at fraction -0.2 and 1.2 along cath0cath1
     // interpPointSingle(a,b,f,g): point at fraction f along ab, offset g perpendicular (along x for vertical bar)
     // Perpendicular to cath0cath1 (which is vertical) is horizontal
-    // Wing tips at Â±11/16 = Â±0.6875 grid units (from Falstad pixel coords Â±11 at 16px/unit)
+    // Wing tips at ±11/16 = ±0.6875 grid units (from Falstad pixel coords ±11 at 16px/unit)
     const wing0 = {
       x: cath0.x - hs,
       y: -11 / 16,
@@ -659,7 +690,6 @@ export const ZenerDiodeDefinition: ComponentDefinition = {
       factory: createDiodeElement,
       paramDefs: ZENER_SPICE_L1_PARAM_DEFS,
       params: ZENER_SPICE_L1_DEFAULTS,
-      mayCreateInternalNodes: true,
       ngspiceNodeMap: { A: "pos", K: "neg" },
     },
     "simplified": {

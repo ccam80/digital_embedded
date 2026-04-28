@@ -1,14 +1,3 @@
-/**
- * Solver-test infrastructure helpers.
- *
- * The legacy positional-argument element builders and the post-construction
- * node-id stamping helper were removed in the setup-load cleanup wave. Tests
- * construct elements via the production factories (e.g.
- * `makeDcVoltageSource(new Map([...]), props, () => 0)`) and invoke
- * `setupAll(elements, ctx)` against a `SetupContext` produced by
- * `makeTestSetupContext`. See spec/setup-load-cleanup.md §A.19.
- */
-
 import { SparseSolver } from "../sparse-solver.js";
 import type { AnalogElement, PoolBackedAnalogElement } from "../element.js";
 import { isPoolBacked } from "../element.js";
@@ -384,9 +373,8 @@ export interface MakeLoadCtxOptions {
  *     `cktinit.c:53-55` defaults.
  */
 export function makeLoadCtx(opts: MakeLoadCtxOptions): LoadContext {
-  const fallback = new Float64Array(0);
-  const rhs = opts.rhs ?? fallback;
-  const rhsOld = opts.rhsOld ?? fallback;
+  const rhs = opts.rhs ?? new Float64Array(0);
+  const rhsOld = opts.rhsOld ?? new Float64Array(0);
   // Empty StatePool: tests built via makeLoadCtx don't exercise state-ring
   // reads. Call sites that need real state should construct via
   // makeSimpleCtx (which wires the pool through CKTCircuitContext).

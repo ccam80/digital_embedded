@@ -57,12 +57,14 @@ export interface MixedComponentConfig {
 // Internal helpers
 // ---------------------------------------------------------------------------
 
-function makeNoopAnalogFactory() {
+function makeNoopAnalogFactory(pinNodes: ReadonlyMap<string, number>) {
   return {
-    branchIndex: -1 as const,
+    label: "",
     ngspiceLoadOrder: 0,
-    isNonlinear: false,
-    isReactive: false,
+    _pinNodes: new Map(pinNodes),
+    _stateBase: -1,
+    branchIndex: -1 as const,
+    setup: (_ctx: unknown) => {},
     load: (_ctx: unknown) => {},
     getPinCurrents: () => [] as number[],
     setParam: (_key: string, _value: number) => {},
@@ -103,7 +105,7 @@ function makeAnalogDef(config: AnalogComponentConfig): Omit<ComponentDefinition,
     modelRegistry: {
       [modelKey]: {
         kind: "inline" as const,
-        factory: () => makeNoopAnalogFactory(),
+        factory: (pinNodes: ReadonlyMap<string, number>) => makeNoopAnalogFactory(pinNodes),
         paramDefs: [],
         params: {},
       },
@@ -130,7 +132,7 @@ function makeMixedDef(config: MixedComponentConfig): Omit<ComponentDefinition, "
     modelRegistry: {
       [modelKey]: {
         kind: "inline" as const,
-        factory: () => makeNoopAnalogFactory(),
+        factory: (pinNodes: ReadonlyMap<string, number>) => makeNoopAnalogFactory(pinNodes),
         paramDefs: [],
         params: {},
       },

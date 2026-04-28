@@ -689,9 +689,6 @@ export interface SetupContext {
   /** Sparse solver — element setup() calls allocElement(row, col) on this
    *  to register every TSTALLOC matrix entry the element will stamp. */
   readonly solver: SparseSolver;
-  // Note: tests construct the solver and call solver.beginAssembly(...) /
-  // solver.endAssembly() outside the SetupContext lifecycle; element setup()
-  // calls only ctx.solver.allocElement(...).
 
   /** Operating temperature in Kelvin (ngspice CKTtemp). */
   readonly temp: number;
@@ -852,7 +849,7 @@ A test that wants element `V1` to receive branch row 3:
 
 ```ts
 const solver = new SparseSolver();
-solver.beginAssembly(matrixSize);
+solver._initStructure(matrixSize);
 const v = makeDcVoltageSource(new Map([["pos", 1], ["neg", 0]]), 5);
 v.label = "V1";
 const ctx = makeTestSetupContext({ solver, startBranch: 3 });

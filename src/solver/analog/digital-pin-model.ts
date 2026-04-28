@@ -92,8 +92,10 @@ export class DigitalOutputPinModel {
     this._nodeId = nodeId;
     this._branchIndex = branchIdx;
     if (this._loaded && this._spec.cOut > 0 && nodeId > 0) {
-      const cap = new AnalogCapacitorElement(this._spec.cOut, 0, 0, 0, 300.15, 1, 1);
-      cap.pinNodeIds = [nodeId, 0];
+      const cap = new AnalogCapacitorElement(
+        new Map([["pos", nodeId], ["neg", 0]]),
+        this._spec.cOut, 0, 0, 0, 300.15, 1, 1,
+      );
       this._outputCap = cap;
     } else {
       this._outputCap = null;
@@ -275,8 +277,10 @@ export class DigitalInputPinModel {
   init(nodeId: number, _groundNode: number): void {
     this._nodeId = nodeId;
     if (this._loaded && this._spec.cIn > 0 && nodeId > 0) {
-      const cap = new AnalogCapacitorElement(this._spec.cIn, 0, 0, 0, 300.15, 1, 1);
-      cap.pinNodeIds = [nodeId, 0];
+      const cap = new AnalogCapacitorElement(
+        new Map([["pos", nodeId], ["neg", 0]]),
+        this._spec.cIn, 0, 0, 0, 300.15, 1, 1,
+      );
       this._inputCap = cap;
     } else {
       this._inputCap = null;

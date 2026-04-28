@@ -66,7 +66,7 @@ function makeComparator(
     makeProps(overrides),
     () => 0,
   ) as unknown as AnalogElement;
-  const pool = initElement(el as unknown as import("../../../solver/analog/element.js").ReactiveAnalogElement);
+  const pool = initElement(el as unknown as import("../../../solver/analog/element.js").PoolBackedAnalogElement);
   return { element: el, pool };
 }
 

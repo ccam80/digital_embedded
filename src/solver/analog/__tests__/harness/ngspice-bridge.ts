@@ -892,7 +892,6 @@ export class NgspiceBridge {
 
     const elements = this._topology.devices.map((d, i) => ({
       index: i, label: d.name, type: d.typeName,
-      isNonlinear: false, isReactive: false,
       pinNodeIds: d.nodeIndices as readonly number[],
     }));
 

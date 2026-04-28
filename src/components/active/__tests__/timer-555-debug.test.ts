@@ -11,12 +11,45 @@ import { MNAEngine } from "../../../solver/analog/analog-engine.js";
 import { ConcreteCompiledAnalogCircuit } from "../../../solver/analog/compiled-analog-circuit.js";
 import { StatePool } from "../../../solver/analog/state-pool.js";
 import type { ModelEntry, AnalogFactory } from "../../../core/registry.js";
-import {
-  createTestCapacitor,
-  makeVoltageSource,
-  makeResistor,
-} from "../../../solver/analog/__tests__/test-helpers.js";
+import { AnalogCapacitorElement } from "../../passives/capacitor.js";
 import type { SetupContext } from "../../../solver/analog/setup-context.js";
+import type { LoadContext } from "../../../solver/analog/load-context.js";
+
+function makeResistor(nodeA: number, nodeB: number, resistance: number): AnalogElement {
+  const G = 1 / resistance;
+  return {
+    label: "",
+    _pinNodes: new Map<string, number>([["A", nodeA], ["B", nodeB]]),
+    _stateBase: -1,
+    branchIndex: -1,
+    ngspiceLoadOrder: 40,
+    setParam(_key: string, _value: number): void {},
+    getPinCurrents(): number[] { return []; },
+    setup(_ctx: SetupContext): void {},
+    load(ctx: LoadContext): void {
+      const { solver } = ctx;
+      if (nodeA > 0) { const h = solver.allocElement(nodeA, nodeA); solver.stampElement(h, G); }
+      if (nodeB > 0) { const h = solver.allocElement(nodeB, nodeB); solver.stampElement(h, G); }
+      if (nodeA > 0 && nodeB > 0) {
+        solver.stampElement(solver.allocElement(nodeA, nodeB), -G);
+        solver.stampElement(solver.allocElement(nodeB, nodeA), -G);
+      }
+    },
+  } as unknown as AnalogElement;
+}
+
+function createTestCapacitor(capacitance: number, nodePos: number, nodeNeg: number): AnalogElement {
+  return new AnalogCapacitorElement(
+    new Map([["pos", nodePos], ["neg", nodeNeg]]),
+    capacitance,
+    0,      // IC
+    0,      // TC1
+    0,      // TC2
+    300.15, // TNOM
+    1,      // SCALE
+    1,      // M
+  );
+}
 
 function getFactory(entry: ModelEntry): AnalogFactory {
   if (entry.kind !== "inline") throw new Error("Expected inline ModelEntry");
@@ -58,10 +91,7 @@ function make555(
     makeProps(overrides),
     () => 0,
   );
-  return Object.assign(core, {
-    pinNodeIds: [nodes.dis, nodes.trig, nodes.thr, nodes.vcc, nodes.ctrl, nodes.out, nodes.rst, nodes.gnd],
-    allNodeIds: [nodes.dis, nodes.trig, nodes.thr, nodes.vcc, nodes.ctrl, nodes.out, nodes.rst, nodes.gnd],
-  }) as AnalogElement;
+  return core;
 }
 
 function buildHandCircuit(opts: {
@@ -85,17 +115,28 @@ function makeVsElement(
   branchIdx: number,
   voltage: number,
 ): AnalogElement {
-  const base = makeVoltageSource(nodePos, nodeNeg, branchIdx, voltage);
-  const k = branchIdx + 1;
-  return Object.assign(base, {
+  const k = branchIdx;
+  let _hPosK = -1, _hKPos = -1, _hNegK = -1, _hKNeg = -1;
+  return {
+    label: "",
+    _pinNodes: new Map<string, number>([["pos", nodePos], ["neg", nodeNeg]]),
     _stateBase: -1,
-    _pinNodes: new Map<string, number>(),
+    branchIndex: k,
+    ngspiceLoadOrder: 48,
     setup(ctx: SetupContext): void {
-      if (nodePos !== 0) { ctx.solver.allocElement(nodePos, k); ctx.solver.allocElement(k, nodePos); }
-      if (nodeNeg !== 0) { ctx.solver.allocElement(nodeNeg, k); ctx.solver.allocElement(k, nodeNeg); }
+      if (nodePos !== 0) { _hPosK = ctx.solver.allocElement(nodePos, k); _hKPos = ctx.solver.allocElement(k, nodePos); }
+      if (nodeNeg !== 0) { _hNegK = ctx.solver.allocElement(nodeNeg, k); _hKNeg = ctx.solver.allocElement(k, nodeNeg); }
       ctx.solver.allocElement(k, k);
     },
-  });
+    load(ctx: LoadContext): void {
+      const { solver, rhs } = ctx;
+      if (nodePos !== 0) { solver.stampElement(_hPosK, 1); solver.stampElement(_hKPos, 1); }
+      if (nodeNeg !== 0) { solver.stampElement(_hNegK, -1); solver.stampElement(_hKNeg, -1); }
+      rhs[k] += voltage;
+    },
+    setParam(_key: string, _value: number): void {},
+    getPinCurrents(): number[] { return []; },
+  } as unknown as AnalogElement;
 }
 
 describe("Timer555Debug", () => {
@@ -139,10 +180,10 @@ describe("Timer555Debug", () => {
     if (!pool) {
       console.log("No state pool found");
     } else {
-      // Find cap stateBaseOffset — capEl is AnalogCapacitorElement, has stateBaseOffset
-      const capBase = (capEl as any).stateBaseOffset as number;
-      const SLOT_Q = 3, SLOT_CCAP = 4;
-      console.log(`Cap stateBaseOffset=${capBase}, pool.totalSlots=${pool.totalSlots}`);
+      // Find cap _stateBase — capEl is AnalogCapacitorElement, has _stateBase
+      const capBase = (capEl as any)._stateBase as number;
+      const SLOT_Q = 3;
+      console.log(`Cap _stateBase=${capBase}, pool.totalSlots=${pool.totalSlots}`);
       console.log(`After DC-OP: states[0][Q]=${pool.states[0][capBase+SLOT_Q]?.toExponential(4)}, states[1][Q]=${pool.states[1][capBase+SLOT_Q]?.toExponential(4)}, states[2][Q]=${pool.states[2][capBase+SLOT_Q]?.toExponential(4)}, states[3][Q]=${pool.states[3][capBase+SLOT_Q]?.toExponential(4)}`);
     }
 
@@ -161,7 +202,7 @@ describe("Timer555Debug", () => {
       engine.step();
       stepCount++;
       if (pool) {
-        const capBase = (capEl as any).stateBaseOffset as number;
+        const capBase = (capEl as any)._stateBase as number;
         const SLOT_Q = 3, SLOT_CCAP = 4;
         const q0 = pool.states[0][capBase+SLOT_Q];
         const q1 = pool.states[1][capBase+SLOT_Q];

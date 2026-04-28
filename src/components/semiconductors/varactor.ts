@@ -217,7 +217,6 @@ export const VaractorDefinition: ComponentDefinition = {
       factory: createDiodeElement,
       paramDefs: VARACTOR_PARAM_DEFS,
       params: VARACTOR_PARAM_DEFAULTS,
-      mayCreateInternalNodes: true,
       ngspiceNodeMap: { A: "pos", K: "neg" },
     },
   },

@@ -25,9 +25,9 @@ import {
   type ComponentDefinition,
   type ComponentLayout,
 } from "../../core/registry.js";
-import type { AnalogElementCore, LoadContext } from "../../solver/analog/element.js";
-import { NGSPICE_LOAD_ORDER } from "../../solver/analog/element.js";
-import type { SetupContext } from "../../solver/analog/setup-context.js";
+import type { AnalogElement } from "../../core/analog-types.js";
+import { NGSPICE_LOAD_ORDER } from "../../core/analog-types.js";
+import type { LoadContext } from "../../solver/analog/load-context.js";
 
 // ---------------------------------------------------------------------------
 // Pin layout
@@ -106,20 +106,23 @@ export function executeGround(index: number, state: Uint32Array, _highZs: Uint32
 
 function createGroundAnalogElement(
   pinNodes: ReadonlyMap<string, number>,
-  _internalNodeIds: readonly number[],
-  _branchIdx: number,
   _props: PropertyBag,
-): AnalogElementCore {
-  pinNodes.get("out");
-  return {
+  _getTime: () => number,
+): AnalogElement {
+  const el: AnalogElement = {
+    label: "",
+    elementIndex: -1,
+    _pinNodes: new Map(pinNodes),
     branchIndex: -1,
+    _stateBase: -1,
     // Ground is a no-op stamper (the compiler maps its pin to node 0 directly,
     // load() does nothing). Ordinal is therefore irrelevant for parity, but
-    // every AnalogElementCore must declare one. RES is the lowest-ordinal
+    // every AnalogElement must declare one. RES is the lowest-ordinal
     // bucket so any other element loads after it.
     ngspiceLoadOrder: NGSPICE_LOAD_ORDER.RES,
-    isNonlinear: false,
-    isReactive: false,
+    setup(): void {
+      // Ground has no stamps — constraint is enforced by the compiler's node mapping.
+    },
     load(_ctx: LoadContext): void {
       // Ground constraint is handled by the compiler's node mapping.
     },
@@ -127,11 +130,10 @@ function createGroundAnalogElement(
     setParam(_key: string, _value: number) {},
 
     getPinCurrents(_rhs: Float64Array): number[] {
-      // Ground constraint is enforced by node mapping (pin node = MNA node 0).
-      // No current flows through the element stamp� return zero for the one pin.
       return [0];
     },
   };
+  return el;
 }
 
 // ---------------------------------------------------------------------------

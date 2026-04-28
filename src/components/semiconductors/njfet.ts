@@ -27,7 +27,7 @@ import {
   type AttributeMapping,
   type ComponentDefinition,
 } from "../../core/registry.js";
-import type { IntegrationMethod, LoadContext } from "../../solver/analog/element.js";
+import type { AnalogElement, PoolBackedAnalogElement, IntegrationMethod, LoadContext } from "../../solver/analog/element.js";
 import { NGSPICE_LOAD_ORDER } from "../../solver/analog/element.js";
 import { stampRHS } from "../../solver/analog/stamp-helpers.js";
 import { pnjlim, fetlim } from "../../solver/analog/newton-raphson.js";
@@ -272,8 +272,8 @@ export function computeJfetTempParams(p: JfetParams): JfetTempParams {
 export function createNJfetElement(
   pinNodes: ReadonlyMap<string, number>,
   props: PropertyBag,
-  _getTime: () => number = () => 0,
-) {
+  _getTime: () => number,
+): AnalogElement {
   // N-channel polarity literal (jfetdefs.h:234 `#define NJF 1`).
   const polarity: 1 = 1;
 
@@ -302,7 +302,6 @@ export function createNJfetElement(
   };
 
   let tp = computeJfetTempParams(params);
-  const hasCapacitance = params.CGS > 0 || params.CGD > 0;
 
   let pool: StatePoolRef;
   let base: number;
@@ -310,80 +309,84 @@ export function createNJfetElement(
   // Ephemeral per-iteration icheck flag (jfetload.c:500-508 CKTnoncon bump).
   let icheckLimited = false;
 
-  return {
+  // Internal nodes allocated during setup() — jfetset.c:115-158
+  let _sourcePrimeNode = -1;
+  let _drainPrimeNode  = -1;
+
+  // TSTALLOC handles — closure-local per A.9, jfetset.c:166-180
+  let _hDDP  = -1, _hGDP  = -1, _hGSP  = -1, _hSSP  = -1;
+  let _hDPD  = -1, _hDPG  = -1, _hDPSP = -1;
+  let _hSPG  = -1, _hSPS  = -1, _hSPDP = -1;
+  let _hDD   = -1, _hGG   = -1, _hSS   = -1;
+  let _hDPDP = -1, _hSPSP = -1;
+
+  // Internal-node labels recorded in allocation order (A.7).
+  const internalLabels: string[] = [];
+
+  const el: PoolBackedAnalogElement & { readonly _p: JfetParams } = {
     branchIndex: -1,
     _stateBase: -1,
     _pinNodes: new Map(pinNodes),
-    _model: params,
     label: "",
     ngspiceLoadOrder: NGSPICE_LOAD_ORDER.JFET,
-    isNonlinear: true,
-    isReactive: hasCapacitance,
     poolBacked: true as const,
     stateSchema: JFET_SCHEMA,
     stateSize: JFET_SCHEMA.size,
-    stateBaseOffset: -1,
-
-    // Internal nodes allocated during setup() — jfetset.c:115-158
-    _sourcePrimeNode: -1,
-    _drainPrimeNode: -1,
-
-    // TSTALLOC handles — jfetset.c:166-180
-    _hDDP:  -1,
-    _hGDP:  -1,
-    _hGSP:  -1,
-    _hSSP:  -1,
-    _hDPD:  -1,
-    _hDPG:  -1,
-    _hDPSP: -1,
-    _hSPG:  -1,
-    _hSPS:  -1,
-    _hSPDP: -1,
-    _hDD:   -1,
-    _hGG:   -1,
-    _hSS:   -1,
-    _hDPDP: -1,
-    _hSPSP: -1,
 
     setup(ctx: import("../../solver/analog/setup-context.js").SetupContext): void {
       const solver     = ctx.solver;
-      const gateNode   = this._pinNodes.get("G")!;
-      const sourceNode = this._pinNodes.get("S")!;
-      const drainNode  = this._pinNodes.get("D")!;
-      const model      = this._model;
+      const gateNode   = el._pinNodes.get("G")!;
+      const sourceNode = el._pinNodes.get("S")!;
+      const drainNode  = el._pinNodes.get("D")!;
 
       // State slots — jfetset.c:112-113
-      this._stateBase = ctx.allocStates(13);
+      el._stateBase = ctx.allocStates(13);
+      base = el._stateBase;
 
       // Internal nodes — jfetset.c:115-158
       // Source prime BEFORE drain prime (ngspice order)
-      this._sourcePrimeNode = (model.RS === 0) ? sourceNode : ctx.makeVolt(this.label, "source");
-      this._drainPrimeNode  = (model.RD === 0) ? drainNode  : ctx.makeVolt(this.label, "drain");
+      internalLabels.length = 0;
+      if (params.RS === 0) {
+        _sourcePrimeNode = sourceNode;
+      } else {
+        _sourcePrimeNode = ctx.makeVolt(el.label, "source");
+        internalLabels.push("source");
+      }
+      if (params.RD === 0) {
+        _drainPrimeNode = drainNode;
+      } else {
+        _drainPrimeNode = ctx.makeVolt(el.label, "drain");
+        internalLabels.push("drain");
+      }
 
-      const sp = this._sourcePrimeNode;
-      const dp = this._drainPrimeNode;
+      const sp = _sourcePrimeNode;
+      const dp = _drainPrimeNode;
 
       // TSTALLOC sequence — jfetset.c:166-180
-      this._hDDP  = solver.allocElement(drainNode,  dp);          // (1)
-      this._hGDP  = solver.allocElement(gateNode,   dp);          // (2)
-      this._hGSP  = solver.allocElement(gateNode,   sp);          // (3)
-      this._hSSP  = solver.allocElement(sourceNode, sp);          // (4)
-      this._hDPD  = solver.allocElement(dp,         drainNode);   // (5)
-      this._hDPG  = solver.allocElement(dp,         gateNode);    // (6)
-      this._hDPSP = solver.allocElement(dp,         sp);          // (7)
-      this._hSPG  = solver.allocElement(sp,         gateNode);    // (8)
-      this._hSPS  = solver.allocElement(sp,         sourceNode);  // (9)
-      this._hSPDP = solver.allocElement(sp,         dp);          // (10)
-      this._hDD   = solver.allocElement(drainNode,  drainNode);   // (11)
-      this._hGG   = solver.allocElement(gateNode,   gateNode);    // (12)
-      this._hSS   = solver.allocElement(sourceNode, sourceNode);  // (13)
-      this._hDPDP = solver.allocElement(dp,         dp);          // (14)
-      this._hSPSP = solver.allocElement(sp,         sp);          // (15)
+      _hDDP  = solver.allocElement(drainNode,  dp);          // (1)
+      _hGDP  = solver.allocElement(gateNode,   dp);          // (2)
+      _hGSP  = solver.allocElement(gateNode,   sp);          // (3)
+      _hSSP  = solver.allocElement(sourceNode, sp);          // (4)
+      _hDPD  = solver.allocElement(dp,         drainNode);   // (5)
+      _hDPG  = solver.allocElement(dp,         gateNode);    // (6)
+      _hDPSP = solver.allocElement(dp,         sp);          // (7)
+      _hSPG  = solver.allocElement(sp,         gateNode);    // (8)
+      _hSPS  = solver.allocElement(sp,         sourceNode);  // (9)
+      _hSPDP = solver.allocElement(sp,         dp);          // (10)
+      _hDD   = solver.allocElement(drainNode,  drainNode);   // (11)
+      _hGG   = solver.allocElement(gateNode,   gateNode);    // (12)
+      _hSS   = solver.allocElement(sourceNode, sourceNode);  // (13)
+      _hDPDP = solver.allocElement(dp,         dp);          // (14)
+      _hSPSP = solver.allocElement(sp,         sp);          // (15)
+    },
+
+    getInternalNodeLabels(): readonly string[] {
+      return internalLabels;
     },
 
     initState(poolRef: StatePoolRef): void {
       pool = poolRef;
-      base = this.stateBaseOffset;
+      base = el._stateBase;
       applyInitialValues(JFET_SCHEMA, pool, base, {});
     },
 
@@ -400,7 +403,7 @@ export function createNJfetElement(
       const solver = ctx.solver;
       const m = params.M;
 
-      const nodeG = this._pinNodes.get("G")!;
+      const nodeG = el._pinNodes.get("G")!;
 
       // jfetload.c:95-98: dc model parameters (area-scaled).
       const beta = tp.tBeta * params.AREA;
@@ -484,8 +487,8 @@ export function createNJfetElement(
         //   vgd = type * (rhsOld[gate] - rhsOld[drainPrime]);
         // N-channel polarity = +1  raw difference.
         const vG  = voltages[nodeG];
-        const vSP = voltages[this._sourcePrimeNode];
-        const vDP = voltages[this._drainPrimeNode];
+        const vSP = voltages[_sourcePrimeNode];
+        const vDP = voltages[_drainPrimeNode];
         const vgsRaw = polarity * (vG - vSP);
         const vgdRaw = polarity * (vG - vDP);
         vgs = vgsRaw;
@@ -507,8 +510,8 @@ export function createNJfetElement(
 
         if (ctx.limitingCollector) {
           ctx.limitingCollector.push({
-            elementIndex: (this as any).elementIndex ?? -1,
-            label: (this as any).label ?? "",
+            elementIndex: (el as any).elementIndex ?? -1,
+            label: el.label ?? "",
             junction: "GS",
             limitType: "pnjlim",
             vBefore: vgsRaw,
@@ -516,8 +519,8 @@ export function createNJfetElement(
             wasLimited: vgsResult.limited,
           });
           ctx.limitingCollector.push({
-            elementIndex: (this as any).elementIndex ?? -1,
-            label: (this as any).label ?? "",
+            elementIndex: (el as any).elementIndex ?? -1,
+            label: el.label ?? "",
             junction: "GD",
             limitType: "pnjlim",
             vBefore: vgdRaw,
@@ -802,8 +805,8 @@ export function createNJfetElement(
       const ceqgs = polarity * ((cg - cgd) - ggs * vgs);
       const cdreq = polarity * ((cd + cgd) - gds * vds - gm * vgs);
 
-      const sp = this._sourcePrimeNode;
-      const dp = this._drainPrimeNode;
+      const sp = _sourcePrimeNode;
+      const dp = _drainPrimeNode;
 
       stampRHS(ctx.rhs, nodeG, m * (-ceqgs - ceqgd));
       stampRHS(ctx.rhs, dp,    m * (-cdreq + ceqgd));
@@ -811,24 +814,24 @@ export function createNJfetElement(
 
       // jfetload.c:534-550: Y-matrix stamps via cached TSTALLOC handles.
       // jfetload.c:536-544: off-diagonal + prime-node cross terms.
-      solver.stampElement(this._hGG,   m * (ggd + ggs));          // JFETgateGatePtr
-      solver.stampElement(this._hGDP,  m * (-ggd));               // JFETgateDrainPrimePtr
-      solver.stampElement(this._hGSP,  m * (-ggs));               // JFETgateSourcePrimePtr
-      solver.stampElement(this._hDPG,  m * (gm - ggd));           // JFETdrainPrimeGatePtr
-      solver.stampElement(this._hDPDP, m * (gdpr + gds + ggd));   // JFETdrainPrimeDrainPrimePtr
-      solver.stampElement(this._hDPSP, m * (-gds - gm));          // JFETdrainPrimeSourcePrimePtr
-      solver.stampElement(this._hSPG,  m * (-ggs - gm));          // JFETsourcePrimeGatePtr
-      solver.stampElement(this._hSPDP, m * (-gds));               // JFETsourcePrimeDrainPrimePtr
-      solver.stampElement(this._hSPSP, m * (gspr + gds + gm + ggs)); // JFETsourcePrimeSourcePrimePtr
+      solver.stampElement(_hGG,   m * (ggd + ggs));          // JFETgateGatePtr
+      solver.stampElement(_hGDP,  m * (-ggd));               // JFETgateDrainPrimePtr
+      solver.stampElement(_hGSP,  m * (-ggs));               // JFETgateSourcePrimePtr
+      solver.stampElement(_hDPG,  m * (gm - ggd));           // JFETdrainPrimeGatePtr
+      solver.stampElement(_hDPDP, m * (gdpr + gds + ggd));   // JFETdrainPrimeDrainPrimePtr
+      solver.stampElement(_hDPSP, m * (-gds - gm));          // JFETdrainPrimeSourcePrimePtr
+      solver.stampElement(_hSPG,  m * (-ggs - gm));          // JFETsourcePrimeGatePtr
+      solver.stampElement(_hSPDP, m * (-gds));               // JFETsourcePrimeDrainPrimePtr
+      solver.stampElement(_hSPSP, m * (gspr + gds + gm + ggs)); // JFETsourcePrimeSourcePrimePtr
       // jfetload.c:546-550: ohmic resistance stamps (drain/source series Rs).
       // JFETdrainDrainPrimePtr, JFETdrainPrimeDrainPtr, JFETdrainDrainPtr.
-      solver.stampElement(this._hDDP,  m * (-gdpr));              // JFETdrainDrainPrimePtr
-      solver.stampElement(this._hDPD,  m * (-gdpr));              // JFETdrainPrimeDrainPtr
-      solver.stampElement(this._hDD,   m * gdpr);                 // JFETdrainDrainPtr
+      solver.stampElement(_hDDP,  m * (-gdpr));              // JFETdrainDrainPrimePtr
+      solver.stampElement(_hDPD,  m * (-gdpr));              // JFETdrainPrimeDrainPtr
+      solver.stampElement(_hDD,   m * gdpr);                 // JFETdrainDrainPtr
       // JFETsourceSourcePrimePtr, JFETsourcePrimeSourcePtr, JFETsourceSourcePtr.
-      solver.stampElement(this._hSSP,  m * (-gspr));              // JFETsourceSourcePrimePtr
-      solver.stampElement(this._hSPS,  m * (-gspr));              // JFETsourcePrimeSourcePtr
-      solver.stampElement(this._hSS,   m * gspr);                 // JFETsourceSourcePtr
+      solver.stampElement(_hSSP,  m * (-gspr));              // JFETsourceSourcePrimePtr
+      solver.stampElement(_hSPS,  m * (-gspr));              // JFETsourcePrimeSourcePtr
+      solver.stampElement(_hSS,   m * gspr);                 // JFETsourceSourcePtr
     },
 
     getPinCurrents(_rhs: Float64Array): number[] {
@@ -882,6 +885,8 @@ export function createNJfetElement(
       return minDt;
     },
   };
+
+  return el;
 }
 
 // ---------------------------------------------------------------------------
@@ -1040,7 +1045,6 @@ export const NJfetDefinition: ComponentDefinition = {
       paramDefs: NJFET_PARAM_DEFS,
       params: NJFET_PARAM_DEFAULTS,
       ngspiceNodeMap: { G: "gate", S: "source", D: "drain" },
-      mayCreateInternalNodes: true,
     },
   },
   defaultModel: "spice",

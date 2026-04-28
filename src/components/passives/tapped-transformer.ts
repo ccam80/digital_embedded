@@ -39,15 +39,13 @@ import {
   type AttributeMapping,
   type ComponentDefinition,
 } from "../../core/registry.js";
-import type { AnalogElementCore } from "../../core/analog-types.js";
+import type { AnalogElement } from "../../core/analog-types.js";
 import { NGSPICE_LOAD_ORDER } from "../../core/analog-types.js";
-import type { ReactiveAnalogElement, IntegrationMethod, LoadContext } from "../../solver/analog/element.js";
 import type { SetupContext } from "../../solver/analog/setup-context.js";
 import { defineModelParams } from "../../core/model-params.js";
-import type { StatePoolRef } from "../../core/analog-types.js";
-import { defineStateSchema, applyInitialValues } from "../../solver/analog/state-schema.js";
+import { defineStateSchema } from "../../solver/analog/state-schema.js";
 import type { StateSchema } from "../../solver/analog/state-schema.js";
-import { cktTerr } from "../../solver/analog/ckt-terr.js";
+import { CompositeElement } from "../../solver/analog/composite-element.js";
 import { InductorSubElement, MutualInductorElement } from "./mutual-inductor.js";
 
 // ---------------------------------------------------------------------------
@@ -67,19 +65,14 @@ export const { paramDefs: TAPPED_TRANSFORMER_PARAM_DEFS, defaults: TAPPED_TRANSF
 });
 
 // ---------------------------------------------------------------------------
-// State-pool schema — minimal composite (sub-elements own their state slots).
-// Composite stores 6 flux-linkage read-back slots for getLteTimestep.
+// State-pool schema — composite owns no state.
+// ngspice mutsetup.c:28 is `NG_IGNORE(states)` — MUT allocates zero slots.
+// All flux/companion state lives in the IND sub-elements (L1, L2, L3).
 // ---------------------------------------------------------------------------
 
-const TAPPED_TRANSFORMER_SCHEMA: StateSchema = defineStateSchema("AnalogTappedTransformerElement", [
-  { name: "PHI1",  doc: "Total flux linkage winding 1 (mirror of L1 sub-element slot)", init: { kind: "zero" } },
-  { name: "PHI2",  doc: "Total flux linkage winding 2 (mirror of L2 sub-element slot)", init: { kind: "zero" } },
-  { name: "PHI3",  doc: "Total flux linkage winding 3 (mirror of L3 sub-element slot)", init: { kind: "zero" } },
-]);
-
-const SLOT_PHI1 = 0;
-const SLOT_PHI2 = 1;
-const SLOT_PHI3 = 2;
+const TAPPED_TRANSFORMER_SCHEMA: StateSchema = defineStateSchema(
+  "AnalogTappedTransformerElement", []
+);
 
 // ---------------------------------------------------------------------------
 // Pin layout
@@ -205,30 +198,18 @@ export class TappedTransformerElement extends AbstractCircuitElement {
 /**
  * MNA element for the three-winding center-tapped transformer.
  *
- * Composite: delegates to three InductorSubElement (L1, L2, L3) and three
- * MutualInductorElement (MUT12, MUT13, MUT23), all stored by ref.
- * setup() calls sub-elements in NGSPICE_LOAD_ORDER: INDs first, then MUTs.
- * load() delegates to sub-element load() methods.
+ * Composite: extends `CompositeElement` and delegates lifecycle (setup, load,
+ * initState, getLteTimestep) to three InductorSubElement (L1, L2, L3) and
+ * three MutualInductorElement (MUT12, MUT13, MUT23). The base-class
+ * forwarders iterate `getSubElements()` in array order, which preserves the
+ * NGSPICE_LOAD_ORDER invariant (all IND setup() before any MUT setup()).
  *
- * Node layout (pinNodeIds array positions):
- *   [0] = P1 (primary+)    [1] = P2 (primary-)
- *   [2] = S1 (sec-half-1+) [3] = CT (center tap)
- *   [4] = S2 (sec-half-2-)
+ * Pin layout (insertion order matches pinLayout order):
+ *   P1 (primary+), P2 (primary-), S1 (sec-half-1+), CT (center tap), S2 (sec-half-2-)
  */
-export class AnalogTappedTransformerElement implements ReactiveAnalogElement {
-  readonly pinNodeIds: readonly number[];
-  readonly allNodeIds: readonly number[];
-  branchIndex: number = -1;
-  _stateBase: number = -1;
-  _pinNodes: Map<string, number> = new Map();
+export class AnalogTappedTransformerElement extends CompositeElement {
   readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.MUT;
-  readonly isNonlinear = false;
-  readonly isReactive = true;
-  readonly poolBacked = true as const;
   readonly stateSchema = TAPPED_TRANSFORMER_SCHEMA;
-  readonly stateSize = TAPPED_TRANSFORMER_SCHEMA.size;
-  stateBaseOffset = -1;
-  setParam(_key: string, _value: number): void {}
 
   readonly _l1: InductorSubElement;
   readonly _l2: InductorSubElement;
@@ -237,19 +218,24 @@ export class AnalogTappedTransformerElement implements ReactiveAnalogElement {
   readonly _mut13: MutualInductorElement;
   readonly _mut23: MutualInductorElement;
 
-  private _pool!: StatePoolRef;
-
   constructor(
-    pinNodeIds: number[],
+    nodeIds: number[],
     label: string,
     primaryInductance: number,
     turnsRatio: number,
     couplingCoefficient: number,
   ) {
-    this.pinNodeIds = pinNodeIds;
-    this.allNodeIds = pinNodeIds;
+    super();
+    this.label = label;
+    this._pinNodes = new Map([
+      ["P1", nodeIds[0]],
+      ["P2", nodeIds[1]],
+      ["S1", nodeIds[2]],
+      ["CT", nodeIds[3]],
+      ["S2", nodeIds[4]],
+    ]);
 
-    const [p1Node, p2Node, s1Node, ctNode, s2Node] = pinNodeIds;
+    const [p1Node, p2Node, s1Node, ctNode, s2Node] = nodeIds;
 
     const halfRatio = turnsRatio / 2;
     const l1 = primaryInductance;
@@ -269,51 +255,29 @@ export class AnalogTappedTransformerElement implements ReactiveAnalogElement {
     this._mut23 = new MutualInductorElement(m23, this._l2, this._l3);
   }
 
-  setup(ctx: SetupContext): void {
-    // Composite setup: call sub-elements in NGSPICE_LOAD_ORDER — IND before MUT.
-    // Order: L1, L2, L3 (INDs), then MUT12, MUT13, MUT23.
-    // MUT setup reads li.branchIndex directly — no findDevice needed.
+  protected getSubElements(): readonly AnalogElement[] {
+    // Order matters: all INDs MUST setup before any MUT (MUT.setup reads
+    // INDbrEq via constructor-stored refs). Base-class forwarder iterates
+    // this array in order, preserving the ngspice setup ordering invariant.
+    return [this._l1, this._l2, this._l3, this._mut12, this._mut13, this._mut23];
+  }
 
-    this._l1.setup(ctx);   // indsetup.c pattern: allocStates(2) + makeCur + 5×allocElement
-    this._l2.setup(ctx);   // indsetup.c pattern: allocStates(2) + makeCur + 5×allocElement
-    this._l3.setup(ctx);   // indsetup.c pattern: allocStates(2) + makeCur + 5×allocElement
-
-    // MUT instances require INDbrEq to be set on both inductors before calling setup.
-    // Ordering invariant: all three IND setup() calls MUST complete before any MUT setup() call.
-    // Each MutualInductorElement holds refs to its two inductors (stored at construction time).
-    this._mut12.setup(ctx);  // mutsetup.c: 2×allocElement
-    this._mut13.setup(ctx);  // mutsetup.c: 2×allocElement
-    this._mut23.setup(ctx);  // mutsetup.c: 2×allocElement
-
-    // Composite branchIndex mirrors the primary winding's branch row.
+  override setup(ctx: SetupContext): void {
+    // Forward to children via base class (INDs allocate their own _stateBase
+    // via ctx.allocStates; MUTs allocate handles only).
+    super.setup(ctx);
+    // Mirror the primary winding's branch row onto the composite branchIndex
+    // (used by getPinCurrents and wire-current resolution).
     this.branchIndex = this._l1.branchIndex;
+    // Record the composite's _stateBase as L1's base so that initState()
+    // distributes correctly when called by the engine (which never sets
+    // _stateBase on the composite directly — it relies on setup() having
+    // done so via allocStates on sub-elements).
+    this._stateBase = this._l1._stateBase;
   }
 
-  initState(pool: StatePoolRef): void {
-    this._pool = pool;
-    applyInitialValues(TAPPED_TRANSFORMER_SCHEMA, pool, this.stateBaseOffset, {});
-  }
-
-  load(ctx: LoadContext): void {
-    this._l1.load(ctx);
-    this._l2.load(ctx);
-    this._l3.load(ctx);
-    this._mut12.load(ctx);
-    this._mut13.load(ctx);
-    this._mut23.load(ctx);
-  }
-
-  getLteTimestep(
-    dt: number,
-    deltaOld: readonly number[],
-    order: number,
-    method: IntegrationMethod,
-    lteParams: import("../../solver/analog/ckt-terr.js").LteParams,
-  ): number {
-    const dt1 = this._l1.getLteTimestep(dt, deltaOld, order, method, lteParams);
-    const dt2 = this._l2.getLteTimestep(dt, deltaOld, order, method, lteParams);
-    const dt3 = this._l3.getLteTimestep(dt, deltaOld, order, method, lteParams);
-    return Math.min(dt1, dt2, dt3);
+  setParam(_key: string, _value: number): void {
+    // Per-instance param plumbing is installed by the analog factory.
   }
 
   getPinCurrents(rhs: Float64Array): number[] {
@@ -325,6 +289,21 @@ export class AnalogTappedTransformerElement implements ReactiveAnalogElement {
     return [i1, -i1, i2, i3 - i2, -i3];
   }
 
+  findBranchFor(name: string, ctx: SetupContext): number {
+    return this._l1.findBranchFor(name, ctx)
+      || this._l2.findBranchFor(name, ctx)
+      || this._l3.findBranchFor(name, ctx);
+  }
+
+  /** Branch row of secondary half-1 (S1 → CT). */
+  get branch2(): number {
+    return this._l2.branchIndex;
+  }
+
+  /** Branch row of secondary half-2 (CT → S2). */
+  get branch3(): number {
+    return this._l3.branchIndex;
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -335,12 +314,18 @@ function createTappedTransformerElement(
   pinNodes: ReadonlyMap<string, number>,
   props: PropertyBag,
   _getTime: () => number,
-): AnalogElementCore {
+): AnalogElement {
+  // A.9 audit: primaryInductance, turnsRatio, couplingCoefficient are declared
+  // in defineModelParams (TAPPED_TRANSFORMER_PARAM_DEFS) — model-param partition.
+  // Use props.getModelParam<T>(key) — must not collapse into getOrDefault.
   let primaryInductance = props.getModelParam<number>("primaryInductance");
   let turnsRatio = props.getModelParam<number>("turnsRatio");
   let couplingCoefficient = props.getModelParam<number>("couplingCoefficient");
 
-  const label = (props.has("label") ? props.getString("label") : "") || "TAPXFMR";
+  // A.9 audit: label is an instance overlay (TAPPED_TRANSFORMER_PROPERTY_DEFS)
+  // — regular partition. Use getOrDefault for the absent-key fallback.
+  const labelRaw = props.getOrDefault<string>("label", "");
+  const label = labelRaw || "TAPXFMR";
 
   const el = new AnalogTappedTransformerElement(
     [
@@ -357,7 +342,7 @@ function createTappedTransformerElement(
   );
   el._pinNodes = new Map(pinNodes);
 
-  (el as AnalogElementCore).setParam = function(key: string, value: number): void {
+  el.setParam = function(key: string, value: number): void {
     if (key === "primaryInductance") {
       primaryInductance = value;
       const halfRatio = turnsRatio / 2;
@@ -491,17 +476,10 @@ export const TappedTransformerDefinition: ComponentDefinition = {
       factory: createTappedTransformerElement,
       paramDefs: TAPPED_TRANSFORMER_PARAM_DEFS,
       params: TAPPED_TRANSFORMER_DEFAULTS,
+      // Three branch rows: primary winding + sec-half-1 + sec-half-2.
+      // TT-W3-1: anything less causes b2/b3 to alias unrelated matrix rows.
+      branchCount: 3,
     },
   },
   defaultModel: "behavioral",
-  findBranchFor: (name: string, ctx: SetupContext, elements: ReadonlyMap<string, import("../../solver/analog/element.js").AnalogElement>) => {
-    void elements;
-    const el = elements.get(name);
-    if (!el) return 0;
-    const analog = el as unknown as AnalogTappedTransformerElement;
-    if (!analog._l1 || !analog._l2 || !analog._l3) return 0;
-    return analog._l1.findBranchFor(name, ctx)
-      || analog._l2.findBranchFor(name, ctx)
-      || analog._l3.findBranchFor(name, ctx);
-  },
 };

@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Tests for BehavioralGateElement and analog gate factory functions.
  *
  * Circuit topology used in truth table tests:
@@ -22,7 +22,8 @@
  */
 
 import { describe, it, expect, vi } from "vitest";
-import { makeVoltageSource, makeResistor, withNodeIds, runNR, makeLoadCtx } from "./test-helpers.js";
+import { makeSimpleCtx, makeLoadCtx } from "./test-helpers.js";
+import { newtonRaphson } from "../newton-raphson.js";
 import {
   BehavioralGateElement,
   makeAndAnalogFactory,
@@ -38,10 +39,12 @@ import {
 } from "../digital-pin-model.js";
 import type { ResolvedPinElectrical } from "../../../core/pin-electrical.js";
 import { PropertyBag } from "../../../core/properties.js";
-import type { AnalogElement, PoolBackedAnalogElementCore } from "../element.js";
+import type { AnalogElement, PoolBackedAnalogElement } from "../element.js";
 import type { LoadContext } from "../load-context.js";
 import { MODETRAN, MODEINITFLOAT } from "../ckt-mode.js";
 import { StatePool } from "../state-pool.js";
+import { makeDcVoltageSource, DC_VOLTAGE_SOURCE_DEFAULTS } from "../../../components/sources/dc-voltage-source.js";
+import { ResistorDefinition } from "../../../components/passives/resistor.js";
 
 // ---------------------------------------------------------------------------
 // Shared test constants
@@ -61,8 +64,34 @@ const CMOS_3V3: ResolvedPinElectrical = {
 
 const VDD = 3.3;
 const GND = 0.0;
-const LOAD_R = 10_000; // 10 kÎ load resistor on output
+const LOAD_R = 10_000; // 10 kΩ load resistor on output
 const NR_OPTS = { maxIterations: 50, reltol: 1e-3, abstol: 1e-6, iabstol: 1e-12 };
+
+// ---------------------------------------------------------------------------
+// Local element builders
+// ---------------------------------------------------------------------------
+
+/**
+ * Build a DC voltage source element.
+ * posNode / negNode are 1-based MNA node IDs (0 = ground sentinel).
+ */
+function makeVoltageSource(posNode: number, negNode: number, voltage: number): AnalogElement {
+  const props = new PropertyBag();
+  props.replaceModelParams({ ...DC_VOLTAGE_SOURCE_DEFAULTS, voltage });
+  return makeDcVoltageSource(new Map([["pos", posNode], ["neg", negNode]]), props, () => 0);
+}
+
+/**
+ * Build a resistor element using the production ResistorDefinition factory.
+ * nodeA / nodeB are 1-based MNA node IDs.
+ */
+function makeLocalResistor(nodeA: number, nodeB: number, resistance: number): AnalogElement {
+  const pinNodes = new Map([["A", nodeA], ["B", nodeB]]);
+  const props = new PropertyBag();
+  props.replaceModelParams({ resistance });
+  const factory = (ResistorDefinition.modelRegistry!["behavioral"] as { factory: (p: ReadonlyMap<string, number>, pr: PropertyBag, g: () => number) => AnalogElement }).factory;
+  return factory(pinNodes, props, () => 0);
+}
 
 // ---------------------------------------------------------------------------
 // Circuit builder helpers
@@ -87,15 +116,16 @@ function make2InputGateCircuit(
   vB: number,
 ) {
   // Ideal voltage sources driving input nodes (1-based circuit nodes)
-  const vsA = makeVoltageSource(1, 0, 3, vA); // node 1, branch row 3
-  const vsB = makeVoltageSource(2, 0, 4, vB); // node 2, branch row 4
+  const vsA = makeVoltageSource(1, 0, vA);
+  const vsB = makeVoltageSource(2, 0, vB);
 
   // Load resistor from output node (1-based=3) to ground
-  const rLoad = makeResistor(3, 0, LOAD_R);
+  const rLoad = makeLocalResistor(3, 0, LOAD_R);
 
-  const elements: AnalogElement[] = [vsA, vsB, rLoad, withNodeIds(gateElement, [1, 2, 3])];
+  gateElement._pinNodes = new Map([["In_1", 1], ["In_2", 2], ["out", 3]]);
+  const elements: AnalogElement[] = [vsA, vsB, rLoad, gateElement];
 
-  return { elements, matrixSize: 5 };
+  return { elements, matrixSize: 5, nodeCount: 3 };
 }
 
 /**
@@ -111,23 +141,19 @@ function make1InputGateCircuit(
   gateElement: BehavioralGateElement,
   vIn: number,
 ) {
-  const vsIn = makeVoltageSource(1, 0, 2, vIn); // node 1, branch row 2
-  const rLoad = makeResistor(2, 0, LOAD_R);
+  const vsIn = makeVoltageSource(1, 0, vIn);
+  const rLoad = makeLocalResistor(2, 0, LOAD_R);
 
-  const elements: AnalogElement[] = [vsIn, rLoad, withNodeIds(gateElement, [1, 2])];
+  gateElement._pinNodes = new Map([["In_1", 1], ["out", 2]]);
+  const elements: AnalogElement[] = [vsIn, rLoad, gateElement];
 
-  return { elements, matrixSize: 3 };
+  return { elements, matrixSize: 3, nodeCount: 2 };
 }
 
-function solve(elements: AnalogElement[], matrixSize: number) {
-  const nodeIds = new Set<number>();
-  for (const el of elements) {
-    for (const n of el.allNodeIds) {
-      if (n > 0) nodeIds.add(n);
-    }
-  }
-  const nodeCount = nodeIds.size;
-  return runNR({ elements, matrixSize, nodeCount, params: NR_OPTS, isDcOp: true });
+function solve(elements: AnalogElement[], matrixSize: number, nodeCount: number) {
+  const ctx = makeSimpleCtx({ elements, matrixSize, nodeCount, params: NR_OPTS });
+  newtonRaphson(ctx);
+  return ctx.nrResult;
 }
 
 /**
@@ -167,10 +193,10 @@ function make1InputGate(
 describe("AND", () => {
   it("both_high_outputs_high", () => {
     const gate = make2InputGate((inputs) => inputs[0] && inputs[1]);
-    const { elements, matrixSize } =
+    const { elements, matrixSize, nodeCount } =
       make2InputGateCircuit(gate, VDD, VDD);
 
-    const result = solve(elements, matrixSize);
+    const result = solve(elements, matrixSize, nodeCount);
 
     expect(result.converged).toBe(true);
     // Output node is circuit node 3 → voltages[3] (1-based)
@@ -181,10 +207,10 @@ describe("AND", () => {
 
   it("one_low_outputs_low", () => {
     const gate = make2InputGate((inputs) => inputs[0] && inputs[1]);
-    const { elements, matrixSize } =
+    const { elements, matrixSize, nodeCount } =
       make2InputGateCircuit(gate, VDD, GND);
 
-    const result = solve(elements, matrixSize);
+    const result = solve(elements, matrixSize, nodeCount);
 
     expect(result.converged).toBe(true);
     // vOL = 0  output voltage is essentially 0V
@@ -200,13 +226,13 @@ describe("NOT", () => {
     // Input HIGH  output LOW
     const gateHigh = make1InputGate((inputs) => !inputs[0]);
     const highCircuit = make1InputGateCircuit(gateHigh, VDD);
-    const resultHigh = solve(highCircuit.elements, highCircuit.matrixSize);
+    const resultHigh = solve(highCircuit.elements, highCircuit.matrixSize, highCircuit.nodeCount);
     expect(resultHigh.converged).toBe(true);
 
     // Input LOW  output HIGH
     const gateLow = make1InputGate((inputs) => !inputs[0]);
     const lowCircuit = make1InputGateCircuit(gateLow, GND);
-    const resultLow = solve(lowCircuit.elements, lowCircuit.matrixSize);
+    const resultLow = solve(lowCircuit.elements, lowCircuit.matrixSize, lowCircuit.nodeCount);
     expect(resultLow.converged).toBe(true);
     const vOut = resultLow.voltages[2]; // output = circuit node 2 → voltages[2]
     expect(vOut).toBeGreaterThan(3.0);
@@ -229,9 +255,9 @@ describe("NAND", () => {
 
     for (const [vA, vB, expectHigh] of combos) {
       const gate = make2InputGate((inputs) => !(inputs[0] && inputs[1]));
-      const { elements, matrixSize } =
+      const { elements, matrixSize, nodeCount } =
         make2InputGateCircuit(gate, vA, vB);
-      const result = solve(elements, matrixSize);
+      const result = solve(elements, matrixSize, nodeCount);
 
       expect(result.converged).toBe(true);
       const vOut = result.voltages[3]; // output = circuit node 3 → voltages[3]
@@ -260,9 +286,9 @@ describe("XOR", () => {
 
     for (const [vA, vB, expectHigh] of combos) {
       const gate = make2InputGate((inputs) => inputs[0] !== inputs[1]);
-      const { elements, matrixSize } =
+      const { elements, matrixSize, nodeCount } =
         make2InputGateCircuit(gate, vA, vB);
-      const result = solve(elements, matrixSize);
+      const result = solve(elements, matrixSize, nodeCount);
 
       expect(result.converged).toBe(true);
       const vOut = result.voltages[3]; // output = circuit node 3 → voltages[3]
@@ -282,10 +308,10 @@ describe("XOR", () => {
 describe("NR", () => {
   it("converges_within_5_iterations", () => {
     const gate = make2InputGate((inputs) => inputs[0] && inputs[1]);
-    const { elements, matrixSize } =
+    const { elements, matrixSize, nodeCount } =
       make2InputGateCircuit(gate, VDD, VDD);
 
-    const result = solve(elements, matrixSize);
+    const result = solve(elements, matrixSize, nodeCount);
 
     expect(result.converged).toBe(true);
     expect(result.iterations).toBeLessThanOrEqual(5);
@@ -296,10 +322,10 @@ describe("NR", () => {
     // The gate should hold the previous latched level (false initially)
     const gate = make2InputGate((inputs) => inputs[0] && inputs[1]);
     // Input B=3.3V (HIGH), Input A=1.5V (indeterminate)
-    const { elements, matrixSize } =
+    const { elements, matrixSize, nodeCount } =
       make2InputGateCircuit(gate, 1.5, VDD);
 
-    const result = solve(elements, matrixSize);
+    const result = solve(elements, matrixSize, nodeCount);
 
     expect(result.converged).toBe(true);
     // Initial latch is false, so AND output should be LOW
@@ -314,23 +340,23 @@ describe("NR", () => {
 
 describe("Loading", () => {
   it("input_loads_source", () => {
-    // A high-impedance source through 1kÎ to node 1 with rIn=10MÎ to ground.
+    // A high-impedance source through 1kΩ to node 1 with rIn=10MΩ to ground.
     // Expected voltage: 3.3 * 10e6 / (10e6 + 1000)  3.2997V
-    // Sag = 3.3 - 3.2997 = 0.3mV (much less than 1ÂµV threshold per 10MÎ with 1kÎ source)
+    // Sag = 3.3 - 3.2997 = 0.3mV (much less than 1µV threshold per 10MΩ with 1kΩ source)
     // Actually: 3.3 * 1e7 / (1e7 + 1000)  3.2997V  sag  0.33mV
-    // The spec says "voltage sag < 1ÂµV for 10MÎ load on 1kÎ divider" but
-    // actually for rIn=10MÎ and Rsource=1kÎ: sag = 3.3 * 1000 / (1e7+1000)  0.33mV
+    // The spec says "voltage sag < 1µV for 10MΩ load on 1kΩ divider" but
+    // actually for rIn=10MΩ and Rsource=1kΩ: sag = 3.3 * 1000 / (1e7+1000)  0.33mV
     // The spec's intention is that the loading IS measurable but small.
     // We verify the node voltage is slightly below 3.3V.
 
     // Node 1 = input node (0-based solver: 0)
-    // 1kÎ from 3.3V source to node 1 (driving through resistor, not ideal VS)
+    // 1kΩ from 3.3V source to node 1 (driving through resistor, not ideal VS)
     // Node 2 = output (0-based solver: 1)
-    // We use: VS 3.3V  node "src" (branch row 2), 1kÎ from src to node 1
+    // We use: VS 3.3V  node "src" (branch row 2), 1kΩ from src to node 1
     // But test-elements VS stamps into existing nodes. Simpler:
     //   VS at node 3 (branch row 3): 3.3V ideal source
-    //   R=1kÎ from node 3 to node 1: the high-impedance source path
-    //   Gate input pin at node 1: rIn=10MÎ to ground (stamped by gate)
+    //   R=1kΩ from node 3 to node 1: the high-impedance source path
+    //   Gate input pin at node 1: rIn=10MΩ to ground (stamped by gate)
     //   Gate output at node 2
     //   rLoad from node 2 to ground
 
@@ -346,18 +372,20 @@ describe("Loading", () => {
     const out = new DigitalOutputPinModel(CMOS_3V3);
     out.init(2, -1); // MNA node 2
     const gate = new BehavioralGateElement([inA], out, (inputs) => !inputs[0], new Map());
+    gate._pinNodes = new Map([["In_1", 1], ["out", 2]]);
 
-    // 3.3V ideal source at circuit node 3, branch index 3 (0-based)
-    const vs = makeVoltageSource(3, 0, 3, VDD);
+    // 3.3V ideal source at circuit node 3
+    const vs = makeVoltageSource(3, 0, VDD);
     // 1kΩ from circuit node 3 to circuit node 1
-    const rSource = makeResistor(3, 1, 1000);
+    const rSource = makeLocalResistor(3, 1, 1000);
     // Load on output
-    const rLoad = makeResistor(2, 0, LOAD_R);
+    const rLoad = makeLocalResistor(2, 0, LOAD_R);
 
-    const elements: AnalogElement[] = [vs, rSource, rLoad, withNodeIds(gate, [1, 2])];
+    const elements: AnalogElement[] = [vs, rSource, rLoad, gate];
     const matrixSize = 4; // 3 node rows + 1 branch row
+    const nodeCount = 3;
 
-    const result = solve(elements, matrixSize);
+    const result = solve(elements, matrixSize, nodeCount);
 
     expect(result.converged).toBe(true);
     // Input node 1 should be slightly below 3.3V due to rIn loading
@@ -376,39 +404,28 @@ describe("Factory", () => {
     const factory = makeAndAnalogFactory(2);
     const props = new PropertyBag();
     // pinNodes: "In_1"=1, "In_2"=2, "out"=3
-    const element = withNodeIds(
-      factory(new Map([["In_1", 1], ["In_2", 2], ["out", 3]]), [], -1, props, () => 0),
-      [1, 2, 3],
-    );
+    const element = factory(new Map([["In_1", 1], ["In_2", 2], ["out", 3]]), props, () => 0);
 
     expect(element).toBeDefined();
     // Verify AnalogElement interface fields
     expect(typeof element.load).toBe("function");
-    expect(element.isNonlinear).toBe(true);
-    expect(element.isReactive).toBe(true);
     expect(element.branchIndex).toBe(-1);
-    expect(element.pinNodeIds.length).toBe(3);
+    expect(element._pinNodes.size).toBe(3);
   });
 
   it("not_factory_returns_1_input_element", () => {
     const factory = makeNotAnalogFactory();
     const props = new PropertyBag();
-    const element = withNodeIds(
-      factory(new Map([["In_1", 1], ["out", 2]]), [], -1, props, () => 0),
-      [1, 2],
-    );
+    const element = factory(new Map([["In_1", 1], ["out", 2]]), props, () => 0);
 
     expect(element).toBeDefined();
-    expect(element.pinNodeIds.length).toBe(2);
+    expect(element._pinNodes.size).toBe(2);
   });
 
   it("nand_factory_correct_truth_table", () => {
     const factory = makeNandAnalogFactory(2);
     const props = new PropertyBag();
-    const gate = withNodeIds(
-      factory(new Map([["In_1", 1], ["In_2", 2], ["out", 3]]), [], -1, props, () => 0),
-      [1, 2, 3],
-    ) as unknown as BehavioralGateElement;
+    factory(new Map([["In_1", 1], ["In_2", 2], ["out", 3]]), props, () => 0);
 
     // Build a circuit, drive both inputs HIGH, expect LOW output
     const inA = new DigitalInputPinModel(CMOS_3V3, true);
@@ -424,50 +441,85 @@ describe("Factory", () => {
       new Map(),
     );
 
-    const { elements, matrixSize } =
+    const { elements, matrixSize, nodeCount } =
       make2InputGateCircuit(nandGate, VDD, VDD);
-    const result = solve(elements, matrixSize);
+    const result = solve(elements, matrixSize, nodeCount);
 
     expect(result.converged).toBe(true);
     // NAND(HIGH, HIGH) = LOW — output = circuit node 3 → voltages[3]
     expect(result.voltages[3]).toBeLessThan(0.5);
-
-    // Verify the factory-produced gate also satisfies AnalogElement interface
-    expect(gate.isNonlinear).toBe(true);
-    expect(gate.isReactive).toBe(true);
   });
 
   it("or_factory_returns_analog_element", () => {
-    const factory = makeOrAnalogFactory(2);
-    const props = new PropertyBag();
-    const element = withNodeIds(
-      factory(new Map([["In_1", 1], ["In_2", 2], ["out", 3]]), [], -1, props, () => 0),
-      [1, 2, 3],
-    );
-    expect(element.isNonlinear).toBe(true);
-    expect(element.pinNodeIds.length).toBe(3);
+    // OR truth table: HIGH when any input is HIGH
+    const combos: [number, number, boolean][] = [
+      [GND, GND, false],
+      [GND, VDD, true],
+      [VDD, GND, true],
+      [VDD, VDD, true],
+    ];
+    for (const [vA, vB, expectHigh] of combos) {
+      const factory = makeOrAnalogFactory(2);
+      const props = new PropertyBag();
+      const element = factory(new Map([["In_1", 1], ["In_2", 2], ["out", 3]]), props, () => 0) as BehavioralGateElement;
+      const { elements, matrixSize, nodeCount } = make2InputGateCircuit(element, vA, vB);
+      const result = solve(elements, matrixSize, nodeCount);
+      expect(result.converged).toBe(true);
+      const vOut = result.voltages[3];
+      if (expectHigh) {
+        expect(vOut).toBeGreaterThan(2.0);
+      } else {
+        expect(vOut).toBeLessThan(0.5);
+      }
+    }
   });
 
   it("nor_factory_returns_analog_element", () => {
-    const factory = makeNorAnalogFactory(2);
-    const props = new PropertyBag();
-    const element = withNodeIds(
-      factory(new Map([["In_1", 1], ["In_2", 2], ["out", 3]]), [], -1, props, () => 0),
-      [1, 2, 3],
-    );
-    expect(element.isNonlinear).toBe(true);
-    expect(element.pinNodeIds.length).toBe(3);
+    // NOR truth table: HIGH only when both inputs are LOW
+    const combos: [number, number, boolean][] = [
+      [GND, GND, true],
+      [GND, VDD, false],
+      [VDD, GND, false],
+      [VDD, VDD, false],
+    ];
+    for (const [vA, vB, expectHigh] of combos) {
+      const factory = makeNorAnalogFactory(2);
+      const props = new PropertyBag();
+      const element = factory(new Map([["In_1", 1], ["In_2", 2], ["out", 3]]), props, () => 0) as BehavioralGateElement;
+      const { elements, matrixSize, nodeCount } = make2InputGateCircuit(element, vA, vB);
+      const result = solve(elements, matrixSize, nodeCount);
+      expect(result.converged).toBe(true);
+      const vOut = result.voltages[3];
+      if (expectHigh) {
+        expect(vOut).toBeGreaterThan(2.0);
+      } else {
+        expect(vOut).toBeLessThan(0.5);
+      }
+    }
   });
 
   it("xor_factory_returns_analog_element", () => {
-    const factory = makeXorAnalogFactory(2);
-    const props = new PropertyBag();
-    const element = withNodeIds(
-      factory(new Map([["In_1", 1], ["In_2", 2], ["out", 3]]), [], -1, props, () => 0),
-      [1, 2, 3],
-    );
-    expect(element.isNonlinear).toBe(true);
-    expect(element.pinNodeIds.length).toBe(3);
+    // XOR truth table: HIGH when inputs differ
+    const combos: [number, number, boolean][] = [
+      [GND, GND, false],
+      [GND, VDD, true],
+      [VDD, GND, true],
+      [VDD, VDD, false],
+    ];
+    for (const [vA, vB, expectHigh] of combos) {
+      const factory = makeXorAnalogFactory(2);
+      const props = new PropertyBag();
+      const element = factory(new Map([["In_1", 1], ["In_2", 2], ["out", 3]]), props, () => 0) as BehavioralGateElement;
+      const { elements, matrixSize, nodeCount } = make2InputGateCircuit(element, vA, vB);
+      const result = solve(elements, matrixSize, nodeCount);
+      expect(result.converged).toBe(true);
+      const vOut = result.voltages[3];
+      if (expectHigh) {
+        expect(vOut).toBeGreaterThan(2.0);
+      } else {
+        expect(vOut).toBeLessThan(0.5);
+      }
+    }
   });
 });
 
@@ -502,7 +554,7 @@ describe("Task 6.4.3  _pinLoading propagation and delegation", () => {
     const factory = makeNandAnalogFactory(2);
     const element = factory(
       new Map([["In_1", 1], ["In_2", 2], ["out", 3]]),
-      [], -1, props, () => 0,
+      props, () => 0,
     ) as BehavioralGateElement;
 
     // Access internal pins via the pinModelsByLabel map is not exposed; instead
@@ -521,9 +573,8 @@ describe("Task 6.4.3  _pinLoading propagation and delegation", () => {
     const ctx = makeMinimalCtx();
     (ctx as any).solver = solver;
 
-    withNodeIds(element, [1, 2, 3]);
     const pool = new StatePool(element.stateSize);
-    element.stateBaseOffset = 0;
+    element._stateBase = 0;
     element.initState(pool);
     element.load(ctx);
 
@@ -545,7 +596,7 @@ describe("Task 6.4.3  _pinLoading propagation and delegation", () => {
     const factory = makeNandAnalogFactory(2);
     const element = factory(
       new Map([["In_1", 1], ["In_2", 2], ["out", 3]]),
-      [], -1, props, () => 0,
+      props, () => 0,
     ) as BehavioralGateElement;
 
     const allocCalls: Array<[number, number]> = [];
@@ -556,7 +607,6 @@ describe("Task 6.4.3  _pinLoading propagation and delegation", () => {
     const ctx = makeMinimalCtx();
     (ctx as any).solver = solver;
 
-    withNodeIds(element, [1, 2, 3]);
     element.load(ctx);
 
     // DigitalInputPinModel with loaded=false is a pure no-op in load():
@@ -576,7 +626,7 @@ describe("Task 6.4.3  _pinLoading propagation and delegation", () => {
     const factory = makeAndAnalogFactory(2);
     const element = factory(
       new Map([["In_1", 1], ["In_2", 2], ["out", 3]]),
-      [], -1, props, () => 0,
+      props, () => 0,
     ) as BehavioralGateElement;
 
     // Count allocElement calls: a loaded input calls allocElement once for the
@@ -589,9 +639,8 @@ describe("Task 6.4.3  _pinLoading propagation and delegation", () => {
     const ctx = makeMinimalCtx();
     (ctx as any).solver = solver;
 
-    withNodeIds(element, [1, 2, 3]);
     const pool = new StatePool(element.stateSize);
-    element.stateBaseOffset = 0;
+    element._stateBase = 0;
     element.initState(pool);
     element.load(ctx);
 
@@ -621,9 +670,9 @@ describe("Task 6.4.3  _pinLoading propagation and delegation", () => {
       (inputs) => !(inputs[0] && inputs[1]),
       new Map(),
     );
-    withNodeIds(gate, [1, 2, 3]);
+    gate._pinNodes = new Map([["In_1", 1], ["In_2", 2], ["out", 3]]);
     const pool = new StatePool(gate.stateSize);
-    gate.stateBaseOffset = 0;
+    gate._stateBase = 0;
     gate.initState(pool);
 
     const inALoadSpy = vi.spyOn(inA, "load");
@@ -659,7 +708,7 @@ describe("Task 6.4.3  _pinLoading propagation and delegation", () => {
       (inputs) => inputs[0] || inputs[1],
       new Map(),
     );
-    withNodeIds(gate, [1, 2, 3]);
+    gate._pinNodes = new Map([["In_1", 1], ["In_2", 2], ["out", 3]]);
 
     // Pin models have no accept() method
     expect(typeof (inA as any).accept).toBe("undefined");
@@ -682,12 +731,11 @@ describe("Task 6.4.3  _pinLoading propagation and delegation", () => {
     const factory = makeOrAnalogFactory(2);
     const element = factory(
       new Map([["In_1", 1], ["In_2", 2], ["out", 3]]),
-      [], -1, props, () => 0,
+      props, () => 0,
     );
-    withNodeIds(element, [1, 2, 3]);
-    const poolBacked = element as unknown as PoolBackedAnalogElementCore;
+    const poolBacked = element as unknown as PoolBackedAnalogElement;
     const pool = new StatePool(poolBacked.stateSize);
-    poolBacked.stateBaseOffset = 0;
+    poolBacked._stateBase = 0;
     poolBacked.initState(pool);
 
     const allocCalls: Array<[number, number]> = [];

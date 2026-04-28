@@ -130,11 +130,29 @@ export interface SimulationParams {
    * has already been initialised with UIC (ngspice: MODEUIC + MODEINITTRAN).
    */
   noOpIter?: boolean;
+  /**
+   * Operating temperature in Kelvin (ngspice CKTtemp). Used by element setup()
+   * to compute temperature-dependent model parameters (e.g. vt = kT/q).
+   * Default: 300.15 K (27 °C, matching ngspice default temperature).
+   */
+  temp?: number;
+  /**
+   * Nominal model temperature in Kelvin (ngspice CKTnomTemp). The temperature
+   * at which model parameters were extracted. Used by BJT, diode, and MOSFET
+   * models for temperature scaling. Default: 300.15 K.
+   */
+  nomTemp?: number;
+  /**
+   * Whether to copy nodesets into initial conditions (ngspice CKTcopyNodesets).
+   * When true, nodeset constraints are promoted to IC constraints for the first
+   * transient DC-OP solve. Default: false.
+   */
+  copyNodesets?: boolean;
 }
 
 /** SimulationParams with all optional timestep fields resolved to concrete values. */
 export type ResolvedSimulationParams = SimulationParams &
-  Required<Pick<SimulationParams, "maxTimeStep" | "minTimeStep" | "firstStep">>;
+  Required<Pick<SimulationParams, "maxTimeStep" | "minTimeStep" | "firstStep" | "temp" | "nomTemp" | "copyNodesets">>;
 
 /**
  * Default values for all SimulationParams fields, matching circuits-engine-spec.md section 2.
@@ -166,6 +184,9 @@ export const DEFAULT_SIMULATION_PARAMS: ResolvedSimulationParams = {
   gminFactor: 10,
   srcFact: 1,
   xmu: 0.5,
+  temp: 300.15,
+  nomTemp: 300.15,
+  copyNodesets: false,
 };
 
 /**

@@ -26,7 +26,7 @@ import { PropertyBag } from "../../../../core/properties.js";
 import type { PropertyValue } from "../../../../core/properties.js";
 import type { Rect, RenderContext } from "../../../../core/renderer-interface.js";
 import type { SerializedElement } from "../../../../core/element.js";
-import { ComponentRegistry } from "../../../../core/registry.js";
+import { ComponentRegistry, type AnalogFactory } from "../../../../core/registry.js";
 import { compileUnified } from "@/compile/compile.js";
 
 import { ConcreteCompiledAnalogCircuit } from "../../compiled-analog-circuit.js";
@@ -34,20 +34,13 @@ import { StatePool } from "../../state-pool.js";
 import type { AnalogElement } from "../../element.js";
 
 import { ResistorDefinition } from "../../../../components/passives/resistor.js";
-import { DcVoltageSourceDefinition } from "../../../../components/sources/dc-voltage-source.js";
-import { CapacitorDefinition } from "../../../../components/passives/capacitor.js";
-import { DiodeDefinition } from "../../../../components/semiconductors/diode.js";
+import { DcVoltageSourceDefinition, makeDcVoltageSource } from "../../../../components/sources/dc-voltage-source.js";
+import { CapacitorDefinition, AnalogCapacitorElement, CAPACITOR_DEFAULTS } from "../../../../components/passives/capacitor.js";
+import { DiodeDefinition, createDiodeElement, DIODE_PARAM_DEFAULTS } from "../../../../components/semiconductors/diode.js";
 import { GroundDefinition } from "../../../../components/io/ground.js";
 import { ProbeDefinition } from "../../../../components/io/probe.js";
-
-import {
-  makeResistor,
-  makeVoltageSource,
-  createTestCapacitor,
-  makeDiode,
-  makeInductor,
-} from "../test-helpers.js";
 import { AnalogFuseElement } from "../../../../components/passives/analog-fuse.js";
+import { AnalogInductorElement, INDUCTOR_DEFAULTS } from "../../../../components/passives/inductor.js";
 
 // ---------------------------------------------------------------------------
 // Production-path helpers
@@ -155,6 +148,52 @@ export function wrapHandElements(opts: {
 // Most tests should prefer the production-path compile* helpers below.
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// Inline production factory helpers — used by hand-element circuit recipes.
+// These replace the deleted positional-argument helpers from test-helpers.js.
+// ---------------------------------------------------------------------------
+
+function makeVoltageSource(posNode: number, negNode: number, voltage: number): AnalogElement {
+  const props = new PropertyBag();
+  props.replaceModelParams({ voltage });
+  return makeDcVoltageSource(new Map([["pos", posNode], ["neg", negNode]]), props, () => 0);
+}
+
+function makeResistor(nodeA: number, nodeB: number, resistance: number): AnalogElement {
+  const props = new PropertyBag();
+  props.replaceModelParams({ resistance });
+  const factory = (ResistorDefinition.modelRegistry!["behavioral"] as { factory: AnalogFactory }).factory;
+  return factory(new Map([["A", nodeA], ["B", nodeB]]), props, () => 0);
+}
+
+function createTestCapacitor(capacitance: number, posNode: number, negNode: number): AnalogElement {
+  return new AnalogCapacitorElement(
+    new Map([["pos", posNode], ["neg", negNode]]),
+    capacitance,
+    CAPACITOR_DEFAULTS["IC"] as number,
+    CAPACITOR_DEFAULTS["TC1"] as number,
+    CAPACITOR_DEFAULTS["TC2"] as number,
+    CAPACITOR_DEFAULTS["TNOM"] as number,
+    CAPACITOR_DEFAULTS["SCALE"] as number,
+    CAPACITOR_DEFAULTS["M"] as number,
+  );
+}
+
+function makeInductor(posNode: number, negNode: number, inductance: number): AnalogElement {
+  const props = new PropertyBag();
+  props.replaceModelParams({ ...INDUCTOR_DEFAULTS, inductance });
+  return new AnalogInductorElement(
+    new Map([["pos", posNode], ["neg", negNode]]),
+    props,
+  );
+}
+
+function makeDiode(anodeNode: number, cathodeNode: number, IS: number, N: number): AnalogElement {
+  const props = new PropertyBag();
+  props.replaceModelParams({ ...DIODE_PARAM_DEFAULTS, IS, N });
+  return createDiodeElement(new Map([["A", anodeNode], ["K", cathodeNode]]), props, () => 0);
+}
+
 export interface DividerOpts { R1?: number; R2?: number; V?: number }
 
 /** Vs(node1, 0, branch=2) → R1(node1→node2) → R2(node2→0). */
@@ -163,7 +202,7 @@ export function dividerCircuit(opts: DividerOpts = {}): ConcreteCompiledAnalogCi
   return wrapHandElements({
     nodeCount: 2,
     elements: [
-      makeVoltageSource(1, 0, 2, V),
+      makeVoltageSource(1, 0, V),
       makeResistor(1, 2, R1),
       makeResistor(2, 0, R2),
     ],
@@ -178,7 +217,7 @@ export function rcCircuit(opts: { R?: number; C?: number; V?: number } = {}): Co
   return wrapHandElements({
     nodeCount: 2,
     elements: [
-      makeVoltageSource(1, 0, 2, V),
+      makeVoltageSource(1, 0, V),
       makeResistor(1, 2, R),
       createTestCapacitor(C, 2, 0),
     ],
@@ -191,9 +230,9 @@ export function rlCircuit(opts: { R?: number; L?: number; V?: number } = {}): Co
   return wrapHandElements({
     nodeCount: 2,
     elements: [
-      makeVoltageSource(1, 0, 2, V),
+      makeVoltageSource(1, 0, V),
       makeResistor(1, 2, R),
-      makeInductor(2, 0, 3, L),
+      makeInductor(2, 0, L),
     ],
   });
 }
@@ -204,7 +243,7 @@ export function diodeCircuit(opts: { R?: number; V?: number; Is?: number; n?: nu
   return wrapHandElements({
     nodeCount: 2,
     elements: [
-      makeVoltageSource(1, 0, 2, V),
+      makeVoltageSource(1, 0, V),
       makeResistor(1, 2, R),
       makeDiode(2, 0, Is, n),
     ],
@@ -212,8 +251,7 @@ export function diodeCircuit(opts: { R?: number; V?: number; Is?: number; n?: nu
 }
 
 /** Fuse circuit: Vs → fuse → load resistor → ground.
- *  Constructs AnalogFuseElement with the same pin-binding pattern as
- *  buildAnalogFuseElement (pinNodes map + pinNodeIds). */
+ *  Constructs AnalogFuseElement via production constructor (pinNodes first). */
 export function fuseCircuit(opts: {
   V?: number;
   rCold?: number;
@@ -222,15 +260,17 @@ export function fuseCircuit(opts: {
   rLoad?: number;
 }): { circuit: ConcreteCompiledAnalogCircuit; fuse: AnalogFuseElement } {
   const { V = 5, rCold = 1.0, rBlown = 1e9, i2tRating = 1e-8, rLoad = 9.0 } = opts;
-  const fuse = new AnalogFuseElement(rCold, rBlown, i2tRating);
-  fuse._pinNodes = new Map([["out1", 1], ["out2", 2]]);
-  fuse.pinNodeIds = [1, 2];
-  fuse.allNodeIds = [1, 2];
+  const fuse = new AnalogFuseElement(
+    new Map([["out1", 1], ["out2", 2]]),
+    rCold,
+    rBlown,
+    i2tRating,
+  );
 
   const circuit = wrapHandElements({
     nodeCount: 2,
     elements: [
-      makeVoltageSource(1, 0, 2, V),
+      makeVoltageSource(1, 0, V),
       fuse as unknown as AnalogElement,
       makeResistor(2, 0, rLoad),
     ],

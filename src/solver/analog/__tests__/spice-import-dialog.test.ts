@@ -27,13 +27,8 @@ import type { SerializedElement } from "../../../core/element.js";
 import type { AnalogElement } from "../element.js";
 import type { ComplexSparseSolver } from "../complex-sparse-solver.js";
 import type { LoadContext } from "../load-context.js";
-import type { AnalogElementFactory } from "../behavioral-gate.js";
-import { BJT_NPN_DEFAULTS } from "../../../components/semiconductors/bjt.js";
-
-// ---------------------------------------------------------------------------
-// Helper: narrow ModelEntry to inline factory (throws if netlist kind)
-// ---------------------------------------------------------------------------
 import type { ModelEntry, AnalogFactory } from "../../../core/registry.js";
+import { BJT_NPN_DEFAULTS } from "../../../components/semiconductors/bjt.js";
 function getFactory(entry: ModelEntry): AnalogFactory {
   if (entry.kind !== "inline") throw new Error("Expected inline ModelEntry");
   return entry.factory;
@@ -144,7 +139,17 @@ describe("spice-import-dialog: parse and apply", () => {
       modelRegistry: {
         behavioral: {
           kind: "inline",
-          factory: () => ({ pinNodeIds: [], allNodeIds: [], branchIndex: -1, isNonlinear: false, isReactive: false, stamp() {} }),
+          factory: () => ({
+            label: "",
+            ngspiceLoadOrder: 0,
+            _pinNodes: new Map<string, number>(),
+            _stateBase: -1,
+            branchIndex: -1,
+            setup() {},
+            load(_ctx: LoadContext) {},
+            getPinCurrents(_rhs: Float64Array) { return []; },
+            setParam(_k: string, _v: number) {},
+          }),
           params: {},
         },
       },
@@ -180,7 +185,17 @@ describe("spice-import-dialog: parse and apply", () => {
       modelRegistry: {
         behavioral: {
           kind: "inline",
-          factory: () => ({ pinNodeIds: [], allNodeIds: [], branchIndex: -1, isNonlinear: false, isReactive: false, stamp() {} }),
+          factory: () => ({
+            label: "",
+            ngspiceLoadOrder: 0,
+            _pinNodes: new Map<string, number>(),
+            _stateBase: -1,
+            branchIndex: -1,
+            setup() {},
+            load(_ctx: LoadContext) {},
+            getPinCurrents(_rhs: Float64Array) { return []; },
+            setParam(_k: string, _v: number) {},
+          }),
           params: {},
         },
       },
@@ -219,7 +234,17 @@ describe("spice-import-dialog: parse and apply", () => {
       modelRegistry: {
         behavioral: {
           kind: "inline",
-          factory: () => ({ pinNodeIds: [], allNodeIds: [], branchIndex: -1, isNonlinear: false, isReactive: false, stamp() {} }),
+          factory: () => ({
+            label: "",
+            ngspiceLoadOrder: 0,
+            _pinNodes: new Map<string, number>(),
+            _stateBase: -1,
+            branchIndex: -1,
+            setup() {},
+            load(_ctx: LoadContext) {},
+            getPinCurrents(_rhs: Float64Array) { return []; },
+            setParam(_k: string, _v: number) {},
+          }),
           params: {},
         },
       },
@@ -257,7 +282,17 @@ describe("spice-import-dialog: parse and apply", () => {
       modelRegistry: {
         behavioral: {
           kind: "inline",
-          factory: () => ({ pinNodeIds: [], allNodeIds: [], branchIndex: -1, isNonlinear: false, isReactive: false, stamp() {} }),
+          factory: () => ({
+            label: "",
+            ngspiceLoadOrder: 0,
+            _pinNodes: new Map<string, number>(),
+            _stateBase: -1,
+            branchIndex: -1,
+            setup() {},
+            load(_ctx: LoadContext) {},
+            getPinCurrents(_rhs: Float64Array) { return []; },
+            setParam(_k: string, _v: number) {},
+          }),
           params: {},
         },
       },
@@ -288,17 +323,17 @@ describe("spice-import-dialog: compile integration", () => {
   } {
     let capturedModelParams: Record<string, number> | undefined;
 
-    const npnFactory: AnalogElementFactory = (_pinNodes, _internalNodeIds, _branchIdx, props, _getTime) => {
+    const npnFactory: AnalogFactory = (_pinNodes, props, _getTime) => {
       capturedModelParams = props.getModelParamKeys().length > 0
         ? Object.fromEntries(props.getModelParamKeys().map(k => [k, props.getModelParam<number>(k)]))
         : undefined;
       const stub: AnalogElement = {
-        pinNodeIds: [],
-        allNodeIds: [],
-        branchIndex: -1,
+        label: "",
         ngspiceLoadOrder: 0,
-        isNonlinear: false,
-        isReactive: false,
+        _pinNodes: new Map(_pinNodes),
+        _stateBase: -1,
+        branchIndex: -1,
+        setup() {},
         load(_ctx: LoadContext): void {},
         stampAc(_solver: ComplexSparseSolver, _omega: number, _ctx: LoadContext): void {},
         setParam(_k: string, _v: number): void {},
@@ -427,7 +462,17 @@ describe("spice-import-dialog: compile integration", () => {
       modelRegistry: {
         behavioral: {
           kind: "inline",
-          factory: () => ({ pinNodeIds: [], allNodeIds: [], branchIndex: -1, isNonlinear: false, isReactive: false, stamp() {} }),
+          factory: () => ({
+            label: "",
+            ngspiceLoadOrder: 0,
+            _pinNodes: new Map<string, number>(),
+            _stateBase: -1,
+            branchIndex: -1,
+            setup() {},
+            load(_ctx: LoadContext) {},
+            getPinCurrents(_rhs: Float64Array) { return []; },
+            setParam(_k: string, _v: number) {},
+          }),
           params: {},
         },
       },

@@ -16,7 +16,7 @@ import { PropertyBag } from "../../../core/properties.js";
 import { ComponentCategory } from "../../../core/registry.js";
 import { createTestPropertyBag } from "../../../test-fixtures/model-fixtures.js";
 import type { SparseSolver as SparseSolverType } from "../../../solver/analog/sparse-solver.js";
-import { withNodeIds, makeSimpleCtx } from "../../../solver/analog/__tests__/test-helpers.js";
+import { makeSimpleCtx } from "../../../solver/analog/__tests__/test-helpers.js";
 
 // ---------------------------------------------------------------------------
 // Capture solver — records stamp tuples via the real allocElement/stampElement
@@ -101,10 +101,7 @@ function makeProps(overrides: Partial<{
 function computeIp(vpk: number, vgk: number, props?: PropertyBag): number {
   const p = props ?? makeProps();
   // nodeP=1, nodeG=2, nodeK=0(ground)
-  const elem = withNodeIds(
-    createTriodeElement(new Map([["P", 1], ["G", 2], ["K", 0]]), [], -1, p),
-    [1, 2, 0],
-  );
+  const elem = createTriodeElement(new Map([["P", 1], ["G", 2], ["K", 0]]), p, () => 0);
 
   // Build a voltage vector that produces the desired vpk, vgk.
   // matrixSize = 2 (ground is suppressed); voltages[0] = V(node 1) = V_P,
@@ -239,10 +236,7 @@ describe("Triode", () => {
       // Grid current = V_GK / R_GI = 1 / 2000 = 0.5 mA
 
       // Use createTriodeElement with nodes P=1, G=2, K=0(ground); matrixSize=2.
-      const elem = withNodeIds(
-        createTriodeElement(new Map([["P", 1], ["G", 2], ["K", 0]]), [], -1, p),
-        [1, 2, 0],
-      );
+      const elem = createTriodeElement(new Map([["P", 1], ["G", 2], ["K", 0]]), p, () => 0);
       const { solver, stamps, rhs } = makeCaptureSolver();
       const ctx = makeSimpleCtx({
         solver,
@@ -277,10 +271,7 @@ describe("Triode", () => {
 
     it("grid conductance 1/R_GI is active when V_GK > 0", () => {
       const p = makeProps();
-      const elem = withNodeIds(
-        createTriodeElement(new Map([["P", 1], ["G", 2], ["K", 0]]), [], -1, p),
-        [1, 2, 0],
-      );
+      const elem = createTriodeElement(new Map([["P", 1], ["G", 2], ["K", 0]]), p, () => 0);
       const { solver } = makeCaptureSolver();
       const ctx = makeSimpleCtx({
         solver,
@@ -305,10 +296,7 @@ describe("Triode", () => {
     it("NR loop converges in ≤ 10 iterations at V_PK=200V, V_GK=-2V", () => {
       const p = makeProps();
       // nodeP=1, nodeG=2, nodeK=0(ground)
-      const elem = withNodeIds(
-        createTriodeElement(new Map([["P", 1], ["G", 2], ["K", 0]]), [], -1, p),
-        [1, 2, 0],
-      );
+      const elem = createTriodeElement(new Map([["P", 1], ["G", 2], ["K", 0]]), p, () => 0);
 
       const targetVpk = 200;
       const targetVgk = -2;
@@ -381,14 +369,12 @@ describe("Triode", () => {
       expect(entry!.params["kg1"]).toBe(1060);
     });
 
-    it("analogFactory creates a triode element with isNonlinear=true", () => {
+    it("analogFactory creates a triode element", () => {
       const props = makeProps();
-      const elem = createTriodeElement(new Map([["P", 1], ["G", 2], ["K", 0]]), [], -1, props);
-      Object.assign(elem, { pinNodeIds: [1, 2, 0], allNodeIds: [1, 2, 0] });
-      const elemWithPins = elem as typeof elem & { pinNodeIds: number[] };
-      expect(elem.isNonlinear).toBe(true);
-      expect(elem.isReactive).toBe(false);
-      expect(elemWithPins.pinNodeIds).toEqual([1, 2, 0]);
+      const elem = createTriodeElement(new Map([["P", 1], ["G", 2], ["K", 0]]), props, () => 0);
+      expect(elem).toBeDefined();
+      expect(typeof elem.load).toBe("function");
+      expect(typeof elem.setup).toBe("function");
     });
   });
 });

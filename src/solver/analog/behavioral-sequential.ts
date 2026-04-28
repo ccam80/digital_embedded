@@ -7,8 +7,8 @@
  * driven by extracting individual bits from the internal count/value.
  */
 
-import type { LoadContext, StatePoolRef, ReactiveAnalogElementCore } from "./element.js";
 import { NGSPICE_LOAD_ORDER } from "./element.js";
+import type { AnalogElement } from "./element.js";
 import type { ResolvedPinElectrical } from "../../core/pin-electrical.js";
 import {
   DigitalInputPinModel,
@@ -17,11 +17,11 @@ import {
   delegatePinSetParam,
   collectPinModelChildren,
 } from "./digital-pin-model.js";
-import type { AnalogCapacitorElement } from "../../components/passives/capacitor.js";
 import type { AnalogElementFactory } from "./behavioral-gate.js";
-import type { SetupContext } from "./setup-context.js";
-import { defineStateSchema } from "./state-schema.js";
 import type { StateSchema } from "./state-schema.js";
+import { defineStateSchema } from "./state-schema.js";
+import { CompositeElement } from "./composite-element.js";
+import type { LoadContext } from "./load-context.js";
 
 // Empty composite schema — children carry their own schemas.
 const SEQUENTIAL_COMPOSITE_SCHEMA: StateSchema = defineStateSchema("BehavioralSequentialComposite", []);
@@ -59,13 +59,13 @@ const FALLBACK_SPEC: ResolvedPinElectrical = {
  * Rising-edge detection uses _prevClockVoltage stored after each accepted
  * timestep.
  */
-export class BehavioralCounterElement implements ReactiveAnalogElementCore {
+export class BehavioralCounterElement extends CompositeElement {
   private readonly _clockPin: DigitalInputPinModel;
   private readonly _enPin: DigitalInputPinModel;
   private readonly _clrPin: DigitalInputPinModel;
   private readonly _outBitPins: DigitalOutputPinModel[];
   private readonly _ovfPin: DigitalOutputPinModel;
-  private readonly _childElements: AnalogCapacitorElement[];
+  private readonly _allSubElements: AnalogElement[];
 
   private readonly _bitWidth: number;
   private readonly _maxValue: number;
@@ -76,19 +76,8 @@ export class BehavioralCounterElement implements ReactiveAnalogElementCore {
 
   private readonly _pinModelsByLabel: ReadonlyMap<string, DigitalInputPinModel | DigitalOutputPinModel>;
 
-  pinNodeIds!: readonly number[];  // set by compiler via Object.assign after factory returns
-  allNodeIds!: readonly number[];  // set by compiler via Object.assign after factory returns
-  readonly branchIndex: number = -1;
   readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.VCVS;
-  readonly isNonlinear: true = true;
-  label?: string;
-
-  readonly poolBacked = true as const;
   readonly stateSchema: StateSchema = SEQUENTIAL_COMPOSITE_SCHEMA;
-  stateSize: number;
-  stateBaseOffset = -1;
-  _stateBase: number = -1;
-  _pinNodes: Map<string, number> = new Map();
 
   constructor(
     enPin: DigitalInputPinModel,
@@ -101,6 +90,7 @@ export class BehavioralCounterElement implements ReactiveAnalogElementCore {
     _vIL: number,
     pinModelsByLabel: ReadonlyMap<string, DigitalInputPinModel | DigitalOutputPinModel>,
   ) {
+    super();
     this._enPin = enPin;
     this._clockPin = clockPin;
     this._clrPin = clrPin;
@@ -114,63 +104,32 @@ export class BehavioralCounterElement implements ReactiveAnalogElementCore {
     const allPins: (DigitalInputPinModel | DigitalOutputPinModel)[] = [
       enPin, clockPin, clrPin, ...outBitPins, ovfPin,
     ];
-    this._childElements = collectPinModelChildren(allPins);
-    this.stateSize = this._childElements.reduce((s, c) => s + c.stateSize, 0);
+    const childCaps = collectPinModelChildren(allPins);
+    this._allSubElements = [
+      enPin, clockPin, clrPin, ...outBitPins, ovfPin,
+      ...childCaps,
+    ] as unknown as AnalogElement[];
   }
 
-  get isReactive(): true {
-    return (this._childElements.length > 0) as true;
-  }
-
-  initState(pool: StatePoolRef): void {
-    let offset = this.stateBaseOffset;
-    for (const child of this._childElements) {
-      child.stateBaseOffset = offset;
-      child.initState(pool);
-      offset += child.stateSize;
-    }
+  protected getSubElements(): readonly AnalogElement[] {
+    return this._allSubElements;
   }
 
   initVoltages(rhs: Float64Array): void {
     this._prevClockVoltage = readMnaVoltage(this._clockPin.nodeId, rhs);
   }
 
-  setup(ctx: SetupContext): void {
-    // Forward to every input pin model
-    this._enPin.setup(ctx);
-    this._clockPin.setup(ctx);
-    this._clrPin.setup(ctx);
-
-    // Forward to every output pin model. The bitWidth out-bit pin models
-    // all share one MNA node (the "out" bus node); each independently calls
-    // allocElement(busNode, busNode) during its own setup. allocElement is
-    // idempotent for repeated coordinates, so all bit-pin models receive
-    // the same handle in their _hNodeDiag fields.
-    for (const pin of this._outBitPins) pin.setup(ctx);
-    this._ovfPin.setup(ctx);
-
-    // Forward to every capacitor child collected from all pin models
-    for (const child of this._childElements) child.setup(ctx);
-  }
-
   load(ctx: LoadContext): void {
-    this._enPin.load(ctx);
-    this._clockPin.load(ctx);
-    this._clrPin.load(ctx);
-
-    // Stamp output Norton equivalents from current count
+    // Set logic levels on output pins before stamping
     for (let bit = 0; bit < this._bitWidth; bit++) {
       const high = ((this._count >> bit) & 1) === 1;
       this._outBitPins[bit].setLogicLevel(high);
-      this._outBitPins[bit].load(ctx);
     }
     const ovf = this._count === this._maxValue;
     this._ovfPin.setLogicLevel(ovf);
-    this._ovfPin.load(ctx);
 
-    for (const child of this._childElements) {
-      child.load(ctx);
-    }
+    // Forward load to all sub-elements (pin models + capacitor children)
+    super.load(ctx);
   }
 
   /**
@@ -208,7 +167,7 @@ export class BehavioralCounterElement implements ReactiveAnalogElementCore {
   }
 
   /**
-   * Per-pin currents in pinNodeIds (pinLayout) order:
+   * Per-pin currents in pinLayout order:
    *   [en, C, clr, out[0], ..., out[bitWidth-1], ovf]
    *
    * Input pins (en, C, clr): I = V_node / rIn.
@@ -263,12 +222,12 @@ export class BehavioralCounterElement implements ReactiveAnalogElementCore {
  *
  * On rising clock edge with en=1: latches all data inputs to outputs.
  */
-export class BehavioralRegisterElement implements ReactiveAnalogElementCore {
+export class BehavioralRegisterElement extends CompositeElement {
   private readonly _clockPin: DigitalInputPinModel;
   private readonly _enPin: DigitalInputPinModel;
   private readonly _dataPins: DigitalInputPinModel[];
   private readonly _outBitPins: DigitalOutputPinModel[];
-  private readonly _childElements: AnalogCapacitorElement[];
+  private readonly _allSubElements: AnalogElement[];
 
   private readonly _bitWidth: number;
   private _storedValue = 0;
@@ -277,19 +236,8 @@ export class BehavioralRegisterElement implements ReactiveAnalogElementCore {
 
   private readonly _pinModelsByLabel: ReadonlyMap<string, DigitalInputPinModel | DigitalOutputPinModel>;
 
-  pinNodeIds!: readonly number[];  // set by compiler via Object.assign after factory returns
-  allNodeIds!: readonly number[];  // set by compiler via Object.assign after factory returns
-  readonly branchIndex: number = -1;
   readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.VCVS;
-  readonly isNonlinear: true = true;
-  label?: string;
-
-  readonly poolBacked = true as const;
   readonly stateSchema: StateSchema = SEQUENTIAL_COMPOSITE_SCHEMA;
-  stateSize: number;
-  stateBaseOffset = -1;
-  _stateBase: number = -1;
-  _pinNodes: Map<string, number> = new Map();
 
   constructor(
     dataPins: DigitalInputPinModel[],
@@ -301,6 +249,7 @@ export class BehavioralRegisterElement implements ReactiveAnalogElementCore {
     _vIL: number,
     pinModelsByLabel: ReadonlyMap<string, DigitalInputPinModel | DigitalOutputPinModel>,
   ) {
+    super();
     this._dataPins = dataPins;
     this._clockPin = clockPin;
     this._enPin = enPin;
@@ -312,62 +261,30 @@ export class BehavioralRegisterElement implements ReactiveAnalogElementCore {
     const allPins: (DigitalInputPinModel | DigitalOutputPinModel)[] = [
       ...dataPins, clockPin, enPin, ...outBitPins,
     ];
-    this._childElements = collectPinModelChildren(allPins);
-    this.stateSize = this._childElements.reduce((s, c) => s + c.stateSize, 0);
+    const childCaps = collectPinModelChildren(allPins);
+    this._allSubElements = [
+      ...dataPins, clockPin, enPin, ...outBitPins,
+      ...childCaps,
+    ] as unknown as AnalogElement[];
   }
 
-  get isReactive(): true {
-    return (this._childElements.length > 0) as true;
-  }
-
-  initState(pool: StatePoolRef): void {
-    let offset = this.stateBaseOffset;
-    for (const child of this._childElements) {
-      child.stateBaseOffset = offset;
-      child.initState(pool);
-      offset += child.stateSize;
-    }
+  protected getSubElements(): readonly AnalogElement[] {
+    return this._allSubElements;
   }
 
   initVoltages(rhs: Float64Array): void {
     this._prevClockVoltage = readMnaVoltage(this._clockPin.nodeId, rhs);
   }
 
-  setup(ctx: SetupContext): void {
-    // Forward to every data pin model. All bitWidth pin models share the
-    // single "D" bus node; each independently calls allocElement(D, D)
-    // during its setup, all returning the same handle (idempotent).
-    for (const pin of this._dataPins) pin.setup(ctx);
-
-    // Single-node input pins
-    this._clockPin.setup(ctx);
-    this._enPin.setup(ctx);
-
-    // Forward to every output pin model. All bitWidth out-bit models share
-    // the single "Q" bus node.
-    for (const pin of this._outBitPins) pin.setup(ctx);
-
-    // Forward to every capacitor child collected from all pin models
-    for (const child of this._childElements) child.setup(ctx);
-  }
-
   load(ctx: LoadContext): void {
-    for (const pin of this._dataPins) {
-      pin.load(ctx);
-    }
-    this._clockPin.load(ctx);
-    this._enPin.load(ctx);
-
-    // Stamp output Norton equivalents from stored value
+    // Set logic levels on output pins before stamping
     for (let bit = 0; bit < this._bitWidth; bit++) {
       const high = ((this._storedValue >> bit) & 1) === 1;
       this._outBitPins[bit].setLogicLevel(high);
-      this._outBitPins[bit].load(ctx);
     }
 
-    for (const child of this._childElements) {
-      child.load(ctx);
-    }
+    // Forward load to all sub-elements (pin models + capacitor children)
+    super.load(ctx);
   }
 
   /**
@@ -498,7 +415,7 @@ export function makeBehavioralCounterAnalogFactory(): AnalogElementFactory {
       pinModelsByLabel.set(`out_${bit}`, outBitPins[bit]);
     }
 
-    return new BehavioralCounterElement(
+    const el = new BehavioralCounterElement(
       enPin,
       clockPin,
       clrPin,
@@ -509,6 +426,8 @@ export function makeBehavioralCounterAnalogFactory(): AnalogElementFactory {
       cSpec.vIL,
       pinModelsByLabel,
     );
+    el._pinNodes = new Map(pinNodes);
+    return el;
   };
 }
 
@@ -529,7 +448,7 @@ export function makeBehavioralCounterAnalogFactory(): AnalogElementFactory {
  * dir=0 → count up; dir=1 → count down.
  * ovf=1 when: counting up and count==maxValue, or counting down and count==0.
  */
-export class BehavioralCounterPresetElement implements ReactiveAnalogElementCore {
+export class BehavioralCounterPresetElement extends CompositeElement {
   private readonly _enPin: DigitalInputPinModel;
   private readonly _clockPin: DigitalInputPinModel;
   private readonly _dirPin: DigitalInputPinModel;
@@ -538,7 +457,7 @@ export class BehavioralCounterPresetElement implements ReactiveAnalogElementCore
   private readonly _clrPin: DigitalInputPinModel;
   private readonly _outBitPins: DigitalOutputPinModel[];
   private readonly _ovfPin: DigitalOutputPinModel;
-  private readonly _childElements: AnalogCapacitorElement[];
+  private readonly _allSubElements: AnalogElement[];
 
   private readonly _bitWidth: number;
   private readonly _maxValue: number;
@@ -549,19 +468,8 @@ export class BehavioralCounterPresetElement implements ReactiveAnalogElementCore
 
   private readonly _pinModelsByLabel: ReadonlyMap<string, DigitalInputPinModel | DigitalOutputPinModel>;
 
-  pinNodeIds!: readonly number[];  // set by compiler via Object.assign after factory returns
-  allNodeIds!: readonly number[];  // set by compiler via Object.assign after factory returns
-  readonly branchIndex: number = -1;
   readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.VCVS;
-  readonly isNonlinear: true = true;
-  label?: string;
-
-  readonly poolBacked = true as const;
   readonly stateSchema: StateSchema = SEQUENTIAL_COMPOSITE_SCHEMA;
-  stateSize: number;
-  stateBaseOffset = -1;
-  _stateBase: number = -1;
-  _pinNodes: Map<string, number> = new Map();
 
   constructor(
     enPin: DigitalInputPinModel,
@@ -578,6 +486,7 @@ export class BehavioralCounterPresetElement implements ReactiveAnalogElementCore
     _vIL: number,
     pinModelsByLabel: ReadonlyMap<string, DigitalInputPinModel | DigitalOutputPinModel>,
   ) {
+    super();
     this._enPin = enPin;
     this._clockPin = clockPin;
     this._dirPin = dirPin;
@@ -594,61 +503,28 @@ export class BehavioralCounterPresetElement implements ReactiveAnalogElementCore
     const allPins: (DigitalInputPinModel | DigitalOutputPinModel)[] = [
       enPin, clockPin, dirPin, ...inBitPins, ldPin, clrPin, ...outBitPins, ovfPin,
     ];
-    this._childElements = collectPinModelChildren(allPins);
-    this.stateSize = this._childElements.reduce((s, c) => s + c.stateSize, 0);
+    const childCaps = collectPinModelChildren(allPins);
+    this._allSubElements = [
+      enPin, clockPin, dirPin, ...inBitPins, ldPin, clrPin, ...outBitPins, ovfPin,
+      ...childCaps,
+    ] as unknown as AnalogElement[];
   }
 
-  get isReactive(): true {
-    return (this._childElements.length > 0) as true;
-  }
-
-  initState(pool: StatePoolRef): void {
-    let offset = this.stateBaseOffset;
-    for (const child of this._childElements) {
-      child.stateBaseOffset = offset;
-      child.initState(pool);
-      offset += child.stateSize;
-    }
+  protected getSubElements(): readonly AnalogElement[] {
+    return this._allSubElements;
   }
 
   initVoltages(rhs: Float64Array): void {
     this._prevClockVoltage = readMnaVoltage(this._clockPin.nodeId, rhs);
   }
 
-  setup(ctx: SetupContext): void {
-    // Forward to every input pin model
-    this._enPin.setup(ctx);
-    this._clockPin.setup(ctx);
-    this._dirPin.setup(ctx);
-    // bitWidth in-bit pin models all share the "in" bus node.
-    for (const pin of this._inBitPins) pin.setup(ctx);
-    this._ldPin.setup(ctx);
-    this._clrPin.setup(ctx);
-
-    // Forward to every output pin model. bitWidth out-bit models share the
-    // "out" bus node. ovf has its own node.
-    for (const pin of this._outBitPins) pin.setup(ctx);
-    this._ovfPin.setup(ctx);
-
-    // Forward to every capacitor child collected from all pin models
-    for (const child of this._childElements) child.setup(ctx);
-  }
-
   load(ctx: LoadContext): void {
     const rhsOld = ctx.rhsOld;
 
-    this._enPin.load(ctx);
-    this._clockPin.load(ctx);
-    this._dirPin.load(ctx);
-    for (const pin of this._inBitPins) pin.load(ctx);
-    this._ldPin.load(ctx);
-    this._clrPin.load(ctx);
-
-    // Stamp output Norton equivalents from current count
+    // Set logic levels on output pins before stamping
     for (let bit = 0; bit < this._bitWidth; bit++) {
       const high = ((this._count >> bit) & 1) === 1;
       this._outBitPins[bit].setLogicLevel(high);
-      this._outBitPins[bit].load(ctx);
     }
     // ovf depends on dir and en levels at the current NR iterate
     const dirHigh = this._dirPin.readLogicLevel(
@@ -662,11 +538,9 @@ export class BehavioralCounterPresetElement implements ReactiveAnalogElementCore
       readMnaVoltage(this._enPin.nodeId, rhsOld),
     );
     this._ovfPin.setLogicLevel(atOverflow && enHigh === true);
-    this._ovfPin.load(ctx);
 
-    for (const child of this._childElements) {
-      child.load(ctx);
-    }
+    // Forward load to all sub-elements (pin models + capacitor children)
+    super.load(ctx);
   }
 
   /**
@@ -845,7 +719,7 @@ export function makeBehavioralCounterPresetAnalogFactory(): AnalogElementFactory
       pinModelsByLabel.set(`out_${bit}`, outBitPins[bit]);
     }
 
-    return new BehavioralCounterPresetElement(
+    const el = new BehavioralCounterPresetElement(
       enPin,
       clockPin,
       dirPin,
@@ -860,6 +734,8 @@ export function makeBehavioralCounterPresetAnalogFactory(): AnalogElementFactory
       cSpec.vIL,
       pinModelsByLabel,
     );
+    el._pinNodes = new Map(pinNodes);
+    return el;
   };
 }
 
@@ -925,7 +801,7 @@ export function makeBehavioralRegisterAnalogFactory(): AnalogElementFactory {
       pinModelsByLabel.set(`Q_${bit}`, outBitPins[bit]);
     }
 
-    return new BehavioralRegisterElement(
+    const el = new BehavioralRegisterElement(
       dataPins,
       clockPin,
       enPin,
@@ -935,5 +811,7 @@ export function makeBehavioralRegisterAnalogFactory(): AnalogElementFactory {
       cSpec.vIL,
       pinModelsByLabel,
     );
+    el._pinNodes = new Map(pinNodes);
+    return el;
   };
 }

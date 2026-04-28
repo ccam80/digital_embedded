@@ -27,7 +27,7 @@ import {
   type ComponentLayout,
 } from "../../core/registry.js";
 import type { FETLayout } from "./nfet.js";
-import type { AnalogElementCore } from "../../core/analog-types.js";
+import type { AnalogElement } from "../../core/analog-types.js";
 import { NGSPICE_LOAD_ORDER } from "../../core/analog-types.js";
 import type { SetupContext } from "../../solver/analog/setup-context.js";
 import type { LoadContext } from "../../solver/analog/load-context.js";
@@ -101,6 +101,13 @@ const MOS_SLOT_GMBS  = 24;
 const MOS_SLOT_MODE  = 25;
 const MOS_SLOT_VON   = 26;
 const MOS_SLOT_VDSAT = 27;
+
+// latent-stamp-gap: MOS_SLOT_CQBD and MOS_SLOT_CQBS are reserved for the
+// NIintegrate companion-current write-back of bulk junction caps (mos1load.c:
+// capbd/capbs integration path). Currently zero for the digital 3-terminal model
+// (CBD=CBS=CJ=0), but the slots are retained for when full bulk caps are implemented.
+void MOS_SLOT_CQBD;
+void MOS_SLOT_CQBS;
 
 // ---------------------------------------------------------------------------
 // CAP state slot indices — matches AnalogCapacitorElement slots
@@ -319,19 +326,18 @@ function fgpfetFactory(props: PropertyBag): FGPFETElement {
 // Identical structure to FGNFET CAP sub-element.
 // ---------------------------------------------------------------------------
 
-class FGPFETCapSubElement implements AnalogElementCore {
-  readonly branchIndex: number = -1;
+class FGPFETCapSubElement implements AnalogElement {
+  label: string = "";
+  branchIndex: number = -1;
   readonly ngspiceLoadOrder: number = NGSPICE_LOAD_ORDER.CAP;
-  readonly isNonlinear: boolean = false;
-  readonly isReactive: boolean = true;
   _stateBase: number = -1;
   _pinNodes: Map<string, number>;
 
   // Matrix handles allocated during setup() — capsetup.c:114-117
-  _hPP: number = -1;
-  _hNN: number = -1;
-  _hPN: number = -1;
-  _hNP: number = -1;
+  private _hPP: number = -1;
+  private _hNN: number = -1;
+  private _hPN: number = -1;
+  private _hNP: number = -1;
 
   constructor(pinNodes: Map<string, number>) {
     this._pinNodes = pinNodes;
@@ -441,37 +447,36 @@ class FGPFETCapSubElement implements AnalogElementCore {
 // sNodePrime=sNode (the conditional CKTmkVolt at mos1set.c:134-178 is skipped).
 // ---------------------------------------------------------------------------
 
-class FGPFETMosSubElement implements AnalogElementCore {
-  readonly branchIndex: number = -1;
+class FGPFETMosSubElement implements AnalogElement {
+  label: string = "";
+  branchIndex: number = -1;
   readonly ngspiceLoadOrder: number = NGSPICE_LOAD_ORDER.MOS;
-  readonly isNonlinear: boolean = true;
-  readonly isReactive: boolean = false;
   _stateBase: number = -1;
   _pinNodes: Map<string, number>;
 
   // Matrix handles allocated during setup() — mos1set.c:186-207 (22 entries)
-  _hDd: number = -1;
-  _hGg: number = -1;
-  _hSs: number = -1;
-  _hBb: number = -1;
-  _hDPdp: number = -1;
-  _hSPsp: number = -1;
-  _hDdp: number = -1;
-  _hGb: number = -1;
-  _hGdp: number = -1;
-  _hGsp: number = -1;
-  _hSsp: number = -1;
-  _hBdp: number = -1;
-  _hBsp: number = -1;
-  _hDPsp: number = -1;
-  _hDPd: number = -1;
-  _hBg: number = -1;
-  _hDPg: number = -1;
-  _hSPg: number = -1;
-  _hSPs: number = -1;
-  _hDPb: number = -1;
-  _hSPb: number = -1;
-  _hSPdp: number = -1;
+  private _hDd: number = -1;
+  private _hGg: number = -1;
+  private _hSs: number = -1;
+  private _hBb: number = -1;
+  private _hDPdp: number = -1;
+  private _hSPsp: number = -1;
+  private _hDdp: number = -1;
+  private _hGb: number = -1;
+  private _hGdp: number = -1;
+  private _hGsp: number = -1;
+  private _hSsp: number = -1;
+  private _hBdp: number = -1;
+  private _hBsp: number = -1;
+  private _hDPsp: number = -1;
+  private _hDPd: number = -1;
+  private _hBg: number = -1;
+  private _hDPg: number = -1;
+  private _hSPg: number = -1;
+  private _hSPs: number = -1;
+  private _hDPb: number = -1;
+  private _hSPb: number = -1;
+  private _hSPdp: number = -1;
 
   constructor(pinNodes: Map<string, number>) {
     this._pinNodes = pinNodes;
@@ -543,7 +548,11 @@ class FGPFETMosSubElement implements AnalogElementCore {
     const GateSourceOverlapCap = 0.0;
     const GateDrainOverlapCap  = 0.0;
     const GateBulkOverlapCap   = 0.0;
+    // latent-stamp-gap: OxideCap is zero for the digital 3-terminal model (no TOX).
+    // Retained for the DEVqmeyer cap computation path (mos1load.c:759+) when full
+    // oxide-cap model is implemented. void-reference suppresses TS6133.
     const OxideCap = 0.0;
+    void OxideCap;
 
     // Node indices.
     const nodeG = this._pinNodes.get("G")!;  // floating-gate node
@@ -889,14 +898,14 @@ class FGPFETMosSubElement implements AnalogElementCore {
 // PFET polarity inversion (MOS1type=PMOS, polarity=-1) is applied in load() only.
 // ---------------------------------------------------------------------------
 
-export class FGPFETAnalogElement implements AnalogElementCore {
-  readonly branchIndex: number = -1;
+export class FGPFETAnalogElement implements AnalogElement {
+  label: string = "";
+  branchIndex: number = -1;
   readonly ngspiceLoadOrder: number = NGSPICE_LOAD_ORDER.MOS;
-  readonly isNonlinear: boolean = true;
-  readonly isReactive: boolean = true;
   _stateBase: number = -1;
   _pinNodes: Map<string, number>;
-  _fgNode: number = -1;
+  private _fgNode: number = -1;
+  private readonly _internalLabels: string[] = [];
 
   readonly _cap: FGPFETCapSubElement;
   readonly _mos: FGPFETMosSubElement;
@@ -925,6 +934,8 @@ export class FGPFETAnalogElement implements AnalogElementCore {
   setup(ctx: SetupContext): void {
     // Allocate the floating-gate internal node first.
     this._fgNode = ctx.makeVolt(this.label ?? "FGPFET", "fg");
+    this._internalLabels.length = 0;
+    this._internalLabels.push("fg");
 
     // Patch fgNode into sub-element pin maps before calling their setup().
     this._cap._pinNodes.set("pos", this._fgNode);
@@ -936,6 +947,10 @@ export class FGPFETAnalogElement implements AnalogElementCore {
     for (const sub of [this._cap, this._mos].sort((a, b) => a.ngspiceLoadOrder - b.ngspiceLoadOrder)) {
       sub.setup(ctx);
     }
+  }
+
+  getInternalNodeLabels(): readonly string[] {
+    return this._internalLabels;
   }
 
   load(ctx: LoadContext): void {
@@ -954,7 +969,7 @@ const fgpfetAnalogFactory: AnalogFactory = (
   pinNodes: ReadonlyMap<string, number>,
   _props: PropertyBag,
   _getTime: () => number,
-): AnalogElementCore => new FGPFETAnalogElement(pinNodes);
+): AnalogElement => new FGPFETAnalogElement(pinNodes);
 
 export const FGPFETDefinition: ComponentDefinition = {
   name: "FGPFET",
@@ -981,7 +996,6 @@ export const FGPFETDefinition: ComponentDefinition = {
       factory: fgpfetAnalogFactory,
       paramDefs: [],
       params: {},
-      mayCreateInternalNodes: true,
     },
   },
 };

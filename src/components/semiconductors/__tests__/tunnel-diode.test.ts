@@ -22,9 +22,9 @@ import { computeNIcomCof } from "../../../solver/analog/integration.js";
 import { PropertyBag } from "../../../core/properties.js";
 import { SparseSolver } from "../../../solver/analog/sparse-solver.js";
 import { DiagnosticCollector } from "../../../solver/analog/diagnostics.js";
-import { withNodeIds, runNR, makeLoadCtx, loadCtxFromFields } from "../../../solver/analog/__tests__/test-helpers.js";
+import { runNR, makeLoadCtx, loadCtxFromFields } from "../../../solver/analog/__tests__/test-helpers.js";
 import { StatePool } from "../../../solver/analog/state-pool.js";
-import type { AnalogElement, AnalogElementCore, ReactiveAnalogElement } from "../../../solver/analog/element.js";
+import type { AnalogElement, PoolBackedAnalogElement } from "../../../solver/analog/element.js";
 import type { AnalogFactory } from "../../../core/registry.js";
 import { MODETRAN, MODEDCOP, MODEINITFLOAT } from "../../../solver/analog/ckt-mode.js";
 
@@ -50,12 +50,11 @@ const TD_MODEL_PARAMS = {
 // Helpers
 // ---------------------------------------------------------------------------
 
-function withState(core: AnalogElementCore): { element: ReactiveAnalogElement; pool: StatePool } {
-  const re = core as ReactiveAnalogElement;
-  const pool = new StatePool(Math.max(re.stateSize, 1));
-  re.stateBaseOffset = 0;
-  re.initState(pool);
-  return { element: re, pool };
+function withState(core: PoolBackedAnalogElement): { element: PoolBackedAnalogElement; pool: StatePool } {
+  const pool = new StatePool(Math.max(core.stateSize, 1));
+  (core as unknown as { _stateBase: number })._stateBase = 0;
+  core.initState(pool);
+  return { element: core, pool };
 }
 
 function makeParamBag(params: Record<string, number>): PropertyBag {
@@ -66,10 +65,9 @@ function makeParamBag(params: Record<string, number>): PropertyBag {
 
 function makeTunnelDiode(overrides: Partial<typeof TD_MODEL_PARAMS> = {}): AnalogElement {
   const modelParams = { ...TD_MODEL_PARAMS, ...overrides };
-  const core = createTunnelDiodeElement(new Map([["A", 1], ["K", 2]]), [], -1, makeParamBag(modelParams));
+  const core = createTunnelDiodeElement(new Map([["A", 1], ["K", 2]]), makeParamBag(modelParams), () => 0);
   const { element: statedCore } = withState(core);
-  // nodeAnode=1, nodeCathode=2
-  return withNodeIds(statedCore, [1, 2]);
+  return statedCore as unknown as AnalogElement;
 }
 
 /**
@@ -279,22 +277,21 @@ describe("TunnelDiode", () => {
 
     const core = createTunnelDiodeElement(
       new Map([["A", 2], ["K", 0]]),
-      [],
-      -1,
       makeParamBag(TD_MODEL_PARAMS),
+      () => 0,
     );
     const { element: statedCore } = withState(core);
-    const td = withNodeIds(statedCore, [2, 0]);
+    const td = statedCore as unknown as AnalogElement;
 
     // Resistor element (load-style) — 1-based: node1=1, node2=2
     const G = 1 / 100;
     const resistor: AnalogElement = {
-      pinNodeIds: [1, 2],
-      allNodeIds: [1, 2],
+      label: "",
+      _pinNodes: new Map([["A", 1], ["B", 2]]),
       branchIndex: -1,
+      _stateBase: -1,
       ngspiceLoadOrder: 0,
-      isNonlinear: false,
-      isReactive: false,
+      setup(_ctx): void {},
       setParam(_key: string, _value: number): void {},
       getPinCurrents(_v: Float64Array): number[] { return []; },
       load(ctx): void {
@@ -309,12 +306,12 @@ describe("TunnelDiode", () => {
     // Voltage source: node1=1 forced to vTarget, gnd=0.
     // With nodeCount=2 and branchCount=1, branch row = nodeCount+1 = 3.
     const vsource: AnalogElement = {
-      pinNodeIds: [1, 0],
-      allNodeIds: [1, 0],
+      label: "",
+      _pinNodes: new Map([["pos", 1], ["neg", 0]]),
       branchIndex: 3,
+      _stateBase: -1,
       ngspiceLoadOrder: 0,
-      isNonlinear: false,
-      isReactive: false,
+      setup(_ctx): void {},
       setParam(_key: string, _value: number): void {},
       getPinCurrents(_v: Float64Array): number[] { return []; },
       load(ctx): void {
@@ -357,9 +354,8 @@ describe("TunnelDiode", () => {
   it("cap_state_schema_has_no_cap_geq_ieq_v_slots", () => {
     const core = createTunnelDiodeElement(
       new Map([["A", 1], ["K", 2]]),
-      [],
-      -1,
       makeParamBag({ ...TD_MODEL_PARAMS, CJO: 5e-12 }),
+      () => 0,
     );
     const schema = (core as any).stateSchema;
     expect(schema.indexOf.get("CAP_GEQ")).toBeUndefined();
@@ -370,9 +366,8 @@ describe("TunnelDiode", () => {
   it("cap_state_size_is_six", () => {
     const core = createTunnelDiodeElement(
       new Map([["A", 1], ["K", 2]]),
-      [],
-      -1,
       makeParamBag({ ...TD_MODEL_PARAMS, CJO: 5e-12 }),
+      () => 0,
     );
     const schema = (core as any).stateSchema;
     expect(schema.size).toBe(6);
@@ -445,9 +440,9 @@ describe("TunnelDiode TEMP", () => {
 
     // Element constructed with TEMP=400
     const props = makeTunnelDiodeProps({ IP, VP, IV, VV, IS, N, TEMP });
-    const core = createTunnelDiodeElement(new Map([["A", 1], ["K", 2]]), [], -1, props);
+    const core = createTunnelDiodeElement(new Map([["A", 1], ["K", 2]]), props, () => 0);
     const pool = new StatePool(Math.max(core.stateSize, 1));
-    (core as any).stateBaseOffset = 0;
+    (core as unknown as { _stateBase: number })._stateBase = 0;
     core.initState(pool);
     // 1-based: [0]=ground sentinel, [1]=nodeA, [2]=nodeK
     const solver = new SparseSolver();
@@ -470,9 +465,9 @@ describe("TunnelDiode TEMP", () => {
     const vtAt300 = 300.15 * CONSTboltz / CHARGE;
 
     const props = makeTunnelDiodeProps({ IP, VP, IV, VV, IS, N });
-    const core = createTunnelDiodeElement(new Map([["A", 1], ["K", 2]]), [], -1, props);
+    const core = createTunnelDiodeElement(new Map([["A", 1], ["K", 2]]), props, () => 0);
     const pool = new StatePool(Math.max(core.stateSize, 1));
-    (core as any).stateBaseOffset = 0;
+    (core as unknown as { _stateBase: number })._stateBase = 0;
     core.initState(pool);
     // First load at 300.15K
     // 1-based: [0]=ground sentinel, [1]=nodeA, [2]=nodeK
@@ -534,13 +529,12 @@ describe("integration", () => {
     const modelParams = { IP, VP, IV, VV, IS, N, CJO, VJ, M, TT, FC };
     const core = createTunnelDiodeElement(
       new Map([["A", 1], ["K", 0]]),
-      [],
-      -1,
       makeParamBag(modelParams),
+      () => 0,
     );
 
     const pool = new StatePool(6);
-    (core as any).stateBaseOffset = 0;
+    (core as unknown as { _stateBase: number })._stateBase = 0;
     core.initState(pool);
 
     // Seed previous-step charge in s1[SLOT_Q=4]
@@ -607,7 +601,6 @@ describe("integration", () => {
     expect(tempDef!.partition).toBe("instance");
 
     // All other keys should have partition "model"
-    // Step 3a: IBEQ/IBSW/NB migrated from plain Diode into TunnelDiode's secondary group.
     const modelParamKeys = ["IP", "VP", "IV", "VV", "IS", "N", "CJO", "VJ", "M", "TT", "FC", "IBEQ", "IBSW", "NB"];
     for (const key of modelParamKeys) {
       const def = TUNNEL_DIODE_PARAM_DEFS.find((d) => d.key === key);
@@ -617,7 +610,7 @@ describe("integration", () => {
   });
 
   it("TUNNEL_DIODE_PARAM_DEFAULTS has tunnel current params with ngspice defaults", () => {
-    // Step 3a: IBEQ/IBSW/NB migrated from plain Diode (dioload.c:267-285).
+    // cite: dioload.c:267-285
     expect(TUNNEL_DIODE_PARAM_DEFAULTS.IBEQ).toBe(0);
     expect(TUNNEL_DIODE_PARAM_DEFAULTS.IBSW).toBe(0);
     expect(TUNNEL_DIODE_PARAM_DEFAULTS.NB).toBe(1);

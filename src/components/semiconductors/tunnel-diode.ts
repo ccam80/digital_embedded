@@ -34,7 +34,7 @@ import {
   type AttributeMapping,
   type ComponentDefinition,
 } from "../../core/registry.js";
-import type { PoolBackedAnalogElementCore, LoadContext } from "../../solver/analog/element.js";
+import type { PoolBackedAnalogElement, LoadContext } from "../../solver/analog/element.js";
 import { NGSPICE_LOAD_ORDER } from "../../solver/analog/element.js";
 import type { IntegrationMethod } from "../../solver/analog/element.js";
 import { MODETRAN, MODEAC } from "../../solver/analog/ckt-mode.js";
@@ -196,7 +196,7 @@ export function createTunnelDiodeElement(
   pinNodes: ReadonlyMap<string, number>,
   props: PropertyBag,
   _getTime: () => number,
-): PoolBackedAnalogElementCore {
+): PoolBackedAnalogElement {
   const nodeAnode   = pinNodes.get("A")!;
   const nodeCathode = pinNodes.get("K")!;
 
@@ -267,17 +267,15 @@ export function createTunnelDiodeElement(
     return v > params.VP * 0.8 && v < params.VV * 1.2;
   }
 
-  const element: PoolBackedAnalogElementCore & { _vccs: VCCSAnalogElement } = {
+  const element: PoolBackedAnalogElement & { _vccs: VCCSAnalogElement } = {
+    label: "",
     branchIndex: -1,
     _stateBase: -1,
     _pinNodes: new Map(pinNodes),
     ngspiceLoadOrder: NGSPICE_LOAD_ORDER.DIO,
-    isNonlinear: true,
-    isReactive: hasCapacitance,
     poolBacked: true as const,
     stateSize: hasCapacitance ? 6 : 4,
     stateSchema: hasCapacitance ? TUNNEL_DIODE_CAP_STATE_SCHEMA : TUNNEL_DIODE_STATE_SCHEMA,
-    stateBaseOffset: -1,
     _vccs: vccsElement,
 
     setup(ctx: SetupContext): void {
@@ -286,7 +284,7 @@ export function createTunnelDiodeElement(
 
     initState(poolRef: StatePoolRef): void {
       pool = poolRef;
-      base = this.stateBaseOffset;
+      base = this._stateBase;
       applyInitialValues(this.stateSchema, pool, base, params);
     },
 

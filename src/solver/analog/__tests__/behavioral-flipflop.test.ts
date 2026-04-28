@@ -324,7 +324,6 @@ describe("Task 6.4.3 — flipflop load delegates to pin models", () => {
     );
     element._setThresholds(CMOS33.vIH, CMOS33.vIL);
     initElement(element);
-    Object.assign(element, { pinNodeIds: [1, 2, 3, 4], allNodeIds: [1, 2, 3, 4] });
 
     const clockLoadSpy = vi.spyOn(clockPin, "load");
     const dLoadSpy = vi.spyOn(dPin, "load");

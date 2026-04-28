@@ -21,7 +21,6 @@ import type { RenderContext, Rect } from "../../core/renderer-interface.js";
 import { PropertyBag } from "../../core/properties.js";
 import type { PropertyBag as PropertyBagType, PropertyValue } from "../../core/properties.js";
 import type { AnalogElement } from "../../solver/analog/element.js";
-import type { SparseSolver } from "../../solver/analog/sparse-solver.js";
 import type { ComplexSparseSolver } from "../../solver/analog/complex-sparse-solver.js";
 import type { LoadContext } from "../../solver/analog/load-context.js";
 import type { SerializedElement } from "../../core/element.js";
@@ -113,7 +112,7 @@ function makeDigitalDef(
 ): ComponentDefinition {
   return {
     name,
-    typeId: -1 as unknown as number,
+    typeId: -1,
     factory: (props: PropertyBagType) =>
       createTestElementFromDecls(name, crypto.randomUUID(), pinDecls, props),
     pinLayout: pinDecls,
@@ -131,7 +130,7 @@ function makeInDef(): ComponentDefinition {
   const pinDecls = inPinDecl("out", { x: 2, y: 0 });
   return {
     name: "In",
-    typeId: -1 as unknown as number,
+    typeId: -1,
     factory: (props: PropertyBagType) =>
       createTestElementFromDecls("In", crypto.randomUUID(), pinDecls, props),
     pinLayout: pinDecls,
@@ -149,7 +148,7 @@ function makeOutDef(): ComponentDefinition {
   const pinDecls = outPinDecl("in", { x: 0, y: 0 });
   return {
     name: "Out",
-    typeId: -1 as unknown as number,
+    typeId: -1,
     factory: (props: PropertyBagType) =>
       createTestElementFromDecls("Out", crypto.randomUUID(), pinDecls, props),
     pinLayout: pinDecls,
@@ -170,12 +169,12 @@ function makeResistorAnalogEl(
   resistance: number,
 ): AnalogElement {
   return {
-    pinNodeIds: [n1, n2],
-    allNodeIds: [n1, n2],
+    label: "",
+    _pinNodes: new Map([["p1", n1], ["p2", n2]]),
+    _stateBase: -1,
     branchIndex: -1,
     ngspiceLoadOrder: 0,
-    isNonlinear: false,
-    isReactive: false,
+    setup(_ctx) {},
     load(_ctx: LoadContext): void { /* no-op for static test fixture */ },
     stampAc(solver: ComplexSparseSolver, _omega: number, _ctx: LoadContext): void {
       const g = 1 / resistance;
@@ -206,7 +205,7 @@ function makeAnalogDef(
 ): ComponentDefinition {
   return {
     name,
-    typeId: -1 as unknown as number,
+    typeId: -1,
     factory: () => makeAnalogElement(name, crypto.randomUUID(), pinPairs),
     pinLayout: pinPairs.map((p, i) => ({
       direction: PinDirection.BIDIRECTIONAL,
@@ -225,15 +224,15 @@ function makeAnalogDef(
     defaultModel: 'behavioral',
     models: {},
     modelRegistry: {
-      behavioral: { kind: 'inline' as const, factory: (pinNodes: ReadonlyMap<string, number>) => mnaFactory(pinNodes), paramDefs: [], params: {} },
+      behavioral: { kind: 'inline' as const, factory: (pinNodes: ReadonlyMap<string, number>, _props: PropertyBagType, _getTime: () => number) => mnaFactory(pinNodes), paramDefs: [], params: {} },
     },
-  } as unknown as ComponentDefinition;
+  } as ComponentDefinition;
 }
 
 function makeGroundDef(): ComponentDefinition {
   return {
     name: "Ground",
-    typeId: -1 as unknown as number,
+    typeId: -1,
     factory: () => makeAnalogElement("Ground", crypto.randomUUID(), [{ x: 0, y: 0, label: "gnd" }]),
     pinLayout: [{
       direction: PinDirection.BIDIRECTIONAL,
@@ -252,18 +251,19 @@ function makeGroundDef(): ComponentDefinition {
     defaultModel: 'behavioral',
     models: {},
     modelRegistry: {
-      behavioral: { kind: 'inline' as const, factory: (_pinNodes: ReadonlyMap<string, number>) => ({
-        pinNodeIds: [],
-        allNodeIds: [],
+      behavioral: { kind: 'inline' as const, factory: (_pinNodes: ReadonlyMap<string, number>, _props: PropertyBagType, _getTime: () => number) => ({
+        label: "",
+        _pinNodes: new Map<string, number>(),
+        _stateBase: -1,
         branchIndex: -1,
         ngspiceLoadOrder: 0,
-        isNonlinear: false,
-        isReactive: false,
-        stamp(_s: SparseSolver) {},
+        setup(_ctx: import('../../solver/analog/setup-context.js').SetupContext) {},
+        load(_ctx: LoadContext) {},
         getPinCurrents(_v: Float64Array) { return [0]; },
+        setParam(_key: string, _value: number) {},
       }), paramDefs: [], params: {} },
     },
-  } as unknown as ComponentDefinition;
+  } as ComponentDefinition;
 }
 
 function makeRegistry(...defs: ComponentDefinition[]): ComponentRegistry {

@@ -90,9 +90,8 @@ function makeMinimalCircuit(
  * posNode=1 (out1), negNode=2 (out2).
  *
  * Uses the real factory path: createAnalogFuseElement(pinNodes, props) so that
- * the element is constructed identically to the compiler path. Then stamps
- * pinNodeIds/allNodeIds so the engine can route signals to the correct nodes.
- * This is the local equivalent of the withNodeIds pattern in test-helpers.ts.
+ * the element is constructed identically to the compiler path. Pin nodes are
+ * passed directly to the factory; _pinNodes is initialized from them.
  */
 function makeFuseAnalogElement(
   rCold = 0.01,
@@ -102,10 +101,7 @@ function makeFuseAnalogElement(
   const pinNodes = new Map([["out1", 1], ["out2", 2]]);
   const props = new PropertyBag();
   props.replaceModelParams({ rCold, rBlown, i2tRating });
-  const core = createAnalogFuseElement(pinNodes, props);
-  core.pinNodeIds = [1, 2];
-  core.allNodeIds = [1, 2];
-  return core as AnalogFuseElement;
+  return createAnalogFuseElement(pinNodes, props, () => 0) as AnalogFuseElement;
 }
 
 // ---------------------------------------------------------------------------
@@ -329,7 +325,10 @@ describe("Fuse — ComponentDefinition", () => {
     expect(FuseDefinition.ngspiceNodeMap).toEqual({ out1: "pos", out2: "neg" });
     const behavioral = FuseDefinition.modelRegistry?.["behavioral"];
     expect(behavioral).toBeDefined();
-    expect(behavioral!.ngspiceNodeMap).toEqual({ out1: "pos", out2: "neg" });
+    expect(behavioral!.kind).toBe("inline");
+    if (behavioral!.kind === "inline") {
+      expect(behavioral!.ngspiceNodeMap).toEqual({ out1: "pos", out2: "neg" });
+    }
   });
 });
 

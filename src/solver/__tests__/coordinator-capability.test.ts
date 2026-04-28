@@ -39,12 +39,12 @@ function makeAnalogElementObj(typeId: string, instanceId: string, pinDescs: { x:
 function makeResistorAnalogEl(nodeA: number, nodeB: number, r: number): AnalogElement {
   const g = 1 / r;
   return {
-    pinNodeIds: [nodeA, nodeB],
-    allNodeIds: [nodeA, nodeB],
+    label: "",
+    _pinNodes: new Map([["p1", nodeA], ["p2", nodeB]]),
+    _stateBase: -1,
     branchIndex: -1,
     ngspiceLoadOrder: 0,
-    isNonlinear: false,
-    isReactive: false,
+    setup(_ctx: import('../analog/setup-context.js').SetupContext): void {},
     load(ctx: LoadContext): void {
       if (nodeA !== 0 && nodeB !== 0) {
         ctx.solver.stampElement(ctx.solver.allocElement(nodeA, nodeA), +g);
@@ -104,9 +104,13 @@ function makeGroundDef(): ComponentDefinition {
     defaultModel: 'behavioral',
     models: {},
     modelRegistry: {
-      behavioral: { kind: 'inline' as const, factory: (_pinNodes: ReadonlyMap<string, number>) => ({
-        pinNodeIds: [] as number[], allNodeIds: [] as number[], branchIndex: -1 as const,
-        isNonlinear: false, isReactive: false,
+      behavioral: { kind: 'inline' as const, factory: (gndPinNodes: ReadonlyMap<string, number>) => ({
+        label: "",
+        _pinNodes: new Map(gndPinNodes),
+        _stateBase: -1,
+        branchIndex: -1 as const,
+        ngspiceLoadOrder: 0,
+        setup(_ctx: import('../analog/setup-context.js').SetupContext): void {},
         load(_ctx: LoadContext): void {},
         getPinCurrents(_v: Float64Array) { return [0]; },
         setParam(_key: string, _value: number) {},

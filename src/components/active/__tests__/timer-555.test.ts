@@ -96,10 +96,7 @@ function make555(
     makeProps(overrides),
     () => 0,
   );
-  return Object.assign(core, {
-    pinNodeIds: [nodes.dis, nodes.trig, nodes.thr, nodes.vcc, nodes.ctrl, nodes.out, nodes.rst, nodes.gnd],
-    allNodeIds: [nodes.dis, nodes.trig, nodes.thr, nodes.vcc, nodes.ctrl, nodes.out, nodes.rst, nodes.gnd],
-  }) as AnalogElement;
+  return core;
 }
 
 // ---------------------------------------------------------------------------
@@ -124,20 +121,56 @@ function buildHandCircuit(opts: {
 }
 
 import { stampRHS } from "../../../solver/analog/stamp-helpers.js";
-import {
-  createTestCapacitor,
-  makeVoltageSource,
-  makeResistor,
-} from "../../../solver/analog/__tests__/test-helpers.js";
+import { AnalogCapacitorElement } from "../../passives/capacitor.js";
 import type { SetupContext } from "../../../solver/analog/setup-context.js";
+import type { LoadContext } from "../../../solver/analog/load-context.js";
 
 /**
- * Wrap makeVoltageSource with a real setup() that pre-allocates matrix entries.
- *
- * makeVoltageSource uses k = branchIdx + 1 as the 1-based branch row. This
- * wrapper's setup() calls ctx.solver.allocElement for those entries before
- * allocateRowBuffers() finalises rhs size, so the branch row is included in
- * the solver._size count and the rhs buffer is large enough when load() runs.
+ * Inline resistor helper for circuit assembly. Stamps directly in load() with
+ * no setup()-time handle allocation — compatible with engine-managed setup.
+ */
+function makeResistor(nodeA: number, nodeB: number, resistance: number): AnalogElement {
+  const G = 1 / resistance;
+  return {
+    label: "",
+    _pinNodes: new Map<string, number>([["A", nodeA], ["B", nodeB]]),
+    _stateBase: -1,
+    branchIndex: -1,
+    ngspiceLoadOrder: 40,
+    setParam(_key: string, _value: number): void {},
+    getPinCurrents(): number[] { return []; },
+    setup(_ctx: SetupContext): void {},
+    load(ctx: LoadContext): void {
+      const { solver } = ctx;
+      if (nodeA > 0) { const h = solver.allocElement(nodeA, nodeA); solver.stampElement(h, G); }
+      if (nodeB > 0) { const h = solver.allocElement(nodeB, nodeB); solver.stampElement(h, G); }
+      if (nodeA > 0 && nodeB > 0) {
+        solver.stampElement(solver.allocElement(nodeA, nodeB), -G);
+        solver.stampElement(solver.allocElement(nodeB, nodeA), -G);
+      }
+    },
+  } as unknown as AnalogElement;
+}
+
+/**
+ * Create a production AnalogCapacitorElement for circuit assembly.
+ */
+function createTestCapacitor(capacitance: number, nodePos: number, nodeNeg: number): AnalogElement {
+  return new AnalogCapacitorElement(
+    new Map([["pos", nodePos], ["neg", nodeNeg]]),
+    capacitance,
+    0,      // IC
+    0,      // TC1
+    0,      // TC2
+    300.15, // TNOM
+    1,      // SCALE
+    1,      // M
+  );
+}
+
+/**
+ * Inline voltage source element with a real setup() that pre-allocates matrix
+ * entries. branchIdx is used directly as the branch row (0-based MNA row).
  *
  * branchIdx must be chosen to not collide with any internal nodes or branch
  * rows that the Timer555 composite allocates during its own setup(). The
@@ -150,20 +183,29 @@ function makeVsElement(
   branchIdx: number,
   voltage: number,
 ): AnalogElement {
-  const base = makeVoltageSource(nodePos, nodeNeg, branchIdx, voltage);
-  const k = branchIdx + 1; // 1-based branch row — same as load() uses
+  const k = branchIdx;
   let _hPosK = -1, _hKPos = -1;
   let _hNegK = -1, _hKNeg = -1;
-  return Object.assign(base, {
+  return {
+    label: "",
+    _pinNodes: new Map<string, number>([["pos", nodePos], ["neg", nodeNeg]]),
     _stateBase: -1,
-    _pinNodes: new Map<string, number>(),
+    branchIndex: k,
+    ngspiceLoadOrder: 48,
     setup(ctx: SetupContext): void {
       if (nodePos !== 0) { _hPosK = ctx.solver.allocElement(nodePos, k); _hKPos = ctx.solver.allocElement(k, nodePos); }
       if (nodeNeg !== 0) { _hNegK = ctx.solver.allocElement(nodeNeg, k); _hKNeg = ctx.solver.allocElement(k, nodeNeg); }
-      // Diagonal slot keeps the row in the solver index even if unused in load()
       ctx.solver.allocElement(k, k);
     },
-  });
+    load(ctx: LoadContext): void {
+      const { solver, rhs } = ctx;
+      if (nodePos !== 0) { solver.stampElement(_hPosK, 1); solver.stampElement(_hKPos, 1); }
+      if (nodeNeg !== 0) { solver.stampElement(_hNegK, -1); solver.stampElement(_hKNeg, -1); }
+      stampRHS(rhs, k, voltage);
+    },
+    setParam(_key: string, _value: number): void {},
+    getPinCurrents(): number[] { return []; },
+  } as unknown as AnalogElement;
 }
 
 // ---------------------------------------------------------------------------
@@ -523,12 +565,9 @@ function buildMonostableCircuit(R: number, Cval: number, VCC: number): {
   let _trigVoltage = VCC; // starts HIGH (idle)
   let _hTrigK = -1, _hKTrig = -1;
   const vsTrig: AnalogElement = {
-    pinNodeIds: [nTrig, 0],
-    allNodeIds: [nTrig, 0],
     branchIndex: brTrig,
     ngspiceLoadOrder: 0,
-    isNonlinear: false,
-    isReactive: false,
+    label: "",
     _stateBase: -1,
     _pinNodes: new Map<string, number>([["pos", nTrig], ["neg", 0]]),
     setup(ctx: SetupContext): void {
@@ -541,7 +580,7 @@ function buildMonostableCircuit(R: number, Cval: number, VCC: number): {
     },
     setParam(_key: string, _value: number): void {},
     getPinCurrents(_v: Float64Array): number[] { return []; },
-    load(ctx): void {
+    load(ctx: LoadContext): void {
       const { solver, rhs } = ctx;
       const k = brTrig;
       if (nTrig > 0) {

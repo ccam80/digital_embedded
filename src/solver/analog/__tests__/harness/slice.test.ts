@@ -31,9 +31,9 @@ function makeTopology(): TopologySnapshot {
   ]);
   const matrixColLabels = new Map<number, string>(matrixRowLabels);
   const elements = [
-    { index: 0, label: "Q1", type: "NPN", isNonlinear: true, isReactive: false, pinNodeIds: [3, 2, 4] as readonly number[] },
-    { index: 1, label: "R1", type: "resistor", isNonlinear: false, isReactive: false, pinNodeIds: [1, 2] as readonly number[] },
-    { index: 2, label: "V1", type: "voltageSource", isNonlinear: false, isReactive: false, pinNodeIds: [1, 0] as readonly number[] },
+    { index: 0, label: "Q1", type: "NPN", pinNodeIds: [3, 2, 4] as readonly number[] },
+    { index: 1, label: "R1", type: "resistor", pinNodeIds: [1, 2] as readonly number[] },
+    { index: 2, label: "V1", type: "voltageSource", pinNodeIds: [1, 0] as readonly number[] },
   ];
   return { matrixSize: 7, nodeCount: 6, elementCount: 3, elements, nodeLabels, matrixRowLabels, matrixColLabels };
 }

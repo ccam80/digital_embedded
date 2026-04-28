@@ -2721,25 +2721,55 @@ export class ComparisonSession {
     }
 
     const fmt = (e: Entry) => `(row=${e.row}, col=${e.col}, val=${e.value})`;
-    const lines: string[] = [
-      "Matrix-entry structural divergence at step=0 attempt=0 iter=0:",
-      `  ours has ${ourMap.size} entries; ngspice has ${ngMap.size} entries.`,
-    ];
-    if (oursOnly.length > 0) {
+
+    // Classify: structural = different shape (extra/missing coords, implies
+    // node-swap or MNA-layout drift). value-only = same coords on both sides
+    // but different summed value, implies arithmetic divergence (operand
+    // order, transcendental precision, or parameter mismatch) — NOT a
+    // load-order bug.
+    const isStructural = oursOnly.length > 0 || ngOnly.length > 0;
+    const isValueOnly = !isStructural && valueMismatches.length > 0;
+
+    const lines: string[] = [];
+
+    if (isStructural) {
+      lines.push("Matrix-entry structural divergence at step=0 attempt=0 iter=0:");
+      lines.push(`  ours has ${ourMap.size} entries; ngspice has ${ngMap.size} entries.`);
+      if (oursOnly.length > 0) {
+        lines.push(
+          `  ${oursOnly.length} entries present in ours but missing in ngspice: ` +
+            oursOnly.slice(0, 8).map(fmt).join(", ") +
+            (oursOnly.length > 8 ? ", ..." : ""),
+        );
+      }
+      if (ngOnly.length > 0) {
+        lines.push(
+          `  ${ngOnly.length} entries present in ngspice but missing in ours: ` +
+            ngOnly.slice(0, 8).map(fmt).join(", ") +
+            (ngOnly.length > 8 ? ", ..." : ""),
+        );
+      }
+      if (valueMismatches.length > 0) {
+        lines.push(
+          `  Plus ${valueMismatches.length} same-coord value mismatch(es): ` +
+            valueMismatches
+              .slice(0, 8)
+              .map((m) => `${m.pos} ours=${m.ours} ngspice=${m.ng}`)
+              .join(", ") +
+            (valueMismatches.length > 8 ? ", ..." : ""),
+        );
+      }
       lines.push(
-        `  ${oursOnly.length} entries present in ours but missing in ngspice: ` +
-          oursOnly.slice(0, 8).map(fmt).join(", ") +
-          (oursOnly.length > 8 ? ", ..." : ""),
+        "Structural mismatch means the (row, col) coordinate sets differ — " +
+          "most likely a node-swap, internal-node allocation drift, or " +
+          "per-device-type load order out of sync with ngspice's DEVices[] " +
+          "iteration order (see compileAnalogPartition's ngspiceLoadOrder " +
+          "sort and core/analog-types.ts NGSPICE_LOAD_ORDER). Do NOT " +
+          "reconcile at the harness level.",
       );
-    }
-    if (ngOnly.length > 0) {
-      lines.push(
-        `  ${ngOnly.length} entries present in ngspice but missing in ours: ` +
-          ngOnly.slice(0, 8).map(fmt).join(", ") +
-          (ngOnly.length > 8 ? ", ..." : ""),
-      );
-    }
-    if (valueMismatches.length > 0) {
+    } else if (isValueOnly) {
+      lines.push("Matrix-entry value divergence at step=0 attempt=0 iter=0:");
+      lines.push(`  ours and ngspice have identical (row, col) layout (${ourMap.size} entries each).`);
       lines.push(
         `  ${valueMismatches.length} entries with same (row,col) but different values: ` +
           valueMismatches
@@ -2748,14 +2778,15 @@ export class ComparisonSession {
             .join(", ") +
           (valueMismatches.length > 8 ? ", ..." : ""),
       );
+      lines.push(
+        "Layout matches, so this is NOT a load-order or MNA-structural issue. " +
+          "Same (row, col) cells received different summed values. Likely causes: " +
+          "(a) operand order differs in a multi-term stamp, (b) a model parameter " +
+          "is computed differently between engines, (c) a transcendental call " +
+          "(exp/log/sqrt/pow) returned a different LSB. Inspect the per-element " +
+          "stamps that contribute to the listed cells.",
+      );
     }
-    lines.push(
-      "This is an MNA-layout architectural error. Equation counts match but the " +
-        "internal sparse-matrix indices diverge — most likely cause is per-device-type " +
-        "load order being out of sync with ngspice's DEVices[] iteration order " +
-        "(see compileAnalogPartition's ngspiceLoadOrder sort, and " +
-        "core/analog-types.ts NGSPICE_LOAD_ORDER). Do NOT reconcile at the harness level.",
-    );
     throw new Error(lines.join("\n"));
   }
 

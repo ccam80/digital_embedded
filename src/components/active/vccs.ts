@@ -115,19 +115,11 @@ function buildVCCSPinDeclarations(): PinDeclaration[] {
 /**
  * MNA analog element for a Voltage-Controlled Current Source.
  *
- * pinNodeIds index ordering (pinLayout order):
- *   [0] = ctrl+ node  (VCCScontPosNode)
- *   [1] = ctrl- node  (VCCScontNegNode)
- *   [2] = out+  node  (VCCSposNode)
- *   [3] = out-  node  (VCCSnegNode)
- *
- * No branch variable (Norton stamp only).
+ * ctrl+ and ctrl- sense the control voltage; out+ and out- are the output
+ * current source terminals. No branch variable (Norton stamp only).
  */
 export class VCCSAnalogElement extends ControlledSourceElement {
-  branchIndex = -1;
   readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.VCCS;
-  _stateBase: number = -1;
-  _pinNodes: Map<string, number> = new Map();
 
   // TSTALLOC handles — allocated in setup(), written in load()
   // vccsset.c:43-46 line-for-line

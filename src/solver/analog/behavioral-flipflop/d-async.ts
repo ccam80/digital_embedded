@@ -2,14 +2,12 @@
  * Behavioral analog factory for D flip-flops with async Set/Clear.
  */
 
-import type { LoadContext } from "../element.js";
-import type { StatePoolRef } from "../element.js";
+import type { AnalogElement } from "../../../core/analog-types.js";
+import type { LoadContext } from "../load-context.js";
 import { NGSPICE_LOAD_ORDER } from "../element.js";
 import { readMnaVoltage, delegatePinSetParam } from "../digital-pin-model.js";
 import type { DigitalInputPinModel, DigitalOutputPinModel } from "../digital-pin-model.js";
 import type { AnalogElementFactory } from "../behavioral-gate.js";
-import type { SetupContext } from "../setup-context.js";
-import type { AnalogCapacitorElement } from "../../../components/passives/capacitor.js";
 import {
   FALLBACK_SPEC,
   getPinSpecs,
@@ -18,12 +16,11 @@ import {
   makeOutputPin,
   FLIPFLOP_COMPOSITE_SCHEMA,
   buildChildElements,
-  computeChildStateSize,
-  initChildState,
-  loadChildren,
   checkChildConvergence,
 } from "./shared.js";
 import type { StateSchema } from "../state-schema.js";
+import type { AnalogCapacitorElement } from "../../../components/passives/capacitor.js";
+import { CompositeElement } from "../composite-element.js";
 
 // ---------------------------------------------------------------------------
 // BehavioralDAsyncFlipflopElement
@@ -42,7 +39,7 @@ import type { StateSchema } from "../state-schema.js";
  *              currently latched Q state, then loads capacitor children.
  *   accept() — rising-edge D latching and async Set/Clr overrides.
  */
-export class BehavioralDAsyncFlipflopElement {
+export class BehavioralDAsyncFlipflopElement extends CompositeElement {
   private readonly _setPin: DigitalInputPinModel;
   private readonly _dPin: DigitalInputPinModel;
   private readonly _clockPin: DigitalInputPinModel;
@@ -57,18 +54,8 @@ export class BehavioralDAsyncFlipflopElement {
 
   private readonly _pinModelsByLabel: ReadonlyMap<string, DigitalInputPinModel | DigitalOutputPinModel>;
 
-  pinNodeIds!: readonly number[];  // set by compiler via Object.assign after factory returns
-  readonly branchIndex: number = -1;
   readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.VCVS;
-  readonly isNonlinear: true = true;
-  label?: string;
-
-  readonly poolBacked = true as const;
   readonly stateSchema: StateSchema = FLIPFLOP_COMPOSITE_SCHEMA;
-  stateSize: number;
-  stateBaseOffset = -1;
-  _stateBase: number = -1;
-  _pinNodes: Map<string, number> = new Map();
 
   constructor(
     setPin: DigitalInputPinModel,
@@ -81,6 +68,7 @@ export class BehavioralDAsyncFlipflopElement {
     _vIL: number,
     pinModelsByLabel: ReadonlyMap<string, DigitalInputPinModel | DigitalOutputPinModel>,
   ) {
+    super();
     this._setPin = setPin;
     this._dPin = dPin;
     this._clockPin = clockPin;
@@ -90,15 +78,18 @@ export class BehavioralDAsyncFlipflopElement {
     this._vIH = vIH;
     this._pinModelsByLabel = pinModelsByLabel;
     this._childElements = buildChildElements([setPin, dPin, clockPin, clrPin, qPin, qBarPin]);
-    this.stateSize = computeChildStateSize(this._childElements);
   }
 
-  get isReactive(): boolean {
-    return this._childElements.length > 0;
-  }
-
-  initState(pool: StatePoolRef): void {
-    initChildState(this._childElements, this.stateBaseOffset, pool);
+  protected getSubElements(): readonly AnalogElement[] {
+    return [
+      this._setPin as unknown as AnalogElement,
+      this._dPin as unknown as AnalogElement,
+      this._clockPin as unknown as AnalogElement,
+      this._clrPin as unknown as AnalogElement,
+      this._qPin as unknown as AnalogElement,
+      this._qBarPin as unknown as AnalogElement,
+      ...this._childElements as unknown as AnalogElement[],
+    ];
   }
 
   checkConvergence(ctx: LoadContext): boolean {
@@ -113,34 +104,10 @@ export class BehavioralDAsyncFlipflopElement {
     this._prevClockVoltage = readMnaVoltage(this._clockPin.nodeId, rhs);
   }
 
-  setup(ctx: SetupContext): void {
-    // Forward to every input pin model
-    this._setPin.setup(ctx);
-    this._dPin.setup(ctx);
-    this._clockPin.setup(ctx);
-    this._clrPin.setup(ctx);
-
-    // Forward to every output pin model (role "direct")
-    this._qPin.setup(ctx);
-    this._qBarPin.setup(ctx);
-
-    // Forward to every capacitor child collected from pin models
-    for (const child of this._childElements) child.setup(ctx);
-  }
-
   load(ctx: LoadContext): void {
-    // Delegate input stamping to pin models
-    this._setPin.load(ctx);
-    this._dPin.load(ctx);
-    this._clockPin.load(ctx);
-    this._clrPin.load(ctx);
-
     this._qPin.setLogicLevel(this._latchedQ);
     this._qBarPin.setLogicLevel(!this._latchedQ);
-    this._qPin.load(ctx);
-    this._qBarPin.load(ctx);
-
-    loadChildren(this._childElements, ctx);
+    super.load(ctx);
   }
 
   /**
@@ -235,9 +202,11 @@ export function makeDAsyncFlipflopAnalogFactory(): AnalogElementFactory {
       ["~Q", qBarPin],
     ]);
 
-    return new BehavioralDAsyncFlipflopElement(
+    const el = new BehavioralDAsyncFlipflopElement(
       setPin, dPin, clockPin, clrPin, qPin, qBarPin,
       cSpec.vIH, cSpec.vIL, pinModelsByLabel,
     );
+    el._pinNodes = new Map(pinNodes);
+    return el;
   };
 }

@@ -17,8 +17,8 @@ import { DIODE_PARAM_DEFAULTS, createDiodeElement } from "../diode.js";
 import { PropertyBag } from "../../../core/properties.js";
 import { SparseSolver } from "../../../solver/analog/sparse-solver.js";
 import { StatePool } from "../../../solver/analog/state-pool.js";
-import type { AnalogElementCore } from "../../../core/analog-types.js";
-import type { ReactiveAnalogElement } from "../../../solver/analog/element.js";
+import type { AnalogElement as AnalogElementCore } from "../../../core/analog-types.js";
+import type { PoolBackedAnalogElement } from "../../../solver/analog/element.js";
 import type { AnalogFactory } from "../../../core/registry.js";
 import type { SetupContext } from "../../../solver/analog/setup-context.js";
 import { MNAEngine } from "../../../solver/analog/analog-engine.js";
@@ -55,13 +55,13 @@ function runSetup(core: AnalogElementCore, solver: SparseSolver): void {
 // and call initState.
 // ---------------------------------------------------------------------------
 
-function withState(core: AnalogElementCore): { element: ReactiveAnalogElement; pool: StatePool; solver: SparseSolver } {
+function withState(core: AnalogElementCore): { element: PoolBackedAnalogElement; pool: StatePool; solver: SparseSolver } {
   const solver = new SparseSolver();
   solver._initStructure();
   runSetup(core, solver);
-  const re = core as ReactiveAnalogElement;
+  const re = core as PoolBackedAnalogElement;
   const pool = new StatePool(Math.max(re.stateSize, 1));
-  re.stateBaseOffset = 0;
+  (re as unknown as { _stateBase: number })._stateBase = 0;
   re.initState(pool);
   return { element: re, pool, solver };
 }
@@ -145,11 +145,6 @@ describe("Varactor definition", () => {
     expect(VaractorDefinition.ngspiceNodeMap).toEqual({ A: "pos", K: "neg" });
   });
 
-  it("mayCreateInternalNodes_true", () => {
-    const entry = VaractorDefinition.modelRegistry?.["spice"];
-    expect(entry).toBeDefined();
-    expect((entry as { mayCreateInternalNodes?: boolean }).mayCreateInternalNodes).toBe(true);
-  });
 });
 
 // ---------------------------------------------------------------------------
@@ -157,24 +152,11 @@ describe("Varactor definition", () => {
 // ---------------------------------------------------------------------------
 
 describe("Varactor setup contract", () => {
-  it("isReactive_true_when_cjo_nonzero", () => {
-    // VARACTOR_PARAM_DEFAULTS has CJO=20pF → reactive
-    const propsObj = makeParamBag({});
-    const core = createDiodeElement(new Map([["A", 1], ["K", 2]]), propsObj);
-    expect(core.isReactive).toBe(true);
-  });
-
-  it("isNonlinear_true", () => {
-    const propsObj = makeParamBag({});
-    const core = createDiodeElement(new Map([["A", 1], ["K", 2]]), propsObj);
-    expect(core.isNonlinear).toBe(true);
-  });
-
   it("setup_allocates_handles_before_load", () => {
     // The setup() must allocate 7 TSTALLOC handles (RS=0, so posPrimeNode=posNode).
     // After setup, _hPosPP etc. must be valid handles (non-negative).
     const propsObj = makeParamBag({ RS: 0 });
-    const core = createDiodeElement(new Map([["A", 1], ["K", 2]]), propsObj);
+    const core = createDiodeElement(new Map([["A", 1], ["K", 2]]), propsObj, () => 0);
     const { element } = withState(core);
     // All 7 handles must be valid (>= 0) after setup
     expect((element as any)._hPosPP).toBeGreaterThanOrEqual(0);
@@ -191,7 +173,7 @@ describe("Varactor setup contract", () => {
     // Expected TSTALLOC sequence (same as PB-DIO RS=0):
     //  1. (1,1), 2. (2,1), 3. (1,1), 4. (1,2), 5. (1,1), 6. (2,2), 7. (1,1)
     const propsObj = makeParamBag({ RS: 0 });
-    const el = createDiodeElement(new Map([["A", 1], ["K", 2]]), propsObj);
+    const el = createDiodeElement(new Map([["A", 1], ["K", 2]]), propsObj, () => 0);
     const circuit = makeMinimalCircuit([el as unknown as AnalogElement], 2);
     const engine = new MNAEngine();
     engine.init(circuit);

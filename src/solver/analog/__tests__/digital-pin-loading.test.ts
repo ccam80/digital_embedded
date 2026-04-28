@@ -65,12 +65,12 @@ function makeStubElFactory(typeId: string, pinsFn: (props: PropertyBag) => Pin[]
 
 function makeStubAnalogElement(pinNodes: ReadonlyMap<string, number>): AnalogElement {
   return {
-    pinNodeIds: [...pinNodes.values()],
-    allNodeIds: [...pinNodes.values()],
-    branchIndex: -1,
+    label: "",
     ngspiceLoadOrder: 0,
-    isNonlinear: false,
-    isReactive: false,
+    _pinNodes: new Map(pinNodes),
+    _stateBase: -1,
+    branchIndex: -1,
+    setup(_ctx): void {},
     load(_ctx: LoadContext): void {},
     stampAc(_solver: ComplexSparseSolver, _omega: number, _ctx: LoadContext): void { /* no-op */ },
     setParam(_key: string, _value: number): void {},
@@ -88,7 +88,7 @@ function makeStubAnalogElement(pinNodes: ReadonlyMap<string, number>): AnalogEle
 // ---------------------------------------------------------------------------
 
 function buildRegistry(
-  analogFactory?: (pinNodes: ReadonlyMap<string, number>, internalNodeIds: readonly number[], branchIdx: number, props: PropertyBag, getTime: () => number) => AnalogElement,
+  analogFactory?: (pinNodes: ReadonlyMap<string, number>, props: PropertyBag, getTime: () => number) => AnalogElement,
 ) {
   const registry = new ComponentRegistry();
 
@@ -104,13 +104,13 @@ function buildRegistry(
     defaultModel: "behavioral",
     models: {},
     modelRegistry: {
-      behavioral: { kind: 'inline' as const, factory: () => ({
-        pinNodeIds: [],
-        allNodeIds: [],
-        branchIndex: -1,
+      behavioral: { kind: 'inline' as const, factory: (_pinNodes) => ({
+        label: "",
         ngspiceLoadOrder: 0,
-        isNonlinear: false,
-        isReactive: false,
+        _pinNodes: new Map(_pinNodes),
+        _stateBase: -1,
+        branchIndex: -1,
+        setup(_ctx: unknown): void {},
         load(_ctx: unknown): void {},
         setParam(_k: string, _v: number): void {},
         getPinCurrents(_v: Float64Array): number[] { return []; },

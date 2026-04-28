@@ -103,7 +103,6 @@ function makeLDR(overrides: Partial<{
     overrides.lux ?? 500,
   );
   el._pinNodes = new Map([["pos", 1], ["neg", 2]]);
-  Object.assign(el, { pinNodeIds: [1, 2], allNodeIds: [1, 2] });
   return el;
 }
 
@@ -261,8 +260,6 @@ describe("LDR", () => {
       props.replaceModelParams(LDR_DEFAULTS);
       const element = createLDRElement(new Map([["pos", 1], ["neg", 2]]), props, () => 0);
       expect(element).toBeInstanceOf(LDRElement);
-      expect(element.isNonlinear).toBe(true);
-      expect(element.isReactive).toBe(false);
     });
 
     it("branchCount is false", () => {
@@ -296,10 +293,7 @@ describe("ldr_load_dcop_parity", () => {
       props,
       () => 0,
     );
-    const analogElement = Object.assign(core, {
-      pinNodeIds: [1, 2] as readonly number[],
-      allNodeIds: [1, 2] as readonly number[],
-    }) as unknown as AnalogElement;
+    const analogElement = core as unknown as AnalogElement;
 
     const stampCtx = makeSimpleCtx({
       elements: [analogElement],

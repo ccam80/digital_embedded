@@ -50,12 +50,10 @@ import { ComponentCategory, ComponentRegistry } from "../../../core/registry.js"
 import type { ComponentLayout } from "../../../core/registry.js";
 import type { RenderContext, Point, TextAnchor, FontSpec, PathData } from "../../../core/renderer-interface.js";
 import type { ThemeColor } from "../../../core/renderer-interface.js";
-import { makeDcVoltageSource } from "../../sources/dc-voltage-source.js";
-import { withNodeIds, runDcOp, makeLoadCtx } from "../../../solver/analog/__tests__/test-helpers.js";
+import { makeDcVoltageSource, DC_VOLTAGE_SOURCE_DEFAULTS } from "../../sources/dc-voltage-source.js";
+import { runDcOp, makeLoadCtx, initElement } from "../../../solver/analog/__tests__/test-helpers.js";
 import { StatePool } from "../../../solver/analog/state-pool.js";
-import type { AnalogElement, ReactiveAnalogElement } from "../../../solver/analog/element.js";
-import type { AnalogElementCore } from "../../../core/analog-types.js";
-import type { PoolBackedAnalogElementCore } from "../../../solver/analog/element.js";
+import type { AnalogElement, PoolBackedAnalogElement } from "../../../solver/analog/element.js";
 import type { ComplexSparseSolver } from "../../../solver/analog/complex-sparse-solver.js";
 import { MODETRAN, MODEINITFLOAT, MODEINITJCT } from "../../../solver/analog/ckt-mode.js";
 import type { LimitingEvent } from "../../../solver/analog/newton-raphson.js";
@@ -75,14 +73,20 @@ function getFactory(entry: ModelEntry): AnalogFactory {
 // Helper: allocate a StatePool for a single element and call initState
 // ---------------------------------------------------------------------------
 
-function withState(core: AnalogElementCore): { element: ReactiveAnalogElement; pool: StatePool } {
-  const re = core as ReactiveAnalogElement;
-  const pool = new StatePool(Math.max(re.stateSize, 1));
-  re.stateBaseOffset = 0;
-  re.initState(pool);
-  return { element: re, pool };
+function withState(core: AnalogElement): { element: PoolBackedAnalogElement; pool: StatePool } {
+  const pool = initElement(core);
+  return { element: core as PoolBackedAnalogElement, pool };
 }
 
+
+// ---------------------------------------------------------------------------
+// makeVsrc — DC voltage source helper
+// ---------------------------------------------------------------------------
+function makeVsrc(posNode: number, negNode: number, voltage: number): AnalogElement {
+  const props = new PropertyBag();
+  props.replaceModelParams({ ...DC_VOLTAGE_SOURCE_DEFAULTS, voltage });
+  return makeDcVoltageSource(new Map([["pos", posNode], ["neg", negNode]]), props, () => 0);
+}
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -738,16 +742,16 @@ describe("RGBLED", () => {
 
 function makeResistorElementForLed(nodeA: number, nodeB: number, resistance: number): AnalogElement {
   const G = 1 / resistance;
-  return {
-    pinNodeIds: [nodeA, nodeB],
-    allNodeIds: [nodeA, nodeB],
+  const el: AnalogElement = {
+    label: "",
+    _pinNodes: new Map([["A", nodeA], ["B", nodeB]]),
     branchIndex: -1,
+    _stateBase: -1,
     ngspiceLoadOrder: 0,
-    isNonlinear: false,
-    isReactive: false,
     setParam(_key: string, _value: number): void {},
     getPinCurrents(_v: Float64Array): number[] { return []; },
     stampAc(_solver: ComplexSparseSolver, _omega: number, _ctx: LoadContext): void { /* no-op */ },
+    setup(_ctx: import("../../../solver/analog/setup-context.js").SetupContext): void {},
     load(ctx: import("../../../solver/analog/load-context.js").LoadContext): void {
       const solver = ctx.solver;
       if (nodeA !== 0 && nodeB !== 0) {
@@ -762,6 +766,7 @@ function makeResistorElementForLed(nodeA: number, nodeB: number, resistance: num
       }
     },
   };
+  return el;
 }
 
 describe("AnalogLED", () => {
@@ -788,36 +793,34 @@ describe("AnalogLED", () => {
     expect(getFactory(LedDefinition.modelRegistry!.red!)).toBeDefined();
   });
 
-  it("analog_factory_produces_nonlinear_element", () => {
+  it("analog_factory_produces_pool_backed_element", () => {
     const props = new PropertyBag();
     props.set("color", "red");
     props.replaceModelParams({ ...DIODE_PARAM_DEFAULTS });
     const core = getFactory(LedDefinition.modelRegistry!.red!)!(new Map([["in", 1]]), props, () => 0);
     const { element } = withState(core);
-    expect(element.isNonlinear).toBe(true);
-    expect(element.isReactive).toBe(false);
+    expect(element).toBeDefined();
+    expect(typeof element.load).toBe("function");
   });
 
   it("red_led_forward_drop", () => {
-    // Circuit: 5V  220Î  red LED (anode=node1, cathode=gnd)  ground
-    // Red LED Vf  1.8V Â± 0.15V at the operating point
+    // Circuit: 5V  220Ω  red LED (anode=node1, cathode=gnd)  ground
+    // Red LED Vf  1.8V ± 0.15V at the operating point
     //
     // MNA: node1 = LED anode / resistor junction
     //      node2 = +5V source terminal
-    //      branch row = 2
+    //      branch row allocated by setup()
     //      matrixSize = 3
 
     const matrixSize = 3;
 
-    const vs = withNodeIds(makeDcVoltageSource(new Map([["pos", 2], ["neg", 0]]), 5), [2, 0]);
+    const vs = makeVsrc(2, 0, 5);
     const r = makeResistorElementForLed(1, 2, 220);
 
     const props = new PropertyBag();
     props.set("color", "red");
     props.replaceModelParams({ ...DIODE_PARAM_DEFAULTS });
-    const ledCore = getFactory(LedDefinition.modelRegistry!.red!)!(new Map([["in", 1]]), props, () => 0);
-    const { element: ledStateWrapped } = withState(ledCore);
-    const led = withNodeIds(ledStateWrapped, [1, 0]);
+    const led = getFactory(LedDefinition.modelRegistry!.red!)!(new Map([["in", 1]]), props, () => 0);
 
     const result = runDcOp({
       elements: [vs, r, led],
@@ -834,20 +837,18 @@ describe("AnalogLED", () => {
   });
 
   it("blue_led_forward_drop", () => {
-    // Circuit: 5V  100Î  blue LED (anode=node1, cathode=gnd)  ground
-    // Blue LED Vf  3.2V Â± 0.15V
+    // Circuit: 5V  100Ω  blue LED (anode=node1, cathode=gnd)  ground
+    // Blue LED Vf  3.2V ± 0.15V
 
     const matrixSize = 3;
 
-    const vs = withNodeIds(makeDcVoltageSource(new Map([["pos", 2], ["neg", 0]]), 5), [2, 0]);
+    const vs = makeVsrc(2, 0, 5);
     const r = makeResistorElementForLed(1, 2, 100);
 
     const props = new PropertyBag();
     props.set("color", "blue");
     props.replaceModelParams({ ...DIODE_PARAM_DEFAULTS, IS: 6.26e-24, N: 2.5 });
-    const ledCore = getFactory(LedDefinition.modelRegistry!.blue!)!(new Map([["in", 1]]), props, () => 0);
-    const { element: ledStateWrapped } = withState(ledCore);
-    const led = withNodeIds(ledStateWrapped, [1, 0]);
+    const led = getFactory(LedDefinition.modelRegistry!.blue!)!(new Map([["in", 1]]), props, () => 0);
 
     const result = runDcOp({
       elements: [vs, r, led],
@@ -899,8 +900,8 @@ describe("integration", () => {
     const slotVD = DIODE_CAP_SCHEMA.indexOf.get("VD")!;
     const slotQ  = DIODE_CAP_SCHEMA.indexOf.get("Q")!;
     const pool = new StatePool(DIODE_CAP_SCHEMA.size);
-    (core as unknown as PoolBackedAnalogElementCore).stateBaseOffset = 0;
-    (core as unknown as PoolBackedAnalogElementCore).initState(pool);
+    (core as unknown as PoolBackedAnalogElement & { _stateBase: number })._stateBase = 0;
+    (core as unknown as PoolBackedAnalogElement).initState(pool);
 
     // Seed VD with vd so pnjlim sees vdOld=vd and returns vdLimited=vd unchanged.
     pool.state0[slotVD] = vd;
@@ -977,7 +978,7 @@ describe("LED limitingCollector", () => {
     const core = getFactory(LedDefinition.modelRegistry!.red!)!(new Map([["in", 1]]), props, () => 0);
     (core as unknown as { label: string }).label = overrides?.label ?? "LED1";
     (core as unknown as { elementIndex: number }).elementIndex = overrides?.elementIndex ?? 7;
-    const { element, pool } = withState(core as AnalogElementCore);
+    const { element, pool } = withState(core);
     return { element, pool, core };
   }
 
@@ -1093,7 +1094,7 @@ describe("LED TEMP", () => {
       props,
       () => 0,
     );
-    const { element, pool } = withState(core as AnalogElementCore);
+    const { element, pool } = withState(core);
     return { element, pool, core };
   }
 

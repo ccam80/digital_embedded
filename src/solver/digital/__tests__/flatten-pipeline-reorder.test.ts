@@ -31,7 +31,7 @@ import { noopExecFn } from "@/test-fixtures/execute-stubs";
 // ---------------------------------------------------------------------------
 
 function noopAnalogFactory() {
-  return { branchIndex: -1 as const, ngspiceLoadOrder: 0, isNonlinear: false, isReactive: false, load: (_ctx: unknown) => {}, getPinCurrents: () => [] as number[], setParam: (_k: string, _v: number) => {} };
+  return { label: "", branchIndex: -1, _stateBase: -1, _pinNodes: new Map<string, number>(), ngspiceLoadOrder: 0, load: (_ctx: unknown) => {}, setup: (_ctx: unknown) => {}, getPinCurrents: () => [] as number[], setParam: (_k: string, _v: number) => {} };
 }
 
 function makeAnalogDef(typeId: string): ComponentDefinition {

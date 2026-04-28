@@ -42,15 +42,13 @@ function makeFuseElement(opts: {
   onStateChange?: (blown: boolean, thermalRatio: number) => void;
 }): AnalogFuseElement {
   const el = new AnalogFuseElement(
+    new Map([["out1", 1], ["out2", 0]]),
     opts.rCold ?? 0.01,
     opts.rBlown ?? 1e9,
     opts.i2tRating ?? 1.0,
     opts.emitDiagnostic,
     opts.onStateChange,
   );
-  el._pinNodes = new Map([["out1", 1], ["out2", 0]]);
-  el.pinNodeIds = [1, 0];
-  el.allNodeIds = [1, 0];
   return el;
 }
 
@@ -168,10 +166,8 @@ describe("AnalogFuseElement", () => {
       const i2tRating = 1.0;
 
       // Below threshold: drive low energy, expect rCold.
-      const intactFuse = new AnalogFuseElement(rCold, rBlown, i2tRating);
+      const intactFuse = new AnalogFuseElement(new Map([["out1", 1], ["out2", 0]]), rCold, rBlown, i2tRating);
       intactFuse._pinNodes = new Map([["out1", 1], ["out2", 0]]);
-      intactFuse.pinNodeIds = [1, 0];
-      intactFuse.allNodeIds = [1, 0];
       const lowEnergyV = Math.sqrt(0.5 * i2tRating) * rCold;
       const vLow = new Float64Array(2);
       vLow[1] = lowEnergyV;
@@ -180,10 +176,8 @@ describe("AnalogFuseElement", () => {
       expect(intactFuse.currentResistance).toBe(rCold);
 
       // At/above threshold: drive enough energy to trip in one step.
-      const blownFuse = new AnalogFuseElement(rCold, rBlown, i2tRating);
+      const blownFuse = new AnalogFuseElement(new Map([["out1", 1], ["out2", 0]]), rCold, rBlown, i2tRating);
       blownFuse._pinNodes = new Map([["out1", 1], ["out2", 0]]);
-      blownFuse.pinNodeIds = [1, 0];
-      blownFuse.allNodeIds = [1, 0];
       const highEnergyV = Math.sqrt(2 * i2tRating) * rCold;
       const vHigh = new Float64Array(2);
       vHigh[1] = highEnergyV;
@@ -284,7 +278,7 @@ describe("AnalogFuseElement", () => {
       props.setModelParam("rBlown", 1e9);
       props.setModelParam("i2tRating", 0.001);
 
-      const el = createAnalogFuseElement(new Map([["out1", 1], ["out2", 0]]), props) as AnalogFuseElement;
+      const el = createAnalogFuseElement(new Map([["out1", 1], ["out2", 0]]), props, () => 0) as AnalogFuseElement;
 
       // 1-indexed: slot 0 = ground, slot 1 = node 1.
       const voltages = new Float64Array(2);
@@ -304,9 +298,10 @@ describe("AnalogFuseElement", () => {
       fuseProps.setModelParam("rCold", rCold);
       fuseProps.setModelParam("rBlown", 1e9);
       fuseProps.setModelParam("i2tRating", 100.0);
-      const fuse = createAnalogFuseElement(new Map([["out1", 1], ["out2", 0]]), fuseProps) as AnalogFuseElement;
+      const fuse = createAnalogFuseElement(new Map([["out1", 1], ["out2", 0]]), fuseProps, () => 0) as AnalogFuseElement;
       // nodeCount=1: branch occupies absolute 1-based row 2 (= nodeCount+1).
-      const vs = makeDcVoltageSource(1, 0, 2, 1.0) as unknown as AnalogElement;
+      const vsProps = new PropertyBag(); vsProps.setModelParam("voltage", 1.0);
+      const vs = makeDcVoltageSource(new Map([["pos", 1], ["neg", 0]]), vsProps, () => 0) as unknown as AnalogElement;
 
       const result = runDcOp({
         elements: [vs, fuse],
@@ -337,20 +332,21 @@ describe("AnalogFuseElement", () => {
       fuseProps.setModelParam("rCold", rCold);
       fuseProps.setModelParam("rBlown", 1e9);
       fuseProps.setModelParam("i2tRating", 100.0);
-      const fuse = createAnalogFuseElement(new Map([["out1", 1], ["out2", 2]]), fuseProps) as AnalogFuseElement;
+      const fuse = createAnalogFuseElement(new Map([["out1", 1], ["out2", 2]]), fuseProps, () => 0) as AnalogFuseElement;
       // nodeCount=2: branch occupies absolute 1-based row 3 (= nodeCount+1).
-      const vs = makeDcVoltageSource(1, 0, 3, 1.0) as unknown as AnalogElement;
+      const vsProps2 = new PropertyBag(); vsProps2.setModelParam("voltage", 1.0);
+      const vs = makeDcVoltageSource(new Map([["pos", 1], ["neg", 0]]), vsProps2, () => 0) as unknown as AnalogElement;
 
       const G_load = 1 / rLoad;
       const loadResistor: AnalogElement = {
-        pinNodeIds: [2, 0] as readonly number[],
-        allNodeIds: [2, 0] as readonly number[],
+        _pinNodes: new Map([["pos", 2], ["neg", 0]]),
         branchIndex: -1,
+        _stateBase: -1,
         ngspiceLoadOrder: 0,
-        isNonlinear: false,
-        isReactive: false,
+        label: "",
         setParam(_key: string, _value: number): void {},
         getPinCurrents(_v: Float64Array): number[] { return []; },
+        setup(_ctx: import("../../../solver/analog/setup-context.js").SetupContext): void {},
         load(ctx: LoadContext): void {
           // node 2 diagonal (1-indexed)
           ctx.solver.stampElement(ctx.solver.allocElement(2, 2), G_load);
@@ -385,7 +381,7 @@ describe("AnalogFuseElement", () => {
       fuseProps.setModelParam("rCold", rCold);
       fuseProps.setModelParam("rBlown", rBlown);
       fuseProps.setModelParam("i2tRating", i2tRating);
-      const fuse = createAnalogFuseElement(new Map([["out1", 1], ["out2", 0]]), fuseProps) as AnalogFuseElement;
+      const fuse = createAnalogFuseElement(new Map([["out1", 1], ["out2", 0]]), fuseProps, () => 0) as AnalogFuseElement;
 
       const stampCtx = makeSimpleCtx({
         elements: [fuse as unknown as AnalogElement],
@@ -403,13 +399,30 @@ describe("AnalogFuseElement", () => {
   });
 
   describe("unified FuseDefinition", () => {
-    it("FuseDefinition has both digital and analog models", () => {
-      expect(FuseDefinition.modelRegistry?.behavioral).toBeDefined();
-    });
+    it("FuseDefinition behavioral factory produces AnalogFuseElement that stamps G=1/rCold on diagonal", () => {
+      const rCold = 0.1;
+      const props = new PropertyBag();
+      props.setModelParam("rCold", rCold);
+      props.setModelParam("rBlown", 1e9);
+      props.setModelParam("i2tRating", 100.0);
+      const entry = FuseDefinition.modelRegistry?.behavioral;
+      if (!entry || entry.kind !== "inline") throw new Error("Expected inline behavioral entry");
+      const el = entry.factory(new Map([["out1", 1], ["out2", 0]]), props, () => 0);
+      expect(el).toBeInstanceOf(AnalogFuseElement);
 
-    it("FuseDefinition has analogFactory", () => {
-      expect((FuseDefinition.modelRegistry?.behavioral as {kind:"inline";factory:AnalogFactory}|undefined)?.factory).toBeDefined();
-      expect(typeof (FuseDefinition.modelRegistry?.behavioral as {kind:"inline";factory:AnalogFactory}|undefined)?.factory).toBe("function");
+      const stampCtx = makeSimpleCtx({
+        elements: [el as unknown as import("../../../solver/analog/element.js").AnalogElement],
+        matrixSize: 1,
+        nodeCount: 1,
+      });
+      stampCtx.solver._resetForAssembly();
+      el.load(stampCtx.loadCtx as unknown as LoadContext);
+      const stamps = stampCtx.solver.getCSCNonZeros();
+      const MIN_RESISTANCE = 1e-12;
+      const G_expected = 1 / Math.max(rCold, MIN_RESISTANCE);
+      const diag = stamps.find((e) => e.row === 1 && e.col === 1);
+      expect(diag).toBeDefined();
+      expect(diag!.value).toBe(G_expected);
     });
 
     it("FuseDefinition has switchPins for bus resolver", () => {
@@ -434,10 +447,8 @@ describe("AnalogFuseElement", () => {
       props.setModelParam("rCold", 0.01);
       props.setModelParam("rBlown", 1e9);
       props.setModelParam("i2tRating", 1e-4);
-      const el = createAnalogFuseElement(new Map([["out1", 1], ["out2", 0]]), props);
+      const el = createAnalogFuseElement(new Map([["out1", 1], ["out2", 0]]), props, () => 0);
       expect(el).toBeInstanceOf(AnalogFuseElement);
-      expect(el.isNonlinear).toBe(true);
-      expect(el.isReactive).toBe(false);
     });
   });
 });

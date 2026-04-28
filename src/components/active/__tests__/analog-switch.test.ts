@@ -85,33 +85,6 @@ describe("SPST interface contracts", () => {
     expect((el as any).stateSchema).toBe(SW_SCHEMA);
   });
 
-  it("stateBaseOffset initialises to -1 (set by compiler)", () => {
-    const factory = getFactory(SwitchSPSTDefinition.modelRegistry!["behavioral"]!);
-    const el = factory(
-      new Map([["in", 1], ["out", 2], ["ctrl", 3]]),
-      makeProps(), () => 0,
-    );
-    expect((el as any).stateBaseOffset).toBe(-1);
-  });
-
-  it("isNonlinear is true", () => {
-    const factory = getFactory(SwitchSPSTDefinition.modelRegistry!["behavioral"]!);
-    const el = factory(
-      new Map([["in", 1], ["out", 2], ["ctrl", 3]]),
-      makeProps(), () => 0,
-    );
-    expect(el.isNonlinear).toBe(true);
-  });
-
-  it("isReactive is false (no junction capacitance)", () => {
-    const factory = getFactory(SwitchSPSTDefinition.modelRegistry!["behavioral"]!);
-    const el = factory(
-      new Map([["in", 1], ["out", 2], ["ctrl", 3]]),
-      makeProps(), () => 0,
-    );
-    expect(el.isReactive).toBe(false);
-  });
-
   it("branchIndex is -1 (no extra MNA row)", () => {
     const factory = getFactory(SwitchSPSTDefinition.modelRegistry!["behavioral"]!);
     const el = factory(
@@ -195,23 +168,6 @@ describe("SPDT interface contracts", () => {
     expect((el as any).stateSchema).toBe(SPDT_SCHEMA);
   });
 
-  it("isNonlinear is true", () => {
-    const factory = getFactory(SwitchSPDTDefinition.modelRegistry!["behavioral"]!);
-    const el = factory(
-      new Map([["com", 1], ["no", 2], ["nc", 3], ["ctrl", 4]]),
-      makeProps(), () => 0,
-    );
-    expect(el.isNonlinear).toBe(true);
-  });
-
-  it("isReactive is false", () => {
-    const factory = getFactory(SwitchSPDTDefinition.modelRegistry!["behavioral"]!);
-    const el = factory(
-      new Map([["com", 1], ["no", 2], ["nc", 3], ["ctrl", 4]]),
-      makeProps(), () => 0,
-    );
-    expect(el.isReactive).toBe(false);
-  });
 });
 
 // ---------------------------------------------------------------------------

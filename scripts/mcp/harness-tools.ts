@@ -170,15 +170,16 @@ export function registerHarnessTools(
           engineEl && isPoolBacked(engineEl)
             ? engineEl.stateSchema.slots.map((s: any) => s.name)
             : [];
-        const pins: string[] = el.pinNodeIds.map((nodeId: number) => {
+        const elPinIds: number[] = engineEl
+          ? [...engineEl._pinNodes.values()]
+          : [];
+        const pins: string[] = elPinIds.map((nodeId: number) => {
           if (nodeId === 0) return "gnd";
           return topology.nodeLabels.get(nodeId) ?? `node${nodeId}`;
         });
         return {
           label: el.label,
           type: el.type ?? "unknown",
-          isNonlinear: el.isNonlinear,
-          isReactive: el.isReactive,
           pins,
           slots,
         };
@@ -193,7 +194,11 @@ export function registerHarnessTools(
         if (nodeId === 0) return; // ground is the reference, excluded from output
         const connectedComponents: string[] = [];
         for (const el of topology.elements) {
-          if ((el.pinNodeIds as readonly number[]).includes(nodeId)) {
+          const engineEl = (engine?.elements ?? [])[el.index];
+          const elPinIds: number[] = engineEl
+            ? [...engineEl._pinNodes.values()]
+            : [];
+          if (elPinIds.includes(nodeId)) {
             connectedComponents.push(el.label);
           }
         }
@@ -307,7 +312,10 @@ export function registerHarnessTools(
           engineEl && isPoolBacked(engineEl)
             ? engineEl.stateSchema.slots.map((s: any) => s.name)
             : [];
-        const pins = el.pinNodeIds.map((nodeId: number) => ({
+        const elPinIds: number[] = engineEl
+          ? [...engineEl._pinNodes.values()]
+          : [];
+        const pins = elPinIds.map((nodeId: number) => ({
           label:
             nodeId === 0
               ? "gnd"
@@ -318,8 +326,6 @@ export function registerHarnessTools(
           label: el.label,
           index: el.index,
           type: el.type ?? "unknown",
-          isNonlinear: el.isNonlinear,
-          isReactive: el.isReactive,
           pins,
           slots,
         };
@@ -335,7 +341,10 @@ export function registerHarnessTools(
         const connectedComponents: Array<{ label: string; pinLabel: string }> =
           [];
         for (const el of topology.elements) {
-          const pinIds = el.pinNodeIds as readonly number[];
+          const engineEl = (engine?.elements ?? [])[el.index];
+          const pinIds: number[] = engineEl
+            ? [...engineEl._pinNodes.values()]
+            : [];
           for (let p = 0; p < pinIds.length; p++) {
             if (pinIds[p] === nodeId) {
               connectedComponents.push({
@@ -620,7 +629,10 @@ export function registerHarnessTools(
           engineEl && isPoolBacked(engineEl)
             ? engineEl.stateSchema.slots.map((s: any) => s.name)
             : [];
-        const pins = el.pinNodeIds.map((nodeId: number) => ({
+        const elPinIds: number[] = engineEl
+          ? [...engineEl._pinNodes.values()]
+          : [];
+        const pins = elPinIds.map((nodeId: number) => ({
           label:
             nodeId === 0
               ? "gnd"
@@ -631,8 +643,6 @@ export function registerHarnessTools(
           label: el.label,
           index: el.index,
           type: el.type ?? "unknown",
-          isNonlinear: el.isNonlinear,
-          isReactive: el.isReactive,
           pins,
           slots,
         };
@@ -647,7 +657,10 @@ export function registerHarnessTools(
         if (nodeId === 0) return;
         const connectedComponents: Array<{ label: string; pinLabel: string }> = [];
         for (const el of topology.elements) {
-          const pinIds = el.pinNodeIds as readonly number[];
+          const engineEl = (engine?.elements ?? [])[el.index];
+          const pinIds: number[] = engineEl
+            ? [...engineEl._pinNodes.values()]
+            : [];
           for (let p = 0; p < pinIds.length; p++) {
             if (pinIds[p] === nodeId) {
               connectedComponents.push({ label: el.label, pinLabel: label });

@@ -19,7 +19,7 @@ import {
   type ComponentDefinition,
 } from "../../core/registry.js";
 import { formatSI } from "../../editor/si-format.js";
-import type { AnalogElementCore } from "../../core/analog-types.js";
+import type { AnalogElement } from "../../core/analog-types.js";
 import { NGSPICE_LOAD_ORDER } from "../../core/analog-types.js";
 import type { LoadContext } from "../../solver/analog/load-context.js";
 import type { SetupContext } from "../../solver/analog/setup-context.js";
@@ -146,14 +146,13 @@ export class ResistorElement extends AbstractCircuitElement {
 }
 
 // ---------------------------------------------------------------------------
-// ResistorAnalogElement — AnalogElementCore class implementation
+// ResistorAnalogElement — AnalogElement class implementation
 // ---------------------------------------------------------------------------
 
-class ResistorAnalogElement implements AnalogElementCore {
-  readonly branchIndex: number = -1;
+class ResistorAnalogElement implements AnalogElement {
+  branchIndex: number = -1;
   readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.RES;
-  readonly isNonlinear: boolean = false;
-  readonly isReactive: boolean = false;
+  label: string = "";
   _stateBase: number = -1;
   _pinNodes: Map<string, number> = new Map();
 
@@ -215,7 +214,7 @@ function createResistorElement(
   pinNodes: ReadonlyMap<string, number>,
   props: PropertyBag,
   _getTime: () => number,
-): AnalogElementCore {
+): AnalogElement {
   const el = new ResistorAnalogElement(props.getModelParam<number>("resistance"));
   el._pinNodes = new Map(pinNodes);
   return el;

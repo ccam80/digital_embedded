@@ -1,4 +1,4 @@
-﻿/**
+/**
  * AC Voltage Source  time-varying independent voltage source.
  *
  * Supports four waveforms: sine, square, triangle, sawtooth.
@@ -29,8 +29,10 @@ import {
   type AttributeMapping,
   type ComponentDefinition,
 } from "../../core/registry.js";
-import type { AnalogElementCore, LoadContext } from "../../solver/analog/element.js";
+import type { AnalogElement, LoadContext } from "../../solver/analog/element.js";
 import { NGSPICE_LOAD_ORDER } from "../../solver/analog/element.js";
+import type { SetupContext } from "../../solver/analog/setup-context.js";
+import { MODEDCOP, MODEDCTRANCURVE, MODETRANOP } from "../../solver/analog/ckt-mode.js";
 import { parseExpression, evaluateExpression, ExprParseError } from "../../solver/analog/expression.js";
 import type { ExprNode } from "../../solver/analog/expression.js";
 import { defineModelParams } from "../../core/model-params.js";
@@ -160,7 +162,7 @@ export function computeWaveformValue(
       // piecewise-linear form is bit-exact against a SPICE PULSE(V1 V2 TD halfP
       // halfP 0 period) emission  indispensable for .tran parity against
       // ngspice (computing via asin(sin(...)) instead drifts by ~1 ulp per
-      // sample due to the irrational-Ï€ rounding chain).
+      // sample due to the irrational-π rounding chain).
       if (frequency <= 0) return dcOffset - amplitude;
       const period = 1 / frequency;
       const halfPeriod = period / 2;
@@ -529,7 +531,7 @@ const AC_VOLTAGE_SOURCE_ATTRIBUTE_MAP: AttributeMapping[] = [
 // AcVoltageSourceAnalogElement  AnalogElement with time-varying stamp
 // ---------------------------------------------------------------------------
 
-export interface AcVoltageSourceAnalogElement extends AnalogElementCore {
+export interface AcVoltageSourceAnalogElement extends AnalogElement {
   /** Returns transition times within [tStart, tEnd] for square waveforms. */
   getBreakpoints(tStart: number, tEnd: number): number[];
   /** Returns the strictly-next breakpoint strictly after afterTime, or null. */
@@ -545,7 +547,7 @@ export interface AcVoltageSourceAnalogElement extends AnalogElementCore {
   setParam(key: string, value: number): void;
 }
 
-function createAcVoltageSourceElement(
+export function makeAcVoltageSourceElement(
   pinNodes: ReadonlyMap<string, number>,
   props: PropertyBag,
   getTime: () => number,
@@ -596,16 +598,14 @@ function createAcVoltageSourceElement(
     }
   }
 
-  const element: AcVoltageSourceAnalogElement & { label: string } = {
-    branchIndex: -1,
+  const element: AcVoltageSourceAnalogElement = {
+    label: "",
     ngspiceLoadOrder: NGSPICE_LOAD_ORDER.VSRC,
-    isNonlinear: false,
-    isReactive: false,
     _stateBase: -1,
     _pinNodes: new Map<string, number>(pinNodes),
-    label: "",
+    branchIndex: -1,
 
-    setup(ctx: import("../../solver/analog/setup-context.js").SetupContext): void {
+    setup(ctx: SetupContext): void {
       const posNode    = element._pinNodes.get("pos")!;
       const negNode    = element._pinNodes.get("neg")!;
 
@@ -620,6 +620,14 @@ function createAcVoltageSourceElement(
       _hNegBr = ctx.solver.allocElement(negNode,    branchNode); // VSRCnegNode, VSRCbranch
       _hBrNeg = ctx.solver.allocElement(branchNode, negNode);    // VSRCbranch,  VSRCnegNode
       _hBrPos = ctx.solver.allocElement(branchNode, posNode);    // VSRCbranch,  VSRCposNode
+    },
+
+    findBranchFor(_name: string, ctx: SetupContext): number {
+      // Mirrors VSRCfindBr (vsrc/vsrcfbr.c:26-39).
+      if (element.branchIndex === -1) {
+        element.branchIndex = ctx.makeCur(element.label, "branch");
+      }
+      return element.branchIndex;
     },
 
     _parsedExpr: parsedExpr,
@@ -645,15 +653,29 @@ function createAcVoltageSourceElement(
       const solver = ctx.solver;
       const t = getTime();
 
+      // ngspice srcFact gating mirrors vsrcload.c. The waveform-evaluation path
+      // (vsrcload.c:56-401) is followed by `if (CKTmode & MODETRANOP) value *= srcFact`
+      // at vsrcload.c:410-412. The dcGiven branch (vsrcload.c:47-55) applies srcFact
+      // when MODEDCOP|MODEDCTRANCURVE bits are set with a DC value present. digiTS's
+      // AC source folds dcOffset into the waveform computation, so we treat the
+      // combined output as having an effective DC content and gate srcFact across
+      // all three source-stepping modes — matching the §A.13 canonical pattern.
+      // Outside these modes (regular MODETRAN steps, MODEAC), srcFact must NOT be
+      // applied: AC small-signal analysis goes through stampAc / vsrcacld.c which
+      // never multiplies by srcFact (vsrcacld.c:29-30).
+      const ramp = (ctx.cktMode & (MODEDCOP | MODEDCTRANCURVE | MODETRANOP))
+        ? ctx.srcFact
+        : 1.0;
+
       let v: number;
       if (waveform === "expression") {
         if (element._parsedExpr !== null) {
-          v = evaluateExpression(element._parsedExpr, { t }) * ctx.srcFact;
+          v = evaluateExpression(element._parsedExpr, { t }) * ramp;
         } else {
           v = 0;
         }
       } else {
-        v = computeWaveformValue(waveform, amplitude, frequency, phase, dcOffset, t, ext) * ctx.srcFact;
+        v = computeWaveformValue(waveform, amplitude, frequency, phase, dcOffset, t, ext) * ramp;
       }
 
       // vsrcload.c:43-46
@@ -697,7 +719,7 @@ function createAcVoltageSourceElement(
             break;
           case "sawtooth": {
             // PULSE-aligned sawtooth (Fix 2): start of fall at tMod=riseSpan,
-            // end of fall / start of next rise at tMod=period (â‰¡ 0 of next cycle).
+            // end of fall / start of next rise at tMod=period (≡ 0 of next cycle).
             const riseSpan = period - fallTime;
             offsets = [riseSpan, period];
             break;
@@ -931,25 +953,10 @@ export const AcVoltageSourceDefinition: ComponentDefinition = {
   modelRegistry: {
     "behavioral": {
       kind: "inline",
-      factory(
-        pinNodes: ReadonlyMap<string, number>,
-        props: PropertyBag,
-        getTime: () => number,
-      ): AnalogElementCore {
-        return createAcVoltageSourceElement(pinNodes, props, getTime);
-      },
+      factory: makeAcVoltageSourceElement,
       paramDefs: AC_VOLTAGE_SOURCE_PARAM_DEFS,
       params: AC_VOLTAGE_SOURCE_DEFAULTS,
       ngspiceNodeMap: { neg: "neg", pos: "pos" },
-      findBranchFor(name: string, ctx: import("../../solver/analog/setup-context.js").SetupContext): number {
-        // Mirrors VSRCfindBr (vsrc/vsrcfbr.c:26-39).
-        const el = ctx.findDevice(name);
-        if (!el) return 0;
-        if (el.branchIndex === -1) {
-          el.branchIndex = ctx.makeCur(name, "branch");
-        }
-        return el.branchIndex;
-      },
     },
   },
   defaultModel: "behavioral",

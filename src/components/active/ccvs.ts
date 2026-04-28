@@ -114,19 +114,11 @@ function buildCCVSPinDeclarations(): PinDeclaration[] {
 /**
  * MNA analog element for a Current-Controlled Voltage Source.
  *
- * pinNodeIds index ordering (pinLayout order):
- *   [0] = sense+ node  (not used directly in stamps — sense via contBranch)
- *   [1] = sense- node  (not used directly in stamps)
- *   [2] = out+   node  (CCVSposNode)
- *   [3] = out-   node  (CCVSnegNode)
- *
+ * out+ and out- are the output voltage source terminals.
  * branchIndex: own output voltage source branch, set during setup().
  */
 export class CCVSAnalogElement extends ControlledSourceElement {
-  branchIndex: number = -1;
   readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.CCVS;
-  _stateBase: number = -1;
-  _pinNodes: Map<string, number> = new Map();
 
   // senseSourceLabel — label of the controlling VSRC/CCVS/VCVS/IND.
   // Must be set via setParam("senseSourceLabel", label) before setup() runs.
@@ -234,21 +226,6 @@ export class CCVSAnalogElement extends ControlledSourceElement {
     const iSense = this._contBranch >= 0 ? rhs[this._contBranch] : 0;
     const iOut   = this.branchIndex >= 0  ? rhs[this.branchIndex]  : 0;
     return [iSense, -iSense, iOut, -iOut];
-  }
-
-  /**
-   * Lazy-branch finder for downstream CCCS/CCVS elements that sense this CCVS
-   * output current. Mirrors VSRCfindBr (vsrc/vsrcfbr.c:26-39).
-   *
-   * Called by ctx.findBranch when a downstream element resolves this CCVS by
-   * label before CCVS's own setup() has run. Allocates the branch row via
-   * ctx.makeCur if not yet allocated.
-   */
-  findBranchFor(_name: string, ctx: SetupContext): number {
-    if (this.branchIndex === -1) {
-      this.branchIndex = ctx.makeCur(this.label ?? "ccvs", "branch");
-    }
-    return this.branchIndex;
   }
 
   /**
@@ -400,15 +377,6 @@ export const CCVSDefinition: ComponentDefinition = {
       paramDefs: CCVS_PARAM_DEFS,
       params: CCVS_DEFAULTS,
       ngspiceNodeMap: { "out+": "pos", "out-": "neg" },
-      findBranchFor(name: string, ctx: SetupContext): number {
-        const el = ctx.findDevice(name);
-        if (!el) return 0;
-        const ccvs = el as unknown as CCVSAnalogElement;
-        if (ccvs.branchIndex === -1) {
-          ccvs.branchIndex = ctx.makeCur(name, "branch");
-        }
-        return ccvs.branchIndex;
-      },
     },
   },
   defaultModel: "behavioral",

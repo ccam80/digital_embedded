@@ -98,12 +98,12 @@ function outputPin(x: number, y: number, label: string, bitWidth = 1): PinDeclar
 
 function makeResistorElement(nodeA: number, nodeB: number): AnalogElement {
   return {
-    pinNodeIds: [nodeA, nodeB],
-    allNodeIds: [nodeA, nodeB],
+    label: "",
+    _pinNodes: new Map([["a", nodeA], ["b", nodeB]]),
+    _stateBase: -1,
     branchIndex: -1,
     ngspiceLoadOrder: 0,
-    isNonlinear: false,
-    isReactive: false,
+    setup(_ctx) {},
     load(_ctx: LoadContext): void { /* no-op for static test fixture */ },
     stampAc(_s: ComplexSparseSolver, _omega: number, _ctx: LoadContext) {},
     getPinCurrents(_v: Float64Array) { return [0, 0]; },
@@ -113,12 +113,12 @@ function makeResistorElement(nodeA: number, nodeB: number): AnalogElement {
 
 function makeVsElement(nodePos: number, nodeNeg: number, branchIdx: number): AnalogElement {
   return {
-    pinNodeIds: [nodePos, nodeNeg],
-    allNodeIds: [nodePos, nodeNeg],
+    label: "",
+    _pinNodes: new Map([["pos", nodePos], ["neg", nodeNeg]]),
+    _stateBase: -1,
     branchIndex: branchIdx,
     ngspiceLoadOrder: 0,
-    isNonlinear: false,
-    isReactive: false,
+    setup(_ctx) {},
     load(_ctx: LoadContext): void { /* no-op for static test fixture */ },
     stampAc(_s: ComplexSparseSolver, _omega: number, _ctx: LoadContext) {},
     getPinCurrents(_v: Float64Array) { return [0, 0]; },
@@ -128,14 +128,15 @@ function makeVsElement(nodePos: number, nodeNeg: number, branchIdx: number): Ana
 
 function makeCapacitorElement(nodeA: number, nodeB: number, branchIdx: number): AnalogElement {
   return {
-    pinNodeIds: [nodeA, nodeB],
-    allNodeIds: [nodeA, nodeB],
+    label: "",
+    _pinNodes: new Map([["a", nodeA], ["b", nodeB]]),
+    _stateBase: -1,
     branchIndex: branchIdx,
     ngspiceLoadOrder: 0,
-    isNonlinear: false,
-    isReactive: true,
+    setup(_ctx) {},
     load(_ctx: LoadContext): void { /* no-op for static test fixture */ },
     stampAc(_s: ComplexSparseSolver, _omega: number, _ctx: LoadContext) {},
+    getLteTimestep(_dt: number, _deltaOld: readonly number[], _order: number, _method: import('../../core/analog-types.js').IntegrationMethod, _lteParams: import('../../solver/analog/ckt-terr.js').LteParams): number { return Infinity; },
     getPinCurrents(_v: Float64Array) { return [0, 0]; },
     setParam(_key: string, _value: number) {},
   };
@@ -149,7 +150,7 @@ function makeCapacitorElement(nodeA: number, nodeB: number, branchIdx: number): 
 function makeDigitalDef(name: string, pins: PinDeclaration[] = []): ComponentDefinition {
   return {
     name,
-    typeId: -1 as unknown as number,
+    typeId: -1,
     factory: (props: PropertyBagType) => createTestElementFromDecls(name, crypto.randomUUID(), pins, props),
     pinLayout: pins,
     propertyDefs: [],
@@ -163,11 +164,11 @@ function makeDigitalDef(name: string, pins: PinDeclaration[] = []): ComponentDef
 function makeAnalogDef(
   name: string,
   branchCount: boolean,
-  factoryFn: (pinNodes: ReadonlyMap<string, number>, _internal: readonly number[], branchIdx: number, _props: PropertyBagType, _getTime: () => number) => AnalogElement,
+  factoryFn: (pinNodes: ReadonlyMap<string, number>) => AnalogElement,
 ): ComponentDefinition {
   return {
     name,
-    typeId: -1 as unknown as number,
+    typeId: -1,
     factory: () => { throw new Error('not used'); },
     pinLayout: [],
     propertyDefs: [],
@@ -177,9 +178,9 @@ function makeAnalogDef(
     defaultModel: 'behavioral',
     models: {},
     modelRegistry: {
-      behavioral: { kind: 'inline' as const, factory: factoryFn, branchCount: branchCount ? 1 : 0, paramDefs: [], params: {} },
+      behavioral: { kind: 'inline' as const, factory: (pinNodes: ReadonlyMap<string, number>, _props: PropertyBagType, _getTime: () => number) => factoryFn(pinNodes), branchCount: branchCount ? 1 : 0, paramDefs: [], params: {} },
     },
-  } as unknown as ComponentDefinition;
+  } as ComponentDefinition;
 }
 
 function buildDigitalRegistry(): ComponentRegistry {
@@ -199,9 +200,9 @@ function buildAnalogRegistry(): ComponentRegistry {
   const r = new ComponentRegistry();
 
   r.register({
-    ...makeAnalogDef('AnalogVs', true, (pinNodes, _i, branchIdx) => {
+    ...makeAnalogDef('AnalogVs', true, (pinNodes) => {
       const [n0, n1] = [...pinNodes.values()];
-      return makeVsElement(n0 ?? 0, n1 ?? 0, branchIdx);
+      return makeVsElement(n0 ?? 0, n1 ?? 0, -1);
     }),
   } as ComponentDefinition);
 
@@ -213,9 +214,9 @@ function buildAnalogRegistry(): ComponentRegistry {
   } as ComponentDefinition);
 
   r.register({
-    ...makeAnalogDef('AnalogC', true, (pinNodes, _i, branchIdx) => {
+    ...makeAnalogDef('AnalogC', true, (pinNodes) => {
       const [n0, n1] = [...pinNodes.values()];
-      return makeCapacitorElement(n0 ?? 0, n1 ?? 0, branchIdx);
+      return makeCapacitorElement(n0 ?? 0, n1 ?? 0, -1);
     }),
   } as ComponentDefinition);
 
@@ -245,12 +246,10 @@ function buildMixedRegistry(): ComponentRegistry {
   r.register(makeDigitalDef('Out', [inputPin(0, 0, 'in')]) as ComponentDefinition);
 
   // Analog components
-  r.register({
-    ...makeAnalogDef('AnalogR', false, (pinNodes) => {
-      const [n0, n1] = [...pinNodes.values()];
-      return makeResistorElement(n0 ?? 0, n1 ?? 0);
-    }),
-  } as ComponentDefinition);
+  r.register(makeAnalogDef('AnalogR', false, (pinNodes) => {
+    const [n0, n1] = [...pinNodes.values()];
+    return makeResistorElement(n0 ?? 0, n1 ?? 0);
+  }));
 
   r.register({
     name: 'Ground',
@@ -504,7 +503,6 @@ describe('compileUnified — RC circuit (analog)', () => {
     circuit.addWire(new Wire({ x: 20, y: 0 }, { x: 20, y: 0 }));
     circuit.addWire(new Wire({ x: 0, y: 0 }, { x: 0, y: 0 }));
 
-    const reference = compileUnified(circuit, registry).analog!;
     const unified = compileUnified(circuit, registry);
 
     expect(unified.analog).not.toBeNull();
@@ -885,9 +883,9 @@ describe('compileUnified — model resolution', () => {
     const twoIn = [inputPin(0, 0, 'a'), inputPin(0, 1, 'b'), outputPin(2, 0, 'out')];
     const behavioralEntry: ModelEntry = {
       kind: 'inline',
-      factory: (pinNodes: ReadonlyMap<string, number>, _internal: readonly number[], _branchIdx: number, _props: PropertyBag, _getTime: () => number) => {
+      factory: (pinNodes: ReadonlyMap<string, number>, _props: PropertyBag, _getTime: () => number) => {
         const [n0, n1] = [...pinNodes.values()];
-        return makeResistorElement(n0 ?? 0, n1 ?? 0) as unknown as import('../../core/analog-types.js').AnalogElementCore;
+        return makeResistorElement(n0 ?? 0, n1 ?? 0);
       },
       paramDefs: [],
       params: {},

@@ -20,8 +20,9 @@ import type { ModelEntry, AnalogFactory } from "../../../core/registry.js";
 import { ConcreteCompiledAnalogCircuit } from "../../../solver/analog/compiled-analog-circuit.js";
 import { StatePool } from "../../../solver/analog/state-pool.js";
 import { MNAEngine } from "../../../solver/analog/analog-engine.js";
-import { makeResistor, makeVoltageSource, withNodeIds } from "../../../solver/analog/__tests__/test-helpers.js";
 import type { AnalogElement } from "../../../solver/analog/element.js";
+import type { SetupContext } from "../../../solver/analog/setup-context.js";
+import type { LoadContext } from "../../../solver/analog/load-context.js";
 
 // ---------------------------------------------------------------------------
 // Helper
@@ -33,16 +34,58 @@ function getFactory(entry: ModelEntry): AnalogFactory {
 }
 
 /**
- * Wrap an AnalogElement that lacks a setup() method with a no-op setup().
- * MNAEngine._setup() calls el.setup() on every element; helpers produced by
- * makeVoltageSource do not define setup(), so they must be wrapped before
- * passing into the engine.
+ * Minimal inline voltage source for circuit tests.
+ * Uses k = branchIdx as the branch row index directly.
  */
-function withSetup(el: AnalogElement): AnalogElement {
-  if (typeof (el as any).setup === "function") return el;
-  return Object.assign(el, {
-    setup(_ctx: import("../../../solver/analog/setup-context.js").SetupContext): void {},
-  });
+function makeTestVoltageSource(nodePos: number, nodeNeg: number, branchIdx: number, voltage: number): AnalogElement {
+  let _hPosK = -1, _hKPos = -1, _hNegK = -1, _hKNeg = -1;
+  const k = branchIdx;
+  return {
+    label: "",
+    _pinNodes: new Map<string, number>([["pos", nodePos], ["neg", nodeNeg]]),
+    _stateBase: -1,
+    branchIndex: k,
+    ngspiceLoadOrder: 48,
+    setup(ctx: SetupContext): void {
+      if (nodePos > 0) { _hPosK = ctx.solver.allocElement(nodePos, k); _hKPos = ctx.solver.allocElement(k, nodePos); }
+      if (nodeNeg > 0) { _hNegK = ctx.solver.allocElement(nodeNeg, k); _hKNeg = ctx.solver.allocElement(k, nodeNeg); }
+      ctx.solver.allocElement(k, k);
+    },
+    load(ctx: LoadContext): void {
+      const { solver, rhs } = ctx;
+      if (nodePos > 0) { solver.stampElement(_hPosK, 1); solver.stampElement(_hKPos, 1); }
+      if (nodeNeg > 0) { solver.stampElement(_hNegK, -1); solver.stampElement(_hKNeg, -1); }
+      rhs[k] += voltage;
+    },
+    setParam(_key: string, _value: number): void {},
+    getPinCurrents(): number[] { return []; },
+  } as unknown as AnalogElement;
+}
+
+/**
+ * Minimal inline resistor for circuit tests.
+ */
+function makeTestResistor(nodeA: number, nodeB: number, resistance: number): AnalogElement {
+  const G = 1 / resistance;
+  return {
+    label: "",
+    _pinNodes: new Map<string, number>([["A", nodeA], ["B", nodeB]]),
+    _stateBase: -1,
+    branchIndex: -1,
+    ngspiceLoadOrder: 40,
+    setup(_ctx: SetupContext): void {},
+    load(ctx: LoadContext): void {
+      const { solver } = ctx;
+      if (nodeA > 0) { const h = solver.allocElement(nodeA, nodeA); solver.stampElement(h, G); }
+      if (nodeB > 0) { const h = solver.allocElement(nodeB, nodeB); solver.stampElement(h, G); }
+      if (nodeA > 0 && nodeB > 0) {
+        solver.stampElement(solver.allocElement(nodeA, nodeB), -G);
+        solver.stampElement(solver.allocElement(nodeB, nodeA), -G);
+      }
+    },
+    setParam(_key: string, _value: number): void {},
+    getPinCurrents(): number[] { return []; },
+  } as unknown as AnalogElement;
 }
 
 function makeOptocouplerCore(
@@ -87,7 +130,6 @@ describe("Optocoupler parameter plumbing", () => {
     const el = makeOptocouplerCore(1, 2, 3, 4, 5);
     expect(el).toBeDefined();
     expect(el.branchIndex).toBe(-1);
-    expect(el.isNonlinear).toBe(true);
   });
 });
 
@@ -106,17 +148,6 @@ describe("Optocoupler composite interface (PB-OPTO)", () => {
   it("branchIndex is -1 (no extra MNA row at composite level)", () => {
     const el = makeOptocouplerCore(1, 2, 3, 4, 5);
     expect(el.branchIndex).toBe(-1);
-  });
-
-  it("isNonlinear is true (DIO and BJT sub-elements are nonlinear)", () => {
-    const el = makeOptocouplerCore(1, 2, 3, 4, 5);
-    expect(el.isNonlinear).toBe(true);
-  });
-
-  it("modelRegistry behavioral entry has mayCreateInternalNodes=true", () => {
-    const entry = OptocouplerDefinition.modelRegistry!["behavioral"]!;
-    if (entry.kind !== "inline") throw new Error("Expected inline");
-    expect(entry.mayCreateInternalNodes).toBe(true);
   });
 });
 
@@ -166,7 +197,7 @@ function makeOptocouplerElement(
       }
     }
   };
-  return withNodeIds(core as unknown as AnalogElement, [nAnode, nCathode, nCollector, nEmitter]);
+  return core as unknown as AnalogElement;
 }
 
 function buildCircuit(opts: {
@@ -201,9 +232,9 @@ describe("Optocoupler (salvaged behavioural tests — pre-composition)", () => {
     const vF    = 1.2;
     const rLoad = 1000;
 
-    const vs   = withSetup(makeVoltageSource(1, 0, vsBranch, vIn));
+    const vs   = makeTestVoltageSource(1, 0, vsBranch, vIn);
     const opto = makeOptocouplerElement(1, 0, 2, 0, { ctr: 1.0, vForward: vF, rLed });
-    const rL   = makeResistor(2, 0, rLoad);
+    const rL   = makeTestResistor(2, 0, rLoad);
 
     const compiled = buildCircuit({ nodeCount, branchCount, elements: [vs, opto, rL] });
     const engine = new MNAEngine();
@@ -230,9 +261,9 @@ describe("Optocoupler (salvaged behavioural tests — pre-composition)", () => {
       const branchCount = 1;
       const vsBranch    = nodeCount + 0;
 
-      const vs   = withSetup(makeVoltageSource(1, 0, vsBranch, vIn));
+      const vs   = makeTestVoltageSource(1, 0, vsBranch, vIn);
       const opto = makeOptocouplerElement(1, 0, 2, 0, { ctr: 1.0, vForward: vF, rLed });
-      const rL   = makeResistor(2, 0, rLoad);
+      const rL   = makeTestResistor(2, 0, rLoad);
 
       const compiled = buildCircuit({ nodeCount, branchCount, elements: [vs, opto, rL] });
       const engine = new MNAEngine();
@@ -248,10 +279,10 @@ describe("Optocoupler (salvaged behavioural tests — pre-composition)", () => {
       const vsBranchIn      = nodeCount + 0; // row 3
       const vsBranchEmitter = nodeCount + 1; // row 4
 
-      const vsIn      = withSetup(makeVoltageSource(1, 0, vsBranchIn,      vIn));
-      const vsEmitter = withSetup(makeVoltageSource(3, 0, vsBranchEmitter, 100));
+      const vsIn      = makeTestVoltageSource(1, 0, vsBranchIn,      vIn);
+      const vsEmitter = makeTestVoltageSource(3, 0, vsBranchEmitter, 100);
       const opto      = makeOptocouplerElement(1, 0, 2, 3, { ctr: 1.0, vForward: vF, rLed });
-      const rL        = makeResistor(2, 3, rLoad);
+      const rL        = makeTestResistor(2, 3, rLoad);
 
       const compiled = buildCircuit({ nodeCount, branchCount, elements: [vsIn, vsEmitter, opto, rL] });
       const engine = new MNAEngine();
@@ -276,9 +307,9 @@ describe("Optocoupler (salvaged behavioural tests — pre-composition)", () => {
     const branchCount = 1;
     const vsBranch    = nodeCount + 0;
 
-    const vsBelow = withSetup(makeVoltageSource(1, 0, vsBranch, 0.5));
+    const vsBelow = makeTestVoltageSource(1, 0, vsBranch, 0.5);
     const opto    = makeOptocouplerElement(1, 0, 2, 0, { ctr: 1.0, vForward: 1.2, rLed: 10 });
-    const rLoad   = makeResistor(2, 0, 1000);
+    const rLoad   = makeTestResistor(2, 0, 1000);
 
     const compiled = buildCircuit({ nodeCount, branchCount, elements: [vsBelow, opto, rLoad] });
     const engine = new MNAEngine();
@@ -295,9 +326,9 @@ describe("Optocoupler (salvaged behavioural tests — pre-composition)", () => {
     const branchCount = 1;
     const vsBranch    = nodeCount + 0;
 
-    const vs    = withSetup(makeVoltageSource(1, 0, vsBranch, 0.0));
+    const vs    = makeTestVoltageSource(1, 0, vsBranch, 0.0);
     const opto  = makeOptocouplerElement(1, 0, 2, 0, { ctr: 1.0, vForward: 1.2, rLed: 10 });
-    const rLoad = makeResistor(2, 0, 1000);
+    const rLoad = makeTestResistor(2, 0, 1000);
 
     const compiled = buildCircuit({ nodeCount, branchCount, elements: [vs, opto, rLoad] });
     const engine = new MNAEngine();
@@ -320,9 +351,9 @@ describe("Optocoupler (salvaged behavioural tests — pre-composition)", () => {
     const rLed  = 10;
     const rLoad = 1000;
 
-    const vs    = withSetup(makeVoltageSource(1, 0, vsBranch, vIn));
+    const vs    = makeTestVoltageSource(1, 0, vsBranch, vIn);
     const opto  = makeOptocouplerElement(1, 0, 2, 0, { ctr: 0.5, vForward: vF, rLed });
-    const rL    = makeResistor(2, 0, rLoad);
+    const rL    = makeTestResistor(2, 0, rLoad);
 
     const compiled = buildCircuit({ nodeCount, branchCount, elements: [vs, opto, rL] });
     const engine = new MNAEngine();

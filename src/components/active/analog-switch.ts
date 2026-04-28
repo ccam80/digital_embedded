@@ -40,7 +40,7 @@ import {
   type AttributeMapping,
   type ComponentDefinition,
 } from "../../core/registry.js";
-import type { LoadContext, StatePoolRef, PoolBackedAnalogElementCore } from "../../solver/analog/element.js";
+import type { LoadContext, StatePoolRef, PoolBackedAnalogElement } from "../../solver/analog/element.js";
 import { NGSPICE_LOAD_ORDER } from "../../solver/analog/element.js";
 import type { SetupContext } from "../../solver/analog/setup-context.js";
 import { defineModelParams } from "../../core/model-params.js";
@@ -243,7 +243,7 @@ function swLoadHandles(
 function createSwitchSPSTElement(
   pinNodes: ReadonlyMap<string, number>,
   props: PropertyBag,
-): PoolBackedAnalogElementCore {
+): PoolBackedAnalogElement {
   const nIn   = pinNodes.get("in")!;   // positive signal node (SWposNode, swdefs.h:28)
   const nOut  = pinNodes.get("out")!;  // negative signal node (SWnegNode, swdefs.h:29)
   const nCtrl = pinNodes.get("ctrl")!; // positive control node (SWposCntrlNode, swdefs.h:30)
@@ -260,7 +260,7 @@ function createSwitchSPSTElement(
   // read via pool.states[N] at call time. Mirrors ngspice CKTstate0/1 pointer
   // access (cktload.c never caches state pointers on devices).
   let pool: StatePoolRef;
-  let base: number; // = stateBaseOffset, set by initState()
+  let base: number; // = _stateBase, set by initState()
 
   // Matrix handles allocated in setup() per swsetup.c:59-62 TSTALLOC sequence
   let _hPP = -1;
@@ -269,10 +269,9 @@ function createSwitchSPSTElement(
   let _hNN = -1;
 
   return {
+    label: "",
     branchIndex: -1,
     ngspiceLoadOrder: NGSPICE_LOAD_ORDER.SW,
-    isNonlinear: true,
-    isReactive: false,
     _stateBase: -1,
     _pinNodes: new Map(pinNodes),
 
@@ -291,11 +290,10 @@ function createSwitchSPSTElement(
     poolBacked: true as const,
     stateSize: SW_SCHEMA.size,   // 2 (SW_NUM_STATES, swdefs.h:56)
     stateSchema: SW_SCHEMA,
-    stateBaseOffset: -1,         // set by compiler (compiler.ts:1388)
 
     initState(poolRef: StatePoolRef): void {
       pool = poolRef;
-      base = this.stateBaseOffset;
+      base = this._stateBase;
       applyInitialValues(SW_SCHEMA, pool, base, p);
     },
 
@@ -350,7 +348,7 @@ function createSwitchSPSTElement(
 function createSwitchSPDTElement(
   pinNodes: ReadonlyMap<string, number>,
   props: PropertyBag,
-): PoolBackedAnalogElementCore {
+): PoolBackedAnalogElement {
   const nCom  = pinNodes.get("com")!;  // common terminal
   const nNO   = pinNodes.get("no")!;   // normally-open terminal
   const nNC   = pinNodes.get("nc")!;   // normally-closed terminal
@@ -379,10 +377,9 @@ function createSwitchSPDTElement(
   let _hNC_NN = -1;
 
   return {
+    label: "",
     branchIndex: -1,
     ngspiceLoadOrder: NGSPICE_LOAD_ORDER.SW,
-    isNonlinear: true,
-    isReactive: false,
     _stateBase: -1,
     _pinNodes: new Map(pinNodes),
 
@@ -406,11 +403,10 @@ function createSwitchSPDTElement(
     poolBacked: true as const,
     stateSize: SPDT_SCHEMA.size,   // 4 (two SW paths × 2 slots each)
     stateSchema: SPDT_SCHEMA,
-    stateBaseOffset: -1,
 
     initState(poolRef: StatePoolRef): void {
       pool = poolRef;
-      base = this.stateBaseOffset;
+      base = this._stateBase;
       applyInitialValues(SPDT_SCHEMA, pool, base, p);
     },
 
@@ -690,7 +686,6 @@ export const SwitchSPSTDefinition: ComponentDefinition = {
         createSwitchSPSTElement(pinNodes, props),
       paramDefs: ANALOG_SWITCH_PARAM_DEFS,
       params: ANALOG_SWITCH_DEFAULTS,
-      mayCreateInternalNodes: false,
     },
   },
   defaultModel: "behavioral",
@@ -722,7 +717,6 @@ export const SwitchSPDTDefinition: ComponentDefinition = {
         createSwitchSPDTElement(pinNodes, props),
       paramDefs: ANALOG_SWITCH_PARAM_DEFS,
       params: ANALOG_SWITCH_DEFAULTS,
-      mayCreateInternalNodes: false,
     },
   },
   defaultModel: "behavioral",

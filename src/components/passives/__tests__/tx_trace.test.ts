@@ -2,10 +2,64 @@ import { describe, it } from "vitest";
 import { AnalogTappedTransformerElement } from "../tapped-transformer.js";
 import { SparseSolver } from "../../../solver/analog/sparse-solver.js";
 import { MODETRAN, MODEINITTRAN, MODEINITFLOAT } from "../../../solver/analog/ckt-mode.js";
-import { allocateStatePool, makeVoltageSource, makeResistor, loadCtxFromFields } from "../../../solver/analog/__tests__/test-helpers.js";
-import type { AnalogElementCore } from "../../../solver/analog/element.js";
+import { allocateStatePool, loadCtxFromFields } from "../../../solver/analog/__tests__/test-helpers.js";
+import type { AnalogElement } from "../../../solver/analog/element.js";
 import type { LoadContext } from "../../../solver/analog/load-context.js";
 import type { SparseSolver as SparseSolverType } from "../../../solver/analog/sparse-solver.js";
+import type { SetupContext } from "../../../solver/analog/setup-context.js";
+
+// ---------------------------------------------------------------------------
+// Inline helpers (replaces deleted test-helpers makeVoltageSource / makeResistor)
+// ---------------------------------------------------------------------------
+
+function makeVoltageSource(posNode: number, negNode: number, branchRow: number, voltage: number): AnalogElement {
+  return {
+    label: "",
+    _pinNodes: new Map([["pos", posNode], ["neg", negNode]]),
+    branchIndex: branchRow,
+    _stateBase: -1,
+    ngspiceLoadOrder: 10,
+    setParam(_key: string, _value: number): void {},
+    getPinCurrents(_v: Float64Array): number[] { return []; },
+    setup(_ctx: SetupContext): void {},
+    load(ctx: LoadContext): void {
+      const { solver, rhs } = ctx;
+      const k = branchRow;
+      if (posNode !== 0) { solver.stampElement(solver.allocElement(posNode, k), 1); solver.stampElement(solver.allocElement(k, posNode), 1); }
+      if (negNode !== 0) { solver.stampElement(solver.allocElement(negNode, k), -1); solver.stampElement(solver.allocElement(k, negNode), -1); }
+      rhs[k] += voltage;
+    },
+  };
+}
+
+function makeResistor(nodeA: number, nodeB: number, resistance: number): AnalogElement {
+  const G = 1 / Math.max(resistance, 1e-9);
+  let _hAA = -1, _hBB = -1, _hAB = -1, _hBA = -1;
+  return {
+    label: "",
+    _pinNodes: new Map([["A", nodeA], ["B", nodeB]]),
+    branchIndex: -1,
+    _stateBase: -1,
+    ngspiceLoadOrder: 0,
+    setParam(_key: string, _value: number): void {},
+    getPinCurrents(_v: Float64Array): number[] { return []; },
+    setup(ctx: SetupContext): void {
+      if (nodeA !== 0) _hAA = ctx.solver.allocElement(nodeA, nodeA);
+      if (nodeB !== 0) _hBB = ctx.solver.allocElement(nodeB, nodeB);
+      if (nodeA !== 0 && nodeB !== 0) {
+        _hAB = ctx.solver.allocElement(nodeA, nodeB);
+        _hBA = ctx.solver.allocElement(nodeB, nodeA);
+      }
+    },
+    load(ctx: LoadContext): void {
+      const { solver } = ctx;
+      if (_hAA !== -1) solver.stampElement(_hAA, G);
+      if (_hBB !== -1) solver.stampElement(_hBB, G);
+      if (_hAB !== -1) solver.stampElement(_hAB, -G);
+      if (_hBA !== -1) solver.stampElement(_hBA, -G);
+    },
+  };
+}
 
 const N = 2, Vpeak = 10.0, freq = 1000, Lp = 500e-3, k = 0.99;
 const Rload = 100e3;
@@ -77,8 +131,8 @@ function doStep(tx: AnalogTappedTransformerElement, solver: SparseSolver, rhs: F
 
 describe("tx trace with NR", () => {
   it("traces transformer with NR per step", () => {
-    const tx = new AnalogTappedTransformerElement([1, 0, 2, 3, 4], bTx1, Lp, N, k, 0, 0);
-    const pool = allocateStatePool([tx as AnalogElementCore]);
+    const tx = new AnalogTappedTransformerElement([1, 0, 2, 3, 4], String(bTx1), Lp, N, k);
+    const pool = allocateStatePool([tx as unknown as AnalogElement]);
     const solver = new SparseSolver();
     let voltages = new Float64Array(matrixSize);
 

@@ -29,22 +29,74 @@ import { compileUnified } from "@/compile/compile.js";
 import { MNAEngine } from "../analog-engine.js";
 import { ConcreteCompiledAnalogCircuit } from "../compiled-analog-circuit.js";
 import { EngineState } from "../../../core/engine-interface.js";
-import {
-  makeResistor,
-  makeVoltageSource,
-  createTestCapacitor,
-  makeDiode,
-  makeInductor,
-  allocateStatePool,
-} from "./test-helpers.js";
+import { allocateStatePool } from "./test-helpers.js";
+import { makeDcVoltageSource, DC_VOLTAGE_SOURCE_DEFAULTS } from "../../../components/sources/dc-voltage-source.js";
 
 // Import real component definitions
 import { ResistorDefinition } from "../../../components/passives/resistor.js";
 import { DcVoltageSourceDefinition } from "../../../components/sources/dc-voltage-source.js";
 import { GroundDefinition } from "../../../components/io/ground.js";
 import { CapacitorDefinition } from "../../../components/passives/capacitor.js";
-import { DiodeDefinition } from "../../../components/semiconductors/diode.js";
+import { DiodeDefinition, createDiodeElement, DIODE_PARAM_DEFAULTS } from "../../../components/semiconductors/diode.js";
+import { InductorDefinition } from "../../../components/passives/inductor.js";
 import { NmosfetDefinition, PmosfetDefinition } from "../../../components/semiconductors/mosfet.js";
+import type { AnalogElement } from "../element.js";
+import type { AnalogFactory } from "../../../core/registry.js";
+
+// ---------------------------------------------------------------------------
+// Local production-factory wrappers (thin, no shape duplication)
+// ---------------------------------------------------------------------------
+
+/**
+ * Build a resistor analog element via the production ResistorDefinition factory.
+ * Pin labels "A" (nodeA) and "B" (nodeB) match ResistorDefinition.
+ */
+function makeResistor(nodeA: number, nodeB: number, resistance: number): AnalogElement {
+  const props = new PropertyBag();
+  props.replaceModelParams({ resistance });
+  const factory = (ResistorDefinition.modelRegistry!["behavioral"] as { kind: "inline"; factory: AnalogFactory }).factory;
+  return factory(new Map([["A", nodeA], ["B", nodeB]]), props, () => 0);
+}
+
+/**
+ * Build a capacitor analog element via the production CapacitorDefinition factory.
+ * Pin labels "pos" and "neg" match CapacitorDefinition.
+ */
+function createTestCapacitor(capacitance: number, posNode: number, negNode: number): AnalogElement {
+  const props = new PropertyBag();
+  props.replaceModelParams({ capacitance });
+  const factory = (CapacitorDefinition.modelRegistry!["behavioral"] as { kind: "inline"; factory: AnalogFactory }).factory;
+  return factory(new Map([["pos", posNode], ["neg", negNode]]), props, () => 0);
+}
+
+/**
+ * Build a diode analog element via the production createDiodeElement factory.
+ * Pin labels "A" (anode) and "K" (cathode) match DiodeDefinition.
+ */
+function makeDiode(nodeA: number, nodeK: number, IS: number, N: number): AnalogElement {
+  const props = new PropertyBag();
+  props.replaceModelParams({ ...DIODE_PARAM_DEFAULTS, IS, N });
+  return createDiodeElement(new Map([["A", nodeA], ["K", nodeK]]), props, () => 0);
+}
+
+/**
+ * Build an inductor analog element via the production InductorDefinition factory.
+ * Pin labels "A" and "B" match InductorDefinition. The third argument (_branchHint)
+ * was used by the old positional-array helper to pre-assign a branch row; the
+ * production factory leaves branchIndex=-1 so the engine assigns it during setup().
+ */
+function makeInductor(nodeA: number, nodeB: number, _branchHint: number, inductance: number): AnalogElement {
+  const props = new PropertyBag();
+  props.replaceModelParams({ inductance });
+  const factory = (InductorDefinition.modelRegistry!["behavioral"] as { kind: "inline"; factory: AnalogFactory }).factory;
+  return factory(new Map([["A", nodeA], ["B", nodeB]]), props, () => 0);
+}
+
+function makeVsrc(posNode: number, negNode: number, voltage: number): AnalogElement {
+  const props = new PropertyBag();
+  props.replaceModelParams({ ...DC_VOLTAGE_SOURCE_DEFAULTS, voltage });
+  return makeDcVoltageSource(new Map([["pos", posNode], ["neg", negNode]]), props, () => 0);
+}
 
 // ---------------------------------------------------------------------------
 // Minimal CircuitElement factory — same pattern as analog-compiler.test.ts
@@ -264,7 +316,7 @@ describe("End-to-end: tight transient tolerances", () => {
   it("rc_steady_state_no_drift", () => {
     // Vs=5V, R=1kΩ, C=1µF. After DC OP capacitor is at 5V.
     // Run 2ms transient — voltage must not drift from 5V.
-    const vs = makeVoltageSource(1, 0, 2, 5.0);
+    const vs = makeVsrc(1, 0, 5.0);
     const r = makeResistor(1, 2, 1000);
     const cap = createTestCapacitor(1e-6, 2, 0);
 
@@ -295,7 +347,7 @@ describe("End-to-end: tight transient tolerances", () => {
 
   it("rc_steady_state_current_zero", () => {
     // At steady state with C fully charged, current through R should be ~0.
-    const vs = makeVoltageSource(1, 0, 2, 5.0);
+    const vs = makeVsrc(1, 0, 5.0);
     const r = makeResistor(1, 2, 1000);
     const cap = createTestCapacitor(1e-6, 2, 0);
 
@@ -332,7 +384,7 @@ describe("End-to-end: tight transient tolerances", () => {
     // Vs=5V, R=100Ω, L=10mH → τ=L/R=0.1ms
     // At DC: inductor is short, I = 5V/100Ω = 50mA
     // Vs branch=2, L branch=3
-    const vs = makeVoltageSource(1, 0, 2, 5.0);
+    const vs = makeVsrc(1, 0, 5.0);
     const r = makeResistor(1, 2, 100);
     const ind = makeInductor(2, 0, 3, 10e-3);
 
@@ -377,7 +429,7 @@ describe("End-to-end: multi-nonlinear convergence", () => {
     // Vs=5V → R=1kΩ → D1 → D2 → GND
     // node1: Vs+, R.A;  node2: R.B, D1.anode;  node3: D1.cathode, D2.anode
     // Vs branch=3, matrixSize=4
-    const vs = makeVoltageSource(1, 0, 3, 5.0);
+    const vs = makeVsrc(1, 0, 5.0);
     const r = makeResistor(1, 2, 1000);
     const d1 = makeDiode(2, 3, 1e-14, 1.0);
     const d2 = makeDiode(3, 0, 1e-14, 1.0);
@@ -411,7 +463,7 @@ describe("End-to-end: multi-nonlinear convergence", () => {
   it("parallel_diodes", () => {
     // Vs=5V → R=1kΩ → [D1 || D2] → GND
     // node1: Vs+, R.A;  node2: R.B, D1.anode, D2.anode
-    const vs = makeVoltageSource(1, 0, 2, 5.0);
+    const vs = makeVsrc(1, 0, 5.0);
     const r = makeResistor(1, 2, 1000);
     const d1 = makeDiode(2, 0, 1e-14, 1.0);
     const d2 = makeDiode(2, 0, 1e-14, 1.0);
@@ -436,7 +488,7 @@ describe("End-to-end: multi-nonlinear convergence", () => {
     // Vs=5V → R1=1kΩ → mid → R2=1kΩ → GND
     //                   mid → D1 → GND
     // Without D1: V_mid = 2.5V. With D1: V_mid ≈ 0.65V (diode clamps)
-    const vs = makeVoltageSource(1, 0, 2, 5.0);
+    const vs = makeVsrc(1, 0, 5.0);
     const r1 = makeResistor(1, 2, 1000);
     const r2 = makeResistor(2, 0, 1000);
     const d1 = makeDiode(2, 0, 1e-14, 1.0);
@@ -461,7 +513,7 @@ describe("End-to-end: multi-nonlinear convergence", () => {
     // Vs=5V → R=1kΩ → node2 → D1(forward) → GND
     //                  node2 → D2(reverse: anode=gnd, cathode=node2) → GND
     // D2 reverse leakage is negligible; result ≈ single forward diode
-    const vs = makeVoltageSource(1, 0, 2, 5.0);
+    const vs = makeVsrc(1, 0, 5.0);
     const r = makeResistor(1, 2, 1000);
     const d1 = makeDiode(2, 0, 1e-14, 1.0);   // forward
     const d2 = makeDiode(0, 2, 1e-14, 1.0);   // reverse
@@ -489,7 +541,7 @@ describe("End-to-end: multi-nonlinear convergence", () => {
 describe("End-to-end: analytical verification", () => {
   it("resistor_divider_2_to_1_ratio", () => {
     // R1=2kΩ, R2=1kΩ → V_mid = 5 * 1/3 ≈ 1.6667V
-    const vs = makeVoltageSource(1, 0, 2, 5.0);
+    const vs = makeVsrc(1, 0, 5.0);
     const r1 = makeResistor(1, 2, 2000);
     const r2 = makeResistor(2, 0, 1000);
 
@@ -515,7 +567,7 @@ describe("End-to-end: analytical verification", () => {
     const n = 1.0;
     const Vt = 0.02585;
 
-    const vs = makeVoltageSource(1, 0, 2, Vs);
+    const vs = makeVsrc(1, 0, Vs);
     const r = makeResistor(1, 2, R);
     const d = makeDiode(2, 0, Is, n);
 
@@ -548,8 +600,8 @@ describe("End-to-end: analytical verification", () => {
     //
     // KCL at node2: (10-Vn2)/1k + (5-Vn2)/2k - Vn2/1k = 0
     //   25 = 5*Vn2 → Vn2 = 5V
-    const v1 = makeVoltageSource(1, 0, 3, 10.0);
-    const v2 = makeVoltageSource(3, 0, 4, 5.0);
+    const v1 = makeVsrc(1, 0, 10.0);
+    const v2 = makeVsrc(3, 0, 5.0);
     const r1 = makeResistor(1, 2, 1000);
     const r2 = makeResistor(3, 2, 2000);
     const r3 = makeResistor(2, 0, 1000);

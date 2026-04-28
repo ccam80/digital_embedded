@@ -70,11 +70,15 @@ class TestCircuitElement extends AbstractCircuitElement {
 
 function makeAnalogEl(pinNodeIds: number[]): AnalogElement {
   return {
-    pinNodeIds, allNodeIds: pinNodeIds, branchIndex: -1,
-    load: (_ctx: LoadContext) => void 0, isNonlinear: false, isReactive: false,
-    label: "test", stateSchema: { slots: [] }, stateBaseOffset: 0,
-    stateSize: 0, initState: () => {}, getPinCurrents: () => [],
-    setParam: () => {}, isPoolBacked: false,
+    _pinNodes: new Map(pinNodeIds.map((id, i) => [String(i), id])),
+    _stateBase: -1,
+    branchIndex: -1,
+    ngspiceLoadOrder: 0,
+    label: "test",
+    setup: (_ctx: unknown) => void 0,
+    load: (_ctx: LoadContext) => void 0,
+    getPinCurrents: () => [],
+    setParam: () => {},
   } as unknown as AnalogElement;
 }
 

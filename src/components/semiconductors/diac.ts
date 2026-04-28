@@ -24,7 +24,7 @@ import {
   type AttributeMapping,
   type ComponentDefinition,
 } from "../../core/registry.js";
-import type { AnalogElementCore, LoadContext } from "../../solver/analog/element.js";
+import type { AnalogElement, LoadContext } from "../../solver/analog/element.js";
 import { NGSPICE_LOAD_ORDER } from "../../solver/analog/element.js";
 import {
   createDiodeElement,
@@ -41,7 +41,7 @@ export function createDiacElement(
   pinNodes: ReadonlyMap<string, number>,
   props: PropertyBag,
   getTime: () => number,
-): AnalogElementCore {
+): AnalogElement {
   const nodeA = pinNodes.get("A")!; // terminal A
   const nodeB = pinNodes.get("B")!; // terminal B
 
@@ -69,12 +69,11 @@ export function createDiacElement(
   dRev.label = revLabel;
 
   return {
+    label: "",
     branchIndex: -1,
     _stateBase: -1,
     _pinNodes: new Map(pinNodes),
     ngspiceLoadOrder: NGSPICE_LOAD_ORDER.DIO,
-    isNonlinear: true,
-    isReactive: false,
 
     setup(ctx: SetupContext): void {
       dFwd.setup(ctx);   // D_fwd: DIO with posNode=A, negNode=B
@@ -263,7 +262,6 @@ export const DiacDefinition: ComponentDefinition = {
       factory: createDiacElement,
       paramDefs: DIODE_PARAM_DEFS,
       params: DIODE_PARAM_DEFAULTS,
-      mayCreateInternalNodes: true,
     },
   },
   defaultModel: "spice",

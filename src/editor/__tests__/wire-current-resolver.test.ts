@@ -14,13 +14,108 @@ import type { Rect, RenderContext } from "@/core/renderer-interface";
 import type { SerializedElement } from "@/core/element";
 import { MNAEngine } from "@/solver/analog/analog-engine";
 import type { ConcreteCompiledAnalogCircuit } from "@/solver/analog/compiled-analog-circuit";
-import {
-  makeResistor,
-  makeVoltageSource,
-  makeAcVoltageSource,
-  makeCapacitor,
-  makeInductor,
-} from "@/solver/analog/__tests__/test-helpers";
+import { makeDcVoltageSource, DC_VOLTAGE_SOURCE_DEFAULTS } from "@/components/sources/dc-voltage-source";
+import { AnalogCapacitorElement, CAPACITOR_DEFAULTS } from "@/components/passives/capacitor";
+import { AnalogInductorElement, INDUCTOR_DEFAULTS } from "@/components/passives/inductor";
+import { PropertyBag } from "@/core/properties";
+import { makeAcVoltageSourceElement } from "@/components/sources/ac-voltage-source";
+import type { SetupContext } from "@/solver/analog/setup-context";
+import type { LoadContext } from "@/solver/analog/load-context";
+
+// ---------------------------------------------------------------------------
+// Local element factory helpers — use production constructors / factories
+// ---------------------------------------------------------------------------
+
+/** Inline resistor factory: 2-terminal, stamps conductance G=1/R. */
+function makeResistor(posNode: number, negNode: number, resistance: number): AnalogElement {
+  const G = 1 / Math.max(resistance, 1e-9);
+  let _hPP = -1, _hNN = -1, _hPN = -1, _hNP = -1;
+  const pinNodes = new Map([["A", posNode], ["B", negNode]]);
+  const res: AnalogElement = {
+    label: "",
+    ngspiceLoadOrder: 40,
+    _pinNodes: new Map(pinNodes),
+    _stateBase: -1,
+    branchIndex: -1,
+    setup(ctx) {
+      const p = res._pinNodes.get("A")!;
+      const n = res._pinNodes.get("B")!;
+      _hPP = ctx.solver.allocElement(p, p);
+      _hNN = ctx.solver.allocElement(n, n);
+      _hPN = ctx.solver.allocElement(p, n);
+      _hNP = ctx.solver.allocElement(n, p);
+    },
+    load(ctx) {
+      ctx.solver.stampElement(_hPP, G);
+      ctx.solver.stampElement(_hNN, G);
+      ctx.solver.stampElement(_hPN, -G);
+      ctx.solver.stampElement(_hNP, -G);
+    },
+    getPinCurrents(rhs) {
+      const vA = rhs[res._pinNodes.get("A")!];
+      const vB = rhs[res._pinNodes.get("B")!];
+      const I = G * (vA - vB);
+      return [I, -I];
+    },
+    setParam(key, value) {
+      void key; void value;
+    },
+  };
+  return res;
+}
+
+/** DC voltage source factory wrapping makeDcVoltageSource. */
+function makeDcVsElement(posNode: number, negNode: number, _branchNode: number, voltage: number): AnalogElement {
+  const props = new PropertyBag();
+  props.replaceModelParams({ ...DC_VOLTAGE_SOURCE_DEFAULTS, voltage });
+  return makeDcVoltageSource(new Map([["pos", posNode], ["neg", negNode]]), props, () => 0);
+}
+
+/** AC voltage source factory wrapping createAcVoltageSourceElement. */
+function makeAcVoltageSource(
+  posNode: number,
+  negNode: number,
+  branchNode: number,
+  amplitude: number,
+  frequency: number,
+  phase: number,
+  dcOffset: number,
+  getTime: () => number,
+): AnalogElement {
+  void branchNode;
+  const props = new PropertyBag();
+  props.replaceModelParams({ amplitude, frequency, phase, dcOffset });
+  return makeAcVoltageSourceElement(
+    new Map([["pos", posNode], ["neg", negNode]]),
+    props,
+    getTime,
+  );
+}
+
+/** Capacitor factory using the production AnalogCapacitorElement. */
+function makeCapacitor(posNode: number, negNode: number, capacitance: number): AnalogElement {
+  return new AnalogCapacitorElement(
+    new Map([["pos", posNode], ["neg", negNode]]),
+    capacitance,
+    CAPACITOR_DEFAULTS["IC"]!,
+    CAPACITOR_DEFAULTS["TC1"]!,
+    CAPACITOR_DEFAULTS["TC2"]!,
+    CAPACITOR_DEFAULTS["TNOM"]!,
+    CAPACITOR_DEFAULTS["SCALE"]!,
+    CAPACITOR_DEFAULTS["M"]!,
+  );
+}
+
+/** Inductor factory using the production AnalogInductorElement. */
+function makeInductor(posNode: number, negNode: number, branchNode: number, inductance: number): AnalogElement {
+  void branchNode;
+  const props = new PropertyBag();
+  props.replaceModelParams({ ...INDUCTOR_DEFAULTS, inductance });
+  return new AnalogInductorElement(
+    new Map([["A", posNode], ["B", negNode]]),
+    props,
+  );
+}
 
 // ---------------------------------------------------------------------------
 // Test helpers
@@ -32,15 +127,18 @@ function makeWire(x1: number, y1: number, x2: number, y2: number): Wire {
 }
 
 /** Minimal AnalogElement stub with stamp no-op. */
-function makeMockElement(pinNodeIds: number[], branchIndex = -1): AnalogElement {
+function makeMockElement(pinNodes: number[], branchIndex = -1): AnalogElement {
+  const pins = new Map(pinNodes.map((n, i) => [`p${i}`, n]));
   return {
-    pinNodeIds,
-    allNodeIds: pinNodeIds,
+    label: "",
+    ngspiceLoadOrder: 0,
+    _pinNodes: pins,
+    _stateBase: -1,
     branchIndex,
-    stamp() {},
-    isNonlinear: false,
-    isReactive: false,
-    getPinCurrents() { return pinNodeIds.map(() => 0); },
+    setup(_ctx: SetupContext) {},
+    load(_ctx: LoadContext) {},
+    getPinCurrents() { return pinNodes.map(() => 0); },
+    setParam(_k: string, _v: number) {},
   } as unknown as AnalogElement;
 }
 
@@ -418,7 +516,7 @@ describe("WireCurrentResolver — KCL conservation", () => {
       R3 = 3000,
       VS = 5;
     // MNA: node1=idx0, node2=idx1, branch=idx2 → matrixSize=3
-    const vs = makeVoltageSource(1, 0, 2, VS);
+    const vs = makeDcVsElement(1, 0, 2, VS);
     const r1 = makeResistor(1, 2, R1);
     const r2 = makeResistor(2, 0, R2);
     const r3 = makeResistor(2, 0, R3);
@@ -488,7 +586,7 @@ describe("WireCurrentResolver — KCL conservation", () => {
     const R1v = 1000, R2v = 2000, R3v = 1000, R4v = 3000;
     const R5v = 2000, R6v = 1000, R7v = 4000;
 
-    const vs = makeVoltageSource(1, 0, 4, VS);
+    const vs = makeDcVsElement(1, 0, 4, VS);
     const r1 = makeResistor(1, 2, R1v);
     const r2 = makeResistor(2, 0, R2v);
     const r3 = makeResistor(2, 3, R3v);
@@ -689,7 +787,7 @@ describe("WireCurrentResolver — AC transient RLC", () => {
 
       resolver.resolve(makeContextFromEngine(engine, compiled));
 
-      // Element currents (convention: positive = from pinNodeIds[0] to [1])
+      // Element currents (convention: positive flows from first pin in _pinNodes insertion order to second)
       const I_R = engine.getElementCurrent(1);   // resistor
       const I_C = engine.getElementCurrent(2);   // capacitor
       const I_L = engine.getElementCurrent(3);   // inductor
@@ -726,9 +824,9 @@ describe("WireCurrentResolver — AC transient RLC", () => {
       // KCL at node 2: I_R (entering via terminal 1) = I_C + I_L (leaving via terminal 0)
       // Signed: I_R - I_C - I_L should ≈ 0
       // But from getElementCurrent convention:
-      //   R: pinNodeIds=[1,2], positive I_R flows 1→2, so I_R enters node 2
-      //   C: pinNodeIds=[2,0], positive I_C flows 2→0, so I_C leaves node 2
-      //   L: pinNodeIds=[2,0], positive I_L flows 2→0, so I_L leaves node 2
+      //   R: _pinNodes=["A"→1,"B"→2], positive I_R flows 1→2, so I_R enters node 2
+      //   C: _pinNodes=["pos"→2,"neg"→0], positive I_C flows 2→0, so I_C leaves node 2
+      //   L: _pinNodes=["A"→2,"B"→0], positive I_L flows 2→0, so I_L leaves node 2
       // KCL: I_R - I_C - I_L = 0
       const kclResidual = Math.abs(I_R - I_C - I_L) / maxI;
       if (kclResidual > maxKclError) maxKclError = kclResidual;
@@ -986,7 +1084,7 @@ describe("WireCurrentResolver — lrctest.dig real fixture", () => {
 
     for (let eIdx = 0; eIdx < compiled.elements.length; eIdx++) {
       const ae = compiled.elements[eIdx];
-      if (ae.pinNodeIds.length !== 2) continue;
+      if (ae._pinNodes.size !== 2) continue;
       const ce = compiled.elementToCircuitElement.get(eIdx);
       if (!ce) continue;
       const pins = ce.getPins();
@@ -998,15 +1096,19 @@ describe("WireCurrentResolver — lrctest.dig real fixture", () => {
       const pinAWires: Wire[] = [];
       const pinBWires: Wire[] = [];
 
+      const pinNodeValues = [...ae._pinNodes.values()];
+      const nodeA = pinNodeValues[0];
+      const nodeB = pinNodeValues[1];
+
       for (const wire of circuit.wires) {
         const nodeId = compiled.wireToNodeId.get(wire);
         if (nodeId === undefined) continue;
 
-        const matchA = (nodeId === ae.pinNodeIds[0]) && (
+        const matchA = (nodeId === nodeA) && (
           (Math.abs(wire.start.x - posA.x) < 1 && Math.abs(wire.start.y - posA.y) < 1) ||
           (Math.abs(wire.end.x - posA.x) < 1 && Math.abs(wire.end.y - posA.y) < 1)
         );
-        const matchB = (nodeId === ae.pinNodeIds[1]) && (
+        const matchB = (nodeId === nodeB) && (
           (Math.abs(wire.start.x - posB.x) < 1 && Math.abs(wire.start.y - posB.y) < 1) ||
           (Math.abs(wire.end.x - posB.x) < 1 && Math.abs(wire.end.y - posB.y) < 1)
         );
@@ -1036,10 +1138,11 @@ describe("WireCurrentResolver — lrctest.dig real fixture", () => {
         if (I_elem < 1e-9) continue;
 
         const ae = compiled.elements[eIdx];
+        const pinNodeValues = [...ae._pinNodes.values()];
 
         for (const [pinWires, nodeIdx] of [
-          [pinAWires, ae.pinNodeIds[0]] as const,
-          [pinBWires, ae.pinNodeIds[1]] as const,
+          [pinAWires, pinNodeValues[0]] as const,
+          [pinBWires, pinNodeValues[1]] as const,
         ]) {
           if (pinWires.length === 0) continue;
 
@@ -1065,7 +1168,7 @@ describe("WireCurrentResolver — lrctest.dig real fixture", () => {
       let pathIdx = 0;
       for (let eIdx = 0; eIdx < compiled.elements.length && pathIdx < paths.length; eIdx++) {
         const ae = compiled.elements[eIdx];
-        if (ae.pinNodeIds.length !== 2) continue;
+        if (ae._pinNodes.size !== 2) continue;
         if (!compiled.elementToCircuitElement.get(eIdx)) continue;
 
         const I_elem = Math.abs(engine.getElementCurrent(eIdx));
@@ -1091,7 +1194,7 @@ describe("WireCurrentResolver — lrctest.dig real fixture", () => {
     expect(finalPaths.length).toBeGreaterThan(0);
     for (let eIdx = 0, pIdx = 0; eIdx < compiled.elements.length && pIdx < finalPaths.length; eIdx++) {
       const ae = compiled.elements[eIdx];
-      if (ae.pinNodeIds.length !== 2) continue;
+      if (ae._pinNodes.size !== 2) continue;
       if (!compiled.elementToCircuitElement.get(eIdx)) continue;
       pIdx++;
     }
@@ -1195,7 +1298,7 @@ describe("WireCurrentResolver — lrctest.dig real fixture", () => {
 
       for (let eIdx = 0; eIdx < compiled.elements.length; eIdx++) {
         const ae = compiled.elements[eIdx];
-        if (ae.pinNodeIds.length !== 2) continue;
+        if (ae._pinNodes.size !== 2) continue;
         const ce = compiled.elementToCircuitElement.get(eIdx);
         if (!ce) continue;
 
@@ -1210,9 +1313,11 @@ describe("WireCurrentResolver — lrctest.dig real fixture", () => {
         const vB = vertices[1];
         if (!vA || !vB) { pathIdx++; continue; }
 
+        const pinNodeValues = [...ae._pinNodes.values()];
+
         // Find the wire at each pin's vertex
-        const wireA = findWireAtVertex(vA, ae.pinNodeIds[0]);
-        const wireB = findWireAtVertex(vB, ae.pinNodeIds[1]);
+        const wireA = findWireAtVertex(vA, pinNodeValues[0]);
+        const wireB = findWireAtVertex(vB, pinNodeValues[1]);
         if (!wireA || !wireB) { pathIdx++; continue; }
 
         const cA = resolver.getWireCurrent(wireA)?.current ?? 0;
@@ -1222,8 +1327,8 @@ describe("WireCurrentResolver — lrctest.dig real fixture", () => {
         const bodyCurrent = pathIdx < paths.length ? paths[pathIdx].current : 0;
 
         // Determine if each pin is at a junction (multiple wires at vertex)
-        const isJunctionA = wireCountAtVertex(vA, ae.pinNodeIds[0]) > 1;
-        const isJunctionB = wireCountAtVertex(vB, ae.pinNodeIds[1]) > 1;
+        const isJunctionA = wireCountAtVertex(vA, pinNodeValues[0]) > 1;
+        const isJunctionB = wireCountAtVertex(vB, pinNodeValues[1]) > 1;
 
         // CHECK 1: For non-junction pins, wire current must match body current.
         // At a junction vertex the component's current splits across multiple
@@ -1276,7 +1381,7 @@ describe("WireCurrentResolver — misaligned pin snap (mock)", () => {
     // wire current on the ground side differ from the R2 side.
     const VS = 5, R1v = 1000, R2v = 1000;
 
-    const vs = makeVoltageSource(1, 0, 2, VS); // branch index = nodeCount
+    const vs = makeDcVsElement(1, 0, 2, VS); // branch index = nodeCount
     const r1 = makeResistor(1, 2, R1v);
     const r2 = makeResistor(2, 0, R2v);
 
@@ -1321,8 +1426,23 @@ describe("WireCurrentResolver — misaligned pin snap (mock)", () => {
     const resolver = new WireCurrentResolver();
     resolver.resolve(makeContextFromEngine(engine, compiled as unknown as ConcreteCompiledAnalogCircuit));
 
-    Math.abs(engine.getElementCurrent(2));
+    const I_R2 = Math.abs(engine.getElementCurrent(2));
 
     // THE KEY CHECKS:
+    // wb (node 2): R1.B(6,0) → R2.A(8,0) — both endpoints match pins, single wire at node 2.
+    // Wire wb must carry R2's current (= R1's current = series current).
+    const cWb = resolver.getWireCurrent(wb)!.current;
+    expect(cWb).toBeGreaterThan(0);
+    expect(Math.abs(cWb - I_R2) / I_R2).toBeLessThan(0.01);
+
+    // wg1 (ground, node 0): R2.B(10,3) lies ON segment (10,0)→(10,6) but not at an endpoint.
+    // With snap-to-vertex, the resolver must still attribute R2's current to wg1.
+    const cWg1 = resolver.getWireCurrent(wg1)!.current;
+    expect(cWg1).toBeGreaterThan(0);
+    expect(Math.abs(cWg1 - I_R2) / I_R2).toBeLessThan(0.01);
+
+    // Component body paths — one per element (vs, r1, r2)
+    const paths = resolver.getComponentPaths();
+    expect(paths).toHaveLength(3);
   });
 });

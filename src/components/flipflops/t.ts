@@ -280,7 +280,6 @@ export const TDefinition: ComponentDefinition = {
       factory: makeTFlipflopAnalogFactory(),
       paramDefs: [],
       params: {},
-      mayCreateInternalNodes: false,
     },
   },
   models: {

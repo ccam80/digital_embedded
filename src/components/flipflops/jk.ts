@@ -284,7 +284,6 @@ export const JKDefinition: ComponentDefinition = {
       factory: makeJKFlipflopAnalogFactory(),
       paramDefs: [],
       params: {},
-      mayCreateInternalNodes: false,
     },
   },
   models: {

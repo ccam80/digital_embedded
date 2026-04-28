@@ -21,8 +21,9 @@ import {
   type ComponentDefinition,
 } from "../../core/registry.js";
 import { formatSI } from "../../editor/si-format.js";
-import type { AnalogElementCore, ReactiveAnalogElementCore, IntegrationMethod, LoadContext } from "../../solver/analog/element.js";
-import { NGSPICE_LOAD_ORDER } from "../../solver/analog/element.js";
+import type { PoolBackedAnalogElement, IntegrationMethod } from "../../core/analog-types.js";
+import { NGSPICE_LOAD_ORDER } from "../../core/analog-types.js";
+import type { LoadContext } from "../../solver/analog/load-context.js";
 import { cktTerr } from "../../solver/analog/ckt-terr.js";
 import { niIntegrate } from "../../solver/analog/ni-integrate.js";
 import {
@@ -161,19 +162,16 @@ const SLOT_V    = 2;
 const SLOT_Q    = 3;
 const SLOT_CCAP = 4;
 
-export class AnalogCapacitorElement implements ReactiveAnalogElementCore {
-  pinNodeIds!: readonly number[];
-  readonly branchIndex = -1;
+export class AnalogCapacitorElement implements PoolBackedAnalogElement {
+  branchIndex: number = -1;
   _stateBase: number = -1;
-  _pinNodes: Map<string, number> = new Map();
+  _pinNodes: Map<string, number>;
+  label: string = "";
 
   readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.CAP;
-  readonly isNonlinear = false;
-  readonly isReactive = true;
   readonly poolBacked = true as const;
   readonly stateSchema = CAPACITOR_SCHEMA;
   readonly stateSize = CAPACITOR_SCHEMA.size;
-  stateBaseOffset = -1;
 
   private _nominalC: number;
   private C: number;
@@ -191,7 +189,8 @@ export class AnalogCapacitorElement implements ReactiveAnalogElementCore {
   private _hPN: number = -1;
   private _hNP: number = -1;
 
-  constructor(capacitance: number, IC: number, TC1: number, TC2: number, TNOM: number, SCALE: number, M: number) {
+  constructor(pinNodes: ReadonlyMap<string, number>, capacitance: number, IC: number, TC1: number, TC2: number, TNOM: number, SCALE: number, M: number) {
+    this._pinNodes = new Map(pinNodes);
     this._nominalC = capacitance;
     this._IC = IC;
     this._TC1 = TC1;
@@ -207,8 +206,8 @@ export class AnalogCapacitorElement implements ReactiveAnalogElementCore {
   }
 
   setup(ctx: import("../../solver/analog/setup-context.js").SetupContext): void {
-    const posNode = this.pinNodeIds[0];  // CAPposNode
-    const negNode = this.pinNodeIds[1];  // CAPnegNode
+    const posNode = this._pinNodes.get("pos")!;  // CAPposNode
+    const negNode = this._pinNodes.get("neg")!;  // CAPnegNode
 
     // capsetup.c:102-103  *states += 2 (CAPqcap slot).
     // digiTS uses stateSize slots (GEQ, IEQ, V, Q, CCAP) to cover all
@@ -216,7 +215,6 @@ export class AnalogCapacitorElement implements ReactiveAnalogElementCore {
     // derives GEQ/IEQ/V on the fly from state. Allocate full stateSize so
     // the pool covers every field load() reads/writes.
     this._stateBase = ctx.allocStates(this.stateSize);
-    this.stateBaseOffset = this._stateBase;
 
     // capsetup.c:114-117  TSTALLOC sequence, line-for-line, with ground guards.
     if (posNode !== 0) this._hPP = ctx.solver.allocElement(posNode, posNode);
@@ -229,7 +227,7 @@ export class AnalogCapacitorElement implements ReactiveAnalogElementCore {
 
   initState(pool: StatePoolRef): void {
     this._pool = pool;
-    applyInitialValues(CAPACITOR_SCHEMA, pool, this.stateBaseOffset, {});
+    applyInitialValues(CAPACITOR_SCHEMA, pool, this._stateBase, {});
   }
 
   setParam(key: string, value: number): void {
@@ -270,12 +268,12 @@ export class AnalogCapacitorElement implements ReactiveAnalogElementCore {
    */
   load(ctx: LoadContext): void {
     const { solver, rhsOld: voltages, ag, cktMode: mode } = ctx;
-    const n0 = this.pinNodeIds[0];
-    const n1 = this.pinNodeIds[1];
+    const n0 = this._pinNodes.get("pos")!;
+    const n1 = this._pinNodes.get("neg")!;
     const C = this.C;
     // capload.c:44  m = CAPm; applied at every stamp site, not folded into C.
     const m = this._M;
-    const base = this.stateBaseOffset;
+    const base = this._stateBase;
     // pool.states[N] accessed at call time  no cached Float64Array refs (A4).
     const s0 = this._pool.states[0];
     const s1 = this._pool.states[1];
@@ -360,12 +358,12 @@ export class AnalogCapacitorElement implements ReactiveAnalogElementCore {
   }
 
   getPinCurrents(rhs: Float64Array): number[] {
-    const n0 = this.pinNodeIds[0];
-    const n1 = this.pinNodeIds[1];
+    const n0 = this._pinNodes.get("pos")!;
+    const n1 = this._pinNodes.get("neg")!;
     const v0 = rhs[n0];
     const v1 = rhs[n1];
     const s0 = this._pool.states[0];
-    const base = this.stateBaseOffset;
+    const base = this._stateBase;
     const geq = s0[base + SLOT_GEQ];
     const ieq = s0[base + SLOT_IEQ];
     const I = geq * (v0 - v1) + ieq;
@@ -379,7 +377,7 @@ export class AnalogCapacitorElement implements ReactiveAnalogElementCore {
     method: IntegrationMethod,
     lteParams: import("../../solver/analog/ckt-terr.js").LteParams,
   ): number {
-    const base = this.stateBaseOffset;
+    const base = this._stateBase;
     const s0 = this._pool.states[0];
     const s1 = this._pool.states[1];
     const s2 = this._pool.states[2];
@@ -395,10 +393,10 @@ export class AnalogCapacitorElement implements ReactiveAnalogElementCore {
 }
 
 function createCapacitorElement(
-  _pinNodes: ReadonlyMap<string, number>,
+  pinNodes: ReadonlyMap<string, number>,
   props: PropertyBag,
   _getTime: () => number,
-): AnalogElementCore {
+): PoolBackedAnalogElement {
   const C     = props.getModelParam<number>("capacitance");
   const IC    = props.hasModelParam("IC")    ? props.getModelParam<number>("IC")    : CAPACITOR_DEFAULTS["IC"]!;
   const TC1   = props.hasModelParam("TC1")   ? props.getModelParam<number>("TC1")   : CAPACITOR_DEFAULTS["TC1"]!;
@@ -406,7 +404,7 @@ function createCapacitorElement(
   const TNOM  = props.hasModelParam("TNOM")  ? props.getModelParam<number>("TNOM")  : CAPACITOR_DEFAULTS["TNOM"]!;
   const SCALE = props.hasModelParam("SCALE") ? props.getModelParam<number>("SCALE") : CAPACITOR_DEFAULTS["SCALE"]!;
   const M     = props.hasModelParam("M")     ? props.getModelParam<number>("M")     : CAPACITOR_DEFAULTS["M"]!;
-  return new AnalogCapacitorElement(C, IC, TC1, TC2, TNOM, SCALE, M);
+  return new AnalogCapacitorElement(pinNodes, C, IC, TC1, TC2, TNOM, SCALE, M);
 }
 
 // ---------------------------------------------------------------------------

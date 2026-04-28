@@ -1,10 +1,10 @@
-﻿/**
+/**
  * Tests for the DC operating point solver (Tasks 1.1.3 and 1.3.2).
  *
  * Tests cover all four outcomes:
  *   - Direct NR convergence (Level 0)
- *   - Gmin stepping fallback (Level 1)
- *   - Source stepping fallback (Level 2)
+ *   - Gmin stepping (Level 1)
+ *   - Source stepping (Level 2)
  *   - Total failure with blame attribution (Level 3)
  */
 
@@ -33,16 +33,113 @@ import { solveDcOperatingPoint, cktncDump } from "../dc-operating-point.js";
 import { CKTCircuitContext } from "../ckt-context.js";
 import { SparseSolver } from "../sparse-solver.js";
 import { stampRHS } from "../stamp-helpers.js";
-import { makeResistor, makeVoltageSource, makeDiode, allocateStatePool } from "./test-helpers.js";
+import { allocateStatePool, makeTestSetupContext, setupAll } from "./test-helpers.js";
 import type { AnalogElement } from "../element.js";
 import { DEFAULT_SIMULATION_PARAMS, resolveSimulationParams } from "../../../core/analog-engine-interface.js";
 import type { SimulationParams } from "../../../core/analog-engine-interface.js";
+import { makeDcVoltageSource, DC_VOLTAGE_SOURCE_DEFAULTS } from "../../../components/sources/dc-voltage-source.js";
+import { PropertyBag } from "../../../core/properties.js";
+import { NGSPICE_LOAD_ORDER } from "../../../core/analog-types.js";
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
 const noopBreakpoint = (_t: number): void => {};
+
+/**
+ * Build a simple inline resistor element (two-terminal, conductance stamp).
+ * Shaped per §A contract: _pinNodes, label, ngspiceLoadOrder, _stateBase, setup().
+ */
+function makeResistor(nodeA: number, nodeB: number, resistance: number): AnalogElement {
+  const G = 1 / resistance;
+  let _hAA = -1, _hBB = -1, _hAB = -1, _hBA = -1;
+  const el: AnalogElement = {
+    label: "",
+    ngspiceLoadOrder: NGSPICE_LOAD_ORDER.RES,
+    _pinNodes: new Map([["A", nodeA], ["B", nodeB]]),
+    _stateBase: -1,
+    branchIndex: -1,
+    setup(ctx): void {
+      const a = el._pinNodes.get("A")!;
+      const b = el._pinNodes.get("B")!;
+      if (a !== 0) _hAA = ctx.solver.allocElement(a, a);
+      if (b !== 0) _hBB = ctx.solver.allocElement(b, b);
+      if (a !== 0 && b !== 0) {
+        _hAB = ctx.solver.allocElement(a, b);
+        _hBA = ctx.solver.allocElement(b, a);
+      }
+    },
+    load(ctx): void {
+      const solver = ctx.solver;
+      if (_hAA !== -1) solver.stampElement(_hAA,  G);
+      if (_hBB !== -1) solver.stampElement(_hBB,  G);
+      if (_hAB !== -1) solver.stampElement(_hAB, -G);
+      if (_hBA !== -1) solver.stampElement(_hBA, -G);
+    },
+    setParam(_key: string, _value: number): void {},
+    getPinCurrents(_rhs: Float64Array): number[] { return [0, 0]; },
+  };
+  return el;
+}
+
+/**
+ * Build a simple inline diode element (Shockley model, two nodes).
+ * Shaped per §A contract.
+ */
+function makeDiode(nodeAnode: number, nodeCathode: number, Is: number, N: number): AnalogElement {
+  const vt = 0.025852;
+  let _hAA = -1, _hKK = -1, _hAK = -1, _hKA = -1;
+  const el: AnalogElement = {
+    label: "",
+    ngspiceLoadOrder: NGSPICE_LOAD_ORDER.DIO,
+    _pinNodes: new Map([["A", nodeAnode], ["K", nodeCathode]]),
+    _stateBase: -1,
+    branchIndex: -1,
+    setup(ctx): void {
+      const a = el._pinNodes.get("A")!;
+      const k = el._pinNodes.get("K")!;
+      if (a !== 0) _hAA = ctx.solver.allocElement(a, a);
+      if (k !== 0) _hKK = ctx.solver.allocElement(k, k);
+      if (a !== 0 && k !== 0) {
+        _hAK = ctx.solver.allocElement(a, k);
+        _hKA = ctx.solver.allocElement(k, a);
+      }
+    },
+    load(ctx): void {
+      const { solver } = ctx;
+      const a = el._pinNodes.get("A")!;
+      const k = el._pinNodes.get("K")!;
+      const vA = ctx.rhsOld[a] ?? 0;
+      const vK = k !== 0 ? (ctx.rhsOld[k] ?? 0) : 0;
+      const v = vA - vK;
+      const vMax = 40 * vt * N;
+      const expv = v > vMax ? Math.exp(vMax / (vt * N)) : Math.exp(v / (vt * N));
+      const id = Is * (expv - 1);
+      const geq = (Is * expv) / (vt * N);
+      const ieq = id - geq * v;
+      if (_hAA !== -1) solver.stampElement(_hAA,  geq);
+      if (_hKK !== -1) solver.stampElement(_hKK,  geq);
+      if (_hAK !== -1) solver.stampElement(_hAK, -geq);
+      if (_hKA !== -1) solver.stampElement(_hKA, -geq);
+      if (a !== 0) stampRHS(ctx.rhs, a, -ieq);
+      if (k !== 0) stampRHS(ctx.rhs, k,  ieq);
+    },
+    checkConvergence(ctx): boolean {
+      const a = el._pinNodes.get("A")!;
+      const k = el._pinNodes.get("K")!;
+      const vA = ctx.rhsOld[a] ?? 0;
+      const vK = k !== 0 ? (ctx.rhsOld[k] ?? 0) : 0;
+      const vANew = ctx.rhs[a] ?? 0;
+      const vKNew = k !== 0 ? (ctx.rhs[k] ?? 0) : 0;
+      const dv = Math.abs((vANew - vKNew) - (vA - vK));
+      return dv < ctx.voltTol + ctx.reltol * Math.max(Math.abs(vANew - vKNew), Math.abs(vA - vK));
+    },
+    setParam(_key: string, _value: number): void {},
+    getPinCurrents(_rhs: Float64Array): number[] { return [0, 0]; },
+  };
+  return el;
+}
 
 /**
  * Create a test element that forces NR to report non-convergence until
@@ -67,12 +164,12 @@ function makeGminDependentElement(nodeA: number, nodeB: number = 0): AnalogEleme
     if (row !== 0 && col !== 0) solver.stampElement(solver.allocElement(row, col), val);
   }
   return {
-    pinNodeIds: nodeB === 0 ? [nodeA] : [nodeA, nodeB],
-    allNodeIds: nodeB === 0 ? [nodeA] : [nodeA, nodeB],
+    label: "",
+    ngspiceLoadOrder: NGSPICE_LOAD_ORDER.DIO,
+    _pinNodes: nodeB === 0 ? new Map([["A", nodeA]]) : new Map([["A", nodeA], ["B", nodeB]]),
+    _stateBase: -1,
     branchIndex: -1,
-    ngspiceLoadOrder: 0,
-    isNonlinear: true,
-    isReactive: false,
+    setup(_ctx): void {},
     setParam(_key: string, _value: number): void {},
 
     load(ctx: import("../load-context.js").LoadContext): void {
@@ -102,7 +199,7 @@ function makeGminDependentElement(nodeA: number, nodeB: number = 0): AnalogEleme
       // has been warmed up and the final clean solve (gmin=0) can converge.
       if (ctx.gmin > 0) seenPositiveDiagGmin = true;
       // Force non-convergence when gmin=0 so direct NR fails and the
-      // gmin stepping fallback is reliably entered. Stop blocking once gmin
+      // gmin stepping path is reliably entered. Stop blocking once gmin
       // stepping has warmed up the solution.
       if (ctx.gmin === 0 && !seenPositiveDiagGmin) ctx.noncon.value++;
     },
@@ -134,12 +231,12 @@ function makeSrcSteppingRequiredElement(nodeA: number, nodeB: number = 0): Analo
     if (row !== 0 && col !== 0) solver.stampElement(solver.allocElement(row, col), val);
   }
   return {
-    pinNodeIds: nodeB === 0 ? [nodeA] : [nodeA, nodeB],
-    allNodeIds: nodeB === 0 ? [nodeA] : [nodeA, nodeB],
+    label: "",
+    ngspiceLoadOrder: NGSPICE_LOAD_ORDER.DIO,
+    _pinNodes: nodeB === 0 ? new Map([["A", nodeA]]) : new Map([["A", nodeA], ["B", nodeB]]),
+    _stateBase: -1,
     branchIndex: -1,
-    ngspiceLoadOrder: 0,
-    isNonlinear: true,
-    isReactive: false,
+    setup(_ctx): void {},
     setParam(_key: string, _value: number): void {},
 
     load(ctx: import("../load-context.js").LoadContext): void {
@@ -169,7 +266,7 @@ function makeSrcSteppingRequiredElement(nodeA: number, nodeB: number = 0): Analo
       if (ctx.srcFact < 1) seenPartialSrcFact = true;
       // Force non-convergence at full scale until source stepping has warmed
       // up the operating point. Direct NR and gmin stepping both run at
-      // srcFact=1 and fail here, triggering the source-stepping fallback.
+      // srcFact=1 and fail here, triggering source stepping.
       if (ctx.srcFact >= 1 && !seenPartialSrcFact) ctx.noncon.value++;
     },
 
@@ -181,6 +278,7 @@ const DEFAULT_PARAMS = resolveSimulationParams(DEFAULT_SIMULATION_PARAMS);
 
 /**
  * Build a CKTCircuitContext for a test circuit.
+ * Calls setupAll after construction so TSTALLOC handles are allocated.
  */
 function makeCtx(
   elements: readonly AnalogElement[],
@@ -188,17 +286,35 @@ function makeCtx(
   branchCount: number,
   params: SimulationParams = DEFAULT_PARAMS,
 ): CKTCircuitContext {
-  const pool = allocateStatePool(elements as AnalogElement[]);
-  const circuit = {
-    nodeCount,
-    branchCount,
-    matrixSize: nodeCount + branchCount,
-    elements,
-    statePool: pool,
-  };
   const resolved = resolveSimulationParams(params);
-  const ctx = new CKTCircuitContext(circuit, resolved, noopBreakpoint, new SparseSolver());
+  const solver = new SparseSolver();
+  const ctx = new CKTCircuitContext(
+    { nodeCount, elements },
+    resolved,
+    noopBreakpoint,
+    solver,
+  );
   ctx.diagnostics = new DiagnosticCollector();
+
+  // Run setup() on all elements after CKTCircuitContext construction
+  // (constructor calls solver._initStructure which wipes prior handles).
+  const setupCtx = makeTestSetupContext({
+    solver,
+    startBranch: nodeCount + 1,
+    startNode: nodeCount + branchCount + 1,
+    elements: [...elements],
+  });
+  setupAll([...elements], setupCtx);
+
+  const pool = allocateStatePool(elements as AnalogElement[]);
+  const matrixSize = nodeCount + branchCount;
+  ctx.statePool = pool;
+  const numStates = pool.state0.length;
+  ctx.dcopSavedState0 = new Float64Array(Math.max(numStates, 1));
+  ctx.dcopOldState0 = new Float64Array(Math.max(numStates, 1));
+  ctx.loadCtx.setStatePool(pool);
+  ctx.allocateRowBuffers(matrixSize);
+
   return ctx;
 }
 
@@ -216,12 +332,12 @@ function makeScalableVoltageSource(
   voltage: number,
 ): AnalogElement {
   return {
-    pinNodeIds: [nodePos, nodeNeg],
-    allNodeIds: [nodePos, nodeNeg],
+    label: "",
+    ngspiceLoadOrder: NGSPICE_LOAD_ORDER.VSRC,
+    _pinNodes: new Map([["pos", nodePos], ["neg", nodeNeg]]),
+    _stateBase: -1,
     branchIndex: branchIdx,
-    ngspiceLoadOrder: 0,
-    isNonlinear: false,
-    isReactive: false,
+    setup(_ctx): void {},
     load(ctx: import("../load-context.js").LoadContext): void {
       const solver = ctx.solver;
       const k = branchIdx + 1; // 1-based solver row for branch
@@ -240,6 +356,15 @@ function makeScalableVoltageSource(
 }
 
 // ---------------------------------------------------------------------------
+// makeVsrc — DC voltage source helper
+// ---------------------------------------------------------------------------
+function makeVsrc(posNode: number, negNode: number, voltage: number): AnalogElement {
+  const props = new PropertyBag();
+  props.replaceModelParams({ ...DC_VOLTAGE_SOURCE_DEFAULTS, voltage });
+  return makeDcVoltageSource(new Map([["pos", posNode], ["neg", negNode]]), props, () => 0);
+}
+
+// ---------------------------------------------------------------------------
 // DcOP tests
 // ---------------------------------------------------------------------------
 
@@ -248,7 +373,7 @@ describe("DcOP", () => {
     // Circuit: Vs=5V, R1=1kOhm (node1node2), R2=1kOhm (node2gnd)
     // matrixSize = 2 nodes + 1 branch = 3
     const elements = [
-      makeVoltageSource(1, 0, 2, 5),   // Vs=5V: node1(+), gnd(-)
+      makeVsrc(1, 0, 5),
       makeResistor(1, 2, 1000),         // R1=1kOhm
       makeResistor(2, 0, 1000),         // R2=1kOhm
     ];
@@ -264,7 +389,7 @@ describe("DcOP", () => {
 
   it("diode_circuit_direct", () => {
     const elements = [
-      makeVoltageSource(1, 0, 2, 5),   // Vs=5V
+      makeVsrc(1, 0, 5),
       makeResistor(1, 2, 1000),         // R=1kOhm
       makeDiode(2, 0, 1e-14, 1),       // diode: anode=node2, cathode=gnd
     ];
@@ -283,7 +408,7 @@ describe("DcOP", () => {
 
   it("direct_success_emits_converged_info", () => {
     const elements = [
-      makeVoltageSource(1, 0, 1, 3),
+      makeVsrc(1, 0, 3),
       makeResistor(1, 0, 1000),
     ];
     const ctx = makeCtx(elements, 1, 1);
@@ -303,7 +428,7 @@ describe("DcOP", () => {
     // operating point. From zero-voltage initial guess, direct NR diverges.
     // dynamicGmin adds diagonal conductance to stabilise the Jacobian.
     const elements = [
-      makeVoltageSource(1, 0, 2, 200),  // extreme 200V source
+      makeVsrc(1, 0, 200),
       makeResistor(1, 2, 1),             // 1Î  huge current
       makeDiode(2, 0, 1e-14, 1),
     ];
@@ -405,7 +530,7 @@ describe("DcOP", () => {
   it("gshunt_zero_is_noop", () => {
     function makeElements() {
       return [
-        makeVoltageSource(1, 0, 2, 5),
+        makeVsrc(1, 0, 5),
         makeResistor(1, 2, 1000),
         makeResistor(2, 0, 1000),
       ];
@@ -474,7 +599,7 @@ describe("DcOP", () => {
     }
   });
 
-  // Deleted per Phase 2.5 W2.2 + A1 Â§Test handling rule:
+  // Deleted per Phase 2.5 W2.2 + A1 §Test handling rule:
   //   dcopFinalize_transitions_initMode_to_initFloat
   // Inspected ctx.statePool?.initMode  a string-typed field that never
   // existed as a writable mirror in production (StatePoolRef.initMode is a
@@ -493,7 +618,7 @@ describe("DcOP", () => {
     // Run DC-OP on a resistive divider.
     // Assert ctx.dcopResult.converged === true and nodeVoltages has correct values.
     const elements = [
-      makeVoltageSource(1, 0, 2, 5),
+      makeVsrc(1, 0, 5),
       makeResistor(1, 2, 1000),
       makeResistor(2, 0, 1000),
     ];
@@ -523,7 +648,7 @@ describe("DcOP", () => {
     try {
       // Use extreme circuit that requires gmin stepping
       const elements = [
-        makeVoltageSource(1, 0, 2, 200),
+        makeVsrc(1, 0, 200),
         makeResistor(1, 2, 1),
         makeDiode(2, 0, 1e-14, 1),
       ];
@@ -609,8 +734,8 @@ describe("DcOP", () => {
     // node difference, producing a singular MNA matrix. Direct NR, gmin
     // stepping, and source stepping all fail against this degeneracy.
     const elements = [
-      makeVoltageSource(1, 0, 1, 5),
-      makeVoltageSource(1, 0, 2, 6),
+      makeVsrc(1, 0, 5),
+      makeVsrc(1, 0, 6),
     ];
     const ctx = makeCtx(elements, 1, 2, { ...DEFAULT_PARAMS, gmin: 0 });
 
@@ -646,7 +771,7 @@ describe("DcOP", () => {
 
   it("noncon_set_before_each_nr_call", () => {
     // ngspice cktop.c:170 sets CKTnoncon=1 before each NIiter call.
-    // Assert ctx.noncon === 1 at the moment newtonRaphson is entered 
+    // Assert ctx.noncon === 1 at the moment newtonRaphson is entered
     // i.e. after runNR's `ctx.noncon = 1` assignment and before NR clears it.
     //
     // Observation mechanism: vi.mock replaces newton-raphson.js for all
@@ -659,7 +784,7 @@ describe("DcOP", () => {
     _observedNoncons = [];
 
     const elements = [
-      makeVoltageSource(1, 0, 2, 200),
+      makeVsrc(1, 0, 200),
       makeResistor(1, 2, 1),
       makeDiode(2, 0, 1e-14, 1),
     ];
@@ -689,7 +814,7 @@ describe("DcOP", () => {
     // during the first dcopGminDynamic phase (runNR sets ctx.diagonalGmin
     // before calling newtonRaphson, so it is readable inside the hook).
     const elements = [
-      makeVoltageSource(1, 0, 1, 5),
+      makeVsrc(1, 0, 5),
       makeResistor(1, 0, 1000),
       makeGminDependentElement(1),
     ];
@@ -734,7 +859,7 @@ describe("DcOP", () => {
     // fails because gmin=0). Run with gminFactor=10 and gminFactor=20, count
     // gmin steps. Larger factor  fewer steps (gmin decreases faster).
     const makeElements = () => [
-      makeVoltageSource(1, 0, 1, 5),
+      makeVsrc(1, 0, 5),
       makeResistor(1, 0, 1000),
       makeGminDependentElement(1),
     ];
@@ -783,7 +908,7 @@ describe("DcOP", () => {
     // fail. With maxIterations=100 it has adequate budget. We verify the solver
     // converges AND used the dynamicGmin path.
     const elements = [
-      makeVoltageSource(1, 0, 1, 5),
+      makeVsrc(1, 0, 5),
       makeResistor(1, 0, 1000),
       makeGminDependentElement(1),
     ];
@@ -820,7 +945,7 @@ describe("DcOP", () => {
     const gminVal = 1e-12;
     const gminFactor = 10;
     const elements = [
-      makeVoltageSource(1, 0, 1, 5),
+      makeVsrc(1, 0, 5),
       makeResistor(1, 0, 1000),
       makeGminDependentElement(1),
     ];
@@ -865,7 +990,7 @@ describe("DcOP", () => {
     const gminVal = 1e-12;
     const gminFactor = 10;
     const elements = [
-      makeVoltageSource(1, 0, 1, 5),
+      makeVsrc(1, 0, 5),
       makeResistor(1, 0, 1000),
       makeGminDependentElement(1),
     ];
@@ -916,7 +1041,7 @@ describe("DcOP", () => {
     // Count NR calls in dcopSrcSweep phase: must be numSrcSteps+1=5, not 6.
     const numSrcSteps = 4;
     const elements = [
-      makeVoltageSource(1, 0, 1, 5),
+      makeVsrc(1, 0, 5),
       makeResistor(1, 0, 1000),
       makeSrcSteppingRequiredElement(1),
     ];
@@ -969,7 +1094,7 @@ describe("DcOP", () => {
     // phase with param > 0 (stepping loop NR calls).
     const gshuntVal = 1e-9;
     const elements = [
-      makeVoltageSource(1, 0, 1, 5),
+      makeVsrc(1, 0, 5),
       makeResistor(1, 0, 1000),
       makeSrcSteppingRequiredElement(1),
     ];

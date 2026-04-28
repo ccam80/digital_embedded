@@ -1036,11 +1036,22 @@ export class SparseSolver {
     const n = this._size;
     const result: Array<{ row: number; col: number; value: number }> = [];
     // Walk slots 1..n; slot 0 is the ground sentinel and never linked.
+    // Report ngspice-external (MNA) indices, not internal sparse-matrix indices,
+    // so the harness comparison aligns with ngspice's niiter.c:813,830 which
+    // exports ExtCol/ExtRow. Without this, two engines that walk elements in
+    // different orders during setup get different internal index assignments
+    // via _translate, even though their external (MNA) layout is identical.
+    const intToExtRow = this._intToExtRow;
+    const intToExtCol = this._intToExtCol;
     for (let col = 1; col <= n; col++) {
       let e = this._colHead[col];
       while (e >= 0) {
-        result.push({ row: this._elRow[e], col: this._elCol[e], value: this._elVal[e] });
-        e = this._elNextInCol[e];
+        const intRow = this._elRow[e]!;
+        const intCol = this._elCol[e]!;
+        const extRow = intToExtRow[intRow] ?? intRow;
+        const extCol = intToExtCol[intCol] ?? intCol;
+        result.push({ row: extRow, col: extCol, value: this._elVal[e]! });
+        e = this._elNextInCol[e]!;
       }
     }
     return result;

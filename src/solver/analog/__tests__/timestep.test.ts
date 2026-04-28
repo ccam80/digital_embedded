@@ -37,24 +37,26 @@ const DEFAULT_PARAMS: ResolvedSimulationParams = {
   dcTrcvMaxIter: 50,
   gmin: 1e-12,
   nodeDamping: false,
+  temp: 300.15,
+  nomTemp: 300.15,
+  copyNodesets: false,
 };
 
 /**
  * Create a minimal reactive element that returns a fixed LTE estimate.
  *
- * isReactive = true, getLteTimestep computes a new dt from the given truncationError
+ * getLteTimestep computes a new dt from the given truncationError
  * using the ngspice composite `local_tol = trtol · chgtol` (toleranceReference=0
  * so the reltol term vanishes) — this keeps the rejection/ratio math easy to
  * reason about in tests.
  */
 function makeReactiveElement(truncationError: number): AnalogElement {
   return {
-    pinNodeIds: [1, 0],
-    allNodeIds: [1, 0],
+    label: "",
+    _pinNodes: new Map([["A", 1], ["B", 0]]),
     branchIndex: -1,
+    _stateBase: -1,
     ngspiceLoadOrder: 0,
-    isNonlinear: false,
-    isReactive: true,
     load(_ctx: LoadContext): void {},
     stampAc(_solver: ComplexSparseSolver, _omega: number, _ctx: LoadContext): void { /* no-op */ },
     getLteTimestep(
@@ -69,6 +71,7 @@ function makeReactiveElement(truncationError: number): AnalogElement {
       if (ratio <= 0) return Infinity;
       return 0.9 * dt * Math.pow(1 / ratio, 1 / 3);
     },
+    setup(_ctx: unknown): void {},
     setParam(_key: string, _value: number): void {},
     getPinCurrents(_v: Float64Array): number[] { return [0, 0]; },
   };

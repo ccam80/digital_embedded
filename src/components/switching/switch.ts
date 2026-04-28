@@ -24,7 +24,7 @@ import {
   type ComponentDefinition,
   type ComponentLayout,
 } from "../../core/registry.js";
-import type { AnalogElementCore, LoadContext } from "../../solver/analog/element.js";
+import type { AnalogElement, LoadContext } from "../../solver/analog/element.js";
 import { NGSPICE_LOAD_ORDER } from "../../solver/analog/element.js";
 import type { SetupContext } from "../../solver/analog/setup-context.js";
 
@@ -290,24 +290,21 @@ const SWITCH_PROPERTY_DEFS: PropertyDefinition[] = [
 ];
 
 // ---------------------------------------------------------------------------
-// SwitchAnalogElement -- W3 migrated analog element class
-//
 // Port of ngspice SW device:
 //   setup: swsetup.c:47-62
 //   load:  swload.c
 // ---------------------------------------------------------------------------
 
-export interface SpstAnalogElement extends AnalogElementCore {
+export interface SpstAnalogElement extends AnalogElement {
   setClosed(closed: boolean): void;
   setCtrlVoltage(v: number): void;
   setSwState(on: boolean): void;
 }
 
 export class SwitchAnalogElement implements SpstAnalogElement {
-  readonly branchIndex: number = -1;
+  label: string = "";
+  branchIndex: number = -1;
   readonly ngspiceLoadOrder: number = NGSPICE_LOAD_ORDER.SW;
-  readonly isNonlinear: boolean = false;
-  readonly isReactive: boolean = false;
   _stateBase: number = -1;
   _pinNodes: Map<string, number>;
 
@@ -317,14 +314,24 @@ export class SwitchAnalogElement implements SpstAnalogElement {
   private _closed: boolean;
   private _effectivelyClosed: boolean;
 
+  // Voltage-controlled state. _pendingCtrlVoltage stores the latest value passed
+  // to setCtrlVoltage(); _useCtrlVoltage gates load() consumption (true while
+  // setCtrlVoltage is the active driver, cleared by setClosed / setSwState which
+  // override). Mirrors ngspice swload.c which reads SWcontVoltage from CKTrhsOld
+  // every NR iteration; digiTS exposes the same live-update semantics through
+  // this hook when an external driver supplies the control voltage explicitly.
+  // Default thresholds mirror ngspice SW model defaults: SWonThreshold = 0V,
+  // SWoffThreshold = 0V (no hysteresis). Hysteresis can be added later as model
+  // params if needed.
   private _pendingCtrlVoltage: number = 0;
+  private _useCtrlVoltage: boolean = false;
   private _forcedState: boolean | null = null;
 
   // Matrix handles allocated in setup() — port of swsetup.c:59-62 TSTALLOC sequence
-  _hPP: number = -1;
-  _hPN: number = -1;
-  _hNP: number = -1;
-  _hNN: number = -1;
+  private _hPP: number = -1;
+  private _hPN: number = -1;
+  private _hNP: number = -1;
+  private _hNN: number = -1;
 
   constructor(pinNodes: ReadonlyMap<string, number>, props: PropertyBag) {
     this._pinNodes = new Map(pinNodes);
@@ -350,6 +357,20 @@ export class SwitchAnalogElement implements SpstAnalogElement {
   }
 
   load(ctx: LoadContext): void {
+    // Hot-patch consumption: when setCtrlVoltage() is the active driver, derive
+    // the switch state from _pendingCtrlVoltage every NR iteration. Mirrors
+    // ngspice swload.c which evaluates SWcontVoltage live each iteration. With
+    // ngspice default thresholds (SWonThreshold = SWoffThreshold = 0V) and no
+    // hysteresis, the switch is closed for v > 0 and open for v <= 0 (inverted
+    // when normallyClosed). _forcedState (one-shot) takes precedence; otherwise
+    // _useCtrlVoltage gates the voltage-controlled path; otherwise the boolean
+    // _effectivelyClosed (set by setClosed / constructor) drives behavior.
+    if (this._useCtrlVoltage) {
+      const v = this._pendingCtrlVoltage;
+      const closeFromVoltage = this._normallyClosed ? v <= 0 : v > 0;
+      this._effectivelyClosed = closeFromVoltage;
+    }
+
     const on = this._forcedState !== null ? this._forcedState : this._effectivelyClosed;
     this._forcedState = null;
     const G = on ? 1 / this._ron : 1 / this._roff;
@@ -364,14 +385,17 @@ export class SwitchAnalogElement implements SpstAnalogElement {
   setClosed(closed: boolean): void {
     this._closed = closed;
     this._effectivelyClosed = this._normallyClosed ? !this._closed : this._closed;
+    this._useCtrlVoltage = false;  // boolean driver supersedes voltage driver
   }
 
   setCtrlVoltage(v: number): void {
     this._pendingCtrlVoltage = v;
+    this._useCtrlVoltage = true;  // become the active driver until setClosed/setSwState
   }
 
   setSwState(on: boolean): void {
     this._forcedState = on;
+    this._useCtrlVoltage = false;  // explicit override supersedes voltage driver
   }
 
   getPinCurrents(rhs: Float64Array): number[] {

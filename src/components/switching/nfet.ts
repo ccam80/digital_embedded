@@ -25,7 +25,7 @@ import {
   type ComponentDefinition,
   type ComponentLayout,
 } from "../../core/registry.js";
-import type { AnalogElementCore } from "../../core/analog-types.js";
+import type { AnalogElement } from "../../core/analog-types.js";
 import { NGSPICE_LOAD_ORDER } from "../../core/analog-types.js";
 import type { LoadContext } from "../../solver/analog/load-context.js";
 import type { SetupContext } from "../../solver/analog/setup-context.js";
@@ -188,11 +188,10 @@ export function executeNFET(index: number, state: Uint32Array, highZs: Uint32Arr
 // ngspice anchor: ref/ngspice/src/spicelib/devices/sw/swsetup.c:47-62
 // ---------------------------------------------------------------------------
 
-export class NFETSWSubElement implements AnalogElementCore {
+export class NFETSWSubElement implements AnalogElement {
+  label: string = "";
   branchIndex: number = -1;
   readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.SW;
-  readonly isNonlinear: boolean = false;
-  readonly isReactive: boolean = false;
   _stateBase: number = -1;
   _pinNodes: Map<string, number> = new Map();
 
@@ -249,14 +248,13 @@ export class NFETSWSubElement implements AnalogElementCore {
 }
 
 // ---------------------------------------------------------------------------
-// NFETAnalogElement — AnalogElementCore implementation (composite, delegates to SW)
+// NFETAnalogElement — AnalogElement implementation (composite, delegates to SW)
 // ---------------------------------------------------------------------------
 
-export class NFETAnalogElement implements AnalogElementCore {
+export class NFETAnalogElement implements AnalogElement {
+  label: string = "";
   branchIndex: number = -1;
   readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.SW;
-  readonly isNonlinear: boolean = false;
-  readonly isReactive: boolean = false;
   _stateBase: number = -1;
   _pinNodes: Map<string, number> = new Map();
 

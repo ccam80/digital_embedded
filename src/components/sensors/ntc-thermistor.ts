@@ -13,8 +13,8 @@
  *   Integrated with forward Euler each accepted timestep via accept().
  *
  * MNA topology:
- *   pinNodeIds[0] = n_pos
- *   pinNodeIds[1] = n_neg
+ *   _pinNodes["pos"] = n_pos
+ *   _pinNodes["neg"] = n_neg
  *   branchIndex    = -1
  *
  * Unified load() pipeline:
@@ -22,7 +22,7 @@
  *   accept(ctx, ...)  integrates thermal ODE after an accepted timestep when selfHeating
  */
 
-import type { AnalogElementCore } from "../../core/analog-types.js";
+import type { AnalogElement } from "../../core/analog-types.js";
 import { NGSPICE_LOAD_ORDER } from "../../core/analog-types.js";
 import type { LoadContext } from "../../solver/analog/load-context.js";
 import type { SetupContext } from "../../solver/analog/setup-context.js";
@@ -109,12 +109,10 @@ function steinhartHartResistance(shA: number, shB: number, shC: number, t: numbe
 // NTCThermistorElement  MNA implementation
 // ---------------------------------------------------------------------------
 
-export class NTCThermistorElement implements AnalogElementCore {
-  pinNodeIds!: readonly number[];  // set by compiler via Object.assign after factory returns
-  readonly branchIndex: number = -1;
+export class NTCThermistorElement implements AnalogElement {
+  label: string = "";
+  branchIndex: number = -1;
   readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.RES;
-  readonly isNonlinear: boolean = true;
-  readonly isReactive: boolean;
   _stateBase: number = -1;
   _pinNodes: Map<string, number> = new Map();
 
@@ -165,9 +163,6 @@ export class NTCThermistorElement implements AnalogElementCore {
     this._shA = shA;
     this._shB = shB;
     this._shC = shC;
-    // isReactive is true when self-heating is enabled because the element has
-    // dynamic state that evolves with the simulation timestep.
-    this.isReactive = selfHeating;
   }
 
   setup(ctx: SetupContext): void {
@@ -218,8 +213,8 @@ export class NTCThermistorElement implements AnalogElementCore {
   }
 
   getPinCurrents(rhs: Float64Array): number[] {
-    const nPos = this.pinNodeIds[0];
-    const nNeg = this.pinNodeIds[1];
+    const nPos = this._pinNodes.get("pos")!;
+    const nNeg = this._pinNodes.get("neg")!;
     const vPos = rhs[nPos];
     const vNeg = rhs[nNeg];
     const G = 1 / this.resistance();
@@ -232,8 +227,8 @@ export class NTCThermistorElement implements AnalogElementCore {
 
     const dt = ctx.dt;
     const voltages = ctx.rhs;
-    const nPos = this.pinNodeIds[0];
-    const nNeg = this.pinNodeIds[1];
+    const nPos = this._pinNodes.get("pos")!;
+    const nNeg = this._pinNodes.get("neg")!;
     const vPos = voltages[nPos];
     const vNeg = voltages[nNeg];
     const vDiff = vPos - vNeg;
@@ -256,8 +251,8 @@ export class NTCThermistorElement implements AnalogElementCore {
 export function createNTCThermistorElement(
   pinNodes: ReadonlyMap<string, number>,
   props: PropertyBag,
-  _getTime?: () => number,
-): AnalogElementCore {
+  _getTime: () => number,
+): AnalogElement {
   const r0 = props.getModelParam<number>("r0");
   const beta = props.getModelParam<number>("beta");
   const t0 = props.getModelParam<number>("t0");
@@ -281,7 +276,6 @@ export function createNTCThermistorElement(
     shC,
   );
   el._pinNodes = new Map(pinNodes);
-  el.pinNodeIds = [pinNodes.get("pos")!, pinNodes.get("neg")!];
   return el;
 }
 

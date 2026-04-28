@@ -17,7 +17,7 @@ import type { SerializedElement, CircuitElement } from '../../core/element.js';
 import type { PropertyValue } from '../../core/properties.js';
 import type { Rect, RenderContext } from '../../core/renderer-interface.js';
 import type { AnalogElement } from '../analog/element.js';
-import type { SparseSolverStamp, ComplexSparseSolver } from '../../core/analog-types.js';
+import type { ComplexSparseSolver } from '../../core/analog-types.js';
 import type { LoadContext } from '../analog/load-context.js';
 import { TestElement, makePin } from '../../test-fixtures/test-element.js';
 import { noopExecFn, executePassThrough } from '../../test-fixtures/execute-stubs.js';
@@ -53,9 +53,12 @@ function makeAnalogElementObj(typeId: string, instanceId: string, pins: Array<{ 
 
 function makeResistorAnalogEl(n1: number, n2: number, resistance: number): AnalogElement {
   return {
-    pinNodeIds: [n1, n2], allNodeIds: [n1, n2], branchIndex: -1,
+    label: "",
+    _pinNodes: new Map([["p1", n1], ["p2", n2]]),
+    _stateBase: -1,
+    branchIndex: -1,
     ngspiceLoadOrder: 0,
-    isNonlinear: false, isReactive: false,
+    setup(_ctx: import('../analog/setup-context.js').SetupContext): void {},
     load(_ctx: LoadContext): void { /* no-op for static test fixture */ },
     stampAc(solver: ComplexSparseSolver, _omega: number, _ctx: LoadContext): void {
       const g = 1 / resistance;
@@ -107,11 +110,14 @@ function makeGroundDef(): ComponentDefinition {
     defaultModel: 'behavioral',
     models: {},
     modelRegistry: {
-      behavioral: { kind: 'inline' as const, factory: (_pinNodes: ReadonlyMap<string, number>) => ({
+      behavioral: { kind: 'inline' as const, factory: (gndPinNodes: ReadonlyMap<string, number>) => ({
+        label: "",
+        _pinNodes: new Map(gndPinNodes),
+        _stateBase: -1,
         branchIndex: -1 as const,
         ngspiceLoadOrder: 0,
-        isNonlinear: false, isReactive: false,
-        stamp(_s: SparseSolverStamp) {},
+        setup(_ctx: import('../analog/setup-context.js').SetupContext): void {},
+        load(_ctx: import('../analog/load-context.js').LoadContext): void {},
         getPinCurrents(_v: Float64Array) { return [0]; },
         setParam(_key: string, _value: number) {},
       }), paramDefs: [], params: {} },

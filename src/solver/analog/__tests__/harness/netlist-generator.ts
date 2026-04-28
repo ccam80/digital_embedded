@@ -61,9 +61,25 @@ export function generateSpiceNetlist(
   // Collect model cards: modelName -> ".model <name> <type> (<params>)"
   const modelCards = new Map<string, string>();
 
-  // One element line per compiled element
-  for (let i = 0; i < compiled.elements.length; i++) {
-    const el = compiled.elements[i];
+  // One element line per compiled element. compiled.elements is sorted by
+  // (ngspiceLoadOrder ASC, originalIndex DESC) — i.e. reverse-within-bucket
+  // (see compiler.ts). Emit the deck in forward-within-bucket order so that
+  // ngspice's `cktcrte.c:63-65` prepend reverses it back into the order our
+  // engine actually walks. Concretely: walk each bucket of consecutive
+  // same-loadOrder elements from end to start.
+  const emitOrder: number[] = [];
+  let bucketStart = 0;
+  for (let i = 0; i <= compiled.elements.length; i++) {
+    const atEnd = i === compiled.elements.length;
+    const orderChanged = !atEnd
+      && compiled.elements[i]!.ngspiceLoadOrder !== compiled.elements[bucketStart]!.ngspiceLoadOrder;
+    if (atEnd || orderChanged) {
+      for (let j = i - 1; j >= bucketStart; j--) emitOrder.push(j);
+      bucketStart = i;
+    }
+  }
+  for (const i of emitOrder) {
+    const el = compiled.elements[i]!;
     const rawLabel = elementLabels.get(i) ?? `element_${i}`;
     const circuitEl = compiled.elementToCircuitElement.get(i);
 
@@ -74,7 +90,7 @@ export function generateSpiceNetlist(
     if (!spec) continue;
 
     const props = circuitEl.getProperties();
-    const nodes = el.pinNodeIds;
+    const nodes = [...el._pinNodes.values()];
 
     let paramDefs: ParamDef[] = [];
     let emission: ModelEmissionSpec | undefined;
