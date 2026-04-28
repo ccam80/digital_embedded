@@ -278,14 +278,6 @@ export function createTunnelDiodeElement(
     stateSize: hasCapacitance ? 6 : 4,
     stateSchema: hasCapacitance ? TUNNEL_DIODE_CAP_STATE_SCHEMA : TUNNEL_DIODE_STATE_SCHEMA,
     stateBaseOffset: -1,
-    s0: new Float64Array(0),
-    s1: new Float64Array(0),
-    s2: new Float64Array(0),
-    s3: new Float64Array(0),
-    s4: new Float64Array(0),
-    s5: new Float64Array(0),
-    s6: new Float64Array(0),
-    s7: new Float64Array(0),
     _vccs: vccsElement,
 
     setup(ctx: SetupContext): void {
