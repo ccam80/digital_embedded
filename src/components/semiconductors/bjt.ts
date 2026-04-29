@@ -33,7 +33,7 @@ import {
 } from "../../solver/analog/ckt-mode.js";
 import { stampRHS } from "../../solver/analog/stamp-helpers.js";
 import { pnjlim } from "../../solver/analog/newton-raphson.js";
-import { defineModelParams, deviceParams } from "../../core/model-params.js";
+import { defineModelParams, deviceParams, kelvinToCelsius } from "../../core/model-params.js";
 import { cktTerr } from "../../solver/analog/ckt-terr.js";
 import { niIntegrate } from "../../solver/analog/ni-integrate.js";
 import type { PoolBackedAnalogElement, StatePoolRef } from "../../core/analog-types.js";
@@ -71,12 +71,12 @@ export const { paramDefs: BJT_PARAM_DEFS, defaults: BJT_NPN_DEFAULTS } = defineM
     VAR: { default: Infinity, unit: "V", description: "Reverse Early voltage" },
     NE:  { default: 1.5,    description: "B-E leakage emission coefficient" },
     NC:  { default: 2,      description: "B-C leakage emission coefficient" },
-    TNOM: { default: 300.15, unit: "K", description: "Nominal temperature" },
+    TNOM: { default: 300.15, unit: "K", description: "Nominal temperature", spiceConverter: kelvinToCelsius },
   },
   instance: {
     AREA: { default: 1,     description: "Device area factor" },
     M:   { default: 1,      description: "Parallel device multiplier" },
-    TEMP: { default: 300.15, unit: "K", description: "Per-instance operating temperature" },
+    TEMP: { default: 300.15, unit: "K", description: "Per-instance operating temperature", spiceConverter: kelvinToCelsius },
     OFF:   { default: 0, emit: "flag",   description: "Initial condition: device off (0=false, 1=true)" },
     ICVBE: { default: NaN,  unit: "V",  description: "Initial condition: B-E voltage for UIC" },
     ICVCE: { default: NaN,  unit: "V",  description: "Initial condition: C-E voltage for UIC" },
@@ -100,12 +100,12 @@ export const { defaults: BJT_PNP_DEFAULTS } = defineModelParams({
     VAR: { default: Infinity, unit: "V", description: "Reverse Early voltage" },
     NE:  { default: 1.5,    description: "B-E leakage emission coefficient" },
     NC:  { default: 2,      description: "B-C leakage emission coefficient" },
-    TNOM: { default: 300.15, unit: "K", description: "Nominal temperature" },
+    TNOM: { default: 300.15, unit: "K", description: "Nominal temperature", spiceConverter: kelvinToCelsius },
   },
   instance: {
     AREA: { default: 1,     description: "Device area factor" },
     M:   { default: 1,      description: "Parallel device multiplier" },
-    TEMP: { default: 300.15, unit: "K", description: "Per-instance operating temperature" },
+    TEMP: { default: 300.15, unit: "K", description: "Per-instance operating temperature", spiceConverter: kelvinToCelsius },
     OFF:   { default: 0, emit: "flag",   description: "Initial condition: device off (0=false, 1=true)" },
     ICVBE: { default: NaN,  unit: "V",  description: "Initial condition: B-E voltage for UIC" },
     ICVCE: { default: NaN,  unit: "V",  description: "Initial condition: C-E voltage for UIC" },
@@ -163,14 +163,14 @@ export const { paramDefs: BJT_SPICE_L1_PARAM_DEFS, defaults: BJT_SPICE_L1_NPN_DE
     KF:  { default: 0,      description: "Flicker noise coefficient" },
     AF:  { default: 1,      description: "Flicker noise exponent" },
     NKF: { default: 0.5,    description: "High-injection roll-off exponent" },
-    TNOM: { default: 300.15, unit: "K", description: "Nominal temperature" },
+    TNOM: { default: 300.15, unit: "K", description: "Nominal temperature", spiceConverter: kelvinToCelsius },
   },
   instance: {
     AREA: { default: 1,     description: "Device area factor" },
     AREAB: { default: 1,    description: "Base-area factor" },
     AREAC: { default: 1,    description: "Collector-area factor" },
     M:   { default: 1,      description: "Parallel device multiplier" },
-    TEMP: { default: 300.15, unit: "K", description: "Per-instance operating temperature" },
+    TEMP: { default: 300.15, unit: "K", description: "Per-instance operating temperature", spiceConverter: kelvinToCelsius },
     OFF:   { default: 0, emit: "flag",   description: "Initial condition: device off (0=false, 1=true)" },
     ICVBE: { default: NaN,  unit: "V",  description: "Initial condition: B-E voltage for UIC" },
     ICVCE: { default: NaN,  unit: "V",  description: "Initial condition: C-E voltage for UIC" },
@@ -224,14 +224,14 @@ export const { defaults: BJT_SPICE_L1_PNP_DEFAULTS } = defineModelParams({
     KF:  { default: 0,      description: "Flicker noise coefficient" },
     AF:  { default: 1,      description: "Flicker noise exponent" },
     NKF: { default: 0.5,    description: "High-injection roll-off exponent" },
-    TNOM: { default: 300.15, unit: "K", description: "Nominal temperature" },
+    TNOM: { default: 300.15, unit: "K", description: "Nominal temperature", spiceConverter: kelvinToCelsius },
   },
   instance: {
     AREA: { default: 1,     description: "Device area factor" },
     AREAB: { default: 1,    description: "Base-area factor" },
     AREAC: { default: 1,    description: "Collector-area factor" },
     M:   { default: 1,      description: "Parallel device multiplier" },
-    TEMP: { default: 300.15, unit: "K", description: "Per-instance operating temperature" },
+    TEMP: { default: 300.15, unit: "K", description: "Per-instance operating temperature", spiceConverter: kelvinToCelsius },
     OFF:   { default: 0, emit: "flag",   description: "Initial condition: device off (0=false, 1=true)" },
     ICVBE: { default: NaN,  unit: "V",  description: "Initial condition: B-E voltage for UIC" },
     ICVCE: { default: NaN,  unit: "V",  description: "Initial condition: C-E voltage for UIC" },

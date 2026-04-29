@@ -474,9 +474,22 @@ export class ComparisonSession {
     this._stepCapture = createStepCaptureHook(
       this._engine.solver!,
       this._engine.elements,
-      this._engine.statePool,
+      // Pass a getter, NOT the value. MNAEngine allocates its statePool inside
+      // _setup() — called from the first dcOperatingPoint() / step(), which
+      // runs AFTER this hook is wired up. A by-value capture would freeze
+      // statePool at null and silently no-op captureElementStates() forever
+      // (the bug that hid all per-iteration MOSFET/BJT/diode device-state
+      // divergences from every parity test).
+      () => this._engine.statePool,
       this._elementLabels,
     );
+
+    // captureTopology(...) above ran BEFORE engine._setup() — engine.matrixSize
+    // is 0 at init time and only becomes meaningful once the first
+    // dcOperatingPoint()/step() lazily runs the setup pass. The topology gets
+    // refreshed after each run completes (see _refreshOurTopologyAfterSetup);
+    // the initial capture exists so consumers querying before any run still
+    // see element labels and node connectivity.
 
     const sc = this._stepCapture;
     const bundle: PhaseAwareCaptureHook = {
@@ -551,6 +564,7 @@ export class ComparisonSession {
       });
     }
 
+    this._refreshOurTopologyAfterSetup();
     this._ourSession = {
       source: "ours",
       topology: this._ourTopology,
@@ -689,6 +703,7 @@ export class ComparisonSession {
       if (nowTime >= tStop) break;
     }
 
+    this._refreshOurTopologyAfterSetup();
     this._ourSession = {
       source: "ours",
       topology: this._ourTopology,
@@ -1501,12 +1516,20 @@ export class ComparisonSession {
       const ourData: IterationSideData | null = ourIter ? {
         rawIteration: ourIter.iteration,
         globalConverged: ourIter.globalConverged,
+        elemConverged: ourIter.elemConverged,
         noncon: ourIter.noncon,
+        convergenceFailedElements: [...ourIter.convergenceFailedElements],
         nodeVoltages: this._buildNodeVoltages(ourIter.voltages),
         nodeVoltagesBefore: this._buildNodeVoltages(ourIter.prevVoltages),
         branchValues: this._buildBranchValues(ourIter.voltages, nodeCount),
         elementStates: Object.fromEntries(
           ourIter.elementStates.map(es => [es.label, es.slots]),
+        ),
+        elementStates1Slots: Object.fromEntries(
+          ourIter.elementStates.map(es => [es.label, es.state1Slots]),
+        ),
+        elementStates2Slots: Object.fromEntries(
+          ourIter.elementStates.map(es => [es.label, es.state2Slots]),
         ),
         limitingEvents: ourIter.limitingEvents,
         rhs: ourLinSys!.rhs,
@@ -1519,18 +1542,34 @@ export class ComparisonSession {
         ag: Array.from(ourIter.ag),
         method: ourIter.method,
         order: ourIter.order,
+        matrixSize: ourIter.matrixSize,
+        rhsBufSize: ourIter.rhsBufSize,
+        initMode: ourIter.initMode,
+        delta: ourIter.delta,
+        diagGmin: ourIter.diagGmin,
+        srcFact: ourIter.srcFact,
+        ...(ourIter.lteDt !== undefined ? { lteDt: ourIter.lteDt } : {}),
       } : null;
 
       const ngLinSys = ngIter ? _computeLinearSystemData(ngIter, ngIter.matrixSize) : null;
       const ngData: IterationSideData | null = ngIter ? {
         rawIteration: ngIter.iteration,
         globalConverged: ngIter.globalConverged,
+        elemConverged: ngIter.elemConverged,
         noncon: ngIter.noncon,
+        convergenceFailedElements: [...ngIter.convergenceFailedElements],
+        ngspiceConvergenceFailedDevices: [...ngIter.ngspiceConvergenceFailedDevices],
         nodeVoltages: this._buildNodeVoltages(ngIter.voltages),
         nodeVoltagesBefore: this._buildNodeVoltages(ngIter.prevVoltages),
         branchValues: this._buildBranchValues(ngIter.voltages, nodeCount),
         elementStates: Object.fromEntries(
           ngIter.elementStates.map(es => [es.label, es.slots]),
+        ),
+        elementStates1Slots: Object.fromEntries(
+          ngIter.elementStates.map(es => [es.label, es.state1Slots]),
+        ),
+        elementStates2Slots: Object.fromEntries(
+          ngIter.elementStates.map(es => [es.label, es.state2Slots]),
         ),
         limitingEvents: ngIter.limitingEvents,
         rhs: ngLinSys!.rhs,
@@ -1542,6 +1581,13 @@ export class ComparisonSession {
         ag: Array.from(ngIter.ag),
         method: ngIter.method,
         order: ngIter.order,
+        matrixSize: ngIter.matrixSize,
+        rhsBufSize: ngIter.rhsBufSize,
+        initMode: ngIter.initMode,
+        delta: ngIter.delta,
+        diagGmin: ngIter.diagGmin,
+        srcFact: ngIter.srcFact,
+        ...(ngIter.lteDt !== undefined ? { lteDt: ngIter.lteDt } : {}),
       } : null;
 
       const divergenceNorm = _l2Norm(
@@ -2561,6 +2607,29 @@ export class ComparisonSession {
    * no captured steps (e.g. ngspice failed during init/load — there's
    * nothing to compare and the existing `errors[]` already records that).
    */
+  /**
+   * Refresh the cached `_ourTopology` after the engine's `_setup()` has run.
+   *
+   * `captureTopology(compiled, engine.matrixSize, ...)` in `_initWithCircuit`
+   * ran BEFORE the engine had a chance to discover its own equation count —
+   * `engine.matrixSize` is 0 at init time and only becomes meaningful after
+   * the first `dcOperatingPoint()`/`step()` has lazily invoked `_setup()`.
+   *
+   * Calling this method after a run completes re-captures the topology with
+   * the now-correct `matrixSize`, so consumers like `harness_describe` see
+   * the real value instead of the init-time 0. Cheap to call; the function
+   * just rebuilds a few maps from `compiled` + the live engine state.
+   */
+  protected _refreshOurTopologyAfterSetup(): void {
+    if (!this._engine || !this._engine.compiled) return;
+    const compiled = this._engine.compiled as ConcreteCompiledAnalogCircuit;
+    this._ourTopology = captureTopology(
+      compiled,
+      this._engine.matrixSize,
+      this._elementLabels,
+    );
+  }
+
   private _assertMatrixStructuralParity(): void {
     if (this._opts.selfCompare) return;
     const ours = this._ourSession;

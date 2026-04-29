@@ -47,7 +47,7 @@ import {
 import { cktTerr } from "../../solver/analog/ckt-terr.js";
 import { niIntegrate } from "../../solver/analog/ni-integrate.js";
 import type { LteParams } from "../../solver/analog/ckt-terr.js";
-import { defineModelParams } from "../../core/model-params.js";
+import { defineModelParams, kelvinToCelsius } from "../../core/model-params.js";
 import type { StatePoolRef } from "../../core/analog-types.js";
 import { defineStateSchema, applyInitialValues } from "../../solver/analog/state-schema.js";
 import { VCCSAnalogElement } from "../active/vccs.js";
@@ -101,7 +101,7 @@ export const { paramDefs: TUNNEL_DIODE_PARAM_DEFS, defaults: TUNNEL_DIODE_PARAM_
     NB:   { default: 1,                  description: "Tunnel emission coefficient (DIOtunEmissionCoeff)" },
   },
   instance: {
-    TEMP: { default: 300.15, unit: "K",  description: "Per-instance operating temperature" },
+    TEMP: { default: 300.15, unit: "K",  description: "Per-instance operating temperature", spiceConverter: kelvinToCelsius },
   },
 });
 
@@ -279,6 +279,9 @@ export function createTunnelDiodeElement(
     _vccs: vccsElement,
 
     setup(ctx: SetupContext): void {
+      if (this._stateBase === -1) {
+        this._stateBase = ctx.allocStates(this.stateSize);
+      }
       this._vccs.setup(ctx);
     },
 

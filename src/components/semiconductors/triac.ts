@@ -37,7 +37,7 @@ import type { AnalogElement } from "../../core/analog-types.js";
 import { NGSPICE_LOAD_ORDER } from "../../core/analog-types.js";
 import type { LoadContext } from "../../solver/analog/load-context.js";
 import type { SetupContext } from "../../solver/analog/setup-context.js";
-import { defineModelParams } from "../../core/model-params.js";
+import { defineModelParams, kelvinToCelsius } from "../../core/model-params.js";
 
 import {
   createBjtElement,
@@ -61,7 +61,7 @@ export const { paramDefs: TRIAC_PARAM_DEFS, defaults: TRIAC_PARAM_DEFAULTS } = d
     RB:  { default: 0,                     unit: "Ω", description: "Base resistance" },
     RE:  { default: 0,                     unit: "Ω", description: "Emitter resistance" },
     AREA: { default: 1,                    description: "Device area factor" },
-    TEMP: { default: 300.15,               unit: "K", description: "Operating temperature" },
+    TEMP: { default: 300.15,               unit: "K", description: "Operating temperature", spiceConverter: kelvinToCelsius },
   },
 });
 
@@ -176,6 +176,17 @@ class TriacCompositeElement implements AnalogElement {
   getPinCurrents(_rhs: Float64Array): number[] {
     // Pin order: [MT2(0), MT1(1), G(2)]
     return [0, 0, 0];
+  }
+
+  /** Sub-elements in setup() order: Q1, Q2, Q3, Q4 BJTs. Each is independent
+   *  in setup; setup() rebinds their pin nodes via internal latch nodes. */
+  getSubElements(): readonly AnalogElement[] {
+    return [
+      this._q1 as unknown as AnalogElement,
+      this._q2 as unknown as AnalogElement,
+      this._q3 as unknown as AnalogElement,
+      this._q4 as unknown as AnalogElement,
+    ];
   }
 }
 

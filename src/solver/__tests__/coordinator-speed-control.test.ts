@@ -268,7 +268,7 @@ describe('DefaultSimulationCoordinator -- speed control (continuous)', () => {
   });
   it('formatSpeed returns micros/s for rate in 1e-6 to 1e-3 range', () => {
     coord.speed = 500e-6; const fmt = coord.formatSpeed();
-    expect(fmt.unit).toBe('Âµs/s'); expect(fmt.value).toBe('500');
+    expect(fmt.unit).toBe('µs/s'); expect(fmt.value).toBe('500');
   });
   it('formatSpeed returns ns/s for rate below 1e-6', () => {
     coord.speed = 100e-9; expect(coord.formatSpeed().unit).toBe('ns/s');

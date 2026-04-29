@@ -70,6 +70,15 @@ export interface ParamDef {
    * The group is emitted only when at least one member has a non-default value.
    */
   emitGroup?: { name: string; index: number };
+  /**
+   * Optional value transform applied at SPICE netlist emission only. Use when
+   * the digiTS internal unit differs from ngspice's expected netlist unit.
+   * Example: TEMP/TNOM are stored in Kelvin in digiTS but ngspice's parser
+   * adds CONSTCtoK (273.15), so they must be emitted in Celsius — the
+   * converter is `v => v - 273.15`. Storage and `getModelParam` are
+   * unaffected.
+   */
+  spiceConverter?: (value: number) => number;
 }
 
 /** SPICE-emission overrides for a ModelEntry. */

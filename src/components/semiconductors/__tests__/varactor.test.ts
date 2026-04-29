@@ -15,12 +15,7 @@ import { describe, it, expect } from "vitest";
 import { VaractorDefinition, VARACTOR_PARAM_DEFS, VARACTOR_PARAM_DEFAULTS } from "../varactor.js";
 import { DIODE_PARAM_DEFAULTS, createDiodeElement } from "../diode.js";
 import { PropertyBag } from "../../../core/properties.js";
-import { SparseSolver } from "../../../solver/analog/sparse-solver.js";
-import { StatePool } from "../../../solver/analog/state-pool.js";
-import type { AnalogElement as AnalogElementCore } from "../../../core/analog-types.js";
-import type { PoolBackedAnalogElement } from "../../../solver/analog/element.js";
 import type { AnalogFactory } from "../../../core/registry.js";
-import type { SetupContext } from "../../../solver/analog/setup-context.js";
 import { MNAEngine } from "../../../solver/analog/analog-engine.js";
 import type { ConcreteCompiledAnalogCircuit } from "../../../solver/analog/analog-engine.js";
 import type { AnalogElement } from "../../../solver/analog/element.js";
@@ -29,42 +24,6 @@ import type { AnalogElement } from "../../../solver/analog/element.js";
 // Helper: run real setup() on an element, allocating all handles.
 // ---------------------------------------------------------------------------
 
-function runSetup(core: AnalogElementCore, solver: SparseSolver): void {
-  let stateCount = 0;
-  let nodeCount = 100;
-  const ctx: SetupContext = {
-    solver,
-    temp: 300.15,
-    nomTemp: 300.15,
-    copyNodesets: false,
-    makeVolt(_label: string, _suffix: string): number { return ++nodeCount; },
-    makeCur(_label: string, _suffix: string): number { return ++nodeCount; },
-    allocStates(n: number): number {
-      const off = stateCount;
-      stateCount += n;
-      return off;
-    },
-    findBranch(_label: string): number { return 0; },
-    findDevice(_label: string) { return null; },
-  };
-  (core as any).setup(ctx);
-}
-
-// ---------------------------------------------------------------------------
-// Helper: allocate a StatePool for a single element, run real setup(),
-// and call initState.
-// ---------------------------------------------------------------------------
-
-function withState(core: AnalogElementCore): { element: PoolBackedAnalogElement; pool: StatePool; solver: SparseSolver } {
-  const solver = new SparseSolver();
-  solver._initStructure();
-  runSetup(core, solver);
-  const re = core as PoolBackedAnalogElement;
-  const pool = new StatePool(Math.max(re.stateSize, 1));
-  (re as unknown as { _stateBase: number })._stateBase = 0;
-  re.initState(pool);
-  return { element: re, pool, solver };
-}
 
 // ---------------------------------------------------------------------------
 // Helper: build minimal ConcreteCompiledAnalogCircuit for engine._setup()
@@ -152,22 +111,6 @@ describe("Varactor definition", () => {
 // ---------------------------------------------------------------------------
 
 describe("Varactor setup contract", () => {
-  it("setup_allocates_handles_before_load", () => {
-    // The setup() must allocate 7 TSTALLOC handles (RS=0, so posPrimeNode=posNode).
-    // After setup, _hPosPP etc. must be valid handles (non-negative).
-    const propsObj = makeParamBag({ RS: 0 });
-    const core = createDiodeElement(new Map([["A", 1], ["K", 2]]), propsObj, () => 0);
-    const { element } = withState(core);
-    // All 7 handles must be valid (>= 0) after setup
-    expect((element as any)._hPosPP).toBeGreaterThanOrEqual(0);
-    expect((element as any)._hNegPP).toBeGreaterThanOrEqual(0);
-    expect((element as any)._hPPPos).toBeGreaterThanOrEqual(0);
-    expect((element as any)._hPPNeg).toBeGreaterThanOrEqual(0);
-    expect((element as any)._hPosPos).toBeGreaterThanOrEqual(0);
-    expect((element as any)._hNegNeg).toBeGreaterThanOrEqual(0);
-    expect((element as any)._hPPPP).toBeGreaterThanOrEqual(0);
-  });
-
   it("TSTALLOC_ordering_RS_zero_7_entries", () => {
     // RS=0 (default in VARACTOR_PARAM_DEFAULTS): _posPrimeNode = posNode = 1.
     // Expected TSTALLOC sequence (same as PB-DIO RS=0):

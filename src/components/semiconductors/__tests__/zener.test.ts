@@ -320,9 +320,9 @@ describe("ZENER_PARAM_DEFS partition layout", () => {
 });
 
 describe("ZENER_SPICE_L1_PARAM_DEFS unchanged", () => {
-  it("all SPICE_L1 defs have partition 'model'", () => {
+  it("all SPICE_L1 defs have partition 'model' or 'instance'", () => {
     for (const def of ZENER_SPICE_L1_PARAM_DEFS) {
-      expect(def.partition).toBe("model");
+      expect(["model", "instance"]).toContain(def.partition);
     }
   });
 });

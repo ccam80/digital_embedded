@@ -262,7 +262,7 @@ export type PostIterationHook = (
 export function createIterationCaptureHook(
   solver: SparseSolver,
   elements: readonly AnalogElement[],
-  statePool: StatePool | null,
+  statePool: StatePool | null | (() => StatePool | null),
   elementLabels?: Map<number, string>,
 ): {
   hook: PostIterationHook;
@@ -271,6 +271,15 @@ export function createIterationCaptureHook(
   clear: () => void;
   drainForLog: () => NRAttemptRecord["iterationDetails"];
 } {
+  // Normalize the statePool argument into a getter. The MNAEngine creates its
+  // statePool lazily inside _setup() (called from the first dcOperatingPoint() /
+  // step()), which runs AFTER the harness wires up its capture hooks. Capturing
+  // the statePool by value at hook-construction time would freeze it at `null`
+  // and silently no-op every captureElementStates() call — which is exactly the
+  // bug that left every parity-test elementStates array empty for our side.
+  const getStatePool: () => StatePool | null =
+    typeof statePool === "function" ? statePool : () => statePool;
+
   let snapshots: IterationSnapshot[] = [];
   let detailBuffer: NonNullable<NRAttemptRecord["iterationDetails"]> = [];
 
@@ -353,7 +362,7 @@ export function createIterationCaptureHook(
       prevVoltages: prevVoltages.slice(),
       preSolveRhs: preSolveRhs.slice(),
       matrix: preFactorMatrix,
-      elementStates: captureElementStates(elements, statePool, elementLabels),
+      elementStates: captureElementStates(elements, getStatePool(), elementLabels),
       noncon,
       diagGmin: ctx.diagonalGmin,
       srcFact: ctx.srcFact,
@@ -433,7 +442,7 @@ export function createIterationCaptureHook(
 export function createStepCaptureHook(
   solver: SparseSolver,
   elements: readonly AnalogElement[],
-  statePool: StatePool | null,
+  statePool: StatePool | null | (() => StatePool | null),
   elementLabels?: Map<number, string>,
 ): {
   iterationHook: PostIterationHook & { drainForLog: () => NRAttemptRecord["iterationDetails"] };

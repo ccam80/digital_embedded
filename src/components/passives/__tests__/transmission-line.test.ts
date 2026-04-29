@@ -739,18 +739,6 @@ describe("TransmissionLine", () => {
       expect((TransmissionLineDefinition.modelRegistry?.behavioral as {kind:"inline";factory:AnalogFactory}|undefined)?.factory).toBeDefined();
     });
 
-    it("requires branch row", () => {
-      type BehavioralEntry = {kind:"inline";factory:AnalogFactory;branchCount?:number|((props:PropertyBag)=>number)};
-      const behavioral = TransmissionLineDefinition.modelRegistry?.behavioral as BehavioralEntry|undefined;
-      expect(typeof behavioral?.branchCount).toBe("function");
-      const props10 = new PropertyBag();
-      props10.setModelParam("segments", 10);
-      const props1 = new PropertyBag();
-      props1.setModelParam("segments", 1);
-      expect((behavioral?.branchCount as (props:PropertyBag)=>number)(props10)).toBe(10);
-      expect((behavioral?.branchCount as (props:PropertyBag)=>number)(props1)).toBe(1);
-    });
-
     it("has behavioral model entry", () => {
       expect(TransmissionLineDefinition.modelRegistry?.behavioral).toBeDefined();
     });
@@ -893,35 +881,41 @@ describe("TransmissionLine", () => {
       expect(() => el.load(makeStubCtx(solver, { voltages, dt: 1e-9, method: "trapezoidal", order: 1, cktMode: MODETRAN | MODEINITTRAN }))).not.toThrow();
     });
 
-    it("SegmentInductorElement sub-elements declare stateSchema with 5 slots", () => {
+    it("SegmentInductorElement sub-elements declare stateSchema with correct slots", () => {
       const N = 3;
       const el = makeEl(N);
-      const subEls = (el as unknown as { _subElements: { stateSchema?: { size: number; owner: string } }[] })._subElements;
+      const subEls = (el as unknown as { _subElements: { stateSchema?: { size: number; owner: string; slots: readonly { name: string }[] } }[] })._subElements;
       const inductors = subEls.filter(s => s.stateSchema?.owner === "SegmentInductorElement");
       expect(inductors.length).toBe(N - 1);
       for (const ind of inductors) {
-        expect(ind.stateSchema!.size).toBe(5);
+        expect(ind.stateSchema!.slots.map(s => s.name).sort()).toEqual(
+          ["GEQ", "IEQ", "I_PREV", "PHI", "CCAP"].sort(),
+        );
       }
     });
 
-    it("SegmentCapacitorElement sub-elements declare stateSchema with 5 slots", () => {
+    it("SegmentCapacitorElement sub-elements declare stateSchema with correct slots", () => {
       const N = 3;
       const el = makeEl(N);
-      const subEls = (el as unknown as { _subElements: { stateSchema?: { size: number; owner: string } }[] })._subElements;
+      const subEls = (el as unknown as { _subElements: { stateSchema?: { size: number; owner: string; slots: readonly { name: string }[] } }[] })._subElements;
       const caps = subEls.filter(s => s.stateSchema?.owner === "SegmentCapacitorElement");
       expect(caps.length).toBe(N - 1);
       for (const cap of caps) {
-        expect(cap.stateSchema!.size).toBe(5);
+        expect(cap.stateSchema!.slots.map(s => s.name).sort()).toEqual(
+          ["GEQ", "IEQ", "V_PREV", "Q", "CCAP"].sort(),
+        );
       }
     });
 
-    it("CombinedRLElement sub-element declares stateSchema with 5 slots", () => {
+    it("CombinedRLElement sub-element declares stateSchema with correct slots", () => {
       const N = 3;
       const el = makeEl(N);
-      const subEls = (el as unknown as { _subElements: { stateSchema?: { size: number; owner: string } }[] })._subElements;
+      const subEls = (el as unknown as { _subElements: { stateSchema?: { size: number; owner: string; slots: readonly { name: string }[] } }[] })._subElements;
       const combRL = subEls.filter(s => s.stateSchema?.owner === "CombinedRLElement");
       expect(combRL.length).toBe(1);
-      expect(combRL[0].stateSchema!.size).toBe(5);
+      expect(combRL[0].stateSchema!.slots.map(s => s.name).sort()).toEqual(
+        ["GEQ", "IEQ", "I_PREV", "PHI", "CCAP"].sort(),
+      );
     });
 
     it("all reactive sub-elements have _stateBase >= 0 after initState", () => {

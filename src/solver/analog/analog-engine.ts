@@ -1364,14 +1364,28 @@ export class MNAEngine implements AnalogEngine {
   }
 
   /** Recursive walk of compiled.elements to build _deviceMap (A4.1).
-   *  Subcircuit sub-elements are keyed as "parentLabel/childLabel". */
+   *  Subcircuit sub-elements are keyed as "parentLabel/childLabel".
+   *
+   *  Composite traversal: per spec §A.15 every CompositeElement subclass
+   *  exposes `getSubElements(): readonly AnalogElement[]` returning its
+   *  children in dependency order. Use that method when present; fall back
+   *  to a legacy `_subElements` field for any non-composite leaf element
+   *  that still publishes its sub-children that way (e.g. transmission-line
+   *  segment owners). Leaf `PoolBackedAnalogElement` instances have
+   *  neither and are simply registered by their own label. */
   private _buildDeviceMap(elements: readonly AnalogElement[], prefix: string): void {
     for (const el of elements) {
       const fullLabel = prefix ? `${prefix}/${el.label}` : el.label;
       if (fullLabel) {
         this._deviceMap.set(fullLabel, el);
       }
-      const subElements = (el as any)._subElements as readonly AnalogElement[] | undefined;
+      let subElements: readonly AnalogElement[] | undefined;
+      const candidate = el as { getSubElements?: () => readonly AnalogElement[]; _subElements?: readonly AnalogElement[] };
+      if (typeof candidate.getSubElements === "function") {
+        subElements = candidate.getSubElements();
+      } else if (candidate._subElements) {
+        subElements = candidate._subElements;
+      }
       if (subElements && subElements.length > 0) {
         this._buildDeviceMap(subElements, fullLabel ?? "");
       }

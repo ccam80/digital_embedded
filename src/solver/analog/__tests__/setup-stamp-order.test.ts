@@ -65,11 +65,11 @@ import { FGNFETAnalogElement } from "../../../components/switching/fgnfet.js";
 import { FGPFETAnalogElement } from "../../../components/switching/fgpfet.js";
 import { POTENTIOMETER_DEFAULTS, PotentiometerDefinition } from "../../../components/passives/potentiometer.js";
 import { OpAmpDefinition, OPAMP_DEFAULTS } from "../../../components/active/opamp.js";
-import { RealOpAmpDefinition } from "../../../components/active/real-opamp.js";
-import { OTADefinition } from "../../../components/active/ota.js";
+import { RealOpAmpDefinition, REAL_OPAMP_DEFAULTS } from "../../../components/active/real-opamp.js";
+import { OTADefinition, OTA_DEFAULTS } from "../../../components/active/ota.js";
 import { VoltageComparatorDefinition, COMPARATOR_DEFAULTS } from "../../../components/active/comparator.js";
-import { SchmittInvertingDefinition } from "../../../components/active/schmitt-trigger.js";
-import { OptocouplerDefinition } from "../../../components/active/optocoupler.js";
+import { SchmittInvertingDefinition, SCHMITT_DEFAULTS } from "../../../components/active/schmitt-trigger.js";
+import { OptocouplerDefinition, OPTOCOUPLER_DEFAULTS } from "../../../components/active/optocoupler.js";
 import { ADCDefinition, ADC_DEFAULTS } from "../../../components/active/adc.js";
 import { DACDefinition, DAC_DEFAULTS } from "../../../components/active/dac.js";
 import { CrystalDefinition, CRYSTAL_DEFAULTS } from "../../../components/passives/crystal.js";
@@ -1095,6 +1095,7 @@ describe("setup-stamp-order", () => {
       ["anode", 1], ["cathode", 2], ["collector", 3], ["emitter", 4],
     ]);
     const props = new PropertyBag();
+    props.replaceModelParams({ ...BJT_NPN_DEFAULTS, ...OPTOCOUPLER_DEFAULTS });
     const el = entry.factory(pinNodes, props, () => 0);
     const circuit = makeMinimalCircuit([el as unknown as AnalogElement], 4);
     const engine = new MNAEngine();
@@ -1159,6 +1160,7 @@ describe("setup-stamp-order", () => {
       ["V+", 1], ["V-", 2], ["Iabc", 3], ["OUT+", 4], ["OUT", 5],
     ]);
     const props = new PropertyBag();
+    props.replaceModelParams({ ...OTA_DEFAULTS });
     const el = entry.factory(pinNodes, props, () => 0);
     const circuit = makeMinimalCircuit([el as unknown as AnalogElement], 5);
     const engine = new MNAEngine();
@@ -1401,6 +1403,7 @@ describe("setup-stamp-order", () => {
       ["in+", 1], ["in-", 2], ["out", 3],
     ]);
     const props = new PropertyBag();
+    props.replaceModelParams({ ...REAL_OPAMP_DEFAULTS });
     const el = entry.factory(pinNodes, props, () => 0);
     const circuit = makeMinimalCircuit([el as unknown as AnalogElement], 3);
     const engine = new MNAEngine();
@@ -1654,6 +1657,7 @@ describe("setup-stamp-order", () => {
     if (entry.kind !== "inline") throw new Error("Expected inline ModelEntry");
     const pinNodes = new Map<string, number>([["in", 1], ["out", 2]]);
     const props = new PropertyBag();
+    props.replaceModelParams({ ...SCHMITT_DEFAULTS });
     const el = entry.factory(pinNodes, props, () => 0);
     const circuit = makeMinimalCircuit([el as unknown as AnalogElement], 2);
     const engine = new MNAEngine();
@@ -2048,7 +2052,7 @@ describe("setup-stamp-order", () => {
     ]);
     const props = new PropertyBag();
     props.replaceModelParams({ ...TRANSMISSION_LINE_DEFAULTS });
-    props.set("segments", 2);
+    props.setModelParam("segments", 2);
     const el = entry.factory(pinNodes, props, () => 0);
     const circuit = makeMinimalCircuit([el as unknown as AnalogElement], 2);
     const engine = new MNAEngine();

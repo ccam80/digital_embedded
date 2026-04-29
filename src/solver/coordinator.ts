@@ -138,6 +138,33 @@ export class DefaultSimulationCoordinator implements SimulationCoordinator {
         this._diagnostics = this._createDiagnosticProxy();
       }
     }
+
+    this._pushAnalogStreamingParams();
+  }
+
+  /**
+   * Push speed-derived transient parameters to the analog engine.
+   *
+   * Streaming-mode UI has no fixed tStop, so we pass Infinity and let
+   * resolveSimulationParams derive maxTimeStep, firstStep, and minTimeStep
+   * from outputStep. outputStep targets ~60 sample points per wall-second
+   * at the current display speed, which both gives the render loop a
+   * sensible per-frame step budget and keeps maxTimeStep proportional to
+   * the time horizon the user is actually watching.
+   *
+   * Without this call the engine runs with DEFAULT_SIMULATION_PARAMS
+   * (firstStep=1e-9, maxTimeStep=10e-6, finalTime=Infinity), which
+   * mismatches every circuit whose interesting dynamics live outside
+   * that ratio.
+   */
+  private _pushAnalogStreamingParams(): void {
+    if (this._analog === null) return;
+    const outputStep = Math.max(1e-12, this._analogSpeed / 60);
+    this._analog.configure({
+      tStop: Number.POSITIVE_INFINITY,
+      outputStep,
+      initTime: 0,
+    });
   }
 
   get compiled(): CompiledCircuitUnified { return this._compiled; }
@@ -567,11 +594,13 @@ export class DefaultSimulationCoordinator implements SimulationCoordinator {
   set speed(value: number) {
     this._analogSpeed = Math.max(1e-9, value);
     this._syncTargetOnSpeedChange();
+    this._pushAnalogStreamingParams();
   }
 
   adjustSpeed(factor: number): void {
     this._analogSpeed = Math.max(1e-9, this._analogSpeed * factor);
     this._syncTargetOnSpeedChange();
+    this._pushAnalogStreamingParams();
   }
 
   parseSpeed(text: string): void {
@@ -579,6 +608,7 @@ export class DefaultSimulationCoordinator implements SimulationCoordinator {
     if (Number.isFinite(parsed) && parsed > 0) {
       this._analogSpeed = parsed;
       this._syncTargetOnSpeedChange();
+      this._pushAnalogStreamingParams();
     }
   }
 
@@ -705,9 +735,12 @@ export class DefaultSimulationCoordinator implements SimulationCoordinator {
     const bag = element.getProperties();
     const result: SliderPropertyDescriptor[] = [];
 
-    // Model params (primary source of tunable analog parameters)
-    const modelKey = bag.get<string>("model");
-    const entry = def.modelRegistry?.[modelKey];
+    // Model params (primary source of tunable analog parameters).
+    // Bag may not have "model" set (e.g. resistor/inductor/capacitor/MOSFET
+    // unless the user picked a model explicitly); skip model params in that case
+    // rather than throwing from PropertyBag.get.
+    const modelKey = bag.has("model") ? bag.get<string>("model") : "";
+    const entry = modelKey ? def.modelRegistry?.[modelKey] : undefined;
     if (entry?.paramDefs) {
       for (const pd of entry.paramDefs) {
         const currentValue = bag.hasModelParam(pd.key)

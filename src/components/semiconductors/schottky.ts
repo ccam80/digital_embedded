@@ -24,7 +24,7 @@ import {
 } from "../../core/registry.js";
 import type { AnalogElement } from "../../solver/analog/element.js";
 import { createDiodeElement } from "./diode.js";
-import { defineModelParams } from "../../core/model-params.js";
+import { defineModelParams, kelvinToCelsius } from "../../core/model-params.js";
 
 // ---------------------------------------------------------------------------
 // Model parameter declarations
@@ -48,6 +48,9 @@ export const { paramDefs: SCHOTTKY_PARAM_DEFS, defaults: SCHOTTKY_PARAM_DEFAULTS
     XTI: { default: 2,                description: "Saturation current temperature exponent" },
     KF:  { default: 0,                description: "Flicker noise coefficient" },
     AF:  { default: 1,                description: "Flicker noise exponent" },
+  },
+  instance: {
+    TEMP: { default: 300.15, unit: "K", description: "Per-instance operating temperature", spiceConverter: kelvinToCelsius },
   },
 });
 

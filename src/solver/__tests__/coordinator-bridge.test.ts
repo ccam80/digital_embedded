@@ -16,6 +16,7 @@ import type { FlatComponentLayout } from "../digital/compiled-circuit.js";
 import type { CompiledCircuitUnified, BridgeAdapter } from "../../compile/types.js";
 import type { ResolvedPinElectrical } from "../../core/pin-electrical.js";
 import { MODEDCOP, MODEINITFLOAT } from "../analog/ckt-mode.js";
+import { SparseSolver } from "../analog/sparse-solver.js";
 import { loadCtxFromFields } from "../analog/__tests__/test-helpers.js";
 
 const CMOS: ResolvedPinElectrical = {
@@ -28,37 +29,10 @@ const NODE_ID = 1;
 const BRANCH_IDX = 2;
 
 // ---------------------------------------------------------------------------
-// MockSolver — records stamp/stampRHS calls for behavioral assertions
+// makeCtx helper
 // ---------------------------------------------------------------------------
 
-interface StampCall { row: number; col: number; value: number }
-
-class MockSolver {
-  readonly stamps: StampCall[] = [];
-  private readonly _handles: Array<{ row: number; col: number }> = [];
-
-  allocElement(row: number, col: number): number {
-    this._handles.push({ row, col });
-    return this._handles.length - 1;
-  }
-
-  stampElement(handle: number, value: number): void {
-    const { row, col } = this._handles[handle];
-    this.stamps.push({ row, col, value });
-  }
-
-  reset(): void {
-    this.stamps.length = 0;
-  }
-
-  sumStamp(row: number, col: number): number {
-    return this.stamps
-      .filter((s) => s.row === row && s.col === col)
-      .reduce((acc, s) => acc + s.value, 0);
-  }
-}
-
-function makeCtx(solver: MockSolver, rhs?: Float64Array) {
+function makeCtx(solver: SparseSolver, rhs?: Float64Array) {
   const rhsBuf = rhs ?? new Float64Array(8);
   return loadCtxFromFields({
     solver: solver as any,
@@ -291,8 +265,10 @@ class TestableCoordinator extends DefaultSimulationCoordinator {
 describe('bridge adapter: digital output drives analog node', () => {
   it('outputAdapter.setLogicLevel(true) drives vOH on the branch RHS', () => {
     const { outputAdapter } = buildBridgeFixture('digital-to-analog');
-    const solver = new MockSolver();
+    const solver = new SparseSolver();
+    solver._initStructure();
     outputAdapter.setLogicLevel(true);
+    solver._resetForAssembly();
     outputAdapter.load(makeCtx(solver));
   });
 
@@ -366,9 +342,11 @@ describe('bridge adapter: setParam updates electrical parameters', () => {
 
   it('setParam("vOH") on outputAdapter changes the branch RHS when stamped high', () => {
     const { outputAdapter } = buildBridgeFixture('digital-to-analog');
-    const solver = new MockSolver();
+    const solver = new SparseSolver();
+    solver._initStructure();
     outputAdapter.setLogicLevel(true);
     outputAdapter.setParam('vOH', 5.0);
+    solver._resetForAssembly();
     outputAdapter.load(makeCtx(solver));
   });
 
@@ -390,21 +368,26 @@ describe('bridge adapter: hi-z output stops driving analog node', () => {
   it('setHighZ(true) switches branch equation to I=0 mode', () => {
     const { outputAdapter } = buildBridgeFixture('digital-to-analog');
     outputAdapter.setHighZ(true);
-    const solver = new MockSolver();
+    const solver = new SparseSolver();
+    solver._initStructure();
     const rhs = new Float64Array(8);
+    solver._resetForAssembly();
     outputAdapter.load(makeCtx(solver, rhs));
     // Hi-Z mode: branch RHS must be 0
     expect(rhs[BRANCH_IDX]).toBe(0);
     // Hi-Z mode: stamp(branchIdx, branchIdx, 1)
-    expect(solver.stamps.some(s => s.row === BRANCH_IDX && s.col === BRANCH_IDX && s.value === 1)).toBe(true);
+    const entries = solver.getCSCNonZeros();
+    expect(entries.some(e => e.row === BRANCH_IDX && e.col === BRANCH_IDX && e.value === 1)).toBe(true);
   });
 
   it('setHighZ(true) then setLogicLevel(false) keeps branch RHS at 0 while hi-z', () => {
     const { outputAdapter } = buildBridgeFixture('digital-to-analog');
     outputAdapter.setHighZ(true);
     outputAdapter.setLogicLevel(false);
-    const solver = new MockSolver();
+    const solver = new SparseSolver();
+    solver._initStructure();
     const rhs = new Float64Array(8);
+    solver._resetForAssembly();
     outputAdapter.load(makeCtx(solver, rhs));
     // Hi-Z overrides logic level — branch RHS stays 0
     expect(rhs[BRANCH_IDX]).toBe(0);
@@ -415,7 +398,9 @@ describe('bridge adapter: hi-z output stops driving analog node', () => {
     outputAdapter.setHighZ(true);
     outputAdapter.setHighZ(false);
     outputAdapter.setLogicLevel(false);
-    const solver = new MockSolver();
+    const solver = new SparseSolver();
+    solver._initStructure();
+    solver._resetForAssembly();
     outputAdapter.load(makeCtx(solver));
     // Drive mode restored: branch RHS must be vOL
   });

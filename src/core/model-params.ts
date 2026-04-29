@@ -10,7 +10,16 @@ interface ParamSpec {
   spiceName?: string;
   emit?: "key-value" | "flag";
   emitGroup?: { name: string; index: number };
+  spiceConverter?: (value: number) => number;
 }
+
+/**
+ * Kelvin→Celsius converter for ngspice TEMP/TNOM emission. ngspice's
+ * parser adds CONSTCtoK (273.15) to whatever appears in the netlist
+ * (bjtparam.c:47, bjtmpar.c:42, etc.), so a Kelvin value must be
+ * pre-subtracted by 273.15 before it crosses the netlist boundary.
+ */
+export const kelvinToCelsius = (v: number): number => v - 273.15;
 
 /**
  * Compact declaration that generates both the parameter schema (ParamDef[])
@@ -42,6 +51,7 @@ export function defineModelParams(spec: {
       if (s.spiceName !== undefined) pDef.spiceName = s.spiceName;
       if (s.emit !== undefined) pDef.emit = s.emit;
       if (s.emitGroup !== undefined) pDef.emitGroup = s.emitGroup;
+      if (s.spiceConverter !== undefined) pDef.spiceConverter = s.spiceConverter;
       paramDefs.push(pDef);
       defaults[key] = s.default;
     }

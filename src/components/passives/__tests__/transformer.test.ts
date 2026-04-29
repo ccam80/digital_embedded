@@ -165,38 +165,6 @@ function makeTransientCtx(
   });
 }
 
-// ---------------------------------------------------------------------------
-// makeCaptureSolver — records allocElement/stampElement/stampRHS calls
-// ---------------------------------------------------------------------------
-
-interface CaptureStamp { row: number; col: number; value: number; }
-
-function makeCaptureSolver(): { solver: SparseSolverType; stamps: CaptureStamp[] } {
-  const stamps: CaptureStamp[] = [];
-  const handles: { row: number; col: number }[] = [];
-  const handleIndex = new Map<string, number>();
-  const solver = {
-    allocElement: (row: number, col: number): number => {
-      const key = `${row},${col}`;
-      let h = handleIndex.get(key);
-      if (h === undefined) {
-        h = handles.length;
-        handles.push({ row, col });
-        handleIndex.set(key, h);
-      }
-      return h;
-    },
-    stampElement: (handle: number, value: number): void => {
-      const { row, col } = handles[handle];
-      stamps.push({ row, col, value });
-    },
-    stampRHS: (_row: number, _value: number): void => {},
-    beginAssembly: (): void => {},
-    finalize: (): void => {},
-    solve: (): Float64Array => new Float64Array(0),
-  } as unknown as SparseSolverType;
-  return { solver, stamps };
-}
 
 // ---------------------------------------------------------------------------
 // withState: allocate a StatePool for a single element and call initState
@@ -742,12 +710,9 @@ describe("Transformer", () => {
      * We test load() directly: check that the resistor conductance stamps
      * appear correctly in the matrix for the primary winding.
      */
-    const { solver: capSolver, stamps } = makeCaptureSolver();
-
     const rPri = 10.0;
     const { element: transformer } = makeTransformerElement({
       pinNodeIds: [1, 2, 3, 4],
-      // branch1 omitted: load() is called directly with capSolver without setup.
       lPrimary: 10e-3,
       turnsRatio: 1,
       k: 0.99,
@@ -755,20 +720,33 @@ describe("Transformer", () => {
       rSec: 0,
     });
 
+    const solver = new SparseSolver();
+    solver._initStructure();
+    transformer.label = "T1";
+    const setupCtx = makeTestSetupContext({
+      solver,
+      startBranch: 10,
+      startNode: 100,
+      elements: [transformer],
+    });
+    setupAll([transformer], setupCtx);
+
     const voltages = new Float64Array(8);
     const rhs = new Float64Array(8);
-    const ctx = makeTransientCtx(capSolver, voltages, { rhs });
+    solver._resetForAssembly();
+    const ctx = makeTransientCtx(solver as unknown as SparseSolverType, voltages, { rhs });
     transformer.load(ctx);
 
     // Primary resistance conductance = 1/10 = 0.1 S
     // Under 1-indexed nodes: node 1 → row/col 1, node 2 → row/col 2.
-    const diagN1 = stamps.find((s) => s.row === 1 && s.col === 1);
-    const diagN2 = stamps.find((s) => s.row === 2 && s.col === 2);
+    const entries = solver.getCSCNonZeros();
+    const diagN1 = entries.find((e) => e.row === 1 && e.col === 1);
+    const diagN2 = entries.find((e) => e.row === 2 && e.col === 2);
     expect(diagN1).toBeDefined();
     expect(diagN2).toBeDefined();
 
     // Off-diagonal: -gPri
-    const offN1N2 = stamps.find((s) => s.row === 1 && s.col === 2);
+    const offN1N2 = entries.find((e) => e.row === 1 && e.col === 2);
     expect(offN1N2).toBeDefined();
   });
 });
@@ -810,8 +788,29 @@ describe("TransformerDefinition", () => {
     expect((TransformerDefinition.modelRegistry?.behavioral as {kind:"inline";factory:AnalogFactory}|undefined)?.factory).toBeDefined();
   });
 
-  it("branchCount is 2", () => {
-    expect((TransformerDefinition.modelRegistry?.behavioral as {kind:"inline";factory:AnalogFactory;branchCount?:number}|undefined)?.branchCount).toBe(2);
+  it("element allocates a branch row in setup()", () => {
+    const factory = getFactory(TransformerDefinition.modelRegistry!.behavioral!);
+    const props = new PropertyBag();
+    props.setModelParam("turnsRatio", 1);
+    props.setModelParam("primaryInductance", 10e-3);
+    props.setModelParam("couplingCoefficient", 0.99);
+    props.setModelParam("primaryResistance", 0);
+    props.setModelParam("secondaryResistance", 0);
+    const el = factory(new Map([["P1", 1], ["P2", 0], ["S1", 2], ["S2", 0]]), props, () => 0) as AnalogTransformerElement;
+    el.label = "T1";
+
+    const solver = new SparseSolver();
+    solver._initStructure();
+    const setupCtx = makeTestSetupContext({
+      solver,
+      startBranch: 5,
+      startNode: 100,
+      elements: [el],
+    });
+    setupAll([el], setupCtx);
+
+    expect(el.branchIndex).toBeGreaterThanOrEqual(0);
+    expect(el.branch2).toBeGreaterThanOrEqual(0);
   });
 
   it("category is PASSIVES", () => {

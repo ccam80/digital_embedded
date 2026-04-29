@@ -46,7 +46,7 @@ import { pnjlim } from "../../solver/analog/newton-raphson.js";
 import { cktTerr } from "../../solver/analog/ckt-terr.js";
 import type { LteParams } from "../../solver/analog/ckt-terr.js";
 import { niIntegrate } from "../../solver/analog/ni-integrate.js";
-import { defineModelParams } from "../../core/model-params.js";
+import { defineModelParams, kelvinToCelsius } from "../../core/model-params.js";
 import type { StatePoolRef } from "../../core/analog-types.js";
 import {
   defineStateSchema,
@@ -123,7 +123,7 @@ export const { paramDefs: DIODE_PARAM_DEFS, defaults: DIODE_PARAM_DEFAULTS } = d
     XTI: { default: 3,                description: "Saturation current temperature exponent" },
     KF:  { default: 0,                description: "Flicker noise coefficient" },
     AF:  { default: 1,                description: "Flicker noise exponent" },
-    TNOM: { default: REFTEMP, unit: "K", description: "Parameter measurement temperature" },
+    TNOM: { default: REFTEMP, unit: "K", description: "Parameter measurement temperature", spiceConverter: kelvinToCelsius },
     // D-W3-6: sidewall saturation current params  dioload.c:209-243
     ISW:   { default: 0,    unit: "A",  spiceName: "JSW", description: "Sidewall saturation current (DIOsatSWCur)" },
     NSW:   { default: NaN,             description: "Sidewall emission coefficient (DIOswEmissionCoeff; default=N)" },
@@ -132,7 +132,7 @@ export const { paramDefs: DIODE_PARAM_DEFS, defaults: DIODE_PARAM_DEFAULTS } = d
     AREA: { default: 1,               description: "Area scaling factor" },
     OFF: { default: 0, emit: "flag",  description: "Initial condition: device off (0=false, 1=true)" },
     IC:  { default: NaN,   unit: "V",  description: "Initial condition: junction voltage for UIC" },
-    TEMP:  { default: 300.15, unit: "K", description: "Per-instance operating temperature" },
+    TEMP:  { default: 300.15, unit: "K", description: "Per-instance operating temperature", spiceConverter: kelvinToCelsius },
   },
 });
 

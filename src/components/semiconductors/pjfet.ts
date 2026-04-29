@@ -34,7 +34,7 @@ import { pnjlim, fetlim } from "../../solver/analog/newton-raphson.js";
 import { cktTerr } from "../../solver/analog/ckt-terr.js";
 import type { LteParams } from "../../solver/analog/ckt-terr.js";
 import { niIntegrate } from "../../solver/analog/ni-integrate.js";
-import { defineModelParams } from "../../core/model-params.js";
+import { defineModelParams, kelvinToCelsius } from "../../core/model-params.js";
 import type { StatePoolRef } from "../../core/analog-types.js";
 import {
   defineStateSchema,
@@ -83,12 +83,12 @@ export const { paramDefs: PJFET_PARAM_DEFS, defaults: PJFET_PARAM_DEFAULTS } = d
     BEX:  { default: 0.0,               description: "Mobility temperature exponent" },
     KF:   { default: 0,                 description: "Flicker noise coefficient" },
     AF:   { default: 1,                 description: "Flicker noise exponent" },
-    TNOM: { default: REFTEMP, unit: "K", description: "Nominal temperature for parameters" },
+    TNOM: { default: REFTEMP, unit: "K", description: "Nominal temperature for parameters", spiceConverter: kelvinToCelsius },
   },
   instance: {
     AREA: { default: 1.0,               description: "Area factor" },
     M:    { default: 1.0,               description: "Parallel multiplier" },
-    TEMP: { default: 300.15,  unit: "K", description: "Per-instance operating temperature" },
+    TEMP: { default: 300.15,  unit: "K", description: "Per-instance operating temperature", spiceConverter: kelvinToCelsius },
     OFF:  { default: 0, emit: "flag",   description: "Initial condition: device off (0=false, 1=true)" },
   },
 });

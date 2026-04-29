@@ -2,12 +2,12 @@
  * Tests for the AnalogResistor component and voltage divider integration.
  */
 
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect } from "vitest";
 import { ResistorDefinition } from "../resistor.js";
 import { PropertyBag } from "../../../core/properties.js";
-import { runDcOp, makeSimpleCtx, makeLoadCtx } from "../../../solver/analog/__tests__/test-helpers.js";
+import { runDcOp, makeSimpleCtx, makeLoadCtx, makeTestSetupContext, setupAll } from "../../../solver/analog/__tests__/test-helpers.js";
 import type { AnalogElement } from "../../../solver/analog/element.js";
-import type { SparseSolver as SparseSolverType } from "../../../solver/analog/sparse-solver.js";
+import { SparseSolver } from "../../../solver/analog/sparse-solver.js";
 
 // ---------------------------------------------------------------------------
 // Helper: narrow ModelEntry to inline factory (throws if netlist kind)
@@ -20,28 +20,6 @@ function getFactory(entry: ModelEntry): AnalogFactory {
 
 
 // ---------------------------------------------------------------------------
-// Capture solver (Pattern D)
-// ---------------------------------------------------------------------------
-
-function makeCaptureSolver() {
-  const stamps: [number, number, number][] = [];
-  const rhs: [number, number][] = [];
-  const solver = {
-    allocElement: vi.fn((row: number, col: number) => {
-      stamps.push([row, col, 0]);
-      return stamps.length - 1;
-    }),
-    stampElement: vi.fn((h: number, v: number) => {
-      stamps[h][2] += v;
-    }),
-    stampRHS: vi.fn((row: number, v: number) => {
-      rhs.push([row, v]);
-    }),
-  } as unknown as SparseSolverType;
-  return { solver, stamps, rhs };
-}
-
-// ---------------------------------------------------------------------------
 // Resistor unit tests
 // ---------------------------------------------------------------------------
 
@@ -50,53 +28,89 @@ describe("Resistor", () => {
     const props = new PropertyBag(); props.replaceModelParams({ resistance: 1000 });
     const core = getFactory(ResistorDefinition.modelRegistry!.behavioral!)(new Map([["A", 1], ["B", 2]]), props, () => 0);
     const element = core as unknown as AnalogElement;
-    const { solver, stamps } = makeCaptureSolver();
+    const solver = new SparseSolver();
+    solver._initStructure();
+
+    element.label = "R1";
+    const setupCtx = makeTestSetupContext({
+      solver,
+      startBranch: 5,
+      startNode: 100,
+      elements: [element],
+    });
+    setupAll([element], setupCtx);
+    solver._resetForAssembly();
 
     const ctx = makeLoadCtx({ solver });
     element.load(ctx);
 
-    expect(stamps).toHaveLength(4);
+    const entries = solver.getCSCNonZeros();
+    expect(entries).toHaveLength(4);
 
     const G = 1e-3;
     // Node IDs are 1-based (A=1, B=2); elements stamp at the raw 1-based node indices
-    expect(stamps).toContainEqual([1, 1, G]);
-    expect(stamps).toContainEqual([2, 2, G]);
-    expect(stamps).toContainEqual([1, 2, -G]);
-    expect(stamps).toContainEqual([2, 1, -G]);
+    expect(entries.find((e) => e.row === 1 && e.col === 1)?.value).toBe(G);
+    expect(entries.find((e) => e.row === 2 && e.col === 2)?.value).toBe(G);
+    expect(entries.find((e) => e.row === 1 && e.col === 2)?.value).toBe(-G);
+    expect(entries.find((e) => e.row === 2 && e.col === 1)?.value).toBe(-G);
   });
 
   it("resistance_from_props", () => {
     const props = new PropertyBag(); props.replaceModelParams({ resistance: 470 });
     const core = getFactory(ResistorDefinition.modelRegistry!.behavioral!)(new Map([["A", 1], ["B", 2]]), props, () => 0);
     const element = core as unknown as AnalogElement;
-    const { solver, stamps } = makeCaptureSolver();
+    const solver = new SparseSolver();
+    solver._initStructure();
+
+    element.label = "R1";
+    const setupCtx = makeTestSetupContext({
+      solver,
+      startBranch: 5,
+      startNode: 100,
+      elements: [element],
+    });
+    setupAll([element], setupCtx);
+    solver._resetForAssembly();
 
     const ctx = makeLoadCtx({ solver });
     element.load(ctx);
 
+    const entries = solver.getCSCNonZeros();
     const G = 1 / 470;
     // Node IDs are 1-based (A=1, B=2); elements stamp at the raw 1-based node indices
-    expect(stamps).toContainEqual([1, 1, G]);
-    expect(stamps).toContainEqual([2, 2, G]);
-    expect(stamps).toContainEqual([1, 2, -G]);
-    expect(stamps).toContainEqual([2, 1, -G]);
+    expect(entries.find((e) => e.row === 1 && e.col === 1)?.value).toBe(G);
+    expect(entries.find((e) => e.row === 2 && e.col === 2)?.value).toBe(G);
+    expect(entries.find((e) => e.row === 1 && e.col === 2)?.value).toBe(-G);
+    expect(entries.find((e) => e.row === 2 && e.col === 1)?.value).toBe(-G);
   });
 
   it("minimum_resistance_clamped", () => {
     const props = new PropertyBag(); props.replaceModelParams({ resistance: 0 });
     const core = getFactory(ResistorDefinition.modelRegistry!.behavioral!)(new Map([["A", 1], ["B", 2]]), props, () => 0);
     const element = core as unknown as AnalogElement;
-    const { solver, stamps } = makeCaptureSolver();
+    const solver = new SparseSolver();
+    solver._initStructure();
+
+    element.label = "R1";
+    const setupCtx = makeTestSetupContext({
+      solver,
+      startBranch: 5,
+      startNode: 100,
+      elements: [element],
+    });
+    setupAll([element], setupCtx);
+    solver._resetForAssembly();
 
     const ctx = makeLoadCtx({ solver });
     element.load(ctx);
 
+    const entries = solver.getCSCNonZeros();
     const G = 1 / 1e-9;
     // Node IDs are 1-based (A=1, B=2); elements stamp at the raw 1-based node indices
-    expect(stamps).toContainEqual([1, 1, G]);
-    expect(stamps).toContainEqual([2, 2, G]);
-    expect(stamps).toContainEqual([1, 2, -G]);
-    expect(stamps).toContainEqual([2, 1, -G]);
+    expect(entries.find((e) => e.row === 1 && e.col === 1)?.value).toBe(G);
+    expect(entries.find((e) => e.row === 2 && e.col === 2)?.value).toBe(G);
+    expect(entries.find((e) => e.row === 1 && e.col === 2)?.value).toBe(-G);
+    expect(entries.find((e) => e.row === 2 && e.col === 1)?.value).toBe(-G);
   });
 
   it("branch_index_is_minus_one", () => {

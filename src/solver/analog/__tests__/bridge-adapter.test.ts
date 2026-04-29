@@ -19,51 +19,14 @@ import {
 } from "../bridge-adapter.js";
 import type { ResolvedPinElectrical } from "../../../core/pin-electrical.js";
 import { StatePool } from "../state-pool.js";
-import { loadCtxFromFields } from "./test-helpers.js";
+import { SparseSolver } from "../sparse-solver.js";
+import { loadCtxFromFields, makeTestSetupContext, setupAll } from "./test-helpers.js";
 
 // ---------------------------------------------------------------------------
-// Test helper — records stamp() and stampRHS() calls
+// makeCtx helper
 // ---------------------------------------------------------------------------
 
-interface StampCall {
-  row: number;
-  col: number;
-  value: number;
-}
-
-class MockSolver {
-  readonly stamps: StampCall[] = [];
-  private readonly _handles: Array<{ row: number; col: number }> = [];
-
-  allocElement(row: number, col: number): number {
-    this._handles.push({ row, col });
-    return this._handles.length - 1;
-  }
-
-  stampElement(handle: number, value: number): void {
-    const { row, col } = this._handles[handle];
-    this.stamps.push({ row, col, value });
-  }
-
-  reset(): void {
-    this.stamps.length = 0;
-  }
-
-  /** Sum all stamp values at (row, col). */
-  sumStamp(row: number, col: number): number {
-    return this.stamps
-      .filter((s) => s.row === row && s.col === col)
-      .reduce((acc, s) => acc + s.value, 0);
-  }
-
-  /** Last stamp value written at (row, col), or undefined if never stamped. */
-  lastStamp(row: number, col: number): number | undefined {
-    const hits = this.stamps.filter((s) => s.row === row && s.col === col);
-    return hits.length > 0 ? hits[hits.length - 1].value : undefined;
-  }
-}
-
-function makeCtx(solver: MockSolver, rhs?: Float64Array) {
+function makeCtx(solver: SparseSolver, rhs?: Float64Array) {
   const rhsBuf = rhs ?? new Float64Array(8);
   return loadCtxFromFields({
     solver: solver as any,
@@ -120,27 +83,51 @@ const BRANCH_IDX = 2;
 // ---------------------------------------------------------------------------
 
 describe("BridgeOutputAdapter", () => {
-  let solver: MockSolver;
+  let solver: SparseSolver;
 
   beforeEach(() => {
-    solver = new MockSolver();
+    solver = new SparseSolver();
+    solver._initStructure();
   });
 
   it("output adapter stamps ideal voltage source at vOL", () => {
     // Default logic level is low (vOL)
     const adapter = makeBridgeOutputAdapter(CMOS_3V3, NODE, BRANCH_IDX, false);
+    adapter.label = "OUT";
+    const setupCtx = makeTestSetupContext({
+      solver,
+      startBranch: 1,
+      startNode: 100,
+      elements: [adapter],
+    });
+    setupAll([adapter], setupCtx);
+
+    solver._resetForAssembly();
     adapter.load(makeCtx(solver));
 
+    const entries = solver.getCSCNonZeros();
     // Drive mode branch equation: stamp(branchIdx, nodeIdx, 1)
-    expect(solver.lastStamp(BRANCH_IDX, NODE_IDX)).toBe(1);
+    const branchNode = entries.find((e) => e.row === BRANCH_IDX && e.col === NODE_IDX);
+    expect(branchNode?.value).toBe(1);
     // KCL: stamp(nodeIdx, branchIdx, 1)
-    expect(solver.lastStamp(NODE_IDX, BRANCH_IDX)).toBe(1);
+    const nodeBranch = entries.find((e) => e.row === NODE_IDX && e.col === BRANCH_IDX);
+    expect(nodeBranch?.value).toBe(1);
     // RHS: stampRHS(branchIdx, vOL)
   });
 
   it("output adapter setLogicLevel(true) drives vOH", () => {
     const adapter = makeBridgeOutputAdapter(CMOS_3V3, NODE, BRANCH_IDX, false);
+    adapter.label = "OUT";
+    const setupCtx = makeTestSetupContext({
+      solver,
+      startBranch: 1,
+      startNode: 100,
+      elements: [adapter],
+    });
+    setupAll([adapter], setupCtx);
+
     adapter.setLogicLevel(true);
+    solver._resetForAssembly();
     adapter.load(makeCtx(solver));
 
     // RHS must be vOH after setting level high
@@ -148,23 +135,47 @@ describe("BridgeOutputAdapter", () => {
 
   it("output adapter hi-z stamps I=0", () => {
     const adapter = makeBridgeOutputAdapter(CMOS_3V3, NODE, BRANCH_IDX, false);
+    adapter.label = "OUT";
+    const setupCtx = makeTestSetupContext({
+      solver,
+      startBranch: 1,
+      startNode: 100,
+      elements: [adapter],
+    });
+    setupAll([adapter], setupCtx);
+
     adapter.setHighZ(true);
     const rhs = new Float64Array(8);
+    solver._resetForAssembly();
     adapter.load(makeCtx(solver, rhs));
 
+    const entries = solver.getCSCNonZeros();
     // Hi-Z branch equation: stamp(branchIdx, branchIdx, 1)
-    expect(solver.lastStamp(BRANCH_IDX, BRANCH_IDX)).toBe(1);
+    const branchBranch = entries.find((e) => e.row === BRANCH_IDX && e.col === BRANCH_IDX);
+    expect(branchBranch?.value).toBe(1);
     // KCL still present: stamp(nodeIdx, branchIdx, 1)
-    expect(solver.lastStamp(NODE_IDX, BRANCH_IDX)).toBe(1);
+    const nodeBranch = entries.find((e) => e.row === NODE_IDX && e.col === BRANCH_IDX);
+    expect(nodeBranch?.value).toBe(1);
     // RHS: stampRHS(branchIdx, 0)
     expect(rhs[BRANCH_IDX]).toBe(0);
   });
 
   it("loaded output adapter stamps rOut conductance on node diagonal", () => {
     const adapter = makeBridgeOutputAdapter(CMOS_3V3, NODE, BRANCH_IDX, true);
+    adapter.label = "OUT";
+    const setupCtx = makeTestSetupContext({
+      solver,
+      startBranch: 1,
+      startNode: 100,
+      elements: [adapter],
+    });
+    setupAll([adapter], setupCtx);
+
     const pool = new StatePool(adapter.stateSize);
     adapter._stateBase = 0;
     adapter.initState(pool);
+
+    solver._resetForAssembly();
     adapter.load(makeCtx(solver));
 
     // 1/rOut must appear on the node diagonal
@@ -172,28 +183,63 @@ describe("BridgeOutputAdapter", () => {
 
   it("unloaded output adapter does not stamp rOut on node diagonal", () => {
     const adapter = makeBridgeOutputAdapter(CMOS_3V3, NODE, BRANCH_IDX, false);
+    adapter.label = "OUT";
+    const setupCtx = makeTestSetupContext({
+      solver,
+      startBranch: 1,
+      startNode: 100,
+      elements: [adapter],
+    });
+    setupAll([adapter], setupCtx);
+
+    solver._resetForAssembly();
     adapter.load(makeCtx(solver));
 
+    const entries = solver.getCSCNonZeros();
     // Node diagonal must be zero — no rOut conductance when unloaded
-    expect(solver.sumStamp(NODE_IDX, NODE_IDX)).toBe(0);
+    const nodeDiag = entries
+      .filter((e) => e.row === NODE_IDX && e.col === NODE_IDX)
+      .reduce((acc, e) => acc + e.value, 0);
+    expect(nodeDiag).toBe(0);
   });
 
   it("input adapter unloaded stamps nothing", () => {
     const adapter = makeBridgeInputAdapter(CMOS_3V3, NODE, false);
+    adapter.label = "IN";
+    const setupCtx = makeTestSetupContext({
+      solver,
+      startBranch: 1,
+      startNode: 100,
+      elements: [adapter],
+    });
+    setupAll([adapter], setupCtx);
+
     const rhs = new Float64Array(8);
+    solver._resetForAssembly();
     adapter.load(makeCtx(solver, rhs));
 
     // No stamps at all when unloaded
-    expect(solver.stamps.length).toBe(0);
+    const entries = solver.getCSCNonZeros();
+    expect(entries.length).toBe(0);
     expect(rhs.every(v => v === 0)).toBe(true);
   });
 
   it("input adapter loaded stamps rIn on node diagonal", () => {
     const adapter = makeBridgeInputAdapter(CMOS_3V3, NODE, true);
+    adapter.label = "IN";
+    const setupCtx = makeTestSetupContext({
+      solver,
+      startBranch: 1,
+      startNode: 100,
+      elements: [adapter],
+    });
+    setupAll([adapter], setupCtx);
+
     const pool = new StatePool(adapter.stateSize);
     adapter._stateBase = 0;
     adapter.initState(pool);
     const rhs = new Float64Array(8);
+    solver._resetForAssembly();
     adapter.load(makeCtx(solver, rhs));
 
     expect(rhs.every(v => v === 0)).toBe(true);
@@ -212,14 +258,25 @@ describe("BridgeOutputAdapter", () => {
 
   it("setParam('rOut', 50) hot-updates output adapter conductance", () => {
     const adapter = makeBridgeOutputAdapter(CMOS_3V3, NODE, BRANCH_IDX, true);
+    adapter.label = "OUT";
+    const setupCtx = makeTestSetupContext({
+      solver,
+      startBranch: 1,
+      startNode: 100,
+      elements: [adapter],
+    });
+    setupAll([adapter], setupCtx);
+
     const pool = new StatePool(adapter.stateSize);
     adapter._stateBase = 0;
     adapter.initState(pool);
+
+    solver._resetForAssembly();
     adapter.load(makeCtx(solver));
 
-    solver.reset();
     const newROut = 100;
     adapter.setParam("rOut", newROut);
+    solver._resetForAssembly();
     adapter.load(makeCtx(solver));
 
   });

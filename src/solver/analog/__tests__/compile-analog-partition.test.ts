@@ -23,6 +23,8 @@ import { compileAnalogPartition } from "../compiler.js";
 import type { SolverPartition, PartitionedComponent, ConnectivityGroup } from "../../../compile/types.js";
 import { pinWorldPosition } from "../../../core/pin.js";
 import { StatePool } from "../state-pool.js";
+import { SparseSolver } from "../sparse-solver.js";
+import { makeTestSetupContext, setupAll } from "./test-helpers.js";
 
 // ---------------------------------------------------------------------------
 // Test helpers — mirror the helpers from analog-compiler.test.ts
@@ -511,44 +513,23 @@ describe("compileAnalogPartition", () => {
     expect(new Set(nodeValues).size).toBe(3);
   });
 
-  it("compiled circuit has a statePool field that is a StatePool instance", () => {
+  it("compiled circuit has statePool === null (deferred to setup time)", () => {
     const propsMap = new Map<string, PropertyValue>([["model", "behavioral"]]);
     const { partition, registry } = buildAndGatePartition(propsMap);
     const compiled = compileAnalogPartition(partition, registry);
-
-    expect(compiled.statePool).toBeInstanceOf(StatePool);
+    expect(compiled.statePool).toBeNull();
   });
 
-  it("statePool totalSlots is 0 when all elements have stateSize 0 (existing elements)", () => {
+  it("compiled elements have _stateBase === -1 (allocated by setup, not compiler)", () => {
     const propsMap = new Map<string, PropertyValue>([["model", "behavioral"]]);
     const { partition, registry } = buildAndGatePartition(propsMap);
     const compiled = compileAnalogPartition(partition, registry);
-
-    // The stub elements in the test registry don't declare stateSize — treated as 0
-    // so the pool should have totalSlots 0
-    expect(compiled.statePool.totalSlots).toBe(0);
-  });
-
-  it("elements without stateSize get _stateBase -1 after compilation", () => {
-    const propsMap = new Map<string, PropertyValue>([["model", "behavioral"]]);
-    const { partition, registry } = buildAndGatePartition(propsMap);
-    const compiled = compileAnalogPartition(partition, registry);
-
     for (const element of compiled.elements) {
-      expect(typeof element.getLteTimestep).not.toBe("function");
+      expect(element._stateBase).toBe(-1);
     }
   });
 
-  it("statePool is a fresh StatePool instance per compile call — not shared across compilations", () => {
-    const propsMap = new Map<string, PropertyValue>([["model", "behavioral"]]);
-    const { partition, registry } = buildAndGatePartition(propsMap);
-    const compiled1 = compileAnalogPartition(partition, registry);
-    const compiled2 = compileAnalogPartition(partition, registry);
-
-    expect(compiled1.statePool).not.toBe(compiled2.statePool);
-  });
-
-  it("elements with stateSize get contiguous _stateBase values assigned by compiler", () => {
+  it("setup() assigns contiguous _stateBase values via ctx.allocStates", () => {
     // Build a registry with an element that declares stateSize
     const registry = new ComponentRegistry();
     registry.register({
@@ -556,7 +537,6 @@ describe("compileAnalogPartition", () => {
       models: {},
     });
 
-    let assignedBase = -999;
     const elementWithState = {
       poolBacked: true as const,
       stateSize: 7,
@@ -565,18 +545,18 @@ describe("compileAnalogPartition", () => {
       _stateBase: -1,
       branchIndex: -1,
       ngspiceLoadOrder: 0,
-      setup(_ctx: import("../setup-context.js").SetupContext): void { /* no-op */ },
+      setup(ctx: import("../setup-context.js").SetupContext): void {
+        this._stateBase = ctx.allocStates(this.stateSize);
+      },
       load(_ctx: LoadContext): void { /* no-op */ },
       setParam(_key: string, _value: number): void {},
       getPinCurrents(_v: Float64Array) { return []; },
       initState(pool: StatePool): void {
-        assignedBase = this._stateBase;
         pool.state0[this._stateBase] = 99.0;
       },
     };
 
     const factoryReturningStateElement = vi.fn((_pinNodes: ReadonlyMap<string, number>) => {
-      // Return the element that has state — _pinNodes set by compiler
       return elementWithState;
     });
 
@@ -656,10 +636,26 @@ describe("compileAnalogPartition", () => {
 
     const compiled = compileAnalogPartition(partition, registry);
 
-    // The element with stateSize:7 should have been assigned offset 0
-    expect(assignedBase).toBe(0);
-    expect(compiled.statePool.totalSlots).toBe(7);
-    // initState wrote 99.0 to slot 0
-    expect(compiled.statePool.state0[0]).toBe(99.0);
+    // Pool deferred to setup; compiler does not assign _stateBase or
+    // allocate a pool. Run the engine boot path via setupAll + initState
+    // to verify the stateful element gets its slot.
+    const solver = new SparseSolver();
+    solver._initStructure();
+    const setupCtx = makeTestSetupContext({
+      solver,
+      startBranch: 1,
+      startNode: 100,
+      elements: compiled.elements,
+    });
+    setupAll(compiled.elements, setupCtx);
+
+    const stateful = compiled.elements.find(
+      (e): e is typeof elementWithState => (e as any).poolBacked === true
+    )!;
+    expect(stateful._stateBase).toBe(0);
+
+    const pool = new StatePool(stateful.stateSize);
+    stateful.initState(pool);
+    expect(pool.state0[0]).toBe(99.0);
   });
 });

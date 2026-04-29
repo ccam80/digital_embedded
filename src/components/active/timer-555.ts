@@ -439,6 +439,23 @@ class Timer555CompositeElement implements PoolBackedAnalogElement {
     this._p = { ...opts.props };
   }
 
+  /** Sub-elements in setup() order: R-divider chain (rDiv1, rDiv2, rDiv3),
+   *  threshold/trigger comparators (comp1, comp2), discharge BJT, output pin
+   *  model, then capacitor children. None reference each other via
+   *  findDevice/findBranch, so order matches setup() body for parity. */
+  getSubElements(): readonly AnalogElement[] {
+    return [
+      this._rDiv1,
+      this._rDiv2,
+      this._rDiv3,
+      this._comp1 as unknown as AnalogElement,
+      this._comp2 as unknown as AnalogElement,
+      this._bjtDis as unknown as AnalogElement,
+      this._outModel as unknown as AnalogElement,
+      ...(this._childElements as unknown as AnalogElement[]),
+    ];
+  }
+
   // Internal node labels recorded during setup() for getInternalNodeLabels()
   private _internalLabels: string[] = [];
 

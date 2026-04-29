@@ -150,6 +150,19 @@ describe("DigitalOutputPinModel", () => {
     pin.setLogicLevel(true);
     pin.setHighZ(false);
 
+    const setupCtx: import("../setup-context.js").SetupContext = {
+      solver: solver as any,
+      temp: 300.15,
+      nomTemp: 300.15,
+      copyNodesets: false,
+      makeVolt: () => { throw new Error("makeVolt not needed"); },
+      makeCur: () => { throw new Error("makeCur not needed"); },
+      allocStates: () => 0,
+      findBranch: () => 0,
+      findDevice: () => null,
+    };
+    pin.setup(setupCtx);
+
     const ctx = makeCtx({ solver });
     pin.load(ctx);
 
@@ -169,6 +182,19 @@ describe("DigitalOutputPinModel", () => {
     const pin = new DigitalOutputPinModel(CMOS_3V3, false, "branch");
     pin.init(NODE, BRANCH);
     pin.setHighZ(true);
+
+    const setupCtx: import("../setup-context.js").SetupContext = {
+      solver: solver as any,
+      temp: 300.15,
+      nomTemp: 300.15,
+      copyNodesets: false,
+      makeVolt: () => { throw new Error("makeVolt not needed"); },
+      makeCur: () => { throw new Error("makeCur not needed"); },
+      allocStates: () => 0,
+      findBranch: () => 0,
+      findDevice: () => null,
+    };
+    pin.setup(setupCtx);
 
     const ctx = makeCtx({ solver });
     pin.load(ctx);

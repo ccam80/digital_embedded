@@ -44,7 +44,33 @@ function makeSide(n: number): IterationSideData {
   const rhs = Array.from({ length: N }, (_, i) => (i + 1) * 10);
   const residual = Array.from({ length: N }, (_, i) => (i + 1) * 0.1);
   const residualInfinityNorm = Math.max(...residual.map(Math.abs));
-  return { rawIteration: 1, globalConverged: false, noncon: 2, nodeVoltages: {}, nodeVoltagesBefore: {}, branchValues: {}, elementStates: {}, limitingEvents: [], rhs, residual, residualInfinityNorm, matrix, ag: [0, 0, 0, 0, 0, 0, 0], method: "trapezoidal" as const, order: 1 };
+  return {
+    rawIteration: 1,
+    globalConverged: false,
+    elemConverged: false,
+    noncon: 2,
+    convergenceFailedElements: [],
+    nodeVoltages: {},
+    nodeVoltagesBefore: {},
+    branchValues: {},
+    elementStates: {},
+    elementStates1Slots: {},
+    elementStates2Slots: {},
+    limitingEvents: [],
+    rhs,
+    residual,
+    residualInfinityNorm,
+    matrix,
+    ag: [0, 0, 0, 0, 0, 0, 0],
+    method: "trapezoidal" as const,
+    order: 1,
+    matrixSize: N + 1,
+    rhsBufSize: N,
+    initMode: "MODE_NONE",
+    delta: 0,
+    diagGmin: 0,
+    srcFact: 0,
+  };
 }
 
 describe("resolveNodeToMatrixIndex", () => {

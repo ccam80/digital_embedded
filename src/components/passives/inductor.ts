@@ -30,7 +30,7 @@ import {
   MODEDC, MODEINITTRAN, MODEINITPRED, MODEUIC,
 } from "../../solver/analog/ckt-mode.js";
 import { stampRHS } from "../../solver/analog/stamp-helpers.js";
-import { defineModelParams } from "../../core/model-params.js";
+import { defineModelParams, kelvinToCelsius } from "../../core/model-params.js";
 import type { StatePoolRef } from "../../core/analog-types.js";
 import { defineStateSchema, applyInitialValues } from "../../solver/analog/state-schema.js";
 import type { StateSchema } from "../../solver/analog/state-schema.js";
@@ -47,7 +47,7 @@ export const { paramDefs: INDUCTOR_PARAM_DEFS, defaults: INDUCTOR_DEFAULTS } = d
     IC:   { default: NaN,    unit: "A",    description: "Initial condition current for UIC" },
     TC1:  { default: 0,                    description: "Linear temperature coefficient" },
     TC2:  { default: 0,                    description: "Quadratic temperature coefficient" },
-    TNOM: { default: 300.15, unit: "K",    description: "Nominal temperature for TC coefficients" },
+    TNOM: { default: 300.15, unit: "K",    description: "Nominal temperature for TC coefficients", spiceConverter: kelvinToCelsius },
     SCALE: { default: 1,                   description: "Instance scale factor" },
     M:    { default: 1,                    description: "Parallel multiplicity" },
   },

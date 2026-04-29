@@ -51,7 +51,7 @@ import type { ComponentLayout } from "../../../core/registry.js";
 import type { RenderContext, Point, TextAnchor, FontSpec, PathData } from "../../../core/renderer-interface.js";
 import type { ThemeColor } from "../../../core/renderer-interface.js";
 import { makeDcVoltageSource, DC_VOLTAGE_SOURCE_DEFAULTS } from "../../sources/dc-voltage-source.js";
-import { runDcOp, makeLoadCtx, initElement } from "../../../solver/analog/__tests__/test-helpers.js";
+import { runDcOp, makeLoadCtx, makeTestSetupContext, setupAll, allocateStatePool } from "../../../solver/analog/__tests__/test-helpers.js";
 import { StatePool } from "../../../solver/analog/state-pool.js";
 import type { AnalogElement, PoolBackedAnalogElement } from "../../../solver/analog/element.js";
 import type { ComplexSparseSolver } from "../../../solver/analog/complex-sparse-solver.js";
@@ -70,11 +70,15 @@ function getFactory(entry: ModelEntry): AnalogFactory {
 }
 
 // ---------------------------------------------------------------------------
-// Helper: allocate a StatePool for a single element and call initState
+// Helper: run setup() then allocate a StatePool for a single element
 // ---------------------------------------------------------------------------
 
 function withState(core: AnalogElement): { element: PoolBackedAnalogElement; pool: StatePool } {
-  const pool = initElement(core);
+  const solver = new SparseSolver();
+  solver._initStructure();
+  const ctx = makeTestSetupContext({ solver, elements: [core] });
+  setupAll([core], ctx);
+  const pool = allocateStatePool([core]);
   return { element: core as PoolBackedAnalogElement, pool };
 }
 

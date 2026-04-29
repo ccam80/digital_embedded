@@ -36,7 +36,7 @@ import {
 } from "../../solver/analog/ckt-mode.js";
 import { stampRHS } from "../../solver/analog/stamp-helpers.js";
 import { pnjlim } from "../../solver/analog/newton-raphson.js";
-import { defineModelParams } from "../../core/model-params.js";
+import { defineModelParams, kelvinToCelsius } from "../../core/model-params.js";
 import { createDiodeElement } from "./diode.js";
 import type { StatePoolRef } from "../../core/analog-types.js";
 import { defineStateSchema, applyInitialValues } from "../../solver/analog/state-schema.js";
@@ -65,12 +65,12 @@ export const { paramDefs: ZENER_PARAM_DEFS, defaults: ZENER_PARAM_DEFAULTS } = d
     NBV: { default: NaN,              description: "Breakdown emission coefficient (defaults to N)" },
     IBV: { default: 1e-3, unit: "A", description: "Current at breakdown voltage" },
     TCV: { default: 0,    unit: "V/°C", description: "Breakdown voltage temperature coefficient" },
-    TNOM:{ default: 300.15, unit: "K",  description: "Parameter measurement temperature" },
+    TNOM:{ default: 300.15, unit: "K",  description: "Parameter measurement temperature", spiceConverter: kelvinToCelsius },
   },
   secondary: {
   },
   instance: {
-    TEMP: { default: 300.15, unit: "K", description: "Per-instance operating temperature" },
+    TEMP: { default: 300.15, unit: "K", description: "Per-instance operating temperature", spiceConverter: kelvinToCelsius },
   },
 });
 
@@ -93,6 +93,9 @@ export const { paramDefs: ZENER_SPICE_L1_PARAM_DEFS, defaults: ZENER_SPICE_L1_DE
     XTI: { default: 3,                    description: "Saturation current temperature exponent" },
     KF:  { default: 0,                    description: "Flicker noise coefficient" },
     AF:  { default: 1,                    description: "Flicker noise exponent" },
+  },
+  instance: {
+    TEMP: { default: 300.15, unit: "K", description: "Per-instance operating temperature", spiceConverter: kelvinToCelsius },
   },
 });
 

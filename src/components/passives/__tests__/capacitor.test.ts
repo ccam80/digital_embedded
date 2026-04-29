@@ -9,7 +9,7 @@
  *   - RC step response integration test
  */
 
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect } from "vitest";
 import {
   CapacitorDefinition,
   CAPACITOR_ATTRIBUTE_MAPPINGS,
@@ -19,11 +19,12 @@ import { ComponentCategory, ComponentRegistry } from "../../../core/registry.js"
 import { StatePool } from "../../../solver/analog/state-pool.js";
 import type { AnalogElement, PoolBackedAnalogElement } from "../../../core/analog-types.js";
 import type { SparseSolver as SparseSolverType } from "../../../solver/analog/sparse-solver.js";
+import { SparseSolver } from "../../../solver/analog/sparse-solver.js";
 import type { LoadContext } from "../../../solver/analog/load-context.js";
 import {
   MODETRAN, MODEINITFLOAT, MODEINITTRAN, MODEINITPRED,
 } from "../../../solver/analog/ckt-mode.js";
-import { loadCtxFromFields } from "../../../solver/analog/__tests__/test-helpers.js";
+import { loadCtxFromFields, makeTestSetupContext, setupAll } from "../../../solver/analog/__tests__/test-helpers.js";
 
 // ---------------------------------------------------------------------------
 // companionLoadCtx — build a transient LoadContext matching the ag[] that
@@ -107,44 +108,33 @@ function getFactory(entry: ModelEntry): AnalogFactory {
 }
 
 // ---------------------------------------------------------------------------
-// withState: allocate a StatePool for a single element and call initState
+// withRealSetup: run real setup() + initState for a single element
 // ---------------------------------------------------------------------------
 
-function withState(core: AnalogElement): { element: PoolBackedAnalogElement; pool: StatePool } {
+function withRealSetup(core: AnalogElement, solver: SparseSolverType): {
+  element: PoolBackedAnalogElement;
+  pool: StatePool;
+  setupCtx: ReturnType<typeof makeTestSetupContext>;
+} {
   const re = core as PoolBackedAnalogElement;
+  const setupCtx = makeTestSetupContext({
+    solver: solver as SparseSolver,
+    startBranch: 10,
+    startNode: 100,
+    elements: [re],
+  });
+  setupAll([re], setupCtx);
   const pool = new StatePool(Math.max(re.stateSize, 1));
-  re._stateBase = 0;
   re.initState(pool);
-  return { element: re, pool };
+  return { element: re, pool, setupCtx };
 }
 
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-function makeCaptureSolver(): { solver: SparseSolverType; stamps: [number, number, number][]; rhsStamps: [number, number][] } {
-  const stamps: [number, number, number][] = [];
-  const rhsStamps: [number, number][] = [];
-  const solver = {
-    allocElement: vi.fn((row: number, col: number) => {
-      stamps.push([row, col, 0]);
-      return stamps.length - 1;
-    }),
-    stampElement: vi.fn((h: number, v: number) => {
-      stamps[h][2] += v;
-    }),
-    stampRHS: vi.fn((row: number, v: number) => {
-      rhsStamps.push([row, v]);
-    }),
-  } as unknown as SparseSolverType;
-  return { solver, stamps, rhsStamps };
-}
-
-/** Call analogFactory and wire up state pool (simulating what the compiler does). */
+/** Call analogFactory and wire up state pool via real setup(). */
 function makeCapacitorElement(pinNodes: Map<string, number>, props: PropertyBag) {
+  const solver = new SparseSolver();
+  solver._initStructure();
   const core = getFactory(CapacitorDefinition.modelRegistry!.behavioral!)(pinNodes, props, () => 0);
-  const { element } = withState(core);
+  const { element } = withRealSetup(core, solver);
   return element;
 }
 
@@ -160,18 +150,23 @@ describe("Capacitor", () => {
 
       // Node IDs are 1-based (ground=0). Use [1, 2] so both are non-ground.
       // Solver indices: node1→idx0, node2→idx1
-      const analogElement = makeCapacitorElement(new Map([["pos", 1], ["neg", 2]]), props);
+      const solver = new SparseSolver();
+      solver._initStructure();
+      const core = getFactory(CapacitorDefinition.modelRegistry!.behavioral!)(
+        new Map([["pos", 1], ["neg", 2]]), props, () => 0,
+      );
+      const { element: analogElement } = withRealSetup(core, solver);
 
       // voltages[0] = V(node1) = 5V, voltages[1] = V(node2) = 0V
       const voltages = new Float64Array([5, 0]);
 
       // For trapezoidal order 2: geq = 2C/h = 2 * 1e-6 / 1e-6 = 2.0
-      const { solver, stamps } = makeCaptureSolver();
       const ctx = makeCompanionCtx({ solver, rhs: voltages, dt: 1e-6, method: "trapezoidal", order: 2 });
       analogElement.load(ctx);
 
-      const geqStamps = stamps.filter((s) => s[2] > 0);
-      expect(geqStamps.length).toBe(2); // diagonal entries
+      const entries = solver.getCSCNonZeros();
+      const geqEntries = entries.filter((e) => e.value > 0);
+      expect(geqEntries.length).toBe(2); // diagonal entries
     });
   });
 
@@ -180,16 +175,18 @@ describe("Capacitor", () => {
       const props = new PropertyBag();
       props.setModelParam("capacitance", 1e-6);
 
-      const analogElement = makeCapacitorElement(new Map([["pos", 1], ["neg", 2]]), props);
+      const solver = new SparseSolver();
+      solver._initStructure();
+      const core = getFactory(CapacitorDefinition.modelRegistry!.behavioral!)(
+        new Map([["pos", 1], ["neg", 2]]), props, () => 0,
+      );
+      const { element: analogElement } = withRealSetup(core, solver);
 
       const voltages = new Float64Array([5, 0]);
 
       // For order-1 trap: geq = C/h = 1e-6 / 1e-6 = 1.0
-      const { solver, stamps } = makeCaptureSolver();
       const ctx = makeCompanionCtx({ solver, rhs: voltages, dt: 1e-6, method: "trapezoidal", order: 1 });
       analogElement.load(ctx);
-
-      stamps.filter((s) => s[2] > 0);
     });
   });
 
@@ -198,16 +195,18 @@ describe("Capacitor", () => {
       const props = new PropertyBag();
       props.setModelParam("capacitance", 1e-6);
 
-      const analogElement = makeCapacitorElement(new Map([["pos", 1], ["neg", 2]]), props);
+      const solver = new SparseSolver();
+      solver._initStructure();
+      const core = getFactory(CapacitorDefinition.modelRegistry!.behavioral!)(
+        new Map([["pos", 1], ["neg", 2]]), props, () => 0,
+      );
+      const { element: analogElement } = withRealSetup(core, solver);
 
       const voltages = new Float64Array([5, 0]);
 
       // For order-2 gear: geq = 3C/(2h) = 3 * 1e-6 / (2 * 1e-6) = 1.5
-      const { solver, stamps } = makeCaptureSolver();
       const ctx = makeCompanionCtx({ solver, rhs: voltages, dt: 1e-6, method: "gear", order: 2 });
       analogElement.load(ctx);
-
-      stamps.filter((s) => s[2] > 0);
     });
   });
 
@@ -224,8 +223,9 @@ describe("Capacitor", () => {
       const core = getFactory(CapacitorDefinition.modelRegistry!.behavioral!)(
         new Map([["pos", 1], ["neg", 0]]), props, () => 0,
       );
-      const { element } = withState(core);
-      const { solver, stamps, rhsStamps } = makeCaptureSolver();
+      const solver = new SparseSolver();
+      solver._initStructure();
+      const { element } = withRealSetup(core, solver);
       const ag = new Float64Array(7);
       ag[0] = 1 / dt;
       ag[1] = -1 / dt;
@@ -257,10 +257,10 @@ describe("Capacitor", () => {
       });
       element.load(ctx);
       const geqExpected = C / dt;
-      const diagStamp = stamps.find((s) => s[0] === 1 && s[1] === 1);
-      expect(diagStamp).toBeDefined();
-      expect(diagStamp![2]).toBe(geqExpected);
-      void rhsStamps;
+      const entries = solver.getCSCNonZeros();
+      const diagEntry = entries.find((e) => e.row === 1 && e.col === 1);
+      expect(diagEntry).toBeDefined();
+      expect(diagEntry!.value).toBe(geqExpected);
     });
 
     it("CapacitorDefinition category is PASSIVES", () => {
@@ -312,10 +312,11 @@ describe("Capacitor", () => {
       const core = getFactory(CapacitorDefinition.modelRegistry!.behavioral!)(
         new Map([["pos", 1], ["neg", 2]]), props, () => 0,
       );
-      const { element } = withState(core);
+      const solver = new SparseSolver();
+      solver._initStructure();
+      const { element } = withRealSetup(core, solver);
 
       const voltages = new Float64Array([5, 0]);
-      const { solver } = makeCaptureSolver();
       element.load(makeCompanionCtx({ solver, rhs: voltages, dt: 1e-6, method: "trapezoidal", order: 1 }));
 
       // slot 0 = GEQ = C/h = 1e-6 / 1e-6 = 1.0
@@ -329,8 +330,9 @@ describe("Capacitor", () => {
       const core = getFactory(CapacitorDefinition.modelRegistry!.behavioral!)(
         new Map([["pos", 1], ["neg", 2]]), props, () => 0,
       );
-      const { element } = withState(core);
-      const { solver } = makeCaptureSolver();
+      const solver = new SparseSolver();
+      solver._initStructure();
+      const { element } = withRealSetup(core, solver);
 
       // First call: voltage = 3V
       element.load(makeCompanionCtx({ solver, rhs: new Float64Array([3, 0]), dt: 1e-6, method: "trapezoidal", order: 1 }));
@@ -345,9 +347,10 @@ describe("Capacitor", () => {
       const core = getFactory(CapacitorDefinition.modelRegistry!.behavioral!)(
         new Map([["pos", 1], ["neg", 2]]), props, () => 0,
       );
-      const { element, pool } = withState(core);
+      const solver = new SparseSolver();
+      solver._initStructure();
+      const { element, pool } = withRealSetup(core, solver);
 
-      const { solver } = makeCaptureSolver();
       element.load(makeCompanionCtx({ solver, rhs: new Float64Array([5, 0]), dt: 1e-6, method: "trapezoidal", order: 1 }));
       pool.rotateStateVectors();
       element.load(makeCompanionCtx({ solver, rhs: new Float64Array([7, 0]), dt: 1e-6, method: "trapezoidal", order: 1 }));
@@ -364,10 +367,11 @@ describe("Capacitor", () => {
       const core = getFactory(CapacitorDefinition.modelRegistry!.behavioral!)(
         new Map([["pos", 1], ["neg", 2]]), props, () => 0,
       );
-      const { element, pool } = withState(core);
+      const solver = new SparseSolver();
+      solver._initStructure();
+      const { element, pool } = withRealSetup(core, solver);
 
       // First call: v1 = 3V — rotate pool so v=3 lands in s1
-      const { solver } = makeCaptureSolver();
       element.load(makeCompanionCtx({ solver, rhs: new Float64Array([3, 0]), dt: 1e-6, method: "trapezoidal", order: 1 }));
       pool.rotateStateVectors();
       // Second call: v2 = 7V
@@ -386,10 +390,11 @@ describe("Capacitor", () => {
       const core = getFactory(CapacitorDefinition.modelRegistry!.behavioral!)(
         new Map([["pos", 1], ["neg", 2]]), props, () => 0,
       );
-      const { element, pool } = withState(core);
+      const solver = new SparseSolver();
+      solver._initStructure();
+      const { element, pool } = withRealSetup(core, solver);
 
       // First call: v1 = 5V (non-zero) — rotate so v=5 lands in s1
-      const { solver } = makeCaptureSolver();
       element.load(makeCompanionCtx({ solver, rhs: new Float64Array([5, 0]), dt: 1e-6, method: "trapezoidal", order: 1 }));
       pool.rotateStateVectors();
       // Second call: v2 = 0V (zero crossing)
@@ -414,10 +419,11 @@ describe("Capacitor initPred", () => {
     const core = getFactory(CapacitorDefinition.modelRegistry!.behavioral!)(
       new Map([["pos", 1], ["neg", 2]]), props, () => 0,
     );
-    const { element, pool } = withState(core);
+    const solver = new SparseSolver();
+    solver._initStructure();
+    const { element, pool } = withRealSetup(core, solver);
 
     // First step: v=3V, accepted — charge C*3 lands in s1 after rotateStateVectors
-    const { solver } = makeCaptureSolver();
     element.load(makeCompanionCtx({ solver, rhs: new Float64Array([3, 0]), dt: 1e-6, method: "trapezoidal", order: 1 }));
     pool.rotateStateVectors();
 
@@ -683,14 +689,13 @@ describe("capacitor_load_transient_parity (C4.2)", () => {
 
     const props = new PropertyBag();
     props.setModelParam("capacitance", C_val);
-    const element = makeCapacitorElement(new Map([["pos", 2], ["neg", 0]]), props);
 
     const ag = new Float64Array(7);
     ag[0] = ag0;
     ag[1] = ag1;
 
-    // Reusable capture solver — handles are allocated once and reused across steps,
-    // matching the element's internal _handlesInit caching pattern.
+    // Reusable handle-based solver used for both setup and load — handles are
+    // allocated once during setup() and reused across steps.
     const handles: { row: number; col: number }[] = [];
     const handleIndex = new Map<string, number>();
     const matValues: number[] = [];
@@ -711,6 +716,14 @@ describe("capacitor_load_transient_parity (C4.2)", () => {
       stampElement: (h: number, v: number): void => { matValues[h] += v; },
       stampRHS: (row: number, v: number): void => { rhsEntries.push([row, v]); },
     } as unknown as SparseSolverType;
+
+    // Set up element using the same solver so _hPP/_hNN/_hPN/_hNP get handles
+    // allocated against this solver (not a separate internal one).
+    const core = getFactory(CapacitorDefinition.modelRegistry!.behavioral!)(
+      new Map([["pos", 2], ["neg", 0]]), props, () => 0,
+    );
+    const { element, pool: _pool } = withRealSetup(core, solver as unknown as SparseSolver);
+    void _pool;
 
     // Compute bit-exact reference sequence using the same order-1 trap arithmetic.
     // v2[k] = (G_R*Vsrc - ceq[k]) / (G_R + geq), where ceq[k] = ag[1]*C*v2[k-1]

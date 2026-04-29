@@ -855,7 +855,23 @@ export type StepQuery =
 export interface IterationSideData {
   rawIteration: number;
   globalConverged: boolean;
+  /**
+   * Element-level convergence flag at the end of this iteration.
+   * Distinct from `globalConverged` — the latter additionally requires
+   * `noncon === 0` whereas this is the per-element predicate alone.
+   */
+  elemConverged: boolean;
   noncon: number;
+  /**
+   * Element labels that flunked the per-element convergence predicate at
+   * this iteration. Same namespace as `elementStates` keys.
+   */
+  convergenceFailedElements: string[];
+  /**
+   * ngspice-side counterpart of `convergenceFailedElements`. Only populated
+   * on the ngspice `IterationSideData`; absent on our side.
+   */
+  ngspiceConvergenceFailedDevices?: string[];
   /** Node voltages AFTER this iteration's linear solve (post-solve result). */
   nodeVoltages: Record<string, number>;
   /**
@@ -865,7 +881,21 @@ export interface IterationSideData {
    */
   nodeVoltagesBefore: Record<string, number>;
   branchValues: Record<string, number>;
+  /** Element state slots at state0 (current step). Keyed by element label. */
   elementStates: Record<string, Record<string, number>>;
+  /**
+   * Element state slots at state1 (previous accepted step). Keyed by element
+   * label. Required for diagnosing LTE divided-difference divergences, since
+   * `cktTerr` reads q1 = state1[Q] for every reactive junction. Same shape
+   * as `elementStates` (state0).
+   */
+  elementStates1Slots: Record<string, Record<string, number>>;
+  /**
+   * Element state slots at state2 (two steps ago). Keyed by element label.
+   * Used by order-2 LTE (3rd divided difference of Q). Same shape as
+   * `elementStates` (state0).
+   */
+  elementStates2Slots: Record<string, Record<string, number>>;
   limitingEvents: LimitingEvent[];
   /**
    * RHS vector b at the start of this iteration (before the linear solve).
@@ -906,6 +936,47 @@ export interface IterationSideData {
   method: string;
   /** Integration order active at this iteration (1 = order-1 trap/gear, 2 = order-2 trap/gear). */
   order: number;
+  /**
+   * `matrixSize` from the underlying `IterationSnapshot` — ngspice
+   * `CKTmaxEqNum + 1`, our engine reports `voltages.length + 1`. Both
+   * sides should agree on the N+2 convention; mismatch flags a structural
+   * setup divergence.
+   */
+  matrixSize: number;
+  /**
+   * `rhsBufSize` from the underlying `IterationSnapshot` — actual
+   * allocation of rhs/rhsOld/preSolveRhs. ngspice's bridge reports `1`
+   * during DCOP-init while CKTmatrix is being sized incrementally; outside
+   * that window both sides should equal N+1.
+   */
+  rhsBufSize: number;
+  /**
+   * Human-readable cktMode label produced by `bitsToName(cktMode)` from
+   * ckt-mode.ts (cktdefs.h:165-185). Examples:
+   *   - "MODEDCOP|MODEINITJCT"
+   *   - "MODETRAN|MODEINITFLOAT"
+   * The single most useful field for "what NR phase is this iteration in".
+   */
+  initMode: string;
+  /**
+   * Active CKTdelta for this iteration (seconds). Distinct from the
+   * step-level `dt` because the harness paints each iteration with the dt
+   * the engine had when it called NIiter — for an LTE-rejected step the
+   * iterations BEFORE the rejection ran with the original dt, the
+   * iterations AFTER with the recovery dt.
+   */
+  delta: number;
+  /** Diagonal Gmin value during gmin-stepping sub-solves (0 outside DCOP gmin phases). */
+  diagGmin: number;
+  /** Source-stepping factor during source-sweep DCOP (0 outside the dcopSrcSweep phase). */
+  srcFact: number;
+  /**
+   * LTE-proposed next dt (seconds). Populated only on the final accepted
+   * iteration of each step — undefined elsewhere. From our
+   * `TimestepController.computeNewDt()` on our side, from
+   * `RawNgspiceOuterEvent.nextDelta` on the ngspice side.
+   */
+  lteDt?: number;
 }
 
 export interface PairedIteration {

@@ -31,7 +31,7 @@ import {
   MODEINITJCT, MODEINITTRAN, MODEINITPRED, MODEUIC,
 } from "../../solver/analog/ckt-mode.js";
 import { stampRHS } from "../../solver/analog/stamp-helpers.js";
-import { defineModelParams } from "../../core/model-params.js";
+import { defineModelParams, kelvinToCelsius } from "../../core/model-params.js";
 import type { StatePoolRef } from "../../core/analog-types.js";
 import {
   defineStateSchema,
@@ -51,7 +51,7 @@ export const { paramDefs: CAPACITOR_PARAM_DEFS, defaults: CAPACITOR_DEFAULTS } =
     IC:   { default: 0.0,    unit: "V",    description: "Initial condition voltage for UIC" },
     TC1:  { default: 0,                    description: "Linear temperature coefficient" },
     TC2:  { default: 0,                    description: "Quadratic temperature coefficient" },
-    TNOM: { default: 300.15, unit: "K",    description: "Nominal temperature for TC coefficients" },
+    TNOM: { default: 300.15, unit: "K",    description: "Nominal temperature for TC coefficients", spiceConverter: kelvinToCelsius },
     SCALE: { default: 1,                   description: "Instance scale factor" },
     M:    { default: 1,                    description: "Parallel multiplicity" },
   },

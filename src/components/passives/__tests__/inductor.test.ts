@@ -10,7 +10,7 @@
  *   - RL step response integration test
  */
 
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect } from "vitest";
 import {
   InductorDefinition,
   INDUCTOR_ATTRIBUTE_MAPPINGS,
@@ -20,12 +20,13 @@ import { ComponentCategory, ComponentRegistry } from "../../../core/registry.js"
 import { StatePool } from "../../../solver/analog/state-pool.js";
 import type { AnalogElement, PoolBackedAnalogElement } from "../../../core/analog-types.js";
 import type { SparseSolver as SparseSolverType } from "../../../solver/analog/sparse-solver.js";
+import { SparseSolver } from "../../../solver/analog/sparse-solver.js";
 import type { LoadContext } from "../../../solver/analog/load-context.js";
 import {
   MODETRAN, MODEDCOP,
   MODEINITFLOAT, MODEINITTRAN,
 } from "../../../solver/analog/ckt-mode.js";
-import { makeLoadCtx, loadCtxFromFields } from "../../../solver/analog/__tests__/test-helpers.js";
+import { makeLoadCtx, loadCtxFromFields, makeTestSetupContext, setupAll } from "../../../solver/analog/__tests__/test-helpers.js";
 
 // ---------------------------------------------------------------------------
 // companion context builder — replaces the deleted stampCompanion(dt, method,
@@ -90,46 +91,27 @@ function getFactory(entry: ModelEntry): AnalogFactory {
 }
 
 // ---------------------------------------------------------------------------
-// withState: allocate a StatePool for a single element and call initState
+// withRealSetup: run real setup() + initState for a single element
 // ---------------------------------------------------------------------------
 
-function withState(core: AnalogElement): { element: PoolBackedAnalogElement; pool: StatePool } {
+function withRealSetup(core: AnalogElement, solver: SparseSolverType): {
+  element: PoolBackedAnalogElement;
+  pool: StatePool;
+  setupCtx: ReturnType<typeof makeTestSetupContext>;
+} {
   const re = core as PoolBackedAnalogElement;
+  const setupCtx = makeTestSetupContext({
+    solver: solver as SparseSolver,
+    startBranch: 10,
+    startNode: 100,
+    elements: [re],
+  });
+  setupAll([re], setupCtx);
   const pool = new StatePool(Math.max(re.stateSize, 1));
-  re._stateBase = 0;
   re.initState(pool);
-  return { element: re, pool };
+  return { element: re, pool, setupCtx };
 }
 
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-function makeCaptureSolver(): { solver: SparseSolverType; stamps: [number, number, number][]; rhsStamps: [number, number][] } {
-  const stamps: [number, number, number][] = [];
-  const rhsStamps: [number, number][] = [];
-  const solver = {
-    allocElement: vi.fn((row: number, col: number) => {
-      stamps.push([row, col, 0]);
-      return stamps.length - 1;
-    }),
-    stampElement: vi.fn((h: number, v: number) => {
-      stamps[h][2] += v;
-    }),
-    stampRHS: vi.fn((row: number, v: number) => {
-      rhsStamps.push([row, v]);
-    }),
-  } as unknown as SparseSolverType;
-  return { solver, stamps, rhsStamps };
-}
-
-/** Call analogFactory and wire up state pool (simulating what the compiler does). */
-function makeInductorElement(pinNodes: Map<string, number>, _branchIdx: number, props: PropertyBag) {
-  const core = getFactory(InductorDefinition.modelRegistry!.behavioral!)(pinNodes, props, () => 0);
-  const { element } = withState(core);
-  return element;
-}
 
 // ---------------------------------------------------------------------------
 // stamps_branch_equation tests
@@ -143,9 +125,13 @@ describe("Inductor", () => {
 
       // 1-based MNA convention: nodeA=1, nodeB=2, branchIndex=3 (distinct from node rows).
       // matrixSize=3 → 1-based rows 1..3. voltages sized matrixSize+1=4 (slot 0 = ground).
-      const analogElement = makeInductorElement(new Map([["A", 1], ["B", 2]]), 3, props);
+      const solver = new SparseSolver();
+      solver._initStructure();
+      const core = getFactory(InductorDefinition.modelRegistry!.behavioral!)(
+        new Map([["A", 1], ["B", 2]]), props, () => 0,
+      );
+      const { element: analogElement } = withRealSetup(core, solver);
 
-      const { solver, stamps } = makeCaptureSolver();
       // Use a non-transient / non-DC-OP context so only the topology-constant
       // branch incidence entries are stamped (no companion branch diagonal term).
       const voltages = new Float64Array(4); // 1-based: slots 0..3
@@ -167,20 +153,22 @@ describe("Inductor", () => {
       analogElement.load(ctx);
 
       // Should have: 2 B-matrix incidence + 2 C/D-matrix branch + 1 branch diagonal = 5
-      // B-matrix (node rows): (1,3)=+1, (2,3)=-1  [1-based: nodeA=1, nodeB=2, branch=3]
-      // C/D-matrix (branch row): (3,1)=+1, (3,2)=-1
-      // D-matrix diagonal (branch row): (3,3)=-req stamped unconditionally per indload.c:119-123
-      expect(stamps.length).toBe(5);
+      // B-matrix (node rows): (1,b)=+1, (2,b)=-1  [1-based: nodeA=1, nodeB=2, branch=b]
+      // C/D-matrix (branch row): (b,1)=+1, (b,2)=-1
+      // D-matrix diagonal (branch row): (b,b)=-req stamped unconditionally per indload.c:119-123
+      const entries = solver.getCSCNonZeros();
+      expect(entries.length).toBe(5);
 
+      const b = analogElement.branchIndex;
       // B sub-matrix: branch current incidence in node KCL rows (1-based)
-      const nodeEntries = stamps.filter((s) => s[0] < 3);
-      expect(nodeEntries.some((s) => s[0] === 1 && s[1] === 3 && s[2] === 1)).toBe(true);
-      expect(nodeEntries.some((s) => s[0] === 2 && s[1] === 3 && s[2] === -1)).toBe(true);
+      const nodeEntries = entries.filter((e) => e.row < b);
+      expect(nodeEntries.some((e) => e.row === 1 && e.col === b && e.value === 1)).toBe(true);
+      expect(nodeEntries.some((e) => e.row === 2 && e.col === b && e.value === -1)).toBe(true);
 
       // C sub-matrix: branch equation entries (1-based)
-      const branchEntries = stamps.filter((s) => s[0] === 3);
-      expect(branchEntries.some((s) => s[1] === 1 && s[2] === 1)).toBe(true);
-      expect(branchEntries.some((s) => s[1] === 2 && s[2] === -1)).toBe(true);
+      const branchEntries = entries.filter((e) => e.row === b);
+      expect(branchEntries.some((e) => e.col === 1 && e.value === 1)).toBe(true);
+      expect(branchEntries.some((e) => e.col === 2 && e.value === -1)).toBe(true);
     });
   });
 
@@ -189,18 +177,24 @@ describe("Inductor", () => {
       const props = new PropertyBag();
       props.setModelParam("inductance", 0.01);
 
-      // [1, 2] with branchIdx=2. Solver: node1→idx0, node2→idx1, branch→idx2
-      const analogElement = makeInductorElement(new Map([["A", 1], ["B", 2]]), 2, props);
+      // [1, 2] with branchIdx allocated by setup. Solver: node1→idx0, node2→idx1, branch→allocated
+      const solver = new SparseSolver();
+      solver._initStructure();
+      const core = getFactory(InductorDefinition.modelRegistry!.behavioral!)(
+        new Map([["A", 1], ["B", 2]]), props, () => 0,
+      );
+      const { element: analogElement } = withRealSetup(core, solver);
 
       // voltages[0]=V(node1)=5V, voltages[1]=V(node2)=0V, voltages[2]=I_branch=0A
       const voltages = new Float64Array([5, 0, 0]);
 
       // For trapezoidal (order 2): geq = ag[0]*L = (2/dt)*L = 2 * 0.01 / 1e-4 = 200
-      const { solver, stamps } = makeCaptureSolver();
       analogElement.load(makeCompanionCtx({ solver, rhs: voltages, dt: 1e-4, method: "trapezoidal", order: 2 }));
 
-      // geq appears as -geq on the branch diagonal (row=2, col=2)
-      const branchDiag = stamps.find((s) => s[0] === 2 && s[1] === 2);
+      // geq appears as -geq on the branch diagonal
+      const b = analogElement.branchIndex;
+      const entries = solver.getCSCNonZeros();
+      const branchDiag = entries.find((e) => e.row === b && e.col === b);
       expect(branchDiag).toBeDefined();
     });
   });
@@ -210,15 +204,21 @@ describe("Inductor", () => {
       const props = new PropertyBag();
       props.setModelParam("inductance", 0.01);
 
-      const analogElement = makeInductorElement(new Map([["A", 1], ["B", 2]]), 2, props);
+      const solver = new SparseSolver();
+      solver._initStructure();
+      const core = getFactory(InductorDefinition.modelRegistry!.behavioral!)(
+        new Map([["A", 1], ["B", 2]]), props, () => 0,
+      );
+      const { element: analogElement } = withRealSetup(core, solver);
 
       const voltages = new Float64Array([5, 0, 0]);
 
       // For order-1 trap: geq = L/h = 0.01 / 1e-4 = 100
-      const { solver, stamps } = makeCaptureSolver();
       analogElement.load(makeCompanionCtx({ solver, rhs: voltages, dt: 1e-4, method: "trapezoidal", order: 1 }));
 
-      const branchDiag = stamps.find((s) => s[0] === 2 && s[1] === 2);
+      const b = analogElement.branchIndex;
+      const entries = solver.getCSCNonZeros();
+      const branchDiag = entries.find((e) => e.row === b && e.col === b);
       expect(branchDiag).toBeDefined();
     });
   });
@@ -236,8 +236,24 @@ describe("Inductor", () => {
       expect((InductorDefinition.modelRegistry?.behavioral as {kind:"inline";factory:AnalogFactory}|undefined)?.factory).toBeDefined();
     });
 
-    it("InductorDefinition branchCount is 1", () => {
-      expect((InductorDefinition.modelRegistry?.behavioral as {kind:"inline";factory:AnalogFactory;branchCount?:number}|undefined)?.branchCount).toBe(1);
+    it("element allocates a branch row in setup()", () => {
+      const factory = getFactory(InductorDefinition.modelRegistry!.behavioral!);
+      const props = new PropertyBag();
+      props.setModelParam("inductance", 1e-3);
+      const el = factory(new Map([["A", 1], ["B", 2]]), props, () => 0);
+      el.label = "L1";
+
+      const solver = new SparseSolver();
+      solver._initStructure();
+      const setupCtx = makeTestSetupContext({
+        solver,
+        startBranch: 5,
+        startNode: 100,
+        elements: [el],
+      });
+      setupAll([el], setupCtx);
+
+      expect(el.branchIndex).toBeGreaterThanOrEqual(0);
     });
 
     it("InductorDefinition category is PASSIVES", () => {
@@ -289,11 +305,12 @@ describe("Inductor", () => {
       const core = getFactory(InductorDefinition.modelRegistry!.behavioral!)(
         new Map([["A", 1], ["B", 2]]), props, () => 0,
       );
-      const { element } = withState(core);
+      const solver = new SparseSolver();
+      solver._initStructure();
+      const { element } = withRealSetup(core, solver);
 
       // voltages[0]=V(node1)=5V, voltages[1]=V(node2)=0V, voltages[2]=I_branch=0.5A
       const voltages = new Float64Array([5, 0, 0.5]);
-      const { solver } = makeCaptureSolver();
       element.load(makeCompanionCtx({ solver, rhs: voltages, dt: 1e-4, method: "trapezoidal", order: 1 }));
 
       // slot 0 = GEQ = L/h = 0.01 / 1e-4 = 100
@@ -306,11 +323,12 @@ describe("Inductor", () => {
       const core = getFactory(InductorDefinition.modelRegistry!.behavioral!)(
         new Map([["A", 1], ["B", 2]]), props, () => 0,
       );
-      const { element } = withState(core);
+      const solver = new SparseSolver();
+      solver._initStructure();
+      const { element } = withRealSetup(core, solver);
 
       // terminal voltage = 10V, branch current = 0.3A
       const voltages = new Float64Array([10, 0, 0.3]);
-      const { solver } = makeCaptureSolver();
       element.load(makeCompanionCtx({ solver, rhs: voltages, dt: 1e-4, method: "trapezoidal", order: 1 }));
 
       // slot 2 must be branch current (0.3), not terminal voltage (10)
@@ -322,10 +340,11 @@ describe("Inductor", () => {
       const core = getFactory(InductorDefinition.modelRegistry!.behavioral!)(
         new Map([["A", 1], ["B", 2]]), props, () => 0,
       );
-      const { element, pool } = withState(core);
+      const solver = new SparseSolver();
+      solver._initStructure();
+      const { element, pool } = withRealSetup(core, solver);
 
       // First call establishes i=0.5 in s0, then rotate so it lands in s1
-      const { solver } = makeCaptureSolver();
       element.load(makeCompanionCtx({ solver, rhs: new Float64Array([5, 0, 0.5]), dt: 1e-4, method: "trapezoidal", order: 1 }));
       pool.rotateStateVectors();
       // Second call: i=0.6, s1 now has i=0.5
@@ -350,11 +369,12 @@ describe("Inductor SLOT_VOLT", () => {
     const core = getFactory(InductorDefinition.modelRegistry!.behavioral!)(
       new Map([["A", 1], ["B", 2]]), props, () => 0,
     );
-    const { element } = withState(core);
+    const solver = new SparseSolver();
+    solver._initStructure();
+    const { element } = withRealSetup(core, solver);
 
     // V(node1)=10V, V(node2)=3V → terminal voltage = 10-3 = 7V
     const voltages = new Float64Array([10, 3, 0.5]);
-    const { solver } = makeCaptureSolver();
     element.load(makeCompanionCtx({ solver, rhs: voltages, dt: 1e-4, method: "trapezoidal", order: 1 }));
 
   });
@@ -365,11 +385,12 @@ describe("Inductor SLOT_VOLT", () => {
     const core = getFactory(InductorDefinition.modelRegistry!.behavioral!)(
       new Map([["A", 1], ["B", 2]]), props, () => 0,
     );
-    const { element } = withState(core);
+    const solver = new SparseSolver();
+    solver._initStructure();
+    const { element } = withRealSetup(core, solver);
 
     // Same voltage on both terminals
     const voltages = new Float64Array([5, 5, 0.0]);
-    const { solver } = makeCaptureSolver();
     element.load(makeCompanionCtx({ solver, rhs: voltages, dt: 1e-4, method: "trapezoidal", order: 1 }));
 
   });
@@ -485,13 +506,13 @@ describe("inductor_load_transient_parity (C4.2)", () => {
 
     const props = new PropertyBag();
     props.setModelParam("inductance", L_val);
-    const element = makeInductorElement(new Map([["A", 2], ["B", 0]]), 3, props);
 
     const ag = new Float64Array(7);
     ag[0] = ag0;
     ag[1] = ag1;
 
-    // Handle-based capture solver (persistent handles across steps, matching element caching)
+    // Handle-based solver used for both setup and load — persistent handles across steps,
+    // matching the element's internal handle-caching pattern.
     const handles: { row: number; col: number }[] = [];
     const handleIndex = new Map<string, number>();
     const matValues: number[] = [];
@@ -512,6 +533,13 @@ describe("inductor_load_transient_parity (C4.2)", () => {
       stampElement: (h: number, v: number): void => { matValues[h] += v; },
       stampRHS: (row: number, v: number): void => { rhsEntries.push([row, v]); },
     } as unknown as SparseSolverType;
+
+    // Create element and run setup against the same solver so handles match load().
+    const core = getFactory(InductorDefinition.modelRegistry!.behavioral!)(
+      new Map([["A", 2], ["B", 0]]), props, () => 0,
+    );
+    const { element, pool: _pool } = withRealSetup(core, solver as unknown as SparseSolver);
+    void _pool;
 
     // Closed-form RL step reference.
     // Branch equation: V2 - geq*I_L = ceq, and G_R*(Vsrc-V2) = I_L (KCL).

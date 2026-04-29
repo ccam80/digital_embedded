@@ -235,8 +235,9 @@ function instanceParamSuffix(
   for (const def of paramDefs) {
     if (def.partition !== "instance") continue;
     if (!props.hasModelParam(def.key)) continue;
-    const v = props.getModelParam<number>(def.key);
-    if (typeof v !== "number" || !Number.isFinite(v)) continue;
+    const raw = props.getModelParam<number>(def.key);
+    if (typeof raw !== "number" || !Number.isFinite(raw)) continue;
+    const v = def.spiceConverter ? def.spiceConverter(raw) : raw;
 
     if (def.emitGroup) {
       let arr = groups.get(def.emitGroup.name);
@@ -287,8 +288,9 @@ function modelCardSuffix(
       );
     }
     if (!props.hasModelParam(def.key)) continue;
-    const v = props.getModelParam<number>(def.key);
-    if (typeof v !== "number" || !Number.isFinite(v)) continue;
+    const raw = props.getModelParam<number>(def.key);
+    if (typeof raw !== "number" || !Number.isFinite(raw)) continue;
+    const v = def.spiceConverter ? def.spiceConverter(raw) : raw;
     parts.push(`${def.spiceName ?? def.key}=${v}`);
   }
 

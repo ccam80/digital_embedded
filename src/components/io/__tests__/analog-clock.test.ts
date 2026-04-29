@@ -2,12 +2,12 @@
  * Tests for the analog clock factory on the Clock component.
  */
 
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect } from "vitest";
 import { makeAnalogClockElement, ClockDefinition } from "../clock.js";
 import { PropertyBag } from "../../../core/properties.js";
-import type { SparseSolver } from "../../../solver/analog/sparse-solver.js";
+import { SparseSolver } from "../../../solver/analog/sparse-solver.js";
 import { MODEDCOP, MODEINITFLOAT } from "../../../solver/analog/ckt-mode.js";
-import { loadCtxFromFields } from "../../../solver/analog/__tests__/test-helpers.js";
+import { loadCtxFromFields, makeTestSetupContext, setupAll } from "../../../solver/analog/__tests__/test-helpers.js";
 
 // ---------------------------------------------------------------------------
 // Helper: narrow ModelEntry to inline factory (throws if netlist kind)
@@ -19,27 +19,6 @@ function getFactory(entry: ModelEntry): AnalogFactory {
 }
 
 
-// ---------------------------------------------------------------------------
-// Mock solver
-// ---------------------------------------------------------------------------
-
-// eslint-disable-next-line @typescript-eslint/explicit-function-return-type
-function makeMockSolver(rhsSize = 16) {
-  const stamps: [number, number, number][] = [];
-  const rhs = new Float64Array(rhsSize);
-
-  return {
-    allocElement: vi.fn((row: number, col: number) => {
-      stamps.push([row, col, 0]);
-      return stamps.length - 1;
-    }),
-    stampElement: vi.fn((h: number, v: number) => {
-      stamps[h][2] += v;
-    }),
-    _stamps: stamps,
-    _rhs: rhs,
-  };
-}
 
 // ===========================================================================
 // AnalogClock tests
@@ -155,11 +134,20 @@ describe("AnalogClock", () => {
 
   it("stamp_produces_incidence_entries — voltage source topology", () => {
     const clk = makeAnalogClockElement(1, 0, 1, 1000, 3.3, () => 0);
-    const solver = makeMockSolver();
+    clk.label = "CLK1";
+    const solver = new SparseSolver();
+    solver._initStructure();
+    const setupCtx = makeTestSetupContext({
+      solver,
+      startBranch: 1,
+      startNode: 100,
+      elements: [clk],
+    });
+    setupAll([clk], setupCtx);
     const rhs = new Float64Array(3);
     clk.load(loadCtxFromFields({
-      solver: solver as unknown as SparseSolver,
-      matrix: solver as unknown as SparseSolver,
+      solver,
+      matrix: solver,
       rhs,
       rhsOld: new Float64Array(3),
       cktMode: MODEDCOP | MODEINITFLOAT,
@@ -183,13 +171,11 @@ describe("AnalogClock", () => {
       bypass: false,
       voltTol: 1e-6,
     }));
-    // nodePos=1, nodeNeg=0 (ground), branchIdx=1
-    // B[nodePos,k] = allocElement(1, 1) → stampElement(h, 1)
-    // C[k,nodePos] = allocElement(1, 1) → stampElement(h, 1) (same slot, accumulated)
-    // nodeNeg=0 stamps suppressed
-    const stamps = solver._stamps;
-    // Both B and C stamps land at (1,1); the combined value is 2 after accumulation
-    expect(stamps.some(([r, c]) => r === 1 && c === 1)).toBe(true);
+    // nodePos=1, nodeNeg=0 (ground), branchIdx allocated by setup
+    // B[nodePos,k] and C[k,nodePos] land at (1,b); nodeNeg=0 stamps suppressed
+    const entries = solver.getCSCNonZeros();
+    const b = clk.branchIndex;
+    expect(entries.some((e) => e.row === 1 && e.col === b)).toBe(true);
   });
 });
 
@@ -205,10 +191,10 @@ describe("AnalogClock", () => {
 // ===========================================================================
 
 describe("clock_load_srcfact_parity", () => {
-  function makeCtx(solver: unknown, rhs: Float64Array, srcFact: number) {
+  function makeCtx(solver: SparseSolver, rhs: Float64Array, srcFact: number) {
     return loadCtxFromFields({
-      solver: solver as SparseSolver,
-      matrix: solver as SparseSolver,
+      solver,
+      matrix: solver,
       rhs,
       rhsOld: new Float64Array(rhs.length),
       cktMode: MODEDCOP | MODEINITFLOAT,
@@ -234,13 +220,26 @@ describe("clock_load_srcfact_parity", () => {
     });
   }
 
+  function setupClk(clk: ReturnType<typeof makeAnalogClockElement>): SparseSolver {
+    const solver = new SparseSolver();
+    solver._initStructure();
+    const setupCtx = makeTestSetupContext({
+      solver,
+      startBranch: clk.branchIndex >= 0 ? clk.branchIndex : 1,
+      startNode: 100,
+      elements: [clk],
+    });
+    setupAll([clk], setupCtx);
+    return solver;
+  }
+
   it("srcfact_05_halves_rhs_at_high_phase_bit_exact", () => {
     const VDD = 3.3;
     const FREQ = 1000;
     const BRANCH = 1;
     let simTime = 0; // first half-period → high
     const clk = makeAnalogClockElement(1, 0, BRANCH, FREQ, VDD, () => simTime);
-    const solver = makeMockSolver(4);
+    const solver = setupClk(clk);
     const rhs = new Float64Array(4);
 
     clk.load(makeCtx(solver, rhs, 0.5));
@@ -259,7 +258,7 @@ describe("clock_load_srcfact_parity", () => {
     const halfPeriod = 1 / (2 * FREQ);
     let simTime = halfPeriod; // second half-period → low
     const clk = makeAnalogClockElement(1, 0, BRANCH, FREQ, VDD, () => simTime);
-    const solver = makeMockSolver(4);
+    const solver = setupClk(clk);
     const rhs = new Float64Array(4);
 
     clk.load(makeCtx(solver, rhs, 0.25));
@@ -275,7 +274,7 @@ describe("clock_load_srcfact_parity", () => {
     const BRANCH = 2;
     let simTime = 0; // first half-period → high
     const clk = makeAnalogClockElement(1, 0, BRANCH, FREQ, VDD, () => simTime);
-    const solver = makeMockSolver(4);
+    const solver = setupClk(clk);
     const rhs = new Float64Array(4);
 
     clk.load(makeCtx(solver, rhs, 1));

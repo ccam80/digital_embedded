@@ -27,7 +27,7 @@ import type { AnalogElement } from "../../core/analog-types.js";
 import { NGSPICE_LOAD_ORDER } from "../../core/analog-types.js";
 import type { LoadContext } from "../../solver/analog/load-context.js";
 import type { SetupContext } from "../../solver/analog/setup-context.js";
-import { defineModelParams } from "../../core/model-params.js";
+import { defineModelParams, kelvinToCelsius } from "../../core/model-params.js";
 
 import {
   createBjtElement,
@@ -53,7 +53,7 @@ export const { paramDefs: SCR_PARAM_DEFS, defaults: SCR_PARAM_DEFAULTS } = defin
   },
   instance: {
     AREA: { default: 1,      description: "Device area factor" },
-    TEMP: { default: 300.15, unit: "K", description: "Per-instance operating temperature" },
+    TEMP: { default: 300.15, unit: "K", description: "Per-instance operating temperature", spiceConverter: kelvinToCelsius },
   },
 });
 
@@ -155,6 +155,15 @@ class ScrCompositeElement implements AnalogElement {
 
   getPinCurrents(_rhs: Float64Array): number[] {
     return [0, 0, 0];
+  }
+
+  /** Sub-elements in setup() order: Q1 NPN, then Q2 PNP. Each is independent
+   *  in setup; setup() rebinds their pin nodes via the shared Vint latch node. */
+  getSubElements(): readonly AnalogElement[] {
+    return [
+      this._q1 as unknown as AnalogElement,
+      this._q2 as unknown as AnalogElement,
+    ];
   }
 }
 

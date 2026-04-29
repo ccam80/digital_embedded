@@ -252,9 +252,11 @@ function buildContextMenu(ctx: AppContext, deps: MTDeps): void {
     contextMenu.hide();
     document.getElementById('wire-context-menu')?.remove();
 
+    const items: MenuItem[] = [];
+    try {
+
     const worldPt = renderPipeline.canvasToWorld(e);
     const locked = lockedModeGuard.isLocked();
-    const items: MenuItem[] = [];
 
     const elementHit = hitTestElements(worldPt, ctx.circuit.elements);
     const wireHit = !elementHit ? hitTestWires(worldPt, ctx.circuit.wires, HIT_THRESHOLD) : null;
@@ -638,6 +640,12 @@ function buildContextMenu(ctx: AppContext, deps: MTDeps): void {
           simController.updateSpeedDisplay();
         }, enabled: true },
       );
+    }
+
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error('Context menu builder error:', err);
+      ctx.showStatus(`Context menu error: ${msg}`, true);
     }
 
     if (items.length > 0) {

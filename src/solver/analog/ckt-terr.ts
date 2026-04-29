@@ -30,23 +30,27 @@ import type { IntegrationMethod } from "./element.js";
 // Method-specific LTE coefficients (ngspice trdefs.h / geardefs.h)
 // ---------------------------------------------------------------------------
 
-// ngspice cktterr.c:32-35 trapCoeff[]
-const TRAP_LTE_FACTORS = [0.5, 1 / 12];
+// ngspice cktterr.c:32-35 trapCoeff[] — must match ngspice's truncated decimal
+// literals bit-exact, NOT the closer rational fractions. Using `1/12` instead of
+// `.08333333333` produces a different double (3.3e-12 apart) which propagates
+// through the LTE formula `del = trtol*tol/(factor*|diff|)` and `sqrt(del)` to
+// a 2ULP-different proposed dt — visible in rlc-oscillator parity at step=1.
+const TRAP_LTE_FACTORS = [0.5, 0.08333333333];
 
 /**
  * LTE error factor for Gear (BDF) methods, indexed by (order - 1).
- * Values from ngspice cktterr.c:24-31 gearCoeff[] table (exact fractions
- * of the truncated decimals ngspice ships; see
- * spec/state-machines/ngspice-cktterr-vs-ckt-terr.md rows 43-48 for the
- * per-element mapping).
- *   [0] = 0.5           = 0.5          (order 1, trap / gear)
- *   [1] = 2/9           ≈ .2222222222  (order 2, gear)
- *   [2] = 3/22          ≈ .1363636364  (order 3)
- *   [3] = 12/125        = .096         (order 4)
- *   [4] = 10/137        ≈ .07299270073 (order 5)
- *   [5] = 20/343        ≈ .05830903790 (order 6)
+ * Values are the EXACT decimal literals ngspice ships in cktterr.c:24-31
+ * gearCoeff[]. We deliberately do NOT replace them with the closer rational
+ * fractions (2/9, 3/22, 10/137, 20/343) — those produce different doubles
+ * and break bit-exact parity even though they are mathematically more correct.
+ *   [0] = 0.5
+ *   [1] = .2222222222   (≈ 2/9)
+ *   [2] = .1363636364   (≈ 3/22)
+ *   [3] = .096          (= 12/125, exactly representable)
+ *   [4] = .07299270073  (≈ 10/137)
+ *   [5] = .05830903790  (≈ 20/343)
  */
-export const GEAR_LTE_FACTORS = [0.5, 2 / 9, 3 / 22, 12 / 125, 10 / 137, 20 / 343];
+export const GEAR_LTE_FACTORS = [0.5, 0.2222222222, 0.1363636364, 0.096, 0.07299270073, 0.05830903790];
 
 // ---------------------------------------------------------------------------
 // LteParams -- tolerance parameters passed from TimestepController

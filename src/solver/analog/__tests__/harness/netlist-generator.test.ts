@@ -431,7 +431,10 @@ describe("generateSpiceNetlist", () => {
     const netlist = generateSpiceNetlist(compiled, testRegistry, new Map([[0, "D1"]]));
     // OFF is a bare-flag instance param in ngspice (`OFF=1` produces a hard
     // "unknown parameter" parse error); emitted as a bare keyword instead.
-    expect(netlist).toContain("D1 1 2 D1_D AREA=2 OFF TEMP=325");
+    // TEMP carries the Kelvin→Celsius spiceConverter (325 K → 51.85 °C, with
+    // a trailing FP artifact from the subtraction). The element-line shape is
+    // unchanged; only the emitted TEMP value reflects the unit conversion.
+    expect(netlist).toContain("D1 1 2 D1_D AREA=2 OFF TEMP=51.85000000000002");
     expect(netlist).not.toContain("OFF=");
     expect(netlist).not.toContain("IC=");
   });
@@ -459,9 +462,10 @@ describe("generateSpiceNetlist", () => {
   });
 
   it("MOSFET NMOS: non-default instance params emit on element line in paramDefs order", () => {
-    // Use NON-default values for every emitted param so each token survives
-    // the ngspice "drop default" filter. M=1, ICV*=0, OFF=0, TEMP=300.15 are
-    // all ngspice defaults and would be silently omitted.
+    // Use NON-default values so every token is visibly present — needed
+    // because TEMP carries a Kelvin→Celsius spiceConverter (TEMP=300.15 K
+    // emits as TEMP=27, ngspice's default). At TEMP=350 K → TEMP=76.85,
+    // which both side-steps that collapse and asserts the converter ran.
     const props = new PropertyBag();
     props.setModelParam("W", 2e-6);
     props.setModelParam("L", 1e-6);
@@ -560,7 +564,9 @@ describe("generateSpiceNetlist", () => {
     expect(elementLine).not.toMatch(/\bOFF=/);
     expect(elementLine).toContain("ICVBE=0.7");
     expect(elementLine).toContain("ICVCE=5");
-    expect(elementLine).toContain("TEMP=350");
+    // TEMP carries the Kelvin→Celsius spiceConverter (350 K → 76.85 °C, with
+    // a trailing FP artifact from the subtraction).
+    expect(elementLine).toContain("TEMP=76.85");
     // SUBS has no ngspice counterpart — must never reach the netlist.
     expect(elementLine).not.toContain("SUBS");
     // Model card must not contain instance keys
@@ -630,6 +636,60 @@ describe("generateSpiceNetlist", () => {
     expect(modelLine).toBeDefined();
     expect(modelLine).toContain("IS=");
     expect(modelLine).not.toContain("JS=");
+  });
+
+  // -------------------------------------------------------------------------
+  // spiceConverter — Kelvin→Celsius for TEMP/TNOM
+  //
+  // ngspice parses TEMP/TNOM as Celsius and adds CONSTCtoK (273.15) — see
+  // bjtparam.c:47, bjtmpar.c:42, etc. digiTS stores these in Kelvin (REFTEMP
+  // = 300.15 K = 27 °C), so emission must subtract 273.15 to round-trip
+  // correctly. Without the converter, TEMP=300.15 K is read back by ngspice
+  // as 573.3 K, breaking BJT/MOSFET/diode parity at iter 0 of MODEINITJCT.
+  // -------------------------------------------------------------------------
+  it("BJT TNOM (model card): Kelvin value emits as Celsius", () => {
+    const props = new PropertyBag();
+    props.setModelParam("TNOM", 300.15);
+    const compiled = makeCompiled(
+      [makeAnalogEl([3, 2, 1])],
+      new Map([[0, new TestCircuitElement("NpnBJT", props)]]),
+    );
+    const netlist = generateSpiceNetlist(compiled, testRegistry, new Map([[0, "Q1"]]));
+    const modelLine = netlist.split("\n").find(l => l.startsWith(".model Q1_NPN NPN"))!;
+    expect(modelLine).toBeDefined();
+    expect(modelLine).toContain("TNOM=27");
+    expect(modelLine).not.toContain("TNOM=300.15");
+  });
+
+  it("BJT TEMP (instance line): non-default Kelvin value emits as exact Celsius", () => {
+    const props = new PropertyBag();
+    props.setModelParam("TEMP", 350); // 350 K = 76.85 °C
+    const compiled = makeCompiled(
+      [makeAnalogEl([3, 2, 1])],
+      new Map([[0, new TestCircuitElement("NpnBJT", props)]]),
+    );
+    const netlist = generateSpiceNetlist(compiled, testRegistry, new Map([[0, "Q1"]]));
+    const elementLine = netlist.split("\n").find(l => l.startsWith("Q1 "))!;
+    expect(elementLine).toBeDefined();
+    expect(elementLine).toContain("TEMP=76.85");
+    expect(elementLine).not.toContain("TEMP=350");
+  });
+
+  it("Diode TEMP/TNOM: both partitions apply the converter", () => {
+    const props = new PropertyBag();
+    props.setModelParam("TEMP", 400);   // 400 K = 126.85 °C  (instance)
+    props.setModelParam("TNOM", 273.15); // 273.15 K = 0 °C    (model card)
+    const compiled = makeCompiled(
+      [makeAnalogEl([1, 2])],
+      new Map([[0, new TestCircuitElement("Diode", props)]]),
+    );
+    const netlist = generateSpiceNetlist(compiled, testRegistry, new Map([[0, "D1"]]));
+    const elementLine = netlist.split("\n").find(l => l.startsWith("D1 "))!;
+    const modelLine = netlist.split("\n").find(l => l.startsWith(".model D1_D D"))!;
+    expect(elementLine).toContain("TEMP=126.85");
+    expect(modelLine).toContain("TNOM=0");
+    expect(elementLine).not.toContain("TEMP=400");
+    expect(modelLine).not.toContain("TNOM=273.15");
   });
 
 });

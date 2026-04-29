@@ -21,7 +21,7 @@ import {
 } from "../crystal.js";
 import { PropertyBag } from "../../../core/properties.js";
 import { makeDcVoltageSource } from "../../sources/dc-voltage-source.js";
-import { runDcOp, makeTestSetupContext, setupAll, makeLoadCtx } from "../../../solver/analog/__tests__/test-helpers.js";
+import { runDcOp, makeTestSetupContext, setupAll, makeLoadCtx, allocateStatePool } from "../../../solver/analog/__tests__/test-helpers.js";
 import { SparseSolver } from "../../../solver/analog/sparse-solver.js";
 import { ComponentCategory, ComponentRegistry } from "../../../core/registry.js";
 import { StatePool } from "../../../solver/analog/state-pool.js";
@@ -39,13 +39,16 @@ function getFactory(entry: ModelEntry): AnalogFactory {
 }
 
 // ---------------------------------------------------------------------------
-// withState: allocate a StatePool for a single element and call initState
+// withState: run setup() then allocate a StatePool for a single element
 // ---------------------------------------------------------------------------
 function withState(core: AnalogElement): { element: PoolBackedAnalogElement; pool: StatePool } {
   const pb = core as unknown as PoolBackedAnalogElement;
-  const pool = new StatePool(Math.max(pb.stateSize, 1));
-  pb._stateBase = 0;
-  pb.initState(pool);
+  const solver = new SparseSolver();
+  solver._initStructure();
+  // Crystal external nodes are A=1, B=0; internal nodes start at 2, branch at 3.
+  const ctx = makeTestSetupContext({ solver, startNode: 2, startBranch: 3, elements: [core] });
+  setupAll([core], ctx);
+  const pool = allocateStatePool([core]);
   return { element: pb, pool };
 }
 

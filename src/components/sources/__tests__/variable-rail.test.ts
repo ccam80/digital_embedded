@@ -7,6 +7,7 @@ import { makeVariableRailElement, VariableRailDefinition } from "../variable-rai
 import { runDcOp, loadCtxFromFields } from "../../../solver/analog/__tests__/test-helpers.js";
 import type { AnalogElement } from "../../../solver/analog/element.js";
 import { PropertyBag } from "../../../core/properties.js";
+import { SparseSolver } from "../../../solver/analog/sparse-solver.js";
 import type { SparseSolver as SparseSolverType } from "../../../solver/analog/sparse-solver.js";
 import { MODEDCOP, MODEINITFLOAT } from "../../../solver/analog/ckt-mode.js";
 import { makeTestSetupContext, setupAll } from "../../../solver/analog/__tests__/test-helpers.js";
@@ -114,8 +115,23 @@ describe("VariableRail", () => {
     expect(rail.currentVoltage).toBe(15);
   });
 
-  it("definition_has_requires_branch_row", () => {
-    expect((VariableRailDefinition.modelRegistry?.behavioral as {kind:"inline";factory:AnalogFactory;branchCount?:number}|undefined)?.branchCount).toBe(1);
+  it("element allocates a branch row in setup()", () => {
+    const factory = getFactory(VariableRailDefinition.modelRegistry!.behavioral!);
+    const props = makeVRailProps(5);
+    const el = factory(new Map([["pos", 1]]), props, () => 0);
+    el.label = "VTEST";
+
+    const solver = new SparseSolver();
+    solver._initStructure();
+    const setupCtx = makeTestSetupContext({
+      solver,
+      startBranch: 5,
+      startNode: 100,
+      elements: [el as unknown as AnalogElement],
+    });
+    setupAll([el as unknown as AnalogElement], setupCtx);
+
+    expect(el.branchIndex).toBeGreaterThanOrEqual(0);
   });
 
   it("definition_engine_type_analog", () => {

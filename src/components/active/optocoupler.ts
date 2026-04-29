@@ -376,6 +376,18 @@ class OptocouplerCompositeElement implements AnalogElement {
     // Pin order: [anode, cathode, collector, emitter]
     return [0, 0, 0, 0];
   }
+
+  /** Sub-elements in dependency order. _vSense allocates the controlling
+   *  branch that _cccsCouple references via findBranch during setup(); the
+   *  diode and BJT are independent. Order matches setup() body. */
+  getSubElements(): readonly AnalogElement[] {
+    return [
+      this._dLed as unknown as AnalogElement,
+      this._vSense,
+      this._cccsCouple,
+      this._bjtPhoto as unknown as AnalogElement,
+    ];
+  }
 }
 
 // ---------------------------------------------------------------------------

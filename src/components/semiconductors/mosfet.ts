@@ -39,7 +39,7 @@ import { stampRHS } from "../../solver/analog/stamp-helpers.js";
 import { fetlim, limvds, pnjlim } from "../../solver/analog/newton-raphson.js";
 import { cktTerr } from "../../solver/analog/ckt-terr.js";
 import type { LteParams } from "../../solver/analog/ckt-terr.js";
-import { defineModelParams, deviceParams } from "../../core/model-params.js";
+import { defineModelParams, deviceParams, kelvinToCelsius } from "../../core/model-params.js";
 import type { StatePoolRef } from "../../core/analog-types.js";
 import {
   defineStateSchema,
@@ -152,7 +152,7 @@ export const { paramDefs: MOSFET_NMOS_PARAM_DEFS, defaults: MOSFET_NMOS_DEFAULTS
     MJSW:   { default: 0.5,                  description: "Bulk junction sidewall grading coefficient" },
     JS:     { default: 0,    unit: "A/mÂ²",   description: "Bulk junction saturation current density" },
     RSH:    { default: 0,    unit: "Î/sq",   description: "Drain/source diffusion sheet resistance" },
-    TNOM:   { default: REFTEMP, unit: "K",   description: "Nominal temperature" },
+    TNOM:   { default: REFTEMP, unit: "K",   description: "Nominal temperature", spiceConverter: kelvinToCelsius },
     TOX:    { default: 1e-7, unit: "m",      description: "Oxide thickness" },
     TPG:    { default: 1,                    description: "Gate type: 1=opposite, -1=same, 0=Al gate" },
     LD:     { default: 0,    unit: "m",      description: "Lateral diffusion" },
@@ -173,7 +173,7 @@ export const { paramDefs: MOSFET_NMOS_PARAM_DEFS, defaults: MOSFET_NMOS_DEFAULTS
     ICVDS:  { default: 0,    unit: "V",      emitGroup: { name: "IC", index: 0 }, description: "Initial condition for Vds (MODEUIC)" },
     ICVGS:  { default: 0,    unit: "V",      emitGroup: { name: "IC", index: 1 }, description: "Initial condition for Vgs (MODEUIC)" },
     ICVBS:  { default: 0,    unit: "V",      emitGroup: { name: "IC", index: 2 }, description: "Initial condition for Vbs (MODEUIC)" },
-    TEMP:   { default: REFTEMP, unit: "K",   description: "Per-instance operating temperature" },
+    TEMP:   { default: REFTEMP, unit: "K",   description: "Per-instance operating temperature", spiceConverter: kelvinToCelsius },
     drainSquares:  { default: 1, description: "Drain diffusion squares (mos1set.c:124-125)" },
     sourceSquares: { default: 1, description: "Source diffusion squares (mos1set.c:127-128)" },
   },
@@ -257,7 +257,7 @@ export const { paramDefs: MOSFET_PMOS_PARAM_DEFS, defaults: MOSFET_PMOS_DEFAULTS
     MJSW:   { default: 0.5,                  description: "Bulk junction sidewall grading coefficient" },
     JS:     { default: 0,    unit: "A/mÂ²",   description: "Bulk junction saturation current density" },
     RSH:    { default: 0,    unit: "Î/sq",   description: "Drain/source diffusion sheet resistance" },
-    TNOM:   { default: REFTEMP, unit: "K",   description: "Nominal temperature" },
+    TNOM:   { default: REFTEMP, unit: "K",   description: "Nominal temperature", spiceConverter: kelvinToCelsius },
     TOX:    { default: 1e-7, unit: "m",      description: "Oxide thickness" },
     TPG:    { default: 1,                    description: "Gate type: 1=opposite, -1=same, 0=Al gate" },
     LD:     { default: 0,    unit: "m",      description: "Lateral diffusion" },
@@ -278,7 +278,7 @@ export const { paramDefs: MOSFET_PMOS_PARAM_DEFS, defaults: MOSFET_PMOS_DEFAULTS
     ICVDS:  { default: 0,    unit: "V",      emitGroup: { name: "IC", index: 0 }, description: "Initial condition for Vds (MODEUIC)" },
     ICVGS:  { default: 0,    unit: "V",      emitGroup: { name: "IC", index: 1 }, description: "Initial condition for Vgs (MODEUIC)" },
     ICVBS:  { default: 0,    unit: "V",      emitGroup: { name: "IC", index: 2 }, description: "Initial condition for Vbs (MODEUIC)" },
-    TEMP:   { default: REFTEMP, unit: "K",   description: "Per-instance operating temperature" },
+    TEMP:   { default: REFTEMP, unit: "K",   description: "Per-instance operating temperature", spiceConverter: kelvinToCelsius },
     drainSquares:  { default: 1, description: "Drain diffusion squares (mos1set.c:124-125)" },
     sourceSquares: { default: 1, description: "Source diffusion squares (mos1set.c:127-128)" },
   },

@@ -24,6 +24,7 @@ import { loadCtxFromFields, makeTestSetupContext, setupAll } from './test-helper
 import type { MnaSubcircuitNetlist } from '../../../core/mna-subcircuit-netlist.js';
 import { PropertyBag } from '../../../core/properties.js';
 import { StatePool } from '../state-pool.js';
+import { SparseSolver } from '../sparse-solver.js';
 import { ResistorDefinition } from '../../../components/passives/resistor.js';
 
 const CMOS_3V3 = { rOut: 50, cOut: 5e-12, rIn: 1e7, cIn: 5e-12, vOH: 3.3, vOL: 0.0, vIH: 2.0, vIL: 0.8, rHiZ: 1e7 };
@@ -41,26 +42,7 @@ function makePartition(stubs: BridgeStub[], groups: ConnectivityGroup[]): Solver
   return { components: [], groups, bridgeStubs: stubs };
 }
 
-interface StampCall { row: number; col: number; value: number }
-
-class MockSolver {
-  readonly stamps: StampCall[] = [];
-  private readonly _handles: Array<{ row: number; col: number }> = [];
-  allocElement(row: number, col: number): number {
-    this._handles.push({ row, col });
-    return this._handles.length - 1;
-  }
-  stampElement(handle: number, value: number): void {
-    const { row, col } = this._handles[handle];
-    this.stamps.push({ row, col, value });
-  }
-  reset(): void { this.stamps.length = 0; this._handles.length = 0; }
-  sumStamp(row: number, col: number): number {
-    return this.stamps.filter(s => s.row === row && s.col === col).reduce((a, s) => a + s.value, 0);
-  }
-}
-
-function makeCtx(solver: MockSolver, rhs?: Float64Array) {
+function makeCtx(solver: SparseSolver, rhs?: Float64Array) {
   const rhsBuf = rhs ?? new Float64Array(8);
   return loadCtxFromFields({
     solver: solver as any,
@@ -144,10 +126,16 @@ describe('bridge-compilation: none mode bridge adapters are unloaded', () => {
     const partition = makePartition([stub], [group]);
     const compiled = compileAnalogPartition(partition, new ComponentRegistry(), undefined, undefined, undefined, 'none');
     const adapter = compiled.bridgeAdaptersByGroupId.get(1)![0] as BridgeOutputAdapter;
-    const solver = new MockSolver();
+    const solver = new SparseSolver();
+    solver._initStructure();
+    solver._resetForAssembly();
     adapter.load(makeCtx(solver));
     // nodeId=1 -> nodeIdx=0. Unloaded: no rOut conductance on diagonal.
-    expect(solver.sumStamp(0, 0)).toBe(0);
+    const entries = solver.getCSCNonZeros();
+    const diagSum = entries
+      .filter((e) => e.row === 0 && e.col === 0)
+      .reduce((acc, e) => acc + e.value, 0);
+    expect(diagSum).toBe(0);
   });
 
   it('none mode input adapter stamps nothing', () => {
@@ -156,10 +144,13 @@ describe('bridge-compilation: none mode bridge adapters are unloaded', () => {
     const partition = makePartition([stub], [group]);
     const compiled = compileAnalogPartition(partition, new ComponentRegistry(), undefined, undefined, undefined, 'none');
     const adapter = compiled.bridgeAdaptersByGroupId.get(2)![0] as BridgeInputAdapter;
-    const solver = new MockSolver();
+    const solver = new SparseSolver();
+    solver._initStructure();
     const rhs = new Float64Array(8);
+    solver._resetForAssembly();
     adapter.load(makeCtx(solver, rhs));
-    expect(solver.stamps.length).toBe(0);
+    const entries = solver.getCSCNonZeros();
+    expect(entries.length).toBe(0);
     expect(rhs.every(v => v === 0)).toBe(true);
   });
 });
@@ -171,10 +162,16 @@ describe('bridge-compilation: cross-domain mode bridge adapters are loaded', () 
     const partition = makePartition([stub], [group]);
     const compiled = compileAnalogPartition(partition, new ComponentRegistry(), undefined, undefined, undefined, 'cross-domain');
     const adapter = compiled.bridgeAdaptersByGroupId.get(1)![0] as BridgeOutputAdapter;
-    const solver = new MockSolver();
+    const solver = new SparseSolver();
+    solver._initStructure();
+    solver._resetForAssembly();
     adapter.load(makeCtx(solver));
     // nodeId=1 -> nodeIdx=0. Loaded: 1/rOut on diagonal.
-    expect(solver.sumStamp(0, 0)).toBeCloseTo(1 / CMOS_3V3.rOut, 9);
+    const entries = solver.getCSCNonZeros();
+    const diagSum = entries
+      .filter((e) => e.row === 0 && e.col === 0)
+      .reduce((acc, e) => acc + e.value, 0);
+    expect(diagSum).toBeCloseTo(1 / CMOS_3V3.rOut, 9);
   });
 });
 
@@ -186,9 +183,15 @@ describe('bridge-compilation: per-net ideal override produces unloaded adapters'
     const partition = makePartition([stub], [group]);
     const compiled = compileAnalogPartition(partition, new ComponentRegistry(), undefined, undefined, undefined, 'cross-domain');
     const adapter = compiled.bridgeAdaptersByGroupId.get(1)![0] as BridgeOutputAdapter;
-    const solver = new MockSolver();
+    const solver = new SparseSolver();
+    solver._initStructure();
+    solver._resetForAssembly();
     adapter.load(makeCtx(solver));
-    expect(solver.sumStamp(0, 0)).toBe(0);
+    const entries = solver.getCSCNonZeros();
+    const diagSum = entries
+      .filter((e) => e.row === 0 && e.col === 0)
+      .reduce((acc, e) => acc + e.value, 0);
+    expect(diagSum).toBe(0);
   });
 });
 
@@ -200,8 +203,10 @@ describe('bridge-compilation: bridge output in hi-z mode stamps I=0', () => {
     const compiled = compileAnalogPartition(partition, new ComponentRegistry(), undefined, undefined, undefined, 'cross-domain');
     const adapter = compiled.bridgeAdaptersByGroupId.get(1)![0] as BridgeOutputAdapter;
     adapter.setHighZ(true);
-    const solver = new MockSolver();
+    const solver = new SparseSolver();
+    solver._initStructure();
     const rhs = new Float64Array(8);
+    solver._resetForAssembly();
     adapter.load(makeCtx(solver, rhs));
     expect(rhs[adapter.branchIndex]).toBe(0);
   });
@@ -344,7 +349,8 @@ describe('bridge-compilation: compileSubcircuitToMnaModel returns CompositeEleme
     // within the composite must have _stateBase !== -1.
     // The composite itself gets _stateBase assigned by setupAll.
     const matrixSize = 2;
-    const mockSolver = new MockSolver();
+    const mockSolver = new SparseSolver();
+    mockSolver._initStructure();
     const ctx = makeTestSetupContext({ solver: mockSolver as any, startNode: matrixSize + 1, startBranch: matrixSize + 1 });
     setupAll([composite], ctx);
 

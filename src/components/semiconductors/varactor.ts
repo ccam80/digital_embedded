@@ -25,7 +25,7 @@ import {
   type AttributeMapping,
   type ComponentDefinition,
 } from "../../core/registry.js";
-import { defineModelParams } from "../../core/model-params.js";
+import { defineModelParams, kelvinToCelsius } from "../../core/model-params.js";
 import {
   createDiodeElement,
   DIODE_PARAM_DEFAULTS,
@@ -62,7 +62,7 @@ export const { paramDefs: VARACTOR_PARAM_DEFS, defaults: VARACTOR_PARAM_DEFAULTS
       XTI: { default: DIODE_PARAM_DEFAULTS.XTI,             description: "Saturation current temperature exponent" },
       KF:  { default: DIODE_PARAM_DEFAULTS.KF,              description: "Flicker noise coefficient" },
       AF:  { default: DIODE_PARAM_DEFAULTS.AF,              description: "Flicker noise exponent" },
-      TNOM: { default: DIODE_PARAM_DEFAULTS.TNOM, unit: "K", description: "Parameter measurement temperature" },
+      TNOM: { default: DIODE_PARAM_DEFAULTS.TNOM, unit: "K", description: "Parameter measurement temperature", spiceConverter: kelvinToCelsius },
     },
     instance: {
       AREA: { default: DIODE_PARAM_DEFAULTS.AREA,           description: "Area scaling factor" },

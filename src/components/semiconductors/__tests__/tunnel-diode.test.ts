@@ -22,7 +22,7 @@ import { computeNIcomCof } from "../../../solver/analog/integration.js";
 import { PropertyBag } from "../../../core/properties.js";
 import { SparseSolver } from "../../../solver/analog/sparse-solver.js";
 import { DiagnosticCollector } from "../../../solver/analog/diagnostics.js";
-import { runNR, makeLoadCtx, loadCtxFromFields } from "../../../solver/analog/__tests__/test-helpers.js";
+import { runNR, makeLoadCtx, loadCtxFromFields, makeTestSetupContext, setupAll, allocateStatePool } from "../../../solver/analog/__tests__/test-helpers.js";
 import { StatePool } from "../../../solver/analog/state-pool.js";
 import type { AnalogElement, PoolBackedAnalogElement } from "../../../solver/analog/element.js";
 import type { AnalogFactory } from "../../../core/registry.js";
@@ -51,9 +51,11 @@ const TD_MODEL_PARAMS = {
 // ---------------------------------------------------------------------------
 
 function withState(core: PoolBackedAnalogElement): { element: PoolBackedAnalogElement; pool: StatePool } {
-  const pool = new StatePool(Math.max(core.stateSize, 1));
-  (core as unknown as { _stateBase: number })._stateBase = 0;
-  core.initState(pool);
+  const solver = new SparseSolver();
+  solver._initStructure();
+  const ctx = makeTestSetupContext({ solver, elements: [core] });
+  setupAll([core], ctx);
+  const pool = allocateStatePool([core]);
   return { element: core, pool };
 }
 

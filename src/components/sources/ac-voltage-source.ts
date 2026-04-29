@@ -108,7 +108,11 @@ export function computeWaveformValue(
   const arg = 2 * Math.PI * frequency * t + phase;
   switch (waveform) {
     case "sine":
-      return dcOffset + amplitude * Math.sin(arg);
+      // ngspice vsrcload.c:159 — operand order is `FREQ*time * 2.0 * M_PI + phase`,
+      // not `2*PI*FREQ*time + phase`. Floating-point multiply is non-associative,
+      // so the difference is observable as 1 ULP in the argument and propagates
+      // through sin to a 1-ULP source voltage that drifts the entire MNA solve.
+      return dcOffset + amplitude * Math.sin(frequency * t * 2.0 * Math.PI + phase);
 
     case "square": {
       const riseTime = ext?.riseTime ?? 0;

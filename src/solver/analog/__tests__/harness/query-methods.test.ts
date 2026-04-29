@@ -158,12 +158,15 @@ function buildHwrCircuit(registry: ComponentRegistry) {
       { id: "vs",  type: "DcVoltageSource", props: { voltage: 5 } },
       { id: "r1",  type: "Resistor",        props: { resistance: 1000 } },
       { id: "d1",  type: "Diode",           props: {} },
+      { id: "c1",  type: "Capacitor",       props: { capacitance: 1e-6 } },
       { id: "gnd", type: "Ground" },
     ],
     connections: [
       ["vs:pos", "r1:A"],
       ["r1:B",   "d1:A"],
       ["d1:K",   "gnd:out"],
+      ["c1:pos", "r1:B"],
+      ["c1:neg", "gnd:out"],
       ["vs:neg",  "gnd:out"],
     ],
   });

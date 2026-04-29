@@ -458,11 +458,27 @@ export function registerHarnessTools(
         ? { index: args.index }
         : { time: args.time!, side: args.side as "ours" | "ngspice" | undefined };
       const detail = entry.session.getStep(query);
+      // Normalize NaN sentinels to -1 so the JSON contract stays type-stable
+      // (`typeof === "number"`). NaN survives ComparisonSession but JSON.stringify
+      // emits it as `null`, which would otherwise break consumers asserting
+      // numeric attempt-end norms. Mirrors the divergenceNorm handling below.
+      // Branch norm is NaN whenever the circuit has no branch rows
+      // (matrixSize === nodeCount + 1) — common for purely resistive/passive
+      // fixtures with no V-source or inductor elements.
+      const normalizeAttempt = <T extends { endNodeNorm: number; endBranchNorm: number }>(
+        a: T,
+      ): T => ({
+        ...a,
+        endNodeNorm: Number.isNaN(a.endNodeNorm) ? -1 : a.endNodeNorm,
+        endBranchNorm: Number.isNaN(a.endBranchNorm) ? -1 : a.endBranchNorm,
+      });
       const formatted = {
         ...detail,
         stepStartTime: formatComparedValue(detail.stepStartTime),
         stepEndTime: formatComparedValue(detail.stepEndTime),
         dt: formatComparedValue(detail.dt),
+        ours: detail.ours.map(normalizeAttempt),
+        ngspice: detail.ngspice.map(normalizeAttempt),
         pairing: detail.pairing.map(p => ({
           ...p,
           divergenceNorm: Number.isNaN(p.divergenceNorm) ? -1 : p.divergenceNorm,
