@@ -189,15 +189,15 @@ export class AnalogCapacitorElement implements PoolBackedAnalogElement {
   private _hPN: number = -1;
   private _hNP: number = -1;
 
-  constructor(pinNodes: ReadonlyMap<string, number>, capacitance: number, IC: number, TC1: number, TC2: number, TNOM: number, SCALE: number, M: number) {
+  constructor(pinNodes: ReadonlyMap<string, number>, props: PropertyBag) {
     this._pinNodes = new Map(pinNodes);
-    this._nominalC = capacitance;
-    this._IC = IC;
-    this._TC1 = TC1;
-    this._TC2 = TC2;
-    this._TNOM = TNOM;
-    this._SCALE = SCALE;
-    this._M = M;
+    this._nominalC = props.hasModelParam("capacitance") ? props.getModelParam<number>("capacitance") : CAPACITOR_DEFAULTS["capacitance"]!;
+    this._IC       = props.hasModelParam("IC")    ? props.getModelParam<number>("IC")    : CAPACITOR_DEFAULTS["IC"]!;
+    this._TC1      = props.hasModelParam("TC1")   ? props.getModelParam<number>("TC1")   : CAPACITOR_DEFAULTS["TC1"]!;
+    this._TC2      = props.hasModelParam("TC2")   ? props.getModelParam<number>("TC2")   : CAPACITOR_DEFAULTS["TC2"]!;
+    this._TNOM     = props.hasModelParam("TNOM")  ? props.getModelParam<number>("TNOM")  : CAPACITOR_DEFAULTS["TNOM"]!;
+    this._SCALE    = props.hasModelParam("SCALE") ? props.getModelParam<number>("SCALE") : CAPACITOR_DEFAULTS["SCALE"]!;
+    this._M        = props.hasModelParam("M")     ? props.getModelParam<number>("M")     : CAPACITOR_DEFAULTS["M"]!;
     // capload.c:44  CAPm is applied at stamp time, not folded into CAPcapac.
     // C is raw per-instance capacitance (TC + SCALE applied); M kept separate.
     // _pool not yet set in constructor; temperature defaults to TNOM  dT = 0.
@@ -397,14 +397,7 @@ function createCapacitorElement(
   props: PropertyBag,
   _getTime: () => number,
 ): PoolBackedAnalogElement {
-  const C     = props.getModelParam<number>("capacitance");
-  const IC    = props.hasModelParam("IC")    ? props.getModelParam<number>("IC")    : CAPACITOR_DEFAULTS["IC"]!;
-  const TC1   = props.hasModelParam("TC1")   ? props.getModelParam<number>("TC1")   : CAPACITOR_DEFAULTS["TC1"]!;
-  const TC2   = props.hasModelParam("TC2")   ? props.getModelParam<number>("TC2")   : CAPACITOR_DEFAULTS["TC2"]!;
-  const TNOM  = props.hasModelParam("TNOM")  ? props.getModelParam<number>("TNOM")  : CAPACITOR_DEFAULTS["TNOM"]!;
-  const SCALE = props.hasModelParam("SCALE") ? props.getModelParam<number>("SCALE") : CAPACITOR_DEFAULTS["SCALE"]!;
-  const M     = props.hasModelParam("M")     ? props.getModelParam<number>("M")     : CAPACITOR_DEFAULTS["M"]!;
-  return new AnalogCapacitorElement(pinNodes, C, IC, TC1, TC2, TNOM, SCALE, M);
+  return new AnalogCapacitorElement(pinNodes, props);
 }
 
 // ---------------------------------------------------------------------------

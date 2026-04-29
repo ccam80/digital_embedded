@@ -85,22 +85,15 @@ export class MemristorElement implements AnalogElement {
   /** Normalised state variable: 0 = fully undoped, 1 = fully doped. */
   private _w: number;
 
-  constructor(
-    pinNodes: ReadonlyMap<string, number>,
-    rOn: number,
-    rOff: number,
-    initialState: number,
-    mobility: number,
-    deviceLength: number,
-    windowOrder: number,
-  ) {
+  constructor(pinNodes: ReadonlyMap<string, number>, props: PropertyBag) {
     this._pinNodes = new Map(pinNodes);
-    this.rOn = rOn;
-    this.rOff = rOff;
+    this.rOn          = props.hasModelParam("rOn")          ? props.getModelParam<number>("rOn")          : MEMRISTOR_DEFAULTS["rOn"]!;
+    this.rOff         = props.hasModelParam("rOff")         ? props.getModelParam<number>("rOff")         : MEMRISTOR_DEFAULTS["rOff"]!;
+    this.mobility     = props.hasModelParam("mobility")     ? props.getModelParam<number>("mobility")     : MEMRISTOR_DEFAULTS["mobility"]!;
+    this.deviceLength = props.hasModelParam("deviceLength") ? props.getModelParam<number>("deviceLength") : MEMRISTOR_DEFAULTS["deviceLength"]!;
+    this.windowOrder  = props.hasModelParam("windowOrder")  ? props.getModelParam<number>("windowOrder")  : MEMRISTOR_DEFAULTS["windowOrder"]!;
+    const initialState = props.hasModelParam("initialState") ? props.getModelParam<number>("initialState") : MEMRISTOR_DEFAULTS["initialState"]!;
     this._w = Math.max(0, Math.min(1, initialState));
-    this.mobility = mobility;
-    this.deviceLength = deviceLength;
-    this.windowOrder = windowOrder;
   }
 
   /**
@@ -313,23 +306,7 @@ export function createMemristorElement(
   props: PropertyBag,
   _getTime: () => number,
 ): AnalogElement {
-  const rOn = props.getModelParam<number>("rOn");
-  const rOff = props.getModelParam<number>("rOff");
-  const initialState = props.getModelParam<number>("initialState");
-  const mobility = props.getModelParam<number>("mobility");
-  const deviceLength = props.getModelParam<number>("deviceLength");
-  const windowOrder = props.getModelParam<number>("windowOrder");
-
-  const el = new MemristorElement(
-    pinNodes,
-    rOn,
-    rOff,
-    initialState,
-    mobility,
-    deviceLength,
-    windowOrder,
-  );
-  return el;
+  return new MemristorElement(pinNodes, props);
 }
 
 // ---------------------------------------------------------------------------

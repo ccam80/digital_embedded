@@ -42,8 +42,8 @@
     "runtime": null
   },
   "build": {
-    "buildCommand": "cat /tmp/tsc-errors.txt",
-    "testCommand": "git show HEAD:.vitest-failures.json > head-failures.json.tmp 2>&1 ; ls -la head-failures.json.tmp",
+    "buildCommand": "cat /tmp/tsc-final.txt; echo \"---\"; wc -l /tmp/tsc-final.txt",
+    "testCommand": "npx vitest run src/components/active/__tests__/optocoupler.test.ts 2>&1 | tail -40",
     "lintCommand": "npm run lint",
     "devCommand": "npm run dev",
     "scripts": {
@@ -292,32 +292,32 @@
   "hotPaths": [
     {
       "path": "src\\solver\\analog\\__tests__\\test-helpers.ts",
-      "accessCount": 413,
-      "lastAccessed": 1777416358673,
+      "accessCount": 415,
+      "lastAccessed": 1777421329435,
       "type": "directory"
     },
     {
       "path": "",
-      "accessCount": 357,
-      "lastAccessed": 1777414878085,
+      "accessCount": 359,
+      "lastAccessed": 1777421225867,
       "type": "directory"
     },
     {
       "path": "src",
-      "accessCount": 346,
-      "lastAccessed": 1777420469599,
+      "accessCount": 348,
+      "lastAccessed": 1777421298689,
       "type": "directory"
+    },
+    {
+      "path": "src\\solver\\analog\\sparse-solver.ts",
+      "accessCount": 271,
+      "lastAccessed": 1777421968056,
+      "type": "file"
     },
     {
       "path": "src\\solver\\analog\\analog-engine.ts",
       "accessCount": 270,
       "lastAccessed": 1777415437383,
-      "type": "file"
-    },
-    {
-      "path": "src\\solver\\analog\\sparse-solver.ts",
-      "accessCount": 266,
-      "lastAccessed": 1777416767844,
       "type": "file"
     },
     {
@@ -328,8 +328,8 @@
     },
     {
       "path": "src\\core\\analog-types.ts",
-      "accessCount": 187,
-      "lastAccessed": 1777420342105,
+      "accessCount": 188,
+      "lastAccessed": 1777420795636,
       "type": "file"
     },
     {
@@ -435,6 +435,12 @@
       "type": "file"
     },
     {
+      "path": ".vitest-failures.json",
+      "accessCount": 22,
+      "lastAccessed": 1777421186297,
+      "type": "file"
+    },
+    {
       "path": "src\\solver\\analog\\ckt-load.ts",
       "accessCount": 21,
       "lastAccessed": 1777405724575,
@@ -444,12 +450,6 @@
       "path": "src\\solver\\coordinator.ts",
       "accessCount": 17,
       "lastAccessed": 1777415404599,
-      "type": "file"
-    },
-    {
-      "path": ".vitest-failures.json",
-      "accessCount": 16,
-      "lastAccessed": 1777415404771,
       "type": "file"
     },
     {

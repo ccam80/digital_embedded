@@ -121,7 +121,7 @@ function buildHandCircuit(opts: {
 }
 
 import { stampRHS } from "../../../solver/analog/stamp-helpers.js";
-import { AnalogCapacitorElement } from "../../passives/capacitor.js";
+import { AnalogCapacitorElement, CAPACITOR_DEFAULTS } from "../../passives/capacitor.js";
 import type { SetupContext } from "../../../solver/analog/setup-context.js";
 import type { LoadContext } from "../../../solver/analog/load-context.js";
 
@@ -156,15 +156,11 @@ function makeResistor(nodeA: number, nodeB: number, resistance: number): AnalogE
  * Create a production AnalogCapacitorElement for circuit assembly.
  */
 function createTestCapacitor(capacitance: number, nodePos: number, nodeNeg: number): AnalogElement {
+  const capProps = new PropertyBag();
+  capProps.replaceModelParams({ ...CAPACITOR_DEFAULTS, capacitance });
   return new AnalogCapacitorElement(
     new Map([["pos", nodePos], ["neg", nodeNeg]]),
-    capacitance,
-    0,      // IC
-    0,      // TC1
-    0,      // TC2
-    300.15, // TNOM
-    1,      // SCALE
-    1,      // M
+    capProps,
   );
 }
 

@@ -1,135 +1,45 @@
 {
   "summary": {
-    "passed": 139,
-    "failed": 13,
+    "passed": 5,
+    "failed": 4,
     "skipped": 0,
-    "totalFiles": 7,
-    "durationSeconds": 0.9
+    "totalFiles": 1,
+    "durationSeconds": 0.7
   },
   "failures": [
     {
-      "message": "expected 0 to be greater than 0",
-      "count": 1,
-      "locations": [
-        {
-          "file": "src\\solver\\analog\\__tests__\\ckt-load.test.ts",
-          "test": "noncon_incremented_by_device_limiting",
-          "line": 240,
-          "column": 24
-        }
-      ]
-    },
-    {
-      "message": "expected null to be an instance of StatePool",
-      "count": 1,
-      "locations": [
-        {
-          "file": "src\\solver\\analog\\__tests__\\compile-analog-partition.test.ts",
-          "test": "compiled circuit has a statePool field that is a StatePool instance",
-          "line": 519,
-          "column": 32
-        }
-      ]
-    },
-    {
-      "message": "Cannot read properties of null (reading 'totalSlots')",
-      "count": 1,
-      "locations": [
-        {
-          "file": "src\\solver\\analog\\__tests__\\compile-analog-partition.test.ts",
-          "test": "statePool totalSlots is 0 when all elements have stateSize 0 (existing elements)",
-          "line": 529,
-          "column": 31
-        }
-      ]
-    },
-    {
-      "message": "expected null not to be null // Object.is equality",
-      "count": 1,
-      "locations": [
-        {
-          "file": "src\\solver\\analog\\__tests__\\compile-analog-partition.test.ts",
-          "test": "statePool is a fresh StatePool instance per compile call — not shared across compilations",
-          "line": 548,
-          "column": 37
-        }
-      ]
-    },
-    {
-      "message": "expected -999 to be +0 // Object.is equality",
-      "count": 1,
-      "locations": [
-        {
-          "file": "src\\solver\\analog\\__tests__\\compile-analog-partition.test.ts",
-          "test": "elements with stateSize get contiguous _stateBase values assigned by compiler",
-          "line": 660,
-          "column": 26
-        }
-      ]
-    },
-    {
-      "message": "expected 'dynamic-gmin' to be 'direct' // Object.is equality",
-      "count": 1,
-      "locations": [
-        {
-          "file": "src\\solver\\analog\\__tests__\\dc-operating-point.test.ts",
-          "test": "diode_circuit_direct",
-          "line": 401,
-          "column": 35
-        }
-      ]
-    },
-    {
-      "message": "offset is out of bounds",
-      "count": 2,
-      "locations": [
-        {
-          "file": "src\\solver\\analog\\dc-operating-point.ts",
-          "test": "method_reflects_last_strategy",
-          "line": 129,
-          "column": 22
-        },
-        {
-          "file": "src\\solver\\analog\\dc-operating-point.ts",
-          "test": "gillespieSrc_source_stepping_uses_gshunt",
-          "line": 129,
-          "column": 22
-        }
-      ]
-    },
-    {
       "message": "expected false to be true // Object.is equality",
-      "count": 5,
+      "count": 3,
       "locations": [
         {
-          "file": "src\\solver\\analog\\__tests__\\mna-end-to-end.test.ts",
-          "test": "two_diodes_in_series",
-          "line": 445,
+          "file": "src\\components\\active\\__tests__\\optocoupler.test.ts",
+          "test": "current_transfer",
+          "line": 244,
           "column": 30
         },
         {
-          "file": "src\\solver\\analog\\__tests__\\mna-end-to-end.test.ts",
-          "test": "parallel_diodes",
-          "line": 479,
-          "column": 30
+          "file": "src\\components\\active\\__tests__\\optocoupler.test.ts",
+          "test": "galvanic_isolation",
+          "line": 272,
+          "column": 32
         },
         {
-          "file": "src\\solver\\analog\\__tests__\\mna-end-to-end.test.ts",
-          "test": "diode_clamp_on_resistor_divider",
-          "line": 504,
+          "file": "src\\components\\active\\__tests__\\optocoupler.test.ts",
+          "test": "ctr_scaling",
+          "line": 363,
           "column": 30
-        },
+        }
+      ]
+    },
+    {
+      "message": "expected 0.5000241109004844 to be close to +0, received difference is 0.5000241109004844, but expected 0.0005",
+      "count": 1,
+      "locations": [
         {
-          "file": "src\\solver\\analog\\__tests__\\mna-end-to-end.test.ts",
-          "test": "anti_parallel_diodes",
-          "line": 529,
-          "column": 30
-        },
-        {
-          "file": "src\\solver\\analog\\__tests__\\mna-end-to-end.test.ts",
-          "test": "diode_shockley_equation_consistency",
-          "line": 582,
-          "column": 30
+          "file": "src\\components\\active\\__tests__\\optocoupler.test.ts",
+          "test": "led_forward_voltage",
+          "line": 320,
+          "column": 36
         }
       ]
     }

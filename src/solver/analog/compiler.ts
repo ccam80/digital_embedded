@@ -19,6 +19,7 @@ import type { ComponentRegistry } from "../../core/registry.js";
 import type { Diagnostic } from "../../compile/types.js";
 import { pinWorldPosition } from "../../core/pin.js";
 import type { ResolvedPin } from "../../core/pin.js";
+import type { ResolvedGroupPin } from "../../compile/types.js";
 import { PropertyBag } from "../../core/properties.js";
 import { makeDiagnostic } from "./diagnostics.js";
 import { paramDefDefaults } from "../../core/model-params.js";
@@ -1071,7 +1072,7 @@ function buildAnalogNodeMapFromPartition(
     // is [G, S, D]). The TYPE_ID_TO_DECK_PIN_LABEL_ORDER table mirrors what
     // netlist-generator emits.
     const deckLabels = TYPE_ID_TO_DECK_PIN_LABEL_ORDER[pc.element.typeId];
-    const visitPin = (rp: ResolvedPin): void => {
+    const visitPin = (rp: ResolvedGroupPin): void => {
       const key = `${rp.worldPosition.x},${rp.worldPosition.y}`;
       const gid = positionToGroupId.get(key);
       if (gid === undefined) return;

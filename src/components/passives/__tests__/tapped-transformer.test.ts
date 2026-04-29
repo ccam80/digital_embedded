@@ -30,7 +30,7 @@ import { SparseSolver } from "../../../solver/analog/sparse-solver.js";
 import { allocateStatePool, loadCtxFromFields } from "../../../solver/analog/__tests__/test-helpers.js";
 import { makeDcVoltageSource } from "../../sources/dc-voltage-source.js";
 import { createDiodeElement, DIODE_PARAM_DEFAULTS } from "../../semiconductors/diode.js";
-import { AnalogCapacitorElement } from "../capacitor.js";
+import { AnalogCapacitorElement, CAPACITOR_DEFAULTS } from "../capacitor.js";
 import { makeAcVoltageSourceElement } from "../../sources/ac-voltage-source.js";
 import type { AnalogElement } from "../../../solver/analog/element.js";
 import type { PoolBackedAnalogElement } from "../../../core/analog-types.js";
@@ -99,15 +99,11 @@ function makeDiode(anode: number, cathode: number, IS: number, N: number): Analo
 }
 
 function makeCapacitor(posNode: number, negNode: number, capacitance: number): AnalogElement {
+  const capProps = new PropertyBag();
+  capProps.replaceModelParams({ ...CAPACITOR_DEFAULTS, capacitance, IC: NaN });
   const el = new AnalogCapacitorElement(
     new Map([["pos", posNode], ["neg", negNode]]),
-    capacitance,
-    NaN,   // IC
-    0,     // TC1
-    0,     // TC2
-    300.15,// TNOM
-    1,     // SCALE
-    1,     // M
+    capProps,
   );
   return el as unknown as AnalogElement;
 }

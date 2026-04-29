@@ -27,7 +27,7 @@ import { PFETAnalogElement } from "../../../components/switching/pfet.js";
 
 import type { AnalogElement } from "../element.js";
 import { NGSPICE_LOAD_ORDER } from "../element.js";
-import { createBjtElement, BJT_NPN_DEFAULTS, BJT_PNP_DEFAULTS } from "../../../components/semiconductors/bjt.js";
+import { createBjtElement, BJT_NPN_DEFAULTS } from "../../../components/semiconductors/bjt.js";
 import { createDiodeElement, DIODE_PARAM_DEFAULTS } from "../../../components/semiconductors/diode.js";
 import { createZenerElement, ZENER_PARAM_DEFAULTS } from "../../../components/semiconductors/zener.js";
 import { createMosfetElement } from "../../../components/semiconductors/mosfet.js";
@@ -45,7 +45,6 @@ import { createSparkGapElement, SPARK_GAP_DEFAULTS } from "../../../components/s
 import { parseExpression } from "../expression.js";
 import { differentiate, simplify } from "../expression-differentiate.js";
 import { PropertyBag } from "../../../core/properties.js";
-import { createTestPropertyBag } from "../../../test-fixtures/model-fixtures.js";
 import type { SetupContext } from "../setup-context.js";
 import type { LoadContext } from "../load-context.js";
 import { TransGateAnalogElement } from "../../../components/switching/trans-gate.js";

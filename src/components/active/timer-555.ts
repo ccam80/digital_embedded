@@ -711,9 +711,9 @@ function createTimer555Element(
   // Discharge BJT NPN sub-element (pin nodes assigned in setup())
   const bjtProps = makeBjtProps();
   const bjtDis = createBjtElement(
-    1,
     new Map([["B", 0], ["C", 0], ["E", 0]]),
     bjtProps,
+    _getTime,
   ) as PoolBackedAnalogElement;
 
   // Output pin model

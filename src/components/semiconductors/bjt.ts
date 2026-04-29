@@ -36,7 +36,7 @@ import { pnjlim } from "../../solver/analog/newton-raphson.js";
 import { defineModelParams, deviceParams } from "../../core/model-params.js";
 import { cktTerr } from "../../solver/analog/ckt-terr.js";
 import { niIntegrate } from "../../solver/analog/ni-integrate.js";
-import type { AnalogElement, PoolBackedAnalogElement, StatePoolRef } from "../../core/analog-types.js";
+import type { PoolBackedAnalogElement, StatePoolRef } from "../../core/analog-types.js";
 import {
   defineStateSchema,
   applyInitialValues,
@@ -993,16 +993,16 @@ export function createBjtElement(
   pinNodes: ReadonlyMap<string, number>,
   props: PropertyBag,
   _getTime: () => number,
-): AnalogElement {
-  return _createBjtElementWithPolarity(1, pinNodes, props) as unknown as AnalogElement;
+): PoolBackedAnalogElement {
+  return _createBjtElementWithPolarity(1, pinNodes, props) as unknown as PoolBackedAnalogElement;
 }
 
 export function createPnpBjtElement(
   pinNodes: ReadonlyMap<string, number>,
   props: PropertyBag,
   _getTime: () => number,
-): AnalogElement {
-  return _createBjtElementWithPolarity(-1, pinNodes, props) as unknown as AnalogElement;
+): PoolBackedAnalogElement {
+  return _createBjtElementWithPolarity(-1, pinNodes, props) as unknown as PoolBackedAnalogElement;
 }
 
 // ---------------------------------------------------------------------------

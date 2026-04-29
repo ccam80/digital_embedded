@@ -38,14 +38,19 @@ function makeMemristor(overrides: Partial<{
   deviceLength: number;
   windowOrder: number;
 }> = {}): MemristorElement {
+  const memProps = new PropertyBag();
+  memProps.replaceModelParams({
+    ...MEMRISTOR_DEFAULTS,
+    rOn: overrides.rOn ?? R_ON,
+    rOff: overrides.rOff ?? R_OFF,
+    initialState: overrides.initialState ?? INITIAL_W,
+    mobility: overrides.mobility ?? MOBILITY,
+    deviceLength: overrides.deviceLength ?? DEVICE_LENGTH,
+    windowOrder: overrides.windowOrder ?? WINDOW_ORDER,
+  });
   return new MemristorElement(
     new Map([["A", 1], ["B", 2]]),
-    overrides.rOn ?? R_ON,
-    overrides.rOff ?? R_OFF,
-    overrides.initialState ?? INITIAL_W,
-    overrides.mobility ?? MOBILITY,
-    overrides.deviceLength ?? DEVICE_LENGTH,
-    overrides.windowOrder ?? WINDOW_ORDER,
+    memProps,
   );
 }
 
@@ -389,7 +394,9 @@ describe("memristor_load_transient_parity (C4.2)", () => {
     const G_ref = w0 * (1 / rOn - 1 / rOff) + 1 / rOff;
 
     // Build element: _pinNodes=[A=1, B=0(gnd)]
-    const mem = new MemristorElement(new Map([["A", 1], ["B", 0]]), rOn, rOff, w0, mobility, deviceLen, windowOrder);
+    const memProps2 = new PropertyBag();
+    memProps2.replaceModelParams({ ...MEMRISTOR_DEFAULTS, rOn, rOff, initialState: w0, mobility, deviceLength: deviceLen, windowOrder });
+    const mem = new MemristorElement(new Map([["A", 1], ["B", 0]]), memProps2);
 
     // Handle-based capture solver (persistent handles across steps)
     const handles: { row: number; col: number }[] = [];

@@ -94,15 +94,11 @@ function makeAcVoltageSource(
 
 /** Capacitor factory using the production AnalogCapacitorElement. */
 function makeCapacitor(posNode: number, negNode: number, capacitance: number): AnalogElement {
+  const capProps = new PropertyBag();
+  capProps.replaceModelParams({ ...CAPACITOR_DEFAULTS, capacitance });
   return new AnalogCapacitorElement(
     new Map([["pos", posNode], ["neg", negNode]]),
-    capacitance,
-    CAPACITOR_DEFAULTS["IC"]!,
-    CAPACITOR_DEFAULTS["TC1"]!,
-    CAPACITOR_DEFAULTS["TC2"]!,
-    CAPACITOR_DEFAULTS["TNOM"]!,
-    CAPACITOR_DEFAULTS["SCALE"]!,
-    CAPACITOR_DEFAULTS["M"]!,
+    capProps,
   );
 }
 

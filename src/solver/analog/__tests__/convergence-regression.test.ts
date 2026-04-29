@@ -37,15 +37,11 @@ function makeVoltageSource(posNode: number, negNode: number, voltage: number): A
 }
 
 function createTestCapacitor(capacitance: number, posNode: number, negNode: number): PoolBackedAnalogElement {
+  const capProps = new PropertyBag();
+  capProps.replaceModelParams({ ...CAPACITOR_DEFAULTS, capacitance });
   return new AnalogCapacitorElement(
     new Map([["pos", posNode], ["neg", negNode]]),
-    capacitance,
-    CAPACITOR_DEFAULTS["IC"] as number,
-    CAPACITOR_DEFAULTS["TC1"] as number,
-    CAPACITOR_DEFAULTS["TC2"] as number,
-    CAPACITOR_DEFAULTS["TNOM"] as number,
-    CAPACITOR_DEFAULTS["SCALE"] as number,
-    CAPACITOR_DEFAULTS["M"] as number,
+    capProps,
   );
 }
 

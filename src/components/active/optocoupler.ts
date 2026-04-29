@@ -417,11 +417,11 @@ function createOptocouplerElement(
 
   // bjtPhoto: base/_nBase overwritten in setup(); C = collector, E = emitter
   const bjtProps = makeBjtProps();
-  const bjtPhoto = createBjtElement(1 /* NPN */, new Map([
+  const bjtPhoto = createBjtElement(new Map([
     ["B", 0],
     ["C", nCollector],
     ["E", nEmitter],
-  ]), bjtProps);
+  ]), bjtProps, _getTime);
   (bjtPhoto as any).label = `${instanceLabel}_bjtPhoto`;
 
   return new OptocouplerCompositeElement(pinNodes, dLed, vSense, cccsCouple, bjtPhoto);

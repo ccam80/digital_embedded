@@ -14,6 +14,7 @@ import { readFileSync } from "fs";
 import { resolve } from "path";
 import {
   createBjtElement,
+  createPnpBjtElement,
   createSpiceL1BjtElement,
   BJT_NPN_DEFAULTS,
   BJT_SPICE_L1_NPN_DEFAULTS,
@@ -131,9 +132,9 @@ describe("dcopInitJct", () => {
   describe("BJT simple (L0) primeJunctions", () => {
     it("NPN: arms Vbe=tVcrit, Vbc=0 as per-device local override", () => {
       const element = createBjtElement(
-        1, // NPN
         new Map([["B", 1], ["C", 2], ["E", 3]]),
         makeBjtProps(),
+        () => 0,
       );
       initElement(element as unknown as PoolBackedAnalogElement);
 
@@ -168,10 +169,10 @@ describe("dcopInitJct", () => {
       // produce +tVcrit because load() computes vbeRaw as
       // polarity * (vB - vE) and that expression is always positive for a
       // forward-biased junction regardless of NPN/PNP convention.
-      const element = createBjtElement(
-        -1, // PNP
+      const element = createPnpBjtElement(
         new Map([["B", 1], ["C", 2], ["E", 3]]),
         makeBjtProps(),
+        () => 0,
       );
       initElement(element as unknown as PoolBackedAnalogElement);
 
@@ -185,10 +186,10 @@ describe("dcopInitJct", () => {
 
     it("grounded collector (nodeC=0): priming is independent of node topology", () => {
       // This is the PNP-CC-style topology the old shared-vector scheme broke on.
-      const element = createBjtElement(
-        -1, // PNP
+      const element = createPnpBjtElement(
         new Map([["B", 1], ["C", 0], ["E", 2]]),
         makeBjtProps(),
+        () => 0,
       );
       initElement(element as unknown as PoolBackedAnalogElement);
 

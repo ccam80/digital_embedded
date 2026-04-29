@@ -25,7 +25,6 @@ import type { LoadContext } from "../../../solver/analog/load-context.js";
 import { MODETRAN, MODEINITFLOAT } from "../../../solver/analog/ckt-mode.js";
 import type { Diagnostic } from "../../../compile/types.js";
 import { ComponentRegistry } from "../../../core/registry.js";
-import type { AnalogFactory } from "../../../core/registry.js";
 import { FuseDefinition } from "../../switching/fuse.js";
 
 

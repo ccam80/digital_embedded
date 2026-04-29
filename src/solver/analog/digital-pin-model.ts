@@ -18,7 +18,8 @@
 import type { LoadContext } from "./load-context.js";
 import type { SetupContext } from "./setup-context.js";
 import type { ResolvedPinElectrical } from "../../core/pin-electrical.js";
-import { AnalogCapacitorElement } from "../../components/passives/capacitor.js";
+import { AnalogCapacitorElement, CAPACITOR_DEFAULTS } from "../../components/passives/capacitor.js";
+import { PropertyBag } from "../../core/properties.js";
 import { stampRHS } from "./stamp-helpers.js";
 
 /**
@@ -92,9 +93,11 @@ export class DigitalOutputPinModel {
     this._nodeId = nodeId;
     this._branchIndex = branchIdx;
     if (this._loaded && this._spec.cOut > 0 && nodeId > 0) {
+      const capProps = new PropertyBag();
+      capProps.replaceModelParams({ ...CAPACITOR_DEFAULTS, capacitance: this._spec.cOut });
       const cap = new AnalogCapacitorElement(
         new Map([["pos", nodeId], ["neg", 0]]),
-        this._spec.cOut, 0, 0, 0, 300.15, 1, 1,
+        capProps,
       );
       this._outputCap = cap;
     } else {
@@ -277,9 +280,11 @@ export class DigitalInputPinModel {
   init(nodeId: number, _groundNode: number): void {
     this._nodeId = nodeId;
     if (this._loaded && this._spec.cIn > 0 && nodeId > 0) {
+      const capProps = new PropertyBag();
+      capProps.replaceModelParams({ ...CAPACITOR_DEFAULTS, capacitance: this._spec.cIn });
       const cap = new AnalogCapacitorElement(
         new Map([["pos", nodeId], ["neg", 0]]),
-        this._spec.cIn, 0, 0, 0, 300.15, 1, 1,
+        capProps,
       );
       this._inputCap = cap;
     } else {

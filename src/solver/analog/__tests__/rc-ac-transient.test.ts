@@ -72,15 +72,11 @@ function makeResistor(nodeA: number, nodeB: number, resistance: number): AnalogE
 }
 
 function createTestCapacitor(capacitance: number, nodePos: number, nodeNeg: number): AnalogElement {
+  const capProps = new PropertyBag();
+  capProps.replaceModelParams({ ...CAPACITOR_DEFAULTS, capacitance });
   return new AnalogCapacitorElement(
     new Map([["pos", nodePos], ["neg", nodeNeg]]),
-    capacitance,
-    CAPACITOR_DEFAULTS["IC"] as number,
-    CAPACITOR_DEFAULTS["TC1"] as number,
-    CAPACITOR_DEFAULTS["TC2"] as number,
-    CAPACITOR_DEFAULTS["TNOM"] as number,
-    CAPACITOR_DEFAULTS["SCALE"] as number,
-    CAPACITOR_DEFAULTS["M"] as number,
+    capProps,
   );
 }
 
