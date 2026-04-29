@@ -34,7 +34,6 @@ const ELEMENT_SPECS: Record<string, ElementSpec> = {
   Diode:           { prefix: "D", modelType: "D" },
   ZenerDiode:      { prefix: "D", modelType: "D" },
   VaractorDiode:   { prefix: "D", modelType: "D" },
-  TunnelDiode:     { prefix: "D", modelType: "D" },
   NpnBJT:          { prefix: "Q", modelType: "NPN" },
   PnpBJT:          { prefix: "Q", modelType: "PNP" },
   NMOS:            { prefix: "M", modelType: "NMOS" },

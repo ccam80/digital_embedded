@@ -12,115 +12,12 @@
 
 import { describe, it, expect } from "vitest";
 import { MNAEngine } from "../../analog-engine.js";
-import type { ConcreteCompiledAnalogCircuit } from "../../compiled-analog-circuit.js";
-import type { AnalogElement } from "../../element.js";
-import { makeDcVoltageSource, DC_VOLTAGE_SOURCE_DEFAULTS } from "../../../../components/sources/dc-voltage-source.js";
-import { PropertyBag } from "../../../../core/properties.js";
-import { makeTestSetupContext, setupAll, allocateStatePool } from "../test-helpers.js";
-import { SparseSolver } from "../../sparse-solver.js";
-import { NGSPICE_LOAD_ORDER } from "../../element.js";
-import type { SetupContext } from "../../setup-context.js";
-import type { LoadContext } from "../../load-context.js";
 import {
   buildElementLabelMap,
   createStepCaptureHook,
 } from "./capture.js";
 import type { IntegrationCoefficients, NRPhase, NRAttemptOutcome } from "./types.js";
-
-// ---------------------------------------------------------------------------
-// Minimal inline factories (production pattern per §A.13)
-// ---------------------------------------------------------------------------
-
-function makeResistor(
-  pinNodes: ReadonlyMap<string, number>,
-  resistance: number,
-): AnalogElement {
-  let _hAA = -1, _hBB = -1, _hAB = -1, _hBA = -1;
-  const el: AnalogElement = {
-    label: "",
-    ngspiceLoadOrder: NGSPICE_LOAD_ORDER.RES,
-    _pinNodes: new Map(pinNodes),
-    _stateBase: -1,
-    branchIndex: -1,
-    setup(ctx: SetupContext): void {
-      const a = el._pinNodes.get("A")!;
-      const b = el._pinNodes.get("B")!;
-      _hAA = ctx.solver.allocElement(a, a);
-      _hBB = ctx.solver.allocElement(b, b);
-      _hAB = ctx.solver.allocElement(a, b);
-      _hBA = ctx.solver.allocElement(b, a);
-    },
-    load(ctx: LoadContext): void {
-      const G = 1.0 / Math.max(resistance, 1e-12);
-      ctx.solver.stampElement(_hAA, G);
-      ctx.solver.stampElement(_hBB, G);
-      ctx.solver.stampElement(_hAB, -G);
-      ctx.solver.stampElement(_hBA, -G);
-    },
-    getPinCurrents(rhs: Float64Array): number[] {
-      const a = el._pinNodes.get("A")!;
-      const b = el._pinNodes.get("B")!;
-      const Vab = rhs[a] - rhs[b];
-      const I = Vab / Math.max(resistance, 1e-12);
-      return [I, -I];
-    },
-    setParam(key: string, value: number): void {
-      if (key === "resistance") resistance = value;
-    },
-  };
-  return el;
-}
-
-function makeDiode(
-  pinNodes: ReadonlyMap<string, number>,
-  Is: number,
-  n: number,
-): AnalogElement {
-  const VT = 0.025852;
-  let _hAA = -1, _hKK = -1, _hAK = -1, _hKA = -1;
-  const el: AnalogElement = {
-    label: "",
-    ngspiceLoadOrder: NGSPICE_LOAD_ORDER.DIO,
-    _pinNodes: new Map(pinNodes),
-    _stateBase: -1,
-    branchIndex: -1,
-    setup(ctx: SetupContext): void {
-      const a = el._pinNodes.get("anode")!;
-      const k = el._pinNodes.get("cathode")!;
-      _hAA = ctx.solver.allocElement(a, a);
-      _hKK = ctx.solver.allocElement(k, k);
-      _hAK = ctx.solver.allocElement(a, k);
-      _hKA = ctx.solver.allocElement(k, a);
-    },
-    load(ctx: LoadContext): void {
-      const a = el._pinNodes.get("anode")!;
-      const k = el._pinNodes.get("cathode")!;
-      const Vd = ctx.rhsOld[a] - ctx.rhsOld[k];
-      const Vd_clamped = Math.min(Vd, 0.8);
-      const Id = Is * (Math.exp(Vd_clamped / (n * VT)) - 1);
-      const Gd = Is * Math.exp(Vd_clamped / (n * VT)) / (n * VT);
-      const Ieq = Id - Gd * Vd_clamped;
-      ctx.solver.stampElement(_hAA, Gd);
-      ctx.solver.stampElement(_hKK, Gd);
-      ctx.solver.stampElement(_hAK, -Gd);
-      ctx.solver.stampElement(_hKA, -Gd);
-      ctx.rhs[a] -= Ieq;
-      ctx.rhs[k] += Ieq;
-    },
-    getPinCurrents(rhs: Float64Array): number[] {
-      const a = el._pinNodes.get("anode")!;
-      const k = el._pinNodes.get("cathode")!;
-      const Vd = rhs[a] - rhs[k];
-      const Id = Is * (Math.exp(Math.min(Vd, 0.8) / (n * VT)) - 1);
-      return [Id, -Id];
-    },
-    setParam(key: string, value: number): void {
-      if (key === "Is") Is = value;
-      if (key === "n") n = value;
-    },
-  };
-  return el;
-}
+import { buildHwrFixture } from "./hwr-fixture.js";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -131,43 +28,6 @@ const TRAN_INTEG_COEFF: IntegrationCoefficients = {
   ngspice: { ag0: 2e9, ag1: 2e9, method: "trapezoidal", order: 2 },
 };
 
-function makeVsrc(posNode: number, negNode: number, voltage: number) {
-  const props = new PropertyBag();
-  props.replaceModelParams({ ...DC_VOLTAGE_SOURCE_DEFAULTS, voltage });
-  return makeDcVoltageSource(new Map([["pos", posNode], ["neg", negNode]]), props, () => 0);
-}
-
-function makeHWRCircuit(): { circuit: ConcreteCompiledAnalogCircuit; pool: ReturnType<typeof allocateStatePool> } {
-  const solver = new SparseSolver();
-  const vs = makeVsrc(1, 0, 5.0);
-  const r = makeResistor(new Map([["A", 1], ["B", 2]]), 1000);
-  const diode = makeDiode(new Map([["anode", 2], ["cathode", 0]]), 1e-14, 1.0);
-  const elements = [vs, r, diode];
-
-  vs.label = "Vs";
-  r.label = "R1";
-  diode.label = "D1";
-
-  const ctx = makeTestSetupContext({
-    solver,
-    startBranch: 3,
-    startNode: 10,
-    elements,
-  });
-  setupAll(elements, ctx);
-
-  const pool = allocateStatePool(elements);
-  return {
-    circuit: {
-      netCount: 2, componentCount: 3, nodeCount: 2,
-      elements,
-      labelToNodeId: new Map([["Vs", 1], ["R1:B", 2]]),
-      statePool: pool,
-    } as unknown as ConcreteCompiledAnalogCircuit,
-    pool,
-  };
-}
-
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
@@ -175,7 +35,7 @@ function makeHWRCircuit(): { circuit: ConcreteCompiledAnalogCircuit; pool: Retur
 describe("nr-retry-grouping: failed attempt + retry grouped in same step", () => {
 
   it("two attempts with nrFailedRetry then accepted → 1 step, 2 attempts", () => {
-    const { circuit, pool } = makeHWRCircuit();
+    const { circuit, pool } = buildHwrFixture();
     const engine = new MNAEngine();
     engine.init(circuit);
 
@@ -230,7 +90,7 @@ describe("nr-retry-grouping: failed attempt + retry grouped in same step", () =>
   });
 
   it("failed attempt has outcome === 'nrFailedRetry'", () => {
-    const { circuit, pool } = makeHWRCircuit();
+    const { circuit, pool } = buildHwrFixture();
     const engine = new MNAEngine();
     engine.init(circuit);
 
@@ -265,7 +125,7 @@ describe("nr-retry-grouping: failed attempt + retry grouped in same step", () =>
   });
 
   it("accepted attempt has outcome === 'accepted' and converged === true", () => {
-    const { circuit, pool } = makeHWRCircuit();
+    const { circuit, pool } = buildHwrFixture();
     const engine = new MNAEngine();
     engine.init(circuit);
 
@@ -300,7 +160,7 @@ describe("nr-retry-grouping: failed attempt + retry grouped in same step", () =>
   });
 
   it("both attempts share the same stepStartTime", () => {
-    const { circuit, pool } = makeHWRCircuit();
+    const { circuit, pool } = buildHwrFixture();
     const engine = new MNAEngine();
     engine.init(circuit);
 
@@ -338,7 +198,7 @@ describe("nr-retry-grouping: failed attempt + retry grouped in same step", () =>
   });
 
   it("acceptedAttemptIndex correctly points at the accepted attempt", () => {
-    const { circuit, pool } = makeHWRCircuit();
+    const { circuit, pool } = buildHwrFixture();
     const engine = new MNAEngine();
     engine.init(circuit);
 
@@ -373,7 +233,7 @@ describe("nr-retry-grouping: failed attempt + retry grouped in same step", () =>
   });
 
   it("step accepted === true even though first attempt failed", () => {
-    const { circuit, pool } = makeHWRCircuit();
+    const { circuit, pool } = buildHwrFixture();
     const engine = new MNAEngine();
     engine.init(circuit);
 
@@ -408,7 +268,7 @@ describe("nr-retry-grouping: failed attempt + retry grouped in same step", () =>
   });
 
   it("multiple NR retries before acceptance → all grouped in 1 step", () => {
-    const { circuit, pool } = makeHWRCircuit();
+    const { circuit, pool } = buildHwrFixture();
     const engine = new MNAEngine();
     engine.init(circuit);
 

@@ -103,7 +103,6 @@ export const TYPE_ID_TO_NGSPICE_LOAD_ORDER: Readonly<Record<string, number>> = {
   Diode:           NGSPICE_LOAD_ORDER.DIO,
   ZenerDiode:      NGSPICE_LOAD_ORDER.DIO,
   VaractorDiode:   NGSPICE_LOAD_ORDER.DIO,
-  TunnelDiode:     NGSPICE_LOAD_ORDER.DIO,
   Schottky:        NGSPICE_LOAD_ORDER.DIO,
   NpnBJT:          NGSPICE_LOAD_ORDER.BJT,
   PnpBJT:          NGSPICE_LOAD_ORDER.BJT,
@@ -160,7 +159,6 @@ export const TYPE_ID_TO_DECK_PIN_LABEL_ORDER: Readonly<Record<string, readonly s
   Diode:           ["A", "K"],
   ZenerDiode:      ["A", "K"],
   VaractorDiode:   ["A", "K"],
-  TunnelDiode:     ["A", "K"],
   Schottky:        ["A", "K"],
   // Q name C B E model
   NpnBJT:          ["C", "B", "E"],

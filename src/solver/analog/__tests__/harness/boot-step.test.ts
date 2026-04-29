@@ -13,19 +13,12 @@
 
 import { describe, it, expect } from "vitest";
 import { MNAEngine } from "../../analog-engine.js";
-import type { ConcreteCompiledAnalogCircuit } from "../../compiled-analog-circuit.js";
-import { allocateStatePool } from "../test-helpers.js";
-import { makeDcVoltageSource, DC_VOLTAGE_SOURCE_DEFAULTS } from "../../../../components/sources/dc-voltage-source.js";
-import { PropertyBag } from "../../../../core/properties.js";
-import type { AnalogElement } from "../../element.js";
-import type { SetupContext } from "../../setup-context.js";
-import type { LoadContext } from "../../load-context.js";
-import { NGSPICE_LOAD_ORDER } from "../../../../core/analog-types.js";
 import {
   buildElementLabelMap,
   createStepCaptureHook,
 } from "./capture.js";
 import type { IntegrationCoefficients, NRPhase, NRAttemptOutcome } from "./types.js";
+import { buildHwrFixture } from "./hwr-fixture.js";
 
 // ---------------------------------------------------------------------------
 // Test helpers
@@ -36,131 +29,9 @@ const ZERO_INTEG_COEFF: IntegrationCoefficients = {
   ngspice: { ag0: 0, ag1: 0, method: "trapezoidal", order: 1 },
 };
 
-// ---------------------------------------------------------------------------
-// Minimal inline element factories — implement the new AnalogElement contract.
-// These exist only to give the engine a functioning circuit; they are NOT
-// testing element correctness (that is the responsibility of element-specific
-// tests).
-// ---------------------------------------------------------------------------
-
-function makeResistorEl(nodeA: number, nodeB: number, resistance: number): AnalogElement {
-  let _hPP = -1, _hNN = -1, _hPN = -1, _hNP = -1;
-  const G = 1 / resistance;
-  const el: AnalogElement = {
-    label: "",
-    ngspiceLoadOrder: NGSPICE_LOAD_ORDER.RES,
-    _pinNodes: new Map([["A", nodeA], ["B", nodeB]]),
-    _stateBase: -1,
-    branchIndex: -1,
-    setup(ctx: SetupContext) {
-      const s = ctx.solver;
-      const p = el._pinNodes.get("A")!;
-      const n = el._pinNodes.get("B")!;
-      _hPP = s.allocElement(p, p);
-      _hNN = s.allocElement(n, n);
-      _hPN = s.allocElement(p, n);
-      _hNP = s.allocElement(n, p);
-    },
-    load(ctx: LoadContext) {
-      ctx.solver.stampElement(_hPP, G);
-      ctx.solver.stampElement(_hNN, G);
-      ctx.solver.stampElement(_hPN, -G);
-      ctx.solver.stampElement(_hNP, -G);
-    },
-    getPinCurrents(_rhs: Float64Array): number[] {
-      return [];
-    },
-    setParam(_key: string, _value: number): void {},
-  };
-  return el;
-}
-
-function makeDiodeEl(nodeA: number, nodeK: number, IS: number, N: number): AnalogElement {
-  let _hAA = -1, _hKK = -1, _hAK = -1, _hKA = -1;
-  const VT = 0.025852;
-  let _vd = 0;
-  const el: AnalogElement = {
-    label: "",
-    ngspiceLoadOrder: NGSPICE_LOAD_ORDER.DIO,
-    _pinNodes: new Map([["A", nodeA], ["K", nodeK]]),
-    _stateBase: -1,
-    branchIndex: -1,
-    setup(ctx: SetupContext) {
-      const s = ctx.solver;
-      _hAA = s.allocElement(nodeA, nodeA);
-      _hKK = s.allocElement(nodeK, nodeK);
-      _hAK = s.allocElement(nodeA, nodeK);
-      _hKA = s.allocElement(nodeK, nodeA);
-    },
-    load(ctx: LoadContext) {
-      const vA = ctx.rhsOld[nodeA] ?? 0;
-      const vK = ctx.rhsOld[nodeK] ?? 0;
-      _vd = vA - vK;
-      const expArg = Math.min(_vd / (N * VT), 40);
-      const Id = IS * (Math.exp(expArg) - 1);
-      const Gd = IS * Math.exp(expArg) / (N * VT);
-      const Ieq = Id - Gd * _vd;
-      ctx.solver.stampElement(_hAA, Gd);
-      ctx.solver.stampElement(_hKK, Gd);
-      ctx.solver.stampElement(_hAK, -Gd);
-      ctx.solver.stampElement(_hKA, -Gd);
-      ctx.rhs[nodeA] -= Ieq;
-      ctx.rhs[nodeK] += Ieq;
-    },
-    checkConvergence(ctx: LoadContext): boolean {
-      const vA = ctx.rhsOld[nodeA] ?? 0;
-      const vK = ctx.rhsOld[nodeK] ?? 0;
-      const vdNew = vA - vK;
-      return Math.abs(vdNew - _vd) < ctx.voltTol + ctx.reltol * Math.abs(vdNew);
-    },
-    getPinCurrents(_rhs: Float64Array): number[] {
-      return [];
-    },
-    setParam(_key: string, _value: number): void {},
-  };
-  return el;
-}
-
-// ---------------------------------------------------------------------------
-// Helper: create a DC voltage source using the 3-arg production factory.
-// ---------------------------------------------------------------------------
-
-function makeVsrc(posNode: number, negNode: number, voltage: number) {
-  const props = new PropertyBag();
-  props.replaceModelParams({ ...DC_VOLTAGE_SOURCE_DEFAULTS, voltage });
-  return makeDcVoltageSource(new Map([["pos", posNode], ["neg", negNode]]), props, () => 0);
-}
-
-// ---------------------------------------------------------------------------
-// HWR circuit: V1(5V) — R1(1kΩ) — D1 in series
-// Node 1: V+ / R-top   Node 2: R-bottom / D-anode   Node 0: ground / D-cathode
-// matrixSize=3  (2 nodes + branch row at index 2 for voltage source)
-// ---------------------------------------------------------------------------
-
-function makeHWRCircuit(): { circuit: ConcreteCompiledAnalogCircuit; pool: ReturnType<typeof allocateStatePool> } {
-  const vs = makeVsrc(1, 0, 5.0);
-  vs.label = "Vs";
-  const r = makeResistorEl(1, 2, 1000);
-  r.label = "R1";
-  const diode = makeDiodeEl(2, 0, 1e-14, 1.0);
-  diode.label = "D1";
-
-  const elements = [vs, r, diode];
-  const pool = allocateStatePool(elements);
-  return {
-    circuit: {
-      netCount: 2, componentCount: 3, nodeCount: 2,
-      elements,
-      labelToNodeId: new Map([["Vs", 1], ["R1:B", 2]]),
-      statePool: pool,
-    } as unknown as ConcreteCompiledAnalogCircuit,
-    pool,
-  };
-}
-
 /** Run DCOP with phase/iteration hooks and return the captured steps. */
 function runDcopCapture() {
-  const { circuit, pool } = makeHWRCircuit();
+  const { circuit, pool } = buildHwrFixture();
   const engine = new MNAEngine();
   engine.init(circuit);
 
@@ -181,7 +52,7 @@ function runDcopCapture() {
     analysisPhase: "dcop",
     acceptedAttemptIndex: -1,
     order: engine.integrationOrder,
-    delta: engine.currentDt,
+    delta: 0,                  // DC-OP has no timestep — analog-engine.ts:855-862
   });
 
   engine.stepPhaseHook = null;

@@ -59,7 +59,6 @@ import { ScrDefinition, SCR_PARAM_DEFAULTS } from "../../../components/semicondu
 import { TriacDefinition, TRIAC_PARAM_DEFAULTS } from "../../../components/semiconductors/triac.js";
 import { createDiacElement } from "../../../components/semiconductors/diac.js";
 import { createTriodeElement, TRIODE_PARAM_DEFAULTS } from "../../../components/semiconductors/triode.js";
-import { createTunnelDiodeElement, TUNNEL_DIODE_PARAM_DEFAULTS } from "../../../components/semiconductors/tunnel-diode.js";
 import { createPJfetElement, PJFET_PARAM_DEFAULTS } from "../../../components/semiconductors/pjfet.js";
 import { FGNFETAnalogElement } from "../../../components/switching/fgnfet.js";
 import { FGPFETAnalogElement } from "../../../components/switching/fgpfet.js";
@@ -2268,33 +2267,6 @@ describe("setup-stamp-order", () => {
       // gds stamps
       { extRow: 1, extCol: 1 },  // (nP, nP) = (plate, plate)
       { extRow: 3, extCol: 1 },  // (nK, nP) = (cathode, plate)
-    ]);
-  });
-  it("PB-TUNNEL TSTALLOC sequence", () => {
-    // createTunnelDiodeElement: delegates only to _vccs.setup() — 4 VCCS entries.
-    //
-    // Pins: A=1 (anode), K=2 (cathode). nodeCount=2.
-    // VCCS pin mapping:
-    //   ctrl+ = A=1,  ctrl- = K=2,  out+ = A=1,  out- = K=2
-    //
-    // VCCS setup (vccsset.c:43-46) — 4 entries:
-    //   (out+=1, ctrl+=1), (out+=1, ctrl-=2), (out-=2, ctrl+=1), (out-=2, ctrl-=2)
-    //
-    // Total: 4 entries.
-    const props = new PropertyBag();
-    props.replaceModelParams({ ...TUNNEL_DIODE_PARAM_DEFAULTS });
-    const el = createTunnelDiodeElement(new Map([["A", 1], ["K", 2]]), props, () => 0);
-    const circuit = makeMinimalCircuit([el as unknown as AnalogElement], 2);
-    const engine = new MNAEngine();
-    engine.init(circuit);
-    (engine as any)._setup();
-    const order = (engine as any)._solver._getInsertionOrder();
-    expect(order).toEqual([
-      // VCCS sub-element (vccsset.c:43-46): ctrl+=A=1, ctrl-=K=2, out+=A=1, out-=K=2
-      { extRow: 1, extCol: 1 },  // (out+, ctrl+) = (A, A)
-      { extRow: 1, extCol: 2 },  // (out+, ctrl-) = (A, K)
-      { extRow: 2, extCol: 1 },  // (out-, ctrl+) = (K, A)
-      { extRow: 2, extCol: 2 },  // (out-, ctrl-) = (K, K)
     ]);
   });
   it("PB-VARACTOR TSTALLOC sequence", () => {

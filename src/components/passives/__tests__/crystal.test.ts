@@ -21,11 +21,11 @@ import {
 } from "../crystal.js";
 import { PropertyBag } from "../../../core/properties.js";
 import { makeDcVoltageSource } from "../../sources/dc-voltage-source.js";
+import { ResistorDefinition } from "../resistor.js";
 import { runDcOp, makeTestSetupContext, setupAll, makeLoadCtx, allocateStatePool } from "../../../solver/analog/__tests__/test-helpers.js";
 import { SparseSolver } from "../../../solver/analog/sparse-solver.js";
 import { ComponentCategory, ComponentRegistry } from "../../../core/registry.js";
 import { StatePool } from "../../../solver/analog/state-pool.js";
-import type { LoadContext } from "../../../solver/analog/load-context.js";
 
 // ---------------------------------------------------------------------------
 // Helper: narrow ModelEntry to inline factory (throws if netlist kind)
@@ -202,71 +202,78 @@ describe("Crystal", () => {
 
   describe("dc_blocks", () => {
     it("DC source across crystal produces near-zero current (capacitors block DC)", () => {
-      // At DC, both C_s and C_0 have geq=0 (open circuits). This creates floating
-      // internal nodes (n2 floats when C_s is open). To prevent singularity while
-      // still verifying DC blocking, add a 1GΩ bleed resistor across the crystal
-      // terminals. DC current is then V/R_bleed ≈ 1nA — essentially zero.
+      // At DC, C_s and C_0 have geq=0 (open circuits) and L_s has no companion stamp
+      // (only branch incidence rows). The crystal provides no resistive DC path between
+      // terminals A and B — the matrix would be singular without help.
       //
-      // The key assertion: current through the source is determined by the bleed
-      // resistor (R_bleed = 1e9 Ω), not by any crystal conduction path.
+      // A 1 GΩ bleed resistor across A–B (nodes 1–0) supplies the only real DC path.
+      // DC current through the source = V / R_bleed = 1V / 1e9Ω = 1 nA.
+      // This confirms the crystal contributes zero conductance at DC.
       //
       // MNA layout:
-      //   node 1 = terminal A (source positive)
-      //   node 2 = internal n1 (between R_s and L_s)
-      //   node 3 = internal n2 (between L_s and C_s)
-      //   branch 3 = L_s branch current (solver row 3)
-      //   branch 4 = voltage source branch current (solver row 4)
-      //   matrixSize = 5
+      //   node 0  = ground (B, vsrc neg, rbleed B)
+      //   node 1  = terminal A (vsrc pos, crystal A, rbleed A)
+      //   node 5  = crystal internal n1 (Rs↔Ls junction)  ← startNode=5
+      //   node 6  = crystal internal n2 (Ls↔Cs junction)
+      //   branch 4 = vsrc branch                           ← startBranch=4
+      //   branch 5 = crystal Ls branch
+      //   matrixSize = 8  (covers all indices 0..7)
+      //   nodeCount  = 3  (convergence check iterates nodes 1..3; nodes 5/6 are
+      //                    internal and checked via branch residuals)
+
+      const V = 1.0;
+      const R_bleed = 1e9; // 1 GΩ
 
       const f0 = 1e6;
       const Q = 1000;
       const Cs = 20e-15;
       const C0 = 5e-12;
 
-      const props = new PropertyBag();
-      props.setModelParam("frequency", f0);
-      props.setModelParam("qualityFactor", Q);
-      props.setModelParam("motionalCapacitance", Cs);
-      props.setModelParam("shuntCapacitance", C0);
+      // DC voltage source: pos=node1, neg=node0 (ground)
+      const vsProps = new PropertyBag();
+      vsProps.setModelParam("voltage", V);
+      const vs = makeDcVoltageSource(
+        new Map([["pos", 1], ["neg", 0]]),
+        vsProps,
+        () => 0,
+      ) as unknown as AnalogElement;
 
-      const crystalCore = createCrystalElement(new Map([["A", 1], ["B", 0]]), props, () => 0);
-      const { element: crystalEl } = withState(crystalCore);
-      const crystal = crystalEl as unknown as AnalogElement;
-      const vsProps = new PropertyBag(); vsProps.setModelParam("voltage", 1.0);
-      const vs = makeDcVoltageSource(new Map([["pos", 1], ["neg", 0]]), vsProps, () => 0) as unknown as AnalogElement;
+      // Bleed resistor: A=node1, B=node0 — provides the only DC path
+      const rProps = new PropertyBag();
+      rProps.setModelParam("resistance", R_bleed);
+      const rbleed = getFactory(ResistorDefinition.modelRegistry!.behavioral!)(
+        new Map([["A", 1], ["B", 0]]),
+        rProps,
+        () => 0,
+      ) as unknown as AnalogElement;
 
-      // 1GΩ gmin shunts on all non-ground nodes (1,2,3) to prevent floating nodes
-      // at DC where all capacitors have geq=0.
-      const G_bleed = 1e-9; // 1nS = 1GΩ
-      const gminShunts: AnalogElement = {
-        _pinNodes: new Map([["1", 1], ["2", 2], ["3", 3]]),
-        branchIndex: -1,
-        _stateBase: -1,
-        ngspiceLoadOrder: 0,
-        label: "",
-        setParam(_key: string, _value: number): void {},
-        getPinCurrents(_v: Float64Array): number[] { return []; },
-        setup(_ctx: import("../../../solver/analog/setup-context.js").SetupContext): void {},
-        load(ctx: LoadContext): void {
-          const solver = ctx.solver;
-          solver.stampElement(solver.allocElement(0, 0), G_bleed); // node1 → solver[0]
-          solver.stampElement(solver.allocElement(1, 1), G_bleed); // node2 → solver[1]
-          solver.stampElement(solver.allocElement(2, 2), G_bleed); // node3 → solver[2]
-        },
-      };
+      // Crystal: A=node1, B=node0 — internal nodes allocated at startNode=5
+      const crystalProps = new PropertyBag();
+      crystalProps.setModelParam("frequency", f0);
+      crystalProps.setModelParam("qualityFactor", Q);
+      crystalProps.setModelParam("motionalCapacitance", Cs);
+      crystalProps.setModelParam("shuntCapacitance", C0);
+      const crystal = createCrystalElement(
+        new Map([["A", 1], ["B", 0]]),
+        crystalProps,
+        () => 0,
+      ) as unknown as AnalogElement;
 
       const result = runDcOp({
-        elements: [vs, crystal, gminShunts],
-        matrixSize: 5,
+        elements: [vs, rbleed, crystal],
+        matrixSize: 8,
         nodeCount: 3,
+        startNode: 5,
+        startBranch: 4,
       });
 
       expect(result.converged).toBe(true);
 
-      // DC current = V * G_bleed_total ≈ 1V * 1nS * 3 = 3nA (all paths through gmin shunts)
-      // This is << 1µA, confirming capacitors block all significant DC current paths.
+      // Source branch current lives at row = vsrc branchIndex = 4.
+      // Expected: I = V / R_bleed = 1e-9 A. The engine also adds gmin leakage
+      // on every node (~1e-12 S each), so allow ±1% margin.
       const sourceCurrent = Math.abs(result.nodeVoltages[4]);
-      expect(sourceCurrent).toBeLessThan(1e-6); // < 1µA
+      expect(sourceCurrent).toBeCloseTo(V / R_bleed, 6);
     });
   });
 

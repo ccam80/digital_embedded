@@ -13,7 +13,7 @@
  *   NDRV — NPN collector output to NMOS gate
  *
  * Tests verify:
- *   1. Nonlinear NR convergence (multiple BJTs, NMOS, tunnel diode)
+ *   1. Nonlinear NR convergence (multiple BJTs, NMOS, diode)
  *   2. DC supply rail reads exactly 10V via scope trace stats
  *   3. Transient voltages are finite, bounded, and evolving
  *   4. stepToTime advances the engine to the correct sim-time
@@ -143,10 +143,6 @@ async function buildBuckBJT(builder: UICircuitBuilder): Promise<void> {
   // Tunnel "NDRV" at (39,10) rot=0 — NMOS gate drive
   await builder.placeLabeled('Tunnel', 39, 10, 'T_NDRV_M');
   await builder.setComponentProperty('T_NDRV_M', 'Net Name', 'NDRV');
-
-  // --- Tunnel diode snubber ---
-  // Diode TD at (43,12) rot=90: A@(43,12), K@(43,8)
-  await builder.placeLabeled('Diode', 43, 12, 'TD', 90);
 
   // --- LC filter + load ---
   // Inductor L1 at (46,5) rot=0: A@(46,5), B@(50,5)

@@ -69,7 +69,7 @@ function makeOutputPin(nodeId: number): DigitalOutputPinModel {
   return pin;
 }
 
-function makeCtx(_v: Float64Array = new Float64Array(8)): LoadContext {
+function makeCtx(v: Float64Array = new Float64Array(8)): LoadContext {
   return makeLoadCtx({
     solver: {
       allocElement: (_r: number, _c: number) => 0,
@@ -78,6 +78,8 @@ function makeCtx(_v: Float64Array = new Float64Array(8)): LoadContext {
     } as any,
     cktMode: MODETRAN | MODEINITFLOAT,
     order: 1,
+    rhs: v,
+    rhsOld: v,
   });
 }
 

@@ -27,7 +27,7 @@ import {
   fuseCircuit,
   wrapHandElements,
 } from "./fixtures/analog-fixtures.js";
-import { makeDcVoltageSource } from "../../../components/sources/dc-voltage-source.js";
+import { makeDcVoltageSource, DC_VOLTAGE_SOURCE_DEFAULTS } from "../../../components/sources/dc-voltage-source.js";
 import { PropertyBag } from "../../../core/properties.js";
 import { NGSPICE_LOAD_ORDER } from "../../../core/analog-types.js";
 import type { AnalogElement } from "../element.js";
@@ -329,7 +329,11 @@ describe("MNAEngine", () => {
     const compiled = wrapHandElements({
       nodeCount: 2,
       elements: [
-        makeDcVoltageSource(new Map([["pos", 1], ["neg", 0]]), new PropertyBag([["voltage", 5.0]]), () => 0),
+        (() => {
+          const props = new PropertyBag();
+          props.replaceModelParams({ ...DC_VOLTAGE_SOURCE_DEFAULTS, voltage: 5.0 });
+          return makeDcVoltageSource(new Map([["pos", 1], ["neg", 0]]), props, () => 0);
+        })(),
         makeResistor(1, 2, 1000),
         makeResistor(2, 0, 1000),
         pulseElement as unknown as import("../element.js").AnalogElement,

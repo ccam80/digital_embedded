@@ -16,10 +16,21 @@ import {
 import { makeDcVoltageSource } from '../../../components/sources/dc-voltage-source.js';
 import { makeCurrentSource as makeCurrentSourceProduction } from '../../../components/sources/current-source.js';
 import { PropertyBag } from '../../../core/properties.js';
+import { createDiodeElement, DIODE_PARAM_DEFAULTS } from '../../../components/semiconductors/diode.js';
 import { NGSPICE_LOAD_ORDER } from '../../../core/analog-types.js';
 import type { AnalogElement } from '../element.js';
 import type { LoadContext } from '../load-context.js';
 import type { SetupContext } from '../setup-context.js';
+import { newtonRaphson } from '../newton-raphson.js';
+import { SparseSolver, spSINGULAR } from '../sparse-solver.js';
+import {
+  MODEDCOP,
+  MODETRANOP,
+  MODEINITFLOAT,
+  MODEINITJCT,
+  MODEINITFIX,
+  MODEUIC,
+} from '../ckt-mode.js';
 
 function makeResistor(nodeA: number, nodeB: number, resistance: number): AnalogElement {
   const G = 1 / resistance;
@@ -76,54 +87,15 @@ function makeCurrentSource(posNode: number, negNode: number, current: number): A
   );
 }
 
-function makeDiode(nodeAnode: number, nodeCathode: number, IS: number, N: number): AnalogElement {
-  const VT = 0.025852;
-  let _hAA = -1, _hKK = -1, _hAK = -1, _hKA = -1;
-  const el: AnalogElement = {
-    label: "",
-    ngspiceLoadOrder: NGSPICE_LOAD_ORDER.DIO,
-    _pinNodes: new Map([["A", nodeAnode], ["K", nodeCathode]]),
-    _stateBase: -1,
-    branchIndex: -1,
-    setup(ctx: SetupContext): void {
-      const s = ctx.solver;
-      if (nodeAnode !== 0) _hAA = s.allocElement(nodeAnode, nodeAnode);
-      if (nodeCathode !== 0) _hKK = s.allocElement(nodeCathode, nodeCathode);
-      if (nodeAnode !== 0 && nodeCathode !== 0) {
-        _hAK = s.allocElement(nodeAnode, nodeCathode);
-        _hKA = s.allocElement(nodeCathode, nodeAnode);
-      }
-    },
-    load(ctx: LoadContext): void {
-      const vA = ctx.rhsOld[nodeAnode] ?? 0;
-      const vK = ctx.rhsOld[nodeCathode] ?? 0;
-      const vD = Math.min(vA - vK, 0.7);
-      const Id = IS * (Math.exp(vD / (N * VT)) - 1);
-      const Gd = IS / (N * VT) * Math.exp(vD / (N * VT));
-      const Ieq = Id - Gd * vD;
-      const s = ctx.solver;
-      if (_hAA !== -1) s.stampElement(_hAA,  Gd);
-      if (_hKK !== -1) s.stampElement(_hKK,  Gd);
-      if (_hAK !== -1) s.stampElement(_hAK, -Gd);
-      if (_hKA !== -1) s.stampElement(_hKA, -Gd);
-      if (nodeAnode !== 0) ctx.rhs[nodeAnode] -= Ieq;
-      if (nodeCathode !== 0) ctx.rhs[nodeCathode] += Ieq;
-    },
-    getPinCurrents(_rhs: Float64Array): number[] { return [0, 0]; },
-    setParam(_key: string, _value: number): void {},
-  };
-  return el;
+function makeDiode(nodeAnode: number, nodeCathode: number, _IS: number, _N: number): AnalogElement {
+  const props = new PropertyBag([]);
+  props.replaceModelParams({ ...DIODE_PARAM_DEFAULTS });
+  return createDiodeElement(
+    new Map([["A", nodeAnode], ["K", nodeCathode]]),
+    props,
+    () => 0,
+  );
 }
-import { newtonRaphson } from '../newton-raphson.js';
-import { SparseSolver, spSINGULAR } from '../sparse-solver.js';
-import {
-  MODEDCOP,
-  MODETRANOP,
-  MODEINITFLOAT,
-  MODEINITJCT,
-  MODEINITFIX,
-  MODEUIC,
-} from '../ckt-mode.js';
 
 // ---------------------------------------------------------------------------
 // Stamping tests

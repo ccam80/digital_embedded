@@ -72,7 +72,6 @@ export const CTZ_TYPE_MAP: Record<string, string> = {
   // Semiconductors
   d: "Diode",
   dz: "ZenerDiode",
-  dt: "TunnelDiode",
   dled: "Diode",
 
   // Transistors — BJT

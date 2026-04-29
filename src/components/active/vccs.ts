@@ -143,7 +143,7 @@ export class VCCSAnalogElement extends ControlledSourceElement {
   }
 
   /**
-   * Readonly accessor for composites (PB-TUNNEL, PB-TRIODE) that stamp
+   * Readonly accessor for composites (PB-TRIODE) that stamp
    * through the VCCS without owning the handle fields directly.
    */
   get stamps(): { pCtP: number; pCtN: number; nCtP: number; nCtN: number } {

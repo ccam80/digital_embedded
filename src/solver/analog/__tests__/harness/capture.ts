@@ -40,7 +40,6 @@ const TYPE_TO_PREFIX: Record<string, string> = {
   DcVoltageSource: "V", AcVoltageSource: "V",
   DcCurrentSource: "I", AcCurrentSource: "I",
   Varactor: "D",
-  TunnelDiode: "D",
   SCR: "SCR", Triac: "TR",
 };
 

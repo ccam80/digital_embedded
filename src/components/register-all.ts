@@ -158,7 +158,6 @@ import { SchottkyDiodeDefinition } from "./semiconductors/schottky.js";
 import { ScrDefinition } from "./semiconductors/scr.js";
 import { TriacDefinition } from "./semiconductors/triac.js";
 import { DiacDefinition } from "./semiconductors/diac.js";
-import { TunnelDiodeDefinition } from "./semiconductors/tunnel-diode.js";
 import { VaractorDefinition } from "./semiconductors/varactor.js";
 import { TriodeDefinition } from "./semiconductors/triode.js";
 
@@ -371,7 +370,6 @@ export function createDefaultRegistry(
   registry.register(ScrDefinition);
   registry.register(TriacDefinition);
   registry.register(DiacDefinition);
-  registry.register(TunnelDiodeDefinition);
   registry.register(VaractorDefinition);
   registry.register(TriodeDefinition);
 

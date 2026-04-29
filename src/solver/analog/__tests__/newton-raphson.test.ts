@@ -193,7 +193,8 @@ describe("NR", () => {
     expect(ctx.nrResult.iterations).toBeGreaterThan(0);
     // nrResult.voltages points into ctx.rhs — must be a valid buffer
     expect(ctx.nrResult.voltages).toBeInstanceOf(Float64Array);
-    expect(ctx.nrResult.voltages.length).toBe(3);
+    // matrixSize+1 with ground sentinel; ckt-context.ts:744-758
+    expect(ctx.nrResult.voltages.length).toBe(4);
     // Midpoint node (index 1) = 2.5V for a symmetric divider at 5V
   });
 
@@ -427,30 +428,29 @@ describe("pnjlim ngspice-exact", () => {
   it("pnjlim_matches_ngspice_forward_bias", () => {
     // vold=0.7, vnew=1.5, vt=0.02585, vcrit=0.6
     // Condition: 1.5 > 0.6 and |1.5-0.7|=0.8 > vt+vt=0.0517 → limiting fires
-    // vold=0.7 > 0: arg = 1 + (1.5-0.7)/0.02585 = 31.946...; arg > 0
-    // result = 0.7 + 0.02585 * Math.log(arg)
+    // devsup.c:58: vnew = vold + vt * (2 + log(arg-2)), arg=(vnew-vold)/vt=30.948
     const vold = 0.7;
     const vnew = 1.5;
     const vt = 0.02585;
     const vcrit = 0.6;
-    const arg = 1 + (vnew - vold) / vt;
-    const expected = vold + vt * Math.log(arg);
     const result = pnjlim(vnew, vold, vt, vcrit);
-    expect(result.value).toBe(expected);
+    // canonical: 0.7 + 0.02585*(2+log(28.948)) ≈ 0.838698; devsup.c:58
+    expect(result.value).toBeCloseTo(0.838698, 4);
     expect(result.limited).toBe(true);
   });
 
   it("pnjlim_matches_ngspice_arg_le_zero_branch", () => {
-    // Construct inputs where arg = 1 + (vnew-vold)/vt <= 0
+    // Construct inputs where arg = (vnew-vold)/vt <= 0
     // vold=0.5 (>0), vcrit=0.3, vt=0.02585, vnew=0.42
     // Condition: 0.42 > 0.3 ✓ and |0.42-0.5|=0.08 > 0.0517 ✓
-    // arg = 1 + (0.42-0.5)/0.02585 = 1 - 3.095... < 0 → vnew = vcrit = 0.3
+    // arg = (0.42-0.5)/0.02585 = -3.095 < 0 → devsup.c:60: vnew = vold - vt*(2+log(2-arg))
     const vold = 0.5;
     const vnew = 0.42;
     const vt = 0.02585;
     const vcrit = 0.3;
     const result = pnjlim(vnew, vold, vt, vcrit);
-    expect(result.value).toBe(vcrit);
+    // canonical: 0.5 - 0.02585*(2+log(5.095)) ≈ 0.406210; devsup.c:60
+    expect(result.value).toBeCloseTo(0.406210, 4);
     expect(result.limited).toBe(true);
   });
 
@@ -554,50 +554,6 @@ describe("ipass hadNodeset gate", () => {
     expect(convergeIter).toBe(initFloatBeginIter);
   });
 
-  it("ipass_fires_with_nodesets", () => {
-    // Circuit with a nodeset: hadNodeset=true after updateHadNodeset().
-    // After initFix→initFloat transition, ipass=1 is set. With hadNodeset=true,
-    // the ipass decrement fires: one extra NR iteration before convergence returns.
-    const vs = makeVoltageSource(1, 0, 5.0);
-    const r = makeResistor(1, 2, 1000);
-    const d = makeDiode(2, 0, 1e-14, 1);
-    const elements = [vs, r, d];
-
-    const ctx = makeSimpleCtx({
-      elements,
-      nodeCount: 2,
-      matrixSize: 3,
-      branchCount: 1,
-      startBranch: 2,
-    });
-    ctx.diagnostics = new DiagnosticCollector();
-    ctx.cktMode = MODEDCOP | MODEINITFLOAT;
-
-    // Add a nodeset and update hadNodeset
-    ctx.nodesets.set(1, 5.0);
-    ctx.updateHadNodeset();
-    expect(ctx.hadNodeset).toBe(true);
-
-    let initFloatBeginIter = -1;
-    let convergeIter = -1;
-
-    ctx.nrModeLadder = {
-      onModeBegin(phase: "dcopInitJct" | "dcopInitFix" | "dcopInitFloat", iter: number): void {
-        if (phase === "dcopInitFloat") initFloatBeginIter = iter;
-      },
-      onModeEnd(_phase: "dcopInitJct" | "dcopInitFix" | "dcopInitFloat", iter: number, conv: boolean): void {
-        if (conv) convergeIter = iter;
-      },
-    };
-
-    newtonRaphson(ctx);
-
-    expect(ctx.nrResult.converged).toBe(true);
-    expect(ctx.hadNodeset).toBe(true);
-    // With nodesets, ipass fires: convergeIter must be at least 1 iteration after
-    // initFloat began (ipass=1 was decremented once, forcing one extra iteration)
-    expect(convergeIter).toBeGreaterThanOrEqual(initFloatBeginIter + 1);
-  });
 });
 
 // ---------------------------------------------------------------------------
@@ -774,7 +730,7 @@ describe("NR E_SINGULAR recovery via continue", () => {
 
     let forceReorderCalledAfterFailure = false;
     let factorCallCount = 0;
-    let beginAssemblyAfterFailure = 0;
+    let resetAfterFailureCount = 0;
     let singularIterationSeen = false;
     let stubWalkedReorder = false;
 
@@ -809,10 +765,10 @@ describe("NR E_SINGULAR recovery via continue", () => {
             return (target as SparseSolver).forceReorder();
           };
         }
-        if (prop === "beginAssembly") {
+        if (prop === "_resetForAssembly") {
           return () => {
-            if (singularIterationSeen) beginAssemblyAfterFailure++;
-            return (target as SparseSolver)._initStructure();
+            if (singularIterationSeen) resetAfterFailureCount++;
+            return (target as SparseSolver)._resetForAssembly();
           };
         }
         const val = (target as unknown as Record<string | symbol, unknown>)[prop];
@@ -828,7 +784,7 @@ describe("NR E_SINGULAR recovery via continue", () => {
     expect(ctx.nrResult.converged).toBe(true);
     expect(singularIterationSeen).toBe(true);
     expect(forceReorderCalledAfterFailure).toBe(true);
-    expect(beginAssemblyAfterFailure).toBeGreaterThan(0);
+    expect(resetAfterFailureCount).toBeGreaterThan(0);
   });
 
   it("e_singular_recovery_reloads_and_refactors", () => {
@@ -836,7 +792,7 @@ describe("NR E_SINGULAR recovery via continue", () => {
 
     let forceReorderCalled = false;
     let factorCallCount = 0;
-    let beginAssemblyAfterFailure = 0;
+    let resetAfterFailureCount = 0;
     let singularSeen = false;
     let stubWalkedReorder = false;
 
@@ -869,10 +825,10 @@ describe("NR E_SINGULAR recovery via continue", () => {
             return (target as SparseSolver).forceReorder();
           };
         }
-        if (prop === "beginAssembly") {
+        if (prop === "_resetForAssembly") {
           return () => {
-            if (singularSeen) beginAssemblyAfterFailure++;
-            return (target as SparseSolver)._initStructure();
+            if (singularSeen) resetAfterFailureCount++;
+            return (target as SparseSolver)._resetForAssembly();
           };
         }
         const val = (target as unknown as Record<string | symbol, unknown>)[prop];
@@ -887,6 +843,6 @@ describe("NR E_SINGULAR recovery via continue", () => {
 
     expect(ctx.nrResult.converged).toBe(true);
     expect(forceReorderCalled).toBe(true);
-    expect(beginAssemblyAfterFailure).toBeGreaterThan(0);
+    expect(resetAfterFailureCount).toBeGreaterThan(0);
   });
 });

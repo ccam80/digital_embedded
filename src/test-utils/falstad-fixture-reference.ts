@@ -119,7 +119,6 @@ const JSON_TO_TS: Record<string, string> = {
   SCR: "SCR",
   Triac: "Triac",
   Diac: "Diac",
-  TunnelDiode: "TunnelDiode",
   Varactor: "VaractorDiode",
   Triode: "Triode",
   // Sources
@@ -168,7 +167,6 @@ const PIN_LABELS: Record<string, string[]> = {
   Diode: ["A", "K"],
   ZenerDiode: ["A", "K"],
   AnalogLED: ["A", "K"],
-  TunnelDiode: ["A", "K"],
   VaractorDiode: ["A", "K"],
   Diac: ["A", "B"],
   NpnBJT: ["B", "C", "E"],
@@ -507,7 +505,6 @@ export const ALL_ANALOG_TYPES: readonly string[] = [
   "SCR",
   "Triac",
   "Diac",
-  "TunnelDiode",
   "VaractorDiode",
   "Triode",
   // Sources

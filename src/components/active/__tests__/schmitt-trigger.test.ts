@@ -179,7 +179,7 @@ function driveAndReadOutput(
   runSchmittSetup(element, solver);
   const ctx = makeSchmittLoadCtx(voltages, solver, rhs);
   element.load(ctx);
-  const outRhs = rhs[nOut - 1];
+  const outRhs = rhs[nOut];
   if (outRhs === 0) return 0;
   const gOut = 1 / rOut;
   return outRhs / gOut;
@@ -467,12 +467,12 @@ describe("SchmittTrigger parity (C4.5)", () => {
             .reduce((a, s) => a + s.value, 0);
 
     // Input resistance on nIn diagonal
-    expect(sumAt(nIn - 1, nIn - 1)).toBe(NGSPICE_GIN);
+    expect(sumAt(nIn, nIn)).toBe(NGSPICE_GIN);
 
     // Output resistance on nOut diagonal
-    expect(sumAt(nOut - 1, nOut - 1)).toBe(NGSPICE_GOUT);
+    expect(sumAt(nOut, nOut)).toBe(NGSPICE_GOUT);
 
     // Output Norton RHS: vOL * G_out
-    expect(rhsBuf[nOut - 1]).toBe(NGSPICE_RHS_OUT);
+    expect(rhsBuf[nOut]).toBe(NGSPICE_RHS_OUT);
   });
 });

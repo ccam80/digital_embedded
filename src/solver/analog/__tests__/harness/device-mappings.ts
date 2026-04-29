@@ -267,13 +267,7 @@ export const JFET_MAPPING: DeviceMapping = {
 // ---------------------------------------------------------------------------
 // Registry
 // ---------------------------------------------------------------------------
-//
-// Tunnel-diode and varactor intentionally omitted. ngspice has no dedicated
-// tunnel-diode model (it's a digiTS-only device; comparison is nonsense), and
-// the varactor was reusing the diode model with an invented cap-state layout
-// that had no ngspice counterpart. Both are architectural BLOCKERs, not
-// mapping gaps — routed to Track A (architectural-alignment.md) for a
-// user decision.
+
 
 /** All device mappings keyed by device type. */
 export const DEVICE_MAPPINGS: Record<string, DeviceMapping> = {
@@ -299,7 +293,6 @@ const TYPE_ID_TO_CANONICAL: Record<string, string> = {
   Diode: "diode",
   Zener: "diode",
   Varactor: "varactor",
-  TunnelDiode: "tunnel-diode",
   Capacitor: "capacitor",
   Inductor: "inductor",
   Resistor: "resistor",

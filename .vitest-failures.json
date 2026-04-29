@@ -1,10 +1,10 @@
 {
   "summary": {
-    "passed": 8700,
-    "failed": 181,
+    "passed": 8697,
+    "failed": 141,
     "skipped": 0,
-    "totalFiles": 398,
-    "durationSeconds": 18.8
+    "totalFiles": 397,
+    "durationSeconds": 19.9
   },
   "failures": [
     {
@@ -21,7 +21,7 @@
     },
     {
       "message": "expected 0 to be greater than 0",
-      "count": 10,
+      "count": 5,
       "locations": [
         {
           "file": "src\\editor\\__tests__\\wire-current-resolver.test.ts",
@@ -36,51 +36,21 @@
           "column": 25
         },
         {
-          "file": "src\\solver\\analog\\__tests__\\ckt-load.test.ts",
-          "test": "noncon_incremented_by_device_limiting",
-          "line": 240,
-          "column": 24
-        },
-        {
           "file": "src\\solver\\analog\\__tests__\\convergence-regression.test.ts",
           "test": "reset restores initial values in statePool",
           "line": 276,
           "column": 40
         },
         {
-          "file": "src\\solver\\analog\\__tests__\\digital-pin-model.test.ts",
-          "test": "handle_cache_stable_across_iterations",
-          "line": 311,
-          "column": 28
-        },
-        {
-          "file": "src\\solver\\analog\\__tests__\\digital-pin-model.test.ts",
-          "test": "handle_cache_stable_across_iterations",
-          "line": 382,
-          "column": 28
-        },
-        {
-          "file": "src\\solver\\analog\\__tests__\\newton-raphson.test.ts",
-          "test": "e_singular_recovers_via_continue",
-          "line": 831,
-          "column": 39
-        },
-        {
-          "file": "src\\solver\\analog\\__tests__\\newton-raphson.test.ts",
-          "test": "e_singular_recovery_reloads_and_refactors",
-          "line": 890,
-          "column": 39
-        },
-        {
           "file": "src\\solver\\analog\\__tests__\\harness\\harness-integration.test.ts",
           "test": "captureElementStates snapshots pool-backed elements",
-          "line": 258,
+          "line": 238,
           "column": 27
         },
         {
           "file": "src\\solver\\analog\\__tests__\\harness\\harness-integration.test.ts",
           "test": "findLargestDelta identifies worst convergence point",
-          "line": 581,
+          "line": 560,
           "column": 27
         }
       ]
@@ -111,13 +81,25 @@
     },
     {
       "message": "expected false to be true // Object.is equality",
-      "count": 32,
+      "count": 25,
       "locations": [
         {
           "file": "src\\solver\\__tests__\\coordinator-bridge.test.ts",
           "test": "setHighZ(true) switches branch equation to I=0 mode",
           "line": 380,
           "column": 94
+        },
+        {
+          "file": "src\\components\\active\\__tests__\\opamp.test.ts",
+          "test": "output_impedance",
+          "line": 211,
+          "column": 30
+        },
+        {
+          "file": "src\\components\\active\\__tests__\\opamp.test.ts",
+          "test": "inverting_amplifier",
+          "line": 280,
+          "column": 30
         },
         {
           "file": "src\\components\\active\\__tests__\\opamp.test.ts",
@@ -164,25 +146,13 @@
         {
           "file": "src\\components\\io\\__tests__\\led.test.ts",
           "test": "pushes AK pnjlim event on non-init NR iteration",
-          "line": 1018,
+          "line": 983,
           "column": 37
-        },
-        {
-          "file": "src\\components\\semiconductors\\__tests__\\tunnel-diode.test.ts",
-          "test": "nr_converges_in_ndr_region",
-          "line": 344,
-          "column": 30
         },
         {
           "file": "src\\components\\passives\\__tests__\\capacitor.test.ts",
           "test": "getLteTimestep uses stored ccap from stampCompanion",
           "line": 383,
-          "column": 32
-        },
-        {
-          "file": "src\\components\\passives\\__tests__\\crystal.test.ts",
-          "test": "DC source across crystal produces near-zero current (capacitors block DC)",
-          "line": 264,
           "column": 32
         },
         {
@@ -258,82 +228,10 @@
           "column": 32
         },
         {
-          "file": "src\\solver\\analog\\__tests__\\mna-end-to-end.test.ts",
-          "test": "two_diodes_in_series",
-          "line": 445,
-          "column": 30
-        },
-        {
-          "file": "src\\solver\\analog\\__tests__\\mna-end-to-end.test.ts",
-          "test": "parallel_diodes",
-          "line": 479,
-          "column": 30
-        },
-        {
-          "file": "src\\solver\\analog\\__tests__\\mna-end-to-end.test.ts",
-          "test": "diode_clamp_on_resistor_divider",
-          "line": 504,
-          "column": 30
-        },
-        {
-          "file": "src\\solver\\analog\\__tests__\\mna-end-to-end.test.ts",
-          "test": "anti_parallel_diodes",
-          "line": 529,
-          "column": 30
-        },
-        {
-          "file": "src\\solver\\analog\\__tests__\\mna-end-to-end.test.ts",
-          "test": "diode_shockley_equation_consistency",
-          "line": 582,
-          "column": 30
-        },
-        {
-          "file": "src\\solver\\analog\\__tests__\\newton-raphson.test.ts",
-          "test": "ipass_fires_with_nodesets",
-          "line": 595,
-          "column": 36
-        },
-        {
           "file": "src\\solver\\analog\\__tests__\\phase-3-nr-reorder.test.ts",
           "test": "cites niiter.c:888-891 at the E_SINGULAR retry",
           "line": 276,
           "column": 27
-        },
-        {
-          "file": "src\\solver\\analog\\__tests__\\harness\\boot-step.test.ts",
-          "test": "step accepted === true and converged === true for a simple converging circuit",
-          "line": 235,
-          "column": 32
-        }
-      ]
-    },
-    {
-      "message": "offset is out of bounds",
-      "count": 4,
-      "locations": [
-        {
-          "file": "src\\solver\\analog\\dc-operating-point.ts",
-          "test": "output_impedance",
-          "line": 129,
-          "column": 22
-        },
-        {
-          "file": "src\\solver\\analog\\dc-operating-point.ts",
-          "test": "inverting_amplifier",
-          "line": 129,
-          "column": 22
-        },
-        {
-          "file": "src\\solver\\analog\\dc-operating-point.ts",
-          "test": "method_reflects_last_strategy",
-          "line": 129,
-          "column": 22
-        },
-        {
-          "file": "src\\solver\\analog\\dc-operating-point.ts",
-          "test": "gillespieSrc_source_stepping_uses_gshunt",
-          "line": 129,
-          "column": 22
         }
       ]
     },
@@ -434,48 +332,6 @@
       ]
     },
     {
-      "message": "expected +0 to be 10 // Object.is equality",
-      "count": 2,
-      "locations": [
-        {
-          "file": "src\\components\\active\\__tests__\\schmitt-trigger.test.ts",
-          "test": "noisy_sine_clean_square",
-          "line": 321,
-          "column": 25
-        },
-        {
-          "file": "src\\solver\\analog\\__tests__\\ckt-context.test.ts",
-          "test": "allocates_all_buffers_at_init",
-          "line": 169,
-          "column": 31
-        }
-      ]
-    },
-    {
-      "message": "expected null not to be null",
-      "count": 1,
-      "locations": [
-        {
-          "file": "src\\components\\active\\__tests__\\schmitt-trigger.test.ts",
-          "test": "plot_matches_hysteresis_loop",
-          "line": 358,
-          "column": 36
-        }
-      ]
-    },
-    {
-      "message": "expected +0 to be 1e-7 // Object.is equality",
-      "count": 1,
-      "locations": [
-        {
-          "file": "src\\components\\active\\__tests__\\schmitt-trigger.test.ts",
-          "test": "schmitt_load_dcop_parity",
-          "line": 470,
-          "column": 37
-        }
-      ]
-    },
-    {
       "message": "expected 100 to be less than 1",
       "count": 1,
       "locations": [
@@ -536,7 +392,7 @@
         {
           "file": "src\\components\\io\\__tests__\\led.test.ts",
           "test": "red_led_forward_drop",
-          "line": 839,
+          "line": 819,
           "column": 16
         }
       ]
@@ -548,7 +404,7 @@
         {
           "file": "src\\components\\io\\__tests__\\led.test.ts",
           "test": "blue_led_forward_drop",
-          "line": 866,
+          "line": 831,
           "column": 16
         }
       ]
@@ -560,26 +416,38 @@
         {
           "file": "src\\components\\io\\__tests__\\led.test.ts",
           "test": "junction_cap_transient_matches_ngspice",
-          "line": 959,
+          "line": 924,
           "column": 21
         }
       ]
     },
     {
-      "message": "expected 0.7614530246405854 to be less than 1e-10",
-      "count": 2,
+      "message": "expected 0 to be less than 0",
+      "count": 1,
       "locations": [
         {
           "file": "src\\components\\io\\__tests__\\led.test.ts",
           "test": "vt_reflects_TEMP",
-          "line": 1140,
-          "column": 68
-        },
+          "line": 1107,
+          "column": 19
+        }
+      ]
+    },
+    {
+      "message": "expected undefined to be defined",
+      "count": 2,
+      "locations": [
         {
           "file": "src\\components\\io\\__tests__\\led.test.ts",
           "test": "setParam_TEMP_recomputes",
-          "line": 1155,
-          "column": 68
+          "line": 1125,
+          "column": 24
+        },
+        {
+          "file": "src\\components\\passives\\__tests__\\resistor.test.ts",
+          "test": "load(ctx) stamps G=1/R bit-exact for R=1kÎ",
+          "line": 376,
+          "column": 21
         }
       ]
     },
@@ -626,25 +494,25 @@
         {
           "file": "src\\components\\semiconductors\\diode.ts",
           "test": "blocks_below_breakover",
-          "line": 602,
+          "line": 537,
           "column": 23
         },
         {
           "file": "src\\components\\semiconductors\\diode.ts",
           "test": "conducts_above_breakover",
-          "line": 602,
+          "line": 537,
           "column": 23
         },
         {
           "file": "src\\components\\semiconductors\\diode.ts",
           "test": "symmetric",
-          "line": 602,
+          "line": 537,
           "column": 23
         },
         {
           "file": "src\\components\\semiconductors\\diode.ts",
           "test": "triggers_triac",
-          "line": 602,
+          "line": 537,
           "column": 23
         },
         {
@@ -760,66 +628,6 @@
           "test": "PB-TRIAC TSTALLOC sequence",
           "line": 137,
           "column": 13
-        }
-      ]
-    },
-    {
-      "message": "expected NaN to be greater than 0.00475",
-      "count": 1,
-      "locations": [
-        {
-          "file": "src\\components\\semiconductors\\__tests__\\tunnel-diode.test.ts",
-          "test": "peak_current_at_vp",
-          "line": 159,
-          "column": 23
-        }
-      ]
-    },
-    {
-      "message": "expected NaN to be greater than 0.00045000000000000004",
-      "count": 1,
-      "locations": [
-        {
-          "file": "src\\components\\semiconductors\\__tests__\\tunnel-diode.test.ts",
-          "test": "valley_current_at_vv",
-          "line": 186,
-          "column": 23
-        }
-      ]
-    },
-    {
-      "message": "expected 0.004876662713912611 to be close to 0.0012663150997819432, received difference is 0.0036103476141306676, but expected 5e-16",
-      "count": 1,
-      "locations": [
-        {
-          "file": "src\\components\\semiconductors\\__tests__\\tunnel-diode.test.ts",
-          "test": "vt_reflects_TEMP",
-          "line": 456,
-          "column": 22
-        }
-      ]
-    },
-    {
-      "message": "expected 0.004876662714208326 to be close to 0.001266316129476505, received difference is 0.0036103465847318206, but expected 5e-16",
-      "count": 1,
-      "locations": [
-        {
-          "file": "src\\components\\semiconductors\\__tests__\\tunnel-diode.test.ts",
-          "test": "setParam_TEMP_recomputes",
-          "line": 483,
-          "column": 20
-        }
-      ]
-    },
-    {
-      "message": "expected +0 to be -0.009489176401370602 // Object.is equality",
-      "count": 1,
-      "locations": [
-        {
-          "file": "src\\components\\semiconductors\\__tests__\\tunnel-diode.test.ts",
-          "test": "negative_resistance_transient_matches_ngspice",
-          "line": 586,
-          "column": 21
         }
       ]
     },
@@ -980,18 +788,6 @@
       ]
     },
     {
-      "message": "expected undefined to be defined",
-      "count": 1,
-      "locations": [
-        {
-          "file": "src\\components\\passives\\__tests__\\resistor.test.ts",
-          "test": "load(ctx) stamps G=1/R bit-exact for R=1kÎ",
-          "line": 376,
-          "column": 21
-        }
-      ]
-    },
-    {
       "message": "expected 1.521562838977706e+300 to be less than 11.5",
       "count": 1,
       "locations": [
@@ -1130,36 +926,6 @@
       ]
     },
     {
-      "message": "PropertyBag: model param \"voltage\" not found",
-      "count": 1,
-      "locations": [
-        {
-          "file": "src\\core\\properties.ts",
-          "test": "pulse_breakpoint_scheduled",
-          "line": 137,
-          "column": 13
-        }
-      ]
-    },
-    {
-      "message": "expected 0 to be greater than or equal to 1",
-      "count": 2,
-      "locations": [
-        {
-          "file": "src\\solver\\analog\\__tests__\\behavioral-flipflop-variants.test.ts",
-          "test": "both_set_emits_diagnostic",
-          "line": 367,
-          "column": 32
-        },
-        {
-          "file": "src\\solver\\analog\\__tests__\\competing-voltage-constraints.test.ts",
-          "test": "two voltage sources on same net emits competing-voltage-constraints error",
-          "line": 129,
-          "column": 30
-        }
-      ]
-    },
-    {
       "message": "expected +0 to be 5 // Object.is equality",
       "count": 2,
       "locations": [
@@ -1179,19 +945,13 @@
     },
     {
       "message": "expected +0 to be 3 // Object.is equality",
-      "count": 2,
+      "count": 1,
       "locations": [
         {
           "file": "src\\solver\\analog\\__tests__\\behavioral-sequential.test.ts",
           "test": "clear_resets_to_zero",
           "line": 249,
           "column": 27
-        },
-        {
-          "file": "src\\solver\\analog\\__tests__\\harness\\harness-integration.test.ts",
-          "test": "MNAEngine exposes accessors after init",
-          "line": 534,
-          "column": 31
         }
       ]
     },
@@ -1268,44 +1028,32 @@
       ]
     },
     {
-      "message": "expected Infinity to be 2.645751312387466 // Object.is equality",
+      "message": "expected +0 to be 10 // Object.is equality",
+      "count": 1,
+      "locations": [
+        {
+          "file": "src\\solver\\analog\\__tests__\\ckt-context.test.ts",
+          "test": "allocates_all_buffers_at_init",
+          "line": 169,
+          "column": 31
+        }
+      ]
+    },
+    {
+      "message": "expected Infinity to be 7.000000006999999 // Object.is equality",
       "count": 2,
       "locations": [
         {
           "file": "src\\solver\\analog\\__tests__\\ckt-terr.test.ts",
           "test": "order 1 trapezoidal: returns finite positive timestep for non-trivial charges",
-          "line": 50,
+          "line": 51,
           "column": 20
         },
         {
           "file": "src\\solver\\analog\\__tests__\\ckt-terr.test.ts",
           "test": "constant charge history produces finite timestep (not Infinity) — abstol-gated",
-          "line": 101,
+          "line": 104,
           "column": 20
-        }
-      ]
-    },
-    {
-      "message": "expected 9.222255689824751e-10 to be 9.474539396484565e-7 // Object.is equality",
-      "count": 1,
-      "locations": [
-        {
-          "file": "src\\solver\\analog\\__tests__\\ckt-terr.test.ts",
-          "test": "order 2 gear: returns sqrt-scaled timestep",
-          "line": 81,
-          "column": 16
-        }
-      ]
-    },
-    {
-      "message": "expected 1.506015936200784 to be 1.134042 // Object.is equality",
-      "count": 1,
-      "locations": [
-        {
-          "file": "src\\solver\\analog\\__tests__\\ckt-terr.test.ts",
-          "test": "gear order 2 returns positive finite timestep for cubic charge data",
-          "line": 141,
-          "column": 19
         }
       ]
     },
@@ -1316,26 +1064,14 @@
         {
           "file": "src\\solver\\analog\\__tests__\\ckt-terr.test.ts",
           "test": "order 2 gear: applies sqrt root extraction for nonzero 3rd divided difference",
-          "line": 232,
+          "line": 240,
           "column": 16
         },
         {
           "file": "src\\solver\\analog\\__tests__\\ckt-terr.test.ts",
           "test": "trapezoidal order 2 and gear order 2 both return positive finite timestep for cubic data",
-          "line": 292,
+          "line": 300,
           "column": 20
-        }
-      ]
-    },
-    {
-      "message": "expected 200 to be +0 // Object.is equality",
-      "count": 1,
-      "locations": [
-        {
-          "file": "src\\solver\\analog\\__tests__\\ckt-terr.test.ts",
-          "test": "zero_allocations_in_lte_path",
-          "line": 374,
-          "column": 24
         }
       ]
     },
@@ -1346,7 +1082,7 @@
         {
           "file": "src\\solver\\analog\\__tests__\\ckt-terr.test.ts",
           "test": "gear_lte_factor_order_3",
-          "line": 425,
+          "line": 433,
           "column": 33
         }
       ]
@@ -1358,7 +1094,7 @@
         {
           "file": "src\\solver\\analog\\__tests__\\ckt-terr.test.ts",
           "test": "gear_lte_factor_order_5",
-          "line": 462,
+          "line": 470,
           "column": 33
         }
       ]
@@ -1370,32 +1106,8 @@
         {
           "file": "src\\solver\\analog\\__tests__\\ckt-terr.test.ts",
           "test": "gear_lte_factor_order_6",
-          "line": 498,
+          "line": 506,
           "column": 33
-        }
-      ]
-    },
-    {
-      "message": "expected 2.799999999999998e-7 to be 5.291502622129179e-10 // Object.is equality",
-      "count": 1,
-      "locations": [
-        {
-          "file": "src\\solver\\analog\\__tests__\\ckt-terr.test.ts",
-          "test": "cktTerr_trap_order1_matches_ngspice",
-          "line": 560,
-          "column": 20
-        }
-      ]
-    },
-    {
-      "message": "expected 0.0000015060159362007841 to be 1.1340420000000001e-24 // Object.is equality",
-      "count": 1,
-      "locations": [
-        {
-          "file": "src\\solver\\analog\\__tests__\\ckt-terr.test.ts",
-          "test": "cktTerr_trap_order2_matches_ngspice",
-          "line": 591,
-          "column": 20
         }
       ]
     },
@@ -1406,32 +1118,20 @@
         {
           "file": "src\\solver\\analog\\__tests__\\ckt-terr.test.ts",
           "test": "cktTerrVoltage_gear_order2_matches_ngspice",
-          "line": 625,
+          "line": 639,
           "column": 20
         }
       ]
     },
     {
-      "message": "expected 2.799999999999998e-7 to be 0.000529150262212918 // Object.is equality",
+      "message": "expected 0 to be greater than or equal to 1",
       "count": 1,
       "locations": [
         {
-          "file": "src\\solver\\analog\\__tests__\\ckt-terr.test.ts",
-          "test": "cktTerr_gear_order1_sqrt",
-          "line": 655,
-          "column": 20
-        }
-      ]
-    },
-    {
-      "message": "expected 0.00011149612440600089 to be 0.0010850377014617293 // Object.is equality",
-      "count": 1,
-      "locations": [
-        {
-          "file": "src\\solver\\analog\\__tests__\\ckt-terr.test.ts",
-          "test": "gear_higher_order_root_is_order_plus_one",
-          "line": 720,
-          "column": 20
+          "file": "src\\solver\\analog\\__tests__\\competing-voltage-constraints.test.ts",
+          "test": "two voltage sources on same net emits competing-voltage-constraints error",
+          "line": 129,
+          "column": 30
         }
       ]
     },
@@ -1460,14 +1160,14 @@
       ]
     },
     {
-      "message": "expected 4 to be 3 // Object.is equality",
+      "message": "expected 0.013536179992185128 to be less than 0.001",
       "count": 1,
       "locations": [
         {
-          "file": "src\\solver\\analog\\__tests__\\newton-raphson.test.ts",
-          "test": "writes_into_ctx_nrResult",
-          "line": 196,
-          "column": 42
+          "file": "src\\solver\\analog\\__tests__\\mna-end-to-end.test.ts",
+          "test": "diode_shockley_equation_consistency",
+          "line": 596,
+          "column": 22
         }
       ]
     },
@@ -1478,7 +1178,7 @@
         {
           "file": "src\\solver\\analog\\__tests__\\newton-raphson.test.ts",
           "test": "diode_circuit_converges",
-          "line": 257,
+          "line": 258,
           "column": 16
         }
       ]
@@ -1490,56 +1190,8 @@
         {
           "file": "src\\solver\\analog\\__tests__\\newton-raphson.test.ts",
           "test": "diode_reverse_bias",
-          "line": 275,
+          "line": 276,
           "column": 21
-        }
-      ]
-    },
-    {
-      "message": "expected 0.838698003514509 to be 0.7895470511246272 // Object.is equality",
-      "count": 1,
-      "locations": [
-        {
-          "file": "src\\solver\\analog\\__tests__\\newton-raphson.test.ts",
-          "test": "pnjlim_matches_ngspice_forward_bias",
-          "line": 439,
-          "column": 26
-        }
-      ]
-    },
-    {
-      "message": "expected 0.4062106161985045 to be 0.3 // Object.is equality",
-      "count": 1,
-      "locations": [
-        {
-          "file": "src\\solver\\analog\\__tests__\\newton-raphson.test.ts",
-          "test": "pnjlim_matches_ngspice_arg_le_zero_branch",
-          "line": 453,
-          "column": 26
-        }
-      ]
-    },
-    {
-      "message": "Unguarded xfact reads:",
-      "count": 1,
-      "locations": [
-        {
-          "file": "src\\solver\\analog\\__tests__\\phase-3-xfact-scope-audit.test.ts",
-          "test": "has zero unguarded xfact reads in src/components/",
-          "line": 143,
-          "column": 76
-        }
-      ]
-    },
-    {
-      "message": "Stale allowlist entries:",
-      "count": 1,
-      "locations": [
-        {
-          "file": "src\\solver\\analog\\__tests__\\phase-3-xfact-scope-audit.test.ts",
-          "test": "allowlist is exhaustive — no stale entries",
-          "line": 191,
-          "column": 74
         }
       ]
     },
@@ -1550,7 +1202,7 @@
         {
           "file": "src\\solver\\analog\\__tests__\\setup-stamp-order.test.ts",
           "test": "PB-BJT TSTALLOC sequence",
-          "line": 325,
+          "line": 324,
           "column": 19
         }
       ]
@@ -1562,7 +1214,7 @@
         {
           "file": "src\\solver\\analog\\__tests__\\setup-stamp-order.test.ts",
           "test": "PB-IND TSTALLOC sequence",
-          "line": 824,
+          "line": 823,
           "column": 19
         }
       ]
@@ -1574,19 +1226,7 @@
         {
           "file": "src\\solver\\analog\\__tests__\\setup-stamp-order.test.ts",
           "test": "PB-OPTO TSTALLOC sequence",
-          "line": 1105,
-          "column": 19
-        }
-      ]
-    },
-    {
-      "message": "expected [ { extRow: 4, extCol: 3 }, …(17) ] to deeply equal [ { extRow: 4, extCol: 4 }, …(39) ]",
-      "count": 1,
-      "locations": [
-        {
-          "file": "src\\solver\\analog\\__tests__\\setup-stamp-order.test.ts",
-          "test": "PB-SCR TSTALLOC sequence",
-          "line": 1599,
+          "line": 1104,
           "column": 19
         }
       ]
@@ -1598,32 +1238,20 @@
         {
           "file": "src\\solver\\analog\\__tests__\\setup-stamp-order.test.ts",
           "test": "PB-TIMER555 TSTALLOC sequence",
-          "line": 1965,
+          "line": 1964,
           "column": 19
         }
       ]
     },
     {
-      "message": "expected 0.17199554967529299 to be +0 // Object.is equality",
-      "count": 1,
-      "locations": [
-        {
-          "file": "src\\solver\\analog\\__tests__\\harness\\boot-step.test.ts",
-          "test": "step dt === 0 (boot step is DCOP, no timestepping)",
-          "line": 216,
-          "column": 25
-        }
-      ]
-    },
-    {
-      "message": "expected 2 to be 3 // Object.is equality",
+      "message": "expected null not to be null",
       "count": 1,
       "locations": [
         {
           "file": "src\\solver\\analog\\__tests__\\harness\\harness-integration.test.ts",
-          "test": "SparseSolver exposes dimension, getCSCNonZeros",
-          "line": 549,
-          "column": 30
+          "test": "MNAEngine exposes accessors after init",
+          "line": 511,
+          "column": 34
         }
       ]
     },

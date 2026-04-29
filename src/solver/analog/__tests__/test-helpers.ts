@@ -251,8 +251,8 @@ export function makeSimpleCtx(opts: SimpleCtxOptions): CKTCircuitContext {
   ctx.statePool = statePool;
   // Mirror allocateStateBuffers: resize dcop snapshot buffers and bind the
   // live state-ring reference into loadCtx (no snapshot — getter-based).
-  ctx.dcopSavedState0 = new Float64Array(Math.max(numStates, 1));
-  ctx.dcopOldState0 = new Float64Array(Math.max(numStates, 1));
+  ctx.dcopSavedState0 = new Float64Array(numStates);
+  ctx.dcopOldState0 = new Float64Array(numStates);
   ctx.loadCtx.setStatePool(statePool);
 
   // Step 4: Allocate row buffers so rhs / rhsOld have correct sizes.

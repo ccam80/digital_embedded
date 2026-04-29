@@ -261,7 +261,7 @@ describe("Task 3.1.2 — non-top-of-loop forceReorder citations", () => {
         // Check if this is in the E_SINGULAR retry block by looking for preceding context
         const contextStart = Math.max(0, i - 10);
         const contextText = lines.slice(contextStart, i).join("\n");
-        if (contextText.includes("lastFactorUsedReorder") || contextText.includes("!factorResult")) {
+        if (contextText.includes("lastFactorWalkedReorder") || contextText.includes("!factorResult")) {
           // This is the E_SINGULAR retry block; check for the citation
           const citationStart = Math.max(0, i - 10);
           const citationText = lines.slice(citationStart, i).join("\n");

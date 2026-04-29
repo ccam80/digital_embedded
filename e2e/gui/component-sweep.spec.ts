@@ -69,7 +69,7 @@ const PASSIVES = [
 const SEMICONDUCTORS = [
   'Diode', 'ZenerDiode', 'NpnBJT', 'PnpBJT',
   'NMOS', 'PMOS', 'NJFET', 'PJFET',
-  'SCR', 'Triac', 'Diac', 'TunnelDiode', 'VaractorDiode', 'Triode',
+  'SCR', 'Triac', 'Diac', 'VaractorDiode', 'Triode',
 ];
 
 const SOURCES = [

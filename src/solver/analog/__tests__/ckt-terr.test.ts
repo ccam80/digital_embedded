@@ -28,9 +28,9 @@ describe("cktTerr", () => {
     const q0 = 1e-12, q1 = 0.9e-12, q2 = 0.8e-12;
     const result = cktTerr(dt, [dt, dt], 1, "gear", q0, q1, q2, 0, q0, q1, defaultParams);
 
-    // NGSPICE_REF: ngspice cktterr.c CKTterr, order=1 GEAR path.
-    // Divided difference (2nd) -> tolerance -> del = trtol*tol/max(abstol, factor*ddiff)
-    // -> GEAR order 1 takes sqrt(del).
+    // NGSPICE_REF: cktterr.c:69-74 unified scalar form, order=1 GEAR.
+    // del = trtol * tol / max(abstol, factor * ddiff)
+    // order === 1: return del raw (no root extraction)
     const h0 = dt, h1 = dt;
     let d0 = q0, d1 = q1, d2 = q2;
     d0 = (d0 - d1) / h0;
@@ -42,10 +42,11 @@ describe("cktTerr", () => {
     const chargetolRaw = defaultParams.reltol * Math.max(Math.max(Math.abs(q0), Math.abs(q1)), defaultParams.chgtol);
     const chargetol = chargetolRaw / dt;
     const tol = Math.max(volttol, chargetol);
-    const factor = 0.5; // GEAR_LTE_FACTORS[0]
+    const gearCoeff = [0.5, 0.2222222222, 0.1363636364, 0.096, 0.07299270073, 0.05830903790];
+    const factor = gearCoeff[1 - 1]; // order=1 -> index 0
     const denom = Math.max(defaultParams.abstol, factor * ddiff);
     const del = defaultParams.trtol * tol / denom;
-    const NGSPICE_REF = Math.sqrt(del);
+    const NGSPICE_REF = del; // order === 1: del returned raw, no root
 
     expect(result).toBe(NGSPICE_REF);
   });
@@ -56,8 +57,9 @@ describe("cktTerr", () => {
     const q0 = 27e-12, q1 = 8e-12, q2 = 1e-12, q3 = 0;
     const r2 = cktTerr(dt, [dt, dt], 2, "gear", q0, q1, q2, q3, q0, q1, defaultParams);
 
-    // NGSPICE_REF: ngspice cktterr.c CKTterr, order=2 GEAR path.
-    // 3rd divided difference -> tol -> del -> root via exp(log(del)/(order+1)).
+    // NGSPICE_REF: cktterr.c:69-74 unified scalar form, order=2 GEAR.
+    // del = trtol * tol / max(abstol, factor * ddiff)
+    // order === 2: return sqrt(del)
     const h0 = dt, h1 = dt, h2 = dt;
     let d0 = q0, d1 = q1, d2 = q2, d3 = q3;
     d0 = (d0 - d1) / h0;
@@ -73,30 +75,31 @@ describe("cktTerr", () => {
     const chargetolRaw = defaultParams.reltol * Math.max(Math.max(Math.abs(q0), Math.abs(q1)), defaultParams.chgtol);
     const chargetol = chargetolRaw / dt;
     const tol = Math.max(volttol, chargetol);
-    const factor = 2 / 9; // GEAR_LTE_FACTORS[1]
+    const gearCoeff = [0.5, 0.2222222222, 0.1363636364, 0.096, 0.07299270073, 0.05830903790];
+    const factor = gearCoeff[2 - 1]; // order=2 -> index 1
     const denom = Math.max(defaultParams.abstol, factor * ddiff);
     const del = defaultParams.trtol * tol / denom;
-    const NGSPICE_REF = Math.exp(Math.log(del) / (2 + 1));
+    const NGSPICE_REF = Math.sqrt(del); // order === 2: sqrt(del)
 
     expect(r2).toBe(NGSPICE_REF);
   });
 
   it("constant charge history produces finite timestep (not Infinity) — abstol-gated", () => {
-    // When ddiff=0, TRAP returns Infinity; GEAR returns sqrt(abstol-gated del)
+    // When ddiff=0, TRAP returns Infinity; GEAR order 1 returns del raw (abstol-gated)
     const dt = 1e-9;
     const q = 1e-12;
     const result = cktTerr(dt, [dt, dt], 1, "gear", q, q, q, q, q, q, defaultParams);
 
-    // NGSPICE_REF: ngspice cktterr.c CKTterr, order=1 GEAR, ddiff=0 case.
+    // NGSPICE_REF: cktterr.c:69-74 unified scalar form, order=1 GEAR, ddiff=0 case.
     // Constant Q -> 2nd divided difference = 0 -> denom clamps to abstol ->
-    // del = trtol*tol/abstol -> sqrt(del) for GEAR order 1.
+    // del = trtol*tol/abstol -> order === 1: return del raw, no root extraction.
     const volttol = defaultParams.abstol + defaultParams.reltol * Math.max(Math.abs(q), Math.abs(q));
     const chargetolRaw = defaultParams.reltol * Math.max(Math.max(Math.abs(q), Math.abs(q)), defaultParams.chgtol);
     const chargetol = chargetolRaw / dt;
     const tol = Math.max(volttol, chargetol);
     const denom = defaultParams.abstol; // max(abstol, 0.5 * 0) = abstol
     const del = defaultParams.trtol * tol / denom;
-    const NGSPICE_REF = Math.sqrt(del);
+    const NGSPICE_REF = del; // order === 1: del returned raw, no root
 
     expect(result).toBe(NGSPICE_REF);
   });
@@ -109,7 +112,7 @@ describe("cktTerr", () => {
     const rTrap = cktTerr(dt, [dt, dt], 2, "trapezoidal", q0, q1, q2, q3, q0, q1, defaultParams);
     const rGear2 = cktTerr(dt, [dt, dt], 2, "gear", q0, q1, q2, q3, q0, q1, defaultParams);
 
-    // Shared divided-difference bookkeeping (ngspice cktterr.c:43-59 order=2).
+    // Shared divided-difference bookkeeping (cktterr.c:43-59 order=2).
     const h0 = dt, h1 = dt, h2 = dt;
     let d0 = q0, d1 = q1, d2 = q2, d3 = q3;
     d0 = (d0 - d1) / h0;
@@ -119,24 +122,29 @@ describe("cktTerr", () => {
     d0 = (d0 - d1) / dt0;
     d1 = (d1 - d2) / dt1;
     dt0 = dt1 + h0;
-    const diffSigned = (d0 - d1) / dt0; // signed 3rd divided difference (TRAP order-2 uses signed form)
+    const diffSigned = (d0 - d1) / dt0; // signed 3rd divided difference
     const ddiff = Math.abs(diffSigned);
     const volttol = defaultParams.abstol + defaultParams.reltol * Math.max(Math.abs(q0), Math.abs(q1));
     const chargetolRaw = defaultParams.reltol * Math.max(Math.max(Math.abs(q0), Math.abs(q1)), defaultParams.chgtol);
     const chargetol = chargetolRaw / dt;
     const tol = Math.max(volttol, chargetol);
 
-    // NGSPICE_REF_TRAP: ngspice cktterr.c TRAP order 2:
-    //   del = |deltaOld[0] * trtol * tol * 3 * (deltaOld[0]+deltaOld[1]) / diff|
-    const d0old = dt, d1old = dt;
-    const NGSPICE_REF_TRAP = Math.abs(d0old * defaultParams.trtol * tol * 3 * (d0old + d1old) / diffSigned);
+    const trapCoeff = [0.5, 0.08333333333];
+    const gearCoeff = [0.5, 0.2222222222, 0.1363636364, 0.096, 0.07299270073, 0.05830903790];
 
-    // NGSPICE_REF_GEAR2: ngspice cktterr.c GEAR order 2:
-    //   del = trtol*tol/max(abstol, factor*ddiff); result = exp(log(del)/(order+1))
-    const factor = 2 / 9; // GEAR_LTE_FACTORS[1]
-    const denom = Math.max(defaultParams.abstol, factor * ddiff);
-    const del = defaultParams.trtol * tol / denom;
-    const NGSPICE_REF_GEAR2 = Math.exp(Math.log(del) / (2 + 1));
+    // NGSPICE_REF_TRAP: cktterr.c:69-74 unified scalar form, order=2 TRAP.
+    // del = trtol * tol / max(abstol, factor * ddiff); order===2: sqrt(del)
+    const factorTrap = trapCoeff[2 - 1]; // order=2 -> index 1
+    const denomTrap = Math.max(defaultParams.abstol, factorTrap * ddiff);
+    const delTrap = defaultParams.trtol * tol / denomTrap;
+    const NGSPICE_REF_TRAP = Math.sqrt(delTrap);
+
+    // NGSPICE_REF_GEAR2: cktterr.c:69-74 unified scalar form, order=2 GEAR.
+    // del = trtol * tol / max(abstol, factor * ddiff); order===2: sqrt(del)
+    const factorGear = gearCoeff[2 - 1]; // order=2 -> index 1
+    const denomGear = Math.max(defaultParams.abstol, factorGear * ddiff);
+    const delGear = defaultParams.trtol * tol / denomGear;
+    const NGSPICE_REF_GEAR2 = Math.sqrt(delGear);
 
     expect(rTrap).toBe(NGSPICE_REF_TRAP);
     expect(rGear2).toBe(NGSPICE_REF_GEAR2);
@@ -347,12 +355,12 @@ describe("zero_allocations_in_lte_path", () => {
     });
 
     const dt = 1e-9;
-    const deltaOld = new RealF64([dt, dt, dt]);
+    const deltaOld: readonly number[] = [dt, dt, dt];
     const params: LteParams = { trtol: 7, reltol: 1e-3, abstol: 1e-6, chgtol: 1e-14 };
 
     // Warm up — first call may trigger internal initialisation not counted.
-    cktTerr(dt, Array.from(deltaOld), 1, "gear", 1e-12, 0.9e-12, 0.8e-12, 0, 1e-12, 0.9e-12, params);
-    cktTerrVoltage(5.0, 4.9, 4.8, 4.7, dt, Array.from(deltaOld), 1, "gear", 1e-3, 1e-6, 7);
+    cktTerr(dt, deltaOld, 1, "gear", 1e-12, 0.9e-12, 0.8e-12, 0, 1e-12, 0.9e-12, params);
+    cktTerrVoltage(5.0, 4.9, 4.8, 4.7, dt, deltaOld, 1, "gear", 1e-3, 1e-6, 7);
 
     // Reset counters after warmup.
     f64Count = 0;
@@ -361,10 +369,10 @@ describe("zero_allocations_in_lte_path", () => {
     // Run 100 LTE evaluations across orders 1 and 2, charge-based and voltage-based.
     for (let i = 0; i < 50; i++) {
       const q = 1e-12 * (1 + i * 0.01);
-      cktTerr(dt, Array.from(deltaOld), 1, "gear", q, q * 0.99, q * 0.98, 0, q, q * 0.99, params);
-      cktTerr(dt, Array.from(deltaOld), 2, "gear", q, q * 0.99, q * 0.98, q * 0.97, q, q * 0.99, params);
-      cktTerrVoltage(5 + i * 0.001, 4.9, 4.8, 4.7, dt, Array.from(deltaOld), 1, "gear", 1e-3, 1e-6, 7);
-      cktTerrVoltage(5 + i * 0.001, 4.9, 4.8, 4.7, dt, Array.from(deltaOld), 2, "gear", 1e-3, 1e-6, 7);
+      cktTerr(dt, deltaOld, 1, "gear", q, q * 0.99, q * 0.98, 0, q, q * 0.99, params);
+      cktTerr(dt, deltaOld, 2, "gear", q, q * 0.99, q * 0.98, q * 0.97, q, q * 0.99, params);
+      cktTerrVoltage(5 + i * 0.001, 4.9, 4.8, 4.7, dt, deltaOld, 1, "gear", 1e-3, 1e-6, 7);
+      cktTerrVoltage(5 + i * 0.001, 4.9, 4.8, 4.7, dt, deltaOld, 2, "gear", 1e-3, 1e-6, 7);
     }
 
     (globalThis as unknown as Record<string, unknown>)["Float64Array"] = RealF64;
@@ -452,7 +460,7 @@ describe("gear_lte_factor_selection", () => {
     const factor = 3 / 22; // correct GEAR order 3 factor
     const denom = Math.max(1e-12, factor * ddiff);
     const del = 7 * tol / denom;
-    const expectedOrder3 = Math.exp(Math.log(del) / (3 + 1)); // order+1=4
+    const expectedOrder3 = Math.exp(Math.log(del) / 3); // cktterr.c:69-74: root index = order
     expect(resultOrder3).toBe(expectedOrder3);
   });
 
@@ -486,7 +494,7 @@ describe("gear_lte_factor_selection", () => {
     const factor = 10 / 137; // correct GEAR order 5 factor
     const denom = Math.max(1e-12, factor * ddiff);
     const del = 7 * tol / denom;
-    const expectedOrder5 = Math.exp(Math.log(del) / (5 + 1)); // order+1=6
+    const expectedOrder5 = Math.exp(Math.log(del) / 5); // cktterr.c:69-74: root index = order
     expect(resultOrder5).toBe(expectedOrder5);
 
     // Regression guard against the incorrect 5/72 value.
@@ -521,7 +529,7 @@ describe("gear_lte_factor_selection", () => {
     const factor = 20 / 343;
     const denom = Math.max(1e-12, factor * ddiff);
     const del = 7 * tol / denom;
-    const expectedOrder6 = Math.exp(Math.log(del) / (6 + 1));
+    const expectedOrder6 = Math.exp(Math.log(del) / 6); // cktterr.c:69-74: root index = order
     expect(resultOrder6).toBe(expectedOrder6);
   });
 });
@@ -532,15 +540,15 @@ describe("gear_lte_factor_selection", () => {
 
 describe("cktTerr_formula_fixes", () => {
   it("cktTerr_trap_order1_matches_ngspice", () => {
-    // V3: TRAP order 1 formula: del = deltaOld[0] * sqrt(trtol * tol * 2 / ddiff)
-    // Inputs chosen so ddiff is nonzero (nonlinear charge history)
+    // cktterr.c:69-74: unified scalar form, order=1 TRAP.
+    // del = trtol * tol / max(abstol, factor * ddiff); order===1: return del raw
     const dt = 1e-6;
     const deltaOld = [1e-6, 1e-6, 1e-6, 1e-6, 1e-6, 1e-6, 1e-6];
     const q0 = 1e-12, q1 = 0.8e-12, q2 = 0.5e-12, q3 = 0;
     const ccap0 = 1e-10, ccap1 = 0.8e-10;
     const params: LteParams = { trtol: 7, reltol: 1e-3, abstol: 1e-12, chgtol: 1e-14 };
 
-    // Compute reference inline from corrected ngspice formula
+    // cktterr.c:69-74 unified scalar form
     const h0 = dt, h1 = deltaOld[1];
     let d0 = q0, d1 = q1, d2 = q2;
     d0 = (d0 - d1) / h0;
@@ -552,23 +560,26 @@ describe("cktTerr_formula_fixes", () => {
     const chargetol = chargetolRaw / dt;
     const volttol = 1e-12 + 1e-3 * Math.max(Math.abs(ccap0), Math.abs(ccap1));
     const tol = Math.max(volttol, chargetol);
-    const d0ref = deltaOld[0];
-    // ngspice cktterr.c TRAP order 1: del = deltaOld[0] * sqrt(trtol * tol * 2 / ddiff)
-    const reference = d0ref * Math.sqrt(7 * tol * 2 / ddiff);
+    const trapCoeff = [0.5, 0.08333333333];
+    const factor = trapCoeff[1 - 1]; // order=1 -> index 0
+    const denom = Math.max(params.abstol, factor * ddiff);
+    const del = params.trtol * tol / denom;
+    const reference = del; // order === 1: del returned raw, no root
 
     const result = cktTerr(dt, deltaOld, 1, "trapezoidal", q0, q1, q2, q3, ccap0, ccap1, params);
     expect(result).toBe(reference); // bit-exact IEEE-754
   });
 
   it("cktTerr_trap_order2_matches_ngspice", () => {
-    // V4: TRAP order 2 formula: del = |deltaOld[0] * trtol * tol * 3 * (deltaOld[0]+deltaOld[1]) / diff|
+    // cktterr.c:69-74: unified scalar form, order=2 TRAP.
+    // del = trtol * tol / max(abstol, factor * ddiff); order===2: sqrt(del)
     const dt = 1e-6;
     const deltaOld = [1e-6, 1e-6, 1e-6, 1e-6, 1e-6, 1e-6, 1e-6];
     const q0 = 27e-12, q1 = 8e-12, q2 = 1e-12, q3 = 0;
     const ccap0 = 27e-6, ccap1 = 8e-6;
     const params: LteParams = { trtol: 7, reltol: 1e-3, abstol: 1e-12, chgtol: 1e-14 };
 
-    // Compute reference inline from corrected ngspice formula
+    // cktterr.c:69-74 unified scalar form
     const h0 = dt, h1 = deltaOld[1], h2 = deltaOld[2];
     let d0 = q0, d1 = q1, d2 = q2, d3 = q3;
     d0 = (d0 - d1) / h0;
@@ -578,14 +589,17 @@ describe("cktTerr_formula_fixes", () => {
     d0 = (d0 - d1) / dt0ref;
     d1 = (d1 - d2) / dt1ref;
     dt0ref = dt1ref + h0;
-    const diff0Final = (d0 - d1) / dt0ref; // signed final divided difference
+    d0 = (d0 - d1) / dt0ref;
+    const ddiff = Math.abs(d0);
     const chargetolRaw = 1e-3 * Math.max(Math.max(Math.abs(q0), Math.abs(q1)), 1e-14);
     const chargetol = chargetolRaw / dt;
     const volttol = 1e-12 + 1e-3 * Math.max(Math.abs(ccap0), Math.abs(ccap1));
     const tol = Math.max(volttol, chargetol);
-    const d0r = deltaOld[0], d1r = deltaOld[1];
-    // ngspice cktterr.c TRAP order 2: del = |deltaOld[0] * trtol * tol * 3 * (d0+d1) / diff|
-    const reference = Math.abs(d0r * 7 * tol * 3 * (d0r + d1r) / diff0Final);
+    const trapCoeff = [0.5, 0.08333333333];
+    const factor = trapCoeff[2 - 1]; // order=2 -> index 1
+    const denom = Math.max(params.abstol, factor * ddiff);
+    const del = params.trtol * tol / denom;
+    const reference = Math.sqrt(del); // order === 2: sqrt(del)
 
     const result = cktTerr(dt, deltaOld, 2, "trapezoidal", q0, q1, q2, q3, ccap0, ccap1, params);
     expect(result).toBe(reference); // bit-exact IEEE-754
@@ -625,16 +639,17 @@ describe("cktTerr_formula_fixes", () => {
     expect(result).toBe(reference); // bit-exact IEEE-754
   });
 
-  it("cktTerr_gear_order1_sqrt", () => {
-    // V6: GEAR order 1 must take sqrt(del), not return del directly
-    // Verify: cktTerr GEAR order 1 result equals sqrt of the del computed before root extraction
+  it("cktTerr_gear_order1_raw_no_sqrt", () => {
+    // cktterr.c:69-74: GEAR order 1 returns del raw — no root extraction.
+    // Verify: cktTerr GEAR order 1 result equals del, not sqrt(del).
     const dt = 1e-6;
     const deltaOld = [1e-6, 1e-6, 1e-6, 1e-6, 1e-6];
     const q0 = 1e-12, q1 = 0.8e-12, q2 = 0.5e-12, q3 = 0;
     const ccap0 = 1e-10, ccap1 = 0.8e-10;
     const params: LteParams = { trtol: 7, reltol: 1e-3, abstol: 1e-12, chgtol: 1e-14 };
 
-    // Compute del directly (before root extraction)
+    // cktterr.c:69-74 unified scalar form, order=1 GEAR.
+    // del = trtol * tol / max(abstol, factor * ddiff); order===1: return del raw
     const h0 = dt, h1 = deltaOld[1];
     let d0 = q0, d1 = q1, d2 = q2;
     d0 = (d0 - d1) / h0;
@@ -646,14 +661,14 @@ describe("cktTerr_formula_fixes", () => {
     const chargetol = chargetolRaw / dt;
     const volttol = 1e-12 + 1e-3 * Math.max(Math.abs(ccap0), Math.abs(ccap1));
     const tol = Math.max(volttol, chargetol);
-    const factor = 0.5; // GEAR_LTE_FACTORS[0]
+    const gearCoeff = [0.5, 0.2222222222, 0.1363636364, 0.096, 0.07299270073, 0.05830903790];
+    const factor = gearCoeff[1 - 1]; // order=1 -> index 0
     const denom = Math.max(1e-12, factor * ddiff);
     const del = 7 * tol / denom;
-    const expectedSqrt = Math.sqrt(del);
 
     const result = cktTerr(dt, deltaOld, 1, "gear", q0, q1, q2, q3, ccap0, ccap1, params);
-    expect(result).toBe(expectedSqrt); // must be sqrt(del), not del
-    expect(result).not.toBe(del);       // confirm del != sqrt(del) for this input
+    expect(result).toBe(del);                  // order === 1: del returned raw
+    expect(result).not.toBe(Math.sqrt(del));   // confirm sqrt(del) != del for this input
   });
 
   it("cktTerrVoltage_gear_order1_sqrt", () => {
@@ -684,15 +699,17 @@ describe("cktTerr_formula_fixes", () => {
     expect(result).toBe(expectedResult);
   });
 
-  it("gear_higher_order_root_is_order_plus_one", () => {
-    // V6: GEAR order 3 root extraction must use exp(log(tmp)/(order+1)) = exp(log(tmp)/4)
+  it("gear_higher_order_root_is_order", () => {
+    // cktterr.c:69-74: GEAR order>2 root index is order, NOT order+1.
+    // For order=3: exp(log(del)/3) = del^(1/3), not del^(1/4).
     const dt = 1e-6;
     const deltaOld = [1e-6, 1e-6, 1e-6, 1e-6, 1e-6];
     const q0 = 27e-12, q1 = 8e-12, q2 = 1e-12, q3 = 0;
     const ccap0 = 27e-6, ccap1 = 8e-6;
     const params: LteParams = { trtol: 7, reltol: 1e-3, abstol: 1e-12, chgtol: 1e-14 };
 
-    // Compute del (before root extraction)
+    // cktterr.c:69-74 unified scalar form, order=3 GEAR.
+    // del = trtol * tol / max(abstol, factor * ddiff); order>2: exp(log(del) / order)
     const h0 = dt, h1 = deltaOld[1], h2 = deltaOld[2];
     let d0 = q0, d1 = q1, d2 = q2, d3 = q3;
     d0 = (d0 - d1) / h0;
@@ -708,16 +725,17 @@ describe("cktTerr_formula_fixes", () => {
     const chargetol = chargetolRaw / dt;
     const volttol = 1e-12 + 1e-3 * Math.max(Math.abs(ccap0), Math.abs(ccap1));
     const tol = Math.max(volttol, chargetol);
-    const factor = 3 / 22; // GEAR_LTE_FACTORS[2] for order 3
+    const gearCoeff = [0.5, 0.2222222222, 0.1363636364, 0.096, 0.07299270073, 0.05830903790];
+    const factor = gearCoeff[3 - 1]; // order=3 -> index 2
     const denom = Math.max(1e-12, factor * ddiff);
     const del = 7 * tol / denom;
-    // Correct: exp(log(del) / (3+1)) = exp(log(del)/4) = del^(1/4)
-    const expectedOrderPlus1 = Math.exp(Math.log(del) / 4);
-    // Wrong (old): exp(log(del) / 3) = del^(1/3)
-    const wrongOrder = Math.exp(Math.log(del) / 3);
+    // Correct: exp(log(del) / order) = exp(log(del)/3) = del^(1/3)
+    const expectedOrder = Math.exp(Math.log(del) / 3);
+    // Wrong (old): exp(log(del) / (order+1)) = exp(log(del)/4) = del^(1/4)
+    const wrongOrderPlus1 = Math.exp(Math.log(del) / 4);
 
     const result = cktTerr(dt, deltaOld, 3, "gear", q0, q1, q2, q3, ccap0, ccap1, params);
-    expect(result).toBe(expectedOrderPlus1); // bit-exact: uses (order+1)=4
-    expect(result).not.toBe(wrongOrder);     // confirm old formula was different
+    expect(result).toBe(expectedOrder);        // bit-exact: uses root index = order = 3
+    expect(result).not.toBe(wrongOrderPlus1);  // confirm old order+1 formula was different
   });
 });

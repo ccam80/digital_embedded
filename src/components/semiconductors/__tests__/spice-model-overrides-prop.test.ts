@@ -15,7 +15,6 @@ import { SchottkyDiodeDefinition } from "../schottky.js";
 import { ScrDefinition } from "../scr.js";
 import { DiacDefinition } from "../diac.js";
 import { TriacDefinition } from "../triac.js";
-import { TunnelDiodeDefinition } from "../tunnel-diode.js";
 import type { ComponentDefinition } from "../../../core/registry.js";
 
 // ---------------------------------------------------------------------------
@@ -41,7 +40,6 @@ const SEMICONDUCTOR_DEFS: ComponentDefinition[] = [
   ScrDefinition,
   DiacDefinition,
   TriacDefinition,
-  TunnelDiodeDefinition,
 ];
 
 describe("modelRegistry on semiconductor components", () => {

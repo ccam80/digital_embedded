@@ -6,7 +6,7 @@ describe("Task 3.2.5 — xfact scope audit", () => {
   /**
    * Scope audit for ctx.xfact reads across src/components/ and src/solver/analog/.
    *
-   * Every read of .xfact or ctx.xfact (except the one write at analog-engine.ts:430)
+   * Every read of .xfact or ctx.xfact (except the one write at analog-engine.ts:447)
    * must be guarded by (ctx.cktMode & MODEINITPRED) !== 0.
    *
    * Expected reads after Phase 3.2:
@@ -20,17 +20,17 @@ describe("Task 3.2.5 — xfact scope audit", () => {
   const allowlistComponents: { file: string; line: number; reason: string }[] = [
     {
       file: "semiconductors\\mosfet.ts",
-      line: 1410,
+      line: 1496,
       reason:
-        "comment inside MODEINITPRED|MODEINITTRAN guard — mentions ctx.xfact to explain why it is NOT used; not an actual read",
+        "comment inside MODEINITPRED|MODEINITTRAN guard — mentions ctx.xfact to explain why it is NOT used (mos1load.c:828 uses local xfact, computed once per call); not an actual ctx.xfact read",
     },
   ];
 
   const allowlistSolver: { file: string; line: number; reason: string }[] = [
     {
       file: "analog-engine.ts",
-      line: 432,
-      reason: "engine-side xfact computation (write, not a guarded read)",
+      line: 447,
+      reason: "engine-side xfact write (ctx.loadCtx.xfact = deltaOld[0]/deltaOld[1]); cite: bjtload.c:279 xfact = CKTdelta/CKTdeltaOld[1]",
     },
   ];
 

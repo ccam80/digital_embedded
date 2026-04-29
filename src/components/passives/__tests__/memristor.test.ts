@@ -310,18 +310,18 @@ describe("Memristor", () => {
 
       const G = mem.conductance();
 
-      // Expect 4 conductance stamps: (0,0,G), (0,1,-G), (1,0,-G), (1,1,G)
-      // (node 1 → index 0, node 2 → index 1)
+      // Expect 4 conductance stamps: (1,1,G), (1,2,-G), (2,1,-G), (2,2,G)
+      // (node 1 → row/col 1, node 2 → row/col 2 — 1-based MNA convention)
       const entries = solver.getCSCNonZeros();
       const sumAt = (row: number, col: number) =>
         entries
           .filter((e) => e.row === row && e.col === col)
           .reduce((acc, e) => acc + e.value, 0);
 
-      expect(sumAt(0, 0)).toBe(G);
-      expect(sumAt(0, 1)).toBe(-G);
-      expect(sumAt(1, 0)).toBe(-G);
       expect(sumAt(1, 1)).toBe(G);
+      expect(sumAt(1, 2)).toBe(-G);
+      expect(sumAt(2, 1)).toBe(-G);
+      expect(sumAt(2, 2)).toBe(G);
     });
   });
 

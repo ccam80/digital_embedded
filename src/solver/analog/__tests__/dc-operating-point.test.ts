@@ -310,8 +310,8 @@ function makeCtx(
   const matrixSize = nodeCount + branchCount;
   ctx.statePool = pool;
   const numStates = pool.state0.length;
-  ctx.dcopSavedState0 = new Float64Array(Math.max(numStates, 1));
-  ctx.dcopOldState0 = new Float64Array(Math.max(numStates, 1));
+  ctx.dcopSavedState0 = new Float64Array(numStates);
+  ctx.dcopOldState0 = new Float64Array(numStates);
   ctx.loadCtx.setStatePool(pool);
   ctx.allocateRowBuffers(matrixSize);
 

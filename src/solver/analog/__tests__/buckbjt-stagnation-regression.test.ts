@@ -6,7 +6,7 @@
  *   - NPN: base via 1kΩ, collector pulled up to 10V through 10kΩ → NDRV
  *   - PNP: base via 1kΩ, collector pulled down through 10kΩ → PDRV
  * NDRV drives the NMOS gate. The NMOS drain is on the 10V rail; the
- * source switches into a tunnel diode (freewheeling clamp to ground)
+ * source switches into a diode (freewheeling clamp to ground)
  * and an L-C-R output filter (300mH, 10µF, 50Ω).
  *
  * These are transient-stagnation regression tests — they verify the

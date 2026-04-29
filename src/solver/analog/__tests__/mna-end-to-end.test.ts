@@ -29,7 +29,7 @@ import { compileUnified } from "@/compile/compile.js";
 import { MNAEngine } from "../analog-engine.js";
 import { ConcreteCompiledAnalogCircuit } from "../compiled-analog-circuit.js";
 import { EngineState } from "../../../core/engine-interface.js";
-import { allocateStatePool } from "./test-helpers.js";
+import { StatePool } from "../state-pool.js";
 import { makeDcVoltageSource, DC_VOLTAGE_SOURCE_DEFAULTS } from "../../../components/sources/dc-voltage-source.js";
 
 // Import real component definitions
@@ -183,7 +183,6 @@ function buildHandCircuit(opts: {
   nodeCount: number;
   elements: import("../element.js").AnalogElement[];
 }): ConcreteCompiledAnalogCircuit {
-  const statePool = allocateStatePool(opts.elements);
   return new ConcreteCompiledAnalogCircuit({
     nodeCount: opts.nodeCount,
     elements: opts.elements,
@@ -191,7 +190,13 @@ function buildHandCircuit(opts: {
     wireToNodeId: new Map(),
     models: new Map(),
     elementToCircuitElement: new Map(),
-    statePool,
+    // Hand circuits MUST hand the engine an empty placeholder pool, then let
+    // MNAEngine._setup() walk every element's setup() to drive ctx.allocStates
+    // → engine._numStates → allocateStateBuffers. Pre-calling allocateStatePool
+    // sets _stateBase=0, which trips the diode/BJT/MOSFET setup idempotency
+    // guard, skipping the engine's allocation and leaving every pool-backed
+    // state read returning undefined.
+    statePool: new StatePool(0),
   });
 }
 

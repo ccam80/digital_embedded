@@ -22,7 +22,6 @@ const BANNED_IDENTIFIERS = [
   { id: "poolBackedElements", pattern: /\bpoolBackedElements\b/ },
   { id: "refreshElementRefs", pattern: /\brefreshElementRefs\b/ },
   { id: "mnaAssembler", pattern: /\bMNAAssembler\b/ },
-  { id: "tunnelDiodeMapping", pattern: /\bTUNNEL_DIODE_MAPPING\b/ },
   { id: "varactorMapping", pattern: /\bVARACTOR_MAPPING\b/ },
   { id: "derivedNgspiceSlots", pattern: /\bderivedNgspiceSlots\b/ },
   { id: "junctionCap", pattern: /\bjunctionCap\b/ },

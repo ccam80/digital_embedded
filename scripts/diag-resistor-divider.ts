@@ -10,7 +10,7 @@ import { SparseSolver } from "../src/solver/analog/sparse-solver.js";
 
 const n = 3; // 2 nodes + 1 voltage-source branch
 const solver = new SparseSolver();
-solver.beginAssembly(n);
+
 
 // Voltage source: V=5V, +node=1 (idx 0), -node=GND, branch=2
 const k = 2;

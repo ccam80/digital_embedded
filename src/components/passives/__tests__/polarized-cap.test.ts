@@ -363,7 +363,7 @@ describe("PolarizedCap", () => {
       const vs = makeDcVoltageSource(new Map([["pos", 1], ["neg", 0]]), vsProps, () => 0);
       const rSeries = makeResistorElement(1, 2, R);
       const clampDiode296 = makeClampDiode(2, 0);
-      const cap = new AnalogPolarizedCapElement(C, esr, rLeak, 1.0, () => {}, NaN, 1, clampDiode296);
+      const cap = new AnalogPolarizedCapElement(C, esr, rLeak, 1.0, () => {}, 0, 1, clampDiode296);
       cap._pinNodes = new Map([["pos", 2], ["neg", 0]]);
       // State pool is allocated once and persists across timesteps; setup() is
       // re-run per step on the fresh solver so cached matrix handles bind to

@@ -30,10 +30,9 @@ import type { SetupContext } from "../../solver/analog/setup-context.js";
 import { defineModelParams, kelvinToCelsius } from "../../core/model-params.js";
 
 import {
-  createBjtElement,
-  createPnpBjtElement,
-  BJT_NPN_DEFAULTS,
-  BJT_PNP_DEFAULTS,
+  createBjtL1Element,
+  BJT_SPICE_L1_NPN_DEFAULTS,
+  BJT_SPICE_L1_PNP_DEFAULTS,
 } from "./bjt.js";
 
 // ---------------------------------------------------------------------------
@@ -63,13 +62,13 @@ export const { paramDefs: SCR_PARAM_DEFS, defaults: SCR_PARAM_DEFAULTS } = defin
 
 function makeNpnProps(BF: number, IS: number, RC: number, RB: number, RE: number, AREA: number, TEMP: number): PropertyBag {
   const bag = new PropertyBag(new Map<string, number>().entries());
-  bag.replaceModelParams({ ...BJT_NPN_DEFAULTS, BF, IS, RC, RB, RE, AREA, TEMP });
+  bag.replaceModelParams({ ...BJT_SPICE_L1_NPN_DEFAULTS, BF, IS, RC, RB, RE, AREA, TEMP });
   return bag;
 }
 
 function makePnpProps(BR: number, IS: number, RC: number, RB: number, RE: number, AREA: number, TEMP: number): PropertyBag {
   const bag = new PropertyBag(new Map<string, number>().entries());
-  bag.replaceModelParams({ ...BJT_PNP_DEFAULTS, BR, IS, RC, RB, RE, AREA, TEMP });
+  bag.replaceModelParams({ ...BJT_SPICE_L1_PNP_DEFAULTS, BR, IS, RC, RB, RE, AREA, TEMP });
   return bag;
 }
 
@@ -90,14 +89,14 @@ class ScrCompositeElement implements AnalogElement {
   private _vintNode: number = -1;
   private _internalLabels: string[] = [];
 
-  readonly _q1: ReturnType<typeof createBjtElement>;  // NPN: B=G, C=Vint, E=K
-  readonly _q2: ReturnType<typeof createBjtElement>;  // PNP: B=Vint, C=G, E=A
+  readonly _q1: AnalogElement;  // NPN: B=G, C=Vint, E=K
+  readonly _q2: AnalogElement;  // PNP: B=Vint, C=G, E=A
 
   constructor(
     label: string,
     pinNodes: ReadonlyMap<string, number>,
-    q1: ReturnType<typeof createBjtElement>,
-    q2: ReturnType<typeof createBjtElement>,
+    q1: AnalogElement,
+    q2: AnalogElement,
   ) {
     this.label = label;
     this._pinNodes = new Map(pinNodes);
@@ -191,7 +190,7 @@ function createScrElement(
   const pnpProps = makePnpProps(BR, IS, RC, RB, RE, AREA, TEMP);
 
   // Q1 NPN: B=G, C=Vint, E=K — Vint not known yet; overwritten in setup()
-  const q1 = createBjtElement(
+  const q1 = createBjtL1Element(1, false)(
     new Map([["B", pinNodes.get("G")!], ["C", 0], ["E", pinNodes.get("K")!]]),
     npnProps,
     () => 0,
@@ -199,7 +198,7 @@ function createScrElement(
   (q1 as any).label = `${label}#Q1`;
 
   // Q2 PNP: B=Vint, C=G, E=A — Vint not known yet; overwritten in setup()
-  const q2 = createPnpBjtElement(
+  const q2 = createBjtL1Element(-1, false)(
     new Map([["B", 0], ["C", pinNodes.get("G")!], ["E", pinNodes.get("A")!]]),
     pnpProps,
     () => 0,

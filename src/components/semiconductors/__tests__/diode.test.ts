@@ -1418,13 +1418,6 @@ describe("DIODE_PARAM_DEFS partition layout", () => {
     }
   });
 
-  it("IBEQ, IBSW, NB are NOT present in plain Diode schema (moved to TunnelDiode in Step 3a)", () => {
-    const tunnelKeys = ["IBEQ", "IBSW", "NB"];
-    for (const key of tunnelKeys) {
-      const def = DIODE_PARAM_DEFS.find((d) => d.key === key);
-      expect(def, `Tunnel-only param "${key}" must NOT be in DIODE_PARAM_DEFS`).toBeUndefined();
-    }
-  });
 });
 
 // ---------------------------------------------------------------------------

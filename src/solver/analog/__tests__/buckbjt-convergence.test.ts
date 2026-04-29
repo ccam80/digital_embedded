@@ -8,7 +8,7 @@
  *
  * Fixture: `fixtures/buckbjt.dts` — BJT-driven buck converter. A 10kHz
  * square wave feeds two BJT gate-driver stages (NPN/PNP) that switch
- * an NMOS into a tunnel-diode freewheeling clamp and an L-C-R output
+ * an NMOS into a diode freewheeling clamp and an L-C-R output
  * filter. Canonical multi-junction DC-OP convergence stress test.
  *
  * The test runs `ComparisonSession.runDcOp()` against the instrumented
