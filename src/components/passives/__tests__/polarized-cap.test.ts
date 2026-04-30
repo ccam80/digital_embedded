@@ -10,6 +10,8 @@
  */
 
 import { describe, it, expect } from "vitest";
+import { DefaultSimulatorFacade } from "../../../headless/default-facade.js";
+import { createDefaultRegistry } from "../../register-all.js";
 import {
   PolarizedCapDefinition,
   AnalogPolarizedCapElement,
@@ -169,31 +171,6 @@ function makeCapElement(opts: {
   return el;
 }
 
-/**
- * Build a resistor analog element for test use.
- * n_a and n_b are 1-based (0 = ground).
- */
-function makeResistorElement(nA: number, nB: number, resistance: number) {
-  const G = 1 / resistance;
-  return {
-    label: "",
-    _pinNodes: new Map([["a", nA], ["b", nB]]),
-    _stateBase: -1,
-    branchIndex: -1,
-    ngspiceLoadOrder: 0,
-    setParam(_key: string, _value: number): void {},
-    getPinCurrents(_v: Float64Array): number[] { return []; },
-    setup(_ctx: LoadContext): void {},
-    load(ctx: LoadContext): void {
-      const { solver } = ctx;
-      if (nA !== 0) solver.stampElement(solver.allocElement(nA, nA), G);
-      if (nA !== 0 && nB !== 0) solver.stampElement(solver.allocElement(nA, nB), -G);
-      if (nB !== 0 && nA !== 0) solver.stampElement(solver.allocElement(nB, nA), -G);
-      if (nB !== 0) solver.stampElement(solver.allocElement(nB, nB), G);
-    },
-  };
-}
-
 // ---------------------------------------------------------------------------
 // PolarizedCap tests
 // ---------------------------------------------------------------------------
@@ -335,153 +312,51 @@ describe("PolarizedCap", () => {
   });
 
   describe("charges_with_rc_time_constant", () => {
-    it("capacitor voltage reaches 63% of step voltage at t  RC", () => {
-      // RC circuit: 10ÂµF cap + 1kÎ series resistor, 5V step input
-      // Run transient to t = RC = 10ms using backward Euler.
-      // Expected: V(cap_pos)  5 * (1 - exp(-1))  3.161V at t = RC.
+    it("capacitor voltage reaches 63% of step voltage at t≈RC", async () => {
+      // RC circuit: 10µF PolarizedCap + 1kΩ series resistor, 5V step input.
+      // Run transient to t = RC = 10ms via DefaultSimulatorFacade.stepToTime.
+      // Expected: V(cap:pos) ≈ 5 * (1 - exp(-1)) ≈ 3.161V at t = RC.
       //
-      // MNA layout (1-based nodes, 0=ground):
-      //   node 1 = voltage source positive terminal
-      //   node 2 = junction of R and cap positive terminal
-      //   node 3 = cap internal node (between ESR and cap body)
-      //   branch 3 (solver row 3) = voltage source branch current
-      //   matrixSize = 4 (3 non-ground nodes + 1 voltage source branch)
-      //
-      // Cap: [nPos=2, nNeg=0(ground), nCap=3]
-      // R: node1 â†" node2
-      // Vs: node1 to ground (branchIdx=3 = solver row 3)
-
+      // Circuit: DcVoltageSource(vs) → Resistor(r) → PolarizedCap(cap) → Ground(gnd)
+      // cap:pos labeled "cap" so readAllSignals returns "cap:pos".
       const V_step = 5;
       const R = 1000;
       const C = 10e-6;
-      const rLeak = 25e6;
-      const esr = 1e-3;     // tiny ESR so internal node is valid
-      const RC = R * C;     // 10 ms
+      const RC = R * C; // 10 ms
 
-      const vsProps = new PropertyBag();
-      vsProps.setModelParam("voltage", V_step);
-      const vs = makeDcVoltageSource(new Map([["pos", 1], ["neg", 0]]), vsProps, () => 0);
-      const rSeries = makeResistorElement(1, 2, R);
-      const clampDiode296 = makeClampDiode(2, 0);
-      const cap = new AnalogPolarizedCapElement(C, esr, rLeak, 1.0, () => {}, 0, 1, clampDiode296);
-      cap._pinNodes = new Map([["pos", 2], ["neg", 0]]);
-      // State pool is allocated once and persists across timesteps; setup() is
-      // re-run per step on the fresh solver so cached matrix handles bind to
-      // the live sparse structure. _stateBase is set per step but always to
-      // the same offset because allocStates is the only state stream.
-      const capPool = new StatePool(Math.max(cap.stateSize, 1));
+      const registry = createDefaultRegistry();
+      const facade = new DefaultSimulatorFacade(registry);
+      const circuit = facade.build({
+        components: [
+          { id: "vs",  type: "DcVoltageSource", props: { voltage: V_step } },
+          { id: "r",   type: "Resistor",        props: { resistance: R } },
+          // IC=0: force cap body to start at 0V via MODEUIC rather than DCOP value.
+          { id: "cap", type: "PolarizedCap",    props: { capacitance: C, esr: 1e-3, leakageCurrent: 2e-7, voltageRating: 25, IC: 0, label: "cap" } },
+          { id: "gnd", type: "Ground" },
+        ],
+        connections: [
+          ["vs:pos",  "r:A"],
+          ["r:B",     "cap:pos"],
+          ["cap:neg", "gnd:out"],
+          ["vs:neg",  "gnd:out"],
+        ],
+      });
 
-      // Layout: node 1 = vsrc pos, node 2 = R/cap junction, node 3 = internal
-      // cap node (allocated by setup), branch row 4 = vsrc.
-      const matrixSize = 4;
-      const voltages = new Float64Array(matrixSize + 1);
+      const coordinator = facade.compile(circuit);
 
-      // Run 500 steps at dt = RC/500 = 20Âµs using order-1 trap (no ringing on step input)
-      const dt = RC / 500;
-      const steps = 500;
+      // Advance to t = RC via the public stepToTime API.
+      // Timestep granularity is owned by LTE/NR adaptive subdivision inside
+      // coordinator.step() — no maxTimeStep knob needed.
+      await coordinator.stepToTime(RC);
 
-      const method: IntegrationMethod = "trapezoidal";
-      const order = 1;
-      const deltaOld = [dt, dt, dt, dt, dt, dt, dt];
-      const ag = new Float64Array(7);
-      const scratch = new Float64Array(64);
-      computeNIcomCof(dt, deltaOld, order, method, ag, scratch);
+      const signals = facade.readAllSignals(coordinator);
+      // "cap:pos" is the voltage at the positive terminal of the PolarizedCap.
+      const vCapPos = signals["cap:pos"];
+      expect(vCapPos).toBeDefined();
+      expect(coordinator.simTime).toBeGreaterThanOrEqual(RC * 0.99);
 
-      // Run setup() ONCE on a freshly-allocated solver to assign
-      // cap._stateBase and the embedded clamp-diode's _stateBase. After this
-      // call, we keep the cached matrix-handle layout consistent across
-      // iterations by reusing the same solver via _initStructure() — that
-      // entry point clears the assembly state but preserves matrix-row
-      // allocation when paired with re-stamping every iteration.
-      const setupSolver = new SparseSolver();
-      setupSolver._initStructure();
-      const initSetupCtx = makeTestSetupContext({ solver: setupSolver, startNode: 3, startBranch: 4 });
-      setupAll([vs, cap as unknown as AnalogElement], initSetupCtx);
-      cap.initState(capPool);
-
-      for (let step = 0; step < steps; step++) {
-        // Fresh solver each step: SparseSolver._numericLUMarkowitz permanently
-        // permutes _colHead via _swapColumnsForPivot during Markowitz pivot
-        // selection. Reusing the same solver across steps causes accumulated
-        // column swaps that corrupt subsequent factorizations.
-        const solver = new SparseSolver();
-        solver._initStructure();
-        // Re-run setup() so cached matrix handles in vs and cap point at the
-        // fresh sparse structure built on this iteration's solver. Reset
-        // branchIndex on vs so it allocates a fresh branch row that lands at
-        // startBranch=4 on every step (idempotent).
-        (vs as { branchIndex: number }).branchIndex = -1;
-        const setupCtx = makeTestSetupContext({ solver, startNode: 3, startBranch: 4 });
-        setupAll([vs, cap as unknown as AnalogElement], setupCtx);
-
-        const cktMode = step === 0 ? (MODETRAN | MODEINITTRAN) : (MODETRAN | MODEINITFLOAT);
-        const ctx = loadCtxFromFields({
-          cktMode,
-          solver,
-          matrix: solver,
-          rhs: voltages,
-          rhsOld: voltages,
-          time: 0,
-          dt,
-          method,
-          order,
-          deltaOld,
-          ag,
-          srcFact: 1,
-          noncon: { value: 0 },
-          limitingCollector: null,
-          convergenceCollector: null,
-          xfact: 1,
-          gmin: 1e-12,
-          reltol: 1e-3,
-          iabstol: 1e-12,
-          temp: 300.15,
-          vt: 0.025852,
-          cktFixLimit: false,
-          bypass: false,
-          voltTol: 1e-6,
-        });
-
-        vs.load(ctx);
-        rSeries.load(ctx);
-        cap.load(ctx);
-
-        if (step === 0) {
-          // eslint-disable-next-line no-console
-          console.log(`PRE-FACTOR step=${step} rhs=`, Array.from(voltages));
-          // eslint-disable-next-line no-console
-          console.log(`  cap _stateBase=${(cap as unknown as { _stateBase: number })._stateBase} _nCap=${(cap as unknown as { _nCap: number })._nCap} clamp._stateBase=${(cap as unknown as { _clampDiode: { _stateBase: number } })._clampDiode._stateBase}`);
-          // eslint-disable-next-line no-console
-          console.log(`  vs.branchIndex=${(vs as { branchIndex: number }).branchIndex}`);
-        }
-        const factorResult = solver.factor();
-        if (factorResult !== 0) {
-          throw new Error(`Singular matrix at step ${step}`);
-        }
-        solver.solve(voltages, voltages);
-        if (step === 0 || step === 1 || step === 100 || step === 499) {
-          // eslint-disable-next-line no-console
-          console.log(`step=${step} voltages=`, Array.from(voltages));
-        }
-
-        // Accept pass: commit post-solve state (updated voltages) to pool.
-        // Uses a no-op stub solver to call cap.load() for state writes only,
-        // without disturbing the main solver or creating a stale second assembly.
-        const stubSolver = {
-          allocElement: (_r: number, _c: number) => 0,
-          stampElement: (_h: number, _v: number) => {},
-          stampRHS: (_r: number, _v: number) => {},
-        } as unknown as SparseSolver;
-        cap.load({ ...ctx, solver: stubSolver });
-
-        capPool.rotateStateVectors();
-      }
-
-      // After RC seconds, V(cap_pos = node2)  5*(1-exp(-1))  3.161V.
-      // voltages is 1-based (index 0 = ground), so node 2 lives at voltages[2].
-      const vCapPos = voltages[2];
-      const expected = V_step * (1 - Math.exp(-1));
-      const tolerance = 0.10; // 10%  order-1 trap has first-order error
+      const expected = V_step * (1 - Math.exp(-1)); // ≈ 3.161 V
+      const tolerance = 0.10; // 10% — accounts for first-order trap error
       expect(Math.abs(vCapPos - expected) / expected).toBeLessThan(tolerance);
     });
   });

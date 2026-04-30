@@ -12,12 +12,12 @@
 import { describe, it, expect } from "vitest";
 import { OpAmpDefinition } from "../opamp.js";
 import { PropertyBag } from "../../../core/properties.js";
-import { makeDcVoltageSource, DC_VOLTAGE_SOURCE_DEFAULTS } from "../../sources/dc-voltage-source.js";
-import { runDcOp, makeLoadCtx, makeSimpleCtx } from "../../../solver/analog/__tests__/test-helpers.js";
+import { makeLoadCtx, makeSimpleCtx } from "../../../solver/analog/__tests__/test-helpers.js";
 import type { AnalogElement } from "../../../solver/analog/element.js";
 import { SparseSolver } from "../../../solver/analog/sparse-solver.js";
 import { MODEDCOP, MODEINITFLOAT } from "../../../solver/analog/ckt-mode.js";
-import { solveDcOperatingPoint } from "../../../solver/analog/dc-operating-point.js";
+import { DefaultSimulatorFacade } from "../../../headless/default-facade.js";
+import { createDefaultRegistry } from "../../../components/register-all.js";
 
 // ---------------------------------------------------------------------------
 // Helper: narrow ModelEntry to inline factory (throws if netlist kind)
@@ -65,12 +65,6 @@ function makeOpAmp(opts: {
 function readVal(solver: SparseSolver, extRow: number, extCol: number): number {
   const handle = solver.allocElement(extRow, extCol);
   return (solver as unknown as { _elVal: Float64Array })._elVal[handle];
-}
-
-function makeVsrc(posNode: number, negNode: number, voltage: number): AnalogElement {
-  const props = new PropertyBag();
-  props.replaceModelParams({ ...DC_VOLTAGE_SOURCE_DEFAULTS, voltage });
-  return makeDcVoltageSource(new Map([["pos", posNode], ["neg", negNode]]), props, () => 0);
 }
 
 // ---------------------------------------------------------------------------
@@ -161,54 +155,30 @@ describe("OpAmp", () => {
   });
 
   it("output_impedance", () => {
-    // Circuit: Vin=2µV fixes in+, in- grounded via VS, R_load=75Ω on output.
-    // With VCVS gain=1e6 and rOut=75Ω: Vout_open = gain*Vin = 2V
-    // With R_load = rOut = 75Ω: Vout ≈ 1V (voltage divider across rOut+R_load)
-    //
-    // MNA: nodes 1..5, branches 6..9
-    // matrixSize = 1010: large to accommodate opamp internal nodes allocated
-    // by setupElements starting at nodeCount=1000 → vint=1001, branch=1002.
-    //   node 1 = in+, node 2 = in- (grounded via VS), node 3 = out
-    //   node 4 = Vcc+, node 5 = Vcc-
-    const nInp = 1, nInn = 2, nOut = 3, nVccP = 4, nVccN = 5;
-    const matrixSize = 1010;
-
-    const props = new PropertyBag([]);
-    props.replaceModelParams({ gain: 1e6, rOut: 75 });
-    const opampEl = getFactory(OpAmpDefinition.modelRegistry!["behavioral"]!)(
-      new Map([["in+", nInp], ["in-", nInn], ["out", nOut]]), props, () => 0,
-    );
-
-    // 75Ω load on output
-    const G_load = 1 / 75;
-    const rLoadEl: AnalogElement = {
-      label: "",
-      _pinNodes: new Map([["pos", nOut], ["neg", 0]]),
-      _stateBase: -1,
-      branchIndex: -1,
-      ngspiceLoadOrder: 40,
-      setParam(_key: string, _value: number): void {},
-      getPinCurrents(): number[] { return []; },
-      setup(_ctx): void {},
-      load(ctx): void {
-        const h = ctx.solver.allocElement(nOut, nOut);
-        ctx.solver.stampElement(h, G_load);
-      },
-    };
-
-    const vinSource  = makeVsrc(nInp,  0, 2e-6);
-    const vinnSource = makeVsrc(nInn,  0, 0);
-    const vccPSource = makeVsrc(nVccP, 0, 15);
-    const vccNSource = makeVsrc(nVccN, 0, -15);
-
-    const result = runDcOp({
-      elements: [opampEl, rLoadEl, vinSource, vinnSource, vccPSource, vccNSource],
-      matrixSize,
-      nodeCount: 5,
-      branchCount: matrixSize - 5,
+    // Circuit: Vin=2µV fixes in+, in- grounded, R_load=75Ω on output.
+    // With gain=1e6 and rOut=75Ω: Vout ≈ 1V (voltage divider across rOut+R_load).
+    const registry = createDefaultRegistry();
+    const facade = new DefaultSimulatorFacade(registry);
+    const circuit = facade.build({
+      components: [
+        { id: "vin",  type: "DcVoltageSource", props: { voltage: 2e-6 } },
+        { id: "vinn", type: "DcVoltageSource", props: { voltage: 0 } },
+        { id: "rl",   type: "Resistor",        props: { resistance: 75 } },
+        { id: "opamp", type: "OpAmp",          props: { gain: 1e6, rOut: 75 } },
+        { id: "gnd",  type: "Ground" },
+      ],
+      connections: [
+        ["vin:pos",  "opamp:in+"],
+        ["vin:neg",  "gnd:out"],
+        ["vinn:pos", "opamp:in-"],
+        ["vinn:neg", "gnd:out"],
+        ["opamp:out", "rl:A"],
+        ["rl:B",     "gnd:out"],
+      ],
     });
-
-    expect(result.converged).toBe(true);
+    const coordinator = facade.compile(circuit);
+    const result = facade.getDcOpResult();
+    expect(result?.converged).toBe(true);
   });
 });
 
@@ -217,106 +187,60 @@ describe("OpAmp", () => {
 // ---------------------------------------------------------------------------
 
 describe("Integration", () => {
-  function makeResistor(nodeA: number, nodeB: number, resistance: number): AnalogElement {
-    const G = 1 / resistance;
-    return {
-      label: "",
-      _pinNodes: new Map([["a", nodeA], ["b", nodeB]]),
-      _stateBase: -1,
-      branchIndex: -1,
-      ngspiceLoadOrder: 40,
-      setParam(_key: string, _value: number): void {},
-      getPinCurrents(): number[] { return []; },
-      setup(_ctx): void {},
-      load(ctx): void {
-        const { solver } = ctx;
-        if (nodeA > 0) { const h = solver.allocElement(nodeA, nodeA); solver.stampElement(h, G); }
-        if (nodeB > 0) { const h = solver.allocElement(nodeB, nodeB); solver.stampElement(h, G); }
-        if (nodeA > 0 && nodeB > 0) {
-          const hab = solver.allocElement(nodeA, nodeB); solver.stampElement(hab, -G);
-          const hba = solver.allocElement(nodeB, nodeA); solver.stampElement(hba, -G);
-        }
-      },
-    };
-  }
-
   it("inverting_amplifier", () => {
     // Inverting amplifier: gain = -Rf/Rin = -10kΩ/1kΩ = -10
-    // Vin = 1V  Vout ≈ -10V
-    //
-    // Node assignments:
-    //   node 1 = Vin terminal
-    //   node 2 = in- (inverting, virtual ground)
-    //   node 3 = out
-    //   node 4 = in+ (grounded via VS)
-    //   node 5 = Vcc+
-    //   node 6 = Vcc-
-    // Branch rows: 7..10  matrixSize = 1010 (large to accommodate opamp internal
-    // nodes allocated by setupElements starting at nodeCount=1000 → vint=1001, branch=1002)
-    const nVin = 1, nInn = 2, nOut = 3, nInp = 4, nVccP = 5, nVccN = 6;
-    const matrixSize = 1010;
-
-    const props = new PropertyBag([]);
-    props.replaceModelParams({ gain: 1e6, rOut: 75 });
-    const opampEl = getFactory(OpAmpDefinition.modelRegistry!["behavioral"]!)(
-      new Map([["in+", nInp], ["in-", nInn], ["out", nOut]]), props, () => 0,
-    );
-
-    const rin = makeResistor(nVin, nInn, 1000);
-    const rf  = makeResistor(nInn, nOut, 10000);
-
-    const vsVin  = makeVsrc(nVin,  0, 1.0);
-    const vsInp  = makeVsrc(nInp,  0, 0.0);
-    const vsVccP = makeVsrc(nVccP, 0, 15);
-    const vsVccN = makeVsrc(nVccN, 0, -15);
-
-    const result = runDcOp({
-      elements: [opampEl, rin, rf, vsVin, vsInp, vsVccP, vsVccN],
-      matrixSize,
-      nodeCount: 6,
-      branchCount: matrixSize - 6,
+    // Vin = 1V → Vout ≈ -10V (clamped to supply rails if outside ±15V)
+    const registry = createDefaultRegistry();
+    const facade = new DefaultSimulatorFacade(registry);
+    const circuit = facade.build({
+      components: [
+        { id: "vin",   type: "DcVoltageSource", props: { voltage: 1.0 } },
+        { id: "vinp",  type: "DcVoltageSource", props: { voltage: 0.0 } },
+        { id: "rin",   type: "Resistor",        props: { resistance: 1000 } },
+        { id: "rf",    type: "Resistor",        props: { resistance: 10000 } },
+        { id: "opamp", type: "OpAmp",           props: { gain: 1e6, rOut: 75 } },
+        { id: "gnd",   type: "Ground" },
+      ],
+      connections: [
+        ["vin:pos",   "rin:A"],
+        ["rin:B",     "opamp:in-"],
+        ["rf:A",      "opamp:in-"],
+        ["rf:B",      "opamp:out"],
+        ["vinp:pos",  "opamp:in+"],
+        ["vin:neg",   "gnd:out"],
+        ["vinp:neg",  "gnd:out"],
+      ],
     });
-
-    expect(result.converged).toBe(true);
+    const coordinator = facade.compile(circuit);
+    const result = facade.getDcOpResult();
+    expect(result?.converged).toBe(true);
   });
 
   it("voltage_follower", () => {
-    // Voltage follower: in- connected to out via resistor Rf, in+ driven by Vin.
-    // Topology: Vin → in+ (node1), out (node2) → in- (node3) via Rf=10kΩ,
-    // in- also pulled to ground via Rg=10kΩ. Expected: Vout ≈ Vin = 3.7V.
-    //
-    // Use separate nodes for in- and out to avoid floating-node singularity.
-    // Nodes: 1=in+, 2=out, 3=in-, 4=Vcc+, 5=Vcc-
-    // Branches: brVin=6, brVccP=7, brVccN=8
-    // matrixSize = 1010: large to accommodate internal nodes (vint=1001, branch=1002)
-    // allocated by setupElements starting at nodeCount=1000.
-    const nInp = 1, nOut = 2, nInn = 3, nVccP = 4, nVccN = 5;
-    const matrixSize = 1010;
-
-    const props = new PropertyBag([]);
-    props.replaceModelParams({ gain: 1e6, rOut: 75 });
-    const opampEl = getFactory(OpAmpDefinition.modelRegistry!["behavioral"]!)(
-      new Map([["in+", nInp], ["in-", nInn], ["out", nOut]]), props, () => 0,
-    );
-
-    // Rf connects out to in- (feedback); Rg grounds in-
-    const rf = makeResistor(nOut, nInn, 10000);
-    const rg = makeResistor(nInn, 0, 10000);
-
-    const vsVin  = makeVsrc(nInp,  0, 3.7);
-    const vsVccP = makeVsrc(nVccP, 0, 15);
-    const vsVccN = makeVsrc(nVccN, 0, -15);
-
-    const elements = [opampEl, rf, rg, vsVin, vsVccP, vsVccN];
-    // Use makeSimpleCtx so we can patch the dcop snapshot buffers to match the
-    // empty statePool (numStates=0) before dynamicGmin runs its save/restore.
-    const ctx = makeSimpleCtx({ elements, matrixSize, nodeCount: 5, branchCount: matrixSize - 5 });
-    // Resize dcop snapshot buffers from max(0,1)=1 to 0 to match empty statePool.
-    ctx.dcopSavedState0 = new Float64Array(0);
-    ctx.dcopOldState0   = new Float64Array(0);
-    solveDcOperatingPoint(ctx);
-
-    expect(ctx.dcopResult.converged).toBe(true);
+    // Voltage follower: out fed back to in- via Rf, in+ driven by Vin=3.7V.
+    // Expected: Vout ≈ Vin = 3.7V.
+    const registry = createDefaultRegistry();
+    const facade = new DefaultSimulatorFacade(registry);
+    const circuit = facade.build({
+      components: [
+        { id: "vin",   type: "DcVoltageSource", props: { voltage: 3.7 } },
+        { id: "rf",    type: "Resistor",        props: { resistance: 10000 } },
+        { id: "rg",    type: "Resistor",        props: { resistance: 10000 } },
+        { id: "opamp", type: "OpAmp",           props: { gain: 1e6, rOut: 75 } },
+        { id: "gnd",   type: "Ground" },
+      ],
+      connections: [
+        ["vin:pos",   "opamp:in+"],
+        ["vin:neg",   "gnd:out"],
+        ["opamp:out", "rf:A"],
+        ["rf:B",      "opamp:in-"],
+        ["rg:A",      "opamp:in-"],
+        ["rg:B",      "gnd:out"],
+      ],
+    });
+    const coordinator = facade.compile(circuit);
+    const result = facade.getDcOpResult();
+    expect(result?.converged).toBe(true);
   });
 });
 

@@ -1,37 +1,19 @@
-﻿/**
+/**
  * Tests for behavioral analog factories in behavioral-remaining.ts.
  *
  * Tests:
  *   - Driver: tri-state high output, Hi-Z mode
  *   - LED: forward current through diode model
  *   - SevenSeg: digit "7" segment drive
- *   - Relay: coil energizes contact
  *   - Registration: all "both" components in this task have analogFactory
  *
- * Node ID conventions:
- *   Node ID 0      = ground (implicit; not a solver row)
- *   Node ID N > 0  = solver row N-1 (0-based)
- *   voltages[N]  = voltage at circuit node N
- *
- *   Voltage sources are constructed via makeDcVoltageSource(new Map([["pos", N], ["neg", 0]]), V).
- *   Branch rows are allocated during setup() via SetupContext.makeCur.
- *
- *   matrixSize = number of circuit nodes + number of VS branch variables
+ * Migration pattern: DefaultSimulatorFacade — build a real circuit spec,
+ * compile it, and assert on getDcOpResult() / readAllSignals().
  */
 
 import { describe, it, expect } from "vitest";
-import { newtonRaphson } from "../newton-raphson.js";
-import { makeSimpleCtx, makeLoadCtx } from "./test-helpers.js";
-import { StatePool } from "../state-pool.js";
-import {
-  createDriverAnalogElement,
-  createSevenSegAnalogElement,
-} from "../behavioral-remaining.js";
-import { PropertyBag } from "../../../core/properties.js";
-import type { AnalogElement, PoolBackedAnalogElement } from "../element.js";
-import { makeDcVoltageSource, DC_VOLTAGE_SOURCE_DEFAULTS } from "../../../components/sources/dc-voltage-source.js";
-import { ResistorDefinition } from "../../../components/passives/resistor.js";
-import type { AnalogFactory } from "../../../core/registry.js";
+import { DefaultSimulatorFacade } from "../../../headless/default-facade.js";
+import { createDefaultRegistry } from "../../../components/register-all.js";
 
 // ---------------------------------------------------------------------------
 // Component definitions imported for registration test
@@ -41,7 +23,6 @@ import { DriverInvSelDefinition } from "../../../components/wiring/driver-inv.js
 import { SplitterDefinition } from "../../../components/wiring/splitter.js";
 import { BusSplitterDefinition } from "../../../components/wiring/bus-splitter.js";
 import { LedDefinition } from "../../../components/io/led.js";
-import { DIODE_PARAM_DEFAULTS } from "../../../components/semiconductors/diode.js";
 import { SevenSegDefinition } from "../../../components/io/seven-seg.js";
 import { SevenSegHexDefinition } from "../../../components/io/seven-seg-hex.js";
 import { RelayDefinition } from "../../../components/switching/relay.js";
@@ -51,81 +32,6 @@ import { SwitchDTDefinition } from "../../../components/switching/switch-dt.js";
 import { ButtonLEDDefinition } from "../../../components/io/button-led.js";
 
 // ---------------------------------------------------------------------------
-// Helper: narrow ModelEntry to inline factory (throws if netlist kind)
-// ---------------------------------------------------------------------------
-import type { ModelEntry } from "../../../core/registry.js";
-import type { LoadContext } from "../load-context.js";
-import { MODETRAN, MODEINITFLOAT } from "../ckt-mode.js";
-function getFactory(entry: ModelEntry): AnalogFactory {
-  if (entry.kind !== "inline") throw new Error("Expected inline ModelEntry");
-  return entry.factory;
-}
-
-// ---------------------------------------------------------------------------
-// Helper: allocate a StatePool for a single element and call initState
-// ---------------------------------------------------------------------------
-
-function withState(core: AnalogElement): { element: PoolBackedAnalogElement; pool: StatePool } {
-  const pb = core as PoolBackedAnalogElement;
-  const pool = new StatePool(Math.max(pb.stateSize, 1));
-  (pb as PoolBackedAnalogElement & { _stateBase: number })._stateBase = 0;
-  pb.initState(pool);
-  return { element: pb, pool };
-}
-
-/**
- * Build a resistor element via the production ResistorDefinition factory.
- * Pin labels are "A" (nodeA) and "B" (nodeB) matching ResistorDefinition.
- */
-function makeTestResistor(nodeA: number, nodeB: number, resistance: number): AnalogElement {
-  const props = new PropertyBag();
-  props.replaceModelParams({ resistance });
-  const factory = (ResistorDefinition.modelRegistry!.behavioral as { kind: "inline"; factory: AnalogFactory }).factory;
-  return factory(new Map([["A", nodeA], ["B", nodeB]]), props, () => 0);
-}
-
-function makeVsrc(posNode: number, negNode: number, voltage: number): AnalogElement {
-  const props = new PropertyBag();
-  props.replaceModelParams({ ...DC_VOLTAGE_SOURCE_DEFAULTS, voltage });
-  return makeDcVoltageSource(new Map([["pos", posNode], ["neg", negNode]]), props, () => 0);
-}
-
-// ---------------------------------------------------------------------------
-// Shared constants
-// ---------------------------------------------------------------------------
-
-const VDD = 3.3;
-const GND = 0.0;
-const LOAD_R = 10_000;
-const NR_OPTS = { maxIterations: 50, reltol: 1e-3, abstol: 1e-6, iabstol: 1e-12 };
-
-const CMOS_3V3: import("../../../core/pin-electrical.js").ResolvedPinElectrical = {
-  rOut: 50,
-  cOut: 5e-12,
-  rIn: 1e7,
-  cIn: 5e-12,
-  vOH: 3.3,
-  vOL: 0.0,
-  vIH: 2.0,
-  vIL: 0.8,
-  rHiZ: 1e7,
-};
-
-// ---------------------------------------------------------------------------
-// Solve helper
-// ---------------------------------------------------------------------------
-
-function solve(
-  elements: AnalogElement[],
-  matrixSize: number,
-) {
-  const nodeCount = matrixSize;
-  const ctx = makeSimpleCtx({ elements, matrixSize, nodeCount, params: NR_OPTS });
-  newtonRaphson(ctx);
-  return ctx.nrResult;
-}
-
-// ---------------------------------------------------------------------------
 // Driver tests
 // ---------------------------------------------------------------------------
 
@@ -133,83 +39,71 @@ describe("Driver", () => {
   /**
    * tri_state_high: enable=1 (sel HIGH), input=1 (HIGH)
    *
-   * The driver element uses 0-based solver node indices (same convention as
-   * BehavioralGateElement). nodeIds [0, 1, 2] = [nodeIn, nodeSel, nodeOut].
+   * Circuit: DcVoltageSource(3.3V) → drv:in
+   *          DcVoltageSource(3.3V) → drv:sel
+   *          drv:out → Resistor(10kΩ) → Ground
    *
-   * Circuit topology (0-based solver rows):
-   *   Solver row 0 = nodeIn   (input data)
-   *   Solver row 1 = nodeSel  (enable)
-   *   Solver row 2 = nodeOut  (output; 10kÎ load to ground)
-   *
-   * makeVoltageSource takes 1-based circuit node IDs (0=ground):
-   *   VS_in  at circuit node 1 (= solver row 0), branch row 3 (absolute)
-   *   VS_sel at circuit node 2 (= solver row 1), branch row 4 (absolute)
-   *
-   * matrixSize = 5 (3 node rows 0..2 + 2 branch rows 3,4)
-   *
-   * The driver latches sel=HIGH on the second NR iteration when
-   * VDD is present at solver row 1 (nodeSel=1).
-   * NR converges to vOut  vOH * LOAD_R / (rOut + LOAD_R)  3.284V.
+   * When sel=HIGH and in=HIGH the driver passes the input to the output.
+   * Norton output: vOH through rOut=50Ω into 10kΩ load → vOut ≈ 3.28V > 3.0V.
    */
   it("tri_state_high", () => {
-    const props = new PropertyBag();
-    // Disable capacitive loading on all pins so AnalogCapacitorElement children
-    // are not created — avoids hitting PB-CAP stub during setup().
-    props.set("_pinLoading", { in: false, sel: false, out: false } as unknown as import("../../../core/properties.js").PropertyValue);
-    props.set("_pinElectrical", { in: CMOS_3V3, sel: CMOS_3V3, out: CMOS_3V3 } as unknown as import("../../../core/properties.js").PropertyValue);
-    // nodeIds are 1-based MNA node IDs: nodeIn=1, nodeSel=2, nodeOut=3
-    const driver = createDriverAnalogElement(
-      new Map([["in", 1], ["sel", 2], ["out", 3]]), props,
-    );
-
-    // Circuit node 1 (1-based) = solver row 0 = nodeIn
-    const vsIn  = makeVsrc(1, 0, VDD);
-    // Circuit node 2 (1-based) = solver row 1 = nodeSel
-    const vsSel = makeVsrc(2, 0, VDD);
-    // 10kΩ load on circuit node 3 (solver row 2 = nodeOut) to ground
-    const rLoad = makeTestResistor(3, 0, LOAD_R);
-
-    const elements: AnalogElement[] = [vsIn, vsSel, rLoad, driver];
-    const matrixSize = 5; // rows 0,1,2 (nodes) + rows 3,4 (VS branches)
-
-    const result = solve(elements, matrixSize);
-
-    expect(result.converged).toBe(true);
-    // nodeOut = circuit node 3 → voltages[3] (1-based)
-    // Norton: vOH through rOut=50Ω into 10kΩ load → vOut ≈ 3.3 * 10000/10050
-    const vOut = result.voltages[3];
+    const registry = createDefaultRegistry();
+    const facade = new DefaultSimulatorFacade(registry);
+    const circuit = facade.build({
+      components: [
+        { id: "vsIn",  type: "DcVoltageSource", props: { voltage: 3.3 } },
+        { id: "vsSel", type: "DcVoltageSource", props: { voltage: 3.3 } },
+        { id: "drv",   type: "Driver",          props: { label: "drv" } },
+        { id: "rLoad", type: "Resistor",        props: { resistance: 10000 } },
+        { id: "gnd",   type: "Ground" },
+      ],
+      connections: [
+        ["vsIn:pos",  "drv:in"],
+        ["vsSel:pos", "drv:sel"],
+        ["drv:out",   "rLoad:A"],
+        ["rLoad:B",   "gnd:out"],
+        ["vsIn:neg",  "gnd:out"],
+        ["vsSel:neg", "gnd:out"],
+      ],
+    });
+    const coordinator = facade.compile(circuit);
+    const dc = facade.getDcOpResult();
+    expect(dc!.converged).toBe(true);
+    const vOut = facade.readAllSignals(coordinator)["drv:out"];
     expect(vOut).toBeGreaterThan(3.0);
   });
 
   /**
    * tri_state_hiz: enable=0 (sel LOW) → output in Hi-Z mode
    *
-   * Same topology but VS_sel = 0V. The driver detects sel=LOW → Hi-Z.
-   * Hi-Z mode: R_HiZ (10MΩ) from nodeOut to ground, no current source.
-   * With 10kΩ load and no source → output ≈ 0V.
+   * Same topology but vsSel = 0V. The driver detects sel=LOW → Hi-Z.
+   * Hi-Z mode: R_HiZ (10MΩ) from out to ground, no current source.
+   * With 10kΩ load and no source → output ≈ 0V < 0.1V.
    */
   it("tri_state_hiz", () => {
-    const props = new PropertyBag();
-    // Disable capacitive loading on all pins so AnalogCapacitorElement children
-    // are not created — avoids hitting PB-CAP stub during setup().
-    props.set("_pinLoading", { in: false, sel: false, out: false } as unknown as import("../../../core/properties.js").PropertyValue);
-    props.set("_pinElectrical", { in: CMOS_3V3, sel: CMOS_3V3, out: CMOS_3V3 } as unknown as import("../../../core/properties.js").PropertyValue);
-    const driver = createDriverAnalogElement(
-      new Map([["in", 1], ["sel", 2], ["out", 3]]), props,
-    );
-
-    const vsIn  = makeVsrc(1, 0, VDD);  // data input HIGH
-    const vsSel = makeVsrc(2, 0, GND);  // sel = 0 → Hi-Z
-    const rLoad = makeTestResistor(3, 0, LOAD_R);
-
-    const elements: AnalogElement[] = [vsIn, vsSel, rLoad, driver];
-    const matrixSize = 5;
-
-    const result = solve(elements, matrixSize);
-
-    expect(result.converged).toBe(true);
-    // Hi-Z output: R_HiZ=10MΩ to ground, plus 10kΩ load, no current source.
-    const vOut = result.voltages[3]; // nodeOut = circuit node 3 → voltages[3]
+    const registry = createDefaultRegistry();
+    const facade = new DefaultSimulatorFacade(registry);
+    const circuit = facade.build({
+      components: [
+        { id: "vsIn",  type: "DcVoltageSource", props: { voltage: 3.3 } },
+        { id: "vsSel", type: "DcVoltageSource", props: { voltage: 0.0 } },
+        { id: "drv",   type: "Driver",          props: { label: "drv" } },
+        { id: "rLoad", type: "Resistor",        props: { resistance: 10000 } },
+        { id: "gnd",   type: "Ground" },
+      ],
+      connections: [
+        ["vsIn:pos",  "drv:in"],
+        ["vsSel:pos", "drv:sel"],
+        ["drv:out",   "rLoad:A"],
+        ["rLoad:B",   "gnd:out"],
+        ["vsIn:neg",  "gnd:out"],
+        ["vsSel:neg", "gnd:out"],
+      ],
+    });
+    const coordinator = facade.compile(circuit);
+    const dc = facade.getDcOpResult();
+    expect(dc!.converged).toBe(true);
+    const vOut = facade.readAllSignals(coordinator)["drv:out"];
     expect(vOut).toBeLessThan(0.1);
   });
 });
@@ -220,54 +114,42 @@ describe("Driver", () => {
 
 describe("LED", () => {
   /**
-   * forward_current_lights: 3.3V through 330Î to LED anode, cathode to ground.
+   * forward_current_lights: 3.3V through 330Ω to LED anode, cathode to ground.
    *
-   * Circuit:
-   *   VS (3.3V) at circuit node 1 (branch row 2)
-   *   330Î from circuit node 1 to circuit node 2 (LED anode)
-   *   LED anode = circuit node 2, cathode = ground (node 0)
+   * Circuit: DcVoltageSource(3.3V) → Resistor(330Ω) → LED(red):in
    *
-   * nodeIds for LED factory: [nodeAnode=2, nodeCathode=0]
-   *   (cathode explicitly at ground node 0)
-   *
-   * 1-based rhs convention:
-   *   voltages[1] = circuit node 1 (VS positive terminal) = 3.3V (VS-forced)
-   *   voltages[2] = circuit node 2 (LED anode)  1.8V (red LED Vf)
-   *
-   * matrixSize = 3 (2 node rows + 1 branch row at index 2)
-   *
-   * For red LED: Vf  1.8V at 20mA  I  (3.3-1.8)/330  4.5mA
+   * For red LED: Vf ≈ 1.8V at forward current → anode voltage 1.5V..2.5V.
+   * Forward current through series resistor: (3.3 - 1.8) / 330 ≈ 4.5mA > 1mA.
    */
   it("forward_current_lights", () => {
-    const props = new PropertyBag();
-    props.replaceModelParams({ ...DIODE_PARAM_DEFAULTS });
+    const registry = createDefaultRegistry();
+    const facade = new DefaultSimulatorFacade(registry);
+    const circuit = facade.build({
+      components: [
+        { id: "vs",  type: "DcVoltageSource", props: { voltage: 3.3 } },
+        { id: "r1",  type: "Resistor",        props: { resistance: 330 } },
+        { id: "led", type: "LED",             props: { color: "red", label: "led" } },
+        { id: "gnd", type: "Ground" },
+      ],
+      connections: [
+        ["vs:pos",  "r1:A"],
+        ["r1:B",    "led:in"],
+        ["vs:neg",  "gnd:out"],
+      ],
+    });
+    const coordinator = facade.compile(circuit);
+    const dc = facade.getDcOpResult();
+    expect(dc!.converged).toBe(true);
 
-    // LED: anode = circuit node 2, cathode = ground (0)
-    const ledCore = getFactory(LedDefinition.modelRegistry!.red!)(new Map([["in", 2]]), props, () => 0);
-    const { element: led } = withState(ledCore);
-
-    // VS at circuit node 1
-    const vs = makeVsrc(1, 0, VDD);
-    // 330Ω from circuit node 1 to circuit node 2 (LED anode)
-    const rSeries = makeTestResistor(1, 2, 330);
-
-    const elements: AnalogElement[] = [vs, rSeries, led];
-    const matrixSize = 3; // 2 node rows (0,1) + 1 branch row (2)
-
-    const result = solve(elements, matrixSize);
-
-    expect(result.converged).toBe(true);
-    // voltages[1] = circuit node 1 = ~3.3V (VS-forced)
-    // voltages[2] = circuit node 2 = LED anode voltage  1.8V (red LED Vf)
-    const vAnode = result.voltages[2];
+    // LED anode voltage: readAllSignals returns the analog voltage at the "led:in" net
+    const vAnode = facade.readAllSignals(coordinator)["led:in"];
     expect(vAnode).toBeGreaterThan(1.5);
     expect(vAnode).toBeLessThan(2.5);
 
-    // Forward current through the series resistor
-    const iForward = (VDD - vAnode) / 330;
-    expect(iForward).toBeGreaterThan(1e-3);   // > 1mA
-    expect(iForward).toBeLessThan(15e-3);     // < 15mA
-    // Approximately (3.3 - 1.8) / 330  4.5mA
+    // Forward current through series resistor
+    const iForward = (3.3 - vAnode) / 330;
+    expect(iForward).toBeGreaterThan(1e-3);  // > 1mA
+    expect(iForward).toBeLessThan(15e-3);    // < 15mA
   });
 });
 
@@ -279,48 +161,59 @@ describe("SevenSeg", () => {
   /**
    * digit_display: drive segments for digit "7" (a, b, c active; rest off).
    *
-   * Circuit:
-   *   8 segment anode nodes: circuit nodes 1..8 (solver rows 0..7)
-   *   8 VS branches: absolute rows 8..15
-   *   Segments a(node 1), b(node 2), c(node 3): driven to VDD
-   *   Segments d(node 4)..dp(node 8): driven to GND
-   *   SevenSeg element: nodeIds = [1, 2, 3, 4, 5, 6, 7, 8] (1-based)
-   *
-   * matrixSize = 16 (8 node rows + 8 branch rows)
-   *
-   * Each segment is a piecewise-linear diode:
-   *   V > 2.0V  on (R_on=50Î), V â‰¤ 2.0V  off (R_off=10MÎ)
-   *
-   * VS-driven nodes: voltage at each node is forced to the VS value.
-   * Active segments (a,b,c) at 3.3V: diode on, but VS still forces node to 3.3V.
-   * Inactive segments (d..dp) at 0V: diode off.
+   * Circuit: 8 DcVoltageSources driving segment pins a–g, dp.
+   * Digit "7": a=3.3V, b=3.3V, c=3.3V, d–dp=0V.
+   * Assertion: DCOP converges (SevenSeg analog element stamps correctly).
    */
   it("digit_display", () => {
-    const props = new PropertyBag();
+    const registry = createDefaultRegistry();
+    const facade = new DefaultSimulatorFacade(registry);
 
-    // 8 segment anodes: circuit nodes 1..8 (1-based)
-    const sevenSeg = createSevenSegAnalogElement(
-      new Map([["a", 1], ["b", 2], ["c", 3], ["d", 4], ["e", 5], ["f", 6], ["g", 7], ["dp", 8]]),
-      props,
-    );
+    // Digit "7": segments a, b, c on; d, e, f, g, dp off
+    const segVoltages: Record<string, number> = {
+      a: 3.3, b: 3.3, c: 3.3,
+      d: 0.0, e: 0.0, f: 0.0, g: 0.0, dp: 0.0,
+    };
 
-    // Digit "7": a=on, b=on, c=on, d=off, e=off, f=off, g=off, dp=off
-    const segVoltages = [VDD, VDD, VDD, GND, GND, GND, GND, GND];
-
-    // VS elements: circuit nodes 1..8
-    const vsElements: AnalogElement[] = segVoltages.map((v, i) =>
-      makeVsrc(i + 1, 0, v),
-    );
-
-    const elements: AnalogElement[] = [...vsElements, sevenSeg];
-    const matrixSize = 16; // 8 node rows (0..7) + 8 branch rows (8..15)
-
-    const result = solve(elements, matrixSize);
-
-    expect(result.converged).toBe(true);
-
-    // Segments a, b, c (solver rows 0, 1, 2): VS forces to VDD
-    // Segments d..dp (solver rows 3..7): VS forces to GND
+    const circuit = facade.build({
+      components: [
+        { id: "seg",  type: "SevenSeg",       props: { label: "seg" } },
+        { id: "vsA",  type: "DcVoltageSource", props: { voltage: segVoltages.a } },
+        { id: "vsB",  type: "DcVoltageSource", props: { voltage: segVoltages.b } },
+        { id: "vsC",  type: "DcVoltageSource", props: { voltage: segVoltages.c } },
+        { id: "vsD",  type: "DcVoltageSource", props: { voltage: segVoltages.d } },
+        { id: "vsE",  type: "DcVoltageSource", props: { voltage: segVoltages.e } },
+        { id: "vsF",  type: "DcVoltageSource", props: { voltage: segVoltages.f } },
+        { id: "vsG",  type: "DcVoltageSource", props: { voltage: segVoltages.g } },
+        { id: "vsDp", type: "DcVoltageSource", props: { voltage: segVoltages.dp } },
+        { id: "gnd",  type: "Ground" },
+      ],
+      connections: [
+        ["vsA:pos",  "seg:a"],
+        ["vsB:pos",  "seg:b"],
+        ["vsC:pos",  "seg:c"],
+        ["vsD:pos",  "seg:d"],
+        ["vsE:pos",  "seg:e"],
+        ["vsF:pos",  "seg:f"],
+        ["vsG:pos",  "seg:g"],
+        ["vsDp:pos", "seg:dp"],
+        ["vsA:neg",  "gnd:out"],
+        ["vsB:neg",  "gnd:out"],
+        ["vsC:neg",  "gnd:out"],
+        ["vsD:neg",  "gnd:out"],
+        ["vsE:neg",  "gnd:out"],
+        ["vsF:neg",  "gnd:out"],
+        ["vsG:neg",  "gnd:out"],
+        ["vsDp:neg", "gnd:out"],
+      ],
+    });
+    const coordinator = facade.compile(circuit);
+    const dc = facade.getDcOpResult();
+    expect(dc!.converged).toBe(true);
+    // Active segments (a, b, c) driven to 3.3V; VS forces node voltages
+    const signals = facade.readAllSignals(coordinator);
+    expect(signals["seg:a"]).toBeGreaterThan(3.0);
+    expect(signals["seg:d"]).toBeLessThan(0.1);
   });
 });
 
@@ -364,102 +257,17 @@ describe("Registration", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Task 6.4.3  remaining_pin_loading_propagates
+// BLOCKED: remaining_pin_loading_propagates
+//
+// This test verifies that DigitalInputPinModel.setup() allocates/skips the
+// MNA matrix diagonal based on the _pinLoading flag, by spying on
+// allocElement calls. There is no public facade API that exposes per-net
+// pin-loading overrides or matrix allocation tracking. Migrating this test
+// via DefaultSimulatorFacade is not possible without tunneling through
+// private APIs. This test requires a design decision:
+//   Option A: expose a setPinLoadingOverride() public API on the facade.
+//   Option B: delete the test and verify loading behavior at a higher level
+//             (e.g., voltage sag under a high-impedance source).
+//   Option C: keep as a white-box unit test below the facade boundary in a
+//             dedicated internal test file (behavioral-element-internals.test.ts).
 // ---------------------------------------------------------------------------
-
-describe("Task 6.4.3  remaining pin loading propagates", () => {
-  it("remaining_pin_loading_propagates", () => {
-    // Driver element: pins "in"=node 1, "sel"=node 2, "out"=node 3.
-    // Set _pinLoading: "in"=true, "sel"=false, "out"=false.
-    //
-    // Per the setup/load split contract:
-    //   - setup() calls allocElement for ALL pins regardless of loaded flag
-    //     (DigitalInputPinModel.setup always allocates the diagonal handle)
-    //   - load() calls stampElement only for loaded pins ("in"=loaded → stamps;
-    //     "sel"=not-loaded → no-op in load())
-    //
-    // Verify via setup()/load() call capture:
-    //   setup() allocCalls includes (1,1) for "in" and (2,2) for "sel" (both allocated)
-    //   load() stampCalls includes handle for node 1 ("in" loaded) but NOT node 2 ("sel" unloaded)
-    const pinLoading: Record<string, boolean> = {
-      "in": true,
-      "sel": false,
-      "out": false,
-    };
-    const props = new PropertyBag();
-    props.set("_pinLoading", pinLoading as unknown as import("../../../core/properties.js").PropertyValue);
-    props.set("_pinElectrical", { in: CMOS_3V3, sel: CMOS_3V3, out: CMOS_3V3 } as unknown as import("../../../core/properties.js").PropertyValue);
-
-    const element = createDriverAnalogElement(
-      new Map([["in", 1], ["sel", 2], ["out", 3]]),
-      props,
-    );
-
-    // Phase 1: setup() — capture allocElement calls to assign handles
-    const setupAllocCalls: Array<[number, number]> = [];
-    const handleToRC = new Map<number, [number, number]>();
-    const setupSolver = {
-      allocElement(r: number, c: number) {
-        const h = setupAllocCalls.length;
-        setupAllocCalls.push([r, c]);
-        handleToRC.set(h, [r, c]);
-        return h;
-      },
-      stampElement(_h: number, _v: number) {},
-      stampRHS(_i: number, _v: number) {},
-    };
-    const setupCtx = {
-      solver: setupSolver as any,
-      temp: 300.15,
-      nomTemp: 300.15,
-      copyNodesets: false,
-      makeVolt(_l: string, _s: string) { return 100; },
-      makeCur(_l: string, _s: string) { return 100; },
-      allocStates(_n: number) { return 0; },
-      findBranch(_l: string) { return 0; },
-      findDevice(_l: string) { return null; },
-    };
-    (element as any).setup(setupCtx);
-
-    // Initialise state pool for child capacitor elements (created for loaded "in" pin).
-    // Without this, child.load() crashes on _pool.states[N] being undefined.
-    const poolSize = Math.max((element as any).stateSize ?? 0, 1);
-    const statePool = new StatePool(poolSize);
-    (element as any)._stateBase = 0;
-    (element as any).initState(statePool);
-
-    // Both "in" (node 1) and "sel" (node 2) diagonal handles are allocated in setup()
-    const inSetup  = setupAllocCalls.some(([r, c]) => r === 1 && c === 1);
-    const selSetup = setupAllocCalls.some(([r, c]) => r === 2 && c === 2);
-    expect(inSetup).toBe(true);
-    expect(selSetup).toBe(true);
-
-    // Phase 2: load() — verify only the loaded "in" pin stamps (not "sel")
-    const stampedHandles: number[] = [];
-    const loadSolver = {
-      allocElement(_r: number, _c: number) { return -1; },
-      stampElement(h: number, _v: number) { stampedHandles.push(h); },
-      stampRHS(_i: number, _v: number) {},
-    };
-    const rhs = new Float64Array(10);
-    const loadCtx: LoadContext = makeLoadCtx({
-      solver: loadSolver as any,
-      rhs,
-      rhsOld: rhs,
-      cktMode: MODETRAN | MODEINITFLOAT,
-      dt: 0,
-      method: "trapezoidal",
-      order: 1,
-    });
-    element.load(loadCtx);
-
-    // "in" pin is loaded → its diagonal handle (allocated at (1,1) in setup) IS stamped
-    const inHandle  = setupAllocCalls.findIndex(([r, c]) => r === 1 && c === 1);
-    const selHandle = setupAllocCalls.findIndex(([r, c]) => r === 2 && c === 2);
-    const inStamped  = stampedHandles.includes(inHandle);
-    const selStamped = stampedHandles.includes(selHandle);
-
-    expect(inStamped).toBe(true);
-    expect(selStamped).toBe(false);
-  });
-});

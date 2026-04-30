@@ -42,8 +42,8 @@
     "runtime": null
   },
   "build": {
-    "buildCommand": "npm run build",
-    "testCommand": "npm test > test-output.log 2>&1; echo \"EXIT: $?\"",
+    "buildCommand": "npx tsc --noEmit --skipLibCheck 2>&1 | head -80",
+    "testCommand": "npx vitest run src/editor/__tests__/wire-current-resolver.test.ts -t \"cross-component current equality\" 2>&1 | head -70",
     "lintCommand": "npm run lint",
     "devCommand": "npm run dev",
     "scripts": {
@@ -292,27 +292,105 @@
   },
   "hotPaths": [
     {
+      "path": "src\\solver\\analog\\analog-engine.ts",
+      "accessCount": 47,
+      "lastAccessed": 1777500105964,
+      "type": "directory"
+    },
+    {
+      "path": "src\\components\\semiconductors\\bjt.ts",
+      "accessCount": 34,
+      "lastAccessed": 1777499954589,
+      "type": "directory"
+    },
+    {
+      "path": "src\\components\\io\\__tests__\\led.test.ts",
+      "accessCount": 29,
+      "lastAccessed": 1777500004831,
+      "type": "file"
+    },
+    {
+      "path": "src\\solver\\coordinator.ts",
+      "accessCount": 29,
+      "lastAccessed": 1777500009433,
+      "type": "file"
+    },
+    {
+      "path": "src\\components\\passives\\__tests__\\polarized-cap.test.ts",
+      "accessCount": 28,
+      "lastAccessed": 1777457807531,
+      "type": "file"
+    },
+    {
+      "path": "spec\\test-fix-jobs.md",
+      "accessCount": 26,
+      "lastAccessed": 1777500825086,
+      "type": "file"
+    },
+    {
+      "path": "src\\solver\\analog\\__tests__\\ckt-terr.test.ts",
+      "accessCount": 21,
+      "lastAccessed": 1777499967168,
+      "type": "file"
+    },
+    {
+      "path": "src\\components\\semiconductors\\diode.ts",
+      "accessCount": 21,
+      "lastAccessed": 1777499991684,
+      "type": "file"
+    },
+    {
       "path": "src\\solver\\analog\\__tests__\\newton-raphson.test.ts",
       "accessCount": 18,
       "lastAccessed": 1777441774927,
       "type": "file"
     },
     {
-      "path": "src\\solver\\analog\\__tests__\\ckt-terr.test.ts",
+      "path": "src",
       "accessCount": 18,
-      "lastAccessed": 1777441914588,
+      "lastAccessed": 1777499794541,
+      "type": "directory"
+    },
+    {
+      "path": "src\\headless\\default-facade.ts",
+      "accessCount": 16,
+      "lastAccessed": 1777499894458,
       "type": "file"
     },
     {
-      "path": "src\\components\\io\\__tests__\\led.test.ts",
-      "accessCount": 17,
-      "lastAccessed": 1777442246134,
+      "path": "src\\components\\semiconductors\\scr.ts",
+      "accessCount": 14,
+      "lastAccessed": 1777499624997,
       "type": "file"
     },
     {
       "path": "src\\components\\passives\\resistor.ts",
       "accessCount": 13,
       "lastAccessed": 1777442319702,
+      "type": "directory"
+    },
+    {
+      "path": "src\\solver\\analog\\__tests__\\test-helpers.ts",
+      "accessCount": 13,
+      "lastAccessed": 1777499982235,
+      "type": "file"
+    },
+    {
+      "path": "src\\components\\sources\\dc-voltage-source.ts",
+      "accessCount": 12,
+      "lastAccessed": 1777455683942,
+      "type": "directory"
+    },
+    {
+      "path": "src\\components\\passives\\__tests__\\memristor.test.ts",
+      "accessCount": 12,
+      "lastAccessed": 1777456075778,
+      "type": "file"
+    },
+    {
+      "path": "src\\components\\register-all.ts",
+      "accessCount": 12,
+      "lastAccessed": 1777500043824,
       "type": "directory"
     },
     {
@@ -328,10 +406,10 @@
       "type": "file"
     },
     {
-      "path": "spec\\test-fix-jobs.md",
+      "path": "src\\solver\\analog\\ckt-context.ts",
       "accessCount": 11,
-      "lastAccessed": 1777443360290,
-      "type": "file"
+      "lastAccessed": 1777499701453,
+      "type": "directory"
     },
     {
       "path": "src\\solver\\analog\\__tests__\\harness\\query-methods.test.ts",
@@ -346,51 +424,39 @@
       "type": "file"
     },
     {
+      "path": "src\\solver\\analog\\__tests__\\harness\\harness-integration.test.ts",
+      "accessCount": 10,
+      "lastAccessed": 1777499890221,
+      "type": "file"
+    },
+    {
+      "path": "src\\components",
+      "accessCount": 10,
+      "lastAccessed": 1777500032847,
+      "type": "directory"
+    },
+    {
+      "path": "src\\solver\\analog\\__tests__\\setup-stamp-order.test.ts",
+      "accessCount": 9,
+      "lastAccessed": 1777499720826,
+      "type": "file"
+    },
+    {
       "path": "src\\solver\\analog\\__tests__\\ckt-load.test.ts",
       "accessCount": 8,
       "lastAccessed": 1777441688636,
       "type": "file"
     },
     {
-      "path": "src\\components\\sources\\dc-voltage-source.ts",
+      "path": "src\\solver\\coordinator-types.ts",
       "accessCount": 8,
-      "lastAccessed": 1777442267616,
+      "lastAccessed": 1777456006051,
       "type": "directory"
     },
     {
-      "path": "src\\components\\semiconductors\\bjt.ts",
+      "path": "src\\solver\\analog\\newton-raphson.ts",
       "accessCount": 7,
-      "lastAccessed": 1777441806109,
-      "type": "directory"
-    },
-    {
-      "path": "src\\components\\semiconductors\\scr.ts",
-      "accessCount": 7,
-      "lastAccessed": 1777441832706,
-      "type": "file"
-    },
-    {
-      "path": "src\\components\\semiconductors\\diode.ts",
-      "accessCount": 7,
-      "lastAccessed": 1777441986694,
-      "type": "file"
-    },
-    {
-      "path": "src\\solver\\analog\\__tests__\\harness\\harness-integration.test.ts",
-      "accessCount": 7,
-      "lastAccessed": 1777442022651,
-      "type": "file"
-    },
-    {
-      "path": "src",
-      "accessCount": 7,
-      "lastAccessed": 1777442298694,
-      "type": "directory"
-    },
-    {
-      "path": "src\\solver\\coordinator.ts",
-      "accessCount": 6,
-      "lastAccessed": 1777442193839,
+      "lastAccessed": 1777499954704,
       "type": "file"
     },
     {
@@ -406,16 +472,28 @@
       "type": "file"
     },
     {
-      "path": "src\\components\\register-all.ts",
+      "path": "src\\solver\\analog\\state-pool.ts",
       "accessCount": 5,
-      "lastAccessed": 1777442292978,
-      "type": "directory"
+      "lastAccessed": 1777456533164,
+      "type": "file"
     },
     {
-      "path": "src\\solver\\analog\\__tests__\\setup-stamp-order.test.ts",
-      "accessCount": 4,
-      "lastAccessed": 1777441784156,
+      "path": "src\\components\\io\\led.ts",
+      "accessCount": 5,
+      "lastAccessed": 1777499844512,
       "type": "file"
+    },
+    {
+      "path": "src\\solver\\analog\\__tests__\\mna-end-to-end.test.ts",
+      "accessCount": 5,
+      "lastAccessed": 1777499900181,
+      "type": "file"
+    },
+    {
+      "path": "src\\solver\\analog\\__tests__\\harness",
+      "accessCount": 5,
+      "lastAccessed": 1777499931260,
+      "type": "directory"
     },
     {
       "path": "src\\components\\io\\ground.ts",
@@ -442,39 +520,27 @@
       "type": "directory"
     },
     {
+      "path": "src\\headless\\__tests__\\default-facade.test.ts",
+      "accessCount": 4,
+      "lastAccessed": 1777455328776,
+      "type": "file"
+    },
+    {
+      "path": "src\\solver\\analog\\compiled-analog-circuit.ts",
+      "accessCount": 4,
+      "lastAccessed": 1777499834636,
+      "type": "file"
+    },
+    {
+      "path": "src\\solver\\analog\\__tests__\\dc-operating-point.test.ts",
+      "accessCount": 4,
+      "lastAccessed": 1777499956531,
+      "type": "file"
+    },
+    {
       "path": "src\\solver\\analog\\__tests__\\digital-pin-model.test.ts",
       "accessCount": 3,
       "lastAccessed": 1777441641894,
-      "type": "file"
-    },
-    {
-      "path": "src\\solver\\analog\\__tests__\\mna-end-to-end.test.ts",
-      "accessCount": 3,
-      "lastAccessed": 1777441896698,
-      "type": "file"
-    },
-    {
-      "path": "src\\solver\\analog\\__tests__\\test-helpers.ts",
-      "accessCount": 3,
-      "lastAccessed": 1777441912623,
-      "type": "file"
-    },
-    {
-      "path": "src\\solver\\coordinator-types.ts",
-      "accessCount": 3,
-      "lastAccessed": 1777442003740,
-      "type": "directory"
-    },
-    {
-      "path": "src\\headless\\__tests__\\default-facade.test.ts",
-      "accessCount": 3,
-      "lastAccessed": 1777442007821,
-      "type": "file"
-    },
-    {
-      "path": "src\\headless\\default-facade.ts",
-      "accessCount": 3,
-      "lastAccessed": 1777442245505,
       "type": "file"
     },
     {
@@ -484,87 +550,33 @@
       "type": "directory"
     },
     {
+      "path": "src\\components\\active\\real-opamp.ts",
+      "accessCount": 3,
+      "lastAccessed": 1777499668632,
+      "type": "file"
+    },
+    {
       "path": "src\\solver\\analog\\__tests__\\phase-3-nr-reorder.test.ts",
-      "accessCount": 2,
-      "lastAccessed": 1777441652723,
+      "accessCount": 3,
+      "lastAccessed": 1777499797564,
       "type": "file"
-    },
-    {
-      "path": "src\\solver\\analog\\__tests__\\dc-operating-point.test.ts",
-      "accessCount": 2,
-      "lastAccessed": 1777441807832,
-      "type": "file"
-    },
-    {
-      "path": "src\\components\\passives\\__tests__\\polarized-cap.test.ts",
-      "accessCount": 2,
-      "lastAccessed": 1777441821360,
-      "type": "file"
-    },
-    {
-      "path": "src\\solver\\analog\\compiled-analog-circuit.ts",
-      "accessCount": 2,
-      "lastAccessed": 1777441832740,
-      "type": "file"
-    },
-    {
-      "path": "src\\components\\passives\\__tests__\\memristor.test.ts",
-      "accessCount": 2,
-      "lastAccessed": 1777441855334,
-      "type": "file"
-    },
-    {
-      "path": "src\\solver\\analog\\ckt-context.ts",
-      "accessCount": 2,
-      "lastAccessed": 1777441958077,
-      "type": "directory"
-    },
-    {
-      "path": "src\\solver\\analog\\__tests__\\harness",
-      "accessCount": 2,
-      "lastAccessed": 1777442027232,
-      "type": "directory"
-    },
-    {
-      "path": "src\\components\\io\\led.ts",
-      "accessCount": 2,
-      "lastAccessed": 1777442252227,
-      "type": "file"
-    },
-    {
-      "path": "src\\components",
-      "accessCount": 2,
-      "lastAccessed": 1777442299133,
-      "type": "directory"
-    },
-    {
-      "path": "src\\solver\\analog\\analog-engine.ts",
-      "accessCount": 1,
-      "lastAccessed": 1777441757150,
-      "type": "directory"
     },
     {
       "path": "src\\solver\\analog\\__tests__",
-      "accessCount": 1,
-      "lastAccessed": 1777441797702,
+      "accessCount": 3,
+      "lastAccessed": 1777499817736,
       "type": "directory"
     },
     {
-      "path": "src\\core\\registry.ts",
-      "accessCount": 1,
-      "lastAccessed": 1777441800728,
-      "type": "file"
-    },
-    {
       "path": "src\\solver\\analog\\__tests__\\harness\\hwr-fixture.ts",
-      "accessCount": 1,
-      "lastAccessed": 1777441846652,
+      "accessCount": 2,
+      "lastAccessed": 1777499872138,
       "type": "file"
     },
     {
-      "path": "src\\solver\\analog\\state-pool.ts",
-      "accessCount": 1,
-      "lastAccessed": 1777441880406,
+      "path": "src\\core\\registry.ts",
+      "accessCount": 2,
+      "lastAccessed": 1777499974774,
       "type": "file"
     },
     {
@@ -578,18 +590,6 @@
       "accessCount": 1,
       "lastAccessed": 1777441918756,
       "type": "directory"
-    },
-    {
-      "path": "src\\solver\\analog\\newton-raphson.ts",
-      "accessCount": 1,
-      "lastAccessed": 1777441974117,
-      "type": "file"
-    },
-    {
-      "path": "src\\components\\active\\real-opamp.ts",
-      "accessCount": 1,
-      "lastAccessed": 1777441974416,
-      "type": "file"
     }
   ],
   "userDirectives": []

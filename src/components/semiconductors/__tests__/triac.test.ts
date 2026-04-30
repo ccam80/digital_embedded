@@ -18,7 +18,7 @@ import { describe, it, expect } from "vitest";
 import { TriacDefinition, TRIAC_PARAM_DEFAULTS } from "../triac.js";
 import { PropertyBag } from "../../../core/properties.js";
 import { SparseSolver } from "../../../solver/analog/sparse-solver.js";
-import { makeTestSetupContext, setupAll, makeLoadCtx } from "../../../solver/analog/__tests__/test-helpers.js";
+import { makeTestSetupContext, setupAll, makeLoadCtx, allocateStatePool } from "../../../solver/analog/__tests__/test-helpers.js";
 import type { AnalogElement } from "../../../core/analog-types.js";
 import type { AnalogFactory } from "../../../core/registry.js";
 import { MODEDCOP, MODEINITFLOAT } from "../../../solver/analog/ckt-mode.js";
@@ -74,6 +74,13 @@ function buildAndSetupTriac(
   });
 
   setupAll([element], ctx);
+
+  // Allocate state pool for the BJT sub-elements (Q1..Q4).
+  // All four are pool-backed and read pool.states[N] in load(); without
+  // initState() the pool reference is undefined and load() throws.
+  const subElements = (element as any).getSubElements() as AnalogElement[];
+  allocateStatePool(subElements);
+
   return { element, solver };
 }
 

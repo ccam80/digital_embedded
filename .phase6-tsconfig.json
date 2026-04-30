@@ -1,9 +1,0 @@
-{
-  "extends": "./tsconfig.json",
-  "exclude": [
-    "node_modules",
-    "dist",
-    "src/components/active/__tests__/comparator.test.ts",
-    "src/fixtures/__tests__/analog-shape-audit.test.ts"
-  ]
-}

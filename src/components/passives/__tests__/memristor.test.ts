@@ -30,6 +30,8 @@ const MOBILITY = 1e-14;
 const DEVICE_LENGTH = 10e-9;
 const WINDOW_ORDER = 1;
 
+import { makeTestSetupContext, setupAll } from "../../../solver/analog/__tests__/test-helpers.js";
+
 function makeMemristor(overrides: Partial<{
   rOn: number;
   rOff: number;
@@ -48,21 +50,36 @@ function makeMemristor(overrides: Partial<{
     deviceLength: overrides.deviceLength ?? DEVICE_LENGTH,
     windowOrder: overrides.windowOrder ?? WINDOW_ORDER,
   });
-  return new MemristorElement(
+  const mem = new MemristorElement(
     new Map([["A", 1], ["B", 2]]),
     memProps,
   );
+  // Run setup() so matrix handles are allocated (required before load()).
+  const solver = new SparseSolver();
+  solver._initStructure();
+  const ctx = makeTestSetupContext({ solver });
+  setupAll([mem as unknown as AnalogElement], ctx);
+  return mem;
 }
 
 /**
  * Integrate the memristor state variable w forward by one accepted step.
- * Memristor.accept() reads ctx.dt and ctx.voltages to compute dw/dt.
+ * Memristor.accept() reads ctx.rhs[nA] and ctx.rhs[nB] using 1-based pin
+ * node indices (A=1, B=2), so the voltage array must be sized >= 3 with
+ * values at the correct 1-based positions.
  */
-function acceptStep(mem: MemristorElement, dt: number, _rhs: Float64Array): void {
+function acceptStep(mem: MemristorElement, dt: number, voltages: Float64Array): void {
+  // Build a Float64Array sized to cover node indices 0..2 (1-based: A=1, B=2).
+  // Copy caller voltages into 1-based slots so accept() reads the right values.
+  const rhs = new Float64Array(3);
+  rhs[1] = voltages[0]; // node A=1 ← caller's index 0
+  rhs[2] = voltages[1]; // node B=2 ← caller's index 1
   const ctx = makeLoadCtx({
     solver: new SparseSolver() as unknown as import("../../../solver/analog/sparse-solver.js").SparseSolver,
     cktMode: MODETRAN | MODEINITFLOAT,
     dt,
+    rhs,
+    rhsOld: rhs,
     deltaOld: [dt, dt, dt, dt, dt, dt, dt],
   });
   mem.accept(ctx, 0, () => {});
@@ -276,15 +293,26 @@ describe("Memristor", () => {
 
   describe("load", () => {
     it("stamps conductance between nodes A and B", () => {
-      const mem = makeMemristor();
+      // Build a fresh element and run setup on the same solver used for load(),
+      // so the matrix handles allocated in setup() are valid for the load() call.
+      const memProps = new PropertyBag();
+      memProps.replaceModelParams({
+        ...MEMRISTOR_DEFAULTS,
+        rOn: R_ON, rOff: R_OFF, initialState: INITIAL_W,
+        mobility: MOBILITY, deviceLength: DEVICE_LENGTH, windowOrder: WINDOW_ORDER,
+      });
+      const mem = new MemristorElement(new Map([["A", 1], ["B", 2]]), memProps);
 
       const solver = new SparseSolver();
       solver._initStructure();
+      const setupCtx = makeTestSetupContext({ solver });
+      setupAll([mem as unknown as AnalogElement], setupCtx);
+
       const ctx = loadCtxFromFields({
         solver,
         matrix: solver,
-        rhs: new Float64Array(2),
-        rhsOld: new Float64Array(2),
+        rhs: new Float64Array(3),
+        rhsOld: new Float64Array(3),
         time: 0,
         cktMode: MODEDCOP | MODEINITFLOAT,
         dt: 0,
@@ -398,7 +426,10 @@ describe("memristor_load_transient_parity (C4.2)", () => {
     memProps2.replaceModelParams({ ...MEMRISTOR_DEFAULTS, rOn, rOff, initialState: w0, mobility, deviceLength: deviceLen, windowOrder });
     const mem = new MemristorElement(new Map([["A", 1], ["B", 0]]), memProps2);
 
-    // Handle-based capture solver (persistent handles across steps)
+    // Handle-based capture solver (persistent handles across steps).
+    // setup() allocates handles into this solver, so load() stamps through the
+    // same handle table. Node A=1, B=0(gnd) → only _hPP at (1,1) is allocated
+    // (ground-guarded: negNode=0 skips _hNN/_hPN/_hNP per ressetup.c:46-49).
     const handles: { row: number; col: number }[] = [];
     const handleIndex = new Map<string, number>();
     const matValues: number[] = [];
@@ -417,13 +448,19 @@ describe("memristor_load_transient_parity (C4.2)", () => {
       },
       stampElement: (h: number, v: number): void => { matValues[h] += v; },
       stampRHS: (_row: number, _v: number): void => {},
+      _initStructure: () => {},
     } as unknown as import("../../../solver/analog/sparse-solver.js").SparseSolver;
+
+    // Run setup() against the capture solver so _hPP is allocated at key "1,1".
+    const setupCtx = makeTestSetupContext({ solver });
+    setupAll([mem as unknown as AnalogElement], setupCtx);
 
     const ag = new Float64Array(7);
     ag[0] = 1 / dt;
     ag[1] = -1 / dt;
 
     // All voltages zero → vAB=0 → current=0 → dw/dt=0 → w stays at w0.
+    // Size 2: index 0=node 0 (gnd), index 1=node 1 (A). Both zero.
     const voltages = new Float64Array(2);
 
     // 10-step transient loop
@@ -464,10 +501,10 @@ describe("memristor_load_transient_parity (C4.2)", () => {
       expect(ctx.order).toBe(order);
       expect(ctx.method).toBe(method);
 
-      // Assert stamped conductance is bit-exact G(w0) (zero voltage → w constant)
-      // stampG stamps G on [nA-1,nA-1] — matValues[0] after fill(0) is G_ref.
-      const h00 = handleIndex.get("0,0")!;
-      expect(matValues[h00]).toBe(G_ref);
+      // Assert stamped conductance is bit-exact G(w0) (zero voltage → w constant).
+      // _hPP is allocated at (nodeA=1, nodeA=1) by setup() → key "1,1".
+      const h11 = handleIndex.get("1,1")!;
+      expect(matValues[h11]).toBe(G_ref);
 
       // Call accept() with zero voltages → dWdt=0 → w unchanged
       mem.accept(ctx, step * dt, () => {});

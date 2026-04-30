@@ -78,6 +78,8 @@ function makeCompanionCtx(opts: {
     deltaOld: [opts.dt, opts.dt, opts.dt, opts.dt, opts.dt, opts.dt, opts.dt],
     ag: companionAg(opts.dt, opts.method, opts.order),
     uic: opts.uic ?? false,
+    rhs: opts.rhs,
+    rhsOld: opts.rhs,
   });
 }
 
@@ -344,11 +346,25 @@ describe("Inductor", () => {
       solver._initStructure();
       const { element, pool } = withRealSetup(core, solver);
 
+      // branchIndex is allocated by withRealSetup (startBranch:10) → b=10.
+      // rhsOld[b] = branch current. Build arrays sized b+1 with current at slot b.
+      const b = element.branchIndex;
+      const rhs1 = new Float64Array(b + 1);
+      rhs1[1] = 5;   // V(A=1) = 5V
+      rhs1[2] = 0;   // V(B=2) = 0V
+      rhs1[b] = 0.5; // branch current = 0.5A
+
       // First call establishes i=0.5 in s0, then rotate so it lands in s1
-      element.load(makeCompanionCtx({ solver, rhs: new Float64Array([5, 0, 0.5]), dt: 1e-4, method: "trapezoidal", order: 1 }));
+      element.load(makeCompanionCtx({ solver, rhs: rhs1, dt: 1e-4, method: "trapezoidal", order: 1 }));
       pool.rotateStateVectors();
+
+      const rhs2 = new Float64Array(b + 1);
+      rhs2[1] = 5;   // V(A=1) = 5V
+      rhs2[2] = 0;   // V(B=2) = 0V
+      rhs2[b] = 0.6; // branch current = 0.6A
+
       // Second call: i=0.6, s1 now has i=0.5
-      element.load(makeCompanionCtx({ solver, rhs: new Float64Array([5, 0, 0.6]), dt: 1e-4, method: "trapezoidal", order: 1 }));
+      element.load(makeCompanionCtx({ solver, rhs: rhs2, dt: 1e-4, method: "trapezoidal", order: 1 }));
 
       const lteParams = { trtol: 7, reltol: 1e-3, abstol: 1e-6, chgtol: 1e-14 };
       const result = element.getLteTimestep!(1e-4, [1e-4, 1e-4], 1, "trapezoidal", lteParams);
@@ -566,13 +582,21 @@ describe("inductor_load_transient_parity (C4.2)", () => {
       _pool: { states: Float64Array[] }; _stateBase: number;
     };
 
-    // 1-based MNA layout: node2=circuit node 2 (slot 2), branch=slot 3.
-    // voltages layout (1-based): [ground(0), V(node1)=Vsrc, V(node2)=v2, I_bL=i_L]
-    // rhsOld[branchIndex=3] = i_L — branch current at slot 3.
+    // 1-based MNA layout: node A=2, node B=0(gnd).
+    // branchIndex is allocated by withRealSetup (startBranch:10) → branchIndex=10.
+    // rhsOld[branchIndex] = prior-step branch current I_L.
+    // rhsOld must be sized to at least branchIndex+1.
+    const b = element.branchIndex;  // = 10 from withRealSetup startBranch:10
+    let i_prev = 0;  // branch current accepted from previous step
 
     for (let step = 0; step < 10; step++) {
       matValues.fill(0);
       rhsEntries.length = 0;
+
+      // Build rhsOld with accepted branch current at slot branchIndex.
+      // The inductor reads rhsOld[b] for flux: phi = L * rhsOld[b].
+      const rhsOld = new Float64Array(b + 1);
+      rhsOld[b] = i_prev;
 
       const ctx: LoadContext = makeLoadCtx({
         cktMode: step === 0 ? (MODETRAN | MODEINITTRAN) : (MODETRAN | MODEINITFLOAT),
@@ -582,6 +606,7 @@ describe("inductor_load_transient_parity (C4.2)", () => {
         order,
         deltaOld: [dt, dt, dt, dt, dt, dt, dt],
         ag,
+        rhsOld,
       });
 
       element.load(ctx);
@@ -594,10 +619,8 @@ describe("inductor_load_transient_parity (C4.2)", () => {
       // Rotate state: s1 ← s0
       poolEl._pool.states[1].set(poolEl._pool.states[0]);
 
-      // Advance to next accepted values (kept as side-effect statements; values are
-      // referenced indirectly via refV2/refI arrays in subsequent iterations).
-      void refV2[step];
-      void refI[step];
+      // Advance accepted branch current for next step.
+      i_prev = refI[step];
     }
 
     // After 10 accepted steps: assert companion state from last load().

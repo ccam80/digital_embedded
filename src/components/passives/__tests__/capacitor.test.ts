@@ -371,11 +371,12 @@ describe("Capacitor", () => {
       solver._initStructure();
       const { element, pool } = withRealSetup(core, solver);
 
-      // First call: v1 = 3V — rotate pool so v=3 lands in s1
-      element.load(makeCompanionCtx({ solver, rhs: new Float64Array([3, 0]), dt: 1e-6, method: "trapezoidal", order: 1 }));
+      // Voltage arrays use 1-based indexing: pos=1 → index 1, neg=2 → index 2.
+      // First call: V(pos=1)=3V, V(neg=2)=0V → rotate pool so v=3 lands in s1
+      element.load(makeCompanionCtx({ solver, rhs: new Float64Array([0, 3, 0]), dt: 1e-6, method: "trapezoidal", order: 1 }));
       pool.rotateStateVectors();
-      // Second call: v2 = 7V
-      element.load(makeCompanionCtx({ solver, rhs: new Float64Array([7, 0]), dt: 1e-6, method: "trapezoidal", order: 1 }));
+      // Second call: V(pos=1)=7V, V(neg=2)=0V
+      element.load(makeCompanionCtx({ solver, rhs: new Float64Array([0, 7, 0]), dt: 1e-6, method: "trapezoidal", order: 1 }));
 
       const lteParams = { trtol: 7, reltol: 1e-3, abstol: 1e-6, chgtol: 1e-14 };
       const result = element.getLteTimestep!(1e-6, [1e-6, 1e-6], 1, "trapezoidal", lteParams);
@@ -745,7 +746,9 @@ describe("capacitor_load_transient_parity (C4.2)", () => {
       matValues.fill(0);
       rhsEntries.length = 0;
 
-      const stepVoltages = new Float64Array([Vsrc, v2, 0]);
+      // 1-based node layout: node1=index1=Vsrc (fixed source), node2=index2=v2 (cap node).
+      // capacitor has pos=2, neg=0 → reads voltages[2]=v2 and voltages[0]=0 → vcap=v2.
+      const stepVoltages = new Float64Array([0, Vsrc, v2]);
       const ctx = loadCtxFromFields({
         cktMode: step === 0 ? (MODETRAN | MODEINITTRAN) : (MODETRAN | MODEINITFLOAT),
         solver,

@@ -1,354 +1,235 @@
-# Test-Fix Jobs — remaining work after burst-4 dispatch
+# Test-Fix Jobs
 
-**Test results after dispatch (uncommitted on working tree):**
-- vitest: **6533 passed, 115 failed** (was 191) — **-76 failures**
-- playwright: timed out at 600s wall clock; placement-sweep cluster all
-  timing out at 30s each. Likely cascade from a single startup error
-  (see CRITICAL below). E2E re-run blocked until that's fixed.
+Each job lives in `spec/test-fix-jobs/<name>.md` and is self-contained:
+problem statement, sites, verified ngspice citations, fix shape, blast
+radius, tensions/uncertainties.
 
-**Status legend:**
-- `[CRITICAL]` — blocking many tests; fix first
-- `[BLOCKED]` — needs user direction
-- `[OPEN]` — not yet attempted
+## Categories
 
----
+- **architecture-fix** — production code doesn't match ngspice and should
+- **contract-update** — tests don't match the (correct) production contract
+- **few-ULP** — actual numerical FP-ordering divergence at the few-ULP level
 
-## §C — Critical blockers (fix first)
+Anything bigger than few-ULP that "looks numerical" is a `contract-update`
+in disguise (test reading wrong slot/index/fixture) until proved otherwise.
 
-### C1 — `register-all.ts` still imports deleted `tunnel-diode.js` `[CRITICAL]`
+## Hard rules for any agent acting on these specs
 
-**Failure pattern:**
-```
-Failed to load url ./semiconductors/tunnel-diode.js (resolved id: ./semiconductors/tunnel-diode.js) in C:/local_working_projects/digital_in_browser/src/components/register-all.ts. Does the file exist?  (x2)
-```
-
-**Sites:**
-- `src/editor/__tests__/wire-current-resolver.test.ts` (2 tests)
-
-**Likely also breaking:** the entire Playwright placement-sweep cluster
-(150+ tests timing out at 30s) — the app fails to boot when the registry
-import throws.
-
-**Fix:** Remove the `tunnel-diode` import and registry registration from
-`src/components/register-all.ts`. The component was deleted (per git
-status: `D src/components/semiconductors/tunnel-diode.ts`,
-`D src/components/semiconductors/__tests__/tunnel-diode.test.ts`) but the
-registry still references it.
-
-Also check / remove other tunnel-diode references:
-- UI palette (icons, palette JSON)
-- `.dig` file references in fixtures/circuits
-- Documentation
-
-**Resolves:** 2 vitest tests directly, plus the entire Playwright
-placement-sweep cascade (~150 tests) once the app can boot.
+1. No shims, aliases, backwards-compat hacks.
+2. No "pragmatic" / "minimal diff" framing — implement the cleanest final shape.
+3. No scope reduction, no deferral, no TODO comments.
+4. No `(coord as any)._private` tunneling. Use facade / coordinator / harness public APIs only.
+5. No banned-vocab closing verdicts (`tolerance`, `mapping`, `equivalent under`, `pre-existing`,
+   `intentional divergence`, `partial`, `citation divergence`). If you'd be tempted, escalate.
+6. Composite components extend `CompositeElement` (in `src/solver/analog/composite-element.ts`)
+   via the new `CompositeComponentBase` abstraction once that lands. Per-component manual prop
+   merging is forbidden.
 
 ---
 
-## §J — Test-migration jobs (test bugs; rewrite to current contract)
+## Composite component family
 
-### J7c — PB-IND golden re-record `[OPEN]`
+- [composite-component-base.md](test-fix-jobs/composite-component-base.md) — central:
+  `CompositeComponentBase`, `PropertyBag.forModel(modelDefaults, overrides)` auto-merge,
+  typed `bindSubPin` API replacing `(child as any)._pinNodes.set(...)`. **architecture-fix.**
+- [composite-scr.md](test-fix-jobs/composite-scr.md) — Q1 NPN + Q2 PNP latch via shared
+  internal node. **architecture-fix.**
+- [composite-triac.md](test-fix-jobs/composite-triac.md) — Q1..Q4 + 2 latch nodes; resolves
+  `triggers_triac` (`PropertyBag: model param "NF" not found`). **architecture-fix.**
+- [composite-diac.md](test-fix-jobs/composite-diac.md) — promote anonymous literal to
+  `DiacCompositeElement`; resolves `blocks_below_breakover` (anonymous literal's `_stateBase: -1`
+  never initialized). **architecture-fix.**
+- [composite-optocoupler.md](test-fix-jobs/composite-optocoupler.md) — DIO + VSRC + CCCS + BJT;
+  setup order forced by `findBranch` dependency, not `NGSPICE_LOAD_ORDER` ascending.
+  **architecture-fix.**
+- [composite-timer-555.md](test-fix-jobs/composite-timer-555.md) — three resistors + 2 VCVS
+  comparators + discharge BJT + RS-FF; custom `load()` interleaves stamps with FF state update.
+  **architecture-fix.**
+- [composite-transmission-line.md](test-fix-jobs/composite-transmission-line.md) —
+  N-segment R/L/G/C with last segment as `CombinedRLElement`; lazy `addSubElement`
+  registration inside `setup()`. **architecture-fix.**
+- [composite-real-opamp.md](test-fix-jobs/composite-real-opamp.md) — recommends real-opamp
+  stays a leaf `PoolBackedAnalogElement` (not a `CompositeElement`); `railLim` is per-element
+  NR-limiter discipline, not composite shape. **architecture-fix.**
+- [composite-behavioral-families.md](test-fix-jobs/composite-behavioral-families.md) — audit
+  result: behavioral-gate / -combinational / -remaining / -sequential / -flipflop already
+  extend `CompositeElement` cleanly. No rework. **architecture-fix (audit-only).**
 
-**Site:** `src/solver/analog/__tests__/setup-stamp-order.test.ts` PB-IND
-TSTALLOC sequence test.
+## Compiler architecture
 
-**Verdict:** ALIGNED with ngspice (`indsetup.c:96-100` — 5 stamps; digiTS at
-`inductor.ts:239-243` matches). Plain golden re-record needed.
+- [topology-validation-after-setup.md](test-fix-jobs/topology-validation-after-setup.md) —
+  pull pre-flight validation into a post-setup hook in `analog-engine._setup()`; populated
+  `branchIndex` enables `detectVoltageSourceLoops` / `detectInductorLoops`. **architecture-fix.**
+- [digital-pin-loaded-vs-unloaded.md](test-fix-jobs/digital-pin-loaded-vs-unloaded.md) —
+  split `DigitalInputPinModel` into `DigitalInputPinLoaded` / `DigitalInputPinUnloaded`;
+  compiler picks at instantiation; delete `_loaded` flag. **architecture-fix.**
 
-**Action:** Run the test, capture actual emission via
-`solver._getInsertionOrder()`, overwrite the golden literal. Cannot be done
-without running tests, so the agent dispatch round skipped it.
+## Element-level production
 
----
+- [real-opamp-rail-limited-nr.md](test-fix-jobs/real-opamp-rail-limited-nr.md) — full
+  pool-backing + `railLim` voltage limiter clamping `vOut` (not just `vInt`) and bumping
+  `ctx.noncon.value` on overshoot. **architecture-fix.**
+- [setup-stamp-order-bjt-ind.md](test-fix-jobs/setup-stamp-order-bjt-ind.md) — uncovers two
+  latent production bugs: `createBjtElement` always returns L0 (9 entries; L1 with 20 entries
+  is unreachable); inductor reads `A`/`B` while tests pass `pos`/`neg`. **architecture-fix.**
+- [setup-stamp-order-opto-555.md](test-fix-jobs/setup-stamp-order-opto-555.md) — golden
+  re-record gated on composite-base + BJT factory dispatch fix. **contract-update**
+  (depends on composite-component-base.md).
+- [ckt-context-buffer-allocation.md](test-fix-jobs/ckt-context-buffer-allocation.md) —
+  needs user decision: thread matrix size into constructor (architecture-fix) vs rename test
+  to `allocates_all_buffers_after_setup` and call deferred sizers (contract-update).
+- [potentiometer-double-stamp.md](test-fix-jobs/potentiometer-double-stamp.md) — production
+  matches `resload.c` 1:1; test diagonal-row indices have W↔B swap. **contract-update**
+  (brief was wrong about a 2× production stamp bug).
+- [wire-current-resolver-lrctest.md](test-fix-jobs/wire-current-resolver-lrctest.md) — engine
+  enters ERROR state on first transient step; `simTime` never advances. NOT a tunnel-diode
+  fixture issue (lrctest only uses Resistor/Cap/Inductor/AcVoltageSource). **architecture-fix.**
 
-### J7a / J7b — golden re-records after L1 BJT switch `[OPEN]`
+## LTE / NR / DC-OP
 
-**Sites:** `src/solver/analog/__tests__/setup-stamp-order.test.ts` PB-BJT
-and PB-SCR golden literals.
+- [rlc-lte-adaptive-subdivision.md](test-fix-jobs/rlc-lte-adaptive-subdivision.md) — adaptive
+  rejection-and-retry loop is correct; failure is `setSignal` mutating source param before
+  first `step()` runs `_transientDcop()`, so DCOP solves with the new value already applied.
+  Three resolution options. **architecture-fix.**
+- [dc-op-strategy-direct-vs-gmin.md](test-fix-jobs/dc-op-strategy-direct-vs-gmin.md) — test
+  uses a thin `makeDiode` mock missing MODEINITJCT seed, pnjlim, GMIN injection, and
+  current-based convTest; production has all four. Migrate test to `createDiodeElement`.
+  **contract-update.**
+- [nr-diode-convergence-drift.md](test-fix-jobs/nr-diode-convergence-drift.md) — Vd=5.005V,
+  Ireverse=0.005A, Shockley 1.35% — past few-ULP. Most likely root: NR convergence gating
+  off-by-one OR missing MODEINITJCT seed. **architecture-fix; ESCALATE.**
+- [dc-op-parity-divergence.md](test-fix-jobs/dc-op-parity-divergence.md) — four parity tests
+  (`bjt-common-emitter:dc_op_match`, `mosfet-inverter:dc_op_match`, `rc-transient:transient_per_step_match`,
+  `rlc-oscillator:transient_oscillation_match`) at `absDelta === 0` bar. **architecture-fix; ESCALATE.**
+- [harness-comparison-matrix-divergence.md](test-fix-jobs/harness-comparison-matrix-divergence.md) —
+  five matrix-entry divergences in comparison-session tests; per-iteration (row, col, ours,
+  ngspice) extraction documented. **architecture-fix; ESCALATE.**
+- [hotload-bf-param-drift.md](test-fix-jobs/hotload-bf-param-drift.md) — 30 ppm drift; same
+  family as `bjt-common-emitter:dc_op_match`. Phase A failure on default BF=100 means hot-load
+  path is not the source — engine BJT load is. **architecture-fix.**
+- [ckt-terr-lte-literals.md](test-fix-jobs/ckt-terr-lte-literals.md) — Gear factor literals:
+  tests use rationals (`2/9`, `3/22`); production exports ngspice's truncated decimals
+  (`0.2222222222`, `0.1363636364`). **contract-update.**
+- [nr-reorder-citation.md](test-fix-jobs/nr-reorder-citation.md) — `phase-3-nr-reorder.test.ts`
+  asserts `niiter.c:888-891`; production emits `niiter.c:881-902`; correct narrow range is
+  889-894. **contract-update.**
 
-The factory switches landed (J7a test, J7b production). The golden literals
-were left intact; the tests will fail with sequence-mismatch and the user
-re-records against the actual L1 emission.
+## E2E / fixtures
 
-**Expected emission lengths:**
-- PB-BJT: 20 entries (`bjtsetup.c:435-464` minus 3 substrate stamps when subst=0)
-- PB-SCR: 40 entries (2 × 20 substrate-dropped L1 stamps)
+- [cmos-mode-gate-timeouts.md](test-fix-jobs/cmos-mode-gate-timeouts.md) — single-gate-no-wiring
+  CMOS netlists create floating subnets; NR damps via gmin and never converges. Needs the
+  post-setup topology validator + a "nonlinear-only subnet with no DC ground path" detector.
+  **architecture-fix.**
+- [master-circuit-assembly-suite.md](test-fix-jobs/master-circuit-assembly-suite.md) — Master
+  1: cmos engine-class; Master 2: status-bar from compile diagnostic; Master 3: DAC `rOut`
+  default 100Ω forms divider with R1=1k (~9% drop). **architecture-fix (mixed).**
+- [adc-bits-4-status-error.md](test-fix-jobs/adc-bits-4-status-error.md) — width-sweep wires
+  only `D0`; `EOC, D1..D(N-1)` outputs are unwired and each `DigitalOutputPinModel` produces
+  a structurally singular floating subnet. Needs per-net Hi-Z fallback. **architecture-fix.**
+- [bjt-convergence-fixture-tunnel-diode.md](test-fix-jobs/bjt-convergence-fixture-tunnel-diode.md) —
+  `TD` is NOT a deleted tunnel-diode component (no such component existed). `buildBuckBJT`
+  references `'TD'` in 3 wiring/trace calls but never calls
+  `placeLabeled('Diode', 43, 12, 'TD', 90)`. One-line fixture fix. **contract-update.**
 
----
+## Test migrations (mock/accessor cleanup)
 
-### J12 — `behavioral-sequential` outputs read 0 (digital wiring not driven) `[BLOCKED — needs decision]`
-
-**Failure pattern:** `expected +0 to be 5/3/85/165` (×6)
-
-**Site:** `src/solver/analog/__tests__/behavioral-sequential.test.ts` —
-`counts_on_clock_edges`, `clear_resets_to_zero`, `output_voltages_match_logic`,
-`latches_all_bits`, `holds_value_across_timesteps`, `sequential_pin_loading_propagates`
-
-**Root cause:** Tests bypass the facade entirely (hand-rolled `makeNullSolver`,
-direct element construction, no `compileAnalogPartition` or facade anywhere).
-Migration to `DefaultSimulatorFacade` blocked because:
-1. No JSON counter/register fixture exists in repo, and the spec prohibits
-   fabricating one without authorization.
-2. Several tests assert on internal element state (`element.count`,
-   `element.storedValue`, direct `allocElement` call tracking) not exposed
-   through the facade's public API (`readSignal`, `step`, etc.).
-
-**User decision required:** (a) authorize fabricating a counter/register
-JSON spec + accept loss of internal-state coverage; or (b) keep the tests
-direct-stamp but rewrite under the new contract; or (c) move these tests
-to `headless/__tests__/` and assert against facade signal reads only.
-
----
-
-## §K — Production / architecture jobs
-
-### K4 — Real-opamp voltage-limited NR `[BLOCKED — needs scope decision]`
-
-**Status:** Dispatch agent hit STOP condition. `real-opamp.ts` has **no
-pool-backed state infrastructure**:
-
-- `_stateBase: -1` declared in element literal but never allocated
-- No `poolBacked: true`, no `stateSize`, no `stateSchema` on the element
-- All state (`vInt`, `vIntPrev`, `_vOutPrev`, `aEff`, `geq_int`,
-  `outputSaturated`, etc.) lives in **closure variables**
-- `accept()` writes to closure assignments (e.g. `vIntPrev = vInt`,
-  `_vOutPrev = readNode(ctx.rhs, nOut)`), no `pool.state0` access anywhere
-- `ctx.noncon` is a plain `number`, not `{value: number}` — increment is
-  `ctx.noncon++`, NOT `ctx.noncon.value++` as originally specified
-
-**User decision required:**
-
-- **Option 1 — Add full pool-backing as part of K4:** Add `poolBacked: true`,
-  `stateSize`, `stateSchema`, allocate in `setup()`, migrate all closure
-  state to pool slots, then add `SLOT_VINT_PREV`. Architecturally correct
-  per diode pattern but larger blast radius than the original K4 spec.
-- **Option 2 — Implement K4 against the existing closure pattern:** The
-  `vIntPrev` closure variable already tracks the previous accepted `vInt`,
-  and `accept()` already advances it. The `railLim` call in `load()` would
-  use `vIntPrev` directly. This stays inside the K4 spec scope as written
-  ("adapt to its existing pattern").
-- **Option 3 — Defer K4:** Resolve pool-backing question separately first.
-
-**Dispatch-spec carryover (re-usable when unblocked):**
-
-The `railLim` helper text is canonical and ready to add to
-`newton-raphson.ts`:
-
-```ts
-/**
- * Voltage limiter for behavioral amplifier rail clamps. Algorithmic peer of
- * DEVpnjlim (devsup.c:50-84) and DEVlimvds (devsup.c:20-40), but shaped for
- * hard rail clamping rather than junction log-compression or FET vds magic
- * constants. NOT a literal port of any single ngspice function — the rail-clamp
- * topology has no first-class ngspice analog. The algorithmic pattern (limit,
- * set icheck, bump CKTnoncon) IS the canonical NR-convergence discipline used
- * by every nonlinear ngspice device.
- */
-export function railLim(
-  vnew: number,
-  vold: number,
-  vRailPos: number,
-  vRailNeg: number,
-): { vnew: number; limited: boolean } {
-  if (vnew > vRailPos && vold < vRailPos) {
-    return { vnew: (vRailPos + vold) / 2, limited: true };
-  }
-  if (vnew < vRailNeg && vold > vRailNeg) {
-    return { vnew: (vRailNeg + vold) / 2, limited: true };
-  }
-  return { vnew, limited: false };
-}
-```
-
-**Resolves:** 10 tests (all 10 real-opamp failures).
-
----
-
-### K11-B — Move topology validation post-`setup()` `[BLOCKED — excluded from dispatch by user]`
-
-**Verdict:** Production architectural bug. `compiler.ts:912-932` runs
-topology validation BEFORE setup; the validator at `compiler.ts:1437-1448`
-reads `element.branchIndex` which is `-1` until `setup()` runs.
-Same defect silently disables `detectVoltageSourceLoops` and
-`detectInductorLoops`.
-
-**User decision (resolved):** Option B1 — move validation post-setup.
-
-**Implementation paths:**
-- **Path A** — pull validation forward into the engine: add a post-setup
-  hook in `analog-engine.ts:_setup()` that calls the validator with the
-  populated `branchIndex` values, then routes diagnostics to the same
-  collector the compiler uses. **(Recommended — smaller blast radius.)**
-- **Path B** — push setup into the compiler: have `compileAnalogPartition`
-  drive `setupAll` immediately after building `topologyInfo`, then run
-  validation on the post-setup state.
-
-**Sites:** Production: `src/solver/analog/compiler.ts:912-932, 1437-1448, 1557`.
-Tests: `src/solver/analog/__tests__/competing-voltage-constraints.test.ts:129`.
-
-**ngspice citations (verbatim — for "no pre-flight" framing):**
-- `cktinit.c:24-135` — pure struct allocation, no topology inspection
-- `cktsetup.c:31-131` — per-device matrix-pointer registration, no
-  cross-device validation
-- `cktsoachk.c:35-53` — runs only post-convergence
-- `spfactor.c:260-262` — singularity detected inside elimination loop
-- `niiter.c:885-904` — E_SINGULAR retry → forceReorder + continue;
-  if reorder also fails: `"singular matrix: check nodes %s and %s\n"`
-
-**Side benefit:** Once K11-B lands, `detectVoltageSourceLoops` and
-`detectInductorLoops` start working too.
-
-**Resolves:** 1 test directly (`competing-voltage-constraints`). Latent
-fixes for `detectVoltageSourceLoops`/`detectInductorLoops`.
+- [behavioral-tests-via-harness.md](test-fix-jobs/behavioral-tests-via-harness.md) —
+  9 failing tests across `behavioral-sequential.test.ts` / `behavioral-gate.test.ts` /
+  `behavioral-combinational.test.ts`. Recommendation: keep facade/harness duality with
+  explicit names (`SimulatorFacade` = bounded production-call API; `ComparisonSession` =
+  bounded numerical-investigation API; single hand-off via `setCaptureHook`). All migrate to
+  `.dts` fixture + `ComparisonSession.createSelfCompare`. **contract-update.**
+- [convergence-regression-state-pool.md](test-fix-jobs/convergence-regression-state-pool.md) —
+  5 tests reading `coordinator.statePool` directly; migrate to `coordinator.captureElementStates`.
+  **contract-update.**
+- [harness-integration-accessor-rename.md](test-fix-jobs/harness-integration-accessor-rename.md) —
+  brief framing was wrong; accessors exist. Real fault: tests build a fresh `MNAEngine` in
+  `beforeEach` and ignore the engine returned by `buildHwrFixture()`. **contract-update.**
+- [resistor-stamp-via-facade.md](test-fix-jobs/resistor-stamp-via-facade.md) — fixes ngspice
+  citation (`resload.c:34-37` for DC-load, not `:45-48` which is `RESacload`). Migrates to
+  facade + `getCSCNonZeros()`. **contract-update.**
+- [led-junction-cap-transient.md](test-fix-jobs/led-junction-cap-transient.md) — `mockSolver`
+  returns 0; folds in latent bug (test filters stamps on `(row=0, col=0)` but pin map puts
+  LED at MNA node 1). **contract-update.**
+- [led-temp-and-forward-drop.md](test-fix-jobs/led-temp-and-forward-drop.md) — signal label
+  drift (`led:in` vs actual). **contract-update.**
+- [led-pnjlim-event-push.md](test-fix-jobs/led-pnjlim-event-push.md) — agent disagrees with
+  brief: the MODEINITJCT push test currently passes and documents an intentional digiTS
+  contract. Deletion is escalated, not done. **contract-update; ESCALATE.**
+- [jfet-conducting-stamps.md](test-fix-jobs/jfet-conducting-stamps.md) — fixture feeds same
+  `voltages` buffer to `load()` 50× without iterating; pnjlim/fetlim trap `vgs` at `vcrit≈0.78V`
+  → device stays in cutoff. **contract-update.**
 
 ---
 
-## §E — Numerical / parity escalations (NOT test fixes)
+## Open user decisions
 
-Per CLAUDE.md ngspice-parity vocabulary rules, every item below is a
-candidate for `spec/architectural-alignment.md` (architectural divergence)
-or `spec/fix-list-phase-2-audit.md` (numerical bug). **Agents do not
-edit `architectural-alignment.md`** — escalate to user with the cited
-ngspice file, the digiTS file, and the divergent quantities.
+The following items require user decisions before implementation. Each
+links to its spec for context.
 
-### E3 — `harness/comparison-session.ts` matrix-entry divergences (×10)
+1. **Composite refactor — `setPinNode` interface placement.** Optional method on
+   `AnalogElement`, or duck-typed inside `bindSubPin`? Only `VsenseSubElement` and
+   `CccsSubElement` implement it today.
+2. **Composite refactor — `PropertyBag.forModel` schema validation.** Should `forModel`
+   accept the `ParamDef[]` schema for higher-quality unknown-key error messages, folding in
+   `model-params.ts:84-94`'s `deviceParams()`?
+3. **Real-opamp boundary.** Confirm real-opamp stays a leaf `PoolBackedAnalogElement` (not
+   `CompositeElement`); pool-backing + `railLim` are independent of the composite refactor.
+4. **Optocoupler hot-loadable params.** `CccsSubElement.gain` is `private readonly`. Per
+   the user's hot-loadable-params policy it must become mutable. Land in the same PR as the
+   composite-base refactor, or as a follow-up?
+5. **`getPinCurrents` placeholders.** SCR / TRIAC / optocoupler return all-zeros today.
+   Real per-pin current resolution is a separate aggregation problem — out-of-scope flag.
+6. **Topology-validation surface.** Where to surface post-setup diagnostics: on the
+   compile-result vs via a new compile-pipeline warmup step? Spec recommends warmup.
+7. **Digital-pin classes — `role` axis.** Fold the output-pin `role` axis with the loaded
+   axis (4 classes), or keep `role` internal to two output classes? Spec recommends keeping
+   internal.
+8. **BJT default model level.** `BJT_NPN_DEFAULTS` does not specify L0 vs L1; the unreachable
+   L1 factory must be wired up — which level is the default?
+9. **Inductor pin-key alignment.** Capacitor uses `pos`/`neg`; inductor uses `A`/`B`. Align
+   inductor on `pos`/`neg`? Currently 4 of 5 stamp allocations receive `undefined`.
+10. **`ckt-context` buffer-allocation contract.** Option A — thread matrix size into the
+    constructor (architecture-fix; non-trivial engine refactor). Option B — rename test to
+    `allocates_all_buffers_after_setup` and call deferred sizers (contract-update; matches
+    ngspice's `cktinit.c` precedent).
+11. **LED pnjlim MODEINITJCT contract.** Keep current behavior (push under MODEINITJCT —
+    intentional digiTS contract per `diode.ts:609-619`) or align with ngspice (no push under
+    MODEINITJCT)?
+12. **Behavioral-tests harness — `digitalPinLoadingOverrides` direction.** Per-pin direct
+    on the element (artificial; production never does this) vs per-net override (matches
+    production)? Spec recommends per-net only.
+13. **Behavioral-tests harness — single typed accessor addition.**
+    `ComparisonSession.getMatrixInsertionOrder()` to avoid `(harness as any)._engine`
+    tunneling — add or accept the tunneling?
+14. **Behavioral-tests — observable-behavior reformulation vs structural assertions.**
+    Should pin-loading tests assert via voltage-sag through finite-impedance source instead
+    of matrix-allocation pairs? Spec recommends keeping structural via `_getInsertionOrder()`.
+15. **`setSignal` + DCOP ordering.** Add `setSignalAtTime(label, value, time)` with
+    breakpoint-driven event scheduling (cleanest), rewrite RLC tests to use PULSE source
+    idiom, or per-test step-then-set ordering? RLC LTE tests gate on this.
+16. **Few-ULP threshold.** `CLAUDE.md` does not specify a numerical threshold for the
+    `few-ULP` category. Choose a value (conventional `≤16 ulp`?).
+17. **LU pivot-order alignment with Sparse 1.3.** If digiTS LU and ngspice's Sparse 1.3 must
+    be bit-exact at the last ULP, this is an architectural-alignment item to formalize.
+18. **`docs/ngspice-harness-howto.md` is missing.** `CLAUDE.md` cites this as the entry point
+    for any numerical-discrepancy investigation; it does not exist in the tree. Author it?
 
-All ten tests fail with `Matrix-entry value divergence at step=0
-attempt=0 iter=0`. These are the canonical ngspice-parity comparison
-tests (buckbjt_load_dcop, transient: CCAP/PNP/inductor, DC-OP match,
-transient_rectification_match, dc_op_pnjlim_match, dump+compare structure).
+## Latent bugs uncovered (not in scope but in blast radius)
 
-**Action:** This is the **first tool** per CLAUDE.md's "ngspice
-comparison harness" rule. Run the harness, identify the iteration where
-values first diverge, and report the exact (row, col, ours, ngspice)
-quartet. Escalate with that quartet.
+These were discovered during investigation. Per project policy on latent
+bugs in the same blast radius, they are documented for fold-in
+consideration in their respective specs.
 
----
-
-### E4 — Bit-exact misses with absDelta ~10^-21
-
-- `parity-helpers.ts` — `transient_match` (absDelta=4.4e-21)
-- `parity-helpers.ts` — `transient_oscillation_match` (absDelta=1.6e-24)
-
-**Root cause:** Floating-point operation ordering between digiTS and
-ngspice differs at the ULP level. Per CLAUDE.md banned-vocab rules, this
-is an **architectural escalation** ("intentional divergence" is banned;
-items go in `architectural-alignment.md`).
-
-**Action:** Escalate. The user decides whether to accept FP-ordering
-divergence or chase the per-summation-order match.
-
----
-
-### E6 — diode_circuit_direct strategy mismatch
-
-`dc-operating-point.test.ts` — `diode_circuit_direct`
-(`expected 'dynamic-gmin' to be 'direct'`)
-
-**Root cause:** Production now falls back to dynamic-gmin where ngspice
-takes the direct path on the same diode circuit. Architectural —
-escalate after E1/E2 land (they likely affect the strategy decision).
-
----
-
-### E7 residual — convergence-regression / state-pool
-
-- `convergence-regression.test.ts` — `half-wave rectifier converges`,
-  `statePool state0 has non-zero values after DC OP`,
-  `statePool state1 is updated after accepted transient step`,
-  `reset restores initial values in statePool`,
-  `diode circuit runs 100 transient steps without error` (5 tests;
-  likely cascade from K3/K1/J19).
-
-Re-evaluate after burst-4 fixes settle.
-
----
-
-### E8 — Misc numerical / convergence / stamp-shape
-
-| Test | Failure | Likely lane |
-|---|---|---|
-| `rlc-lte-path.test.ts` — RC step / RL step exponential matches | 5 vs ≤3.22, 1 vs ≤0.64 | E1 (LTE rooted) |
-| `behavioral-combinational/-gate.test.ts` — pin_loading | false-true (3×) | likely §J12 family |
-| `tapped-transformer.test.ts` — `center_tap_voltage_is_half`, `full_wave_rectifier`, `symmetric_halves` | 1.5e+300 / ERROR / 0 | numerical instability — E |
-| `transformer.test.ts` — `voltage_ratio`, `power_conservation`, `analogFactory creates element with correct branch indices` | 5.7e+20 / 4.8e+193 / -1 vs 5 | numerical instability + branchIndex==-1 contract change |
-| `transmission-line.test.ts` — `step input arrives at port 2`, `matched load no reflection`, `lossy line < lossless`, `unterminated line voltage rises`, `N=50 delay more accurate than N=5` | false-true / ERROR / 0 | numerical (E) |
-| `jfet.test.ts` — `emits_stamps_when_conducting` (5e-11 vs >1e-5) | numerical, jfet model | E |
-| `analog-fuse.test.ts` (recently modified, may have new test cases) | — | check after baseline |
-| `potentiometer.test.ts` — `wiper=0.5 G_top=G_bottom=1/5000 bit-exact` (0.0002 vs 0.0004) | 2× factor; production stamp pair-counting | K (production) |
-| `capacitor.test.ts` — `capacitor_load_transient_parity` (1 vs -0.0080) | numerical / K3 family |
-| `inductor.test.ts` — `inductor_load_transient_parity` (NaN vs 9.98e-7) | K3 family |
-| `ac-voltage-source.test.ts` — `rc_lowpass` | numerical (E1) |
-
----
-
-## §P — Playwright (browser) failures
-
-### P1 — CMOS-mode gate timeouts (×6)
-
-Tests: `And/Or/NAnd/NOr/XOr/XNOr works in cmos mode` in
-`gui/component-sweep.spec.ts:766` — all hit the 30s test timeout.
-
-**Likely cause:** CMOS mode compilation triggers a new convergence path
-(BJT-rooted) that hangs or runs orders of magnitude slower than the
-digital fallback. NOT a test fix — production fix once underlying analog
-regressions land.
-
----
-
-### P2 — `master-circuit-assembly.spec.ts` (×3)
-
-- `Master 1: digital logic` — timeout at line 46
-- `Master 2: analog — switched divider, RC, opamp, BJT` — status bar error
-- `Master 3: mixed-signal — DAC, RC, comparator, counter` — `toBeLessThan` fail
-
-These are the highest-leverage E2E tests. Likely surface K-class issues in
-combination. Run after the analog production fixes land.
-
----
-
-### P3 — `hotload-params-e2e.spec.ts` BF param drift
-
-Test: `changing BF on BJT via primary param row changes output voltage`
-— observed 0.09577 vs expected 0.09577 with 1e-7 precision; off by 2.8e-6.
-
-**Likely cause:** Numerical drift, related to E1/E2 family. Escalate.
-
----
-
-### P4 — `analog-bjt-convergence.spec.ts` (×2)
-
-- `compile and step — no convergence error, supply rail is 10V` — 0 vs 0.0208
-- `step to 5ms — output voltage evolves and trace captures transient` — `not.toBeCloseTo` failure
-
-**Likely cause:** Same BJT-rooted regression as the unit failures.
-
----
-
-### P5 — `component-sweep.spec.ts` ADC bits=4 (×1)
-
-`ADC at bits=4: set property and compile` — status bar shows error.
-Possibly K-family ADC compile path.
-
----
-
-## Open user gates
-
-| Gate | Job | Question |
-|---|---|---|
-| 1 | §J12 | Authorize counter/register JSON fixture (a), keep direct-stamp under new contract (b), or move to facade-only assertions (c) |
-| 2 | §K4 | Add full pool-backing to real-opamp (Option 1), use existing closure pattern (Option 2), or defer (Option 3) |
-| 3 | §K11-B | Path A (validation in engine setup hook — recommended) or Path B (compiler drives setupAll) |
-
----
-
-## Next steps
-
-1. **Run vitest** to measure post-dispatch reduction.
-2. **Re-record** PB-BJT, PB-SCR, PB-IND goldens (J7a/J7b/J7c) from actual emission.
-3. **Resolve K4 scope** — pick Option 1/2/3 above.
-4. **Resolve J12** — pick gate option.
-5. **Authorize K11-B** path.
-6. **Escalation lane:** run §E3 harness comparison sessions and produce
-   `(row, col, ours, ngspice)` quartets for E3, E4, E6, E7 residual, E8.
-7. **Playwright** (P1–P5) re-run after analog production fixes land.
+- **`createBjtElement` always returns L0** when the L1 factory exists with the full 20-entry
+  TSTALLOC sequence (unreachable code). See `setup-stamp-order-bjt-ind.md`.
+- **Inductor reads `A`/`B` pin keys** while the rest of the codebase uses `pos`/`neg`.
+  Documented in `setup-stamp-order-bjt-ind.md`.
+- **DIAC anonymous literal element** has `_stateBase: -1` never initialized, producing
+  `1e+171` divergence on first `load()`. Documented in `composite-diac.md`.
+- **Diode `setParam("AREA"|"IS"|"CJO", ...)` does not re-apply area scaling.** Same blast
+  radius as the named DC-OP failures. Documented in `dc-op-parity-divergence.md`.
+- **`load-context.ts` declares `noncon: { value: number }`** but `newton-raphson.ts:351`
+  writes `ctx.noncon = 0`, replacing the object. Element-side code increments
+  `ctx.noncon.value`. Verify increment plumbing before declaring real-opamp green. Documented
+  in `real-opamp-rail-limited-nr.md`.

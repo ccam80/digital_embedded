@@ -194,6 +194,36 @@ class TriacCompositeElement implements AnalogElement {
 // createTriacElement  AnalogElement factory (3-arg signature per A.3)
 // ---------------------------------------------------------------------------
 
+function makeTriacNpnProps(props: PropertyBag): PropertyBag {
+  // Build a full BJT NPN PropertyBag by merging BJT_NPN_DEFAULTS with
+  // the triac's overrideable params (BF, IS, RC, RB, RE, AREA, TEMP).
+  // createBjtElement reads NF, NR, ISE, ISC, VAF, VAR, IKF, IKR, NE, NC,
+  // M, TNOM, OFF, ICVBE, ICVCE — none of which are in TRIAC_PARAM_DEFAULTS.
+  const BF   = props.getModelParam<number>("BF");
+  const IS   = props.getModelParam<number>("IS");
+  const RC   = props.getModelParam<number>("RC");
+  const RB   = props.getModelParam<number>("RB");
+  const RE   = props.getModelParam<number>("RE");
+  const AREA = props.getModelParam<number>("AREA");
+  const TEMP = props.getModelParam<number>("TEMP");
+  const bag = new PropertyBag();
+  bag.replaceModelParams({ ...BJT_NPN_DEFAULTS, BF, IS, RC, RB, RE, AREA, TEMP });
+  return bag;
+}
+
+function makeTriacPnpProps(props: PropertyBag): PropertyBag {
+  const BR   = props.getModelParam<number>("BR");
+  const IS   = props.getModelParam<number>("IS");
+  const RC   = props.getModelParam<number>("RC");
+  const RB   = props.getModelParam<number>("RB");
+  const RE   = props.getModelParam<number>("RE");
+  const AREA = props.getModelParam<number>("AREA");
+  const TEMP = props.getModelParam<number>("TEMP");
+  const bag = new PropertyBag();
+  bag.replaceModelParams({ ...BJT_PNP_DEFAULTS, BR, IS, RC, RB, RE, AREA, TEMP });
+  return bag;
+}
+
 function createTriacElement(
   pinNodes: ReadonlyMap<string, number>,
   props: PropertyBag,
@@ -203,10 +233,13 @@ function createTriacElement(
   const mt2Node = pinNodes.get("MT2")!;
   const gNode   = pinNodes.get("G")!;
 
+  const npnProps = makeTriacNpnProps(props);
+  const pnpProps = makeTriacPnpProps(props);
+
   // Q1 NPN SCR1: B=G, C=Vint1(placeholder 0), E=MT1
   const q1 = createBjtElement(
     new Map([["B", gNode], ["C", 0], ["E", mt1Node]]),
-    props,
+    npnProps,
     () => 0,
   );
   (q1 as any).ngspiceNodeMap = { B: "base", C: "col", E: "emit" };
@@ -214,7 +247,7 @@ function createTriacElement(
   // Q2 PNP SCR1: B=Vint1(placeholder 0), C=G, E=MT2
   const q2 = createPnpBjtElement(
     new Map([["B", 0], ["C", gNode], ["E", mt2Node]]),
-    props,
+    pnpProps,
     () => 0,
   );
   (q2 as any).ngspiceNodeMap = { B: "base", C: "col", E: "emit" };
@@ -222,7 +255,7 @@ function createTriacElement(
   // Q3 NPN SCR2: B=G, C=Vint2(placeholder 0), E=MT2
   const q3 = createBjtElement(
     new Map([["B", gNode], ["C", 0], ["E", mt2Node]]),
-    props,
+    npnProps,
     () => 0,
   );
   (q3 as any).ngspiceNodeMap = { B: "base", C: "col", E: "emit" };
@@ -230,7 +263,7 @@ function createTriacElement(
   // Q4 PNP SCR2: B=Vint2(placeholder 0), C=G, E=MT1
   const q4 = createPnpBjtElement(
     new Map([["B", 0], ["C", gNode], ["E", mt1Node]]),
-    props,
+    pnpProps,
     () => 0,
   );
   (q4 as any).ngspiceNodeMap = { B: "base", C: "col", E: "emit" };

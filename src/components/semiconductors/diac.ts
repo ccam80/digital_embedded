@@ -68,7 +68,9 @@ export function createDiacElement(
   dFwd.label = fwdLabel;
   dRev.label = revLabel;
 
-  return {
+  // Cast to unknown first so TypeScript accepts the extra `getSubElements` method
+  // that is not part of the AnalogElement interface but is needed by allocateStatePool.
+  return ({
     label: "",
     branchIndex: -1,
     _stateBase: -1,
@@ -109,7 +111,11 @@ export function createDiacElement(
       dFwd.setParam?.(key, value);
       dRev.setParam?.(key, value);
     },
-  };
+
+    getSubElements(): readonly AnalogElement[] {
+      return [dFwd, dRev];
+    },
+  } as unknown as AnalogElement);
 }
 
 // ---------------------------------------------------------------------------

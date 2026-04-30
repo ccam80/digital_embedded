@@ -26,23 +26,12 @@ import {
 } from "../tapped-transformer.js";
 import { PropertyBag } from "../../../core/properties.js";
 import { ComponentCategory, ComponentRegistry } from "../../../core/registry.js";
-import { SparseSolver } from "../../../solver/analog/sparse-solver.js";
 import { allocateStatePool, loadCtxFromFields } from "../../../solver/analog/__tests__/test-helpers.js";
-import { makeDcVoltageSource } from "../../sources/dc-voltage-source.js";
-import { createDiodeElement, DIODE_PARAM_DEFAULTS } from "../../semiconductors/diode.js";
-import { AnalogCapacitorElement, CAPACITOR_DEFAULTS } from "../capacitor.js";
-import { makeAcVoltageSourceElement } from "../../sources/ac-voltage-source.js";
-import type { AnalogElement } from "../../../solver/analog/element.js";
-import type { PoolBackedAnalogElement } from "../../../core/analog-types.js";
-import type { LoadContext } from "../../../solver/analog/load-context.js";
 import type { SparseSolver as SparseSolverType } from "../../../solver/analog/sparse-solver.js";
-import type { SetupContext } from "../../../solver/analog/setup-context.js";
 import type { ModelEntry, AnalogFactory } from "../../../core/registry.js";
 import { MODETRAN, MODEINITTRAN, MODEINITFLOAT } from "../../../solver/analog/ckt-mode.js";
-import { ConcreteCompiledAnalogCircuit } from "../../../solver/analog/compiled-analog-circuit.js";
-import { StatePool } from "../../../solver/analog/state-pool.js";
-import { MNAEngine } from "../../../solver/analog/analog-engine.js";
-import { EngineState } from "../../../core/engine-interface.js";
+import { DefaultSimulatorFacade } from "../../../headless/default-facade.js";
+import { createDefaultRegistry } from "../../register-all.js";
 
 // ---------------------------------------------------------------------------
 // Helper: narrow ModelEntry to inline factory (throws if netlist kind)
@@ -58,193 +47,16 @@ function getFactory(entry: ModelEntry): AnalogFactory {
 // makeDiode / makeCapacitor / makeAcVoltageSource)
 // ---------------------------------------------------------------------------
 
-function makeResistor(nodeA: number, nodeB: number, resistance: number): AnalogElement {
-  const G = 1 / Math.max(resistance, 1e-9);
-  let _hAA = -1, _hBB = -1, _hAB = -1, _hBA = -1;
-  return {
-    label: "",
-    _pinNodes: new Map([["A", nodeA], ["B", nodeB]]),
-    branchIndex: -1,
-    _stateBase: -1,
-    ngspiceLoadOrder: 0,
-    setParam(_key: string, _value: number): void {},
-    getPinCurrents(_v: Float64Array): number[] { return []; },
-    setup(ctx: SetupContext): void {
-      if (nodeA !== 0) _hAA = ctx.solver.allocElement(nodeA, nodeA);
-      if (nodeB !== 0) _hBB = ctx.solver.allocElement(nodeB, nodeB);
-      if (nodeA !== 0 && nodeB !== 0) {
-        _hAB = ctx.solver.allocElement(nodeA, nodeB);
-        _hBA = ctx.solver.allocElement(nodeB, nodeA);
-      }
-    },
-    load(ctx: LoadContext): void {
-      const { solver } = ctx;
-      if (_hAA !== -1) solver.stampElement(_hAA, G);
-      if (_hBB !== -1) solver.stampElement(_hBB, G);
-      if (_hAB !== -1) solver.stampElement(_hAB, -G);
-      if (_hBA !== -1) solver.stampElement(_hBA, -G);
-    },
-  };
-}
-
-
-function makeDiode(anode: number, cathode: number, IS: number, N: number): AnalogElement {
-  const props = new PropertyBag();
-  props.replaceModelParams({ ...DIODE_PARAM_DEFAULTS, IS, N });
-  return createDiodeElement(
-    new Map([["A", anode], ["K", cathode]]),
-    props,
-    () => 0,
-  ) as AnalogElement;
-}
-
-function makeCapacitor(posNode: number, negNode: number, capacitance: number): AnalogElement {
-  const capProps = new PropertyBag();
-  capProps.replaceModelParams({ ...CAPACITOR_DEFAULTS, capacitance, IC: NaN });
-  const el = new AnalogCapacitorElement(
-    new Map([["pos", posNode], ["neg", negNode]]),
-    capProps,
-  );
-  return el as unknown as AnalogElement;
-}
-
-function makeAcVoltageSource(
-  posNode: number,
-  negNode: number,
-  branchRow: number,
-  amplitude: number,
-  frequency: number,
-  phase: number,
-  dcOffset: number,
-  getTime: () => number,
-): AnalogElement {
-  const props = new PropertyBag();
-  props.setModelParam("amplitude", amplitude);
-  props.setModelParam("frequency", frequency);
-  props.setModelParam("phase", phase);
-  props.setModelParam("dcOffset", dcOffset);
-  const el = makeAcVoltageSourceElement(
-    new Map([["pos", posNode], ["neg", negNode]]),
-    props,
-    getTime,
-  ) as unknown as AnalogElement;
-  el.branchIndex = branchRow;
-  return el;
-}
-
-// ---------------------------------------------------------------------------
-// makeTransientCtx — minimal LoadContext for manual transient loops.
-//
-// Seeds ctx.ag[] with the integration coefficients that computeNIcomCof would
-// produce for (dt, "trapezoidal", order=1), which matches the pre-migration
-// stampCompanion(dt, "trapezoidal", voltages) defaults.
-// ---------------------------------------------------------------------------
-
-function makeTransientCtx(solver: SparseSolverType, rhs: Float64Array, dt: number = 1e-6): LoadContext {
-  const ag = new Float64Array(7);
-  // Trapezoidal order 1: ag[0] = 1/dt, ag[1] = -1/dt.
-  if (dt > 0) {
-    ag[0] = 1 / dt;
-    ag[1] = -1 / dt;
-  }
-  return loadCtxFromFields({
-    cktMode: MODETRAN | MODEINITFLOAT,
-    solver: solver as unknown as import("../../../solver/analog/sparse-solver.js").SparseSolver,
-    matrix: solver as unknown as import("../../../solver/analog/sparse-solver.js").SparseSolver,
-    rhs: rhs,
-    rhsOld: rhs,
-    time: 0,
-    dt,
-    method: "trapezoidal",
-    order: 1,
-    deltaOld: [dt, dt, dt, dt, dt, dt, dt],
-    ag,
-    srcFact: 1,
-    noncon: { value: 0 },
-    limitingCollector: null,
-    convergenceCollector: null,
-    xfact: 1,
-    gmin: 1e-12,
-    reltol: 1e-3,
-    iabstol: 1e-12,
-    temp: 300.15,
-    vt: 0.025852,
-    cktFixLimit: false,
-    bypass: false,
-    voltTol: 1e-6,
-  });
-}
-
-// ---------------------------------------------------------------------------
-// buildTxCircuit — compile a transformer circuit for use with MNAEngine
-// ---------------------------------------------------------------------------
-
-function buildTxCircuit(opts: {
-  nodeCount: number;
-  elements: AnalogElement[];
-}): ConcreteCompiledAnalogCircuit {
-  // Do NOT pre-allocate statePool or call initState here.
-  // MNAEngine._setup() calls each element's setup() (which assigns _stateBase via
-  // ctx.allocStates), then allocateStateBuffers() creates the pool and calls initState.
-  // Pre-calling initState sets sub-element _stateBase values, which suppresses the
-  // ctx.allocStates() call inside InductorSubElement.setup() (idempotency guard),
-  // leaving _numStates=0 and creating a size-0 state pool.
-  return new ConcreteCompiledAnalogCircuit({
-    nodeCount: opts.nodeCount,
-    elements: opts.elements,
-    labelToNodeId: new Map(),
-    wireToNodeId: new Map(),
-    models: new Map(),
-    elementToCircuitElement: new Map(),
-    statePool: null as unknown as StatePool,
-  });
-}
-
-// ---------------------------------------------------------------------------
-// Element construction helper
-// ---------------------------------------------------------------------------
-
-function makeTappedTransformer(opts: {
-  pinNodeIds: number[];
-  branch1: number;
-  lPrimary?: number;
-  turnsRatio?: number;
-  k?: number;
-  rPri?: number;
-  rSec?: number;
-}): AnalogTappedTransformerElement {
-  return new AnalogTappedTransformerElement(
-    opts.pinNodeIds,
-    String(opts.branch1),
-    opts.lPrimary ?? 100e-3,
-    opts.turnsRatio ?? 2.0,
-    opts.k ?? 0.99,
-  );
-}
-
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
 
 describe("TappedTransformer", () => {
-  it("center_tap_voltage_is_half — N=2 (1:1 each half); AC primary; CT at midpoint", () => {
+  it("center_tap_voltage_is_half — N=2 (1:1 each half); AC primary; CT at midpoint", async () => {
     /**
-     * N=2 total turns ratio means each secondary half has N/2 = 1 turns relative
-     * to primary. With ideal coupling (k=0.99), each half should produce ~V_primary.
-     * The center tap is the midpoint of the total secondary, so:
-     *   V(S1 to CT) ≈ V_primary (each half ≈ primary for N=2, i.e., 1:1 each half)
-     *   V(CT to S2) ≈ V_primary
-     *   V(S1 to S2) ≈ 2 × V_primary
-     *
-     * Circuit:
-     *   Nodes: 1=primary+(Vsrc+), 2=S1, 3=CT, 4=S2
-     *   primary- = gnd = node 0
-     *   Load: Rload between S1 and S2 (nodes 2 and 4), CT not loaded (floating mid)
-     *   Branches: bVsrc=4, bTx1=5, bTx2=6, bTx3=7
-     *   matrixSize = nodeCount(4) + branchCount(4) = 8
-     *
-     * Uses MNAEngine for proper NR + adaptive timestepping to handle the stiff
-     * coupled-inductor system (k=0.99 → near-singular L matrix).
+     * Facade migration: AcVoltageSource + TappedTransformer(N=2) + load resistors.
+     * Sample S1, CT, S2 voltages over 20 cycles at 1kHz, find peaks in last cycle.
+     * Each half ≈ Vpeak (1:1 per half for N=2). Tolerance ±15%.
      */
     const N = 2;
     const Vpeak = 10.0;
@@ -255,53 +67,59 @@ describe("TappedTransformer", () => {
     const numCycles = 20;
     const period = 1 / freq;
 
-    const nodeCount = 4;
-    const bVsrc = nodeCount + 0;  // branch row 4
-    const bTx1 = nodeCount + 1;   // branch row 5
-
-    const engine = new MNAEngine();
-
-    const tx = makeTappedTransformer({
-      pinNodeIds: [1, 0, 2, 3, 4],
-      branch1: bTx1,
-      lPrimary: Lp,
-      turnsRatio: N,
-      k,
+    const registry = createDefaultRegistry();
+    const facade = new DefaultSimulatorFacade(registry);
+    const circuit = facade.build({
+      components: [
+        { id: "vs",  type: "AcVoltageSource",    props: { amplitude: Vpeak, frequency: freq, label: "vs" } },
+        { id: "tx",  type: "TappedTransformer",  props: { turnsRatio: N, primaryInductance: Lp, couplingCoefficient: k, primaryResistance: 0, secondaryResistance: 0, label: "tx" } },
+        { id: "rl",  type: "Resistor",           props: { resistance: Rload } },
+        { id: "rct", type: "Resistor",           props: { resistance: 1e6 } },
+        { id: "rs2", type: "Resistor",           props: { resistance: 1e6 } },
+        { id: "gnd", type: "Ground" },
+      ],
+      connections: [
+        ["vs:pos",  "tx:P1"],
+        ["tx:P2",   "gnd:out"],
+        ["vs:neg",  "gnd:out"],
+        ["tx:S1",   "rl:A"],
+        ["rl:B",    "tx:S2"],
+        ["tx:CT",   "rct:A"],
+        ["rct:B",   "gnd:out"],
+        ["tx:S2",   "rs2:A"],
+        ["rs2:B",   "gnd:out"],
+      ],
     });
 
-    const rLoad = makeResistor(2, 4, Rload);
-    const rCtGnd = makeResistor(3, 0, 1e6);
-    const rS2Gnd = makeResistor(4, 0, 1e6);
-    const vsrc = makeAcVoltageSource(1, 0, bVsrc, Vpeak, freq, 0, 0, () => engine.simTime);
+    const coordinator = facade.compile(circuit);
 
-    const compiled = buildTxCircuit({
-      nodeCount,
-      elements: [vsrc, tx as unknown as AnalogElement, rLoad, rCtGnd, rS2Gnd],
+    // Sample 100 points per cycle over 20 cycles.
+    const samplesPerCycle = 100;
+    const totalSamples = numCycles * samplesPerCycle;
+    const times = Array.from({ length: totalSamples }, (_, i) =>
+      (i + 1) * (numCycles * period / totalSamples),
+    );
+    const samples = await coordinator.sampleAtTimes(times, () => {
+      const sigs = facade.readAllSignals(coordinator);
+      return {
+        s1: sigs["tx:S1"] ?? 0,
+        ct: sigs["tx:CT"] ?? 0,
+        s2: sigs["tx:S2"] ?? 0,
+      };
     });
 
-    engine.init(compiled);
-    engine.configure({ maxTimeStep: period / 100 });
-
-    let maxVS1CT = 0;
-    let maxVCTS2 = 0;
-    let maxVS1S2 = 0;
-
-    while (engine.simTime < numCycles * period && engine.getState() !== EngineState.ERROR) {
-      engine.step();
-      if (engine.simTime >= (numCycles - 1) * period) {
-        const vs1 = engine.getNodeVoltage(2);
-        const vct = engine.getNodeVoltage(3);
-        const vs2 = engine.getNodeVoltage(4);
-        const absS1CT = Math.abs(vs1 - vct);
-        const absCTS2 = Math.abs(vct - vs2);
-        const absS1S2 = Math.abs(vs1 - vs2);
-        if (absS1CT > maxVS1CT) maxVS1CT = absS1CT;
-        if (absCTS2 > maxVCTS2) maxVCTS2 = absCTS2;
-        if (absS1S2 > maxVS1S2) maxVS1S2 = absS1S2;
-      }
+    // Find peaks in the last cycle.
+    const lastCycleOffset = (numCycles - 1) * samplesPerCycle;
+    let maxVS1CT = 0, maxVCTS2 = 0, maxVS1S2 = 0;
+    for (let i = lastCycleOffset; i < samples.length; i++) {
+      const { s1, ct, s2 } = samples[i] as { s1: number; ct: number; s2: number };
+      const absS1CT = Math.abs(s1 - ct);
+      const absCTS2 = Math.abs(ct - s2);
+      const absS1S2 = Math.abs(s1 - s2);
+      if (absS1CT > maxVS1CT) maxVS1CT = absS1CT;
+      if (absCTS2 > maxVCTS2) maxVCTS2 = absCTS2;
+      if (absS1S2 > maxVS1S2) maxVS1S2 = absS1S2;
     }
-
-    expect(engine.getState()).not.toBe(EngineState.ERROR);
 
     // For N=2 with near-open-circuit load: each half ≈ Vpeak (1:1 per half).
     // Tolerances ±15% for inductive losses with k=0.99.
@@ -314,13 +132,10 @@ describe("TappedTransformer", () => {
     expect(maxVS1S2).toBeLessThan(maxVS1CT * 2.2);
   });
 
-  it("symmetric_halves — secondary half voltages equal in magnitude, opposite phase to CT", () => {
+  it("symmetric_halves — secondary half voltages equal in magnitude, opposite phase to CT", async () => {
     /**
-     * With a symmetric center-tapped secondary (L2 = L3), the two halves
-     * should produce equal peak voltages. The voltages at S1 and S2 relative
-     * to the center tap should be equal in magnitude.
-     *
-     * We verify: peak(V_S1 - V_CT) ≈ peak(V_S2 - V_CT) within 5%.
+     * Facade migration: AcVoltageSource + TappedTransformer(N=2) + symmetric loads.
+     * Verify peak(V_S1 - V_CT) ≈ peak(V_S2 - V_CT) within 10%.
      */
     const N = 2;
     const Vpeak = 5.0;
@@ -328,79 +143,60 @@ describe("TappedTransformer", () => {
     const Lp = 200e-3;
     const k = 0.99;
     const Rload = 50.0;
-    const dt = 1 / (freq * 400);
     const numCycles = 20;
-    const steps = numCycles * 400;
+    const period = 1 / freq;
 
-    const nodeCount = 4;
-    const bTx1 = nodeCount + 1;
-    const matrixSize = nodeCount + 4;
-
-    const tx = makeTappedTransformer({
-      pinNodeIds: [1, 0, 2, 3, 4],
-      branch1: bTx1,
-      lPrimary: Lp,
-      turnsRatio: N,
-      k,
+    const registry = createDefaultRegistry();
+    const facade = new DefaultSimulatorFacade(registry);
+    const circuit = facade.build({
+      components: [
+        { id: "vs",   type: "AcVoltageSource",   props: { amplitude: Vpeak, frequency: freq, label: "vs" } },
+        { id: "tx",   type: "TappedTransformer", props: { turnsRatio: N, primaryInductance: Lp, couplingCoefficient: k, primaryResistance: 0, secondaryResistance: 0, label: "tx" } },
+        { id: "rl1",  type: "Resistor",          props: { resistance: Rload } },
+        { id: "rl2",  type: "Resistor",          props: { resistance: Rload } },
+        { id: "rgnd", type: "Resistor",          props: { resistance: 0.1 } },
+        { id: "gnd",  type: "Ground" },
+      ],
+      connections: [
+        ["vs:pos",  "tx:P1"],
+        ["tx:P2",   "gnd:out"],
+        ["vs:neg",  "gnd:out"],
+        ["tx:S1",   "rl1:A"],
+        ["rl1:B",   "tx:CT"],
+        ["tx:CT",   "rl2:A"],
+        ["rl2:B",   "tx:S2"],
+        ["tx:S2",   "rgnd:A"],
+        ["rgnd:B",  "gnd:out"],
+      ],
     });
 
-    // Symmetric resistive loads on each half
-    const rLoad1 = makeResistor(2, 3, Rload); // S1 to CT
-    const rLoad2 = makeResistor(3, 4, Rload); // CT to S2
+    const coordinator = facade.compile(circuit);
 
-    // Ground S2 via reference
-    const rGnd = makeResistor(4, 0, 0.1); // low resistance to gnd for S2
+    // Sample 400 points per cycle over 20 cycles.
+    const samplesPerCycle = 400;
+    const totalSamples = numCycles * samplesPerCycle;
+    const times = Array.from({ length: totalSamples }, (_, i) =>
+      (i + 1) * (numCycles * period / totalSamples),
+    );
+    const samples = await coordinator.sampleAtTimes(times, () => {
+      const sigs = facade.readAllSignals(coordinator);
+      return {
+        s1: sigs["tx:S1"] ?? 0,
+        ct: sigs["tx:CT"] ?? 0,
+        s2: sigs["tx:S2"] ?? 0,
+      };
+    });
 
-    // setup() must run before allocateStatePool so sub-elements get
-    // branchIndex and _stateBase from ctx.allocStates/ctx.makeCur.
-    const solver0 = new SparseSolver();
-    let stateOff = 0;
-    let branchOff = nodeCount; // nodes 0..nodeCount-1 already taken
-    const setupCtx0 = {
-      solver: solver0 as unknown as import("../../../solver/analog/setup-context.js").SetupContext["solver"],
-      allocStates: (n: number): number => { const b = stateOff; stateOff += n; return b; },
-      makeCur: (_l: string, _k: string): number => { return ++branchOff; },
-    } as unknown as import("../../../solver/analog/setup-context.js").SetupContext;
-    tx.setup(setupCtx0);
-
-    const pool = allocateStatePool([tx as PoolBackedAnalogElement]);
-
-    const solver = new SparseSolver();
-    let voltages = new Float64Array(matrixSize);
+    // Find peaks in the last cycle.
+    const lastCycleOffset = (numCycles - 1) * samplesPerCycle;
     let maxVS1toGnd = 0;
     let maxVS2toGnd = 0;
-    const lastCycleStart = (numCycles - 1) * 400;
-
-    for (let i = 0; i < steps; i++) {
-      const t = i * dt;
-      const vSrc = Vpeak * Math.sin(2 * Math.PI * freq * t);
-      const vsrcProps = new PropertyBag();
-      vsrcProps.setModelParam("voltage", vSrc);
-      const vsrc = makeDcVoltageSource(new Map([["pos", 1], ["neg", 0]]), vsrcProps, () => 0);
-
-      solver._initStructure();
-      const ctx = makeTransientCtx(solver as unknown as SparseSolverType, voltages, dt);
-      if (i === 0) ctx.cktMode = MODETRAN | MODEINITTRAN;
-      vsrc.load(ctx);
-      tx.load(ctx);
-      rLoad1.load(ctx);
-      rLoad2.load(ctx);
-      rGnd.load(ctx);
-      const result = solver.factor();
-      if (result !== 0) throw new Error(`Singular at step ${i}`);
-      solver.solve(voltages, voltages);
-      pool.rotateStateVectors();
-
-      if (i >= lastCycleStart) {
-        const vs1 = voltages[1]; // node 2
-        const vct = voltages[2]; // node 3
-        const vs2 = voltages[3]; // node 4
-
-        const absUpperHalf = Math.abs(vs1 - vct);
-        const absLowerHalf = Math.abs(vs2 - vct);
-        if (absUpperHalf > maxVS1toGnd) maxVS1toGnd = absUpperHalf;
-        if (absLowerHalf > maxVS2toGnd) maxVS2toGnd = absLowerHalf;
-      }
+    for (let i = lastCycleOffset; i < samples.length; i++) {
+      const { s1, ct, s2 } = samples[i] as { s1: number; ct: number; s2: number };
+      const absUpperHalf = Math.abs(s1 - ct);
+      const absLowerHalf = Math.abs(s2 - ct);
+      if (absUpperHalf > maxVS1toGnd) maxVS1toGnd = absUpperHalf;
+      if (absLowerHalf > maxVS2toGnd) maxVS2toGnd = absLowerHalf;
     }
 
     expect(maxVS1toGnd).toBeGreaterThan(0);
@@ -412,18 +208,11 @@ describe("TappedTransformer", () => {
     expect(ratio).toBeLessThan(1.10);
   });
 
-  it("full_wave_rectifier — two diodes + CT ground produce DC output ≈ Vpeak_sec", () => {
+  it("full_wave_rectifier — two diodes + CT ground produce DC output ≈ Vpeak_sec", async () => {
     /**
-     * Full-wave center-tap rectifier:
-     *   CT tied to gnd, D1: S1 → out, D2: S2 → out.
-     *   When S1>0: D1 conducts; when S2>0 (= negative half cycle): D2 conducts.
-     *   Filter cap holds DC output.
-     *
-     * Nodes: 1=P1, 2=S1, 3=CT(gnd ref), 4=S2, 5=out
-     * Branches: bVsrc=5, bTx1=6, bTx2=7, bTx3=8
-     * matrixSize = nodeCount(5) + branchCount(4) = 9
-     *
-     * Uses MNAEngine for proper NR + adaptive timestepping.
+     * Facade migration: AcVoltageSource + TappedTransformer + 2×Diode + Capacitor + Resistor.
+     * CT tied to gnd, D1: S1→out, D2: S2→out. Filter cap holds DC output.
+     * After 40 cycles at 500Hz: V_out ≈ Vpeak - 0.7V ±30%.
      */
     const N = 2;
     const Vpeak = 10.0;
@@ -434,43 +223,42 @@ describe("TappedTransformer", () => {
     const numCycles = 40;
     const period = 1 / freq;
 
-    const nodeCount = 5;
-    const bVsrc = nodeCount + 0;  // branch row 5
-    const bTx1 = nodeCount + 1;   // branch row 6
-
-    const engine = new MNAEngine();
-
-    const tx = makeTappedTransformer({
-      pinNodeIds: [1, 0, 2, 3, 4],
-      branch1: bTx1,
-      lPrimary: Lp,
-      turnsRatio: N,
-      k,
+    const registry = createDefaultRegistry();
+    const facade = new DefaultSimulatorFacade(registry);
+    const circuit = facade.build({
+      components: [
+        { id: "vs",    type: "AcVoltageSource",   props: { amplitude: Vpeak, frequency: freq, label: "vs" } },
+        { id: "tx",    type: "TappedTransformer", props: { turnsRatio: N, primaryInductance: Lp, couplingCoefficient: k, primaryResistance: 0, secondaryResistance: 0, label: "tx" } },
+        { id: "rctgnd", type: "Resistor",         props: { resistance: 0.01 } },
+        { id: "d1",    type: "Diode",             props: { label: "d1" } },
+        { id: "d2",    type: "Diode",             props: { label: "d2" } },
+        { id: "cfilt", type: "Capacitor",         props: { capacitance: 1000e-6 } },
+        { id: "rl",    type: "Resistor",          props: { resistance: Rload } },
+        { id: "gnd",   type: "Ground" },
+      ],
+      connections: [
+        ["vs:pos",      "tx:P1"],
+        ["tx:P2",       "gnd:out"],
+        ["vs:neg",      "gnd:out"],
+        ["tx:CT",       "rctgnd:A"],
+        ["rctgnd:B",    "gnd:out"],
+        ["tx:S1",       "d1:A"],
+        ["d1:K",        "cfilt:pos"],
+        ["tx:S2",       "d2:A"],
+        ["d2:K",        "cfilt:pos"],
+        ["cfilt:neg",   "gnd:out"],
+        ["cfilt:pos",   "rl:A"],
+        ["rl:B",        "gnd:out"],
+      ],
     });
 
-    const rCtGnd = makeResistor(3, 0, 0.01);
-    const d1 = makeDiode(2, 5, 1e-14, 1.0);
-    const d2 = makeDiode(4, 5, 1e-14, 1.0);
-    const cFilter = makeCapacitor(5, 0, 1000e-6);
-    const rLoadEl = makeResistor(5, 0, Rload);
-    const vsrc = makeAcVoltageSource(1, 0, bVsrc, Vpeak, freq, 0, 0, () => engine.simTime);
+    const coordinator = facade.compile(circuit);
 
-    const compiled = buildTxCircuit({
-      nodeCount,
-      elements: [vsrc, tx as unknown as AnalogElement, rCtGnd, d1, d2, cFilter, rLoadEl],
-    });
+    // Advance to the end of 40 cycles, then read DC output.
+    await coordinator.stepToTime(numCycles * period);
 
-    engine.init(compiled);
-    engine.configure({ maxTimeStep: period / 100 });
-
-    while (engine.simTime < numCycles * period && engine.getState() !== EngineState.ERROR) {
-      engine.step();
-    }
-
-    expect(engine.getState()).not.toBe(EngineState.ERROR);
-
-    // Measure DC output at node 5
-    const vOut = engine.getNodeVoltage(5);
+    const sigs = facade.readAllSignals(coordinator);
+    const vOut = sigs["cfilt:pos"] ?? sigs["d1:K"] ?? 0;
 
     // For N=2 (1:1 per half), each secondary half peak ≈ Vpeak = 10V.
     // After full-wave rectification: V_dc ≈ Vpeak - V_diode ≈ 9.3V.

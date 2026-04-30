@@ -1,8 +1,0 @@
-[04:28:58.957] start
-[04:28:58.958] built compiled1
-[04:28:58.959] engine1 configured, calling dcOperatingPoint
-[04:28:58.961]   ENTER factor(0)
-[04:28:58.961]   ENTER factorWithReorder(0)
-[04:28:58.961]   ENTER _numericLUMarkowitz()
-[04:28:58.961]   ENTER _searchForPivot(0)
-[04:28:58.961]   EXIT  _searchForPivot ret=176

@@ -34,14 +34,9 @@
 import { describe, it, expect } from "vitest";
 import { Timer555Definition } from "../timer-555.js";
 import { PropertyBag } from "../../../core/properties.js";
-import type { AnalogElement } from "../../../solver/analog/element.js";
-import { MNAEngine } from "../../../solver/analog/analog-engine.js";
-import { ConcreteCompiledAnalogCircuit } from "../../../solver/analog/compiled-analog-circuit.js";
-import { StatePool } from "../../../solver/analog/state-pool.js";
-import { EngineState } from "../../../core/engine-interface.js";
 import type { ModelEntry, AnalogFactory } from "../../../core/registry.js";
-// StatePool used as placeholder in buildHandCircuit — engine creates the real pool in _setup().
-
+import { DefaultSimulatorFacade } from "../../../headless/default-facade.js";
+import { createDefaultRegistry } from "../../register-all.js";
 // ---------------------------------------------------------------------------
 // Helper: narrow ModelEntry to inline factory (throws if netlist kind)
 // ---------------------------------------------------------------------------
@@ -71,198 +66,59 @@ function makeProps(overrides: Record<string, number | string> = {}): PropertyBag
   return bag;
 }
 
-/**
- * Create a 555 analog element with the given pin-to-node mapping.
- * Uses the 3-param factory signature (A6.3): (pinNodes, props, getTime).
- * Internal nodes (nLower, nComp1Out, nComp2Out, nDisBase) are allocated
- * during setup() via the engine's SetupContext.
- */
-function make555(
-  nodes: { vcc: number; gnd: number; trig: number; thr: number; ctrl: number; rst: number; dis: number; out: number },
-  overrides: Record<string, number | string> = {},
-): AnalogElement {
-  // pinLayout order: [DIS, TRIG, THR, VCC, CTRL, OUT, RST, GND]
-  const core = getFactory(Timer555Definition.modelRegistry!["bipolar"]!)(
-    new Map([
-      ["DIS",  nodes.dis],
-      ["TRIG", nodes.trig],
-      ["THR",  nodes.thr],
-      ["VCC",  nodes.vcc],
-      ["CTRL", nodes.ctrl],
-      ["OUT",  nodes.out],
-      ["RST",  nodes.rst],
-      ["GND",  nodes.gnd],
-    ]),
-    makeProps(overrides),
-    () => 0,
-  );
-  return core;
-}
-
-// ---------------------------------------------------------------------------
-// Helper: build hand-wired ConcreteCompiledAnalogCircuit
-// ---------------------------------------------------------------------------
-
-function buildHandCircuit(opts: {
-  nodeCount: number;
-  elements: AnalogElement[];
-}): ConcreteCompiledAnalogCircuit {
-  // Pass an empty placeholder StatePool — MNAEngine._setup() calls
-  // allocateStateBuffers() which creates the real pool after setup() runs.
-  return new ConcreteCompiledAnalogCircuit({
-    nodeCount: opts.nodeCount,
-    elements: opts.elements,
-    labelToNodeId: new Map(),
-    wireToNodeId: new Map() as any,
-    models: new Map(),
-    elementToCircuitElement: new Map(),
-    statePool: new StatePool(0),
-  });
-}
-
-import { stampRHS } from "../../../solver/analog/stamp-helpers.js";
-import { AnalogCapacitorElement, CAPACITOR_DEFAULTS } from "../../passives/capacitor.js";
-import type { SetupContext } from "../../../solver/analog/setup-context.js";
-import type { LoadContext } from "../../../solver/analog/load-context.js";
-
-/**
- * Inline resistor helper for circuit assembly. Stamps directly in load() with
- * no setup()-time handle allocation — compatible with engine-managed setup.
- */
-function makeResistor(nodeA: number, nodeB: number, resistance: number): AnalogElement {
-  const G = 1 / resistance;
-  return {
-    label: "",
-    _pinNodes: new Map<string, number>([["A", nodeA], ["B", nodeB]]),
-    _stateBase: -1,
-    branchIndex: -1,
-    ngspiceLoadOrder: 40,
-    setParam(_key: string, _value: number): void {},
-    getPinCurrents(): number[] { return []; },
-    setup(_ctx: SetupContext): void {},
-    load(ctx: LoadContext): void {
-      const { solver } = ctx;
-      if (nodeA > 0) { const h = solver.allocElement(nodeA, nodeA); solver.stampElement(h, G); }
-      if (nodeB > 0) { const h = solver.allocElement(nodeB, nodeB); solver.stampElement(h, G); }
-      if (nodeA > 0 && nodeB > 0) {
-        solver.stampElement(solver.allocElement(nodeA, nodeB), -G);
-        solver.stampElement(solver.allocElement(nodeB, nodeA), -G);
-      }
-    },
-  } as unknown as AnalogElement;
-}
-
-/**
- * Create a production AnalogCapacitorElement for circuit assembly.
- */
-function createTestCapacitor(capacitance: number, nodePos: number, nodeNeg: number): AnalogElement {
-  const capProps = new PropertyBag();
-  capProps.replaceModelParams({ ...CAPACITOR_DEFAULTS, capacitance });
-  return new AnalogCapacitorElement(
-    new Map([["pos", nodePos], ["neg", nodeNeg]]),
-    capProps,
-  );
-}
-
-/**
- * Inline voltage source element with a real setup() that pre-allocates matrix
- * entries. branchIdx is used directly as the branch row (0-based MNA row).
- *
- * branchIdx must be chosen to not collide with any internal nodes or branch
- * rows that the Timer555 composite allocates during its own setup(). The
- * Timer555 allocates nodeCount+1 through nodeCount+6 (4 voltage nodes + 2
- * VCVS branch rows). A safe branchIdx is nodeCount+6 or higher.
- */
-function makeVsElement(
-  nodePos: number,
-  nodeNeg: number,
-  branchIdx: number,
-  voltage: number,
-): AnalogElement {
-  const k = branchIdx;
-  let _hPosK = -1, _hKPos = -1;
-  let _hNegK = -1, _hKNeg = -1;
-  return {
-    label: "",
-    _pinNodes: new Map<string, number>([["pos", nodePos], ["neg", nodeNeg]]),
-    _stateBase: -1,
-    branchIndex: k,
-    ngspiceLoadOrder: 48,
-    setup(ctx: SetupContext): void {
-      if (nodePos !== 0) { _hPosK = ctx.solver.allocElement(nodePos, k); _hKPos = ctx.solver.allocElement(k, nodePos); }
-      if (nodeNeg !== 0) { _hNegK = ctx.solver.allocElement(nodeNeg, k); _hKNeg = ctx.solver.allocElement(k, nodeNeg); }
-      ctx.solver.allocElement(k, k);
-    },
-    load(ctx: LoadContext): void {
-      const { solver, rhs } = ctx;
-      if (nodePos !== 0) { solver.stampElement(_hPosK, 1); solver.stampElement(_hKPos, 1); }
-      if (nodeNeg !== 0) { solver.stampElement(_hNegK, -1); solver.stampElement(_hKNeg, -1); }
-      stampRHS(rhs, k, voltage);
-    },
-    setParam(_key: string, _value: number): void {},
-    getPinCurrents(): number[] { return []; },
-  } as unknown as AnalogElement;
-}
-
 // ---------------------------------------------------------------------------
 // Timer555 unit tests  observable DC operating point
 // ---------------------------------------------------------------------------
 
 describe("Timer555", () => {
   it("internal_divider_voltages", () => {
-    // CTRL pin floating: internal divider sets CTRL  2/3 × VCC.
-    // With VCC=5V: CTRL  3.333V ±1%
-    // Solve DC with VCC=5V fixed, CTRL floating (driven only by internal divider).
-    //
-    // Node assignment:
-    //   node 1 = VCC, node 2 = GND (connected to circuit ground=0 via VS),
-    //   node 3 = TRIG, node 4 = THR, node 5 = CTRL
-    //   node 6 = RST (tied to VCC), node 7 = DIS, node 8 = OUT
-    //
-    // For a simpler approach: use 1-based nodes, VCC=1, GND=2(=circuit GND),
-    // CTRL=3 (floating, driven only by internal divider).
-    // The 555 stamps 5kΩ from VCC→CTRL and 10kΩ from CTRL→GND.
-    // DC solve gives CTRL = VCC * (10k/15k) = 2/3 VCC.
-    //
-    // Let GND node = circuit ground (node 0). VCC node=1, CTRL node=2,
-    // THR/TRIG/RST/DIS/OUT = don't care nodes for this test.
-    // branchCount=1 (VCC voltage source), matrixSize=5.
-    //
-    // Nodes: 1=VCC, 2=CTRL, 3=TRIG(unused), 4=THR(unused), 5=RST(=VCC)
-    //         DIS=0(GND), OUT=0(GND)  grounded for simplicity
+    /**
+     * Facade migration: DC-OP only. VCC=5V fixed, CTRL floating.
+     * Internal divider sets CTRL ≈ 2/3 VCC = 3.333V ±1%.
+     *
+     * Circuit: DcVoltageSource(vcc) + Timer555(t) + Ground.
+     * THR, TRIG, DIS, OUT left open (connected to ground for stability).
+     * RST tied to VCC node via wire.
+     * Read CTRL from "t:CTRL".
+     */
     const VCC = 5;
-    const nVcc = 1, nGnd = 0, nTrig = 0, nThr = 0, nCtrl = 2;
-    const nRst = 1; // RST tied to VCC
-    const nDis = 0, nOut = 0; // OUT grounded — not relevant for this test
-    // nodeCount=2 (VCC=1, CTRL=2). Timer555 allocates indices 3-8 internally
-    // (nLower=3, nComp1Out=4, nComp2Out=5, nDisBase=6, comp1_br=7, comp2_br=8).
-    // VCC voltage source branch: brVcc=8 → k=9 (above all timer internal allocs).
-    const nodeCount = 2;
-    const brVcc = 8; // safe: k=brVcc+1=9, above timer's internal range 3-8
 
-    const timer = make555(
-      { vcc: nVcc, gnd: nGnd, trig: nTrig, thr: nThr, ctrl: nCtrl, rst: nRst, dis: nDis, out: nOut },
-    );
+    const registry = createDefaultRegistry();
+    const facade = new DefaultSimulatorFacade(registry);
+    const circuit = facade.build({
+      components: [
+        { id: "vcc", type: "DcVoltageSource", props: { voltage: VCC, label: "vcc" } },
+        { id: "t",   type: "Timer555",        props: { label: "t" } },
+        { id: "gnd", type: "Ground" },
+      ],
+      connections: [
+        ["vcc:pos", "t:VCC"],
+        ["vcc:neg", "gnd:out"],
+        ["t:GND",   "gnd:out"],
+        ["t:RST",   "t:VCC"],
+        ["t:TRIG",  "gnd:out"],
+        ["t:THR",   "gnd:out"],
+        ["t:DIS",   "gnd:out"],
+        ["t:OUT",   "gnd:out"],
+      ],
+    });
 
-    const vsVcc = makeVsElement(nVcc, nGnd, brVcc, VCC);
+    const coordinator = facade.compile(circuit);
+    const result = facade.getDcOpResult();
 
-    const elements = [timer, vsVcc];
-    const compiled = buildHandCircuit({ nodeCount, elements });
-    const engine = new MNAEngine();
-    engine.init(compiled);
-    const result = engine.dcOperatingPoint();
+    expect(result).not.toBeNull();
+    expect(result!.converged).toBe(true);
 
-    expect(result.converged).toBe(true);
-
-    const vCtrlSolved = result.nodeVoltages[nCtrl];
+    const sigs = facade.readAllSignals(coordinator);
+    const vCtrl = sigs["t:CTRL"] ?? 0;
     const vExpected = VCC * (2 / 3);
-    const errorPct = Math.abs(vCtrlSolved - vExpected) / vExpected * 100;
+    const errorPct = Math.abs(vCtrl - vExpected) / vExpected * 100;
 
-    // CTRL  2/3 VCC ±1%
+    // CTRL ≈ 2/3 VCC ±1%
     expect(errorPct).toBeLessThan(1);
 
-    // Trigger reference = CTRL/2  1/3 VCC ±1%
-    const vTrigRef = vCtrlSolved * 0.5;
+    // Trigger reference = CTRL/2 ≈ 1/3 VCC ±1%
+    const vTrigRef = vCtrl * 0.5;
     const vTrigExpected = VCC / 3;
     const trigErrorPct = Math.abs(vTrigRef - vTrigExpected) / vTrigExpected * 100;
     expect(trigErrorPct).toBeLessThan(1);
@@ -273,209 +129,157 @@ describe("Timer555", () => {
 // Astable (free-running) transient tests
 // ---------------------------------------------------------------------------
 
+
+
 /**
- * Astable 555 circuit:
- *
- *   VCC → R1 → node_a → R2 → node_b → C → GND
- *                     ↑                  ↑
- *                    DIS               THR, TRIG
- *
- * The DIS pin connects between R1 and R2 (node_a).
- * THR and TRIG are both connected to node_b (the capacitor top plate).
- *
- * Charge path: VCC → R1 → R2 → C (DIS is OFF/Hi-Z)
- * Discharge path: C → R2 → DIS (which sinks to GND through R_sat)
- *
- * Timing:
- *   t_high = 0.693 × (R1 + R2) × C
- *   t_low  = 0.693 × R2 × C
- *   T      = t_high + t_low = 0.693 × (R1 + 2R2) × C
- *   f      = 1.44 / ((R1 + 2R2) × C)
- *   duty   = (R1 + R2) / (R1 + 2R2)
- *
- * For R1=1kΩ, R2=10kΩ, C=10µF:
- *   f  1.44 / (21000 × 10e-6) = 6.857 Hz  period  145.8ms
- *   duty  11/21  52.38%
- *
- * Node assignment for MNA:
- *   1 = VCC (fixed at 5V via voltage source, branch 0)
- *   2 = node_a (DIS, R1-R2 junction)
- *   3 = node_b (THR, TRIG, capacitor top plate)
- *   4 = OUT    (output)
- *   5 = CTRL   (floating, internal divider from VCC)
- *   GND = 0 (circuit ground)
- *   RST = VCC = node 1 (always active)
- *
- * Elements:
- *   VS_VCC:   voltage source, 5V, node1→GND, branch row 5
- *   R1:       1kΩ, node1→node2
- *   R2:       10kΩ, node2→node3
- *   C:        10µF, node3→GND
- *   timer555: [VCC=1, GND=0, TRIG=3, THR=3, CTRL=5, RST=1, DIS=2, OUT=4]
- *
- * nodeCount=5 (VCC, node_a, node_b, OUT, CTRL)
- * branchCount=1 (VS_VCC branch row = nodeCount = 5)
- * matrixSize = 6
+ * Facade helper: build the astable 555 circuit.
+ * VCC → R1 → node_a(DIS) → R2 → node_b(THR=TRIG) → C → GND
+ * OUT connected to labeled "out" resistor probe (high-Z, 1MΩ to GND).
  */
-
-function buildAstableCircuit(R1: number, R2: number, C: number, VCC: number, vDrop: number): {
-  engine: MNAEngine;
-  nOut: number;
-  nCap: number;
+function buildAstableFacade(R1: number, R2: number, C: number, VCC: number): {
+  facade: DefaultSimulatorFacade;
+  coordinator: ReturnType<DefaultSimulatorFacade["compile"]>;
+  readOut: () => number;
 } {
-  const nVcc  = 1; // VCC node
-  const nDis  = 2; // DIS pin / R1-R2 junction
-  const nCap  = 3; // capacitor top / THR / TRIG
-  const nOut  = 4; // output
-  const nCtrl = 5; // CTRL (floating via internal divider)
-
-  const nodeCount  = 5;
-  // Timer555 allocates nodeCount+1..nodeCount+6 internally (4 voltage + 2 VCVS branches).
-  // nodeCount=5 → timer range 6-11. Safe VCC branch: brVcc=11 → k=12.
-  const brVcc = 11;
-
-  const timer = make555(
-    { vcc: nVcc, gnd: 0, trig: nCap, thr: nCap, ctrl: nCtrl, rst: nVcc, dis: nDis, out: nOut },
-    { vDrop },
-  );
-
-  const vsVcc  = makeVsElement(nVcc, 0, brVcc, VCC);
-  const r1El   = makeResistor(nVcc, nDis, R1);
-  const r2El   = makeResistor(nDis, nCap, R2);
-  const capEl  = createTestCapacitor(C, nCap, 0);
-
-  const elements = [timer, vsVcc, r1El, r2El, capEl];
-
-  const compiled = buildHandCircuit({ nodeCount, elements });
-
-  const engine = new MNAEngine();
-  engine.init(compiled);
-
-  return { engine, nOut, nCap };
+  const registry = createDefaultRegistry();
+  const facade = new DefaultSimulatorFacade(registry);
+  const circuit = facade.build({
+    components: [
+      { id: "vcc",  type: "DcVoltageSource", props: { voltage: VCC, label: "vcc" } },
+      { id: "t",    type: "Timer555",        props: { label: "t" } },
+      { id: "r1",   type: "Resistor",        props: { resistance: R1 } },
+      { id: "r2",   type: "Resistor",        props: { resistance: R2 } },
+      { id: "cap",  type: "Capacitor",       props: { capacitance: C } },
+      { id: "rout", type: "Resistor",        props: { resistance: 1e6 } },
+      { id: "gnd",  type: "Ground" },
+    ],
+    connections: [
+      ["vcc:pos", "t:VCC"],
+      ["vcc:neg", "gnd:out"],
+      ["t:GND",   "gnd:out"],
+      ["t:RST",   "t:VCC"],
+      // R1: VCC → DIS junction
+      ["t:VCC",   "r1:A"],
+      ["r1:B",    "t:DIS"],
+      // R2: DIS junction → cap/THR/TRIG node
+      ["t:DIS",   "r2:A"],
+      ["r2:B",    "t:THR"],
+      ["t:THR",   "t:TRIG"],
+      // Capacitor: THR node → GND
+      ["t:THR",   "cap:pos"],
+      ["cap:neg", "gnd:out"],
+      // OUT probe: OUT → 1MΩ → GND (high-Z read)
+      ["t:OUT",   "rout:A"],
+      ["rout:B",  "gnd:out"],
+    ],
+  });
+  const coordinator = facade.compile(circuit);
+  const readOut = () => facade.readAllSignals(coordinator)["t:OUT"] ?? 0;
+  return { facade, coordinator, readOut };
 }
 
 describe("Astable", () => {
-  it("oscillates_at_correct_frequency", () => {
-    const R1 = 1000;    // 1kΩ
-    const R2 = 10000;   // 10kΩ
-    const C  = 10e-6;   // 10µF
-    const VCC = 5;
-
-    // Expected: f = 1.44 / ((R1 + 2*R2) * C) = 1.44 / (21000 * 10e-6)  6.857 Hz
-    const fExpected = 1.44 / ((R1 + 2 * R2) * C);
-    const periodExpected = 1 / fExpected;
-
-    const { engine, nOut } = buildAstableCircuit(R1, R2, C, VCC, 1.5);
-
-    // Run DC operating point first to initialize
-    const dcResult = engine.dcOperatingPoint();
-    expect(dcResult.converged).toBe(true);
-
-    // Use timestep = 0.2% of period for accurate threshold-crossing resolution
-    engine.configure({ maxTimeStep: periodExpected * 0.002 });
-
-    // Skip the first period (initial transient from DC state differs from
-    // steady-state). Measure frequency over periods 2-6 (5 steady-state periods).
-    const warmupTime = periodExpected * 1.5;
-    let steps = 0;
-    const maxStepsWarmup = 10000;
-    while (engine.simTime < warmupTime && steps < maxStepsWarmup) {
-      engine.step();
-      steps++;
-      if (engine.getState() === EngineState.ERROR) break;
-    }
-    expect(engine.getState()).not.toBe(EngineState.ERROR);
-
-    // Now measure 5 complete steady-state periods
-    let transitions = 0;
-    let prevOutVoltage = engine.getNodeVoltage(nOut);
-    const midVoltage = VCC / 2;
-    const measureStart = engine.simTime;
-    const measureTime = 5 * periodExpected;
-    steps = 0;
-    const maxSteps = 50000;
-
-    while (engine.simTime < measureStart + measureTime && steps < maxSteps) {
-      engine.step();
-      steps++;
-      if (engine.getState() === EngineState.ERROR) break;
-
-      const vOut = engine.getNodeVoltage(nOut);
-      if ((prevOutVoltage < midVoltage && vOut >= midVoltage) ||
-          (prevOutVoltage >= midVoltage && vOut < midVoltage)) {
-        transitions++;
-      }
-      prevOutVoltage = vOut;
-    }
-
-    expect(engine.getState()).not.toBe(EngineState.ERROR);
-
-    // 5 complete steady-state periods = 10 transitions
-    expect(transitions).toBeGreaterThanOrEqual(8);
-    expect(transitions).toBeLessThanOrEqual(12);
-
-    // Measure frequency from steady-state transitions over known time window
-    const fMeasured = transitions / 2 / measureTime;
-    const fError = Math.abs(fMeasured - fExpected) / fExpected;
-    // Within 10% (spec requirement; accounts for timestep quantization)
-    expect(fError).toBeLessThan(0.10);
-  });
-
-  it("duty_cycle", () => {
+  it("oscillates_at_correct_frequency", async () => {
+    /**
+     * Facade migration: sample OUT at 500 points per period over 6.5 periods,
+     * count threshold crossings in the last 5 periods.
+     * Expected: f = 1.44/((R1+2R2)·C) ≈ 6.857 Hz ±10%.
+     */
     const R1 = 1000;
     const R2 = 10000;
     const C  = 10e-6;
     const VCC = 5;
 
-    // Expected duty cycle: (R1 + R2) / (R1 + 2*R2) = 11000/21000  52.38%
+    const fExpected = 1.44 / ((R1 + 2 * R2) * C);
+    const periodExpected = 1 / fExpected;
+    const midVoltage = VCC / 2;
+
+    const { coordinator, readOut } = buildAstableFacade(R1, R2, C, VCC);
+
+    // Warmup: 1.5 periods; then measure: 5 periods.
+    const warmupTime = periodExpected * 1.5;
+    const measureTime = 5 * periodExpected;
+    const totalTime = warmupTime + measureTime;
+
+    // Sample at 500 pts/period across the full run.
+    const samplesPerPeriod = 500;
+    const totalSamples = Math.ceil(totalTime / periodExpected) * samplesPerPeriod;
+    const times = Array.from({ length: totalSamples }, (_, i) =>
+      (i + 1) * (totalTime / totalSamples),
+    );
+
+    const samples = await coordinator.sampleAtTimes(times, readOut);
+
+    // Find sample index at warmup boundary.
+    const warmupIdx = Math.floor(warmupTime / totalTime * totalSamples);
+
+    // Count threshold crossings in the measurement window.
+    let transitions = 0;
+    let prev = samples[warmupIdx] as number;
+    for (let i = warmupIdx + 1; i < samples.length; i++) {
+      const v = samples[i] as number;
+      if ((prev < midVoltage && v >= midVoltage) ||
+          (prev >= midVoltage && v < midVoltage)) {
+        transitions++;
+      }
+      prev = v;
+    }
+
+    // 5 complete steady-state periods = 10 transitions ±2.
+    expect(transitions).toBeGreaterThanOrEqual(8);
+    expect(transitions).toBeLessThanOrEqual(12);
+
+    const fMeasured = transitions / 2 / measureTime;
+    const fError = Math.abs(fMeasured - fExpected) / fExpected;
+    // Within 10%
+    expect(fError).toBeLessThan(0.10);
+  });
+
+  it("duty_cycle", async () => {
+    /**
+     * Facade migration: sample OUT at fine resolution, accumulate time-weighted
+     * duty over 5 steady-state periods.
+     * Expected duty = (R1+R2)/(R1+2R2) = 11/21 ≈ 52.38% ±5%.
+     */
+    const R1 = 1000;
+    const R2 = 10000;
+    const C  = 10e-6;
+    const VCC = 5;
+
     const dutyExpected = (R1 + R2) / (R1 + 2 * R2);
     const fExpected = 1.44 / ((R1 + 2 * R2) * C);
     const periodExpected = 1 / fExpected;
+    const midVoltage = VCC / 2;
 
-    const { engine, nOut } = buildAstableCircuit(R1, R2, C, VCC, 1.5);
+    const { coordinator, readOut } = buildAstableFacade(R1, R2, C, VCC);
 
-    const dcResult = engine.dcOperatingPoint();
-    expect(dcResult.converged).toBe(true);
-
-    // Use timestep = 0.2% of period for accurate threshold-crossing resolution
-    engine.configure({ maxTimeStep: periodExpected * 0.002 });
-
-    // Skip first period (initial transient)
+    // Warmup: 1.5 periods; measure: 5 periods.
     const warmupTime = periodExpected * 1.5;
-    let steps = 0;
-    while (engine.simTime < warmupTime && steps < 10000) {
-      engine.step();
-      steps++;
-      if (engine.getState() === EngineState.ERROR) break;
-    }
-    expect(engine.getState()).not.toBe(EngineState.ERROR);
+    const measureTime = 5 * periodExpected;
+    const totalTime = warmupTime + measureTime;
 
-    // Measure duty cycle over 5 steady-state periods
+    // 500 pts/period for duty-cycle resolution.
+    const samplesPerPeriod = 500;
+    const totalSamples = Math.ceil(totalTime / periodExpected) * samplesPerPeriod;
+    const dt = totalTime / totalSamples;
+    const times = Array.from({ length: totalSamples }, (_, i) =>
+      (i + 1) * dt,
+    );
+
+    const samples = await coordinator.sampleAtTimes(times, readOut);
+
+    // Accumulate time-weighted high/low in measurement window.
+    const warmupIdx = Math.floor(warmupTime / totalTime * totalSamples);
     let timeHigh = 0;
     let timeLow = 0;
-    const measureStart = engine.simTime;
-    const measureTime = 5 * periodExpected;
-    steps = 0;
-    const maxSteps = 50000;
-
-    while (engine.simTime < measureStart + measureTime && steps < maxSteps) {
-      const tBefore = engine.simTime;
-      engine.step();
-      steps++;
-      if (engine.getState() === EngineState.ERROR) break;
-
-      const dt = engine.simTime - tBefore;
-      const vOut = engine.getNodeVoltage(nOut);
-      const isHigh = vOut > VCC / 2;
-
-      if (isHigh) {
+    for (let i = warmupIdx; i < samples.length; i++) {
+      const v = samples[i] as number;
+      if (v > midVoltage) {
         timeHigh += dt;
       } else {
         timeLow += dt;
       }
     }
-
-    expect(engine.getState()).not.toBe(EngineState.ERROR);
 
     const totalMeasured = timeHigh + timeLow;
     expect(totalMeasured).toBeGreaterThan(0);
@@ -493,170 +297,110 @@ describe("Astable", () => {
 // ---------------------------------------------------------------------------
 
 /**
- * Monostable 555 circuit:
- *
- *   VCC → R → node_thr → C → GND
- *                   ↑
- *                  THR (and DIS)
- *
- *   TRIG: externally driven (pulsed low to trigger)
- *   OUT: monitored for pulse width
- *
- * Initial state: C is discharged, TRIG is high (idle).
- * The 555 is in RESET state (Q=0, output low, DIS grounds C through R_sat).
- *
- * Trigger event: TRIG goes below 1/3 VCC  SET (Q=1, output high, DIS off).
- * C now charges through R from VCC.
- * When V_C reaches 2/3 VCC  RESET (Q=0, output low, DIS discharges C).
- *
- * Pulse width: t_W = 1.1 × R × C
- * For R=100kΩ, C=1µF: t_W = 1.1 × 100e3 × 1e-6 = 110ms
- *
- * Node assignment:
- *   1 = VCC     (fixed at 5V, branch 0)
- *   2 = THR     (capacitor top plate = DIS pin connects here)
- *   3 = TRIG    (driven by external "source")
- *   4 = OUT     (output)
- *   5 = CTRL    (floating, internal divider)
- *   GND = 0
- *   RST = VCC = node 1
- *
- * Elements:
- *   VS_VCC:    5V source, node1→GND, branch 5
- *   R:         100kΩ, node1→node2
- *   C:         1µF, node2→GND
- *   VS_TRIG:   voltage source controlling TRIG, node3→GND, branch 6
- *   timer555:  [VCC=1, GND=0, TRIG=3, THR=2, CTRL=5, RST=1, DIS=2, OUT=4]
- *
- * nodeCount=5, branchCount=2, matrixSize=7
+ * Facade helper: build the monostable 555 circuit.
+ * VCC → R → THR(=DIS) → C → GND. TRIG driven by labeled DcVoltageSource "trig".
+ * OUT readable via "t:OUT".
  */
-
-function buildMonostableCircuit(R: number, Cval: number, VCC: number): {
-  engine: MNAEngine;
-  nOut: number;
+function buildMonostableFacade(R: number, Cval: number, VCC: number): {
+  facade: DefaultSimulatorFacade;
+  coordinator: ReturnType<DefaultSimulatorFacade["compile"]>;
+  readOut: () => number;
   setTrig: (v: number) => void;
 } {
-  const nVcc  = 1;
-  const nThr  = 2; // capacitor top / THR / DIS
-  const nTrig = 3;
-  const nOut  = 4;
-  const nCtrl = 5;
-
-  const nodeCount   = 5;
-  // Timer555 allocates nodeCount+1..nodeCount+6 internally (4 voltage + 2 VCVS branches).
-  // nodeCount=5 → timer range 6-11. Safe VCC branch: brVcc=11 → k=12. vsTrig: k=13.
-  const brVcc  = 11; // k = brVcc+1 = 12 (used by makeVoltageSource/makeVsElement)
-  const brTrig = 13; // k = brTrig = 13 (used directly by vsTrig.load())
-
-  const timer = make555(
-    { vcc: nVcc, gnd: 0, trig: nTrig, thr: nThr, ctrl: nCtrl, rst: nVcc, dis: nThr, out: nOut },
-  );
-
-  const vsVcc  = makeVsElement(nVcc, 0, brVcc, VCC);
-  const rEl    = makeResistor(nVcc, nThr, R);
-  const capEl  = createTestCapacitor(Cval, nThr, 0);
-
-  // Mutable trigger voltage source with real setup() to pre-allocate its branch row.
-  // Uses k=brTrig directly (1-based) for its matrix entries.
-  let _trigVoltage = VCC; // starts HIGH (idle)
-  let _hTrigK = -1, _hKTrig = -1;
-  const vsTrig: AnalogElement = {
-    branchIndex: brTrig,
-    ngspiceLoadOrder: 0,
-    label: "",
-    _stateBase: -1,
-    _pinNodes: new Map<string, number>([["pos", nTrig], ["neg", 0]]),
-    setup(ctx: SetupContext): void {
-      const k = brTrig;
-      if (nTrig > 0) {
-        _hTrigK = ctx.solver.allocElement(nTrig, k);
-        _hKTrig = ctx.solver.allocElement(k, nTrig);
-      }
-      ctx.solver.allocElement(k, k); // ensure branch row in solver index
-    },
-    setParam(_key: string, _value: number): void {},
-    getPinCurrents(_v: Float64Array): number[] { return []; },
-    load(ctx: LoadContext): void {
-      const { solver, rhs } = ctx;
-      const k = brTrig;
-      if (nTrig > 0) {
-        solver.stampElement(_hTrigK, 1);
-        solver.stampElement(_hKTrig, 1);
-      }
-      stampRHS(rhs, k, _trigVoltage);
-    },
-  } as unknown as AnalogElement;
-
-  const elements = [timer, vsVcc, rEl, capEl, vsTrig];
-
-  const compiled = buildHandCircuit({ nodeCount, elements });
-
-  const engine = new MNAEngine();
-  engine.init(compiled);
-
-  return {
-    engine,
-    nOut,
-    setTrig: (v: number) => { _trigVoltage = v; },
-  };
+  const registry = createDefaultRegistry();
+  const facade = new DefaultSimulatorFacade(registry);
+  const circuit = facade.build({
+    components: [
+      { id: "vcc",  type: "DcVoltageSource", props: { voltage: VCC,  label: "vcc"  } },
+      { id: "trig", type: "DcVoltageSource", props: { voltage: VCC,  label: "trig" } },
+      { id: "t",    type: "Timer555",        props: { label: "t" } },
+      { id: "r",    type: "Resistor",        props: { resistance: R } },
+      { id: "cap",  type: "Capacitor",       props: { capacitance: Cval } },
+      { id: "rout", type: "Resistor",        props: { resistance: 1e6 } },
+      { id: "gnd",  type: "Ground" },
+    ],
+    connections: [
+      ["vcc:pos",  "t:VCC"],
+      ["vcc:neg",  "gnd:out"],
+      ["t:GND",    "gnd:out"],
+      ["t:RST",    "t:VCC"],
+      // R: VCC → THR/DIS node
+      ["t:VCC",    "r:A"],
+      ["r:B",      "t:THR"],
+      ["t:THR",    "t:DIS"],
+      // Capacitor: THR → GND
+      ["t:THR",    "cap:pos"],
+      ["cap:neg",  "gnd:out"],
+      // TRIG source: controlled externally via setSignal("trig", v)
+      ["trig:pos", "t:TRIG"],
+      ["trig:neg", "gnd:out"],
+      // OUT probe
+      ["t:OUT",    "rout:A"],
+      ["rout:B",   "gnd:out"],
+    ],
+  });
+  const coordinator = facade.compile(circuit);
+  const readOut = () => facade.readAllSignals(coordinator)["t:OUT"] ?? 0;
+  const setTrig = (v: number) => facade.setSignal(coordinator, "trig", v);
+  return { facade, coordinator, readOut, setTrig };
 }
 
 describe("Monostable", () => {
-  it("pulse_width", () => {
-    const R    = 100e3;  // 100kΩ
-    const Cval = 1e-6;   // 1µF
+  it("pulse_width", async () => {
+    /**
+     * Facade migration: monostable 555.
+     * 1. Compile circuit with TRIG=VCC (idle).
+     * 2. Set TRIG=0.5V, advance one small step to fire comparator.
+     * 3. Release TRIG=VCC.
+     * 4. Sample OUT over 3×tWidth to find pulse start/end.
+     * Expected: tWidth = 1.1×R×C = 110ms ±10%.
+     */
+    const R    = 100e3;
+    const Cval = 1e-6;
     const VCC  = 5;
+    const tWidthExpected = 1.1 * R * Cval; // 110ms
 
-    // Expected pulse width: 1.1 × R × C = 110ms
-    const tWidthExpected = 1.1 * R * Cval;
+    const { facade, coordinator, readOut, setTrig } = buildMonostableFacade(R, Cval, VCC);
 
-    const { engine, nOut, setTrig } = buildMonostableCircuit(R, Cval, VCC);
+    // DC-OP converges with TRIG high (idle state).
+    const dcResult = facade.getDcOpResult();
+    expect(dcResult).not.toBeNull();
+    expect(dcResult!.converged).toBe(true);
 
-    // Initialize: run DC OP with TRIG high to establish initial RESET state
-    const dcResult = engine.dcOperatingPoint();
-    expect(dcResult.converged).toBe(true);
-
-    // Use timestep = 0.5% of pulse width for accurate threshold-crossing resolution
-    const maxDt = tWidthExpected * 0.005;
-    engine.configure({ maxTimeStep: maxDt });
-
-    // Apply trigger pulse (TRIG goes to 0.5V < 1/3 VCC = 1.67V  fires trigger comparator)
+    // Apply trigger pulse: TRIG → 0.5V (< 1/3 VCC = 1.67V).
     setTrig(0.5);
+    await coordinator.stepToTime(1e-4); // one small step to register trigger
 
-    // Run one step to register the trigger
-    engine.step();
+    // Release trigger.
+    setTrig(VCC);
 
+    // Sample OUT at 200 pts/tWidth over 3×tWidth to locate pulse edges.
+    const measureEnd = tWidthExpected * 3;
+    const totalSamples = 600; // 200 per tWidth
+    const times = Array.from({ length: totalSamples }, (_, i) =>
+      (coordinator.simTime ?? 0) + (i + 1) * (measureEnd / totalSamples),
+    );
+    const samples = await coordinator.sampleAtTimes(times, readOut);
+
+    // Post-process: find rising edge (pulseStart) and falling edge (pulseEnd).
     const midVoltage = VCC / 2;
     let pulseStart = -1;
     let pulseEnd = -1;
-    let prevHigh = engine.getNodeVoltage(nOut) > midVoltage;
+    let prev = samples[0] as number;
 
-    // Release trigger (TRIG goes back to VCC)
-    setTrig(VCC);
-
-    let steps = 0;
-    const maxSteps = 50000;
-    const maxSimTime = tWidthExpected * 3; // simulate 3× expected pulse width
-
-    while (engine.simTime < maxSimTime && steps < maxSteps) {
-      engine.step();
-      steps++;
-      if (engine.getState() === EngineState.ERROR) break;
-
-      const vOut = engine.getNodeVoltage(nOut);
-      const isHigh = vOut > midVoltage;
-
-      if (!prevHigh && isHigh) {
-        pulseStart = engine.simTime;
+    for (let i = 1; i < samples.length; i++) {
+      const v = samples[i] as number;
+      const t = times[i]!;
+      if (prev <= midVoltage && v > midVoltage && pulseStart < 0) {
+        pulseStart = t;
       }
-      if (prevHigh && !isHigh && pulseStart >= 0) {
-        pulseEnd = engine.simTime;
-        break; // pulse complete
+      if (prev > midVoltage && v <= midVoltage && pulseStart >= 0) {
+        pulseEnd = t;
+        break;
       }
-      prevHigh = isHigh;
+      prev = v;
     }
 
-    expect(engine.getState()).not.toBe(EngineState.ERROR);
     expect(pulseEnd).toBeGreaterThan(0);
 
     const tWidthMeasured = pulseEnd - pulseStart;
@@ -666,73 +410,84 @@ describe("Monostable", () => {
     expect(tWidthError).toBeLessThan(0.10);
   });
 
-  it("retrigger_ignored_during_pulse", () => {
-    // Standard 555: applying a second trigger during the output pulse does NOT
-    // extend the pulse. The capacitor continues charging; once it hits 2/3 VCC,
-    // the timer resets regardless of TRIG level.
+  it("retrigger_ignored_during_pulse", async () => {
+    /**
+     * Facade migration: standard 555 retrigger immunity.
+     * Applying a second trigger during the output pulse must NOT extend it.
+     * Strategy: step through 3 phases using stepToTime + setSignal.
+     *   Phase 1: trigger, advance tiny step.
+     *   Phase 2: release, sample to find pulse start; advance to 30% of tWidth.
+     *   Phase 3: retrigger, advance to 40%; release; sample remaining to find end.
+     */
     const R    = 100e3;
     const Cval = 1e-6;
     const VCC  = 5;
     const tWidthExpected = 1.1 * R * Cval; // 110ms
 
-    const { engine, nOut, setTrig } = buildMonostableCircuit(R, Cval, VCC);
+    const { facade, coordinator, readOut, setTrig } = buildMonostableFacade(R, Cval, VCC);
 
-    engine.dcOperatingPoint();
-    const maxDt = tWidthExpected * 0.005;
-    engine.configure({ maxTimeStep: maxDt });
+    facade.getDcOpResult(); // ensure DC-OP has run
 
-    // Trigger the 555
+    // Phase 1: fire trigger.
     setTrig(0.5);
-    engine.step();
+    await coordinator.stepToTime(1e-4);
     setTrig(VCC);
 
-    // Record when output goes high
+    // Phase 2: sample to find pulse start, then advance to 30% point.
+    const phase2End = tWidthExpected * 1.5;
+    const phase2Samples = 300;
+    const phase2Times = Array.from({ length: phase2Samples }, (_, i) =>
+      (coordinator.simTime ?? 0) + (i + 1) * (phase2End / phase2Samples),
+    );
+    const phase2 = await coordinator.sampleAtTimes(phase2Times, readOut);
+
+    const midVoltage = VCC / 2;
     let pulseStart = -1;
-    let pulseEnd = -1;
-    let retriggered = false;
-    let prevHigh = engine.getNodeVoltage(nOut) > VCC / 2;
-
-    let steps = 0;
-    const maxSteps = 50000;
-    const maxSimTime = tWidthExpected * 3;
-
-    while (engine.simTime < maxSimTime && steps < maxSteps) {
-      engine.step();
-      steps++;
-      if (engine.getState() === EngineState.ERROR) break;
-
-      const vOut = engine.getNodeVoltage(nOut);
-      const isHigh = vOut > VCC / 2;
-
-      if (!prevHigh && isHigh && pulseStart < 0) {
-        pulseStart = engine.simTime;
+    let prev2 = phase2[0] as number;
+    for (let i = 1; i < phase2.length; i++) {
+      const v = phase2[i] as number;
+      if (prev2 <= midVoltage && v > midVoltage && pulseStart < 0) {
+        pulseStart = phase2Times[i]!;
       }
-
-      // Apply retrigger at 30% through the expected pulse
-      if (pulseStart >= 0 && !retriggered && engine.simTime > pulseStart + tWidthExpected * 0.3) {
-        setTrig(0.5); // re-trigger during pulse
-        retriggered = true;
-      }
-      if (retriggered && engine.simTime > pulseStart + tWidthExpected * 0.4) {
-        setTrig(VCC); // release retrigger
-      }
-
-      if (prevHigh && !isHigh && pulseStart >= 0) {
-        pulseEnd = engine.simTime;
-        break;
-      }
-      prevHigh = isHigh;
+      prev2 = v;
     }
 
-    expect(engine.getState()).not.toBe(EngineState.ERROR);
+    // Apply retrigger at ~30% through the expected pulse.
+    const retriggerAt = pulseStart >= 0 ? pulseStart + tWidthExpected * 0.3 : (coordinator.simTime ?? 0) + tWidthExpected * 0.3;
+    await coordinator.stepToTime(retriggerAt);
+    setTrig(0.5); // retrigger
+
+    // Release at ~40%.
+    const releaseAt = pulseStart >= 0 ? pulseStart + tWidthExpected * 0.4 : retriggerAt + tWidthExpected * 0.1;
+    await coordinator.stepToTime(releaseAt);
+    setTrig(VCC);
+
+    // Phase 3: sample remaining to find pulse end.
+    const phase3End = tWidthExpected * 3;
+    const phase3Samples = 400;
+    const phase3Times = Array.from({ length: phase3Samples }, (_, i) =>
+      (coordinator.simTime ?? 0) + (i + 1) * (phase3End / phase3Samples),
+    );
+    const phase3 = await coordinator.sampleAtTimes(phase3Times, readOut);
+
+    let pulseEnd = -1;
+    let prev3 = phase3[0] as number;
+    for (let i = 1; i < phase3.length; i++) {
+      const v = phase3[i] as number;
+      if (prev3 > midVoltage && v <= midVoltage && pulseStart >= 0) {
+        pulseEnd = phase3Times[i]!;
+        break;
+      }
+      prev3 = v;
+    }
+
     expect(pulseEnd).toBeGreaterThan(0);
 
     const tWidthMeasured = pulseEnd - pulseStart;
 
     // Pulse width must NOT be extended beyond 1.1×RC × 1.15 (15% margin).
-    // If retrigger extended the pulse, it would be ~2× tWidthExpected.
     expect(tWidthMeasured).toBeLessThan(tWidthExpected * 1.15);
-    // Pulse must have the normal width (within 10%)
+    // Pulse must have the normal width (within 10%).
     const tWidthError = Math.abs(tWidthMeasured - tWidthExpected) / tWidthExpected;
     expect(tWidthError).toBeLessThan(0.10);
   });

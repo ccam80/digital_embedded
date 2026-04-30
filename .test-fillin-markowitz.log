@@ -1,5 +1,0 @@
-[2mfilter:  [22m[33msrc/solver/analog/__tests__/_diag-fillin-markowitz.test.ts[39m
-[2minclude: [22m[33msrc/**/*.test.ts[2m, [22mscripts/**/*.test.ts[39m
-[2mexclude:  [22m[33mnode_modules[2m, [22mdist[39m
-[31m
-No test files found, exiting with code 1[39m
