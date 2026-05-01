@@ -1,5 +1,5 @@
 /**
- * Tests for LookUpTable — combinational truth-table component.
+ * Tests for LookUpTable- combinational truth-table component.
  *
  * Covers:
  *   - Lookup correctness for all input combinations
@@ -49,7 +49,7 @@ describe("LookUpTable", () => {
     clearBackingStores();
   });
 
-  it("lookupCorrectness2Input — 2-input, 1-bit table (AND gate)", () => {
+  it("lookupCorrectness2Input- 2-input, 1-bit table (AND gate)", () => {
     // Table: addr → value
     // 0b00 → 0, 0b01 → 0, 0b10 → 0, 0b11 → 1 (AND gate)
     const mem = new DataField(4); // 2^2 = 4 entries
@@ -69,7 +69,7 @@ describe("LookUpTable", () => {
     state[0] = 1; state[1] = 1; executeLookUpTable(0, state, highZs, layout); expect(state[2]).toBe(1);
   });
 
-  it("addressFormation — input 0 is LSB, input N-1 is MSB", () => {
+  it("addressFormation- input 0 is LSB, input N-1 is MSB", () => {
     // 3 inputs, 8-entry table
     const mem = new DataField(8); // 2^3 = 8
     for (let i = 0; i < 8; i++) mem.write(i, i); // table[i] = i
@@ -94,7 +94,7 @@ describe("LookUpTable", () => {
     expect(state[3]).toBe(7);
   });
 
-  it("multibitOutput — 4-bit output values", () => {
+  it("multibitOutput- 4-bit output values", () => {
     const mem = new DataField(4); // 2-input LUT
     mem.write(0, 0x0);
     mem.write(1, 0xA);
@@ -111,7 +111,7 @@ describe("LookUpTable", () => {
     state[0] = 1; state[1] = 1; executeLookUpTable(0, state, highZs, layout); expect(state[2]).toBe(0xF);
   });
 
-  it("noBackingStore — returns 0 gracefully", () => {
+  it("noBackingStore- returns 0 gracefully", () => {
     const { layout, state } = makeLayout(2, 1);
     const highZs = new Uint32Array(state.length);
     state[0] = 1; state[1] = 1;
@@ -119,7 +119,7 @@ describe("LookUpTable", () => {
     expect(state[2]).toBe(0);
   });
 
-  it("1InputLUT — single-input table (NOT gate)", () => {
+  it("1InputLUT- single-input table (NOT gate)", () => {
     const mem = new DataField(2); // 2^1 = 2 entries
     mem.write(0, 1); // NOT 0 = 1
     mem.write(1, 0); // NOT 1 = 0
@@ -131,7 +131,7 @@ describe("LookUpTable", () => {
     state[0] = 1; executeLookUpTable(0, state, highZs, layout); expect(state[1]).toBe(0);
   });
 
-  it("4InputLUT — 4-input lookup table", () => {
+  it("4InputLUT- 4-input lookup table", () => {
     const mem = new DataField(16); // 2^4 = 16 entries
     for (let i = 0; i < 16; i++) mem.write(i, i * 2);
     registerBackingStore(0, mem);
@@ -150,7 +150,7 @@ describe("LookUpTable", () => {
     expect(state[4]).toBe(30); // 15 * 2
   });
 
-  it("pinLayout — correct number of inputs and single output", () => {
+  it("pinLayout- correct number of inputs and single output", () => {
     const props = new PropertyBag();
     props.set("inputCount", 3);
     const el = new LookUpTableElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
@@ -167,7 +167,7 @@ describe("LookUpTable", () => {
     expect(inputLabels).toContain("2");
   });
 
-  it("pinLayout2Input — default 2-input layout", () => {
+  it("pinLayout2Input- default 2-input layout", () => {
     const props = new PropertyBag();
     const el = new LookUpTableElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
     const pins = el.getPins();
@@ -175,7 +175,7 @@ describe("LookUpTable", () => {
     expect(pins.filter(p => p.direction === PinDirection.OUTPUT).length).toBe(1);
   });
 
-  it("attributeMapping — Bits, LutInputCount, Label map correctly", () => {
+  it("attributeMapping- Bits, LutInputCount, Label map correctly", () => {
     const bitsMap = LUT_ATTRIBUTE_MAPPINGS.find(m => m.xmlName === "Bits");
     const lutMap = LUT_ATTRIBUTE_MAPPINGS.find(m => m.xmlName === "LutInputCount");
     const labelMap = LUT_ATTRIBUTE_MAPPINGS.find(m => m.xmlName === "Label");
@@ -185,7 +185,7 @@ describe("LookUpTable", () => {
     expect(labelMap!.convert("F")).toBe("F");
   });
 
-  it("draw — renders body with LUT label", () => {
+  it("draw- renders body with LUT label", () => {
     const props = new PropertyBag();
     const el = new LookUpTableElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
 
@@ -216,7 +216,7 @@ describe("LookUpTable", () => {
     expect(texts).toContain("LUT");
   });
 
-  it("drawWithLabel — label appears in draw calls", () => {
+  it("drawWithLabel- label appears in draw calls", () => {
     const props = new PropertyBag();
     props.set("label", "MyLUT");
     const el = new LookUpTableElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
@@ -234,7 +234,7 @@ describe("LookUpTable", () => {
     expect(texts).toContain("MyLUT");
   });
 
-  it("definitionComplete — LookUpTableDefinition has all required fields", () => {
+  it("definitionComplete- LookUpTableDefinition has all required fields", () => {
     expect(LookUpTableDefinition.name).toBe("LookUpTable");
     expect(LookUpTableDefinition.factory).toBeDefined();
     expect(LookUpTableDefinition.models!.digital!.executeFn).toBeDefined();
@@ -246,12 +246,12 @@ describe("LookUpTable", () => {
     expect(typeof LookUpTableDefinition.models!.digital!.defaultDelay).toBe("number");
   });
 
-  it("factoryCreatesInstance — factory returns LookUpTableElement", () => {
+  it("factoryCreatesInstance- factory returns LookUpTableElement", () => {
     const props = new PropertyBag();
     expect(LookUpTableDefinition.factory(props)).toBeInstanceOf(LookUpTableElement);
   });
 
-  it("boundingBox — returns non-zero dimensions", () => {
+  it("boundingBox- returns non-zero dimensions", () => {
     const props = new PropertyBag();
     const el = new LookUpTableElement(crypto.randomUUID(), { x: 2, y: 3 }, 0, false, props);
     const bb = el.getBoundingBox();

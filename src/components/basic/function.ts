@@ -1,16 +1,16 @@
 /**
- * Boolean Function component — generic user-defined boolean function.
+ * Boolean Function component- generic user-defined boolean function.
  *
  * Implements a combinational boolean function defined by a user-editable truth
  * table. The truth table maps each combination of input values to an output value.
  *
  * Properties:
- *   inputCount  — number of input variables (1–8). There are 2^inputCount rows.
- *   outputCount — number of output bits per row (1–32, default 1).
- *   truthTable  — array of 2^inputCount output values (number[]).
+ *   inputCount - number of input variables (1–8). There are 2^inputCount rows.
+ *   outputCount- number of output bits per row (1–32, default 1).
+ *   truthTable - array of 2^inputCount output values (number[]).
  *                 Each entry is the output for the corresponding input combination.
  *                 Entries of -1 represent don't-care (X): output is 0 for don't-care.
- *   label       — optional label shown above the component.
+ *   label      - optional label shown above the component.
  *
  * Pin layout:
  *   Inputs:  in0, in1, … inN-1 on the west face (N = inputCount, each 1-bit)
@@ -26,8 +26,8 @@
  * Truth table storage in state:
  *   The compiler stores the truth table values in extra state slots after the
  *   regular output slots. Slot layout (outputOffset(index)):
- *     [0..outputCount-1]  — output values (written by executeFn)
- *     [outputCount..]     — truth table (2^inputCount entries, set by compiler)
+ *     [0..outputCount-1] - output values (written by executeFn)
+ *     [outputCount..]    - truth table (2^inputCount entries, set by compiler)
  */
 
 import { AbstractCircuitElement } from "../../core/element.js";
@@ -178,7 +178,7 @@ export function evaluateAllOutputs(
 }
 
 // ---------------------------------------------------------------------------
-// BooleanFunctionElement — CircuitElement implementation
+// BooleanFunctionElement- CircuitElement implementation
 // ---------------------------------------------------------------------------
 
 export class BooleanFunctionElement extends AbstractCircuitElement {
@@ -284,7 +284,7 @@ export class BooleanFunctionElement extends AbstractCircuitElement {
 }
 
 // ---------------------------------------------------------------------------
-// executeBooleanFunction — flat simulation function
+// executeBooleanFunction- flat simulation function
 //
 // Input slot layout: in0 at inputStart+0 (LSB), in1 at inputStart+1, etc.
 // Output slot layout: out0 at outputStart+0, out1 at outputStart+1, etc.
@@ -417,7 +417,7 @@ export const BooleanFunctionDefinition: ComponentDefinition = {
   attributeMap: BOOLEAN_FUNCTION_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.LOGIC,
   helpText:
-    "Boolean Function — a user-defined combinational function expressed as a truth table.\n" +
+    "Boolean Function- a user-defined combinational function expressed as a truth table.\n" +
     "inputCount sets the number of input variables (1–8).\n" +
     "outputCount sets the number of output bits.\n" +
     "Don't-care entries (-1) output 0 at simulation time.",

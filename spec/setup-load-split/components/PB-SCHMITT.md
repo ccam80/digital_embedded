@@ -12,8 +12,8 @@ Two registered component definitions share this spec:
 The composite itself has no `ngspiceNodeMap`. Pin models carry their own matrix allocations per `02-behavioral.md`.
 
 Composite pin labels (from `buildSchmittPinDeclarations()`):
-- `in` — input (pinLayout index 0)
-- `out` — output (pinLayout index 1)
+- `in`- input (pinLayout index 0)
+- `out`- output (pinLayout index 1)
 
 ## Sub-element decomposition
 
@@ -22,7 +22,7 @@ Composite pin labels (from `buildSchmittPinDeclarations()`):
 | `inModel` | DigitalInputPinModel | behavioral (02-behavioral.md) | `in` → input node | `"rIn"`, `"cIn"`, `"vIH"`, `"vIL"` → inModel |
 | `outModel` | DigitalOutputPinModel | behavioral (02-behavioral.md) | `out` → output node | `"vOH"`, `"vOL"`, `"rOut"`, `"cOut"` → outModel |
 
-`DigitalInputPinModel` and `DigitalOutputPinModel` are behavioral — they own their `setup()` bodies per `02-behavioral.md`. Each owns its own CAP companion child element for transient capacitance.
+`DigitalInputPinModel` and `DigitalOutputPinModel` are behavioral- they own their `setup()` bodies per `02-behavioral.md`. Each owns its own CAP companion child element for transient capacitance.
 
 ## Construction (factory body sketch)
 
@@ -44,7 +44,7 @@ factory(pinNodes, props, getTime): AnalogElementCore {
 }
 ```
 
-## setup() body — composite forwards
+## setup() body- composite forwards
 
 ```ts
 setup(ctx: SetupContext): void {
@@ -65,7 +65,7 @@ setup(ctx: SetupContext): void {
 }
 ```
 
-## load() body — composite forwards
+## load() body- composite forwards
 
 ```ts
 load(ctx: LoadContext): void {
@@ -117,11 +117,11 @@ Not needed. Direct refs to `_inModel`, `_outModel`, and `_childElements`.
 
 Per CLAUDE.md "Test Policy During W3 Setup-Load-Split", verification is spec compliance only. DO NOT run tests; DO NOT use test results.
 
-1. `setup()` body in the implementation file matches the "setup() body — alloc only" listing in this PB line-for-line.
+1. `setup()` body in the implementation file matches the "setup() body- alloc only" listing in this PB line-for-line.
 2. TSTALLOC sequence in `setup()` matches the order in the cited ngspice anchor file (see top of this PB, e.g. `ressetup.c:46-49`).
 3. Factory cleanup applied per the "Factory cleanup" section above.
 4. `ngspiceNodeMap` registered per the "Pin mapping" section above (or omitted for composites where the spec says so).
-5. `load()` writes through cached handles only — zero `solver.allocElement(...)` calls inside `load()`, `accept()`, or any non-`setup()` method.
+5. `load()` writes through cached handles only- zero `solver.allocElement(...)` calls inside `load()`, `accept()`, or any non-`setup()` method.
 6. `mayCreateInternalNodes` flag set per spec.
 7. `findBranchFor` callback present where spec says (V-output sources, IND, etc.).
 8. No banned closing verdicts (mapping/tolerance/equivalent-to/pre-existing/intentional-divergence/citation-divergence/partial) used in any commit message or report.

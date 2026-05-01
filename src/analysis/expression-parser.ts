@@ -94,7 +94,7 @@ function tokenize(src: string): Token[] {
       i++;
       continue;
     }
-    // Middle dot (·) — UTF-8 multi-byte
+    // Middle dot (·)- UTF-8 multi-byte
     if (src.startsWith('·', i)) {
       tokens.push({ kind: 'AND', text: '·', pos: i });
       i += '·'.length;

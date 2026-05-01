@@ -12,11 +12,11 @@ FGNFET is a composite (MOS + CAP). It has no `ngspiceNodeMap` of its own.
 
 External pins: `G` (external gate, not directly connected to MOS gate), `D` (drain), `S` (source).
 
-An auxiliary internal node `fg` (floating gate) is allocated via `ctx.makeVolt(this.label, "fg")`. This node is the MOS gate input and the CAP positive terminal. The external pin `G` is connected to nothing in the MNA — it is a parameter input for charge injection logic only.
+An auxiliary internal node `fg` (floating gate) is allocated via `ctx.makeVolt(this.label, "fg")`. This node is the MOS gate input and the CAP positive terminal. The external pin `G` is connected to nothing in the MNA- it is a parameter input for charge injection logic only.
 
 ### MOS sub-element pin map
 
-`{ G: "gate", D: "drain", S: "source" }` — but MOS's `G` pin is wired to the floating-gate internal node `fgNode`, **not** to `pinNodes.get("G")`. The MOS drain and source map to the composite's `D` and `S` pins normally.
+`{ G: "gate", D: "drain", S: "source" }`- but MOS's `G` pin is wired to the floating-gate internal node `fgNode`, **not** to `pinNodes.get("G")`. The MOS drain and source map to the composite's `D` and `S` pins normally.
 
 | MOS sub-element node | Resolves to |
 |---|---|
@@ -24,16 +24,16 @@ An auxiliary internal node `fg` (floating gate) is allocated via `ctx.makeVolt(t
 | `MOS1dNode` (drain) | `pinNodes.get("D")` |
 | `MOS1sNode` (source) | `pinNodes.get("S")` |
 | `MOS1bNode` (bulk) | `pinNodes.get("S")` (3-terminal: bulk tied to source) |
-| `MOS1dNodePrime` | conditional — equals `MOS1dNode` unless drain resistance > 0 |
-| `MOS1sNodePrime` | conditional — equals `MOS1sNode` unless source resistance > 0 |
+| `MOS1dNodePrime` | conditional- equals `MOS1dNode` unless drain resistance > 0 |
+| `MOS1sNodePrime` | conditional- equals `MOS1sNode` unless source resistance > 0 |
 
 ### CAP sub-element pin map
 
-`{ pos: "pos", neg: "neg" }` — CAP's `pos` is wired to `fgNode` (floating gate), CAP's `neg` is wired to ground (0). This models the floating-gate charge storage as a capacitor between the floating gate and ground.
+`{ pos: "pos", neg: "neg" }`- CAP's `pos` is wired to `fgNode` (floating gate), CAP's `neg` is wired to ground (0). This models the floating-gate charge storage as a capacitor between the floating gate and ground.
 
 ## Internal nodes
 
-1 — the floating-gate node `fgNode`, allocated via:
+1- the floating-gate node `fgNode`, allocated via:
 ```typescript
 this._fgNode = ctx.makeVolt(this.label, "fg");
 ```
@@ -41,7 +41,7 @@ This is the digiTS port of `CKTmkVolt` (`cktmkvol.c:20-41`). The MOS sub-element
 
 ## Branch rows
 
-none — neither MOS nor CAP allocates a branch row.
+none- neither MOS nor CAP allocates a branch row.
 
 ## State slots
 
@@ -51,11 +51,11 @@ MOS1numStates (from mos1set.c:96-97: `here->MOS1states = *states; *states += MOS
 - `NGSPICE_LOAD_ORDER.CAP = 17`
 - `NGSPICE_LOAD_ORDER.MOS = 35`
 
-Since 17 < 35, the floating-gate CAP sub-element's `setup()` runs before the MOS sub-element's `setup()`. This determines the state-slot offsets: CAP slots are allocated first (lower offsets), MOS slots second (higher offsets). Composite implementers MUST NOT hard-code the order in the setup() body — sort by `ngspiceLoadOrder` so the order remains correct if either anchor's value moves.
+Since 17 < 35, the floating-gate CAP sub-element's `setup()` runs before the MOS sub-element's `setup()`. This determines the state-slot offsets: CAP slots are allocated first (lower offsets), MOS slots second (higher offsets). Composite implementers MUST NOT hard-code the order in the setup() body- sort by `ngspiceLoadOrder` so the order remains correct if either anchor's value moves.
 
 ## TSTALLOC sequence (line-for-line port)
 
-### CAP sub-element (capsetup.c:114-117) — runs first:
+### CAP sub-element (capsetup.c:114-117)- runs first:
 
 | Position | ngspice pair | digiTS pair | handle field name |
 |---|---|---|---|
@@ -64,7 +64,7 @@ Since 17 < 35, the floating-gate CAP sub-element's `setup()` runs before the MOS
 | 3 | `(CAPposNode, CAPnegNode)` | `(fgNode, 0)` | `cap._hPN` |
 | 4 | `(CAPnegNode, CAPposNode)` | `(0, fgNode)` | `cap._hNP` |
 
-### MOS sub-element (mos1set.c:186-207) — runs second:
+### MOS sub-element (mos1set.c:186-207)- runs second:
 
 For the 3-terminal digital FGNFET case, drain resistance = 0 and source resistance = 0, so `MOS1dNodePrime = MOS1dNode` and `MOS1sNodePrime = MOS1sNode`. The conditional `CKTmkVolt` calls at mos1set.c:134-178 are skipped.
 
@@ -95,7 +95,7 @@ For the 3-terminal digital FGNFET case, drain resistance = 0 and source resistan
 
 Note: positions 8-10 (`_hBb`, `_hDPdp`, `_hSPsp`) and positions 9/10 alias existing nodes because bulk=source and dNodePrime=dNode, sNodePrime=sNode in the 3-terminal case. The TSTALLOC calls must still be made in this order for insertion-order correctness.
 
-## setup() body — alloc only
+## setup() body- alloc only
 
 ```typescript
 setup(ctx: SetupContext): void {
@@ -105,7 +105,7 @@ setup(ctx: SetupContext): void {
 
   // Sort sub-elements by ngspiceLoadOrder; ascending order = ngspice cktLoad order.
   // CAP (17) loads before MOS (35), so CAP's state slots and handles come first.
-  // Do NOT hard-code the order — sort so this remains correct if either anchor's
+  // Do NOT hard-code the order- sort so this remains correct if either anchor's
   // NGSPICE_LOAD_ORDER value moves.
   for (const sub of [this._cap, this._mos].sort((a, b) => a.ngspiceLoadOrder - b.ngspiceLoadOrder)) {
     sub.setup(ctx);
@@ -115,7 +115,7 @@ setup(ctx: SetupContext): void {
 
 The floating-gate node assignment must happen before either sub-element's setup() so both receive the correct node number via their pinNodes binding.
 
-## load() body — value writes only
+## load() body- value writes only
 
 Implementer ports value-side from `mos1load.c` and `capload.c` line-for-line, stamping through cached handles. No allocElement calls.
 
@@ -145,11 +145,11 @@ Neither MOS nor CAP has a branch row.
 
 Per CLAUDE.md "Test Policy During W3 Setup-Load-Split", verification is spec compliance only. DO NOT run tests; DO NOT use test results.
 
-1. `setup()` body in the implementation file matches the "setup() body — alloc only" listing in this PB line-for-line.
+1. `setup()` body in the implementation file matches the "setup() body- alloc only" listing in this PB line-for-line.
 2. TSTALLOC sequence in `setup()` matches the order in the cited ngspice anchor file (see top of this PB, e.g. `ressetup.c:46-49`).
 3. Factory cleanup applied per the "Factory cleanup" section above.
 4. `ngspiceNodeMap` registered per the "Pin mapping" section above (or omitted for composites where the spec says so).
-5. `load()` writes through cached handles only — zero `solver.allocElement(...)` calls inside `load()`, `accept()`, or any non-`setup()` method.
+5. `load()` writes through cached handles only- zero `solver.allocElement(...)` calls inside `load()`, `accept()`, or any non-`setup()` method.
 6. `mayCreateInternalNodes` flag set per spec.
 7. `findBranchFor` callback present where spec says (V-output sources, IND, etc.).
 8. No banned closing verdicts (mapping/tolerance/equivalent-to/pre-existing/intentional-divergence/citation-divergence/partial) used in any commit message or report.

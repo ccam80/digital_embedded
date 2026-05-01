@@ -27,7 +27,7 @@ import {
 import { loadCtxFromFields, makeTestSetupContext, setupAll } from "../../../solver/analog/__tests__/test-helpers.js";
 
 // ---------------------------------------------------------------------------
-// companionLoadCtx — build a transient LoadContext matching the ag[] that
+// companionLoadCtx- build a transient LoadContext matching the ag[] that
 // computeNIcomCof would emit for (dt, method, order), then call element.load(ctx).
 // Replaces the deleted stampCompanion(dt, method, voltages, order, deltaOld).
 // ---------------------------------------------------------------------------
@@ -337,7 +337,7 @@ describe("Capacitor", () => {
       // First call: voltage = 3V
       element.load(makeCompanionCtx({ solver, rhs: new Float64Array([3, 0]), dt: 1e-6, method: "trapezoidal", order: 1 }));
 
-      // Second call: voltage = 7V — V_PREV should now be 7V after the call
+      // Second call: voltage = 7V- V_PREV should now be 7V after the call
       element.load(makeCompanionCtx({ solver, rhs: new Float64Array([7, 0]), dt: 1e-6, method: "trapezoidal", order: 1 }));
     });
 
@@ -395,7 +395,7 @@ describe("Capacitor", () => {
       solver._initStructure();
       const { element, pool } = withRealSetup(core, solver);
 
-      // First call: v1 = 5V (non-zero) — rotate so v=5 lands in s1
+      // First call: v1 = 5V (non-zero)- rotate so v=5 lands in s1
       element.load(makeCompanionCtx({ solver, rhs: new Float64Array([5, 0]), dt: 1e-6, method: "trapezoidal", order: 1 }));
       pool.rotateStateVectors();
       // Second call: v2 = 0V (zero crossing)
@@ -409,7 +409,7 @@ describe("Capacitor", () => {
 });
 
 // ---------------------------------------------------------------------------
-// initPred charge test — q0 from s1 on initPred step
+// initPred charge test- q0 from s1 on initPred step
 // ---------------------------------------------------------------------------
 
 describe("Capacitor initPred", () => {
@@ -424,7 +424,7 @@ describe("Capacitor initPred", () => {
     solver._initStructure();
     const { element, pool } = withRealSetup(core, solver);
 
-    // First step: v=3V, accepted — charge C*3 lands in s1 after rotateStateVectors
+    // First step: v=3V, accepted- charge C*3 lands in s1 after rotateStateVectors
     element.load(makeCompanionCtx({ solver, rhs: new Float64Array([3, 0]), dt: 1e-6, method: "trapezoidal", order: 1 }));
     pool.rotateStateVectors();
 
@@ -508,11 +508,11 @@ describe("Capacitor M multiplicity", () => {
 });
 
 // ---------------------------------------------------------------------------
-// C4.6 — trap-order-2 ccap parity with non-standard xmu (Phase 3 G-02)
+// C4.6- trap-order-2 ccap parity with non-standard xmu (Phase 3 G-02)
 // ---------------------------------------------------------------------------
 //
 // Drives the analog capacitor element through a transient step with
-// xmu=0.3 (non-standard — differs from the default 0.5 trapezoidal weighting)
+// xmu=0.3 (non-standard- differs from the default 0.5 trapezoidal weighting)
 // and asserts the stamped companion current `ccap` matches ngspice's
 // niinteg.c trap-order-2 formula exactly:
 //
@@ -619,10 +619,10 @@ describe("Capacitor trap-order-2 xmu parity (C4.6)", () => {
 
 
 // ---------------------------------------------------------------------------
-// C4.2 — Capacitor transient parity (10-step RC circuit)
+// C4.2- Capacitor transient parity (10-step RC circuit)
 // ---------------------------------------------------------------------------
 //
-// Circuit: V_src=1V (node 1 → gnd) — R=1000Ω (node 1 → node 2) — C=1µF (node 2 → gnd)
+// Circuit: V_src=1V (node 1 → gnd)- R=1000Ω (node 1 → node 2)- C=1µF (node 2 → gnd)
 // Integration: order-1 trap, fixed dt=1e-6 s, 10 steps.
 //
 // ngspice reference (capload.c:58, niinteg.c:28-63, order-1 (backward-Euler) case):
@@ -643,10 +643,10 @@ describe("Capacitor trap-order-2 xmu parity (C4.6)", () => {
 //   capload.c:CAPload::ceq                → s0[SLOT_IEQ]
 
 // ---------------------------------------------------------------------------
-// C4.2 — Capacitor transient parity (10-step RC circuit)
+// C4.2- Capacitor transient parity (10-step RC circuit)
 // ---------------------------------------------------------------------------
 //
-// Circuit: V_src=1V (node 1 → gnd) — R=1000Ω (node 1 → node 2) — C=1µF (node 2 → gnd)
+// Circuit: V_src=1V (node 1 → gnd)- R=1000Ω (node 1 → node 2)- C=1µF (node 2 → gnd)
 // Integration: order-1 trap, fixed dt=1e-6 s, 10 steps.
 //
 // ngspice reference (capload.c:58, niinteg.c:28-63, order-1 (backward-Euler) case):
@@ -684,7 +684,7 @@ describe("capacitor_load_transient_parity (C4.2)", () => {
     // ngspice niinteg.c order-1 (backward-Euler) coefficients: ag[0]=1/dt, ag[1]=-1/dt
     const ag0 = 1 / dt;
     const ag1 = -1 / dt;
-    // geq = ag[0]*C  (niinteg.c:77) — bit-exact reference constant
+    // geq = ag[0]*C  (niinteg.c:77)- bit-exact reference constant
     const geq = ag0 * C_val;
     const G_R = 1 / R_val;
 
@@ -695,7 +695,7 @@ describe("capacitor_load_transient_parity (C4.2)", () => {
     ag[0] = ag0;
     ag[1] = ag1;
 
-    // Reusable handle-based solver used for both setup and load — handles are
+    // Reusable handle-based solver used for both setup and load- handles are
     // allocated once during setup() and reused across steps.
     const handles: { row: number; col: number }[] = [];
     const handleIndex = new Map<string, number>();
@@ -807,7 +807,7 @@ describe("capacitor_load_transient_parity (C4.2)", () => {
     const base = poolEl._stateBase;
     const s0 = poolEl._pool.states[0];
 
-    // geq = ag[0]*C — bit-exact (niinteg.c:77)
+    // geq = ag[0]*C- bit-exact (niinteg.c:77)
     expect(s0[base + SLOT_GEQ_F]).toBe(geq);
 
     // ceq at step 9 (last, 0-indexed) = ag[1]*C * refV2[7]

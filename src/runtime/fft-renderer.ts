@@ -1,5 +1,5 @@
 /**
- * FFT spectrum renderer — draws magnitude spectra on a CanvasRenderingContext2D.
+ * FFT spectrum renderer- draws magnitude spectra on a CanvasRenderingContext2D.
  *
  * Used by ScopePanel when FFT view is enabled. Draws the one-sided
  * magnitude spectrum as a filled polyline with a frequency axis.

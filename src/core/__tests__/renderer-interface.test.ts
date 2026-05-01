@@ -166,7 +166,7 @@ describe("COLOR_SCHEMES", () => {
     expect(Object.keys(COLOR_SCHEMES)).toContain("monochrome");
   });
 
-  it("schemes are switchable at runtime — resolving same color through different schemes gives different results", () => {
+  it("schemes are switchable at runtime- resolving same color through different schemes gives different results", () => {
     const schemes: ColorScheme[] = [
       COLOR_SCHEMES["dark"]!,
       COLOR_SCHEMES["light"]!,
@@ -190,15 +190,15 @@ describe("COLOR_SCHEMES", () => {
 });
 
 // ---------------------------------------------------------------------------
-// DarkMode — new dark default color scheme
+// DarkMode- new dark default color scheme
 // ---------------------------------------------------------------------------
 
 describe("DarkMode", () => {
-  it("darkIsDefault — defaultColorScheme has background #000000", () => {
+  it("darkIsDefault- defaultColorScheme has background #000000", () => {
     expect(defaultColorScheme.resolve("BACKGROUND")).toBe("#000000");
   });
 
-  it("wireColorDistinct — dark scheme wire colors for logic-1, logic-0, high-Z, error, undefined are all distinct", () => {
+  it("wireColorDistinct- dark scheme wire colors for logic-1, logic-0, high-Z, error, undefined are all distinct", () => {
     const colors = [
       darkColorScheme.resolve("WIRE_HIGH"),
       darkColorScheme.resolve("WIRE_LOW"),
@@ -210,18 +210,18 @@ describe("DarkMode", () => {
     expect(unique.size).toBe(colors.length);
   });
 
-  it("lightPreserved — lightColorScheme exists with non-black background", () => {
+  it("lightPreserved- lightColorScheme exists with non-black background", () => {
     const bg = lightColorScheme.resolve("BACKGROUND");
     expect(bg).not.toBe("#000000");
     expect(bg).toMatch(/^#[0-9a-fA-F]{6}$/);
   });
 
-  it("registryHasBoth — COLOR_SCHEMES has entries for 'dark' and 'light'", () => {
+  it("registryHasBoth- COLOR_SCHEMES has entries for 'dark' and 'light'", () => {
     expect(COLOR_SCHEMES["dark"]).toBeDefined();
     expect(COLOR_SCHEMES["light"]).toBeDefined();
   });
 
-  it("contrastCheck — text color has sufficient luminance contrast against background (ratio >= 4.5:1)", () => {
+  it("contrastCheck- text color has sufficient luminance contrast against background (ratio >= 4.5:1)", () => {
     function relativeLuminance(hex: string): number {
       const r = parseInt(hex.slice(1, 3), 16) / 255;
       const g = parseInt(hex.slice(3, 5), 16) / 255;

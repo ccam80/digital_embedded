@@ -2,7 +2,7 @@
  * Diagnostic probe: captures per-NR-iteration internal state for buckbjt
  * at the point where it stagnates (step 1, t=5ns).
  *
- * Pure diagnostic output — no assertions.
+ * Pure diagnostic output- no assertions.
  */
 import { describe, it } from 'vitest';
 import { readFileSync } from 'fs';

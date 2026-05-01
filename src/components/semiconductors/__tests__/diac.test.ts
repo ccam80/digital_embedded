@@ -25,7 +25,7 @@ import type { AnalogElement } from "../../../core/analog-types.js";
 import type { AnalogFactory } from "../../../core/registry.js";
 
 // ---------------------------------------------------------------------------
-// Default Diac parameters — use DIODE defaults with BV set to breakover voltage
+// Default Diac parameters- use DIODE defaults with BV set to breakover voltage
 // ---------------------------------------------------------------------------
 
 const DIAC_TEST_DEFAULTS = {
@@ -103,7 +103,7 @@ function driveToOp(element: AnalogElement, solver: SparseSolver, vA: number, vB:
 function getCurrentAtV(element: AnalogElement, solver: SparseSolver, v: number): number {
   driveToOp(element, solver, v, 0, 50);
 
-  // Final measurement iteration — reset so we get a clean single-stamp read.
+  // Final measurement iteration- reset so we get a clean single-stamp read.
   (solver as any)._resetForAssembly();
   const voltages = new Float64Array(4);
   voltages[1] = v;

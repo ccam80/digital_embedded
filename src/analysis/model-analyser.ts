@@ -1,5 +1,5 @@
 /**
- * Model Analyser — generate a complete truth table for a combinational circuit.
+ * Model Analyser- generate a complete truth table for a combinational circuit.
  *
  * Process:
  *   1. Identify input signals (all "In" components) and output signals (all "Out" components).
@@ -53,7 +53,7 @@ export interface TruthTable {
 }
 
 // ---------------------------------------------------------------------------
-// analyseCircuit — public API
+// analyseCircuit- public API
 // ---------------------------------------------------------------------------
 
 /**

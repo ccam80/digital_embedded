@@ -257,7 +257,7 @@ const DIODE_ATTRIBUTE_MAPPINGS: AttributeMapping[] = [
 ];
 
 // ---------------------------------------------------------------------------
-// DiodeElement — CircuitElement implementation
+// DiodeElement- CircuitElement implementation
 // ---------------------------------------------------------------------------
 
 export class DiodeElement extends AbstractCircuitElement {
@@ -307,7 +307,7 @@ export class DiodeElement extends AbstractCircuitElement {
 }
 
 // ---------------------------------------------------------------------------
-// DiodeForwardElement — unidirectional forward diode (wired-OR)
+// DiodeForwardElement- unidirectional forward diode (wired-OR)
 // ---------------------------------------------------------------------------
 
 export class DiodeForwardElement extends AbstractCircuitElement {
@@ -354,7 +354,7 @@ export class DiodeForwardElement extends AbstractCircuitElement {
 }
 
 // ---------------------------------------------------------------------------
-// DiodeBackwardElement — unidirectional backward diode (wired-AND)
+// DiodeBackwardElement- unidirectional backward diode (wired-AND)
 // ---------------------------------------------------------------------------
 
 export class DiodeBackwardElement extends AbstractCircuitElement {
@@ -401,7 +401,7 @@ export class DiodeBackwardElement extends AbstractCircuitElement {
 }
 
 // ---------------------------------------------------------------------------
-// executeDiode — flat simulation function
+// executeDiode- flat simulation function
 //
 // The bidirectional Diode's bus interaction is handled by Phase 3 bus resolution.
 // The executeFn encodes the diode's drive intent:
@@ -430,7 +430,7 @@ export function executeDiode(index: number, state: Uint32Array, _highZs: Uint32A
   const blown = state[wt[outputStart + 4]] !== 0;
 
   if (blown) {
-    // Open circuit — both outputs high-Z
+    // Open circuit- both outputs high-Z
     state[wt[outputStart]] = 0;
     state[wt[outputStart + 1]] = 1;
     state[wt[outputStart + 2]] = 0;
@@ -458,7 +458,7 @@ export function executeDiode(index: number, state: Uint32Array, _highZs: Uint32A
 }
 
 // ---------------------------------------------------------------------------
-// executeDiodeForward — flat simulation function (wired-OR diode)
+// executeDiodeForward- flat simulation function (wired-OR diode)
 //
 // in=1 → out=1 (active drive); in=0 → out=high-Z.
 // Output encoding: slot 0 = value, slot 1 = highZ (1=highZ).
@@ -488,7 +488,7 @@ export function executeDiodeForward(index: number, state: Uint32Array, _highZs: 
 }
 
 // ---------------------------------------------------------------------------
-// executeDiodeBackward — flat simulation function (wired-AND diode)
+// executeDiodeBackward- flat simulation function (wired-AND diode)
 //
 // in=1 → out=1 (contributes to pull-up); in=0 → out=0 (pulls down).
 // ---------------------------------------------------------------------------
@@ -546,7 +546,7 @@ export const PldDiodeDefinition: ComponentDefinition = {
   attributeMap: DIODE_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.PLD,
   helpText:
-    "Diode — bidirectional current-flow element for PLD wired-OR/AND arrays.\n" +
+    "Diode- bidirectional current-flow element for PLD wired-OR/AND arrays.\n" +
     "Use in conjunction with pull-up/pull-down resistors.\n" +
     "blown=true permanently opens the diode.",
   models: {
@@ -568,7 +568,7 @@ export const PldDiodeForwardDefinition: ComponentDefinition = {
   attributeMap: DIODE_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.PLD,
   helpText:
-    "DiodeForward — forward diode for wired-OR PLD arrays.\n" +
+    "DiodeForward- forward diode for wired-OR PLD arrays.\n" +
     "in=1 → out=1; in=0 → out=high-Z. Requires pull-down on output net.\n" +
     "blown=true permanently opens the diode.",
   models: {
@@ -590,7 +590,7 @@ export const PldDiodeBackwardDefinition: ComponentDefinition = {
   attributeMap: DIODE_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.PLD,
   helpText:
-    "DiodeBackward — backward diode for wired-AND PLD arrays.\n" +
+    "DiodeBackward- backward diode for wired-AND PLD arrays.\n" +
     "in=1 → out=1; in=0 → out=0. Requires pull-up on output net.\n" +
     "blown=true permanently opens the diode.",
   models: {

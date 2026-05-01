@@ -1,5 +1,5 @@
 /**
- * Parity tests — error handling via postMessage.
+ * Parity tests- error handling via postMessage.
  *
  * Verifies that the browser-side message handler correctly reports errors
  * instead of silently failing or crashing.

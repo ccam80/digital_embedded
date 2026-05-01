@@ -213,7 +213,7 @@ describe("resolvePins", () => {
     const config = createInverterConfig([]);
     const pins = resolvePins(decls, { x: 10, y: 20 }, 0, config, createClockConfig([]));
     expect(pins).toHaveLength(2);
-    // Origin is ignored — positions are local-rotated only
+    // Origin is ignored- positions are local-rotated only
     expect(pins[0].position).toEqual({ x: 0, y: 1 });
     expect(pins[1].position).toEqual({ x: 2, y: 1 });
   });
@@ -329,7 +329,7 @@ describe("layoutPinsOnFace", () => {
   });
 
   it("two pins on west face are evenly distributed (h=4 → y=1,3)", () => {
-    // Even distribution with margin=1: y=1,3 — symmetric about midline y=2
+    // Even distribution with margin=1: y=1,3- symmetric about midline y=2
     const positions = layoutPinsOnFace("west", 2, 4, 4);
     expect(positions[0].y).toBe(1);
     expect(positions[1].y).toBe(3);

@@ -1,6 +1,6 @@
 package com.lushprojects.circuitjs1.client;
 
-/** Minimal mock — just a boolean toggle. */
+/** Minimal mock- just a boolean toggle. */
 public class CheckboxMenuItem {
     private boolean on;
     private String name;

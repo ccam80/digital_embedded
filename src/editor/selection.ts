@@ -1,5 +1,5 @@
 /**
- * SelectionModel — tracks which elements and wires are currently selected.
+ * SelectionModel- tracks which elements and wires are currently selected.
  *
  * The model is mutated by editor interaction handlers. The renderer reads
  * selectedElements and selectedWires to draw highlights. Change listeners
@@ -109,7 +109,7 @@ export class SelectionModel {
 
   /**
    * Expand wire selection to adjacent wires sharing endpoints.
-   * Each press grows the selection one hop — wires sharing any endpoint
+   * Each press grows the selection one hop- wires sharing any endpoint
    * (junction or pin) with already-selected wires are added. The expansion
    * naturally stops at component boundaries because wires on opposite sides
    * of a component connect to different pin positions.

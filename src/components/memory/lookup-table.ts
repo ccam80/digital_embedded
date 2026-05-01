@@ -1,5 +1,5 @@
 /**
- * LookUpTable — combinational configurable truth-table component.
+ * LookUpTable- combinational configurable truth-table component.
  *
  * N 1-bit inputs form an N-bit address into a user-editable data table.
  * Output = table[input_address]. Output bit width is configurable.
@@ -76,7 +76,7 @@ function buildLUTPins(inputCount: number, dataBits: number): PinDeclaration[] {
 }
 
 // ---------------------------------------------------------------------------
-// LookUpTableElement — CircuitElement implementation
+// LookUpTableElement- CircuitElement implementation
 // ---------------------------------------------------------------------------
 
 export class LookUpTableElement extends AbstractCircuitElement {
@@ -129,7 +129,7 @@ export class LookUpTableElement extends AbstractCircuitElement {
 }
 
 // ---------------------------------------------------------------------------
-// executeLookUpTable — flat simulation function
+// executeLookUpTable- flat simulation function
 //
 // Input layout:  [in0=0, in1=1, ..., inN-1=N-1]
 // Output layout: [out=0]
@@ -215,7 +215,7 @@ export const LookUpTableDefinition: ComponentDefinition = {
   propertyDefs: LUT_PROPERTY_DEFS,
   attributeMap: LUT_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.MEMORY,
-  helpText: "LookUpTable — user-configurable combinational truth table. Output = table[input_address].",
+  helpText: "LookUpTable- user-configurable combinational truth table. Output = table[input_address].",
   models: {
     digital: {
       executeFn: executeLookUpTable,

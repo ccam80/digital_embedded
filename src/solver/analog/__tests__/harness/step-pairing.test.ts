@@ -6,7 +6,7 @@
  *   endStep() on the capture hook only when `_engine.simTime > prevSimTime`.
  *   Because the harness used `this._engine.simTime ?? 0` without accounting
  *   for pre-advance vs post-advance snapshots, the guard collapsed and a
- *   single synthetic step at t≈0 was published — every later harness_get_step
+ *   single synthetic step at t≈0 was published- every later harness_get_step
  *   query mapped back to that same DCOP/dcopInitFloat iteration.
  *
  * Fix:

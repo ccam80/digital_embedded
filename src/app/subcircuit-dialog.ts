@@ -84,7 +84,7 @@ function computePreviewDimensions(
       height: Math.max(counts.left + 1, counts.right + 1, chipHeight),
     };
   }
-  // DEFAULT / SIMPLE / DIL — non-right pins go on the left side in the preview
+  // DEFAULT / SIMPLE / DIL- non-right pins go on the left side in the preview
   const leftSide = counts.left + counts.top + counts.bottom;
   const sideH = Math.max(leftSide, counts.right, 1);
   return { width: chipWidth, height: sideH };
@@ -105,7 +105,7 @@ function positionPreviewPins(
   if (shapeMode === 'LAYOUT') {
     return positionLayoutPins(pins, width, height);
   }
-  // DEFAULT / SIMPLE / DIL — left/right only
+  // DEFAULT / SIMPLE / DIL- left/right only
   const leftPins = pins.filter(p => p.face !== 'right');
   const rightPins = pins.filter(p => p.face === 'right');
 
@@ -299,7 +299,7 @@ function generateAutoName(
  *
  * @param boundaryPorts     Auto-derived boundary ports from analyzeBoundary().
  * @param registry          Registry for checking name uniqueness.
- * @param selectedElements  Selected elements — Port elements found here are added to the port table.
+ * @param selectedElements  Selected elements- Port elements found here are added to the port table.
  * @param existingName      If provided, pre-fills the name (for editing existing subcircuits).
  * @returns                 Promise resolving to the confirmed result or null.
  */
@@ -503,7 +503,7 @@ export function openSubcircuitDialog(
         nameInput.style.borderColor = '';
       }
 
-      // Validate port labels — must be non-empty and unique
+      // Validate port labels- must be non-empty and unique
       const labelCounts = new Map<string, number>();
       for (const p of ports) {
         const k = p.label.toLowerCase();

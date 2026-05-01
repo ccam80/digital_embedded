@@ -38,7 +38,7 @@ None. CCVS has no internal voltage nodes.
 
 ## Branch rows
 
-1 own branch row — the output voltage source current branch.
+1 own branch row- the output voltage source current branch.
 
 Branch allocated via `ctx.makeCur(this.label, "branch")`, mirroring ccvsset.c:40-43:
 ```c
@@ -49,12 +49,12 @@ if(here->CCVSbranch==0) {
 ```
 
 The controlling branch (`CCVScontBranch`) is resolved separately via
-`ctx.findBranch(senseSourceLabel)` — this is the branch of the controlling VSRC
+`ctx.findBranch(senseSourceLabel)`- this is the branch of the controlling VSRC
 (or other branch-owning source), not CCVS's own branch.
 
 ## State slots
 
-0. `NG_IGNORE(states)` — ccvsset.c performs no `*states +=` increment.
+0. `NG_IGNORE(states)`- ccvsset.c performs no `*states +=` increment.
 
 ## TSTALLOC sequence (line-for-line port from ccvsset.c:58-62)
 
@@ -70,16 +70,16 @@ The TSTALLOC calls come after both `CKTmkCur` (line 40-43) and `CKTfndBranch`
 | 5 | `:62` `TSTALLOC(CCVSibrContBrptr, CCVSbranch, CCVScontBranch)` | (ownBranch, contBranch) | `(ownBranch, contBranch)` |
 
 Note: entries 3 and 4 are in negNode-then-posNode order (`ibrNeg` before
-`ibrPos`) — this is the exact ngspice ordering from ccvsset.c:60-61 and must be
+`ibrPos`)- this is the exact ngspice ordering from ccvsset.c:60-61 and must be
 preserved exactly for `setup-stamp-order.test.ts` to pass.
 
-## setup() body — alloc only
+## setup() body- alloc only
 
 ```typescript
 setup(ctx: SetupContext): void {
   const solver = ctx.solver;
-  const posNode = this.pinNodeIds[2]; // pinNodes.get("out+") — CCVSposNode
-  const negNode = this.pinNodeIds[3]; // pinNodes.get("out-") — CCVSnegNode
+  const posNode = this.pinNodeIds[2]; // pinNodes.get("out+")- CCVSposNode
+  const negNode = this.pinNodeIds[3]; // pinNodes.get("out-")- CCVSnegNode
 
   // Own branch row: ccvsset.c:58-62 (idempotent guard)
   if (this.branchIndex === -1) {
@@ -89,7 +89,7 @@ setup(ctx: SetupContext): void {
 
   // Resolve controlling branch: ccvsset.c:45
   // ctx.findBranch dispatches to the controlling source's findBranchFor callback
-  // (lazy-allocating per 00-engine.md §A2/A4.2). Call order is irrelevant —
+  // (lazy-allocating per 00-engine.md ssA2/A4.2). Call order is irrelevant-
   // findBranchFor allocates the branch via ctx.makeCur if the controlling
   // source's setup() has not yet run.
   if (!this._senseSourceLabel) {
@@ -118,7 +118,7 @@ index 0 = `sense+`, index 1 = `sense-`, index 2 = `out+`, index 3 = `out-`.
 All 5 handles stored on the element instance. `allocElement` NEVER called from
 `load()`.
 
-## load() body — value writes only
+## load() body- value writes only
 
 Implementer ports value-side from `ref/ngspice/src/spicelib/devices/ccvs/ccvsload.c`
 line-for-line. No `allocElement`. Stamps the output voltage source and the
@@ -127,7 +127,7 @@ Jacobian entry linking it to the controlling branch:
 ```typescript
 load(ctx: LoadContext): void {
   const iSense = ctx.rhsOld[this._contBranch]; // controlling branch current
-  const rm     = this._derivative(iSense);     // f'(I_sense) — transresistance for linear case
+  const rm     = this._derivative(iSense);     // f'(I_sense)- transresistance for linear case
   const vNR    = this._value(iSense) - rm * iSense; // NR constant term
 
   // B/C incidence for own output voltage source branch
@@ -152,7 +152,7 @@ Mirrors VSRCfindBr (`vsrc/vsrcfbr.c:26-39`):
 
 ```typescript
 findBranchFor(name: string, ctx: SetupContext): number {
-  // Look up the device by namespaced label (auto-registered per 00-engine.md §A4.1 recursive _deviceMap walk).
+  // Look up the device by namespaced label (auto-registered per 00-engine.md ssA4.1 recursive _deviceMap walk).
   const el = ctx.findDevice(name);
   if (!el) return 0;
   // The element owns its branch row. Lazy-allocate if needed.
@@ -177,10 +177,10 @@ const contBranch = ctx.findBranch(this._senseSourceLabel);
 ```
 
 `ctx.findBranch` dispatches to the controlling source's `findBranchFor` callback
-(registered on that source's MnaModel). Per 00-engine.md §A2 and §A4.2, the
+(registered on that source's MnaModel). Per 00-engine.md ssA2 and ssA4.2, the
 `findBranchFor` callback lazily allocates the branch via `ctx.makeCur` if the
 controlling source's `setup()` has not yet run. This means CCVS's `setup()` can
-call `ctx.findBranch(senseSourceLabel)` regardless of element ordering — the
+call `ctx.findBranch(senseSourceLabel)` regardless of element ordering- the
 lazy mechanism ensures the branch number is valid by the time CCVS needs it.
 
 CCVS does NOT wait for the controlling source's setup() to have executed.
@@ -202,11 +202,11 @@ map (populated at compile time, before any setup() runs).
 
 Per CLAUDE.md "Test Policy During W3 Setup-Load-Split", verification is spec compliance only. DO NOT run tests; DO NOT use test results.
 
-1. `setup()` body in the implementation file matches the "setup() body — alloc only" listing in this PB line-for-line.
+1. `setup()` body in the implementation file matches the "setup() body- alloc only" listing in this PB line-for-line.
 2. TSTALLOC sequence in `setup()` matches the order in the cited ngspice anchor file (see top of this PB, e.g. `ressetup.c:46-49`).
 3. Factory cleanup applied per the "Factory cleanup" section above.
 4. `ngspiceNodeMap` registered per the "Pin mapping" section above (or omitted for composites where the spec says so).
-5. `load()` writes through cached handles only — zero `solver.allocElement(...)` calls inside `load()`, `accept()`, or any non-`setup()` method.
+5. `load()` writes through cached handles only- zero `solver.allocElement(...)` calls inside `load()`, `accept()`, or any non-`setup()` method.
 6. `mayCreateInternalNodes` flag set per spec.
 7. `findBranchFor` callback present where spec says (V-output sources, IND, etc.).
 8. No banned closing verdicts (mapping/tolerance/equivalent-to/pre-existing/intentional-divergence/citation-divergence/partial) used in any commit message or report.

@@ -1,5 +1,5 @@
 /**
- * Analog shape render audit — pixel comparison of TS analog component
+ * Analog shape render audit- pixel comparison of TS analog component
  * rendering against CircuitJS1 (Falstad) reference shapes.
  *
  * Mirrors the digital shape-render-audit.test.ts structure. For each analog
@@ -17,9 +17,9 @@
  *   - Rotation × mirror pin transform audit (all 8 combinations)
  *   - Uncovered components get sanity checks (factory, draw, bbox, pins)
  *
- * Silent-catch policy (per spec/architectural-alignment.md §I1
+ * Silent-catch policy (per spec/architectural-alignment.md ssI1
  * retain-with-reason): the factory/draw/bbox try/catch blocks in this
- * suite DO NOT suppress anomalies — they record FACTORY_ERROR /
+ * suite DO NOT suppress anomalies- they record FACTORY_ERROR /
  * DRAW_ERROR / bboxOverflow=-1 audit rows in the results array, which is
  * the intended failure-report output of the test. Re-raising would break
  * the per-component report generation.
@@ -68,7 +68,7 @@ const DICE_THRESHOLD = 0.99;
 const EXTENT_THRESHOLD = 0;
 
 // ---------------------------------------------------------------------------
-// Skip list — analog components whose TS rendering intentionally differs
+// Skip list- analog components whose TS rendering intentionally differs
 // from the Falstad/CircuitJS1 reference (different layout, additional detail,
 // or artistic differences that are not bugs).
 // ---------------------------------------------------------------------------
@@ -227,7 +227,7 @@ function comparePins(
 // Test suite
 // ---------------------------------------------------------------------------
 
-describe("analog shape render audit — pixel comparison vs Falstad/CircuitJS1", () => {
+describe("analog shape render audit- pixel comparison vs Falstad/CircuitJS1", () => {
   let registry: ComponentRegistry;
   const results: AnalogResult[] = [];
 
@@ -236,7 +236,7 @@ describe("analog shape render audit — pixel comparison vs Falstad/CircuitJS1",
   });
 
   // -------------------------------------------------------------------------
-  // Covered types — have Falstad reference → pixel comparison
+  // Covered types- have Falstad reference → pixel comparison
   // -------------------------------------------------------------------------
 
   it.each(computeCoveredTypes())(
@@ -382,11 +382,11 @@ describe("analog shape render audit — pixel comparison vs Falstad/CircuitJS1",
   );
 
   // -------------------------------------------------------------------------
-  // Uncovered types — no Falstad reference, sanity checks only
+  // Uncovered types- no Falstad reference, sanity checks only
   // -------------------------------------------------------------------------
 
   it.each(computeUncoveredTypes())(
-    "$typeName (uncovered — no Falstad reference)",
+    "$typeName (uncovered- no Falstad reference)",
     ({ typeName }) => {
       const def = registry.get(typeName)!;
       const props = buildDefaultProps(registry, typeName);
@@ -767,7 +767,7 @@ describe("analog shape render audit — pixel comparison vs Falstad/CircuitJS1",
 const ROTATIONS: Rotation[] = [0, 1, 2, 3];
 const MIRRORS = [false, true];
 
-describe("analog pin transform audit — rotation × mirror correctness", () => {
+describe("analog pin transform audit- rotation × mirror correctness", () => {
   let registry: ComponentRegistry;
 
   beforeAll(() => {
@@ -808,7 +808,7 @@ describe("analog pin transform audit — rotation × mirror correctness", () => 
 
       for (const rot of ROTATIONS) {
         for (const mir of MIRRORS) {
-          // Skip rot=0 mir=false — already covered by main audit
+          // Skip rot=0 mir=false- already covered by main audit
           if (rot === 0 && !mir) continue;
 
           element.rotation = rot;

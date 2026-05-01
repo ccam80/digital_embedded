@@ -1,5 +1,5 @@
 /**
- * Application settings — typed access with localStorage persistence.
+ * Application settings- typed access with localStorage persistence.
  *
  * Settings are identified by SettingKey enum values. Each key has a type-safe
  * default. Values are persisted to localStorage as JSON. Per-setting change
@@ -116,8 +116,8 @@ export class AppSettings {
         }
       }
     } catch (e) {
-      // Corrupted localStorage entry — surface the anomaly and fall back to
-      // defaults. Per spec/architectural-alignment.md §I1 the prior silent
+      // Corrupted localStorage entry- surface the anomaly and fall back to
+      // defaults. Per spec/architectural-alignment.md ssI1 the prior silent
       // swallow hid real parse/quota errors.
       console.warn(`[settings] Failed to parse stored settings; using defaults.`, e);
     }

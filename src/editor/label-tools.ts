@@ -1,5 +1,5 @@
 /**
- * label-tools.ts — Batch label manipulation utilities.
+ * label-tools.ts- Batch label manipulation utilities.
  *
  * All operations return reversible EditCommand objects for undo/redo support.
  * The "label" property key is the standard property name for component labels.

@@ -313,7 +313,7 @@ describe("spice-import-dialog: parse and apply", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Tests: end-to-end compile flow — import → store → compile → params applied
+// Tests: end-to-end compile flow- import → store → compile → params applied
 // ---------------------------------------------------------------------------
 
 describe("spice-import-dialog: compile integration", () => {
@@ -536,7 +536,7 @@ describe("spice-import-dialog: compile integration", () => {
 // ---------------------------------------------------------------------------
 
 describe("spice-import-dialog: auto-detect format", () => {
-  it(".SUBCKT auto-detect — input starting with .SUBCKT is parsed as subcircuit", () => {
+  it(".SUBCKT auto-detect- input starting with .SUBCKT is parsed as subcircuit", () => {
     const text = ".SUBCKT MYAMP in out vcc vee\nR1 in out 1k\n.ENDS";
     expect(detectFormat(text.trim())).toBe("subckt");
 
@@ -547,7 +547,7 @@ describe("spice-import-dialog: auto-detect format", () => {
     expect(result.elements[0]!.type).toBe("R");
   });
 
-  it(".MODEL auto-detect — input starting with .MODEL is parsed as model card", () => {
+  it(".MODEL auto-detect- input starting with .MODEL is parsed as model card", () => {
     const text = ".MODEL 2N2222 NPN(IS=1e-14 BF=200)";
     expect(detectFormat(text.trim())).toBe("model");
 
@@ -558,7 +558,7 @@ describe("spice-import-dialog: auto-detect format", () => {
     expect(result.deviceType).toBe("NPN");
   });
 
-  it("mixed content auto-detect — first non-blank line determines type (.SUBCKT wins)", () => {
+  it("mixed content auto-detect- first non-blank line determines type (.SUBCKT wins)", () => {
     const text = "\n\n.SUBCKT FILTER in out\nR1 in out 10k\n.ENDS\n.MODEL EXTRA NPN()";
     expect(detectFormat(text.trim())).toBe("subckt");
 
@@ -567,7 +567,7 @@ describe("spice-import-dialog: auto-detect format", () => {
     expect(result.ports).toEqual(["in", "out"]);
   });
 
-  it("mixed content auto-detect — first non-blank line determines type (.MODEL wins)", () => {
+  it("mixed content auto-detect- first non-blank line determines type (.MODEL wins)", () => {
     const text = "\n\n.MODEL 1N4148 D(IS=2.52e-9 RS=0.568)\n.SUBCKT IGNORED a b\n.ENDS";
     expect(detectFormat(text.trim())).toBe("model");
 
@@ -578,7 +578,7 @@ describe("spice-import-dialog: auto-detect format", () => {
     expect(result.deviceType).toBe("D");
   });
 
-  it(".SUBCKT case-insensitive — lower-case .subckt is detected as subcircuit", () => {
+  it(".SUBCKT case-insensitive- lower-case .subckt is detected as subcircuit", () => {
     const text = ".subckt mymod a b\nR1 a b 1k\n.ends";
     expect(detectFormat(text.trim())).toBe("subckt");
 

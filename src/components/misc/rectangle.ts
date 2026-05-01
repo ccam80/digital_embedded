@@ -1,15 +1,15 @@
 /**
- * Rectangle annotation component — visual grouping box on the canvas.
+ * Rectangle annotation component- visual grouping box on the canvas.
  *
  * Rectangle has no simulation behavior: no pins, no executeFn state changes.
  * The executeFn is a no-op. Rectangle is purely a visual annotation for
  * grouping related circuit sections with an optional label.
  *
  * Properties:
- *   - label: string — optional label displayed inside or above the rectangle
- *   - rectWidth: number — width in grid units (default 6)
- *   - rectHeight: number — height in grid units (default 4)
- *   - lineWidth: number — border line width (default 1)
+ *   - label: string- optional label displayed inside or above the rectangle
+ *   - rectWidth: number- width in grid units (default 6)
+ *   - rectHeight: number- height in grid units (default 4)
+ *   - lineWidth: number- border line width (default 1)
  */
 
 import { AbstractCircuitElement } from "../../core/element.js";
@@ -33,7 +33,7 @@ const DEFAULT_WIDTH = 6;
 const DEFAULT_HEIGHT = 4;
 
 // ---------------------------------------------------------------------------
-// RectangleElement — CircuitElement implementation
+// RectangleElement- CircuitElement implementation
 // ---------------------------------------------------------------------------
 
 export class RectangleElement extends AbstractCircuitElement {
@@ -88,7 +88,7 @@ export class RectangleElement extends AbstractCircuitElement {
 }
 
 // ---------------------------------------------------------------------------
-// executeRectangle — no-op (Rectangle has no simulation behavior)
+// executeRectangle- no-op (Rectangle has no simulation behavior)
 // ---------------------------------------------------------------------------
 
 export function executeRectangle(
@@ -101,7 +101,7 @@ export function executeRectangle(
 }
 
 // ---------------------------------------------------------------------------
-// RECTANGLE_ATTRIBUTE_MAPPINGS — .dig XML attribute → PropertyBag conversions
+// RECTANGLE_ATTRIBUTE_MAPPINGS- .dig XML attribute → PropertyBag conversions
 // ---------------------------------------------------------------------------
 
 export const RECTANGLE_ATTRIBUTE_MAPPINGS: AttributeMapping[] = [
@@ -169,7 +169,7 @@ const RECTANGLE_PROPERTY_DEFS: PropertyDefinition[] = [
 ];
 
 // ---------------------------------------------------------------------------
-// RectangleDefinition — ComponentDefinition for registry registration
+// RectangleDefinition- ComponentDefinition for registry registration
 // ---------------------------------------------------------------------------
 
 function rectangleFactory(props: PropertyBag): RectangleElement {
@@ -198,7 +198,7 @@ export const RectangleDefinition: ComponentDefinition = {
     },
   },
   helpText:
-    "Rectangle — visual grouping box on the canvas.\n" +
+    "Rectangle- visual grouping box on the canvas.\n" +
     "No simulation behavior. Used to group related circuit sections.\n" +
     "label: optional label displayed above the rectangle.\n" +
     "rectWidth/rectHeight: dimensions in grid units.\n" +

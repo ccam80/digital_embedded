@@ -408,7 +408,7 @@ describe("equalsWithDontCare", () => {
 
   it("UNDEFINED only in some bits", () => {
     // a = 0b1010, b has highZ on bits 3,1 and value 0 on bits 2,0
-    // dontCare covers bits 3,1 — compare bits 2,0: a=01, b=00 → false
+    // dontCare covers bits 3,1- compare bits 2,0: a=01, b=00 → false
     const a = BitVector.fromNumber(0b1010, 4);
     const b = BitVector.fromRaw(0b0000, 0b1010, 4);
     // bit 2 of a is 0, bit 2 of b (not Z) is 0 → match
@@ -502,7 +502,7 @@ describe("bitVectorToRaw / rawToBitVector round-trip", () => {
   });
 
   it("value bits are zero where HIGH_Z is set", () => {
-    // create with value bits set in HIGH_Z positions — they must be cleared
+    // create with value bits set in HIGH_Z positions- they must be cleared
     const bv = BitVector.fromRaw(0xFF, 0xF0, 8); // value=0x0F after mask
     const values = new Uint32Array(1);
     const highZs = new Uint32Array(1);
@@ -530,7 +530,7 @@ describe("BitVector.from", () => {
 
 describe("BitVector.fromRaw", () => {
   it("clears value bits where highZ is set", () => {
-    // raw value has bits set in Z positions — they must be cleared
+    // raw value has bits set in Z positions- they must be cleared
     const bv = BitVector.fromRaw(0xFF, 0xF0, 8);
     expect(bv.valueBits).toBe(0x0Fn); // high nibble cleared
     expect(bv.highZMask).toBe(0xF0n);

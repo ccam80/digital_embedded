@@ -1,5 +1,5 @@
 /**
- * PresentationMode — fullscreen canvas mode for projection/lecture use.
+ * PresentationMode- fullscreen canvas mode for projection/lecture use.
  *
  * Toggled by F4 (registered in the default shortcut bindings).
  * On enter: palette and property panel collapse, viewport fits to circuit
@@ -17,7 +17,7 @@ import type { MenuAction } from "./context-menu.js";
 import type { CircuitElement } from "@/core/element";
 
 // ---------------------------------------------------------------------------
-// PanelSet — the pair of collapsible side panels
+// PanelSet- the pair of collapsible side panels
 // ---------------------------------------------------------------------------
 
 /**
@@ -42,7 +42,7 @@ export interface PanelSet {
 }
 
 // ---------------------------------------------------------------------------
-// CanvasSize — width/height needed by fitToContent
+// CanvasSize- width/height needed by fitToContent
 // ---------------------------------------------------------------------------
 
 export interface CanvasSize {
@@ -102,7 +102,7 @@ export class PresentationMode {
    * panels, and calls viewport.fitToContent() with the current canvas size.
    *
    * @param viewport  The circuit viewport. fitToContent is called on it.
-   * @param elements  Circuit elements to fit — if omitted, fitToContent is
+   * @param elements  Circuit elements to fit- if omitted, fitToContent is
    *                  still called with an empty array so it resets to zoom=1.
    */
   enter(viewport: Viewport, elements: readonly CircuitElement[] = []): void {
@@ -209,7 +209,7 @@ export class PresentationMode {
 }
 
 // ---------------------------------------------------------------------------
-// PresentationCallbacks — simulation control callbacks for the toolbar
+// PresentationCallbacks- simulation control callbacks for the toolbar
 // ---------------------------------------------------------------------------
 
 export interface PresentationCallbacks {

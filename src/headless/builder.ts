@@ -168,7 +168,7 @@ export class CircuitBuilder {
         continue;
       }
 
-      // Unknown key — pass through (may be a component-specific key we
+      // Unknown key- pass through (may be a component-specific key we
       // don't have a propertyDef for, e.g. dynamic subcircuit props)
       translated[key] = value;
     }
@@ -238,7 +238,7 @@ export class CircuitBuilder {
 
     const element = definition.factory(bag);
 
-    // Factories create elements at (0,0) — apply the position from the bag.
+    // Factories create elements at (0,0)- apply the position from the bag.
     const pos = bag.has('position') ? bag.get<number[]>('position') : undefined;
     if (pos && pos.length >= 2) {
       element.position = { x: pos[0], y: pos[1] };
@@ -338,7 +338,7 @@ export class CircuitBuilder {
     }
 
     const parsed = parseTestData(resolvedData);
-    // Provide a minimal RunnerFacade inline — reads/writes via the coordinator directly.
+    // Provide a minimal RunnerFacade inline- reads/writes via the coordinator directly.
     const runnerFacade = {
       setSignal(coord: SimulationCoordinator, label: string, value: number): void {
         const addr = coord.compiled.labelSignalMap.get(label);
@@ -380,7 +380,7 @@ export class CircuitBuilder {
   }
 
   // ---------------------------------------------------------------------------
-  // build() — declarative circuit construction
+  // build()- declarative circuit construction
   // ---------------------------------------------------------------------------
 
   /**
@@ -481,7 +481,7 @@ export class CircuitBuilder {
   }
 
   // ---------------------------------------------------------------------------
-  // patch() — incremental circuit editing
+  // patch()- incremental circuit editing
   // ---------------------------------------------------------------------------
 
   /**
@@ -726,7 +726,7 @@ export class CircuitBuilder {
           // Reconnect wires where pin labels match between old and new types.
           for (const { wire, oldPinLabel, atStart } of wireRecords) {
             const newPin = newElement.getPins().find((p: Pin) => p.label === oldPinLabel);
-            if (!newPin) continue; // pin label doesn't exist on new type — skip
+            if (!newPin) continue; // pin label doesn't exist on new type- skip
 
             const newPinPos = pinWorldPosition(newElement, newPin);
             const newWire = atStart

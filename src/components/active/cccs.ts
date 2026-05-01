@@ -114,20 +114,20 @@ function buildCCCSPinDeclarations(): PinDeclaration[] {
  * MNA analog element for a Current-Controlled Current Source.
  *
  * sense+ and sense- form the current sense port; out+ and out- are the output
- * current source terminals. No own branch row — controlling branch resolved
+ * current source terminals. No own branch row- controlling branch resolved
  * at setup() time.
  */
 export class CCCSAnalogElement extends ControlledSourceElement {
   readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.CCCS;
 
-  // senseSourceLabel — the label of the controlling VSRC/CCVS/VCVS/IND.
+  // senseSourceLabel- the label of the controlling VSRC/CCVS/VCVS/IND.
   // Must be set via setParam("senseSourceLabel", label) before setup() runs.
   private _senseSourceLabel: string = "";
 
   // Resolved controlling branch index (filled in setup()).
   private _contBranch: number = -1;
 
-  // TSTALLOC handles — allocated in setup(), written in load()
+  // TSTALLOC handles- allocated in setup(), written in load()
   // cccsset.c:49-50 line-for-line
   private _hPCtBr: number = -1; // G[posNode, contBranch]  :49
   private _hNCtBr: number = -1; // G[negNode, contBranch]  :50
@@ -139,7 +139,7 @@ export class CCCSAnalogElement extends ControlledSourceElement {
 
     // Resolve controlling branch: cccsset.c:36
     // ctx.findBranch dispatches to the controlling source's findBranchFor
-    // callback (lazy-allocating per 00-engine.md §A2/A4.2).
+    // callback (lazy-allocating per 00-engine.md ssA2/A4.2).
     if (!this._senseSourceLabel) {
       throw new Error(`CCCS '${this.label}': senseSourceLabel not set before setup()`);
     }
@@ -175,7 +175,7 @@ export class CCCSAnalogElement extends ControlledSourceElement {
 
   /**
    * Stamp NR-linearized Norton equivalent for the controlled current output.
-   * Port of cccsload.c value-side — no allocElement calls.
+   * Port of cccsload.c value-side- no allocElement calls.
    *
    * I_out ≈ f'(I0) * I_sense + [f(I0) - f'(I0)*I0]
    *
@@ -239,7 +239,7 @@ export class CCCSAnalogElement extends ControlledSourceElement {
 }
 
 // ---------------------------------------------------------------------------
-// CCCSElement — CircuitElement
+// CCCSElement- CircuitElement
 // ---------------------------------------------------------------------------
 
 export class CCCSElement extends AbstractCircuitElement {
@@ -275,7 +275,7 @@ export class CCCSElement extends AbstractCircuitElement {
     ctx.save();
     ctx.setLineWidth(1);
 
-    // Body — polyline box (1,-1)→(5,-1)→(5,3)→(1,3)→(1,-1)
+    // Body- polyline box (1,-1)→(5,-1)→(5,3)→(1,3)→(1,-1)
     ctx.setColor("COMPONENT");
     ctx.drawLine(1, -1, 5, -1);
     ctx.drawLine(5, -1, 5, 3);
@@ -351,7 +351,7 @@ export const CCCSDefinition: ComponentDefinition = {
   attributeMap: CCCS_ATTRIBUTE_MAPPINGS,
 
   helpText:
-    "Current-Controlled Current Source — output current is an expression of " +
+    "Current-Controlled Current Source- output current is an expression of " +
     "the current through the sense port.",
 
   factory(props: PropertyBag): CCCSElement {

@@ -1,5 +1,5 @@
 /**
- * GUI tests — verify the application initializes correctly in a real browser.
+ * GUI tests- verify the application initializes correctly in a real browser.
  *
  * These catch wiring bugs in app-init.ts that unit tests cannot reach:
  * missing DOM elements, broken imports, canvas initialization failures, etc.

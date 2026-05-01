@@ -14,7 +14,7 @@ import type { IntegrationMethod } from "../../core/analog-types.js";
  *   - q0            CKTstate0[qcap]
  *   - q1            CKTstate1[qcap]
  *   - qHistory      [q2, q3, q4, q5, q6] for GEAR order >= 2; zeros if unavailable
- *   - ccapPrev      CKTstate1[ccap] — required for TRAP order 2 recursion (niinteg.c:32)
+ *   - ccapPrev      CKTstate1[ccap]- required for TRAP order 2 recursion (niinteg.c:32)
  */
 export function niIntegrate(
   method: IntegrationMethod,
@@ -32,11 +32,11 @@ export function niIntegrate(
       // niinteg.c:28-29
       ccap = ag[0] * q0 + ag[1] * q1;
     } else {
-      // niinteg.c:32-34 — RECURSIVE in ccapPrev
+      // niinteg.c:32-34- RECURSIVE in ccapPrev
       ccap = -ccapPrev * ag[1] + ag[0] * (q0 - q1);
     }
   } else if (method === "gear") {
-    // GEAR — niinteg.c:43, 47-63.
+    // GEAR- niinteg.c:43, 47-63.
     // capload.c:69: NIintegrate returns E_ORDER for invalid order; mirror that here.
     if (order < 1) {
       throw new Error(`niIntegrate: unsupported BDF/GEAR order ${order} (ngspice E_ORDER)`);
@@ -46,10 +46,10 @@ export function niIntegrate(
       ccap += ag[k] * (qHistory[k - 2] ?? 0);
     }
   } else {
-    // capload.c:69 error path: method integer unrecognised — ngspice returns E_METHOD.
+    // capload.c:69 error path: method integer unrecognised- ngspice returns E_METHOD.
     throw new Error(`niIntegrate: unsupported integration method "${method as string}" (ngspice E_METHOD)`);
   }
-  // niinteg.c:77-78 — universal exit
+  // niinteg.c:77-78- universal exit
   const ceq = ccap - ag[0] * q0;
   const geq = ag[0] * cap;
   return { ccap, ceq, geq };

@@ -1,11 +1,11 @@
 /**
- * AppContext — shared state interface for app-init sub-modules.
+ * AppContext- shared state interface for app-init sub-modules.
  *
  * This is the typed contract between app-init.ts and the modules it will
  * delegate to. All shared state lives here; modules receive a reference to
  * the concrete object rather than capturing closure locals.
  *
- * This file contains only the interface declaration — no implementation.
+ * This file contains only the interface declaration- no implementation.
  * The concrete object is built in app-init.ts after all locals are created.
  */
 
@@ -35,7 +35,7 @@ import type { HttpResolver } from '../io/file-resolver.js';
 
 export interface AppContext {
   // --- Core state ---
-  /** Current circuit — mutable; modules may reassign via setCircuit(). */
+  /** Current circuit- mutable; modules may reassign via setCircuit(). */
   circuit: Circuit;
   readonly registry: ComponentRegistry;
   readonly facade: DefaultSimulatorFacade;
@@ -91,7 +91,7 @@ export interface AppContext {
 
   /**
    * Ensure the circuit is compiled. If dirty, calls compileAndBind().
-   * Returns false if compilation failed — callers should abort their action.
+   * Returns false if compilation failed- callers should abort their action.
    *
    * Replaces the pattern: `if (compiledDirty && !compileAndBind()) return;`
    */

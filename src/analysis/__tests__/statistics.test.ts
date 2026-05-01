@@ -48,7 +48,7 @@ describe('statistics', () => {
   // componentCounts: 3 AND + 2 OR → counts correct
   // -------------------------------------------------------------------------
 
-  it('componentCounts — 3 AND + 2 OR → correct counts per typeId', () => {
+  it('componentCounts- 3 AND + 2 OR → correct counts per typeId', () => {
     const registry = buildRegistry();
     const circuit = new Circuit();
 
@@ -84,7 +84,7 @@ describe('statistics', () => {
   // wireCount: circuit with 5 wires → wireCount = 5
   // -------------------------------------------------------------------------
 
-  it('wireCount — circuit with 5 wires → wireCount = 5', () => {
+  it('wireCount- circuit with 5 wires → wireCount = 5', () => {
     const registry = buildRegistry();
     const circuit = new Circuit();
 
@@ -118,7 +118,7 @@ describe('statistics', () => {
   // emptyCircuit: empty circuit → all counts zero
   // -------------------------------------------------------------------------
 
-  it('emptyCircuit — empty circuit → all counts zero', () => {
+  it('emptyCircuit- empty circuit → all counts zero', () => {
     const registry = buildRegistry();
     const circuit = new Circuit();
 

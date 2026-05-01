@@ -6,7 +6,7 @@
 
 ## Pin mapping (from 01-pin-mapping.md)
 
-DIAC is a **composite** — it does not stamp into the matrix directly.
+DIAC is a **composite**- it does not stamp into the matrix directly.
 It decomposes into 2× DIO sub-elements (antiparallel, both with breakdown).
 
 | digiTS parent label | Parent pin | Role |
@@ -16,7 +16,7 @@ It decomposes into 2× DIO sub-elements (antiparallel, both with breakdown).
 
 ## Sub-element specification
 
-### Sub-element 1: DIO `D_fwd` — forward diode (A→B)
+### Sub-element 1: DIO `D_fwd`- forward diode (A→B)
 
 | Field | Value |
 |---|---|
@@ -25,10 +25,10 @@ It decomposes into 2× DIO sub-elements (antiparallel, both with breakdown).
 | Anode (`DIOposNode`) | `pinNodes.get("A")!` |
 | Cathode (`DIOnegNode`) | `pinNodes.get("B")!` |
 | `ngspiceNodeMap` | `{ A: "pos", B: "neg" }` (A=anode maps to pos, B=cathode maps to neg) |
-| Breakdown enabled | Yes — `BV` set to DIAC breakover voltage (e.g. 30 V) |
+| Breakdown enabled | Yes- `BV` set to DIAC breakover voltage (e.g. 30 V) |
 | `RS` | As per DIAC model (small series resistance) |
 
-### Sub-element 2: DIO `D_rev` — reverse diode (B→A, antiparallel)
+### Sub-element 2: DIO `D_rev`- reverse diode (B→A, antiparallel)
 
 | Field | Value |
 |---|---|
@@ -37,12 +37,12 @@ It decomposes into 2× DIO sub-elements (antiparallel, both with breakdown).
 | Anode (`DIOposNode`) | `pinNodes.get("B")!` |
 | Cathode (`DIOnegNode`) | `pinNodes.get("A")!` |
 | `ngspiceNodeMap` | `{ B: "pos", A: "neg" }` (B=anode maps to pos, A=cathode maps to neg) |
-| Breakdown enabled | Yes — same `BV` as D_fwd |
+| Breakdown enabled | Yes- same `BV` as D_fwd |
 | `RS` | Same as D_fwd |
 
 The two diodes are electrically antiparallel: D_fwd conducts for positive
 V(A,B); D_rev conducts for negative V(A,B). Breakdown fires in reverse for
-each diode — for D_fwd when V(B,A) > BV, for D_rev when V(A,B) > BV.
+each diode- for D_fwd when V(B,A) > BV, for D_rev when V(A,B) > BV.
 Together they implement the DIAC's symmetric bidirectional breakover.
 
 ### setParam routing rule
@@ -58,13 +58,13 @@ Each sub-element may create one internal node when its `RS ≠ 0`:
 - `D_fwd._posPrimeNode`: internal between A and the DIO junction (when RS ≠ 0)
 - `D_rev._posPrimeNode`: internal between B and the DIO junction (when RS ≠ 0)
 
-Managed by each sub-element's own `setup()` — the parent DIAC composite does
+Managed by each sub-element's own `setup()`- the parent DIAC composite does
 not call `ctx.makeVolt()` directly.
 
 ### RS=0 alias rule (per ngspice `dio/diosetup.c:204-208`)
 
 When the diode model has `RS = 0`, ngspice sets `DIOposPrimeNode = DIOposNode`
-directly — no internal node is allocated via `CKTmkVolt`. When `RS > 0` (and
+directly- no internal node is allocated via `CKTmkVolt`. When `RS > 0` (and
 `DIOposPrimeNode == 0`, i.e. not yet allocated), ngspice calls
 `CKTmkVolt(ckt, &tmp, here->DIOname, "internal")` to create a private internal
 node and stores its number on `DIOposPrimeNode`.
@@ -78,7 +78,7 @@ Translation to digiTS for D_fwd / D_rev sub-elements:
   `(posPrime, posPrime) → (pos, pos)`, `(posPrime, neg) → (pos, neg)`,
   `(pos, posPrime) → (pos, pos)`, `(neg, posPrime) → (neg, pos)`. The two
   `(pos, pos)` entries collapse to the same handle (`allocElement` is
-  idempotent on identical row/col pairs per 00-engine.md §A6 — confirm with
+  idempotent on identical row/col pairs per 00-engine.md ssA6- confirm with
   the engine spec).
 - If `this._params.RS > 0`: call
   `this._posPrimeNode = ctx.makeVolt(this._label, "posPrime")` and allocate
@@ -134,10 +134,10 @@ forwards to both in order.
 | 7 | `DIOposPrimePosPrimePtr` | posPrime_rev | posPrime_rev | `D_rev._hPPPP` |
 
 Note: D_fwd entry (6) `allocElement(B,B)` and D_rev entry (5) `allocElement(B,B)`
-are the same call — `allocElement` returns the existing handle on the second call.
+are the same call- `allocElement` returns the existing handle on the second call.
 Similarly D_fwd entry (5) `allocElement(A,A)` and D_rev entry (6) `allocElement(A,A)`.
 
-## setup() body — alloc only
+## setup() body- alloc only
 
 ```ts
 // DIAC composite setup()
@@ -150,7 +150,7 @@ setup(ctx: SetupContext): void {
 Each sub-element's `setup()` is the full PB-DIO `setup()` body with its
 respective node assignments.
 
-## load() body — value writes only
+## load() body- value writes only
 
 ```ts
 // DIAC composite load()
@@ -172,17 +172,17 @@ Not applicable.
 - Drop `internalNodeIds`, `branchIdx` from factory.
 - Drop `branchCount`, `getInternalNodeCount` from MnaModel.
 - Add `mayCreateInternalNodes: true` (sub-elements may create internal nodes).
-- Composite does not carry `ngspiceNodeMap` — sub-elements carry their own.
+- Composite does not carry `ngspiceNodeMap`- sub-elements carry their own.
 
 ## Verification gate
 
 Per CLAUDE.md "Test Policy During W3 Setup-Load-Split", verification is spec compliance only. DO NOT run tests; DO NOT use test results.
 
-1. `setup()` body in the implementation file matches the "setup() body — alloc only" listing in this PB line-for-line.
+1. `setup()` body in the implementation file matches the "setup() body- alloc only" listing in this PB line-for-line.
 2. TSTALLOC sequence in `setup()` matches the order in the cited ngspice anchor file (see top of this PB, e.g. `ressetup.c:46-49`).
 3. Factory cleanup applied per the "Factory cleanup" section above.
 4. `ngspiceNodeMap` registered per the "Pin mapping" section above (or omitted for composites where the spec says so).
-5. `load()` writes through cached handles only — zero `solver.allocElement(...)` calls inside `load()`, `accept()`, or any non-`setup()` method.
+5. `load()` writes through cached handles only- zero `solver.allocElement(...)` calls inside `load()`, `accept()`, or any non-`setup()` method.
 6. `mayCreateInternalNodes` flag set per spec.
 7. `findBranchFor` callback present where spec says (V-output sources, IND, etc.).
 8. No banned closing verdicts (mapping/tolerance/equivalent-to/pre-existing/intentional-divergence/citation-divergence/partial) used in any commit message or report.

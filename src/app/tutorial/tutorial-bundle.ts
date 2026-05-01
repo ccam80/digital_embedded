@@ -1,5 +1,5 @@
 /**
- * Tutorial shared bundle — browser-safe barrel export for the tutorial editor.
+ * Tutorial shared bundle- browser-safe barrel export for the tutorial editor.
  *
  * This module re-exports presets, type guards, and validation helpers
  * so that app/tutorial/edit.html can import them via a single <script type="module">.

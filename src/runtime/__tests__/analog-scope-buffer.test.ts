@@ -46,7 +46,7 @@ describe("ScopeBuffer", () => {
 
     expect(buf2.sampleCount).toBe(capacity);
 
-    // Oldest sample should be gone — time of first sample should be after t=0
+    // Oldest sample should be gone- time of first sample should be after t=0
     expect(buf2.timeStart).toBeGreaterThan(0);
     // timeStart should be around the 50th sample (index 50 * 0.001)
   });
@@ -94,7 +94,7 @@ describe("ScopeBuffer", () => {
       buf2.push(i * 0.001, i * 0.001);
     }
 
-    // Query the sub-range [0.005, 0.006] — should return samples at t=0.005 and t=0.006
+    // Query the sub-range [0.005, 0.006]- should return samples at t=0.005 and t=0.006
     const result = buf2.getSamplesInRange(0.005, 0.006);
 
     expect(result.time.length).toBeGreaterThan(0);
@@ -173,7 +173,7 @@ describe("ScopeBuffer", () => {
       buf2.push(i * 1.0, i * 10.0);
     }
 
-    // Query the full range — should return all capacity samples
+    // Query the full range- should return all capacity samples
     const result = buf2.getSamplesInRange(4.0, (capacity + 3) * 1.0);
     expect(result.time.length).toBe(capacity);
 

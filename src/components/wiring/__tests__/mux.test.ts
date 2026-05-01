@@ -92,7 +92,7 @@ function makeMux(overrides?: { selectorBits?: number; bitWidth?: number }): MuxE
 }
 
 // ---------------------------------------------------------------------------
-// executeMux — logic correctness
+// executeMux- logic correctness
 // ---------------------------------------------------------------------------
 
 describe("Multiplexer", () => {

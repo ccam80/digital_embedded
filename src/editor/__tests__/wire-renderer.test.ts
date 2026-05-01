@@ -87,7 +87,7 @@ describe("WireRenderer", () => {
   });
 
   it("noJunctionDotAtTwoWayJoin", () => {
-    // Two wires meeting end-to-end at (5, 5) — pass-through, no dot
+    // Two wires meeting end-to-end at (5, 5)- pass-through, no dot
     const w1 = makeWire(0, 5, 5, 5);
     const w2 = makeWire(5, 5, 10, 5);
 

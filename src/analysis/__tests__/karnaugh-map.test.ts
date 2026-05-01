@@ -2,12 +2,12 @@
  * Tests for Karnaugh Map visualization (Task 8.2.3).
  *
  * Covers:
- *   render2var    — 2-variable → 2×2 grid
- *   render4var    — 4-variable → 4×4 grid with correct Gray code labels
- *   cellClick     — click cell, verify value toggles and change event emitted
- *   implicantLoops — provide prime implicants, verify colored loops drawn around correct cells
- *   5varSplit     — 5 variables → two 4×4 maps side by side
- *   grayCodeOrder — verify row/column labels follow Gray code sequence
+ *   render2var   - 2-variable → 2×2 grid
+ *   render4var   - 4-variable → 4×4 grid with correct Gray code labels
+ *   cellClick    - click cell, verify value toggles and change event emitted
+ *   implicantLoops- provide prime implicants, verify colored loops drawn around correct cells
+ *   5varSplit    - 5 variables → two 4×4 maps side by side
+ *   grayCodeOrder- verify row/column labels follow Gray code sequence
  */
 
 import { describe, expect, it } from 'vitest';
@@ -91,7 +91,7 @@ describe('cycleValue', () => {
 });
 
 // ---------------------------------------------------------------------------
-// render2var — 2-variable → 2×2 grid
+// render2var- 2-variable → 2×2 grid
 // ---------------------------------------------------------------------------
 
 describe('render2var', () => {
@@ -128,7 +128,7 @@ describe('render2var', () => {
 });
 
 // ---------------------------------------------------------------------------
-// render4var — 4-variable → 4×4 grid with correct Gray code labels
+// render4var- 4-variable → 4×4 grid with correct Gray code labels
 // ---------------------------------------------------------------------------
 
 describe('render4var', () => {
@@ -189,7 +189,7 @@ describe('render4var', () => {
 });
 
 // ---------------------------------------------------------------------------
-// cellClick — click cell, verify value toggles and change event emitted
+// cellClick- click cell, verify value toggles and change event emitted
 // ---------------------------------------------------------------------------
 
 describe('cellClick', () => {
@@ -275,7 +275,7 @@ describe('cellClick', () => {
 });
 
 // ---------------------------------------------------------------------------
-// implicantLoops — provide prime implicants, verify colored loops drawn
+// implicantLoops- provide prime implicants, verify colored loops drawn
 // ---------------------------------------------------------------------------
 
 describe('implicantLoops', () => {
@@ -371,7 +371,7 @@ describe('implicantLoops', () => {
 });
 
 // ---------------------------------------------------------------------------
-// 5varSplit — 5 variables → two 4×4 maps side by side
+// 5varSplit- 5 variables → two 4×4 maps side by side
 // ---------------------------------------------------------------------------
 
 describe('5varSplit', () => {
@@ -433,7 +433,7 @@ describe('5varSplit', () => {
 });
 
 // ---------------------------------------------------------------------------
-// grayCodeOrder — verify row/column labels follow Gray code sequence
+// grayCodeOrder- verify row/column labels follow Gray code sequence
 // ---------------------------------------------------------------------------
 
 describe('grayCodeOrder', () => {

@@ -35,7 +35,7 @@ import {
 export { STANDARD_GATE_ATTRIBUTE_MAPPINGS as OR_ATTRIBUTE_MAPPINGS } from "./gate-shared.js";
 
 // ---------------------------------------------------------------------------
-// OrElement — CircuitElement implementation
+// OrElement- CircuitElement implementation
 // ---------------------------------------------------------------------------
 
 export class OrElement extends AbstractCircuitElement {
@@ -115,7 +115,7 @@ export class OrElement extends AbstractCircuitElement {
 }
 
 // ---------------------------------------------------------------------------
-// executeOr — flat simulation function
+// executeOr- flat simulation function
 // ---------------------------------------------------------------------------
 
 export function executeOr(index: number, state: Uint32Array, _highZs: Uint32Array, layout: ComponentLayout): void {
@@ -132,7 +132,7 @@ export function executeOr(index: number, state: Uint32Array, _highZs: Uint32Arra
 }
 
 // ---------------------------------------------------------------------------
-// CMOS_OR2_NETLIST — 2-input CMOS OR gate structural netlist
+// CMOS_OR2_NETLIST- 2-input CMOS OR gate structural netlist
 //
 // Topology: CMOS NOR2 driving a CMOS inverter.
 // Ports: In_1, In_2, out, VDD, GND
@@ -189,7 +189,7 @@ export const OrDefinition: ComponentDefinition = {
   attributeMap: STANDARD_GATE_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.LOGIC,
   helpText:
-    "Or gate — performs bitwise OR of all inputs.\n" +
+    "Or gate- performs bitwise OR of all inputs.\n" +
     "Configurable input count (2–5) and bit width (1–32).\n" +
     "Both IEEE/US (curved) and IEC/DIN (rectangular with ≥1) shapes are supported.\n" +
     "Individual inputs can be inverted via the inverterConfig property.",

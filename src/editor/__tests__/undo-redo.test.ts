@@ -90,7 +90,7 @@ describe("UndoRedo", () => {
 
     stack.push(cmd1);
     stack.push(cmd2);
-    stack.push(cmd3); // cmd1 is trimmed — only cmd2 and cmd3 remain
+    stack.push(cmd3); // cmd1 is trimmed- only cmd2 and cmd3 remain
 
     // Undo cmd3
     expect(stack.undo()).toBe(true);

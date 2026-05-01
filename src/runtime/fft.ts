@@ -1,5 +1,5 @@
 /**
- * FFT utilities — Cooley-Tukey radix-2 in-place FFT, windowing, and spectrum
+ * FFT utilities- Cooley-Tukey radix-2 in-place FFT, windowing, and spectrum
  * computation for the analog oscilloscope's frequency-domain view.
  */
 
@@ -141,7 +141,7 @@ export function magnitudeToDb(magnitude: Float64Array, reference?: number): Floa
     }
   }
   if (ref === 0) {
-    // All zeros — return -Infinity for all bins
+    // All zeros- return -Infinity for all bins
     out.fill(-Infinity);
     return out;
   }

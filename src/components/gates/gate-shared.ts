@@ -2,7 +2,7 @@
  * Shared helpers and constants for multi-input gate components.
  *
  * Extracted from And, Or, NAnd, NOr, XOr, XNOr to eliminate duplication.
- * NOT gate is excluded — it has a different pin model and shape.
+ * NOT gate is excluded- it has a different pin model and shape.
  */
 
 import type { RenderContext } from "../../core/renderer-interface.js";
@@ -17,7 +17,7 @@ import type { PropertyDefinition } from "../../core/properties.js";
 import type { AttributeMapping } from "../../core/registry.js";
 
 // ---------------------------------------------------------------------------
-// Layout helpers — identical across all 6 multi-input gates
+// Layout helpers- identical across all 6 multi-input gates
 // ---------------------------------------------------------------------------
 
 /** Gate width: 3 grid units (narrow/IEC) or 4 (wide/IEEE), matching Java GenericShape. */
@@ -29,7 +29,7 @@ export function componentHeight(inputCount: number): number {
 }
 
 // ---------------------------------------------------------------------------
-// Pin layout helpers — identical across all 6 multi-input gates
+// Pin layout helpers- identical across all 6 multi-input gates
 // ---------------------------------------------------------------------------
 
 export function buildInputLabels(inputCount: number): string[] {
@@ -70,7 +70,7 @@ export function buildInvertedPinDeclarations(
 }
 
 // ---------------------------------------------------------------------------
-// Shared attribute mappings — identical across all 6 multi-input gates
+// Shared attribute mappings- identical across all 6 multi-input gates
 // ---------------------------------------------------------------------------
 
 export const STANDARD_GATE_ATTRIBUTE_MAPPINGS: AttributeMapping[] = [
@@ -102,8 +102,8 @@ export const STANDARD_GATE_ATTRIBUTE_MAPPINGS: AttributeMapping[] = [
 ];
 
 // ---------------------------------------------------------------------------
-// Shared property definitions — identical across all 6 multi-input gates
-// (wideShape description varies per gate — passed as parameter)
+// Shared property definitions- identical across all 6 multi-input gates
+// (wideShape description varies per gate- passed as parameter)
 // ---------------------------------------------------------------------------
 
 export function buildStandardGatePropertyDefs(wideShapeDescription: string): PropertyDefinition[] {
@@ -148,7 +148,7 @@ export function buildStandardGatePropertyDefs(wideShapeDescription: string): Pro
 }
 
 // ---------------------------------------------------------------------------
-// Shared drawing helpers — identical across all 6 multi-input gates
+// Shared drawing helpers- identical across all 6 multi-input gates
 // ---------------------------------------------------------------------------
 
 /**
@@ -204,7 +204,7 @@ export function appendPowerPins(
 
 /**
  * Draw vertical extension lines for gates with >2 inputs.
- * Java IEEEGenericShape pattern — identical across all 6 multi-input gates.
+ * Java IEEEGenericShape pattern- identical across all 6 multi-input gates.
  */
 export function drawGateExtensionLines(ctx: RenderContext, inputCount: number): void {
   const offs = Math.floor(inputCount / 2) - 1;
@@ -217,11 +217,11 @@ export function drawGateExtensionLines(ctx: RenderContext, inputCount: number): 
 }
 
 // ---------------------------------------------------------------------------
-// Shared IEEE body shapes — paired gates share identical shapes
+// Shared IEEE body shapes- paired gates share identical shapes
 // ---------------------------------------------------------------------------
 
 /**
- * IEEE/US AND gate body — shared by And and NAnd.
+ * IEEE/US AND gate body- shared by And and NAnd.
  * Flat left edge at x=0.05, straight top/bottom, two cubic bezier curves
  * forming a D-shape on the right. Coordinates from Java IEEEAndShape.
  */
@@ -245,7 +245,7 @@ export function drawAndBody(ctx: RenderContext, w: number): void {
 }
 
 /**
- * IEEE/US OR gate body — shared by Or and NOr.
+ * IEEE/US OR gate body- shared by Or and NOr.
  * Concave back (left) edge, pointed front meeting at x=w, output at y=1.
  * Coordinates from Java IEEEOrShape.
  */
@@ -278,7 +278,7 @@ export function drawOrBody(ctx: RenderContext, w: number): void {
 }
 
 /**
- * IEEE/US XOR gate body (body + back curve) — shared by XOr and XNOr.
+ * IEEE/US XOR gate body (body + back curve)- shared by XOr and XNOr.
  * Same as OR but body shifted right by 0.5 grid, plus an extra
  * open-stroke back curve. Coordinates from Java IEEEXOrShape.
  */

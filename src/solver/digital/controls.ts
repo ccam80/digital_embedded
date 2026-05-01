@@ -1,5 +1,5 @@
 /**
- * SimulationController — state machine for the engine lifecycle.
+ * SimulationController- state machine for the engine lifecycle.
  *
  * Manages the STOPPED / RUNNING / PAUSED / ERROR lifecycle of a DigitalEngine.
  * In continuous run mode, calls engine.step() N times per animation frame
@@ -90,7 +90,7 @@ export class SimulationController {
 
   /**
    * Perform a single simulation step.
-   * Works from STOPPED or PAUSED state — stays in the current state after.
+   * Works from STOPPED or PAUSED state- stays in the current state after.
    * Does nothing if RUNNING (continuous run is managing steps).
    * Does nothing if in ERROR state.
    */

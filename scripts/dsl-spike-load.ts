@@ -14,7 +14,7 @@ const registry = createDefaultRegistry();
 try {
   const circuit = deserializeDts(json, registry);
   console.log(
-    `Deserialize OK — elements: ${circuit.elements.length}, wires: ${circuit.wires.length}`,
+    `Deserialize OK- elements: ${circuit.elements.length}, wires: ${circuit.wires.length}`,
   );
 
   // Try resolving pins for every element (this exercises the same code paths
@@ -40,11 +40,11 @@ try {
   }
   console.log(`Pin resolution OK for ${circuit.elements.length} elements`);
 
-  // Drive through compile — same path the engine uses.
+  // Drive through compile- same path the engine uses.
   const facade = new DefaultSimulatorFacade(registry);
   try {
     const coord = facade.compile(circuit);
-    console.log(`Compile OK — coordinator created`);
+    console.log(`Compile OK- coordinator created`);
     void coord;
   } catch (e) {
     console.log("COMPILE ERROR:", e instanceof Error ? e.message : String(e));
@@ -54,11 +54,11 @@ try {
     process.exit(1);
   }
 
-  // Try a netlist read — exercises another rendering-adjacent code path.
+  // Try a netlist read- exercises another rendering-adjacent code path.
   try {
     const netlist = facade.netlist(circuit);
     console.log(
-      `Netlist OK — components: ${netlist.components.length}, nets: ${netlist.nets.length}, diagnostics: ${netlist.diagnostics.length}`,
+      `Netlist OK- components: ${netlist.components.length}, nets: ${netlist.nets.length}, diagnostics: ${netlist.diagnostics.length}`,
     );
     for (const d of netlist.diagnostics.slice(0, 5)) {
       console.log(`  diag: ${d.severity ?? "?"} ${d.code ?? "?"} ${d.message ?? ""}`);

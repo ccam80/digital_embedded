@@ -36,12 +36,12 @@ Contacts: `A1` ↔ `B1` via `swNO`; `A1` ↔ `C1` via `swNC`.
 
 ## Internal nodes
 
-1 — `_nCoilMid`: the junction between `coilL` and `coilR`. Allocated via
+1- `_nCoilMid`: the junction between `coilL` and `coilR`. Allocated via
 `ctx.makeVolt(label, "coilMid")` in `setup()`.
 
 ## Branch rows
 
-1 — allocated by `coilL` (IND) via `ctx.makeCur(label + "_coilL", "branch")`. Same idempotent
+1- allocated by `coilL` (IND) via `ctx.makeCur(label + "_coilL", "branch")`. Same idempotent
 guard as PB-RELAY.
 
 ## State slots
@@ -55,9 +55,9 @@ guard as PB-RELAY.
 
 Total: 6 state slots. Allocation order: coilL first, then swNO, then swNC (coilR has none).
 
-## TSTALLOC sequence (17 entries — line-for-line port, all ngspice-anchored)
+## TSTALLOC sequence (17 entries- line-for-line port, all ngspice-anchored)
 
-### coilL (IND) — indsetup.c:96-100, runs first:
+### coilL (IND)- indsetup.c:96-100, runs first:
 
 | # | ngspice pair | digiTS pair | handle field |
 |---|---|---|---|
@@ -67,7 +67,7 @@ Total: 6 state slots. Allocation order: coilL first, then swNO, then swNC (coilR
 | 4 | `(INDbrEq, INDposNode)` | `(coilBranch, in1node)` | `coilL._hIbrP` |
 | 5 | `(INDbrEq, INDbrEq)` | `(coilBranch, coilBranch)` | `coilL._hIbrIbr` |
 
-### coilR (RES) — ressetup.c:46-49, runs second:
+### coilR (RES)- ressetup.c:46-49, runs second:
 
 | # | ngspice pair | digiTS pair | handle field |
 |---|---|---|---|
@@ -76,7 +76,7 @@ Total: 6 state slots. Allocation order: coilL first, then swNO, then swNC (coilR
 | 8 | `(RESposNode, RESnegNode)` | `(_nCoilMid, in2node)` | `coilR._hPN` |
 | 9 | `(RESnegNode, RESposNode)` | `(in2node, _nCoilMid)` | `coilR._hNP` |
 
-### swNO (SW normally-open) — swsetup.c:59-62, runs third:
+### swNO (SW normally-open)- swsetup.c:59-62, runs third:
 
 | # | ngspice pair | digiTS pair | handle field |
 |---|---|---|---|
@@ -85,7 +85,7 @@ Total: 6 state slots. Allocation order: coilL first, then swNO, then swNC (coilR
 | 12 | `(SWnegNode, SWposNode)` | `(B1node, A1node)` | `swNO._hNP` |
 | 13 | `(SWnegNode, SWnegNode)` | `(B1node, B1node)` | `swNO._hNN` |
 
-### swNC (SW normally-closed) — swsetup.c:59-62, runs fourth:
+### swNC (SW normally-closed)- swsetup.c:59-62, runs fourth:
 
 | # | ngspice pair | digiTS pair | handle field |
 |---|---|---|---|
@@ -94,7 +94,7 @@ Total: 6 state slots. Allocation order: coilL first, then swNO, then swNC (coilR
 | 16 | `(SWnegNode, SWposNode)` | `(C1node, A1node)` | `swNC._hNP` |
 | 17 | `(SWnegNode, SWnegNode)` | `(C1node, C1node)` | `swNC._hNN` |
 
-## setup() body — alloc only
+## setup() body- alloc only
 
 ```typescript
 setup(ctx: SetupContext): void {
@@ -118,7 +118,7 @@ setup(ctx: SetupContext): void {
 }
 ```
 
-## load() body — value writes only
+## load() body- value writes only
 
 Ports value-side from `indload.c`, `resload.c`, and `swload.c` line-for-line. No `allocElement`
 calls.
@@ -139,11 +139,11 @@ load(ctx: LoadContext): void {
 `setParam("coilResistance", v)` routes to `this._coilR`. `setParam("inductance", v)` routes to
 `this._coilL`. `setParam("ron" | "roff", v)` routes to both `this._swNO` and `this._swNC`.
 
-## findBranchFor (applicable — coilL IND)
+## findBranchFor (applicable- coilL IND)
 
 Relay coil sub-element label is `${relayLabel}/_coilL`. External callers reference the coil via
 its full namespaced name. The `/` separator matches the engine's `_deviceMap` keying
-(see `00-engine.md` §A4.1).
+(see `00-engine.md` ssA4.1).
 
 ```typescript
 findBranchFor(name: string, ctx: SetupContext): number {
@@ -172,11 +172,11 @@ findBranchFor(name: string, ctx: SetupContext): number {
 
 Per CLAUDE.md "Test Policy During W3 Setup-Load-Split", verification is spec compliance only. DO NOT run tests; DO NOT use test results.
 
-1. `setup()` body in the implementation file matches the "setup() body — alloc only" listing in this PB line-for-line.
+1. `setup()` body in the implementation file matches the "setup() body- alloc only" listing in this PB line-for-line.
 2. TSTALLOC sequence in `setup()` matches the order in the cited ngspice anchor file (see top of this PB, e.g. `ressetup.c:46-49`).
 3. Factory cleanup applied per the "Factory cleanup" section above.
 4. `ngspiceNodeMap` registered per the "Pin mapping" section above (or omitted for composites where the spec says so).
-5. `load()` writes through cached handles only — zero `solver.allocElement(...)` calls inside `load()`, `accept()`, or any non-`setup()` method.
+5. `load()` writes through cached handles only- zero `solver.allocElement(...)` calls inside `load()`, `accept()`, or any non-`setup()` method.
 6. `mayCreateInternalNodes` flag set per spec.
 7. `findBranchFor` callback present where spec says (V-output sources, IND, etc.).
 8. No banned closing verdicts (mapping/tolerance/equivalent-to/pre-existing/intentional-divergence/citation-divergence/partial) used in any commit message or report.

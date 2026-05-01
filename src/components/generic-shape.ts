@@ -1,5 +1,5 @@
 /**
- * Shared GenericShape drawing utility — matches Java Digital's GenericShape rendering.
+ * Shared GenericShape drawing utility- matches Java Digital's GenericShape rendering.
  *
  * Java GenericShape draws:
  *   - Body rect with 0.05 horizontal insets (1px at 20px/grid)

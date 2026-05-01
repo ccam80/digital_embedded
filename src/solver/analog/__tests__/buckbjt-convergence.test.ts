@@ -1,12 +1,12 @@
 /**
- * Wave C4 Task C4.3 — buckbjt DC-OP convergence parity against ngspice.
+ * Wave C4 Task C4.3- buckbjt DC-OP convergence parity against ngspice.
  *
  * Spec (spec/phase-catchup.md:300-311):
  *   Compare every NR iteration's `rhsOld[]` + `noncon` + `diagGmin` +
  *   `srcFact` against ngspice for the BJT-based buck converter
- *   fixture. Bit-exact (`toBe` / `absDelta === 0`) — zero `toBeCloseTo`.
+ *   fixture. Bit-exact (`toBe` / `absDelta === 0`)- zero `toBeCloseTo`.
  *
- * Fixture: `fixtures/buckbjt.dts` — BJT-driven buck converter. A 10kHz
+ * Fixture: `fixtures/buckbjt.dts`- BJT-driven buck converter. A 10kHz
  * square wave feeds two BJT gate-driver stages (NPN/PNP) that switch
  * an NMOS into a diode freewheeling clamp and an L-C-R output
  * filter. Canonical multi-junction DC-OP convergence stress test.
@@ -25,7 +25,7 @@
  * and Phase 5 (transient step alignment) have not been executed, so
  * our DC-OP is not yet iteration-level aligned with ngspice. Per the
  * Wave C4 tests-red protocol this red signal is the test doing its
- * job — it MUST NOT be softened to `toBeCloseTo` or relaxed with
+ * job- it MUST NOT be softened to `toBeCloseTo` or relaxed with
  * tolerances. The divergence is documented in
  * `spec/progress-catchup.md` for user adjudication.
  *
@@ -174,7 +174,7 @@ describeIfDll('buckbjt DC-OP per-NR-iteration parity (C4.3)', () => {
       expect(iters.length, `step ${s}: no iterations captured`).toBeGreaterThan(0);
 
       for (const it of iters) {
-        // noncon bit-exact — absDelta is |ours - ngspice|; 0 === bit-exact.
+        // noncon bit-exact- absDelta is |ours - ngspice|; 0 === bit-exact.
         expect(
           it.noncon.absDelta,
           `step ${s} iter ${it.iteration}: noncon divergence ours=${it.noncon.ours} ng=${it.noncon.ngspice}`,

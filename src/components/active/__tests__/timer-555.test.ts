@@ -1,7 +1,7 @@
 /**
  * Tests for the 555 Timer IC composite analog model.
  *
- * Test handling per A1 §Test handling rule (spec/architectural-alignment.md §A1):
+ * Test handling per A1 ssTest handling rule (spec/architectural-alignment.md ssA1):
  *   - Post-load observable state (engine-agnostic, node voltages): KEPT
  *   - Parameter-plumbing (setParam on vDrop, rDischarge): KEPT
  *   - Engine-agnostic interface contracts: KEPT

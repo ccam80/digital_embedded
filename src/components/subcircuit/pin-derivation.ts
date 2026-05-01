@@ -134,7 +134,7 @@ export function deriveInterfacePins(circuit: Circuit): PinDeclaration[] {
     direction: p.direction,
     label: p.label,
     defaultBitWidth: p.bitWidth,
-    position: { x: 0, y: p.sortPos }, // sortPos placeholder — overwritten by subcircuit
+    position: { x: 0, y: p.sortPos }, // sortPos placeholder- overwritten by subcircuit
     isNegatable: false,
     isClockCapable: false,
     face: p.face,

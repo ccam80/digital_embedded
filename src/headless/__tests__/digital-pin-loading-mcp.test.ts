@@ -6,7 +6,7 @@
  * DefaultSimulatorFacade (the facade exposed through the MCP server).
  *
  * These tests use the real component registry (createDefaultRegistry) with
- * the `And` gate — a component with digital and behavioral models — placed
+ * the `And` gate- a component with digital and behavioral models- placed
  * in an analog circuit alongside passive components.
  */
 
@@ -98,7 +98,7 @@ function countBridgeAdapters(facade: DefaultSimulatorFacade): number {
 // Test 1: digitalPinLoading="all" via circuit metadata
 // ---------------------------------------------------------------------------
 
-describe('digitalPinLoading MCP surface — mode all', () => {
+describe('digitalPinLoading MCP surface- mode all', () => {
   it('circuit_compile with digitalPinLoading="all" produces bridge adapters for the And gate', () => {
     const facade = new DefaultSimulatorFacade(registry);
     const circuit = buildAnalogAndCircuit({ digitalPinLoading: "all" });
@@ -130,10 +130,10 @@ describe('digitalPinLoading MCP surface — mode all', () => {
 });
 
 // ---------------------------------------------------------------------------
-// Test 2: digitalPinLoading="none" — bridges at real boundaries only, zero loading
+// Test 2: digitalPinLoading="none"- bridges at real boundaries only, zero loading
 // ---------------------------------------------------------------------------
 
-describe('digitalPinLoading MCP surface — mode none', () => {
+describe('digitalPinLoading MCP surface- mode none', () => {
   it('digitalPinLoading="none": And gate in logical mode gets zero-loading bridge adapters', () => {
     const facade = new DefaultSimulatorFacade(registry);
     const circuit = buildAnalogAndCircuit(
@@ -172,7 +172,7 @@ describe('digitalPinLoading MCP surface — mode none', () => {
 });
 
 // ---------------------------------------------------------------------------
-// Test 3: bridge behavioral verification — step and verify signal flow
+// Test 3: bridge behavioral verification- step and verify signal flow
 //
 // Uses facade.build() (the MCP/CircuitSpec path) to construct a pure digital
 // circuit: In → And gate → Out. Drives inputs, steps, and verifies that the
@@ -184,11 +184,11 @@ describe('digitalPinLoading MCP surface — mode none', () => {
 // produces a non-zero voltage on the analog side when inputs are HIGH.
 // ---------------------------------------------------------------------------
 
-describe('digitalPinLoading MCP surface — bridge behavioral verification', () => {
+describe('digitalPinLoading MCP surface- bridge behavioral verification', () => {
   it('digital In → And → Out: step produces correct logic values (facade.build path)', () => {
     const facade = new DefaultSimulatorFacade(registry);
 
-    // Use facade.build() — the path the MCP server uses (circuit_build tool).
+    // Use facade.build()- the path the MCP server uses (circuit_build tool).
     const circuit = facade.build({
       components: [
         { id: 'inA',  type: 'In',  props: { label: 'A', bitWidth: 1 } },
@@ -223,7 +223,7 @@ describe('digitalPinLoading MCP surface — bridge behavioral verification', () 
     expect(facade.readSignal(engine, 'Y')).toBe(0);
   });
 
-  it('mixed digital→analog: And gate (digital mode) output drives Resistor via bridge — analog voltage present', () => {
+  it('mixed digital→analog: And gate (digital mode) output drives Resistor via bridge- analog voltage present', () => {
     const facade = new DefaultSimulatorFacade(registry);
 
     // Build: In_A, In_B → And (digital) → Port (BIDIR) → Resistor → Ground

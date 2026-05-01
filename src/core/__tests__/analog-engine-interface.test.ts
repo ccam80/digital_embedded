@@ -2,7 +2,7 @@
  * Tests for AnalogEngine interface and associated types.
  *
  * Verifies that all types from circuits-engine-spec.md sections 2 and 7 are
- * defined, exported, and structurally correct. These are type-level tests —
+ * defined, exported, and structurally correct. These are type-level tests-
  * they exercise TypeScript assignability by constructing literal objects and
  * asserting runtime field values.
  */
@@ -152,7 +152,7 @@ describe("AnalogEngineTypes", () => {
     const unique = new Set(allCodes);
     expect(unique.size).toBe(allCodes.length);
 
-    // Construct a Diagnostic using a code — verifies assignability
+    // Construct a Diagnostic using a code- verifies assignability
     const diag: Diagnostic = {
       code: "convergence-failed",
       severity: "error",

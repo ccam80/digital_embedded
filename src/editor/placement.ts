@@ -1,5 +1,5 @@
 /**
- * PlacementMode — manages the ghost-element placement interaction.
+ * PlacementMode- manages the ghost-element placement interaction.
  *
  * When the user selects a component from the palette, placement mode is entered.
  * A ghost image of the component follows the cursor (snapped to grid). Click
@@ -19,7 +19,7 @@ import type { Circuit } from "@/core/circuit";
 import { snapToGrid } from "@/editor/coordinates";
 import type { ClipboardData } from "@/editor/edit-operations";
 
-/** The grid size for snapping during placement — 1 grid unit. */
+/** The grid size for snapping during placement- 1 grid unit. */
 const PLACEMENT_GRID_SIZE = 1;
 
 /** Snapshot of ghost element state, exposed for rendering the overlay. */
@@ -147,11 +147,11 @@ export class PlacementMode {
 
   /**
    * Instantiate a real element at the current ghost position and return it.
-   * The element is NOT added to the circuit — the caller is responsible for
+   * The element is NOT added to the circuit- the caller is responsible for
    * pushing a `placeComponent` EditCommand so placement is undoable.
    * The mode stays active for placing further copies.
    *
-   * Not valid in paste mode — use getTransformedClipboard() instead.
+   * Not valid in paste mode- use getTransformedClipboard() instead.
    */
   place(_circuit?: Circuit): CircuitElement {
     if (!this._active || this._definition === undefined) {

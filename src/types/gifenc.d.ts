@@ -1,5 +1,5 @@
 /**
- * Type declarations for gifenc — a fast pure-JS GIF encoder.
+ * Type declarations for gifenc- a fast pure-JS GIF encoder.
  * Package: https://www.npmjs.com/package/gifenc
  */
 

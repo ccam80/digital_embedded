@@ -47,7 +47,7 @@ const DEFAULT_PARAMS: ResolvedSimulationParams = {
  *
  * getLteTimestep computes a new dt from the given truncationError
  * using the ngspice composite `local_tol = trtol · chgtol` (toleranceReference=0
- * so the reltol term vanishes) — this keeps the rejection/ratio math easy to
+ * so the reltol term vanishes)- this keeps the rejection/ratio math easy to
  * reason about in tests.
  */
 function makeReactiveElement(truncationError: number): AnalogElement {
@@ -134,12 +134,12 @@ describe("LTE", () => {
     const elements = [makeReactiveElement(hugeError)];
     const { newDt } = ctrl.computeNewDt(elements, new HistoryStore(1), 0);
 
-    // No lower-bound clamp — proposal can fall arbitrarily below minTimeStep.
+    // No lower-bound clamp- proposal can fall arbitrarily below minTimeStep.
     expect(newDt).toBeLessThan(params.minTimeStep);
   });
 
   it("getClampedDt_enforces_maxTimeStep", () => {
-    // dctran.c:540 — CKTdelta = MIN(CKTdelta, CKTmaxStep). The maxStep
+    // dctran.c:540- CKTdelta = MIN(CKTdelta, CKTmaxStep). The maxStep
     // clamp lives at top-of-step in getClampedDt, not in computeNewDt.
     const params: ResolvedSimulationParams = {
       ...DEFAULT_PARAMS,
@@ -192,7 +192,7 @@ describe("LTE", () => {
 
 describe("Rejection", () => {
   it("shouldReject_true_when_worstRatio_gt_1", () => {
-    // Threshold is 1/0.9 ≈ 1.111 — values at or above this are rejected.
+    // Threshold is 1/0.9 ≈ 1.111- values at or above this are rejected.
     const ctrl = new TimestepController(DEFAULT_PARAMS);
     expect(ctrl.shouldReject(1.2)).toBe(true);
     expect(ctrl.shouldReject(2.0)).toBe(true);
@@ -200,7 +200,7 @@ describe("Rejection", () => {
   });
 
   it("shouldReject_false_within_hysteresis_band", () => {
-    // Values below threshold (1/0.9 ≈ 1.111) are accepted — hysteresis band.
+    // Values below threshold (1/0.9 ≈ 1.111) are accepted- hysteresis band.
     const ctrl = new TimestepController(DEFAULT_PARAMS);
     // worstRatio == 1.05: below threshold → accept (within hysteresis band)
     expect(ctrl.shouldReject(1.05)).toBe(false);
@@ -221,7 +221,7 @@ describe("Rejection", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Task 5.1.1 — no_method_switching
+// Task 5.1.1- no_method_switching
 // ---------------------------------------------------------------------------
 
 describe("no_method_switching", () => {
@@ -242,7 +242,7 @@ describe("no_method_switching", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Task 5.1.1 — post_breakpoint_order1_trap_preserved
+// Task 5.1.1- post_breakpoint_order1_trap_preserved
 // ---------------------------------------------------------------------------
 
 describe("post_breakpoint_order1_trap_preserved", () => {
@@ -271,7 +271,7 @@ describe("post_breakpoint_order1_trap_preserved", () => {
     // The breakpoint accept incremented _acceptedSteps, so we need to check that
     // immediately after the breakpoint step (step count = 6), tryOrderPromotion
     // does NOT promote yet (guard: _acceptedSteps <= 1 is relative to the
-    // internal counter, which is now 6 — but the post-breakpoint order-1 trap is
+    // internal counter, which is now 6- but the post-breakpoint order-1 trap is
     // set after accept increments the counter, so the first step after breakpoint
     // starts with _acceptedSteps = 7 after next accept).
     //
@@ -293,14 +293,14 @@ describe("post_breakpoint_order1_trap_preserved", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Task 5.1.2 — initial_method_is_trapezoidal
+// Task 5.1.2- initial_method_is_trapezoidal
 // ---------------------------------------------------------------------------
 
 describe("initial_method_is_trapezoidal", () => {
   it("initial_method_is_trapezoidal", () => {
     // Assert new TimestepController has currentMethod === "trapezoidal"
     // (ngspice CKTintegrateMethod default) and currentOrder === 1
-    // (ngspice dctran.c:315 — `ckt->CKTorder = 1` at transient entry).
+    // (ngspice dctran.c:315- `ckt->CKTorder = 1` at transient entry).
     // Order-2 promotion only happens after the order-1 LTE gate passes
     // (dctran.c:881-892).
     const ctrl = new TimestepController(DEFAULT_PARAMS);
@@ -318,7 +318,7 @@ describe("initial_method_is_trapezoidal", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Task 5.2.1 — breakpoint_ulps_comparison
+// Task 5.2.1- breakpoint_ulps_comparison
 // ---------------------------------------------------------------------------
 
 describe("breakpoint_ulps_comparison", () => {
@@ -344,7 +344,7 @@ describe("breakpoint_ulps_comparison", () => {
     i64[0] = bpBits + 200n;
     const simTimeFar = f64[0];
 
-    // Test: close (50 ULPs) — breakpoint consumed.
+    // Test: close (50 ULPs)- breakpoint consumed.
     const params: ResolvedSimulationParams = { ...DEFAULT_PARAMS, tStop: 1e-3 };
     const ctrl1 = new TimestepController(params);
     ctrl1.addBreakpoint(bp);
@@ -354,10 +354,10 @@ describe("breakpoint_ulps_comparison", () => {
     ctrl1.currentDt = 1e-6;
     const history = new HistoryStore(0);
     const { newDt: dtAfterClose } = ctrl1.computeNewDt([], history, simTimeClose);
-    // No breakpoint remaining — dt grows freely.
+    // No breakpoint remaining- dt grows freely.
     expect(dtAfterClose).toBeGreaterThan(bp - simTimeClose);
 
-    // Test: far (200 ULPs) — breakpoint NOT consumed.
+    // Test: far (200 ULPs)- breakpoint NOT consumed.
     const ctrl2 = new TimestepController(params);
     ctrl2.addBreakpoint(bp);
     ctrl2.accept(simTimeFar);
@@ -378,13 +378,13 @@ describe("breakpoint_ulps_comparison", () => {
     // We need to verify that 200 ULPs > 100 ULP threshold means not consumed
     // when simTime is BEFORE bp by 200 ULPs and > delmin gap.
     // Use tStop = 1 so delmin = 1e-11, then 200 ULPs ≈ 2.2e-20 << delmin still fails.
-    // The ULP test is the primary path — with 50 ULPs it's consumed, with 200 it's not.
+    // The ULP test is the primary path- with 50 ULPs it's consumed, with 200 it's not.
     const paramsLargeTStop: ResolvedSimulationParams = { ...DEFAULT_PARAMS, tStop: 1e3 };
     // delmin = 1e3 * 1e-11 = 1e-8
 
     const ctrl4 = new TimestepController(paramsLargeTStop);
     ctrl4.addBreakpoint(bp);
-    // simTimeClose (bp + 50 ULPs) — consumed via almostEqualUlps(simTimeClose, bp, 100)
+    // simTimeClose (bp + 50 ULPs)- consumed via almostEqualUlps(simTimeClose, bp, 100)
     ctrl4.accept(simTimeClose);
     ctrl4.currentDt = 1e-6;
     const { newDt: dtC } = ctrl4.computeNewDt([], history, simTimeClose);
@@ -392,10 +392,10 @@ describe("breakpoint_ulps_comparison", () => {
 
     // 200 ULPs below bp with delmin=1e-8: bp - simTimeFarBelow ≈ 2.2e-20 << 1e-8
     // so still consumed via delmin band. Need gap > delmin for "not consumed" test.
-    // Use bp = 0.1 and simTime = 0 (large gap) — definitely not consumed.
+    // Use bp = 0.1 and simTime = 0 (large gap)- definitely not consumed.
     const ctrl5 = new TimestepController(params);
     ctrl5.addBreakpoint(0.1);
-    ctrl5.accept(1e-9);  // simTime = 1ns, bp = 0.1s — gap = 0.1 >> delmin=1e-14
+    ctrl5.accept(1e-9);  // simTime = 1ns, bp = 0.1s- gap = 0.1 >> delmin=1e-14
     // Breakpoint at 0.1s should NOT have been consumed.
     ctrl5.currentDt = 1e-6;
     const { newDt: dtFar } = ctrl5.computeNewDt([], history, 1e-9);
@@ -436,7 +436,7 @@ describe("breakpoint_ulps_comparison", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Task 5.2.2 — first_step_gap_between_breakpoints
+// Task 5.2.2- first_step_gap_between_breakpoints
 // ---------------------------------------------------------------------------
 
 describe("first_step_gap_between_breakpoints", () => {
@@ -472,7 +472,7 @@ describe("first_step_gap_between_breakpoints", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Task 5.2.3 — savedDelta_only_at_breakpoint_hit
+// Task 5.2.3- savedDelta_only_at_breakpoint_hit
 // ---------------------------------------------------------------------------
 
 describe("savedDelta_only_at_breakpoint_hit", () => {
@@ -549,7 +549,7 @@ describe("Breakpoints", () => {
   });
 
   it("pops_breakpoint_via_getClampedDt", () => {
-    // ngspice dctran.c:624-638 — the pop loop runs at top of next step
+    // ngspice dctran.c:624-638- the pop loop runs at top of next step
     // (inside getClampedDt), not at accept-time. accept() updates the step
     // counter only; getClampedDt is the sole pop site.
     const ctrl = new TimestepController(DEFAULT_PARAMS);
@@ -560,7 +560,7 @@ describe("Breakpoints", () => {
     // Top-of-next-step pop drains bp at 100e-6 (almostEqualUlps match).
     ctrl.getClampedDt(100e-6);
 
-    // No reactive constraint and no remaining breakpoint — ckttrunc.c:53
+    // No reactive constraint and no remaining breakpoint- ckttrunc.c:53
     // (HUGE timetemp) returns 2 * dt with no maxStep clamp from computeNewDt.
     const elements = [makeReactiveElement(0)];
     const { newDt } = ctrl.computeNewDt(elements, new HistoryStore(1), 100e-6);
@@ -570,7 +570,7 @@ describe("Breakpoints", () => {
   it("late_clamp_predicate_is_strict_gt_not_gte", () => {
     // dctran.c:640 (XSPICE late-clamp) uses `>` not `>=`. When CKTtime + CKTdelta
     // lands EXACTLY on breaks[0], the late-clamp does not fire and breakFlag
-    // stays false — the next step satisfies the at-breakpoint test instead.
+    // stays false- the next step satisfies the at-breakpoint test instead.
     // The non-XSPICE branch at dctran.c:594 uses `>=` and would set breakFlag
     // here. Pure-XSPICE port: `>` is the contract.
     const params: ResolvedSimulationParams = { ...DEFAULT_PARAMS, maxTimeStep: 20e-6, tStop: 1e-3 };
@@ -613,11 +613,11 @@ describe("Breakpoints", () => {
     expect(dt1).toBe(10e-6);
 
     // Second call: simTime + dt = 40e-6 + 30e-6 = 70e-6 >= 50e-6. Clamp to
-    // 50e-6 - 40e-6 ≈ 10e-6 (modulo IEEE-754 — 50e-6 - 40e-6 isn't exact).
+    // 50e-6 - 40e-6 ≈ 10e-6 (modulo IEEE-754- 50e-6 - 40e-6 isn't exact).
     ctrl.currentDt = 30e-6;
     const dt2 = ctrl.getClampedDt(40e-6);
     expect(dt2).toBe(50e-6 - 40e-6);
-    // Temp-bp clamp does NOT set breakFlag — only the late-clamp does.
+    // Temp-bp clamp does NOT set breakFlag- only the late-clamp does.
     expect(ctrl.breakFlag).toBe(false);
 
     // Promote order so we can observe the order-cut on the next call.

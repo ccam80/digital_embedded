@@ -1,5 +1,5 @@
 /**
- * Test Results Export — convert TestResults to CSV format.
+ * Test Results Export- convert TestResults to CSV format.
  *
  * Exports test results to RFC 4180 compliant CSV for grading and record-keeping.
  *

@@ -1,7 +1,7 @@
 /**
  * Tests for DigitalOutputPinModel and DigitalInputPinModel.
  *
- * Task 6.4.2 — new load(ctx) API:
+ * Task 6.4.2- new load(ctx) API:
  *  - output_load_branch_role_drive_loaded
  *  - output_load_branch_role_hiz_ideal
  *  - output_load_direct_role_drive_loaded
@@ -12,7 +12,7 @@
  *  - loaded_getter_reads_private_field
  *  - handle_cache_stable_across_iterations
  *
- * Task 0.2.3 — DigitalPinModel refactored to use AnalogCapacitorElement child:
+ * Task 0.2.3- DigitalPinModel refactored to use AnalogCapacitorElement child:
  *  - no_prev_voltage_field
  *  - accept_method_removed
  *  - getChildElements_returns_capacitor_when_loaded_and_cout_positive
@@ -35,7 +35,7 @@ import { MODEINITFLOAT, MODETRAN } from "../ckt-mode.js";
 import { loadCtxFromFields } from "./test-helpers.js";
 
 // ---------------------------------------------------------------------------
-// Mock SparseSolver — records allocElement / stampElement calls
+// Mock SparseSolver- records allocElement / stampElement calls
 // ---------------------------------------------------------------------------
 
 class MockSolver {
@@ -76,7 +76,7 @@ class MockSolver {
 }
 
 // ---------------------------------------------------------------------------
-// makeCtx — minimal LoadContext factory for tests
+// makeCtx- minimal LoadContext factory for tests
 // ---------------------------------------------------------------------------
 
 function makeCtx(overrides: Omit<Partial<LoadContext>, "solver"> & { solver?: MockSolver } = {}): LoadContext {
@@ -133,7 +133,7 @@ const CMOS_3V3: ResolvedPinElectrical = {
 };
 
 // ---------------------------------------------------------------------------
-// DigitalOutputPinModel — Task 6.4.2 tests
+// DigitalOutputPinModel- Task 6.4.2 tests
 // ---------------------------------------------------------------------------
 
 describe("DigitalOutputPinModel", () => {
@@ -221,7 +221,7 @@ describe("DigitalOutputPinModel", () => {
 
     // direct: 1/rOut diagonal at NODE
     // RHS at NODE = vOL / rOut
-    // No branch-row stamps at all — branchRow unused for direct
+    // No branch-row stamps at all- branchRow unused for direct
     expect(solver.sumAt(branchRow, NODE)).toBe(0);
     expect(solver.sumAt(branchRow, branchRow)).toBe(0);
   });
@@ -280,14 +280,14 @@ describe("DigitalOutputPinModel", () => {
     const pinTrue = new DigitalOutputPinModel(CMOS_3V3, true, "direct");
     expect(pinTrue.loaded).toBe(true);
 
-    // No setter — assignment is silently ignored (getter-only in class)
+    // No setter- assignment is silently ignored (getter-only in class)
     const pin = new DigitalOutputPinModel(CMOS_3V3, false, "direct");
     try {
       (pin as any).loaded = true;
     } catch {
       // Test accepts both strict-mode TypeError and non-strict silent
       // ignore. The catch is part of the assertion. Per
-      // spec/architectural-alignment.md §I1 retain-with-reason.
+      // spec/architectural-alignment.md ssI1 retain-with-reason.
     }
     expect(pin.loaded).toBe(false);
   });
@@ -326,7 +326,7 @@ describe("DigitalOutputPinModel", () => {
 });
 
 // ---------------------------------------------------------------------------
-// DigitalInputPinModel — Task 6.4.2 tests
+// DigitalInputPinModel- Task 6.4.2 tests
 // ---------------------------------------------------------------------------
 
 describe("DigitalInputPinModel", () => {
@@ -410,13 +410,13 @@ describe("DigitalInputPinModel", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Task 0.2.3 — DigitalPinModel refactored to use AnalogCapacitorElement child
+// Task 0.2.3- DigitalPinModel refactored to use AnalogCapacitorElement child
 // ---------------------------------------------------------------------------
 
-describe("Task 0.2.3 — DigitalPinModel capacitor child refactor", () => {
+describe("Task 0.2.3- DigitalPinModel capacitor child refactor", () => {
   it("no_prev_voltage_field", () => {
     // _prevVoltage and _prevCurrent must not exist as own properties on either class.
-    // These were removed in Task 0.2.3 — companion history is now held by the
+    // These were removed in Task 0.2.3- companion history is now held by the
     // AnalogCapacitorElement child element.
     const outPin = new DigitalOutputPinModel(CMOS_3V3, true, "direct");
     const inPin = new DigitalInputPinModel(CMOS_3V3, true);

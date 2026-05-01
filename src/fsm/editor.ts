@@ -1,5 +1,5 @@
 /**
- * FSM graphical editor — manages FSM-mode canvas rendering and interaction.
+ * FSM graphical editor- manages FSM-mode canvas rendering and interaction.
  *
  * Reuses the shared undo/redo stack from Phase 2. Provides tools for adding
  * states and transitions, moving states, deleting items, and editing properties.

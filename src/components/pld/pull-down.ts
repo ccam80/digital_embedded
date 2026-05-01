@@ -1,5 +1,5 @@
 /**
- * PullDown component — pulls a floating net to logic 0.
+ * PullDown component- pulls a floating net to logic 0.
  *
  * In Digital, PullDown is "only a placeholder. Has no connections to the model!"
  * Its effect is declared via a PullResistor annotation on the output pin.
@@ -10,8 +10,8 @@
  * with other drivers using wired-OR priority: active-high driver wins over pull-down.
  *
  * Properties:
- *   bitWidth — width of the net being pulled (default 1)
- *   label    — optional label shown near the component
+ *   bitWidth- width of the net being pulled (default 1)
+ *   label   - optional label shown near the component
  */
 
 import { AbstractCircuitElement } from "../../core/element.js";
@@ -52,7 +52,7 @@ function buildPullDownPinDeclarations(bitWidth: number): PinDeclaration[] {
 }
 
 // ---------------------------------------------------------------------------
-// PullDownElement — CircuitElement implementation
+// PullDownElement- CircuitElement implementation
 // ---------------------------------------------------------------------------
 
 export class PullDownElement extends AbstractCircuitElement {
@@ -117,7 +117,7 @@ export class PullDownElement extends AbstractCircuitElement {
 }
 
 // ---------------------------------------------------------------------------
-// executePullDown — flat simulation function
+// executePullDown- flat simulation function
 //
 // Writes zero to the output slot.
 // The bus resolver gives priority to active drivers; this value is used
@@ -188,7 +188,7 @@ export const PullDownDefinition: ComponentDefinition = {
   attributeMap: PULL_DOWN_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.PLD,
   helpText:
-    "PullDown — pulls a floating net to logic 0.\n" +
+    "PullDown- pulls a floating net to logic 0.\n" +
     "Connects a resistor from GND to the output net.\n" +
     "When no active-high driver overrides, the net reads as logic 0.",
   models: {

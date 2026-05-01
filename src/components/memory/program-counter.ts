@@ -1,5 +1,5 @@
 /**
- * ProgramCounter — edge-triggered counter with jump (load) support.
+ * ProgramCounter- edge-triggered counter with jump (load) support.
  *
  * Used as the instruction pointer in CPU circuits. On each rising clock edge:
  *   - If ld=1 (load): PC = D (jump to address)
@@ -52,7 +52,7 @@ const COMP_WIDTH = 3;
 const COMP_HEIGHT = 4;
 
 // ---------------------------------------------------------------------------
-// Pin declarations — y-positions shifted down by 1 from previous layout
+// Pin declarations- y-positions shifted down by 1 from previous layout
 // ---------------------------------------------------------------------------
 
 const PROGRAM_COUNTER_PIN_DECLARATIONS: PinDeclaration[] = [
@@ -113,7 +113,7 @@ const PROGRAM_COUNTER_PIN_DECLARATIONS: PinDeclaration[] = [
 ];
 
 // ---------------------------------------------------------------------------
-// ProgramCounterElement — CircuitElement implementation
+// ProgramCounterElement- CircuitElement implementation
 // ---------------------------------------------------------------------------
 
 export class ProgramCounterElement extends AbstractCircuitElement {
@@ -177,7 +177,7 @@ export class ProgramCounterElement extends AbstractCircuitElement {
 }
 
 // ---------------------------------------------------------------------------
-// executeProgramCounter — flat simulation function
+// executeProgramCounter- flat simulation function
 //
 // Input layout:  [D=0, en=1, C=2, ld=3]
 // Output layout: [Q=0, ovf=1]
@@ -284,7 +284,7 @@ export const ProgramCounterDefinition: ComponentDefinition = {
   propertyDefs: PROGRAM_COUNTER_PROPERTY_DEFS,
   attributeMap: PROGRAM_COUNTER_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.MEMORY,
-  helpText: "ProgramCounter — edge-triggered instruction pointer with jump support.",
+  helpText: "ProgramCounter- edge-triggered instruction pointer with jump support.",
   models: {
     digital: {
       executeFn: executeProgramCounter,

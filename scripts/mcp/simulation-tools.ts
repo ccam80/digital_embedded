@@ -1,5 +1,5 @@
 /**
- * MCP simulation tool registrations — interactive simulation for compiled circuits.
+ * MCP simulation tool registrations- interactive simulation for compiled circuits.
  *
  * Requires circuit_compile to be called first to store an engine in session.
  * All tools auto-compile if no engine is stored yet for the given handle.
@@ -235,7 +235,7 @@ export function registerSimulationTools(
       description:
         "Run the analog simulation to each target time in order, capturing all labeled " +
         "signal values at each sample point. Times must be monotonically increasing. " +
-        "Runs without yielding to the event loop — fast for headless/test use. " +
+        "Runs without yielding to the event loop- fast for headless/test use. " +
         "Returns a table of signal values at each time.",
       inputSchema: {
         handle: z.string().describe("Circuit handle"),

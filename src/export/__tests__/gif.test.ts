@@ -1,10 +1,10 @@
 /**
- * Tests for exportGif() — animated GIF circuit export.
+ * Tests for exportGif()- animated GIF circuit export.
  *
  * Spec tests:
- *   producesBlob      — export returns a Blob with type image/gif
- *   correctFrameCount — 10 steps → GIF has 10 frames
- *   frameDelay        — 100ms delay → encoded in GIF frame metadata
+ *   producesBlob     - export returns a Blob with type image/gif
+ *   correctFrameCount- 10 steps → GIF has 10 frames
+ *   frameDelay       - 100ms delay → encoded in GIF frame metadata
  *
  * Runs in the node environment (no DOM). The engine is stubbed to count
  * step() calls. Frame pixel data is injected via the `frameCapture` option
@@ -144,7 +144,7 @@ function buildEmptyCircuit(): Circuit {
 // ---------------------------------------------------------------------------
 
 describe("exportGif", () => {
-  it("producesBlob — export returns a Blob with type image/gif", async () => {
+  it("producesBlob- export returns a Blob with type image/gif", async () => {
     const circuit = buildEmptyCircuit();
     const engine = new StubEngine();
 
@@ -160,7 +160,7 @@ describe("exportGif", () => {
     expect(blob.type).toBe("image/gif");
   });
 
-  it("correctFrameCount — 10 steps produces a GIF with 10 frames", async () => {
+  it("correctFrameCount- 10 steps produces a GIF with 10 frames", async () => {
     const circuit = buildEmptyCircuit();
     const engine = new StubEngine();
 
@@ -179,7 +179,7 @@ describe("exportGif", () => {
     expect(frameCount).toBe(10);
   });
 
-  it("correctFrameCount — engine.step() called once per frame step", async () => {
+  it("correctFrameCount- engine.step() called once per frame step", async () => {
     const circuit = buildEmptyCircuit();
     const engine = new StubEngine();
 
@@ -194,7 +194,7 @@ describe("exportGif", () => {
     expect(engine.stepCount).toBe(7);
   });
 
-  it("frameDelay — 100ms delay is encoded as 10 centiseconds in GIF metadata", async () => {
+  it("frameDelay- 100ms delay is encoded as 10 centiseconds in GIF metadata", async () => {
     const circuit = buildEmptyCircuit();
     const engine = new StubEngine();
 
@@ -217,7 +217,7 @@ describe("exportGif", () => {
     }
   });
 
-  it("frameDelay — 200ms delay is encoded as 20 centiseconds in GIF metadata", async () => {
+  it("frameDelay- 200ms delay is encoded as 20 centiseconds in GIF metadata", async () => {
     const circuit = buildEmptyCircuit();
     const engine = new StubEngine();
 

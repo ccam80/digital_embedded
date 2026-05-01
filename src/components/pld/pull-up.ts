@@ -1,5 +1,5 @@
 /**
- * PullUp component — pulls a floating net to logic 1.
+ * PullUp component- pulls a floating net to logic 1.
  *
  * In Digital, PullUp is "only a placeholder. Has no connections to the model!"
  * Its effect is declared via a PullResistor annotation on the output pin.
@@ -10,8 +10,8 @@
  * with other drivers using wired-OR priority: active-low driver wins over pull-up.
  *
  * Properties:
- *   bitWidth — width of the net being pulled (default 1)
- *   label    — optional label shown near the component
+ *   bitWidth- width of the net being pulled (default 1)
+ *   label   - optional label shown near the component
  */
 
 import { AbstractCircuitElement } from "../../core/element.js";
@@ -52,7 +52,7 @@ function buildPullUpPinDeclarations(bitWidth: number): PinDeclaration[] {
 }
 
 // ---------------------------------------------------------------------------
-// PullUpElement — CircuitElement implementation
+// PullUpElement- CircuitElement implementation
 // ---------------------------------------------------------------------------
 
 export class PullUpElement extends AbstractCircuitElement {
@@ -119,7 +119,7 @@ export class PullUpElement extends AbstractCircuitElement {
 }
 
 // ---------------------------------------------------------------------------
-// executePullUp — flat simulation function
+// executePullUp- flat simulation function
 //
 // Writes all-ones mask for the configured bit width.
 // The bus resolver gives priority to active drivers; this value is used
@@ -190,7 +190,7 @@ export const PullUpDefinition: ComponentDefinition = {
   attributeMap: PULL_UP_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.PLD,
   helpText:
-    "PullUp — pulls a floating net to logic 1.\n" +
+    "PullUp- pulls a floating net to logic 1.\n" +
     "Connects a resistor from VDD to the output net.\n" +
     "When no active-low driver overrides, the net reads as logic 1.",
   models: {

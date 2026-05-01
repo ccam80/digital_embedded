@@ -77,21 +77,21 @@ function makeFETLayout(inputCount: number, stateCount: number): {
 // ---------------------------------------------------------------------------
 
 describe("NFET", () => {
-  it("gateHigh — G=1 → closed (state=1)", () => {
+  it("gateHigh- G=1 → closed (state=1)", () => {
     const { layout, state, highZs } = makeFETLayout(1, 1);
     state[0] = 1; // G
     executeNFET(0, state, highZs, layout);
     expect(state[1]).toBe(1);
   });
 
-  it("gateLow — G=0 → open (state=0)", () => {
+  it("gateLow- G=0 → open (state=0)", () => {
     const { layout, state, highZs } = makeFETLayout(1, 1);
     state[0] = 0; // G
     executeNFET(0, state, highZs, layout);
     expect(state[1]).toBe(0);
   });
 
-  it("gateTransitions — toggles correctly", () => {
+  it("gateTransitions- toggles correctly", () => {
     const { layout, state, highZs } = makeFETLayout(1, 1);
 
     state[0] = 1;
@@ -107,7 +107,7 @@ describe("NFET", () => {
     expect(state[1]).toBe(1);
   });
 
-  it("pinLayout — 1 input (G) + 2 bidirectional (D, S)", () => {
+  it("pinLayout- 1 input (G) + 2 bidirectional (D, S)", () => {
     const props = new PropertyBag();
     const el = new NFETElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
     const pins = el.getPins();
@@ -121,14 +121,14 @@ describe("NFET", () => {
     expect(labels).toContain("S");
   });
 
-  it("attributeMapping — Bits and Label map correctly", () => {
+  it("attributeMapping- Bits and Label map correctly", () => {
     const bitsMap = NFET_ATTRIBUTE_MAPPINGS.find(m => m.xmlName === "Bits");
     const labelMap = NFET_ATTRIBUTE_MAPPINGS.find(m => m.xmlName === "Label");
     expect(bitsMap!.convert("4")).toBe(4);
     expect(labelMap!.convert("Q1")).toBe("Q1");
   });
 
-  it("draw — renders lines and gate elements", () => {
+  it("draw- renders lines and gate elements", () => {
     const props = new PropertyBag();
     const el = new NFETElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
     const calls: string[] = [];
@@ -149,7 +149,7 @@ describe("NFET", () => {
     expect(calls.filter(c => c === "drawLine").length).toBeGreaterThan(0);
   });
 
-  it("draw — renders label when set", () => {
+  it("draw- renders label when set", () => {
     const props = new PropertyBag();
     props.set("label", "Q1");
     const el = new NFETElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
@@ -163,7 +163,7 @@ describe("NFET", () => {
     expect(texts).toContain("Q1");
   });
 
-  it("definitionComplete — NFETDefinition has all required fields", () => {
+  it("definitionComplete- NFETDefinition has all required fields", () => {
     expect(NFETDefinition.name).toBe("NFET");
     expect(NFETDefinition.factory).toBeDefined();
     expect(NFETDefinition.models.digital!.executeFn).toBeDefined();
@@ -175,12 +175,12 @@ describe("NFET", () => {
     expect(typeof NFETDefinition.models.digital!.defaultDelay).toBe("number");
   });
 
-  it("factoryCreatesInstance — factory returns NFETElement", () => {
+  it("factoryCreatesInstance- factory returns NFETElement", () => {
     const props = new PropertyBag();
     expect(NFETDefinition.factory(props)).toBeInstanceOf(NFETElement);
   });
 
-  it("boundingBox — non-zero dimensions at correct position", () => {
+  it("boundingBox- non-zero dimensions at correct position", () => {
     const props = new PropertyBag();
     const el = new NFETElement(crypto.randomUUID(), { x: 2, y: 3 }, 0, false, props);
     const bb = el.getBoundingBox();
@@ -196,21 +196,21 @@ describe("NFET", () => {
 // ---------------------------------------------------------------------------
 
 describe("PFET", () => {
-  it("gateLow — G=0 → closed (state=1)", () => {
+  it("gateLow- G=0 → closed (state=1)", () => {
     const { layout, state, highZs } = makeFETLayout(1, 1);
     state[0] = 0; // G
     executePFET(0, state, highZs, layout);
     expect(state[1]).toBe(1);
   });
 
-  it("gateHigh — G=1 → open (state=0)", () => {
+  it("gateHigh- G=1 → open (state=0)", () => {
     const { layout, state, highZs } = makeFETLayout(1, 1);
     state[0] = 1; // G
     executePFET(0, state, highZs, layout);
     expect(state[1]).toBe(0);
   });
 
-  it("gateTransitions — toggles correctly (inverted vs NFET)", () => {
+  it("gateTransitions- toggles correctly (inverted vs NFET)", () => {
     const { layout, state, highZs } = makeFETLayout(1, 1);
 
     state[0] = 0;
@@ -222,7 +222,7 @@ describe("PFET", () => {
     expect(state[1]).toBe(0); // non-conducting
   });
 
-  it("pinLayout — 1 input (G) + 2 bidirectional (S, D)", () => {
+  it("pinLayout- 1 input (G) + 2 bidirectional (S, D)", () => {
     const props = new PropertyBag();
     const el = new PFETElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
     const pins = el.getPins();
@@ -236,14 +236,14 @@ describe("PFET", () => {
     expect(labels).toContain("D");
   });
 
-  it("attributeMapping — Bits and Label map correctly", () => {
+  it("attributeMapping- Bits and Label map correctly", () => {
     const bitsMap = PFET_ATTRIBUTE_MAPPINGS.find(m => m.xmlName === "Bits");
     const labelMap = PFET_ATTRIBUTE_MAPPINGS.find(m => m.xmlName === "Label");
     expect(bitsMap!.convert("8")).toBe(8);
     expect(labelMap!.convert("P1")).toBe("P1");
   });
 
-  it("draw — renders P-channel arrow (drawPolygon) and lead lines", () => {
+  it("draw- renders P-channel arrow (drawPolygon) and lead lines", () => {
     const props = new PropertyBag();
     const el = new PFETElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
     const calls: string[] = [];
@@ -267,7 +267,7 @@ describe("PFET", () => {
     expect(calls).toContain("drawPolygon");
   });
 
-  it("definitionComplete — PFETDefinition has all required fields", () => {
+  it("definitionComplete- PFETDefinition has all required fields", () => {
     expect(PFETDefinition.name).toBe("PFET");
     expect(PFETDefinition.factory).toBeDefined();
     expect(PFETDefinition.models.digital!.executeFn).toBeDefined();
@@ -275,7 +275,7 @@ describe("PFET", () => {
     expect(typeof PFETDefinition.models.digital!.defaultDelay).toBe("number");
   });
 
-  it("factoryCreatesInstance — factory returns PFETElement", () => {
+  it("factoryCreatesInstance- factory returns PFETElement", () => {
     const props = new PropertyBag();
     expect(PFETDefinition.factory(props)).toBeInstanceOf(PFETElement);
   });
@@ -286,7 +286,7 @@ describe("PFET", () => {
 // ---------------------------------------------------------------------------
 
 describe("FGNFET", () => {
-  it("gateHigh_notBlown — G=1, blown=0 → closed (state=1)", () => {
+  it("gateHigh_notBlown- G=1, blown=0 → closed (state=1)", () => {
     // State layout: [G=0, closedFlag=1, blownFlag=2]
     const state = new Uint32Array(3);
     const highZs = new Uint32Array(state.length);
@@ -305,7 +305,7 @@ describe("FGNFET", () => {
     expect(state[1]).toBe(1); // closedFlag=1 (conducting)
   });
 
-  it("gateLow_notBlown — G=0, blown=0 → open (state=0)", () => {
+  it("gateLow_notBlown- G=0, blown=0 → open (state=0)", () => {
     // State layout: inputs=[G], state=[closedFlag, blownFlag]
     // Total slots: 1 input + 2 state = 3
     const state = new Uint32Array(3);
@@ -326,7 +326,7 @@ describe("FGNFET", () => {
     expect(state[1]).toBe(0); // closed=0 (gate low)
   });
 
-  it("gateHigh_notBlown — G=1, blown=0 → closed=1", () => {
+  it("gateHigh_notBlown- G=1, blown=0 → closed=1", () => {
     const state = new Uint32Array(3);
     const highZs = new Uint32Array(state.length);
     const layout: ComponentLayout & FETLayout = {
@@ -344,7 +344,7 @@ describe("FGNFET", () => {
     expect(state[1]).toBe(1); // closed=1
   });
 
-  it("blown_gateHigh — G=1, blown=1 → permanently open (state=0)", () => {
+  it("blown_gateHigh- G=1, blown=1 → permanently open (state=0)", () => {
     const state = new Uint32Array(3);
     const highZs = new Uint32Array(state.length);
     const layout: ComponentLayout & FETLayout = {
@@ -362,7 +362,7 @@ describe("FGNFET", () => {
     expect(state[1]).toBe(0); // blown → always open
   });
 
-  it("blown_gateLow — G=0, blown=1 → still open", () => {
+  it("blown_gateLow- G=0, blown=1 → still open", () => {
     const state = new Uint32Array(3);
     const highZs = new Uint32Array(state.length);
     const layout: ComponentLayout & FETLayout = {
@@ -380,20 +380,20 @@ describe("FGNFET", () => {
     expect(state[1]).toBe(0); // blown → always open
   });
 
-  it("blownProperty — element exposes blown flag", () => {
+  it("blownProperty- element exposes blown flag", () => {
     const props = new PropertyBag();
     props.set("blown", true);
     const el = new FGNFETElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
     expect(el.blown).toBe(true);
   });
 
-  it("notBlownDefault — defaults to false", () => {
+  it("notBlownDefault- defaults to false", () => {
     const props = new PropertyBag();
     const el = new FGNFETElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
     expect(el.blown).toBe(false);
   });
 
-  it("draw — renders blown X mark when blown", () => {
+  it("draw- renders blown X mark when blown", () => {
     const props = new PropertyBag();
     props.set("blown", true);
     const el = new FGNFETElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
@@ -408,7 +408,7 @@ describe("FGNFET", () => {
     expect(colors).toContain("WIRE_ERROR");
   });
 
-  it("draw_notBlown — no WIRE_ERROR color when not blown", () => {
+  it("draw_notBlown- no WIRE_ERROR color when not blown", () => {
     const props = new PropertyBag();
     const el = new FGNFETElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
     const colors: string[] = [];
@@ -422,7 +422,7 @@ describe("FGNFET", () => {
     expect(colors).not.toContain("ERROR");
   });
 
-  it("attributeMapping — Bits, Label, blown map correctly", () => {
+  it("attributeMapping- Bits, Label, blown map correctly", () => {
     const bitsMap = FGNFET_ATTRIBUTE_MAPPINGS.find(m => m.xmlName === "Bits");
     const blownMap = FGNFET_ATTRIBUTE_MAPPINGS.find(m => m.xmlName === "blown");
     expect(bitsMap!.convert("4")).toBe(4);
@@ -430,7 +430,7 @@ describe("FGNFET", () => {
     expect(blownMap!.convert("false")).toBe(false);
   });
 
-  it("definitionComplete — FGNFETDefinition has all required fields", () => {
+  it("definitionComplete- FGNFETDefinition has all required fields", () => {
     expect(FGNFETDefinition.name).toBe("FGNFET");
     expect(FGNFETDefinition.factory).toBeDefined();
     expect(FGNFETDefinition.models.digital!.executeFn).toBeDefined();
@@ -438,7 +438,7 @@ describe("FGNFET", () => {
     expect(typeof FGNFETDefinition.models.digital!.defaultDelay).toBe("number");
   });
 
-  it("factoryCreatesInstance — factory returns FGNFETElement", () => {
+  it("factoryCreatesInstance- factory returns FGNFETElement", () => {
     const props = new PropertyBag();
     expect(FGNFETDefinition.factory(props)).toBeInstanceOf(FGNFETElement);
   });
@@ -449,7 +449,7 @@ describe("FGNFET", () => {
 // ---------------------------------------------------------------------------
 
 describe("FGPFET", () => {
-  it("gateLow_notBlown — G=0, blown=0 → closed=1 (P-channel)", () => {
+  it("gateLow_notBlown- G=0, blown=0 → closed=1 (P-channel)", () => {
     const state = new Uint32Array(3);
     const highZs = new Uint32Array(state.length);
     const layout: ComponentLayout & FETLayout = {
@@ -467,7 +467,7 @@ describe("FGPFET", () => {
     expect(state[1]).toBe(1); // closed (PFET: gate low → conducting)
   });
 
-  it("gateHigh_notBlown — G=1, blown=0 → open=0", () => {
+  it("gateHigh_notBlown- G=1, blown=0 → open=0", () => {
     const state = new Uint32Array(3);
     const highZs = new Uint32Array(state.length);
     const layout: ComponentLayout & FETLayout = {
@@ -485,7 +485,7 @@ describe("FGPFET", () => {
     expect(state[1]).toBe(0); // open (PFET: gate high → non-conducting)
   });
 
-  it("blown_gateLow — G=0, blown=1 → permanently open", () => {
+  it("blown_gateLow- G=0, blown=1 → permanently open", () => {
     const state = new Uint32Array(3);
     const highZs = new Uint32Array(state.length);
     const layout: ComponentLayout & FETLayout = {
@@ -503,7 +503,7 @@ describe("FGPFET", () => {
     expect(state[1]).toBe(0); // blown → always open
   });
 
-  it("blown_gateHigh — G=1, blown=1 → still open", () => {
+  it("blown_gateHigh- G=1, blown=1 → still open", () => {
     const state = new Uint32Array(3);
     const highZs = new Uint32Array(state.length);
     const layout: ComponentLayout & FETLayout = {
@@ -521,14 +521,14 @@ describe("FGPFET", () => {
     expect(state[1]).toBe(0); // blown → always open
   });
 
-  it("blownProperty — element exposes blown flag", () => {
+  it("blownProperty- element exposes blown flag", () => {
     const props = new PropertyBag();
     props.set("blown", true);
     const el = new FGPFETElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
     expect(el.blown).toBe(true);
   });
 
-  it("draw — renders blown indicator when blown", () => {
+  it("draw- renders blown indicator when blown", () => {
     const props = new PropertyBag();
     props.set("blown", true);
     const el = new FGPFETElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
@@ -543,13 +543,13 @@ describe("FGPFET", () => {
     expect(colors).toContain("WIRE_ERROR");
   });
 
-  it("attributeMapping — blown converts string to boolean", () => {
+  it("attributeMapping- blown converts string to boolean", () => {
     const blownMap = FGPFET_ATTRIBUTE_MAPPINGS.find(m => m.xmlName === "blown");
     expect(blownMap!.convert("true")).toBe(true);
     expect(blownMap!.convert("false")).toBe(false);
   });
 
-  it("definitionComplete — FGPFETDefinition has all required fields", () => {
+  it("definitionComplete- FGPFETDefinition has all required fields", () => {
     expect(FGPFETDefinition.name).toBe("FGPFET");
     expect(FGPFETDefinition.factory).toBeDefined();
     expect(FGPFETDefinition.models.digital!.executeFn).toBeDefined();
@@ -557,7 +557,7 @@ describe("FGPFET", () => {
     expect(typeof FGPFETDefinition.models.digital!.defaultDelay).toBe("number");
   });
 
-  it("factoryCreatesInstance — factory returns FGPFETElement", () => {
+  it("factoryCreatesInstance- factory returns FGPFETElement", () => {
     const props = new PropertyBag();
     expect(FGPFETDefinition.factory(props)).toBeInstanceOf(FGPFETElement);
   });
@@ -568,7 +568,7 @@ describe("FGPFET", () => {
 // ---------------------------------------------------------------------------
 
 describe("TransGate", () => {
-  it("S=1 ~S=0 — valid complementary pair, gate on → closed (state=1)", () => {
+  it("S=1 ~S=0- valid complementary pair, gate on → closed (state=1)", () => {
     const state = new Uint32Array(3); // [S=0, ~S=1, closedFlag=2]
     const highZs = new Uint32Array(state.length);
     const layout: ComponentLayout & FETLayout = {
@@ -586,7 +586,7 @@ describe("TransGate", () => {
     expect(state[2]).toBe(1); // closed
   });
 
-  it("S=0 ~S=1 — valid complementary pair, gate off → open (state=0)", () => {
+  it("S=0 ~S=1- valid complementary pair, gate off → open (state=0)", () => {
     const state = new Uint32Array(3);
     const highZs = new Uint32Array(state.length);
     const layout: ComponentLayout & FETLayout = {
@@ -604,7 +604,7 @@ describe("TransGate", () => {
     expect(state[2]).toBe(0); // open
   });
 
-  it("S=0 ~S=0 — invalid (same) → open (state=0)", () => {
+  it("S=0 ~S=0- invalid (same) → open (state=0)", () => {
     const state = new Uint32Array(3);
     const highZs = new Uint32Array(state.length);
     const layout: ComponentLayout & FETLayout = {
@@ -622,7 +622,7 @@ describe("TransGate", () => {
     expect(state[2]).toBe(0); // invalid → open
   });
 
-  it("S=1 ~S=1 — invalid (same) → open (state=0)", () => {
+  it("S=1 ~S=1- invalid (same) → open (state=0)", () => {
     const state = new Uint32Array(3);
     const highZs = new Uint32Array(state.length);
     const layout: ComponentLayout & FETLayout = {
@@ -640,7 +640,7 @@ describe("TransGate", () => {
     expect(state[2]).toBe(0); // invalid → open
   });
 
-  it("gateTransitions — toggling S and ~S changes state", () => {
+  it("gateTransitions- toggling S and ~S changes state", () => {
     const state = new Uint32Array(3);
     const highZs = new Uint32Array(state.length);
     const layout: ComponentLayout & FETLayout = {
@@ -662,7 +662,7 @@ describe("TransGate", () => {
     expect(state[2]).toBe(0); // open
   });
 
-  it("pinLayout — 2 inputs (p1, p2) + 2 bidirectional (out1, out2)", () => {
+  it("pinLayout- 2 inputs (p1, p2) + 2 bidirectional (out1, out2)", () => {
     const props = new PropertyBag();
     const el = new TransGateElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
     const pins = el.getPins();
@@ -677,14 +677,14 @@ describe("TransGate", () => {
     expect(labels).toContain("out2");
   });
 
-  it("attributeMapping — Bits and Label map correctly", () => {
+  it("attributeMapping- Bits and Label map correctly", () => {
     const bitsMap = TRANS_GATE_ATTRIBUTE_MAPPINGS.find(m => m.xmlName === "Bits");
     const labelMap = TRANS_GATE_ATTRIBUTE_MAPPINGS.find(m => m.xmlName === "Label");
     expect(bitsMap!.convert("16")).toBe(16);
     expect(labelMap!.convert("TG1")).toBe("TG1");
   });
 
-  it("draw — renders bowtie polygons and inversion bubble", () => {
+  it("draw- renders bowtie polygons and inversion bubble", () => {
     const props = new PropertyBag();
     const el = new TransGateElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
     const calls: string[] = [];
@@ -709,7 +709,7 @@ describe("TransGate", () => {
     expect(calls.filter(c => c === "drawLine").length).toBeGreaterThan(0);
   });
 
-  it("draw — renders label when set", () => {
+  it("draw- renders label when set", () => {
     const props = new PropertyBag();
     props.set("label", "TG1");
     const el = new TransGateElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
@@ -723,7 +723,7 @@ describe("TransGate", () => {
     expect(texts).toContain("TG1");
   });
 
-  it("definitionComplete — TransGateDefinition has all required fields", () => {
+  it("definitionComplete- TransGateDefinition has all required fields", () => {
     expect(TransGateDefinition.name).toBe("TransGate");
     expect(TransGateDefinition.factory).toBeDefined();
     expect(TransGateDefinition.models!.digital!.executeFn).toBeDefined();
@@ -735,12 +735,12 @@ describe("TransGate", () => {
     expect(typeof TransGateDefinition.models!.digital!.defaultDelay).toBe("number");
   });
 
-  it("factoryCreatesInstance — factory returns TransGateElement", () => {
+  it("factoryCreatesInstance- factory returns TransGateElement", () => {
     const props = new PropertyBag();
     expect(TransGateDefinition.factory(props)).toBeInstanceOf(TransGateElement);
   });
 
-  it("boundingBox — non-zero dimensions at correct position", () => {
+  it("boundingBox- non-zero dimensions at correct position", () => {
     const props = new PropertyBag();
     const el = new TransGateElement(crypto.randomUUID(), { x: 5, y: 7 }, 0, false, props);
     const bb = el.getBoundingBox();

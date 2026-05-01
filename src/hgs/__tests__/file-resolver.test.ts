@@ -1,5 +1,5 @@
 /**
- * Tests for HGS file resolvers — task 4.3.5.
+ * Tests for HGS file resolvers- task 4.3.5.
  */
 
 import { describe, it, expect } from "vitest";

@@ -41,7 +41,7 @@ export function formatNetlist(netlist: Netlist): string {
       )
       .join(", ");
 
-    // Show non-trivial properties (skip label — already shown — and position)
+    // Show non-trivial properties (skip label- already shown- and position)
     const propEntries = Object.entries(comp.properties).filter(
       ([k]) => k !== "label" && k !== "position"
     );
@@ -51,7 +51,7 @@ export function formatNetlist(netlist: Netlist): string {
         : "";
 
     const modelTag = comp.modelKey ? ` [${comp.modelKey}]` : "";
-    lines.push(`  [${comp.index}] ${comp.typeId}${modelTag}${label}${propSuffix} — pins: ${pinSummary}`);
+    lines.push(`  [${comp.index}] ${comp.typeId}${modelTag}${label}${propSuffix}- pins: ${pinSummary}`);
   }
 
   lines.push("");
@@ -133,7 +133,7 @@ export function formatComponentDefinition(def: ComponentDefinition): string {
           }
         }
       } catch {
-        /* factory may fail with minimal props — skip detection */
+        /* factory may fail with minimal props- skip detection */
       }
     }
 

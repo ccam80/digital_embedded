@@ -75,7 +75,7 @@ function makeRegistry(...typeIds: string[]): ComponentRegistry {
 // Tests
 // ---------------------------------------------------------------------------
 
-describe("flattenCircuit — Port interface elements", () => {
+describe("flattenCircuit- Port interface elements", () => {
   it("Port matched by label creates bridge wire for BIDIRECTIONAL subcircuit pin", () => {
     // Internal circuit: Port("A") → And gate
     const internal = new Circuit({ name: "PortSub" });
@@ -165,7 +165,7 @@ describe("flattenCircuit — Port interface elements", () => {
     expect(flat.circuit.wires.length).toBe(3);
   });
 
-  it("returns undefined for BIDIRECTIONAL when no Port matches — does not match Out", () => {
+  it("returns undefined for BIDIRECTIONAL when no Port matches- does not match Out", () => {
     // Internal circuit has an Out("Z") but NO Port("Z")
     const internal = new Circuit({ name: "MismatchSub" });
     const outEl = makeOutElement("out1", "Z", { x: 10, y: 0 });
@@ -173,7 +173,7 @@ describe("flattenCircuit — Port interface elements", () => {
     internal.addElement(outEl);
     internal.addElement(gate);
 
-    // Parent with a BIDIRECTIONAL pin "Z" — should NOT match the Out element
+    // Parent with a BIDIRECTIONAL pin "Z"- should NOT match the Out element
     const top = new Circuit({ name: "Top" });
     const subcircuitPins: Pin[] = [
       {
@@ -196,7 +196,7 @@ describe("flattenCircuit — Port interface elements", () => {
     const flatGates = flat.circuit.elements.filter((e) => e.typeId === "And");
     expect(flatGates.length).toBe(1);
 
-    // No bridge wire for the unmatched BIDIRECTIONAL pin — findInterfaceElement returned undefined
+    // No bridge wire for the unmatched BIDIRECTIONAL pin- findInterfaceElement returned undefined
     // The only wires should be from internal wiring, not bridge wires from the subcircuit pin
     const bridgeWires = flat.circuit.wires.filter((w) =>
       (w.start.x === 30 && w.start.y === 1) ||
@@ -205,7 +205,7 @@ describe("flattenCircuit — Port interface elements", () => {
     expect(bridgeWires.length).toBe(0);
   });
 
-  it("Port with bitWidth 8 flattens correctly — bus-width preserved across bridge", () => {
+  it("Port with bitWidth 8 flattens correctly- bus-width preserved across bridge", () => {
     // Internal circuit: Port("BUS") with bitWidth 8
     const internal = new Circuit({ name: "BusSub" });
     const portEl = makePortElement("port-BUS", "BUS", { x: 0, y: 0 }, 8);
@@ -243,7 +243,7 @@ describe("flattenCircuit — Port interface elements", () => {
     // 1 internal wire (Port pin → And pin) + 1 bridge wire (subcircuit pin → Port pin) = 2
     expect(flat.circuit.wires.length).toBe(2);
 
-    // Port IS retained in the flattened circuit — assert count unconditionally
+    // Port IS retained in the flattened circuit- assert count unconditionally
     const flatPorts = flat.circuit.elements.filter((e) => e.typeId === "Port");
     expect(flatPorts.length).toBe(1);
     const portPins = flatPorts[0].getPins();
@@ -283,7 +283,7 @@ describe("flattenCircuit — Port interface elements", () => {
     const reg = makeRegistry();
     const flat = flattenCircuit(top, reg);
 
-    // Find the bridge wire — endpoints at world positions: subcircuit pin world and Port pin world
+    // Find the bridge wire- endpoints at world positions: subcircuit pin world and Port pin world
     const bridgeWire = flat.circuit.wires.find((w) =>
       (w.start.x === expectedSubPinWorld.x && w.start.y === expectedSubPinWorld.y &&
        w.end.x === expectedPortPinWorld.x && w.end.y === expectedPortPinWorld.y) ||

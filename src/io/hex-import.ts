@@ -1,5 +1,5 @@
 /**
- * Hex file import — auto-detects and parses Logisim raw hex, Intel HEX,
+ * Hex file import- auto-detects and parses Logisim raw hex, Intel HEX,
  * and raw binary formats into a DataField.
  */
 
@@ -70,7 +70,7 @@ export function parseLogisimHex(text: string): DataField {
       i++;
 
       if (i < tokens.length && tokens[i] === "*") {
-        // count * value — next token after * is the value
+        // count * value- next token after * is the value
         const count = parseInt(token, 10);
         if (isNaN(count)) {
           throw new Error(`Invalid run-length count in Logisim hex: "${token}"`);
@@ -114,10 +114,10 @@ export function parseLogisimHex(text: string): DataField {
  * Parse an Intel HEX file.
  *
  * Record types handled:
- *   00 — Data
- *   01 — End of File
- *   02 — Extended Segment Address (shift by 4 bits)
- *   04 — Extended Linear Address (shift by 16 bits)
+ *   00- Data
+ *   01- End of File
+ *   02- Extended Segment Address (shift by 4 bits)
+ *   04- Extended Linear Address (shift by 16 bits)
  *
  * Bytes are packed into dataBits-wide words using ByteArrayFromValueArray
  * semantics.

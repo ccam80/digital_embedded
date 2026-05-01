@@ -1,5 +1,5 @@
 /**
- * RLC oscillator transient parity — Task 7.3.2
+ * RLC oscillator transient parity- Task 7.3.2
  *
  * Circuit: V1=1V peak AC sine at 1592Hz (≈ resonant freq of 1/(2π√(LC)) with
  *          L=10mH, C=1µF), R1=10Ω series (low damping), L1=10mH, C1=1µF.
@@ -25,7 +25,7 @@ const DTS_PATH = resolve(
   "src/solver/analog/__tests__/ngspice-parity/fixtures/rlc-oscillator.dts",
 );
 
-describeIfDll("RLC oscillator transient parity — Task 7.3.2", () => {
+describeIfDll("RLC oscillator transient parity- Task 7.3.2", () => {
   it("transient_oscillation_match", async () => {
     const session = new ComparisonSession({
       dtsPath: DTS_PATH,

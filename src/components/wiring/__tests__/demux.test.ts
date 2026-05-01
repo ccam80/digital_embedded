@@ -92,7 +92,7 @@ function makeDemux(overrides?: { selectorBits?: number; bitWidth?: number }): De
 }
 
 // ---------------------------------------------------------------------------
-// executeDemux — logic correctness
+// executeDemux- logic correctness
 // ---------------------------------------------------------------------------
 
 describe("Demultiplexer", () => {

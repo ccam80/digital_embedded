@@ -1,11 +1,11 @@
 /**
- * PaletteDragController — manages touch-drag-to-canvas from the palette.
+ * PaletteDragController- manages touch-drag-to-canvas from the palette.
  *
  * Lifecycle:
- *   start(def, itemEl, startX, startY) — called when drag threshold is crossed
- *   move(clientX, clientY)             — update ghost position
- *   drop(clientX, clientY, canvas)     — drop over canvas → returns world point or null
- *   cancel()                           — animate back and clean up
+ *   start(def, itemEl, startX, startY)- called when drag threshold is crossed
+ *   move(clientX, clientY)            - update ghost position
+ *   drop(clientX, clientY, canvas)    - drop over canvas → returns world point or null
+ *   cancel()                          - animate back and clean up
  */
 
 import type { ComponentDefinition } from "@/core/registry";
@@ -122,7 +122,7 @@ export class PaletteDragController {
   }
 
   /**
-   * Cancel the drag — animate ghost back to palette origin then clean up.
+   * Cancel the drag- animate ghost back to palette origin then clean up.
    */
   cancel(): void {
     if (!this._ghost) {

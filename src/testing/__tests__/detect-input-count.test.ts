@@ -1,5 +1,5 @@
 /**
- * Tests for detectInputCount() — Task 7b.
+ * Tests for detectInputCount()- Task 7b.
  *
  * Verifies that the function correctly identifies the boundary between
  * input columns and output columns in a test-data header string by
@@ -104,7 +104,7 @@ describe('detectInputCount', () => {
       ],
     });
 
-    // CLK and D are inputs, Q is output — so inputCount should be 2
+    // CLK and D are inputs, Q is output- so inputCount should be 2
     const result = detectInputCount(circuit, registry, 'CLK D Q\n0 0 0');
     expect(result).toBe(2);
   });

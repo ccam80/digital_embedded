@@ -25,7 +25,7 @@ const CMOS: ResolvedPinElectrical = {
 const BRANCH_IDX = 2;
 
 // ---------------------------------------------------------------------------
-// MockSolver — records stamp/stampRHS calls
+// MockSolver- records stamp/stampRHS calls
 // ---------------------------------------------------------------------------
 
 class MockSolver {
@@ -83,7 +83,7 @@ describe('bridge adapter: hot-load vOH mid-simulation', () => {
     // Drive high from the start (coordinator sets logic level before each step)
     adapter.setLogicLevel(true);
 
-    // Step N=5 times to reach steady state — each step re-stamps the branch equation
+    // Step N=5 times to reach steady state- each step re-stamps the branch equation
     const N = 5;
     for (let i = 0; i < N; i++) {
       solver.reset();
@@ -95,7 +95,7 @@ describe('bridge adapter: hot-load vOH mid-simulation', () => {
     // Hot-load: update vOH to 5.0 mid-simulation
     adapter.setParam('vOH', 5.0);
 
-    // Step again — coordinator re-stamps after param change
+    // Step again- coordinator re-stamps after param change
     solver.reset();
     adapter.load(makeCtx(solver));
 
@@ -116,7 +116,7 @@ describe('bridge adapter: hot-load vOH mid-simulation', () => {
       adapter.load(makeCtx(solver));
     }
 
-    // Hot-load vOH — should not affect the low-level voltage
+    // Hot-load vOH- should not affect the low-level voltage
     adapter.setParam('vOH', 5.0);
     solver.reset();
     adapter.load(makeCtx(solver));

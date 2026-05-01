@@ -138,7 +138,7 @@ describe('synthesis', () => {
   // singleGate: A & B → circuit with 2 In, 1 And, 1 Out, correctly wired
   // -------------------------------------------------------------------------
 
-  it('singleGate — A & B → 2 In, 1 And, 1 Out elements', () => {
+  it('singleGate- A & B → 2 In, 1 And, 1 Out elements', () => {
     const registry = buildRegistry();
     const expr: BoolExpr = and([variable('A'), variable('B')]);
     const expressions = new Map<string, BoolExpr>([['Y', expr]]);
@@ -167,7 +167,7 @@ describe('synthesis', () => {
   // multiOutput: two expressions → shared inputs, two output chains
   // -------------------------------------------------------------------------
 
-  it('multiOutput — A&B and A|B → shared inputs, two output Out components', () => {
+  it('multiOutput- A&B and A|B → shared inputs, two output Out components', () => {
     const registry = buildRegistry();
     const exprAnd: BoolExpr = and([variable('A'), variable('B')]);
     const exprOr: BoolExpr = or([variable('A'), variable('B')]);
@@ -202,7 +202,7 @@ describe('synthesis', () => {
   // (NAND is represented as not(and([...])))
   // -------------------------------------------------------------------------
 
-  it('nandOnly — NAND-only expression → circuit contains only Not and And gate elements', () => {
+  it('nandOnly- NAND-only expression → circuit contains only Not and And gate elements', () => {
     const registry = buildRegistry();
 
     // A & B converted to NAND-only: not(and(not(and(A,B)), not(and(A,B))))
@@ -229,7 +229,7 @@ describe('synthesis', () => {
   // layoutPositions: all components have valid grid positions, no overlaps
   // -------------------------------------------------------------------------
 
-  it('layoutPositions — all components have integer positions, no two share same position', () => {
+  it('layoutPositions- all components have integer positions, no two share same position', () => {
     const registry = buildRegistry();
 
     // Use a more complex expression to get multiple elements
@@ -260,7 +260,7 @@ describe('synthesis', () => {
   // the circuit's structural correspondence to the expression
   // -------------------------------------------------------------------------
 
-  it('functionalVerification — synthesised circuit structure matches expression', () => {
+  it('functionalVerification- synthesised circuit structure matches expression', () => {
     const registry = buildRegistry();
 
     // A | !B  →  Or(A, Not(B))
@@ -285,7 +285,7 @@ describe('synthesis', () => {
   // loadInEditor: synthesized circuit loads without errors
   // -------------------------------------------------------------------------
 
-  it('loadInEditor — synthesized circuit is structurally valid (no errors on creation)', () => {
+  it('loadInEditor- synthesized circuit is structurally valid (no errors on creation)', () => {
     const registry = buildRegistry();
 
     // Constant expression

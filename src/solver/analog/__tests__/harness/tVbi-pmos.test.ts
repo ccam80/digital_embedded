@@ -1,5 +1,5 @@
 /**
- * PMOS tVbi sign audit — Task 6.3.1
+ * PMOS tVbi sign audit- Task 6.3.1
  *
  * Verifies that digiTS computeTempParams produces a tVbi value that is
  * bit-exact with the ngspice mos1temp.c:170-174 formula for a PMOS device

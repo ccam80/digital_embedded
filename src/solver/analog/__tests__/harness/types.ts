@@ -20,7 +20,7 @@ export type SidePresence = "both" | "oursOnly" | "ngspiceOnly";
 /** Side selector for time-based queries. Disjoint from SidePresence. */
 export type Side = "ours" | "ngspice";
 
-/** Compact summary of one NR attempt — used in shape reports. */
+/** Compact summary of one NR attempt- used in shape reports. */
 export interface AttemptShapeSummary {
   phase: NRPhase;
   outcome: NRAttemptOutcome;
@@ -29,7 +29,7 @@ export interface AttemptShapeSummary {
   converged: boolean;
 }
 
-/** Counts of attempts grouped by phase / outcome — used for fast diff. */
+/** Counts of attempts grouped by phase / outcome- used for fast diff. */
 export interface AttemptCounts {
   byPhase: Partial<Record<NRPhase, number>>;
   byOutcome: Partial<Record<NRAttemptOutcome, number>>;
@@ -70,7 +70,7 @@ export interface PhaseAwareCaptureHook {
   /**
    * Optional pre-factor hook. Fires between cktLoad and solver.preorder()/factor()
    * (newton-raphson.ts STEP B+; ngspice niiter.c:704). Window where the
-   * assembled MNA still holds post-load, pre-LU values — only place a
+   * assembled MNA still holds post-load, pre-LU values- only place a
    * harness can read the matrix solver.factor() is about to overwrite.
    */
   preFactorHook?: (ctx: import("../../ckt-context.js").CKTCircuitContext) => void;
@@ -79,7 +79,7 @@ export interface PhaseAwareCaptureHook {
 }
 
 // ---------------------------------------------------------------------------
-// Compared value — the fundamental triple for side-by-side comparison
+// Compared value- the fundamental triple for side-by-side comparison
 // ---------------------------------------------------------------------------
 
 /** A single numeric value from both engines, with computed delta. */
@@ -93,7 +93,7 @@ export interface ComparedValue {
 }
 
 // ---------------------------------------------------------------------------
-// Topology snapshot — captured once per compile
+// Topology snapshot- captured once per compile
 // ---------------------------------------------------------------------------
 
 /** MNA matrix non-zero entry. */
@@ -133,7 +133,7 @@ export interface NgspiceTopology {
   devices: NgspiceDeviceInfo[];
 }
 
-/** Captured once after compile — describes the circuit structure. */
+/** Captured once after compile- describes the circuit structure. */
 export interface TopologySnapshot {
   matrixSize: number;
   nodeCount: number;
@@ -150,7 +150,7 @@ export interface TopologySnapshot {
 }
 
 // ---------------------------------------------------------------------------
-// Limiting event — captured per junction per NR iteration
+// Limiting event- captured per junction per NR iteration
 // ---------------------------------------------------------------------------
 
 /** Voltage limiting event for one junction in one NR iteration. */
@@ -175,14 +175,14 @@ export interface IterationSnapshot {
    * ngspice setup-counter convention. ngspice initializes `CKTmaxEqNum = 1`
    * (cktinit.c:43) and post-increments it for every CKTmkVolt/CKTmkCur call
    * (cktlnkeq.c:32). After N active equations CKTmaxEqNum = 1 + N, and
-   * `matrixSize = CKTmaxEqNum + 1 = N + 2` — one slot for ground (idx 0),
+   * `matrixSize = CKTmaxEqNum + 1 = N + 2`- one slot for ground (idx 0),
    * N slots for active equations (idx 1..N), plus 1 post-inc tracker slot.
-   * The post-inc slot is NOT an actual rhs/matrix entry — it's setup
+   * The post-inc slot is NOT an actual rhs/matrix entry- it's setup
    * bookkeeping. Real rhs allocation is rhsBufSize.
    *
    * Both sides report this same N+2 convention so the structural-parity
    * gate (ComparisonSession._assertMatrixStructuralParity) can compare like
-   * for like. Carried per-iteration because the gate runs at every step —
+   * for like. Carried per-iteration because the gate runs at every step-
    * a session-level constant would mask intra-run drift, which would itself
    * be an architectural bug.
    */
@@ -216,7 +216,7 @@ export interface IterationSnapshot {
    * Integration order active at this NR iteration (1 = order-1 trap/gear, 2 = order-2 trap/gear).
    * Set per-iteration from `ctx.loadCtx.order` for our engine and from the
    * ngspice NiIterationData.order FFI field. Populated by createIterationCaptureHook
-   * and ngspice-bridge at iteration time — no longer painted at step-end.
+   * and ngspice-bridge at iteration time- no longer painted at step-end.
    */
   order: number;
   delta: number;
@@ -224,7 +224,7 @@ export interface IterationSnapshot {
    * Integration coefficients (CKTag[]) active at this NR iteration. Length 7,
    * matching ngspice MAXORDER+1. Only slots 0 and 1 are populated on the
    * ngspice side (FFI marshals ag0/ag1 only); remaining slots are 0.
-   * A fresh copy is taken per iteration — ctx.ag is a live buffer.
+   * A fresh copy is taken per iteration- ctx.ag is a live buffer.
    */
   ag: Float64Array;
   /**
@@ -257,7 +257,7 @@ export interface ElementStateSnapshot {
 }
 
 // ---------------------------------------------------------------------------
-// Integration coefficients — captured per step for both engines
+// Integration coefficients- captured per step for both engines
 // ---------------------------------------------------------------------------
 
 /** Integration coefficients ag0/ag1 for a single timestep, from both engines. */
@@ -267,11 +267,11 @@ export interface IntegrationCoefficients {
 }
 
 // ---------------------------------------------------------------------------
-// NR phase and outcome enumerations (spec §3)
+// NR phase and outcome enumerations (spec ss3)
 // ---------------------------------------------------------------------------
 
 /**
- * Semantic role of a single NR solve attempt — orthogonal to phase name.
+ * Semantic role of a single NR solve attempt- orthogonal to phase name.
  * Two attempts can share a phase name (e.g. "dcopInitFloat") but represent
  * entirely different operations; role disambiguates them for pairing.
  */
@@ -282,7 +282,7 @@ export type AttemptRole =
   | "finalVerify"    // 1-iter verification after converged state (ngspice's last dcopInitFloat)
   | "junctionPrime"  // ngspice MODEINITJCT priming pass
   // Tran
-  | "predictorPass"  // ngspice MODEINITPRED retry — always fails by design
+  | "predictorPass"  // ngspice MODEINITPRED retry- always fails by design
   | "tranSolve";     // the NR pass that produces the accepted step result (both sides)
 
 /**
@@ -351,7 +351,7 @@ export interface StepSnapshot {
 }
 
 // ---------------------------------------------------------------------------
-// Device mapping — maps our state slots to ngspice state offsets
+// Device mapping- maps our state slots to ngspice state offsets
 // ---------------------------------------------------------------------------
 
 export interface DeviceMapping {
@@ -403,12 +403,12 @@ export interface ComparisonResult {
     withinTol: boolean;
   }>;
   allWithinTol: boolean;
-  /** True when our stepEndTime and ngspice stepEndTime differ by more than timeDeltaTol — these steps represent different physical moments and should not be treated as real divergences. */
+  /** True when our stepEndTime and ngspice stepEndTime differ by more than timeDeltaTol- these steps represent different physical moments and should not be treated as real divergences. */
   timeMismatched: boolean;
 }
 
 // ---------------------------------------------------------------------------
-// Capture session — holds all snapshots for one simulation run
+// Capture session- holds all snapshots for one simulation run
 // ---------------------------------------------------------------------------
 
 /** Complete capture from one simulation run. */
@@ -537,7 +537,7 @@ export interface RawNgspiceIterationEx {
   iteration: number;
   matrixSize: number;
   /**
-   * SMPmatSize+1 — actual rhs/rhsOld/preSolveRhs slot count on the ngspice side.
+   * SMPmatSize+1- actual rhs/rhsOld/preSolveRhs slot count on the ngspice side.
    * Can be smaller than matrixSize when CKTmaxEqNum > SMPmatSize (devices stamp
    * into ground row/col via TrashCan). The bridge clamps the FFI decode to this
    * value to prevent OOB reads that surface as NaN bit-pattern garbage.
@@ -857,7 +857,7 @@ export interface IterationSideData {
   globalConverged: boolean;
   /**
    * Element-level convergence flag at the end of this iteration.
-   * Distinct from `globalConverged` — the latter additionally requires
+   * Distinct from `globalConverged`- the latter additionally requires
    * `noncon === 0` whereas this is the per-element predicate alone.
    */
   elemConverged: boolean;
@@ -937,14 +937,14 @@ export interface IterationSideData {
   /** Integration order active at this iteration (1 = order-1 trap/gear, 2 = order-2 trap/gear). */
   order: number;
   /**
-   * `matrixSize` from the underlying `IterationSnapshot` — ngspice
+   * `matrixSize` from the underlying `IterationSnapshot`- ngspice
    * `CKTmaxEqNum + 1`, our engine reports `voltages.length + 1`. Both
    * sides should agree on the N+2 convention; mismatch flags a structural
    * setup divergence.
    */
   matrixSize: number;
   /**
-   * `rhsBufSize` from the underlying `IterationSnapshot` — actual
+   * `rhsBufSize` from the underlying `IterationSnapshot`- actual
    * allocation of rhs/rhsOld/preSolveRhs. ngspice's bridge reports `1`
    * during DCOP-init while CKTmatrix is being sized incrementally; outside
    * that window both sides should equal N+1.
@@ -961,7 +961,7 @@ export interface IterationSideData {
   /**
    * Active CKTdelta for this iteration (seconds). Distinct from the
    * step-level `dt` because the harness paints each iteration with the dt
-   * the engine had when it called NIiter — for an LTE-rejected step the
+   * the engine had when it called NIiter- for an LTE-rejected step the
    * iterations BEFORE the rejection ran with the original dt, the
    * iterations AFTER with the recovery dt.
    */
@@ -972,7 +972,7 @@ export interface IterationSideData {
   srcFact: number;
   /**
    * LTE-proposed next dt (seconds). Populated only on the final accepted
-   * iteration of each step — undefined elsewhere. From our
+   * iteration of each step- undefined elsewhere. From our
    * `TimestepController.computeNewDt()` on our side, from
    * `RawNgspiceOuterEvent.nextDelta` on the ngspice side.
    */

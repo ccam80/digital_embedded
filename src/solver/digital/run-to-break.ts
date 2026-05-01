@@ -1,5 +1,5 @@
 /**
- * RunToBreak — run simulation until a Break component fires or maxSteps is reached.
+ * RunToBreak- run simulation until a Break component fires or maxSteps is reached.
  *
  * Break components monitor a condition (their input signal) and fire when the
  * condition is non-zero. The run-to-break loop advances the engine one step at
@@ -17,10 +17,10 @@ import type { CompiledCircuit } from "@/core/engine-interface";
 /**
  * Result returned by run().
  *
- * reason: 'break'    — a Break component's input was asserted.
- * reason: 'maxSteps' — maxSteps was reached before any Break fired.
- * breakComponent:    — index of the Break component that fired (when reason='break').
- * stepsExecuted:     — total steps executed before halting.
+ * reason: 'break'   - a Break component's input was asserted.
+ * reason: 'maxSteps'- maxSteps was reached before any Break fired.
+ * breakComponent:   - index of the Break component that fired (when reason='break').
+ * stepsExecuted:    - total steps executed before halting.
  */
 export interface BreakResult {
   readonly reason: "break" | "maxSteps";
@@ -42,7 +42,7 @@ export interface BreakResult {
  *
  * @param engine    The DigitalEngine to step.
  * @param compiled  The compiled circuit (needed to locate Break components).
- * @param maxSteps  Safety limit — halts with reason 'maxSteps' if reached.
+ * @param maxSteps  Safety limit- halts with reason 'maxSteps' if reached.
  */
 export function run(
   engine: DigitalEngine,

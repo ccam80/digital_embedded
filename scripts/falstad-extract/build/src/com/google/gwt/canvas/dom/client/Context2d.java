@@ -1,7 +1,7 @@
 package com.google.gwt.canvas.dom.client;
 
 /**
- * Stub for GWT Context2d — used by CircuitJS1's Graphics class.
+ * Stub for GWT Context2d- used by CircuitJS1's Graphics class.
  * Our mock Graphics replaces Graphics.java and doesn't use this,
  * but CircuitElm.java imports Context2d.LineCap so we need this to compile.
  */
@@ -11,7 +11,7 @@ public class Context2d {
         public String getValue() { return name().toLowerCase(); }
     }
 
-    // Canvas2D methods — no-ops for compilation only.
+    // Canvas2D methods- no-ops for compilation only.
     // The actual recording happens in our mock Graphics.java.
     public void beginPath() {}
     public void closePath() {}

@@ -1,5 +1,5 @@
 /**
- * DataField — a resizable array of bigint words used for ROM/RAM content.
+ * DataField- a resizable array of bigint words used for ROM/RAM content.
  *
  * Words are addressed by integer index. Addresses beyond the allocated size
  * read as 0n. The field grows automatically on setWord().
@@ -69,7 +69,7 @@ export class DataField {
 }
 
 // ---------------------------------------------------------------------------
-// parseDataFieldString — comma-separated hex with run-length encoding
+// parseDataFieldString- comma-separated hex with run-length encoding
 // ---------------------------------------------------------------------------
 
 /**
@@ -117,7 +117,7 @@ function parseBigIntHex(s: string, context: string): bigint {
 }
 
 // ---------------------------------------------------------------------------
-// serializeDataField — produce comma-separated hex with run-length encoding
+// serializeDataField- produce comma-separated hex with run-length encoding
 // ---------------------------------------------------------------------------
 
 const RLE_THRESHOLD = 4;

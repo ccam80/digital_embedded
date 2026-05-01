@@ -1,12 +1,12 @@
 /**
- * ContextMenu — right-click context menu for the circuit editor.
+ * ContextMenu- right-click context menu for the circuit editor.
  *
  * show() renders a menu at a screen position with the given actions.
  * Factory functions build relevant actions for element, wire, and canvas targets.
  */
 
 // ---------------------------------------------------------------------------
-// MenuItem — actions and separators
+// MenuItem- actions and separators
 // ---------------------------------------------------------------------------
 
 export interface MenuAction {

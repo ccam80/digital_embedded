@@ -2,9 +2,9 @@
  * Signal value types for the digital logic simulator.
  *
  * Provides two representations:
- *   1. BitVector — rich OOP API for UI code (property panels, tooltips, data tables).
+ *   1. BitVector- rich OOP API for UI code (property panels, tooltips, data tables).
  *      Allocates. Used at low frequency.
- *   2. Flat Uint32Array slots — zero-allocation hot path for the engine inner loop and
+ *   2. Flat Uint32Array slots- zero-allocation hot path for the engine inner loop and
  *      wire coloring. High-Z state is stored in a parallel Uint32Array.
  *
  * Flat representation layout:
@@ -18,7 +18,7 @@
  */
 
 // ---------------------------------------------------------------------------
-// Bit enum — state of a single bit line
+// Bit enum- state of a single bit line
 // ---------------------------------------------------------------------------
 
 /** State of a single bit on a signal line. */
@@ -46,7 +46,7 @@ export type DisplayFormat =
   | "ascii";
 
 // ---------------------------------------------------------------------------
-// BitVector — rich multi-bit signal value
+// BitVector- rich multi-bit signal value
 // ---------------------------------------------------------------------------
 
 /**
@@ -255,7 +255,7 @@ export class BitVector {
     }
 
     if (this._highZMask !== 0n) {
-      // Mixed HIGH_Z — render bit by bit
+      // Mixed HIGH_Z- render bit by bit
       return formatMixed(this._value, this._highZMask, this.width);
     }
 

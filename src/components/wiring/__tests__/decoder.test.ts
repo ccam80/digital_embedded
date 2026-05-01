@@ -91,7 +91,7 @@ function makeDecoder(overrides?: { selectorBits?: number }): DecoderElement {
 }
 
 // ---------------------------------------------------------------------------
-// executeDecoder — logic correctness
+// executeDecoder- logic correctness
 // ---------------------------------------------------------------------------
 
 describe("Decoder", () => {

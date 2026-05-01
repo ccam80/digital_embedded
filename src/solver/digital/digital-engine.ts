@@ -1,5 +1,5 @@
 /**
- * DigitalEngine — single implementation of SimulationEngine.
+ * DigitalEngine- single implementation of SimulationEngine.
  *
  * Three evaluation modes (level, timed, microstep) share the same flat
  * Uint32Array signal storage and compiled circuit representation.
@@ -40,7 +40,7 @@ import { OscillationDetector, COLLECTION_STEPS } from "./oscillation.js";
 import { MAX_STEPS } from "@/core/constants";
 
 // ---------------------------------------------------------------------------
-// EvaluationGroup — one group in the topological evaluation order
+// EvaluationGroup- one group in the topological evaluation order
 // ---------------------------------------------------------------------------
 
 /**
@@ -58,7 +58,7 @@ export interface EvaluationGroup {
 }
 
 // ---------------------------------------------------------------------------
-// ConcreteCompiledCircuit — the engine-internal view of a compiled circuit
+// ConcreteCompiledCircuit- the engine-internal view of a compiled circuit
 // ---------------------------------------------------------------------------
 
 /**
@@ -127,7 +127,7 @@ function isConcreteCompiledCircuit(c: CompiledCircuit): c is ConcreteCompiledCir
 }
 
 // ---------------------------------------------------------------------------
-// MicrostepCursor — tracks position in micro-step evaluation
+// MicrostepCursor- tracks position in micro-step evaluation
 // ---------------------------------------------------------------------------
 
 interface MicrostepCursor {
@@ -136,7 +136,7 @@ interface MicrostepCursor {
 }
 
 // ---------------------------------------------------------------------------
-// TimedEvent — an event pending in timed simulation
+// TimedEvent- an event pending in timed simulation
 // ---------------------------------------------------------------------------
 
 interface TimedEvent {
@@ -156,7 +156,7 @@ const MAX_FEEDBACK_ITERATIONS = 1000;
 const DEFAULT_SNAPSHOT_BUDGET = 512 * 1024;
 
 // ---------------------------------------------------------------------------
-// EngineSnapshot — one captured state entry in the ring buffer
+// EngineSnapshot- one captured state entry in the ring buffer
 // ---------------------------------------------------------------------------
 
 interface EngineSnapshot {
@@ -184,15 +184,15 @@ export class DigitalEngine implements SimulationEngine, InitializableEngine {
   private _mode: EvaluationMode;
   private _engineState: EngineState = EngineState.STOPPED;
 
-  // Signal arrays — owned by the engine
+  // Signal arrays- owned by the engine
   private _values: Uint32Array = new Uint32Array(0);
   private _highZs: Uint32Array = new Uint32Array(0);
 
-  // Per-net undefined flags — 1 = UNDEFINED, 0 = defined.
+  // Per-net undefined flags- 1 = UNDEFINED, 0 = defined.
   // Set by _initSignalsUndefined, cleared when a component writes a net.
   private _undefinedFlags: Uint8Array = new Uint8Array(0);
 
-  // Compiled circuit — set by init()
+  // Compiled circuit- set by init()
   private _compiled: ConcreteCompiledCircuit | null = null;
 
   // Listeners and observers
@@ -290,7 +290,7 @@ export class DigitalEngine implements SimulationEngine, InitializableEngine {
 
   init(circuit: CompiledCircuit): void {
     if (!isConcreteCompiledCircuit(circuit)) {
-      // Accept opaque CompiledCircuit for test/mock scenarios — build minimal
+      // Accept opaque CompiledCircuit for test/mock scenarios- build minimal
       // concrete structure so the engine can at least allocate signal arrays.
       this._values = new Uint32Array(circuit.netCount);
       this._highZs = new Uint32Array(circuit.netCount);
@@ -545,7 +545,7 @@ export class DigitalEngine implements SimulationEngine, InitializableEngine {
   restoreSnapshot(id: SnapshotId): void {
     const snapshot = this._snapshots.find((s) => s.id === id);
     if (snapshot === undefined) {
-      throw new Error(`Snapshot ${id} not found — it may have been evicted or never saved`);
+      throw new Error(`Snapshot ${id} not found- it may have been evicted or never saved`);
     }
     this._values.set(snapshot.values);
     this._highZs.set(snapshot.highZs);
@@ -748,7 +748,7 @@ export class DigitalEngine implements SimulationEngine, InitializableEngine {
       if (stable) return;
     }
 
-    // Oscillation limit exceeded — collect oscillating components
+    // Oscillation limit exceeded- collect oscillating components
     for (let c = 0; c < COLLECTION_STEPS; c++) {
       const snapshot = snapshotBuf.subarray(0, outputNets.length);
       for (let n = 0; n < outputNets.length; n++) {
@@ -852,7 +852,7 @@ export class DigitalEngine implements SimulationEngine, InitializableEngine {
     // This adds cross-links between nets (e.g. VDD↔output when PFET closes).
     if (switchComponentIndices !== undefined && switchComponentIndices.length > 0) {
       this._checkSwitchStateChanges(compiled, state);
-      // Step 3: Recalculate again — cross-linked actual net IDs are now
+      // Step 3: Recalculate again- cross-linked actual net IDs are now
       // registered as drivers, so the resolved values flow through switches.
       recalcAllBusNets();
       // Step 4: Re-evaluate all components so downstream see resolved values.
@@ -911,7 +911,7 @@ export class DigitalEngine implements SimulationEngine, InitializableEngine {
         this._highZs[busNet] = 0xffffffff;
       }
 
-      // Recalculate iteratively until stable — bus nets can be circularly
+      // Recalculate iteratively until stable- bus nets can be circularly
       // cross-linked through switches, requiring multiple passes.
       const MAX_BUS_SETTLE = 10;
       for (let pass = 0; pass < MAX_BUS_SETTLE; pass++) {
@@ -923,7 +923,7 @@ export class DigitalEngine implements SimulationEngine, InitializableEngine {
       }
 
       // Re-evaluate all components so downstream components see resolved
-      // values — this may change switch closedFlags for the next iteration.
+      // values- this may change switch closedFlags for the next iteration.
       for (let g = 0; g < evaluationOrder.length; g++) {
         const group = evaluationOrder[g]!;
         if (group.isFeedback) {
@@ -1078,7 +1078,7 @@ export class DigitalEngine implements SimulationEngine, InitializableEngine {
       this._microstepCursor.indexWithinGroup = 0;
     }
 
-    // All groups exhausted — wrap around for next full pass
+    // All groups exhausted- wrap around for next full pass
     this._resetMicrostepCursor();
   }
 

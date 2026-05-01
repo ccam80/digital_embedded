@@ -5,18 +5,18 @@
  * injected via the options object so tests run without a real browser.
  *
  * Test scenarios:
- *   readyOnInit     — sim-ready sent when adapter is initialized
- *   loadUrl         — sim-load-url → hook called, sim-loaded sent
- *   loadData        — sim-load-data with base64 .dig → hook called
- *   setBase         — sim-set-base → resolver base path updated, cache cleared
- *   setLocked       — sim-set-locked → hook called, locked state updated
- *   setPalette      — sim-set-palette → hook called
- *   test            — sim-test → sim-test-result response
- *   getCircuit      — sim-get-circuit → sim-circuit-data response
- *   highlight       — sim-highlight → hook called
- *   errorHandling   — message that causes error → sim-error response
- *   stepDelegation  — sim-step delegates to hooks.step when present
- *   stepClockCanary — sim-step via postMessage advances clocks (regression canary)
+ *   readyOnInit    - sim-ready sent when adapter is initialized
+ *   loadUrl        - sim-load-url → hook called, sim-loaded sent
+ *   loadData       - sim-load-data with base64 .dig → hook called
+ *   setBase        - sim-set-base → resolver base path updated, cache cleared
+ *   setLocked      - sim-set-locked → hook called, locked state updated
+ *   setPalette     - sim-set-palette → hook called
+ *   test           - sim-test → sim-test-result response
+ *   getCircuit     - sim-get-circuit → sim-circuit-data response
+ *   highlight      - sim-highlight → hook called
+ *   errorHandling  - message that causes error → sim-error response
+ *   stepDelegation - sim-step delegates to hooks.step when present
+ *   stepClockCanary- sim-step via postMessage advances clocks (regression canary)
  */
 
 import { describe, it, expect, vi } from "vitest";
@@ -117,7 +117,7 @@ function makeAdapter(
 // ---------------------------------------------------------------------------
 
 describe("PostMessageAdapter.init", () => {
-  it("readyOnInit — sim-ready sent when adapter is initialized", () => {
+  it("readyOnInit- sim-ready sent when adapter is initialized", () => {
     const { adapter, sent } = makeAdapter();
     adapter.init();
     expect(sent).toHaveLength(1);
@@ -129,8 +129,8 @@ describe("PostMessageAdapter.init", () => {
 // loadUrl
 // ---------------------------------------------------------------------------
 
-describe("PostMessageAdapter — sim-load-url", () => {
-  it("loadUrl — hook called, sim-loaded response sent", async () => {
+describe("PostMessageAdapter- sim-load-url", () => {
+  it("loadUrl- hook called, sim-loaded response sent", async () => {
     const fetchFn = vi.fn().mockResolvedValue({
       ok: true,
       text: async () => "<circuit>xml</circuit>",
@@ -144,7 +144,7 @@ describe("PostMessageAdapter — sim-load-url", () => {
     expect(sent).toContainEqual({ type: "sim-loaded" });
   });
 
-  it("loadUrl — fetch failure sends sim-error", async () => {
+  it("loadUrl- fetch failure sends sim-error", async () => {
     const fetchFn = vi.fn().mockResolvedValue({ ok: false, text: async () => "" });
     const { sent, dispatch } = makeAdapter({}, undefined, fetchFn);
 
@@ -153,7 +153,7 @@ describe("PostMessageAdapter — sim-load-url", () => {
     expect(sent.some((m) => (m as { type: string }).type === "sim-error")).toBe(true);
   });
 
-  it("loadUrl — empty URL sends sim-error", async () => {
+  it("loadUrl- empty URL sends sim-error", async () => {
     const { sent, dispatch } = makeAdapter();
 
     await dispatch({ type: "sim-load-url", url: "" });
@@ -166,8 +166,8 @@ describe("PostMessageAdapter — sim-load-url", () => {
 // loadData
 // ---------------------------------------------------------------------------
 
-describe("PostMessageAdapter — sim-load-data", () => {
-  it("loadData — hook called with decoded XML, sim-loaded sent", async () => {
+describe("PostMessageAdapter- sim-load-data", () => {
+  it("loadData- hook called with decoded XML, sim-loaded sent", async () => {
     const xml = "<circuit>test xml</circuit>";
     const base64 = btoa(xml);
     const { sent, dispatch, hooks } = makeAdapter();
@@ -178,7 +178,7 @@ describe("PostMessageAdapter — sim-load-data", () => {
     expect(sent).toContainEqual({ type: "sim-loaded" });
   });
 
-  it("loadData — empty data sends sim-error", async () => {
+  it("loadData- empty data sends sim-error", async () => {
     const { sent, dispatch } = makeAdapter();
 
     await dispatch({ type: "sim-load-data", data: "" });
@@ -191,8 +191,8 @@ describe("PostMessageAdapter — sim-load-data", () => {
 // setBase
 // ---------------------------------------------------------------------------
 
-describe("PostMessageAdapter — sim-set-base", () => {
-  it("setBase — HttpResolver base path updated", async () => {
+describe("PostMessageAdapter- sim-set-base", () => {
+  it("setBase- HttpResolver base path updated", async () => {
     const http = new HttpResolver("old/");
     const resolver = new ChainResolver([http]);
     const { dispatch, hooks } = makeAdapter({}, resolver);
@@ -203,7 +203,7 @@ describe("PostMessageAdapter — sim-set-base", () => {
     expect(hooks.setBasePath).toHaveBeenCalledWith("new/");
   });
 
-  it("setBase — CacheResolver cache cleared", async () => {
+  it("setBase- CacheResolver cache cleared", async () => {
     const directCache = new CacheResolver();
     directCache.set("Y", "<circuit/>");
     expect(directCache.size).toBe(1);
@@ -219,7 +219,7 @@ describe("PostMessageAdapter — sim-set-base", () => {
 // setLocked
 // ---------------------------------------------------------------------------
 
-describe("PostMessageAdapter — sim-set-locked", () => {
+describe("PostMessageAdapter- sim-set-locked", () => {
   it("locked state toggled and hook called", async () => {
     const { adapter, dispatch, hooks } = makeAdapter();
 
@@ -239,8 +239,8 @@ describe("PostMessageAdapter — sim-set-locked", () => {
 // setPalette
 // ---------------------------------------------------------------------------
 
-describe("PostMessageAdapter — sim-set-palette", () => {
-  it("setPalette — hook called with component names", async () => {
+describe("PostMessageAdapter- sim-set-palette", () => {
+  it("setPalette- hook called with component names", async () => {
     const { sent, dispatch, hooks } = makeAdapter();
 
     await dispatch({ type: "sim-set-palette", components: ["And", "Or", "Not"] });
@@ -249,7 +249,7 @@ describe("PostMessageAdapter — sim-set-palette", () => {
     expect(sent).toContainEqual({ type: "sim-loaded" });
   });
 
-  it("setPalette — null clears allowlist", async () => {
+  it("setPalette- null clears allowlist", async () => {
     const { dispatch, hooks } = makeAdapter();
 
     await dispatch({ type: "sim-set-palette", components: null });
@@ -262,8 +262,8 @@ describe("PostMessageAdapter — sim-set-palette", () => {
 // getCircuit
 // ---------------------------------------------------------------------------
 
-describe("PostMessageAdapter — sim-get-circuit", () => {
-  it("getCircuit — serializeDts hook preferred: produces dts-json-base64 format", async () => {
+describe("PostMessageAdapter- sim-get-circuit", () => {
+  it("getCircuit- serializeDts hook preferred: produces dts-json-base64 format", async () => {
     const dtsJson = JSON.stringify({ format: "dts", version: 1, circuit: { name: "test", elements: [], wires: [] } });
     const { sent, dispatch } = makeAdapter({
       serializeDts: () => dtsJson,
@@ -282,7 +282,7 @@ describe("PostMessageAdapter — sim-get-circuit", () => {
     expect(atob(msg.data)).toBe(dtsJson);
   });
 
-  it("getCircuit — falls back to dig-xml-base64 when serializeDts not provided", async () => {
+  it("getCircuit- falls back to dig-xml-base64 when serializeDts not provided", async () => {
     const { sent, dispatch } = makeAdapter({
       serializeCircuit: () => "<circuit>serialized</circuit>",
     });
@@ -299,7 +299,7 @@ describe("PostMessageAdapter — sim-get-circuit", () => {
     expect(atob(msg.data)).toBe("<circuit>serialized</circuit>");
   });
 
-  it("getCircuit — no hooks at all sends sim-error", async () => {
+  it("getCircuit- no hooks at all sends sim-error", async () => {
     const { sent, dispatch } = makeAdapter({});
 
     await dispatch({ type: "sim-get-circuit" });
@@ -312,7 +312,7 @@ describe("PostMessageAdapter — sim-get-circuit", () => {
 // sim-load-data with DTS JSON format
 // ---------------------------------------------------------------------------
 
-describe("PostMessageAdapter — sim-load-data DTS detection", () => {
+describe("PostMessageAdapter- sim-load-data DTS detection", () => {
   it("load-data with DTS JSON base64 calls loadCircuitXml (via dig fallback)", async () => {
     const registry = createDefaultRegistry();
     const circuit = new Circuit({ name: "dts-load-test" });
@@ -371,8 +371,8 @@ describe("PostMessageAdapter — sim-load-data DTS detection", () => {
 // highlight
 // ---------------------------------------------------------------------------
 
-describe("PostMessageAdapter — sim-highlight", () => {
-  it("highlight — hook called with labels and duration", async () => {
+describe("PostMessageAdapter- sim-highlight", () => {
+  it("highlight- hook called with labels and duration", async () => {
     const { dispatch, hooks } = makeAdapter();
 
     await dispatch({ type: "sim-highlight", labels: ["A", "B"], duration: 5000 });
@@ -380,7 +380,7 @@ describe("PostMessageAdapter — sim-highlight", () => {
     expect(hooks.highlight).toHaveBeenCalledWith(["A", "B"], 5000);
   });
 
-  it("highlight — default duration 3000ms", async () => {
+  it("highlight- default duration 3000ms", async () => {
     const { dispatch, hooks } = makeAdapter();
 
     await dispatch({ type: "sim-highlight", labels: ["X"] });
@@ -388,7 +388,7 @@ describe("PostMessageAdapter — sim-highlight", () => {
     expect(hooks.highlight).toHaveBeenCalledWith(["X"], 3000);
   });
 
-  it("highlight — non-array labels sends error", async () => {
+  it("highlight- non-array labels sends error", async () => {
     const { sent, dispatch } = makeAdapter();
 
     await dispatch({ type: "sim-highlight", labels: "not-an-array" });
@@ -404,8 +404,8 @@ describe("PostMessageAdapter — sim-highlight", () => {
 // clearHighlight
 // ---------------------------------------------------------------------------
 
-describe("PostMessageAdapter — sim-clear-highlight", () => {
-  it("clearHighlight — hook called", async () => {
+describe("PostMessageAdapter- sim-clear-highlight", () => {
+  it("clearHighlight- hook called", async () => {
     const { dispatch, hooks } = makeAdapter();
 
     await dispatch({ type: "sim-clear-highlight" });
@@ -418,8 +418,8 @@ describe("PostMessageAdapter — sim-clear-highlight", () => {
 // setReadonlyComponents
 // ---------------------------------------------------------------------------
 
-describe("PostMessageAdapter — sim-set-readonly-components", () => {
-  it("setReadonlyComponents — hook called with labels", async () => {
+describe("PostMessageAdapter- sim-set-readonly-components", () => {
+  it("setReadonlyComponents- hook called with labels", async () => {
     const { dispatch, hooks } = makeAdapter();
 
     await dispatch({ type: "sim-set-readonly-components", labels: ["A", "B"] });
@@ -427,7 +427,7 @@ describe("PostMessageAdapter — sim-set-readonly-components", () => {
     expect(hooks.setReadonlyComponents).toHaveBeenCalledWith(["A", "B"]);
   });
 
-  it("setReadonlyComponents — null clears all", async () => {
+  it("setReadonlyComponents- null clears all", async () => {
     const { dispatch, hooks } = makeAdapter();
 
     await dispatch({ type: "sim-set-readonly-components", labels: null });
@@ -440,8 +440,8 @@ describe("PostMessageAdapter — sim-set-readonly-components", () => {
 // setInstructions
 // ---------------------------------------------------------------------------
 
-describe("PostMessageAdapter — sim-set-instructions", () => {
-  it("setInstructions — hook called with markdown", async () => {
+describe("PostMessageAdapter- sim-set-instructions", () => {
+  it("setInstructions- hook called with markdown", async () => {
     const { dispatch, hooks } = makeAdapter();
 
     await dispatch({ type: "sim-set-instructions", markdown: "# Hello" });
@@ -449,7 +449,7 @@ describe("PostMessageAdapter — sim-set-instructions", () => {
     expect(hooks.setInstructions).toHaveBeenCalledWith("# Hello");
   });
 
-  it("setInstructions — null hides panel", async () => {
+  it("setInstructions- null hides panel", async () => {
     const { dispatch, hooks } = makeAdapter();
 
     await dispatch({ type: "sim-set-instructions", markdown: null });
@@ -462,7 +462,7 @@ describe("PostMessageAdapter — sim-set-instructions", () => {
 // error handling
 // ---------------------------------------------------------------------------
 
-describe("PostMessageAdapter — error handling", () => {
+describe("PostMessageAdapter- error handling", () => {
   it("hook error sends sim-error response", async () => {
     const { sent, dispatch } = makeAdapter({
       loadCircuitXml: vi.fn().mockImplementation(() => {
@@ -499,10 +499,10 @@ describe("PostMessageAdapter — error handling", () => {
 });
 
 // ---------------------------------------------------------------------------
-// step delegation — hooks.step called when present
+// step delegation- hooks.step called when present
 // ---------------------------------------------------------------------------
 
-describe("PostMessageAdapter — sim-step delegation", () => {
+describe("PostMessageAdapter- sim-step delegation", () => {
   it("sim-step delegates to hooks.step when provided", async () => {
     const stepHook = vi.fn();
     const { dispatch } = makeAdapter({ step: stepHook });
@@ -550,8 +550,8 @@ describe("PostMessageAdapter — sim-step delegation", () => {
 //  flip-flops don't toggle via PostMessage sim-step"
 // ---------------------------------------------------------------------------
 
-describe("PostMessageAdapter — sim-step clock canary", () => {
-  it("sim-step via postMessage advances clocks — D flip-flop latches input", async () => {
+describe("PostMessageAdapter- sim-step clock canary", () => {
+  it("sim-step via postMessage advances clocks- D flip-flop latches input", async () => {
     const registry = createDefaultRegistry();
     const facade = new DefaultSimulatorFacade(registry);
 
@@ -599,7 +599,7 @@ describe("PostMessageAdapter — sim-step clock canary", () => {
       await new Promise((r) => setTimeout(r, 0));
     };
 
-    // Read Q before any stepping — FF not yet latched, Q must be 0
+    // Read Q before any stepping- FF not yet latched, Q must be 0
     await dispatch({ type: "sim-read-signal", label: "Q" });
     const initialOutputMsg = sent.find(
       (m) => (m as { type: string }).type === "sim-output",
@@ -611,7 +611,7 @@ describe("PostMessageAdapter — sim-step clock canary", () => {
     // Set D=1
     await dispatch({ type: "sim-set-signal", label: "D", value: 1 });
 
-    // Step once to advance clock edge and propagate — Q must become 1
+    // Step once to advance clock edge and propagate- Q must become 1
     await dispatch({ type: "sim-step" });
 
     // Read Q after stepping

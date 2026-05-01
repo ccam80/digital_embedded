@@ -3,7 +3,7 @@
  *
  * Covers:
  *  - Simple minimization (OR of minterms → single variable)
- *  - XOR function (already minimal — no simplification possible)
+ *  - XOR function (already minimal- no simplification possible)
  *  - Don't-care exploitation
  *  - Multiple minimal covers
  *  - 4-variable minimization
@@ -172,7 +172,7 @@ describe('dontCareExploited', () => {
 // 6 prime implicants (none combinable in round 2):
 //   !A&C, !B&C, !A&B, B&!C, A&!B, A&!C
 //
-// No prime is essential — each minterm is covered by exactly 2 primes.
+// No prime is essential- each minterm is covered by exactly 2 primes.
 // Two minimal covers of size 3:
 //   Cover 1: {!A&C, B&!C, A&!B}
 //   Cover 2: {!B&C, !A&B, A&!C}
@@ -256,7 +256,7 @@ describe('4variables', () => {
 // 1 1 | 1   m3
 //
 // Minterms 0 and 3 differ in both A and B → cannot combine.
-// Prime implicants: {!A&!B (covers m0), A&B (covers m3)} — 2 primes.
+// Prime implicants: {!A&!B (covers m0), A&B (covers m3)}- 2 primes.
 // ---------------------------------------------------------------------------
 
 describe('primeImplicants', () => {

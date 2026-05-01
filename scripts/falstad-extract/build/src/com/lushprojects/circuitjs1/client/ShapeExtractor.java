@@ -233,7 +233,7 @@ public class ShapeExtractor {
 
         if (style.equals("xfmr")) {
             // Transformer: horizontal with vertical width separation
-            // point1=(0,0), point2=(64,32) — width comes from abs(y2-y)
+            // point1=(0,0), point2=(64,32)- width comes from abs(y2-y)
             elm.x2 = CANONICAL_LEN;
             elm.y2 = 32;
         } else {

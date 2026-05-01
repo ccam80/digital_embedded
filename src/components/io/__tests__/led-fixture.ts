@@ -2,7 +2,7 @@
  * Shared fixture for LED analog tests.
  *
  * Builds a DC circuit: DcVoltageSource → Resistor → LED (anode) → GND (cathode
- * is hardwired to node 0 inside createLedAnalogElementViaDiode — the LED is a
+ * is hardwired to node 0 inside createLedAnalogElementViaDiode- the LED is a
  * single-pin circuit element at the netlist level).
  *
  * Using DefaultSimulatorFacade ensures the compiler runs its three color-preset

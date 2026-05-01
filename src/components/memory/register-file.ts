@@ -1,5 +1,5 @@
 /**
- * RegisterFile — edge-triggered register file with two read ports and one write port.
+ * RegisterFile- edge-triggered register file with two read ports and one write port.
  *
  * Contains 2^addrBits registers, each of width bitWidth.
  * On rising clock edge, if we=1: write Din to register[Rw].
@@ -40,7 +40,7 @@ const COMP_WIDTH = 4;
 // bodyHeight = max(6,2) = 6
 
 // ---------------------------------------------------------------------------
-// Pin declarations — y-positions shifted down by 1 from previous layout
+// Pin declarations- y-positions shifted down by 1 from previous layout
 // ---------------------------------------------------------------------------
 
 const REGISTER_FILE_PIN_DECLARATIONS: PinDeclaration[] = [
@@ -119,7 +119,7 @@ const REGISTER_FILE_PIN_DECLARATIONS: PinDeclaration[] = [
 ];
 
 // ---------------------------------------------------------------------------
-// RegisterFileElement — CircuitElement implementation
+// RegisterFileElement- CircuitElement implementation
 // ---------------------------------------------------------------------------
 
 export class RegisterFileElement extends AbstractCircuitElement {
@@ -170,7 +170,7 @@ export class RegisterFileElement extends AbstractCircuitElement {
 }
 
 // ---------------------------------------------------------------------------
-// executeRegisterFile — flat simulation function
+// executeRegisterFile- flat simulation function
 //
 // Input layout:  [Din=0, we=1, Rw=2, C=3, Ra=4, Rb=5]
 // Output layout: [Da=0, Db=1]
@@ -279,7 +279,7 @@ const REGISTER_FILE_PROPERTY_DEFS: PropertyDefinition[] = [
 ];
 
 // ---------------------------------------------------------------------------
-// RegisterFileDefinition — ComponentDefinition
+// RegisterFileDefinition- ComponentDefinition
 // ---------------------------------------------------------------------------
 
 function registerFileFactory(props: PropertyBag): RegisterFileElement {
@@ -295,7 +295,7 @@ export const RegisterFileDefinition: ComponentDefinition = {
   attributeMap: REGISTER_FILE_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.MEMORY,
   helpText:
-    "RegisterFile — register file with 2 read ports and 1 write port.\n" +
+    "RegisterFile- register file with 2 read ports and 1 write port.\n" +
     "On rising clock edge: if we=1, writes Din to register[Rw].\n" +
     "Da = register[Ra] and Db = register[Rb] always (combinational reads).",
   models: {

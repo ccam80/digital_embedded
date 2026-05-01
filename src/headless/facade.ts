@@ -221,7 +221,7 @@ export interface SimulatorFacade {
    * (width mismatches, unconnected pins, etc.).
    *
    * Each pin shows `connectedTo`: all other pins on the same net. This is
-   * the primary introspection tool for LLM agents — no coordinate tracing
+   * the primary introspection tool for LLM agents- no coordinate tracing
    * required.
    *
    * @param circuit - The circuit to inspect
@@ -259,7 +259,7 @@ export interface SimulatorFacade {
   /**
    * Build a circuit from a declarative spec.
    *
-   * No coordinates, no object references — pure topology. The builder
+   * No coordinates, no object references- pure topology. The builder
    * auto-lays-out components and auto-routes wires. Components are
    * addressed by their `spec.id`, pins by `"id:pinLabel"`.
    *

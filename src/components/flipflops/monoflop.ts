@@ -1,5 +1,5 @@
 /**
- * Monoflop — monostable multivibrator.
+ * Monoflop- monostable multivibrator.
  *
  * On rising edge of C: Q goes high and stays high for `timerDelay` clock ticks.
  * After timerDelay ticks, Q returns to low.
@@ -44,7 +44,7 @@ const COMP_WIDTH = 3;
 // max(2,2)=2, yBottom=(2-1)+0.5=1.5, height=1.5+0.5=2
 
 // ---------------------------------------------------------------------------
-// Pin declarations — GenericShape positions (symmetric=false, 2 inputs, 2 outputs)
+// Pin declarations- GenericShape positions (symmetric=false, 2 inputs, 2 outputs)
 // inputs: C@y=0, R@y=1
 // outputs: Q@y=0, ~Q@y=1
 // ---------------------------------------------------------------------------
@@ -89,7 +89,7 @@ const MONOFLOP_PIN_DECLARATIONS: PinDeclaration[] = [
 ];
 
 // ---------------------------------------------------------------------------
-// MonoflopElement — CircuitElement implementation
+// MonoflopElement- CircuitElement implementation
 // ---------------------------------------------------------------------------
 
 export class MonoflopElement extends AbstractCircuitElement {
@@ -127,7 +127,7 @@ export class MonoflopElement extends AbstractCircuitElement {
 }
 
 // ---------------------------------------------------------------------------
-// executeMonoflop — flat simulation function
+// executeMonoflop- flat simulation function
 //
 // Input layout:  [C=0, R=1]
 // Output layout: [Q=0, ~Q=1]
@@ -135,7 +135,7 @@ export class MonoflopElement extends AbstractCircuitElement {
 //
 // The timerDelay is read from layout.propertyOf(index, "timerDelay") if the
 // engine supports it, otherwise defaults to 1. In practice, the engine
-// provides timerDelay via the compiled component's property slot — accessed
+// provides timerDelay via the compiled component's property slot- accessed
 // here via the stateOffset extended layout interface.
 //
 // Pulse timing:
@@ -215,7 +215,7 @@ const MONOFLOP_PROPERTY_DEFS: PropertyDefinition[] = [
 ];
 
 // ---------------------------------------------------------------------------
-// MonoflopDefinition — ComponentDefinition
+// MonoflopDefinition- ComponentDefinition
 // ---------------------------------------------------------------------------
 
 function monoflopFactory(props: PropertyBag): MonoflopElement {
@@ -231,7 +231,7 @@ export const MonoflopDefinition: ComponentDefinition = {
   attributeMap: MONOFLOP_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.FLIP_FLOPS,
   helpText:
-    "Monoflop — monostable multivibrator.\n" +
+    "Monoflop- monostable multivibrator.\n" +
     "On rising edge of C: Q goes high for timerDelay clock cycles, then returns low.\n" +
     "R (reset) immediately forces Q=0 and cancels any active pulse.",
   models: {

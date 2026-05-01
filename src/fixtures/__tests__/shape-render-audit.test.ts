@@ -1,5 +1,5 @@
 /**
- * Shape render audit — pixel comparison + structural text comparison
+ * Shape render audit- pixel comparison + structural text comparison
  * of TS component rendering against Java Digital's reference shapes.
  *
  * For each component type present in both the Java reference and the TS registry:
@@ -12,9 +12,9 @@
  * Pixel comparison catches shape, position, and proportion errors that
  * fingerprint counting (poly/line/circle/text counts) cannot.
  *
- * Silent-catch policy (per spec/architectural-alignment.md §I1
+ * Silent-catch policy (per spec/architectural-alignment.md ssI1
  * retain-with-reason): the factory/draw/bbox try/catch blocks in this
- * suite DO NOT suppress anomalies — they record FACTORY_ERROR /
+ * suite DO NOT suppress anomalies- they record FACTORY_ERROR /
  * DRAW_ERROR / bboxOverflow=-1 audit rows in the results array, which is
  * the intended failure-report output of the test. Re-raising would break
  * the per-component report generation.
@@ -161,7 +161,7 @@ function computeMatchedTypes(): Array<{
 
 /**
  * Find registered TS component types that have NO java-shapes.json entry.
- * These still get pin-position, bbox, and draw-sanity checks — just no
+ * These still get pin-position, bbox, and draw-sanity checks- just no
  * pixel comparison (there's nothing to compare against).
  */
 function computeUncoveredTypes(): Array<{ tsName: string }> {
@@ -182,7 +182,7 @@ function computeUncoveredTypes(): Array<{ tsName: string }> {
   for (const def of reg.getAll()) {
     if (SKIP_TYPES.has(def.name)) continue;
     if (coveredTsNames.has(def.name)) continue;
-    // 74xx ICs are subcircuit stubs — factory intentionally throws
+    // 74xx ICs are subcircuit stubs- factory intentionally throws
     if (def.category === "74XX") continue;
     types.push({ tsName: def.name });
   }
@@ -193,7 +193,7 @@ function computeUncoveredTypes(): Array<{ tsName: string }> {
 // Test suite
 // ---------------------------------------------------------------------------
 
-describe("shape render audit — pixel + text comparison vs Java Digital", () => {
+describe("shape render audit- pixel + text comparison vs Java Digital", () => {
   let registry: ComponentRegistry;
   let javaShapes: Record<string, JavaDrawCall[]>;
   const results: ComponentResult[] = [];
@@ -386,12 +386,12 @@ describe("shape render audit — pixel + text comparison vs Java Digital", () =>
   );
 
   // -------------------------------------------------------------------------
-  // Uncovered types — registered in TS but no java-shapes.json pixel data.
+  // Uncovered types- registered in TS but no java-shapes.json pixel data.
   // Still check: factory, draw, pin positions, bbox, text overlaps.
   // -------------------------------------------------------------------------
 
   it.each(computeUncoveredTypes())(
-    "$tsName (uncovered — no Java pixel reference)",
+    "$tsName (uncovered- no Java pixel reference)",
     ({ tsName }) => {
       const def = registry.get(tsName)!;
       const props = buildDefaultProps(registry, tsName);
@@ -766,7 +766,7 @@ describe("shape render audit — pixel + text comparison vs Java Digital", () =>
     console.log(`  0.8–1.0: ${buckets[4]}`);
 
     // -----------------------------------------------------------------------
-    // Assertions — strict thresholds, no escape hatches
+    // Assertions- strict thresholds, no escape hatches
     // -----------------------------------------------------------------------
 
     // -----------------------------------------------------------------------
@@ -846,7 +846,7 @@ import { javaWorldPosition } from "@/test-utils/java-pin-reference";
 const ROTATIONS: Rotation[] = [0, 1, 2, 3];
 const MIRRORS = [false, true];
 
-describe("pin transform audit — rotation × mirror correctness", () => {
+describe("pin transform audit- rotation × mirror correctness", () => {
   let registry: ComponentRegistry;
 
   beforeAll(() => {
@@ -899,7 +899,7 @@ describe("pin transform audit — rotation × mirror correctness", () => {
 
       for (const rot of ROTATIONS) {
         for (const mir of MIRRORS) {
-          // Skip rot=0 mir=false — already covered by main audit
+          // Skip rot=0 mir=false- already covered by main audit
           if (rot === 0 && !mir) continue;
 
           element.rotation = rot;
@@ -967,10 +967,10 @@ describe("pin transform audit — rotation × mirror correctness", () => {
         patterns.get(key)!.count++;
       }
 
-      lines.push(`  ${typeId} — ${ms.length} mismatch(es):`);
+      lines.push(`  ${typeId}- ${ms.length} mismatch(es):`);
       for (const [pattern, { count, example }] of patterns) {
         lines.push(
-          `    ${pattern} (×${count}) — expected (${example.expected.x},${example.expected.y}), got (${example.actual.x},${example.actual.y})`,
+          `    ${pattern} (×${count})- expected (${example.expected.x},${example.expected.y}), got (${example.actual.x},${example.actual.y})`,
         );
       }
     }

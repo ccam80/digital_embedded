@@ -1,5 +1,5 @@
 /**
- * Splitter component — splits a multi-bit bus into sub-buses or merges sub-buses into a bus.
+ * Splitter component- splits a multi-bit bus into sub-buses or merges sub-buses into a bus.
  *
  * Faithful port of hneemann/Digital Splitter.java + SplitterShape.java.
  *
@@ -37,7 +37,7 @@ export interface SplitterPort {
 }
 
 // ---------------------------------------------------------------------------
-// Port name — mirrors Java Port constructor logic
+// Port name- mirrors Java Port constructor logic
 // ---------------------------------------------------------------------------
 
 function portName(pos: number, bits: number): string {
@@ -47,7 +47,7 @@ function portName(pos: number, bits: number): string {
 }
 
 // ---------------------------------------------------------------------------
-// parsePorts — mirrors Java Ports(String definition) constructor
+// parsePorts- mirrors Java Ports(String definition) constructor
 //
 // Supports three token forms (comma-separated):
 //   "4"    → port at running bit position, 4 bits wide
@@ -64,7 +64,7 @@ export function parsePorts(definition: string): SplitterPort[] {
   for (const token of tokens) {
     const starIdx = token.indexOf("*");
     if (starIdx >= 0) {
-      // "bits*count" — repeat shorthand
+      // "bits*count"- repeat shorthand
       const bits = parseInt(token.substring(0, starIdx).trim(), 10);
       const count = parseInt(token.substring(starIdx + 1).trim(), 10);
       for (let i = 0; i < count; i++) {
@@ -74,7 +74,7 @@ export function parsePorts(definition: string): SplitterPort[] {
     } else {
       const dashIdx = token.indexOf("-");
       if (dashIdx >= 0) {
-        // "from-to" — explicit range (from and to are bit indices, inclusive)
+        // "from-to"- explicit range (from and to are bit indices, inclusive)
         let from = parseInt(token.substring(0, dashIdx).trim(), 10);
         let to = parseInt(token.substring(dashIdx + 1).trim(), 10);
         if (to < from) { const z = to; to = from; from = z; }
@@ -83,7 +83,7 @@ export function parsePorts(definition: string): SplitterPort[] {
         // runningPos not used for range tokens (pos is explicit)
         runningPos = from + bits;
       } else {
-        // plain number — bits wide at running position
+        // plain number- bits wide at running position
         const bits = parseInt(token, 10);
         ports.push({ pos: runningPos, bits, name: portName(runningPos, bits) });
         runningPos += bits;
@@ -182,7 +182,7 @@ export function buildSplitterPinDeclarations(
 const SPLITTER_LABEL_FONT = { family: "sans-serif", size: 0.35, weight: "normal" as const };
 
 // ---------------------------------------------------------------------------
-// SplitterElement — CircuitElement implementation
+// SplitterElement- CircuitElement implementation
 // ---------------------------------------------------------------------------
 
 export class SplitterElement extends AbstractCircuitElement {
@@ -316,7 +316,7 @@ export class SplitterElement extends AbstractCircuitElement {
 }
 
 // ---------------------------------------------------------------------------
-// executeSplitter — copies bits between wide and narrow ports
+// executeSplitter- copies bits between wide and narrow ports
 // ---------------------------------------------------------------------------
 
 export function executeSplitter(
@@ -360,7 +360,7 @@ export function executeSplitter(
 }
 
 /**
- * executeSplitterWithWidths — used when the engine supplies port widths.
+ * executeSplitterWithWidths- used when the engine supplies port widths.
  */
 export function executeSplitterWithWidths(
   index: number,
@@ -384,7 +384,7 @@ export function executeSplitterWithWidths(
 }
 
 /**
- * executeSplitterMergeWithWidths — merge mode: narrow ports → wide bus.
+ * executeSplitterMergeWithWidths- merge mode: narrow ports → wide bus.
  */
 export function executeSplitterMergeWithWidths(
   index: number,
@@ -408,7 +408,7 @@ export function executeSplitterMergeWithWidths(
 }
 
 // ---------------------------------------------------------------------------
-// SPLITTER_ATTRIBUTE_MAPPINGS — correct XML attribute name casing
+// SPLITTER_ATTRIBUTE_MAPPINGS- correct XML attribute name casing
 // ---------------------------------------------------------------------------
 
 export const SPLITTER_ATTRIBUTE_MAPPINGS: AttributeMapping[] = [
@@ -478,7 +478,7 @@ export const SplitterDefinition: ComponentDefinition = {
   attributeMap: SPLITTER_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.WIRING,
   helpText:
-    "Splitter — splits a multi-bit bus into sub-buses or merges them.\n" +
+    "Splitter- splits a multi-bit bus into sub-buses or merges them.\n" +
     "Configure Input Splitting for the left pins and Output Splitting for the right pins.\n" +
     "Supports patterns like '4,4', '1*8', or '0-3'.",
   models: {

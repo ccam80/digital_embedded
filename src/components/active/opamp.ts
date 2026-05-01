@@ -174,14 +174,14 @@ function createOpAmpElement(
   // Internal node (only used when rOut > 0)
   let nVint = 0;
 
-  // RES handles (ressetup.c:46-49) — 4 entries: PP, NN, PN, NP
+  // RES handles (ressetup.c:46-49)- 4 entries: PP, NN, PN, NP
   // Only allocated when rOut > 0
   let hResAA = -1;
   let hResBB = -1;
   let hResAB = -1;
   let hResBA = -1;
 
-  // VCVS handles (vcvsset.c:53-58) — 4 entries kept (entries 2 and 4 omitted).
+  // VCVS handles (vcvsset.c:53-58)- 4 entries kept (entries 2 and 4 omitted).
   //
   // Ground-row/column suppression: ngspice's spbuild.c skips row/col 0 (the
   // grounded node) at the sparse-matrix layer (Translate, lines 436-504).
@@ -229,7 +229,7 @@ function createOpAmpElement(
         hResBA = solver.allocElement(nOut,  nVint);
 
         // VCVS sub-element (vcvsset.c:53-58): posNode=vint, negNode=0(gnd)
-        // Entries 2 and 4 (negNode rows/cols) skipped — solver-level gnd suppression.
+        // Entries 2 and 4 (negNode rows/cols) skipped- solver-level gnd suppression.
         // Entry 1: (posNode, branch) = (vint, k)
         hVcvsPosIbr = solver.allocElement(nVint, k);
         // Entry 3: (branch, posNode) = (k, vint)
@@ -241,7 +241,7 @@ function createOpAmpElement(
       } else {
         // rOut == 0: VCVS connects directly to nOut (no RES, no internal node)
         // VCVS sub-element (vcvsset.c:53-58): posNode=nOut, negNode=0(gnd)
-        // Entries 2 and 4 (negNode rows/cols) skipped — solver-level gnd suppression.
+        // Entries 2 and 4 (negNode rows/cols) skipped- solver-level gnd suppression.
         hVcvsPosIbr = solver.allocElement(nOut, k);
         hVcvsIbrPos = solver.allocElement(k, nOut);
         hVcvsIbrCP  = nInp > 0 ? solver.allocElement(k, nInp) : -1;
@@ -350,7 +350,7 @@ export const OpAmpDefinition: ComponentDefinition = {
   attributeMap: OPAMP_ATTRIBUTE_MAPPINGS,
 
   helpText:
-    "Ideal Op-Amp — 3-terminal nonlinear element (in+, in-, out). " +
+    "Ideal Op-Amp- 3-terminal nonlinear element (in+, in-, out). " +
     "High-gain voltage amplifier with output saturation at supply rails.",
 
   factory(props: PropertyBag): OpAmpElement {

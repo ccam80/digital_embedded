@@ -84,7 +84,7 @@ describe('StatePool', () => {
       expect(Array.from(pool.state1)).toEqual([1.0, 2.0, 3.0]);
     });
 
-    it('state0 is the recycled old state[maxOrder+1] — pointer swap, not data copy', () => {
+    it('state0 is the recycled old state[maxOrder+1]- pointer swap, not data copy', () => {
       // Default maxOrder=2 → recycled buffer is state[3].
       const pool = new StatePool(3);
       pool.state0.set([1.0, 2.0, 3.0]);
@@ -98,11 +98,11 @@ describe('StatePool', () => {
 
       // state0 = recycled old state3.
       expect(Array.from(pool.state0)).toEqual([3000.0, 3000.0, 3000.0]);
-      // state7 is above the ring — unchanged.
+      // state7 is above the ring- unchanged.
       expect(Array.from(pool.state7)).toEqual([7000.0, 8000.0, 9000.0]);
     });
 
-    it('slots above maxOrder+1 are NOT rotated — stay at construction-zero', () => {
+    it('slots above maxOrder+1 are NOT rotated- stay at construction-zero', () => {
       // ngspice cktsetup.c:82-83 only allocates slots 0..MAX(2,maxOrder)+1
       // (slots 4..7 in our pool with default maxOrder=2 simply do not exist
       // in ngspice). Rotation must mirror that: never touch them.
@@ -135,7 +135,7 @@ describe('StatePool', () => {
       expect(Array.from(pool.state7)).toEqual([0, 0]);
     });
 
-    it('state1 and state2 are independent after rotateStateVectors — mutating state1 does not affect state2', () => {
+    it('state1 and state2 are independent after rotateStateVectors- mutating state1 does not affect state2', () => {
       const pool = new StatePool(2);
       pool.state0.set([5.0, 6.0]);
       pool.state1.set([1.0, 2.0]);
@@ -148,7 +148,7 @@ describe('StatePool', () => {
       expect(Array.from(pool.state2)).toEqual([1.0, 2.0]);
       expect(Array.from(pool.state1)).toEqual([5.0, 6.0]);
 
-      // Mutating state1 should not affect state2 — they are distinct arrays
+      // Mutating state1 should not affect state2- they are distinct arrays
       pool.state1[0] = 99.0;
       expect(pool.state2[0]).toBe(1.0);
     });
@@ -199,7 +199,7 @@ describe('StatePool', () => {
       expect(pool.states[7]).toBe(origS7);
     });
 
-    it('honours a wider maxOrder — Gear-style ring extends through state[maxOrder+1]', () => {
+    it('honours a wider maxOrder- Gear-style ring extends through state[maxOrder+1]', () => {
       const pool = new StatePool(2);
       pool.maxOrder = 5; // Gear order 5 → ring spans slots 0..6
       pool.state0.set([1.0, 1.0]);
@@ -256,7 +256,7 @@ describe('StatePool', () => {
     });
   });
 
-  describe('allocation loop — offset assignment (mirrors compiler logic)', () => {
+  describe('allocation loop- offset assignment (mirrors compiler logic)', () => {
     it('elements with stateSize 0 get stateBaseOffset -1', () => {
       const elements: Array<{ stateSize: number; stateBaseOffset: number; initState?: (pool: StatePool) => void }> = [
         { stateSize: 0, stateBaseOffset: -1 },
@@ -401,9 +401,9 @@ describe('StatePool', () => {
 
       // t=0: DC operating point converged. Mirror what production does
       // (analog-engine.ts _seedFromDcop and the for(;;) firsttime block):
-      //   ngspice dctran.c:349-350 — state1 = state0
-      //   ngspice dctran.c:795-799 — state2 = state3 = state1 (inside for(;;))
-      // state4..state7 stay at the constructor's zero — matching ngspice's
+      //   ngspice dctran.c:349-350- state1 = state0
+      //   ngspice dctran.c:795-799- state2 = state3 = state1 (inside for(;;))
+      // state4..state7 stay at the constructor's zero- matching ngspice's
       // CKTalloc/calloc-zero (cktsetup.c:82-83 → tmalloc → calloc) where
       // those slots aren't allocated at all under maxOrder=2.
       pool.state0.set([0.6, 5.0]);
@@ -417,20 +417,20 @@ describe('StatePool', () => {
       expect(Array.from(pool.state1)).toEqual([0.6, 5.0]);
       expect(Array.from(pool.state2)).toEqual([0.6, 5.0]);
       expect(Array.from(pool.state3)).toEqual([0.6, 5.0]);
-      // Slots above the ring stay zero — matches ngspice exactly.
+      // Slots above the ring stay zero- matches ngspice exactly.
       expect(Array.from(pool.state4)).toEqual([0, 0]);
       expect(Array.from(pool.state5)).toEqual([0, 0]);
       expect(Array.from(pool.state6)).toEqual([0, 0]);
       expect(Array.from(pool.state7)).toEqual([0, 0]);
 
-      // t=2: rotate again — state0 is fresh, state1 = t=1 result
+      // t=2: rotate again- state0 is fresh, state1 = t=1 result
       pool.rotateStateVectors();
       pool.state0.set([0.62, 4.8]);
 
       expect(Array.from(pool.state1)).toEqual([0.61, 4.9]);
       expect(Array.from(pool.state2)).toEqual([0.6, 5.0]);
       expect(Array.from(pool.state3)).toEqual([0.6, 5.0]);
-      // Slots above the ring still zero — never touched by rotation.
+      // Slots above the ring still zero- never touched by rotation.
       expect(Array.from(pool.state4)).toEqual([0, 0]);
       expect(Array.from(pool.state5)).toEqual([0, 0]);
       expect(Array.from(pool.state6)).toEqual([0, 0]);

@@ -1,5 +1,5 @@
 /**
- * ClockManager — identifies clock sources and manages clock toggling.
+ * ClockManager- identifies clock sources and manages clock toggling.
  *
  * After compilation, ClockManager scans the compiled circuit for Clock
  * components and tracks their phase state. On each call to advanceClocks(),
@@ -29,7 +29,7 @@ import type { ConcreteCompiledCircuit } from "./digital-engine.js";
 export type ClockEdge = "rising" | "falling";
 
 // ---------------------------------------------------------------------------
-// ClockInfo — describes one Clock component in the circuit
+// ClockInfo- describes one Clock component in the circuit
 // ---------------------------------------------------------------------------
 
 /**
@@ -59,7 +59,7 @@ export interface ClockInfo {
 }
 
 // ---------------------------------------------------------------------------
-// FiredEdge — a clock edge that fired during advanceClocks()
+// FiredEdge- a clock edge that fired during advanceClocks()
 // ---------------------------------------------------------------------------
 
 export interface FiredEdge {
@@ -109,7 +109,7 @@ export class ClockManager {
    * Return info for all Clock components found in the compiled circuit.
    *
    * Called once after construction. The returned array is the same mutable
-   * array held internally — callers should not modify it.
+   * array held internally- callers should not modify it.
    */
   findClocks(): ClockInfo[] {
     return this._clocks;

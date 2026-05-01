@@ -1,5 +1,5 @@
 /**
- * RAM components — all variants in one file sharing common logic.
+ * RAM components- all variants in one file sharing common logic.
  *
  * Variants implemented:
  *   - RAMSinglePort    : single address bus, read/write on same port (clock-synchronous write)
@@ -47,7 +47,7 @@ import {
 } from "../../core/registry.js";
 
 // ---------------------------------------------------------------------------
-// RAMLayout — extends ComponentLayout with stateOffset for stateful RAM variants
+// RAMLayout- extends ComponentLayout with stateOffset for stateful RAM variants
 // ---------------------------------------------------------------------------
 
 export interface RAMLayout extends ComponentLayout {
@@ -55,7 +55,7 @@ export interface RAMLayout extends ComponentLayout {
 }
 
 // ---------------------------------------------------------------------------
-// DataField — simple word-addressed memory array
+// DataField- simple word-addressed memory array
 // ---------------------------------------------------------------------------
 
 /**
@@ -104,7 +104,7 @@ export class DataField {
 }
 
 // ---------------------------------------------------------------------------
-// Backing store registry — scoped per engine via setActiveBackingStores()
+// Backing store registry- scoped per engine via setActiveBackingStores()
 //
 // Each engine owns its own Map<number, DataField>. Before compilation or
 // stepping, the engine calls setActiveBackingStores() to make its map
@@ -227,7 +227,7 @@ const SHARED_ATTRIBUTE_MAPPINGS: AttributeMapping[] = [
 // Outputs: D (dataBits, bidirectional)
 //
 // On rising clock edge: if str=1, writes the current D output value back to
-// memory[A] (the D pin is bidirectional — data to write comes from the net
+// memory[A] (the D pin is bidirectional- data to write comes from the net
 // driving the bidirectional D pin; we model this as state[wt[outBase]] at write time).
 // If ld=1, output D = memory[A]; else D = 0.
 //
@@ -337,7 +337,7 @@ export const RAMSinglePortDefinition: ComponentDefinition = {
   propertyDefs: RAM_SINGLE_PORT_PROPERTY_DEFS,
   attributeMap: RAM_SINGLE_PORT_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.MEMORY,
-  helpText: "RAMSinglePort — synchronous RAM with a single read/write port.",
+  helpText: "RAMSinglePort- synchronous RAM with a single read/write port.",
   models: {
     digital: {
       executeFn: executeRAMSinglePort,
@@ -359,7 +359,7 @@ export const RAMSinglePortDefinition: ComponentDefinition = {
 //
 // CS=1 selects chip. WE=1 writes D (from the bidirectional net) to memory[A].
 // OE=1 && CS=1 && !WE → D = memory[A]; else D = 0.
-// Fully combinational — no clock.
+// Fully combinational- no clock.
 //
 // internalStateCount: 0
 // ---------------------------------------------------------------------------
@@ -456,7 +456,7 @@ export const RAMSinglePortSelDefinition: ComponentDefinition = {
   propertyDefs: RAM_SINGLE_PORT_SEL_PROPERTY_DEFS,
   attributeMap: RAM_SINGLE_PORT_SEL_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.MEMORY,
-  helpText: "RAMSinglePortSel — combinational RAM with chip select (CS/WE/OE).",
+  helpText: "RAMSinglePortSel- combinational RAM with chip select (CS/WE/OE).",
   models: {
     digital: {
       executeFn: executeRAMSinglePortSel,
@@ -586,7 +586,7 @@ export const RAMDualPortDefinition: ComponentDefinition = {
   propertyDefs: RAM_DUAL_PORT_PROPERTY_DEFS,
   attributeMap: RAM_DUAL_PORT_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.MEMORY,
-  helpText: "RAMDualPort — synchronous RAM with separate read/write address buses.",
+  helpText: "RAMDualPort- synchronous RAM with separate read/write address buses.",
   models: {
     digital: {
       executeFn: executeRAMDualPort,
@@ -718,7 +718,7 @@ export const RAMDualAccessDefinition: ComponentDefinition = {
   propertyDefs: RAM_DUAL_ACCESS_PROPERTY_DEFS,
   attributeMap: RAM_DUAL_ACCESS_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.MEMORY,
-  helpText: "RAMDualAccess — RAM with two independent access ports (one sync, one async read).",
+  helpText: "RAMDualAccess- RAM with two independent access ports (one sync, one async read).",
   models: {
     digital: {
       executeFn: executeRAMDualAccess,
@@ -822,7 +822,7 @@ export const RAMAsyncDefinition: ComponentDefinition = {
   propertyDefs: RAM_ASYNC_PROPERTY_DEFS,
   attributeMap: RAM_ASYNC_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.MEMORY,
-  helpText: "RAMAsync — fully asynchronous RAM. Combinational read, write-enable driven write.",
+  helpText: "RAMAsync- fully asynchronous RAM. Combinational read, write-enable driven write.",
   models: {
     digital: {
       executeFn: executeRAMAsync,
@@ -945,7 +945,7 @@ export const BlockRAMDualPortDefinition: ComponentDefinition = {
   propertyDefs: BLOCK_RAM_DUAL_PORT_PROPERTY_DEFS,
   attributeMap: BLOCK_RAM_DUAL_PORT_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.MEMORY,
-  helpText: "BlockRAMDualPort — synchronous read block RAM suitable for FPGA block RAM inference.",
+  helpText: "BlockRAMDualPort- synchronous read block RAM suitable for FPGA block RAM inference.",
   models: {
     digital: {
       executeFn: executeBlockRAMDualPort,

@@ -1,5 +1,5 @@
 /**
- * GUI tests — circuit building via canvas interactions.
+ * GUI tests- circuit building via canvas interactions.
  *
  * Tests the full pipeline: palette click → component placement → wire drawing
  * → circuit verification. Uses the test bridge (__test) to discover pin
@@ -28,7 +28,7 @@ async function placeComponent(
   // Click the component in the palette
   await iframe.locator(`[data-type="${typeName}"]`).click();
 
-  // Click on the canvas to place it — convert canvas-relative coords to iframe coords
+  // Click on the canvas to place it- convert canvas-relative coords to iframe coords
   const canvasBox = await iframe.locator('#sim-canvas').boundingBox();
   expect(canvasBox).not.toBeNull();
   await harness.page.mouse.click(
@@ -294,7 +294,7 @@ test.describe('GUI: circuit building', () => {
     await harness.page.mouse.click(iframeBox!.x + 10, iframeBox!.y + 10);
     await harness.page.waitForTimeout(100);
 
-    // Use menu buttons instead — click Edit > Select All, then Edit > Delete
+    // Use menu buttons instead- click Edit > Select All, then Edit > Delete
     await harness.page.evaluate(() => {
       const iframe = document.getElementById('sim') as HTMLIFrameElement;
       const doc = iframe.contentWindow!.document;

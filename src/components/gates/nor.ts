@@ -35,7 +35,7 @@ import {
 export { STANDARD_GATE_ATTRIBUTE_MAPPINGS as NOR_ATTRIBUTE_MAPPINGS } from "./gate-shared.js";
 
 // ---------------------------------------------------------------------------
-// NOrElement — CircuitElement implementation
+// NOrElement- CircuitElement implementation
 // ---------------------------------------------------------------------------
 
 export class NOrElement extends AbstractCircuitElement {
@@ -119,7 +119,7 @@ export class NOrElement extends AbstractCircuitElement {
 }
 
 // ---------------------------------------------------------------------------
-// executeNOr — flat simulation function
+// executeNOr- flat simulation function
 // ---------------------------------------------------------------------------
 
 export function executeNOr(index: number, state: Uint32Array, _highZs: Uint32Array, layout: ComponentLayout): void {
@@ -138,7 +138,7 @@ export function executeNOr(index: number, state: Uint32Array, _highZs: Uint32Arr
 }
 
 // ---------------------------------------------------------------------------
-// CMOS_NOR2_NETLIST — 2-input CMOS NOR gate structural netlist
+// CMOS_NOR2_NETLIST- 2-input CMOS NOR gate structural netlist
 //
 // Topology: 2 PMOS in series (pull-up), 2 NMOS in parallel (pull-down).
 // Ports: In_1, In_2, out, VDD, GND
@@ -190,7 +190,7 @@ export const NOrDefinition: ComponentDefinition = {
   attributeMap: STANDARD_GATE_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.LOGIC,
   helpText:
-    "NOr gate — performs bitwise NOT(OR) of all inputs.\n" +
+    "NOr gate- performs bitwise NOT(OR) of all inputs.\n" +
     "Configurable input count (2–5) and bit width (1–32).\n" +
     "Both IEEE/US (curved with bubble) and IEC/DIN (rectangular with ≥1 and bubble) shapes are supported.\n" +
     "Individual inputs can be inverted via the inverterConfig property.",

@@ -1,5 +1,5 @@
 /**
- * ComplexSparseSolver — N×N complex sparse LU solver for AC analysis.
+ * ComplexSparseSolver- N×N complex sparse LU solver for AC analysis.
  *
  * Architecture: Persistent linked-list matrix format matching ngspice spMatrix,
  * with values stored as parallel _elRe / _elIm Float64Arrays (complex analogue
@@ -10,11 +10,11 @@
  * Solve: sparse forward/backward substitution on CSC L/U built from linked structure.
  *
  * ngspice references:
- *   spGetElement (spbuild.c) — complex variant, cached-pointer pattern
- *   spOrderAndFactor (spfactor.c) — factorWithReorder (complex variant)
- *   spFactor (spfactor.c) — factorNumerical (complex variant)
- *   spSolve (spsolve.c) — solve (complex variant)
- *   SMPpreOrder (sputils.c) — preorder
+ *   spGetElement (spbuild.c)- complex variant, cached-pointer pattern
+ *   spOrderAndFactor (spfactor.c)- factorWithReorder (complex variant)
+ *   spFactor (spfactor.c)- factorNumerical (complex variant)
+ *   spSolve (spsolve.c)- solve (complex variant)
+ *   SMPpreOrder (sputils.c)- preorder
  */
 
 import type { ComplexSparseSolver as IComplexSparseSolver } from "./element.js";
@@ -22,7 +22,7 @@ import type { ComplexSparseSolver as IComplexSparseSolver } from "./element.js";
 /**
  * Default pivot thresholds for complex factorization.
  * ngspice spConfig.h:331 DEFAULT_THRESHOLD = 1e-3 (RelThreshold).
- * Complex path uses the same RelThreshold field — no separate complex default.
+ * Complex path uses the same RelThreshold field- no separate complex default.
  * AbsThreshold default is 0.0; abs threshold comparisons use absThreshold² (mag² compare).
  *
  * ngspice variable mapping:
@@ -199,7 +199,7 @@ export class ComplexSparseSolver implements IComplexSparseSolver {
    * Returns a stable handle (pool index) for use with stampComplexElement().
    *
    * Called at compile time. Idempotent per (row, col) per solver instance.
-   * ngspice: spGetElement (spbuild.c) — complex variant.
+   * ngspice: spGetElement (spbuild.c)- complex variant.
    */
   allocComplexElement(row: number, col: number): number {
     // Fast path: handle table lookup
@@ -604,7 +604,7 @@ export class ComplexSparseSolver implements IComplexSparseSolver {
   /**
    * Reset for a new assembly pass: zero A-entry complex values, remove fill-in
    * entries via chain walk, preserve linked structure topology.
-   * Zero allocations — fill-in entries are returned to the free-list.
+   * Zero allocations- fill-in entries are returned to the free-list.
    */
   private _resetForAssembly(): void {
     const n = this._size;
@@ -1265,7 +1265,7 @@ export class ComplexSparseSolver implements IComplexSparseSolver {
       if (bestRow >= 0) return bestRow;
     }
 
-    // Phase 4: Last-resort — largest magnitude
+    // Phase 4: Last-resort- largest magnitude
     {
       let bestRow = -1;
       let bestMag2 = 0;

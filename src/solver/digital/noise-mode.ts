@@ -3,7 +3,7 @@
  *
  * Digital's noise mode breaks symmetry in circuits like SR latches from gates
  * by shuffling evaluation order and interleaving reads/writes within each SCC.
- * After initialization is complete, noise mode is not used — the engine runs
+ * After initialization is complete, noise mode is not used- the engine runs
  * deterministically.
  *
  */
@@ -11,7 +11,7 @@
 import type { ComponentLayout, ExecuteFunction } from "../../core/registry.js";
 
 // ---------------------------------------------------------------------------
-// shuffleArray — Fisher-Yates in-place shuffle of a subrange
+// shuffleArray- Fisher-Yates in-place shuffle of a subrange
 // ---------------------------------------------------------------------------
 
 /**
@@ -35,7 +35,7 @@ function shuffleArray(arr: Uint32Array, start: number, length: number): void {
 }
 
 // ---------------------------------------------------------------------------
-// evaluateWithNoise — interleaved read/write in shuffled order
+// evaluateWithNoise- interleaved read/write in shuffled order
 // ---------------------------------------------------------------------------
 
 /**
@@ -44,7 +44,7 @@ function shuffleArray(arr: Uint32Array, start: number, length: number): void {
  * and writes outputs in one call, interleaved with other components).
  *
  * This matches Digital's noise mode semantics where reads and writes are NOT
- * separated — one component's output can immediately affect the next component's
+ * separated- one component's output can immediately affect the next component's
  * input within the same micro-step. The randomized order breaks symmetry in
  * feedback loops (e.g. SR latches from NOR gates).
  *
@@ -77,7 +77,7 @@ export function evaluateWithNoise(
 }
 
 // ---------------------------------------------------------------------------
-// evaluateSynchronized — snapshot-based, order-independent within an SCC
+// evaluateSynchronized- snapshot-based, order-independent within an SCC
 // ---------------------------------------------------------------------------
 
 /**
@@ -85,7 +85,7 @@ export function evaluateWithNoise(
  * values for all components in the SCC before any writes, then evaluate each
  * component reading from the snapshot and writing to the real state array.
  *
- * This ensures evaluation is order-independent within the SCC — matching
+ * This ensures evaluation is order-independent within the SCC- matching
  * Digital's non-noise synchronized mode. The snapshot buffer must be sized to
  * at least the number of distinct input nets referenced by components in this
  * SCC. In practice, the buffer is sized to netCount (pre-allocated by the

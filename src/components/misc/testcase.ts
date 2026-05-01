@@ -1,10 +1,10 @@
 /**
- * Testcase component — placeable test case element.
+ * Testcase component- placeable test case element.
  *
  * Contains embedded truth table test data. Displayed as a labeled box on
  * the canvas. The test data is accessible to the test executor (Phase 6).
  *
- * No simulation behavior — executeFn is a no-op. The component acts as a
+ * No simulation behavior- executeFn is a no-op. The component acts as a
  * data carrier only: its test data property holds the truth table as a
  * newline-delimited string in Digital's test format.
  *
@@ -28,7 +28,7 @@ import { AbstractCircuitElement } from "../../core/element.js";
 import type { RenderContext } from "../../core/renderer-interface.js";
 import type { Rect } from "../../core/renderer-interface.js";
 import type { Pin, PinDeclaration, Rotation } from "../../core/pin.js";
-// No pin imports needed — derivePins() is inherited from AbstractCircuitElement
+// No pin imports needed- derivePins() is inherited from AbstractCircuitElement
 import { PropertyBag, PropertyType } from "../../core/properties.js";
 import type { PropertyDefinition } from "../../core/properties.js";
 import {
@@ -47,7 +47,7 @@ const COMP_WIDTH = 4;
 const COMP_HEIGHT = 2;
 
 // ---------------------------------------------------------------------------
-// TestcaseRow — one row of parsed test data
+// TestcaseRow- one row of parsed test data
 // ---------------------------------------------------------------------------
 
 export interface TestcaseRow {
@@ -56,7 +56,7 @@ export interface TestcaseRow {
 }
 
 // ---------------------------------------------------------------------------
-// TestcaseData — parsed test data extracted from the raw string
+// TestcaseData- parsed test data extracted from the raw string
 // ---------------------------------------------------------------------------
 
 export interface TestcaseData {
@@ -67,7 +67,7 @@ export interface TestcaseData {
 }
 
 // ---------------------------------------------------------------------------
-// parseTestData — parse raw test string into structured data
+// parseTestData- parse raw test string into structured data
 // ---------------------------------------------------------------------------
 
 export function parseTestData(raw: string): TestcaseData {
@@ -98,7 +98,7 @@ export function parseTestData(raw: string): TestcaseData {
 }
 
 // ---------------------------------------------------------------------------
-// Pin layout — no circuit connections
+// Pin layout- no circuit connections
 // ---------------------------------------------------------------------------
 
 function buildTestcasePinDeclarations(): PinDeclaration[] {
@@ -106,7 +106,7 @@ function buildTestcasePinDeclarations(): PinDeclaration[] {
 }
 
 // ---------------------------------------------------------------------------
-// TestcaseElement — CircuitElement implementation
+// TestcaseElement- CircuitElement implementation
 // ---------------------------------------------------------------------------
 
 export class TestcaseElement extends AbstractCircuitElement {
@@ -155,7 +155,7 @@ export class TestcaseElement extends AbstractCircuitElement {
 
     ctx.save();
 
-    // Component body — labeled box
+    // Component body- labeled box
     ctx.setColor("COMPONENT_FILL");
     ctx.drawRect(0, 0, COMP_WIDTH, COMP_HEIGHT, true);
     ctx.setColor("COMPONENT");
@@ -190,7 +190,7 @@ export class TestcaseElement extends AbstractCircuitElement {
 }
 
 // ---------------------------------------------------------------------------
-// executeTestcase — no-op (no simulation behavior)
+// executeTestcase- no-op (no simulation behavior)
 // ---------------------------------------------------------------------------
 
 export function executeTestcase(
@@ -199,7 +199,7 @@ export function executeTestcase(
   _highZs: Uint32Array,
   _layout: ComponentLayout,
 ): void {
-  // Testcase has no simulation behavior — it is a data carrier only.
+  // Testcase has no simulation behavior- it is a data carrier only.
 }
 
 // ---------------------------------------------------------------------------
@@ -261,8 +261,8 @@ export const TestcaseDefinition: ComponentDefinition = {
     },
   },
   helpText:
-    "Testcase — embedded truth table test element.\n" +
+    "Testcase- embedded truth table test element.\n" +
     "Contains test data (pin names + expected input/output rows).\n" +
-    "No simulation behavior — acts as data carrier for the test executor.\n" +
+    "No simulation behavior- acts as data carrier for the test executor.\n" +
     "testData: newline-delimited string in Digital test format.",
 };

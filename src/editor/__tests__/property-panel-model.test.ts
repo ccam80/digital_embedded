@@ -210,7 +210,7 @@ describe('showModelSelector param commit on blur', () => {
 });
 
 // ---------------------------------------------------------------------------
-// Task 3.5 — dropdown lists correct entries from modelRegistry + digital + runtime
+// Task 3.5- dropdown lists correct entries from modelRegistry + digital + runtime
 // ---------------------------------------------------------------------------
 
 describe('showModelSelector dropdown sources (Task 3.5)', () => {

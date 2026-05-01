@@ -199,7 +199,7 @@ class Tokenizer {
     // comments: skip to end of line, then return EOL
     if (c === '#') {
       while (this.pos < this.src.length && this.src[this.pos] !== '\n') this.pos++;
-      // don't consume the newline — it will be picked up as EOL on next call
+      // don't consume the newline- it will be picked up as EOL on next call
       return this.readToken();
     }
 
@@ -708,7 +708,7 @@ function parseRows(
       continue;
     }
 
-    // regular data row — starts with NUMBER, IDENT (X/C/Z), OPEN (expr), or BITS
+    // regular data row- starts with NUMBER, IDENT (X/C/Z), OPEN (expr), or BITS
     if (
       t.type === TK.NUMBER ||
       t.type === TK.IDENT ||
@@ -810,7 +810,7 @@ function parseDataRow(
     }
 
     if (t.type === TK.OPEN) {
-      // expression in parentheses — evaluate and record numeric value
+      // expression in parentheses- evaluate and record numeric value
       tok.consume();
       const expr = new ExprParser(tok).parseExpr();
       expectToken(tok, TK.CLOSE, t.line);
@@ -820,7 +820,7 @@ function parseDataRow(
     }
 
     if (t.type === TK.KW_BITS) {
-      // bits(N, expr) — expand expr into N individual bit columns
+      // bits(N, expr)- expand expr into N individual bit columns
       tok.consume();
       expectToken(tok, TK.OPEN, t.line);
       const nExpr = new ExprParser(tok).parseExpr();
@@ -934,7 +934,7 @@ export function parseTestData(
   signalDomains?: Map<string, 'digital' | 'analog'>,
 ): ParsedTestData {
   if (text.trim().length === 0) {
-    throw new ParseError('Test data is empty — no signal header found', 1);
+    throw new ParseError('Test data is empty- no signal header found', 1);
   }
 
   const analogPragmas = extractAnalogPragmas(text);
@@ -946,7 +946,7 @@ export function parseTestData(
   const { names, separatorIndex } = parseHeader(tok);
 
   if (names.length === 0) {
-    throw new ParseError('Test data header is empty — no signal names found', 1);
+    throw new ParseError('Test data header is empty- no signal names found', 1);
   }
 
   const columnCount = names.length;

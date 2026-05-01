@@ -1,5 +1,5 @@
 /**
- * ConcreteCompiledAnalogCircuit — the executable analog circuit produced by
+ * ConcreteCompiledAnalogCircuit- the executable analog circuit produced by
  * the analog compiler.
  *
  * Implements `CompiledAnalogCircuit` (which extends `CompiledCircuit`) so the
@@ -17,7 +17,7 @@ import type { ResolvedPin } from "../../core/pin.js";
 import { StatePool } from "./state-pool.js";
 
 // ---------------------------------------------------------------------------
-// DeviceModel — placeholder for Phase 2 .MODEL support
+// DeviceModel- placeholder for Phase 2 .MODEL support
 // ---------------------------------------------------------------------------
 
 /**
@@ -42,16 +42,16 @@ export interface DeviceModel {
  * Concrete implementation of `CompiledAnalogCircuit`.
  *
  * Fields:
- * - `nodeCount`         — number of non-ground MNA nodes (IDs 1…nodeCount)
- * - `elements`          — all AnalogElement instances with stamp functions
- * - `labelToNodeId`     — maps component labels to MNA node IDs (runner label resolution)
- * - `wireToNodeId`      — maps Wire objects to MNA node IDs (wire renderer)
- * - `models`            — device models (empty until Phase 2 adds .MODEL support)
- * - `elementToCircuitElement` — element index → visual CircuitElement (diagnostics / UI)
+ * - `nodeCount`        - number of non-ground MNA nodes (IDs 1…nodeCount)
+ * - `elements`         - all AnalogElement instances with stamp functions
+ * - `labelToNodeId`    - maps component labels to MNA node IDs (runner label resolution)
+ * - `wireToNodeId`     - maps Wire objects to MNA node IDs (wire renderer)
+ * - `models`           - device models (empty until Phase 2 adds .MODEL support)
+ * - `elementToCircuitElement`- element index → visual CircuitElement (diagnostics / UI)
  *
  * `CompiledCircuit` base fields:
- * - `netCount`          — aliases nodeCount (same concept for analog)
- * - `componentCount`    — aliases elementCount
+ * - `netCount`         - aliases nodeCount (same concept for analog)
+ * - `componentCount`   - aliases elementCount
  */
 export class ConcreteCompiledAnalogCircuit implements CompiledAnalogCircuit {
   /** Number of non-ground MNA nodes. */
@@ -60,14 +60,14 @@ export class ConcreteCompiledAnalogCircuit implements CompiledAnalogCircuit {
   /** All analog element instances. */
   readonly elements: AnalogElement[];
 
-  /** Maps component label strings to MNA node IDs (first-pin semantics —
+  /** Maps component label strings to MNA node IDs (first-pin semantics-
    *  preserved for AC analysis, Monte Carlo, parameter sweep, etc.). */
   readonly labelToNodeId: Map<string, number>;
 
   /** Maps component labels to the full list of their pins with MNA node IDs.
    *  Used by the unified compiler to build rich `labelSignalMap` entries:
    *  1-pin components get a bare label entry pointing to that pin's node;
-   *  2-pin (and higher) components do NOT get a bare label entry — callers
+   *  2-pin (and higher) components do NOT get a bare label entry- callers
    *  must use `label:pinLabel` form to address individual pins. */
   readonly labelPinNodes: Map<string, Array<{ pinLabel: string; nodeId: number }>>;
 
@@ -86,7 +86,7 @@ export class ConcreteCompiledAnalogCircuit implements CompiledAnalogCircuit {
   readonly elementPinVertices: Map<number, Array<{ x: number; y: number } | null>>;
 
   /** Maps element index to resolved pins in pinLayout order.
-   *  Replaces elementPinVertices — carries label, vertex, nodeId in one object.
+   *  Replaces elementPinVertices- carries label, vertex, nodeId in one object.
    *  During migration, coexists with elementPinVertices. */
   readonly elementResolvedPins: Map<number, ResolvedPin[]>;
 
@@ -118,7 +118,7 @@ export class ConcreteCompiledAnalogCircuit implements CompiledAnalogCircuit {
    *  cast) because per-element state counts aren't known until each element's
    *  setup() runs. MNAEngine._setup() then either adopts the pre-built pool
    *  (test path that pre-allocated) or allocates one and writes back here.
-   *  Post-_setup, cac.statePool === ctx.statePool — single-ownership invariant. */
+   *  Post-_setup, cac.statePool === ctx.statePool- single-ownership invariant. */
   statePool: StatePool;
 
   /** Nodeset constraints: map of MNA nodeId → target voltage. */

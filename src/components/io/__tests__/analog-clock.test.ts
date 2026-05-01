@@ -25,7 +25,7 @@ function getFactory(entry: ModelEntry): AnalogFactory {
 // ===========================================================================
 
 describe("AnalogClock", () => {
-  it("outputs_vdd_and_zero — 1kHz CMOS 3.3V; alternates between 0V and 3.3V", () => {
+  it("outputs_vdd_and_zero- 1kHz CMOS 3.3V; alternates between 0V and 3.3V", () => {
     const freq = 1000;
     const vdd = 3.3;
     const nodePos = 1;
@@ -55,7 +55,7 @@ describe("AnalogClock", () => {
     expect(rhs[branchIdx]).toBe(0);
   });
 
-  it("frequency_matches_property — 1kHz period is 1ms", () => {
+  it("frequency_matches_property- 1kHz period is 1ms", () => {
     const freq = 1000;
     const halfPeriod = 1 / (2 * freq); // 0.5ms
     const BRANCH = 1;
@@ -77,7 +77,7 @@ describe("AnalogClock", () => {
     expect(rhs[BRANCH]).toBe(3.3);
   });
 
-  it("registers_breakpoints — getBreakpoints returns transition times", () => {
+  it("registers_breakpoints- getBreakpoints returns transition times", () => {
     const freq = 1000;
     const clk = makeAnalogClockElement(1, 0, 1, freq, 3.3, () => 0);
 
@@ -97,7 +97,7 @@ describe("AnalogClock", () => {
     }
   });
 
-  it("registers_breakpoints_via_callback — getBreakpoints returns correct transition times", () => {
+  it("registers_breakpoints_via_callback- getBreakpoints returns correct transition times", () => {
     const freq = 1000;
     const clk = makeAnalogClockElement(1, 0, 1, freq, 3.3, () => 0);
     const bps = clk.getBreakpoints(0, 0.003);
@@ -106,7 +106,7 @@ describe("AnalogClock", () => {
     expect(bps).toHaveLength(5);
   });
 
-  it("digital_mode_unchanged — ClockDefinition has executeFn and factory", () => {
+  it("digital_mode_unchanged- ClockDefinition has executeFn and factory", () => {
     // Verify the digital clock behavior is preserved
     expect(ClockDefinition.models.digital!.executeFn).toBeDefined();
     expect(ClockDefinition.factory).toBeDefined();
@@ -114,16 +114,16 @@ describe("AnalogClock", () => {
     expect(typeof ClockDefinition.factory).toBe("function");
   });
 
-  it("has both digital and analog models — clock appears in both palettes", () => {
+  it("has both digital and analog models- clock appears in both palettes", () => {
     expect(ClockDefinition.models.digital).toBeDefined();
     expect(ClockDefinition.modelRegistry?.behavioral).toBeDefined();
   });
 
-  it("has digital model — logical clock behavior preserved", () => {
+  it("has digital model- logical clock behavior preserved", () => {
     expect(ClockDefinition.models.digital).toBeDefined();
   });
 
-  it("analogFactory_creates_element — factory produces a valid AnalogElement", () => {
+  it("analogFactory_creates_element- factory produces a valid AnalogElement", () => {
     const props = new PropertyBag();
     props.set("Frequency", 1000);
     props.set("vdd", 3.3);
@@ -132,7 +132,7 @@ describe("AnalogClock", () => {
     expect(el.branchIndex).toBe(-1);
   });
 
-  it("stamp_produces_incidence_entries — voltage source topology", () => {
+  it("stamp_produces_incidence_entries- voltage source topology", () => {
     const clk = makeAnalogClockElement(1, 0, 1, 1000, 3.3, () => 0);
     clk.label = "CLK1";
     const solver = new SparseSolver();
@@ -180,13 +180,13 @@ describe("AnalogClock", () => {
 });
 
 // ===========================================================================
-// Task C4.4 — Analog clock srcFact + breakpoint parity
+// Task C4.4- Analog clock srcFact + breakpoint parity
 //
 // Clock is treated as an independent source for ngspice DC-OP source
 // stepping. The RHS value (vdd on even half-periods, 0 on odd half-periods)
 // is scaled by CKTsrcFact before the stamp (clock.ts load() body).
 //
-// Breakpoints are deterministic integer multiples of the half period —
+// Breakpoints are deterministic integer multiples of the half period-
 // must match exact === expected.
 // ===========================================================================
 

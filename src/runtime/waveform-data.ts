@@ -1,5 +1,5 @@
 /**
- * WaveformChannel — append-only ring buffer for waveform sample storage.
+ * WaveformChannel- append-only ring buffer for waveform sample storage.
  *
  * Each channel records { time, value } samples. When the buffer is full the
  * oldest sample is overwritten (ring eviction). The buffer capacity is set at
@@ -10,7 +10,7 @@
 import type { SignalAddress } from "@/compile/types.js";
 
 // ---------------------------------------------------------------------------
-// Sample — one recorded data point
+// Sample- one recorded data point
 // ---------------------------------------------------------------------------
 
 export interface WaveformSample {
@@ -21,7 +21,7 @@ export interface WaveformSample {
 }
 
 // ---------------------------------------------------------------------------
-// WaveformChannel — ring buffer holding samples for one signal
+// WaveformChannel- ring buffer holding samples for one signal
 // ---------------------------------------------------------------------------
 
 /**
@@ -88,7 +88,7 @@ export class WaveformChannel {
 
   /**
    * Return all stored samples in chronological order (oldest first).
-   * Allocates a new array — use sparingly (for rendering, not the hot path).
+   * Allocates a new array- use sparingly (for rendering, not the hot path).
    */
   getSamples(): WaveformSample[] {
     const n = this.count;
@@ -97,12 +97,12 @@ export class WaveformChannel {
     const result: WaveformSample[] = new Array(n);
 
     if (this._totalAppended <= this._capacity) {
-      // Buffer not yet wrapped — data starts at index 0
+      // Buffer not yet wrapped- data starts at index 0
       for (let i = 0; i < n; i++) {
         result[i] = this._buf[i]!;
       }
     } else {
-      // Buffer has wrapped — oldest sample is at _head
+      // Buffer has wrapped- oldest sample is at _head
       for (let i = 0; i < n; i++) {
         result[i] = this._buf[(this._head + i) % this._capacity]!;
       }

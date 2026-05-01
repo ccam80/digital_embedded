@@ -87,7 +87,7 @@ describe("BusNet", () => {
   });
 
   // -------------------------------------------------------------------------
-  // twoDriversOneHighZ — driver A = 0xFF defined, driver B = all-high-Z
+  // twoDriversOneHighZ- driver A = 0xFF defined, driver B = all-high-Z
   // -------------------------------------------------------------------------
   it("twoDriversOneHighZ", () => {
     const { state, highZ } = makeState(3);
@@ -99,14 +99,14 @@ describe("BusNet", () => {
     const bus = new BusNet(2, [0, 1], "none");
     bus.recalculate(state, highZ);
 
-    // B doesn't contribute — output should be 0xFF
+    // B doesn't contribute- output should be 0xFF
     expect(state[2]).toBe(0xff);
     expect(highZ[2]).toBe(0);
     expect(bus.checkBurn()).toBeUndefined();
   });
 
   // -------------------------------------------------------------------------
-  // twoDriversAgree — driver A = 0x0F, driver B = 0x0F — no burn
+  // twoDriversAgree- driver A = 0x0F, driver B = 0x0F- no burn
   // -------------------------------------------------------------------------
   it("twoDriversAgree", () => {
     const { state, highZ } = makeState(3);
@@ -122,7 +122,7 @@ describe("BusNet", () => {
   });
 
   // -------------------------------------------------------------------------
-  // twoDriversConflict — driver A = 0xFF, driver B = 0x00 — burn detected
+  // twoDriversConflict- driver A = 0xFF, driver B = 0x00- burn detected
   // -------------------------------------------------------------------------
   it("twoDriversConflict", () => {
     const { state, highZ } = makeState(3);
@@ -138,7 +138,7 @@ describe("BusNet", () => {
   });
 
   // -------------------------------------------------------------------------
-  // pullUpResolvesFloating — all drivers high-Z with pull-up → all 1s
+  // pullUpResolvesFloating- all drivers high-Z with pull-up → all 1s
   // -------------------------------------------------------------------------
   it("pullUpResolvesFloating", () => {
     const { state, highZ } = makeState(2);
@@ -154,7 +154,7 @@ describe("BusNet", () => {
   });
 
   // -------------------------------------------------------------------------
-  // pullDownResolvesFloating — all drivers high-Z with pull-down → all 0s
+  // pullDownResolvesFloating- all drivers high-Z with pull-down → all 0s
   // -------------------------------------------------------------------------
   it("pullDownResolvesFloating", () => {
     const { state, highZ } = makeState(2);
@@ -170,7 +170,7 @@ describe("BusNet", () => {
   });
 
   // -------------------------------------------------------------------------
-  // noDriversFullHighZ — empty driver list → full high-Z output
+  // noDriversFullHighZ- empty driver list → full high-Z output
   // -------------------------------------------------------------------------
   it("noDriversFullHighZ", () => {
     const { state, highZ } = makeState(1);
@@ -183,7 +183,7 @@ describe("BusNet", () => {
   });
 
   // -------------------------------------------------------------------------
-  // partialHighZ — some bits high-Z from all drivers, others driven
+  // partialHighZ- some bits high-Z from all drivers, others driven
   // -------------------------------------------------------------------------
   it("partialHighZ", () => {
     // Driver at 0: bits [7:4] = high-Z, bits [3:0] = 0b1010 = 0x0A
@@ -201,7 +201,7 @@ describe("BusNet", () => {
   });
 
   // -------------------------------------------------------------------------
-  // partialConflict — only some bits conflict
+  // partialConflict- only some bits conflict
   // -------------------------------------------------------------------------
   it("partialConflict", () => {
     // Driver A: bits[7:4]=defined-high(0xF0), bits[3:0]=defined-low
@@ -225,7 +225,7 @@ describe("BusNet", () => {
 
 describe("BusResolver", () => {
   // -------------------------------------------------------------------------
-  // burnDeferredToPostStep — transient conflict resolves before step ends
+  // burnDeferredToPostStep- transient conflict resolves before step ends
   // -------------------------------------------------------------------------
   it("burnDeferredToPostStep", () => {
     // Simulate a transient conflict: two drivers conflict during propagation,
@@ -239,7 +239,7 @@ describe("BusResolver", () => {
     setDefined(state, highZ, 1, 0x00);
     resolver.onNetChanged(0, state, highZ);
 
-    // Conflict exists transiently — but we don't check burns yet
+    // Conflict exists transiently- but we don't check burns yet
     const transientBurns = resolver.checkAllBurns();
     expect(transientBurns.length).toBe(1); // burn present at this instant
 
@@ -253,7 +253,7 @@ describe("BusResolver", () => {
   });
 
   // -------------------------------------------------------------------------
-  // persistentBurnDetected — conflict that does not resolve → BurnException
+  // persistentBurnDetected- conflict that does not resolve → BurnException
   // -------------------------------------------------------------------------
   it("persistentBurnDetected", () => {
     const { state, highZ } = makeState(3);
@@ -263,14 +263,14 @@ describe("BusResolver", () => {
     setDefined(state, highZ, 0, 0xff);
     setDefined(state, highZ, 1, 0x00);
     resolver.onNetChanged(0, state, highZ);
-    // No resolution — burn persists
+    // No resolution- burn persists
     const burns = resolver.checkAllBurns();
     expect(burns.length).toBe(1);
     expect(burns[0]).toBeInstanceOf(BurnException);
   });
 
   // -------------------------------------------------------------------------
-  // switchMergesNets — close switch between two bus nets
+  // switchMergesNets- close switch between two bus nets
   // -------------------------------------------------------------------------
   it("switchMergesNets", () => {
     // Two isolated bus nets: netA (output=2, driver=0) and netB (output=3, driver=1)
@@ -287,7 +287,7 @@ describe("BusResolver", () => {
     resolver.onNetChanged(0, state, highZ);
     resolver.onNetChanged(1, state, highZ);
 
-    // Close the switch — nets 2 and 3 merge
+    // Close the switch- nets 2 and 3 merge
     resolver.reconfigureForSwitch(99, true);
 
     // Recalculate after merge
@@ -302,7 +302,7 @@ describe("BusResolver", () => {
   });
 
   // -------------------------------------------------------------------------
-  // switchOpenSplitsNets — close then open a switch, nets become independent
+  // switchOpenSplitsNets- close then open a switch, nets become independent
   // -------------------------------------------------------------------------
   it("switchOpenSplitsNets", () => {
     const { state, highZ } = makeState(4);
@@ -322,7 +322,7 @@ describe("BusResolver", () => {
     resolver.onNetChanged(0, state, highZ);
     resolver.onNetChanged(1, state, highZ);
 
-    // No burn — each net has only one driver
+    // No burn- each net has only one driver
     const burns = resolver.checkAllBurns();
     expect(burns.length).toBe(0);
 
@@ -354,7 +354,7 @@ describe("BusResolver", () => {
   });
 
   // -------------------------------------------------------------------------
-  // addBusNetWithPullUp — resolver respects pull-up on registration
+  // addBusNetWithPullUp- resolver respects pull-up on registration
   // -------------------------------------------------------------------------
   it("addBusNetWithPullUp", () => {
     const { state, highZ } = makeState(2);
@@ -372,7 +372,7 @@ describe("BusResolver", () => {
   });
 
   // -------------------------------------------------------------------------
-  // switchIdempotent — closing an already-closed switch is a no-op
+  // switchIdempotent- closing an already-closed switch is a no-op
   // -------------------------------------------------------------------------
   it("switchIdempotent", () => {
     const { state, highZ } = makeState(4);
@@ -400,7 +400,7 @@ describe("BusResolver", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Integration test helpers — compile real circuits and run the engine
+// Integration test helpers- compile real circuits and run the engine
 // ---------------------------------------------------------------------------
 
 
@@ -456,7 +456,7 @@ function makeRegistry(...defs: (Omit<ComponentDefinition, "typeId"> & { typeId: 
 }
 
 // ---------------------------------------------------------------------------
-// BusIntegration — compiler + engine integration tests
+// BusIntegration- compiler + engine integration tests
 // ---------------------------------------------------------------------------
 
 describe("BusIntegration", () => {

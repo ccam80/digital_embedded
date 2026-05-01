@@ -1,5 +1,5 @@
 /**
- * ROM components — ROM and ROMDualPort.
+ * ROM components- ROM and ROMDualPort.
  *
  * ROM: single-port read-only memory with chip-select.
  *   Inputs: A (addrBits), sel (1)
@@ -232,7 +232,7 @@ export const ROMDefinition: ComponentDefinition = {
   propertyDefs: ROM_PROPERTY_DEFS,
   attributeMap: ROM_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.MEMORY,
-  helpText: "ROM — read-only memory. If sel=1, output D = memory[A].",
+  helpText: "ROM- read-only memory. If sel=1, output D = memory[A].",
   models: {
     digital: {
       executeFn: executeROM,
@@ -365,7 +365,7 @@ export const ROMDualPortDefinition: ComponentDefinition = {
   propertyDefs: ROM_DUAL_PORT_PROPERTY_DEFS,
   attributeMap: ROM_DUAL_PORT_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.MEMORY,
-  helpText: "ROMDualPort — dual-port read-only memory with two independent read ports.",
+  helpText: "ROMDualPort- dual-port read-only memory with two independent read ports.",
   models: {
     digital: {
       executeFn: executeROMDualPort,

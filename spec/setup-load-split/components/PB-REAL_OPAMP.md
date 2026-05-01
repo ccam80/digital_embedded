@@ -8,11 +8,11 @@
 The composite itself has no `ngspiceNodeMap`. Sub-elements carry their own maps.
 
 Composite pin labels (from `buildRealOpAmpPinDeclarations()`):
-- `in-` — inverting input (pinLayout index 0)
-- `in+` — non-inverting input (pinLayout index 1)
-- `out` — output (pinLayout index 2)
-- `Vcc+` — positive supply (pinLayout index 3)
-- `Vcc-` — negative supply (pinLayout index 4)
+- `in-`- inverting input (pinLayout index 0)
+- `in+`- non-inverting input (pinLayout index 1)
+- `out`- output (pinLayout index 2)
+- `Vcc+`- positive supply (pinLayout index 3)
+- `Vcc-`- negative supply (pinLayout index 4)
 
 ## Internal nodes
 
@@ -103,7 +103,7 @@ this._inN = inN;
 
 These replace all inline `this._pinNodes.get("in+")!` and `this._pinNodes.get("in-")!` calls in `load()`. The `load()` body reads `this._inP` and `this._inN` directly.
 
-## setup() body — composite forwards in NGSPICE_LOAD_ORDER order
+## setup() body- composite forwards in NGSPICE_LOAD_ORDER order
 
 ```ts
 setup(ctx: SetupContext): void {
@@ -116,23 +116,23 @@ setup(ctx: SetupContext): void {
   // Allocate internal gain-stage node
   this._nVint = ctx.makeVolt(this.label, "vint");
 
-  // 1. RES — output resistance (ressetup.c:46-49, 4 TSTALLOC)
+  // 1. RES- output resistance (ressetup.c:46-49, 4 TSTALLOC)
   this._resOut.pinNodeIds = [this._nVint, nOut];
   this._resOut.setup(ctx);
 
-  // 2. CAP — compensation capacitor (capsetup.c:114-117, 2 states, 4 TSTALLOC)
+  // 2. CAP- compensation capacitor (capsetup.c:114-117, 2 states, 4 TSTALLOC)
   this._capComp.pinNodeIds = [this._nVint, 0];
   this._capComp.setup(ctx);
 
-  // 3. DIO — positive clamp (diosetup.c:198-238, 5 states, 7 TSTALLOC)
+  // 3. DIO- positive clamp (diosetup.c:198-238, 5 states, 7 TSTALLOC)
   this._dClampP.pinNodeIds = [nVccP, this._nVint];
   this._dClampP.setup(ctx);
 
-  // 4. DIO — negative clamp (diosetup.c:198-238, 5 states, 7 TSTALLOC)
+  // 4. DIO- negative clamp (diosetup.c:198-238, 5 states, 7 TSTALLOC)
   this._dClampN.pinNodeIds = [this._nVint, nVccN];
   this._dClampN.setup(ctx);
 
-  // 5. VCVS — main gain stage (vcvsset.c:53-58, 1 branch, 6 TSTALLOC)
+  // 5. VCVS- main gain stage (vcvsset.c:53-58, 1 branch, 6 TSTALLOC)
   this._vcvs1.pinNodeIds = [inP, inN, this._nVint, 0];
   this._vcvs1.setup(ctx);
 
@@ -143,12 +143,12 @@ setup(ctx: SetupContext): void {
 ### Setup ordering rationale
 
 Order follows ascending `ngspiceLoadOrder` buckets:
-1. RES (`resOut`) — `NGSPICE_LOAD_ORDER.RES`
-2. CAP (`capComp`) — `NGSPICE_LOAD_ORDER.CAP`
-3. DIO (`dClampP`, `dClampN`) — `NGSPICE_LOAD_ORDER.DIO`
-4. VCVS (`vcvs1`) — `NGSPICE_LOAD_ORDER.VCVS`
+1. RES (`resOut`)- `NGSPICE_LOAD_ORDER.RES`
+2. CAP (`capComp`)- `NGSPICE_LOAD_ORDER.CAP`
+3. DIO (`dClampP`, `dClampN`)- `NGSPICE_LOAD_ORDER.DIO`
+4. VCVS (`vcvs1`)- `NGSPICE_LOAD_ORDER.VCVS`
 
-## load() body — composite forwards
+## load() body- composite forwards
 
 ```ts
 load(ctx: LoadContext): void {
@@ -198,7 +198,7 @@ Composite has none of its own. Sub-element state:
 
 Total: 12 state slots across sub-elements.
 
-## setParam routing — model presets
+## setParam routing- model presets
 
 The `REAL_OPAMP_MODELS` presets (`741`, `LM358`, `TL072`, `OPA2134`) are applied at registration time when the `model` property is set. `setParam` routes:
 - `"aol"` → `vcvs1.setParam("gain", value)`
@@ -213,7 +213,7 @@ Not needed. Direct refs to all sub-elements.
 ## Factory cleanup
 
 - Drop `internalNodeIds`, `branchIdx` from factory signature.
-- Drop `getInternalNodeCount` (was 1 for `V_int`) — replaced by `mayCreateInternalNodes: true`.
+- Drop `getInternalNodeCount` (was 1 for `V_int`)- replaced by `mayCreateInternalNodes: true`.
 - Add `mayCreateInternalNodes: true` (`nVint` allocated in `setup()`).
 - Leave `ngspiceNodeMap` undefined on `RealOpAmpDefinition`.
 
@@ -221,11 +221,11 @@ Not needed. Direct refs to all sub-elements.
 
 Per CLAUDE.md "Test Policy During W3 Setup-Load-Split", verification is spec compliance only. DO NOT run tests; DO NOT use test results.
 
-1. `setup()` body in the implementation file matches the "setup() body — alloc only" listing in this PB line-for-line.
+1. `setup()` body in the implementation file matches the "setup() body- alloc only" listing in this PB line-for-line.
 2. TSTALLOC sequence in `setup()` matches the order in the cited ngspice anchor file (see top of this PB, e.g. `ressetup.c:46-49`).
 3. Factory cleanup applied per the "Factory cleanup" section above.
 4. `ngspiceNodeMap` registered per the "Pin mapping" section above (or omitted for composites where the spec says so).
-5. `load()` writes through cached handles only — zero `solver.allocElement(...)` calls inside `load()`, `accept()`, or any non-`setup()` method.
+5. `load()` writes through cached handles only- zero `solver.allocElement(...)` calls inside `load()`, `accept()`, or any non-`setup()` method.
 6. `mayCreateInternalNodes` flag set per spec.
 7. `findBranchFor` callback present where spec says (V-output sources, IND, etc.).
 8. No banned closing verdicts (mapping/tolerance/equivalent-to/pre-existing/intentional-divergence/citation-divergence/partial) used in any commit message or report.

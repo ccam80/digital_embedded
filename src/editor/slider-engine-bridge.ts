@@ -1,5 +1,5 @@
 /**
- * SliderEngineBridge — connects SliderPanel to the SimulationCoordinator.
+ * SliderEngineBridge- connects SliderPanel to the SimulationCoordinator.
  *
  * When a slider value changes, the bridge:
  *   1. Resolves the analog element from the coordinator's current resolver context.

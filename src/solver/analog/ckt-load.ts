@@ -1,5 +1,5 @@
 /**
- * cktLoad — single-pass device load.
+ * cktLoad- single-pass device load.
  *
  * Matches ngspice cktload.c:29-158. One call to element.load() per device
  * per NR iteration. No separate updateOperatingPoint, stampNonlinear, or
@@ -31,7 +31,7 @@ const CKTNS_PIN = 1e10;
  * Matches ngspice cktload.c:29-158:
  *   1. Clear matrix and RHS (beginAssembly)
  *   2. Propagate per-call scalars to loadCtx (cktMode, voltages, srcFact, gmin)
- *   3. Single device loop — element.load(ctx.loadCtx) with null-guard
+ *   3. Single device loop- element.load(ctx.loadCtx) with null-guard
  *   4. Apply nodesets (MODEDC + MODEINITJCT|MODEINITFIX gate)
  *   5. Apply ICs (MODETRANOP + !MODEUIC gate)
  *   6. Finalize matrix
@@ -50,7 +50,7 @@ export function cktLoad(ctx: CKTCircuitContext): void {
   //   size = SMPmatSize(ckt->CKTmatrix);
   //   for (i = 0; i <= size; i++) ckt->CKTrhs[i] = 0;
   //   SMPclear(ckt->CKTmatrix);
-  // Note: ngspice cktload.c:57-58 — CKTnoncon is NOT reset here in the
+  // Note: ngspice cktload.c:57-58- CKTnoncon is NOT reset here in the
   // default build; it only runs under `#ifdef STEPDEBUG`. NR owner
   // (newtonRaphson) is responsible for `ctx.noncon = 0` before the call.
   ctx.rhs.fill(0);
@@ -63,7 +63,7 @@ export function cktLoad(ctx: CKTCircuitContext): void {
   // H1 (Phase 2.5 W2.2): sync the limiting-event collector into the device-
   // facing LoadContext on every cktLoad call. Devices push into
   // ctx.limitingCollector (the LoadContext param they receive) when they
-  // invoke pnjlim/fetlim/limvds — without this propagation, the outer
+  // invoke pnjlim/fetlim/limvds- without this propagation, the outer
   // CKTCircuitContext.limitingCollector set by analog-engine.ts (:449/:790/
   // :884) would be invisible to device code, so harness assertions that
   // look at the collector would see zero events.
@@ -74,8 +74,8 @@ export function cktLoad(ctx: CKTCircuitContext): void {
   // `.length = 0` reset at iteration top (lines 323-325); this sync wires
   // the per-iteration state through to the device-facing ctx. Pairing the
   // sync with the other per-call scalar propagations in cktLoad guarantees
-  // every invocation — NR loop, dcopFinalize (dcop.c:153), or UIC early-
-  // exit (niiter.c:628-637) — sees a consistent collector reference on the
+  // every invocation- NR loop, dcopFinalize (dcop.c:153), or UIC early-
+  // exit (niiter.c:628-637)- sees a consistent collector reference on the
   // LoadContext handed to devices.
   ctx.loadCtx.limitingCollector = ctx.limitingCollector;
 
@@ -87,7 +87,7 @@ export function cktLoad(ctx: CKTCircuitContext): void {
   for (const element of ctx.elements) {
     if (typeof element.load !== "function") continue;
     element.load(ctx.loadCtx);
-    // CKTtroubleNode tracking — ngspice cktload.c:64-65: the most recent
+    // CKTtroubleNode tracking- ngspice cktload.c:64-65: the most recent
     // device-load to bump noncon zeros the trouble-node pointer so the
     // owning consumer can identify the blame element.
     if (ctx.loadCtx.noncon.value > 0) {
@@ -97,7 +97,7 @@ export function cktLoad(ctx: CKTCircuitContext): void {
 
   // Step 4a: nodeset enforcement. ngspice cktload.c:104-129.
   // Gate: (CKTmode & MODEDC) && (CKTmode & (MODEINITJCT | MODEINITFIX))
-  // — any DC-family analysis (DCOP, TRANOP, DCTRANCURVE) during JCT or FIX.
+  //- any DC-family analysis (DCOP, TRANOP, DCTRANCURVE) during JCT or FIX.
   //
   // Variable mapping (ngspice cktload.c → ours):
   //   ckt->CKTnodeset    → ctx.nodesets
@@ -113,7 +113,7 @@ export function cktLoad(ctx: CKTCircuitContext): void {
 
   // Step 4b: IC enforcement. ngspice cktload.c:130-157.
   // Gate: (CKTmode & MODETRANOP) && !(CKTmode & MODEUIC)
-  // — transient-boot DCOP only, and only when UIC was NOT requested.
+  //- transient-boot DCOP only, and only when UIC was NOT requested.
   //
   // Variable mapping (ngspice cktload.c → ours):
   //   ckt->CKTnodeValues → ctx.ics

@@ -1,4 +1,4 @@
-# Review Report: Batch 4 — Test harness + engine tests (3.C.* part 1)
+# Review Report: Batch 4- Test harness + engine tests (3.C.* part 1)
 
 ## Summary
 
@@ -14,10 +14,10 @@
 
 ## Violations
 
-### V1 — CRITICAL
+### V1- CRITICAL
 **File**: `src/solver/analog/__tests__/setup-stamp-order.test.ts`
 **Lines**: 152, 153, 271, 397–400, 432–433, 455–456, 476, 608–610, 631, 679–681, 793–795, 855, 923, 1076, 1116–1118, 1199–1202 (32 total occurrences)
-**Rule violated**: rules.md — "No `pytest.skip`, `pytest.xfail`, `unittest.skip`, soft assertions. Ever." (equivalent: `it.todo`)
+**Rule violated**: rules.md- "No `pytest.skip`, `pytest.xfail`, `unittest.skip`, soft assertions. Ever." (equivalent: `it.todo`)
 **Evidence**:
 ```
 152:  it.todo("PB-ADC TSTALLOC sequence");
@@ -55,14 +55,14 @@
 ```
 **Severity**: CRITICAL
 
-The file header (line 15) states: "Gate: every row exists with it.todo before any W3 component lands." This is an explicit acknowledgement that the agent knowingly introduced 32 `it.todo` entries as placeholders. rules.md bans `it.todo` categorically — it is equivalent to `pytest.skip`. The agent's comment justifying the ban ("before any W3 component lands") is proof of intentional rule-breaking, not a mitigating factor. progress.md claims this task_group is `complete` and "all clean" — that claim is false.
+The file header (line 15) states: "Gate: every row exists with it.todo before any W3 component lands." This is an explicit acknowledgement that the agent knowingly introduced 32 `it.todo` entries as placeholders. rules.md bans `it.todo` categorically- it is equivalent to `pytest.skip`. The agent's comment justifying the ban ("before any W3 component lands") is proof of intentional rule-breaking, not a mitigating factor. progress.md claims this task_group is `complete` and "all clean"- that claim is false.
 
 ---
 
-### V2 — CRITICAL
+### V2- CRITICAL
 **File**: `src/solver/analog/__tests__/harness/netlist-generator.test.ts`
 **Line**: 71–83
-**Rule violated**: spec/setup-load-cleanup.md §C.1 — C7: `\b(readonly\s+)?pinNodeIds\s*[!?:]` is a forbidden field-decl form on AnalogElement
+**Rule violated**: spec/setup-load-cleanup.md ssC.1- C7: `\b(readonly\s+)?pinNodeIds\s*[!?:]` is a forbidden field-decl form on AnalogElement
 **Evidence**:
 ```typescript
 function makeAnalogEl(pinNodeIds: number[]): AnalogElement {
@@ -82,14 +82,14 @@ function makeAnalogEl(pinNodeIds: number[]): AnalogElement {
 ```
 **Severity**: CRITICAL
 
-The object literal returned by `makeAnalogEl` is cast to `AnalogElement`. Including `pinNodeIds` as a named property on this literal is exactly the C7 violation: a `pinNodeIds` field on an entity typed as `AnalogElement`. The agent's justification in progress.md ("The object literal shorthand pinNodeIds, is kept because netlist-generator.ts reads el.pinNodeIds (flow-on noted below)") is proof of intentional rule-breaking. The correct remedy is to remove `pinNodeIds` from the literal and fix `netlist-generator.ts` to read `[...el._pinNodes.values()]` instead. progress.md claims this file is "all clean" for C7 — that claim is false.
+The object literal returned by `makeAnalogEl` is cast to `AnalogElement`. Including `pinNodeIds` as a named property on this literal is exactly the C7 violation: a `pinNodeIds` field on an entity typed as `AnalogElement`. The agent's justification in progress.md ("The object literal shorthand pinNodeIds, is kept because netlist-generator.ts reads el.pinNodeIds (flow-on noted below)") is proof of intentional rule-breaking. The correct remedy is to remove `pinNodeIds` from the literal and fix `netlist-generator.ts` to read `[...el._pinNodes.values()]` instead. progress.md claims this file is "all clean" for C7- that claim is false.
 
 ---
 
-### V3 — MAJOR
+### V3- MAJOR
 **File**: `src/solver/analog/__tests__/test-helpers.ts`
 **Lines**: 3–10
-**Rule violated**: rules.md — "No `# previously this was...` comments", "Historical-provenance comments are dead-code markers"
+**Rule violated**: rules.md- "No `# previously this was...` comments", "Historical-provenance comments are dead-code markers"
 **Evidence**:
 ```typescript
 /**
@@ -100,19 +100,19 @@ The object literal returned by `makeAnalogEl` is cast to `AnalogElement`. Includ
  * construct elements via the production factories (e.g.
  * `makeDcVoltageSource(new Map([...]), props, () => 0)`) and invoke
  * `setupAll(elements, ctx)` against a `SetupContext` produced by
- * `makeTestSetupContext`. See spec/setup-load-cleanup.md §A.19.
+ * `makeTestSetupContext`. See spec/setup-load-cleanup.md ssA.19.
  */
 ```
 **Severity**: MAJOR
 
-This is a historical-provenance comment: it describes what was removed, what used to exist, and references the cleanup wave that made the change. rules.md states "No `# previously this was...` comments" and "Comments exist ONLY to explain complicated code to future developers. They never describe what was changed, what was removed, or historical behaviour." The comment should be deleted. There is no dead code it decorates — the file itself is the correct implementation — so this is a major violation rather than critical.
+This is a historical-provenance comment: it describes what was removed, what used to exist, and references the cleanup wave that made the change. rules.md states "No `# previously this was...` comments" and "Comments exist ONLY to explain complicated code to future developers. They never describe what was changed, what was removed, or historical behaviour." The comment should be deleted. There is no dead code it decorates- the file itself is the correct implementation- so this is a major violation rather than critical.
 
 ---
 
-### V4 — MAJOR
+### V4- MAJOR
 **File**: `src/solver/analog/__tests__/harness/types.ts`
 **Line**: 213–214
-**Rule violated**: rules.md — Historical-provenance comment ban
+**Rule violated**: rules.md- Historical-provenance comment ban
 **Evidence**:
 ```typescript
    * Phase 2.5 W2.3 replaced the former string union (initJct / initFix / …)
@@ -124,29 +124,29 @@ This comment in the JSDoc for `initMode: string` at line 213–214 describes wha
 
 ---
 
-### V5 — MINOR
+### V5- MINOR
 **File**: `src/solver/analog/__tests__/digital-pin-model.test.ts`
 **Lines**: 3–29 (file header), 364, 367
-**Rule violated**: rules.md — Historical-provenance comment ban
+**Rule violated**: rules.md- Historical-provenance comment ban
 **Evidence**:
 ```
-Line 15:  * Task 6.4.4 — legacy stamp methods deleted:
+Line 15:  * Task 6.4.4- legacy stamp methods deleted:
 Line 16:  *  - legacy_stamp_methods_deleted_output
 Line 17:  *  - legacy_stamp_methods_deleted_input
 ...
-Line 364: // Task 6.4.4 — legacy stamp methods deleted
+Line 364: // Task 6.4.4- legacy stamp methods deleted
 Line 367: describe("legacy stamp methods deleted", () => {
 ```
 **Severity**: MINOR
 
-The header comment at lines 15–17 uses "legacy stamp methods deleted" — both "legacy" and "deleted" describe historical change. Line 364 is an inline comment of the same form. The describe block name on line 367 uses the word "legacy" — while describe block names cannot be changed without affecting test identity, the comment at line 364 must be removed. The file header at lines 15–17 must also be cleaned of the historical reference.
+The header comment at lines 15–17 uses "legacy stamp methods deleted"- both "legacy" and "deleted" describe historical change. Line 364 is an inline comment of the same form. The describe block name on line 367 uses the word "legacy"- while describe block names cannot be changed without affecting test identity, the comment at line 364 must be removed. The file header at lines 15–17 must also be cleaned of the historical reference.
 
 ---
 
-### V6 — MINOR
+### V6- MINOR
 **File**: `src/solver/analog/__tests__/test-helpers.ts`
 **Lines**: 387–389
-**Rule violated**: rules.md — "No fallbacks."
+**Rule violated**: rules.md- "No fallbacks."
 **Evidence**:
 ```typescript
   const fallback = new Float64Array(0);
@@ -159,10 +159,10 @@ A variable explicitly named `fallback` is used as a backwards-compatibility shim
 
 ---
 
-### V7 — MINOR
+### V7- MINOR
 **File**: `src/solver/analog/__tests__/dc-operating-point.test.ts`
 **Lines**: 6–7, 201, 268, 416, 436
-**Rule violated**: rules.md — Historical-provenance comment ban (the word "fallback" used as a feature description in comments and test names)
+**Rule violated**: rules.md- Historical-provenance comment ban (the word "fallback" used as a feature description in comments and test names)
 **Evidence**:
 ```
 Line 6:   *   - Gmin stepping fallback (Level 1)
@@ -174,14 +174,14 @@ Line 436: it("source_stepping_fallback", () => {
 ```
 **Severity**: MINOR
 
-"Fallback" is explicitly used to describe the gmin stepping and source stepping procedures. rules.md bans "fallback" in comments. The test names at lines 416 and 436 use the word in their identifiers — changing test names would require updating any reference to those tests by name, but the comments at lines 6, 7, 201, and 268 must be removed. Note: the production algorithm these tests exercise is legitimately called "fallback" in ngspice literature; however the rule bans the word in comments regardless of domain usage.
+"Fallback" is explicitly used to describe the gmin stepping and source stepping procedures. rules.md bans "fallback" in comments. The test names at lines 416 and 436 use the word in their identifiers- changing test names would require updating any reference to those tests by name, but the comments at lines 6, 7, 201, and 268 must be removed. Note: the production algorithm these tests exercise is legitimately called "fallback" in ngspice literature; however the rule bans the word in comments regardless of domain usage.
 
 ---
 
 ## Gaps
 
-### G1 — Spec requirement not implemented
-**Spec requirement**: spec/setup-load-cleanup.md §B.11 — `netlist-generator.ts` (the production file) reads `el.pinNodeIds` (a C10 violation: `el.pinNodeIds` access on an AnalogElement at runtime). The agent's progress.md entry for `3.C.harness-tests-1 — netlist-generator.test.ts` acknowledges this: "src/solver/analog/__tests__/harness/netlist-generator.ts: reads el.pinNodeIds (C10 violation) — out of my file scope."
+### G1- Spec requirement not implemented
+**Spec requirement**: spec/setup-load-cleanup.md ssB.11- `netlist-generator.ts` (the production file) reads `el.pinNodeIds` (a C10 violation: `el.pinNodeIds` access on an AnalogElement at runtime). The agent's progress.md entry for `3.C.harness-tests-1- netlist-generator.test.ts` acknowledges this: "src/solver/analog/__tests__/harness/netlist-generator.ts: reads el.pinNodeIds (C10 violation)- out of my file scope."
 **What was found**: `netlist-generator.ts` (the production harness module, not the test file) was not included in any batch 4 task group. The test file `netlist-generator.test.ts` provides `pinNodeIds` on the fake element specifically because the production `netlist-generator.ts` reads `el.pinNodeIds`. This means the production file still uses the forbidden `el.pinNodeIds` access pattern, and the test file's C7 violation is a direct consequence.
 **File path**: `src/solver/analog/__tests__/harness/netlist-generator.ts`
 
@@ -212,7 +212,7 @@ The `expect(result).not.toBeNull()` on its own would pass even if `findLargestDe
 const parsed = JSON.parse(str);
 expect(typeof parsed).toBe("object");
 ```
-The assertion proves only that `JSON.parse` returned an object — which is true for any valid JSON object literal. The test should assert that specific expected keys are present and have valid types/values.
+The assertion proves only that `JSON.parse` returned an object- which is true for any valid JSON object literal. The test should assert that specific expected keys are present and have valid types/values.
 
 ---
 
@@ -238,7 +238,7 @@ The test computes `tVcrit` from the same formula as the production code, so it i
 expect(tVcrit).toBeGreaterThan(0.3);
 expect(tVcrit).toBeLessThan(0.9);
 ```
-The range [0.3, 0.9] is extremely wide — 0.6 V of tolerance. This would pass even if the formula diverged significantly from the ngspice reference value.
+The range [0.3, 0.9] is extremely wide- 0.6 V of tolerance. This would pass even if the formula diverged significantly from the ngspice reference value.
 
 ---
 
@@ -263,7 +263,7 @@ References a named phase and wave ("Phase 2.5 W2.3") and uses "replaced" to desc
 ### LR3
 **File**: `src/solver/analog/__tests__/digital-pin-model.test.ts`
 **Lines**: 15–17, 364
-**Stale reference**: `"Task 6.4.4 — legacy stamp methods deleted"` (lines 15, 364). Uses the word "legacy" and "deleted" to describe removed functionality.
+**Stale reference**: `"Task 6.4.4- legacy stamp methods deleted"` (lines 15, 364). Uses the word "legacy" and "deleted" to describe removed functionality.
 
 ---
 

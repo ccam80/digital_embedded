@@ -19,7 +19,7 @@ function setNet(engine: DigitalEngine, netId: number, value: number): void {
 }
 
 // ---------------------------------------------------------------------------
-// Helpers — build minimal ConcreteCompiledCircuit for oscillation tests
+// Helpers- build minimal ConcreteCompiledCircuit for oscillation tests
 // ---------------------------------------------------------------------------
 
 class StaticLayout implements ComponentLayout {

@@ -1,5 +1,5 @@
 /**
- * CKTmode bitfield — single source of truth for simulation mode.
+ * CKTmode bitfield- single source of truth for simulation mode.
  *
  * Direct port of ngspice `CKTmode` (cktdefs.h:160-209).
  *
@@ -7,7 +7,7 @@
  * ref/ngspice/src/include/ngspice/cktdefs.h:165-185.
  *
  * Semantics (ngspice cktdefs.h):
- *   MODE          — high-level analysis selector bits
+ *   MODE         - high-level analysis selector bits
  *     MODETRAN    (0x0001) transient analysis active       (cktdefs.h:166)
  *     MODEAC      (0x0002) AC small-signal analysis active (cktdefs.h:167)
  *     MODEDC      (0x0070) union of all DC-family modes    (cktdefs.h:170)
@@ -15,7 +15,7 @@
  *     MODETRANOP  (0x0020) transient-boot DCOP             (cktdefs.h:172)
  *     MODEDCTRANCURVE (0x0040) DC sweep (.DC)              (cktdefs.h:173)
  *     MODEUIC     (0x10000) use IC (bypasses DCOP for .tran with uic=true) (cktdefs.h:185)
- *   INITF         — low-level Newton init-mode selector bits (mutually exclusive)
+ *   INITF        - low-level Newton init-mode selector bits (mutually exclusive)
  *     MODEINITFLOAT (0x0100) normal linearization from previous iterate (cktdefs.h:177)
  *     MODEINITJCT   (0x0200) cold-start: seed junctions from per-device tVcrit (cktdefs.h:178)
  *     MODEINITFIX   (0x0400) post-initJct: freeze OFF devices, float others (cktdefs.h:179)
@@ -140,24 +140,24 @@ export function initf(mode: number): number {
  * log, error messages).
  *
  * Decoded bits (cktdefs.h:165-185):
- *   - MODETRAN         (0x0001) — cktdefs.h:166
- *   - MODEAC           (0x0002) — cktdefs.h:167
- *   - MODEDCOP         (0x0010) — cktdefs.h:171
- *   - MODETRANOP       (0x0020) — cktdefs.h:172
- *   - MODEDCTRANCURVE  (0x0040) — cktdefs.h:173
- *   - MODEINITFLOAT    (0x0100) — cktdefs.h:177
- *   - MODEINITJCT      (0x0200) — cktdefs.h:178
- *   - MODEINITFIX      (0x0400) — cktdefs.h:179
- *   - MODEINITSMSIG    (0x0800) — cktdefs.h:180
- *   - MODEINITTRAN     (0x1000) — cktdefs.h:181
- *   - MODEINITPRED     (0x2000) — cktdefs.h:182
- *   - MODEUIC          (0x10000) — cktdefs.h:185
+ *   - MODETRAN         (0x0001)- cktdefs.h:166
+ *   - MODEAC           (0x0002)- cktdefs.h:167
+ *   - MODEDCOP         (0x0010)- cktdefs.h:171
+ *   - MODETRANOP       (0x0020)- cktdefs.h:172
+ *   - MODEDCTRANCURVE  (0x0040)- cktdefs.h:173
+ *   - MODEINITFLOAT    (0x0100)- cktdefs.h:177
+ *   - MODEINITJCT      (0x0200)- cktdefs.h:178
+ *   - MODEINITFIX      (0x0400)- cktdefs.h:179
+ *   - MODEINITSMSIG    (0x0800)- cktdefs.h:180
+ *   - MODEINITTRAN     (0x1000)- cktdefs.h:181
+ *   - MODEINITPRED     (0x2000)- cktdefs.h:182
+ *   - MODEUIC          (0x10000)- cktdefs.h:185
  *
  * Multiple bits are joined with `|` in the order listed above (analysis class
- * first, then INITF, then UIC) — e.g. `"MODEDCOP|MODEINITJCT"`. Returns
+ * first, then INITF, then UIC)- e.g. `"MODEDCOP|MODEINITJCT"`. Returns
  * `"MODE_NONE"` when `mode === 0` (no bits set).
  *
- * This helper is for diagnostic use only — production control flow must read
+ * This helper is for diagnostic use only- production control flow must read
  * the bitfield directly via `initf()`, `isDcop()`, etc.
  */
 export function bitsToName(mode: number): string {

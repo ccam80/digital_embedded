@@ -1,5 +1,5 @@
 /**
- * Tests for createTestBridge — lightweight coordinate and state API for E2E tests.
+ * Tests for createTestBridge- lightweight coordinate and state API for E2E tests.
  *
  * Covers getAnalogState() that reads from the SimulationCoordinator.
  */

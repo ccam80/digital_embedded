@@ -17,7 +17,7 @@ import { TestElement, makePin } from '../../test-fixtures/test-element.js';
 // ---------------------------------------------------------------------------
 
 describe('CycleDetector', () => {
-  it('noCycles — simple AND gate circuit → empty array', () => {
+  it('noCycles- simple AND gate circuit → empty array', () => {
     // In(A) → AND → Out(Y)
     // In(B) → AND → Out(Y)
     //
@@ -53,7 +53,7 @@ describe('CycleDetector', () => {
     expect(cycles).toHaveLength(0);
   });
 
-  it('selfLoop — output wired to own input → cycle detected', () => {
+  it('selfLoop- output wired to own input → cycle detected', () => {
     // A NOT gate with its output wired back to its own input.
     //
     // NOT at origin: input pin offset (0,0) → world (0,0)
@@ -76,7 +76,7 @@ describe('CycleDetector', () => {
     expect(cycles[0].componentIds).toContain('not1');
   });
 
-  it('noCycles — two independent chains → empty array', () => {
+  it('noCycles- two independent chains → empty array', () => {
     // Chain 1: In(X) → NOT → Out(Y)
     // Chain 2: In(P) → NOT → Out(Q)
     // Both are acyclic.
@@ -115,14 +115,14 @@ describe('CycleDetector', () => {
     expect(cycles).toHaveLength(0);
   });
 
-  it('noCycles — empty circuit → empty array', () => {
+  it('noCycles- empty circuit → empty array', () => {
     const circuit = new Circuit();
     const cycles = detectCycles(circuit);
     expect(cycles).toHaveLength(0);
   });
 
-  it('noCycles — memory component in feedback path is not a cycle', () => {
-    // FlipflopD Q output fed back to D input — this is sequential, not combinational.
+  it('noCycles- memory component in feedback path is not a cycle', () => {
+    // FlipflopD Q output fed back to D input- this is sequential, not combinational.
     // The flip-flop is a memory component and should break the cycle.
     //
     // In(D) → FlipflopD(D input) → FlipflopD(Q output) → Out(Q)
@@ -149,7 +149,7 @@ describe('CycleDetector', () => {
     circuit.wires.push(new Wire({ x: 8, y: 0 }, { x: 4, y: 0 }));
 
     const cycles = detectCycles(circuit);
-    // Flip-flop breaks the combinational cycle — should be 0 cycles
+    // Flip-flop breaks the combinational cycle- should be 0 cycles
     expect(cycles).toHaveLength(0);
   });
 });

@@ -1,5 +1,5 @@
 /**
- * SixteenSeg component — direct-drive 16-segment alphanumeric display.
+ * SixteenSeg component- direct-drive 16-segment alphanumeric display.
  *
  * 16 segment inputs (a1, a2, b, c, d1, d2, e, f, g, h, i, j, k, l, m, dp).
  * Each segment is independently controlled (no internal decoder).
@@ -36,15 +36,15 @@ import {
 
 // ---------------------------------------------------------------------------
 // Layout constants
-// Java SixteenShape: same size as SevenSegHex — width=4, height=7
+// Java SixteenShape: same size as SevenSegHex- width=4, height=7
 // ---------------------------------------------------------------------------
 
 const COMP_HEIGHT = 7;
 
 // ---------------------------------------------------------------------------
-// Pin layout — 2 inputs matching Java SixteenShape (same as SevenSegHexShape):
-//   led (16-bit) at (2, 7) — bottom-left of display
-//   dp  (1-bit)  at (3, 7) — bottom-right of display
+// Pin layout- 2 inputs matching Java SixteenShape (same as SevenSegHexShape):
+//   led (16-bit) at (2, 7)- bottom-left of display
+//   dp  (1-bit)  at (3, 7)- bottom-right of display
 // ---------------------------------------------------------------------------
 
 function buildSixteenSegPinDeclarations(): PinDeclaration[] {
@@ -71,7 +71,7 @@ function buildSixteenSegPinDeclarations(): PinDeclaration[] {
 }
 
 // ---------------------------------------------------------------------------
-// SixteenSegElement — CircuitElement implementation
+// SixteenSegElement- CircuitElement implementation
 // ---------------------------------------------------------------------------
 
 export class SixteenSegElement extends AbstractCircuitElement {
@@ -213,7 +213,7 @@ export class SixteenSegElement extends AbstractCircuitElement {
       { x: 0.614, y: 6.09 }, { x: 0.361, y: 6.09 }, { x: 0.389, y: 5.494 },
     ], false);
 
-    // Decimal point (dp) — filled circle
+    // Decimal point (dp)- filled circle
     ctx.setColor("COMPONENT");
     ctx.drawCircle(3.1, 6.55, 0.2, true);
 
@@ -222,7 +222,7 @@ export class SixteenSegElement extends AbstractCircuitElement {
 }
 
 // ---------------------------------------------------------------------------
-// executeSixteenSeg — reads 16 inputs, packs into 16-bit output word
+// executeSixteenSeg- reads 16 inputs, packs into 16-bit output word
 // ---------------------------------------------------------------------------
 
 export function executeSixteenSeg(
@@ -231,7 +231,7 @@ export function executeSixteenSeg(
   _highZs: Uint32Array,
   _layout: ComponentLayout,
 ): void {
-  // SixteenSeg has no outputs — it is a display-only component.
+  // SixteenSeg has no outputs- it is a display-only component.
   // The display panel reads "led" (16-bit packed segments) and "dp" inputs directly.
 }
 
@@ -290,7 +290,7 @@ export const SixteenSegDefinition: ComponentDefinition = {
   attributeMap: SIXTEEN_SEG_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.IO,
   helpText:
-    "SixteenSeg — direct-drive 16-segment alphanumeric display.\n" +
+    "SixteenSeg- direct-drive 16-segment alphanumeric display.\n" +
     "16 independent segment inputs for full alphanumeric character display.\n" +
     "commonCathode=true: segments light when input=1.",
   models: {

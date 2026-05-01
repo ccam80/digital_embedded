@@ -1,7 +1,7 @@
 /**
  * Tests for TimingWheel and EventPool.
  *
- * Task 3.1.2 — Timing Wheel Event Queue
+ * Task 3.1.2- Timing Wheel Event Queue
  */
 
 import { describe, it, expect, beforeEach } from "vitest";
@@ -29,7 +29,7 @@ describe("EventPool", () => {
     const e1 = pool.alloc();
     pool.free(e1);
     const e2 = pool.alloc();
-    expect(e2).toBe(e1); // same object reference — pool reuse
+    expect(e2).toBe(e1); // same object reference- pool reuse
   });
 
   it("throws when exhausted", () => {
@@ -65,7 +65,7 @@ describe("TimingWheel", () => {
     wheel = new TimingWheel(1024, 256);
   });
 
-  it("scheduleSingleEvent — schedule at t=10, advance to t=10, get 1 event with correct netId/value", () => {
+  it("scheduleSingleEvent- schedule at t=10, advance to t=10, get 1 event with correct netId/value", () => {
     wheel.schedule(7, 0xff, 0, 10n);
     const events = wheel.advance(10n);
     expect(events).toHaveLength(1);
@@ -74,7 +74,7 @@ describe("TimingWheel", () => {
     expect(events[0].timestamp).toBe(10n);
   });
 
-  it("batchesSimultaneousEvents — schedule 3 events at t=10, advance to t=10, get all 3", () => {
+  it("batchesSimultaneousEvents- schedule 3 events at t=10, advance to t=10, get all 3", () => {
     wheel.schedule(1, 1, 0, 10n);
     wheel.schedule(2, 2, 0, 10n);
     wheel.schedule(3, 3, 0, 10n);
@@ -84,7 +84,7 @@ describe("TimingWheel", () => {
     expect(netIds).toEqual([1, 2, 3]);
   });
 
-  it("orderedByTimestamp — schedule at t=20, t=10, t=15; advance to t=20; receive in order 10, 15, 20", () => {
+  it("orderedByTimestamp- schedule at t=20, t=10, t=15; advance to t=20; receive in order 10, 15, 20", () => {
     wheel.schedule(1, 0, 0, 20n);
     wheel.schedule(2, 0, 0, 10n);
     wheel.schedule(3, 0, 0, 15n);
@@ -95,7 +95,7 @@ describe("TimingWheel", () => {
     expect(events[2].timestamp).toBe(20n);
   });
 
-  it("replacesExistingEventForSameNet — schedule net 5 at t=10, then at t=15; advance to t=15; only one event for net 5 (at t=15)", () => {
+  it("replacesExistingEventForSameNet- schedule net 5 at t=10, then at t=15; advance to t=15; only one event for net 5 (at t=15)", () => {
     wheel.schedule(5, 1, 0, 10n);
     wheel.schedule(5, 2, 0, 15n);
     const events = wheel.advance(15n);
@@ -105,16 +105,16 @@ describe("TimingWheel", () => {
     expect(net5[0].value).toBe(2);
   });
 
-  it("replacesExistingEventForSameNet — first event not returned at t=10 when replaced", () => {
+  it("replacesExistingEventForSameNet- first event not returned at t=10 when replaced", () => {
     wheel.schedule(5, 1, 0, 10n);
     wheel.schedule(5, 2, 0, 15n);
-    // Advance only to t=10 — replacement is at t=15 so nothing at t=10.
+    // Advance only to t=10- replacement is at t=15 so nothing at t=10.
     const at10 = wheel.advance(10n);
     const net5at10 = at10.filter((e) => e.netId === 5);
     expect(net5at10).toHaveLength(0);
   });
 
-  it("handlesWrapAround — wheel size 16, schedule at t=20 (wraps), advance to t=20, receive event", () => {
+  it("handlesWrapAround- wheel size 16, schedule at t=20 (wraps), advance to t=20, receive event", () => {
     const smallWheel = new TimingWheel(16, 64);
     // t=20 wraps: 20 % 16 = 4, but base=0 so offset=20 > wheelSize → overflow.
     // After clearing base past t=20, it should be returned.
@@ -126,7 +126,7 @@ describe("TimingWheel", () => {
     expect(events[0].timestamp).toBe(20n);
   });
 
-  it("handlesWrapAround — multiple events across a wrap boundary", () => {
+  it("handlesWrapAround- multiple events across a wrap boundary", () => {
     const smallWheel = new TimingWheel(16, 64);
     smallWheel.schedule(1, 1, 0, 5n);
     smallWheel.schedule(2, 2, 0, 20n); // exceeds wheelSize of 16 → overflow
@@ -140,10 +140,10 @@ describe("TimingWheel", () => {
     expect(at20[0].netId).toBe(2);
   });
 
-  it("overflowHandled — schedule at t > wheelSize, verify it's returned at correct time", () => {
+  it("overflowHandled- schedule at t > wheelSize, verify it's returned at correct time", () => {
     // wheelSize=1024, schedule at t=2000 which is > 1024
     wheel.schedule(11, 77, 0, 2000n);
-    // Advance to before — should get nothing.
+    // Advance to before- should get nothing.
     const before = wheel.advance(1999n);
     expect(before).toHaveLength(0);
     // Advance to exactly t=2000.
@@ -154,14 +154,14 @@ describe("TimingWheel", () => {
     expect(at2000[0].timestamp).toBe(2000n);
   });
 
-  it("overflowHandled — event not returned early", () => {
+  it("overflowHandled- event not returned early", () => {
     wheel.schedule(3, 5, 0, 1500n);
     const before = wheel.advance(1000n);
     expect(before).toHaveLength(0);
     expect(wheel.size).toBe(1);
   });
 
-  it("zeroAllocation — schedule and advance 1000 events, verify no new objects created (event pool reuse)", () => {
+  it("zeroAllocation- schedule and advance 1000 events, verify no new objects created (event pool reuse)", () => {
     // Use a wheel with a fixed pool. If pool is exhausted, alloc() throws.
     // Pool size = 64. We schedule one event at a time and advance, reusing pool.
     const poolSize = 64;

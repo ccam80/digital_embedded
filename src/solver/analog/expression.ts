@@ -325,21 +325,21 @@ class Parser {
       if (this._peek().kind === TokenKind.LParen) {
         this._advance(); // consume '('
 
-        // V(label) — circuit node voltage reference
+        // V(label)- circuit node voltage reference
         if (name === "V") {
           const labelTok = this._expect(TokenKind.Ident, "label identifier");
           this._expect(TokenKind.RParen, "')'");
           return circuitVoltageNode(labelTok.name!);
         }
 
-        // I(label) — circuit branch current reference
+        // I(label)- circuit branch current reference
         if (name === "I") {
           const labelTok = this._expect(TokenKind.Ident, "label identifier");
           this._expect(TokenKind.RParen, "')'");
           return circuitCurrentNode(labelTok.name!);
         }
 
-        // random() — white noise
+        // random()- white noise
         if (name === "random") {
           this._expect(TokenKind.RParen, "')'");
           return builtinFuncNode("random");

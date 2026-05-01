@@ -1,5 +1,5 @@
 /**
- * Tests for TestRunner and CircuitBuilder.runTests — task 6.3.4.
+ * Tests for TestRunner and CircuitBuilder.runTests- task 6.3.4.
  *
  * Tests cover:
  *   - Embedded test data extraction from Testcase components
@@ -39,7 +39,7 @@ function executeXor2(index: number, state: Uint32Array, _highZs: Uint32Array, la
 }
 
 // ---------------------------------------------------------------------------
-// buildRegistry — mock component registry
+// buildRegistry- mock component registry
 // ---------------------------------------------------------------------------
 
 function buildRegistry(): ComponentRegistry {
@@ -93,7 +93,7 @@ function buildRegistry(): ComponentRegistry {
 }
 
 // ---------------------------------------------------------------------------
-// buildHalfAdder — circuit with labeled In/Out components
+// buildHalfAdder- circuit with labeled In/Out components
 // ---------------------------------------------------------------------------
 
 function buildHalfAdder(): Circuit {
@@ -137,7 +137,7 @@ function buildHalfAdder(): Circuit {
 }
 
 // ---------------------------------------------------------------------------
-// makeTestcaseElement — create a TestcaseElement with given test data string
+// makeTestcaseElement- create a TestcaseElement with given test data string
 // ---------------------------------------------------------------------------
 
 function makeTestcaseElement(testData: string): TestcaseElement {
@@ -202,7 +202,7 @@ describe("TestRunner", () => {
   // embeddedTests
   // -------------------------------------------------------------------------
 
-  it("embeddedTests — circuit with Testcase component → runTests extracts embedded data and returns results", async () => {
+  it("embeddedTests- circuit with Testcase component → runTests extracts embedded data and returns results", async () => {
     const registry = buildRegistry();
     const builder = new CircuitBuilder(registry);
 
@@ -226,7 +226,7 @@ describe("TestRunner", () => {
   // externalTests
   // -------------------------------------------------------------------------
 
-  it("externalTests — external testData string overrides embedded Testcase data", async () => {
+  it("externalTests- external testData string overrides embedded Testcase data", async () => {
     const registry = buildRegistry();
     const builder = new CircuitBuilder(registry);
 
@@ -239,7 +239,7 @@ describe("TestRunner", () => {
 
     await builder.runTests(engine, circuit, externalData);
 
-    // External data takes precedence — parser called with external string
+    // External data takes precedence- parser called with external string
     expect(parseTestDataMock).toHaveBeenCalledWith(externalData);
   });
 
@@ -247,7 +247,7 @@ describe("TestRunner", () => {
   // noTestData
   // -------------------------------------------------------------------------
 
-  it("noTestData — circuit without Testcase and no external data → throws FacadeError", async () => {
+  it("noTestData- circuit without Testcase and no external data → throws FacadeError", async () => {
     const registry = buildRegistry();
     const builder = new CircuitBuilder(registry);
 
@@ -264,7 +264,7 @@ describe("TestRunner", () => {
   // multipleTestcases
   // -------------------------------------------------------------------------
 
-  it("multipleTestcases — circuit with 2 Testcase components → both sets of vectors combined", async () => {
+  it("multipleTestcases- circuit with 2 Testcase components → both sets of vectors combined", async () => {
     const registry = buildRegistry();
     const builder = new CircuitBuilder(registry);
 
@@ -283,16 +283,16 @@ describe("TestRunner", () => {
   });
 
   // -------------------------------------------------------------------------
-  // extractEmbeddedTestData — unit tests for the helper
+  // extractEmbeddedTestData- unit tests for the helper
   // -------------------------------------------------------------------------
 
-  it("extractEmbeddedTestData — circuit with no Testcase elements → returns null", () => {
+  it("extractEmbeddedTestData- circuit with no Testcase elements → returns null", () => {
     const circuit = buildHalfAdder();
     const result = extractEmbeddedTestData(circuit);
     expect(result).toBeNull();
   });
 
-  it("extractEmbeddedTestData — single Testcase element → returns its test data", () => {
+  it("extractEmbeddedTestData- single Testcase element → returns its test data", () => {
     const circuit = buildHalfAdder();
     const testData = "A B Y\n0 0 0\n1 1 1";
     circuit.elements.push(makeTestcaseElement(testData));
@@ -301,7 +301,7 @@ describe("TestRunner", () => {
     expect(result).toBe(testData);
   });
 
-  it("extractEmbeddedTestData — two Testcase elements → concatenated with newline", () => {
+  it("extractEmbeddedTestData- two Testcase elements → concatenated with newline", () => {
     const circuit = buildHalfAdder();
     circuit.elements.push(makeTestcaseElement("A B Y\n0 0 0"));
     circuit.elements.push(makeTestcaseElement("A B Y\n1 1 0"));
@@ -310,7 +310,7 @@ describe("TestRunner", () => {
     expect(result).toBe("A B Y\n0 0 0\nA B Y\n1 1 0");
   });
 
-  it("extractEmbeddedTestData — Testcase with empty testData ignored", () => {
+  it("extractEmbeddedTestData- Testcase with empty testData ignored", () => {
     const circuit = buildHalfAdder();
     circuit.elements.push(makeTestcaseElement(""));
     circuit.elements.push(makeTestcaseElement("A B Y\n1 0 1"));

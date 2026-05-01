@@ -13,7 +13,7 @@
  *   import.meta.env?.NGSPICE_DLL_PATH || describe.skip(...)
  *
  * Environment variable:
- *   NGSPICE_DLL_PATH — absolute path to ngspice.dll with instrumentation
+ *   NGSPICE_DLL_PATH- absolute path to ngspice.dll with instrumentation
  */
 
 import type {
@@ -177,7 +177,7 @@ export class NgspiceBridge {
     const SendStat = koffi.proto(`int SendStatCb${uid}(char*, int, void*)`);
     const ControlledExit = koffi.proto(`int ControlledExitCb${uid}(int, int, int, void*)`);
 
-    // SendChar receives every line ngspice would print to stdout/stderr —
+    // SendChar receives every line ngspice would print to stdout/stderr-
     // including "Warning: parameter X ignored" notices when our netlist
     // contains a model param ngspice's parser doesn't recognise. Silently
     // swallowing them masked netlist bugs that left ngspice in a broken
@@ -279,11 +279,11 @@ export class NgspiceBridge {
   }
 
   private _registerIterationCallback(koffi: any, uid: string): void {
-    // NiIterationData struct — extended with simTimeStart + phase fields
+    // NiIterationData struct- extended with simTimeStart + phase fields
     const NiIterationData = koffi.struct(`NiIterationData${uid}`, {
       iteration:        "int",
       matrixSize:       "int",
-      // SMPmatSize+1 — actual rhs/rhsOld/preSolveRhs slot count. Can be smaller
+      // SMPmatSize+1- actual rhs/rhsOld/preSolveRhs slot count. Can be smaller
       // than matrixSize when devices stamp into ground row/col via TrashCan;
       // decoding matrixSize doubles from rhs/rhsOld then reads OOB heap.
       rhsBufSize:       "int",
@@ -315,7 +315,7 @@ export class NgspiceBridge {
       limitVBefore:     koffi.pointer("double"),
       limitVAfter:      koffi.pointer("double"),
       limitWasLimited:  koffi.pointer("int"),
-      // New fields (spec §3.5, §8.1, §8.2)
+      // New fields (spec ss3.5, ss8.1, ss8.2)
       simTimeStart:     "double",
       phaseGmin:        "double",
       phaseSrcFact:     "double",
@@ -338,7 +338,7 @@ export class NgspiceBridge {
 
         // rhs/rhsOld/preSolveRhs are sized SMPmatSize+1 = rhsBufSize on the C
         // side (nireinit.c:31). matrixSize = CKTmaxEqNum+1 may exceed that
-        // when devices stamp into ground row/col via TrashCan — decoding
+        // when devices stamp into ground row/col via TrashCan- decoding
         // matrixSize doubles then reads OOB and returns NaN-shaped garbage.
         // Math.min is defensive; rhsBufSize alone should already be ≤ matrixSize.
         const rhsLen = Math.min(matrixSize, rhsBufSize);
@@ -568,7 +568,7 @@ export class NgspiceBridge {
   /**
    * Convert accumulated iteration data into a CaptureSession.
    *
-   * Grouping algorithm (spec §6.1):
+   * Grouping algorithm (spec ss6.1):
    *   - Keyed on simTimeStart from each raw iteration.
    *   - New step when simTimeStart changes.
    *   - New attempt when: iteration resets OR phase changes.
@@ -755,7 +755,7 @@ export class NgspiceBridge {
         if (currentStep.pendingAttempt && (isIterReset || isPhaseChange)) {
           let outcome: NRAttemptOutcome;
           // Transient INITTRAN→FLOAT and INITPRED→FLOAT happen inside one
-          // ngspice NIiter call (niiter.c:1072-1076 INITF dispatcher) — the
+          // ngspice NIiter call (niiter.c:1072-1076 INITF dispatcher)- the
           // mid-call mode flip is not a NR failure or a sub-solve boundary,
           // it is a phase handoff. Emit "tranPhaseHandoff" so the outcome
           // matches our engine's transient mode-ladder, instead of falsely
@@ -803,7 +803,7 @@ export class NgspiceBridge {
       const ngIntegrateMethod: IntegrationMethod =
         raw.integrateMethod === 2 ? "gear"
         : "trapezoidal";
-      // Only ag0/ag1 are marshalled across the FFI (see §8.1 of ngspice-bridge
+      // Only ag0/ag1 are marshalled across the FFI (see ss8.1 of ngspice-bridge
       // struct); pad remaining slots with 0 to match the length-7 harness shape.
       const agBuf = new Float64Array(7);
       agBuf[0] = raw.ag0 ?? 0;

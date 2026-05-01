@@ -252,7 +252,7 @@ describe("drawDIL", () => {
 // ---------------------------------------------------------------------------
 
 describe("executeFnNoOp", () => {
-  it("execute function does nothing — no state change", () => {
+  it("execute function does nothing- no state change", () => {
     const state = new Uint32Array([1, 2, 3, 4]);
     const highZs = new Uint32Array(state.length);
     const snapshot = Uint32Array.from(state);

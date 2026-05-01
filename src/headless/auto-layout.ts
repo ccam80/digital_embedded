@@ -4,14 +4,14 @@
  * Implements Sugiyama-style layered graph layout optimised for digital
  * circuit schematics with up to ~100 components:
  *
- *   1. Cycle removal — DFS back-edge reversal
- *   2. Layer assignment — longest-path from sources
- *   3. Sink promotion — align outputs on the rightmost column
- *   4. Dummy node insertion — for multi-layer crossing reduction
- *   5. Crossing reduction — barycenter heuristic, bidirectional sweeps,
+ *   1. Cycle removal- DFS back-edge reversal
+ *   2. Layer assignment- longest-path from sources
+ *   3. Sink promotion- align outputs on the rightmost column
+ *   4. Dummy node insertion- for multi-layer crossing reduction
+ *   5. Crossing reduction- barycenter heuristic, bidirectional sweeps,
  *      best-of tracking
- *   6. Coordinate assignment — size-aware spacing with vertical centering
- *   7. Orthogonal wire routing — Z-shaped segments, waypoints through
+ *   6. Coordinate assignment- size-aware spacing with vertical centering
+ *   7. Orthogonal wire routing- Z-shaped segments, waypoints through
  *      dummy nodes for long edges
  *
  * Complexity: O(sweeps · n · m) where n = nodes, m = edges.
@@ -106,7 +106,7 @@ interface GEdge {
   reversed: boolean;
 }
 
-/** Pin-level connection record — survives edge reversal / splitting. */
+/** Pin-level connection record- survives edge reversal / splitting. */
 interface PinConn {
   srcId: string;
   srcPin: string;
@@ -124,7 +124,7 @@ interface Graph {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// Step 1 — Build directed graph from circuit wires
+// Step 1- Build directed graph from circuit wires
 // ═══════════════════════════════════════════════════════════════════════════
 
 function buildGraph(circuit: Circuit): Graph {
@@ -222,7 +222,7 @@ function buildGraph(circuit: Circuit): Graph {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// Step 2 — Break cycles via DFS back-edge reversal
+// Step 2- Break cycles via DFS back-edge reversal
 // ═══════════════════════════════════════════════════════════════════════════
 
 function breakCycles(g: Graph): void {
@@ -234,7 +234,7 @@ function breakCycles(g: Graph): void {
 
   function dfs(u: string): void {
     color.set(u, GRAY);
-    // Copy list — reverseEdge mutates the adjacency array
+    // Copy list- reverseEdge mutates the adjacency array
     for (const e of [...(g.out.get(u) ?? [])]) {
       const c = color.get(e.dst)!;
       if (c === GRAY) {
@@ -261,7 +261,7 @@ function reverseEdge(g: Graph, e: GEdge): void {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// Step 3 — Layer assignment (longest path from sources)
+// Step 3- Layer assignment (longest path from sources)
 // ═══════════════════════════════════════════════════════════════════════════
 
 function assignLayers(
@@ -308,7 +308,7 @@ function assignLayers(
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// Step 3b — Promote sinks to the rightmost layer
+// Step 3b- Promote sinks to the rightmost layer
 // ═══════════════════════════════════════════════════════════════════════════
 
 function promoteSinks(
@@ -329,7 +329,7 @@ function promoteSinks(
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// Step 4 — Insert dummy nodes for edges spanning multiple layers
+// Step 4- Insert dummy nodes for edges spanning multiple layers
 // ═══════════════════════════════════════════════════════════════════════════
 
 function insertDummies(g: Graph): void {
@@ -376,7 +376,7 @@ function addEdge(g: Graph, src: string, dst: string): void {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// Step 5 — Build layer arrays and set initial order
+// Step 5- Build layer arrays and set initial order
 // ═══════════════════════════════════════════════════════════════════════════
 
 function buildLayerArrays(g: Graph): void {
@@ -397,7 +397,7 @@ function buildLayerArrays(g: Graph): void {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// Step 5b — Apply row constraints (initial order pinning)
+// Step 5b- Apply row constraints (initial order pinning)
 // ═══════════════════════════════════════════════════════════════════════════
 
 /**
@@ -458,7 +458,7 @@ function applyRowConstraints(
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// Step 6 — Crossing reduction (barycenter, best-of tracking)
+// Step 6- Crossing reduction (barycenter, best-of tracking)
 // ═══════════════════════════════════════════════════════════════════════════
 
 function reduceCrossings(
@@ -604,7 +604,7 @@ function restoreOrder(g: Graph, snap: Map<string, number>): void {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// Step 7 — Coordinate assignment
+// Step 7- Coordinate assignment
 // ═══════════════════════════════════════════════════════════════════════════
 
 function assignCoordinates(
@@ -651,7 +651,7 @@ function assignCoordinates(
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// Step 8 — Apply positions + collision-aware orthogonal wire routing
+// Step 8- Apply positions + collision-aware orthogonal wire routing
 // ═══════════════════════════════════════════════════════════════════════════
 
 /** Padded bounding box for collision tests. */
@@ -728,7 +728,7 @@ function applyLayout(g: Graph, circuit: Circuit): void {
   circuit.wires.length = 0;
 
   // Track how many feedback wires are routed above/below so they don't
-  // overlap each other — each gets its own channel offset.
+  // overlap each other- each gets its own channel offset.
   let feedbackAboveCount = 0;
   let feedbackBelowCount = 0;
 
@@ -851,7 +851,7 @@ function routeSegmentSafe(
       circuit.wires.push(new Wire(a, b));
       return;
     }
-    // Blocked — detour with a horizontal jog
+    // Blocked- detour with a horizontal jog
     for (let off = 1; off <= 10; off++) {
       for (const dx of [off, -off]) {
         const jx = a.x + dx;
@@ -879,7 +879,7 @@ function routeSegmentSafe(
       circuit.wires.push(new Wire(a, b));
       return;
     }
-    // Blocked — detour with a vertical jog
+    // Blocked- detour with a vertical jog
     for (let off = 1; off <= 10; off++) {
       for (const dy of [off, -off]) {
         const jy = a.y + dy;

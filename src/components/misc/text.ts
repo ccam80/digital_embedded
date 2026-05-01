@@ -1,14 +1,14 @@
 /**
- * Text annotation component — non-functional visual label on the canvas.
+ * Text annotation component- non-functional visual label on the canvas.
  *
  * Text has no simulation behavior: no pins, no executeFn state changes.
  * The executeFn is a no-op. Text is purely a visual annotation for labelling
  * circuit sections, documenting designs, or providing instructional content.
  *
  * Properties:
- *   - text: string — the content to display
- *   - fontSize: number — font size in grid units (default 1.0)
- *   - rotation: Rotation — text rotation (0=horizontal, 1=90°CW, etc.)
+ *   - text: string- the content to display
+ *   - fontSize: number- font size in grid units (default 1.0)
+ *   - rotation: Rotation- text rotation (0=horizontal, 1=90°CW, etc.)
  */
 
 import { AbstractCircuitElement } from "../../core/element.js";
@@ -32,7 +32,7 @@ const COMP_WIDTH = 4;
 const COMP_HEIGHT = 2;
 
 // ---------------------------------------------------------------------------
-// TextElement — CircuitElement implementation
+// TextElement- CircuitElement implementation
 // ---------------------------------------------------------------------------
 
 export class TextElement extends AbstractCircuitElement {
@@ -74,7 +74,7 @@ export class TextElement extends AbstractCircuitElement {
 }
 
 // ---------------------------------------------------------------------------
-// executeText — no-op (Text has no simulation behavior)
+// executeText- no-op (Text has no simulation behavior)
 // ---------------------------------------------------------------------------
 
 export function executeText(
@@ -87,7 +87,7 @@ export function executeText(
 }
 
 // ---------------------------------------------------------------------------
-// TEXT_ATTRIBUTE_MAPPINGS — .dig XML attribute → PropertyBag conversions
+// TEXT_ATTRIBUTE_MAPPINGS- .dig XML attribute → PropertyBag conversions
 // ---------------------------------------------------------------------------
 
 export const TEXT_ATTRIBUTE_MAPPINGS: AttributeMapping[] = [
@@ -127,7 +127,7 @@ const TEXT_PROPERTY_DEFS: PropertyDefinition[] = [
 ];
 
 // ---------------------------------------------------------------------------
-// TextDefinition — ComponentDefinition for registry registration
+// TextDefinition- ComponentDefinition for registry registration
 // ---------------------------------------------------------------------------
 
 function textFactory(props: PropertyBag): TextElement {
@@ -150,7 +150,7 @@ export const TextDefinition: ComponentDefinition = {
     },
   },
   helpText:
-    "Text — visual annotation label on the canvas.\n" +
+    "Text- visual annotation label on the canvas.\n" +
     "No simulation behavior. Used for documentation and labelling.\n" +
     "text: the content to display.\n" +
     "fontSize: font size in grid units (default 1.0).",

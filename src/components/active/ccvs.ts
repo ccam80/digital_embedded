@@ -120,14 +120,14 @@ function buildCCVSPinDeclarations(): PinDeclaration[] {
 export class CCVSAnalogElement extends ControlledSourceElement {
   readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.CCVS;
 
-  // senseSourceLabel — label of the controlling VSRC/CCVS/VCVS/IND.
+  // senseSourceLabel- label of the controlling VSRC/CCVS/VCVS/IND.
   // Must be set via setParam("senseSourceLabel", label) before setup() runs.
   private _senseSourceLabel: string = "";
 
   // Resolved controlling branch index (filled in setup()).
   private _contBranch: number = -1;
 
-  // TSTALLOC handles — allocated in setup(), written in load()
+  // TSTALLOC handles- allocated in setup(), written in load()
   // ccvsset.c:58-62 line-for-line
   private _hPIbr:    number = -1; // G[posNode,   ownBranch]   :58
   private _hNIbr:    number = -1; // G[negNode,   ownBranch]   :59
@@ -148,7 +148,7 @@ export class CCVSAnalogElement extends ControlledSourceElement {
 
     // Resolve controlling branch: ccvsset.c:45
     // ctx.findBranch dispatches to the controlling source's findBranchFor
-    // callback (lazy-allocating per 00-engine.md §A2/A4.2).
+    // callback (lazy-allocating per 00-engine.md ssA2/A4.2).
     if (!this._senseSourceLabel) {
       throw new Error(`CCVS '${this.label}': senseSourceLabel not set before setup()`);
     }
@@ -191,7 +191,7 @@ export class CCVSAnalogElement extends ControlledSourceElement {
 
   /**
    * Stamp Jacobian and NR-linearized RHS for the output branch.
-   * Port of ccvsload.c value-side — no allocElement calls.
+   * Port of ccvsload.c value-side- no allocElement calls.
    *
    * Output branch equation: V_out+ - V_out- - rm*I_sense = f(I0) - rm*I0
    *
@@ -229,7 +229,7 @@ export class CCVSAnalogElement extends ControlledSourceElement {
   }
 
   /**
-   * Override load() to use cached handles — no allocElement calls.
+   * Override load() to use cached handles- no allocElement calls.
    */
   override load(ctx: LoadContext): void {
     this._bindContext(ctx.rhsOld);
@@ -241,7 +241,7 @@ export class CCVSAnalogElement extends ControlledSourceElement {
 }
 
 // ---------------------------------------------------------------------------
-// CCVSElement — CircuitElement
+// CCVSElement- CircuitElement
 // ---------------------------------------------------------------------------
 
 export class CCVSElement extends AbstractCircuitElement {
@@ -277,7 +277,7 @@ export class CCVSElement extends AbstractCircuitElement {
     ctx.save();
     ctx.setLineWidth(1);
 
-    // Body — open polyline box (1,-1)→(5,-1)→(5,3)→(1,3) (no left edge)
+    // Body- open polyline box (1,-1)→(5,-1)→(5,3)→(1,3) (no left edge)
     ctx.setColor("COMPONENT");
     ctx.drawLine(1, -1, 5, -1);
     ctx.drawLine(5, -1, 5, 3);
@@ -352,7 +352,7 @@ export const CCVSDefinition: ComponentDefinition = {
   attributeMap: CCVS_ATTRIBUTE_MAPPINGS,
 
   helpText:
-    "Current-Controlled Voltage Source — output voltage is an expression of " +
+    "Current-Controlled Voltage Source- output voltage is an expression of " +
     "the current through the sense port.",
 
   factory(props: PropertyBag): CCVSElement {

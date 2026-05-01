@@ -1,12 +1,12 @@
 /**
- * Tests for exportSvg() — circuit-level SVG export.
+ * Tests for exportSvg()- circuit-level SVG export.
  *
  * Spec tests:
- *   basicCircuit  — export AND gate circuit → valid SVG with <svg>, <path>, <text>
- *   validXml      — exported SVG parses as valid XML
- *   latexText     — LaTeX mode → text elements contain LaTeX notation
- *   scaleOption   — scale=2 → SVG viewBox dimensions doubled
- *   noBackground  — background=false → no background rect element
+ *   basicCircuit - export AND gate circuit → valid SVG with <svg>, <path>, <text>
+ *   validXml     - exported SVG parses as valid XML
+ *   latexText    - LaTeX mode → text elements contain LaTeX notation
+ *   scaleOption  - scale=2 → SVG viewBox dimensions doubled
+ *   noBackground - background=false → no background rect element
  */
 
 import { describe, it, expect } from "vitest";
@@ -47,7 +47,7 @@ function buildWireCircuit(): Circuit {
 function isWellFormedSvg(svg: string): boolean {
   if (!svg.trimStart().startsWith("<svg")) return false;
   if (!svg.trimEnd().endsWith("</svg>")) return false;
-  // Count open/close tags — not a real parser but catches obvious breakage
+  // Count open/close tags- not a real parser but catches obvious breakage
   const opens = (svg.match(/<[a-zA-Z]/g) ?? []).length;
   const closes = (svg.match(/<\/[a-zA-Z]/g) ?? []).length;
   const selfClose = (svg.match(/\/>/g) ?? []).length;
@@ -69,7 +69,7 @@ function parseViewBox(svg: string): [number, number, number, number] {
 // ---------------------------------------------------------------------------
 
 describe("exportSvg", () => {
-  it("basicCircuit — AND gate circuit exports SVG with required elements", () => {
+  it("basicCircuit- AND gate circuit exports SVG with required elements", () => {
     const circuit = buildAndCircuit();
     const svg = exportSvg(circuit, { colorScheme: lightColorScheme });
 
@@ -84,11 +84,11 @@ describe("exportSvg", () => {
     const hasPoly = svg.includes("<polygon");
     expect(hasRect || hasPath || hasPoly).toBe(true);
 
-    // The label "/A" is set — a <text> element must be present
+    // The label "/A" is set- a <text> element must be present
     expect(svg).toContain("<text");
   });
 
-  it("basicCircuit — SVG contains path elements for wire circuit", () => {
+  it("basicCircuit- SVG contains path elements for wire circuit", () => {
     const circuit = buildWireCircuit();
     const svg = exportSvg(circuit, { colorScheme: lightColorScheme });
     expect(svg).toContain("<svg");
@@ -96,13 +96,13 @@ describe("exportSvg", () => {
     expect(svg).toContain("<line");
   });
 
-  it("validXml — exported SVG from AND circuit is well-formed", () => {
+  it("validXml- exported SVG from AND circuit is well-formed", () => {
     const circuit = buildAndCircuit();
     const svg = exportSvg(circuit, { colorScheme: lightColorScheme });
     expect(isWellFormedSvg(svg)).toBe(true);
   });
 
-  it("latexText — LaTeX mode converts /A label to overline notation", () => {
+  it("latexText- LaTeX mode converts /A label to overline notation", () => {
     const circuit = buildAndCircuit();
     const svg = exportSvg(circuit, {
       colorScheme: lightColorScheme,
@@ -112,7 +112,7 @@ describe("exportSvg", () => {
     expect(svg).toContain("\\overline{A}");
   });
 
-  it("scaleOption — scale=2 doubles the SVG viewBox dimensions vs scale=1", () => {
+  it("scaleOption- scale=2 doubles the SVG viewBox dimensions vs scale=1", () => {
     const circuit = buildAndCircuit();
 
     const svg1 = exportSvg(circuit, { scale: 1, colorScheme: lightColorScheme });
@@ -124,7 +124,7 @@ describe("exportSvg", () => {
     // Width and height (indices 2 and 3) should double
   });
 
-  it("noBackground — background=false → no background rect element", () => {
+  it("noBackground- background=false → no background rect element", () => {
     const circuit = buildAndCircuit();
     const svg = exportSvg(circuit, {
       colorScheme: lightColorScheme,

@@ -27,7 +27,7 @@ import type { RenderContext, Point, TextAnchor, FontSpec, PathData } from "../..
 import type { ThemeColor } from "../../../core/renderer-interface.js";
 
 // ---------------------------------------------------------------------------
-// Helpers — ComponentLayout mock
+// Helpers- ComponentLayout mock
 // ---------------------------------------------------------------------------
 
 /**
@@ -60,7 +60,7 @@ function makeState(inputs: number[]): Uint32Array {
 }
 
 // ---------------------------------------------------------------------------
-// Helpers — RenderContext mock
+// Helpers- RenderContext mock
 // ---------------------------------------------------------------------------
 
 interface DrawCall {
@@ -100,7 +100,7 @@ function makeStubCtx(): { ctx: RenderContext; calls: DrawCall[] } {
 }
 
 // ---------------------------------------------------------------------------
-// Helpers — AndElement factory
+// Helpers- AndElement factory
 // ---------------------------------------------------------------------------
 
 function makeAnd(overrides?: {
@@ -124,7 +124,7 @@ function makeAnd(overrides?: {
 }
 
 // ---------------------------------------------------------------------------
-// executeAnd — logic correctness
+// executeAnd- logic correctness
 // ---------------------------------------------------------------------------
 
 describe("AndGate", () => {
@@ -332,7 +332,7 @@ describe("AndGate", () => {
   });
 
   // ---------------------------------------------------------------------------
-  // Rendering — IEC/DIN
+  // Rendering- IEC/DIN
   // ---------------------------------------------------------------------------
 
   describe("drawNarrowIEEE", () => {
@@ -356,7 +356,7 @@ describe("AndGate", () => {
   });
 
   // ---------------------------------------------------------------------------
-  // Rendering — IEEE/US
+  // Rendering- IEEE/US
   // ---------------------------------------------------------------------------
 
   describe("drawIEEE", () => {
@@ -402,7 +402,7 @@ describe("AndGate", () => {
   });
 
   // ---------------------------------------------------------------------------
-  // Rendering — inversion bubbles
+  // Rendering- inversion bubbles
   // ---------------------------------------------------------------------------
 
   describe("drawInverterBubble", () => {

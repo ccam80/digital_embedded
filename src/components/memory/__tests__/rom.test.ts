@@ -34,7 +34,7 @@ import { ComponentCategory } from "../../../core/registry.js";
 import type { ComponentLayout } from "../../../core/registry.js";
 
 // ---------------------------------------------------------------------------
-// Test layout helper — mimics a flat Uint32Array layout for one component.
+// Test layout helper- mimics a flat Uint32Array layout for one component.
 // The component is always at index 0.
 // Slot layout: [inputs... | outputs... | state...]
 // ---------------------------------------------------------------------------
@@ -66,7 +66,7 @@ describe("ROM", () => {
     clearBackingStores();
   });
 
-  it("readFromDataField — sel=1 returns memory[A]", () => {
+  it("readFromDataField- sel=1 returns memory[A]", () => {
     const mem = new DataField(16);
     mem.write(0, 0xAB);
     mem.write(3, 0xCD);
@@ -85,7 +85,7 @@ describe("ROM", () => {
     expect(state[2]).toBe(0xCD);
   });
 
-  it("chipSelectGating — sel=0 outputs 0 regardless of address", () => {
+  it("chipSelectGating- sel=0 outputs 0 regardless of address", () => {
     const mem = new DataField(16);
     mem.write(0, 0xFF);
     registerBackingStore(0, mem);
@@ -98,7 +98,7 @@ describe("ROM", () => {
     expect(state[2]).toBe(0);
   });
 
-  it("addressBoundaryWrapping — address wraps modulo size", () => {
+  it("addressBoundaryWrapping- address wraps modulo size", () => {
     const mem = new DataField(4); // size = 4
     mem.write(0, 0x11);
     mem.write(1, 0x22);
@@ -121,7 +121,7 @@ describe("ROM", () => {
     expect(state[2]).toBe(0x44);
   });
 
-  it("noBackingStore — returns 0 when no DataField registered", () => {
+  it("noBackingStore- returns 0 when no DataField registered", () => {
     const { layout, state } = makeLayout(2, 1, 0);
     const highZs = new Uint32Array(state.length);
     state[0] = 0;
@@ -130,7 +130,7 @@ describe("ROM", () => {
     expect(state[2]).toBe(0);
   });
 
-  it("dataFieldInitFrom — initFrom populates multiple addresses", () => {
+  it("dataFieldInitFrom- initFrom populates multiple addresses", () => {
     const mem = new DataField(8);
     mem.initFrom([0x10, 0x20, 0x30, 0x40, 0x50]);
     registerBackingStore(0, mem);
@@ -150,33 +150,33 @@ describe("ROM", () => {
     expect(state[2]).toBe(0);
   });
 
-  it("isProgramMemoryFlag — element reports correct isProgramMemory", () => {
+  it("isProgramMemoryFlag- element reports correct isProgramMemory", () => {
     const props = new PropertyBag();
     props.set("isProgramMemory", true);
     const el = new ROMElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
     expect(el.isProgramMemory).toBe(true);
   });
 
-  it("isProgramMemoryDefault — defaults to false", () => {
+  it("isProgramMemoryDefault- defaults to false", () => {
     const props = new PropertyBag();
     const el = new ROMElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
     expect(el.isProgramMemory).toBe(false);
   });
 
-  it("autoReloadFlag — element reports correct autoReload", () => {
+  it("autoReloadFlag- element reports correct autoReload", () => {
     const props = new PropertyBag();
     props.set("autoReload", true);
     const el = new ROMElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
     expect(el.autoReload).toBe(true);
   });
 
-  it("autoReloadDefault — defaults to false", () => {
+  it("autoReloadDefault- defaults to false", () => {
     const props = new PropertyBag();
     const el = new ROMElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
     expect(el.autoReload).toBe(false);
   });
 
-  it("pinLayout — ROM has 2 input pins and 1 output pin", () => {
+  it("pinLayout- ROM has 2 input pins and 1 output pin", () => {
     const props = new PropertyBag();
     const el = new ROMElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
     const pins = el.getPins();
@@ -190,7 +190,7 @@ describe("ROM", () => {
     expect(labels).toContain("D");
   });
 
-  it("attributeMapping — Bits and AddrBits map correctly", () => {
+  it("attributeMapping- Bits and AddrBits map correctly", () => {
     const mapping = ROM_ATTRIBUTE_MAPPINGS;
     const bitsMapping = mapping.find(m => m.xmlName === "Bits");
     const addrMapping = mapping.find(m => m.xmlName === "AddrBits");
@@ -211,7 +211,7 @@ describe("ROM", () => {
     expect(arMapping!.convert("true")).toBe(true);
   });
 
-  it("draw — calls ctx.drawPolygon and ctx.drawText", () => {
+  it("draw- calls ctx.drawPolygon and ctx.drawText", () => {
     const props = new PropertyBag();
     const el = new ROMElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
 
@@ -242,7 +242,7 @@ describe("ROM", () => {
     expect(calls.some(c => c.startsWith("drawText:ROM"))).toBe(true);
   });
 
-  it("drawWithLabel — label text appears in draw calls", () => {
+  it("drawWithLabel- label text appears in draw calls", () => {
     const props = new PropertyBag();
     props.set("label", "PROG");
     const el = new ROMElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
@@ -270,7 +270,7 @@ describe("ROM", () => {
     expect(texts).toContain("PROG");
   });
 
-  it("definitionComplete — ROMDefinition has all required fields", () => {
+  it("definitionComplete- ROMDefinition has all required fields", () => {
     expect(ROMDefinition.name).toBe("ROM");
     expect(ROMDefinition.factory).toBeDefined();
     expect(ROMDefinition.models!.digital!.executeFn).toBeDefined();
@@ -283,7 +283,7 @@ describe("ROM", () => {
   });
 
 
-  it("boundingBox — returns non-zero dimensions", () => {
+  it("boundingBox- returns non-zero dimensions", () => {
     const props = new PropertyBag();
     const el = new ROMElement(crypto.randomUUID(), { x: 5, y: 3 }, 0, false, props);
     const bb = el.getBoundingBox();
@@ -293,7 +293,7 @@ describe("ROM", () => {
     expect(bb.height).toBeGreaterThanOrEqual(2);
   });
 
-  it("factoryCreatesInstance — ROMDefinition.factory returns ROMElement", () => {
+  it("factoryCreatesInstance- ROMDefinition.factory returns ROMElement", () => {
     const props = new PropertyBag();
     const el = ROMDefinition.factory(props);
     expect(el).toBeInstanceOf(ROMElement);
@@ -309,7 +309,7 @@ describe("ROMDualPort", () => {
     clearBackingStores();
   });
 
-  it("dualPortIndependentRead — two ports read independently", () => {
+  it("dualPortIndependentRead- two ports read independently", () => {
     const mem = new DataField(16);
     mem.write(2, 0xAA);
     mem.write(5, 0xBB);
@@ -328,7 +328,7 @@ describe("ROMDualPort", () => {
     expect(state[5]).toBe(0xBB); // D2
   });
 
-  it("port1Select — s1=0 disables port 1 output", () => {
+  it("port1Select- s1=0 disables port 1 output", () => {
     const mem = new DataField(16);
     mem.write(0, 0xFF);
     registerBackingStore(0, mem);
@@ -343,7 +343,7 @@ describe("ROMDualPort", () => {
     expect(state[5]).toBe(0xFF); // D2 = memory[0]
   });
 
-  it("port2Select — s2=0 disables port 2 output", () => {
+  it("port2Select- s2=0 disables port 2 output", () => {
     const mem = new DataField(16);
     mem.write(1, 0x55);
     registerBackingStore(0, mem);
@@ -358,7 +358,7 @@ describe("ROMDualPort", () => {
     expect(state[5]).toBe(0);    // D2 = 0 (not selected)
   });
 
-  it("bothPortsDisabled — s1=0 and s2=0 produce all zeros", () => {
+  it("bothPortsDisabled- s1=0 and s2=0 produce all zeros", () => {
     const mem = new DataField(16);
     mem.write(0, 0xFF);
     registerBackingStore(0, mem);
@@ -373,7 +373,7 @@ describe("ROMDualPort", () => {
     expect(state[5]).toBe(0);
   });
 
-  it("sharedBackingStore — both ports read from same memory", () => {
+  it("sharedBackingStore- both ports read from same memory", () => {
     const mem = new DataField(16);
     for (let i = 0; i < 16; i++) mem.write(i, i * 0x10);
     registerBackingStore(0, mem);
@@ -390,7 +390,7 @@ describe("ROMDualPort", () => {
     }
   });
 
-  it("pinLayout — ROMDualPort has 4 input pins and 2 output pins", () => {
+  it("pinLayout- ROMDualPort has 4 input pins and 2 output pins", () => {
     const props = new PropertyBag();
     const el = new ROMDualPortElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
     const pins = el.getPins();
@@ -407,14 +407,14 @@ describe("ROMDualPort", () => {
     expect(labels).toContain("D2");
   });
 
-  it("isProgramMemoryFlag — ROMDualPortElement reports isProgramMemory", () => {
+  it("isProgramMemoryFlag- ROMDualPortElement reports isProgramMemory", () => {
     const props = new PropertyBag();
     props.set("isProgramMemory", true);
     const el = new ROMDualPortElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
     expect(el.isProgramMemory).toBe(true);
   });
 
-  it("attributeMapping — dual port mappings correct", () => {
+  it("attributeMapping- dual port mappings correct", () => {
     const mapping = ROM_DUAL_PORT_ATTRIBUTE_MAPPINGS;
     const bitsMapping = mapping.find(m => m.xmlName === "Bits");
     expect(bitsMapping!.convert("32")).toBe(32);
@@ -422,7 +422,7 @@ describe("ROMDualPort", () => {
     expect(arMapping).toBeDefined();
   });
 
-  it("draw — renders body with ROM2 symbol", () => {
+  it("draw- renders body with ROM2 symbol", () => {
     const props = new PropertyBag();
     const el = new ROMDualPortElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
 
@@ -449,7 +449,7 @@ describe("ROMDualPort", () => {
     expect(texts.some(t => t.includes("ROM"))).toBe(true);
   });
 
-  it("definitionComplete — ROMDualPortDefinition has all required fields", () => {
+  it("definitionComplete- ROMDualPortDefinition has all required fields", () => {
     expect(ROMDualPortDefinition.name).toBe("ROMDualPort");
     expect(ROMDualPortDefinition.factory).toBeDefined();
     expect(ROMDualPortDefinition.models!.digital!.executeFn).toBeDefined();
@@ -461,13 +461,13 @@ describe("ROMDualPort", () => {
     expect(typeof ROMDualPortDefinition.models!.digital!.defaultDelay).toBe("number");
   });
 
-  it("factoryCreatesInstance — factory returns ROMDualPortElement", () => {
+  it("factoryCreatesInstance- factory returns ROMDualPortElement", () => {
     const props = new PropertyBag();
     const el = ROMDualPortDefinition.factory(props);
     expect(el).toBeInstanceOf(ROMDualPortElement);
   });
 
-  it("noBackingStore — returns 0 for both ports", () => {
+  it("noBackingStore- returns 0 for both ports", () => {
     const { layout, state } = makeLayout(4, 2, 0);
     const highZs = new Uint32Array(state.length);
     state[0] = 0; state[1] = 1;

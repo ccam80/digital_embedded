@@ -35,7 +35,7 @@ function makeMockElement(x: number, y: number, w: number, h: number): CircuitEle
 }
 
 describe("Viewport", () => {
-  it("zoomAtCursorKeepsWorldPointFixed — zoom in at screen center, verify the world point under cursor didn't move", () => {
+  it("zoomAtCursorKeepsWorldPointFixed- zoom in at screen center, verify the world point under cursor didn't move", () => {
     const vp = new Viewport(1.0, { x: 0, y: 0 });
     const screenPoint: Point = { x: 400, y: 300 };
 
@@ -43,7 +43,7 @@ describe("Viewport", () => {
 
   });
 
-  it("zoomClampsToLimits — zoom below 0.1 clamps to 0.1, above 10 clamps to 10", () => {
+  it("zoomClampsToLimits- zoom below 0.1 clamps to 0.1, above 10 clamps to 10", () => {
     const vp = new Viewport(1.0, { x: 0, y: 0 });
 
     // Zoom in far
@@ -79,7 +79,7 @@ describe("Viewport", () => {
     }
   });
 
-  it("panByTranslatesOffset — panBy(100,50), verify pan offset changed", () => {
+  it("panByTranslatesOffset- panBy(100,50), verify pan offset changed", () => {
     const vp = new Viewport(1.0, { x: 0, y: 0 });
     vp.panBy({ x: 100, y: 50 });
     expect(vp.pan.x).toBe(100);
@@ -94,7 +94,7 @@ describe("Viewport", () => {
     expect(vp.pan.y).toBe(30);
   });
 
-  it("fitToContentCentersElements — place elements at known positions, fitToContent, verify all elements are within the visible world rect", () => {
+  it("fitToContentCentersElements- place elements at known positions, fitToContent, verify all elements are within the visible world rect", () => {
     const vp = new Viewport(1.0, { x: 0, y: 0 });
 
     // Two elements at (0,0) 2x2 and (10,10) 2x2
@@ -118,7 +118,7 @@ describe("Viewport", () => {
     }
   });
 
-  it("getVisibleWorldRect — at zoom=1, pan=(0,0), canvas 800x600: visible rect is (0, 0, 40, 30) in grid units", () => {
+  it("getVisibleWorldRect- at zoom=1, pan=(0,0), canvas 800x600: visible rect is (0, 0, 40, 30) in grid units", () => {
     const vp = new Viewport(1.0, { x: 0, y: 0 });
     const canvasSize = { width: 800, height: 600 };
     vp.getVisibleWorldRect(canvasSize);

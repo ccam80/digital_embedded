@@ -1,5 +1,5 @@
 /**
- * Port component — domain-agnostic subcircuit interface element.
+ * Port component- domain-agnostic subcircuit interface element.
  *
  * Port is neutral infrastructure (like Ground, Tunnel). It carries no
  * simulation model. The compilation pipeline infers domain from what is
@@ -47,7 +47,7 @@ function buildPortPinDeclarations(bitWidth: number): PinDeclaration[] {
 }
 
 // ---------------------------------------------------------------------------
-// PortElement — CircuitElement implementation
+// PortElement- CircuitElement implementation
 // ---------------------------------------------------------------------------
 
 export class PortElement extends AbstractCircuitElement {
@@ -191,7 +191,7 @@ export const PortDefinition: ComponentDefinition = {
   attributeMap: PORT_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.IO,
   helpText:
-    "Port — domain-agnostic subcircuit interface element.\n" +
+    "Port- domain-agnostic subcircuit interface element.\n" +
     "Bidirectional pin that connects internal circuit nodes to external parent circuit nets.\n" +
     "Neutral infrastructure: no simulation model. Domain is inferred from connected components.",
   models: {},

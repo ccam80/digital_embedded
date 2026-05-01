@@ -1,5 +1,5 @@
 /**
- * PriorityEncoder component — outputs the index of the highest-priority
+ * PriorityEncoder component- outputs the index of the highest-priority
  * (most significant) active input.
  *
  * Based on Digital's Java implementation: scans from lowest to highest index,
@@ -96,7 +96,7 @@ export function buildPriorityEncoderPinDeclarations(
 }
 
 // ---------------------------------------------------------------------------
-// PriorityEncoderElement — CircuitElement implementation
+// PriorityEncoderElement- CircuitElement implementation
 // ---------------------------------------------------------------------------
 
 export class PriorityEncoderElement extends AbstractCircuitElement {
@@ -148,7 +148,7 @@ export class PriorityEncoderElement extends AbstractCircuitElement {
 }
 
 // ---------------------------------------------------------------------------
-// executePriorityEncoder — flat simulation function
+// executePriorityEncoder- flat simulation function
 //
 // Mirrors Digital's Java implementation: scans all inputs, the last active
 // input (highest index) wins. Sets any=1 if any input is active.
@@ -242,7 +242,7 @@ export const PriorityEncoderDefinition: ComponentDefinition = {
   attributeMap: PRIORITY_ENCODER_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.WIRING,
   helpText:
-    "PriorityEncoder — outputs the index of the highest-priority active input.\n" +
+    "PriorityEncoder- outputs the index of the highest-priority active input.\n" +
     "num: highest active input index. any: 1 if any input is active.",
   models: {
     digital: {

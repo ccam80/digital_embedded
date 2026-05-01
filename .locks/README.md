@@ -1,9 +1,9 @@
-# Team Lock Protocol — Phase 2 Audit Fixes
+# Team Lock Protocol- Phase 2 Audit Fixes
 
 ## Directories
-- `.locks/tasks/` — one lock file per task (registers ownership)
-- `.locks/files/` — one lock file per source file being edited (prevents concurrent edits)
-- `.locks/reports/` — completion reports (one per completed task)
+- `.locks/tasks/`- one lock file per task (registers ownership)
+- `.locks/files/`- one lock file per source file being edited (prevents concurrent edits)
+- `.locks/reports/`- completion reports (one per completed task)
 
 ## Lock registration (agents MUST use these exact commands)
 
@@ -42,6 +42,6 @@ Write `.locks/reports/<TASK_ID>.md` with 2-3 line description, then SendMessage 
 
 ## Rules
 - NEVER edit a file whose lock exists and is owned by another worker.
-- If a file lock is stale (worker dropped), SendMessage team-lead — do NOT clear it yourself.
+- If a file lock is stale (worker dropped), SendMessage team-lead- do NOT clear it yourself.
 - Task lock stays for entire task lifetime; file locks are per-edit-session.
 - ALWAYS release file locks immediately after saving edits; keep task locks until task completed.

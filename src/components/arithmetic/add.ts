@@ -1,5 +1,5 @@
 /**
- * Add component — N-bit adder with carry in/out.
+ * Add component- N-bit adder with carry in/out.
  *
  * Ports from Digital's Add.java:
  *   Inputs: a (bitWidth), b (bitWidth), c_i (1-bit carry in)
@@ -39,7 +39,7 @@ const COMP_WIDTH = 3;
 // bodyHeight = max(3,2)=3, yBottom=(3-1)+0.5=2.5, height=2.5+0.5=3
 
 // ---------------------------------------------------------------------------
-// Pin layout — GenericShape positions (symmetric=false, 3 inputs, 2 outputs)
+// Pin layout- GenericShape positions (symmetric=false, 3 inputs, 2 outputs)
 // offs=0; no even correction
 // inputs: a@y=0, b@y=1, c_i@y=2
 // outputs: s@y=0, c_o@y=1
@@ -135,7 +135,7 @@ export class AddElement extends AbstractCircuitElement {
 }
 
 // ---------------------------------------------------------------------------
-// executeAdd — flat simulation function
+// executeAdd- flat simulation function
 //
 // Inputs layout (3 slots): [a, b, c_i]
 // Outputs layout (2 slots): [s, c_o]
@@ -234,7 +234,7 @@ export const AddDefinition: ComponentDefinition = {
   attributeMap: ADD_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.ARITHMETIC,
   helpText:
-    "Add — N-bit adder with carry in/out.\n" +
+    "Add- N-bit adder with carry in/out.\n" +
     "Inputs: a, b (bitWidth bits each), c_i (1-bit carry in).\n" +
     "Outputs: s (bitWidth-bit sum), c_o (1-bit carry out).",
   models: {

@@ -1,8 +1,8 @@
 /**
  * Unit tests for the ckt-mode bitfield helpers.
  *
- * Focus: `bitsToName()` — the diagnostic decoder for the `cktMode` bitfield.
- * Canonical policy for the `cktMode` bitfield is `spec/architectural-alignment.md` §C2.
+ * Focus: `bitsToName()`- the diagnostic decoder for the `cktMode` bitfield.
+ * Canonical policy for the `cktMode` bitfield is `spec/architectural-alignment.md` ssC2.
  */
 
 import { describe, it, expect } from "vitest";
@@ -13,7 +13,7 @@ import {
   bitsToName, setInitf, setAnalysis,
 } from "../ckt-mode.js";
 
-describe("bitsToName — cktMode diagnostic decoder", () => {
+describe("bitsToName- cktMode diagnostic decoder", () => {
   it("returns MODE_NONE for zero", () => {
     expect(bitsToName(0)).toBe("MODE_NONE");
   });
@@ -40,7 +40,7 @@ describe("bitsToName — cktMode diagnostic decoder", () => {
   });
 
   it("joins multiple bits with | in the canonical order", () => {
-    // Analysis first, then INITF — matches bitsToName body order.
+    // Analysis first, then INITF- matches bitsToName body order.
     const dcopWithJct = setInitf(MODEDCOP, MODEINITJCT);
     expect(bitsToName(dcopWithJct)).toBe("MODEDCOP|MODEINITJCT");
 
@@ -58,7 +58,7 @@ describe("bitsToName — cktMode diagnostic decoder", () => {
   it("produces the ngspice dcopDirect pattern (MODEDCOP|MODEINITFLOAT)", () => {
     // After the DCOP init ladder completes (cktop.c), MODEDCOP|MODEINITFLOAT
     // is the steady state during the main dcopDirect solve. Cited in
-    // ngspice-bridge-grouping.test.ts §6.1 fixtures.
+    // ngspice-bridge-grouping.test.ts ss6.1 fixtures.
     const dcopDirect = setInitf(MODEDCOP, MODEINITFLOAT);
     expect(bitsToName(dcopDirect)).toBe("MODEDCOP|MODEINITFLOAT");
   });

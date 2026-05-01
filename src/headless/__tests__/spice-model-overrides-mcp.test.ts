@@ -98,7 +98,7 @@ function buildBjtCircuit(): { circuit: Circuit; facade: DefaultSimulatorFacade }
   const q1C    = pinWorldPosition(q1,  q1Pins.find(p => p.label === 'C')!);
   const q1E    = pinWorldPosition(q1,  q1Pins.find(p => p.label === 'E')!);
 
-  // Vcc.pos and Rc.A share world position {4,4} — zero-length wire is valid.
+  // Vcc.pos and Rc.A share world position {4,4}- zero-length wire is valid.
   circuit.addWire(new Wire(vccPos, rcA));
   circuit.addWire(new Wire(rcB,    q1C));
   circuit.addWire(new Wire(vbPos,  q1B));
@@ -113,7 +113,7 @@ function buildBjtCircuit(): { circuit: Circuit; facade: DefaultSimulatorFacade }
 // Test 1: Override via applySpiceImportResult
 // ---------------------------------------------------------------------------
 
-describe('spice-model-overrides MCP surface — override via applySpiceImportResult', () => {
+describe('spice-model-overrides MCP surface- override via applySpiceImportResult', () => {
   it('applySpiceImportResult with IS override changes element model params vs default', () => {
     // Default circuit: Q1 has no model override, IS defaults to BJT_NPN_DEFAULTS.IS (1e-14).
     const { circuit: circuitDefault } = buildBjtCircuit();
@@ -134,7 +134,7 @@ describe('spice-model-overrides MCP surface — override via applySpiceImportRes
     facadeOverridden.compile(circuitOverridden);
     const compiledOverridden = facadeOverridden.getCompiledUnified();
     const overriddenDiags = compiledOverridden?.analog?.diagnostics ?? [];
-    // No warnings about invalid model key — runtime model recognized.
+    // No warnings about invalid model key- runtime model recognized.
     expect(overriddenDiags.filter(d => (d.code as string) === 'invalid-simulation-model')).toHaveLength(0);
 
     // After compile, the element's model params should have IS=1e-18 (merged by compiler).
@@ -224,7 +224,7 @@ describe('spice-model-overrides MCP surface — override via applySpiceImportRes
 // Test 2: Round-trip serialization
 // ---------------------------------------------------------------------------
 
-describe('spice-model-overrides MCP surface — round-trip serialization', () => {
+describe('spice-model-overrides MCP surface- round-trip serialization', () => {
   it('overrides survive serialize -> deserialize -> recompile', () => {
     const { circuit, facade } = buildBjtCircuit();
     const q1 = circuit.elements.find(el => el.getProperties().has('label') && el.getProperties().get('label') === 'Q1')!;

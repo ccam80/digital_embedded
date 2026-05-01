@@ -1,9 +1,9 @@
 /**
- * LedMatrix component — NxN LED grid display.
+ * LedMatrix component- NxN LED grid display.
  *
  * Inputs:
- *   - r-data: rowDataBits-wide — row data (one bit per LED row in the addressed column)
- *   - c-addr: colAddrBits-wide — column address selector
+ *   - r-data: rowDataBits-wide- row data (one bit per LED row in the addressed column)
+ *   - c-addr: colAddrBits-wide- column address selector
  *
  * The matrix has (2^colAddrBits) columns and (rowDataBits) rows.
  * On each simulation step, the row data is written into data[c-addr].
@@ -45,7 +45,7 @@ import {
 const COMP_WIDTH = 3;
 
 // ---------------------------------------------------------------------------
-// Pin layout — Java GenericShape(2 inputs, 0 outputs, width=3):
+// Pin layout- Java GenericShape(2 inputs, 0 outputs, width=3):
 //   r-data at (0, 0)
 //   c-addr at (0, 1)
 // ---------------------------------------------------------------------------
@@ -77,7 +77,7 @@ function buildLedMatrixPinDeclarations(
 }
 
 // ---------------------------------------------------------------------------
-// LedMatrixElement — CircuitElement implementation
+// LedMatrixElement- CircuitElement implementation
 // ---------------------------------------------------------------------------
 
 export class LedMatrixElement extends AbstractCircuitElement {
@@ -162,7 +162,7 @@ export class LedMatrixElement extends AbstractCircuitElement {
 }
 
 // ---------------------------------------------------------------------------
-// executeLedMatrix — read r-data and c-addr, update data buffer
+// executeLedMatrix- read r-data and c-addr, update data buffer
 //
 // The execute function writes r-data into a designated output slot so the
 // engine can track state. The actual matrix buffer update is performed by
@@ -175,13 +175,13 @@ export function executeLedMatrix(
   _highZs: Uint32Array,
   _layout: ComponentLayout,
 ): void {
-  // LedMatrix has no outputs — it is a display-only sink component.
+  // LedMatrix has no outputs- it is a display-only sink component.
   // The display panel reads r-data and c-addr inputs via the engine's
   // post-step hook accessing the element. No output slots to write.
 }
 
 // ---------------------------------------------------------------------------
-// LED_MATRIX_ATTRIBUTE_MAPPINGS — .dig XML attribute → PropertyBag conversions
+// LED_MATRIX_ATTRIBUTE_MAPPINGS- .dig XML attribute → PropertyBag conversions
 // ---------------------------------------------------------------------------
 
 export const LED_MATRIX_ATTRIBUTE_MAPPINGS: AttributeMapping[] = [
@@ -235,7 +235,7 @@ const LED_MATRIX_PROPERTY_DEFS: PropertyDefinition[] = [
 ];
 
 // ---------------------------------------------------------------------------
-// LedMatrixDefinition — ComponentDefinition for registry registration
+// LedMatrixDefinition- ComponentDefinition for registry registration
 // ---------------------------------------------------------------------------
 
 function ledMatrixFactory(props: PropertyBag): LedMatrixElement {
@@ -264,7 +264,7 @@ export const LedMatrixDefinition: ComponentDefinition = {
     },
   },
   helpText:
-    "LedMatrix — NxN LED grid display.\n" +
+    "LedMatrix- NxN LED grid display.\n" +
     "r-data input selects which rows are lit in the addressed column.\n" +
     "c-addr input selects the column to update.\n" +
     "Matrix has (2^colAddrBits) columns and rowDataBits rows.\n" +

@@ -120,7 +120,7 @@ export interface ExportStmt extends ASTNode {
 
 export interface AssignStmt extends ASTNode {
   readonly kind: "assign";
-  /** Left-hand side — an expression that resolves to an assignable location */
+  /** Left-hand side- an expression that resolves to an assignable location */
   readonly target: Expression;
   readonly value: Expression;
 }

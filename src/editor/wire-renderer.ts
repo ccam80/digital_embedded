@@ -1,5 +1,5 @@
 /**
- * WireRenderer — draws wire segments, junction dots, and bus annotations.
+ * WireRenderer- draws wire segments, junction dots, and bus annotations.
  *
  * Consumes the engine-agnostic RenderContext and the optional WireSignalAccess
  * bridge. When no engine is connected every wire is drawn in the neutral WIRE
@@ -23,7 +23,7 @@ const JUNCTION_RADIUS = 0.15;
 /** Line width for single-bit wires. */
 const WIRE_WIDTH_SINGLE = 1;
 
-/** Line width for analog wires — thicker than digital to make gradient visible. */
+/** Line width for analog wires- thicker than digital to make gradient visible. */
 const WIRE_WIDTH_ANALOG = 2;
 
 /** Line width for bus wires (width > 1). */
@@ -258,7 +258,7 @@ export class WireRenderer {
   ): "WIRE" | "WIRE_HIGH" | "WIRE_LOW" | "WIRE_Z" | "WIRE_UNDEFINED" | "WIRE_ANALOG" {
     if (value === undefined) return "WIRE";
     if ("voltage" in value) return "WIRE_ANALOG";
-    // Mask raw value to the signal's bit width — execute functions may store
+    // Mask raw value to the signal's bit width- execute functions may store
     // full 32-bit results (e.g. ~0 >>> 0 = 0xFFFFFFFF for a 1-bit NOT output).
     const mask = value.width >= 32 ? 0xFFFFFFFF : (1 << value.width) - 1;
     const masked = (value.raw & mask) >>> 0;

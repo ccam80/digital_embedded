@@ -1,5 +1,5 @@
 /**
- * ProgramMemory — ROM with address auto-increment for instruction fetch.
+ * ProgramMemory- ROM with address auto-increment for instruction fetch.
  *
  * On each rising clock edge, the internal address register increments
  * (auto-increment for sequential instruction fetch). If ld=1, the address
@@ -106,7 +106,7 @@ function buildProgramMemoryPins(addrBits: number, dataBits: number): PinDeclarat
 }
 
 // ---------------------------------------------------------------------------
-// ProgramMemoryElement — CircuitElement implementation
+// ProgramMemoryElement- CircuitElement implementation
 // ---------------------------------------------------------------------------
 
 export class ProgramMemoryElement extends AbstractCircuitElement {
@@ -165,7 +165,7 @@ export class ProgramMemoryElement extends AbstractCircuitElement {
 }
 
 // ---------------------------------------------------------------------------
-// executeProgramMemory — flat simulation function
+// executeProgramMemory- flat simulation function
 //
 // Input layout:  [A=0, ld=1, C=2]
 // Output layout: [D=0]
@@ -276,7 +276,7 @@ export const ProgramMemoryDefinition: ComponentDefinition = {
   propertyDefs: PROGRAM_MEMORY_PROPERTY_DEFS,
   attributeMap: PROGRAM_MEMORY_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.MEMORY,
-  helpText: "ProgramMemory — ROM with address auto-increment for CPU instruction fetch.",
+  helpText: "ProgramMemory- ROM with address auto-increment for CPU instruction fetch.",
   models: {
     digital: {
       executeFn: executeProgramMemory,

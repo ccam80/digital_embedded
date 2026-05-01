@@ -60,7 +60,7 @@ function makeBridge(
   return bridge;
 }
 
-describe("ngspice-bridge lteDt mapping — synthetic", () => {
+describe("ngspice-bridge lteDt mapping- synthetic", () => {
   it("nextDelta from accepted outer event maps to lteDt on last iteration", () => {
     const t = 1e-9;
     const expectedLteDt = 2.5e-9;
@@ -131,7 +131,7 @@ describe("ngspice-bridge lteDt mapping — synthetic", () => {
   });
 });
 
-describeIfDll("lteDt_captured_from_ngspice — DLL required", () => {
+describeIfDll("lteDt_captured_from_ngspice- DLL required", () => {
   it("lteDt present on every accepted outer step from real ngspice run", async () => {
     const session = new ComparisonSession({
       dtsPath: "fixtures/rlc-transient.dts",

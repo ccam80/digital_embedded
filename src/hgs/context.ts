@@ -1,5 +1,5 @@
 /**
- * HGS evaluation context — port of Digital's hdl/hgs/Context.java.
+ * HGS evaluation context- port of Digital's hdl/hgs/Context.java.
  *
  * Hierarchical parent-child scope chain. Variable lookup walks the chain to
  * the root. The root context holds built-in functions and output buffer.
@@ -137,7 +137,7 @@ export class HGSContext {
 }
 
 // ---------------------------------------------------------------------------
-// Root context factory — registers all built-in functions
+// Root context factory- registers all built-in functions
 // ---------------------------------------------------------------------------
 
 export function createRootContext(options: {

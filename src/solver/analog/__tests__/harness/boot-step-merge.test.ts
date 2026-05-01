@@ -1,12 +1,12 @@
 /**
- * Unit tests for boot-step merge (spec §10.2 test 3 / spec §5).
+ * Unit tests for boot-step merge (spec ss10.2 test 3 / spec ss5).
  *
  * When runTransient() runs, step 0 (stepStartTime=0) must contain both the
  * DCOP attempts AND the first tranInit attempt. The acceptedAttemptIndex must
  * point at a tranInit (or tranNR) attempt, not at a DCOP sub-solve.
  *
  * Verified using ComparisonSession.runTransient() on a simple RC circuit
- * loaded from fixtures/rlc-transient.dts (no DLL required — ngspice side
+ * loaded from fixtures/rlc-transient.dts (no DLL required- ngspice side
  * is skipped when DLL is not present, and the test only checks ourSession).
  */
 
@@ -25,7 +25,7 @@ describeIfDts("boot-step-merge: runTransient() step 0 contains DCOP + tranInit",
   async function runSession() {
     const session = new ComparisonSession({
       dtsPath: DTS_PATH,
-      // No dllPath — ngspice side will be empty, which is fine for these assertions
+      // No dllPath- ngspice side will be empty, which is fine for these assertions
     });
     await session.init();
     await session.runTransient(0, 1e-6, 1e-7);

@@ -1,5 +1,5 @@
 /**
- * Neg component — two's complement negation.
+ * Neg component- two's complement negation.
  *
  * Ports from Digital's Neg.java:
  *   Input: in (bitWidth)
@@ -91,7 +91,7 @@ export const NegDefinition: ComponentDefinition = {
   propertyDefs: NEG_PROPERTY_DEFS,
   attributeMap: NEG_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.ARITHMETIC,
-  helpText: "Neg — two's complement negation. Output = -input, masked to bitWidth bits.",
+  helpText: "Neg- two's complement negation. Output = -input, masked to bitWidth bits.",
   models: {
     digital: {
       executeFn: executeNeg,

@@ -1,5 +1,5 @@
 /**
- * Property-diversity pin audit — tests pin positions across .dig fixture files
+ * Property-diversity pin audit- tests pin positions across .dig fixture files
  * that exercise non-default property combinations (inputCount, selectorBits,
  * bits, spreading, etc.).
  *
@@ -139,7 +139,7 @@ const allCountMismatches: PinCountMismatch[] = [];
 // Test suite
 // ---------------------------------------------------------------------------
 
-describe("property-diversity pin audit — non-default props from fixtures", () => {
+describe("property-diversity pin audit- non-default props from fixtures", () => {
   let registry: ComponentRegistry;
 
   beforeAll(() => {
@@ -245,10 +245,10 @@ describe("property-diversity pin audit — non-default props from fixtures", () 
         patterns.get(key)!.count++;
       }
 
-      lines.push(`  ${typeId} — ${mismatches.length} mismatch(es):`);
+      lines.push(`  ${typeId}- ${mismatches.length} mismatch(es):`);
       for (const [pattern, { count, example }] of patterns) {
         lines.push(
-          `    ${pattern} (×${count}) — expected (${example.expected.x},${example.expected.y}), got (${example.actual.x},${example.actual.y})`,
+          `    ${pattern} (×${count})- expected (${example.expected.x},${example.expected.y}), got (${example.actual.x},${example.actual.y})`,
         );
       }
     }
@@ -272,7 +272,7 @@ describe("property-diversity pin audit — non-default props from fixtures", () 
     for (const [typeId, mismatches] of [...byType.entries()].sort((a, b) => b[1].length - a[1].length)) {
       const example = mismatches[0];
       lines.push(
-        `  ${typeId} — expected ${example.expectedCount} pins, got ${example.actualCount} (×${mismatches.length} instances)`,
+        `  ${typeId}- expected ${example.expectedCount} pins, got ${example.actualCount} (×${mismatches.length} instances)`,
       );
     }
 

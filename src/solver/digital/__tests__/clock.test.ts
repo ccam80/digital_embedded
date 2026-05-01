@@ -1,5 +1,5 @@
 /**
- * Tests for ClockManager — task 3.3.3.
+ * Tests for ClockManager- task 3.3.3.
  *
  * Tests build minimal ConcreteCompiledCircuit objects that include the
  * componentToElement map needed by ClockManager.findClocks(). The circuit
@@ -165,7 +165,7 @@ describe("ClockManager", () => {
   // findsClockComponents
   // -------------------------------------------------------------------------
 
-  it("findsClockComponents — circuit with 2 Clock elements, findClocks returns 2 entries with correct frequencies", () => {
+  it("findsClockComponents- circuit with 2 Clock elements, findClocks returns 2 entries with correct frequencies", () => {
     const compiled = buildClockCircuit(
       [
         { componentIndex: 0, netId: 0, frequency: 1 },
@@ -190,7 +190,7 @@ describe("ClockManager", () => {
     expect(sorted[1]!.frequency).toBe(4);
   });
 
-  it("findsClockComponents — no Clock elements returns empty list", () => {
+  it("findsClockComponents- no Clock elements returns empty list", () => {
     const compiled = buildClockCircuit([], 0);
     const mgr = new ClockManager(compiled);
     expect(mgr.findClocks()).toHaveLength(0);
@@ -200,7 +200,7 @@ describe("ClockManager", () => {
   // togglesClockOnAdvance
   // -------------------------------------------------------------------------
 
-  it("togglesClockOnAdvance — initial value 0, advanceClocks once → value 1, again → value 0", () => {
+  it("togglesClockOnAdvance- initial value 0, advanceClocks once → value 1, again → value 0", () => {
     const compiled = buildClockCircuit(
       [{ componentIndex: 0, netId: 0, frequency: 1 }],
       1,
@@ -222,7 +222,7 @@ describe("ClockManager", () => {
     expect(edges2[0]!.edge).toBe("falling");
   });
 
-  it("togglesClockOnAdvance — clock with frequency=2 only toggles every 2 steps", () => {
+  it("togglesClockOnAdvance- clock with frequency=2 only toggles every 2 steps", () => {
     const compiled = buildClockCircuit(
       [{ componentIndex: 0, netId: 0, frequency: 2 }],
       1,
@@ -256,7 +256,7 @@ describe("ClockManager", () => {
   // identifiesEdgeType
   // -------------------------------------------------------------------------
 
-  it("identifiesEdgeType — verify rising edge detected on 0→1 transition", () => {
+  it("identifiesEdgeType- verify rising edge detected on 0→1 transition", () => {
     const compiled = buildClockCircuit(
       [{ componentIndex: 0, netId: 0, frequency: 1 }],
       1,
@@ -272,7 +272,7 @@ describe("ClockManager", () => {
     expect(state[0]).toBe(1);
   });
 
-  it("identifiesEdgeType — verify falling edge detected on 1→0 transition", () => {
+  it("identifiesEdgeType- verify falling edge detected on 1→0 transition", () => {
     const compiled = buildClockCircuit(
       [{ componentIndex: 0, netId: 0, frequency: 1 }],
       1,
@@ -296,7 +296,7 @@ describe("ClockManager", () => {
   // multiClockIndependent
   // -------------------------------------------------------------------------
 
-  it("multiClockIndependent — 2 clocks at different frequencies, verify they toggle at their own rate", () => {
+  it("multiClockIndependent- 2 clocks at different frequencies, verify they toggle at their own rate", () => {
     // Clock A: frequency=1 (toggles every step), net ID 0
     // Clock B: frequency=3 (toggles every 3 steps), net ID 1
     const compiled = buildClockCircuit(
@@ -345,7 +345,7 @@ describe("ClockManager", () => {
   // getSequentialComponentsForEdge
   // -------------------------------------------------------------------------
 
-  it("getSequentialComponentsForEdge — rising edge returns sequential components", () => {
+  it("getSequentialComponentsForEdge- rising edge returns sequential components", () => {
     const compiled = buildClockCircuit(
       [{ componentIndex: 0, netId: 0, frequency: 1 }],
       2,
@@ -357,7 +357,7 @@ describe("ClockManager", () => {
     expect(seqOnRising).toEqual([2, 3]);
   });
 
-  it("getSequentialComponentsForEdge — falling edge returns empty list", () => {
+  it("getSequentialComponentsForEdge- falling edge returns empty list", () => {
     const compiled = buildClockCircuit(
       [{ componentIndex: 0, netId: 0, frequency: 1 }],
       2,
@@ -373,7 +373,7 @@ describe("ClockManager", () => {
   // FiredEdge includes correct clockInfo
   // -------------------------------------------------------------------------
 
-  it("advanceClocks — fired edge includes correct clockInfo reference", () => {
+  it("advanceClocks- fired edge includes correct clockInfo reference", () => {
     const compiled = buildClockCircuit(
       [{ componentIndex: 0, netId: 5, frequency: 1 }],
       6,
@@ -393,7 +393,7 @@ describe("ClockManager", () => {
   // Opaque CompiledCircuit (no componentToElement) returns empty clock list
   // -------------------------------------------------------------------------
 
-  it("findClocks — opaque CompiledCircuit without componentToElement returns empty list", () => {
+  it("findClocks- opaque CompiledCircuit without componentToElement returns empty list", () => {
     const opaque = { netCount: 2, componentCount: 1 };
     const mgr = new ClockManager(opaque as unknown as ConcreteCompiledCircuit);
     expect(mgr.findClocks()).toHaveLength(0);

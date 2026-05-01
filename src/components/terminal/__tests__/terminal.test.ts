@@ -198,9 +198,9 @@ describe("Terminal", () => {
   });
 
   describe("executeTerminal", () => {
-    it("executeTerminal is a no-op — Terminal is a display sink with no outputs", () => {
+    it("executeTerminal is a no-op- Terminal is a display sink with no outputs", () => {
       // Terminal has 3 inputs (D, C, en) and 0 outputs.
-      // The executeFn does nothing — display is driven by engine side-channel.
+      // The executeFn does nothing- display is driven by engine side-channel.
       const layout = makeLayout(3, 0);
       const state = makeState([0x41, 1, 1], 0);
       const highZs = new Uint32Array(state.length);
@@ -441,7 +441,7 @@ describe("Keyboard", () => {
     // Scratch: prev_clk at outBase+2, pending_rd at outBase+3
     // inBase=0, outBase=2
 
-    it("no clock edge (C=0, en=1) — pending_rd flag not set", () => {
+    it("no clock edge (C=0, en=1)- pending_rd flag not set", () => {
       const layout = makeLayout(2, 4);
       const state = makeState([0, 1], 4); // C=0, en=1
       const highZs = new Uint32Array(state.length);
@@ -452,7 +452,7 @@ describe("Keyboard", () => {
       expect(state[2 + 3]).toBe(0); // no rising edge → no pending_rd
     });
 
-    it("rising clock edge with en=1 — sets pending_rd flag", () => {
+    it("rising clock edge with en=1- sets pending_rd flag", () => {
       const layout = makeLayout(2, 4);
       const state = makeState([1, 1], 4); // C=1, en=1
       const highZs = new Uint32Array(state.length);
@@ -462,7 +462,7 @@ describe("Keyboard", () => {
       expect(state[2 + 3]).toBe(1); // pending_rd set
     });
 
-    it("rising clock edge with en=0 — pending_rd NOT set", () => {
+    it("rising clock edge with en=0- pending_rd NOT set", () => {
       const layout = makeLayout(2, 4);
       const state = makeState([1, 0], 4); // C=1, en=0
       const highZs = new Uint32Array(state.length);
@@ -472,7 +472,7 @@ describe("Keyboard", () => {
       expect(state[2 + 3]).toBe(0); // en=0 suppresses pending_rd
     });
 
-    it("C stays high (prev_clk=1) — no repeated pending_rd", () => {
+    it("C stays high (prev_clk=1)- no repeated pending_rd", () => {
       const layout = makeLayout(2, 4);
       const state = makeState([1, 1], 4); // C=1, en=1
       const highZs = new Uint32Array(state.length);

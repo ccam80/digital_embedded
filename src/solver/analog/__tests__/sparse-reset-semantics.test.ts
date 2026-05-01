@@ -36,7 +36,7 @@ describe("SparseSolver._resetForAssembly semantics", () => {
    * beginAssembly again and assert the snapshots are byte-identical.
    */
   it("reset preserves linked structure", () => {
-    // Simple tridiagonal — no fill-ins, straightforward structure.
+    // Simple tridiagonal- no fill-ins, straightforward structure.
     // 1-based indexing: external rows/cols 1..3 (slot 0 is ground/TrashCan).
     const entries: Array<[number, number, number]> = [
       [1, 1, 4], [1, 2, -1],
@@ -82,14 +82,14 @@ describe("SparseSolver._resetForAssembly semantics", () => {
    *   [0  2  1]
    *   [1  0  2]
    * When Markowitz picks (0,0): mult = (1,0)/2; row 1 += (-mult)*row 0 at
-   * col 1 (exists) — no fill there. But col 0 of row 2: mult=(2,0)/2=0.5;
+   * col 1 (exists)- no fill there. But col 0 of row 2: mult=(2,0)/2=0.5;
    * update row 2 with row 0: (2,1) fill-in created (missing), (2,2) exists.
    *
    * If Markowitz picks differently, a fill-in still occurs due to the cycle.
    *
    * To guarantee Markowitz picks (0,0) first, we make row 0 and col 0 each
    * have exactly 2 entries while (1,1) and (2,2) are singletons in their
-   * remaining submatrix — but that's complex. Instead, we simply record
+   * remaining submatrix- but that's complex. Instead, we simply record
    * elCount before vs after factor and assert that fill-ins were created and
    * that beginAssembly preserves the elCount.
    */
@@ -122,7 +122,7 @@ describe("SparseSolver._resetForAssembly semantics", () => {
     // _resetForAssembly resets values but must keep fill-ins in the pool.
     solver._resetForAssembly();
 
-    // _elCount unchanged — fill-ins were NOT returned to free-list.
+    // _elCount unchanged- fill-ins were NOT returned to free-list.
     expect((s._elCount as number)).toBe(elCountAfterFactor);
 
     const fillInsAfter = countFillIns(solver);
@@ -143,7 +143,7 @@ describe("SparseSolver._resetForAssembly semantics", () => {
     const solver = buildAndFactor(entries);
     const s = solver as any;
 
-    // After factor, values are LU-factored — not all zero.
+    // After factor, values are LU-factored- not all zero.
     // (This confirms the test exercises meaningful state.)
     const elCountAfterFactor: number = s._elCount;
     expect(elCountAfterFactor).toBeGreaterThan(0);

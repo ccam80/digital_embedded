@@ -13,7 +13,7 @@ import { DEFAULT_SIMULATION_PARAMS, type ResolvedSimulationParams } from "../../
 import type { SetupContext } from "../setup-context.js";
 
 // ---------------------------------------------------------------------------
-// makeTestSetupContext — produce a SetupContext driving the four allocation
+// makeTestSetupContext- produce a SetupContext driving the four allocation
 // streams (internal nodes, branch rows, state slots, peer lookup) deterministically.
 // ---------------------------------------------------------------------------
 
@@ -21,19 +21,19 @@ import type { SetupContext } from "../setup-context.js";
  * Build a `SetupContext` for use by `setupAll` in unit tests. The four
  * allocation streams behave as follows:
  *
- *   - `makeVolt(label, suffix)` — returns sequential ids starting at
+ *   - `makeVolt(label, suffix)`- returns sequential ids starting at
  *     `opts.startNode`, incrementing per call. THROWS if `startNode` is
- *     unset and any element calls `makeVolt`. The throw is intentional —
+ *     unset and any element calls `makeVolt`. The throw is intentional-
  *     tests whose elements allocate internal nodes must declare their
  *     starting node id rather than silently defaulting to 0 and propagating
  *     off-by-one errors.
  *
- *   - `makeCur(label, suffix)` — same shape as `makeVolt` but for branch
+ *   - `makeCur(label, suffix)`- same shape as `makeVolt` but for branch
  *     row indices, gated on `opts.startBranch`. Same throw semantics.
  *
- *   - `allocStates(n)` — sequential, always available; counter starts at 0.
+ *   - `allocStates(n)`- sequential, always available; counter starts at 0.
  *
- *   - `findBranch(label)` / `findDevice(label)` — resolve against
+ *   - `findBranch(label)` / `findDevice(label)`- resolve against
  *     `opts.elements` by `el.label` match. `findBranch` dispatches to the
  *     element's `findBranchFor(label, ctx)` if present; otherwise returns
  *     the element's existing `branchIndex` or 0. Mirrors the engine-side
@@ -105,13 +105,13 @@ export function makeTestSetupContext(opts: {
 }
 
 // ---------------------------------------------------------------------------
-// setupAll — sort elements by ngspiceLoadOrder, call setup() on each.
+// setupAll- sort elements by ngspiceLoadOrder, call setup() on each.
 // ---------------------------------------------------------------------------
 
 /**
  * Sort `elements` by `ngspiceLoadOrder` ascending and invoke `setup(ctx)`
  * on each. Mirrors the per-type bucket order ngspice uses (every R, then
- * every C, ..., then every V, ...) — see `core/analog-types.ts` /
+ * every C, ..., then every V, ...)- see `core/analog-types.ts` /
  * NGSPICE_LOAD_ORDER for the rationale.
  *
  * No opt-out: tests that need to inject element-private state must do so
@@ -125,7 +125,7 @@ export function setupAll(elements: AnalogElement[], ctx: SetupContext): void {
 }
 
 // ---------------------------------------------------------------------------
-// allocateStatePool — assign _stateBase sequentially and build a sized pool
+// allocateStatePool- assign _stateBase sequentially and build a sized pool
 // ---------------------------------------------------------------------------
 
 /**
@@ -135,7 +135,7 @@ export function setupAll(elements: AnalogElement[], ctx: SetupContext): void {
  * populated.
  *
  * Tests that build `ConcreteCompiledAnalogCircuit` directly (bypassing the
- * real compiler) must call this before `engine.init()` — otherwise pool-
+ * real compiler) must call this before `engine.init()`- otherwise pool-
  * backed elements arrive with `_stateBase=-1` and the engine's allocation
  * assertion throws.
  *
@@ -162,7 +162,7 @@ export function allocateStatePool(
 }
 
 // ---------------------------------------------------------------------------
-// initElement — wire a single element to a freshly-allocated StatePool
+// initElement- wire a single element to a freshly-allocated StatePool
 // ---------------------------------------------------------------------------
 
 /**
@@ -170,7 +170,7 @@ export function allocateStatePool(
  * element's `_stateBase` to 0, and call `initState(pool)`. Required before
  * driving `element.load()` directly in unit tests for any pool-backed
  * element (capacitor, inductor, BJT, MOSFET, comparator, behavioral
- * flip-flop, etc.) — otherwise the element's `_pool` reference is undefined
+ * flip-flop, etc.)- otherwise the element's `_pool` reference is undefined
  * and `load()` throws.
  *
  * Mirrors the engine's compile path: compile.ts walks every analog element
@@ -192,7 +192,7 @@ export function initElement(element: AnalogElement): StatePool {
 }
 
 // ---------------------------------------------------------------------------
-// makeSimpleCtx / runDcOp / runNR — minimal CKTCircuitContext wrappers
+// makeSimpleCtx / runDcOp / runNR- minimal CKTCircuitContext wrappers
 // ---------------------------------------------------------------------------
 
 export interface SimpleCtxOptions {
@@ -218,7 +218,7 @@ export function makeSimpleCtx(opts: SimpleCtxOptions): CKTCircuitContext {
   const diagnostics = opts.diagnostics ?? new DiagnosticCollector();
   const solver = opts.solver ?? new SparseSolver();
 
-  // Step 1: Construct CKTCircuitContext — this calls solver._initStructure()
+  // Step 1: Construct CKTCircuitContext- this calls solver._initStructure()
   // which wipes any previously allocated sparse handles. Therefore setup()
   // MUST be called AFTER construction, not before.
   const ctx = new CKTCircuitContext(
@@ -250,7 +250,7 @@ export function makeSimpleCtx(opts: SimpleCtxOptions): CKTCircuitContext {
   const numStates = statePool.state0.length;
   ctx.statePool = statePool;
   // Mirror allocateStateBuffers: resize dcop snapshot buffers and bind the
-  // live state-ring reference into loadCtx (no snapshot — getter-based).
+  // live state-ring reference into loadCtx (no snapshot- getter-based).
   ctx.dcopSavedState0 = new Float64Array(numStates);
   ctx.dcopOldState0 = new Float64Array(numStates);
   ctx.loadCtx.setStatePool(statePool);
@@ -304,7 +304,7 @@ export function runNR(opts: SimpleNROptions): NRResult {
 }
 
 // ---------------------------------------------------------------------------
-// loadCtxFromFields — wrap a LoadContext literal (sans state0..state3)
+// loadCtxFromFields- wrap a LoadContext literal (sans state0..state3)
 // ---------------------------------------------------------------------------
 
 /**
@@ -322,7 +322,7 @@ export function loadCtxFromFields(
 }
 
 // ---------------------------------------------------------------------------
-// makeLoadCtx — build a fully-populated LoadContext literal for unit tests
+// makeLoadCtx- build a fully-populated LoadContext literal for unit tests
 // ---------------------------------------------------------------------------
 
 export interface MakeLoadCtxOptions {
@@ -365,7 +365,7 @@ export interface MakeLoadCtxOptions {
  *
  * Defaults:
  *   - cktMode  = MODETRAN | MODEINITFLOAT (a normal NR iteration during
- *     transient — produces the same bit pattern an engine drives on
+ *     transient- produces the same bit pattern an engine drives on
  *     non-init iterations).
  *   - dt = 0, order = 1, method = "trapezoidal".
  *   - rhs / rhsOld both alias `voltages` unless overridden.

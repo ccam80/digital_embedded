@@ -1,7 +1,7 @@
 /**
  * Tests for subcircuit engine flattening (Task 6.2.3).
  *
- * Tests construct SubcircuitHost implementations directly — no dependency on
+ * Tests construct SubcircuitHost implementations directly- no dependency on
  * the SubcircuitElement class from 6.2.1. This makes the tests independent of
  * that task's completion state.
  */
@@ -87,7 +87,7 @@ function makeRegistry(...typeIds: string[]): ComponentRegistry {
 // ---------------------------------------------------------------------------
 
 describe("flattenCircuit", () => {
-  it("noSubcircuitsUnchanged — circuit with no subcircuits returns structurally identical circuit", () => {
+  it("noSubcircuitsUnchanged- circuit with no subcircuits returns structurally identical circuit", () => {
     const circuit = new Circuit({ name: "Top" });
     const andEl = makeLeafElement("And", "and-1", { x: 0, y: 0 });
     const orEl = makeLeafElement("Or", "or-1", { x: 10, y: 0 });
@@ -103,7 +103,7 @@ describe("flattenCircuit", () => {
     expect(flat.wires.length).toBe(1);
   });
 
-  it("preservesLeafComponents — gates and other leaf elements pass through unchanged", () => {
+  it("preservesLeafComponents- gates and other leaf elements pass through unchanged", () => {
     const circuit = new Circuit();
     const and1 = makeLeafElement("And", "and-a", { x: 0, y: 0 });
     const and2 = makeLeafElement("And", "and-b", { x: 5, y: 0 });
@@ -118,7 +118,7 @@ describe("flattenCircuit", () => {
     expect(flat.elements[1]!.typeId).toBe("And");
   });
 
-  it("singleSubcircuit — subcircuit element is replaced by its internal components", () => {
+  it("singleSubcircuit- subcircuit element is replaced by its internal components", () => {
     // Internal circuit: In → And → Out
     const internal = new Circuit({ name: "AndWrapper" });
     const inEl = makeInElement("in-1", "A", { x: 0, y: 0 });
@@ -174,7 +174,7 @@ describe("flattenCircuit", () => {
     expect(flat.elements.length).toBe(3);
   });
 
-  it("twoInstances — two instances of same subcircuit have distinct scoped names", () => {
+  it("twoInstances- two instances of same subcircuit have distinct scoped names", () => {
     const internal = new Circuit({ name: "HalfAdder" });
     const inEl = makeInElement("in-1", "A", { x: 0, y: 0 });
     const andEl = makeLeafElement("And", "and-1", { x: 5, y: 0 });
@@ -218,7 +218,7 @@ describe("flattenCircuit", () => {
     expect(instance1Names.length).toBe(3);
   });
 
-  it("nestedSubcircuit — subcircuit containing another subcircuit is fully recursively flattened", () => {
+  it("nestedSubcircuit- subcircuit containing another subcircuit is fully recursively flattened", () => {
     // Inner: just an And gate
     const inner = new Circuit({ name: "Inner" });
     const innerIn = makeInElement("in-i", "X", { x: 0, y: 0 });
@@ -266,7 +266,7 @@ describe("flattenCircuit", () => {
     expect(typeIds.filter((t) => t === "Out").length).toBe(2);
   });
 
-  it("pinWiring — parent net connected to subcircuit input pin is wired to the internal In component", () => {
+  it("pinWiring- parent net connected to subcircuit input pin is wired to the internal In component", () => {
     // Internal circuit: In(label=A) → Out(label=Y)
     const internal = new Circuit({ name: "Passthrough" });
     const inEl = makeInElement("in-1", "A", { x: 0, y: 5 });
@@ -330,7 +330,7 @@ describe("flattenCircuit", () => {
     expect(bridgeWireForY).toBeDefined();
   });
 
-  it("isSubcircuitHost — correctly identifies SubcircuitHost elements", () => {
+  it("isSubcircuitHost- correctly identifies SubcircuitHost elements", () => {
     const internal = new Circuit({ name: "X" });
     const sub = makeSubcircuitElement("X", "sub-1", { x: 0, y: 0 }, internal, []);
     const leaf = makeLeafElement("And", "and-1", { x: 0, y: 0 });
@@ -339,7 +339,7 @@ describe("flattenCircuit", () => {
     expect(isSubcircuitHost(leaf)).toBe(false);
   });
 
-  it("singleSubcircuit — original circuit is not mutated by flattening", () => {
+  it("singleSubcircuit- original circuit is not mutated by flattening", () => {
     const internal = new Circuit({ name: "Sub" });
     const inEl = makeInElement("in-1", "A", { x: 0, y: 0 });
     const andEl = makeLeafElement("And", "and-1", { x: 5, y: 0 });
@@ -369,8 +369,8 @@ describe("flattenCircuit", () => {
 // Port-based subcircuit flattening tests
 // ---------------------------------------------------------------------------
 
-describe("flattenCircuit — Port-based subcircuits", () => {
-  it("singleLevelFlattenWithPortInterfaces — internal circuit with Port elements is inlined correctly", () => {
+describe("flattenCircuit- Port-based subcircuits", () => {
+  it("singleLevelFlattenWithPortInterfaces- internal circuit with Port elements is inlined correctly", () => {
     // Internal circuit: Port("A") → And gate → Port("Y")
     const internal = new Circuit({ name: "PortWrapper" });
     const portA = makePortElement("port-A", "A", { x: 0, y: 0 });
@@ -432,7 +432,7 @@ describe("flattenCircuit — Port-based subcircuits", () => {
     expect(flat.wires.length).toBe(4);
   });
 
-  it("nestedPortSubcircuits — recursive flattening works with Port at every level", () => {
+  it("nestedPortSubcircuits- recursive flattening works with Port at every level", () => {
     // Inner circuit: Port("X") → And gate → Port("Z")
     const inner = new Circuit({ name: "Inner" });
     const innerPortX = makePortElement("port-X", "X", { x: 0, y: 0 });
@@ -480,7 +480,7 @@ describe("flattenCircuit — Port-based subcircuits", () => {
     expect(portEls.length).toBe(4);
   });
 
-  it("multiInstancePortSubcircuit — two instances of the same Port-based subcircuit have distinct scoped names", () => {
+  it("multiInstancePortSubcircuit- two instances of the same Port-based subcircuit have distinct scoped names", () => {
     const internal = new Circuit({ name: "PortGate" });
     const portA = makePortElement("port-A", "A", { x: 0, y: 0 });
     const andEl = makeLeafElement("And", "and-1", { x: 5, y: 0 });
@@ -523,7 +523,7 @@ describe("flattenCircuit — Port-based subcircuits", () => {
     expect(instance1Names.length).toBe(3);
   });
 
-  it("portWithMultiBitWidth — Port('BUS', bitWidth=8) preserves bus width through the bridge", () => {
+  it("portWithMultiBitWidth- Port('BUS', bitWidth=8) preserves bus width through the bridge", () => {
     // Internal circuit: Port("BUS") with bitWidth 8 → And gate
     const internal = new Circuit({ name: "BusSub" });
     const portBus = makePortElement("port-BUS", "BUS", { x: 0, y: 0 }, 8);
@@ -566,7 +566,7 @@ describe("flattenCircuit — Port-based subcircuits", () => {
     expect(flat.wires.length).toBe(2);
   });
 
-  it("mixedPortAndLeafElements — multiple internal gates wired together are all preserved with correct bridge wires", () => {
+  it("mixedPortAndLeafElements- multiple internal gates wired together are all preserved with correct bridge wires", () => {
     // Internal circuit: Port("IN") → And → Or → Port("OUT")
     const internal = new Circuit({ name: "TwoGates" });
     const portIn = makePortElement("port-IN", "IN", { x: 0, y: 0 });

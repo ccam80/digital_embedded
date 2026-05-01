@@ -1,5 +1,5 @@
 /**
- * PolarityAwareLED component — LED with anode/cathode orientation.
+ * PolarityAwareLED component- LED with anode/cathode orientation.
  *
  * Lights up when anode input is high AND cathode input is low.
  * Considers signal polarity: current flows from anode to cathode.
@@ -30,7 +30,7 @@ import {
 const COMP_HEIGHT = 4;
 
 // ---------------------------------------------------------------------------
-// Pin layout — anode on west, cathode on east
+// Pin layout- anode on west, cathode on east
 // ---------------------------------------------------------------------------
 
 // Java PolarityAwareLEDShape: A(0,0), K(0,SIZE*4)=(0,4)
@@ -58,7 +58,7 @@ function buildPolarityLedPinDeclarations(): PinDeclaration[] {
 }
 
 // ---------------------------------------------------------------------------
-// PolarityLedElement — CircuitElement implementation
+// PolarityLedElement- CircuitElement implementation
 // ---------------------------------------------------------------------------
 
 export class PolarityLedElement extends AbstractCircuitElement {
@@ -142,7 +142,7 @@ export class PolarityLedElement extends AbstractCircuitElement {
 }
 
 // ---------------------------------------------------------------------------
-// executePolarityLed — anode=1 and cathode=0 → lit
+// executePolarityLed- anode=1 and cathode=0 → lit
 // ---------------------------------------------------------------------------
 
 export function executePolarityLed(
@@ -214,7 +214,7 @@ export const PolarityLedDefinition: ComponentDefinition = {
   attributeMap: POLARITY_LED_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.IO,
   helpText:
-    "PolarityAwareLED — LED that considers anode/cathode orientation.\n" +
+    "PolarityAwareLED- LED that considers anode/cathode orientation.\n" +
     "Lights up when anode is high AND cathode is low (current flows anode→cathode).\n" +
     "Color is configurable.",
   models: {

@@ -1,5 +1,5 @@
 /**
- * Element Help UI — DOM rendering for the element help dialog.
+ * Element Help UI- DOM rendering for the element help dialog.
  *
  * Renders a HelpContent record as a modal overlay. The modal is appended to
  * document.body and removed when the user dismisses it.
@@ -98,7 +98,7 @@ function buildPropertyTable(props: readonly PropInfo[]): HTMLTableElement {
 }
 
 // ---------------------------------------------------------------------------
-// HelpDialog — the modal overlay
+// HelpDialog- the modal overlay
 // ---------------------------------------------------------------------------
 
 /**

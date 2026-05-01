@@ -200,8 +200,8 @@ export function makeCurrentSource(
     },
 
     getPinCurrents(_rhs: Float64Array): number[] {
-      // No branch row — current is defined by the stamp: I = current * srcFact.
-      // Pin layout order: [neg, pos] — neg is index 0, pos is index 1.
+      // No branch row- current is defined by the stamp: I = current * srcFact.
+      // Pin layout order: [neg, pos]- neg is index 0, pos is index 1.
       // Conventional current flows from neg through source to pos (arrow direction).
       // Current into neg = +I (current enters element at neg from the circuit).
       // Current into pos = -I (current exits element at pos into the circuit).

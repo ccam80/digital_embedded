@@ -22,7 +22,7 @@ for (const { src, dst, tag, title } of mapping) {
   const text = Array.isArray(parsed)
     ? parsed.filter(b => b?.type === "text" && typeof b.text === "string").map(b => b.text).join("\n\n")
     : typeof parsed === "string" ? parsed : JSON.stringify(parsed, null, 2);
-  const header = `# ngspice alignment — ${tag}: ${title}\n\n_Extracted from ephemeral tool-results cache. Source agent output verbatim below._\n\n---\n\n`;
+  const header = `# ngspice alignment- ${tag}: ${title}\n\n_Extracted from ephemeral tool-results cache. Source agent output verbatim below._\n\n---\n\n`;
   writeFileSync(dstPath, header + text, "utf8");
   console.log(`wrote ${dstPath} (${Buffer.byteLength(text, "utf8")} bytes)`);
   unlinkSync(srcPath);

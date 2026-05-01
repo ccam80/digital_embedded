@@ -63,14 +63,14 @@ import type { BodeViewport } from '../runtime/bode-plot.js';
 
 
 // ---------------------------------------------------------------------------
-// initApp — entry point called from main.ts
+// initApp- entry point called from main.ts
 // ---------------------------------------------------------------------------
 
 export function initApp(search?: string): void {
   const params = parseUrlParams(search);
   const isIframe = window.self !== window.top;
 
-  // Load persisted settings — use AppSettings for persistence (SettingKey.COLOR_SCHEME etc.)
+  // Load persisted settings- use AppSettings for persistence (SettingKey.COLOR_SCHEME etc.)
   const appSettings = new AppSettings(localStorage);
   appSettings.load();
 
@@ -85,7 +85,7 @@ export function initApp(search?: string): void {
   }
 
   const registry = createDefaultRegistry();
-  // Analog component types — their output pins are circuit nodes, not signal drivers,
+  // Analog component types- their output pins are circuit nodes, not signal drivers,
   // so the shorted-outputs consistency check must skip them.
   const analogTypeIds: ReadonlySet<string> = new Set(
     registry.getWithModel("analog").map((d) => d.name),
@@ -117,7 +117,7 @@ export function initApp(search?: string): void {
     canvasRenderer.setColorScheme(active);
     wireRenderer.setColorScheme(active);
     // The element renderer's factory captures the scheme at creation time.
-    // No update needed here — the factory reads the current scheme on each call.
+    // No update needed here- the factory reads the current scheme on each call.
   });
 
   // -------------------------------------------------------------------------
@@ -165,10 +165,10 @@ export function initApp(search?: string): void {
   let activeTutorialBar: TutorialBar | null = null;
   let activeTutorialShelf: TutorialShelf | null = null;
 
-  // isSimActive, compileAndBind, invalidateCompiled — delegated to simController (set up below)
+  // isSimActive, compileAndBind, invalidateCompiled- delegated to simController (set up below)
 
   // -------------------------------------------------------------------------
-  // Render pipeline — canvas sizing, render loop, coordinate helpers
+  // Render pipeline- canvas sizing, render loop, coordinate helpers
   // -------------------------------------------------------------------------
 
   // renderPipeline is initialized after the AppContext object is built below.
@@ -286,7 +286,7 @@ export function initApp(search?: string): void {
   });
 
   // ---------------------------------------------------------------------------
-  // SimulationController forward declaration — initialized after renderPipeline.
+  // SimulationController forward declaration- initialized after renderPipeline.
   // ---------------------------------------------------------------------------
 
   let simController: SimulationController = null!;
@@ -299,7 +299,7 @@ export function initApp(search?: string): void {
   function isSimActive(): boolean { return simController.isSimActive(); }
 
   // ---------------------------------------------------------------------------
-  // AppContext — shared state object passed to extracted sub-modules
+  // AppContext- shared state object passed to extracted sub-modules
   // ---------------------------------------------------------------------------
 
   let fileIOController = null! as ReturnType<typeof initFileIOController>;
@@ -687,7 +687,7 @@ export function initApp(search?: string): void {
               renderPipeline.scheduleRender();
               return;
             }
-            // TutorialCircuitSpec — build via facade
+            // TutorialCircuitSpec- build via facade
             const built = facade.build(goalCircuit as import('../headless/netlist-types.js').CircuitSpec);
             const xml = serializeCircuitToDig(built, registry);
             await fileIOController.loadCircuitFromXml(xml);
@@ -740,7 +740,7 @@ export function initApp(search?: string): void {
           }
         });
 
-        // Update UI on step changes — override goToStep to hook in
+        // Update UI on step changes- override goToStep to hook in
         const origGoToStep = runner.goToStep.bind(runner);
         runner.goToStep = async (index: number) => {
           await origGoToStep(index);
@@ -772,7 +772,7 @@ export function initApp(search?: string): void {
   });
 
   // -------------------------------------------------------------------------
-  // Test bridge — exposes coordinate queries for E2E tests
+  // Test bridge- exposes coordinate queries for E2E tests
   // -------------------------------------------------------------------------
 
   if (import.meta.env.DEV || import.meta.env.MODE === 'test') {

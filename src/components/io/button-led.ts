@@ -1,5 +1,5 @@
 /**
- * ButtonLED component — push button with integrated LED indicator.
+ * ButtonLED component- push button with integrated LED indicator.
  *
  * Extends Button with an additional input pin that drives an LED indicator.
  * The button output (out) is set externally by engine on mouse events.
@@ -60,7 +60,7 @@ function buildButtonLEDPinDeclarations(): PinDeclaration[] {
 }
 
 // ---------------------------------------------------------------------------
-// ButtonLEDElement — CircuitElement implementation
+// ButtonLEDElement- CircuitElement implementation
 // ---------------------------------------------------------------------------
 
 export class ButtonLEDElement extends AbstractCircuitElement {
@@ -133,7 +133,7 @@ export class ButtonLEDElement extends AbstractCircuitElement {
     ctx.setColor("COMPONENT");
     ctx.drawCircle(-1.15, -0.35, 0.5, false);
 
-    // Text label (always drawn, even if empty — Java always emits text call)
+    // Text label (always drawn, even if empty- Java always emits text call)
     ctx.setColor("TEXT");
     ctx.setFont({ family: "sans-serif", size: 0.7 });
     ctx.drawText(label, -2.25, -0.2, {
@@ -146,7 +146,7 @@ export class ButtonLEDElement extends AbstractCircuitElement {
 }
 
 // ---------------------------------------------------------------------------
-// executeButtonLED — reads LED input, stores for display; button output set externally
+// executeButtonLED- reads LED input, stores for display; button output set externally
 // ---------------------------------------------------------------------------
 
 export function executeButtonLED(
@@ -231,7 +231,7 @@ export const ButtonLEDDefinition: ComponentDefinition = {
   attributeMap: BUTTON_LED_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.IO,
   helpText:
-    "ButtonLED — push button with integrated LED indicator.\n" +
+    "ButtonLED- push button with integrated LED indicator.\n" +
     "The 'in' pin drives the LED; the 'out' pin is the button output.\n" +
     "Button behavior: output high while held, low when released (inverted if activeLow).\n" +
     "Interactive: the engine sets the output value on mouse-down/up events.",

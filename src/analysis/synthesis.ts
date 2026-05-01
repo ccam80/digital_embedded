@@ -1,5 +1,5 @@
 /**
- * Circuit synthesis — generate a Circuit from boolean expressions.
+ * Circuit synthesis- generate a Circuit from boolean expressions.
  *
  * Takes a map of output-name → BoolExpr and produces a Circuit containing:
  *   - One In component per input variable (left column)
@@ -10,7 +10,7 @@
  * Layout: left-to-right, inputs at column 0, outputs at the rightmost column,
  * gates at intermediate columns determined by their depth in the expression tree.
  *
- * The circuit is engine-agnostic — it is a pure visual Circuit model that
+ * The circuit is engine-agnostic- it is a pure visual Circuit model that
  * can be loaded by the editor without any simulation backend.
  */
 
@@ -173,14 +173,14 @@ function buildExprTree(
     }
 
     case 'variable': {
-      // Variable node — look up the existing In element
+      // Variable node- look up the existing In element
       const baseId = expr.name;
       if (!expr.negated) {
-        // Positive literal — reuse the In element directly
+        // Positive literal- reuse the In element directly
         if (signalElements.has(baseId)) {
           return baseId;
         }
-        // Variable not in map — create a late In element
+        // Variable not in map- create a late In element
         const inDef = registry.get('In');
         if (inDef === undefined) throw new Error('synthesizeCircuit: "In" not registered');
         const props = new PropertyBag([['label', baseId], ['bitWidth', 1]]);
@@ -191,7 +191,7 @@ function buildExprTree(
         columnMap.set(el.instanceId, 0);
         return baseId;
       } else {
-        // Negated variable — insert a NOT gate
+        // Negated variable- insert a NOT gate
         const inputId = buildPosVariable(
           baseId,
           circuit,
@@ -371,7 +371,7 @@ function buildNaryGate(
  * created with the element positions as set at call time. After layout(), wire
  * start/end points would ideally be recomputed from pin world positions.
  *
- * For synthesis purposes the wires represent logical connections — their visual
+ * For synthesis purposes the wires represent logical connections- their visual
  * accuracy is secondary to functional correctness (which the compiler resolves
  * from pin proximity and net tracing).
  */

@@ -33,7 +33,7 @@ import {
 } from "./gate-shared.js";
 
 // ---------------------------------------------------------------------------
-// NAndElement — CircuitElement implementation
+// NAndElement- CircuitElement implementation
 // ---------------------------------------------------------------------------
 
 export class NAndElement extends AbstractCircuitElement {
@@ -103,7 +103,7 @@ export class NAndElement extends AbstractCircuitElement {
 }
 
 // ---------------------------------------------------------------------------
-// executeNAnd — flat simulation function
+// executeNAnd- flat simulation function
 // ---------------------------------------------------------------------------
 
 export function executeNAnd(index: number, state: Uint32Array, _highZs: Uint32Array, layout: ComponentLayout): void {
@@ -122,7 +122,7 @@ export function executeNAnd(index: number, state: Uint32Array, _highZs: Uint32Ar
 }
 
 // ---------------------------------------------------------------------------
-// CMOS_NAND2_NETLIST — 2-input CMOS NAND gate structural netlist
+// CMOS_NAND2_NETLIST- 2-input CMOS NAND gate structural netlist
 //
 // Topology: 2 PMOS in parallel (pull-up), 2 NMOS in series (pull-down).
 // Ports: In_1, In_2, out, VDD, GND
@@ -174,7 +174,7 @@ export const NAndDefinition: ComponentDefinition = {
   attributeMap: STANDARD_GATE_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.LOGIC,
   helpText:
-    "NAnd gate — performs bitwise NOT(AND) of all inputs.\n" +
+    "NAnd gate- performs bitwise NOT(AND) of all inputs.\n" +
     "Configurable input count (2–5) and bit width (1–32).\n" +
     "Both IEEE/US (curved with bubble) and IEC/DIN (rectangular with & and bubble) shapes are supported.\n" +
     "Individual inputs can be inverted via the inverterConfig property.",

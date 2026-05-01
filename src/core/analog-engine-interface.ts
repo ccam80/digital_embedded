@@ -1,5 +1,5 @@
 /**
- * AnalogEngine interface — MNA simulation contract.
+ * AnalogEngine interface- MNA simulation contract.
  *
  * Defines the contract for analog simulation backends. `AnalogEngine` extends
  * the `Engine` base interface so that any code holding an `Engine` reference
@@ -19,7 +19,7 @@ export type { AcParams, AcResult, DiagnosticSuggestion };
 export type { Diagnostic, DiagnosticCode };
 
 // ---------------------------------------------------------------------------
-// SimulationParams — transient solver configuration
+// SimulationParams- transient solver configuration
 // ---------------------------------------------------------------------------
 
 /**
@@ -52,7 +52,7 @@ export interface SimulationParams {
   /**
    * Truncation-error multiplier (ngspice `trtol`). Multiplies the composite
    * per-element LTE tolerance, giving the simulator a safety margin above
-   * the raw absolute+relative floor. ngspice default is 7.0 — same here.
+   * the raw absolute+relative floor. ngspice default is 7.0- same here.
    */
   trtol: number;
   /** Maximum Newton-Raphson iterations before declaring failure. Default: 100 */
@@ -71,7 +71,7 @@ export interface SimulationParams {
   /** Enable node damping in NR iteration (ngspice niiter.c). Default: false */
   nodeDamping: boolean;
   /**
-   * Transient stop time in seconds (ngspice CKTfinalTime). Optional — only
+   * Transient stop time in seconds (ngspice CKTfinalTime). Optional- only
    * available in batch/harness runs, not in streaming mode. When provided,
    * the initial timestep uses `MIN(tStop / 100, outputStep) / 10` matching
    * ngspice dctran.c:118. When absent, falls back to `maxTimeStep / 10`.
@@ -105,7 +105,7 @@ export interface SimulationParams {
   pivotRelTol?: number;
   /** Requested output timestep for initial delta formula (ngspice CKTstep). */
   outputStep?: number;
-  /** Start time for data output — skip initial transient (ngspice CKTinitTime). Default: 0 */
+  /** Start time for data output- skip initial transient (ngspice CKTinitTime). Default: 0 */
   initTime?: number;
   /** Maximum integration order (ngspice CKTmaxOrder). Default: 2 */
   maxOrder?: number;
@@ -117,7 +117,7 @@ export interface SimulationParams {
   gminFactor?: number;
   /**
    * Current source scale factor for source stepping (ngspice srcFact).
-   * Runtime state that changes during source stepping — not a user-settable constant.
+   * Runtime state that changes during source stepping- not a user-settable constant.
    * Default: 1 (full scale).
    */
   srcFact?: number;
@@ -201,7 +201,7 @@ export function computeFirstStep(tStop: number, tStep: number): number {
 export function resolveSimulationParams(params: SimulationParams): ResolvedSimulationParams {
   // ngspice traninit.c:23-32. CKTmaxStep is auto-derived only when the user
   // omits it (TRANmaxStep defaults to 0 in trandefs.h, and the ngspice gate
-  // is `if (CKTmaxStep == 0)` — negatives/NaN pass through unchanged).
+  // is `if (CKTmaxStep == 0)`- negatives/NaN pass through unchanged).
   let maxTimeStep: number;
   const userMax = params.maxTimeStep;
   if (userMax != null && userMax !== 0) {
@@ -212,7 +212,7 @@ export function resolveSimulationParams(params: SimulationParams): ResolvedSimul
     const span = (params.tStop - tStart) / 50;
     maxTimeStep = params.outputStep < span ? params.outputStep : span;
   } else {
-    // Streaming mode (no tStop) — ngspice cannot run .tran without a
+    // Streaming mode (no tStop)- ngspice cannot run .tran without a
     // finalTime; the static default is the closest analogue.
     maxTimeStep = DEFAULT_SIMULATION_PARAMS.maxTimeStep;
   }
@@ -239,7 +239,7 @@ export function resolveSimulationParams(params: SimulationParams): ResolvedSimul
 }
 
 // ---------------------------------------------------------------------------
-// DcOpResult — result of a DC operating-point analysis
+// DcOpResult- result of a DC operating-point analysis
 // ---------------------------------------------------------------------------
 
 /**
@@ -259,7 +259,7 @@ export interface DcOpResult {
 }
 
 // ---------------------------------------------------------------------------
-// CompiledAnalogCircuit — executable analog circuit representation
+// CompiledAnalogCircuit- executable analog circuit representation
 // ---------------------------------------------------------------------------
 
 /**
@@ -295,7 +295,7 @@ export interface CompiledAnalogCircuit extends CompiledCircuit {
 }
 
 // ---------------------------------------------------------------------------
-// AnalogEngine — MNA simulation interface
+// AnalogEngine- MNA simulation interface
 // ---------------------------------------------------------------------------
 
 /**
@@ -412,7 +412,7 @@ export interface AnalogEngine extends Engine {
   readonly convergenceLog: ConvergenceLog;
 
   // -------------------------------------------------------------------------
-  // Breakpoints — timestep landing targets
+  // Breakpoints- timestep landing targets
   // -------------------------------------------------------------------------
 
   /**
@@ -453,7 +453,7 @@ export interface AnalogEngine extends Engine {
 // --- Compile-time guard: public SimulationParams.integrationMethod must
 // equal the internal IntegrationMethod type exactly (no drift between the
 // UI / MCP / postMessage public surface and the solver-facing type).
-// If this line fails to compile, the two types have diverged — realign
+// If this line fails to compile, the two types have diverged- realign
 // before shipping. See spec/phase-3-f2-nr-reorder-xfact.md Wave 3.3.
 type _AssertPublicInternalEq =
   SimulationParams["integrationMethod"] extends IntegrationMethod

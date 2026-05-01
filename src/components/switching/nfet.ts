@@ -1,5 +1,5 @@
 /**
- * NFET — N-channel MOSFET voltage-controlled switch.
+ * NFET- N-channel MOSFET voltage-controlled switch.
  *
  * Gate input G controls source-drain connection:
  *   G=1 → conducting (closed): D and S connected
@@ -82,7 +82,7 @@ const NFET_PIN_DECLARATIONS: PinDeclaration[] = [
 ];
 
 // ---------------------------------------------------------------------------
-// NFETElement — CircuitElement implementation
+// NFETElement- CircuitElement implementation
 // ---------------------------------------------------------------------------
 
 export class NFETElement extends AbstractCircuitElement {
@@ -128,7 +128,7 @@ export class NFETElement extends AbstractCircuitElement {
     // Gate oxide bar: vertical line at x=0.05 from y=0 to y=2
     ctx.drawLine(0.05, 0, 0.05, 2);
 
-    // Gate lead (THIN): (0.75,1) to (1,1) — connects channel to G pin at (1,1)
+    // Gate lead (THIN): (0.75,1) to (1,1)- connects channel to G pin at (1,1)
     ctx.drawLine(0.75, 1, 1, 1);
 
     // N-channel arrow (filled triangle): (0.6,1) → (0.85,0.9) → (0.85,1.1)
@@ -150,7 +150,7 @@ export class NFETElement extends AbstractCircuitElement {
 }
 
 // ---------------------------------------------------------------------------
-// executeNFET — flat simulation function
+// executeNFET- flat simulation function
 //
 // Input layout: [G=0]
 // State layout: [closedFlag=0]
@@ -181,7 +181,7 @@ export function executeNFET(index: number, state: Uint32Array, highZs: Uint32Arr
 }
 
 // ---------------------------------------------------------------------------
-// NFETSWSubElement — SW sub-element used by NFET and PFET composites.
+// NFETSWSubElement- SW sub-element used by NFET and PFET composites.
 //
 // Implements the single SW sub-element decomposition per PB-NFET / PB-PFET.
 // Pin keys: "D" → SWposNode (drain), "S" → SWnegNode (source).
@@ -213,10 +213,10 @@ export class NFETSWSubElement implements AnalogElement {
     const drainNode = this._pinNodes.get("D")!;
     const sourceNode = this._pinNodes.get("S")!;
 
-    // Port of swsetup.c:47-48 — state slot allocation (SW_NUM_STATES = 2)
+    // Port of swsetup.c:47-48- state slot allocation (SW_NUM_STATES = 2)
     this._stateBase = ctx.allocStates(2);
 
-    // Port of swsetup.c:59-62 — TSTALLOC sequence (line-for-line)
+    // Port of swsetup.c:59-62- TSTALLOC sequence (line-for-line)
     this._hPP = ctx.solver.allocElement(drainNode, drainNode);
     this._hPN = ctx.solver.allocElement(drainNode, sourceNode);
     this._hNP = ctx.solver.allocElement(sourceNode, drainNode);
@@ -229,7 +229,7 @@ export class NFETSWSubElement implements AnalogElement {
     const gOff = 1 / this._roff;
     const g_now = this._pendingCtrlVoltage > this._vth ? gOn : gOff;
 
-    // swload.c:149-152 — stamp conductance through cached handles
+    // swload.c:149-152- stamp conductance through cached handles
     ctx.solver.stampElement(this._hPP, +g_now);
     ctx.solver.stampElement(this._hPN, -g_now);
     ctx.solver.stampElement(this._hNP, -g_now);
@@ -248,7 +248,7 @@ export class NFETSWSubElement implements AnalogElement {
 }
 
 // ---------------------------------------------------------------------------
-// NFETAnalogElement — AnalogElement implementation (composite, delegates to SW)
+// NFETAnalogElement- AnalogElement implementation (composite, delegates to SW)
 // ---------------------------------------------------------------------------
 
 export class NFETAnalogElement implements AnalogElement {
@@ -371,7 +371,7 @@ export const NFETDefinition: ComponentDefinition = {
   propertyDefs: NFET_PROPERTY_DEFS,
   attributeMap: NFET_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.SWITCHING,
-  helpText: "NFET — N-channel MOSFET. G=1 → conducting.",
+  helpText: "NFET- N-channel MOSFET. G=1 → conducting.",
   models: {
     digital: {
       executeFn: executeNFET,

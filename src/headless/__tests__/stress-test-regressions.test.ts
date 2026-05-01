@@ -1,5 +1,5 @@
 /**
- * Regression suite — component execution and registry validation tests
+ * Regression suite- component execution and registry validation tests
  * found via MCP circuit stress testing.
  */
 

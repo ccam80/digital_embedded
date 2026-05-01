@@ -1,5 +1,5 @@
 /**
- * WireDragMode — handles dragging one or more wire segments while maintaining
+ * WireDragMode- handles dragging one or more wire segments while maintaining
  * endpoint connections, matching Java Digital's behavior.
  *
  * Single wire: constrained to perpendicular movement. Pin-connected endpoints

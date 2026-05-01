@@ -12,7 +12,7 @@ import type { StepRecord } from '../solver/analog/convergence-log.js';
 import type { SimulationCoordinator } from '../solver/coordinator-types.js';
 
 // ---------------------------------------------------------------------------
-// Module-level logging state — persists across recompiles
+// Module-level logging state- persists across recompiles
 // ---------------------------------------------------------------------------
 
 let _loggingDesired = false;

@@ -64,7 +64,7 @@ server.registerTool(
     title: "Reset Server State",
     description:
       "Clear all circuit handles, compiled engines, and harness sessions. " +
-      "The server process stays alive — use this to flush stale state without " +
+      "The server process stays alive- use this to flush stale state without " +
       "picking up code changes. All existing handles become invalid.",
     inputSchema: {},
   },
@@ -78,7 +78,7 @@ server.registerTool(
           type: "text" as const,
           text:
             `Reset complete. Disposed ${engines} engine(s) and ${harnesses} harness session(s). ` +
-            `All handles invalidated — use circuit_load / harness_start to begin fresh.`,
+            `All handles invalidated- use circuit_load / harness_start to begin fresh.`,
         },
       ],
     };
@@ -105,7 +105,7 @@ server.registerTool(
       content: [
         {
           type: "text" as const,
-          text: "Server restarting — all handles invalidated. Wait a moment, then continue.",
+          text: "Server restarting- all handles invalidated. Wait a moment, then continue.",
         },
       ],
     };
@@ -119,7 +119,7 @@ server.registerTool(
 async function main(): Promise<void> {
   const transport = new StdioServerTransport();
   await server.connect(transport);
-  // Server is running — it reads from stdin and writes to stdout
+  // Server is running- it reads from stdin and writes to stdout
   // Process will stay alive until the transport closes
 }
 

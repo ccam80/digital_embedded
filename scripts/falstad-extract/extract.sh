@@ -84,7 +84,7 @@ echo "Compiling..."
 
 compile_attempt() {
     local attempt="$1"
-    # Use @file to avoid "argument list too long" — with paths relative to BUILD_DIR
+    # Use @file to avoid "argument list too long"- with paths relative to BUILD_DIR
     (cd "$BUILD_DIR" && find src -name "*.java" > sources.txt)
     (cd "$BUILD_DIR" && javac -d classes -sourcepath src @sources.txt 2>errors_${attempt}.txt)
 }

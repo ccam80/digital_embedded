@@ -1,10 +1,10 @@
 # Task PB-BEHAV-FF-RS
 
 **digiTS files:**
-- `src/solver/analog/behavioral-flipflop/rs.ts` (`BehavioralRSFlipflopElement` — clocked RS flip-flop)
-- `src/solver/analog/behavioral-flipflop/rs-async.ts` (`BehavioralRSAsyncLatchElement` — **level-sensitive RS latch, no clock**)
+- `src/solver/analog/behavioral-flipflop/rs.ts` (`BehavioralRSFlipflopElement`- clocked RS flip-flop)
+- `src/solver/analog/behavioral-flipflop/rs-async.ts` (`BehavioralRSAsyncLatchElement`- **level-sensitive RS latch, no clock**)
 
-**ngspice anchor:** NONE — behavioral elements. setup() body matches the
+**ngspice anchor:** NONE- behavioral elements. setup() body matches the
 existing per-pin-model alloc pattern from `02-behavioral.md` Shape rules
 1, 2, 3. NOT bound by ngspice line-for-line equivalence.
 
@@ -13,9 +13,9 @@ existing per-pin-model alloc pattern from `02-behavioral.md` Shape rules
 Unlike the D and JK pairs (where the "async" variant is the sync class
 plus async-Set/Clear pins), the RS pair is structurally different:
 
-- **`BehavioralRSFlipflopElement`** — clocked, edge-triggered, S/R inputs
+- **`BehavioralRSFlipflopElement`**- clocked, edge-triggered, S/R inputs
   sampled on the rising clock edge.
-- **`BehavioralRSAsyncLatchElement`** — **level-sensitive latch**, no clock
+- **`BehavioralRSAsyncLatchElement`**- **level-sensitive latch**, no clock
   pin. Responds to S/R levels every accepted timestep. Pin layout has no
   `C` pin.
 
@@ -86,7 +86,7 @@ setup(ctx: SetupContext): void {
 
 ```ts
 setup(ctx: SetupContext): void {
-  // Forward to every input pin model (level-sensitive — no clock pin)
+  // Forward to every input pin model (level-sensitive- no clock pin)
   this._sPin.setup(ctx);
   this._rPin.setup(ctx);
 
@@ -101,7 +101,7 @@ setup(ctx: SetupContext): void {
 
 Forward order: inputs → outputs → children (per Shape rule 3).
 
-## load() body — value writes only
+## load() body- value writes only
 
 The existing `load()` bodies on both classes stamp through pin models.
 No `solver.allocElement` calls remain after pin-model migration.
@@ -135,7 +135,7 @@ For each variant's analog factory (`makeRSFlipflopAnalogFactory`,
 
 ## State pool
 
-Identical to PB-BEHAV-FF-D — composite schema is empty
+Identical to PB-BEHAV-FF-D- composite schema is empty
 (`FLIPFLOP_COMPOSITE_SCHEMA`); children own slots; `initChildState` helper
 distributes offsets unchanged.
 
@@ -149,7 +149,7 @@ spec compliance only. DO NOT run tests; DO NOT use test results.
 2. `setup()` body in `behavioral-flipflop/rs-async.ts` matches the
    level-sensitive latch block line-for-line.
 3. The level-sensitive latch's setup() body has NO `_clockPin.setup(ctx)`
-   call — there is no clock pin model on this class.
+   call- there is no clock pin model on this class.
 4. Forward order is inputs → outputs → children for both.
 5. Factory cleanup applied per the "Factory cleanup" section.
 6. No `solver.allocElement(...)` calls inside `load()`, `accept()`, or any

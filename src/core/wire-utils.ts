@@ -1,5 +1,5 @@
 /**
- * Wire merging — collinear adjacent wire segment fusion.
+ * Wire merging- collinear adjacent wire segment fusion.
  *
  * After wire drawing, adjacent wires on the same horizontal or vertical line
  * are merged into a single wire spanning both. This reduces redundant segments
@@ -86,12 +86,12 @@ function tryMerge(a: Wire, b: Wire): Wire | undefined {
   const bV = b.start.x === b.end.x;
 
   if (aH && bH && a.start.y === b.start.y) {
-    // Both horizontal, same y — check for adjacency
+    // Both horizontal, same y- check for adjacency
     return mergeOnAxis("x", a, b);
   }
 
   if (aV && bV && a.start.x === b.start.x) {
-    // Both vertical, same x — check for adjacency
+    // Both vertical, same x- check for adjacency
     return mergeOnAxis("y", a, b);
   }
 
@@ -113,7 +113,7 @@ function mergeOnAxis(axis: "x" | "y", a: Wire, b: Wire): Wire | undefined {
 
   // They are adjacent or overlapping if their ranges touch or overlap
   if (aMax < bMin || bMax < aMin) {
-    // Gap between them — not adjacent
+    // Gap between them- not adjacent
     return undefined;
   }
 

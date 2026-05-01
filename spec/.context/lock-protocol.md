@@ -67,7 +67,7 @@ rm -rf "spec/.locks/files/${LOCK_NAME}"
 
 ## Stale Lock Policy
 
-The orchestrator cleans locks after implementer Tasks return. No timeout-based expiry — this avoids race conditions. If an implementer Task returns but its locks remain in `.locks/`, the orchestrator releases them (the agent crashed or forgot).
+The orchestrator cleans locks after implementer Tasks return. No timeout-based expiry- this avoids race conditions. If an implementer Task returns but its locks remain in `.locks/`, the orchestrator releases them (the agent crashed or forgot).
 
 ## Conflict Handling
 

@@ -6,7 +6,7 @@
  */
 
 // ---------------------------------------------------------------------------
-// CircuitBuildOptions — options for createCircuit()
+// CircuitBuildOptions- options for createCircuit()
 // ---------------------------------------------------------------------------
 
 /**
@@ -20,7 +20,7 @@ export interface CircuitBuildOptions {
 }
 
 // ---------------------------------------------------------------------------
-// TestVector — result of a single test vector row
+// TestVector- result of a single test vector row
 // ---------------------------------------------------------------------------
 
 /**
@@ -40,7 +40,7 @@ export interface TestVector {
 }
 
 // ---------------------------------------------------------------------------
-// TestResults — aggregate results from runTests()
+// TestResults- aggregate results from runTests()
 // ---------------------------------------------------------------------------
 
 /**
@@ -58,13 +58,13 @@ export interface TestResults {
 }
 
 // ---------------------------------------------------------------------------
-// FacadeError — structured error for all facade-level failures
+// FacadeError- structured error for all facade-level failures
 // ---------------------------------------------------------------------------
 
 /**
  * Error class for all facade-level failures.
  *
- * Messages are plain English — not raw stack traces. Context fields carry
+ * Messages are plain English- not raw stack traces. Context fields carry
  * structured information for programmatic inspection. LLM clients should read
  * .message for a human-readable description and the context fields for
  * structured data.

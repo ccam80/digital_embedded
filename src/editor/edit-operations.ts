@@ -1,5 +1,5 @@
 /**
- * Edit operations — all mutations to the circuit model.
+ * Edit operations- all mutations to the circuit model.
  *
  * Each function returns an EditCommand: an object with execute() and undo()
  * that the UndoRedoStack can push, undo, and redo.
@@ -21,7 +21,7 @@ import type { EditCommand } from "@/editor/undo-redo";
 export type { EditCommand };
 
 // ---------------------------------------------------------------------------
-// ClipboardData — internal clipboard for cut/copy/paste
+// ClipboardData- internal clipboard for cut/copy/paste
 // ---------------------------------------------------------------------------
 
 /**
@@ -45,7 +45,7 @@ export interface ClipboardEntry {
 
 /**
  * A clipboard snapshot holding a group of elements and wires.
- * Not the system clipboard — purely in-memory.
+ * Not the system clipboard- purely in-memory.
  */
 export interface ClipboardData {
   readonly entries: ClipboardEntry[];
@@ -159,7 +159,7 @@ export function mirrorSelection(elements: CircuitElement[]): EditCommand {
 
 /**
  * Remove selected elements and wires from the circuit.
- * Only removes explicitly selected items — does not cascade to connected wires.
+ * Only removes explicitly selected items- does not cascade to connected wires.
  * Returns a reversible EditCommand.
  */
 export function deleteSelection(
@@ -167,7 +167,7 @@ export function deleteSelection(
   elements: CircuitElement[],
   wires: Wire[],
 ): EditCommand {
-  // Only delete explicitly selected wires — do NOT cascade to wires
+  // Only delete explicitly selected wires- do NOT cascade to wires
   // connected to deleted elements. The user's selection is authoritative.
   const allWiresToDelete = [...wires];
 
@@ -336,7 +336,7 @@ export function pasteFromClipboard(
 }
 
 // ---------------------------------------------------------------------------
-// Wire punch-out — remove wire segments that pass under a placed component
+// Wire punch-out- remove wire segments that pass under a placed component
 // ---------------------------------------------------------------------------
 
 /**
@@ -391,14 +391,14 @@ function computeWirePunchOuts(
     // outermost pins passes through the INTERIOR of the component body.
     // A wire running along an edge (ground/VDD rail) is not punched out.
     if (isH) {
-      // Horizontal wire at y=sy — must be strictly inside bbox vertically
+      // Horizontal wire at y=sy- must be strictly inside bbox vertically
       if (sy <= bbox.y || sy >= bbox.y + bbox.height) continue;
     } else {
-      // Vertical wire at x=sx — must be strictly inside bbox horizontally
+      // Vertical wire at x=sx- must be strictly inside bbox horizontally
       if (sx <= bbox.x || sx >= bbox.x + bbox.width) continue;
     }
 
-    // Wire passes through the body — punch out between outermost pins.
+    // Wire passes through the body- punch out between outermost pins.
     removed.push(wire);
 
     if (isH) {

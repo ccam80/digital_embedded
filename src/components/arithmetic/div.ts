@@ -1,5 +1,5 @@
 /**
- * Div component — N-bit divider with quotient and remainder.
+ * Div component- N-bit divider with quotient and remainder.
  *
  * Ports from Digital's Div.java:
  *   Inputs: a (bitWidth), b (bitWidth)
@@ -121,7 +121,7 @@ export class DivElement extends AbstractCircuitElement {
 }
 
 // ---------------------------------------------------------------------------
-// makeExecuteDiv — parameterised flat simulation function
+// makeExecuteDiv- parameterised flat simulation function
 //
 // Inputs: [a, b]    Outputs: [q, r]
 //
@@ -268,7 +268,7 @@ export const DivDefinition: ComponentDefinition = {
   attributeMap: DIV_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.ARITHMETIC,
   helpText:
-    "Div — N-bit divider with quotient and remainder.\n" +
+    "Div- N-bit divider with quotient and remainder.\n" +
     "Inputs: a, b (bitWidth bits each).\n" +
     "Outputs: q (quotient), r (remainder).\n" +
     "Division by zero is treated as division by 1.\n" +

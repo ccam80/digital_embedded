@@ -1,5 +1,5 @@
 ﻿/**
- * Tests for executeTests() — task 6.3.2.
+ * Tests for executeTests()- task 6.3.2.
  *
  * Uses a mock SimulatorFacade and SimulationEngine to test the executor
  * logic in isolation. The mock facade records calls to setInput/readOutput/
@@ -49,7 +49,7 @@ function makeMockFacade(outputValues: Record<string, number> = {}): {
     step: vi.fn((_coordinator: SimulationCoordinator) => {
       calls.step++;
     }),
-    // Unused facade methods — present to satisfy the interface
+    // Unused facade methods- present to satisfy the interface
     createCircuit: vi.fn(),
     addComponent: vi.fn(),
     connect: vi.fn(),
@@ -65,10 +65,10 @@ function makeMockFacade(outputValues: Record<string, number> = {}): {
   return { facade, calls };
 }
 
-/** A stub coordinator — the executor only passes it through to the facade. */
+/** A stub coordinator- the executor only passes it through to the facade. */
 const stubEngine = {} as SimulationCoordinator;
 
-/** A stub circuit — unused by the executor logic. */
+/** A stub circuit- unused by the executor logic. */
 const stubCircuit = {} as Circuit;
 
 /** Helper to build a TestValue with kind='value'. */
@@ -117,7 +117,7 @@ describe("executeTests", () => {
   // allPass
   // -------------------------------------------------------------------------
 
-  it("allPass — AND gate truth table with all correct expected outputs → all vectors pass", async () => {
+  it("allPass- AND gate truth table with all correct expected outputs → all vectors pass", async () => {
     // AND gate: Y = A AND B
     // Output map: exact match for each input combo
     const { facade } = makeMockFacade({});
@@ -157,7 +157,7 @@ describe("executeTests", () => {
   // someFail
   // -------------------------------------------------------------------------
 
-  it("someFail — deliberate wrong expected value on row 2 → that vector fails, others pass", async () => {
+  it("someFail- deliberate wrong expected value on row 2 → that vector fails, others pass", async () => {
     // readOutput always returns 0
     const { facade } = makeMockFacade({ Y: 0 });
 
@@ -181,7 +181,7 @@ describe("executeTests", () => {
   // dontCareAlwaysPasses
   // -------------------------------------------------------------------------
 
-  it("dontCareAlwaysPasses — output expectation is X → passes regardless of actual value", async () => {
+  it("dontCareAlwaysPasses- output expectation is X → passes regardless of actual value", async () => {
     // readOutput returns arbitrary values
     const { facade } = makeMockFacade({ Y: 42 });
 
@@ -212,7 +212,7 @@ describe("executeTests", () => {
   // clockToggle
   // -------------------------------------------------------------------------
 
-  it("clockToggle — clock input in vector → setSignal called with 1 then 0, settle called three times", async () => {
+  it("clockToggle- clock input in vector → setSignal called with 1 then 0, settle called three times", async () => {
     const { facade, calls } = makeMockFacade({ Q: 0 });
 
     const testData: ParsedTestData = {
@@ -243,7 +243,7 @@ describe("executeTests", () => {
   // resultsStructure
   // -------------------------------------------------------------------------
 
-  it("resultsStructure — TestResults has correct passed, failed, total counts and vectors array length", async () => {
+  it("resultsStructure- TestResults has correct passed, failed, total counts and vectors array length", async () => {
     // 5 vectors, readOutput always returns 1, expected values mix of 0 and 1
     const { facade } = makeMockFacade({ Y: 1 });
 
@@ -314,7 +314,7 @@ describe("withinTolerance", () => {
 
   it("passes when either absolute or relative is satisfied (both specified)", () => {
     const tol: Tolerance = { absolute: 0.5, relative: 0.01 }; // 1% relative, 0.5 absolute
-    // 2.8 vs 3.3: delta=0.5 — passes absolute even though relative fails
+    // 2.8 vs 3.3: delta=0.5- passes absolute even though relative fails
     expect(withinTolerance(2.8, 3.3, tol)).toBe(true);
   });
 
@@ -328,7 +328,7 @@ describe("withinTolerance", () => {
 // Analog vector execution tests
 // ---------------------------------------------------------------------------
 
-describe("executeTests — analog", () => {
+describe("executeTests- analog", () => {
   it("passes analog output within tolerance", async () => {
     const { facade } = makeMockFacade({ Vout: 3.28 });
 

@@ -1,5 +1,5 @@
 /**
- * TestResultsPanel — browser UI for displaying test execution results.
+ * TestResultsPanel- browser UI for displaying test execution results.
  *
  * Renders test vectors as a table with pass/fail coloring.
  * Summary bar shows pass/fail counts.

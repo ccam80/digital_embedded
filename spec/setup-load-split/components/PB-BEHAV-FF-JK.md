@@ -1,10 +1,10 @@
 # Task PB-BEHAV-FF-JK
 
 **digiTS files:**
-- `src/solver/analog/behavioral-flipflop/jk.ts` (`BehavioralJKFlipflopElement` — sync JK flip-flop)
-- `src/solver/analog/behavioral-flipflop/jk-async.ts` (`BehavioralJKAsyncFlipflopElement` — JK flip-flop with async Set/Clear)
+- `src/solver/analog/behavioral-flipflop/jk.ts` (`BehavioralJKFlipflopElement`- sync JK flip-flop)
+- `src/solver/analog/behavioral-flipflop/jk-async.ts` (`BehavioralJKAsyncFlipflopElement`- JK flip-flop with async Set/Clear)
 
-**ngspice anchor:** NONE — behavioral elements. setup() body matches the
+**ngspice anchor:** NONE- behavioral elements. setup() body matches the
 existing per-pin-model alloc pattern from `02-behavioral.md` Shape rules
 1, 2, 3. NOT bound by ngspice line-for-line equivalence.
 
@@ -88,7 +88,7 @@ setup(ctx: SetupContext): void {
 
 Forward order: inputs → outputs → children (per Shape rule 3).
 
-## load() body — value writes only
+## load() body- value writes only
 
 The existing `load()` bodies on both classes stamp through pin models
 (which cache handles via `setup()` per Shape rules 1/2). No `solver.allocElement`
@@ -122,7 +122,7 @@ For each variant's analog factory (`makeJKFlipflopAnalogFactory`,
 
 ## State pool
 
-Identical to PB-BEHAV-FF-D — composite schema is empty
+Identical to PB-BEHAV-FF-D- composite schema is empty
 (`FLIPFLOP_COMPOSITE_SCHEMA`); children own slots; `initChildState` helper
 distributes offsets unchanged.
 

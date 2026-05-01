@@ -1,7 +1,7 @@
 # Task PB-BEHAV-DRIVER
 
 **digiTS file:** `src/solver/analog/behavioral-remaining.ts` (factory: `createDriverAnalogElement`)
-**ngspice anchor:** NONE — behavioral. setup() body replicates the existing `allocElement` calls embedded in `stampG()` within the current load() body (per 02-behavioral.md Shape rule 5).
+**ngspice anchor:** NONE- behavioral. setup() body replicates the existing `allocElement` calls embedded in `stampG()` within the current load() body (per 02-behavioral.md Shape rule 5).
 
 ## Composition (per 02-behavioral.md Shape rule 5)
 
@@ -16,13 +16,13 @@
 
 | Position | Label | Role |
 |---|---|---|
-| 0 | `in` | data input — `DigitalInputPinModel` |
-| 1 | `sel` | enable input — `DigitalInputPinModel` |
-| 2 | `out` | tri-state output — `DigitalOutputPinModel` (role="direct") |
+| 0 | `in` | data input- `DigitalInputPinModel` |
+| 1 | `sel` | enable input- `DigitalInputPinModel` |
+| 2 | `out` | tri-state output- `DigitalOutputPinModel` (role="direct") |
 
 ## setup() body
 
-The current factory returns an object literal. Per the task instructions, add a `setup(ctx)` property to the existing returned object literal — no class refactor required.
+The current factory returns an object literal. Per the task instructions, add a `setup(ctx)` property to the existing returned object literal- no class refactor required.
 
 ```ts
 // inside the existing return { ... } block in createDriverAnalogElement:
@@ -40,7 +40,7 @@ Forward order: **inputs (data, enable) → output → children** (inputs first, 
 `DigitalOutputPinModel.setup(ctx)` allocates `(nodeId, nodeId)` for role="direct" per Shape rule 2.
 Each `AnalogCapacitorElement.setup(ctx)` allocates 4 entries per PB-CAP.md.
 
-## load() body — value writes only
+## load() body- value writes only
 
 Existing load() body kept verbatim minus any `solver.allocElement` calls. The `stampG()` helper currently calls `solver.allocElement` internally; after migration, `stampG` must be replaced by direct `solver.stampElement(handle, value)` calls using the handles allocated in setup(). The per-pin-model load() calls stamp through their own cached handles. No `allocElement` calls remain in load() after migration.
 
@@ -70,7 +70,7 @@ load(ctx: LoadContext): void {
 
 ## Pin model TSTALLOCs
 
-Allocated by sub-element setup() calls — not by the composite directly:
+Allocated by sub-element setup() calls- not by the composite directly:
 
 | Sub-element | allocElement calls | Condition |
 |---|---|---|
@@ -82,23 +82,23 @@ Allocated by sub-element setup() calls — not by the composite directly:
 ## Factory cleanup
 
 - Drop `internalNodeIds`, `branchIdx` parameters from factory signature (new 3-param form per A6.3).
-- `ngspiceNodeMap` left undefined (behavioral — no ngspice pin map per 02-behavioral.md §Pin-map field).
+- `ngspiceNodeMap` left undefined (behavioral- no ngspice pin map per 02-behavioral.md ssPin-map field).
 - `mayCreateInternalNodes: false`.
 - No `findBranchFor` callback.
 
 ## State pool
 
-`stateSize = childElements.reduce((s, c) => s + c.stateSize, 0)` — unchanged; driven entirely by capacitor children. Zero if no capacitor children are present.
+`stateSize = childElements.reduce((s, c) => s + c.stateSize, 0)`- unchanged; driven entirely by capacitor children. Zero if no capacitor children are present.
 
 ## Verification gate
 
 Per CLAUDE.md "Test Policy During W3 Setup-Load-Split", verification is spec compliance only. DO NOT run tests; DO NOT use test results.
 
-1. `setup()` body in the implementation file matches the "setup() body — alloc only" listing in this PB line-for-line.
+1. `setup()` body in the implementation file matches the "setup() body- alloc only" listing in this PB line-for-line.
 2. TSTALLOC sequence in `setup()` matches the order in the cited ngspice anchor file (see top of this PB, e.g. `ressetup.c:46-49`).
 3. Factory cleanup applied per the "Factory cleanup" section above.
 4. `ngspiceNodeMap` registered per the "Pin mapping" section above (or omitted for composites where the spec says so).
-5. `load()` writes through cached handles only — zero `solver.allocElement(...)` calls inside `load()`, `accept()`, or any non-`setup()` method.
+5. `load()` writes through cached handles only- zero `solver.allocElement(...)` calls inside `load()`, `accept()`, or any non-`setup()` method.
 6. `mayCreateInternalNodes` flag set per spec.
 7. `findBranchFor` callback present where spec says (V-output sources, IND, etc.).
 8. No banned closing verdicts (mapping/tolerance/equivalent-to/pre-existing/intentional-divergence/citation-divergence/partial) used in any commit message or report.

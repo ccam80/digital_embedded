@@ -1,5 +1,5 @@
 /**
- * Stop component — like Break but terminates simulation entirely.
+ * Stop component- like Break but terminates simulation entirely.
  * When input goes high, the engine closes (terminates) the simulation model.
  *
  * Properties:
@@ -37,7 +37,7 @@ import {
 const COMP_WIDTH = 3;
 
 // ---------------------------------------------------------------------------
-// Pin layout — Java GenericShape(1 input, 0 outputs, width=3):
+// Pin layout- Java GenericShape(1 input, 0 outputs, width=3):
 //   stop at (0, 0)
 // ---------------------------------------------------------------------------
 
@@ -56,7 +56,7 @@ export function buildStopPinDeclarations(): PinDeclaration[] {
 }
 
 // ---------------------------------------------------------------------------
-// StopElement — CircuitElement implementation
+// StopElement- CircuitElement implementation
 // ---------------------------------------------------------------------------
 
 export class StopElement extends AbstractCircuitElement {
@@ -94,7 +94,7 @@ export class StopElement extends AbstractCircuitElement {
 }
 
 // ---------------------------------------------------------------------------
-// executeStop — flat simulation function
+// executeStop- flat simulation function
 //
 // Writes 1 to output slot when input is high. Engine polls this and
 // terminates the simulation model when non-zero.
@@ -161,7 +161,7 @@ export const StopDefinition: ComponentDefinition = {
   attributeMap: STOP_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.WIRING,
   helpText:
-    "Stop — terminates simulation entirely when input goes high.\n" +
+    "Stop- terminates simulation entirely when input goes high.\n" +
     "Unlike Break, Stop closes the model rather than pausing.",
   models: {
     digital: {

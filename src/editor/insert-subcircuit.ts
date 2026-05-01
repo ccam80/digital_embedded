@@ -22,16 +22,16 @@ import { PortElement } from "@/components/io/port.js";
 import { PropertyBag } from "@/core/properties.js";
 
 // ---------------------------------------------------------------------------
-// BoundaryPort — one wire crossing the selection boundary
+// BoundaryPort- one wire crossing the selection boundary
 // ---------------------------------------------------------------------------
 
 /**
  * Describes a single wire that crosses the boundary between the selected
  * elements and the rest of the circuit. Domain-agnostic: no direction field.
  *
- * label    — derived from pin label + element label, deduplicated across ports
- * bitWidth — from the pin declaration on the selected element
- * position — world coordinate of the selected-element-side wire endpoint
+ * label   - derived from pin label + element label, deduplicated across ports
+ * bitWidth- from the pin declaration on the selected element
+ * position- world coordinate of the selected-element-side wire endpoint
  */
 export interface BoundaryPort {
   wire: Wire;
@@ -166,7 +166,7 @@ export function analyzeBoundary(
       continue;
     }
 
-    // Exactly one endpoint touches a selected element — this is a boundary wire.
+    // Exactly one endpoint touches a selected element- this is a boundary wire.
     const selectedPin = startSelected ? startPin! : endPin!;
     const position = startSelected ? wire.start : wire.end;
 
@@ -219,7 +219,7 @@ export interface PortOverride {
  * position relative to the selection centroid, unless overridden by userPorts.
  *
  * The new circuit contains:
- *   - All selected elements (by reference — callers clone if needed).
+ *   - All selected elements (by reference- callers clone if needed).
  *   - All internal wires.
  *   - One Port element per boundary crossing.
  */

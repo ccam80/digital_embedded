@@ -277,7 +277,7 @@ describe("Wire punch-out on placeComponent", () => {
 
   it("pins at wire endpoints produce no stubs (full consumption)", () => {
     const circuit = new Circuit();
-    // Wire from (3,5) to (7,5) — exactly matching the pin positions
+    // Wire from (3,5) to (7,5)- exactly matching the pin positions
     circuit.addWire(new Wire({ x: 3, y: 5 }, { x: 7, y: 5 }));
 
     // Bbox encloses the wire strictly in y

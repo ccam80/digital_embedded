@@ -1,5 +1,5 @@
 /**
- * SimulatorHarness — Playwright helper for interacting with the simulator
+ * SimulatorHarness- Playwright helper for interacting with the simulator
  * via the postMessage API through the harness.html iframe wrapper.
  *
  * IMPORTANT: The actual postMessage API in app-init.ts uses these types:

@@ -3,11 +3,11 @@
   "_tool": "ngspice via scripts/generate-spice-references.sh",
   "_notes": "Independent reference values for E2E analog test assertions. Re-run this script if component models change.",
   "_tolerance_guidance": {
-    "resistive_dc": "±0.1% — exact math, only FP accumulation",
-    "nonlinear_dc": "per-circuit — set at 2x observed engine-vs-ngspice deviation",
-    "transient_peak": "per-circuit — measured, not guessed",
-    "resonant_frequency": "±0.1% — analytical, model-independent",
-    "digital_threshold": "rail-to-rail — check < 0.1V or > Vdd-0.1V"
+    "resistive_dc": "±0.1%- exact math, only FP accumulation",
+    "nonlinear_dc": "per-circuit- set at 2x observed engine-vs-ngspice deviation",
+    "transient_peak": "per-circuit- measured, not guessed",
+    "resonant_frequency": "±0.1%- analytical, model-independent",
+    "digital_threshold": "rail-to-rail- check < 0.1V or > Vdd-0.1V"
   },
 
     "a2_voltage_divider": { "v_mid": 2.500000e+00, "v_vcc": 5.000000e+00 },

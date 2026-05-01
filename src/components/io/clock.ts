@@ -295,7 +295,7 @@ export function makeAnalogClockElement(
       const solver = ctx.solver;
       const k = el.branchIndex;
 
-      // Branch incidence (B and C sub-matrices) — handles allocated in setup().
+      // Branch incidence (B and C sub-matrices)- handles allocated in setup().
       if (nodePos !== 0) solver.stampElement(_hPosBranch, 1);
       if (nodeNeg !== 0) solver.stampElement(_hNegBranch, -1);
       if (nodePos !== 0) solver.stampElement(_hBranchPos, 1);

@@ -76,7 +76,7 @@ function makeRelayDTLayout(inputCount: number, stateCount: number): {
 // ---------------------------------------------------------------------------
 
 describe("Relay", () => {
-  it("coilEnergised — in1=0 in2=1 → state=1 (closed)", () => {
+  it("coilEnergised- in1=0 in2=1 → state=1 (closed)", () => {
     // 2 coil inputs + 1 state slot
     const { layout, state } = makeRelayLayout(2, 1);
     const highZs = new Uint32Array(state.length);
@@ -86,7 +86,7 @@ describe("Relay", () => {
     expect(state[2]).toBe(1); // closed
   });
 
-  it("coilEnergised — in1=1 in2=0 → state=1 (closed)", () => {
+  it("coilEnergised- in1=1 in2=0 → state=1 (closed)", () => {
     const { layout, state } = makeRelayLayout(2, 1);
     const highZs = new Uint32Array(state.length);
     state[0] = 1; state[1] = 0;
@@ -94,7 +94,7 @@ describe("Relay", () => {
     expect(state[2]).toBe(1);
   });
 
-  it("coilDeenergised — in1=0 in2=0 → state=0 (open)", () => {
+  it("coilDeenergised- in1=0 in2=0 → state=0 (open)", () => {
     const { layout, state } = makeRelayLayout(2, 1);
     const highZs = new Uint32Array(state.length);
     state[0] = 0; state[1] = 0;
@@ -102,7 +102,7 @@ describe("Relay", () => {
     expect(state[2]).toBe(0);
   });
 
-  it("coilDeenergised — in1=1 in2=1 → state=0 (open)", () => {
+  it("coilDeenergised- in1=1 in2=1 → state=0 (open)", () => {
     const { layout, state } = makeRelayLayout(2, 1);
     const highZs = new Uint32Array(state.length);
     state[0] = 1; state[1] = 1;
@@ -110,7 +110,7 @@ describe("Relay", () => {
     expect(state[2]).toBe(0);
   });
 
-  it("coilTransitions — energised then de-energised", () => {
+  it("coilTransitions- energised then de-energised", () => {
     const { layout, state } = makeRelayLayout(2, 1);
     const highZs = new Uint32Array(state.length);
 
@@ -123,20 +123,20 @@ describe("Relay", () => {
     expect(state[2]).toBe(0); // open
   });
 
-  it("normallyClosed — reported by element correctly", () => {
+  it("normallyClosed- reported by element correctly", () => {
     const props = new PropertyBag();
     props.set("normallyClosed", true);
     const el = new RelayElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
     expect(el.normallyClosed).toBe(true);
   });
 
-  it("normallyOpenDefault — defaults to false", () => {
+  it("normallyOpenDefault- defaults to false", () => {
     const props = new PropertyBag();
     const el = new RelayElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
     expect(el.normallyClosed).toBe(false);
   });
 
-  it("pinLayout — 2 coil inputs + 2 bidirectional contact pins per pole", () => {
+  it("pinLayout- 2 coil inputs + 2 bidirectional contact pins per pole", () => {
     const props = new PropertyBag();
     props.set("poles", 1);
     const el = new RelayElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
@@ -152,7 +152,7 @@ describe("Relay", () => {
     expect(labels).toContain("B1");
   });
 
-  it("pinLayout2Poles — 2 coil inputs + 4 bidirectional pins for 2 poles", () => {
+  it("pinLayout2Poles- 2 coil inputs + 4 bidirectional pins for 2 poles", () => {
     const props = new PropertyBag();
     props.set("poles", 2);
     const el = new RelayElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
@@ -161,7 +161,7 @@ describe("Relay", () => {
     expect(bidirectional.length).toBe(4); // A1, B1, A2, B2
   });
 
-  it("attributeMapping — Bits, Label, Poles, normallyClosed map correctly", () => {
+  it("attributeMapping- Bits, Label, Poles, normallyClosed map correctly", () => {
     const bitsMap = RELAY_ATTRIBUTE_MAPPINGS.find(m => m.xmlName === "Bits");
     const labelMap = RELAY_ATTRIBUTE_MAPPINGS.find(m => m.xmlName === "Label");
     const polesMap = RELAY_ATTRIBUTE_MAPPINGS.find(m => m.xmlName === "Poles");
@@ -174,7 +174,7 @@ describe("Relay", () => {
     expect(ncMap!.convert("false")).toBe(false);
   });
 
-  it("draw — renders coil rectangle and contact arm lines", () => {
+  it("draw- renders coil rectangle and contact arm lines", () => {
     const props = new PropertyBag();
     const el = new RelayElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
 
@@ -198,7 +198,7 @@ describe("Relay", () => {
     expect(calls.filter(c => c === "drawLine").length).toBeGreaterThan(0);
   });
 
-  it("drawNormallyClosed — extra straight line drawn for NC contacts", () => {
+  it("drawNormallyClosed- extra straight line drawn for NC contacts", () => {
     const props = new PropertyBag();
     props.set("normallyClosed", true);
     const el = new RelayElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
@@ -217,7 +217,7 @@ describe("Relay", () => {
     expect(callsNC.length).toBeGreaterThan(callsNO.length);
   });
 
-  it("definitionComplete — RelayDefinition has all required fields", () => {
+  it("definitionComplete- RelayDefinition has all required fields", () => {
     expect(RelayDefinition.name).toBe("Relay");
     expect(RelayDefinition.factory).toBeDefined();
     expect(RelayDefinition.models!.digital!.executeFn).toBeDefined();
@@ -229,12 +229,12 @@ describe("Relay", () => {
     expect(typeof RelayDefinition.models.digital!.defaultDelay).toBe("number");
   });
 
-  it("factoryCreatesInstance — factory returns RelayElement", () => {
+  it("factoryCreatesInstance- factory returns RelayElement", () => {
     const props = new PropertyBag();
     expect(RelayDefinition.factory(props)).toBeInstanceOf(RelayElement);
   });
 
-  it("boundingBox — returns non-zero dimensions", () => {
+  it("boundingBox- returns non-zero dimensions", () => {
     const props = new PropertyBag();
     const el = new RelayElement(crypto.randomUUID(), { x: 1, y: 2 }, 0, false, props);
     const bb = el.getBoundingBox();
@@ -251,7 +251,7 @@ describe("Relay", () => {
 // ---------------------------------------------------------------------------
 
 describe("RelayDT", () => {
-  it("coilEnergised — in1 XOR in2 → state=1 (C connects to T)", () => {
+  it("coilEnergised- in1 XOR in2 → state=1 (C connects to T)", () => {
     const { layout, state } = makeRelayDTLayout(2, 1);
     const highZs = new Uint32Array(state.length);
     state[0] = 1; state[1] = 0;
@@ -259,7 +259,7 @@ describe("RelayDT", () => {
     expect(state[2]).toBe(1); // energised → C-T
   });
 
-  it("coilEnergised — in1=0 in2=1 → state=1", () => {
+  it("coilEnergised- in1=0 in2=1 → state=1", () => {
     const { layout, state } = makeRelayDTLayout(2, 1);
     const highZs = new Uint32Array(state.length);
     state[0] = 0; state[1] = 1;
@@ -267,7 +267,7 @@ describe("RelayDT", () => {
     expect(state[2]).toBe(1);
   });
 
-  it("coilDeenergised — in1=in2=0 → state=0 (C connects to R)", () => {
+  it("coilDeenergised- in1=in2=0 → state=0 (C connects to R)", () => {
     const { layout, state } = makeRelayDTLayout(2, 1);
     const highZs = new Uint32Array(state.length);
     state[0] = 0; state[1] = 0;
@@ -275,7 +275,7 @@ describe("RelayDT", () => {
     expect(state[2]).toBe(0);
   });
 
-  it("coilDeenergised — in1=in2=1 → state=0", () => {
+  it("coilDeenergised- in1=in2=1 → state=0", () => {
     const { layout, state } = makeRelayDTLayout(2, 1);
     const highZs = new Uint32Array(state.length);
     state[0] = 1; state[1] = 1;
@@ -283,7 +283,7 @@ describe("RelayDT", () => {
     expect(state[2]).toBe(0);
   });
 
-  it("coilTransitions — energised then de-energised", () => {
+  it("coilTransitions- energised then de-energised", () => {
     const { layout, state } = makeRelayDTLayout(2, 1);
     const highZs = new Uint32Array(state.length);
 
@@ -296,7 +296,7 @@ describe("RelayDT", () => {
     expect(state[2]).toBe(0);
   });
 
-  it("pinLayout — 2 coil inputs + 3 bidirectional pins per pole (A, B, C)", () => {
+  it("pinLayout- 2 coil inputs + 3 bidirectional pins per pole (A, B, C)", () => {
     const props = new PropertyBag();
     props.set("poles", 1);
     const el = new RelayDTElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
@@ -313,7 +313,7 @@ describe("RelayDT", () => {
     expect(labels).toContain("C1");
   });
 
-  it("pinLayout2Poles — 2 coil inputs + 6 bidirectional pins for 2 poles", () => {
+  it("pinLayout2Poles- 2 coil inputs + 6 bidirectional pins for 2 poles", () => {
     const props = new PropertyBag();
     props.set("poles", 2);
     const el = new RelayDTElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
@@ -321,7 +321,7 @@ describe("RelayDT", () => {
     expect(bidirectional.length).toBe(6); // A1, B1, C1, A2, B2, C2
   });
 
-  it("attributeMapping — Bits, Label, Poles map correctly", () => {
+  it("attributeMapping- Bits, Label, Poles map correctly", () => {
     const bitsMap = RELAY_DT_ATTRIBUTE_MAPPINGS.find(m => m.xmlName === "Bits");
     const labelMap = RELAY_DT_ATTRIBUTE_MAPPINGS.find(m => m.xmlName === "Label");
     const polesMap = RELAY_DT_ATTRIBUTE_MAPPINGS.find(m => m.xmlName === "Poles");
@@ -331,7 +331,7 @@ describe("RelayDT", () => {
     expect(polesMap!.convert("2")).toBe(2);
   });
 
-  it("draw — renders coil polygon, contact arm and pole stub", () => {
+  it("draw- renders coil polygon, contact arm and pole stub", () => {
     const props = new PropertyBag();
     const el = new RelayDTElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
 
@@ -358,7 +358,7 @@ describe("RelayDT", () => {
     expect(calls.filter(c => c === "drawLine").length).toBeGreaterThan(0);
   });
 
-  it("definitionComplete — RelayDTDefinition has all required fields", () => {
+  it("definitionComplete- RelayDTDefinition has all required fields", () => {
     expect(RelayDTDefinition.name).toBe("RelayDT");
     expect(RelayDTDefinition.factory).toBeDefined();
     expect(RelayDTDefinition.models!.digital!.executeFn).toBeDefined();
@@ -370,7 +370,7 @@ describe("RelayDT", () => {
     expect(typeof RelayDTDefinition.models!.digital!.defaultDelay).toBe("number");
   });
 
-  it("factoryCreatesInstance — factory returns RelayDTElement", () => {
+  it("factoryCreatesInstance- factory returns RelayDTElement", () => {
     const props = new PropertyBag();
     expect(RelayDTDefinition.factory(props)).toBeInstanceOf(RelayDTElement);
   });

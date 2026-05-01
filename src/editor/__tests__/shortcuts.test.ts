@@ -1,7 +1,7 @@
 /**
  * Tests for ShortcutManager.
  *
- * No DOM required — keyboard events are plain objects matching the
+ * No DOM required- keyboard events are plain objects matching the
  * KeyboardEvent shape that handleKeyDown() reads.
  */
 
@@ -9,7 +9,7 @@ import { describe, it, expect, vi } from "vitest";
 import { ShortcutManager, createDefaultShortcuts } from "../shortcuts.js";
 
 // ---------------------------------------------------------------------------
-// Helper — build a minimal KeyboardEvent-shaped object
+// Helper- build a minimal KeyboardEvent-shaped object
 // ---------------------------------------------------------------------------
 
 function makeKeyEvent(
@@ -89,7 +89,7 @@ describe("Shortcuts", () => {
     const undo = vi.fn();
     const mgr = createDefaultShortcuts({ undo });
 
-    // Press Z without Ctrl — should NOT fire undo
+    // Press Z without Ctrl- should NOT fire undo
     const handled = mgr.handleKeyDown(makeKeyEvent("z"));
     expect(handled).toBe(false);
     expect(undo).not.toHaveBeenCalled();

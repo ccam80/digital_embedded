@@ -1,7 +1,7 @@
 /**
  * Tests for Text and Rectangle annotation components (task 5.2.24).
  *
- * Both components are non-functional visual elements — no simulation behavior.
+ * Both components are non-functional visual elements- no simulation behavior.
  * Tests cover:
  *   - Rendering: correct draw calls for text content / rectangle border
  *   - No simulation behavior: executeFn is a no-op, getPins returns empty
@@ -29,7 +29,7 @@ import type { RenderContext, Point, TextAnchor, FontSpec, PathData } from "../..
 import type { ThemeColor } from "../../../core/renderer-interface.js";
 
 // ---------------------------------------------------------------------------
-// Helpers — RenderContext mock
+// Helpers- RenderContext mock
 // ---------------------------------------------------------------------------
 
 interface DrawCall {
@@ -69,7 +69,7 @@ function makeStubCtx(): { ctx: RenderContext; calls: DrawCall[] } {
 }
 
 // ---------------------------------------------------------------------------
-// Helpers — ComponentLayout mock (no-op for annotation components)
+// Helpers- ComponentLayout mock (no-op for annotation components)
 // ---------------------------------------------------------------------------
 
 function makeNoOpLayout(): ComponentLayout {
@@ -85,7 +85,7 @@ function makeNoOpLayout(): ComponentLayout {
 }
 
 // ---------------------------------------------------------------------------
-// Helpers — element factories
+// Helpers- element factories
 // ---------------------------------------------------------------------------
 
 function makeText(overrides?: {
@@ -115,7 +115,7 @@ function makeRectangle(overrides?: {
 }
 
 // ---------------------------------------------------------------------------
-// Text — rendering
+// Text- rendering
 // ---------------------------------------------------------------------------
 
 describe("Text", () => {
@@ -179,7 +179,7 @@ describe("Text", () => {
   });
 
   // ---------------------------------------------------------------------------
-  // Text — no simulation behavior
+  // Text- no simulation behavior
   // ---------------------------------------------------------------------------
 
   describe("noSimulationBehavior", () => {
@@ -188,7 +188,7 @@ describe("Text", () => {
       expect(el.getPins()).toHaveLength(0);
     });
 
-    it("executeText is a no-op — does not modify state", () => {
+    it("executeText is a no-op- does not modify state", () => {
       const layout = makeNoOpLayout();
       const state = new Uint32Array(4);
       const highZs = new Uint32Array(state.length);
@@ -213,7 +213,7 @@ describe("Text", () => {
   });
 
   // ---------------------------------------------------------------------------
-  // Text — getBoundingBox
+  // Text- getBoundingBox
   // ---------------------------------------------------------------------------
 
   describe("getBoundingBox", () => {
@@ -236,7 +236,7 @@ describe("Text", () => {
   });
 
   // ---------------------------------------------------------------------------
-  // Text — attribute mapping
+  // Text- attribute mapping
   // ---------------------------------------------------------------------------
 
   describe("attributeMapping", () => {
@@ -268,7 +268,7 @@ describe("Text", () => {
   });
 
   // ---------------------------------------------------------------------------
-  // Text — ComponentDefinition completeness
+  // Text- ComponentDefinition completeness
   // ---------------------------------------------------------------------------
 
   describe("definitionComplete", () => {
@@ -338,7 +338,7 @@ describe("Text", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Rectangle — rendering
+// Rectangle- rendering
 // ---------------------------------------------------------------------------
 
 describe("Rectangle", () => {
@@ -425,7 +425,7 @@ describe("Rectangle", () => {
   });
 
   // ---------------------------------------------------------------------------
-  // Rectangle — no simulation behavior
+  // Rectangle- no simulation behavior
   // ---------------------------------------------------------------------------
 
   describe("noSimulationBehavior", () => {
@@ -434,7 +434,7 @@ describe("Rectangle", () => {
       expect(el.getPins()).toHaveLength(0);
     });
 
-    it("executeRectangle is a no-op — does not modify state", () => {
+    it("executeRectangle is a no-op- does not modify state", () => {
       const layout = makeNoOpLayout();
       const state = new Uint32Array(4);
       const highZs = new Uint32Array(state.length);
@@ -459,7 +459,7 @@ describe("Rectangle", () => {
   });
 
   // ---------------------------------------------------------------------------
-  // Rectangle — getBoundingBox
+  // Rectangle- getBoundingBox
   // ---------------------------------------------------------------------------
 
   describe("getBoundingBox", () => {
@@ -483,7 +483,7 @@ describe("Rectangle", () => {
   });
 
   // ---------------------------------------------------------------------------
-  // Rectangle — attribute mapping
+  // Rectangle- attribute mapping
   // ---------------------------------------------------------------------------
 
   describe("attributeMapping", () => {
@@ -536,7 +536,7 @@ describe("Rectangle", () => {
   });
 
   // ---------------------------------------------------------------------------
-  // Rectangle — ComponentDefinition completeness
+  // Rectangle- ComponentDefinition completeness
   // ---------------------------------------------------------------------------
 
   describe("definitionComplete", () => {

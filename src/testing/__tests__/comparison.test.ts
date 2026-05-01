@@ -1,5 +1,5 @@
 ﻿/**
- * Tests for compareCircuits() — task 6.3.6.
+ * Tests for compareCircuits()- task 6.3.6.
  *
  * Uses a mock ComparatorFacade with controlled readOutput returns to test
  * all comparison modes and edge cases without running a real simulation engine.
@@ -26,7 +26,7 @@ import type { PropertyValue } from "@/core/properties";
 import type { ParsedTestData } from "../parser.js";
 
 // ---------------------------------------------------------------------------
-// Mock CircuitElement — minimal stub for In/Out elements
+// Mock CircuitElement- minimal stub for In/Out elements
 // ---------------------------------------------------------------------------
 
 class MockElement implements CircuitElement {
@@ -163,7 +163,7 @@ describe("compareCircuits", () => {
   // identicalCircuits
   // -------------------------------------------------------------------------
 
-  it("identicalCircuits — compare circuit to itself → zero mismatches", async () => {
+  it("identicalCircuits- compare circuit to itself → zero mismatches", async () => {
     // Both engines return same output for every input
     const facade = makeFacade((_tag, _label) => 0);
 
@@ -201,7 +201,7 @@ describe("compareCircuits", () => {
   // differentCircuits
   // -------------------------------------------------------------------------
 
-  it("differentCircuits — AND gate reference vs OR gate student → mismatches on specific inputs", async () => {
+  it("differentCircuits- AND gate reference vs OR gate student → mismatches on specific inputs", async () => {
     // AND: Y = A & B;  OR: Y = A | B
     // They differ on (0,1) and (1,0): AND=0, OR=1
     const facade = makeFacade((tag, _label) => {
@@ -237,7 +237,7 @@ describe("compareCircuits", () => {
   // exhaustiveMode
   // -------------------------------------------------------------------------
 
-  it("exhaustiveMode — no test data, 2 single-bit inputs → all 4 combinations tested, mode is exhaustive", async () => {
+  it("exhaustiveMode- no test data, 2 single-bit inputs → all 4 combinations tested, mode is exhaustive", async () => {
     // Both engines return identical outputs → no mismatches
     const facade = makeFacade(() => 0);
 
@@ -265,7 +265,7 @@ describe("compareCircuits", () => {
   // testBasedMode
   // -------------------------------------------------------------------------
 
-  it("testBasedMode — test data provided → uses provided vectors, mode is test-based", async () => {
+  it("testBasedMode- test data provided → uses provided vectors, mode is test-based", async () => {
     const facade = makeFacade(() => 0);
 
     const circuit = makeCircuit([
@@ -298,7 +298,7 @@ describe("compareCircuits", () => {
   // tooManyInputs
   // -------------------------------------------------------------------------
 
-  it("tooManyInputs — 21 input bits, no test data → throws requesting test vectors", async () => {
+  it("tooManyInputs- 21 input bits, no test data → throws requesting test vectors", async () => {
     const facade = makeFacade(() => 0);
 
     // 21 single-bit inputs → 21 total input bits > 20
@@ -320,7 +320,7 @@ describe("compareCircuits", () => {
   // mismatchDetails
   // -------------------------------------------------------------------------
 
-  it("mismatchDetails — verify differingSignals lists only the outputs that disagree", async () => {
+  it("mismatchDetails- verify differingSignals lists only the outputs that disagree", async () => {
     // Two outputs: Y and Z. ref returns: Y=0, Z=1. stu returns: Y=1, Z=1.
     // So only Y differs.
     let callCount = 0;

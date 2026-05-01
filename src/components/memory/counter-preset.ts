@@ -1,5 +1,5 @@
 /**
- * CounterPreset — edge-triggered up/down counter with load, clear, and configurable max.
+ * CounterPreset- edge-triggered up/down counter with load, clear, and configurable max.
  *
  * On rising clock edge:
  *   - If en=1:
@@ -41,7 +41,7 @@ const COMP_WIDTH = 3;
 // en@y=0, C@y=1, dir@y=2, in@y=3, ld@y=4, clr@y=5; out@y=0, ovf@y=1
 
 // ---------------------------------------------------------------------------
-// Pin declarations — matching Java GenericShape layout
+// Pin declarations- matching Java GenericShape layout
 // ---------------------------------------------------------------------------
 
 const COUNTER_PRESET_PIN_DECLARATIONS: PinDeclaration[] = [
@@ -120,7 +120,7 @@ const COUNTER_PRESET_PIN_DECLARATIONS: PinDeclaration[] = [
 ];
 
 // ---------------------------------------------------------------------------
-// CounterPresetElement — CircuitElement implementation
+// CounterPresetElement- CircuitElement implementation
 // ---------------------------------------------------------------------------
 
 export class CounterPresetElement extends AbstractCircuitElement {
@@ -164,7 +164,7 @@ export class CounterPresetElement extends AbstractCircuitElement {
 }
 
 // ---------------------------------------------------------------------------
-// executeCounterPreset — flat simulation function
+// executeCounterPreset- flat simulation function
 //
 // Input layout:  [en=0, C=1, dir=2, in=3, ld=4, clr=5]
 // Output layout: [out=0, ovf=1]
@@ -327,7 +327,7 @@ const COUNTER_PRESET_PROPERTY_DEFS: PropertyDefinition[] = [
 ];
 
 // ---------------------------------------------------------------------------
-// CounterPresetDefinition — ComponentDefinition
+// CounterPresetDefinition- ComponentDefinition
 // ---------------------------------------------------------------------------
 
 function counterPresetFactory(props: PropertyBag): CounterPresetElement {
@@ -343,7 +343,7 @@ export const CounterPresetDefinition: ComponentDefinition = {
   attributeMap: COUNTER_PRESET_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.MEMORY,
   helpText:
-    "CounterPreset — edge-triggered up/down counter with preset load.\n" +
+    "CounterPreset- edge-triggered up/down counter with preset load.\n" +
     "dir=0: counts up; dir=1: counts down. clr clears to 0, ld loads from 'in'.\n" +
     "maxValue property sets the wrap-around value.",
   models: {

@@ -1,5 +1,5 @@
 /**
- * Tests for element-help.ts — buildHelpContent.
+ * Tests for element-help.ts- buildHelpContent.
  */
 
 import { describe, it, expect } from "vitest";

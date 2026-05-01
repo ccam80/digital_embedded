@@ -4,7 +4,7 @@
  * Provides locale-aware string lookup with parameter interpolation,
  * fallback chains, and locale change events.
  *
- * Locale JSON files are loaded via Vite dynamic import() — one code path
+ * Locale JSON files are loaded via Vite dynamic import()- one code path
  * for both browser and test environments.
  */
 

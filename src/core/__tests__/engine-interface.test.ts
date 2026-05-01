@@ -36,7 +36,7 @@ function freshEngine(): MockEngine {
 }
 
 // ---------------------------------------------------------------------------
-// Type-level checks — confirm SimulationEngine interface is fully covered
+// Type-level checks- confirm SimulationEngine interface is fully covered
 // ---------------------------------------------------------------------------
 
 describe("SimulationEngine interface compliance", () => {

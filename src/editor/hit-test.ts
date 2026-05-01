@@ -1,5 +1,5 @@
 /**
- * Hit-testing — pure functions for determining what the user interacted with.
+ * Hit-testing- pure functions for determining what the user interacted with.
  *
  * Priority ordering: pin > element > wire > none.
  * All coordinates are in world (grid) space.
@@ -88,7 +88,7 @@ export function hitTestWires(
 
 /**
  * Returns the first pin (across all elements) within threshold distance of point.
- * Pin positions are stored relative to the component origin — this function
+ * Pin positions are stored relative to the component origin- this function
  * checks them in world space (getPins() returns world-space positions per the
  * CircuitElement contract).
  */
@@ -175,7 +175,7 @@ function distancePointToSegment(p: Point, a: Point, b: Point): number {
   const lenSq = dx * dx + dy * dy;
 
   if (lenSq === 0) {
-    // Degenerate segment — point distance to A
+    // Degenerate segment- point distance to A
     const ex = p.x - a.x;
     const ey = p.y - a.y;
     return Math.sqrt(ex * ex + ey * ey);

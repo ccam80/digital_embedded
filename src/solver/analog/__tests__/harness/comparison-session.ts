@@ -475,7 +475,7 @@ export class ComparisonSession {
       this._engine.solver!,
       this._engine.elements,
       // Pass a getter, NOT the value. MNAEngine allocates its statePool inside
-      // _setup() — called from the first dcOperatingPoint() / step(), which
+      // _setup()- called from the first dcOperatingPoint() / step(), which
       // runs AFTER this hook is wired up. A by-value capture would freeze
       // statePool at null and silently no-op captureElementStates() forever
       // (the bug that hid all per-iteration MOSFET/BJT/diode device-state
@@ -484,7 +484,7 @@ export class ComparisonSession {
       this._elementLabels,
     );
 
-    // captureTopology(...) above ran BEFORE engine._setup() — engine.matrixSize
+    // captureTopology(...) above ran BEFORE engine._setup()- engine.matrixSize
     // is 0 at init time and only becomes meaningful once the first
     // dcOperatingPoint()/step() lazily runs the setup pass. The topology gets
     // refreshed after each run completes (see _refreshOurTopologyAfterSetup);
@@ -828,7 +828,7 @@ export class ComparisonSession {
     }
     const presence = this._stepPresence(stepIndex);
 
-    // Accepted attempt final iteration (spec Â§9.3)
+    // Accepted attempt final iteration (spec Âss9.3)
     const ourAccIdx = ourStep.acceptedAttemptIndex >= 0 && ourStep.acceptedAttemptIndex < ourStep.attempts.length
       ? ourStep.acceptedAttemptIndex
       : ourStep.attempts.length - 1;
@@ -901,7 +901,7 @@ export class ComparisonSession {
   }
 
   /**
-   * Per-iteration data for a step  uses accepted attempt iterations (spec Â§9.2).
+   * Per-iteration data for a step  uses accepted attempt iterations (spec Âss9.2).
    */
   getIterations(stepIndex: number): IterationReport[] {
     this._ensureRun();
@@ -1505,13 +1505,13 @@ export class ComparisonSession {
       const ourIter = ourIters[ii] ?? null;
       const ngIter  = ngIters[ii] ?? null;
 
-      // Per-side densification — not a graceful fallback. The session-level
+      // Per-side densification- not a graceful fallback. The session-level
       // structural-parity gate (_assertMatrixStructuralParity, called at the
       // end of runDcOp/runTransient) hard-fails on any matrixSize divergence,
       // so by the time this code runs in a non-failing session, both sides
       // already match. When the gate has fired, the per-side dimensions here
       // let post-mortem callers (error logs, harness_get_attempt diagnostics)
-      // see what each engine actually built — not a forced common slice.
+      // see what each engine actually built- not a forced common slice.
       const ourLinSys = ourIter ? _computeLinearSystemData(ourIter, ourIter.matrixSize) : null;
       const ourData: IterationSideData | null = ourIter ? {
         rawIteration: ourIter.iteration,
@@ -2593,25 +2593,25 @@ export class ComparisonSession {
    * `ours.matrixSize === ngspice.matrixSize`. Any divergence is an A1-class
    * MNA-layout error: the engines have different equation counts and any
    * subsequent value comparison would require silently dropping or padding
-   * one side's data — see comparison-session.ts:_computeLinearSystemData
+   * one side's data- see comparison-session.ts:_computeLinearSystemData
    * which now densifies per-side rather than papering over with our size.
    *
    * Throws on the first mismatch found, with a structural error message
    * naming the divergence (sizes, step/iter/attempt locator, and which
    * column indices the larger side has that the smaller lacks). The fix
    * direction is always "modify our engine to match ngspice's MNA layout"
-   * — this is not a tolerance or display setting.
+   *- this is not a tolerance or display setting.
    *
    * Skipped when `selfCompare` is set (both sides come from the same
    * engine, so sizes are identical by construction) or when ngspice has
-   * no captured steps (e.g. ngspice failed during init/load — there's
+   * no captured steps (e.g. ngspice failed during init/load- there's
    * nothing to compare and the existing `errors[]` already records that).
    */
   /**
    * Refresh the cached `_ourTopology` after the engine's `_setup()` has run.
    *
    * `captureTopology(compiled, engine.matrixSize, ...)` in `_initWithCircuit`
-   * ran BEFORE the engine had a chance to discover its own equation count —
+   * ran BEFORE the engine had a chance to discover its own equation count-
    * `engine.matrixSize` is 0 at init time and only becomes meaningful after
    * the first `dcOperatingPoint()`/`step()` has lazily invoked `_setup()`.
    *
@@ -2672,7 +2672,7 @@ export class ComparisonSession {
             `matrixSize changed from ${first} (step=0 iter=0) to ${it.size} ` +
             `(step=${it.stepIndex} attempt=${it.attemptIndex} iter=${it.iterIndex}). ` +
             `${side === "ours" ? "Our" : "ngspice"} engine equation count must be ` +
-            `constant for the lifetime of a session — investigate whether a ` +
+            `constant for the lifetime of a session- investigate whether a ` +
             `device added or removed an equation mid-run, which is itself an ` +
             `A1-class MNA-layout bug.`
           );
@@ -2696,7 +2696,7 @@ export class ComparisonSession {
       return;
     }
 
-    // Cross-side divergence — collect detail for the first iteration where
+    // Cross-side divergence- collect detail for the first iteration where
     // both sides exist, so the error message can point at concrete CSC
     // entries the smaller side is missing.
     const firstShared = (() => {
@@ -2732,7 +2732,7 @@ export class ComparisonSession {
       `Matrix structural divergence (A1): equation counts differ between engines.\n` +
       `  ours.matrixSize = ${ourSize}\n` +
       `  ngspice.matrixSize = ${ngSize}\n` +
-      `  delta = ${Math.abs(ourSize - ngSize)} equation(s) — ${lacking} side is short.\n` +
+      `  delta = ${Math.abs(ourSize - ngSize)} equation(s)- ${lacking} side is short.\n` +
       `This is an MNA-layout architectural error. Per project rules ngspice is the ` +
       `golden reference; the fix direction is to modify our engine's equation ` +
       `allocation (likely CKTmkVolt/CKTmkCur equivalents in our setup path) so the ` +
@@ -2743,14 +2743,14 @@ export class ComparisonSession {
 
   /**
    * Compare the (row, col, value) multiset of the first-iteration MNA matrix
-   * on both sides. Throws on any divergence — extra entries on either side,
+   * on both sides. Throws on any divergence- extra entries on either side,
    * missing entries, or value mismatches at the same position.
    *
    * Matrix entries reflect each engine's INTERNAL sparse-matrix indices
    * (assigned by ngspice's `Translate` / our `_translate` on first sight of
    * each external row/col during the first NR iteration's load loop). For
    * the indices to line up, both engines must call `cktLoad` in the same
-   * per-device-type order — that's the A1 sort applied in compileAnalogPartition.
+   * per-device-type order- that's the A1 sort applied in compileAnalogPartition.
    *
    * Skipped when self-compare is set or either side has no captured iteration.
    */
@@ -2794,7 +2794,7 @@ export class ComparisonSession {
     // Classify: structural = different shape (extra/missing coords, implies
     // node-swap or MNA-layout drift). value-only = same coords on both sides
     // but different summed value, implies arithmetic divergence (operand
-    // order, transcendental precision, or parameter mismatch) — NOT a
+    // order, transcendental precision, or parameter mismatch)- NOT a
     // load-order bug.
     const isStructural = oursOnly.length > 0 || ngOnly.length > 0;
     const isValueOnly = !isStructural && valueMismatches.length > 0;
@@ -2829,7 +2829,7 @@ export class ComparisonSession {
         );
       }
       lines.push(
-        "Structural mismatch means the (row, col) coordinate sets differ — " +
+        "Structural mismatch means the (row, col) coordinate sets differ- " +
           "most likely a node-swap, internal-node allocation drift, or " +
           "per-device-type load order out of sync with ngspice's DEVices[] " +
           "iteration order (see compileAnalogPartition's ngspiceLoadOrder " +

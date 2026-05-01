@@ -68,7 +68,7 @@ export class TimingWheel {
 
     if (existing !== undefined) {
       if (existing.timestamp === timestamp) {
-        // Same slot — just update the payload in-place.
+        // Same slot- just update the payload in-place.
         existing.value = value;
         existing.highZ = highZ;
         return;
@@ -92,7 +92,7 @@ export class TimingWheel {
 
   /**
    * Return all events with timestamp ≤ toTimestamp, ordered ascending by
-   * timestamp. The returned array is stable for this call only — events are
+   * timestamp. The returned array is stable for this call only- events are
    * freed back to the pool after being returned (caller must consume them
    * before the next `advance` call).
    */
@@ -121,7 +121,7 @@ export class TimingWheel {
             result.push(evt);
             evt = next;
           } else {
-            // Should not happen in a correct wheel — defensive skip.
+            // Should not happen in a correct wheel- defensive skip.
             evt = evt._next;
           }
         }

@@ -1,5 +1,5 @@
 /**
- * Circuit statistics — summary metrics for a placed circuit.
+ * Circuit statistics- summary metrics for a placed circuit.
  *
  * Computes:
  *   - Component counts by type (typeId → count)

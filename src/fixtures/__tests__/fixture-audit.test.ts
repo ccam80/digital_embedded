@@ -1,5 +1,5 @@
 /**
- * Fixture audit — headless integrity checks for all .dig circuit fixtures.
+ * Fixture audit- headless integrity checks for all .dig circuit fixtures.
  *
  * For each .dig file in fixtures/, loads the circuit (with recursive subcircuit
  * resolution across the full fixture tree) and runs structural checks:
@@ -26,14 +26,14 @@ import { pinWorldPosition } from "@/core/pin";
 import { MockRenderContext } from "@/test-utils/mock-render-context";
 
 // ---------------------------------------------------------------------------
-// Only GenericInitCode is allowed to be skipped — it's a no-op metadata
+// Only GenericInitCode is allowed to be skipped- it's a no-op metadata
 // element with zero pins, zero outputs, no simulation behavior.
 // ---------------------------------------------------------------------------
 
 const ALLOWED_SKIP_ELEMENTS = new Set(["GenericInitCode"]);
 
 // ---------------------------------------------------------------------------
-// Known-failure exemptions — fixture files with pre-existing wiring issues
+// Known-failure exemptions- fixture files with pre-existing wiring issues
 // that are exempt from the strict zero-orphan / zero-disconnected-tunnel rules.
 // Each entry is a relative fixture path (as used in the `label` field).
 // ---------------------------------------------------------------------------
@@ -106,7 +106,7 @@ function buildDigIndex(roots: string[]): Map<string, string> {
 
 /**
  * Resolver that searches the full fixture tree by basename.
- * This is how Java Digital works — subcircuit names are bare filenames,
+ * This is how Java Digital works- subcircuit names are bare filenames,
  * resolved by scanning the library path.
  */
 class FixtureTreeResolver implements FileResolver {
@@ -167,7 +167,7 @@ for (const dir of FIXTURE_DIRS) {
 }
 
 // ---------------------------------------------------------------------------
-// Registry factory — each fixture gets a fresh registry so subcircuit
+// Registry factory- each fixture gets a fresh registry so subcircuit
 // registrations from one fixture don't leak into another (different
 // fixture directories may contain different versions of same-named
 // subcircuits like control.dig).
@@ -208,10 +208,10 @@ function captureSkippedElements(fn: () => Promise<Circuit>): Promise<{ circuit: 
 
 function requireCircuit(loadError: Error | null, circuit: Circuit | undefined): asserts circuit is Circuit {
   if (loadError) {
-    throw new Error(`Prerequisite failed — circuit did not load: ${loadError.message}`);
+    throw new Error(`Prerequisite failed- circuit did not load: ${loadError.message}`);
   }
   if (!circuit) {
-    throw new Error("Prerequisite failed — circuit is undefined");
+    throw new Error("Prerequisite failed- circuit is undefined");
   }
 }
 
@@ -268,7 +268,7 @@ describe("fixture audit", () => {
     });
 
     // ------------------------------------------------------------------
-    // 2. Pin-wire connectivity — ZERO orphans allowed
+    // 2. Pin-wire connectivity- ZERO orphans allowed
     // ------------------------------------------------------------------
 
     it("wire endpoints meet pins or junctions", () => {
@@ -413,7 +413,7 @@ describe("fixture audit", () => {
               const isUpsideDown = Math.abs(norm - Math.PI) < 0.1;
               if (isUpsideDown) {
                 throw new Error(
-                  `[${el.typeId}] upside-down text "${call.text}" — net rotation ${(norm * 180 / Math.PI).toFixed(0)}° (element rotation=${el.rotation})`,
+                  `[${el.typeId}] upside-down text "${call.text}"- net rotation ${(norm * 180 / Math.PI).toFixed(0)}° (element rotation=${el.rotation})`,
                 );
               }
               break;
@@ -456,7 +456,7 @@ describe("fixture audit", () => {
     //
     // Tunnels connect by name, but each tunnel pin must physically
     // touch either a wire endpoint or another component's pin.
-    // A tunnel that touches neither is disconnected — usually caused
+    // A tunnel that touches neither is disconnected- usually caused
     // by a shape/dimension bug in the adjacent component.
     // ------------------------------------------------------------------
 

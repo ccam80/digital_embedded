@@ -1,5 +1,5 @@
 /**
- * Tests for the program memory loader — Task 7.2.3.
+ * Tests for the program memory loader- Task 7.2.3.
  *
  * Covers:
  *   - intelHex: parse Intel HEX string, verify DataField contains correct values
@@ -22,7 +22,7 @@ import { parseCsv, parseLogisim, parseRawBinary } from "../program-formats.js";
 
 // A minimal Intel HEX file loading two data records plus EOF.
 // Record: :LLAAAATT[DD...]CC
-// :02000000AABB?? — 2 bytes at 0x0000: 0xAA, 0xBB
+// :02000000AABB??- 2 bytes at 0x0000: 0xAA, 0xBB
 // Generated with correct checksums.
 function makeIntelHexLine(byteCount: number, address: number, recordType: number, data: number[]): string {
   const bytes: number[] = [byteCount, (address >> 8) & 0xFF, address & 0xFF, recordType, ...data];
@@ -64,7 +64,7 @@ describe("parseIntelHex", () => {
 
   it("stops parsing at EOF record", () => {
     const hex = makeIntelHex([{ address: 0x0000, data: [0xFF] }]);
-    // Append another line after EOF — should be ignored
+    // Append another line after EOF- should be ignored
     const hexWithExtra = hex + "\n" + makeIntelHexLine(1, 0x0001, 0x00, [0x42]);
     const bytes = parseIntelHex(hexWithExtra);
     expect(bytes.length).toBe(1);
@@ -72,7 +72,7 @@ describe("parseIntelHex", () => {
   });
 
   it("throws on bad checksum", () => {
-    // ":01000000AA" — 1 byte at 0x0000, data=0xAA.
+    // ":01000000AA"- 1 byte at 0x0000, data=0xAA.
     // Correct checksum: sum([01,00,00,00,AA]) = 0xAB, two's complement = 0x55.
     // We use 0x00 instead to trigger a mismatch.
     const line = ":01000000AA00\n:00000001FF";
@@ -81,7 +81,7 @@ describe("parseIntelHex", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Tests: loadProgram — intelHex
+// Tests: loadProgram- intelHex
 // ---------------------------------------------------------------------------
 
 describe("loadProgram intelHex", () => {
@@ -136,7 +136,7 @@ describe("parseCsv", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Tests: loadProgram — csv
+// Tests: loadProgram- csv
 // ---------------------------------------------------------------------------
 
 describe("loadProgram csv", () => {
@@ -181,7 +181,7 @@ describe("parseRawBinary", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Tests: loadProgram — rawBinary
+// Tests: loadProgram- rawBinary
 // ---------------------------------------------------------------------------
 
 describe("loadProgram rawBinary", () => {
@@ -244,7 +244,7 @@ describe("parseLogisim", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Tests: loadProgram — logisimV2
+// Tests: loadProgram- logisimV2
 // ---------------------------------------------------------------------------
 
 describe("loadProgram logisimV2", () => {

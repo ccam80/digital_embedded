@@ -1,5 +1,5 @@
 /**
- * .dig XML serializer — converts a Circuit back to Digital's XML format.
+ * .dig XML serializer- converts a Circuit back to Digital's XML format.
  *
  * Reverse of dig-loader.ts:
  *   Circuit → reverse attribute mappings → DigEntry[] → XML string
@@ -65,7 +65,7 @@ function propertyValueToXml(xmlName: string, value: PropertyValue): string {
       } catch (err) {
         console.warn('[dig-serializer] InverterConfig JSON parse failed; using raw string', err);
         // Dual-format fallback (JSON-encoded vs raw string). Per
-        // spec/architectural-alignment.md §I1 retain-with-reason.
+        // spec/architectural-alignment.md ssI1 retain-with-reason.
         return `<string>${escapeXml(value)}</string>`;
       }
     }
@@ -77,7 +77,7 @@ function propertyValueToXml(xmlName: string, value: PropertyValue): string {
       } catch (err) {
         console.warn('[dig-serializer] Color JSON parse failed; using raw string', err);
         // Dual-format fallback (JSON-encoded vs raw string). Per
-        // spec/architectural-alignment.md §I1 retain-with-reason.
+        // spec/architectural-alignment.md ssI1 retain-with-reason.
         return `<string>${escapeXml(value)}</string>`;
       }
     }
@@ -92,7 +92,7 @@ function propertyValueToXml(xmlName: string, value: PropertyValue): string {
       } catch (err) {
         console.warn('[dig-serializer] InDefault JSON parse failed; using raw string', err);
         // Dual-format fallback (JSON-encoded vs raw string). Per
-        // spec/architectural-alignment.md §I1 retain-with-reason.
+        // spec/architectural-alignment.md ssI1 retain-with-reason.
         return `<string>${escapeXml(value)}</string>`;
       }
     }
@@ -107,11 +107,11 @@ function propertyValueToXml(xmlName: string, value: PropertyValue): string {
   if (typeof value === "boolean") {
     return `<boolean>${value}</boolean>`;
   }
-  // number[] — unlikely in element attributes, but handle gracefully
+  // number[]- unlikely in element attributes, but handle gracefully
   if (Array.isArray(value)) {
     return `<string>${value.join(",")}</string>`;
   }
-  // Guard against plain objects — JSON-serialize rather than toString()
+  // Guard against plain objects- JSON-serialize rather than toString()
   // which would produce "[object Object]"
   if (typeof value === "object" && value !== null) {
     try {
@@ -119,7 +119,7 @@ function propertyValueToXml(xmlName: string, value: PropertyValue): string {
     } catch (err) {
       console.warn('[dig-serializer] JSON.stringify failed (circular object?)', err);
       // JSON.stringify throws on circular objects. The serializer must emit
-      // valid XML regardless. Per spec/architectural-alignment.md §I1
+      // valid XML regardless. Per spec/architectural-alignment.md ssI1
       // retain-with-reason.
       return `<string>[unserializable]</string>`;
     }
@@ -219,12 +219,12 @@ function serializeElement(
   for (const [propKey, value] of bag.entries()) {
     if (SKIP_PROPERTIES.has(propKey)) continue;
 
-    // Skip rotation/mirror — already handled above
+    // Skip rotation/mirror- already handled above
     if (propKey === "rotation" || propKey === "mirror") continue;
 
     // Skip compiler-injected transient state that is regenerated on every
     // compile. _pinElectrical is a resolved object injected by the analog
-    // compiler — it must not be serialized (it would produce "[object Object]").
+    // compiler- it must not be serialized (it would produce "[object Object]").
     // User per-pin overrides are stored separately as _pinElectricalOverrides
     // (a JSON string) which serializes correctly.
     if (propKey === "_pinElectrical") continue;
@@ -251,7 +251,7 @@ function serializeElement(
   // Serialize unmapped entries (preserved from loading for round-trip)
   const unmapped = getUnmapped(bag);
   for (const [key, digValue] of unmapped) {
-    // Skip rotation/mirror — already handled
+    // Skip rotation/mirror- already handled
     if (key === "rotation" || key === "mirror") continue;
     xml += writeEntry("        ", key, digValueToXml(digValue));
   }

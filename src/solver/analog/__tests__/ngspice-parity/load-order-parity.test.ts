@@ -5,7 +5,7 @@
  * of (row, col, value) entries. Internal indices on each side are assigned
  * lazily by ngspice's `Translate` / our `_translate` (sparse-solver.ts:399)
  * on first sight of each external row/col. For the indices to match, both
- * engines must call `cktLoad` in the same per-device-type order — that's
+ * engines must call `cktLoad` in the same per-device-type order- that's
  * the A1 sort applied in `compileAnalogPartition` against
  * `ngspiceLoadOrder`.
  *

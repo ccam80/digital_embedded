@@ -1,5 +1,5 @@
 /**
- * Tests for formatSI / parseSI — SI prefix formatting and parsing.
+ * Tests for formatSI / parseSI- SI prefix formatting and parsing.
  */
 
 import { describe, it, expect } from "vitest";

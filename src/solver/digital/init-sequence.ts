@@ -22,7 +22,7 @@ import type { EvaluationGroup } from "./digital-engine.js";
 export type { EvaluationGroup };
 
 // ---------------------------------------------------------------------------
-// InitializableEngine — subset of DigitalEngine needed by the init sequence
+// InitializableEngine- subset of DigitalEngine needed by the init sequence
 // ---------------------------------------------------------------------------
 
 /**
@@ -58,7 +58,7 @@ export interface InitializableEngine {
 /**
  * UNDEFINED encoding in the flat signal array: value=0, highZ=0xFFFFFFFF.
  * The flat signal array stores only value words; UNDEFINED is represented by
- * value word = 0 (the parallel highZ array is not tracked here — initialization
+ * value word = 0 (the parallel highZ array is not tracked here- initialization
  * sets all value words to 0, which matches the UNDEFINED convention).
  */
 const UNDEFINED_VALUE = 0;
@@ -70,7 +70,7 @@ const MAX_NOISE_ITERATIONS = 100;
 const MAX_SETTLE_ITERATIONS = 100;
 
 // ---------------------------------------------------------------------------
-// initializeCircuit — full init sequence
+// initializeCircuit- full init sequence
 // ---------------------------------------------------------------------------
 
 /**
@@ -89,7 +89,7 @@ export function initializeCircuit(engine: InitializableEngine): void {
 
   // Step 1.5: Apply default values for In components.
   // This seeds the starting state before propagation. defaultValue is read
-  // once at init — runtime changes have no effect on the running simulation.
+  // once at init- runtime changes have no effect on the running simulation.
   {
     const wt = layout.wiringTable;
     for (let i = 0; i < typeIds.length; i++) {
@@ -104,14 +104,14 @@ export function initializeCircuit(engine: InitializableEngine): void {
     }
   }
 
-  // Step 2: Noise propagation — run multiple passes to let circuit settle
+  // Step 2: Noise propagation- run multiple passes to let circuit settle
   // For feedback SCCs: use noise (shuffled, interleaved). For non-feedback: synchronized.
   runNoisePropagation(state, highZs, snapshotBuffer, typeIds, executeFns, layout, evaluationOrder);
 
   // Step 3: Release Reset components (drive output to 1)
   releaseResetComponents(engine);
 
-  // Step 4: Deterministic settle — one full sweep in topological order, no noise
+  // Step 4: Deterministic settle- one full sweep in topological order, no noise
   runDeterministicSettle(state, highZs, snapshotBuffer, typeIds, executeFns, layout, evaluationOrder);
 }
 

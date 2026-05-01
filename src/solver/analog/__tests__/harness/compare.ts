@@ -133,7 +133,7 @@ export function compareSnapshots(
         }
       }
 
-      // Device state diffs — compare our pool-backed state slots against
+      // Device state diffs- compare our pool-backed state slots against
       // ngspice state via device mappings
       const stateDiffs: ComparisonResult["stateDiffs"] = [];
       for (const ourEs of ourIter.elementStates) {
@@ -161,7 +161,7 @@ export function compareSnapshots(
           if (ngIdx !== null) comparableSlots.add(slotName);
         }
 
-        // Compare each mapped slot — strict bit-exact match
+        // Compare each mapped slot- strict bit-exact match
         for (const slotName of comparableSlots) {
           if (!(slotName in ourEs.slots) || !(slotName in refEs.slots)) continue;
 

@@ -61,9 +61,9 @@ function neg(a: ExprNode): ExprNode {
  * Compute the symbolic derivative of `expr` with respect to `variable`.
  *
  * `variable` is matched against:
- *   - `{ kind: "variable", name }` — plain variable (e.g. "x")
- *   - `{ kind: "circuit-voltage", label }` — when variable is `"V(label)"`
- *   - `{ kind: "circuit-current", label }` — when variable is `"I(label)"`
+ *   - `{ kind: "variable", name }`- plain variable (e.g. "x")
+ *   - `{ kind: "circuit-voltage", label }`- when variable is `"V(label)"`
+ *   - `{ kind: "circuit-current", label }`- when variable is `"I(label)"`
  *
  * For `builtin-var` (time, freq) the variable string is the name directly.
  */
@@ -188,7 +188,7 @@ export function differentiate(expr: ExprNode, variable: string): ExprNode {
             break;
           case "abs":
             // d/dx(|g|) = sign(g) * g'  (undefined at 0, we return 0 there)
-            // sign(g) = g / |g| — represented as a conditional approximation
+            // sign(g) = g / |g|- represented as a conditional approximation
             // Use: abs'(g) = g / abs(g) (same as sign, undefined at 0)
             fPrimeG = div(g, callNode("abs", [g]));
             break;
@@ -204,7 +204,7 @@ export function differentiate(expr: ExprNode, variable: string): ExprNode {
         return simplify(mul(fPrimeG, dg));
       }
 
-      // Multi-argument functions — only atan2 and pow are common
+      // Multi-argument functions- only atan2 and pow are common
       if (fn === "atan2" && args.length === 2) {
         // atan2(y, x): d/dy(atan2(y,x)) = x/(x²+y²), d/dx(atan2(y,x)) = -y/(x²+y²)
         // For general variable differentiation we approximate via total derivative
@@ -219,7 +219,7 @@ export function differentiate(expr: ExprNode, variable: string): ExprNode {
       }
 
       if (fn === "pow" && args.length === 2) {
-        // pow(f, g) — same as f^g binary node
+        // pow(f, g)- same as f^g binary node
         const f = args[0];
         const g = args[1];
         const df = differentiate(f, variable);

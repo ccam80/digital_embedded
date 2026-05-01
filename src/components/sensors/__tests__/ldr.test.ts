@@ -46,7 +46,7 @@ function makeSetupCtx(solver: SparseSolverType): SetupContext {
 }
 
 // ---------------------------------------------------------------------------
-// Capture solver — records stamp tuples via the real allocElement/stampElement
+// Capture solver- records stamp tuples via the real allocElement/stampElement
 // API so tests can read back what load() wrote. Used where tests assert on
 // the exact matrix entries produced by a single load(ctx) call.
 // ---------------------------------------------------------------------------
@@ -269,7 +269,7 @@ describe("LDR", () => {
 });
 
 // ---------------------------------------------------------------------------
-// ldr_load_dcop_parity — C4.1 / Task 6.2.1
+// ldr_load_dcop_parity- C4.1 / Task 6.2.1
 //
 // LDR at 1000 lux. Default params: rDark=1e6, luxRef=100, gamma=0.7, lux=1000.
 // R(1000lux) = rDark * (lux / luxRef)^(-gamma) = 1e6 * (1000/100)^(-0.7)
@@ -300,14 +300,14 @@ describe("ldr_load_dcop_parity", () => {
       matrixSize: 2,
       nodeCount: 2,
     });
-    // Call setup() directly — element is not poolBacked so makeSimpleCtx
+    // Call setup() directly- element is not poolBacked so makeSimpleCtx
     // does not call it automatically. setup() must run before load().
     (core as unknown as LDRElement).setup(makeSetupCtx(stampCtx.solver));
     analogElement.load(stampCtx.loadCtx);
     const stamps = stampCtx.solver.getCSCNonZeros();
 
     // NGSPICE ref: G = 1/R where R = rDark * (lux/luxRef)^(-gamma).
-    // Inline closed-form — same IEEE-754 operations as LDRElement.resistance():
+    // Inline closed-form- same IEEE-754 operations as LDRElement.resistance():
     const rDark = LDR_DEFAULTS.rDark;
     const luxRef = LDR_DEFAULTS.luxRef;
     const gamma = LDR_DEFAULTS.gamma;

@@ -16,7 +16,7 @@ export function stampG(solver: SparseSolver, row: number, col: number, val: numb
 }
 
 /**
- * Additive RHS stamp — `*pCKTrhsPtr += val` analogue. ngspice device
+ * Additive RHS stamp- `*pCKTrhsPtr += val` analogue. ngspice device
  * code does `*(here->XxxNode) += val` directly into ckt->CKTrhs;
  * digiTS callers pass `ctx.rhs` as the buffer. Drops stamps targeting
  * the ground row (row == 0) so callers don't need to guard.

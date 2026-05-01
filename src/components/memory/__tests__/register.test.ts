@@ -136,7 +136,7 @@ describe("Register", () => {
       const layout = makeLayout(3, 1);
       const state = makeState(6, { 0: 10, 1: 0, 2: 1, 4: 0, 5: 0 });
       const highZs = new Uint32Array(state.length);
-      // First rising edge — store 10
+      // First rising edge- store 10
       state[1] = 1;
       executeRegister(0, state, highZs, layout);
       expect(state[3]).toBe(10);

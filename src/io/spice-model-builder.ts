@@ -160,7 +160,7 @@ function buildModelOverrides(
 }
 
 // ---------------------------------------------------------------------------
-// Element factory — maps ParsedElement → CircuitElement
+// Element factory- maps ParsedElement → CircuitElement
 // ---------------------------------------------------------------------------
 
 /**
@@ -307,7 +307,7 @@ function buildElement(
     }
 
     case "X": {
-      // Subcircuit instance — we model it as a placeholder element.
+      // Subcircuit instance- we model it as a placeholder element.
       // The modelName is stored as a property so the compiler can look it up.
       // We create one pin per node.
       const pins = el.nodes.map((node, idx) => ({
@@ -321,7 +321,7 @@ function buildElement(
 }
 
 // ---------------------------------------------------------------------------
-// buildSpiceSubcircuit — main public function
+// buildSpiceSubcircuit- main public function
 // ---------------------------------------------------------------------------
 
 /**

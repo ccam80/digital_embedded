@@ -128,7 +128,7 @@ describe("partitionByDomain", () => {
       expect(result.analog.components).toHaveLength(0);
     });
 
-    it("analog partition is empty — not null", () => {
+    it("analog partition is empty- not null", () => {
       const el0 = makeElement("And", 0);
       const registry = makeRegistry([makeDigitalDef("And")]);
       const group = makeGroup(0, [makePin(0, 0, "digital")]);
@@ -181,7 +181,7 @@ describe("partitionByDomain", () => {
       expect(result.digital.components).toHaveLength(0);
     });
 
-    it("digital partition is empty — not null", () => {
+    it("digital partition is empty- not null", () => {
       const el0 = makeElement("Resistor", 0);
       const registry = makeRegistry([makeAnalogDef("Resistor")]);
       const group = makeGroup(0, [makePin(0, 0, "analog")]);
@@ -256,7 +256,7 @@ describe("partitionByDomain", () => {
       const elA = makeElement("Resistor", 1);
       const registry = makeRegistry([makeDigitalDef("And"), makeAnalogDef("Resistor")]);
 
-      // Digital INPUT pin at boundary — analog drives digital
+      // Digital INPUT pin at boundary- analog drives digital
       const gBoundary = makeGroup(1, [
         makePin(0, 0, "digital", PinDirection.INPUT),
         makePin(1, 0, "analog", PinDirection.BIDIRECTIONAL),
@@ -357,7 +357,7 @@ describe("partitionByDomain", () => {
 
   describe("infrastructure components (no model assignment)", () => {
     it("components without a model assignment are not included in either partition", () => {
-      // Element 0 is a Tunnel (infrastructure) — no ModelAssignment
+      // Element 0 is a Tunnel (infrastructure)- no ModelAssignment
       // Element 1 is digital
       const elTunnel = makeElement("Tunnel", 0);
       const elAnd = makeElement("And", 1);

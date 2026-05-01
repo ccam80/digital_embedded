@@ -18,7 +18,7 @@ import type { IntegrationMethod } from "./element.js";
  * History is stored in two `Float64Array` buffers (slots A and B). Each
  * element independently tracks which slot is its current (v(n)) slot via a
  * per-element flag in a `Uint8Array`. Rotating history for one element does
- * not disturb any other element — zero array copies occur per push.
+ * not disturb any other element- zero array copies occur per push.
  *
  * Slot mapping per element i:
  *   _slotIsA[i] === 1  →  _a[i] holds v(n),   _b[i] holds v(n-1)
@@ -62,7 +62,7 @@ export class HistoryStore {
    *
    * Rotation: v(n-1) ← v(n), v(n) ← value.
    * Implemented by toggling this element's current-slot flag and writing into
-   * the newly designated current slot — zero array copies per call.
+   * the newly designated current slot- zero array copies per call.
    *
    * @param elementIndex - 0-based reactive element index
    * @param value        - New v(n) value to record
@@ -95,7 +95,7 @@ export class HistoryStore {
 }
 
 // ---------------------------------------------------------------------------
-// NodeVoltageHistory — circular buffer of full node-voltage vectors for NIpred
+// NodeVoltageHistory- circular buffer of full node-voltage vectors for NIpred
 // ---------------------------------------------------------------------------
 
 /**
@@ -121,7 +121,7 @@ export class NodeVoltageHistory {
 
   /**
    * Allocate `NODE_VOLTAGE_HISTORY_DEPTH` Float64Arrays, each of length `nodeCount`.
-   * Safe to call multiple times — reallocates on each call.
+   * Safe to call multiple times- reallocates on each call.
    */
   initNodeVoltages(nodeCount: number): void {
     this._buf = [];
@@ -174,7 +174,7 @@ export class NodeVoltageHistory {
 }
 
 /**
- * Centralized NIcomCof — compute integration coefficients ag[] into shared store.
+ * Centralized NIcomCof- compute integration coefficients ag[] into shared store.
  *
  * Mirrors ngspice nicomcof.c. Called once per transient retry iteration in
  * analog-engine.ts step(), BEFORE companion stamping. Elements read ag[0] etc.
@@ -313,12 +313,12 @@ export function computeNIcomCof(
     }
   } else {
     // method === "gear"
-    // nicomcof.c:40-41 — order 1 regardless of method uses the trap-1 formula.
+    // nicomcof.c:40-41- order 1 regardless of method uses the trap-1 formula.
     if (order === 1) {
       ag[0] = 1 / dt;
       ag[1] = -1 / dt;
     } else {
-      // nicomcof.c:52-127 — GEAR order 2..6 via Vandermonde collocation.
+      // nicomcof.c:52-127- GEAR order 2..6 via Vandermonde collocation.
       solveGearVandermonde(dt, deltaOld, order, ag, scratch);
     }
   }

@@ -1,7 +1,7 @@
 /**
  * Stepping performance E2E test.
  *
- * Loads fixtures/buckbjt.dts (BJT buck converter — a relatively complex analog
+ * Loads fixtures/buckbjt.dts (BJT buck converter- a relatively complex analog
  * circuit), runs the simulation at 1ms/s, and measures how far simTime advances
  * in a fixed wall-clock window. This catches regressions in the stepping hot
  * path (e.g. breakpoint accumulation forcing micro-steps).
@@ -45,7 +45,7 @@ test.describe('Stepping performance', () => {
     await page.waitForTimeout(500);
   });
 
-  test('buckbjt at 1ms/s — simTime advances at least 500us in 2s wall time', async () => {
+  test('buckbjt at 1ms/s- simTime advances at least 500us in 2s wall time', async () => {
     const xml = readFileSync(resolve(fixturesDir, 'buckbjt.dts'), 'utf-8');
     await harness.loadDigXml(xml);
 
@@ -82,7 +82,7 @@ test.describe('Stepping performance', () => {
     // Allow generous margin (500us minimum) to account for compilation overhead
     // and CI variability. The key assertion: the sim isn't stuck or crawling.
     console.log(`simTime advanced: ${(advanced * 1e6).toFixed(1)}us in 2s wall time (expected ~2000us at 1ms/s)`);
-    expect(advanced, `simTime only advanced ${(advanced * 1e6).toFixed(1)}us — expected at least 500us`).toBeGreaterThan(500e-6);
+    expect(advanced, `simTime only advanced ${(advanced * 1e6).toFixed(1)}us- expected at least 500us`).toBeGreaterThan(500e-6);
 
     // All voltages must remain finite (no divergence)
     for (const [label, v] of Object.entries(stateAfter!.nodeVoltages)) {
@@ -90,7 +90,7 @@ test.describe('Stepping performance', () => {
     }
   });
 
-  test('buckbjt fast-forward 1ms — completes within 5s wall budget', async () => {
+  test('buckbjt fast-forward 1ms- completes within 5s wall budget', async () => {
     const xml = readFileSync(resolve(fixturesDir, 'buckbjt.dts'), 'utf-8');
     await harness.loadDigXml(xml);
 
@@ -142,7 +142,7 @@ test.describe('Stepping performance', () => {
     console.log(`FF advanced: ${(advanced * 1e3).toFixed(3)}ms in ${(wallElapsed / 1000).toFixed(1)}s wall time`);
 
     // Should have reached or gotten close to the 1ms target
-    expect(advanced, `FF only advanced ${(advanced * 1e6).toFixed(1)}us — expected ~1ms`).toBeGreaterThan(100e-6);
+    expect(advanced, `FF only advanced ${(advanced * 1e6).toFixed(1)}us- expected ~1ms`).toBeGreaterThan(100e-6);
 
     for (const [label, v] of Object.entries(stateAfter!.nodeVoltages)) {
       expect(Number.isFinite(v), `Voltage at "${label}" is not finite: ${v}`).toBe(true);

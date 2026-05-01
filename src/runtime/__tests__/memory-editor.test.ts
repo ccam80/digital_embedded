@@ -1,5 +1,5 @@
 /**
- * Tests for MemoryEditorDialog and HexGrid — Task 7.2.1.
+ * Tests for MemoryEditorDialog and HexGrid- Task 7.2.1.
  *
  * Uses a minimal DOM stub so tests run in node environment without jsdom.
  *
@@ -14,7 +14,7 @@
 import { describe, it, expect, beforeEach } from "vitest";
 
 // ---------------------------------------------------------------------------
-// Minimal DOM stub — installed before importing DOM-dependent modules
+// Minimal DOM stub- installed before importing DOM-dependent modules
 // ---------------------------------------------------------------------------
 
 class StubClassList {
@@ -53,7 +53,7 @@ class StubElement {
   parentElement: StubElement | null = null;
 
   /**
-   * className getter/setter — keeps classList in sync.
+   * className getter/setter- keeps classList in sync.
    * MemoryEditorDialog sets element.className = "hex-row" etc.
    * querySelectorAll uses classList.contains() to match.
    */

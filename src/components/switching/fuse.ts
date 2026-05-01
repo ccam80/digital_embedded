@@ -1,5 +1,5 @@
 /**
- * Fuse — unified digital/analog fuse component.
+ * Fuse- unified digital/analog fuse component.
  *
  * Digital engine: bidirectional switch controlled by the `blown` property.
  *   state[stBase] = blown ? 0 : 1; the bus resolver merges/splits nets.
@@ -10,10 +10,10 @@
  *   engine picks up the blown state on the next step.
  *
  * Visual phases:
- *   Cold (ratio < 0.3)     — normal sine wave, component color
- *   Warming (0.3 → 0.9)    — thickening line, color lerps to orange/red
- *   Critical (0.9 → 1.0)   — red, thick, slight vertex jitter
- *   Blown                   — gap in middle, warped endpoints, smoke puff
+ *   Cold (ratio < 0.3)    - normal sine wave, component color
+ *   Warming (0.3 → 0.9)   - thickening line, color lerps to orange/red
+ *   Critical (0.9 → 1.0)  - red, thick, slight vertex jitter
+ *   Blown                  - gap in middle, warped endpoints, smoke puff
  *
  * Pins:
  *   Bidirectional: out1, out2
@@ -101,7 +101,7 @@ function heatColor(ratio: number): string {
 // ---------------------------------------------------------------------------
 
 const SEGMENTS = 16;
-const HS = 6 / 16; // 0.375 — half-height of sine wave
+const HS = 6 / 16; // 0.375- half-height of sine wave
 
 function sinePoints(): Array<{ x: number; y: number }> {
   const pts: Array<{ x: number; y: number }> = [];
@@ -115,7 +115,7 @@ function sinePoints(): Array<{ x: number; y: number }> {
 }
 
 // ---------------------------------------------------------------------------
-// FuseElement — CircuitElement implementation
+// FuseElement- CircuitElement implementation
 // ---------------------------------------------------------------------------
 
 export class FuseElement extends AbstractCircuitElement {
@@ -159,7 +159,7 @@ export class FuseElement extends AbstractCircuitElement {
   }
 
   // -------------------------------------------------------------------------
-  // Intact rendering — sine wave with heat glow
+  // Intact rendering- sine wave with heat glow
   // -------------------------------------------------------------------------
 
   private _drawIntact(
@@ -208,7 +208,7 @@ export class FuseElement extends AbstractCircuitElement {
   }
 
   // -------------------------------------------------------------------------
-  // Blown rendering — broken wire with warped ends + smoke
+  // Blown rendering- broken wire with warped ends + smoke
   // -------------------------------------------------------------------------
 
   private _drawBlown(ctx: RenderContext, label: string): void {
@@ -220,7 +220,7 @@ export class FuseElement extends AbstractCircuitElement {
 
     ctx.setLineWidth(1.5);
 
-    // Draw left half — warped downward at break
+    // Draw left half- warped downward at break
     if (ctx.setRawColor) {
       ctx.setRawColor(lerpRgb(COLOR_CHARRED, COLOR_CHARRED, 0));
     } else {
@@ -251,7 +251,7 @@ export class FuseElement extends AbstractCircuitElement {
       ctx.drawLine(pts[i].x, pts[i].y, pts[i + 1].x, pts[i + 1].y);
     }
 
-    // Gap marker — small flash/spark lines at the break
+    // Gap marker- small flash/spark lines at the break
     if (ctx.setRawColor) {
       ctx.setRawColor("rgb(200,80,20)");
     }
@@ -259,7 +259,7 @@ export class FuseElement extends AbstractCircuitElement {
     ctx.drawLine(gapX - 0.04, -0.06, gapX + 0.04, 0.06);
     ctx.drawLine(gapX + 0.04, -0.06, gapX - 0.04, 0.06);
 
-    // Smoke puff animation — fades over ~1.5 seconds
+    // Smoke puff animation- fades over ~1.5 seconds
     this._drawSmoke(ctx);
 
     this._drawLabel(ctx, label);
@@ -314,7 +314,7 @@ export class FuseElement extends AbstractCircuitElement {
 }
 
 // ---------------------------------------------------------------------------
-// executeFuse — flat simulation function
+// executeFuse- flat simulation function
 //
 // Reads the blown property and writes the closed flag into state[stBase]
 // for the bus resolver: blown=false → 1 (closed), blown=true → 0 (open).
@@ -416,7 +416,7 @@ export const FuseDefinition: ComponentDefinition = {
   attributeMap: FUSE_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.SWITCHING,
   helpText:
-    "Fuse — one-time irreversible switch with I²t thermal model.\n" +
+    "Fuse- one-time irreversible switch with I²t thermal model.\n" +
     "Digital: blown property controls open/closed.\n" +
     "Simplified: blows when accumulated I²t exceeds the rating.",
   models: {

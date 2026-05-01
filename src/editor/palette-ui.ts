@@ -1,5 +1,5 @@
 /**
- * PaletteUI — DOM rendering for the component palette.
+ * PaletteUI- DOM rendering for the component palette.
  *
  * Renders the tree view, search input, and recent section.
  * Depends on ComponentPalette (logic) and the browser DOM.
@@ -363,7 +363,7 @@ export class PaletteUI {
       if (!dragging) {
         // Vertical scroll: >10px vertical AND more vertical than horizontal → cancel
         if (Math.abs(dy) > DRAG_THRESHOLD_PX && Math.abs(dy) > Math.abs(dx)) {
-          // Allow native scroll — release capture and cancel
+          // Allow native scroll- release capture and cancel
           cleanup();
           this._dragController.cancel();
           return;
@@ -469,7 +469,7 @@ export class PaletteUI {
     } catch (e) {
       // Surface icon-rendering failure so a broken component doesn't
       // produce a silent blank-tile palette. Per
-      // spec/architectural-alignment.md §I1 replaced prior silent swallow.
+      // spec/architectural-alignment.md ssI1 replaced prior silent swallow.
       console.warn(`[palette-ui] Failed to render palette icon for "${def.name}".`, e);
     }
 
@@ -489,7 +489,7 @@ export class PaletteUI {
     const currentAllowlist = this._palette.getAllowlist();
     const allDefs = registry.getAll();
 
-    // Build a mutable checked set — start from allowlist or all
+    // Build a mutable checked set- start from allowlist or all
     const checked = new Set<string>(
       currentAllowlist !== null ? currentAllowlist : allDefs.map((d) => d.name),
     );

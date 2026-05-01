@@ -1,5 +1,5 @@
 /**
- * Button component — momentary push button.
+ * Button component- momentary push button.
  *
  * Output is high while held, low when released (or inverted if activeLow=true).
  * Interactive: user holds mouse button down to assert, releases to de-assert.
@@ -46,7 +46,7 @@ function buildButtonPinDeclarations(): PinDeclaration[] {
 }
 
 // ---------------------------------------------------------------------------
-// ButtonElement — CircuitElement implementation
+// ButtonElement- CircuitElement implementation
 // ---------------------------------------------------------------------------
 
 export class ButtonElement extends AbstractCircuitElement {
@@ -120,7 +120,7 @@ export class ButtonElement extends AbstractCircuitElement {
 }
 
 // ---------------------------------------------------------------------------
-// executeButton — no-op (value set externally by engine on user interaction)
+// executeButton- no-op (value set externally by engine on user interaction)
 // ---------------------------------------------------------------------------
 
 export function executeButton(
@@ -187,7 +187,7 @@ export const ButtonDefinition: ComponentDefinition = {
   attributeMap: BUTTON_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.IO,
   helpText:
-    "Button — momentary push button.\n" +
+    "Button- momentary push button.\n" +
     "Output is high while the button is held down, low when released.\n" +
     "activeLow=true inverts this: output is low while held, high when released.\n" +
     "Interactive: the engine sets the output value on mouse-down/up events.",

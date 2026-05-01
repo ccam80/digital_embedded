@@ -96,7 +96,7 @@ function computeCircuitBounds(circuit: Circuit): {
  * Export a circuit to an SVG string.
  *
  * Uses SVGRenderContext (implementing RenderContext) and the existing
- * ElementRenderer / WireRenderer for rendering — the same code path as
+ * ElementRenderer / WireRenderer for rendering- the same code path as
  * the Canvas2D renderer.
  */
 export function exportSvg(circuit: Circuit, options?: SvgExportOptions): string {

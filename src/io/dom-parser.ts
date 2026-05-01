@@ -1,5 +1,5 @@
 /**
- * DOM parser factory — returns a browser DOMParser or @xmldom/xmldom in Node.js.
+ * DOM parser factory- returns a browser DOMParser or @xmldom/xmldom in Node.js.
  *
  * Environment detection: if `window` and `DOMParser` exist, use the native browser
  * parser. Otherwise, use @xmldom/xmldom for Node.js (test) environments.
@@ -27,7 +27,7 @@ export function createDomParser(): XmlDomParser {
     };
   }
 
-  // Node.js environment — use @xmldom/xmldom.
+  // Node.js environment- use @xmldom/xmldom.
   const NodeDOMParser = xmldom.DOMParser as unknown as new () => {
     parseFromString(xml: string, mimeType: string): Document;
   };

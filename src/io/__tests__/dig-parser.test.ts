@@ -105,7 +105,7 @@ describe("DigParser", () => {
     const testDataEntry = testcase!.elementAttributes.find((e) => e.key === "Testdata");
     expect(testDataEntry).not.toBeUndefined();
     expect(testDataEntry!.value.type).toBe("testData");
-    // Assert unconditionally — type was already verified above
+    // Assert unconditionally- type was already verified above
     expect((testDataEntry!.value as { type: "testData"; value: string }).value).toContain("A B Y");
   });
 
@@ -189,7 +189,7 @@ describe("DigParser", () => {
     const secondNot = notElements[1];
     const rotEntry = secondNot.elementAttributes.find((e) => e.key === "rotation");
     expect(rotEntry).not.toBeUndefined();
-    // Should resolve to the same value as the first Not — rotation 3
+    // Should resolve to the same value as the first Not- rotation 3
     expect(rotEntry!.value).toEqual({ type: "rotation", value: 3 });
   });
 
@@ -289,7 +289,7 @@ describe("DigParser", () => {
     const colorEntry = led!.elementAttributes.find((e) => e.key === "Color");
     expect(colorEntry).not.toBeUndefined();
     expect(colorEntry!.value.type).toBe("color");
-    // Assert unconditionally — type was verified above
+    // Assert unconditionally- type was verified above
     expect((colorEntry!.value as { type: "color"; value: { r: number; g: number; b: number; a: number } }).value).toEqual({ r: 255, g: 0, b: 128, a: 255 });
   });
 
@@ -384,7 +384,7 @@ describe("DigParser", () => {
     };
 
     const result = migrateVersion(circuit);
-    expect(result).toBe(circuit); // same reference — no mutation
+    expect(result).toBe(circuit); // same reference- no mutation
     expect(result.version).toBe(2);
     expect(result.visualElements[0].pos).toEqual({ x: 100, y: 200 });
   });

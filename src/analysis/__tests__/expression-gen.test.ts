@@ -166,7 +166,7 @@ describe('sopWithDontCare', () => {
 // ---------------------------------------------------------------------------
 // Plain-text string format
 //
-// A B | Y (NAND-like: 0,1,1,1 — same as OR above but test focuses on string)
+// A B | Y (NAND-like: 0,1,1,1- same as OR above but test focuses on string)
 // ---------------------------------------------------------------------------
 
 describe('toStringFormat', () => {

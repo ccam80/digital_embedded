@@ -46,7 +46,7 @@ function getLabel(el: ReturnType<typeof makeElement>): string {
 // Tests
 // ---------------------------------------------------------------------------
 
-describe('LabelTools — autoNumberLabels', () => {
+describe('LabelTools- autoNumberLabels', () => {
   // -------------------------------------------------------------------------
   // B8: autoNumberLabels sequential numbering
   // -------------------------------------------------------------------------

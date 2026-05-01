@@ -95,7 +95,7 @@ function buildRegistry(): ComponentRegistry {
 // Tests: stableNetId format and anchor round-trip
 // ---------------------------------------------------------------------------
 
-describe('stableNetId — format matches PinLoadingOverride anchor format', () => {
+describe('stableNetId- format matches PinLoadingOverride anchor format', () => {
   it('label-anchored net produces "label:<label>" stable ID', () => {
     const registry = buildRegistry();
     const tunnelProps = new PropertyBag(new Map([['label', 'CLK']]));
@@ -136,7 +136,7 @@ describe('stableNetId — format matches PinLoadingOverride anchor format', () =
 // Tests: resolveLoadingOverrides
 // ---------------------------------------------------------------------------
 
-describe('resolveLoadingOverrides — matches overrides to connectivity groups', () => {
+describe('resolveLoadingOverrides- matches overrides to connectivity groups', () => {
   it('label-anchored override matches the correct group', () => {
     const registry = buildRegistry();
     const tunnelProps = new PropertyBag(new Map([['label', 'DATA']]));
@@ -242,7 +242,7 @@ describe('resolveLoadingOverrides — matches overrides to connectivity groups',
 // Tests: stableNetId wires membership
 // ---------------------------------------------------------------------------
 
-describe('connectivity groups — wires field is populated for connected groups', () => {
+describe('connectivity groups- wires field is populated for connected groups', () => {
   it('wire connecting two elements appears in the connectivity group', () => {
     const registry = buildRegistry();
     const andPins1 = [inputPin(0, 0, 'a'), inputPin(0, 1, 'b'), outputPin(2, 0, 'out')];

@@ -1,5 +1,5 @@
 /**
- * HGS generic circuit resolution — port of Digital's ResolveGenerics.java.
+ * HGS generic circuit resolution- port of Digital's ResolveGenerics.java.
  *
  * When a circuit has isGeneric: true, its GenericInitCode and GenericCode
  * elements contain HGS scripts that parameterize the circuit at load time.
@@ -106,7 +106,7 @@ export class GenericResolutionCache {
 }
 
 // ---------------------------------------------------------------------------
-// GenericResolver — internal implementation
+// GenericResolver- internal implementation
 // ---------------------------------------------------------------------------
 
 /**
@@ -357,7 +357,7 @@ class GenericResolver {
 }
 
 // ---------------------------------------------------------------------------
-// PendingElement — deferred element waiting for attribute configuration
+// PendingElement- deferred element waiting for attribute configuration
 // ---------------------------------------------------------------------------
 
 /**
@@ -394,7 +394,7 @@ class PendingElement {
 }
 
 // ---------------------------------------------------------------------------
-// ElementAttributeMap — writable HGSMap using XML attribute names as keys
+// ElementAttributeMap- writable HGSMap using XML attribute names as keys
 // ---------------------------------------------------------------------------
 
 /**
@@ -495,7 +495,7 @@ function applyXmlMappingsToProps(
       const propVal = mapping.convert(strVal);
       bag.set(mapping.propertyKey, propVal);
     } else {
-      // No mapping — store under the XML name directly with direct conversion
+      // No mapping- store under the XML name directly with direct conversion
       const pv = hgsValueToProperty(hgsVal);
       if (pv !== undefined) {
         bag.set(xmlName, pv);

@@ -1,7 +1,7 @@
 * Verify ngspice defaults by measuring known circuits
-* Test 1: BJT IS — measure Vbe at known Ib to back-calculate IS
-* Test 2: MOSFET VTO/KP — measure Id at known Vgs to verify threshold
-* Test 3: Diode IS — measure Vd at known Id
+* Test 1: BJT IS- measure Vbe at known Ib to back-calculate IS
+* Test 2: MOSFET VTO/KP- measure Id at known Vgs to verify threshold
+* Test 3: Diode IS- measure Vd at known Id
 
 * BJT with default model
 .model DEFNPN NPN()

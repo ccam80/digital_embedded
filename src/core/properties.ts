@@ -18,13 +18,13 @@ export const enum PropertyType {
 }
 
 // ---------------------------------------------------------------------------
-// PropertyValue — the union of all valid property value types
+// PropertyValue- the union of all valid property value types
 // ---------------------------------------------------------------------------
 
 export type PropertyValue = number | string | boolean | bigint | number[] | Record<string, number>;
 
 // ---------------------------------------------------------------------------
-// PropertyDefinition — static description of one property slot
+// PropertyDefinition- static description of one property slot
 // ---------------------------------------------------------------------------
 
 export interface PropertyDefinition {
@@ -71,7 +71,7 @@ export interface PropertyDefinition {
 }
 
 // ---------------------------------------------------------------------------
-// PropertyBag — validated map<string, PropertyValue> with typed access
+// PropertyBag- validated map<string, PropertyValue> with typed access
 // ---------------------------------------------------------------------------
 
 export class PropertyBag {

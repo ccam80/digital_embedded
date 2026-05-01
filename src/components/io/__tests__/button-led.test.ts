@@ -208,7 +208,7 @@ describe("ButtonLED", () => {
       const el = makeButtonLED({ label: "" });
       const { ctx, calls } = makeStubCtx();
       el.draw(ctx);
-      // ButtonLED.draw() always emits a drawText call (Java parity — always renders label position)
+      // ButtonLED.draw() always emits a drawText call (Java parity- always renders label position)
       const textCalls = calls.filter((c) => c.method === "drawText");
       expect(textCalls.length).toBeGreaterThanOrEqual(1);
     });

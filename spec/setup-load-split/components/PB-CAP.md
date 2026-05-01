@@ -31,11 +31,11 @@ here->CAPqcap = *states;
 
 Two state slots allocated. digiTS port: `this._stateBase = ctx.allocStates(2)`.
 
-Note: the sensitivity `*states += 2 * SENparms` block at line 104-106 is conditional on `CKTsenInfo` which digiTS does not implement — omit.
+Note: the sensitivity `*states += 2 * SENparms` block at line 104-106 is conditional on `CKTsenInfo` which digiTS does not implement- omit.
 
 ## TSTALLOC sequence (line-for-line port)
 
-`capsetup.c:114-117` — four unconditional TSTALLOC calls:
+`capsetup.c:114-117`- four unconditional TSTALLOC calls:
 
 | # | ngspice pair | digiTS pair | handle field |
 |---|---|---|---|
@@ -44,7 +44,7 @@ Note: the sensitivity `*states += 2 * SENparms` block at line 104-106 is conditi
 | 3 | `(CAPposNode, CAPnegNode)` | `(pinNodes.get("pos"), pinNodes.get("neg"))` | `_hPN` |
 | 4 | `(CAPnegNode, CAPposNode)` | `(pinNodes.get("neg"), pinNodes.get("pos"))` | `_hNP` |
 
-## setup() body — alloc only
+## setup() body- alloc only
 
 ```ts
 setup(ctx: SetupContext): void {
@@ -52,10 +52,10 @@ setup(ctx: SetupContext): void {
   const posNode = pinNodes.get("pos")!;  // CAPposNode
   const negNode = pinNodes.get("neg")!;  // CAPnegNode
 
-  // capsetup.c:102-103 — *states += 2 (CAPqcap slot)
+  // capsetup.c:102-103- *states += 2 (CAPqcap slot)
   this._stateBase = ctx.allocStates(2);
 
-  // capsetup.c:114-117 — TSTALLOC sequence, line-for-line.
+  // capsetup.c:114-117- TSTALLOC sequence, line-for-line.
   this._hPP = solver.allocElement(posNode, posNode);  // (CAPposNode, CAPposNode)
   this._hNN = solver.allocElement(negNode, negNode);  // (CAPnegNode, CAPnegNode)
   this._hPN = solver.allocElement(posNode, negNode);  // (CAPposNode, CAPnegNode)
@@ -74,14 +74,14 @@ private _hNP: number = -1;
 
 The existing `AnalogCapacitorElement` currently allocates handles lazily inside `load()` via `_handlesInit`. After this migration, those lazy allocations are **removed** and the cached handles from `setup()` are used instead. The `_handlesInit` guard and `_hAA`/`_hBB`/`_hAB`/`_hBA` fields are replaced by `_hPP`/`_hNN`/`_hPN`/`_hNP`.
 
-## load() body — value writes only
+## load() body- value writes only
 
 Implementer ports value-side equations from `ref/ngspice/src/spicelib/devices/cap/capload.c` line-for-line, stamping through cached handles only. No `solver.allocElement` calls.
 
 ## Factory cleanup
 
 - Drop `internalNodeIds` and `branchIdx` parameters from `createCapacitorElement` factory signature (per A6.3).
-- Drop any `branchCount` or `getInternalNodeCount` from `MnaModel` registration if present — confirm neither exists; neither needs adding.
+- Drop any `branchCount` or `getInternalNodeCount` from `MnaModel` registration if present- confirm neither exists; neither needs adding.
 - `mayCreateInternalNodes` omitted (no internal nodes).
 - Add `ngspiceNodeMap: { pos: "pos", neg: "neg" }` to `ComponentDefinition` (`CapacitorDefinition`).
 - No `findBranchFor` callback (no branch row).
@@ -90,11 +90,11 @@ Implementer ports value-side equations from `ref/ngspice/src/spicelib/devices/ca
 
 Per CLAUDE.md "Test Policy During W3 Setup-Load-Split", verification is spec compliance only. DO NOT run tests; DO NOT use test results.
 
-1. `setup()` body in the implementation file matches the "setup() body — alloc only" listing in this PB line-for-line.
+1. `setup()` body in the implementation file matches the "setup() body- alloc only" listing in this PB line-for-line.
 2. TSTALLOC sequence in `setup()` matches the order in the cited ngspice anchor file (see top of this PB, e.g. `ressetup.c:46-49`).
 3. Factory cleanup applied per the "Factory cleanup" section above.
 4. `ngspiceNodeMap` registered per the "Pin mapping" section above (or omitted for composites where the spec says so).
-5. `load()` writes through cached handles only — zero `solver.allocElement(...)` calls inside `load()`, `accept()`, or any non-`setup()` method.
+5. `load()` writes through cached handles only- zero `solver.allocElement(...)` calls inside `load()`, `accept()`, or any non-`setup()` method.
 6. `mayCreateInternalNodes` flag set per spec.
 7. `findBranchFor` callback present where spec says (V-output sources, IND, etc.).
 8. No banned closing verdicts (mapping/tolerance/equivalent-to/pre-existing/intentional-divergence/citation-divergence/partial) used in any commit message or report.

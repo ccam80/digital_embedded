@@ -1,5 +1,5 @@
 /**
- * W6.T1 — Master-switch tests (§10.4 headless).
+ * W6.T1- Master-switch tests (ss10.4 headless).
  *
  * Tests for setCaptureHook master switch, throw-on-conflict, and
  * pre-hook log state restore when setCaptureHook(null) is called.

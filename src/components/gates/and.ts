@@ -1,5 +1,5 @@
 /**
- * And gate component — the exemplar component.
+ * And gate component- the exemplar component.
  *
  * Establishes the exact pattern all subsequent components follow:
  *   1. CircuitElement class (rendering, properties, pin declarations)
@@ -35,7 +35,7 @@ import {
 export { STANDARD_GATE_ATTRIBUTE_MAPPINGS as AND_ATTRIBUTE_MAPPINGS } from "./gate-shared.js";
 
 // ---------------------------------------------------------------------------
-// AndElement — CircuitElement implementation
+// AndElement- CircuitElement implementation
 // ---------------------------------------------------------------------------
 
 export class AndElement extends AbstractCircuitElement {
@@ -98,7 +98,7 @@ export class AndElement extends AbstractCircuitElement {
 }
 
 // ---------------------------------------------------------------------------
-// executeAnd — flat simulation function (Decision 1)
+// executeAnd- flat simulation function (Decision 1)
 //
 // Called by the engine's inner loop via a function table indexed by typeId.
 // Zero allocations. Reads N inputs from the state array, ANDs them together,
@@ -120,7 +120,7 @@ export function executeAnd(index: number, state: Uint32Array, _highZs: Uint32Arr
 
 
 // ---------------------------------------------------------------------------
-// CMOS_AND2_NETLIST — 2-input CMOS AND gate structural netlist
+// CMOS_AND2_NETLIST- 2-input CMOS AND gate structural netlist
 //
 // Topology: CMOS NAND2 driving a CMOS inverter.
 // Ports: In_1, In_2, out, VDD, GND
@@ -155,7 +155,7 @@ const CMOS_AND2_NETLIST: MnaSubcircuitNetlist = {
 };
 
 // ---------------------------------------------------------------------------
-// AndDefinition — ComponentDefinition for registry registration (Decision 4)
+// AndDefinition- ComponentDefinition for registry registration (Decision 4)
 //
 // typeId: -1 signals to the registry that it should auto-assign a numeric ID.
 // ---------------------------------------------------------------------------
@@ -179,7 +179,7 @@ export const AndDefinition: ComponentDefinition = {
   attributeMap: STANDARD_GATE_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.LOGIC,
   helpText:
-    "And gate — performs bitwise AND of all inputs.\n" +
+    "And gate- performs bitwise AND of all inputs.\n" +
     "Configurable input count (2–5) and bit width (1–32).\n" +
     "Both IEEE/US (curved) and IEC/DIN (rectangular with &) shapes are supported.\n" +
     "Individual inputs can be inverted via the inverterConfig property.",

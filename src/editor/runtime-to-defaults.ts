@@ -1,12 +1,12 @@
 /**
  * Actual-to-Default and Fuse Reset menu actions.
  *
- * captureRuntimeToDefaults — snapshot current simulation values onto component
+ * captureRuntimeToDefaults- snapshot current simulation values onto component
  *   property defaults. Components that expose a "value" property (registers,
  *   counters, etc.) have that property's stored default updated to the live
  *   signal value so the circuit boots into its last-observed state.
  *
- * restoreAllFuses — traverse all Fuse components in the circuit and reset their
+ * restoreAllFuses- traverse all Fuse components in the circuit and reset their
  *   "blown" property to false.
  *
  * Both operations return an EditCommand so they integrate with UndoRedoStack.
@@ -18,7 +18,7 @@ import type { EditCommand } from "./undo-redo.js";
 import type { PropertyValue } from "@/core/properties";
 
 // ---------------------------------------------------------------------------
-// ElementSignalAccess — engine bridge for reading live element output values
+// ElementSignalAccess- engine bridge for reading live element output values
 // ---------------------------------------------------------------------------
 
 /**
@@ -46,7 +46,7 @@ export interface ElementSignalAccess {
  *
  * For each element that has a "value" property AND the signal access reports a
  * current value, the property default is overwritten with that value. The
- * returned command is undoable — undo restores the original property values.
+ * returned command is undoable- undo restores the original property values.
  */
 export function captureRuntimeToDefaults(
   circuit: Circuit,

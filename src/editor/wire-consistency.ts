@@ -1,5 +1,5 @@
 /**
- * Wire consistency checking — validates new wires against circuit rules.
+ * Wire consistency checking- validates new wires against circuit rules.
  *
  * Primary check: no two output pins connected to the same net without a bus
  * driver. This detects shorted outputs before they are committed to the circuit.

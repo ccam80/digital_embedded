@@ -1,5 +1,5 @@
 /**
- * RC circuit transient parity — Task 7.3.1
+ * RC circuit transient parity- Task 7.3.1
  *
  * Circuit: V1 pulse source (0V→1V, 1ns rise/fall, 1ms width, 2ms period),
  *          R1=1kΩ from V1 to cap_top, C1=1µF from cap_top to gnd.
@@ -24,7 +24,7 @@ const DTS_PATH = resolve(
   "src/solver/analog/__tests__/ngspice-parity/fixtures/rc-transient.dts",
 );
 
-describeIfDll("RC transient parity — Task 7.3.1", () => {
+describeIfDll("RC transient parity- Task 7.3.1", () => {
   it("transient_per_step_match", async () => {
     const session = new ComparisonSession({
       dtsPath: DTS_PATH,

@@ -1,12 +1,12 @@
 /**
- * Shared upright text helper — counter-rotates text to stay readable.
+ * Shared upright text helper- counter-rotates text to stay readable.
  *
  * Java Digital's GraphicSwing.drawText() automatically detects when the text
  * baseline is flipped and adjusts orientation:
- *   0°   — horizontal, normal alignment
- *   90°  — vertical (reads bottom-to-top), normal alignment
- *   180° — horizontal, FLIPPED alignment (avoids upside-down)
- *   270° — vertical (reads bottom-to-top), FLIPPED alignment
+ *   0°  - horizontal, normal alignment
+ *   90° - vertical (reads bottom-to-top), normal alignment
+ *   180°- horizontal, FLIPPED alignment (avoids upside-down)
+ *   270°- vertical (reads bottom-to-top), FLIPPED alignment
  *
  * Since our RenderContext.drawText() has no directional information,
  * components must explicitly call this helper to achieve the same behavior.

@@ -118,7 +118,7 @@ describe("Compiler", () => {
   // -------------------------------------------------------------------------
   it("compilesSimpleCombinational", () => {
     // AND gate: 2 input pins at (0,0) and (0,1); 1 output pin at (2,0).
-    // Wire from output pin (2,0) connects to nothing — standalone gate.
+    // Wire from output pin (2,0) connects to nothing- standalone gate.
     // Expected: 3 nets (one per pin), 1 component, 1 non-feedback group.
 
     const andDef = makeDefinition("And", twoInputPins());
@@ -315,8 +315,8 @@ describe("Compiler", () => {
   // -------------------------------------------------------------------------
   it("pinNetMapMapsAllPins", () => {
     // Circuit with In(label="A") and Out(label="S").
-    // In at (0,0): output pin at (0,0) — drives value into the circuit
-    // Out at (10,0): input pin at (10,0) — reads value from circuit
+    // In at (0,0): output pin at (0,0)- drives value into the circuit
+    // Out at (10,0): input pin at (10,0)- reads value from circuit
     // Wire: (0,0) → (10,0) connects them
 
     const inPins = inputOnlyPin("A", { x: 0, y: 0 });
@@ -369,7 +369,7 @@ describe("Compiler", () => {
   // bitWidthMismatchThrows (BitsException)
   // -------------------------------------------------------------------------
   it("bitWidthMismatchThrows", () => {
-    // 1-bit output connected to 8-bit input — compileUnified emits a
+    // 1-bit output connected to 8-bit input- compileUnified emits a
     // width-mismatch diagnostic instead of throwing so the caller receives
     // a structured error report rather than an uncaught exception.
     const singleBitOutPins: PinDeclaration[] = [
@@ -384,7 +384,7 @@ describe("Compiler", () => {
     const registry = makeRegistry(srcDef, dstDef);
 
     const circuit = new Circuit();
-    // Both elements have pins at (2,0) — they'll share a net
+    // Both elements have pins at (2,0)- they'll share a net
     circuit.addElement(createTestElementFromDecls("Src", "src-1", singleBitOutPins));
     circuit.addElement(createTestElementFromDecls("Dst", "dst-1", eightBitInPins));
 
@@ -427,7 +427,7 @@ describe("Compiler", () => {
     const registry = new ComponentRegistry();
     const circuit = new Circuit();
     const result = compileUnified(circuit, registry);
-    // An empty circuit has no components — both domains are null.
+    // An empty circuit has no components- both domains are null.
     expect(result.digital).toBeNull();
     expect(result.analog).toBeNull();
     expect(result.diagnostics).toHaveLength(0);
@@ -443,7 +443,7 @@ describe("Tarjan", () => {
   // findsSimpleCycle
   // -------------------------------------------------------------------------
   it("findsSimpleCycle", () => {
-    // adjacency [[1],[0]] — 0→1 and 1→0, one SCC [0,1]
+    // adjacency [[1],[0]]- 0→1 and 1→0, one SCC [0,1]
     const sccs = findSCCs([[1], [0]]);
     expect(sccs.length).toBe(1);
     const scc = sccs[0]!;
@@ -456,7 +456,7 @@ describe("Tarjan", () => {
   // findsNoCycleInDAG
   // -------------------------------------------------------------------------
   it("findsNoCycleInDAG", () => {
-    // 0→1→2 — three singleton SCCs (no cycles)
+    // 0→1→2- three singleton SCCs (no cycles)
     const sccs = findSCCs([[1], [2], []]);
     expect(sccs.length).toBe(3);
     // Each SCC should be a singleton
@@ -492,7 +492,7 @@ describe("Tarjan", () => {
   // handlesDisconnectedGraph
   // -------------------------------------------------------------------------
   it("handlesDisconnectedGraph", () => {
-    // 0→1 and 2→3 — two separate components
+    // 0→1 and 2→3- two separate components
     const sccs = findSCCs([[1], [], [3], []]);
     expect(sccs.length).toBe(4);
     for (const scc of sccs) {
@@ -515,7 +515,7 @@ describe("Tarjan", () => {
   // handlesLargerCycle
   // -------------------------------------------------------------------------
   it("handlesLargerCycle", () => {
-    // 0→1→2→0 — one SCC of size 3
+    // 0→1→2→0- one SCC of size 3
     const sccs = findSCCs([[1], [2], [0]]);
     expect(sccs.length).toBe(1);
     expect(sccs[0]!.length).toBe(3);
@@ -555,7 +555,7 @@ describe("TopologicalSort", () => {
   // throwsOnCycle
   // -------------------------------------------------------------------------
   it("throwsOnCycle", () => {
-    // 0→1→0 — cycle, should throw
+    // 0→1→0- cycle, should throw
     expect(() => topologicalSort([[1], [0]])).toThrow(/cycle detected/);
   });
 
@@ -894,8 +894,8 @@ describe("compileDigitalPartition", () => {
     const compiledOld = compileUnified(circuit, registry).digital!;
 
     // Via compileDigitalPartition (new path)
-    // NOT pins: in@(0,0), out@(2,0) — world: (0,0) and (2,0)
-    // AND pins: a@(0,0), b@(0,1), out@(2,0) — world: (8,0), (8,1), (10,0)
+    // NOT pins: in@(0,0), out@(2,0)- world: (0,0) and (2,0)
+    // AND pins: a@(0,0), b@(0,1), out@(2,0)- world: (8,0), (8,1), (10,0)
     // Shared net: NOT.out(2,0) and AND.a(8,0) are in same group
     // Groups: NOT.in=0, NOT.out+AND.a=1, AND.b=2, AND.out=3
     const partition = buildPartition(
@@ -955,7 +955,7 @@ describe("compileDigitalPartition", () => {
     const srcEl = createTestElementFromDecls("Src", "src-1", singleBitOutPins);
     const dstEl = createTestElementFromDecls("Dst", "dst-1", eightBitInPins);
 
-    // Both pins in group 0 — will trigger bit-width mismatch
+    // Both pins in group 0- will trigger bit-width mismatch
     const partition = buildPartition(
       [srcEl, dstEl],
       [singleBitOutPins, eightBitInPins],
@@ -972,7 +972,7 @@ describe("compileDigitalPartition", () => {
   // wireToNetIdPopulatedFromGroups
   // -------------------------------------------------------------------------
   it("wireToNetIdPopulatedFromGroups", () => {
-    // Partition with a wire assigned to a group — the wire must appear in wireToNetId
+    // Partition with a wire assigned to a group- the wire must appear in wireToNetId
     const notDef = makeDefinition("Not", notPins());
     const registry = makeRegistry(notDef);
     const notEl = createTestElementFromDecls("Not", "not-1", notPins());
@@ -997,10 +997,10 @@ describe("compileDigitalPartition", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Feedback wire mapping — SR latch
+// Feedback wire mapping- SR latch
 // ---------------------------------------------------------------------------
 
-describe("Compiler — feedback wire mapping", () => {
+describe("Compiler- feedback wire mapping", () => {
   it("allWiresMappedInSRLatch", () => {
     // Build an SR latch from two NOR gates with cross-feedback wires.
     //

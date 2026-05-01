@@ -1,5 +1,5 @@
 /**
- * Test Executor — drives the simulation engine with parsed test vectors.
+ * Test Executor- drives the simulation engine with parsed test vectors.
  *
  * For each vector:
  *   1. Set all non-clock inputs via facade.setSignal()
@@ -19,7 +19,7 @@ export type { ParsedTestData, ParsedVector };
 export type { TestValue } from './parser.js';
 
 // ---------------------------------------------------------------------------
-// RunnerFacade — minimal interface required by the executor
+// RunnerFacade- minimal interface required by the executor
 // ---------------------------------------------------------------------------
 
 /**
@@ -43,7 +43,7 @@ export interface RunnerFacade {
  * Sentinel numeric value used by the engine to represent HIGH_Z state.
  * Matches the encoding used in signal.ts: highZ bits set, value bits zero.
  * In the raw Uint32Array representation, a HIGH_Z signal has value=0
- * with the parallel highZ array bits set — getSignalRaw returns 0xFFFFFFFF
+ * with the parallel highZ array bits set- getSignalRaw returns 0xFFFFFFFF
  * when a 1-bit signal is fully HIGH_Z.
  */
 const HIGH_Z_SENTINEL = 0xFFFFFFFF;
@@ -183,12 +183,12 @@ async function executeVector(
       continue;
     }
     if (val.kind === 'highZ') {
-      // Setting HIGH_Z on an input — use HIGH_Z_SENTINEL
+      // Setting HIGH_Z on an input- use HIGH_Z_SENTINEL
       facade.setSignal(coordinator, name, HIGH_Z_SENTINEL);
       inputRecord[name] = HIGH_Z_SENTINEL;
       continue;
     }
-    // kind === 'value' or 'clock' — clock inputs handled above via regularInputs list
+    // kind === 'value' or 'clock'- clock inputs handled above via regularInputs list
     const numericValue = val.kind === 'value' ? Number(val.value) : 0;
     facade.setSignal(coordinator, name, numericValue);
     inputRecord[name] = numericValue;
@@ -224,7 +224,7 @@ async function executeVector(
     actualOutputs[name] = actual;
 
     if (expected === undefined || expected.kind === 'dontCare') {
-      // Don't-care: always passes — record a nominal expected value
+      // Don't-care: always passes- record a nominal expected value
       expectedOutputs[name] = actual;
       continue;
     }
@@ -248,7 +248,7 @@ async function executeVector(
       continue;
     }
 
-    // kind === 'value' — exact numeric match
+    // kind === 'value'- exact numeric match
     const expectedNum = expected.kind === 'value' ? Number(expected.value) : 0;
     expectedOutputs[name] = expectedNum;
     if (actual !== expectedNum) {

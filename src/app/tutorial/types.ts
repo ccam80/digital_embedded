@@ -1,5 +1,5 @@
 /**
- * Tutorial data model — structured types for authoring and running tutorials.
+ * Tutorial data model- structured types for authoring and running tutorials.
  *
  * All types are browser-free, Node.js-compatible, and JSON-serializable.
  * The schema is designed for LLM agents to produce correctly:
@@ -20,17 +20,17 @@
  */
 
 // ---------------------------------------------------------------------------
-// Palette presets — named component sets for common tutorial scenarios
+// Palette presets- named component sets for common tutorial scenarios
 // ---------------------------------------------------------------------------
 
 /**
  * Either an explicit list of component type names, or a named preset.
  *
  * Examples:
- *   ["And", "Or", "Not", "In", "Out"]        — explicit list
- *   "basic-gates"                              — preset name
- *   { preset: "basic-gates", add: ["Clock"] }  — preset + extras
- *   { preset: "basic-gates", remove: ["XOr"] } — preset - exclusions
+ *   ["And", "Or", "Not", "In", "Out"]       - explicit list
+ *   "basic-gates"                             - preset name
+ *   { preset: "basic-gates", add: ["Clock"] } - preset + extras
+ *   { preset: "basic-gates", remove: ["XOr"] }- preset - exclusions
  */
 export type PaletteSpec =
   | string[]
@@ -38,7 +38,7 @@ export type PaletteSpec =
   | { preset: string; add?: string[]; remove?: string[] };
 
 // ---------------------------------------------------------------------------
-// Hint — progressive hints for a step
+// Hint- progressive hints for a step
 // ---------------------------------------------------------------------------
 
 /**
@@ -58,7 +58,7 @@ export interface TutorialHint {
 }
 
 // ---------------------------------------------------------------------------
-// Validation criteria — how to check the student's circuit
+// Validation criteria- how to check the student's circuit
 // ---------------------------------------------------------------------------
 
 /**
@@ -74,7 +74,7 @@ export interface TutorialHint {
 export type ValidationMode = 'test-vectors' | 'equivalence' | 'compile-only' | 'manual';
 
 // ---------------------------------------------------------------------------
-// TutorialStep — one step in a tutorial
+// TutorialStep- one step in a tutorial
 // ---------------------------------------------------------------------------
 
 /**
@@ -85,7 +85,7 @@ export type ValidationMode = 'test-vectors' | 'equivalence' | 'compile-only' | '
  *   - What the student should build (goal description)
  *   - How to validate their work (test vectors, equivalence, or manual)
  *
- * Template for agents — copy this and fill in:
+ * Template for agents- copy this and fill in:
  * ```json
  * {
  *   "id": "step-1-sr-latch",
@@ -215,7 +215,7 @@ export interface TutorialStep {
 }
 
 // ---------------------------------------------------------------------------
-// TutorialCircuitSpec — extended CircuitSpec for tutorials
+// TutorialCircuitSpec- extended CircuitSpec for tutorials
 // ---------------------------------------------------------------------------
 
 /**
@@ -223,7 +223,7 @@ export interface TutorialStep {
  * with optional metadata fields. The `components` and `connections` fields
  * use the same format as `circuit_build`.
  *
- * This type is a superset of CircuitSpec — any valid CircuitSpec is also
+ * This type is a superset of CircuitSpec- any valid CircuitSpec is also
  * a valid TutorialCircuitSpec.
  */
 export interface TutorialCircuitSpec {
@@ -259,7 +259,7 @@ export interface TutorialComponentSpec {
 }
 
 // ---------------------------------------------------------------------------
-// TutorialManifest — the top-level tutorial definition
+// TutorialManifest- the top-level tutorial definition
 // ---------------------------------------------------------------------------
 
 /**
@@ -268,7 +268,7 @@ export interface TutorialComponentSpec {
  *
  * File convention: `tutorials/<tutorial-id>/manifest.json`
  *
- * Template for agents — copy this structure:
+ * Template for agents- copy this structure:
  * ```json
  * {
  *   "id": "sr-to-flipflop",
@@ -344,7 +344,7 @@ export interface TutorialManifest {
 }
 
 // ---------------------------------------------------------------------------
-// Tutorial progress — runtime state (not authored, stored by host)
+// Tutorial progress- runtime state (not authored, stored by host)
 // ---------------------------------------------------------------------------
 
 /**
@@ -411,7 +411,7 @@ export type TutorialIframeMessage =
   | { type: 'sim-error'; error: string };
 
 // ---------------------------------------------------------------------------
-// Type guards — for runtime validation of JSON data
+// Type guards- for runtime validation of JSON data
 // ---------------------------------------------------------------------------
 
 /** Check that a value is a non-null object. */
@@ -464,7 +464,7 @@ export function isValidationMode(v: unknown): v is ValidationMode {
 
 /**
  * Type guard for TutorialStep.
- * Checks structural correctness only — not semantic validity.
+ * Checks structural correctness only- not semantic validity.
  * Use `validateManifest()` for full validation including cross-references.
  */
 export function isTutorialStep(v: unknown): v is TutorialStep {
@@ -478,7 +478,7 @@ export function isTutorialStep(v: unknown): v is TutorialStep {
   const sc = v['startCircuit'];
   if (sc !== null && sc !== undefined) {
     if (typeof sc === 'string') {
-      // ok — "carry-forward" or .dig file path
+      // ok- "carry-forward" or .dig file path
     } else if (!isTutorialCircuitSpec(sc)) {
       return false;
     }
@@ -509,7 +509,7 @@ export function isTutorialStep(v: unknown): v is TutorialStep {
 
 /**
  * Type guard for TutorialManifest.
- * Checks structural correctness — use `validateManifest()` for full validation.
+ * Checks structural correctness- use `validateManifest()` for full validation.
  */
 export function isTutorialManifest(v: unknown): v is TutorialManifest {
   if (!isObject(v)) return false;

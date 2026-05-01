@@ -80,7 +80,7 @@ test.describe('SPICE import flows', () => {
 
     await expect(page.locator('.prop-popup')).toBeVisible({ timeout: 3000 });
 
-    // Primary params are visible directly — no dialog, no textarea
+    // Primary params are visible directly- no dialog, no textarea
     const popup = page.locator('.prop-popup');
     await expect(popup.locator('label').filter({ hasText: /^IS$/ })).toBeVisible({ timeout: 3000 });
     await expect(popup.locator('label').filter({ hasText: /^BF$/ })).toBeVisible({ timeout: 3000 });
@@ -115,7 +115,7 @@ test.describe('SPICE import flows', () => {
 
     // Input should show formatted SI value (parseSI("1e-14") → formatSI → "10.0 f")
     const displayedValue = await isInput.inputValue();
-    // Either "10.0 f" (SI formatted) or the raw value — both confirm the input accepted the entry
+    // Either "10.0 f" (SI formatted) or the raw value- both confirm the input accepted the entry
     expect(
       displayedValue.includes('10') || displayedValue.includes('1e-14') || displayedValue.includes('1E-14')
     ).toBe(true);

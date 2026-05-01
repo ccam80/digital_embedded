@@ -1,12 +1,12 @@
 /**
- * Analog fixture pin audit — per-(type, rotation, mirror) individual tests.
+ * Analog fixture pin audit- per-(type, rotation, mirror) individual tests.
  *
  * For every analog component type that has a Falstad pin reference, tests all
  * 8 transform combinations (4 rotations × 2 mirrors) at a non-origin position
  * to verify that pinWorldPosition() matches the expected Falstad transform.
  *
  * 46 types with pin references × 8 transforms = ~368 individual test instances.
- * Each test asserts unconditionally — no skip lists, no gating, no KNOWN_FAILURES.
+ * Each test asserts unconditionally- no skip lists, no gating, no KNOWN_FAILURES.
  *
  * CI output reads: "Resistor rot=1 mir=true", "NpnBJT rot=2 mir=false", etc.
  */
@@ -78,7 +78,7 @@ function buildCases(): TransformCase[] {
 // Test suite
 // ---------------------------------------------------------------------------
 
-describe("analog fixture pin audit — all rotations × mirrors", () => {
+describe("analog fixture pin audit- all rotations × mirrors", () => {
   const registry = createDefaultRegistry();
   const cases = buildCases();
 

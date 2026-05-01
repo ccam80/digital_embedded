@@ -29,7 +29,7 @@ function loadBuckBjt() {
   return { facade, coordinator };
 }
 
-describe('buckbjt MCP surface — breakpoint-push-once regression', () => {
+describe('buckbjt MCP surface- breakpoint-push-once regression', () => {
   it('compile() on buckbjt fixture does not throw', () => {
     expect(() => loadBuckBjt()).not.toThrow();
   });

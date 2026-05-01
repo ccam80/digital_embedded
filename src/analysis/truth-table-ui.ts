@@ -1,5 +1,5 @@
 /**
- * TruthTableTab — editable truth table grid for the analysis dialog.
+ * TruthTableTab- editable truth table grid for the analysis dialog.
  *
  * Renders a TruthTable as an HTML table with clickable output cells
  * that cycle through 0 → 1 → X → 0. Input cells are read-only.

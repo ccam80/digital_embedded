@@ -225,10 +225,10 @@ export function createZenerElement(
   // Ephemeral per-iteration pnjlim limiting flag (ngspice Check / DIOload  CKTnoncon++)
   let pnjlimLimited = false;
 
-  // Internal prime node (DIOposPrimeNode) — set during setup(), read by load()
+  // Internal prime node (DIOposPrimeNode)- set during setup(), read by load()
   let _posPrimeNode = nodeAnode;
 
-  // TSTALLOC handles — closure-local, set during setup(), read inside load()
+  // TSTALLOC handles- closure-local, set during setup(), read inside load()
   let _hPosPP  = -1;
   let _hNegPP  = -1;
   let _hPPPos  = -1;
@@ -237,7 +237,7 @@ export function createZenerElement(
   let _hNegNeg = -1;
   let _hPPPP   = -1;
 
-  // Internal node labels — recorded during setup() when RS > 0
+  // Internal node labels- recorded during setup() when RS > 0
   const internalLabels: string[] = [];
 
   const zenerElement: PoolBackedAnalogElement = {
@@ -257,11 +257,11 @@ export function createZenerElement(
       const posNode = zenerElement._pinNodes.get("A")!;
       const negNode = zenerElement._pinNodes.get("K")!;
 
-      // State slots — diosetup.c:198-199
+      // State slots- diosetup.c:198-199
       zenerElement._stateBase = ctx.allocStates(4);
       base = zenerElement._stateBase;
 
-      // Internal node — diosetup.c:204-224
+      // Internal node- diosetup.c:204-224
       // ngspice gating: RS > 0 → allocate anode-prime node
       if (params.RS === 0 || !params.RS) {
         _posPrimeNode = posNode;
@@ -270,7 +270,7 @@ export function createZenerElement(
         internalLabels.push("internal");
       }
 
-      // TSTALLOC sequence — diosetup.c:232-238 (identical to PB-DIO)
+      // TSTALLOC sequence- diosetup.c:232-238 (identical to PB-DIO)
       _hPosPP  = solver.allocElement(posNode,       _posPrimeNode); // (1)
       _hNegPP  = solver.allocElement(negNode,       _posPrimeNode); // (2)
       _hPPPos  = solver.allocElement(_posPrimeNode, posNode);       // (3)
@@ -453,7 +453,7 @@ export function createZenerElement(
       // Series-resistance T-model (gspr) gating mirrors dioload.c:98 and the
       // setup-side gating at diosetup.c:204 (DIOresist == 0 → no prime node).
       // When RS == 0, _posPrimeNode aliases the external anode (zener.ts:264)
-      // and the prime-side stamps collapse to no-ops — gspr is skipped to match.
+      // and the prime-side stamps collapse to no-ops- gspr is skipped to match.
       // When RS > 0, the seven stamps below mirror dioload.c:431-441 line for
       // line: gd contributes to (PP,PP), (Neg,Neg), (PP,Neg), (Neg,PP) and gspr
       // contributes to (PP,PP), (Pos,Pos), (Pos,PP), (PP,Pos). The (PP,PP)
@@ -461,7 +461,7 @@ export function createZenerElement(
       //
       // gspr = DIOtConductance * AREA (dioload.c:98). DIOtConductance = 1/RS
       // baseline (diotemp.c:72), with optional polynomial scaling by
-      // DIOresistTemp1/2 (diotemp.c:253-257) — not yet applied here; tracked
+      // DIOresistTemp1/2 (diotemp.c:253-257)- not yet applied here; tracked
       // for future bit-exact temp parity.
       // -----------------------------------------------------------------------
       const solver = ctx.solver;

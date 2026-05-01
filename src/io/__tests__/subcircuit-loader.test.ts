@@ -1,5 +1,5 @@
 /**
- * Tests for subcircuit-loader.ts — Recursive .dig loading with cycle detection.
+ * Tests for subcircuit-loader.ts- Recursive .dig loading with cycle detection.
  */
 
 import { describe, it, expect, vi } from "vitest";
@@ -64,7 +64,7 @@ ${elements}
 // ---------------------------------------------------------------------------
 
 describe("subcircuit-loader", () => {
-  it("recursiveLoad — main .dig references sub .dig, resolver returns both, verify both loaded and registered", async () => {
+  it("recursiveLoad- main .dig references sub .dig, resolver returns both, verify both loaded and registered", async () => {
     // Main circuit uses In, Out (built-in), and SubA (subcircuit)
     const mainXml = makeDigXml(["In", "Out", "SubA"]);
     // SubA contains only built-in elements
@@ -101,7 +101,7 @@ describe("subcircuit-loader", () => {
   // circularDetection
   // ---------------------------------------------------------------------------
 
-  it("circularDetection — A references B, B references A → throws with cycle message", async () => {
+  it("circularDetection- A references B, B references A → throws with cycle message", async () => {
     const aXml = makeDigXml(["In", "B"]);
     const bXml = makeDigXml(["In", "A"]);
 
@@ -115,14 +115,14 @@ describe("subcircuit-loader", () => {
     const registry = new ComponentRegistry();
     registry.register(stubDef("In"));
 
-    // Load A as the root — it references B which references A (cycle)
+    // Load A as the root- it references B which references A (cycle)
     await expect(loadWithSubcircuits(aXml, resolver, registry)).rejects.toThrow(
       /Circular subcircuit reference/,
     );
 
     // Error message should contain both A and B
     try {
-      // Fresh registry — no cache to clear, each load is independent
+      // Fresh registry- no cache to clear, each load is independent
       const reg2 = new ComponentRegistry();
       reg2.register(stubDef("In"));
       await loadWithSubcircuits(aXml, resolver, reg2);
@@ -136,7 +136,7 @@ describe("subcircuit-loader", () => {
   // depthLimit
   // ---------------------------------------------------------------------------
 
-  it("depthLimit — chain of 31 nested subcircuits → throws depth limit error", async () => {
+  it("depthLimit- chain of 31 nested subcircuits → throws depth limit error", async () => {
     // Create a chain: Level0 → Level1 → ... → Level30 → Level31 (31 levels deep)
     const resolver: FileResolver = {
       resolve: async (name: string) => {
@@ -163,7 +163,7 @@ describe("subcircuit-loader", () => {
   // cacheReuse
   // ---------------------------------------------------------------------------
 
-  it("cacheReuse — two instances of same subcircuit, resolver called only once", async () => {
+  it("cacheReuse- two instances of same subcircuit, resolver called only once", async () => {
     // Main circuit has two SubA instances
     const mainXml = makeDigXml(["In", "SubA", "SubA", "Out"]);
     const subAXml = makeDigXml(["In", "Out"]);
@@ -186,7 +186,7 @@ describe("subcircuit-loader", () => {
   // clearCache
   // ---------------------------------------------------------------------------
 
-  it("separateLoads — each loadWithSubcircuits call re-resolves independently", async () => {
+  it("separateLoads- each loadWithSubcircuits call re-resolves independently", async () => {
     const mainXml = makeDigXml(["In", "SubA", "Out"]);
     const subAXml = makeDigXml(["In", "Out"]);
 
@@ -201,21 +201,21 @@ describe("subcircuit-loader", () => {
     await loadWithSubcircuits(mainXml, resolver, registry1);
     expect(resolveFn).toHaveBeenCalledTimes(1);
 
-    // Second load (fresh registry — each call is independent, no shared cache)
+    // Second load (fresh registry- each call is independent, no shared cache)
     const registry2 = new ComponentRegistry();
     registry2.register(stubDef("In"));
     registry2.register(stubDef("Out"));
 
     await loadWithSubcircuits(mainXml, resolver, registry2);
-    // Resolver called again — no module-level cache shared between calls
+    // Resolver called again- no module-level cache shared between calls
     expect(resolveFn).toHaveBeenCalledTimes(2);
   });
 
   // ---------------------------------------------------------------------------
-  // No subcircuits — circuit with only built-in elements loads normally
+  // No subcircuits- circuit with only built-in elements loads normally
   // ---------------------------------------------------------------------------
 
-  it("noSubcircuits — circuit with only built-in elements loads without using resolver", async () => {
+  it("noSubcircuits- circuit with only built-in elements loads without using resolver", async () => {
     const xml = makeDigXml(["In", "And", "Out"]);
 
     const resolveFn = vi.fn();
@@ -236,7 +236,7 @@ describe("subcircuit-loader", () => {
   // Multi-level nesting within depth limit
   // ---------------------------------------------------------------------------
 
-  it("nestedLoad — A references B which references C (all within depth limit)", async () => {
+  it("nestedLoad- A references B which references C (all within depth limit)", async () => {
     const aXml = makeDigXml(["In", "B", "Out"]);
     const bXml = makeDigXml(["In", "C", "Out"]);
     const cXml = makeDigXml(["In", "And", "Out"]);
@@ -268,7 +268,7 @@ describe("subcircuit-loader", () => {
   // SubcircuitElement executeFn is no-op
   // ---------------------------------------------------------------------------
 
-  it("subcircuitExecuteFnNoOp — circuit-scoped subcircuit execute function does not throw", async () => {
+  it("subcircuitExecuteFnNoOp- circuit-scoped subcircuit execute function does not throw", async () => {
     const mainXml = makeDigXml(["In", "SubA"]);
     const subAXml = makeDigXml(["In", "Out"]);
 

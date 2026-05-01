@@ -1,19 +1,19 @@
 # Task PB-ADC
 
 **digiTS file:** `src/components/active/adc.ts`
-**Architecture:** composite. Purely behavioral — no analog matrix entries beyond those owned by `DigitalInputPinModel` loading on VIN/CLK/VREF and `DigitalOutputPinModel` on D0..D{N-1}/EOC. No VCVS, VCCS, or other analog sub-elements.
+**Architecture:** composite. Purely behavioral- no analog matrix entries beyond those owned by `DigitalInputPinModel` loading on VIN/CLK/VREF and `DigitalOutputPinModel` on D0..D{N-1}/EOC. No VCVS, VCCS, or other analog sub-elements.
 
 ## Pin mapping (from 01-pin-mapping.md)
 
 The composite itself has no `ngspiceNodeMap`. Pin models own their matrix allocations per `02-behavioral.md`.
 
 Composite pin labels (from `buildADCPinDeclarations(bits)`):
-- `VIN` — analog input (index 0) — `DigitalInputPinModel` for resistive loading only
-- `CLK` — clock input (index 1) — `DigitalInputPinModel`
-- `VREF` — reference voltage input (index 2) — passive read (no pin model, no matrix entry)
-- `GND` — ground reference (index 3) — passive read (no pin model)
-- `EOC` — end-of-conversion output (index 4) — `DigitalOutputPinModel`
-- `D0`..`D{N-1}` — digital output bits, LSB first (indices 5..5+N-1) — `DigitalOutputPinModel` each
+- `VIN`- analog input (index 0)- `DigitalInputPinModel` for resistive loading only
+- `CLK`- clock input (index 1)- `DigitalInputPinModel`
+- `VREF`- reference voltage input (index 2)- passive read (no pin model, no matrix entry)
+- `GND`- ground reference (index 3)- passive read (no pin model)
+- `EOC`- end-of-conversion output (index 4)- `DigitalOutputPinModel`
+- `D0`..`D{N-1}`- digital output bits, LSB first (indices 5..5+N-1)- `DigitalOutputPinModel` each
 
 ## Sub-element decomposition
 
@@ -24,7 +24,7 @@ Composite pin labels (from `buildADCPinDeclarations(bits)`):
 | `eocModel` | DigitalOutputPinModel | behavioral (02-behavioral.md) | `EOC` → output node | `"vOH"`, `"vOL"`, `"rOut"` |
 | `dBit[i]` (N entries) | DigitalOutputPinModel | behavioral (02-behavioral.md) | `D{i}` → output node | same output spec |
 
-`VREF` and `GND` have no pin models — they are read passively from `ctx.rhsOld` in `load()` for the conversion calculation.
+`VREF` and `GND` have no pin models- they are read passively from `ctx.rhsOld` in `load()` for the conversion calculation.
 
 The current source file's `ADC_COMPOSITE_SCHEMA` is an empty schema. After migration it gains the clock-edge detection state (previous CLK voltage) and the N-bit conversion output register.
 
@@ -58,7 +58,7 @@ factory(pinNodes, props, getTime): AnalogElementCore {
 }
 ```
 
-## setup() body — composite forwards to every pin model
+## setup() body- composite forwards to every pin model
 
 ```ts
 setup(ctx: SetupContext): void {
@@ -70,7 +70,7 @@ setup(ctx: SetupContext): void {
   // Simplest layout: 1 slot for prevClk, 1 slot for the integer code (as Float64)
   this._stateBase = ctx.allocStates(2);
 
-  // Forward to pin models — each calls their own TSTALLOC entries
+  // Forward to pin models- each calls their own TSTALLOC entries
   if (nVin > 0) this._vinModel.setup(ctx);
   if (nClk > 0) this._clkModel.setup(ctx);
   if (nEoc > 0) this._eocModel.setup(ctx);
@@ -85,7 +85,7 @@ setup(ctx: SetupContext): void {
 }
 ```
 
-## load() body — composite forwards
+## load() body- composite forwards
 
 ```ts
 load(ctx: LoadContext): void {
@@ -105,7 +105,7 @@ load(ctx: LoadContext): void {
   }
   for (const child of this._childElements) { child.load(ctx); }
 
-  // Conversion logic is NOT done here — only in accept() (clock-edge detection)
+  // Conversion logic is NOT done here- only in accept() (clock-edge detection)
 }
 
 accept(ctx: LoadContext, simTime: number, addBreakpoint: (t: number) => void): void {
@@ -144,7 +144,7 @@ accept(ctx: LoadContext, simTime: number, addBreakpoint: (t: number) => void): v
 }
 ```
 
-**FADC-D3 — no-edge behavior:** If CLK is wired to a constant-high source, no rising edges occur and EOC never fires. This is correct clock-driven behavior; do not add a workaround DC conversion mode.
+**FADC-D3- no-edge behavior:** If CLK is wired to a constant-high source, no rising edges occur and EOC never fires. This is correct clock-driven behavior; do not add a workaround DC conversion mode.
 
 ## State slots
 
@@ -172,11 +172,11 @@ Not needed. Direct refs to `_vinModel`, `_clkModel`, `_eocModel`, `_dBits[]`.
 
 Per CLAUDE.md "Test Policy During W3 Setup-Load-Split", verification is spec compliance only. DO NOT run tests; DO NOT use test results.
 
-1. `setup()` body in the implementation file matches the "setup() body — alloc only" listing in this PB line-for-line.
+1. `setup()` body in the implementation file matches the "setup() body- alloc only" listing in this PB line-for-line.
 2. TSTALLOC sequence in `setup()` matches the order in the cited ngspice anchor file (see top of this PB, e.g. `ressetup.c:46-49`).
 3. Factory cleanup applied per the "Factory cleanup" section above.
 4. `ngspiceNodeMap` registered per the "Pin mapping" section above (or omitted for composites where the spec says so).
-5. `load()` writes through cached handles only — zero `solver.allocElement(...)` calls inside `load()`, `accept()`, or any non-`setup()` method.
+5. `load()` writes through cached handles only- zero `solver.allocElement(...)` calls inside `load()`, `accept()`, or any non-`setup()` method.
 6. `mayCreateInternalNodes` flag set per spec.
 7. `findBranchFor` callback present where spec says (V-output sources, IND, etc.).
 8. No banned closing verdicts (mapping/tolerance/equivalent-to/pre-existing/intentional-divergence/citation-divergence/partial) used in any commit message or report.

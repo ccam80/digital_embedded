@@ -9,7 +9,7 @@
  * source switches into a diode (freewheeling clamp to ground)
  * and an L-C-R output filter (300mH, 10µF, 50Ω).
  *
- * These are transient-stagnation regression tests — they verify the
+ * These are transient-stagnation regression tests- they verify the
  * engine does not enter the ERROR state or stop advancing simTime over
  * long transient runs. The spec-required per-NR-iteration ngspice
  * ComparisonSession parity test for the same fixture lives in
@@ -61,7 +61,7 @@ describe('buckbjt.dts stagnation regression', () => {
   it('transient stepping does not error after 50 steps', () => {
     const coordinator = loadBuckBjt();
 
-    // Step 50 times — if convergence fails the engine transitions to ERROR
+    // Step 50 times- if convergence fails the engine transitions to ERROR
     for (let i = 0; i < 50; i++) {
       coordinator.step();
     }

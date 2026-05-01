@@ -92,7 +92,7 @@ function makePowerSupply(overrides?: { label?: string }): PowerSupplyElement {
 describe("PowerSupply", () => {
   describe("execute", () => {
     it("is a no-op (validation-only sink: no output slots written)", () => {
-      // executePowerSupply is a display/validation sink — state is unchanged
+      // executePowerSupply is a display/validation sink- state is unchanged
       const layout = makeLayout(2, 0);
       const state = makeState([1, 0], 0);
       const highZs = new Uint32Array(state.length);

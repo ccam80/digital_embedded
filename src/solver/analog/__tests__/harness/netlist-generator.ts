@@ -61,7 +61,7 @@ export function generateSpiceNetlist(
   const modelCards = new Map<string, string>();
 
   // One element line per compiled element. compiled.elements is sorted by
-  // (ngspiceLoadOrder ASC, originalIndex DESC) — i.e. reverse-within-bucket
+  // (ngspiceLoadOrder ASC, originalIndex DESC)- i.e. reverse-within-bucket
   // (see compiler.ts). Emit the deck in forward-within-bucket order so that
   // ngspice's `cktcrte.c:63-65` prepend reverses it back into the order our
   // engine actually walks. Concretely: walk each bucket of consecutive
@@ -113,7 +113,7 @@ export function generateSpiceNetlist(
 
     // SPICE infers the element type from the first letter of the instance name.
     // User-authored labels (e.g. "Vc" for a capacitor, "Vs" for a voltage source,
-    // "r1" vs "R1") may not start with the correct SPICE prefix for their type —
+    // "r1" vs "R1") may not start with the correct SPICE prefix for their type-
     // emitting them verbatim silently reinterprets the device on the ngspice side
     // (a capacitor labeled "Vc" becomes a voltage source in ngspice). When the
     // label's first letter (case-insensitive) does not match the required SPICE
@@ -189,7 +189,7 @@ export function generateSpiceNetlist(
       } else if (typeId === "PMOS") {
         d = nodes[1] ?? 0; g = nodes[0] ?? 0; s = nodes[2] ?? 0; b = nodes[2] ?? 0;
       } else {
-        throw new Error(`netlist-generator: unknown MOSFET typeId '${typeId}' — add an explicit pin-order branch`);
+        throw new Error(`netlist-generator: unknown MOSFET typeId '${typeId}'- add an explicit pin-order branch`);
       }
       line = `${label} ${d} ${g} ${s} ${b} ${modelName}${instanceParamSuffix(paramDefs, props)}`;
       if (!modelCards.has(modelName)) {
@@ -306,13 +306,13 @@ function modelCardSuffix(
  * so that ngspice drives the same time-varying waveform as our engine during
  * .tran analysis. The SPICE transient spec syntax is identical for V and I sources.
  *
- * Supported waveforms (all exact — no approximations):
+ * Supported waveforms (all exact- no approximations):
  *   sine     → SIN(VO VA FREQ TD THETA PHASE_DEG)
  *   square   → PULSE(V1 V2 TD TR TF PW PER)
  *   triangle → PULSE(V1 V2 TD halfPeriod halfPeriod 0 PER)
  *   sawtooth → PULSE(V1 V2 TD (period-fallTime) fallTime 0 PER)
  *
- * Rejected waveforms (throw): sweep, am, fm, noise, expression — none of these
+ * Rejected waveforms (throw): sweep, am, fm, noise, expression- none of these
  * are representable as a SPICE transient primitive. A .tran parity comparison
  * against ngspice is not valid for these; callers must author a custom SPICE
  * deck (e.g. PWL) if they need a ngspice counterpart.
@@ -321,7 +321,7 @@ function modelCardSuffix(
  *   Our engine uses ngspice PULSE semantics exactly: at t=0 (phase=0) value is V1 (LOW),
  *   the rising edge spans [0, TR], HIGH plateau is [TR, TR+PW], falling edge is
  *   [TR+PW, TR+PW+TF], then LOW until the next period. The PULSE(V1 V2 TD TR TF PW PER)
- *   emission is therefore exact — no approximation or sub-riseTime discrepancy.
+ *   emission is therefore exact- no approximation or sub-riseTime discrepancy.
  *
  * Triangle-wave note:
  *   After the -π/2 phase alignment in computeWaveformValue, at t=0 (phase=0) our
@@ -350,7 +350,7 @@ function buildAcSourceSpec(
     case "sine": {
       // Our engine: dc + amp * sin(2π * freq * t + phase)  [phase in radians]
       // SPICE SIN:  SIN(VO VA FREQ TD THETA PHASE_DEG)
-      //   PHASE_DEG is phase in degrees (ngspice manual §4.1.2).
+      //   PHASE_DEG is phase in degrees (ngspice manual ss4.1.2).
       const phaseDeg = phase * (180 / Math.PI);
       return `SIN(${dc} ${amp} ${freq} 0 0 ${phaseDeg})`;
     }
@@ -427,7 +427,7 @@ function buildAcSourceSpec(
     case "expression":
       throw new Error(
         `SPICE transient parity is not valid for waveform "${waveform}". ` +
-        `Sweep/AM/FM/noise/expression sources have no exact SPICE transient primitive — ` +
+        `Sweep/AM/FM/noise/expression sources have no exact SPICE transient primitive- ` +
         `author a custom SPICE deck (e.g. PWL) if you need a ngspice counterpart.`,
       );
 

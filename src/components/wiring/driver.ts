@@ -1,5 +1,5 @@
 /**
- * Driver component — tri-state buffer.
+ * Driver component- tri-state buffer.
  *
  * When enable is high: output = input.
  * When enable is low: output = high-Z (all bits set in the highZ output slot).
@@ -83,7 +83,7 @@ function buildDriverPinDeclarations(bitWidth: number, flipSelPos = false, invert
 }
 
 // ---------------------------------------------------------------------------
-// DriverElement — CircuitElement implementation
+// DriverElement- CircuitElement implementation
 // ---------------------------------------------------------------------------
 
 export class DriverElement extends AbstractCircuitElement {
@@ -169,7 +169,7 @@ export class DriverElement extends AbstractCircuitElement {
 }
 
 // ---------------------------------------------------------------------------
-// executeDriver — tri-state logic
+// executeDriver- tri-state logic
 //
 // Signal layout (by convention with two output slots):
 //   inputOffset(index) + 0 = data input
@@ -266,7 +266,7 @@ export const DriverDefinition: ComponentDefinition = {
   attributeMap: DRIVER_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.WIRING,
   helpText:
-    "Driver — tri-state buffer.\n" +
+    "Driver- tri-state buffer.\n" +
     "When sel=1: output = input.\n" +
     "When sel=0: output is high-impedance (disconnected).",
   models: {

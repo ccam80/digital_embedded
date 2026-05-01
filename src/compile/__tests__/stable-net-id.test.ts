@@ -1,7 +1,7 @@
 /**
  * Tests for stableNetId() helper and resolveLoadingOverrides().
  *
- * Uses minimal in-process circuit elements — no .dig parser, no full
+ * Uses minimal in-process circuit elements- no .dig parser, no full
  * component registry. Mirrors the pattern from extract-connectivity.test.ts.
  */
 

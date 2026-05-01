@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { SparseSolver } from "../sparse-solver.js";
 
 // ---------------------------------------------------------------------------
-// A1.8 — SparseSolver expandable matrix tests
+// A1.8- SparseSolver expandable matrix tests
 // ---------------------------------------------------------------------------
 
 describe("SparseSolver expandable matrix (A1.8)", () => {
@@ -38,7 +38,7 @@ describe("SparseSolver expandable matrix (A1.8)", () => {
   // Note: allocElement(1,1) is called first so both row 1 and col 1 map to
   // internal slot 1, then (7,7) each get new slots: row 7 → slot 2,
   // col 7 → also slot 2 (same slot because row 7 and col 7 are in the same
-  // external-index namespace — _extToIntRow and _extToIntCol are separate maps).
+  // external-index namespace- _extToIntRow and _extToIntCol are separate maps).
   // -------------------------------------------------------------------------
   it("case3: allocElement(7,7) grows allocation beyond initial 6", () => {
     const solver = new SparseSolver();
@@ -207,7 +207,7 @@ describe("SparseSolver expandable matrix (A1.8)", () => {
     // Ground-pin calls (row=0 or col=0) are NOT recorded (they return TrashCan handle 0).
     solver.allocElement(0, 1);
     solver.allocElement(1, 0);
-    // Still 4 entries — ground calls skip _translate entirely.
+    // Still 4 entries- ground calls skip _translate entirely.
     expect(solver._getInsertionOrder()).toHaveLength(4);
 
     // _resetForAssembly does NOT reset insertionOrder.

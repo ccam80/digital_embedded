@@ -1,11 +1,11 @@
 /**
- * Probe component — measurement point.
+ * Probe component- measurement point.
  *
  * Reads its input signal and adds it to the measurement/signal list.
  * Supports configurable display format (binary, decimal, hexadecimal, octal).
  * Supports probe modes: VALUE (show current value), UP (count rising edges),
  * DOWN (count falling edges), BOTH (count all edges).
- * No outputs — display only. executeFn copies input to internal store slot.
+ * No outputs- display only. executeFn copies input to internal store slot.
  */
 
 import { AbstractCircuitElement } from "../../core/element.js";
@@ -38,7 +38,7 @@ export type ProbeMode = "VALUE" | "UP" | "DOWN" | "BOTH";
 // ---------------------------------------------------------------------------
 
 // ---------------------------------------------------------------------------
-// Pin layout — one input on west face, no outputs
+// Pin layout- one input on west face, no outputs
 // ---------------------------------------------------------------------------
 
 function buildProbePinDeclarations(bitWidth: number): PinDeclaration[] {
@@ -56,7 +56,7 @@ function buildProbePinDeclarations(bitWidth: number): PinDeclaration[] {
 }
 
 // ---------------------------------------------------------------------------
-// ProbeElement — CircuitElement implementation
+// ProbeElement- CircuitElement implementation
 // ---------------------------------------------------------------------------
 
 export class ProbeElement extends AbstractCircuitElement {
@@ -77,7 +77,7 @@ export class ProbeElement extends AbstractCircuitElement {
   }
 
   getBoundingBox(): Rect {
-    // draw() is text-only — tsCallsToSegments produces no segments so
+    // draw() is text-only- tsCallsToSegments produces no segments so
     // tsBounds collapses to (0,0,0,0). Starting y below 0 caused
     // overflow = tsBounds.minY - by0 = 0 - (-0.4) = 0.4.
     // Keep y=0 so the bbox top aligns with the collapsed draw bounds.
@@ -125,7 +125,7 @@ export class ProbeElement extends AbstractCircuitElement {
 }
 
 // ---------------------------------------------------------------------------
-// executeProbe — reads input into output slot (internal storage for display)
+// executeProbe- reads input into output slot (internal storage for display)
 //
 // The Probe has no output pins. The engine allocates an internal slot so the
 // executeFn can store the current value for the measurement panel to read.
@@ -219,16 +219,16 @@ class AnalogProbeElement implements AnalogElement {
   label: string = "";
   branchIndex: number = -1;
   _stateBase: number = -1;
-  // Probe is a pure voltage measurement — no MNA contribution. Ordinal is
+  // Probe is a pure voltage measurement- no MNA contribution. Ordinal is
   // therefore irrelevant for parity, but every AnalogElement must declare one.
   readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.RES;
 
   setup(): void {
-    // Probe is a pure voltage measurement — no allocation needed.
+    // Probe is a pure voltage measurement- no allocation needed.
   }
 
   load(_ctx: LoadContext): void {
-    // Probe is a pure voltage measurement — no MNA contribution.
+    // Probe is a pure voltage measurement- no MNA contribution.
   }
 
   getVoltage(rhs: Float64Array): number {
@@ -272,7 +272,7 @@ export const ProbeDefinition: ComponentDefinition = {
   attributeMap: PROBE_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.IO,
   helpText:
-    "Probe — measurement point.\n" +
+    "Probe- measurement point.\n" +
     "Reads the connected signal and adds it to the signal/measurement list.\n" +
     "probeMode controls what is displayed: VALUE (current value), UP (rising edge count),\n" +
     "DOWN (falling edge count), or BOTH (total edge count).\n" +

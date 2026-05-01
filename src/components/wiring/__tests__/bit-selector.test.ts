@@ -91,7 +91,7 @@ function makeBitSelector(overrides?: { selectorBits?: number }): BitSelectorElem
 }
 
 // ---------------------------------------------------------------------------
-// executeBitSelector — logic correctness
+// executeBitSelector- logic correctness
 // ---------------------------------------------------------------------------
 
 describe("BitSelector", () => {

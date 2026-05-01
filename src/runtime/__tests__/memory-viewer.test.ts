@@ -1,5 +1,5 @@
 /**
- * Tests for MemoryEditorDialog live update capability — Task 7.2.2.
+ * Tests for MemoryEditorDialog live update capability- Task 7.2.2.
  *
  * Uses a minimal DOM stub (shared with memory-editor.test.ts) and a mock
  * SimulationEngine to verify live update behaviour.
@@ -147,7 +147,7 @@ class MockEngine implements SimulationEngine {
   private readonly _measurementObservers: MeasurementObserver[] = [];
   private _stepCount: number = 0;
 
-  /** Simulate a single step — notifies all registered measurement observers. */
+  /** Simulate a single step- notifies all registered measurement observers. */
   simulateStep(): void {
     this._stepCount++;
     for (const obs of this._measurementObservers) {
@@ -155,7 +155,7 @@ class MockEngine implements SimulationEngine {
     }
   }
 
-  /** Simulate an engine reset — notifies all registered observers. */
+  /** Simulate an engine reset- notifies all registered observers. */
   simulateReset(): void {
     for (const obs of this._measurementObservers) {
       obs.onReset();
@@ -175,7 +175,7 @@ class MockEngine implements SimulationEngine {
     return this._measurementObservers.length;
   }
 
-  // Unused SimulationEngine methods — minimal stubs
+  // Unused SimulationEngine methods- minimal stubs
   init(_circuit: CompiledCircuit): void {}
   reset(): void {}
   dispose(): void {}
@@ -238,7 +238,7 @@ describe("MemoryEditorDialog live update (Task 7.2.2)", () => {
       // Enable live and confirm initial cell value
       editor.enableLiveUpdate(engine as unknown as SimulationEngine);
 
-      // Change DataField and step engine — editor should refresh
+      // Change DataField and step engine- editor should refresh
       df.write(0, 0xAA);
       engine.simulateStep();
 
@@ -277,7 +277,7 @@ describe("MemoryEditorDialog live update (Task 7.2.2)", () => {
       // Trigger one step so the editor captures the initial prevValues
       engine.simulateStep();
 
-      // Change value at 0x10 and step again — this should trigger highlight
+      // Change value at 0x10 and step again- this should trigger highlight
       df.write(0x10, 0xFF);
       engine.simulateStep();
 
@@ -328,7 +328,7 @@ describe("MemoryEditorDialog live update (Task 7.2.2)", () => {
       editor.disableLiveUpdate();
       expect(editor.isLiveUpdateActive()).toBe(false);
 
-      // Change DataField and step — display should NOT update
+      // Change DataField and step- display should NOT update
       df.write(0, 0xBB);
       engine.simulateStep();
 

@@ -91,7 +91,7 @@ export function evaluate(expr: ExprNode, ctx: ExpressionContext): number {
       if (ctx.variables !== undefined && name in ctx.variables) {
         return ctx.variables[name];
       }
-      throw new Error(`Undefined variable "${name}" — use ExpressionContext for runtime bindings`);
+      throw new Error(`Undefined variable "${name}"- use ExpressionContext for runtime bindings`);
     }
 
     case "unary":

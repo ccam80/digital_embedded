@@ -5,7 +5,7 @@
  * different default SPICE parameters reflecting the metal-semiconductor
  * junction: higher IS, lower forward voltage drop, lower breakdown voltage.
  *
- * Reuses the standard diode analog element factory — the Schottky behavior
+ * Reuses the standard diode analog element factory- the Schottky behavior
  * comes from the SCHOTTKY_DEFAULTS parameter set.
  */
 
@@ -55,7 +55,7 @@ export const { paramDefs: SCHOTTKY_PARAM_DEFS, defaults: SCHOTTKY_PARAM_DEFAULTS
 });
 
 // ---------------------------------------------------------------------------
-// createSchottkyElement — AnalogElement factory
+// createSchottkyElement- AnalogElement factory
 // ---------------------------------------------------------------------------
 
 /**
@@ -71,7 +71,7 @@ export function createSchottkyElement(
 }
 
 // ---------------------------------------------------------------------------
-// SchottkyElement — CircuitElement implementation
+// SchottkyElement- CircuitElement implementation
 // ---------------------------------------------------------------------------
 
 export class SchottkyElement extends AbstractCircuitElement {
@@ -124,7 +124,7 @@ export class SchottkyElement extends AbstractCircuitElement {
       { x: 2.5, y: 0 },
     ], true);
 
-    // Schottky cathode bar — vertical bar with inward-bent ends (S-shape)
+    // Schottky cathode bar- vertical bar with inward-bent ends (S-shape)
     // Main vertical bar
     ctx.drawLine(2.5, -0.5, 2.5, 0.5);
     // Top hook bends left (inward toward anode)

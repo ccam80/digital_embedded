@@ -1,5 +1,5 @@
 /**
- * PropertyPanel — right-side panel showing properties of the selected element.
+ * PropertyPanel- right-side panel showing properties of the selected element.
  *
  * Populated by showProperties(). Fires onChange callbacks when a value changes.
  * Collapsible for iframe-embedded mode.
@@ -80,12 +80,12 @@ export class PropertyPanel {
     element: CircuitElement,
     definitions: PropertyDefinition[],
   ): void {
-    // Don't clear the container — showModelSelector() may have already
+    // Don't clear the container- showModelSelector() may have already
     // populated it above us.  Just reset internal tracking state.
     this._inputs.clear();
     this._element = element;
     this._definitions = definitions;
-    // _showValueInModelParams is NOT reset here — it was set by showModelSelector
+    // _showValueInModelParams is NOT reset here- it was set by showModelSelector
     // which runs before us, and we need to read it below.
 
     const bag = element.getProperties();
@@ -93,7 +93,7 @@ export class PropertyPanel {
     const conditionalRows: Map<string, { row: HTMLElement; values: PropertyValue[] }[]> = new Map();
 
     for (const def of definitions) {
-      // showLabel and showValue are rendered inline — skip standalone rows
+      // showLabel and showValue are rendered inline- skip standalone rows
       if (def.key === "showLabel" || def.key === "showValue") {
         continue;
       }
@@ -146,8 +146,8 @@ export class PropertyPanel {
       const capturedKey = def.key;
       input.onChange((newValue) => {
         // Commit value to the PropertyBag immediately.
-        // When the key is absent from the bag, always write — even if newValue
-        // equals the schema default — so the value is explicitly stored.
+        // When the key is absent from the bag, always write- even if newValue
+        // equals the schema default- so the value is explicitly stored.
         const hadKey = bag.has(capturedKey);
         const oldValue = hadKey ? bag.get(capturedKey) : def.defaultValue;
         if (!hadKey || !_valuesEqual(oldValue, newValue)) {
@@ -333,14 +333,14 @@ export class PropertyPanel {
       select.appendChild(opt);
     }
 
-    // Container for primary params — rendered above the model dropdown
+    // Container for primary params- rendered above the model dropdown
     const primaryContainer = document.createElement("div");
     this._container.appendChild(primaryContainer);
 
     const modelRow = this._buildRow("Model", select as unknown as HTMLElement);
     this._container.appendChild(modelRow);
 
-    // Container for secondary (advanced) params — below the model dropdown
+    // Container for secondary (advanced) params- below the model dropdown
     const secondaryContainer = document.createElement("div");
     this._container.appendChild(secondaryContainer);
 
@@ -497,7 +497,7 @@ export class PropertyPanel {
     unitSpan.style.cssText = "opacity:0.5;font-size:11px;min-width:16px;";
     unitSpan.textContent = pd.unit ?? "";
 
-    // Reset button — only shown when value differs from default
+    // Reset button- only shown when value differs from default
     const resetBtn = document.createElement("button");
     resetBtn.title = "Reset to default";
     resetBtn.textContent = "↺";

@@ -204,7 +204,7 @@ describe("DataField", () => {
 // ---------------------------------------------------------------------------
 
 describe("RAMSinglePort", () => {
-  describe("execute — write then read", () => {
+  describe("execute- write then read", () => {
     it("write on rising clock edge, read with ld=1", () => {
       const INDEX = 0;
       const mem = new DataField(16);
@@ -441,7 +441,7 @@ describe("RAMSinglePort", () => {
 // ---------------------------------------------------------------------------
 
 describe("RAMSinglePortSel", () => {
-  describe("execute — CS/WE/OE logic", () => {
+  describe("execute- CS/WE/OE logic", () => {
     it("CS=1, WE=1: writes data to memory", () => {
       const INDEX = 10;
       const mem = new DataField(16);
@@ -583,13 +583,13 @@ describe("RAMSinglePortSel", () => {
 // ---------------------------------------------------------------------------
 
 describe("RAMDualPort", () => {
-  describe("execute — write then read", () => {
+  describe("execute- write then read", () => {
     it("write Din on rising clock edge, read with ld=1", () => {
       const INDEX = 20;
       const mem = new DataField(16);
       registerBackingStore(INDEX, mem);
 
-      // Inputs: A, Din, str, C, ld — 5 inputs, 1 output
+      // Inputs: A, Din, str, C, ld- 5 inputs, 1 output
       const layout = makeRAMLayout(5, 1);
 
       // Setup: clk=0, str=1, A=4, Din=0x42, ld=1
@@ -731,14 +731,14 @@ describe("RAMDualPort", () => {
 // ---------------------------------------------------------------------------
 
 describe("RAMDualAccess", () => {
-  describe("execute — dual port access", () => {
+  describe("execute- dual port access", () => {
     it("port 2 async read always reflects memory", () => {
       const INDEX = 30;
       const mem = new DataField(16);
       mem.write(7, 0xDE);
       registerBackingStore(INDEX, mem);
 
-      // Inputs: str, C, ld, 1A, 1Din, 2A — 6 inputs, 2 outputs
+      // Inputs: str, C, ld, 1A, 1Din, 2A- 6 inputs, 2 outputs
       const layout = makeRAMLayout(6, 2);
       // Port 2: addr=7
       const state = makeState([0, 0, 0, 0, 0, 7], 2, 1);
@@ -876,13 +876,13 @@ describe("RAMDualAccess", () => {
 // ---------------------------------------------------------------------------
 
 describe("RAMAsync", () => {
-  describe("execute — combinational read and write", () => {
+  describe("execute- combinational read and write", () => {
     it("we=1: writes D to memory[A]", () => {
       const INDEX = 40;
       const mem = new DataField(16);
       registerBackingStore(INDEX, mem);
 
-      // Inputs: A, D, we — 3 inputs, 1 output
+      // Inputs: A, D, we- 3 inputs, 1 output
       const layout = makeLayout(3, 1);
       const state = makeState([6, 0xAB, 1], 1);
       const highZs = new Uint32Array(state.length);
@@ -1079,14 +1079,14 @@ describe("RAMAsync", () => {
 // ---------------------------------------------------------------------------
 
 describe("BlockRAMDualPort", () => {
-  describe("execute — synchronous read-before-write", () => {
+  describe("execute- synchronous read-before-write", () => {
     it("output holds 0 before any clock edge", () => {
       const INDEX = 50;
       const mem = new DataField(16);
       mem.write(0, 0xBB);
       registerBackingStore(INDEX, mem);
 
-      // Inputs: A, Din, str, C — 4 inputs, 1 output, 2 state slots
+      // Inputs: A, Din, str, C- 4 inputs, 1 output, 2 state slots
       const layout = makeRAMLayout(4, 1);
       const state = makeState([0, 0, 0, 0], 1, 2);
       const highZs = new Uint32Array(state.length);
@@ -1175,7 +1175,7 @@ describe("BlockRAMDualPort", () => {
       const layout = makeRAMLayout(4, 1);
       const state = makeState([0, 0, 0, 0], 1, 2);
       const highZs = new Uint32Array(state.length);
-      // clk stays low — output never updates
+      // clk stays low- output never updates
       for (let i = 0; i < 5; i++) {
         executeBlockRAMDualPort(INDEX, state, highZs, layout);
         expect(state[4]).toBe(0);

@@ -1,5 +1,5 @@
 /**
- * TruthTable data model — source-of-truth for the analysis dialog.
+ * TruthTable data model- source-of-truth for the analysis dialog.
  *
  * Stores input/output signal specs and output values for every input
  * combination. Output values use a ternary encoding:

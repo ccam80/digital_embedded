@@ -1,5 +1,5 @@
 /**
- * Demultiplexer component — routes one input to one of N outputs based on selector.
+ * Demultiplexer component- routes one input to one of N outputs based on selector.
  * Selected output = input, all other outputs = 0.
  *
  * Properties:
@@ -45,7 +45,7 @@ function componentHeight(outputCount: number): number {
 }
 
 // ---------------------------------------------------------------------------
-// Pin layout — matches Java DemuxerShape.getPins() order:
+// Pin layout- matches Java DemuxerShape.getPins() order:
 //   sel (input[0]), outputs, then in (input[1]).
 //
 // Java positions (in SIZE=20px = 1 grid unit):
@@ -118,7 +118,7 @@ export function buildDemuxPinDeclarations(
 }
 
 // ---------------------------------------------------------------------------
-// DemuxElement — CircuitElement implementation
+// DemuxElement- CircuitElement implementation
 // ---------------------------------------------------------------------------
 
 export class DemuxElement extends AbstractCircuitElement {
@@ -191,7 +191,7 @@ export class DemuxElement extends AbstractCircuitElement {
 }
 
 // ---------------------------------------------------------------------------
-// executeDemux — flat simulation function
+// executeDemux- flat simulation function
 //
 // Pin layout in state array (matching buildDemuxPinDeclarations order):
 //   input 0: sel
@@ -285,7 +285,7 @@ export const DemuxDefinition: ComponentDefinition = {
   attributeMap: DEMUX_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.WIRING,
   helpText:
-    "Demultiplexer — routes one input to one of N outputs based on selector.\n" +
+    "Demultiplexer- routes one input to one of N outputs based on selector.\n" +
     "Selected output = input, all others = 0. N = 2^selectorBits.",
   models: {
     digital: {

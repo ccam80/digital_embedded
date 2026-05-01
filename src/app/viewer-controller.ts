@@ -1,5 +1,5 @@
 /**
- * ViewerController — scope panels, signal viewers, and trace management.
+ * ViewerController- scope panels, signal viewers, and trace management.
  *
  * Extracted from app-init.ts (Step 6 of modularization plan).
  * Owns: WatchedSignal[], ScopePanelEntry management, DataTablePanel lifecycle,
@@ -32,7 +32,7 @@ export interface WatchedSignal {
   width: number;
   group: SignalGroup;
   panelIndex: number;
-  /** 'voltage' (default) or 'current' — determines which scope channel type is created. */
+  /** 'voltage' (default) or 'current'- determines which scope channel type is created. */
   kind?: 'voltage' | 'current';
   /** For current signals: the element label used to re-resolve the element index after recompile. */
   elementLabel?: string;
@@ -59,7 +59,7 @@ export interface ViewerController {
 }
 
 // ---------------------------------------------------------------------------
-// D5 fix — shared signal name resolution utility
+// D5 fix- shared signal name resolution utility
 // ---------------------------------------------------------------------------
 
 /**
@@ -550,7 +550,7 @@ export function initViewerController(ctx: AppContext, renderPipeline: RenderPipe
       items.push({
         label: `Trace Voltages: ${label} (starts on Run)`,
         action: () => {
-          ctx.showStatus(`Probe queued — start simulation to view traces`, false);
+          ctx.showStatus(`Probe queued- start simulation to view traces`, false);
         },
         enabled: true,
       });

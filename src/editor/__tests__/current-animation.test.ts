@@ -1,5 +1,5 @@
 /**
- * Tests for CurrentFlowAnimator — animated current-flow dots.
+ * Tests for CurrentFlowAnimator- animated current-flow dots.
  */
 
 import { describe, it, expect } from "vitest";
@@ -195,7 +195,7 @@ describe("CurrentAnimation", () => {
     circuit.addWire(wire);
 
     const results = new Map<Wire, WireCurrentResult>([
-      [wire, { current: 1e-6, direction: [1, 0], flowSign: 1 as const }], // 1 uA — very small
+      [wire, { current: 1e-6, direction: [1, 0], flowSign: 1 as const }], // 1 uA- very small
     ]);
     const resolver = makeResolver(results);
     const animator = new CurrentFlowAnimator(resolver);

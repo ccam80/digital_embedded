@@ -75,7 +75,7 @@ describe('circuit_describe_file deletion', () => {
 });
 
 // ===========================================================================
-// circuit_list — no directional arrows
+// circuit_list- no directional arrows
 // ===========================================================================
 
 describe('circuit_list include_pins', () => {
@@ -121,7 +121,7 @@ describe('circuit_list include_pins', () => {
       expect(output).not.toContain('↓');
       expect(output).not.toContain('↑');
     } else {
-      // ANALOG is not a registered category — the tool must say so, not silently return nothing
+      // ANALOG is not a registered category- the tool must say so, not silently return nothing
       const output = await callTool('circuit_list', { category: 'ANALOG' });
       expect(output).toContain('No components found');
       expect(output).toContain('ANALOG');
@@ -130,7 +130,7 @@ describe('circuit_list include_pins', () => {
 });
 
 // ===========================================================================
-// circuit_compile — analog tool suggestions
+// circuit_compile- analog tool suggestions
 // ===========================================================================
 
 describe('circuit_compile analog tool suggestions', () => {
@@ -182,7 +182,7 @@ describe('circuit_compile analog tool suggestions', () => {
 });
 
 // ===========================================================================
-// circuit_patch — analog example in description
+// circuit_patch- analog example in description
 // ===========================================================================
 
 describe('circuit_patch description includes analog example', () => {
@@ -199,7 +199,7 @@ describe('circuit_patch description includes analog example', () => {
 });
 
 // ===========================================================================
-// circuit_test — driver analysis for digital outputs
+// circuit_test- driver analysis for digital outputs
 // ===========================================================================
 
 describe('circuit_test driver analysis', () => {

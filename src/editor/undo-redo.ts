@@ -7,7 +7,7 @@
  */
 
 // ---------------------------------------------------------------------------
-// EditCommand — the contract every edit operation must satisfy
+// EditCommand- the contract every edit operation must satisfy
 // ---------------------------------------------------------------------------
 
 /**

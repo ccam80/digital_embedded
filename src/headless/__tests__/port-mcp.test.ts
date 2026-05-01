@@ -19,7 +19,7 @@ const registry = createDefaultRegistry();
 // Test 1: circuit_build with a Port component succeeds and netlist shows Port
 // ---------------------------------------------------------------------------
 
-describe('Port MCP surface — build and netlist', () => {
+describe('Port MCP surface- build and netlist', () => {
   it('circuit_build with a Port component succeeds and netlist lists the Port', () => {
     const facade = new DefaultSimulatorFacade(registry);
 
@@ -48,11 +48,11 @@ describe('Port MCP surface — build and netlist', () => {
 // Test 2: circuit_compile succeeds for a Port-interface subcircuit
 // ---------------------------------------------------------------------------
 
-describe('Port MCP surface — compile', () => {
+describe('Port MCP surface- compile', () => {
   it('Port-only interface circuit compiles without In/Out elements', () => {
     const facade = new DefaultSimulatorFacade(registry);
 
-    // Build a NOT gate with ONLY Port elements as interface — no In/Out
+    // Build a NOT gate with ONLY Port elements as interface- no In/Out
     const circuit = facade.build({
       components: [
         { id: 'pIn',  type: 'Port', props: { label: 'X', bitWidth: 1, face: 'left'  } },
@@ -65,7 +65,7 @@ describe('Port MCP surface — compile', () => {
       ],
     });
 
-    // Compile must not throw — Port-only circuits are valid subcircuit definitions
+    // Compile must not throw- Port-only circuits are valid subcircuit definitions
     expect(() => facade.compile(circuit)).not.toThrow();
 
     const diagnostics = facade.validate(circuit);
@@ -84,7 +84,7 @@ describe('Port MCP surface — compile', () => {
 // Test 3: circuit_test resolves test vector columns to Port labels
 // ---------------------------------------------------------------------------
 
-describe('Port MCP surface — test vectors resolve Port labels', () => {
+describe('Port MCP surface- test vectors resolve Port labels', () => {
   it('circuit_test resolves Port label as output column in test vectors', async () => {
     const facade = new DefaultSimulatorFacade(registry);
 
@@ -144,12 +144,12 @@ describe('Port MCP surface — test vectors resolve Port labels', () => {
 // Test 4: setSignal()/readSignal() resolve Port labels
 // ---------------------------------------------------------------------------
 
-describe('Port MCP surface — setSignal/readSignal via Port labels', () => {
+describe('Port MCP surface- setSignal/readSignal via Port labels', () => {
   it('setSignal and readSignal resolve Port labels in a wire-through circuit', () => {
     const facade = new DefaultSimulatorFacade(registry);
 
     // Circuit: In("src") → Port("mid") → Out("dst")
-    // Port is on the same net as In and Out — signal passes through transparently.
+    // Port is on the same net as In and Out- signal passes through transparently.
     const circuit = facade.build({
       components: [
         { id: 'src', type: 'In',   props: { label: 'src', bitWidth: 1 } },
@@ -164,7 +164,7 @@ describe('Port MCP surface — setSignal/readSignal via Port labels', () => {
 
     const engine = facade.compile(circuit);
 
-    // Drive via In label, read via Out label — both should work
+    // Drive via In label, read via Out label- both should work
     facade.setSignal(engine, 'src', 1);
     facade.step(engine);
     expect(facade.readSignal(engine, 'dst')).toBe(1);
@@ -179,11 +179,11 @@ describe('Port MCP surface — setSignal/readSignal via Port labels', () => {
     expect(facade.readSignal(engine, 'dst')).toBe(0);
   });
 
-  it('Port label resolves in labelSignalMap — setSignal via Port label drives the net', () => {
+  it('Port label resolves in labelSignalMap- setSignal via Port label drives the net', () => {
     const facade = new DefaultSimulatorFacade(registry);
 
     // Circuit: Port("drive") → Out("observe")
-    // Port is connected to Out — driving the Port net drives the Out.
+    // Port is connected to Out- driving the Port net drives the Out.
     // We also need an In as the digital driver source for the compiler.
     const circuit = facade.build({
       components: [

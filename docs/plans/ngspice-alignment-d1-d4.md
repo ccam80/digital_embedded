@@ -4,9 +4,9 @@ Here is the comprehensive executable diff:
 
 ---
 
-# NGSPICE STATE-ARCHITECTURE ALIGNMENT — EXECUTABLE DIFF
+# NGSPICE STATE-ARCHITECTURE ALIGNMENT- EXECUTABLE DIFF
 
-> **SUPERSEDED — `seedHistory()`** (lines 85, 108 below): the bulk-seed call that
+> **SUPERSEDED- `seedHistory()`** (lines 85, 108 below): the bulk-seed call that
 > filled `state1..state7` from `state0` was later **removed entirely**. ngspice
 > only seeds `state1` at firsttime entry (`dctran.c:349-350`); `state2`/`state3`
 > are filled from `state1` *inside* the `for(;;)` loop on the first transient
@@ -16,23 +16,23 @@ Here is the comprehensive executable diff:
 > single `states[1].set(states[0])` copy, and `copyState1ToState23`
 > (`state-pool.ts`) is invoked from inside the `for(;;)` loop while
 > `_stepCount === 0` (`analog-engine.ts:512-514`). Do **not** reintroduce a
-> `seedHistory()`-style bulk fill — it over-seeds `state4..state7` with DCOP
+> `seedHistory()`-style bulk fill- it over-seeds `state4..state7` with DCOP
 > values, which would diverge from ngspice the moment Gear order ≥ 4 is enabled.
 
-## Preamble — Key Design Decisions
+## Preamble- Key Design Decisions
 
 **D3 field name:** `isTransientDcop: boolean` on both `CKTCircuitContext` and `LoadContext`. Rejected alternative `isMODETRANOP` is too SPICE-internal; `isDcopForTransient` is verbose. `isTransientDcop` reads as "this is the DCOP that precedes transient," matches ngspice's `MODETRANOP` semantics, and composes naturally with `isDcOp && isTransientDcop` at element sites that want to mimic `vsrcload.c:410-411`.
 
-**D4 — single chosen path:** **Extend `LoadContext` with an `isAc: boolean` field. Change `stampAc` signature to `stampAc?(solver: ComplexSparseSolver, omega: number, ctx: LoadContext): void`.** Rejected `AcLoadContext` as a separate interface because (a) `uic` is already on `LoadContext` per D2, (b) AC elements frequently need the other `LoadContext` scalars (gmin, reltol, iabstol) for consistency, (c) a second interface duplicates the zero-alloc machinery already built into `CKTCircuitContext.loadCtx`, (d) ngspice itself reuses CKTcircuit in AC (no separate ACcircuit struct). The AC code path sets `ctx.isAc=true, ctx.isDcOp=false, ctx.isTransient=false` at `ac-analysis.ts` top of freq loop and hands the same `LoadContext` object to every `stampAc` call. Default to `isAc: false` everywhere else, just like `uic`.
+**D4- single chosen path:** **Extend `LoadContext` with an `isAc: boolean` field. Change `stampAc` signature to `stampAc?(solver: ComplexSparseSolver, omega: number, ctx: LoadContext): void`.** Rejected `AcLoadContext` as a separate interface because (a) `uic` is already on `LoadContext` per D2, (b) AC elements frequently need the other `LoadContext` scalars (gmin, reltol, iabstol) for consistency, (c) a second interface duplicates the zero-alloc machinery already built into `CKTCircuitContext.loadCtx`, (d) ngspice itself reuses CKTcircuit in AC (no separate ACcircuit struct). The AC code path sets `ctx.isAc=true, ctx.isDcOp=false, ctx.isTransient=false` at `ac-analysis.ts` top of freq loop and hands the same `LoadContext` object to every `stampAc` call. Default to `isAc: false` everywhere else, just like `uic`.
 
-**D1 ag buffer:** Remove `StatePool.ag` entirely. Migrate all tests away from `pool.ag`; keep tests that construct their own `ag: new Float64Array(8)` on LoadContext literals (they will continue to work with length 8 even though production uses 7 — LoadContext typing is `Float64Array`, not a length-parameterized variant). The phantom removal is the load-bearing change.
+**D1 ag buffer:** Remove `StatePool.ag` entirely. Migrate all tests away from `pool.ag`; keep tests that construct their own `ag: new Float64Array(8)` on LoadContext literals (they will continue to work with length 8 even though production uses 7- LoadContext typing is `Float64Array`, not a length-parameterized variant). The phantom removal is the load-bearing change.
 
 ---
 
-## D1 — REMOVE `StatePool.ag` PHANTOM BUFFER
+## D1- REMOVE `StatePool.ag` PHANTOM BUFFER
 
 ### FILE: src/solver/analog/state-pool.ts
-### REASON: D1 — delete phantom 8-length ag buffer; ngspice has one `CKTag[7]` on CKTcircuit, not on state storage.
+### REASON: D1- delete phantom 8-length ag buffer; ngspice has one `CKTag[7]` on CKTcircuit, not on state storage.
 ### NGSPICE REF: src/include/ngspice/cktdefs.h:97; src/maths/ni/nicomcof.c:39-45
 
 OLD (lines 44-53):
@@ -81,13 +81,13 @@ NEW:
 ```
 
 ### FILE: src/solver/analog/analog-engine.ts
-### REASON: D1 — these writes currently zero `statePool.ag`; must zero ctx.ag (the real coefficient buffer read by element.load via loadCtx.ag).
+### REASON: D1- these writes currently zero `statePool.ag`; must zero ctx.ag (the real coefficient buffer read by element.load via loadCtx.ag).
 ### NGSPICE REF: dctran.c:348
 
 OLD (lines 1107-1117):
 ```
       cac.statePool.analysisMode = "tran";
-      // ngspice dctran.c:346 — `CKTmode = (CKTmode & MODEUIC) | MODETRAN | MODEINITTRAN`.
+      // ngspice dctran.c:346- `CKTmode = (CKTmode & MODEUIC) | MODETRAN | MODEINITTRAN`.
       // Set isTransient ONCE here, post-DCOP / pre-first-step. Reactive elements
       // (capacitor, inductor, transmission-line, transformer, …) gate their
       // companion stamps on `isTransient || isDcOp`; without this assignment the
@@ -102,13 +102,13 @@ OLD (lines 1107-1117):
 NEW:
 ```
       cac.statePool.analysisMode = "tran";
-      // ngspice dctran.c:346 — `CKTmode = (CKTmode & MODEUIC) | MODETRAN | MODEINITTRAN`.
+      // ngspice dctran.c:346- `CKTmode = (CKTmode & MODEUIC) | MODETRAN | MODEINITTRAN`.
       // Set isTransient ONCE here, post-DCOP / pre-first-step. Reactive elements
       // (capacitor, inductor, transmission-line, transformer, …) gate their
       // companion stamps on `isTransient || isDcOp`; without this assignment the
       // entire reactive ladder is invisible to every transient NR call.
       ctx.isTransient = true;
-      // Exit MODETRANOP DCOP — reset the transient-DCOP distinguisher flag
+      // Exit MODETRANOP DCOP- reset the transient-DCOP distinguisher flag
       // before the first real transient step (ngspice dctran.c:346 clears
       // MODETRANOP along with MODEDCOP when switching to MODETRAN).
       ctx.isTransientDcop = false;
@@ -123,7 +123,7 @@ NEW:
 ```
 
 ### FILE: src/solver/analog/__tests__/state-pool.test.ts
-### REASON: D1 — `describe('ag[] integration coefficients')` asserts pool.ag is an 8-length Float64Array that reset() zeros. The field is gone; these assertions must be deleted.
+### REASON: D1- `describe('ag[] integration coefficients')` asserts pool.ag is an 8-length Float64Array that reset() zeros. The field is gone; these assertions must be deleted.
 ### NGSPICE REF: n/a (test-only)
 
 OLD (lines 336-367):
@@ -136,7 +136,7 @@ OLD (lines 336-367):
       expect(Array.from(pool.ag)).toEqual([0, 0, 0, 0, 0, 0, 0, 0]);
     });
 
-    it('ag is writable — setting ag[0] and ag[1] is reflected', () => {
+    it('ag is writable- setting ag[0] and ag[1] is reflected', () => {
       const pool = new StatePool(4);
       pool.ag[0] = 1e6;
       pool.ag[1] = -1e6;
@@ -173,7 +173,7 @@ NEW:
 ```
 
 ### FILE: src/solver/analog/__tests__/fet-base.test.ts
-### REASON: D1 — test harness sets `pool.ag[0] = ag0; pool.ag[1] = ag1` then passes `pool.ag` as LoadContext.ag. Must migrate to a local Float64Array.
+### REASON: D1- test harness sets `pool.ag[0] = ag0; pool.ag[1] = ag1` then passes `pool.ag` as LoadContext.ag. Must migrate to a local Float64Array.
 ### NGSPICE REF: n/a (test-only)
 
 OLD (lines 630-671):
@@ -264,19 +264,19 @@ NEW:
     };
 ```
 
-### Additional D1 test migrations — replace `pool.ag.set(ag)` / `pool.ag[x] = y` with LoadContext-owned `ag` buffer
+### Additional D1 test migrations- replace `pool.ag.set(ag)` / `pool.ag[x] = y` with LoadContext-owned `ag` buffer
 
 The following files contain `pool.ag.*` references that must be migrated. Pattern: replace `pool.ag.set(ag)` with a no-op (ag already constructed locally as `new Float64Array(8)` or `(7)` and passed into the LoadContext literal). If the test constructs `ag` into `pool.ag`, redirect that into the local `ag` variable that feeds into the LoadContext literal.
 
 Enumerated hunks (file:line from Grep):
 
-- `src/components/semiconductors/__tests__/varactor.test.ts:445` — remove `pool.ag.set(ag);` (ag is already in LoadContext literal at line 96)
-- `src/components/semiconductors/__tests__/tunnel-diode.test.ts:422` — remove `pool.ag.set(ag);` (ag in literal at 90)
-- `src/components/semiconductors/__tests__/mosfet.test.ts:1106` — remove `pool.ag.set(ag);` (ag in literal at 102/1265)
-- `src/components/semiconductors/__tests__/diode.test.ts:948` — remove `pool.ag.set(ag);`
-- `src/components/semiconductors/__tests__/diode.test.ts:1132` — remove `pool.ag.set(ag);`
-- `src/components/semiconductors/__tests__/diode-state-pool.test.ts:273` — remove `pool.ag.set(ag);`
-- `src/components/io/__tests__/led.test.ts:921` — remove `pool.ag.set(ag);`
+- `src/components/semiconductors/__tests__/varactor.test.ts:445`- remove `pool.ag.set(ag);` (ag is already in LoadContext literal at line 96)
+- `src/components/semiconductors/__tests__/tunnel-diode.test.ts:422`- remove `pool.ag.set(ag);` (ag in literal at 90)
+- `src/components/semiconductors/__tests__/mosfet.test.ts:1106`- remove `pool.ag.set(ag);` (ag in literal at 102/1265)
+- `src/components/semiconductors/__tests__/diode.test.ts:948`- remove `pool.ag.set(ag);`
+- `src/components/semiconductors/__tests__/diode.test.ts:1132`- remove `pool.ag.set(ag);`
+- `src/components/semiconductors/__tests__/diode-state-pool.test.ts:273`- remove `pool.ag.set(ag);`
+- `src/components/io/__tests__/led.test.ts:921`- remove `pool.ag.set(ag);`
 
 Exact-form deletion for each:
 
@@ -306,10 +306,10 @@ NEW:
 
 ---
 
-## D2 — PLUMB `loadCtx.uic` FROM `params.uic`; ADD `uic` TO `LoadContext` SHAPE AS NON-OPTIONAL (ALREADY IS); REMOVE UNSOUND CAST IN `newton-raphson.ts`
+## D2- PLUMB `loadCtx.uic` FROM `params.uic`; ADD `uic` TO `LoadContext` SHAPE AS NON-OPTIONAL (ALREADY IS); REMOVE UNSOUND CAST IN `newton-raphson.ts`
 
 ### FILE: src/solver/analog/ckt-context.ts
-### REASON: D2 — hard-coded `uic: false` discards `params.uic` set by user. ngspice traninit.c:35 seeds MODEUIC mask then dctran.c:190,346,366 preserve it across MODEDCOP→MODETRANOP→MODETRAN transitions.
+### REASON: D2- hard-coded `uic: false` discards `params.uic` set by user. ngspice traninit.c:35 seeds MODEUIC mask then dctran.c:190,346,366 preserve it across MODEDCOP→MODETRANOP→MODETRAN transitions.
 ### NGSPICE REF: src/frontend/sim/traninit.c:35; src/ciderlib/twod/dctran.c:190,346,366
 
 OLD (lines 529-536):
@@ -368,7 +368,7 @@ NEW:
 ```
 
 ### FILE: src/solver/analog/newton-raphson.ts
-### REASON: D2 — UIC was read via unsound `(statePool as { uic?: boolean })` cast. StatePool does not have `uic`; the flag belongs on LoadContext/ctx. Use `ctx.loadCtx.uic` (the plumbed value) directly.
+### REASON: D2- UIC was read via unsound `(statePool as { uic?: boolean })` cast. StatePool does not have `uic`; the flag belongs on LoadContext/ctx. Use `ctx.loadCtx.uic` (the plumbed value) directly.
 ### NGSPICE REF: niiter.c MODEUIC check; traninit.c:35
 
 OLD (lines 271-280):
@@ -388,7 +388,7 @@ OLD (lines 271-280):
 NEW:
 ```
   // MODETRANOP && MODEUIC: single CKTload, no iteration (ngspice dctran.c UIC path).
-  // D2/D3: gated on isTransientDcop (MODETRANOP-only) per dctran.c — standalone
+  // D2/D3: gated on isTransientDcop (MODETRANOP-only) per dctran.c- standalone
   // .OP never takes the UIC shortcut even if uic=true in the params.
   if (ctx.isTransientDcop && ctx.loadCtx.uic) {
     [voltages, prevVoltages] = [prevVoltages, voltages];
@@ -403,10 +403,10 @@ NEW:
 
 ---
 
-## D3 — DISTINGUISH MODETRANOP FROM MODEDCOP
+## D3- DISTINGUISH MODETRANOP FROM MODEDCOP
 
 ### FILE: src/solver/analog/load-context.ts
-### REASON: D3 — new required field on LoadContext; D2 already provides uic; D4 adds isAc.
+### REASON: D3- new required field on LoadContext; D2 already provides uic; D4 adds isAc.
 ### NGSPICE REF: src/include/ngspice/cktdefs.h:171-172 (MODEDCOP=0x10, MODETRANOP=0x20); src/ciderlib/twod/dctran.c:190,219-220,231-232
 
 OLD (lines 56-70):
@@ -463,7 +463,7 @@ NEW:
 ```
 
 ### FILE: src/solver/analog/ckt-context.ts
-### REASON: D3 — add `isTransientDcop` and `isAc` as boolean fields on CKTCircuitContext, initialised false, mirrored into loadCtx by cktLoad.
+### REASON: D3- add `isTransientDcop` and `isAc` as boolean fields on CKTCircuitContext, initialised false, mirrored into loadCtx by cktLoad.
 ### NGSPICE REF: cktdefs.h:171-172
 
 OLD (lines 228-240):
@@ -511,7 +511,7 @@ NEW:
 ```
 
 ### FILE: src/solver/analog/ckt-load.ts
-### REASON: D3/D4 — cktLoad is the single site that synchronizes ctx → loadCtx per NR iteration; propagate new flags.
+### REASON: D3/D4- cktLoad is the single site that synchronizes ctx → loadCtx per NR iteration; propagate new flags.
 ### NGSPICE REF: cktload.c:29-158
 
 OLD (lines 45-59):
@@ -554,8 +554,8 @@ NEW:
   ctx.noncon = ctx.loadCtx.noncon.value;
 ```
 
-### FILE: src/solver/analog/analog-engine.ts — set `isTransientDcop=true` at entry to `_transientDcop()`, keep false in `dcOperatingPoint()`.
-### REASON: D3 — the two DCOP paths must be distinguishable at solveDcOperatingPoint time.
+### FILE: src/solver/analog/analog-engine.ts- set `isTransientDcop=true` at entry to `_transientDcop()`, keep false in `dcOperatingPoint()`.
+### REASON: D3- the two DCOP paths must be distinguishable at solveDcOperatingPoint time.
 ### NGSPICE REF: dctran.c:190,219-220,231-232 (sets MODETRANOP before CKTop)
 
 OLD (lines 740-750, inside `dcOperatingPoint()`):
@@ -631,8 +631,8 @@ NEW:
 (The D1 block above already clears `ctx.isTransientDcop = false` inside `_seedFromDcop`.)
 
 ### FILE: src/solver/analog/dc-operating-point.ts
-### REASON: D3 — `runNR()` currently forces `isTransient=false`. It must preserve `isTransientDcop` across sub-solves but never set `isTransient=true`. No logic change — document intent and explicitly leave isTransientDcop alone (it's set by the caller, engine level).
-### NGSPICE REF: cktop.c (all sub-solves stay under MODEDCOP|MODETRANOP — never flip to MODETRAN)
+### REASON: D3- `runNR()` currently forces `isTransient=false`. It must preserve `isTransientDcop` across sub-solves but never set `isTransient=true`. No logic change- document intent and explicitly leave isTransientDcop alone (it's set by the caller, engine level).
+### NGSPICE REF: cktop.c (all sub-solves stay under MODEDCOP|MODETRANOP- never flip to MODETRAN)
 
 OLD (lines 144-171):
 ```
@@ -645,7 +645,7 @@ function runNR(
   exactMaxIterations?: boolean,
 ): StepResult {
   ctx.isDcOp = true;
-  // Mutually exclusive with isTransient — matches ngspice's MODEDCOP/MODETRAN
+  // Mutually exclusive with isTransient- matches ngspice's MODEDCOP/MODETRAN
   // bitfield where dctran.c:346 overwrites MODEDCOP with MODETRAN. Without this
   // pair, a reset() → step() → dcOp() sequence would carry isTransient=true
   // into the DCOP solve and elements gating on `isTransient || isDcOp` would
@@ -677,7 +677,7 @@ function runNR(
   exactMaxIterations?: boolean,
 ): StepResult {
   ctx.isDcOp = true;
-  // Mutually exclusive with isTransient — matches ngspice's MODEDCOP/MODETRAN
+  // Mutually exclusive with isTransient- matches ngspice's MODEDCOP/MODETRAN
   // bitfield where dctran.c:346 overwrites MODEDCOP with MODETRAN. Without this
   // pair, a reset() → step() → dcOp() sequence would carry isTransient=true
   // into the DCOP solve and elements gating on `isTransient || isDcOp` would
@@ -685,9 +685,9 @@ function runNR(
   ctx.isTransient = false;
   // D3: isTransientDcop is set by the CALLER (analog-engine.ts) for the
   // _transientDcop path and left false for standalone .OP. Do NOT modify it
-  // here — all DCOP sub-solves (gmin stepping, source stepping, initSmsig
+  // here- all DCOP sub-solves (gmin stepping, source stepping, initSmsig
   // finalize) inherit the caller's MODETRANOP vs MODEDCOP distinction.
-  // isAc stays false — there is no AC sub-solve inside the DCOP ladder.
+  // isAc stays false- there is no AC sub-solve inside the DCOP ladder.
   ctx.isAc = false;
   ctx.maxIterations = maxIterations;
   ctx.initialGuess = initialGuess;
@@ -706,10 +706,10 @@ function runNR(
 
 ---
 
-## D4 — ADD `isAc` FLAG AND EXTEND `stampAc` SIGNATURE
+## D4- ADD `isAc` FLAG AND EXTEND `stampAc` SIGNATURE
 
 ### FILE: src/solver/analog/element.ts
-### REASON: D4 — stampAc must receive LoadContext so `isAc`, `uic`, `gmin`, `reltol` are observable by element stamps.
+### REASON: D4- stampAc must receive LoadContext so `isAc`, `uic`, `gmin`, `reltol` are observable by element stamps.
 ### NGSPICE REF: acan.c:285 (CKTmode = (CKTmode & MODEUIC) | MODEAC); element ACload() functions read CKTmode bits.
 
 OLD (lines 94-103):
@@ -745,7 +745,7 @@ NEW:
 ```
 
 ### FILE: src/core/analog-types.ts
-### REASON: D4 — mirror signature in the core interface so registry consumers agree.
+### REASON: D4- mirror signature in the core interface so registry consumers agree.
 ### NGSPICE REF: acan.c:285
 
 OLD (lines 178-182):
@@ -770,7 +770,7 @@ NEW:
 ```
 
 ### FILE: src/solver/analog/ac-analysis.ts
-### REASON: D4 — set MODEAC bits on the AC analysis's CKTCircuitContext, hand its `loadCtx` to every stampAc call.
+### REASON: D4- set MODEAC bits on the AC analysis's CKTCircuitContext, hand its `loadCtx` to every stampAc call.
 ### NGSPICE REF: acan.c:285
 
 OLD (lines 181-193, inside the frequency loop at `for (let fi = 0; ...`):
@@ -792,7 +792,7 @@ OLD (lines 181-193, inside the frequency loop at `for (let fi = 0; ...`):
 
 NEW:
 ```
-    // D4: ngspice acan.c:285 — `CKTmode = (CKTmode & MODEUIC) | MODEAC` at top
+    // D4: ngspice acan.c:285- `CKTmode = (CKTmode & MODEUIC) | MODEAC` at top
     // of frequency loop. We preserve the LoadContext's uic field (set from
     // params.uic at ctx construction) and flip isAc=true / isDcOp=false /
     // isTransient=false for the entire sweep.
@@ -821,7 +821,7 @@ NEW:
       }
 ```
 
-### D4 stampAc implementations — signature updates
+### D4 stampAc implementations- signature updates
 
 Every test stub that defines `stampAc` must accept a third optional parameter. Because `stampAc` is optional on the interface and the new signature includes a third argument, TypeScript will accept stubs that omit the third argument only if they use the looser `stampAc?` member-initialization style. To be safe, every `stampAc` implementation that does NOT use a prefix-underscore unused pattern must receive an `_ctx?: LoadContext` or `_ctx: LoadContext` param.
 
@@ -1037,7 +1037,7 @@ NEW:
 
 ---
 
-## D2/D3 — TEST LOADCONTEXT LITERAL MIGRATIONS (add `isTransientDcop: false, isAc: false` to every literal)
+## D2/D3- TEST LOADCONTEXT LITERAL MIGRATIONS (add `isTransientDcop: false, isAc: false` to every literal)
 
 Every LoadContext literal in the codebase needs `isTransientDcop: false, isAc: false` appended (both default). The canonical insertion point is **immediately after the `isTransient: X` line**.
 
@@ -1142,7 +1142,7 @@ NEW:
 
 ---
 
-## SUMMARY BLOCK — Every File Touched
+## SUMMARY BLOCK- Every File Touched
 
 | File | Hunks | D-label(s) |
 |------|-------|------------|
@@ -1167,23 +1167,23 @@ NEW:
 
 ---
 
-## VERIFICATION CHECKLIST — Post-Apply
+## VERIFICATION CHECKLIST- Post-Apply
 
 Run these in order. Each should succeed.
 
-1. **Grep sanity — D1 (phantom ag must be gone):**
+1. **Grep sanity- D1 (phantom ag must be gone):**
    ```
    Grep: pattern="pool\.ag|statePool\.ag" glob="src/**/*.ts"
    ```
    Expected: zero matches in production; zero matches in `__tests__` (all tests migrated to LoadContext-owned ag).
 
-2. **Grep sanity — D2 (no unsound uic cast):**
+2. **Grep sanity- D2 (no unsound uic cast):**
    ```
    Grep: pattern="as \{ uic\?: boolean \}" glob="src/**/*.ts"
    ```
    Expected: zero matches.
 
-3. **Grep sanity — D3 (every LoadContext literal has isTransientDcop):**
+3. **Grep sanity- D3 (every LoadContext literal has isTransientDcop):**
    ```
    Grep: pattern="uic: (true|false)" glob="src/**/*.ts" output_mode="files_with_matches"
    ```
@@ -1193,11 +1193,11 @@ Run these in order. Each should succeed.
    ```
    Every file in the first set must appear in the second.
 
-4. **Grep sanity — D4 (every stampAc takes 3 args or is the interface):**
+4. **Grep sanity- D4 (every stampAc takes 3 args or is the interface):**
    ```
    Grep: pattern="stampAc\(.*?\).*?void" output_mode="content" glob="src/**/*.ts"
    ```
-   Manually check none use only 2 parameters (except `stampAc?` interface declarations — but those are updated).
+   Manually check none use only 2 parameters (except `stampAc?` interface declarations- but those are updated).
 
 5. **Typecheck:**
    ```
@@ -1205,7 +1205,7 @@ Run these in order. Each should succeed.
    ```
    Expected: zero errors.
 
-6. **Targeted test runs (per user feedback guidance — target numerical-critical subsystems only):**
+6. **Targeted test runs (per user feedback guidance- target numerical-critical subsystems only):**
    ```
    npx vitest run src/solver/analog/__tests__/state-pool.test.ts
    npx vitest run src/solver/analog/__tests__/dc-operating-point.test.ts
@@ -1231,19 +1231,19 @@ Run these in order. Each should succeed.
 9. **ngspice-harness spot check** (per CLAUDE.md "First Tool for Numerical Issues"):
    - Load a BJT stress circuit (any existing harness fixture).
    - Capture per-iteration voltages for a transient step following DCOP.
-   - Confirm values match the pre-change baseline to machine precision (D1-D3 are semantic cleanups; D1's `ctx.ag[0] = 0` is functionally identical to the old `statePool.ag[0] = 0` because no production element actually read `statePool.ag` — only `loadCtx.ag` which was already `ctx.ag`).
+   - Confirm values match the pre-change baseline to machine precision (D1-D3 are semantic cleanups; D1's `ctx.ag[0] = 0` is functionally identical to the old `statePool.ag[0] = 0` because no production element actually read `statePool.ag`- only `loadCtx.ag` which was already `ctx.ag`).
 
 ---
 
-## LANDING PLAN — Recommended Commit Boundaries
+## LANDING PLAN- Recommended Commit Boundaries
 
-### Commit 1: D1 (phantom ag removal) — self-contained
+### Commit 1: D1 (phantom ag removal)- self-contained
 - `src/solver/analog/state-pool.ts`
 - `src/solver/analog/analog-engine.ts` (just lines 1114-1115: change `cac.statePool.ag[0/1] = 0` to `ctx.ag[0/1] = 0`)
 - `src/solver/analog/integration.ts` (doc comment only)
 - `src/solver/analog/__tests__/state-pool.test.ts` (delete `ag[] integration coefficients` block)
 - All `pool.ag.set(ag)` deletions across seven test files
-- `src/solver/analog/__tests__/fet-base.test.ts` (full LoadContext rewrite at line ~625-672 — migrate ag allocation)
+- `src/solver/analog/__tests__/fet-base.test.ts` (full LoadContext rewrite at line ~625-672- migrate ag allocation)
 
 Verification: `npm run test:q -- state-pool fet-base varactor tunnel-diode mosfet diode led` should pass.
 
@@ -1282,8 +1282,8 @@ Verification: `npm run test:q -- ac-analysis compiler coordinator compile compil
 1. **Do not touch `src/solver/analog/bridge-adapter.ts`** per preamble.
 2. **Do not change `deltaOld[0..6] = maxTimeStep` seeding** per preamble correction.
 3. The new field `isTransientDcop` is *compatible* with `isDcOp=true`. A transient-boot DCOP has both flags set; a standalone .OP has only `isDcOp=true`. Elements that want ngspice's exact MODETRANOP gating write `if (ctx.isDcOp && ctx.isTransientDcop)` (mirror of `MODE & MODETRANOP`). Elements that want ngspice's exact MODEDCOP gating (standalone .OP only) write `if (ctx.isDcOp && !ctx.isTransientDcop)`.
-4. `isAc` is **mutually exclusive** with `isDcOp` and `isTransient`. This mirrors the fact that AC sweeps use only `MODEAC|MODEUIC` — never `MODEDCOP`, `MODETRAN`, or `MODETRANOP`. Elements may safely assume `ctx.isAc ⇒ !ctx.isDcOp && !ctx.isTransient`. The DC-OP that *precedes* an AC sweep runs with `isDcOp=true, isAc=false` like any other DCOP; only the frequency-sweep loop itself sets `isAc=true`.
-5. In `dc-operating-point.ts`'s `dcopFinalize` sub-solve (initSmsig pass), `isTransientDcop` is inherited from the ctx (set by caller). ngspice does the same — initSmsig does not change the MODETRANOP bit. No explicit action needed; the "preserve caller's value" intent in the updated `runNR` comment covers this.
+4. `isAc` is **mutually exclusive** with `isDcOp` and `isTransient`. This mirrors the fact that AC sweeps use only `MODEAC|MODEUIC`- never `MODEDCOP`, `MODETRAN`, or `MODETRANOP`. Elements may safely assume `ctx.isAc ⇒ !ctx.isDcOp && !ctx.isTransient`. The DC-OP that *precedes* an AC sweep runs with `isDcOp=true, isAc=false` like any other DCOP; only the frequency-sweep loop itself sets `isAc=true`.
+5. In `dc-operating-point.ts`'s `dcopFinalize` sub-solve (initSmsig pass), `isTransientDcop` is inherited from the ctx (set by caller). ngspice does the same- initSmsig does not change the MODETRANOP bit. No explicit action needed; the "preserve caller's value" intent in the updated `runNR` comment covers this.
 6. The `AcAnalysis` constructor at `ac-analysis.ts:74-87` creates a **new `CKTCircuitContext`** per `run()` call (line 102: `new CKTCircuitContext(...)`). This means `dcCtx.loadCtx` is fresh, `isAc=false` at construction (via the new ckt-context literal default). The `acLoadCtx.isAc = true` assignment in the new hunk flips it just before the sweep, matching ngspice's `CKTmode = (CKTmode & MODEUIC) | MODEAC` at acan.c:285. The `uic` bit is preserved because the ckt-context constructor seeds `uic: params.uic ?? false` (D2 fix) from the same ResolvedSimulationParams the engine used for DCOP.
 
 Absolute paths of every key file touched:

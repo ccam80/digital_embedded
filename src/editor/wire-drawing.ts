@@ -1,5 +1,5 @@
 /**
- * WireDrawingMode — manages the interactive wire-drawing interaction.
+ * WireDrawingMode- manages the interactive wire-drawing interaction.
  *
  * The user clicks an output pin to start a wire. Manhattan-routed preview
  * segments follow the cursor. Click adds waypoints; click on an input pin
@@ -43,7 +43,7 @@ function isPointOnSegmentInterior(p: Point, a: Point, b: Point): boolean {
     const maxX = Math.max(a.x, b.x);
     return p.x > minX && p.x < maxX;
   }
-  // Diagonal — not a valid wire in this editor
+  // Diagonal- not a valid wire in this editor
   return false;
 }
 
@@ -83,7 +83,7 @@ export function isWireEndpoint(point: Point, circuit: Circuit): boolean {
  *
  * Unlike the blanket `circuit.splitWiresAtJunctions()`, this only considers
  * the path's start and end points (plus existing wire endpoints and pin
- * positions) as potential split points — NOT intermediate routing corners
+ * positions) as potential split points- NOT intermediate routing corners
  * of the new wire. This prevents false junctions when a Manhattan-routed
  * wire path crosses an existing wire at an intermediate corner.
  */
@@ -378,7 +378,7 @@ export class WireDrawingMode {
  * Compute Manhattan-routed segments from `from` to `to`.
  *
  * When `lockedAxis` is provided ('h' or 'v'), that axis is always routed
- * first — this prevents the routing from flip-flopping once the user has
+ * first- this prevents the routing from flip-flopping once the user has
  * committed to a direction (>= 2 grid units of movement).
  *
  * Without a locked axis, the heuristic picks the axis with more displacement

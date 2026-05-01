@@ -12,7 +12,7 @@ import type { SubcircuitNavigator } from './canvas-subcircuit.js';
 import type { MemoryEditorController } from './canvas-memory-editor.js';
 import { hitTestElements } from '../editor/hit-test.js';
 
-/** Component type names that are togglable during simulation — skip property popup on dblclick. */
+/** Component type names that are togglable during simulation- skip property popup on dblclick. */
 const TOGGLABLE_TYPES = new Set(['In', 'Clock', 'Button', 'Switch', 'SwitchDT', 'DipSwitch']);
 
 /** Memory component type IDs that support the hex editor. */

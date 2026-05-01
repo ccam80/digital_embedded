@@ -283,11 +283,11 @@ export function createPJfetElement(
   // Ephemeral per-iteration icheck flag (jfetload.c:500-508 CKTnoncon bump).
   let icheckLimited = false;
 
-  // Internal nodes allocated during setup() — jfetset.c:115-158
+  // Internal nodes allocated during setup()- jfetset.c:115-158
   let _sourcePrimeNode = -1;
   let _drainPrimeNode  = -1;
 
-  // TSTALLOC handles — closure-local per A.9, jfetset.c:166-180
+  // TSTALLOC handles- closure-local per A.9, jfetset.c:166-180
   let _hDDP  = -1, _hGDP  = -1, _hGSP  = -1, _hSSP  = -1;
   let _hDPD  = -1, _hDPG  = -1, _hDPSP = -1;
   let _hSPG  = -1, _hSPS  = -1, _hSPDP = -1;
@@ -313,11 +313,11 @@ export function createPJfetElement(
       const drainNode  = el._pinNodes.get("D")!;
       const sourceNode = el._pinNodes.get("S")!;
 
-      // State slots — jfetset.c:112-113
+      // State slots- jfetset.c:112-113
       el._stateBase = ctx.allocStates(13);
       base = el._stateBase;
 
-      // Internal nodes — jfetset.c:115-158 (source prime before drain prime)
+      // Internal nodes- jfetset.c:115-158 (source prime before drain prime)
       internalLabels.length = 0;
       if (params.RS === 0) {
         _sourcePrimeNode = sourceNode;
@@ -335,7 +335,7 @@ export function createPJfetElement(
       const sp = _sourcePrimeNode;
       const dp = _drainPrimeNode;
 
-      // TSTALLOC sequence — jfetset.c:166-180 (identical to NJFET)
+      // TSTALLOC sequence- jfetset.c:166-180 (identical to NJFET)
       _hDDP  = solver.allocElement(drainNode,  dp);          // (1)
       _hGDP  = solver.allocElement(gateNode,   dp);          // (2)
       _hGSP  = solver.allocElement(gateNode,   sp);          // (3)

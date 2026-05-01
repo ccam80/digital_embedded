@@ -72,7 +72,7 @@ export function getComponentLabel(el: CircuitElement): string | undefined {
  * Find a component by label or instanceId in a circuit.
  *
  * Resolution order:
- * 1. Exact instanceId match (always unambiguous — takes priority)
+ * 1. Exact instanceId match (always unambiguous- takes priority)
  * 2. User label (getAttribute("label"), or NetName for Tunnels)
  *
  * When multiple components share a label (e.g. many Tunnels named "C"),
@@ -157,15 +157,15 @@ export function resolvePin(circuit: Circuit, address: string): ResolvedPin {
  * named subcircuit.
  *
  * Example: resolveScope(topCircuit, registry, "MCU/sysreg") walks:
- *   1. Find element labelled "MCU" in topCircuit — must be a SubcircuitElement
+ *   1. Find element labelled "MCU" in topCircuit- must be a SubcircuitElement
  *   2. Get its inner Circuit
- *   3. Find element labelled "sysreg" in that inner Circuit — must be a SubcircuitElement
+ *   3. Find element labelled "sysreg" in that inner Circuit- must be a SubcircuitElement
  *   4. Return its inner Circuit
  *
  * Throws FacadeError if any segment is not found or is not a subcircuit.
  *
  * @param circuit   The top-level (or current) circuit to start walking from.
- * @param _registry Unused — reserved for future registry-based lookup.
+ * @param _registry Unused- reserved for future registry-based lookup.
  * @param scope     Slash-separated path, e.g. "MCU/sysreg" or just "sysreg".
  * @returns         The inner Circuit of the leaf subcircuit named by scope.
  */

@@ -30,18 +30,18 @@ import type { IntegrationMethod } from "./element.js";
 // Method-specific LTE coefficients (ngspice trdefs.h / geardefs.h)
 // ---------------------------------------------------------------------------
 
-// ngspice cktterr.c:32-35 trapCoeff[] — must match ngspice's truncated decimal
+// ngspice cktterr.c:32-35 trapCoeff[]- must match ngspice's truncated decimal
 // literals bit-exact, NOT the closer rational fractions. Using `1/12` instead of
 // `.08333333333` produces a different double (3.3e-12 apart) which propagates
 // through the LTE formula `del = trtol*tol/(factor*|diff|)` and `sqrt(del)` to
-// a 2ULP-different proposed dt — visible in rlc-oscillator parity at step=1.
+// a 2ULP-different proposed dt- visible in rlc-oscillator parity at step=1.
 const TRAP_LTE_FACTORS = [0.5, 0.08333333333];
 
 /**
  * LTE error factor for Gear (BDF) methods, indexed by (order - 1).
  * Values are the EXACT decimal literals ngspice ships in cktterr.c:24-31
  * gearCoeff[]. We deliberately do NOT replace them with the closer rational
- * fractions (2/9, 3/22, 10/137, 20/343) — those produce different doubles
+ * fractions (2/9, 3/22, 10/137, 20/343)- those produce different doubles
  * and break bit-exact parity even though they are mathematically more correct.
  *   [0] = 0.5
  *   [1] = .2222222222   (≈ 2/9)

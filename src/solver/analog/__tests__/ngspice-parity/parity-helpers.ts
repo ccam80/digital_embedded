@@ -17,7 +17,7 @@ export const describeIfDll = dllAvailable() ? describe : describe.skip;
 
 /**
  * Assert that two IterationSnapshots match bit-exact across every observable
- * field the harness publishes. Fields covered (in order — failures surface
+ * field the harness publishes. Fields covered (in order- failures surface
  * earliest divergence first):
  *
  *   • Per-iteration scalars: matrixSize, rhsBufSize
@@ -35,7 +35,7 @@ export const describeIfDll = dllAvailable() ? describe : describe.skip;
  *
  * Design notes:
  *  - All numeric comparisons are bit-exact (`absDelta === 0`). Tolerances
- *    are not allowed — see CLAUDE.md "ngspice Parity Vocabulary" §banned.
+ *    are not allowed- see CLAUDE.md "ngspice Parity Vocabulary" ssbanned.
  *  - `limitingEvents.limitType` is INTENTIONALLY NOT compared. ngspice
  *    labels every junction "pnjlim" via the bridge, while our engine
  *    distinguishes "fetlim" / "limvds" / "pnjlim" by call site. The
@@ -72,11 +72,11 @@ export function assertIterationMatch(
     ).toBe(ngspice.rhsBufSize);
   }
 
-  // ----- prevVoltages (rhsOld) — exact IEEE-754 ---------------------------
-  // Slot 0 is the ground row — always 0 on both engines, safe to compare.
+  // ----- prevVoltages (rhsOld)- exact IEEE-754 ---------------------------
+  // Slot 0 is the ground row- always 0 on both engines, safe to compare.
   _assertFloat64ArrayMatch(ours.prevVoltages, ngspice.prevVoltages, `${ctxLabel} rhsOld`);
 
-  // ----- preSolveRhs — exact IEEE-754 -------------------------------------
+  // ----- preSolveRhs- exact IEEE-754 -------------------------------------
   // SKIP slot 0 (ground row). ngspice's TrashCan pattern lets devices
   // stamp into the ground row before LU; we don't (architectural choice
   // documented in capture.ts). Comparing slot 0 of preSolveRhs would
@@ -88,7 +88,7 @@ export function assertIterationMatch(
     { skipGroundSlot: true },
   );
 
-  // ----- voltages (post-solve solution) — exact IEEE-754 ------------------
+  // ----- voltages (post-solve solution)- exact IEEE-754 ------------------
   // Slot 0 (ground voltage) is always 0 after the solve; comparable.
   _assertFloat64ArrayMatch(ours.voltages, ngspice.voltages, `${ctxLabel} voltages`);
 
@@ -215,7 +215,7 @@ function _assertFloat64ArrayMatch(
   opts: { skipGroundSlot?: boolean } = {},
 ): void {
   // ngspice's bridge reports rhsBufSize=1 (a single-slot placeholder) during
-  // DCOP-init iterations because CKTmatrix is sized incrementally — the
+  // DCOP-init iterations because CKTmatrix is sized incrementally- the
   // SMPmatSize used by Float64Array decoding only reaches N+1 once the matrix
   // is fully linked. Skip length parity in that case; the substantive data
   // simply isn't there to compare. Otherwise require exact-length equality.
@@ -335,9 +335,9 @@ function _assertMatrixMatch(
   ngspice: IterationSnapshot,
   ctxLabel: string,
 ): void {
-  // Pair entries by (row, col). SKIP ground row/col (index 0) — ngspice's
+  // Pair entries by (row, col). SKIP ground row/col (index 0)- ngspice's
   // TrashCan pattern stamps into row 0 / col 0; we don't. This is the
-  // documented architectural choice — comparing those cells would always
+  // documented architectural choice- comparing those cells would always
   // flag a known asymmetry rather than any real divergence.
   const ngByCell = new Map<string, number>();
   for (const e of ngspice.matrix) {

@@ -1,5 +1,5 @@
 /**
- * WaveformRenderer — canvas drawing logic for digital and bus waveforms.
+ * WaveformRenderer- canvas drawing logic for digital and bus waveforms.
  *
  * Responsible solely for drawing. It receives a list of WaveformChannel objects
  * and a viewport descriptor, then paints onto a CanvasRenderingContext2D.
@@ -12,7 +12,7 @@
 import type { WaveformSample } from "./waveform-data.js";
 
 // ---------------------------------------------------------------------------
-// DrawCommand — testable output of the renderer
+// DrawCommand- testable output of the renderer
 // ---------------------------------------------------------------------------
 
 /**
@@ -31,7 +31,7 @@ export type DrawCommand =
   | { kind: "setFillStyle"; style: string };
 
 // ---------------------------------------------------------------------------
-// RenderContext — thin abstraction over Canvas2D
+// RenderContext- thin abstraction over Canvas2D
 // ---------------------------------------------------------------------------
 
 /**
@@ -54,7 +54,7 @@ export interface WaveformRenderContext {
 }
 
 // ---------------------------------------------------------------------------
-// Viewport — describes which time range is visible
+// Viewport- describes which time range is visible
 // ---------------------------------------------------------------------------
 
 export interface WaveformViewport {
@@ -71,7 +71,7 @@ export interface WaveformViewport {
 }
 
 // ---------------------------------------------------------------------------
-// WaveformRenderer — stateless drawing functions
+// WaveformRenderer- stateless drawing functions
 // ---------------------------------------------------------------------------
 
 /** Colour constants for waveform drawing. */
@@ -243,7 +243,7 @@ export function drawTimeAxis(
 
   const sps = vp.stepsPerSecond ?? 1000;
 
-  // Tick marks — approximately every 80 pixels
+  // Tick marks- approximately every 80 pixels
   const tickCount = Math.max(2, Math.floor(drawWidth / 80));
   const rawInterval = timeRange / tickCount;
   // Snap to a nice real-time interval
@@ -306,7 +306,7 @@ export function drawChannelLabel(
 }
 
 // ---------------------------------------------------------------------------
-// Time cursor — vertical crosshair with tooltip showing signal values
+// Time cursor- vertical crosshair with tooltip showing signal values
 // ---------------------------------------------------------------------------
 
 /** One row of the time-cursor tooltip: channel name + value at cursor. */

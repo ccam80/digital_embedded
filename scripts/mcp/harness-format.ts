@@ -1,4 +1,4 @@
-// harness-format.ts — FormattedNumber and ComparedValueJSON serialization utilities
+// harness-format.ts- FormattedNumber and ComparedValueJSON serialization utilities
 
 import type { ComparedValue } from "../../src/solver/analog/__tests__/harness/types.js";
 

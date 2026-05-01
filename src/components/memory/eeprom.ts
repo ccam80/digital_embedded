@@ -1,5 +1,5 @@
 /**
- * EEPROM components — EEPROM and EEPROMDualPort.
+ * EEPROM components- EEPROM and EEPROMDualPort.
  *
  * EEPROM: electrically-erasable programmable read-only memory.
  *   Inputs: A (addrBits), CS (1), WE (1 clock), OE (1), Din (dataBits)
@@ -257,7 +257,7 @@ export const EEPROMDefinition: ComponentDefinition = {
   propertyDefs: EEPROM_PROPERTY_DEFS,
   attributeMap: EEPROM_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.MEMORY,
-  helpText: "EEPROM — electrically-erasable ROM. WE-edge write, combinational read.",
+  helpText: "EEPROM- electrically-erasable ROM. WE-edge write, combinational read.",
   models: {
     digital: {
       executeFn: executeEEPROM,
@@ -406,7 +406,7 @@ export const EEPROMDualPortDefinition: ComponentDefinition = {
   propertyDefs: EEPROM_DUAL_PORT_PROPERTY_DEFS,
   attributeMap: EEPROM_DUAL_PORT_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.MEMORY,
-  helpText: "EEPROMDualPort — EEPROM with clock-synchronous write and combinational read.",
+  helpText: "EEPROMDualPort- EEPROM with clock-synchronous write and combinational read.",
   models: {
     digital: {
       executeFn: executeEEPROMDualPort,

@@ -1,5 +1,5 @@
 /**
- * GenericCache — caches resolved generic circuits by parameter hash.
+ * GenericCache- caches resolved generic circuits by parameter hash.
  *
  * Prevents redundant resolution when the same generic circuit is instantiated
  * multiple times with the same parameter values.

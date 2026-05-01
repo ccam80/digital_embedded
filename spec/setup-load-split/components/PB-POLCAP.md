@@ -1,14 +1,14 @@
 # Task PB-POLCAP
 
 **digiTS file:** `src/components/passives/polarized-cap.ts`
-**ngspice setup anchor:** `ref/ngspice/src/spicelib/devices/cap/capsetup.c:102-117` (delegated — polarized cap IS a capacitor with additional topology)
+**ngspice setup anchor:** `ref/ngspice/src/spicelib/devices/cap/capsetup.c:102-117` (delegated- polarized cap IS a capacitor with additional topology)
 **ngspice load anchor:** `ref/ngspice/src/spicelib/devices/cap/capload.c`
 
 ## Pin mapping (from 01-pin-mapping.md)
 
 `ngspiceNodeMap = { pos: "pos", neg: "neg" }` (delegated to CAP sub-element).
 
-The PolarizedCap composite does not get its own `ngspiceNodeMap` on `ComponentDefinition` — it decomposes into a CAP sub-element (plus ESR RES, leakage RES, and clamp DIO sub-elements), and each sub-element carries its own map.
+The PolarizedCap composite does not get its own `ngspiceNodeMap` on `ComponentDefinition`- it decomposes into a CAP sub-element (plus ESR RES, leakage RES, and clamp DIO sub-elements), and each sub-element carries its own map.
 
 ## Internal nodes
 
@@ -34,7 +34,7 @@ this._stateBase = ctx.allocStates(this.stateSize);  // 9 slots total
 
 ## TSTALLOC sequence (line-for-line port)
 
-The PolarizedCap composite is NOT a direct ngspice primitive — it has no matching single `*setup.c`. Its TSTALLOC stamps come from its sub-elements:
+The PolarizedCap composite is NOT a direct ngspice primitive- it has no matching single `*setup.c`. Its TSTALLOC stamps come from its sub-elements:
 
 **ESR RES** (`ressetup.c:46-49` pattern, pos ↔ n_cap):
 
@@ -54,9 +54,9 @@ The PolarizedCap composite is NOT a direct ngspice primitive — it has no match
 | 7 | `(RESposNode, RESnegNode)` | `(nCap, negNode)` | `_hLEAK_PN` |
 | 8 | `(RESnegNode, RESposNode)` | `(negNode, nCap)` | `_hLEAK_NP` |
 
-**Clamp DIO** (`diosetup.c` pattern, anode = negNode, cathode = posNode — reverse-mounted clamp):
+**Clamp DIO** (`diosetup.c` pattern, anode = negNode, cathode = posNode- reverse-mounted clamp):
 
-Clamp diode TSTALLOC sequence inlined here for self-containment (mirrors PB-DIO §setup() body for the standalone DIO).
+Clamp diode TSTALLOC sequence inlined here for self-containment (mirrors PB-DIO sssetup() body for the standalone DIO).
 
 The clamp diode has an internal `posPrime_clamp` node (DIO cathode-side ohmic resistance junction). Polarity-reverse rule: anode = `negNode`, cathode = `posNode`.
 
@@ -78,7 +78,7 @@ The clamp diode sub-element's `setup()` allocates these handles and stores `posP
 | 11 | `(CAPposNode, CAPnegNode)` | `(nCap, negNode)` | `_hCAP_PN` |
 | 12 | `(CAPnegNode, CAPposNode)` | `(negNode, nCap)` | `_hCAP_NP` |
 
-## setup() body — alloc only
+## setup() body- alloc only
 
 ```ts
 setup(ctx: SetupContext): void {
@@ -87,11 +87,11 @@ setup(ctx: SetupContext): void {
   const negNode = this._pinNodes.get("neg")!;  // neg pin
 
   // Allocate internal node n_cap (junction between ESR and cap body).
-  // No ngspice primitive equivalent — digiTS-internal topology extension.
+  // No ngspice primitive equivalent- digiTS-internal topology extension.
   const nCap = ctx.makeVolt(this._label, "cap");
   this._nCap = nCap;
 
-  // State slots — 9 total (5 cap body + 4 clamp diode).
+  // State slots- 9 total (5 cap body + 4 clamp diode).
   this._stateBase = ctx.allocStates(this.stateSize);
 
   // ESR RES stamps (ressetup.c:46-49, pos ↔ nCap).
@@ -133,7 +133,7 @@ private _hCAP_PN: number = -1;      private _hCAP_NP: number = -1;
 
 The clamp diode sub-element is constructed at factory time (not setup time), so it exists before `setup()` is called.
 
-## load() body — value writes only
+## load() body- value writes only
 
 Implementer ports value-side equations from `ref/ngspice/src/spicelib/devices/cap/capload.c` line-for-line for the CAP body stamps, stamping through cached handles only. ESR and leakage conductance stamps also use cached handles. The clamp diode sub-element's `load()` is called via `this._clampDiode.load(ctx)`. No `solver.allocElement` calls anywhere in `load()`.
 
@@ -142,18 +142,18 @@ Implementer ports value-side equations from `ref/ngspice/src/spicelib/devices/ca
 - Drop `internalNodeIds` and `branchIdx` parameters from `createPolarizedCapElement` factory signature (per A6.3). The internal node `n_cap` is allocated in `setup()`, not passed from the compiler.
 - Remove `getInternalNodeCount: 1` from `MnaModel` registration (per A6.2).
 - Add `mayCreateInternalNodes: true` to `MnaModel` registration (creates `n_cap` in setup).
-- The composite `ComponentDefinition` leaves `ngspiceNodeMap` undefined (composite decomposes — sub-elements carry their own maps).
+- The composite `ComponentDefinition` leaves `ngspiceNodeMap` undefined (composite decomposes- sub-elements carry their own maps).
 - No `findBranchFor` callback (no branch row).
 
 ## Verification gate
 
 Per CLAUDE.md "Test Policy During W3 Setup-Load-Split", verification is spec compliance only. DO NOT run tests; DO NOT use test results.
 
-1. `setup()` body in the implementation file matches the "setup() body — alloc only" listing in this PB line-for-line.
+1. `setup()` body in the implementation file matches the "setup() body- alloc only" listing in this PB line-for-line.
 2. TSTALLOC sequence in `setup()` matches the order in the cited ngspice anchor file (see top of this PB, e.g. `ressetup.c:46-49`).
 3. Factory cleanup applied per the "Factory cleanup" section above.
 4. `ngspiceNodeMap` registered per the "Pin mapping" section above (or omitted for composites where the spec says so).
-5. `load()` writes through cached handles only — zero `solver.allocElement(...)` calls inside `load()`, `accept()`, or any non-`setup()` method.
+5. `load()` writes through cached handles only- zero `solver.allocElement(...)` calls inside `load()`, `accept()`, or any non-`setup()` method.
 6. `mayCreateInternalNodes` flag set per spec.
 7. `findBranchFor` callback present where spec says (V-output sources, IND, etc.).
 8. No banned closing verdicts (mapping/tolerance/equivalent-to/pre-existing/intentional-divergence/citation-divergence/partial) used in any commit message or report.

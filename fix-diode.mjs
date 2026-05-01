@@ -84,7 +84,7 @@ src = src.replace(
 );
 src = src.replace(
   /\/\/ Tiny step[^\n]*\n([ \t]*)voltages\[0\] = 0\.601;/,
-  '// Tiny step — should not be limited\n$1voltages[1] = 0.601;'
+  '// Tiny step- should not be limited\n$1voltages[1] = 0.601;'
 );
 console.log('4 LimitingEvent done');
 

@@ -1,10 +1,10 @@
 /**
- * Palette presets — named component sets for common tutorial scenarios.
+ * Palette presets- named component sets for common tutorial scenarios.
  *
  * Each preset is a curated list of component type names. Presets can be
  * used directly in TutorialStep.palette or modified with add/remove.
  *
- * Preset names are lowercase-kebab-case. They should be stable — don't
+ * Preset names are lowercase-kebab-case. They should be stable- don't
  * rename or remove presets once tutorials reference them.
  */
 
@@ -16,8 +16,8 @@
  * All available palette presets.
  *
  * Usage in a tutorial step:
- *   palette: "basic-gates"                          — use preset as-is
- *   palette: { preset: "basic-gates", add: ["Mux"] } — preset + extras
+ *   palette: "basic-gates"                         - use preset as-is
+ *   palette: { preset: "basic-gates", add: ["Mux"] }- preset + extras
  */
 export const PALETTE_PRESETS: ReadonlyMap<string, readonly string[]> = new Map([
 
@@ -116,7 +116,7 @@ export const PALETTE_PRESETS: ReadonlyMap<string, readonly string[]> = new Map([
   // --- Full palette (no restriction) ---
 
   ['full', [
-    // This is a sentinel — resolved by the palette system to mean "no filter".
+    // This is a sentinel- resolved by the palette system to mean "no filter".
     // Listed here so the preset name validates, but resolves to null allowlist.
   ]],
 ]);
@@ -149,7 +149,7 @@ export function resolvePaletteSpec(
   // Preset with modifications
   const base = spec.preset === 'full' ? null : PALETTE_PRESETS.get(spec.preset);
   if (base === null) return null; // "full" preset
-  if (base === undefined) return null; // Unknown preset — fall through to no filter
+  if (base === undefined) return null; // Unknown preset- fall through to no filter
 
   const result = new Set(base);
   for (const name of spec.add ?? []) result.add(name);

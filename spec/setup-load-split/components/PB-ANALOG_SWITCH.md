@@ -2,8 +2,8 @@
 
 **digiTS file:** `src/components/active/analog-switch.ts`
 **Architecture:** composite. Two variants registered under one file:
-- **SPST** — decomposes into 1× SWElement
-- **SPDT** — decomposes into 2× SWElement (one per throw, complementary control)
+- **SPST**- decomposes into 1× SWElement
+- **SPDT**- decomposes into 2× SWElement (one per throw, complementary control)
 
 ## Pin mapping (from 01-pin-mapping.md)
 
@@ -11,16 +11,16 @@ The composite itself has no `ngspiceNodeMap`. Sub-elements carry their own maps.
 
 ### SPST pin labels
 
-- `in` — signal input (pinLayout index 0)
-- `out` — signal output (pinLayout index 1)
-- `ctrl` — control voltage (pinLayout index 2)
+- `in`- signal input (pinLayout index 0)
+- `out`- signal output (pinLayout index 1)
+- `ctrl`- control voltage (pinLayout index 2)
 
 ### SPDT pin labels
 
-- `com` — common (pinLayout index 0)
-- `no` — normally-open throw (pinLayout index 1)
-- `nc` — normally-closed throw (pinLayout index 2)
-- `ctrl` — control voltage (pinLayout index 3)
+- `com`- common (pinLayout index 0)
+- `no`- normally-open throw (pinLayout index 1)
+- `nc`- normally-closed throw (pinLayout index 2)
+- `ctrl`- control voltage (pinLayout index 3)
 
 ## Sub-element decomposition
 
@@ -35,7 +35,7 @@ Sub-element `ngspiceNodeMap`:
 sw1.ngspiceNodeMap = { "pos": "pos", "neg": "neg" }
 ```
 
-The `ctrl` pin is a pure voltage-read in `load()` to determine switch state. `ctrl` does not appear in the SW TSTALLOC sequence — SWsetup.c stamps only `(pos,pos)`, `(pos,neg)`, `(neg,pos)`, `(neg,neg)`. The control voltage is read from `ctx.rhsOld[nCtrl]` in `load()` and passed to `sw1.setCtrlVoltage(vCtrl)` before `sw1.load(ctx)`.
+The `ctrl` pin is a pure voltage-read in `load()` to determine switch state. `ctrl` does not appear in the SW TSTALLOC sequence- SWsetup.c stamps only `(pos,pos)`, `(pos,neg)`, `(neg,pos)`, `(neg,neg)`. The control voltage is read from `ctx.rhsOld[nCtrl]` in `load()` and passed to `sw1.setCtrlVoltage(vCtrl)` before `sw1.load(ctx)`.
 
 ### SPDT
 
@@ -45,7 +45,7 @@ The `ctrl` pin is a pure voltage-read in `load()` to determine switch state. `ct
 | `swNC` | SWElement | `sw/swsetup.c:47-62` | `com`→`pos`, `nc`→`neg` | same params |
 
 `swNO` is ON when `V(ctrl) >= vThreshold + vHysteresis/2` (normal polarity).
-`swNC` is ON when `V(ctrl) < vThreshold - vHysteresis/2` (inverted polarity — complementary).
+`swNC` is ON when `V(ctrl) < vThreshold - vHysteresis/2` (inverted polarity- complementary).
 
 Both switches use the same `(rOn, rOff, vThreshold, vHysteresis)` model parameters.
 
@@ -88,7 +88,7 @@ factory(pinNodes, props, getTime): AnalogElementCore {
 }
 ```
 
-## setup() body — composite forwards
+## setup() body- composite forwards
 
 ### SPST
 
@@ -121,7 +121,7 @@ setup(ctx: SetupContext): void {
 }
 ```
 
-## load() body — read ctrl, delegate to SW sub-elements
+## load() body- read ctrl, delegate to SW sub-elements
 
 ### SPST
 
@@ -131,7 +131,7 @@ load(ctx: LoadContext): void {
   const vCtrl = nCtrl > 0 ? ctx.rhsOld[nCtrl] : 0;
 
   // Pass control voltage to SW sub-element for state machine evaluation
-  this._sw1.setCtrlVoltage(vCtrl);  // Defined in PB-SW §"setCtrlVoltage(v) — for composite use only"
+  this._sw1.setCtrlVoltage(vCtrl);  // Defined in PB-SW ss"setCtrlVoltage(v)- for composite use only"
   this._sw1.load(ctx);
 }
 ```
@@ -144,15 +144,15 @@ load(ctx: LoadContext): void {
   const vCtrl = nCtrl > 0 ? ctx.rhsOld[nCtrl] : 0;
 
   // NO path: normal polarity
-  this._swNO.setCtrlVoltage(vCtrl);  // Defined in PB-SW §"setCtrlVoltage(v) — for composite use only"
+  this._swNO.setCtrlVoltage(vCtrl);  // Defined in PB-SW ss"setCtrlVoltage(v)- for composite use only"
   this._swNO.load(ctx);
 
-  // NC path: inverted polarity — explicit ON/OFF based on threshold comparison
+  // NC path: inverted polarity- explicit ON/OFF based on threshold comparison
   // (Option A from FANALOG_SWITCH-D2: avoids -vCtrl negation pattern)
   const vThreshold = this._props.getModelParam("vThreshold") ?? 2.5;
   const vHyst      = this._props.getModelParam("vHysteresis") ?? 0.5;
   const ncOn = vCtrl < vThreshold - vHyst / 2;
-  this._swNC.setSwState(ncOn);  // Defined in PB-SW §"setSwState(on) — for composite use only"
+  this._swNC.setSwState(ncOn);  // Defined in PB-SW ss"setSwState(on)- for composite use only"
   this._swNC.load(ctx);
 }
 ```
@@ -198,17 +198,17 @@ Not needed. Direct refs to `_sw1` (SPST) or `_swNO`/`_swNC` (SPDT).
 - Drop `internalNodeIds`, `branchIdx` from factory signature.
 - Add `mayCreateInternalNodes: false`.
 - Leave `ngspiceNodeMap` undefined on both `AnalogSwitchSPSTDefinition` and `AnalogSwitchSPDTDefinition`.
-- The SPDT `"inverted polarity"` for `swNC` is a digiTS extension beyond `sw/swsetup.c` — it is not a new ngspice anchor. The SPDT composite is documented as a digiTS-specific composition of two standard SW primitives, each anchored at `sw/swsetup.c`.
+- The SPDT `"inverted polarity"` for `swNC` is a digiTS extension beyond `sw/swsetup.c`- it is not a new ngspice anchor. The SPDT composite is documented as a digiTS-specific composition of two standard SW primitives, each anchored at `sw/swsetup.c`.
 
 ## Verification gate
 
 Per CLAUDE.md "Test Policy During W3 Setup-Load-Split", verification is spec compliance only. DO NOT run tests; DO NOT use test results.
 
-1. `setup()` body in the implementation file matches the "setup() body — alloc only" listing in this PB line-for-line.
+1. `setup()` body in the implementation file matches the "setup() body- alloc only" listing in this PB line-for-line.
 2. TSTALLOC sequence in `setup()` matches the order in the cited ngspice anchor file (see top of this PB, e.g. `ressetup.c:46-49`).
 3. Factory cleanup applied per the "Factory cleanup" section above.
 4. `ngspiceNodeMap` registered per the "Pin mapping" section above (or omitted for composites where the spec says so).
-5. `load()` writes through cached handles only — zero `solver.allocElement(...)` calls inside `load()`, `accept()`, or any non-`setup()` method.
+5. `load()` writes through cached handles only- zero `solver.allocElement(...)` calls inside `load()`, `accept()`, or any non-`setup()` method.
 6. `mayCreateInternalNodes` flag set per spec.
 7. `findBranchFor` callback present where spec says (V-output sources, IND, etc.).
 8. No banned closing verdicts (mapping/tolerance/equivalent-to/pre-existing/intentional-divergence/citation-divergence/partial) used in any commit message or report.

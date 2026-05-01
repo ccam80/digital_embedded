@@ -179,7 +179,7 @@ export const LIBRARY_74XX: Library74xxEntry[] = [
  * under the SEVENTY_FOUR_XX palette category.
  *
  * Each IC is registered as a stub entry. The actual SubcircuitDefinition is
- * loaded on demand (lazy) when the user places the component — the file path
+ * loaded on demand (lazy) when the user places the component- the file path
  * stored in the manifest drives the loader.
  *
  * If `pinMap` is provided, the stub's `pinLayout` is populated from the
@@ -311,7 +311,7 @@ export async function load74xxComponent(
     throw new Error(`74xx component "${name}" not found in manifest.`);
   }
 
-  // Dynamic imports keep this module lightweight — loader and resolver are
+  // Dynamic imports keep this module lightweight- loader and resolver are
   // only pulled in when a 74xx component is actually placed.
   const [{ loadWithSubcircuits }, { HttpResolver }, { createLiveDefinition }] = await Promise.all([
     import('../io/subcircuit-loader.js'),

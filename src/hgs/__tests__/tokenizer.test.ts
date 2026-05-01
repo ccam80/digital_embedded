@@ -1,5 +1,5 @@
 /**
- * Tokenizer tests — task 4.3.1.
+ * Tokenizer tests- task 4.3.1.
  */
 
 import { describe, it, expect } from "vitest";

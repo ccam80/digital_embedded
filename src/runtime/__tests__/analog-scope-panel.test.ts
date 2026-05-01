@@ -1,5 +1,5 @@
 /**
- * Tests for ScopePanel — channel capture, reset, Y-axis ranging, FFT,
+ * Tests for ScopePanel- channel capture, reset, Y-axis ranging, FFT,
  * digital channels, and discrete time mode.
  */
 
@@ -333,7 +333,7 @@ describe("ScopePanel", () => {
 
   it("discrete_mode_uses_stepcount_as_time", () => {
     const coord = new MockCoordinator();
-    // simTime is null by default in MockCoordinator — pure digital
+    // simTime is null by default in MockCoordinator- pure digital
     coord.setSignal(DIGITAL_ADDR, { type: "digital", value: 1 });
 
     const panel = makePanel(coord);

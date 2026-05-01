@@ -26,9 +26,9 @@ export interface LogicFamilyConfig {
   vOH: number;
   /** Output low voltage (V). */
   vOL: number;
-  /** Input high threshold (V) — voltage above which input is read as logic HIGH. */
+  /** Input high threshold (V)- voltage above which input is read as logic HIGH. */
   vIH: number;
-  /** Input low threshold (V) — voltage below which input is read as logic LOW. */
+  /** Input low threshold (V)- voltage below which input is read as logic LOW. */
   vIL: number;
   /** Default output impedance (Ω). */
   rOut: number;
@@ -38,7 +38,7 @@ export interface LogicFamilyConfig {
   cIn: number;
   /** Default output capacitance (F). */
   cOut: number;
-  /** Hi-Z state impedance (Ω) — used when a tristate output is disabled. */
+  /** Hi-Z state impedance (Ω)- used when a tristate output is disabled. */
   rHiZ: number;
 }
 

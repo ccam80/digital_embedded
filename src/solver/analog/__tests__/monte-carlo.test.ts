@@ -58,9 +58,9 @@ function makeVoltageSource(posNode: number, negNode: number, voltage: number): A
  * Build a voltage-divider circuit: Vs=5V, R1 top, R2 bottom.
  *
  * Topology:
- *   node1 — Vs+ (top)
- *   node2 — midpoint (R1-R2 junction)
- *   ground — Vs-, R2 bottom
+ *   node1- Vs+ (top)
+ *   node2- midpoint (R1-R2 junction)
+ *   ground- Vs-, R2 bottom
  *
  * overrides: { "R1" => { "resistance" => multiplier }, "R2" => ... }
  * multiplier applied to nominal resistance.
@@ -134,7 +134,7 @@ function buildSweepDividerFactory(nominalR2: number = 1000): SweepCircuitFactory
  * Build a sweep-compatible RC low-pass filter factory.
  * Sweeps R value; C is fixed.
  *
- * Circuit: Vs=1V AC — R — node2 — C — GND
+ * Circuit: Vs=1V AC- R- node2- C- GND
  * DC analysis: node2 = Vs * (C impedance / total) ≈ Vs for DC (cap open)
  * We use node2 DC voltage as the measurable output.
  *

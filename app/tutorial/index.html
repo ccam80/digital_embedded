@@ -111,7 +111,7 @@
     const params = new URLSearchParams(window.location.search);
     const lockedManifest = params.get('tutorial');
     if (lockedManifest) {
-      // Locked mode — skip the index, go straight to the viewer
+      // Locked mode- skip the index, go straight to the viewer
       window.location.href = 'view.html?manifest=' + encodeURIComponent(lockedManifest);
     }
 

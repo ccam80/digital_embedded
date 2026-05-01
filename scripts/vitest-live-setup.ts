@@ -3,7 +3,7 @@
  *
  * Why a setup file rather than a reporter: in pool=forks, workers batch their
  * task updates and only flush them to the main reporter when a file finishes.
- * That means a reporter cannot see which test is currently running — only what
+ * That means a reporter cannot see which test is currently running- only what
  * has already completed. By registering global beforeEach/afterEach hooks from
  * INSIDE the worker, we print the test name synchronously before the test body
  * runs, so a hang leaves the offending test name as the last line in the log.

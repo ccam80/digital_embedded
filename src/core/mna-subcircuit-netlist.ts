@@ -1,7 +1,7 @@
 export interface SubcircuitElement {
   /** Component type (NMOS, PMOS, Resistor, Diode, etc.) */
   typeId: string;
-  /** Named .MODEL reference — resolved at compile time. */
+  /** Named .MODEL reference- resolved at compile time. */
   modelRef?: string;
   /** Element-level parameter overrides. String values reference subcircuit params by name. */
   params?: Record<string, number | string>;
@@ -10,9 +10,9 @@ export interface SubcircuitElement {
 }
 
 export interface MnaSubcircuitNetlist {
-  /** Port labels in order — maps to outer component pins by label match */
+  /** Port labels in order- maps to outer component pins by label match */
   ports: string[];
-  /** Exposed parameters with defaults — user can override at instance level. */
+  /** Exposed parameters with defaults- user can override at instance level. */
   params?: Record<string, number>;
   /** Sub-elements: topology + model references + per-element parameters */
   elements: SubcircuitElement[];

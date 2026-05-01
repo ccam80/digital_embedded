@@ -1,5 +1,5 @@
 /**
- * HGS reference system — l-value abstractions for the HGS runtime.
+ * HGS reference system- l-value abstractions for the HGS runtime.
  *
  * References represent assignable locations: variables, array elements,
  * struct fields, and function call results. They compose for chained access
@@ -23,7 +23,7 @@ export interface Reference {
 }
 
 // ---------------------------------------------------------------------------
-// ReferenceToVar — reads/writes a named variable in the context
+// ReferenceToVar- reads/writes a named variable in the context
 // ---------------------------------------------------------------------------
 
 export class ReferenceToVar implements Reference {
@@ -51,7 +51,7 @@ export class ReferenceToVar implements Reference {
 }
 
 // ---------------------------------------------------------------------------
-// ReferenceToArray — indexed access into an HGSArray
+// ReferenceToArray- indexed access into an HGSArray
 // ---------------------------------------------------------------------------
 
 export class ReferenceToArray implements Reference {
@@ -100,7 +100,7 @@ export class ReferenceToArray implements Reference {
 }
 
 // ---------------------------------------------------------------------------
-// ReferenceToStruct — field access on an HGSMap
+// ReferenceToStruct- field access on an HGSMap
 // ---------------------------------------------------------------------------
 
 export class ReferenceToStruct implements Reference {
@@ -144,7 +144,7 @@ export class ReferenceToStruct implements Reference {
 }
 
 // ---------------------------------------------------------------------------
-// ReferenceToFunc — function call result (read-only, not assignable)
+// ReferenceToFunc- function call result (read-only, not assignable)
 // ---------------------------------------------------------------------------
 
 export class ReferenceToFunc implements Reference {

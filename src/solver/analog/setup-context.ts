@@ -1,5 +1,5 @@
 /**
- * SetupContext — per-circuit-lifetime context passed to every element.setup() call.
+ * SetupContext- per-circuit-lifetime context passed to every element.setup() call.
  *
  * Port of ngspice's DEVsetup signature:
  *   int XXXsetup(SMPmatrix *matrix, GENmodel *inModel, CKTcircuit *ckt, int *states)

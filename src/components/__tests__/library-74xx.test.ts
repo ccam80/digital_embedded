@@ -50,7 +50,7 @@ describe('library-74xx', () => {
   });
 
   // ---------------------------------------------------------------------------
-  // loadRepresentative — 7400 quad NAND
+  // loadRepresentative- 7400 quad NAND
   // ---------------------------------------------------------------------------
 
   it('loadRepresentative: 7400 parses and contains 4 NAND gates', () => {
@@ -70,7 +70,7 @@ describe('library-74xx', () => {
   });
 
   // ---------------------------------------------------------------------------
-  // load7474 — dual D flip-flop pin layout
+  // load7474- dual D flip-flop pin layout
   // ---------------------------------------------------------------------------
 
   it('load7474: parses and contains D flip-flop elements', () => {
@@ -98,7 +98,7 @@ describe('library-74xx', () => {
   });
 
   // ---------------------------------------------------------------------------
-  // allLoadable — every manifest entry parses without error
+  // allLoadable- every manifest entry parses without error
   // ---------------------------------------------------------------------------
 
   it('allLoadable: every .dig file in the manifest parses without error', () => {
@@ -119,7 +119,7 @@ describe('library-74xx', () => {
   });
 
   // ---------------------------------------------------------------------------
-  // register74xxLibrary — palette registration
+  // register74xxLibrary- palette registration
   // ---------------------------------------------------------------------------
 
   it('register74xxLibrary: registers all manifest entries under SEVENTY_FOUR_XX category', () => {

@@ -36,7 +36,7 @@ for (const targetSpeed of [0.001, 0.01, 0.1, 0.5, 1.0]) {
     : targetSpeed >= 1e-3 ? (targetSpeed * 1000) + ' ms/s'
     : (targetSpeed * 1e6) + ' us/s';
 
-  test('buckbjt at ' + label + ' — 3s wall time', async ({ page }) => {
+  test('buckbjt at ' + label + '- 3s wall time', async ({ page }) => {
     const harness = new SimulatorHarness(page);
     await harness.load();
     await harness.iframe.locator('#sim-canvas').waitFor({ state: 'visible' });

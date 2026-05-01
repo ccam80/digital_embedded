@@ -3,16 +3,16 @@
  *
  * Parses the Intel HEX file format (also called IHEX) into a flat map of
  * address → byte value entries. Supports record types:
- *   00 — Data record
- *   01 — End-of-file record
- *   02 — Extended segment address record
- *   04 — Extended linear address record
+ *   00- Data record
+ *   01- End-of-file record
+ *   02- Extended segment address record
+ *   04- Extended linear address record
  *
  * Reference: https://en.wikipedia.org/wiki/Intel_HEX
  */
 
 // ---------------------------------------------------------------------------
-// ParsedByte — one decoded byte from an Intel HEX file
+// ParsedByte- one decoded byte from an Intel HEX file
 // ---------------------------------------------------------------------------
 
 export interface ParsedByte {
@@ -131,7 +131,7 @@ function verifyChecksum(dataBytes: number[], expectedChecksum: number): void {
   const computed = ((~sum + 1) & 0xFF);
   if (computed !== expectedChecksum) {
     throw new Error(
-      `Intel HEX: checksum mismatch — expected 0x${expectedChecksum.toString(16).padStart(2, "0")}, ` +
+      `Intel HEX: checksum mismatch- expected 0x${expectedChecksum.toString(16).padStart(2, "0")}, ` +
       `computed 0x${computed.toString(16).padStart(2, "0")}`,
     );
   }

@@ -1,5 +1,5 @@
 /**
- * SliderPanel — live parameter sliders for analog component properties.
+ * SliderPanel- live parameter sliders for analog component properties.
  *
  * Hosts HTML range inputs below the canvas. Each slider is tied to a specific
  * (elementId, propertyKey) pair. Dragging the slider fires the registered
@@ -8,7 +8,7 @@
  * Log-scale sliders map the linear slider position [0, 1] to
  * `min * (max/min)^position`, giving even visual spacing across decades.
  *
- * Slider state is runtime-only — not persisted with the circuit file.
+ * Slider state is runtime-only- not persisted with the circuit file.
  */
 
 import { formatSI } from "./si-format.js";
@@ -141,7 +141,7 @@ export class SliderPanel {
     valueDisplay.style.textAlign = "right";
     valueDisplay.textContent = unit ? formatSI(currentValue, unit) : String(currentValue);
 
-    // Pin button — keeps slider visible after deselection
+    // Pin button- keeps slider visible after deselection
     const pinBtn = document.createElement("button");
     pinBtn.type = "button";
     pinBtn.title = "Pin slider (keep visible)";

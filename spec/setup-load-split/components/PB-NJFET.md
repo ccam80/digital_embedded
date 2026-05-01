@@ -8,9 +8,9 @@
 
 | digiTS label | ngspice variable | Note |
 |---|---|---|
-| `G` | `JFETgateNode` | Gate — external |
-| `S` | `JFETsourceNode` | Source — external |
-| `D` | `JFETdrainNode` | Drain — external |
+| `G` | `JFETgateNode` | Gate- external |
+| `S` | `JFETsourceNode` | Source- external |
+| `D` | `JFETdrainNode` | Drain- external |
 | `sourcePrime` | `JFETsourcePrimeNode` | Internal source node (when RS ≠ 0) |
 | `drainPrime` | `JFETdrainPrimeNode` | Internal drain node (when RD ≠ 0) |
 
@@ -99,12 +99,12 @@ Variables: `sp = _sourcePrimeNode`, `dp = _drainPrimeNode`.
 | 14 | `JFETdrainPrimeDrainPrimePtr` | `JFETdrainPrimeNode` | `JFETdrainPrimeNode` | `this._hDPDP` |
 | 15 | `JFETsourcePrimeSourcePrimePtr` | `JFETsourcePrimeNode` | `JFETsourcePrimeNode` | `this._hSPSP` |
 
-**RS=0 / RD=0 collapse:** When RS=0, `sourcePrimeNode = sourceNode` — entries (4) and (13)
+**RS=0 / RD=0 collapse:** When RS=0, `sourcePrimeNode = sourceNode`- entries (4) and (13)
 collapse to `allocElement(sourceNode, sourceNode)`. When RD=0, `drainPrimeNode = drainNode`
 — entries (1) and (11) collapse similarly. `allocElement` returns existing handle on
 repeated calls. No conditional skip in the port.
 
-## setup() body — alloc only
+## setup() body- alloc only
 
 ```ts
 setup(ctx: SetupContext): void {
@@ -114,10 +114,10 @@ setup(ctx: SetupContext): void {
   const drainNode  = this._pinNodes.get("D")!;
   const model      = this._model;
 
-  // State slots — jfetset.c:112-113
+  // State slots- jfetset.c:112-113
   this._stateBase = ctx.allocStates(13);
 
-  // Internal nodes — jfetset.c:115-158
+  // Internal nodes- jfetset.c:115-158
   // Source prime BEFORE drain prime (ngspice order)
   this._sourcePrimeNode = (model.RS === 0) ? sourceNode : ctx.makeVolt(this.label, "source");
   this._drainPrimeNode  = (model.RD === 0) ? drainNode  : ctx.makeVolt(this.label, "drain");
@@ -125,7 +125,7 @@ setup(ctx: SetupContext): void {
   const sp = this._sourcePrimeNode;
   const dp = this._drainPrimeNode;
 
-  // TSTALLOC sequence — jfetset.c:166-180
+  // TSTALLOC sequence- jfetset.c:166-180
   this._hDDP  = solver.allocElement(drainNode,  dp);          // (1)
   this._hGDP  = solver.allocElement(gateNode,   dp);          // (2)
   this._hGSP  = solver.allocElement(gateNode,   sp);          // (3)
@@ -144,7 +144,7 @@ setup(ctx: SetupContext): void {
 }
 ```
 
-## load() body — value writes only
+## load() body- value writes only
 
 Implementer ports value-side from `ref/ngspice/src/spicelib/devices/jfet/jfetload.c`
 line-for-line, stamping through cached handles. No allocElement calls.
@@ -166,11 +166,11 @@ Not applicable. JFET has no branch row.
 
 Per CLAUDE.md "Test Policy During W3 Setup-Load-Split", verification is spec compliance only. DO NOT run tests; DO NOT use test results.
 
-1. `setup()` body in the implementation file matches the "setup() body — alloc only" listing in this PB line-for-line.
+1. `setup()` body in the implementation file matches the "setup() body- alloc only" listing in this PB line-for-line.
 2. TSTALLOC sequence in `setup()` matches the order in the cited ngspice anchor file (see top of this PB, e.g. `ressetup.c:46-49`).
 3. Factory cleanup applied per the "Factory cleanup" section above.
 4. `ngspiceNodeMap` registered per the "Pin mapping" section above (or omitted for composites where the spec says so).
-5. `load()` writes through cached handles only — zero `solver.allocElement(...)` calls inside `load()`, `accept()`, or any non-`setup()` method.
+5. `load()` writes through cached handles only- zero `solver.allocElement(...)` calls inside `load()`, `accept()`, or any non-`setup()` method.
 6. `mayCreateInternalNodes` flag set per spec.
 7. `findBranchFor` callback present where spec says (V-output sources, IND, etc.).
 8. No banned closing verdicts (mapping/tolerance/equivalent-to/pre-existing/intentional-divergence/citation-divergence/partial) used in any commit message or report.

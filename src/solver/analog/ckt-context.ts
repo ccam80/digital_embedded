@@ -1,8 +1,8 @@
 /**
- * CKTCircuitContext — the single god-object holding all pre-allocated buffers,
+ * CKTCircuitContext- the single god-object holding all pre-allocated buffers,
  * solver state, and compiled circuit references for the analog engine.
  *
- * Matches ngspice's `CKTcircuit *ckt` — the one struct every function receives.
+ * Matches ngspice's `CKTcircuit *ckt`- the one struct every function receives.
  * Allocated once in MNAEngine.init(), mutated in place, never re-created.
  *
  * All buffers are allocated in the constructor. No buffer is allocated during
@@ -23,7 +23,7 @@ import type { IntegrationMethod } from "../../core/analog-types.js";
 import { MODEDCOP, MODEINITFLOAT } from "./ckt-mode.js";
 
 // ---------------------------------------------------------------------------
-// LoadCtxImpl — concrete LoadContext with live state-ring access
+// LoadCtxImpl- concrete LoadContext with live state-ring access
 // ---------------------------------------------------------------------------
 
 /**
@@ -34,12 +34,12 @@ import { MODEDCOP, MODEINITFLOAT } from "./ckt-mode.js";
  * exactly mirroring ngspice's `#define CKTstate0 CKTstates[0]` macro
  * indirection (cktdefs.h:82-85). After StatePool.rotateStateVectors() swaps
  * the ring, the next read of `loadCtx.state0` returns the post-rotation
- * array without any explicit refresh step — there is no snapshot to
+ * array without any explicit refresh step- there is no snapshot to
  * invalidate.
  *
  * Other LoadContext fields (cktMode, solver, rhs, dt, etc.) are plain
  * mutable fields. They are mutated in place by the engine each NR iteration
- * and have no ring rotation, so a snapshot would be correct — and is what
+ * and have no ring rotation, so a snapshot would be correct- and is what
  * the engine writes to.
  */
 export class LoadCtxImpl implements LoadContext {
@@ -73,7 +73,7 @@ export class LoadCtxImpl implements LoadContext {
    * (replaced once via `setStatePool` after deferred allocation in
    * CKTCircuitContext.allocateStateBuffers). Rotation in
    * StatePool.rotateStateVectors() permutes `_statePool.states[i]` in place
-   * — the getters below see post-rotation arrays automatically.
+   *- the getters below see post-rotation arrays automatically.
    */
   private _statePool: StatePool;
 
@@ -91,7 +91,7 @@ export class LoadCtxImpl implements LoadContext {
     this._statePool = pool;
   }
 
-  // cite cktdefs.h:82-85 — `#define CKTstate0 CKTstates[0]` (macro, live).
+  // cite cktdefs.h:82-85- `#define CKTstate0 CKTstates[0]` (macro, live).
   get state0(): Float64Array { return this._statePool.states[0]; }
   get state1(): Float64Array { return this._statePool.states[1]; }
   get state2(): Float64Array { return this._statePool.states[2]; }
@@ -99,14 +99,14 @@ export class LoadCtxImpl implements LoadContext {
 }
 
 // ---------------------------------------------------------------------------
-// NRResult — mutable result class for Newton-Raphson iterations
+// NRResult- mutable result class for Newton-Raphson iterations
 // ---------------------------------------------------------------------------
 
 /**
  * Mutable result for a Newton-Raphson solve.
  *
  * Written in place by newtonRaphson(ctx). Callers read fields directly.
- * Never re-allocated between solves — the same instance lives on ctx.nrResult
+ * Never re-allocated between solves- the same instance lives on ctx.nrResult
  * for the lifetime of the engine.
  */
 export class NRResult {
@@ -116,7 +116,7 @@ export class NRResult {
   iterations: number = 0;
   /**
    * Final solution vector (node voltages + branch currents).
-   * Points into ctx.rhs — no additional allocation.
+   * Points into ctx.rhs- no additional allocation.
    */
   voltages: Float64Array;
   /** Index of the element with the largest voltage change; -1 when unknown. */
@@ -138,14 +138,14 @@ export class NRResult {
 }
 
 // ---------------------------------------------------------------------------
-// DcOpResult — mutable result class for DC operating point
+// DcOpResult- mutable result class for DC operating point
 // ---------------------------------------------------------------------------
 
 /**
  * Mutable result for a DC operating-point solve.
  *
  * Written in place by solveDcOperatingPoint(ctx). The voltages buffer is
- * a view into ctx.dcopVoltages — no additional allocation.
+ * a view into ctx.dcopVoltages- no additional allocation.
  */
 export class DcOpResult {
   /** Whether the DC operating point converged. */
@@ -156,7 +156,7 @@ export class DcOpResult {
   iterations: number = 0;
   /**
    * Final node voltages after convergence.
-   * Points into ctx.dcopVoltages — no additional allocation.
+   * Points into ctx.dcopVoltages- no additional allocation.
    */
   nodeVoltages: Float64Array;
   /** Diagnostic messages emitted during DC-OP. */
@@ -190,7 +190,7 @@ export interface CKTCircuitInput {
 }
 
 /**
- * CKTCircuitContext — god-object holding all pre-allocated simulation state.
+ * CKTCircuitContext- god-object holding all pre-allocated simulation state.
  *
  * Matches ngspice CKTcircuit. Every hot-path function (newtonRaphson,
  * solveDcOperatingPoint, integration, LTE) takes a CKTCircuitContext and
@@ -206,7 +206,7 @@ export class CKTCircuitContext {
   // Matrix / solver
   // -------------------------------------------------------------------------
 
-  /** Shared sparse solver — the same instance used for every NR factorization. */
+  /** Shared sparse solver- the same instance used for every NR factorization. */
   private _solver: SparseSolver = null!;
 
   /** Setting this also updates loadCtx.solver to the new instance. */
@@ -267,7 +267,7 @@ export class CKTCircuitContext {
   /**
    * Previous timestep history (ngspice CKTdeltaOld[7], cktdefs.h).
    *
-   * Unified storage — the TimestepController references this SAME array by
+   * Unified storage- the TimestepController references this SAME array by
    * identity (no duplicate buffer, no explicit copies). Elements read via
    * loadCtx.deltaOld / ctx.deltaOld inside load(); the timestep controller
    * writes via rotateDeltaOld()/setDeltaOldCurrent(). Guaranteed invariant:
@@ -290,9 +290,9 @@ export class CKTCircuitContext {
   // Results (mutable classes, not interfaces)
   // -------------------------------------------------------------------------
 
-  /** Mutable NR result — written by newtonRaphson(ctx). */
+  /** Mutable NR result- written by newtonRaphson(ctx). */
   nrResult: NRResult;
-  /** Mutable DC-OP result — written by solveDcOperatingPoint(ctx). */
+  /** Mutable DC-OP result- written by solveDcOperatingPoint(ctx). */
   dcopResult: DcOpResult;
 
   // -------------------------------------------------------------------------
@@ -314,17 +314,17 @@ export class CKTCircuitContext {
   /**
    * Non-convergence counter (ngspice CKTnoncon). Accessor through loadCtx.noncon
    * so there is exactly one storage location across the ckt / loadCtx boundary
-   * (C3 fix — ngspice has a single CKTnoncon field on CKTcircuit).
+   * (C3 fix- ngspice has a single CKTnoncon field on CKTcircuit).
    */
   get noncon(): number { return this.loadCtx.noncon.value; }
   set noncon(v: number) { this.loadCtx.noncon.value = v; }
 
   // -------------------------------------------------------------------------
-  // Mode flags — single CKTmode bitfield (ngspice cktdefs.h:163-209)
+  // Mode flags- single CKTmode bitfield (ngspice cktdefs.h:163-209)
   // -------------------------------------------------------------------------
 
   /**
-   * ngspice CKTmode — single bitfield holding analysis bits (MODEDCOP,
+   * ngspice CKTmode- single bitfield holding analysis bits (MODEDCOP,
    * MODETRAN, MODEAC, MODEUIC) and INITF bits (MODEINITJCT, MODEINITFIX,
    * MODEINITFLOAT, MODEINITTRAN, MODEINITPRED, MODEINITSMSIG). See
    * ./ckt-mode.ts for constants and helpers.
@@ -332,7 +332,7 @@ export class CKTCircuitContext {
    * `cktMode` is the single source of truth; LoadContext exposes
    * it to devices via `loadCtx.cktMode`.
    *
-   * Defaults to MODEDCOP | MODEINITFLOAT — ngspice's post-reset analysis-
+   * Defaults to MODEDCOP | MODEINITFLOAT- ngspice's post-reset analysis-
    * idle state.
    */
   cktMode: number = MODEDCOP | MODEINITFLOAT;
@@ -378,7 +378,7 @@ export class CKTCircuitContext {
   voltTol: number;
   /** Absolute current tolerance (ngspice CKTabstol). */
   iabstol: number;
-  // cite: cktinit.c:53-55 — CKTbypass default false
+  // cite: cktinit.c:53-55- CKTbypass default false
   /** Bypass gate flag (ngspice CKTbypass). When true, device load() may skip
    * recompute if voltage deltas are within tolerance. Default false. */
   bypass: boolean;
@@ -452,7 +452,7 @@ export class CKTCircuitContext {
   ) => void) | null;
   /**
    * Pre-factor hook for harness instrumentation. Mirrors ngspice's
-   * `ni_instrument_cb` gate at niiter.c:704 — fires AFTER cktLoad refreshes
+   * `ni_instrument_cb` gate at niiter.c:704- fires AFTER cktLoad refreshes
    * stamps and BEFORE solver.preorder()/factor() overwrite the matrix with
    * LU values. The unique window where the assembled MNA holds post-load,
    * pre-LU values; harness consumers read it via solver.getCSCNonZeros().
@@ -554,13 +554,13 @@ export class CKTCircuitContext {
   /**
    * Scratch buffer for LTE computations in cktTerr/cktTerrVoltage.
    * Sized generously to accommodate Phase 3's formula corrections.
-   * Length = max(matrixSize * 4, 64) — large enough for all intermediate vectors.
+   * Length = max(matrixSize * 4, 64)- large enough for all intermediate vectors.
    */
   lteScratch: Float64Array;
 
   /**
    * Reusable scratch array returned by `cktncDump`. Stable identity across
-   * calls — consumers must not retain references beyond the current call.
+   * calls- consumers must not retain references beyond the current call.
    * Populated by pushing pre-mutated pool entries from `_ncDumpPool`.
    */
   ncDumpScratch: { node: number; delta: number; tol: number }[];
@@ -607,7 +607,7 @@ export class CKTCircuitContext {
     this.nodesetHandles = new Map();
     this.icHandles = new Map();
 
-    // Matrix / solver — shared instance owned by the engine.
+    // Matrix / solver- shared instance owned by the engine.
     // ngspice SMPnewMatrix → spCreate is called once at circuit setup.
     this.solver = solver;
     solver._initStructure();
@@ -640,11 +640,11 @@ export class CKTCircuitContext {
     // Gear scratch (7×7 flat)
     this.gearMatScratch = new Float64Array(49);
 
-    // Results — point at zero-length rhs/dcopVoltages; re-pointed by allocateRowBuffers
+    // Results- point at zero-length rhs/dcopVoltages; re-pointed by allocateRowBuffers
     this.nrResult = new NRResult(this.rhs);
     this.dcopResult = new DcOpResult(this.dcopVoltages);
 
-    // Load context — pre-allocated once, mutated in place each NR iteration
+    // Load context- pre-allocated once, mutated in place each NR iteration
     const nonconRef = { value: 0 };
     // CKTtemp default (300.15 K = REFTEMP) matches ngspice CONSTreftemp.
     const ctxTemp = 300.15;
@@ -654,7 +654,7 @@ export class CKTCircuitContext {
     // bound in allocateStateBuffers via setStatePool(). The state0..state3
     // getters resolve through whichever pool is currently bound, so post-
     // rotation reads always see the live ring (cktdefs.h:82-85 macro
-    // semantics). cite: cktinit.c:53-55 — CKTbypass default false;
+    // semantics). cite: cktinit.c:53-55- CKTbypass default false;
     // CKTvoltTol default 1e-6.
     this.loadCtx = new LoadCtxImpl(new StatePool(0), {
       cktMode: MODEDCOP | MODEINITFLOAT,
@@ -688,7 +688,7 @@ export class CKTCircuitContext {
     this.abstol = params.voltTol;
     this.voltTol = params.voltTol;
     this.iabstol = params.abstol;
-    // cite: cktinit.c:53-55 — CKTbypass default false
+    // cite: cktinit.c:53-55- CKTbypass default false
     this.bypass = false;
     this.maxIterations = params.maxIterations;
     this.transientMaxIterations = params.transientMaxIterations;
@@ -704,7 +704,7 @@ export class CKTCircuitContext {
     this.nodesets = new Map();
     this.ics = new Map();
 
-    // Instrumentation (defaults — engine sets these after construction)
+    // Instrumentation (defaults- engine sets these after construction)
     this.diagnostics = new DiagnosticCollector();
     this.limitingCollector = null;
     this.enableBlameTracking = false;
@@ -730,7 +730,7 @@ export class CKTCircuitContext {
     // Full params reference
     this.params = params;
 
-    // Per-node non-convergence diagnostic scratch — rebuilt in allocateRowBuffers
+    // Per-node non-convergence diagnostic scratch- rebuilt in allocateRowBuffers
     this.ncDumpScratch = [];
   }
 
@@ -770,7 +770,7 @@ export class CKTCircuitContext {
    * Called from MNAEngine._setup() before allocateRowBuffers().
    *
    * If `existingPool` is provided and matches numStates, it is adopted as the
-   * authoritative pool — single-ownership invariant: cac.statePool and
+   * authoritative pool- single-ownership invariant: cac.statePool and
    * ctx.statePool always reference the same object. Otherwise a fresh pool is
    * allocated.
    */
@@ -781,7 +781,7 @@ export class CKTCircuitContext {
     this.dcopSavedState0       = new Float64Array(numStates);
     this.dcopOldState0         = new Float64Array(numStates);
     // Bind the live ring reference. From this call onward, ctx.loadCtx.stateN
-    // resolves to this.statePool.states[N] on every access — no snapshot,
+    // resolves to this.statePool.states[N] on every access- no snapshot,
     // matches ngspice CKTstateN macro semantics (cktdefs.h:82-85).
     this.loadCtx.setStatePool(this.statePool);
     for (const el of this._poolBackedElements) {

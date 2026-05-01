@@ -1,5 +1,5 @@
 ﻿/**
- * Tests for DefaultSimulatorFacade — Task 10.
+ * Tests for DefaultSimulatorFacade- Task 10.
  *
  * Covers:
  *  1. Build + compile + step + readOutput (AND gate)
@@ -92,7 +92,7 @@ describe('DefaultSimulatorFacade', () => {
   });
 
   // -------------------------------------------------------------------------
-  // Test 2: Clock advancement — step() advances clocks
+  // Test 2: Clock advancement- step() advances clocks
   // -------------------------------------------------------------------------
 
   it('advances clocks on step() so flip-flop latches D', () => {
@@ -113,7 +113,7 @@ describe('DefaultSimulatorFacade', () => {
   });
 
   // -------------------------------------------------------------------------
-  // Test 3: clockAdvance: false — clocks do NOT advance
+  // Test 3: clockAdvance: false- clocks do NOT advance
   // -------------------------------------------------------------------------
 
   it('does not advance clocks when clockAdvance: false', () => {
@@ -123,7 +123,7 @@ describe('DefaultSimulatorFacade', () => {
 
     facade.setSignal(engine, 'D', 1);
 
-    // Run many steps without clock advancement — flip-flop should not latch
+    // Run many steps without clock advancement- flip-flop should not latch
     for (let i = 0; i < 10; i++) {
       facade.step(engine, { clockAdvance: false });
     }
@@ -133,7 +133,7 @@ describe('DefaultSimulatorFacade', () => {
   });
 
   // -------------------------------------------------------------------------
-  // Test 4: Fresh engine per compile — no state leakage
+  // Test 4: Fresh engine per compile- no state leakage
   // -------------------------------------------------------------------------
 
   it('produces a fresh engine on each compile() with no state leakage', () => {
@@ -194,7 +194,7 @@ describe('DefaultSimulatorFacade', () => {
       {
         op: 'add',
         spec: { id: 'newGate', type: 'And' },
-        // intentionally no connections — leaves And inputs unconnected
+        // intentionally no connections- leaves And inputs unconnected
       },
     ]);
 
@@ -215,7 +215,7 @@ describe('DefaultSimulatorFacade', () => {
   });
 
   // -------------------------------------------------------------------------
-  // G1: Analog dispatch — facade routes analog circuits to MNA engine
+  // G1: Analog dispatch- facade routes analog circuits to MNA engine
   // -------------------------------------------------------------------------
 
   it('digital-only circuit routes to digital engine with null compiledAnalog', () => {
@@ -249,7 +249,7 @@ describe('DefaultSimulatorFacade', () => {
   });
 
   // -------------------------------------------------------------------------
-  // R1: runToStable — combinational stabilization
+  // R1: runToStable- combinational stabilization
   // -------------------------------------------------------------------------
 
   it('settle stabilizes a combinational AND gate and reads correct output', async () => {
@@ -268,7 +268,7 @@ describe('DefaultSimulatorFacade', () => {
   });
 
   // -------------------------------------------------------------------------
-  // R2: settle completes for pure digital — does a single evaluation step
+  // R2: settle completes for pure digital- does a single evaluation step
   // -------------------------------------------------------------------------
 
   it('settle completes for a pure digital circuit without throwing', async () => {
@@ -408,11 +408,11 @@ describe('DefaultSimulatorFacade', () => {
     // Voltage divider: 10 V source, two equal resistors (10 Ω each).
     // Midpoint voltage = Vsrc * R2 / (R1 + R2) = 10 * 10/20 = 5 V.
     // If `resistance` is silently dropped, both resistors default to their
-    // fallback value and the ratio stays 1:1 — but the absolute Ohm values
+    // fallback value and the ratio stays 1:1- but the absolute Ohm values
     // change, which we can detect by confirming the midpoint is 5 V.
     // More directly: use unequal resistors (R1=10, R2=40) so the ratio is
     // 10:40 = 1:4, giving Vmid = 10 * 40/50 = 8 V.  If resistance is dropped
-    // both resistors get the same default and Vmid collapses to 5 V — a clear
+    // both resistors get the same default and Vmid collapses to 5 V- a clear
     // regression signal.
     const R1 = 10;
     const R2 = 40;

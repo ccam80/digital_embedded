@@ -1,5 +1,5 @@
 /**
- * Tests for TimingDiagramPanel — waveform view of signals over time.
+ * Tests for TimingDiagramPanel- waveform view of signals over time.
  *
  * @vitest-environment jsdom
  */
@@ -65,7 +65,7 @@ function buildCoordinator(): {
 }
 
 // ---------------------------------------------------------------------------
-// recordsSamples — step coordinator 10 times, verify 10 samples per channel
+// recordsSamples- step coordinator 10 times, verify 10 samples per channel
 // ---------------------------------------------------------------------------
 
 describe("TimingDiagramPanel", () => {
@@ -125,7 +125,7 @@ describe("TimingDiagramPanel", () => {
   });
 
   // -------------------------------------------------------------------------
-  // ringBufferEviction — fill beyond capacity, oldest evicted
+  // ringBufferEviction- fill beyond capacity, oldest evicted
   // -------------------------------------------------------------------------
 
   describe("ringBufferEviction", () => {
@@ -175,7 +175,7 @@ describe("TimingDiagramPanel", () => {
   });
 
   // -------------------------------------------------------------------------
-  // snapshotTagging — snapshots saved at configured intervals with time tags
+  // snapshotTagging- snapshots saved at configured intervals with time tags
   // -------------------------------------------------------------------------
 
   describe("snapshotTagging", () => {
@@ -257,7 +257,7 @@ describe("TimingDiagramPanel", () => {
   });
 
   // -------------------------------------------------------------------------
-  // clickToJump — jump to time T, verify restoreSnapshot called with closest
+  // clickToJump- jump to time T, verify restoreSnapshot called with closest
   // -------------------------------------------------------------------------
 
   describe("clickToJump", () => {
@@ -327,7 +327,7 @@ describe("TimingDiagramPanel", () => {
   });
 
   // -------------------------------------------------------------------------
-  // onReset — clears channels and snapshots
+  // onReset- clears channels and snapshots
   // -------------------------------------------------------------------------
 
   describe("onReset", () => {
@@ -372,7 +372,7 @@ describe("TimingDiagramPanel", () => {
   });
 
   // -------------------------------------------------------------------------
-  // getChannels — returns all configured channels
+  // getChannels- returns all configured channels
   // -------------------------------------------------------------------------
 
   describe("getChannels", () => {
@@ -393,7 +393,7 @@ describe("TimingDiagramPanel", () => {
   });
 
   // -------------------------------------------------------------------------
-  // timeCursor — getCursorTime and getValuesAtTime
+  // timeCursor- getCursorTime and getValuesAtTime
   // -------------------------------------------------------------------------
 
   describe("timeCursor", () => {
@@ -484,7 +484,7 @@ describe("TimingDiagramPanel", () => {
       setSignal(DATA_ADDR, 0xEF);
       panel.onStep(3);
 
-      // Query at t=2 — exact match
+      // Query at t=2- exact match
       const values = panel.getValuesAtTime(2);
       expect(values).toHaveLength(2);
 

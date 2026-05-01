@@ -1,5 +1,5 @@
 /**
- * Tests for pin-electrical.ts — PinElectricalSpec resolution cascade.
+ * Tests for pin-electrical.ts- PinElectricalSpec resolution cascade.
  */
 
 import { describe, it, expect } from 'vitest';

@@ -99,7 +99,7 @@ describe("WireDrawing", () => {
     mode.startFromPin(srcElement, srcPin);
     mode.updateCursor({ x: 5, y: 3 });
 
-    // Lock a waypoint — the corner at (5, 0) and cursor at (5, 3) become locked
+    // Lock a waypoint- the corner at (5, 0) and cursor at (5, 3) become locked
     mode.addWaypoint();
 
     // Now move cursor further
@@ -180,7 +180,7 @@ describe("WireMerge", () => {
   });
 
   it("doesNotMergeNonCollinear", () => {
-    // Two wires at different y values — not collinear
+    // Two wires at different y values- not collinear
     const wire1 = new Wire({ x: 0, y: 0 }, { x: 5, y: 0 });
     const wire2 = new Wire({ x: 5, y: 1 }, { x: 10, y: 1 });
 

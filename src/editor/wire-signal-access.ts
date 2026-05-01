@@ -1,5 +1,5 @@
 /**
- * WireSignalAccess — bridge between the wire renderer and the engine binding layer.
+ * WireSignalAccess- bridge between the wire renderer and the engine binding layer.
  *
  * The renderer uses this interface to read signal values from whatever engine
  * is currently connected. When no engine is active the renderer receives
@@ -27,8 +27,8 @@ export interface WireSignalAccess {
    * Returns the current signal value for a wire, or undefined when no engine
    * is connected or the wire has no net assignment yet.
    *
-   * Digital: `{ raw, width }` — raw unsigned integer + bit-width.
-   * Analog:  `{ voltage }` — continuous node voltage.
+   * Digital: `{ raw, width }`- raw unsigned integer + bit-width.
+   * Analog:  `{ voltage }`- continuous node voltage.
    */
   getWireValue(wire: Wire): WireValue | undefined;
 }

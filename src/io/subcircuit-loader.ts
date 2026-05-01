@@ -90,7 +90,7 @@ async function loadRecursive(
   // Parse the XML to discover element names before attempting to load
   const parsed = parseDigXml(xml);
 
-  // Collect unknown element names — check both global registry and
+  // Collect unknown element names- check both global registry and
   // circuit-scoped subcircuit defs accumulated during this load session.
   const unknownNames = new Set<string>();
   for (const ve of parsed.visualElements) {
@@ -102,7 +102,7 @@ async function loadRecursive(
 
   // Resolve all unknown subcircuits into the collectedDefs accumulator.
   // If a name can't be resolved (e.g. Digital built-in like GenericInitCode),
-  // skip it — loadDigCircuit will also skip unregistered elements gracefully.
+  // skip it- loadDigCircuit will also skip unregistered elements gracefully.
   for (const name of unknownNames) {
     try {
       await resolveAndCollect(name, resolver, registry, xmlCache, loadingStack, depth, collectedDefs!);
@@ -130,7 +130,7 @@ async function resolveAndCollect(
   depth: number,
   collectedDefs: Map<string, SubcircuitDefinition>,
 ): Promise<void> {
-  // Already collected during this load session — skip
+  // Already collected during this load session- skip
   if (collectedDefs.has(name)) return;
 
   // Cycle detection
@@ -166,7 +166,7 @@ async function resolveAndCollect(
     collectedDefs,
   );
 
-  // Collect the definition for circuit-scoped storage — no global registry mutation.
+  // Collect the definition for circuit-scoped storage- no global registry mutation.
   const shapeType = subcircuit.metadata.shapeType || "DEFAULT";
   const subDef = createLiveDefinition(
     subcircuit,

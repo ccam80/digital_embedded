@@ -1,5 +1,5 @@
 /**
- * Tests for src/headless/loader.ts — SimulationLoader.
+ * Tests for src/headless/loader.ts- SimulationLoader.
  */
 
 import { describe, it, expect } from "vitest";
@@ -90,7 +90,7 @@ describe("Loader", () => {
 
     const circuit = await loader.loadDig(filePath);
 
-    // Same verification as loadsDigFromXml — file path code path
+    // Same verification as loadsDigFromXml- file path code path
     expect(circuit.elements.length).toBe(5);
     expect(circuit.wires.length).toBe(5);
 
@@ -106,7 +106,7 @@ describe("Loader", () => {
     const registry = buildAndGateRegistry();
     const loader = new SimulationLoader(registry);
 
-    // XML string starts with "<" — should parse directly without filesystem access
+    // XML string starts with "<"- should parse directly without filesystem access
     const xml = readFileSync(
       join(process.cwd(), "circuits", "and-gate.dig"),
       "utf-8",

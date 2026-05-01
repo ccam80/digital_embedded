@@ -1,15 +1,15 @@
 /**
- * MIDI component — note on/off, channel, velocity via Web MIDI API.
+ * MIDI component- note on/off, channel, velocity via Web MIDI API.
  *
  * Inputs (rising-edge clock triggered, when en=1):
- *   N     — MIDI note number (7-bit, 0–127)
- *   V     — velocity / volume (7-bit, 0–127)
- *   OnOff — 1=note on, 0=note off (1-bit)
- *   en    — enable (1-bit); clock edge is ignored when en=0
- *   C     — clock (1-bit, rising-edge triggered)
+ *   N    - MIDI note number (7-bit, 0–127)
+ *   V    - velocity / volume (7-bit, 0–127)
+ *   OnOff- 1=note on, 0=note off (1-bit)
+ *   en   - enable (1-bit); clock edge is ignored when en=0
+ *   C    - clock (1-bit, rising-edge triggered)
  *
  * Optional inputs when progChangeEnable=true (prepended before en/C):
- *   PC    — program change flag (1-bit); when 1, sends program change using N as program number
+ *   PC   - program change flag (1-bit); when 1, sends program change using N as program number
  *
  * No outputs. MIDI is a pure side-effect component.
  *
@@ -18,13 +18,13 @@
  * is unaffected.
  *
  * Internal state (internalStateCount: 1):
- *   stateSlot 0 — previous clock value (for edge detection)
+ *   stateSlot 0- previous clock value (for edge detection)
  *
  * Properties:
- *   label           — optional label
- *   midiChannel     — MIDI channel number 1–16 (default 1)
- *   midiInstrument  — instrument name or GM patch number string (default "")
- *   progChangeEnable — when true, adds a PC input pin (default false)
+ *   label          - optional label
+ *   midiChannel    - MIDI channel number 1–16 (default 1)
+ *   midiInstrument - instrument name or GM patch number string (default "")
+ *   progChangeEnable- when true, adds a PC input pin (default false)
  */
 
 import { AbstractCircuitElement } from "../../core/element.js";
@@ -87,7 +87,7 @@ function programChangeMessage(channel: number, program: number): number[] {
 }
 
 // ---------------------------------------------------------------------------
-// MidiOutputManager — singleton that manages Web MIDI access
+// MidiOutputManager- singleton that manages Web MIDI access
 //
 // Graceful degradation: if the browser does not support Web MIDI or the user
 // denies access, all send() calls are silently ignored.
@@ -160,7 +160,7 @@ function buildMidiPinDeclarations(progChangeEnable: boolean): PinDeclaration[] {
 }
 
 // ---------------------------------------------------------------------------
-// MidiElement — CircuitElement implementation
+// MidiElement- CircuitElement implementation
 // ---------------------------------------------------------------------------
 
 export class MidiElement extends AbstractCircuitElement {
@@ -188,7 +188,7 @@ export class MidiElement extends AbstractCircuitElement {
       0,
       createInverterConfig(invLabels),
       createClockConfig(["C"]),
-      // No global bitWidth override — pins have heterogeneous defaultBitWidth (N/V=7, others=1)
+      // No global bitWidth override- pins have heterogeneous defaultBitWidth (N/V=7, others=1)
     );
   }
 
@@ -224,7 +224,7 @@ export class MidiElement extends AbstractCircuitElement {
 }
 
 // ---------------------------------------------------------------------------
-// executeMidi — flat simulation function
+// executeMidi- flat simulation function
 //
 // Detects rising clock edge (en=1 required). On edge:
 //   - If progChangeEnable and PC=1: sends program change with N as program number.
@@ -362,7 +362,7 @@ export const MidiDefinition: ComponentDefinition = {
   attributeMap: MIDI_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.IO,
   helpText:
-    "MIDI — sends MIDI note-on/off and program-change messages via Web MIDI API.\n" +
+    "MIDI- sends MIDI note-on/off and program-change messages via Web MIDI API.\n" +
     "Inputs: N (note, 7-bit), V (velocity, 7-bit), OnOff (1=on/0=off), en (enable), C (clock).\n" +
     "Triggered on rising clock edge when en=1.\n" +
     "Graceful degradation: if Web MIDI is unavailable, no audio is produced but signals propagate normally.",

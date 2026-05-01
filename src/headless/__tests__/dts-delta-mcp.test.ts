@@ -29,7 +29,7 @@ import {
 } from "../../test-fixtures/model-fixtures.js";
 import { TestElement } from "../../test-fixtures/test-element.js";
 
-// Finite BJT params — DTS schema rejects Infinity as a param value.
+// Finite BJT params- DTS schema rejects Infinity as a param value.
 // VAF=100 is a typical finite Early voltage used in real BJT models.
 const BJT_FINITE_PARAMS: Record<string, number> = {
   BF: 100,

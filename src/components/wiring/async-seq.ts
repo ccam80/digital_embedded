@@ -1,12 +1,12 @@
 /**
- * AsyncSeq component — marks circuit as asynchronous sequential.
+ * AsyncSeq component- marks circuit as asynchronous sequential.
  * Propagation is triggered by input changes only (no explicit clock).
  *
  * This is a marker component with no simulation behavior. Its presence
  * in a circuit tells the engine to use asynchronous propagation mode.
  * Optionally, a real-time frequency can be configured for timed simulation.
  *
- * No input or output pins. No executeFn behavior needed — the engine
+ * No input or output pins. No executeFn behavior needed- the engine
  * detects this component's presence during compilation.
  *
  * Properties:
@@ -33,7 +33,7 @@ import {
 
 
 // ---------------------------------------------------------------------------
-// Pin layout — no pins
+// Pin layout- no pins
 // ---------------------------------------------------------------------------
 
 export function buildAsyncSeqPinDeclarations(): PinDeclaration[] {
@@ -41,7 +41,7 @@ export function buildAsyncSeqPinDeclarations(): PinDeclaration[] {
 }
 
 // ---------------------------------------------------------------------------
-// AsyncSeqElement — CircuitElement implementation
+// AsyncSeqElement- CircuitElement implementation
 // ---------------------------------------------------------------------------
 
 export class AsyncSeqElement extends AbstractCircuitElement {
@@ -80,7 +80,7 @@ export class AsyncSeqElement extends AbstractCircuitElement {
 
     ctx.save();
 
-    // Filled rectangle: (0.5,0.5) → (4.5,2.5) — 4x2 box
+    // Filled rectangle: (0.5,0.5) → (4.5,2.5)- 4x2 box
     ctx.setColor("COMPONENT_FILL");
     ctx.drawPolygon(
       [
@@ -124,7 +124,7 @@ export class AsyncSeqElement extends AbstractCircuitElement {
 }
 
 // ---------------------------------------------------------------------------
-// executeAsyncSeq — flat simulation function (no-op marker)
+// executeAsyncSeq- flat simulation function (no-op marker)
 //
 // AsyncSeq has no inputs or outputs. Its simulation behavior is solely
 // conveyed by its presence to the compiler/engine during compilation.
@@ -195,7 +195,7 @@ export const AsyncSeqDefinition: ComponentDefinition = {
   attributeMap: ASYNC_SEQ_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.WIRING,
   helpText:
-    "AsyncSeq — marks circuit as asynchronous sequential (no explicit clock).\n" +
+    "AsyncSeq- marks circuit as asynchronous sequential (no explicit clock).\n" +
     "Propagation triggered by input changes only.",
   models: {
     digital: {

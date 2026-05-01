@@ -30,7 +30,7 @@ None. The analog fuse is a pure variable RES with no internal topology.
 
 ## Branch rows
 
-None. The fuse stamps conductance directly — no branch current row.
+None. The fuse stamps conductance directly- no branch current row.
 
 ## State slots
 
@@ -51,7 +51,7 @@ The analog fuse applies `ressetup.c:46-49` once (posNode = out1, negNode = out2)
 
 Total: 4 TSTALLOC entries (matching ressetup.c:46-49 exactly; subject to ground-skip guards).
 
-## setup() body — alloc only
+## setup() body- alloc only
 
 ```ts
 setup(ctx: SetupContext): void {
@@ -59,7 +59,7 @@ setup(ctx: SetupContext): void {
   const posNode = this._pinNodes.get("out1")!;  // RESposNode
   const negNode = this._pinNodes.get("out2")!;  // RESnegNode
 
-  // ressetup.c:46-49 — TSTALLOC sequence, line-for-line.
+  // ressetup.c:46-49- TSTALLOC sequence, line-for-line.
   // Ground-skip guards mirror the existing load() checks.
   if (posNode !== 0) this._hPP = solver.allocElement(posNode, posNode);
   if (negNode !== 0) this._hNN = solver.allocElement(negNode, negNode);
@@ -85,13 +85,13 @@ private _hNP: number = -1;
 
 The `setup()` body must mirror these exactly so that only the handles that will actually be written by `load()` are allocated. The implementation above does this correctly: `_hPP` is allocated when `posNode !== 0`; `_hNN` when `negNode !== 0`; `_hPN` and `_hNP` only when both are non-zero.
 
-## load() body — value writes only
+## load() body- value writes only
 
 Implementer ports the variable conductance stamp from `ref/ngspice/src/spicelib/devices/res/resload.c`, applying the smooth-resistance `smoothResistance(_thermalEnergy, ...)` to get `G`, then stamping:
-- `solver.stampElement(_hPP, G)` — posNode diagonal
-- `solver.stampElement(_hNN, G)` — negNode diagonal
-- `solver.stampElement(_hPN, -G)` — off-diagonal
-- `solver.stampElement(_hNP, -G)` — off-diagonal
+- `solver.stampElement(_hPP, G)`- posNode diagonal
+- `solver.stampElement(_hNN, G)`- negNode diagonal
+- `solver.stampElement(_hPN, -G)`- off-diagonal
+- `solver.stampElement(_hNP, -G)`- off-diagonal
 
 with the same ground-skip guards used in `setup()` (only stamp `_hPN`/`_hNP` when both handles are valid, i.e., `_hPN !== -1`).
 
@@ -100,7 +100,7 @@ No `solver.allocElement` calls in `load()`. The `accept()` method (I²t integrat
 ## Factory cleanup
 
 - Drop `internalNodeIds` and `branchIdx` parameters from `createAnalogFuseElement` factory signature (per A6.3). The current factory already ignores them (`_internalNodeIds`, `_branchIdx`).
-- No `branchCount` existed on this `modelRegistry` entry — no removal needed.
+- No `branchCount` existed on this `modelRegistry` entry- no removal needed.
 - `mayCreateInternalNodes` omitted.
 - Add `ngspiceNodeMap: { out1: "pos", out2: "neg" }` to `ComponentDefinition`.
 - No `findBranchFor` callback (no branch row).
@@ -109,11 +109,11 @@ No `solver.allocElement` calls in `load()`. The `accept()` method (I²t integrat
 
 Per CLAUDE.md "Test Policy During W3 Setup-Load-Split", verification is spec compliance only. DO NOT run tests; DO NOT use test results.
 
-1. `setup()` body in the implementation file matches the "setup() body — alloc only" listing in this PB line-for-line.
+1. `setup()` body in the implementation file matches the "setup() body- alloc only" listing in this PB line-for-line.
 2. TSTALLOC sequence in `setup()` matches the order in the cited ngspice anchor file (see top of this PB, e.g. `ressetup.c:46-49`).
 3. Factory cleanup applied per the "Factory cleanup" section above.
 4. `ngspiceNodeMap` registered per the "Pin mapping" section above (or omitted for composites where the spec says so).
-5. `load()` writes through cached handles only — zero `solver.allocElement(...)` calls inside `load()`, `accept()`, or any non-`setup()` method.
+5. `load()` writes through cached handles only- zero `solver.allocElement(...)` calls inside `load()`, `accept()`, or any non-`setup()` method.
 6. `mayCreateInternalNodes` flag set per spec.
 7. `findBranchFor` callback present where spec says (V-output sources, IND, etc.).
 8. No banned closing verdicts (mapping/tolerance/equivalent-to/pre-existing/intentional-divergence/citation-divergence/partial) used in any commit message or report.

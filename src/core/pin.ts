@@ -1,5 +1,5 @@
 /**
- * Pin system — visual/declarative only.
+ * Pin system- visual/declarative only.
  *
  * Per Decision 6: Pin has no simulation state. No netId, no signalValue.
  * The compiler assigns net IDs from pin declarations and wire topology.
@@ -47,7 +47,7 @@ export interface PinDeclaration {
 }
 
 /**
- * A fully resolved pin — produced once per component instance during compilation.
+ * A fully resolved pin- produced once per component instance during compilation.
  * Carries identity, geometry, and electrical binding in a single object.
  * The array of ResolvedPins is always in `pinLayout` order.
  */
@@ -189,7 +189,7 @@ export function pinWorldPosition(
  * origin (rotation applied, but NOT translated by origin). Consumers must
  * add element.position to get world-space coordinates.
  *
- * The origin parameter is accepted for API compatibility but ignored —
+ * The origin parameter is accepted for API compatibility but ignored-
  * all position offsetting is done at the consumer side.
  */
 export function resolvePins(
@@ -299,7 +299,7 @@ export function layoutPinsOnFace(
 
 /**
  * Build PinDeclarations for a set of inputs on the west face and a single
- * output on the east face — the most common gate layout.
+ * output on the east face- the most common gate layout.
  *
  * Pin positions match Java Digital's GenericShape.createPins():
  *   - Input pins at x=0, spaced 1 grid unit apart starting at y=0

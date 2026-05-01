@@ -1,5 +1,5 @@
 /**
- * CTZ URL parser — entry point for importing CircuitJS circuits.
+ * CTZ URL parser- entry point for importing CircuitJS circuits.
  *
  * CircuitJS encodes circuits as URL fragments containing raw-deflate-compressed
  * text, then base64-encoded. This module handles the full decode pipeline:
@@ -48,7 +48,7 @@ export function isCtzUrl(url: string): boolean {
 }
 
 // ---------------------------------------------------------------------------
-// Decompression — browser-native DecompressionStream
+// Decompression- browser-native DecompressionStream
 // ---------------------------------------------------------------------------
 
 /**
@@ -68,7 +68,7 @@ async function decompressRawDeflate(compressed: Uint8Array): Promise<string> {
   } catch (err) {
     console.warn('[ctz-parser] deflate-raw not supported; trying deflate fallback', err);
     // Dual-format fallback: polyfill environments only support zlib-wrapped
-    // deflate. Per spec/architectural-alignment.md §I1 retain-with-reason.
+    // deflate. Per spec/architectural-alignment.md ssI1 retain-with-reason.
     ds = new DecompressionStream("deflate");
   }
 
@@ -137,7 +137,7 @@ function extractFragment(url: string): string {
 }
 
 // ---------------------------------------------------------------------------
-// parseCtzUrl — public API
+// parseCtzUrl- public API
 // ---------------------------------------------------------------------------
 
 /**

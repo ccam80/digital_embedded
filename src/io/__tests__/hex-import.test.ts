@@ -1,5 +1,5 @@
 /**
- * Tests for hex-import — task 4.3.5.
+ * Tests for hex-import- task 4.3.5.
  */
 
 import { describe, it, expect } from "vitest";
@@ -54,7 +54,7 @@ describe("HexImport", () => {
     // :04000000 01020304 F5 (checksum)
     // len=04, addr=0000, type=00, data=01 02 03 04, checksum=F5
     // checksum = (256 - (0x04+0x00+0x00+0x00+0x01+0x02+0x03+0x04)) & 0xFF
-    //          = (256 - 0x0E) & 0xFF = 0xF2 — let me recalculate
+    //          = (256 - 0x0E) & 0xFF = 0xF2- let me recalculate
     // sum = 4+0+0+0+1+2+3+4 = 14 = 0x0E; checksum = (0x100 - 0x0E) & 0xFF = 0xF2
     // 04 bytes, addr 0x0000, type 0x00, data = 01 02 03 04
     // sum = 04+00+00+00+01+02+03+04 = 0x0E, checksum byte = 0x100-0x0E = 0xF2
@@ -71,7 +71,7 @@ describe("HexImport", () => {
     // :020000040001F9  sets upper 16 bits to 0x0001, so segment = 0x00010000
     // sum = 02+00+00+04+00+01 = 0x07; checksum = 0x100-0x07 = 0xF9
     // Then a data record at local addr 0x0000:
-    // :01000000AASS  — 1 byte = 0xAA at byte addr 0x00010000
+    // :01000000AASS - 1 byte = 0xAA at byte addr 0x00010000
     // sum = 01+00+00+00+AA = 0xAB; checksum = 0x100-0xAB = 0x55
     const records = [
       ":020000040001F9",
@@ -133,7 +133,7 @@ describe("HexImport", () => {
   });
 
   it("autoDetectsBinaryFile", () => {
-    // Not a text format — raw bytes
+    // Not a text format- raw bytes
     const data = new Uint8Array([0xDE, 0xAD, 0xBE, 0xEF]);
     const df = importHex(data, 8, false);
     expect(df.getWord(0)).toBe(0xDEn);

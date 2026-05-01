@@ -29,7 +29,7 @@ import type { RenderContext, Point, TextAnchor, FontSpec, PathData } from "../..
 import type { ThemeColor } from "../../../core/renderer-interface.js";
 
 // ---------------------------------------------------------------------------
-// Helpers — ComponentLayout mock with stateOffset support
+// Helpers- ComponentLayout mock with stateOffset support
 // ---------------------------------------------------------------------------
 
 interface LayoutWithState extends ComponentLayout {
@@ -787,7 +787,7 @@ describe("FlipflopRSAsync", () => {
     });
   });
 
-  describe("no clock needed — level sensitive", () => {
+  describe("no clock needed- level sensitive", () => {
     it("changes propagate immediately without clock", () => {
       const state = makeState(6, { 0: 0, 1: 0, 4: 0, 5: 1 });
       const highZs = new Uint32Array(state.length);

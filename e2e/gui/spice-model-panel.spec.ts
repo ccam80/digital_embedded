@@ -9,7 +9,7 @@
  *     collapsible subsection.
  *
  * Tests:
- *   1. Primary params visible for NPN BJT — IS and BF labels shown directly
+ *   1. Primary params visible for NPN BJT- IS and BF labels shown directly
  *   2. No model params shown for Resistor
  *   3. And gate in digital mode shows no IS/BF/Advanced Parameters
  *   4. Edit IS field and verify persistence through close/reopen
@@ -69,7 +69,7 @@ test.describe('Model parameter panel', () => {
   // Test 1: Primary params visible for NPN BJT
   // -------------------------------------------------------------------------
   test('panel visible for NPN BJT in analog mode', async ({ page }) => {
-    // NPN BJT defaultModel is "behavioral" — primary params IS and BF are
+    // NPN BJT defaultModel is "behavioral"- primary params IS and BF are
     // rendered directly below the Model row (no expand needed).
     await builder.placeLabeled('NpnBJT', 10, 10, 'Q1');
 
@@ -103,7 +103,7 @@ test.describe('Model parameter panel', () => {
   // Test 3: And gate in digital mode shows no model params
   // -------------------------------------------------------------------------
   test('panel not shown when model is logical', async ({ page }) => {
-    // And gate defaultModel is "digital" — _renderModelParams returns early for
+    // And gate defaultModel is "digital"- _renderModelParams returns early for
     // "digital" key, so no IS/BF/Advanced Parameters appear in the popup.
     await builder.placeLabeled('And', 10, 10, 'G1');
 
@@ -123,7 +123,7 @@ test.describe('Model parameter panel', () => {
   test('edited IS value persists after closing and reopening popup', async ({ page }) => {
     await builder.placeLabeled('NpnBJT', 10, 10, 'Q1');
 
-    // Open popup — IS is a primary param, visible directly
+    // Open popup- IS is a primary param, visible directly
     await openPopupForLabel(builder, 'Q1');
 
     const isInput = await getModelParamInput(page, 'IS');
@@ -142,7 +142,7 @@ test.describe('Model parameter panel', () => {
     const isInputAfter = await getModelParamInput(page, 'IS');
     await expect(isInputAfter).toBeVisible({ timeout: 2000 });
     const displayedValue = await isInputAfter.inputValue();
-    // formatSI(1e-14, "", 3) → "10.0 f" — value encodes 1e-14
+    // formatSI(1e-14, "", 3) → "10.0 f"- value encodes 1e-14
     expect(
       displayedValue.includes('10') || displayedValue.includes('1e-14') || displayedValue.includes('1E-14')
     ).toBe(true);

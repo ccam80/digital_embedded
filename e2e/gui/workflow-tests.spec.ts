@@ -1,5 +1,5 @@
 /**
- * Workflow E2E tests — full user journeys through the simulator UI.
+ * Workflow E2E tests- full user journeys through the simulator UI.
  *
  * Each test simulates a realistic user workflow: placing components from the
  * palette, wiring them together, configuring properties, running simulations,
@@ -336,7 +336,7 @@ test.describe('Workflow: property editing', () => {
       await numInputs.first().press('Tab');
       await page.waitForTimeout(100);
 
-      // No crash — panel still visible
+      // No crash- panel still visible
       await expect(page.locator('#property-content')).toBeVisible();
     }
   });
@@ -523,7 +523,7 @@ test.describe('Workflow: analog mode', () => {
   });
 
   test('palette shows analog components without mode switching', async ({ page }) => {
-    // The palette always shows all components — no mode switch needed.
+    // The palette always shows all components- no mode switch needed.
     // Expand all categories to make analog items visible.
     const categories = page.locator('.palette-category-header');
     const catCount = await categories.count();
@@ -598,7 +598,7 @@ test.describe('Workflow: analog simulation with sliders', () => {
 
     // During run: slider panel container exists and is shown
     const panel = page.locator('#slider-panel');
-    // Panel is display:'' but CSS :empty hides it — that's expected,
+    // Panel is display:'' but CSS :empty hides it- that's expected,
     // sliders populate on selection change which requires canvas clicks
     // that are currently blocked during analog sim (known limitation).
     expect(await panel.count()).toBe(1);
@@ -620,9 +620,9 @@ test.describe('Workflow: analog simulation with sliders', () => {
     const b64 = Buffer.from(ANALOG_RC_XML).toString('base64');
 
     // Analog speed is sim-seconds per wall-second (not Hz like digital).
-    // At 1e-6, simTimeGoal per frame ≈ 1.6e-8 — less than one maxTimeStep
+    // At 1e-6, simTimeGoal per frame ≈ 1.6e-8- less than one maxTimeStep
     // (5µs), so the solver does exactly 1 MNA step per frame.
-    // At 1, simTimeGoal ≈ 16ms/frame — thousands of steps requested, but
+    // At 1, simTimeGoal ≈ 16ms/frame- thousands of steps requested, but
     // the 12ms CPU budget caps at ~24-120 steps/frame. Ratio ≥ 24x.
 
     // Slow run (1 step per frame)

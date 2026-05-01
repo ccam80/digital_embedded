@@ -52,13 +52,13 @@ Note: SW's TSTALLOC ordering differs from RES. SW stamps the cross terms
 (posNode, negNode) and (negNode, posNode) before the (negNode, negNode) diagonal,
 whereas RES stamps all four in PP, NN, PN, NP order.
 
-## setup() body — alloc only
+## setup() body- alloc only
 
 ```typescript
 setup(ctx: SetupContext): void {
   const solver = ctx.solver;
-  const posNode = this.pinNodeIds[0]; // pinNodes.get("pos") — SWposNode
-  const negNode = this.pinNodeIds[1]; // pinNodes.get("neg") — SWnegNode
+  const posNode = this.pinNodeIds[0]; // pinNodes.get("pos")- SWposNode
+  const negNode = this.pinNodeIds[1]; // pinNodes.get("neg")- SWnegNode
 
   // State allocation: swsetup.c:47-48
   this._stateBase = ctx.allocStates(2); // SW_NUM_STATES = 2 (swdefs.h:56)
@@ -75,7 +75,7 @@ Handles `_hPP`, `_hPN`, `_hNP`, `_hNN` stored on instance. `_stateBase` stores
 the state slot base returned by `allocStates`. `allocElement` is NEVER called from
 `load()`.
 
-## load() body — value writes only
+## load() body- value writes only
 
 Implementer ports value-side from `ref/ngspice/src/spicelib/devices/sw/swload.c`
 line-for-line. No `allocElement`.
@@ -123,11 +123,11 @@ Not applicable.
 
 Per CLAUDE.md "Test Policy During W3 Setup-Load-Split", verification is spec compliance only. DO NOT run tests; DO NOT use test results.
 
-1. `setup()` body in the implementation file matches the "setup() body — alloc only" listing in this PB line-for-line.
+1. `setup()` body in the implementation file matches the "setup() body- alloc only" listing in this PB line-for-line.
 2. TSTALLOC sequence in `setup()` matches the order in the cited ngspice anchor file (see top of this PB, e.g. `ressetup.c:46-49`).
 3. Factory cleanup applied per the "Factory cleanup" section above.
 4. `ngspiceNodeMap` registered per the "Pin mapping" section above (or omitted for composites where the spec says so).
-5. `load()` writes through cached handles only — zero `solver.allocElement(...)` calls inside `load()`, `accept()`, or any non-`setup()` method.
+5. `load()` writes through cached handles only- zero `solver.allocElement(...)` calls inside `load()`, `accept()`, or any non-`setup()` method.
 6. `mayCreateInternalNodes` flag set per spec.
 7. `findBranchFor` callback present where spec says (V-output sources, IND, etc.).
 8. No banned closing verdicts (mapping/tolerance/equivalent-to/pre-existing/intentional-divergence/citation-divergence/partial) used in any commit message or report.

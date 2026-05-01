@@ -1,5 +1,5 @@
 /**
- * Attribute mapping framework — converts .dig XML attribute entries into
+ * Attribute mapping framework- converts .dig XML attribute entries into
  * PropertyBag entries for component instantiation.
  *
  * Per Decision 5: Components only see PropertyBag. The .dig attribute mapping
@@ -16,7 +16,7 @@ import { PropertyBag } from "../core/properties.js";
 import type { DigEntry, DigValue } from "./dig-schema.js";
 
 // ---------------------------------------------------------------------------
-// DigAttributeMapping — extends AttributeMapping for typed DigValue conversion
+// DigAttributeMapping- extends AttributeMapping for typed DigValue conversion
 // ---------------------------------------------------------------------------
 
 /**
@@ -48,7 +48,7 @@ export interface DigAttributeMapping extends AttributeMapping {
  * Entries with no matching mapping are preserved in a `_unmapped` key on the
  * PropertyBag as a Map<string, DigValue>.
  *
- * Missing attributes (entries not present in the XML) are silently omitted —
+ * Missing attributes (entries not present in the XML) are silently omitted-
  * the component factory is responsible for applying defaults via getOrDefault().
  */
 export function applyAttributeMappings(
@@ -83,7 +83,7 @@ export function applyAttributeMappings(
   if (unmapped.size > 0) {
     // Store unmapped entries under a reserved key for debugging / round-trip.
     // The value is cast through unknown because Map<string, DigValue> is not
-    // in the PropertyValue union — it lives outside normal component property space.
+    // in the PropertyValue union- it lives outside normal component property space.
     (bag as unknown as { _unmapped: Map<string, DigValue> })._unmapped = unmapped;
   }
 
@@ -328,7 +328,7 @@ export function dataFieldConverter(): DigAttributeMapping {
 }
 
 /**
- * Converter for <value> attribute values (InDefault — input pin default value).
+ * Converter for <value> attribute values (InDefault- input pin default value).
  *
  * Stores the inValue as a JSON string encoding { value: string (bigint repr), highZ: boolean }.
  * The bigint is stored as a decimal string to survive JSON serialization.

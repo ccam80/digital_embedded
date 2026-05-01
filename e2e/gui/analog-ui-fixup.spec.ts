@@ -192,7 +192,7 @@ test.describe('Analog UI fixes', () => {
 
     // Slider panel container should now be visible (though empty until selection)
     const sliderPanel = harness.iframe.locator('#slider-panel');
-    // It's display:'' but :empty hides it via CSS. That's fine — verify it's in the DOM
+    // It's display:'' but :empty hides it via CSS. That's fine- verify it's in the DOM
     const exists = await sliderPanel.count();
     expect(exists).toBe(1);
 

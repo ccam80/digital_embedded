@@ -1,5 +1,5 @@
 /**
- * Keyboard shortcut handler — consolidates all three document keydown
+ * Keyboard shortcut handler- consolidates all three document keydown
  * listeners that were scattered through app-init.ts into a single handler.
  *
  * Covers:
@@ -33,7 +33,7 @@ export interface KeyboardDeps {
   /** Navigate back in the subcircuit stack. Returns true if there was a stack entry. */
   navigateBack(): boolean;
   updateZoomDisplay(): void;
-  /** Reset dragMode to 'none' — called after Escape cancels an active wire drag. */
+  /** Reset dragMode to 'none'- called after Escape cancels an active wire drag. */
   clearDragMode(): void;
   /** The file input element for Ctrl+O (may be null if not present in DOM). */
   fileInput: HTMLInputElement | null;

@@ -1,5 +1,5 @@
 /**
- * HGS value type system — port of Digital's hdl/hgs/Value.java.
+ * HGS value type system- port of Digital's hdl/hgs/Value.java.
  *
  * All integer arithmetic uses bigint for full Java Long (64-bit) parity.
  * Floating-point uses number. Strings, booleans, arrays, maps, and functions
@@ -108,7 +108,7 @@ export class HGSFunction {
 }
 
 // ---------------------------------------------------------------------------
-// ReturnValue sentinel — thrown by return statements, caught by call handler
+// ReturnValue sentinel- thrown by return statements, caught by call handler
 // ---------------------------------------------------------------------------
 
 export class ReturnValue {
@@ -169,7 +169,7 @@ function typeOf(v: HGSValue): string {
 }
 
 // ---------------------------------------------------------------------------
-// Arithmetic and comparison operations — mirrors Value.java semantics
+// Arithmetic and comparison operations- mirrors Value.java semantics
 // ---------------------------------------------------------------------------
 
 export function hgsAdd(a: HGSValue, b: HGSValue): HGSValue {
@@ -252,7 +252,7 @@ export function hgsShiftLeft(a: HGSValue, b: HGSValue): HGSValue {
 }
 
 export function hgsShiftRight(a: HGSValue, b: HGSValue): HGSValue {
-  // Java's >>> is unsigned right shift on long — in bigint terms this is
+  // Java's >>> is unsigned right shift on long- in bigint terms this is
   // arithmetic shift right (bigint has no unsigned representation).
   // We truncate to 64-bit to match Java Long semantics.
   const av = BigInt.asUintN(64, toBigint(a));

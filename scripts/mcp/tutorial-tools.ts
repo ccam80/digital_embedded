@@ -37,17 +37,17 @@ export function registerTutorialTools(
       const lines: string[] = [`Palette Presets (${presets.length}):\n`];
       for (const p of presets) {
         if (p.count === 0) {
-          lines.push(`  ${p.name} — (no filter, shows all components)`);
+          lines.push(`  ${p.name}- (no filter, shows all components)`);
         } else {
           lines.push(`  ${p.name} (${p.count} components): ${p.components.join(", ")}`);
         }
       }
       lines.push("");
       lines.push("Usage in TutorialStep.palette:");
-      lines.push('  "basic-gates"                              — use preset as-is');
-      lines.push('  ["And", "Or", "In", "Out"]                 — explicit list');
-      lines.push('  { preset: "basic-gates", add: ["Clock"] }  — preset + extras');
-      lines.push('  { preset: "basic-gates", remove: ["Not"] } — preset - exclusions');
+      lines.push('  "basic-gates"                             - use preset as-is');
+      lines.push('  ["And", "Or", "In", "Out"]                - explicit list');
+      lines.push('  { preset: "basic-gates", add: ["Clock"] } - preset + extras');
+      lines.push('  { preset: "basic-gates", remove: ["Not"] }- preset - exclusions');
       return {
         content: [{ type: "text" as const, text: lines.join("\n") }],
       };
@@ -125,9 +125,9 @@ export function registerTutorialTools(
         "runs test vectors against goal circuits to verify they pass, " +
         "and writes all files to the output directory.\n\n" +
         "Output structure:\n" +
-        "  <outputDir>/manifest.json     — the validated manifest\n" +
-        "  <outputDir>/step-id-goal.dts  — goal circuit for each step (if CircuitSpec provided)\n" +
-        "  <outputDir>/step-id-start.dts — start circuit for each step (if CircuitSpec provided)\n\n" +
+        "  <outputDir>/manifest.json    - the validated manifest\n" +
+        "  <outputDir>/step-id-goal.dts - goal circuit for each step (if CircuitSpec provided)\n" +
+        "  <outputDir>/step-id-start.dts- start circuit for each step (if CircuitSpec provided)\n\n" +
         "Template manifest:\n" +
         '{\n' +
         '  "id": "my-tutorial",\n' +
@@ -148,8 +148,8 @@ export function registerTutorialTools(
         '  }]\n' +
         '}\n\n' +
         'Step modes:\n' +
-        '  "guided" (default) — student must pass validation before advancing. Shows Pre-check + Check buttons.\n' +
-        '  "explore" — free navigation, optional checking. Shows Show Solution button if goalCircuit is provided.',
+        '  "guided" (default)- student must pass validation before advancing. Shows Pre-check + Check buttons.\n' +
+        '  "explore"- free navigation, optional checking. Shows Show Solution button if goalCircuit is provided.',
       inputSchema: {
         manifest: z
           .record(z.unknown())
@@ -293,7 +293,7 @@ export function registerTutorialTools(
           indexData = JSON.parse(raw);
           if (!Array.isArray(indexData.tutorials)) indexData.tutorials = [];
         } catch {
-          // File doesn't exist or is invalid — start fresh
+          // File doesn't exist or is invalid- start fresh
         }
 
         const entry = {

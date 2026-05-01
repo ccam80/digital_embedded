@@ -1,4 +1,4 @@
-# Task PB-TLINE — Lumped RLCG transmission line (Option A)
+# Task PB-TLINE- Lumped RLCG transmission line (Option A)
 
 **digiTS file:** `src/components/passives/transmission-line.ts`
 **Composite class:** `TransmissionLineElement`
@@ -12,15 +12,15 @@
 **ngspice setup anchors:**
 - `SegmentResistorElement`: `ref/ngspice/src/spicelib/devices/res/ressetup.c:46-49`
 - `SegmentInductorElement`: `ref/ngspice/src/spicelib/devices/ind/indsetup.c:78-100`
-- `SegmentShuntConductanceElement`: `ref/ngspice/src/spicelib/devices/res/ressetup.c:46-49` (collapsed to single (n,n) — one terminal is ground)
-- `SegmentCapacitorElement`: `ref/ngspice/src/spicelib/devices/cap/capsetup.c:102-117` (collapsed to single (n,n) — one terminal is ground)
+- `SegmentShuntConductanceElement`: `ref/ngspice/src/spicelib/devices/res/ressetup.c:46-49` (collapsed to single (n,n)- one terminal is ground)
+- `SegmentCapacitorElement`: `ref/ngspice/src/spicelib/devices/cap/capsetup.c:102-117` (collapsed to single (n,n)- one terminal is ground)
 - `CombinedRLElement`: NONE (digiTS-internal)
 
 ## Pin mapping
 
 The transmission line composite does not get an `ngspiceNodeMap` on
-`ComponentDefinition` — it decomposes into sub-elements. User-facing pin
-layout (4 pins, 2 per port — preserved from current source):
+`ComponentDefinition`- it decomposes into sub-elements. User-facing pin
+layout (4 pins, 2 per port- preserved from current source):
 
 | digiTS pin label | port | role |
 |---|---|---|
@@ -32,16 +32,16 @@ layout (4 pins, 2 per port — preserved from current source):
 Per the existing factory in `transmission-line.ts:874-877`, only `P1b`
 and `P2b` are passed as MNA nodes to the segment chain (Port-1-high and
 Port-2-high). The return pins `P1a` / `P2a` are not currently used inside
-the analog element — they exist for visual/routing purposes and report
+the analog element- they exist for visual/routing purposes and report
 ground-return current via `getPinCurrents`. This wiring is preserved.
 
 ## Internal nodes
 
 The composite allocates `2 × (N - 1)` internal voltage nodes per segment
 chain:
-- `rlMidNodes[k]` for k=0..N-2 — between R and L within each non-final
+- `rlMidNodes[k]` for k=0..N-2- between R and L within each non-final
   segment (N-1 nodes)
-- `junctionNodes[k]` for k=0..N-2 — between L and the next segment's R
+- `junctionNodes[k]` for k=0..N-2- between L and the next segment's R
   (N-1 nodes)
 
 Each internal node is allocated by `ctx.makeVolt(label, suffix)` during
@@ -52,7 +52,7 @@ not during construction.
 The composite passes the resulting node ids into each sub-element's
 constructor. **The existing construction-time node id assignments must
 move to setup()** per A6.3. The implementer restructures the composite
-to allocate sub-elements lazily inside `setup()` — that is, the segment-
+to allocate sub-elements lazily inside `setup()`- that is, the segment-
 construction loop currently in the constructor (transmission-line.ts
 lines 736-766) is moved into `setup()`. The composite's external pin
 ids stay populated at construction (`pinNodeIds`); internal node ids
@@ -61,12 +61,12 @@ populate in setup().
 ## Branch rows
 
 Each `SegmentInductorElement` allocates one branch row in its `setup()`
-via `ctx.makeCur(label, "branch")` — same pattern as PB-IND. Branch
+via `ctx.makeCur(label, "branch")`- same pattern as PB-IND. Branch
 labels are unique per segment index: `${composite.label}_seg${k}_L`
 for the k-th segment's series inductor.
 
 `CombinedRLElement` (the final segment only) also allocates one branch
-row via `ctx.makeCur` — label `${composite.label}_seg${N-1}_RL`.
+row via `ctx.makeCur`- label `${composite.label}_seg${N-1}_RL`.
 
 Total branch rows allocated per composite: **N** (one per segment;
 N-1 from `SegmentInductorElement`s plus 1 from `CombinedRLElement`).
@@ -78,14 +78,14 @@ N-1 from `SegmentInductorElement`s plus 1 from `CombinedRLElement`).
 
 Per segment:
 - `SegmentResistorElement`: 0 state slots (linear, no companion)
-- `SegmentInductorElement`: 5 slots — uses `SEGMENT_INDUCTOR_SCHEMA`
+- `SegmentInductorElement`: 5 slots- uses `SEGMENT_INDUCTOR_SCHEMA`
   (`GEQ`, `IEQ`, `I_PREV`, `PHI`, `CCAP`). This differs from the 2-slot
   ngspice INDflux/INDvolt schema; the divergence is covered by the
-  architectural-alignment.md entry from §Pre-condition.
+  architectural-alignment.md entry from ssPre-condition.
 - `SegmentShuntConductanceElement`: 0 state slots
-- `SegmentCapacitorElement`: 5 slots — uses `SEGMENT_CAPACITOR_SCHEMA`
+- `SegmentCapacitorElement`: 5 slots- uses `SEGMENT_CAPACITOR_SCHEMA`
   (`GEQ`, `IEQ`, `V_PREV`, `Q`, `CCAP`)
-- `CombinedRLElement`: 5 slots — uses `COMBINED_RL_SCHEMA`
+- `CombinedRLElement`: 5 slots- uses `COMBINED_RL_SCHEMA`
   (`GEQ`, `IEQ`, `I_PREV`, `PHI`, `CCAP`)
 
 Per-segment state-slot total: R(0) + L(5) + G(0) + C(5) = 10 slots per
@@ -99,7 +99,7 @@ contributes 0 slots either way.
 existing pattern at `transmission-line.ts:773-779`. `initState(pool)`
 distributes offsets to reactive sub-elements (existing pattern at lines
 788-799 preserved unchanged). `stateBaseOffset` is set by
-`MNAEngine._setup()` per `00-engine.md` §A5.1.
+`MNAEngine._setup()` per `00-engine.md` ssA5.1.
 
 ## Composite `setup()` body
 
@@ -179,7 +179,7 @@ methods on the composite.
 
 The constructor's existing segment-construction loop (lines 736-766) is
 **deleted**. The constructor only stores per-segment scalar parameters
-(`_rSeg`, `_lSeg`, `_gSeg`, `_cSeg`, `_segments`, `pinNodeIds`, `label`) —
+(`_rSeg`, `_lSeg`, `_gSeg`, `_cSeg`, `_segments`, `pinNodeIds`, `label`)-
 sub-element construction moves entirely to `setup()`.
 
 ## Sub-element class specs
@@ -196,7 +196,7 @@ setup(ctx: SetupContext): void {
   const nA = this.pinNodeIds[0];
   const nB = this.pinNodeIds[1];
 
-  // ressetup.c:46-49 — TSTALLOC sequence, 4 entries.
+  // ressetup.c:46-49- TSTALLOC sequence, 4 entries.
   this._hAA = solver.allocElement(nA, nA);
   this._hAB = solver.allocElement(nA, nB);
   this._hBA = solver.allocElement(nB, nA);
@@ -220,7 +220,7 @@ unchanged.
 ### `SegmentInductorElement.setup(ctx)`
 
 ngspice anchor: `indsetup.c:78-100`. Constructor signature changes:
-`new SegmentInductorElement(nA, nB, label, inductance)` — replaces the
+`new SegmentInductorElement(nA, nB, label, inductance)`- replaces the
 existing 4-arg constructor that takes a pre-allocated branch index. The
 branch index is now allocated by `setup()` itself via `ctx.makeCur`.
 
@@ -230,13 +230,13 @@ setup(ctx: SetupContext): void {
   const posNode = this.pinNodeIds[0];
   const negNode = this.pinNodeIds[1];
 
-  // Branch row allocation per indsetup.c:84-88 — idempotent guard.
+  // Branch row allocation per indsetup.c:84-88- idempotent guard.
   if (this.branchIndex === -1) {
     this.branchIndex = ctx.makeCur(this._label, "branch");
   }
   const b = this.branchIndex;
 
-  // indsetup.c:96-100 — TSTALLOC sequence, 5 entries (line-for-line).
+  // indsetup.c:96-100- TSTALLOC sequence, 5 entries (line-for-line).
   this._hPIbr   = solver.allocElement(posNode, b);
   this._hNIbr   = solver.allocElement(negNode, b);
   this._hIbrN   = solver.allocElement(b, negNode);
@@ -260,13 +260,13 @@ private readonly _label: string;  // assigned in constructor
 `load()` body change: replace the 5 inline `solver.allocElement` calls
 (currently at lines 425-429) with `solver.stampElement` calls using the
 cached handles. State-slot reads/writes (PHI, CCAP, GEQ, IEQ, I_PREV)
-unchanged. The existing `SEGMENT_INDUCTOR_SCHEMA` stays — divergence
+unchanged. The existing `SEGMENT_INDUCTOR_SCHEMA` stays- divergence
 from ngspice 2-slot schema is covered by the architectural-alignment
 entry.
 
 ### `SegmentShuntConductanceElement.setup(ctx)`
 
-ngspice anchor: `ressetup.c:46-49` collapsed to single (n,n) entry —
+ngspice anchor: `ressetup.c:46-49` collapsed to single (n,n) entry-
 one terminal is hard-wired to ground. Constructor signature unchanged
 (`new SegmentShuntConductanceElement(node, G)`).
 
@@ -291,7 +291,7 @@ private _hNN: number = -1;
 
 ### `SegmentCapacitorElement.setup(ctx)`
 
-ngspice anchor: `capsetup.c:102-117` collapsed to single (n,n) entry —
+ngspice anchor: `capsetup.c:102-117` collapsed to single (n,n) entry-
 one terminal is hard-wired to ground. Constructor signature unchanged
 (`new SegmentCapacitorElement(node, capacitance)`).
 
@@ -316,7 +316,7 @@ private _hNN: number = -1;
 with `solver.stampElement(this._hNN, geq)`. State-slot reads/writes
 (Q, V_PREV, GEQ, IEQ, CCAP) unchanged.
 
-### `CombinedRLElement.setup(ctx)` — digiTS-internal, NO ngspice anchor
+### `CombinedRLElement.setup(ctx)`- digiTS-internal, NO ngspice anchor
 
 This class merges series R and series L into a single branch-row equation
 to avoid creating an internal mid-node. It has no ngspice equivalent. Per
@@ -330,13 +330,13 @@ setup(ctx: SetupContext): void {
   const nA = this.pinNodeIds[0];
   const nB = this.pinNodeIds[1];
 
-  // Branch row allocation — same idempotent pattern as SegmentInductorElement.
+  // Branch row allocation- same idempotent pattern as SegmentInductorElement.
   if (this.branchIndex === -1) {
     this.branchIndex = ctx.makeCur(this._label, "branch");
   }
   const b = this.branchIndex;
 
-  // 5 TSTALLOC entries — same shape as SegmentInductorElement, but the
+  // 5 TSTALLOC entries- same shape as SegmentInductorElement, but the
   // (b, b) handle's stamped value during load() includes the -R
   // contribution in addition to -geq, per the combined-RL branch
   // equation:  V(A) - V(B) - (R + geq)·I = ceq.
@@ -349,7 +349,7 @@ setup(ctx: SetupContext): void {
 ```
 
 Constructor signature changes: `new CombinedRLElement(nA, nB, label,
-resistance, inductance)` — adds the `label` parameter for branch
+resistance, inductance)`- adds the `label` parameter for branch
 allocation. Existing `R`, `L` fields preserved.
 
 Add fields:
@@ -369,34 +369,34 @@ with `solver.stampElement` using cached handles. The `(b, b)` stamp
 value is `-(this.R + geq)` (semantic unchanged from line 660; only
 allocation moves to setup()).
 
-## Composite `load()` body — value writes only
+## Composite `load()` body- value writes only
 
 Unchanged from current source (line 801-805): forwards to all
 sub-elements via `for (const el of this._subElements) el.load(ctx);`.
 After this migration, no `solver.allocElement` calls remain in any
 sub-element's load().
 
-## Composite `getLteTimestep` — unchanged
+## Composite `getLteTimestep`- unchanged
 
 The existing implementation (lines 807-829) walks `_subElements`,
 filters by `el.isReactive`, reads from each sub-element's state pool,
 and returns the minimum proposed dt via `cktTerr`. This pattern is
-preserved verbatim — no spec change.
+preserved verbatim- no spec change.
 
 ## Factory cleanup
 
 For `createTransmissionLineElement` and the `MnaModel` registration:
 
-- Drop `internalNodeIds` parameter from factory signature per A6.3 —
+- Drop `internalNodeIds` parameter from factory signature per A6.3-
   internal nodes now allocated in composite's setup() via `ctx.makeVolt`.
-- Drop `branchIdx` parameter likewise — branches allocated in
+- Drop `branchIdx` parameter likewise- branches allocated in
   sub-element setup() via `ctx.makeCur`.
 - Remove `branchCount` from `MnaModel.modelRegistry["behavioral"]`
   registration (per A6.2). Branch count is now sub-element-driven.
-- Remove `getInternalNodeCount` from MnaModel — replaced by
+- Remove `getInternalNodeCount` from MnaModel- replaced by
   `mayCreateInternalNodes: true`.
-- Remove `getInternalNodeLabels` from MnaModel — labels are now built
-  setup-time inside `_makeNode` calls (per `00-engine.md` §A2.2 / plan.md
+- Remove `getInternalNodeLabels` from MnaModel- labels are now built
+  setup-time inside `_makeNode` calls (per `00-engine.md` ssA2.2 / plan.md
   resolved decisions).
 - Add `mayCreateInternalNodes: true` to MnaModel registration.
 - Add `findBranchFor` callback that walks `_subElements` and returns the
@@ -419,7 +419,7 @@ distributes offsets to reactive sub-elements (existing pattern at lines
 
 ## Inter-spec dependency
 
-PB-TLINE has **no inter-spec class-API dependencies** — every sub-element
+PB-TLINE has **no inter-spec class-API dependencies**- every sub-element
 class is inline in `transmission-line.ts`. The setup-load-split lesson
 from PB-XFMR/PB-TAPXFMR (cross-PB shared classes need full external API
 in the introducing PB) does not apply. PB-TLINE is fully self-contained
@@ -439,15 +439,15 @@ spec compliance only. DO NOT run tests; DO NOT use test results.
    nodes are allocated.
 4. Each of the 5 sub-element classes has a `setup()` method matching its
    spec block line-for-line:
-   - `SegmentResistorElement.setup` — 4 allocElement calls.
-   - `SegmentInductorElement.setup` — 1 makeCur + 5 allocElement calls.
-   - `SegmentShuntConductanceElement.setup` — 1 allocElement call.
-   - `SegmentCapacitorElement.setup` — 1 allocElement call.
-   - `CombinedRLElement.setup` — 1 makeCur + 5 allocElement calls.
+   - `SegmentResistorElement.setup`- 4 allocElement calls.
+   - `SegmentInductorElement.setup`- 1 makeCur + 5 allocElement calls.
+   - `SegmentShuntConductanceElement.setup`- 1 allocElement call.
+   - `SegmentCapacitorElement.setup`- 1 allocElement call.
+   - `CombinedRLElement.setup`- 1 makeCur + 5 allocElement calls.
 5. Constructor signatures updated:
-   - `SegmentInductorElement` takes `(nA, nB, label, L)` — drops the
+   - `SegmentInductorElement` takes `(nA, nB, label, L)`- drops the
      pre-allocated branchIdx parameter.
-   - `CombinedRLElement` takes `(nA, nB, label, R, L)` — drops the
+   - `CombinedRLElement` takes `(nA, nB, label, R, L)`- drops the
      pre-allocated branchIdx parameter, adds label.
 6. `branchIndex` mutable on `SegmentInductorElement` and `CombinedRLElement`.
 7. Each sub-element class has the spec-listed handle fields
@@ -458,7 +458,7 @@ spec compliance only. DO NOT run tests; DO NOT use test results.
    `branchCount`/`getInternalNodeCount`/`getInternalNodeLabels` removed,
    `findBranchFor` callback added.
 10. `spec/architectural-alignment.md` contains the transmission-line
-    divergence entry (§Pre-condition check).
+    divergence entry (ssPre-condition check).
 11. No banned closing verdicts (mapping/tolerance/equivalent-to/pre-existing/
     intentional-divergence/citation-divergence/partial) used in any commit
     message or report.

@@ -97,7 +97,7 @@ describe("FlattenPipelineReorder", () => {
 
     const { circuit: flat } = flattenCircuit(outer, registry);
 
-    // Subcircuit is unconditionally inlined — internal Capacitor appears in flat result
+    // Subcircuit is unconditionally inlined- internal Capacitor appears in flat result
     const capEls = flat.elements.filter((e) => e.typeId === "Capacitor");
     expect(capEls).toHaveLength(1);
   });
@@ -115,7 +115,7 @@ describe("FlattenPipelineReorder", () => {
 
     const [assignments, diagnostics] = resolveModelAssignments([el], registry);
 
-    // "nonexistent-model" is not a valid model key — must produce a diagnostic and neutral
+    // "nonexistent-model" is not a valid model key- must produce a diagnostic and neutral
     expect(assignments).toHaveLength(1);
     expect(assignments[0]!.modelKey).toBe("neutral");
     expect(diagnostics).toHaveLength(1);

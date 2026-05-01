@@ -1,5 +1,5 @@
 ﻿/**
- * MCP Server Tool Handler Tests — Phase 6 of the test plan.
+ * MCP Server Tool Handler Tests- Phase 6 of the test plan.
  *
  * Unit tests for the circuit MCP server's tool handler logic (Vitest).
  * Tests exercise the same DefaultSimulatorFacade + registry operations
@@ -33,7 +33,7 @@ import { extractEmbeddedTestData } from '../../src/headless/test-runner.js';
 import { serializeCircuit } from '../../src/io/dts-serializer.js';
 
 // ---------------------------------------------------------------------------
-// Shared state — mirrors the MCP server's session pattern
+// Shared state- mirrors the MCP server's session pattern
 // ---------------------------------------------------------------------------
 
 let registry: ComponentRegistry;
@@ -557,7 +557,7 @@ describe('circuit_validate', () => {
   });
 
   it('returns diagnostics for unconnected inputs', () => {
-    // Build a circuit with dangling inputs — validate should flag them
+    // Build a circuit with dangling inputs- validate should flag them
     const spec: CircuitSpec = {
       components: [
         { id: 'g', type: 'And' },
@@ -639,13 +639,13 @@ describe('circuit_compile', () => {
     const spec: CircuitSpec = {
       components: [
         { id: 'g', type: 'And' },
-        // No inputs connected — required pins are dangling
+        // No inputs connected- required pins are dangling
       ],
       connections: [],
     };
     const circuit = facade.build(spec);
     // Compilation may throw or produce an engine with warnings
-    // Either behavior is acceptable — the test verifies it doesn't hang
+    // Either behavior is acceptable- the test verifies it doesn't hang
     try {
       const engine = facade.compile(circuit);
       // If it compiled, signals should still be accessible
@@ -732,7 +732,7 @@ describe('circuit_test', () => {
       const xml = readFileSync(filePath, 'utf-8');
       const circuit = facade.loadDigXml(xml);
       const testData = extractEmbeddedTestData(circuit);
-      // May or may not have embedded test data — just verify it doesn't crash
+      // May or may not have embedded test data- just verify it doesn't crash
       expect(testData === null || typeof testData === 'string').toBe(true);
     }
   });
@@ -744,7 +744,7 @@ describe('circuit_test', () => {
 
 describe('circuit_test_equivalence', () => {
   it('equivalent circuits match', () => {
-    // Build two AND gates — should be equivalent
+    // Build two AND gates- should be equivalent
     const circuitA = facade.build(andGateSpec());
     const circuitB = facade.build(andGateSpec());
 

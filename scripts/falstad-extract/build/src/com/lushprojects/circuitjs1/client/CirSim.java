@@ -3,7 +3,7 @@ package com.lushprojects.circuitjs1.client;
 import java.util.Vector;
 
 /**
- * Minimal mock of CirSim — provides fields/methods referenced by Elm draw()/setPoints().
+ * Minimal mock of CirSim- provides fields/methods referenced by Elm draw()/setPoints().
  */
 public class CirSim {
     // Mode constants
@@ -38,7 +38,7 @@ public class CirSim {
     public Vector<CircuitElm> elmList = new Vector<>();
     public Vector<CircuitNode> nodeList = new Vector<>();
 
-    // Checkbox toggles — all false by default (no voltage coloring, no power, etc.)
+    // Checkbox toggles- all false by default (no voltage coloring, no power, etc.)
     public CheckboxMenuItem voltsCheckItem = new CheckboxMenuItem(false);
     public CheckboxMenuItem powerCheckItem = new CheckboxMenuItem(false);
     public CheckboxMenuItem showValuesCheckItem = new CheckboxMenuItem(true);
@@ -62,7 +62,7 @@ public class CirSim {
     public static String LS(String s) { return s; }
     public void repaint() {}
 
-    // Stamp methods — no-ops (never called during draw)
+    // Stamp methods- no-ops (never called during draw)
     public void stampResistor(int n1, int n2, double r) {}
     public void stampVoltageSource(int n1, int n2, int vs, double v) {}
     public void stampVoltageSource(int n1, int n2, int vs) {}

@@ -12,7 +12,7 @@ import type { ExtendedWaveformParams } from "../ac-voltage-source.js";
 // ===========================================================================
 
 describe("Sweep", () => {
-  it("frequency_increases_over_time — sweep 100Hz→10kHz over 1s; period shorter at t=0.9s than t=0", () => {
+  it("frequency_increases_over_time- sweep 100Hz→10kHz over 1s; period shorter at t=0.9s than t=0", () => {
     const ext: ExtendedWaveformParams = {
       freqStart: 100,
       freqEnd: 10000,
@@ -38,15 +38,15 @@ describe("Sweep", () => {
     // At t=0.9s, f(t)=100+9900*0.9=9010 Hz (linear sweep).
     // At t very close to 0, the local frequency should be near 100 Hz.
     // Verify: sample a small positive time and check it's near sin(2π*100*t).
-    const tSmall = 1e-5; // 10µs — small enough that f(t) ≈ freqStart
+    const tSmall = 1e-5; // 10µs- small enough that f(t) ≈ freqStart
     computeWaveformValue("sweep", 1, 100, 0, 0, tSmall, ext);
 
-    // At t=0.5s, f=5050 Hz — verify formula
+    // At t=0.5s, f=5050 Hz- verify formula
     const t05 = 0.5;
     computeWaveformValue("sweep", 1, 100, 0, 0, t05, ext);
   });
 
-  it("log_sweep_formula — verify log interpolation f(t) = f_start * (f_end/f_start)^(t/T)", () => {
+  it("log_sweep_formula- verify log interpolation f(t) = f_start * (f_end/f_start)^(t/T)", () => {
     const ext: ExtendedWaveformParams = {
       freqStart: 100,
       freqEnd: 10000,
@@ -59,7 +59,7 @@ describe("Sweep", () => {
     computeWaveformValue("sweep", 1, 100, 0, 0, t, ext);
   });
 
-  it("sweep_at_t0_matches_freqStart — sin(0) = 0", () => {
+  it("sweep_at_t0_matches_freqStart- sin(0) = 0", () => {
   });
 });
 
@@ -68,7 +68,7 @@ describe("Sweep", () => {
 // ===========================================================================
 
 describe("AM", () => {
-  it("modulation_envelope — depth=1, carrier=1kHz, mod=100Hz; envelope varies 0 to 2A", () => {
+  it("modulation_envelope- depth=1, carrier=1kHz, mod=100Hz; envelope varies 0 to 2A", () => {
     const A = 3.0;
     const ext: ExtendedWaveformParams = {
       modulationFreq: 100,
@@ -78,7 +78,7 @@ describe("AM", () => {
     // V(t) = (1 + 1*sin(2π*100*t)) * A * sin(2π*1000*t)
     // The envelope is (1 + sin(2π*100*t)) * A, ranging from 0 to 2A.
 
-    // At mod phase = -π/2 (t where 2π*100*t = -π/2 → t = -1/400 — not valid)
+    // At mod phase = -π/2 (t where 2π*100*t = -π/2 → t = -1/400- not valid)
     // At t where sin(2π*100*t) = -1: 2π*100*t = -π/2 → t = -1/400s (invalid)
     // Easier: at t where sin(2π*100*t) = 1: t = 1/400 = 2.5ms
     const tPeak = 1 / 400; // sin(2π*100*2.5ms) = sin(π/2) = 1 → envelope = 2A
@@ -108,7 +108,7 @@ describe("AM", () => {
     expect(envNear).toBeGreaterThan(1.9); // close to 2
   });
 
-  it("zero_depth_is_pure_carrier — depth=0 gives A*sin(2π*f*t)", () => {
+  it("zero_depth_is_pure_carrier- depth=0 gives A*sin(2π*f*t)", () => {
     void ({ modulationFreq: 100, modulationDepth: 0 } as ExtendedWaveformParams);
   });
 });
@@ -118,7 +118,7 @@ describe("AM", () => {
 // ===========================================================================
 
 describe("FM", () => {
-  it("deviation_proportional_to_index — FM with index=5, modFreq=100Hz; peak phase deviation = index*modFreq", () => {
+  it("deviation_proportional_to_index- FM with index=5, modFreq=100Hz; peak phase deviation = index*modFreq", () => {
     // V(t) = A * sin(2π*f*t + idx * sin(2π*modFreq*t))
     // The instantaneous frequency is f + idx*modFreq*cos(2π*modFreq*t),
     // which deviates from f by ±idx*modFreq.
@@ -135,7 +135,7 @@ describe("FM", () => {
     void (A * Math.sin(2 * Math.PI * f * t + idx * Math.sin(2 * Math.PI * modFreq * t)));
   });
 
-  it("zero_index_is_pure_carrier — index=0 gives pure carrier", () => {
+  it("zero_index_is_pure_carrier- index=0 gives pure carrier", () => {
   });
 });
 
@@ -144,7 +144,7 @@ describe("FM", () => {
 // ===========================================================================
 
 describe("Noise", () => {
-  it("gaussian_distribution — 10000 samples; mean ≈ 0 (within 5% of A) and std dev ≈ A", () => {
+  it("gaussian_distribution- 10000 samples; mean ≈ 0 (within 5% of A) and std dev ≈ A", () => {
     const A = 2.0;
     const samples: number[] = [];
     for (let i = 0; i < 10000; i++) {
@@ -162,7 +162,7 @@ describe("Noise", () => {
     expect(stdDev).toBeLessThan(1.1 * A);
   });
 
-  it("no_correlation — autocorrelation at lag 1 should be small", () => {
+  it("no_correlation- autocorrelation at lag 1 should be small", () => {
     const A = 1.0;
     const N = 1000;
     const samples: number[] = [];

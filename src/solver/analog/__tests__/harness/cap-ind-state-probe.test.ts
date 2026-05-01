@@ -27,7 +27,7 @@ function dllAvailable(): boolean {
 }
 const describeIfDll = dllAvailable() ? describe : describe.skip;
 
-describeIfDll("ngspice cap/ind state probe — direct bridge", () => {
+describeIfDll("ngspice cap/ind state probe- direct bridge", () => {
   it("RC transient: ngspice elementStates has Q and CCAP on C1", async () => {
     const bridge = new NgspiceBridge(DLL_PATH);
     await bridge.init();
@@ -83,7 +83,7 @@ describeIfDll("ngspice cap/ind state probe — direct bridge", () => {
   }, 60_000);
 });
 
-describeIfDll("ngspice cap state probe — via ComparisonSession", () => {
+describeIfDll("ngspice cap state probe- via ComparisonSession", () => {
   it("rc-step.dts: ComparisonSession.ngspiceSession exposes Q/CCAP on capacitor", async () => {
     const session = new ComparisonSession({
       dtsPath: resolve(process.cwd(), "tmp-hang-circuits/rc-step.dts"),
@@ -148,7 +148,7 @@ describeIfDll("ngspice cap/ind state via harness_get_attempt path", () => {
     await session.runTransient(0, 5e-3, 1e-4);
 
     // Walk ngspice steps and find the first one with a tranNR attempt that has
-    // iterations. Use that as the canonical MCP-path probe — the exact step
+    // iterations. Use that as the canonical MCP-path probe- the exact step
     // index varies per ngspice solver behaviour but the slot exposure contract
     // is step-invariant.
     const ngMap = session.sessionMap().ngspice;
@@ -177,7 +177,7 @@ describeIfDll("ngspice cap/ind state via harness_get_attempt path", () => {
     // The paired-iteration array uses Math.max(ourIters.length, ngIters.length);
     // our side may run more NR iterations than ngspice, leaving trailing rows
     // where ngspice is null. Walk back from the end to pick the last row that
-    // actually has ngspice data — that is the iteration whose ngspice state
+    // actually has ngspice data- that is the iteration whose ngspice state
     // we want to probe.
     const ngIter = [...detail.iterations]
       .reverse()

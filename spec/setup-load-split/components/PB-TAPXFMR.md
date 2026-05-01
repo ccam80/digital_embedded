@@ -8,7 +8,7 @@
 
 ## Pin mapping (from 01-pin-mapping.md)
 
-The tapped transformer composite does not get an `ngspiceNodeMap` on `ComponentDefinition` — it decomposes into sub-elements.
+The tapped transformer composite does not get an `ngspiceNodeMap` on `ComponentDefinition`- it decomposes into sub-elements.
 
 Sub-element maps:
 - `L1` (primary winding IND): `{ P1: "pos", P2: "neg" }`
@@ -33,12 +33,12 @@ None. Neither IND nor MUT allocates internal voltage nodes via `CKTmkVolt`.
 
 ## Branch rows
 
-Three branch rows — one per inductor winding:
+Three branch rows- one per inductor winding:
 - `L1.branchIndex`: allocated via `ctx.makeCur(l1.label, "branch")` in `L1.setup(ctx)`
 - `L2.branchIndex`: allocated via `ctx.makeCur(l2.label, "branch")` in `L2.setup(ctx)`
 - `L3.branchIndex`: allocated via `ctx.makeCur(l3.label, "branch")` in `L3.setup(ctx)`
 
-Each `MUTij.setup(ctx)` reads `this._li.branchIndex` and `this._lj.branchIndex` from its constructor-stored refs directly. No `findDevice` needed — composite owns refs.
+Each `MUTij.setup(ctx)` reads `this._li.branchIndex` and `this._lj.branchIndex` from its constructor-stored refs directly. No `findDevice` needed- composite owns refs.
 
 ## State slots
 
@@ -52,7 +52,7 @@ Total: 6 state slots.
 
 ## TSTALLOC sequence (line-for-line port)
 
-### L1 setup — indsetup.c:96-100 (P1 pos, P2 neg, b1)
+### L1 setup- indsetup.c:96-100 (P1 pos, P2 neg, b1)
 
 | # | ngspice pair | digiTS pair | handle field on L1 |
 |---|---|---|---|
@@ -62,7 +62,7 @@ Total: 6 state slots.
 | 4 | `(INDbrEq, INDposNode)` | `(b1, p1Node)` | `_hIbrP` |
 | 5 | `(INDbrEq, INDbrEq)` | `(b1, b1)` | `_hIbrIbr` |
 
-### L2 setup — indsetup.c:96-100 (S1 pos, CT neg, b2)
+### L2 setup- indsetup.c:96-100 (S1 pos, CT neg, b2)
 
 | # | ngspice pair | digiTS pair | handle field on L2 |
 |---|---|---|---|
@@ -72,7 +72,7 @@ Total: 6 state slots.
 | 9 | `(INDbrEq, INDposNode)` | `(b2, s1Node)` | `_hIbrP` |
 | 10 | `(INDbrEq, INDbrEq)` | `(b2, b2)` | `_hIbrIbr` |
 
-### L3 setup — indsetup.c:96-100 (CT pos, S2 neg, b3)
+### L3 setup- indsetup.c:96-100 (CT pos, S2 neg, b3)
 
 | # | ngspice pair | digiTS pair | handle field on L3 |
 |---|---|---|---|
@@ -82,21 +82,21 @@ Total: 6 state slots.
 | 14 | `(INDbrEq, INDposNode)` | `(b3, ctNode)` | `_hIbrP` |
 | 15 | `(INDbrEq, INDbrEq)` | `(b3, b3)` | `_hIbrIbr` |
 
-### MUT12 setup — mutsetup.c:66-67 (L1 ↔ L2)
+### MUT12 setup- mutsetup.c:66-67 (L1 ↔ L2)
 
 | # | ngspice pair | digiTS pair | handle field on MUT12 |
 |---|---|---|---|
 | 16 | `(MUTind1->INDbrEq, MUTind2->INDbrEq)` | `(b1, b2)` | `_hBr1Br2` |
 | 17 | `(MUTind2->INDbrEq, MUTind1->INDbrEq)` | `(b2, b1)` | `_hBr2Br1` |
 
-### MUT13 setup — mutsetup.c:66-67 (L1 ↔ L3)
+### MUT13 setup- mutsetup.c:66-67 (L1 ↔ L3)
 
 | # | ngspice pair | digiTS pair | handle field on MUT13 |
 |---|---|---|---|
 | 18 | `(MUTind1->INDbrEq, MUTind2->INDbrEq)` | `(b1, b3)` | `_hBr1Br2` |
 | 19 | `(MUTind2->INDbrEq, MUTind1->INDbrEq)` | `(b3, b1)` | `_hBr2Br1` |
 
-### MUT23 setup — mutsetup.c:66-67 (L2 ↔ L3)
+### MUT23 setup- mutsetup.c:66-67 (L2 ↔ L3)
 
 | # | ngspice pair | digiTS pair | handle field on MUT23 |
 |---|---|---|---|
@@ -105,13 +105,13 @@ Total: 6 state slots.
 
 Total: 21 TSTALLOC entries.
 
-## setup() body — alloc only
+## setup() body- alloc only
 
 ```ts
 setup(ctx: SetupContext): void {
-  // Composite setup: call sub-elements in NGSPICE_LOAD_ORDER — IND before MUT.
+  // Composite setup: call sub-elements in NGSPICE_LOAD_ORDER- IND before MUT.
   // Order: L1, L2, L3 (INDs), then MUT12, MUT13, MUT23.
-  // MUT setup reads li.branchIndex directly — no findDevice needed.
+  // MUT setup reads li.branchIndex directly- no findDevice needed.
 
   this._l1.setup(ctx);   // indsetup.c pattern: allocStates(2) + makeCur + 5×allocElement
   this._l2.setup(ctx);   // indsetup.c pattern: allocStates(2) + makeCur + 5×allocElement
@@ -145,12 +145,12 @@ in `setParam("primaryInductance", ...)` and `setParam("turnsRatio", ...)`
 and pushed to sub-inductors via `this._l2.setParam("L", L2)` etc.
 
 `MutualInductorElement` is NOT pool-backed (per patched PB-XFMR.md). Each
-sub-inductor IS pool-backed — the engine's `_poolBackedElements` filter at
+sub-inductor IS pool-backed- the engine's `_poolBackedElements` filter at
 `ckt-context.ts:616` picks them up automatically because composite
 construction adds sub-inductors to the recursive element walk performed
-during `init()` per `00-engine.md` §A4.1.
+during `init()` per `00-engine.md` ssA4.1.
 
-## load() body — value writes only
+## load() body- value writes only
 
 The composite `AnalogTappedTransformerElement.load(ctx)` body delegates to
 each sub-element's `load(ctx)`:
@@ -158,14 +158,14 @@ each sub-element's `load(ctx)`:
 ```ts
 load(ctx: LoadContext): void {
   // Each sub-inductor's load() body is specified in PB-XFMR.md
-  // §InductorSubElement.load (line-for-line indload.c port). It stamps
+  // ssInductorSubElement.load (line-for-line indload.c port). It stamps
   // through the 5 cached _hXXX handles populated in setup().
   this._l1.load(ctx);
   this._l2.load(ctx);
   this._l3.load(ctx);
 
   // Each MUT's load() body is specified in PB-XFMR.md
-  // §MutualInductorElement.load (line-for-line mutload.c port). It
+  // ssMutualInductorElement.load (line-for-line mutload.c port). It
   // stamps through the 2 cached _hBrXBrY handles populated in setup()
   // and reads sub-inductor inductance/state via the package-internal
   // getters specified in PB-XFMR.md.
@@ -177,8 +177,8 @@ load(ctx: LoadContext): void {
 
 `MutualInductorElement.load(ctx)` takes only `ctx`; it reads its paired
 inductors from constructor-stored refs (`this._l1` / `this._l2` per the
-patched PB-XFMR.md §MutualInductorElement.load). The previous PB-TAPXFMR
-draft showed `this._mut12.load(ctx, this._l1, this._l2)` — that signature
+patched PB-XFMR.md ssMutualInductorElement.load). The previous PB-TAPXFMR
+draft showed `this._mut12.load(ctx, this._l1, this._l2)`- that signature
 is incorrect. Use the single-argument form.
 
 The existing monolithic `AnalogTappedTransformerElement.load()` body is
@@ -197,7 +197,7 @@ getLteTimestep(
   lteParams: LteParams,
 ): number {
   // 3-way min across the three sub-inductors. MUT elements contribute
-  // no LTE constraint of their own (per PB-XFMR.md §MutualInductorElement).
+  // no LTE constraint of their own (per PB-XFMR.md ssMutualInductorElement).
   return Math.min(
     this._l1.getLteTimestep(dt, deltaOld, order, method, lteParams),
     this._l2.getLteTimestep(dt, deltaOld, order, method, lteParams),
@@ -210,7 +210,7 @@ getLteTimestep(
 
 `AnalogTappedTransformerElement` owns `_pinNodes: Map<string, number>`
 per the A3 invariant. Sub-elements (the three `InductorSubElement`s and
-three `MutualInductorElement`s) do NOT carry their own `_pinNodes` maps —
+three `MutualInductorElement`s) do NOT carry their own `_pinNodes` maps-
 sub-inductors store node ids via constructor args; MUTs read sub-inductor
 refs. The composite's `_pinNodes` is populated at construction with all
 five user-facing pin labels (`P1`, `P2`, `S1`, `CT`, `S2`).
@@ -236,11 +236,11 @@ five user-facing pin labels (`P1`, `P2`, `S1`, `CT`, `S2`).
 
 Per CLAUDE.md "Test Policy During W3 Setup-Load-Split", verification is spec compliance only. DO NOT run tests; DO NOT use test results.
 
-1. `setup()` body in the implementation file matches the "setup() body — alloc only" listing in this PB line-for-line.
+1. `setup()` body in the implementation file matches the "setup() body- alloc only" listing in this PB line-for-line.
 2. TSTALLOC sequence in `setup()` matches the order in the cited ngspice anchor file (see top of this PB, e.g. `ressetup.c:46-49`).
 3. Factory cleanup applied per the "Factory cleanup" section above.
 4. `ngspiceNodeMap` registered per the "Pin mapping" section above (or omitted for composites where the spec says so).
-5. `load()` writes through cached handles only — zero `solver.allocElement(...)` calls inside `load()`, `accept()`, or any non-`setup()` method.
+5. `load()` writes through cached handles only- zero `solver.allocElement(...)` calls inside `load()`, `accept()`, or any non-`setup()` method.
 6. `mayCreateInternalNodes` flag set per spec.
 7. `findBranchFor` callback present where spec says (V-output sources, IND, etc.).
 8. No banned closing verdicts (mapping/tolerance/equivalent-to/pre-existing/intentional-divergence/citation-divergence/partial) used in any commit message or report.

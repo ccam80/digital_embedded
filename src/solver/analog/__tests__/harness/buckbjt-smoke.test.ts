@@ -19,7 +19,7 @@ try { accessSync(DLL_PATH); } catch { throw new Error('ngspice DLL required for 
 
 const describeIfDll = describe;
 
-describeIfDll("ComparisonSession — buckbjt smoke test", () => {
+describeIfDll("ComparisonSession- buckbjt smoke test", () => {
   it("transient: CCAP in capacitor and BJT junctions over first steps/retries", async () => {
     const session = new ComparisonSession({
       dtsPath: "fixtures/buckbjt.dts",
@@ -97,7 +97,7 @@ describeIfDll("ComparisonSession — buckbjt smoke test", () => {
       return;
     }
 
-    console.log("\n=== INDUCTOR CURRENT — STEP 1 ITERATIONS ===");
+    console.log("\n=== INDUCTOR CURRENT- STEP 1 ITERATIONS ===");
     const iters = session.getIterations(1);
     console.log(`Step 1: ${iters.length} iterations`);
 
@@ -146,7 +146,7 @@ describeIfDll("ComparisonSession — buckbjt smoke test", () => {
     }
 
     // Find BJT components
-    console.log("\n=== BJT NODE AGREEMENT — STEP 1 ===");
+    console.log("\n=== BJT NODE AGREEMENT- STEP 1 ===");
     const stepEnd = session.getStepEnd(1);
 
     // Show all BJT component states
@@ -176,7 +176,7 @@ describeIfDll("ComparisonSession — buckbjt smoke test", () => {
     }
 
     // Also trace BJT nodes (pin voltages)
-    console.log("\n=== BJT PIN VOLTAGES — STEP 1 ===");
+    console.log("\n=== BJT PIN VOLTAGES- STEP 1 ===");
     for (const [label, cv] of Object.entries(stepEnd.nodes)) {
       if (label.toUpperCase().includes("Q")) {
         const status = cv.withinTol ? "OK" : "MISMATCH";

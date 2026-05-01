@@ -1,5 +1,5 @@
 /**
- * Tests for SVGRenderContext — verifies RenderContext path calls produce
+ * Tests for SVGRenderContext- verifies RenderContext path calls produce
  * correct SVG `d` attribute strings and that theme colors map to correct
  * SVG fill/stroke values.
  */

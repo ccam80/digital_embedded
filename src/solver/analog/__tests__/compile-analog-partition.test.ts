@@ -27,7 +27,7 @@ import { SparseSolver } from "../sparse-solver.js";
 import { makeTestSetupContext, setupAll } from "./test-helpers.js";
 
 // ---------------------------------------------------------------------------
-// Test helpers — mirror the helpers from analog-compiler.test.ts
+// Test helpers- mirror the helpers from analog-compiler.test.ts
 // ---------------------------------------------------------------------------
 
 function makePin(x: number, y: number, label: string = "", direction: PinDirection = PinDirection.BIDIRECTIONAL): Pin {
@@ -211,8 +211,8 @@ function buildAndGatePartition(propsMap: Map<string, PropertyValue> = new Map())
   const wire2   = new Wire({ x: 20, y: 0 }, { x: 20, y: 0 });
   const wire3   = new Wire({ x: 30, y: 0 }, { x: 30, y: 0 });
 
-  // Build ConnectivityGroups — one group per distinct position
-  // Group 0 (gnd): position (0,0) — Ground element connects here
+  // Build ConnectivityGroups- one group per distinct position
+  // Group 0 (gnd): position (0,0)- Ground element connects here
   const groupGnd: ConnectivityGroup = {
     groupId: 0,
     pins: [

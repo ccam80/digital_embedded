@@ -19,7 +19,7 @@ import type { SparseSolver as SparseSolverType } from "../../../solver/analog/sp
 import { makeSimpleCtx } from "../../../solver/analog/__tests__/test-helpers.js";
 
 // ---------------------------------------------------------------------------
-// Capture solver — records stamp tuples via the real allocElement/stampElement
+// Capture solver- records stamp tuples via the real allocElement/stampElement
 // API so tests can read back what load() wrote.
 // ---------------------------------------------------------------------------
 

@@ -27,7 +27,7 @@ import type { RenderContext, Point, TextAnchor, FontSpec, PathData } from "../..
 import type { ThemeColor } from "../../../core/renderer-interface.js";
 
 // ---------------------------------------------------------------------------
-// Helpers — ComponentLayout mock
+// Helpers- ComponentLayout mock
 // ---------------------------------------------------------------------------
 
 function makeLayout(inputCount: number, inputOffset: number, outputOffset: number): ComponentLayout {
@@ -48,7 +48,7 @@ function makeState(size: number): Uint32Array {
 }
 
 // ---------------------------------------------------------------------------
-// Helpers — RenderContext mock
+// Helpers- RenderContext mock
 // ---------------------------------------------------------------------------
 
 interface DrawCall {
@@ -137,7 +137,7 @@ beforeEach(() => {
 
 describe("MidiElement", () => {
   // -------------------------------------------------------------------------
-  // Pin layout — standard (no progChange): N, V, OnOff, en, C
+  // Pin layout- standard (no progChange): N, V, OnOff, en, C
   // -------------------------------------------------------------------------
 
   describe("pinLayout", () => {
@@ -298,7 +298,7 @@ describe("MidiElement", () => {
 
 describe("executeMidi", () => {
   // -------------------------------------------------------------------------
-  // Graceful degradation — no Web MIDI API
+  // Graceful degradation- no Web MIDI API
   // -------------------------------------------------------------------------
 
   describe("gracefulDegradation", () => {
@@ -342,12 +342,12 @@ describe("executeMidi", () => {
   });
 
   // -------------------------------------------------------------------------
-  // Edge detection — rising clock edge only
+  // Edge detection- rising clock edge only
   // -------------------------------------------------------------------------
 
   describe("edgeDetection", () => {
     it("does not trigger on falling clock edge", () => {
-      // Start with prevClock=1, clock goes to 0 — falling edge, should not trigger
+      // Start with prevClock=1, clock goes to 0- falling edge, should not trigger
       const state = makeState(10);
       const highZs = new Uint32Array(state.length);
       state[5] = 1; // prevClock=1 (was high)
@@ -412,7 +412,7 @@ describe("executeMidi", () => {
   });
 
   // -------------------------------------------------------------------------
-  // MIDI message construction — verified through message helper functions
+  // MIDI message construction- verified through message helper functions
   // -------------------------------------------------------------------------
 
   describe("messageConstruction", () => {

@@ -1,5 +1,5 @@
 /**
- * Viewport — manages pan and zoom state for the circuit canvas.
+ * Viewport- manages pan and zoom state for the circuit canvas.
  *
  * Zoom is centered on a screen point so the world point under the cursor
  * stays fixed. Pan is in pixels (screen space). Zoom range is [0.1, 10.0].

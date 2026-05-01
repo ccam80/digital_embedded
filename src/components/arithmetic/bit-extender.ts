@@ -1,5 +1,5 @@
 /**
- * BitExtender component — sign-extend or zero-extend from narrower to wider width.
+ * BitExtender component- sign-extend or zero-extend from narrower to wider width.
  *
  * Ports from Digital's BitExtender.java:
  *   Input: in (inputBits)
@@ -134,7 +134,7 @@ export const BitExtenderDefinition: ComponentDefinition = {
   propertyDefs: BIT_EXTENDER_PROPERTY_DEFS,
   attributeMap: BIT_EXTENDER_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.ARITHMETIC,
-  helpText: "BitExtender — sign-extends the input from inputBits to outputBits.",
+  helpText: "BitExtender- sign-extends the input from inputBits to outputBits.",
   models: {
     digital: {
       executeFn: executeBitExtender,

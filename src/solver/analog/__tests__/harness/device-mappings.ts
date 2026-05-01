@@ -2,10 +2,10 @@
  * Device name correspondence between our state-pool slot names and
  * ngspice CKTstate0 offsets.
  *
- * This file contains ONLY direct-offset correspondences — i.e. the same
+ * This file contains ONLY direct-offset correspondences- i.e. the same
  * physical quantity (junction voltage, junction charge, etc.) recorded on
  * both sides under different names. If a slot does not have a direct
- * correspondence here, it is not comparable — that is a BLOCKER, to be
+ * correspondence here, it is not comparable- that is a BLOCKER, to be
  * resolved in `architectural-alignment.md`.
  *
  * Sources:
@@ -40,13 +40,13 @@ export const CAPACITOR_MAPPING: DeviceMapping = {
 // Inductor
 // ---------------------------------------------------------------------------
 // ngspice ind state offsets (inddefs.h:68-69):
-//   INDflux = INDstate+0   — flux Φ = L·i (the qcap fed to NIintegrate)
-//   INDvolt = INDstate+1   — NIintegrate companion current. Despite the
+//   INDflux = INDstate+0  - flux Φ = L·i (the qcap fed to NIintegrate)
+//   INDvolt = INDstate+1  - NIintegrate companion current. Despite the
 //                            "INDvolt" name, niinteg.c:15
 //                            (`#define ccap qcap+1`) makes this slot the
 //                            ccap recursion buffer, not a node voltage.
 //
-// digiTS schema (inductor.ts INDUCTOR_SCHEMA): PHI=0, CCAP=1 — same offsets,
+// digiTS schema (inductor.ts INDUCTOR_SCHEMA): PHI=0, CCAP=1- same offsets,
 // same semantics, ngspice-exact 1:1.
 
 export const INDUCTOR_MAPPING: DeviceMapping = {
@@ -71,7 +71,7 @@ export const INDUCTOR_MAPPING: DeviceMapping = {
 // Post-D-2a rename: digiTS slot for DIOcapCurrent is `CAP_CURRENT` (dual
 // semantics per dioload.c:363: iqcap in MODETRAN, capd in MODEINITSMSIG).
 // The digiTS schema `CCAP` slot is a niIntegrate companion-current output
-// with no ngspice CKTstate correspondence — not mapped.
+// with no ngspice CKTstate correspondence- not mapped.
 
 export const DIODE_MAPPING: DeviceMapping = {
   deviceType: "diode",
@@ -92,7 +92,7 @@ export const DIODE_MAPPING: DeviceMapping = {
 };
 
 // ---------------------------------------------------------------------------
-// BJT (SPICE L1 — Gummel-Poon)
+// BJT (SPICE L1- Gummel-Poon)
 // ---------------------------------------------------------------------------
 // ngspice bjt state offsets (bjtdefs.h:289-313):
 //   BJTvbe=0, BJTvbc=1, BJTcc=2, BJTcb=3, BJTgpi=4, BJTgmu=5,
@@ -106,7 +106,7 @@ export const DIODE_MAPPING: DeviceMapping = {
 // now match ngspice bjtdefs.h BJTqsub=12 / BJTcqsub=13 exactly.
 //
 // Note on augmentation: our GPI/GMU/CC/CB (slots 4,5,2,3) are cap-augmented
-// during transient — bjtload.c:725-734 lumps cap companion geq/ieq into
+// during transient- bjtload.c:725-734 lumps cap companion geq/ieq into
 // these slots. The mappings below therefore compare our cap-augmented
 // values against ngspice's CKTstate0 offsets, which are likewise augmented.
 
@@ -174,7 +174,7 @@ export const BJT_MAPPING: DeviceMapping = {
 // Post-W1.3 rename: digiTS schema matches ngspice names exactly for
 // slots 0-16. Schema slots 17-27 (CD, CBD, CBS, GBD, GBS, GM, GDS, GMBS,
 // MODE, VON, VDSAT) correspond to MOS1instance struct fields, NOT to
-// CKTstate offsets — they are not comparable via the state-pool path.
+// CKTstate offsets- they are not comparable via the state-pool path.
 
 export const MOSFET_MAPPING: DeviceMapping = {
   deviceType: "mosfet",

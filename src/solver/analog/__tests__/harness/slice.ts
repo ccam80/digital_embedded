@@ -1,5 +1,5 @@
 /**
- * Slice filters for harness_get_attempt — resolve node/component queries to
+ * Slice filters for harness_get_attempt- resolve node/component queries to
  * matrix indices and apply them to IterationSideData objects.
  */
 

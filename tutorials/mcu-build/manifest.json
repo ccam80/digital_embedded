@@ -2,7 +2,7 @@
   "id": "mcu-build",
   "version": 1,
   "title": "Building a Microcontroller",
-  "description": "Construct an MCU from first principles — starting with an adder and ending with a program counter reading instructions from memory.",
+  "description": "Construct an MCU from first principles- starting with an adder and ending with a program counter reading instructions from memory.",
   "difficulty": "advanced",
   "steps": [
     {
@@ -122,7 +122,7 @@
       "id": "step-2-alu",
       "mode": "explore",
       "title": "8-bit ALU",
-      "instructions": "# 8-bit ALU\n\nAn ALU performs different operations based on an opcode. Build one that supports ADD, SUB, AND, and OR.\n\n## Goal\n\nRoute two 8-bit inputs **A** and **B** through four parallel operations (Add, Sub, And, Or), then use a 4-input multiplexer selected by a 2-bit **Op** to choose the result.\n\n## Operation Table\n\n| Op | Operation |\n|----|-----------|\n| 0  | A + B     |\n| 1  | A - B     |\n| 2  | A AND B   |\n| 3  | A OR B    |\n\n## Hints\n\n- All four operations compute in parallel — the mux just selects which result to output\n- Tie the carry-in pins on Add and Sub to a `Const(0)` to ground them\n- The carry-out from the Add is useful for the flags register later",
+      "instructions": "# 8-bit ALU\n\nAn ALU performs different operations based on an opcode. Build one that supports ADD, SUB, AND, and OR.\n\n## Goal\n\nRoute two 8-bit inputs **A** and **B** through four parallel operations (Add, Sub, And, Or), then use a 4-input multiplexer selected by a 2-bit **Op** to choose the result.\n\n## Operation Table\n\n| Op | Operation |\n|----|-----------|\n| 0  | A + B     |\n| 1  | A - B     |\n| 2  | A AND B   |\n| 3  | A OR B    |\n\n## Hints\n\n- All four operations compute in parallel- the mux just selects which result to output\n- Tie the carry-in pins on Add and Sub to a `Const(0)` to ground them\n- The carry-out from the Add is useful for the flags register later",
       "palette": {
         "preset": "arithmetic",
         "add": [
@@ -345,7 +345,7 @@
       "id": "step-3-register-file",
       "mode": "explore",
       "title": "4x8 Register File",
-      "instructions": "# Register File\n\nRegisters are the CPU's fast local storage. Build a register file with 4 registers, each 8 bits wide, with dual read ports and a single write port.\n\n## Architecture\n\n1. **Write path:** A 2-to-4 decoder selects which register to write. AND gates combine the decoder outputs with a write-enable signal. Each register's `en` pin is driven by its AND gate.\n2. **Read paths:** Two 4-input multiplexers select which register to read on port A and port B.\n3. **All registers** share the same data input (Din) and clock.\n\n## Hints\n\n- Use `Register` components (bitWidth=8) — these are edge-triggered D flip-flop banks\n- The `Decoder` with selectorBits=2 produces 4 one-hot outputs\n- Each AND gate combines one decoder output with the WE signal\n- Both muxes read from the same 4 register outputs but with independent select lines",
+      "instructions": "# Register File\n\nRegisters are the CPU's fast local storage. Build a register file with 4 registers, each 8 bits wide, with dual read ports and a single write port.\n\n## Architecture\n\n1. **Write path:** A 2-to-4 decoder selects which register to write. AND gates combine the decoder outputs with a write-enable signal. Each register's `en` pin is driven by its AND gate.\n2. **Read paths:** Two 4-input multiplexers select which register to read on port A and port B.\n3. **All registers** share the same data input (Din) and clock.\n\n## Hints\n\n- Use `Register` components (bitWidth=8)- these are edge-triggered D flip-flop banks\n- The `Decoder` with selectorBits=2 produces 4 one-hot outputs\n- Each AND gate combines one decoder output with the WE signal\n- Both muxes read from the same 4 register outputs but with independent select lines",
       "palette": {
         "preset": "memory",
         "add": [
@@ -725,7 +725,7 @@
       "id": "step-4-ram",
       "mode": "explore",
       "title": "256x8 RAM",
-      "instructions": "# RAM\n\nThe CPU needs main memory for storing data. Build a 256-byte RAM with an 8-bit address bus.\n\n## Interface\n\n| Signal | Width | Direction | Purpose |\n|--------|-------|-----------|---------|\n| Addr   | 8-bit | Input     | Memory address |\n| Din    | 8-bit | Input     | Data to write |\n| WE     | 1-bit | Input     | Write enable (store on clock edge) |\n| OE     | 1-bit | Input     | Output enable (read) |\n| CLK    | 1-bit | Input     | Clock |\n| Dout   | 8-bit | Output    | Data read from memory |\n\n## Hints\n\n- Use `RAMDualPort` — it has separate Din and D (output) pins\n- Write: set Addr, Din, WE=1, clock edge\n- Read: set Addr, OE=1 → Dout shows memory contents",
+      "instructions": "# RAM\n\nThe CPU needs main memory for storing data. Build a 256-byte RAM with an 8-bit address bus.\n\n## Interface\n\n| Signal | Width | Direction | Purpose |\n|--------|-------|-----------|---------|\n| Addr   | 8-bit | Input     | Memory address |\n| Din    | 8-bit | Input     | Data to write |\n| WE     | 1-bit | Input     | Write enable (store on clock edge) |\n| OE     | 1-bit | Input     | Output enable (read) |\n| CLK    | 1-bit | Input     | Clock |\n| Dout   | 8-bit | Output    | Data read from memory |\n\n## Hints\n\n- Use `RAMDualPort`- it has separate Din and D (output) pins\n- Write: set Addr, Din, WE=1, clock edge\n- Read: set Addr, OE=1 → Dout shows memory contents",
       "palette": {
         "preset": "memory"
       },
@@ -851,7 +851,7 @@
       "id": "step-5-data-bus",
       "mode": "explore",
       "title": "Data Bus",
-      "instructions": "# Data Bus\n\nMultiple sources need to share a single data path. Build a mux-based bus that selects between ALU output, RAM output, and an immediate value.\n\n## Bus Select\n\n| BusSel | Source |\n|--------|--------|\n| 0      | ALU    |\n| 1      | RAM    |\n| 2      | IMM    |\n\n## Hints\n\n- Use a `Multiplexer` with selectorBits=2 and bitWidth=8\n- In a real CPU, tristate drivers would be used — here we use a mux for simplicity\n- The 4th mux input (sel=3) is unused; tie it to `Const(0)`",
+      "instructions": "# Data Bus\n\nMultiple sources need to share a single data path. Build a mux-based bus that selects between ALU output, RAM output, and an immediate value.\n\n## Bus Select\n\n| BusSel | Source |\n|--------|--------|\n| 0      | ALU    |\n| 1      | RAM    |\n| 2      | IMM    |\n\n## Hints\n\n- Use a `Multiplexer` with selectorBits=2 and bitWidth=8\n- In a real CPU, tristate drivers would be used- here we use a mux for simplicity\n- The 4th mux input (sel=3) is unused; tie it to `Const(0)`",
       "palette": {
         "preset": "mux-and-wiring",
         "add": [

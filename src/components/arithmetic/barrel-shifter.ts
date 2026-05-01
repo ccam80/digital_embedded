@@ -1,5 +1,5 @@
 /**
- * BarrelShifter component — configurable shift/rotate.
+ * BarrelShifter component- configurable shift/rotate.
  *
  * Ports from Digital's BarrelShifter.java:
  *   Inputs: in (bitWidth), shift (shiftBits)
@@ -33,7 +33,7 @@ import {
 
 // ---------------------------------------------------------------------------
 // Shift bit width calculation (mirrors Java's Bits.binLn2)
-// ceil(log2(n)) — number of bits needed to address n positions
+// ceil(log2(n))- number of bits needed to address n positions
 // ---------------------------------------------------------------------------
 
 function shiftBitsFor(bitWidth: number): number {
@@ -98,7 +98,7 @@ export class BarrelShifterElement extends AbstractCircuitElement {
 }
 
 // ---------------------------------------------------------------------------
-// Barrel shift helpers — mirror Java's Bits.up / Bits.down
+// Barrel shift helpers- mirror Java's Bits.up / Bits.down
 //
 // bitsUp(val, shift, width): shift left by `shift` bits, mask to `width` bits
 // bitsDown(val, shift, width): shift right by `shift` bits (logical), mask to `width` bits
@@ -225,7 +225,7 @@ export const BarrelShifterDefinition: ComponentDefinition = {
   propertyDefs: BARREL_SHIFTER_PROPERTY_DEFS,
   attributeMap: BARREL_SHIFTER_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.ARITHMETIC,
-  helpText: "BarrelShifter — configurable shift/rotate. Modes: logical, rotate, arithmetic. Directions: left, right.",
+  helpText: "BarrelShifter- configurable shift/rotate. Modes: logical, rotate, arithmetic. Directions: left, right.",
   models: {
     digital: {
       executeFn: executeBarrelShifter,

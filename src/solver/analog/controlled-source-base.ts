@@ -89,7 +89,7 @@ export class MutableExpressionContext implements ExpressionContext {
  * NR linearized RHS: `value - derivative * ctrlValue`.
  *
  * Sources that own a branch row (VCVS, CCVS) inherit the shared
- * `findBranchFor` implementation from this base class (per §A.6).
+ * `findBranchFor` implementation from this base class (per ssA.6).
  */
 export abstract class ControlledSourceElement implements AnalogElement {
   label: string = "";
@@ -134,7 +134,7 @@ export abstract class ControlledSourceElement implements AnalogElement {
    * `findBranchFor` so that CCCS/CCVS controlling elements can lazy-allocate
    * the branch row when a name match is found.
    *
-   * Matches the idempotent makeCur pattern in §A.5 and §A.6.
+   * Matches the idempotent makeCur pattern in ssA.5 and ssA.6.
    */
   findBranchFor(_name: string, ctx: SetupContext): number {
     if (this.branchIndex === -1) {
@@ -203,10 +203,10 @@ export abstract class ControlledSourceElement implements AnalogElement {
   /**
    * `setup()` is a no-op in the base class. Subclasses that introduce branch
    * rows or TSTALLOC entries override this and call `findBranchFor` followed
-   * by TSTALLOC allocations. The pattern follows §A.5 idempotent allocation.
+   * by TSTALLOC allocations. The pattern follows ssA.5 idempotent allocation.
    */
   setup(_ctx: SetupContext): void {
-    // base: no allocation — subclasses override
+    // base: no allocation- subclasses override
   }
 }
 

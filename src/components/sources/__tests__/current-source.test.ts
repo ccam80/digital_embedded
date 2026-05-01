@@ -75,7 +75,7 @@ function makeMinimalCtx(
 }
 
 // ---------------------------------------------------------------------------
-// Helper — build a current source element from pin map + current value
+// Helper- build a current source element from pin map + current value
 // ---------------------------------------------------------------------------
 
 function makeCurrentSourceEl(nodePos: number, nodeNeg: number, current: number) {
@@ -103,7 +103,7 @@ describe("CurrentSource", () => {
 
     src.load(makeMinimalCtx(solver));
 
-    // No matrix stamps — current sources are RHS-only
+    // No matrix stamps- current sources are RHS-only
     expect(solver.allocElement).toHaveBeenCalledTimes(0);
 
     // RHS[nodePos] += I  → rhs[1] += 0.01
@@ -113,7 +113,7 @@ describe("CurrentSource", () => {
   });
 
   it("set_scale_modifies_current", () => {
-    // ngspice vsrcload.c:54 — value = here->VSRCdcValue * ckt->CKTsrcFact
+    // ngspice vsrcload.c:54- value = here->VSRCdcValue * ckt->CKTsrcFact
     // Sources read ctx.srcFact directly during load(); no per-element scale method.
     const src = makeCurrentSourceEl(1, 2, 0.01);
 
@@ -142,7 +142,7 @@ describe("CurrentSource", () => {
 
     src.load(makeMinimalCtx(solver));
 
-    // Only one RHS entry (ground row suppressed — rhs[0] stays 0)
+    // Only one RHS entry (ground row suppressed- rhs[0] stays 0)
     expect(solver._rhs[0]).toBe(0);
     expect(solver._rhs[1]).toBe(0.01);
   });
@@ -185,11 +185,11 @@ describe("CurrentSource", () => {
 });
 
 // ===========================================================================
-// Task C4.4 — Current source srcFact parity
+// Task C4.4- Current source srcFact parity
 //
 // ngspice reference: cktload.c:96-136 + ISRCload.
 // An independent current source stamps `I * CKTsrcFact` into nodePos row,
-// `-I * CKTsrcFact` into nodeNeg row. RHS-only — no matrix entries.
+// `-I * CKTsrcFact` into nodeNeg row. RHS-only- no matrix entries.
 // ===========================================================================
 
 describe("isource_load_srcfact_parity", () => {

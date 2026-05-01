@@ -27,7 +27,7 @@ import type { TestcaseElement } from '../../components/misc/testcase.js';
  * globals prevents import errors in the node test environment.
  *
  * The stub implements only what CodeMirror queries at construction time.
- * It does not attempt to replicate the full DOM API — tests that need full
+ * It does not attempt to replicate the full DOM API- tests that need full
  * DOM functionality use buffer-only mode (null container).
  */
 class StubNode {
@@ -218,18 +218,18 @@ describe('TestEditorPanel', () => {
   // createEditor
   // -------------------------------------------------------------------------
 
-  it('createEditor — buffer mode: panel created without DOM, isMounted is false', () => {
+  it('createEditor- buffer mode: panel created without DOM, isMounted is false', () => {
     const editor = new TestEditorPanel(null, '');
     expect(editor.isMounted).toBe(false);
   });
 
-  it('createEditor — getText returns initial content', () => {
+  it('createEditor- getText returns initial content', () => {
     const initial = 'A B Y\n0 0 0\n0 1 1\n';
     const editor = new TestEditorPanel(null, initial);
     expect(editor.getText()).toBe(initial);
   });
 
-  it('createEditor — empty initial content produces empty getText', () => {
+  it('createEditor- empty initial content produces empty getText', () => {
     const editor = new TestEditorPanel(null);
     expect(editor.getText()).toBe('');
   });
@@ -238,7 +238,7 @@ describe('TestEditorPanel', () => {
   // setContent (setText / getText round-trip)
   // -------------------------------------------------------------------------
 
-  it('setContent — setText then getText returns the new content', () => {
+  it('setContent- setText then getText returns the new content', () => {
     const editor = new TestEditorPanel(null, '');
     const testContent = 'A B Y\n0 0 0\n1 1 1\n';
 
@@ -247,7 +247,7 @@ describe('TestEditorPanel', () => {
     expect(editor.getText()).toBe(testContent);
   });
 
-  it('setContent — overwrite existing content with new content', () => {
+  it('setContent- overwrite existing content with new content', () => {
     const original = 'A B Y\n0 0 0\n';
     const updated = 'CLK D Q\nC 0 0\nC 1 1\n';
 
@@ -257,13 +257,13 @@ describe('TestEditorPanel', () => {
     expect(editor.getText()).toBe(updated);
   });
 
-  it('setContent — setText with empty string clears content', () => {
+  it('setContent- setText with empty string clears content', () => {
     const editor = new TestEditorPanel(null, 'A B Y\n0 0 0\n');
     editor.setText('');
     expect(editor.getText()).toBe('');
   });
 
-  it('setContent — multiple successive setText calls keep the last value', () => {
+  it('setContent- multiple successive setText calls keep the last value', () => {
     const editor = new TestEditorPanel(null, '');
     editor.setText('first');
     editor.setText('second');
@@ -275,7 +275,7 @@ describe('TestEditorPanel', () => {
   // saveToTestcase
   // -------------------------------------------------------------------------
 
-  it('saveToTestcase — edit content, save, verify onSave callback receives updated content', () => {
+  it('saveToTestcase- edit content, save, verify onSave callback receives updated content', () => {
     const { element } = makeTestcaseStub('A B Y\n0 0 0\n');
     const editor = new TestEditorPanel(null, element.testData);
 
@@ -290,7 +290,7 @@ describe('TestEditorPanel', () => {
     expect(savedContent).toBe(newContent);
   });
 
-  it('saveToTestcase — save without editing returns original content to callback', () => {
+  it('saveToTestcase- save without editing returns original content to callback', () => {
     const original = 'CLK D Q\nC 0 0\n';
     const editor = new TestEditorPanel(null, original);
 
@@ -302,7 +302,7 @@ describe('TestEditorPanel', () => {
     expect(savedContent).toBe(original);
   });
 
-  it('saveToTestcase — setTestcase loads testcase data into editor', () => {
+  it('saveToTestcase- setTestcase loads testcase data into editor', () => {
     const { element } = makeTestcaseStub('A B Y\n0 0 0\n1 1 1\n');
     const editor = new TestEditorPanel(null, '');
 
@@ -311,7 +311,7 @@ describe('TestEditorPanel', () => {
     expect(editor.getText()).toBe(element.testData);
   });
 
-  it('saveToTestcase — save propagates edited text, not original testcase data', () => {
+  it('saveToTestcase- save propagates edited text, not original testcase data', () => {
     const { element } = makeTestcaseStub('A B Y\n0 0 0\n');
     const editor = new TestEditorPanel(null, '');
     editor.setTestcase(element);
@@ -331,7 +331,7 @@ describe('TestEditorPanel', () => {
   // destroy
   // -------------------------------------------------------------------------
 
-  it('destroy — after destroy, getText returns empty string (buffer reset)', () => {
+  it('destroy- after destroy, getText returns empty string (buffer reset)', () => {
     const editor = new TestEditorPanel(null, 'A B\n0 1\n');
     editor.destroy();
     // After destroy, the view is null; buffer remains accessible

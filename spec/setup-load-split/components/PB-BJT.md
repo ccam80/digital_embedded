@@ -8,23 +8,23 @@
 
 | digiTS label | ngspice variable | Note |
 |---|---|---|
-| `B` | `BJTbaseNode` | Base — external |
-| `C` | `BJTcolNode` | Collector — external |
-| `E` | `BJTemitNode` | Emitter — external |
+| `B` | `BJTbaseNode` | Base- external |
+| `C` | `BJTcolNode` | Collector- external |
+| `E` | `BJTemitNode` | Emitter- external |
 | `colPrime` | `BJTcolPrimeNode` | Internal collector node (when RC ≠ 0) |
 | `basePrime` | `BJTbasePrimeNode` | Internal base node (when RB ≠ 0) |
 | `emitPrime` | `BJTemitPrimeNode` | Internal emitter node (when RE ≠ 0) |
-| substrate | `BJTsubstNode` | Substrate — **not modelled in digiTS**; treated as ground (node 0) |
+| substrate | `BJTsubstNode` | Substrate- **not modelled in digiTS**; treated as ground (node 0) |
 
 ```
 const baseNode = pinNodes.get("B")!;   // BJTbaseNode
 const colNode  = pinNodes.get("C")!;   // BJTcolNode
 const emitNode = pinNodes.get("E")!;   // BJTemitNode
-const substNode = 0;                   // BJTsubstNode — ground alias
+const substNode = 0;                   // BJTsubstNode- ground alias
 ```
 
 **NPN/PNP polymorphism:** PNP is implemented as NPN with `polarity = -1`
-(mirrors `BJTtype` in bjtdefs.h). setup() is polarity-independent — all
+(mirrors `BJTtype` in bjtdefs.h). setup() is polarity-independent- all
 node allocation and TSTALLOC stamps are identical for NPN and PNP; the
 polarity sign is applied only in load().
 
@@ -91,7 +91,7 @@ if (model->BJTsubs == LATERAL) {
 ```
 
 digiTS port: store `_substConNode` and reuse the already-allocated handle.
-No new `allocElement` call here — it is a pointer alias, not a new stamp.
+No new `allocElement` call here- it is a pointer alias, not a new stamp.
 
 ```ts
 // After TSTALLOC 18 (BJTcolPrimeColPrimePtr) and TSTALLOC 17 (BJTbasePrimeBasePrimePtr):
@@ -153,14 +153,14 @@ Variables: `cp = _colPrimeNode`, `bp = _basePrimeNode`, `ep = _emitPrimeNode`,
 **Entries 19-21 with substNode = 0:** `allocElement(0, 0)`, `allocElement(sc, 0)`,
 `allocElement(0, sc)` all touch the ground row/column. The solver skips row 0
 during KCL assembly, so these handles are written during load() but effectively
-no-op. They are allocated unconditionally — no conditional skip.
+no-op. They are allocated unconditionally- no conditional skip.
 
 **RC=0/RB=0/RE=0 collapse:** When a resistance is zero, the corresponding
 prime node equals the external node. Entries (1)/(13) collapse when RC=0
 (`colPrimeNode = colNode`), etc. `allocElement` returns the existing handle
-on repeated calls — no special case in the port.
+on repeated calls- no special case in the port.
 
-## setup() body — alloc only
+## setup() body- alloc only
 
 ```ts
 setup(ctx: SetupContext): void {
@@ -168,13 +168,13 @@ setup(ctx: SetupContext): void {
   const baseNode = this._pinNodes.get("B")!;
   const colNode  = this._pinNodes.get("C")!;
   const emitNode = this._pinNodes.get("E")!;
-  const substNode = 0;  // ground alias — no substrate terminal
+  const substNode = 0;  // ground alias- no substrate terminal
   const model    = this._model;
 
-  // State slots — bjtsetup.c:366-367
+  // State slots- bjtsetup.c:366-367
   this._stateBase = ctx.allocStates(24);
 
-  // Internal nodes — bjtsetup.c:372-428
+  // Internal nodes- bjtsetup.c:372-428
   this._colPrimeNode  = (model.RC === 0) ? colNode  : ctx.makeVolt(this.label, "collector");
   this._basePrimeNode = (model.RB === 0) ? baseNode : ctx.makeVolt(this.label, "base");
   this._emitPrimeNode = (model.RE === 0) ? emitNode : ctx.makeVolt(this.label, "emitter");
@@ -183,7 +183,7 @@ setup(ctx: SetupContext): void {
   const bp = this._basePrimeNode;
   const ep = this._emitPrimeNode;
 
-  // TSTALLOC sequence — bjtsetup.c:435-452 (entries 1-18)
+  // TSTALLOC sequence- bjtsetup.c:435-452 (entries 1-18)
   this._hCCP  = solver.allocElement(colNode,  cp);      // (1)
   this._hBBP  = solver.allocElement(baseNode, bp);      // (2)
   this._hEEP  = solver.allocElement(emitNode, ep);      // (3)
@@ -203,28 +203,28 @@ setup(ctx: SetupContext): void {
   this._hBPBP = solver.allocElement(bp,       bp);      // (17)
   this._hEPEP = solver.allocElement(ep,       ep);      // (18)
 
-  // Substrate stamps — bjtsetup.c:453 (entry 19), :461-462 (entries 20-21, substNode=0)
+  // Substrate stamps- bjtsetup.c:453 (entry 19), :461-462 (entries 20-21, substNode=0)
   this._hSS   = solver.allocElement(substNode, substNode); // (19)
-  // Substrate alias — bjtsetup.c:454-460
+  // Substrate alias- bjtsetup.c:454-460
   let sc: number;
   if (model.BJTsubs === 'LATERAL') {
     sc = bp;
-    this._hSubstConSubstCon = this._hBPBP;  // pointer alias — no new alloc
+    this._hSubstConSubstCon = this._hBPBP;  // pointer alias- no new alloc
   } else {
     sc = cp;
-    this._hSubstConSubstCon = this._hCPCP;  // pointer alias — no new alloc
+    this._hSubstConSubstCon = this._hCPCP;  // pointer alias- no new alloc
   }
   this._substConNode = sc;
   this._hSCS  = solver.allocElement(sc,        substNode); // (20)
   this._hSSC  = solver.allocElement(substNode, sc);        // (21)
 
-  // Remaining stamps — bjtsetup.c:463-464 (entries 22-23)
+  // Remaining stamps- bjtsetup.c:463-464 (entries 22-23)
   this._hBCP  = solver.allocElement(baseNode, cp);      // (22)
   this._hCPB  = solver.allocElement(cp,       baseNode);// (23)
 }
 ```
 
-## load() body — value writes only
+## load() body- value writes only
 
 Implementer ports value-side from `ref/ngspice/src/spicelib/devices/bjt/bjtload.c`
 line-for-line, stamping through cached handles. No allocElement calls.
@@ -246,11 +246,11 @@ Not applicable. BJT has no branch row.
 
 Per CLAUDE.md "Test Policy During W3 Setup-Load-Split", verification is spec compliance only. DO NOT run tests; DO NOT use test results.
 
-1. `setup()` body in the implementation file matches the "setup() body — alloc only" listing in this PB line-for-line.
+1. `setup()` body in the implementation file matches the "setup() body- alloc only" listing in this PB line-for-line.
 2. TSTALLOC sequence in `setup()` matches the order in the cited ngspice anchor file (see top of this PB, e.g. `ressetup.c:46-49`).
 3. Factory cleanup applied per the "Factory cleanup" section above.
 4. `ngspiceNodeMap` registered per the "Pin mapping" section above (or omitted for composites where the spec says so).
-5. `load()` writes through cached handles only — zero `solver.allocElement(...)` calls inside `load()`, `accept()`, or any non-`setup()` method.
+5. `load()` writes through cached handles only- zero `solver.allocElement(...)` calls inside `load()`, `accept()`, or any non-`setup()` method.
 6. `mayCreateInternalNodes` flag set per spec.
 7. `findBranchFor` callback present where spec says (V-output sources, IND, etc.).
 8. No banned closing verdicts (mapping/tolerance/equivalent-to/pre-existing/intentional-divergence/citation-divergence/partial) used in any commit message or report.

@@ -1,8 +1,8 @@
 /**
- * VoltageRangeTracker — maintains [min, max] voltage range for wire color mapping.
+ * VoltageRangeTracker- maintains [min, max] voltage range for wire color mapping.
  *
  * Scans all node voltages once per render frame. The range latches to the
- * per-simulation-run min/max — it expands instantly to accommodate new extremes
+ * per-simulation-run min/max- it expands instantly to accommodate new extremes
  * but never contracts until the simulation is reset/restarted.
  *
  * Ground (0V) is always included in the range.
@@ -21,7 +21,7 @@ const UNIFORM_PADDING = 0.1;
 /**
  * Log-curve shaping exponent. Values < 1 compress the upper end of the scale
  * so that smaller voltages get more color differentiation. 0.4 gives roughly
- * a square-root-like curve — 10% of the range maps to ~25% of the color span.
+ * a square-root-like curve- 10% of the range maps to ~25% of the color span.
  */
 const LOG_GAMMA = 0.4;
 

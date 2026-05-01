@@ -1,5 +1,5 @@
 /**
- * SevenSeg component — direct-drive 7-segment display.
+ * SevenSeg component- direct-drive 7-segment display.
  *
  * 7 segment inputs (a-g) + 1 decimal point input.
  * Each segment is independently controlled (no internal decoder).
@@ -53,7 +53,7 @@ export const SEVEN_SEG_OUTER_RECT: readonly Point[] = [
 
 /** Polygons for segments a, b, c, d, e, f, g (in that order). */
 export const SEVEN_SEG_POLYGONS: readonly (readonly Point[])[] = [
-  // a — top horizontal
+  // a- top horizontal
   [
     { x: 0.602, y: 0.25  },
     { x: 2.64,  y: 0.25  },
@@ -62,7 +62,7 @@ export const SEVEN_SEG_POLYGONS: readonly (readonly Point[])[] = [
     { x: 0.576, y: 0.811 },
     { x: 0.309, y: 0.53  },
   ],
-  // b — upper-right vertical
+  // b- upper-right vertical
   [
     { x: 2.975, y: 0.601 },
     { x: 3.242, y: 0.881 },
@@ -71,7 +71,7 @@ export const SEVEN_SEG_POLYGONS: readonly (readonly Point[])[] = [
     { x: 2.576, y: 3.15  },
     { x: 2.681, y: 0.881 },
   ],
-  // c — lower-right vertical
+  // c- lower-right vertical
   [
     { x: 2.837, y: 3.57  },
     { x: 3.105, y: 3.851 },
@@ -80,7 +80,7 @@ export const SEVEN_SEG_POLYGONS: readonly (readonly Point[])[] = [
     { x: 2.439, y: 6.119 },
     { x: 2.544, y: 3.851 },
   ],
-  // d — bottom horizontal
+  // d- bottom horizontal
   [
     { x: 0.328, y: 6.189 },
     { x: 2.366, y: 6.189 },
@@ -89,7 +89,7 @@ export const SEVEN_SEG_POLYGONS: readonly (readonly Point[])[] = [
     { x: 0.302, y: 6.75  },
     { x: 0.034, y: 6.469 },
   ],
-  // e — lower-left vertical
+  // e- lower-left vertical
   [
     { x:  0.098, y: 3.57  },
     { x:  0.365, y: 3.851 },
@@ -98,7 +98,7 @@ export const SEVEN_SEG_POLYGONS: readonly (readonly Point[])[] = [
     { x: -0.299, y: 6.119 },
     { x: -0.195, y: 3.851 },
   ],
-  // f — upper-left vertical
+  // f- upper-left vertical
   [
     { x:  0.235, y: 0.601 },
     { x:  0.503, y: 0.881 },
@@ -107,7 +107,7 @@ export const SEVEN_SEG_POLYGONS: readonly (readonly Point[])[] = [
     { x: -0.162, y: 3.15  },
     { x: -0.057, y: 0.881 },
   ],
-  // g — middle horizontal
+  // g- middle horizontal
   [
     { x: 0.465, y: 3.219 },
     { x: 2.503, y: 3.219 },
@@ -122,7 +122,7 @@ export const SEVEN_SEG_POLYGONS: readonly (readonly Point[])[] = [
 export const SEVEN_SEG_DP = { cx: 3.1, cy: 6.55, r: 0.2 } as const;
 
 // ---------------------------------------------------------------------------
-// Shared draw helper — draws the complete static seven-segment shape.
+// Shared draw helper- draws the complete static seven-segment shape.
 // SevenSegHex imports and calls this so both components render identically.
 // ---------------------------------------------------------------------------
 
@@ -150,7 +150,7 @@ export function drawSevenSegShape(ctx: RenderContext): void {
 const SEGMENT_LABELS = ["a", "b", "c", "d", "e", "f", "g", "dp"] as const;
 
 // ---------------------------------------------------------------------------
-// Pin layout — 8 inputs on the west face
+// Pin layout- 8 inputs on the west face
 // ---------------------------------------------------------------------------
 
 function buildSevenSegPinDeclarations(): PinDeclaration[] {
@@ -168,7 +168,7 @@ function buildSevenSegPinDeclarations(): PinDeclaration[] {
 }
 
 // ---------------------------------------------------------------------------
-// SevenSegElement — CircuitElement implementation
+// SevenSegElement- CircuitElement implementation
 // ---------------------------------------------------------------------------
 
 export class SevenSegElement extends AbstractCircuitElement {
@@ -209,7 +209,7 @@ export class SevenSegElement extends AbstractCircuitElement {
 }
 
 // ---------------------------------------------------------------------------
-// executeSevenSeg — reads 8 inputs (a,b,c,d,e,f,g,dp), packs into output
+// executeSevenSeg- reads 8 inputs (a,b,c,d,e,f,g,dp), packs into output
 //
 // Output encoding (bits 7..0): dp=bit7, g=bit6, f=bit5, e=bit4, d=bit3, c=bit2, b=bit1, a=bit0
 // Polarity applied: commonCathode means active-high; common anode means active-low.
@@ -287,7 +287,7 @@ export const SevenSegDefinition: ComponentDefinition = {
   attributeMap: SEVEN_SEG_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.IO,
   helpText:
-    "SevenSeg — direct-drive 7-segment display.\n" +
+    "SevenSeg- direct-drive 7-segment display.\n" +
     "Inputs a–g control each segment independently. dp controls the decimal point.\n" +
     "commonCathode=true: segment on when input=1. commonCathode=false: segment on when input=0.",
   models: {

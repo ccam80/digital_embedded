@@ -1,5 +1,5 @@
 /**
- * Scope component — multi-channel waveform recorder.
+ * Scope component- multi-channel waveform recorder.
  *
  * Records signal values over time, producing waveform data for display in a
  * floating panel. Supports configurable channel count, time scale, and
@@ -53,7 +53,7 @@ const MAX_SAMPLES = 1024;
 
 
 // ---------------------------------------------------------------------------
-// WaveformChannel — per-channel sample buffer
+// WaveformChannel- per-channel sample buffer
 // ---------------------------------------------------------------------------
 
 export interface WaveformChannel {
@@ -62,7 +62,7 @@ export interface WaveformChannel {
 }
 
 // ---------------------------------------------------------------------------
-// Pin layout — N input channels on the west face
+// Pin layout- N input channels on the west face
 // ---------------------------------------------------------------------------
 
 function buildScopePinDeclarations(channelCount: number, bitWidth: number): PinDeclaration[] {
@@ -79,7 +79,7 @@ function buildScopePinDeclarations(channelCount: number, bitWidth: number): PinD
 }
 
 // ---------------------------------------------------------------------------
-// ScopeElement — CircuitElement implementation
+// ScopeElement- CircuitElement implementation
 // ---------------------------------------------------------------------------
 
 export class ScopeElement extends AbstractCircuitElement {
@@ -161,7 +161,7 @@ export class ScopeElement extends AbstractCircuitElement {
   draw(ctx: RenderContext): void {
     ctx.save();
 
-    // Outer rectangle: (0.1, 0.5) → (4, -2) — NORMAL style
+    // Outer rectangle: (0.1, 0.5) → (4, -2)- NORMAL style
     ctx.setColor("COMPONENT");
     ctx.setLineWidth(1);
     ctx.drawPath({
@@ -205,7 +205,7 @@ export class ScopeElement extends AbstractCircuitElement {
 }
 
 // ---------------------------------------------------------------------------
-// executeScope — read N inputs, pack first input into output slot for engine
+// executeScope- read N inputs, pack first input into output slot for engine
 //
 // The full waveform recording (recordSamples) is driven by the engine's
 // post-step hook which has access to the ScopeElement instance. The execute
@@ -301,7 +301,7 @@ export const ScopeDefinition: ComponentDefinition = {
   attributeMap: SCOPE_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.IO,
   helpText:
-    "Scope — multi-channel waveform recorder.\n" +
+    "Scope- multi-channel waveform recorder.\n" +
     "Records signal values over time. Waveform displayed in a floating panel.\n" +
     "channelCount: number of input channels (1–8).\n" +
     "timeScale: horizontal time scale factor.",

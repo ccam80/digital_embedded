@@ -1,5 +1,5 @@
 /**
- * BusSplitter component — bidirectional bus splitter with Output Enable control.
+ * BusSplitter component- bidirectional bus splitter with Output Enable control.
  *
  * Splits a multi-bit common bus D into individual bit lines D0..D(n-1),
  * gated by an OE (Output Enable) input pin.
@@ -27,7 +27,7 @@ import { createSplitterAnalogElement } from "../../solver/analog/behavioral-rema
 import { extractBits } from "./splitter.js";
 
 // ---------------------------------------------------------------------------
-// BusSplitterElement — CircuitElement implementation
+// BusSplitterElement- CircuitElement implementation
 // ---------------------------------------------------------------------------
 
 export class BusSplitterElement extends AbstractCircuitElement {
@@ -282,7 +282,7 @@ export const BusSplitterDefinition: ComponentDefinition = {
   attributeMap: BUS_SPLITTER_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.WIRING,
   helpText:
-    "BusSplitter — bidirectional bus splitter with Output Enable control.\n" +
+    "BusSplitter- bidirectional bus splitter with Output Enable control.\n" +
     "Splits a common bus into individual bit lines gated by OE.",
   models: {
     digital: {

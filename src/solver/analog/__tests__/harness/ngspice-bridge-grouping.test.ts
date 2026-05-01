@@ -1,5 +1,5 @@
 /**
- * Unit tests for the §6.1 ngspice grouping state machine.
+ * Unit tests for the ss6.1 ngspice grouping state machine.
  *
  * No FFI, no DLL. Injects synthetic RawNgspiceIterationEx[] directly into
  * NgspiceBridge._iterations and calls getCaptureSession() to exercise the
@@ -54,7 +54,7 @@ function makeRaw(overrides: Partial<RawNgspiceIterationEx> = {}): RawNgspiceIter
 }
 
 function makeBridge(iters: RawNgspiceIterationEx[], outerEvents: RawNgspiceOuterEvent[] = []): NgspiceBridge {
-  // NgspiceBridge requires a DLL path but we never call init() — we inject directly.
+  // NgspiceBridge requires a DLL path but we never call init()- we inject directly.
   const bridge = new NgspiceBridge("__fake__");
   (bridge as any)._iterations = iters;
   (bridge as any)._outerEvents = outerEvents;
@@ -62,7 +62,7 @@ function makeBridge(iters: RawNgspiceIterationEx[], outerEvents: RawNgspiceOuter
   return bridge;
 }
 
-describe("ngspice-bridge grouping — §6.1 state machine", () => {
+describe("ngspice-bridge grouping- ss6.1 state machine", () => {
 
   it("single DCOP iteration → one step, one attempt, stepStartTime=0", () => {
     const iters = [makeRaw({ simTimeStart: 0, cktMode: MODEDCOP, iteration: 0, converged: true })];
@@ -105,7 +105,7 @@ describe("ngspice-bridge grouping — §6.1 state machine", () => {
     const iters = [
       makeRaw({ simTimeStart: t, cktMode: MODETRAN, iteration: 0, converged: false, dt: 1e-9 }),
       makeRaw({ simTimeStart: t, cktMode: MODETRAN, iteration: 1, converged: false, dt: 1e-9 }),
-      // NR failed — iteration resets to 0 for retry
+      // NR failed- iteration resets to 0 for retry
       makeRaw({ simTimeStart: t, cktMode: MODETRAN, iteration: 0, converged: false, dt: 5e-10 }),
       makeRaw({ simTimeStart: t, cktMode: MODETRAN, iteration: 1, converged: true,  dt: 5e-10 }),
     ];
@@ -191,7 +191,7 @@ describe("ngspice-bridge grouping — §6.1 state machine", () => {
     const session = bridge.getCaptureSession();
     expect(session.steps.length).toBe(1);
     expect(session.steps[0].stepStartTime).toBe(0);
-    // All three sub-solves are in the gminDynamic phase — each iteration reset creates a new attempt
+    // All three sub-solves are in the gminDynamic phase- each iteration reset creates a new attempt
     expect(session.steps[0].attempts.length).toBe(3);
   });
 

@@ -1,5 +1,5 @@
 /**
- * Circuit model — visual representation only.
+ * Circuit model- visual representation only.
  *
  * Per Decision 3: Circuit is the visual model. No simulation state lives here.
  * No net IDs, no signal values. The compiler (Phase 3) transforms Circuit into
@@ -16,7 +16,7 @@ import type { ModelEntry } from "./registry.js";
 import type { SubcircuitDefinition } from "../components/subcircuit/subcircuit.js";
 
 // ---------------------------------------------------------------------------
-// Wire — visual wire segment
+// Wire- visual wire segment
 // ---------------------------------------------------------------------------
 
 /**
@@ -40,14 +40,14 @@ export class Wire {
 }
 
 // ---------------------------------------------------------------------------
-// Net — visual connectivity grouping
+// Net- visual connectivity grouping
 // ---------------------------------------------------------------------------
 
 /**
  * A set of pins that are electrically connected via wires.
  *
  * This is a pure visual construct used by the editor's net tracer and the
- * compiler. It carries no signal value and no net ID — those belong to
+ * compiler. It carries no signal value and no net ID- those belong to
  * CompiledModel.
  */
 export class Net {
@@ -101,7 +101,7 @@ export interface CustomShapeData {
 // ---------------------------------------------------------------------------
 
 /**
- * Persisted trace entry — captures signal identity and panel assignment
+ * Persisted trace entry- captures signal identity and panel assignment
  * so watched signals survive save/load cycles.
  */
 export interface SavedTrace {
@@ -152,7 +152,7 @@ export interface CircuitMetadata {
    *   partition boundaries only. Digital-to-digital connections are ideal.
    * - `"all"`: Every digital-model component pin gets bridge adapters. All wires
    *   become MNA nodes. Full loading everywhere.
-   * - `"none"`: Bridges at partition boundaries use ideal conversion — rIn =
+   * - `"none"`: Bridges at partition boundaries use ideal conversion- rIn =
    *   Infinity (no input loading), rOut = 0 (ideal voltage source).
    */
   digitalPinLoading?: "cross-domain" | "all" | "none";
@@ -169,13 +169,13 @@ export interface CircuitMetadata {
     loading: 'loaded' | 'ideal';
   }>;
 
-  /** Persisted scope traces — restored after compilation. */
+  /** Persisted scope traces- restored after compilation. */
   traces?: SavedTrace[];
 
   /**
    * Runtime model registry for user-imported models.
    * Keyed by component type name (e.g. "NpnBJT"), then model name (e.g. "2N2222").
-   * Each entry is a full ModelEntry with factory refs — runtime only, never serialized directly.
+   * Each entry is a full ModelEntry with factory refs- runtime only, never serialized directly.
    */
   models?: Record<string, Record<string, ModelEntry>>;
 
@@ -183,7 +183,7 @@ export interface CircuitMetadata {
    * Circuit-scoped subcircuit definitions.
    * Keyed by subcircuit type name (e.g. "HalfAdder").
    * These take priority over global registry lookups for element creation.
-   * Runtime only — serialized via DtsDocument.subcircuitDefinitions.
+   * Runtime only- serialized via DtsDocument.subcircuitDefinitions.
    */
   subcircuits?: Map<string, SubcircuitDefinition>;
 }
@@ -203,7 +203,7 @@ function defaultCircuitMetadata(): CircuitMetadata {
 }
 
 // ---------------------------------------------------------------------------
-// Circuit — the top-level visual model
+// Circuit- the top-level visual model
 // ---------------------------------------------------------------------------
 
 /**
@@ -211,7 +211,7 @@ function defaultCircuitMetadata(): CircuitMetadata {
  *
  * Holds placed elements, wire segments, and metadata. This is what the .dig
  * parser produces and what the editor manipulates. Contains zero simulation
- * state — see Decision 3.
+ * state- see Decision 3.
  */
 export class Circuit {
   readonly elements: CircuitElement[] = [];
@@ -235,7 +235,7 @@ export class Circuit {
 
   addWire(wire: Wire): void {
     if (wire.start.x === wire.end.x && wire.start.y === wire.end.y) {
-      // Zero-length wire — skip silently. These are degenerate artifacts
+      // Zero-length wire- skip silently. These are degenerate artifacts
       // from .dig loading, wire merging, or junction splitting that contribute
       // nothing to circuit topology and can cause orphan MNA nodes.
       return;

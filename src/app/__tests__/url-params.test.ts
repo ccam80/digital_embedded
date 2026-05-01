@@ -3,27 +3,27 @@ import { parseUrlParams, applyModuleConfig } from '../url-params.js';
 import type { SimulatorParams, ModuleConfig } from '../url-params.js';
 
 describe('parseUrlParams', () => {
-  it('parseBase — ?base=checkpoint-1/ → { base: "checkpoint-1/" }', () => {
+  it('parseBase- ?base=checkpoint-1/ → { base: "checkpoint-1/" }', () => {
     const params = parseUrlParams('?base=checkpoint-1/');
     expect(params.base).toBe('checkpoint-1/');
   });
 
-  it('parseFile — ?file=cpu.dig → { file: "cpu.dig" }', () => {
+  it('parseFile- ?file=cpu.dig → { file: "cpu.dig" }', () => {
     const params = parseUrlParams('?file=cpu.dig');
     expect(params.file).toBe('cpu.dig');
   });
 
-  it('parseDark — ?dark=0 → { dark: false }', () => {
+  it('parseDark- ?dark=0 → { dark: false }', () => {
     const params = parseUrlParams('?dark=0');
     expect(params.dark).toBe(false);
   });
 
-  it('parseLocked — ?locked=1 → { locked: true }', () => {
+  it('parseLocked- ?locked=1 → { locked: true }', () => {
     const params = parseUrlParams('?locked=1');
     expect(params.locked).toBe(true);
   });
 
-  it('defaults — no params → { base: "./", dark: true, locked: false, panels: "default" }', () => {
+  it('defaults- no params → { base: "./", dark: true, locked: false, panels: "default" }', () => {
     const params = parseUrlParams('');
     expect(params.base).toBe('./');
     expect(params.dark).toBe(true);
@@ -32,7 +32,7 @@ describe('parseUrlParams', () => {
     expect(params.file).toBeUndefined();
   });
 
-  it('panelsNone — ?panels=none → { panels: "none" }', () => {
+  it('panelsNone- ?panels=none → { panels: "none" }', () => {
     const params = parseUrlParams('?panels=none');
     expect(params.panels).toBe('none');
   });
@@ -72,7 +72,7 @@ describe('parseUrlParams', () => {
     expect(params.panels).toBe('default');
   });
 
-  it('module param — ?module=ece101 → { module: "ece101" }', () => {
+  it('module param- ?module=ece101 → { module: "ece101" }', () => {
     const params = parseUrlParams('?module=ece101');
     expect(params.module).toBe('ece101');
   });
@@ -82,7 +82,7 @@ describe('parseUrlParams', () => {
     expect(params.module).toBeUndefined();
   });
 
-  it('defaults — module is undefined', () => {
+  it('defaults- module is undefined', () => {
     const params = parseUrlParams('');
     expect(params.module).toBeUndefined();
   });

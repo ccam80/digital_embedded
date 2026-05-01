@@ -9,10 +9,10 @@
 The composite itself has no `ngspiceNodeMap`. Sub-elements carry their own maps.
 
 Composite pin labels (from `buildOptocouplerPinDeclarations()`):
-- `anode` — LED anode, input+ (pinLayout index 0)
-- `cathode` — LED cathode, input- (pinLayout index 1)
-- `collector` — phototransistor collector, output+ (pinLayout index 2)
-- `emitter` — phototransistor emitter, output- (pinLayout index 3)
+- `anode`- LED anode, input+ (pinLayout index 0)
+- `cathode`- LED cathode, input- (pinLayout index 1)
+- `collector`- phototransistor collector, output+ (pinLayout index 2)
+- `emitter`- phototransistor emitter, output- (pinLayout index 3)
 
 Internal nodes allocated in `setup()`:
 - `_nBase`: phototransistor base (no external pin). `ctx.makeVolt(label, "base")`
@@ -86,7 +86,7 @@ factory(pinNodes, props, getTime): AnalogElementCore {
 }
 ```
 
-## setup() body — composite forwards
+## setup() body- composite forwards
 
 ```ts
 setup(ctx: SetupContext): void {
@@ -103,7 +103,7 @@ setup(ctx: SetupContext): void {
   // Sub-elements are not compiler-augmented, so each sub-element's setup()
   // reads node IDs from its _pinNodes map. There is no setPinNode API on
   // AnalogElementCore; VsenseSubElement and CccsSubElement expose a thin
-  // setPinNode helper for internal use only — the canonical pattern is
+  // setPinNode helper for internal use only- the canonical pattern is
   // direct _pinNodes.set(...) and the BJT sub-element only supports that form.
 
   // Wire dLed: anode → senseMid
@@ -115,7 +115,7 @@ setup(ctx: SetupContext): void {
   // Wire cccsCouple output: nBase → emitter
   this._cccsCouple.setPinNode("pos", this._nBase);
 
-  // Wire bjtPhoto base — BJT reads from _pinNodes, not pinNodeIds
+  // Wire bjtPhoto base- BJT reads from _pinNodes, not pinNodeIds
   (this._bjtPhoto as any)._pinNodes.set("B", this._nBase);
 
   // Sub-element setup in NGSPICE_LOAD_ORDER
@@ -129,25 +129,25 @@ setup(ctx: SetupContext): void {
 ### Setup order
 
 Setup order within composite's `setup()` call:
-1. `ctx.makeVolt(label, "senseMid")` — allocate LED/sense-source mid-node
-2. `ctx.makeVolt(label, "base")` — allocate phototransistor base node
-3. `dLed.setup(ctx)` — DIO TSTALLOC sequence (7 entries, diosetup.c:232-238)
-4. `vSense.setup(ctx)` — VSRC TSTALLOC sequence (4 entries, vsrcsetup.c)
-5. `cccsCouple.setup(ctx)` — CCCS TSTALLOC sequence (cccssetup.c); resolves vSense branch via
+1. `ctx.makeVolt(label, "senseMid")`- allocate LED/sense-source mid-node
+2. `ctx.makeVolt(label, "base")`- allocate phototransistor base node
+3. `dLed.setup(ctx)`- DIO TSTALLOC sequence (7 entries, diosetup.c:232-238)
+4. `vSense.setup(ctx)`- VSRC TSTALLOC sequence (4 entries, vsrcsetup.c)
+5. `cccsCouple.setup(ctx)`- CCCS TSTALLOC sequence (cccssetup.c); resolves vSense branch via
    `ctx.findDevice(vSense.label).branchIndex`
-6. `bjtPhoto.setup(ctx)` — BJT TSTALLOC sequence (23 entries, bjtsetup.c:435-464)
+6. `bjtPhoto.setup(ctx)`- BJT TSTALLOC sequence (23 entries, bjtsetup.c:435-464)
 
 Every stamp is owned by a named sub-element with an ngspice anchor. No composite-level
 `allocElement` calls.
 
-## load() body — forwards to sub-elements in order
+## load() body- forwards to sub-elements in order
 
 ```ts
 load(ctx: LoadContext): void {
-  // 1. LED diode stamp — dioload.c:120-441
+  // 1. LED diode stamp- dioload.c:120-441
   this._dLed.load(ctx);
 
-  // 2. Zero-volt sense source stamp — vsrcload.c
+  // 2. Zero-volt sense source stamp- vsrcload.c
   //    The vSense branch current is I_LED (sense-source in series with dLed).
   this._vSense.load(ctx);
 
@@ -155,7 +155,7 @@ load(ctx: LoadContext): void {
   //    cccsload.c stamps gain × I_sense into output nodes; sense branch = vSense.
   this._cccsCouple.load(ctx);
 
-  // 4. BJT phototransistor stamp — bjtload.c
+  // 4. BJT phototransistor stamp- bjtload.c
   this._bjtPhoto.load(ctx);
 }
 ```
@@ -193,11 +193,11 @@ Not needed. Direct refs to `_dLed`, `_vSense`, `_cccsCouple`, `_bjtPhoto`.
 
 Per CLAUDE.md "Test Policy During W3 Setup-Load-Split", verification is spec compliance only. DO NOT run tests; DO NOT use test results.
 
-1. `setup()` body in the implementation file matches the "setup() body — alloc only" listing in this PB line-for-line.
+1. `setup()` body in the implementation file matches the "setup() body- alloc only" listing in this PB line-for-line.
 2. TSTALLOC sequence in `setup()` matches the order in the cited ngspice anchor file (see top of this PB, e.g. `ressetup.c:46-49`).
 3. Factory cleanup applied per the "Factory cleanup" section above.
 4. `ngspiceNodeMap` registered per the "Pin mapping" section above (or omitted for composites where the spec says so).
-5. `load()` writes through cached handles only — zero `solver.allocElement(...)` calls inside `load()`, `accept()`, or any non-`setup()` method.
+5. `load()` writes through cached handles only- zero `solver.allocElement(...)` calls inside `load()`, `accept()`, or any non-`setup()` method.
 6. `mayCreateInternalNodes` flag set per spec.
 7. `findBranchFor` callback present where spec says (V-output sources, IND, etc.).
 8. No banned closing verdicts (mapping/tolerance/equivalent-to/pre-existing/intentional-divergence/citation-divergence/partial) used in any commit message or report.

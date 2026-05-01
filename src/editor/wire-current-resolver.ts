@@ -1,12 +1,12 @@
 /**
- * WireCurrentResolver — derives per-wire current magnitudes from MNA results.
+ * WireCurrentResolver- derives per-wire current magnitudes from MNA results.
  *
  * Builds a wire endpoint graph per MNA node, identifies element terminal
  * positions via pinWorldPosition, and propagates currents through the tree
  * using BFS + bottom-up subtree-sum computation. Each wire's current equals
  * the signed subtree injection sum of its child vertex (positive = start→end).
  *
- * For wire graphs that contain cycles (rare — parallel wires within a node),
+ * For wire graphs that contain cycles (rare- parallel wires within a node),
  * returns 0 for those wires since the per-wire split is physically
  * indeterminate without resistance.
  */
@@ -64,7 +64,7 @@ function branchWaypoints(typeId: string): Pt[][] | null {
   // The last waypoint of every branch is the shared junction.
   const ch = 2.625; // MOSFET channel x
   switch (typeId) {
-    // BJTs — pin order: B, C, E.  Bar at x≈3.
+    // BJTs- pin order: B, C, E.  Bar at x≈3.
     case "NpnBJT": return [
       [{ x: 3, y: 0 }],                           // B(0,0) → bar
       [{ x: 3, y: -0.375 }],                      // C(4,-1) → bar
@@ -75,7 +75,7 @@ function branchWaypoints(typeId: string): Pt[][] | null {
       [{ x: 3, y: 0.375 }],                       // C(4,1) → bar
       [{ x: 3, y: -0.375 }],                      // E(4,-1) → bar
     ];
-    // MOSFETs — pin order: G, S, D (NMOS) / G, D, S (PMOS).
+    // MOSFETs- pin order: G, S, D (NMOS) / G, D, S (PMOS).
     // Rectangular leads: pin → elbow → channel.
     case "NMOS": return [
       [{ x: ch, y: 0 }],                          // G(0,0) → channel
@@ -87,7 +87,7 @@ function branchWaypoints(typeId: string): Pt[][] | null {
       [{ x: ch, y: 1 }],                          // D(4,1) → channel
       [{ x: ch, y: -1 }],                         // S(4,-1) → channel
     ];
-    // JFETs — pin order: G, S, D (NJFET) / G, D, S (PJFET).
+    // JFETs- pin order: G, S, D (NJFET) / G, D, S (PJFET).
     // L-shaped leads: pin → elbow → channel.
     case "NJFET": return [
       [{ x: 3.375, y: 0 }],                       // G(0,0) → channel
@@ -99,19 +99,19 @@ function branchWaypoints(typeId: string): Pt[][] | null {
       [{ x: 4, y: 0.5 }, { x: 3.375, y: 0.5 }],  // D(4,1) → elbow → channel
       [{ x: 4, y: -0.5 }, { x: 3.375, y: -0.5 }], // S(4,-1) → elbow → channel
     ];
-    // SCR — pin order: A, K, G
+    // SCR- pin order: A, K, G
     case "SCR": return [
       [{ x: 2, y: 0 }],                           // A(0,0) → body
       [{ x: 2, y: 0 }],                           // K(4,0) → body
       [{ x: 3, y: 0.5 }],                         // G(3,1) → body
     ];
-    // Triac — pin order: MT2, MT1, G
+    // Triac- pin order: MT2, MT1, G
     case "Triac": return [
       [{ x: 2, y: 0 }],                           // MT2(0,0) → body
       [{ x: 2, y: 0 }],                           // MT1(4,0) → body
       [{ x: 4, y: -1 }],                          // G(4,-2) → body
     ];
-    // Triode — pin order: P, G, K
+    // Triode- pin order: P, G, K
     case "Triode": return [
       [{ x: 2, y: -1 }],                          // P(4,-2) → body
       [{ x: 2, y: 0 }],                           // G(0,0) → body
@@ -159,7 +159,7 @@ export class WireCurrentResolver {
     //
     // For each element, record how much current each pin injects into the
     // wire graph at the vertex where it connects. The vertex comes from
-    // elementPinVertices — the exact wire endpoint the compiler matched
+    // elementPinVertices- the exact wire endpoint the compiler matched
     // in resolveElementNodes.
     //
     // For 2-terminal elements: positive getElementCurrent(eIdx) means
@@ -199,7 +199,7 @@ export class WireCurrentResolver {
     // (multiple connected components), these pin positions are where
     // current crosses between trees. Ground elements connect separate
     // wire groups to MNA node 0 the same way Tunnels connect groups by
-    // label — both must be recognized for correct current distribution.
+    // label- both must be recognized for correct current distribution.
     // ------------------------------------------------------------------
     const tunnelVerticesByNode = new Map<number, Set<string>>();
 
@@ -343,7 +343,7 @@ export class WireCurrentResolver {
    *
    * Algorithm:
    *   1. Filter out zero-length wires (current = 0, visually invisible).
-   *   2. Deduplicate parallel edges — keep one representative per endpoint
+   *   2. Deduplicate parallel edges- keep one representative per endpoint
    *      pair; duplicates inherit the representative's current.
    *   3. Build an adjacency graph of wire endpoints (vertices) and edges.
    *   4. Find connected components via BFS.
@@ -379,7 +379,7 @@ export class WireCurrentResolver {
 
     // ----- Step 2: Deduplicate parallel edges -----
     // Multiple wires between the same two endpoints are electrically
-    // identical — keep one representative; duplicates get the same current.
+    // identical- keep one representative; duplicates get the same current.
     const edgeKeyToRepIdx = new Map<string, number>(); // canonical edge key → index in realWires
     const duplicateOf = new Map<number, number>();      // realWires index → representative index
 
@@ -464,7 +464,7 @@ export class WireCurrentResolver {
       const Vc = comp.vertices.length;
       const Ec = comp.edges.length;
 
-      // A tree has V = E + 1. If not, cycles exist — set to 0.
+      // A tree has V = E + 1. If not, cycles exist- set to 0.
       if (Vc !== Ec + 1) {
         // Leave uniqueCurrents[edge] at 0 for all edges in this component
         continue;
@@ -527,7 +527,7 @@ export class WireCurrentResolver {
             subtreeSum.set(tv, subtreeSum.get(tv)! + perTunnel);
           }
         } else {
-          // Fallback: no identified tunnel — inject at BFS root
+          // Fallback: no identified tunnel- inject at BFS root
           subtreeSum.set(root, subtreeSum.get(root)! + (-localTotal));
         }
       }

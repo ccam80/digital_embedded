@@ -5,12 +5,12 @@
  * into evaluation order. Components with no dependencies are evaluated first;
  * components that depend on others are evaluated after.
  *
- * Throws if a cycle is detected — this should not happen on the condensation
+ * Throws if a cycle is detected- this should not happen on the condensation
  * graph (which is always a DAG), but is checked defensively.
  */
 
 // ---------------------------------------------------------------------------
-// topologicalSort — Kahn's algorithm
+// topologicalSort- Kahn's algorithm
 // ---------------------------------------------------------------------------
 
 /**

@@ -1,4 +1,4 @@
-# Task #26 Report — D-7: bjt.ts MODEINITSMSIG seed vbx (and vsub) from rhsOld
+# Task #26 Report- D-7: bjt.ts MODEINITSMSIG seed vbx (and vsub) from rhsOld
 
 ## Status: COMPLETE
 

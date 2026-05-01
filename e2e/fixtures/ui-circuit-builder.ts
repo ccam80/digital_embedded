@@ -1,5 +1,5 @@
 /**
- * UICircuitBuilder — Playwright helper for building circuits through genuine
+ * UICircuitBuilder- Playwright helper for building circuits through genuine
  * UI interactions (palette clicks, canvas placement, wire drawing, toolbar actions).
  *
  * RULES:
@@ -8,14 +8,14 @@
  *     - Coordinate queries (worldToScreen, getPinPosition, getCanvasRect)
  *     - Circuit state reads (getCircuitInfo, getAnalogState)
  *   It is NEVER used to mutate circuit state.
- * - No `page.evaluate(() => button.click())` — use Playwright locators/mouse
+ * - No `page.evaluate(() => button.click())`- use Playwright locators/mouse
  * - No conditional fallbacks that silently pass on failure
  *
  * Wire routing rules (enforced by drawWire):
  *   1. Step out from every pin in its exit direction >= 1 grid unit before branching
- *   2. No two wires in the same direction on the same grid column/row — extend stubs if occupied
+ *   2. No two wires in the same direction on the same grid column/row- extend stubs if occupied
  *   3. No 180-degree vertices; only 90-degree turns with >= 1 grid unit between vertices
- *   4. Wires must not cross component bounding boxes — route around them
+ *   4. Wires must not cross component bounding boxes- route around them
  *   5. No intermediate vertex may land on an existing wire or unrelated pin
  *   6. No new wire segment may overlap collinearly with an existing wire
  */
@@ -90,7 +90,7 @@ export class UICircuitBuilder {
     );
   }
 
-  /** No-op — kept for backward compatibility with existing tests. */
+  /** No-op- kept for backward compatibility with existing tests. */
   resetWireState(): void { /* obstacles are fetched live from the bridge */ }
 
   /**
@@ -349,7 +349,7 @@ export class UICircuitBuilder {
     await expect(popup).toBeVisible({ timeout: 3000 });
 
     // Primary model params are rendered directly in prop-row elements.
-    // Secondary params are under "▶ Advanced Parameters" — expand if needed.
+    // Secondary params are under "▶ Advanced Parameters"- expand if needed.
     let keyLabel = popup.locator(`label`).filter({ hasText: new RegExp(`^${paramKey}$`) });
     const isVisible = await keyLabel.first().isVisible().catch(() => false);
     if (!isVisible) {
@@ -489,7 +489,7 @@ export class UICircuitBuilder {
    *   5. No intermediate vertex lands on an existing wire or unrelated pin.
    *   6. No segment overlaps collinearly with an existing wire.
    *
-   * Each waypoint is a real mouse click — the same sequence a user would
+   * Each waypoint is a real mouse click- the same sequence a user would
    * perform. Consecutive click points are always collinear so the wire
    * drawing mode's Manhattan router produces the exact intended path.
    */
@@ -572,7 +572,7 @@ export class UICircuitBuilder {
 
   /**
    * Draw a wire along an explicit path of grid waypoints from a labeled pin
-   * to another labeled pin. No autorouting — every click is specified by the
+   * to another labeled pin. No autorouting- every click is specified by the
    * test author. The app's Manhattan routing handles each click-to-click segment.
    *
    * @param fromLabel - Source component label
@@ -801,7 +801,7 @@ export class UICircuitBuilder {
           nodeCount: stats.length,
         };
       }
-      // No trace stats available — caller must set up traces first
+      // No trace stats available- caller must set up traces first
       // via addTraceViaContextMenu() before calling measureAnalogPeaks()
       return null;
     }
@@ -966,7 +966,7 @@ export class UICircuitBuilder {
   /**
    * Run test vectors against the current circuit using the postMessage API.
    *
-   * Posts `digital-test` to self — the PostMessageAdapter's handler fires
+   * Posts `digital-test` to self- the PostMessageAdapter's handler fires
    * on the live facade, which is the same code path as iframe embedding.
    * Also handles `digital-error` responses to fail fast instead of timing out.
    */
@@ -1147,7 +1147,7 @@ export class UICircuitBuilder {
     for (let i = 0; i < deduped.length; i++) {
       if (i >= 2 &&
           deduped[i].x === deduped[i - 2].x && deduped[i].y === deduped[i - 2].y) {
-        // Remove the middle point (deduped[i-1]) — it's a 180° spike
+        // Remove the middle point (deduped[i-1])- it's a 180° spike
         cleaned.pop();
         continue;
       }
@@ -1161,10 +1161,10 @@ export class UICircuitBuilder {
    * Every consecutive pair of returned points (including from/to) is collinear.
    */
   private _routeStubs(from: Pt, to: Pt, fromDir: Dir, boxes: Box[]): Pt[] {
-    // Same point — no routing needed
+    // Same point- no routing needed
     if (from.x === to.x && from.y === to.y) return [];
 
-    // Same row — try direct horizontal
+    // Same row- try direct horizontal
     if (from.y === to.y) {
       const xMin = Math.min(from.x, to.x);
       const xMax = Math.max(from.x, to.x);
@@ -1172,7 +1172,7 @@ export class UICircuitBuilder {
       return this._detourH(from, to, boxes);
     }
 
-    // Same column — try direct vertical
+    // Same column- try direct vertical
     if (from.x === to.x) {
       const yMin = Math.min(from.y, to.y);
       const yMax = Math.max(from.y, to.y);
@@ -1182,7 +1182,7 @@ export class UICircuitBuilder {
 
     // --- Non-collinear: try L-route, then Z-route ---
 
-    // L option A: horizontal then vertical — corner at (to.x, from.y)
+    // L option A: horizontal then vertical- corner at (to.x, from.y)
     const cA: Pt = { x: to.x, y: from.y };
     const cA_ok = fromDir.dx === 0 ||
       (fromDir.dx > 0 ? to.x >= from.x : to.x <= from.x);
@@ -1193,7 +1193,7 @@ export class UICircuitBuilder {
       return [cA];
     }
 
-    // L option B: vertical then horizontal — corner at (from.x, to.y)
+    // L option B: vertical then horizontal- corner at (from.x, to.y)
     const cB: Pt = { x: from.x, y: to.y };
     const cB_ok = fromDir.dy === 0 ||
       (fromDir.dy > 0 ? to.y >= from.y : to.y <= from.y);
@@ -1292,7 +1292,7 @@ export class UICircuitBuilder {
       }
     }
 
-    // Fallback: simple L (horizontal-first) — should rarely be reached
+    // Fallback: simple L (horizontal-first)- should rarely be reached
     return [{ x: to.x, y: from.y }];
   }
 
@@ -1349,18 +1349,18 @@ export class UICircuitBuilder {
    * Check if a stub endpoint is blocked. A stub is blocked if:
    * - The point coincides with an unrelated pin
    * - The point is on a wire from a DIFFERENT net (not connected to the
-   *   source pin — wires from the same pin are OK for fan-out T-junctions)
+   *   source pin- wires from the same pin are OK for fan-out T-junctions)
    */
   private _stubBlocked(pt: Pt, _exitDir: Dir): boolean {
     // Point at an unrelated pin position
     if (this._ptOnPin(pt)) return true;
-    // Point on a wire from a different net — would merge nets
+    // Point on a wire from a different net- would merge nets
     if (this._ptOnForeignWire(pt)) return true;
     return false;
   }
 
   /**
-   * Check if a point is "occupied" — on an existing wire or at an unrelated pin.
+   * Check if a point is "occupied"- on an existing wire or at an unrelated pin.
    * Used to validate route corner vertices.
    */
   private _ptOccupied(pt: Pt): boolean {
@@ -1572,7 +1572,7 @@ export class UICircuitBuilder {
     );
     await expect(
       item.first(),
-      `Palette item "${typeName}" (display: "${displayName}") not found — is the correct engine mode set?`,
+      `Palette item "${typeName}" (display: "${displayName}") not found- is the correct engine mode set?`,
     ).toBeVisible({ timeout: 5000 });
     await item.first().click();
 
@@ -1601,7 +1601,7 @@ export class UICircuitBuilder {
     const el = info.elements.find(e => e.label === elementLabel);
     expect(el, `Element "${elementLabel}" not found`).toBeTruthy();
 
-    // Close any open popup first — an open popup overlays the canvas and
+    // Close any open popup first- an open popup overlays the canvas and
     // absorbs double-click events, preventing a new popup from opening.
     const existingPopup = this.page.locator('.prop-popup');
     if (await existingPopup.isVisible().catch(() => false)) {
@@ -1615,7 +1615,7 @@ export class UICircuitBuilder {
     await expect(popup).toBeVisible({ timeout: 3000 });
 
     // Primary model params (e.g. IS, BF) are rendered directly in prop-row elements.
-    // Secondary params (e.g. VAF, NF) are under "▶ Advanced Parameters" — expand
+    // Secondary params (e.g. VAF, NF) are under "▶ Advanced Parameters"- expand
     // it first if any secondary param is requested.
     // Each param row: div.prop-row > label.prop-label(key) + input + span(unit)
     for (const [key, value] of Object.entries(overrides)) {
@@ -1623,7 +1623,7 @@ export class UICircuitBuilder {
       let keyLabel = popup.locator(`label`).filter({ hasText: new RegExp(`^${key}$`) });
       const isVisible = await keyLabel.first().isVisible().catch(() => false);
       if (!isVisible) {
-        // May be a secondary param — expand Advanced Parameters if not already open
+        // May be a secondary param- expand Advanced Parameters if not already open
         const advToggle = popup.getByText('▶ Advanced Parameters');
         if (await advToggle.isVisible().catch(() => false)) {
           await advToggle.click();

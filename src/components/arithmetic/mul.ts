@@ -1,5 +1,5 @@
 /**
- * Mul component — N-bit multiplier producing a 2N-bit product.
+ * Mul component- N-bit multiplier producing a 2N-bit product.
  *
  * Ports from Digital's Mul.java:
  *   Inputs: a (bitWidth), b (bitWidth)
@@ -120,7 +120,7 @@ export class MulElement extends AbstractCircuitElement {
 }
 
 // ---------------------------------------------------------------------------
-// makeExecuteMul — parameterised flat simulation function
+// makeExecuteMul- parameterised flat simulation function
 //
 // Inputs: [a, b]    Outputs: [mul_low, mul_high] (each 32-bit)
 //
@@ -251,7 +251,7 @@ export const MulDefinition: ComponentDefinition = {
   attributeMap: MUL_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.ARITHMETIC,
   helpText:
-    "Mul — N-bit multiplier producing a 2N-bit product.\n" +
+    "Mul- N-bit multiplier producing a 2N-bit product.\n" +
     "Inputs: a, b (bitWidth bits each).\n" +
     "Output: mul (2*bitWidth-bit product).\n" +
     "Supports signed and unsigned modes.",

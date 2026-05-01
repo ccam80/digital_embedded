@@ -145,7 +145,7 @@ test.describe('Hot-loading model params via property popup', () => {
     await builder.drawWireExplicit('Rc', 'B', 'Q1', 'C', [[20, 5]]);
     // Vb.pos(11,12) → Rb.A(12,9): L-shape via (11,9)
     await builder.drawWireExplicit('Vb', 'pos', 'Rb', 'A', [[11, 9]]);
-    // Rb.B(16,9) auto-connects to Q1.B(16,9) — no wire needed
+    // Rb.B(16,9) auto-connects to Q1.B(16,9)- no wire needed
     // Vcc.neg(7,5) → Ground(5,5)
     await builder.drawWireFromPinExplicit('Vcc', 'neg', 5, 5);
     // Vb.neg(7,12) → Ground(7,14)
@@ -153,7 +153,7 @@ test.describe('Hot-loading model params via property popup', () => {
     // Q1.E(20,10) → Ground(20,12)
     await builder.drawWireFromPinExplicit('Q1', 'E', 20, 12);
 
-    // --- Phase A: BF=100 (default) — BJT saturated ---
+    // --- Phase A: BF=100 (default)- BJT saturated ---
     await builder.stepViaUI();
     await builder.verifyNoErrors();
 

@@ -1,5 +1,5 @@
 /**
- * PowerSupply component — VCC/GND source enforcer for CMOS circuits.
+ * PowerSupply component- VCC/GND source enforcer for CMOS circuits.
  *
  * Has two inputs: VDD (must be 1) and GND (must be 0).
  * During simulation, if VDD != 1 or GND != 0, the engine raises an error.
@@ -33,7 +33,7 @@ import {
 
 
 // ---------------------------------------------------------------------------
-// Pin layout — Java GenericShape(2 inputs, 0 outputs, width=3):
+// Pin layout- Java GenericShape(2 inputs, 0 outputs, width=3):
 //   VDD at (0, 0)
 //   GND at (0, 1)
 // ---------------------------------------------------------------------------
@@ -62,7 +62,7 @@ function buildPowerSupplyPinDeclarations(): PinDeclaration[] {
 }
 
 // ---------------------------------------------------------------------------
-// PowerSupplyElement — CircuitElement implementation
+// PowerSupplyElement- CircuitElement implementation
 // ---------------------------------------------------------------------------
 
 export class PowerSupplyElement extends AbstractCircuitElement {
@@ -95,7 +95,7 @@ export class PowerSupplyElement extends AbstractCircuitElement {
 
     ctx.save();
 
-    // Rectangle (NORMAL — outline only, no fill per Java fixture)
+    // Rectangle (NORMAL- outline only, no fill per Java fixture)
     ctx.setColor("COMPONENT");
     ctx.setLineWidth(1);
     ctx.drawPolygon(
@@ -131,7 +131,7 @@ export class PowerSupplyElement extends AbstractCircuitElement {
 }
 
 // ---------------------------------------------------------------------------
-// executePowerSupply — validates VDD=1, GND=0; no outputs
+// executePowerSupply- validates VDD=1, GND=0; no outputs
 //
 // Returns without error when connections are correct.
 // The engine is responsible for raising simulation errors based on the
@@ -145,7 +145,7 @@ export function executePowerSupply(
   _highZs: Uint32Array,
   _layout: ComponentLayout,
 ): void {
-  // PowerSupply has no outputs — it is a validation-only sink component.
+  // PowerSupply has no outputs- it is a validation-only sink component.
   // The engine may check VDD/GND inputs via a post-step hook on the element.
 }
 
@@ -192,7 +192,7 @@ export const PowerSupplyDefinition: ComponentDefinition = {
   attributeMap: POWER_SUPPLY_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.IO,
   helpText:
-    "PowerSupply — VCC/GND source enforcer for CMOS circuits.\n" +
+    "PowerSupply- VCC/GND source enforcer for CMOS circuits.\n" +
     "VDD input must be connected to logic 1 (VCC).\n" +
     "GND input must be connected to logic 0 (ground).\n" +
     "The engine raises a simulation error if either connection is incorrect.",

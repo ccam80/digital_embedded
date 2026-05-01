@@ -1,5 +1,5 @@
 /**
- * Tests for subcircuit-store.ts — IndexedDB persistence for user-created subcircuits.
+ * Tests for subcircuit-store.ts- IndexedDB persistence for user-created subcircuits.
  *
  * Uses an in-memory IndexedDB mock (vi.stubGlobal) to exercise the real
  * store logic without requiring a browser or fake-indexeddb package.
@@ -230,7 +230,7 @@ describe("deleteSubcircuit", () => {
 });
 
 // ---------------------------------------------------------------------------
-// onupgradeneeded path — fresh database (objectStore does not exist yet)
+// onupgradeneeded path- fresh database (objectStore does not exist yet)
 // ---------------------------------------------------------------------------
 
 describe("openDB onupgradeneeded", () => {

@@ -1,5 +1,5 @@
 /**
- * DriverInvSel component — tri-state buffer with inverted select (enable active-low).
+ * DriverInvSel component- tri-state buffer with inverted select (enable active-low).
  *
  * When sel=0 (enable active-low): output = input.
  * When sel=1: output = high-Z (all bits set in the highZ output slot).
@@ -27,7 +27,7 @@ import {
 import { createDriverInvAnalogElement } from "../../solver/analog/behavioral-remaining.js";
 
 // ---------------------------------------------------------------------------
-// Layout constants — same as Driver (origin-centred)
+// Layout constants- same as Driver (origin-centred)
 // ---------------------------------------------------------------------------
 
 
@@ -68,7 +68,7 @@ function buildDriverInvPinDeclarations(bitWidth: number, flipSelPos = false): Pi
 }
 
 // ---------------------------------------------------------------------------
-// DriverInvSelElement — CircuitElement implementation
+// DriverInvSelElement- CircuitElement implementation
 // ---------------------------------------------------------------------------
 
 export class DriverInvSelElement extends AbstractCircuitElement {
@@ -110,7 +110,7 @@ export class DriverInvSelElement extends AbstractCircuitElement {
 
     ctx.save();
 
-    // Triangle body (NORMAL — outline only, no fill per Java fixture)
+    // Triangle body (NORMAL- outline only, no fill per Java fixture)
     const triLeft = -0.95;
     const triRight = 0.95;
     const triHalf = 0.6;
@@ -136,7 +136,7 @@ export class DriverInvSelElement extends AbstractCircuitElement {
 }
 
 // ---------------------------------------------------------------------------
-// executeDriverInvSel — tri-state logic with inverted select
+// executeDriverInvSel- tri-state logic with inverted select
 // ---------------------------------------------------------------------------
 
 export function executeDriverInvSel(
@@ -220,7 +220,7 @@ export const DriverInvSelDefinition: ComponentDefinition = {
   attributeMap: DRIVER_INV_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.WIRING,
   helpText:
-    "DriverInvSel — tri-state buffer with active-low enable.\n" +
+    "DriverInvSel- tri-state buffer with active-low enable.\n" +
     "When sel=0 (active-low): output = input.\n" +
     "When sel=1: output is high-impedance (disconnected).",
   models: {

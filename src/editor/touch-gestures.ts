@@ -8,7 +8,7 @@
  *
  * Only activated for pointerType === 'touch'. Mouse and pen bypass this tracker.
  *
- * setPointerCapture is NOT called here — deferred to Phase 3+.
+ * setPointerCapture is NOT called here- deferred to Phase 3+.
  */
 
 import type { Point } from "@/core/renderer-interface";
@@ -122,7 +122,7 @@ export class TouchGestureTracker {
         this._state = 'ONE_FINGER_PAN';
         // Fall through to apply first pan delta
       } else {
-        return false; // still waiting — let normal logic handle
+        return false; // still waiting- let normal logic handle
       }
     }
 
@@ -153,7 +153,7 @@ export class TouchGestureTracker {
     if (this._pointers.size === 0) {
       this._state = 'IDLE';
     } else if (this._pointers.size === 1 && this._state === 'TWO_FINGER_PINCH') {
-      // One finger lifted from pinch — wait mode for remaining finger
+      // One finger lifted from pinch- wait mode for remaining finger
       this._state = 'ONE_FINGER_WAIT';
       this._hitEmpty = true; // After pinch, treat as empty canvas pan
       for (const [, rec] of this._pointers) {

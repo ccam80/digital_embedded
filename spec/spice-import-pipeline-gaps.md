@@ -1,4 +1,4 @@
-# SPICE `.SUBCKT` → digiTS Analog Compile Pipeline — Wiring Gaps
+# SPICE `.SUBCKT` → digiTS Analog Compile Pipeline- Wiring Gaps
 
 **Status:** Surfaced 2026-04-25 during Phase 10 Wave 10.6 (op-amp inverting parity).
 **Trigger:** Wave 10.6 test failed at step=0 iter=0 because the harness silently
@@ -11,7 +11,7 @@ land as identical primitives on both digiTS and ngspice sides.
 
 ## Goal
 
-A single source-of-truth `.subckt` (a real published opamp macromodel — not a
+A single source-of-truth `.subckt` (a real published opamp macromodel- not a
 behavioral stand-in) that:
 
 - digiTS parses via the existing `model-parser.ts` pipeline.
@@ -26,7 +26,7 @@ excuse for the wave.
 
 ## The four gaps
 
-### Gap 1 — Parser does not recognize controlled-source primitives
+### Gap 1- Parser does not recognize controlled-source primitives
 
 **File:** `src/solver/analog/model-parser.ts:42`
 
@@ -58,7 +58,7 @@ gain stage and output buffer. They throw on parse before any other gap fires.
   pick a simple macromodel; document the restriction explicitly with a parser
   error rather than silently truncating.
 
-### Gap 2 — `.SUBCKT`-element typeId mapping hardcodes one variant per prefix
+### Gap 2- `.SUBCKT`-element typeId mapping hardcodes one variant per prefix
 
 **File:** `src/app/spice-import-dialog.ts:324-338`
 
@@ -85,15 +85,15 @@ and P-JFET.
 - Decide the deterministic fallback when a model name doesn't resolve to a
   parsed `.MODEL` (currently silently mis-maps; must throw or warn loudly).
 
-### Gap 3 — `modelRef` and inline `.MODEL` cards are dropped before compile
+### Gap 3- `modelRef` and inline `.MODEL` cards are dropped before compile
 
 **Files:**
-- `src/app/spice-import-dialog.ts:142-167` — builds `MnaSubcircuitNetlist` but
+- `src/app/spice-import-dialog.ts:142-167`- builds `MnaSubcircuitNetlist` but
   **never copies `sc.models`** (the parsed `.MODEL` cards from inside the
   `.SUBCKT`) into the netlist.
-- `src/core/mna-subcircuit-netlist.ts` — `MnaSubcircuitNetlist` has no field
+- `src/core/mna-subcircuit-netlist.ts`- `MnaSubcircuitNetlist` has no field
   for inline models.
-- `src/solver/analog/compiler.ts` — `compileSubcircuitToMnaModel` reads the
+- `src/solver/analog/compiler.ts`- `compileSubcircuitToMnaModel` reads the
   per-element model key as `subEl.params?.model`. The dialog stores the model
   name in `subEl.modelRef` (different field). Result: the compiler always
   falls back to `leafDef?.defaultModel`. Whatever parameters the `.subckt`
@@ -111,7 +111,7 @@ and P-JFET.
 - Audit `applySpiceSubcktImportResult` (`spice-model-apply.ts:91-120`) for
   the same propagation.
 
-### Gap 4 — Netlist generator does not emit subcircuit instances
+### Gap 4- Netlist generator does not emit subcircuit instances
 
 **File:** `src/solver/analog/__tests__/harness/netlist-generator.ts`
 
@@ -119,7 +119,7 @@ and P-JFET.
 backed by a `kind: "netlist"` model entry (i.e. a subcircuit-modeled
 component, e.g. a `RealOpAmp` after a `.subckt` is applied) falls through
 the prefix-lookup at line 67 and is skipped entirely (`continue`). ngspice
-gets a deck missing the host element's contribution — exactly the silent
+gets a deck missing the host element's contribution- exactly the silent
 drop that produced the Wave 10.6 divergence.
 
 **What needs to land:**
@@ -167,8 +167,8 @@ drop that produced the Wave 10.6 divergence.
 ## Why this is bigger than W10.6
 
 Phase 10 Waves 10.4 (BJT) and 10.8 (MOSFET) are simulating discrete devices
-that don't exercise this pipeline. But the broader project goal — being able
-to drop a published part's SPICE model into the simulator — depends on every
+that don't exercise this pipeline. But the broader project goal- being able
+to drop a published part's SPICE model into the simulator- depends on every
 gap above being closed. The Wave 10.6 failure is a useful surfacing event;
 shipping the fix once unblocks all later macromodel-shaped acceptance tests
 and any future component whose realistic model is a `.subckt`.

@@ -1,5 +1,5 @@
 /**
- * Cycle detector — identifies combinational feedback loops in a circuit.
+ * Cycle detector- identifies combinational feedback loops in a circuit.
  *
  * A combinational feedback loop exists when a signal path leads from a
  * component's output back to one of its own inputs without passing through
@@ -9,7 +9,7 @@
  * Algorithm: build a directed graph where nodes are components and edges run
  * from driver components to driven components via shared nets. Run DFS
  * cycle detection. Memory components (flip-flops, latches) are treated as
- * cycle breakers — their inputs do not feed their outputs combinationally.
+ * cycle breakers- their inputs do not feed their outputs combinationally.
  *
  */
 
@@ -18,7 +18,7 @@ import type { CircuitElement } from '../core/element.js';
 import { PinDirection, pinWorldPosition } from '../core/pin.js';
 
 // ---------------------------------------------------------------------------
-// CycleInfo — describes one detected cycle
+// CycleInfo- describes one detected cycle
 // ---------------------------------------------------------------------------
 
 /**
@@ -32,7 +32,7 @@ export interface CycleInfo {
 }
 
 // ---------------------------------------------------------------------------
-// Memory component type names — treated as cycle breakers
+// Memory component type names- treated as cycle breakers
 // ---------------------------------------------------------------------------
 
 /**
@@ -54,7 +54,7 @@ const MEMORY_COMPONENT_TYPES = new Set([
 ]);
 
 // ---------------------------------------------------------------------------
-// detectCycles — public API
+// detectCycles- public API
 // ---------------------------------------------------------------------------
 
 /**
@@ -245,7 +245,7 @@ function findCycles(
 
   function dfs(nodeId: string): void {
     if (inStack.has(nodeId)) {
-      // Found a cycle — extract the cycle portion of the stack
+      // Found a cycle- extract the cycle portion of the stack
       const cycleStart = stackPath.indexOf(nodeId);
       const cyclePath = stackPath.slice(cycleStart);
       const componentIds = [...cyclePath, nodeId];

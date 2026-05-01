@@ -29,13 +29,13 @@ export interface PreFactorEntry {
 export class SparseSolverInstrumentation {
   constructor(private readonly _solver: SparseSolver) {}
 
-  /** Underlying solver — for tests that need to drive the production API. */
+  /** Underlying solver- for tests that need to drive the production API. */
   get solver(): SparseSolver {
     return this._solver;
   }
 
   // -------------------------------------------------------------------------
-  // White-box accessors (digiTS-only — no ngspice analogue beyond the field
+  // White-box accessors (digiTS-only- no ngspice analogue beyond the field
   // names; see SparseSolver class comments for `MatrixFrame.*` mappings).
   // -------------------------------------------------------------------------
 
@@ -75,7 +75,7 @@ export class SparseSolverInstrumentation {
   }
 
   // -------------------------------------------------------------------------
-  // Read-only accessors — the in-class capture API (B.30) was deleted in
+  // Read-only accessors- the in-class capture API (B.30) was deleted in
   // Phase 0; pre-factor snapshots must be taken externally by the harness
   // via getCSCNonZeros() at the appropriate boundary. RHS snapshotting
   // moved to the caller per B.16 / Phase 6 (RHS lives on `ctx.rhs`).
@@ -83,7 +83,7 @@ export class SparseSolverInstrumentation {
 
   /**
    * Assembled-matrix non-zero entries in original ordering. Post-factor
-   * this reflects LU-overwritten data, not the pre-factor A matrix —
+   * this reflects LU-overwritten data, not the pre-factor A matrix-
    * harness consumers must call this BEFORE invoking factor() if they
    * want the pre-factor A.
    */
@@ -93,7 +93,7 @@ export class SparseSolverInstrumentation {
 }
 
 /**
- * Convenience constructor — `attach(solver)` → `SparseSolverInstrumentation`.
+ * Convenience constructor- `attach(solver)` → `SparseSolverInstrumentation`.
  * Mirrors the wrap-once idiom used by the harness.
  */
 export function attach(solver: SparseSolver): SparseSolverInstrumentation {

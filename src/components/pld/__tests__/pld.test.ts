@@ -44,7 +44,7 @@ import type { RenderContext, Point, TextAnchor, FontSpec, PathData } from "../..
 import type { ThemeColor } from "../../../core/renderer-interface.js";
 
 // ---------------------------------------------------------------------------
-// Helpers — ComponentLayout mock
+// Helpers- ComponentLayout mock
 // ---------------------------------------------------------------------------
 
 function makeLayoutSingle(inputOffset: number, outputOffset: number): ComponentLayout {
@@ -64,7 +64,7 @@ function makeState(size: number, fill: number = 0): Uint32Array {
 }
 
 // ---------------------------------------------------------------------------
-// Helpers — RenderContext mock
+// Helpers- RenderContext mock
 // ---------------------------------------------------------------------------
 
 interface DrawCall {
@@ -176,7 +176,7 @@ describe("Diode", () => {
   });
 
   // -------------------------------------------------------------------------
-  // Forward conduction — anode drives cathode high
+  // Forward conduction- anode drives cathode high
   // -------------------------------------------------------------------------
 
   describe("forwardConduction", () => {
@@ -206,7 +206,7 @@ describe("Diode", () => {
 
       // cathode output slot (outputStart=2): state[2]=driven value, state[3]=highZ
       expect(state[2]).toBe(1);
-      expect(state[3]).toBe(0); // not highZ — actively driven
+      expect(state[3]).toBe(0); // not highZ- actively driven
     });
 
     it("anode low (not highZ) → cathode is high-Z (not driven)", () => {
@@ -249,7 +249,7 @@ describe("Diode", () => {
       executeDiode(0, state, highZs, layout);
 
       expect(state[4]).toBe(0); // anode driven to 0
-      expect(state[5]).toBe(0); // not highZ — actively pulling anode low
+      expect(state[5]).toBe(0); // not highZ- actively pulling anode low
     });
 
     it("cathode highZ → anode is high-Z (not pulling)", () => {
@@ -273,7 +273,7 @@ describe("Diode", () => {
       expect(state[5]).toBe(1); // anode is high-Z
     });
 
-    it("blown diode — both outputs are high-Z", () => {
+    it("blown diode- both outputs are high-Z", () => {
       const layout: ComponentLayout = {
         wiringTable: new Int32Array(64).map((_, i) => i),
     inputCount: () => 2,
@@ -518,7 +518,7 @@ describe("DiodeForward", () => {
   });
 
   // -------------------------------------------------------------------------
-  // Forward conduction — in=1 → out=1; in=0 → out=highZ
+  // Forward conduction- in=1 → out=1; in=0 → out=highZ
   // -------------------------------------------------------------------------
 
   describe("forwardConduction", () => {
@@ -707,7 +707,7 @@ describe("DiodeBackward", () => {
   });
 
   // -------------------------------------------------------------------------
-  // Backward conduction — in=1 → out=1; in=0 → out=0
+  // Backward conduction- in=1 → out=1; in=0 → out=0
   // -------------------------------------------------------------------------
 
   describe("backwardConduction", () => {
@@ -750,7 +750,7 @@ describe("DiodeBackward", () => {
       executeDiodeBackward(0, state, highZs, layout);
 
       expect(state[1]).toBe(0); // out=0 (actively pulling down)
-      expect(state[2]).toBe(0); // not high-Z — actively driven
+      expect(state[2]).toBe(0); // not high-Z- actively driven
     });
 
     it("blown=true → output always high-Z", () => {
@@ -908,7 +908,7 @@ describe("PullUp", () => {
   });
 
   // -------------------------------------------------------------------------
-  // executePullUp — pulls floating net to 1
+  // executePullUp- pulls floating net to 1
   // -------------------------------------------------------------------------
 
   describe("pullUpOnFloatingNet", () => {
@@ -1123,7 +1123,7 @@ describe("PullDown", () => {
   });
 
   // -------------------------------------------------------------------------
-  // executePullDown — pulls floating net to 0
+  // executePullDown- pulls floating net to 0
   // -------------------------------------------------------------------------
 
   describe("pullDownOnFloatingNet", () => {

@@ -1,7 +1,7 @@
 # Task PB-SW-DT
 
 **digiTS file:** `src/components/switching/switch-dt.ts`
-**ngspice setup anchor:** `ref/ngspice/src/spicelib/devices/sw/swsetup.c:47-62` (applied twice — once per SW sub-element)
+**ngspice setup anchor:** `ref/ngspice/src/spicelib/devices/sw/swsetup.c:47-62` (applied twice- once per SW sub-element)
 **ngspice load anchor:** `ref/ngspice/src/spicelib/devices/sw/swload.c`
 
 ## Pin mapping (from 01-pin-mapping.md)
@@ -17,15 +17,15 @@ The composite's external pins are `A1`, `B1`, `C1`. The compiler's port-binding 
 
 ## Internal nodes
 
-none — both SW sub-elements have no internal nodes.
+none- both SW sub-elements have no internal nodes.
 
 ## Branch rows
 
-none — SW sub-elements stamp conductance only.
+none- SW sub-elements stamp conductance only.
 
 ## State slots
 
-4 total — 2 per SW sub-element (`SW_NUM_STATES = 2`). SW_AB allocates its 2 slots first, then SW_AC allocates its 2 slots, in the order sub-elements appear in `subElements[]`.
+4 total- 2 per SW sub-element (`SW_NUM_STATES = 2`). SW_AB allocates its 2 slots first, then SW_AC allocates its 2 slots, in the order sub-elements appear in `subElements[]`.
 
 ## TSTALLOC sequence (line-for-line port)
 
@@ -47,7 +47,7 @@ SW_AC (swsetup.c:59-62, second pass):
 | 7 | `(SWnegNode, SWposNode)` | `(C1node, A1node)` | `swAC._hNP` |
 | 8 | `(SWnegNode, SWnegNode)` | `(C1node, C1node)` | `swAC._hNN` |
 
-## setup() body — alloc only
+## setup() body- alloc only
 
 The composite's `setup(ctx)` forwards to each sub-element in order. Each sub-element runs its own SW setup() body (see PB-SW for the per-element body):
 
@@ -62,7 +62,7 @@ setup(ctx: SetupContext): void {
 
 Each sub-element's setup() body is identical to PB-SW, using its own pinNodes binding.
 
-## load() body — value writes only
+## load() body- value writes only
 
 Implementer ports value-side from `swload.c` line-for-line for each sub-element, stamping through the respective cached handles. No allocElement calls.
 
@@ -93,17 +93,17 @@ Neither SW sub-element has a branch row.
 - Drop `branchCount`, `getInternalNodeCount` from MnaModel registration.
 - Composite has no `ngspiceNodeMap` (sub-elements carry their own).
 - No `findBranchFor` callback.
-- Composite carries `{ swAB: SwitchElement, swAC: SwitchElement }` as direct refs — no `findDevice` needed for sub-element traversal.
+- Composite carries `{ swAB: SwitchElement, swAC: SwitchElement }` as direct refs- no `findDevice` needed for sub-element traversal.
 
 ## Verification gate
 
 Per CLAUDE.md "Test Policy During W3 Setup-Load-Split", verification is spec compliance only. DO NOT run tests; DO NOT use test results.
 
-1. `setup()` body in the implementation file matches the "setup() body — alloc only" listing in this PB line-for-line.
+1. `setup()` body in the implementation file matches the "setup() body- alloc only" listing in this PB line-for-line.
 2. TSTALLOC sequence in `setup()` matches the order in the cited ngspice anchor file (see top of this PB, e.g. `ressetup.c:46-49`).
 3. Factory cleanup applied per the "Factory cleanup" section above.
 4. `ngspiceNodeMap` registered per the "Pin mapping" section above (or omitted for composites where the spec says so).
-5. `load()` writes through cached handles only — zero `solver.allocElement(...)` calls inside `load()`, `accept()`, or any non-`setup()` method.
+5. `load()` writes through cached handles only- zero `solver.allocElement(...)` calls inside `load()`, `accept()`, or any non-`setup()` method.
 6. `mayCreateInternalNodes` flag set per spec.
 7. `findBranchFor` callback present where spec says (V-output sources, IND, etc.).
 8. No banned closing verdicts (mapping/tolerance/equivalent-to/pre-existing/intentional-divergence/citation-divergence/partial) used in any commit message or report.

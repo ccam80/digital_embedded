@@ -136,7 +136,7 @@
     },
     {
       "id": "gated-sr",
-      "title": "Add Enable — Gated SR Latch",
+      "title": "Add Enable- Gated SR Latch",
       "instructions": "# Gated SR Latch\n\nThe basic SR latch responds to inputs at all times. In a real system, we need to control **when** the latch captures data.\n\n## Goal\n\nAdd an **Enable (E)** input that gates the S and R signals:\n- When E=1: the latch responds to S and R normally\n- When E=0: the latch **holds** regardless of S and R\n\n## How to build it\n\nAdd two more NAND gates in front of the SR latch. Each gate combines one data input (S or R) with the Enable signal. When E=0, both gating NANDs output 1, which is the hold condition for the SR latch.\n\n## Structure\n\n```\nS ─┐\n   NAND ─┐\nE ─┘     NAND ── Q\n    ┌── NAND\nE ─┐│\n   NAND ─┘\nR ─┘          nQ\n```",
       "palette": "nand-only",
       "startCircuit": "carry-forward",
@@ -314,8 +314,8 @@
     },
     {
       "id": "edge-triggered",
-      "title": "Chain Two Latches — Edge-Triggered D Flip-Flop",
-      "instructions": "# Edge-Triggered D Flip-Flop\n\nA gated SR latch is **level-sensitive** — it passes data through whenever Enable is high. For reliable sequential circuits, we need **edge-triggered** behavior: capture data only at the moment the clock transitions.\n\n## Goal\n\nBuild a master-slave D flip-flop:\n- Input **D** (data) and **C** (clock)\n- Outputs **Q** and **nQ**\n- Q captures D on the **rising edge** of C\n\n## Architecture\n\n1. **Master latch**: A gated SR latch enabled when C=0 (inverted clock)\n2. **Slave latch**: A gated SR latch enabled when C=1\n3. **D to SR conversion**: D feeds the Set path, NOT(D) feeds the Reset path\n\nWhen C goes from 0→1:\n- Master was transparent (captured D), now locks\n- Slave opens and reads the master's stable output\n\n## Component count\n\nYou need: 8 NAND gates (4 per latch) + 2 NOT gates (one for clock inversion, one for D inversion) = 10 gates total.",
+      "title": "Chain Two Latches- Edge-Triggered D Flip-Flop",
+      "instructions": "# Edge-Triggered D Flip-Flop\n\nA gated SR latch is **level-sensitive**- it passes data through whenever Enable is high. For reliable sequential circuits, we need **edge-triggered** behavior: capture data only at the moment the clock transitions.\n\n## Goal\n\nBuild a master-slave D flip-flop:\n- Input **D** (data) and **C** (clock)\n- Outputs **Q** and **nQ**\n- Q captures D on the **rising edge** of C\n\n## Architecture\n\n1. **Master latch**: A gated SR latch enabled when C=0 (inverted clock)\n2. **Slave latch**: A gated SR latch enabled when C=1\n3. **D to SR conversion**: D feeds the Set path, NOT(D) feeds the Reset path\n\nWhen C goes from 0→1:\n- Master was transparent (captured D), now locks\n- Slave opens and reads the master's stable output\n\n## Component count\n\nYou need: 8 NAND gates (4 per latch) + 2 NOT gates (one for clock inversion, one for D inversion) = 10 gates total.",
       "palette": {
         "preset": "nand-only",
         "add": [

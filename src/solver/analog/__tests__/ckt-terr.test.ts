@@ -84,7 +84,7 @@ describe("cktTerr", () => {
     expect(r2).toBe(NGSPICE_REF);
   });
 
-  it("constant charge history produces finite timestep (not Infinity) — abstol-gated", () => {
+  it("constant charge history produces finite timestep (not Infinity)- abstol-gated", () => {
     // When ddiff=0, TRAP returns Infinity; GEAR order 1 returns del raw (abstol-gated)
     const dt = 1e-9;
     const q = 1e-12;
@@ -161,7 +161,7 @@ describe("cktTerrVoltage", () => {
     expect(cktTerrVoltage(1, 0.9, 0.8, 0.7, -1e-9, [1e-9, 1e-9], 1, "gear", 1e-3, 1e-6, 7)).toBe(Infinity);
   });
 
-  it("constant voltages produce finite timestep (not Infinity) — lteAbstol-gated", () => {
+  it("constant voltages produce finite timestep (not Infinity)- lteAbstol-gated", () => {
     // GEAR: denom = max(lteAbstol, 0) = lteAbstol > 0, del > 0, sqrt > 0
     const v = 5.0;
     const dt = 1e-9;
@@ -331,7 +331,7 @@ describe("cktTerrVoltage", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Task 1.2.3 — zero_allocations_in_lte_path
+// Task 1.2.3- zero_allocations_in_lte_path
 // ---------------------------------------------------------------------------
 
 describe("zero_allocations_in_lte_path", () => {
@@ -358,7 +358,7 @@ describe("zero_allocations_in_lte_path", () => {
     const deltaOld: readonly number[] = [dt, dt, dt];
     const params: LteParams = { trtol: 7, reltol: 1e-3, abstol: 1e-6, chgtol: 1e-14 };
 
-    // Warm up — first call may trigger internal initialisation not counted.
+    // Warm up- first call may trigger internal initialisation not counted.
     cktTerr(dt, deltaOld, 1, "gear", 1e-12, 0.9e-12, 0.8e-12, 0, 1e-12, 0.9e-12, params);
     cktTerrVoltage(5.0, 4.9, 4.8, 4.7, dt, deltaOld, 1, "gear", 1e-3, 1e-6, 7);
 
@@ -384,7 +384,7 @@ describe("zero_allocations_in_lte_path", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Task 3.1.1 — chargetol_includes_chgtol_in_reltol_scaling (Bug C1)
+// Task 3.1.1- chargetol_includes_chgtol_in_reltol_scaling (Bug C1)
 // ---------------------------------------------------------------------------
 
 describe("chargetol_formula", () => {
@@ -423,7 +423,7 @@ describe("chargetol_formula", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Task 3.1.2 — GEAR LTE factor selection (Bug C2)
+// Task 3.1.2- GEAR LTE factor selection (Bug C2)
 // ---------------------------------------------------------------------------
 
 describe("gear_lte_factor_selection", () => {
@@ -535,7 +535,7 @@ describe("gear_lte_factor_selection", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Task 3.1.3 — V3/V4/V5/V6 formula fixes
+// Task 3.1.3- V3/V4/V5/V6 formula fixes
 // ---------------------------------------------------------------------------
 
 describe("cktTerr_formula_fixes", () => {
@@ -640,7 +640,7 @@ describe("cktTerr_formula_fixes", () => {
   });
 
   it("cktTerr_gear_order1_raw_no_sqrt", () => {
-    // cktterr.c:69-74: GEAR order 1 returns del raw — no root extraction.
+    // cktterr.c:69-74: GEAR order 1 returns del raw- no root extraction.
     // Verify: cktTerr GEAR order 1 result equals del, not sqrt(del).
     const dt = 1e-6;
     const deltaOld = [1e-6, 1e-6, 1e-6, 1e-6, 1e-6];

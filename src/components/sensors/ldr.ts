@@ -77,10 +77,10 @@ export class LDRElement implements AnalogElement {
   _stateBase: number = -1;
   _pinNodes: Map<string, number> = new Map();
 
-  private _hPP: number = -1; // (posNode, posNode) — ressetup.c:46
-  private _hNN: number = -1; // (negNode, negNode) — ressetup.c:47
-  private _hPN: number = -1; // (posNode, negNode) — ressetup.c:48
-  private _hNP: number = -1; // (negNode, posNode) — ressetup.c:49
+  private _hPP: number = -1; // (posNode, posNode)- ressetup.c:46
+  private _hNN: number = -1; // (negNode, negNode)- ressetup.c:47
+  private _hPN: number = -1; // (posNode, negNode)- ressetup.c:48
+  private _hNP: number = -1; // (negNode, posNode)- ressetup.c:49
 
   private readonly _p: Record<string, number>;
 

@@ -5,7 +5,7 @@
  * a 4-bit SAR ADC (R-2R DAC, comparator, 2-bit down-counter, SAR write-gate).
  *
  * Subcircuits use the inbuilt `subcircuitDefinitions` mechanic. v0 emits
- * interface-only stubs — In/Out elements only, no internal gates. Renderer
+ * interface-only stubs- In/Out elements only, no internal gates. Renderer
  * draws the chip box with correct pin labels; simulation would no-op.
  *
  * Pin offsets and the rotation convention come from the actual component
@@ -19,7 +19,7 @@ import { randomUUID } from "node:crypto";
 import { resolve as resolvePath, dirname } from "node:path";
 
 // ============================================================================
-// DSL types — relative-placement authoring layer
+// DSL types- relative-placement authoring layer
 // ============================================================================
 
 type Pos = { x: number; y: number };
@@ -77,7 +77,7 @@ type CircuitSpec = {
 };
 
 // ============================================================================
-// .dts output types — matching the existing on-disk format
+// .dts output types- matching the existing on-disk format
 // ============================================================================
 
 type DtsElement = {
@@ -105,7 +105,7 @@ type DtsDoc = {
 };
 
 // ============================================================================
-// Pin offsets & sizing — sourced from component definition files
+// Pin offsets & sizing- sourced from component definition files
 // ----------------------------------------------------------------------------
 // All offsets are CANONICAL (rotation 0). The converter applies rotation to
 // derive absolute pin coords. `extent` is the pin bounding box (not the visual
@@ -164,7 +164,7 @@ const COMPONENTS: Record<string, ComponentSpec> = {
 };
 
 // ============================================================================
-// Rotation — quarter-turns clockwise (0=east, 1=south, 2=west, 3=north)
+// Rotation- quarter-turns clockwise (0=east, 1=south, 2=west, 3=north)
 // Mirrors src/core/pin.ts::rotatePoint
 // ============================================================================
 
@@ -264,7 +264,7 @@ function subcircuitPinOffset(sub: SubcircuitDecl, pin: string): Pos {
 }
 
 // ============================================================================
-// Placement resolver — topo-sort, walk from anchors
+// Placement resolver- topo-sort, walk from anchors
 // ============================================================================
 
 function resolvePlacements(
@@ -346,7 +346,7 @@ function tryResolve(
         // horizontal extent
         return { x: Math.min(aAbs.x, bAbs.x), y: aAbs.y };
       } else if (aAbs.x === bAbs.x) {
-        // vertical extent — relies on caller setting rotation: 1
+        // vertical extent- relies on caller setting rotation: 1
         return { x: aAbs.x, y: Math.min(aAbs.y, bAbs.y) };
       } else {
         throw new Error(
@@ -617,7 +617,7 @@ function emitDts(spec: CircuitSpec): DtsDoc {
 }
 
 // ============================================================================
-// SAR ADC spec — corrected for real component pin labels and orientations
+// SAR ADC spec- corrected for real component pin labels and orientations
 // ============================================================================
 
 const downCounter2b: SubcircuitDecl = {
@@ -770,7 +770,7 @@ const sarAdc: CircuitSpec = {
     {
       id: "RT",
       type: "Resistor",
-      // gap 0 so RT.A coincides with R0.B (and Ra.A) — single net by pin
+      // gap 0 so RT.A coincides with R0.B (and Ra.A)- single net by pin
       // coincidence, no extra wire stub needed.
       placement: { kind: "below", ref: "R0", gap: 0 },
       rotation: 3,
@@ -790,7 +790,7 @@ const sarAdc: CircuitSpec = {
   ],
   wires: [
     // Comparator input + ← VIN positive terminal (the only point-to-point wire
-    // — WGATE→FF.D paths use tunnels to avoid L-shape collisions through FF.C.)
+    //- WGATE→FF.D paths use tunnels to avoid L-shape collisions through FF.C.)
     { from: { component: "U1", pin: "in+" }, to: { component: "VIN", pin: "pos" } },
   ],
 };

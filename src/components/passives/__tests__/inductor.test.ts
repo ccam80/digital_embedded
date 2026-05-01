@@ -29,7 +29,7 @@ import {
 import { makeLoadCtx, loadCtxFromFields, makeTestSetupContext, setupAll } from "../../../solver/analog/__tests__/test-helpers.js";
 
 // ---------------------------------------------------------------------------
-// companion context builder — replaces the deleted stampCompanion(dt, method,
+// companion context builder- replaces the deleted stampCompanion(dt, method,
 // voltages, order, deltaOld) method. Seeds ag[] to match computeNIcomCof for
 // (dt, method, order) then the caller invokes element.load(ctx).
 // ---------------------------------------------------------------------------
@@ -375,7 +375,7 @@ describe("Inductor", () => {
 });
 
 // ---------------------------------------------------------------------------
-// SLOT_VOLT — terminal voltage stored in stampCompanion
+// SLOT_VOLT- terminal voltage stored in stampCompanion
 // ---------------------------------------------------------------------------
 
 describe("Inductor SLOT_VOLT", () => {
@@ -474,10 +474,10 @@ describe("Inductor M multiplicity", () => {
 });
 
 // ---------------------------------------------------------------------------
-// C4.2 — Inductor transient parity (10-step RL circuit)
+// C4.2- Inductor transient parity (10-step RL circuit)
 // ---------------------------------------------------------------------------
 //
-// Circuit: V_src=1V (node 1 → gnd) — R=1000Ω (node 1 → node 2) — L=1mH (node 2 → gnd)
+// Circuit: V_src=1V (node 1 → gnd)- R=1000Ω (node 1 → node 2)- L=1mH (node 2 → gnd)
 // Integration: order-1 trap, fixed dt=1e-6 s, 10 steps.
 // Matrix layout: node1=1, node2=2, bVsrc=2 (abs row), bL=3 (abs row); matrixSize=4.
 //
@@ -516,7 +516,7 @@ describe("inductor_load_transient_parity (C4.2)", () => {
     // ngspice niinteg.c order-1 (backward-Euler) coefficients
     const ag0 = 1 / dt;   // = 1e6
     const ag1 = -1 / dt;  // = -1e6
-    // geq = ag[0]*L (niinteg.c:77) — bit-exact reference constant
+    // geq = ag[0]*L (niinteg.c:77)- bit-exact reference constant
     const geq = ag0 * L_val;  // = 1e6 * 1e-3 = 1000
     const G_R = 1 / R_val;    // = 0.001
 
@@ -527,7 +527,7 @@ describe("inductor_load_transient_parity (C4.2)", () => {
     ag[0] = ag0;
     ag[1] = ag1;
 
-    // Handle-based solver used for both setup and load — persistent handles across steps,
+    // Handle-based solver used for both setup and load- persistent handles across steps,
     // matching the element's internal handle-caching pattern.
     const handles: { row: number; col: number }[] = [];
     const handleIndex = new Map<string, number>();
@@ -625,7 +625,7 @@ describe("inductor_load_transient_parity (C4.2)", () => {
 
     // After 10 accepted steps: assert companion state from last load().
     // AnalogInductorElement schema: SLOT_PHI=0 (flux Φ=L·i), SLOT_CCAP=1 (NIintegrate ccap).
-    // geq and ceq are local variables in load() — NOT stored in state pool.
+    // geq and ceq are local variables in load()- NOT stored in state pool.
     //
     // State tracking at step 9 (last):
     //   rhsOld[branchIndex=3] = i_L = refI[8] (branch current from prior step)

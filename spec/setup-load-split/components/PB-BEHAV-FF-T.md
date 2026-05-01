@@ -2,7 +2,7 @@
 
 **digiTS file:** `src/solver/analog/behavioral-flipflop/t.ts`
 **Element class:** `BehavioralTFlipflopElement`
-**ngspice anchor:** NONE — behavioral element. setup() body matches the
+**ngspice anchor:** NONE- behavioral element. setup() body matches the
 existing per-pin-model alloc pattern from `02-behavioral.md` Shape rules
 1, 2, 3. NOT bound by ngspice line-for-line equivalence.
 
@@ -66,7 +66,7 @@ The single class supports both pin layouts via the nullable field.
 
 Forward order: inputs → outputs → children (per Shape rule 3).
 
-## load() body — value writes only
+## load() body- value writes only
 
 The existing `load()` body on the class stamps through pin models. No
 `solver.allocElement` calls remain after pin-model migration. `accept()`
@@ -96,13 +96,13 @@ For `makeTFlipflopAnalogFactory()`:
 - `MnaModel.findBranchFor`: omitted.
 - The factory branches on `withEnable` and constructs the same
   `BehavioralTFlipflopElement` class with `_tPin = null` in the no-enable
-  branch — no class change required, only setup() body.
+  branch- no class change required, only setup() body.
 - Class declarations of `poolBacked` and `FLIPFLOP_COMPOSITE_SCHEMA`
   unchanged.
 
 ## State pool
 
-Identical to PB-BEHAV-FF-D — composite schema is empty
+Identical to PB-BEHAV-FF-D- composite schema is empty
 (`FLIPFLOP_COMPOSITE_SCHEMA`); children own slots; `initChildState` helper
 distributes offsets unchanged.
 

@@ -1,5 +1,5 @@
 /**
- * Counter — edge-triggered up counter with enable and clear.
+ * Counter- edge-triggered up counter with enable and clear.
  *
  * On rising clock edge:
  *   - If enable=1: increment counter (wraps from maxValue back to 0)
@@ -38,7 +38,7 @@ const COMP_WIDTH = 3;
 // en@y=0, C@y=1, clr@y=2; out@y=0, ovf@y=1
 
 // ---------------------------------------------------------------------------
-// Pin declarations — matching Java GenericShape layout
+// Pin declarations- matching Java GenericShape layout
 // ---------------------------------------------------------------------------
 
 const COUNTER_PIN_DECLARATIONS: PinDeclaration[] = [
@@ -90,7 +90,7 @@ const COUNTER_PIN_DECLARATIONS: PinDeclaration[] = [
 ];
 
 // ---------------------------------------------------------------------------
-// CounterElement — CircuitElement implementation
+// CounterElement- CircuitElement implementation
 // ---------------------------------------------------------------------------
 
 export class CounterElement extends AbstractCircuitElement {
@@ -133,7 +133,7 @@ export class CounterElement extends AbstractCircuitElement {
 }
 
 // ---------------------------------------------------------------------------
-// executeCounter — flat simulation function
+// executeCounter- flat simulation function
 //
 // Input layout:  [en=0, C=1, clr=2]
 // Output layout: [out=0, ovf=1]
@@ -239,7 +239,7 @@ const COUNTER_PROPERTY_DEFS: PropertyDefinition[] = [
 ];
 
 // ---------------------------------------------------------------------------
-// CounterDefinition — ComponentDefinition
+// CounterDefinition- ComponentDefinition
 // ---------------------------------------------------------------------------
 
 function counterFactory(props: PropertyBag): CounterElement {
@@ -255,7 +255,7 @@ export const CounterDefinition: ComponentDefinition = {
   attributeMap: COUNTER_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.MEMORY,
   helpText:
-    "Counter — edge-triggered up counter.\n" +
+    "Counter- edge-triggered up counter.\n" +
     "On rising clock edge: if en=1, increments (wraps at maxValue); if clr=1, resets to 0.\n" +
     "ovf output is 1 when counter==maxValue and en=1.",
   models: {

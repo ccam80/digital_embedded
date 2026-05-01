@@ -147,7 +147,7 @@ export function registerPointerHandlers(
   const TOUCH_HIT_MARGIN = 0.5;
 
   // Snapshot of wire endpoints connected to selected elements at drag start.
-  // Only these wires follow during drag — prevents picking up unrelated wires.
+  // Only these wires follow during drag- prevents picking up unrelated wires.
   let dragConnectedWires: Map<Wire, Array<'start' | 'end'>> = new Map();
 
   function cancelLongPress(): void {
@@ -345,7 +345,7 @@ export function registerPointerHandlers(
       state.dragMode = 'select-drag';
       state.dragStart = worldPt;
       // Snapshot which wire endpoints are connected to selected elements' pins
-      // at drag start. Only these wires should follow during drag — prevents
+      // at drag start. Only these wires should follow during drag- prevents
       // unrelated wires from being picked up as pins sweep through other joins.
       dragConnectedWires = new Map();
       const selectedElements = ctx.selection.getSelectedElements();

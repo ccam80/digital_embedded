@@ -6,24 +6,24 @@
 > **Spec status note (2026-04-28):** This PB describes a target architecture in
 > which the DAC owns a concrete `VCVSElement` sub-element object and rebinds it
 > via `pinNodeIds = [...]` in `setup()`. The current `dac.ts` implementation
-> does **not** instantiate that sub-element — it inlines the VCVS TSTALLOC
+> does **not** instantiate that sub-element- it inlines the VCVS TSTALLOC
 > sequence (`_hVCVSPosIbr`, `_hVCVSIbrPos`, etc.) directly into a single
 > closure-backed `AnalogElementCore`. The `pinNodeIds = [...]` listing in the
 > "setup() body" section below is therefore aspirational; it will become
 > reachable code only once the sub-element refactor lands. For sub-element
 > wiring of any element whose `setup()` reads from `_pinNodes` (BJT in
 > particular), the canonical pattern is `_pinNodes.set(...)` direct
-> mutation — see PB-OPTO, PB-TIMER555, PB-SCR.
+> mutation- see PB-OPTO, PB-TIMER555, PB-SCR.
 
 ## Pin mapping (from 01-pin-mapping.md)
 
 The composite itself has no `ngspiceNodeMap`. Sub-elements carry their own maps.
 
 Composite pin labels (from `buildDACPinDeclarations(bits)`):
-- `D0`..`D{N-1}` — digital input pins, LSB first (indices 0..N-1)
-- `VREF` — voltage reference input (index N) — `DigitalInputPinModel` for loading
-- `OUT` — analog output (index N+1) — VCVS output positive terminal; VCVS out- = GND
-- `GND` — ground reference (index N+2) — passive read
+- `D0`..`D{N-1}`- digital input pins, LSB first (indices 0..N-1)
+- `VREF`- voltage reference input (index N)- `DigitalInputPinModel` for loading
+- `OUT`- analog output (index N+1)- VCVS output positive terminal; VCVS out- = GND
+- `GND`- ground reference (index N+2)- passive read
 
 ## Sub-element decomposition
 
@@ -74,7 +74,7 @@ factory(pinNodes, props, getTime): AnalogElementCore {
 }
 ```
 
-## setup() body — composite forwards
+## setup() body- composite forwards
 
 ```ts
 setup(ctx: SetupContext): void {
@@ -87,7 +87,7 @@ setup(ctx: SetupContext): void {
   this._vcvs1.setup(ctx);
   // vcvs1.setup allocates branch via ctx.makeCur, then 6 TSTALLOC entries
 
-  // Digital input pin models — each allocates their own TSTALLOC entries
+  // Digital input pin models- each allocates their own TSTALLOC entries
   for (let i = 0; i < this._bits; i++) {
     const nD = this._pinNodes.get(`D${i}`)!;
     if (nD > 0) this._dBits[i].setup(ctx);
@@ -102,7 +102,7 @@ setup(ctx: SetupContext): void {
 }
 ```
 
-## load() body — decode inputs, update VCVS gain, forward
+## load() body- decode inputs, update VCVS gain, forward
 
 ```ts
 load(ctx: LoadContext): void {
@@ -143,12 +143,12 @@ load(ctx: LoadContext): void {
 ## State slots
 
 Composite has none of its own (`DAC_COMPOSITE_SCHEMA` is empty). Sub-elements:
-- `vcvs1`: `NG_IGNORE(states)` — no state slots.
+- `vcvs1`: `NG_IGNORE(states)`- no state slots.
 - `dBits[i]`, `vrefModel`: CAP children own state slots via their own `setup()`.
 
 ## VCVS TSTALLOC sequence (vcvsset.c:53-58)
 
-With nodes `(nVref, nGnd, nOut, nGnd)` — `ctrl+ = nVref`, `ctrl- = nGnd`, `out+ = nOut`, `out- = nGnd`:
+With nodes `(nVref, nGnd, nOut, nGnd)`- `ctrl+ = nVref`, `ctrl- = nGnd`, `out+ = nOut`, `out- = nGnd`:
 
 | # | ngspice pointer | row | col |
 |---|---|---|---|
@@ -176,11 +176,11 @@ Not needed. Direct refs to `_vcvs1`, `_dBits[]`, `_vrefModel`.
 
 Per CLAUDE.md "Test Policy During W3 Setup-Load-Split", verification is spec compliance only. DO NOT run tests; DO NOT use test results.
 
-1. `setup()` body in the implementation file matches the "setup() body — alloc only" listing in this PB line-for-line.
+1. `setup()` body in the implementation file matches the "setup() body- alloc only" listing in this PB line-for-line.
 2. TSTALLOC sequence in `setup()` matches the order in the cited ngspice anchor file (see top of this PB, e.g. `ressetup.c:46-49`).
 3. Factory cleanup applied per the "Factory cleanup" section above.
 4. `ngspiceNodeMap` registered per the "Pin mapping" section above (or omitted for composites where the spec says so).
-5. `load()` writes through cached handles only — zero `solver.allocElement(...)` calls inside `load()`, `accept()`, or any non-`setup()` method.
+5. `load()` writes through cached handles only- zero `solver.allocElement(...)` calls inside `load()`, `accept()`, or any non-`setup()` method.
 6. `mayCreateInternalNodes` flag set per spec.
 7. `findBranchFor` callback present where spec says (V-output sources, IND, etc.).
 8. No banned closing verdicts (mapping/tolerance/equivalent-to/pre-existing/intentional-divergence/citation-divergence/partial) used in any commit message or report.

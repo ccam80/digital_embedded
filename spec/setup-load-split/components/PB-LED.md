@@ -2,14 +2,14 @@
 
 **digiTS file:** `src/components/io/led.ts`
 **Reused class:** `DiodeAnalogElement` (the diode element produced by `createDiodeElement` in `src/components/semiconductors/diode.ts`)
-**Reused PB:** `PB-DIO.md` (frozen — must be complete before PB-LED runs)
+**Reused PB:** `PB-DIO.md` (frozen- must be complete before PB-LED runs)
 **ngspice setup anchor (inherited from PB-DIO):** `ref/ngspice/src/spicelib/devices/dio/diosetup.c:198-238`
 **ngspice load anchor (inherited from PB-DIO):** `ref/ngspice/src/spicelib/devices/dio/dioload.c`
 
 ## Architectural framing
 
 LED is a **single-port diode with cathode wired to ground**. Its analog model
-is the existing `DiodeAnalogElement` (post-PB-DIO migration) — not a bespoke
+is the existing `DiodeAnalogElement` (post-PB-DIO migration)- not a bespoke
 factory. PB-LED.md does NOT introduce a new analog element class. It
 specifies:
 
@@ -72,21 +72,21 @@ from the `"in"` pin voltage via `PinVoltageAccess`, not from `SLOT_VD`.
 ## TSTALLOC sequence
 
 Inherited from PB-DIO. With `RS = 0` (LED's choice), the 7 ngspice TSTALLOC
-calls collapse per the PB-DIO "RS=0 collapse note" — entries (1)/(3)/(5)/(7)
+calls collapse per the PB-DIO "RS=0 collapse note"- entries (1)/(3)/(5)/(7)
 all reduce to `(posNode, posNode)` and the `allocElement` Translate
 mechanism returns the same handle for repeated coordinates. Entries (2)/(4)
 reduce to `(0, posNode)` / `(posNode, 0)` (ground row/col, discarded).
 Entry (6) is `(0, 0)` (also discarded).
 
 The structurally-meaningful matrix entry is `(posNode, posNode)`. The
-diode element still issues all 7 `allocElement` calls — `setup()` body is
+diode element still issues all 7 `allocElement` calls- `setup()` body is
 identical to PB-DIO's. The `_hPosPos` handle is the only one whose
 `stampElement` updates have effect.
 
-## setup() body — alloc only
+## setup() body- alloc only
 
 LED has no `setup()` of its own. The diode element's `setup()` runs
-verbatim per PB-DIO §setup() body. The LED factory adapter (replacing
+verbatim per PB-DIO sssetup() body. The LED factory adapter (replacing
 `createLedAnalogElement`) is a pure pin remap:
 
 ```ts
@@ -105,7 +105,7 @@ function createLedAnalogElementViaDiode(
 ```
 
 The factory adapter lives in `src/components/io/led.ts`. It does not
-create or mutate matrix entries, attach accessors, or read solver state —
+create or mutate matrix entries, attach accessors, or read solver state-
 that's the diode element's job. Lit-state is the UI's concern and is
 computed by `LedElement.isLit(signals)` from `PinVoltageAccess`, not from
 the analog element.
@@ -131,10 +131,10 @@ accessed by the exported `getLitThreshold(color)` helper, which is called
 from `LedElement.isLit`. The `color` is read from the regular property bag
 (`PropertyType.COLOR` definition), not from analog model params.
 
-## load() body — value writes only
+## load() body- value writes only
 
 LED has no `load()` of its own. The diode element's `load()` runs verbatim
-per PB-DIO §load() body.
+per PB-DIO ssload() body.
 
 ## Factory cleanup
 
@@ -174,7 +174,7 @@ modelRegistry: {
 }
 ```
 
-`color` is NOT in the model-param surface — it's a regular property
+`color` is NOT in the model-param surface- it's a regular property
 (`PropertyType.COLOR`) on `LedDefinition.propertyDefs`, read via
 `PropertyBag.getOrDefault("color", "red")` from `LedElement` and consumed
 exclusively by `isLit`.
@@ -184,7 +184,7 @@ exclusively by `isLit`.
   consumers are rerouted to `DIODE_PARAM_DEFS` / `DIODE_PARAM_DEFAULTS`.
 - `defaultModel: "digital"` unchanged (digital model selection, separate
   axis from analog modelRegistry).
-- `executeLed` (digital function) unchanged — operates on digital wiring
+- `executeLed` (digital function) unchanged- operates on digital wiring
   table, not analog state.
 
 ## findBranchFor (if applicable)
@@ -211,7 +211,7 @@ Not applicable. Diode has no branch row; LED inherits this.
 6. `LED_PARAM_DEFS` and `LED_DEFAULTS` re-export shims are deleted.
    External consumers (tests) import `DIODE_PARAM_DEFS` /
    `DIODE_PARAM_DEFAULTS` directly.
-7. PB-DIO compliance applies — diode element setup/load bodies are
+7. PB-DIO compliance applies- diode element setup/load bodies are
    unchanged from PB-DIO. PB-LED introduces no diode-side mutations.
 8. `executeLed` digital execution path unchanged.
 9. No banned closing verdicts (mapping/tolerance/equivalent-to/pre-existing/

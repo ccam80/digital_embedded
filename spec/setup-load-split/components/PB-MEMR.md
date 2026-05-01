@@ -21,7 +21,7 @@ None. The memristor is a two-terminal conductance with no internal topology.
 
 ## Branch rows
 
-None. The memristor stamps conductance directly — no branch current row.
+None. The memristor stamps conductance directly- no branch current row.
 
 ## State slots
 
@@ -31,7 +31,7 @@ None allocated from the `StatePool`. The memristor's internal state variable `_w
 
 The memristor applies `ressetup.c:46-49` once (posNode = A, negNode = B).
 
-**Ground-node skip rule:** The existing `load()` uses `stampG(solver, nA, nA, G)` etc., which internally skips ground rows/columns. In `setup()`, `allocElement` does not automatically skip ground — the implementer must apply explicit checks for each entry. This matches the pattern used in `AnalogFuseElement.setup()` (PB-AFUSE).
+**Ground-node skip rule:** The existing `load()` uses `stampG(solver, nA, nA, G)` etc., which internally skips ground rows/columns. In `setup()`, `allocElement` does not automatically skip ground- the implementer must apply explicit checks for each entry. This matches the pattern used in `AnalogFuseElement.setup()` (PB-AFUSE).
 
 | # | ngspice pair | digiTS pair | handle field |
 |---|---|---|---|
@@ -42,15 +42,15 @@ The memristor applies `ressetup.c:46-49` once (posNode = A, negNode = B).
 
 Total: 4 TSTALLOC entries (matching ressetup.c:46-49 exactly; subject to ground-skip guards).
 
-## setup() body — alloc only
+## setup() body- alloc only
 
 ```ts
 setup(ctx: SetupContext): void {
   const solver = ctx.solver;
-  const aNode = this._pinNodes.get("A")!;  // A pin — RESposNode
-  const bNode = this._pinNodes.get("B")!;  // B pin — RESnegNode
+  const aNode = this._pinNodes.get("A")!;  // A pin- RESposNode
+  const bNode = this._pinNodes.get("B")!;  // B pin- RESnegNode
 
-  // ressetup.c:46-49 — TSTALLOC sequence, line-for-line.
+  // ressetup.c:46-49- TSTALLOC sequence, line-for-line.
   if (aNode !== 0) this._hPP = solver.allocElement(aNode, aNode);
   if (bNode !== 0) this._hNN = solver.allocElement(bNode, bNode);
   if (aNode !== 0 && bNode !== 0) {
@@ -70,13 +70,13 @@ private _hNP: number = -1;
 
 **Note on _pinNodes:** The current `MemristorElement` has `pinNodeIds!: readonly number[]` (non-null asserted, set via `Object.assign` after factory returns). After migration, the factory receives `pinNodes: ReadonlyMap<string, number>` and stores it as `this._pinNodes = pinNodes` directly in the constructor. The `setup()` reads from `this._pinNodes.get("A")!` and `this._pinNodes.get("B")!` as shown above.
 
-## load() body — value writes only
+## load() body- value writes only
 
 Implementer ports the state-dependent conductance stamp from `ref/ngspice/src/spicelib/devices/res/resload.c`, using the memristor's current conductance `G = this.conductance()`:
-- `solver.stampElement(_hPP, G)` — aNode diagonal
-- `solver.stampElement(_hNN, G)` — bNode diagonal
-- `solver.stampElement(_hPN, -G)` — off-diagonal
-- `solver.stampElement(_hNP, -G)` — off-diagonal
+- `solver.stampElement(_hPP, G)`- aNode diagonal
+- `solver.stampElement(_hNN, G)`- bNode diagonal
+- `solver.stampElement(_hPN, -G)`- off-diagonal
+- `solver.stampElement(_hNP, -G)`- off-diagonal
 
 with the same ground-skip guards used in `setup()` (only stamp `_hPN`/`_hNP` when `_hPN !== -1`).
 
@@ -86,7 +86,7 @@ No `solver.allocElement` calls in `load()`. The `accept()` method (Euler forward
 
 - Drop `internalNodeIds` and `branchIdx` parameters from `createMemristorElement` factory signature (per A6.3). The current factory already ignores them (`_internalNodeIds`, `_branchIdx`).
 - Add `pinNodes` usage: construct `MemristorElement` with `pinNodeIds = [pinNodes.get("A")!, pinNodes.get("B")!]` set at construction time rather than via `Object.assign`.
-- No `branchCount` existed on this `modelRegistry` entry — no removal needed.
+- No `branchCount` existed on this `modelRegistry` entry- no removal needed.
 - `mayCreateInternalNodes` omitted.
 - Add `ngspiceNodeMap: { A: "pos", B: "neg" }` to `ComponentDefinition`.
 - No `findBranchFor` callback (no branch row).
@@ -95,11 +95,11 @@ No `solver.allocElement` calls in `load()`. The `accept()` method (Euler forward
 
 Per CLAUDE.md "Test Policy During W3 Setup-Load-Split", verification is spec compliance only. DO NOT run tests; DO NOT use test results.
 
-1. `setup()` body in the implementation file matches the "setup() body — alloc only" listing in this PB line-for-line.
+1. `setup()` body in the implementation file matches the "setup() body- alloc only" listing in this PB line-for-line.
 2. TSTALLOC sequence in `setup()` matches the order in the cited ngspice anchor file (see top of this PB, e.g. `ressetup.c:46-49`).
 3. Factory cleanup applied per the "Factory cleanup" section above.
 4. `ngspiceNodeMap` registered per the "Pin mapping" section above (or omitted for composites where the spec says so).
-5. `load()` writes through cached handles only — zero `solver.allocElement(...)` calls inside `load()`, `accept()`, or any non-`setup()` method.
+5. `load()` writes through cached handles only- zero `solver.allocElement(...)` calls inside `load()`, `accept()`, or any non-`setup()` method.
 6. `mayCreateInternalNodes` flag set per spec.
 7. `findBranchFor` callback present where spec says (V-output sources, IND, etc.).
 8. No banned closing verdicts (mapping/tolerance/equivalent-to/pre-existing/intentional-divergence/citation-divergence/partial) used in any commit message or report.

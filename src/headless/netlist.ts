@@ -1,5 +1,5 @@
 /**
- * resolveNets — delegates to compilation infrastructure for connectivity.
+ * resolveNets- delegates to compilation infrastructure for connectivity.
  *
  * Uses resolveModelAssignments + extractConnectivityGroups as the single
  * source of truth, then builds the Netlist view types from their output.
@@ -23,7 +23,7 @@ import { resolveModelAssignments, extractConnectivityGroups } from '../compile/e
 import { getComponentLabel } from './address.js';
 
 // ---------------------------------------------------------------------------
-// resolveNets — public entry point
+// resolveNets- public entry point
 // ---------------------------------------------------------------------------
 
 /**
@@ -49,7 +49,7 @@ export function resolveNets(circuit: Circuit, registry: ComponentRegistry): Netl
 }
 
 // ---------------------------------------------------------------------------
-// buildNetlistView — transform compilation types into Netlist view types
+// buildNetlistView- transform compilation types into Netlist view types
 // ---------------------------------------------------------------------------
 
 function buildNetlistView(

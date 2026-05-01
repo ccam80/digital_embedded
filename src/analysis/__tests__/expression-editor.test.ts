@@ -2,7 +2,7 @@
  * Tests for expression-editor.ts (Task 8.2.4).
  *
  * Covers:
- *   toTruthTable — parse "A & B", generate truth table, verify 4 rows with correct values
+ *   toTruthTable- parse "A & B", generate truth table, verify 4 rows with correct values
  */
 
 import { describe, expect, it } from 'vitest';
@@ -10,7 +10,7 @@ import { ExpressionEditorTab } from '../expression-editor.js';
 import type { ParseError as _ParseError } from '../expression-parser.js';
 
 // ---------------------------------------------------------------------------
-// toTruthTable — parse "A & B", generate truth table, verify 4 rows with correct values
+// toTruthTable- parse "A & B", generate truth table, verify 4 rows with correct values
 // ---------------------------------------------------------------------------
 
 describe('toTruthTable', () => {
@@ -196,7 +196,7 @@ describe('detectVariables', () => {
 
   it('returns empty array for invalid expression', () => {
     const editor = new ExpressionEditorTab('A & ');
-    // Don't parse first — detectVariables should try and return []
+    // Don't parse first- detectVariables should try and return []
     const vars = editor.detectVariables();
     expect(vars).toEqual([]);
   });

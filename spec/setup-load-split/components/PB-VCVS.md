@@ -21,7 +21,7 @@ None. VCVS has no internal voltage nodes.
 
 ## Branch rows
 
-1 branch row — the output current branch.
+1 branch row- the output current branch.
 
 Allocated via `ctx.makeCur(this.label, "branch")`, mirroring vcvsset.c:41-44:
 ```c
@@ -33,7 +33,7 @@ if(here->VCVSbranch == 0) {
 
 ## State slots
 
-0. `NG_IGNORE(states)` — vcvsset.c performs no `*states +=` increment.
+0. `NG_IGNORE(states)`- vcvsset.c performs no `*states +=` increment.
 
 ## TSTALLOC sequence (line-for-line port from vcvsset.c:53-58)
 
@@ -46,17 +46,17 @@ if(here->VCVSbranch == 0) {
 | 5 | `:57` `TSTALLOC(VCVSibrContPosptr, VCVSbranch, VCVScontPosNode)` | (branch, contPosNode) | `(branch, ctrlPosNode)` |
 | 6 | `:58` `TSTALLOC(VCVSibrContNegptr, VCVSbranch, VCVScontNegNode)` | (branch, contNegNode) | `(branch, ctrlNegNode)` |
 
-## setup() body — alloc only
+## setup() body- alloc only
 
 ```typescript
 setup(ctx: SetupContext): void {
   const solver = ctx.solver;
-  const posNode     = this.pinNodeIds[2]; // pinNodes.get("out+")  — VCVSposNode
-  const negNode     = this.pinNodeIds[3]; // pinNodes.get("out-")  — VCVSnegNode
-  const ctrlPosNode = this.pinNodeIds[0]; // pinNodes.get("ctrl+") — VCVScontPosNode
-  const ctrlNegNode = this.pinNodeIds[1]; // pinNodes.get("ctrl-") — VCVScontNegNode
+  const posNode     = this.pinNodeIds[2]; // pinNodes.get("out+") - VCVSposNode
+  const negNode     = this.pinNodeIds[3]; // pinNodes.get("out-") - VCVSnegNode
+  const ctrlPosNode = this.pinNodeIds[0]; // pinNodes.get("ctrl+")- VCVScontPosNode
+  const ctrlNegNode = this.pinNodeIds[1]; // pinNodes.get("ctrl-")- VCVScontNegNode
 
-  // Branch row allocation: vcvsset.c:41-44 (idempotent guard — vcvsset.c:41-44)
+  // Branch row allocation: vcvsset.c:41-44 (idempotent guard- vcvsset.c:41-44)
   if (this.branchIndex === -1) {
     this.branchIndex = ctx.makeCur(this.label, "branch");
   }
@@ -80,7 +80,7 @@ index 0 = `ctrl+`, index 1 = `ctrl-`, index 2 = `out+`, index 3 = `out-`.
 All 6 handles stored on the element instance. `allocElement` NEVER called from
 `load()`.
 
-## load() body — value writes only
+## load() body- value writes only
 
 Implementer ports value-side from `ref/ngspice/src/spicelib/devices/vcvs/vcvsload.c`
 line-for-line. No `allocElement`. Stamps:
@@ -89,8 +89,8 @@ line-for-line. No `allocElement`. Stamps:
 - `_hNIbr` += -1 (B[negNode, branch])
 - `_hIbrP` += +1 (C[branch, posNode])
 - `_hIbrN` += -1 (C[branch, negNode])
-- `_hIbrCtP` += -gain (C[branch, ctrlPosNode]) — Jacobian
-- `_hIbrCtN` += +gain (C[branch, ctrlNegNode]) — Jacobian
+- `_hIbrCtP` += -gain (C[branch, ctrlPosNode])- Jacobian
+- `_hIbrCtN` += +gain (C[branch, ctrlNegNode])- Jacobian
 - `rhs[branch]` += NR constant term
 
 (For nonlinear expressions, gain is replaced by the evaluated derivative f'(Vctrl)
@@ -104,7 +104,7 @@ that sense the VCVS output current can lazily resolve it. Mirrors
 
 ```typescript
 findBranchFor(name: string, ctx: SetupContext): number {
-  // Look up the device by namespaced label (auto-registered per 00-engine.md §A4.1 recursive _deviceMap walk).
+  // Look up the device by namespaced label (auto-registered per 00-engine.md ssA4.1 recursive _deviceMap walk).
   const el = ctx.findDevice(name);
   if (!el) return 0;
   // The element owns its branch row. Lazy-allocate if needed.
@@ -137,11 +137,11 @@ Not applicable.
 
 Per CLAUDE.md "Test Policy During W3 Setup-Load-Split", verification is spec compliance only. DO NOT run tests; DO NOT use test results.
 
-1. `setup()` body in the implementation file matches the "setup() body — alloc only" listing in this PB line-for-line.
+1. `setup()` body in the implementation file matches the "setup() body- alloc only" listing in this PB line-for-line.
 2. TSTALLOC sequence in `setup()` matches the order in the cited ngspice anchor file (see top of this PB, e.g. `ressetup.c:46-49`).
 3. Factory cleanup applied per the "Factory cleanup" section above.
 4. `ngspiceNodeMap` registered per the "Pin mapping" section above (or omitted for composites where the spec says so).
-5. `load()` writes through cached handles only — zero `solver.allocElement(...)` calls inside `load()`, `accept()`, or any non-`setup()` method.
+5. `load()` writes through cached handles only- zero `solver.allocElement(...)` calls inside `load()`, `accept()`, or any non-`setup()` method.
 6. `mayCreateInternalNodes` flag set per spec.
 7. `findBranchFor` callback present where spec says (V-output sources, IND, etc.).
 8. No banned closing verdicts (mapping/tolerance/equivalent-to/pre-existing/intentional-divergence/citation-divergence/partial) used in any commit message or report.

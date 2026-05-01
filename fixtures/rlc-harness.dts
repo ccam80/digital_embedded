@@ -1,6 +1,6 @@
 {
   "circuit": {
-    "description": "Series RLC driven by square-wave step — exercises linear reactive integration paths for LTE comparison. R=50, L=1mH, C=100nF → fn=15.9kHz, Q=2 (underdamped ringing)",
+    "description": "Series RLC driven by square-wave step- exercises linear reactive integration paths for LTE comparison. R=50, L=1mH, C=100nF → fn=15.9kHz, Q=2 (underdamped ringing)",
     "elements": [
       {
         "id": "6ffd0768-83fc-448b-8782-7f54a1ebd3d4",

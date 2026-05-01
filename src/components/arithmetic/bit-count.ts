@@ -1,5 +1,5 @@
 /**
- * BitCount component — count number of set bits (popcount).
+ * BitCount component- count number of set bits (popcount).
  *
  * Ports from Digital's BitCount.java:
  *   Input: in (bitWidth)
@@ -113,7 +113,7 @@ export const BitCountDefinition: ComponentDefinition = {
   propertyDefs: BIT_COUNT_PROPERTY_DEFS,
   attributeMap: BIT_COUNT_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.ARITHMETIC,
-  helpText: "BitCount — counts the number of set (1) bits in the input (population count).",
+  helpText: "BitCount- counts the number of set (1) bits in the input (population count).",
   models: {
     digital: {
       executeFn: executebitCount,

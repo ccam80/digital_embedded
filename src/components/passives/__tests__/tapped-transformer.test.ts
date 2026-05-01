@@ -52,7 +52,7 @@ function getFactory(entry: ModelEntry): AnalogFactory {
 // ---------------------------------------------------------------------------
 
 describe("TappedTransformer", () => {
-  it("center_tap_voltage_is_half — N=2 (1:1 each half); AC primary; CT at midpoint", async () => {
+  it("center_tap_voltage_is_half- N=2 (1:1 each half); AC primary; CT at midpoint", async () => {
     /**
      * Facade migration: AcVoltageSource + TappedTransformer(N=2) + load resistors.
      * Sample S1, CT, S2 voltages over 20 cycles at 1kHz, find peaks in last cycle.
@@ -132,7 +132,7 @@ describe("TappedTransformer", () => {
     expect(maxVS1S2).toBeLessThan(maxVS1CT * 2.2);
   });
 
-  it("symmetric_halves — secondary half voltages equal in magnitude, opposite phase to CT", async () => {
+  it("symmetric_halves- secondary half voltages equal in magnitude, opposite phase to CT", async () => {
     /**
      * Facade migration: AcVoltageSource + TappedTransformer(N=2) + symmetric loads.
      * Verify peak(V_S1 - V_CT) ≈ peak(V_S2 - V_CT) within 10%.
@@ -208,7 +208,7 @@ describe("TappedTransformer", () => {
     expect(ratio).toBeLessThan(1.10);
   });
 
-  it("full_wave_rectifier — two diodes + CT ground produce DC output ≈ Vpeak_sec", async () => {
+  it("full_wave_rectifier- two diodes + CT ground produce DC output ≈ Vpeak_sec", async () => {
     /**
      * Facade migration: AcVoltageSource + TappedTransformer + 2×Diode + Capacitor + Resistor.
      * CT tied to gnd, D1: S1→out, D2: S2→out. Filter cap holds DC output.
@@ -324,7 +324,7 @@ describe("TappedTransformerDefinition", () => {
     // Simulate engine setup: nodeCount=5 nodes (0..4), so _maxEqNum starts at 5+1=6.
     // Pre-set the vsrc branch at row 5 (vsrcset.c idempotency guard skips makeCur
     // if branchIndex != -1). With nodeCount=5, rows 0-4 are node rows.
-    // L1 gets row 6 (++branchOff from 5), L2=7, L3=8 would be wrong —
+    // L1 gets row 6 (++branchOff from 5), L2=7, L3=8 would be wrong-
     // test expects 10,11,12 so nodeCount must account for 5 nodes and some offset.
     // With nodeCount=5 nodes (0-4) and starting branchOff=9 (to match expected 10):
     let stateOff = 0;
@@ -380,7 +380,7 @@ describe("TappedTransformerDefinition", () => {
 });
 
 // ---------------------------------------------------------------------------
-// C4.2 — Transient parity test
+// C4.2- Transient parity test
 //
 // Circuit: Three-winding tapped transformer, all voltages/currents zero.
 // pinNodeIds=[P1=1, P2=0, S1=2, CT=3, S2=4], branch1=5, branch2=6, branch3=7.
@@ -390,8 +390,8 @@ describe("TappedTransformerDefinition", () => {
 //
 // Architecture (A.7+A.8): The composite owns zero state slots. State lives in
 // the three InductorSubElement instances (L1, L2, L3), each with 2 slots:
-//   SLOT_PHI=0  (INDflux — flux linkage Φ = L·i + M·i_other)
-//   SLOT_CCAP=1 (NIintegrate companion current — stores geq/ceq output ccap)
+//   SLOT_PHI=0  (INDflux- flux linkage Φ = L·i + M·i_other)
+//   SLOT_CCAP=1 (NIintegrate companion current- stores geq/ceq output ccap)
 //
 // After 10 zero-voltage steps: all currents zero → all phi=0, all ccap=0.
 //
@@ -459,7 +459,7 @@ describe("tapped_transformer_load_transient_parity (C4.2)", () => {
     ag[0] = ag0;
     ag[1] = ag1;
 
-    // voltages layout: [V(node0..4), I_b5, I_b6, I_b7] — all zero.
+    // voltages layout: [V(node0..4), I_b5, I_b6, I_b7]- all zero.
     // All zero → i1=i2=i3=0 → all phi=0.
     const voltages = new Float64Array(8);
 

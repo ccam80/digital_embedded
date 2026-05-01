@@ -1,5 +1,5 @@
 /**
- * CircuitJS CTZ format — low-level text parsing.
+ * CircuitJS CTZ format- low-level text parsing.
  *
  * CircuitJS encodes circuits as a line-based text format where each line
  * represents one component. After decompression the text looks like:
@@ -26,7 +26,7 @@ import type { Pin, Rotation } from "../core/pin.js";
 import { PropertyBag } from "../core/properties.js";
 
 // ---------------------------------------------------------------------------
-// CtzComponent — parsed record for one CTZ line
+// CtzComponent- parsed record for one CTZ line
 // ---------------------------------------------------------------------------
 
 /** A single component record parsed from the CTZ text format. */
@@ -48,7 +48,7 @@ export interface CtzComponent {
 }
 
 // ---------------------------------------------------------------------------
-// CTZ_TYPE_MAP — CircuitJS type codes → digiTS registry type names
+// CTZ_TYPE_MAP- CircuitJS type codes → digiTS registry type names
 // ---------------------------------------------------------------------------
 
 /**
@@ -74,7 +74,7 @@ export const CTZ_TYPE_MAP: Record<string, string> = {
   dz: "ZenerDiode",
   dled: "Diode",
 
-  // Transistors — BJT
+  // Transistors- BJT
   t: "NpnBJT",
   tf: "PnpBJT",
 
@@ -181,7 +181,7 @@ export class CtzPlaceholderElement extends AbstractCircuitElement {
 }
 
 // ---------------------------------------------------------------------------
-// parseCtzText — text → CtzComponent[]
+// parseCtzText- text → CtzComponent[]
 // ---------------------------------------------------------------------------
 
 /**
@@ -308,7 +308,7 @@ function buildWires(components: CtzComponent[]): Array<{ x1: number; y1: number;
 }
 
 // ---------------------------------------------------------------------------
-// mapCtzToCircuit — CtzComponent[] + registry → Circuit
+// mapCtzToCircuit- CtzComponent[] + registry → Circuit
 // ---------------------------------------------------------------------------
 
 /**
@@ -358,7 +358,7 @@ export function mapCtzToCircuit(
         element.position = position;
         circuit.addElement(element);
       } else {
-        // Type is mapped but not registered — treat as unsupported
+        // Type is mapped but not registered- treat as unsupported
         emitUnsupportedDiagnostic(comp.type, diagnostics, placeholderCounter);
         const element = new CtzPlaceholderElement(
           crypto.randomUUID(),

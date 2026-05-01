@@ -4,11 +4,11 @@
  * BoolExpr is a tagged-union AST for boolean algebra expressions. Each node
  * kind corresponds to a fundamental construct:
  *
- *   variable  — a named signal, optionally negated
- *   and       — conjunction of two or more sub-expressions
- *   or        — disjunction of two or more sub-expressions
- *   not       — logical negation of a sub-expression
- *   constant  — a literal true or false value
+ *   variable - a named signal, optionally negated
+ *   and      - conjunction of two or more sub-expressions
+ *   or       - disjunction of two or more sub-expressions
+ *   not      - logical negation of a sub-expression
+ *   constant - a literal true or false value
  *
  * The `negated` flag on variable nodes allows compact representation of
  * literals (A, !A) without an extra `not` wrapper. The `not` node kind is

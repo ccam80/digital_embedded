@@ -1,6 +1,6 @@
 # digiTS
 
-A browser-based mixed-domain digital logic and analog MNA-based simulator, statring from a TypeScript port of Helmut Neeman's [Digital](https://github.com/hneemann/Digital) and Paul Falstad's [circuitjs1](https://www.falstad.com/circuit/) — purely static files, no server, no licensing dependencies. I wanted to combine some digital/analog simulations for the ADC/DAC portion of a computer architecture course, and my life has been taken over by AI-agent-fuelled ambition, so I made one. 
+A browser-based mixed-domain digital logic and analog MNA-based simulator, statring from a TypeScript port of Helmut Neeman's [Digital](https://github.com/hneemann/Digital) and Paul Falstad's [circuitjs1](https://www.falstad.com/circuit/)- purely static files, no server, no licensing dependencies. I wanted to combine some digital/analog simulations for the ADC/DAC portion of a computer architecture course, and my life has been taken over by AI-agent-fuelled ambition, so I made one. 
 
 ## Quick Start
 

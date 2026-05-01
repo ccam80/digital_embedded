@@ -59,7 +59,7 @@ class MockFacade implements SequentialAnalysisFacade {
 // ---------------------------------------------------------------------------
 
 describe('StateTransitionTable', () => {
-  it('dFlipflop — D flip-flop: Q_next = D', () => {
+  it('dFlipflop- D flip-flop: Q_next = D', () => {
     const facade = new MockFacade(
       (_state, inputs) => new Map([['Q', inputs.get('D') ?? 0n]]),
       (state, _inputs) => new Map([['Q_out', state.get('Q') ?? 0n]]),
@@ -94,7 +94,7 @@ describe('StateTransitionTable', () => {
     expect(result.transitions[3]!.nextState).toEqual([1n]);
   });
 
-  it('srLatch — SR latch transitions', () => {
+  it('srLatch- SR latch transitions', () => {
     const facade = new MockFacade(
       (state, inputs) => {
         const s = inputs.get('S') ?? 0n;
@@ -119,7 +119,7 @@ describe('StateTransitionTable', () => {
     expect(result.transitions).toHaveLength(8);
   });
 
-  it('twoStateBits — 2 flip-flops give 4 states', () => {
+  it('twoStateBits- 2 flip-flops give 4 states', () => {
     const facade = new MockFacade(
       (state, inputs) => {
         const d = inputs.get('D') ?? 0n;
@@ -144,7 +144,7 @@ describe('StateTransitionTable', () => {
     expect(result.transitions).toHaveLength(8);
   });
 
-  it('noCombinationalOnly — throws when no state variables', () => {
+  it('noCombinationalOnly- throws when no state variables', () => {
     const facade = new MockFacade(
       () => new Map(),
       () => new Map(),

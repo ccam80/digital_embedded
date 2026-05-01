@@ -1,5 +1,5 @@
 /**
- * SevenSegHex component — 7-segment display with internal BCD/hex decoder.
+ * SevenSegHex component- 7-segment display with internal BCD/hex decoder.
  *
  * 4-bit BCD input → internal decoder → segment pattern → display.
  * Displays 0–9 and A–F (hex digits).
@@ -61,7 +61,7 @@ export const HEX_SEGMENT_TABLE: readonly number[] = [
 ];
 
 // ---------------------------------------------------------------------------
-// Pin layout — 4-bit input on west face
+// Pin layout- 4-bit input on west face
 // ---------------------------------------------------------------------------
 
 function buildSevenSegHexPinDeclarations(): PinDeclaration[] {
@@ -89,7 +89,7 @@ function buildSevenSegHexPinDeclarations(): PinDeclaration[] {
 }
 
 // ---------------------------------------------------------------------------
-// SevenSegHexElement — CircuitElement implementation
+// SevenSegHexElement- CircuitElement implementation
 // ---------------------------------------------------------------------------
 
 export class SevenSegHexElement extends AbstractCircuitElement {
@@ -129,7 +129,7 @@ export class SevenSegHexElement extends AbstractCircuitElement {
 }
 
 // ---------------------------------------------------------------------------
-// executeSevenSegHex — decode 4-bit input, produce segment pattern output
+// executeSevenSegHex- decode 4-bit input, produce segment pattern output
 // ---------------------------------------------------------------------------
 
 export function executeSevenSegHex(
@@ -198,7 +198,7 @@ export const SevenSegHexDefinition: ComponentDefinition = {
   attributeMap: SEVEN_SEG_HEX_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.IO,
   helpText:
-    "SevenSegHex — 7-segment display with internal hex decoder.\n" +
+    "SevenSegHex- 7-segment display with internal hex decoder.\n" +
     "4-bit input selects which hex digit (0–F) to display.\n" +
     "commonCathode=true: common cathode configuration (active high).",
   models: {

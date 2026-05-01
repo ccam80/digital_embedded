@@ -39,34 +39,34 @@ function mkCtx(opts: {
 // ===========================================================================
 
 describe("Evaluate", () => {
-  it("v_function_resolves — V(R1)*2 with V(R1)=3.3 gives 6.6", () => {
+  it("v_function_resolves- V(R1)*2 with V(R1)=3.3 gives 6.6", () => {
     parseExpression("V(R1) * 2");
     mkCtx({ voltages: { R1: 3.3 } });
   });
 
-  it("i_function_resolves — I(R1) with I(R1)=0.005 gives 0.005", () => {
+  it("i_function_resolves- I(R1) with I(R1)=0.005 gives 0.005", () => {
     parseExpression("I(R1)");
     mkCtx({ currents: { R1: 0.005 } });
   });
 
-  it("time_variable — sin(2*pi*1000*time) at time=0.00025 ≈ 1.0", () => {
+  it("time_variable- sin(2*pi*1000*time) at time=0.00025 ≈ 1.0", () => {
     parseExpression("sin(2 * pi * 1000 * time)");
     mkCtx({ time: 0.00025 });
   });
 
-  it("freq_variable — freq at 1kHz gives 1000", () => {
+  it("freq_variable- freq at 1kHz gives 1000", () => {
     const expr = parseExpression("freq");
     const ctx = mkCtx({ freq: 1000 });
     expect(evaluate(expr, ctx)).toBe(1000);
   });
 
-  it("freq_undefined_defaults_to_zero — freq with no freq in context gives 0", () => {
+  it("freq_undefined_defaults_to_zero- freq with no freq in context gives 0", () => {
     const expr = parseExpression("freq");
     const ctx = mkCtx({});
     expect(evaluate(expr, ctx)).toBe(0);
   });
 
-  it("compiled_matches_interpreted — same result from evaluate and compileExpression", () => {
+  it("compiled_matches_interpreted- same result from evaluate and compileExpression", () => {
     const exprText = "V(in) * 2 + sin(time * 1000)";
     const expr = parseExpression(exprText);
     const ctx = mkCtx({ voltages: { in: 1.5 }, time: 0.001 });
@@ -74,28 +74,28 @@ describe("Evaluate", () => {
     compileExpression(expr);
   });
 
-  it("arithmetic_still_works — 2+3*4 = 14 via extended evaluator", () => {
+  it("arithmetic_still_works- 2+3*4 = 14 via extended evaluator", () => {
     const expr = parseExpression("2 + 3 * 4");
     const ctx = mkCtx({});
     expect(evaluate(expr, ctx)).toBe(14);
   });
 
-  it("builtin_constants_available — pi evaluates to Math.PI", () => {
+  it("builtin_constants_available- pi evaluates to Math.PI", () => {
     parseExpression("pi");
     mkCtx({});
   });
 
-  it("builtin_functions_available — sin(pi/2) = 1", () => {
+  it("builtin_functions_available- sin(pi/2) = 1", () => {
     parseExpression("sin(pi / 2)");
     mkCtx({});
   });
 
-  it("circuit_voltage_in_complex_expr — 0.01 * V(ctrl)^2 at V(ctrl)=3 gives 0.09", () => {
+  it("circuit_voltage_in_complex_expr- 0.01 * V(ctrl)^2 at V(ctrl)=3 gives 0.09", () => {
     parseExpression("0.01 * V(ctrl) ^ 2");
     mkCtx({ voltages: { ctrl: 3 } });
   });
 
-  it("circuit_current_in_complex_expr — 100 * I(sense) at I(sense)=0.02 gives 2", () => {
+  it("circuit_current_in_complex_expr- 100 * I(sense) at I(sense)=0.02 gives 2", () => {
     parseExpression("100 * I(sense)");
     mkCtx({ currents: { sense: 0.02 } });
   });
@@ -111,13 +111,13 @@ describe("compileExpression", () => {
     expect(typeof compileExpression(expr)).toBe("function");
   });
 
-  it("compiled_constant — 42 compiles to function returning 42", () => {
+  it("compiled_constant- 42 compiles to function returning 42", () => {
     const fn = compileExpression(parseExpression("42"));
     const ctx = mkCtx({});
     expect(fn(ctx)).toBe(42);
   });
 
-  it("compiled_v_function — V(A) resolves via context each call", () => {
+  it("compiled_v_function- V(A) resolves via context each call", () => {
     const fn = compileExpression(parseExpression("V(A)"));
     const ctx1 = mkCtx({ voltages: { A: 1.0 } });
     const ctx2 = mkCtx({ voltages: { A: 5.0 } });
@@ -125,7 +125,7 @@ describe("compileExpression", () => {
     expect(fn(ctx2)).toBe(5.0);
   });
 
-  it("compiled_time — time variable resolves from context each call", () => {
+  it("compiled_time- time variable resolves from context each call", () => {
     const fn = compileExpression(parseExpression("time"));
     expect(fn(mkCtx({ time: 0.001 }))).toBe(0.001);
     expect(fn(mkCtx({ time: 0.002 }))).toBe(0.002);

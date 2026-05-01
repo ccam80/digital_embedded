@@ -1,5 +1,5 @@
 /**
- * Test data extraction — collect embedded test vectors from Testcase components.
+ * Test data extraction- collect embedded test vectors from Testcase components.
  *
  * This module has no browser dependencies and runs in Node.js.
  */
@@ -8,7 +8,7 @@ import type { Circuit } from "../core/circuit.js";
 import { TestcaseElement } from "../components/misc/testcase.js";
 
 // ---------------------------------------------------------------------------
-// extractEmbeddedTestData — collect test data from all Testcase elements
+// extractEmbeddedTestData- collect test data from all Testcase elements
 // ---------------------------------------------------------------------------
 
 /**

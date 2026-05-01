@@ -1,5 +1,5 @@
 /**
- * Tests for DataTablePanel — live tabular view of measured signals.
+ * Tests for DataTablePanel- live tabular view of measured signals.
  *
  * @vitest-environment jsdom
  */
@@ -27,7 +27,7 @@ function teardown(el: HTMLElement): void {
 }
 
 // ---------------------------------------------------------------------------
-// Mock coordinator — minimal implementation for DataTablePanel tests
+// Mock coordinator- minimal implementation for DataTablePanel tests
 // ---------------------------------------------------------------------------
 
 class MockCoordinator implements Pick<SimulationCoordinator, 'readSignal' | 'addMeasurementObserver' | 'removeMeasurementObserver'> {
@@ -69,7 +69,7 @@ const THREE_SIGNALS: SignalDescriptor[] = [
 ];
 
 // ---------------------------------------------------------------------------
-// rendersSignals — create with 3 signals, verify 3 rows rendered with names
+// rendersSignals- create with 3 signals, verify 3 rows rendered with names
 // ---------------------------------------------------------------------------
 
 describe("DataTablePanel", () => {
@@ -129,7 +129,7 @@ describe("DataTablePanel", () => {
   });
 
   // -------------------------------------------------------------------------
-  // updatesOnStep — call onStep(), verify values refreshed from coordinator
+  // updatesOnStep- call onStep(), verify values refreshed from coordinator
   // -------------------------------------------------------------------------
 
   describe("updatesOnStep", () => {
@@ -219,7 +219,7 @@ describe("DataTablePanel", () => {
   });
 
   // -------------------------------------------------------------------------
-  // radixSwitch — switch signal from decimal to hex, verify display format
+  // radixSwitch- switch signal from decimal to hex, verify display format
   // -------------------------------------------------------------------------
 
   describe("radixSwitch", () => {
@@ -334,7 +334,7 @@ describe("DataTablePanel", () => {
   });
 
   // -------------------------------------------------------------------------
-  // onReset — call onReset(), verify values cleared/reset
+  // onReset- call onReset(), verify values cleared/reset
   // -------------------------------------------------------------------------
 
   describe("onReset", () => {
@@ -419,7 +419,7 @@ describe("DataTablePanel", () => {
       panel.onStep(1);
       panel.onReset();
 
-      // Step again — should repopulate from coordinator
+      // Step again- should repopulate from coordinator
       coordinator.setDigitalSignal(0, 77);
       panel.onStep(2);
       expect(panel.getDisplayValueByName("A")).toBe("77");

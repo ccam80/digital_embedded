@@ -1,6 +1,6 @@
-# Task #24 Report — D-5: bjt.ts:1789 remove dt>0 from capGate
+# Task #24 Report- D-5: bjt.ts:1789 remove dt>0 from capGate
 
-## Status: COMPLETE (already correct — no edit needed)
+## Status: COMPLETE (already correct- no edit needed)
 
 ## Findings
 

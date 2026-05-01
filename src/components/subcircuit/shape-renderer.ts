@@ -44,7 +44,7 @@ export function computeChipDimensions(
 }
 
 // ---------------------------------------------------------------------------
-// Upright text helper — counter-rotates text when component is at 180°
+// Upright text helper- counter-rotates text when component is at 180°
 // ---------------------------------------------------------------------------
 
 /**
@@ -123,7 +123,7 @@ function drawPins(
 }
 
 // ---------------------------------------------------------------------------
-// DEFAULT shape — labeled rectangle with pin stubs and pin name labels
+// DEFAULT shape- labeled rectangle with pin stubs and pin name labels
 // ---------------------------------------------------------------------------
 
 /**
@@ -158,7 +158,7 @@ export function drawDefaultShape(
 }
 
 // ---------------------------------------------------------------------------
-// DIL shape — DIP IC package appearance
+// DIL shape- DIP IC package appearance
 // ---------------------------------------------------------------------------
 
 /**
@@ -193,7 +193,7 @@ export function drawDILShape(
 }
 
 // ---------------------------------------------------------------------------
-// CUSTOM shape — renders custom drawables and pin labels
+// CUSTOM shape- renders custom drawables and pin labels
 // ---------------------------------------------------------------------------
 
 /**
@@ -347,7 +347,7 @@ function renderCustomPinLabels(
 }
 
 // ---------------------------------------------------------------------------
-// LAYOUT shape — miniature rendering of subcircuit internals
+// LAYOUT shape- miniature rendering of subcircuit internals
 // ---------------------------------------------------------------------------
 
 /**

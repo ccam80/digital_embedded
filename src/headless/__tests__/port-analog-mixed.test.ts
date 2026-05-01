@@ -7,12 +7,12 @@
  * value proposition over plain In/Out.
  *
  * Tests:
- *   1. Port connected to Resistor — pure analog circuit, Port is neutral
+ *   1. Port connected to Resistor- pure analog circuit, Port is neutral
  *      infrastructure.  Compilation must succeed with zero errors.
- *   2. Port in mixed-mode subcircuit — And gate (digital) + Resistor (analog)
+ *   2. Port in mixed-mode subcircuit- And gate (digital) + Resistor (analog)
  *      with Port interfaces.  Compilation must succeed; partition/bridge
  *      mechanism must handle Port correctly.
- *   3. Port label resolution in analog domain — when the analog compiler's
+ *   3. Port label resolution in analog domain- when the analog compiler's
  *      labelToNodeId includes Port, readAllSignals() must expose that label.
  *
  * If any test reveals that Port does not work with analog components, the
@@ -26,7 +26,7 @@ import { createDefaultRegistry } from '../../components/register-all.js';
 const registry = createDefaultRegistry();
 
 // ---------------------------------------------------------------------------
-// Test 1: Port connected to Resistor — pure analog
+// Test 1: Port connected to Resistor- pure analog
 //
 // Circuit topology (no digital components):
 //   DcVoltageSource(pos) → Port("P_in") → Resistor("R1") → Ground
@@ -36,7 +36,7 @@ const registry = createDefaultRegistry();
 // labelToNodeId so that readAllSignals() returns a "P_in" entry.
 // ---------------------------------------------------------------------------
 
-describe('Port + Resistor — pure analog compile', () => {
+describe('Port + Resistor- pure analog compile', () => {
   it('compiles a circuit with Port connected to Resistor without errors', () => {
     const facade = new DefaultSimulatorFacade(registry);
 
@@ -58,7 +58,7 @@ describe('Port + Resistor — pure analog compile', () => {
       ],
     });
 
-    // Validate — no fatal errors expected
+    // Validate- no fatal errors expected
     const diagnostics = facade.validate(circuit);
     const errors = diagnostics.filter(d => d.severity === 'error');
     expect(errors, `Unexpected errors: ${JSON.stringify(errors)}`).toHaveLength(0);
@@ -70,7 +70,7 @@ describe('Port + Resistor — pure analog compile', () => {
   it('Port is skipped as a neutral element in the analog MNA matrix (no analog model)', () => {
     const facade = new DefaultSimulatorFacade(registry);
 
-    // Port.models is {} — it must not be stamped into the MNA matrix.
+    // Port.models is {}- it must not be stamped into the MNA matrix.
     // We verify this indirectly: if Port were stamped as an unknown element
     // the compile() call would throw or produce an error diagnostic.
     const circuit = facade.build({
@@ -90,7 +90,7 @@ describe('Port + Resistor — pure analog compile', () => {
 
     const engine = facade.compile(circuit);
     facade.step(engine);
-    // Port is neutral infrastructure — verify the circuit compiles and steps
+    // Port is neutral infrastructure- verify the circuit compiles and steps
     // without error, and the analog domain has elements (vsrc + r1, not Port).
     const signals = facade.readAllSignals(engine);
     expect(Object.keys(signals).length).toBeGreaterThan(0);
@@ -106,13 +106,13 @@ describe('Port + Resistor — pure analog compile', () => {
 //
 // The partition/bridge mechanism must handle Port without crashing.  Port
 // resolves as "neutral" so it is not assigned to either partition's component
-// list — the bridge is created between the two connectivity groups that span
+// list- the bridge is created between the two connectivity groups that span
 // the Port's wire.
 //
 // Structural test: compile must succeed without throwing.
 // ---------------------------------------------------------------------------
 
-describe('Port in mixed-mode circuit — And gate + Resistor', () => {
+describe('Port in mixed-mode circuit- And gate + Resistor', () => {
   it('compile() does not throw when Port sits between digital And gate and analog Resistor', () => {
     const facade = new DefaultSimulatorFacade(registry);
 
@@ -230,7 +230,7 @@ describe('Port label resolution in analog domain via readAllSignals()', () => {
 
     // readSignal() throws FacadeError when the label is absent from
     // labelSignalMap. If Port labels are not resolved by compileAnalogPartition,
-    // this will throw and the test will fail — exposing the gap.
+    // this will throw and the test will fail- exposing the gap.
     expect(() => facade.readSignal(engine, 'P_read')).not.toThrow();
     const voltage = facade.readSignal(engine, 'P_read');
     // With 5V source and 1kΩ load, the voltage at the Port node is ~5V
@@ -240,10 +240,10 @@ describe('Port label resolution in analog domain via readAllSignals()', () => {
 });
 
 // ---------------------------------------------------------------------------
-// Test 4: Port in pure-digital circuit — no regression
+// Test 4: Port in pure-digital circuit- no regression
 // ---------------------------------------------------------------------------
 
-describe('Port in pure-digital circuit — no regression', () => {
+describe('Port in pure-digital circuit- no regression', () => {
   it('Port works as expected in a digital-only circuit', () => {
     const facade = new DefaultSimulatorFacade(registry);
 
@@ -269,7 +269,7 @@ describe('Port in pure-digital circuit — no regression', () => {
 });
 
 // ---------------------------------------------------------------------------
-// Test 5: Port at cross-domain boundary — connected to both digital and analog
+// Test 5: Port at cross-domain boundary- connected to both digital and analog
 // ---------------------------------------------------------------------------
 
 describe('Port at cross-domain boundary', () => {
@@ -294,7 +294,7 @@ describe('Port at cross-domain boundary', () => {
       ],
     });
 
-    // Compile should succeed — Port spans both domains via the bridge mechanism
+    // Compile should succeed- Port spans both domains via the bridge mechanism
     const engine = facade.compile(circuit);
     facade.step(engine);
 

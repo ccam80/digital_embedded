@@ -106,7 +106,7 @@ describe('path-analysis', () => {
   // singleGate: one AND gate → path length = defaultDelay (10ns)
   // -------------------------------------------------------------------------
 
-  it('singleGate — one AND gate → pathLength = 10ns', () => {
+  it('singleGate- one AND gate → pathLength = 10ns', () => {
     const registry = buildRegistry({ And: 10 });
     const circuit = new Circuit();
 
@@ -153,7 +153,7 @@ describe('path-analysis', () => {
   // cascade: AND → OR → NOT → path length = sum of delays
   // -------------------------------------------------------------------------
 
-  it('cascade — AND(15ns) → OR(20ns) → NOT(5ns) → pathLength = 40ns', () => {
+  it('cascade- AND(15ns) → OR(20ns) → NOT(5ns) → pathLength = 40ns', () => {
     const registry = buildRegistry({ And: 15, Or: 20, Not: 5 });
     const circuit = new Circuit();
 
@@ -228,7 +228,7 @@ describe('path-analysis', () => {
   // parallelPaths: two paths of different length → reports the longer one
   // -------------------------------------------------------------------------
 
-  it('parallelPaths — two paths (10ns vs 20ns) → reports longer one (20ns)', () => {
+  it('parallelPaths- two paths (10ns vs 20ns) → reports longer one (20ns)', () => {
     const registry = buildRegistry({ And: 10, Or: 20 });
     const circuit = new Circuit();
 
@@ -290,7 +290,7 @@ describe('path-analysis', () => {
   // componentList: verify components listed in path order
   // -------------------------------------------------------------------------
 
-  it('componentList — cascade path lists components in topological order', () => {
+  it('componentList- cascade path lists components in topological order', () => {
     const registry = buildRegistry({ And: 10, Not: 5 });
     const circuit = new Circuit();
 

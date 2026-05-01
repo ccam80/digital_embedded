@@ -1,5 +1,5 @@
 {
-  "title": "ECE 101 — Introduction to Digital Logic",
+  "title": "ECE 101- Introduction to Digital Logic",
   "description": "First-year digital logic course. Covers combinational gates, adders, latches, and flip-flops.",
   "palette": ["And", "Or", "Not", "NAnd", "NOr", "XOr", "In", "Out", "Clock", "Led", "FlipflopD", "FlipflopJK"],
   "locked": false,

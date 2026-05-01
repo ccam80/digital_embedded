@@ -30,7 +30,7 @@ const FIXTURE_PATH = resolve(
 const TRAN_STOP_TIME = 200e-6;
 const TRAN_MAX_STEP = 1e-6;
 
-describeIfDll("MOSFET inverter — ngspice DC-OP + transient parity", () => {
+describeIfDll("MOSFET inverter- ngspice DC-OP + transient parity", () => {
   it("dc_op_match", async () => {
     const session = new ComparisonSession({
       dtsPath: FIXTURE_PATH,

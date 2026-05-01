@@ -1,5 +1,5 @@
 /**
- * LED component — single-color indicator.
+ * LED component- single-color indicator.
  *
  * Renders as a circle with configurable color. Lit state derives from the
  * analog forward voltage compared against a per-color illumination
@@ -64,7 +64,7 @@ export function getLitThreshold(color: string): number {
 }
 
 // ---------------------------------------------------------------------------
-// LedElement — UI-facing CircuitElement
+// LedElement- UI-facing CircuitElement
 // ---------------------------------------------------------------------------
 
 export class LedElement extends AbstractCircuitElement {
@@ -124,7 +124,7 @@ export class LedElement extends AbstractCircuitElement {
     // Inner color zone circle at (0.8, 0) r=0.65
     ctx.drawCircle(0.8, 0, 0.65, true);
 
-    // Bright central highlight when lit — visual indication that Vd has
+    // Bright central highlight when lit- visual indication that Vd has
     // crossed the per-color threshold.
     if (lit) {
       ctx.drawCircle(0.8, 0, 0.3, true);
@@ -143,7 +143,7 @@ export class LedElement extends AbstractCircuitElement {
 }
 
 // ---------------------------------------------------------------------------
-// executeLed — reads input, writes to output slot for display state
+// executeLed- reads input, writes to output slot for display state
 // ---------------------------------------------------------------------------
 
 export function executeLed(
@@ -158,7 +158,7 @@ export function executeLed(
 }
 
 // ---------------------------------------------------------------------------
-// createLedAnalogElementViaDiode — pin-remap adapter
+// createLedAnalogElementViaDiode- pin-remap adapter
 // ---------------------------------------------------------------------------
 
 function createLedAnalogElementViaDiode(

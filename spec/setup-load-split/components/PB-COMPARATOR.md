@@ -9,10 +9,10 @@ The composite itself has no `ngspiceNodeMap`. Sub-element carries its own map.
 
 Composite pin labels (from `buildComparatorPinDeclarations()`):
 
-**IMPORTANT — pin ordering differs from opamp:**
-- `in+` — non-inverting input (pinLayout index 0, position y:-1)
-- `in-` — inverting input (pinLayout index 1, position y:1)
-- `out` — output (pinLayout index 2)
+**IMPORTANT- pin ordering differs from opamp:**
+- `in+`- non-inverting input (pinLayout index 0, position y:-1)
+- `in-`- inverting input (pinLayout index 1, position y:1)
+- `out`- output (pinLayout index 2)
 
 The comparator's `in+` is at y=-1 and `in-` is at y=+1. This is the *opposite* physical position from the op-amp (which places `in-` at y=-1). The MNA node assignments below must use the correct labels, not positional indices.
 
@@ -42,7 +42,7 @@ The current PB-COMPARATOR implementation uses a Norton output stage (conductance
 2. After applying this spec, run `comparator.test.ts` again. Any newly-failing assertion is a regression.
 3. For each regression, the implementer must REPORT (not silently fix) before declaring the task complete. The user will decide whether the regression is acceptable (high-gain VCVS saturation behavior is provably equivalent to Norton at steady state) or whether the architecture needs to revert to Norton (Option B from FCOMP-D1).
 
-**Hot field declarations** (FCOMP-D2 resolved): `this._latchActive` is derived in `load()` by reading `ctx.state0[this._stateBase + OUTPUT_LATCH] >= 0.5` — no separate cached field is needed; the value is re-read from state each `load()` call. `this._p.rSat` is declared as a model parameter on PB-COMPARATOR with default `1.0` Ω; users can override via setParam. Add `rSat` to the comparator's parameter list alongside `vOH`, `vOL`, `hysteresis`, and `vos`.
+**Hot field declarations** (FCOMP-D2 resolved): `this._latchActive` is derived in `load()` by reading `ctx.state0[this._stateBase + OUTPUT_LATCH] >= 0.5`- no separate cached field is needed; the value is re-read from state each `load()` call. `this._p.rSat` is declared as a model parameter on PB-COMPARATOR with default `1.0` Ω; users can override via setParam. Add `rSat` to the comparator's parameter list alongside `vOH`, `vOL`, `hysteresis`, and `vos`.
 
 The current open-collector and push-pull implementations use a conductance-only stamp (no VCVS branch). After migration, the VCVS sub-element provides the branch row for the stamp-order test. The saturation behavior is preserved: when `|gain * (V_in+ - V_in-)| > vOH`, the VCVS gain is effectively frozen and a Norton clamp current is injected.
 
@@ -62,7 +62,7 @@ factory(pinNodes, props, getTime): AnalogElementCore {
 }
 ```
 
-## setup() body — composite forwards
+## setup() body- composite forwards
 
 ```ts
 setup(ctx: SetupContext): void {
@@ -79,7 +79,7 @@ setup(ctx: SetupContext): void {
 }
 ```
 
-## load() body — composite forwards with output saturation
+## load() body- composite forwards with output saturation
 
 ```ts
 load(ctx: LoadContext): void {
@@ -140,11 +140,11 @@ With nodes `(inP, inN, nOut, 0)`:
 | 5 | `VCVSibrContPosptr` | `branch` | `inP` |
 | 6 | `VCVSibrContNegptr` | `branch` | `inN` |
 
-Note: entry (2) `(0, branch)` — ground row is node 0; `allocElement(0, branch)` is a no-op (ground row not stamped). Entry (4) similarly skipped. VCVSElement.setup() must handle node-0 entries correctly (skip, as ngspice does — ground row is never explicitly stored).
+Note: entry (2) `(0, branch)`- ground row is node 0; `allocElement(0, branch)` is a no-op (ground row not stamped). Entry (4) similarly skipped. VCVSElement.setup() must handle node-0 entries correctly (skip, as ngspice does- ground row is never explicitly stored).
 
 ## Pre-implementation checklist (W3 implementer)
 
-1. Run `npm run test:q -- comparator` — capture baseline pass/fail counts.
+1. Run `npm run test:q -- comparator`- capture baseline pass/fail counts.
 2. Identify any `expect(out).toBeCloseTo(...)` assertions where the expected value depends on saturation behavior. The Norton→VCVS swap may shift these by µV-to-mV depending on circuit load.
 3. After implementation, re-run; report any new failures for user review.
 
@@ -152,11 +152,11 @@ Note: entry (2) `(0, branch)` — ground row is node 0; `allocElement(0, branch)
 
 Per CLAUDE.md "Test Policy During W3 Setup-Load-Split", verification is spec compliance only. DO NOT run tests; DO NOT use test results.
 
-1. `setup()` body in the implementation file matches the "setup() body — alloc only" listing in this PB line-for-line.
+1. `setup()` body in the implementation file matches the "setup() body- alloc only" listing in this PB line-for-line.
 2. TSTALLOC sequence in `setup()` matches the order in the cited ngspice anchor file (see top of this PB, e.g. `ressetup.c:46-49`).
 3. Factory cleanup applied per the "Factory cleanup" section above.
 4. `ngspiceNodeMap` registered per the "Pin mapping" section above (or omitted for composites where the spec says so).
-5. `load()` writes through cached handles only — zero `solver.allocElement(...)` calls inside `load()`, `accept()`, or any non-`setup()` method.
+5. `load()` writes through cached handles only- zero `solver.allocElement(...)` calls inside `load()`, `accept()`, or any non-`setup()` method.
 6. `mayCreateInternalNodes` flag set per spec.
 7. `findBranchFor` callback present where spec says (V-output sources, IND, etc.).
 8. No banned closing verdicts (mapping/tolerance/equivalent-to/pre-existing/intentional-divergence/citation-divergence/partial) used in any commit message or report.

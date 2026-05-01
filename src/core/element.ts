@@ -1,5 +1,5 @@
 /**
- * CircuitElement interface — the editor-facing object for every component type.
+ * CircuitElement interface- the editor-facing object for every component type.
  *
  * Per Decision 1: CircuitElement has NO execute() method. No simulation logic.
  * Simulation is handled by standalone flat functions registered in ComponentDefinition.
@@ -8,7 +8,7 @@
  *
  * The interface is engine-agnostic: any simulation backend (digital event-driven,
  * analog MNA, etc.) can reuse the same CircuitElement for rendering and property
- * editing — only the registered flat simulation functions differ.
+ * editing- only the registered flat simulation functions differ.
  */
 
 import type { Point, Rect, RenderContext } from "./renderer-interface.js";
@@ -24,7 +24,7 @@ import type { PropertyBag, PropertyValue } from "./properties.js";
 import { propertyBagToJson } from "./properties.js";
 
 // ---------------------------------------------------------------------------
-// SerializedElement — shape for JSON save/load
+// SerializedElement- shape for JSON save/load
 // ---------------------------------------------------------------------------
 
 /**
@@ -41,7 +41,7 @@ export interface SerializedElement {
   readonly position: Point;
   readonly rotation: Rotation;
   readonly mirror: boolean;
-  /** Serialized property values — plain JSON-safe object. */
+  /** Serialized property values- plain JSON-safe object. */
   readonly properties: Record<string, number | string | boolean | number[]>;
 }
 
@@ -150,7 +150,7 @@ export interface CircuitElement {
 }
 
 // ---------------------------------------------------------------------------
-// AbstractCircuitElement — base class with common default implementations
+// AbstractCircuitElement- base class with common default implementations
 // ---------------------------------------------------------------------------
 
 /**

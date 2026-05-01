@@ -167,11 +167,11 @@ function createOTAElement(
   let iOut = 0; // cached output current for getPinCurrents
 
   // Cached TSTALLOC handles (vccsset.c:43-46): 4 entries for VCCS
-  // Closure-locals per §A.9; allocated once in setup(), used every NR iteration in load().
-  let _hPCP = -1;  // (nOutP, nVp)  — VCCSposContPosptr
-  let _hPCN = -1;  // (nOutP, nVm)  — VCCSposContNegptr
-  let _hNCP = -1;  // (nOutN, nVp)  — VCCSnegContPosptr
-  let _hNCN = -1;  // (nOutN, nVm)  — VCCSnegContNegptr
+  // Closure-locals per ssA.9; allocated once in setup(), used every NR iteration in load().
+  let _hPCP = -1;  // (nOutP, nVp) - VCCSposContPosptr
+  let _hPCN = -1;  // (nOutP, nVm) - VCCSposContNegptr
+  let _hNCP = -1;  // (nOutN, nVp) - VCCSnegContPosptr
+  let _hNCN = -1;  // (nOutN, nVm) - VCCSnegContNegptr
 
   function readNode(rhs: Float64Array, n: number): number {
     return rhs[n];

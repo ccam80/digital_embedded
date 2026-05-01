@@ -1,5 +1,5 @@
 /**
- * ScopeCursors — measurement cursors for the analog oscilloscope.
+ * ScopeCursors- measurement cursors for the analog oscilloscope.
  *
  * Two vertical cursors (A and B) can be placed on the time axis. When both
  * are set, getMeasurements() computes ΔT, ΔV, frequency, RMS, peak-to-peak,
@@ -11,7 +11,7 @@ import { formatSI } from "../editor/si-format.js";
 export { formatSI };
 
 // ---------------------------------------------------------------------------
-// ScopeMeasurements — computed values between cursors A and B
+// ScopeMeasurements- computed values between cursors A and B
 // ---------------------------------------------------------------------------
 
 export interface ScopeMeasurements {

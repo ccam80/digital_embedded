@@ -3,7 +3,7 @@
  *
  * Transforms a Circuit containing subcircuit elements into an equivalent flat
  * Circuit containing only leaf (non-subcircuit) components. The compiler then
- * processes the flat circuit — it has no knowledge of subcircuits.
+ * processes the flat circuit- it has no knowledge of subcircuits.
  *
  * Flattening process per subcircuit instance:
  *   1. Look up the subcircuit's internal Circuit definition.
@@ -30,7 +30,7 @@ import type { RenderContext, Rect } from "../../core/renderer-interface.js";
 import type { SerializedElement } from "../../core/element.js";
 
 // ---------------------------------------------------------------------------
-// SubcircuitHost interface — the contract flatten.ts needs from a subcircuit element
+// SubcircuitHost interface- the contract flatten.ts needs from a subcircuit element
 // ---------------------------------------------------------------------------
 
 /**
@@ -67,7 +67,7 @@ export function isSubcircuitHost(el: CircuitElement): el is SubcircuitHost {
 }
 
 // ---------------------------------------------------------------------------
-// FlattenResult — public return type
+// FlattenResult- public return type
 // ---------------------------------------------------------------------------
 
 /**
@@ -82,14 +82,14 @@ export interface FlattenResult {
 }
 
 // ---------------------------------------------------------------------------
-// flattenCircuit — public API
+// flattenCircuit- public API
 // ---------------------------------------------------------------------------
 
 /**
  * Flatten a circuit by unconditionally inlining all subcircuit instances.
  *
  * Every subcircuit is recursively replaced by its internal components.
- * Domain classification is the partitioner's job — the flattener does not
+ * Domain classification is the partitioner's job- the flattener does not
  * care about simulation domains.
  *
  * @param circuit   Source circuit (may contain subcircuit elements).
@@ -212,7 +212,7 @@ function inlineSubcircuit(
   const bridgeWires: Wire[] = [];
 
   // All elements from the flattened internal circuit go into the parent.
-  // In/Out/Port interface elements are included — they are leaf components.
+  // In/Out/Port interface elements are included- they are leaf components.
   for (const internalEl of flatInternal.elements) {
     elements.push(internalEl);
   }
@@ -252,7 +252,7 @@ function inlineSubcircuit(
 
     // Create a bridge wire from the subcircuit's pin WORLD position in the parent
     // to the internal interface element's pin WORLD position.
-    // pinWorldPosition(el, pin) = el.position + pin.position — this matches
+    // pinWorldPosition(el, pin) = el.position + pin.position- this matches
     // how the connectivity extractor resolves net membership for both endpoints.
     bridgeWires.push(new Wire(
       {
@@ -285,7 +285,7 @@ function findInterfaceElement(
   label: string,
   direction: PinDirection,
 ): CircuitElement | undefined {
-  // Port — the standard subcircuit interface element
+  // Port- the standard subcircuit interface element
   for (const el of flatCircuit.elements) {
     if (el.typeId === "Port") {
       const elLabel = el.getAttribute("label");
@@ -296,7 +296,7 @@ function findInterfaceElement(
   // BIDIRECTIONAL pins only match Port.
   if (direction === PinDirection.BIDIRECTIONAL) return undefined;
 
-  // In/Out — for pre-existing .dig files that predate Port
+  // In/Out- for pre-existing .dig files that predate Port
   const targetTypeId = direction === PinDirection.INPUT ? "In" : "Out";
   for (const el of flatCircuit.elements) {
     if (el.typeId !== targetTypeId) continue;
@@ -337,7 +337,7 @@ function scopeInstanceId(el: CircuitElement, scopePrefix: string): CircuitElemen
 }
 
 // ---------------------------------------------------------------------------
-// ScopedElement — thin wrapper that overrides instanceId
+// ScopedElement- thin wrapper that overrides instanceId
 // ---------------------------------------------------------------------------
 
 /**

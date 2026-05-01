@@ -30,7 +30,7 @@ describe("VoltageRange", () => {
   it("fixed_range_overrides_auto", () => {
     tracker.setFixedRange(0, 3.3);
 
-    // Feed voltages up to 12V — max must remain exactly 3.3 (fixed range).
+    // Feed voltages up to 12V- max must remain exactly 3.3 (fixed range).
     tracker.update(0, 12);
 
     expect(tracker.max).toBe(3.3);
@@ -41,7 +41,7 @@ describe("VoltageRange", () => {
     tracker.clearFixedRange();
     expect(tracker.isAutoRange).toBe(true);
 
-    // Feed new voltages — auto range should track them.
+    // Feed new voltages- auto range should track them.
     tracker.update(0, 8);
 
     expect(tracker.max).toBeGreaterThanOrEqual(8);
@@ -54,7 +54,7 @@ describe("VoltageRange", () => {
     // Now feed a narrow range.
     tracker.update(-1, 1);
 
-    // Range must NOT have contracted — latching holds the peak.
+    // Range must NOT have contracted- latching holds the peak.
     expect(tracker.max).toBeGreaterThanOrEqual(10);
     expect(tracker.min).toBeLessThanOrEqual(-10);
   });

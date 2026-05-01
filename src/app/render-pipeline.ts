@@ -1,5 +1,5 @@
 /**
- * RenderPipeline — canvas rendering loop, coordinate helpers, canvas management.
+ * RenderPipeline- canvas rendering loop, coordinate helpers, canvas management.
  *
  * Owns: resizeCanvas, scheduleRender, renderFrame, frame profiling,
  * diagnostic overlays, canvas rect cache, coordinate helpers, sizeCanvasInContainer.
@@ -72,7 +72,7 @@ export function initRenderPipeline(ctx: AppContext, search?: string): RenderPipe
   // Canvas sizing
   // -------------------------------------------------------------------------
 
-  // Cached canvas dimensions — avoids forced synchronous layout reflow
+  // Cached canvas dimensions- avoids forced synchronous layout reflow
   // from reading clientWidth/clientHeight on every render frame.
   let _canvasW = 0;
   let _canvasH = 0;
@@ -109,7 +109,7 @@ export function initRenderPipeline(ctx: AppContext, search?: string): RenderPipe
     }
   }
 
-  // Frame profiling — enabled via ?profile query param or console: _enableFrameProfile()
+  // Frame profiling- enabled via ?profile query param or console: _enableFrameProfile()
   let _frameProfileEnabled = search?.includes('profile') ?? false;
   let _frameProfileSamples: number[] = [];
   (window as any)._enableFrameProfile = () => { _frameProfileEnabled = true; _frameProfileSamples = []; };
@@ -126,7 +126,7 @@ export function initRenderPipeline(ctx: AppContext, search?: string): RenderPipe
     _frameProfileSamples = [];
   };
 
-  // Wire signal access adapter — reads live signal values for wire coloring.
+  // Wire signal access adapter- reads live signal values for wire coloring.
   const wireSignalAccessAdapter: WireSignalAccess = {
     getWireValue(wire: Wire): { raw: number; width: number } | { voltage: number } | undefined {
       const coordinator = ctx.facade.getCoordinator();
@@ -146,7 +146,7 @@ export function initRenderPipeline(ctx: AppContext, search?: string): RenderPipe
     const dpr = window.devicePixelRatio || 1;
     ctx2d.setTransform(dpr, 0, 0, dpr, 0, 0);
 
-    // Use cached dimensions — avoids forced synchronous layout reflow.
+    // Use cached dimensions- avoids forced synchronous layout reflow.
     const w = _canvasW;
     const h = _canvasH;
 
@@ -324,7 +324,7 @@ export function initRenderPipeline(ctx: AppContext, search?: string): RenderPipe
     const h = cvs.clientHeight;
     const targetW = Math.round(w * dpr);
     const targetH = Math.round(h * dpr);
-    // Only resize when dimensions actually changed — setting canvas.width/height
+    // Only resize when dimensions actually changed- setting canvas.width/height
     // resets the entire canvas context and forces GPU reallocation.
     if (targetW > 0 && targetH > 0 && (cvs.width !== targetW || cvs.height !== targetH)) {
       cvs.width = targetW;

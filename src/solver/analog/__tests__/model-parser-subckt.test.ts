@@ -19,7 +19,7 @@ function getElement(sc: ParsedSubcircuit, name: string): ParsedElement {
 // Basic structure
 // ---------------------------------------------------------------------------
 
-describe("parseSubcircuit — basic structure", () => {
+describe("parseSubcircuit- basic structure", () => {
   const TEXT = `
 .SUBCKT myopamp inp inn out vcc vee
 R1 inp 1 10k
@@ -53,7 +53,7 @@ R2 inn 2 10k
 // Comments and blank lines
 // ---------------------------------------------------------------------------
 
-describe("parseSubcircuit — comments and blank lines", () => {
+describe("parseSubcircuit- comments and blank lines", () => {
   const TEXT = `
 .SUBCKT demo a b
 
@@ -87,7 +87,7 @@ R2 a b 2k
 // Element type R (resistor)
 // ---------------------------------------------------------------------------
 
-describe("parseSubcircuit — R element", () => {
+describe("parseSubcircuit- R element", () => {
   const TEXT = `.SUBCKT test a b\nR1 a b 10k\n.ENDS`;
 
   it("parses R type correctly", () => {
@@ -112,7 +112,7 @@ describe("parseSubcircuit — R element", () => {
 // Element type C (capacitor)
 // ---------------------------------------------------------------------------
 
-describe("parseSubcircuit — C element", () => {
+describe("parseSubcircuit- C element", () => {
   const TEXT = `.SUBCKT test a b\nC1 a b 100n\n.ENDS`;
 
   it("parses C type correctly", () => {
@@ -131,7 +131,7 @@ describe("parseSubcircuit — C element", () => {
 // Element type L (inductor)
 // ---------------------------------------------------------------------------
 
-describe("parseSubcircuit — L element", () => {
+describe("parseSubcircuit- L element", () => {
   const TEXT = `.SUBCKT test a b\nL1 a b 1u\n.ENDS`;
 
   it("parses L type correctly", () => {
@@ -150,7 +150,7 @@ describe("parseSubcircuit — L element", () => {
 // Element type D (diode)
 // ---------------------------------------------------------------------------
 
-describe("parseSubcircuit — D element", () => {
+describe("parseSubcircuit- D element", () => {
   const TEXT = `.SUBCKT test a b\nD1 a b 1N4148\n.ENDS`;
 
   it("parses D type correctly", () => {
@@ -176,7 +176,7 @@ describe("parseSubcircuit — D element", () => {
 // Element type Q (BJT)
 // ---------------------------------------------------------------------------
 
-describe("parseSubcircuit — Q element", () => {
+describe("parseSubcircuit- Q element", () => {
   const TEXT = `.SUBCKT test c b e\nQ1 c b e NPN\n.ENDS`;
 
   it("parses Q type correctly", () => {
@@ -198,7 +198,7 @@ describe("parseSubcircuit — Q element", () => {
   });
 });
 
-describe("parseSubcircuit — Q element with substrate", () => {
+describe("parseSubcircuit- Q element with substrate", () => {
   const TEXT = `.SUBCKT test c b e sub\nQ1 c b e sub NPN\n.ENDS`;
 
   it("captures all four nodes with substrate", () => {
@@ -218,7 +218,7 @@ describe("parseSubcircuit — Q element with substrate", () => {
 // Element type M (MOSFET)
 // ---------------------------------------------------------------------------
 
-describe("parseSubcircuit — M element", () => {
+describe("parseSubcircuit- M element", () => {
   const TEXT = `.SUBCKT test d g s b\nM1 d g s b NMOS W=10u L=1u\n.ENDS`;
 
   it("parses M type correctly", () => {
@@ -254,7 +254,7 @@ describe("parseSubcircuit — M element", () => {
 // Element type J (JFET)
 // ---------------------------------------------------------------------------
 
-describe("parseSubcircuit — J element", () => {
+describe("parseSubcircuit- J element", () => {
   const TEXT = `.SUBCKT test d g s\nJ1 d g s NJFET\n.ENDS`;
 
   it("parses J type correctly", () => {
@@ -280,7 +280,7 @@ describe("parseSubcircuit — J element", () => {
 // Element type V (voltage source)
 // ---------------------------------------------------------------------------
 
-describe("parseSubcircuit — V element", () => {
+describe("parseSubcircuit- V element", () => {
   it("parses plain numeric value", () => {
     const sc = parseSubcircuit(`.SUBCKT test p n\nV1 p n 5\n.ENDS`);
     const v = getElement(sc, "V1");
@@ -305,7 +305,7 @@ describe("parseSubcircuit — V element", () => {
 // Element type I (current source)
 // ---------------------------------------------------------------------------
 
-describe("parseSubcircuit — I element", () => {
+describe("parseSubcircuit- I element", () => {
   it("parses current source with DC value", () => {
     const sc = parseSubcircuit(`.SUBCKT test p n\nI1 p n DC 1m\n.ENDS`);
     const i = getElement(sc, "I1");
@@ -317,7 +317,7 @@ describe("parseSubcircuit — I element", () => {
 // Element type X (subcircuit instance)
 // ---------------------------------------------------------------------------
 
-describe("parseSubcircuit — X element", () => {
+describe("parseSubcircuit- X element", () => {
   const TEXT = `.SUBCKT test a b c\nX1 a b c MySubckt\n.ENDS`;
 
   it("parses X type correctly", () => {
@@ -343,7 +343,7 @@ describe("parseSubcircuit — X element", () => {
 // Inline .MODEL statements
 // ---------------------------------------------------------------------------
 
-describe("parseSubcircuit — inline .MODEL", () => {
+describe("parseSubcircuit- inline .MODEL", () => {
   const TEXT = `
 .SUBCKT myopamp inp inn out vcc vee
 Q1 3 1 4 NPN
@@ -381,7 +381,7 @@ Q2 3 2 5 NPN
 // .PARAM defaults
 // ---------------------------------------------------------------------------
 
-describe("parseSubcircuit — .PARAM", () => {
+describe("parseSubcircuit- .PARAM", () => {
   const TEXT = `
 .SUBCKT amp in out
 .PARAM gm=0.01 rout=1k
@@ -402,7 +402,7 @@ R1 in out rout
 // Value suffix parsing
 // ---------------------------------------------------------------------------
 
-describe("parseSubcircuit — value suffixes", () => {
+describe("parseSubcircuit- value suffixes", () => {
   const suffixCases: Array<[string, string, number]> = [
     ["R1 a b 10k", "R1", 10e3],
     ["R2 a b 1m", "R2", 1e-3],
@@ -425,7 +425,7 @@ describe("parseSubcircuit — value suffixes", () => {
 // Full opamp example
 // ---------------------------------------------------------------------------
 
-describe("parseSubcircuit — full opamp example", () => {
+describe("parseSubcircuit- full opamp example", () => {
   const TEXT = `
 .SUBCKT myopamp inp inn out vcc vee
 * Internal bias network
@@ -481,7 +481,7 @@ V1 vcc 0 DC 5
 // Error cases
 // ---------------------------------------------------------------------------
 
-describe("parseSubcircuit — error: missing .ENDS", () => {
+describe("parseSubcircuit- error: missing .ENDS", () => {
   it("throws with message about missing .ENDS", () => {
     expect(() =>
       parseSubcircuit(`.SUBCKT test a b\nR1 a b 1k`)
@@ -495,7 +495,7 @@ describe("parseSubcircuit — error: missing .ENDS", () => {
   });
 });
 
-describe("parseSubcircuit — error: no .SUBCKT", () => {
+describe("parseSubcircuit- error: no .SUBCKT", () => {
   it("throws with message about missing .SUBCKT", () => {
     expect(() =>
       parseSubcircuit(`R1 a b 1k\n.ENDS`)
@@ -509,7 +509,7 @@ describe("parseSubcircuit — error: no .SUBCKT", () => {
   });
 });
 
-describe("parseSubcircuit — error: no ports", () => {
+describe("parseSubcircuit- error: no ports", () => {
   it("throws when .SUBCKT declares no ports", () => {
     expect(() =>
       parseSubcircuit(`.SUBCKT noports\nR1 a b 1k\n.ENDS`)
@@ -523,7 +523,7 @@ describe("parseSubcircuit — error: no ports", () => {
   });
 });
 
-describe("parseSubcircuit — error: unknown element prefix", () => {
+describe("parseSubcircuit- error: unknown element prefix", () => {
   it("throws on unrecognised element prefix", () => {
     expect(() =>
       parseSubcircuit(`.SUBCKT test a b\nZ1 a b 1k\n.ENDS`)
@@ -541,7 +541,7 @@ describe("parseSubcircuit — error: unknown element prefix", () => {
 // Case-insensitive directive matching
 // ---------------------------------------------------------------------------
 
-describe("parseSubcircuit — case-insensitive directives", () => {
+describe("parseSubcircuit- case-insensitive directives", () => {
   it("accepts lowercase .subckt and .ends", () => {
     const sc = parseSubcircuit(`.subckt test a b\nr1 a b 1k\n.ends test`);
     expect(sc.name).toBe("test");

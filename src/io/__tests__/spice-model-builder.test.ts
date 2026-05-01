@@ -23,7 +23,7 @@ function parse(text: string): ParsedSubcircuit {
 // Circuit structure
 // ---------------------------------------------------------------------------
 
-describe("buildSpiceSubcircuit — circuit structure", () => {
+describe("buildSpiceSubcircuit- circuit structure", () => {
   const TEXT = `
 .SUBCKT simple a b
 R1 a b 1k
@@ -72,7 +72,7 @@ R1 a b 1k
 // Net mapping
 // ---------------------------------------------------------------------------
 
-describe("buildSpiceSubcircuit — net mapping", () => {
+describe("buildSpiceSubcircuit- net mapping", () => {
   const TEXT = `
 .SUBCKT test a b
 R1 a b 1k
@@ -113,7 +113,7 @@ R1 a 0 1k
 // Element mapping: R
 // ---------------------------------------------------------------------------
 
-describe("buildSpiceSubcircuit — R element mapping", () => {
+describe("buildSpiceSubcircuit- R element mapping", () => {
   it("maps R to Resistor with pins A and B", () => {
     const circuit = buildSpiceSubcircuit(parse(`.SUBCKT t a b\nR1 a b 10k\n.ENDS`));
     const el = circuit.elements.find((e) => e.typeId === "Resistor");
@@ -141,7 +141,7 @@ describe("buildSpiceSubcircuit — R element mapping", () => {
 // Element mapping: C
 // ---------------------------------------------------------------------------
 
-describe("buildSpiceSubcircuit — C element mapping", () => {
+describe("buildSpiceSubcircuit- C element mapping", () => {
   it("maps C to Capacitor with capacitance=100n", () => {
     const circuit = buildSpiceSubcircuit(parse(`.SUBCKT t a b\nC1 a b 100n\n.ENDS`));
     const el = circuit.elements.find((e) => e.typeId === "Capacitor");
@@ -158,7 +158,7 @@ describe("buildSpiceSubcircuit — C element mapping", () => {
 // Element mapping: L
 // ---------------------------------------------------------------------------
 
-describe("buildSpiceSubcircuit — L element mapping", () => {
+describe("buildSpiceSubcircuit- L element mapping", () => {
   it("maps L to Inductor with inductance=1u", () => {
     const circuit = buildSpiceSubcircuit(parse(`.SUBCKT t a b\nL1 a b 1u\n.ENDS`));
     const el = circuit.elements.find((e) => e.typeId === "Inductor");
@@ -175,7 +175,7 @@ describe("buildSpiceSubcircuit — L element mapping", () => {
 // Element mapping: D
 // ---------------------------------------------------------------------------
 
-describe("buildSpiceSubcircuit — D element mapping", () => {
+describe("buildSpiceSubcircuit- D element mapping", () => {
   it("maps D to Diode with pins A and K", () => {
     const circuit = buildSpiceSubcircuit(parse(`.SUBCKT t a k\nD1 a k 1N4148\n.ENDS`));
     const el = circuit.elements.find((e) => e.typeId === "Diode");
@@ -198,7 +198,7 @@ describe("buildSpiceSubcircuit — D element mapping", () => {
 // Element mapping: Q (BJT)
 // ---------------------------------------------------------------------------
 
-describe("buildSpiceSubcircuit — Q element mapping, NPN", () => {
+describe("buildSpiceSubcircuit- Q element mapping, NPN", () => {
   const TEXT = `
 .SUBCKT test c b e
 Q1 c b e NPN
@@ -233,7 +233,7 @@ Q1 c b e NPN
   });
 });
 
-describe("buildSpiceSubcircuit — Q element mapping, PNP", () => {
+describe("buildSpiceSubcircuit- Q element mapping, PNP", () => {
   const TEXT = `
 .SUBCKT test c b e
 Q1 c b e PNP
@@ -258,7 +258,7 @@ Q1 c b e PNP
 // Element mapping: M (MOSFET)
 // ---------------------------------------------------------------------------
 
-describe("buildSpiceSubcircuit — M element mapping, NMOS", () => {
+describe("buildSpiceSubcircuit- M element mapping, NMOS", () => {
   const TEXT = `
 .SUBCKT test d g s b
 M1 d g s b NMOS W=10u L=1u
@@ -292,7 +292,7 @@ M1 d g s b NMOS W=10u L=1u
   });
 });
 
-describe("buildSpiceSubcircuit — M element mapping, PMOS", () => {
+describe("buildSpiceSubcircuit- M element mapping, PMOS", () => {
   const TEXT = `
 .SUBCKT test d g s b
 M1 d g s b PMOS W=5u L=1u
@@ -316,7 +316,7 @@ M1 d g s b PMOS W=5u L=1u
 // Element mapping: J (JFET)
 // ---------------------------------------------------------------------------
 
-describe("buildSpiceSubcircuit — J element mapping, NJFET", () => {
+describe("buildSpiceSubcircuit- J element mapping, NJFET", () => {
   const TEXT = `
 .SUBCKT test d g s
 J1 d g s NJFET
@@ -344,7 +344,7 @@ J1 d g s NJFET
   });
 });
 
-describe("buildSpiceSubcircuit — J element mapping, PJFET", () => {
+describe("buildSpiceSubcircuit- J element mapping, PJFET", () => {
   const TEXT = `
 .SUBCKT test d g s
 J1 d g s PJFET
@@ -368,7 +368,7 @@ J1 d g s PJFET
 // Element mapping: V (voltage source)
 // ---------------------------------------------------------------------------
 
-describe("buildSpiceSubcircuit — V element mapping", () => {
+describe("buildSpiceSubcircuit- V element mapping", () => {
   it("maps V to DcVoltageSource", () => {
     const circuit = buildSpiceSubcircuit(parse(`.SUBCKT t p n\nV1 p n DC 5\n.ENDS`));
     expect(circuit.elements.find((e) => e.typeId === "DcVoltageSource")).toBeDefined();
@@ -392,7 +392,7 @@ describe("buildSpiceSubcircuit — V element mapping", () => {
 // Element mapping: I (current source)
 // ---------------------------------------------------------------------------
 
-describe("buildSpiceSubcircuit — I element mapping", () => {
+describe("buildSpiceSubcircuit- I element mapping", () => {
   it("maps I to CurrentSource", () => {
     const circuit = buildSpiceSubcircuit(parse(`.SUBCKT t p n\nI1 p n DC 1m\n.ENDS`));
     expect(circuit.elements.find((e) => e.typeId === "CurrentSource")).toBeDefined();
@@ -405,10 +405,10 @@ describe("buildSpiceSubcircuit — I element mapping", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Port mapping — correct number and order of In elements
+// Port mapping- correct number and order of In elements
 // ---------------------------------------------------------------------------
 
-describe("buildSpiceSubcircuit — port mapping", () => {
+describe("buildSpiceSubcircuit- port mapping", () => {
   const TEXT = `
 .SUBCKT opamp inp inn out vcc vee
 R1 inp 1 10k
@@ -444,10 +444,10 @@ R1 inp 1 10k
 });
 
 // ---------------------------------------------------------------------------
-// Inline model overrides — no model = no model params
+// Inline model overrides- no model = no model params
 // ---------------------------------------------------------------------------
 
-describe("buildSpiceSubcircuit — model overrides", () => {
+describe("buildSpiceSubcircuit- model overrides", () => {
   it("Resistor without inline model has no model params", () => {
     const circuit = buildSpiceSubcircuit(parse(`.SUBCKT t a b\nR1 a b 1k\n.ENDS`));
     const el = circuit.elements.find((e) => e.typeId === "Resistor");
@@ -474,10 +474,10 @@ M1 d g s b NMOS W=20u L=2u
 });
 
 // ---------------------------------------------------------------------------
-// Full opamp example — element count and structure
+// Full opamp example- element count and structure
 // ---------------------------------------------------------------------------
 
-describe("buildSpiceSubcircuit — full opamp example", () => {
+describe("buildSpiceSubcircuit- full opamp example", () => {
   const TEXT = `
 .SUBCKT myopamp inp inn out vcc vee
 R1 inp 1 10k
@@ -525,10 +525,10 @@ V1 vcc 0 DC 5
 });
 
 // ---------------------------------------------------------------------------
-// Wire connectivity — every non-ground pin gets a wire to net spine
+// Wire connectivity- every non-ground pin gets a wire to net spine
 // ---------------------------------------------------------------------------
 
-describe("buildSpiceSubcircuit — wires", () => {
+describe("buildSpiceSubcircuit- wires", () => {
   it("adds exactly 4 wires for a two-resistor three-port subcircuit", () => {
     const TEXT = `
 .SUBCKT test a b c

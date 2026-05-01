@@ -479,7 +479,7 @@ describe("SixteenSeg", () => {
   describe("segmentPacking", () => {
     it("is a no-op (display-only sink: no outputs to write)", () => {
       // SixteenSeg now has 2 inputs: led (16-bit packed) and dp (1-bit)
-      // executeSixteenSeg does nothing — display panel reads inputs directly
+      // executeSixteenSeg does nothing- display panel reads inputs directly
       const layout = makeLayout(2, 0);
       const state = makeState([0xFFFF, 1], 0);
       const highZs = new Uint32Array(state.length);

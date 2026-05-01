@@ -1,5 +1,5 @@
 /**
- * Tests for spice-model-apply.ts — unified model system.
+ * Tests for spice-model-apply.ts- unified model system.
  *
  * Verifies:
  * 1. applySpiceImportResult populates circuit.metadata.models with kind:"inline"
@@ -83,7 +83,7 @@ function makeElement(
 }
 
 const stubFactory: AnalogFactory = () => {
-  throw new Error("stub factory — not for execution");
+  throw new Error("stub factory- not for execution");
 };
 
 const STUB_PARAM_DEFS = [

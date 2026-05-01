@@ -2,13 +2,13 @@
  * Structural node mapping between our engine and ngspice.
  *
  * ngspice node names follow patterns like:
- *   "q1_c", "q1_b", "q1_e"      — BJT collector/base/emitter
- *   "r1_1", "r1_2"               — resistor terminals
- *   "v1#branch"                   — voltage source branch current
- *   "d1_a", "d1_k"               — diode anode/cathode
- *   "m1_d", "m1_g", "m1_s"       — MOSFET drain/gate/source
- *   "0"                           — ground
- *   "net_3", "3"                  — internal net numbers
+ *   "q1_c", "q1_b", "q1_e"     - BJT collector/base/emitter
+ *   "r1_1", "r1_2"              - resistor terminals
+ *   "v1#branch"                  - voltage source branch current
+ *   "d1_a", "d1_k"              - diode anode/cathode
+ *   "m1_d", "m1_g", "m1_s"      - MOSFET drain/gate/source
+ *   "0"                          - ground
+ *   "net_3", "3"                 - internal net numbers
  *
  * Our node labels follow patterns like:
  *   "Q1:C", "Q1:B", "Q1:E"
@@ -103,7 +103,7 @@ function canonicalizeNgspiceName(
     return `${label}:${pinSuffix.toUpperCase()}`;
   }
 
-  // Bare net name or number — can't canonicalize to component:pin
+  // Bare net name or number- can't canonicalize to component:pin
   return null;
 }
 
@@ -112,7 +112,7 @@ function canonicalizeNgspiceName(
  * just normalize case.
  */
 function canonicalizeOurLabel(label: string): string {
-  // Already "Q1:C" format — just uppercase
+  // Already "Q1:C" format- just uppercase
   return label.toUpperCase();
 }
 
@@ -243,7 +243,7 @@ export function reindexNgspiceSession(
       voltages: reindexArray(iter.voltages),
       prevVoltages: reindexArray(iter.prevVoltages),
       preSolveRhs: iter.preSolveRhs.length > 0 ? reindexArray(iter.preSolveRhs) : iter.preSolveRhs,
-      // elementStates and matrix are not reindexed — they use labels
+      // elementStates and matrix are not reindexed- they use labels
     };
   }
 

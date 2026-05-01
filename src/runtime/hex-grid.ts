@@ -1,5 +1,5 @@
 /**
- * HexGrid — virtualized hex grid renderer for the memory editor.
+ * HexGrid- virtualized hex grid renderer for the memory editor.
  *
  * Renders only visible rows from a DataField, supporting large memories
  * (64KB+) without constructing DOM nodes for every address.
@@ -8,9 +8,9 @@
  *   [address] [hex columns...] [ascii decode]
  *
  * Data width modes:
- *   8-bit  — 16 bytes per row, each displayed as 2 hex digits
- *   16-bit — 8 words per row, each displayed as 4 hex digits
- *   32-bit — 4 dwords per row, each displayed as 8 hex digits
+ *   8-bit - 16 bytes per row, each displayed as 2 hex digits
+ *   16-bit- 8 words per row, each displayed as 4 hex digits
+ *   32-bit- 4 dwords per row, each displayed as 8 hex digits
  */
 
 import type { DataField } from "../components/memory/ram.js";

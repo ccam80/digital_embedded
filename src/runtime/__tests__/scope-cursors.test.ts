@@ -118,7 +118,7 @@ describe("Cursors", () => {
   });
 
   it("cursors_swapped_order_still_works", () => {
-    // B before A in time — deltaT should be negative, frequency still positive
+    // B before A in time- deltaT should be negative, frequency still positive
     const buf = bufferFromPairs([[0, 0], [1, 5], [2, 10]]);
     const cursors = new ScopeCursors();
     cursors.setCursorA(2);

@@ -1,5 +1,5 @@
 /**
- * Task 7.2.3 — BJT common-emitter DC-OP parity
+ * Task 7.2.3- BJT common-emitter DC-OP parity
  *
  * NPN BJT with biasing resistors. Tests multi-junction limiting and
  * (if required for convergence) gmin stepping.

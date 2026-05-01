@@ -1,5 +1,5 @@
 /**
- * Register — edge-triggered storage register with enable.
+ * Register- edge-triggered storage register with enable.
  *
  * On rising clock edge, if en=1: capture D input into stored value.
  * Output Q always reflects the stored value.
@@ -35,7 +35,7 @@ import { makeBehavioralRegisterAnalogFactory } from "../../solver/analog/behavio
 const COMP_WIDTH = 3;
 
 // ---------------------------------------------------------------------------
-// Pin declarations — matches Java GenericShape.createPins() exactly
+// Pin declarations- matches Java GenericShape.createPins() exactly
 // 3 inputs (odd), symmetric: offs = floor(3/2) = 1
 // ---------------------------------------------------------------------------
 
@@ -79,7 +79,7 @@ const REGISTER_PIN_DECLARATIONS: PinDeclaration[] = [
 ];
 
 // ---------------------------------------------------------------------------
-// RegisterElement — CircuitElement implementation
+// RegisterElement- CircuitElement implementation
 // ---------------------------------------------------------------------------
 
 export class RegisterElement extends AbstractCircuitElement {
@@ -124,7 +124,7 @@ export class RegisterElement extends AbstractCircuitElement {
 }
 
 // ---------------------------------------------------------------------------
-// executeRegister — flat simulation function
+// executeRegister- flat simulation function
 //
 // Input layout:  [D=0, C=1, en=2]
 // Output layout: [Q=0]
@@ -199,7 +199,7 @@ const REGISTER_PROPERTY_DEFS: PropertyDefinition[] = [
 ];
 
 // ---------------------------------------------------------------------------
-// RegisterDefinition — ComponentDefinition
+// RegisterDefinition- ComponentDefinition
 // ---------------------------------------------------------------------------
 
 function registerFactory(props: PropertyBag): RegisterElement {
@@ -215,7 +215,7 @@ export const RegisterDefinition: ComponentDefinition = {
   attributeMap: REGISTER_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.MEMORY,
   helpText:
-    "Register — edge-triggered storage register with enable.\n" +
+    "Register- edge-triggered storage register with enable.\n" +
     "On rising clock edge: if en=1, captures D input into stored value.\n" +
     "Output Q always reflects the stored value.",
   models: {

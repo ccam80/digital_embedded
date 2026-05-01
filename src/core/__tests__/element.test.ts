@@ -20,7 +20,7 @@ import { PinDirection, type Pin, type Rotation } from "../pin.js";
 import type { RenderContext, Point, Rect, ThemeColor, FontSpec, TextAnchor, PathData } from "../renderer-interface.js";
 
 // ---------------------------------------------------------------------------
-// Minimal RenderContext stub — records all draw calls
+// Minimal RenderContext stub- records all draw calls
 // ---------------------------------------------------------------------------
 
 interface DrawCall {

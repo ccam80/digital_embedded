@@ -9,7 +9,7 @@ export class StatePool {
    * Written by the analog engine before each stamp/NR pass so that element
    * stampCompanion methods can derive the integration coefficient locally
    * (ag0 = 1/dt for TRAP order-1, matching NIcomCof in nicomcof.c:33-51).
-   * During DC-OP this stays 0 (no time elapsed), so ag0 = 0 — matching
+   * During DC-OP this stays 0 (no time elapsed), so ag0 = 0- matching
    * dctran.c:348 where CKTag[0] is zeroed before the first transient step.
    */
   dt: number = 0;
@@ -22,7 +22,7 @@ export class StatePool {
   temperature: number = 300.15;
 
   /**
-   * Maximum integration order — mirrors ngspice CKTmaxOrder
+   * Maximum integration order- mirrors ngspice CKTmaxOrder
    * (cktdojob.c:53 sets `CKTmaxOrder = TSKmaxOrder` once per job; default 2
    * for trapezoidal). Bounds the rotation ring in `rotateStateVectors()` to
    * exactly slots `0..maxOrder+1`, matching `dctran.c:719-723`. Slots above
@@ -60,7 +60,7 @@ export class StatePool {
   get state7(): Float64Array { return this.states[7]; }
 
   /**
-   * Ring rotation of state arrays — pointer swap, not data copy. Mirrors
+   * Ring rotation of state arrays- pointer swap, not data copy. Mirrors
    * ngspice `dctran.c:719-723`:
    *
    *   temp = ckt->CKTstates[ckt->CKTmaxOrder+1];
@@ -68,7 +68,7 @@ export class StatePool {
    *     ckt->CKTstates[i+1] = ckt->CKTstates[i];
    *   ckt->CKTstates[0] = temp;
    *
-   * The ring spans slots `0..maxOrder+1` exactly — slots above `maxOrder+1`
+   * The ring spans slots `0..maxOrder+1` exactly- slots above `maxOrder+1`
    * are NOT rotated. They stay at construction-zero, matching ngspice's
    * allocator (`cktsetup.c:82-83`) which never allocates above
    * `MAX(2,maxOrder)+1`. Without this bound, slots beyond the integration
@@ -92,7 +92,7 @@ export class StatePool {
   }
 
   /**
-   * Copy state1 into state2 and state3 only — matches ngspice dctran.c:795-799
+   * Copy state1 into state2 and state3 only- matches ngspice dctran.c:795-799
    * exactly (both placement-inside-for(;;)-loop and width).
    *
    *   if(firsttime) {

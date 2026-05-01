@@ -1,5 +1,5 @@
 /**
- * ColorSchemeManager — runtime color scheme switching and IEEE/IEC gate shape toggle.
+ * ColorSchemeManager- runtime color scheme switching and IEEE/IEC gate shape toggle.
  *
  * Built-in schemes (default, high-contrast, monochrome) are defined in
  * src/core/renderer-interface.ts. This manager wraps them with:
@@ -126,7 +126,7 @@ export class ColorSchemeManager {
    * Create and register a custom color scheme.
    *
    * The scheme is registered under `name` so it can be activated with
-   * setActive(name). The colors map must cover every ThemeColor — missing
+   * setActive(name). The colors map must cover every ThemeColor- missing
    * entries will throw at resolve time.
    *
    * @param name    Unique name for the custom scheme. Overwrites an existing

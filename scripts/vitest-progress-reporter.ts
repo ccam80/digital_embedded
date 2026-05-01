@@ -47,12 +47,12 @@ export default class ProgressReporter implements Reporter {
       // a registered fileById entry.
       let filePath = this.fileById.get(id);
       if (!filePath) {
-        // Sub-task — try to derive parent file via meta.
+        // Sub-task- try to derive parent file via meta.
         const f = meta?.file ?? meta?.filepath;
         if (!f) continue;
         const r = rel(this.cwd, f);
         if (result.state === 'fail' || result.state === 'pass' || result.state === 'skip') {
-          // Per-test terminal — useful as a heartbeat
+          // Per-test terminal- useful as a heartbeat
           // Skip noisy heartbeat for passing sub-tests; only print failures.
           if (result.state === 'fail') {
             process.stdout.write(`[${ts()}] TEST_FAIL ${r}\n`);

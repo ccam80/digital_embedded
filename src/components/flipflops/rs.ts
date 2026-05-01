@@ -1,11 +1,11 @@
 /**
- * RS Flip-Flop — edge-triggered with S/R control inputs.
+ * RS Flip-Flop- edge-triggered with S/R control inputs.
  *
  * On rising clock edge:
  *   S=0, R=0 → no change (hold)
  *   S=1, R=0 → set (Q=1)
  *   S=0, R=1 → reset (Q=0)
- *   S=1, R=1 → undefined (random — per Digital's implementation)
+ *   S=1, R=1 → undefined (random- per Digital's implementation)
  *
  * Input layout:  [S=0, C=1, R=2]
  * Output layout: [Q=0, ~Q=1]
@@ -40,7 +40,7 @@ const COMP_WIDTH = 3;
 // max(3,2)=3, yBottom=(3-1)+0.5=2.5, height=2.5+0.5=3
 
 // ---------------------------------------------------------------------------
-// Pin declarations — GenericShape positions (symmetric=false, 3 inputs, 2 outputs)
+// Pin declarations- GenericShape positions (symmetric=false, 3 inputs, 2 outputs)
 // inputs: S@y=0, C@y=1, R@y=2
 // outputs: Q@y=0, ~Q@y=1
 // ---------------------------------------------------------------------------
@@ -94,7 +94,7 @@ export const RS_FF_PIN_DECLARATIONS: PinDeclaration[] = [
 ];
 
 // ---------------------------------------------------------------------------
-// RSElement — CircuitElement implementation
+// RSElement- CircuitElement implementation
 // ---------------------------------------------------------------------------
 
 export class RSElement extends AbstractCircuitElement {
@@ -132,13 +132,13 @@ export class RSElement extends AbstractCircuitElement {
 }
 
 // ---------------------------------------------------------------------------
-// executeRS — flat simulation function
+// executeRS- flat simulation function
 //
 // Input layout:  [S=0, C=1, R=2]
 // Output layout: [Q=0, ~Q=1]
 // State layout:  [storedQ=0, prevClock=1]
 //
-// S=1, R=1 on clock edge: undefined behavior — output remains unchanged
+// S=1, R=1 on clock edge: undefined behavior- output remains unchanged
 // (deterministic undefined: Digital uses random, we use hold for reproducibility in tests)
 // ---------------------------------------------------------------------------
 
@@ -193,7 +193,7 @@ const RS_FF_PROPERTY_DEFS: PropertyDefinition[] = [
 ];
 
 // ---------------------------------------------------------------------------
-// RSDefinition — ComponentDefinition
+// RSDefinition- ComponentDefinition
 // ---------------------------------------------------------------------------
 
 function rsFactory(props: PropertyBag): RSElement {
@@ -209,7 +209,7 @@ export const RSDefinition: ComponentDefinition = {
   attributeMap: RS_FF_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.FLIP_FLOPS,
   helpText:
-    "RS Flip-Flop — edge-triggered with S/R control inputs.\n" +
+    "RS Flip-Flop- edge-triggered with S/R control inputs.\n" +
     "On rising clock edge: S=0,R=0 → hold; S=1,R=0 → set; S=0,R=1 → reset; S=1,R=1 → undefined.\n" +
     "Q and ~Q outputs are always complementary (except on S=R=1).",
   modelRegistry: {

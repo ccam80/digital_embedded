@@ -1,12 +1,12 @@
 /**
- * Reset component — during initialization, output is held low (or high if inverted).
+ * Reset component- during initialization, output is held low (or high if inverted).
  * After init, output transitions to its post-reset state.
  *
  * Based on Digital's Java implementation: the Reset element has one output pin.
  * During the init phase, it holds the output in the reset state. After init,
  * the engine calls clearReset() and the output transitions.
  *
- * internalStateCount: 1 (init flag — 0 = in init phase, 1 = init complete)
+ * internalStateCount: 1 (init flag- 0 = in init phase, 1 = init complete)
  *
  * Properties:
  *   - invertOutput: invert the output polarity (default false)
@@ -36,7 +36,7 @@ import {
 // Layout constants
 // ---------------------------------------------------------------------------
 
-// Body: rect from (-2.55, -0.75) to (-1.05, 0.75) — 1.5 wide, 1.5 tall
+// Body: rect from (-2.55, -0.75) to (-1.05, 0.75)- 1.5 wide, 1.5 tall
 // Inversion bubble: circle at (-0.5, 0) r=0.45
 // Pin at (0, 0) on the right edge
 const BODY_X1 = -2.55;
@@ -67,7 +67,7 @@ export function buildResetPinDeclarations(): PinDeclaration[] {
 }
 
 // ---------------------------------------------------------------------------
-// ResetElement — CircuitElement implementation
+// ResetElement- CircuitElement implementation
 // ---------------------------------------------------------------------------
 
 export class ResetElement extends AbstractCircuitElement {
@@ -123,7 +123,7 @@ export class ResetElement extends AbstractCircuitElement {
 }
 
 // ---------------------------------------------------------------------------
-// executeReset — flat simulation function
+// executeReset- flat simulation function
 //
 // Uses internal state slot 0 as the init flag.
 //   state[stateOffset+0] = 0: in init phase, output = !invertOutput (reset active)
@@ -147,12 +147,12 @@ export function executeReset(
   layout: ComponentLayout,
 ): void {
   // Reset is a source component: its output is managed by the engine's
-  // init/clear-reset protocol. The executeFn is a no-op — the engine
+  // init/clear-reset protocol. The executeFn is a no-op- the engine
   // writes the output directly via the init sequence.
   // This satisfies the interface requirement while the engine handles
   // the actual reset/release logic.
   const outIdx = layout.outputOffset(index);
-  // Preserve whatever value the engine has written — do not overwrite.
+  // Preserve whatever value the engine has written- do not overwrite.
   void state[outIdx];
 }
 
@@ -211,7 +211,7 @@ export const ResetDefinition: ComponentDefinition = {
   attributeMap: RESET_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.WIRING,
   helpText:
-    "Reset — output held in reset state during init, then released.\n" +
+    "Reset- output held in reset state during init, then released.\n" +
     "Used to reset sequential circuits to a known state at startup.",
   models: {
     digital: {

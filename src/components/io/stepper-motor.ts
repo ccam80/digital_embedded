@@ -1,5 +1,5 @@
 /**
- * StepperMotor components — bipolar and unipolar stepper motor simulation.
+ * StepperMotor components- bipolar and unipolar stepper motor simulation.
  *
  * Stepper motors receive coil drive signals and advance a position counter
  * based on the step sequence. The current step position is stored as
@@ -182,7 +182,7 @@ export class StepperMotorUnipolarElement extends AbstractCircuitElement {
 }
 
 // ---------------------------------------------------------------------------
-// executeStepperMotorBipolar — detect coil pattern, output step index
+// executeStepperMotorBipolar- detect coil pattern, output step index
 // ---------------------------------------------------------------------------
 
 export function executeStepperMotorBipolar(
@@ -217,7 +217,7 @@ export function executeStepperMotorBipolar(
 }
 
 // ---------------------------------------------------------------------------
-// executeStepperMotorUnipolar — detect coil pattern, output step index
+// executeStepperMotorUnipolar- detect coil pattern, output step index
 // Inputs: P0, P1, P2, P3, com (5 inputs); Outputs: S0, S1
 // ---------------------------------------------------------------------------
 
@@ -233,7 +233,7 @@ export function executeStepperMotorUnipolar(
   const p1 = state[wt[inputStart + 1]];
   const p2 = state[wt[inputStart + 2]];
   const p3 = state[wt[inputStart + 3]];
-  // com (inputStart+4) is the common line — not used in step detection
+  // com (inputStart+4) is the common line- not used in step detection
 
   let stepIndex = 0;
   for (let s = 0; s < UNIPOLAR_STEP_SEQUENCE.length; s++) {
@@ -304,7 +304,7 @@ export const StepperMotorBipolarDefinition: ComponentDefinition = {
   attributeMap: STEPPER_MOTOR_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.IO,
   helpText:
-    "StepperMotorBipolar — bipolar stepper motor simulation.\n" +
+    "StepperMotorBipolar- bipolar stepper motor simulation.\n" +
     "4 coil inputs (A+, A-, B+, B-). Step position output tracks current step.\n" +
     "Full-step sequence advances one position per valid coil pattern change.",
   models: {
@@ -322,7 +322,7 @@ export const StepperMotorUnipolarDefinition: ComponentDefinition = {
   attributeMap: STEPPER_MOTOR_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.IO,
   helpText:
-    "StepperMotorUnipolar — unipolar stepper motor simulation.\n" +
+    "StepperMotorUnipolar- unipolar stepper motor simulation.\n" +
     "4 coil inputs (A, B, C, D). Step position output tracks current step.\n" +
     "Full-step sequence advances one position per valid coil pattern change.",
   models: {

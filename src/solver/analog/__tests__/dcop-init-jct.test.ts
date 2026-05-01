@@ -200,7 +200,7 @@ describe("dcopInitJct", () => {
       ctx.cktMode = setInitf(ctx.cktMode, MODEINITFLOAT);
 
       // Key property: the seed is Vbe=+tVcrit, Vbc=0 regardless of
-      // whether the collector is grounded — the old shared-vector
+      // whether the collector is grounded- the old shared-vector
       // scheme couldn't do this because it couldn't write to node 0.
       // Voltages buffer untouched.
       expect(voltages[0]).toBe(0);
@@ -290,7 +290,7 @@ describe("dcopInitJct", () => {
 
   describe("solveDcOperatingPoint phase", () => {
     it("emits dcopInitJct phase marker before dcopInitFloat", () => {
-      // Simple resistor divider — no nonlinear elements.
+      // Simple resistor divider- no nonlinear elements.
       // Phase marker must still be emitted (even though no priming happens).
       const matrixSize = 3;
 
@@ -361,24 +361,24 @@ describe("dcopInitJct", () => {
       // Locate BJT terminal nodes by scanning the result for voltages in the
       // expected physical ranges. (The facade doesn't expose a label→index
       // map from here, and we only need to assert the circuit is in the
-      // active region — not hit exact values.)
+      // active region- not hit exact values.)
       const voltages = Array.from(dcOp!.nodeVoltages);
       const inRange = (lo: number, hi: number) =>
         voltages.some((v) => v >= lo && v <= hi);
 
-      // Base in active-region band (1.3 V … 1.6 V — harness observed 1.4713 V)
+      // Base in active-region band (1.3 V … 1.6 V- harness observed 1.4713 V)
       expect(
         inRange(1.3, 1.6),
         `no node in base band [1.3, 1.6] V; voltages=${voltages.map((v) => v.toFixed(4)).join(", ")}`,
       ).toBe(true);
 
-      // Collector pulled down from 10 V supply (6.0 V … 7.5 V — observed 6.7130 V)
+      // Collector pulled down from 10 V supply (6.0 V … 7.5 V- observed 6.7130 V)
       expect(
         inRange(6.0, 7.5),
         `no node in collector band [6.0, 7.5] V; voltages=${voltages.map((v) => v.toFixed(4)).join(", ")}`,
       ).toBe(true);
 
-      // Emitter above ground, below base (0.6 V … 0.8 V — observed 0.7063 V)
+      // Emitter above ground, below base (0.6 V … 0.8 V- observed 0.7063 V)
       expect(
         inRange(0.6, 0.8),
         `no node in emitter band [0.6, 0.8] V; voltages=${voltages.map((v) => v.toFixed(4)).join(", ")}`,

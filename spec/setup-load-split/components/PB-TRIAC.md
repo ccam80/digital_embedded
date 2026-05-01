@@ -6,7 +6,7 @@
 
 ## Pin mapping (from 01-pin-mapping.md)
 
-TRIAC is a **composite** — it does not stamp into the matrix directly.
+TRIAC is a **composite**- it does not stamp into the matrix directly.
 It decomposes into 4× BJT (= 2× SCR antiparallel). This gives the
 TRIAC its bidirectional conduction capability.
 
@@ -16,7 +16,7 @@ TRIAC its bidirectional conduction capability.
 | `MT2` | Main Terminal 2 | SCR1 cathode / SCR2 anode |
 | `G` | Gate | Both SCRs' trigger input |
 
-## Four-transistor latch — node assignment table
+## Four-transistor latch- node assignment table
 
 The TRIAC is modelled as two antiparallel SCRs, each built from the
 NPN+PNP two-transistor latch (see PB-SCR). The four BJTs are:
@@ -34,7 +34,7 @@ Two separate internal latch nodes are created:
 | Vint1 | SCR1 latch node | `ctx.makeVolt(parentLabel, "latch1")` |
 | Vint2 | SCR2 latch node | `ctx.makeVolt(parentLabel, "latch2")` |
 
-### SCR1 — fires for positive MT2→MT1 current
+### SCR1- fires for positive MT2→MT1 current
 
 Identical structure to PB-SCR with `A=MT2, K=MT1, G=G`:
 
@@ -42,7 +42,7 @@ Identical structure to PB-SCR with `A=MT2, K=MT1, G=G`:
 
 **Q2 (PNP):** `B=Vint1, C=G, E=MT2`
 
-### SCR2 — fires for negative MT2→MT1 current (antiparallel)
+### SCR2- fires for negative MT2→MT1 current (antiparallel)
 
 Identical structure to PB-SCR with `A=MT1, K=MT2, G=G` (roles of MT1 and
 MT2 swapped):
@@ -53,7 +53,7 @@ MT2 swapped):
 
 ### Sub-element construction parameters
 
-**Q1 — NPN (SCR1 NPN)**
+**Q1- NPN (SCR1 NPN)**
 
 | Field | Value |
 |---|---|
@@ -62,7 +62,7 @@ MT2 swapped):
 | `pinNodes` | `{ B: G, C: Vint1, E: MT1 }` |
 | `ngspiceNodeMap` | `{ B: "base", C: "col", E: "emit" }` |
 
-**Q2 — PNP (SCR1 PNP)**
+**Q2- PNP (SCR1 PNP)**
 
 | Field | Value |
 |---|---|
@@ -71,7 +71,7 @@ MT2 swapped):
 | `pinNodes` | `{ B: Vint1, C: G, E: MT2 }` |
 | `ngspiceNodeMap` | `{ B: "base", C: "col", E: "emit" }` |
 
-**Q3 — NPN (SCR2 NPN)**
+**Q3- NPN (SCR2 NPN)**
 
 | Field | Value |
 |---|---|
@@ -80,7 +80,7 @@ MT2 swapped):
 | `pinNodes` | `{ B: G, C: Vint2, E: MT2 }` |
 | `ngspiceNodeMap` | `{ B: "base", C: "col", E: "emit" }` |
 
-**Q4 — PNP (SCR2 PNP)**
+**Q4- PNP (SCR2 PNP)**
 
 | Field | Value |
 |---|---|
@@ -150,9 +150,9 @@ composite's `setup()` forwards to Q1, Q2, Q3, Q4 in that order.
 | `BJTsubstNode` | 0 | 0 | 0 | 0 |
 
 Prime nodes (colPrime, basePrime, emitPrime) alias external or are internal
-per RC/RB/RE values — same rule as PB-BJT.
+per RC/RB/RE values- same rule as PB-BJT.
 
-## setup() body — alloc only
+## setup() body- alloc only
 
 ```ts
 // TRIAC composite setup()
@@ -187,7 +187,7 @@ setup(ctx: SetupContext): void {
 }
 ```
 
-## load() body — value writes only
+## load() body- value writes only
 
 ```ts
 // TRIAC composite load()
@@ -208,17 +208,17 @@ Not applicable.
 - Drop `internalNodeIds`, `branchIdx` from factory.
 - Drop `branchCount`, `getInternalNodeCount` from MnaModel.
 - Add `mayCreateInternalNodes: true`.
-- Composite does not carry `ngspiceNodeMap` — sub-elements carry their own.
+- Composite does not carry `ngspiceNodeMap`- sub-elements carry their own.
 
 ## Verification gate
 
 Per CLAUDE.md "Test Policy During W3 Setup-Load-Split", verification is spec compliance only. DO NOT run tests; DO NOT use test results.
 
-1. `setup()` body in the implementation file matches the "setup() body — alloc only" listing in this PB line-for-line.
+1. `setup()` body in the implementation file matches the "setup() body- alloc only" listing in this PB line-for-line.
 2. TSTALLOC sequence in `setup()` matches the order in the cited ngspice anchor file (see top of this PB, e.g. `ressetup.c:46-49`).
 3. Factory cleanup applied per the "Factory cleanup" section above.
 4. `ngspiceNodeMap` registered per the "Pin mapping" section above (or omitted for composites where the spec says so).
-5. `load()` writes through cached handles only — zero `solver.allocElement(...)` calls inside `load()`, `accept()`, or any non-`setup()` method.
+5. `load()` writes through cached handles only- zero `solver.allocElement(...)` calls inside `load()`, `accept()`, or any non-`setup()` method.
 6. `mayCreateInternalNodes` flag set per spec.
 7. `findBranchFor` callback present where spec says (V-output sources, IND, etc.).
 8. No banned closing verdicts (mapping/tolerance/equivalent-to/pre-existing/intentional-divergence/citation-divergence/partial) used in any commit message or report.

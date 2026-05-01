@@ -1,12 +1,12 @@
 /**
- * Test bridge — lightweight API exposed on `window.__test` for E2E tests.
+ * Test bridge- lightweight API exposed on `window.__test` for E2E tests.
  *
  * Provides coordinate queries so Playwright tests can discover where to click
  * on the canvas to place components and draw wires. All methods return screen
  * coordinates (pixels relative to the canvas element's bounding rect) so tests
  * can use Playwright's `page.mouse.click(x, y)` directly.
  *
- * This is NOT a simulation shortcut — tests still use real pointer events
+ * This is NOT a simulation shortcut- tests still use real pointer events
  * that go through the full hit-test → placement → wire-drawing pipeline.
  */
 
@@ -203,7 +203,7 @@ export function createTestBridge(
         elements: circuit.elements.map(el => {
           const label = el.getProperties().getOrDefault('label', '') as string;
           const bb = el.getBoundingBox();
-          // getBoundingBox() is NOT rotation-aware — compute center in local
+          // getBoundingBox() is NOT rotation-aware- compute center in local
           // space, rotate, then translate, matching pinWorldPosition's transform.
           const localCx = bb.x - el.position.x + bb.width / 2;
           const localCy = bb.y - el.position.y + bb.height / 2;

@@ -1,5 +1,5 @@
 /**
- * Tests for the DigitalEngine snapshot API — task 5.5.3.
+ * Tests for the DigitalEngine snapshot API- task 5.5.3.
  *
  * Tests use a minimal ConcreteCompiledCircuit built in-process (same pattern
  * as digital-engine.test.ts) so they do not depend on the compiler.
@@ -11,7 +11,7 @@ import { EngineState } from "@/core/engine-interface";
 import type { ExecuteFunction, ComponentLayout } from "@/core/registry";
 
 // ---------------------------------------------------------------------------
-// Helpers — reused from digital-engine.test.ts pattern
+// Helpers- reused from digital-engine.test.ts pattern
 // ---------------------------------------------------------------------------
 
 class StaticLayout implements ComponentLayout {
@@ -110,7 +110,7 @@ describe("saveAndRestore", () => {
     // Set signal values via setSignalRaw-equivalent: use setSignalValue
     // We use the raw approach: call init, manipulate via getSignalRaw after
     // setting up the state manually via the engine's setSignalValue pathway.
-    // For simplicity use the BitVector import-free path — we write via
+    // For simplicity use the BitVector import-free path- we write via
     // internal signal manipulation by stepping with a custom execute function.
 
     // Build a circuit where component 0 writes net 0 = 42 when step() is called
@@ -136,7 +136,7 @@ describe("saveAndRestore", () => {
     // (the execute fn always writes 42, so instead we test with net 1)
     // Simpler approach: use a second circuit step that overwrites net 0 to 99
     // We can't hot-swap executeFns after init, so we use setSignalValue path.
-    // Use a second engine step but with a different fn — instead test by
+    // Use a second engine step but with a different fn- instead test by
     // directly writing via raw Uint32Array through getSignalRaw observation.
 
     // Confirm state before: net 0 = 42
@@ -146,7 +146,7 @@ describe("saveAndRestore", () => {
     eng.reset();
     expect(eng.getSignalRaw(0)).toBe(0);
 
-    // Restore — should bring net 0 back to 42
+    // Restore- should bring net 0 back to 42
     eng.restoreSnapshot(id);
     expect(eng.getSignalRaw(0)).toBe(42);
   });
@@ -240,13 +240,13 @@ describe("ringBufferEviction", () => {
 
     value = 2;
     eng.step();
-    const id2 = eng.saveSnapshot(); // snapshot 2 (18 bytes used — at budget)
+    const id2 = eng.saveSnapshot(); // snapshot 2 (18 bytes used- at budget)
 
     expect(eng.getSnapshotCount()).toBe(2);
 
     value = 3;
     eng.step();
-    const id3 = eng.saveSnapshot(); // snapshot 3 — evicts snapshot 1
+    const id3 = eng.saveSnapshot(); // snapshot 3- evicts snapshot 1
 
     expect(eng.getSnapshotCount()).toBe(2);
 
@@ -286,7 +286,7 @@ describe("restorePausesEngine", () => {
     const id2 = eng.saveSnapshot();
     void id2; // used to verify below
 
-    // Restore to STOPPED-era snapshot — must result in PAUSED regardless
+    // Restore to STOPPED-era snapshot- must result in PAUSED regardless
     eng.restoreSnapshot(id);
     expect(eng.getState()).toBe(EngineState.PAUSED);
   });

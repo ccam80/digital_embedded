@@ -62,10 +62,10 @@ async function createHwrSession(): Promise<{ session: ComparisonSession; topolog
 }
 
 // ---------------------------------------------------------------------------
-// glob.ts — 7 tests
+// glob.ts- 7 tests
 // ---------------------------------------------------------------------------
 
-describe("glob.ts — compileSlotMatcher / matchSlotPattern", () => {
+describe("glob.ts- compileSlotMatcher / matchSlotPattern", () => {
   it("1. compileSlotMatcher([]) always returns false", () => {
     const match = compileSlotMatcher([]);
     expect(match("anything")).toBe(false);
@@ -92,23 +92,23 @@ describe("glob.ts — compileSlotMatcher / matchSlotPattern", () => {
     expect(matchSlotPattern("VBE", ["Q_*"])).toBe(false);
   });
 
-  it('6. matchSlotPattern: ? matches single char — "VBE" matches "V?E"', () => {
+  it('6. matchSlotPattern: ? matches single char- "VBE" matches "V?E"', () => {
     expect(matchSlotPattern("VBE", ["V?E"])).toBe(true);
     expect(matchSlotPattern("VBE", ["V??"])).toBe(true);
     expect(matchSlotPattern("VBE", ["V?"])).toBe(false);
   });
 
-  it('7. matchSlotPattern with multiple patterns OR\'d — "GEQ" matches ["Q_*", "GEQ"]', () => {
+  it('7. matchSlotPattern with multiple patterns OR\'d- "GEQ" matches ["Q_*", "GEQ"]', () => {
     expect(matchSlotPattern("GEQ", ["Q_*", "GEQ"])).toBe(true);
     expect(matchSlotPattern("GEQ", ["Q_*"])).toBe(false);
   });
 });
 
 // ---------------------------------------------------------------------------
-// format.ts — 6 tests
+// format.ts- 6 tests
 // ---------------------------------------------------------------------------
 
-describe("format.ts — formatting and serialization utilities", () => {
+describe("format.ts- formatting and serialization utilities", () => {
   const cvPass: ComparedValue = {
     ours: 1.23e-3,
     ngspice: 1.24e-3,
@@ -153,7 +153,7 @@ describe("format.ts — formatting and serialization utilities", () => {
     expect(result.summary).toBe(formatComparedValue(cvPass, 4));
   });
 
-  it("11. formatComparedTable with 3 entries — sorted by absDelta desc, contains headers", () => {
+  it("11. formatComparedTable with 3 entries- sorted by absDelta desc, contains headers", () => {
     const entries: Record<string, ComparedValue> = {
       slot_a: { ours: 1, ngspice: 1.01, delta: -0.01, absDelta: 0.01, relDelta: 0.01, withinTol: true },
       slot_b: { ours: 1, ngspice: 1.5, delta: -0.5, absDelta: 0.5, relDelta: 0.33, withinTol: false },
@@ -183,7 +183,7 @@ describe("format.ts — formatting and serialization utilities", () => {
 });
 
 // ---------------------------------------------------------------------------
-// normalizeDeviceType — 4 tests (14-17)
+// normalizeDeviceType- 4 tests (14-17)
 // ---------------------------------------------------------------------------
 
 describe("normalizeDeviceType", () => {
@@ -205,10 +205,10 @@ describe("normalizeDeviceType", () => {
 });
 
 // ---------------------------------------------------------------------------
-// captureTopology type field fix — 1 test (18)
+// captureTopology type field fix- 1 test (18)
 // ---------------------------------------------------------------------------
 
-describe("captureTopology — type field population", () => {
+describe("captureTopology- type field population", () => {
   it("18. type is a non-empty string for all elements after captureTopology", () => {
     const { circuit } = buildHwrFixture();
     const elementLabels = buildElementLabelMap(circuit);
@@ -221,7 +221,7 @@ describe("captureTopology — type field population", () => {
 });
 
 // ---------------------------------------------------------------------------
-// listComponents — 3 tests (19-21)
+// listComponents- 3 tests (19-21)
 // ---------------------------------------------------------------------------
 
 describe("listComponents", () => {
@@ -248,7 +248,7 @@ describe("listComponents", () => {
 });
 
 // ---------------------------------------------------------------------------
-// listNodes — 3 tests (22-24)
+// listNodes- 3 tests (22-24)
 // ---------------------------------------------------------------------------
 
 describe("listNodes", () => {
@@ -276,13 +276,13 @@ describe("listNodes", () => {
 });
 
 // ---------------------------------------------------------------------------
-// getComponentsByType — 3 tests (25-27)
+// getComponentsByType- 3 tests (25-27)
 // ---------------------------------------------------------------------------
 
 describe("getComponentsByType", () => {
   it("25. Returns labels for matching type in HWR circuit (type sourced from topology)", async () => {
     const { session } = await createHwrSession();
-    // HWR circuit has a diode — verify getComponentsByType returns it.
+    // HWR circuit has a diode- verify getComponentsByType returns it.
     const diodeComponents = session.getComponentsByType("diode");
     expect(diodeComponents.length).toBeGreaterThanOrEqual(1);
     // All returned components should have non-empty labels.
@@ -306,7 +306,7 @@ describe("getComponentsByType", () => {
 });
 
 // ---------------------------------------------------------------------------
-// getDivergences (self-comparison → zero divergences) — 4 tests (28-31)
+// getDivergences (self-comparison → zero divergences)- 4 tests (28-31)
 // ---------------------------------------------------------------------------
 
 describe("getDivergences", () => {
@@ -387,7 +387,7 @@ describe("getDivergences", () => {
 });
 
 // ---------------------------------------------------------------------------
-// getStepEndRange — 2 tests (32-33)
+// getStepEndRange- 2 tests (32-33)
 // ---------------------------------------------------------------------------
 
 describe("getStepEndRange", () => {
@@ -407,7 +407,7 @@ describe("getStepEndRange", () => {
 });
 
 // ---------------------------------------------------------------------------
-// traceComponentSlot — 3 tests (34-36)
+// traceComponentSlot- 3 tests (34-36)
 // ---------------------------------------------------------------------------
 
 describe("traceComponentSlot", () => {
@@ -443,7 +443,7 @@ describe("traceComponentSlot", () => {
 });
 
 // ---------------------------------------------------------------------------
-// getStateHistory — 3 tests (37-39)
+// getStateHistory- 3 tests (37-39)
 // ---------------------------------------------------------------------------
 
 describe("getStateHistory", () => {
@@ -485,7 +485,7 @@ describe("getStateHistory", () => {
 });
 
 // ---------------------------------------------------------------------------
-// getMatrixLabeled / getRhsLabeled / compareMatrixAt — 4 tests (40-43)
+// getMatrixLabeled / getRhsLabeled / compareMatrixAt- 4 tests (40-43)
 // ---------------------------------------------------------------------------
 
 describe("getMatrixLabeled / getRhsLabeled / compareMatrixAt", () => {
@@ -525,7 +525,7 @@ describe("getMatrixLabeled / getRhsLabeled / compareMatrixAt", () => {
 });
 
 // ---------------------------------------------------------------------------
-// getIntegrationCoefficients — 2 tests (44-45)
+// getIntegrationCoefficients- 2 tests (44-45)
 // ---------------------------------------------------------------------------
 
 describe("getIntegrationCoefficients", () => {
@@ -551,7 +551,7 @@ describe("getIntegrationCoefficients", () => {
 });
 
 // ---------------------------------------------------------------------------
-// getLimitingComparison — 2 tests (46-47)
+// getLimitingComparison- 2 tests (46-47)
 // ---------------------------------------------------------------------------
 
 describe("getLimitingComparison", () => {
@@ -562,7 +562,7 @@ describe("getLimitingComparison", () => {
     expect(report.junctions).toHaveLength(0);
   });
 
-  it("47. Nonexistent label does not throw — returns empty report", async () => {
+  it("47. Nonexistent label does not throw- returns empty report", async () => {
     const { session } = await createHwrSession();
     expect(() => session.getLimitingComparison("DOES_NOT_EXIST", 0, 0)).not.toThrow();
     const report = session.getLimitingComparison("DOES_NOT_EXIST", 0, 0);
@@ -572,7 +572,7 @@ describe("getLimitingComparison", () => {
 });
 
 // ---------------------------------------------------------------------------
-// getConvergenceDetail — 2 tests (48-49)
+// getConvergenceDetail- 2 tests (48-49)
 // ---------------------------------------------------------------------------
 
 describe("getConvergenceDetail", () => {
@@ -596,7 +596,7 @@ describe("getConvergenceDetail", () => {
 });
 
 // ---------------------------------------------------------------------------
-// toJSON — 3 tests (50-52)
+// toJSON- 3 tests (50-52)
 // ---------------------------------------------------------------------------
 
 describe("toJSON", () => {
@@ -610,7 +610,7 @@ describe("toJSON", () => {
     const { session } = await createHwrSession();
     const json = session.toJSON();
     const str = JSON.stringify(json);
-    // JSON.stringify converts NaN and Infinity to null — verify no raw NaN/Infinity strings
+    // JSON.stringify converts NaN and Infinity to null- verify no raw NaN/Infinity strings
     expect(str).not.toContain('"NaN"');
     expect(str).not.toContain('"Infinity"');
     // No Float64Array or Map in output (would fail JSON.stringify)
@@ -640,7 +640,7 @@ describe("toJSON", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Enhanced traceComponent / traceNode — 2 tests (53-54)
+// Enhanced traceComponent / traceNode- 2 tests (53-54)
 // ---------------------------------------------------------------------------
 
 describe("Enhanced traceComponent / traceNode", () => {
@@ -673,7 +673,7 @@ describe("Enhanced traceComponent / traceNode", () => {
 });
 
 // ---------------------------------------------------------------------------
-// static create — 1 test (55)
+// static create- 1 test (55)
 // ---------------------------------------------------------------------------
 
 describe("ComparisonSession.create", () => {
@@ -687,7 +687,7 @@ describe("ComparisonSession.create", () => {
 });
 
 // ---------------------------------------------------------------------------
-// dispose — 1 test (56)
+// dispose- 1 test (56)
 // ---------------------------------------------------------------------------
 
 describe("dispose", () => {
@@ -696,13 +696,13 @@ describe("dispose", () => {
     session.dispose();
     expect(session.ourSession).toBeNull();
     expect(session.ngspiceSession).toBeNull();
-    // Call again — must not throw
+    // Call again- must not throw
     expect(() => session.dispose()).not.toThrow();
   });
 });
 
 // ---------------------------------------------------------------------------
-// Edge cases for getComponentSlots — 3 tests (57-59)
+// Edge cases for getComponentSlots- 3 tests (57-59)
 // ---------------------------------------------------------------------------
 
 describe("getComponentSlots edge cases", () => {
@@ -731,7 +731,7 @@ describe("getComponentSlots edge cases", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Fix 1: simTime is not "-Inf" — it reads stepStartTime correctly (60-62)
+// Fix 1: simTime is not "-Inf"- it reads stepStartTime correctly (60-62)
 // ---------------------------------------------------------------------------
 
 describe("Fix 1: simTime reads stepStartTime, not undefined simTime field", () => {
@@ -756,7 +756,7 @@ describe("Fix 1: simTime reads stepStartTime, not undefined simTime field", () =
     }
   });
 
-  it("62. getSummary firstDivergence has stepStartTime (not simTime) — structural type check", async () => {
+  it("62. getSummary firstDivergence has stepStartTime (not simTime)- structural type check", async () => {
     const { session } = await createHwrSession();
     const summary = session.getSummary();
     // In self-compare, firstDivergence is null (no divergence). That is correct.
@@ -773,10 +773,10 @@ describe("Fix 1: simTime reads stepStartTime, not undefined simTime field", () =
 });
 
 // ---------------------------------------------------------------------------
-// Fix 2 & 3: asymmetric step counts — ngspice-only steps accessible (63-65)
+// Fix 2 & 3: asymmetric step counts- ngspice-only steps accessible (63-65)
 // ---------------------------------------------------------------------------
 
-describe("Fix 2 & 3: asymmetric step counts — ours shorter than ngspice", () => {
+describe("Fix 2 & 3: asymmetric step counts- ours shorter than ngspice", () => {
   it("63. getStepEnd on an ngspice-only step does not throw and returns presence 'ngspiceOnly'", async () => {
     // Use a freshly built transient self-compare session; simulate asymmetry by injecting
     // extra steps into the ngspice session.
@@ -787,7 +787,7 @@ describe("Fix 2 & 3: asymmetric step counts — ours shorter than ngspice", () =
     const ngSteps: any[] = (ngReindexed ?? ngSession)?.steps ?? [];
     if (ourSteps.length < 1 || ngSteps.length < 1) return; // skip if no steps
 
-    // Truncate ours to simulate crash at step 0 — ng has the rest
+    // Truncate ours to simulate crash at step 0- ng has the rest
     const savedOurTail = ourSteps.splice(1);
     try {
       // Step 1 is now ngspice-only
@@ -835,7 +835,7 @@ describe("Fix 2 & 3: asymmetric step counts — ours shorter than ngspice", () =
     try {
       const firstNode = Array.from(topology.nodeLabels.values())[0] as string;
       const trace = session.traceNode(firstNode);
-      // Step index 1+ are ngspice-only — ours voltage should be NaN
+      // Step index 1+ are ngspice-only- ours voltage should be NaN
       for (let si = 1; si < trace.steps.length; si++) {
         const step = trace.steps[si];
         for (const iter of step.iterations) {

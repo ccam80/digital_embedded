@@ -1,9 +1,9 @@
 /**
- * PostMessageAdapter — single source of truth for the postMessage wire protocol.
+ * PostMessageAdapter- single source of truth for the postMessage wire protocol.
  *
  * Translates incoming messages from a parent frame into simulator operations
  * and posts structured responses back. All message handling is centralized here
- * — no inline handlers in app-init.ts.
+ *- no inline handlers in app-init.ts.
  *
  * GUI-specific operations (loading into the editor, palette filtering,
  * highlighting, instructions panel) are handled via callback hooks injected
@@ -12,40 +12,40 @@
  * Parent → Simulator message types:
  *
  *   Core:
- *     sim-load-url          — fetch URL then load circuit
- *     sim-load-data         — base64-decode then load circuit
- *     sim-load-json         — deserialize DTS then load circuit
- *     sim-set-signal        — write a signal value by label (analog or digital)
- *     sim-step              — single propagation step
- *     sim-run-tests         — run test vectors (headless runner)
- *     sim-test              — run test vectors (tutorial-style, with label validation)
- *     sim-read-signal       — read a signal value by label (analog or digital)
- *     sim-read-all-signals  — snapshot all labeled signals
- *     sim-get-circuit       — export current circuit as base64 DTS JSON
- *     sim-set-base          — update resolver base path
- *     sim-set-locked        — enable / disable locked mode
- *     sim-load-memory       — load hex/binary data into RAM/ROM
+ *     sim-load-url         - fetch URL then load circuit
+ *     sim-load-data        - base64-decode then load circuit
+ *     sim-load-json        - deserialize DTS then load circuit
+ *     sim-set-signal       - write a signal value by label (analog or digital)
+ *     sim-step             - single propagation step
+ *     sim-run-tests        - run test vectors (headless runner)
+ *     sim-test             - run test vectors (tutorial-style, with label validation)
+ *     sim-read-signal      - read a signal value by label (analog or digital)
+ *     sim-read-all-signals - snapshot all labeled signals
+ *     sim-get-circuit      - export current circuit as base64 DTS JSON
+ *     sim-set-base         - update resolver base path
+ *     sim-set-locked       - enable / disable locked mode
+ *     sim-load-memory      - load hex/binary data into RAM/ROM
  *
  *   Tutorial / UI:
- *     sim-set-palette             — restrict component palette
- *     sim-highlight               — highlight components by label
- *     sim-clear-highlight         — clear all highlights
- *     sim-set-readonly-components — lock specific components
- *     sim-set-instructions        — show/hide instructions panel
- *     sim-load-tutorial           — load a TutorialManifest and start embedded runner
- *     sim-tutorial-goto           — jump to a specific tutorial step by index
+ *     sim-set-palette            - restrict component palette
+ *     sim-highlight              - highlight components by label
+ *     sim-clear-highlight        - clear all highlights
+ *     sim-set-readonly-components- lock specific components
+ *     sim-set-instructions       - show/hide instructions panel
+ *     sim-load-tutorial          - load a TutorialManifest and start embedded runner
+ *     sim-tutorial-goto          - jump to a specific tutorial step by index
  *
  * Simulator → Parent response types:
- *     sim-ready        — sent once on init
- *     sim-loaded       — circuit/setting applied
- *     sim-error        — error occurred
- *     sim-output       — response to sim-read-signal
- *     sim-signals      — response to sim-read-all-signals
- *     sim-test-result  — response to sim-test / sim-run-tests
- *     sim-circuit-data — response to sim-get-circuit
- *     sim-tutorial-loaded       — tutorial manifest accepted, runner active
- *     sim-tutorial-step-changed — step navigation occurred
- *     sim-tutorial-check-result — validation result for a step
+ *     sim-ready       - sent once on init
+ *     sim-loaded      - circuit/setting applied
+ *     sim-error       - error occurred
+ *     sim-output      - response to sim-read-signal
+ *     sim-signals     - response to sim-read-all-signals
+ *     sim-test-result - response to sim-test / sim-run-tests
+ *     sim-circuit-data- response to sim-get-circuit
+ *     sim-tutorial-loaded      - tutorial manifest accepted, runner active
+ *     sim-tutorial-step-changed- step navigation occurred
+ *     sim-tutorial-check-result- validation result for a step
  */
 
 import type { FileResolver } from './file-resolver.js';
@@ -65,12 +65,12 @@ import type { SimulatorFacade } from '../headless/facade.js';
 import { PinDirection } from '../core/pin.js';
 
 // ---------------------------------------------------------------------------
-// Callback hooks — injected by app-init.ts for GUI integration
+// Callback hooks- injected by app-init.ts for GUI integration
 // ---------------------------------------------------------------------------
 
 /**
  * Hooks that the host (app-init.ts) provides for operations that touch
- * the editor, canvas, or DOM. All are optional — headless-only hosts
+ * the editor, canvas, or DOM. All are optional- headless-only hosts
  * can omit them entirely.
  */
 export interface PostMessageHooks {
@@ -470,7 +470,7 @@ export class PostMessageAdapter {
   // -------------------------------------------------------------------------
 
   /**
-   * `sim-run-tests` — headless test execution via SimulationRunner.
+   * `sim-run-tests`- headless test execution via SimulationRunner.
    * Uses facade.runTests pattern: recompiles, runs all test vectors.
    */
   private async _handleRunTests(msg: { testData?: unknown }): Promise<void> {
@@ -504,7 +504,7 @@ export class PostMessageAdapter {
   }
 
   /**
-   * `sim-test` — tutorial-style test execution with label validation
+   * `sim-test`- tutorial-style test execution with label validation
    * and user-friendly error messages.
    */
   private async _handleTestTutorial(msg: { testData?: unknown }): Promise<void> {
@@ -523,7 +523,7 @@ export class PostMessageAdapter {
       // Determine input/output labels from compiled labelSignalMap.
       // Analog-domain entries are inputs (sources). For digital, use
       // the direction field on the SignalAddress (resolved at compile time
-      // from the component's pin layout — no typeId whitelist needed).
+      // from the component's pin layout- no typeId whitelist needed).
       const circuitInputLabels = new Set<string>();
       const circuitOutputLabels = new Set<string>();
       for (const [lbl, addr] of coordinator.compiled.labelSignalMap) {
@@ -756,7 +756,7 @@ export class PostMessageAdapter {
     }
   }
 
-  /** Get the current circuit — prefers the GUI hook, falls back to error. */
+  /** Get the current circuit- prefers the GUI hook, falls back to error. */
   private _getCircuit(): Circuit {
     if (this._hooks.getCircuit) {
       return this._hooks.getCircuit();

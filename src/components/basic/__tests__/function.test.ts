@@ -29,7 +29,7 @@ import type { RenderContext, Point, TextAnchor, FontSpec, PathData } from "../..
 import type { ThemeColor } from "../../../core/renderer-interface.js";
 
 // ---------------------------------------------------------------------------
-// Helpers — ComponentLayout mock
+// Helpers- ComponentLayout mock
 // ---------------------------------------------------------------------------
 
 function makeLayout(
@@ -54,7 +54,7 @@ function makeState(size: number): Uint32Array {
 }
 
 // ---------------------------------------------------------------------------
-// Helpers — RenderContext mock
+// Helpers- RenderContext mock
 // ---------------------------------------------------------------------------
 
 interface DrawCall {
@@ -384,11 +384,11 @@ describe("BooleanFunctionElement", () => {
 
 describe("executeBooleanFunction", () => {
   // -------------------------------------------------------------------------
-  // Truth table evaluation — single output
+  // Truth table evaluation- single output
   // -------------------------------------------------------------------------
 
   describe("singleOutputEvaluation", () => {
-    it("AND function: [0,0,0,1] — inputs [0,0] → output 0", () => {
+    it("AND function: [0,0,0,1]- inputs [0,0] → output 0", () => {
       const { state, layout } = makeExecuteState([0, 0], [0, 0, 0, 1], 1);
       const highZs = new Uint32Array(state.length);
       executeBooleanFunction(0, state, highZs, layout);
@@ -396,63 +396,63 @@ describe("executeBooleanFunction", () => {
       expect(state[outputIdx]).toBe(0);
     });
 
-    it("AND function: [0,0,0,1] — inputs [1,0] → output 0", () => {
+    it("AND function: [0,0,0,1]- inputs [1,0] → output 0", () => {
       const { state, layout } = makeExecuteState([1, 0], [0, 0, 0, 1], 1);
       const highZs = new Uint32Array(state.length);
       executeBooleanFunction(0, state, highZs, layout);
       expect(state[layout.outputOffset(0)]).toBe(0);
     });
 
-    it("AND function: [0,0,0,1] — inputs [0,1] → output 0", () => {
+    it("AND function: [0,0,0,1]- inputs [0,1] → output 0", () => {
       const { state, layout } = makeExecuteState([0, 1], [0, 0, 0, 1], 1);
       const highZs = new Uint32Array(state.length);
       executeBooleanFunction(0, state, highZs, layout);
       expect(state[layout.outputOffset(0)]).toBe(0);
     });
 
-    it("AND function: [0,0,0,1] — inputs [1,1] → output 1", () => {
+    it("AND function: [0,0,0,1]- inputs [1,1] → output 1", () => {
       const { state, layout } = makeExecuteState([1, 1], [0, 0, 0, 1], 1);
       const highZs = new Uint32Array(state.length);
       executeBooleanFunction(0, state, highZs, layout);
       expect(state[layout.outputOffset(0)]).toBe(1);
     });
 
-    it("OR function: [0,1,1,1] — inputs [0,0] → output 0", () => {
+    it("OR function: [0,1,1,1]- inputs [0,0] → output 0", () => {
       const { state, layout } = makeExecuteState([0, 0], [0, 1, 1, 1], 1);
       const highZs = new Uint32Array(state.length);
       executeBooleanFunction(0, state, highZs, layout);
       expect(state[layout.outputOffset(0)]).toBe(0);
     });
 
-    it("OR function: [0,1,1,1] — inputs [1,0] → output 1", () => {
+    it("OR function: [0,1,1,1]- inputs [1,0] → output 1", () => {
       const { state, layout } = makeExecuteState([1, 0], [0, 1, 1, 1], 1);
       const highZs = new Uint32Array(state.length);
       executeBooleanFunction(0, state, highZs, layout);
       expect(state[layout.outputOffset(0)]).toBe(1);
     });
 
-    it("XOR function: [0,1,1,0] — inputs [1,1] → output 0", () => {
+    it("XOR function: [0,1,1,0]- inputs [1,1] → output 0", () => {
       const { state, layout } = makeExecuteState([1, 1], [0, 1, 1, 0], 1);
       const highZs = new Uint32Array(state.length);
       executeBooleanFunction(0, state, highZs, layout);
       expect(state[layout.outputOffset(0)]).toBe(0);
     });
 
-    it("XOR function: [0,1,1,0] — inputs [1,0] → output 1", () => {
+    it("XOR function: [0,1,1,0]- inputs [1,0] → output 1", () => {
       const { state, layout } = makeExecuteState([1, 0], [0, 1, 1, 0], 1);
       const highZs = new Uint32Array(state.length);
       executeBooleanFunction(0, state, highZs, layout);
       expect(state[layout.outputOffset(0)]).toBe(1);
     });
 
-    it("NOT function (1-input): [1,0] — in0=0 → output 1", () => {
+    it("NOT function (1-input): [1,0]- in0=0 → output 1", () => {
       const { state, layout } = makeExecuteState([0], [1, 0], 1);
       const highZs = new Uint32Array(state.length);
       executeBooleanFunction(0, state, highZs, layout);
       expect(state[layout.outputOffset(0)]).toBe(1);
     });
 
-    it("NOT function (1-input): [1,0] — in0=1 → output 0", () => {
+    it("NOT function (1-input): [1,0]- in0=1 → output 0", () => {
       const { state, layout } = makeExecuteState([1], [1, 0], 1);
       const highZs = new Uint32Array(state.length);
       executeBooleanFunction(0, state, highZs, layout);
@@ -465,7 +465,7 @@ describe("executeBooleanFunction", () => {
   // -------------------------------------------------------------------------
 
   describe("multiOutputEvaluation", () => {
-    it("2-output function with [0,1,2,3] — inputs [0,0] → outputs [0,0]", () => {
+    it("2-output function with [0,1,2,3]- inputs [0,0] → outputs [0,0]", () => {
       // Table: row0=0b00=0, row1=0b01=1, row2=0b10=2, row3=0b11=3
       const { state, layout } = makeExecuteState([0, 0], [0, 1, 2, 3], 2);
       const highZs = new Uint32Array(state.length);
@@ -475,7 +475,7 @@ describe("executeBooleanFunction", () => {
       expect(state[outBase + 1]).toBe(0); // bit1
     });
 
-    it("2-output function with [0,1,2,3] — inputs [1,0] → outputs [1,0]", () => {
+    it("2-output function with [0,1,2,3]- inputs [1,0] → outputs [1,0]", () => {
       // row1=1 = 0b01: bit0=1, bit1=0
       const { state, layout } = makeExecuteState([1, 0], [0, 1, 2, 3], 2);
       const highZs = new Uint32Array(state.length);
@@ -485,7 +485,7 @@ describe("executeBooleanFunction", () => {
       expect(state[outBase + 1]).toBe(0); // bit1 of 1
     });
 
-    it("2-output function with [0,1,2,3] — inputs [0,1] → outputs [0,1]", () => {
+    it("2-output function with [0,1,2,3]- inputs [0,1] → outputs [0,1]", () => {
       // row2=2 = 0b10: bit0=0, bit1=1
       const { state, layout } = makeExecuteState([0, 1], [0, 1, 2, 3], 2);
       const highZs = new Uint32Array(state.length);
@@ -495,7 +495,7 @@ describe("executeBooleanFunction", () => {
       expect(state[outBase + 1]).toBe(1); // bit1 of 2
     });
 
-    it("2-output function with [0,1,2,3] — inputs [1,1] → outputs [1,1]", () => {
+    it("2-output function with [0,1,2,3]- inputs [1,1] → outputs [1,1]", () => {
       // row3=3 = 0b11: bit0=1, bit1=1
       const { state, layout } = makeExecuteState([1, 1], [0, 1, 2, 3], 2);
       const highZs = new Uint32Array(state.length);

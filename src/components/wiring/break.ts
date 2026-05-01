@@ -1,5 +1,5 @@
 /**
- * Break component — monitors input; when input goes high, signals the engine
+ * Break component- monitors input; when input goes high, signals the engine
  * to halt simulation (run-to-break behavior).
  *
  * The executeFn writes a sentinel value to its output slot when the input is
@@ -60,7 +60,7 @@ export function buildBreakPinDeclarations(): PinDeclaration[] {
 }
 
 // ---------------------------------------------------------------------------
-// BreakElement — CircuitElement implementation
+// BreakElement- CircuitElement implementation
 // ---------------------------------------------------------------------------
 
 export class BreakElement extends AbstractCircuitElement {
@@ -108,7 +108,7 @@ export class BreakElement extends AbstractCircuitElement {
 }
 
 // ---------------------------------------------------------------------------
-// executeBreak — flat simulation function
+// executeBreak- flat simulation function
 //
 // Writes 1 to its output slot when input is high (non-zero).
 // The engine polls output slot for any Break components and halts if non-zero.
@@ -198,7 +198,7 @@ export const BreakDefinition: ComponentDefinition = {
   attributeMap: BREAK_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.WIRING,
   helpText:
-    "Break — halts simulation when input goes high.\n" +
+    "Break- halts simulation when input goes high.\n" +
     "Used for run-to-breakpoint debugging.",
   models: {
     digital: {

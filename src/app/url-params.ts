@@ -12,7 +12,7 @@
  */
 
 // ---------------------------------------------------------------------------
-// SimulatorParams — parsed URL parameters
+// SimulatorParams- parsed URL parameters
 // ---------------------------------------------------------------------------
 
 export interface SimulatorParams {
@@ -27,7 +27,7 @@ export interface SimulatorParams {
   /** Panel display mode. Default: "default". */
   panels: 'default' | 'none';
   /**
-   * Palette override — comma-separated list of component type names to show.
+   * Palette override- comma-separated list of component type names to show.
    * When set, only these types appear in the palette. Undefined means show all.
    * Example: "And,Or,Not,In,Out,Clock,Led"
    */
@@ -40,7 +40,7 @@ export interface SimulatorParams {
 }
 
 // ---------------------------------------------------------------------------
-// ModuleConfig — course/module-scoped configuration
+// ModuleConfig- course/module-scoped configuration
 // ---------------------------------------------------------------------------
 
 /**
@@ -50,7 +50,7 @@ export interface SimulatorParams {
  * File location: `modules/<id>/config.json`
  */
 export interface ModuleConfig {
-  /** Display title for the module (e.g. "ECE 101 — Digital Logic"). */
+  /** Display title for the module (e.g. "ECE 101- Digital Logic"). */
   title: string;
   /** Optional description shown in the UI. */
   description?: string;
@@ -147,9 +147,9 @@ export async function loadModuleConfig(
     const config = (await res.json()) as ModuleConfig;
     return { config, moduleBase };
   } catch (e) {
-    // Network error or malformed JSON — surface the anomaly and return
+    // Network error or malformed JSON- surface the anomaly and return
     // null so the caller can decide. Per spec/architectural-alignment.md
-    // §I1 replaced prior silent swallow.
+    // ssI1 replaced prior silent swallow.
     console.warn(`[url-params] Failed to load module config from "${configUrl}".`, e);
     return null;
   }
@@ -164,7 +164,7 @@ export function applyModuleConfig(
   config: ModuleConfig,
   moduleBase: string,
 ): void {
-  // Module sets defaults — explicit URL params override
+  // Module sets defaults- explicit URL params override
   if (config.locked !== undefined && !params.locked) {
     params.locked = config.locked;
   }

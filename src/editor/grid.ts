@@ -1,5 +1,5 @@
 /**
- * Grid renderer — draws minor and major grid lines on the circuit canvas.
+ * Grid renderer- draws minor and major grid lines on the circuit canvas.
  *
  * Minor lines appear every grid unit. Major lines appear every 5 grid units
  * and are drawn with a slightly thicker line width. Minor lines are hidden

@@ -40,17 +40,17 @@ export interface TutorialDiagnostic {
 }
 
 // Diagnostic codes:
-// manifest-structure    — top-level structure invalid
-// step-structure        — step structure invalid
-// duplicate-step-id     — two steps share an ID
-// unsafe-id             — ID contains characters that aren't URL-safe
-// unknown-component     — component type not in registry
-// unknown-preset        — palette preset name not recognized
-// carry-forward-first   — "carry-forward" on first step
-// missing-test-data     — test-vectors validation without testData
-// missing-goal          — equivalence validation without goalCircuit
-// test-data-parse-error — testData string fails to parse
-// circuit-spec-error    — circuit spec references unknown types
+// manifest-structure   - top-level structure invalid
+// step-structure       - step structure invalid
+// duplicate-step-id    - two steps share an ID
+// unsafe-id            - ID contains characters that aren't URL-safe
+// unknown-component    - component type not in registry
+// unknown-preset       - palette preset name not recognized
+// carry-forward-first  - "carry-forward" on first step
+// missing-test-data    - test-vectors validation without testData
+// missing-goal         - equivalence validation without goalCircuit
+// test-data-parse-error- testData string fails to parse
+// circuit-spec-error   - circuit spec references unknown types
 
 // ---------------------------------------------------------------------------
 // validateManifest
@@ -157,7 +157,7 @@ export function validateManifest(
       });
     }
 
-    // Explore mode without goalCircuit — "Show Solution" button won't work
+    // Explore mode without goalCircuit- "Show Solution" button won't work
     if (step.mode === 'explore' && !step.goalCircuit) {
       diagnostics.push({
         severity: 'warning',
@@ -172,7 +172,7 @@ export function validateManifest(
     if (step.testData) {
       // validateTestDataSyntax appends to `diagnostics` directly; it does
       // not throw on malformed input. Per spec/architectural-alignment.md
-      // §I1 the prior try/catch hid real bugs.
+      // ssI1 the prior try/catch hid real bugs.
       validateTestDataSyntax(step.testData, step.id, diagnostics);
     }
 
@@ -337,7 +337,7 @@ function validateTestDataSyntax(
       stepId,
       code: 'test-data-parse-error',
       message: 'Test data header has fewer than 2 signal names. Need at least one input and one output.',
-      fix: 'Format: "input1 input2 output1 output2" — input/output split is auto-detected from circuit In/Out labels.',
+      fix: 'Format: "input1 input2 output1 output2"- input/output split is auto-detected from circuit In/Out labels.',
     });
   }
 }

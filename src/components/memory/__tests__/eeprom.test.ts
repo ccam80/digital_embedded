@@ -65,9 +65,9 @@ function makeLayout(inputCount: number, outputCount: number, stateCount: number)
 // ---------------------------------------------------------------------------
 
 describe("EEPROM", () => {
-  // Inputs: A(0), CS(1), WE(2), OE(3), Din(4) — 5 inputs
-  // Outputs: D(0) — 1 output
-  // State: lastWE(0), writeAddr(1) — 2 state slots
+  // Inputs: A(0), CS(1), WE(2), OE(3), Din(4)- 5 inputs
+  // Outputs: D(0)- 1 output
+  // State: lastWE(0), writeAddr(1)- 2 state slots
   const IN = 5;
   const OUT = 1;
   const STATE = 2;
@@ -76,7 +76,7 @@ describe("EEPROM", () => {
     clearBackingStores();
   });
 
-  it("readWithCSandOE — CS=1 OE=1 WE=0 outputs memory[A]", () => {
+  it("readWithCSandOE- CS=1 OE=1 WE=0 outputs memory[A]", () => {
     const mem = new DataField(16);
     mem.write(0, 0xAB);
     registerBackingStore(0, mem);
@@ -93,7 +93,7 @@ describe("EEPROM", () => {
     expect(state[IN]).toBe(0xAB); // D
   });
 
-  it("readGating — CS=0 suppresses output", () => {
+  it("readGating- CS=0 suppresses output", () => {
     const mem = new DataField(16);
     mem.write(0, 0xFF);
     registerBackingStore(0, mem);
@@ -105,7 +105,7 @@ describe("EEPROM", () => {
     expect(state[IN]).toBe(0);
   });
 
-  it("readGating — OE=0 suppresses output", () => {
+  it("readGating- OE=0 suppresses output", () => {
     const mem = new DataField(16);
     mem.write(0, 0xFF);
     registerBackingStore(0, mem);
@@ -117,7 +117,7 @@ describe("EEPROM", () => {
     expect(state[IN]).toBe(0);
   });
 
-  it("readGating — WE=1 suppresses output even with CS and OE asserted", () => {
+  it("readGating- WE=1 suppresses output even with CS and OE asserted", () => {
     const mem = new DataField(16);
     mem.write(0, 0xFF);
     registerBackingStore(0, mem);
@@ -130,7 +130,7 @@ describe("EEPROM", () => {
     expect(state[IN]).toBe(0);
   });
 
-  it("writeThenRead — WE rising edge captures address, falling edge commits write", () => {
+  it("writeThenRead- WE rising edge captures address, falling edge commits write", () => {
     const mem = new DataField(16);
     registerBackingStore(0, mem);
 
@@ -151,7 +151,7 @@ describe("EEPROM", () => {
     expect(state[IN + OUT + 1]).toBe(5);   // writeAddr
 
     // Step 2: Falling edge of WE with Din = 0xBE
-    state[0] = 9;   // A changes (irrelevant for write — uses captured addr=5)
+    state[0] = 9;   // A changes (irrelevant for write- uses captured addr=5)
     state[1] = 1;   // CS
     state[2] = 0;   // WE (falling)
     state[3] = 0;   // OE
@@ -171,7 +171,7 @@ describe("EEPROM", () => {
     expect(state[IN]).toBe(0xBE);
   });
 
-  it("noWriteWithoutCS — write does not occur when CS=0 on falling WE", () => {
+  it("noWriteWithoutCS- write does not occur when CS=0 on falling WE", () => {
     const mem = new DataField(16);
     registerBackingStore(0, mem);
 
@@ -192,7 +192,7 @@ describe("EEPROM", () => {
     expect(mem.read(2)).toBe(0);
   });
 
-  it("multipleWrites — sequential writes to different addresses", () => {
+  it("multipleWrites- sequential writes to different addresses", () => {
     const mem = new DataField(16);
     registerBackingStore(0, mem);
 
@@ -220,7 +220,7 @@ describe("EEPROM", () => {
     expect(mem.read(3)).toBe(0x33);
   });
 
-  it("addressWrapping — address wraps modulo DataField size", () => {
+  it("addressWrapping- address wraps modulo DataField size", () => {
     const mem = new DataField(4);
     mem.write(0, 0xAA);
     registerBackingStore(0, mem);
@@ -236,7 +236,7 @@ describe("EEPROM", () => {
     expect(state[IN]).toBe(0xAA);
   });
 
-  it("noBackingStore — read returns 0 gracefully", () => {
+  it("noBackingStore- read returns 0 gracefully", () => {
     const { layout, state } = makeLayout(IN, OUT, STATE);
     const highZs = new Uint32Array(state.length);
     state[0] = 0; state[1] = 1; state[2] = 0; state[3] = 1; state[4] = 0;
@@ -244,20 +244,20 @@ describe("EEPROM", () => {
     expect(state[IN]).toBe(0);
   });
 
-  it("isProgramMemoryFlag — element reports isProgramMemory correctly", () => {
+  it("isProgramMemoryFlag- element reports isProgramMemory correctly", () => {
     const props = new PropertyBag();
     props.set("isProgramMemory", true);
     const el = new EEPROMElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
     expect(el.isProgramMemory).toBe(true);
   });
 
-  it("isProgramMemoryDefault — defaults to false", () => {
+  it("isProgramMemoryDefault- defaults to false", () => {
     const props = new PropertyBag();
     const el = new EEPROMElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
     expect(el.isProgramMemory).toBe(false);
   });
 
-  it("pinLayout — EEPROM has 5 input pins and 1 output pin", () => {
+  it("pinLayout- EEPROM has 5 input pins and 1 output pin", () => {
     const props = new PropertyBag();
     const el = new EEPROMElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
     const pins = el.getPins();
@@ -274,7 +274,7 @@ describe("EEPROM", () => {
     expect(labels).toContain("D");
   });
 
-  it("weClockCapable — WE pin is marked as clock-capable", () => {
+  it("weClockCapable- WE pin is marked as clock-capable", () => {
     const props = new PropertyBag();
     const el = new EEPROMElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
     const pins = el.getPins();
@@ -283,7 +283,7 @@ describe("EEPROM", () => {
     expect(wePin!.isClock).toBe(true);
   });
 
-  it("attributeMapping — Bits, AddrBits, Label, isProgramMemory map correctly", () => {
+  it("attributeMapping- Bits, AddrBits, Label, isProgramMemory map correctly", () => {
     const mapping = EEPROM_ATTRIBUTE_MAPPINGS;
     const bitsMap = mapping.find(m => m.xmlName === "Bits");
     const addrMap = mapping.find(m => m.xmlName === "AddrBits");
@@ -297,7 +297,7 @@ describe("EEPROM", () => {
     expect(isPMMap!.convert("false")).toBe(false);
   });
 
-  it("draw — calls ctx.drawRect and ctx.drawText with EEPROM label", () => {
+  it("draw- calls ctx.drawRect and ctx.drawText with EEPROM label", () => {
     const props = new PropertyBag();
     const el = new EEPROMElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
 
@@ -328,7 +328,7 @@ describe("EEPROM", () => {
     expect(texts.some(t => t.includes("EEPROM"))).toBe(true);
   });
 
-  it("definitionComplete — EEPROMDefinition has all required fields", () => {
+  it("definitionComplete- EEPROMDefinition has all required fields", () => {
     expect(EEPROMDefinition.name).toBe("EEPROM");
     expect(EEPROMDefinition.factory).toBeDefined();
     expect(EEPROMDefinition.models!.digital!.executeFn).toBeDefined();
@@ -340,7 +340,7 @@ describe("EEPROM", () => {
     expect(typeof EEPROMDefinition.models!.digital!.defaultDelay).toBe("number");
   });
 
-  it("factoryCreatesInstance — EEPROMDefinition.factory returns EEPROMElement", () => {
+  it("factoryCreatesInstance- EEPROMDefinition.factory returns EEPROMElement", () => {
     const props = new PropertyBag();
     expect(EEPROMDefinition.factory(props)).toBeInstanceOf(EEPROMElement);
   });
@@ -351,9 +351,9 @@ describe("EEPROM", () => {
 // ---------------------------------------------------------------------------
 
 describe("EEPROMDualPort", () => {
-  // Inputs: A(0), Din(1), str(2), C(3), ld(4) — 5 inputs
-  // Outputs: D(0) — 1 output
-  // State: lastClk(0) — 1 state slot
+  // Inputs: A(0), Din(1), str(2), C(3), ld(4)- 5 inputs
+  // Outputs: D(0)- 1 output
+  // State: lastClk(0)- 1 state slot
   const IN = 5;
   const OUT = 1;
   const STATE = 1;
@@ -362,7 +362,7 @@ describe("EEPROMDualPort", () => {
     clearBackingStores();
   });
 
-  it("writeThenRead — clock-edge write then load read", () => {
+  it("writeThenRead- clock-edge write then load read", () => {
     const mem = new DataField(16);
     registerBackingStore(0, mem);
 
@@ -391,7 +391,7 @@ describe("EEPROMDualPort", () => {
     expect(state[IN]).toBe(0xAB);
   });
 
-  it("noWriteWithoutClockEdge — str=1 but no rising edge → no write", () => {
+  it("noWriteWithoutClockEdge- str=1 but no rising edge → no write", () => {
     const mem = new DataField(16);
     registerBackingStore(0, mem);
 
@@ -402,7 +402,7 @@ describe("EEPROMDualPort", () => {
     state[0] = 0; state[1] = 0xAA; state[2] = 1; state[3] = 1; state[4] = 0;
     sampleEEPROMDualPort(0, state, highZs, layout);
     executeEEPROMDualPort(0, state, highZs, layout);
-    // Now write with clk still high (no rising edge — lastClk=1)
+    // Now write with clk still high (no rising edge- lastClk=1)
     state[1] = 0xFF; state[2] = 1; state[3] = 1;
     sampleEEPROMDualPort(0, state, highZs, layout);
     executeEEPROMDualPort(0, state, highZs, layout);
@@ -410,7 +410,7 @@ describe("EEPROMDualPort", () => {
     expect(mem.read(0)).toBe(0xAA);
   });
 
-  it("noWriteWhenStrLow — rising clock edge with str=0 → no write", () => {
+  it("noWriteWhenStrLow- rising clock edge with str=0 → no write", () => {
     const mem = new DataField(16);
     registerBackingStore(0, mem);
 
@@ -422,7 +422,7 @@ describe("EEPROMDualPort", () => {
     expect(mem.read(0)).toBe(0);
   });
 
-  it("readWithLd — ld=1 outputs memory[A]", () => {
+  it("readWithLd- ld=1 outputs memory[A]", () => {
     const mem = new DataField(16);
     mem.write(7, 0xCC);
     registerBackingStore(0, mem);
@@ -434,7 +434,7 @@ describe("EEPROMDualPort", () => {
     expect(state[IN]).toBe(0xCC);
   });
 
-  it("readGating — ld=0 outputs 0", () => {
+  it("readGating- ld=0 outputs 0", () => {
     const mem = new DataField(16);
     mem.write(0, 0xDD);
     registerBackingStore(0, mem);
@@ -446,7 +446,7 @@ describe("EEPROMDualPort", () => {
     expect(state[IN]).toBe(0);
   });
 
-  it("clockEdgeTracking — lastClk updated correctly after each cycle", () => {
+  it("clockEdgeTracking- lastClk updated correctly after each cycle", () => {
     const mem = new DataField(16);
     registerBackingStore(0, mem);
 
@@ -474,7 +474,7 @@ describe("EEPROMDualPort", () => {
     expect(mem.read(4)).toBe(0x11); // unchanged
   });
 
-  it("addressWrapping — address wraps modulo DataField size", () => {
+  it("addressWrapping- address wraps modulo DataField size", () => {
     const mem = new DataField(4);
     mem.write(2, 0x55);
     registerBackingStore(0, mem);
@@ -488,7 +488,7 @@ describe("EEPROMDualPort", () => {
     expect(state[IN]).toBe(0x55);
   });
 
-  it("pinLayout — EEPROMDualPort has 5 input pins and 1 output pin", () => {
+  it("pinLayout- EEPROMDualPort has 5 input pins and 1 output pin", () => {
     const props = new PropertyBag();
     const el = new EEPROMDualPortElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
     const pins = el.getPins();
@@ -505,7 +505,7 @@ describe("EEPROMDualPort", () => {
     expect(labels).toContain("D");
   });
 
-  it("clockPinMarked — C pin is clock-capable", () => {
+  it("clockPinMarked- C pin is clock-capable", () => {
     const props = new PropertyBag();
     const el = new EEPROMDualPortElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
     const pins = el.getPins();
@@ -514,14 +514,14 @@ describe("EEPROMDualPort", () => {
     expect(cPin!.isClock).toBe(true);
   });
 
-  it("isProgramMemoryFlag — element reports isProgramMemory", () => {
+  it("isProgramMemoryFlag- element reports isProgramMemory", () => {
     const props = new PropertyBag();
     props.set("isProgramMemory", true);
     const el = new EEPROMDualPortElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
     expect(el.isProgramMemory).toBe(true);
   });
 
-  it("attributeMapping — Bits, AddrBits, Label, isProgramMemory", () => {
+  it("attributeMapping- Bits, AddrBits, Label, isProgramMemory", () => {
     const mapping = EEPROM_DUAL_PORT_ATTRIBUTE_MAPPINGS;
     const bitsMap = mapping.find(m => m.xmlName === "Bits");
     const addrMap = mapping.find(m => m.xmlName === "AddrBits");
@@ -529,7 +529,7 @@ describe("EEPROMDualPort", () => {
     expect(addrMap!.convert("12")).toBe(12);
   });
 
-  it("draw — renders body with EEPROM2 symbol", () => {
+  it("draw- renders body with EEPROM2 symbol", () => {
     const props = new PropertyBag();
     const el = new EEPROMDualPortElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
 
@@ -556,7 +556,7 @@ describe("EEPROMDualPort", () => {
     expect(texts.some(t => t.includes("EEPROM"))).toBe(true);
   });
 
-  it("definitionComplete — EEPROMDualPortDefinition has all required fields", () => {
+  it("definitionComplete- EEPROMDualPortDefinition has all required fields", () => {
     expect(EEPROMDualPortDefinition.name).toBe("EEPROMDualPort");
     expect(EEPROMDualPortDefinition.factory).toBeDefined();
     expect(EEPROMDualPortDefinition.models!.digital!.executeFn).toBeDefined();
@@ -568,12 +568,12 @@ describe("EEPROMDualPort", () => {
     expect(typeof EEPROMDualPortDefinition.models!.digital!.defaultDelay).toBe("number");
   });
 
-  it("factoryCreatesInstance — factory returns EEPROMDualPortElement", () => {
+  it("factoryCreatesInstance- factory returns EEPROMDualPortElement", () => {
     const props = new PropertyBag();
     expect(EEPROMDualPortDefinition.factory(props)).toBeInstanceOf(EEPROMDualPortElement);
   });
 
-  it("noBackingStore — read returns 0 gracefully", () => {
+  it("noBackingStore- read returns 0 gracefully", () => {
     const { layout, state } = makeLayout(IN, OUT, STATE);
     const highZs = new Uint32Array(state.length);
     state[4] = 1; // ld

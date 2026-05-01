@@ -1,5 +1,5 @@
 /**
- * TimingDiagramPanel — waveform view of signals over time.
+ * TimingDiagramPanel- waveform view of signals over time.
  *
  * Implements MeasurementObserver to receive step notifications and records
  * one sample per channel per step. Renders to a <canvas> element.
@@ -33,7 +33,7 @@ import {
 } from "./waveform-renderer.js";
 
 // ---------------------------------------------------------------------------
-// SnapshotTag — associates a snapshot ID with a simulation time
+// SnapshotTag- associates a snapshot ID with a simulation time
 // ---------------------------------------------------------------------------
 
 interface SnapshotTag {
@@ -43,7 +43,7 @@ interface SnapshotTag {
 }
 
 // ---------------------------------------------------------------------------
-// CanvasRenderContext — adapts Canvas2D to WaveformRenderContext
+// CanvasRenderContext- adapts Canvas2D to WaveformRenderContext
 // ---------------------------------------------------------------------------
 
 import type { WaveformRenderContext } from "./waveform-renderer.js";
@@ -224,7 +224,7 @@ export class TimingDiagramPanel implements MeasurementObserver {
   }
 
   // -------------------------------------------------------------------------
-  // Query — used by tests and UI code
+  // Query- used by tests and UI code
   // -------------------------------------------------------------------------
 
   /** Return the WaveformChannel for a signal by name. */
@@ -383,7 +383,7 @@ export class TimingDiagramPanel implements MeasurementObserver {
 
     drawTimeAxis(ctx, vp);
 
-    // Time cursor overlay — drawn last so it appears on top of all waveforms
+    // Time cursor overlay- drawn last so it appears on top of all waveforms
     if (this._cursorX !== null) {
       const cursorTime = this._xToTime(this._cursorX);
       const rows = this.getValuesAtTime(cursorTime);

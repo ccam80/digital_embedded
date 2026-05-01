@@ -22,7 +22,7 @@ function makeContainer(): HTMLElement {
 }
 
 describe('TruthTableTab', () => {
-  it('renderGrid — 2 inputs, 1 output renders 4 rows', () => {
+  it('renderGrid- 2 inputs, 1 output renders 4 rows', () => {
     const table = new TruthTable([A, B], [Y]);
     const tab = new TruthTableTab(table);
     const container = makeContainer();
@@ -40,7 +40,7 @@ describe('TruthTableTab', () => {
     expect(headers[2]!.textContent).toBe('Y');
   });
 
-  it('editCell — click output cell, value cycles 0→1→X→0', () => {
+  it('editCell- click output cell, value cycles 0→1→X→0', () => {
     const table = new TruthTable([A], [Y]);
     table.setOutput(0, 0, 0n);
 
@@ -67,7 +67,7 @@ describe('TruthTableTab', () => {
     expect(table.getOutput(0, 0)).toBe(0n);
   });
 
-  it('blankTable — 3 inputs, 2 outputs creates 8 rows with all X', () => {
+  it('blankTable- 3 inputs, 2 outputs creates 8 rows with all X', () => {
     const table = TruthTable.blank([A, B, C], [Y, Z]);
     const tab = new TruthTableTab(table);
     const container = makeContainer();

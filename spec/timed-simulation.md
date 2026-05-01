@@ -1,4 +1,4 @@
-# Timed Digital Simulation — Requirements
+# Timed Digital Simulation- Requirements
 
 ## Status
 
@@ -7,12 +7,12 @@
 ## Bugs in Current Implementation
 
 1. **executeFn writes immediately to state** (line 1015), defeating delay scheduling
-2. **No shadow buffer** — ExecuteFunction writes directly to shared state array
+2. **No shadow buffer**- ExecuteFunction writes directly to shared state array
 3. **No sample phase** for sequential components (flip-flops won't work)
 4. **No feedback group handling** (single-pass only)
 5. **No bus resolution** (no switch checks, no burn detection)
-6. **Unused TimingWheel** — engine uses naive `TimedEvent[]` instead
-7. **O(n) event queue** — Array.filter/sort per step vs TimingWheel's O(1)
+6. **Unused TimingWheel**- engine uses naive `TimedEvent[]` instead
+7. **O(n) event queue**- Array.filter/sort per step vs TimingWheel's O(1)
 
 ## Recommended Approach: Snapshot-Restore
 
@@ -67,15 +67,15 @@ Sufficient as-is: per-net deduplication (latest-wins), sorted advance(), 1024-sl
 ## Configuration
 
 Extend `TimedConfig` at `evaluation-mode.ts:35`:
-- `tickSize?: number` — ns per step(), default = DEFAULT_GATE_DELAY
-- `timeResolution?: number` — ns per wheel slot, default = 1
+- `tickSize?: number`- ns per step(), default = DEFAULT_GATE_DELAY
+- `timeResolution?: number`- ns per wheel slot, default = 1
 
 Per-component delays already working via 3-level resolution in `compiler.ts:688-703`.
 
 ## Key Files
 
-- `digital-engine.ts:969-1048` — broken _stepTimed (rewrite target)
-- `timing-wheel.ts` — 311 lines, 13 tests, production-ready, unused
-- `event-pool.ts` — 92 lines, 4 tests, production-ready, unused
-- `delay.ts:15` — DEFAULT_GATE_DELAY = 10 (10ns)
-- `compiled-circuit.ts:137` — delays Uint32Array (populated, unused)
+- `digital-engine.ts:969-1048`- broken _stepTimed (rewrite target)
+- `timing-wheel.ts`- 311 lines, 13 tests, production-ready, unused
+- `event-pool.ts`- 92 lines, 4 tests, production-ready, unused
+- `delay.ts:15`- DEFAULT_GATE_DELAY = 10 (10ns)
+- `compiled-circuit.ts:137`- delays Uint32Array (populated, unused)

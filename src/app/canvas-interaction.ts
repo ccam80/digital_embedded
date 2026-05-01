@@ -1,13 +1,13 @@
 /**
- * CanvasInteraction — coordinator that wires together all canvas event handlers.
+ * CanvasInteraction- coordinator that wires together all canvas event handlers.
  *
  * Creates shared state, then delegates to focused handler modules:
- *   canvas-pointer      — pointerdown/pointermove/pointerup/pointercancel
- *   canvas-wheel        — wheel zoom
- *   canvas-dblclick     — property popup / memory editor / subcircuit nav
- *   canvas-popup        — property popup lifecycle
- *   canvas-subcircuit   — subcircuit navigation stack + breadcrumb
- *   canvas-memory-editor — hex editor overlay
+ *   canvas-pointer     - pointerdown/pointermove/pointerup/pointercancel
+ *   canvas-wheel       - wheel zoom
+ *   canvas-dblclick    - property popup / memory editor / subcircuit nav
+ *   canvas-popup       - property popup lifecycle
+ *   canvas-subcircuit  - subcircuit navigation stack + breadcrumb
+ *   canvas-memory-editor- hex editor overlay
  */
 
 import type { AppContext } from './app-context.js';

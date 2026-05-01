@@ -1,5 +1,5 @@
 /**
- * Terminal component — serial text terminal.
+ * Terminal component- serial text terminal.
  *
  * Receives character data on its input pins and appends characters to an
  * internal scrollback buffer. The buffer is displayed in a floating terminal
@@ -9,7 +9,7 @@
  * Pin layout:
  *   Inputs:
  *     - din  (8-bit): character code to write
- *     - wr   (1-bit): write strobe — character is latched when wr goes high
+ *     - wr   (1-bit): write strobe- character is latched when wr goes high
  *   Outputs:
  *     - dout (8-bit): key code from keyboard input queue
  *     - rdy  (1-bit): 1 when a key is waiting in the queue, 0 when empty
@@ -19,7 +19,7 @@
  *     char(din) to the buffer.
  *   - Always output the front of the keyboard queue on dout/rdy.
  *   - A key is dequeued when the circuit reads rdy=1 and asserts a "next"
- *     strobe (wr input repurposed — here represented by the rd input).
+ *     strobe (wr input repurposed- here represented by the rd input).
  *
  * internalStateCount: 1  (previous wr value for edge detection)
  *
@@ -56,7 +56,7 @@ const MAX_BUFFER_CHARS = 4096;
 const MAX_KEY_QUEUE = 64;
 
 // ---------------------------------------------------------------------------
-// Pin layout — Java GenericShape(3 inputs, 0 outputs, width=3):
+// Pin layout- Java GenericShape(3 inputs, 0 outputs, width=3):
 //   D  at (0, 0)
 //   C  at (0, 1)
 //   en at (0, 2)
@@ -96,7 +96,7 @@ function buildTerminalPinDeclarations(): PinDeclaration[] {
 }
 
 // ---------------------------------------------------------------------------
-// TerminalElement — CircuitElement implementation
+// TerminalElement- CircuitElement implementation
 // ---------------------------------------------------------------------------
 
 export class TerminalElement extends AbstractCircuitElement {
@@ -191,7 +191,7 @@ export class TerminalElement extends AbstractCircuitElement {
 }
 
 // ---------------------------------------------------------------------------
-// executeTerminal — latch character on wr edge, expose keyboard queue
+// executeTerminal- latch character on wr edge, expose keyboard queue
 //
 // State layout (Uint32Array slots relative to component):
 //   Internal state slot 0: previous wr value (for edge detection)
@@ -212,7 +212,7 @@ export function executeTerminal(
   _highZs: Uint32Array,
   _layout: ComponentLayout,
 ): void {
-  // Terminal has no outputs — it is a display-only sink component.
+  // Terminal has no outputs- it is a display-only sink component.
   // The display panel reads inputs D, C, en directly via the engine's
   // post-step hook accessing the element. No output slots to write.
 }
@@ -295,7 +295,7 @@ export const TerminalDefinition: ComponentDefinition = {
     },
   },
   helpText:
-    "Terminal — serial text terminal with keyboard input.\n" +
+    "Terminal- serial text terminal with keyboard input.\n" +
     "din (8-bit): character code to display.\n" +
     "wr (1-bit): rising edge latches din into the display buffer.\n" +
     "rd (1-bit): rising edge dequeues one key from the keyboard queue.\n" +

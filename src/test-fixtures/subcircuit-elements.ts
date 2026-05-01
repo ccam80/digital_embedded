@@ -14,7 +14,7 @@ import { Circuit } from "../core/circuit.js";
 import type { SubcircuitHost } from "../solver/digital/flatten.js";
 
 // ---------------------------------------------------------------------------
-// TestLeafElement — simple leaf circuit element for flatten tests
+// TestLeafElement- simple leaf circuit element for flatten tests
 // ---------------------------------------------------------------------------
 
 /**
@@ -47,7 +47,7 @@ export class TestLeafElement extends AbstractCircuitElement {
 }
 
 // ---------------------------------------------------------------------------
-// TestSubcircuitElement — SubcircuitHost for flatten tests
+// TestSubcircuitElement- SubcircuitHost for flatten tests
 // ---------------------------------------------------------------------------
 
 /**

@@ -3,7 +3,7 @@
  *
  * Invariant: each ngspice-anchored component's setup() must call
  * solver.allocElement() in exactly the order the corresponding ngspice
- * *setup.c file calls TSTALLOC — position-for-position.
+ * *setup.c file calls TSTALLOC- position-for-position.
  *
  * W3 implementation pattern (for reference when implementing each row):
  *   const engine = new MNAEngine(/* ... *\/);
@@ -88,7 +88,7 @@ import { SwitchSPSTDefinition, SwitchSPDTDefinition, ANALOG_SWITCH_DEFAULTS } fr
 //
 // Builds the minimal ConcreteCompiledAnalogCircuit shape needed to call
 // engine.init() and (engine as any)._setup(). Only `elements` and
-// `nodeCount` are structurally required by _setup() — all other fields
+// `nodeCount` are structurally required by _setup()- all other fields
 // are stubs that satisfy the TypeScript cast.
 // ---------------------------------------------------------------------------
 
@@ -203,11 +203,11 @@ describe("setup-stamp-order", () => {
     ]);
   });
   it("PB-AFUSE TSTALLOC sequence", () => {
-    // ngspice anchor: ressetup.c:46-49 — 4 TSTALLOC entries (RES pattern).
+    // ngspice anchor: ressetup.c:46-49- 4 TSTALLOC entries (RES pattern).
     // AnalogFuseElement uses pin keys "out1" (posNode) and "out2" (negNode).
     // Already tested above as PB-FUSE. This is a duplicate with canonical pin names.
     // Nodes: posNode=1 ("out1"), negNode=2 ("out2").
-    // Expected: (1,1), (2,2), (1,2), (2,1) — PP, NN, PN, NP
+    // Expected: (1,1), (2,2), (1,2), (2,1)- PP, NN, PN, NP
     const props = new PropertyBag();
     props.replaceModelParams({ ...ANALOG_FUSE_DEFAULTS });
     const el = createAnalogFuseElement(new Map([["out1", 1], ["out2", 2]]), props, () => 0);
@@ -217,19 +217,19 @@ describe("setup-stamp-order", () => {
     (engine as any)._setup();
     const order = (engine as any)._solver._getInsertionOrder();
     expect(order).toEqual([
-      { extRow: 1, extCol: 1 },  // (RESposNode, RESposNode) — ressetup.c:46
-      { extRow: 2, extCol: 2 },  // (RESnegNode, RESnegNode) — ressetup.c:47
-      { extRow: 1, extCol: 2 },  // (RESposNode, RESnegNode) — ressetup.c:48
-      { extRow: 2, extCol: 1 },  // (RESnegNode, RESposNode) — ressetup.c:49
+      { extRow: 1, extCol: 1 },  // (RESposNode, RESposNode)- ressetup.c:46
+      { extRow: 2, extCol: 2 },  // (RESnegNode, RESnegNode)- ressetup.c:47
+      { extRow: 1, extCol: 2 },  // (RESposNode, RESnegNode)- ressetup.c:48
+      { extRow: 2, extCol: 1 },  // (RESnegNode, RESposNode)- ressetup.c:49
     ]);
   });
   it("PB-ANALOG_SWITCH TSTALLOC sequence", () => {
     // ngspice anchor: swsetup.c:59-62 (SW pattern applied once for SPST, twice for SPDT).
     //
-    // SPST (in=1, out=2, ctrl=3): 4 entries — swsetup.c:59-62
+    // SPST (in=1, out=2, ctrl=3): 4 entries- swsetup.c:59-62
     //   (in,in),(in,out),(out,in),(out,out) = (1,1),(1,2),(2,1),(2,2)
     //
-    // SPDT (com=1, no=2, nc=3, ctrl=4): 8 entries — swsetup.c:59-62 applied to NO path then NC path
+    // SPDT (com=1, no=2, nc=3, ctrl=4): 8 entries- swsetup.c:59-62 applied to NO path then NC path
     //   NO path (pos=com=1, neg=no=2): (1,1),(1,2),(2,1),(2,2)
     //   NC path (pos=com=1, neg=nc=3): (1,1),(1,3),(3,1),(3,3)
     const spstProps = new PropertyBag();
@@ -279,7 +279,7 @@ describe("setup-stamp-order", () => {
     ]);
   });
   it("PB-BJT TSTALLOC sequence", () => {
-    // ngspice anchor: bjtsetup.c:435-464 — 23 TSTALLOC entries.
+    // ngspice anchor: bjtsetup.c:435-464- 23 TSTALLOC entries.
     // L0 element: RC=RB=RE=0, so primeNodes alias external nodes.
     // Nodes: B=baseNode=1, C=colNode=2, E=emitNode=3. substNode=0 (ground).
     // With RC=RB=RE=0: cp=colNode=2, bp=baseNode=1, ep=emitNode=3.
@@ -290,29 +290,29 @@ describe("setup-stamp-order", () => {
     // So only 20 of the 23 calls appear in _insertionOrder.
     //
     // Expected sequence (entries 1-18, 22-23):
-    //  1. (2,2) _hCCP  — colNode, cp
-    //  2. (1,1) _hBBP  — baseNode, bp
-    //  3. (3,3) _hEEP  — emitNode, ep
-    //  4. (2,2) _hCPC  — cp, colNode
-    //  5. (2,1) _hCPBP — cp, bp
-    //  6. (2,3) _hCPEP — cp, ep
-    //  7. (1,1) _hBPB  — bp, baseNode
-    //  8. (1,2) _hBPCP — bp, cp
-    //  9. (1,3) _hBPEP — bp, ep
-    // 10. (3,3) _hEPE  — ep, emitNode
-    // 11. (3,2) _hEPCP — ep, cp
-    // 12. (3,1) _hEPBP — ep, bp
-    // 13. (2,2) _hCC   — colNode, colNode
-    // 14. (1,1) _hBB   — baseNode, baseNode
-    // 15. (3,3) _hEE   — emitNode, emitNode
-    // 16. (2,2) _hCPCP — cp, cp
-    // 17. (1,1) _hBPBP — bp, bp
-    // 18. (3,3) _hEPEP — ep, ep
-    // 19. SKIPPED (0,0) — substNode ground → TrashCan, not in _insertionOrder
-    // 20. SKIPPED (2,0) — sc, substNode → TrashCan
-    // 21. SKIPPED (0,2) — substNode, sc → TrashCan
-    // 22. (1,2) _hBCP  — baseNode, cp
-    // 23. (2,1) _hCPB  — cp, baseNode
+    //  1. (2,2) _hCCP - colNode, cp
+    //  2. (1,1) _hBBP - baseNode, bp
+    //  3. (3,3) _hEEP - emitNode, ep
+    //  4. (2,2) _hCPC - cp, colNode
+    //  5. (2,1) _hCPBP- cp, bp
+    //  6. (2,3) _hCPEP- cp, ep
+    //  7. (1,1) _hBPB - bp, baseNode
+    //  8. (1,2) _hBPCP- bp, cp
+    //  9. (1,3) _hBPEP- bp, ep
+    // 10. (3,3) _hEPE - ep, emitNode
+    // 11. (3,2) _hEPCP- ep, cp
+    // 12. (3,1) _hEPBP- ep, bp
+    // 13. (2,2) _hCC  - colNode, colNode
+    // 14. (1,1) _hBB  - baseNode, baseNode
+    // 15. (3,3) _hEE  - emitNode, emitNode
+    // 16. (2,2) _hCPCP- cp, cp
+    // 17. (1,1) _hBPBP- bp, bp
+    // 18. (3,3) _hEPEP- ep, ep
+    // 19. SKIPPED (0,0)- substNode ground → TrashCan, not in _insertionOrder
+    // 20. SKIPPED (2,0)- sc, substNode → TrashCan
+    // 21. SKIPPED (0,2)- substNode, sc → TrashCan
+    // 22. (1,2) _hBCP - baseNode, cp
+    // 23. (2,1) _hCPB - cp, baseNode
     const props = new PropertyBag();
     props.replaceModelParams({ ...BJT_NPN_DEFAULTS });
     const el = createBjtElement(new Map([["B", 1], ["C", 2], ["E", 3]]), props, () => 0);
@@ -345,10 +345,10 @@ describe("setup-stamp-order", () => {
     ]);
   });
   it("PB-CAP TSTALLOC sequence", () => {
-    // ngspice anchor: capsetup.c:114-117 — 4 TSTALLOC entries with ground guards.
+    // ngspice anchor: capsetup.c:114-117- 4 TSTALLOC entries with ground guards.
     // Both posNode and negNode non-zero → all 4 entries recorded.
     // Nodes: posNode=1 ("pos"), negNode=2 ("neg").
-    // Expected: (1,1), (2,2), (1,2), (2,1) — PP, NN, PN, NP
+    // Expected: (1,1), (2,2), (1,2), (2,1)- PP, NN, PN, NP
     const capProps = new PropertyBag();
     capProps.replaceModelParams({ ...CAPACITOR_DEFAULTS, capacitance: 1e-6 });
     const el = new AnalogCapacitorElement(new Map([["pos", 1], ["neg", 2]]), capProps);
@@ -365,7 +365,7 @@ describe("setup-stamp-order", () => {
     ]);
   });
   it("PB-CCCS TSTALLOC sequence", () => {
-    // ngspice anchor: cccsset.c:49-50 — 2 TSTALLOC entries.
+    // ngspice anchor: cccsset.c:49-50- 2 TSTALLOC entries.
     // No own branch row. Controlling branch resolved via findBranchFor (lazy).
     //
     // Setup order:
@@ -417,12 +417,12 @@ describe("setup-stamp-order", () => {
     (engine as any)._setup();
     const order = (engine as any)._solver._getInsertionOrder();
     expect(order).toEqual([
-      { extRow: 1, extCol: 3 },  // :49 (posNode=1, contBranch=3) — _hPCtBr
-      { extRow: 2, extCol: 3 },  // :50 (negNode=2, contBranch=3) — _hNCtBr
+      { extRow: 1, extCol: 3 },  // :49 (posNode=1, contBranch=3)- _hPCtBr
+      { extRow: 2, extCol: 3 },  // :50 (negNode=2, contBranch=3)- _hNCtBr
     ]);
   });
   it("PB-CCVS TSTALLOC sequence", () => {
-    // ngspice anchor: ccvsset.c:58-62 — 5 TSTALLOC entries.
+    // ngspice anchor: ccvsset.c:58-62- 5 TSTALLOC entries.
     // Own branch row allocated first via ctx.makeCur (ccvsset.c:40-43).
     // Controlling branch resolved lazily via findBranchFor (ccvsset.c:45).
     //
@@ -437,10 +437,10 @@ describe("setup-stamp-order", () => {
     // ownBranch=3, contBranch=4
     //
     // Expected TSTALLOC sequence (ccvsset.c:58-62, negNode then posNode for ibr):
-    //  1. :58 (posNode=1,   ownBranch=3) — _hPIbr
-    //  2. :59 (negNode=2,   ownBranch=3) — _hNIbr
-    //  3. :60 (ownBranch=3, negNode=2)   — _hIbrN
-    //  4. :61 (ownBranch=3, posNode=1)   — _hIbrP
+    //  1. :58 (posNode=1,   ownBranch=3)- _hPIbr
+    //  2. :59 (negNode=2,   ownBranch=3)- _hNIbr
+    //  3. :60 (ownBranch=3, negNode=2)  - _hIbrN
+    //  4. :61 (ownBranch=3, posNode=1)  - _hIbrP
     //  5. :62 (ownBranch=3, contBranch=4)— _hIbrCtBr
 
     // Build a sense VSRC element with findBranchFor on the instance.
@@ -482,10 +482,10 @@ describe("setup-stamp-order", () => {
     (engine as any)._setup();
     const order = (engine as any)._solver._getInsertionOrder();
     expect(order).toEqual([
-      { extRow: 1, extCol: 3 },  // :58 (posNode=1,   ownBranch=3) — _hPIbr
-      { extRow: 2, extCol: 3 },  // :59 (negNode=2,   ownBranch=3) — _hNIbr
-      { extRow: 3, extCol: 2 },  // :60 (ownBranch=3, negNode=2)   — _hIbrN
-      { extRow: 3, extCol: 1 },  // :61 (ownBranch=3, posNode=1)   — _hIbrP
+      { extRow: 1, extCol: 3 },  // :58 (posNode=1,   ownBranch=3)- _hPIbr
+      { extRow: 2, extCol: 3 },  // :59 (negNode=2,   ownBranch=3)- _hNIbr
+      { extRow: 3, extCol: 2 },  // :60 (ownBranch=3, negNode=2)  - _hIbrN
+      { extRow: 3, extCol: 1 },  // :61 (ownBranch=3, posNode=1)  - _hIbrP
       { extRow: 3, extCol: 4 },  // :62 (ownBranch=3, contBranch=4)— _hIbrCtBr
     ]);
   });
@@ -613,7 +613,7 @@ describe("setup-stamp-order", () => {
     ]);
   });
   it("PB-DIAC TSTALLOC sequence", () => {
-    // Diac composite: dFwd.setup(ctx) + dRev.setup(ctx) — 7 + 7 = 14 entries.
+    // Diac composite: dFwd.setup(ctx) + dRev.setup(ctx)- 7 + 7 = 14 entries.
     // dFwd: posNode=A=1, negNode=B=2, RS=0 → _posPrimeNode=posNode=1
     //   (diosetup.c:232-238, 7 entries):
     //   (1,1),(2,1),(1,1),(1,2),(1,1),(2,2),(1,1)
@@ -650,7 +650,7 @@ describe("setup-stamp-order", () => {
     ]);
   });
   it("PB-DIO TSTALLOC sequence", () => {
-    // ngspice anchor: diosetup.c:232-238 — 7 TSTALLOC entries.
+    // ngspice anchor: diosetup.c:232-238- 7 TSTALLOC entries.
     // RS=0 (default): _posPrimeNode = posNode = 1. No internal node.
     // Nodes: posNode=1 (A/anode), negNode=2 (K/cathode).
     //
@@ -684,7 +684,7 @@ describe("setup-stamp-order", () => {
     // FGNFETAnalogElement: setup() allocates fg=internal node (nodeCount+1=4),
     // then calls sub-elements sorted by ngspiceLoadOrder (CAP=17 before MOS=35).
     //
-    // Pins: D=1, S=2, G=3 (external gate pin, not used in MNA — fg replaces it).
+    // Pins: D=1, S=2, G=3 (external gate pin, not used in MNA- fg replaces it).
     // Internal fg node = 4 (makeVolt allocates nodeCount+1).
     //
     // CAP sub (capsetup.c:114-117, pos=fg=4, neg=0):
@@ -741,7 +741,7 @@ describe("setup-stamp-order", () => {
     // FGPFETAnalogElement: identical TSTALLOC sequence to FGNFET.
     // setup() allocates fg=internal node (nodeCount+1=4), then CAP (pos=fg=4, neg=0)
     // then MOS (22 entries, G=fg=4, D=1, S=2, B=S=2).
-    // Polarity difference (PMOS vs NMOS) is load-time only — stamp order is identical.
+    // Polarity difference (PMOS vs NMOS) is load-time only- stamp order is identical.
     //
     // Pins: D=1, S=2, G=3.
     // Total: 1 (CAP PP) + 22 (MOS) = 23 entries.
@@ -781,11 +781,11 @@ describe("setup-stamp-order", () => {
     ]);
   });
   it("PB-FUSE TSTALLOC sequence", () => {
-    // ngspice anchor: ressetup.c:46-49 — 4 TSTALLOC entries (RES pattern).
+    // ngspice anchor: ressetup.c:46-49- 4 TSTALLOC entries (RES pattern).
     // AnalogFuseElement uses pin keys "out1" (posNode) and "out2" (negNode).
     // Nodes: posNode=1, negNode=2.
     //
-    // Expected order: (1,1),(2,2),(1,2),(2,1) — PP, NN, PN, NP
+    // Expected order: (1,1),(2,2),(1,2),(2,1)- PP, NN, PN, NP
     const props = new PropertyBag();
     props.replaceModelParams({ ...ANALOG_FUSE_DEFAULTS });
     const el = createAnalogFuseElement(new Map([["out1", 1], ["out2", 2]]), props, () => 0);
@@ -795,23 +795,23 @@ describe("setup-stamp-order", () => {
     (engine as any)._setup();
     const order = (engine as any)._solver._getInsertionOrder();
     expect(order).toEqual([
-      { extRow: 1, extCol: 1 },  // (RESposNode, RESposNode) — ressetup.c:46
-      { extRow: 2, extCol: 2 },  // (RESnegNode, RESnegNode) — ressetup.c:47
-      { extRow: 1, extCol: 2 },  // (RESposNode, RESnegNode) — ressetup.c:48
-      { extRow: 2, extCol: 1 },  // (RESnegNode, RESposNode) — ressetup.c:49
+      { extRow: 1, extCol: 1 },  // (RESposNode, RESposNode)- ressetup.c:46
+      { extRow: 2, extCol: 2 },  // (RESnegNode, RESnegNode)- ressetup.c:47
+      { extRow: 1, extCol: 2 },  // (RESposNode, RESnegNode)- ressetup.c:48
+      { extRow: 2, extCol: 1 },  // (RESnegNode, RESposNode)- ressetup.c:49
     ]);
   });
   it("PB-IND TSTALLOC sequence", () => {
-    // ngspice anchor: indsetup.c:96-100 — 5 TSTALLOC entries.
+    // ngspice anchor: indsetup.c:96-100- 5 TSTALLOC entries.
     // posNode=1 ("pos"), negNode=2 ("neg"), branch=3 (nodeCount+1).
     // Both posNode and negNode non-zero → all 5 entries recorded.
     //
     // Expected:
-    //  1. (posNode=1, branch=3)  — INDposNode, INDbrEq
-    //  2. (negNode=2, branch=3)  — INDnegNode, INDbrEq
-    //  3. (branch=3,  negNode=2) — INDbrEq,    INDnegNode
-    //  4. (branch=3,  posNode=1) — INDbrEq,    INDposNode
-    //  5. (branch=3,  branch=3)  — INDbrEq,    INDbrEq
+    //  1. (posNode=1, branch=3) - INDposNode, INDbrEq
+    //  2. (negNode=2, branch=3) - INDnegNode, INDbrEq
+    //  3. (branch=3,  negNode=2)- INDbrEq,    INDnegNode
+    //  4. (branch=3,  posNode=1)- INDbrEq,    INDposNode
+    //  5. (branch=3,  branch=3) - INDbrEq,    INDbrEq
     const indProps = new PropertyBag();
     indProps.replaceModelParams({ ...INDUCTOR_DEFAULTS, inductance: 1e-3 });
     const el = new AnalogInductorElement(new Map([["pos", 1], ["neg", 2]]), indProps);
@@ -821,15 +821,15 @@ describe("setup-stamp-order", () => {
     (engine as any)._setup();
     const order = (engine as any)._solver._getInsertionOrder();
     expect(order).toEqual([
-      { extRow: 1, extCol: 3 },  // (INDposNode, INDbrEq) — indsetup.c:96
-      { extRow: 2, extCol: 3 },  // (INDnegNode, INDbrEq) — indsetup.c:97
-      { extRow: 3, extCol: 2 },  // (INDbrEq,    INDnegNode) — indsetup.c:98
-      { extRow: 3, extCol: 1 },  // (INDbrEq,    INDposNode) — indsetup.c:99
-      { extRow: 3, extCol: 3 },  // (INDbrEq,    INDbrEq)   — indsetup.c:100
+      { extRow: 1, extCol: 3 },  // (INDposNode, INDbrEq)- indsetup.c:96
+      { extRow: 2, extCol: 3 },  // (INDnegNode, INDbrEq)- indsetup.c:97
+      { extRow: 3, extCol: 2 },  // (INDbrEq,    INDnegNode)- indsetup.c:98
+      { extRow: 3, extCol: 1 },  // (INDbrEq,    INDposNode)- indsetup.c:99
+      { extRow: 3, extCol: 3 },  // (INDbrEq,    INDbrEq)  - indsetup.c:100
     ]);
   });
   it("PB-ISRC TSTALLOC sequence", () => {
-    // ngspice anchor: isrcset.c — ISRC has an empty setup() body (0 TSTALLOC entries).
+    // ngspice anchor: isrcset.c- ISRC has an empty setup() body (0 TSTALLOC entries).
     // Current sources stamp only into the RHS vector (no G-matrix entries).
     // Expected: [] (empty insertion order).
     const props = new PropertyBag();
@@ -843,9 +843,9 @@ describe("setup-stamp-order", () => {
     expect(order).toEqual([]);
   });
   it("PB-LDR TSTALLOC sequence", () => {
-    // ngspice anchor: ressetup.c:46-49 — 4 TSTALLOC entries, RES pattern.
+    // ngspice anchor: ressetup.c:46-49- 4 TSTALLOC entries, RES pattern.
     // Nodes: posNode=1, negNode=2.
-    // Expected order: (1,1), (2,2), (1,2), (2,1) — PP, NN, PN, NP
+    // Expected order: (1,1), (2,2), (1,2), (2,1)- PP, NN, PN, NP
     const props = new PropertyBag();
     props.replaceModelParams({ ...LDR_DEFAULTS });
     const el = createLDRElement(new Map([["pos", 1], ["neg", 2]]), props, () => 0);
@@ -855,18 +855,18 @@ describe("setup-stamp-order", () => {
     (engine as any)._setup();
     const order = (engine as any)._solver._getInsertionOrder();
     expect(order).toEqual([
-      { extRow: 1, extCol: 1 }, // (posNode, posNode) — ressetup.c:46
-      { extRow: 2, extCol: 2 }, // (negNode, negNode) — ressetup.c:47
-      { extRow: 1, extCol: 2 }, // (posNode, negNode) — ressetup.c:48
-      { extRow: 2, extCol: 1 }, // (negNode, posNode) — ressetup.c:49
+      { extRow: 1, extCol: 1 }, // (posNode, posNode)- ressetup.c:46
+      { extRow: 2, extCol: 2 }, // (negNode, negNode)- ressetup.c:47
+      { extRow: 1, extCol: 2 }, // (posNode, negNode)- ressetup.c:48
+      { extRow: 2, extCol: 1 }, // (negNode, posNode)- ressetup.c:49
     ]);
   });
   it("PB-MEMR TSTALLOC sequence", () => {
-    // ngspice anchor: ressetup.c:46-49 — 4 TSTALLOC entries (RES pattern with ground guards).
+    // ngspice anchor: ressetup.c:46-49- 4 TSTALLOC entries (RES pattern with ground guards).
     // MemristorElement uses pin keys "A" (posNode) and "B" (negNode).
     // Both nodes non-zero → all 4 entries recorded.
     // Nodes: A=1 (posNode), B=2 (negNode).
-    // Expected: (1,1),(2,2),(1,2),(2,1) — PP, NN, PN, NP
+    // Expected: (1,1),(2,2),(1,2),(2,1)- PP, NN, PN, NP
     const memrProps = new PropertyBag();
     memrProps.replaceModelParams({ ...MEMRISTOR_DEFAULTS });
     const el = new MemristorElement(new Map([["A", 1], ["B", 2]]), memrProps);
@@ -876,17 +876,17 @@ describe("setup-stamp-order", () => {
     (engine as any)._setup();
     const order = (engine as any)._solver._getInsertionOrder();
     expect(order).toEqual([
-      { extRow: 1, extCol: 1 },  // (A, A) — ressetup.c:46
-      { extRow: 2, extCol: 2 },  // (B, B) — ressetup.c:47
-      { extRow: 1, extCol: 2 },  // (A, B) — ressetup.c:48
-      { extRow: 2, extCol: 1 },  // (B, A) — ressetup.c:49
+      { extRow: 1, extCol: 1 },  // (A, A)- ressetup.c:46
+      { extRow: 2, extCol: 2 },  // (B, B)- ressetup.c:47
+      { extRow: 1, extCol: 2 },  // (A, B)- ressetup.c:48
+      { extRow: 2, extCol: 1 },  // (B, A)- ressetup.c:49
     ]);
   });
 
   it("PB-NFET TSTALLOC sequence", () => {
-    // ngspice anchor: swsetup.c:59-62 — 4 stamps, D=posNode, S=negNode
+    // ngspice anchor: swsetup.c:59-62- 4 stamps, D=posNode, S=negNode
     // drainNode=1, sourceNode=2
-    // Expected order: (1,1), (1,2), (2,1), (2,2) — PP, PN, NP, NN
+    // Expected order: (1,1), (1,2), (2,1), (2,2)- PP, PN, NP, NN
     const el = makeNFETElement();
     const circuit = makeMinimalCircuit([el as unknown as AnalogElement], 3);
     const engine = new MNAEngine();
@@ -902,7 +902,7 @@ describe("setup-stamp-order", () => {
   });
 
   it("PB-NJFET TSTALLOC sequence", () => {
-    // ngspice anchor: jfetset.c:166-180 — 15 TSTALLOC entries.
+    // ngspice anchor: jfetset.c:166-180- 15 TSTALLOC entries.
     // Nodes: G=1, D=2, S=3. RS=RD=0 (defaults) → sp=sourceNode=3, dp=drainNode=2.
     //
     // TSTALLOC sequence (jfetset.c:166-180, all unconditional):
@@ -930,25 +930,25 @@ describe("setup-stamp-order", () => {
     (engine as any)._setup();
     const order = (engine as any)._solver._getInsertionOrder();
     expect(order).toEqual([
-      { extRow: 2, extCol: 2 },  // (1)  drainNode, dp  — _hDDP
-      { extRow: 1, extCol: 2 },  // (2)  gateNode, dp   — _hGDP
-      { extRow: 1, extCol: 3 },  // (3)  gateNode, sp   — _hGSP
-      { extRow: 3, extCol: 3 },  // (4)  sourceNode, sp — _hSSP
-      { extRow: 2, extCol: 2 },  // (5)  dp, drainNode  — _hDPD
-      { extRow: 2, extCol: 1 },  // (6)  dp, gateNode   — _hDPG
-      { extRow: 2, extCol: 3 },  // (7)  dp, sp         — _hDPSP
-      { extRow: 3, extCol: 1 },  // (8)  sp, gateNode   — _hSPG
-      { extRow: 3, extCol: 3 },  // (9)  sp, sourceNode — _hSPS
-      { extRow: 3, extCol: 2 },  // (10) sp, dp         — _hSPDP
-      { extRow: 2, extCol: 2 },  // (11) drainNode, drainNode — _hDD
-      { extRow: 1, extCol: 1 },  // (12) gateNode, gateNode  — _hGG
-      { extRow: 3, extCol: 3 },  // (13) sourceNode, sourceNode — _hSS
-      { extRow: 2, extCol: 2 },  // (14) dp, dp         — _hDPDP
-      { extRow: 3, extCol: 3 },  // (15) sp, sp         — _hSPSP
+      { extRow: 2, extCol: 2 },  // (1)  drainNode, dp - _hDDP
+      { extRow: 1, extCol: 2 },  // (2)  gateNode, dp  - _hGDP
+      { extRow: 1, extCol: 3 },  // (3)  gateNode, sp  - _hGSP
+      { extRow: 3, extCol: 3 },  // (4)  sourceNode, sp- _hSSP
+      { extRow: 2, extCol: 2 },  // (5)  dp, drainNode - _hDPD
+      { extRow: 2, extCol: 1 },  // (6)  dp, gateNode  - _hDPG
+      { extRow: 2, extCol: 3 },  // (7)  dp, sp        - _hDPSP
+      { extRow: 3, extCol: 1 },  // (8)  sp, gateNode  - _hSPG
+      { extRow: 3, extCol: 3 },  // (9)  sp, sourceNode- _hSPS
+      { extRow: 3, extCol: 2 },  // (10) sp, dp        - _hSPDP
+      { extRow: 2, extCol: 2 },  // (11) drainNode, drainNode- _hDD
+      { extRow: 1, extCol: 1 },  // (12) gateNode, gateNode - _hGG
+      { extRow: 3, extCol: 3 },  // (13) sourceNode, sourceNode- _hSS
+      { extRow: 2, extCol: 2 },  // (14) dp, dp        - _hDPDP
+      { extRow: 3, extCol: 3 },  // (15) sp, sp        - _hSPSP
     ]);
   });
   it("PB-NMOS TSTALLOC sequence", () => {
-    // ngspice anchor: mos1set.c:186-207 — 22 TSTALLOC entries (all unconditional).
+    // ngspice anchor: mos1set.c:186-207- 22 TSTALLOC entries (all unconditional).
     // Nodes: G=3, S=2, D=1.  B=S=2 (body tied to source, 3-terminal).
     // RD=RS=RSH=0 → no prime nodes → dp=dNode=1, sp=sNode=2.
     // Ground-involving entries return TrashCan (handle 0) without recording.
@@ -974,30 +974,30 @@ describe("setup-stamp-order", () => {
       { extRow: 3, extCol: 3 },  // (2)  gNode, gNode
       { extRow: 2, extCol: 2 },  // (3)  sNode, sNode
       { extRow: 2, extCol: 2 },  // (4)  bNode, bNode = (sNode, sNode)
-      { extRow: 1, extCol: 1 },  // (5)  dp, dp = (dNode, dNode) — RD=0
-      { extRow: 2, extCol: 2 },  // (6)  sp, sp = (sNode, sNode) — RS=0
-      { extRow: 1, extCol: 1 },  // (7)  dNode, dp = (dNode, dNode) — RD=0
+      { extRow: 1, extCol: 1 },  // (5)  dp, dp = (dNode, dNode)- RD=0
+      { extRow: 2, extCol: 2 },  // (6)  sp, sp = (sNode, sNode)- RS=0
+      { extRow: 1, extCol: 1 },  // (7)  dNode, dp = (dNode, dNode)- RD=0
       { extRow: 3, extCol: 2 },  // (8)  gNode, bNode = (gNode, sNode)
       { extRow: 3, extCol: 1 },  // (9)  gNode, dp = (gNode, dNode)
       { extRow: 3, extCol: 2 },  // (10) gNode, sp = (gNode, sNode)
-      { extRow: 2, extCol: 2 },  // (11) sNode, sp = (sNode, sNode) — RS=0
+      { extRow: 2, extCol: 2 },  // (11) sNode, sp = (sNode, sNode)- RS=0
       { extRow: 2, extCol: 1 },  // (12) bNode, dp = (sNode, dNode)
       { extRow: 2, extCol: 2 },  // (13) bNode, sp = (sNode, sNode)
-      { extRow: 1, extCol: 2 },  // (14) dp, sp = (dNode, sNode) — RD=RS=0
-      { extRow: 1, extCol: 1 },  // (15) dp, dNode = (dNode, dNode) — RD=0
+      { extRow: 1, extCol: 2 },  // (14) dp, sp = (dNode, sNode)- RD=RS=0
+      { extRow: 1, extCol: 1 },  // (15) dp, dNode = (dNode, dNode)- RD=0
       { extRow: 2, extCol: 3 },  // (16) bNode, gNode = (sNode, gNode)
-      { extRow: 1, extCol: 3 },  // (17) dp, gNode = (dNode, gNode) — RD=0
-      { extRow: 2, extCol: 3 },  // (18) sp, gNode = (sNode, gNode) — RS=0
-      { extRow: 2, extCol: 2 },  // (19) sp, sNode = (sNode, sNode) — RS=0
+      { extRow: 1, extCol: 3 },  // (17) dp, gNode = (dNode, gNode)- RD=0
+      { extRow: 2, extCol: 3 },  // (18) sp, gNode = (sNode, gNode)- RS=0
+      { extRow: 2, extCol: 2 },  // (19) sp, sNode = (sNode, sNode)- RS=0
       { extRow: 1, extCol: 2 },  // (20) dp, bNode = (dNode, sNode)
       { extRow: 2, extCol: 2 },  // (21) sp, bNode = (sNode, sNode)
-      { extRow: 2, extCol: 1 },  // (22) sp, dp = (sNode, dNode) — RS=RD=0
+      { extRow: 2, extCol: 1 },  // (22) sp, dp = (sNode, dNode)- RS=RD=0
     ]);
   });
   it("PB-NTC TSTALLOC sequence", () => {
-    // ngspice anchor: ressetup.c:46-49 — 4 TSTALLOC entries, RES pattern.
+    // ngspice anchor: ressetup.c:46-49- 4 TSTALLOC entries, RES pattern.
     // Nodes: posNode=1, negNode=2.
-    // Expected order: (1,1), (2,2), (1,2), (2,1) — PP, NN, PN, NP
+    // Expected order: (1,1), (2,2), (1,2), (2,1)- PP, NN, PN, NP
     const props = new PropertyBag();
     props.replaceModelParams({ ...NTC_DEFAULTS });
     const el = createNTCThermistorElement(new Map([["pos", 1], ["neg", 2]]), props, () => 0);
@@ -1007,10 +1007,10 @@ describe("setup-stamp-order", () => {
     (engine as any)._setup();
     const order = (engine as any)._solver._getInsertionOrder();
     expect(order).toEqual([
-      { extRow: 1, extCol: 1 }, // (posNode, posNode) — ressetup.c:46
-      { extRow: 2, extCol: 2 }, // (negNode, negNode) — ressetup.c:47
-      { extRow: 1, extCol: 2 }, // (posNode, negNode) — ressetup.c:48
-      { extRow: 2, extCol: 1 }, // (negNode, posNode) — ressetup.c:49
+      { extRow: 1, extCol: 1 }, // (posNode, posNode)- ressetup.c:46
+      { extRow: 2, extCol: 2 }, // (negNode, negNode)- ressetup.c:47
+      { extRow: 1, extCol: 2 }, // (posNode, negNode)- ressetup.c:48
+      { extRow: 2, extCol: 1 }, // (negNode, posNode)- ressetup.c:49
     ]);
   });
   it("PB-OPAMP TSTALLOC sequence", () => {
@@ -1143,16 +1143,16 @@ describe("setup-stamp-order", () => {
     ]);
   });
   it("PB-OTA TSTALLOC sequence", () => {
-    // OTADefinition "behavioral" model — VCCS pattern with ground guards.
-    // vccsset.c:43-46 — 4 entries when all nodes non-zero.
+    // OTADefinition "behavioral" model- VCCS pattern with ground guards.
+    // vccsset.c:43-46- 4 entries when all nodes non-zero.
     //
     // Pins: V+=1 (nVp), V-=2 (nVm), Iabc=3 (nIabc), OUT+=4 (nOutP), OUT=5 (nOutN).
     //
     // VCCS TSTALLOC sequence:
-    //  1. (nOutP=4, nVp=1)   — VCCSposContPosptr
-    //  2. (nOutP=4, nVm=2)   — VCCSposContNegptr
-    //  3. (nOutN=5, nVp=1)   — VCCSnegContPosptr
-    //  4. (nOutN=5, nVm=2)   — VCCSnegContNegptr
+    //  1. (nOutP=4, nVp=1)  - VCCSposContPosptr
+    //  2. (nOutP=4, nVm=2)  - VCCSposContNegptr
+    //  3. (nOutN=5, nVp=1)  - VCCSnegContPosptr
+    //  4. (nOutN=5, nVm=2)  - VCCSnegContNegptr
     const entry = OTADefinition.modelRegistry!["behavioral"]!;
     if (entry.kind !== "inline") throw new Error("Expected inline ModelEntry");
     const pinNodes = new Map<string, number>([
@@ -1167,18 +1167,18 @@ describe("setup-stamp-order", () => {
     (engine as any)._setup();
     const order = (engine as any)._solver._getInsertionOrder();
     expect(order).toEqual([
-      { extRow: 4, extCol: 1 },  // (nOutP, nVp)  — vccsset.c:43
-      { extRow: 4, extCol: 2 },  // (nOutP, nVm)  — vccsset.c:44
-      { extRow: 5, extCol: 1 },  // (nOutN, nVp)  — vccsset.c:45
-      { extRow: 5, extCol: 2 },  // (nOutN, nVm)  — vccsset.c:46
+      { extRow: 4, extCol: 1 },  // (nOutP, nVp) - vccsset.c:43
+      { extRow: 4, extCol: 2 },  // (nOutP, nVm) - vccsset.c:44
+      { extRow: 5, extCol: 1 },  // (nOutN, nVp) - vccsset.c:45
+      { extRow: 5, extCol: 2 },  // (nOutN, nVm) - vccsset.c:46
     ]);
   });
 
   it("PB-PFET TSTALLOC sequence", () => {
-    // ngspice anchor: swsetup.c:59-62 — 4 stamps, D=posNode, S=negNode
-    // Identical to NFET — polarity inversion is load-time only.
+    // ngspice anchor: swsetup.c:59-62- 4 stamps, D=posNode, S=negNode
+    // Identical to NFET- polarity inversion is load-time only.
     // drainNode=1, sourceNode=2
-    // Expected order: (1,1), (1,2), (2,1), (2,2) — PP, PN, NP, NN
+    // Expected order: (1,1), (1,2), (2,1), (2,2)- PP, PN, NP, NN
     const el = makePFETElement();
     const circuit = makeMinimalCircuit([el as unknown as AnalogElement], 3);
     const engine = new MNAEngine();
@@ -1194,7 +1194,7 @@ describe("setup-stamp-order", () => {
   });
 
   it("PB-PJFET TSTALLOC sequence", () => {
-    // ngspice anchor: jfetset.c:166-180 — 15 TSTALLOC entries.
+    // ngspice anchor: jfetset.c:166-180- 15 TSTALLOC entries.
     // PJFET TSTALLOC sequence is identical to NJFET (polarity difference is load-time only).
     // Nodes: G=1, D=2, S=3. RS=RD=0 (PJFET_PARAM_DEFAULTS) → sp=sourceNode=3, dp=drainNode=2.
     //
@@ -1241,10 +1241,10 @@ describe("setup-stamp-order", () => {
     ]);
   });
   it("PB-PMOS TSTALLOC sequence", () => {
-    // ngspice anchor: mos1set.c:186-207 — 22 TSTALLOC entries (all unconditional).
+    // ngspice anchor: mos1set.c:186-207- 22 TSTALLOC entries (all unconditional).
     // PMOS pin layout: G=3, D=1, S=2.  B=S=2 (body tied to source, 3-terminal).
     // RD=RS=RSH=0 → no prime nodes → dp=dNode=1, sp=sNode=2.
-    // Identical TSTALLOC sequence to NMOS — mos1set.c:186-207 is polarity-independent.
+    // Identical TSTALLOC sequence to NMOS- mos1set.c:186-207 is polarity-independent.
     const props = new PropertyBag();
     props.replaceModelParams({
       VTO: -0.7, KP: 60e-6, LAMBDA: 0.02, PHI: 0.6, GAMMA: 0.37,
@@ -1267,24 +1267,24 @@ describe("setup-stamp-order", () => {
       { extRow: 3, extCol: 3 },  // (2)  gNode, gNode
       { extRow: 2, extCol: 2 },  // (3)  sNode, sNode
       { extRow: 2, extCol: 2 },  // (4)  bNode, bNode = (sNode, sNode)
-      { extRow: 1, extCol: 1 },  // (5)  dp, dp = (dNode, dNode) — RD=0
-      { extRow: 2, extCol: 2 },  // (6)  sp, sp = (sNode, sNode) — RS=0
-      { extRow: 1, extCol: 1 },  // (7)  dNode, dp = (dNode, dNode) — RD=0
+      { extRow: 1, extCol: 1 },  // (5)  dp, dp = (dNode, dNode)- RD=0
+      { extRow: 2, extCol: 2 },  // (6)  sp, sp = (sNode, sNode)- RS=0
+      { extRow: 1, extCol: 1 },  // (7)  dNode, dp = (dNode, dNode)- RD=0
       { extRow: 3, extCol: 2 },  // (8)  gNode, bNode = (gNode, sNode)
       { extRow: 3, extCol: 1 },  // (9)  gNode, dp = (gNode, dNode)
       { extRow: 3, extCol: 2 },  // (10) gNode, sp = (gNode, sNode)
-      { extRow: 2, extCol: 2 },  // (11) sNode, sp = (sNode, sNode) — RS=0
+      { extRow: 2, extCol: 2 },  // (11) sNode, sp = (sNode, sNode)- RS=0
       { extRow: 2, extCol: 1 },  // (12) bNode, dp = (sNode, dNode)
       { extRow: 2, extCol: 2 },  // (13) bNode, sp = (sNode, sNode)
-      { extRow: 1, extCol: 2 },  // (14) dp, sp = (dNode, sNode) — RD=RS=0
-      { extRow: 1, extCol: 1 },  // (15) dp, dNode = (dNode, dNode) — RD=0
+      { extRow: 1, extCol: 2 },  // (14) dp, sp = (dNode, sNode)- RD=RS=0
+      { extRow: 1, extCol: 1 },  // (15) dp, dNode = (dNode, dNode)- RD=0
       { extRow: 2, extCol: 3 },  // (16) bNode, gNode = (sNode, gNode)
-      { extRow: 1, extCol: 3 },  // (17) dp, gNode = (dNode, gNode) — RD=0
-      { extRow: 2, extCol: 3 },  // (18) sp, gNode = (sNode, gNode) — RS=0
-      { extRow: 2, extCol: 2 },  // (19) sp, sNode = (sNode, sNode) — RS=0
+      { extRow: 1, extCol: 3 },  // (17) dp, gNode = (dNode, gNode)- RD=0
+      { extRow: 2, extCol: 3 },  // (18) sp, gNode = (sNode, gNode)- RS=0
+      { extRow: 2, extCol: 2 },  // (19) sp, sNode = (sNode, sNode)- RS=0
       { extRow: 1, extCol: 2 },  // (20) dp, bNode = (dNode, sNode)
       { extRow: 2, extCol: 2 },  // (21) sp, bNode = (sNode, sNode)
-      { extRow: 2, extCol: 1 },  // (22) sp, dp = (sNode, dNode) — RS=RD=0
+      { extRow: 2, extCol: 1 },  // (22) sp, dp = (sNode, dNode)- RS=RD=0
     ]);
   });
   it("PB-POLCAP TSTALLOC sequence", () => {
@@ -1345,7 +1345,7 @@ describe("setup-stamp-order", () => {
     ]);
   });
   it("PB-POT TSTALLOC sequence", () => {
-    // PotentiometerDefinition "behavioral" model — two RES sub-elements.
+    // PotentiometerDefinition "behavioral" model- two RES sub-elements.
     // setup() calls R_AW then R_WB each following ressetup.c:46-49.
     //
     // Pins: A=1, W=2, B=3. nodeCount=3.
@@ -1420,7 +1420,7 @@ describe("setup-stamp-order", () => {
     ]);
   });
   it("PB-RELAY TSTALLOC sequence", () => {
-    // ngspice anchor: composite — coilL(IND,5) + coilR(RES,4) + contactSW(SW,4).
+    // ngspice anchor: composite- coilL(IND,5) + coilR(RES,4) + contactSW(SW,4).
     //
     // Pin nodes: in1=1, in2=2, A1=3, B1=4. nodeCount=4.
     // setup() allocates:
@@ -1428,15 +1428,15 @@ describe("setup-stamp-order", () => {
     //   coilL branch = ctx.makeCur → 6  (_maxEqNum advances 5→6)
     //
     // coilL.setup (IND, posNode=in1=1, negNode=coilMid=5, branch=6):
-    //   indsetup.c:96-100 — 5 entries:
+    //   indsetup.c:96-100- 5 entries:
     //   (1,6),(5,6),(6,5),(6,1),(6,6)
     //
     // coilR.setup (RES, posNode=coilMid=5, negNode=in2=2):
-    //   ressetup.c:46-49 — 4 entries:
+    //   ressetup.c:46-49- 4 entries:
     //   (5,5),(2,2),(5,2),(2,5)
     //
     // contactSW.setup (SW, A1=3, B1=4):
-    //   swsetup.c:59-62 — 4 entries:
+    //   swsetup.c:59-62- 4 entries:
     //   (3,3),(3,4),(4,3),(4,4)
     //
     // Total: 13 entries.
@@ -1454,18 +1454,18 @@ describe("setup-stamp-order", () => {
     (engine as any)._setup();
     const order = (engine as any)._solver._getInsertionOrder();
     expect(order).toEqual([
-      // coilL (IND): posNode=1, negNode=5, branch=6 — indsetup.c:96-100
+      // coilL (IND): posNode=1, negNode=5, branch=6- indsetup.c:96-100
       { extRow: 1, extCol: 6 },  // (INDposNode, INDbrEq)
       { extRow: 5, extCol: 6 },  // (INDnegNode, INDbrEq)
       { extRow: 6, extCol: 5 },  // (INDbrEq, INDnegNode)
       { extRow: 6, extCol: 1 },  // (INDbrEq, INDposNode)
       { extRow: 6, extCol: 6 },  // (INDbrEq, INDbrEq)
-      // coilR (RES): posNode=5, negNode=2 — ressetup.c:46-49
+      // coilR (RES): posNode=5, negNode=2- ressetup.c:46-49
       { extRow: 5, extCol: 5 },  // (RESposNode, RESposNode)
       { extRow: 2, extCol: 2 },  // (RESnegNode, RESnegNode)
       { extRow: 5, extCol: 2 },  // (RESposNode, RESnegNode)
       { extRow: 2, extCol: 5 },  // (RESnegNode, RESposNode)
-      // contactSW (SW): A1=3, B1=4 — swsetup.c:59-62
+      // contactSW (SW): A1=3, B1=4- swsetup.c:59-62
       { extRow: 3, extCol: 3 },  // (SWposNode, SWposNode)
       { extRow: 3, extCol: 4 },  // (SWposNode, SWnegNode)
       { extRow: 4, extCol: 3 },  // (SWnegNode, SWposNode)
@@ -1473,7 +1473,7 @@ describe("setup-stamp-order", () => {
     ]);
   });
   it("PB-RELAY-DT TSTALLOC sequence", () => {
-    // ngspice anchor: composite — coilL(IND,5) + coilR(RES,4) + swNO(SW,4) + swNC(SW,4).
+    // ngspice anchor: composite- coilL(IND,5) + coilR(RES,4) + swNO(SW,4) + swNC(SW,4).
     //
     // Pin nodes: in1=1, in2=2, A1=3, B1=4, C1=5. nodeCount=5.
     // setup() allocates:
@@ -1481,19 +1481,19 @@ describe("setup-stamp-order", () => {
     //   coilL branch = ctx.makeCur → 7  (_maxEqNum advances 6→7)
     //
     // coilL.setup (IND, posNode=in1=1, negNode=coilMid=6, branch=7):
-    //   indsetup.c:96-100 — 5 entries:
+    //   indsetup.c:96-100- 5 entries:
     //   (1,7),(6,7),(7,6),(7,1),(7,7)
     //
     // coilR.setup (RES, posNode=coilMid=6, negNode=in2=2):
-    //   ressetup.c:46-49 — 4 entries:
+    //   ressetup.c:46-49- 4 entries:
     //   (6,6),(2,2),(6,2),(2,6)
     //
     // swNO.setup (SW, A1=3, B1=4, normally-open):
-    //   swsetup.c:59-62 — 4 entries:
+    //   swsetup.c:59-62- 4 entries:
     //   (3,3),(3,4),(4,3),(4,4)
     //
     // swNC.setup (SW, A1=3, B1=C1=5, normally-closed):
-    //   swsetup.c:59-62 — 4 entries:
+    //   swsetup.c:59-62- 4 entries:
     //   (3,3),(3,5),(5,3),(5,5)
     //
     // Total: 17 entries.
@@ -1511,23 +1511,23 @@ describe("setup-stamp-order", () => {
     (engine as any)._setup();
     const order = (engine as any)._solver._getInsertionOrder();
     expect(order).toEqual([
-      // coilL (IND): posNode=1, negNode=6, branch=7 — indsetup.c:96-100
+      // coilL (IND): posNode=1, negNode=6, branch=7- indsetup.c:96-100
       { extRow: 1, extCol: 7 },  // (INDposNode, INDbrEq)
       { extRow: 6, extCol: 7 },  // (INDnegNode, INDbrEq)
       { extRow: 7, extCol: 6 },  // (INDbrEq, INDnegNode)
       { extRow: 7, extCol: 1 },  // (INDbrEq, INDposNode)
       { extRow: 7, extCol: 7 },  // (INDbrEq, INDbrEq)
-      // coilR (RES): posNode=6, negNode=2 — ressetup.c:46-49
+      // coilR (RES): posNode=6, negNode=2- ressetup.c:46-49
       { extRow: 6, extCol: 6 },  // (RESposNode, RESposNode)
       { extRow: 2, extCol: 2 },  // (RESnegNode, RESnegNode)
       { extRow: 6, extCol: 2 },  // (RESposNode, RESnegNode)
       { extRow: 2, extCol: 6 },  // (RESnegNode, RESposNode)
-      // swNO (SW): A1=3, B1=4 — swsetup.c:59-62
+      // swNO (SW): A1=3, B1=4- swsetup.c:59-62
       { extRow: 3, extCol: 3 },  // (SWposNode, SWposNode)
       { extRow: 3, extCol: 4 },  // (SWposNode, SWnegNode)
       { extRow: 4, extCol: 3 },  // (SWnegNode, SWposNode)
       { extRow: 4, extCol: 4 },  // (SWnegNode, SWnegNode)
-      // swNC (SW): A1=3, B1=C1=5 — swsetup.c:59-62
+      // swNC (SW): A1=3, B1=C1=5- swsetup.c:59-62
       { extRow: 3, extCol: 3 },  // (SWposNode, SWposNode)
       { extRow: 3, extCol: 5 },  // (SWposNode, SWnegNode)
       { extRow: 5, extCol: 3 },  // (SWnegNode, SWposNode)
@@ -1535,10 +1535,10 @@ describe("setup-stamp-order", () => {
     ]);
   });
   it("PB-RES TSTALLOC sequence", () => {
-    // ngspice anchor: ressetup.c:46-49 — 4 TSTALLOC entries.
+    // ngspice anchor: ressetup.c:46-49- 4 TSTALLOC entries.
     // ResistorDefinition "behavioral" model uses pin keys "A" (posNode) and "B" (negNode).
     // Nodes: A=1 (posNode), B=2 (negNode).
-    // Expected: (1,1),(2,2),(1,2),(2,1) — PP, NN, PN, NP
+    // Expected: (1,1),(2,2),(1,2),(2,1)- PP, NN, PN, NP
     const entry = ResistorDefinition.modelRegistry!["behavioral"]!;
     if (entry.kind !== "inline") throw new Error("Expected inline ModelEntry");
     const props = new PropertyBag();
@@ -1550,10 +1550,10 @@ describe("setup-stamp-order", () => {
     (engine as any)._setup();
     const order = (engine as any)._solver._getInsertionOrder();
     expect(order).toEqual([
-      { extRow: 1, extCol: 1 },  // (RESposNode, RESposNode) — ressetup.c:46
-      { extRow: 2, extCol: 2 },  // (RESnegNode, RESnegNode) — ressetup.c:47
-      { extRow: 1, extCol: 2 },  // (RESposNode, RESnegNode) — ressetup.c:48
-      { extRow: 2, extCol: 1 },  // (RESnegNode, RESposNode) — ressetup.c:49
+      { extRow: 1, extCol: 1 },  // (RESposNode, RESposNode)- ressetup.c:46
+      { extRow: 2, extCol: 2 },  // (RESnegNode, RESnegNode)- ressetup.c:47
+      { extRow: 1, extCol: 2 },  // (RESposNode, RESnegNode)- ressetup.c:48
+      { extRow: 2, extCol: 1 },  // (RESnegNode, RESposNode)- ressetup.c:49
     ]);
   });
   it("PB-SCR TSTALLOC sequence", () => {
@@ -1643,7 +1643,7 @@ describe("setup-stamp-order", () => {
   it("PB-SCHMITT TSTALLOC sequence", () => {
     // SchmittInvertingDefinition "behavioral" model.
     // setup():
-    //   allocStates(1) — composite OUTPUT_HIGH slot
+    //   allocStates(1)- composite OUTPUT_HIGH slot
     //   inModel.setup(ctx)  (DigitalInputPinModel, nodeId=nIn=1>0): allocElement(1,1) → (1,1)
     //   outModel.setup(ctx) (DigitalOutputPinModel "direct", loaded=false, nodeId=nOut=2>0):
     //     allocElement(2,2) → (2,2)
@@ -1670,7 +1670,7 @@ describe("setup-stamp-order", () => {
     ]);
   });
   it("PB-SCHOTTKY TSTALLOC sequence", () => {
-    // ngspice anchor: diosetup.c:232-238 — 7 TSTALLOC entries (identical to DIO).
+    // ngspice anchor: diosetup.c:232-238- 7 TSTALLOC entries (identical to DIO).
     // SchottkyDiode delegates to createDiodeElement with SCHOTTKY_DEFAULTS.
     // RS=1Ω (Schottky default): _posPrimeNode = internal node = 3 (nodeCount+1).
     // Nodes: posNode=1 (A), negNode=2 (K), internal _posPrimeNode=3.
@@ -1709,10 +1709,10 @@ describe("setup-stamp-order", () => {
     ]);
   });
   it("PB-SPARK TSTALLOC sequence", () => {
-    // ngspice anchor: swsetup.c:59-62 — 4 TSTALLOC entries, SW pattern.
-    // Note: SW ordering differs from RES — cross terms come before NN diagonal.
+    // ngspice anchor: swsetup.c:59-62- 4 TSTALLOC entries, SW pattern.
+    // Note: SW ordering differs from RES- cross terms come before NN diagonal.
     // Nodes: posNode=1 (SWposNode), negNode=2 (SWnegNode).
-    // Expected order: (1,1), (1,2), (2,1), (2,2) — PP, PN, NP, NN
+    // Expected order: (1,1), (1,2), (2,1), (2,2)- PP, PN, NP, NN
     const props = new PropertyBag();
     props.replaceModelParams({ ...SPARK_GAP_DEFAULTS });
     const el = createSparkGapElement(new Map([["pos", 1], ["neg", 2]]), props, () => 0);
@@ -1722,15 +1722,15 @@ describe("setup-stamp-order", () => {
     (engine as any)._setup();
     const order = (engine as any)._solver._getInsertionOrder();
     expect(order).toEqual([
-      { extRow: 1, extCol: 1 }, // (SWposNode, SWposNode) — swsetup.c:59
-      { extRow: 1, extCol: 2 }, // (SWposNode, SWnegNode) — swsetup.c:60
-      { extRow: 2, extCol: 1 }, // (SWnegNode, SWposNode) — swsetup.c:61
-      { extRow: 2, extCol: 2 }, // (SWnegNode, SWnegNode) — swsetup.c:62
+      { extRow: 1, extCol: 1 }, // (SWposNode, SWposNode)- swsetup.c:59
+      { extRow: 1, extCol: 2 }, // (SWposNode, SWnegNode)- swsetup.c:60
+      { extRow: 2, extCol: 1 }, // (SWnegNode, SWposNode)- swsetup.c:61
+      { extRow: 2, extCol: 2 }, // (SWnegNode, SWnegNode)- swsetup.c:62
     ]);
   });
   it.todo("PB-SUBCKT TSTALLOC sequence");
   it("PB-SW TSTALLOC sequence", () => {
-    // ngspice anchor: swsetup.c:59-62 — 4 TSTALLOC entries, SW pattern.
+    // ngspice anchor: swsetup.c:59-62- 4 TSTALLOC entries, SW pattern.
     // Nodes: posNode=A1=1, negNode=B1=2.
     // TSTALLOC sequence (swsetup.c:59-62, line-for-line):
     //  1. (SWposNode=1, SWposNode=1) → (1,1)  _hPP
@@ -1749,10 +1749,10 @@ describe("setup-stamp-order", () => {
     (engine as any)._setup();
     const order = (engine as any)._solver._getInsertionOrder();
     expect(order).toEqual([
-      { extRow: 1, extCol: 1 },  // (1) SWposNode, SWposNode — swsetup.c:59
-      { extRow: 1, extCol: 2 },  // (2) SWposNode, SWnegNode — swsetup.c:60
-      { extRow: 2, extCol: 1 },  // (3) SWnegNode, SWposNode — swsetup.c:61
-      { extRow: 2, extCol: 2 },  // (4) SWnegNode, SWnegNode — swsetup.c:62
+      { extRow: 1, extCol: 1 },  // (1) SWposNode, SWposNode- swsetup.c:59
+      { extRow: 1, extCol: 2 },  // (2) SWposNode, SWnegNode- swsetup.c:60
+      { extRow: 2, extCol: 1 },  // (3) SWnegNode, SWposNode- swsetup.c:61
+      { extRow: 2, extCol: 2 },  // (4) SWnegNode, SWnegNode- swsetup.c:62
     ]);
   });
   it("PB-SW-DT TSTALLOC sequence", () => {
@@ -1785,15 +1785,15 @@ describe("setup-stamp-order", () => {
     const order = (engine as any)._solver._getInsertionOrder();
     expect(order).toEqual([
       // SW_AB (A1↔B1)
-      { extRow: 1, extCol: 1 },  // (1) A1, A1 — swAB._hPP
-      { extRow: 1, extCol: 2 },  // (2) A1, B1 — swAB._hPN
-      { extRow: 2, extCol: 1 },  // (3) B1, A1 — swAB._hNP
-      { extRow: 2, extCol: 2 },  // (4) B1, B1 — swAB._hNN
+      { extRow: 1, extCol: 1 },  // (1) A1, A1- swAB._hPP
+      { extRow: 1, extCol: 2 },  // (2) A1, B1- swAB._hPN
+      { extRow: 2, extCol: 1 },  // (3) B1, A1- swAB._hNP
+      { extRow: 2, extCol: 2 },  // (4) B1, B1- swAB._hNN
       // SW_AC (A1↔C1)
-      { extRow: 1, extCol: 1 },  // (5) A1, A1 — swAC._hPP
-      { extRow: 1, extCol: 3 },  // (6) A1, C1 — swAC._hPN
-      { extRow: 3, extCol: 1 },  // (7) C1, A1 — swAC._hNP
-      { extRow: 3, extCol: 3 },  // (8) C1, C1 — swAC._hNN
+      { extRow: 1, extCol: 1 },  // (5) A1, A1- swAC._hPP
+      { extRow: 1, extCol: 3 },  // (6) A1, C1- swAC._hPN
+      { extRow: 3, extCol: 1 },  // (7) C1, A1- swAC._hNP
+      { extRow: 3, extCol: 3 },  // (8) C1, C1- swAC._hNN
     ]);
   });
   it("PB-TAPXFMR TSTALLOC sequence", () => {
@@ -1882,16 +1882,16 @@ describe("setup-stamp-order", () => {
     //
     // Sub-element TSTALLOC sequence:
     //
-    // rDiv1 (RES, A=VCC=4, B=CTRL=5) — ressetup.c:46-49 — 4 entries:
+    // rDiv1 (RES, A=VCC=4, B=CTRL=5)- ressetup.c:46-49- 4 entries:
     //   (4,4), (4,5), (5,4), (5,5)
     //
-    // rDiv2 (RES, A=CTRL=5, B=nLower=9) — 4 entries:
+    // rDiv2 (RES, A=CTRL=5, B=nLower=9)- 4 entries:
     //   (5,5), (5,9), (9,5), (9,9)
     //
-    // rDiv3 (RES, A=nLower=9, B=GND=8) — 4 entries:
+    // rDiv3 (RES, A=nLower=9, B=GND=8)- 4 entries:
     //   (9,9), (9,8), (8,9), (8,8)
     //
-    // comp1 (VCVS, ctrl+=THR=3, ctrl-=CTRL=5, out+=nComp1Out=10, out-=GND=8) — vcvsset.c:53-58 — 6 entries:
+    // comp1 (VCVS, ctrl+=THR=3, ctrl-=CTRL=5, out+=nComp1Out=10, out-=GND=8)- vcvsset.c:53-58- 6 entries:
     //   branch=13 (first makeCur call)
     //   1. (out+=10, branch=13)   :53
     //   2. (out-=8,  branch=13)   :54
@@ -1900,7 +1900,7 @@ describe("setup-stamp-order", () => {
     //   5. (branch=13, ctrl+=3)   :57
     //   6. (branch=13, ctrl-=5)   :58
     //
-    // comp2 (VCVS, ctrl+=nLower=9, ctrl-=TRIG=2, out+=nComp2Out=11, out-=GND=8) — vcvsset.c:53-58 — 6 entries:
+    // comp2 (VCVS, ctrl+=nLower=9, ctrl-=TRIG=2, out+=nComp2Out=11, out-=GND=8)- vcvsset.c:53-58- 6 entries:
     //   branch=14 (second makeCur call)
     //   1. (out+=11, branch=14)   :53
     //   2. (out-=8,  branch=14)   :54
@@ -1909,7 +1909,7 @@ describe("setup-stamp-order", () => {
     //   5. (branch=14, ctrl+=9)   :57
     //   6. (branch=14, ctrl-=2)   :58
     //
-    // bjtDis (BJT NPN, B=nDisBase=12, C=DIS=1, E=GND=8) — bjtsetup.c:435-464 — 23 calls:
+    // bjtDis (BJT NPN, B=nDisBase=12, C=DIS=1, E=GND=8)- bjtsetup.c:435-464- 23 calls:
     //   bp=12, cp=1, ep=8, substNode=0 (TrashCan, entries 19-21 skipped)
     //   sc=cp=1 (VERTICAL). 20 entries recorded:
     //   1. (cp=1,  cp=1)    _hCCP
@@ -2020,7 +2020,7 @@ describe("setup-stamp-order", () => {
     ]);
   });
   it("PB-TLINE TSTALLOC sequence", () => {
-    // TransmissionLineDefinition "behavioral" — N=2 segments (lossless: rSeg=gSeg=0).
+    // TransmissionLineDefinition "behavioral"- N=2 segments (lossless: rSeg=gSeg=0).
     //
     // Pins: P1b=1, P2b=2. nodeCount=2, N=2.
     // Internal nodes allocated in setup():
@@ -2035,12 +2035,12 @@ describe("setup-stamp-order", () => {
     //   k=1 (last):     CombinedRL(junc0=4, P2b=2)
     //
     // Setup order (sub-elements processed in array order):
-    // 1. SegR(1,3) — ressetup.c:46-49 AA,AB,BA,BB order:
+    // 1. SegR(1,3)- ressetup.c:46-49 AA,AB,BA,BB order:
     //    (1,1),(1,3),(3,1),(3,3)
-    // 2. SegL(3,4) branch=5 — indsetup.c:96-100:
+    // 2. SegL(3,4) branch=5- indsetup.c:96-100:
     //    (3,5),(4,5),(5,4),(5,3),(5,5)
-    // 3. SegC(4→0) — capsetup.c collapsed: neg=0 so only (4,4)
-    // 4. CombinedRL(4,2) branch=6 — indsetup.c pattern (5 entries):
+    // 3. SegC(4→0)- capsetup.c collapsed: neg=0 so only (4,4)
+    // 4. CombinedRL(4,2) branch=6- indsetup.c pattern (5 entries):
     //    (4,6),(2,6),(6,2),(6,4),(6,6)
     //
     // Total: 4+5+1+5 = 15 entries.
@@ -2059,20 +2059,20 @@ describe("setup-stamp-order", () => {
     (engine as any)._setup();
     const order = (engine as any)._solver._getInsertionOrder();
     expect(order).toEqual([
-      // SegR(P1b=1, rlMid0=3) — ressetup.c AA,AB,BA,BB
+      // SegR(P1b=1, rlMid0=3)- ressetup.c AA,AB,BA,BB
       { extRow: 1, extCol: 1 },
       { extRow: 1, extCol: 3 },
       { extRow: 3, extCol: 1 },
       { extRow: 3, extCol: 3 },
-      // SegL(rlMid0=3, junc0=4) branch=5 — indsetup.c:96-100
+      // SegL(rlMid0=3, junc0=4) branch=5- indsetup.c:96-100
       { extRow: 3, extCol: 5 },
       { extRow: 4, extCol: 5 },
       { extRow: 5, extCol: 4 },
       { extRow: 5, extCol: 3 },
       { extRow: 5, extCol: 5 },
-      // SegC(junc0=4 → GND=0) — capsetup.c collapsed to (4,4)
+      // SegC(junc0=4 → GND=0)- capsetup.c collapsed to (4,4)
       { extRow: 4, extCol: 4 },
-      // CombinedRL(junc0=4, P2b=2) branch=6 — 5 entries
+      // CombinedRL(junc0=4, P2b=2) branch=6- 5 entries
       { extRow: 4, extCol: 6 },
       { extRow: 2, extCol: 6 },
       { extRow: 6, extCol: 2 },
@@ -2085,16 +2085,16 @@ describe("setup-stamp-order", () => {
     //
     // TransGateAnalogElement: composite of _nfetSW + _pfetSW sharing the same
     // signal path (out1=inNode, out2=outNode). Control pins (p1, p2) are not
-    // part of the MNA matrix — only the signal path nodes are stamped.
+    // part of the MNA matrix- only the signal path nodes are stamped.
     //
     // Nodes: out1=1 (inNode=SWposNode), out2=2 (outNode=SWnegNode).
     // setup() calls _nfetSW.setup(ctx) then _pfetSW.setup(ctx).
     //
     // NFET SW (D=1, S=2):
-    //   swsetup.c:59-62 — 4 entries: (1,1),(1,2),(2,1),(2,2)
+    //   swsetup.c:59-62- 4 entries: (1,1),(1,2),(2,1),(2,2)
     //
-    // PFET SW (D=1, S=2) — identical signal path:
-    //   swsetup.c:59-62 — 4 entries: (1,1),(1,2),(2,1),(2,2)
+    // PFET SW (D=1, S=2)- identical signal path:
+    //   swsetup.c:59-62- 4 entries: (1,1),(1,2),(2,1),(2,2)
     //
     // Total: 8 entries.
     const pinNodes = new Map<string, number>([
@@ -2107,12 +2107,12 @@ describe("setup-stamp-order", () => {
     (engine as any)._setup();
     const order = (engine as any)._solver._getInsertionOrder();
     expect(order).toEqual([
-      // NFET SW (D=out1=1, S=out2=2) — swsetup.c:59-62
+      // NFET SW (D=out1=1, S=out2=2)- swsetup.c:59-62
       { extRow: 1, extCol: 1 },  // SWposPosptr
       { extRow: 1, extCol: 2 },  // SWposNegptr
       { extRow: 2, extCol: 1 },  // SWnegPosptr
       { extRow: 2, extCol: 2 },  // SWnegNegptr
-      // PFET SW (D=out1=1, S=out2=2) — swsetup.c:59-62
+      // PFET SW (D=out1=1, S=out2=2)- swsetup.c:59-62
       { extRow: 1, extCol: 1 },  // SWposPosptr
       { extRow: 1, extCol: 2 },  // SWposNegptr
       { extRow: 2, extCol: 1 },  // SWnegPosptr
@@ -2132,7 +2132,7 @@ describe("setup-stamp-order", () => {
     // Q3 NPN: B=G=3, C=latch2=5, E=MT2=2. substNode=0, cp=5, bp=3, ep=2, sc=5.
     // Q4 PNP: B=latch2=5, C=G=3, E=MT1=1. substNode=0, cp=3, bp=5, ep=1, sc=3.
     //
-    // Each BJT: bjtsetup.c:435-464 — 20 of 23 recorded (entries 19-21 = substNode=0 → TrashCan).
+    // Each BJT: bjtsetup.c:435-464- 20 of 23 recorded (entries 19-21 = substNode=0 → TrashCan).
     // Total: 4×20 = 80 entries.
     const entry = TriacDefinition.modelRegistry!["behavioral"]!;
     if (entry.kind !== "inline") throw new Error("Expected inline ModelEntry");
@@ -2146,7 +2146,7 @@ describe("setup-stamp-order", () => {
     (engine as any)._setup();
     const order = (engine as any)._solver._getInsertionOrder();
     expect(order).toEqual([
-      // Q1 NPN (B=3, C=4, E=1): cp=4, bp=3, ep=1, sc=4 — bjtsetup.c:435-464
+      // Q1 NPN (B=3, C=4, E=1): cp=4, bp=3, ep=1, sc=4- bjtsetup.c:435-464
       { extRow: 4, extCol: 4 },  // _hCCP
       { extRow: 3, extCol: 3 },  // _hBBP
       { extRow: 1, extCol: 1 },  // _hEEP
@@ -2168,7 +2168,7 @@ describe("setup-stamp-order", () => {
       // entries 19-21: substNode=0 → TrashCan (not in order)
       { extRow: 3, extCol: 4 },  // _hBCP (baseNode=3, cp=4)
       { extRow: 4, extCol: 3 },  // _hCPB (cp=4, baseNode=3)
-      // Q2 PNP (B=4, C=3, E=2): cp=3, bp=4, ep=2, sc=3 — bjtsetup.c:435-464
+      // Q2 PNP (B=4, C=3, E=2): cp=3, bp=4, ep=2, sc=3- bjtsetup.c:435-464
       { extRow: 3, extCol: 3 },  // _hCCP
       { extRow: 4, extCol: 4 },  // _hBBP
       { extRow: 2, extCol: 2 },  // _hEEP
@@ -2190,7 +2190,7 @@ describe("setup-stamp-order", () => {
       // entries 19-21: substNode=0 → TrashCan
       { extRow: 4, extCol: 3 },  // _hBCP (baseNode=4, cp=3)
       { extRow: 3, extCol: 4 },  // _hCPB (cp=3, baseNode=4)
-      // Q3 NPN (B=3, C=5, E=2): cp=5, bp=3, ep=2, sc=5 — bjtsetup.c:435-464
+      // Q3 NPN (B=3, C=5, E=2): cp=5, bp=3, ep=2, sc=5- bjtsetup.c:435-464
       { extRow: 5, extCol: 5 },  // _hCCP
       { extRow: 3, extCol: 3 },  // _hBBP
       { extRow: 2, extCol: 2 },  // _hEEP
@@ -2212,7 +2212,7 @@ describe("setup-stamp-order", () => {
       // entries 19-21: substNode=0 → TrashCan
       { extRow: 3, extCol: 5 },  // _hBCP (baseNode=3, cp=5)
       { extRow: 5, extCol: 3 },  // _hCPB (cp=5, baseNode=3)
-      // Q4 PNP (B=5, C=3, E=1): cp=3, bp=5, ep=1, sc=3 — bjtsetup.c:435-464
+      // Q4 PNP (B=5, C=3, E=1): cp=3, bp=5, ep=1, sc=3- bjtsetup.c:435-464
       { extRow: 3, extCol: 3 },  // _hCCP
       { extRow: 5, extCol: 5 },  // _hBBP
       { extRow: 1, extCol: 1 },  // _hEEP
@@ -2243,10 +2243,10 @@ describe("setup-stamp-order", () => {
     // VCCS pin mapping:
     //   ctrl+ = G=2,  ctrl- = K=3,  out+ = P=1,  out- = K=3
     //
-    // VCCS setup (vccsset.c:43-46) — 4 entries:
+    // VCCS setup (vccsset.c:43-46)- 4 entries:
     //   (out+=1, ctrl+=2), (out+=1, ctrl-=3), (out-=3, ctrl+=2), (out-=3, ctrl-=3)
     //
-    // gds stamps (plate=nP=1, cathode=nK=3) — 2 entries:
+    // gds stamps (plate=nP=1, cathode=nK=3)- 2 entries:
     //   (nP=1, nP=1),  (nK=3, nP=1)
     //
     // Total: 6 entries.
@@ -2270,7 +2270,7 @@ describe("setup-stamp-order", () => {
     ]);
   });
   it("PB-VARACTOR TSTALLOC sequence", () => {
-    // ngspice anchor: diosetup.c:232-238 — 7 TSTALLOC entries (identical to DIO).
+    // ngspice anchor: diosetup.c:232-238- 7 TSTALLOC entries (identical to DIO).
     // PB-VARACTOR per spec delegates to createDiodeElement, so the TSTALLOC
     // sequence is identical to PB-DIO with RS=0 (no internal node).
     // Nodes: posNode=1 (A), negNode=2 (K). _posPrimeNode = posNode = 1.
@@ -2293,7 +2293,7 @@ describe("setup-stamp-order", () => {
     ]);
   });
   it("PB-VCCS TSTALLOC sequence", () => {
-    // ngspice anchor: vccsset.c:43-46 — 4 TSTALLOC entries.
+    // ngspice anchor: vccsset.c:43-46- 4 TSTALLOC entries.
     // Nodes: ctrl+=1 (ctrlPosNode), ctrl-=2 (ctrlNegNode), out+=3 (posNode), out-=4 (negNode).
     // No branch row, no internal nodes.
     //
@@ -2319,7 +2319,7 @@ describe("setup-stamp-order", () => {
     ]);
   });
   it("PB-VCVS TSTALLOC sequence", () => {
-    // ngspice anchor: vcvsset.c:53-58 — 6 TSTALLOC entries.
+    // ngspice anchor: vcvsset.c:53-58- 6 TSTALLOC entries.
     // Nodes: ctrl+=1 (ctrlPosNode), ctrl-=2 (ctrlNegNode), out+=3 (posNode), out-=4 (negNode).
     // Branch row allocated by engine._setup() at maxEqNum = nodeCount+1 = 5.
     //
@@ -2350,8 +2350,8 @@ describe("setup-stamp-order", () => {
     ]);
   });
   it("PB-VSRC-AC TSTALLOC sequence", () => {
-    // ngspice anchor: vsrcset.c:52-55 — 4 TSTALLOC entries.
-    // makeAcVoltageSourceElement is a 3-arg §A.3 factory.
+    // ngspice anchor: vsrcset.c:52-55- 4 TSTALLOC entries.
+    // makeAcVoltageSourceElement is a 3-arg ssA.3 factory.
     // Nodes: posNode=1 ("pos"), negNode=2 ("neg").
     // Branch row allocated by engine._setup() at maxEqNum = nodeCount+1 = 3.
     //
@@ -2373,15 +2373,15 @@ describe("setup-stamp-order", () => {
     (engine as any)._setup();
     const order = (engine as any)._solver._getInsertionOrder();
     expect(order).toEqual([
-      { extRow: 1, extCol: 3 },  // (posNode=1, branch=3) — vsrcset.c:52
-      { extRow: 2, extCol: 3 },  // (negNode=2, branch=3) — vsrcset.c:53
-      { extRow: 3, extCol: 2 },  // (branch=3,  negNode=2) — vsrcset.c:54
-      { extRow: 3, extCol: 1 },  // (branch=3,  posNode=1) — vsrcset.c:55
+      { extRow: 1, extCol: 3 },  // (posNode=1, branch=3)- vsrcset.c:52
+      { extRow: 2, extCol: 3 },  // (negNode=2, branch=3)- vsrcset.c:53
+      { extRow: 3, extCol: 2 },  // (branch=3,  negNode=2)- vsrcset.c:54
+      { extRow: 3, extCol: 1 },  // (branch=3,  posNode=1)- vsrcset.c:55
     ]);
   });
   it("PB-VSRC-DC TSTALLOC sequence", () => {
-    // ngspice anchor: vsrcset.c:52-55 — 4 TSTALLOC entries.
-    // makeDcVoltageSource is a 3-arg §A.3 factory.
+    // ngspice anchor: vsrcset.c:52-55- 4 TSTALLOC entries.
+    // makeDcVoltageSource is a 3-arg ssA.3 factory.
     // Nodes: posNode=1 ("pos"), negNode=2 ("neg").
     // Branch row allocated by engine._setup() at maxEqNum = nodeCount+1 = 3.
     //
@@ -2403,16 +2403,16 @@ describe("setup-stamp-order", () => {
     (engine as any)._setup();
     const order = (engine as any)._solver._getInsertionOrder();
     expect(order).toEqual([
-      { extRow: 1, extCol: 3 },  // (posNode=1, branch=3) — vsrcset.c:52
-      { extRow: 2, extCol: 3 },  // (negNode=2, branch=3) — vsrcset.c:53
-      { extRow: 3, extCol: 2 },  // (branch=3,  negNode=2) — vsrcset.c:54
-      { extRow: 3, extCol: 1 },  // (branch=3,  posNode=1) — vsrcset.c:55
+      { extRow: 1, extCol: 3 },  // (posNode=1, branch=3)- vsrcset.c:52
+      { extRow: 2, extCol: 3 },  // (negNode=2, branch=3)- vsrcset.c:53
+      { extRow: 3, extCol: 2 },  // (branch=3,  negNode=2)- vsrcset.c:54
+      { extRow: 3, extCol: 1 },  // (branch=3,  posNode=1)- vsrcset.c:55
     ]);
   });
   it("PB-VSRC-VAR TSTALLOC sequence", () => {
-    // ngspice anchor: vsrcset.c:52-55 — 4 TSTALLOC entries.
-    // makeVariableRailElement is a 3-arg §A.3 factory.
-    // Nodes: posNode=1 ("pos"), negNode=0 (ground — variable rail has no neg pin).
+    // ngspice anchor: vsrcset.c:52-55- 4 TSTALLOC entries.
+    // makeVariableRailElement is a 3-arg ssA.3 factory.
+    // Nodes: posNode=1 ("pos"), negNode=0 (ground- variable rail has no neg pin).
     // Branch row allocated by engine._setup() at maxEqNum = nodeCount+1 = 2.
     //
     // negNode=0 → allocElement(0, ...) and allocElement(..., 0) return TrashCan
@@ -2438,13 +2438,13 @@ describe("setup-stamp-order", () => {
     (engine as any)._setup();
     const order = (engine as any)._solver._getInsertionOrder();
     expect(order).toEqual([
-      { extRow: 1, extCol: 2 },  // (posNode=1, branch=2) — vsrcset.c:52
-      { extRow: 2, extCol: 1 },  // (branch=2,  posNode=1) — vsrcset.c:55
+      { extRow: 1, extCol: 2 },  // (posNode=1, branch=2)- vsrcset.c:52
+      { extRow: 2, extCol: 1 },  // (branch=2,  posNode=1)- vsrcset.c:55
     ]);
   });
   it("PB-XFMR TSTALLOC sequence", () => {
     // TransformerDefinition "behavioral" model.
-    // §A.3: createTransformerElement(pinNodes, props, getTime).
+    // ssA.3: createTransformerElement(pinNodes, props, getTime).
     //
     // Pins: P1=1, P2=2, S1=3, S2=4. nodeCount=4.
     // setup() calls _l1.setup(), _l2.setup(), _mut.setup(), then winding
@@ -2452,16 +2452,16 @@ describe("setup-stamp-order", () => {
     //
     // _l1 (IND, posNode=P1=1, negNode=P2=2):
     //   branch b1 = makeCur → 5 (nodeCount+1=5)
-    //   indsetup.c:96-100 — 5 entries:
+    //   indsetup.c:96-100- 5 entries:
     //   (1,5),(2,5),(5,2),(5,1),(5,5)
     //
     // _l2 (IND, posNode=S1=3, negNode=S2=4):
     //   branch b2 = makeCur → 6
-    //   indsetup.c:96-100 — 5 entries:
+    //   indsetup.c:96-100- 5 entries:
     //   (3,6),(4,6),(6,4),(6,3),(6,6)
     //
     // _mut (MUT, b1=5, b2=6):
-    //   mutsetup.c — 2 entries:
+    //   mutsetup.c- 2 entries:
     //   (5,6),(6,5)
     //
     // Winding resistances (TRANSFORMER_DEFAULTS: primaryResistance=1>0, secondaryResistance=1>0):
@@ -2526,7 +2526,7 @@ describe("setup-stamp-order", () => {
     ]);
   });
   it("PB-ZENER TSTALLOC sequence", () => {
-    // ngspice anchor: diosetup.c:232-238 — 7 TSTALLOC entries (identical to DIO).
+    // ngspice anchor: diosetup.c:232-238- 7 TSTALLOC entries (identical to DIO).
     // ZenerDiode uses createZenerElement (simplified model) which has
     // the same TSTALLOC sequence as createDiodeElement.
     // RS=0 (default in ZENER_PARAM_DEFAULTS): _posPrimeNode = posNode = 1.

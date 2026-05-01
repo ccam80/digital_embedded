@@ -330,13 +330,13 @@ export class AnalogPolarizedCapElement implements PoolBackedAnalogElement {
     const negNode = this._pinNodes.get("neg")!;  // neg pin
 
     // Allocate internal node n_cap (junction between ESR and cap body).
-    // No ngspice primitive equivalent — digiTS-internal topology extension.
+    // No ngspice primitive equivalent- digiTS-internal topology extension.
     const nCap = ctx.makeVolt(this.label, "cap");
     this._nCap = nCap;
     this._internalLabels.length = 0;
     this._internalLabels.push("cap");
 
-    // State slots — 9 total (5 cap body + 4 clamp diode).
+    // State slots- 9 total (5 cap body + 4 clamp diode).
     this._stateBase = ctx.allocStates(this.stateSize);
 
     // ESR RES stamps (ressetup.c:46-49, pos ↔ nCap).
@@ -354,7 +354,7 @@ export class AnalogPolarizedCapElement implements PoolBackedAnalogElement {
     // Pre-partition the clamp diode's state region inside the composite's
     // 9-slot allocation (5 cap-body + 4 diode). The diode's setup has an
     // idempotent guard so it skips its own allocStates when _stateBase is
-    // already set. C.4 fix — eliminates the per-step state-base patching
+    // already set. C.4 fix- eliminates the per-step state-base patching
     // dance previously needed in tests.
     this._clampDiode._stateBase = this._stateBase + POLARIZED_CAP_SCHEMA.size;
     // Clamp diode sub-element setup (diosetup.c pattern, anode=neg, cathode=pos).

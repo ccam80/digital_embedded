@@ -1,5 +1,5 @@
 /**
- * DataTablePanel — live tabular view of all measured signals.
+ * DataTablePanel- live tabular view of all measured signals.
  *
  * Implements MeasurementObserver to receive step/reset notifications from
  * the simulation coordinator. Renders one row per signal with the current
@@ -17,13 +17,13 @@ import type { SimulationCoordinator } from "@/solver/coordinator-types";
 import type { SignalAddress } from "@/compile/types";
 
 // ---------------------------------------------------------------------------
-// Signal group — categorises signals by component type
+// Signal group- categorises signals by component type
 // ---------------------------------------------------------------------------
 
 export type SignalGroup = "input" | "output" | "probe";
 
 // ---------------------------------------------------------------------------
-// SignalDescriptor — describes one signal in the table
+// SignalDescriptor- describes one signal in the table
 // ---------------------------------------------------------------------------
 
 export interface SignalDescriptor {
@@ -38,7 +38,7 @@ export interface SignalDescriptor {
 }
 
 // ---------------------------------------------------------------------------
-// SignalRow — live row in the table
+// SignalRow- live row in the table
 // ---------------------------------------------------------------------------
 
 interface SignalRow {

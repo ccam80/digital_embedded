@@ -68,5 +68,5 @@ for (const [name, subRaw] of Object.entries(doc.subcircuitDefinitions ?? {})) {
 }
 
 console.log(
-  `Audit complete — ${bad} issue(s) across ${wires.length} circuit wires, ${elements.length} circuit elements, ${Object.keys(doc.subcircuitDefinitions ?? {}).length} subcircuits.`,
+  `Audit complete- ${bad} issue(s) across ${wires.length} circuit wires, ${elements.length} circuit elements, ${Object.keys(doc.subcircuitDefinitions ?? {}).length} subcircuits.`,
 );

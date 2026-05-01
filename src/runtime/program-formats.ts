@@ -4,9 +4,9 @@
  * Supported formats:
  *   - Intel HEX  (.hex, .ihex)
  *   - Raw binary (.bin)
- *   - CSV        (.csv)  — "address,value" pairs, one per line
- *   - Logisim v2 raw    — "v2.0 raw" header, space/newline separated hex words
- *   - Logisim v3 raw    — "v3.0 raw" header (same layout as v2)
+ *   - CSV        (.csv) - "address,value" pairs, one per line
+ *   - Logisim v2 raw   - "v2.0 raw" header, space/newline separated hex words
+ *   - Logisim v3 raw   - "v3.0 raw" header (same layout as v2)
  */
 
 // ---------------------------------------------------------------------------
@@ -53,7 +53,7 @@ export function detectFormatFromContent(content: string, filename?: string): Pro
       return detectFormatFromExtension(filename);
     } catch {
       // Dual-detector fallback: unknown extension → content heuristic.
-      // Per spec/architectural-alignment.md §I1 retain-with-reason.
+      // Per spec/architectural-alignment.md ssI1 retain-with-reason.
     }
   }
 

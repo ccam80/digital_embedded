@@ -31,9 +31,9 @@ async function rightClickAt(page: Page, x: number, y: number): Promise<void> {
  * the page-absolute coordinates of the wire midpoint for right-clicking.
  *
  * Layout:
- *   And1 (label "A1") at grid (2, 5) — output pin "out"
- *   And2 (label "A2") at grid (8, 5) — input pin "In_1"
- *   Wire from A1.out to A2.In_1 — midpoint used for right-click
+ *   And1 (label "A1") at grid (2, 5)- output pin "out"
+ *   And2 (label "A2") at grid (8, 5)- input pin "In_1"
+ *   Wire from A1.out to A2.In_1- midpoint used for right-click
  */
 async function setupCircuitWithWire(
   builder: UICircuitBuilder,
@@ -50,7 +50,7 @@ async function setupCircuitWithWire(
   await builder.drawWire('A1', 'out', 'A2', 'In_1');
 
   // Compute wire midpoint in page-absolute coordinates.
-  // The wire goes from A1.out to A2.In_1 — the midpoint is halfway between.
+  // The wire goes from A1.out to A2.In_1- the midpoint is halfway between.
   const fromPos = await builder.getPinPagePosition('A1', 'out');
   const toPos = await builder.getPinPagePosition('A2', 'In_1');
   const wireMidX = Math.round((fromPos.x + toPos.x) / 2);
@@ -159,7 +159,7 @@ test.describe('Pin Loading wire override context menu', () => {
     await defaultItem.click();
     await page.waitForTimeout(300);
 
-    // Right-click wire again — Default item should now have checkmark, Loaded should not
+    // Right-click wire again- Default item should now have checkmark, Loaded should not
     await rightClickAt(page, wireMidX, wireMidY);
     await page.waitForTimeout(200);
 
@@ -196,7 +196,7 @@ test.describe('Pin Loading wire override context menu', () => {
       await page.waitForTimeout(200);
     }
 
-    // Right-click wire — the Loaded checkmark should still be present
+    // Right-click wire- the Loaded checkmark should still be present
     await rightClickAt(page, wireMidX, wireMidY);
     await page.waitForTimeout(200);
 

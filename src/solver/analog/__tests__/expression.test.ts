@@ -41,58 +41,58 @@ function calc(text: string, env: Record<string, number> = {}): number {
 // ===========================================================================
 
 describe("ExprParser", () => {
-  it("basic_arithmetic — 2 + 3 * 4 = 14", () => {
+  it("basic_arithmetic- 2 + 3 * 4 = 14", () => {
     expect(calc("2 + 3 * 4")).toBe(14);
   });
 
-  it("operator_precedence — 2 + 3 * 4 ^ 2 = 50", () => {
+  it("operator_precedence- 2 + 3 * 4 ^ 2 = 50", () => {
     expect(calc("2 + 3 * 4 ^ 2")).toBe(50);
   });
 
-  it("parentheses — (2 + 3) * 4 = 20", () => {
+  it("parentheses- (2 + 3) * 4 = 20", () => {
     expect(calc("(2 + 3) * 4")).toBe(20);
   });
 
-  it("unary_minus — -3 + 5 = 2", () => {
+  it("unary_minus- -3 + 5 = 2", () => {
     expect(calc("-3 + 5")).toBe(2);
   });
 
-  it("variables — 2 * t + 1 with t=3 gives 7", () => {
+  it("variables- 2 * t + 1 with t=3 gives 7", () => {
     expect(calc("2 * t + 1", { t: 3 })).toBe(7);
   });
 
 
-  it("nested_functions — sqrt(abs(-16)) = 4.0", () => {
+  it("nested_functions- sqrt(abs(-16)) = 4.0", () => {
     expect(calc("sqrt(abs(-16))")).toBe(4.0);
   });
 
-  it("multi_arg_functions — max(3, 7) = 7", () => {
+  it("multi_arg_functions- max(3, 7) = 7", () => {
     expect(calc("max(3, 7)")).toBe(7);
   });
 
 
-  it("power_right_associative — 2 ^ 3 ^ 2 = 512", () => {
+  it("power_right_associative- 2 ^ 3 ^ 2 = 512", () => {
     // Right-associative: 2 ^ (3 ^ 2) = 2 ^ 9 = 512
     // NOT (2 ^ 3) ^ 2 = 8 ^ 2 = 64
     expect(calc("2 ^ 3 ^ 2")).toBe(512);
   });
 
 
-  it("division_by_zero — 1 / 0 = Infinity (IEEE 754)", () => {
+  it("division_by_zero- 1 / 0 = Infinity (IEEE 754)", () => {
     expect(calc("1 / 0")).toBe(Infinity);
   });
 
-  it("missing_variable_throws — x + 1 with empty env throws ExprParseError mentioning 'x'", () => {
+  it("missing_variable_throws- x + 1 with empty env throws ExprParseError mentioning 'x'", () => {
     const expr = parseExpression("x + 1");
     expect(() => evaluateExpression(expr, {})).toThrow(ExprParseError);
     expect(() => evaluateExpression(expr, {})).toThrow("x");
   });
 
-  it("invalid_syntax_throws — '2 + + 3' throws ExprParseError with position", () => {
+  it("invalid_syntax_throws- '2 + + 3' throws ExprParseError with position", () => {
     expect(() => parseExpression("2 + + 3")).toThrow(ExprParseError);
   });
 
-  it("complex_expression — 5 * sin(2 * pi * 1000 * t) at t=0.00025 ≈ 5.0", () => {
+  it("complex_expression- 5 * sin(2 * pi * 1000 * t) at t=0.00025 ≈ 5.0", () => {
     // Quarter period of 1kHz: sin(2π * 1000 * 0.00025) = sin(π/2) = 1.0
     calc("5 * sin(2 * pi * 1000 * t)", { t: 0.00025 });
   });
@@ -103,50 +103,50 @@ describe("ExprParser", () => {
 // ===========================================================================
 
 describe("ExprParser extended", () => {
-  it("subtraction — 10 - 3 = 7", () => {
+  it("subtraction- 10 - 3 = 7", () => {
     expect(calc("10 - 3")).toBe(7);
   });
 
-  it("division — 10 / 4 = 2.5", () => {
+  it("division- 10 / 4 = 2.5", () => {
     expect(calc("10 / 4")).toBe(2.5);
   });
 
-  it("chained addition — 1 + 2 + 3 = 6", () => {
+  it("chained addition- 1 + 2 + 3 = 6", () => {
     expect(calc("1 + 2 + 3")).toBe(6);
   });
 
-  it("nested unary — --5 = 5", () => {
+  it("nested unary- --5 = 5", () => {
     expect(calc("- -5")).toBe(5);
   });
 
 
 
-  it("pow function — pow(2, 10) = 1024", () => {
+  it("pow function- pow(2, 10) = 1024", () => {
     expect(calc("pow(2, 10)")).toBe(1024);
   });
 
-  it("min function — min(5, 3) = 3", () => {
+  it("min function- min(5, 3) = 3", () => {
     expect(calc("min(5, 3)")).toBe(3);
   });
 
-  it("floor function — floor(3.7) = 3", () => {
+  it("floor function- floor(3.7) = 3", () => {
     expect(calc("floor(3.7)")).toBe(3);
   });
 
-  it("ceil function — ceil(3.1) = 4", () => {
+  it("ceil function- ceil(3.1) = 4", () => {
     expect(calc("ceil(3.1)")).toBe(4);
   });
 
-  it("round function — round(3.5) = 4", () => {
+  it("round function- round(3.5) = 4", () => {
     expect(calc("round(3.5)")).toBe(4);
   });
 
 
-  it("sqrt — sqrt(9) = 3", () => {
+  it("sqrt- sqrt(9) = 3", () => {
     expect(calc("sqrt(9)")).toBe(3);
   });
 
-  it("cos — cos(0) = 1", () => {
+  it("cos- cos(0) = 1", () => {
     expect(calc("cos(0)")).toBe(1);
   });
 
@@ -159,7 +159,7 @@ describe("ExprParser extended", () => {
     expect(() => evaluateExpression(expr, {})).toThrow("foo");
   });
 
-  it("deeply nested parentheses — ((2 + 3)) * 4 = 20", () => {
+  it("deeply nested parentheses- ((2 + 3)) * 4 = 20", () => {
     expect(calc("((2 + 3)) * 4")).toBe(20);
   });
 
@@ -167,11 +167,11 @@ describe("ExprParser extended", () => {
     expect(calc("a + b * c", { a: 1, b: 2, c: 3 })).toBe(7);
   });
 
-  it("unary minus on variable — -t with t=5 gives -5", () => {
+  it("unary minus on variable- -t with t=5 gives -5", () => {
     expect(calc("-t", { t: 5 })).toBe(-5);
   });
 
-  it("unary minus on function — -sin(0) = 0", () => {
+  it("unary minus on function- -sin(0) = 0", () => {
     expect(calc("-sin(0)")).toBe(-0);
   });
 
@@ -181,7 +181,7 @@ describe("ExprParser extended", () => {
 
 
 
-  it("scientific notation uppercase E — 2.5E6 = 2500000", () => {
+  it("scientific notation uppercase E- 2.5E6 = 2500000", () => {
     expect(calc("2.5E6")).toBe(2500000);
   });
 });
@@ -224,7 +224,7 @@ describe("AST helpers", () => {
     }
   });
 
-  it("AST built programmatically evaluates correctly — sin(pi/2) = 1", () => {
+  it("AST built programmatically evaluates correctly- sin(pi/2) = 1", () => {
     // Build: sin(pi / 2) manually
     callNode("sin", [binOp("/", varNode("pi"), numNode(2))]);
   });

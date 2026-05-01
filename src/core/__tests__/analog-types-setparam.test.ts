@@ -15,7 +15,7 @@ describe("AnalogElement.setParam", () => {
       getPinCurrents() { return []; },
     };
     // If this compiles without the @ts-expect-error triggering,
-    // setParam is still optional — that is a bug.
+    // setParam is still optional- that is a bug.
     expect(_bad).toBeDefined();
   });
 

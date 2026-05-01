@@ -1112,7 +1112,7 @@ describe("Div", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Dynamic-dispatch wrapper tests — verify executeFn reads bitWidth from layout
+// Dynamic-dispatch wrapper tests- verify executeFn reads bitWidth from layout
 // ---------------------------------------------------------------------------
 
 describe("executeAdd dynamic dispatch via getProperty", () => {

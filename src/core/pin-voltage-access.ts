@@ -1,9 +1,9 @@
 /**
- * PinVoltageAccess — signal context passed to component draw() methods.
+ * PinVoltageAccess- signal context passed to component draw() methods.
  *
  * Allows analog components to query per-pin node voltages during rendering
  * so they can color leads and bodies based on live simulation state.
- * Digital components ignore the optional parameter — no breaking change.
+ * Digital components ignore the optional parameter- no breaking change.
  */
 
 /**

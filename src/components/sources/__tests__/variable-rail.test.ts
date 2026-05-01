@@ -151,7 +151,7 @@ describe("VariableRail", () => {
 });
 
 // ===========================================================================
-// Task C4.4 — Variable Rail srcFact parity
+// Task C4.4- Variable Rail srcFact parity
 //
 // Variable Rail is an interactive slider, NOT an ngspice independent source.
 // Per variable-rail.ts load() documentation, ctx.srcFact is deliberately
@@ -226,7 +226,7 @@ describe("variable_rail_load_srcfact_parity", () => {
     const rhs = new Float64Array(8);
     rail.load(makeCtx(solver, 0.5, rhs));
 
-    // Variable rail by contract ignores srcFact — RHS stamp is the raw voltage.
+    // Variable rail by contract ignores srcFact- RHS stamp is the raw voltage.
     const NGSPICE_REF = VOLTAGE; // no srcFact multiplier in variable-rail.ts load()
     expect(rhs[2]).toBe(NGSPICE_REF);
   });

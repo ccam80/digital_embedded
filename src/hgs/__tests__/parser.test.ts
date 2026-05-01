@@ -1,5 +1,5 @@
 /**
- * Parser tests — task 4.3.2.
+ * Parser tests- task 4.3.2.
  *
  * Verifies the AST structure produced by the parser. Tests check node kinds
  * and key structural properties without exhaustively comparing every field.
@@ -126,7 +126,7 @@ describe("Parser", () => {
       expect(bin.op).toBe("+");
     });
 
-    it("operator precedence — multiply before add", () => {
+    it("operator precedence- multiply before add", () => {
       const stmt = first("x := 1 + 2 * 3;") as DeclareStmt;
       const bin = stmt.init as BinaryExpr;
       expect(bin.op).toBe("+");
@@ -190,7 +190,7 @@ describe("Parser", () => {
       expect(field.name).toBe("b");
     });
 
-    it("chained postfix — a.b[0]()", () => {
+    it("chained postfix- a.b[0]()", () => {
       const stmt = first("x := a.b[0]();") as DeclareStmt;
       const call = stmt.init as CallExpr;
       expect(call.kind).toBe("call");

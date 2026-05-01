@@ -42,7 +42,7 @@
   </div>
 
   <script>
-    // This page lives at /<base>/app/tutorial/view.html — resolve manifest paths
+    // This page lives at /<base>/app/tutorial/view.html- resolve manifest paths
     // (callers pass root-relative paths like "tutorials/foo/manifest.json")
     // against the deploy root so they work regardless of page depth and so that
     // the absolute basePath we forward to the simulator iframe resolves cleanly.
@@ -98,12 +98,12 @@
         case 'sim-tutorial-step-changed':
           // Update page title with step info
           if (manifest) {
-            document.title = `${data.title} — ${manifest.title}`;
+            document.title = `${data.title}- ${manifest.title}`;
           }
           break;
 
         case 'sim-tutorial-check-result':
-          // Could show a toast or update the top bar — for now just log
+          // Could show a toast or update the top bar- for now just log
           break;
       }
     });

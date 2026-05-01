@@ -1,7 +1,7 @@
 /**
  * Tests for init-sequence integration with DigitalEngine.
  *
- * Task 3.2 — Noise Mode / Init Sequence Integration
+ * Task 3.2- Noise Mode / Init Sequence Integration
  */
 
 import { describe, it, expect, vi } from "vitest";
@@ -9,7 +9,7 @@ import { DigitalEngine, type ConcreteCompiledCircuit, type EvaluationGroup } fro
 import type { ExecuteFunction, ComponentLayout } from "@/core/registry";
 
 // ---------------------------------------------------------------------------
-// Helpers — build minimal ConcreteCompiledCircuit instances for tests
+// Helpers- build minimal ConcreteCompiledCircuit instances for tests
 // ---------------------------------------------------------------------------
 
 class StaticLayout implements ComponentLayout {
@@ -322,7 +322,7 @@ describe("InitSequence", () => {
         engine.step();
       }
       // The feedback group should use sccSnapshotBuffer.subarray() which
-      // does NOT call the Uint32Array constructor — so allocCount should be 0.
+      // does NOT call the Uint32Array constructor- so allocCount should be 0.
       expect(allocCount).toBe(0);
     } finally {
       spy.mockRestore();

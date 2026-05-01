@@ -1,5 +1,5 @@
 /**
- * Circuit Comparison — compare two circuits by running the same test vectors
+ * Circuit Comparison- compare two circuits by running the same test vectors
  * against both and diffing the outputs.
  *
  * Two modes:
@@ -19,7 +19,7 @@ import type { SimulationCoordinator } from '../solver/coordinator-types.js';
 import type { ParsedTestData } from './parser.js';
 
 // ---------------------------------------------------------------------------
-// ComparatorFacade — minimal interface required by compareCircuits
+// ComparatorFacade- minimal interface required by compareCircuits
 // ---------------------------------------------------------------------------
 
 /**
@@ -71,7 +71,7 @@ export interface ComparisonResult {
 }
 
 // ---------------------------------------------------------------------------
-// Signal inventory — names and bit widths derived from circuit elements
+// Signal inventory- names and bit widths derived from circuit elements
 // ---------------------------------------------------------------------------
 
 interface SignalInventory {
@@ -115,7 +115,7 @@ function deriveSignalInventory(circuit: Circuit): SignalInventory {
 }
 
 // ---------------------------------------------------------------------------
-// compareCircuits — main entry point
+// compareCircuits- main entry point
 // ---------------------------------------------------------------------------
 
 /**

@@ -1,6 +1,6 @@
-# Task #25 Report — D-6: bjt.ts UIC branch use === MODETRANOP form
+# Task #25 Report- D-6: bjt.ts UIC branch use === MODETRANOP form
 
-## Status: COMPLETE (already correct — no edit needed)
+## Status: COMPLETE (already correct- no edit needed)
 
 ## Findings
 

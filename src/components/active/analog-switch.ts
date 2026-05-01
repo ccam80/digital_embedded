@@ -276,11 +276,11 @@ function createSwitchSPSTElement(
     _pinNodes: new Map(pinNodes),
 
     setup(ctx: SetupContext): void {
-      // swsetup.c:47-48 — allocate 2 state slots (SW_NUM_STATES = 2)
+      // swsetup.c:47-48- allocate 2 state slots (SW_NUM_STATES = 2)
       this._stateBase = ctx.allocStates(2);
       base = this._stateBase;
 
-      // swsetup.c:59-62 — TSTALLOC sequence line-for-line
+      // swsetup.c:59-62- TSTALLOC sequence line-for-line
       _hPP = ctx.solver.allocElement(nIn,  nIn);   // SWposPosptr
       _hPN = ctx.solver.allocElement(nIn,  nOut);  // SWposNegptr
       _hNP = ctx.solver.allocElement(nOut, nIn);   // SWnegPosptr

@@ -1,5 +1,5 @@
 /**
- * ModelSwitchCommand — undo/redo record for a model selection change.
+ * ModelSwitchCommand- undo/redo record for a model selection change.
  *
  * Captures the old and new model keys plus the full model param snapshots
  * so that undo restores both the selection and all param values atomically.
@@ -9,7 +9,7 @@ import type { CircuitElement } from "@/core/element";
 import type { PropertyValue } from "@/core/properties";
 
 // ---------------------------------------------------------------------------
-// EditCommand interface (local — avoids circular imports)
+// EditCommand interface (local- avoids circular imports)
 // ---------------------------------------------------------------------------
 
 export interface EditCommand {

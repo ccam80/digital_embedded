@@ -11,7 +11,7 @@
  * e2e/circuits/rc-ac-20hz.dts.json.
  *
  * No timeout overrides. If the engine stalls, simTime stops advancing,
- * stepCount exhausts, and the assertions fail — that is the finding.
+ * stepCount exhausts, and the assertions fail- that is the finding.
  */
 import { test, expect } from '@playwright/test';
 import { SimulatorHarness } from '../fixtures/simulator-harness';
@@ -29,7 +29,7 @@ const RC_AC_B64 = Buffer.from(RC_AC_DTS, 'utf-8').toString('base64');
 
 // ---------------------------------------------------------------------------
 
-test.describe('RLC LTE path — postMessage (E2E) surface', () => {
+test.describe('RLC LTE path- postMessage (E2E) surface', () => {
   let harness: SimulatorHarness;
 
   test.beforeEach(async ({ page }) => {
@@ -51,7 +51,7 @@ test.describe('RLC LTE path — postMessage (E2E) surface', () => {
     // Playwright ↔ browser round-trips from O(steps) to O(batches).
     //
     // Period = 50ms at 20Hz. Typical adaptive step ≈ 1µs → ~50k steps/period.
-    // Batch size = 500 steps, ~100 batches per period — manageable.
+    // Batch size = 500 steps, ~100 batches per period- manageable.
     //
     // If the engine stalls (STOPPED state), simTime freezes and the outer
     // while loop will exhaust batchLimit without reaching 2*period.
@@ -111,7 +111,7 @@ test.describe('RLC LTE path — postMessage (E2E) surface', () => {
     expect(samples.length).toBeGreaterThan(0);
 
     // Count zero-crossings of Vc in the sampled series.
-    // With BATCH_SIZE=500 steps, consecutive samples span ~500µs each —
+    // With BATCH_SIZE=500 steps, consecutive samples span ~500µs each-
     // well within one half-cycle (25ms at 20Hz), so crossings are detectable.
     let crossings = 0;
     for (let i = 1; i < samples.length; i++) {

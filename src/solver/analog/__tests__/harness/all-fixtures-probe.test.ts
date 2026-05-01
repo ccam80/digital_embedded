@@ -57,7 +57,7 @@ describeIfDll("all-fixtures regression probe (post order/method sync)", () => {
       );
 
       expect(ourSteps.length, "must make progress").toBeGreaterThan(3);
-      // Did not hit the maxOurSteps cap of 500 — proxy for "no collapse stagnation".
+      // Did not hit the maxOurSteps cap of 500- proxy for "no collapse stagnation".
       expect(ourSteps.length).toBeLessThan(500);
     }, 120_000);
   }

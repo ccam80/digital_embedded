@@ -1,5 +1,5 @@
 /**
- * ScopeTrigger component — trigger source for the Scope waveform display.
+ * ScopeTrigger component- trigger source for the Scope waveform display.
  *
  * A separately placeable component that signals the Scope to start or stop
  * recording based on an edge or level condition on its input.
@@ -44,7 +44,7 @@ import {
 export type TriggerMode = "rising" | "falling" | "both";
 
 // ---------------------------------------------------------------------------
-// Pin layout — 1 input pin "T" at origin (Java ScopeShape: single pin at (0,0))
+// Pin layout- 1 input pin "T" at origin (Java ScopeShape: single pin at (0,0))
 // ---------------------------------------------------------------------------
 
 function buildScopeTriggerPinDeclarations(): PinDeclaration[] {
@@ -62,7 +62,7 @@ function buildScopeTriggerPinDeclarations(): PinDeclaration[] {
 }
 
 // ---------------------------------------------------------------------------
-// ScopeTriggerElement — CircuitElement implementation
+// ScopeTriggerElement- CircuitElement implementation
 // ---------------------------------------------------------------------------
 
 export class ScopeTriggerElement extends AbstractCircuitElement {
@@ -108,7 +108,7 @@ export class ScopeTriggerElement extends AbstractCircuitElement {
       { x: 4,   y: 0.5 },
     ], false);
 
-    // Step waveform polyline: open, OTHER(2,false) — thin line width
+    // Step waveform polyline: open, OTHER(2,false)- thin line width
     // (0.45,-0.3)→(1.3,-0.3)→(1.3,-1.3)→(2.3,-1.3)→(2.3,-0.3)→(2.65,-0.3)
     ctx.setLineWidth(0.5);
     ctx.drawPath({
@@ -152,7 +152,7 @@ export class ScopeTriggerElement extends AbstractCircuitElement {
 }
 
 // ---------------------------------------------------------------------------
-// executeScopeTrigger — edge detection, output=1 on trigger event
+// executeScopeTrigger- edge detection, output=1 on trigger event
 //
 // State layout (via layout.stateOffset if available; simplified here):
 //   state[outputOffset] = trigger output (0 or 1)
@@ -167,7 +167,7 @@ export function executeScopeTrigger(
   _highZs: Uint32Array,
   _layout: ComponentLayout,
 ): void {
-  // ScopeTrigger has no outputs — it is a display-only trigger marker.
+  // ScopeTrigger has no outputs- it is a display-only trigger marker.
   // The scope panel reads the T input directly; no output slots to write.
 }
 
@@ -215,7 +215,7 @@ export const ScopeTriggerDefinition: ComponentDefinition = {
   attributeMap: SCOPE_TRIGGER_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.IO,
   helpText:
-    "ScopeTrigger — trigger source for the Scope waveform display.\n" +
+    "ScopeTrigger- trigger source for the Scope waveform display.\n" +
     "Detects edges on its input and signals the Scope to start recording.\n" +
     "triggerMode: 'rising', 'falling', or 'both'.",
   models: {

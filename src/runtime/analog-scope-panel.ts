@@ -1,5 +1,5 @@
 /**
- * ScopePanel — unified oscilloscope panel for both analog and digital signals.
+ * ScopePanel- unified oscilloscope panel for both analog and digital signals.
  *
  * Captures voltage, current, and digital waveforms at every accepted timestep
  * from the simulation coordinator and renders them on a dedicated
@@ -841,7 +841,7 @@ export class ScopePanel implements MeasurementObserver {
 }
 
 // ---------------------------------------------------------------------------
-// resampleUniform — linear interpolation of non-uniform samples
+// resampleUniform- linear interpolation of non-uniform samples
 // ---------------------------------------------------------------------------
 
 /**
@@ -890,7 +890,7 @@ function resampleUniform(
 }
 
 // ---------------------------------------------------------------------------
-// formatTime — compact SI time label
+// formatTime- compact SI time label
 // ---------------------------------------------------------------------------
 
 function formatTime(t: number): string {

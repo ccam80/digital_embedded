@@ -1,5 +1,5 @@
 /**
- * Parity tests — headless simulation operations via postMessage.
+ * Parity tests- headless simulation operations via postMessage.
  *
  * These test the wired-up operations that the PostMessageAdapter
  * supports: sim-set-signal, sim-step, sim-read-signal,
@@ -23,7 +23,7 @@ test.describe('Parity: headless simulation via postMessage', () => {
     await harness.load();
   });
 
-  test('set-signal + step + read-signal — AND gate truth table', async () => {
+  test('set-signal + step + read-signal- AND gate truth table', async () => {
     const xml = readFileSync(resolve(circuitsDir, 'and-gate.dig'), 'utf-8');
     await harness.loadDigXml(xml);
 
@@ -68,7 +68,7 @@ test.describe('Parity: headless simulation via postMessage', () => {
     expect(msg.signals['Y']).toBe(1);
   });
 
-  test('half adder — step-by-step signal verification', async () => {
+  test('half adder- step-by-step signal verification', async () => {
     const xml = readFileSync(resolve(circuitsDir, 'half-adder.dig'), 'utf-8');
 
     const cases: [number, number, number, number][] = [

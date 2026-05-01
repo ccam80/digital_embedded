@@ -3,7 +3,7 @@
  *
  * Converts draw calls (from both Java Digital fixtures and TS MockRenderContext)
  * into line segments, rasterizes them to binary bitmaps, and compares.
- * Zero external dependencies — all rasterization is done in pure TypeScript.
+ * Zero external dependencies- all rasterization is done in pure TypeScript.
  *
  * Design: both Java and TS draw calls are first converted to a uniform list of
  * LineSegments (outline edges). This normalizes across primitive types (polygon,
@@ -79,7 +79,7 @@ export interface ExtentResult {
   maxDelta: number;
 }
 
-/** Raw Java fixture draw call (untyped on purpose — mirrors the JSON). */
+/** Raw Java fixture draw call (untyped on purpose- mirrors the JSON). */
 export interface JavaDrawCall {
   kind: string;
   path?: string;
@@ -214,7 +214,7 @@ function flattenCubicBezier(
 
 // ---------------------------------------------------------------------------
 // SVG path parser (for Java fixture `path` strings)
-// Handles M, L, C, Q, Z — pixel coordinates, scaled by `s` (typically 1/20)
+// Handles M, L, C, Q, Z- pixel coordinates, scaled by `s` (typically 1/20)
 // ---------------------------------------------------------------------------
 
 function parseSvgPathToPoints(
@@ -285,7 +285,7 @@ function parseSvgPathToPoints(
         // Closing edge handled by caller (closed flag)
         break;
       default:
-        // Unknown command — skip
+        // Unknown command- skip
         break;
     }
   }
@@ -611,7 +611,7 @@ export function renderSegments(segs: LineSegment[], vp: Viewport): Bitmap {
 }
 
 // ---------------------------------------------------------------------------
-// Bitmap comparison — soft Dice with 1-pixel neighborhood tolerance
+// Bitmap comparison- soft Dice with 1-pixel neighborhood tolerance
 // ---------------------------------------------------------------------------
 
 function hasNeighbor(bmp: Bitmap, x: number, y: number): boolean {
@@ -922,7 +922,7 @@ export function checkPinProximity(
   segments: readonly LineSegment[],
   threshold = 0.6,
 ): PinProximityResult {
-  // Text-only components produce no segments — nothing to be "detached from".
+  // Text-only components produce no segments- nothing to be "detached from".
   // Skip proximity check when the drawn shape has no geometric content.
   if (segments.length === 0) return { detached: [] };
 

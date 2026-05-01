@@ -1,5 +1,5 @@
 /**
- * Tests for resolve-generics.ts — HGS generic circuit resolution.
+ * Tests for resolve-generics.ts- HGS generic circuit resolution.
  */
 
 import { describe, it, expect } from "vitest";
@@ -166,7 +166,7 @@ describe("Generic", () => {
     );
 
     // Build a circuit:
-    //   GenericInitCode: (empty — we'll use external args)
+    //   GenericInitCode: (empty- we'll use external args)
     //   GenericCode: addComponent("In", 0, 0);
     const circuit = new Circuit({ isGeneric: true });
 
@@ -232,13 +232,13 @@ describe("Generic", () => {
     const args = new Map<string, HGSValue>();
     const argsKey = GenericResolutionCache.keyFor(args);
 
-    // First call — not cached
+    // First call- not cached
     expect(cache.get(argsKey)).toBeUndefined();
 
     const resolved1 = await resolveGenericCircuit(circuit, args, registry);
     cache.set(argsKey, resolved1);
 
-    // Second call — returns cached result (same reference)
+    // Second call- returns cached result (same reference)
     const cached = cache.get(argsKey);
     expect(cached).toBe(resolved1);
 
@@ -294,7 +294,7 @@ describe("Generic", () => {
     registry.register(makeTestDef("Out"));
 
     // Parse and load the circuit (dig-loader will throw on GenericInitCode/GenericCode
-    // because they're registered as TestElement — that's fine, we just need
+    // because they're registered as TestElement- that's fine, we just need
     // the circuit structure)
     const parsed = parseDigXml(xml);
     const circuit = loadDigCircuit(parsed, registry);
@@ -357,7 +357,7 @@ describe("GenericResolutionCache", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Helper — make a simple test component definition
+// Helper- make a simple test component definition
 // ---------------------------------------------------------------------------
 
 function makeTestDef(name: string): ComponentDefinition {

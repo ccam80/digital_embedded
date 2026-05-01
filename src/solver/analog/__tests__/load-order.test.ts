@@ -4,7 +4,7 @@
  * Each analog factory must declare an `ngspiceLoadOrder` ordinal that
  * matches its ngspice device-type slot in `dev.c`'s `DEVices[]` array. The
  * compiler's per-iteration cktLoad ordering parity (architectural item A1)
- * depends on every factory setting this field correctly — a missing or wrong
+ * depends on every factory setting this field correctly- a missing or wrong
  * value silently de-syncs internal sparse-matrix indexing from ngspice.
  *
  * This test asserts the field at the leaf-factory level so we catch

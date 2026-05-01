@@ -1,5 +1,5 @@
 /**
- * Tests for fft.ts — Cooley-Tukey FFT, Hann windowing, and spectrum utilities.
+ * Tests for fft.ts- Cooley-Tukey FFT, Hann windowing, and spectrum utilities.
  */
 
 import { describe, it, expect } from "vitest";
@@ -156,7 +156,7 @@ describe("FFT", () => {
     const N = 1024;
     const sampleRate = 44100;
     // Use a non-integer number of cycles so the frequency doesn't align to a bin
-    const freq = 1234; // Hz — not a bin center for N=1024, sr=44100
+    const freq = 1234; // Hz- not a bin center for N=1024, sr=44100
 
     const rawSamples = new Float64Array(N);
     for (let n = 0; n < N; n++) {

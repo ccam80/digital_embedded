@@ -412,7 +412,7 @@ describe("Stop", () => {
 describe("Reset", () => {
   describe("initRelease", () => {
     it("executeReset is a no-op: does not modify output slot", () => {
-      // Reset has no inputs — output managed by engine
+      // Reset has no inputs- output managed by engine
       const layout = makeLayout(0, 1);
       const state = makeState([]);
       const highZs = new Uint32Array(state.length);

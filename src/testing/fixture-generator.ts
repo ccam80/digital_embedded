@@ -1,5 +1,5 @@
 /**
- * Behavioral Fixture Generator — auto-generate a test template from a circuit's I/O.
+ * Behavioral Fixture Generator- auto-generate a test template from a circuit's I/O.
  *
  * Extracts input and output signal names from the circuit's In/Out components,
  * then creates a skeleton test data string:
@@ -119,7 +119,7 @@ function exhaustiveCombinations(n: number): number[][] {
  *
  * Produces PARTIAL_ROW_COUNT rows chosen to cover boundary conditions
  * and a mix of patterns. When N > PARTIAL_ROW_COUNT, not all combinations
- * are listed — just representative ones.
+ * are listed- just representative ones.
  */
 function partialCombinations(n: number): number[][] {
   const rows: number[][] = [];

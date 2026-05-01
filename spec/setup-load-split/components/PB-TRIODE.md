@@ -2,11 +2,11 @@
 
 **digiTS file:** `src/components/semiconductors/triode.ts`
 **ngspice setup anchor:** `ref/ngspice/src/spicelib/devices/vccs/vccsset.c:43-46`
-**ngspice load anchor:** `ref/ngspice/src/spicelib/devices/vccs/vccsload.c` (structure only — Koren transconductance overrides value)
+**ngspice load anchor:** `ref/ngspice/src/spicelib/devices/vccs/vccsload.c` (structure only- Koren transconductance overrides value)
 
 ## Pin mapping (from 01-pin-mapping.md)
 
-Triode is a **composite** — it does not stamp into the matrix directly.
+Triode is a **composite**- it does not stamp into the matrix directly.
 It decomposes into 1× VCCS sub-element with Koren-style transconductance.
 
 | digiTS parent label | Parent pin | Sub-element assignment | ngspice VCCS variable |
@@ -32,7 +32,7 @@ The cathode is simultaneously the output minus and the control minus.
 | `posNode` | `pinNodes.get("P")!` |
 | `negNode` | `pinNodes.get("K")!` |
 | `ngspiceNodeMap` | `{ "out+": "pos", "out-": "neg", "ctrl+": "contPos", "ctrl-": "contNeg" }` |
-| Static `G` param | Not used — plate current computed dynamically in load() via Koren formula |
+| Static `G` param | Not used- plate current computed dynamically in load() via Koren formula |
 
 ### setParam routing rule
 
@@ -64,7 +64,7 @@ None. VCCS has no branch row.
 
 ## State slots
 
-VCCS: `NG_IGNORE(states)` — zero states allocated.
+VCCS: `NG_IGNORE(states)`- zero states allocated.
 
 ```ts
 // No ctx.allocStates call.
@@ -92,21 +92,21 @@ With the Triode's node assignments (`posNode=P`, `negNode=K`, `contPosNode=G`,
 | 3 | `allocElement(K, G)` | `this._hNegCPos` |
 | 4 | `allocElement(K, K)` | `this._hNegCNeg` |
 
-Note: entries (2) and (4) share `K` as both row and column — `allocElement(P,K)`
+Note: entries (2) and (4) share `K` as both row and column- `allocElement(P,K)`
 and `allocElement(K,K)` are distinct positions. No collapse beyond what
 `allocElement` handles idempotently for the (K,K) diagonal.
 
-## setup() body — alloc only
+## setup() body- alloc only
 
 ```ts
 // Triode composite setup()
 setup(ctx: SetupContext): void {
-  this._vccs.setup(ctx);   // forwards to VccsAnalogElement.setup() — 4 entries
+  this._vccs.setup(ctx);   // forwards to VccsAnalogElement.setup()- 4 entries
   const solver = ctx.solver;
   const nP = this._vccs._posNode;  // plate node
   const nK = this._vccs._negNode;  // cathode node
 
-  // gds stamps — 2 additional entries (6 total for Triode).
+  // gds stamps- 2 additional entries (6 total for Triode).
   // Triode setup() unconditionally allocates 6 entries (4 VCCS + 2 gds, gds always nonzero per Koren formula).
   this._hPP_gds = solver.allocElement(nP, nP);  // (plate, plate)
   this._hKP_gds = solver.allocElement(nK, nP);  // (cathode, plate)
@@ -122,7 +122,7 @@ private _hKP_gds: number = -1;
 The VccsAnalogElement.setup() for this instance (P=plate, G=grid, K=cathode):
 
 ```ts
-// VccsAnalogElement.setup() — Triode binding
+// VccsAnalogElement.setup()- Triode binding
 setup(ctx: SetupContext): void {
   const solver      = ctx.solver;
   const posNode     = this._posNode;      // P (plate)
@@ -130,7 +130,7 @@ setup(ctx: SetupContext): void {
   const contPosNode = this._contPosNode;  // G (grid)
   const contNegNode = this._contNegNode;  // K (cathode)
 
-  // TSTALLOC sequence — vccsset.c:43-46
+  // TSTALLOC sequence- vccsset.c:43-46
   this._hPosCPos = solver.allocElement(posNode, contPosNode); // (1) P, G
   this._hPosCNeg = solver.allocElement(posNode, contNegNode); // (2) P, K
   this._hNegCPos = solver.allocElement(negNode, contPosNode); // (3) K, G
@@ -138,7 +138,7 @@ setup(ctx: SetupContext): void {
 }
 ```
 
-## load() body — value writes only
+## load() body- value writes only
 
 The parent Triode composite `load()` computes the Koren plate-current
 equation at the current operating point V(G,K) and V(P,K), then stamps
@@ -187,17 +187,17 @@ Not applicable.
 - Drop `internalNodeIds`, `branchIdx` from factory.
 - Drop `branchCount`, `getInternalNodeCount` from MnaModel.
 - `mayCreateInternalNodes` omitted (false).
-- Composite does not carry `ngspiceNodeMap` — the VCCS sub-element carries its own.
+- Composite does not carry `ngspiceNodeMap`- the VCCS sub-element carries its own.
 
 ## Verification gate
 
 Per CLAUDE.md "Test Policy During W3 Setup-Load-Split", verification is spec compliance only. DO NOT run tests; DO NOT use test results.
 
-1. `setup()` body in the implementation file matches the "setup() body — alloc only" listing in this PB line-for-line.
+1. `setup()` body in the implementation file matches the "setup() body- alloc only" listing in this PB line-for-line.
 2. TSTALLOC sequence in `setup()` matches the order in the cited ngspice anchor file (see top of this PB, e.g. `ressetup.c:46-49`).
 3. Factory cleanup applied per the "Factory cleanup" section above.
 4. `ngspiceNodeMap` registered per the "Pin mapping" section above (or omitted for composites where the spec says so).
-5. `load()` writes through cached handles only — zero `solver.allocElement(...)` calls inside `load()`, `accept()`, or any non-`setup()` method.
+5. `load()` writes through cached handles only- zero `solver.allocElement(...)` calls inside `load()`, `accept()`, or any non-`setup()` method.
 6. `mayCreateInternalNodes` flag set per spec.
 7. `findBranchFor` callback present where spec says (V-output sources, IND, etc.).
 8. No banned closing verdicts (mapping/tolerance/equivalent-to/pre-existing/intentional-divergence/citation-divergence/partial) used in any commit message or report.

@@ -1,5 +1,5 @@
 /**
- * Tests for ScopeTrigger — scope trigger mechanism for timing diagram.
+ * Tests for ScopeTrigger- scope trigger mechanism for timing diagram.
  */
 
 import { describe, it, expect } from "vitest";
@@ -15,7 +15,7 @@ function makeReader(values: Record<number, number>): (netId: number) => number {
 }
 
 // ---------------------------------------------------------------------------
-// edgeTrigger — 0→1 transition fires trigger
+// edgeTrigger- 0→1 transition fires trigger
 // ---------------------------------------------------------------------------
 
 describe("ScopeTrigger", () => {
@@ -47,7 +47,7 @@ describe("ScopeTrigger", () => {
       });
 
       // Signal starts at 0, then stays at 1
-      trigger.onStep(1, makeReader({ 0: 1 })); // rising edge — fires
+      trigger.onStep(1, makeReader({ 0: 1 })); // rising edge- fires
       trigger.status; // side-effect read
 
       // If recording window is 0 it transitions to triggered immediately
@@ -63,7 +63,7 @@ describe("ScopeTrigger", () => {
       // Instead: fire once, note status, then check second step
       const t2 = new ScopeTrigger({ triggerNetId: 0, mode: "edge" });
       t2.onStep(1, makeReader({ 0: 1 })); // edge fires: 0→1
-      t2.onStep(2, makeReader({ 0: 1 })); // 1→1: no new edge — stays in same state
+      t2.onStep(2, makeReader({ 0: 1 })); // 1→1: no new edge- stays in same state
       // Status should be triggered (from step 1), not cycling again
       expect(t2.status).toBe("triggered");
     });
@@ -115,7 +115,7 @@ describe("ScopeTrigger", () => {
   });
 
   // -------------------------------------------------------------------------
-  // levelTrigger — signal held at 1 fires on every step while high
+  // levelTrigger- signal held at 1 fires on every step while high
   // -------------------------------------------------------------------------
 
   describe("levelTrigger", () => {
@@ -163,7 +163,7 @@ describe("ScopeTrigger", () => {
   });
 
   // -------------------------------------------------------------------------
-  // preTriggerBuffer — capture N samples before trigger fires
+  // preTriggerBuffer- capture N samples before trigger fires
   // -------------------------------------------------------------------------
 
   describe("preTriggerBuffer", () => {
@@ -239,13 +239,13 @@ describe("ScopeTrigger", () => {
   });
 
   // -------------------------------------------------------------------------
-  // noTrigger — no ScopeTrigger → diagram records continuously
+  // noTrigger- no ScopeTrigger → diagram records continuously
   // -------------------------------------------------------------------------
 
   describe("noTrigger", () => {
     it("without ScopeTrigger, timing diagram records continuously (no filtering)", () => {
       // This test verifies that TimingDiagramPanel without a ScopeTrigger
-      // records on every step — i.e. the trigger class itself is not needed
+      // records on every step- i.e. the trigger class itself is not needed
       // for continuous recording. We verify this by confirming ScopeTrigger
       // only returns true when the condition is met and consumers are not
       // required to instantiate it.

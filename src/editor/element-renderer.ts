@@ -1,5 +1,5 @@
 /**
- * ElementRenderer — iterates circuit elements and dispatches draw calls.
+ * ElementRenderer- iterates circuit elements and dispatches draw calls.
  *
  * Applies position, rotation, and mirror transforms per element, then
  * delegates to element.draw(ctx). Also draws pin indicators, negation
@@ -56,7 +56,7 @@ function isVisible(element: CircuitElement, viewport: Rect): boolean {
 export class ElementRenderer {
   private _pinVoltageFactory: PinVoltageAccessFactory | null = null;
 
-  // Reusable scratch structures for _findOverlaps — avoids per-frame allocation.
+  // Reusable scratch structures for _findOverlaps- avoids per-frame allocation.
   private readonly _overlapByPos = new Map<string, CircuitElement[]>();
   private _overlapCache: Set<CircuitElement> | null = null;
   private _overlapCacheVersion = -1;
@@ -79,7 +79,7 @@ export class ElementRenderer {
 
   /**
    * Set per-pin loading indicators. Each key is `instanceId:pinLabel`.
-   * 'ideal' renders ∞ (no loading), 'loaded' renders Z — both in COMPONENT colour.
+   * 'ideal' renders ∞ (no loading), 'loaded' renders Z- both in COMPONENT colour.
    */
   setPinLoadingIndicators(indicators: ReadonlyMap<string, 'loaded' | 'ideal'>): void {
     this._pinLoadingMap = indicators;
@@ -92,7 +92,7 @@ export class ElementRenderer {
    *   - save context state
    *   - translate to element world position
    *   - apply rotation (in radians) and mirror scale transforms
-   *   - call element.draw(ctx, signals?) — analog elements receive PinVoltageAccess
+   *   - call element.draw(ctx, signals?)- analog elements receive PinVoltageAccess
    *   - draw pin indicators
    *   - draw selection highlight if element is in the selection set
    *   - restore context state
@@ -218,7 +218,7 @@ export class ElementRenderer {
 
     // Determine outboard direction: snap to the dominant axis from
     // bounding-box center → pin, so the offset is a clean horizontal shift.
-    // getBoundingBox() returns world coords — convert center to local space.
+    // getBoundingBox() returns world coords- convert center to local space.
     const bb = element.getBoundingBox();
     const cx = bb.x + bb.width / 2 - element.position.x;
     const cy = bb.y + bb.height / 2 - element.position.y;
@@ -282,7 +282,7 @@ export class ElementRenderer {
       return this._overlapCache;
     }
 
-    // Reuse the Map — clear arrays in-place to avoid GC pressure.
+    // Reuse the Map- clear arrays in-place to avoid GC pressure.
     const byPos = this._overlapByPos;
     for (const arr of byPos.values()) arr.length = 0;
     byPos.clear();
@@ -298,7 +298,7 @@ export class ElementRenderer {
     for (const group of byPos.values()) {
       if (group.length < 2) continue;
       // Don't flag groups where all but one element is a single-pin connector
-      // (Tunnel, Ground, VDD, etc.) — they're designed to sit pin-on-pin.
+      // (Tunnel, Ground, VDD, etc.)- they're designed to sit pin-on-pin.
       const multiPin = group.filter(el => el.getPins().length > 1);
       if (multiPin.length <= 1) continue;
       for (const el of multiPin) result.add(el);

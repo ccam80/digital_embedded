@@ -35,7 +35,7 @@ import {
 export { STANDARD_GATE_ATTRIBUTE_MAPPINGS as XNOR_ATTRIBUTE_MAPPINGS } from "./gate-shared.js";
 
 // ---------------------------------------------------------------------------
-// XNOrElement — CircuitElement implementation
+// XNOrElement- CircuitElement implementation
 // ---------------------------------------------------------------------------
 
 export class XNOrElement extends AbstractCircuitElement {
@@ -119,7 +119,7 @@ export class XNOrElement extends AbstractCircuitElement {
 }
 
 // ---------------------------------------------------------------------------
-// executeXNOr — flat simulation function
+// executeXNOr- flat simulation function
 // ---------------------------------------------------------------------------
 
 export function executeXNOr(index: number, state: Uint32Array, _highZs: Uint32Array, layout: ComponentLayout): void {
@@ -138,7 +138,7 @@ export function executeXNOr(index: number, state: Uint32Array, _highZs: Uint32Ar
 }
 
 // ---------------------------------------------------------------------------
-// CMOS_XNOR2_NETLIST — 2-input CMOS XNOR gate structural netlist
+// CMOS_XNOR2_NETLIST- 2-input CMOS XNOR gate structural netlist
 //
 // Topology: CMOS XOR2 driving a CMOS inverter.
 // Ports: In_1, In_2, out, VDD, GND
@@ -201,7 +201,7 @@ export const XNOrDefinition: ComponentDefinition = {
   attributeMap: STANDARD_GATE_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.LOGIC,
   helpText:
-    "XNOr gate — performs bitwise NOT(XOR) of all inputs.\n" +
+    "XNOr gate- performs bitwise NOT(XOR) of all inputs.\n" +
     "Configurable input count (2–5) and bit width (1–32).\n" +
     "Both IEEE/US (curved with bubble) and IEC/DIN (rectangular with =1 and bubble) shapes are supported.\n" +
     "Individual inputs can be inverted via the inverterConfig property.",

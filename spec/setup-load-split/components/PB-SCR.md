@@ -6,7 +6,7 @@
 
 ## Pin mapping (from 01-pin-mapping.md)
 
-SCR is a **composite** — it does not stamp into the matrix directly.
+SCR is a **composite**- it does not stamp into the matrix directly.
 It decomposes into 2× BJT (NPN Q1 + PNP Q2) in a two-transistor latch
 configuration.
 
@@ -16,7 +16,7 @@ configuration.
 | `K` | Cathode | Q1 collector; Q2 emitter (with R_K if present) |
 | `G` | Gate | Q1 base input |
 
-## Two-transistor latch — node assignment table
+## Two-transistor latch- node assignment table
 
 The two-BJT latch is the classic Ebers-Moll SCR model. Internal node
 `Vint` (the interlocking base node) couples Q1's collector to Q2's base
@@ -27,29 +27,29 @@ and Q2's collector to Q1's base.
 | Anode | `A` | `pinNodes.get("A")!` |
 | Kathode | `K` | `pinNodes.get("K")!` |
 | Gate | `G` | `pinNodes.get("G")!` |
-| Internal latch node | `Vint` | `ctx.makeVolt(parentLabel, "latch")` — created once by the composite |
+| Internal latch node | `Vint` | `ctx.makeVolt(parentLabel, "latch")`- created once by the composite |
 
-### Q1 — NPN transistor
+### Q1- NPN transistor
 
 | BJT terminal | digiTS pin | Node |
 |---|---|---|
-| `B` (base) | — | Gate `G` (external trigger input) |
-| `C` (collector) | — | Internal latch node `Vint` |
-| `E` (emitter) | — | Cathode `K` |
+| `B` (base) |- | Gate `G` (external trigger input) |
+| `C` (collector) |- | Internal latch node `Vint` |
+| `E` (emitter) |- | Cathode `K` |
 
 Q1 conducts when gate is triggered: base current from G turns on Q1,
 pulling Vint low.
 
-### Q2 — PNP transistor
+### Q2- PNP transistor
 
 | BJT terminal | digiTS pin | Node |
 |---|---|---|
-| `B` (base) | — | Internal latch node `Vint` |
-| `C` (collector) | — | Gate `G` (positive feedback to Q1 base) |
-| `E` (emitter) | — | Anode `A` |
+| `B` (base) |- | Internal latch node `Vint` |
+| `C` (collector) |- | Gate `G` (positive feedback to Q1 base) |
+| `E` (emitter) |- | Anode `A` |
 
 Q2 conducts when Vint falls: base–emitter junction of PNP fires,
-feeding current back into Q1's base via G — latching the device on.
+feeding current back into Q1's base via G- latching the device on.
 
 ### Sub-element construction parameters
 
@@ -149,7 +149,7 @@ For Q1:
 | `BJTemitPrimeNode` | `A` or internal (if RE≠0) |
 | `BJTsubstNode` | 0 (ground) |
 
-## setup() body — alloc only
+## setup() body- alloc only
 
 ```ts
 // SCR composite setup()
@@ -179,7 +179,7 @@ setup(ctx: SetupContext): void {
 }
 ```
 
-## load() body — value writes only
+## load() body- value writes only
 
 ```ts
 // SCR composite load()
@@ -201,17 +201,17 @@ Not applicable.
 - Drop `internalNodeIds`, `branchIdx` from factory.
 - Drop `branchCount`, `getInternalNodeCount` from MnaModel.
 - Add `mayCreateInternalNodes: true`.
-- Composite does not carry `ngspiceNodeMap` — sub-elements carry their own.
+- Composite does not carry `ngspiceNodeMap`- sub-elements carry their own.
 
 ## Verification gate
 
 Per CLAUDE.md "Test Policy During W3 Setup-Load-Split", verification is spec compliance only. DO NOT run tests; DO NOT use test results.
 
-1. `setup()` body in the implementation file matches the "setup() body — alloc only" listing in this PB line-for-line.
+1. `setup()` body in the implementation file matches the "setup() body- alloc only" listing in this PB line-for-line.
 2. TSTALLOC sequence in `setup()` matches the order in the cited ngspice anchor file (see top of this PB, e.g. `ressetup.c:46-49`).
 3. Factory cleanup applied per the "Factory cleanup" section above.
 4. `ngspiceNodeMap` registered per the "Pin mapping" section above (or omitted for composites where the spec says so).
-5. `load()` writes through cached handles only — zero `solver.allocElement(...)` calls inside `load()`, `accept()`, or any non-`setup()` method.
+5. `load()` writes through cached handles only- zero `solver.allocElement(...)` calls inside `load()`, `accept()`, or any non-`setup()` method.
 6. `mayCreateInternalNodes` flag set per spec.
 7. `findBranchFor` callback present where spec says (V-output sources, IND, etc.).
 8. No banned closing verdicts (mapping/tolerance/equivalent-to/pre-existing/intentional-divergence/citation-divergence/partial) used in any commit message or report.

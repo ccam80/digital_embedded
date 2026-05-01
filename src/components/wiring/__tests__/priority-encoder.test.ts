@@ -96,7 +96,7 @@ function makePrioEnc(overrides?: { selectorBits?: number }): PriorityEncoderElem
 }
 
 // ---------------------------------------------------------------------------
-// executePriorityEncoder — logic correctness
+// executePriorityEncoder- logic correctness
 // ---------------------------------------------------------------------------
 
 describe("PriorityEncoder", () => {

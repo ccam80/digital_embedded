@@ -35,7 +35,7 @@ import {
 export { STANDARD_GATE_ATTRIBUTE_MAPPINGS as XOR_ATTRIBUTE_MAPPINGS } from "./gate-shared.js";
 
 // ---------------------------------------------------------------------------
-// XOrElement — CircuitElement implementation
+// XOrElement- CircuitElement implementation
 // ---------------------------------------------------------------------------
 
 export class XOrElement extends AbstractCircuitElement {
@@ -113,7 +113,7 @@ export class XOrElement extends AbstractCircuitElement {
 }
 
 // ---------------------------------------------------------------------------
-// executeXOr — flat simulation function
+// executeXOr- flat simulation function
 // ---------------------------------------------------------------------------
 
 export function executeXOr(index: number, state: Uint32Array, _highZs: Uint32Array, layout: ComponentLayout): void {
@@ -130,7 +130,7 @@ export function executeXOr(index: number, state: Uint32Array, _highZs: Uint32Arr
 }
 
 // ---------------------------------------------------------------------------
-// CMOS_XOR2_NETLIST — 2-input CMOS XOR gate structural netlist
+// CMOS_XOR2_NETLIST- 2-input CMOS XOR gate structural netlist
 //
 // Topology: standard CMOS XOR using transmission gates.
 // Ports: In_1, In_2, out, VDD, GND
@@ -189,7 +189,7 @@ export const XOrDefinition: ComponentDefinition = {
   attributeMap: STANDARD_GATE_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.LOGIC,
   helpText:
-    "XOr gate — performs bitwise XOR of all inputs.\n" +
+    "XOr gate- performs bitwise XOR of all inputs.\n" +
     "Configurable input count (2–5) and bit width (1–32).\n" +
     "Both IEEE/US (curved with extra line) and IEC/DIN (rectangular with =1) shapes are supported.\n" +
     "Individual inputs can be inverted via the inverterConfig property.",

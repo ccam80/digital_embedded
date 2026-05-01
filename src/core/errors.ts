@@ -7,7 +7,7 @@
  */
 
 // ---------------------------------------------------------------------------
-// SimulationError — base class for all simulator errors
+// SimulationError- base class for all simulator errors
 // ---------------------------------------------------------------------------
 
 /**
@@ -40,12 +40,12 @@ export class SimulationError extends Error {
 }
 
 // ---------------------------------------------------------------------------
-// BurnException — shorted outputs / conflicting drivers on a net
+// BurnException- shorted outputs / conflicting drivers on a net
 // ---------------------------------------------------------------------------
 
 /**
  * Thrown when two or more output pins drive a net to conflicting values
- * simultaneously (a "burn" condition — analogous to a shorted circuit).
+ * simultaneously (a "burn" condition- analogous to a shorted circuit).
  *
  */
 export class BurnException extends SimulationError {
@@ -68,7 +68,7 @@ export class BurnException extends SimulationError {
 }
 
 // ---------------------------------------------------------------------------
-// BitsException — bit-width mismatch between connected pins
+// BitsException- bit-width mismatch between connected pins
 // ---------------------------------------------------------------------------
 
 /**
@@ -101,7 +101,7 @@ export class BitsException extends SimulationError {
 }
 
 // ---------------------------------------------------------------------------
-// OscillationError — circuit did not stabilize within iteration limit
+// OscillationError- circuit did not stabilize within iteration limit
 // ---------------------------------------------------------------------------
 
 /**

@@ -1,5 +1,5 @@
 /**
- * GUI tests — menu actions work end-to-end.
+ * GUI tests- menu actions work end-to-end.
  *
  * Verifies that menu items trigger their expected actions when clicked.
  * Uses data-menu attributes for reliable menu targeting.

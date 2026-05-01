@@ -289,10 +289,10 @@ function buildMixedRegistry(): ComponentRegistry {
 }
 
 // ---------------------------------------------------------------------------
-// Test 1: Simple AND gate (digital only) — net count matches old compiler
+// Test 1: Simple AND gate (digital only)- net count matches old compiler
 // ---------------------------------------------------------------------------
 
-describe('compileUnified — simple AND gate (digital only)', () => {
+describe('compileUnified- simple AND gate (digital only)', () => {
   it('net count matches reference compileUnified for standalone AND gate', () => {
     const twoIn = [inputPin(0, 0, 'a'), inputPin(0, 1, 'b'), outputPin(2, 0, 'out')];
     const registry = buildDigitalRegistry();
@@ -357,10 +357,10 @@ describe('compileUnified — simple AND gate (digital only)', () => {
 });
 
 // ---------------------------------------------------------------------------
-// Test 2: SR latch with feedback — SCC handling preserved
+// Test 2: SR latch with feedback- SCC handling preserved
 // ---------------------------------------------------------------------------
 
-describe('compileUnified — SR latch (digital feedback)', () => {
+describe('compileUnified- SR latch (digital feedback)', () => {
   it('detects feedback SCC in unified path matching reference compiler', () => {
     const twoIn = [inputPin(0, 0, 'a'), inputPin(0, 1, 'b'), outputPin(2, 0, 'out')];
     const registry = buildDigitalRegistry();
@@ -411,10 +411,10 @@ describe('compileUnified — SR latch (digital feedback)', () => {
 });
 
 // ---------------------------------------------------------------------------
-// Test 3: Simple resistor divider (analog only) — node count matches
+// Test 3: Simple resistor divider (analog only)- node count matches
 // ---------------------------------------------------------------------------
 
-describe('compileUnified — resistor divider (analog only)', () => {
+describe('compileUnified- resistor divider (analog only)', () => {
   it('node count matches reference compileUnified for resistor divider', () => {
     const registry = buildAnalogRegistry();
 
@@ -484,17 +484,17 @@ describe('compileUnified — resistor divider (analog only)', () => {
 });
 
 // ---------------------------------------------------------------------------
-// Test 4: RC circuit (analog) — branch allocation preserved
+// Test 4: RC circuit (analog)- branch allocation preserved
 // ---------------------------------------------------------------------------
 
-describe('compileUnified — RC circuit (analog)', () => {
+describe('compileUnified- RC circuit (analog)', () => {
   it('branch count matches reference for RC circuit', () => {
     const registry = buildAnalogRegistry();
 
     const circuit = new Circuit();
     // Vs: pos=node1(x=10), neg=ground(x=0)  → 1 branch
-    // R:  node1(x=10) — node2(x=20)          → 0 branches
-    // C:  node2(x=20) — ground(x=0)          → 1 branch
+    // R:  node1(x=10)- node2(x=20)          → 0 branches
+    // C:  node2(x=20)- ground(x=0)          → 1 branch
     circuit.addElement(makeAnalogElement('AnalogVs', 'vs1', [{ x: 10, y: 0 }, { x: 0, y: 0 }]));
     circuit.addElement(makeAnalogElement('AnalogR', 'r1', [{ x: 10, y: 0 }, { x: 20, y: 0 }]));
     circuit.addElement(makeAnalogElement('AnalogC', 'c1', [{ x: 20, y: 0 }, { x: 0, y: 0 }]));
@@ -511,10 +511,10 @@ describe('compileUnified — RC circuit (analog)', () => {
 });
 
 // ---------------------------------------------------------------------------
-// Test 5: Mixed digital+analog circuit — bridges, both partitions, cross-refs
+// Test 5: Mixed digital+analog circuit- bridges, both partitions, cross-refs
 // ---------------------------------------------------------------------------
 
-describe('compileUnified — mixed digital+analog', () => {
+describe('compileUnified- mixed digital+analog', () => {
   it('both digital and analog domains populated for mixed circuit', () => {
     const registry = buildMixedRegistry();
 
@@ -565,7 +565,7 @@ describe('compileUnified — mixed digital+analog', () => {
   it('bridges array is non-empty when circuit has cross-domain boundary', () => {
     const registry = buildMixedRegistry();
 
-    // Use DABridge as the boundary element — it has both digital and analog models
+    // Use DABridge as the boundary element- it has both digital and analog models
     // Digital side: AND output → DABridge digital input
     // Analog side: DABridge analog pin → Resistor → Ground
     const twoIn = [inputPin(0, 0, 'a'), inputPin(0, 1, 'b'), outputPin(2, 0, 'out')];
@@ -593,10 +593,10 @@ describe('compileUnified — mixed digital+analog', () => {
 });
 
 // ---------------------------------------------------------------------------
-// Test 6: Circuit with Tunnels — tunnel merging works
+// Test 6: Circuit with Tunnels- tunnel merging works
 // ---------------------------------------------------------------------------
 
-describe('compileUnified — tunnel merging', () => {
+describe('compileUnified- tunnel merging', () => {
   it('tunnels at same label are merged into the same net group', () => {
     const registry = buildDigitalRegistry();
 
@@ -639,7 +639,7 @@ describe('compileUnified — tunnel merging', () => {
     circuit.addElement(t1);
     circuit.addElement(t2);
 
-    // Should compile without errors — tunnels don't generate diagnostics
+    // Should compile without errors- tunnels don't generate diagnostics
     expect(() => compileUnified(circuit, registry)).not.toThrow();
 
     const unified = compileUnified(circuit, registry);
@@ -648,10 +648,10 @@ describe('compileUnified — tunnel merging', () => {
 });
 
 // ---------------------------------------------------------------------------
-// Test 7: Width mismatch — diagnostic emitted
+// Test 7: Width mismatch- diagnostic emitted
 // ---------------------------------------------------------------------------
 
-describe('compileUnified — width mismatch diagnostic', () => {
+describe('compileUnified- width mismatch diagnostic', () => {
   it('emits diagnostic when 1-bit output drives 8-bit input', () => {
     const oneBitOutPins: PinDeclaration[] = [
       { direction: PinDirection.OUTPUT, label: 'out', defaultBitWidth: 1, position: { x: 2, y: 0 }, isNegatable: false, isClockCapable: false, kind: "signal" },
@@ -689,7 +689,7 @@ describe('compileUnified — width mismatch diagnostic', () => {
     circuit.addElement(createTestElementFromDecls('Src', 'src-1', oneBitOutPins));
     circuit.addElement(createTestElementFromDecls('Dst', 'dst-1', eightBitInPins));
 
-    // compileUnified must not throw for width mismatch — emit diagnostic instead
+    // compileUnified must not throw for width mismatch- emit diagnostic instead
     expect(() => compileUnified(circuit, registry)).not.toThrow();
 
     const unified = compileUnified(circuit, registry);
@@ -699,10 +699,10 @@ describe('compileUnified — width mismatch diagnostic', () => {
 });
 
 // ---------------------------------------------------------------------------
-// Test 8: Empty circuit — graceful handling
+// Test 8: Empty circuit- graceful handling
 // ---------------------------------------------------------------------------
 
-describe('compileUnified — empty circuit', () => {
+describe('compileUnified- empty circuit', () => {
   it('returns null domains, empty maps, no diagnostics for empty circuit', () => {
     const registry = new ComponentRegistry();
     const circuit = new Circuit();
@@ -720,7 +720,7 @@ describe('compileUnified — empty circuit', () => {
   it('returns pure digital domain for registry with only digital components', () => {
     const registry = buildDigitalRegistry();
     const circuit = new Circuit();
-    // Empty circuit with digital registry — still empty
+    // Empty circuit with digital registry- still empty
     const unified = compileUnified(circuit, registry);
 
     expect(unified.digital).toBeNull();
@@ -729,10 +729,10 @@ describe('compileUnified — empty circuit', () => {
 });
 
 // ---------------------------------------------------------------------------
-// Test 9: labelSignalMap — labels map to correct signal addresses
+// Test 9: labelSignalMap- labels map to correct signal addresses
 // ---------------------------------------------------------------------------
 
-describe('compileUnified — labelSignalMap', () => {
+describe('compileUnified- labelSignalMap', () => {
   it('labels for In/Out components appear in labelSignalMap with digital addresses', () => {
     const inPins = [outputPin(0, 0, 'out')];
     const outPins = [inputPin(0, 0, 'in')];
@@ -826,7 +826,7 @@ describe('compileUnified — labelSignalMap', () => {
     const unified = compileUnified(circuit, registry);
     const labelSignalMap = unified.labelSignalMap;
 
-    // Single-pin In component labeled "A" — both "A:out" (pin-form) and "A" (bare) should exist
+    // Single-pin In component labeled "A"- both "A:out" (pin-form) and "A" (bare) should exist
     const addrAPin = labelSignalMap.get('A:out');
     const addrABare = labelSignalMap.get('A');
     expect(addrAPin).toBeDefined();
@@ -838,7 +838,7 @@ describe('compileUnified — labelSignalMap', () => {
       expect(addrAPin!.netId).toBe(addrABare!.netId);
     }
 
-    // Single-pin Out component labeled "Y" — both "Y:in" (pin-form) and "Y" (bare) should exist
+    // Single-pin Out component labeled "Y"- both "Y:in" (pin-form) and "Y" (bare) should exist
     const addrYPin = labelSignalMap.get('Y:in');
     const addrYBare = labelSignalMap.get('Y');
     expect(addrYPin).toBeDefined();
@@ -853,10 +853,10 @@ describe('compileUnified — labelSignalMap', () => {
 });
 
 // ---------------------------------------------------------------------------
-// Test 6: Model resolution — H2-H8 / H12-H15 coverage
+// Test 6: Model resolution- H2-H8 / H12-H15 coverage
 // ---------------------------------------------------------------------------
 
-describe('compileUnified — model resolution', () => {
+describe('compileUnified- model resolution', () => {
   function buildDualModelRegistry(): ComponentRegistry {
     const r = new ComponentRegistry();
 

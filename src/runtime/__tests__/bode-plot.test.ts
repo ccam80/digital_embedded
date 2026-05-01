@@ -27,7 +27,7 @@ function makeMockCtx(): { ctx: CanvasRenderingContext2D; calls: DrawCall[] } {
     get(_target, prop: string) {
       if (prop === "calls") return calls;
 
-      // Property setters (strokeStyle, lineWidth, etc.) — track as set calls
+      // Property setters (strokeStyle, lineWidth, etc.)- track as set calls
       return new Proxy(() => {}, {
         apply(_fn, _thisArg, argList) {
           calls.push({ method: prop, args: argList });
@@ -117,7 +117,7 @@ const STD_VIEWPORT: BodeViewport = {
 // ---------------------------------------------------------------------------
 
 describe("Bode", () => {
-  it("renders_magnitude_trace — render() calls lineTo for each frequency point in the magnitude trace", () => {
+  it("renders_magnitude_trace- render() calls lineTo for each frequency point in the magnitude trace", () => {
     const renderer = new BodePlotRenderer();
     const result = makeRcAcResult(50);
     const { ctx, calls } = makeMockCtx();
@@ -134,14 +134,14 @@ describe("Bode", () => {
     expect(lineToCount).toBeGreaterThanOrEqual(49);
   });
 
-  it("frequency_axis_log_scale — grid lines drawn at decade intervals (1, 10, 100, 1k, 10k, 100k)", () => {
+  it("frequency_axis_log_scale- grid lines drawn at decade intervals (1, 10, 100, 1k, 10k, 100k)", () => {
     const renderer = new BodePlotRenderer();
     const result = makeRcAcResult(10);
     const { ctx, calls } = makeMockCtx();
 
     renderer.render(ctx, result, STD_VIEWPORT);
 
-    // The renderer calls moveTo/lineTo for grid lines. Count moveTo calls —
+    // The renderer calls moveTo/lineTo for grid lines. Count moveTo calls-
     // each grid line (horizontal dB lines, vertical frequency lines) starts with moveTo.
     const moveToCount = calls.filter(c => c.method === "moveTo").length;
 
@@ -156,7 +156,7 @@ describe("Bode", () => {
     expect(fillTextCount).toBeGreaterThan(0);
   });
 
-  it("phase_axis_degrees — grid lines drawn at 0°, -90°, -180°, -270°", () => {
+  it("phase_axis_degrees- grid lines drawn at 0°, -90°, -180°, -270°", () => {
     const renderer = new BodePlotRenderer();
     // Use a viewport that covers -270° to 0°
     const vp: BodeViewport = {
@@ -187,7 +187,7 @@ describe("Bode", () => {
     expect(degStrings.some(s => s.includes("-270°"))).toBe(true);
   });
 
-  it("auto_detect_3db_point — -3dB marker placed at correct frequency for lowpass filter", () => {
+  it("auto_detect_3db_point- -3dB marker placed at correct frequency for lowpass filter", () => {
     const renderer = new BodePlotRenderer();
     const result = makeRcAcResult(200); // high resolution for accurate marker detection
     const fC = 159.15;

@@ -1,5 +1,5 @@
 /**
- * Keyboard component — keyboard input source.
+ * Keyboard component- keyboard input source.
  *
  * Reads key codes from a keyboard input dialog (floating panel). The circuit
  * can read the current key code from dout and detect when a key is available
@@ -8,7 +8,7 @@
  *
  * Pin layout:
  *   Inputs:
- *     - rd   (1-bit): read strobe — rising edge dequeues front key
+ *     - rd   (1-bit): read strobe- rising edge dequeues front key
  *   Outputs:
  *     - dout (8-bit): current key code (front of queue)
  *     - rdy  (1-bit): 1 when a key is waiting, 0 when queue is empty
@@ -54,7 +54,7 @@ const COMP_WIDTH = 3;
 const MAX_KEY_QUEUE = 64;
 
 // ---------------------------------------------------------------------------
-// Pin layout — Java GenericShape(2 inputs, 2 outputs, width=3, non-symmetric):
+// Pin layout- Java GenericShape(2 inputs, 2 outputs, width=3, non-symmetric):
 //   C  (input)  at (0, 0)
 //   en (input)  at (0, 1)
 //   D  (output) at (3, 0)
@@ -103,7 +103,7 @@ function buildKeyboardPinDeclarations(): PinDeclaration[] {
 }
 
 // ---------------------------------------------------------------------------
-// KeyboardElement — CircuitElement implementation
+// KeyboardElement- CircuitElement implementation
 // ---------------------------------------------------------------------------
 
 export class KeyboardElement extends AbstractCircuitElement {
@@ -184,13 +184,13 @@ export class KeyboardElement extends AbstractCircuitElement {
 }
 
 // ---------------------------------------------------------------------------
-// executeKeyboard — output current key code and ready flag
+// executeKeyboard- output current key code and ready flag
 //
 // State layout (Uint32Array slots relative to component):
 //   Input  slot 0: rd strobe
 //   Output slot 0: dout (current key code)
 //   Output slot 1: rdy  (1 if queue non-empty)
-//   Output slot 2: prev_rd (previous rd value for edge detection — scratch)
+//   Output slot 2: prev_rd (previous rd value for edge detection- scratch)
 //
 // The key queue lives on KeyboardElement. The engine's step loop calls
 // element.dequeueKey() after detecting a rising rd edge (outBase+2 changed)
@@ -280,7 +280,7 @@ export const KeyboardDefinition: ComponentDefinition = {
     },
   },
   helpText:
-    "Keyboard — keyboard input source.\n" +
+    "Keyboard- keyboard input source.\n" +
     "rd (1-bit): rising edge dequeues the front key from the queue.\n" +
     "dout (8-bit): current key code at the front of the queue.\n" +
     "rdy (1-bit): 1 when a key is waiting, 0 when queue is empty.\n" +

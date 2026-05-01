@@ -1,5 +1,5 @@
 /**
- * W6.T2 — MCP harness shape mode tests (§10.4).
+ * W6.T2- MCP harness shape mode tests (ss10.4).
  *
  * Tests for:
  *   1. harness_session_map returns a SessionMap object with step counts and attempts.
@@ -25,7 +25,7 @@ import type { Circuit } from "../../../src/core/circuit.js";
 import type { PhaseAwareCaptureHook } from "../../../src/solver/coordinator-types.js";
 
 // ---------------------------------------------------------------------------
-// ToolCapture — lightweight mock MCP server (mirrors harness-mcp-verification)
+// ToolCapture- lightweight mock MCP server (mirrors harness-mcp-verification)
 // ---------------------------------------------------------------------------
 
 type ToolHandler = (args: any) => Promise<{
@@ -57,7 +57,7 @@ class ToolCapture {
 }
 
 // ---------------------------------------------------------------------------
-// Circuit factory (RC — headless, no DLL)
+// Circuit factory (RC- headless, no DLL)
 // ---------------------------------------------------------------------------
 
 function buildRcCircuit(registry: ComponentRegistry): Circuit {
@@ -156,11 +156,11 @@ describe("circuit_convergence_log disable conflict", () => {
     const simFacade = new DefaultSimulatorFacade(registry);
     const circuit = buildRcCircuit(registry);
 
-    // Compile via facade. No DCOP runs at compile time — analyses
+    // Compile via facade. No DCOP runs at compile time- analyses
     // (dcOperatingPoint(), step()) drive their own DCOP on demand.
     const coordinator = simFacade.compile(circuit);
 
-    // Install capture hook — sets _captureHookInstalled on the coordinator
+    // Install capture hook- sets _captureHookInstalled on the coordinator
     const bundle: PhaseAwareCaptureHook = {
       iterationHook: () => {},
       phaseHook: { onAttemptBegin: () => {}, onAttemptEnd: () => {} },
@@ -177,7 +177,7 @@ describe("circuit_convergence_log disable conflict", () => {
     const simTools = new ToolCapture();
     registerSimulationTools(simTools as any, simFacade, registry, simSession);
 
-    // Call circuit_convergence_log { action: "disable" } — must return an error
+    // Call circuit_convergence_log { action: "disable" }- must return an error
     const raw = await simTools.callRaw("circuit_convergence_log", {
       handle: circuitHandle,
       action: "disable",

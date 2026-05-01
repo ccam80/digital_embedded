@@ -1,5 +1,5 @@
 /**
- * AnalogTooltip — hover tooltips showing instantaneous electrical values.
+ * AnalogTooltip- hover tooltips showing instantaneous electrical values.
  *
  * Wire/pin hover shows voltage. Component body hover shows current and power.
  * The tooltip appears after a 200ms delay and follows the mouse.
@@ -102,19 +102,19 @@ export class AnalogTooltip {
     const text = this._textForHit(hitTarget);
 
     if (text === "") {
-      // Nothing hoverable — cancel timer and hide.
+      // Nothing hoverable- cancel timer and hide.
       this._cancelTimer();
       this._hide();
       return;
     }
 
     if (text === this._text && this._visible) {
-      // Same target, already visible — just update position.
+      // Same target, already visible- just update position.
       this._updateDivPosition();
       return;
     }
 
-    // New target — restart 200ms delay.
+    // New target- restart 200ms delay.
     this._text = text;
     this._hide();
     this._cancelTimer();
@@ -135,7 +135,7 @@ export class AnalogTooltip {
   }
 
   /**
-   * Draw method — this tooltip is DOM-based, not canvas-based.
+   * Draw method- this tooltip is DOM-based, not canvas-based.
    * The `render` method exists to satisfy the interface but the tooltip is
    * managed via the DOM overlay. Canvas-based callers may call this no-op.
    */

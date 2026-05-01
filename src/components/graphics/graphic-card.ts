@@ -1,16 +1,16 @@
 /**
- * GraphicCard component — memory-mapped graphics framebuffer with double buffering.
+ * GraphicCard component- memory-mapped graphics framebuffer with double buffering.
  *
  * Inputs:
- *   - A: addrBits-wide — memory address
- *   - str: 1-bit — store strobe (write enable, sampled on rising clock)
- *   - C: 1-bit — clock (rising edge triggers write when str=1)
- *   - ld: 1-bit — load (read enable, output data at address)
- *   - B: 1-bit — bank select (selects which bank is displayed)
- *   - D: dataBits-wide — data input/output (bidirectional)
+ *   - A: addrBits-wide- memory address
+ *   - str: 1-bit- store strobe (write enable, sampled on rising clock)
+ *   - C: 1-bit- clock (rising edge triggers write when str=1)
+ *   - ld: 1-bit- load (read enable, output data at address)
+ *   - B: 1-bit- bank select (selects which bank is displayed)
+ *   - D: dataBits-wide- data input/output (bidirectional)
  *
  * Output:
- *   - D: dataBits-wide — data output (high-Z when ld=0)
+ *   - D: dataBits-wide- data output (high-Z when ld=0)
  *
  * The framebuffer has two banks of (graphicWidth * graphicHeight) pixels.
  * On rising clock with str=1, data is written to memory[addr].
@@ -74,7 +74,7 @@ function computeAddrBits(size: number): number {
 }
 
 // ---------------------------------------------------------------------------
-// Pin layout — Java GenericShape(5 inputs, 1 output, width=3, symmetric):
+// Pin layout- Java GenericShape(5 inputs, 1 output, width=3, symmetric):
 //   offs = floor(5/2) = 2
 //   A   (input)  at (0, 0)
 //   str (input)  at (0, 1)
@@ -152,7 +152,7 @@ function buildGraphicCardPinDeclarations(
 }
 
 // ---------------------------------------------------------------------------
-// GraphicCardElement — CircuitElement implementation
+// GraphicCardElement- CircuitElement implementation
 // ---------------------------------------------------------------------------
 
 export class GraphicCardElement extends AbstractCircuitElement {
@@ -324,7 +324,7 @@ export class GraphicCardElement extends AbstractCircuitElement {
 }
 
 // ---------------------------------------------------------------------------
-// executeGraphicCard — read inputs, pack into output slot for engine tracking
+// executeGraphicCard- read inputs, pack into output slot for engine tracking
 // ---------------------------------------------------------------------------
 
 export function executeGraphicCard(
@@ -354,7 +354,7 @@ export function executeGraphicCard(
 }
 
 // ---------------------------------------------------------------------------
-// GRAPHIC_CARD_ATTRIBUTE_MAPPINGS — .dig XML attribute → PropertyBag
+// GRAPHIC_CARD_ATTRIBUTE_MAPPINGS- .dig XML attribute → PropertyBag
 // ---------------------------------------------------------------------------
 
 export const GRAPHIC_CARD_ATTRIBUTE_MAPPINGS: AttributeMapping[] = [
@@ -422,7 +422,7 @@ const GRAPHIC_CARD_PROPERTY_DEFS: PropertyDefinition[] = [
 ];
 
 // ---------------------------------------------------------------------------
-// GraphicCardDefinition — ComponentDefinition for registry registration
+// GraphicCardDefinition- ComponentDefinition for registry registration
 // ---------------------------------------------------------------------------
 
 function graphicCardFactory(props: PropertyBag): GraphicCardElement {
@@ -449,7 +449,7 @@ export const GraphicCardDefinition: ComponentDefinition = {
     },
   },
   helpText:
-    "GraphicCard — memory-mapped graphics framebuffer with double buffering.\n" +
+    "GraphicCard- memory-mapped graphics framebuffer with double buffering.\n" +
     "Inputs: A (address), str (store strobe), C (clock), ld (load/read), B (bank select), D (data in).\n" +
     "Output: D (data out, high-Z when ld=0).\n" +
     "On rising clock edge with str=1: data is written to memory[A].\n" +

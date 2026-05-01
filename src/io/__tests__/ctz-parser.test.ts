@@ -148,7 +148,7 @@ describe("CTZ", () => {
       "Ground",
     );
     const url = `https://www.falstad.com/circuit/circuitjs.html#${RC_CIRCUIT_B64}`;
-    // parseCtzUrl must succeed and return a Circuit with elements — this
+    // parseCtzUrl must succeed and return a Circuit with elements- this
     // confirms that decompression produced valid CTZ text.
     const circuit = await parseCtzUrl(url, registry);
     expect(circuit.elements.length).toBeGreaterThan(0);

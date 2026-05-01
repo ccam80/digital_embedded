@@ -1,11 +1,11 @@
 /**
- * Expression modifiers — convert boolean expressions to constrained forms.
+ * Expression modifiers- convert boolean expressions to constrained forms.
  *
  * Supported transformations:
  *
- *   toNandOnly(expr)          — rewrite using only NAND (De Morgan's laws)
- *   toNorOnly(expr)           — rewrite using only NOR  (De Morgan's laws)
- *   limitFanIn(expr, max)     — decompose wide AND/OR gates into cascades of
+ *   toNandOnly(expr)         - rewrite using only NAND (De Morgan's laws)
+ *   toNorOnly(expr)          - rewrite using only NOR  (De Morgan's laws)
+ *   limitFanIn(expr, max)    - decompose wide AND/OR gates into cascades of
  *                               at most `max` inputs
  *
  * All functions are pure: they return new BoolExpr trees and never mutate
@@ -222,11 +222,11 @@ export function isNandOnly(expr: BoolExpr): boolean {
     case 'variable':
       return true;
     case 'not':
-      // Allowed: not wrapping an and (= NAND) — recurse into the and's operands
+      // Allowed: not wrapping an and (= NAND)- recurse into the and's operands
       if (expr.operand.kind === 'and') {
         return expr.operand.operands.every(isNandOnly);
       }
-      // Bare NOT wrapping something other than AND is not a NAND gate —
+      // Bare NOT wrapping something other than AND is not a NAND gate-
       // but we allow it only if the operand is a NAND (not(and)) node itself
       // (double-NOT cancellation). For simplicity, allow bare NOT in classification.
       return isNandOnly(expr.operand);

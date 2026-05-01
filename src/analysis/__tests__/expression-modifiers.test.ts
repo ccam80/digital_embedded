@@ -2,11 +2,11 @@
  * Tests for expression-modifiers.ts (Task 8.2.5).
  *
  * Covers:
- *   nandConversion       — A & B → NAND(NAND(A,B)) equivalent
- *   norConversion        — A | B → NOR(NOR(A,B)) equivalent
- *   fanInLimit           — 4-input AND with limit 2 → cascade of 2-input ANDs
- *   functionalEquivalence — original and modified expressions produce same truth table
- *   nandOnlyVerify       — converted expression contains only NAND and NOT nodes
+ *   nandConversion      - A & B → NAND(NAND(A,B)) equivalent
+ *   norConversion       - A | B → NOR(NOR(A,B)) equivalent
+ *   fanInLimit          - 4-input AND with limit 2 → cascade of 2-input ANDs
+ *   functionalEquivalence- original and modified expressions produce same truth table
+ *   nandOnlyVerify      - converted expression contains only NAND and NOT nodes
  */
 
 import { describe, expect, it } from 'vitest';
@@ -62,7 +62,7 @@ function areFunctionallyEquivalent(a: BoolExpr, b: BoolExpr): boolean {
 }
 
 // ---------------------------------------------------------------------------
-// nandConversion — A & B → NAND equivalent
+// nandConversion- A & B → NAND equivalent
 // ---------------------------------------------------------------------------
 
 describe('nandConversion', () => {
@@ -116,7 +116,7 @@ describe('nandConversion', () => {
 });
 
 // ---------------------------------------------------------------------------
-// norConversion — A | B → NOR equivalent
+// norConversion- A | B → NOR equivalent
 // ---------------------------------------------------------------------------
 
 describe('norConversion', () => {
@@ -169,7 +169,7 @@ describe('norConversion', () => {
 });
 
 // ---------------------------------------------------------------------------
-// fanInLimit — 4-input AND with limit 2 → cascade of 2-input ANDs
+// fanInLimit- 4-input AND with limit 2 → cascade of 2-input ANDs
 // ---------------------------------------------------------------------------
 
 describe('fanInLimit', () => {
@@ -273,7 +273,7 @@ describe('fanInLimit', () => {
 });
 
 // ---------------------------------------------------------------------------
-// functionalEquivalence — all conversions produce same truth table
+// functionalEquivalence- all conversions produce same truth table
 // ---------------------------------------------------------------------------
 
 describe('functionalEquivalence', () => {
@@ -302,7 +302,7 @@ describe('functionalEquivalence', () => {
 });
 
 // ---------------------------------------------------------------------------
-// nandOnlyVerify — converted expression contains only NAND and NOT nodes
+// nandOnlyVerify- converted expression contains only NAND and NOT nodes
 // ---------------------------------------------------------------------------
 
 describe('nandOnlyVerify', () => {

@@ -1,5 +1,5 @@
 /**
- * FileIOController — file open/save, folder management, and export.
+ * FileIOController- file open/save, folder management, and export.
  *
  * Extracted from app-init.ts (Step 7 of modularization plan).
  * Owns: file open/save/save-as, circuit name, format toggle, folder open/browse/close/
@@ -257,7 +257,7 @@ export function initFileIOController(ctx: AppContext, opts: FileIOControllerOpti
   });
 
   // -------------------------------------------------------------------------
-  // Open Folder — read all .dig files from a directory
+  // Open Folder- read all .dig files from a directory
   // -------------------------------------------------------------------------
 
   const folderInput = document.getElementById('folder-input') as HTMLInputElement | null;
@@ -363,7 +363,7 @@ export function initFileIOController(ctx: AppContext, opts: FileIOControllerOpti
         new EmbeddedResolver(siblingMap),
         httpResolver,
       ]);
-      // Format detection — same logic as direct file open
+      // Format detection- same logic as direct file open
       let loaded: Circuit;
       const firstChar = xml.replace(/^\s+/, '').charAt(0);
       if (firstChar === '{' || firstChar === '[') {
@@ -387,7 +387,7 @@ export function initFileIOController(ctx: AppContext, opts: FileIOControllerOpti
     const sortedKeys = [...files.keys()].sort();
 
     const { overlay, body: list } = createModal({
-      title: `Open circuit — ${folderName}`,
+      title: `Open circuit- ${folderName}`,
       className: 'circuit-picker',
       overlayClassName: 'circuit-picker-overlay',
     });
@@ -496,7 +496,7 @@ export function initFileIOController(ctx: AppContext, opts: FileIOControllerOpti
   });
 
   // -------------------------------------------------------------------------
-  // Export menu — D8 fix: shared downloadExport() helper
+  // Export menu- D8 fix: shared downloadExport() helper
   // -------------------------------------------------------------------------
 
   function downloadBlob(blob: Blob, filename: string): void {

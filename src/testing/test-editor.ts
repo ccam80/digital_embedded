@@ -1,5 +1,5 @@
 /**
- * TestEditorPanel — CodeMirror 6 editor panel for Digital test vector syntax.
+ * TestEditorPanel- CodeMirror 6 editor panel for Digital test vector syntax.
  *
  * Provides a code editor with syntax highlighting for Digital's test format:
  *   - Signal name headers (first line) → identifier color
@@ -116,7 +116,7 @@ export class TestEditorPanel {
    * The updater is responsible for creating a new TestcaseElement with
    * the updated testData (elements are immutable after construction).
    *
-   * If no updater is provided and a testcase is set, this is a no-op —
+   * If no updater is provided and a testcase is set, this is a no-op-
    * use setTestcaseUpdater to configure save behaviour.
    */
   save(onSave?: (content: string) => void): void {
@@ -171,7 +171,7 @@ export class TestEditorPanel {
 }
 
 // ---------------------------------------------------------------------------
-// TestcaseUpdater type — passed to save() to apply editor content
+// TestcaseUpdater type- passed to save() to apply editor content
 // ---------------------------------------------------------------------------
 
 /**

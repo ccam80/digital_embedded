@@ -1,10 +1,10 @@
 /**
- * Tests for exportPng() — circuit-level PNG export.
+ * Tests for exportPng()- circuit-level PNG export.
  *
  * Spec tests:
- *   producesBlob   — export returns a Blob with type image/png
- *   scale2x        — scale=2 → canvas dimensions are 2x the circuit bounds
- *   scale4x        — scale=4 → canvas dimensions are 4x
+ *   producesBlob  - export returns a Blob with type image/png
+ *   scale2x       - scale=2 → canvas dimensions are 2x the circuit bounds
+ *   scale4x       - scale=4 → canvas dimensions are 4x
  *
  * Runs in the node environment (no DOM). All canvas calls go to a stub
  * that records dimensions and returns a synthetic Blob.
@@ -116,7 +116,7 @@ function buildWireCircuit(): Circuit {
 // ---------------------------------------------------------------------------
 
 describe("exportPng", () => {
-  it("producesBlob — export returns a Blob with type image/png", async () => {
+  it("producesBlob- export returns a Blob with type image/png", async () => {
     const circuit = buildWireCircuit();
     const blob = await exportPng(circuit, {
       scale: 1,
@@ -128,7 +128,7 @@ describe("exportPng", () => {
     expect(blob.type).toBe("image/png");
   });
 
-  it("scale2x — scale=2 produces canvas dimensions 2x circuit bounds", async () => {
+  it("scale2x- scale=2 produces canvas dimensions 2x circuit bounds", async () => {
     const circuit = buildWireCircuit();
 
     // Capture scale=1 canvas size
@@ -162,7 +162,7 @@ describe("exportPng", () => {
     expect(canvas2!.height).toBe(canvas1!.height * 2);
   });
 
-  it("scale4x — scale=4 produces canvas dimensions 4x circuit bounds", async () => {
+  it("scale4x- scale=4 produces canvas dimensions 4x circuit bounds", async () => {
     const circuit = buildWireCircuit();
 
     let canvas1: StubCanvas | null = null;
@@ -231,7 +231,7 @@ describe("exportPng", () => {
 
     expect(capturedCtx).not.toBeNull();
     // With empty circuit and no background, no fillRect for the background
-    // The only fillRects would come from element rendering — empty circuit has none
+    // The only fillRects would come from element rendering- empty circuit has none
     const fillRects = capturedCtx!.calls.filter((c) => c.method === "fillRect");
     expect(fillRects.length).toBe(0);
   });

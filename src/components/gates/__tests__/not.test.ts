@@ -24,7 +24,7 @@ import type { RenderContext, Point, TextAnchor, FontSpec, PathData } from "../..
 import type { ThemeColor } from "../../../core/renderer-interface.js";
 
 // ---------------------------------------------------------------------------
-// Helpers — ComponentLayout mock (Not always has 1 input)
+// Helpers- ComponentLayout mock (Not always has 1 input)
 // ---------------------------------------------------------------------------
 
 function makeLayout(bitWidth = 32): ComponentLayout {
@@ -46,7 +46,7 @@ function makeState(input: number): Uint32Array {
 }
 
 // ---------------------------------------------------------------------------
-// Helpers — RenderContext mock
+// Helpers- RenderContext mock
 // ---------------------------------------------------------------------------
 
 interface DrawCall {
@@ -86,7 +86,7 @@ function makeStubCtx(): { ctx: RenderContext; calls: DrawCall[] } {
 }
 
 // ---------------------------------------------------------------------------
-// Helpers — NotElement factory
+// Helpers- NotElement factory
 // ---------------------------------------------------------------------------
 
 function makeNot(overrides?: {
@@ -104,7 +104,7 @@ function makeNot(overrides?: {
 }
 
 // ---------------------------------------------------------------------------
-// executeNot — logic correctness
+// executeNot- logic correctness
 // ---------------------------------------------------------------------------
 
 describe("NotGate", () => {
@@ -239,7 +239,7 @@ describe("NotGate", () => {
   });
 
   // ---------------------------------------------------------------------------
-  // Rendering — IEC/DIN
+  // Rendering- IEC/DIN
   // ---------------------------------------------------------------------------
 
   describe("drawNarrowIEEE", () => {
@@ -272,7 +272,7 @@ describe("NotGate", () => {
   });
 
   // ---------------------------------------------------------------------------
-  // Rendering — IEEE/US
+  // Rendering- IEEE/US
   // ---------------------------------------------------------------------------
 
   describe("drawIEEE", () => {

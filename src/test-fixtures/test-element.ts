@@ -18,7 +18,7 @@ import type { RenderContext, Rect } from "../core/renderer-interface.js";
 import { PropertyBag } from "../core/properties.js";
 
 // ---------------------------------------------------------------------------
-// TestElement — configurable AbstractCircuitElement for tests
+// TestElement- configurable AbstractCircuitElement for tests
 // ---------------------------------------------------------------------------
 
 /**

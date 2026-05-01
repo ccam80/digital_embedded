@@ -1,7 +1,7 @@
 /**
  * Tests for extractConnectivityGroups() and resolveModelAssignments().
  *
- * Uses minimal in-process circuit elements — no .dig parser, no full
+ * Uses minimal in-process circuit elements- no .dig parser, no full
  * component registry. Mirrors the pattern from compiler.test.ts.
  */
 
@@ -180,10 +180,10 @@ describe('resolveModelAssignments', () => {
 });
 
 // ---------------------------------------------------------------------------
-// extractConnectivityGroups — pure digital circuit
+// extractConnectivityGroups- pure digital circuit
 // ---------------------------------------------------------------------------
 
-describe('extractConnectivityGroups — pure digital', () => {
+describe('extractConnectivityGroups- pure digital', () => {
   it('returns one group per disconnected pin when there are no wires', () => {
     const registry = buildDigitalRegistry();
     const el = createTestElementFromDecls('And', 'a1', [
@@ -200,11 +200,11 @@ describe('extractConnectivityGroups — pure digital', () => {
 
   it('wires merge two pins into one group', () => {
     const registry = buildDigitalRegistry();
-    // Out-component output at (2,0); In-component input at (2,0) — same position via wire
+    // Out-component output at (2,0); In-component input at (2,0)- same position via wire
     const outEl = createTestElementFromDecls('Out', 'o1', [outputPin(2, 0, 'out')]);
     const inEl  = createTestElementFromDecls('In', 'i1', [inputPin(0, 0, 'in')], undefined, { x: 2, y: 0 });
     // outEl pin world pos: element(0,0) + pin(2,0) = (2,0)
-    // inEl  pin world pos: element(2,0) + pin(0,0) = (2,0) — same position
+    // inEl  pin world pos: element(2,0) + pin(0,0) = (2,0)- same position
 
     const elements: CircuitElement[] = [outEl, inEl];
     const [assignments] = resolveModelAssignments(elements, registry);
@@ -268,7 +268,7 @@ describe('extractConnectivityGroups — pure digital', () => {
     registry.register(makeBaseDef('WideOut', { digital: { executeFn: noopExecFn } }) as ComponentDefinition);
     registry.register(makeBaseDef('NarrowIn', { digital: { executeFn: noopExecFn } }) as ComponentDefinition);
 
-    // 4-bit output at (2,0), 1-bit input at (2,0) — same position
+    // 4-bit output at (2,0), 1-bit input at (2,0)- same position
     const wideEl   = createTestElementFromDecls('WideOut', 'w1', [outputPin(2, 0, 'out', 4)]);
     const narrowEl = createTestElementFromDecls('NarrowIn', 'n1', [inputPin(0, 0, 'in', 1)], undefined, { x: 2, y: 0 });
 
@@ -309,10 +309,10 @@ describe('extractConnectivityGroups — pure digital', () => {
 });
 
 // ---------------------------------------------------------------------------
-// extractConnectivityGroups — Tunnel merging
+// extractConnectivityGroups- Tunnel merging
 // ---------------------------------------------------------------------------
 
-describe('extractConnectivityGroups — Tunnel merging', () => {
+describe('extractConnectivityGroups- Tunnel merging', () => {
   it('tunnels with same label are merged even without a wire', () => {
     const registry = buildDigitalRegistry();
 
@@ -373,16 +373,16 @@ describe('extractConnectivityGroups — Tunnel merging', () => {
     const [assignments] = resolveModelAssignments(elements, registry);
     const [groups] = extractConnectivityGroups(elements, [], registry, assignments);
 
-    // Both tunnels have no label — they stay separate
+    // Both tunnels have no label- they stay separate
     expect(groups).toHaveLength(2);
   });
 });
 
 // ---------------------------------------------------------------------------
-// extractConnectivityGroups — Port label-merge
+// extractConnectivityGroups- Port label-merge
 // ---------------------------------------------------------------------------
 
-describe('extractConnectivityGroups — Port label-merge', () => {
+describe('extractConnectivityGroups- Port label-merge', () => {
   it('Ports with same label are merged into one group', () => {
     const registry = buildDigitalRegistry();
 
@@ -447,10 +447,10 @@ describe('extractConnectivityGroups — Port label-merge', () => {
 });
 
 // ---------------------------------------------------------------------------
-// extractConnectivityGroups — pure analog circuit
+// extractConnectivityGroups- pure analog circuit
 // ---------------------------------------------------------------------------
 
-describe('extractConnectivityGroups — pure analog', () => {
+describe('extractConnectivityGroups- pure analog', () => {
   it('all groups have domains containing only "analog"', () => {
     const registry = buildAnalogRegistry();
     const r1 = createTestElementFromDecls('Resistor', 'r1', [
@@ -468,7 +468,7 @@ describe('extractConnectivityGroups — pure analog', () => {
 
   it('no width-mismatch diagnostic for analog circuits regardless of bitWidth values', () => {
     const registry = buildAnalogRegistry();
-    // Two analog pins at the same position with different bitWidths —
+    // Two analog pins at the same position with different bitWidths-
     // width-mismatch only applies to digital pins
     const r1 = createTestElementFromDecls('Resistor', 'r1', [
       { ...outputPin(2, 0, 'p1', 4), direction: PinDirection.BIDIRECTIONAL },
@@ -485,14 +485,14 @@ describe('extractConnectivityGroups — pure analog', () => {
 });
 
 // ---------------------------------------------------------------------------
-// extractConnectivityGroups — mixed circuit
+// extractConnectivityGroups- mixed circuit
 // ---------------------------------------------------------------------------
 
-describe('extractConnectivityGroups — mixed circuit', () => {
+describe('extractConnectivityGroups- mixed circuit', () => {
   it('boundary groups have domains.size > 1', () => {
     const registry = buildMixedRegistry();
 
-    // Digital And gate output at (2,0); analog Resistor pin at (2,0) — boundary
+    // Digital And gate output at (2,0); analog Resistor pin at (2,0)- boundary
     const andEl = createTestElementFromDecls('And', 'a1', [
       inputPin(0, 0, 'A'), inputPin(0, 1, 'B'), outputPin(2, 0, 'out'),
     ]);
@@ -534,10 +534,10 @@ describe('extractConnectivityGroups — mixed circuit', () => {
 });
 
 // ---------------------------------------------------------------------------
-// extractConnectivityGroups — empty circuit
+// extractConnectivityGroups- empty circuit
 // ---------------------------------------------------------------------------
 
-describe('extractConnectivityGroups — empty circuit', () => {
+describe('extractConnectivityGroups- empty circuit', () => {
   it('returns empty groups and no diagnostics for empty circuit', () => {
     const registry = buildDigitalRegistry();
     const [groups, diags] = extractConnectivityGroups([], [], registry, []);
@@ -555,10 +555,10 @@ describe('extractConnectivityGroups — empty circuit', () => {
 });
 
 // ---------------------------------------------------------------------------
-// extractConnectivityGroups — group metadata
+// extractConnectivityGroups- group metadata
 // ---------------------------------------------------------------------------
 
-describe('extractConnectivityGroups — group metadata', () => {
+describe('extractConnectivityGroups- group metadata', () => {
   it('groupId is a unique sequential integer starting from 0', () => {
     const registry = buildDigitalRegistry();
     const andEl = createTestElementFromDecls('And', 'a1', [

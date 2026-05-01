@@ -1,5 +1,5 @@
 /**
- * SimulationLoader — headless .dig and JSON circuit loading.
+ * SimulationLoader- headless .dig and JSON circuit loading.
  *
  * Chains: XML string → parseDigXml() → DigCircuit → loadDigCircuit() → Circuit.
  *
@@ -101,7 +101,7 @@ export class SimulationLoader {
 
   /**
    * Load a circuit from a native JSON string produced by serializeCircuit().
-   * Synchronous — JSON parsing and element construction require no I/O.
+   * Synchronous- JSON parsing and element construction require no I/O.
    */
   loadJson(json: string): Circuit {
     return deserializeDts(json, this._registry);

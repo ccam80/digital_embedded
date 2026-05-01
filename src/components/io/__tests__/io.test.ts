@@ -67,7 +67,7 @@ import type {
 } from "../../../core/renderer-interface.js";
 
 // ---------------------------------------------------------------------------
-// Helpers — ComponentLayout mock
+// Helpers- ComponentLayout mock
 // ---------------------------------------------------------------------------
 
 function makeLayout(inputCount: number): ComponentLayout {
@@ -105,7 +105,7 @@ function makeState(inputs: number[], outputSlots = 1): Uint32Array {
 }
 
 // ---------------------------------------------------------------------------
-// Helpers — RenderContext mock
+// Helpers- RenderContext mock
 // ---------------------------------------------------------------------------
 
 interface DrawCall {
@@ -144,7 +144,7 @@ function makeStubCtx(): { ctx: RenderContext; calls: DrawCall[] } {
 }
 
 // ---------------------------------------------------------------------------
-// Helpers — element factories
+// Helpers- element factories
 // ---------------------------------------------------------------------------
 
 function makeIn(overrides?: {
@@ -214,7 +214,7 @@ function makeNotConnected(): NotConnectedElement {
 
 describe("InComponent", () => {
   describe("execute", () => {
-    it("executeIn is a no-op — does not write to output slot", () => {
+    it("executeIn is a no-op- does not write to output slot", () => {
       const layout = makeLayoutNoInputs();
       const state = new Uint32Array(1);
       const highZs = new Uint32Array(state.length);
@@ -504,7 +504,7 @@ describe("OutComponent", () => {
 
 describe("ClockComponent", () => {
   describe("execute", () => {
-    it("executeClock is a no-op — output unchanged", () => {
+    it("executeClock is a no-op- output unchanged", () => {
       const layout = makeLayoutNoInputs();
       const state = new Uint32Array(1);
       const highZs = new Uint32Array(state.length);

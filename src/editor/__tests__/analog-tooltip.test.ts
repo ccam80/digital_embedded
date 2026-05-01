@@ -2,7 +2,7 @@
  * Tests for AnalogTooltip.
  *
  * Uses vitest fake timers for the 200ms hover delay tests.
- * Uses lightweight mock objects — no DOM, no canvas required for the
+ * Uses lightweight mock objects- no DOM, no canvas required for the
  * logic-only tests (wire voltage, component current/power, delay, leave).
  */
 
@@ -146,11 +146,11 @@ describe("Tooltip", () => {
     const hit: HitResult = { type: "wire", wire };
     tooltip.onMouseMove(0, 0, hit);
 
-    // At 100ms — not yet visible.
+    // At 100ms- not yet visible.
     vi.advanceTimersByTime(100);
     expect(tooltip.visible).toBe(false);
 
-    // At 250ms total (100 + 150) — now visible.
+    // At 250ms total (100 + 150)- now visible.
     vi.advanceTimersByTime(150);
     expect(tooltip.visible).toBe(true);
   });
@@ -169,7 +169,7 @@ describe("Tooltip", () => {
     vi.advanceTimersByTime(250);
     expect(tooltip.visible).toBe(true);
 
-    // Leave — tooltip must disappear immediately.
+    // Leave- tooltip must disappear immediately.
     tooltip.onMouseLeave();
     expect(tooltip.visible).toBe(false);
   });

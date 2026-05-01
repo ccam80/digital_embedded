@@ -1,5 +1,5 @@
 /**
- * Locked mode guard — prevents circuit mutations when a circuit is locked.
+ * Locked mode guard- prevents circuit mutations when a circuit is locked.
  *
  * In locked mode users may still toggle switches, press buttons, and observe
  * outputs, but they cannot add, move, delete, or wire up components.
@@ -21,12 +21,12 @@ const INTERACTIVE_TYPES = new Set(["In", "Button", "Switch", "DipSwitch"]);
 /**
  * Stateful guard for locked-mode enforcement.
  *
- * isLocked()               — returns current lock state.
- * setLocked(locked)        — toggle the lock.
- * canEdit()                — true when NOT locked.
- * canInteract(element)     — true for interactive components, always.
+ * isLocked()              - returns current lock state.
+ * setLocked(locked)       - toggle the lock.
+ * canEdit()               - true when NOT locked.
+ * canInteract(element)    - true for interactive components, always.
  *                            true for any component when NOT locked.
- * guardMutation(operation) — throws if locked.
+ * guardMutation(operation)- throws if locked.
  */
 export class LockedModeGuard {
   private _locked: boolean;

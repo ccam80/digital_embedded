@@ -3,7 +3,7 @@
 > **Spec-doc duplication note (added during remediation-pass-1):** The analog
 > `FuseElement` lives in `src/components/passives/analog-fuse.ts` and is owned by
 > `PB-AFUSE.md`. `src/components/switching/fuse.ts` is the digital-side
-> wrapper — its `FuseDefinition.modelRegistry["behavioral"]` imports
+> wrapper- its `FuseDefinition.modelRegistry["behavioral"]` imports
 > `createAnalogFuseElement` from `passives/analog-fuse.ts`. There is no separate
 > "PB-FUSE" analog implementation. PB-FUSE.md and PB-AFUSE.md describe the same
 > setup() / load() bodies. When the W3 owner exercises the analog migration, it
@@ -19,9 +19,9 @@ PB-AFUSE.md)
 
 ## Pin mapping (from 01-pin-mapping.md)
 
-`ngspiceNodeMap = { out1: "pos", out2: "neg" }` (from the Switching — primitive table in 01-pin-mapping.md)
+`ngspiceNodeMap = { out1: "pos", out2: "neg" }` (from the Switching- primitive table in 01-pin-mapping.md)
 
-`FuseElement` is a flat element (not a composite). It owns its conductance handles directly — there is no `ResElement` sub-element.
+`FuseElement` is a flat element (not a composite). It owns its conductance handles directly- there is no `ResElement` sub-element.
 
 | digiTS pin label | ngspice node variable | pinNodes.get() key |
 |---|---|---|
@@ -30,19 +30,19 @@ PB-AFUSE.md)
 
 ## Internal nodes
 
-none — RES has no internal nodes. (`NG_IGNORE(state)` and `NG_IGNORE(ckt)` at ressetup.c:22-23 confirm zero state slots.)
+none- RES has no internal nodes. (`NG_IGNORE(state)` and `NG_IGNORE(ckt)` at ressetup.c:22-23 confirm zero state slots.)
 
 ## Branch rows
 
-none — RES stamps a conductance, not a branch row.
+none- RES stamps a conductance, not a branch row.
 
 ## State slots
 
-0 — `ressetup.c:22-23` calls `NG_IGNORE(state)` and `NG_IGNORE(ckt)`.
+0- `ressetup.c:22-23` calls `NG_IGNORE(state)` and `NG_IGNORE(ckt)`.
 
 ## TSTALLOC sequence (line-for-line port)
 
-`ressetup.c:46-49` — 4 allocations, in order, on `FuseElement` directly:
+`ressetup.c:46-49`- 4 allocations, in order, on `FuseElement` directly:
 
 | Position | ngspice pair | digiTS pair | handle field name |
 |---|---|---|---|
@@ -51,7 +51,7 @@ none — RES stamps a conductance, not a branch row.
 | 3 | `(RESposNode, RESnegNode)` | `(posNode, negNode)` | `_hPN` |
 | 4 | `(RESnegNode, RESposNode)` | `(negNode, posNode)` | `_hNP` |
 
-## setup() body — alloc only
+## setup() body- alloc only
 
 ```typescript
 setup(ctx: SetupContext): void {
@@ -59,7 +59,7 @@ setup(ctx: SetupContext): void {
   const posNode = this._pinNodes.get("out1")!;  // RESposNode
   const negNode = this._pinNodes.get("out2")!;  // RESnegNode
 
-  // Port of ressetup.c:46-49 — TSTALLOC sequence (line-for-line)
+  // Port of ressetup.c:46-49- TSTALLOC sequence (line-for-line)
   this._hPP = solver.allocElement(posNode, posNode);  // (RESposNode, RESposNode)
   this._hNN = solver.allocElement(negNode, negNode);  // (RESnegNode, RESnegNode)
   this._hPN = solver.allocElement(posNode, negNode);  // (RESposNode, RESnegNode)
@@ -76,7 +76,7 @@ private _hNP: number = -1;
 private _conduct: number = 1;  // = 1/R, updated by accept()
 ```
 
-## load() body — value writes only
+## load() body- value writes only
 
 Implementer ports value-side from `resload.c` line-for-line, stamping through cached handles. No allocElement calls.
 
@@ -114,17 +114,17 @@ RES has no branch row.
 - Drop `branchCount`, `getInternalNodeCount` from MnaModel registration.
 - Add `ngspiceNodeMap: { out1: "pos", out2: "neg" }` to `FuseElement`'s `ComponentDefinition` directly (flat element, no sub-element).
 - No `findBranchFor` callback.
-- Remove all references to `ResElement` as a sub-element — `FuseElement` is now flat and owns its own handles.
+- Remove all references to `ResElement` as a sub-element- `FuseElement` is now flat and owns its own handles.
 
 ## Verification gate
 
 Per CLAUDE.md "Test Policy During W3 Setup-Load-Split", verification is spec compliance only. DO NOT run tests; DO NOT use test results.
 
-1. `setup()` body in the implementation file matches the "setup() body — alloc only" listing in this PB line-for-line.
+1. `setup()` body in the implementation file matches the "setup() body- alloc only" listing in this PB line-for-line.
 2. TSTALLOC sequence in `setup()` matches the order in the cited ngspice anchor file (see top of this PB, e.g. `ressetup.c:46-49`).
 3. Factory cleanup applied per the "Factory cleanup" section above.
 4. `ngspiceNodeMap` registered per the "Pin mapping" section above (or omitted for composites where the spec says so).
-5. `load()` writes through cached handles only — zero `solver.allocElement(...)` calls inside `load()`, `accept()`, or any non-`setup()` method.
+5. `load()` writes through cached handles only- zero `solver.allocElement(...)` calls inside `load()`, `accept()`, or any non-`setup()` method.
 6. `mayCreateInternalNodes` flag set per spec.
 7. `findBranchFor` callback present where spec says (V-output sources, IND, etc.).
 8. No banned closing verdicts (mapping/tolerance/equivalent-to/pre-existing/intentional-divergence/citation-divergence/partial) used in any commit message or report.

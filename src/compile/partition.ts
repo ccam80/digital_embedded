@@ -1,5 +1,5 @@
 /**
- * Domain partitioner — splits a unified connectivity graph into
+ * Domain partitioner- splits a unified connectivity graph into
  * digital and analog SolverPartitions, with BridgeDescriptors at boundaries.
  *
  * Implements spec Section 4.4.
@@ -36,10 +36,10 @@ export interface PartitionResult {
 /**
  * Determine the bridge direction at a boundary group.
  *
- * "digital-to-analog": a digital output pin drives the net — the digital
+ * "digital-to-analog": a digital output pin drives the net- the digital
  *   domain is the source, analog is the sink.
  * "analog-to-digital": an analog output (or no digital output) drives the
- *   net — the analog domain is the source, digital is the sink.
+ *   net- the analog domain is the source, digital is the sink.
  *
  * Tie-break: when both domains have outputs, digital-to-analog wins (digital
  * is the event-driven driver; analog receives the threshold crossing).
@@ -87,7 +87,7 @@ function electricalSpecForGroup(
  * separate digital and analog SolverPartitions, producing BridgeDescriptors
  * for every boundary group.
  *
- * Neither partition is ever null — callers check `partition.components.length`
+ * Neither partition is ever null- callers check `partition.components.length`
  * to determine whether a domain is active.
  *
  * ID assignment is NOT performed here; backend compilers assign net/node IDs.
@@ -134,7 +134,7 @@ export function partitionByDomain(
     const ma = assignmentByIndex.get(i);
 
     // Infrastructure components (wires, tunnels, ground, etc.) have no model
-    // assignment — they are handled by each backend individually.
+    // assignment- they are handled by each backend individually.
     if (!ma) continue;
 
     const def = registry.get(el.typeId);
@@ -206,7 +206,7 @@ export function partitionByDomain(
 
     // A group with no domain tags (all-neutral pins) belongs to the digital
     // partition in digital circuits. In analog/mixed circuits it must also be
-    // included in the analog partition — but ONLY if it contains pins from
+    // included in the analog partition- but ONLY if it contains pins from
     // elements that are in the analog partition (e.g., In/Out/Probe with
     // analog-only models). Adding ALL neutral groups would create spurious
     // MNA nodes that break the analog topology.

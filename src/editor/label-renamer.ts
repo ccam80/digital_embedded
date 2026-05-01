@@ -1,5 +1,5 @@
 /**
- * Label renaming on copy — ports Digital's CopiedElementLabelRenamer.
+ * Label renaming on copy- ports Digital's CopiedElementLabelRenamer.
  *
  * When copying components with numeric suffixes, auto-increment the suffix
  * to avoid duplicate labels. If the incremented label already exists in the
@@ -8,7 +8,7 @@
  * Examples:
  *   "Reg1"  → "Reg2" (if "Reg2" is free)
  *   "Reg1"  → "Reg3" (if "Reg2" already exists)
- *   "Clock" → "Clock" (no numeric suffix — unchanged)
+ *   "Clock" → "Clock" (no numeric suffix- unchanged)
  */
 
 import type { CircuitElement } from "@/core/element";

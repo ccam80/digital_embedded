@@ -1,5 +1,5 @@
 /**
- * Const component — constant value source.
+ * Const component- constant value source.
  *
  * Writes a fixed value to its output on every simulation step.
  * The value is a bigint to support up to 32 bits without signed overflow.
@@ -45,7 +45,7 @@ function buildConstPinDeclarations(bitWidth: number): PinDeclaration[] {
 }
 
 // ---------------------------------------------------------------------------
-// ConstElement — CircuitElement implementation
+// ConstElement- CircuitElement implementation
 // ---------------------------------------------------------------------------
 
 export class ConstElement extends AbstractCircuitElement {
@@ -70,7 +70,7 @@ export class ConstElement extends AbstractCircuitElement {
   }
 
   getBoundingBox(): Rect {
-    // draw() is text-only — tsCallsToSegments produces no segments, so the
+    // draw() is text-only- tsCallsToSegments produces no segments, so the
     // computed draw-bounds collapses to (0,0,0,0) at the pin origin.
     // The bbox must start at x=0 (not negative) to avoid a false overflow on
     // the left side, and extend rightward to cover label text.
@@ -98,7 +98,7 @@ export class ConstElement extends AbstractCircuitElement {
 }
 
 // ---------------------------------------------------------------------------
-// executeConst — writes the fixed value to the output slot
+// executeConst- writes the fixed value to the output slot
 // ---------------------------------------------------------------------------
 
 export function executeConst(index: number, state: Uint32Array, _highZs: Uint32Array, layout: ComponentLayout): void {
@@ -167,7 +167,7 @@ export const ConstDefinition: ComponentDefinition = {
   attributeMap: CONST_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.IO,
   helpText:
-    "Const — constant value source.\n" +
+    "Const- constant value source.\n" +
     "Outputs a fixed value on every simulation step.\n" +
     "Configurable bit width and constant value.",
   models: {

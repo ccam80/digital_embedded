@@ -2,15 +2,15 @@
  * Tests for wiring components: Driver, DriverInvSel, Splitter, BusSplitter, Tunnel.
  *
  * Covers:
- *   - Driver::enableHigh — enable=1, input=0xFF → output=0xFF, highZ=0
- *   - Driver::enableLow — enable=0 → output=highZ
- *   - DriverInvSel::enableLow — sel=0 (active-low enable), output=input
- *   - DriverInvSel::enableHigh — sel=1, output=highZ
+ *   - Driver::enableHigh- enable=1, input=0xFF → output=0xFF, highZ=0
+ *   - Driver::enableLow- enable=0 → output=highZ
+ *   - DriverInvSel::enableLow- sel=0 (active-low enable), output=input
+ *   - DriverInvSel::enableHigh- sel=1, output=highZ
  *   - Splitter::split bit extraction utilities
  *   - Splitter::merge bit insertion utilities
  *   - Splitter::splitPattern "1,1,1,1,4" on 8-bit
- *   - Tunnel::noOpExecute — executeFn does nothing
- *   - Tunnel::sameNameConnection — two Tunnels with same label declare same netName
+ *   - Tunnel::noOpExecute- executeFn does nothing
+ *   - Tunnel::sameNameConnection- two Tunnels with same label declare same netName
  */
 
 import { describe, it, expect } from "vitest";
@@ -63,7 +63,7 @@ import type {
 } from "../../../core/renderer-interface.js";
 
 // ---------------------------------------------------------------------------
-// Helpers — ComponentLayout mocks
+// Helpers- ComponentLayout mocks
 // ---------------------------------------------------------------------------
 
 function makeLayout(inputCount: number, outputCount = 1): ComponentLayout {
@@ -78,7 +78,7 @@ function makeLayout(inputCount: number, outputCount = 1): ComponentLayout {
   };
 }
 
-/** Layout for driver — 2 inputs (data + sel), 1 output (value). High-Z is written to the highZs array. */
+/** Layout for driver- 2 inputs (data + sel), 1 output (value). High-Z is written to the highZs array. */
 function makeDriverLayout(): ComponentLayout {
   return {
     wiringTable: new Int32Array(64).map((_, i) => i),
@@ -100,7 +100,7 @@ function makeState(...values: number[]): Uint32Array {
 }
 
 // ---------------------------------------------------------------------------
-// Helpers — RenderContext mock
+// Helpers- RenderContext mock
 // ---------------------------------------------------------------------------
 
 interface DrawCall {

@@ -1,5 +1,5 @@
 /**
- * property-inputs.ts — Input widget factory for the property panel.
+ * property-inputs.ts- Input widget factory for the property panel.
  *
  * Creates type-appropriate DOM input widgets for each PropertyType.
  * Each widget implements the PropertyInput interface.
@@ -73,7 +73,7 @@ export function createInput(
 }
 
 // ---------------------------------------------------------------------------
-// NumberInput — for INT, FLOAT, BIT_WIDTH, LONG, ROTATION
+// NumberInput- for INT, FLOAT, BIT_WIDTH, LONG, ROTATION
 // ---------------------------------------------------------------------------
 
 export class NumberInput implements PropertyInput {
@@ -135,7 +135,7 @@ export class NumberInput implements PropertyInput {
 }
 
 // ---------------------------------------------------------------------------
-// UnitNumberInput — for FLOAT/INT with SI unit (e.g. "Ω", "F", "H")
+// UnitNumberInput- for FLOAT/INT with SI unit (e.g. "Ω", "F", "H")
 // ---------------------------------------------------------------------------
 
 /**
@@ -242,7 +242,7 @@ export class UnitNumberInput implements PropertyInput {
 }
 
 // ---------------------------------------------------------------------------
-// TextInput — for STRING, FILE
+// TextInput- for STRING, FILE
 // ---------------------------------------------------------------------------
 
 export class TextInput implements PropertyInput {
@@ -283,7 +283,7 @@ export class TextInput implements PropertyInput {
 }
 
 // ---------------------------------------------------------------------------
-// EnumSelect — for ENUM, INTFORMAT
+// EnumSelect- for ENUM, INTFORMAT
 // ---------------------------------------------------------------------------
 
 export class EnumSelect implements PropertyInput {
@@ -330,7 +330,7 @@ export class EnumSelect implements PropertyInput {
 }
 
 // ---------------------------------------------------------------------------
-// BooleanCheckbox — for BOOLEAN
+// BooleanCheckbox- for BOOLEAN
 // ---------------------------------------------------------------------------
 
 export class BooleanCheckbox implements PropertyInput {
@@ -371,7 +371,7 @@ export class BooleanCheckbox implements PropertyInput {
 }
 
 // ---------------------------------------------------------------------------
-// HexDataEditor — for HEX_DATA (number[] stored as hex)
+// HexDataEditor- for HEX_DATA (number[] stored as hex)
 // ---------------------------------------------------------------------------
 
 export class HexDataEditor implements PropertyInput {
@@ -423,7 +423,7 @@ export class HexDataEditor implements PropertyInput {
 }
 
 // ---------------------------------------------------------------------------
-// FileInput — for FILE (text input + Browse... button)
+// FileInput- for FILE (text input + Browse... button)
 // ---------------------------------------------------------------------------
 
 export class FileInput implements PropertyInput {
@@ -507,7 +507,7 @@ export class FileInput implements PropertyInput {
 }
 
 // ---------------------------------------------------------------------------
-// ColorPicker — for COLOR
+// ColorPicker- for COLOR
 // ---------------------------------------------------------------------------
 
 export class ColorPicker implements PropertyInput {

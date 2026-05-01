@@ -4,7 +4,7 @@ import { MockRenderContext } from "@/test-utils/mock-render-context";
 import type { Rect } from "@/core/renderer-interface";
 
 describe("GridRenderer", () => {
-  it("drawsGridLines — render with MockRenderContext, assert drawLine calls made for grid lines within viewport", () => {
+  it("drawsGridLines- render with MockRenderContext, assert drawLine calls made for grid lines within viewport", () => {
     const renderer = new GridRenderer();
     const ctx = new MockRenderContext();
 
@@ -38,13 +38,13 @@ describe("GridRenderer", () => {
   it("draws only major grid lines when zoomed out far", () => {
     const renderer = new GridRenderer();
 
-    // Below MINOR_GRID_MIN_ZOOM (0.5) — only major lines
+    // Below MINOR_GRID_MIN_ZOOM (0.5)- only major lines
     const ctxOut = new MockRenderContext();
     const viewport: Rect = { x: 0, y: 0, width: 400, height: 400 };
     renderer.render(ctxOut, viewport, 0.25, { x: 0, y: 0 });
     const linesOut = ctxOut.callsOfKind("line");
 
-    // At zoom=1 — both minor and major
+    // At zoom=1- both minor and major
     const ctxIn = new MockRenderContext();
     renderer.render(ctxIn, viewport, 1, { x: 0, y: 0 });
     const linesIn = ctxIn.callsOfKind("line");

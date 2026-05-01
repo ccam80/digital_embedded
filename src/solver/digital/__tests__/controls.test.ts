@@ -1,5 +1,5 @@
 /**
- * Tests for SimulationController — task 3.4.1.
+ * Tests for SimulationController- task 3.4.1.
  *
  * Uses a stub DigitalEngine that counts step() calls and can be configured
  * to throw on demand. No compiled circuit is required.
@@ -68,7 +68,7 @@ describe("Controls", () => {
   // stateTransitions
   // -------------------------------------------------------------------------
 
-  it("stateTransitions — STOPPED → start → RUNNING → stop → PAUSED → reset → STOPPED", () => {
+  it("stateTransitions- STOPPED → start → RUNNING → stop → PAUSED → reset → STOPPED", () => {
     const engine = new StubEngine();
     const ctrl = new SimulationController(engine as unknown as DigitalEngine);
 
@@ -84,7 +84,7 @@ describe("Controls", () => {
     expect(ctrl.getState()).toBe(EngineState.STOPPED);
   });
 
-  it("stateTransitions — PAUSED → start → RUNNING", () => {
+  it("stateTransitions- PAUSED → start → RUNNING", () => {
     const engine = new StubEngine();
     const ctrl = new SimulationController(engine as unknown as DigitalEngine);
 
@@ -98,7 +98,7 @@ describe("Controls", () => {
     ctrl.stop(); // clean up
   });
 
-  it("stateTransitions — start() when already RUNNING is idempotent", () => {
+  it("stateTransitions- start() when already RUNNING is idempotent", () => {
     const engine = new StubEngine();
     const ctrl = new SimulationController(engine as unknown as DigitalEngine);
 
@@ -110,7 +110,7 @@ describe("Controls", () => {
     ctrl.stop();
   });
 
-  it("stateTransitions — stop() when already PAUSED is idempotent", () => {
+  it("stateTransitions- stop() when already PAUSED is idempotent", () => {
     const engine = new StubEngine();
     const ctrl = new SimulationController(engine as unknown as DigitalEngine);
 
@@ -125,7 +125,7 @@ describe("Controls", () => {
   // stepFromStopped
   // -------------------------------------------------------------------------
 
-  it("stepFromStopped — step from STOPPED works, stays STOPPED", () => {
+  it("stepFromStopped- step from STOPPED works, stays STOPPED", () => {
     const engine = new StubEngine();
     const ctrl = new SimulationController(engine as unknown as DigitalEngine);
 
@@ -136,7 +136,7 @@ describe("Controls", () => {
     expect(ctrl.getState()).toBe(EngineState.STOPPED);
   });
 
-  it("stepFromStopped — step from PAUSED works, stays PAUSED", () => {
+  it("stepFromStopped- step from PAUSED works, stays PAUSED", () => {
     const engine = new StubEngine();
     const ctrl = new SimulationController(engine as unknown as DigitalEngine);
 
@@ -150,7 +150,7 @@ describe("Controls", () => {
     expect(ctrl.getState()).toBe(EngineState.PAUSED);
   });
 
-  it("stepFromStopped — step does nothing when RUNNING", () => {
+  it("stepFromStopped- step does nothing when RUNNING", () => {
     const engine = new StubEngine();
     const ctrl = new SimulationController(engine as unknown as DigitalEngine);
 
@@ -170,7 +170,7 @@ describe("Controls", () => {
   // errorTransition
   // -------------------------------------------------------------------------
 
-  it("errorTransition — engine.step throws SimulationError, state becomes ERROR", () => {
+  it("errorTransition- engine.step throws SimulationError, state becomes ERROR", () => {
     const engine = new StubEngine();
     engine.throwOnStep = new SimulationError("test error");
 
@@ -186,7 +186,7 @@ describe("Controls", () => {
     expect(errors[0]!.message).toBe("test error");
   });
 
-  it("errorTransition — engine.step throws plain Error, wrapped in SimulationError", () => {
+  it("errorTransition- engine.step throws plain Error, wrapped in SimulationError", () => {
     const engine = new StubEngine();
     engine.throwOnStep = new Error("plain error");
 
@@ -203,7 +203,7 @@ describe("Controls", () => {
     expect(errors[0]!.message).toBe("plain error");
   });
 
-  it("errorTransition — reset() from ERROR returns to STOPPED", () => {
+  it("errorTransition- reset() from ERROR returns to STOPPED", () => {
     const engine = new StubEngine();
     engine.throwOnStep = new SimulationError("test error");
 
@@ -216,7 +216,7 @@ describe("Controls", () => {
     expect(ctrl.getState()).toBe(EngineState.STOPPED);
   });
 
-  it("errorTransition — multiple error callbacks all fired", () => {
+  it("errorTransition- multiple error callbacks all fired", () => {
     const engine = new StubEngine();
     engine.throwOnStep = new SimulationError("multi callback error");
 
@@ -237,7 +237,7 @@ describe("Controls", () => {
   // speedControlsStepsPerFrame
   // -------------------------------------------------------------------------
 
-  it("speedControlsStepsPerFrame — set speed 10, verify engine.step called 10 times per tick", () => {
+  it("speedControlsStepsPerFrame- set speed 10, verify engine.step called 10 times per tick", () => {
     const engine = new StubEngine();
     const ctrl = new SimulationController(engine as unknown as DigitalEngine);
 
@@ -258,7 +258,7 @@ describe("Controls", () => {
     expect(ctrl.getState()).toBe(EngineState.STOPPED);
   });
 
-  it("speedControlsStepsPerFrame — setSpeed enforces minimum of 1", () => {
+  it("speedControlsStepsPerFrame- setSpeed enforces minimum of 1", () => {
     const engine = new StubEngine();
     const ctrl = new SimulationController(engine as unknown as DigitalEngine);
 

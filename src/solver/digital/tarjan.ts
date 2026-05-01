@@ -1,7 +1,7 @@
 /**
  * Tarjan's algorithm for finding Strongly Connected Components (SCCs).
  *
- * Returns SCCs in reverse topological order — each SCC appears before any SCC
+ * Returns SCCs in reverse topological order- each SCC appears before any SCC
  * it depends on. This is the standard Tarjan output ordering.
  *
  * Used by the circuit compiler to detect combinational feedback loops.
@@ -10,7 +10,7 @@
  */
 
 // ---------------------------------------------------------------------------
-// findSCCs — Tarjan's strongly connected components algorithm
+// findSCCs- Tarjan's strongly connected components algorithm
 // ---------------------------------------------------------------------------
 
 /**
@@ -70,7 +70,7 @@ export function findSCCs(adjacency: number[][]): number[][] {
 }
 
 // ---------------------------------------------------------------------------
-// hasSelfLoop — check whether a node has a self-referencing edge
+// hasSelfLoop- check whether a node has a self-referencing edge
 // ---------------------------------------------------------------------------
 
 /**

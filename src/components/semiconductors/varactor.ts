@@ -1,7 +1,7 @@
 /**
- * Varactor Diode — component definition only.
+ * Varactor Diode- component definition only.
  *
- * Per spec/architectural-alignment.md §F2 (APPROVED FIX): the varactor is
+ * Per spec/architectural-alignment.md ssF2 (APPROVED FIX): the varactor is
  * not a separate device. ngspice has no VARACTOR primitive; vendors use
  * the DIO model with a tuned parameter block to emphasise junction
  * capacitance. digiTS follows the same approach: VaractorDiode's
@@ -32,7 +32,7 @@ import {
 } from "./diode.js";
 
 // ---------------------------------------------------------------------------
-// VaractorDiode model parameter block — diode superset with C-V-oriented defaults.
+// VaractorDiode model parameter block- diode superset with C-V-oriented defaults.
 //
 // These are the same parameter names the diode exposes (CJO, VJ, M, FC, TT, IS, ...).
 // The varactor preset simply biases the defaults to a typical voltage-controlled
@@ -72,7 +72,7 @@ export const { paramDefs: VARACTOR_PARAM_DEFS, defaults: VARACTOR_PARAM_DEFAULTS
   });
 
 // ---------------------------------------------------------------------------
-// VaractorElement — visual component (rendering only).
+// VaractorElement- visual component (rendering only).
 //
 // All load() and state behaviour is delegated to createDiodeElement via the
 // modelRegistry factory below.
@@ -190,7 +190,7 @@ export const VARACTOR_ATTRIBUTE_MAPPINGS: AttributeMapping[] = [
 ];
 
 // ---------------------------------------------------------------------------
-// VaractorDefinition — routes through createDiodeElement per F2.
+// VaractorDefinition- routes through createDiodeElement per F2.
 // ---------------------------------------------------------------------------
 
 function varactorCircuitFactory(props: PropertyBag): VaractorElement {
@@ -206,7 +206,7 @@ export const VaractorDefinition: ComponentDefinition = {
   attributeMap: VARACTOR_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.SEMICONDUCTORS,
   helpText:
-    "Varactor Diode — voltage-controlled junction capacitance (ngspice DIO model).\n" +
+    "Varactor Diode- voltage-controlled junction capacitance (ngspice DIO model).\n" +
     "C_j(V_R) = CJO / (1 - V_d/VJ)^M\n" +
     "Uses the same load path as the standard Diode with varactor-tuned defaults.",
   ngspiceNodeMap: { A: "pos", K: "neg" },

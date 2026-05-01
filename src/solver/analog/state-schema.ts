@@ -9,7 +9,7 @@
  * HOT PATH: nothing in this module runs during step(). The schema is consulted
  * once at initState() time (via applyInitialValues) and once at dev-probe time
  * (via assertPoolIsSoleMutableState). All runtime slot access is a direct
- * `pool[base + CONST]` read — identical to capacitor.ts:180-230 today.
+ * `pool[base + CONST]` read- identical to capacitor.ts:180-230 today.
  */
 import type { StatePoolRef } from "../../core/analog-types.js";
 
@@ -30,7 +30,7 @@ export interface SlotDescriptor {
 }
 
 /**
- * Frozen schema — the single source of truth for an element's state layout.
+ * Frozen schema- the single source of truth for an element's state layout.
  * The array index of each descriptor IS the slot offset: descriptors[3] lives
  * at pool.state0[stateBaseOffset + 3].
  */
@@ -38,7 +38,7 @@ export interface StateSchema<Names extends string = string> {
   /** Element kind for diagnostics (e.g. "AnalogCapacitorElement"). */
   readonly owner: string;
   readonly slots: readonly SlotDescriptor[];
-  /** Total slot count — equals slots.length. Used as `stateSize`. */
+  /** Total slot count- equals slots.length. Used as `stateSize`. */
   readonly size: number;
   /** name → index, built at schema construction. Dev-only; not touched per-step. */
   readonly indexOf: ReadonlyMap<Names, number>;
@@ -100,7 +100,7 @@ export function applyInitialValues(
 }
 
 /**
- * Runtime probe — see section 3 of the spec. Gated on import.meta.env?.DEV.
+ * Runtime probe- see section 3 of the spec. Gated on import.meta.env?.DEV.
  * Returns a violation list; caller emits the diagnostic.
  */
 export interface SchemaViolation {
@@ -146,7 +146,7 @@ function snapshotOwnFields(obj: object): Map<string, unknown> {
  *
  * Spread these into the array passed to defineStateSchema() for elements
  * whose companion model is a conductance + history-current pair plus one
- * previous-value slot. The fragment is NOT a schema — the calling element's
+ * previous-value slot. The fragment is NOT a schema- the calling element's
  * defineStateSchema() owns the resulting schema identity.
  *
  * Hot-path cost: zero. Array spread happens once at module load; the
@@ -168,7 +168,7 @@ export const L_COMPANION_SLOTS: readonly SlotDescriptor[] = Object.freeze([
 /**
  * Rename every slot in `fragment` by appending `suffix`. Used by elements
  * that host multiple instances of the same companion fragment in a single
- * schema — the motivating case is `crystal.ts`, which has three branches
+ * schema- the motivating case is `crystal.ts`, which has three branches
  * (series L, series C, parallel C) each carrying its own GEQ/IEQ/history.
  *
  * Returns a fresh frozen array; does not mutate `fragment`. Called at

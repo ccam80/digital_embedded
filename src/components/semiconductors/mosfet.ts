@@ -767,7 +767,7 @@ function _createMosfetElementWithPolarity(
   // 3-terminal MOSFET: bulk = source (no separate bulk pin).
   const nodeB = nodeS_ext;
 
-  // Internal drain/source prime nodes — allocated in setup() via ctx.makeVolt().
+  // Internal drain/source prime nodes- allocated in setup() via ctx.makeVolt().
   // Initialised to external nodes here; setup() overwrites when RD/RS > 0.
   let nodeD = nodeD_ext;
   let nodeS = nodeS_ext;
@@ -831,8 +831,8 @@ function _createMosfetElementWithPolarity(
   const ld = params.LD;
   const effectiveLength = params.L - 2 * ld;
   const oxideCapProbe = params.TOX > 0 ? (EPS_OX * EPS0 / params.TOX) * effectiveLength * params.W : 0;
-  // hasCapacitance: latent-stamp-gap — computed but not yet used to gate cap-companion
-  // stamps. Preserved per §A.20 (TS6133 surfaced, not deleted).
+  // hasCapacitance: latent-stamp-gap- computed but not yet used to gate cap-companion
+  // stamps. Preserved per ssA.20 (TS6133 surfaced, not deleted).
   void (params.CBD > 0 || params.CBS > 0
     || params.CJ > 0 || params.CJSW > 0
     || params.CGDO > 0 || params.CGSO > 0 || params.CGBO > 0
@@ -841,7 +841,7 @@ function _createMosfetElementWithPolarity(
   let pool: StatePoolRef;
   let base: number;
 
-  // Matrix element handles — allocated by setup(), written by load().
+  // Matrix element handles- allocated by setup(), written by load().
   let _hDD = -1, _hGG = -1, _hSS = -1, _hBB = -1;
   let _hDPDP = -1, _hSPSP = -1;
   let _hDDP = -1, _hGB = -1, _hGDP = -1, _hGSP = -1;
@@ -872,11 +872,11 @@ function _createMosfetElementWithPolarity(
       const dNode  = nodeD_ext;
       const bNode  = sNode;   // 3-terminal: body tied to source
 
-      // State slots — mos1set.c:96-97 (MOS1numStates=17) plus digiTS DC-op scalars (slots 17-27).
+      // State slots- mos1set.c:96-97 (MOS1numStates=17) plus digiTS DC-op scalars (slots 17-27).
       base = ctx.allocStates(MOSFET_SCHEMA.size);
       el._stateBase = base;
 
-      // Internal nodes — mos1set.c:131-178
+      // Internal nodes- mos1set.c:131-178
       internalLabels.length = 0;
       const needDrainPrime = (params.RD !== 0) ||
         (params.RSH !== 0 && params.drainSquares !== 0);
@@ -899,7 +899,7 @@ function _createMosfetElementWithPolarity(
       const dp = nodeD;
       const sp = nodeS;
 
-      // TSTALLOC sequence — mos1set.c:186-207 (all 22, unconditional)
+      // TSTALLOC sequence- mos1set.c:186-207 (all 22, unconditional)
       _hDD   = solver.allocElement(dNode, dNode); // (1)
       _hGG   = solver.allocElement(gNode, gNode); // (2)
       _hSS   = solver.allocElement(sNode, sNode); // (3)
@@ -1629,7 +1629,7 @@ function _createMosfetElementWithPolarity(
       stampRHS(ctx.rhs, nodeS, (cdreq + ceqbs + polarity * ceqgs));
 
       // RS/RD external terminal stamps (mos1load.c linear model pieces).
-      // Uses pre-allocated handles from setup() — no allocElement calls.
+      // Uses pre-allocated handles from setup()- no allocElement calls.
       if (params.RD > 0 && nodeD !== nodeD_ext) {
         const gRD = 1 / params.RD;
         solver.stampElement(_hDD,   gRD);   // (dNode, dNode)
@@ -1645,7 +1645,7 @@ function _createMosfetElementWithPolarity(
         solver.stampElement(_hSPSP, gRS);   // (sp, sp)
       }
 
-      // Y-matrix stamps — mos1load.c:929-956 via cached handles (no allocElement).
+      // Y-matrix stamps- mos1load.c:929-956 via cached handles (no allocElement).
       // Handle names match mos1set.c TSTALLOC sequence (setup() entries 1-22).
       // With RD=RS=0: dp=dNode, sp=sNode, so duplicate-position handles alias
       // the same matrix cell; stampElement is idempotent for repeated handles.
@@ -1787,10 +1787,10 @@ function _createMosfetElementWithPolarity(
 }
 
 // ---------------------------------------------------------------------------
-// Public 3-arg AnalogFactory entry points (spec §A.3).
+// Public 3-arg AnalogFactory entry points (spec ssA.3).
 //
-// createMosfetElement   — NMOS polarity (default for tests / Nmosfet registry)
-// createPmosfetElement  — PMOS polarity (Pmosfet registry)
+// createMosfetElement  - NMOS polarity (default for tests / Nmosfet registry)
+// createPmosfetElement - PMOS polarity (Pmosfet registry)
 // ---------------------------------------------------------------------------
 
 export function createMosfetElement(

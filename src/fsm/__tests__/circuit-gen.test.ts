@@ -322,10 +322,10 @@ describe('fsmToCircuit', () => {
     expect(Array.isArray(minimizedCircuit.wires)).toBe(true);
   });
 
-  it('synthesizeD — minimize:false uses raw SOP not minimize()', () => {
+  it('synthesizeD- minimize:false uses raw SOP not minimize()', () => {
     // A 2-state FSM with one input: S0 --A--> S1 --A--> S0.
     // With minimize=true: Z_0_next simplifies to A (one variable).
-    // With minimize=false: canonical SOP — one minterm per 1-row, no simplification.
+    // With minimize=false: canonical SOP- one minterm per 1-row, no simplification.
     // Both circuits must be structurally valid and the unminimized circuit
     // must have at least as many elements as the minimized one.
     const fsm = createFSM('d-unmin-test');
@@ -351,11 +351,11 @@ describe('fsmToCircuit', () => {
     // Both have Out components (next-state outputs)
     expect(countByType(rawCircuit, 'Out')).toBeGreaterThanOrEqual(1);
 
-    // Unminimized SOP is never simpler than minimized — at least as many elements
+    // Unminimized SOP is never simpler than minimized- at least as many elements
     expect(rawCircuit.elements.length).toBeGreaterThanOrEqual(minCircuit.elements.length);
   });
 
-  it('synthesizeJK — minimize:false uses raw SOP not minimize()', () => {
+  it('synthesizeJK- minimize:false uses raw SOP not minimize()', () => {
     // Same 2-state FSM, JK synthesis path.
     // With minimize=false the JK truth tables produce raw SOP expressions.
     // The circuit must be valid, contain J and K outputs, and have at least

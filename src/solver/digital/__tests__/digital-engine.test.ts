@@ -1,5 +1,5 @@
 /**
- * Tests for DigitalEngine — task 3.1.1.
+ * Tests for DigitalEngine- task 3.1.1.
  *
  * Tests use a minimal ConcreteCompiledCircuit built in-process so they
  * do not depend on the compiler (task 3.2.1).
@@ -11,7 +11,7 @@ import { EngineState } from "@/core/engine-interface";
 import type { ExecuteFunction, ComponentLayout } from "@/core/registry";
 
 // ---------------------------------------------------------------------------
-// Helpers — build minimal ConcreteCompiledCircuit instances for tests
+// Helpers- build minimal ConcreteCompiledCircuit instances for tests
 // ---------------------------------------------------------------------------
 
 /**
@@ -167,7 +167,7 @@ describe("DigitalEngine", () => {
 
     engine.init(circuit);
 
-    // getSignalRaw returns the value word — UNDEFINED encoding has value=0
+    // getSignalRaw returns the value word- UNDEFINED encoding has value=0
     for (let i = 0; i < 5; i++) {
       expect(engine.getSignalRaw(i)).toBe(0);
     }
@@ -253,7 +253,7 @@ describe("DigitalEngine", () => {
   // feedbackSCCIteratesUntilStable
   // -------------------------------------------------------------------------
   it("feedbackSCCIteratesUntilStable", () => {
-    // SR latch from 2 NOR gates (S=0, R=0 — hold state).
+    // SR latch from 2 NOR gates (S=0, R=0- hold state).
     // NOR1 (component 0): NOR(S=net0, Q_bar=net3) → Q=net2
     // NOR2 (component 1): NOR(R=net1, Q=net2)    → Q_bar=net3
 

@@ -23,7 +23,7 @@ import { loadDigCircuit } from "../../../io/dig-loader.js";
 import { createDefaultRegistry } from "../../register-all.js";
 
 // ---------------------------------------------------------------------------
-// Helper — create a PortElement with given props
+// Helper- create a PortElement with given props
 // ---------------------------------------------------------------------------
 
 function makePort(props: Record<string, import("../../../core/properties.js").PropertyValue> = {}): PortElement {
@@ -62,7 +62,7 @@ describe("PortDefinition", () => {
 });
 
 // ---------------------------------------------------------------------------
-// PortElement.getPins — bitWidth from props
+// PortElement.getPins- bitWidth from props
 // ---------------------------------------------------------------------------
 
 describe("PortElement.getPins", () => {
@@ -128,7 +128,7 @@ describe("Port serialization round-trip", () => {
 });
 
 // ---------------------------------------------------------------------------
-// deriveInterfacePins — Port element produces BIDIRECTIONAL PinDeclaration
+// deriveInterfacePins- Port element produces BIDIRECTIONAL PinDeclaration
 // ---------------------------------------------------------------------------
 
 describe("deriveInterfacePins with Port element", () => {
@@ -170,10 +170,10 @@ describe("deriveInterfacePins with Port element", () => {
 });
 
 // ---------------------------------------------------------------------------
-// resolveModelAssignments — Port resolves to modelKey "neutral"
+// resolveModelAssignments- Port resolves to modelKey "neutral"
 // ---------------------------------------------------------------------------
 
-describe("resolveModelAssignments — Port is neutral infrastructure", () => {
+describe("resolveModelAssignments- Port is neutral infrastructure", () => {
   it("Port with models: {} resolves to modelKey 'neutral'", () => {
     const registry = createDefaultRegistry();
     const el = makePort({ label: "p" });

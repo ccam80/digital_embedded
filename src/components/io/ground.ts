@@ -1,8 +1,8 @@
 /**
- * Ground component — unified digital + analog.
+ * Ground component- unified digital + analog.
  *
  * Digital mode: OUTPUT pin "out" always writes 0 to the simulation state.
- * Analog mode: topological marker — the analog compiler maps any node
+ * Analog mode: topological marker- the analog compiler maps any node
  * connected to this component to node 0 (the MNA ground reference). The
  * AnalogElement stamp is a no-op; the constraint is enforced by node
  * assignment, not by stamping into the matrix.
@@ -48,7 +48,7 @@ function buildGroundPinDeclarations(bitWidth: number): PinDeclaration[] {
 }
 
 // ---------------------------------------------------------------------------
-// GroundElement — CircuitElement implementation
+// GroundElement- CircuitElement implementation
 // ---------------------------------------------------------------------------
 
 export class GroundElement extends AbstractCircuitElement {
@@ -92,7 +92,7 @@ export class GroundElement extends AbstractCircuitElement {
 }
 
 // ---------------------------------------------------------------------------
-// executeGround — always writes 0 to output
+// executeGround- always writes 0 to output
 // ---------------------------------------------------------------------------
 
 export function executeGround(index: number, state: Uint32Array, _highZs: Uint32Array, layout: ComponentLayout): void {
@@ -101,7 +101,7 @@ export function executeGround(index: number, state: Uint32Array, _highZs: Uint32
 }
 
 // ---------------------------------------------------------------------------
-// createGroundAnalogElement — AnalogElement factory (no-op stamp)
+// createGroundAnalogElement- AnalogElement factory (no-op stamp)
 // ---------------------------------------------------------------------------
 
 function createGroundAnalogElement(
@@ -121,7 +121,7 @@ function createGroundAnalogElement(
     // bucket so any other element loads after it.
     ngspiceLoadOrder: NGSPICE_LOAD_ORDER.RES,
     setup(): void {
-      // Ground has no stamps — constraint is enforced by the compiler's node mapping.
+      // Ground has no stamps- constraint is enforced by the compiler's node mapping.
     },
     load(_ctx: LoadContext): void {
       // Ground constraint is handled by the compiler's node mapping.
@@ -183,7 +183,7 @@ export const GroundDefinition: ComponentDefinition = {
   attributeMap: GROUND_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.IO,
   helpText:
-    "Ground — outputs logic 0 in digital mode. In analog mode, marks the connected node as the MNA ground reference (node 0).",
+    "Ground- outputs logic 0 in digital mode. In analog mode, marks the connected node as the MNA ground reference (node 0).",
   models: {
     digital: { executeFn: executeGround, inputSchema: [], outputSchema: ["out"] },
   },

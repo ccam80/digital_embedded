@@ -1,5 +1,5 @@
 /**
- * Multiplexer component — selects one of N inputs based on selector bits.
+ * Multiplexer component- selects one of N inputs based on selector bits.
  * Output = input[selector].
  *
  * Properties:
@@ -58,7 +58,7 @@ export function buildMuxPinDeclarations(
   };
 
   // Data input pins: left side
-  // Special case for 2 inputs: pins at (0,0) and (0,2) — gap at middle
+  // Special case for 2 inputs: pins at (0,0) and (0,2)- gap at middle
   const inputPins: PinDeclaration[] = [];
   if (inputCount === 2) {
     inputPins.push({
@@ -108,7 +108,7 @@ export function buildMuxPinDeclarations(
 }
 
 // ---------------------------------------------------------------------------
-// MuxElement — CircuitElement implementation
+// MuxElement- CircuitElement implementation
 // ---------------------------------------------------------------------------
 
 export class MuxElement extends AbstractCircuitElement {
@@ -183,7 +183,7 @@ export class MuxElement extends AbstractCircuitElement {
 }
 
 // ---------------------------------------------------------------------------
-// executeMux — flat simulation function
+// executeMux- flat simulation function
 //
 // Pin layout in state array (matching buildMuxPinDeclarations order):
 //   input 0: sel
@@ -286,7 +286,7 @@ export const MuxDefinition: ComponentDefinition = {
   attributeMap: MUX_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.WIRING,
   helpText:
-    "Multiplexer — selects one of N inputs based on selector bits.\n" +
+    "Multiplexer- selects one of N inputs based on selector bits.\n" +
     "Output = input[selector]. N = 2^selectorBits.",
   models: {
     digital: {

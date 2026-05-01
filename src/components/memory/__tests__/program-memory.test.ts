@@ -1,5 +1,5 @@
 /**
- * Tests for ProgramMemory — ROM with address auto-increment.
+ * Tests for ProgramMemory- ROM with address auto-increment.
  *
  * Covers:
  *   - Auto-increment on rising clock edge
@@ -33,9 +33,9 @@ import type { ComponentLayout } from "../../../core/registry.js";
 
 // ---------------------------------------------------------------------------
 // Layout helper
-// Input layout:  [A=0, ld=1, C=2]  — 3 inputs
-// Output layout: [D=0]             — 1 output
-// State layout:  [addrReg=0, prevClock=1] — 2 state slots
+// Input layout:  [A=0, ld=1, C=2] - 3 inputs
+// Output layout: [D=0]            - 1 output
+// State layout:  [addrReg=0, prevClock=1]- 2 state slots
 // ---------------------------------------------------------------------------
 
 function makeLayout(): {
@@ -65,7 +65,7 @@ describe("ProgramMemory", () => {
     clearBackingStores();
   });
 
-  it("autoIncrement — sequential fetch reads consecutive addresses", () => {
+  it("autoIncrement- sequential fetch reads consecutive addresses", () => {
     const mem = new DataField(16);
     for (let i = 0; i < 16; i++) mem.write(i, i * 10);
     registerBackingStore(0, mem);
@@ -91,7 +91,7 @@ describe("ProgramMemory", () => {
     expect(state[3]).toBe(30); // D = memory[3]
   });
 
-  it("jumpOnLoad — ld=1 loads A into address register", () => {
+  it("jumpOnLoad- ld=1 loads A into address register", () => {
     const mem = new DataField(16);
     mem.write(8, 0xAB);
     registerBackingStore(0, mem);
@@ -106,7 +106,7 @@ describe("ProgramMemory", () => {
     expect(state[4]).toBe(8);    // addrReg = 8
   });
 
-  it("jumpThenFetch — jump to address then auto-increment", () => {
+  it("jumpThenFetch- jump to address then auto-increment", () => {
     const mem = new DataField(16);
     for (let i = 0; i < 16; i++) mem.write(i, i + 100);
     registerBackingStore(0, mem);
@@ -129,7 +129,7 @@ describe("ProgramMemory", () => {
     expect(state[3]).toBe(106); // memory[6]
   });
 
-  it("noChangeOnFallingClock — falling edge does not increment", () => {
+  it("noChangeOnFallingClock- falling edge does not increment", () => {
     const mem = new DataField(16);
     mem.write(0, 0xFF);
     mem.write(1, 0xEE);
@@ -152,7 +152,7 @@ describe("ProgramMemory", () => {
     expect(state[4]).toBe(1);
   });
 
-  it("noChangeOnSustainedHighClock — second high tick does not increment", () => {
+  it("noChangeOnSustainedHighClock- second high tick does not increment", () => {
     const mem = new DataField(16);
     registerBackingStore(0, mem);
 
@@ -169,7 +169,7 @@ describe("ProgramMemory", () => {
     expect(state[4]).toBe(1);
   });
 
-  it("noBackingStore — output is 0, no crash", () => {
+  it("noBackingStore- output is 0, no crash", () => {
     const { layout, state } = makeLayout();
     const highZs = new Uint32Array(state.length);
     state[1] = 0;
@@ -177,7 +177,7 @@ describe("ProgramMemory", () => {
     expect(state[3]).toBe(0);
   });
 
-  it("outputCurrentAddress — D always reflects memory[addrReg] after each call", () => {
+  it("outputCurrentAddress- D always reflects memory[addrReg] after each call", () => {
     const mem = new DataField(8);
     mem.write(0, 0xAA);
     mem.write(1, 0xBB);
@@ -196,7 +196,7 @@ describe("ProgramMemory", () => {
     expect(state[3]).toBe(0xBB); // memory[1]
   });
 
-  it("wrap32bit — address wraps after 32-bit overflow", () => {
+  it("wrap32bit- address wraps after 32-bit overflow", () => {
     const mem = new DataField(4);
     mem.write(0, 0x99);
     registerBackingStore(0, mem);
@@ -212,20 +212,20 @@ describe("ProgramMemory", () => {
     expect(state[3]).toBe(0x99); // memory[0]
   });
 
-  it("isProgramMemoryFlag — element reports isProgramMemory", () => {
+  it("isProgramMemoryFlag- element reports isProgramMemory", () => {
     const props = new PropertyBag();
     props.set("isProgramMemory", true);
     const el = new ProgramMemoryElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
     expect(el.isProgramMemory).toBe(true);
   });
 
-  it("isProgramMemoryDefault — defaults to true", () => {
+  it("isProgramMemoryDefault- defaults to true", () => {
     const props = new PropertyBag();
     const el = new ProgramMemoryElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
     expect(el.isProgramMemory).toBe(true);
   });
 
-  it("pinLayout — 3 input pins and 1 output pin", () => {
+  it("pinLayout- 3 input pins and 1 output pin", () => {
     const props = new PropertyBag();
     const el = new ProgramMemoryElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
     const pins = el.getPins();
@@ -240,7 +240,7 @@ describe("ProgramMemory", () => {
     expect(labels).toContain("D");
   });
 
-  it("clockPinMarked — C pin is clock-capable", () => {
+  it("clockPinMarked- C pin is clock-capable", () => {
     const props = new PropertyBag();
     const el = new ProgramMemoryElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
     const cPin = el.getPins().find(p => p.label === "C");
@@ -248,7 +248,7 @@ describe("ProgramMemory", () => {
     expect(cPin!.isClock).toBe(true);
   });
 
-  it("attributeMapping — Bits, AddrBits, Label, isProgramMemory map correctly", () => {
+  it("attributeMapping- Bits, AddrBits, Label, isProgramMemory map correctly", () => {
     const bitsMap = PROGRAM_MEMORY_ATTRIBUTE_MAPPINGS.find(m => m.xmlName === "Bits");
     const addrMap = PROGRAM_MEMORY_ATTRIBUTE_MAPPINGS.find(m => m.xmlName === "AddrBits");
     const labelMap = PROGRAM_MEMORY_ATTRIBUTE_MAPPINGS.find(m => m.xmlName === "Label");
@@ -261,7 +261,7 @@ describe("ProgramMemory", () => {
     expect(isPMMap!.convert("false")).toBe(false);
   });
 
-  it("draw — renders body with PMEM symbol", () => {
+  it("draw- renders body with PMEM symbol", () => {
     const props = new PropertyBag();
     const el = new ProgramMemoryElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
 
@@ -284,7 +284,7 @@ describe("ProgramMemory", () => {
     expect(texts).toContain("PMEM");
   });
 
-  it("drawWithLabel — label appears in draw output", () => {
+  it("drawWithLabel- label appears in draw output", () => {
     const props = new PropertyBag();
     props.set("label", "CODE");
     const el = new ProgramMemoryElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
@@ -299,7 +299,7 @@ describe("ProgramMemory", () => {
     expect(texts).toContain("CODE");
   });
 
-  it("definitionComplete — ProgramMemoryDefinition has all required fields", () => {
+  it("definitionComplete- ProgramMemoryDefinition has all required fields", () => {
     expect(ProgramMemoryDefinition.name).toBe("ProgramMemory");
     expect(ProgramMemoryDefinition.factory).toBeDefined();
     expect(ProgramMemoryDefinition.models!.digital!.executeFn).toBeDefined();
@@ -311,12 +311,12 @@ describe("ProgramMemory", () => {
     expect(typeof ProgramMemoryDefinition.models!.digital!.defaultDelay).toBe("number");
   });
 
-  it("factoryCreatesInstance — factory returns ProgramMemoryElement", () => {
+  it("factoryCreatesInstance- factory returns ProgramMemoryElement", () => {
     const props = new PropertyBag();
     expect(ProgramMemoryDefinition.factory(props)).toBeInstanceOf(ProgramMemoryElement);
   });
 
-  it("boundingBox — returns non-zero dimensions", () => {
+  it("boundingBox- returns non-zero dimensions", () => {
     const props = new PropertyBag();
     const el = new ProgramMemoryElement(crypto.randomUUID(), { x: 1, y: 2 }, 0, false, props);
     const bb = el.getBoundingBox();

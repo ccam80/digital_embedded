@@ -111,14 +111,14 @@ export function captureTopology(
       }
     }
 
-    // Internal (prime) nodes — labels from getInternalNodeLabels(); IDs are
-    // allocated in order starting at _pinNodes.size (allocation offset per §A.23).
+    // Internal (prime) nodes- labels from getInternalNodeLabels(); IDs are
+    // allocated in order starting at _pinNodes.size (allocation offset per ssA.23).
     const pinCount = el._pinNodes.size;
     const internalLabels = (el as any).getInternalNodeLabels?.() ?? [];
     for (let p = 0; p < internalLabels.length; p++) {
       // Internal node IDs follow pin nodes in allocation order: offset = pinCount + p.
       // The element's own nodeId bookkeeping is not on the public interface, so we
-      // derive the ID from the allocation offset as specified in §A.23.
+      // derive the ID from the allocation offset as specified in ssA.23.
       const nodeId = pinCount + p;
       if (nodeId === 0) continue;
       const tag = `${elLabel}:${internalLabels[p]}`;
@@ -253,7 +253,7 @@ export type PostIterationHook = (
  * The pre-factor hook fires between cktLoad and solver.preorder()/factor()
  * (newton-raphson.ts STEP B+; mirrors ngspice niiter.c:704-842 + 915-924).
  * It captures the post-load, pre-LU MNA matrix and the pre-solve RHS into
- * scratch buffers — the unique window where these values are observable
+ * scratch buffers- the unique window where these values are observable
  * before factor() overwrites _elVal[] with LU and solve() overwrites
  * ctx.rhs with the solution. The post-iteration hook reads the scratch
  * buffers when assembling each IterationSnapshot.
@@ -274,7 +274,7 @@ export function createIterationCaptureHook(
   // statePool lazily inside _setup() (called from the first dcOperatingPoint() /
   // step()), which runs AFTER the harness wires up its capture hooks. Capturing
   // the statePool by value at hook-construction time would freeze it at `null`
-  // and silently no-op every captureElementStates() call — which is exactly the
+  // and silently no-op every captureElementStates() call- which is exactly the
   // bug that left every parity-test elementStates array empty for our side.
   const getStatePool: () => StatePool | null =
     typeof statePool === "function" ? statePool : () => statePool;
@@ -282,9 +282,9 @@ export function createIterationCaptureHook(
   let snapshots: IterationSnapshot[] = [];
   let detailBuffer: NonNullable<NRAttemptRecord["iterationDetails"]> = [];
 
-  // Pre-factor scratch buffers — populated by preFactorHook, consumed by hook.
+  // Pre-factor scratch buffers- populated by preFactorHook, consumed by hook.
   // Mirrors ngspice's static ni_mxColPtr / ni_mxRowIdx / ni_mxVals / ni_preSolveRhs
-  // (niiter.c:170-175, 166-167) — one snapshot per NR iteration, overwritten
+  // (niiter.c:170-175, 166-167)- one snapshot per NR iteration, overwritten
   // each iteration before the post-iteration hook reads it.
   let preFactorMatrix: ReturnType<SparseSolver["getCSCNonZeros"]> = [];
   let preSolveRhs: Float64Array = new Float64Array(0);
@@ -305,7 +305,7 @@ export function createIterationCaptureHook(
   const preFactorHook = (ctx: CKTCircuitContext): void => {
     // Window: post-cktLoad, pre-preorder/factor. ctx.rhs holds load stamps;
     // solver._elVal[] holds post-load, pre-LU MNA values. ngspice
-    // niiter.c:704-842 (matrix) + niiter.c:915-924 (pre-solve RHS) — both
+    // niiter.c:704-842 (matrix) + niiter.c:915-924 (pre-solve RHS)- both
     // captures land in this window since factor() does not write RHS.
     preFactorMatrix = solver.getCSCNonZeros();
     if (preSolveRhs.length !== ctx.rhs.length) {
@@ -334,7 +334,7 @@ export function createIterationCaptureHook(
       : convergenceFailedElements;
 
     // W2.3: diagnostic label decoded from the `cktMode` bitfield (cktdefs.h:165-185).
-    // bitsToName joins multiple set bits with "|" — e.g. "MODEDCOP|MODEINITJCT".
+    // bitsToName joins multiple set bits with "|"- e.g. "MODEDCOP|MODEINITJCT".
     const resolvedInitMode = bitsToName(ctx.cktMode);
 
     // matrixSize: mirror ngspice's CKTmaxEqNum-based counter convention
@@ -343,7 +343,7 @@ export function createIterationCaptureHook(
     // CKTmaxEqNum = 1 + N, and reports matrixSize = CKTmaxEqNum + 1 = N + 2.
     // Our rhs.length is N + 1 (ground sentinel + N active eqs), so the
     // ngspice-equivalent matrixSize is rhs.length + 1. The +1 is a
-    // post-inc setup tracker, not an actual rhs-vector slot — ngspice's
+    // post-inc setup tracker, not an actual rhs-vector slot- ngspice's
     // CKTrhs is allocated to SMPmatSize+1 = N+1 doubles (nireinit.c).
     //
     // rhsBufSize: actual rhs/rhsOld/preSolveRhs buffer length. Our engine
@@ -368,7 +368,7 @@ export function createIterationCaptureHook(
       initMode: resolvedInitMode,
       // ctx.ag is a live length-7 reused buffer (see CKTCircuitContext:ctx.ag
       // allocated once in constructor at ckt-context.ts:511). A fresh copy is
-      // MANDATORY here — without `new Float64Array(...)` every snapshot would
+      // MANDATORY here- without `new Float64Array(...)` every snapshot would
       // alias the latest step's coefficients, destroying per-iteration history.
       ag: new Float64Array(ctx.ag),
       method: ctx.loadCtx.method,
@@ -408,22 +408,22 @@ export function createIterationCaptureHook(
 }
 
 // ---------------------------------------------------------------------------
-// Phase-aware step capture hook (spec §4.2)
+// Phase-aware step capture hook (spec ss4.2)
 // ---------------------------------------------------------------------------
 
 /**
  * Create a phase-aware step capture hook.
  *
  * API:
- *   beginAttempt(phase, dt, phaseParameter?) — opens a new NRAttempt.
+ *   beginAttempt(phase, dt, phaseParameter?)- opens a new NRAttempt.
  *     stepStartTime is captured from simTime on the first beginAttempt call
  *     for this step (currentStep === null).
- *   endAttempt(outcome, converged) — closes the current NRAttempt.
+ *   endAttempt(outcome, converged)- closes the current NRAttempt.
  *   endStep({ stepEndTime, integrationCoefficients, analysisPhase, acceptedAttemptIndex })
- *     — emits the completed StepSnapshot.
- *   peekIterations() — view current iteration snapshots without consuming.
- *   getSteps() — all completed steps.
- *   clear() — reset all state.
+ *    - emits the completed StepSnapshot.
+ *   peekIterations()- view current iteration snapshots without consuming.
+ *   getSteps()- all completed steps.
+ *   clear()- reset all state.
  *
  * Usage for DCOP (called from comparison-session.ts before compile()):
  *   beginAttempt("dcopDirect", 0)
@@ -488,7 +488,7 @@ export function createStepCaptureHook(
     /**
      * Begin a new NR attempt. If no step is currently open, opens one
      * and captures dt as stepStartTime sentinel (actual stepStartTime is
-     * set from the first iteration's simTime context — but since we don't
+     * set from the first iteration's simTime context- but since we don't
      * have engine.simTime here, callers must pass 0 for DCOP and the
      * pre-advance simTime for transient).
      *
@@ -556,7 +556,7 @@ export function createStepCaptureHook(
       lteDt?: number;
     }): void {
       if (pendingAttempts.length === 0) {
-        // Nothing to emit — no attempts were recorded
+        // Nothing to emit- no attempts were recorded
         return;
       }
 
@@ -575,7 +575,7 @@ export function createStepCaptureHook(
 
       // Paint per-step `delta` onto the last iteration of the accepted
       // attempt. `order` is now set per-iteration from ctx.loadCtx.order in
-      // createIterationCaptureHook — do NOT overwrite it at step-end or the
+      // createIterationCaptureHook- do NOT overwrite it at step-end or the
       // per-iteration history (needed to discriminate H1 vs H2 vs H3) is lost.
       if (acceptedAttempt.iterations.length > 0) {
         const lastIter = acceptedAttempt.iterations[acceptedAttempt.iterations.length - 1]!;

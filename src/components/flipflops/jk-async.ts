@@ -38,7 +38,7 @@ import { makeJKAsyncFlipflopAnalogFactory } from "../../solver/analog/behavioral
 const COMP_WIDTH = 3;
 
 // ---------------------------------------------------------------------------
-// Pin declarations — symmetric=false, 5 inputs, 2 outputs
+// Pin declarations- symmetric=false, 5 inputs, 2 outputs
 // inputs: Set@y=0, J@y=1, C@y=2, K@y=3, Clr@y=4
 // outputs: Q@y=0, ~Q@y=1
 // ---------------------------------------------------------------------------
@@ -110,7 +110,7 @@ const JK_FF_AS_PIN_DECLARATIONS: PinDeclaration[] = [
 ];
 
 // ---------------------------------------------------------------------------
-// JKAsyncElement — CircuitElement implementation
+// JKAsyncElement- CircuitElement implementation
 // ---------------------------------------------------------------------------
 
 export class JKAsyncElement extends AbstractCircuitElement {
@@ -214,7 +214,7 @@ export class JKAsyncElement extends AbstractCircuitElement {
 }
 
 // ---------------------------------------------------------------------------
-// executeJKAsync — flat simulation function
+// executeJKAsync- flat simulation function
 //
 // Input layout:  [Set=0, J=1, C=2, K=3, Clr=4]
 // Output layout: [Q=0, ~Q=1]
@@ -292,7 +292,7 @@ const JK_FF_AS_PROPERTY_DEFS: PropertyDefinition[] = [
 ];
 
 // ---------------------------------------------------------------------------
-// JKAsyncDefinition — ComponentDefinition
+// JKAsyncDefinition- ComponentDefinition
 // ---------------------------------------------------------------------------
 
 function jkAsyncFactory(props: PropertyBag): JKAsyncElement {

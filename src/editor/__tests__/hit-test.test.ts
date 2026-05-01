@@ -1,7 +1,7 @@
 /**
  * Tests for hit-test pure functions.
  *
- * Uses lightweight stubs for CircuitElement and Wire — no DOM required.
+ * Uses lightweight stubs for CircuitElement and Wire- no DOM required.
  */
 
 import { describe, it, expect } from "vitest";
@@ -124,7 +124,7 @@ describe("HitTest", () => {
   });
 
   // ---------------------------------------------------------------------------
-  // hitTestAll — priority ordering
+  // hitTestAll- priority ordering
   // ---------------------------------------------------------------------------
 
   it("pinTakesPriorityOverElement", () => {

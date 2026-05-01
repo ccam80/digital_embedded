@@ -1,5 +1,5 @@
 /**
- * Sub component — N-bit subtractor with borrow in/out.
+ * Sub component- N-bit subtractor with borrow in/out.
  *
  * Ports from Digital's Sub.java:
  *   Inputs: a (bitWidth), b (bitWidth), c_i (1-bit borrow in)
@@ -43,7 +43,7 @@ const COMP_WIDTH = 3;
 // bodyHeight = max(3,2)=3, yBottom=(3-1)+0.5=2.5, height=2.5+0.5=3
 
 // ---------------------------------------------------------------------------
-// Pin layout — GenericShape positions (symmetric=false, 3 inputs, 2 outputs)
+// Pin layout- GenericShape positions (symmetric=false, 3 inputs, 2 outputs)
 // offs=0; no even correction
 // inputs: a@y=0, b@y=1, c_i@y=2
 // outputs: s@y=0, c_o@y=1
@@ -139,7 +139,7 @@ export class SubElement extends AbstractCircuitElement {
 }
 
 // ---------------------------------------------------------------------------
-// executeSubWithWidth — parameterised flat simulation function
+// executeSubWithWidth- parameterised flat simulation function
 //
 // Inputs: [a, b, c_i]   Outputs: [s, c_o]
 //
@@ -234,7 +234,7 @@ export const SubDefinition: ComponentDefinition = {
   attributeMap: SUB_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.ARITHMETIC,
   helpText:
-    "Sub — N-bit subtractor with borrow in/out.\n" +
+    "Sub- N-bit subtractor with borrow in/out.\n" +
     "Inputs: a, b (bitWidth bits each), c_i (1-bit borrow in).\n" +
     "Outputs: s (bitWidth-bit difference), c_o (1-bit borrow out).",
   models: {

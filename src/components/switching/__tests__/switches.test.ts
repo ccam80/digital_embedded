@@ -41,7 +41,7 @@ import type { RenderContext, Point, TextAnchor, FontSpec, PathData } from "../..
 import type { ThemeColor } from "../../../core/renderer-interface.js";
 
 // ---------------------------------------------------------------------------
-// Helpers — ComponentLayout mock
+// Helpers- ComponentLayout mock
 // ---------------------------------------------------------------------------
 
 function makeLayout(
@@ -65,7 +65,7 @@ function makeState(size: number): Uint32Array {
 }
 
 // ---------------------------------------------------------------------------
-// Helpers — RenderContext mock
+// Helpers- RenderContext mock
 // ---------------------------------------------------------------------------
 
 interface DrawCall {
@@ -253,7 +253,7 @@ describe("Switch", () => {
   });
 
   // -------------------------------------------------------------------------
-  // executeSwitch — writes closed flag to state
+  // executeSwitch- writes closed flag to state
   // -------------------------------------------------------------------------
 
   describe("executeFn", () => {
@@ -309,7 +309,7 @@ describe("Switch", () => {
       const { ctx, calls } = makeStubCtx();
       sw.draw(ctx);
       const lineCalls = calls.filter((c) => c.method === "drawLine");
-      // Contact arm line: (0,0) → (1.8,-0.5) — starts at x=0
+      // Contact arm line: (0,0) → (1.8,-0.5)- starts at x=0
       const contactArm = lineCalls.find(
         (c) => c.args[0] === 0,
       );
@@ -475,7 +475,7 @@ describe("SwitchDT", () => {
   });
 
   // -------------------------------------------------------------------------
-  // Pin layout — SPDT: 3 pins per pole (A, B, C)
+  // Pin layout- SPDT: 3 pins per pole (A, B, C)
   // -------------------------------------------------------------------------
 
   describe("pinLayout", () => {
@@ -517,7 +517,7 @@ describe("SwitchDT", () => {
   });
 
   // -------------------------------------------------------------------------
-  // executeSwitchDT — writes closed flag to state
+  // executeSwitchDT- writes closed flag to state
   // -------------------------------------------------------------------------
 
   describe("executeFn", () => {
@@ -724,7 +724,7 @@ describe("RegistryAliases", () => {
 });
 
 // ===========================================================================
-// Analog Switch tests — use real setup path (W3 contract)
+// Analog Switch tests- use real setup path (W3 contract)
 // ===========================================================================
 
 import { SparseSolver } from "../../../solver/analog/sparse-solver.js";
@@ -737,7 +737,7 @@ import type { AnalogElement } from "../../../solver/analog/element.js";
 import type { SetupContext } from "../../../solver/analog/setup-context.js";
 
 // ---------------------------------------------------------------------------
-// Inline resistor helper — §A.13 contract shape (no exported factory exists).
+// Inline resistor helper- ssA.13 contract shape (no exported factory exists).
 // ---------------------------------------------------------------------------
 function makeResistor(nodeA: number, nodeB: number, resistance: number): AnalogElement {
   const G = 1 / resistance;
@@ -815,7 +815,7 @@ function makeSpstProps(overrides: {
 }
 
 // ---------------------------------------------------------------------------
-// makeVsrc — DC voltage source helper
+// makeVsrc- DC voltage source helper
 // ---------------------------------------------------------------------------
 function makeVsrc(posNode: number, negNode: number, voltage: number): AnalogElement {
   const props = new PropertyBag();
@@ -843,7 +843,7 @@ describe("AnalogSwitch", () => {
     const order = (solver as any)._getInsertionOrder() as Array<{ extRow: number; extCol: number }>;
     expect(order).toHaveLength(4); // PP, PN, NP, NN
 
-    // Handles are private (§A.9); verify setup ran via observable state fields.
+    // Handles are private (ssA.9); verify setup ran via observable state fields.
     expect(el._stateBase).toBeGreaterThanOrEqual(0);
     expect(el.branchIndex).toBe(-1); // SW has no branch row
   });
@@ -864,7 +864,7 @@ describe("AnalogSwitch", () => {
     elClosed.setup(ctxClosed);
 
     // G_roff = 1/1e9 = 1e-9, G_ron = 1/1 = 1.0
-    // Both elements get the same TSTALLOC shape — 4 handles
+    // Both elements get the same TSTALLOC shape- 4 handles
     const orderOpen = (solverOpen as any)._getInsertionOrder() as Array<{ extRow: number; extCol: number }>;
     const orderClosed = (solverClosed as any)._getInsertionOrder() as Array<{ extRow: number; extCol: number }>;
     expect(orderOpen).toHaveLength(4);
@@ -1006,12 +1006,12 @@ describe("AnalogSPDT", () => {
 
     const order = (solver as any)._getInsertionOrder() as Array<{ extRow: number; extCol: number }>;
     expect(order).toEqual([
-      // SW_AB — swsetup.c:59-62, first pass (posNode=1, negNode=2)
+      // SW_AB- swsetup.c:59-62, first pass (posNode=1, negNode=2)
       { extRow: 1, extCol: 1 }, // swAB._hPP
       { extRow: 1, extCol: 2 }, // swAB._hPN
       { extRow: 2, extCol: 1 }, // swAB._hNP
       { extRow: 2, extCol: 2 }, // swAB._hNN
-      // SW_AC — swsetup.c:59-62, second pass (posNode=1, negNode=3)
+      // SW_AC- swsetup.c:59-62, second pass (posNode=1, negNode=3)
       { extRow: 1, extCol: 1 }, // swAC._hPP
       { extRow: 1, extCol: 3 }, // swAC._hPN
       { extRow: 3, extCol: 1 }, // swAC._hNP
@@ -1036,11 +1036,11 @@ describe("AnalogSPDT", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Integration test — switched resistor divider using makeSimpleCtx + solveDcOp
+// Integration test- switched resistor divider using makeSimpleCtx + solveDcOp
 //
 // SwitchAnalogElement.setup() is called after CKTCircuitContext construction
 // (which calls _initStructure), ensuring handles are valid before load().
-// makeDcVoltageSource and the local makeResistor follow the §A.13 contract:
+// makeDcVoltageSource and the local makeResistor follow the ssA.13 contract:
 // handles are allocated in setup(), stamped in load().
 // ---------------------------------------------------------------------------
 

@@ -5,7 +5,7 @@
  * so the MNA solver allocates a proper branch row for the voltage source.
  *
  * Circuit topology:
- *   Vs(5V, pos→node1, neg→node0) — R1(1kΩ, A→node1, B→node2) — D1(A→node2, K→node0)
+ *   Vs(5V, pos→node1, neg→node0)- R1(1kΩ, A→node1, B→node2)- D1(A→node2, K→node0)
  *   matrixSize = 3  (2 voltage nodes + 1 branch row for Vs)
  */
 
@@ -49,7 +49,7 @@ export function buildHwrFixture(): HwrFixture {
 
   const analogEngine = coordinator.getAnalogEngine();
   if (analogEngine === null) {
-    throw new Error("buildHwrFixture: no analog engine — circuit has no analog domain");
+    throw new Error("buildHwrFixture: no analog engine- circuit has no analog domain");
   }
 
   const mnaEngine = analogEngine as MNAEngine;

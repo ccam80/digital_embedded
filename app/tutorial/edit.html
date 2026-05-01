@@ -298,7 +298,7 @@
       if (editable) editableFields = new Set(editable.split(','));
       else editableFields = new Set(['testData', 'instructions', 'hints']);
     }
-    // This page lives at /<base>/app/tutorial/edit.html — resolve manifest paths
+    // This page lives at /<base>/app/tutorial/edit.html- resolve manifest paths
     // (callers pass root-relative paths like "tutorials/foo/manifest.json") against
     // the deploy root so they work regardless of page depth.
     const DEPLOY_ROOT = new URL('../../', location.href).href;
@@ -875,7 +875,7 @@
     }
 
     // -----------------------------------------------------------------------
-    // Validation (structural — no registry access in browser)
+    // Validation (structural- no registry access in browser)
     // -----------------------------------------------------------------------
     function validateInEditor() {
       const diags = [];
@@ -1148,7 +1148,7 @@
           });
         return;
       }
-      // No .dig file — load empty circuit
+      // No .dig file- load empty circuit
       const emptyDig = '<?xml version="1.0" encoding="utf-8"?><circuit></circuit>';
       previewIframe.contentWindow.postMessage({ type: 'sim-load-data', data: btoa(emptyDig) }, '*');
     }

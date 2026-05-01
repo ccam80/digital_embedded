@@ -51,7 +51,7 @@ export function registerCircuitTools(
 
         let circuit;
         if (content.trimStart().startsWith("{")) {
-          // Native .dts JSON format — subcircuits are stored on circuit.metadata
+          // Native .dts JSON format- subcircuits are stored on circuit.metadata
           circuit = deserializeDts(content, registry);
         } else {
           // .dig XML format
@@ -201,7 +201,7 @@ export function registerCircuitTools(
         for (const name of typeNames) {
           let def = facade.describeComponent(name);
           if (def && def.pinLayout.length === 0 && LIBRARY_74XX.some((e) => e.name === name)) {
-            // 74xx stub with no pins — load the full definition from disk
+            // 74xx stub with no pins- load the full definition from disk
             const entry = LIBRARY_74XX.find((e) => e.name === name)!;
             const lib74xxDir = resolve(fileURLToPath(import.meta.url), "../../..", "lib/74xx");
             const filePath = `${lib74xxDir}/${entry.file}`;
@@ -475,7 +475,7 @@ export function registerCircuitTools(
       title: "Build Circuit from Spec",
       description:
         "Create a new circuit from a declarative specification. Works with digital, analog, and mixed-signal circuits. " +
-        "No coordinates required — the builder auto-positions components and auto-routes wires. " +
+        "No coordinates required- the builder auto-positions components and auto-routes wires. " +
         "Components are addressed by their spec id, pins by 'id:pinLabel'. " +
         "Returns a handle and post-build diagnostics.",
       inputSchema: {
@@ -492,7 +492,7 @@ export function registerCircuitTools(
                     .record(z.unknown())
                     .optional()
                     .describe(
-                      "Optional properties — use internal keys from circuit_describe (e.g. bitWidth, label, inputCount). XML-convention keys (e.g. Bits, Inputs) are also accepted and auto-translated.",
+                      "Optional properties- use internal keys from circuit_describe (e.g. bitWidth, label, inputCount). XML-convention keys (e.g. Bits, Inputs) are also accepted and auto-translated.",
                     ),
                   layout: z
                     .object({
@@ -963,7 +963,7 @@ export function registerCircuitTools(
         const result = testEquivalence(circuitA, circuitB, registry, maxInputBits);
 
         if (result.mismatches === -1) {
-          // Limit exceeded — not an equivalence result, just a bounds error
+          // Limit exceeded- not an equivalence result, just a bounds error
           return {
             content: [
               {

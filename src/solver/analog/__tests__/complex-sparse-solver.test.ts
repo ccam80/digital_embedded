@@ -1,8 +1,8 @@
 /**
- * ComplexSparseSolver unit tests — Wave 0.4
+ * ComplexSparseSolver unit tests- Wave 0.4
  *
  * Task 0.4.1: Persistent linked-list complex matrix + handle-based stamp API
- * Task 0.4.2: Drop AMD/etree — Markowitz on original column order
+ * Task 0.4.2: Drop AMD/etree- Markowitz on original column order
  * Task 0.4.3: SMPpreOrder on complex linked structure
  * Task 0.4.4: value-addressed stamp() deleted
  * Task 0.4.5: forceReorder() lifecycle
@@ -19,7 +19,7 @@ import { ComplexSparseSolver } from "../complex-sparse-solver.js";
 // Task 0.4.1 tests
 // ---------------------------------------------------------------------------
 
-describe("ComplexSparseSolver — Task 0.4.1", () => {
+describe("ComplexSparseSolver- Task 0.4.1", () => {
   it("allocComplexElement_returns_stable_handle", () => {
     const solver = new ComplexSparseSolver();
     solver.beginAssembly(3);
@@ -122,7 +122,7 @@ describe("ComplexSparseSolver — Task 0.4.1", () => {
     const xIm = new Float64Array(2);
     solver.solve(xRe, xIm);
 
-    // Second beginAssembly — should zero values but preserve structure
+    // Second beginAssembly- should zero values but preserve structure
     solver.beginAssembly(2);
 
     // Element count (A-matrix entries) unchanged
@@ -173,10 +173,10 @@ describe("ComplexSparseSolver — Task 0.4.1", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Task 0.4.2 tests — Drop AMD, Markowitz on original column order
+// Task 0.4.2 tests- Drop AMD, Markowitz on original column order
 // ---------------------------------------------------------------------------
 
-describe("ComplexSparseSolver — Task 0.4.2", () => {
+describe("ComplexSparseSolver- Task 0.4.2", () => {
   it("solve_without_amd_3x3_complex", () => {
     // 3×3 complex system: A*x = b
     // A = [[2+j, -1, 0], [-1, 2+j, -1], [0, -1, 2+j]]
@@ -304,10 +304,10 @@ describe("ComplexSparseSolver — Task 0.4.2", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Task 0.4.3 tests — SMPpreOrder on complex linked structure
+// Task 0.4.3 tests- SMPpreOrder on complex linked structure
 // ---------------------------------------------------------------------------
 
-describe("ComplexSparseSolver — Task 0.4.3", () => {
+describe("ComplexSparseSolver- Task 0.4.3", () => {
   it("preorder_fixes_zero_diagonal_from_ac_voltage_source", () => {
     // 3×3 AC MNA with voltage-source branch row:
     //   [[G, 0, 1],
@@ -322,12 +322,12 @@ describe("ComplexSparseSolver — Task 0.4.3", () => {
 
     const h00 = solver.allocComplexElement(0, 0); solver.stampComplexElement(h00, G, 0);
     const h11 = solver.allocComplexElement(1, 1); solver.stampComplexElement(h11, G, 0);
-    // Twin pair: (0,2)=1 and (2,0)=1 — |value|²=1
+    // Twin pair: (0,2)=1 and (2,0)=1- |value|²=1
     const h02 = solver.allocComplexElement(0, 2); solver.stampComplexElement(h02, 1, 0);
     const h12 = solver.allocComplexElement(1, 2); solver.stampComplexElement(h12, -1, 0);
     const h20 = solver.allocComplexElement(2, 0); solver.stampComplexElement(h20, 1, 0);
     const h21 = solver.allocComplexElement(2, 1); solver.stampComplexElement(h21, -1, 0);
-    // No diagonal at (2,2) — structurally zero
+    // No diagonal at (2,2)- structurally zero
 
     solver.stampRHS(2, 1, 0); // Vs = 1
     solver.finalize();
@@ -352,7 +352,7 @@ describe("ComplexSparseSolver — Task 0.4.3", () => {
     //      [1, -1, 0, 0, 0],
     //      [0, 0, 0, G3, 1],
     //      [0, 0, 0, 1, 0]]
-    // Cols 2 and 4 have zero diagonals — preorder should fix both.
+    // Cols 2 and 4 have zero diagonals- preorder should fix both.
     const n = 5;
     const G1 = 1.0, G2 = 1.0, G3 = 1.0;
     const solver = new ComplexSparseSolver();
@@ -528,7 +528,7 @@ describe("ComplexSparseSolver — Task 0.4.3", () => {
 // Task 0.4.4 tests
 // ---------------------------------------------------------------------------
 
-describe("ComplexSparseSolver — Task 0.4.4", () => {
+describe("ComplexSparseSolver- Task 0.4.4", () => {
   it("value_addressed_stamp_deleted", () => {
     // stamp(row, col, re, im) must not exist on the class or its interface.
     expect((new ComplexSparseSolver() as any).stamp).toBeUndefined();
@@ -539,7 +539,7 @@ describe("ComplexSparseSolver — Task 0.4.4", () => {
 // Task 0.4.5 tests
 // ---------------------------------------------------------------------------
 
-describe("ComplexSparseSolver — Task 0.4.5", () => {
+describe("ComplexSparseSolver- Task 0.4.5", () => {
   it("factor_uses_numeric_path_after_first_complex_reorder", () => {
     // After one successful factor() with reorder, subsequent factor() calls
     // should use the numeric-only path.
@@ -612,10 +612,10 @@ describe("ComplexSparseSolver — Task 0.4.5", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Wave 1.5 tests — Complex solver mirror (F1.2, F1.3, F1.4)
+// Wave 1.5 tests- Complex solver mirror (F1.2, F1.3, F1.4)
 // ---------------------------------------------------------------------------
 
-describe("ComplexSparseSolver — Wave 1.5 (F1.2: invalidateTopology sets _needsReorderComplex)", () => {
+describe("ComplexSparseSolver- Wave 1.5 (F1.2: invalidateTopology sets _needsReorderComplex)", () => {
   it("invalidateTopology_sets_needsReorderComplex_so_next_factor_uses_reorder_path", () => {
     // Arrange: fully assembled and factored solver (no reorder needed for 2nd factor)
     const n = 2;
@@ -670,7 +670,7 @@ describe("ComplexSparseSolver — Wave 1.5 (F1.2: invalidateTopology sets _needs
   });
 });
 
-describe("ComplexSparseSolver — Wave 1.5 (F1.3: allocComplexElement sets _needsReorderComplex)", () => {
+describe("ComplexSparseSolver- Wave 1.5 (F1.3: allocComplexElement sets _needsReorderComplex)", () => {
   it("allocComplexElement_new_entry_triggers_reorder_on_next_factor", () => {
     // Arrange: assemble and factor 2×2 system to establish pivot order
     const n = 3;
@@ -687,7 +687,7 @@ describe("ComplexSparseSolver — Wave 1.5 (F1.3: allocComplexElement sets _need
     solver.factor();
     expect(solver.lastFactorUsedReorder).toBe(true);
 
-    // Reassemble without new elements — should use numeric path
+    // Reassemble without new elements- should use numeric path
     solver.beginAssembly(n);
     solver.stampComplexElement(solver.allocComplexElement(0, 0), 2, 1);
     solver.stampComplexElement(solver.allocComplexElement(1, 1), 2, 1);
@@ -699,7 +699,7 @@ describe("ComplexSparseSolver — Wave 1.5 (F1.3: allocComplexElement sets _need
     solver.factor();
     expect(solver.lastFactorUsedReorder).toBe(false);
 
-    // Now add a NEW off-diagonal element — allocComplexElement must set _needsReorderComplex
+    // Now add a NEW off-diagonal element- allocComplexElement must set _needsReorderComplex
     solver.beginAssembly(n);
     solver.stampComplexElement(solver.allocComplexElement(0, 0), 2, 1);
     solver.stampComplexElement(solver.allocComplexElement(1, 1), 2, 1);
@@ -716,7 +716,7 @@ describe("ComplexSparseSolver — Wave 1.5 (F1.3: allocComplexElement sets _need
   });
 });
 
-describe("ComplexSparseSolver — Wave 1.5 (F1.4: threshold constants + per-instance tolerances)", () => {
+describe("ComplexSparseSolver- Wave 1.5 (F1.4: threshold constants + per-instance tolerances)", () => {
   it("setComplexPivotTolerances_method_exists_and_accepts_valid_values", () => {
     const solver = new ComplexSparseSolver();
     // Must exist and not throw

@@ -1,5 +1,5 @@
 /**
- * Decoder component — N-bit input → 2^N one-hot outputs.
+ * Decoder component- N-bit input → 2^N one-hot outputs.
  * Only output[input_value] is 1; all others are 0.
  *
  * Properties:
@@ -54,7 +54,7 @@ export function buildDecoderPinDeclarations(selectorBits: number, flipSelPos = f
     isClockCapable: false,
   });
 
-  // Output pins — 2 outputs get gap (y=0, y=2), otherwise sequential
+  // Output pins- 2 outputs get gap (y=0, y=2), otherwise sequential
   if (outCount === 2) {
     pins.push({ kind: "signal", direction: PinDirection.OUTPUT, label: "out_0", defaultBitWidth: 1, position: { x: 2, y: 0 }, isNegatable: false, isClockCapable: false });
     pins.push({ kind: "signal", direction: PinDirection.OUTPUT, label: "out_1", defaultBitWidth: 1, position: { x: 2, y: 2 }, isNegatable: false, isClockCapable: false });
@@ -68,7 +68,7 @@ export function buildDecoderPinDeclarations(selectorBits: number, flipSelPos = f
 }
 
 // ---------------------------------------------------------------------------
-// DecoderElement — CircuitElement implementation
+// DecoderElement- CircuitElement implementation
 // ---------------------------------------------------------------------------
 
 export class DecoderElement extends AbstractCircuitElement {
@@ -141,7 +141,7 @@ export class DecoderElement extends AbstractCircuitElement {
 }
 
 // ---------------------------------------------------------------------------
-// executeDecoder — flat simulation function
+// executeDecoder- flat simulation function
 //
 // Pin layout in state array (matching buildDecoderPinDeclarations order):
 //   input 0: sel
@@ -218,7 +218,7 @@ export const DecoderDefinition: ComponentDefinition = {
   attributeMap: DECODER_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.WIRING,
   helpText:
-    "Decoder — N-bit input produces 2^N one-hot outputs.\n" +
+    "Decoder- N-bit input produces 2^N one-hot outputs.\n" +
     "Only output[input_value] is 1; all others are 0.",
   models: {
     digital: {

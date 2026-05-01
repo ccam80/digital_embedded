@@ -28,7 +28,7 @@ if(here->INDbrEq == 0) {
 }
 ```
 
-One branch row allocated for the inductor current. The guard `if (here->INDbrEq == 0)` is the idempotent pattern — mirrors `VSRCfindBr`. In digiTS, `setup()` calls `ctx.makeCur(label, "branch")` and stores the result; `findBranchFor` performs the same idempotent allocation.
+One branch row allocated for the inductor current. The guard `if (here->INDbrEq == 0)` is the idempotent pattern- mirrors `VSRCfindBr`. In digiTS, `setup()` calls `ctx.makeCur(label, "branch")` and stores the result; `findBranchFor` performs the same idempotent allocation.
 
 ## State slots
 
@@ -45,7 +45,7 @@ this._stateBase = ctx.allocStates(2);
 
 ## TSTALLOC sequence (line-for-line port)
 
-`indsetup.c:96-100` — five unconditional TSTALLOC calls (after `INDbrEq` is allocated):
+`indsetup.c:96-100`- five unconditional TSTALLOC calls (after `INDbrEq` is allocated):
 
 | # | ngspice pair | digiTS pair | handle field |
 |---|---|---|---|
@@ -55,7 +55,7 @@ this._stateBase = ctx.allocStates(2);
 | 4 | `(INDbrEq, INDposNode)` | `(this.branchIndex, pinNodes.get("A"))` | `_hIbrP` |
 | 5 | `(INDbrEq, INDbrEq)` | `(this.branchIndex, this.branchIndex)` | `_hIbrIbr` |
 
-## setup() body — alloc only
+## setup() body- alloc only
 
 ```ts
 setup(ctx: SetupContext): void {
@@ -63,16 +63,16 @@ setup(ctx: SetupContext): void {
   const posNode = pinNodes.get("A")!;  // INDposNode
   const negNode = pinNodes.get("B")!;  // INDnegNode
 
-  // indsetup.c:78-79 — *states += 2 (INDflux = state+0, INDvolt = state+1)
+  // indsetup.c:78-79- *states += 2 (INDflux = state+0, INDvolt = state+1)
   this._stateBase = ctx.allocStates(2);
 
-  // indsetup.c:84-88 — CKTmkCur guard (idempotent, mirrors VSRCfindBr pattern).
+  // indsetup.c:84-88- CKTmkCur guard (idempotent, mirrors VSRCfindBr pattern).
   if (this.branchIndex === -1) {
     this.branchIndex = ctx.makeCur(this._label, "branch");
   }
   const b = this.branchIndex;
 
-  // indsetup.c:96-100 — TSTALLOC sequence, line-for-line.
+  // indsetup.c:96-100- TSTALLOC sequence, line-for-line.
   this._hPIbr   = solver.allocElement(posNode, b);  // (INDposNode, INDbrEq)
   this._hNIbr   = solver.allocElement(negNode, b);  // (INDnegNode, INDbrEq)
   this._hIbrN   = solver.allocElement(b, negNode);  // (INDbrEq,    INDnegNode)
@@ -93,7 +93,7 @@ private _hIbrIbr: number = -1;
 
 Note: `branchIndex` on `AnalogElementCore` must be mutable (per A3: `Drop readonly from branchIndex`). The current `AnalogInductorElement` receives `branchIndex` via constructor; after migration it starts at `-1` and is set in `setup()`.
 
-## load() body — value writes only
+## load() body- value writes only
 
 Implementer ports value-side equations from `ref/ngspice/src/spicelib/devices/ind/indload.c` line-for-line, stamping through cached handles only. No `solver.allocElement` calls.
 
@@ -111,7 +111,7 @@ findBranchFor(name: string, ctx: SetupContext): number {
 }
 ```
 
-This callback is registered on the `MnaModel` and called by `MNAEngine._findBranch()`. The guard `if (this.branchIndex === -1)` is the same idempotent pattern used in `setup()`, so call order is irrelevant — mirrors `VSRCfindBr (vsrc/vsrcfbr.c:26-39)`.
+This callback is registered on the `MnaModel` and called by `MNAEngine._findBranch()`. The guard `if (this.branchIndex === -1)` is the same idempotent pattern used in `setup()`, so call order is irrelevant- mirrors `VSRCfindBr (vsrc/vsrcfbr.c:26-39)`.
 
 ## Factory cleanup
 
@@ -125,11 +125,11 @@ This callback is registered on the `MnaModel` and called by `MNAEngine._findBran
 
 Per CLAUDE.md "Test Policy During W3 Setup-Load-Split", verification is spec compliance only. DO NOT run tests; DO NOT use test results.
 
-1. `setup()` body in the implementation file matches the "setup() body — alloc only" listing in this PB line-for-line.
+1. `setup()` body in the implementation file matches the "setup() body- alloc only" listing in this PB line-for-line.
 2. TSTALLOC sequence in `setup()` matches the order in the cited ngspice anchor file (see top of this PB, e.g. `ressetup.c:46-49`).
 3. Factory cleanup applied per the "Factory cleanup" section above.
 4. `ngspiceNodeMap` registered per the "Pin mapping" section above (or omitted for composites where the spec says so).
-5. `load()` writes through cached handles only — zero `solver.allocElement(...)` calls inside `load()`, `accept()`, or any non-`setup()` method.
+5. `load()` writes through cached handles only- zero `solver.allocElement(...)` calls inside `load()`, `accept()`, or any non-`setup()` method.
 6. `mayCreateInternalNodes` flag set per spec.
 7. `findBranchFor` callback present where spec says (V-output sources, IND, etc.).
 8. No banned closing verdicts (mapping/tolerance/equivalent-to/pre-existing/intentional-divergence/citation-divergence/partial) used in any commit message or report.

@@ -9,7 +9,7 @@
 import type { LogicFamilyConfig } from './logic-family.js';
 
 // ---------------------------------------------------------------------------
-// PinElectricalSpec — optional override fields
+// PinElectricalSpec- optional override fields
 // ---------------------------------------------------------------------------
 
 /**
@@ -40,13 +40,13 @@ export interface PinElectricalSpec {
 }
 
 // ---------------------------------------------------------------------------
-// ResolvedPinElectrical — fully resolved, no optional fields
+// ResolvedPinElectrical- fully resolved, no optional fields
 // ---------------------------------------------------------------------------
 
 /**
  * Fully resolved electrical characteristics for one pin.
  *
- * All fields are required — downstream analog code never needs null checks.
+ * All fields are required- downstream analog code never needs null checks.
  * Produced by resolvePinElectrical() after applying the override cascade.
  */
 export interface ResolvedPinElectrical {
@@ -79,9 +79,9 @@ export interface ResolvedPinElectrical {
  * cascade onto the circuit-level logic family defaults.
  *
  * Priority (highest to lowest):
- *   1. pinOverride   — per-pin override from ComponentDefinition.pinElectricalOverrides
- *   2. componentOverride — component-level override from ComponentDefinition.pinElectrical
- *   3. family        — circuit-level LogicFamilyConfig (from CircuitMetadata.logicFamily)
+ *   1. pinOverride  - per-pin override from ComponentDefinition.pinElectricalOverrides
+ *   2. componentOverride- component-level override from ComponentDefinition.pinElectrical
+ *   3. family       - circuit-level LogicFamilyConfig (from CircuitMetadata.logicFamily)
  */
 export function resolvePinElectrical(
   family: LogicFamilyConfig,

@@ -23,7 +23,7 @@ import type { RenderContext, Point, TextAnchor, FontSpec, PathData } from "../..
 import type { ThemeColor } from "../../../core/renderer-interface.js";
 
 // ---------------------------------------------------------------------------
-// Helpers — ComponentLayout mock
+// Helpers- ComponentLayout mock
 // ---------------------------------------------------------------------------
 
 function makeLayout(inputCount: number): ComponentLayout {
@@ -48,7 +48,7 @@ function makeState(inputs: number[]): Uint32Array {
 }
 
 // ---------------------------------------------------------------------------
-// Helpers — RenderContext mock
+// Helpers- RenderContext mock
 // ---------------------------------------------------------------------------
 
 interface DrawCall {
@@ -88,7 +88,7 @@ function makeStubCtx(): { ctx: RenderContext; calls: DrawCall[] } {
 }
 
 // ---------------------------------------------------------------------------
-// Helpers — XOrElement factory
+// Helpers- XOrElement factory
 // ---------------------------------------------------------------------------
 
 function makeXOr(overrides?: {
@@ -112,7 +112,7 @@ function makeXOr(overrides?: {
 }
 
 // ---------------------------------------------------------------------------
-// executeXOr — logic correctness
+// executeXOr- logic correctness
 // ---------------------------------------------------------------------------
 
 describe("XOrGate", () => {
@@ -203,7 +203,7 @@ describe("XOrGate", () => {
   });
 
   // ---------------------------------------------------------------------------
-  // Rendering — IEC/DIN
+  // Rendering- IEC/DIN
   // ---------------------------------------------------------------------------
 
   describe("drawNarrowIEEE", () => {
@@ -236,7 +236,7 @@ describe("XOrGate", () => {
   });
 
   // ---------------------------------------------------------------------------
-  // Rendering — IEEE/US
+  // Rendering- IEEE/US
   // ---------------------------------------------------------------------------
 
   describe("drawIEEE", () => {

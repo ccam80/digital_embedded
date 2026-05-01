@@ -1,5 +1,5 @@
 /**
- * BitSelector component — selects a single bit from a multi-bit input.
+ * BitSelector component- selects a single bit from a multi-bit input.
  * Output = (input >> selector) & 1.
  *
  * The input width is 2^selectorBits, so selectorBits=3 → 8-bit input.
@@ -37,7 +37,7 @@ import {
 const COMP_WIDTH = 2;
 
 // ---------------------------------------------------------------------------
-// Pin layout — y-positions shifted down by 1 from previous layout
+// Pin layout- y-positions shifted down by 1 from previous layout
 // ---------------------------------------------------------------------------
 
 export function buildBitSelectorPinDeclarations(selectorBits: number): PinDeclaration[] {
@@ -77,7 +77,7 @@ export function buildBitSelectorPinDeclarations(selectorBits: number): PinDeclar
 }
 
 // ---------------------------------------------------------------------------
-// BitSelectorElement — CircuitElement implementation
+// BitSelectorElement- CircuitElement implementation
 // ---------------------------------------------------------------------------
 
 export class BitSelectorElement extends AbstractCircuitElement {
@@ -131,7 +131,7 @@ export class BitSelectorElement extends AbstractCircuitElement {
 }
 
 // ---------------------------------------------------------------------------
-// executeBitSelector — flat simulation function
+// executeBitSelector- flat simulation function
 //
 // Pin layout in state array:
 //   input 0: in (the wide data value)
@@ -207,7 +207,7 @@ export const BitSelectorDefinition: ComponentDefinition = {
   attributeMap: BIT_SELECTOR_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.WIRING,
   helpText:
-    "BitSelector — selects a single bit from a multi-bit input.\n" +
+    "BitSelector- selects a single bit from a multi-bit input.\n" +
     "Output = (input >> selector) & 1.",
   models: {
     digital: {

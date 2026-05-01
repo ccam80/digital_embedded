@@ -1,5 +1,5 @@
 /**
- * Tests for ComponentPalette — tree structure, filtering, recent history,
+ * Tests for ComponentPalette- tree structure, filtering, recent history,
  * and collapsed state.
  */
 
@@ -136,7 +136,7 @@ describe("Palette", () => {
 
     palette.recordPlacement("And");
     palette.recordPlacement("Or");
-    palette.recordPlacement("And"); // duplicate — should move to front
+    palette.recordPlacement("And"); // duplicate- should move to front
 
     const history = palette.getRecentHistory();
     expect(history).toHaveLength(2);
@@ -175,7 +175,7 @@ describe("Palette", () => {
     expect(subcircuitAfter!.children.some(d => d.name === "MyAdder")).toBe(true);
   });
 
-  it("refreshCategories is idempotent — calling it twice does not duplicate entries", () => {
+  it("refreshCategories is idempotent- calling it twice does not duplicate entries", () => {
     registerDef(registry, "MyAdder", ComponentCategory.SUBCIRCUIT);
     const palette = new ComponentPalette(registry);
 

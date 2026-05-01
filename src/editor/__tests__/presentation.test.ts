@@ -1,5 +1,5 @@
 /**
- * Tests for presentation.ts — PresentationMode.
+ * Tests for presentation.ts- PresentationMode.
  */
 
 import { describe, it, expect, vi } from "vitest";

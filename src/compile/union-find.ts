@@ -1,5 +1,5 @@
 /**
- * UnionFind — disjoint-set data structure with path compression and union by rank.
+ * UnionFind- disjoint-set data structure with path compression and union by rank.
  * O(α(n)) amortized per operation.
  */
 

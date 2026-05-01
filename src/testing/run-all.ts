@@ -1,5 +1,5 @@
 /**
- * runAllTests — batch-execute every Testcase component in a circuit.
+ * runAllTests- batch-execute every Testcase component in a circuit.
  *
  * Finds all TestcaseElement instances in the circuit's element list, runs
  * each through the test executor with the circuit's embedded test data, and
@@ -17,13 +17,13 @@ import { executeTests } from './executor.js';
 import type { RunnerFacade } from './executor.js';
 
 // ---------------------------------------------------------------------------
-// countInputs — derive inputCount from circuit topology
+// countInputs- derive inputCount from circuit topology
 // ---------------------------------------------------------------------------
 
 /**
  * Count the number of top-level input components in the circuit.
  *
- * Counts elements whose typeId is "In" — these correspond to the input pins
+ * Counts elements whose typeId is "In"- these correspond to the input pins
  * declared in the test header. The count is used as `inputCount` when parsing
  * embedded test data, so the parser correctly splits signal names into inputs
  * and outputs.
@@ -128,7 +128,7 @@ export async function runAllTests(
  * Attaches a keydown listener on the given target element (or document).
  * When F11 is pressed, calls the provided callback.
  *
- * Returns an unregister function — call it to remove the listener.
+ * Returns an unregister function- call it to remove the listener.
  *
  * @param callback  Function to invoke when F11 is pressed.
  * @param target    Event target (defaults to globalThis document).

@@ -1,5 +1,5 @@
 /**
- * Tests for dig-loader.ts — Circuit construction from parsed .dig XML.
+ * Tests for dig-loader.ts- Circuit construction from parsed .dig XML.
  */
 
 import { describe, it, expect } from "vitest";
@@ -29,7 +29,7 @@ function readCircuit(name: string): string {
 }
 
 // ---------------------------------------------------------------------------
-// Factory helper — creates a TestElement from props, recording label
+// Factory helper- creates a TestElement from props, recording label
 // ---------------------------------------------------------------------------
 
 function makeFactory(typeName: string) {
@@ -469,7 +469,7 @@ describe("DigLoader", () => {
   });
 
   it("missingAttributeUsesDefault", () => {
-    // Element without a Bits attribute — factory should receive PropertyBag
+    // Element without a Bits attribute- factory should receive PropertyBag
     // without "bitWidth" and use its own default
     const xml = `<?xml version="1.0" encoding="utf-8"?>
 <circuit>

@@ -117,7 +117,7 @@ describe("PlacementMode", () => {
 
     const placed = mode.place(circuit);
 
-    // place() no longer adds to circuit directly — caller uses placeComponent EditCommand
+    // place() no longer adds to circuit directly- caller uses placeComponent EditCommand
     expect(circuit.elements).toHaveLength(0);
     // Element position should match the ghost position (snapped cursor)
     expect(placed.position.x).toBe(5);

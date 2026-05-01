@@ -1,8 +1,8 @@
 /**
- * Tunnel component — named wire connection.
+ * Tunnel component- named wire connection.
  *
  * Two Tunnels with the same label in the same circuit are electrically connected.
- * The net resolver (Phase 3) merges same-name Tunnel nets — no simulation behavior needed.
+ * The net resolver (Phase 3) merges same-name Tunnel nets- no simulation behavior needed.
  * The executeFn is a no-op.
  *
  * Matches Digital's TunnelShape: a small triangle pointing right from the pin
@@ -27,7 +27,7 @@ import {
 } from "../../core/registry.js";
 
 // ---------------------------------------------------------------------------
-// Layout constants — matching Digital's TunnelShape
+// Layout constants- matching Digital's TunnelShape
 // ---------------------------------------------------------------------------
 
 /** Triangle half-height in grid units (Digital: SIZE2 - 2 = 8px ≈ 0.4 grid). */
@@ -38,7 +38,7 @@ const ARROW_W = 0.7;
 
 
 // ---------------------------------------------------------------------------
-// Pin layout — single pin at component origin (0,0)
+// Pin layout- single pin at component origin (0,0)
 // ---------------------------------------------------------------------------
 
 function buildTunnelPinDeclarations(bitWidth: number): PinDeclaration[] {
@@ -56,7 +56,7 @@ function buildTunnelPinDeclarations(bitWidth: number): PinDeclaration[] {
 }
 
 // ---------------------------------------------------------------------------
-// TunnelElement — CircuitElement implementation
+// TunnelElement- CircuitElement implementation
 // ---------------------------------------------------------------------------
 
 export class TunnelElement extends AbstractCircuitElement {
@@ -132,7 +132,7 @@ export class TunnelElement extends AbstractCircuitElement {
 }
 
 // ---------------------------------------------------------------------------
-// executeTunnel — no-op (net merging handled by the compiler/net resolver)
+// executeTunnel- no-op (net merging handled by the compiler/net resolver)
 // ---------------------------------------------------------------------------
 
 export function executeTunnel(
@@ -201,7 +201,7 @@ export const TunnelDefinition: ComponentDefinition = {
   attributeMap: TUNNEL_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.WIRING,
   helpText:
-    "Tunnel — named wire connection.\n" +
+    "Tunnel- named wire connection.\n" +
     "All Tunnels with the same label in a circuit are electrically connected.\n" +
     "The net resolver merges same-label nets during compilation.",
   models: {

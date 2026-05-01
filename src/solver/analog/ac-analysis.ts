@@ -34,7 +34,7 @@ import type { Diagnostic } from "../../compile/types.js";
 import { DEFAULT_SIMULATION_PARAMS, resolveSimulationParams } from "../../core/analog-engine-interface.js";
 
 // ---------------------------------------------------------------------------
-// AcParams, AcResult — canonical home is core/analog-types.ts; re-exported here
+// AcParams, AcResult- canonical home is core/analog-types.ts; re-exported here
 // ---------------------------------------------------------------------------
 
 import type { AcParams, AcResult } from "../../core/analog-types.js";
@@ -106,7 +106,7 @@ export class AcAnalysis {
     const dcResult = dcCtx.dcopResult;
 
     // After DC OP, nonlinear elements have their small-signal parameters set.
-    // We don't need the DC voltages explicitly — they're baked into element state.
+    // We don't need the DC voltages explicitly- they're baked into element state.
 
     // Step 2: Find AC source node
     const sourceNodeId = compiled.labelToNodeId.get(params.sourceLabel);
@@ -158,7 +158,7 @@ export class AcAnalysis {
       imagMap.set(label, new Float64Array(numFreq));
     }
 
-    // MNA matrix size — expand by 1 for the AC voltage source branch row
+    // MNA matrix size- expand by 1 for the AC voltage source branch row
     const N = compiled.matrixSize;
     const N_ac = N + 1;               // AC system size: add one branch row for V_ac
     const branchRow = N;              // 0-based index of the AC source branch row
@@ -278,7 +278,7 @@ export class AcAnalysis {
 }
 
 // ---------------------------------------------------------------------------
-// buildFrequencyArray — generate frequency points for a sweep
+// buildFrequencyArray- generate frequency points for a sweep
 // ---------------------------------------------------------------------------
 
 /**

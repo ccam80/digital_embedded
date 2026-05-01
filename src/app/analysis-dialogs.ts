@@ -1,5 +1,5 @@
 /**
- * Analysis dialogs — circuit analysis, K-map, expressions, expression editor,
+ * Analysis dialogs- circuit analysis, K-map, expressions, expression editor,
  * critical path, state transition, test vector editor, auto-connect power,
  * and tutorials menu wiring.
  *
@@ -38,11 +38,11 @@ export function isJsTestScript(text: string): boolean {
 /**
  * Evaluate a JavaScript test script and return the equivalent plain-format
  * test data string. The script runs in a sandboxed Function() with helpers:
- *   signals('A', 'B', 'Y')  — declare pin names (must be called once)
- *   row(0, 1, 1)            — add a test vector row
- *   X                       — don't-care value
- *   C                       — clock pulse value
- *   Z                       — high-impedance value
+ *   signals('A', 'B', 'Y') - declare pin names (must be called once)
+ *   row(0, 1, 1)           - add a test vector row
+ *   X                      - don't-care value
+ *   C                      - clock pulse value
+ *   Z                      - high-impedance value
  */
 export function evalJsTestScript(script: string): string {
   let pinNames: string[] | null = null;
@@ -677,7 +677,7 @@ export function initAnalysisDialogs(ctx: AppContext): void {
     help.innerHTML =
       '<b>Plain format:</b> signal names on first line, then one row per test vector. Use 0/1, X (don\'t-care), C (clock).<br>' +
       '<b>JavaScript:</b> use <code>signals(\'A\',\'B\',\'Y\')</code> then <code>row(0,0,1)</code>. ' +
-      'Use loops, variables, functions — full JS. Constants: <code>X</code> (don\'t-care), <code>C</code> (clock), <code>Z</code> (high-Z).';
+      'Use loops, variables, functions- full JS. Constants: <code>X</code> (don\'t-care), <code>C</code> (clock), <code>Z</code> (high-Z).';
     dialog.appendChild(help);
 
     const textarea = document.createElement('textarea');
@@ -707,7 +707,7 @@ export function initAnalysisDialogs(ctx: AppContext): void {
         } catch (err) {
           const msg = err instanceof Error ? err.message : String(err);
           ctx.showStatus(`Test script error: ${msg}`, true);
-          return; // Don't close dialog — let user fix the script
+          return; // Don't close dialog- let user fix the script
         }
       } else {
         testData = rawText;

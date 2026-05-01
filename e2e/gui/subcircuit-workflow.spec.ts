@@ -1,5 +1,5 @@
 /**
- * GUI tests — full subcircuit creation, editing, and navigation workflow.
+ * GUI tests- full subcircuit creation, editing, and navigation workflow.
  *
  * Builds circuits through genuine UI interactions (palette click → wire draw →
  * partial selection → right-click → Make Subcircuit dialog → verify result).
@@ -150,7 +150,7 @@ async function selectTwoByLabel(
 // Tests
 // ---------------------------------------------------------------------------
 
-test.describe('Subcircuit workflow — full lifecycle', () => {
+test.describe('Subcircuit workflow- full lifecycle', () => {
   let builder: UICircuitBuilder;
 
   test.beforeEach(async ({ page }) => {
@@ -165,7 +165,7 @@ test.describe('Subcircuit workflow — full lifecycle', () => {
   test('partial selection shows correct boundary ports in the dialog', async () => {
     await buildAndNotChainCircuit(builder);
 
-    // Select And + Not (partial selection — 2 elements, 3 boundary wires)
+    // Select And + Not (partial selection- 2 elements, 3 boundary wires)
     await selectTwoByLabel(builder, 'G1', 'G2');
 
     // Right-click on the And gate
@@ -185,7 +185,7 @@ test.describe('Subcircuit workflow — full lifecycle', () => {
     for (let i = 0; i < 3; i++) {
       labels.push(await labelInputs.nth(i).inputValue());
     }
-    // Boundary wires touch And:In_1, And:In_2, Not:out — labels derived from pin labels
+    // Boundary wires touch And:In_1, And:In_2, Not:out- labels derived from pin labels
     expect(labels).toContain('In_1');
     expect(labels).toContain('In_2');
     expect(labels.some(l => l === 'out' || l === 'out_2')).toBe(true);
@@ -222,7 +222,7 @@ test.describe('Subcircuit workflow — full lifecycle', () => {
   });
 
   // -------------------------------------------------------------------------
-  // 3. Name validation — empty and duplicate rejection
+  // 3. Name validation- empty and duplicate rejection
   // -------------------------------------------------------------------------
 
   test('Create button rejects empty name', async () => {
@@ -239,7 +239,7 @@ test.describe('Subcircuit workflow — full lifecycle', () => {
     await nameInput.fill('');
     await builder.page.waitForTimeout(100);
 
-    // Click Create — dialog should stay open (validation fails)
+    // Click Create- dialog should stay open (validation fails)
     await dialog.getByRole('button', { name: 'Create' }).click();
     await builder.page.waitForTimeout(200);
     await expect(dialog).toBeVisible();
@@ -298,7 +298,7 @@ test.describe('Subcircuit workflow — full lifecycle', () => {
   });
 
   // -------------------------------------------------------------------------
-  // 5. Create subcircuit — replaces selection, correct pin count & dimensions
+  // 5. Create subcircuit- replaces selection, correct pin count & dimensions
   // -------------------------------------------------------------------------
 
   test('creating a subcircuit replaces selection with correctly-sized chip', async () => {
@@ -347,7 +347,7 @@ test.describe('Subcircuit workflow — full lifecycle', () => {
 
     // The circuit is In A, In B → [subcircuit(And→Not)] → Out Y
     // Equivalent to NAND gate: Y = NOT(A AND B)
-    // Run test vectors directly — this also exercises compilation.
+    // Run test vectors directly- this also exercises compilation.
     const result = await builder.runTestVectors('A B Y\n0 0 1\n0 1 1\n1 0 1\n1 1 0');
     expect(result.passed).toBe(4);
     expect(result.failed).toBe(0);
@@ -466,7 +466,7 @@ test.describe('Subcircuit workflow — full lifecycle', () => {
     // "Open Subcircuit" should be in the context menu
     await clickMenuItem(builder, 'Open Subcircuit');
 
-    // Should now be inside the subcircuit — breadcrumb visible
+    // Should now be inside the subcircuit- breadcrumb visible
     const breadcrumb = builder.page.locator('#circuit-breadcrumb');
     await expect(breadcrumb).toBeVisible({ timeout: 3000 });
     const breadcrumbText = await breadcrumb.textContent();
@@ -516,7 +516,7 @@ test.describe('Subcircuit workflow — full lifecycle', () => {
     const nameInput = dialog.locator('input[type="text"]').first();
     expect(await nameInput.inputValue()).toBe('subcircuit_1');
 
-    // Change a face and confirm — the subcircuit should update
+    // Change a face and confirm- the subcircuit should update
     const firstFaceSelect = dialog.locator('table select').first();
     const curFace = await firstFaceSelect.inputValue();
     const newFace = curFace === 'left' ? 'right' : 'left';
@@ -607,10 +607,10 @@ test.describe('Subcircuit workflow — full lifecycle', () => {
     await nameInput2.fill('DupTest');
     await builder.page.waitForTimeout(100);
 
-    // Click Create — should stay open because name is duplicate
+    // Click Create- should stay open because name is duplicate
     await dialog.getByRole('button', { name: 'Create' }).click();
     await builder.page.waitForTimeout(200);
-    await expect(dialog).toBeVisible(); // Still open — validation failed
+    await expect(dialog).toBeVisible(); // Still open- validation failed
 
     // An error message should be visible about the duplicate name
     const errorSpan = dialog.locator('span').filter({ hasText: /already exists/ });

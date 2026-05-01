@@ -36,8 +36,8 @@ export interface NRAttemptRecord {
    * Per-iteration detail records for this attempt.
    *
    * CONTRACT: When `engine.convergenceLog.enabled === true`, this field MUST be
-   * populated with one entry per NR iteration. Per Q5 resolution (§11.1), the
-   * harness `postIterationHook` is NOT a precondition — convergence logging is
+   * populated with one entry per NR iteration. Per Q5 resolution (ss11.1), the
+   * harness `postIterationHook` is NOT a precondition- convergence logging is
    * an independent capability. The drain at `analog-engine.ts:400-408` and
    * `:676-687` fires on the log-enabled gate alone.
    */
@@ -77,7 +77,7 @@ export interface StepRecord {
 }
 
 // ---------------------------------------------------------------------------
-// ConvergenceLog — fixed-capacity ring buffer
+// ConvergenceLog- fixed-capacity ring buffer
 // ---------------------------------------------------------------------------
 
 /**
@@ -94,7 +94,7 @@ export class ConvergenceLog {
 
   /**
    * The gating flag. When false, the engine skips all logging code paths.
-   * Designed as a public field for JIT-friendly boolean checks — no getter
+   * Designed as a public field for JIT-friendly boolean checks- no getter
    * overhead, no prototype chain traversal.
    */
   enabled: boolean = false;

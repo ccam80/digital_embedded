@@ -1,5 +1,5 @@
 /**
- * GUI tests — simulation toolbar controls.
+ * GUI tests- simulation toolbar controls.
  *
  * Verifies that the Run/Stop/Step buttons in the toolbar actually trigger
  * simulation actions, not just exist in the DOM.
@@ -37,7 +37,7 @@ test.describe('GUI: simulation controls', () => {
     const stopBtn = page.locator('#btn-tb-stop');
     await stopBtn.click();
 
-    // Should not throw — simulation started and stopped without crashing
+    // Should not throw- simulation started and stopped without crashing
     await expect(page.locator('#sim-canvas')).toBeVisible();
   });
 

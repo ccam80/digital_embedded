@@ -134,7 +134,7 @@ function parseSpiceValue(raw: string): number {
     }
   }
 
-  // Unknown suffix — return NaN to signal parse failure
+  // Unknown suffix- return NaN to signal parse failure
   return NaN;
 }
 
@@ -178,7 +178,7 @@ function parseParamBlock(block: string): Record<string, number> {
 }
 
 // ---------------------------------------------------------------------------
-// parseModelCard — single .MODEL statement
+// parseModelCard- single .MODEL statement
 // ---------------------------------------------------------------------------
 
 /**
@@ -197,7 +197,7 @@ export function parseModelCard(
   // Normalize: join continuation lines (lines starting with +)
   const joined = joinContinuationLines(text);
 
-  // Strip inline comments (;...) — * comments are full-line and handled by joinContinuationLines
+  // Strip inline comments (;...)- * comments are full-line and handled by joinContinuationLines
   const noComments = joined.replace(/;[^\n]*/g, "");
 
   // Extract the .MODEL keyword line
@@ -234,7 +234,7 @@ export function parseModelCard(
   // Parse parameters from the remainder
   const params = parseParamBlock(rest);
 
-  // Extract LEVEL parameter (case-insensitive) — default is 1
+  // Extract LEVEL parameter (case-insensitive)- default is 1
   const level = params["LEVEL"] !== undefined ? params["LEVEL"] : 1;
 
   delete params["LEVEL"];
@@ -270,7 +270,7 @@ function joinContinuationLines(text: string): string {
 }
 
 // ---------------------------------------------------------------------------
-// parseModelFile — multiple .MODEL statements in a file
+// parseModelFile- multiple .MODEL statements in a file
 // ---------------------------------------------------------------------------
 
 /**
@@ -512,7 +512,7 @@ function parseElementLine(line: string): ParsedElement | null {
 }
 
 // ---------------------------------------------------------------------------
-// parseSubcircuit — parse a .SUBCKT…ENDS block
+// parseSubcircuit- parse a .SUBCKT…ENDS block
 // ---------------------------------------------------------------------------
 
 /**
@@ -580,7 +580,7 @@ export function parseSubcircuit(text: string): ParsedSubcircuit {
       continue;
     }
 
-    // .ENDS — end of subcircuit
+    // .ENDS- end of subcircuit
     if (upper.startsWith(".ENDS")) {
       endsLine = lineNo;
       currentModelBlock = null;

@@ -197,17 +197,17 @@ class AnalogPotentiometerElement implements AnalogElement {
 
   setup(ctx: SetupContext): void {
     const solver = ctx.solver;
-    const aNode = this._pinNodes.get("A")!;  // A pin — R_AW posNode
-    const wNode = this._pinNodes.get("W")!;  // W pin — shared wiper node
-    const bNode = this._pinNodes.get("B")!;  // B pin — R_WB negNode
+    const aNode = this._pinNodes.get("A")!;  // A pin- R_AW posNode
+    const wNode = this._pinNodes.get("W")!;  // W pin- shared wiper node
+    const bNode = this._pinNodes.get("B")!;  // B pin- R_WB negNode
 
-    // R_AW — ressetup.c:46-49 (A as posNode, W as negNode)
+    // R_AW- ressetup.c:46-49 (A as posNode, W as negNode)
     this._hAW_PP = solver.allocElement(aNode, aNode);  // (RESposNode, RESposNode)
     this._hAW_NN = solver.allocElement(wNode, wNode);  // (RESnegNode, RESnegNode)
     this._hAW_PN = solver.allocElement(aNode, wNode);  // (RESposNode, RESnegNode)
     this._hAW_NP = solver.allocElement(wNode, aNode);  // (RESnegNode, RESposNode)
 
-    // R_WB — ressetup.c:46-49 (W as posNode, B as negNode)
+    // R_WB- ressetup.c:46-49 (W as posNode, B as negNode)
     this._hWB_PP = solver.allocElement(wNode, wNode);  // (RESposNode, RESposNode)
     this._hWB_NN = solver.allocElement(bNode, bNode);  // (RESnegNode, RESnegNode)
     this._hWB_PN = solver.allocElement(wNode, bNode);  // (RESposNode, RESnegNode)

@@ -1,5 +1,5 @@
 /**
- * FSM renderer — draws states (circles) and transitions (curved arrows) using RenderContext.
+ * FSM renderer- draws states (circles) and transitions (curved arrows) using RenderContext.
  *
  * All rendering goes through the abstract RenderContext interface, never Canvas2D directly.
  * States are circles with centered name labels. Transitions are curved arrows with condition labels.

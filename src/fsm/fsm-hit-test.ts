@@ -1,5 +1,5 @@
 /**
- * FSM hit testing — determine which state or transition the user clicked.
+ * FSM hit testing- determine which state or transition the user clicked.
  *
  * States use point-in-circle tests. Transitions use point-near-curve distance.
  * Priority: state > transition > none (states are rendered on top of transitions).

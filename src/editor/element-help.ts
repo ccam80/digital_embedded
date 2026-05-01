@@ -1,5 +1,5 @@
 /**
- * Element Help — builds structured help content from a CircuitElement and its
+ * Element Help- builds structured help content from a CircuitElement and its
  * ComponentDefinition.
  *
  * Content is pure data (no DOM). The DOM rendering is handled separately in
@@ -14,7 +14,7 @@ import { PinDirection } from "@/core/pin";
 import type { PropertyDefinition } from "@/core/properties";
 
 // ---------------------------------------------------------------------------
-// PinInfo — one row in the pin table
+// PinInfo- one row in the pin table
 // ---------------------------------------------------------------------------
 
 /**
@@ -34,7 +34,7 @@ export interface PinInfo {
 }
 
 // ---------------------------------------------------------------------------
-// PropInfo — one row in the property table
+// PropInfo- one row in the property table
 // ---------------------------------------------------------------------------
 
 /**
@@ -54,7 +54,7 @@ export interface PropInfo {
 }
 
 // ---------------------------------------------------------------------------
-// HelpContent — the full structured help record
+// HelpContent- the full structured help record
 // ---------------------------------------------------------------------------
 
 /**

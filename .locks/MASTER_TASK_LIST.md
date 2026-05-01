@@ -1,27 +1,27 @@
-# Phase 2 Audit — Master Task List
+# Phase 2 Audit- Master Task List
 
 **Source**: `spec/fix-list-phase-2-audit.md`
 **Overriding rule**: Complete match with ngspice. No exceptions. No test-running by agents. Grep-only verification.
 **Ambiguity protocol**: If answer to any question is "match ngspice", it is NOT a real ambiguity. Proceed.
 
 ## Status legend
-- `AVAILABLE` — not yet claimed
-- `FETCHED` — claimed by a worker (task lock held)
-- `IN_PROGRESS` — worker is actively editing
-- `COMPLETED` — worker reported completion
-- `BLOCKED` — waiting on dependency or ambiguity
+- `AVAILABLE`- not yet claimed
+- `FETCHED`- claimed by a worker (task lock held)
+- `IN_PROGRESS`- worker is actively editing
+- `COMPLETED`- worker reported completion
+- `BLOCKED`- waiting on dependency or ambiguity
 
 ## Wave ordering
-- **Wave 1 (parallel)**: A-1..A-4, E-1, E-2, F-1 — independent files
-- **Wave 2 (parallel)**: B-1, B-2, B-3, B-4, C-8 — sparse solver + standalone infra
-- **Wave 3 (parallel)**: C-1..C-7, C-10, D-9, D-11, D-15 — infra & simple device fixes
+- **Wave 1 (parallel)**: A-1..A-4, E-1, E-2, F-1- independent files
+- **Wave 2 (parallel)**: B-1, B-2, B-3, B-4, C-8- sparse solver + standalone infra
+- **Wave 3 (parallel)**: C-1..C-7, C-10, D-9, D-11, D-15- infra & simple device fixes
 - **Wave 4 (sequential/parallel)**: C-9 (24 test files in parallel), D-1, D-3, D-4, D-5, D-6, D-7, D-10, D-12, D-13, D-14
 - **Wave 5**: D-2a (diode schema), D-8 (MOSFET regression)
-- **Wave 6**: F-2, G (weak-test strengthening — per-test subtasks)
+- **Wave 6**: F-2, G (weak-test strengthening- per-test subtasks)
 
 ---
 
-## Wave 1 — Parallel, low-risk
+## Wave 1- Parallel, low-risk
 
 | ID | Status | Worker | File | Fix |
 |----|--------|--------|------|-----|
@@ -33,7 +33,7 @@
 | E-2 | AVAILABLE | - | src/components/io/led.ts | Add MODEINITJCT gate around pnjlim |
 | F-1 | AVAILABLE | - | (multi-file grep verification) | Verify historical-provenance comments deleted |
 
-## Wave 2 — Sparse solver & standalone infra
+## Wave 2- Sparse solver & standalone infra
 
 | ID | Status | Worker | File | Fix |
 |----|--------|--------|------|-----|
@@ -43,7 +43,7 @@
 | B-4 | AVAILABLE | - | src/solver/analog/__tests__/sparse-solver.test.ts | Strengthen WT-001/002/003 weak tests |
 | C-8 | AVAILABLE | - | src/solver/analog/state-pool.ts:41 | Rewrite comment: `(ctx.cktMode & MODEINITTRAN) !== 0` |
 
-## Wave 3 — Phase 2 infra + simple device fixes
+## Wave 3- Phase 2 infra + simple device fixes
 
 | ID | Status | Worker | File | Fix |
 |----|--------|--------|------|-----|
@@ -54,12 +54,12 @@
 | C-5 | AVAILABLE | - | src/solver/analog/ckt-mode.ts:106-108 | Fix `isDcop()` to use MODEDC mask |
 | C-6 | AVAILABLE | - | src/solver/analog/dc-operating-point.ts:187-201 | Replace InitMode string param with firstInitf number |
 | C-7 | AVAILABLE | - | src/solver/analog/dc-operating-point.ts:239,368 | Rewrite stale isTransientDcop comments |
-| C-10 | AVAILABLE | - | src/**/*.ts (production) | Audit legacy mode reads — zero-hits per grep list |
+| C-10 | AVAILABLE | - | src/**/*.ts (production) | Audit legacy mode reads- zero-hits per grep list |
 | D-9 | AVAILABLE | - | src/components/semiconductors/mosfet.ts:1196 | Delete duplicate `_ctxCktMode` write |
 | D-11 | AVAILABLE | - | src/solver/analog/fet-base.ts:194-196 | Reduce comment to single-line semantics |
 | D-15 | AVAILABLE | - | src/components/passives/capacitor.ts | Default `_IC = 0.0`, drop isNaN guard |
 
-## Wave 4 — Test migration (C-9 parallel batch) + device D-items
+## Wave 4- Test migration (C-9 parallel batch) + device D-items
 
 ### C-9 sub-tasks (one per test file, individually claimable)
 | ID | Status | Worker | File |
@@ -102,18 +102,18 @@
 | D-6 | AVAILABLE | - | src/components/semiconductors/bjt.ts:1875-1876 | Use `=== MODETRANOP` form for UIC branch |
 | D-7 | AVAILABLE | - | src/components/semiconductors/bjt.ts:1507-1510 | Seed vbx (and vsub if subs) from rhsOld |
 | D-10 | AVAILABLE | - | src/solver/analog/fet-base.ts + njfet/pjfet/mosfet | Split capGate into abstract `_capGate(ctx)` overrides |
-| D-12 | AVAILABLE | - | src/components/passives/__tests__/capacitor.test.ts:301-323 | Fix test — single solver mock for both load() calls |
+| D-12 | AVAILABLE | - | src/components/passives/__tests__/capacitor.test.ts:301-323 | Fix test- single solver mock for both load() calls |
 | D-13 | AVAILABLE | - | src/components/passives/__tests__/capacitor.test.ts:399-438 | Fix expected -7 → -3 |
 | D-14 | AVAILABLE | - | src/components/passives/__tests__/inductor.test.ts:153-191 | Fix expected count 4 → 5 |
 
-## Wave 5 — Complex device fixes
+## Wave 5- Complex device fixes
 
 | ID | Status | Worker | File | Fix |
 |----|--------|--------|------|-----|
 | D-2a | AVAILABLE | - | src/components/semiconductors/diode.ts + tests | Delete SLOT_CAP_GEQ/IEQ; add SLOT_CAP_CURRENT w/ dual semantics; MODEINITSMSIG body |
 | D-8 | AVAILABLE | - | src/components/semiconductors/mosfet.ts | Fix cgs_cgd_transient regression (DB junction cap companion); verbatim port from mos1load.c:789-795 + state-1 seeding |
 
-## Wave 6 — Strengthening + verification
+## Wave 6- Strengthening + verification
 
 | ID | Status | Worker | File | Fix |
 |----|--------|--------|------|-----|
@@ -126,16 +126,16 @@
 
 - Wave N blocks Wave N+1 only in the listed ordering rules; within a wave, tasks are independent unless they share a file.
 - Shared file pairs (take file lock, coordinate via team-lead):
-  - `bjt.ts`: A-3, A-4, D-4, D-5, D-6, D-7 — serialize via file lock.
-  - `diode.ts`: D-1, D-2a, D-3 — serialize.
-  - `mosfet.ts`: D-8, D-9, D-10-mosfet-part — serialize.
-  - `fet-base.ts`: D-10, D-11 — serialize.
-  - `sparse-solver.ts`: B-1, B-2 — serialize.
-  - `sparse-solver.test.ts`: B-3, B-4 — serialize.
-  - `dc-operating-point.ts`: C-6, C-7 — serialize.
-  - `analog-engine.ts`: C-2, C-3 — serialize.
-  - `capacitor.test.ts`: D-12, D-13 — serialize.
-  - `capacitor.ts`: D-15 — lone.
+  - `bjt.ts`: A-3, A-4, D-4, D-5, D-6, D-7- serialize via file lock.
+  - `diode.ts`: D-1, D-2a, D-3- serialize.
+  - `mosfet.ts`: D-8, D-9, D-10-mosfet-part- serialize.
+  - `fet-base.ts`: D-10, D-11- serialize.
+  - `sparse-solver.ts`: B-1, B-2- serialize.
+  - `sparse-solver.test.ts`: B-3, B-4- serialize.
+  - `dc-operating-point.ts`: C-6, C-7- serialize.
+  - `analog-engine.ts`: C-2, C-3- serialize.
+  - `capacitor.test.ts`: D-12, D-13- serialize.
+  - `capacitor.ts`: D-15- lone.
 
 ## Completion ledger
 - A-1 done by worker-1: Math.min(expArg,80) removed from all 4 sites in njfet.ts.

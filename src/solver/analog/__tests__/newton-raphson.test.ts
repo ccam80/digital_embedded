@@ -41,7 +41,7 @@ function makeDiode(anodeNode: number, cathodeNode: number, IS: number, N: number
 }
 
 // ---------------------------------------------------------------------------
-// Helpers — build CKTCircuitContext for test circuits
+// Helpers- build CKTCircuitContext for test circuits
 // ---------------------------------------------------------------------------
 
 /**
@@ -124,7 +124,7 @@ function makeDiodeCtxWithSolver(sourceVoltage: number, solver: SparseSolver): CK
 
 describe("NR", () => {
   it("pnjlim_clamps_large_step", () => {
-    // Large forward step: 0.5V → 100V — should be compressed logarithmically
+    // Large forward step: 0.5V → 100V- should be compressed logarithmically
     const result = pnjlim(100, 0.5, 0.026, 0.6);
     // Must be dramatically less than 100 (logarithmic compression)
     expect(result.value).toBeLessThan(10);
@@ -136,7 +136,7 @@ describe("NR", () => {
   it("pnjlim_passes_small_step", () => {
     // Small step within 2*Vt: 0.60V → 0.65V, Vt=0.026, vcrit=0.6
     // |0.65 - 0.60| = 0.05, 2*vt = 0.052, so 0.05 <= 0.052 → no limiting.
-    // When limited===false, pnjlim returns vnew unchanged — bit-identical.
+    // When limited===false, pnjlim returns vnew unchanged- bit-identical.
     const result = pnjlim(0.65, 0.60, 0.026, 0.6);
     expect(result.value).toBe(0.65);
     expect(result.limited).toBe(false);
@@ -191,7 +191,7 @@ describe("NR", () => {
 
     expect(ctx.nrResult.converged).toBe(true);
     expect(ctx.nrResult.iterations).toBeGreaterThan(0);
-    // nrResult.voltages points into ctx.rhs — must be a valid buffer
+    // nrResult.voltages points into ctx.rhs- must be a valid buffer
     expect(ctx.nrResult.voltages).toBeInstanceOf(Float64Array);
     // matrixSize+1 with ground sentinel; ckt-context.ts:744-758
     expect(ctx.nrResult.voltages.length).toBe(4);
@@ -306,8 +306,8 @@ describe("NR", () => {
     // Solve with initial guess close to the solution
     const ctx2 = makeDiodeCtx(5.0);
     const guess = new Float64Array(3);
-    guess[0] = -5.0;   // Vs+ node (node 1, index 0) — set by voltage source
-    guess[1] = 0.68;   // diode anode (node 2, index 1) — near expected Vd
+    guess[0] = -5.0;   // Vs+ node (node 1, index 0)- set by voltage source
+    guess[1] = 0.68;   // diode anode (node 2, index 1)- near expected Vd
     guess[2] = 0.0043; // branch current (index 2)
     ctx2.rhsOld.set(guess);
 
@@ -346,7 +346,7 @@ describe("NR", () => {
   });
 
   // ---------------------------------------------------------------------------
-  // Wave 2: convergence gate — initTran blocks convergence until initFloat
+  // Wave 2: convergence gate- initTran blocks convergence until initFloat
   // ---------------------------------------------------------------------------
 
   it("initTran_transitions_to_initFloat_after_iteration_0", () => {
@@ -389,11 +389,11 @@ describe("NR", () => {
   });
 
   // ---------------------------------------------------------------------------
-  // Wave 7.1: UIC bypass — single CKTload, no NR iteration
+  // Wave 7.1: UIC bypass- single CKTload, no NR iteration
   // ---------------------------------------------------------------------------
 
   it("uic_bypass_returns_converged_with_zero_iterations", () => {
-    // Gate: isTranOp(cktMode) && isUic(cktMode) — transient-boot DCOP with UIC.
+    // Gate: isTranOp(cktMode) && isUic(cktMode)- transient-boot DCOP with UIC.
     // ngspice dctran.c:117-189: single CKTload, no NR iteration.
     const ctx = makeDiodeCtx(5.0);
     // Set cktMode to MODETRANOP | MODEUIC | MODEINITJCT (transient-boot DCOP + UIC).
@@ -511,7 +511,7 @@ describe("fetlim ngspice-exact", () => {
 describe("ipass hadNodeset gate", () => {
   it("ipass_skipped_without_nodesets", () => {
     // Circuit with no nodesets and nrModeLadder: after initFix→initFloat,
-    // hadNodeset=false so ipass is never decremented — convergence fires immediately
+    // hadNodeset=false so ipass is never decremented- convergence fires immediately
     // when noncon===0 and tolerances pass.
     const vs = makeVoltageSource(1, 0, 5.0);
     const r = makeResistor(1, 2, 1000);
@@ -527,7 +527,7 @@ describe("ipass hadNodeset gate", () => {
     });
     ctx.diagnostics = new DiagnosticCollector();
     ctx.cktMode = MODEDCOP | MODEINITFLOAT;
-    // No nodesets added — hadNodeset stays false
+    // No nodesets added- hadNodeset stays false
     expect(ctx.hadNodeset).toBe(false);
 
     let initFloatBeginIter = -1;
@@ -557,13 +557,13 @@ describe("ipass hadNodeset gate", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Wave 2.1.3: singular retry — factorNumerical failure triggers forceReorder
+// Wave 2.1.3: singular retry- factorNumerical failure triggers forceReorder
 // ---------------------------------------------------------------------------
 
 describe("NR singular retry", () => {
   it("nr_retries_with_reorder_after_numerical_singular", () => {
     // Verify that when factor() returns spSINGULAR from the SMPluFac (reuse)
-    // path — i.e. lastFactorWalkedReorder=false — the NR loop calls
+    // path- i.e. lastFactorWalkedReorder=false- the NR loop calls
     // forceReorder() and retries. Mirrors niiter.c:881-902 else-arm.
     const diagnostics = new DiagnosticCollector();
 
@@ -613,8 +613,8 @@ describe("NR singular retry", () => {
   });
 
   it("nr_emits_singular_diagnostic_when_reorder_also_fails", () => {
-    // When factor() returns spSINGULAR from the SMPreorder path —
-    // lastFactorWalkedReorder=true — the retry gate cannot fire and NR
+    // When factor() returns spSINGULAR from the SMPreorder path-
+    // lastFactorWalkedReorder=true- the retry gate cannot fire and NR
     // must emit a singular-matrix diagnostic with converged=false.
     // Mirrors niiter.c:881-902 if-arm (NISHOULDREORDER → SMPreorder).
     const diagnostics = new DiagnosticCollector();
@@ -746,7 +746,7 @@ describe("NR E_SINGULAR recovery via continue", () => {
             factorCallCount++;
             if (factorCallCount === 2) {
               singularIterationSeen = true;
-              // Simulate SMPluFac (reuse) returning spSINGULAR — eligible
+              // Simulate SMPluFac (reuse) returning spSINGULAR- eligible
               // for the NR-side NISHOULDREORDER retry.
               stubWalkedReorder = false;
               return spSINGULAR;

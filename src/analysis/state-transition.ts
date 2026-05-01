@@ -71,7 +71,7 @@ export function analyseSequential(
   if (stateVars.length === 0) {
     throw new Error(
       'analyseSequential: no state variables found. ' +
-        'This is a purely combinational circuit — use analyseCircuit instead.',
+        'This is a purely combinational circuit- use analyseCircuit instead.',
     );
   }
 

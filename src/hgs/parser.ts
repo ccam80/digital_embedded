@@ -1,5 +1,5 @@
 /**
- * HGS recursive-descent parser — port of Digital's hdl/hgs/Parser.java.
+ * HGS recursive-descent parser- port of Digital's hdl/hgs/Parser.java.
  *
  * Produces an AST from HGS source code. Supports both pure-code mode
  * (parse) and template mode (parseTemplate) where text outside `<? ?>` is
@@ -192,7 +192,7 @@ class Parser {
       }
 
       case TokenType.CODEEND: {
-        // End of code block in template mode — emit following text
+        // End of code block in template mode- emit following text
         const text = this.tok.readText();
         const stmts: Statement[] = [];
         if (text.length > 0) {
@@ -292,7 +292,7 @@ class Parser {
   }
 
   // ---------------------------------------------------------------------------
-  // Expressions — Pratt-style precedence climbing
+  // Expressions- Pratt-style precedence climbing
   // ---------------------------------------------------------------------------
 
   private parseExpression(minPrec: number = 0): Expression {
@@ -326,7 +326,7 @@ class Parser {
     if (peek.type === TokenType.NOT) {
       const t = this.tok.next();
       const operand = this.parseUnary();
-      // ~ is bitwise NOT, ! is logical NOT — both map to "~" or "!" based on context
+      // ~ is bitwise NOT, ! is logical NOT- both map to "~" or "!" based on context
       // The tokenizer maps both `~` and `!` (without =) to NOT token.
       // We store the original character to distinguish.
       const op: "~" | "!" = t.value === "~" ? "~" : "!";

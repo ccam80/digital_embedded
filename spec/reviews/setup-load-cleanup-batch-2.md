@@ -1,4 +1,4 @@
-# Review Report: Batch 2 — Semiconductors + Switching (2.B.* part 1)
+# Review Report: Batch 2- Semiconductors + Switching (2.B.* part 1)
 
 **Scope:** task_groups 2.B.bjt, 2.B.mosfet, 2.B.jfet, 2.B.diode, 2.B.semi-misc, 2.B.thyristor-fgnfet, 2.B.fgpfet-sw, 2.B.relay-fets
 
@@ -47,25 +47,25 @@
 
 ## Violations
 
-### V-1 — Historical-provenance comment: relay.ts line 180
+### V-1- Historical-provenance comment: relay.ts line 180
 
 **File:** `src/components/switching/relay.ts:180`
-**Rule:** rules.md — "Historical-provenance comments are dead-code markers. Any comment containing words like … 'migrated from' … The comment exists because an agent left dead or transitional code in place."
+**Rule:** rules.md- "Historical-provenance comments are dead-code markers. Any comment containing words like … 'migrated from' … The comment exists because an agent left dead or transitional code in place."
 **Severity:** major
 
 **Evidence:**
 ```
-// RelayAnalogElement — W3 migrated composite class
+// RelayAnalogElement- W3 migrated composite class
 ```
 
 The phrase "W3 migrated" is a historical-provenance marker: it records which wave produced this class, not what the class does. This is explicitly banned per rules.md. The class itself is fully implemented (not dead code), but the comment records the history of the refactor rather than explaining the code to future developers.
 
 ---
 
-### V-2 — Historical-provenance comment: bjt.test.ts line 2018
+### V-2- Historical-provenance comment: bjt.test.ts line 2018
 
 **File:** `src/components/semiconductors/__tests__/bjt.test.ts:2018`
-**Rule:** rules.md — "Comments exist ONLY to explain complicated code to future developers. They never describe what was changed, what was removed, or historical behaviour."
+**Rule:** rules.md- "Comments exist ONLY to explain complicated code to future developers. They never describe what was changed, what was removed, or historical behaviour."
 **Severity:** major
 
 **Evidence:**
@@ -80,10 +80,10 @@ This comment describes what SUBS "was previously" and how it was refactored. It 
 
 ---
 
-### V-3 — Historical-provenance comment: tunnel-diode.test.ts line 604
+### V-3- Historical-provenance comment: tunnel-diode.test.ts line 604
 
 **File:** `src/components/semiconductors/__tests__/tunnel-diode.test.ts:604`
-**Rule:** rules.md — "Historical-provenance comments are dead-code markers. Any comment containing words like … 'migrated from' …"
+**Rule:** rules.md- "Historical-provenance comments are dead-code markers. Any comment containing words like … 'migrated from' …"
 **Severity:** major
 
 **Evidence:**
@@ -95,10 +95,10 @@ The phrase "migrated from" is in the explicit banned-word list. The comment desc
 
 ---
 
-### V-4 — Historical-provenance comment: tunnel-diode.test.ts line 614
+### V-4- Historical-provenance comment: tunnel-diode.test.ts line 614
 
 **File:** `src/components/semiconductors/__tests__/tunnel-diode.test.ts:614`
-**Rule:** rules.md — "Any comment containing words like … 'migrated from' …"
+**Rule:** rules.md- "Any comment containing words like … 'migrated from' …"
 **Severity:** major
 
 **Evidence:**
@@ -118,7 +118,7 @@ None found.
 
 ## Weak Tests
 
-### WT-1 — spice-model-overrides-prop.test.ts: bare .toBeDefined() assertions without content checks
+### WT-1- spice-model-overrides-prop.test.ts: bare .toBeDefined() assertions without content checks
 
 **Test path:** `src/components/semiconductors/__tests__/spice-model-overrides-prop.test.ts`
 **Issue:** Multiple assertions use `toBeDefined()` as the sole check, which is a trivially-true guard that provides no coverage of shape or correctness.
@@ -136,11 +136,11 @@ it(`${def.name}: default model entry has params record`, () => {
 });
 ```
 
-The first `it` block does nothing but verify that a key exists. The second verifies only that `params` is not undefined and is an object — it does not check any param key or value. Per rules.md: "Test assertions that are trivially true (e.g. `assert result is not None`, `assert isinstance(x, dict)` without checking contents)" are flagged.
+The first `it` block does nothing but verify that a key exists. The second verifies only that `params` is not undefined and is an object- it does not check any param key or value. Per rules.md: "Test assertions that are trivially true (e.g. `assert result is not None`, `assert isinstance(x, dict)` without checking contents)" are flagged.
 
 ---
 
-### WT-2 — spice-model-overrides-prop.test.ts: obfuscated key construction hides intent
+### WT-2- spice-model-overrides-prop.test.ts: obfuscated key construction hides intent
 
 **Test path:** `src/components/semiconductors/__tests__/spice-model-overrides-prop.test.ts::legacy model override property does not appear in propertyDefs`
 **Issue:** The legacy key is constructed via string concatenation to avoid direct string appearance.
@@ -150,25 +150,25 @@ The first `it` block does nothing but verify that a key exists. The second verif
 const legacyKey = ["_spice", "Model", "Overrides"].join("");
 ```
 
-This is test-internal obfuscation: the test verifies that `_spiceModelOverrides` is absent, but constructs the key string by joining fragments rather than writing it directly. This is a code-hygiene concern — it makes the assertion harder to understand and resembles a workaround for a lint or search rule. The test should use a plain string literal.
+This is test-internal obfuscation: the test verifies that `_spiceModelOverrides` is absent, but constructs the key string by joining fragments rather than writing it directly. This is a code-hygiene concern- it makes the assertion harder to understand and resembles a workaround for a lint or search rule. The test should use a plain string literal.
 
 ---
 
 ## Legacy References
 
-### LR-1 — relay.ts line 180: "W3 migrated" historical-provenance marker
+### LR-1- relay.ts line 180: "W3 migrated" historical-provenance marker
 
 **File:** `src/components/switching/relay.ts:180`
 **Evidence:**
 ```
-// RelayAnalogElement — W3 migrated composite class
+// RelayAnalogElement- W3 migrated composite class
 ```
 
 "W3 migrated" is a wave-execution reference identifying when this class was written. This is a historical-provenance comment per rules.md Section "Code Hygiene". See also V-1 above.
 
 ---
 
-### LR-2 — bjt.test.ts line 2018: "previously declared" provenance comment
+### LR-2- bjt.test.ts line 2018: "previously declared" provenance comment
 
 **File:** `src/components/semiconductors/__tests__/bjt.test.ts:2018`
 **Evidence:**
@@ -176,11 +176,11 @@ This is test-internal obfuscation: the test verifies that `_spiceModelOverrides`
 // SUBS was previously declared as an instance param; it is now expressed as
 ```
 
-Contains "previously" — explicit banned word in historical-provenance list. See also V-2 above.
+Contains "previously"- explicit banned word in historical-provenance list. See also V-2 above.
 
 ---
 
-### LR-3 — tunnel-diode.test.ts lines 604, 614: "migrated from" provenance comments
+### LR-3- tunnel-diode.test.ts lines 604, 614: "migrated from" provenance comments
 
 **File:** `src/components/semiconductors/__tests__/tunnel-diode.test.ts:604` and `:614`
 **Evidence:**
@@ -189,7 +189,7 @@ Contains "previously" — explicit banned word in historical-provenance list. Se
 // Step 3a: IBEQ/IBSW/NB migrated from plain Diode (dioload.c:267-285).
 ```
 
-Contains "migrated from" — explicit banned word. See also V-3, V-4 above.
+Contains "migrated from"- explicit banned word. See also V-3, V-4 above.
 
 ---
 
@@ -224,28 +224,28 @@ The following items were independently verified clean (all C.1 forbidden-pattern
 - trans-gate.ts (TransGateAnalogElement line 215)
 
 **A.7 (`getInternalNodeLabels`) verification:** Present on all elements that call `ctx.makeVolt`:
-- bjt.ts L1 (line 1209) — collector/base/emitter primes conditional
-- mosfet.ts (line 859) — drain/source primes conditional
-- njfet.ts (line 383) — source/drain primes conditional
-- pjfet.ts (line 356) — source/drain primes conditional
-- diode.ts (line 584) — internal anode-prime conditional
-- zener.ts (line 280) — internal anode-prime conditional
-- scr.ts (line 110) — latch node
-- triac.ts (line 153) — latch1/latch2 nodes
-- relay.ts (line 259) — coilMid node
-- relay-dt.ts (line 142) — coilMid node
-- fgnfet.ts (line 994) — fg node
-- fgpfet.ts (line 941) — fg node
+- bjt.ts L1 (line 1209)- collector/base/emitter primes conditional
+- mosfet.ts (line 859)- drain/source primes conditional
+- njfet.ts (line 383)- source/drain primes conditional
+- pjfet.ts (line 356)- source/drain primes conditional
+- diode.ts (line 584)- internal anode-prime conditional
+- zener.ts (line 280)- internal anode-prime conditional
+- scr.ts (line 110)- latch node
+- triac.ts (line 153)- latch1/latch2 nodes
+- relay.ts (line 259)- coilMid node
+- relay-dt.ts (line 142)- coilMid node
+- fgnfet.ts (line 994)- fg node
+- fgpfet.ts (line 941)- fg node
 
 **A.6 (`findBranchFor`) placement:** Correctly on element (not ModelEntry) for all branch-owning elements:
 - relay.ts RelayInductorSubElement (line 107) and RelayAnalogElement (line 263)
 - relay-dt.ts RelayDTAnalogElement (line 146)
 
-**A.15 composite mandate:** Not applicable to the semiconductors/switching batch. The 18-class mandate covers behavioral-gate, behavioral-combinational, behavioral-sequential, behavioral-flipflop variants, bridge-adapter, adc.ts, dac.ts, and the compiler anonymous class — none of which are in this batch. `ScrCompositeElement`, `TriacCompositeElement`, `RelayAnalogElement`, `TransGateAnalogElement`, `FGNFETAnalogElement`, `FGPFETAnalogElement` all correctly implement `AnalogElement` directly per B.7 scope.
+**A.15 composite mandate:** Not applicable to the semiconductors/switching batch. The 18-class mandate covers behavioral-gate, behavioral-combinational, behavioral-sequential, behavioral-flipflop variants, bridge-adapter, adc.ts, dac.ts, and the compiler anonymous class- none of which are in this batch. `ScrCompositeElement`, `TriacCompositeElement`, `RelayAnalogElement`, `TransGateAnalogElement`, `FGNFETAnalogElement`, `FGPFETAnalogElement` all correctly implement `AnalogElement` directly per B.7 scope.
 
 **C19 (composite + makeVolt restriction):** Not triggered. No class in this batch `extends CompositeElement`. The `ctx.makeVolt` calls in `ScrCompositeElement`, `TriacCompositeElement`, `RelayAnalogElement`, `RelayDTAnalogElement`, `FGNFETAnalogElement`, and `FGPFETAnalogElement` are all on non-CompositeElement classes and are therefore outside C19's pattern scope.
 
-**`spice-model-overrides-prop.test.ts` legacy-word analysis:** The word "legacy" at lines 3, 69, 70, 71 and 72 is used in test names and variable names to describe the property being *tested for absence*. The test itself verifies that a legacy property no longer exists. This is different from the banned usage: the comment in the file header (line 3) says "the removed legacy model override property no longer appears" which is testing for removal — this is a test specification comment that accurately describes the test's purpose, not a historical-provenance marker on live code. The word "legacy" appears in a test-name string and a local variable name. This does not decorate dead production code. Reported as information; it is borderline but does not meet the "decorates dead/transitional code" threshold.
+**`spice-model-overrides-prop.test.ts` legacy-word analysis:** The word "legacy" at lines 3, 69, 70, 71 and 72 is used in test names and variable names to describe the property being *tested for absence*. The test itself verifies that a legacy property no longer exists. This is different from the banned usage: the comment in the file header (line 3) says "the removed legacy model override property no longer appears" which is testing for removal- this is a test specification comment that accurately describes the test's purpose, not a historical-provenance marker on live code. The word "legacy" appears in a test-name string and a local variable name. This does not decorate dead production code. Reported as information; it is borderline but does not meet the "decorates dead/transitional code" threshold.
 
 **`mosfet.ts` "fallback" hits:** Lines 1212–1216 use `fallback` as a local variable name for the IC-dispatch path in `mos1load.c:419-430`. This is a computation variable (the boolean condition determining whether to apply the ngspice IC fallback), not a comment describing a backwards-compatibility shim. It mirrors the ngspice term for the all-zero IC dispatch path. Not a violation.
 

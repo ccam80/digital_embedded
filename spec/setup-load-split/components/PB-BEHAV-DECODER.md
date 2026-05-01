@@ -2,7 +2,7 @@
 
 **digiTS file:** `src/solver/analog/behavioral-combinational.ts` (factory: `makeBehavioralDecoderAnalogFactory`)
 **Element class:** `BehavioralDecoderElement`
-**ngspice anchor:** NONE — behavioral element. setup() body matches the existing alloc block extracted from the current `load()` path (per 02-behavioral.md). NOT bound by ngspice line-for-line equivalence.
+**ngspice anchor:** NONE- behavioral element. setup() body matches the existing alloc block extracted from the current `load()` path (per 02-behavioral.md). NOT bound by ngspice line-for-line equivalence.
 
 ## Composition (per 02-behavioral.md Shape rule 3)
 
@@ -12,17 +12,17 @@
 | DigitalOutputPinModel | `2^selectorBits` | One per output, labels `"out_0"`...`"out_(N-1)"`, role `"direct"` |
 | AnalogCapacitorElement (child) | dynamic | Created by pin model init when loaded && cIn/cOut > 0; collected via `collectPinModelChildren` over `[...selPins, ...outPins]` |
 
-The decoder has no separate data input — it is a pure selector-to-one-hot converter. There is no `_inPin` field; this distinguishes it from the demux.
+The decoder has no separate data input- it is a pure selector-to-one-hot converter. There is no `_inPin` field; this distinguishes it from the demux.
 
 ## Pin layout (per pinLayout order)
 
 Labels in pinLayout order (matching `buildDecoderPinDeclarations` as referenced in the factory comment):
 
-1. `sel` — selector bus (one MNA node; `selectorBits` `DigitalInputPinModel` instances share it)
-2. `out_0` — first output (1-bit, own MNA node); HIGH when sel = 0
-3. `out_1` — second output; HIGH when sel = 1
+1. `sel`- selector bus (one MNA node; `selectorBits` `DigitalInputPinModel` instances share it)
+2. `out_0`- first output (1-bit, own MNA node); HIGH when sel = 0
+3. `out_1`- second output; HIGH when sel = 1
 4. ...
-5. `out_(2^selectorBits - 1)` — last output
+5. `out_(2^selectorBits - 1)`- last output
 
 For `selectorBits = 1`: pins are `sel`, `out_0`, `out_1` (3 pins, 2 outputs).
 For `selectorBits = 2`: pins are `sel`, `out_0`...`out_3` (5 pins, 4 outputs).
@@ -51,7 +51,7 @@ setup(ctx: SetupContext): void {
 
 Forward order: selector pins → output pins → children (inputs before outputs before children, per Shape rule 3).
 
-## load() body — value writes only (no allocElement)
+## load() body- value writes only (no allocElement)
 
 Implementer keeps the existing `load()` body verbatim BUT removes any `solver.allocElement` calls. Pin models stamp through the handles cached during their `setup()`. Capacitor children stamp through their own cached handles. The selector decode loop, one-hot output logic (`i === sel`), and per-output `setLogicLevel`/`load` calls all remain unchanged.
 
@@ -74,27 +74,27 @@ Example (selectorBits=3): 3 + 8 = **11 TSTALLOCs** (before capacitors).
 ## Factory cleanup
 
 - Drop `internalNodeIds` and `branchIdx` from the `makeBehavioralDecoderAnalogFactory` closure signature (per A6.3). The factory currently ignores them (`_internalNodeIds`, `_branchIdx`); remove the parameters entirely once A6.3 lands.
-- `ComponentDefinition`: `ngspiceNodeMap` left `undefined` (behavioral — per 02-behavioral.md §"Pin-map field on behavioral models").
+- `ComponentDefinition`: `ngspiceNodeMap` left `undefined` (behavioral- per 02-behavioral.md ss"Pin-map field on behavioral models").
 - `MnaModel`: `mayCreateInternalNodes: false`.
 - `BehavioralDecoderElement` adds a `setup(ctx: SetupContext): void` method per Shape rule 3.
 
 ## State pool
 
-The combinational composite element schema declares no state slots of its own — all state comes from capacitor children. setup() does not call `ctx.allocStates(...)` for the composite itself; child capacitor sub-elements call `ctx.allocStates(2)` each (per indsetup.c-style state allocation for inductors / capsetup.c-style for caps; see PB-CAP §State slots for the per-capacitor count).
+The combinational composite element schema declares no state slots of its own- all state comes from capacitor children. setup() does not call `ctx.allocStates(...)` for the composite itself; child capacitor sub-elements call `ctx.allocStates(2)` each (per indsetup.c-style state allocation for inductors / capsetup.c-style for caps; see PB-CAP ssState slots for the per-capacitor count).
 
-If you need to verify the existing source constant name (e.g., `COMBINATIONAL_COMPOSITE_SCHEMA`), the spec author should pin it down here — leave the implementer with a behavioral description, not a source-name reference.
+If you need to verify the existing source constant name (e.g., `COMBINATIONAL_COMPOSITE_SCHEMA`), the spec author should pin it down here- leave the implementer with a behavioral description, not a source-name reference.
 
-`BehavioralDecoderElement.stateSize` aggregates `_childElements[].stateSize`. `stateBaseOffset` is set by `MNAEngine._setup()` via `allocateStateBuffers` per `00-engine.md` §A5.1. `initState(pool)` distributes offsets to children (existing pattern in `BehavioralDecoderElement.initState` preserved unchanged).
+`BehavioralDecoderElement.stateSize` aggregates `_childElements[].stateSize`. `stateBaseOffset` is set by `MNAEngine._setup()` via `allocateStateBuffers` per `00-engine.md` ssA5.1. `initState(pool)` distributes offsets to children (existing pattern in `BehavioralDecoderElement.initState` preserved unchanged).
 
 ## Verification gate
 
 Per CLAUDE.md "Test Policy During W3 Setup-Load-Split", verification is spec compliance only. DO NOT run tests; DO NOT use test results.
 
-1. `setup()` body in the implementation file matches the "setup() body — alloc only" listing in this PB line-for-line.
+1. `setup()` body in the implementation file matches the "setup() body- alloc only" listing in this PB line-for-line.
 2. TSTALLOC sequence in `setup()` matches the order in the cited ngspice anchor file (see top of this PB, e.g. `ressetup.c:46-49`).
 3. Factory cleanup applied per the "Factory cleanup" section above.
 4. `ngspiceNodeMap` registered per the "Pin mapping" section above (or omitted for composites where the spec says so).
-5. `load()` writes through cached handles only — zero `solver.allocElement(...)` calls inside `load()`, `accept()`, or any non-`setup()` method.
+5. `load()` writes through cached handles only- zero `solver.allocElement(...)` calls inside `load()`, `accept()`, or any non-`setup()` method.
 6. `mayCreateInternalNodes` flag set per spec.
 7. `findBranchFor` callback present where spec says (V-output sources, IND, etc.).
 8. No banned closing verdicts (mapping/tolerance/equivalent-to/pre-existing/intentional-divergence/citation-divergence/partial) used in any commit message or report.

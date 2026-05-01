@@ -20,7 +20,7 @@ function copyStaticAssets() {
           statSync(src);
           cpSync(src, dest, { recursive: true });
         } catch {
-          // Directory doesn't exist yet — skip silently
+          // Directory doesn't exist yet- skip silently
         }
       }
       // HTML files that use inline scripts (not Vite inputs)
@@ -31,7 +31,7 @@ function copyStaticAssets() {
           mkdirSync(dirname(dest), { recursive: true });
           copyFileSync(resolve(__dirname, file), dest);
         } catch {
-          // File doesn't exist — skip
+          // File doesn't exist- skip
         }
       }
     },

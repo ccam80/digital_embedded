@@ -8,14 +8,14 @@
 The composite itself has no `ngspiceNodeMap`. Sub-elements carry their own maps.
 
 Composite pin labels (from `buildTimer555PinDeclarations()`, pinLayout order):
-- `DIS` — discharge (index 0, position x:0, y:1)
-- `TRIG` — trigger (index 1, position x:0, y:3)
-- `THR` — threshold (index 2, position x:0, y:5)
-- `VCC` — supply voltage (index 3, position x:3, y:-1)
-- `CTRL` — control voltage (index 4, position x:6, y:5)
-- `OUT` — output (index 5, position x:6, y:3)
-- `RST` — reset (active-low) (index 6, position x:6, y:1)
-- `GND` — ground reference (index 7, position x:3, y:7)
+- `DIS`- discharge (index 0, position x:0, y:1)
+- `TRIG`- trigger (index 1, position x:0, y:3)
+- `THR`- threshold (index 2, position x:0, y:5)
+- `VCC`- supply voltage (index 3, position x:3, y:-1)
+- `CTRL`- control voltage (index 4, position x:6, y:5)
+- `OUT`- output (index 5, position x:6, y:3)
+- `RST`- reset (active-low) (index 6, position x:6, y:1)
+- `GND`- ground reference (index 7, position x:3, y:7)
 
 ## Internal nodes
 
@@ -81,7 +81,7 @@ factory(pinNodes, props, getTime): AnalogElementCore {
 }
 ```
 
-## setup() body — composite forwards in NGSPICE_LOAD_ORDER order
+## setup() body- composite forwards in NGSPICE_LOAD_ORDER order
 
 ```ts
 setup(ctx: SetupContext): void {
@@ -154,22 +154,22 @@ setup(ctx: SetupContext): void {
 ### Setup ordering rationale
 
 Sub-elements are set up in ascending `ngspiceLoadOrder` bucket order, matching `cktsetup.c:72-81`, followed by composite-owned allocElement calls:
-1. RES (rDiv1, rDiv2, rDiv3) — `NGSPICE_LOAD_ORDER.RES`
-2. VCVS (comp1, comp2) — `NGSPICE_LOAD_ORDER.VCVS`
-3. BJT (bjtDis) — `NGSPICE_LOAD_ORDER.BJT`
+1. RES (rDiv1, rDiv2, rDiv3)- `NGSPICE_LOAD_ORDER.RES`
+2. VCVS (comp1, comp2)- `NGSPICE_LOAD_ORDER.VCVS`
+3. BJT (bjtDis)- `NGSPICE_LOAD_ORDER.BJT`
 4. Behavioral (outModel, CAP children)
-5. Composite-owned glue handle (RS-FF `_hDisBaseDisBase`) — allocated last, after all sub-element setups, since it wires pre-existing nodes
+5. Composite-owned glue handle (RS-FF `_hDisBaseDisBase`)- allocated last, after all sub-element setups, since it wires pre-existing nodes
 
-## load() body — composite forwards with RS latch coupling
+## load() body- composite forwards with RS latch coupling
 
 ```ts
 load(ctx: LoadContext): void {
-  // R-divider stamps (resload.c pattern — G stamped at 4 entries)
+  // R-divider stamps (resload.c pattern- G stamped at 4 entries)
   this._rDiv1.load(ctx);
   this._rDiv2.load(ctx);
   this._rDiv3.load(ctx);
 
-  // Comparator stamps (VCVS load — vcvsload.c pattern)
+  // Comparator stamps (VCVS load- vcvsload.c pattern)
   this._comp1.load(ctx);
   this._comp2.load(ctx);
 
@@ -240,7 +240,7 @@ Not needed. Direct refs to all sub-elements.
 ## Factory cleanup
 
 - Drop `internalNodeIds`, `branchIdx` from factory signature.
-- Drop `getInternalNodeCount` (was 4) — replaced by `mayCreateInternalNodes: true`.
+- Drop `getInternalNodeCount` (was 4)- replaced by `mayCreateInternalNodes: true`.
 - Add `mayCreateInternalNodes: true` (4 internal nodes in `setup()`).
 - Leave `ngspiceNodeMap` undefined on `Timer555Definition`.
 
@@ -248,11 +248,11 @@ Not needed. Direct refs to all sub-elements.
 
 Per CLAUDE.md "Test Policy During W3 Setup-Load-Split", verification is spec compliance only. DO NOT run tests; DO NOT use test results.
 
-1. `setup()` body in the implementation file matches the "setup() body — alloc only" listing in this PB line-for-line.
+1. `setup()` body in the implementation file matches the "setup() body- alloc only" listing in this PB line-for-line.
 2. TSTALLOC sequence in `setup()` matches the order in the cited ngspice anchor file (see top of this PB, e.g. `ressetup.c:46-49`).
 3. Factory cleanup applied per the "Factory cleanup" section above.
 4. `ngspiceNodeMap` registered per the "Pin mapping" section above (or omitted for composites where the spec says so).
-5. `load()` writes through cached handles only — zero `solver.allocElement(...)` calls inside `load()`, `accept()`, or any non-`setup()` method.
+5. `load()` writes through cached handles only- zero `solver.allocElement(...)` calls inside `load()`, `accept()`, or any non-`setup()` method.
 6. `mayCreateInternalNodes` flag set per spec.
 7. `findBranchFor` callback present where spec says (V-output sources, IND, etc.).
 8. No banned closing verdicts (mapping/tolerance/equivalent-to/pre-existing/intentional-divergence/citation-divergence/partial) used in any commit message or report.

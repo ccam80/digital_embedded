@@ -18,7 +18,7 @@ describe('BrowserDepFence', () => {
       expect(typeof headless.Net).toBe('function');
       expect(typeof headless.ComponentRegistry).toBe('function');
 
-      // Render context types — these are objects, not constructors
+      // Render context types- these are objects, not constructors
       expect(typeof headless.defaultColorScheme).toBe('object');
       expect(typeof headless.highContrastColorScheme).toBe('object');
       expect(typeof headless.monochromeColorScheme).toBe('object');

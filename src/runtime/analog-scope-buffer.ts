@@ -1,5 +1,5 @@
 /**
- * AnalogScopeBuffer — ring buffer for analog oscilloscope sample capture.
+ * AnalogScopeBuffer- ring buffer for analog oscilloscope sample capture.
  *
  * Stores Float64 (time, value) pairs at non-uniform time intervals produced
  * by the adaptive timestep controller. Supports time-range queries, min/max
@@ -120,7 +120,7 @@ export class AnalogScopeBuffer {
     const bucketWidth = span / bucketCount;
 
     // Snap bucket boundaries to multiples of bucketWidth so they don't
-    // shift as the view scrolls — eliminates discontinuous min/max jumps.
+    // shift as the view scrolls- eliminates discontinuous min/max jumps.
     const alignedStart = Math.floor(tStart / bucketWidth) * bucketWidth;
 
     // Track the last known value to fill empty buckets instead of

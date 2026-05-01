@@ -1,5 +1,5 @@
 /**
- * HGS async evaluator — port of Digital's hdl/hgs/Expression.java and Statement.java.
+ * HGS async evaluator- port of Digital's hdl/hgs/Expression.java and Statement.java.
  *
  * Walks the AST and executes it. All evaluation is async to support loadHex()
  * and loadFile() file I/O built-ins.

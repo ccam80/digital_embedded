@@ -1,5 +1,5 @@
 /**
- * RotEncoder component — rotary encoder with quadrature output.
+ * RotEncoder component- rotary encoder with quadrature output.
  *
  * Interactive component: user rotates the encoder (CW or CCW) via
  * clicks on the component. Each detent step produces a quadrature
@@ -54,7 +54,7 @@ export const QUADRATURE_TABLE: readonly [number, number][] = [
 ];
 
 // ---------------------------------------------------------------------------
-// Pin layout — outputs A and B on east face
+// Pin layout- outputs A and B on east face
 // ---------------------------------------------------------------------------
 
 function buildRotaryEncoderPinDeclarations(): PinDeclaration[] {
@@ -82,7 +82,7 @@ function buildRotaryEncoderPinDeclarations(): PinDeclaration[] {
 }
 
 // ---------------------------------------------------------------------------
-// RotaryEncoderElement — CircuitElement implementation
+// RotaryEncoderElement- CircuitElement implementation
 // ---------------------------------------------------------------------------
 
 export class RotaryEncoderElement extends AbstractCircuitElement {
@@ -142,7 +142,7 @@ export class RotaryEncoderElement extends AbstractCircuitElement {
 }
 
 // ---------------------------------------------------------------------------
-// executeRotaryEncoder — output A and B based on internal position state
+// executeRotaryEncoder- output A and B based on internal position state
 //
 // State layout: state[outputOffset] = A, state[outputOffset+1] = B
 // Internal position is stored at state[outputOffset+2] (scratch slot).
@@ -208,7 +208,7 @@ export const RotaryEncoderDefinition: ComponentDefinition = {
   attributeMap: ROTARY_ENCODER_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.IO,
   helpText:
-    "RotEncoder — rotary encoder with quadrature output.\n" +
+    "RotEncoder- rotary encoder with quadrature output.\n" +
     "Outputs A and B follow a Gray-code quadrature sequence.\n" +
     "Interactive: user rotates the encoder by clicking CW or CCW.",
   models: {

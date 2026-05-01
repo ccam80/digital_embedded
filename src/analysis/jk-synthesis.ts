@@ -1,5 +1,5 @@
 /**
- * JK flip-flop synthesis — derive JK excitation equations from a state
+ * JK flip-flop synthesis- derive JK excitation equations from a state
  * transition table.
  *
  * For each state bit, the JK excitation table maps the current-state /

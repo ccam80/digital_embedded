@@ -1,10 +1,10 @@
 /**
- * Coupled inductor pair — mutual inductance coupling parameters.
+ * Coupled inductor pair- mutual inductance coupling parameters.
  *
  * Two inductors L₁ and L₂ with coupling coefficient k produce mutual
  * inductance M = k·√(L₁·L₂). Used by transformer.ts to derive L1, L2, M
  * for the MNA stamp. Integration state is managed by the state-pool schema
- * in transformer.ts (SLOT_PHI1/PHI2/CCAP1/CCAP2) — no separate state object.
+ * in transformer.ts (SLOT_PHI1/PHI2/CCAP1/CCAP2)- no separate state object.
  */
 
 // ---------------------------------------------------------------------------

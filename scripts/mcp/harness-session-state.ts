@@ -1,4 +1,4 @@
-// harness-session-state.ts — lifecycle manager for ComparisonSession instances
+// harness-session-state.ts- lifecycle manager for ComparisonSession instances
 
 import type { ComparisonSession } from "../../src/solver/analog/__tests__/harness/comparison-session.js";
 
@@ -11,7 +11,7 @@ export interface HarnessEntry {
 }
 
 /**
- * HarnessSessionState — lifecycle manager for ComparisonSession instances.
+ * HarnessSessionState- lifecycle manager for ComparisonSession instances.
  *
  * Parallel to SessionState in tool-helpers.ts but specialized for harness sessions.
  * Each session maps to one ComparisonSession instance and its metadata.

@@ -1,5 +1,5 @@
 /**
- * Tutorial step state machine — pure logic, no DOM dependencies.
+ * Tutorial step state machine- pure logic, no DOM dependencies.
  *
  * Drives a TutorialManifest through its steps, managing:
  *   - Palette restriction per step
@@ -99,9 +99,9 @@ function loadProgress(manifest: TutorialManifest): TutorialProgress {
       return { ...parsed, steps };
     }
   } catch (e) {
-    // Corrupted localStorage entry or unavailable storage — surface the
+    // Corrupted localStorage entry or unavailable storage- surface the
     // anomaly and fall through to fresh init. Per
-    // spec/architectural-alignment.md §I1 replaced prior silent swallow.
+    // spec/architectural-alignment.md ssI1 replaced prior silent swallow.
     console.warn(`[tutorial-runner] Failed to load progress for "${manifest.id}"; starting fresh.`, e);
   }
   return initProgress(manifest);
@@ -112,8 +112,8 @@ function saveProgress(progress: TutorialProgress): void {
     progress.lastActivityAt = now();
     localStorage.setItem(storageKey(progress.tutorialId), JSON.stringify(progress));
   } catch (e) {
-    // localStorage quota exceeded or unavailable — surface the anomaly.
-    // Per spec/architectural-alignment.md §I1 replaced prior silent swallow.
+    // localStorage quota exceeded or unavailable- surface the anomaly.
+    // Per spec/architectural-alignment.md ssI1 replaced prior silent swallow.
     console.warn(`[tutorial-runner] Failed to save progress for "${progress.tutorialId}".`, e);
   }
 }
@@ -261,7 +261,7 @@ export class TutorialRunner {
 
       case 'equivalence':
         // Equivalence checking requires the goal circuit to be loaded as a
-        // reference engine — not supported in-iframe. Fall back to test-vectors
+        // reference engine- not supported in-iframe. Fall back to test-vectors
         // if testData is available, otherwise treat as compile-only.
         if (step.testData) {
           const tr = await this._callbacks.runTests(step.testData);
@@ -310,7 +310,7 @@ export class TutorialRunner {
 
   /**
    * Pre-check: compile the circuit and verify that the required signal labels
-   * from the test data are present. Does NOT run full test vectors — just
+   * from the test data are present. Does NOT run full test vectors- just
    * confirms the circuit is structurally ready to be tested.
    *
    * Only meaningful for steps with test-vectors validation.
@@ -324,7 +324,7 @@ export class TutorialRunner {
     const result = this._callbacks.precheck(testData);
     return {
       ok: result.ok,
-      message: result.ok ? 'Pre-check passed — labels and compilation OK.' : (result.error ?? 'Pre-check failed.'),
+      message: result.ok ? 'Pre-check passed- labels and compilation OK.' : (result.error ?? 'Pre-check failed.'),
     };
   }
 
@@ -417,12 +417,12 @@ export class TutorialRunner {
     }
 
     if (typeof sc === 'string') {
-      // .dig file path — delegate to URL-based loader
+      // .dig file path- delegate to URL-based loader
       await cb.loadCircuitFromUrl(sc);
       return;
     }
 
-    // TutorialCircuitSpec object — build and load
+    // TutorialCircuitSpec object- build and load
     await cb.loadCircuitSpec(sc);
   }
 }

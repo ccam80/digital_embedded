@@ -13,7 +13,7 @@ import type { HistoryStore } from "./integration.js";
 import type { LteParams } from "./ckt-terr.js";
 
 // ---------------------------------------------------------------------------
-// almostEqualUlps — module-level singleton buffer (allocation-free after init)
+// almostEqualUlps- module-level singleton buffer (allocation-free after init)
 // ngspice reference: dctran.c:553-554 AlmostEqualUlps(time, bkpt, 100)
 // ---------------------------------------------------------------------------
 
@@ -23,7 +23,7 @@ const _ulpI64 = new BigInt64Array(_ulpBuf);
 
 /**
  * Returns true when a and b are within maxUlps IEEE-754 ULPs of each other.
- * Uses a module-level singleton ArrayBuffer — allocation-free after module load.
+ * Uses a module-level singleton ArrayBuffer- allocation-free after module load.
  * Matches ngspice dctran.c:553-554 and vsrcacct.c AlmostEqualUlps usage.
  *
  * Exported for source-element acceptStep gating (TRNOISE/TRRANDOM/PWL pattern
@@ -48,7 +48,7 @@ export function almostEqualUlps(a: number, b: number, maxUlps: number): boolean 
  *
  * Call sequence per accepted timestep:
  *   1. computeNewDt(elements, history) → { newDt, worstRatio }
- *   2. shouldReject(worstRatio) — rejects when worstRatio > 1
+ *   2. shouldReject(worstRatio)- rejects when worstRatio > 1
  *   3. If accepted: accept(simTime)
  */
 export class TimestepController {
@@ -69,7 +69,7 @@ export class TimestepController {
   /** Simulation time of the last accepted step. Used for accept() invariant check. */
   private _lastAcceptedSimTime: number;
 
-  /** Total accepted step count — drives the startup state machine. */
+  /** Total accepted step count- drives the startup state machine. */
   private _acceptedSteps: number;
 
   /** Backing field for largestErrorElement. */
@@ -85,7 +85,7 @@ export class TimestepController {
   /**
    * Minimum-break threshold used by the breakpoint pop loop and queue dedup.
    * ngspice dctran.c:157: CKTminBreak = CKTmaxStep * 5e-5 (different threshold
-   * from CKTdelmin — see dctran.c:554 vs dctran.c:629).
+   * from CKTdelmin- see dctran.c:554 vs dctran.c:629).
    */
   private _minBreak: number = 0;
 
@@ -112,11 +112,11 @@ export class TimestepController {
   /**
    * XSPICE temporary breakpoint (g_mif_info.breakpoint.current).
    *
-   * Default +Infinity — no temp bp pending. XSPICE-style event devices push
+   * Default +Infinity- no temp bp pending. XSPICE-style event devices push
    * their next analog handoff time here via setTempBreakpoint(); the temp-bp
    * clamp at dctran.c:609-618 then truncates the working dt so the next step
    * lands exactly on this time. digiTS has no XSPICE event lane today, so
-   * this stays at +Infinity in practice — but the slot exists so the dctran
+   * this stays at +Infinity in practice- but the slot exists so the dctran
    * port has a consistent place to read from when an event device is added.
    */
   private _tempBreakpoint: number = Number.POSITIVE_INFINITY;
@@ -136,7 +136,7 @@ export class TimestepController {
    * [0] = current trial dt (set by setDeltaOldCurrent), [1] = h_{n-1} (previous accepted dt), [2] = h_{n-2}, [3] = h_{n-3}.
    * Pre-allocated once; shifted in rotateDeltaOld(). ngspice: CKTdeltaOld[].
    *
-   * UNIFIED STORAGE — when the controller is wired into a CKTCircuitContext
+   * UNIFIED STORAGE- when the controller is wired into a CKTCircuitContext
    * (via the optional `sharedDeltaOld` ctor argument), this field holds the
    * SAME `number[]` reference as `ctx.deltaOld`. Matches ngspice where
    * CKTdeltaOld[7] lives on CKTcircuit, not on a separate timestep struct.
@@ -151,7 +151,7 @@ export class TimestepController {
    *
    * Initialized to 1 to match ngspice dctran.c:315 (`ckt->CKTorder = 1;` at
    * transient entry). Order is promoted to 2 only after the first order-1
-   * LTE gate passes — see tryOrderPromotion() and the firsttime branch at
+   * LTE gate passes- see tryOrderPromotion() and the firsttime branch at
    * dctran.c:849-872 that skips CKTtrunc on step 0.
    */
   currentOrder: number = 1;
@@ -192,7 +192,7 @@ export class TimestepController {
     this._params = params;
     // Unified CKTdeltaOld storage: reference the context's buffer when one is
     // provided (MNAEngine.init path), else self-allocate for standalone usage
-    // (unit tests, pre-init field defaults). Length MUST be 7 — matches
+    // (unit tests, pre-init field defaults). Length MUST be 7- matches
     // ngspice CKTdeltaOld[7] (cktdefs.h).
     if (sharedDeltaOld !== undefined) {
       if (sharedDeltaOld.length !== 7) {
@@ -211,7 +211,7 @@ export class TimestepController {
       Math.min(params.maxTimeStep, params.firstStep),
     );
     // ngspice default CKTintegrateMethod = TRAPEZOIDAL (set in
-    // ref/ngspice/src/spicelib/analysis/cktsetup.c — paired with
+    // ref/ngspice/src/spicelib/analysis/cktsetup.c- paired with
     // dctran.c:315 `ckt->CKTorder = 1` so the first step runs order-1
     // backward-Euler semantics via the order-1 coefficients even though
     // the configured method is trapezoidal).
@@ -221,7 +221,7 @@ export class TimestepController {
     // every transient run starts with breaks=[0, finalTime] and CKTbreak
     // pre-seeded so the first arrival at `nextTime:` (the head of the
     // transient loop) dispatches CKTaccept with breakFlag=true. The seed
-    // lives in the constructor — not in a separate method — because
+    // lives in the constructor- not in a separate method- because
     // ngspice's dctran does it inline and there's no lifecycle reason for
     // a fresh controller to be in any other state. The configure() path
     // that re-seeds without re-constructing has its own restart method.
@@ -254,13 +254,13 @@ export class TimestepController {
       ? params.tStop / 50
       : params.maxTimeStep;
 
-    // ngspice traninit.c:34 — CKTdelmin = 1e-11 * CKTmaxStep. Gates the
+    // ngspice traninit.c:34- CKTdelmin = 1e-11 * CKTmaxStep. Gates the
     // at-breakpoint proximity test (`breaks[0] - simTime <= delmin`) in
     // getClampedDt() / dctran.c:554. Streaming-mode safe: maxTimeStep is
     // always meaningful, no tStop dependence.
     this._delmin = params.maxTimeStep * 1e-11;
 
-    // ngspice dctran.c:154 (XSPICE init, runs first) — CKTminBreak = 10 *
+    // ngspice dctran.c:154 (XSPICE init, runs first)- CKTminBreak = 10 *
     // CKTdelmin. Under XSPICE this resolves to ~1e-15 for typical runs;
     // small enough that the loose `<=` pop predicate at dctran.c:629
     // behaves like the strict `>` pop at dctran.c:412 in practice. The
@@ -280,7 +280,7 @@ export class TimestepController {
    *
    * Only fields that originate from `params` are refreshed:
    *   - _delmin / _minBreak (both derived from maxTimeStep, traninit.c:34 / dctran.c:157)
-   *   - _lteParams (trtol, reltol, abstol, chgtol) — cast past readonly
+   *   - _lteParams (trtol, reltol, abstol, chgtol)- cast past readonly
    *     because the struct is logically immutable per computeNewDt call but
    *     we deliberately refresh it once on configure().
    *   - currentDt: while no step has been taken (_isFirstGetClampedDt),
@@ -292,7 +292,7 @@ export class TimestepController {
   updateParams(params: ResolvedSimulationParams): void {
     this._params = params;
 
-    // LTE params — readonly at the interface level; this is the one legal
+    // LTE params- readonly at the interface level; this is the one legal
     // refresh point, mirroring the constructor's _lteParams allocation.
     const lte = this._lteParams as {
       trtol: number;
@@ -313,7 +313,7 @@ export class TimestepController {
 
     if (this._isFirstGetClampedDt) {
       // No step has been taken yet. Re-apply firstStep exactly as the
-      // constructor does — this lets callers (e.g. the ngspice comparison
+      // constructor does- this lets callers (e.g. the ngspice comparison
       // harness) legitimately reconfigure firstStep after engine
       // construction but before runTransient. Without this branch the
       // engine silently ignores a harness-supplied firstStep and runs
@@ -414,14 +414,14 @@ export class TimestepController {
       // tolerance, safety factors, and order-dependent root extraction).
       newDt = minProposedDt;
       // Clamp step growth to 2*dt (ngspice ckttrunc.c:53).
-      // No lower clamp — ngspice allows arbitrary shrinkage per LTE.
+      // No lower clamp- ngspice allows arbitrary shrinkage per LTE.
       newDt = Math.min(2 * dt, newDt);
       // worstRatio: >1 means step should be rejected (proposed < current dt)
       worstRatio = minProposedDt < dt ? dt / minProposedDt : 0;
     } else {
       // ngspice ckttrunc.c:53 with timetemp=HUGE (no devices have DEVtrunc):
       // *timeStep = MIN(2 * *timeStep, HUGE) = 2 * *timeStep. No maxStep
-      // clamp here — that is applied at top-of-next-step in dctran.c:540
+      // clamp here- that is applied at top-of-next-step in dctran.c:540
       // (mirrored by getClampedDt). Clamping here would publish a maxStep-
       // capped value as the LTE proposal and break parity capture of the
       // unclamped CKTdelta that ngspice reports out of CKTtrunc.
@@ -433,7 +433,7 @@ export class TimestepController {
     // returns the raw LTE proposal; top-of-step (dctran.c:540) handles the
     // maxStep clamp via getClampedDt, and the delmin two-strike check
     // (dctran.c:766, mirrored at analog-engine.ts:614) handles below-delmin.
-    // Mirror that exact split — clamping here would diverge bit-for-bit
+    // Mirror that exact split- clamping here would diverge bit-for-bit
     // from ngspice's published CKTdelta between steps.
     //
     // Likewise, do NOT clamp to the next breakpoint here. ngspice CKTtrunc
@@ -450,7 +450,7 @@ export class TimestepController {
   }
 
   /**
-   * Mirrors ngspice dctran.c:540-644 top-of-step flow — pure XSPICE port.
+   * Mirrors ngspice dctran.c:540-644 top-of-step flow- pure XSPICE port.
    *
    *   540        : dt = MIN(dt, maxStep)
    *   542-548    : XSPICE order-cut on _lastTempBreakpoint
@@ -466,20 +466,20 @@ export class TimestepController {
    *                 sets breakFlag = true)
    *
    * The non-XSPICE approaching-bp clamp at dctran.c:594-602 (`else if` with
-   * `>=`) is intentionally NOT ported — the XSPICE late-clamp at 640-644 is
+   * `>=`) is intentionally NOT ported- the XSPICE late-clamp at 640-644 is
    * the equivalent gate in the XSPICE build, and it runs after the pop loop
    * has discarded the breakpoint we just landed on. Mixing the two would
    * splice incompatible build configurations.
    *
-   * Does NOT mutate this.currentDt — the clamp applies only to this step's
+   * Does NOT mutate this.currentDt- the clamp applies only to this step's
    * working dt. Persisting it would prevent NR retries from halving from the
    * pre-clamp value (stagnation at t=0).
    */
   getClampedDt(simTime: number): number {
-    // dctran.c:540 — CKTdelta = MIN(CKTdelta, CKTmaxStep)
+    // dctran.c:540- CKTdelta = MIN(CKTdelta, CKTmaxStep)
     let dt = Math.min(this.currentDt, this._params.maxTimeStep);
 
-    // dctran.c:542-548 (XSPICE) — first timepoint after a temp breakpoint
+    // dctran.c:542-548 (XSPICE)- first timepoint after a temp breakpoint
     // cuts integration order. _lastTempBreakpoint is updated by the temp-bp
     // clamp below (set to post-clamp CKTtime when it fires, 1e30 otherwise),
     // so this only triggers on the call AFTER a temp-bp landing.
@@ -489,7 +489,7 @@ export class TimestepController {
 
     this._breakFlag = false;
 
-    // dctran.c:551-591 — at-breakpoint clamp on permanent CKTbreaks queue.
+    // dctran.c:551-591- at-breakpoint clamp on permanent CKTbreaks queue.
     const len = this._breakpoints.length;
     if (len > 0) {
       const bp0 = this._breakpoints[0]!;
@@ -497,31 +497,31 @@ export class TimestepController {
         almostEqualUlps(simTime, bp0, 100) || bp0 - simTime <= this._delmin;
 
       if (atBreak) {
-        // dctran.c:559 — CKTorder = 1 on at-breakpoint
+        // dctran.c:559- CKTorder = 1 on at-breakpoint
         this.currentOrder = 1;
 
-        // dctran.c:572-573 — CKTdelta = MIN(CKTdelta, 0.1 * MIN(saveDelta,
+        // dctran.c:572-573- CKTdelta = MIN(CKTdelta, 0.1 * MIN(saveDelta,
         //   breaks[1] - breaks[0])). Sentinel guarantees length >= 2 after
         //   the constructor seed; breaks[1] is always the next bp or finalTime.
         const gap = this._breakpoints[1]! - bp0;
         dt = Math.min(dt, 0.1 * Math.min(this._savedDelta, gap));
 
-        // dctran.c:580 — firsttime: CKTdelta /= 10. The proximity clamp above
+        // dctran.c:580- firsttime: CKTdelta /= 10. The proximity clamp above
         // fires on every at-breakpoint step; the /=10 cut is firsttime-only.
         if (this._isFirstGetClampedDt) {
           dt /= 10;
         }
 
-        // dctran.c:586-589 — `MAX(CKTdelta, CKTdelmin * 2.0)` is wrapped in
+        // dctran.c:586-589- `MAX(CKTdelta, CKTdelmin * 2.0)` is wrapped in
         // `#ifndef XSPICE`. Pure-XSPICE port: floor intentionally absent.
       }
     }
 
-    // dctran.c:606-620 (XSPICE) — temp-bp clamp on g_mif_info.breakpoint.current.
+    // dctran.c:606-620 (XSPICE)- temp-bp clamp on g_mif_info.breakpoint.current.
     // _tempBreakpoint defaults to +Infinity (no event device pushed) and stays
     // there until setTempBreakpoint() is called. With +Infinity the if-condition
     // is unconditionally false, mirroring ngspice when no XSPICE event device
-    // is active. This clamp does NOT set breakFlag — only the late-clamp at
+    // is active. This clamp does NOT set breakFlag- only the late-clamp at
     // 640-644 sets CKTbreak.
     if (simTime + dt >= this._tempBreakpoint) {
       this._savedDelta = dt;
@@ -531,10 +531,10 @@ export class TimestepController {
       this._lastTempBreakpoint = 1.0e30;
     }
 
-    // dctran.c:624-638 (XSPICE) — pop loop on permanent CKTbreaks queue using
+    // dctran.c:624-638 (XSPICE)- pop loop on permanent CKTbreaks queue using
     // CKTminBreak. ngspice's pop is shift-only; sources register their next
     // edge via DEVaccept → CKTsetBreak after the step is accepted. We mirror
-    // that via element.acceptStep(simTime, addBP) in MNAEngine.step() —
+    // that via element.acceptStep(simTime, addBP) in MNAEngine.step()-
     // refilling from `popped.source` here would re-insert the same edge inside
     // the loop and spin (next > simTime is true when next sits within minBreak
     // of simTime, which the next pop iteration then re-pops).
@@ -554,7 +554,7 @@ export class TimestepController {
       }
     }
 
-    // dctran.c:640-644 (XSPICE) — late-clamp on permanent CKTbreaks queue.
+    // dctran.c:640-644 (XSPICE)- late-clamp on permanent CKTbreaks queue.
     // Predicate is strict `>` (NOT `>=`): when CKTtime + CKTdelta lands
     // exactly on breaks[0], no clamp fires and breakFlag stays false. The
     // next step will satisfy the at-breakpoint test above and cut order/dt
@@ -592,7 +592,7 @@ export class TimestepController {
    * @param worstRatio - dt / proposedDt from computeNewDt (0 when no constraint)
    */
   shouldReject(worstRatio: number): boolean {
-    // ngspice dctran.c:880 — reject when newdelta <= .9 * CKTdelta
+    // ngspice dctran.c:880- reject when newdelta <= .9 * CKTdelta
     return worstRatio >= 1 / 0.9;
   }
 
@@ -620,14 +620,14 @@ export class TimestepController {
     // step 0 because dctran.c:849-866's firsttime branch does
     // `goto nextTime` and skips the LTE/promotion code entirely; our
     // _stepCount === 0 early-break in MNAEngine.step() (around line 568)
-    // mirrors that skip — computeNewDt and tryOrderPromotion never run on
+    // mirrors that skip- computeNewDt and tryOrderPromotion never run on
     // step 0, so order cannot be promoted. No defensive pin needed here.
     this._acceptedSteps++;
 
-    // deltaOld rotation removed — now performed by the engine before/inside
+    // deltaOld rotation removed- now performed by the engine before/inside
     // the for(;;) loop to match ngspice dctran.c:704-706, 735.
     //
-    // Breakpoint pop and at-breakpoint clamp live in getClampedDt() — see
+    // Breakpoint pop and at-breakpoint clamp live in getClampedDt()- see
     // ngspice dctran.c:540-644 (top-of-next-step, not at-acceptance).
   }
 
@@ -684,7 +684,7 @@ export class TimestepController {
     if (rawTrialDt > 2 * executedDt) rawTrialDt = 2 * executedDt;
 
     if (rawTrialDt <= 1.05 * executedDt) {
-      // Promotion does not help — keep order 1.
+      // Promotion does not help- keep order 1.
       // Still update currentDt to the (clamped) trial result, matching
       // ngspice dctran.c:876 which always writes newdelta.
       this.currentDt = Math.max(
@@ -694,7 +694,7 @@ export class TimestepController {
       return;
     }
 
-    // Promotion succeeds — switch to trapezoidal order 2.
+    // Promotion succeeds- switch to trapezoidal order 2.
     this.currentMethod = "trapezoidal";
     this.currentOrder = 2;
     // Clamp for actual stepping.
@@ -712,7 +712,7 @@ export class TimestepController {
    * Restart the transient loop with a new finalTime, preserving accepted-step
    * history (currentDt, deltaOld, currentOrder, currentMethod, _stepCount).
    *
-   * **No ngspice analogue.** dctran is a one-shot function — it never
+   * **No ngspice analogue.** dctran is a one-shot function- it never
    * re-runs its prologue without re-entering the whole routine. This method
    * exists for the digiTS-specific configure() path where tStop changes
    * mid-run and the engine must reset the queue+breakFlag without
@@ -727,7 +727,7 @@ export class TimestepController {
     this._breakFlag = true;
   }
 
-  /** ngspice cktclrbk.c — shift breakpoint array, maintaining finalTime sentinel when length collapses to 2. */
+  /** ngspice cktclrbk.c- shift breakpoint array, maintaining finalTime sentinel when length collapses to 2. */
   private _clrBreak(): void {
     if (this._breakpoints.length > 2) {
       this._breakpoints.shift();

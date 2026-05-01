@@ -1,5 +1,5 @@
 /**
- * HGS Evaluator tests — task 4.3.3
+ * HGS Evaluator tests- task 4.3.3
  *
  * Tests cover all HGS language features: arithmetic, control flow, functions,
  * closures, arrays, structs, template output, and runtime errors.
@@ -95,12 +95,12 @@ describe("Evaluator", () => {
   // Control flow
   // ---------------------------------------------------------------------------
 
-  it("ifElse — true branch", async () => {
+  it("ifElse- true branch", async () => {
     const { ctx } = await run("x := 0; if (1 = 1) x = 1; else x = 2;");
     expect(ctx.getVar("x")).toBe(1n);
   });
 
-  it("ifElse — false branch", async () => {
+  it("ifElse- false branch", async () => {
     const { ctx } = await run("x := 0; if (1 = 2) x = 1; else x = 2;");
     expect(ctx.getVar("x")).toBe(2n);
   });
@@ -154,7 +154,7 @@ describe("Evaluator", () => {
     expect(ctx.getVar("x")).toBe(2n);
   });
 
-  it("recursion — factorial", async () => {
+  it("recursion- factorial", async () => {
     const { ctx } = await run(`
       func fact(n) {
         if (n = 0) return 1;
@@ -177,17 +177,17 @@ describe("Evaluator", () => {
   // Arrays
   // ---------------------------------------------------------------------------
 
-  it("arrays — creation and access", async () => {
+  it("arrays- creation and access", async () => {
     const { ctx } = await run("a := [1, 2, 3]; x := a[1];");
     expect(ctx.getVar("x")).toBe(2n);
   });
 
-  it("arrays — assignment", async () => {
+  it("arrays- assignment", async () => {
     const { ctx } = await run("a := [10, 20, 30]; a[1] = 99; x := a[1];");
     expect(ctx.getVar("x")).toBe(99n);
   });
 
-  it("arrays — sizeOf", async () => {
+  it("arrays- sizeOf", async () => {
     const { ctx } = await run("a := [1, 2, 3, 4]; x := sizeOf(a);");
     expect(ctx.getVar("x")).toBe(4n);
   });
@@ -196,7 +196,7 @@ describe("Evaluator", () => {
   // Structs / maps
   // ---------------------------------------------------------------------------
 
-  it("structs — creation and field access", async () => {
+  it("structs- creation and field access", async () => {
     const { ctx } = await run('m := {width: 8}; x := m.width;');
     expect(ctx.getVar("x")).toBe(8n);
   });
@@ -206,7 +206,7 @@ describe("Evaluator", () => {
     expect(ctx.getVar("x")).toBe(16n);
   });
 
-  it("struct — multiple fields", async () => {
+  it("struct- multiple fields", async () => {
     const { ctx } = await run('m := {a: 1, b: 2}; x := m.a + m.b;');
     expect(ctx.getVar("x")).toBe(3n);
   });
@@ -220,12 +220,12 @@ describe("Evaluator", () => {
     expect(ctx.getVar("x")).toBe(8n);
   });
 
-  it("bitsNeededFor — 256", async () => {
+  it("bitsNeededFor- 256", async () => {
     const { ctx } = await run("x := bitsNeededFor(256);");
     expect(ctx.getVar("x")).toBe(9n);
   });
 
-  it("bitsNeededFor — 1", async () => {
+  it("bitsNeededFor- 1", async () => {
     const { ctx } = await run("x := bitsNeededFor(1);");
     expect(ctx.getVar("x")).toBe(1n);
   });
@@ -245,7 +245,7 @@ describe("Evaluator", () => {
     expect(ctx.getVar("x")).toBe(3n);
   });
 
-  it("abs — negative", async () => {
+  it("abs- negative", async () => {
     const { ctx } = await run("x := abs(-5);");
     expect(ctx.getVar("x")).toBe(5n);
   });
@@ -275,12 +275,12 @@ describe("Evaluator", () => {
     expect(ctx.getVar("x")).toBe("val=42");
   });
 
-  it("int — converts float to bigint", async () => {
+  it("int- converts float to bigint", async () => {
     const { ctx } = await run("x := int(3.7);");
     expect(ctx.getVar("x")).toBe(3n);
   });
 
-  it("float — converts bigint to number", async () => {
+  it("float- converts bigint to number", async () => {
     const { ctx } = await run("x := float(5);");
     expect(ctx.getVar("x")).toBe(5);
   });
@@ -313,17 +313,17 @@ describe("Evaluator", () => {
   // Template output
   // ---------------------------------------------------------------------------
 
-  it("templateOutput — basic", async () => {
+  it("templateOutput- basic", async () => {
     const output = await runTemplate("Width is <? = 8; ?> bits");
     expect(output).toBe("Width is 8 bits");
   });
 
-  it("templateOutput — multiple blocks", async () => {
+  it("templateOutput- multiple blocks", async () => {
     const output = await runTemplate("a=<? = 1; ?>, b=<? = 2; ?>");
     expect(output).toBe("a=1, b=2");
   });
 
-  it("templateOutput — code block", async () => {
+  it("templateOutput- code block", async () => {
     const output = await runTemplate("Hello <? x := \"World\"; = x; ?>!");
     expect(output).toBe("Hello World!");
   });
@@ -342,14 +342,14 @@ describe("Evaluator", () => {
   // Runtime errors
   // ---------------------------------------------------------------------------
 
-  it("runtimeErrorHasLine — undefined variable", async () => {
+  it("runtimeErrorHasLine- undefined variable", async () => {
     const ctx = createRootContext();
     registerBuiltins(ctx);
     const ast = parse("x := 1;\ny := z + 1;");
     await expect(evaluate(ast, ctx)).rejects.toThrow(/variable not found: z/i);
   });
 
-  it("runtimeErrorHasLine — division by zero", async () => {
+  it("runtimeErrorHasLine- division by zero", async () => {
     const ctx = createRootContext();
     registerBuiltins(ctx);
     // Construct a 3-line program so the error is on line 3
@@ -365,7 +365,7 @@ describe("Evaluator", () => {
     expect(caught!.message).toMatch(/line/i);
   });
 
-  it("runtimeErrorHasLine — array out of bounds", async () => {
+  it("runtimeErrorHasLine- array out of bounds", async () => {
     const ctx = createRootContext();
     registerBuiltins(ctx);
     const ast = parse("a := [1, 2];\nx := a[5];");
@@ -383,22 +383,22 @@ describe("Evaluator", () => {
   // Comparison operators
   // ---------------------------------------------------------------------------
 
-  it("comparison — equal returns boolean", async () => {
+  it("comparison- equal returns boolean", async () => {
     const { ctx } = await run("x := 1 = 1;");
     expect(ctx.getVar("x")).toBe(true);
   });
 
-  it("comparison — not equal", async () => {
+  it("comparison- not equal", async () => {
     const { ctx } = await run("x := 1 != 2;");
     expect(ctx.getVar("x")).toBe(true);
   });
 
-  it("comparison — less than", async () => {
+  it("comparison- less than", async () => {
     const { ctx } = await run("x := 3 < 5;");
     expect(ctx.getVar("x")).toBe(true);
   });
 
-  it("comparison — greater than equal", async () => {
+  it("comparison- greater than equal", async () => {
     const { ctx } = await run("x := 5 >= 5;");
     expect(ctx.getVar("x")).toBe(true);
   });

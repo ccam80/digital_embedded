@@ -1,5 +1,5 @@
 /**
- * Tests for ProgramCounter — edge-triggered counter with jump support.
+ * Tests for ProgramCounter- edge-triggered counter with jump support.
  *
  * Covers:
  *   - Count increment on rising clock edge with en=1
@@ -29,9 +29,9 @@ import type { ComponentLayout } from "../../../core/registry.js";
 
 // ---------------------------------------------------------------------------
 // Layout helper
-// Input layout:  [D=0, en=1, C=2, ld=3]  — 4 inputs
-// Output layout: [Q=0, ovf=1]             — 2 outputs
-// State layout:  [counter=0, prevClock=1] — 2 state slots
+// Input layout:  [D=0, en=1, C=2, ld=3] - 4 inputs
+// Output layout: [Q=0, ovf=1]            - 2 outputs
+// State layout:  [counter=0, prevClock=1]- 2 state slots
 // ---------------------------------------------------------------------------
 
 function makeLayout(): {
@@ -59,7 +59,7 @@ function tick(state: Uint32Array, highZs: Uint32Array, layout: ComponentLayout &
 }
 
 describe("ProgramCounter", () => {
-  it("incrementOnRisingEdge — en=1, ld=0 increments counter", () => {
+  it("incrementOnRisingEdge- en=1, ld=0 increments counter", () => {
     const { layout, state } = makeLayout();
     const highZs = new Uint32Array(state.length);
     state[0] = 0;  // D
@@ -70,7 +70,7 @@ describe("ProgramCounter", () => {
     tick(state, highZs, layout, true);
     expect(state[4]).toBe(1); // Q = 1
 
-    // Falling edge — no change
+    // Falling edge- no change
     tick(state, highZs, layout, false);
     expect(state[4]).toBe(1);
 
@@ -79,7 +79,7 @@ describe("ProgramCounter", () => {
     expect(state[4]).toBe(2); // Q = 2
   });
 
-  it("jumpOnLoad — ld=1 loads D value", () => {
+  it("jumpOnLoad- ld=1 loads D value", () => {
     const { layout, state } = makeLayout();
     const highZs = new Uint32Array(state.length);
     state[0] = 0x50; // D
@@ -91,7 +91,7 @@ describe("ProgramCounter", () => {
     expect(state[4]).toBe(0x50); // Q = 0x50
   });
 
-  it("loadTakesPriorityOverEnable — ld=1 and en=1, load wins", () => {
+  it("loadTakesPriorityOverEnable- ld=1 and en=1, load wins", () => {
     const { layout, state } = makeLayout();
     const highZs = new Uint32Array(state.length);
     state[0] = 0x20; // D = 0x20
@@ -102,7 +102,7 @@ describe("ProgramCounter", () => {
     expect(state[4]).toBe(0x20); // loaded, not incremented from 0
   });
 
-  it("noActionWhenDisabled — en=0, ld=0, counter stays same", () => {
+  it("noActionWhenDisabled- en=0, ld=0, counter stays same", () => {
     const { layout, state } = makeLayout();
     const highZs = new Uint32Array(state.length);
     state[6] = 0x42; // counter = 0x42 initial
@@ -113,7 +113,7 @@ describe("ProgramCounter", () => {
     expect(state[4]).toBe(0x42); // unchanged
   });
 
-  it("noActionOnHighClock — no rising edge when clock stays high", () => {
+  it("noActionOnHighClock- no rising edge when clock stays high", () => {
     const { layout, state } = makeLayout();
     const highZs = new Uint32Array(state.length);
     state[1] = 1; state[3] = 0; // en=1, ld=0
@@ -127,7 +127,7 @@ describe("ProgramCounter", () => {
     expect(state[4]).toBe(1);
   });
 
-  it("multipleIncrements — counter increments on each rising edge", () => {
+  it("multipleIncrements- counter increments on each rising edge", () => {
     const { layout, state } = makeLayout();
     const highZs = new Uint32Array(state.length);
     state[1] = 1; state[3] = 0;
@@ -139,7 +139,7 @@ describe("ProgramCounter", () => {
     }
   });
 
-  it("jumpThenIncrement — jump to address then continue incrementing", () => {
+  it("jumpThenIncrement- jump to address then continue incrementing", () => {
     const { layout, state } = makeLayout();
     const highZs = new Uint32Array(state.length);
     state[0] = 100; state[3] = 1; state[1] = 0;
@@ -155,7 +155,7 @@ describe("ProgramCounter", () => {
     expect(state[4]).toBe(101);
   });
 
-  it("overflowAt32Bit — wraps from 0xFFFFFFFF to 0", () => {
+  it("overflowAt32Bit- wraps from 0xFFFFFFFF to 0", () => {
     const { layout, state } = makeLayout();
     const highZs = new Uint32Array(state.length);
     state[6] = 0xFFFFFFFF; // counter at max 32-bit value
@@ -166,7 +166,7 @@ describe("ProgramCounter", () => {
     expect(state[5]).toBe(1); // ovf = 1
   });
 
-  it("noOverflowOnNormalIncrement — ovf stays 0 normally", () => {
+  it("noOverflowOnNormalIncrement- ovf stays 0 normally", () => {
     const { layout, state } = makeLayout();
     const highZs = new Uint32Array(state.length);
     state[6] = 5;
@@ -176,20 +176,20 @@ describe("ProgramCounter", () => {
     expect(state[5]).toBe(0); // no overflow
   });
 
-  it("isProgramCounterFlag — element reports correctly", () => {
+  it("isProgramCounterFlag- element reports correctly", () => {
     const props = new PropertyBag();
     props.set("isProgramCounter", true);
     const el = new ProgramCounterElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
     expect(el.isProgramCounter).toBe(true);
   });
 
-  it("isProgramCounterDefault — defaults to true", () => {
+  it("isProgramCounterDefault- defaults to true", () => {
     const props = new PropertyBag();
     const el = new ProgramCounterElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
     expect(el.isProgramCounter).toBe(true);
   });
 
-  it("pinLayout — 4 input pins and 2 output pins", () => {
+  it("pinLayout- 4 input pins and 2 output pins", () => {
     const props = new PropertyBag();
     const el = new ProgramCounterElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
     const pins = el.getPins();
@@ -206,7 +206,7 @@ describe("ProgramCounter", () => {
     expect(labels).toContain("ovf");
   });
 
-  it("clockPinMarked — C pin is clock-capable", () => {
+  it("clockPinMarked- C pin is clock-capable", () => {
     const props = new PropertyBag();
     const el = new ProgramCounterElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
     const cPin = el.getPins().find(p => p.label === "C");
@@ -214,7 +214,7 @@ describe("ProgramCounter", () => {
     expect(cPin!.isClock).toBe(true);
   });
 
-  it("attributeMapping — Bits and Label map correctly", () => {
+  it("attributeMapping- Bits and Label map correctly", () => {
     const bitsMap = PROGRAM_COUNTER_ATTRIBUTE_MAPPINGS.find(m => m.xmlName === "Bits");
     const labelMap = PROGRAM_COUNTER_ATTRIBUTE_MAPPINGS.find(m => m.xmlName === "Label");
     const pcMap = PROGRAM_COUNTER_ATTRIBUTE_MAPPINGS.find(m => m.xmlName === "isProgramCounter");
@@ -225,7 +225,7 @@ describe("ProgramCounter", () => {
     expect(pcMap!.convert("false")).toBe(false);
   });
 
-  it("draw — renders body with PC label", () => {
+  it("draw- renders body with PC label", () => {
     const props = new PropertyBag();
     const el = new ProgramCounterElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
 
@@ -249,7 +249,7 @@ describe("ProgramCounter", () => {
     expect(texts).toContain("PC");
   });
 
-  it("definitionComplete — ProgramCounterDefinition has all required fields", () => {
+  it("definitionComplete- ProgramCounterDefinition has all required fields", () => {
     expect(ProgramCounterDefinition.name).toBe("ProgramCounter");
     expect(ProgramCounterDefinition.factory).toBeDefined();
     expect(ProgramCounterDefinition.models!.digital!.executeFn).toBeDefined();
@@ -261,7 +261,7 @@ describe("ProgramCounter", () => {
     expect(typeof ProgramCounterDefinition.models!.digital!.defaultDelay).toBe("number");
   });
 
-  it("factoryCreatesInstance — factory returns ProgramCounterElement", () => {
+  it("factoryCreatesInstance- factory returns ProgramCounterElement", () => {
     const props = new PropertyBag();
     expect(ProgramCounterDefinition.factory(props)).toBeInstanceOf(ProgramCounterElement);
   });

@@ -1,5 +1,5 @@
 /**
- * ScopeTrigger — connects a Scope component's trigger condition to the
+ * ScopeTrigger- connects a Scope component's trigger condition to the
  * timing diagram's recording state.
  *
  * Trigger modes:
@@ -16,7 +16,7 @@
  * the state returns to ARMED.
  *
  * When no ScopeTrigger is installed the timing diagram records continuously
- * (this class is simply not used in that case — it does not intercept recording).
+ * (this class is simply not used in that case- it does not intercept recording).
  */
 
 // ---------------------------------------------------------------------------
@@ -173,12 +173,12 @@ export class ScopeTrigger {
     const result: PreTriggerSample[] = new Array(n);
 
     if (this._preBufCount < this._preTriggerDepth) {
-      // Buffer not yet wrapped — data starts at index 0
+      // Buffer not yet wrapped- data starts at index 0
       for (let i = 0; i < n; i++) {
         result[i] = this._preBuf[i]!;
       }
     } else {
-      // Buffer wrapped — oldest is at _preBufHead
+      // Buffer wrapped- oldest is at _preBufHead
       for (let i = 0; i < n; i++) {
         result[i] = this._preBuf[(this._preBufHead + i) % this._preTriggerDepth]!;
       }

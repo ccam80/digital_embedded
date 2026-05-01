@@ -1,5 +1,5 @@
 /**
- * LightBulb component — incandescent bulb indicator.
+ * LightBulb component- incandescent bulb indicator.
  *
  * Rendered as a circle with filament cross lines.
  * Brightness is conceptually proportional to input value; visually it is
@@ -58,7 +58,7 @@ function buildLightBulbPinDeclarations(): PinDeclaration[] {
 }
 
 // ---------------------------------------------------------------------------
-// LightBulbElement — CircuitElement implementation
+// LightBulbElement- CircuitElement implementation
 // ---------------------------------------------------------------------------
 
 export class LightBulbElement extends AbstractCircuitElement {
@@ -91,7 +91,7 @@ export class LightBulbElement extends AbstractCircuitElement {
   draw(ctx: RenderContext): void {
     ctx.save();
 
-    // Bulb body — centered between pins A@(0,0) and B@(0,2)
+    // Bulb body- centered between pins A@(0,0) and B@(0,2)
     ctx.setColor("COMPONENT_FILL");
     ctx.drawCircle(0, 1, BULB_RADIUS, true);
     ctx.setColor("COMPONENT");
@@ -118,7 +118,7 @@ export class LightBulbElement extends AbstractCircuitElement {
 }
 
 // ---------------------------------------------------------------------------
-// executeLightBulb — on when input is non-zero
+// executeLightBulb- on when input is non-zero
 // ---------------------------------------------------------------------------
 
 export function executeLightBulb(
@@ -175,7 +175,7 @@ export const LightBulbDefinition: ComponentDefinition = {
   attributeMap: LIGHT_BULB_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.IO,
   helpText:
-    "LightBulb — incandescent bulb indicator.\n" +
+    "LightBulb- incandescent bulb indicator.\n" +
     "Rendered as a circle with filament cross. On when input is non-zero.\n" +
     "Label is shown above the component.",
   models: {

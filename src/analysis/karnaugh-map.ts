@@ -5,13 +5,13 @@
  * are used (the extra variable selects which sub-map is active).
  *
  * The K-map uses Gray code ordering for rows and columns so that adjacent
- * cells differ in exactly one variable — the fundamental property that makes
+ * cells differ in exactly one variable- the fundamental property that makes
  * prime implicant groupings visible as rectangles.
  *
  * Architecture:
- *   KarnaughMap      — pure data model: grid layout, cell ↔ truth-table-row
+ *   KarnaughMap     - pure data model: grid layout, cell ↔ truth-table-row
  *                      mapping, implicant loop geometry
- *   KarnaughMapTab   — UI controller: owns a KarnaughMap, handles click
+ *   KarnaughMapTab  - UI controller: owns a KarnaughMap, handles click
  *                      events, emits change events, drives rendering
  */
 
@@ -120,7 +120,7 @@ export interface ImplicantLoop {
 }
 
 // ---------------------------------------------------------------------------
-// KarnaughMap — pure data model
+// KarnaughMap- pure data model
 // ---------------------------------------------------------------------------
 
 /**
@@ -292,7 +292,7 @@ export class KarnaughMap {
 }
 
 // ---------------------------------------------------------------------------
-// KarnaughMapTab — UI controller
+// KarnaughMapTab- UI controller
 // ---------------------------------------------------------------------------
 
 export type KMapChangeListener = (row: number, value: TernaryValue) => void;

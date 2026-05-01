@@ -24,7 +24,7 @@ import type { RenderContext, Point, TextAnchor, FontSpec, PathData } from "../..
 import type { ThemeColor } from "../../../core/renderer-interface.js";
 
 // ---------------------------------------------------------------------------
-// Helpers — ComponentLayout mock
+// Helpers- ComponentLayout mock
 // ---------------------------------------------------------------------------
 
 function makeLayout(inputCount: number): ComponentLayout {
@@ -49,7 +49,7 @@ function makeState(inputs: number[]): Uint32Array {
 }
 
 // ---------------------------------------------------------------------------
-// Helpers — RenderContext mock
+// Helpers- RenderContext mock
 // ---------------------------------------------------------------------------
 
 interface DrawCall {
@@ -89,7 +89,7 @@ function makeStubCtx(): { ctx: RenderContext; calls: DrawCall[] } {
 }
 
 // ---------------------------------------------------------------------------
-// Helpers — OrElement factory
+// Helpers- OrElement factory
 // ---------------------------------------------------------------------------
 
 function makeOr(overrides?: {
@@ -113,7 +113,7 @@ function makeOr(overrides?: {
 }
 
 // ---------------------------------------------------------------------------
-// executeOr — logic correctness
+// executeOr- logic correctness
 // ---------------------------------------------------------------------------
 
 describe("OrGate", () => {
@@ -278,7 +278,7 @@ describe("OrGate", () => {
   });
 
   // ---------------------------------------------------------------------------
-  // Rendering — IEC/DIN
+  // Rendering- IEC/DIN
   // ---------------------------------------------------------------------------
 
   describe("drawNarrowIEEE", () => {
@@ -302,7 +302,7 @@ describe("OrGate", () => {
   });
 
   // ---------------------------------------------------------------------------
-  // Rendering — IEEE/US
+  // Rendering- IEEE/US
   // ---------------------------------------------------------------------------
 
   describe("drawIEEE", () => {

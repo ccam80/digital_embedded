@@ -1,5 +1,5 @@
 /**
- * Tests for OscillationDetector — task 3.3.2.
+ * Tests for OscillationDetector- task 3.3.2.
  */
 
 import { describe, it, expect } from "vitest";

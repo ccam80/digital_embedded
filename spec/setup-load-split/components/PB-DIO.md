@@ -8,8 +8,8 @@
 
 | digiTS label | ngspice variable | Note |
 |---|---|---|
-| `A` | `DIOposNode` | Anode — external positive terminal |
-| `K` | `DIOnegNode` | Cathode — external negative terminal |
+| `A` | `DIOposNode` | Anode- external positive terminal |
+| `K` | `DIOnegNode` | Cathode- external negative terminal |
 | `internal` | `DIOposPrimeNode` | Internal node created when RS ≠ 0 |
 
 ```
@@ -28,7 +28,7 @@ if(model->DIOresist == 0) {
     error = CKTmkVolt(ckt, &tmp, here->DIOname, "internal");
     if(error) return(error);
     here->DIOposPrimeNode = tmp->number;
-    /* copyNodesets block omitted — handled by engine */
+    /* copyNodesets block omitted- handled by engine */
 }
 ```
 
@@ -66,9 +66,9 @@ this._stateBase = ctx.allocStates(5);
 | 6 | `DIOnegNegPtr` | `DIOnegNode` | `DIOnegNode` | `this._hNegNeg` |
 | 7 | `DIOposPrimePosPrimePtr` | `DIOposPrimeNode` | `DIOposPrimeNode` | `this._hPPPP` |
 
-**RS=0 collapse note:** When `RS === 0`, `_posPrimeNode === posNode`. Entries (1) and (5) become `allocElement(posNode, posNode)` — same call twice. `allocElement` returns the existing handle on the second call (idempotent by design). No special-case needed in the port. Similarly entries (2) and (4) reduce: (2) stays `(negNode, posNode)`, (4) becomes `(posNode, negNode)`. Entry (3) becomes `(posNode, posNode)` — same as (5). Entry (7) becomes `(posNode, posNode)` — same again. The Translate mechanism returns the existing slot handle each time; load() uses all 7 handles regardless.
+**RS=0 collapse note:** When `RS === 0`, `_posPrimeNode === posNode`. Entries (1) and (5) become `allocElement(posNode, posNode)`- same call twice. `allocElement` returns the existing handle on the second call (idempotent by design). No special-case needed in the port. Similarly entries (2) and (4) reduce: (2) stays `(negNode, posNode)`, (4) becomes `(posNode, negNode)`. Entry (3) becomes `(posNode, posNode)`- same as (5). Entry (7) becomes `(posNode, posNode)`- same again. The Translate mechanism returns the existing slot handle each time; load() uses all 7 handles regardless.
 
-## setup() body — alloc only
+## setup() body- alloc only
 
 ```ts
 setup(ctx: SetupContext): void {
@@ -76,15 +76,15 @@ setup(ctx: SetupContext): void {
   const posNode  = this._pinNodes.get("A")!;
   const negNode  = this._pinNodes.get("K")!;
 
-  // State slots — diosetup.c:198-199
+  // State slots- diosetup.c:198-199
   this._stateBase = ctx.allocStates(5);
 
-  // Internal node — diosetup.c:204-224
+  // Internal node- diosetup.c:204-224
   this._posPrimeNode = (this._model.RS === 0)
     ? posNode
     : ctx.makeVolt(this.label, "internal");
 
-  // TSTALLOC sequence — diosetup.c:232-238
+  // TSTALLOC sequence- diosetup.c:232-238
   this._hPosPP  = solver.allocElement(posNode,           this._posPrimeNode); // (1)
   this._hNegPP  = solver.allocElement(negNode,           this._posPrimeNode); // (2)
   this._hPPPos  = solver.allocElement(this._posPrimeNode, posNode);           // (3)
@@ -95,7 +95,7 @@ setup(ctx: SetupContext): void {
 }
 ```
 
-## load() body — value writes only
+## load() body- value writes only
 
 Implementer ports value-side from `ref/ngspice/src/spicelib/devices/dio/dioload.c` line-for-line, stamping through cached handles. No allocElement calls.
 
@@ -116,11 +116,11 @@ Not applicable. DIO has no branch row.
 
 Per CLAUDE.md "Test Policy During W3 Setup-Load-Split", verification is spec compliance only. DO NOT run tests; DO NOT use test results.
 
-1. `setup()` body in the implementation file matches the "setup() body — alloc only" listing in this PB line-for-line.
+1. `setup()` body in the implementation file matches the "setup() body- alloc only" listing in this PB line-for-line.
 2. TSTALLOC sequence in `setup()` matches the order in the cited ngspice anchor file (see top of this PB, e.g. `ressetup.c:46-49`).
 3. Factory cleanup applied per the "Factory cleanup" section above.
 4. `ngspiceNodeMap` registered per the "Pin mapping" section above (or omitted for composites where the spec says so).
-5. `load()` writes through cached handles only — zero `solver.allocElement(...)` calls inside `load()`, `accept()`, or any non-`setup()` method.
+5. `load()` writes through cached handles only- zero `solver.allocElement(...)` calls inside `load()`, `accept()`, or any non-`setup()` method.
 6. `mayCreateInternalNodes` flag set per spec.
 7. `findBranchFor` callback present where spec says (V-output sources, IND, etc.).
 8. No banned closing verdicts (mapping/tolerance/equivalent-to/pre-existing/intentional-divergence/citation-divergence/partial) used in any commit message or report.

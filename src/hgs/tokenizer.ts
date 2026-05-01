@@ -1,5 +1,5 @@
 /**
- * HGS tokenizer — port of Digital's hdl/hgs/Tokenizer.java.
+ * HGS tokenizer- port of Digital's hdl/hgs/Tokenizer.java.
  *
  * Produces tokens from HGS source code. Tracks line numbers for error reporting.
  */

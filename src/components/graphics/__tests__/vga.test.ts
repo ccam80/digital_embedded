@@ -28,7 +28,7 @@ import type { RenderContext, Point, TextAnchor, FontSpec, PathData } from "../..
 import type { ThemeColor } from "../../../core/renderer-interface.js";
 
 // ---------------------------------------------------------------------------
-// Helpers — ComponentLayout mock (6 inputs, 1 output)
+// Helpers- ComponentLayout mock (6 inputs, 1 output)
 // ---------------------------------------------------------------------------
 
 function makeLayout(): ComponentLayout {
@@ -59,7 +59,7 @@ function makeState(r: number, g: number, b: number, h: number, v: number, c: num
 }
 
 // ---------------------------------------------------------------------------
-// Helpers — RenderContext mock
+// Helpers- RenderContext mock
 // ---------------------------------------------------------------------------
 
 interface DrawCall {
@@ -98,7 +98,7 @@ function makeStubCtx(): { ctx: RenderContext; calls: DrawCall[] } {
 }
 
 // ---------------------------------------------------------------------------
-// Helpers — VGAElement factory
+// Helpers- VGAElement factory
 // ---------------------------------------------------------------------------
 
 function makeVga(overrides?: {
@@ -183,7 +183,7 @@ describe("VGA", () => {
   });
 
   // ---------------------------------------------------------------------------
-  // processInputs — HSync/VSync timing
+  // processInputs- HSync/VSync timing
   // ---------------------------------------------------------------------------
 
   describe("processInputs", () => {
@@ -226,7 +226,7 @@ describe("VGA", () => {
 
     it("no-op on same clock level (not a rising edge)", () => {
       const el = makeVga({ colorBits: 4, frameWidth: 4, frameHeight: 4 });
-      // clock stays low — no pixel written
+      // clock stays low- no pixel written
       el.processInputs(15, 0, 0, false, false, false);
       el.processInputs(15, 0, 0, false, false, false);
       expect(el.readPixelAt(0, 0)).toBe(0);

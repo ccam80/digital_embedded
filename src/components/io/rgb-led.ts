@@ -1,5 +1,5 @@
 /**
- * RGBLED component — three-color LED with independent R, G, B channel inputs.
+ * RGBLED component- three-color LED with independent R, G, B channel inputs.
  *
  * Rendered as a circle divided into three arcs (red/green/blue sectors).
  * Each channel is 1-bit: on when input is non-zero.
@@ -29,7 +29,7 @@ const LED_OUTER_RADIUS = 0.75;
 const LED_INNER_RADIUS = 0.65;
 
 // ---------------------------------------------------------------------------
-// Pin layout — R, G, B inputs at Java RGBLEDShape positions: R(0,-1), G(0,0), B(0,1)
+// Pin layout- R, G, B inputs at Java RGBLEDShape positions: R(0,-1), G(0,0), B(0,1)
 // ---------------------------------------------------------------------------
 
 function buildRgbLedPinDeclarations(): PinDeclaration[] {
@@ -65,7 +65,7 @@ function buildRgbLedPinDeclarations(): PinDeclaration[] {
 }
 
 // ---------------------------------------------------------------------------
-// RgbLedElement — CircuitElement implementation
+// RgbLedElement- CircuitElement implementation
 // ---------------------------------------------------------------------------
 
 export class RgbLedElement extends AbstractCircuitElement {
@@ -93,7 +93,7 @@ export class RgbLedElement extends AbstractCircuitElement {
   }
 
   draw(ctx: RenderContext): void {
-    // LED center at (0.8, 0) — pins R@(0,-1), G@(0,0), B@(0,1)
+    // LED center at (0.8, 0)- pins R@(0,-1), G@(0,0), B@(0,1)
     const cx = 0.8;
     const cy = 0;
 
@@ -129,7 +129,7 @@ export class RgbLedElement extends AbstractCircuitElement {
 }
 
 // ---------------------------------------------------------------------------
-// executeRgbLed — pack R/G/B channel states into output slot
+// executeRgbLed- pack R/G/B channel states into output slot
 // ---------------------------------------------------------------------------
 
 export function executeRgbLed(
@@ -190,7 +190,7 @@ export const RgbLedDefinition: ComponentDefinition = {
   attributeMap: RGB_LED_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.IO,
   helpText:
-    "RGBLED — three-color LED with independent R, G, B channel inputs.\n" +
+    "RGBLED- three-color LED with independent R, G, B channel inputs.\n" +
     "Each channel is 1-bit: channel lights when input is non-zero.\n" +
     "All three channels active produces white light.",
   models: {

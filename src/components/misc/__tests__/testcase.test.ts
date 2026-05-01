@@ -232,7 +232,7 @@ describe("Testcase", () => {
   });
 
   describe("noSimulationBehavior", () => {
-    it("executeTestcase is a no-op — state unchanged", () => {
+    it("executeTestcase is a no-op- state unchanged", () => {
       const layout = makeLayout(0, 0);
       const state = new Uint32Array(4);
       const highZs = new Uint32Array(state.length);

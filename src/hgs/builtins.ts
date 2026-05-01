@@ -1,5 +1,5 @@
 /**
- * HGS built-in functions — port of the inner classes in Context.java.
+ * HGS built-in functions- port of the inner classes in Context.java.
  *
  * Registers all ~25 built-in functions into a root HGSContext.
  */
@@ -294,7 +294,7 @@ function builtinStartsWith(): HGSFunction {
 }
 
 // ---------------------------------------------------------------------------
-// File I/O builtins (async — delegate to FileResolver)
+// File I/O builtins (async- delegate to FileResolver)
 // ---------------------------------------------------------------------------
 
 function builtinLoadHex(ctx: HGSContext): HGSFunction {

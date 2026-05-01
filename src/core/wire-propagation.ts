@@ -1,5 +1,5 @@
 /**
- * Wire bit-width propagation — reusable across loader and editor.
+ * Wire bit-width propagation- reusable across loader and editor.
  *
  * Sets each wire's bitWidth by tracing connected nets from multi-bit pins.
  * Extracted from dig-loader.ts (Step 5 of architectural refactor) so that
@@ -22,7 +22,7 @@ function ptKey(x: number, y: number): string {
  * 2. Seed from multi-bit component pins.
  * 3. Flood-fill through connected wires so the entire net gets the bit width.
  *
- * Safe to call multiple times — resets wire bitWidths to 1 before propagating
+ * Safe to call multiple times- resets wire bitWidths to 1 before propagating
  * so stale values from a previous run are cleared.
  */
 export function propagateWireBitWidths(circuit: Circuit): void {

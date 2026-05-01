@@ -1,5 +1,5 @@
 /**
- * Comparator component — compares two N-bit values.
+ * Comparator component- compares two N-bit values.
  *
  * Ports from Digital's Comparator.java:
  *   Inputs: a (bitWidth), b (bitWidth)
@@ -146,7 +146,7 @@ export const MagnitudeComparatorDefinition: ComponentDefinition = {
   propertyDefs: COMPARATOR_PROPERTY_DEFS,
   attributeMap: COMPARATOR_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.ARITHMETIC,
-  helpText: "Magnitude Comparator — compares two N-bit values. Outputs: > (a greater), = (equal), < (a less).",
+  helpText: "Magnitude Comparator- compares two N-bit values. Outputs: > (a greater), = (equal), < (a less).",
   models: {
     digital: {
       executeFn: executeComparator,

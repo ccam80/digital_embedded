@@ -12,10 +12,10 @@
  * Each winding includes a series winding resistance for ohmic loss modelling.
  *
  * ngspice anchors:
- *   indsetup.c:84-100  — IND branch allocation and TSTALLOC sequence
- *   mutsetup.c:30-70   — MUT branch resolution and TSTALLOC sequence
- *   indload.c          — IND load (companion model)
- *   mutload.c          — MUT load (off-diagonal coupling stamps)
+ *   indsetup.c:84-100 - IND branch allocation and TSTALLOC sequence
+ *   mutsetup.c:30-70  - MUT branch resolution and TSTALLOC sequence
+ *   indload.c         - IND load (companion model)
+ *   mutload.c         - MUT load (off-diagonal coupling stamps)
  */
 
 import { AbstractCircuitElement } from "../../core/element.js";
@@ -215,9 +215,9 @@ export class TransformerElement extends AbstractCircuitElement {
  * MNA element for the two-winding transformer.
  *
  * Composed of three sub-elements:
- *   _l1  (InductorSubElement) — primary winding, pins P1/P2
- *   _l2  (InductorSubElement) — secondary winding, pins S1/S2
- *   _mut (MutualInductorElement) — coupling K element
+ *   _l1  (InductorSubElement)- primary winding, pins P1/P2
+ *   _l2  (InductorSubElement)- secondary winding, pins S1/S2
+ *   _mut (MutualInductorElement)- coupling K element
  *
  * Node layout (pinNodeIds array positions):
  *   [0] = P1 (primary+)   [1] = P2 (primary−)
@@ -298,7 +298,7 @@ export class AnalogTransformerElement implements PoolBackedAnalogElement {
     // Composite setup: call sub-elements in order L1, L2, MUT.
     // Ordering invariant: _l1.setup() and _l2.setup() MUST complete before
     // _mut.setup() is called, because _mut reads _l1.branchIndex and
-    // _l2.branchIndex (set during IND setup) directly — no findDevice needed.
+    // _l2.branchIndex (set during IND setup) directly- no findDevice needed.
     this._l1.setup(ctx);
     this._l2.setup(ctx);
     this._mut.setup(ctx);
@@ -411,7 +411,7 @@ export class AnalogTransformerElement implements PoolBackedAnalogElement {
     const s2 = this._pool.states[2];
     const s3 = this._pool.states[3];
 
-    // Winding resistances — stamped through cached handles
+    // Winding resistances- stamped through cached handles
     if (this._rPri > 0) {
       const gPri = 1 / this._rPri;
       if (this._hRP1P1 !== -1) solver.stampElement(this._hRP1P1, gPri);
@@ -427,19 +427,19 @@ export class AnalogTransformerElement implements PoolBackedAnalogElement {
       if (this._hRS2S1 !== -1) solver.stampElement(this._hRS2S1, -gSec);
     }
 
-    // B sub-matrix: branch current incidence in KCL node rows — cached handles
+    // B sub-matrix: branch current incidence in KCL node rows- cached handles
     if (this._hP1B1 !== -1) solver.stampElement(this._hP1B1, 1);
     if (this._hP2B1 !== -1) solver.stampElement(this._hP2B1, -1);
     if (this._hS1B2 !== -1) solver.stampElement(this._hS1B2, 1);
     if (this._hS2B2 !== -1) solver.stampElement(this._hS2B2, -1);
 
-    // C sub-matrix: KVL voltage incidence — cached handles
+    // C sub-matrix: KVL voltage incidence- cached handles
     if (this._hB1P1 !== -1) solver.stampElement(this._hB1P1, 1);
     if (this._hB1P2 !== -1) solver.stampElement(this._hB1P2, -1);
     if (this._hB2S1 !== -1) solver.stampElement(this._hB2S1, 1);
     if (this._hB2S2 !== -1) solver.stampElement(this._hB2S2, -1);
 
-    // UIC branch current override for flux seeding — indload.c:44-46
+    // UIC branch current override for flux seeding- indload.c:44-46
     let i1Now = voltages[b1];
     let i2Now = voltages[b2];
     if ((mode & MODEUIC) && (mode & MODEINITTRAN)) {
@@ -460,7 +460,7 @@ export class AnalogTransformerElement implements PoolBackedAnalogElement {
       s0[base + SLOT_PHI2] = s1[base + SLOT_PHI2];
     }
 
-    // Companion coefficients — zero at DC; niIntegrate-derived otherwise
+    // Companion coefficients- zero at DC; niIntegrate-derived otherwise
     let g11 = 0, g22 = 0, g12 = 0, hist1 = 0, hist2 = 0;
     if (!(mode & MODEDC)) {
       const phi1_0 = s0[base + SLOT_PHI1];
@@ -501,7 +501,7 @@ export class AnalogTransformerElement implements PoolBackedAnalogElement {
       hist2 = ni2.ceq;
     }
 
-    // 2×2 branch block stamp — cached handles from sub-elements
+    // 2×2 branch block stamp- cached handles from sub-elements
     solver.stampElement(this._l1.hIbrIbr, -g11);
     solver.stampElement(this._mut.hBr1Br2, -g12);
     solver.stampElement(this._mut.hBr2Br1, -g12);
@@ -509,7 +509,7 @@ export class AnalogTransformerElement implements PoolBackedAnalogElement {
     stampRHS(ctx.rhs, b1, hist1);
     stampRHS(ctx.rhs, b2, hist2);
 
-    // SLOT_VOLT1/VOLT2 — terminal voltage state, MODEINITTRAN copy
+    // SLOT_VOLT1/VOLT2- terminal voltage state, MODEINITTRAN copy
     const v1Now = (voltages[p1]) - (voltages[p2]);
     const v2Now = (voltages[sec1]) - (voltages[sec2]);
     s0[base + SLOT_VOLT1] = v1Now;

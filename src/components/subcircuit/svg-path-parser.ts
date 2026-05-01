@@ -16,7 +16,7 @@ import type { PathOperation } from "../../core/renderer-interface.js";
  * - M x,y (moveTo)
  * - L x,y (lineTo)
  * - C cp1x,cp1y cp2x,cp2y x,y (cubic bezier)
- * - Q cpx,cpy x,y (quadratic bezier — converted to cubic for PathOperation)
+ * - Q cpx,cpy x,y (quadratic bezier- converted to cubic for PathOperation)
  * - Z (closePath)
  *
  * All coordinates are divided by pixelScale to convert from pixel to grid units.

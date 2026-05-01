@@ -166,7 +166,7 @@ describe("UnionFind", () => {
     it("decrements only on new merges", () => {
       const uf = new UnionFind(5);
       uf.union(0, 1); // 4
-      uf.union(1, 0); // still 4 — no-op
+      uf.union(1, 0); // still 4- no-op
       uf.union(2, 3); // 3
       uf.union(0, 3); // 2
       expect(uf.componentCount).toBe(2);

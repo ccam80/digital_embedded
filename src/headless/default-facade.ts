@@ -1,5 +1,5 @@
 /**
- * DefaultSimulatorFacade — concrete implementation of SimulatorFacade.
+ * DefaultSimulatorFacade- concrete implementation of SimulatorFacade.
  *
  * Composes CircuitBuilder and SimulationLoader. This is the
  * single entry point for all programmatic circuit building, simulation, and I/O.
@@ -73,7 +73,7 @@ export class DefaultSimulatorFacade implements SimulatorFacade {
   }
 
   // =========================================================================
-  // Building — delegates to _builder
+  // Building- delegates to _builder
   // =========================================================================
 
   createCircuit(opts?: CircuitBuildOptions): Circuit {
@@ -102,7 +102,7 @@ export class DefaultSimulatorFacade implements SimulatorFacade {
 
   /**
    * Install a phase-aware capture hook bundle. Pass null to clear. The hook
-   * fires for every NR iteration thereafter — install it before any analysis
+   * fires for every NR iteration thereafter- install it before any analysis
    * call (`dcOperatingPoint()`, `step()`) whose iterations you want captured.
    */
   setCaptureHook(bundle: PhaseAwareCaptureHook | null): void {
@@ -158,7 +158,7 @@ export class DefaultSimulatorFacade implements SimulatorFacade {
   }
 
   /**
-   * Headless batch sampler — no event-loop yields between samples.
+   * Headless batch sampler- no event-loop yields between samples.
    * For test/MCP contexts. See SimulationCoordinator.sampleAtTimes for full docs.
    */
   sampleAtTimes<T>(
@@ -309,7 +309,7 @@ export class DefaultSimulatorFacade implements SimulatorFacade {
       const { loadWithSubcircuits } = await import('../io/subcircuit-loader.js');
       subCircuit = await loadWithSubcircuits(content, resolver, this._registry);
     } else {
-      // .dig XML format — no resolver, basic loading only
+      // .dig XML format- no resolver, basic loading only
       const { loadDig } = await import('../io/dig-loader.js');
       subCircuit = loadDig(content, this._registry);
     }
@@ -326,7 +326,7 @@ export class DefaultSimulatorFacade implements SimulatorFacade {
   }
 
   // =========================================================================
-  // Introspection — delegates to _builder
+  // Introspection- delegates to _builder
   // =========================================================================
 
   netlist(circuit: Circuit): Netlist {
@@ -346,7 +346,7 @@ export class DefaultSimulatorFacade implements SimulatorFacade {
   // =========================================================================
 
   /**
-   * Returns the active coordinator (never null — returns NullSimulationCoordinator
+   * Returns the active coordinator (never null- returns NullSimulationCoordinator
    * before compile() is called).
    */
   getCoordinator(): SimulationCoordinator {

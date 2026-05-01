@@ -69,7 +69,7 @@ const parser: StreamParser<DigitalTestState> = {
       }
     }
 
-    // Whitespace (spaces and tabs only — newlines handled by CodeMirror)
+    // Whitespace (spaces and tabs only- newlines handled by CodeMirror)
     if (stream.eat(/[ \t]/)) {
       stream.eatWhile(/[ \t]/);
       return null;
@@ -146,7 +146,7 @@ const parser: StreamParser<DigitalTestState> = {
 export const digitalTestLanguage = StreamLanguage.define(parser);
 
 // ---------------------------------------------------------------------------
-// tokenizeLine — standalone utility for testing
+// tokenizeLine- standalone utility for testing
 // ---------------------------------------------------------------------------
 
 /**
@@ -176,7 +176,7 @@ export function tokenizeLine(
   while (pos < line.length) {
     const ch = line[pos];
 
-    // Whitespace — skip silently
+    // Whitespace- skip silently
     if (ch === ' ' || ch === '\t') {
       readWhile((c) => c === ' ' || c === '\t');
       continue;

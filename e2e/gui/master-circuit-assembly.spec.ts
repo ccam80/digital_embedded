@@ -1,5 +1,5 @@
 /**
- * Master circuit assembly E2E tests — consolidated from digital, analog,
+ * Master circuit assembly E2E tests- consolidated from digital, analog,
  * and mixed-signal assembly tests.
  *
  * Three large circuits tested via genuine UI interactions, with explicit
@@ -43,7 +43,7 @@ test.describe('Master circuit assembly via UI', () => {
   //           counter increment, clock distribution
   // =========================================================================
 
-  test('Master 1: digital logic — gates, flip-flop, counter', async () => {
+  test('Master 1: digital logic- gates, flip-flop, counter', async () => {
     // --- Place inputs (col 3) ---
     await builder.placeLabeled('In', 3, 4, 'A');
     await builder.placeLabeled('In', 3, 8, 'B');
@@ -136,7 +136,7 @@ test.describe('Master circuit assembly via UI', () => {
     expect(cntY).not.toBeNull();
     expect(cntY!).toBeGreaterThanOrEqual(4);
 
-    // --- CMOS model: Phase C — wire VDD/GND to G_AND power pins ---
+    // --- CMOS model: Phase C- wire VDD/GND to G_AND power pins ---
     // Set G_AND to CMOS model so VDD/GND power pins appear
     await builder.setComponentProperty('G_AND', 'model', 'cmos');
 
@@ -176,7 +176,7 @@ test.describe('Master circuit assembly via UI', () => {
     await builder.stepViaUI();
     await builder.verifyNoErrors();
 
-    // --- CMOS model: Phase C — verify analog voltages on CMOS gate ---
+    // --- CMOS model: Phase C- verify analog voltages on CMOS gate ---
     await builder.stepToTimeViaUI('5m');
     const cmosState = await builder.getAnalogState();
     expect(cmosState).not.toBeNull();
@@ -204,7 +204,7 @@ test.describe('Master circuit assembly via UI', () => {
   //           OpAmp buffer unity gain, BJT CE bias, analog-digital bridge
   // =========================================================================
 
-  test('Master 2: analog — switched divider, RC, opamp, BJT', async () => {
+  test('Master 2: analog- switched divider, RC, opamp, BJT', async () => {
     // --- Section A: Power + switch + voltage divider (y=3) ---
     await builder.placeLabeled('DcVoltageSource', 3, 3, 'Vs');
     await builder.placeLabeled('In', 3, 7, 'CTRL');
@@ -213,14 +213,14 @@ test.describe('Master circuit assembly via UI', () => {
     await builder.setComponentProperty('R1', 'resistance', 10000);
     await builder.placeLabeled('Resistor', 28, 3, 'R2');
     await builder.setComponentProperty('R2', 'resistance', 10000);
-    await builder.placeComponent('Ground', 3, 4);    // Vs.neg — moved up to avoid CTRL at (3,7)
+    await builder.placeComponent('Ground', 3, 4);    // Vs.neg- moved up to avoid CTRL at (3,7)
     await builder.placeComponent('Ground', 32, 8);
     await builder.placeLabeled('Probe', 26, 1, 'P_DIV');
 
     // --- Section B: RC lowpass (y=11) ---
     await builder.placeLabeled('Resistor', 20, 11, 'R3');
     await builder.placeLabeled('Capacitor', 28, 11, 'C1');
-    await builder.placeComponent('Ground', 32, 12);   // C1.neg — moved up to avoid opamp fb at y=15
+    await builder.placeComponent('Ground', 32, 12);   // C1.neg- moved up to avoid opamp fb at y=15
     await builder.placeLabeled('Probe', 26, 9, 'P_RC');
 
     // --- Section C: OpAmp buffer (y=19) ---
@@ -248,7 +248,7 @@ test.describe('Master circuit assembly via UI', () => {
     // Divider junction fan-out: R1.B → R2.A first, then P_DIV and R3 tap
     await builder.drawWireExplicit('R1', 'B', 'R2', 'A');
     await builder.drawWireFromPinExplicit('P_DIV', 'in', 26, 3);
-    // R3.A taps divider net — route via waypoints to avoid crossing
+    // R3.A taps divider net- route via waypoints to avoid crossing
     await builder.drawWireFromPinExplicit('R3', 'A', 26, 3, [[18, 11], [18, 7], [26, 7]]);
 
     // Section B: RC filter
@@ -263,7 +263,7 @@ test.describe('Master circuit assembly via UI', () => {
     await builder.drawWireExplicit('AMP', 'in-', 'AMP', 'out', [[27, 18], [27, 15], [35, 15], [35, 19]]);
     // P_AMP taps AMP.out wire
     await builder.drawWireFromPinExplicit('P_AMP', 'in', 35, 19);
-    // Rb.A taps AMP output — route down via waypoints
+    // Rb.A taps AMP output- route down via waypoints
     await builder.drawWireFromPinExplicit('Rb', 'A', 35, 19, [[19, 25], [19, 23], [35, 23]]);
 
     // Section D: BJT
@@ -414,7 +414,7 @@ test.describe('Master circuit assembly via UI', () => {
   //           comparator output
   // =========================================================================
 
-  test('Master 3: mixed-signal — DAC, RC, comparator, counter', async () => {
+  test('Master 3: mixed-signal- DAC, RC, comparator, counter', async () => {
     // --- DAC inputs (col 3) ---
     await builder.placeLabeled('Const', 3, 8, 'D0');
     await builder.setComponentProperty('D0', 'value', 0);

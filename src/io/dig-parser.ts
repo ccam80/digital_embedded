@@ -1,5 +1,5 @@
 /**
- * .dig XML parser — converts Digital's XML format into a strongly-typed DigCircuit.
+ * .dig XML parser- converts Digital's XML format into a strongly-typed DigCircuit.
  *
  * Handles:
  * - XML string → DOM via browser DOMParser or @xmldom/xmldom (Node.js)
@@ -93,11 +93,11 @@ export function resolveDigReference(
       }
       current = parent;
     } else if (segment === "") {
-      // Leading slash or double slash — skip.
+      // Leading slash or double slash- skip.
     } else {
       const bracketIdx = segment.indexOf("[");
       if (bracketIdx !== -1) {
-        // Indexed: "tagName[N]" — 1-based index among same-tagged siblings.
+        // Indexed: "tagName[N]"- 1-based index among same-tagged siblings.
         const tagName = segment.slice(0, bracketIdx);
         const index = parseInt(segment.slice(bracketIdx + 1, segment.indexOf("]")), 10);
         const matches = getChildElementsByTagName(current, tagName);
@@ -126,7 +126,7 @@ export function resolveDigReference(
 /**
  * Parse the value of a single attribute entry element.
  *
- * The value element is the second child of an `<entry>` — the first child is
+ * The value element is the second child of an `<entry>`- the first child is
  * always `<string>` (the key name). This function is called with the value
  * element directly.
  *

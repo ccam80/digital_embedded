@@ -91,7 +91,7 @@ describe("DFlipFlop", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Async D Flip-Flop — no sampleFn
+// Async D Flip-Flop- no sampleFn
 // ---------------------------------------------------------------------------
 
 describe("AsyncDFlipFlop", () => {
@@ -172,7 +172,7 @@ describe("RSFlipFlop", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Async flip-flops — no sampleFn
+// Async flip-flops- no sampleFn
 // ---------------------------------------------------------------------------
 
 describe("AsyncFlipFlops", () => {

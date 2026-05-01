@@ -1,16 +1,16 @@
 /**
- * Circuit compiler — transforms a visual Circuit into an executable
+ * Circuit compiler- transforms a visual Circuit into an executable
  * CompiledCircuit.
  *
  * Compilation pipeline (per spec task 3.2.1):
- *   1. Enumerate components — assign sequential component indices 0..N-1
- *   2. Trace nets — run net resolver to assign net IDs 0..M-1
- *   3. Build wiring tables — map component pins to net IDs
- *   4. SCC decomposition — Tarjan's algorithm on the dependency graph
- *   5. Topological sort — sort the condensation DAG for evaluation order
- *   6. Build function table — executeFns[] indexed by type ID
- *   7. Allocate snapshot buffer — sized to largest feedback SCC net count
- *   8. Classify sequential elements — flip-flops sampled on clock edge
+ *   1. Enumerate components- assign sequential component indices 0..N-1
+ *   2. Trace nets- run net resolver to assign net IDs 0..M-1
+ *   3. Build wiring tables- map component pins to net IDs
+ *   4. SCC decomposition- Tarjan's algorithm on the dependency graph
+ *   5. Topological sort- sort the condensation DAG for evaluation order
+ *   6. Build function table- executeFns[] indexed by type ID
+ *   7. Allocate snapshot buffer- sized to largest feedback SCC net count
+ *   8. Classify sequential elements- flip-flops sampled on clock edge
  *   9. Produce CompiledCircuitImpl
  *
  */
@@ -31,7 +31,7 @@ import type { SolverPartition } from "@/compile/types.js";
 import { INFRASTRUCTURE_TYPES } from "@/compile/extract-connectivity.js";
 
 // ---------------------------------------------------------------------------
-// CompilationWarning — non-fatal issue found during compilation
+// CompilationWarning- non-fatal issue found during compilation
 // ---------------------------------------------------------------------------
 
 export interface CompilationWarning {
@@ -42,7 +42,7 @@ export interface CompilationWarning {
 
 
 // ---------------------------------------------------------------------------
-// compileCircuit — main entry point
+// compileCircuit- main entry point
 // ---------------------------------------------------------------------------
 
 /**
@@ -54,12 +54,12 @@ export interface CompilationWarning {
  * @throws          Error if an element's typeId is not registered.
  * @throws          BitsException if connected pins have mismatched bit widths.
  */
-// Engine-neutral infrastructure types — Port is registered in the component
+// Engine-neutral infrastructure types- Port is registered in the component
 // registry but has no simulation model; the rest are never registered at all.
 // None of these must trigger "unknown component" errors during compilation.
 
 // ---------------------------------------------------------------------------
-// compileDigitalPartition — entry point for the unified netlist pipeline
+// compileDigitalPartition- entry point for the unified netlist pipeline
 // ---------------------------------------------------------------------------
 
 /**
@@ -67,7 +67,7 @@ export interface CompilationWarning {
  *
  * Unlike compileCircuit(), this function receives pre-computed connectivity
  * groups and partitioned components from the unified netlist pipeline.
- * It receives pre-computed connectivity groups — wire→netId mapping is
+ * It receives pre-computed connectivity groups- wire→netId mapping is
  * already encoded in the partition's groups and their wires arrays.
  *
  * All digital-specific logic (multi-driver detection, SCC decomposition,
@@ -295,11 +295,11 @@ export function compileDigitalPartition(
     }
 
     if (INFRASTRUCTURE_TYPES.has(el.typeId)) {
-      // Neutral infrastructure (Port, etc.) — no inputs, no outputs; pure wire identity.
+      // Neutral infrastructure (Port, etc.)- no inputs, no outputs; pure wire identity.
       componentInputNets.push([]);
       componentOutputNets.push([]);
     } else {
-      // Resolve schema — may be a static array or a function of the element's properties.
+      // Resolve schema- may be a static array or a function of the element's properties.
       const elProps = new PropertyBag(componentPropertiesList[i]!);
       const rawInputSchema = def.models!.digital!.inputSchema;
       const resolvedInputSchema = typeof rawInputSchema === 'function'
@@ -540,7 +540,7 @@ export function compileDigitalPartition(
   // Step 8c: Classify switch components
   //
   // A switch merges/splits two nets when it closes/opens. This requires
-  // the BusResolver even when neither net has multiple drivers — the switch
+  // the BusResolver even when neither net has multiple drivers- the switch
   // itself creates a cross-link. We ensure the resolver exists and that
   // both switch nets are registered as bus nets (single-driver bus nets
   // with a shadow indirection so the resolver can manage them).

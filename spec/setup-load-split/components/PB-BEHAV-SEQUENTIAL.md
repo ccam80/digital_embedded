@@ -2,15 +2,15 @@
 
 **digiTS file:** `src/solver/analog/behavioral-sequential.ts`
 **Element classes:**
-- `BehavioralCounterElement` — N-bit edge-triggered counter with overflow output
-- `BehavioralRegisterElement` — N-bit parallel-load register
-- `BehavioralCounterPresetElement` — N-bit up/down counter with preset load and clear
+- `BehavioralCounterElement`- N-bit edge-triggered counter with overflow output
+- `BehavioralRegisterElement`- N-bit parallel-load register
+- `BehavioralCounterPresetElement`- N-bit up/down counter with preset load and clear
 
-**ngspice anchor:** NONE — behavioral elements. setup() bodies match the
+**ngspice anchor:** NONE- behavioral elements. setup() bodies match the
 existing per-pin-model alloc pattern from `02-behavioral.md` Shape rules
 1, 2, 3. NOT bound by ngspice line-for-line equivalence.
 
-This single spec covers all three classes — they all live in
+This single spec covers all three classes- they all live in
 `behavioral-sequential.ts`, share the `SEQUENTIAL_COMPOSITE_SCHEMA`
 (empty), and follow Shape rule 3.
 
@@ -29,10 +29,10 @@ MNA node id. Examples:
 Each per-bit pin model independently calls `solver.allocElement(busNodeId,
 busNodeId)` during its `setup()` (per Shape rule 1 / Shape rule 2 role
 "direct"). `SparseSolver.allocElement` returns the existing handle on
-subsequent calls to the same coordinates (idempotent by design — same
+subsequent calls to the same coordinates (idempotent by design- same
 mechanism PB-DIO uses for the RS=0 collapse case). **Each pin model still
 needs its own `_hNodeDiag` populated by setup(), so de-duplication is not
-permitted at the spec level — every pin model independently calls
+permitted at the spec level- every pin model independently calls
 allocElement.** The handle returned is the same per-bus, but the field
 storing it is per-pin-model.
 
@@ -88,7 +88,7 @@ the `out` bus diagonal).
 
 Examples:
 - bitWidth=1: 5 allocElement calls → 5 distinct matrix entries
-  (en, C, clr, out, ovf — each its own diagonal)
+  (en, C, clr, out, ovf- each its own diagonal)
 - bitWidth=4: 8 allocElement calls → 5 distinct matrix entries
   (en, C, clr, out [shared bus diagonal], ovf)
 - bitWidth=8: 12 allocElement calls → 5 distinct matrix entries
@@ -194,13 +194,13 @@ setup(ctx: SetupContext): void {
 
 **`5 + bitWidth + bitWidth + 1 = 2 × bitWidth + 6`** allocElement calls.
 After shared-bus collapse: 7 distinct matrix entries (en, C, dir, in bus,
-ld, clr, out bus, ovf — wait that's 8; let me recount: en, C, dir, in
+ld, clr, out bus, ovf- wait that's 8; let me recount: en, C, dir, in
 bus diagonal, ld, clr, out bus diagonal, ovf = **8 distinct** matrix
 entries).
 
 Capacitor children add 4 entries each.
 
-## load() body — value writes only
+## load() body- value writes only
 
 The existing `load()` bodies on all three classes stamp through pin models.
 No `solver.allocElement` calls remain after pin-model migration.
@@ -231,7 +231,7 @@ typed-array slot block (lines 540-551 of source). Per the
 also expected on this class. The implementer adds the missing
 `s0..s7: Float64Array<ArrayBufferLike>` declarations and the standard
 `initVoltages(rhs)` body (`this._prevClockVoltage = readMnaVoltage(this._clockPin.nodeId, rhs)`)
-to bring this class in line with the other two — this is a pre-existing
+to bring this class in line with the other two- this is a pre-existing
 class-shape gap surfaced by the migration; not new work.
 
 ## State pool
@@ -240,7 +240,7 @@ The composite schema is empty (`SEQUENTIAL_COMPOSITE_SCHEMA` defined as
 `defineStateSchema("BehavioralSequentialComposite", [])`). `stateSize`
 aggregates from `_childElements[].stateSize`. `stateBaseOffset` is set
 by `MNAEngine._setup()` via `allocateStateBuffers` per `00-engine.md`
-§A5.1. `initState(pool)` distributes offsets to children via the
+ssA5.1. `initState(pool)` distributes offsets to children via the
 existing inline pattern (preserved unchanged).
 
 The composites participate in the unified state pool via `isPoolBacked`

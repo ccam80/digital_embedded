@@ -7,7 +7,7 @@
  *   3. AttributeMapping[] for .dig XML parsing
  *   4. ComponentDefinition for registry registration
  *
- * Not always has exactly 1 input — inputCount is not configurable.
+ * Not always has exactly 1 input- inputCount is not configurable.
  */
 
 import { AbstractCircuitElement } from "../../core/element.js";
@@ -56,7 +56,7 @@ function buildPinDeclarations(bitWidth: number, wideShape: boolean = true): PinD
 }
 
 // ---------------------------------------------------------------------------
-// NotElement — CircuitElement implementation
+// NotElement- CircuitElement implementation
 // ---------------------------------------------------------------------------
 
 export class NotElement extends AbstractCircuitElement {
@@ -166,7 +166,7 @@ export class NotElement extends AbstractCircuitElement {
 }
 
 // ---------------------------------------------------------------------------
-// executeNot — flat simulation function
+// executeNot- flat simulation function
 // ---------------------------------------------------------------------------
 
 export function executeNot(index: number, state: Uint32Array, _highZs: Uint32Array, layout: ComponentLayout): void {
@@ -227,7 +227,7 @@ const NOT_PROPERTY_DEFS: PropertyDefinition[] = [
 ];
 
 // ---------------------------------------------------------------------------
-// CMOS_INVERTER_NETLIST — CMOS inverter structural netlist
+// CMOS_INVERTER_NETLIST- CMOS inverter structural netlist
 //
 // Topology: 1 PMOS (pull-up) + 1 NMOS (pull-down).
 // Ports: in, out, VDD, GND
@@ -272,7 +272,7 @@ export const NotDefinition: ComponentDefinition = {
   attributeMap: NOT_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.LOGIC,
   helpText:
-    "Not gate — performs bitwise NOT (inversion) of the input.\n" +
+    "Not gate- performs bitwise NOT (inversion) of the input.\n" +
     "Single input, configurable bit width (1–32).\n" +
     "Both IEEE/US (triangle with bubble) and IEC/DIN (rectangular with 1) shapes are supported.",
   modelRegistry: {

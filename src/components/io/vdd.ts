@@ -1,5 +1,5 @@
 /**
- * VDD component — always outputs all bits set to 1.
+ * VDD component- always outputs all bits set to 1.
  *
  * executeFn writes a mask of all ones (based on bitWidth) to its output.
  */
@@ -39,7 +39,7 @@ function buildVddPinDeclarations(bitWidth: number): PinDeclaration[] {
 }
 
 // ---------------------------------------------------------------------------
-// VddElement — CircuitElement implementation
+// VddElement- CircuitElement implementation
 // ---------------------------------------------------------------------------
 
 export class VddElement extends AbstractCircuitElement {
@@ -92,7 +92,7 @@ export class VddElement extends AbstractCircuitElement {
 }
 
 // ---------------------------------------------------------------------------
-// executeVdd — writes all-ones mask to output (bit-width masked)
+// executeVdd- writes all-ones mask to output (bit-width masked)
 // ---------------------------------------------------------------------------
 
 export function executeVdd(index: number, state: Uint32Array, _highZs: Uint32Array, layout: ComponentLayout): void {
@@ -148,7 +148,7 @@ export const VddDefinition: ComponentDefinition = {
   attributeMap: VDD_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.IO,
   helpText:
-    "VDD — always outputs logic 1 (all bits set).\n" +
+    "VDD- always outputs logic 1 (all bits set).\n" +
     "Connects the net to the supply voltage in the simulation.\n" +
     "Configurable bit width.",
   models: {

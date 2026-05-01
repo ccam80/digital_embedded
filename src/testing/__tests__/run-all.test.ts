@@ -1,5 +1,5 @@
 ﻿/**
- * Tests for runAllTests() — task 7.3.2.
+ * Tests for runAllTests()- task 7.3.2.
  *
  * Tests:
  *   - multipleTestcases: circuit with 3 Testcase components → all 3 executed, results aggregated
@@ -103,7 +103,7 @@ function makeFacade(outputValues: Record<string, number> = {}): RunnerFacade {
   };
 }
 
-/** Stub coordinator — run-all passes it through to executeTests but never calls it directly. */
+/** Stub coordinator- run-all passes it through to executeTests but never calls it directly. */
 const stubEngine = {} as SimulationCoordinator;
 
 // ---------------------------------------------------------------------------
@@ -138,7 +138,7 @@ describe('runAllTests', () => {
   // multipleTestcases
   // -------------------------------------------------------------------------
 
-  it('multipleTestcases — circuit with 3 Testcase components → all 3 executed, results aggregated', async () => {
+  it('multipleTestcases- circuit with 3 Testcase components → all 3 executed, results aggregated', async () => {
     // Buffer facade: readSignal('Y') returns what was last set on 'A'
     const lastA = { value: 0 };
     const facade: RunnerFacade = {
@@ -172,7 +172,7 @@ describe('runAllTests', () => {
   // summaryCorrect
   // -------------------------------------------------------------------------
 
-  it('summaryCorrect — one testcase 5/5 pass, one 3/5 pass → aggregate shows 8/10', async () => {
+  it('summaryCorrect- one testcase 5/5 pass, one 3/5 pass → aggregate shows 8/10', async () => {
     // For FIVE_ROW_PASS_TEST: all rows expect Y=1, readOutput returns 1 → 5/5 pass
     // For THREE_OF_FIVE_PASS_TEST: rows expect alternating 1/0, readOutput always returns 1
     //   → rows expecting 1 pass (rows 1,3), rows expecting 0 fail (rows 2,4,5) → 3 pass, 2 fail... wait:
@@ -223,7 +223,7 @@ describe('runAllTests', () => {
   // noTestcases
   // -------------------------------------------------------------------------
 
-  it('noTestcases — circuit with no Testcase components → returns empty results, not an error', async () => {
+  it('noTestcases- circuit with no Testcase components → returns empty results, not an error', async () => {
     const facade = makeFacade();
     const circuit = new Circuit({ name: 'Empty' });
     // circuit has no elements at all
@@ -237,10 +237,10 @@ describe('runAllTests', () => {
     expect(aggregate.results).toHaveLength(0);
   });
 
-  it('noTestcases — circuit with only non-Testcase elements → empty aggregate', async () => {
+  it('noTestcases- circuit with only non-Testcase elements → empty aggregate', async () => {
     const facade = makeFacade();
     const circuit = makeCircuit();
-    // No testcase elements — just test that a circuit with elements that are
+    // No testcase elements- just test that a circuit with elements that are
     // not TestcaseElement instances yields empty results. We can't add other
     // element types without their full setup, so test via empty circuit is sufficient.
 
@@ -250,7 +250,7 @@ describe('runAllTests', () => {
     expect(aggregate.results).toHaveLength(0);
   });
 
-  it('noTestcases — empty testData string is skipped, not counted', async () => {
+  it('noTestcases- empty testData string is skipped, not counted', async () => {
     // A Testcase with empty testData should not appear in results
     const facade = makeFacade();
     const propsEmpty = new PropertyBag([
@@ -275,7 +275,7 @@ describe('runAllTests', () => {
   // shortcutTriggered
   // -------------------------------------------------------------------------
 
-  it('shortcutTriggered — F11 keydown event on target triggers callback', () => {
+  it('shortcutTriggered- F11 keydown event on target triggers callback', () => {
     const callback = vi.fn();
 
     // Use a minimal EventTarget stub
@@ -332,7 +332,7 @@ describe('runAllTests', () => {
     expect(callback).toHaveBeenCalledTimes(1); // still 1
   });
 
-  it('shortcutTriggered — F11 calls preventDefault to prevent browser fullscreen', () => {
+  it('shortcutTriggered- F11 calls preventDefault to prevent browser fullscreen', () => {
     const callback = vi.fn();
     const preventDefaultSpy = vi.fn();
 

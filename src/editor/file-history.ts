@@ -1,5 +1,5 @@
 /**
- * File history — recently-opened file paths.
+ * File history- recently-opened file paths.
  *
  * Maintains a most-recent-first list of file paths, capped at MAX_ENTRIES.
  * Duplicate paths are deduplicated: re-opening an existing entry moves it to
@@ -16,11 +16,11 @@ const STORAGE_KEY = "digital-js:file-history";
 /**
  * Recently-opened file path history.
  *
- * add(path)       — prepend path; deduplicate; trim to MAX_ENTRIES.
- * getRecent()     — return paths, most recent first.
- * clear()         — empty the history.
- * save()          — persist to localStorage.
- * load()          — restore from localStorage.
+ * add(path)      - prepend path; deduplicate; trim to MAX_ENTRIES.
+ * getRecent()    - return paths, most recent first.
+ * clear()        - empty the history.
+ * save()         - persist to localStorage.
+ * load()         - restore from localStorage.
  */
 export class FileHistory {
   private _paths: string[] = [];
@@ -67,8 +67,8 @@ export class FileHistory {
         }
       }
     } catch (e) {
-      // Corrupted localStorage entry — surface the anomaly and keep empty
-      // history. Per spec/architectural-alignment.md §I1 the prior silent
+      // Corrupted localStorage entry- surface the anomaly and keep empty
+      // history. Per spec/architectural-alignment.md ssI1 the prior silent
       // swallow hid real parse/quota errors.
       console.warn(`[file-history] Failed to parse stored history; keeping empty.`, e);
     }

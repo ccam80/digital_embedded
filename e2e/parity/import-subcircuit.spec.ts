@@ -1,14 +1,14 @@
 /**
- * Parity tests — sim-import-subcircuit via postMessage.
+ * Parity tests- sim-import-subcircuit via postMessage.
  *
  * These catch the blind spot where the headless facade works but the browser
  * wiring (postMessage handler, subcircuit registration, serialization) fails.
  *
  * Three behaviours under test:
- *   1. Happy path — valid DTS JSON payload yields sim-subcircuit-imported with
+ *   1. Happy path- valid DTS JSON payload yields sim-subcircuit-imported with
  *      the correct name and pin list.
- *   2. Error path — missing name/data fields yield sim-error.
- *   3. Round-trip — importing multiple subcircuits yields distinct responses.
+ *   2. Error path- missing name/data fields yield sim-error.
+ *   3. Round-trip- importing multiple subcircuits yields distinct responses.
  */
 import { test, expect } from '@playwright/test';
 import { SimulatorHarness } from '../fixtures/simulator-harness';

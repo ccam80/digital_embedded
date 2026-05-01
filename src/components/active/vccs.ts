@@ -11,7 +11,7 @@
  * `expression` is the default ("V(ctrl)"), the effective expression is
  * `transconductance * V(ctrl)`.
  *
- * MNA formulation (Norton stamp — no branch variable):
+ * MNA formulation (Norton stamp- no branch variable):
  *   setup() allocates 4 off-diagonal matrix handles (vccsset.c:43-46 port).
  *   load() stamps the NR-linearized Norton equivalent using cached handles:
  *
@@ -121,7 +121,7 @@ function buildVCCSPinDeclarations(): PinDeclaration[] {
 export class VCCSAnalogElement extends ControlledSourceElement {
   readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.VCCS;
 
-  // TSTALLOC handles — allocated in setup(), written in load()
+  // TSTALLOC handles- allocated in setup(), written in load()
   // vccsset.c:43-46 line-for-line
   private _hPCtP: number = -1; // G[posNode, ctrlPosNode]  :43
   private _hPCtN: number = -1; // G[posNode, ctrlNegNode]  :44
@@ -171,7 +171,7 @@ export class VCCSAnalogElement extends ControlledSourceElement {
 
   /**
    * Stamp the Norton transconductance matrix using cached handles.
-   * Port of vccsload.c, value-side only — no allocElement calls.
+   * Port of vccsload.c, value-side only- no allocElement calls.
    *
    * Signs follow the MNA Norton convention: current gm*Vctrl injected
    * INTO posNode requires G[posNode, ctrlPosNode] = -gm so the KCL
@@ -213,7 +213,7 @@ export class VCCSAnalogElement extends ControlledSourceElement {
 }
 
 // ---------------------------------------------------------------------------
-// VCCSElement — CircuitElement
+// VCCSElement- CircuitElement
 // ---------------------------------------------------------------------------
 
 export class VCCSElement extends AbstractCircuitElement {
@@ -249,7 +249,7 @@ export class VCCSElement extends AbstractCircuitElement {
     ctx.save();
     ctx.setLineWidth(1);
 
-    // Body — rect and port lines stay COMPONENT
+    // Body- rect and port lines stay COMPONENT
     ctx.setColor("COMPONENT");
     ctx.drawRect(1, -2, 4, 4, false);
 
@@ -322,7 +322,7 @@ export const VCCSDefinition: ComponentDefinition = {
   attributeMap: VCCS_ATTRIBUTE_MAPPINGS,
 
   helpText:
-    "Voltage-Controlled Current Source — output current is an expression of " +
+    "Voltage-Controlled Current Source- output current is an expression of " +
     "the control port voltage V(ctrl+ - ctrl-).",
 
   factory(props: PropertyBag): VCCSElement {

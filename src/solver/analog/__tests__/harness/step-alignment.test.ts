@@ -1,5 +1,5 @@
 /**
- * Step-alignment tests (spec §10.2 test 1 / spec §7).
+ * Step-alignment tests (spec ss10.2 test 1 / spec ss7).
  *
  * Alignment is by exact stepStartTime equality (EPS = 1e-15).
  * Every aligned pair must satisfy |ours.stepStartTime - ng.stepStartTime| <= 1e-15.

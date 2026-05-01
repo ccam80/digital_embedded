@@ -93,7 +93,7 @@ export interface DtsCircuit {
  *
  * Inline entries carry only params (factory/paramDefs are rehydrated from the
  * component registry on load). Netlist entries carry their own paramDefs and
- * netlist (no factory — compiled at load time).
+ * netlist (no factory- compiled at load time).
  */
 export type DtsSerializedModelEntry =
   | { kind: 'inline'; params: Record<string, number> }
@@ -106,9 +106,9 @@ export type DtsSerializedModelEntry =
  * definitions are bundled together so no external files are needed.
  */
 export interface DtsDocument {
-  /** Format identifier — always the literal string "dts". */
+  /** Format identifier- always the literal string "dts". */
   format: 'dts';
-  /** Format version — currently always 1. */
+  /** Format version- currently always 1. */
   version: 1;
   /** The main circuit. */
   circuit: DtsCircuit;

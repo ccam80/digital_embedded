@@ -1,5 +1,5 @@
 /**
- * PFET — P-channel MOSFET voltage-controlled switch.
+ * PFET- P-channel MOSFET voltage-controlled switch.
  *
  * Gate input G controls source-drain connection (inverted logic vs NFET):
  *   G=0 → conducting (closed): S and D connected
@@ -47,9 +47,9 @@ const COMP_HEIGHT = 2;
 
 /**
  * Java FETShapeP.getPins():
- *   Gate  at (0, 0)        — input[0]
- *   Drain at (SIZE, 0)     — output[0]  (1, 0) in grid
- *   Source at (SIZE, SIZE*2) — output[1]  (1, 2) in grid
+ *   Gate  at (0, 0)       - input[0]
+ *   Drain at (SIZE, 0)    - output[0]  (1, 0) in grid
+ *   Source at (SIZE, SIZE*2)- output[1]  (1, 2) in grid
  */
 const PFET_PIN_DECLARATIONS: PinDeclaration[] = [
   {
@@ -82,7 +82,7 @@ const PFET_PIN_DECLARATIONS: PinDeclaration[] = [
 ];
 
 // ---------------------------------------------------------------------------
-// PFETElement — CircuitElement implementation
+// PFETElement- CircuitElement implementation
 // ---------------------------------------------------------------------------
 
 export class PFETElement extends AbstractCircuitElement {
@@ -118,7 +118,7 @@ export class PFETElement extends AbstractCircuitElement {
     ctx.setColor("COMPONENT");
     ctx.setLineWidth(1);
 
-    // Drain path (open L): pin D at (1,0) -> stub to channel — use drawPath so
+    // Drain path (open L): pin D at (1,0) -> stub to channel- use drawPath so
     // the rasterizer treats it as an open polyline matching the Java fixture (closed=false).
     ctx.drawPath({ operations: [
       { op: "moveTo", x: 1, y: 0 },
@@ -153,7 +153,7 @@ export class PFETElement extends AbstractCircuitElement {
 }
 
 // ---------------------------------------------------------------------------
-// executePFET — flat simulation function
+// executePFET- flat simulation function
 //
 // G=0 → closed=1; G=1 → closed=0 (inverted compared to NFET)
 // ---------------------------------------------------------------------------
@@ -182,9 +182,9 @@ export function executePFET(index: number, state: Uint32Array, highZs: Uint32Arr
 }
 
 // ---------------------------------------------------------------------------
-// PFETAnalogElement — AnalogElement implementation (composite, delegates to SW)
+// PFETAnalogElement- AnalogElement implementation (composite, delegates to SW)
 //
-// PFET is structurally identical to NFET — same 4-stamp SW setup.
+// PFET is structurally identical to NFET- same 4-stamp SW setup.
 // Polarity inversion: control voltage is V(S) - V(G) (inverted vs NFET).
 // ngspice anchor: ref/ngspice/src/spicelib/devices/sw/swsetup.c:47-62
 // ---------------------------------------------------------------------------
@@ -201,7 +201,7 @@ export class PFETAnalogElement implements AnalogElement {
   setup(ctx: SetupContext): void {
     // PFET composite forwards directly to its single SW sub-element.
     // SW sub-element uses D as posNode, S as negNode.
-    // Inverted polarity is a load-time concern only — setup is identical to NFET.
+    // Inverted polarity is a load-time concern only- setup is identical to NFET.
     this._sw.setup(ctx);
   }
 
@@ -311,7 +311,7 @@ export const PFETDefinition: ComponentDefinition = {
   propertyDefs: PFET_PROPERTY_DEFS,
   attributeMap: PFET_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.SWITCHING,
-  helpText: "PFET — P-channel MOSFET. G=0 → conducting.",
+  helpText: "PFET- P-channel MOSFET. G=0 → conducting.",
   models: {
     digital: {
       executeFn: executePFET,

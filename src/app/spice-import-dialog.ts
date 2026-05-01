@@ -1,5 +1,5 @@
 /**
- * SPICE import dialog — handles both .MODEL and .SUBCKT formats.
+ * SPICE import dialog- handles both .MODEL and .SUBCKT formats.
  *
  * Triggered from right-click context menu on semiconductor components.
  * Auto-detects the format from the first non-blank line of pasted text:
@@ -266,7 +266,7 @@ export function openSpiceImportDialog(
         return;
       }
 
-      // Success — show .MODEL summary
+      // Success- show .MODEL summary
       const summaryDiv = document.createElement('div');
       summaryDiv.className = 'spice-import-summary';
 

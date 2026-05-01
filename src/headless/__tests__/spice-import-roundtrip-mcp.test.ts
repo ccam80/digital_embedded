@@ -77,7 +77,7 @@ function buildBjtCircuit(): { circuit: Circuit; facade: DefaultSimulatorFacade }
   const q1B    = pinWorldPosition(q1,  q1Pins.find(p => p.label === 'B')!);
   const q1C    = pinWorldPosition(q1,  q1Pins.find(p => p.label === 'C')!);
   const q1E    = pinWorldPosition(q1,  q1Pins.find(p => p.label === 'E')!);
-  // Vcc.pos and Rc.A share world position {4,4} — zero-length wire is valid.
+  // Vcc.pos and Rc.A share world position {4,4}- zero-length wire is valid.
   circuit.addWire(new Wire(vccPos, rcA));
   circuit.addWire(new Wire(rcB,    q1C));
   circuit.addWire(new Wire(vbPos,  q1B));
@@ -335,7 +335,7 @@ describe('spice-import round-trip MCP surface -- serialize/deserialize preserves
 });
 
 // ---------------------------------------------------------------------------
-// Test suite 4: SPICE import via facade — the MCP tool path
+// Test suite 4: SPICE import via facade- the MCP tool path
 //
 // The MCP server calls facade methods (compile, getDcOpResult, serialize,
 // deserialize) after applying SPICE models. These tests exercise the full
@@ -343,7 +343,7 @@ describe('spice-import round-trip MCP surface -- serialize/deserialize preserves
 // as the manual tests above) and then facade-level compile/query methods.
 // ---------------------------------------------------------------------------
 
-describe('spice-import MCP tool path — applySpiceImportResult + facade compile/query', () => {
+describe('spice-import MCP tool path- applySpiceImportResult + facade compile/query', () => {
   it('applySpiceImportResult then facade.compile succeeds with zero error diagnostics', () => {
     const { circuit, facade } = buildBjtCircuit();
 

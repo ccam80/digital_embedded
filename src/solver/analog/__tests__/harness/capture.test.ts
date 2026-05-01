@@ -4,7 +4,7 @@
 import { describe, it, expect } from "vitest";
 import { ComparisonSession } from "./comparison-session.js";
 
-describe("lteDt capture — our engine", () => {
+describe("lteDt capture- our engine", () => {
   it("lteDt_captured_from_ours: lteDt is finite positive on every accepted transient step", async () => {
     const session = await ComparisonSession.createSelfCompare({
       dtsPath: "fixtures/rlc-transient.dts",

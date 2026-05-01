@@ -8,26 +8,26 @@
 
 | digiTS label | ngspice variable | Note |
 |---|---|---|
-| `G` | `MOS1gNode` | Gate — external |
-| `D` | `MOS1dNode` | Drain — external |
-| `S` | `MOS1sNode` | Source — external |
-| `B` (bulk) | `MOS1bNode` | Bulk — set to `pinNodes.get("S")` for 3-terminal PMOS (body tied to source) |
+| `G` | `MOS1gNode` | Gate- external |
+| `D` | `MOS1dNode` | Drain- external |
+| `S` | `MOS1sNode` | Source- external |
+| `B` (bulk) | `MOS1bNode` | Bulk- set to `pinNodes.get("S")` for 3-terminal PMOS (body tied to source) |
 | `dNodePrime` | `MOS1dNodePrime` | Internal drain node (conditional) |
 | `sNodePrime` | `MOS1sNodePrime` | Internal source node (conditional) |
 
-Note: PMOS pin layout order is `G`, `D`, `S` (drain before source) — distinct
+Note: PMOS pin layout order is `G`, `D`, `S` (drain before source)- distinct
 from NMOS which uses `G`, `S`, `D`. The `ngspiceNodeMap` reflects this.
 
 ```
 const gNode = pinNodes.get("G")!;   // MOS1gNode
 const dNode = pinNodes.get("D")!;   // MOS1dNode
 const sNode = pinNodes.get("S")!;   // MOS1sNode
-const bNode = sNode;                // MOS1bNode — body tied to source
+const bNode = sNode;                // MOS1bNode- body tied to source
 ```
 
 ## Property name mapping
 
-Identical to PB-NMOS — see that spec's "Property name mapping" subsection.
+Identical to PB-NMOS- see that spec's "Property name mapping" subsection.
 
 | ngspice variable | digiTS model property | Default |
 |---|---|---|
@@ -39,7 +39,7 @@ Identical to PB-NMOS — see that spec's "Property name mapping" subsection.
 
 ## Internal nodes
 
-Two conditional internal nodes. Same conditional gates as PB-NMOS — see
+Two conditional internal nodes. Same conditional gates as PB-NMOS- see
 `mos1set.c:131-178`. Drain prime BEFORE source prime (ngspice order).
 
 ```ts
@@ -70,7 +70,7 @@ this._stateBase = ctx.allocStates(17);
 
 ## TSTALLOC sequence (line-for-line port)
 
-`mos1set.c:186-207`. Twenty-two entries. Identical to PB-NMOS — the same
+`mos1set.c:186-207`. Twenty-two entries. Identical to PB-NMOS- the same
 ngspice source file handles both N and P channel MOSFET via the `MOS1type`
 flag (+1 for NMOS, -1 for PMOS). All 22 TSTALLOC entries are unconditional.
 
@@ -99,9 +99,9 @@ flag (+1 for NMOS, -1 for PMOS). All 22 TSTALLOC entries are unconditional.
 | 21 | `MOS1SPbPtr` | `MOS1sNodePrime` | `MOS1bNode` | `this._hSPB` |
 | 22 | `MOS1SPdpPtr` | `MOS1sNodePrime` | `MOS1dNodePrime` | `this._hSPDP` |
 
-No conditional skips — identical reasoning to PB-NMOS.
+No conditional skips- identical reasoning to PB-NMOS.
 
-## setup() body — alloc only
+## setup() body- alloc only
 
 ```ts
 setup(ctx: SetupContext): void {
@@ -113,10 +113,10 @@ setup(ctx: SetupContext): void {
   const model    = this._model;
   const instance = this._instance;
 
-  // State slots — mos1set.c:96-97
+  // State slots- mos1set.c:96-97
   this._stateBase = ctx.allocStates(17);
 
-  // Internal nodes — mos1set.c:131-178 (drain prime before source prime)
+  // Internal nodes- mos1set.c:131-178 (drain prime before source prime)
   const needDrainPrime = (model.RD !== 0) ||
     (model.RS_sheet !== 0 && instance.drainSquares !== 0);
   this._dNodePrime = needDrainPrime
@@ -132,7 +132,7 @@ setup(ctx: SetupContext): void {
   const dp = this._dNodePrime;
   const sp = this._sNodePrime;
 
-  // TSTALLOC sequence — mos1set.c:186-207 (all 22, unconditional)
+  // TSTALLOC sequence- mos1set.c:186-207 (all 22, unconditional)
   this._hDD   = solver.allocElement(dNode, dNode); // (1)
   this._hGG   = solver.allocElement(gNode, gNode); // (2)
   this._hSS   = solver.allocElement(sNode, sNode); // (3)
@@ -158,7 +158,7 @@ setup(ctx: SetupContext): void {
 }
 ```
 
-## load() body — value writes only
+## load() body- value writes only
 
 Implementer ports value-side from `ref/ngspice/src/spicelib/devices/mos1/mos1load.c`
 line-for-line, applying P-channel polarity (`MOS1type = -1`), stamping through
@@ -181,11 +181,11 @@ Not applicable. MOS1 has no branch row.
 
 Per CLAUDE.md "Test Policy During W3 Setup-Load-Split", verification is spec compliance only. DO NOT run tests; DO NOT use test results.
 
-1. `setup()` body in the implementation file matches the "setup() body — alloc only" listing in this PB line-for-line.
+1. `setup()` body in the implementation file matches the "setup() body- alloc only" listing in this PB line-for-line.
 2. TSTALLOC sequence in `setup()` matches the order in the cited ngspice anchor file (see top of this PB, e.g. `ressetup.c:46-49`).
 3. Factory cleanup applied per the "Factory cleanup" section above.
 4. `ngspiceNodeMap` registered per the "Pin mapping" section above (or omitted for composites where the spec says so).
-5. `load()` writes through cached handles only — zero `solver.allocElement(...)` calls inside `load()`, `accept()`, or any non-`setup()` method.
+5. `load()` writes through cached handles only- zero `solver.allocElement(...)` calls inside `load()`, `accept()`, or any non-`setup()` method.
 6. `mayCreateInternalNodes` flag set per spec.
 7. `findBranchFor` callback present where spec says (V-output sources, IND, etc.).
 8. No banned closing verdicts (mapping/tolerance/equivalent-to/pre-existing/intentional-divergence/citation-divergence/partial) used in any commit message or report.

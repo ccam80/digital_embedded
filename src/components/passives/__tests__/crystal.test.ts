@@ -122,7 +122,7 @@ describe("Crystal", () => {
       props.setModelParam("motionalCapacitance", 12.5e-15);
       props.setModelParam("shuntCapacitance", 3e-12);
 
-      // The element is created from props — verify through property accessors
+      // The element is created from props- verify through property accessors
       // We verify indirectly by checking that the correct L_s is used in the
       // analytical impedance formula, which is tested in series_resonance_frequency.
     });
@@ -204,7 +204,7 @@ describe("Crystal", () => {
     it("DC source across crystal produces near-zero current (capacitors block DC)", () => {
       // At DC, C_s and C_0 have geq=0 (open circuits) and L_s has no companion stamp
       // (only branch incidence rows). The crystal provides no resistive DC path between
-      // terminals A and B — the matrix would be singular without help.
+      // terminals A and B- the matrix would be singular without help.
       //
       // A 1 GΩ bleed resistor across A–B (nodes 1–0) supplies the only real DC path.
       // DC current through the source = V / R_bleed = 1V / 1e9Ω = 1 nA.
@@ -238,7 +238,7 @@ describe("Crystal", () => {
         () => 0,
       ) as unknown as AnalogElement;
 
-      // Bleed resistor: A=node1, B=node0 — provides the only DC path
+      // Bleed resistor: A=node1, B=node0- provides the only DC path
       const rProps = new PropertyBag();
       rProps.setModelParam("resistance", R_bleed);
       const rbleed = getFactory(ResistorDefinition.modelRegistry!.behavioral!)(
@@ -247,7 +247,7 @@ describe("Crystal", () => {
         () => 0,
       ) as unknown as AnalogElement;
 
-      // Crystal: A=node1, B=node0 — internal nodes allocated at startNode=5
+      // Crystal: A=node1, B=node0- internal nodes allocated at startNode=5
       const crystalProps = new PropertyBag();
       crystalProps.setModelParam("frequency", f0);
       crystalProps.setModelParam("qualityFactor", Q);

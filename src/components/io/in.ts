@@ -1,5 +1,5 @@
 /**
- * In component — interactive toggle input.
+ * In component- interactive toggle input.
  *
  * The user clicks this component to change its output value.
  * executeFn is an identity pass-through: the signal value is set externally
@@ -48,7 +48,7 @@ function buildInPinDeclarations(bitWidth: number): PinDeclaration[] {
 }
 
 // ---------------------------------------------------------------------------
-// InElement — CircuitElement implementation
+// InElement- CircuitElement implementation
 // ---------------------------------------------------------------------------
 
 export class InElement extends AbstractCircuitElement {
@@ -115,7 +115,7 @@ export class InElement extends AbstractCircuitElement {
 }
 
 // ---------------------------------------------------------------------------
-// executeIn — pass-through (value is set externally by engine interaction)
+// executeIn- pass-through (value is set externally by engine interaction)
 // ---------------------------------------------------------------------------
 
 export function executeIn(_index: number, _state: Uint32Array, _highZs: Uint32Array, _layout: ComponentLayout): void {
@@ -205,7 +205,7 @@ export const InDefinition: ComponentDefinition = {
   attributeMap: IN_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.IO,
   helpText:
-    "In — interactive input component.\n" +
+    "In- interactive input component.\n" +
     "Click to toggle the output value (1-bit: toggle 0↔1; multi-bit: opens value editor).\n" +
     "The executeFn is a pass-through; the signal value is set externally by user interaction.",
   models: {

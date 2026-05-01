@@ -1,13 +1,13 @@
 /**
- * VGA component — VGA-resolution pixel display.
+ * VGA component- VGA-resolution pixel display.
  *
  * Inputs:
- *   - R: colorBits-wide — red channel
- *   - G: colorBits-wide — green channel
- *   - B: colorBits-wide — blue channel
- *   - H: 1-bit — HSync signal
- *   - V: 1-bit — VSync signal
- *   - C: 1-bit — pixel clock (rising edge samples pixel)
+ *   - R: colorBits-wide- red channel
+ *   - G: colorBits-wide- green channel
+ *   - B: colorBits-wide- blue channel
+ *   - H: 1-bit- HSync signal
+ *   - V: 1-bit- VSync signal
+ *   - C: 1-bit- pixel clock (rising edge samples pixel)
  *
  * The VGA component decodes pixel clock, HSync, and VSync signals to build
  * a framebuffer. On each rising clock edge, the current pixel position is
@@ -57,7 +57,7 @@ const DEFAULT_WIDTH = 640;
 const DEFAULT_HEIGHT = 480;
 
 // ---------------------------------------------------------------------------
-// Pin layout — Java GenericShape(6 inputs, 0 outputs, width=3):
+// Pin layout- Java GenericShape(6 inputs, 0 outputs, width=3):
 //   R at (0, 0), G at (0, 1), B at (0, 2), H at (0, 3), V at (0, 4), C at (0, 5)
 // ---------------------------------------------------------------------------
 
@@ -121,7 +121,7 @@ function buildVgaPinDeclarations(colorBits: number): PinDeclaration[] {
 }
 
 // ---------------------------------------------------------------------------
-// VGAElement — CircuitElement implementation
+// VGAElement- CircuitElement implementation
 // ---------------------------------------------------------------------------
 
 export class VGAElement extends AbstractCircuitElement {
@@ -292,7 +292,7 @@ export class VGAElement extends AbstractCircuitElement {
 }
 
 // ---------------------------------------------------------------------------
-// executeVga — read inputs, pack into output slot for engine tracking
+// executeVga- read inputs, pack into output slot for engine tracking
 // ---------------------------------------------------------------------------
 
 export function executeVga(
@@ -301,13 +301,13 @@ export function executeVga(
   _highZs: Uint32Array,
   _layout: ComponentLayout,
 ): void {
-  // VGA has no outputs — it is a display-only sink component.
+  // VGA has no outputs- it is a display-only sink component.
   // The display panel reads R, G, B, H, V, C inputs via the engine's
   // post-step hook accessing the element. No output slots to write.
 }
 
 // ---------------------------------------------------------------------------
-// VGA_ATTRIBUTE_MAPPINGS — .dig XML attribute → PropertyBag conversions
+// VGA_ATTRIBUTE_MAPPINGS- .dig XML attribute → PropertyBag conversions
 // ---------------------------------------------------------------------------
 
 export const VGA_ATTRIBUTE_MAPPINGS: AttributeMapping[] = [
@@ -375,7 +375,7 @@ const VGA_PROPERTY_DEFS: PropertyDefinition[] = [
 ];
 
 // ---------------------------------------------------------------------------
-// VGADefinition — ComponentDefinition for registry registration
+// VGADefinition- ComponentDefinition for registry registration
 // ---------------------------------------------------------------------------
 
 function vgaFactory(props: PropertyBag): VGAElement {
@@ -398,7 +398,7 @@ export const VGADefinition: ComponentDefinition = {
     },
   },
   helpText:
-    "VGA — VGA-resolution pixel display.\n" +
+    "VGA- VGA-resolution pixel display.\n" +
     "Inputs: R, G, B (color channels), H (HSync), V (VSync), C (pixel clock).\n" +
     "Rising clock edge samples a pixel. HSync resets X, VSync resets Y.\n" +
     "Framebuffer contents displayed in a floating panel.\n" +

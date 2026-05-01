@@ -8,8 +8,8 @@
 
 | digiTS label | ngspice variable | Note |
 |---|---|---|
-| `A` | `DIOposNode` | Anode — external positive terminal |
-| `K` | `DIOnegNode` | Cathode — external negative terminal |
+| `A` | `DIOposNode` | Anode- external positive terminal |
+| `K` | `DIOnegNode` | Cathode- external negative terminal |
 | `internal` | `DIOposPrimeNode` | Internal node created when RS ≠ 0 |
 
 ```
@@ -29,7 +29,7 @@ Property differences from plain Diode:
 
 | Property | Diode default | Varactor tuning |
 |---|---|---|
-| `CJO` | 0 | set (e.g. 10–100 pF) — capacitance dominates |
+| `CJO` | 0 | set (e.g. 10–100 pF)- capacitance dominates |
 | `VJ` | 1.0 V | junction potential (tuned for C-V curve) |
 | `M` | 0.5 | grading coefficient (abrupt=0.5, hyper-abrupt>0.5) |
 | `IS` | 1e-14 A | typically small (reverse-biased in use) |
@@ -41,7 +41,7 @@ setup() body is byte-identical to PB-DIO.
 
 ## Internal nodes
 
-Same conditional as PB-DIO — see `diosetup.c:204-224`.
+Same conditional as PB-DIO- see `diosetup.c:204-224`.
 
 ```ts
 this._posPrimeNode = (this._model.RS === 0)
@@ -63,7 +63,7 @@ this._stateBase = ctx.allocStates(5);
 
 ## TSTALLOC sequence (line-for-line port)
 
-Identical to PB-DIO — `diosetup.c:232-238`, 7 entries.
+Identical to PB-DIO- `diosetup.c:232-238`, 7 entries.
 
 | # | ngspice pointer | row | col | digiTS handle |
 |---|---|---|---|---|
@@ -75,9 +75,9 @@ Identical to PB-DIO — `diosetup.c:232-238`, 7 entries.
 | 6 | `DIOnegNegPtr` | `DIOnegNode` | `DIOnegNode` | `this._hNegNeg` |
 | 7 | `DIOposPrimePosPrimePtr` | `DIOposPrimeNode` | `DIOposPrimeNode` | `this._hPPPP` |
 
-RS=0 collapse behaviour is identical to PB-DIO — see that spec.
+RS=0 collapse behaviour is identical to PB-DIO- see that spec.
 
-## setup() body — alloc only
+## setup() body- alloc only
 
 ```ts
 setup(ctx: SetupContext): void {
@@ -85,15 +85,15 @@ setup(ctx: SetupContext): void {
   const posNode = this._pinNodes.get("A")!;
   const negNode = this._pinNodes.get("K")!;
 
-  // State slots — diosetup.c:198-199
+  // State slots- diosetup.c:198-199
   this._stateBase = ctx.allocStates(5);
 
-  // Internal node — diosetup.c:204-224
+  // Internal node- diosetup.c:204-224
   this._posPrimeNode = (this._model.RS === 0)
     ? posNode
     : ctx.makeVolt(this.label, "internal");
 
-  // TSTALLOC sequence — diosetup.c:232-238 (identical to PB-DIO)
+  // TSTALLOC sequence- diosetup.c:232-238 (identical to PB-DIO)
   this._hPosPP  = solver.allocElement(posNode,            this._posPrimeNode);
   this._hNegPP  = solver.allocElement(negNode,            this._posPrimeNode);
   this._hPPPos  = solver.allocElement(this._posPrimeNode, posNode);
@@ -104,7 +104,7 @@ setup(ctx: SetupContext): void {
 }
 ```
 
-## load() body — value writes only
+## load() body- value writes only
 
 Implementer ports value-side from `ref/ngspice/src/spicelib/devices/dio/dioload.c` line-for-line, including full junction-capacitance path for `CJO`/`VJ`/`M`, stamping through cached handles. No allocElement calls.
 
@@ -125,11 +125,11 @@ Not applicable.
 
 Per CLAUDE.md "Test Policy During W3 Setup-Load-Split", verification is spec compliance only. DO NOT run tests; DO NOT use test results.
 
-1. `setup()` body in the implementation file matches the "setup() body — alloc only" listing in this PB line-for-line.
+1. `setup()` body in the implementation file matches the "setup() body- alloc only" listing in this PB line-for-line.
 2. TSTALLOC sequence in `setup()` matches the order in the cited ngspice anchor file (see top of this PB, e.g. `ressetup.c:46-49`).
 3. Factory cleanup applied per the "Factory cleanup" section above.
 4. `ngspiceNodeMap` registered per the "Pin mapping" section above (or omitted for composites where the spec says so).
-5. `load()` writes through cached handles only — zero `solver.allocElement(...)` calls inside `load()`, `accept()`, or any non-`setup()` method.
+5. `load()` writes through cached handles only- zero `solver.allocElement(...)` calls inside `load()`, `accept()`, or any non-`setup()` method.
 6. `mayCreateInternalNodes` flag set per spec.
 7. `findBranchFor` callback present where spec says (V-output sources, IND, etc.).
 8. No banned closing verdicts (mapping/tolerance/equivalent-to/pre-existing/intentional-divergence/citation-divergence/partial) used in any commit message or report.

@@ -1,5 +1,5 @@
 /**
- * ShortcutManager — keyboard shortcut registry and dispatch.
+ * ShortcutManager- keyboard shortcut registry and dispatch.
  *
  * Supports configurable bindings. Default bindings match Digital's UI.
  * handleKeyDown() dispatches the matching action and returns true if handled.

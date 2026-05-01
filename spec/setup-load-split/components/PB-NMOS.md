@@ -8,10 +8,10 @@
 
 | digiTS label | ngspice variable | Note |
 |---|---|---|
-| `G` | `MOS1gNode` | Gate — external |
-| `S` | `MOS1sNode` | Source — external |
-| `D` | `MOS1dNode` | Drain — external |
-| `B` (bulk) | `MOS1bNode` | Bulk — set to `pinNodes.get("S")` for 3-terminal NMOS (body tied to source) |
+| `G` | `MOS1gNode` | Gate- external |
+| `S` | `MOS1sNode` | Source- external |
+| `D` | `MOS1dNode` | Drain- external |
+| `B` (bulk) | `MOS1bNode` | Bulk- set to `pinNodes.get("S")` for 3-terminal NMOS (body tied to source) |
 | `dNodePrime` | `MOS1dNodePrime` | Internal drain node (conditional) |
 | `sNodePrime` | `MOS1sNodePrime` | Internal source node (conditional) |
 
@@ -19,7 +19,7 @@
 const gNode = pinNodes.get("G")!;   // MOS1gNode
 const sNode = pinNodes.get("S")!;   // MOS1sNode
 const dNode = pinNodes.get("D")!;   // MOS1dNode
-const bNode = sNode;                // MOS1bNode — body tied to source (3-terminal)
+const bNode = sNode;                // MOS1bNode- body tied to source (3-terminal)
 ```
 
 ## Property name mapping
@@ -134,17 +134,17 @@ Variables: `dp = _dNodePrime`, `sp = _sNodePrime`, `b = bNode` (= `sNode` for
 
 **No conditional skips for RD=0 / RS=0:** ngspice does NOT skip entries
 5/6/7/11/15/19 when the prime node aliases the external node. When
-`dNodePrime = dNode`, entries (1) and (5) become `allocElement(dNode, dNode)` —
+`dNodePrime = dNode`, entries (1) and (5) become `allocElement(dNode, dNode)`-
 the second call returns the existing handle. Entry (7) becomes
 `allocElement(dNode, dNode)` again. The port allocates all 22 entries
 unconditionally.
 
 **3-terminal bulk alias:** `bNode = sNode`. Entries (4), (8), (12), (13), (16),
 (20), (21) reference `bNode`. With `bNode = sNode`, entries (3) and (4) become
-`allocElement(sNode, sNode)` — repeated calls return existing handles. No
+`allocElement(sNode, sNode)`- repeated calls return existing handles. No
 special case.
 
-## setup() body — alloc only
+## setup() body- alloc only
 
 ```ts
 setup(ctx: SetupContext): void {
@@ -156,10 +156,10 @@ setup(ctx: SetupContext): void {
   const model    = this._model;
   const instance = this._instance;
 
-  // State slots — mos1set.c:96-97
+  // State slots- mos1set.c:96-97
   this._stateBase = ctx.allocStates(17);
 
-  // Internal nodes — mos1set.c:131-178
+  // Internal nodes- mos1set.c:131-178
   const needDrainPrime = (model.RD !== 0) ||
     (model.RS_sheet !== 0 && instance.drainSquares !== 0);
   this._dNodePrime = needDrainPrime
@@ -175,7 +175,7 @@ setup(ctx: SetupContext): void {
   const dp = this._dNodePrime;
   const sp = this._sNodePrime;
 
-  // TSTALLOC sequence — mos1set.c:186-207 (all 22, unconditional)
+  // TSTALLOC sequence- mos1set.c:186-207 (all 22, unconditional)
   this._hDD   = solver.allocElement(dNode, dNode); // (1)
   this._hGG   = solver.allocElement(gNode, gNode); // (2)
   this._hSS   = solver.allocElement(sNode, sNode); // (3)
@@ -201,7 +201,7 @@ setup(ctx: SetupContext): void {
 }
 ```
 
-## load() body — value writes only
+## load() body- value writes only
 
 Implementer ports value-side from `ref/ngspice/src/spicelib/devices/mos1/mos1load.c`
 line-for-line, stamping through cached handles. No allocElement calls.
@@ -218,17 +218,17 @@ Not applicable. MOS1 has no branch row.
 - Drop `branchCount`, `getInternalNodeCount` from MnaModel.
 - Add `mayCreateInternalNodes: true`.
 - Add `ngspiceNodeMap: { G: "gate", S: "source", D: "drain" }`.
-  (`B` bulk is not in the pin layout for 3-terminal — it is derived as `sNode` in setup().)
+  (`B` bulk is not in the pin layout for 3-terminal- it is derived as `sNode` in setup().)
 
 ## Verification gate
 
 Per CLAUDE.md "Test Policy During W3 Setup-Load-Split", verification is spec compliance only. DO NOT run tests; DO NOT use test results.
 
-1. `setup()` body in the implementation file matches the "setup() body — alloc only" listing in this PB line-for-line.
+1. `setup()` body in the implementation file matches the "setup() body- alloc only" listing in this PB line-for-line.
 2. TSTALLOC sequence in `setup()` matches the order in the cited ngspice anchor file (see top of this PB, e.g. `ressetup.c:46-49`).
 3. Factory cleanup applied per the "Factory cleanup" section above.
 4. `ngspiceNodeMap` registered per the "Pin mapping" section above (or omitted for composites where the spec says so).
-5. `load()` writes through cached handles only — zero `solver.allocElement(...)` calls inside `load()`, `accept()`, or any non-`setup()` method.
+5. `load()` writes through cached handles only- zero `solver.allocElement(...)` calls inside `load()`, `accept()`, or any non-`setup()` method.
 6. `mayCreateInternalNodes` flag set per spec.
 7. `findBranchFor` callback present where spec says (V-output sources, IND, etc.).
 8. No banned closing verdicts (mapping/tolerance/equivalent-to/pre-existing/intentional-divergence/citation-divergence/partial) used in any commit message or report.

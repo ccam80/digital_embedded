@@ -1,5 +1,5 @@
 /**
- * Triode vacuum tube analog component — Koren model.
+ * Triode vacuum tube analog component- Koren model.
  *
  * The Koren model is the standard for audio amplifier simulation. The plate
  * current depends on both plate voltage and grid voltage via:
@@ -77,9 +77,9 @@ interface TriodeOperatingPoint {
   vgk: number;
   vpk: number;
   ip: number;
-  /** dI_P/dV_GK — transconductance */
+  /** dI_P/dV_GK- transconductance */
   gm: number;
-  /** dI_P/dV_PK — plate (output) conductance */
+  /** dI_P/dV_PK- plate (output) conductance */
   gds: number;
 }
 
@@ -136,7 +136,7 @@ function computeTriodeOp(
 }
 
 // ---------------------------------------------------------------------------
-// TriodeElement — composite analog element
+// TriodeElement- composite analog element
 // ---------------------------------------------------------------------------
 
 class TriodeElement implements AnalogElement {
@@ -222,12 +222,12 @@ class TriodeElement implements AnalogElement {
   }
 
   setup(ctx: SetupContext): void {
-    this._vccs.setup(ctx);   // forwards to VccsAnalogElement.setup() — 4 entries
+    this._vccs.setup(ctx);   // forwards to VccsAnalogElement.setup()- 4 entries
     const solver = ctx.solver;
     const nP = this._nodeP;  // plate node
     const nK = this._nodeK;  // cathode node
 
-    // gds stamps — 2 additional entries (6 total for Triode).
+    // gds stamps- 2 additional entries (6 total for Triode).
     // Triode setup() unconditionally allocates 6 entries (4 VCCS + 2 gds,
     // gds always nonzero per Koren formula).
     this._hPP_gds = solver.allocElement(nP, nP);  // (plate, plate)
@@ -300,7 +300,7 @@ class TriodeElement implements AnalogElement {
     // Grid current: zero (no grid-current model in spec body).
     const iGrid = 0;
 
-    // Cathode current: KCL — all three must sum to zero
+    // Cathode current: KCL- all three must sum to zero
     const iCathode = -(iPlate + iGrid);
 
     // pinLayout order: P, G, K
@@ -340,7 +340,7 @@ class TriodeElement implements AnalogElement {
 }
 
 // ---------------------------------------------------------------------------
-// createTriodeElement — AnalogElement factory (3-arg signature per A.3)
+// createTriodeElement- AnalogElement factory (3-arg signature per A.3)
 // ---------------------------------------------------------------------------
 
 export function createTriodeElement(
@@ -352,7 +352,7 @@ export function createTriodeElement(
 }
 
 // ---------------------------------------------------------------------------
-// TriodeCircuitElement — AbstractCircuitElement (editor/visual layer)
+// TriodeCircuitElement- AbstractCircuitElement (editor/visual layer)
 // ---------------------------------------------------------------------------
 
 export class TriodeCircuitElement extends AbstractCircuitElement {
@@ -489,7 +489,7 @@ export const TriodeDefinition: ComponentDefinition = {
   attributeMap: TRIODE_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.SEMICONDUCTORS,
   helpText:
-    "Triode vacuum tube — Koren model.\n" +
+    "Triode vacuum tube- Koren model.\n" +
     "Pins: P (plate), G (grid), K (cathode).\n" +
     "Standard 12AX7 defaults: µ=100, K_P=600, K_VB=300, K_G1=1060, EX=1.4.",
   models: {},

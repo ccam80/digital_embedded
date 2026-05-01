@@ -1,5 +1,5 @@
 /**
- * Out component — display component showing the current signal value.
+ * Out component- display component showing the current signal value.
  *
  * Reads its input and stores it for display. Supports configurable radix
  * (binary, decimal, hexadecimal).
@@ -61,7 +61,7 @@ export function formatValue(value: number, bitWidth: number, format: IntFormat):
 // ---------------------------------------------------------------------------
 
 function buildOutPinDeclarations(bitWidth: number): PinDeclaration[] {
-  // Pin at (0, 0) — matching Digital's OutputShape where pin is at component origin y=0.
+  // Pin at (0, 0)- matching Digital's OutputShape where pin is at component origin y=0.
   // The body is drawn centered around y=0.
   return [
     {
@@ -77,7 +77,7 @@ function buildOutPinDeclarations(bitWidth: number): PinDeclaration[] {
 }
 
 // ---------------------------------------------------------------------------
-// OutElement — CircuitElement implementation
+// OutElement- CircuitElement implementation
 // ---------------------------------------------------------------------------
 
 export class OutElement extends AbstractCircuitElement {
@@ -138,7 +138,7 @@ export class OutElement extends AbstractCircuitElement {
 }
 
 // ---------------------------------------------------------------------------
-// executeOut — reads input, copies to output slot for display
+// executeOut- reads input, copies to output slot for display
 // ---------------------------------------------------------------------------
 
 export function executeOut(index: number, state: Uint32Array, _highZs: Uint32Array, layout: ComponentLayout): void {
@@ -219,7 +219,7 @@ export const OutDefinition: ComponentDefinition = {
   attributeMap: OUT_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.IO,
   helpText:
-    "Out — output display component.\n" +
+    "Out- output display component.\n" +
     "Shows the current value of the connected signal.\n" +
     "Configurable display radix: binary, decimal, hexadecimal, octal.",
   models: {

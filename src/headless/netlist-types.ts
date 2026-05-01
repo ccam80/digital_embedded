@@ -13,7 +13,7 @@ import type { PropertyValue } from '../core/properties.js';
 import type { Diagnostic } from '../compile/types.js';
 
 // ===========================================================================
-// Netlist — the read side
+// Netlist- the read side
 // ===========================================================================
 
 /**
@@ -47,7 +47,7 @@ export interface NetDescriptor {
 }
 
 /**
- * A pin's membership in a net — the fundamental unit of connectivity.
+ * A pin's membership in a net- the fundamental unit of connectivity.
  *
  * This is the same structure used in both netlist output (reading) and
  * diagnostic context (errors), so agents see consistent addresses.
@@ -107,13 +107,13 @@ export interface PinDescriptor {
 }
 
 // ===========================================================================
-// Circuit spec — declarative circuit creation (the write side, new circuits)
+// Circuit spec- declarative circuit creation (the write side, new circuits)
 // ===========================================================================
 
 /**
  * Declarative description of a circuit for `build()`.
  *
- * No coordinates, no object references — pure topology.
+ * No coordinates, no object references- pure topology.
  * The builder auto-lays-out and auto-routes.
  */
 export interface CircuitSpec {
@@ -135,7 +135,7 @@ export interface CircuitSpec {
  * One component in a CircuitSpec.
  */
 export interface ComponentSpec {
-  /** Local identifier — used in `connections` to address this component. */
+  /** Local identifier- used in `connections` to address this component. */
   readonly id: string;
   /** Component type name from registry (e.g. "And", "In", "FlipflopD"). */
   readonly type: string;
@@ -155,7 +155,7 @@ export interface ComponentSpec {
 }
 
 // ===========================================================================
-// Patch operations — editing existing circuits (the write side, edits)
+// Patch operations- editing existing circuits (the write side, edits)
 // ===========================================================================
 
 /**

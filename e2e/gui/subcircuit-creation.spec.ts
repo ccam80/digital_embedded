@@ -1,5 +1,5 @@
 /**
- * GUI tests — subcircuit creation workflow.
+ * GUI tests- subcircuit creation workflow.
  *
  * Tests the "Make Subcircuit…" context menu entry: right-click trigger,
  * disabled state during simulation, dialog port table population, preview
@@ -269,7 +269,7 @@ test.describe('GUI: subcircuit creation', () => {
     // Select only the And gate (not the whole circuit) so that boundary wires
     // exist and the dialog's port table is populated with face dropdowns.
     // The And gate has 2 input boundary wires (from In A and In B) and 1
-    // output boundary wire (to Out Y) — producing 3 face dropdowns.
+    // output boundary wire (to Out Y)- producing 3 face dropdowns.
     await harness.loadDigXml(AND_GATE_XML);
     await waitForCircuitElements(harness, 4);
 
@@ -319,7 +319,7 @@ test.describe('GUI: subcircuit creation', () => {
     const dialog = harness.iframe.locator('.subcircuit-dialog');
     await expect(dialog).toBeVisible({ timeout: 3000 });
 
-    // Expect boundary ports — selecting only the And gate yields wires that
+    // Expect boundary ports- selecting only the And gate yields wires that
     // cross the selection boundary, so face dropdowns must be present.
     // Scope to the table to skip the shape select (LAYOUT/DIL) above the table.
     const faceSelects = harness.iframe.locator('.subcircuit-dialog table select');

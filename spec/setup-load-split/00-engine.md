@@ -1,7 +1,7 @@
-# Setup/Load Split — Engine Spec (00)
+# Setup/Load Split- Engine Spec (00)
 
 Engine-side contract for the setup/load split (sections A0–A9). This file
-is the technical spec only — wave plan, sequencing, exit criteria, and
+is the technical spec only- wave plan, sequencing, exit criteria, and
 open blockers live in `plan.md`. Per-component contracts live in
 `components/PB-*.md`. Behavioral elements live in `02-behavioral.md`.
 Pin-label maps live in `01-pin-mapping.md`.
@@ -10,7 +10,7 @@ ngspice line numbers anchor to `ref/ngspice/` as it exists in this checkout.
 
 The decisions baked into this spec (lazy `findBranch`, compile-time
 `findDevice` map, deleted `matrixSize` field, etc.) are documented with
-rationale in `plan.md` §"Resolved decisions". Read `plan.md` first if
+rationale in `plan.md` ss"Resolved decisions". Read `plan.md` first if
 you need the why; read this file for the what.
 
 ---
@@ -25,17 +25,17 @@ ngspice-equivalent. A1 removes the basis for the comment.
 
 ---
 
-## A1. SparseSolver — expandable matrix port
+## A1. SparseSolver- expandable matrix port
 
 **ngspice anchors:**
-- `spconfig.h:207` — `#define EXPANDABLE YES`
-- `spconfig.h:336` — `#define MINIMUM_ALLOCATED_SIZE 6`
-- `spconfig.h:337` — `#define EXPANSION_FACTOR 1.5`
-- `spalloc.c:117-277` — `spCreate`
-- `spbuild.c:436-504` — `Translate`
-- `spbuild.c:957-1019` — `EnlargeMatrix`
-- `spbuild.c:1047-1081` — `ExpandTranslationArrays`
-- `spsmp.c:249-257` — `SMPnewMatrix → spCreate(0, 1, &Error)` (initial size = 0)
+- `spconfig.h:207`- `#define EXPANDABLE YES`
+- `spconfig.h:336`- `#define MINIMUM_ALLOCATED_SIZE 6`
+- `spconfig.h:337`- `#define EXPANSION_FACTOR 1.5`
+- `spalloc.c:117-277`- `spCreate`
+- `spbuild.c:436-504`- `Translate`
+- `spbuild.c:957-1019`- `EnlargeMatrix`
+- `spbuild.c:1047-1081`- `ExpandTranslationArrays`
+- `spsmp.c:249-257`- `SMPnewMatrix → spCreate(0, 1, &Error)` (initial size = 0)
 
 ### A1.1 Field renaming and addition
 
@@ -50,9 +50,9 @@ ngspice-equivalent. A1 removes the basis for the comment.
 
 Drop `_n`. Every `this._n` site → `this._size` (~15-30 occurrences).
 
-### A1.2 `_initStructure()` — no parameters
+### A1.2 `_initStructure()`- no parameters
 
-**Production caller:** `src/solver/analog/ckt-context.ts:537` (single site in non-test production code — confirm by grepping `_initStructure` scoped to `src/solver/analog/*.ts` excluding `__tests__/` returning only this match before proceeding). Test callers that call `_initStructure(n)` with an explicit `n` are addressed in A1.9.
+**Production caller:** `src/solver/analog/ckt-context.ts:537` (single site in non-test production code- confirm by grepping `_initStructure` scoped to `src/solver/analog/*.ts` excluding `__tests__/` returning only this match before proceeding). Test callers that call `_initStructure(n)` with an explicit `n` are addressed in A1.9.
 
 ```ts
 _initStructure(): void {
@@ -88,7 +88,7 @@ _initStructure(): void {
 }
 ```
 
-### A1.3 `_enlargeMatrix(newSize)` — port `EnlargeMatrix` (spbuild.c:957-1019)
+### A1.3 `_enlargeMatrix(newSize)`- port `EnlargeMatrix` (spbuild.c:957-1019)
 
 ```ts
 private _enlargeMatrix(newSize: number): void {
@@ -106,7 +106,7 @@ private _enlargeMatrix(newSize: number): void {
   this._rowHead     = this._growInt32(this._rowHead,     newSize + 1, -1);
   this._colHead     = this._growInt32(this._colHead,     newSize + 1, -1);
 
-  // spbuild.c:1000-1006 — drop Markowitz/Intermediate workspace.
+  // spbuild.c:1000-1006- drop Markowitz/Intermediate workspace.
   this._markowitzRow  = new Int32Array(0);
   this._markowitzCol  = new Int32Array(0);
   this._markowitzProd = new Int32Array(0);
@@ -114,7 +114,7 @@ private _enlargeMatrix(newSize: number): void {
   this._intermediate  = new Float64Array(0);
   this._internalVectorsAllocated = false;
 
-  // spbuild.c:1009-1016 — initialise the new portion (identity map).
+  // spbuild.c:1009-1016- initialise the new portion (identity map).
   for (let I = oldAllocatedSize + 1; I <= newSize; I++) {
     this._intToExtRow[I] = I;
     this._intToExtCol[I] = I;
@@ -133,7 +133,7 @@ If `_markowitzProd` does not currently exist as a field, add it as
 `private _markowitzProd: Int32Array = new Int32Array(0);`. Confirm by
 grepping `private _` in sparse-solver.ts before implementing.
 
-### A1.4 `_expandTranslationArrays(newSize)` — port spbuild.c:1047-1081
+### A1.4 `_expandTranslationArrays(newSize)`- port spbuild.c:1047-1081
 
 ```ts
 private _expandTranslationArrays(newSize: number): void {
@@ -152,20 +152,20 @@ private _expandTranslationArrays(newSize: number): void {
 }
 ```
 
-### A1.5 `_translate(extRow, extCol)` — port spbuild.c:436-504
+### A1.5 `_translate(extRow, extCol)`- port spbuild.c:436-504
 
 > ngspice anchor: `spbuild.c:436-504` `Translate()`. Each call to `spGetElement(M, row, col)` produces exactly one matrix-element registration regardless of whether row or col are first-seen. digiTS `_insertionOrder` mirrors this 1:1: one `allocElement` call → one entry. Index-assignment side-effects (when row or col is new) do NOT produce additional `_insertionOrder` entries.
 
 ```ts
 private _translate(extRow: number, extCol: number): { intRow: number; intCol: number } {
   // Record this allocElement call in insertion order (one entry per call,
-  // matching ngspice TSTALLOC semantics — one TSTALLOC macro = one matrix
+  // matching ngspice TSTALLOC semantics- one TSTALLOC macro = one matrix
   // entry registration. See spbuild.c:436-504 Translate().)
   this._insertionOrder.push({ extRow, extCol });
 
   let intRow = this._extToInt[extRow];
   if (intRow === -1) {
-    // existing row-new branch body — assigns a new internal row index;
+    // existing row-new branch body- assigns a new internal row index;
     // does NOT push to _insertionOrder anymore (the top-of-function push
     // already recorded this allocElement call).
     intRow = this._assignNewInternalRow(extRow);
@@ -173,7 +173,7 @@ private _translate(extRow: number, extCol: number): { intRow: number; intCol: nu
 
   let intCol = this._extToInt[extCol];
   if (intCol === -1) {
-    // existing col-new branch body — assigns a new internal col index;
+    // existing col-new branch body- assigns a new internal col index;
     // does NOT push to _insertionOrder anymore.
     intCol = this._assignNewInternalCol(extCol);
   }
@@ -195,7 +195,7 @@ Every loop bounded on `this._n` becomes `this._size`. Verified sites:
 - `getCSCNonZeros`
 - `_initStructure` element-pool sizing (was `(n+1)*4`; now `this._allocatedSize` at init = 6).
 
-### A1.7 `_getInsertionOrder()` — new test-only debug method
+### A1.7 `_getInsertionOrder()`- new test-only debug method
 
 ```ts
 private _insertionOrder: Array<{ extRow: number; extCol: number }> = [];
@@ -211,7 +211,7 @@ _getInsertionOrder(): ReadonlyArray<{ extRow: number; extCol: number }> {
 
 Returns the array of `{extRow, extCol}` pairs in the order `allocElement` was called during `_setup()`. One entry per `allocElement` call. The A9 test asserts this array equals the per-component TSTALLOC sequence position-for-position.
 
-**Lifetime**: `_insertionOrder` is populated during `_setup()` and persists for the life of the engine. It is RESET only by `_initStructure()` (a fresh circuit build); `_resetForAssembly()` does NOT touch it. ngspice has no equivalent reset because TSTALLOC sequences are built once at setup time and the matrix structure persists across NR iterations and across analyses (DC OP → transient). The A9 setup-stamp-order test reads `_getInsertionOrder()` after `_setup()` and the result is stable for the rest of the engine's life — read-once-after-setup is sufficient.
+**Lifetime**: `_insertionOrder` is populated during `_setup()` and persists for the life of the engine. It is RESET only by `_initStructure()` (a fresh circuit build); `_resetForAssembly()` does NOT touch it. ngspice has no equivalent reset because TSTALLOC sequences are built once at setup time and the matrix structure persists across NR iterations and across analyses (DC OP → transient). The A9 setup-stamp-order test reads `_getInsertionOrder()` after `_setup()` and the result is stable for the rest of the engine's life- read-once-after-setup is sufficient.
 
 ### A1.8 Tests
 
@@ -228,7 +228,7 @@ Returns the array of `{extRow, extCol}` pairs in the order `allocElement` was ca
 
 ### A1.9 Existing tests must remain green
 
-`__tests__/sparse-reset-semantics.test.ts` and `__tests__/sparse-solver.test.ts`. They call `_initStructure(n)` with explicit `n` — those calls become `_initStructure()` followed by N `allocElement` calls. Post-condition `_size === n` holds.
+`__tests__/sparse-reset-semantics.test.ts` and `__tests__/sparse-solver.test.ts`. They call `_initStructure(n)` with explicit `n`- those calls become `_initStructure()` followed by N `allocElement` calls. Post-condition `_size === n` holds.
 
 ---
 
@@ -280,7 +280,7 @@ export interface SetupContext {
 }
 ```
 
-**`makeCur(deviceLabel: string, suffix: string): number`** — allocates a NEW branch row by calling `engine._makeNode(deviceLabel, suffix, "current")`. Returns the new branch row index (>= 1).
+**`makeCur(deviceLabel: string, suffix: string): number`**- allocates a NEW branch row by calling `engine._makeNode(deviceLabel, suffix, "current")`. Returns the new branch row index (>= 1).
 
 **NOT idempotent.** Each call allocates a fresh branch index, even with the same `(deviceLabel, suffix)` pair. Callers MUST guard against duplicate allocation using the element-level pattern:
 
@@ -298,7 +298,7 @@ NGSPICE_LOAD_ORDER bucket order.
 
 ---
 
-## A3. `src/core/analog-types.ts` — declare `setup()` on AnalogElementCore
+## A3. `src/core/analog-types.ts`- declare `setup()` on AnalogElementCore
 
 Add a required method between `ngspiceLoadOrder` and `load`:
 
@@ -320,7 +320,7 @@ Add a required method between `ngspiceLoadOrder` and `load`:
  *   - never call solver.allocElement from load().
  *
  *  Order of allocElement calls determines internal-index assignment.
- *  It MUST mirror the corresponding ngspice DEVsetup line-for-line —
+ *  It MUST mirror the corresponding ngspice DEVsetup line-for-line-
  *  including stamps that ngspice allocates unconditionally even when
  *  their value will be zero in some operating mode.
  */
@@ -343,7 +343,7 @@ _stateBase: number;
 protected _pinNodes: Map<string, number>;  // populated by the factory at construction
 ```
 
-setup() bodies access pin nodes by label: `const pos = this._pinNodes.get("pos")!;`. This map is populated once at construction (factory layer) and is read-only thereafter. setup() runs once per compile, so Map.get() lookup cost is amortized; load() bodies do NOT use Map lookups — they cache resolved nodeIds in instance fields during setup().
+setup() bodies access pin nodes by label: `const pos = this._pinNodes.get("pos")!;`. This map is populated once at construction (factory layer) and is read-only thereafter. setup() runs once per compile, so Map.get() lookup cost is amortized; load() bodies do NOT use Map lookups- they cache resolved nodeIds in instance fields during setup().
 
 **Field name policy**: `_pinNodes` (with leading underscore) is canonical. Specs using `pinNodes.get(...)` (no `this.` prefix) or `pinNodeIds[N]` (indexed array) are non-canonical and must be updated to `this._pinNodes.get("label")!` form.
 
@@ -354,7 +354,7 @@ mutability changes.
 The `AnalogElement` interface in `src/solver/analog/element.ts` inherits
 `setup` automatically via the re-export.
 
-### A3.1 MnaModel — extend with `mayCreateInternalNodes`, `findBranchFor`, `ngspiceNodeMap`
+### A3.1 MnaModel- extend with `mayCreateInternalNodes`, `findBranchFor`, `ngspiceNodeMap`
 
 In the file defining `MnaModel`, replace `branchCount` and
 `getInternalNodeCount` / `getInternalNodeLabels` with:
@@ -379,15 +379,15 @@ interface MnaModel {
 }
 ```
 
-**Branch-row tracking**: post-setup, an element's branch index is reflected in `AnalogElementCore.branchIndex` directly (-1 = no branch, ≥1 = branch row index). Topology validators walk `compiled.elements` and inspect `el.branchIndex !== -1` for each element, recursing into composites' `_subElements`. No per-model boolean flag is needed; the actual allocation is the source of truth. (Investigated: `hasBranchRow` was a proposed field with no ngspice equivalent and no production use — dropped.)
+**Branch-row tracking**: post-setup, an element's branch index is reflected in `AnalogElementCore.branchIndex` directly (-1 = no branch, ≥1 = branch row index). Topology validators walk `compiled.elements` and inspect `el.branchIndex !== -1` for each element, recursing into composites' `_subElements`. No per-model boolean flag is needed; the actual allocation is the source of truth. (Investigated: `hasBranchRow` was a proposed field with no ngspice equivalent and no production use- dropped.)
 
 `MNAEngine.findBranch(label)` dispatches by walking registered models'
-`findBranchFor` — first non-zero result wins, mirroring `CKTfndBranch`
+`findBranchFor`- first non-zero result wins, mirroring `CKTfndBranch`
 (`cktfbran.c:20-33`).
 
-### A3.2 — W2 component stubs (every component file)
+### A3.2- W2 component stubs (every component file)
 
-After adding the `setup(ctx: SetupContext): void` method to `AnalogElementCore` (§A3 above), every existing file in `src/components/` that exports a factory returning an `AnalogElementCore` (or constructs an element class implementing `AnalogElementCore`) must receive a stub `setup()` whose body is exactly:
+After adding the `setup(ctx: SetupContext): void` method to `AnalogElementCore` (ssA3 above), every existing file in `src/components/` that exports a factory returning an `AnalogElementCore` (or constructs an element class implementing `AnalogElementCore`) must receive a stub `setup()` whose body is exactly:
 
 ```ts
 setup(ctx: SetupContext): void {
@@ -397,39 +397,39 @@ setup(ctx: SetupContext): void {
 
 where `name` is the component's registered label string (the same identifier used in the component's `ComponentDefinition.name`).
 
-**Rationale.** This stub is the W2 intermediate state. It makes any `_setup()` call loudly fail on un-migrated components, surfacing the W2→W3 transition deterministically. Without the stub, the engine would call a missing method (TypeScript runtime undefined) or — worse — silently no-op, hiding W3 progress.
+**Rationale.** This stub is the W2 intermediate state. It makes any `_setup()` call loudly fail on un-migrated components, surfacing the W2→W3 transition deterministically. Without the stub, the engine would call a missing method (TypeScript runtime undefined) or- worse- silently no-op, hiding W3 progress.
 
 **Verification gate (W2).** Every component file under `src/components/` defines a `setup()` method matching the body above. Existing component tests that do NOT call `_setup()` (most unit tests) remain green; tests that DO trigger the engine driver path (`dcOperatingPoint`, `step`, `acAnalysis`) fail with the stub `Error` until W3 replaces the stub for that component.
 
-**W3 obligation.** The W3 per-component spec files (`spec/setup-load-split/components/PB-*.md`) replace the stub body with the real `setup()` implementation. Until every W3 component lands, the engine cannot run any analysis driver — this is the loud-and-correct intermediate state described in `plan.md` §"Half-state risk".
+**W3 obligation.** The W3 per-component spec files (`spec/setup-load-split/components/PB-*.md`) replace the stub body with the real `setup()` implementation. Until every W3 component lands, the engine cannot run any analysis driver- this is the loud-and-correct intermediate state described in `plan.md` ss"Half-state risk".
 
-**Exception — `createSegmentDiodeElement.setup()` (W2.6)**:
+**Exception- `createSegmentDiodeElement.setup()` (W2.6)**:
 
-`createSegmentDiodeElement` is a shared helper used by both `createSevenSegAnalogElement` (per PB-BEHAV-SEVENSEG) and `createButtonLEDAnalogElement` (per PB-BEHAV-BUTTONLED). In W2 it receives its REAL `setup(ctx)` body — not a throwing stub — to avoid an intra-W3 write race between SEVENSEG and BUTTONLED implementer agents.
+`createSegmentDiodeElement` is a shared helper used by both `createSevenSegAnalogElement` (per PB-BEHAV-SEVENSEG) and `createButtonLEDAnalogElement` (per PB-BEHAV-BUTTONLED). In W2 it receives its REAL `setup(ctx)` body- not a throwing stub- to avoid an intra-W3 write race between SEVENSEG and BUTTONLED implementer agents.
 
 The real setup body for `createSegmentDiodeElement(nodeAnode, nodeCathode)`:
 - If `nodeAnode > 0`: allocate diagonal handle `_hAA = ctx.solver.allocElement(nodeAnode, nodeAnode)`. Else: skip (`_hAA = -1`).
 - If `nodeCathode > 0`: allocate diagonal handle `_hCC = ctx.solver.allocElement(nodeCathode, nodeCathode)`. Else: skip.
 - If both `nodeAnode > 0` AND `nodeCathode > 0`: allocate the two off-diagonal handles `_hAC = ctx.solver.allocElement(nodeAnode, nodeCathode)` and `_hCA = ctx.solver.allocElement(nodeCathode, nodeAnode)`. Else: skip both.
-- Per BATCH1-D2 (Option C — guard only when shunt structurally possible): the cathode CAN be ground (current ButtonLED uses cathode=0), so guards are required.
+- Per BATCH1-D2 (Option C- guard only when shunt structurally possible): the cathode CAN be ground (current ButtonLED uses cathode=0), so guards are required.
 
-PB-BEHAV-SEVENSEG and PB-BEHAV-BUTTONLED W3 tasks become parallel: both read the helper's `setup()` from this paragraph and CONFIRM it exists — neither writes it.
+PB-BEHAV-SEVENSEG and PB-BEHAV-BUTTONLED W3 tasks become parallel: both read the helper's `setup()` from this paragraph and CONFIRM it exists- neither writes it.
 
-**Exception — `BehavioralGateElement.setup()` (W2.7)**:
+**Exception- `BehavioralGateElement.setup()` (W2.7)**:
 
-`BehavioralGateElement` (in `src/solver/analog/behavioral-gate.ts`) is the shared class for all 7 gate types (NOT, AND, NAND, OR, NOR, XOR, XNOR). All 7 gate W3 tasks would otherwise compete to write the same `setup()` method on the same class, creating a parallel-write race. In W2 the method receives its REAL body (per 02-behavioral.md Shape rule 3 forward template) — not a throwing stub.
+`BehavioralGateElement` (in `src/solver/analog/behavioral-gate.ts`) is the shared class for all 7 gate types (NOT, AND, NAND, OR, NOR, XOR, XNOR). All 7 gate W3 tasks would otherwise compete to write the same `setup()` method on the same class, creating a parallel-write race. In W2 the method receives its REAL body (per 02-behavioral.md Shape rule 3 forward template)- not a throwing stub.
 
 The real setup body for `BehavioralGateElement.setup(ctx)`:
 - Iterate `for (const pin of this._inputs) pin.setup(ctx);` (per Shape rule 1 forwarding).
 - Call `this._output.setup(ctx);` (per Shape rule 2 forwarding).
 - Iterate `for (const child of this._childElements) child.setup(ctx);` (per Shape rule 3, capacitor children).
-- No direct `ctx.solver.allocElement` calls — all stamping is delegated to the pin models and child elements.
+- No direct `ctx.solver.allocElement` calls- all stamping is delegated to the pin models and child elements.
 
 The 7 gate W3 tasks (PB-BEHAV-NOT/AND/NAND/OR/NOR/XOR/XNOR) confirm the method exists; they do NOT write it.
 
 ---
 
-## A4. `src/solver/analog/analog-engine.ts` — restructure init/setup
+## A4. `src/solver/analog/analog-engine.ts`- restructure init/setup
 
 ### A4.1 Strip pre-sizing from `init()`
 
@@ -444,7 +444,7 @@ NOT call `_setup()`.
 `init()`'s new responsibilities:
 1. `this._solver = new SparseSolver(); this._solver._initStructure();`
 2. Resolve `compiled.elements`, sort by `ngspiceLoadOrder`.
-3. **`_deviceMap` construction** — recursive walk of `compiled.elements`:
+3. **`_deviceMap` construction**- recursive walk of `compiled.elements`:
 
 ```ts
 private _buildDeviceMap(elements: readonly AnalogElement[], prefix: string): void {
@@ -464,9 +464,9 @@ this._deviceMap = new Map<string, AnalogElement>();
 this._buildDeviceMap(compiled.elements, "");
 ```
 
-**Namespaced labels.** Subcircuit sub-element `innerLabel` inside `subcktLabel` is keyed as `subcktLabel/innerLabel`. Relay coil-IND sub-element with internal label `_coil` inside relay `R1` is keyed as `R1/_coil`. The `/` separator matches the project's existing addressing scheme (see CLAUDE.md "Addressing Scheme" — read format equals write format).
+**Namespaced labels.** Subcircuit sub-element `innerLabel` inside `subcktLabel` is keyed as `subcktLabel/innerLabel`. Relay coil-IND sub-element with internal label `_coil` inside relay `R1` is keyed as `R1/_coil`. The `/` separator matches the project's existing addressing scheme (see CLAUDE.md "Addressing Scheme"- read format equals write format).
 
-**ngspice anchor**: ngspice does not have a recursive device map — it has a flat hash table per circuit. Subcircuits in ngspice are flattened at parse time (each sub-instance gets its own top-level entry with the namespaced label baked in). digiTS preserves the composite tree at runtime, so `_deviceMap` recursion is the equivalent operation. The visible behaviour is identical to ngspice's flattened hash: `findDevice("R1/_coil")` returns the inductor instance.
+**ngspice anchor**: ngspice does not have a recursive device map- it has a flat hash table per circuit. Subcircuits in ngspice are flattened at parse time (each sub-instance gets its own top-level entry with the namespaced label baked in). digiTS preserves the composite tree at runtime, so `_deviceMap` recursion is the equivalent operation. The visible behaviour is identical to ngspice's flattened hash: `findDevice("R1/_coil")` returns the inductor instance.
 
 **`findDevice(name: string)` semantics**: returns `this._deviceMap.get(name) ?? null`. Callers use the namespaced form. CCCS/CCVS/MUT inside a subcircuit referencing an internal element pass the namespaced name (the netlist generator emits the namespaced label per the existing addressing scheme).
 4. Construct `CKTCircuitContext` with no `matrixSize` parameter.
@@ -475,7 +475,7 @@ this._buildDeviceMap(compiled.elements, "");
 7. Transition to `STOPPED`.
 
 **Delete** the `stateBaseOffset < 0` validation block at
-analog-engine.ts:143-160 — after A6 strips compile-time state allocation
+analog-engine.ts:143-160- after A6 strips compile-time state allocation
 the guard becomes dead code. Removing avoids the "previously this was…"
 anti-pattern.
 
@@ -540,31 +540,31 @@ private _findBranch(label: string, ctx: SetupContext): number {
 }
 ```
 
-**`_findBranch(name: string)` dispatch**: looks up `name` directly in `this._deviceMap` (built recursively from `compiled.elements` per §A4.1). If the resolved element has a `findBranchFor?` method (defined on the element class, not the model), invokes it; otherwise checks the element's `branchIndex` field directly. ngspice anchor: `cktfbran.c:20-33` walks model types; digiTS uses the device map (already populated with namespaced labels per R7) for the same effect. The `_registeredMnaModels` field proposed in an earlier draft is NOT used.
+**`_findBranch(name: string)` dispatch**: looks up `name` directly in `this._deviceMap` (built recursively from `compiled.elements` per ssA4.1). If the resolved element has a `findBranchFor?` method (defined on the element class, not the model), invokes it; otherwise checks the element's `branchIndex` field directly. ngspice anchor: `cktfbran.c:20-33` walks model types; digiTS uses the device map (already populated with namespaced labels per R7) for the same effect. The `_registeredMnaModels` field proposed in an earlier draft is NOT used.
 
 **Engine state additions:**
 - `_isSetup: boolean = false;`
-- `_maxEqNum: number;` — initialised in `init()` to `compiled.nodeCount + 1`.
+- `_maxEqNum: number;`- initialised in `init()` to `compiled.nodeCount + 1`.
 - `_numStates: number = 0;`
 - `_nodeTable: Array<{ name: string; number: number; type: "voltage" | "current" }>;`
-- `_deviceMap: Map<string, AnalogElement>;` — populated in `init()` from `compiled.elements`.
+- `_deviceMap: Map<string, AnalogElement>;`- populated in `init()` from `compiled.elements`.
 
 ### A4.3 Driver entry calls
 
 Add `this._setup();` at the top of every analysis driver, before any
 solver work:
 
-- `MNAEngine.dcOperatingPoint()` — immediately above the
+- `MNAEngine.dcOperatingPoint()`- immediately above the
   `solveDcOperatingPoint(this._ctx!)` call.
-- `MNAEngine.step()` — immediately after the `if (!this._compiled) return;`
+- `MNAEngine.step()`- immediately after the `if (!this._compiled) return;`
   guard.
-- `MNAEngine.acAnalysis(params)` — first non-guard line.
+- `MNAEngine.acAnalysis(params)`- first non-guard line.
 
 The early-return inside `_setup()` makes repeat calls O(1).
 
 ---
 
-## A5. `src/solver/analog/ckt-context.ts` — defer per-row buffer allocation
+## A5. `src/solver/analog/ckt-context.ts`- defer per-row buffer allocation
 
 ### A5.1 Constructor change + `allocateRowBuffers` / `allocateStateBuffers`
 
@@ -624,7 +624,7 @@ This list is read by `allocateStateBuffers(numStates)` to call `el.initState(sta
 
 `MNAEngine._setup()` calls `allocateStateBuffers` BEFORE `allocateRowBuffers` (state pool sized first; row buffers depend only on `solver._size`).
 
-### A5.2 `matrixSize` field — DELETED
+### A5.2 `matrixSize` field- DELETED
 
 The `matrixSize: number` field on `CKTCircuitContext` (ckt-context.ts:271)
 is **deleted**. Every read site is replaced with `this._solver._size`.
@@ -640,7 +640,7 @@ Read sites to migrate (full enumeration via grep `\.matrixSize` in
 If grep surfaces consumers outside `src/solver/analog/`, they migrate
 to `solver._size` access via the engine's `solver` getter.
 
-### A5.3 StatePool — deferred to setup-end
+### A5.3 StatePool- deferred to setup-end
 
 `compiled.statePool` is `null` at engine init. Compile-time stops
 computing state-pool size. Construction moves to
@@ -653,7 +653,7 @@ Existing `ckt-context` tests must still pass. Tests that construct
 `CKTCircuitContext` with explicit `matrixSize` arg drop the arg; tests
 that read `ctx.matrixSize` migrate to `ctx.solver._size`.
 
-### A5.5 LoadContext — state0/state1 fields
+### A5.5 LoadContext- state0/state1 fields
 
 `LoadContext` (the object passed to each element's `load()` and `accept()`) gains:
 
@@ -665,13 +665,13 @@ state0: Float64Array;
 state1: Float64Array;
 ```
 
-**State-vector access from load()/accept()**: ngspice elements access state via `*(ckt->CKTstate0 + here->slot_idx)`. digiTS mirrors this directly: load() and accept() bodies read/write `ctx.state0[this._stateBase + SLOT_X]` and `ctx.state1[this._stateBase + SLOT_X]`, where `this._stateBase` is the element's first state-pool offset (set during setup() via `ctx.allocStates(N)`). No `_pool` instance field on the element is needed — state is accessed through the LoadContext, identical to ngspice.
+**State-vector access from load()/accept()**: ngspice elements access state via `*(ckt->CKTstate0 + here->slot_idx)`. digiTS mirrors this directly: load() and accept() bodies read/write `ctx.state0[this._stateBase + SLOT_X]` and `ctx.state1[this._stateBase + SLOT_X]`, where `this._stateBase` is the element's first state-pool offset (set during setup() via `ctx.allocStates(N)`). No `_pool` instance field on the element is needed- state is accessed through the LoadContext, identical to ngspice.
 
-The existing `LoadContext.temp: number` (already at `load-context.ts:115`) provides circuit temperature for elements that need it (e.g., NTC, semiconductor temp dependence). Earlier spec assertions that `ctx.temp` was only on SetupContext were errors — `temp` has been on LoadContext since the original ngspice port.
+The existing `LoadContext.temp: number` (already at `load-context.ts:115`) provides circuit temperature for elements that need it (e.g., NTC, semiconductor temp dependence). Earlier spec assertions that `ctx.temp` was only on SetupContext were errors- `temp` has been on LoadContext since the original ngspice port.
 
 ---
 
-## A6. `src/solver/analog/compiler.ts` — strip-down
+## A6. `src/solver/analog/compiler.ts`- strip-down
 
 ### A6.1 Drop matrix-structure allocation from Pass A
 
@@ -679,7 +679,7 @@ The existing `LoadContext.temp: number` (already at `load-context.ts:115`) provi
 - For each component, still resolve route (`stamp` / `skip` / `bridge`).
 - Do NOT call `route.model.branchCount` or
   `route.model.getInternalNodeCount`.
-- `elementMeta` carries only `pc` and `route` — no `branchIdx`, no
+- `elementMeta` carries only `pc` and `route`- no `branchIdx`, no
   `internalNodeOffset`, no `internalNodeCount`.
 
 `ResultPassAPartition` drops `branchCount` and `nextInternalNode`
@@ -688,9 +688,9 @@ fields. `matrixSize` is no longer computable at compile time.
 ### A6.2 Drop `branchCount`, `getInternalNodeCount`, `getInternalNodeLabels` from `MnaModel`
 
 After A6, all three are dead code. Replaced by:
-- `mayCreateInternalNodes?: boolean` (optional) — see A3.1.
+- `mayCreateInternalNodes?: boolean` (optional)- see A3.1.
 - Diagnostic labels for internal nodes are built at setup-time inside
-  `_makeNode` (`${label}#${suffix}`) — see A4.2.
+  `_makeNode` (`${label}#${suffix}`)- see A4.2.
 
 ### A6.3 Factory signature change
 
@@ -705,17 +705,17 @@ factory(pinNodes, props, getTime): AnalogElementCore
 ```
 
 `internalNodeIds` and `branchIdx` are removed. The factory returns an
-element with `branchIndex = -1` and no internal-node fields set —
+element with `branchIndex = -1` and no internal-node fields set-
 `setup()` populates both.
 
-This change ripples to **every** registered factory — any
+This change ripples to **every** registered factory- any
 `make<Component>(...)` factory in the model registry. Whether the
 factory currently uses `internalNodeIds` / `branchIdx` or ignores them,
 the parameter must be dropped to avoid signature drift.
 
 ### A6.4 Sub-element ordering rule
 
-Composite elements (XFMR, TAPXFMR, RELAY, OPTO, OPAMP, COMPARATOR, REAL_OPAMP, TIMER555, NFET, PFET, FGNFET, FGPFET, ANALOG_SWITCH, SCR, TRIAC, DIAC, SEVENSEG, SEVENSEGHEX, SUBCKT, etc.) MUST call `setup()` on their sub-elements in NGSPICE_LOAD_ORDER ordinal sequence (ascending). The composite's `setup()` body is responsible for the ordering — sort its `_subElements` by `ngspiceLoadOrder` before iteration, OR construct sub-elements in load-order order.
+Composite elements (XFMR, TAPXFMR, RELAY, OPTO, OPAMP, COMPARATOR, REAL_OPAMP, TIMER555, NFET, PFET, FGNFET, FGPFET, ANALOG_SWITCH, SCR, TRIAC, DIAC, SEVENSEG, SEVENSEGHEX, SUBCKT, etc.) MUST call `setup()` on their sub-elements in NGSPICE_LOAD_ORDER ordinal sequence (ascending). The composite's `setup()` body is responsible for the ordering- sort its `_subElements` by `ngspiceLoadOrder` before iteration, OR construct sub-elements in load-order order.
 
 Example (PB-OPAMP after this rule applies):
 
@@ -743,21 +743,21 @@ ngspice anchor: ngspice does not have nested composites (subcircuits are flatten
   needed for sub-element traversal).
 
 `bindings: Map<string, Array<{ el; key }>>` (compiler.ts:262) for
-`setParam` survives — sub-elements are constructed at compile time so
+`setParam` survives- sub-elements are constructed at compile time so
 the bind targets exist; their internal-node IDs become valid only after
 setup, but `setParam` doesn't care about node IDs.
 
-### A6.6 — Ground-node guard policy in setup() bodies
+### A6.6- Ground-node guard policy in setup() bodies
 
 `solver.allocElement(row, col)` does NOT silently skip ground (node 0). It allocates a real handle pointing at row/col, including row=0 or col=0 entries. If the calling element does not want a ground stamp, the setup() body must guard explicitly.
 
 Rule (matches ngspice trasetup.c convention):
 
-- **Series elements between two non-ground pins** (RES, CAP, IND, NTC, LDR, POT slot resistors, transformer windings, MOS bulk path) — NO guard. Both pin nodes are structurally non-ground in any valid circuit; allocating handles unconditionally is correct and minimum-noise.
-- **Shunt elements with one pin potentially at ground** (MEMR, AFUSE, the incidence terms of CRYSTAL, any element where one terminal is structurally allowed to be node 0 in a valid circuit) — guard each allocElement call with `if (xNode !== 0)`. Document in the spec why the guard is needed for that specific element.
-- **Composite sub-elements that may receive node 0 from the parent's pinNodeIds reassignment** (DAC's VCVS with out-=0; OPAMP rOut=0 case; SCR/TRIAC internal latch nodes) — sub-element setup() must apply its own guard, since the parent intentionally passes 0.
+- **Series elements between two non-ground pins** (RES, CAP, IND, NTC, LDR, POT slot resistors, transformer windings, MOS bulk path)- NO guard. Both pin nodes are structurally non-ground in any valid circuit; allocating handles unconditionally is correct and minimum-noise.
+- **Shunt elements with one pin potentially at ground** (MEMR, AFUSE, the incidence terms of CRYSTAL, any element where one terminal is structurally allowed to be node 0 in a valid circuit)- guard each allocElement call with `if (xNode !== 0)`. Document in the spec why the guard is needed for that specific element.
+- **Composite sub-elements that may receive node 0 from the parent's pinNodeIds reassignment** (DAC's VCVS with out-=0; OPAMP rOut=0 case; SCR/TRIAC internal latch nodes)- sub-element setup() must apply its own guard, since the parent intentionally passes 0.
 
-This is the canonical rule. Per-PB-* specs do NOT need to repeat the rule — they may simply declare which category their element falls into and follow the corresponding pattern.
+This is the canonical rule. Per-PB-* specs do NOT need to repeat the rule- they may simply declare which category their element falls into and follow the corresponding pattern.
 
 ### A6.7 Topology validation
 
@@ -776,14 +776,14 @@ read by `init()` for `_maxEqNum` initialisation).
 `netCount` getter (line 178) keeps aliasing `nodeCount`.
 
 Read-site migrations:
-- `ckt-context.ts:520` — drop the read.
-- `analog-engine.ts:174-178` — drop the field from ctx ctor args.
+- `ckt-context.ts:520`- drop the read.
+- `analog-engine.ts:174-178`- drop the field from ctx ctor args.
 - Any test fixture constructing `ConcreteCompiledAnalogCircuit` with
-  explicit `matrixSize` parameter — drop the parameter.
+  explicit `matrixSize` parameter- drop the parameter.
 
 ---
 
-## A7. load() no allocations — convention only
+## A7. load() no allocations- convention only
 
 ngspice has no runtime guard. `*load.c` files do not call `SMPmakeElt`;
 this is enforced by source-file split alone. digiTS port matches
@@ -792,11 +792,11 @@ exactly: convention only. Component agents are spec-bound to call
 `allocElement` is a port error caught at component-spec verification
 time (Part B per-task gate).
 
-**Verification (verifier-agent gated):** After W2 lands, the verifier agent runs `Grep "allocElement" src/components/` and confirms every match falls inside a `setup()` method body. Any match inside a `load()`, `accept()`, or other body is a violation. This is a verifier-gate, not an automated CI test — but it is a hard gate, not advisory.
+**Verification (verifier-agent gated):** After W2 lands, the verifier agent runs `Grep "allocElement" src/components/` and confirms every match falls inside a `setup()` method body. Any match inside a `load()`, `accept()`, or other body is a violation. This is a verifier-gate, not an automated CI test- but it is a hard gate, not advisory.
 
 ---
 
-## A8. cktLoad nodeset/IC enforcement — setup-time allocation
+## A8. cktLoad nodeset/IC enforcement- setup-time allocation
 
 `src/solver/analog/ckt-load.ts:107-127` currently calls `solver.allocElement`
 during cktLoad (the only non-element load-time allocation site). Move
@@ -827,10 +827,10 @@ private _allocateNodesetIcHandles(): void {
 **Update `cktLoad`** (ckt-load.ts:109, :124):
 
 ```ts
-// :109 — was: solver.stampElement(solver.allocElement(node, node), CKTNS_PIN);
+// :109- was: solver.stampElement(solver.allocElement(node, node), CKTNS_PIN);
 solver.stampElement(ctx.nodesetHandles.get(node)!, CKTNS_PIN);
 
-// :124 — same shape.
+// :124- same shape.
 solver.stampElement(ctx.icHandles.get(node)!, CKTNS_PIN);
 ```
 
@@ -839,7 +839,7 @@ during `_setup()`.
 
 ---
 
-## A9. New invariant test — `setup-stamp-order.test.ts`
+## A9. New invariant test- `setup-stamp-order.test.ts`
 
 **Path:** `src/solver/analog/__tests__/setup-stamp-order.test.ts`
 
@@ -857,7 +857,7 @@ diverges from its ngspice anchor.
 of them lands. Initially every row is RED. Turns green as component
 agents complete tasks.
 
-**A9 test pattern for invoking `_setup()`**: `_setup()` is private on `MNAEngine` (production code never calls it directly — it runs unconditionally from each analysis driver). The A9 test uses TypeScript's escape hatch:
+**A9 test pattern for invoking `_setup()`**: `_setup()` is private on `MNAEngine` (production code never calls it directly- it runs unconditionally from each analysis driver). The A9 test uses TypeScript's escape hatch:
 
 ```ts
 const engine = new MNAEngine(/* ... */);

@@ -1,5 +1,5 @@
 /**
- * Tests for generateTestFixture() — task 7.3.4.
+ * Tests for generateTestFixture()- task 7.3.4.
  *
  * Tests:
  *   - headerLine:       circuit with inputs A, B and output Y → header line "A B Y"
@@ -97,7 +97,7 @@ describe('generateTestFixture', () => {
   // headerLine
   // -------------------------------------------------------------------------
 
-  it('headerLine — circuit with inputs A, B and output Y → header "A B Y"', () => {
+  it('headerLine- circuit with inputs A, B and output Y → header "A B Y"', () => {
     const circuit = makeCircuit('AND Gate', ['A', 'B'], ['Y']);
 
     const fixture = generateTestFixture(circuit);
@@ -108,7 +108,7 @@ describe('generateTestFixture', () => {
     expect(tokens).toEqual(['A', 'B', 'Y']);
   });
 
-  it('headerLine — single input, single output → 2-token header', () => {
+  it('headerLine- single input, single output → 2-token header', () => {
     const circuit = makeCircuit('Buffer', ['IN'], ['OUT']);
 
     const fixture = generateTestFixture(circuit);
@@ -118,7 +118,7 @@ describe('generateTestFixture', () => {
     expect(tokens).toEqual(['IN', 'OUT']);
   });
 
-  it('headerLine — multiple outputs → all appear after inputs', () => {
+  it('headerLine- multiple outputs → all appear after inputs', () => {
     const circuit = makeCircuit('Half Adder', ['A', 'B'], ['S', 'C']);
 
     const fixture = generateTestFixture(circuit);
@@ -128,7 +128,7 @@ describe('generateTestFixture', () => {
     expect(tokens).toEqual(['A', 'B', 'S', 'C']);
   });
 
-  it('headerLine — no inputs or outputs → returns comment only', () => {
+  it('headerLine- no inputs or outputs → returns comment only', () => {
     const circuit = new Circuit({ name: 'Empty' });
 
     const fixture = generateTestFixture(circuit);
@@ -143,7 +143,7 @@ describe('generateTestFixture', () => {
   // exhaustive2bit
   // -------------------------------------------------------------------------
 
-  it('exhaustive2bit — 2 single-bit inputs → exactly 4 rows (all combinations)', () => {
+  it('exhaustive2bit- 2 single-bit inputs → exactly 4 rows (all combinations)', () => {
     const circuit = makeCircuit('AND Gate', ['A', 'B'], ['Y']);
 
     const fixture = generateTestFixture(circuit);
@@ -152,7 +152,7 @@ describe('generateTestFixture', () => {
     expect(rows).toHaveLength(4);
   });
 
-  it('exhaustive2bit — 2 inputs: rows cover all 4 input combinations', () => {
+  it('exhaustive2bit- 2 inputs: rows cover all 4 input combinations', () => {
     const circuit = makeCircuit('AND Gate', ['A', 'B'], ['Y']);
 
     const fixture = generateTestFixture(circuit);
@@ -170,7 +170,7 @@ describe('generateTestFixture', () => {
     expect(inputCombos).toContain('1 1');
   });
 
-  it('exhaustive2bit — 1 input → 2 rows (0 and 1)', () => {
+  it('exhaustive2bit- 1 input → 2 rows (0 and 1)', () => {
     const circuit = makeCircuit('Buffer', ['A'], ['Y']);
 
     const fixture = generateTestFixture(circuit);
@@ -183,7 +183,7 @@ describe('generateTestFixture', () => {
     expect(inputValues).toContain('1');
   });
 
-  it('exhaustive2bit — 4 inputs → 16 rows (2^4)', () => {
+  it('exhaustive2bit- 4 inputs → 16 rows (2^4)', () => {
     const circuit = makeCircuit('4-input', ['A', 'B', 'C', 'D'], ['Y']);
 
     const fixture = generateTestFixture(circuit);
@@ -196,7 +196,7 @@ describe('generateTestFixture', () => {
   // partial5bit
   // -------------------------------------------------------------------------
 
-  it('partial5bit — 5 single-bit inputs → partial template, fewer than 32 rows', () => {
+  it('partial5bit- 5 single-bit inputs → partial template, fewer than 32 rows', () => {
     const circuit = makeCircuit('5-input', ['A', 'B', 'C', 'D', 'E'], ['Y']);
 
     const fixture = generateTestFixture(circuit);
@@ -208,7 +208,7 @@ describe('generateTestFixture', () => {
     expect(rows.length).toBeGreaterThan(0);
   });
 
-  it('partial5bit — 8 inputs → partial template', () => {
+  it('partial5bit- 8 inputs → partial template', () => {
     const circuit = makeCircuit('8-input', ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'], ['Y']);
 
     const fixture = generateTestFixture(circuit);
@@ -222,7 +222,7 @@ describe('generateTestFixture', () => {
   // dontCareOutputs
   // -------------------------------------------------------------------------
 
-  it('dontCareOutputs — all output values are X (don\'t-care placeholder)', () => {
+  it('dontCareOutputs- all output values are X (don\'t-care placeholder)', () => {
     const circuit = makeCircuit('AND Gate', ['A', 'B'], ['Y']);
 
     const fixture = generateTestFixture(circuit);
@@ -238,7 +238,7 @@ describe('generateTestFixture', () => {
     }
   });
 
-  it('dontCareOutputs — multiple outputs: all are X', () => {
+  it('dontCareOutputs- multiple outputs: all are X', () => {
     const circuit = makeCircuit('Half Adder', ['A', 'B'], ['S', 'C']);
 
     const fixture = generateTestFixture(circuit);
@@ -252,7 +252,7 @@ describe('generateTestFixture', () => {
     }
   });
 
-  it('dontCareOutputs — input values are 0 or 1, never X', () => {
+  it('dontCareOutputs- input values are 0 or 1, never X', () => {
     const circuit = makeCircuit('AND Gate', ['A', 'B'], ['Y']);
 
     const fixture = generateTestFixture(circuit);
@@ -270,7 +270,7 @@ describe('generateTestFixture', () => {
   // Comment header
   // -------------------------------------------------------------------------
 
-  it('comment — fixture starts with comment containing circuit name', () => {
+  it('comment- fixture starts with comment containing circuit name', () => {
     const circuit = makeCircuit('MyCircuit', ['A'], ['Y']);
 
     const fixture = generateTestFixture(circuit);
@@ -278,7 +278,7 @@ describe('generateTestFixture', () => {
     expect(fixture).toContain('# Auto-generated test template for: MyCircuit');
   });
 
-  it('comment — fixture includes instruction comment', () => {
+  it('comment- fixture includes instruction comment', () => {
     const circuit = makeCircuit('Test', ['A'], ['Y']);
 
     const fixture = generateTestFixture(circuit);

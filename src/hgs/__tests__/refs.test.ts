@@ -1,5 +1,5 @@
 /**
- * Tests for the HGS reference system — task 4.3.4.
+ * Tests for the HGS reference system- task 4.3.4.
  */
 
 import { describe, it, expect } from "vitest";
@@ -67,7 +67,7 @@ describe("Reference", () => {
   });
 
   it("chainedAccess", async () => {
-    // obj.data[0] — ReferenceToArray(ReferenceToStruct(ReferenceToVar("obj"), "data"), 0)
+    // obj.data[0]- ReferenceToArray(ReferenceToStruct(ReferenceToVar("obj"), "data"), 0)
     const ctx = new HGSContext({ enableOutput: true });
     const innerArr = new HGSArray([100n, 200n]);
     const map = new HGSMap(new Map<string, import("../value").HGSValue>([["data", innerArr]]));

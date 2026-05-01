@@ -1,5 +1,5 @@
 /**
- * DipSwitch component — multi-bit toggle switch array.
+ * DipSwitch component- multi-bit toggle switch array.
  *
  * Each bit of the output is independently toggled by the user.
  * The executeFn is a no-op; each bit's value is set externally
@@ -53,7 +53,7 @@ function buildDipSwitchPinDeclarations(bitCount: number): PinDeclaration[] {
 }
 
 // ---------------------------------------------------------------------------
-// DipSwitchElement — CircuitElement implementation
+// DipSwitchElement- CircuitElement implementation
 // ---------------------------------------------------------------------------
 
 export class DipSwitchElement extends AbstractCircuitElement {
@@ -152,7 +152,7 @@ export class DipSwitchElement extends AbstractCircuitElement {
 }
 
 // ---------------------------------------------------------------------------
-// executeDipSwitch — no-op (value set externally per-bit by engine)
+// executeDipSwitch- no-op (value set externally per-bit by engine)
 // ---------------------------------------------------------------------------
 
 export function executeDipSwitch(
@@ -233,7 +233,7 @@ export const DipSwitchDefinition: ComponentDefinition = {
   attributeMap: DIP_SWITCH_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.IO,
   helpText:
-    "DipSwitch — multi-bit toggle switch array.\n" +
+    "DipSwitch- multi-bit toggle switch array.\n" +
     "Each bit is independently toggled by clicking the corresponding switch position.\n" +
     "The bitCount property controls how many individual switches are shown.\n" +
     "Interactive: the engine sets each bit's value when the user clicks.",

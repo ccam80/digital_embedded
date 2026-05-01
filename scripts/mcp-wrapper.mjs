@@ -30,7 +30,7 @@ let child = null;
 /** @type {Map<number|string, boolean>} */
 const pendingRequests = new Map(); // track in-flight request IDs
 let restarting = false;
-/** @type {Set<number|string>} IDs of replayed init messages — suppress their responses */
+/** @type {Set<number|string>} IDs of replayed init messages- suppress their responses */
 const suppressedIds = new Set();
 
 // -- Child lifecycle ---------------------------------------------------------
@@ -51,12 +51,12 @@ function spawnChild() {
       if (msg.id !== undefined && !msg.method) {
         if (suppressedIds.has(msg.id)) {
           suppressedIds.delete(msg.id);
-          return; // swallow — client already got this response on first boot
+          return; // swallow- client already got this response on first boot
         }
         pendingRequests.delete(msg.id);
       }
     } catch {
-      // Not valid JSON — proxy anyway
+      // Not valid JSON- proxy anyway
     }
     process.stdout.write(line + "\n");
   });
@@ -68,7 +68,7 @@ function spawnChild() {
       spawnChild();
       replayInit();
     } else {
-      // Unexpected exit — propagate to client
+      // Unexpected exit- propagate to client
       process.stderr.write(`[mcp-wrapper] Server exited with code ${code}, shutting down.\n`);
       process.exit(code ?? 1);
     }
@@ -105,7 +105,7 @@ function handleClientMessage(line) {
   try {
     msg = JSON.parse(line);
   } catch {
-    // Not valid JSON — forward raw
+    // Not valid JSON- forward raw
     sendToChild(line);
     return;
   }

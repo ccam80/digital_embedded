@@ -1,5 +1,5 @@
 /**
- * Delay component — pass-through with configurable delay.
+ * Delay component- pass-through with configurable delay.
  *
  * In level-by-level simulation: passes input to output unchanged (combinational).
  * In timed simulation: the engine schedules the output change at currentTime + delayTime.
@@ -66,7 +66,7 @@ export function buildDelayPinDeclarations(bitWidth: number): PinDeclaration[] {
 }
 
 // ---------------------------------------------------------------------------
-// DelayElement — CircuitElement implementation
+// DelayElement- CircuitElement implementation
 // ---------------------------------------------------------------------------
 
 export class DelayElement extends AbstractCircuitElement {
@@ -136,7 +136,7 @@ export class DelayElement extends AbstractCircuitElement {
 }
 
 // ---------------------------------------------------------------------------
-// executeDelay — flat simulation function (level-by-level: pass-through)
+// executeDelay- flat simulation function (level-by-level: pass-through)
 // ---------------------------------------------------------------------------
 
 export function executeDelay(
@@ -217,7 +217,7 @@ export const DelayDefinition: ComponentDefinition = {
   attributeMap: DELAY_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.WIRING,
   helpText:
-    "Delay — pass-through with configurable propagation delay.\n" +
+    "Delay- pass-through with configurable propagation delay.\n" +
     "In timed mode: output changes after delayTime gate-delay units.",
   models: {
     digital: {

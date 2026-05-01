@@ -1,5 +1,5 @@
 /**
- * LoadContext — per-iteration context passed to every element.load() call.
+ * LoadContext- per-iteration context passed to every element.load() call.
  *
  * Matches ngspice's CKTcircuit fields accessed inside DEVload. Pre-allocated
  * on CKTCircuitContext once; mutated in place before each NR iteration.
@@ -14,7 +14,7 @@
  *   CKTdelta    -> dt
  *   CKTintegrateMethod -> method
  *   CKTorder    -> order
- *   CKTag[]     -> ag — integration coefficients
+ *   CKTag[]     -> ag- integration coefficients
  *   CKTdeltaOld -> deltaOld
  *   CKTsrcFact  -> srcFact
  *   CKTnoncon   -> noncon.value
@@ -31,7 +31,7 @@ import type { IntegrationMethod } from "../../core/analog-types.js";
 import type { LimitingEvent } from "./newton-raphson.js";
 
 // ---------------------------------------------------------------------------
-// ConvergenceEvent — per-iteration element-level convergence record
+// ConvergenceEvent- per-iteration element-level convergence record
 // ---------------------------------------------------------------------------
 
 /**
@@ -118,11 +118,11 @@ export interface LoadContext {
   /**
    * Fix-limit mode flag (ngspice CKTfixLimit per cktdefs.h).
    * When true, the reverse-mode limvds guard in MOSFET load is skipped.
-   * Default false — matches ngspice's default (CKTfixLimit not set).
+   * Default false- matches ngspice's default (CKTfixLimit not set).
    * See mos1load.c:385: `if(!(ckt->CKTfixLimit)) { ... limvds(-vds, ...) }`.
    */
   cktFixLimit: boolean;
-  // cite: cktinit.c:53-55 — CKTbypass default false; CKTvoltTol default 1e-6
+  // cite: cktinit.c:53-55- CKTbypass default false; CKTvoltTol default 1e-6
   /** Bypass gate flag (ngspice CKTbypass). When true, device load() may skip
    * recompute if voltage deltas are within tolerance. Default false. */
   bypass: boolean;
@@ -130,7 +130,7 @@ export interface LoadContext {
    * Used by device bypass gates. Default 1e-6 V. */
   voltTol: number;
   /**
-   * Current-iteration state vector (ngspice CKTstate0). Live reference —
+   * Current-iteration state vector (ngspice CKTstate0). Live reference-
    * re-resolves through the backing StatePool.states[] ring on every access,
    * so callers see post-rotation arrays without any refresh step.
    *

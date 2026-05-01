@@ -32,8 +32,8 @@ Total test failures organized by error type: 88 distinct failure categories affe
 | src\components\active\__tests__\schmitt-trigger.test.ts::noisy_sine_clean_square | FAIL | expected +0 to be 10 // Object.is equality |
 | src\components\active\__tests__\schmitt-trigger.test.ts::plot_matches_hysteresis_loop | FAIL | expected null not to be null |
 | src\components\active\__tests__\schmitt-trigger.test.ts::schmitt_load_dcop_parity | FAIL | expected +0 to be 1e-7 // Object.is equality |
-| src\components\io\clock.ts::analogFactory_creates_element — factory produces a valid AnalogElement | FAIL | props.getOrDefault is not a function (4 occurrences) |
-| src\components\io\__tests__\analog-clock.test.ts::stamp_produces_incidence_entries — voltage source topology | FAIL | Cannot read properties of undefined (reading '2') (4 occurrences) |
+| src\components\io\clock.ts::analogFactory_creates_element- factory produces a valid AnalogElement | FAIL | props.getOrDefault is not a function (4 occurrences) |
+| src\components\io\__tests__\analog-clock.test.ts::stamp_produces_incidence_entries- voltage source topology | FAIL | Cannot read properties of undefined (reading '2') (4 occurrences) |
 | src\components\io\__tests__\led.test.ts::junction_cap_transient_matches_ngspice | FAIL | expected +0 to be 0.4862002658788155 // Object.is equality |
 | src\components\io\__tests__\led.test.ts::pushes AK pnjlim event on non-init NR iteration | FAIL | expected false to be true // Object.is equality (3 occurrences) |
 | src\components\io\__tests__\led.test.ts::vt_reflects_TEMP | FAIL | expected 0.7614530246405854 to be less than 1e-10 (2 occurrences) |
@@ -50,12 +50,12 @@ Total test failures organized by error type: 88 distinct failure categories affe
 | src\components\passives\__tests__\memristor.test.ts::memristor_load_transient_parity | FAIL | expected undefined to be 0.00503125 // Object.is equality |
 | src\components\passives\polarized-cap.ts::emits reverse-biased-cap diagnostic when V(pos) < V(neg) - reverseMax | FAIL | Cannot set properties of undefined (setting 'stateBaseOffset') (6 occurrences) |
 | src\components\sources\dc-voltage-source.ts::voltage_divider_dc_op | FAIL | number 2 is not iterable (cannot read property Symbol(Symbol.iterator)) (10 occurrences) |
-| src\components\passives\__tests__\tapped-transformer.test.ts::center_tap_voltage_is_half — N=2 (1:1 each half); AC primary; CT at midpoint | FAIL | makeResistor is not a function (33 occurrences) |
+| src\components\passives\__tests__\tapped-transformer.test.ts::center_tap_voltage_is_half- N=2 (1:1 each half); AC primary; CT at midpoint | FAIL | makeResistor is not a function (33 occurrences) |
 | src\components\passives\__tests__\tapped-transformer.test.ts::branchCount is 3 | FAIL | expected undefined to be 3 // Object.is equality |
 | src\components\passives\mutual-inductor.ts::tapped_transformer_load_transient_parity | FAIL | Cannot read properties of undefined (reading 'states') |
-| src\solver\analog\coupled-inductor.ts::voltage_ratio — N=10:1 secondary ≈ primary/10 for k=0.99 in AC steady state | FAIL | Coupling coefficient k must be in [0, 1]; got 10 |
-| src\solver\analog\coupled-inductor.ts::current_ratio_inverse — secondary current ≈ N × primary branch current | FAIL | Coupling coefficient k must be in [0, 1]; got 2 (2 occurrences) |
-| src\components\passives\__tests__\transformer.test.ts::winding_resistance_drops_voltage — R_pri=10Ω drops ~10V with 1A | FAIL | Cannot destructure property 'row' of 'handles[handle]' as it is undefined. |
+| src\solver\analog\coupled-inductor.ts::voltage_ratio- N=10:1 secondary ≈ primary/10 for k=0.99 in AC steady state | FAIL | Coupling coefficient k must be in [0, 1]; got 10 |
+| src\solver\analog\coupled-inductor.ts::current_ratio_inverse- secondary current ≈ N × primary branch current | FAIL | Coupling coefficient k must be in [0, 1]; got 2 (2 occurrences) |
+| src\components\passives\__tests__\transformer.test.ts::winding_resistance_drops_voltage- R_pri=10Ω drops ~10V with 1A | FAIL | Cannot destructure property 'row' of 'handles[handle]' as it is undefined. |
 | src\components\passives\__tests__\transformer.test.ts::branchCount is 2 | FAIL | expected undefined to be 2 // Object.is equality |
 | src\components\passives\transmission-line.ts::lossless line: R_seg and G_seg stamps are zero when loss=0 | FAIL | props.hasModelParam is not a function (18 occurrences) |
 | src\components\passives\__tests__\transmission-line.test.ts::requires branch row | FAIL | expected 'undefined' to be 'function' // Object.is equality |

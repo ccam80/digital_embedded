@@ -4,7 +4,7 @@
  * Allows users to type boolean expressions, parse them, validate them, and
  * convert them into truth tables. Supports variable auto-detection.
  *
- * The ExpressionEditorTab is a pure data/logic class — no DOM dependency.
+ * The ExpressionEditorTab is a pure data/logic class- no DOM dependency.
  * The host (dialog) calls methods to drive it; a thin UI adapter wires it
  * to actual input elements.
  */

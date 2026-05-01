@@ -30,7 +30,7 @@ export const FALLBACK_SPEC: ResolvedPinElectrical = {
   rHiZ: 1e7,
 };
 
-// Empty composite schema — children carry their own schemas.
+// Empty composite schema- children carry their own schemas.
 export const FLIPFLOP_COMPOSITE_SCHEMA: StateSchema = defineStateSchema("BehavioralFlipflopComposite", []);
 
 // ---------------------------------------------------------------------------

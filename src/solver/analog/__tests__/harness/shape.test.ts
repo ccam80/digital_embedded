@@ -1,8 +1,8 @@
 /**
- * W6.T1 — Shape API tests (§10.4 headless).
+ * W6.T1- Shape API tests (ss10.4 headless).
  *
  * Tests for getSessionShape(), getStepShape(), and getStepAtTime() on
- * ComparisonSession.createSelfCompare(). All tests are purely headless —
+ * ComparisonSession.createSelfCompare(). All tests are purely headless-
  * no ngspice DLL required.
  */
 
@@ -13,7 +13,7 @@ import type { ComponentRegistry } from "../../../../core/registry.js";
 import type { Circuit } from "../../../../core/circuit.js";
 
 // ---------------------------------------------------------------------------
-// Circuit factories — return a high-level Circuit via facade.build()
+// Circuit factories- return a high-level Circuit via facade.build()
 // ---------------------------------------------------------------------------
 
 function buildRcCircuit(registry: ComponentRegistry): Circuit {
@@ -65,7 +65,7 @@ describe("getSessionShape", () => {
       maxStep: 1e-6,
     });
     const shape = session.getSessionShape();
-    // In self-compare mode the ngspice side is a deep clone of ours —
+    // In self-compare mode the ngspice side is a deep clone of ours-
     // every step must be "both"; asymmetric counts must be zero.
     expect(shape.presenceCounts.oursOnly).toBe(0);
     expect(shape.presenceCounts.ngspiceOnly).toBe(0);

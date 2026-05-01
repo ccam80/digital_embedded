@@ -41,7 +41,7 @@ import { createDiodeElement, DIODE_PARAM_DEFAULTS } from "../../semiconductors/d
  * subsequent `load(ctx)` calls MUST use the same solver.
  *
  * For tests using `runDcOp`/`makeSimpleCtx` the helper handles setup
- * internally — do not call this first or setup will run twice on different
+ * internally- do not call this first or setup will run twice on different
  * solvers and the cached handles will point at the wrong one.
  */
 function setupOn(
@@ -130,7 +130,7 @@ function makeSlotLoadCtx(
  *   solver index 1 = node 2 (internal cap node)
  */
 /** Build the reverse-bias clamp diode sub-element for AnalogPolarizedCapElement.
- *  A=nNeg, K=nPos — matches polarized-cap.ts factory convention. */
+ *  A=nNeg, K=nPos- matches polarized-cap.ts factory convention. */
 function makeClampDiode(posNode: number, negNode: number): PoolBackedAnalogElement {
   const props = new PropertyBag();
   props.replaceModelParams({ ...DIODE_PARAM_DEFAULTS, CJO: 0, TT: 0 });
@@ -143,7 +143,7 @@ function makeClampDiode(posNode: number, negNode: number): PoolBackedAnalogEleme
 
 /**
  * Build a polarized-cap element for tests that go through `runDcOp` /
- * `makeSimpleCtx`. Does NOT call setup() — the helper inside
+ * `makeSimpleCtx`. Does NOT call setup()- the helper inside
  * `makeSimpleCtx` will invoke `setupAll` against the runDcOp-owned solver
  * so the cached matrix handles bind to the same solver that load() stamps
  * into. Calling setup() here too would bind handles to a throwaway solver
@@ -293,7 +293,7 @@ describe("PolarizedCap", () => {
         voltTol: 1e-6,
       });
 
-      // Do NOT call _initStructure() again — that would wipe the sparse
+      // Do NOT call _initStructure() again- that would wipe the sparse
       // structure built by setup() and invalidate every cached handle.
       vs.load(ctx);
       cap.load(ctx);
@@ -346,7 +346,7 @@ describe("PolarizedCap", () => {
 
       // Advance to t = RC via the public stepToTime API.
       // Timestep granularity is owned by LTE/NR adaptive subdivision inside
-      // coordinator.step() — no maxTimeStep knob needed.
+      // coordinator.step()- no maxTimeStep knob needed.
       await coordinator.stepToTime(RC);
 
       const signals = facade.readAllSignals(coordinator);
@@ -356,7 +356,7 @@ describe("PolarizedCap", () => {
       expect(coordinator.simTime).toBeGreaterThanOrEqual(RC * 0.99);
 
       const expected = V_step * (1 - Math.exp(-1)); // ≈ 3.161 V
-      const tolerance = 0.10; // 10% — accounts for first-order trap error
+      const tolerance = 0.10; // 10%- accounts for first-order trap error
       expect(Math.abs(vCapPos - expected) / expected).toBeLessThan(tolerance);
     });
   });
@@ -430,7 +430,7 @@ describe("PolarizedCap", () => {
       props.setModelParam("M", 1);
       const entry = PolarizedCapDefinition.modelRegistry?.behavioral;
       if (!entry || entry.kind !== "inline") throw new Error("Expected inline behavioral entry");
-      // pos=1, neg=0 — internal cap node will be allocated at startNode=2
+      // pos=1, neg=0- internal cap node will be allocated at startNode=2
       const el = entry.factory(new Map([["pos", 1], ["neg", 0]]), props, () => 0) as PoolBackedAnalogElement;
 
       const handles: { row: number; col: number }[] = [];
@@ -481,7 +481,7 @@ describe("PolarizedCap", () => {
     it("load writes GEQ and IEQ to pool slots 0 and 1", () => {
       const el = new AnalogPolarizedCapElement(100e-6, 0.1, 25e6, 1.0, () => {}, NaN, 1, makeClampDiode(1, 0));
       el._pinNodes = new Map([["pos", 1], ["neg", 0]]);
-      // setup() and load() must share a solver — withState sets that up.
+      // setup() and load() must share a solver- withState sets that up.
       const { pool, solver } = withState(el);
       // 1-based voltages buffer: index 0 = ground, 1 = pos, 2 = _nCap.
       const voltages = new Float64Array([0, 5, 0]);
@@ -689,7 +689,7 @@ describe("polarized_cap_F4b_clamp_diode_stamp (PC-W3-4)", () => {
     );
     element._pinNodes = new Map([["pos", 1], ["neg", 0]]);
 
-    // Track matrix entries by (row,col) — the recording solver assigns one
+    // Track matrix entries by (row,col)- the recording solver assigns one
     // handle per unique (row,col) and accumulates stamps under that handle.
     const matEntries = new Map<string, number>();
     const handleToKey: string[] = [];

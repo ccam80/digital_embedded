@@ -1,5 +1,5 @@
 /**
- * HGS parity tests — task 4.3.6.
+ * HGS parity tests- task 4.3.6.
  *
  * Behavioral parity with Digital's ParserTest.java. Each test section maps
  * to a method in the Java test class.
@@ -50,7 +50,7 @@ describe("Parity", () => {
       expect(ctx.getVar("a")).toBe(10n);
     });
 
-    it("scope — for loop var does not leak to outer", async () => {
+    it("scope- for loop var does not leak to outer", async () => {
       const ctx = await run("sum := 0; for (i := 0; i < 5; i++) sum = sum + i;");
       expect(ctx.getVar("sum")).toBe(10n);
     });
@@ -169,7 +169,7 @@ describe("Parity", () => {
       expect(output).toBe("1,2,3,2,1");
     });
 
-    it("closure factory — independent instances", async () => {
+    it("closure factory- independent instances", async () => {
       const output = await runTemplate(
         "<?" +
         "func create() {" +
@@ -523,7 +523,7 @@ describe("Parity", () => {
       expect(ctx.getVar("result")).toBe(false);
     });
 
-    it("isPresent used in conditional — present branch executes", async () => {
+    it("isPresent used in conditional- present branch executes", async () => {
       const ctx = createRootContext();
       registerBuiltins(ctx);
       ctx.declareVar("val", 7n);
@@ -532,7 +532,7 @@ describe("Parity", () => {
       expect(ctx.getVar("x")).toBe(1n);
     });
 
-    it("isPresent used in conditional — absent branch executes", async () => {
+    it("isPresent used in conditional- absent branch executes", async () => {
       const ctx = createRootContext();
       registerBuiltins(ctx);
       const ast = parse("x := 0; if (isPresent(missingVar)) x = 1; else x = 2;");
@@ -587,7 +587,7 @@ describe("Parity", () => {
     });
 
     it("wrong variable type assignment fails", async () => {
-      // Assigning integer to string variable — HGS does not enforce static types
+      // Assigning integer to string variable- HGS does not enforce static types
       // but invalid operations on wrong types should throw
       await expectError('a := "hello"; b := a + a; c := b / 2;');
     });
@@ -598,12 +598,12 @@ describe("Parity", () => {
   // ---------------------------------------------------------------------------
 
   describe("arithmetic", () => {
-    it("operator precedence — multiply before add", async () => {
+    it("operator precedence- multiply before add", async () => {
       const ctx = await run("x := 1 + 2 * 2;");
       expect(ctx.getVar("x")).toBe(5n);
     });
 
-    it("operator precedence — parentheses override", async () => {
+    it("operator precedence- parentheses override", async () => {
       const ctx = await run("x := 2 * (1 + 2);");
       expect(ctx.getVar("x")).toBe(6n);
     });

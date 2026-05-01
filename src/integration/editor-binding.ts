@@ -1,5 +1,5 @@
 /**
- * EditorBinding — integration layer connecting the compiled coordinator to the
+ * EditorBinding- integration layer connecting the compiled coordinator to the
  * visual editor.
  *
  * Holds the Wire→SignalAddress and pin-key→SignalAddress mappings produced by
@@ -33,10 +33,10 @@ export interface EditorBinding {
   /**
    * Connect a circuit, coordinator, and signal-address mappings.
    *
-   * circuit         — the compiled circuit providing component-to-pin context.
-   * coordinator     — unified simulation coordinator for all domains.
-   * wireSignalMap   — maps each Wire to its SignalAddress (from CompiledCircuitUnified).
-   * pinSignalMap    — maps "{instanceId}:{pinLabel}" keys to SignalAddresses.
+   * circuit        - the compiled circuit providing component-to-pin context.
+   * coordinator    - unified simulation coordinator for all domains.
+   * wireSignalMap  - maps each Wire to its SignalAddress (from CompiledCircuitUnified).
+   * pinSignalMap   - maps "{instanceId}:{pinLabel}" keys to SignalAddresses.
    */
   bind(
     _circuit: Circuit,

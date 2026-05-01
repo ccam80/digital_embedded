@@ -1,5 +1,5 @@
 /**
- * Unified connectivity extraction — Phase 3 core algorithm.
+ * Unified connectivity extraction- Phase 3 core algorithm.
  *
  * Single pass that works for digital, analog, and mixed circuits.
  */
@@ -14,7 +14,7 @@ import type { ConnectivityGroup, ResolvedGroupPin } from './types.js';
 import type { Diagnostic } from './types.js';
 
 // ---------------------------------------------------------------------------
-// Infrastructure component types — engine-neutral, carry no domain signal
+// Infrastructure component types- engine-neutral, carry no domain signal
 // ---------------------------------------------------------------------------
 
 export const INFRASTRUCTURE_TYPES = new Set([
@@ -23,7 +23,7 @@ export const INFRASTRUCTURE_TYPES = new Set([
 ]);
 
 // ---------------------------------------------------------------------------
-// ModelAssignment — per-element active model resolution
+// ModelAssignment- per-element active model resolution
 // ---------------------------------------------------------------------------
 
 export interface ModelAssignment {
@@ -44,7 +44,7 @@ export interface ModelAssignment {
  *
  * For each element, look up `def.models` and determine the active model key.
  * Infrastructure components (Wire, Tunnel, Ground, etc.) are tagged as
- * neutral — they participate in connectivity but have no simulation model.
+ * neutral- they participate in connectivity but have no simulation model.
  */
 export function resolveModelAssignments(
   elements: readonly CircuitElement[],
@@ -82,7 +82,7 @@ export function resolveModelAssignments(
     const mnaKeys = runtimeKeys.length > 0 ? [...new Set([...staticKeys, ...runtimeKeys])] : staticKeys;
     // The element's "model" property is the source of truth (set at creation).
     // requestedKey comes from the element's bag.
-    // IMPLEMENTATION FAILURE — does not match ngspice spec.
+    // IMPLEMENTATION FAILURE- does not match ngspice spec.
     // Original excuse: "Fall back to definition only for legacy circuits that predate model-property-at-creation"
     // Remedy: re-implement per spec. Do not weaken tests. Do not patch symptoms.
     // See spec/reviews/ for the finding that identified this.
@@ -98,7 +98,7 @@ export function resolveModelAssignments(
 
     let modelKey: string;
     if (requestedKey !== undefined && !isValidKey) {
-      // User-provided key is not valid for this component — emit diagnostic and neutralize.
+      // User-provided key is not valid for this component- emit diagnostic and neutralize.
       diagnostics.push({
         severity: 'warning',
         code: 'invalid-simulation-model',
@@ -141,7 +141,7 @@ function resolveDomainFromModelKey(modelKey: string): string {
 }
 
 // ---------------------------------------------------------------------------
-// extractConnectivityGroups — the unified netlist extraction algorithm
+// extractConnectivityGroups- the unified netlist extraction algorithm
 // ---------------------------------------------------------------------------
 
 /**
@@ -237,7 +237,7 @@ export function extractConnectivityGroups(
   }
 
   // -------------------------------------------------------------------------
-  // Step 3: Label-merge — union pin slots for same-label Tunnel/Port components.
+  // Step 3: Label-merge- union pin slots for same-label Tunnel/Port components.
   // Tunnel and Port both have one pin and a label. Same label = same net.
   // -------------------------------------------------------------------------
 
@@ -354,7 +354,7 @@ export function extractConnectivityGroups(
     }
   }
 
-  // Populate wire membership — a wire belongs to a group if either of its
+  // Populate wire membership- a wire belongs to a group if either of its
   // virtual slots maps to a group (which it does if it shares position with a pin)
   for (let k = 0; k < wires.length; k++) {
     const startSlot = wireVirtualBase + k * 2;
@@ -412,7 +412,7 @@ export function extractConnectivityGroups(
 
       // Suppress when both sides are analog (both will be 1-bit nominal)
       if (analogPins.length > 0 && digitalPins.length === 0) {
-        // purely analog mismatch — suppress
+        // purely analog mismatch- suppress
       } else if (analogPins.length > 0 && digitalPins.length > 0) {
         // Analog terminal connected to multi-bit digital bus
         const multiBitDigital = digitalPins.find((p) => p.bitWidth > 1);
@@ -428,7 +428,7 @@ export function extractConnectivityGroups(
           });
         }
       } else {
-        // Pure digital width mismatch — name the pins
+        // Pure digital width mismatch- name the pins
         const pinDescs = digitalPins.map((p) => {
           const elLabel = (elements[p.elementIndex]?.getProperties().getOrDefault<string>('label', '') || elements[p.elementIndex]?.instanceId) ?? 'unknown';
           return `${elLabel}:${p.pinLabel} [${p.bitWidth}-bit]`;
@@ -455,7 +455,7 @@ export function extractConnectivityGroups(
   }
 
   // -------------------------------------------------------------------------
-  // Step 7: Post-group diagnostics — unconnected input, floating terminal,
+  // Step 7: Post-group diagnostics- unconnected input, floating terminal,
   // multi-driver
   // -------------------------------------------------------------------------
 
@@ -529,7 +529,7 @@ export function extractConnectivityGroups(
 }
 
 // ---------------------------------------------------------------------------
-// stableNetId — stable string identifier for a connectivity group
+// stableNetId- stable string identifier for a connectivity group
 // ---------------------------------------------------------------------------
 
 /**
@@ -564,14 +564,14 @@ export function stableNetId(
 }
 
 // ---------------------------------------------------------------------------
-// PinLoadingOverride — per-net override type (mirrors CircuitMetadata field)
+// PinLoadingOverride- per-net override type (mirrors CircuitMetadata field)
 // ---------------------------------------------------------------------------
 
 /**
  * A per-net override for digital pin loading mode.
  * anchor identifies the net by a stable net ID:
- *   - { type: "label"; label: string } — for named nets (Tunnel/Port label)
- *   - { type: "pin"; instanceId: string; pinLabel: string } — for unnamed nets
+ *   - { type: "label"; label: string }- for named nets (Tunnel/Port label)
+ *   - { type: "pin"; instanceId: string; pinLabel: string }- for unnamed nets
  */
 export interface PinLoadingOverride {
   anchor:
@@ -581,7 +581,7 @@ export interface PinLoadingOverride {
 }
 
 // ---------------------------------------------------------------------------
-// applyLoadingDecisions — inject "analog" domain into digital-only nets
+// applyLoadingDecisions- inject "analog" domain into digital-only nets
 // ---------------------------------------------------------------------------
 
 /**
@@ -623,7 +623,7 @@ export function applyLoadingDecisions(
 }
 
 // ---------------------------------------------------------------------------
-// resolveLoadingOverrides — match per-net overrides to connectivity groups
+// resolveLoadingOverrides- match per-net overrides to connectivity groups
 // ---------------------------------------------------------------------------
 
 /**

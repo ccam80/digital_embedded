@@ -7,7 +7,7 @@
  *   - SevenSeg: digit "7" segment drive
  *   - Registration: all "both" components in this task have analogFactory
  *
- * Migration pattern: DefaultSimulatorFacade — build a real circuit spec,
+ * Migration pattern: DefaultSimulatorFacade- build a real circuit spec,
  * compile it, and assert on getDcOpResult() / readAllSignals().
  */
 

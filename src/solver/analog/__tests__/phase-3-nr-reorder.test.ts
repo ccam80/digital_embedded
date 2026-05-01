@@ -1,5 +1,5 @@
 /**
- * Phase 3, Wave 3.1 — NR loop-top forceReorder gate + citation hygiene.
+ * Phase 3, Wave 3.1- NR loop-top forceReorder gate + citation hygiene.
  *
  * Task 3.1.1: Verify the pre-factor NISHOULDREORDER gate (newton-raphson.ts:337-357)
  *   fires on MODEINITJCT and MODEINITTRAN iteration 0, does NOT fire on MODEINITFLOAT
@@ -83,7 +83,7 @@ function makeDiodeCtx(sourceVoltage: number): CKTCircuitContext {
   return ctx;
 }
 
-describe("Task 3.1.1 — NR loop-top forceReorder gate", () => {
+describe("Task 3.1.1- NR loop-top forceReorder gate", () => {
   it("fires forceReorder when cktMode has MODEINITJCT", () => {
     const ctx = makeDiodeCtx(5.0);
     ctx.cktMode = setAnalysis(MODEDCOP, ctx.cktMode);
@@ -242,7 +242,7 @@ describe("Task 3.1.1 — NR loop-top forceReorder gate", () => {
   });
 });
 
-describe("Task 3.1.2 — non-top-of-loop forceReorder citations", () => {
+describe("Task 3.1.2- non-top-of-loop forceReorder citations", () => {
   it("cites niiter.c:888-891 at the E_SINGULAR retry", () => {
     // Read the newton-raphson.ts file and verify the E_SINGULAR retry citation
     const nrPath = path.join(

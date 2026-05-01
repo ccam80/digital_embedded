@@ -1,6 +1,6 @@
 /// <reference types="vite/client" />
 /**
- * Subcircuit navigation — drill down into subcircuit elements and back.
+ * Subcircuit navigation- drill down into subcircuit elements and back.
  *
  * Manages the circuit stack, breadcrumb UI, and afterMutate hook for
  * persisting subcircuit edits to IndexedDB.
@@ -99,7 +99,7 @@ export function createSubcircuitNavigator(
       const xml = serializeCircuitToDig(ctx.circuit, ctx.registry);
       void storeSubcircuit(subcircuitName, xml).catch((err: unknown) => {
         console.error('Failed to persist subcircuit on edit:', err);
-        ctx.showStatus(`ERROR: Failed to save subcircuit "${subcircuitName}" — changes may be lost on reload`);
+        ctx.showStatus(`ERROR: Failed to save subcircuit "${subcircuitName}"- changes may be lost on reload`);
       });
     };
   }

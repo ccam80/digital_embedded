@@ -56,7 +56,7 @@ export class MockEngine implements SimulationEngine {
   private readonly _listeners: Set<EngineChangeListener> = new Set();
   private readonly _measurementObservers: Set<MeasurementObserver> = new Set();
 
-  // Snapshot storage — simple array, no budget enforcement
+  // Snapshot storage- simple array, no budget enforcement
   private _mockSnapshots: Map<SnapshotId, { values: Uint32Array; highZs: Uint32Array }> = new Map();
   private _nextMockSnapshotId = 0;
 
@@ -225,7 +225,7 @@ export class MockEngine implements SimulationEngine {
 
   setSnapshotBudget(bytes: number): void {
     this.calls.push({ method: "setSnapshotBudget", bytes });
-    // No budget enforcement in mock — all snapshots are retained
+    // No budget enforcement in mock- all snapshots are retained
   }
 
   /** Reset call log without affecting signal state or circuit. */

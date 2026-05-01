@@ -21,7 +21,7 @@ test.describe("Model selector dropdown", () => {
   });
 
   test("multi-model component shows Model dropdown with labels", async ({ page }) => {
-    // And gate has modelRegistry: { behavioral } and models.digital — so two
+    // And gate has modelRegistry: { behavioral } and models.digital- so two
     // model options appear: "Behavioral (MNA)" and "Digital".
     await builder.placeLabeled("And", 10, 10, "G1");
 
@@ -47,7 +47,7 @@ test.describe("Model selector dropdown", () => {
   });
 
   test("component with empty modelRegistry does not show Model dropdown", async ({ page }) => {
-    // In port has modelRegistry: {} — so no model dropdown is shown.
+    // In port has modelRegistry: {}- so no model dropdown is shown.
     await builder.placeLabeled("In", 10, 10, "I1");
 
     const info = await builder.getCircuitInfo();

@@ -1,5 +1,5 @@
 /**
- * Renderer interface — engine-agnostic drawing context.
+ * Renderer interface- engine-agnostic drawing context.
  *
  * Components call these methods to render themselves. The concrete
  * implementation may be Canvas2D, SVG, or a test recorder. No component
@@ -86,7 +86,7 @@ export interface RenderContext {
   /**
    * Draw multiple line segments in a single batched stroke.
    * `coords` is a flat array: [x1,y1,x2,y2, x1,y1,x2,y2, ...].
-   * Optional — callers should fall back to individual drawLine if absent.
+   * Optional- callers should fall back to individual drawLine if absent.
    */
   drawLinesBatch?(coords: ArrayLike<number>): void;
   drawRect(x: number, y: number, width: number, height: number, filled: boolean): void;
@@ -108,7 +108,7 @@ export interface RenderContext {
    * Set the stroke and fill to a linear gradient in local coordinates.
    * Subsequent drawLine/drawPath/drawArc calls use this gradient as their
    * stroke style. The gradient is defined along the axis (x1,y1)→(x2,y2)
-   * with the given color stops. Optional — renderers that don't support
+   * with the given color stops. Optional- renderers that don't support
    * gradients may omit this method.
    */
   setLinearGradient?(

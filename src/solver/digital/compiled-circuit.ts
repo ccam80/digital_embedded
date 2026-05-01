@@ -1,11 +1,11 @@
 /**
- * ConcreteCompiledCircuit — the engine-internal executable representation.
+ * ConcreteCompiledCircuit- the engine-internal executable representation.
  *
  * Produced by compileCircuit() (compiler.ts) from a visual Circuit model.
  * Implements the opaque CompiledCircuit interface from Phase 1 with all
  * concrete fields the engine needs.
  *
- * Per Decision 3: this contains zero visual data — no positions, no wire
+ * Per Decision 3: this contains zero visual data- no positions, no wire
  * coordinates. The binding layer (Phase 6) holds cross-references.
  *
  */
@@ -19,14 +19,14 @@ import type { EvaluationGroup } from "./digital-engine.js";
 import type { BusResolver } from "./bus-resolution.js";
 
 // ---------------------------------------------------------------------------
-// FlatComponentLayout — ComponentLayout backed by flat typed arrays
+// FlatComponentLayout- ComponentLayout backed by flat typed arrays
 // ---------------------------------------------------------------------------
 
 /**
  * ComponentLayout implementation backed by pre-computed flat arrays.
  *
  * The compiler produces these arrays once. The engine's inner loop calls
- * inputOffset/outputOffset on every component evaluation — these are O(1)
+ * inputOffset/outputOffset on every component evaluation- these are O(1)
  * array reads.
  *
  * inputOffsets[i]  = index in wiringTable where component i's inputs start
@@ -99,13 +99,13 @@ export class FlatComponentLayout implements ComponentLayout {
 }
 
 // ---------------------------------------------------------------------------
-// CompiledCircuitImpl — concrete CompiledCircuit
+// CompiledCircuitImpl- concrete CompiledCircuit
 // ---------------------------------------------------------------------------
 
 /**
  * Concrete implementation of CompiledCircuit produced by compileCircuit().
  *
- * All fields are readonly after construction — the engine reads them, never
+ * All fields are readonly after construction- the engine reads them, never
  * writes them. The engine owns the signal arrays (Uint32Array) separately.
  */
 export class CompiledCircuitImpl implements CompiledCircuit {
@@ -114,7 +114,7 @@ export class CompiledCircuitImpl implements CompiledCircuit {
   readonly totalStateSlots: number;
   readonly signalArraySize: number;
 
-  /** Type ID per component slot — indexes into executeFns. */
+  /** Type ID per component slot- indexes into executeFns. */
   readonly typeIds: Uint16Array;
 
   /** Function table indexed by type ID. Populated from registry. */
@@ -126,7 +126,7 @@ export class CompiledCircuitImpl implements CompiledCircuit {
   /** Wiring indirection table mapping layout indices to net IDs. */
   readonly wiringTable: Int32Array;
 
-  /** Wiring layout — O(1) input/output offset lookups per component. */
+  /** Wiring layout- O(1) input/output offset lookups per component. */
   readonly layout: FlatComponentLayout;
 
   /** Topologically sorted evaluation groups (SCCs in DAG order). */

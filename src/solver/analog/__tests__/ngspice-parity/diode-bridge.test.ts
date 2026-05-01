@@ -29,7 +29,7 @@ const FIXTURE_PATH = resolve(
 const STOP_TIME = 33.3e-3;
 const MAX_STEP = 100e-6;
 
-describeIfDll("Diode bridge rectifier — ngspice transient parity", () => {
+describeIfDll("Diode bridge rectifier- ngspice transient parity", () => {
   it("transient_rectification_match", async () => {
     const session = new ComparisonSession({
       dtsPath: FIXTURE_PATH,

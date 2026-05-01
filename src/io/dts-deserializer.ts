@@ -28,7 +28,7 @@ const POS_INF = '_inf';
 const NEG_INF = '-_inf';
 
 /** Decode Infinity sentinels in a model params record back to numeric Infinity.
- *  Also recovers `null` values — these are legacy artifacts from JSON.stringify
+ *  Also recovers `null` values- these are legacy artifacts from JSON.stringify
  *  silently nullifying Infinity before the sentinel encoding was introduced. */
 function decodeModelParams(params: Record<string, number>): Record<string, number> {
   const out: Record<string, number> = {};
@@ -118,14 +118,14 @@ function rehydrateModels(
       if (entry.kind === 'inline') {
         if (def === undefined || def.modelRegistry === undefined) {
           throw new Error(
-            `deserializeDts: cannot rehydrate inline model "${compType}"/"${modelName}" — ` +
+            `deserializeDts: cannot rehydrate inline model "${compType}"/"${modelName}"- ` +
             `component type "${compType}" not found in registry or has no modelRegistry.`,
           );
         }
         const baseEntry = Object.values(def.modelRegistry)[0];
         if (baseEntry === undefined || baseEntry.kind !== 'inline') {
           throw new Error(
-            `deserializeDts: cannot rehydrate inline model "${compType}"/"${modelName}" — ` +
+            `deserializeDts: cannot rehydrate inline model "${compType}"/"${modelName}"- ` +
             `no inline base entry found in component modelRegistry.`,
           );
         }

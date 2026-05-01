@@ -1,5 +1,5 @@
 /**
- * Program memory loader — loads binary/hex data into a DataField.
+ * Program memory loader- loads binary/hex data into a DataField.
  *
  * Entry point: loadProgram(data, format, target, options?)
  *

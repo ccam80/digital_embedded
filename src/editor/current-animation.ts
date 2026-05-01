@@ -1,12 +1,12 @@
 /**
- * CurrentFlowAnimator — animated current-flow dots along wire segments.
+ * CurrentFlowAnimator- animated current-flow dots along wire segments.
  *
  * Renders small filled circles (dots) that move along wire segments at
  * speeds proportional to current magnitude. Uses WireCurrentResolver to
  * obtain per-wire currents and directions.
  *
  * Dots move at a uniform **absolute** speed (grid units / second) for a
- * given current magnitude — short stubs and long runs move at the same
+ * given current magnitude- short stubs and long runs move at the same
  * rate. Each segment stores a single scalar offset (in grid units) rather
  * than per-dot phase arrays. All segments initialise their offset to 0
  * and advance by `|I| × speedScale × dt`, so segments carrying the same
@@ -25,7 +25,7 @@ import type { RenderContext } from "@/core/renderer-interface";
 import type { Wire, Circuit } from "@/core/circuit";
 import type { WireCurrentResolver, ComponentCurrentPath } from "./wire-current-resolver";
 
-/** Dot radius in grid units — slightly wider than wire for visibility. */
+/** Dot radius in grid units- slightly wider than wire for visibility. */
 const DOT_RADIUS_GRID = 0.08;
 
 /** Spacing between dots along any segment, in grid units. */

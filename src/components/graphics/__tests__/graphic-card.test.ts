@@ -28,7 +28,7 @@ import type { RenderContext, Point, TextAnchor, FontSpec, PathData } from "../..
 import type { ThemeColor } from "../../../core/renderer-interface.js";
 
 // ---------------------------------------------------------------------------
-// Helpers — ComponentLayout mock (5 inputs, 1 output)
+// Helpers- ComponentLayout mock (5 inputs, 1 output)
 // GraphicCard has 5 inputs (A, str, C, ld, B) and 1 output (D)
 // ---------------------------------------------------------------------------
 
@@ -66,7 +66,7 @@ function makeState(
 }
 
 // ---------------------------------------------------------------------------
-// Helpers — RenderContext mock
+// Helpers- RenderContext mock
 // ---------------------------------------------------------------------------
 
 interface DrawCall {
@@ -105,7 +105,7 @@ function makeStubCtx(): { ctx: RenderContext; calls: DrawCall[] } {
 }
 
 // ---------------------------------------------------------------------------
-// Helpers — GraphicCardElement factory
+// Helpers- GraphicCardElement factory
 // ---------------------------------------------------------------------------
 
 function makeCard(overrides?: {
@@ -189,7 +189,7 @@ describe("GraphicCard", () => {
   });
 
   // ---------------------------------------------------------------------------
-  // processInputs — write on rising clock + str
+  // processInputs- write on rising clock + str
   // ---------------------------------------------------------------------------
 
   describe("processInputs", () => {
@@ -210,7 +210,7 @@ describe("GraphicCard", () => {
       const el = makeCard({ graphicWidth: 8, graphicHeight: 4 });
       // First rising edge: write 0xAB
       el.processInputs(3, true, true, false, false, 0xAB);
-      // Clock stays high (not a rising edge): write 0xCD — should NOT update
+      // Clock stays high (not a rising edge): write 0xCD- should NOT update
       el.processInputs(3, true, true, false, false, 0xCD);
       expect(el.readMemory(3)).toBe(0xAB);
     });

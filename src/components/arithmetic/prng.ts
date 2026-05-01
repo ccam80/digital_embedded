@@ -1,5 +1,5 @@
 /**
- * PRNG component — pseudo-random number generator.
+ * PRNG component- pseudo-random number generator.
  *
  * Ports from Digital's PRNG.java:
  *   Inputs: S (seed, bitWidth), se (set enable, 1-bit), ne (next enable, 1-bit), C (clock, 1-bit)
@@ -218,7 +218,7 @@ export const PRNGDefinition: ComponentDefinition = {
   propertyDefs: PRNG_PROPERTY_DEFS,
   attributeMap: PRNG_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.ARITHMETIC,
-  helpText: "PRNG — pseudo-random number generator (LFSR-based). se=1 seeds; ne=1 advances on rising clock edge.",
+  helpText: "PRNG- pseudo-random number generator (LFSR-based). se=1 seeds; ne=1 advances on rising clock edge.",
   models: {
     digital: {
       executeFn: executePRNG,

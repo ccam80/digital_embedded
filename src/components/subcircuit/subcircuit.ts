@@ -1,5 +1,5 @@
 /**
- * SubcircuitElement — a CircuitElement representing a nested circuit.
+ * SubcircuitElement- a CircuitElement representing a nested circuit.
  *
  * Renders as a chip (labeled rectangle with interface pins). Pins are derived
  * dynamically from the subcircuit's In/Out components.
@@ -136,7 +136,7 @@ export class SubcircuitElement extends AbstractCircuitElement {
         } else if (p.direction === PinDirection.OUTPUT) {
           rightCount++;
         } else {
-          // BIDIRECTIONAL — use face attribute
+          // BIDIRECTIONAL- use face attribute
           const face = (p as PinDeclaration & { face?: string }).face;
           if (face === 'right') {
             rightCount++;
@@ -296,7 +296,7 @@ function buildDefaultPositions(
     } else if (pin.direction === PinDirection.OUTPUT) {
       outputs.push(pin);
     } else {
-      // BIDIRECTIONAL (Port elements) — use face attribute to decide side
+      // BIDIRECTIONAL (Port elements)- use face attribute to decide side
       const face = (pin as PinDeclaration & { face?: string }).face;
       if (face === 'right') {
         outputs.push(pin);
@@ -397,7 +397,7 @@ function buildLayoutPositions(
   }
 
   // Top face: y=0 (at chip edge, matching Java LayoutShape startPos=(0,0))
-  // Java: top.createPosition(map, new Vector(0, 0), width) — pins AT the edge.
+  // Java: top.createPosition(map, new Vector(0, 0), width)- pins AT the edge.
   const topX = distribute(groups.top.length, width);
   for (let i = 0; i < groups.top.length; i++) {
     positioned.push({ ...groups.top[i], position: { x: topX[i], y: 0 } });

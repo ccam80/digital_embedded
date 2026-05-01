@@ -7,7 +7,7 @@
  *   cross-domain (default): bridge adapters only at real cross-engine
  *                            boundaries (groups that have both digital and
  *                            analog pins from real boundary components).
- *   all:                     bridge adapters on EVERY digital net — digital-
+ *   all:                     bridge adapters on EVERY digital net- digital-
  *                            only groups receive an injected "analog" domain
  *                            entry so each net gets a per-net bridge.
  *   none:                    bridges at real boundaries only, with zero
@@ -230,10 +230,10 @@ function buildRegistry(
 // Circuit builder
 //
 // Builds a circuit with:
-//   - Ground at (0,0) — provides MNA reference node
-//   - Resistor at (20,0) with pins A=(20,0) and B=(22,0) — MNA-only component
+//   - Ground at (0,0)- provides MNA reference node
+//   - Resistor at (20,0) with pins A=(20,0) and B=(22,0)- MNA-only component
 //     that forces a non-empty analog partition
-//   - DigitalXor at (10,0) — component under test (digital + behavioral)
+//   - DigitalXor at (10,0)- component under test (digital + behavioral)
 //
 // All components share wires to Ground so they form a connected net.
 // ---------------------------------------------------------------------------
@@ -256,7 +256,7 @@ function buildCircuit(
   gndEl.position = { x: 0, y: 0 };
   circuit.addElement(gndEl);
 
-  // Resistor at position (20, 0) — pin A at world (20,0), pin B at world (22,0)
+  // Resistor at position (20, 0)- pin A at world (20,0), pin B at world (22,0)
   const resEl = makeStubElFactory("Resistor", () => [
     { direction: PinDirection.BIDIRECTIONAL, position: { x: 0, y: 0 }, label: "A", bitWidth: 1, isNegated: false, isClock: false, kind: "signal" },
     { direction: PinDirection.BIDIRECTIONAL, position: { x: 2, y: 0 }, label: "B", bitWidth: 1, isNegated: false, isClock: false, kind: "signal" },
@@ -264,7 +264,7 @@ function buildCircuit(
   resEl.position = { x: 20, y: 0 };
   circuit.addElement(resEl);
 
-  // DigitalXor at position (10, 0) — pins A=(10,1), B=(10,2), out=(12,1)
+  // DigitalXor at position (10, 0)- pins A=(10,1), B=(10,2), out=(12,1)
   const xorProps = new PropertyBag();
   for (const [k, v] of propsMap) xorProps.set(k, v);
   const xorEl = makeStubElFactory("DigitalXor", (_props) => [
@@ -308,7 +308,7 @@ function countBridgeAdapters(analogDomain: ConcreteCompiledAnalogCircuit | null)
 describe("digitalPinLoading: cross-domain (default)", () => {
   it("absent metadata defaults to cross-domain: no per-net bridges for isolated digital nets", () => {
     const registry = buildRegistry();
-    // No model set — DigitalXor stays digital-only, no analog boundary.
+    // No model set- DigitalXor stays digital-only, no analog boundary.
     // "cross-domain" only bridges real cross-domain boundaries, so zero bridges.
     const circuit = buildCircuit();
 
@@ -348,7 +348,7 @@ describe("digitalPinLoading: all", () => {
     const analogDomain = compiled.analog as ConcreteCompiledAnalogCircuit | null;
 
     expect(analogDomain).not.toBeNull();
-    // One boundary group per digital net — DigitalXor has 3 pins → 3 nets.
+    // One boundary group per digital net- DigitalXor has 3 pins → 3 nets.
     expect(analogDomain!.bridgeAdaptersByGroupId.size).toBeGreaterThan(0);
   });
 
@@ -398,7 +398,7 @@ describe("digitalPinLoading: all", () => {
 describe("digitalPinLoading: none", () => {
   it("none mode: no per-net bridges on isolated digital-only nets (same count as cross-domain)", () => {
     // "none" does not inject "analog" into digital-only nets. Only real
-    // cross-domain boundaries get bridges — with zero loading applied.
+    // cross-domain boundaries get bridges- with zero loading applied.
     const registry = buildRegistry();
     const circuitNone  = buildCircuit({ digitalPinLoading: "none" });
     const circuitCross = buildCircuit({ digitalPinLoading: "cross-domain" });

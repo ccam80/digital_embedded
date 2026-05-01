@@ -1,14 +1,14 @@
 /**
- * DC operating point solver — ngspice CKTop three-level fallback.
+ * DC operating point solver- ngspice CKTop three-level fallback.
  *
  * Implements the three-level convergence stack from ngspice cktop.c:20-79:
  *
- *   Level 0 — Direct NR: standard Newton-Raphson with params.maxIterations
- *   Level 1 — dynamicGmin: adaptive diagonal conductance stepping
+ *   Level 0- Direct NR: standard Newton-Raphson with params.maxIterations
+ *   Level 1- dynamicGmin: adaptive diagonal conductance stepping
  *              (cktop.c:127-258), analogous to ngspice's CKTdcOp gmin path
- *   Level 2 — gillespieSrc: adaptive source stepping
+ *   Level 2- gillespieSrc: adaptive source stepping
  *              (cktop.c:369-569), Gillespie source-stepping algorithm
- *   Level 3 — Failure: emit blame diagnostics
+ *   Level 3- Failure: emit blame diagnostics
  *
  * Variable mapping (ngspice → ours):
  *   CKTdiagGmin      → ctx.diagonalGmin (set before each NR call)
@@ -22,7 +22,7 @@
  *   OldRhsOld        → ctx.dcopSavedVoltages
  *   OldCKTstate0     → ctx.dcopSavedState0
  *
- * `ctx.dcopVoltages` is digiTS-only — it is the destination buffer that
+ * `ctx.dcopVoltages` is digiTS-only- it is the destination buffer that
  * `ctx.dcopResult.nodeVoltages` aliases, populated once at success from
  * `ctx.rhs`. It plays no role inside any NR sub-solve and has no ngspice
  * analogue; ngspice consumers read `CKTrhs` directly after CKTop returns.
@@ -67,9 +67,9 @@ export type DcOpNRAttemptOutcome =
  * DC source stepping. Every source-device `load()` reads `ctx.srcFact`
  * directly and multiplies its stamped value by it.
  *
- * ngspice reference: cktop.c:385 (gillespie_src start — `ckt->CKTsrcFact = 0;`)
+ * ngspice reference: cktop.c:385 (gillespie_src start- `ckt->CKTsrcFact = 0;`)
  * and cktop.c:475,514 (increment during ramp). vsrcload.c:54 and isrcload.c
- * read `ckt->CKTsrcFact` directly in each device's load() — no per-element
+ * read `ckt->CKTsrcFact` directly in each device's load()- no per-element
  * setter dispatch.
  */
 function scaleAllSources(ctx: CKTCircuitContext, factor: number): void {
@@ -80,7 +80,7 @@ function scaleAllSources(ctx: CKTCircuitContext, factor: number): void {
  * Zero CKTrhsOld and CKTstate0 once at sub-solver entry.
  *
  * Mirrors cktop.c:156-160 (dynamic_gmin) and cktop.c:398-402 (gillespie_src).
- * Called from `dynamicGmin` and `gillespieSrc` only — `spice3_gmin` and
+ * Called from `dynamicGmin` and `gillespieSrc` only- `spice3_gmin` and
  * `spice3_src` perform NO entry zero pass and inherit both buffers from the
  * caller's prior NIiter exit state.
  */
@@ -131,7 +131,7 @@ function restoreSnapshot(
 }
 
 // ---------------------------------------------------------------------------
-// StepResult — internal return type for stepping sub-solvers
+// StepResult- internal return type for stepping sub-solvers
 // ---------------------------------------------------------------------------
 
 interface StepResult {
@@ -144,7 +144,7 @@ type PhaseBeginFn = ((phase: DcOpNRPhase, phaseParameter?: number) => void) | un
 type PhaseEndFn = ((outcome: DcOpNRAttemptOutcome, converged: boolean) => void) | undefined;
 
 // ---------------------------------------------------------------------------
-// runNR — configure ctx for a sub-solve and call newtonRaphson
+// runNR- configure ctx for a sub-solve and call newtonRaphson
 // ---------------------------------------------------------------------------
 
 /**
@@ -164,7 +164,7 @@ function runNR(
   ladder: CKTCircuitContext["nrModeLadder"],
 ): StepResult {
   // The caller (dcOperatingPoint / _transientDcop in analog-engine.ts) owns
-  // the cktMode write — standalone .OP sets MODEDCOP | MODEINITJCT (dcop.c:82)
+  // the cktMode write- standalone .OP sets MODEDCOP | MODEINITJCT (dcop.c:82)
   // and transient-boot DCOP sets MODETRANOP | MODEINITJCT (dctran.c:231).
   // Sub-solves (gmin/src stepping ladders) inherit those bits and only flip
   // the INITF sub-field via ladder.onModeBegin. The cktMode bitfield already
@@ -186,14 +186,14 @@ function runNR(
 }
 
 // ---------------------------------------------------------------------------
-// cktop — ngspice cktop.c:20-79 direct NR level
+// cktop- ngspice cktop.c:20-79 direct NR level
 // ---------------------------------------------------------------------------
 
 /**
  * Run the direct-NR level of the DC-OP ladder (cktop.c:20-79).
  *
  * Sets the firstmode INITF bits and dispatches to NIiter. Does NOT touch
- * CKTrhsOld — ngspice cktop.c:46 passes it directly to NIiter, which inherits
+ * CKTrhsOld- ngspice cktop.c:46 passes it directly to NIiter, which inherits
  * whatever the prior NIiter call (or NIreinit, on a fresh circuit) left
  * there. digiTS matches: ctx.rhsOld carries forward across solveDcOperatingPoint
  * invocations (it is a `Float64Array(sizePlusOne)` so it starts at zero on
@@ -222,7 +222,7 @@ function cktop(
 }
 
 // ---------------------------------------------------------------------------
-// dcopFinalize — ngspice DCop initSmsig final CKTload (dcop.c:127,153)
+// dcopFinalize- ngspice DCop initSmsig final CKTload (dcop.c:127,153)
 // ---------------------------------------------------------------------------
 
 /**
@@ -240,12 +240,12 @@ function cktop(
  *
  * After the load, ngspice does NOT reset CKTmode. We clear INITF back to
  * MODEINITFLOAT on return so cktMode never leaks MODEINITSMSIG across
- * analysis boundaries — matches niiter.c:1070-1071's post-converge INITF
+ * analysis boundaries- matches niiter.c:1070-1071's post-converge INITF
  * landing mode.
  *
  * Runs ONLY on the standalone .OP path (!isTranOp(ctx.cktMode)). The
  * transient-boot DCOP path (dctran.c:230-346) has no smsig load and callers
- * must skip this function — gate on !isTranOp(ctx.cktMode) at each call site.
+ * must skip this function- gate on !isTranOp(ctx.cktMode) at each call site.
  */
 function dcopFinalize(ctx: CKTCircuitContext): void {
   ctx.cktMode = setInitf(ctx.cktMode, MODEINITSMSIG);
@@ -254,7 +254,7 @@ function dcopFinalize(ctx: CKTCircuitContext): void {
 }
 
 // ---------------------------------------------------------------------------
-// cktncDump — per-node non-convergence diagnostics (cktncdump.c)
+// cktncDump- per-node non-convergence diagnostics (cktncdump.c)
 // ---------------------------------------------------------------------------
 
 /**
@@ -332,7 +332,7 @@ export function solveDcOperatingPoint(ctx: CKTCircuitContext): void {
     },
   };
 
-  // ngspice cktop.c:46 — NIiter is invoked with whatever CKTrhsOld carried
+  // ngspice cktop.c:46- NIiter is invoked with whatever CKTrhsOld carried
   // from the prior call (or NIreinit's zero-fill on a fresh circuit). digiTS
   // matches: ctx.rhsOld is left untouched here.
 
@@ -373,7 +373,7 @@ export function solveDcOperatingPoint(ctx: CKTCircuitContext): void {
   let totalIterations = directResult.iterations;
 
   // -------------------------------------------------------------------------
-  // Level 1 — gmin stepping (cktop.c:57-60: select ONE gmin method)
+  // Level 1- gmin stepping (cktop.c:57-60: select ONE gmin method)
   // -------------------------------------------------------------------------
   const numGminSteps = params.numGminSteps ?? 1;
   let gminResult: StepResult;
@@ -386,7 +386,7 @@ export function solveDcOperatingPoint(ctx: CKTCircuitContext): void {
 
   if (gminResult.converged) {
     ctx.dcopVoltages.set(ctx.rhs);
-    // smsig load is .OP-only — skip on transient-boot DCOP (dctran.c:230-346).
+    // smsig load is .OP-only- skip on transient-boot DCOP (dctran.c:230-346).
     if (!isTranOp(ctx.cktMode)) {
       dcopFinalize(ctx);
     }
@@ -411,7 +411,7 @@ export function solveDcOperatingPoint(ctx: CKTCircuitContext): void {
   }
 
   // -------------------------------------------------------------------------
-  // Level 2 — source stepping (cktop.c:66-75: select ONE source-stepping method)
+  // Level 2- source stepping (cktop.c:66-75: select ONE source-stepping method)
   // -------------------------------------------------------------------------
   const numSrcSteps = params.numSrcSteps ?? 1;
   let srcResult: StepResult;
@@ -424,7 +424,7 @@ export function solveDcOperatingPoint(ctx: CKTCircuitContext): void {
 
   if (srcResult.converged) {
     ctx.dcopVoltages.set(ctx.rhs);
-    // smsig load is .OP-only — skip on transient-boot DCOP (dctran.c:230-346).
+    // smsig load is .OP-only- skip on transient-boot DCOP (dctran.c:230-346).
     if (!isTranOp(ctx.cktMode)) {
       dcopFinalize(ctx);
     }
@@ -449,7 +449,7 @@ export function solveDcOperatingPoint(ctx: CKTCircuitContext): void {
   }
 
   // -------------------------------------------------------------------------
-  // Level 5 — Failure with blame attribution (cktncdump.c)
+  // Level 5- Failure with blame attribution (cktncdump.c)
   //
   // ngspice CKTncDump compares the iter-K output (CKTrhs) against the
   // iter-K-1 output (CKTrhsOld) at the moment NIiter gave up. After the last
@@ -491,7 +491,7 @@ export function solveDcOperatingPoint(ctx: CKTCircuitContext): void {
 }
 
 // ---------------------------------------------------------------------------
-// dynamicGmin — cktop.c:127-258
+// dynamicGmin- cktop.c:127-258
 // ---------------------------------------------------------------------------
 
 /**
@@ -513,7 +513,7 @@ function dynamicGmin(
 ): StepResult {
   const { statePool, params } = ctx;
 
-  // cktop.c:156-160 — single zero pass at function entry.
+  // cktop.c:156-160- single zero pass at function entry.
   zeroRhsOldAndState(ctx, statePool);
 
   ctx.cktMode = setInitf(ctx.cktMode, MODEINITJCT);  // cktop.c:35 firstmode=MODEINITJCT
@@ -539,7 +539,7 @@ function dynamicGmin(
         break;
       }
 
-      // cktop.c:186-194 — save CKTrhsOld + CKTstate0 (the iter-K-1 output of
+      // cktop.c:186-194- save CKTrhsOld + CKTstate0 (the iter-K-1 output of
       // the converging NIiter call, per niiter.c:1066-1069 no-swap exit).
       saveSnapshot(ctx.rhsOld, savedVoltages, statePool, savedState0);
 
@@ -567,12 +567,12 @@ function dynamicGmin(
       }
       factor = Math.sqrt(Math.sqrt(factor));
       diagGmin = oldGmin / factor;
-      // cktop.c:226-233 — restore CKTrhsOld + CKTstate0 from snapshot.
+      // cktop.c:226-233- restore CKTrhsOld + CKTstate0 from snapshot.
       restoreSnapshot(ctx.rhsOld, savedVoltages, statePool, savedState0);
     }
   }
 
-  // cktop.c:253 — final clean solve, no rhsOld touch (carries forward from
+  // cktop.c:253- final clean solve, no rhsOld touch (carries forward from
   // the last successful NIiter exit inside the while loop).
   onPhaseBegin?.("dcopGminDynamic", 0);
   const cleanResult = runNR(ctx, params.maxIterations, params.gshunt ?? 0, null);
@@ -587,7 +587,7 @@ function dynamicGmin(
 }
 
 // ---------------------------------------------------------------------------
-// spice3Gmin — cktop.c:273-341
+// spice3Gmin- cktop.c:273-341
 // ---------------------------------------------------------------------------
 
 /**
@@ -596,7 +596,7 @@ function dynamicGmin(
  * Starts with diagGmin = params.gmin * gminFactor^numGminSteps, then ramps
  * it down by gminFactor per step, for numGminSteps+1 steps. No backtracking.
  *
- * NO entry zero of CKTrhsOld or CKTstate0 — both inherit from the prior
+ * NO entry zero of CKTrhsOld or CKTstate0- both inherit from the prior
  * NIiter exit (cktop.c:285-303 only writes CKTmode and CKTdiagGmin).
  */
 function spice3Gmin(
@@ -633,7 +633,7 @@ function spice3Gmin(
     diagGmin /= gminFactor;
   }
 
-  // cktop.c:338 — final clean solve, no rhsOld touch.
+  // cktop.c:338- final clean solve, no rhsOld touch.
   onPhaseBegin?.("dcopGminSpice3", 0);
   const cleanResult = runNR(ctx, params.dcTrcvMaxIter, params.gshunt ?? 0, null);
   totalIter += cleanResult.iterations;
@@ -647,14 +647,14 @@ function spice3Gmin(
 }
 
 // ---------------------------------------------------------------------------
-// spice3Src — cktop.c:583-628
+// spice3Src- cktop.c:583-628
 // ---------------------------------------------------------------------------
 
 /**
  * spice3 source stepping (cktop.c:583-628).
  * Uniform linear source ramp with no backtracking.
  *
- * NO entry zero of CKTrhsOld or CKTstate0 — both inherit from the prior
+ * NO entry zero of CKTrhsOld or CKTstate0- both inherit from the prior
  * NIiter exit (cktop.c:583-595 only writes CKTmode).
  */
 function spice3Src(
@@ -688,7 +688,7 @@ function spice3Src(
 }
 
 // ---------------------------------------------------------------------------
-// gillespieSrc — cktop.c:369-569
+// gillespieSrc- cktop.c:369-569
 // ---------------------------------------------------------------------------
 
 /**
@@ -712,7 +712,7 @@ function gillespieSrc(
   ctx.cktMode = setInitf(ctx.cktMode, MODEINITJCT);  // cktop.c:381 firstmode=MODEINITJCT
   scaleAllSources(ctx, 0);
 
-  // cktop.c:398-402 — single zero pass at function entry.
+  // cktop.c:398-402- single zero pass at function entry.
   zeroRhsOldAndState(ctx, statePool);
 
   const savedVoltages = ctx.dcopSavedVoltages;
@@ -754,7 +754,7 @@ function gillespieSrc(
     ctx.cktMode = setInitf(ctx.cktMode, MODEINITFLOAT);  // cktop.c:453-497 continuemode=MODEINITFLOAT
   }
 
-  // cktop.c:463-470 — save initial converged state (after either the direct
+  // cktop.c:463-470- save initial converged state (after either the direct
   // zero-source solve or the gmin bootstrap path) before entering the main
   // ramp loop. Required so the first main-loop retry has a snapshot to
   // restore from.
@@ -778,7 +778,7 @@ function gillespieSrc(
     if (stepResult.converged) {
       onPhaseEnd?.("dcopSubSolveConverged", true);
       ctx.cktMode = setInitf(ctx.cktMode, MODEINITFLOAT);  // cktop.c:497 continuemode=MODEINITFLOAT
-      // cktop.c:502-509 — save CKTrhsOld + CKTstate0 (iter-K-1 output of
+      // cktop.c:502-509- save CKTrhsOld + CKTstate0 (iter-K-1 output of
       // the just-converged NIiter call) for restoration on a future retry.
       saveSnapshot(ctx.rhsOld, savedVoltages, statePool, savedState0);
       convFact = srcFact;
@@ -799,7 +799,7 @@ function gillespieSrc(
       if (raise > 0.01) {
         raise = 0.01;
       }
-      // cktop.c:539-545 — restore CKTrhsOld + CKTstate0 from snapshot.
+      // cktop.c:539-545- restore CKTrhsOld + CKTstate0 from snapshot.
       restoreSnapshot(ctx.rhsOld, savedVoltages, statePool, savedState0);
       srcFact = convFact + raise;
     }

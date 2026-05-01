@@ -1,5 +1,5 @@
 /**
- * Scope renderer — drawing utilities for the ScopePanel.
+ * Scope renderer- drawing utilities for the ScopePanel.
  *
  * All functions draw onto a CanvasRenderingContext2D directly. The scope
  * panel is a standalone runtime panel (not an editor-canvas overlay), so
@@ -7,7 +7,7 @@
  */
 
 // ---------------------------------------------------------------------------
-// ScopeViewport — maps simulation time/value to canvas pixels
+// ScopeViewport- maps simulation time/value to canvas pixels
 // ---------------------------------------------------------------------------
 
 /**
@@ -199,7 +199,7 @@ export function drawYAxis(
 }
 
 // ---------------------------------------------------------------------------
-// chooseGridInterval — picks a nice grid spacing using the 1-2-5 sequence
+// chooseGridInterval- picks a nice grid spacing using the 1-2-5 sequence
 // ---------------------------------------------------------------------------
 
 /**

@@ -1,5 +1,5 @@
 /**
- * Tests for RunToBreak — task 3.4.3.
+ * Tests for RunToBreak- task 3.4.3.
  *
  * Builds minimal ConcreteCompiledCircuit instances with Break components
  * (identified by element.type === "Break") to verify halt behaviour.
@@ -13,7 +13,7 @@ import type { CircuitElement } from "@/core/element";
 import type { Wire } from "@/core/circuit";
 
 // ---------------------------------------------------------------------------
-// StaticLayout — same pattern as other engine tests
+// StaticLayout- same pattern as other engine tests
 // ---------------------------------------------------------------------------
 
 class StaticLayout implements ComponentLayout {
@@ -104,12 +104,12 @@ describe("RunToBreak", () => {
   // haltsOnBreak
   // -------------------------------------------------------------------------
 
-  it("haltsOnBreak — circuit with Break component, input goes high after 5 steps, verify stops at step 5", () => {
+  it("haltsOnBreak- circuit with Break component, input goes high after 5 steps, verify stops at step 5", () => {
     // Circuit layout:
-    //   Net 0: a counter-driven signal — goes to 1 on the 5th step
+    //   Net 0: a counter-driven signal- goes to 1 on the 5th step
     //   Net 1: output of the driver component (unused)
-    //   Component 0 (index 0): driver — counts calls and writes 1 to net 0 on 5th call
-    //   Component 1 (index 1): Break — input is net 0
+    //   Component 0 (index 0): driver- counts calls and writes 1 to net 0 on 5th call
+    //   Component 1 (index 1): Break- input is net 0
     //
     // The Break component has no execute logic (it is a monitor, not a gate).
     // run-to-break reads the Break's input net directly after each step.
@@ -148,7 +148,7 @@ describe("RunToBreak", () => {
   // haltsOnMaxSteps
   // -------------------------------------------------------------------------
 
-  it("haltsOnMaxSteps — no Break fires, verify stops at maxSteps", () => {
+  it("haltsOnMaxSteps- no Break fires, verify stops at maxSteps", () => {
     // Circuit with a Break component whose input never goes high.
     const noopFn = (_i: number, _s: Uint32Array, _hz: Uint32Array, _l: ComponentLayout): void => {};
 
@@ -176,7 +176,7 @@ describe("RunToBreak", () => {
   // reportsBreakComponent
   // -------------------------------------------------------------------------
 
-  it("reportsBreakComponent — verify breakComponent index matches the Break element", () => {
+  it("reportsBreakComponent- verify breakComponent index matches the Break element", () => {
     // Circuit with 3 components:
     //   Index 0: driver (immediately asserts net 0 = 1 on first step)
     //   Index 1: non-Break component

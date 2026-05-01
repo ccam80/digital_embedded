@@ -1,9 +1,9 @@
 /**
- * ComponentPalette — tree-based component palette logic.
+ * ComponentPalette- tree-based component palette logic.
  *
  * Manages the tree structure of components grouped by category,
  * search/filter state, recent placement history, and collapsed state.
- * Pure logic — no DOM dependencies.
+ * Pure logic- no DOM dependencies.
  */
 
 import type { ComponentDefinition } from "@/core/registry";
@@ -11,7 +11,7 @@ import { ComponentCategory, ComponentRegistry } from "@/core/registry";
 import { buildSubcircuitComponentDef } from "../components/subcircuit/subcircuit.js";
 
 // ---------------------------------------------------------------------------
-// PaletteNode — one category tree node
+// PaletteNode- one category tree node
 // ---------------------------------------------------------------------------
 
 export interface PaletteNode {
@@ -45,7 +45,7 @@ const CATEGORY_LABELS: Record<ComponentCategory, string> = {
   [ComponentCategory.ACTIVE]: "Active",
 };
 
-/** Category order — analog categories promoted for unified palette. */
+/** Category order- analog categories promoted for unified palette. */
 const CATEGORIES_ANALOG: readonly ComponentCategory[] = [
   ComponentCategory.PASSIVES,
   ComponentCategory.SEMICONDUCTORS,
@@ -81,7 +81,7 @@ const PALETTE_DEFAULT_COMPONENTS: ReadonlyMap<ComponentCategory, readonly string
   [ComponentCategory.SWITCHING, ["NFET", "PFET", "Switch", "SwitchDT"]],
   [ComponentCategory.FLIP_FLOPS, ["D_FF", "JK_FF", "RS_FF", "T_FF", "D_FF_AS", "JK_FF_AS", "RS_FF_AS"]],
   [ComponentCategory.MEMORY, ["Counter", "CounterPreset", "Register", "RegisterFile", "ROM", "EEPROM", "LookUpTable", "RAMSinglePort"]],
-  // No defaults for analog categories — show all registered components.
+  // No defaults for analog categories- show all registered components.
 ]);
 
 const MAX_RECENT_HISTORY = 10;
@@ -109,7 +109,7 @@ export class ComponentPalette {
   private readonly _registry: ComponentRegistry;
   /** Per-category expanded state. True = expanded (showing children). */
   private readonly _expandedCategories: Map<ComponentCategory, boolean> = new Map();
-  /** Recent placements — most recent first. Max 10 unique type names. */
+  /** Recent placements- most recent first. Max 10 unique type names. */
   private readonly _recentHistory: string[] = [];
   private _collapsed = false;
   /**
@@ -179,7 +179,7 @@ export class ComponentPalette {
 
     for (const category of CATEGORIES_ANALOG) {
       // When an allowlist is active, show all categories that have matching
-      // components — don't hide the default-hidden categories since the
+      // components- don't hide the default-hidden categories since the
       // allowlist is the explicit override.
       if (this._allowlist === null && PALETTE_HIDDEN_CATEGORIES.has(category) && !this._forceVisibleCategories.has(category)) continue;
       let all = this._registry.getByCategory(category);

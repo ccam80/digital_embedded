@@ -1,5 +1,5 @@
 /**
- * Tests for color-scheme.ts — ColorSchemeManager.
+ * Tests for color-scheme.ts- ColorSchemeManager.
  */
 
 import { describe, it, expect, vi } from "vitest";
@@ -33,7 +33,7 @@ describe("ColorSchemeManager", () => {
       expect(active.resolve("BACKGROUND")).toBe("#000000");
     });
 
-    it("setActive('high-contrast') — BACKGROUND resolves to #000000", () => {
+    it("setActive('high-contrast')- BACKGROUND resolves to #000000", () => {
       const mgr = new ColorSchemeManager();
 
       mgr.setActive("high-contrast");
@@ -41,7 +41,7 @@ describe("ColorSchemeManager", () => {
       expect(mgr.getActive().resolve("BACKGROUND")).toBe("#000000");
     });
 
-    it("setActive('monochrome') — BACKGROUND resolves to #ffffff", () => {
+    it("setActive('monochrome')- BACKGROUND resolves to #ffffff", () => {
       const mgr = new ColorSchemeManager();
 
       mgr.setActive("monochrome");
@@ -95,7 +95,7 @@ describe("ColorSchemeManager", () => {
       expect(mgr.getGateShapeStyle()).toBe("ieee");
     });
 
-    it("setGateShapeStyle('iec') — getGateShapeStyle returns 'iec'", () => {
+    it("setGateShapeStyle('iec')- getGateShapeStyle returns 'iec'", () => {
       const mgr = new ColorSchemeManager();
 
       mgr.setGateShapeStyle("iec");

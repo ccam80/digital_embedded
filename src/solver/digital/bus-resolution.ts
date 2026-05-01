@@ -11,7 +11,7 @@
  *      all highZ masks).
  *   3. The resolved value is the OR of all non-high-Z driver values.
  *   4. Burn detection: two non-high-Z drivers that disagree on a bit are a
- *      bus conflict. Detection is deferred to post-step — transient conflicts
+ *      bus conflict. Detection is deferred to post-step- transient conflicts
  *      are normal during propagation.
  *   5. Pull resistors: if the net has a pull-up, floating bits resolve to 1.
  *      Pull-down: floating bits resolve to 0.
@@ -25,13 +25,13 @@
 import { BurnException } from "@/core/errors.js";
 
 // ---------------------------------------------------------------------------
-// PullResistor — pull-up / pull-down / none
+// PullResistor- pull-up / pull-down / none
 // ---------------------------------------------------------------------------
 
 export type PullResistor = "up" | "down" | "none";
 
 // ---------------------------------------------------------------------------
-// BusNet — one multi-driver net
+// BusNet- one multi-driver net
 // ---------------------------------------------------------------------------
 
 /**
@@ -155,7 +155,7 @@ export class BusNet {
         // (combinedValue bits are already 0 for floating positions)
         combinedHighZ = 0;
       }
-      // 'none': floating bits remain high-Z — combinedHighZ unchanged
+      // 'none': floating bits remain high-Z- combinedHighZ unchanged
     }
 
     // Mask burn to only non-high-Z bits in the final output (burns on
@@ -194,7 +194,7 @@ export class BusNet {
 }
 
 // ---------------------------------------------------------------------------
-// SwitchRecord — tracks a registered switch and its current state
+// SwitchRecord- tracks a registered switch and its current state
 // ---------------------------------------------------------------------------
 
 interface SwitchRecord {
@@ -206,7 +206,7 @@ interface SwitchRecord {
 }
 
 // ---------------------------------------------------------------------------
-// BusResolver — manages all bus nets in a compiled circuit
+// BusResolver- manages all bus nets in a compiled circuit
 // ---------------------------------------------------------------------------
 
 /**

@@ -13,7 +13,7 @@ const Y: SignalSpec = { name: 'Y', bitWidth: 1 };
 const Z: SignalSpec = { name: 'Z', bitWidth: 1 };
 
 describe('TruthTable', () => {
-  it('setOutput — set output value at row 2, verify stored', () => {
+  it('setOutput- set output value at row 2, verify stored', () => {
     const table = new TruthTable([A, B], [Y]);
 
     // 4 rows (2 inputs), all default to X (-1n)
@@ -26,7 +26,7 @@ describe('TruthTable', () => {
     expect(table.getOutput(2, 0)).toBe(0n);
   });
 
-  it('reorderColumns — swap input A and B, verify row values rearranged', () => {
+  it('reorderColumns- swap input A and B, verify row values rearranged', () => {
     // 2 inputs A, B; 1 output Y
     // Row layout: AB=00(r0), AB=01(r1), AB=10(r2), AB=11(r3)
     const table = new TruthTable([A, B], [Y]);
@@ -55,7 +55,7 @@ describe('TruthTable', () => {
     expect(table.getOutput(3, 0)).toBe(-1n);
   });
 
-  it('blank — creates table with all X outputs', () => {
+  it('blank- creates table with all X outputs', () => {
     const table = TruthTable.blank([A, B, C], [Y, Z]);
 
     expect(table.rowCount).toBe(8); // 2^3
@@ -69,7 +69,7 @@ describe('TruthTable', () => {
     }
   });
 
-  it('getInputValues — returns correct values per row', () => {
+  it('getInputValues- returns correct values per row', () => {
     const table = new TruthTable([A, B], [Y]);
 
     expect(table.getInputValues(0)).toEqual([0n, 0n]); // AB=00
@@ -86,7 +86,7 @@ describe('TruthTable', () => {
     table.setOutput(0, 0, 1n);
     expect(listener).toHaveBeenCalledTimes(1);
 
-    // Same value — no event
+    // Same value- no event
     table.setOutput(0, 0, 1n);
     expect(listener).toHaveBeenCalledTimes(1);
   });

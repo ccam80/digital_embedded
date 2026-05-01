@@ -90,7 +90,7 @@ describe("InsertSubcircuit", () => {
     // Element A has an output pin at (4, 1).
     // Element B has an input pin at (6, 1).
     // Wire runs from (4, 1) to (6, 1).
-    // Only element A is selected — the wire crosses the boundary.
+    // Only element A is selected- the wire crosses the boundary.
 
     const pinA = makePin("Y", PinDirection.OUTPUT, 4, 1, 2);
     const pinB = makePin("A", PinDirection.INPUT, 6, 1, 2);
@@ -106,7 +106,7 @@ describe("InsertSubcircuit", () => {
 
     const result = analyzeBoundary(circuit, [elementA], []);
 
-    // Returns BoundaryPort[] — no direction field
+    // Returns BoundaryPort[]- no direction field
     expect(result.boundaryPorts).toHaveLength(1);
     const port = result.boundaryPorts[0] as BoundaryPort;
     expect(port.wire).toBe(wire);
@@ -133,7 +133,7 @@ describe("InsertSubcircuit", () => {
     const wire = new Wire({ x: 4, y: 1 }, { x: 6, y: 1 });
     circuit.addWire(wire);
 
-    // Both elements are selected — wire is internal.
+    // Both elements are selected- wire is internal.
     const result = analyzeBoundary(circuit, [elementA, elementB], [wire]);
 
     expect(result.internalWires).toHaveLength(1);
@@ -185,7 +185,7 @@ describe("InsertSubcircuit", () => {
     const wire = new Wire({ x: 4, y: 1 }, { x: 6, y: 1 });
     circuit.addWire(wire);
 
-    // Both elements selected — wire is internal, no boundary crossings.
+    // Both elements selected- wire is internal, no boundary crossings.
     const result = analyzeBoundary(circuit, [elementA, elementB], []);
 
     expect(result.boundaryPorts).toHaveLength(0);
@@ -193,7 +193,7 @@ describe("InsertSubcircuit", () => {
   });
 
   it("extractedSubcircuit_containsPortElements_notInOut", () => {
-    // Element A output pin at (4, 1) — one boundary crossing.
+    // Element A output pin at (4, 1)- one boundary crossing.
     const pinA = makePin("Y", PinDirection.OUTPUT, 4, 1);
     const elementA = makeTestElement("el-A", [pinA]);
 
@@ -272,7 +272,7 @@ describe("InsertSubcircuit", () => {
     const boundaryWire = new Wire({ x: 4, y: 1 }, { x: 6, y: 1 });
     circuit.addWire(boundaryWire);
 
-    // Only elementA is selected — boundaryWire crosses the boundary.
+    // Only elementA is selected- boundaryWire crosses the boundary.
     const { command } = insertAsSubcircuit(circuit, [elementA], []);
 
     // Execute removes elementA and the boundary wire.
@@ -359,7 +359,7 @@ describe("InsertSubcircuit", () => {
 
   it("instancePlacement_boundaryWiresReconnectedToSubcircuitPins", () => {
     // elementA at (0,0) with output pin at (4,1).
-    // elementB at (8,0) with input pin at (6,1) — external.
+    // elementB at (8,0) with input pin at (6,1)- external.
     // Boundary wire: (4,1) → (6,1).
     // After execute(), the reconnected wire must connect the external endpoint
     // (6,1) to the subcircuit instance's pin for label "Y".
@@ -393,7 +393,7 @@ describe("InsertSubcircuit", () => {
   });
 
   it("instancePlacement_positionedAtCentroidOfSelection", () => {
-    // Two elements at (0,0) and (4,0) — centroid is (2,0).
+    // Two elements at (0,0) and (4,0)- centroid is (2,0).
     const pinA = makePin("out", PinDirection.OUTPUT, 2, 0);
     const pinC = makePin("in", PinDirection.INPUT, 8, 0);
     const elementA = makeTestElement("el-A", [pinA]);
@@ -413,7 +413,7 @@ describe("InsertSubcircuit", () => {
 
     const { instance } = insertAsSubcircuit(circuit, [elementA, elementA2], [], undefined, "SC2");
 
-    // Centroid of (0,0) and (4,0) is (2,0) — grid-snapped stays (2,0).
+    // Centroid of (0,0) and (4,0) is (2,0)- grid-snapped stays (2,0).
     expect(instance.position).toEqual({ x: 2, y: 0 });
   });
 });

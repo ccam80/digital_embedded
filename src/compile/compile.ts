@@ -1,17 +1,17 @@
 /**
- * Unified compilation entry point — Phase 3.
+ * Unified compilation entry point- Phase 3.
  *
  * Orchestrates the full pipeline from a visual Circuit to a
  * CompiledCircuitUnified containing compiled digital and/or analog domains,
  * bridge adapters, wire-to-signal and label-to-signal maps, and diagnostics.
  *
  * Pipeline (spec Section 4 flowchart):
- *  1. resolveModelAssignments  — assign each component to a domain
- *  2. flattenCircuit           — inline same-domain subcircuits
- *  3. extractConnectivityGroups — unified netlist extraction
- *  4. partitionByDomain        — split into digital/analog partitions + bridges
- *  5. compileDigitalPartition  — compile digital domain (if non-empty)
- *  6. compileAnalogPartition   — compile analog domain (if non-empty)
+ *  1. resolveModelAssignments - assign each component to a domain
+ *  2. flattenCircuit          - inline same-domain subcircuits
+ *  3. extractConnectivityGroups- unified netlist extraction
+ *  4. partitionByDomain       - split into digital/analog partitions + bridges
+ *  5. compileDigitalPartition - compile digital domain (if non-empty)
+ *  6. compileAnalogPartition  - compile analog domain (if non-empty)
  *  7. Build bridge cross-reference map
  *  8. Build wireSignalMap
  *  9. Build labelSignalMap
@@ -38,7 +38,7 @@ import type {
 import type { Diagnostic } from "./types.js";
 
 // ---------------------------------------------------------------------------
-// compileUnified — public entry point
+// compileUnified- public entry point
 // ---------------------------------------------------------------------------
 
 /**
@@ -68,7 +68,7 @@ export function compileUnified(
 
   let circuit: Circuit;
 
-  // Only flatten when there are subcircuit elements — flattening creates new
+  // Only flatten when there are subcircuit elements- flattening creates new
   // Wire objects which would break wireToNetId identity for callers that hold
   // references to the original Wire instances.
   const hasSubcircuits = inputCircuit.elements.some(isSubcircuitHost);
@@ -106,7 +106,7 @@ export function compileUnified(
       if (INFRASTRUCTURE_TYPES.has(el.typeId)) continue;
       if (registry.get(el.typeId) === undefined) {
         throw new Error(
-          `unknown component type "${el.typeId}" — ` +
+          `unknown component type "${el.typeId}"- ` +
           `register this component type before compiling`,
         );
       }
@@ -132,7 +132,7 @@ export function compileUnified(
   diagnostics.push(...overrideDiags);
 
   // -------------------------------------------------------------------------
-  // Step 3b: Apply loading decisions — inject "analog" into loaded nets
+  // Step 3b: Apply loading decisions- inject "analog" into loaded nets
   // -------------------------------------------------------------------------
 
   applyLoadingDecisions(groups, circuit.metadata.digitalPinLoading ?? "cross-domain", perNetLoadingOverrides);
@@ -208,7 +208,7 @@ export function compileUnified(
   }
 
   // Map groupId → analog nodeId via the analog compiler's groupToNodeId.
-  // This is authoritative — it handles zero-wire groups (direct pin overlap)
+  // This is authoritative- it handles zero-wire groups (direct pin overlap)
   // that the old wire-based lookup missed.
   const groupIdToAnalogNodeId = new Map<number, number>();
   if (compiledAnalog !== null) {
@@ -230,8 +230,8 @@ export function compileUnified(
   const pinSignalMap = new Map<string, SignalAddress>();
 
   // Build two coordinate-keyed lookups:
-  //   coordToSignalAddr — keyed by "x,y" for any pin world position in a group
-  //   wireKeyToSignalAddr — keyed by "x1,y1→x2,y2" for flat wire objects in groups
+  //   coordToSignalAddr- keyed by "x,y" for any pin world position in a group
+  //   wireKeyToSignalAddr- keyed by "x1,y1→x2,y2" for flat wire objects in groups
   //
   // flattenCircuit() creates new Wire objects so group.wires differ from
   // circuit.wires by reference. Some wires (e.g. point wires where start==end)
@@ -343,7 +343,7 @@ export function compileUnified(
       const pinLabel = key.substring(colonIdx + 1);
 
       const label = instanceIdToLabel.get(instanceId);
-      if (label === undefined) continue; // unlabeled component — skip
+      if (label === undefined) continue; // unlabeled component- skip
 
       const bitWidth = netId < compiledDigital.netWidths.length
         ? compiledDigital.netWidths[netId] ?? 1

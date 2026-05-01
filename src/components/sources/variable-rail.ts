@@ -10,7 +10,7 @@
  *   C[branch, negNode] -= 1    C[branch, posNode]  += 1
  *   RHS[branch]               = voltage
  *
- * negNode is permanently wired to ground (0) — variable rail has no neg pin.
+ * negNode is permanently wired to ground (0)- variable rail has no neg pin.
  */
 
 import { AbstractCircuitElement } from "../../core/element.js";
@@ -162,7 +162,7 @@ export function makeVariableRailElement(
 ): VariableRailAnalogElement {
   let _voltage = props.getModelParam<number>("voltage");
 
-  // Cached handles — populated in setup(), consumed in load()
+  // Cached handles- populated in setup(), consumed in load()
   let _hPosBr = -1;
   let _hNegBr = -1;
   let _hBrNeg = -1;
@@ -177,15 +177,15 @@ export function makeVariableRailElement(
 
     setup(ctx: SetupContext): void {
       const posNode = element._pinNodes.get("pos")!;
-      const negNode = 0;  // ground — variable rail has no neg pin
+      const negNode = 0;  // ground- variable rail has no neg pin
 
-      // Port of vsrcset.c:40-43 — idempotent branch allocation
+      // Port of vsrcset.c:40-43- idempotent branch allocation
       if (element.branchIndex === -1) {
         element.branchIndex = ctx.makeCur(element.label, "branch");
       }
       const branchNode = element.branchIndex;
 
-      // Port of vsrcset.c:52-55 — TSTALLOC sequence (line-for-line)
+      // Port of vsrcset.c:52-55- TSTALLOC sequence (line-for-line)
       _hPosBr = ctx.solver.allocElement(posNode,    branchNode); // VSRCposNode, VSRCbranch
       _hNegBr = ctx.solver.allocElement(negNode,    branchNode); // VSRCnegNode(=0), VSRCbranch
       _hBrNeg = ctx.solver.allocElement(branchNode, negNode);    // VSRCbranch,  VSRCnegNode(=0)
@@ -222,7 +222,7 @@ export function makeVariableRailElement(
       solver.stampElement(_hNegBr, -1.0);
       solver.stampElement(_hBrPos, +1.0);
       solver.stampElement(_hBrNeg, -1.0);
-      // vsrcload.c:416 — RHS (DC value path: MODEDCOP | MODEDCTRANCURVE with dcGiven)
+      // vsrcload.c:416- RHS (DC value path: MODEDCOP | MODEDCTRANCURVE with dcGiven)
       ctx.rhs[element.branchIndex] += _voltage;
     },
   };

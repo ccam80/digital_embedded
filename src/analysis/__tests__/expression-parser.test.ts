@@ -2,12 +2,12 @@
  * Tests for expression-parser.ts (Task 8.2.4).
  *
  * Covers:
- *   simpleAnd       — "A & B" → correct BoolExpr tree
- *   precedence      — "A | B & C" → OR(A, AND(B,C))
- *   notOperator     — "!A" → NOT(A)
- *   parentheses     — "(A | B) & C" → AND(OR(A,B), C)
- *   syntaxError     — "A & " → error with position
- *   allOperators    — &, *, |, +, !, ~ all recognized
+ *   simpleAnd      - "A & B" → correct BoolExpr tree
+ *   precedence     - "A | B & C" → OR(A, AND(B,C))
+ *   notOperator    - "!A" → NOT(A)
+ *   parentheses    - "(A | B) & C" → AND(OR(A,B), C)
+ *   syntaxError    - "A & " → error with position
+ *   allOperators   - &, *, |, +, !, ~ all recognized
  */
 
 import { describe, expect, it } from 'vitest';
@@ -15,7 +15,7 @@ import { parseExpression, ParseError } from '../expression-parser.js';
 import { exprToString, evaluate } from '../expression.js';
 
 // ---------------------------------------------------------------------------
-// simpleAnd — "A & B" → correct BoolExpr tree
+// simpleAnd- "A & B" → correct BoolExpr tree
 // ---------------------------------------------------------------------------
 
 describe('simpleAnd', () => {
@@ -51,7 +51,7 @@ describe('simpleAnd', () => {
 });
 
 // ---------------------------------------------------------------------------
-// precedence — "A | B & C" → OR(A, AND(B,C))
+// precedence- "A | B & C" → OR(A, AND(B,C))
 // ---------------------------------------------------------------------------
 
 describe('precedence', () => {
@@ -103,7 +103,7 @@ describe('precedence', () => {
 });
 
 // ---------------------------------------------------------------------------
-// notOperator — "!A" → NOT(A)
+// notOperator- "!A" → NOT(A)
 // ---------------------------------------------------------------------------
 
 describe('notOperator', () => {
@@ -136,7 +136,7 @@ describe('notOperator', () => {
 });
 
 // ---------------------------------------------------------------------------
-// parentheses — "(A | B) & C" → AND(OR(A,B), C)
+// parentheses- "(A | B) & C" → AND(OR(A,B), C)
 // ---------------------------------------------------------------------------
 
 describe('parentheses', () => {
@@ -174,7 +174,7 @@ describe('parentheses', () => {
 });
 
 // ---------------------------------------------------------------------------
-// syntaxError — "A & " → error with position
+// syntaxError- "A & " → error with position
 // ---------------------------------------------------------------------------
 
 describe('syntaxError', () => {
@@ -229,7 +229,7 @@ describe('syntaxError', () => {
 });
 
 // ---------------------------------------------------------------------------
-// allOperators — &, *, |, +, !, ~ all recognized
+// allOperators- &, *, |, +, !, ~ all recognized
 // ---------------------------------------------------------------------------
 
 describe('allOperators', () => {

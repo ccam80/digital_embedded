@@ -5,7 +5,7 @@
  * - NFET forwards drain→source when gate is high (unidirectional)
  * - NFET sets highZ on source when gate is low (unidirectional)
  * - TransGate closes when S!=~S and S=1
- * - TransGate burn when S==~S (non-highZ) — treated as open in current implementation
+ * - TransGate burn when S==~S (non-highZ)- treated as open in current implementation
  * - TransGate open when control is highZ
  * - Bidirectional switch triggers bus reconfiguration
  * - Unidirectional NFET not in switchComponentIndices
@@ -221,7 +221,7 @@ describe("SwitchNetwork", () => {
     const highZs = new Uint32Array(6);
 
     state[0] = 1; // S = 1
-    state[1] = 1; // ~S = 1 (invalid — same as S)
+    state[1] = 1; // ~S = 1 (invalid- same as S)
     state[2] = 1; // A = 1
 
     const layout = makeTransGateLayout({
@@ -234,7 +234,7 @@ describe("SwitchNetwork", () => {
 
     executeTransGate(0, state, highZs, layout);
 
-    expect(state[4]).toBe(0); // closedFlag = 0 (open — S == ~S)
+    expect(state[4]).toBe(0); // closedFlag = 0 (open- S == ~S)
     expect(highZs[3]).toBe(0xffffffff); // B is highZ (disconnected)
   });
 
@@ -264,12 +264,12 @@ describe("SwitchNetwork", () => {
 
   it("single_driver_nfet_registered_with_bus_resolver", () => {
     // Single-driver NFET circuit: both switch-pair pins connect to single-driver nets.
-    // Compiler should still register with bus resolver — switches always need it.
+    // Compiler should still register with bus resolver- switches always need it.
 
     // DriverA at (0,0) with output at relative (2,0) => world (2,0)
     // NFET: G input at (0,1.5), D bidir at (3,0), S bidir at (3,3)
     //   placed at (5,0) => G world (5,1.5), D world (8,0), S world (8,3)
-    // Wire from DriverA output (2,0) to NFET G (5,1.5) — but positions must match.
+    // Wire from DriverA output (2,0) to NFET G (5,1.5)- but positions must match.
     // Let's simplify: use matching pin positions.
 
     const driverPins = outputOnlyPin({ x: 2, y: 0 });
@@ -323,10 +323,10 @@ describe("SwitchNetwork", () => {
     const compiled = compileUnified(circuit, registry).digital!;
 
     // All switches are registered with the bus resolver regardless of driver
-    // count — a switch merges/splits nets, so it always needs bus resolution.
+    // count- a switch merges/splits nets, so it always needs bus resolution.
     expect(compiled.switchComponentIndices.length).toBe(1);
 
-    // Check classification — should be bidirectional (2)
+    // Check classification- should be bidirectional (2)
     let nfetIdx = -1;
     for (const [idx, el] of compiled.componentToElement) {
       if (el.typeId === "NFET") nfetIdx = idx;
@@ -370,12 +370,12 @@ describe("SwitchNetwork", () => {
     // NFET at (10, 0): G at (10,1.5), D at (13,0), S at (13,3)
     const elN = createTestElementFromDecls("NFET", "n1", nfetPinDecls, undefined, { x: 10, y: 0 });
 
-    // DriverA at (11,0), output at relative (2,0) => world (13,0) — same as D
+    // DriverA at (11,0), output at relative (2,0) => world (13,0)- same as D
     const elA = createTestElementFromDecls("DriverA", "a1", driverPins, undefined, { x: 11, y: 0 });
     // DriverB at (11,-3), output at relative (2,0) => world (13,-3)
     const elB = createTestElementFromDecls("DriverB", "b1", driverPins, undefined, { x: 11, y: -3 });
 
-    // DriverC at (11,3), output at relative (2,0) => world (13,3) — same as S
+    // DriverC at (11,3), output at relative (2,0) => world (13,3)- same as S
     const elC = createTestElementFromDecls("DriverC", "c1", driverPins, undefined, { x: 11, y: 3 });
     // DriverD at (11,6), output at relative (2,0) => world (13,6)
     const elD = createTestElementFromDecls("DriverD", "d1", driverPins, undefined, { x: 11, y: 6 });
@@ -471,7 +471,7 @@ describe("SwitchNetwork", () => {
 
     // NFET at (10, 0): G at (10,1.5), D at (13,0), S at (13,3)
     const elN = createTestElementFromDecls("NFET", "n1", nfetPinDecls, undefined, { x: 10, y: 0 });
-    // GateDriver output at (10,1.5) — same as G pin
+    // GateDriver output at (10,1.5)- same as G pin
     const elG = createTestElementFromDecls("GateDriver", "g1", driverPins, undefined, { x: 8, y: 1.5 });
 
     circuit.addElement(elN);
@@ -556,7 +556,7 @@ describe("SwitchNetwork", () => {
 
     // Net A should now be 0 (only driver 0 is non-highZ, driving 0)
     expect(state[10]).toBe(0);
-    // Net B should still be 1 (driver 2 is non-highZ, driving 1) — not affected
+    // Net B should still be 1 (driver 2 is non-highZ, driving 1)- not affected
     resolver.onNetChanged(2, state, highZs);
     expect(state[11]).toBe(1);
   });

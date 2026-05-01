@@ -1,5 +1,5 @@
 /**
- * Tests for file-resolver.ts — FileResolver implementations.
+ * Tests for file-resolver.ts- FileResolver implementations.
  */
 
 import { describe, it, expect, vi } from "vitest";
@@ -18,7 +18,7 @@ import {
 // ---------------------------------------------------------------------------
 
 describe("EmbeddedResolver", () => {
-  it("embeddedResolver — resolves name present in embedded map", async () => {
+  it("embeddedResolver- resolves name present in embedded map", async () => {
     const map = new Map([
       ["FullAdder", "<circuit>full adder xml</circuit>"],
       ["HalfAdder", "<circuit>half adder xml</circuit>"],
@@ -37,13 +37,13 @@ describe("EmbeddedResolver", () => {
     expect(content).toBe("<circuit>my xml</circuit>");
   });
 
-  it("embeddedMiss — resolves name not in embedded map throws ResolverNotFoundError", async () => {
+  it("embeddedMiss- resolves name not in embedded map throws ResolverNotFoundError", async () => {
     const resolver = new EmbeddedResolver(new Map());
     await expect(resolver.resolve("Missing")).rejects.toThrow(ResolverNotFoundError);
     await expect(resolver.resolve("Missing")).rejects.toThrow("Missing");
   });
 
-  it("embeddedMiss — error carries the circuit name", async () => {
+  it("embeddedMiss- error carries the circuit name", async () => {
     const resolver = new EmbeddedResolver(new Map([["A", "<circuit/>"]]));
     try {
       await resolver.resolve("NotHere");
@@ -60,7 +60,7 @@ describe("EmbeddedResolver", () => {
 // ---------------------------------------------------------------------------
 
 describe("CacheResolver", () => {
-  it("cacheResolver — resolves from pre-populated cache", async () => {
+  it("cacheResolver- resolves from pre-populated cache", async () => {
     const cache = new CacheResolver(new Map([["SR", "<circuit>sr latch</circuit>"]]));
     const content = await cache.resolve("SR");
     expect(content).toBe("<circuit>sr latch</circuit>");
@@ -73,14 +73,14 @@ describe("CacheResolver", () => {
     expect(content).toBe("<circuit>x</circuit>");
   });
 
-  it("has — returns true for cached name", () => {
+  it("has- returns true for cached name", () => {
     const cache = new CacheResolver();
     cache.set("Y", "<circuit/>");
     expect(cache.has("Y")).toBe(true);
     expect(cache.has("Z")).toBe(false);
   });
 
-  it("size — tracks number of entries", () => {
+  it("size- tracks number of entries", () => {
     const cache = new CacheResolver();
     expect(cache.size).toBe(0);
     cache.set("A", "<circuit/>");
@@ -88,7 +88,7 @@ describe("CacheResolver", () => {
     expect(cache.size).toBe(2);
   });
 
-  it("clear — removes all entries", async () => {
+  it("clear- removes all entries", async () => {
     const cache = new CacheResolver();
     cache.set("A", "<circuit/>");
     cache.clear();
@@ -96,7 +96,7 @@ describe("CacheResolver", () => {
     await expect(cache.resolve("A")).rejects.toThrow(ResolverNotFoundError);
   });
 
-  it("miss — throws ResolverNotFoundError", async () => {
+  it("miss- throws ResolverNotFoundError", async () => {
     const cache = new CacheResolver();
     await expect(cache.resolve("NotCached")).rejects.toThrow(ResolverNotFoundError);
   });
@@ -164,7 +164,7 @@ describe("NodeResolver", () => {
 // ---------------------------------------------------------------------------
 
 describe("ChainResolver", () => {
-  it("chainOrder — chain [embedded, cache], name in cache but not embedded → cache returns it", async () => {
+  it("chainOrder- chain [embedded, cache], name in cache but not embedded → cache returns it", async () => {
     const embedded = new EmbeddedResolver(new Map([["A", "<circuit>A</circuit>"]]));
     const cache = new CacheResolver();
     cache.set("B", "<circuit>B from cache</circuit>");

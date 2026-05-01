@@ -1,5 +1,5 @@
 /**
- * TransGate — CMOS transmission gate.
+ * TransGate- CMOS transmission gate.
  *
  * A bidirectional switch controlled by a complementary pair of gate signals.
  * Closed (A and B connected) when: S=1 AND ~S=0 (S != ~S and S is high).
@@ -89,7 +89,7 @@ const TRANS_GATE_PIN_DECLARATIONS: PinDeclaration[] = [
 ];
 
 // ---------------------------------------------------------------------------
-// TransGateElement — CircuitElement implementation
+// TransGateElement- CircuitElement implementation
 // ---------------------------------------------------------------------------
 
 export class TransGateElement extends AbstractCircuitElement {
@@ -156,7 +156,7 @@ export class TransGateElement extends AbstractCircuitElement {
 }
 
 // ---------------------------------------------------------------------------
-// executeTransGate — flat simulation function
+// executeTransGate- flat simulation function
 //
 // Input layout: [S=0, ~S=1, A=2, B=3]
 // State layout: [closedFlag=0]
@@ -196,7 +196,7 @@ export function executeTransGate(index: number, state: Uint32Array, highZs: Uint
 }
 
 // ---------------------------------------------------------------------------
-// TransGateAnalogElement — MNA composite element
+// TransGateAnalogElement- MNA composite element
 //
 // Composite: two SW sub-elements sharing the same in↔out signal path.
 //   _nfetSW: posNode=inNode, negNode=outNode, control=p1 (ctrl pin)
@@ -204,7 +204,7 @@ export function executeTransGate(index: number, state: Uint32Array, highZs: Uint
 //   _pfetSW: posNode=inNode, negNode=outNode, control=p2 (ctrlN pin, inverted)
 //            ON when V(p2) < Vth_p (implemented as inverted control voltage)
 //
-// setup() calls _nfetSW.setup(ctx) then _pfetSW.setup(ctx) — NFET first per
+// setup() calls _nfetSW.setup(ctx) then _pfetSW.setup(ctx)- NFET first per
 // A6.4 sub-element ordering rule (both are SW, same NGSPICE_LOAD_ORDER; NFET
 // sub-element is first by construction order, matching PB-TRANSGATE TSTALLOC table).
 //
@@ -363,7 +363,7 @@ export const TransGateDefinition: ComponentDefinition = {
   propertyDefs: TRANS_GATE_PROPERTY_DEFS,
   attributeMap: TRANS_GATE_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.SWITCHING,
-  helpText: "TransGate — CMOS transmission gate. S=1, ~S=0 → A and B connected.",
+  helpText: "TransGate- CMOS transmission gate. S=1, ~S=0 → A and B connected.",
   models: {
     digital: {
       executeFn: executeTransGate,

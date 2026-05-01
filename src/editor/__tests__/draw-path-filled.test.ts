@@ -24,7 +24,7 @@ import { PropertyBag } from "@/core/properties";
 import type { PropertyValue } from "@/core/properties";
 
 // ---------------------------------------------------------------------------
-// StubCanvas2D — records canvas method calls
+// StubCanvas2D- records canvas method calls
 // ---------------------------------------------------------------------------
 
 interface CtxCall {
@@ -115,7 +115,7 @@ const SIMPLE_PATH: PathData = {
 };
 
 // ---------------------------------------------------------------------------
-// CanvasRenderer.drawPath — filled parameter
+// CanvasRenderer.drawPath- filled parameter
 // ---------------------------------------------------------------------------
 
 describe("CanvasRenderer.drawPath", () => {
@@ -159,7 +159,7 @@ describe("CanvasRenderer.drawPath", () => {
 });
 
 // ---------------------------------------------------------------------------
-// SVGRenderContext.drawPath — filled parameter
+// SVGRenderContext.drawPath- filled parameter
 // ---------------------------------------------------------------------------
 
 describe("SVGRenderContext.drawPath", () => {
@@ -208,7 +208,7 @@ describe("SVGRenderContext.drawPath", () => {
 });
 
 // ---------------------------------------------------------------------------
-// IEEE gate shapes — fill pass uses filled=true
+// IEEE gate shapes- fill pass uses filled=true
 // ---------------------------------------------------------------------------
 
 function makeProps(overrides: Record<string, PropertyValue>): PropertyBag {

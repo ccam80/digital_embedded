@@ -9,7 +9,7 @@
 
 ## Pin mapping (from 01-pin-mapping.md)
 
-The transformer composite does not get an `ngspiceNodeMap` on `ComponentDefinition` — it decomposes into sub-elements.
+The transformer composite does not get an `ngspiceNodeMap` on `ComponentDefinition`- it decomposes into sub-elements.
 
 Sub-element maps:
 - `L1` (primary winding IND): `{ P1: "pos", P2: "neg" }`
@@ -29,7 +29,7 @@ None. Neither IND nor MUT allocates internal voltage nodes via `CKTmkVolt`.
 
 ## Branch rows
 
-Two branch rows — one per inductor winding:
+Two branch rows- one per inductor winding:
 - `L1.branchIndex`: allocated via `ctx.makeCur(l1.label, "branch")` in `L1.setup(ctx)`
 - `L2.branchIndex`: allocated via `ctx.makeCur(l2.label, "branch")` in `L2.setup(ctx)`
 
@@ -47,7 +47,7 @@ Total: 4 state slots.
 
 ## TSTALLOC sequence (line-for-line port)
 
-### L1 setup — indsetup.c:96-100
+### L1 setup- indsetup.c:96-100
 
 L1 uses pins `P1` (posNode) and `P2` (negNode), branch row `b1 = L1.branchIndex`:
 
@@ -59,7 +59,7 @@ L1 uses pins `P1` (posNode) and `P2` (negNode), branch row `b1 = L1.branchIndex`
 | 4 | `(INDbrEq, INDposNode)` | `(b1, p1Node)` | `_hIbrP` |
 | 5 | `(INDbrEq, INDbrEq)` | `(b1, b1)` | `_hIbrIbr` |
 
-### L2 setup — indsetup.c:96-100
+### L2 setup- indsetup.c:96-100
 
 L2 uses pins `S1` (posNode) and `S2` (negNode), branch row `b2 = L2.branchIndex`:
 
@@ -71,7 +71,7 @@ L2 uses pins `S1` (posNode) and `S2` (negNode), branch row `b2 = L2.branchIndex`
 | 9 | `(INDbrEq, INDposNode)` | `(b2, s1Node)` | `_hIbrP` |
 | 10 | `(INDbrEq, INDbrEq)` | `(b2, b2)` | `_hIbrIbr` |
 
-### MUT setup — mutsetup.c:66-67
+### MUT setup- mutsetup.c:66-67
 
 MUT reads `MUTind1->INDbrEq` = `L1.branchIndex` and `MUTind2->INDbrEq` = `L2.branchIndex`:
 
@@ -80,7 +80,7 @@ MUT reads `MUTind1->INDbrEq` = `L1.branchIndex` and `MUTind2->INDbrEq` = `L2.bra
 | 11 | `(MUTind1->INDbrEq, MUTind2->INDbrEq)` | `(b1, b2)` | `_hBr1Br2` |
 | 12 | `(MUTind2->INDbrEq, MUTind1->INDbrEq)` | `(b2, b1)` | `_hBr2Br1` |
 
-## setup() body — alloc only
+## setup() body- alloc only
 
 ### Composite `AnalogTransformerElement.setup(ctx)`
 
@@ -89,7 +89,7 @@ setup(ctx: SetupContext): void {
   // Composite setup: call sub-elements in order L1, L2, MUT.
   // Ordering invariant: _l1.setup() and _l2.setup() MUST complete before
   // _mut.setup() is called, because _mut reads _l1.branchIndex and
-  // _l2.branchIndex (set during IND setup) directly — no findDevice needed.
+  // _l2.branchIndex (set during IND setup) directly- no findDevice needed.
   this._l1.setup(ctx);
   this._l2.setup(ctx);
   this._mut.setup(ctx);
@@ -154,17 +154,17 @@ export class InductorSubElement implements PoolBackedAnalogElementCore {
 ```
 
 `INDUCTOR_SUB_SCHEMA` reuses the 2-slot ngspice schema (`INDflux` =
-state[0], `INDvolt` = state[1]) — same semantics as PB-IND. Implementer
+state[0], `INDvolt` = state[1])- same semantics as PB-IND. Implementer
 imports `INDUCTOR_SCHEMA` from `inductor.ts` if the constant is exported
 there post-PB-IND, otherwise defines a local 2-slot schema with the same
 slot names.
 
-`InductorSubElement` does NOT store a `_pinNodes` map — it stores
+`InductorSubElement` does NOT store a `_pinNodes` map- it stores
 `_posNode` and `_negNode` directly via constructor args. The composite
 (`AnalogTransformerElement` / `AnalogTappedTransformerElement`) owns
 the user-facing `_pinNodes: Map<string, number>` per A3 invariant.
 
-#### setup() — alloc only
+#### setup()- alloc only
 
 ```ts
 setup(ctx: SetupContext): void {
@@ -172,15 +172,15 @@ setup(ctx: SetupContext): void {
   const posNode = this._posNode;
   const negNode = this._negNode;
 
-  // indsetup.c:78-79 — *states += 2 (INDflux + INDvolt slots)
+  // indsetup.c:78-79- *states += 2 (INDflux + INDvolt slots)
   // The composite does NOT call ctx.allocStates() for sub-element pools;
   // each sub-element calls it via its own setup(). The composite's
   // stateSize aggregates from sub-elements but does not own slots.
   // Here we let the engine assign stateBaseOffset later (in _setup()
   // post-setup walk); this method only marks the state-slot count.
   // Implementer note: if MNAEngine._setup() walks sub-elements
-  // recursively for state-pool allocation (per 00-engine.md §A5.1),
-  // skip the explicit allocStates here — the engine handles it.
+  // recursively for state-pool allocation (per 00-engine.md ssA5.1),
+  // skip the explicit allocStates here- the engine handles it.
   // Otherwise the composite calls ctx.allocStates(this.stateSize) on
   // behalf of each sub-element. The choice depends on engine policy;
   // per current `mutual-inductor.ts:45` the sub-element calls allocStates
@@ -189,13 +189,13 @@ setup(ctx: SetupContext): void {
     this.stateBaseOffset = ctx.allocStates(2);
   }
 
-  // indsetup.c:84-88 — CKTmkCur (idempotent guard)
+  // indsetup.c:84-88- CKTmkCur (idempotent guard)
   if (this.branchIndex === -1) {
     this.branchIndex = ctx.makeCur(this._label, "branch");
   }
   const b = this.branchIndex;
 
-  // indsetup.c:96-100 — TSTALLOC sequence, line-for-line.
+  // indsetup.c:96-100- TSTALLOC sequence, line-for-line.
   this._hPIbr   = solver.allocElement(posNode, b);
   this._hNIbr   = solver.allocElement(negNode, b);
   this._hIbrN   = solver.allocElement(b, negNode);
@@ -204,7 +204,7 @@ setup(ctx: SetupContext): void {
 }
 ```
 
-#### initState — engine state-pool hook
+#### initState- engine state-pool hook
 
 ```ts
 initState(pool: StatePoolRef): void {
@@ -216,7 +216,7 @@ initState(pool: StatePoolRef): void {
 }
 ```
 
-#### load() — value writes only
+#### load()- value writes only
 
 ```ts
 load(ctx: LoadContext): void {
@@ -224,20 +224,20 @@ load(ctx: LoadContext): void {
   // No solver.allocElement calls.
   // State-slot reads/writes via this.s0..s3 (typed-array refs bound by
   // initState). The composite's load() body delegates to this method via
-  // this._l1.load(ctx) / this._l2.load(ctx) etc. — the composite does
+  // this._l1.load(ctx) / this._l2.load(ctx) etc.- the composite does
   // not stamp through these handles directly; sub-elements own their
   // handles privately and stamp through them inside this load() body.
   // ...full indload.c body, line-for-line, using cached handles only...
 }
 ```
 
-The full `load()` body is the line-for-line indload.c port — same as
+The full `load()` body is the line-for-line indload.c port- same as
 PB-IND's `load()` body. The implementer copies the body from the
 post-PB-IND `AnalogInductorElement.load()` and adapts to this class's
 field names (`_inductance` instead of `params.L`; `s0`..`s3` typed
 arrays at slot indices 0/1 for INDflux/INDvolt).
 
-#### getLteTimestep — adaptive time-step contribution
+#### getLteTimestep- adaptive time-step contribution
 
 ```ts
 getLteTimestep(
@@ -247,7 +247,7 @@ getLteTimestep(
   method: IntegrationMethod,
   lteParams: LteParams,
 ): number {
-  // Same body as PB-IND — call cktTerr with (INDflux current, prev,
+  // Same body as PB-IND- call cktTerr with (INDflux current, prev,
   // prev-prev, prev-prev-prev) state-slot reads.
   // ...full body, identical to AnalogInductorElement.getLteTimestep...
 }
@@ -263,7 +263,7 @@ setParam(key: string, value: number): void {
   if (key === "L" || key === "inductance") {
     this._inductance = value;
   }
-  // Other keys silently ignored — matches PB-IND setParam guard.
+  // Other keys silently ignored- matches PB-IND setParam guard.
 }
 ```
 
@@ -282,26 +282,26 @@ findBranchFor(name: string, ctx: SetupContext): number {
 #### Field summary
 
 ```ts
-branchIndex: number = -1;          // public — composite reads to construct MUT
+branchIndex: number = -1;          // public- composite reads to construct MUT
 private _hPIbr:   number = -1;
 private _hNIbr:   number = -1;
 private _hIbrN:   number = -1;
 private _hIbrP:   number = -1;
 private _hIbrIbr: number = -1;
 stateBaseOffset: number = -1;
-// (no public getters — composite does not stamp through sub-element
+// (no public getters- composite does not stamp through sub-element
 //  handles; sub-element's own load() does all stamping)
 ```
 
 The `branchIndex` field is **public** so `MutualInductorElement.setup()`
 can read `_l1.branchIndex` / `_l2.branchIndex`. All other handles are
-private — the composite does NOT stamp through sub-element handles.
+private- the composite does NOT stamp through sub-element handles.
 
 ### New class `MutualInductorElement` (in `mutual-inductor.ts`)
 
 Coupling element between two `InductorSubElement` instances. Reads
 branch indices from constructor-stored sub-inductor refs. Not pool-backed
-(MUT allocates no state slots — `mutsetup.c:28` calls `NG_IGNORE(states)`).
+(MUT allocates no state slots- `mutsetup.c:28` calls `NG_IGNORE(states)`).
 
 This spec covers the **complete external surface** of `MutualInductorElement`.
 
@@ -327,7 +327,7 @@ This matches `mutsetup.c:28` (`NG_IGNORE(states)`).
 
 ```ts
 export class MutualInductorElement implements AnalogElementCore {
-  branchIndex: number = -1;                  // unused — MUT has no branch row
+  branchIndex: number = -1;                  // unused- MUT has no branch row
   readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.MUT;
   readonly isNonlinear: false = false;
   readonly isReactive: false = false;
@@ -336,17 +336,17 @@ export class MutualInductorElement implements AnalogElementCore {
 }
 ```
 
-`MutualInductorElement` does NOT store a `_pinNodes` map — it reads from
+`MutualInductorElement` does NOT store a `_pinNodes` map- it reads from
 its `_l1` / `_l2` refs directly. The composite owns the user-facing
 `_pinNodes` map.
 
-#### setup() — alloc only
+#### setup()- alloc only
 
 ```ts
 setup(ctx: SetupContext): void {
   const solver = ctx.solver;
 
-  // mutsetup.c:44-57 — resolve inductor references via constructor-stored
+  // mutsetup.c:44-57- resolve inductor references via constructor-stored
   // refs (no CKTfndDev needed; composite owns the refs).
   // Pre-condition: both _l1.setup(ctx) and _l2.setup(ctx) MUST have run
   // before this method, so branchIndex is populated. Composite enforces
@@ -357,13 +357,13 @@ setup(ctx: SetupContext): void {
     throw new Error("MutualInductorElement.setup(): branchIndex not yet allocated on sub-inductor");
   }
 
-  // mutsetup.c:66-67 — TSTALLOC sequence, 2 entries.
+  // mutsetup.c:66-67- TSTALLOC sequence, 2 entries.
   this._hBr1Br2 = solver.allocElement(b1, b2);
   this._hBr2Br1 = solver.allocElement(b2, b1);
 }
 ```
 
-#### load() — value writes only
+#### load()- value writes only
 
 ```ts
 load(ctx: LoadContext): void {
@@ -403,7 +403,7 @@ get statePoolForMut(): { s0: Float64Array; s1: Float64Array; ... ; stateBaseOffs
 These getters are scoped to mutual-inductor.ts and have no consumers
 outside that file. They are NOT the same as the out-of-spec public
 getters previously appended to mutual-inductor.ts during the partial
-PB-TAPXFMR run — those exposed handle fields (`hPIbr`, `hNIbr`, etc.)
+PB-TAPXFMR run- those exposed handle fields (`hPIbr`, `hNIbr`, etc.)
 and were used to bypass the missing `load()` method on the sub-element.
 After this spec patch, the `load()` method is on the sub-element class
 itself; handles never need to leave the class.
@@ -438,7 +438,7 @@ private _hBr2Br1: number = -1;
 
 No public getters. No pool participation.
 
-## load() body — value writes only
+## load() body- value writes only
 
 The composite's `AnalogTransformerElement.load(ctx)` body delegates to
 sub-elements:
@@ -456,7 +456,7 @@ load(ctx: LoadContext): void {
 
 Each sub-element's `load()` body is specified in its class section above
 (InductorSubElement.load and MutualInductorElement.load). The composite
-contributes no stamping of its own — all `solver.stampElement` calls live
+contributes no stamping of its own- all `solver.stampElement` calls live
 inside the sub-elements.
 
 ## Composite getLteTimestep
@@ -482,7 +482,7 @@ getLteTimestep(
 
 `AnalogTransformerElement` owns `_pinNodes: Map<string, number>` per the
 A3 invariant. Sub-elements (`InductorSubElement`, `MutualInductorElement`)
-do NOT carry their own `_pinNodes` maps — they store node ids directly
+do NOT carry their own `_pinNodes` maps- they store node ids directly
 via constructor args and read sub-inductor refs as needed. The composite's
 `_pinNodes` is populated at construction with all four user-facing pin
 labels (`P1`, `P2`, `S1`, `S2`).
@@ -509,11 +509,11 @@ Factory signature changes:
 
 Per CLAUDE.md "Test Policy During W3 Setup-Load-Split", verification is spec compliance only. DO NOT run tests; DO NOT use test results.
 
-1. `setup()` body in the implementation file matches the "setup() body — alloc only" listing in this PB line-for-line.
+1. `setup()` body in the implementation file matches the "setup() body- alloc only" listing in this PB line-for-line.
 2. TSTALLOC sequence in `setup()` matches the order in the cited ngspice anchor file (see top of this PB, e.g. `ressetup.c:46-49`).
 3. Factory cleanup applied per the "Factory cleanup" section above.
 4. `ngspiceNodeMap` registered per the "Pin mapping" section above (or omitted for composites where the spec says so).
-5. `load()` writes through cached handles only — zero `solver.allocElement(...)` calls inside `load()`, `accept()`, or any non-`setup()` method.
+5. `load()` writes through cached handles only- zero `solver.allocElement(...)` calls inside `load()`, `accept()`, or any non-`setup()` method.
 6. `mayCreateInternalNodes` flag set per spec.
 7. `findBranchFor` callback present where spec says (V-output sources, IND, etc.).
 8. No banned closing verdicts (mapping/tolerance/equivalent-to/pre-existing/intentional-divergence/citation-divergence/partial) used in any commit message or report.

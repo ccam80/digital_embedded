@@ -1,5 +1,5 @@
 /**
- * Engine interface — pluggable simulation contract.
+ * Engine interface- pluggable simulation contract.
  *
  * The editor and renderer always call through this interface. The concrete
  * implementation may run on the main thread or in a Web Worker backed by
@@ -16,7 +16,7 @@ import type { BitVector } from "./signal";
 export type { BitVector };
 
 // ---------------------------------------------------------------------------
-// CompiledCircuit — opaque input produced by the compiler (Phase 3)
+// CompiledCircuit- opaque input produced by the compiler (Phase 3)
 // ---------------------------------------------------------------------------
 
 /**
@@ -34,7 +34,7 @@ export interface CompiledCircuit {
 }
 
 // ---------------------------------------------------------------------------
-// EngineState — lifecycle state of the simulation engine
+// EngineState- lifecycle state of the simulation engine
 // ---------------------------------------------------------------------------
 
 /** Current execution state of a SimulationEngine. */
@@ -46,7 +46,7 @@ export const enum EngineState {
 }
 
 // ---------------------------------------------------------------------------
-// EngineChangeListener — observation callback
+// EngineChangeListener- observation callback
 // ---------------------------------------------------------------------------
 
 /**
@@ -56,7 +56,7 @@ export const enum EngineState {
 export type EngineChangeListener = (state: EngineState) => void;
 
 // ---------------------------------------------------------------------------
-// SimulationEvent — event in the event-driven engine's priority queue
+// SimulationEvent- event in the event-driven engine's priority queue
 // ---------------------------------------------------------------------------
 
 /**
@@ -76,7 +76,7 @@ export interface SimulationEvent {
 }
 
 // ---------------------------------------------------------------------------
-// MeasurementObserver — observation interface for data table / measurement panel
+// MeasurementObserver- observation interface for data table / measurement panel
 // ---------------------------------------------------------------------------
 
 /**
@@ -94,7 +94,7 @@ export interface MeasurementObserver {
 }
 
 // ---------------------------------------------------------------------------
-// EngineMessage — Worker-safe command envelope
+// EngineMessage- Worker-safe command envelope
 // ---------------------------------------------------------------------------
 
 /**
@@ -159,7 +159,7 @@ export type EngineMessage =
     };
 
 // ---------------------------------------------------------------------------
-// EngineResponse — replies posted back from the Worker to the main thread
+// EngineResponse- replies posted back from the Worker to the main thread
 // ---------------------------------------------------------------------------
 
 /**
@@ -172,7 +172,7 @@ export type EngineResponse =
   | { type: "breakpoint" };
 
 // ---------------------------------------------------------------------------
-// Snapshot API — time-travel state capture
+// Snapshot API- time-travel state capture
 // ---------------------------------------------------------------------------
 
 /**
@@ -182,7 +182,7 @@ export type EngineResponse =
 export type SnapshotId = number;
 
 // ---------------------------------------------------------------------------
-// Engine — base simulation contract (Phase 0, Task 0.1.1)
+// Engine- base simulation contract (Phase 0, Task 0.1.1)
 // ---------------------------------------------------------------------------
 
 /**
@@ -193,7 +193,7 @@ export type SnapshotId = number;
  * extend this base with backend-specific methods.
  *
  * Implementations must be pluggable and engine-agnostic to the editor and
- * renderer — no simulation logic in the UI layer.
+ * renderer- no simulation logic in the UI layer.
  */
 export interface Engine {
   // -------------------------------------------------------------------------
@@ -209,7 +209,7 @@ export interface Engine {
 
   /**
    * Reset all signal values to their initial state and transition to STOPPED.
-   * Does not reinitialise the compiled circuit — the same circuit remains active.
+   * Does not reinitialise the compiled circuit- the same circuit remains active.
    */
   reset(): void;
 
@@ -266,7 +266,7 @@ export interface Engine {
 }
 
 // ---------------------------------------------------------------------------
-// SimulationEngine — digital-specific simulation contract
+// SimulationEngine- digital-specific simulation contract
 // ---------------------------------------------------------------------------
 
 /**
@@ -281,7 +281,7 @@ export interface Engine {
  *  - Web Worker engine: runs in a Worker; signal array is backed by SharedArrayBuffer;
  *    UI reads signals through Atomics.load() via getSignalRaw().
  *
- * The rendering code is identical in both modes — it always calls getSignalRaw().
+ * The rendering code is identical in both modes- it always calls getSignalRaw().
  */
 export interface SimulationEngine extends Engine {
   // -------------------------------------------------------------------------
@@ -349,7 +349,7 @@ export interface SimulationEngine extends Engine {
   removeMeasurementObserver(observer: MeasurementObserver): void;
 
   // -------------------------------------------------------------------------
-  // Snapshot API — state capture and time-travel restore
+  // Snapshot API- state capture and time-travel restore
   // -------------------------------------------------------------------------
 
   /**

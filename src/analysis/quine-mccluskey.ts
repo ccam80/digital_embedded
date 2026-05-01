@@ -10,7 +10,7 @@
  *  3. Select a minimal cover: the smallest set of prime implicants that
  *     covers all non-don't-care minterms.
  *  4. Report all minimal covers of the same minimum size (Petrick's method
- *     via exhaustive search — bounded to ≤31 available primes).
+ *     via exhaustive search- bounded to ≤31 available primes).
  *  5. Build BoolExpr trees from the selected cover.
  */
 

@@ -1,5 +1,5 @@
 /**
- * Parity tests — mirror headless integration tests but run in a real browser
+ * Parity tests- mirror headless integration tests but run in a real browser
  * via the postMessage API.
  *
  * These catch the blind spot where the headless facade works fine but the
@@ -23,7 +23,7 @@ test.describe('Parity: load and simulate via postMessage', () => {
     await harness.load();
   });
 
-  test('AND gate — load .dig and run test vectors', async () => {
+  test('AND gate- load .dig and run test vectors', async () => {
     const xml = readFileSync(resolve(circuitsDir, 'and-gate.dig'), 'utf-8');
     await harness.loadDigXml(xml);
 
@@ -32,7 +32,7 @@ test.describe('Parity: load and simulate via postMessage', () => {
     expect(result.failed).toBe(0);
   });
 
-  test('Half adder — load .dig and run test vectors', async () => {
+  test('Half adder- load .dig and run test vectors', async () => {
     const xml = readFileSync(resolve(circuitsDir, 'half-adder.dig'), 'utf-8');
     await harness.loadDigXml(xml);
 
@@ -43,7 +43,7 @@ test.describe('Parity: load and simulate via postMessage', () => {
     expect(result.failed).toBe(0);
   });
 
-  test('AND gate — load via URL and run test vectors', async () => {
+  test('AND gate- load via URL and run test vectors', async () => {
     await harness.loadDigUrl('/circuits/and-gate.dig');
 
     const result = await harness.runTests('A B Y\n0 0 0\n0 1 0\n1 0 0\n1 1 1');
@@ -51,7 +51,7 @@ test.describe('Parity: load and simulate via postMessage', () => {
     expect(result.failed).toBe(0);
   });
 
-  test('AND gate — failing test vector detected', async () => {
+  test('AND gate- failing test vector detected', async () => {
     const xml = readFileSync(resolve(circuitsDir, 'and-gate.dig'), 'utf-8');
     await harness.loadDigXml(xml);
 
@@ -61,7 +61,7 @@ test.describe('Parity: load and simulate via postMessage', () => {
     expect(result.failed).toBe(1);
   });
 
-  test('get-circuit round-trip — export produces dts-json-base64 format', async () => {
+  test('get-circuit round-trip- export produces dts-json-base64 format', async () => {
     const xml = readFileSync(resolve(circuitsDir, 'and-gate.dig'), 'utf-8');
     await harness.loadDigXml(xml);
 
@@ -79,7 +79,7 @@ test.describe('Parity: load and simulate via postMessage', () => {
     expect(parsed.version).toBe(1);
   });
 
-  test('get-circuit round-trip — export then reimport preserves circuit', async () => {
+  test('get-circuit round-trip- export then reimport preserves circuit', async () => {
     const xml = readFileSync(resolve(circuitsDir, 'and-gate.dig'), 'utf-8');
     await harness.loadDigXml(xml);
 
@@ -93,7 +93,7 @@ test.describe('Parity: load and simulate via postMessage', () => {
     expect(result.passed).toBe(4);
   });
 
-  test('sim-get-circuit / sim-load-data — modelParamDeltas survive round-trip', async () => {
+  test('sim-get-circuit / sim-load-data- modelParamDeltas survive round-trip', async () => {
     // Build a minimal DTS circuit with a NpnBJT, a model entry, and a BF delta.
     // The DTS JSON is constructed inline so no file I/O is needed in the browser.
     const dtsWithDelta = JSON.stringify({
@@ -103,7 +103,7 @@ test.describe('Parity: load and simulate via postMessage', () => {
         NpnBJT: {
           '2N2222': {
             kind: 'inline',
-            // Full spice-l1 param set — use '_inf' sentinel for Infinity
+            // Full spice-l1 param set- use '_inf' sentinel for Infinity
             // (JSON.stringify nullifies Infinity; the DTS deserializer decodes
             // both '_inf' and null back to Infinity).
             params: {

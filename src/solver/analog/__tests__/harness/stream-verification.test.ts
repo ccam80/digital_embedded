@@ -84,7 +84,7 @@ describeGate("Stream Verification -- full pipeline (HWR square wave)", () => {
   });
 
   it("4. integration coefficients: ag0 non-zero for transient steps", () => {
-    // Spec §9.5: target tranFloat steps only. Step 0 (merged boot, analysisPhase="tranInit")
+    // Spec ss9.5: target tranFloat steps only. Step 0 (merged boot, analysisPhase="tranInit")
     // uses backward-Euler (ag1=0), so it must be excluded. Trapezoidal coefficients with
     // both ag0 and ag1 non-zero appear from the first tranFloat step onward.
     const ourSteps = session.ourSession!.steps;
@@ -112,7 +112,7 @@ describeGate("Stream Verification -- full pipeline (HWR square wave)", () => {
   });
 
   it("5. integration coefficients: method transitions to trapezoidal", () => {
-    // Spec §9.5: scan tranFloat steps only. Step 0 (analysisPhase="tranInit") uses
+    // Spec ss9.5: scan tranFloat steps only. Step 0 (analysisPhase="tranInit") uses
     // backward-Euler regardless; trapezoidal appears from tranFloat steps onward.
     const ourSteps = session.ourSession!.steps;
     const tranFloatSteps = ourSteps.filter(
@@ -176,7 +176,7 @@ describeGate("Stream Verification -- full pipeline (HWR square wave)", () => {
     const ourSteps = bjtSession.ourSession!.steps;
     expect(ourSteps.length).toBeGreaterThan(0);
 
-    // buckbjt has convergence failures — find any step/iteration with
+    // buckbjt has convergence failures- find any step/iteration with
     // non-empty convergenceFailedElements (requires detailedConvergence=true)
     let foundFailure = false;
     for (const step of ourSteps) {

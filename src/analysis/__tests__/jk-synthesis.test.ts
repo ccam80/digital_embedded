@@ -48,7 +48,7 @@ function evalExprDirect(
 // ---------------------------------------------------------------------------
 
 describe('jk-synthesis', () => {
-  it('toggleFlipflop — single state bit always toggling → J=1, K=1', () => {
+  it('toggleFlipflop- single state bit always toggling → J=1, K=1', () => {
     const table: StateTransitionTable = {
       stateVars: [{ name: 'Q', bitWidth: 1 }],
       inputs: [],
@@ -87,7 +87,7 @@ describe('jk-synthesis', () => {
   // After minimisation: J=D, K=!D
   // -------------------------------------------------------------------------
 
-  it('dTypeFromJK — D flip-flop equivalent → J=D, K=!D', () => {
+  it('dTypeFromJK- D flip-flop equivalent → J=D, K=!D', () => {
     const table: StateTransitionTable = {
       stateVars: [{ name: 'Q', bitWidth: 1 }],
       inputs: [{ name: 'D', bitWidth: 1 }],
@@ -141,7 +141,7 @@ describe('jk-synthesis', () => {
   // → J1=Q0, K1=Q0
   // -------------------------------------------------------------------------
 
-  it('twoStateBits — 2-state-bit mod-4 counter → correct J/K per bit', () => {
+  it('twoStateBits- 2-state-bit mod-4 counter → correct J/K per bit', () => {
     // Encode both state bits in a single 2-bit state variable "Q" where
     // bit 1 = Q1, bit 0 = Q0.
     const table: StateTransitionTable = {
@@ -197,10 +197,10 @@ describe('jk-synthesis', () => {
   // With don't-cares exploited, J simplifies to just D (independent of Q).
   //
   // We verify this by checking that the J expression for the D flip-flop
-  // does not contain "Q" in its string representation — it was eliminated.
+  // does not contain "Q" in its string representation- it was eliminated.
   // -------------------------------------------------------------------------
 
-  it('dontCaresExploited — JK excitation don\'t-cares simplify expressions', () => {
+  it('dontCaresExploited- JK excitation don\'t-cares simplify expressions', () => {
     const table: StateTransitionTable = {
       stateVars: [{ name: 'Q', bitWidth: 1 }],
       inputs: [{ name: 'D', bitWidth: 1 }],

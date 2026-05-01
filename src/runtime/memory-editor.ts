@@ -1,5 +1,5 @@
 /**
- * MemoryEditorDialog — floating hex editor for RAM/ROM/EEPROM components.
+ * MemoryEditorDialog- floating hex editor for RAM/ROM/EEPROM components.
  *
  * Opens as a panel showing the full address space of a DataField.
  * Supports editing bytes in-place, go-to-address navigation, and
@@ -60,7 +60,7 @@ export class MemoryEditorDialog implements MeasurementObserver {
   }
 
   // ---------------------------------------------------------------------------
-  // MeasurementObserver — Task 7.2.2 (live update)
+  // MeasurementObserver- Task 7.2.2 (live update)
   // ---------------------------------------------------------------------------
 
   /**
@@ -80,7 +80,7 @@ export class MemoryEditorDialog implements MeasurementObserver {
   }
 
   // ---------------------------------------------------------------------------
-  // Live update control — Task 7.2.2
+  // Live update control- Task 7.2.2
   // ---------------------------------------------------------------------------
 
   /**

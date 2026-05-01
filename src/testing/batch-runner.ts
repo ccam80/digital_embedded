@@ -1,5 +1,5 @@
 /**
- * Batch Test Runner — run tests across multiple .dig circuit files.
+ * Batch Test Runner- run tests across multiple .dig circuit files.
  *
  * Accepts a map of filename → XML content strings. For each file:
  *   1. Parse the XML into a Circuit (via facade.loadDig)
@@ -10,7 +10,7 @@
  * Errors in one file (parse errors, compile errors) do not stop others.
  * The function returns an aggregate BatchTestResults object.
  *
- * Works in both browser and Node.js environments — no filesystem access is
+ * Works in both browser and Node.js environments- no filesystem access is
  * performed here. The caller provides content strings directly.
  */
 

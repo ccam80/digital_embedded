@@ -1,5 +1,5 @@
 /**
- * Tests for EditorBinding — coordinator-editor integration layer.
+ * Tests for EditorBinding- coordinator-editor integration layer.
  */
 
 import { describe, it, expect, beforeEach } from "vitest";
@@ -68,13 +68,13 @@ describe("EditorBinding", () => {
     pinSignalMap = new Map([["elem-1:A", pinAddr]]);
   });
 
-  it("bind — bind circuit + coordinator, assert isBound is true", () => {
+  it("bind- bind circuit + coordinator, assert isBound is true", () => {
     expect(binding.isBound).toBe(false);
     binding.bind(circuit, coordinator, wireSignalMap, pinSignalMap);
     expect(binding.isBound).toBe(true);
   });
 
-  it("unbind — unbind, assert isBound is false, coordinator is null", () => {
+  it("unbind- unbind, assert isBound is false, coordinator is null", () => {
     binding.bind(circuit, coordinator, wireSignalMap, pinSignalMap);
     expect(binding.isBound).toBe(true);
     binding.unbind();
@@ -82,7 +82,7 @@ describe("EditorBinding", () => {
     expect(binding.coordinator).toBeNull();
   });
 
-  it("getWireSignal — returns SignalValue from coordinator for the wire's address", () => {
+  it("getWireSignal- returns SignalValue from coordinator for the wire's address", () => {
     const expected: SignalValue = { type: "digital", value: 42 };
     coordinator.setSignal(wireAddr, expected);
     binding.bind(circuit, coordinator, wireSignalMap, pinSignalMap);
@@ -91,7 +91,7 @@ describe("EditorBinding", () => {
     expect(sv).toEqual(expected);
   });
 
-  it("getWireValue — returns raw number extracted from digital SignalValue", () => {
+  it("getWireValue- returns raw number extracted from digital SignalValue", () => {
     coordinator.setSignal(wireAddr, { type: "digital", value: 42 });
     binding.bind(circuit, coordinator, wireSignalMap, pinSignalMap);
 
@@ -99,7 +99,7 @@ describe("EditorBinding", () => {
     expect(value).toBe(42);
   });
 
-  it("getWireValue — returns voltage for analog SignalValue", () => {
+  it("getWireValue- returns voltage for analog SignalValue", () => {
     const analogAddr: SignalAddress = { domain: "analog", nodeId: 5 };
     const analogWire = new Wire({ x: 0, y: 0 }, { x: 20, y: 0 });
     const analogWireMap = new Map([[analogWire, analogAddr]]);
@@ -110,7 +110,7 @@ describe("EditorBinding", () => {
     expect(value).toBe(3.3);
   });
 
-  it("setInput — calls coordinator.writeSignal() with correct address and digital SignalValue", () => {
+  it("setInput- calls coordinator.writeSignal() with correct address and digital SignalValue", () => {
     binding.bind(circuit, coordinator, wireSignalMap, pinSignalMap);
     const bv = BitVector.fromNumber(1, 1);
     binding.setInput(element, "A", bv);
@@ -120,15 +120,15 @@ describe("EditorBinding", () => {
     expect((coordinator.writeCalls[0]!.value as { type: string; value: number }).value).toBe(1);
   });
 
-  it("unboundThrows — calling getWireValue() when unbound throws", () => {
+  it("unboundThrows- calling getWireValue() when unbound throws", () => {
     expect(() => binding.getWireValue(wire)).toThrow();
   });
 
-  it("unboundThrows — calling getWireSignal() when unbound throws", () => {
+  it("unboundThrows- calling getWireSignal() when unbound throws", () => {
     expect(() => binding.getWireSignal(wire)).toThrow();
   });
 
-  it("engine property removed — binding does not expose engine, use coordinator directly", () => {
+  it("engine property removed- binding does not expose engine, use coordinator directly", () => {
     binding.bind(circuit, coordinator, wireSignalMap, pinSignalMap);
     expect("engine" in binding).toBe(false);
   });

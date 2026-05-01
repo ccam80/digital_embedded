@@ -88,11 +88,11 @@ export function createPopupController(
     propertyPopup.onPropertyChange((key, _oldValue, newValue) => {
       const engineKey = key.startsWith("model:") ? key.slice(6) : key;
       if (WELL_KNOWN_PROPERTY_KEYS.has(engineKey)) {
-        // Render-only — no simulation effect, skip hot-load and recompile
+        // Render-only- no simulation effect, skip hot-load and recompile
       } else {
         const propDef = def.propertyDefs?.find(p => p.key === engineKey);
         if (propDef?.structural) {
-          // Structural change — always recompile even if numeric
+          // Structural change- always recompile even if numeric
           if (ctx.compileAndBind()) {
             if (ctx.isSimActive()) deps.startSimulation();
           }

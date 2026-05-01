@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import fs from "fs";
 import path from "path";
 
-describe("Task 3.2.5 — xfact scope audit", () => {
+describe("Task 3.2.5- xfact scope audit", () => {
   /**
    * Scope audit for ctx.xfact reads across src/components/ and src/solver/analog/.
    *
@@ -22,7 +22,7 @@ describe("Task 3.2.5 — xfact scope audit", () => {
       file: "semiconductors\\mosfet.ts",
       line: 1496,
       reason:
-        "comment inside MODEINITPRED|MODEINITTRAN guard — mentions ctx.xfact to explain why it is NOT used (mos1load.c:828 uses local xfact, computed once per call); not an actual ctx.xfact read",
+        "comment inside MODEINITPRED|MODEINITTRAN guard- mentions ctx.xfact to explain why it is NOT used (mos1load.c:828 uses local xfact, computed once per call); not an actual ctx.xfact read",
     },
   ];
 
@@ -165,7 +165,7 @@ describe("Task 3.2.5 — xfact scope audit", () => {
     expect(violations, `Unguarded xfact reads:\n${violations.join("\n")}`).toEqual([]);
   });
 
-  it("allowlist is exhaustive — no stale entries", () => {
+  it("allowlist is exhaustive- no stale entries", () => {
     const componentDir = path.resolve(process.cwd(), "src/components");
     const solverDir = path.resolve(process.cwd(), "src/solver/analog");
 

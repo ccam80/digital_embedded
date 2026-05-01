@@ -27,7 +27,7 @@ describe('PropertyType enum', () => {
 });
 
 // ---------------------------------------------------------------------------
-// PropertyBag — construction
+// PropertyBag- construction
 // ---------------------------------------------------------------------------
 
 describe('PropertyBag construction', () => {
@@ -48,7 +48,7 @@ describe('PropertyBag construction', () => {
 });
 
 // ---------------------------------------------------------------------------
-// PropertyBag — get / set / has
+// PropertyBag- get / set / has
 // ---------------------------------------------------------------------------
 
 describe('PropertyBag CRUD', () => {
@@ -119,7 +119,7 @@ describe('PropertyBag CRUD', () => {
 });
 
 // ---------------------------------------------------------------------------
-// PropertyBag — getOrDefault
+// PropertyBag- getOrDefault
 // ---------------------------------------------------------------------------
 
 describe('PropertyBag.getOrDefault', () => {
@@ -141,7 +141,7 @@ describe('PropertyBag.getOrDefault', () => {
 });
 
 // ---------------------------------------------------------------------------
-// PropertyBag — clone independence
+// PropertyBag- clone independence
 // ---------------------------------------------------------------------------
 
 describe('PropertyBag.clone', () => {
@@ -204,7 +204,7 @@ describe('PropertyBag.clone', () => {
 });
 
 // ---------------------------------------------------------------------------
-// PropertyBag — entries iteration
+// PropertyBag- entries iteration
 // ---------------------------------------------------------------------------
 
 describe('PropertyBag.entries', () => {

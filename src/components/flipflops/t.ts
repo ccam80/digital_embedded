@@ -1,5 +1,5 @@
 /**
- * T Flip-Flop — toggles on rising clock edge when T=1 (or unconditionally if no T input).
+ * T Flip-Flop- toggles on rising clock edge when T=1 (or unconditionally if no T input).
  *
  * With T input (withEnable=true):
  *   T=1 → toggle Q on rising clock edge
@@ -46,7 +46,7 @@ const COMP_HEIGHT_NO_ENABLE = 2;
 const COMP_HEIGHT_WITH_ENABLE = 2;
 
 // ---------------------------------------------------------------------------
-// Pin declarations — GenericShape positions (symmetric=false)
+// Pin declarations- GenericShape positions (symmetric=false)
 // No-enable: 1 input C@y=0; outputs Q@y=0, ~Q@y=1
 // With-enable: inputs T@y=0, C@y=1; outputs Q@y=0, ~Q@y=1
 // ---------------------------------------------------------------------------
@@ -121,7 +121,7 @@ const T_FF_PINS_WITH_ENABLE: PinDeclaration[] = [
 ];
 
 // ---------------------------------------------------------------------------
-// TElement — CircuitElement implementation
+// TElement- CircuitElement implementation
 // ---------------------------------------------------------------------------
 
 export class TElement extends AbstractCircuitElement {
@@ -180,7 +180,7 @@ export class TElement extends AbstractCircuitElement {
 }
 
 // ---------------------------------------------------------------------------
-// executeT — flat simulation function
+// executeT- flat simulation function
 //
 // withEnable=false: inputs [C=0],     outputs [Q=0, ~Q=1], state [storedQ=0, prevClock=1]
 // withEnable=true:  inputs [T=0, C=1], outputs [Q=0, ~Q=1], state [storedQ=0, prevClock=1]
@@ -254,7 +254,7 @@ const T_FF_PROPERTY_DEFS: PropertyDefinition[] = [
 ];
 
 // ---------------------------------------------------------------------------
-// TDefinition — ComponentDefinition
+// TDefinition- ComponentDefinition
 // ---------------------------------------------------------------------------
 
 function tFactory(props: PropertyBag): TElement {
@@ -270,7 +270,7 @@ export const TDefinition: ComponentDefinition = {
   attributeMap: T_FF_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.FLIP_FLOPS,
   helpText:
-    "T Flip-Flop — toggles Q on rising clock edge.\n" +
+    "T Flip-Flop- toggles Q on rising clock edge.\n" +
     "With T input: toggles only when T=1.\n" +
     "Without T input: toggles on every rising clock edge.\n" +
     "Q and ~Q are always complementary.",

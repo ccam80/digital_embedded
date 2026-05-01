@@ -1,5 +1,5 @@
 /**
- * MenuAndToolbar — menus, toolbar, settings, search, presentation mode.
+ * MenuAndToolbar- menus, toolbar, settings, search, presentation mode.
  *
  * Extracted from app-init.ts (Step 10 of modularization plan).
  * Owns: insert menu, context menu, dark mode, zoom display, lock UI,
@@ -339,7 +339,7 @@ function buildContextMenu(ctx: AppContext, deps: MTDeps): void {
                 const xml = serializeCircuitToDig(subcircuit, registry);
                 void storeSubcircuit(result.name, xml).catch((err: unknown) => {
                   console.error('Failed to persist subcircuit:', err);
-                  ctx.showStatus(`ERROR: Failed to save subcircuit "${result.name}" — it will be lost on reload`);
+                  ctx.showStatus(`ERROR: Failed to save subcircuit "${result.name}"- it will be lost on reload`);
                 });
 
                 // Update the palette so the new subcircuit appears immediately.
@@ -353,7 +353,7 @@ function buildContextMenu(ctx: AppContext, deps: MTDeps): void {
           },
         );
 
-        // "Edit Symbol..." and "Open Subcircuit" — for SubcircuitElement instances
+        // "Edit Symbol..." and "Open Subcircuit"- for SubcircuitElement instances
         if ('definition' in elementHit && (elementHit as any).definition?.circuit) {
           const subDef = (elementHit as any).definition as { name: string; circuit: Circuit; pinLayout: any[] };
           items.push(separator());
@@ -402,7 +402,7 @@ function buildContextMenu(ctx: AppContext, deps: MTDeps): void {
           });
         }
 
-        // "Add Slider" — for components with FLOAT properties during analog sim
+        // "Add Slider"- for components with FLOAT properties during analog sim
         if (simController.activeSliderPanel && simController.isSimActive()) {
           const sliderCoord = facade.getCoordinator();
           if (sliderCoord) {
@@ -450,7 +450,7 @@ function buildContextMenu(ctx: AppContext, deps: MTDeps): void {
           }, enabled: true },
         );
 
-        // "Remove Junction" — merge collinear wire pairs at a junction point
+        // "Remove Junction"- merge collinear wire pairs at a junction point
         // so that crossing wires pass through without connecting.
         const snappedPt = snapToGrid(worldPt, 1);
         const jKey = `${snappedPt.x},${snappedPt.y}`;
@@ -655,7 +655,7 @@ function buildContextMenu(ctx: AppContext, deps: MTDeps): void {
 }
 
 // ---------------------------------------------------------------------------
-// Builder: Selection onChange — populate analog sliders
+// Builder: Selection onChange- populate analog sliders
 // ---------------------------------------------------------------------------
 
 function buildSelectionSliderSync(ctx: AppContext, deps: MTDeps): void {
@@ -1536,7 +1536,7 @@ function refreshOverrideIndicators(ctx: AppContext): void {
 
     const hasBridge = bridgedGroupIds.has(group.groupId);
 
-    // Determine effective loading for this net — only if it has an actual bridge
+    // Determine effective loading for this net- only if it has an actual bridge
     let loading: 'loaded' | 'ideal' | undefined;
     if (override !== undefined && hasBridge) {
       loading = override;
@@ -1682,7 +1682,7 @@ export function initMenuAndToolbar(
 }
 
 // ---------------------------------------------------------------------------
-// D9 fix — single applyColorScheme implementation
+// D9 fix- single applyColorScheme implementation
 // ---------------------------------------------------------------------------
 
 export function applyColorScheme(dark: boolean): void {

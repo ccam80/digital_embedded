@@ -1,5 +1,5 @@
 /**
- * D Flip-Flop with async Set/Clear — edge-triggered with async preset/clear.
+ * D Flip-Flop with async Set/Clear- edge-triggered with async preset/clear.
  *
  * Stores D on rising clock edge. Async Set (active-high) forces Q=1.
  * Async Clear (active-high) forces Q=0. Set/Clear take priority over clock.
@@ -37,7 +37,7 @@ const COMP_WIDTH = 3;
 // max(4,2)=4, yBottom=(4-1)+0.5=3.5, height=3.5+0.5=4
 
 // ---------------------------------------------------------------------------
-// Pin declarations — GenericShape positions (symmetric=false, 4 inputs, 2 outputs)
+// Pin declarations- GenericShape positions (symmetric=false, 4 inputs, 2 outputs)
 // inputs: Set@y=0, D@y=1, C@y=2, Clr@y=3
 // outputs: Q@y=0, ~Q@y=1
 // ---------------------------------------------------------------------------
@@ -100,7 +100,7 @@ const D_FF_AS_PIN_DECLARATIONS: PinDeclaration[] = [
 ];
 
 // ---------------------------------------------------------------------------
-// DAsyncElement — CircuitElement implementation
+// DAsyncElement- CircuitElement implementation
 // ---------------------------------------------------------------------------
 
 export class DAsyncElement extends AbstractCircuitElement {
@@ -195,7 +195,7 @@ export class DAsyncElement extends AbstractCircuitElement {
 }
 
 // ---------------------------------------------------------------------------
-// executeDAsync — flat simulation function
+// executeDAsync- flat simulation function
 //
 // Input layout:  [Set=0, D=1, C=2, Clr=3]
 // Output layout: [Q=0, ~Q=1]
@@ -263,7 +263,7 @@ const D_FF_AS_PROPERTY_DEFS: PropertyDefinition[] = [
 ];
 
 // ---------------------------------------------------------------------------
-// DAsyncDefinition — ComponentDefinition
+// DAsyncDefinition- ComponentDefinition
 // ---------------------------------------------------------------------------
 
 function dAsyncFactory(props: PropertyBag): DAsyncElement {
@@ -279,7 +279,7 @@ export const DAsyncDefinition: ComponentDefinition = {
   attributeMap: D_FF_AS_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.FLIP_FLOPS,
   helpText:
-    "D Flip-Flop with async Set/Clear — edge-triggered with async preset/clear.\n" +
+    "D Flip-Flop with async Set/Clear- edge-triggered with async preset/clear.\n" +
     "Set (active-high) forces Q=1 asynchronously.\n" +
     "Clr (active-high) forces Q=0 asynchronously.\n" +
     "When Set and Clr are both inactive, stores D on rising clock edge.",

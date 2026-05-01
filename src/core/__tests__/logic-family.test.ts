@@ -1,5 +1,5 @@
 /**
- * Tests for logic-family.ts — LogicFamilyConfig presets and utilities.
+ * Tests for logic-family.ts- LogicFamilyConfig presets and utilities.
  */
 
 import { describe, it, expect } from 'vitest';

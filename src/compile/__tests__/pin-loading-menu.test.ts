@@ -223,13 +223,13 @@ function buildMixedRegistry(): ComponentRegistry {
 //   Ground: pin=(3,0)
 //
 // Connectivity:
-//   And.out(0,0) ↔ DABridge.din(0,0)    — shared position → digital group
-//   DABridge.aout(1,0) ↔ AnalogR.A(1,0) — shared position → boundary group (digital+analog)
-//   AnalogR.B(3,0) ↔ Ground(3,0)        — shared position → analog group
+//   And.out(0,0) ↔ DABridge.din(0,0)   - shared position → digital group
+//   DABridge.aout(1,0) ↔ AnalogR.A(1,0)- shared position → boundary group (digital+analog)
+//   AnalogR.B(3,0) ↔ Ground(3,0)       - shared position → analog group
 
 function buildMixedCircuit(): { circuit: Circuit; registry: ComponentRegistry } {
   const registry = buildMixedRegistry();
-  // DABridge pins: din at (0,0), aout at (1,0) — element at default position (0,0)
+  // DABridge pins: din at (0,0), aout at (1,0)- element at default position (0,0)
   // so world positions are din=(0,0), aout=(1,0).
   // AnalogR pins at world (1,0) and (3,0) so AnalogR.A touches DABridge.aout.
   const bridgePins = [inputPin(0, 0, 'din'), outputPin(1, 0, 'aout')];
@@ -254,11 +254,11 @@ function buildMixedCircuit(): { circuit: Circuit; registry: ComponentRegistry } 
 // Tests
 // ---------------------------------------------------------------------------
 
-describe('digitalPinLoading — circuit metadata controls bridge adapter synthesis', () => {
+describe('digitalPinLoading- circuit metadata controls bridge adapter synthesis', () => {
   it('default (absent) is equivalent to cross-domain mode', () => {
     const { circuit, registry } = buildMixedCircuit();
 
-    // No metadata set — should behave the same as explicit "cross-domain"
+    // No metadata set- should behave the same as explicit "cross-domain"
     const resultDefault = compileUnified(circuit, registry);
 
     circuit.metadata.digitalPinLoading = 'cross-domain';
@@ -306,7 +306,7 @@ describe('digitalPinLoading — circuit metadata controls bridge adapter synthes
   it('none mode produces zero bridges for a circuit with only digital-model pins at the boundary', () => {
     const { registry } = buildMixedCircuit();
 
-    // Build a purely digital circuit — no analog components at all
+    // Build a purely digital circuit- no analog components at all
     const andPins = [inputPin(0, 0, 'a'), inputPin(0, 1, 'b'), outputPin(2, 0, 'out')];
     const circuit = new Circuit();
     circuit.addElement(createTestElementFromDecls('And', 'and-1', andPins));

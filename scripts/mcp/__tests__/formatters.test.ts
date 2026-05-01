@@ -273,7 +273,7 @@ describe('formatNetlist', () => {
   });
 
   it('does not use availableModels or isAnalogOnly heuristics', () => {
-    // The component has modelKey 'behavioral' — should show [behavioral], not [analog]/[mixed]
+    // The component has modelKey 'behavioral'- should show [behavioral], not [analog]/[mixed]
     const netlist: Netlist = {
       components: [
         {
@@ -347,7 +347,7 @@ describe('formatComponentDefinition', () => {
       modelRegistry: { 'spice-l1': {} as never },
     });
     const result = formatComponentDefinition(def);
-    // Must NOT show [terminal, ...] — that was the defIsAnalogOnly path
+    // Must NOT show [terminal, ...]- that was the defIsAnalogOnly path
     expect(result).not.toContain('[terminal,');
     expect(result).toContain('P [1-bit, INPUT]');
     expect(result).toContain('N [1-bit, OUTPUT]');

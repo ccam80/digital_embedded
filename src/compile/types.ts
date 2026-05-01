@@ -14,7 +14,7 @@ import type { CompiledCircuitImpl as CompiledDigitalDomain } from "../solver/dig
 import type { ConcreteCompiledAnalogCircuit as CompiledAnalogDomain } from "../solver/analog/compiled-analog-circuit.js";
 
 // ---------------------------------------------------------------------------
-// Diagnostic and DiagnosticCode — canonical unified definitions
+// Diagnostic and DiagnosticCode- canonical unified definitions
 // ---------------------------------------------------------------------------
 
 /**
@@ -122,7 +122,7 @@ export interface Diagnostic {
 }
 
 // ---------------------------------------------------------------------------
-// MnaModel — compiler-internal analog model representation
+// MnaModel- compiler-internal analog model representation
 // ---------------------------------------------------------------------------
 
 import type { PropertyBag } from "../core/properties.js";
@@ -175,7 +175,7 @@ export type DigitalCompilerFn = (
 ) => CompiledDigitalDomain;
 
 // ---------------------------------------------------------------------------
-// Section 4.3 — Connectivity group types
+// Section 4.3- Connectivity group types
 // ---------------------------------------------------------------------------
 
 /**
@@ -215,7 +215,7 @@ export interface ConnectivityGroup {
 }
 
 // ---------------------------------------------------------------------------
-// Section 4.4 — Solver partition types
+// Section 4.4- Solver partition types
 // ---------------------------------------------------------------------------
 
 /**
@@ -230,7 +230,7 @@ export interface PartitionedComponent {
 }
 
 /**
- * Describes a single cross-domain boundary group — the data needed to
+ * Describes a single cross-domain boundary group- the data needed to
  * build a bridge adapter connecting the two simulation domains.
  */
 export interface BridgeDescriptor {
@@ -260,7 +260,7 @@ export interface SolverPartition {
 }
 
 // ---------------------------------------------------------------------------
-// Bridge adapter — runtime cross-domain link
+// Bridge adapter- runtime cross-domain link
 // ---------------------------------------------------------------------------
 
 /**
@@ -286,7 +286,7 @@ export interface BridgeAdapter {
 }
 
 // ---------------------------------------------------------------------------
-// Section 4.6 — Unified compiled output
+// Section 4.6- Unified compiled output
 // ---------------------------------------------------------------------------
 
 /**

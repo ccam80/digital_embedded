@@ -1,5 +1,5 @@
 /**
- * SVGRenderContext — SVG implementation of RenderContext.
+ * SVGRenderContext- SVG implementation of RenderContext.
  *
  * Builds an SVG document as a string by translating RenderContext calls
  * into SVG elements. Transformation state (translate/rotate/scale) is
@@ -55,7 +55,7 @@ function matrixToTransform(m: Matrix): string {
   return `matrix(${fmt(m.a)},${fmt(m.b)},${fmt(m.c)},${fmt(m.d)},${fmt(m.e)},${fmt(m.f)})`;
 }
 
-/** Format a number for SVG attributes — trim unnecessary decimals. */
+/** Format a number for SVG attributes- trim unnecessary decimals. */
 function fmt(n: number): string {
   if (Number.isInteger(n)) return String(n);
   const s = n.toFixed(6);
@@ -135,7 +135,7 @@ export class SVGRenderContext implements RenderContext {
   /** Auto-incrementing counter for unique gradient IDs. */
   private _gradientCounter = 0;
 
-  /** State save stack — each save() pushes, restore() pops. */
+  /** State save stack- each save() pushes, restore() pops. */
   private _stateStack: DrawState[] = [];
 
   /** Current draw state. */
@@ -331,7 +331,7 @@ export class SVGRenderContext implements RenderContext {
   }
 
   // ---------------------------------------------------------------------------
-  // Private helpers — attribute builders
+  // Private helpers- attribute builders
   // ---------------------------------------------------------------------------
 
   private _strokeAttrs(): string {

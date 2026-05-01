@@ -22,7 +22,7 @@ import * as integrationModule from "../integration.js";
 // ---------------------------------------------------------------------------
 
 // ---------------------------------------------------------------------------
-// Task 6.3.2 — verify deleted functions are absent
+// Task 6.3.2- verify deleted functions are absent
 // ---------------------------------------------------------------------------
 
 describe("deleted_integrate_functions", () => {
@@ -159,7 +159,7 @@ describe("HistoryStore", () => {
 
 describe("gear_vandermonde_zero_alloc", () => {
   it("gear_vandermonde_uses_scratch_buffer", () => {
-    // solveGearVandermonde no longer allocates — it uses the scratch buffer passed
+    // solveGearVandermonde no longer allocates- it uses the scratch buffer passed
     // via computeNIcomCof. Verify correct coefficients for GEAR orders 2-6 and
     // that the scratch buffer is mutated (not a new allocation path).
     const ag = new Float64Array(7);
@@ -268,7 +268,7 @@ describe("computeNIcomCof", () => {
 
   it("gear order 2 degenerate (h1=0): safeH1=dt yields equal-steps gear-2 coefficients", () => {
     // When deltaOld[1]=0, safeH1 defaults to dt, which gives equal-steps gear-2.
-    // Spec: h1 = deltaOld[1] > 0 ? deltaOld[1] : dt — so h1=dt → equal steps gear-2.
+    // Spec: h1 = deltaOld[1] > 0 ? deltaOld[1] : dt- so h1=dt → equal steps gear-2.
     const ag = new Float64Array(7);
     computeNIcomCof(h, [h, 0], 2, "gear", ag, scratch);
     // h1=0 → safeH1=dt=h → same as equal steps
@@ -362,7 +362,7 @@ describe("computeNIcomCof", () => {
 
 
 // ---------------------------------------------------------------------------
-// Task 3.2.3 — gear_vandermonde_flat_scratch_regression
+// Task 3.2.3- gear_vandermonde_flat_scratch_regression
 // ---------------------------------------------------------------------------
 
 describe("gear_vandermonde_regression", () => {
@@ -389,7 +389,7 @@ describe("gear_vandermonde_regression", () => {
     expect(ag[3]).toBe(-4 / (3 * h));
     expect(ag[4]).toBe(1 / (4 * h));
 
-    // Assert the scratch buffer was mutated — confirms it was used (not bypassed)
+    // Assert the scratch buffer was mutated- confirms it was used (not bypassed)
     expect(scratch[0]).not.toBe(0);
   });
 });
@@ -401,7 +401,7 @@ describe("gear_vandermonde_regression", () => {
 // Guard against the rounding-order regression. The ngspice trapezoidal
 // order-2 formula is `ag[0] = 1.0 / dt / (1.0 - xmu)` (two sequential
 // divisions), matching nicomcof.c operand order. The alternative formula
-// `1 / (dt * (1 - xmu))` performs a multiplication then a single division —
+// `1 / (dt * (1 - xmu))` performs a multiplication then a single division-
 // IEEE-754 gives different last-bit values for non-trivial xmu, so using
 // that form would be silently wrong.
 //
@@ -427,7 +427,7 @@ describe("nicomcof rounding regression (C4.6)", () => {
     // the guard is useless.
     expect(postFix).not.toBe(preFix);
 
-    // Exercise computeNIcomCof — its hardcoded xmu is 0.5. The implementation
+    // Exercise computeNIcomCof- its hardcoded xmu is 0.5. The implementation
     // must produce `1.0 / dt / (1.0 - 0.5)` bit-exactly (not the pre-fix
     // operand order). For xmu=0.5 the two formulas happen to coincide, so
     // the differential assertion above on xmu=1/3 carries the regression guard.

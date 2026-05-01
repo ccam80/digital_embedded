@@ -1,5 +1,5 @@
 /**
- * Bode plot renderer — draws magnitude and phase frequency-response plots.
+ * Bode plot renderer- draws magnitude and phase frequency-response plots.
  *
  * Renders AC analysis results (AcResult from ac-analysis.ts) onto a
  * CanvasRenderingContext2D. The plot is divided into two panels sharing a
@@ -16,7 +16,7 @@
 import type { AcResult } from "../solver/analog/ac-analysis.js";
 
 // ---------------------------------------------------------------------------
-// BodeViewport — layout parameters for the Bode plot canvas region
+// BodeViewport- layout parameters for the Bode plot canvas region
 // ---------------------------------------------------------------------------
 
 /**
@@ -46,7 +46,7 @@ export interface BodeViewport {
 }
 
 // ---------------------------------------------------------------------------
-// BodeCursor — cursor state for interactive frequency readout
+// BodeCursor- cursor state for interactive frequency readout
 // ---------------------------------------------------------------------------
 
 /**
@@ -59,7 +59,7 @@ export interface BodeCursor {
 }
 
 // ---------------------------------------------------------------------------
-// BodeMarker — auto-detected frequency-domain features
+// BodeMarker- auto-detected frequency-domain features
 // ---------------------------------------------------------------------------
 
 export interface BodeMarker {

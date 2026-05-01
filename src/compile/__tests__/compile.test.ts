@@ -1,5 +1,5 @@
 /**
- * Unit tests for compileUnified() — the Phase 3 unified compilation entry point.
+ * Unit tests for compileUnified()- the Phase 3 unified compilation entry point.
  *
  * Tests verify:
  * - Pure digital circuit compiles correctly (digital domain present, analog null)
@@ -322,7 +322,7 @@ describe("compileUnified", () => {
 
     // In component: output pin at (2,0), element at (0,0)
     const inEl = createTestElementFromDecls("In", "in-1", inPinDecl("out", { x: 2, y: 0 }));
-    // And gate: a(8,0), b(8,1), out(10,0) — element at (8,0)
+    // And gate: a(8,0), b(8,1), out(10,0)- element at (8,0)
     const andEl = createTestElementFromDecls("And", "and-1", twoInputOnePinDecls(), undefined, { x: 8, y: 0 });
     // Out component: input pin at (12,0), element at (12,0)
     const outEl = createTestElementFromDecls("Out", "out-1", outPinDecl("in", { x: 0, y: 0 }), undefined, { x: 12, y: 0 });

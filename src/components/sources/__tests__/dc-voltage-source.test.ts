@@ -122,7 +122,7 @@ describe("DcVoltageSource", () => {
   });
 
   it("set_scale_modifies_rhs", () => {
-    // ngspice vsrcload.c:54 — value = here->VSRCdcValue * ckt->CKTsrcFact
+    // ngspice vsrcload.c:54- value = here->VSRCdcValue * ckt->CKTsrcFact
     const src = makeVsrc(1, 2, 10);
 
     const solver = makeMockSolver();
@@ -193,7 +193,7 @@ describe("DcVoltageSource", () => {
 });
 
 // ===========================================================================
-// Task C4.4 — DC voltage source srcFact parity
+// Task C4.4- DC voltage source srcFact parity
 //
 // ngspice reference: cktload.c:96-136 + each source's DEVload.
 // The independent voltage source stamps its RHS entry as `V * CKTsrcFact`
@@ -261,7 +261,7 @@ describe("dc_vsource_load_srcfact_parity", () => {
     expect(solver._rhs[BRANCH_ROW]).toBe(NGSPICE_REF);
     expect(NGSPICE_REF).toBe(0);
 
-    // Incidence stamps are srcFact-independent — must remain present.
+    // Incidence stamps are srcFact-independent- must remain present.
     // Nodes are 1-based: nodePos=1, nodeNeg=2, BRANCH_ROW=3.
     const stamps = solver._stamps;
     expect(stamps.some(([r, c, v]) => r === 1 && c === BRANCH_ROW && v ===  1)).toBe(true);

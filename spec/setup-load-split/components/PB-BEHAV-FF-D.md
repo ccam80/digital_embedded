@@ -1,10 +1,10 @@
 # Task PB-BEHAV-FF-D
 
 **digiTS files:**
-- `src/solver/analog/behavioral-flipflop.ts` (`BehavioralDFlipflopElement` — sync D flip-flop)
-- `src/solver/analog/behavioral-flipflop/d-async.ts` (`BehavioralDAsyncFlipflopElement` — D flip-flop with async Set/Clear)
+- `src/solver/analog/behavioral-flipflop.ts` (`BehavioralDFlipflopElement`- sync D flip-flop)
+- `src/solver/analog/behavioral-flipflop/d-async.ts` (`BehavioralDAsyncFlipflopElement`- D flip-flop with async Set/Clear)
 
-**ngspice anchor:** NONE — behavioral elements. setup() body matches the
+**ngspice anchor:** NONE- behavioral elements. setup() body matches the
 existing per-pin-model alloc pattern from `02-behavioral.md` Shape rules
 1, 2, 3. NOT bound by ngspice line-for-line equivalence.
 
@@ -24,7 +24,7 @@ Both classes have the same composition pattern; counts differ by variant.
 
 The composite class fields are class-based (post-W2.5 architecture). All
 seven flip-flop element classes (D, D-async, JK, JK-async, RS, RS-async,
-T) are pool-backed via the unified state pool — `poolBacked = true as
+T) are pool-backed via the unified state pool- `poolBacked = true as
 const`, `stateSchema = FLIPFLOP_COMPOSITE_SCHEMA` (empty schema; children
 own their slots), `stateSize` aggregated from children, `s0..s7` typed
 arrays present per the `ReactiveAnalogElementCore` interface contract.
@@ -75,12 +75,12 @@ setup(ctx: SetupContext): void {
 
 Note: the existing class also has nullable `_setPin` / `_resetPin` fields
 that are always `null` in the sync factory (`makeDFlipflopAnalogFactory`).
-The setup() body forwards them conditionally for symmetry — but the sync
+The setup() body forwards them conditionally for symmetry- but the sync
 factory passes `null`, so the conditional branch is unreachable for
 sync-only D flip-flops:
 
 ```ts
-// (Optional defensive forward — _setPin and _resetPin are null in the
+// (Optional defensive forward- _setPin and _resetPin are null in the
 //  sync factory but the field exists on the class.)
 if (this._setPin !== null) this._setPin.setup(ctx);
 if (this._resetPin !== null) this._resetPin.setup(ctx);
@@ -111,12 +111,12 @@ setup(ctx: SetupContext): void {
 
 Forward order: inputs → outputs → children (per Shape rule 3).
 
-## load() body — value writes only (no allocElement)
+## load() body- value writes only (no allocElement)
 
 The existing `load()` bodies on both classes already stamp through pin
 models (which cache handles via `setup()` per Shape rules 1/2). The only
 change to load() is removing any residual `_handlesInit` block from the
-pin models — the pin model migrations are owned by the `digital-pin-model.ts`
+pin models- the pin model migrations are owned by the `digital-pin-model.ts`
 W2.7-style work, not by this PB.
 
 For both classes:
@@ -130,8 +130,8 @@ For both classes:
 
 ## Pin model TSTALLOC counts (per 02-behavioral.md Shape rules 1, 2)
 
-Per `DigitalInputPinModel` (when loaded): 1 × `(node, node)` — `_hNodeDiag`.
-Per `DigitalOutputPinModel` role `"direct"`: 1 × `(node, node)` — `_hNodeDiag`.
+Per `DigitalInputPinModel` (when loaded): 1 × `(node, node)`- `_hNodeDiag`.
+Per `DigitalOutputPinModel` role `"direct"`: 1 × `(node, node)`- `_hNodeDiag`.
 
 | Variant | Input pins | Output pins | TSTALLOC count (before children) |
 |---|---|---|---|
@@ -147,8 +147,8 @@ For each variant's analog factory (`makeDFlipflopAnalogFactory`,
 
 - Drop `internalNodeIds` and `branchIdx` from the factory closure signature
   per A6.3 (factory currently ignores them).
-- `ComponentDefinition.ngspiceNodeMap` left undefined (behavioral — per
-  02-behavioral.md §"Pin-map field on behavioral models").
+- `ComponentDefinition.ngspiceNodeMap` left undefined (behavioral- per
+  02-behavioral.md ss"Pin-map field on behavioral models").
 - `MnaModel.mayCreateInternalNodes`: `false`.
 - `MnaModel.findBranchFor`: omitted (no branch row).
 - The class continues to declare `poolBacked = true as const` and the
@@ -161,7 +161,7 @@ The composite's own schema is empty (`FLIPFLOP_COMPOSITE_SCHEMA` defined
 in `behavioral-flipflop/shared.ts` as `defineStateSchema("BehavioralFlipflopComposite", [])`).
 `stateSize` aggregates from `_childElements[].stateSize` via the existing
 `computeChildStateSize` helper. `stateBaseOffset` is set by `MNAEngine._setup()`
-via `allocateStateBuffers` per `00-engine.md` §A5.1. `initState(pool)`
+via `allocateStateBuffers` per `00-engine.md` ssA5.1. `initState(pool)`
 distributes offsets to children via `initChildState` (existing helper
 preserved unchanged).
 

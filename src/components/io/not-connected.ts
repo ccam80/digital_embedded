@@ -1,8 +1,8 @@
 /**
- * NotConnected component — marks an intentionally unconnected pin.
+ * NotConnected component- marks an intentionally unconnected pin.
  *
  * Suppresses the "unconnected pin" warning from the compiler/net resolver.
- * Has no simulation behavior — no executeFn logic needed.
+ * Has no simulation behavior- no executeFn logic needed.
  */
 
 import { AbstractCircuitElement } from "../../core/element.js";
@@ -30,7 +30,7 @@ const COMP_WIDTH = 1;
 const COMP_HEIGHT = 1;
 
 // ---------------------------------------------------------------------------
-// Pin layout — single bidirectional pin at the connection point
+// Pin layout- single bidirectional pin at the connection point
 // ---------------------------------------------------------------------------
 
 function buildNotConnectedPinDeclarations(): PinDeclaration[] {
@@ -49,7 +49,7 @@ function buildNotConnectedPinDeclarations(): PinDeclaration[] {
 }
 
 // ---------------------------------------------------------------------------
-// NotConnectedElement — CircuitElement implementation
+// NotConnectedElement- CircuitElement implementation
 // ---------------------------------------------------------------------------
 
 export class NotConnectedElement extends AbstractCircuitElement {
@@ -92,7 +92,7 @@ export class NotConnectedElement extends AbstractCircuitElement {
 }
 
 // ---------------------------------------------------------------------------
-// executeNotConnected — no-op (suppresses warning only)
+// executeNotConnected- no-op (suppresses warning only)
 // ---------------------------------------------------------------------------
 
 export function executeNotConnected(
@@ -106,13 +106,13 @@ export function executeNotConnected(
 }
 
 // ---------------------------------------------------------------------------
-// NOT_CONNECTED_ATTRIBUTE_MAPPINGS — no configurable attributes
+// NOT_CONNECTED_ATTRIBUTE_MAPPINGS- no configurable attributes
 // ---------------------------------------------------------------------------
 
 export const NOT_CONNECTED_ATTRIBUTE_MAPPINGS: AttributeMapping[] = [];
 
 // ---------------------------------------------------------------------------
-// Property definitions — none
+// Property definitions- none
 // ---------------------------------------------------------------------------
 
 const NOT_CONNECTED_PROPERTY_DEFS: PropertyDefinition[] = [];
@@ -134,7 +134,7 @@ export const NotConnectedDefinition: ComponentDefinition = {
   attributeMap: NOT_CONNECTED_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.IO,
   helpText:
-    "NotConnected — marks an intentionally unconnected pin.\n" +
+    "NotConnected- marks an intentionally unconnected pin.\n" +
     "Attach this to a pin to suppress the unconnected-pin warning.\n" +
     "Has no simulation behavior.",
   models: {

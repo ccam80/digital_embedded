@@ -46,7 +46,7 @@ not allocate it.
 
 ## State slots
 
-0. `NG_IGNORE(states)` — cccsset.c performs no `*states +=` increment.
+0. `NG_IGNORE(states)`- cccsset.c performs no `*states +=` increment.
 
 ## TSTALLOC sequence (line-for-line port from cccsset.c:49-50)
 
@@ -58,17 +58,17 @@ controlling branch number is `CCCScontBranch`.
 | 1 | `:49` `TSTALLOC(CCCSposContBrptr, CCCSposNode, CCCScontBranch)` | (posNode, contBranch) | `(posNode, contBranch)` |
 | 2 | `:50` `TSTALLOC(CCCSnegContBrptr, CCCSnegNode, CCCScontBranch)` | (negNode, contBranch) | `(negNode, contBranch)` |
 
-## setup() body — alloc only
+## setup() body- alloc only
 
 ```typescript
 setup(ctx: SetupContext): void {
   const solver = ctx.solver;
-  const posNode = this.pinNodeIds[2]; // pinNodes.get("out+") — CCCSposNode
-  const negNode = this.pinNodeIds[3]; // pinNodes.get("out-") — CCCSnegNode
+  const posNode = this.pinNodeIds[2]; // pinNodes.get("out+")- CCCSposNode
+  const negNode = this.pinNodeIds[3]; // pinNodes.get("out-")- CCCSnegNode
 
   // Resolve controlling branch: cccsset.c:36
   // ctx.findBranch dispatches to the controlling source's findBranchFor callback
-  // (lazy-allocating per 00-engine.md §A2/A4.2). Call order is irrelevant —
+  // (lazy-allocating per 00-engine.md ssA2/A4.2). Call order is irrelevant-
   // findBranchFor allocates the branch via ctx.makeCur if setup() hasn't run yet.
   if (!this._senseSourceLabel) {
     throw new Error(`CCCS '${this.label}': senseSourceLabel not set before setup()`);
@@ -93,7 +93,7 @@ index 0 = `sense+`, index 1 = `sense-`, index 2 = `out+`, index 3 = `out-`.
 Handles `_hPCtBr`, `_hNCtBr` stored on the element instance. `allocElement`
 NEVER called from `load()`.
 
-## load() body — value writes only
+## load() body- value writes only
 
 Implementer ports value-side from `ref/ngspice/src/spicelib/devices/cccs/cccsload.c`
 line-for-line. No `allocElement`. Stamps the controlled Norton current:
@@ -129,10 +129,10 @@ const contBranch = ctx.findBranch(this._senseSourceLabel);
 ```
 
 `ctx.findBranch` dispatches to the controlling source's `findBranchFor` callback
-(registered on that source's MnaModel). Per 00-engine.md §A2 and §A4.2, the
+(registered on that source's MnaModel). Per 00-engine.md ssA2 and ssA4.2, the
 `findBranchFor` callback lazily allocates the branch via `ctx.makeCur` if the
 controlling source's `setup()` has not yet run. This means CCCS's `setup()` can
-call `ctx.findBranch(senseSourceLabel)` regardless of element ordering — the
+call `ctx.findBranch(senseSourceLabel)` regardless of element ordering- the
 lazy mechanism ensures the branch number is valid by the time CCCS needs it.
 
 CCCS does NOT wait for the controlling source's setup() to have executed.
@@ -147,17 +147,17 @@ map (populated at compile time, before any setup() runs).
 - Drop `branchCount: 1` from MnaModel registration.
 - Add `ngspiceNodeMap: { "out+": "pos", "out-": "neg" }`.
 - No `findBranchFor` callback.
-- Add `mayCreateInternalNodes: false` (omit — default is false).
+- Add `mayCreateInternalNodes: false` (omit- default is false).
 
 ## Verification gate
 
 Per CLAUDE.md "Test Policy During W3 Setup-Load-Split", verification is spec compliance only. DO NOT run tests; DO NOT use test results.
 
-1. `setup()` body in the implementation file matches the "setup() body — alloc only" listing in this PB line-for-line.
+1. `setup()` body in the implementation file matches the "setup() body- alloc only" listing in this PB line-for-line.
 2. TSTALLOC sequence in `setup()` matches the order in the cited ngspice anchor file (see top of this PB, e.g. `ressetup.c:46-49`).
 3. Factory cleanup applied per the "Factory cleanup" section above.
 4. `ngspiceNodeMap` registered per the "Pin mapping" section above (or omitted for composites where the spec says so).
-5. `load()` writes through cached handles only — zero `solver.allocElement(...)` calls inside `load()`, `accept()`, or any non-`setup()` method.
+5. `load()` writes through cached handles only- zero `solver.allocElement(...)` calls inside `load()`, `accept()`, or any non-`setup()` method.
 6. `mayCreateInternalNodes` flag set per spec.
 7. `findBranchFor` callback present where spec says (V-output sources, IND, etc.).
 8. No banned closing verdicts (mapping/tolerance/equivalent-to/pre-existing/intentional-divergence/citation-divergence/partial) used in any commit message or report.

@@ -1,5 +1,5 @@
 /**
- * Memory editor overlay — hex editor for RAM/ROM/EEPROM/RegisterFile elements.
+ * Memory editor overlay- hex editor for RAM/ROM/EEPROM/RegisterFile elements.
  *
  * Opens a modal dialog with a live-updating hex editor when the user
  * double-clicks a memory component during simulation.
@@ -37,7 +37,7 @@ export function createMemoryEditorController(
     const { getBackingStore } = await import('../components/memory/ram.js');
     const dataField = getBackingStore(elementIdx);
     if (!dataField) {
-      ctx.showStatus('Memory contents not available — run simulation first', false);
+      ctx.showStatus('Memory contents not available- run simulation first', false);
       return;
     }
 
