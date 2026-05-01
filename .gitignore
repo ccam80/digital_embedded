@@ -10,3 +10,5 @@ test-results/
 .playwright-tmp/
 .playwright-browsers/
 dist/
+spec/
+.tmp_*
