@@ -1,5 +1,5 @@
 /**
- * Component registry — one registration shape per component type.
+ * Component registry- one registration shape per component type.
  *
  * Per Decision 4: ComponentDefinition bundles factory, models, pinLayout,
  * propertyDefs, and attributeMap. Type IDs are auto-assigned at registration
@@ -10,12 +10,12 @@ import type { CircuitElement } from "./element.js";
 import type { PinDeclaration } from "./pin.js";
 import { PropertyBag, PropertyType } from "./properties.js";
 import type { PropertyDefinition, PropertyValue } from "./properties.js";
-import type { AnalogElement } from "./analog-types.js";
+import type { AnalogElement } from "../solver/analog/element.js";
 import type { MnaSubcircuitNetlist } from "./mna-subcircuit-netlist.js";
 import type { PinElectricalSpec } from "./pin-electrical.js";
 
 // ---------------------------------------------------------------------------
-// AnalogFactory — named factory signature for MNA element construction
+// AnalogFactory- named factory signature for MNA element construction
 // ---------------------------------------------------------------------------
 
 export type AnalogFactory = (
@@ -25,16 +25,23 @@ export type AnalogFactory = (
 ) => AnalogElement;
 
 // ---------------------------------------------------------------------------
-// ParamDef — schema entry for one model parameter
+// ParamDef- schema entry for one model parameter
 // ---------------------------------------------------------------------------
 
 export interface ParamDef {
   key: string;
-  type: PropertyType;
-  label: string;
+  /**
+   * UI / SPICE type. Required for params that surface in the property panel
+   * or get emitted on a `.model` card. Optional for internal-only definitions
+   * whose params are never rendered or emitted (they only feed `createSeededBag`).
+   */
+  type?: PropertyType;
+  /** Display label. Optional for internal-only definitions (no UI surface). */
+  label?: string;
   unit?: string;
   description?: string;
-  rank: "primary" | "secondary";
+  /** Property-panel rank. Optional for internal-only definitions. */
+  rank?: "primary" | "secondary";
   /**
    * SPICE-emission partition. "instance" means the param is emitted on the
    * element line (e.g. `D1 a k MOD AREA=2 OFF=1`) and is NOT a `.model` card
@@ -52,11 +59,11 @@ export interface ParamDef {
    * accepts a different identifier for the same parameter. Example: digiTS
    * uses `ISW` (sidewall saturation current); ngspice's diode parser names
    * the same parameter `JSW`. Storage and `getModelParam("ISW")` still use
-   * the digiTS key — the rename only applies at the netlist boundary.
+   * the digiTS key- the rename only applies at the netlist boundary.
    */
   spiceName?: string;
   /**
-   * Emission style. `"key-value"` (default) — `KEY=value`. `"flag"` — bare
+   * Emission style. `"key-value"` (default)- `KEY=value`. `"flag"`- bare
    * uppercase keyword when value is truthy, omitted when zero/false. ngspice
    * rejects `OFF=0` as a parse error; this is how OFF and any other future
    * bare-keyword param emit.
@@ -74,7 +81,7 @@ export interface ParamDef {
    * Optional value transform applied at SPICE netlist emission only. Use when
    * the digiTS internal unit differs from ngspice's expected netlist unit.
    * Example: TEMP/TNOM are stored in Kelvin in digiTS but ngspice's parser
-   * adds CONSTCtoK (273.15), so they must be emitted in Celsius — the
+   * adds CONSTCtoK (273.15), so they must be emitted in Celsius- the
    * converter is `v => v - 273.15`. Storage and `getModelParam` are
    * unaffected.
    */
@@ -87,14 +94,14 @@ export interface ModelEmissionSpec {
    * Constant tokens prepended to the .model card body, in order, ahead of
    * any paramDefs-derived params. Use for static SPICE attributes that
    * are not exposed as digiTS model params (e.g. `LEVEL=3` for a future
-   * SPICE-L3 tunnel-diode ModelEntry — not used by any component in this
-   * cleanup; see ngspice-netlist-generator-architecture.md §3.7a).
+   * SPICE-L3 tunnel-diode ModelEntry- not used by any component in this
+   * cleanup; see ngspice-netlist-generator-architecture.md ss3.7a).
    */
   modelCardPrefix?: readonly string[];
 }
 
 // ---------------------------------------------------------------------------
-// ModelEntry — unified model type (inline factory or netlist-derived)
+// ModelEntry- unified model type (inline factory or netlist-derived)
 // ---------------------------------------------------------------------------
 
 export type ModelEntry =
@@ -112,7 +119,7 @@ export type ModelEntry =
     }
   | {
       kind: "netlist";
-      netlist: MnaSubcircuitNetlist;
+      netlist: MnaSubcircuitNetlist | ((params: PropertyBag) => MnaSubcircuitNetlist);
       paramDefs: ParamDef[];
       params: Record<string, number>;
       /** SPICE-emission overrides for this model. */
@@ -164,14 +171,14 @@ export const enum ComponentCategory {
 }
 
 // ---------------------------------------------------------------------------
-// AttributeMapping — .dig XML attribute → PropertyBag entry
+// AttributeMapping- .dig XML attribute → PropertyBag entry
 // ---------------------------------------------------------------------------
 
 /**
  * Maps one XML attribute key from a .dig file to a PropertyBag entry.
  *
  * Per Decision 5: Components only see PropertyBag. The parser reads the
- * registry's attributeMap and applies converters mechanically — it never
+ * registry's attributeMap and applies converters mechanically- it never
  * needs to know what properties a component has.
  */
 export interface AttributeMapping {
@@ -186,7 +193,7 @@ export interface AttributeMapping {
 }
 
 // ---------------------------------------------------------------------------
-// ComponentLayout — wiring info for a component instance in the engine
+// ComponentLayout- wiring info for a component instance in the engine
 // ---------------------------------------------------------------------------
 
 /**
@@ -219,7 +226,7 @@ export interface ComponentLayout {
    * Read a per-instance property value for a component at the given index.
    * Returns undefined when the property is not set.
    * ExecuteFunctions use this to read bitWidth, signed, etc. at runtime.
-   * Required by all engines — analog engines use it for live slider updates,
+   * Required by all engines- analog engines use it for live slider updates,
    * digital engines populate it at compile time.
    */
   getProperty(componentIndex: number, key: string): PropertyValue | undefined;
@@ -232,7 +239,7 @@ export interface ComponentLayout {
 }
 
 // ---------------------------------------------------------------------------
-// ExecuteFunction — flat simulation function type
+// ExecuteFunction- flat simulation function type
 // ---------------------------------------------------------------------------
 
 /**
@@ -265,7 +272,7 @@ export type ExecuteFunction = (
 ) => void;
 
 // ---------------------------------------------------------------------------
-// ComponentModels — structured simulation model container
+// ComponentModels- structured simulation model container
 // ---------------------------------------------------------------------------
 
 /**
@@ -291,17 +298,29 @@ export interface ComponentModels {
 }
 
 // ---------------------------------------------------------------------------
-// ComponentDefinition
+// ComponentDefinition (base + extender)
 // ---------------------------------------------------------------------------
 
 /**
- * Complete registration record for one component type.
+ * Base registration record for one component type.
  *
- * Every field is required at registration time. typeId is filled in by the
- * registry — callers supply everything else.
+ * Carries the fields the registry stores and the compiler / SPICE emitter /
+ * harness consume. Any internal-only sub-element (behavioural driver,
+ * transmission-line segment, digital-pin leaf, etc.) registers as this base
+ * shape with `internalOnly: true`. User-facing components extend this base
+ * via `StandaloneComponentDefinition` to add the editor / property-panel /
+ * .dig-XML / digital-engine fields.
+ *
+ * Three downstream effects of `internalOnly: true`:
+ *   1. Editor palette excludes it (palette-builder filters via getAllStandalone).
+ *   2. SPICE-import primary-element matching skips it (spice-model-apply.ts).
+ *   3. harness_describe groups it under its parent composite's label.
  */
 export interface ComponentDefinition {
-  /** Type name matching the .dig elementName, e.g. "And", "FlipflopD". */
+  /** Type name. For user-facing components matches the .dig elementName
+   *  (e.g. "And", "FlipflopD"). For internal-only sub-elements the name is
+   *  the registry lookup key referenced by `SubcircuitElement.typeId` in
+   *  parent netlists (e.g. "BehavioralAndDriver"). */
   name: string;
   /**
    * Numeric type ID auto-assigned by ComponentRegistry.register().
@@ -309,9 +328,43 @@ export interface ComponentDefinition {
    * Set to -1 in the object passed to register(); the registry replaces it.
    */
   typeId: number;
+  /** When true, this definition is an internal-only sub-element. Excluded
+   *  from the editor palette, SPICE-import primary matching, and surfaced
+   *  under its parent in harness_describe. Defaults to false / absent. */
+  internalOnly?: boolean;
+  /** Named MNA models keyed by model name (e.g. "behavioral", "ideal"). */
+  modelRegistry?: Record<string, ModelEntry>;
+  /**
+   * Default model key- indexes into `modelRegistry` keys or the implicit
+   * `"digital"` key when a digital model exists. When omitted, the first key
+   * present in `models` is used. Hidden from the property panel when only one
+   * model is available.
+   */
+  defaultModel?: string;
+  /** Optional pin labels in netlist-connectivity-row order. Required for
+   *  user-facing components (narrowed in StandaloneComponentDefinition).
+   *  Optional for internal-only sub-elements- some drivers (e.g.
+   *  BehavioralDFlipflopDriver) need explicit pin labels to map netlist
+   *  connectivity rows to `_pinNodes` entries during expansion; others
+   *  (pure stamp leaves) omit it. */
+  pinLayout?: PinDeclaration[];
+  /** Maps digiTS pin label → ngspice node-variable suffix.
+   *  See doc on StandaloneComponentDefinition for the full contract. */
+  ngspiceNodeMap?: Record<string, string>;
+}
+
+/**
+ * Registration record for a user-facing component type. All UI / editor /
+ * property-panel surfaces consume this shape via `getStandalone()` /
+ * `getAllStandalone()` / `getByCategory()`.
+ */
+export interface StandaloneComponentDefinition extends ComponentDefinition {
+  /** Explicitly not internal-only (or absent). */
+  internalOnly?: false;
   /** Construct a CircuitElement for a placed instance from its properties. */
   factory: (props: PropertyBag) => CircuitElement;
-  /** Default pin layout for property panel and compiler. */
+  /** Default pin layout for property panel and compiler- required for
+   *  user-facing components. */
   pinLayout: PinDeclaration[];
   /** Property definitions for the property panel. */
   propertyDefs: PropertyDefinition[];
@@ -323,38 +376,22 @@ export interface ComponentDefinition {
   helpText: string;
   /** Structured simulation model container. */
   models: ComponentModels;
-  /** Named MNA models keyed by model name (e.g. "behavioral", "ideal"). */
-  modelRegistry?: Record<string, ModelEntry>;
-  /**
-   * Default model key — indexes into `modelRegistry` keys or the implicit
-   * `"digital"` key when a digital model exists. When omitted, the first key
-   * present in `models` is used. Hidden from the property panel when only one
-   * model is available.
-   */
-  defaultModel?: string;
   /** Bridge adapter electrical specs for digital model pins. */
   pinElectrical?: PinElectricalSpec;
   /** Per-pin overrides for bridge adapter specs. */
   pinElectricalOverrides?: Record<string, PinElectricalSpec>;
-  /** Maps digiTS pin label → ngspice node-variable suffix.
-   *  Used by the netlist generator and by setup() bodies to reach
-   *  ngspice's named view of nodes from digiTS's labelled view.
-   *
-   *  Examples:
-   *    Resistor: { A: "pos", B: "neg" }
-   *      → pinNodes.get("A") corresponds to RESposNode
-   *    MOSFET:   { G: "gate", D: "drain", S: "source", B: "bulk" }
-   *      → pinNodes.get("D") corresponds to MOS1dNode
-   *
-   *  Sub-element composites (transformer, opamp, ADC, etc.) leave this
-   *  field UNDEFINED; the composite's own setup() does not reach into
-   *  ngspice — it constructs sub-elements which carry their own
-   *  ngspiceNodeMap entries.
-   *
-   *  Sibling pattern to ParamDef.spiceName which renames param keys for
-   *  netlist emission.
-   */
-  ngspiceNodeMap?: Record<string, string>;
+}
+
+/** Type guard: narrows a definition to the user-facing extender. */
+export function isStandalone(def: ComponentDefinition): def is StandaloneComponentDefinition {
+  return def.internalOnly !== true;
+}
+
+/** Type guard: true when the definition is an internal-only sub-element.
+ *  Negation of `isStandalone`; kept for callers that read more naturally
+ *  with the positive internal-only check. */
+export function isInternalOnly(def: ComponentDefinition): boolean {
+  return def.internalOnly === true;
 }
 
 // ---------------------------------------------------------------------------
@@ -365,12 +402,13 @@ export interface ComponentDefinition {
  * Central registry of all component types.
  *
  * Type IDs are auto-assigned as an incrementing counter starting at 0.
- * Registration order determines type ID order — this is intentional and must
+ * Registration order determines type ID order- this is intentional and must
  * remain stable within a session (the IDs are never persisted).
  */
 export class ComponentRegistry {
   private readonly _byName: Map<string, ComponentDefinition> = new Map();
-  private readonly _byCategory: Map<ComponentCategory, ComponentDefinition[]> = new Map();
+  // Category index only tracks user-facing definitions (palette / property panel).
+  private readonly _byCategory: Map<ComponentCategory, StandaloneComponentDefinition[]> = new Map();
   private readonly _aliases: Map<string, string> = new Map();
   private _nextTypeId = 0;
 
@@ -387,8 +425,9 @@ export class ComponentRegistry {
       throw new Error(`ComponentRegistry: "${def.name}" is already registered`);
     }
 
-    // Auto-inject label, showLabel, showValue for non-exempt components
-    if (!LABEL_EXEMPT_TYPES.has(def.name)) {
+    // Auto-inject label/showLabel/showValue only for user-facing definitions.
+    // Internal-only sub-elements have no property panel surface to inject into.
+    if (isStandalone(def) && !LABEL_EXEMPT_TYPES.has(def.name)) {
       def = _injectBaseProperties(def);
     }
 
@@ -396,12 +435,16 @@ export class ComponentRegistry {
 
     this._byName.set(assigned.name, assigned);
 
-    let categoryList = this._byCategory.get(assigned.category);
-    if (categoryList === undefined) {
-      categoryList = [];
-      this._byCategory.set(assigned.category, categoryList);
+    // Category index is only meaningful for user-facing definitions
+    // (internal-only never surfaces in the palette).
+    if (isStandalone(assigned)) {
+      let categoryList = this._byCategory.get(assigned.category);
+      if (categoryList === undefined) {
+        categoryList = [];
+        this._byCategory.set(assigned.category, categoryList);
+      }
+      categoryList.push(assigned);
     }
-    categoryList.push(assigned);
   }
 
   /**
@@ -416,29 +459,26 @@ export class ComponentRegistry {
   update(def: ComponentDefinition): void {
     const existing = this._byName.get(def.name);
     if (existing === undefined) {
-      throw new Error(`ComponentRegistry: "${def.name}" is not registered — use register()`);
+      throw new Error(`ComponentRegistry: "${def.name}" is not registered- use register()`);
     }
 
     const updated: ComponentDefinition = { ...def, typeId: existing.typeId };
     this._byName.set(updated.name, updated);
 
-    // Update category list entry
-    if (existing.category !== updated.category) {
-      // Category changed — move between lists
+    // Category index: only user-facing definitions appear in the palette.
+    // Maintain it across the four transitions (standalone↔standalone,
+    // standalone↔internal, internal↔internal).
+    if (isStandalone(existing)) {
       const oldList = this._byCategory.get(existing.category);
       if (oldList) {
         const idx = oldList.indexOf(existing);
         if (idx >= 0) oldList.splice(idx, 1);
       }
+    }
+    if (isStandalone(updated)) {
       let newList = this._byCategory.get(updated.category);
       if (!newList) { newList = []; this._byCategory.set(updated.category, newList); }
       newList.push(updated);
-    } else {
-      const list = this._byCategory.get(updated.category);
-      if (list) {
-        const idx = list.indexOf(existing);
-        if (idx >= 0) list[idx] = updated;
-      }
     }
   }
 
@@ -460,7 +500,7 @@ export class ComponentRegistry {
    * Register an alias for an existing canonical component name.
    *
    * When `get(alias)` is called it returns the canonical definition.
-   * Aliases do NOT appear in `getByCategory()` or `getAll()` results —
+   * Aliases do NOT appear in `getByCategory()` or `getAll()` results-
    * they are invisible to the palette and component list.
    *
    * Throws if the canonical name is not already registered, or if the
@@ -468,10 +508,10 @@ export class ComponentRegistry {
    */
   registerAlias(alias: string, canonicalName: string): void {
     if (this._byName.has(alias)) {
-      throw new Error(`ComponentRegistry: cannot register alias "${alias}" — a canonical type with that name already exists`);
+      throw new Error(`ComponentRegistry: cannot register alias "${alias}"- a canonical type with that name already exists`);
     }
     if (!this._byName.has(canonicalName)) {
-      throw new Error(`ComponentRegistry: cannot register alias "${alias}" → "${canonicalName}" — canonical type is not registered`);
+      throw new Error(`ComponentRegistry: cannot register alias "${alias}" → "${canonicalName}"- canonical type is not registered`);
     }
     this._aliases.set(alias, canonicalName);
   }
@@ -479,6 +519,10 @@ export class ComponentRegistry {
   /**
    * Look up a component definition by its type name or alias.
    * Returns undefined when the name is not registered.
+   *
+   * Returns the base `ComponentDefinition`- callers that need standalone
+   * fields (factory, propertyDefs, category, etc.) should use
+   * `getStandalone()` instead, or narrow with `isStandalone()`.
    */
   get(name: string): ComponentDefinition | undefined {
     const canonical = this._aliases.get(name);
@@ -488,13 +532,40 @@ export class ComponentRegistry {
     return this._byName.get(name);
   }
 
-  /** Return all registered definitions in registration order. */
+  /**
+   * Look up a user-facing component definition by name or alias.
+   * Returns undefined when the name is not registered or refers to an
+   * internal-only sub-element.
+   *
+   * Use this from UI / palette / property-panel / .dig-XML / digital-engine
+   * call sites that access standalone-only fields.
+   */
+  getStandalone(name: string): StandaloneComponentDefinition | undefined {
+    const def = this.get(name);
+    return def !== undefined && isStandalone(def) ? def : undefined;
+  }
+
+  /** Return all registered definitions in registration order, including
+   *  internal-only sub-elements. Use from compiler / SPICE / harness paths
+   *  that need every registered type. */
   getAll(): ComponentDefinition[] {
     return Array.from(this._byName.values());
   }
 
-  /** Return all definitions in the given category, in registration order. */
-  getByCategory(category: ComponentCategory): ComponentDefinition[] {
+  /** Return all user-facing definitions in registration order. Internal-only
+   *  sub-elements are excluded. Use from UI / palette / iteration sites that
+   *  access standalone-only fields. */
+  getAllStandalone(): StandaloneComponentDefinition[] {
+    const out: StandaloneComponentDefinition[] = [];
+    for (const def of this._byName.values()) {
+      if (isStandalone(def)) out.push(def);
+    }
+    return out;
+  }
+
+  /** Return all user-facing definitions in the given category, in registration
+   *  order. Internal-only definitions never appear in any category. */
+  getByCategory(category: ComponentCategory): StandaloneComponentDefinition[] {
     return this._byCategory.get(category) ?? [];
   }
 
@@ -506,7 +577,9 @@ export class ComponentRegistry {
         return d.modelRegistry !== undefined && Object.keys(d.modelRegistry).length > 0;
       }
       if (modelKey === 'digital') {
-        return d.models.digital !== undefined;
+        // Internal-only definitions have no `models` container; treat as
+        // having no digital model.
+        return isStandalone(d) && d.models.digital !== undefined;
       }
       return d.modelRegistry?.[modelKey] !== undefined;
     });
@@ -515,10 +588,16 @@ export class ComponentRegistry {
   /**
    * Create an element with a PropertyBag pre-seeded with model param defaults.
    * Callers should use this instead of `def.factory(new PropertyBag())`.
+   *
+   * Internal-only definitions have no `factory` (they exist solely as
+   * sub-elements inside parent netlists) and throw if called here.
    */
   createElement(name: string): CircuitElement {
     const def = this.get(name);
     if (!def) throw new Error(`ComponentRegistry: "${name}" is not registered`);
+    if (!isStandalone(def)) {
+      throw new Error(`ComponentRegistry: "${name}" is internal-only and cannot be instantiated as a top-level element`);
+    }
     return def.factory(createSeededBag(def));
   }
 
@@ -529,7 +608,7 @@ export class ComponentRegistry {
 }
 
 // ---------------------------------------------------------------------------
-// createSeededBag — PropertyBag with model param defaults from a definition
+// createSeededBag- PropertyBag with model param defaults from a definition
 // ---------------------------------------------------------------------------
 
 /**
@@ -545,7 +624,7 @@ export function createSeededBag(def: ComponentDefinition): PropertyBag {
 }
 
 // ---------------------------------------------------------------------------
-// Base property injection — ensures label/showLabel/showValue on all
+// Base property injection- ensures label/showLabel/showValue on all
 // non-exempt components without requiring each file to declare them.
 // ---------------------------------------------------------------------------
 
@@ -593,9 +672,10 @@ const BASE_SHOW_VALUE_ATTR: AttributeMapping = {
 
 /**
  * Return a copy of `def` with label, showLabel, showValue injected if missing.
- * Existing definitions are preserved — this only fills gaps.
+ * Existing definitions are preserved- this only fills gaps. Internal-only
+ * definitions are never passed in (caller in `register()` narrows first).
  */
-function _injectBaseProperties(def: ComponentDefinition): ComponentDefinition {
+function _injectBaseProperties(def: StandaloneComponentDefinition): StandaloneComponentDefinition {
   const hasKey = (defs: readonly PropertyDefinition[], key: string) =>
     defs.some((d) => d.key === key);
   const hasAttr = (maps: readonly AttributeMapping[], key: string) =>
