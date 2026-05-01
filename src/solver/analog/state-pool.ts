@@ -1,3 +1,37 @@
+/**
+ * Forward reference to StatePool used by element interfaces.
+ *
+ * The `StatePool` class below structurally satisfies this interface; the
+ * interface exists so type-only consumers (element.ts, etc.) can refer to a
+ * pool's read shape without having to import the class itself.
+ */
+export interface StatePoolRef {
+  readonly states: readonly Float64Array[];
+  readonly state0: Float64Array;
+  readonly state1: Float64Array;
+  readonly state2: Float64Array;
+  readonly state3: Float64Array;
+  readonly state4: Float64Array;
+  readonly state5: Float64Array;
+  readonly state6: Float64Array;
+  readonly state7: Float64Array;
+  readonly totalSlots: number;
+  /** Number of accepted transient steps. 0 = MODEINITTRAN equivalent. */
+  readonly tranStep: number;
+  /**
+   * Current transient integration timestep written by the engine before each
+   * stamp pass. 0 during DC-OP. Used by elements to derive ag0 locally
+   * (NIcomCof equivalent, nicomcof.c:33-51).
+   */
+  readonly dt?: number;
+  /**
+   * Circuit operating temperature in Kelvin. Absent → 300.15 K (REFTEMP).
+   * Maps to ngspice CKTtemp. Used by passive elements (capacitor, inductor)
+   * for TC1/TC2 temperature coefficient computation.
+   */
+  readonly temperature?: number;
+}
+
 export class StatePool {
   /** Ring buffer of state arrays. [0]=current, [1]=prev, [2]=prev2, [3]=prev3. */
   states: Float64Array[];

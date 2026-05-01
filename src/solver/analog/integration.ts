@@ -5,7 +5,22 @@
  * using ctx.ag[] coefficients computed here by computeNIcomCof.
  */
 
-import type { IntegrationMethod } from "./element.js";
+/**
+ * Numerical integration method used by companion-model reactive elements.
+ *
+ * Corresponds to ngspice cktdefs.h:107-108:
+ *   #define TRAPEZOIDAL 1
+ *   #define GEAR        2
+ *
+ * 'trapezoidal'- A-stable trapezoidal rule (ngspice TRAPEZOIDAL=1).
+ *                 Order 1 uses the trap-1 coefficients per nicomcof.c:40-41.
+ * 'gear'       - Gear BDF method, orders 1..6 via Vandermonde collocation
+ *                 (ngspice GEAR=2, nicomcof.c:52-127). Order 1 also uses the
+ *                 trap-1 coefficients per nicomcof.c:40-41.
+ *
+ * Default per ngspice cktntask.c:99: TRAPEZOIDAL.
+ */
+export type IntegrationMethod = "trapezoidal" | "gear";
 
 // ---------------------------------------------------------------------------
 // HistoryStore

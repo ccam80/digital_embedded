@@ -17,7 +17,19 @@
  *   SMPpreOrder (sputils.c)- preorder
  */
 
-import type { ComplexSparseSolver as IComplexSparseSolver } from "./element.js";
+/**
+ * Minimal structural interface for the complex (AC-analysis) sparse solver,
+ * exposing only the subset of methods used by element.stampAc() bodies.
+ *
+ * Parallel to `SparseSolverStamp` (real-side). The `ComplexSparseSolver`
+ * class below `implements` this interface and ships a much larger surface
+ * for assembly, factorization, and solve.
+ */
+export interface ComplexSparseSolverStamp {
+  stampRHS(row: number, re: number, im: number): void;
+  allocComplexElement(row: number, col: number): number;
+  stampComplexElement(handle: number, re: number, im: number): void;
+}
 
 /**
  * Default pivot thresholds for complex factorization.
@@ -35,7 +47,7 @@ const DEFAULT_PIVOT_ABS_THRESHOLD_COMPLEX = 0.0;
 // Bit flag stored in _elFlags to distinguish fill-in entries from A-matrix entries.
 const FLAG_FILL_IN = 1;
 
-export class ComplexSparseSolver implements IComplexSparseSolver {
+export class ComplexSparseSolver implements ComplexSparseSolverStamp {
   // =========================================================================
   // Persistent linked-list element pool (complex values in parallel arrays)
   // =========================================================================
