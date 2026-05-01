@@ -16,7 +16,7 @@ import type { PinDeclaration } from '../../core/pin.js';
 import { PinDirection } from '../../core/pin.js';
 import { PropertyBag } from '../../core/properties.js';
 import { ComponentRegistry } from '../../core/registry.js';
-import type { ComponentDefinition } from '../../core/registry.js';
+import type { StandaloneComponentDefinition, ComponentModels } from '../../core/registry.js';
 import { ComponentCategory } from '../../core/registry.js';
 import { createTestElementFromDecls } from '../../test-fixtures/test-element.js';
 import { noopExecFn } from '../../test-fixtures/execute-stubs.js';
@@ -72,8 +72,8 @@ function bidiPin(x: number, y: number, label: string, bitWidth = 1): PinDeclarat
 // Registry helpers
 // ---------------------------------------------------------------------------
 
-function makeBaseDef(name: string, models: object, defaultModel?: string): ComponentDefinition {
-  const def: Record<string, unknown> = {
+function makeBaseDef(name: string, models: object, defaultModel?: string): StandaloneComponentDefinition {
+  return {
     name,
     typeId: -1,
     factory: (props: PropertyBag) => createTestElementFromDecls(name, crypto.randomUUID(), [], props),
@@ -82,39 +82,38 @@ function makeBaseDef(name: string, models: object, defaultModel?: string): Compo
     attributeMap: [],
     category: ComponentCategory.MISC,
     helpText: '',
-    models,
+    models: models as ComponentModels,
+    ...(defaultModel !== undefined ? { defaultModel } : {}),
   };
-  if (defaultModel !== undefined) def['defaultModel'] = defaultModel;
-  return def as unknown as ComponentDefinition;
 }
 
 function buildDigitalRegistry(): ComponentRegistry {
   const r = new ComponentRegistry();
-  r.register(makeBaseDef('In',  { digital: { executeFn: noopExecFn } }) as ComponentDefinition);
-  r.register(makeBaseDef('Out', { digital: { executeFn: noopExecFn } }) as ComponentDefinition);
-  r.register(makeBaseDef('And', { digital: { executeFn: noopExecFn } }) as ComponentDefinition);
-  r.register(makeBaseDef('Tunnel', { digital: { executeFn: noopExecFn } }) as ComponentDefinition);
-  r.register(makeBaseDef('Port', {}) as ComponentDefinition);
-  r.register(makeBaseDef('Ground', {}) as ComponentDefinition);
+  r.register(makeBaseDef('In',  { digital: { executeFn: noopExecFn } }));
+  r.register(makeBaseDef('Out', { digital: { executeFn: noopExecFn } }));
+  r.register(makeBaseDef('And', { digital: { executeFn: noopExecFn } }));
+  r.register(makeBaseDef('Tunnel', { digital: { executeFn: noopExecFn } }));
+  r.register(makeBaseDef('Port', {}));
+  r.register(makeBaseDef('Ground', {}));
   return r;
 }
 
 function buildAnalogRegistry(): ComponentRegistry {
   const r = new ComponentRegistry();
-  r.register(makeBaseDef('Ground',   {}, 'behavioral') as ComponentDefinition);
-  r.register(makeBaseDef('Resistor', {}, 'behavioral') as ComponentDefinition);
-  r.register(makeBaseDef('Tunnel',   {}, 'behavioral') as ComponentDefinition);
+  r.register(makeBaseDef('Ground',   {}, 'behavioral'));
+  r.register(makeBaseDef('Resistor', {}, 'behavioral'));
+  r.register(makeBaseDef('Tunnel',   {}, 'behavioral'));
   return r;
 }
 
 function buildMixedRegistry(): ComponentRegistry {
   const r = new ComponentRegistry();
-  r.register(makeBaseDef('In',       { digital: { executeFn: noopExecFn } }) as ComponentDefinition);
-  r.register(makeBaseDef('Out',      { digital: { executeFn: noopExecFn } }) as ComponentDefinition);
-  r.register(makeBaseDef('And',      { digital: { executeFn: noopExecFn } }) as ComponentDefinition);
-  r.register(makeBaseDef('Ground',   {}, 'behavioral') as ComponentDefinition);
-  r.register(makeBaseDef('Resistor', {}, 'behavioral') as ComponentDefinition);
-  r.register(makeBaseDef('Bridge',   { digital: { executeFn: noopExecFn } }, 'behavioral') as ComponentDefinition);
+  r.register(makeBaseDef('In',       { digital: { executeFn: noopExecFn } }));
+  r.register(makeBaseDef('Out',      { digital: { executeFn: noopExecFn } }));
+  r.register(makeBaseDef('And',      { digital: { executeFn: noopExecFn } }));
+  r.register(makeBaseDef('Ground',   {}, 'behavioral'));
+  r.register(makeBaseDef('Resistor', {}, 'behavioral'));
+  r.register(makeBaseDef('Bridge',   { digital: { executeFn: noopExecFn } }, 'behavioral'));
   return r;
 }
 
@@ -164,7 +163,7 @@ describe('resolveModelAssignments', () => {
     const registry = new ComponentRegistry();
     registry.register(makeBaseDef('Bridge', {
       digital: { executeFn: noopExecFn },
-    }, 'digital') as ComponentDefinition);
+    }, 'digital'));
     const bridge = createTestElementFromDecls('Bridge', 'b1', []);
     const [assignments] = resolveModelAssignments([bridge], registry);
     expect(assignments[0]!.modelKey).toBe('digital');
@@ -265,8 +264,8 @@ describe('extractConnectivityGroups- pure digital', () => {
 
   it('width mismatch diagnostic emitted when digital pins disagree', () => {
     const registry = new ComponentRegistry();
-    registry.register(makeBaseDef('WideOut', { digital: { executeFn: noopExecFn } }) as ComponentDefinition);
-    registry.register(makeBaseDef('NarrowIn', { digital: { executeFn: noopExecFn } }) as ComponentDefinition);
+    registry.register(makeBaseDef('WideOut', { digital: { executeFn: noopExecFn } }));
+    registry.register(makeBaseDef('NarrowIn', { digital: { executeFn: noopExecFn } }));
 
     // 4-bit output at (2,0), 1-bit input at (2,0)- same position
     const wideEl   = createTestElementFromDecls('WideOut', 'w1', [outputPin(2, 0, 'out', 4)]);

@@ -8,13 +8,13 @@ import {
 } from "../subcircuit-loader.js";
 import { SubcircuitElement } from "../../components/subcircuit/subcircuit.js";
 import { ComponentRegistry, ComponentCategory } from "../../core/registry.js";
-import type { ComponentDefinition } from "../../core/registry.js";
+import type { StandaloneComponentDefinition } from "../../core/registry.js";
 import { EmbeddedResolver } from "../file-resolver.js";
 import type { FileResolver } from "../file-resolver.js";
 import { TestElement } from "../../test-fixtures/test-element.js";
 import { noopExecFn } from "../../test-fixtures/execute-stubs.js";
 
-function stubDef(name: string): ComponentDefinition {
+function stubDef(name: string): StandaloneComponentDefinition {
   return {
     name,
     typeId: -1,

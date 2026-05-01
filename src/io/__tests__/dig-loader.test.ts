@@ -8,7 +8,7 @@ import { join } from "path";
 import { parseDigXml } from "../dig-parser.js";
 import { loadDigCircuit, loadDig, loadDigFromParsed, createElementFromDig, createWireFromDig, extractCircuitMetadata, applyInverterConfig, DigParserError } from "../dig-loader.js";
 import { ComponentRegistry, ComponentCategory } from "../../core/registry.js";
-import type { ComponentDefinition, AttributeMapping } from "../../core/registry.js";
+import type { StandaloneComponentDefinition, AttributeMapping } from "../../core/registry.js";
 import { PinDirection, makePin, createInverterConfig } from "../../core/pin.js";
 import type { Pin } from "../../core/pin.js";
 import { PropertyBag } from "../../core/properties.js";
@@ -47,7 +47,7 @@ const INPUTS_MAPPING: AttributeMapping = intConverter("Inputs", "inputCount");
 const BITS_MAPPING: AttributeMapping = intConverter("Bits", "bitWidth");
 const TEST_DATA_MAPPING: AttributeMapping = testDataConverter();
 
-function makeDefinition(name: string, extraMappings: AttributeMapping[] = []): ComponentDefinition {
+function makeDefinition(name: string, extraMappings: AttributeMapping[] = []): StandaloneComponentDefinition {
   return {
     name,
     typeId: -1,

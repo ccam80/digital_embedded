@@ -21,7 +21,7 @@ import type { RenderContext, Rect } from '../../core/renderer-interface.js';
 import { PropertyBag } from '../../core/properties.js';
 import type { PropertyBag as PropertyBagType, PropertyValue } from '../../core/properties.js';
 import { ComponentRegistry } from '../../core/registry.js';
-import type { ComponentDefinition, ComponentModels } from '../../core/registry.js';
+import type { ComponentModels } from '../../core/registry.js';
 import { ComponentCategory } from '../../core/registry.js';
 import type { SerializedElement, CircuitElement } from '../../core/element.js';
 import type { ComplexSparseSolver } from '../../solver/analog/complex-sparse-solver.js';
@@ -147,7 +147,7 @@ function buildMixedRegistry(): ComponentRegistry {
     category: ComponentCategory.LOGIC,
     helpText: '',
     models: { digital: { executeFn: noopExecFn } } as ComponentModels,
-  } as ComponentDefinition);
+  });
 
   // Pure analog component
   r.register({
@@ -166,7 +166,7 @@ function buildMixedRegistry(): ComponentRegistry {
         return makeResistorElement(n0 ?? 0, n1 ?? 0);
       }, paramDefs: [], params: {} },
     },
-  } as ComponentDefinition);
+  });
 
   // Ground (neutral)
   r.register({
@@ -180,7 +180,7 @@ function buildMixedRegistry(): ComponentRegistry {
     helpText: '',
     models: {},
     modelRegistry: { behavioral: { kind: 'inline' as const, factory: () => { throw new Error('not used'); }, paramDefs: [], params: {} } },
-  } as ComponentDefinition);
+  });
 
   // Mixed-model component: digital model + MNA model
   r.register({
@@ -206,7 +206,7 @@ function buildMixedRegistry(): ComponentRegistry {
         return makeResistorElement(n0 ?? 0, n1 ?? 0);
       }, paramDefs: [], params: {} },
     },
-  } as ComponentDefinition);
+  });
 
   return r;
 }

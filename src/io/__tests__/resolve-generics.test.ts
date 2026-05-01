@@ -11,7 +11,7 @@ import {
 import { GenericCache, computeGenericCacheKey } from "../generic-cache.js";
 import { Circuit } from "../../core/circuit.js";
 import { ComponentRegistry, ComponentCategory } from "../../core/registry.js";
-import type { ComponentDefinition, AttributeMapping } from "../../core/registry.js";
+import type { ComponentDefinition, StandaloneComponentDefinition, AttributeMapping } from "../../core/registry.js";
 import { PropertyBag } from "../../core/properties.js";
 import { AndDefinition } from "../../components/gates/and.js";
 import { InDefinition } from "../../components/io/in.js";
@@ -34,7 +34,7 @@ function makeTestFactory(typeName: string) {
 // also stores an "enabled" boolean.
 // ---------------------------------------------------------------------------
 
-function makeGenericCodeDef(typeName: string): ComponentDefinition {
+function makeGenericCodeDef(typeName: string): StandaloneComponentDefinition {
   const attributeMap: AttributeMapping[] = [
     { xmlName: "generic", propertyKey: "generic", convert: (v) => v },
     { xmlName: "enabled", propertyKey: "enabled", convert: (v) => v === "true" },
@@ -360,7 +360,7 @@ describe("GenericResolutionCache", () => {
 // Helper- make a simple test component definition
 // ---------------------------------------------------------------------------
 
-function makeTestDef(name: string): ComponentDefinition {
+function makeTestDef(name: string): StandaloneComponentDefinition {
   return {
     name,
     typeId: -1,

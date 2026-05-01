@@ -21,7 +21,7 @@ import { CapacitorDefinition } from '../../components/passives/capacitor.js';
 import { DcVoltageSourceDefinition } from '../../components/sources/dc-voltage-source.js';
 import { GroundDefinition } from '../../components/io/ground.js';
 import type { Pin } from '../../core/pin.js';
-import type { ComponentDefinition } from '../../core/registry.js';
+import type { StandaloneComponentDefinition } from '../../core/registry.js';
 import type { AnalogElement } from '../analog/element.js';
 import type { LoadContext } from '../analog/load-context.js';
 import type { ComplexSparseSolver } from '../analog/complex-sparse-solver.js';
@@ -67,14 +67,14 @@ function makeAnalogDef(
   name: string,
   pinDescs: { x: number; y: number; label: string }[],
   mnaFactory: (pinNodes: ReadonlyMap<string, number>) => AnalogElement,
-): ComponentDefinition {
+): StandaloneComponentDefinition {
   return {
     name,
-    typeId: name as unknown as number,
+    typeId: -1,
     factory: () => makeAnalogElementObj(name, crypto.randomUUID(), pinDescs),
     pinLayout: pinDescs.map(p => ({
       direction: PinDirection.BIDIRECTIONAL, label: p.label, defaultBitWidth: 1,
-      position: { x: p.x, y: p.y }, isNegatable: false, isClockCapable: false,
+      position: { x: p.x, y: p.y }, isNegatable: false, isClockCapable: false, kind: 'signal' as const,
     })),
     propertyDefs: [],
     attributeMap: [],
@@ -84,17 +84,17 @@ function makeAnalogDef(
     defaultModel: 'behavioral',
     models: {},
     modelRegistry: { behavioral: { kind: 'inline' as const, factory: (pinNodes: ReadonlyMap<string, number>) => mnaFactory(pinNodes), paramDefs: [], params: {} } },
-  } as unknown as ComponentDefinition;
+  };
 }
 
-function makeGroundDef(): ComponentDefinition {
+function makeGroundDef(): StandaloneComponentDefinition {
   return {
     name: 'Ground',
-    typeId: -1 as unknown as number,
+    typeId: -1,
     factory: () => makeAnalogElementObj('Ground', crypto.randomUUID(), [{ x: 0, y: 0, label: 'gnd' }]),
     pinLayout: [{
       direction: PinDirection.BIDIRECTIONAL, label: 'gnd', defaultBitWidth: 1,
-      position: { x: 0, y: 0 }, isNegatable: false, isClockCapable: false,
+      position: { x: 0, y: 0 }, isNegatable: false, isClockCapable: false, kind: 'signal' as const,
     }],
     propertyDefs: [],
     attributeMap: [],
@@ -116,7 +116,7 @@ function makeGroundDef(): ComponentDefinition {
         setParam(_key: string, _value: number) {},
       }), paramDefs: [], params: {} },
     },
-  } as unknown as ComponentDefinition;
+  };
 }
 
 function buildAnalogRegistry(): ComponentRegistry {
@@ -156,7 +156,7 @@ function makeAnalogEl(
   const def = registry?.get(typeId);
   const resolvedPins: Pin[] = pins.map((p, i) => ({
     position: { x: p.x, y: p.y },
-    label: p.label || def?.pinLayout[i]?.label || '',
+    label: p.label || def?.pinLayout?.[i]?.label || '',
     direction: PinDirection.BIDIRECTIONAL,
     isNegated: false,
     isClock: false,

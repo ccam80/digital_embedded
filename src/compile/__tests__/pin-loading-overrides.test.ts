@@ -17,7 +17,7 @@ import { PinDirection } from '../../core/pin.js';
 import { PropertyBag } from '../../core/properties.js';
 import type { PropertyBag as PropertyBagType } from '../../core/properties.js';
 import { ComponentRegistry } from '../../core/registry.js';
-import type { ComponentDefinition, ComponentModels } from '../../core/registry.js';
+import type { ComponentModels } from '../../core/registry.js';
 import { ComponentCategory } from '../../core/registry.js';
 import { createTestElementFromDecls } from '../../test-fixtures/test-element.js';
 import { noopExecFn } from '../../test-fixtures/execute-stubs.js';
@@ -54,7 +54,7 @@ function buildRegistry(): ComponentRegistry {
     category: ComponentCategory.LOGIC,
     helpText: '',
     models: { digital: { executeFn: noopExecFn } } as ComponentModels,
-  } as ComponentDefinition);
+  });
 
   r.register({
     name: 'In',
@@ -70,7 +70,7 @@ function buildRegistry(): ComponentRegistry {
     category: ComponentCategory.IO,
     helpText: '',
     models: { digital: { executeFn: noopExecFn } } as ComponentModels,
-  } as ComponentDefinition);
+  });
 
   r.register({
     name: 'Tunnel',
@@ -86,7 +86,7 @@ function buildRegistry(): ComponentRegistry {
     category: ComponentCategory.WIRING,
     helpText: '',
     models: { digital: { executeFn: noopExecFn } } as ComponentModels,
-  } as ComponentDefinition);
+  });
 
   return r;
 }

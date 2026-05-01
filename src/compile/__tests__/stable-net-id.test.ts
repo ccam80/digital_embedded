@@ -18,7 +18,7 @@ import type { PinDeclaration } from '../../core/pin.js';
 import { PinDirection } from '../../core/pin.js';
 import { PropertyBag } from '../../core/properties.js';
 import { ComponentRegistry } from '../../core/registry.js';
-import type { ComponentDefinition } from '../../core/registry.js';
+import type { StandaloneComponentDefinition, ComponentModels } from '../../core/registry.js';
 import { ComponentCategory } from '../../core/registry.js';
 import type { ConnectivityGroup } from '../types.js';
 import { createTestElementFromDecls } from '../../test-fixtures/test-element.js';
@@ -63,28 +63,28 @@ function inputPin(x: number, y: number, label: string, bitWidth = 1): PinDeclara
 // Registry helpers
 // ---------------------------------------------------------------------------
 
-function makeBaseDef(name: string, models: object): ComponentDefinition {
+function makeBaseDef(name: string, models: object): StandaloneComponentDefinition {
   return {
     name,
-    typeId: -1 as unknown as number,
+    typeId: -1,
     factory: (props: PropertyBag) => createTestElementFromDecls(name, crypto.randomUUID(), [], props),
     pinLayout: [],
     propertyDefs: [],
     attributeMap: [],
     category: ComponentCategory.MISC,
     helpText: '',
-    models,
+    models: models as ComponentModels,
   };
 }
 
 function buildMixedRegistry(): ComponentRegistry {
   const r = new ComponentRegistry();
-  r.register(makeBaseDef('In',       { digital: { executeFn: noopExecFn } }) as ComponentDefinition);
-  r.register(makeBaseDef('Out',      { digital: { executeFn: noopExecFn } }) as ComponentDefinition);
-  r.register(makeBaseDef('And',      { digital: { executeFn: noopExecFn } }) as ComponentDefinition);
-  r.register({ ...makeBaseDef('Resistor', {}), modelRegistry: { behavioral: { kind: 'inline' as const, factory: () => { throw new Error('not used'); }, paramDefs: [], params: {} } } } as ComponentDefinition);
-  r.register(makeBaseDef('Tunnel',   { digital: { executeFn: noopExecFn } }) as ComponentDefinition);
-  r.register(makeBaseDef('Port',     {} ) as ComponentDefinition);
+  r.register(makeBaseDef('In',       { digital: { executeFn: noopExecFn } }));
+  r.register(makeBaseDef('Out',      { digital: { executeFn: noopExecFn } }));
+  r.register(makeBaseDef('And',      { digital: { executeFn: noopExecFn } }));
+  r.register({ ...makeBaseDef('Resistor', {}), modelRegistry: { behavioral: { kind: 'inline' as const, factory: () => { throw new Error('not used'); }, paramDefs: [], params: {} } } });
+  r.register(makeBaseDef('Tunnel',   { digital: { executeFn: noopExecFn } }));
+  r.register(makeBaseDef('Port',     {} ));
   return r;
 }
 

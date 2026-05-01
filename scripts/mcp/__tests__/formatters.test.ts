@@ -11,6 +11,7 @@ import { formatDiagnostics, formatNetlist, formatComponentDefinition } from '../
 import type { Netlist, ComponentDescriptor, NetDescriptor, NetPin, PinDescriptor } from '../../../src/headless/netlist-types.js';
 import type { Diagnostic } from '../../../src/compile/types.js';
 import type { ComponentDefinition } from '../../../src/core/registry.js';
+import { PinDirection } from '../../../src/core/pin.js';
 
 // ---------------------------------------------------------------------------
 // formatDiagnostics
@@ -304,10 +305,9 @@ describe('formatComponentDefinition', () => {
   function makeMinimalDef(overrides: Partial<ComponentDefinition> = {}): ComponentDefinition {
     return {
       name: 'TestComp',
-      category: 'TEST',
-      factory: () => { throw new Error('factory not needed'); },
+      typeId: -1,
       ...overrides,
-    } as unknown as ComponentDefinition;
+    };
   }
 
   it('shows component name and category', () => {
@@ -319,10 +319,10 @@ describe('formatComponentDefinition', () => {
   it('always shows [N-bit, DIRECTION] for pins regardless of model registry', () => {
     const def = makeMinimalDef({
       pinLayout: [
-        { label: 'A', direction: 'INPUT', defaultBitWidth: 1 },
-        { label: 'B', direction: 'INPUT', defaultBitWidth: 1 },
-        { label: 'out', direction: 'OUTPUT', defaultBitWidth: 1 },
-      ] as ComponentDefinition['pinLayout'],
+        { label: 'A', direction: PinDirection.INPUT, defaultBitWidth: 1, position: { x: 0, y: 0 }, isNegatable: false, isClockCapable: false, kind: 'signal' },
+        { label: 'B', direction: PinDirection.INPUT, defaultBitWidth: 1, position: { x: 0, y: 1 }, isNegatable: false, isClockCapable: false, kind: 'signal' },
+        { label: 'out', direction: PinDirection.OUTPUT, defaultBitWidth: 1, position: { x: 2, y: 0 }, isNegatable: false, isClockCapable: false, kind: 'signal' },
+      ],
       modelRegistry: {
         behavioral: {} as never,
         'spice-l1': {} as never,
@@ -341,9 +341,9 @@ describe('formatComponentDefinition', () => {
     const def = makeMinimalDef({
       models: undefined,
       pinLayout: [
-        { label: 'P', direction: 'INPUT', defaultBitWidth: 1 },
-        { label: 'N', direction: 'OUTPUT', defaultBitWidth: 1 },
-      ] as ComponentDefinition['pinLayout'],
+        { label: 'P', direction: PinDirection.INPUT, defaultBitWidth: 1, position: { x: 0, y: 0 }, isNegatable: false, isClockCapable: false, kind: 'signal' },
+        { label: 'N', direction: PinDirection.OUTPUT, defaultBitWidth: 1, position: { x: 2, y: 0 }, isNegatable: false, isClockCapable: false, kind: 'signal' },
+      ],
       modelRegistry: { 'spice-l1': {} as never },
     });
     const result = formatComponentDefinition(def);

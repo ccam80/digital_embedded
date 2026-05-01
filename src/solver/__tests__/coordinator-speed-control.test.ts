@@ -12,12 +12,12 @@ import { PinDirection } from '../../core/pin.js';
 import { ComponentRegistry } from '../../core/registry.js';
 import { ComponentCategory } from '../../core/registry.js';
 import type { Pin } from '../../core/pin.js';
-import type { ComponentDefinition } from '../../core/registry.js';
+import type { StandaloneComponentDefinition } from '../../core/registry.js';
 import type { SerializedElement, CircuitElement } from '../../core/element.js';
 import type { PropertyValue } from '../../core/properties.js';
 import type { Rect, RenderContext } from '../../core/renderer-interface.js';
 import type { AnalogElement } from '../analog/element.js';
-import type { ComplexSparseSolver } from '../../core/analog-types.js';
+import type { ComplexSparseSolverStamp as ComplexSparseSolver } from '../analog/complex-sparse-solver.js';
 import type { LoadContext } from '../analog/load-context.js';
 import { TestElement, makePin } from '../../test-fixtures/test-element.js';
 import { noopExecFn, executePassThrough } from '../../test-fixtures/execute-stubs.js';
@@ -100,11 +100,11 @@ function buildDigitalCircuit(registry: ComponentRegistry): Circuit {
   return circuit;
 }
 
-function makeGroundDef(): ComponentDefinition {
+function makeGroundDef(): StandaloneComponentDefinition {
   return {
-    name: 'Ground', typeId: -1 as unknown as number,
+    name: 'Ground', typeId: -1,
     factory: () => makeAnalogElementObj('Ground', crypto.randomUUID(), [{ x: 0, y: 0, label: 'gnd' }]),
-    pinLayout: [{ direction: PinDirection.BIDIRECTIONAL, label: 'gnd', defaultBitWidth: 1, position: { x: 0, y: 0 }, isNegatable: false, isClockCapable: false }],
+    pinLayout: [{ direction: PinDirection.BIDIRECTIONAL, label: 'gnd', defaultBitWidth: 1, position: { x: 0, y: 0 }, isNegatable: false, isClockCapable: false, kind: 'signal' as const }],
     propertyDefs: [], attributeMap: [], category: ComponentCategory.PASSIVES, helpText: '',
     pinElectrical: {},
     defaultModel: 'behavioral',
@@ -122,16 +122,16 @@ function makeGroundDef(): ComponentDefinition {
         setParam(_key: string, _value: number) {},
       }), paramDefs: [], params: {} },
     },
-  } as unknown as ComponentDefinition;
+  };
 }
 
-function makeResistorDef(): ComponentDefinition {
+function makeResistorDef(): StandaloneComponentDefinition {
   return {
-    name: 'Resistor', typeId: -1 as unknown as number,
+    name: 'Resistor', typeId: -1,
     factory: () => makeAnalogElementObj('Resistor', crypto.randomUUID(), [{ x: 0, y: 0, label: 'p1' }, { x: 0, y: 4, label: 'p2' }]),
     pinLayout: [
-      { direction: PinDirection.BIDIRECTIONAL, label: 'p1', defaultBitWidth: 1, position: { x: 0, y: 0 }, isNegatable: false, isClockCapable: false },
-      { direction: PinDirection.BIDIRECTIONAL, label: 'p2', defaultBitWidth: 1, position: { x: 0, y: 4 }, isNegatable: false, isClockCapable: false },
+      { direction: PinDirection.BIDIRECTIONAL, label: 'p1', defaultBitWidth: 1, position: { x: 0, y: 0 }, isNegatable: false, isClockCapable: false, kind: 'signal' as const },
+      { direction: PinDirection.BIDIRECTIONAL, label: 'p2', defaultBitWidth: 1, position: { x: 0, y: 4 }, isNegatable: false, isClockCapable: false, kind: 'signal' as const },
     ],
     propertyDefs: [], attributeMap: [], category: ComponentCategory.PASSIVES, helpText: '',
     pinElectrical: {},
@@ -140,7 +140,7 @@ function makeResistorDef(): ComponentDefinition {
     modelRegistry: {
       behavioral: { kind: 'inline' as const, factory: (pinNodes: ReadonlyMap<string, number>) => makeResistorAnalogEl(pinNodes.get('p1') ?? 0, pinNodes.get('p2') ?? 0, 1000), paramDefs: [], params: {} },
     },
-  } as unknown as ComponentDefinition;
+  };
 }
 
 function buildAnalogCircuit(): { circuit: Circuit; registry: ComponentRegistry } {

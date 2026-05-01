@@ -8,7 +8,7 @@ import { readFileSync } from "fs";
 import { SimulationLoader } from "../loader.js";
 import { serializeCircuit } from "../../io/dts-serializer.js";
 import { ComponentRegistry, ComponentCategory } from "../../core/registry.js";
-import type { ComponentDefinition } from "../../core/registry.js";
+import type { StandaloneComponentDefinition } from "../../core/registry.js";
 import { PropertyBag } from "../../core/properties.js";
 import { Circuit, Wire } from "../../core/circuit.js";
 import { TestElement } from "../../test-fixtures/test-element.js";
@@ -18,7 +18,7 @@ import { noopExecFn } from "../../test-fixtures/execute-stubs.js";
 // Registry helpers
 // ---------------------------------------------------------------------------
 
-function makeDefinition(name: string): ComponentDefinition {
+function makeDefinition(name: string): StandaloneComponentDefinition {
   return {
     name,
     typeId: -1,

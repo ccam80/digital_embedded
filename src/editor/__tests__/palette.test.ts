@@ -6,7 +6,7 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { ComponentPalette } from "../palette.js";
 import { ComponentRegistry, ComponentCategory } from "@/core/registry";
-import type { ComponentDefinition } from "@/core/registry";
+import type { ComponentDefinition, StandaloneComponentDefinition } from "@/core/registry";
 
 // ---------------------------------------------------------------------------
 // Test helpers
@@ -19,7 +19,7 @@ function makeRegistry(): ComponentRegistry {
 function stubDef(
   name: string,
   category: ComponentCategory,
-): ComponentDefinition {
+): StandaloneComponentDefinition {
   return {
     name,
     typeId: -1,

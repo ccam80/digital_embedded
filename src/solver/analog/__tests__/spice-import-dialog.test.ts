@@ -16,7 +16,6 @@ import { applySpiceImportResult } from "../../../app/spice-model-apply.js";
 import { compileUnified } from "@/compile/compile.js";
 import { Circuit, Wire } from "../../../core/circuit.js";
 import { ComponentRegistry, ComponentCategory } from "../../../core/registry.js";
-import type { ComponentDefinition } from "../../../core/registry.js";
 import { PropertyBag } from "../../../core/properties.js";
 import type { PropertyValue } from "../../../core/properties.js";
 import type { CircuitElement } from "../../../core/element.js";
@@ -59,7 +58,7 @@ function makeElement(
   registry?: ComponentRegistry,
 ): CircuitElement {
   const def = registry?.get(typeId);
-  const resolvedPins = pins.map((p, i) => makePin(p.x, p.y, p.label || def?.pinLayout[i]?.label || ""));
+  const resolvedPins = pins.map((p, i) => makePin(p.x, p.y, p.label || def?.pinLayout?.[i]?.label || ""));
   const propertyBag = new PropertyBag(propsMap.entries());
   const _mp: Record<string, number> = {};
   for (const [k, v] of propsMap) if (typeof v === 'number') _mp[k] = v;
@@ -130,12 +129,13 @@ describe("spice-import-dialog: parse and apply", () => {
     registry.register({
       name: "NpnStub",
       typeId: -1,
-      factory: (_props: unknown) => { throw new Error("unused"); },
+      factory: (_props: PropertyBag) => { throw new Error("unused"); },
       pinLayout: [],
       propertyDefs: [],
       attributeMap: [],
       category: ComponentCategory.MISC,
       helpText: "NPN Stub",
+      models: {},
       modelRegistry: {
         behavioral: {
           kind: "inline",
@@ -150,10 +150,11 @@ describe("spice-import-dialog: parse and apply", () => {
             getPinCurrents(_rhs: Float64Array) { return []; },
             setParam(_k: string, _v: number) {},
           }),
+          paramDefs: [],
           params: {},
         },
       },
-    } as unknown as ComponentDefinition);
+    });
 
     applySpiceImportResult(element, {
       overrides: { IS: 1e-14, BF: 200 },
@@ -176,12 +177,13 @@ describe("spice-import-dialog: parse and apply", () => {
     registry.register({
       name: "NpnStub",
       typeId: -1,
-      factory: (_props: unknown) => { throw new Error("unused"); },
+      factory: (_props: PropertyBag) => { throw new Error("unused"); },
       pinLayout: [],
       propertyDefs: [],
       attributeMap: [],
       category: ComponentCategory.MISC,
       helpText: "NPN Stub",
+      models: {},
       modelRegistry: {
         behavioral: {
           kind: "inline",
@@ -196,10 +198,11 @@ describe("spice-import-dialog: parse and apply", () => {
             getPinCurrents(_rhs: Float64Array) { return []; },
             setParam(_k: string, _v: number) {},
           }),
+          paramDefs: [],
           params: {},
         },
       },
-    } as unknown as ComponentDefinition);
+    });
 
     applySpiceImportResult(element, {
       overrides: { IS: 2e-14 },
@@ -225,12 +228,13 @@ describe("spice-import-dialog: parse and apply", () => {
     registry.register({
       name: "NpnStub",
       typeId: -1,
-      factory: (_props: unknown) => { throw new Error("unused"); },
+      factory: (_props: PropertyBag) => { throw new Error("unused"); },
       pinLayout: [],
       propertyDefs: [],
       attributeMap: [],
       category: ComponentCategory.MISC,
       helpText: "NPN Stub",
+      models: {},
       modelRegistry: {
         behavioral: {
           kind: "inline",
@@ -245,10 +249,11 @@ describe("spice-import-dialog: parse and apply", () => {
             getPinCurrents(_rhs: Float64Array) { return []; },
             setParam(_k: string, _v: number) {},
           }),
+          paramDefs: [],
           params: {},
         },
       },
-    } as unknown as ComponentDefinition);
+    });
 
     applySpiceImportResult(element, {
       overrides: { IS: 5e-15, BF: 300 },
@@ -273,12 +278,13 @@ describe("spice-import-dialog: parse and apply", () => {
     registry.register({
       name: "NpnStub",
       typeId: -1,
-      factory: (_props: unknown) => { throw new Error("unused"); },
+      factory: (_props: PropertyBag) => { throw new Error("unused"); },
       pinLayout: [],
       propertyDefs: [],
       attributeMap: [],
       category: ComponentCategory.MISC,
       helpText: "NPN Stub",
+      models: {},
       modelRegistry: {
         behavioral: {
           kind: "inline",
@@ -293,10 +299,11 @@ describe("spice-import-dialog: parse and apply", () => {
             getPinCurrents(_rhs: Float64Array) { return []; },
             setParam(_k: string, _v: number) {},
           }),
+          paramDefs: [],
           params: {},
         },
       },
-    } as unknown as ComponentDefinition);
+    });
 
     applySpiceImportResult(element, {
       overrides: { IS: 1e-14, BF: 200 },
@@ -347,7 +354,7 @@ describe("spice-import-dialog: compile integration", () => {
     registry.register({
       name: "Ground",
       typeId: -1,
-      factory: (_props: unknown) => { throw new Error("unused"); },
+      factory: (_props: PropertyBag) => { throw new Error("unused"); },
       pinLayout: [],
       propertyDefs: [],
       attributeMap: [],
@@ -355,29 +362,31 @@ describe("spice-import-dialog: compile integration", () => {
       helpText: "Ground",
       models: {},
       modelRegistry: { behavioral: { kind: 'inline' as const, factory: () => { throw new Error('not used'); }, paramDefs: [], params: {} } },
-    } as unknown as ComponentDefinition);
+    });
 
     registry.register({
       name: "NpnStub",
       typeId: -1,
-      factory: (_props: unknown) => { throw new Error("unused"); },
+      factory: (_props: PropertyBag) => { throw new Error("unused"); },
       pinLayout: [
-        { label: "C", direction: PinDirection.BIDIRECTIONAL, position: { x: 0, y: 0 } },
-        { label: "B", direction: PinDirection.BIDIRECTIONAL, position: { x: 0, y: 0 } },
-        { label: "E", direction: PinDirection.BIDIRECTIONAL, position: { x: 0, y: 0 } },
+        { label: "C", direction: PinDirection.BIDIRECTIONAL, position: { x: 0, y: 0 }, defaultBitWidth: 1, isNegatable: false, isClockCapable: false, kind: "signal" as const },
+        { label: "B", direction: PinDirection.BIDIRECTIONAL, position: { x: 0, y: 0 }, defaultBitWidth: 1, isNegatable: false, isClockCapable: false, kind: "signal" as const },
+        { label: "E", direction: PinDirection.BIDIRECTIONAL, position: { x: 0, y: 0 }, defaultBitWidth: 1, isNegatable: false, isClockCapable: false, kind: "signal" as const },
       ],
       propertyDefs: [],
       attributeMap: [],
       category: ComponentCategory.MISC,
       helpText: "NPN Stub",
+      models: {},
       modelRegistry: {
         behavioral: {
           kind: "inline",
           factory: npnFactory,
+          paramDefs: [],
           params: { ...BJT_NPN_DEFAULTS },
         },
       },
-    } as unknown as ComponentDefinition);
+    });
 
     const propsMap = new Map<string, PropertyValue>();
     propsMap.set("label", "q1");
@@ -453,12 +462,13 @@ describe("spice-import-dialog: compile integration", () => {
     registry.register({
       name: "NpnStub",
       typeId: -1,
-      factory: (_props: unknown) => { throw new Error("unused"); },
+      factory: (_props: PropertyBag) => { throw new Error("unused"); },
       pinLayout: [],
       propertyDefs: [],
       attributeMap: [],
       category: ComponentCategory.MISC,
       helpText: "NPN Stub",
+      models: {},
       modelRegistry: {
         behavioral: {
           kind: "inline",
@@ -473,10 +483,11 @@ describe("spice-import-dialog: compile integration", () => {
             getPinCurrents(_rhs: Float64Array) { return []; },
             setParam(_k: string, _v: number) {},
           }),
+          paramDefs: [],
           params: {},
         },
       },
-    } as unknown as ComponentDefinition);
+    });
 
     const circuit = new Circuit();
     applySpiceImportResult(element, {

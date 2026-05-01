@@ -11,7 +11,7 @@ import { PinDirection } from '../../core/pin.js';
 import { ComponentRegistry } from '../../core/registry.js';
 import { FacadeError } from '../../headless/types.js';
 import type { Pin } from '../../core/pin.js';
-import type { ComponentDefinition } from '../../core/registry.js';
+import type { StandaloneComponentDefinition } from '../../core/registry.js';
 import { ComponentCategory } from '../../core/registry.js';
 import type { PropertyValue } from '../../core/properties.js';
 import type { MeasurementObserver } from '../../core/engine-interface.js';
@@ -165,7 +165,7 @@ function makeAnalogDef(
   name: string,
   pinPairs: Array<{ x: number; y: number; label?: string }>,
   mnaFactory: (pinNodes: ReadonlyMap<string, number>) => AnalogElement,
-): ComponentDefinition {
+): StandaloneComponentDefinition {
   return {
     name,
     typeId: -1,
@@ -187,10 +187,10 @@ function makeAnalogDef(
     defaultModel: 'behavioral',
     models: {},
     modelRegistry: { behavioral: { kind: 'inline' as const, factory: (pinNodes: ReadonlyMap<string, number>, _props: PropertyBag, _getTime: () => number) => mnaFactory(pinNodes), paramDefs: [], params: {} } },
-  } as ComponentDefinition;
+  };
 }
 
-function makeGroundDef(): ComponentDefinition {
+function makeGroundDef(): StandaloneComponentDefinition {
   return {
     name: 'Ground',
     typeId: -1,
@@ -218,7 +218,7 @@ function makeGroundDef(): ComponentDefinition {
         setParam(_key: string, _value: number) {},
       }), paramDefs: [], params: {} },
     },
-  } as ComponentDefinition;
+  };
 }
 
 function buildResistorDividerCircuit(): { circuit: Circuit; registry: ComponentRegistry } {

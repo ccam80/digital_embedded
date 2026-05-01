@@ -387,13 +387,6 @@ export function isStandalone(def: ComponentDefinition): def is StandaloneCompone
   return def.internalOnly !== true;
 }
 
-/** Type guard: true when the definition is an internal-only sub-element.
- *  Negation of `isStandalone`; kept for callers that read more naturally
- *  with the positive internal-only check. */
-export function isInternalOnly(def: ComponentDefinition): boolean {
-  return def.internalOnly === true;
-}
-
 // ---------------------------------------------------------------------------
 // ComponentRegistry
 // ---------------------------------------------------------------------------
@@ -420,7 +413,7 @@ export class ComponentRegistry {
    *
    * Throws if a definition with the same name is already registered.
    */
-  register(def: ComponentDefinition): void {
+  register(def: ComponentDefinition | StandaloneComponentDefinition): void {
     if (this._byName.has(def.name)) {
       throw new Error(`ComponentRegistry: "${def.name}" is already registered`);
     }
@@ -456,7 +449,7 @@ export class ComponentRegistry {
    *
    * Throws if the name is not already registered.
    */
-  update(def: ComponentDefinition): void {
+  update(def: ComponentDefinition | StandaloneComponentDefinition): void {
     const existing = this._byName.get(def.name);
     if (existing === undefined) {
       throw new Error(`ComponentRegistry: "${def.name}" is not registered- use register()`);
@@ -488,7 +481,7 @@ export class ComponentRegistry {
    * Convenience method for subcircuit loading where the caller doesn't know
    * (or care) whether the name was previously registered.
    */
-  registerOrUpdate(def: ComponentDefinition): void {
+  registerOrUpdate(def: ComponentDefinition | StandaloneComponentDefinition): void {
     if (this._byName.has(def.name)) {
       this.update(def);
     } else {

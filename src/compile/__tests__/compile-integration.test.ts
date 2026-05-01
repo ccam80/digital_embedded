@@ -17,7 +17,7 @@ import type { RenderContext, Rect } from '../../core/renderer-interface.js';
 import { PropertyBag } from '../../core/properties.js';
 import type { PropertyBag as PropertyBagType, PropertyValue } from '../../core/properties.js';
 import { ComponentRegistry } from '../../core/registry.js';
-import type { ComponentDefinition, ComponentModels, ModelEntry } from '../../core/registry.js';
+import type { StandaloneComponentDefinition, ComponentModels, ModelEntry } from '../../core/registry.js';
 import { ComponentCategory } from '../../core/registry.js';
 import type { SerializedElement } from '../../core/element.js';
 import type { CircuitElement } from '../../core/element.js';
@@ -136,7 +136,7 @@ function makeCapacitorElement(nodeA: number, nodeB: number, branchIdx: number): 
     setup(_ctx) {},
     load(_ctx: LoadContext): void { /* no-op for static test fixture */ },
     stampAc(_s: ComplexSparseSolver, _omega: number, _ctx: LoadContext) {},
-    getLteTimestep(_dt: number, _deltaOld: readonly number[], _order: number, _method: import('../../core/analog-types.js').IntegrationMethod, _lteParams: import('../../solver/analog/ckt-terr.js').LteParams): number { return Infinity; },
+    getLteTimestep(_dt: number, _deltaOld: readonly number[], _order: number, _method: import('../../solver/analog/integration.js').IntegrationMethod, _lteParams: import('../../solver/analog/ckt-terr.js').LteParams): number { return Infinity; },
     getPinCurrents(_v: Float64Array) { return [0, 0]; },
     setParam(_key: string, _value: number) {},
   };
@@ -147,7 +147,7 @@ function makeCapacitorElement(nodeA: number, nodeB: number, branchIdx: number): 
 // ---------------------------------------------------------------------------
 
 
-function makeDigitalDef(name: string, pins: PinDeclaration[] = []): ComponentDefinition {
+function makeDigitalDef(name: string, pins: PinDeclaration[] = []): StandaloneComponentDefinition {
   return {
     name,
     typeId: -1,
@@ -165,7 +165,7 @@ function makeAnalogDef(
   name: string,
   branchCount: boolean,
   factoryFn: (pinNodes: ReadonlyMap<string, number>) => AnalogElement,
-): ComponentDefinition {
+): StandaloneComponentDefinition {
   return {
     name,
     typeId: -1,
@@ -180,19 +180,19 @@ function makeAnalogDef(
     modelRegistry: {
       behavioral: { kind: 'inline' as const, factory: (pinNodes: ReadonlyMap<string, number>, _props: PropertyBagType, _getTime: () => number) => factoryFn(pinNodes), branchCount: branchCount ? 1 : 0, paramDefs: [], params: {} },
     },
-  } as ComponentDefinition;
+  };
 }
 
 function buildDigitalRegistry(): ComponentRegistry {
   const r = new ComponentRegistry();
   const twoIn = [inputPin(0, 0, 'a'), inputPin(0, 1, 'b'), outputPin(2, 0, 'out')];
   const singleIn = [inputPin(0, 0, 'in'), outputPin(2, 0, 'out')];
-  r.register(makeDigitalDef('And', twoIn) as ComponentDefinition);
-  r.register(makeDigitalDef('Not', singleIn) as ComponentDefinition);
-  r.register(makeDigitalDef('Nor', twoIn) as ComponentDefinition);
-  r.register(makeDigitalDef('In', [outputPin(0, 0, 'out')]) as ComponentDefinition);
-  r.register(makeDigitalDef('Out', [inputPin(0, 0, 'in')]) as ComponentDefinition);
-  r.register(makeDigitalDef('Tunnel', [outputPin(0, 0, 'out')]) as ComponentDefinition);
+  r.register(makeDigitalDef('And', twoIn));
+  r.register(makeDigitalDef('Not', singleIn));
+  r.register(makeDigitalDef('Nor', twoIn));
+  r.register(makeDigitalDef('In', [outputPin(0, 0, 'out')]));
+  r.register(makeDigitalDef('Out', [inputPin(0, 0, 'in')]));
+  r.register(makeDigitalDef('Tunnel', [outputPin(0, 0, 'out')]));
   return r;
 }
 
@@ -204,21 +204,21 @@ function buildAnalogRegistry(): ComponentRegistry {
       const [n0, n1] = [...pinNodes.values()];
       return makeVsElement(n0 ?? 0, n1 ?? 0, -1);
     }),
-  } as ComponentDefinition);
+  });
 
   r.register({
     ...makeAnalogDef('AnalogR', false, (pinNodes) => {
       const [n0, n1] = [...pinNodes.values()];
       return makeResistorElement(n0 ?? 0, n1 ?? 0);
     }),
-  } as ComponentDefinition);
+  });
 
   r.register({
     ...makeAnalogDef('AnalogC', true, (pinNodes) => {
       const [n0, n1] = [...pinNodes.values()];
       return makeCapacitorElement(n0 ?? 0, n1 ?? 0, -1);
     }),
-  } as ComponentDefinition);
+  });
 
   r.register({
     name: 'Ground',
@@ -231,7 +231,7 @@ function buildAnalogRegistry(): ComponentRegistry {
     helpText: '',
     models: {},
     modelRegistry: { behavioral: { kind: 'inline' as const, factory: () => { throw new Error('not used'); }, paramDefs: [], params: {} } },
-  } as ComponentDefinition);
+  });
 
   return r;
 }
@@ -241,9 +241,9 @@ function buildMixedRegistry(): ComponentRegistry {
   const twoIn = [inputPin(0, 0, 'a'), inputPin(0, 1, 'b'), outputPin(2, 0, 'out')];
 
   // Digital components
-  r.register(makeDigitalDef('And', twoIn) as ComponentDefinition);
-  r.register(makeDigitalDef('In', [outputPin(0, 0, 'out')]) as ComponentDefinition);
-  r.register(makeDigitalDef('Out', [inputPin(0, 0, 'in')]) as ComponentDefinition);
+  r.register(makeDigitalDef('And', twoIn));
+  r.register(makeDigitalDef('In', [outputPin(0, 0, 'out')]));
+  r.register(makeDigitalDef('Out', [inputPin(0, 0, 'in')]));
 
   // Analog components
   r.register(makeAnalogDef('AnalogR', false, (pinNodes) => {
@@ -262,7 +262,7 @@ function buildMixedRegistry(): ComponentRegistry {
     helpText: '',
     models: {},
     modelRegistry: { behavioral: { kind: 'inline' as const, factory: () => { throw new Error('not used'); }, paramDefs: [], params: {} } },
-  } as ComponentDefinition);
+  });
 
   // Bridge component with both models (has digital output, analog input)
   r.register({
@@ -283,7 +283,7 @@ function buildMixedRegistry(): ComponentRegistry {
         return makeResistorElement(n0 ?? 0, n1 ?? 0);
       }, paramDefs: [], params: {} },
     },
-  } as ComponentDefinition);
+  });
 
   return r;
 }
@@ -671,7 +671,7 @@ describe('compileUnified- width mismatch diagnostic', () => {
       category: ComponentCategory.MISC,
       helpText: '',
       models: { digital: { executeFn: noopExecFn } } as ComponentModels,
-    } as ComponentDefinition);
+    });
     registry.register({
       name: 'Dst',
       typeId: -1,
@@ -682,7 +682,7 @@ describe('compileUnified- width mismatch diagnostic', () => {
       category: ComponentCategory.MISC,
       helpText: '',
       models: { digital: { executeFn: noopExecFn } } as ComponentModels,
-    } as ComponentDefinition);
+    });
 
     const circuit = new Circuit();
     // Both at (0,0) so their pins at (2,0) overlap → share a net with mismatched widths
@@ -748,7 +748,7 @@ describe('compileUnified- labelSignalMap', () => {
       category: ComponentCategory.IO,
       helpText: '',
       models: { digital: { executeFn: noopExecFn } } as ComponentModels,
-    } as ComponentDefinition);
+    });
     registry.register({
       name: 'Out',
       typeId: -1,
@@ -759,7 +759,7 @@ describe('compileUnified- labelSignalMap', () => {
       category: ComponentCategory.IO,
       helpText: '',
       models: { digital: { executeFn: noopExecFn } } as ComponentModels,
-    } as ComponentDefinition);
+    });
 
     const circuit = new Circuit();
 
@@ -803,7 +803,7 @@ describe('compileUnified- labelSignalMap', () => {
       category: ComponentCategory.IO,
       helpText: '',
       models: { digital: { executeFn: noopExecFn } } as ComponentModels,
-    } as ComponentDefinition);
+    });
     registry.register({
       name: 'Out',
       typeId: -1,
@@ -814,7 +814,7 @@ describe('compileUnified- labelSignalMap', () => {
       category: ComponentCategory.IO,
       helpText: '',
       models: { digital: { executeFn: noopExecFn } } as ComponentModels,
-    } as ComponentDefinition);
+    });
 
     const circuit = new Circuit();
     const inProps = new PropertyBag(new Map([['label', 'A']]));
@@ -871,14 +871,14 @@ describe('compileUnified- model resolution', () => {
       helpText: '',
       models: {},
       modelRegistry: { behavioral: { kind: 'inline' as const, factory: () => { throw new Error('not used'); }, paramDefs: [], params: {} } },
-    } as ComponentDefinition);
+    });
 
     r.register({
       ...makeAnalogDef('AnalogR', false, (pinNodes) => {
         const [n0, n1] = [...pinNodes.values()];
         return makeResistorElement(n0 ?? 0, n1 ?? 0);
       }),
-    } as ComponentDefinition);
+    });
 
     const twoIn = [inputPin(0, 0, 'a'), inputPin(0, 1, 'b'), outputPin(2, 0, 'out')];
     const behavioralEntry: ModelEntry = {
@@ -904,7 +904,7 @@ describe('compileUnified- model resolution', () => {
       } as ComponentModels,
       modelRegistry: { behavioral: behavioralEntry },
       defaultModel: 'digital',
-    } as ComponentDefinition);
+    });
 
     return r;
   }
@@ -961,7 +961,7 @@ describe('compileUnified- model resolution', () => {
       helpText: '',
       models: {},
       modelRegistry: { behavioral: { kind: 'inline' as const, factory: () => { throw new Error('not used'); }, paramDefs: [], params: {} } },
-    } as ComponentDefinition);
+    });
 
     r.register({
       ...makeAnalogDef('AnalogR', false, (pinNodes) => {
@@ -972,7 +972,7 @@ describe('compileUnified- model resolution', () => {
         { label: 'a', direction: PinDirection.BIDIRECTIONAL, defaultBitWidth: 1, position: { x: 0, y: 0 }, isNegatable: false, isClockCapable: false, kind: "signal" },
         { label: 'b', direction: PinDirection.BIDIRECTIONAL, defaultBitWidth: 1, position: { x: 2, y: 0 }, isNegatable: false, isClockCapable: false, kind: "signal" },
       ],
-    } as ComponentDefinition);
+    });
 
     const circuit = new Circuit();
     circuit.addElement(makeAnalogElement('AnalogR', 'r1', [{ x: 0, y: 0 }, { x: 2, y: 0 }]));

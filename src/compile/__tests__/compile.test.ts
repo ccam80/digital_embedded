@@ -13,7 +13,7 @@ import { describe, it, expect } from "vitest";
 import { compileUnified } from "../compile.js";
 import { Circuit, Wire } from "../../core/circuit.js";
 import { ComponentRegistry } from "../../core/registry.js";
-import type { ComponentDefinition, ExecuteFunction } from "../../core/registry.js";
+import type { StandaloneComponentDefinition, ExecuteFunction } from "../../core/registry.js";
 import { ComponentCategory } from "../../core/registry.js";
 import type { Pin, PinDeclaration } from "../../core/pin.js";
 import { PinDirection } from "../../core/pin.js";
@@ -109,7 +109,7 @@ function makeDigitalDef(
   name: string,
   pinDecls: PinDeclaration[],
   executeFn: ExecuteFunction = noopExecFn,
-): ComponentDefinition {
+): StandaloneComponentDefinition {
   return {
     name,
     typeId: -1,
@@ -123,10 +123,10 @@ function makeDigitalDef(
     models: {
       digital: { executeFn },
     },
-  } as ComponentDefinition;
+  };
 }
 
-function makeInDef(): ComponentDefinition {
+function makeInDef(): StandaloneComponentDefinition {
   const pinDecls = inPinDecl("out", { x: 2, y: 0 });
   return {
     name: "In",
@@ -141,10 +141,10 @@ function makeInDef(): ComponentDefinition {
     models: {
       digital: { executeFn: noopExecFn },
     },
-  } as ComponentDefinition;
+  };
 }
 
-function makeOutDef(): ComponentDefinition {
+function makeOutDef(): StandaloneComponentDefinition {
   const pinDecls = outPinDecl("in", { x: 0, y: 0 });
   return {
     name: "Out",
@@ -159,7 +159,7 @@ function makeOutDef(): ComponentDefinition {
     models: {
       digital: { executeFn: noopExecFn },
     },
-  } as ComponentDefinition;
+  };
 }
 
 // Minimal resistor AnalogElement factory
@@ -202,7 +202,7 @@ function makeAnalogDef(
   name: string,
   pinPairs: Array<{ x: number; y: number; label?: string }>,
   mnaFactory: (pinNodes: ReadonlyMap<string, number>) => AnalogElement,
-): ComponentDefinition {
+): StandaloneComponentDefinition {
   return {
     name,
     typeId: -1,
@@ -226,10 +226,10 @@ function makeAnalogDef(
     modelRegistry: {
       behavioral: { kind: 'inline' as const, factory: (pinNodes: ReadonlyMap<string, number>, _props: PropertyBagType, _getTime: () => number) => mnaFactory(pinNodes), paramDefs: [], params: {} },
     },
-  } as ComponentDefinition;
+  };
 }
 
-function makeGroundDef(): ComponentDefinition {
+function makeGroundDef(): StandaloneComponentDefinition {
   return {
     name: "Ground",
     typeId: -1,
@@ -263,10 +263,10 @@ function makeGroundDef(): ComponentDefinition {
         setParam(_key: string, _value: number) {},
       }), paramDefs: [], params: {} },
     },
-  } as ComponentDefinition;
+  };
 }
 
-function makeRegistry(...defs: ComponentDefinition[]): ComponentRegistry {
+function makeRegistry(...defs: StandaloneComponentDefinition[]): ComponentRegistry {
   const registry = new ComponentRegistry();
   for (const def of defs) {
     registry.register(def);
