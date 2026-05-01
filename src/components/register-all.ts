@@ -196,6 +196,83 @@ import { BooleanFunctionDefinition } from "./basic/function.js";
 // 74xx library
 import { register74xxLibrary } from "./library-74xx.js";
 
+// Digital pin sub-elements (internalOnly)
+import { DigitalInputPinLoadedDefinition } from "./digital-pins/digital-input-pin-loaded.js";
+import { DigitalInputPinUnloadedDefinition } from "./digital-pins/digital-input-pin-unloaded.js";
+import { DigitalOutputPinLoadedDefinition } from "./digital-pins/digital-output-pin-loaded.js";
+import { DigitalOutputPinUnloadedDefinition } from "./digital-pins/digital-output-pin-unloaded.js";
+
+// Behavioral output driver (internalOnly)
+import { BehavioralOutputDriverDefinition } from "../solver/analog/behavioral-output-driver.js";
+
+// Optocoupler internal sub-elements (internalOnly)
+import { InternalZeroVoltSenseDefinition } from "./active/internal-zero-volt-sense.js";
+import { InternalCccsDefinition } from "./active/internal-cccs.js";
+
+// Timer 555 latch driver (internalOnly)
+import { Timer555LatchDriverDefinition } from "./active/timer-555-latch-driver.js";
+
+// Transmission-line segment sub-elements (internalOnly)
+import { TransmissionSegmentRDefinition } from "./passives/transmission-segment-r.js";
+import { TransmissionSegmentLDefinition } from "./passives/transmission-segment-l.js";
+import { TransmissionSegmentGDefinition } from "./passives/transmission-segment-g.js";
+import { TransmissionSegmentCDefinition } from "./passives/transmission-segment-c.js";
+import { TransmissionSegmentRLDefinition } from "./passives/transmission-segment-rl.js";
+
+// Relay sub-elements (internalOnly)
+import { RelayCouplingDefinition } from "./switching/relay-coupling.js";
+import { RelayInductorDefinition } from "./switching/relay-inductor.js";
+import { RelayResistorDefinition } from "./switching/relay-resistor.js";
+
+// Floating-gate FET blown drivers (internalOnly)
+import { FGNFETBlownDriverDefinition } from "./switching/fgnfet-blown-driver.js";
+import { FGPFETBlownDriverDefinition } from "./switching/fgpfet-blown-driver.js";
+
+// Gate behavioral drivers (internalOnly)
+import { BehavioralAndDriverDefinition } from "../solver/analog/behavioral-drivers/and-driver.js";
+import { BehavioralOrDriverDefinition } from "../solver/analog/behavioral-drivers/or-driver.js";
+import { BehavioralNandDriverDefinition } from "../solver/analog/behavioral-drivers/nand-driver.js";
+import { BehavioralNorDriverDefinition } from "../solver/analog/behavioral-drivers/nor-driver.js";
+import { BehavioralXorDriverDefinition } from "../solver/analog/behavioral-drivers/xor-driver.js";
+import { BehavioralXnorDriverDefinition } from "../solver/analog/behavioral-drivers/xnor-driver.js";
+import { BehavioralNotDriverDefinition } from "../solver/analog/behavioral-drivers/not-driver.js";
+import { BehavioralBufDriverDefinition } from "../solver/analog/behavioral-drivers/buf-driver.js";
+
+// Wiring behavioral drivers (internalOnly)
+import { BehavioralMuxDriverDefinition } from "../solver/analog/behavioral-drivers/mux-driver.js";
+import { BehavioralDemuxDriverDefinition } from "../solver/analog/behavioral-drivers/demux-driver.js";
+import { BehavioralDecoderDriverDefinition } from "../solver/analog/behavioral-drivers/decoder-driver.js";
+
+// Sequential behavioral drivers (internalOnly)
+import { BehavioralCounterDriverDefinition } from "../solver/analog/behavioral-drivers/counter-driver.js";
+import { BehavioralRegisterDriverDefinition } from "../solver/analog/behavioral-drivers/register-driver.js";
+import { BehavioralCounterPresetDriverDefinition } from "../solver/analog/behavioral-drivers/counter-preset-driver.js";
+
+// Remaining behavioral drivers (internalOnly)
+import { BehavioralDriverDriverDefinition } from "../solver/analog/behavioral-drivers/driver-driver.js";
+import { BehavioralDriverInvDriverDefinition } from "../solver/analog/behavioral-drivers/driver-inv-driver.js";
+import { BehavioralSplitterDriverDefinition } from "../solver/analog/behavioral-drivers/splitter-driver.js";
+import { BehavioralSevenSegDriverDefinition } from "../solver/analog/behavioral-drivers/seven-seg-driver.js";
+import { BehavioralButtonLEDDriverDefinition } from "../solver/analog/behavioral-drivers/button-led-driver.js";
+
+// Flip-flop behavioral drivers (internalOnly)
+import { BehavioralDFlipflopDriverDefinition } from "../solver/analog/behavioral-drivers/d-flipflop-driver.js";
+import { BehavioralTFlipflopDriverDefinition } from "../solver/analog/behavioral-drivers/t-flipflop-driver.js";
+import { BehavioralRSFlipflopDriverDefinition } from "../solver/analog/behavioral-drivers/rs-flipflop-driver.js";
+import { BehavioralRSAsyncLatchDriverDefinition } from "../solver/analog/behavioral-drivers/rs-async-latch-driver.js";
+import { BehavioralJKFlipflopDriverDefinition } from "../solver/analog/behavioral-drivers/jk-flipflop-driver.js";
+import { BehavioralJKAsyncFlipflopDriverDefinition } from "../solver/analog/behavioral-drivers/jk-async-flipflop-driver.js";
+import { BehavioralDAsyncFlipflopDriverDefinition } from "../solver/analog/behavioral-drivers/d-async-flipflop-driver.js";
+
+// Analog active drivers (internalOnly)
+import { DACDriverDefinition } from "./active/dac-driver.js";
+import { ADCDriverDefinition } from "./active/adc-driver.js";
+import { ComparatorDriverDefinition } from "./active/comparator-driver.js";
+import { SchmittTriggerDriverDefinition } from "./active/schmitt-trigger-driver.js";
+
+// Transformer coupling sub-element (internalOnly)
+import { TransformerCouplingDefinition } from "./passives/transformer-coupling.js";
+
 /**
  * Create a ComponentRegistry populated with every built-in component type.
  *
@@ -407,6 +484,83 @@ export function createDefaultRegistry(
 
   // 74xx ICs
   register74xxLibrary(registry, pinMap74xx);
+
+  // Digital pin sub-elements (internalOnly)
+  registry.register(DigitalInputPinLoadedDefinition);
+  registry.register(DigitalInputPinUnloadedDefinition);
+  registry.register(DigitalOutputPinLoadedDefinition);
+  registry.register(DigitalOutputPinUnloadedDefinition);
+
+  // Behavioral output driver (internalOnly)
+  registry.register(BehavioralOutputDriverDefinition);
+
+  // Optocoupler internal sub-elements (internalOnly)
+  registry.register(InternalZeroVoltSenseDefinition);
+  registry.register(InternalCccsDefinition);
+
+  // Timer 555 latch driver (internalOnly)
+  registry.register(Timer555LatchDriverDefinition);
+
+  // Transmission-line segment sub-elements (internalOnly)
+  registry.register(TransmissionSegmentRDefinition);
+  registry.register(TransmissionSegmentLDefinition);
+  registry.register(TransmissionSegmentGDefinition);
+  registry.register(TransmissionSegmentCDefinition);
+  registry.register(TransmissionSegmentRLDefinition);
+
+  // Relay sub-elements (internalOnly)
+  registry.register(RelayCouplingDefinition);
+  registry.register(RelayInductorDefinition);
+  registry.register(RelayResistorDefinition);
+
+  // Floating-gate FET blown drivers (internalOnly)
+  registry.register(FGNFETBlownDriverDefinition);
+  registry.register(FGPFETBlownDriverDefinition);
+
+  // Gate behavioral drivers (internalOnly)
+  registry.register(BehavioralAndDriverDefinition);
+  registry.register(BehavioralOrDriverDefinition);
+  registry.register(BehavioralNandDriverDefinition);
+  registry.register(BehavioralNorDriverDefinition);
+  registry.register(BehavioralXorDriverDefinition);
+  registry.register(BehavioralXnorDriverDefinition);
+  registry.register(BehavioralNotDriverDefinition);
+  registry.register(BehavioralBufDriverDefinition);
+
+  // Wiring behavioral drivers (internalOnly)
+  registry.register(BehavioralMuxDriverDefinition);
+  registry.register(BehavioralDemuxDriverDefinition);
+  registry.register(BehavioralDecoderDriverDefinition);
+
+  // Sequential behavioral drivers (internalOnly)
+  registry.register(BehavioralCounterDriverDefinition);
+  registry.register(BehavioralRegisterDriverDefinition);
+  registry.register(BehavioralCounterPresetDriverDefinition);
+
+  // Remaining behavioral drivers (internalOnly)
+  registry.register(BehavioralDriverDriverDefinition);
+  registry.register(BehavioralDriverInvDriverDefinition);
+  registry.register(BehavioralSplitterDriverDefinition);
+  registry.register(BehavioralSevenSegDriverDefinition);
+  registry.register(BehavioralButtonLEDDriverDefinition);
+
+  // Flip-flop behavioral drivers (internalOnly)
+  registry.register(BehavioralDFlipflopDriverDefinition);
+  registry.register(BehavioralTFlipflopDriverDefinition);
+  registry.register(BehavioralRSFlipflopDriverDefinition);
+  registry.register(BehavioralRSAsyncLatchDriverDefinition);
+  registry.register(BehavioralJKFlipflopDriverDefinition);
+  registry.register(BehavioralJKAsyncFlipflopDriverDefinition);
+  registry.register(BehavioralDAsyncFlipflopDriverDefinition);
+
+  // Analog active drivers (internalOnly)
+  registry.register(DACDriverDefinition);
+  registry.register(ADCDriverDefinition);
+  registry.register(ComparatorDriverDefinition);
+  registry.register(SchmittTriggerDriverDefinition);
+
+  // Transformer coupling sub-element (internalOnly)
+  registry.register(TransformerCouplingDefinition);
 
   return registry;
 }
