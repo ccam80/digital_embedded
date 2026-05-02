@@ -1,11 +1,11 @@
-/**
+﻿/**
  * NAnd gate component.
  *
  * Follows the And gate exemplar pattern exactly:
  *   1. CircuitElement class (rendering, properties, pin declarations)
  *   2. Standalone flat executeFn (simulation, zero allocations)
  *   3. AttributeMapping[] for .dig XML parsing
- *   4. ComponentDefinition for registry registration
+ *   4. StandaloneComponentDefinition for registry registration
  */
 
 import { AbstractCircuitElement } from "../../core/element.js";
@@ -16,11 +16,11 @@ import { gateBodyMetrics } from "../../core/pin.js";
 import { PropertyBag, PropertyType } from "../../core/properties.js";
 import {
   ComponentCategory,
-  type ComponentDefinition,
+  type StandaloneComponentDefinition,
   type ComponentLayout,
 } from "../../core/registry.js";
-import type { MnaSubcircuitNetlist } from "../../core/mna-subcircuit-netlist.js";
-import { makeNandAnalogFactory } from "../../solver/analog/behavioral-gate.js";
+import type { MnaSubcircuitNetlist, SubcircuitElement } from "../../core/mna-subcircuit-netlist.js";
+import { defineModelParams } from "../../core/model-params.js";
 import {
   compWidth,
   buildInvertedPinDeclarations,
@@ -152,6 +152,89 @@ const CMOS_NAND2_NETLIST: MnaSubcircuitNetlist = {
 };
 
 // ---------------------------------------------------------------------------
+// Behavioural model parameter declarations
+// ---------------------------------------------------------------------------
+
+export const { paramDefs: NAND_BEHAVIORAL_PARAM_DEFS, defaults: NAND_BEHAVIORAL_DEFAULTS } = defineModelParams({
+  primary: {
+    inputCount: { default: 2,     unit: "",  description: "Number of inputs (structural)" },
+    loaded:     { default: 1,     unit: "",  description: "1 = loaded pins (DigitalInputPinLoaded / DigitalOutputPinLoaded), 0 = unloaded" },
+    vIH:        { default: 2.0,   unit: "V", description: "Input high threshold (CMOS spec)" },
+    vIL:        { default: 0.8,   unit: "V", description: "Input low threshold (CMOS spec)" },
+    rOut:       { default: 100,   unit: "Ω", description: "Output drive resistance" },
+    cOut:       { default: 1e-12, unit: "F", description: "Output companion capacitance" },
+    vOH:        { default: 5.0,   unit: "V", description: "Output high voltage" },
+    vOL:        { default: 0.0,   unit: "V", description: "Output low voltage" },
+  },
+});
+
+// ---------------------------------------------------------------------------
+// buildNandGateNetlist- function-form netlist for the behavioural model
+// ---------------------------------------------------------------------------
+
+export function buildNandGateNetlist(params: PropertyBag): MnaSubcircuitNetlist {
+  const N        = params.getModelParam<number>("inputCount");
+  const loaded   = params.getModelParam<number>("loaded") >= 0.5;
+  const inputPinType  = loaded ? "DigitalInputPinLoaded"  : "DigitalInputPinUnloaded";
+  const outputPinType = loaded ? "DigitalOutputPinLoaded" : "DigitalOutputPinUnloaded";
+
+  const ports: string[] = [];
+  for (let i = 0; i < N; i++) ports.push(`in_${i + 1}`);
+  ports.push("out", "gnd");
+  const outIdx = N;
+  const gndIdx = N + 1;
+
+  const elements: SubcircuitElement[] = [];
+  const netlist: number[][] = [];
+
+  const driverPins: number[] = [];
+  for (let i = 0; i < N; i++) driverPins.push(i);
+  driverPins.push(outIdx, gndIdx);
+  elements.push({
+    typeId: "BehavioralNandDriver",
+    modelRef: "default",
+    subElementName: "drv",
+    params: {
+      inputCount: N,
+      vIH: params.getModelParam<number>("vIH"),
+      vIL: params.getModelParam<number>("vIL"),
+    },
+  });
+  netlist.push(driverPins);
+
+  for (let i = 0; i < N; i++) {
+    elements.push({
+      typeId: inputPinType,
+      modelRef: "default",
+      subElementName: `inPin_${i + 1}`,
+    });
+    netlist.push([i, gndIdx]);
+  }
+
+  elements.push({
+    typeId: outputPinType,
+    modelRef: "default",
+    subElementName: "outPin",
+    params: {
+      rOut: params.getModelParam<number>("rOut"),
+      cOut: params.getModelParam<number>("cOut"),
+      vOH:  params.getModelParam<number>("vOH"),
+      vOL:  params.getModelParam<number>("vOL"),
+      inputLogic: { kind: "siblingState" as const, subElementName: "drv",
+                    slotName: "OUTPUT_LOGIC_LEVEL" },
+    },
+  });
+  netlist.push([outIdx, gndIdx]);
+
+  return {
+    ports,
+    elements,
+    internalNetCount: 0,
+    netlist,
+  };
+}
+
+// ---------------------------------------------------------------------------
 // NAndDefinition
 // ---------------------------------------------------------------------------
 
@@ -165,7 +248,7 @@ function nandFactory(props: PropertyBag): NAndElement {
   );
 }
 
-export const NAndDefinition: ComponentDefinition = {
+export const NAndDefinition: StandaloneComponentDefinition = {
   name: "NAnd",
   typeId: -1,
   factory: nandFactory,
@@ -175,15 +258,15 @@ export const NAndDefinition: ComponentDefinition = {
   category: ComponentCategory.LOGIC,
   helpText:
     "NAnd gate- performs bitwise NOT(AND) of all inputs.\n" +
-    "Configurable input count (2–5) and bit width (1–32).\n" +
+    "Configurable input count (2â€“5) and bit width (1â€“32).\n" +
     "Both IEEE/US (curved with bubble) and IEC/DIN (rectangular with & and bubble) shapes are supported.\n" +
     "Individual inputs can be inverted via the inverterConfig property.",
   modelRegistry: {
     behavioral: {
-      kind: "inline",
-      factory: makeNandAnalogFactory(0),
-      paramDefs: [],
-      params: {},
+      kind: "netlist",
+      netlist: buildNandGateNetlist,
+      paramDefs: NAND_BEHAVIORAL_PARAM_DEFS,
+      params: NAND_BEHAVIORAL_DEFAULTS,
     },
     cmos: {
       kind: "netlist",

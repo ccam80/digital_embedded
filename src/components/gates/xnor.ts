@@ -1,11 +1,11 @@
-/**
+﻿/**
  * XNOr gate component.
  *
  * Follows the And gate exemplar pattern exactly:
  *   1. CircuitElement class (rendering, properties, pin declarations)
  *   2. Standalone flat executeFn (simulation, zero allocations)
  *   3. AttributeMapping[] for .dig XML parsing
- *   4. ComponentDefinition for registry registration
+ *   4. StandaloneComponentDefinition for registry registration
  */
 
 import { AbstractCircuitElement } from "../../core/element.js";
@@ -16,11 +16,11 @@ import { gateBodyMetrics } from "../../core/pin.js";
 import { PropertyBag, PropertyType } from "../../core/properties.js";
 import {
   ComponentCategory,
-  type ComponentDefinition,
+  type StandaloneComponentDefinition,
   type ComponentLayout,
 } from "../../core/registry.js";
-import type { MnaSubcircuitNetlist } from "../../core/mna-subcircuit-netlist.js";
-import { makeXnorAnalogFactory } from "../../solver/analog/behavioral-gate.js";
+import type { MnaSubcircuitNetlist, SubcircuitElement } from "../../core/mna-subcircuit-netlist.js";
+import { defineModelParams } from "../../core/model-params.js";
 import {
   compWidth,
   buildInvertedPinDeclarations,
@@ -66,7 +66,7 @@ export class XNOrElement extends AbstractCircuitElement {
     const inputCount = this._properties.getOrDefault<number>("inputCount", 2);
     const wideShape = this._properties.getOrDefault<boolean>("wideShape", false);
     const { topBorder, bodyHeight } = gateBodyMetrics(inputCount);
-    // Back curve starts at x=0.0; bubble at w+0.5, r=0.45 → maxX = w+0.95+0.05=w+1.
+    // Back curve starts at x=0.0; bubble at w+0.5, r=0.45 â†’ maxX = w+0.95+0.05=w+1.
     return {
       x: this.position.x,
       y: this.position.y - topBorder,
@@ -179,6 +179,99 @@ const CMOS_XNOR2_NETLIST: MnaSubcircuitNetlist = {
 };
 
 // ---------------------------------------------------------------------------
+// Behavioural model parameter declarations
+// ---------------------------------------------------------------------------
+
+export const { paramDefs: XNOR_BEHAVIORAL_PARAM_DEFS, defaults: XNOR_BEHAVIORAL_DEFAULTS } = defineModelParams({
+  primary: {
+    inputCount: { default: 2,     unit: "",  description: "Number of inputs (structural)" },
+    loaded:     { default: 1,     unit: "",  description: "1 = loaded pins (DigitalInputPinLoaded / DigitalOutputPinLoaded), 0 = unloaded" },
+    vIH:        { default: 2.0,   unit: "V", description: "Input high threshold (CMOS spec)" },
+    vIL:        { default: 0.8,   unit: "V", description: "Input low threshold (CMOS spec)" },
+    rOut:       { default: 100,   unit: "Ω", description: "Output drive resistance" },
+    cOut:       { default: 1e-12, unit: "F", description: "Output companion capacitance" },
+    vOH:        { default: 5.0,   unit: "V", description: "Output high voltage" },
+    vOL:        { default: 0.0,   unit: "V", description: "Output low voltage" },
+  },
+});
+
+// ---------------------------------------------------------------------------
+// buildXnorGateNetlist- function-form netlist for the behavioural model
+//
+// Ports (variable count): in_1, in_2, ..., in_N, out, gnd
+// Sub-elements:
+//   drv     : BehavioralXnorDriver  (1-bit pure-truth-function leaf, N inputs)
+//   inPin_i : DigitalInputPin{Loaded|Unloaded}  (one per input port)
+//   outPin  : DigitalOutputPin{Loaded|Unloaded}  (consumes drv OUTPUT_LOGIC_LEVEL)
+// ---------------------------------------------------------------------------
+
+export function buildXnorGateNetlist(params: PropertyBag): MnaSubcircuitNetlist {
+  const N        = params.getModelParam<number>("inputCount");
+  const loaded   = params.getModelParam<number>("loaded") >= 0.5;
+  const inputPinType  = loaded ? "DigitalInputPinLoaded"  : "DigitalInputPinUnloaded";
+  const outputPinType = loaded ? "DigitalOutputPinLoaded" : "DigitalOutputPinUnloaded";
+
+  const ports: string[] = [];
+  for (let i = 0; i < N; i++) ports.push(`in_${i + 1}`);
+  ports.push("out", "gnd");
+  const outIdx = N;
+  const gndIdx = N + 1;
+
+  const elements: SubcircuitElement[] = [];
+  const netlist: number[][] = [];
+
+  // Driver leaf- exposes OUTPUT_LOGIC_LEVEL via siblingState.
+  const driverPins: number[] = [];
+  for (let i = 0; i < N; i++) driverPins.push(i);
+  driverPins.push(outIdx, gndIdx);
+  elements.push({
+    typeId: "BehavioralXnorDriver",
+    modelRef: "default",
+    subElementName: "drv",
+    params: {
+      inputCount: N,
+      vIH: params.getModelParam<number>("vIH"),
+      vIL: params.getModelParam<number>("vIL"),
+    },
+  });
+  netlist.push(driverPins);
+
+  // Input pins- one per input port; pin labels match the driver's `In_${i+1}`
+  // expectations on the same nets.
+  for (let i = 0; i < N; i++) {
+    elements.push({
+      typeId: inputPinType,
+      modelRef: "default",
+      subElementName: `inPin_${i + 1}`,
+    });
+    netlist.push([i, gndIdx]);
+  }
+
+  // Output pin- siblingState consumes the driver's OUTPUT_LOGIC_LEVEL slot.
+  elements.push({
+    typeId: outputPinType,
+    modelRef: "default",
+    subElementName: "outPin",
+    params: {
+      rOut: params.getModelParam<number>("rOut"),
+      cOut: params.getModelParam<number>("cOut"),
+      vOH:  params.getModelParam<number>("vOH"),
+      vOL:  params.getModelParam<number>("vOL"),
+      inputLogic: { kind: "siblingState" as const, subElementName: "drv",
+                    slotName: "OUTPUT_LOGIC_LEVEL" },
+    },
+  });
+  netlist.push([outIdx, gndIdx]);
+
+  return {
+    ports,
+    elements,
+    internalNetCount: 0,
+    netlist,
+  };
+}
+
+// ---------------------------------------------------------------------------
 // XNOrDefinition
 // ---------------------------------------------------------------------------
 
@@ -192,7 +285,7 @@ function xnorFactory(props: PropertyBag): XNOrElement {
   );
 }
 
-export const XNOrDefinition: ComponentDefinition = {
+export const XNOrDefinition: StandaloneComponentDefinition = {
   name: "XNOr",
   typeId: -1,
   factory: xnorFactory,
@@ -202,15 +295,15 @@ export const XNOrDefinition: ComponentDefinition = {
   category: ComponentCategory.LOGIC,
   helpText:
     "XNOr gate- performs bitwise NOT(XOR) of all inputs.\n" +
-    "Configurable input count (2–5) and bit width (1–32).\n" +
+    "Configurable input count (2â€“5) and bit width (1â€“32).\n" +
     "Both IEEE/US (curved with bubble) and IEC/DIN (rectangular with =1 and bubble) shapes are supported.\n" +
     "Individual inputs can be inverted via the inverterConfig property.",
   modelRegistry: {
     behavioral: {
-      kind: "inline",
-      factory: makeXnorAnalogFactory(0),
-      paramDefs: [],
-      params: {},
+      kind: "netlist",
+      netlist: buildXnorGateNetlist,
+      paramDefs: XNOR_BEHAVIORAL_PARAM_DEFS,
+      params: XNOR_BEHAVIORAL_DEFAULTS,
     },
     cmos: {
       kind: "netlist",

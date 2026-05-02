@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Multiplexer component- selects one of N inputs based on selector bits.
  * Output = input[selector].
  *
@@ -24,10 +24,11 @@ import type { PropertyDefinition } from "../../core/properties.js";
 import {
   ComponentCategory,
   type AttributeMapping,
-  type ComponentDefinition,
+  type StandaloneComponentDefinition,
   type ComponentLayout,
 } from "../../core/registry.js";
-import { makeBehavioralMuxAnalogFactory } from "../../solver/analog/behavioral-combinational.js";
+import type { MnaSubcircuitNetlist, SubcircuitElement } from "../../core/mna-subcircuit-netlist.js";
+import { defineModelParams } from "../../core/model-params.js";
 
 // ---------------------------------------------------------------------------
 // Layout constants
@@ -270,6 +271,121 @@ const MUX_PROPERTY_DEFS: PropertyDefinition[] = [
 ];
 
 // ---------------------------------------------------------------------------
+// Behavioural model parameter declarations
+// ---------------------------------------------------------------------------
+//
+// selectorBits: structural; per-instance K selector bits. N = 2^K data inputs.
+// loaded: when true, parent emits DigitalInputPinLoaded / DigitalOutputPinLoaded
+//   sub-elements. When false, parent emits the Unloaded variants.
+// vIH/vIL: per-input CMOS thresholds, consumed by BehavioralMuxDriver leaf.
+// rOut/cOut/vOH/vOL: per-output drive params, consumed by the outPin sibling.
+
+export const { paramDefs: MUX_BEHAVIORAL_PARAM_DEFS, defaults: MUX_BEHAVIORAL_DEFAULTS } = defineModelParams({
+  primary: {
+    selectorBits: { default: 1,     unit: "",  description: "Number of selector bits (structural; N = 2^selectorBits data inputs)" },
+    loaded:       { default: 1,     unit: "",  description: "1 = loaded pins (DigitalInputPinLoaded / DigitalOutputPinLoaded), 0 = unloaded" },
+    vIH:          { default: 2.0,   unit: "V", description: "Input high threshold (CMOS spec)" },
+    vIL:          { default: 0.8,   unit: "V", description: "Input low threshold (CMOS spec)" },
+    rOut:         { default: 100,   unit: "Ω", description: "Output drive resistance" },
+    cOut:         { default: 1e-12, unit: "F", description: "Output companion capacitance" },
+    vOH:          { default: 5.0,   unit: "V", description: "Output high voltage" },
+    vOL:          { default: 0.0,   unit: "V", description: "Output low voltage" },
+  },
+});
+
+// ---------------------------------------------------------------------------
+// buildMuxNetlist- function-form netlist for the behavioural model
+//
+// Ports: data_0 .. data_{N-1}, sel_0 .. sel_{K-1}, out, gnd
+// Sub-elements:
+//   drv       : BehavioralMuxDriver  (selector-indexed pick leaf)
+//   inPin_data_i : DigitalInputPin{Loaded|Unloaded}  (one per data port)
+//   inPin_sel_i  : DigitalInputPin{Loaded|Unloaded}  (one per sel port)
+//   outPin    : DigitalOutputPin{Loaded|Unloaded}  (consumes drv OUTPUT_LOGIC_LEVEL)
+// ---------------------------------------------------------------------------
+
+export function buildMuxNetlist(params: PropertyBag): MnaSubcircuitNetlist {
+  const K        = params.getModelParam<number>("selectorBits");
+  const N        = 1 << K;
+  const loaded   = params.getModelParam<number>("loaded") >= 0.5;
+  const inputPinType  = loaded ? "DigitalInputPinLoaded"  : "DigitalInputPinUnloaded";
+  const outputPinType = loaded ? "DigitalOutputPinLoaded" : "DigitalOutputPinUnloaded";
+
+  // Port order: data_0..data_{N-1}, sel_0..sel_{K-1}, out, gnd
+  const ports: string[] = [];
+  for (let i = 0; i < N; i++) ports.push(`data_${i}`);
+  for (let i = 0; i < K; i++) ports.push(`sel_${i}`);
+  ports.push("out", "gnd");
+
+  const outPortIdx = N + K;
+  const gndPortIdx = N + K + 1;
+
+  const elements: SubcircuitElement[] = [];
+  const netlist: number[][] = [];
+
+  // Driver leaf- exposes OUTPUT_LOGIC_LEVEL via siblingState.
+  // Pin order in driver: data_0..data_{N-1}, sel_0..sel_{K-1}, out, gnd
+  const driverPins: number[] = [];
+  for (let i = 0; i < N; i++) driverPins.push(i);
+  for (let i = 0; i < K; i++) driverPins.push(N + i);
+  driverPins.push(outPortIdx, gndPortIdx);
+  elements.push({
+    typeId: "BehavioralMuxDriver",
+    modelRef: "default",
+    subElementName: "drv",
+    params: {
+      selectorBits: K,
+      vIH: params.getModelParam<number>("vIH"),
+      vIL: params.getModelParam<number>("vIL"),
+    },
+  });
+  netlist.push(driverPins);
+
+  // Data input pins- one per data port.
+  for (let i = 0; i < N; i++) {
+    elements.push({
+      typeId: inputPinType,
+      modelRef: "default",
+      subElementName: `inPin_data_${i}`,
+    });
+    netlist.push([i, gndPortIdx]);
+  }
+
+  // Selector input pins- one per sel port.
+  for (let i = 0; i < K; i++) {
+    elements.push({
+      typeId: inputPinType,
+      modelRef: "default",
+      subElementName: `inPin_sel_${i}`,
+    });
+    netlist.push([N + i, gndPortIdx]);
+  }
+
+  // Output pin- siblingState consumes the driver's OUTPUT_LOGIC_LEVEL slot.
+  elements.push({
+    typeId: outputPinType,
+    modelRef: "default",
+    subElementName: "outPin",
+    params: {
+      rOut: params.getModelParam<number>("rOut"),
+      cOut: params.getModelParam<number>("cOut"),
+      vOH:  params.getModelParam<number>("vOH"),
+      vOL:  params.getModelParam<number>("vOL"),
+      inputLogic: { kind: "siblingState" as const, subElementName: "drv",
+                    slotName: "OUTPUT_LOGIC_LEVEL" },
+    },
+  });
+  netlist.push([outPortIdx, gndPortIdx]);
+
+  return {
+    ports,
+    elements,
+    internalNetCount: 0,
+    netlist,
+  };
+}
+
+// ---------------------------------------------------------------------------
 // MuxDefinition
 // ---------------------------------------------------------------------------
 
@@ -277,7 +393,7 @@ function muxFactory(props: PropertyBag): MuxElement {
   return new MuxElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
 }
 
-export const MuxDefinition: ComponentDefinition = {
+export const MuxDefinition: StandaloneComponentDefinition = {
   name: "Multiplexer",
   typeId: -1,
   factory: muxFactory,
@@ -304,11 +420,11 @@ export const MuxDefinition: ComponentDefinition = {
     },
   },
   modelRegistry: {
-    "behavioral": {
-      kind: "inline",
-      factory: makeBehavioralMuxAnalogFactory(1),
-      paramDefs: [],
-      params: {},
+    behavioral: {
+      kind: "netlist",
+      netlist: buildMuxNetlist,
+      paramDefs: MUX_BEHAVIORAL_PARAM_DEFS,
+      params: MUX_BEHAVIORAL_DEFAULTS,
     },
   },
   defaultModel: "digital",
