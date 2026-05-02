@@ -207,8 +207,7 @@ export class ADCDriverElement implements PoolBackedAnalogElement {
    * conversion = N+3.
    *
    * Instant mode: whole code computed on the rising edge that triggers it;
-   * EOC pulses from rising edge until CLK falls below vIL (matches the
-   * legacy single-step behaviour).
+   * EOC pulses from rising edge until CLK falls below vIL.
    *
    * Bipolar encoding (offset binary): vIn in [-vRef, +vRef] -> code in
    * [0, 2^N - 1] with vIn = 0 -> code = 2^(N-1). Code-to-DAC inverse used
