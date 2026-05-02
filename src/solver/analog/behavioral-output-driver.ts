@@ -36,7 +36,7 @@ import type { SetupContext } from "./setup-context.js";
 import type { LoadContext } from "./load-context.js";
 import { stampRHS } from "./stamp-helpers.js";
 import { PinDirection, type PinDeclaration } from "../../core/pin.js";
-import { PropertyBag } from "../../core/properties.js";
+import { PropertyBag, type PoolSlotRef } from "../../core/properties.js";
 import type { ComponentDefinition, ParamDef } from "../../core/registry.js";
 
 // ---------------------------------------------------------------------------
@@ -82,17 +82,6 @@ const BEHAVIORAL_OUTPUT_DRIVER_DEFAULTS: Record<string, number> = {
 };
 
 // ---------------------------------------------------------------------------
-// Resolved siblingState ref shape- written by compiler.ts:395-426 when it
-// resolves a `{ kind: "siblingState", subElementName, slotName }` param.
-// ---------------------------------------------------------------------------
-
-interface PoolSlotRef {
-  kind: "poolSlotRef";
-  element: AnalogElement & { _stateBase: number };
-  slotIdx: number;
-}
-
-// ---------------------------------------------------------------------------
 // BehavioralOutputDriverElement
 // ---------------------------------------------------------------------------
 
@@ -124,10 +113,10 @@ export class BehavioralOutputDriverElement implements PoolBackedAnalogElement {
     this._vOH = props.hasModelParam("vOH") ? props.getModelParam<number>("vOH") : BEHAVIORAL_OUTPUT_DRIVER_DEFAULTS["vOH"]!;
     this._vOL = props.hasModelParam("vOL") ? props.getModelParam<number>("vOL") : BEHAVIORAL_OUTPUT_DRIVER_DEFAULTS["vOL"]!;
     this._bitIndex = props.hasModelParam("bitIndex") ? props.getModelParam<number>("bitIndex") : BEHAVIORAL_OUTPUT_DRIVER_DEFAULTS["bitIndex"]!;
-    // `inputLogic` is an object (PoolSlotRef), not a number- read via the
-    // plain-prop accessor (the compiler's siblingState resolver writes it
-    // via PropertyBag.set, not replaceModelParams).
-    this._inputLogicRef = (props as unknown as { get<T>(k: string): T }).get<PoolSlotRef>("inputLogic");
+    // `inputLogic` is a PoolSlotRef object (not a number) — read via the
+    // plain-prop accessor. The compiler's siblingState resolver writes it
+    // via PropertyBag.set, not replaceModelParams.
+    this._inputLogicRef = props.get<PoolSlotRef>("inputLogic");
   }
 
   setup(ctx: SetupContext): void {

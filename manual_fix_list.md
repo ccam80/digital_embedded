@@ -130,12 +130,12 @@
 - [x] `src/components/active/comparator-driver.ts` -- **spec:** phase-composite-architecture ssM24 -- NEW FILE; `ComparatorDriverElement` (J-020).
 - [ ] `src/components/active/schmitt-trigger-driver.ts` -- **spec:** phase-composite-architecture ssM25 -- NEW FILE; `SchmittTriggerDriverElement` (J-028).
 - [ ] `src/components/active/timer-555-latch-driver.ts` -- **spec:** phase-composite-architecture ssM5 -- NEW FILE; `Timer555LatchDriverElement` (RS latch + discharge BJT base driver) (J-030).
-- [ ] `src/components/active/internal-zero-volt-sense.ts` -- **spec:** phase-composite-architecture ssM4 -- NEW FILE; `InternalZeroVoltSense` extracted from optocoupler `VsenseSubElement` (J-025).
-- [ ] `src/components/active/internal-cccs.ts` -- **spec:** phase-composite-architecture ssM4 -- NEW FILE; `InternalCccs` extracted from optocoupler `CccsSubElement` (J-024).
-- [ ] `src/components/passives/transformer-coupling.ts` -- **spec:** phase-composite-architecture ssM26 -- NEW FILE; `TransformerCouplingElement` mutual inductance via siblingBranch (J-063).
-- [ ] `src/components/switching/relay-coupling.ts` -- **spec:** phase-composite-architecture ssM7 -- NEW FILE; `RelayCouplingElement` first siblingState user (J-095).
-- [ ] `src/components/switching/fgnfet-blown-driver.ts` -- **spec:** phase-composite-architecture ssM8+M9 -- NEW FILE; `FGNFETBlownDriverElement` + shared `stampBlownClamp` helper (J-091).
-- [ ] `src/components/switching/fgpfet-blown-driver.ts` -- **spec:** phase-composite-architecture ssM9 -- NEW FILE; `FGPFETBlownDriverElement` calling shared `stampBlownClamp` (J-093).
+- [x] `src/components/active/internal-zero-volt-sense.ts` -- **spec:** phase-composite-architecture ssM4 -- NEW FILE; `InternalZeroVoltSense` extracted from optocoupler `VsenseSubElement` (J-025).
+- [x] `src/components/active/internal-cccs.ts` -- **spec:** phase-composite-architecture ssM4 -- NEW FILE; `InternalCccs` extracted from optocoupler `CccsSubElement` (J-024).
+- [x] `src/components/passives/transformer-coupling.ts` -- **spec:** phase-composite-architecture ssM26 -- NEW FILE; `TransformerCouplingElement` mutual inductance via siblingBranch (J-063).
+- [x] `src/components/switching/relay-coupling.ts` -- **spec:** phase-composite-architecture ssM7 -- NEW FILE; `RelayCouplingElement` first siblingState user (J-095).
+- [x] `src/components/switching/fgnfet-blown-driver.ts` -- **spec:** phase-composite-architecture ssM8+M9 -- NEW FILE; `FGNFETBlownDriverElement` + shared `stampBlownClamp` helper (J-091).
+- [x] `src/components/switching/fgpfet-blown-driver.ts` -- **spec:** phase-composite-architecture ssM9 -- NEW FILE; `FGPFETBlownDriverElement` calling shared `stampBlownClamp` (J-093).
 - [x] `src/components/passives/transmission-segment-r.ts` -- **spec:** phase-composite-architecture ssM6 -- NEW FILE; `TransmissionSegmentR` (J-068).
 - [x] `src/components/passives/transmission-segment-l.ts` -- **spec:** phase-composite-architecture ssM6 -- NEW FILE; `TransmissionSegmentL` (J-067).
 - [x] `src/components/passives/transmission-segment-c.ts` -- **spec:** phase-composite-architecture ssM6 -- NEW FILE; `TransmissionSegmentC` (J-065).

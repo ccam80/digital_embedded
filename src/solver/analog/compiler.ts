@@ -425,14 +425,23 @@ function compileSubcircuitToMnaModel(
                     `siblingState: unknown slot "${ref.slotName}" on "${ref.subElementName}"`,
                   );
                 }
+                if (siblingEl === undefined) {
+                  // Per the in-loop invariant (sibling MUST precede consumer in
+                  // netlist.elements iteration order), siblingEl is always
+                  // populated by the time we reach a consumer's siblingState
+                  // ref. If we hit this branch, the parent netlist's element
+                  // ordering is wrong.
+                  throw new Error(
+                    `siblingState: sibling "${ref.subElementName}" not yet ` +
+                      `constructed when consumer needs slot "${ref.slotName}". ` +
+                      `Reorder netlist.elements so the sibling appears first.`,
+                  );
+                }
                 // The dependent leaf's setup() resolves to a flat pool index via
                 //   sibling._stateBase + slotIdx
                 // because at setup-time the sibling's _stateBase is already populated
                 // (initState ran before setup). Write the deferred ref:
-                (subProps as unknown as { set: (k: string, val: unknown) => void }).set(
-                  paramKey,
-                  { kind: "poolSlotRef", element: siblingEl, slotIdx },
-                );
+                subProps.set(paramKey, { kind: "poolSlotRef", element: siblingEl, slotIdx });
               } else {
                 throw new Error(
                   "Unsupported SubcircuitElementParam discriminator. " +
