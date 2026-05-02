@@ -1,4 +1,4 @@
-/**
+﻿/**
  * CounterPreset- edge-triggered up/down counter with load, clear, and configurable max.
  *
  * On rising clock edge:
@@ -27,10 +27,10 @@ import type { PropertyDefinition } from "../../core/properties.js";
 import {
   ComponentCategory,
   type AttributeMapping,
-  type ComponentDefinition,
+  type StandaloneComponentDefinition,
   type ComponentLayout,
 } from "../../core/registry.js";
-import { makeBehavioralCounterPresetAnalogFactory } from "../../solver/analog/behavioral-sequential.js";
+import { buildCounterPresetNetlist } from "../../solver/analog/behavioral-sequential.js";
 
 // ---------------------------------------------------------------------------
 // Layout constants
@@ -173,6 +173,11 @@ export class CounterPresetElement extends AbstractCircuitElement {
 // Priority on clock edge: clr > ld > count
 // ---------------------------------------------------------------------------
 
+interface CounterPresetLayout extends ComponentLayout {
+  stateOffset(componentIndex: number): number;
+  getProperty(componentIndex: number, key: string): number;
+}
+
 export function sampleCounterPreset(
   index: number,
   state: Uint32Array,
@@ -181,10 +186,7 @@ export function sampleCounterPreset(
 ): void {
   const wt = layout.wiringTable;
   const inBase = layout.inputOffset(index);
-  const extLayout = layout as unknown as {
-    stateOffset(i: number): number;
-    getProperty(i: number, key: string): number;
-  };
+  const extLayout = layout as CounterPresetLayout;
   const stBase = extLayout.stateOffset(index);
 
   const en = state[wt[inBase]];
@@ -236,10 +238,7 @@ export function executeCounterPreset(
   const wt = layout.wiringTable;
   const inBase = layout.inputOffset(index);
   const outBase = layout.outputOffset(index);
-  const extLayout = layout as unknown as {
-    stateOffset(i: number): number;
-    getProperty(i: number, key: string): number;
-  };
+  const extLayout = layout as CounterPresetLayout;
   const stBase = extLayout.stateOffset(index);
 
   const en = state[wt[inBase]];
@@ -327,14 +326,14 @@ const COUNTER_PRESET_PROPERTY_DEFS: PropertyDefinition[] = [
 ];
 
 // ---------------------------------------------------------------------------
-// CounterPresetDefinition- ComponentDefinition
+// CounterPresetDefinition- StandaloneComponentDefinition
 // ---------------------------------------------------------------------------
 
 function counterPresetFactory(props: PropertyBag): CounterPresetElement {
   return new CounterPresetElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
 }
 
-export const CounterPresetDefinition: ComponentDefinition = {
+export const CounterPresetDefinition: StandaloneComponentDefinition = {
   name: "CounterPreset",
   typeId: -1,
   factory: counterPresetFactory,
@@ -360,10 +359,12 @@ export const CounterPresetDefinition: ComponentDefinition = {
   },
   modelRegistry: {
     behavioral: {
-      kind: "inline",
-      factory: makeBehavioralCounterPresetAnalogFactory(),
-      paramDefs: [],
-      params: {},
+      kind: "netlist",
+      netlist: buildCounterPresetNetlist,
+      paramDefs: [
+        { key: "bitWidth", default: 4 },
+      ],
+      params: { bitWidth: 4 },
     },
   },
   defaultModel: "digital",

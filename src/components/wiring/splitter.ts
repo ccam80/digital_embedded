@@ -1,10 +1,10 @@
-/**
+﻿/**
  * Splitter component- splits a multi-bit bus into sub-buses or merges sub-buses into a bus.
  *
  * Faithful port of hneemann/Digital Splitter.java + SplitterShape.java.
  *
- * - Input Splitting  → pins on the LEFT  side (x = 0)
- * - Output Splitting → pins on the RIGHT side (x = 1 grid unit)
+ * - Input Splitting  â†’ pins on the LEFT  side (x = 0)
+ * - Output Splitting â†’ pins on the RIGHT side (x = 1 grid unit)
  * - Width = 1 grid unit; height = (max(in, out) - 1) * spreading grid units
  * - Spine is a filled rectangle at x = 0.5, drawn from top to bottom
  */
@@ -21,10 +21,10 @@ import type { PropertyDefinition } from "../../core/properties.js";
 import {
   ComponentCategory,
   type AttributeMapping,
-  type ComponentDefinition,
+  type StandaloneComponentDefinition,
   type ComponentLayout,
 } from "../../core/registry.js";
-import { createSplitterAnalogElement } from "../../solver/analog/behavioral-remaining.js";
+import { buildSplitterNetlist } from "../../solver/analog/behavioral-remaining.js";
 
 // ---------------------------------------------------------------------------
 // Port type
@@ -50,9 +50,9 @@ function portName(pos: number, bits: number): string {
 // parsePorts- mirrors Java Ports(String definition) constructor
 //
 // Supports three token forms (comma-separated):
-//   "4"    → port at running bit position, 4 bits wide
-//   "4*2"  → two ports each 4 bits wide (repeat shorthand)
-//   "4-7"  → port from bit 4 to bit 7 (4 bits, explicit range)
+//   "4"    â†’ port at running bit position, 4 bits wide
+//   "4*2"  â†’ two ports each 4 bits wide (repeat shorthand)
+//   "4-7"  â†’ port from bit 4 to bit 7 (4 bits, explicit range)
 // ---------------------------------------------------------------------------
 
 export function parsePorts(definition: string): SplitterPort[] {
@@ -134,8 +134,8 @@ export function insertBits(
 /**
  * Build pin declarations for a Splitter.
  *
- * Input ports → left side  (x = 0), direction INPUT
- * Output ports → right side (x = 1), direction OUTPUT
+ * Input ports â†’ left side  (x = 0), direction INPUT
+ * Output ports â†’ right side (x = 1), direction OUTPUT
  * Vertical spacing = spreading grid units per port
  */
 export function buildSplitterPinDeclarations(
@@ -285,7 +285,7 @@ export class SplitterElement extends AbstractCircuitElement {
 
   /**
    * Draw text that stays upright regardless of component rotation.
-   * When rotation is 2 (180°), counter-rotates the text and flips alignment.
+   * When rotation is 2 (180Â°), counter-rotates the text and flips alignment.
    */
   private _drawUprightText(
     ctx: RenderContext,
@@ -332,7 +332,7 @@ export function executeSplitter(
   const outCount = layout.outputCount(index);
 
   if (inCount === 1 && outCount >= 1) {
-    // SPLIT mode: 1 wide input → N narrow outputs
+    // SPLIT mode: 1 wide input â†’ N narrow outputs
     const outputProp = layout.getProperty(index, "output splitting");
     const outputStr = typeof outputProp === "string" ? outputProp : undefined;
     const ports = outputStr ? parsePorts(outputStr) : undefined;
@@ -344,7 +344,7 @@ export function executeSplitter(
       startBit += width;
     }
   } else if (outCount === 1 && inCount >= 1) {
-    // MERGE mode: N narrow inputs → 1 wide output
+    // MERGE mode: N narrow inputs â†’ 1 wide output
     const inputProp = layout.getProperty(index, "input splitting");
     const inputStr = typeof inputProp === "string" ? inputProp : undefined;
     const ports = inputStr ? parsePorts(inputStr) : undefined;
@@ -384,7 +384,7 @@ export function executeSplitterWithWidths(
 }
 
 /**
- * executeSplitterMergeWithWidths- merge mode: narrow ports → wide bus.
+ * executeSplitterMergeWithWidths- merge mode: narrow ports â†’ wide bus.
  */
 export function executeSplitterMergeWithWidths(
   index: number,
@@ -453,7 +453,7 @@ const SPLITTER_PROPERTY_DEFS: PropertyDefinition[] = [
     type: PropertyType.INT,
     label: "Pin Spreading",
     defaultValue: 1,
-    description: "Vertical spacing between pins (1–20 grid units)",
+    description: "Vertical spacing between pins (1â€“20 grid units)",
   },
 ];
 
@@ -469,7 +469,7 @@ function splitterFactory(props: PropertyBag): SplitterElement {
 const _defaultInputPorts = parsePorts("4,4");
 const _defaultOutputPorts = parsePorts("8");
 
-export const SplitterDefinition: ComponentDefinition = {
+export const SplitterDefinition: StandaloneComponentDefinition = {
   name: "Splitter",
   typeId: -1,
   factory: splitterFactory,
@@ -495,9 +495,9 @@ export const SplitterDefinition: ComponentDefinition = {
     },
   },
   modelRegistry: {
-    "behavioral": {
-      kind: "inline",
-      factory: createSplitterAnalogElement,
+    behavioral: {
+      kind: "netlist",
+      netlist: buildSplitterNetlist,
       paramDefs: [],
       params: {},
     },

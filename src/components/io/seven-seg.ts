@@ -1,4 +1,4 @@
-/**
+﻿/**
  * SevenSeg component- direct-drive 7-segment display.
  *
  * 7 segment inputs (a-g) + 1 decimal point input.
@@ -28,10 +28,10 @@ import type { PropertyDefinition } from "../../core/properties.js";
 import {
   ComponentCategory,
   type AttributeMapping,
-  type ComponentDefinition,
+  type StandaloneComponentDefinition,
   type ComponentLayout,
 } from "../../core/registry.js";
-import { createSevenSegAnalogElement } from "../../solver/analog/behavioral-remaining.js";
+import { buildSevenSegNetlist } from "../../solver/analog/behavioral-remaining.js";
 
 // ---------------------------------------------------------------------------
 // Layout constants
@@ -278,7 +278,7 @@ function sevenSegFactory(props: PropertyBag): SevenSegElement {
   return new SevenSegElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
 }
 
-export const SevenSegDefinition: ComponentDefinition = {
+export const SevenSegDefinition: StandaloneComponentDefinition = {
   name: "SevenSeg",
   typeId: -1,
   factory: sevenSegFactory,
@@ -288,17 +288,17 @@ export const SevenSegDefinition: ComponentDefinition = {
   category: ComponentCategory.IO,
   helpText:
     "SevenSeg- direct-drive 7-segment display.\n" +
-    "Inputs a–g control each segment independently. dp controls the decimal point.\n" +
+    "Inputs aâ€“g control each segment independently. dp controls the decimal point.\n" +
     "commonCathode=true: segment on when input=1. commonCathode=false: segment on when input=0.",
   models: {
     digital: { executeFn: executeSevenSeg, inputSchema: ["a", "b", "c", "d", "e", "f", "g", "dp"], outputSchema: [] },
   },
   modelRegistry: {
     behavioral: {
-      kind: "inline",
-      factory: createSevenSegAnalogElement,
+      kind: "netlist",
       paramDefs: [],
       params: {},
+      netlist: buildSevenSegNetlist,
     },
   },
   defaultModel: "digital",

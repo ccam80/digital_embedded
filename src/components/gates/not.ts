@@ -1,11 +1,11 @@
-/**
+﻿/**
  * Not gate component.
  *
  * Follows the And gate exemplar pattern exactly:
  *   1. CircuitElement class (rendering, properties, pin declarations)
  *   2. Standalone flat executeFn (simulation, zero allocations)
  *   3. AttributeMapping[] for .dig XML parsing
- *   4. ComponentDefinition for registry registration
+ *   4. StandaloneComponentDefinition for registry registration
  *
  * Not always has exactly 1 input- inputCount is not configurable.
  */
@@ -25,11 +25,11 @@ import type { PropertyDefinition } from "../../core/properties.js";
 import {
   ComponentCategory,
   type AttributeMapping,
-  type ComponentDefinition,
+  type StandaloneComponentDefinition,
   type ComponentLayout,
 } from "../../core/registry.js";
-import type { MnaSubcircuitNetlist } from "../../core/mna-subcircuit-netlist.js";
-import { makeNotAnalogFactory } from "../../solver/analog/behavioral-gate.js";
+import type { MnaSubcircuitNetlist, SubcircuitElement } from "../../core/mna-subcircuit-netlist.js";
+import { defineModelParams } from "../../core/model-params.js";
 
 // ---------------------------------------------------------------------------
 // Layout constants
@@ -37,7 +37,7 @@ import { makeNotAnalogFactory } from "../../solver/analog/behavioral-gate.js";
 
 /**
  * Gate width matching Java GenericShape auto-width:
- * 1-in/1-out with no pin labels → width=1 (narrow) or 2 (wide).
+ * 1-in/1-out with no pin labels â†’ width=1 (narrow) or 2 (wide).
  * Java: `inputs.size()==1 && outputs.size()==1 && !showPinLabels ? 1 : 3`
  * Then .setWide(ws) adds 1 if wideShape.
  */
@@ -106,7 +106,7 @@ export class NotElement extends AbstractCircuitElement {
   getBoundingBox(): Rect {
     const wide = this._properties.getOrDefault<boolean>("wideShape", false);
     // Triangle starts at x=0.05; bubble extends to bubbleCX + BUBBLE_RADIUS.
-    // Narrow: bubbleCX=1.5, r=0.45 → maxX=1.95. Wide: bubbleCX=2.5, r=0.45 → maxX=2.95.
+    // Narrow: bubbleCX=1.5, r=0.45 â†’ maxX=1.95. Wide: bubbleCX=2.5, r=0.45 â†’ maxX=2.95.
     // triY: narrow=0.6, wide=1.1.
     const triY = wide ? 1.1 : 0.6;
     return {
@@ -128,8 +128,8 @@ export class NotElement extends AbstractCircuitElement {
   /**
    * IEEE/US shape: triangle pointing right, with inversion bubble at output.
    * Coordinates from Java IEEENotShape.
-   * Narrow: triangle (0.05,-0.6)→(0.95,0)→(0.05,0.6), bubble at (1.5,0) r=0.45.
-   * Wide: triangle (0.05,-1.1)→(1.95,0)→(0.05,1.1), bubble at (2.5,0) r=0.45.
+   * Narrow: triangle (0.05,-0.6)â†’(0.95,0)â†’(0.05,0.6), bubble at (1.5,0) r=0.45.
+   * Wide: triangle (0.05,-1.1)â†’(1.95,0)â†’(0.05,1.1), bubble at (2.5,0) r=0.45.
    */
   private _drawIEEE(ctx: RenderContext, wide: boolean): void {
     const BUBBLE_RADIUS = 0.45;
@@ -227,6 +227,94 @@ const NOT_PROPERTY_DEFS: PropertyDefinition[] = [
 ];
 
 // ---------------------------------------------------------------------------
+// Behavioural model parameter declarations
+// ---------------------------------------------------------------------------
+//
+// loaded: when true, parent emits DigitalInputPinLoaded / DigitalOutputPinLoaded
+//   sub-elements. When false, emits the Unloaded variants.
+// vIH/vIL: per-input CMOS thresholds, consumed by the BehavioralNotDriver leaf.
+// rOut/cOut/vOH/vOL: per-output drive params, consumed by the outPin sibling.
+
+export const { paramDefs: NOT_BEHAVIORAL_PARAM_DEFS, defaults: NOT_BEHAVIORAL_DEFAULTS } = defineModelParams({
+  primary: {
+    loaded: { default: 1,     unit: "",  description: "1 = loaded pins (DigitalInputPinLoaded / DigitalOutputPinLoaded), 0 = unloaded" },
+    vIH:    { default: 2.0,   unit: "V", description: "Input high threshold (CMOS spec)" },
+    vIL:    { default: 0.8,   unit: "V", description: "Input low threshold (CMOS spec)" },
+    rOut:   { default: 100,   unit: "Ω", description: "Output drive resistance" },
+    cOut:   { default: 1e-12, unit: "F", description: "Output companion capacitance" },
+    vOH:    { default: 5.0,   unit: "V", description: "Output high voltage" },
+    vOL:    { default: 0.0,   unit: "V", description: "Output low voltage" },
+  },
+});
+
+// ---------------------------------------------------------------------------
+// buildNotNetlist- function-form netlist for the behavioural model
+//
+// Ports: in, out, gnd
+// Sub-elements:
+//   drv    : BehavioralNotDriver  (1-bit pure-truth-function leaf, N=1 fixed)
+//   inPin_1: DigitalInputPin{Loaded|Unloaded}
+//   outPin : DigitalOutputPin{Loaded|Unloaded}  (consumes drv OUTPUT_LOGIC_LEVEL)
+// ---------------------------------------------------------------------------
+
+export function buildNotNetlist(params: PropertyBag): MnaSubcircuitNetlist {
+  const loaded        = params.getModelParam<number>("loaded") >= 0.5;
+  const inputPinType  = loaded ? "DigitalInputPinLoaded"  : "DigitalInputPinUnloaded";
+  const outputPinType = loaded ? "DigitalOutputPinLoaded" : "DigitalOutputPinUnloaded";
+
+  // port indices: in=0, out=1, gnd=2
+  const ports = ["in", "out", "gnd"];
+  const outIdx = 1;
+  const gndIdx = 2;
+
+  const elements: SubcircuitElement[] = [];
+  const netlist: number[][] = [];
+
+  // Driver leaf- exposes OUTPUT_LOGIC_LEVEL via siblingState.
+  elements.push({
+    typeId: "BehavioralNotDriver",
+    modelRef: "default",
+    subElementName: "drv",
+    params: {
+      vIH: params.getModelParam<number>("vIH"),
+      vIL: params.getModelParam<number>("vIL"),
+    },
+  });
+  netlist.push([0, outIdx, gndIdx]); // in_1=0, out=outIdx, gnd=gndIdx
+
+  // Input pin- one input port.
+  elements.push({
+    typeId: inputPinType,
+    modelRef: "default",
+    subElementName: "inPin_1",
+  });
+  netlist.push([0, gndIdx]); // in=0, gnd=gndIdx
+
+  // Output pin- siblingState consumes the driver's OUTPUT_LOGIC_LEVEL slot.
+  elements.push({
+    typeId: outputPinType,
+    modelRef: "default",
+    subElementName: "outPin",
+    params: {
+      rOut: params.getModelParam<number>("rOut"),
+      cOut: params.getModelParam<number>("cOut"),
+      vOH:  params.getModelParam<number>("vOH"),
+      vOL:  params.getModelParam<number>("vOL"),
+      inputLogic: { kind: "siblingState" as const, subElementName: "drv",
+                    slotName: "OUTPUT_LOGIC_LEVEL" },
+    },
+  });
+  netlist.push([outIdx, gndIdx]);
+
+  return {
+    ports,
+    elements,
+    internalNetCount: 0,
+    netlist,
+  };
+}
+
+// ---------------------------------------------------------------------------
 // CMOS_INVERTER_NETLIST- CMOS inverter structural netlist
 //
 // Topology: 1 PMOS (pull-up) + 1 NMOS (pull-down).
@@ -263,7 +351,7 @@ function notFactory(props: PropertyBag): NotElement {
   );
 }
 
-export const NotDefinition: ComponentDefinition = {
+export const NotDefinition: StandaloneComponentDefinition = {
   name: "Not",
   typeId: -1,
   factory: notFactory,
@@ -273,14 +361,14 @@ export const NotDefinition: ComponentDefinition = {
   category: ComponentCategory.LOGIC,
   helpText:
     "Not gate- performs bitwise NOT (inversion) of the input.\n" +
-    "Single input, configurable bit width (1–32).\n" +
+    "Single input, configurable bit width (1â€“32).\n" +
     "Both IEEE/US (triangle with bubble) and IEC/DIN (rectangular with 1) shapes are supported.",
   modelRegistry: {
     behavioral: {
-      kind: "inline",
-      factory: makeNotAnalogFactory(),
-      paramDefs: [],
-      params: {},
+      kind: "netlist",
+      netlist: buildNotNetlist,
+      paramDefs: NOT_BEHAVIORAL_PARAM_DEFS,
+      params: NOT_BEHAVIORAL_DEFAULTS,
     },
     cmos: {
       kind: "netlist",

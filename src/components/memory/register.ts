@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Register- edge-triggered storage register with enable.
  *
  * On rising clock edge, if en=1: capture D input into stored value.
@@ -22,10 +22,10 @@ import type { PropertyDefinition } from "../../core/properties.js";
 import {
   ComponentCategory,
   type AttributeMapping,
-  type ComponentDefinition,
+  type StandaloneComponentDefinition,
   type ComponentLayout,
 } from "../../core/registry.js";
-import { makeBehavioralRegisterAnalogFactory } from "../../solver/analog/behavioral-sequential.js";
+import { buildRegisterNetlist } from "../../solver/analog/behavioral-sequential.js";
 
 // ---------------------------------------------------------------------------
 // Layout constants
@@ -199,14 +199,14 @@ const REGISTER_PROPERTY_DEFS: PropertyDefinition[] = [
 ];
 
 // ---------------------------------------------------------------------------
-// RegisterDefinition- ComponentDefinition
+// RegisterDefinition- StandaloneComponentDefinition
 // ---------------------------------------------------------------------------
 
 function registerFactory(props: PropertyBag): RegisterElement {
   return new RegisterElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
 }
 
-export const RegisterDefinition: ComponentDefinition = {
+export const RegisterDefinition: StandaloneComponentDefinition = {
   name: "Register",
   typeId: -1,
   factory: registerFactory,
@@ -232,10 +232,12 @@ export const RegisterDefinition: ComponentDefinition = {
   },
   modelRegistry: {
     behavioral: {
-      kind: "inline",
-      factory: makeBehavioralRegisterAnalogFactory(),
-      paramDefs: [],
-      params: {},
+      kind: "netlist",
+      netlist: buildRegisterNetlist,
+      paramDefs: [
+        { key: "bitWidth", default: 8 },
+      ],
+      params: { bitWidth: 8 },
     },
   },
   defaultModel: "digital",
