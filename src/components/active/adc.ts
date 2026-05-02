@@ -1,36 +1,20 @@
-/**
+﻿/**
  * ADC  N-bit Analog-to-Digital Converter.
  *
  * Behavioral SAR (successive-approximation register) or instant-conversion
  * model. On each rising clock edge the ADC samples the analog input voltage
  * and produces an N-bit unsigned binary output code.
  *
- * Pin layout (in pin-declaration order, which determines nodeIds index):
- *   0  VIN    analog input (DigitalInputPinModel for loading only)
- *   1  CLK    clock input (DigitalInputPinModel for loading)
- *   2  VREF   reference voltage input (passive  read directly from MNA)
- *   3  GND    ground reference (passive  read directly from MNA)
- *   4  EOC    end-of-conversion output (DigitalOutputPinModel)
- *   5..5+N-1 D0..D(N-1)  digital output bits, LSB first
+ * Pin layout (ports):
+ *   VIN    analog input
+ *   CLK    clock input
+ *   VREF   reference voltage input
+ *   GND    ground reference
+ *   EOC    end-of-conversion output
+ *   D0..D(N-1)  digital output bits, LSB first
  *
  * Conversion:
- *   code = clamp(floor((V_in - V_gnd) / (V_ref - V_gnd) × 2^N), 0, 2^N - 1)
- *
- * In 'unipolar' mode: code = floor(V_in / V_ref × 2^N) clamped to [0, 2^N-1]
- *   (V_gnd treated as 0).
- * In 'bipolar' mode: code = floor((V_in + V_ref/2) / V_ref × 2^N)  midscale
- *   offset binary: V_in=0 gives code = 2^(N-1).
- *
- * Clock-edge detection:
- *   Rising edge: prev CLK voltage < vIH, current CLK voltage >= vIH.
- *   Comparison uses threshold vIH = 2.0V (standard CMOS 3.3V logic family).
- *   Edge detection happens in accept() (once per accepted timestep,
- *   never mid-NR), guaranteeing output only latches on real clock edges.
- *
- * EOC:
- *   EOC goes HIGH immediately after conversion completes.
- *   In 'instant' mode: EOC pulses HIGH on the same timestep as conversion.
- *   In 'sar' mode: EOC pulses HIGH N clock cycles after conversion starts.
+ *   code = clamp(floor((V_in - V_gnd) / (V_ref - V_gnd) Ã— 2^N), 0, 2^N - 1)
  */
 
 import { AbstractCircuitElement } from "../../core/element.js";
@@ -43,28 +27,10 @@ import type { PropertyDefinition } from "../../core/properties.js";
 import {
   ComponentCategory,
   type AttributeMapping,
-  type ComponentDefinition,
+  type StandaloneComponentDefinition,
 } from "../../core/registry.js";
 import { defineModelParams } from "../../core/model-params.js";
-import type { LoadContext } from "../../solver/analog/element.js";
-import { NGSPICE_LOAD_ORDER } from "../../solver/analog/element.js";
-import type { SetupContext } from "../../solver/analog/setup-context.js";
-import {
-  collectPinModelChildren,
-  DigitalInputPinModel,
-  DigitalOutputPinModel,
-} from "../../solver/analog/digital-pin-model.js";
-import type { ResolvedPinElectrical } from "../../core/pin-electrical.js";
-import { defineStateSchema } from "../../solver/analog/state-schema.js";
-import type { StateSchema } from "../../solver/analog/state-schema.js";
-import type { AnalogElement, PoolBackedAnalogElement, StatePoolRef } from "../../core/analog-types.js";
-import { CompositeElement } from "../../solver/analog/composite-element.js";
-import type { AnalogCapacitorElement } from "../passives/capacitor.js";
-
-const ADC_COMPOSITE_SCHEMA: StateSchema = defineStateSchema("ADCComposite", [
-  { name: "PREV_CLK",    doc: "Previous clock voltage for rising-edge detection", init: { kind: "zero" } },
-  { name: "OUTPUT_CODE", doc: "Last conversion code as Float64",                  init: { kind: "zero" } },
-]);
+import type { MnaSubcircuitNetlist, SubcircuitElement } from "../../core/mna-subcircuit-netlist.js";
 
 // ---------------------------------------------------------------------------
 // Model parameter declarations
@@ -78,38 +44,12 @@ export const { paramDefs: ADC_PARAM_DEFS, defaults: ADC_DEFAULTS } = defineModel
     vOL: { default: 0.0, unit: "V", description: "Digital output LOW voltage" },
   },
   secondary: {
-    rIn:  { default: 1e7,  unit: "Ω", description: "Analog input impedance" },
+    rIn:  { default: 1e7,  unit: "Î©", description: "Analog input impedance" },
     cIn:  { default: 5e-12, unit: "F", description: "Analog input capacitance" },
-    rOut: { default: 50,   unit: "Ω", description: "Digital output impedance" },
-    rHiZ: { default: 1e7,  unit: "Ω", description: "Hi-Z output impedance" },
+    rOut: { default: 50,   unit: "Î©", description: "Digital output impedance" },
+    rHiZ: { default: 1e7,  unit: "Î©", description: "Hi-Z output impedance" },
   },
 });
-
-// ---------------------------------------------------------------------------
-// Pin electrical specs
-// ---------------------------------------------------------------------------
-
-/** Build input pin spec from model params. Output-side fields zeroed (unused). */
-function buildInputPinSpec(p: Record<string, number>): ResolvedPinElectrical {
-  return {
-    rOut: 0, cOut: 0,
-    rIn: p.rIn, cIn: p.cIn,
-    vOH: 0, vOL: 0,
-    vIH: p.vIH, vIL: p.vIL,
-    rHiZ: 0,
-  };
-}
-
-/** Build output pin spec from model params. Input-side fields zeroed (unused). */
-function buildOutputPinSpec(p: Record<string, number>): ResolvedPinElectrical {
-  return {
-    rOut: p.rOut, cOut: 0,
-    rIn: 0, cIn: 0,
-    vOH: p.vOH, vOL: p.vOL,
-    vIH: 0, vIL: 0,
-    rHiZ: p.rHiZ,
-  };
-}
 
 // ---------------------------------------------------------------------------
 // buildADCPinDeclarations
@@ -188,219 +128,81 @@ function buildADCPinDeclarations(bits: number): PinDeclaration[] {
 }
 
 // ---------------------------------------------------------------------------
-// ADCAnalogElement  CompositeElement (analog element, exported for test inspection)
+// buildAdcNetlist  function-form MnaSubcircuitNetlist builder
 // ---------------------------------------------------------------------------
 
 /**
- * The analog simulation element for the ADC. Exported as `ADCAnalogElement` so that
- * tests can inspect observable state (`latchedCode`, `eocActive`, `accept`).
- * The circuit-element (AbstractCircuitElement) subclass is `ADCElement`.
+ * Function-form netlist builder for the ADC.
+ *
+ * Port order: VIN(0), CLK(1), VREF(2), GND(3), EOC(4), D0(5)..D(N-1)(4+N).
+ *
+ * Sub-elements:
+ *   drv      - ADCDriver (driver leaf: reads VIN/CLK/VREF/GND, writes N+1 output slots)
+ *   eocPin   - DigitalOutputPinLoaded for EOC
+ *   dPin0..N - DigitalOutputPinLoaded for D0..D(N-1)
  */
-export class ADCAnalogElement extends CompositeElement {
-  readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.VCVS;
-  readonly stateSchema = ADC_COMPOSITE_SCHEMA;
+export const buildAdcNetlist = (params: PropertyBag): MnaSubcircuitNetlist => {
+  const N = params.getModelParam<number>("bits");
 
-  private readonly _bits: number;
-  private readonly _bipolar: boolean;
-  private readonly _sar: boolean;
-  private readonly _p: Record<string, number>;
+  // Port order: VIN, CLK, VREF, GND, EOC, D0..D(N-1)
+  const ports = ["VIN", "CLK", "VREF", "GND", "EOC"];
+  for (let i = 0; i < N; i++) ports.push(`D${i}`);
 
-  private readonly _nVin: number;
-  private readonly _nClk: number;
-  private readonly _nVref: number;
-  private readonly _nGnd: number;
-  private readonly _nEoc: number;
-  private readonly _nDigital: number[];
+  const elements: SubcircuitElement[] = [];
+  const netlist: number[][] = [];
 
-  private readonly _vinPin: DigitalInputPinModel;
-  private readonly _clkPin: DigitalInputPinModel;
-  private readonly _eocPin: DigitalOutputPinModel;
-  private readonly _digitalPins: DigitalOutputPinModel[];
-  private readonly _childElements: readonly AnalogCapacitorElement[];
+  // ADCDriver reads VIN(0), CLK(1), VREF(2), GND(3) and drives EOC + D0..D(N-1).
+  // Pin order for driver: VIN, CLK, VREF, GND, EOC, D0..D(N-1).
+  const drvPins = [0, 1, 2, 3, 4];
+  for (let i = 0; i < N; i++) drvPins.push(5 + i);
+  elements.push({
+    typeId: "ADCDriver",
+    modelRef: "default",
+    subElementName: "drv",
+    params: {
+      bits: N,
+      bipolar: params.getModelParam<boolean>("bipolar") ? 1 : 0,
+      sar: params.getModelParam<boolean>("sar") ? 1 : 0,
+      vIH: params.getModelParam<number>("vIH"),
+      vIL: params.getModelParam<number>("vIL"),
+    },
+  });
+  netlist.push(drvPins);
 
-  private _latchedCode: number = 0;
-  private _eocActive: boolean = false;
-  private _prevClkVoltage: number = 0;
-  private _sarCyclesRemaining: number = 0;
+  // EOC digital output pin (port index 4, gnd = port index 3)
+  elements.push({
+    typeId: "DigitalOutputPinLoaded",
+    modelRef: "default",
+    subElementName: "eocPin",
+    params: {
+      rOut: "rOut",
+      rHiZ: "rHiZ",
+      vOH: "vOH",
+      vOL: "vOL",
+      inputLogic: { kind: "siblingState", subElementName: "drv", slotName: "OUTPUT_EOC" },
+    },
+  } as SubcircuitElement & { subElementName: string });
+  netlist.push([4 /* EOC */, 3 /* GND */]);
 
-  get latchedCode(): number { return this._latchedCode; }
-  get eocActive(): boolean { return this._eocActive; }
-
-  constructor(
-    pinNodes: ReadonlyMap<string, number>,
-    props: PropertyBag,
-    bipolar: boolean,
-    sar: boolean,
-  ) {
-    super();
-    this._pinNodes = new Map(pinNodes);
-
-    this._bits = Math.max(1, Math.min(32, props.getOrDefault<number>("bits", 8)));
-    this._bipolar = bipolar;
-    this._sar = sar;
-    this._p = {
-      vIH:  props.getModelParam<number>("vIH"),
-      vIL:  props.getModelParam<number>("vIL"),
-      vOH:  props.getModelParam<number>("vOH"),
-      vOL:  props.getModelParam<number>("vOL"),
-      rIn:  props.getModelParam<number>("rIn"),
-      cIn:  props.getModelParam<number>("cIn"),
-      rOut: props.getModelParam<number>("rOut"),
-      rHiZ: props.getModelParam<number>("rHiZ"),
-    };
-
-    this._nVin  = pinNodes.get("VIN")  ?? 0;
-    this._nClk  = pinNodes.get("CLK")  ?? 0;
-    this._nVref = pinNodes.get("VREF") ?? 0;
-    this._nGnd  = pinNodes.get("GND")  ?? 0;
-    this._nEoc  = pinNodes.get("EOC")  ?? 0;
-
-    this._nDigital = [];
-    for (let i = 0; i < this._bits; i++) {
-      this._nDigital.push(pinNodes.get(`D${i}`) ?? 0);
-    }
-
-    const inputSpec = buildInputPinSpec(this._p);
-    const outputSpec = buildOutputPinSpec(this._p);
-    this._vinPin = new DigitalInputPinModel(inputSpec, true);
-    this._clkPin = new DigitalInputPinModel(inputSpec, true);
-    this._eocPin = new DigitalOutputPinModel(outputSpec);
-    this._digitalPins = this._nDigital.map(() => new DigitalOutputPinModel(outputSpec));
-
-    if (this._nVin > 0) this._vinPin.init(this._nVin, -1);
-    if (this._nClk > 0) this._clkPin.init(this._nClk, -1);
-    if (this._nEoc > 0) this._eocPin.init(this._nEoc, -1);
-    for (let i = 0; i < this._bits; i++) {
-      const n = this._nDigital[i];
-      if (n > 0) this._digitalPins[i].init(n, -1);
-    }
-
-    this._childElements = collectPinModelChildren([
-      this._vinPin, this._clkPin, this._eocPin, ...this._digitalPins,
-    ]);
+  // D0..D(N-1) digital output pins
+  for (let i = 0; i < N; i++) {
+    elements.push({
+      typeId: "DigitalOutputPinLoaded",
+      modelRef: "default",
+      subElementName: `dPin${i}`,
+      params: {
+        rOut: "rOut",
+        rHiZ: "rHiZ",
+        vOH: "vOH",
+        vOL: "vOL",
+        inputLogic: { kind: "siblingState", subElementName: "drv", slotName: `OUTPUT_D${i}` },
+      },
+    } as SubcircuitElement & { subElementName: string });
+    netlist.push([5 + i /* D_i */, 3 /* GND */]);
   }
 
-  protected getSubElements(): readonly AnalogElement[] {
-    return [
-      this._vinPin,
-      this._clkPin,
-      this._eocPin,
-      ...this._digitalPins,
-      ...this._childElements,
-    ] as unknown as readonly AnalogElement[];
-  }
-
-  override setup(ctx: SetupContext): void {
-    // Composite-level state: PREV_CLK (slot 0) + OUTPUT_CODE (slot 1).
-    // Allocate before forwarding so children's allocStates() calls follow.
-    this._stateBase = ctx.allocStates(2);
-    super.setup(ctx);
-  }
-
-  accept(ctx: LoadContext, _simTime: number, _addBreakpoint: (t: number) => void): void {
-    const voltages = ctx.rhs;
-    const clkVoltage = voltages[this._nClk];
-    const risingEdge = this._prevClkVoltage < this._p.vIH && clkVoltage >= this._p.vIH;
-    this._prevClkVoltage = clkVoltage;
-
-    if (risingEdge) {
-      if (!this._sar) {
-        const code = this._computeCode(voltages);
-        this._setOutputCode(code);
-        this._eocActive = true;
-        this._eocPin.setLogicLevel(true);
-      } else {
-        if (this._sarCyclesRemaining === 0) {
-          this._sarCyclesRemaining = this._bits;
-          this._eocActive = false;
-          this._eocPin.setLogicLevel(false);
-        } else {
-          this._sarCyclesRemaining--;
-          if (this._sarCyclesRemaining === 0) {
-            const code = this._computeCode(voltages);
-            this._setOutputCode(code);
-            this._eocActive = true;
-            this._eocPin.setLogicLevel(true);
-          }
-        }
-      }
-    }
-  }
-
-  override initState(pool: StatePoolRef): void {
-    // Composite-level slots (PREV_CLK, OUTPUT_CODE) are at this._stateBase + 0/1.
-    // Pool-backed children (capacitor companions) follow immediately after.
-    let cumulative = this._stateBase + 2;
-    for (const c of this.getSubElements()) {
-      const pb = c as Partial<PoolBackedAnalogElement> & { _stateBase?: number };
-      if (pb.poolBacked && typeof pb.initState === "function") {
-        pb._stateBase = cumulative;
-        pb.initState(pool);
-        cumulative += pb.stateSize ?? 0;
-      }
-    }
-  }
-
-  getPinCurrents(rhs: Float64Array): number[] {
-    const rIn = this._p.rIn;
-    const rOut = this._p.rOut;
-
-    const iVin = this._nVin > 0 ? rhs[this._nVin] / rIn : 0;
-    const iClk = this._nClk > 0 ? rhs[this._nClk] / rIn : 0;
-
-    const vEoc = rhs[this._nEoc];
-    const iEoc = this._nEoc > 0 ? (vEoc - this._eocPin.currentVoltage) / rOut : 0;
-
-    const currents: number[] = [iVin, iClk, 0, 0, iEoc];
-    for (let i = 0; i < this._bits; i++) {
-      const n = this._nDigital[i];
-      const vD = rhs[n];
-      currents.push(n > 0 ? (vD - this._digitalPins[i].currentVoltage) / rOut : 0);
-    }
-
-    return currents;
-  }
-
-  setParam(key: string, value: number): void {
-    if (key in this._p) {
-      this._p[key] = value;
-      if (key === "vIH" || key === "vIL" || key === "rIn" || key === "cIn") {
-        this._vinPin.setParam(key, value);
-        this._clkPin.setParam(key, value);
-      }
-      if (key === "vOH" || key === "vOL" || key === "rOut" || key === "rHiZ") {
-        this._eocPin.setParam(key, value);
-        for (const dp of this._digitalPins) dp.setParam(key, value);
-      }
-    }
-  }
-
-  private _computeCode(rhs: Float64Array): number {
-    const vIn  = rhs[this._nVin];
-    const vRef = rhs[this._nVref];
-    const vGnd = rhs[this._nGnd];
-    const maxCode = (1 << this._bits) - 1;
-
-    const span = vRef - vGnd;
-    if (span <= 0) return 0;
-
-    let normalised: number;
-    if (this._bipolar) {
-      normalised = (vIn - vGnd + span / 2) / span;
-    } else {
-      normalised = (vIn - vGnd) / span;
-    }
-
-    return Math.min(maxCode, Math.max(0, Math.floor(normalised * (1 << this._bits))));
-  }
-
-  private _setOutputCode(code: number): void {
-    this._latchedCode = code;
-    for (let i = 0; i < this._bits; i++) {
-      this._digitalPins[i].setLogicLevel((code >>> i & 1) === 1);
-    }
-  }
-}
+  return { ports, elements, internalNetCount: 0, netlist };
+};
 
 // ---------------------------------------------------------------------------
 // ADCElement  CircuitElement implementation
@@ -530,7 +332,7 @@ const ADC_ATTRIBUTE_MAPPINGS: AttributeMapping[] = [
 // ADCDefinition
 // ---------------------------------------------------------------------------
 
-export const ADCDefinition: ComponentDefinition = {
+export const ADCDefinition: StandaloneComponentDefinition = {
   name: "ADC",
   typeId: -1,
   category: ComponentCategory.ACTIVE,
@@ -549,34 +351,7 @@ export const ADCDefinition: ComponentDefinition = {
 
   models: {},
   modelRegistry: {
-    "unipolar-instant": {
-      kind: "inline",
-      factory: (pinNodes, props, _getTime) =>
-        new ADCAnalogElement(pinNodes, props, false, false),
-      paramDefs: ADC_PARAM_DEFS,
-      params: ADC_DEFAULTS,
-    },
-    "unipolar-sar": {
-      kind: "inline",
-      factory: (pinNodes, props, _getTime) =>
-        new ADCAnalogElement(pinNodes, props, false, true),
-      paramDefs: ADC_PARAM_DEFS,
-      params: ADC_DEFAULTS,
-    },
-    "bipolar-instant": {
-      kind: "inline",
-      factory: (pinNodes, props, _getTime) =>
-        new ADCAnalogElement(pinNodes, props, true, false),
-      paramDefs: ADC_PARAM_DEFS,
-      params: ADC_DEFAULTS,
-    },
-    "bipolar-sar": {
-      kind: "inline",
-      factory: (pinNodes, props, _getTime) =>
-        new ADCAnalogElement(pinNodes, props, true, true),
-      paramDefs: ADC_PARAM_DEFS,
-      params: ADC_DEFAULTS,
-    },
+    default: { kind: "netlist", netlist: buildAdcNetlist, paramDefs: ADC_PARAM_DEFS, params: ADC_DEFAULTS },
   },
-  defaultModel: "unipolar-instant",
+  defaultModel: "default",
 };
