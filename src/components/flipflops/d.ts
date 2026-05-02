@@ -1,4 +1,4 @@
-/**
+﻿/**
  * D Flip-Flop component- edge-triggered data storage.
  *
  * Stores D input on rising clock edge. Q and ~Q outputs are complementary.
@@ -25,11 +25,11 @@ import type { PropertyDefinition } from "../../core/properties.js";
 import {
   ComponentCategory,
   type AttributeMapping,
-  type ComponentDefinition,
+  type StandaloneComponentDefinition,
   type ComponentLayout,
 } from "../../core/registry.js";
 import type { MnaSubcircuitNetlist } from "../../core/mna-subcircuit-netlist.js";
-import { makeDFlipflopAnalogFactory } from "../../solver/analog/behavioral-flipflop.js";
+import { defineModelParams } from "../../core/model-params.js";
 
 // ---------------------------------------------------------------------------
 // Layout constants
@@ -40,6 +40,91 @@ import { makeDFlipflopAnalogFactory } from "../../solver/analog/behavioral-flipf
 // inputs: D@y=0, C@y=1; outputs: Q@y=0, ~Q@y=1
 // max(2,2)=2, yBottom=(2-1)+0.5=1.5, height=1.5+0.5=2
 const COMP_WIDTH = 3;
+
+// ---------------------------------------------------------------------------
+// Behavioural model parameter declarations
+// ---------------------------------------------------------------------------
+//
+// vIH/vIL: per-instance CMOS input thresholds, consumed by the driver leaf
+// for clock-edge detection and D-input level classification.
+// rOut/cOut/vOH/vOL: per-instance output-pin drive parameters, consumed by
+// the qPin / nqPin DigitalOutputPinLoaded sub-elements that own the actual
+// VSRC stamps on Q / ~Q.
+
+export const { paramDefs: D_FF_BEHAVIORAL_PARAM_DEFS, defaults: D_FF_BEHAVIORAL_DEFAULTS } = defineModelParams({
+  primary: {
+    vIH:  { default: 2.0,   unit: "V", description: "Input high threshold (CMOS spec)" },
+    vIL:  { default: 0.8,   unit: "V", description: "Input low threshold (CMOS spec)" },
+    rOut: { default: 100,   unit: "Î©", description: "Output drive resistance" },
+    cOut: { default: 1e-12, unit: "F", description: "Output companion capacitance" },
+    vOH:  { default: 5.0,   unit: "V", description: "Output high voltage" },
+    vOL:  { default: 0.0,   unit: "V", description: "Output low voltage" },
+  },
+});
+
+// ---------------------------------------------------------------------------
+// buildDFlipflopNetlist- function-form netlist for the behavioural model
+//
+// Ports: D, C, Q, ~Q, gnd (indices 0..4)
+// Sub-elements:
+//   drv  : BehavioralDFlipflopDriver  (1-bit pure-truth-function leaf)
+//   qPin : DigitalOutputPinLoaded     (drives Q  from drv slot OUTPUT_LOGIC_LEVEL_Q)
+//   nqPin: DigitalOutputPinLoaded     (drives ~Q from drv slot OUTPUT_LOGIC_LEVEL_NQ)
+//
+// Strictly 1-bit. Multi-bit composites instantiate this subcircuit per bit;
+// bit-width replication is composite-expansion infrastructure and is not
+// co-mingled with this exemplar.
+// ---------------------------------------------------------------------------
+
+export function buildDFlipflopNetlist(params: PropertyBag): MnaSubcircuitNetlist {
+  return {
+    ports: ["D", "C", "Q", "~Q", "gnd"],
+    params: { ...D_FF_BEHAVIORAL_DEFAULTS },
+    elements: [
+      {
+        typeId: "BehavioralDFlipflopDriver",
+        modelRef: "default",
+        subElementName: "drv",
+        params: {
+          vIH: params.getModelParam<number>("vIH"),
+          vIL: params.getModelParam<number>("vIL"),
+        },
+      },
+      {
+        typeId: "DigitalOutputPinLoaded",
+        modelRef: "default",
+        subElementName: "qPin",
+        params: {
+          rOut: params.getModelParam<number>("rOut"),
+          cOut: params.getModelParam<number>("cOut"),
+          vOH:  params.getModelParam<number>("vOH"),
+          vOL:  params.getModelParam<number>("vOL"),
+          inputLogic: { kind: "siblingState", subElementName: "drv",
+                        slotName: "OUTPUT_LOGIC_LEVEL_Q" },
+        },
+      },
+      {
+        typeId: "DigitalOutputPinLoaded",
+        modelRef: "default",
+        subElementName: "nqPin",
+        params: {
+          rOut: params.getModelParam<number>("rOut"),
+          cOut: params.getModelParam<number>("cOut"),
+          vOH:  params.getModelParam<number>("vOH"),
+          vOL:  params.getModelParam<number>("vOL"),
+          inputLogic: { kind: "siblingState", subElementName: "drv",
+                        slotName: "OUTPUT_LOGIC_LEVEL_NQ" },
+        },
+      },
+    ],
+    internalNetCount: 0,
+    netlist: [
+      [0, 1, 2, 3, 4],   // drv: D, C, Q, ~Q, gnd
+      [2, 4],            // qPin:  Q  to gnd
+      [3, 4],            // nqPin: ~Q to gnd
+    ],
+  } as MnaSubcircuitNetlist;
+}
 
 // ---------------------------------------------------------------------------
 // Pin declarations- matches Java GenericShape.createPins() exactly
@@ -299,7 +384,7 @@ const CMOS_D_FF_NETLIST: MnaSubcircuitNetlist = {
   // Internal: ~C=6, m_in=7, m_out=8, s_in=9
   // PMOS/NMOS pins: [D, G, S] (Drain, Gate, Source)
   netlist: [
-    // Master TG1_p: D=VDD_side(source), G=C, S=m_in  → [VDD, C, m_in]- wait, TG passes D→m_in
+    // Master TG1_p: D=VDD_side(source), G=C, S=m_in  â†’ [VDD, C, m_in]- wait, TG passes Dâ†’m_in
     // TG1: D pin connects to D(0), output m_in(7). PMOS: [D=0, G=C_bar=6, S=7], NMOS: [D=0, G=C=1, S=7]
     [0, 6, 7],  // m_tg1_p: D=D(0), G=~C(6), S=m_in(7)
     [0, 1, 7],  // m_tg1_n: D=D(0), G=C(1), S=m_in(7)
@@ -309,13 +394,13 @@ const CMOS_D_FF_NETLIST: MnaSubcircuitNetlist = {
     // Master INV2 (feedback): input=m_out(8), output=m_in(7)- latch closure
     [4, 8, 7],  // m_inv2_p: D=VDD(4), G=m_out(8), S=m_in(7)
     [7, 8, 5],  // m_inv2_n: D=m_in(7), G=m_out(8), S=GND(5)
-    // Slave TG2: m_out(8)→s_in(9), passes when C=0 (PMOS gate=C, NMOS gate=~C)
+    // Slave TG2: m_out(8)â†’s_in(9), passes when C=0 (PMOS gate=C, NMOS gate=~C)
     [8, 1, 9],  // s_tg2_p: D=m_out(8), G=C(1), S=s_in(9)
     [8, 6, 9],  // s_tg2_n: D=m_out(8), G=~C(6), S=s_in(9)
     // Slave INV3: input=s_in(9), output=Q(2)
     [4, 9, 2],  // s_inv3_p: D=VDD(4), G=s_in(9), S=Q(2)
     [2, 9, 5],  // s_inv3_n: D=Q(2), G=s_in(9), S=GND(5)
-    // Slave INV4 (feedback): input=Q(2), output=s_in(9) → drives ~Q(3) too
+    // Slave INV4 (feedback): input=Q(2), output=s_in(9) â†’ drives ~Q(3) too
     [4, 2, 9],  // s_inv4_p: D=VDD(4), G=Q(2), S=s_in(9)
     [9, 2, 5],  // s_inv4_n: D=s_in(9), G=Q(2), S=GND(5)
     // Clock INV: input=C(1), output=~C(6)
@@ -325,14 +410,14 @@ const CMOS_D_FF_NETLIST: MnaSubcircuitNetlist = {
 };
 
 // ---------------------------------------------------------------------------
-// DDefinition- ComponentDefinition
+// DDefinition- StandaloneComponentDefinition
 // ---------------------------------------------------------------------------
 
 function dFactory(props: PropertyBag): DElement {
   return new DElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
 }
 
-export const DDefinition: ComponentDefinition = {
+export const DDefinition: StandaloneComponentDefinition = {
   name: "D_FF",
   typeId: -1,
   factory: dFactory,
@@ -346,10 +431,10 @@ export const DDefinition: ComponentDefinition = {
     "Edge-triggered: only samples D when clock transitions from 0 to 1.",
   modelRegistry: {
     behavioral: {
-      kind: "inline",
-      factory: makeDFlipflopAnalogFactory(),
-      paramDefs: [],
-      params: {},
+      kind: "netlist",
+      netlist: buildDFlipflopNetlist,
+      paramDefs: D_FF_BEHAVIORAL_PARAM_DEFS,
+      params: D_FF_BEHAVIORAL_DEFAULTS,
     },
     cmos: {
       kind: "netlist",

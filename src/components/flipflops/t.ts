@@ -1,9 +1,9 @@
-/**
+﻿/**
  * T Flip-Flop- toggles on rising clock edge when T=1 (or unconditionally if no T input).
  *
  * With T input (withEnable=true):
- *   T=1 → toggle Q on rising clock edge
- *   T=0 → hold Q on rising clock edge
+ *   T=1 â†’ toggle Q on rising clock edge
+ *   T=0 â†’ hold Q on rising clock edge
  *
  * Without T input (withEnable=false):
  *   Toggles Q on every rising clock edge.
@@ -27,10 +27,11 @@ import type { PropertyDefinition } from "../../core/properties.js";
 import {
   ComponentCategory,
   type AttributeMapping,
-  type ComponentDefinition,
+  type StandaloneComponentDefinition,
   type ComponentLayout,
 } from "../../core/registry.js";
-import { makeTFlipflopAnalogFactory } from "../../solver/analog/behavioral-flipflop/t.js";
+import type { MnaSubcircuitNetlist } from "../../core/mna-subcircuit-netlist.js";
+import { defineModelParams } from "../../core/model-params.js";
 
 // ---------------------------------------------------------------------------
 // Layout constants
@@ -50,6 +51,100 @@ const COMP_HEIGHT_WITH_ENABLE = 2;
 // No-enable: 1 input C@y=0; outputs Q@y=0, ~Q@y=1
 // With-enable: inputs T@y=0, C@y=1; outputs Q@y=0, ~Q@y=1
 // ---------------------------------------------------------------------------
+
+// ---------------------------------------------------------------------------
+// Behavioural model parameter declarations
+// ---------------------------------------------------------------------------
+
+export const { paramDefs: T_FF_BEHAVIORAL_PARAM_DEFS, defaults: T_FF_BEHAVIORAL_DEFAULTS } = defineModelParams({
+  primary: {
+    vIH:  { default: 2.0,   unit: "V", description: "Input high threshold (CMOS spec)" },
+    vIL:  { default: 0.8,   unit: "V", description: "Input low threshold (CMOS spec)" },
+    rOut: { default: 100,   unit: "Î©", description: "Output drive resistance" },
+    cOut: { default: 1e-12, unit: "F", description: "Output companion capacitance" },
+    vOH:  { default: 5.0,   unit: "V", description: "Output high voltage" },
+    vOL:  { default: 0.0,   unit: "V", description: "Output low voltage" },
+  },
+});
+
+// ---------------------------------------------------------------------------
+// buildTFlipflopNetlist- function-form netlist for the behavioural model
+//
+// Ports: T, C, Q, ~Q, gnd (indices 0..4) -- with-enable variant only.
+// Sub-elements:
+//   drv  : BehavioralTFlipflopDriver  (1-bit pure-truth-function leaf)
+//   qPin : DigitalOutputPinLoaded     (drives Q  from drv slot OUTPUT_LOGIC_LEVEL_Q)
+//   nqPin: DigitalOutputPinLoaded     (drives ~Q from drv slot OUTPUT_LOGIC_LEVEL_NQ)
+//
+// Strictly 1-bit. Multi-bit composites instantiate this subcircuit per bit;
+// bit-width replication is composite-expansion infrastructure.
+//
+// withEnable=false (always-toggle) is NOT supported by this behavioural
+// netlist; the parent's getPins() variant for that case has no T pin, but
+// the driver leaf still requires a T input. Supporting it requires either
+// (a) always exposing T at the parent (UI behaviour change), or (b) adding
+// an internal vdd-tied net via a voltage-source sub-element. Both are
+// architectural decisions that live outside this composite's blast radius.
+// Until then, withEnable=false instances must use the digital model.
+// ---------------------------------------------------------------------------
+
+export function buildTFlipflopNetlist(params: PropertyBag): MnaSubcircuitNetlist {
+  const withEnable = params.getOrDefault<boolean>("withEnable", true);
+  if (!withEnable) {
+    throw new Error(
+      "Timer-FF behavioural model: withEnable=false is not supported by the " +
+      "subcircuit netlist. Use the digital model for always-toggle T flip-flops, " +
+      "or wire T to vdd in your schematic and set withEnable=true.",
+    );
+  }
+  return {
+    ports: ["T", "C", "Q", "~Q", "gnd"],
+    params: { ...T_FF_BEHAVIORAL_DEFAULTS },
+    elements: [
+      {
+        typeId: "BehavioralTFlipflopDriver",
+        modelRef: "default",
+        subElementName: "drv",
+        params: {
+          vIH: params.getModelParam<number>("vIH"),
+          vIL: params.getModelParam<number>("vIL"),
+        },
+      },
+      {
+        typeId: "DigitalOutputPinLoaded",
+        modelRef: "default",
+        subElementName: "qPin",
+        params: {
+          rOut: params.getModelParam<number>("rOut"),
+          cOut: params.getModelParam<number>("cOut"),
+          vOH:  params.getModelParam<number>("vOH"),
+          vOL:  params.getModelParam<number>("vOL"),
+          inputLogic: { kind: "siblingState", subElementName: "drv",
+                        slotName: "OUTPUT_LOGIC_LEVEL_Q" },
+        },
+      },
+      {
+        typeId: "DigitalOutputPinLoaded",
+        modelRef: "default",
+        subElementName: "nqPin",
+        params: {
+          rOut: params.getModelParam<number>("rOut"),
+          cOut: params.getModelParam<number>("cOut"),
+          vOH:  params.getModelParam<number>("vOH"),
+          vOL:  params.getModelParam<number>("vOL"),
+          inputLogic: { kind: "siblingState", subElementName: "drv",
+                        slotName: "OUTPUT_LOGIC_LEVEL_NQ" },
+        },
+      },
+    ],
+    internalNetCount: 0,
+    netlist: [
+      [0, 1, 2, 3, 4],   // drv: T, C, Q, ~Q, gnd
+      [2, 4],            // qPin:  Q  to gnd
+      [3, 4],            // nqPin: ~Q to gnd
+    ],
+  } as MnaSubcircuitNetlist;
+}
 
 const T_FF_PINS_NO_ENABLE: PinDeclaration[] = [
   {
@@ -254,14 +349,14 @@ const T_FF_PROPERTY_DEFS: PropertyDefinition[] = [
 ];
 
 // ---------------------------------------------------------------------------
-// TDefinition- ComponentDefinition
+// TDefinition- StandaloneComponentDefinition
 // ---------------------------------------------------------------------------
 
 function tFactory(props: PropertyBag): TElement {
   return new TElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
 }
 
-export const TDefinition: ComponentDefinition = {
+export const TDefinition: StandaloneComponentDefinition = {
   name: "T_FF",
   typeId: -1,
   factory: tFactory,
@@ -276,10 +371,10 @@ export const TDefinition: ComponentDefinition = {
     "Q and ~Q are always complementary.",
   modelRegistry: {
     behavioral: {
-      kind: "inline",
-      factory: makeTFlipflopAnalogFactory(),
-      paramDefs: [],
-      params: {},
+      kind: "netlist",
+      netlist: buildTFlipflopNetlist,
+      paramDefs: T_FF_BEHAVIORAL_PARAM_DEFS,
+      params: T_FF_BEHAVIORAL_DEFAULTS,
     },
   },
   models: {

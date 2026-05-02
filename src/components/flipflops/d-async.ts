@@ -1,4 +1,4 @@
-/**
+﻿/**
  * D Flip-Flop with async Set/Clear- edge-triggered with async preset/clear.
  *
  * Stores D on rising clock edge. Async Set (active-high) forces Q=1.
@@ -22,10 +22,11 @@ import type { PropertyDefinition } from "../../core/properties.js";
 import {
   ComponentCategory,
   type AttributeMapping,
-  type ComponentDefinition,
+  type StandaloneComponentDefinition,
   type ComponentLayout,
 } from "../../core/registry.js";
-import { makeDAsyncFlipflopAnalogFactory } from "../../solver/analog/behavioral-flipflop/d-async.js";
+import type { MnaSubcircuitNetlist } from "../../core/mna-subcircuit-netlist.js";
+import { defineModelParams } from "../../core/model-params.js";
 
 // ---------------------------------------------------------------------------
 // Layout constants
@@ -41,6 +42,85 @@ const COMP_WIDTH = 3;
 // inputs: Set@y=0, D@y=1, C@y=2, Clr@y=3
 // outputs: Q@y=0, ~Q@y=1
 // ---------------------------------------------------------------------------
+
+// ---------------------------------------------------------------------------
+// Behavioural model parameter declarations
+// ---------------------------------------------------------------------------
+
+export const { paramDefs: D_FF_AS_BEHAVIORAL_PARAM_DEFS, defaults: D_FF_AS_BEHAVIORAL_DEFAULTS } = defineModelParams({
+  primary: {
+    vIH:  { default: 2.0,   unit: "V", description: "Input high threshold (CMOS spec)" },
+    vIL:  { default: 0.8,   unit: "V", description: "Input low threshold (CMOS spec)" },
+    rOut: { default: 100,   unit: "Î©", description: "Output drive resistance" },
+    cOut: { default: 1e-12, unit: "F", description: "Output companion capacitance" },
+    vOH:  { default: 5.0,   unit: "V", description: "Output high voltage" },
+    vOL:  { default: 0.0,   unit: "V", description: "Output low voltage" },
+  },
+});
+
+// ---------------------------------------------------------------------------
+// buildDAsyncFlipflopNetlist- function-form netlist for the behavioural model
+//
+// Ports: Set, D, C, Clr, Q, ~Q, gnd (indices 0..6)
+// Sub-elements:
+//   drv  : BehavioralDAsyncFlipflopDriver  (1-bit pure-truth-function leaf,
+//          handles edge-triggered D latch + async Set/Clr override)
+//   qPin : DigitalOutputPinLoaded          (drives Q  from drv slot OUTPUT_LOGIC_LEVEL_Q)
+//   nqPin: DigitalOutputPinLoaded          (drives ~Q from drv slot OUTPUT_LOGIC_LEVEL_NQ)
+//
+// Strictly 1-bit. Multi-bit composites instantiate this subcircuit per bit;
+// bit-width replication is composite-expansion infrastructure.
+// ---------------------------------------------------------------------------
+
+export function buildDAsyncFlipflopNetlist(params: PropertyBag): MnaSubcircuitNetlist {
+  return {
+    ports: ["Set", "D", "C", "Clr", "Q", "~Q", "gnd"],
+    params: { ...D_FF_AS_BEHAVIORAL_DEFAULTS },
+    elements: [
+      {
+        typeId: "BehavioralDAsyncFlipflopDriver",
+        modelRef: "default",
+        subElementName: "drv",
+        params: {
+          vIH: params.getModelParam<number>("vIH"),
+          vIL: params.getModelParam<number>("vIL"),
+        },
+      },
+      {
+        typeId: "DigitalOutputPinLoaded",
+        modelRef: "default",
+        subElementName: "qPin",
+        params: {
+          rOut: params.getModelParam<number>("rOut"),
+          cOut: params.getModelParam<number>("cOut"),
+          vOH:  params.getModelParam<number>("vOH"),
+          vOL:  params.getModelParam<number>("vOL"),
+          inputLogic: { kind: "siblingState", subElementName: "drv",
+                        slotName: "OUTPUT_LOGIC_LEVEL_Q" },
+        },
+      },
+      {
+        typeId: "DigitalOutputPinLoaded",
+        modelRef: "default",
+        subElementName: "nqPin",
+        params: {
+          rOut: params.getModelParam<number>("rOut"),
+          cOut: params.getModelParam<number>("cOut"),
+          vOH:  params.getModelParam<number>("vOH"),
+          vOL:  params.getModelParam<number>("vOL"),
+          inputLogic: { kind: "siblingState", subElementName: "drv",
+                        slotName: "OUTPUT_LOGIC_LEVEL_NQ" },
+        },
+      },
+    ],
+    internalNetCount: 0,
+    netlist: [
+      [0, 1, 2, 3, 4, 5, 6],   // drv: Set, D, C, Clr, Q, ~Q, gnd
+      [4, 6],                  // qPin:  Q  to gnd
+      [5, 6],                  // nqPin: ~Q to gnd
+    ],
+  } as MnaSubcircuitNetlist;
+}
 
 const D_FF_AS_PIN_DECLARATIONS: PinDeclaration[] = [
   {
@@ -263,14 +343,14 @@ const D_FF_AS_PROPERTY_DEFS: PropertyDefinition[] = [
 ];
 
 // ---------------------------------------------------------------------------
-// DAsyncDefinition- ComponentDefinition
+// DAsyncDefinition- StandaloneComponentDefinition
 // ---------------------------------------------------------------------------
 
 function dAsyncFactory(props: PropertyBag): DAsyncElement {
   return new DAsyncElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
 }
 
-export const DAsyncDefinition: ComponentDefinition = {
+export const DAsyncDefinition: StandaloneComponentDefinition = {
   name: "D_FF_AS",
   typeId: -1,
   factory: dAsyncFactory,
@@ -285,10 +365,10 @@ export const DAsyncDefinition: ComponentDefinition = {
     "When Set and Clr are both inactive, stores D on rising clock edge.",
   modelRegistry: {
     behavioral: {
-      kind: "inline",
-      factory: makeDAsyncFlipflopAnalogFactory(),
-      paramDefs: [],
-      params: {},
+      kind: "netlist",
+      netlist: buildDAsyncFlipflopNetlist,
+      paramDefs: D_FF_AS_BEHAVIORAL_PARAM_DEFS,
+      params: D_FF_AS_BEHAVIORAL_DEFAULTS,
     },
   },
   models: {

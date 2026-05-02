@@ -1,11 +1,11 @@
-/**
+﻿/**
  * RS Flip-Flop- edge-triggered with S/R control inputs.
  *
  * On rising clock edge:
- *   S=0, R=0 → no change (hold)
- *   S=1, R=0 → set (Q=1)
- *   S=0, R=1 → reset (Q=0)
- *   S=1, R=1 → undefined (random- per Digital's implementation)
+ *   S=0, R=0 â†’ no change (hold)
+ *   S=1, R=0 â†’ set (Q=1)
+ *   S=0, R=1 â†’ reset (Q=0)
+ *   S=1, R=1 â†’ undefined (random- per Digital's implementation)
  *
  * Input layout:  [S=0, C=1, R=2]
  * Output layout: [Q=0, ~Q=1]
@@ -25,10 +25,11 @@ import type { PropertyDefinition } from "../../core/properties.js";
 import {
   ComponentCategory,
   type AttributeMapping,
-  type ComponentDefinition,
+  type StandaloneComponentDefinition,
   type ComponentLayout,
 } from "../../core/registry.js";
-import { makeRSFlipflopAnalogFactory } from "../../solver/analog/behavioral-flipflop/rs.js";
+import type { MnaSubcircuitNetlist } from "../../core/mna-subcircuit-netlist.js";
+import { defineModelParams } from "../../core/model-params.js";
 
 // ---------------------------------------------------------------------------
 // Layout constants
@@ -44,6 +45,84 @@ const COMP_WIDTH = 3;
 // inputs: S@y=0, C@y=1, R@y=2
 // outputs: Q@y=0, ~Q@y=1
 // ---------------------------------------------------------------------------
+
+// ---------------------------------------------------------------------------
+// Behavioural model parameter declarations
+// ---------------------------------------------------------------------------
+
+export const { paramDefs: RS_FF_BEHAVIORAL_PARAM_DEFS, defaults: RS_FF_BEHAVIORAL_DEFAULTS } = defineModelParams({
+  primary: {
+    vIH:  { default: 2.0,   unit: "V", description: "Input high threshold (CMOS spec)" },
+    vIL:  { default: 0.8,   unit: "V", description: "Input low threshold (CMOS spec)" },
+    rOut: { default: 100,   unit: "Î©", description: "Output drive resistance" },
+    cOut: { default: 1e-12, unit: "F", description: "Output companion capacitance" },
+    vOH:  { default: 5.0,   unit: "V", description: "Output high voltage" },
+    vOL:  { default: 0.0,   unit: "V", description: "Output low voltage" },
+  },
+});
+
+// ---------------------------------------------------------------------------
+// buildRSFlipflopNetlist- function-form netlist for the behavioural model
+//
+// Ports: S, C, R, Q, ~Q, gnd (indices 0..5)
+// Sub-elements:
+//   drv  : BehavioralRSFlipflopDriver  (1-bit pure-truth-function leaf)
+//   qPin : DigitalOutputPinLoaded      (drives Q  from drv slot OUTPUT_LOGIC_LEVEL_Q)
+//   nqPin: DigitalOutputPinLoaded      (drives ~Q from drv slot OUTPUT_LOGIC_LEVEL_NQ)
+//
+// Strictly 1-bit. Multi-bit composites instantiate this subcircuit per bit;
+// bit-width replication is composite-expansion infrastructure.
+// ---------------------------------------------------------------------------
+
+export function buildRSFlipflopNetlist(params: PropertyBag): MnaSubcircuitNetlist {
+  return {
+    ports: ["S", "C", "R", "Q", "~Q", "gnd"],
+    params: { ...RS_FF_BEHAVIORAL_DEFAULTS },
+    elements: [
+      {
+        typeId: "BehavioralRSFlipflopDriver",
+        modelRef: "default",
+        subElementName: "drv",
+        params: {
+          vIH: params.getModelParam<number>("vIH"),
+          vIL: params.getModelParam<number>("vIL"),
+        },
+      },
+      {
+        typeId: "DigitalOutputPinLoaded",
+        modelRef: "default",
+        subElementName: "qPin",
+        params: {
+          rOut: params.getModelParam<number>("rOut"),
+          cOut: params.getModelParam<number>("cOut"),
+          vOH:  params.getModelParam<number>("vOH"),
+          vOL:  params.getModelParam<number>("vOL"),
+          inputLogic: { kind: "siblingState", subElementName: "drv",
+                        slotName: "OUTPUT_LOGIC_LEVEL_Q" },
+        },
+      },
+      {
+        typeId: "DigitalOutputPinLoaded",
+        modelRef: "default",
+        subElementName: "nqPin",
+        params: {
+          rOut: params.getModelParam<number>("rOut"),
+          cOut: params.getModelParam<number>("cOut"),
+          vOH:  params.getModelParam<number>("vOH"),
+          vOL:  params.getModelParam<number>("vOL"),
+          inputLogic: { kind: "siblingState", subElementName: "drv",
+                        slotName: "OUTPUT_LOGIC_LEVEL_NQ" },
+        },
+      },
+    ],
+    internalNetCount: 0,
+    netlist: [
+      [0, 1, 2, 3, 4, 5],   // drv: S, C, R, Q, ~Q, gnd
+      [3, 5],               // qPin:  Q  to gnd
+      [4, 5],               // nqPin: ~Q to gnd
+    ],
+  } as MnaSubcircuitNetlist;
+}
 
 export const RS_FF_PIN_DECLARATIONS: PinDeclaration[] = [
   {
@@ -193,14 +272,14 @@ const RS_FF_PROPERTY_DEFS: PropertyDefinition[] = [
 ];
 
 // ---------------------------------------------------------------------------
-// RSDefinition- ComponentDefinition
+// RSDefinition- StandaloneComponentDefinition
 // ---------------------------------------------------------------------------
 
 function rsFactory(props: PropertyBag): RSElement {
   return new RSElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
 }
 
-export const RSDefinition: ComponentDefinition = {
+export const RSDefinition: StandaloneComponentDefinition = {
   name: "RS_FF",
   typeId: -1,
   factory: rsFactory,
@@ -210,14 +289,14 @@ export const RSDefinition: ComponentDefinition = {
   category: ComponentCategory.FLIP_FLOPS,
   helpText:
     "RS Flip-Flop- edge-triggered with S/R control inputs.\n" +
-    "On rising clock edge: S=0,R=0 → hold; S=1,R=0 → set; S=0,R=1 → reset; S=1,R=1 → undefined.\n" +
+    "On rising clock edge: S=0,R=0 â†’ hold; S=1,R=0 â†’ set; S=0,R=1 â†’ reset; S=1,R=1 â†’ undefined.\n" +
     "Q and ~Q outputs are always complementary (except on S=R=1).",
   modelRegistry: {
     behavioral: {
-      kind: "inline",
-      factory: makeRSFlipflopAnalogFactory(),
-      paramDefs: [],
-      params: {},
+      kind: "netlist",
+      netlist: buildRSFlipflopNetlist,
+      paramDefs: RS_FF_BEHAVIORAL_PARAM_DEFS,
+      params: RS_FF_BEHAVIORAL_DEFAULTS,
     },
   },
   models: {

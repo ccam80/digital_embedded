@@ -1,4 +1,4 @@
-/**
+﻿/**
  * JK Flip-Flop with async Set/Clear.
  *
  * JK logic on rising clock edge, with async Set/Clear inputs taking priority.
@@ -22,10 +22,11 @@ import type { PropertyDefinition } from "../../core/properties.js";
 import {
   ComponentCategory,
   type AttributeMapping,
-  type ComponentDefinition,
+  type StandaloneComponentDefinition,
   type ComponentLayout,
 } from "../../core/registry.js";
-import { makeJKAsyncFlipflopAnalogFactory } from "../../solver/analog/behavioral-flipflop/jk-async.js";
+import type { MnaSubcircuitNetlist } from "../../core/mna-subcircuit-netlist.js";
+import { defineModelParams } from "../../core/model-params.js";
 
 // ---------------------------------------------------------------------------
 // Layout constants
@@ -42,6 +43,85 @@ const COMP_WIDTH = 3;
 // inputs: Set@y=0, J@y=1, C@y=2, K@y=3, Clr@y=4
 // outputs: Q@y=0, ~Q@y=1
 // ---------------------------------------------------------------------------
+
+// ---------------------------------------------------------------------------
+// Behavioural model parameter declarations
+// ---------------------------------------------------------------------------
+
+export const { paramDefs: JK_FF_AS_BEHAVIORAL_PARAM_DEFS, defaults: JK_FF_AS_BEHAVIORAL_DEFAULTS } = defineModelParams({
+  primary: {
+    vIH:  { default: 2.0,   unit: "V", description: "Input high threshold (CMOS spec)" },
+    vIL:  { default: 0.8,   unit: "V", description: "Input low threshold (CMOS spec)" },
+    rOut: { default: 100,   unit: "Î©", description: "Output drive resistance" },
+    cOut: { default: 1e-12, unit: "F", description: "Output companion capacitance" },
+    vOH:  { default: 5.0,   unit: "V", description: "Output high voltage" },
+    vOL:  { default: 0.0,   unit: "V", description: "Output low voltage" },
+  },
+});
+
+// ---------------------------------------------------------------------------
+// buildJKAsyncFlipflopNetlist- function-form netlist for the behavioural model
+//
+// Ports: Set, J, C, K, Clr, Q, ~Q, gnd (indices 0..7)
+// Sub-elements:
+//   drv  : BehavioralJKAsyncFlipflopDriver  (1-bit pure-truth-function leaf,
+//          edge-triggered JK + async Set/Clr override)
+//   qPin : DigitalOutputPinLoaded           (drives Q  from drv slot OUTPUT_LOGIC_LEVEL_Q)
+//   nqPin: DigitalOutputPinLoaded           (drives ~Q from drv slot OUTPUT_LOGIC_LEVEL_NQ)
+//
+// Strictly 1-bit. Multi-bit composites instantiate this subcircuit per bit;
+// bit-width replication is composite-expansion infrastructure.
+// ---------------------------------------------------------------------------
+
+export function buildJKAsyncFlipflopNetlist(params: PropertyBag): MnaSubcircuitNetlist {
+  return {
+    ports: ["Set", "J", "C", "K", "Clr", "Q", "~Q", "gnd"],
+    params: { ...JK_FF_AS_BEHAVIORAL_DEFAULTS },
+    elements: [
+      {
+        typeId: "BehavioralJKAsyncFlipflopDriver",
+        modelRef: "default",
+        subElementName: "drv",
+        params: {
+          vIH: params.getModelParam<number>("vIH"),
+          vIL: params.getModelParam<number>("vIL"),
+        },
+      },
+      {
+        typeId: "DigitalOutputPinLoaded",
+        modelRef: "default",
+        subElementName: "qPin",
+        params: {
+          rOut: params.getModelParam<number>("rOut"),
+          cOut: params.getModelParam<number>("cOut"),
+          vOH:  params.getModelParam<number>("vOH"),
+          vOL:  params.getModelParam<number>("vOL"),
+          inputLogic: { kind: "siblingState", subElementName: "drv",
+                        slotName: "OUTPUT_LOGIC_LEVEL_Q" },
+        },
+      },
+      {
+        typeId: "DigitalOutputPinLoaded",
+        modelRef: "default",
+        subElementName: "nqPin",
+        params: {
+          rOut: params.getModelParam<number>("rOut"),
+          cOut: params.getModelParam<number>("cOut"),
+          vOH:  params.getModelParam<number>("vOH"),
+          vOL:  params.getModelParam<number>("vOL"),
+          inputLogic: { kind: "siblingState", subElementName: "drv",
+                        slotName: "OUTPUT_LOGIC_LEVEL_NQ" },
+        },
+      },
+    ],
+    internalNetCount: 0,
+    netlist: [
+      [0, 1, 2, 3, 4, 5, 6, 7],   // drv: Set, J, C, K, Clr, Q, ~Q, gnd
+      [5, 7],                     // qPin:  Q  to gnd
+      [6, 7],                     // nqPin: ~Q to gnd
+    ],
+  } as MnaSubcircuitNetlist;
+}
 
 const JK_FF_AS_PIN_DECLARATIONS: PinDeclaration[] = [
   {
@@ -292,14 +372,14 @@ const JK_FF_AS_PROPERTY_DEFS: PropertyDefinition[] = [
 ];
 
 // ---------------------------------------------------------------------------
-// JKAsyncDefinition- ComponentDefinition
+// JKAsyncDefinition- StandaloneComponentDefinition
 // ---------------------------------------------------------------------------
 
 function jkAsyncFactory(props: PropertyBag): JKAsyncElement {
   return new JKAsyncElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
 }
 
-export const JKAsyncDefinition: ComponentDefinition = {
+export const JKAsyncDefinition: StandaloneComponentDefinition = {
   name: "JK_FF_AS",
   typeId: -1,
   factory: jkAsyncFactory,
@@ -311,13 +391,13 @@ export const JKAsyncDefinition: ComponentDefinition = {
     "JK Flip-Flop with async Set/Clear.\n" +
     "Set (active-high) forces Q=1 asynchronously.\n" +
     "Clr (active-high) forces Q=0 asynchronously.\n" +
-    "On rising clock edge: J=0,K=0 → hold; J=1,K=0 → set; J=0,K=1 → reset; J=1,K=1 → toggle.",
+    "On rising clock edge: J=0,K=0 â†’ hold; J=1,K=0 â†’ set; J=0,K=1 â†’ reset; J=1,K=1 â†’ toggle.",
   modelRegistry: {
     behavioral: {
-      kind: "inline",
-      factory: makeJKAsyncFlipflopAnalogFactory(),
-      paramDefs: [],
-      params: {},
+      kind: "netlist",
+      netlist: buildJKAsyncFlipflopNetlist,
+      paramDefs: JK_FF_AS_BEHAVIORAL_PARAM_DEFS,
+      params: JK_FF_AS_BEHAVIORAL_DEFAULTS,
     },
   },
   models: {
