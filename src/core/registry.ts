@@ -507,7 +507,7 @@ export class ComponentRegistry {
    * Register a new definition, or update an existing one.
    *
    * Convenience method for subcircuit loading where the caller doesn't know
-   * (or care) whether the name was previously registered.
+   * (or care) whether the name is already registered.
    */
   registerOrUpdate(def: ComponentDefinition | StandaloneComponentDefinition): void {
     if (this._byName.has(def.name)) {

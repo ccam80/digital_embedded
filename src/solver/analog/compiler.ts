@@ -16,6 +16,7 @@
 import { Circuit } from "../../core/circuit.js";
 import type { CircuitElement } from "../../core/element.js";
 import type { ComponentRegistry } from "../../core/registry.js";
+import { resolvePinLayout } from "../../core/registry.js";
 import type { Diagnostic } from "../../compile/types.js";
 import { pinWorldPosition } from "../../core/pin.js";
 import type { ResolvedPin } from "../../core/pin.js";
@@ -37,14 +38,16 @@ import type { LogicFamilyConfig } from "../../core/logic-family.js";
 import type { SolverPartition, PartitionedComponent, DigitalCompilerFn, ComponentDefinition, MnaModel } from "../../compile/types.js";
 import type { ModelEntry } from "../../core/registry.js";
 import { StatePool } from "./state-pool.js";
-import { CompositeElement } from "./composite-element.js";
-import type { AnalogElement } from "../../core/analog-types.js";
-import { NGSPICE_LOAD_ORDER, getNgspiceLoadOrderByTypeId, TYPE_ID_TO_DECK_PIN_LABEL_ORDER } from "../../core/analog-types.js";
-import { defineStateSchema } from "./state-schema.js";
+import type { AnalogElement } from "./element.js";
+import { NGSPICE_LOAD_ORDER, getNgspiceLoadOrderByTypeId, TYPE_ID_TO_DECK_PIN_LABEL_ORDER } from "./ngspice-load-order.js";
 import type { StateSchema } from "./state-schema.js";
+import {
+  buildTopologyInfo,
+  runCompileTimeDetectors,
+} from "./topology-diagnostics.js";
 
 // ---------------------------------------------------------------------------
-// Component routing — shared decision logic for Pass A and Pass B
+// Component routing- shared decision logic for Pass A and Pass B
 // ---------------------------------------------------------------------------
 
 type ComponentRoute =
@@ -137,7 +140,7 @@ function resolveComponentRoute(
 
 
 // ---------------------------------------------------------------------------
-// Subcircuit model resolution — post-partition step (W4.1)
+// Subcircuit model resolution- post-partition step (W4.1)
 // ---------------------------------------------------------------------------
 
 /**
@@ -180,7 +183,12 @@ function resolveSubcircuitModels(
       continue;
     }
 
-    pc.model = compileSubcircuitToMnaModel(netlist, pc, registry);
+    const resolvedNetlist =
+      typeof netlist === "function"
+        ? (netlist as unknown as (props: PropertyBag) => MnaSubcircuitNetlist)(pc.element.getProperties())
+        : netlist;
+
+    pc.model = compileSubcircuitToMnaModel(resolvedNetlist, pc, registry);
   }
 }
 
@@ -188,9 +196,9 @@ function resolveSubcircuitModels(
  * A thin leaf element that allocates a single internal MNA node during setup()
  * and records the allocated node ID into a shared mutable slot. Used by
  * compileSubcircuitToMnaModel so that internal-net allocation belongs to leaf
- * children (per §A.7) rather than to the composite's setup() body.
+ * children (per ssA.7) rather than to the composite's setup() body.
  *
- * The allocator element has no stamps — its sole purpose is calling
+ * The allocator element has no stamps- its sole purpose is calling
  * ctx.makeVolt() and writing the result into `slot.nodeId` so that sibling
  * sub-elements sharing the same internal net can read the resolved ID
  * during their own setup() calls (which run after the allocator's setup()).
@@ -206,7 +214,7 @@ function makeInternalNetAllocator(
 ): AnalogElement {
   const el: AnalogElement = {
     label: "",
-    ngspiceLoadOrder: NGSPICE_LOAD_ORDER.VCVS,
+    ngspiceLoadOrder: NGSPICE_LOAD_ORDER.INTERNAL_NET_ALLOC,
     _pinNodes: new Map(),
     _stateBase: -1,
     branchIndex: -1,
@@ -217,7 +225,7 @@ function makeInternalNetAllocator(
     },
 
     load(_ctx: import("./load-context.js").LoadContext): void {
-      // No stamps — allocator only.
+      // No stamps- allocator only.
     },
 
     getPinCurrents(_rhs: Float64Array): number[] {
@@ -232,13 +240,15 @@ function makeInternalNetAllocator(
 }
 
 /**
- * Compile an MnaSubcircuitNetlist into an MnaModel with a composite factory.
+ * Compile an MnaSubcircuitNetlist into an MnaModel with a wrapper factory.
  *
- * The factory returns a single AnalogElement that internally aggregates
- * stamps from all sub-elements via an anonymous class extending CompositeElement.
- * Internal-net allocation is performed by thin leaf allocator elements (per §A.7),
- * not by the composite's own setup() body.
- * The compiler treats the returned element like any other single element.
+ * The factory returns a plain-object wrapper AnalogElement with
+ * participatesInLoad:false. The wrapper's leaves (allocator, patcher,
+ * sub-elements) are exposed via `_subcircuitLeaves` so the caller in
+ * compileAnalogPartition flattens them into the global `analogElements`
+ * accumulator. The engine's global ngspiceLoadOrder sort then sequences
+ * allocator (-2) -> patcher (-1) -> URC (0) -> real devices (>= 0) at
+ * setup-time, which makes the wrapper's own setup/load redundant.
  */
 function compileSubcircuitToMnaModel(
   netlist: MnaSubcircuitNetlist,
@@ -280,10 +290,29 @@ function compileSubcircuitToMnaModel(
       // sub-element param (e.g. "WP" → PMOS elements' "W" param).
       const bindings = new Map<string, Array<{ el: AnalogElement; key: string }>>();
 
+      // Per-instance label resolved at expansion time via setLabel.
+      const labelRef = { value: "" };
+
       // All child elements: allocators first (so slots are populated before
       // sub-elements run setup()), then the real leaf elements.
       const allChildren: AnalogElement[] = [];
       const subElements: AnalogElement[] = [];
+      // Per-sub-element record: { element, subElementName }- used by setLabel
+      // to stamp `${parentLabel}:${subElementName}` onto each leaf.
+      const subElementLabelInfo: Array<{ el: AnalogElement; subElementName: string }> = [];
+
+      // Build elementsByName map for siblingBranch / siblingState resolution.
+      const elementsByName = new Map<string, import("../../core/mna-subcircuit-netlist.js").SubcircuitElement>();
+      for (let elIdx = 0; elIdx < netlist.elements.length; elIdx++) {
+        const subEl = netlist.elements[elIdx]!;
+        const subName = (subEl as unknown as { subElementName?: string }).subElementName ?? `el${elIdx}`;
+        elementsByName.set(subName, subEl);
+      }
+
+      // Map sub-element name → constructed AnalogElement, populated as we build
+      // each leaf below. Used for siblingState resolution to acquire the
+      // resolved sibling element reference (not just the netlist record).
+      const constructedByName = new Map<string, AnalogElement>();
 
       // Helper: resolve a netlist net index to a node ID or a slot reference.
       // Port nets resolve immediately; internal nets resolve via slot.nodeId
@@ -293,7 +322,7 @@ function compileSubcircuitToMnaModel(
           const portLabel = netlist.ports[netIdx];
           return portLabel !== undefined ? (portLabelToNode.get(portLabel) ?? -1) : -1;
         }
-        // Internal net — slot will be populated by the allocator's setup().
+        // Internal net- slot will be populated by the allocator's setup().
         // Return the slot's current value; after all allocator setup() calls
         // run, slot.nodeId holds the real node ID.
         const slotIdx = netIdx - netlist.ports.length;
@@ -338,14 +367,71 @@ function compileSubcircuitToMnaModel(
             if (typeof v === "number") subProps.setModelParam(k, v);
           }
         }
-        // Override with subcircuit-specific params — resolve string references
+        // Override with subcircuit-specific params- discriminated dispatch on value shape.
         if (subEl.params) {
-          for (const [k, v] of Object.entries(subEl.params)) {
+          for (const [paramKey, v] of Object.entries(subEl.params)) {
             if (typeof v === "number") {
-              subProps.setModelParam(k, v);
+              // Literal pass-through to leaf prop bag.
+              subProps.setModelParam(paramKey, v);
             } else if (typeof v === "string") {
+              // Existing subcircuit-level param ref; resolve from merged-instance PropertyBag.
               const resolved = resolvedSubcktParams.get(v);
-              if (resolved !== undefined) subProps.setModelParam(k, resolved);
+              if (resolved !== undefined) subProps.setModelParam(paramKey, resolved);
+            } else if (v !== null && typeof v === "object") {
+              const tag = (v as { kind?: string }).kind;
+              if (tag === "siblingBranch") {
+                const ref = v as { kind: "siblingBranch"; subElementName: string };
+                const sibling = elementsByName.get(ref.subElementName);
+                if (!sibling) {
+                  throw new Error(
+                    `siblingBranch: unknown element "${ref.subElementName}"`,
+                  );
+                }
+                // Write the GLOBAL label into the dependent leaf's prop bag.
+                // The dependent leaf's setup() calls ctx.findBranch(label).
+                (subProps as unknown as { set: (k: string, val: unknown) => void }).set(
+                  paramKey,
+                  `${labelRef.value}:${ref.subElementName}`,
+                );
+              } else if (tag === "siblingState") {
+                const ref = v as { kind: "siblingState"; subElementName: string; slotName: string };
+                const sibling = elementsByName.get(ref.subElementName);
+                if (!sibling) {
+                  throw new Error(
+                    `siblingState: unknown element "${ref.subElementName}"`,
+                  );
+                }
+                const siblingDef = registry.get(sibling.typeId);
+                if (!siblingDef) {
+                  throw new Error(
+                    `siblingState: registry has no definition for typeId "${sibling.typeId}"`,
+                  );
+                }
+                const siblingSchema = (siblingDef as unknown as { stateSchema?: StateSchema }).stateSchema;
+                const slotIdx = siblingSchema
+                  ? (siblingSchema as unknown as { indexOf: (name: string) => number }).indexOf(ref.slotName)
+                  : -1;
+                if (slotIdx < 0) {
+                  throw new Error(
+                    `siblingState: unknown slot "${ref.slotName}" on "${ref.subElementName}"`,
+                  );
+                }
+                // The dependent leaf's setup() resolves to a flat pool index via
+                //   sibling._stateBase + slotIdx
+                // because at setup-time the sibling's _stateBase is already populated
+                // (initState ran before setup). Write the deferred ref:
+                const siblingEl = constructedByName.get(ref.subElementName);
+                (subProps as unknown as { set: (k: string, val: unknown) => void }).set(
+                  paramKey,
+                  { kind: "poolSlotRef", element: siblingEl, slotIdx },
+                );
+              } else {
+                throw new Error(
+                  "Unsupported SubcircuitElementParam discriminator. " +
+                    "Cross-leaf coupling MUST go through pool slots (siblingState) " +
+                    "to preserve StatePool rollback. See composite-architecture-job.md ss11.2.",
+                );
+              }
             }
           }
         }
@@ -353,16 +439,20 @@ function compileSubcircuitToMnaModel(
         // Build pin-label-keyed Map for the sub-element.
         // Port nets resolve immediately; internal nets start as -1 and are
         // patched by the patcher element before this sub-element's setup() runs.
+        // Variable-shape drivers (Template A-variable: gates with N inputs,
+        // counters/registers with N output bits) supply `pinLayoutFactory`;
+        // resolvePinLayout invokes it with the sub-element's resolved props.
         const subPinNodes = new Map<string, number>();
         if (leafDef) {
-          for (let pi = 0; pi < leafDef.pinLayout.length && pi < connectivity.length; pi++) {
+          const subPinLayout = resolvePinLayout(leafDef, subProps);
+          for (let pi = 0; pi < subPinLayout.length && pi < connectivity.length; pi++) {
             const netIdx = connectivity[pi];
             if (netIdx === undefined) continue;
-            const pinLabel = leafDef.pinLayout[pi]!.label;
+            const pinLabel = subPinLayout[pi]!.label;
             if (netIdx < netlist.ports.length) {
               subPinNodes.set(pinLabel, resolveNetToNode(netIdx));
             } else {
-              // Internal net — will be patched before this element's setup()
+              // Internal net- will be patched before this element's setup()
               const slotIdx = netIdx - netlist.ports.length;
               const slot = internalNetSlots[slotIdx];
               if (slot !== undefined) {
@@ -375,6 +465,9 @@ function compileSubcircuitToMnaModel(
 
         const childEl = leafFactory(subPinNodes, subProps, getTime);
         subElements.push(childEl);
+        const subName = (subEl as unknown as { subElementName?: string }).subElementName ?? `el${elIdx}`;
+        constructedByName.set(subName, childEl);
+        subElementLabelInfo.push({ el: childEl, subElementName: subName });
 
         // Record string-ref bindings for setParam routing
         if (subEl.params) {
@@ -394,15 +487,12 @@ function compileSubcircuitToMnaModel(
         patchWork.map(pw => internalNetSlots.indexOf(pw.slot)),
       );
 
-      // The composite label is set by the compiler after construction.
-      // Allocators must capture the label lazily — they read it from
-      // the composite's label field at setup() time via a shared ref.
-      const labelRef = { value: "" };
-
+      const internalNetLabelsResolved: string[] = [];
       for (let i = 0; i < netlist.internalNetCount; i++) {
         if (!usedSlotIndices.has(i)) continue;
         const slot = internalNetSlots[i]!;
         const suffix = `int${i}`;
+        internalNetLabelsResolved.push(suffix);
         allChildren.push(makeInternalNetAllocator(labelRef, suffix, slot));
       }
 
@@ -410,7 +500,7 @@ function compileSubcircuitToMnaModel(
       // to write resolved internal-node IDs into each sub-element's _pinNodes.
       const patcher: AnalogElement = {
         label: "",
-        ngspiceLoadOrder: NGSPICE_LOAD_ORDER.VCVS,
+        ngspiceLoadOrder: NGSPICE_LOAD_ORDER.INTERNAL_NET_PATCH,
         _pinNodes: new Map(),
         _stateBase: -1,
         branchIndex: -1,
@@ -422,7 +512,7 @@ function compileSubcircuitToMnaModel(
         },
 
         load(_ctx: import("./load-context.js").LoadContext): void {
-          // No stamps — patcher only.
+          // No stamps- patcher only.
         },
 
         getPinCurrents(_rhs: Float64Array): number[] {
@@ -440,35 +530,23 @@ function compileSubcircuitToMnaModel(
 
       allChildren.push(...subElements);
 
-      const SUBCIRCUIT_COMPOSITE_SCHEMA: StateSchema = defineStateSchema("SubcircuitComposite", []);
-
-      const composite = new class extends CompositeElement {
-        readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.VCVS;
-        readonly stateSchema: StateSchema = SUBCIRCUIT_COMPOSITE_SCHEMA;
-
-        constructor() {
-          super();
-          this._pinNodes = new Map(pinNodes);
-        }
-
-        protected getSubElements(): readonly AnalogElement[] {
-          return allChildren;
-        }
-
-        setup(ctx: import("./setup-context.js").SetupContext): void {
-          // Update the label ref so allocators read the correct label.
-          labelRef.value = this.label;
-          super.setup(ctx);
-        }
-
-        getPinCurrents(rhs: Float64Array): number[] {
-          const currents: number[] = [];
-          for (const sub of subElements) {
-            currents.push(...sub.getPinCurrents(rhs));
-          }
-          return currents;
-        }
-
+      // Wrapper is a plain object literal satisfying AnalogElement.
+      // It does NOT extend CompositeElement and does NOT define setup/load-
+      // the global sort plus participatesInLoad:false skips it; the leaves
+      // (allocator, patcher, sub-elements) participate directly via the
+      // global ngspiceLoadOrder walk.
+      const wrapper: AnalogElement & {
+        setLabel: (label: string) => void;
+        getInternalNodeLabels: () => readonly string[];
+        _subcircuitLeaves: readonly AnalogElement[];
+      } = {
+        label: "",
+        ngspiceLoadOrder: NGSPICE_LOAD_ORDER.VCVS,
+        participatesInLoad: false,
+        _pinNodes: new Map(pinNodes),
+        _stateBase: -1,
+        branchIndex: -1,
+        _subcircuitLeaves: allChildren,
         setParam(key: string, value: number): void {
           const bound = bindings.get(key);
           if (bound) {
@@ -476,10 +554,27 @@ function compileSubcircuitToMnaModel(
           } else {
             for (const sub of subElements) sub.setParam(key, value);
           }
-        }
-      }();
+        },
+        getPinCurrents(rhs: Float64Array): number[] {
+          const currents: number[] = [];
+          for (const sub of subElements) {
+            currents.push(...sub.getPinCurrents(rhs));
+          }
+          return currents;
+        },
+        getInternalNodeLabels(): readonly string[] {
+          return internalNetLabelsResolved;
+        },
+        setLabel(label: string): void {
+          wrapper.label = label;
+          labelRef.value = label;
+          for (const { el, subElementName } of subElementLabelInfo) {
+            el.label = `${label}:${subElementName}`;
+          }
+        },
+      };
 
-      return composite;
+      return wrapper;
     },
   };
 }
@@ -550,178 +645,6 @@ function resolveElementNodes(
 }
 
 // ---------------------------------------------------------------------------
-// Topology validation
-// ---------------------------------------------------------------------------
-
-/**
- * Detect poorly-connected nodes by counting element terminals per node.
- *
- * Returns two lists:
- * - `orphan`: nodes with **zero** element terminals — completely disconnected
- *   from any component. These make the MNA matrix singular (error).
- * - `floating`: nodes with exactly **one** element terminal — no current path.
- *   These make the system ill-conditioned (warning).
- */
-function detectWeakNodes(
-  elements: Array<{ nodeIds: number[] }>,
-  nodeCount: number,
-): { orphan: number[]; floating: number[] } {
-  // Count how many element terminals touch each node (excluding ground = 0).
-  const terminalCount = new Array<number>(nodeCount + 1).fill(0);
-  for (const el of elements) {
-    for (const n of el.nodeIds) {
-      if (n >= 0 && n <= nodeCount) {
-        terminalCount[n]++;
-      }
-    }
-  }
-  const orphan: number[] = [];
-  const floating: number[] = [];
-  for (let n = 1; n <= nodeCount; n++) {
-    if (terminalCount[n] === 0) {
-      orphan.push(n);
-    } else if (terminalCount[n] === 1) {
-      floating.push(n);
-    }
-  }
-  return { orphan, floating };
-}
-
-/**
- * Detect voltage-source loops: cycles consisting only of voltage sources.
- *
- * A loop of ideal voltage sources (with no resistors in between) creates a
- * contradictory constraint system that makes the MNA matrix singular. We
- * detect this by building a graph of voltage-source connections and looking
- * for cycles within that graph.
- */
-function detectVoltageSourceLoops(
-  elements: Array<{ nodeIds: number[]; isBranch: boolean; typeHint: string }>,
-): boolean {
-  // Build adjacency for voltage-source-only graph
-  const vSources = elements.filter((e) => e.isBranch && e.typeHint === "voltage");
-  if (vSources.length < 2) return false;
-
-  // Build adjacency list: node → set of reachable nodes through voltage sources
-  const adj = new Map<number, Set<number>>();
-  for (const vs of vSources) {
-    const [a, b] = vs.nodeIds;
-    if (a < 0 || b < 0) continue;
-    if (!adj.has(a)) adj.set(a, new Set());
-    if (!adj.has(b)) adj.set(b, new Set());
-    adj.get(a)!.add(b);
-    adj.get(b)!.add(a);
-  }
-
-  // DFS cycle detection
-  const visited = new Set<number>();
-  function hasCycle(node: number, parent: number): boolean {
-    visited.add(node);
-    const neighbors = adj.get(node) ?? new Set<number>();
-    for (const neighbor of neighbors) {
-      if (!visited.has(neighbor)) {
-        if (hasCycle(neighbor, node)) return true;
-      } else if (neighbor !== parent) {
-        return true;
-      }
-    }
-    return false;
-  }
-
-  for (const node of adj.keys()) {
-    if (!visited.has(node)) {
-      if (hasCycle(node, -1)) return true;
-    }
-  }
-  return false;
-}
-
-/**
- * Detect inductor loops: cycles consisting only of inductors.
- *
- * A loop of ideal inductors creates a singular MNA system (degenerate branch
- * equations) at DC and during transient initialization.
- */
-function detectInductorLoops(
-  elements: Array<{ nodeIds: number[]; isBranch: boolean; typeHint: string }>,
-): boolean {
-  const inductors = elements.filter((e) => e.isBranch && e.typeHint === "inductor");
-  if (inductors.length < 2) return false;
-
-  const adj = new Map<number, Set<number>>();
-  for (const ind of inductors) {
-    const [a, b] = ind.nodeIds;
-    if (a < 0 || b < 0) continue;
-    if (!adj.has(a)) adj.set(a, new Set());
-    if (!adj.has(b)) adj.set(b, new Set());
-    adj.get(a)!.add(b);
-    adj.get(b)!.add(a);
-  }
-
-  const visited = new Set<number>();
-  function hasCycle(node: number, parent: number): boolean {
-    visited.add(node);
-    const neighbors = adj.get(node) ?? new Set<number>();
-    for (const neighbor of neighbors) {
-      if (!visited.has(neighbor)) {
-        if (hasCycle(neighbor, node)) return true;
-      } else if (neighbor !== parent) {
-        return true;
-      }
-    }
-    return false;
-  }
-
-  for (const node of adj.keys()) {
-    if (!visited.has(node)) {
-      if (hasCycle(node, -1)) return true;
-    }
-  }
-  return false;
-}
-
-/**
- * Detect nets driven by two or more voltage-source branch equations.
- *
- * Returns pairs of component labels that compete on the same node.
- * Each pair represents one conflict: two components that both impose
- * a voltage constraint on the same MNA node.
- */
-function detectCompetingVoltageConstraints(
-  elements: Array<{ nodeIds: number[]; isBranch: boolean; typeHint: string; label: string }>,
-): Array<[string, string]> {
-  const vSources = elements.filter((e) => e.isBranch && e.typeHint === "voltage");
-  if (vSources.length < 2) return [];
-
-  // Map from node ID → list of component labels that drive that node via a branch equation
-  const nodeDrivers = new Map<number, string[]>();
-  for (const vs of vSources) {
-    for (const nodeId of vs.nodeIds) {
-      if (nodeId <= 0) continue;
-      let drivers = nodeDrivers.get(nodeId);
-      if (!drivers) { drivers = []; nodeDrivers.set(nodeId, drivers); }
-      if (!drivers.includes(vs.label)) drivers.push(vs.label);
-    }
-  }
-
-  const conflicts: Array<[string, string]> = [];
-  const reportedPairs = new Set<string>();
-  for (const drivers of nodeDrivers.values()) {
-    if (drivers.length < 2) continue;
-    for (let i = 0; i < drivers.length - 1; i++) {
-      for (let j = i + 1; j < drivers.length; j++) {
-        const key = `${drivers[i]!}|${drivers[j]!}`;
-        if (!reportedPairs.has(key)) {
-          reportedPairs.add(key);
-          conflicts.push([drivers[i]!, drivers[j]!]);
-        }
-      }
-    }
-  }
-  return conflicts;
-}
-
-// ---------------------------------------------------------------------------
 // Pipeline stage helpers
 // ---------------------------------------------------------------------------
 
@@ -751,7 +674,7 @@ type PartitionElementMeta = {
 /**
  * Pass A for `compileAnalogPartition`: iterate over partition components and
  * resolve each component's route. Branch indices and internal node IDs are
- * allocated lazily at setup() time (per A6.1 — compile-time pre-sizing removed).
+ * allocated lazily at setup() time (per A6.1- compile-time pre-sizing removed).
  *
  * Operates on `PartitionedComponent` entries (which already carry a resolved
  * `ComponentDefinition`) rather than raw `CircuitElement` entries.
@@ -799,141 +722,8 @@ function runPassA_partition(
   return elementMeta;
 }
 
-/**
- * Run topology validation on the assembled element list and append any
- * resulting diagnostics.
- *
- * Checks for:
- *  - Orphan nodes (zero element terminals → singular MNA matrix)
- *  - Floating nodes (one element terminal → ill-conditioned system)
- *  - Voltage-source loops (contradictory KVL constraints)
- *  - Inductor loops (degenerate branch equations)
- */
-function validateTopologyAndEmitDiagnostics(
-  topologyInfo: Array<{ nodeIds: number[]; isBranch: boolean; typeHint: string; label: string }>,
-  totalNodeCount: number,
-  diagnostics: Diagnostic[],
-): void {
-  if (totalNodeCount > 0) {
-    const weakNodes = detectWeakNodes(topologyInfo, totalNodeCount);
-
-    for (const nodeId of weakNodes.orphan) {
-      diagnostics.push(
-        makeDiagnostic(
-          "orphan-node",
-          "error",
-          `Node ${nodeId} is orphan (no element terminals connected)`,
-          {
-            explanation:
-              `MNA node ${nodeId} has no element terminals connected to it. ` +
-              `This typically results from a degenerate wire (zero-length or ` +
-              `disconnected from all components). The orphan node creates a ` +
-              `zero row in the MNA matrix, making it singular.`,
-            involvedNodes: [nodeId],
-            suggestions: [
-              {
-                text: "Remove the disconnected wire or wire fragment at this location.",
-                automatable: false,
-              },
-            ],
-          },
-        ),
-      );
-    }
-
-    for (const nodeId of weakNodes.floating) {
-      diagnostics.push(
-        makeDiagnostic(
-          "floating-node",
-          "warning",
-          `Node ${nodeId} is floating (connected to only one element terminal)`,
-          {
-            explanation:
-              `MNA node ${nodeId} has only one element terminal connected to it. ` +
-              `A floating node has no complete current path, which makes the ` +
-              `MNA system ill-conditioned or unsolvable.`,
-            involvedNodes: [nodeId],
-            suggestions: [
-              {
-                text: "Add a large resistor (e.g. 1 GΩ) from this node to ground to provide a DC path.",
-                automatable: false,
-              },
-            ],
-          },
-        ),
-      );
-    }
-  }
-
-  if (detectVoltageSourceLoops(topologyInfo)) {
-    diagnostics.push(
-      makeDiagnostic(
-        "voltage-source-loop",
-        "error",
-        "Voltage source loop detected — two or more voltage sources form a loop with no resistance",
-        {
-          explanation:
-            "A loop of ideal voltage sources with no resistive elements creates " +
-            "contradictory KVL constraints. The MNA matrix will be singular and " +
-            "cannot be solved. Add a series resistance to break the loop.",
-          suggestions: [
-            {
-              text: "Add a small series resistance (e.g. 1 mΩ) to one of the voltage source branches.",
-              automatable: false,
-            },
-          ],
-        },
-      ),
-    );
-  }
-
-  if (detectInductorLoops(topologyInfo)) {
-    diagnostics.push(
-      makeDiagnostic(
-        "inductor-loop",
-        "error",
-        "Inductor loop detected — inductors form a loop with no resistance",
-        {
-          explanation:
-            "A loop of ideal inductors with no resistive elements creates a " +
-            "degenerate branch equation system. The MNA matrix will be singular " +
-            "at DC and during transient initialization. Add series resistance.",
-          suggestions: [
-            {
-              text: "Add a small series resistance (e.g. 1 mΩ) to one of the inductor branches.",
-              automatable: false,
-            },
-          ],
-        },
-      ),
-    );
-  }
-
-  for (const [comp1, comp2] of detectCompetingVoltageConstraints(topologyInfo)) {
-    diagnostics.push(
-      makeDiagnostic(
-        "competing-voltage-constraints",
-        "error",
-        `Two competing voltage sources are driving the net that connects to ${comp1}, ${comp2} — the circuit design needs to be fixed`,
-        {
-          explanation:
-            `Both "${comp1}" and "${comp2}" impose a voltage constraint (branch equation) ` +
-            `on the same MNA node. Two ideal voltage sources cannot drive the same net — ` +
-            `this makes the MNA matrix singular and prevents the solver from converging.`,
-          suggestions: [
-            {
-              text: `Remove one of the voltage sources (${comp1} or ${comp2}) driving the shared net, or insert a series resistor between them.`,
-              automatable: false,
-            },
-          ],
-        },
-      ),
-    );
-  }
-}
-
 // ---------------------------------------------------------------------------
-// compileAnalogPartition — new partition-based entry point
+// compileAnalogPartition- new partition-based entry point
 // ---------------------------------------------------------------------------
 
 /**
@@ -1029,13 +819,13 @@ function buildAnalogNodeMapFromPartition(
   // INPtermInsert from the per-type `INP2*` parsers, e.g. inp2r.c:60-64).
   //
   // Our deck (generated by `__tests__/harness/netlist-generator.ts`) emits
-  // elements in (ngspiceLoadOrder ASC, original-index ASC) — forward within
+  // elements in (ngspiceLoadOrder ASC, original-index ASC)- forward within
   // bucket. So to match ngspice's parse-time numbering bit-exactly, we walk
   // `partition.components` in the same order here and assign node IDs as we
   // encounter each component's pins.
   //
   // We use the typeId→loadOrder lookup `getNgspiceLoadOrderByTypeId`
-  // (`core/analog-types.ts`) — load order is a per-DEVICE-TYPE concept in
+  // (`core/analog-types.ts`)- load order is a per-DEVICE-TYPE concept in
   // ngspice (its position in `DEVices[]`), not per-model or per-instance, so
   // the typeId is the right key. This avoids the chicken-and-egg of needing
   // a constructed AnalogElement to know its load order.
@@ -1053,7 +843,7 @@ function buildAnalogNodeMapFromPartition(
     }
   }
   // Sort partition.components in deck-emission order and walk pins for
-  // first-encounter numbering. Ground components are walked too — their pins
+  // first-encounter numbering. Ground components are walked too- their pins
   // resolve to groupId 0, which is already mapped, so they're no-ops.
   const componentsInDeckOrder = partition.components
     .map((pc, originalIndex) => ({ pc, originalIndex }))
@@ -1090,7 +880,7 @@ function buildAnalogNodeMapFromPartition(
         if (idx === undefined) continue;
         visitPin(pc.resolvedPins[idx]!);
       }
-      // Walk any pinLayout-only pins (not listed in deckLabels) afterward —
+      // Walk any pinLayout-only pins (not listed in deckLabels) afterward-
       // typically only digital-domain pins on cross-domain components, which
       // never affect ngspice numbering.
       for (let pi = 0; pi < pc.resolvedPins.length; pi++) {
@@ -1140,7 +930,7 @@ function buildAnalogNodeMapFromPartition(
   // Build labelToNodeId and labelPinNodes from all labeled components in
   // the partition.
   //
-  // IMPLEMENTATION FAILURE — does not match ngspice spec.
+  // IMPLEMENTATION FAILURE- does not match ngspice spec.
   // Original excuse: "`labelToNodeId` preserves the legacy single-node-per-label semantics for internal consumers"
   // Remedy: re-implement per spec. Do not weaken tests. Do not patch symptoms.
   // See spec/reviews/ for the finding that identified this.
@@ -1254,14 +1044,6 @@ export function compileAnalogPartition(
   const elementResolvedPins = new Map<number, ResolvedPin[]>();
   const elementBridgeAdapters = new Map<number, Array<BridgeOutputAdapter | BridgeInputAdapter>>();
 
-  type ElementTopologyInfo = {
-    nodeIds: number[];
-    isBranch: boolean;
-    typeHint: string;
-    label: string;
-  };
-  const topologyInfo: ElementTopologyInfo[] = [];
-
   const timeRef = { value: 0 };
   const getTime = (): number => timeRef.value;
 
@@ -1302,14 +1084,14 @@ export function compileAnalogPartition(
           makeDiagnostic(
             "unconnected-analog-pin",
             "warning",
-            `The "${pinLabel}" pin on "${label}" (${el.typeId}) is not connected — component excluded from simulation`,
+            `The "${pinLabel}" pin on "${label}" (${el.typeId}) is not connected- component excluded from simulation`,
             {
               explanation:
                 `Component "${label}" has a pin ("${pinLabel}") that doesn't touch any wire ` +
                 `endpoint in the circuit. The component has been excluded from the analog simulation.`,
               suggestions: [
                 {
-                  text: `Check the wiring around "${label}" — make sure each pin endpoint sits exactly on a wire.`,
+                  text: `Check the wiring around "${label}"- make sure each pin endpoint sits exactly on a wire.`,
                   automatable: false,
                 },
               ],
@@ -1403,11 +1185,23 @@ export function compileAnalogPartition(
     const analogFactory = activeModel.factory;
     if (!analogFactory) continue;
     const core = analogFactory(pinNodes, props, getTime);
+    const resolvedLabel = el.getProperties().has("label")
+      ? String(el.getProperties().get("label") ?? el.instanceId)
+      : el.instanceId;
+    // Subcircuit-wrapper case: the factory returned a plain-object wrapper
+    // with a `setLabel` method and `_subcircuitLeaves` exposed. Stamp the
+    // wrapper's label before flattening leaves so each leaf carries
+    // `${parentLabel}:${subElementName}` (Composite I5).
+    const wrapperLike = core as unknown as {
+      setLabel?: (label: string) => void;
+      _subcircuitLeaves?: readonly import("./element.js").AnalogElement[];
+    };
+    if (typeof wrapperLike.setLabel === "function") {
+      wrapperLike.setLabel(resolvedLabel);
+    }
     const elementIndex = analogElements.length;
     const element: import("./element.js").AnalogElement = Object.assign(core, {
-      label: el.getProperties().has("label")
-        ? String(el.getProperties().get("label") ?? el.instanceId)
-        : el.instanceId,
+      label: resolvedLabel,
       elementIndex,
     });
     analogElements.push(element);
@@ -1434,21 +1228,18 @@ export function compileAnalogPartition(
       elementResolvedPins.set(elementIndex, resolvedPinsOut);
     }
 
-    topologyInfo.push({
-      nodeIds: [...pinNodeIds],
-      isBranch: element.branchIndex !== -1,
-      typeHint: element.branchIndex !== -1
-        ? typeof element.getLteTimestep === "function"
-          ? "inductor"
-          : "voltage"
-        : "other",
-      label: el.getProperties().has("label")
-        ? String(el.getProperties().get("label") ?? el.instanceId)
-        : el.instanceId,
-    });
+    // If the factory was a subcircuit wrapper, push its leaves (allocator,
+    // patcher, sub-elements) directly into the analog accumulator so the
+    // global ngspiceLoadOrder sort sequences them ahead of real devices.
+    // The wrapper itself stays in `analogElements` with participatesInLoad:false.
+    if (wrapperLike._subcircuitLeaves !== undefined) {
+      for (const leaf of wrapperLike._subcircuitLeaves) {
+        analogElements.push(leaf);
+      }
+    }
   }
 
-  // Bridge stub processing — create MNA elements for each cross-domain boundary.
+  // Bridge stub processing- create MNA elements for each cross-domain boundary.
   const bridgeAdaptersByGroupId = new Map<number, Array<BridgeOutputAdapter | BridgeInputAdapter>>();
 
   for (const stub of partition.bridgeStubs) {
@@ -1468,7 +1259,7 @@ export function compileAnalogPartition(
     const adapters: Array<BridgeOutputAdapter | BridgeInputAdapter> = [];
 
     if (descriptor.direction === "digital-to-analog") {
-      // Digital output pin drives the analog node — BridgeOutputAdapter (voltage source).
+      // Digital output pin drives the analog node- BridgeOutputAdapter (voltage source).
       // 1-based slot indexing per the absoluteBranchIdx convention above.
       const branchIdx = totalNodeCount + 1 + branchCount;
       branchCount++;
@@ -1479,7 +1270,7 @@ export function compileAnalogPartition(
       analogElements.push(adapter);
       adapters.push(adapter);
     } else {
-      // Analog voltage drives digital input — BridgeInputAdapter (loading sense)
+      // Analog voltage drives digital input- BridgeInputAdapter (loading sense)
       const adapter = makeBridgeInputAdapter(spec, nodeId, loaded);
       const sensePin = descriptor.boundaryGroup.pins.find(p => p.domain === "digital");
       if (sensePin) adapter.label = `bridge-${boundaryGroupId}:${sensePin.pinLabel}`;
@@ -1553,8 +1344,14 @@ export function compileAnalogPartition(
     }
   }
 
-  // Topology validation — orphan/floating nodes, source loops.
-  validateTopologyAndEmitDiagnostics(topologyInfo, totalNodeCount, diagnostics);
+  // Compile-time topology detectors (no branchIndex needed). Post-setup
+  // detectors run from MNAEngine._setup() and emit through the engine's
+  // runtime DiagnosticCollector- see `topology-diagnostics.ts` and
+  // `analog-engine.ts::_setup()`.
+  {
+    const topology = buildTopologyInfo(analogElements);
+    runCompileTimeDetectors(topology, totalNodeCount, d => diagnostics.push(d));
+  }
 
   // Check for ground.
   const hasGround = partition.components.some((pc) => pc.element.typeId === "Ground");
