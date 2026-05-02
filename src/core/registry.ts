@@ -346,11 +346,39 @@ export interface ComponentDefinition {
    *  Optional for internal-only sub-elements- some drivers (e.g.
    *  BehavioralDFlipflopDriver) need explicit pin labels to map netlist
    *  connectivity rows to `_pinNodes` entries during expansion; others
-   *  (pure stamp leaves) omit it. */
+   *  (pure stamp leaves) omit it.
+   *
+   *  For drivers whose pin set varies per instance (gates with N inputs,
+   *  counters/registers with N output bits, etc.) use `pinLayoutFactory`
+   *  instead. If both are present `pinLayoutFactory` wins. */
   pinLayout?: PinDeclaration[];
+  /** Per-instance pin-layout builder for variable-shape internal-only
+   *  sub-elements (Template A-variable). Invoked by the compiler with the
+   *  sub-element's resolved `PropertyBag` at expansion time, before pin-node
+   *  binding. Mutually exclusive with `pinLayout`; if both are present this
+   *  factory wins. Standalone components express variable shape on the
+   *  element class via `getPins()`, not here. */
+  pinLayoutFactory?: (props: PropertyBag) => PinDeclaration[];
   /** Maps digiTS pin label → ngspice node-variable suffix.
    *  See doc on StandaloneComponentDefinition for the full contract. */
   ngspiceNodeMap?: Record<string, string>;
+}
+
+/**
+ * Resolve a definition's effective pin layout for a given instance. Prefers
+ * `pinLayoutFactory(props)` when present, otherwise falls back to the static
+ * `pinLayout`, otherwise an empty array (pure-stamp leaves with no pins).
+ *
+ * Compiler / harness sites that need to walk pin labels for an instance MUST
+ * call this helper instead of reading `def.pinLayout` directly, so that
+ * variable-shape drivers expand correctly.
+ */
+export function resolvePinLayout(
+  def: ComponentDefinition,
+  props: PropertyBag,
+): readonly PinDeclaration[] {
+  if (def.pinLayoutFactory) return def.pinLayoutFactory(props);
+  return def.pinLayout ?? [];
 }
 
 /**

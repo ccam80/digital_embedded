@@ -74,7 +74,7 @@
 
 #### Output / pin / bridge primitives (gate template depends on these)
 
-- [ ] `src/solver/analog/behavioral-output-driver.ts` -- **spec:** phase-composite-architecture ssI7 -- NEW FILE; `BehavioralOutputDriverElement` (VSRC-shape voltage driver reading siblingState `OUTPUT_LOGIC_LEVEL`) (J-171).
+- [x] `src/solver/analog/behavioral-output-driver.ts` -- **spec:** phase-composite-architecture ssI7 -- NEW FILE; `BehavioralOutputDriverElement` (VSRC-shape voltage driver reading siblingState `OUTPUT_LOGIC_LEVEL`) (J-171).
 - [ ] `src/components/digital-pins/digital-input-pin-loaded.ts` -- **spec:** phase-composite-architecture ssI7 -- NEW FILE; loaded digital input pin netlist (R + C to GND) (J-033).
 - [ ] `src/components/digital-pins/digital-input-pin-unloaded.ts` -- **spec:** phase-composite-architecture ssI7 -- NEW FILE; unloaded digital input pin netlist (empty) (J-034).
 - [ ] `src/components/digital-pins/digital-output-pin-loaded.ts` -- **spec:** phase-composite-architecture ssI7 -- NEW FILE; loaded digital output pin netlist (driver + R + C) (J-035).
@@ -127,7 +127,7 @@
 
 - [ ] `src/components/active/dac-driver.ts` -- **spec:** phase-composite-architecture ssM22 -- NEW FILE; `DACDriverElement` (VCVS branch row stamp) (J-022).
 - [ ] `src/components/active/adc-driver.ts` -- **spec:** phase-composite-architecture ssM23 -- NEW FILE; `ADCDriverElement` with packed `SAR_BITS` slot (J-018).
-- [ ] `src/components/active/comparator-driver.ts` -- **spec:** phase-composite-architecture ssM24 -- NEW FILE; `ComparatorDriverElement` (J-020).
+- [x] `src/components/active/comparator-driver.ts` -- **spec:** phase-composite-architecture ssM24 -- NEW FILE; `ComparatorDriverElement` (J-020).
 - [ ] `src/components/active/schmitt-trigger-driver.ts` -- **spec:** phase-composite-architecture ssM25 -- NEW FILE; `SchmittTriggerDriverElement` (J-028).
 - [ ] `src/components/active/timer-555-latch-driver.ts` -- **spec:** phase-composite-architecture ssM5 -- NEW FILE; `Timer555LatchDriverElement` (RS latch + discharge BJT base driver) (J-030).
 - [ ] `src/components/active/internal-zero-volt-sense.ts` -- **spec:** phase-composite-architecture ssM4 -- NEW FILE; `InternalZeroVoltSense` extracted from optocoupler `VsenseSubElement` (J-025).
@@ -136,11 +136,11 @@
 - [ ] `src/components/switching/relay-coupling.ts` -- **spec:** phase-composite-architecture ssM7 -- NEW FILE; `RelayCouplingElement` first siblingState user (J-095).
 - [ ] `src/components/switching/fgnfet-blown-driver.ts` -- **spec:** phase-composite-architecture ssM8+M9 -- NEW FILE; `FGNFETBlownDriverElement` + shared `stampBlownClamp` helper (J-091).
 - [ ] `src/components/switching/fgpfet-blown-driver.ts` -- **spec:** phase-composite-architecture ssM9 -- NEW FILE; `FGPFETBlownDriverElement` calling shared `stampBlownClamp` (J-093).
-- [ ] `src/components/passives/transmission-segment-r.ts` -- **spec:** phase-composite-architecture ssM6 -- NEW FILE; `TransmissionSegmentR` (J-068).
-- [ ] `src/components/passives/transmission-segment-l.ts` -- **spec:** phase-composite-architecture ssM6 -- NEW FILE; `TransmissionSegmentL` (J-067).
-- [ ] `src/components/passives/transmission-segment-c.ts` -- **spec:** phase-composite-architecture ssM6 -- NEW FILE; `TransmissionSegmentC` (J-065).
-- [ ] `src/components/passives/transmission-segment-g.ts` -- **spec:** phase-composite-architecture ssM6 -- NEW FILE; `TransmissionSegmentG` (J-066).
-- [ ] `src/components/passives/transmission-segment-rl.ts` -- **spec:** phase-composite-architecture ssM6 -- NEW FILE; `TransmissionSegmentRL` (J-069).
+- [x] `src/components/passives/transmission-segment-r.ts` -- **spec:** phase-composite-architecture ssM6 -- NEW FILE; `TransmissionSegmentR` (J-068).
+- [x] `src/components/passives/transmission-segment-l.ts` -- **spec:** phase-composite-architecture ssM6 -- NEW FILE; `TransmissionSegmentL` (J-067).
+- [x] `src/components/passives/transmission-segment-c.ts` -- **spec:** phase-composite-architecture ssM6 -- NEW FILE; `TransmissionSegmentC` (J-065).
+- [x] `src/components/passives/transmission-segment-g.ts` -- **spec:** phase-composite-architecture ssM6 -- NEW FILE; `TransmissionSegmentG` (J-066).
+- [x] `src/components/passives/transmission-segment-rl.ts` -- **spec:** phase-composite-architecture ssM6 -- NEW FILE; `TransmissionSegmentRL` (J-069).
 
 ### 2b. Pool-backed migrations (Component G - StatePool slot conversions)
 
