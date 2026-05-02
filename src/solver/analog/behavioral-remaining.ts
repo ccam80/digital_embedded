@@ -1,619 +1,388 @@
 /**
- * Behavioral analog factories for remaining digital components.
- *
- * Provides analogFactory functions for:
+ * Behavioral analog netlist builders for remaining digital components:
  *   - Driver (tri-state buffer)
  *   - DriverInvSel (inverting tri-state buffer)
  *   - Splitter / BusSplitter (pass-through per bit)
- *   - SevenSeg / SevenSegHex (7 parallel LED diode models)
- *   - ButtonLED (switch + LED diode)
+ *   - SevenSeg / SevenSegHex (7 segment display model)
+ *   - ButtonLED (switch + LED indicator)
+ *
+ * Driver leaves are registered in src/components/register-all.ts.
  */
 
-import type { AnalogElement, PoolBackedAnalogElement } from "./element.js";
-import { NGSPICE_LOAD_ORDER } from "./element.js";
+import type { MnaSubcircuitNetlist } from "../../core/mna-subcircuit-netlist.js";
+import type { SubcircuitElement } from "../../core/mna-subcircuit-netlist.js";
 import type { PropertyBag } from "../../core/properties.js";
-import type { ResolvedPinElectrical } from "../../core/pin-electrical.js";
-import type { SetupContext } from "./setup-context.js";
-import type { LoadContext } from "./load-context.js";
-import {
-  collectPinModelChildren,
-  delegatePinSetParam,
-  DigitalInputPinModel,
-  DigitalOutputPinModel,
-  readMnaVoltage,
-} from "./digital-pin-model.js";
-import { defineStateSchema } from "./state-schema.js";
-import type { StateSchema } from "./state-schema.js";
-import { CompositeElement } from "./composite-element.js";
-
-const REMAINING_COMPOSITE_SCHEMA: StateSchema = defineStateSchema("BehavioralRemainingComposite", []);
-
-function getPinSpec(
-  props: PropertyBag,
-  label: string,
-): ResolvedPinElectrical {
-  if (!props.has("_pinElectrical")) {
-    throw new Error(`getPinSpec: _pinElectrical not set in props (pin "${label}")`);
-  }
-  const pinSpecs = props.get("_pinElectrical") as unknown as Record<string, ResolvedPinElectrical>;
-  const spec = pinSpecs[label];
-  if (spec === undefined) {
-    throw new Error(`getPinSpec: no electrical spec for pin "${label}"`);
-  }
-  return spec;
-}
-
-function getPinLoadingFlag(props: PropertyBag, label: string, defaultValue: boolean): boolean {
-  if (!props.has("_pinLoading")) return defaultValue;
-  const pinLoading = props.get("_pinLoading") as unknown as Record<string, boolean>;
-  return pinLoading[label] ?? defaultValue;
-}
-
-function stampRHS(rhs: Float64Array, n: number, val: number): void {
-  if (n > 0) rhs[n] += val;
-}
+import { defineModelParams } from "../../core/model-params.js";
 
 // ---------------------------------------------------------------------------
-// Driver analog factory - tri-state buffer
+// Driver / DriverInvSel behavioural model parameter declarations
+// ---------------------------------------------------------------------------
 //
-// Pin labels (matching buildDriverPinDeclarations):
-//   "in"  = data input
-//   "sel" = enable
-//   "out" = output
+// Shared shape across both tri-state variants:
+//   loaded:    1 = loaded pin sub-elements (Loaded variants), 0 = unloaded.
+//   vIH/vIL:   per-input CMOS thresholds, consumed by the driver leaf's
+//              threshold-classify-with-hold logic.
+//   rOut/cOut: outPin's RC load (rOut feeds the Norton conductance inside
+//              BehavioralOutputDriver; cOut is a separate Capacitor child).
+//   vOH/vOL:   driven analog rail voltages.
 //
-// When sel > vIH: output = input logic level via DigitalOutputPinModel (driven)
-// When sel < vIL: output in Hi-Z mode (R_HiZ to ground)
-// ---------------------------------------------------------------------------
+// The `behavioural` model is strictly 1-bit (matches mux precedent). Multi-
+// bit Driver/DriverInvSel circuits fall through to the digital path.
 
-class DriverAnalogElement extends CompositeElement {
-  readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.VCVS;
-  readonly stateSchema: StateSchema = REMAINING_COMPOSITE_SCHEMA;
-
-  private readonly inputPin: DigitalInputPinModel;
-  private readonly selPin: DigitalInputPinModel;
-  private readonly outputPin: DigitalOutputPinModel;
-  private readonly nodeIn: number;
-  private readonly nodeSel: number;
-  private readonly nodeOut: number;
-  private readonly pinModelsByLabel: Map<string, DigitalInputPinModel | DigitalOutputPinModel>;
-  private readonly _allSubElements: AnalogElement[];
-
-  private latchedIn = false;
-  private latchedSel = false;
-
-  constructor(
-    pinNodes: ReadonlyMap<string, number>,
-    props: PropertyBag,
-  ) {
-    super();
-    this._pinNodes = new Map(pinNodes);
-    this.nodeIn = pinNodes.get("in") ?? 0;
-    this.nodeSel = pinNodes.get("sel") ?? 0;
-    this.nodeOut = pinNodes.get("out") ?? 0;
-
-    const inSpec = getPinSpec(props, "in");
-    const selSpec = getPinSpec(props, "sel");
-    const outSpec = getPinSpec(props, "out");
-
-    this.inputPin = new DigitalInputPinModel(inSpec, getPinLoadingFlag(props, "in", true));
-    this.inputPin.init(this.nodeIn, 0);
-
-    this.selPin = new DigitalInputPinModel(selSpec, getPinLoadingFlag(props, "sel", true));
-    this.selPin.init(this.nodeSel, 0);
-
-    this.outputPin = new DigitalOutputPinModel(outSpec, getPinLoadingFlag(props, "out", false), "direct");
-    this.outputPin.init(this.nodeOut, -1);
-    this.outputPin.setHighZ(true);
-
-    this.pinModelsByLabel = new Map<string, DigitalInputPinModel | DigitalOutputPinModel>([
-      ["in", this.inputPin],
-      ["sel", this.selPin],
-      ["out", this.outputPin],
-    ]);
-
-    const childCaps = collectPinModelChildren([this.inputPin, this.selPin, this.outputPin]);
-    this._allSubElements = [
-      this.inputPin, this.selPin, this.outputPin,
-      ...childCaps,
-    ] as unknown as AnalogElement[];
-  }
-
-  protected getSubElements(): readonly AnalogElement[] {
-    return this._allSubElements;
-  }
-
-  load(ctx: LoadContext): void {
-    const v = ctx.rhsOld;
-
-    const vIn = readMnaVoltage(this.nodeIn, v);
-    const vSel = readMnaVoltage(this.nodeSel, v);
-
-    const inLevel = this.inputPin.readLogicLevel(vIn);
-    if (inLevel !== undefined) this.latchedIn = inLevel;
-
-    const selLevel = this.selPin.readLogicLevel(vSel);
-    if (selLevel !== undefined) this.latchedSel = selLevel;
-
-    this.outputPin.setHighZ(!this.latchedSel);
-    this.outputPin.setLogicLevel(this.latchedIn);
-
-    super.load(ctx);
-  }
-
-  accept(_ctx: LoadContext, _simTime: number, _addBreakpoint: (t: number) => void): void {}
-
-  getPinCurrents(rhs: Float64Array): number[] {
-    const vIn = readMnaVoltage(this.nodeIn, rhs);
-    const iIn = vIn / this.inputPin.rIn;
-
-    const vSel = readMnaVoltage(this.nodeSel, rhs);
-    const iSel = vSel / this.selPin.rIn;
-
-    const vOut = readMnaVoltage(this.nodeOut, rhs);
-    const iOut = this.outputPin.isHiZ
-      ? vOut / this.outputPin.rHiZ
-      : (vOut - this.outputPin.currentVoltage) / this.outputPin.rOut;
-
-    return [iIn, iSel, iOut];
-  }
-
-  setParam(key: string, value: number): void { delegatePinSetParam(this.pinModelsByLabel, key, value); }
-}
-
-export function createDriverAnalogElement(
-  pinNodes: ReadonlyMap<string, number>,
-  props: PropertyBag,
-  _getTime?: () => number,
-): PoolBackedAnalogElement {
-  return new DriverAnalogElement(pinNodes, props);
-}
+export const { paramDefs: DRIVER_BEHAVIORAL_PARAM_DEFS, defaults: DRIVER_BEHAVIORAL_DEFAULTS } = defineModelParams({
+  primary: {
+    loaded: { default: 1,     unit: "",  description: "1 = loaded pins (DigitalInputPinLoaded / DigitalOutputPinLoaded), 0 = unloaded" },
+    vIH:    { default: 2.0,   unit: "V", description: "Input high threshold (CMOS spec)" },
+    vIL:    { default: 0.8,   unit: "V", description: "Input low threshold (CMOS spec)" },
+    rOut:   { default: 100,   unit: "Ω", description: "Output drive resistance (Norton conductance = 1/rOut when enabled, 1 GΩ when high-Z)" },
+    cOut:   { default: 1e-12, unit: "F", description: "Output companion capacitance" },
+    vOH:    { default: 5.0,   unit: "V", description: "Output high voltage" },
+    vOL:    { default: 0.0,   unit: "V", description: "Output low voltage" },
+  },
+});
 
 // ---------------------------------------------------------------------------
-// DriverInvSel analog factory - inverting tri-state (active-low enable)
-//
-// Same as Driver but enable logic is inverted: sel=0 → driven, sel=1 → Hi-Z
-// Pin labels: "in", "sel", "out" (matching buildDriverPinDeclarations)
+// buildDriverNetlist
 // ---------------------------------------------------------------------------
 
-class DriverInvAnalogElement extends CompositeElement {
-  readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.VCVS;
-  readonly stateSchema: StateSchema = REMAINING_COMPOSITE_SCHEMA;
+/**
+ * Function-form netlist builder for the behavioural tri-state buffer (Driver).
+ *
+ * Port order: in(0), sel(1), out(2), gnd(3).
+ *
+ * Sub-elements:
+ *   drv    - BehavioralDriverDriver (writes OUTPUT_LOGIC_LEVEL + OUTPUT_LOGIC_LEVEL_ENABLE)
+ *   inPin  - Digital input pin (loaded or unloaded) on `in`
+ *   selPin - Digital input pin (loaded or unloaded) on `sel`
+ *   outPin - DigitalOutputPinLoaded on `out`; consumes both:
+ *              inputLogic  ← drv.OUTPUT_LOGIC_LEVEL        (data passes through)
+ *              enableLogic ← drv.OUTPUT_LOGIC_LEVEL_ENABLE (active-high enable)
+ *            When the enable slot reads < 0.5 the inner Norton conductance
+ *            collapses to 1 GΩ → high-Z; other drivers on the shared net
+ *            dominate.
+ */
+export function buildDriverNetlist(params: PropertyBag): MnaSubcircuitNetlist {
+  const loaded        = params.getModelParam<number>("loaded") >= 0.5;
+  const inputPinType  = loaded ? "DigitalInputPinLoaded"  : "DigitalInputPinUnloaded";
+  const outputPinType = loaded ? "DigitalOutputPinLoaded" : "DigitalOutputPinUnloaded";
 
-  private readonly inputPin: DigitalInputPinModel;
-  private readonly selPin: DigitalInputPinModel;
-  private readonly outputPin: DigitalOutputPinModel;
-  private readonly nodeIn: number;
-  private readonly nodeSel: number;
-  private readonly nodeOut: number;
-  private readonly pinModelsByLabel: Map<string, DigitalInputPinModel | DigitalOutputPinModel>;
-  private readonly _allSubElements: AnalogElement[];
+  const ports = ["in", "sel", "out", "gnd"];
 
-  private latchedIn = false;
-  private latchedSel = false;
+  const elements: SubcircuitElement[] = [
+    {
+      typeId: "BehavioralDriverDriver",
+      modelRef: "default",
+      subElementName: "drv",
+      params: {
+        vIH: params.getModelParam<number>("vIH"),
+        vIL: params.getModelParam<number>("vIL"),
+      },
+    } as SubcircuitElement & { subElementName: string },
+    {
+      typeId: inputPinType,
+      modelRef: "default",
+      subElementName: "inPin",
+    } as SubcircuitElement & { subElementName: string },
+    {
+      typeId: inputPinType,
+      modelRef: "default",
+      subElementName: "selPin",
+    } as SubcircuitElement & { subElementName: string },
+    {
+      typeId: outputPinType,
+      modelRef: "default",
+      subElementName: "outPin",
+      params: {
+        rOut: params.getModelParam<number>("rOut"),
+        cOut: params.getModelParam<number>("cOut"),
+        vOH:  params.getModelParam<number>("vOH"),
+        vOL:  params.getModelParam<number>("vOL"),
+        inputLogic:  { kind: "siblingState" as const, subElementName: "drv", slotName: "OUTPUT_LOGIC_LEVEL" },
+        enableLogic: { kind: "siblingState" as const, subElementName: "drv", slotName: "OUTPUT_LOGIC_LEVEL_ENABLE" },
+      },
+    } as SubcircuitElement & { subElementName: string },
+  ];
 
-  constructor(
-    pinNodes: ReadonlyMap<string, number>,
-    props: PropertyBag,
-  ) {
-    super();
-    this._pinNodes = new Map(pinNodes);
-    this.nodeIn = pinNodes.get("in") ?? 0;
-    this.nodeSel = pinNodes.get("sel") ?? 0;
-    this.nodeOut = pinNodes.get("out") ?? 0;
-
-    const inSpec = getPinSpec(props, "in");
-    const selSpec = getPinSpec(props, "sel");
-    const outSpec = getPinSpec(props, "out");
-
-    this.inputPin = new DigitalInputPinModel(inSpec, getPinLoadingFlag(props, "in", true));
-    this.inputPin.init(this.nodeIn, 0);
-
-    this.selPin = new DigitalInputPinModel(selSpec, getPinLoadingFlag(props, "sel", true));
-    this.selPin.init(this.nodeSel, 0);
-
-    this.outputPin = new DigitalOutputPinModel(outSpec, getPinLoadingFlag(props, "out", false), "direct");
-    this.outputPin.init(this.nodeOut, -1);
-    this.outputPin.setHighZ(false);
-
-    this.pinModelsByLabel = new Map<string, DigitalInputPinModel | DigitalOutputPinModel>([
-      ["in", this.inputPin],
-      ["sel", this.selPin],
-      ["out", this.outputPin],
-    ]);
-
-    const childCaps = collectPinModelChildren([this.inputPin, this.selPin, this.outputPin]);
-    this._allSubElements = [
-      this.inputPin, this.selPin, this.outputPin,
-      ...childCaps,
-    ] as unknown as AnalogElement[];
-  }
-
-  protected getSubElements(): readonly AnalogElement[] {
-    return this._allSubElements;
-  }
-
-  load(ctx: LoadContext): void {
-    const v = ctx.rhsOld;
-
-    const vIn = readMnaVoltage(this.nodeIn, v);
-    const vSel = readMnaVoltage(this.nodeSel, v);
-
-    const inLevel = this.inputPin.readLogicLevel(vIn);
-    if (inLevel !== undefined) this.latchedIn = inLevel;
-
-    const selLevel = this.selPin.readLogicLevel(vSel);
-    if (selLevel !== undefined) this.latchedSel = selLevel;
-
-    this.outputPin.setHighZ(this.latchedSel);
-    this.outputPin.setLogicLevel(this.latchedIn);
-
-    super.load(ctx);
-  }
-
-  accept(_ctx: LoadContext, _simTime: number, _addBreakpoint: (t: number) => void): void {}
-
-  getPinCurrents(rhs: Float64Array): number[] {
-    const vIn = readMnaVoltage(this.nodeIn, rhs);
-    const iIn = vIn / this.inputPin.rIn;
-
-    const vSel = readMnaVoltage(this.nodeSel, rhs);
-    const iSel = vSel / this.selPin.rIn;
-
-    const vOut = readMnaVoltage(this.nodeOut, rhs);
-    const iOut = this.outputPin.isHiZ
-      ? vOut / this.outputPin.rHiZ
-      : (vOut - this.outputPin.currentVoltage) / this.outputPin.rOut;
-
-    return [iIn, iSel, iOut];
-  }
-
-  setParam(key: string, value: number): void { delegatePinSetParam(this.pinModelsByLabel, key, value); }
-}
-
-export function createDriverInvAnalogElement(
-  pinNodes: ReadonlyMap<string, number>,
-  props: PropertyBag,
-  _getTime?: () => number,
-): PoolBackedAnalogElement {
-  return new DriverInvAnalogElement(pinNodes, props);
-}
-
-// ---------------------------------------------------------------------------
-// Splitter analog factory - pass-through per bit
-//
-// Pin labels are dynamic bit-range names from buildSplitterPinDeclarations
-// (e.g. "0", "4-7", "0,1"). Inputs come first in pinLayout order, outputs after.
-// The _inputCount/_outputCount props indicate how many of each there are.
-//
-// Each input voltage is threshold-detected and its level is driven on the
-// corresponding output. For mismatched port counts the min(N, M) pairs are
-// connected and remaining ports are driven LOW.
-// ---------------------------------------------------------------------------
-
-class SplitterAnalogElement extends CompositeElement {
-  readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.VCVS;
-  readonly stateSchema: StateSchema = REMAINING_COMPOSITE_SCHEMA;
-
-  private readonly inputPins: DigitalInputPinModel[];
-  private readonly outputPins: DigitalOutputPinModel[];
-  private readonly latchedLevels: boolean[];
-  private readonly numIn: number;
-  private readonly numOut: number;
-  private readonly _allSubElements: AnalogElement[];
-
-  constructor(
-    pinNodes: ReadonlyMap<string, number>,
-    props: PropertyBag,
-  ) {
-    super();
-    this._pinNodes = new Map(pinNodes);
-    this.numIn = props.has("_inputCount") ? (props.get("_inputCount") as number) : 1;
-    this.numOut = props.has("_outputCount") ? (props.get("_outputCount") as number) : 1;
-
-    const allNodeIds = Array.from(pinNodes.values());
-    const allLabels = Array.from(pinNodes.keys());
-
-    this.inputPins = [];
-    this.outputPins = [];
-
-    for (let i = 0; i < this.numIn; i++) {
-      const label = allLabels[i] ?? `in${i}`;
-      const spec = getPinSpec(props, label);
-      const pin = new DigitalInputPinModel(spec, getPinLoadingFlag(props, label, true));
-      pin.init(allNodeIds[i] ?? 0, 0);
-      this.inputPins.push(pin);
-    }
-
-    this.latchedLevels = new Array(this.numIn).fill(false);
-
-    for (let i = 0; i < this.numOut; i++) {
-      const label = allLabels[this.numIn + i] ?? `out${i}`;
-      const spec = getPinSpec(props, label);
-      const pin = new DigitalOutputPinModel(spec, getPinLoadingFlag(props, label, false), "direct");
-      pin.init(allNodeIds[this.numIn + i] ?? 0, -1);
-      pin.setLogicLevel(false);
-      this.outputPins.push(pin);
-    }
-
-    const childCaps = collectPinModelChildren([...this.inputPins, ...this.outputPins]);
-    this._allSubElements = [
-      ...this.inputPins, ...this.outputPins,
-      ...childCaps,
-    ] as unknown as AnalogElement[];
-  }
-
-  protected getSubElements(): readonly AnalogElement[] {
-    return this._allSubElements;
-  }
-
-  load(ctx: LoadContext): void {
-    const v = ctx.rhsOld;
-
-    for (let i = 0; i < this.numIn; i++) {
-      const nodeId = this.inputPins[i].nodeId;
-      const voltage = readMnaVoltage(nodeId, v);
-      const level = this.inputPins[i].readLogicLevel(voltage);
-      if (level !== undefined) this.latchedLevels[i] = level;
-    }
-    for (let i = 0; i < this.numOut; i++) {
-      this.outputPins[i].setLogicLevel(this.latchedLevels[i] ?? false);
-    }
-
-    super.load(ctx);
-  }
-
-  accept(_ctx: LoadContext, _simTime: number, _addBreakpoint: (t: number) => void): void {}
-
-  getPinCurrents(rhs: Float64Array): number[] {
-    const result: number[] = [];
-    for (const p of this.inputPins) {
-      result.push(readMnaVoltage(p.nodeId, rhs) / p.rIn);
-    }
-    for (const p of this.outputPins) {
-      const v = readMnaVoltage(p.nodeId, rhs);
-      result.push((v - p.currentVoltage) / p.rOut);
-    }
-    return result;
-  }
-
-  setParam(_key: string, _value: number): void {}
-}
-
-export function createSplitterAnalogElement(
-  pinNodes: ReadonlyMap<string, number>,
-  props: PropertyBag,
-  _getTime?: () => number,
-): PoolBackedAnalogElement {
-  return new SplitterAnalogElement(pinNodes, props);
-}
-
-// ---------------------------------------------------------------------------
-// SevenSeg analog factory - 7 parallel LED diode models (segments a-g + dp)
-//
-// Each of the 8 segment inputs (a, b, c, d, e, f, g, dp) drives an independent
-// LED diode model. nodeIds order matches pin declaration order (a, b, c, d, e, f, g, dp).
-// Each segment diode is modeled as a simplified forward-biased diode
-// (piecewise linear: R_on=50Ω when forward-biased, R_off=10MΩ otherwise).
-//
-// For the analog model, each segment pin is treated as a DigitalInputPinModel
-// (reading from the driving circuit) with an LED-style diode load. The cathode
-// of each segment is implicitly at ground (common cathode configuration).
-// ---------------------------------------------------------------------------
-
-/** Piecewise-linear LED diode: Vf ≈ 2.0V, R_on = 50Ω, R_off = 10MΩ */
-const LED_VF = 2.0;
-const LED_RON = 50;
-const LED_ROFF = 1e7;
-const LED_GMIN = 1e-12;
-
-type SegmentDiodeElement = AnalogElement & {
-  /** Unified load entry point - stamps linearized diode equations. */
-  load(ctx: LoadContext): void;
-  /** NR-iteration convergence test. */
-  checkConvergence(ctx: LoadContext): boolean;
-  /** Current flowing into the anode pin at the accepted operating point.
-   *  `rhs` is the augmented MNA solution vector (node voltages + branch currents). */
-  anodeCurrent(rhs: Float64Array): number;
-};
-
-function createSegmentDiodeElement(
-  nodeAnode: number,
-  nodeCathode: number,
-): SegmentDiodeElement {
-  let geq = LED_GMIN;
-  let ieq = 0;
-  let _vdStored = 0;
-  let _idStored = 0;
-
-  let _hAA = -1;
-  let _hCC = -1;
-  let _hAC = -1;
-  let _hCA = -1;
+  // Net indices: in=0, sel=1, out=2, gnd=3
+  // drv pins: in, sel, out, gnd
+  // inPin pins: node=in, gnd=gnd
+  // selPin pins: node=sel, gnd=gnd
+  // outPin pins: pos=out, neg=gnd
+  const netlist: number[][] = [
+    [0, 1, 2, 3], // drv
+    [0, 3],       // inPin
+    [1, 3],       // selPin
+    [2, 3],       // outPin
+  ];
 
   return {
-    label: "",
-    branchIndex: -1,
-    ngspiceLoadOrder: NGSPICE_LOAD_ORDER.VCVS,
-    _stateBase: -1,
-    _pinNodes: new Map<string, number>(),
-
-    setup(ctx: SetupContext): void {
-      const s = ctx.solver;
-      if (nodeAnode > 0) {
-        _hAA = s.allocElement(nodeAnode, nodeAnode);
-      } else {
-        _hAA = -1;
-      }
-      if (nodeCathode > 0) {
-        _hCC = s.allocElement(nodeCathode, nodeCathode);
-      } else {
-        _hCC = -1;
-      }
-      if (nodeAnode > 0 && nodeCathode > 0) {
-        _hAC = s.allocElement(nodeAnode, nodeCathode);
-        _hCA = s.allocElement(nodeCathode, nodeAnode);
-      } else {
-        _hAC = -1;
-        _hCA = -1;
-      }
-    },
-
-    load(ctx: LoadContext): void {
-      const s = ctx.solver;
-      const rhsOld = ctx.rhsOld;
-      const va = rhsOld[nodeAnode];
-      const vc = rhsOld[nodeCathode];
-      const vd = va - vc;
-      if (vd > LED_VF) {
-        geq = 1 / LED_RON + LED_GMIN;
-        ieq = geq * LED_VF - LED_GMIN * vd;
-      } else {
-        geq = 1 / LED_ROFF + LED_GMIN;
-        ieq = 0;
-      }
-      _vdStored = vd;
-      _idStored = geq * vd + ieq;
-
-      if (_hAA >= 0) s.stampElement(_hAA, geq);
-      if (_hCC >= 0) s.stampElement(_hCC, geq);
-      if (_hAC >= 0) s.stampElement(_hAC, -geq);
-      if (_hCA >= 0) s.stampElement(_hCA, -geq);
-
-      stampRHS(ctx.rhs, nodeAnode, -ieq);
-      if (nodeCathode > 0) stampRHS(ctx.rhs, nodeCathode, ieq);
-    },
-
-    checkConvergence(ctx: LoadContext): boolean {
-      const rhsOld = ctx.rhsOld;
-      const va = rhsOld[nodeAnode];
-      const vc = rhsOld[nodeCathode];
-      const vdRaw = va - vc;
-
-      const delvd = vdRaw - _vdStored;
-      const cdhat = _idStored + geq * delvd;
-      const tol = ctx.reltol * Math.max(Math.abs(cdhat), Math.abs(_idStored)) + ctx.iabstol;
-      return Math.abs(cdhat - _idStored) <= tol;
-    },
-
-    anodeCurrent(rhs: Float64Array): number {
-      const va = rhs[nodeAnode];
-      const vc = rhs[nodeCathode];
-      return geq * (va - vc) - ieq;
-    },
-
-    getPinCurrents(rhs: Float64Array): number[] {
-      const va = rhs[nodeAnode];
-      const vc = rhs[nodeCathode];
-      const I = geq * (va - vc) - ieq;
-      return [I, -I];
-    },
-
-    setParam(_key: string, _value: number): void {},
+    ports,
+    elements,
+    internalNetCount: 0,
+    netlist,
   };
 }
 
-class SevenSegAnalogElement extends CompositeElement {
-  readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.VCVS;
-  readonly stateSchema: StateSchema = REMAINING_COMPOSITE_SCHEMA;
+// ---------------------------------------------------------------------------
+// buildDriverInvNetlist
+// ---------------------------------------------------------------------------
 
-  private readonly segDiodes: readonly SegmentDiodeElement[];
+/**
+ * Function-form netlist builder for the behavioural inverting tri-state
+ * buffer (DriverInvSel- active-LOW enable).
+ *
+ * Same port shape as Driver. The only behavioural difference is that the
+ * driver leaf (BehavioralDriverInvDriver) inverts sel before writing
+ * OUTPUT_LOGIC_LEVEL_ENABLE, so the outPin's enableLogic sees enable=1
+ * when sel is asserted LOW.
+ *
+ * Port order: in(0), sel(1), out(2), gnd(3).
+ */
+export function buildDriverInvNetlist(params: PropertyBag): MnaSubcircuitNetlist {
+  const loaded        = params.getModelParam<number>("loaded") >= 0.5;
+  const inputPinType  = loaded ? "DigitalInputPinLoaded"  : "DigitalInputPinUnloaded";
+  const outputPinType = loaded ? "DigitalOutputPinLoaded" : "DigitalOutputPinUnloaded";
 
-  constructor(pinNodes: ReadonlyMap<string, number>) {
-    super();
-    this._pinNodes = new Map(pinNodes);
-    const segLabels = ["a", "b", "c", "d", "e", "f", "g", "dp"] as const;
-    const segNodes = segLabels.map((lbl) => pinNodes.get(lbl)!);
-    this.segDiodes = segNodes.map((n) => createSegmentDiodeElement(n, 0));
-  }
+  const ports = ["in", "sel", "out", "gnd"];
 
-  protected getSubElements(): readonly AnalogElement[] {
-    return this.segDiodes as unknown as AnalogElement[];
-  }
+  const elements: SubcircuitElement[] = [
+    {
+      typeId: "BehavioralDriverInvDriver",
+      modelRef: "default",
+      subElementName: "drv",
+      params: {
+        vIH: params.getModelParam<number>("vIH"),
+        vIL: params.getModelParam<number>("vIL"),
+      },
+    } as SubcircuitElement & { subElementName: string },
+    {
+      typeId: inputPinType,
+      modelRef: "default",
+      subElementName: "inPin",
+    } as SubcircuitElement & { subElementName: string },
+    {
+      typeId: inputPinType,
+      modelRef: "default",
+      subElementName: "selPin",
+    } as SubcircuitElement & { subElementName: string },
+    {
+      typeId: outputPinType,
+      modelRef: "default",
+      subElementName: "outPin",
+      params: {
+        rOut: params.getModelParam<number>("rOut"),
+        cOut: params.getModelParam<number>("cOut"),
+        vOH:  params.getModelParam<number>("vOH"),
+        vOL:  params.getModelParam<number>("vOL"),
+        inputLogic:  { kind: "siblingState" as const, subElementName: "drv", slotName: "OUTPUT_LOGIC_LEVEL" },
+        enableLogic: { kind: "siblingState" as const, subElementName: "drv", slotName: "OUTPUT_LOGIC_LEVEL_ENABLE" },
+      },
+    } as SubcircuitElement & { subElementName: string },
+  ];
 
-  checkConvergence(ctx: LoadContext): boolean {
-    return this.segDiodes.every((d) => d.checkConvergence(ctx));
-  }
+  // Net indices: in=0, sel=1, out=2, gnd=3
+  const netlist: number[][] = [
+    [0, 1, 2, 3], // drv
+    [0, 3],       // inPin
+    [1, 3],       // selPin
+    [2, 3],       // outPin
+  ];
 
-  getPinCurrents(rhs: Float64Array): number[] {
-    return this.segDiodes.map((d) => d.anodeCurrent(rhs));
-  }
-
-  setParam(_key: string, _value: number): void {}
-}
-
-export function createSevenSegAnalogElement(
-  pinNodes: ReadonlyMap<string, number>,
-  _props: PropertyBag,
-  _getTime?: () => number,
-): PoolBackedAnalogElement {
-  return new SevenSegAnalogElement(pinNodes);
+  return {
+    ports,
+    elements,
+    internalNetCount: 0,
+    netlist,
+  };
 }
 
 // ---------------------------------------------------------------------------
-// ButtonLED analog factory - switch (variable resistance) + LED diode
-//
-// Pin nodeIds order (matches buildButtonLEDPinDeclarations):
-//   nodeIds[0] = out (button output - digital output pin)
-//   nodeIds[1] = in  (LED input - LED anode, cathode at ground)
-//
-// The button output is driven by a DigitalOutputPinModel (logic HIGH or LOW).
-// The LED input is a forward-biased diode from nodeIds[1] to ground.
+// buildSplitterNetlist
 // ---------------------------------------------------------------------------
 
-class ButtonLEDAnalogElement extends CompositeElement {
-  readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.VCVS;
-  readonly stateSchema: StateSchema = REMAINING_COMPOSITE_SCHEMA;
+/**
+ * Function-form netlist builder for the behavioral splitter / bus-splitter.
+ *
+ * Port order is dynamic: input pins first (labeled by their split range names),
+ * then output pins, then gnd. Input/output counts come from props.
+ *
+ * Sub-elements:
+ *   drv       - BehavioralSplitterDriver (driver leaf)
+ *   in_N pins - DigitalInputPinLoaded for each input
+ *   out_M pins - DigitalOutputPinLoaded for each output
+ */
+export function buildSplitterNetlist(props: PropertyBag): MnaSubcircuitNetlist {
+  const inputCount: number = (props.has("_inputCount") ? props.get("_inputCount") as number : undefined) ?? 1;
+  const outputCount: number = (props.has("_outputCount") ? props.get("_outputCount") as number : undefined) ?? 1;
 
-  private readonly outputPin: DigitalOutputPinModel;
-  private readonly ledDiode: SegmentDiodeElement;
-  private readonly nodeOut: number;
-  private readonly pinModelsByLabel: Map<string, DigitalInputPinModel | DigitalOutputPinModel>;
+  const ports: string[] = [];
+  for (let i = 0; i < inputCount; i++) {
+    ports.push(`in_${i}`);
+  }
+  for (let i = 0; i < outputCount; i++) {
+    ports.push(`out_${i}`);
+  }
+  ports.push("gnd");
 
-  constructor(
-    pinNodes: ReadonlyMap<string, number>,
-    props: PropertyBag,
-  ) {
-    super();
-    this._pinNodes = new Map(pinNodes);
-    this.nodeOut = pinNodes.get("out")!;
-    const nodeLedIn = pinNodes.get("in")!;
+  const netGnd = inputCount + outputCount;
 
-    const outSpec = getPinSpec(props, "out");
-    this.outputPin = new DigitalOutputPinModel(outSpec, getPinLoadingFlag(props, "out", false), "direct");
-    this.outputPin.init(this.nodeOut, -1);
-    this.outputPin.setLogicLevel(false);
+  const drvNets: number[] = [];
+  for (let i = 0; i < inputCount; i++) {
+    drvNets.push(i);
+  }
+  for (let i = 0; i < outputCount; i++) {
+    drvNets.push(inputCount + i);
+  }
+  drvNets.push(netGnd);
 
-    this.ledDiode = createSegmentDiodeElement(nodeLedIn, 0);
+  const elements: SubcircuitElement[] = [
+    {
+      typeId: "BehavioralSplitterDriver",
+      modelRef: "default",
+      subElementName: "drv",
+      params: { inputCount, outputCount },
+    } as SubcircuitElement & { subElementName: string },
+  ];
 
-    this.pinModelsByLabel = new Map<string, DigitalInputPinModel | DigitalOutputPinModel>([
-      ["out", this.outputPin],
-    ]);
+  const netlist: number[][] = [drvNets];
+
+  for (let i = 0; i < inputCount; i++) {
+    elements.push({
+      typeId: "DigitalInputPinLoaded",
+      modelRef: "default",
+      subElementName: `inPin_${i}`,
+      params: {},
+    } as SubcircuitElement & { subElementName: string });
+    netlist.push([i, netGnd]);
   }
 
-  protected getSubElements(): readonly AnalogElement[] {
-    return [this.outputPin, this.ledDiode] as unknown as AnalogElement[];
+  for (let i = 0; i < outputCount; i++) {
+    elements.push({
+      typeId: "DigitalOutputPinLoaded",
+      modelRef: "default",
+      subElementName: `outPin_${i}`,
+      params: {
+        inputLogic: { kind: "siblingState", subElementName: "drv", slotName: `OUTPUT_LOGIC_LEVEL_${i}` },
+      },
+    } as SubcircuitElement & { subElementName: string });
+    netlist.push([inputCount + i, netGnd]);
   }
 
-  checkConvergence(ctx: LoadContext): boolean {
-    return this.ledDiode.checkConvergence(ctx);
-  }
-
-  getPinCurrents(rhs: Float64Array): number[] {
-    const vOut = readMnaVoltage(this.nodeOut, rhs);
-    const iOut = this.outputPin.isHiZ
-      ? vOut / this.outputPin.rHiZ
-      : (vOut - this.outputPin.currentVoltage) / this.outputPin.rOut;
-    const iLed = this.ledDiode.anodeCurrent(rhs);
-    return [iOut, iLed];
-  }
-
-  setParam(key: string, value: number): void { delegatePinSetParam(this.pinModelsByLabel, key, value); }
+  return {
+    ports,
+    params: {},
+    elements,
+    internalNetCount: 0,
+    netlist,
+  };
 }
 
-export function createButtonLEDAnalogElement(
-  pinNodes: ReadonlyMap<string, number>,
-  props: PropertyBag,
-  _getTime?: () => number,
-): PoolBackedAnalogElement {
-  return new ButtonLEDAnalogElement(pinNodes, props);
+// ---------------------------------------------------------------------------
+// buildSevenSegNetlist
+// ---------------------------------------------------------------------------
+
+/**
+ * Function-form netlist builder for the behavioral seven-segment display.
+ *
+ * Port order: a(0), b(1), c(2), d(3), e(4), f(5), g(6), dp(7), gnd(8).
+ *
+ * Sub-elements:
+ *   drv     - BehavioralSevenSegDriver (driver leaf)
+ *   aPin..dpPin - DigitalInputPinLoaded for each segment input
+ */
+export function buildSevenSegNetlist(): MnaSubcircuitNetlist {
+  const segmentLabels = ["a", "b", "c", "d", "e", "f", "g", "dp"] as const;
+  const ports: string[] = [...segmentLabels, "gnd"];
+  const netGnd = segmentLabels.length;
+
+  const drvNets: number[] = segmentLabels.map((_, i) => i);
+  drvNets.push(netGnd);
+
+  const elements: SubcircuitElement[] = [
+    {
+      typeId: "BehavioralSevenSegDriver",
+      modelRef: "default",
+      subElementName: "drv",
+      params: {},
+    } as SubcircuitElement & { subElementName: string },
+  ];
+
+  const netlist: number[][] = [drvNets];
+
+  for (let i = 0; i < segmentLabels.length; i++) {
+    elements.push({
+      typeId: "DigitalInputPinLoaded",
+      modelRef: "default",
+      subElementName: `${segmentLabels[i]}Pin`,
+      params: {},
+    } as SubcircuitElement & { subElementName: string });
+    netlist.push([i, netGnd]);
+  }
+
+  return {
+    ports,
+    params: {},
+    elements,
+    internalNetCount: 0,
+    netlist,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// buildButtonLEDNetlist
+// ---------------------------------------------------------------------------
+
+/**
+ * Function-form netlist builder for the behavioral ButtonLED (button output + LED input).
+ *
+ * Port order: out(0), in(1), gnd(2).
+ *
+ * Sub-elements:
+ *   drv    - BehavioralButtonLEDDriver (driver leaf)
+ *   inPin  - DigitalInputPinLoaded for LED in
+ *   outPin - DigitalOutputPinLoaded for button out
+ */
+export function buildButtonLEDNetlist(): MnaSubcircuitNetlist {
+  const ports = ["out", "in", "gnd"];
+
+  const elements: SubcircuitElement[] = [
+    {
+      typeId: "BehavioralButtonLEDDriver",
+      modelRef: "default",
+      subElementName: "drv",
+      params: {},
+    } as SubcircuitElement & { subElementName: string },
+    {
+      typeId: "DigitalInputPinLoaded",
+      modelRef: "default",
+      subElementName: "inPin",
+      params: {},
+    } as SubcircuitElement & { subElementName: string },
+    {
+      typeId: "DigitalOutputPinLoaded",
+      modelRef: "default",
+      subElementName: "outPin",
+      params: {
+        inputLogic: { kind: "siblingState", subElementName: "drv", slotName: "OUTPUT_LOGIC_LEVEL" },
+      },
+    } as SubcircuitElement & { subElementName: string },
+  ];
+
+  // Net indices: out=0, in=1, gnd=2
+  // drv pins: out, in, gnd
+  // inPin pins: node=in, gnd=gnd
+  // outPin pins: pos=out, neg=gnd
+  const netlist: number[][] = [
+    [0, 1, 2], // drv
+    [1, 2],    // inPin
+    [0, 2],    // outPin
+  ];
+
+  return {
+    ports,
+    params: {},
+    elements,
+    internalNetCount: 0,
+    netlist,
+  };
 }

@@ -1,4 +1,4 @@
-/**
+﻿/**
  * DriverInvSel component- tri-state buffer with inverted select (enable active-low).
  *
  * When sel=0 (enable active-low): output = input.
@@ -21,10 +21,14 @@ import type { PropertyDefinition } from "../../core/properties.js";
 import {
   ComponentCategory,
   type AttributeMapping,
-  type ComponentDefinition,
+  type StandaloneComponentDefinition,
   type ComponentLayout,
 } from "../../core/registry.js";
-import { createDriverInvAnalogElement } from "../../solver/analog/behavioral-remaining.js";
+import {
+  buildDriverInvNetlist,
+  DRIVER_BEHAVIORAL_PARAM_DEFS,
+  DRIVER_BEHAVIORAL_DEFAULTS,
+} from "../../solver/analog/behavioral-remaining.js";
 
 // ---------------------------------------------------------------------------
 // Layout constants- same as Driver (origin-centred)
@@ -96,7 +100,7 @@ export class DriverInvSelElement extends AbstractCircuitElement {
 
   getBoundingBox(): Rect {
     // Triangle: x:[-0.95,0.95], y:[-0.6,0.6]
-    // Circle at (0,-0.7) r=0.3 → y:[-1.0,-0.4] (extends below triangle)
+    // Circle at (0,-0.7) r=0.3 â†’ y:[-1.0,-0.4] (extends below triangle)
     return {
       x: this.position.x - 0.95,
       y: this.position.y - 1.0,
@@ -211,7 +215,7 @@ function driverInvFactory(props: PropertyBag): DriverInvSelElement {
   return new DriverInvSelElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
 }
 
-export const DriverInvSelDefinition: ComponentDefinition = {
+export const DriverInvSelDefinition: StandaloneComponentDefinition = {
   name: "DriverInvSel",
   typeId: -1,
   factory: driverInvFactory,
@@ -232,10 +236,10 @@ export const DriverInvSelDefinition: ComponentDefinition = {
   },
   modelRegistry: {
     "behavioral": {
-      kind: "inline",
-      factory: createDriverInvAnalogElement,
-      paramDefs: [],
-      params: {},
+      kind: "netlist",
+      netlist: buildDriverInvNetlist,
+      paramDefs: DRIVER_BEHAVIORAL_PARAM_DEFS,
+      params: DRIVER_BEHAVIORAL_DEFAULTS,
     },
   },
   defaultModel: "digital",

@@ -1,8 +1,8 @@
-/**
+﻿/**
  * SevenSegHex component- 7-segment display with internal BCD/hex decoder.
  *
- * 4-bit BCD input → internal decoder → segment pattern → display.
- * Displays 0–9 and A–F (hex digits).
+ * 4-bit BCD input â†’ internal decoder â†’ segment pattern â†’ display.
+ * Displays 0â€“9 and Aâ€“F (hex digits).
  * commonCathode property controls polarity.
  *
  * Segment encoding (standard 7-segment):
@@ -24,11 +24,9 @@ import type { PropertyDefinition } from "../../core/properties.js";
 import {
   ComponentCategory,
   type AttributeMapping,
-  type ComponentDefinition,
+  type StandaloneComponentDefinition,
   type ComponentLayout,
 } from "../../core/registry.js";
-import { createSevenSegAnalogElement } from "../../solver/analog/behavioral-remaining.js";
-
 // ---------------------------------------------------------------------------
 // Layout constants
 // ---------------------------------------------------------------------------
@@ -36,7 +34,7 @@ import { createSevenSegAnalogElement } from "../../solver/analog/behavioral-rema
 const COMP_WIDTH = 4;
 
 // ---------------------------------------------------------------------------
-// 7-segment decoder table for hex digits 0–F
+// 7-segment decoder table for hex digits 0â€“F
 //
 // Bit assignments: a=bit0, b=bit1, c=bit2, d=bit3, e=bit4, f=bit5, g=bit6
 // ---------------------------------------------------------------------------
@@ -189,7 +187,7 @@ function sevenSegHexFactory(props: PropertyBag): SevenSegHexElement {
   return new SevenSegHexElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
 }
 
-export const SevenSegHexDefinition: ComponentDefinition = {
+export const SevenSegHexDefinition: StandaloneComponentDefinition = {
   name: "SevenSegHex",
   typeId: -1,
   factory: sevenSegHexFactory,
@@ -199,18 +197,13 @@ export const SevenSegHexDefinition: ComponentDefinition = {
   category: ComponentCategory.IO,
   helpText:
     "SevenSegHex- 7-segment display with internal hex decoder.\n" +
-    "4-bit input selects which hex digit (0–F) to display.\n" +
+    "4-bit input selects which hex digit (0â€“F) to display.\n" +
     "commonCathode=true: common cathode configuration (active high).",
   models: {
     digital: { executeFn: executeSevenSegHex, inputSchema: ["d", "dp"], outputSchema: [] },
   },
-  modelRegistry: {
-    behavioral: {
-      kind: "inline",
-      factory: createSevenSegAnalogElement,
-      paramDefs: [],
-      params: {},
-    },
-  },
+  // Behavioural analog model is a future scoped job (NEW driver leaf with
+  // HEX_SEGMENT_TABLE decode required, distinct from BehavioralSevenSegDriver
+  // whose 8-input shape doesn't accommodate this component's 4-bit `d` input).
   defaultModel: "digital",
 };
