@@ -324,8 +324,7 @@
 - **List A blocked items — all CLEARED via direct-authoring bundles (this session):**
   - **Bundle 1** (commit `61e96a2e`): J-145 + J-146 — tri-state via (b1) OUTPUT_LOGIC_LEVEL_ENABLE slot + sibling `enableLogic` siblingState ref; `BehavioralOutputDriver` Thévenin → Norton refactor as the enabling architectural change; `DigitalOutputPinLoaded` simplified (Resistor child + driveNode internal net removed; driver now owns the conductance). Adjacent broken-import cleanup in `seven-seg-hex.ts` + `bus-splitter.ts` (their behavioural entries dropped pending future scoped J-jobs since neither fits the existing builders' shape).
   - **Bundle 2** (this commit): J-143 + J-144 — `buildDecoderNetlist` + `buildDemuxNetlist` authored directly in `behavioral-combinational.ts` (replacing the 11-line stub); driver leaves added with memoised arity-indexed schema; `decoder.ts` + `demux.ts` migrated to `kind: "netlist"`. Whole-vector hold-on-indeterminate semantic; demux analog model 1-bit (matches mux limitation).
-- **Outstanding direct-authoring items (lifted from agent scope):**
-  - `RelayInductorDefinition` + `RelayResistorDefinition` exports — `register-all.ts:224-225` errors persist until landed.
+  - **Bundle 3** (this commit): `RelayInductorDefinition` + `RelayResistorDefinition` exports landed. `relay-inductor.ts` collapsed to thin adapter over `AnalogInductorElement` (inherited setup/findBranchFor preserve indsetup.c parity; constructor maps relay-local `L` → base's `inductance`); `relay-resistor.ts` constructor normalised to `(pinNodes, props)` reading `R`. `register-all.ts:224-225` TS2305 errors resolved; total project errors at 293 baseline (no regressions, zero `as unknown as` introduced).
 
 > **Locked decisions (recorded 2026-05-01):**
 >
