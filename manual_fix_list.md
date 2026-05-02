@@ -52,7 +52,7 @@
 
 ### 1c. Compiler / engine setup pipeline (depend on the above)
 
-- [ ] `src/solver/analog/compiler.ts` -- **spec:** phase-1-engine-infrastructure File 2 -- Strip 5 inline detectors + validator; wire `topology-diagnostics` compile-time entry; sentinel ordinals on allocator/patcher; wrapper as plain object with `participatesInLoad: false`; siblingBranch/siblingState dispatch; function-form netlist resolution; per-leaf label stamping (J-175; also Composite I1, I2, I4, I5, I6).
+- [ ] `src/solver/analog/compiler.ts` -- **spec:** phase-1-engine-infrastructure File 2 -- Strip 5 inline detectors + validator; wire `topology-diagnostics` compile-time entry; sentinel ordinals on allocator/patcher; wrapper as plain object with `participatesInLoad: false`; siblingBranch/siblingState dispatch; function-form netlist resolution; per-leaf label stamping; **re-implement `labelToNodeId` to ngspice spec** (replace the single-node-per-label workaround flagged in-place at compiler.ts:930-944 and the matching `labelPinNodes` build site that follows; delete both the workaround code and the IMPLEMENTATION-FAILURE comment block once correct; acceptance gate is per-step harness comparison via `harness_get_step` against ngspice, NOT a Grep -- per spec/reviews/REVIEW_SUMMARY.md:165 and spec/reviews/batch-43.md) (J-175; also Composite I1, I2, I4, I5, I6; labelToNodeId remediation per spec-review batch-43).
 - [ ] `src/solver/analog/analog-engine.ts` -- **spec:** phase-1-engine-infrastructure File 3 -- Delete per-element `accept()` invocation loop; delete `_walkSubElements`; skip elements where `participatesInLoad===false`; run `runPostSetupDetectors` at end of `_setup()`; add public `getDiagnostics()` (J-132; also Component G13, Composite I2).
 
 ### 1d. Headless / harness / IO surfaces
@@ -84,7 +84,7 @@
 
 #### Gate driver leaves (M10 - 8 files)
 
-- [ ] `src/solver/analog/behavioral-drivers/and-driver.ts` -- **spec:** phase-composite-architecture ssM10 -- NEW FILE; `BehavioralAndDriverElement` (J-134).
+- [x] `src/solver/analog/behavioral-drivers/and-driver.ts` -- **spec:** phase-composite-architecture ssM10 -- NEW FILE; `BehavioralAndDriverElement` (J-134). ✅ Canonical Template A-variable-pin (variable inputs via `pinLayoutFactory`, fixed 1-slot schema, hold-on-indeterminate semantic).
 - [ ] `src/solver/analog/behavioral-drivers/or-driver.ts` -- **spec:** phase-composite-architecture ssM10 -- NEW FILE; `BehavioralOrDriverElement` (J-153).
 - [ ] `src/solver/analog/behavioral-drivers/nand-driver.ts` -- **spec:** phase-composite-architecture ssM10 -- NEW FILE; `BehavioralNandDriverElement` (J-150).
 - [ ] `src/solver/analog/behavioral-drivers/nor-driver.ts` -- **spec:** phase-composite-architecture ssM10 -- NEW FILE; `BehavioralNorDriverElement` (J-151).
@@ -101,7 +101,7 @@
 
 #### Sequential driver leaves (M12)
 
-- [ ] `src/solver/analog/behavioral-drivers/counter-driver.ts` -- **spec:** phase-composite-architecture ssM12 -- NEW FILE; `BehavioralCounterDriverElement` (J-139).
+- [x] `src/solver/analog/behavioral-drivers/counter-driver.ts` -- **spec:** phase-composite-architecture ssM12 -- NEW FILE; `BehavioralCounterDriverElement` (J-139). ✅ Canonical Template A-multi-bit-schema (memoised arity-indexed schema; LAST_CLOCK + COUNT_BITi + OUTPUT_LOGIC_LEVEL_BITi + OUTPUT_LOGIC_LEVEL_OVF). Spec extension: OVF added beyond J-139 acceptance criteria, required because Counter parent has an ovf output pin.
 - [ ] `src/solver/analog/behavioral-drivers/counter-preset-driver.ts` -- **spec:** phase-composite-architecture ssM12 -- NEW FILE; `BehavioralCounterPresetDriverElement` (J-140).
 - [ ] `src/solver/analog/behavioral-drivers/register-driver.ts` -- **spec:** phase-composite-architecture ssM12 -- NEW FILE; `BehavioralRegisterDriverElement` (J-154).
 
@@ -184,7 +184,7 @@
 
 ### 2f. Gate user-facing components (M10 netlist conversions; depend on 2a gate drivers)
 
-- [ ] `src/components/gates/and.ts` -- **spec:** phase-composite-architecture ssM10 -- Convert `modelRegistry.behavioral` to function-form netlist via `buildAndGateNetlist` (J-037).
+- [x] `src/components/gates/and.ts` -- **spec:** phase-composite-architecture ssM10 -- Convert `modelRegistry.behavioral` to function-form netlist via `buildAndGateNetlist` (J-037). ✅ Migrated to `kind: "netlist"`; emits drv + N inPin_i + outPin via siblingState (`OUTPUT_LOGIC_LEVEL`). Adds `AND_BEHAVIORAL_PARAM_DEFS` (inputCount, loaded, vIH, vIL, rOut, cOut, vOH, vOL).
 - [ ] `src/components/gates/or.ts` -- **spec:** phase-composite-architecture ssM10 -- Convert to function-form netlist using `BehavioralOrDriver` (J-042).
 - [ ] `src/components/gates/nand.ts` -- **spec:** phase-composite-architecture ssM10 -- Convert to function-form netlist using `BehavioralNandDriver` (J-039).
 - [ ] `src/components/gates/nor.ts` -- **spec:** phase-composite-architecture ssM10 -- Convert to function-form netlist using `BehavioralNorDriver` (J-040).
@@ -311,6 +311,7 @@
 - Components: 89
 - Tests: 73 (10 are new-file/rollback test entries within 3e)
 - Unclassified: 0
+- **Completed (List A canonical wave):** J-134 (and-driver), J-139 (counter-driver), J-037 (and.ts). Counter parent (`memory/counter.ts`) migrated as bonus alongside J-139 (no J-ID assigned). Compiler precursor: siblingState resolver fix at compiler.ts:410.
 
 > **Locked decisions (recorded 2026-05-01):**
 >

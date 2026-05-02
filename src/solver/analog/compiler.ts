@@ -407,10 +407,19 @@ function compileSubcircuitToMnaModel(
                     `siblingState: registry has no definition for typeId "${sibling.typeId}"`,
                   );
                 }
-                const siblingSchema = (siblingDef as unknown as { stateSchema?: StateSchema }).stateSchema;
-                const slotIdx = siblingSchema
-                  ? (siblingSchema as unknown as { indexOf: (name: string) => number }).indexOf(ref.slotName)
-                  : -1;
+                // Prefer the constructed sibling's per-instance schema (covers
+                // variable-arity drivers like Counter / Register that build
+                // their schema from props in the constructor); fall back to the
+                // definition's static schema for the canonical fixed-shape case.
+                // Sibling MUST appear before the consumer in `netlist.elements`
+                // iteration order- d-flipflop's parent emits [drv, qPin, nqPin],
+                // counter parent emits [drv, outBit0, outBit1, ...]; the d-flipflop
+                // / counter drv constructor runs first and populates constructedByName.
+                const siblingEl = constructedByName.get(ref.subElementName);
+                const siblingSchema =
+                  (siblingEl as { stateSchema?: StateSchema } | undefined)?.stateSchema
+                  ?? (siblingDef as unknown as { stateSchema?: StateSchema }).stateSchema;
+                const slotIdx = siblingSchema?.indexOf.get(ref.slotName) ?? -1;
                 if (slotIdx < 0) {
                   throw new Error(
                     `siblingState: unknown slot "${ref.slotName}" on "${ref.subElementName}"`,
@@ -420,7 +429,6 @@ function compileSubcircuitToMnaModel(
                 //   sibling._stateBase + slotIdx
                 // because at setup-time the sibling's _stateBase is already populated
                 // (initState ran before setup). Write the deferred ref:
-                const siblingEl = constructedByName.get(ref.subElementName);
                 (subProps as unknown as { set: (k: string, val: unknown) => void }).set(
                   paramKey,
                   { kind: "poolSlotRef", element: siblingEl, slotIdx },
