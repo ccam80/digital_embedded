@@ -143,13 +143,15 @@ export class CounterElement extends AbstractCircuitElement {
 // maxValue = (1 << bitWidth) - 1, accessed via getProperty
 // ---------------------------------------------------------------------------
 
+interface CounterLayout extends ComponentLayout {
+  stateOffset(componentIndex: number): number;
+  getProperty(componentIndex: number, key: string): number;
+}
+
 export function sampleCounter(index: number, state: Uint32Array, _highZs: Uint32Array, layout: ComponentLayout): void {
   const wt = layout.wiringTable;
   const inBase = layout.inputOffset(index);
-  const extLayout = layout as unknown as {
-    stateOffset(i: number): number;
-    getProperty(i: number, key: string): number;
-  };
+  const extLayout = layout as CounterLayout;
   const stBase = extLayout.stateOffset(index);
 
   const en = state[wt[inBase]];
@@ -179,10 +181,7 @@ export function executeCounter(index: number, state: Uint32Array, _highZs: Uint3
   const wt = layout.wiringTable;
   const inBase = layout.inputOffset(index);
   const outBase = layout.outputOffset(index);
-  const extLayout = layout as unknown as {
-    stateOffset(i: number): number;
-    getProperty(i: number, key: string): number;
-  };
+  const extLayout = layout as CounterLayout;
   const stBase = extLayout.stateOffset(index);
 
   const en = state[wt[inBase]];

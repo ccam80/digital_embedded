@@ -215,21 +215,21 @@ export const buildTappedTransformerNetlist = (params: PropertyBag): MnaSubcircui
         subElementName: "L1",
         branchCount: 1,
         params: { L: l1 },
-      } as unknown as import("../../core/mna-subcircuit-netlist.js").SubcircuitElement,
+      },
       {
         typeId: "Inductor",
         modelRef: "behavioral",
         subElementName: "L2",
         branchCount: 1,
         params: { L: l2 },
-      } as unknown as import("../../core/mna-subcircuit-netlist.js").SubcircuitElement,
+      },
       {
         typeId: "Inductor",
         modelRef: "behavioral",
         subElementName: "L3",
         branchCount: 1,
         params: { L: l3 },
-      } as unknown as import("../../core/mna-subcircuit-netlist.js").SubcircuitElement,
+      },
       // Pairwise TransformerCoupling — strict ngspice match. ngspice K elements
       // are 1-to-1 with coupled pairs; a 3-winding tapped transformer emits
       // K12 + K13 + K23. Each instance carries one M and two siblingBranch refs.
@@ -239,30 +239,30 @@ export const buildTappedTransformerNetlist = (params: PropertyBag): MnaSubcircui
         subElementName: "MUT12",
         params: {
           M: m12,
-          L1_branch: { kind: "siblingBranch", subElementName: "L1" } as unknown as number,
-          L2_branch: { kind: "siblingBranch", subElementName: "L2" } as unknown as number,
+          L1_branch: { kind: "siblingBranch", subElementName: "L1" },
+          L2_branch: { kind: "siblingBranch", subElementName: "L2" },
         },
-      } as unknown as import("../../core/mna-subcircuit-netlist.js").SubcircuitElement,
+      },
       {
         typeId: "TransformerCoupling",
         modelRef: "default",
         subElementName: "MUT13",
         params: {
           M: m13,
-          L1_branch: { kind: "siblingBranch", subElementName: "L1" } as unknown as number,
-          L2_branch: { kind: "siblingBranch", subElementName: "L3" } as unknown as number,
+          L1_branch: { kind: "siblingBranch", subElementName: "L1" },
+          L2_branch: { kind: "siblingBranch", subElementName: "L3" },
         },
-      } as unknown as import("../../core/mna-subcircuit-netlist.js").SubcircuitElement,
+      },
       {
         typeId: "TransformerCoupling",
         modelRef: "default",
         subElementName: "MUT23",
         params: {
           M: m23,
-          L1_branch: { kind: "siblingBranch", subElementName: "L2" } as unknown as number,
-          L2_branch: { kind: "siblingBranch", subElementName: "L3" } as unknown as number,
+          L1_branch: { kind: "siblingBranch", subElementName: "L2" },
+          L2_branch: { kind: "siblingBranch", subElementName: "L3" },
         },
-      } as unknown as import("../../core/mna-subcircuit-netlist.js").SubcircuitElement,
+      },
     ],
     internalNetCount: 0,
     netlist: [

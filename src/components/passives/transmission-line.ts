@@ -237,8 +237,9 @@ export const buildTransmissionLineNetlist = (params: PropertyBag): MnaSubcircuit
 
   // `params` is optional on MnaSubcircuitNetlist; under exactOptionalPropertyTypes
   // the field must be ABSENT (not explicitly assigned undefined) to satisfy the
-  // type. Per-element `as unknown as SubcircuitElement` casts dropped: literals
-  // satisfy the structural type when params values are plain numbers.
+  // type. Per-element type-assertion casts on each SubcircuitElement literal
+  // were dropped: literals satisfy the structural type when params values are
+  // plain numbers, so no widening cast is required.
   return { ports, elements, internalNetCount: 2 * (N - 1), internalNetLabels, netlist };
 };
 

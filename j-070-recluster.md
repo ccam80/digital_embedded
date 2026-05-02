@@ -428,3 +428,161 @@ Template B authoring (sibling-only no-pin coupling driver) jumps ahead of Templa
 3. Then resume the original decision queue: A1 (multi-bit output), then Templates C / D / A-variable.
 
 This sequencing is locked in unless the user redirects.
+
+---
+
+## Wave 5/6 audit conclusions (this session)
+
+Pre-spawn audit for Wave 5/6. Findings reshape the wave. **Read this section first
+if picking up cold — it supersedes earlier wave guesses.**
+
+### Drop from scope
+
+- **J-171 (`src/solver/analog/behavioral-output-driver.ts`)** — file already exists
+  in canonical Template A/C-hybrid shape with `bitIndex` multi-bit support (207 lines).
+  Imports `edge-detect` / `state-schema` / `NGSPICE_LOAD_ORDER` / `PoolSlotRef`. VSRC
+  stamps via `solver.allocElement` + `solver.stampElement`. **Do NOT respawn.**
+
+### Surviving netlist builders — the on-disk contracts
+
+Composite classes were deleted from `behavioral-remaining.ts` and
+`behavioral-sequential.ts`; **netlist BUILDERS survive** and dictate exact driver
+shapes. Agents MUST match these shapes (pin order, slot names, sub-element
+wiring). The builders override several earlier recluster classifications.
+
+**`src/solver/analog/behavioral-remaining.ts` (338 lines):**
+
+| Builder | Lines | Driver typeId | Driver pin order | State slots consumed by sub-elements |
+|---|---|---|---|---|
+| `buildDriverNetlist` | 31-82 | `BehavioralDriverDriver` | `[in, sel, out, gnd]` | `OUTPUT_LOGIC_LEVEL` (1) — but tri-state gap, see below |
+| `buildDriverInvNetlist` | 100-147 | `BehavioralDriverInvDriver` | `[in, sel, out, gnd]` | `OUTPUT_LOGIC_LEVEL` (1) — same tri-state gap |
+| `buildSplitterNetlist` | 164-228 | `BehavioralSplitterDriver` | `[in_0..in_{N-1}, out_0..out_{M-1}, gnd]` (variable, from `_inputCount` / `_outputCount` props) | `OUTPUT_LOGIC_LEVEL_<i>` × M, one per `outPin_<i>` |
+| `buildSevenSegNetlist` | 243-279 | `BehavioralSevenSegDriver` | `[a, b, c, d, e, f, g, dp, gnd]` (8 inputs only) | **NONE** — no output pin sub-elements; slots (if any) are display-side observation only |
+| `buildButtonLEDNetlist` | 295-338 | `BehavioralButtonLEDDriver` | `[out, in, gnd]` | `OUTPUT_LOGIC_LEVEL` (1) consumed by `outPin` |
+
+**`src/solver/analog/behavioral-sequential.ts` (326 lines):**
+
+| Builder | Lines | Driver typeId | Driver pin order | State slots consumed by sub-elements |
+|---|---|---|---|---|
+| `buildCounterNetlist` | 34-124 | `BehavioralCounterDriver` | `[en, C, clr, out_0..out_{N-1}, ovf, gnd]` (**separate 1-bit out pins**) | `OUTPUT_LOGIC_LEVEL_<i>` × N (per-bit `outPin_<i>`) + `OUTPUT_LOGIC_LEVEL_OVF` (`ovfPin`) |
+| `buildCounterPresetNetlist` | 148-244 | `BehavioralCounterPresetDriver` | `[en, C, dir, in, ld, clr, out, ovf, gnd]` (**in/out are SINGLE BUS PINS — packed integer per node**) | `OUTPUT_LOGIC_LEVEL_OUT` + `OUTPUT_LOGIC_LEVEL_OVF` (single `outPin` reads packed value via `bitIndex`) |
+| `buildRegisterNetlist` | 264-326 | `BehavioralRegisterDriver` | `[D, C, en, Q, gnd]` (**D/Q are SINGLE BUS PINS**) | `OUTPUT_LOGIC_LEVEL_Q` (single `qPin` reads packed value via `bitIndex`) |
+
+**`src/solver/analog/behavioral-combinational.ts` (11 lines):**
+Gutted — docstring only, no builders. Mux migration done in Wave 4. **Demux and
+decoder builders DO NOT EXIST** — must be authored as precursor before W6-I /
+W6-J spawn. Author them directly per Templates B/C/D authority pattern, NOT via
+agent. Model on `buildSplitterNetlist` (multi-port shape) and
+`buildCounterNetlist` (per-bit `outPin_<i>` consumer pattern).
+- Decoder: K selectors → 2^K active-high outputs (one consumer pin per output bit, separate slot per output).
+- Demux: 1 data input + K selectors → 2^K outputs (data routes to one output by sel, others = 0).
+
+### Reclassification overrides — builders supersede recluster
+
+| Job | Recluster said | Builder reality | Final classification |
+|---|---|---|---|
+| J-138 button-led | "may need analog coupling" | clean digital, no analog coupling | Template A (3-pin, 1 slot) |
+| J-157 seven-seg | A-fixed with 7 output slots | 8 input pins only, **no consumer sub-elements** | Template A (8 INPUT-only pins, observation-only slots — divergent shape, needs explicit template guidance in brief) |
+| J-158 splitter | parent-emits-N decomposition | single multi-port driver, M slots | Template A (multi-port single driver, NOT decomposed) |
+| J-154 register | parent-emits-N "register-bit-driver" | single driver, D/Q as bus pins, packed integer | Template A multi-bit-bus (single driver, NOT bit-driver — name should be `register-driver.ts`) |
+| J-140 counter-preset | A-composed (variable-pin + variable-schema) | single driver, in/out as bus pins, packed integer | Template A multi-bit-bus (same shape as register, plus edge-trigger + ld/dir/clr) |
+
+### Architectural gap blocking J-145 / J-146 (tri-state)
+
+`src/components/digital-pins/digital-output-pin-loaded.ts` (53 lines) has **no
+tri-state mechanism**. The fixed netlist (Resistor + Capacitor +
+BehavioralOutputDriver) always stamps. There is no `enable` param, no
+`skipStamp` flag, no NaN sentinel handling in `BehavioralOutputDriver.load()`.
+
+Original `Driver` / `DriverInvSel` are tri-state buffers (sel=0 → high-Z,
+sel=1 → drive in / ~in). The surviving `buildDriverNetlist` /
+`buildDriverInvNetlist` wire plain `DigitalOutputPinLoaded`, which cannot
+represent high-Z. **Migration cannot complete without an architectural
+addition.**
+
+User has not chosen between:
+- **(b1)** Add `enable` param + skip-stamp logic to `DigitalOutputPinLoaded`
+  and `BehavioralOutputDriver`. Driver writes enable bit to a second slot
+  (e.g. `OUTPUT_ENABLED`), pin reads it via siblingState.
+- **(b2)** New pin variant `DigitalOutputPinLoadedTristate` with explicit
+  enable plumbing alongside `inputLogic`.
+- **(b3)** NaN sentinel in `OUTPUT_LOGIC_LEVEL`; `BehavioralOutputDriver.load()`
+  short-circuits stamp pass when `Number.isNaN(inputLevel)`.
+
+J-145 + J-146 are pulled from Wave 5 until decision lands; the decided option
+is implemented as a precursor task (direct authoring, not agent).
+
+### `as unknown as` baseline (verification gate)
+
+**558 occurrences across 131 files** at start of Wave 5/6. Per-agent gate: an
+agent's touched files MUST NOT increase their `as unknown as` count.
+
+### Wave 5 final agent allocation (6 unblocked, parallel-spawnable)
+
+| Agent | Job | Driver target | Parent target | Reference template | Surviving builder source |
+|---|---|---|---|---|---|
+| W5-A | J-030 | `src/components/active/timer-555-latch-driver.ts` | `src/components/active/timer-555.ts` (already wired ✓) | `d-flipflop-driver.ts` (Template A) | n/a — parent's `buildTimer555Netlist` already references the typeId |
+| W5-B | J-152 | `src/solver/analog/behavioral-drivers/not-driver.ts` | `src/components/gates/not.ts` migration + NEW `buildNotNetlist` | `and-driver.ts` (Template A-variable-pin) at N=1 fixed | n/a — mirror `and.ts` parent migration (already done in Wave 4) |
+| W5-C | J-137 | `src/solver/analog/behavioral-drivers/buf-driver.ts` | NEW FILE `src/components/gates/buf.ts` + NEW `buildBufNetlist` (J-038 in scope) | `and-driver.ts` at N=1 fixed, truth = identity | n/a |
+| W5-D | J-138 | `src/solver/analog/behavioral-drivers/button-led-driver.ts` | `src/components/io/button-led.ts` migration | `d-flipflop-driver.ts` (Template A) | `buildButtonLEDNetlist` @ `behavioral-remaining.ts:295-338` |
+| W5-E | J-157 | `src/solver/analog/behavioral-drivers/seven-seg-driver.ts` | `src/components/io/seven-seg.ts` migration | `d-flipflop-driver.ts` BUT **divergent**: 8 INPUT-only pins, no output pins, no consumer sub-elements (slots observation-only) | `buildSevenSegNetlist` @ `behavioral-remaining.ts:243-279` |
+| W5-F | J-158 | `src/solver/analog/behavioral-drivers/splitter-driver.ts` | `src/components/wiring/splitter.ts` migration | `counter-driver.ts` (multi-port, multi-slot) | `buildSplitterNetlist` @ `behavioral-remaining.ts:164-228` |
+
+### Wave 5 blocked (pending tri-state precursor)
+
+- **J-145** `driver-driver.ts` + `src/components/wiring/driver.ts`
+- **J-146** `driver-inv-driver.ts` + `src/components/wiring/driver-inv.ts`
+
+### Wave 6 final agent allocation (2 unblocked + 2 blocked on decoder/demux precursor)
+
+| Agent | Job | Driver target | Parent target | Reference template | Surviving builder source |
+|---|---|---|---|---|---|
+| W6-G | J-140 | `src/solver/analog/behavioral-drivers/counter-preset-driver.ts` | `src/components/memory/counter-preset.ts` migration | `counter-driver.ts` + bus-pin extraction | `buildCounterPresetNetlist` @ `behavioral-sequential.ts:148-244` |
+| W6-H | J-154 | `src/solver/analog/behavioral-drivers/register-driver.ts` (**NOT** `register-bit-driver.ts`) | `src/components/memory/register.ts` migration | `counter-driver.ts` + bus-pin extraction; en-guard on edge-triggered sample | `buildRegisterNetlist` @ `behavioral-sequential.ts:264-326` |
+| W6-I (BLOCKED) | J-143 | `src/solver/analog/behavioral-drivers/decoder-driver.ts` | `src/components/wiring/decoder.ts` migration | `counter-driver.ts` (multi-port, multi-slot) | **needs precursor** `buildDecoderNetlist` authored in `behavioral-combinational.ts` |
+| W6-J (BLOCKED) | J-144 | `src/solver/analog/behavioral-drivers/demux-driver.ts` | `src/components/wiring/demux.ts` migration | `counter-driver.ts` (multi-port, multi-slot) | **needs precursor** `buildDemuxNetlist` authored in `behavioral-combinational.ts` |
+
+(J-158 splitter lives in W5-F; not duplicated.)
+
+### Per-agent brief content (template for spawn)
+
+Every Wave 5/6 brief includes:
+- **Job ID, target driver path, target parent path** (from table above)
+- **Verbatim spec excerpt** from `spec/contracts_group_<NN>.md` (group_02 for
+  J-030; group_09 for J-137, J-138, J-139; group_10 for J-140, J-143, J-144,
+  J-145, J-146, J-152, J-154, J-157, J-158; group_11 for J-171). Include note
+  that the surviving netlist builder reality overrides any spec line that
+  conflicts with the table above.
+- **Surviving-builder line range** — agent reads it to derive driver pin order
+  and slot names; this is the CONTRACT.
+- **Reference template path** — one of:
+  `src/solver/analog/behavioral-drivers/d-flipflop-driver.ts` (1-bit fixed-pin),
+  `src/solver/analog/behavioral-drivers/counter-driver.ts` (multi-bit / multi-port),
+  `src/solver/analog/behavioral-drivers/and-driver.ts` (variable input pin count, fixed schema).
+- **Strict prohibitions** per the locked-in harness: no test runs, no
+  `register-all.ts` touch, no reads of OTHER `behavioral-drivers/*.ts` files
+  unless the brief explicitly cites them as canonicals (those listed above are
+  the only sanctioned references — all other behavioral-drivers files are
+  context poison from earlier failed waves).
+- **Read scope:** target parent, the cited surviving builder file, the cited
+  canonical template, `src/core/*` for type lookups, **and the W4-completed
+  parent migrations** (`src/components/gates/and.ts`,
+  `src/components/memory/counter.ts`, `src/components/flipflops/d.ts`) as
+  parent-migration shape references.
+- **Bundle rule:** agent's atomic unit is **driver file (CREATE) + parent file
+  (EDIT)**. No orphan drivers landing without consumers.
+- **`as unknown as` gate:** count in agent's touched files at completion MUST
+  NOT exceed pre-edit count.
+- **STOP report format** per harness: emit `STOP: <reason>` and end turn rather
+  than improvise on any spec ambiguity.
+
+### Open user decisions (pre-spawn)
+
+1. **Tri-state mechanism** for `DigitalOutputPinLoaded` — pick (b1), (b2), or
+   (b3) above. Then a precursor task implements the chosen path before W5-G /
+   W5-H (the J-145 / J-146 agents) can spawn.
+2. **Decoder/demux builder authoring authority** — confirm direct (non-agent)
+   authoring of `buildDecoderNetlist` and `buildDemuxNetlist` as precursor.
+3. **Spawn order** — confirm Wave 5 (6 agents) and Wave 6 unblocked (W6-G +
+   W6-H) spawn in parallel as a single 8-agent batch, with W6-I and W6-J
+   following once decoder/demux precursors land.
