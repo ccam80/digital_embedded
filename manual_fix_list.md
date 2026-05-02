@@ -85,37 +85,37 @@
 #### Gate driver leaves (M10 - 8 files)
 
 - [x] `src/solver/analog/behavioral-drivers/and-driver.ts` -- **spec:** phase-composite-architecture ssM10 -- NEW FILE; `BehavioralAndDriverElement` (J-134). ✅ Canonical Template A-variable-pin (variable inputs via `pinLayoutFactory`, fixed 1-slot schema, hold-on-indeterminate semantic).
-- [ ] `src/solver/analog/behavioral-drivers/or-driver.ts` -- **spec:** phase-composite-architecture ssM10 -- NEW FILE; `BehavioralOrDriverElement` (J-153).
-- [ ] `src/solver/analog/behavioral-drivers/nand-driver.ts` -- **spec:** phase-composite-architecture ssM10 -- NEW FILE; `BehavioralNandDriverElement` (J-150).
-- [ ] `src/solver/analog/behavioral-drivers/nor-driver.ts` -- **spec:** phase-composite-architecture ssM10 -- NEW FILE; `BehavioralNorDriverElement` (J-151).
-- [ ] `src/solver/analog/behavioral-drivers/xor-driver.ts` -- **spec:** phase-composite-architecture ssM10 -- NEW FILE; `BehavioralXorDriverElement` (J-161).
-- [ ] `src/solver/analog/behavioral-drivers/xnor-driver.ts` -- **spec:** phase-composite-architecture ssM10 -- NEW FILE; `BehavioralXnorDriverElement` (J-160).
-- [ ] `src/solver/analog/behavioral-drivers/not-driver.ts` -- **spec:** phase-composite-architecture ssM10 -- NEW FILE; `BehavioralNotDriverElement` (N=1) (J-152).
-- [ ] `src/solver/analog/behavioral-drivers/buf-driver.ts` -- **spec:** phase-composite-architecture ssM10 -- NEW FILE; `BehavioralBufDriverElement` (N=1) (J-137).
+- [x] `src/solver/analog/behavioral-drivers/or-driver.ts` -- **spec:** phase-composite-architecture ssM10 -- NEW FILE; `BehavioralOrDriverElement` (J-153). ✅ Wave 4 (driver+parent pair).
+- [x] `src/solver/analog/behavioral-drivers/nand-driver.ts` -- **spec:** phase-composite-architecture ssM10 -- NEW FILE; `BehavioralNandDriverElement` (J-150). ✅ Wave 4 (driver+parent pair).
+- [x] `src/solver/analog/behavioral-drivers/nor-driver.ts` -- **spec:** phase-composite-architecture ssM10 -- NEW FILE; `BehavioralNorDriverElement` (J-151). ✅ Wave 4 (driver+parent pair).
+- [x] `src/solver/analog/behavioral-drivers/xor-driver.ts` -- **spec:** phase-composite-architecture ssM10 -- NEW FILE; `BehavioralXorDriverElement` (J-161). ✅ Wave 4 (driver+parent pair).
+- [x] `src/solver/analog/behavioral-drivers/xnor-driver.ts` -- **spec:** phase-composite-architecture ssM10 -- NEW FILE; `BehavioralXnorDriverElement` (J-160). ✅ Wave 4 (driver+parent pair).
+- [x] `src/solver/analog/behavioral-drivers/not-driver.ts` -- **spec:** phase-composite-architecture ssM10 -- NEW FILE; `BehavioralNotDriverElement` (N=1) (J-152). ✅ Wave 5 (W5-B; driver+parent pair).
+- [x] `src/solver/analog/behavioral-drivers/buf-driver.ts` -- **spec:** phase-composite-architecture ssM10 -- NEW FILE; `BehavioralBufDriverElement` (N=1) (J-137). ✅ Wave 5 (W5-C; driver + new parent buf.ts pair).
 
 #### Combinational driver leaves (M11)
 
-- [ ] `src/solver/analog/behavioral-drivers/mux-driver.ts` -- **spec:** phase-composite-architecture ssM11 -- NEW FILE; `BehavioralMuxDriverElement` (J-149).
-- [ ] `src/solver/analog/behavioral-drivers/demux-driver.ts` -- **spec:** phase-composite-architecture ssM11 -- NEW FILE; `BehavioralDemuxDriverElement` (J-144).
-- [ ] `src/solver/analog/behavioral-drivers/decoder-driver.ts` -- **spec:** phase-composite-architecture ssM11 -- NEW FILE; `BehavioralDecoderDriverElement` (J-143).
+- [x] `src/solver/analog/behavioral-drivers/mux-driver.ts` -- **spec:** phase-composite-architecture ssM11 -- NEW FILE; `BehavioralMuxDriverElement` (J-149). ✅ Wave 4 (driver + mux.ts parent migration).
+- [x] `src/solver/analog/behavioral-drivers/demux-driver.ts` -- **spec:** phase-composite-architecture ssM11 -- NEW FILE; `BehavioralDemuxDriverElement` (J-144). ✅ Bundle 2 (driver + `buildDemuxNetlist` precursor + parent migration; combinational A-multi-bit-schema with whole-vector hold-on-indeterminate; analog model 1-bit, multi-bit demuxes fall through to digital path).
+- [x] `src/solver/analog/behavioral-drivers/decoder-driver.ts` -- **spec:** phase-composite-architecture ssM11 -- NEW FILE; `BehavioralDecoderDriverElement` (J-143). ✅ Bundle 2 (driver + `buildDecoderNetlist` precursor + parent migration; one-hot output via per-bit OUTPUT_LOGIC_LEVEL_BITi slots; whole-vector hold-on-indeterminate because per-bit hold is incoherent for one-hot decoding).
 
 #### Sequential driver leaves (M12)
 
 - [x] `src/solver/analog/behavioral-drivers/counter-driver.ts` -- **spec:** phase-composite-architecture ssM12 -- NEW FILE; `BehavioralCounterDriverElement` (J-139). ✅ Canonical Template A-multi-bit-schema (memoised arity-indexed schema; LAST_CLOCK + COUNT_BITi + OUTPUT_LOGIC_LEVEL_BITi + OUTPUT_LOGIC_LEVEL_OVF). Spec extension: OVF added beyond J-139 acceptance criteria, required because Counter parent has an ovf output pin.
-- [ ] `src/solver/analog/behavioral-drivers/counter-preset-driver.ts` -- **spec:** phase-composite-architecture ssM12 -- NEW FILE; `BehavioralCounterPresetDriverElement` (J-140).
-- [ ] `src/solver/analog/behavioral-drivers/register-driver.ts` -- **spec:** phase-composite-architecture ssM12 -- NEW FILE; `BehavioralRegisterDriverElement` (J-154).
+- [x] `src/solver/analog/behavioral-drivers/counter-preset-driver.ts` -- **spec:** phase-composite-architecture ssM12 -- NEW FILE; `BehavioralCounterPresetDriverElement` (J-140). ✅ Wave 6 (W6-G; bus-pin shape, edge-triggered, vIH/vIL hysteresis on packed `in` decode + parent migration).
+- [x] `src/solver/analog/behavioral-drivers/register-driver.ts` -- **spec:** phase-composite-architecture ssM12 -- NEW FILE; `BehavioralRegisterDriverElement` (J-154). ✅ Wave 6 (W6-H; bus-pin shape D/Q, en-guarded edge sample + parent migration with bitWidth paramDef forwarding fix).
 
 #### Misc behavioural drivers (M13)
 
-- [ ] `src/solver/analog/behavioral-drivers/driver-driver.ts` -- **spec:** phase-composite-architecture ssM13 -- NEW FILE; `BehavioralDriverDriverElement` (J-145).
-- [ ] `src/solver/analog/behavioral-drivers/driver-inv-driver.ts` -- **spec:** phase-composite-architecture ssM13 -- NEW FILE; `BehavioralDriverInvDriverElement` (J-146).
-- [ ] `src/solver/analog/behavioral-drivers/splitter-driver.ts` -- **spec:** phase-composite-architecture ssM13 -- NEW FILE; `BehavioralSplitterDriverElement` (J-158).
-- [ ] `src/solver/analog/behavioral-drivers/seven-seg-driver.ts` -- **spec:** phase-composite-architecture ssM13 -- NEW FILE; `BehavioralSevenSegDriverElement` (J-157).
-- [ ] `src/solver/analog/behavioral-drivers/button-led-driver.ts` -- **spec:** phase-composite-architecture ssM13 -- NEW FILE; `BehavioralButtonLEDDriverElement` (J-138).
+- [x] `src/solver/analog/behavioral-drivers/driver-driver.ts` -- **spec:** phase-composite-architecture ssM13 -- NEW FILE; `BehavioralDriverDriverElement` (J-145). ✅ Bundle 1 (active-high tri-state via OUTPUT_LOGIC_LEVEL_ENABLE slot + sibling `enableLogic` ref; BehavioralOutputDriver Thévenin → Norton refactor as the enabling architectural change; high-Z = 1 GΩ shunt + zero current injection).
+- [x] `src/solver/analog/behavioral-drivers/driver-inv-driver.ts` -- **spec:** phase-composite-architecture ssM13 -- NEW FILE; `BehavioralDriverInvDriverElement` (J-146). ✅ Bundle 1 (mirror of J-145 with active-LOW enable polarity; same Norton + sibling enableLogic architecture).
+- [x] `src/solver/analog/behavioral-drivers/splitter-driver.ts` -- **spec:** phase-composite-architecture ssM13 -- NEW FILE; `BehavioralSplitterDriverElement` (J-158). ✅ Wave 5 (W5-F; multi-port multi-slot, split/merge/passthrough modes mirroring executeSplitter, vIL hot-loadable + parent migration).
+- [x] `src/solver/analog/behavioral-drivers/seven-seg-driver.ts` -- **spec:** phase-composite-architecture ssM13 -- NEW FILE; `BehavioralSevenSegDriverElement` (J-157). ✅ Wave 5 (W5-E; divergent shape — 8 INPUT-only pins, 8 observation-only slots, no consumer sub-elements + parent migration).
+- [x] `src/solver/analog/behavioral-drivers/button-led-driver.ts` -- **spec:** phase-composite-architecture ssM13 -- NEW FILE; `BehavioralButtonLEDDriverElement` (J-138). ✅ Wave 5 (W5-D; threshold-classify with logicLevel; spec referenced non-existent composite load() body, agent escalated, user authorized Template A pattern + parent migration).
 
 #### Flip-flop driver leaves (M14-M20)
 
-- [ ] `src/solver/analog/behavioral-drivers/d-flipflop-driver.ts` -- **spec:** phase-composite-architecture ssM14 -- NEW FILE; `BehavioralDFlipflopDriverElement` (J-142).
+- [x] `src/solver/analog/behavioral-drivers/d-flipflop-driver.ts` -- **spec:** phase-composite-architecture ssM14 -- NEW FILE; `BehavioralDFlipflopDriverElement` (J-142). ✅ Precursor (Template A canonical authored + cleaned this followup).
 - [ ] `src/solver/analog/behavioral-drivers/t-flipflop-driver.ts` -- **spec:** phase-composite-architecture ssM15 -- NEW FILE; `BehavioralTFlipflopDriverElement` (J-159).
 - [ ] `src/solver/analog/behavioral-drivers/rs-flipflop-driver.ts` -- **spec:** phase-composite-architecture ssM16 -- NEW FILE; `BehavioralRSFlipflopDriverElement` (J-156).
 - [ ] `src/solver/analog/behavioral-drivers/rs-async-latch-driver.ts` -- **spec:** phase-composite-architecture ssM17 -- NEW FILE; `BehavioralRSAsyncLatchDriverElement` (J-155).
@@ -125,11 +125,11 @@
 
 #### Composite-specific driver leaves
 
-- [ ] `src/components/active/dac-driver.ts` -- **spec:** phase-composite-architecture ssM22 -- NEW FILE; `DACDriverElement` (VCVS branch row stamp) (J-022).
-- [ ] `src/components/active/adc-driver.ts` -- **spec:** phase-composite-architecture ssM23 -- NEW FILE; `ADCDriverElement` with packed `SAR_BITS` slot (J-018).
+- [x] `src/components/active/dac-driver.ts` -- **spec:** phase-composite-architecture ssM22 -- NEW FILE; `DACDriverElement` (VCVS branch row stamp) (J-022). ✅ Wave 3 (Template D hybrid).
+- [x] `src/components/active/adc-driver.ts` -- **spec:** phase-composite-architecture ssM23 -- NEW FILE; `ADCDriverElement` with packed `SAR_BITS` slot (J-018). ✅ Wave 3 (reclassified to A-multi-bit-schema; per-bit slots not packed SAR per audit).
 - [x] `src/components/active/comparator-driver.ts` -- **spec:** phase-composite-architecture ssM24 -- NEW FILE; `ComparatorDriverElement` (J-020).
-- [ ] `src/components/active/schmitt-trigger-driver.ts` -- **spec:** phase-composite-architecture ssM25 -- NEW FILE; `SchmittTriggerDriverElement` (J-028).
-- [ ] `src/components/active/timer-555-latch-driver.ts` -- **spec:** phase-composite-architecture ssM5 -- NEW FILE; `Timer555LatchDriverElement` (RS latch + discharge BJT base driver) (J-030).
+- [x] `src/components/active/schmitt-trigger-driver.ts` -- **spec:** phase-composite-architecture ssM25 -- NEW FILE; `SchmittTriggerDriverElement` (J-028). ✅ Wave 3 (Template D hybrid).
+- [x] `src/components/active/timer-555-latch-driver.ts` -- **spec:** phase-composite-architecture ssM5 -- NEW FILE; `Timer555LatchDriverElement` (RS latch + discharge BJT base driver) (J-030). ✅ Wave 5 (W5-A; hybrid Template A + 1 local stamp block for BJT base clamp; spec API `ctx.matrix.add` translated to `ctx.solver.allocElement`/`stampElement`).
 - [x] `src/components/active/internal-zero-volt-sense.ts` -- **spec:** phase-composite-architecture ssM4 -- NEW FILE; `InternalZeroVoltSense` extracted from optocoupler `VsenseSubElement` (J-025).
 - [x] `src/components/active/internal-cccs.ts` -- **spec:** phase-composite-architecture ssM4 -- NEW FILE; `InternalCccs` extracted from optocoupler `CccsSubElement` (J-024).
 - [x] `src/components/passives/transformer-coupling.ts` -- **spec:** phase-composite-architecture ssM26 -- NEW FILE; `TransformerCouplingElement` mutual inductance via siblingBranch (J-063).
@@ -185,13 +185,13 @@
 ### 2f. Gate user-facing components (M10 netlist conversions; depend on 2a gate drivers)
 
 - [x] `src/components/gates/and.ts` -- **spec:** phase-composite-architecture ssM10 -- Convert `modelRegistry.behavioral` to function-form netlist via `buildAndGateNetlist` (J-037). ✅ Migrated to `kind: "netlist"`; emits drv + N inPin_i + outPin via siblingState (`OUTPUT_LOGIC_LEVEL`). Adds `AND_BEHAVIORAL_PARAM_DEFS` (inputCount, loaded, vIH, vIL, rOut, cOut, vOH, vOL).
-- [ ] `src/components/gates/or.ts` -- **spec:** phase-composite-architecture ssM10 -- Convert to function-form netlist using `BehavioralOrDriver` (J-042).
-- [ ] `src/components/gates/nand.ts` -- **spec:** phase-composite-architecture ssM10 -- Convert to function-form netlist using `BehavioralNandDriver` (J-039).
-- [ ] `src/components/gates/nor.ts` -- **spec:** phase-composite-architecture ssM10 -- Convert to function-form netlist using `BehavioralNorDriver` (J-040).
-- [ ] `src/components/gates/xor.ts` -- **spec:** phase-composite-architecture ssM10 -- Convert to function-form netlist using `BehavioralXorDriver` (J-044).
-- [ ] `src/components/gates/xnor.ts` -- **spec:** phase-composite-architecture ssM10 -- Convert to function-form netlist using `BehavioralXnorDriver` (J-043).
-- [ ] `src/components/gates/not.ts` -- **spec:** phase-composite-architecture ssM10 -- Convert to function-form netlist with N=1 fixed using `BehavioralNotDriver` (J-041).
-- [ ] `src/components/gates/buf.ts` -- **spec:** phase-composite-architecture ssM10 -- NEW FILE mirroring `not.ts` with `BehavioralBufDriver` (J-038). **DECISION (locked):** make the file (BUF is user-facing).
+- [x] `src/components/gates/or.ts` -- **spec:** phase-composite-architecture ssM10 -- Convert to function-form netlist using `BehavioralOrDriver` (J-042). ✅ Wave 4.
+- [x] `src/components/gates/nand.ts` -- **spec:** phase-composite-architecture ssM10 -- Convert to function-form netlist using `BehavioralNandDriver` (J-039). ✅ Wave 4.
+- [x] `src/components/gates/nor.ts` -- **spec:** phase-composite-architecture ssM10 -- Convert to function-form netlist using `BehavioralNorDriver` (J-040). ✅ Wave 4.
+- [x] `src/components/gates/xor.ts` -- **spec:** phase-composite-architecture ssM10 -- Convert to function-form netlist using `BehavioralXorDriver` (J-044). ✅ Wave 4.
+- [x] `src/components/gates/xnor.ts` -- **spec:** phase-composite-architecture ssM10 -- Convert to function-form netlist using `BehavioralXnorDriver` (J-043). ✅ Wave 4.
+- [x] `src/components/gates/not.ts` -- **spec:** phase-composite-architecture ssM10 -- Convert to function-form netlist with N=1 fixed using `BehavioralNotDriver` (J-041). ✅ Wave 5 (W5-B).
+- [x] `src/components/gates/buf.ts` -- **spec:** phase-composite-architecture ssM10 -- NEW FILE mirroring `not.ts` with `BehavioralBufDriver` (J-038). **DECISION (locked):** make the file (BUF is user-facing). ✅ Wave 5 (W5-C; new file authored).
 
 ### 2g. Behavioural-element file deletions / class removals (Composite M11-M21)
 
@@ -311,7 +311,21 @@
 - Components: 89
 - Tests: 73 (10 are new-file/rollback test entries within 3e)
 - Unclassified: 0
-- **Completed (List A canonical wave):** J-134 (and-driver), J-139 (counter-driver), J-037 (and.ts). Counter parent (`memory/counter.ts`) migrated as bonus alongside J-139 (no J-ID assigned). Compiler precursor: siblingState resolver fix at compiler.ts:410.
+- **Completed (J-070 List A followup, all waves):**
+  - **Wave 1 (Template B siblings-only):** J-095 (relay-coupling), J-063 (transformer-coupling).
+  - **Wave 2 (Template C MNA-stamp):** J-068, J-067, J-066, J-065, J-069 (transmission segments R/L/G/C/RL); J-091, J-093 (fgnfet/fgpfet blown drivers); J-024, J-025 (internal-cccs, internal-zero-volt-sense).
+  - **Wave 3 (Template D + A-multi-bit):** J-020 (comparator-driver), J-022 (dac-driver), J-018 (adc-driver, reclassified to A-multi-bit), J-028 (schmitt-trigger-driver).
+  - **Wave 4 (Template A-variable-pin gates):** J-153, J-150, J-151, J-161, J-160 (or/nand/nor/xor/xnor drivers); J-149 (mux-driver); J-042, J-039, J-040, J-044, J-043 (gate parent migrations); mux.ts parent migration (no J-ID).
+  - **Wave 5 (Template A-fixed standalone):** J-152 (not-driver), J-137 (buf-driver), J-138 (button-led-driver), J-157 (seven-seg-driver, divergent), J-158 (splitter-driver), J-030 (timer-555-latch-driver, hybrid w/ stamp); J-041 (not.ts parent), J-038 (buf.ts NEW parent); button-led.ts, seven-seg.ts, splitter.ts parent migrations (no J-ID).
+  - **Wave 6 (A multi-bit bus-pin):** J-140 (counter-preset-driver), J-154 (register-driver); counter-preset.ts, register.ts parent migrations (no J-ID).
+  - **Template E deletions (mechanical):** J-162 through J-169 (8 flipflop class deletions + 2 same-blast-radius orphan files; behavioral-flipflop/ directory removed).
+  - **Precursor canonicals:** J-134 (and-driver, A-variable-pin canonical), J-139 (counter-driver, A-multi-bit-schema canonical), J-142 (d-flipflop-driver, A-fixed canonical, cleaned), J-037 (and.ts parent, gate parent migration canonical); counter.ts parent (no J-ID); 6 flipflop parent-composite migrations (d.ts, d-async.ts, jk.ts, jk-async.ts, rs.ts, rs-async.ts, t.ts); J-171 (behavioral-output-driver, found already-canonical, dropped from spawn scope); compiler.ts:410 siblingState resolver fix; edge-detect.ts (NEW shared helper module).
+  - **Manual exports (lifted from agent scope):** RelayInductorDefinition + RelayResistorDefinition (handled directly).
+- **List A blocked items — all CLEARED via direct-authoring bundles (this session):**
+  - **Bundle 1** (commit `61e96a2e`): J-145 + J-146 — tri-state via (b1) OUTPUT_LOGIC_LEVEL_ENABLE slot + sibling `enableLogic` siblingState ref; `BehavioralOutputDriver` Thévenin → Norton refactor as the enabling architectural change; `DigitalOutputPinLoaded` simplified (Resistor child + driveNode internal net removed; driver now owns the conductance). Adjacent broken-import cleanup in `seven-seg-hex.ts` + `bus-splitter.ts` (their behavioural entries dropped pending future scoped J-jobs since neither fits the existing builders' shape).
+  - **Bundle 2** (this commit): J-143 + J-144 — `buildDecoderNetlist` + `buildDemuxNetlist` authored directly in `behavioral-combinational.ts` (replacing the 11-line stub); driver leaves added with memoised arity-indexed schema; `decoder.ts` + `demux.ts` migrated to `kind: "netlist"`. Whole-vector hold-on-indeterminate semantic; demux analog model 1-bit (matches mux limitation).
+- **Outstanding direct-authoring items (lifted from agent scope):**
+  - `RelayInductorDefinition` + `RelayResistorDefinition` exports — `register-all.ts:224-225` errors persist until landed.
 
 > **Locked decisions (recorded 2026-05-01):**
 >

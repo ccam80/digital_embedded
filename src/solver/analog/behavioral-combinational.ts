@@ -1,625 +1,214 @@
 /**
- * Behavioral analog models for combinational digital components:
- * multiplexer, demultiplexer, and decoder.
+ * Behavioural function-form netlist builders for combinational wiring
+ * components.
  *
- * All three are purely combinational — they evaluate inside load() every NR
- * iteration. Selector bits are read via threshold detection, the appropriate
- * data routing is performed, and output pin Norton equivalents are re-stamped.
+ * Currently:
+ *   - buildDecoderNetlist  (Decoder, K-bit sel → 2^K one-hot outputs)
+ *   - buildDemuxNetlist    (Demultiplexer, K-bit sel + 1-bit data → 2^K outputs)
  *
- * Pin capacitance companion models are stamped inside load() via capacitor
- * children of the pin models.
+ * Mux's builder lives alongside its component file (`src/components/wiring/
+ * mux.ts`); this module mirrors its shape for the other two combinational
+ * wiring components.
+ *
+ * Both builders emit one BehavioralXxxDriver leaf + per-port loaded/unloaded
+ * input pins + per-output loaded/unloaded output pins. Each output pin
+ * consumes its own `OUTPUT_LOGIC_LEVEL_BIT${i}` slot from the driver via
+ * siblingState (multi-port multi-slot pattern; mirrors `buildSplitterNetlist`
+ * in `behavioral-remaining.ts` and `buildCounterNetlist` in
+ * `behavioral-sequential.ts`).
+ *
+ * Per Cluster M11 follow-up (j-070-recluster.md), J-143 / J-144
+ * (contracts_group_10.md). Authored directly per the user's
+ * "non-agent precursor" decision.
  */
 
-import type { AnalogElement } from "../../core/analog-types.js";
-import { NGSPICE_LOAD_ORDER } from "./element.js";
-import type { LoadContext } from "./load-context.js";
+import type { MnaSubcircuitNetlist, SubcircuitElement } from "../../core/mna-subcircuit-netlist.js";
 import type { PropertyBag } from "../../core/properties.js";
-import type { ResolvedPinElectrical } from "../../core/pin-electrical.js";
-import {
-  DigitalInputPinModel,
-  DigitalOutputPinModel,
-  readMnaVoltage,
-  delegatePinSetParam,
-  collectPinModelChildren,
-} from "./digital-pin-model.js";
-import type { AnalogCapacitorElement } from "../../components/passives/capacitor.js";
-import type { AnalogElementFactory } from "./behavioral-gate.js";
-import { defineStateSchema } from "./state-schema.js";
-import type { StateSchema } from "./state-schema.js";
-import { CompositeElement } from "./composite-element.js";
-
-// Empty composite schema — children carry their own schemas.
-const COMBINATIONAL_COMPOSITE_SCHEMA: StateSchema = defineStateSchema("BehavioralCombinationalComposite", []);
 
 // ---------------------------------------------------------------------------
-// Shared fallback electrical spec (CMOS 3.3 V defaults)
+// buildDecoderNetlist
 // ---------------------------------------------------------------------------
+//
+// Ports: sel_0..sel_{K-1}, out_0..out_{N-1}, gnd      (N = 2^K)
+//
+// Sub-elements:
+//   drv          : BehavioralDecoderDriver (K selector pins + gnd; no driver-
+//                  side output pins because outputs are owned by the sibling
+//                  outPin sub-elements that consume per-bit slots)
+//   inPin_sel_i  : DigitalInputPin{Loaded|Unloaded} per selector bit
+//   outPin_i     : DigitalOutputPin{Loaded|Unloaded} per decoded output bit;
+//                  consumes driver slot OUTPUT_LOGIC_LEVEL_BIT${i} via
+//                  siblingState.
 
-const FALLBACK_SPEC: ResolvedPinElectrical = {
-  rOut: 50,
-  cOut: 5e-12,
-  rIn: 1e7,
-  cIn: 5e-12,
-  vOH: 3.3,
-  vOL: 0.0,
-  vIH: 2.0,
-  vIL: 0.8,
-  rHiZ: 1e7,
-};
+export function buildDecoderNetlist(params: PropertyBag): MnaSubcircuitNetlist {
+  const K        = params.getModelParam<number>("selectorBits");
+  const N        = 1 << K;
+  const loaded   = params.getModelParam<number>("loaded") >= 0.5;
+  const inputPinType  = loaded ? "DigitalInputPinLoaded"  : "DigitalInputPinUnloaded";
+  const outputPinType = loaded ? "DigitalOutputPinLoaded" : "DigitalOutputPinUnloaded";
 
-// ---------------------------------------------------------------------------
-// BehavioralMuxElement
-// ---------------------------------------------------------------------------
+  // Port order: sel_0..sel_{K-1}, out_0..out_{N-1}, gnd
+  const ports: string[] = [];
+  for (let i = 0; i < K; i++) ports.push(`sel_${i}`);
+  for (let i = 0; i < N; i++) ports.push(`out_${i}`);
+  ports.push("gnd");
 
-/**
- * Analog behavioral model for a multiplexer.
- *
- * Pin layout (nodeIds order, matching buildMuxPinDeclarations):
- *   nodeIds[0]             = sel (selectorBits-wide input — read as integer)
- *   nodeIds[1..inputCount] = in_0 .. in_(N-1) (data inputs)
- *   nodeIds[inputCount+1]  = out (single output)
- *
- * For multi-bit data (bitWidth > 1), each nodeId represents one circuit node
- * corresponding to one bit of the bus. The selector picks which data-input
- * group to route to the output.
- *
- * Selector decoding: each selector bit has its own DigitalInputPinModel.
- * The sel pin nodeId is treated as the first node; additional selector bit
- * nodes follow immediately.
- */
-export class BehavioralMuxElement extends CompositeElement {
-  private readonly _selPins: DigitalInputPinModel[];
-  private readonly _dataPins: DigitalInputPinModel[][];
-  private readonly _outPins: DigitalOutputPinModel[];
-  private readonly _bitWidth: number;
-  private readonly _pinModelsByLabel: ReadonlyMap<string, DigitalInputPinModel | DigitalOutputPinModel>;
-  private readonly _childElements: AnalogCapacitorElement[];
+  const selPortBase = 0;
+  const outPortBase = K;
+  const gndPortIdx  = K + N;
 
-  readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.VCVS;
-  readonly stateSchema: StateSchema = COMBINATIONAL_COMPOSITE_SCHEMA;
+  const elements: SubcircuitElement[] = [];
+  const netlist: number[][] = [];
 
-  constructor(
-    selPins: DigitalInputPinModel[],
-    dataPins: DigitalInputPinModel[][],
-    outPins: DigitalOutputPinModel[],
-    _inputCount: number,
-    bitWidth: number,
-    pinModelsByLabel: ReadonlyMap<string, DigitalInputPinModel | DigitalOutputPinModel>,
-  ) {
-    super();
-    this._selPins = selPins;
-    this._dataPins = dataPins;
-    this._outPins = outPins;
-    this._bitWidth = bitWidth;
-    this._pinModelsByLabel = pinModelsByLabel;
+  // Driver leaf- pin order MUST match buildDecoderDriverPinLayout
+  // (sel_0..sel_{K-1}, gnd).
+  const drvNets: number[] = [];
+  for (let i = 0; i < K; i++) drvNets.push(selPortBase + i);
+  drvNets.push(gndPortIdx);
+  elements.push({
+    typeId: "BehavioralDecoderDriver",
+    modelRef: "default",
+    subElementName: "drv",
+    params: {
+      selectorBits: K,
+      vIH: params.getModelParam<number>("vIH"),
+      vIL: params.getModelParam<number>("vIL"),
+    },
+  });
+  netlist.push(drvNets);
 
-    const allPins: (DigitalInputPinModel | DigitalOutputPinModel)[] = [
-      ...selPins,
-      ...dataPins.flat(),
-      ...outPins,
-    ];
-    this._childElements = collectPinModelChildren(allPins);
+  // Selector input pins- one per selector bit.
+  for (let i = 0; i < K; i++) {
+    elements.push({
+      typeId: inputPinType,
+      modelRef: "default",
+      subElementName: `inPin_sel_${i}`,
+    });
+    netlist.push([selPortBase + i, gndPortIdx]);
   }
 
-  protected getSubElements(): readonly AnalogElement[] {
-    return [
-      ...this._selPins,
-      ...this._dataPins.flat(),
-      ...this._outPins,
-      ...this._childElements,
-    ] as unknown as readonly AnalogElement[];
+  // Output pins- one per decoded output bit. Each consumes the driver's
+  // per-bit OUTPUT_LOGIC_LEVEL_BIT${i} slot via siblingState.
+  for (let i = 0; i < N; i++) {
+    elements.push({
+      typeId: outputPinType,
+      modelRef: "default",
+      subElementName: `outPin_${i}`,
+      params: {
+        rOut: params.getModelParam<number>("rOut"),
+        cOut: params.getModelParam<number>("cOut"),
+        vOH:  params.getModelParam<number>("vOH"),
+        vOL:  params.getModelParam<number>("vOL"),
+        inputLogic: { kind: "siblingState" as const, subElementName: "drv",
+                      slotName: `OUTPUT_LOGIC_LEVEL_BIT${i}` },
+      },
+    });
+    netlist.push([outPortBase + i, gndPortIdx]);
   }
 
-  load(ctx: LoadContext): void {
-    const rhsOld = ctx.rhsOld;
-
-    // Decode selector bits into an integer
-    let sel = 0;
-    for (let b = 0; b < this._selPins.length; b++) {
-      const nodeId = this._selPins[b].nodeId;
-      const voltage = readMnaVoltage(nodeId, rhsOld);
-      const level = this._selPins[b].readLogicLevel(voltage);
-      if (level !== undefined) {
-        if (level) sel |= 1 << b;
-        else sel &= ~(1 << b);
-      }
-    }
-
-    const selectedGroup = this._dataPins[sel] ?? this._dataPins[0];
-
-    // Delegate stamping to pin models for all input pins
-    for (const p of this._selPins) p.load(ctx);
-    for (const group of this._dataPins) {
-      for (const p of group) p.load(ctx);
-    }
-
-    // Route selected data to outputs and stamp output Norton equivalents
-    for (let bit = 0; bit < this._bitWidth; bit++) {
-      const inputPin = selectedGroup[bit];
-      const inputNodeId = inputPin.nodeId;
-      const inputVoltage = readMnaVoltage(inputNodeId, rhsOld);
-      const level = inputPin.readLogicLevel(inputVoltage);
-      const outLevel = level ?? false;
-      this._outPins[bit].setLogicLevel(outLevel);
-      this._outPins[bit].load(ctx);
-    }
-
-    for (const child of this._childElements) {
-      child.load(ctx);
-    }
-  }
-
-  accept(_ctx: LoadContext, _simTime: number, _addBreakpoint: (t: number) => void): void {
-    // No accept() work needed — capacitors handle their own state via load()
-  }
-
-  /**
-   * Compute per-pin currents from the MNA solution vector.
-   *
-   * Order: selector pins, data input groups (flattened), output pins.
-   * Input pins: I = V_node / rIn
-   * Output pins: I = (V_node - V_target) / rOut
-   * The sum is nonzero — the residual is the implicit supply current.
-   */
-  getPinCurrents(rhs: Float64Array): number[] {
-    const result: number[] = [];
-    for (const p of this._selPins) {
-      const v = readMnaVoltage(p.nodeId, rhs);
-      result.push(v / p.rIn);
-    }
-    for (const group of this._dataPins) {
-      for (const p of group) {
-        const v = readMnaVoltage(p.nodeId, rhs);
-        result.push(v / p.rIn);
-      }
-    }
-    for (const p of this._outPins) {
-      const v = readMnaVoltage(p.nodeId, rhs);
-      result.push((v - p.currentVoltage) / p.rOut);
-    }
-    return result;
-  }
-
-  setParam(key: string, value: number): void {
-    delegatePinSetParam(this._pinModelsByLabel, key, value);
-  }
-}
-
-// ---------------------------------------------------------------------------
-// BehavioralDemuxElement
-// ---------------------------------------------------------------------------
-
-/**
- * Analog behavioral model for a demultiplexer.
- *
- * Pin layout (nodeIds order, matching buildDemuxPinDeclarations):
- *   nodeIds[0]                    = sel (selectorBits-wide)
- *   nodeIds[1..outputCount]       = out_0 .. out_(N-1) (outputs)
- *   nodeIds[outputCount+1]        = in (data input)
- *
- * The selected output receives the input signal level; all other outputs
- * are driven LOW (vOL).
- */
-export class BehavioralDemuxElement extends CompositeElement {
-  private readonly _selPins: DigitalInputPinModel[];
-  private readonly _inPin: DigitalInputPinModel;
-  private readonly _outPins: DigitalOutputPinModel[];
-  private readonly _outputCount: number;
-  private readonly _pinModelsByLabel: ReadonlyMap<string, DigitalInputPinModel | DigitalOutputPinModel>;
-  private readonly _childElements: AnalogCapacitorElement[];
-
-  readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.VCVS;
-  readonly stateSchema: StateSchema = COMBINATIONAL_COMPOSITE_SCHEMA;
-
-  constructor(
-    selPins: DigitalInputPinModel[],
-    inPin: DigitalInputPinModel,
-    outPins: DigitalOutputPinModel[],
-    outputCount: number,
-    pinModelsByLabel: ReadonlyMap<string, DigitalInputPinModel | DigitalOutputPinModel>,
-  ) {
-    super();
-    this._selPins = selPins;
-    this._inPin = inPin;
-    this._outPins = outPins;
-    this._outputCount = outputCount;
-    this._pinModelsByLabel = pinModelsByLabel;
-
-    const allPins: (DigitalInputPinModel | DigitalOutputPinModel)[] = [
-      ...selPins,
-      inPin,
-      ...outPins,
-    ];
-    this._childElements = collectPinModelChildren(allPins);
-  }
-
-  protected getSubElements(): readonly AnalogElement[] {
-    return [
-      ...this._selPins,
-      this._inPin,
-      ...this._outPins,
-      ...this._childElements,
-    ] as unknown as readonly AnalogElement[];
-  }
-
-  load(ctx: LoadContext): void {
-    const rhsOld = ctx.rhsOld;
-
-    // Decode selector
-    let sel = 0;
-    for (let b = 0; b < this._selPins.length; b++) {
-      const nodeId = this._selPins[b].nodeId;
-      const voltage = readMnaVoltage(nodeId, rhsOld);
-      const level = this._selPins[b].readLogicLevel(voltage);
-      if (level !== undefined) {
-        if (level) sel |= 1 << b;
-        else sel &= ~(1 << b);
-      }
-    }
-
-    // Read input level
-    const inNodeId = this._inPin.nodeId;
-    const inVoltage = readMnaVoltage(inNodeId, rhsOld);
-    const inLevel = this._inPin.readLogicLevel(inVoltage) ?? false;
-
-    // Delegate stamping to pin models for inputs
-    for (const p of this._selPins) p.load(ctx);
-    this._inPin.load(ctx);
-
-    // Route: selected output gets input level, all others get LOW
-    for (let i = 0; i < this._outputCount; i++) {
-      this._outPins[i].setLogicLevel(i === sel ? inLevel : false);
-      this._outPins[i].load(ctx);
-    }
-
-    for (const child of this._childElements) {
-      child.load(ctx);
-    }
-  }
-
-  accept(_ctx: LoadContext, _simTime: number, _addBreakpoint: (t: number) => void): void {
-    // No accept() work needed — capacitors handle their own state via load()
-  }
-
-  /**
-   * Compute per-pin currents from the MNA solution vector.
-   *
-   * Order: selector pins, input pin, output pins.
-   * Input pins (sel, in): I = V_node / rIn
-   * Output pins: I = (V_node - V_target) / rOut
-   * The sum is nonzero — the residual is the implicit supply current.
-   */
-  getPinCurrents(rhs: Float64Array): number[] {
-    const result: number[] = [];
-    for (const p of this._selPins) {
-      const v = readMnaVoltage(p.nodeId, rhs);
-      result.push(v / p.rIn);
-    }
-    const vIn = readMnaVoltage(this._inPin.nodeId, rhs);
-    result.push(vIn / this._inPin.rIn);
-    for (const p of this._outPins) {
-      const v = readMnaVoltage(p.nodeId, rhs);
-      result.push((v - p.currentVoltage) / p.rOut);
-    }
-    return result;
-  }
-
-  setParam(key: string, value: number): void {
-    delegatePinSetParam(this._pinModelsByLabel, key, value);
-  }
-}
-
-// ---------------------------------------------------------------------------
-// BehavioralDecoderElement
-// ---------------------------------------------------------------------------
-
-/**
- * Analog behavioral model for a decoder.
- *
- * Pin layout (nodeIds order, matching buildDecoderPinDeclarations):
- *   nodeIds[0]               = sel (selectorBits-wide input)
- *   nodeIds[1..outputCount]  = out_0 .. out_(N-1)
- *
- * Exactly one output is driven HIGH (the one indexed by the selector value);
- * all others are driven LOW.
- */
-export class BehavioralDecoderElement extends CompositeElement {
-  private readonly _selPins: DigitalInputPinModel[];
-  private readonly _outPins: DigitalOutputPinModel[];
-  private readonly _outputCount: number;
-  private readonly _pinModelsByLabel: ReadonlyMap<string, DigitalInputPinModel | DigitalOutputPinModel>;
-  private readonly _childElements: AnalogCapacitorElement[];
-
-  readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.VCVS;
-  readonly stateSchema: StateSchema = COMBINATIONAL_COMPOSITE_SCHEMA;
-
-  constructor(
-    selPins: DigitalInputPinModel[],
-    outPins: DigitalOutputPinModel[],
-    outputCount: number,
-    pinModelsByLabel: ReadonlyMap<string, DigitalInputPinModel | DigitalOutputPinModel>,
-  ) {
-    super();
-    this._selPins = selPins;
-    this._outPins = outPins;
-    this._outputCount = outputCount;
-    this._pinModelsByLabel = pinModelsByLabel;
-
-    const allPins: (DigitalInputPinModel | DigitalOutputPinModel)[] = [
-      ...selPins,
-      ...outPins,
-    ];
-    this._childElements = collectPinModelChildren(allPins);
-  }
-
-  protected getSubElements(): readonly AnalogElement[] {
-    return [
-      ...this._selPins,
-      ...this._outPins,
-      ...this._childElements,
-    ] as unknown as readonly AnalogElement[];
-  }
-
-  load(ctx: LoadContext): void {
-    const rhsOld = ctx.rhsOld;
-
-    // Decode selector
-    let sel = 0;
-    for (let b = 0; b < this._selPins.length; b++) {
-      const nodeId = this._selPins[b].nodeId;
-      const voltage = readMnaVoltage(nodeId, rhsOld);
-      const level = this._selPins[b].readLogicLevel(voltage);
-      if (level !== undefined) {
-        if (level) sel |= 1 << b;
-        else sel &= ~(1 << b);
-      }
-    }
-
-    // Delegate stamping for selector-pin loading
-    for (const p of this._selPins) p.load(ctx);
-
-    // One-hot output: only the selected index is HIGH
-    for (let i = 0; i < this._outputCount; i++) {
-      this._outPins[i].setLogicLevel(i === sel);
-      this._outPins[i].load(ctx);
-    }
-
-    for (const child of this._childElements) {
-      child.load(ctx);
-    }
-  }
-
-  accept(_ctx: LoadContext, _simTime: number, _addBreakpoint: (t: number) => void): void {
-    // No accept() work needed — capacitors handle their own state via load()
-  }
-
-  /**
-   * Per-pin currents in _pinNodes insertion order:
-   *   [sel, out_0, out_1, ..., out_(N-1)]
-   *
-   * sel is an input: I = V_node / rIn (current into element).
-   * out_i are outputs: I = (V_node - V_target) / rOut (current into element).
-   * Sum is nonzero because behavioral outputs have an implicit supply.
-   */
-  getPinCurrents(rhs: Float64Array): number[] {
-    const result: number[] = [];
-    // sel pin (input) — all selPins share the same node; use first
-    const selPin = this._selPins[0];
-    if (selPin !== undefined) {
-      const vSel = readMnaVoltage(selPin.nodeId, rhs);
-      result.push(vSel / selPin.rIn);
-    }
-    // output pins
-    for (const p of this._outPins) {
-      const vNode = readMnaVoltage(p.nodeId, rhs);
-      result.push((vNode - p.currentVoltage) / p.rOut);
-    }
-    return result;
-  }
-
-  setParam(key: string, value: number): void {
-    delegatePinSetParam(this._pinModelsByLabel, key, value);
-  }
-}
-
-// ---------------------------------------------------------------------------
-// Helper: resolve pin electrical spec from props
-// ---------------------------------------------------------------------------
-
-function resolveSpec(
-  props: PropertyBag,
-  pinLabel: string,
-): ResolvedPinElectrical {
-  const pinSpecs = props.has("_pinElectrical")
-    ? (props.get("_pinElectrical") as unknown as Record<string, ResolvedPinElectrical>)
-    : undefined;
-  return pinSpecs?.[pinLabel] ?? FALLBACK_SPEC;
-}
-
-function resolveLoaded(props: PropertyBag, pinLabel: string, defaultLoaded: boolean): boolean {
-  const pinLoading = props.has("_pinLoading")
-    ? (props.get("_pinLoading") as unknown as Record<string, boolean>)
-    : undefined;
-  return pinLoading !== undefined ? (pinLoading[pinLabel] ?? defaultLoaded) : defaultLoaded;
-}
-
-// ---------------------------------------------------------------------------
-// makeBehavioralMuxAnalogFactory
-// ---------------------------------------------------------------------------
-
-/**
- * Returns an analogFactory for a multiplexer with the given selectorBits.
- *
- * Pin layout matches buildMuxPinDeclarations:
- *   "sel"              = selector input (multi-bit bus — one MNA node)
- *   "in_0".."in_(N-1)" = data inputs (each multi-bit bus — one MNA node each)
- *   "out"              = output (multi-bit bus — one MNA node)
- *
- * All per-bit pin model arrays share the single bus node for their label.
- */
-export function makeBehavioralMuxAnalogFactory(selectorBits: number): AnalogElementFactory {
-  return (pinNodes, props, _getTime) => {
-    const bitWidth = props.has("bitWidth") ? (props.get("bitWidth") as number) : 1;
-    const inputCount = 1 << selectorBits;
-
-    // All selector bit pins share the single "sel" bus node
-    const selNodeId = pinNodes.get("sel") ?? 0;
-    const selSpec = resolveSpec(props, "sel");
-    const selLoaded = resolveLoaded(props, "sel", true);
-    const selPins: DigitalInputPinModel[] = [];
-    for (let b = 0; b < selectorBits; b++) {
-      const pin = new DigitalInputPinModel(selSpec, selLoaded);
-      pin.init(selNodeId, 0);
-      selPins.push(pin);
-    }
-
-    // Each data input group shares its own "in_i" bus node
-    const dataPins: DigitalInputPinModel[][] = [];
-    for (let i = 0; i < inputCount; i++) {
-      const inLabel = `in_${i}`;
-      const inNodeId = pinNodes.get(inLabel) ?? 0;
-      const spec = resolveSpec(props, inLabel);
-      const loaded = resolveLoaded(props, inLabel, true);
-      const group: DigitalInputPinModel[] = [];
-      for (let bit = 0; bit < bitWidth; bit++) {
-        const pin = new DigitalInputPinModel(spec, loaded);
-        pin.init(inNodeId, 0);
-        group.push(pin);
-      }
-      dataPins.push(group);
-    }
-
-    // All output bit pins share the single "out" bus node
-    const outNodeId = pinNodes.get("out") ?? 0;
-    const outSpec = resolveSpec(props, "out");
-    const outLoaded = resolveLoaded(props, "out", false);
-    const outPins: DigitalOutputPinModel[] = [];
-    for (let bit = 0; bit < bitWidth; bit++) {
-      const pin = new DigitalOutputPinModel(outSpec, outLoaded, "direct");
-      pin.init(outNodeId, -1);
-      outPins.push(pin);
-    }
-
-    const pinModelsByLabel = new Map<string, DigitalInputPinModel | DigitalOutputPinModel>();
-    pinModelsByLabel.set("sel", selPins[0]);
-    for (let i = 0; i < inputCount; i++) {
-      pinModelsByLabel.set(`in_${i}`, dataPins[i][0]);
-    }
-    pinModelsByLabel.set("out", outPins[0]);
-
-    const el = new BehavioralMuxElement(selPins, dataPins, outPins, inputCount, bitWidth, pinModelsByLabel);
-    el._pinNodes = new Map(pinNodes);
-    return el;
+  return {
+    ports,
+    elements,
+    internalNetCount: 0,
+    netlist,
   };
 }
 
 // ---------------------------------------------------------------------------
-// makeBehavioralDemuxAnalogFactory
+// buildDemuxNetlist
 // ---------------------------------------------------------------------------
+//
+// Ports: sel_0..sel_{K-1}, in, out_0..out_{N-1}, gnd  (N = 2^K)
+//
+// Sub-elements:
+//   drv          : BehavioralDemuxDriver (K selector pins + 1 data pin + gnd)
+//   inPin_sel_i  : DigitalInputPin{Loaded|Unloaded} per selector bit
+//   inPin_in     : DigitalInputPin{Loaded|Unloaded} for data input
+//   outPin_i     : DigitalOutputPin{Loaded|Unloaded} per output port; consumes
+//                  driver slot OUTPUT_LOGIC_LEVEL_BIT${i} via siblingState.
+//
+// Analog model treats data as 1-bit (matches mux's analog-model limitation:
+// multi-bit data falls through to the digital path).
 
-/**
- * Returns an analogFactory for a demultiplexer with the given selectorBits.
- *
- * Pin layout matches buildDemuxPinDeclarations:
- *   "sel"              = selector input (multi-bit bus — one MNA node)
- *   "out_0".."out_(N-1)" = outputs (each 1-bit — one MNA node each)
- *   "in"               = data input (multi-bit bus — one MNA node)
- *
- * All selector bit pins share the single "sel" bus node.
- */
-export function makeBehavioralDemuxAnalogFactory(selectorBits: number): AnalogElementFactory {
-  return (pinNodes, props, _getTime) => {
-    const outputCount = 1 << selectorBits;
+export function buildDemuxNetlist(params: PropertyBag): MnaSubcircuitNetlist {
+  const K        = params.getModelParam<number>("selectorBits");
+  const N        = 1 << K;
+  const loaded   = params.getModelParam<number>("loaded") >= 0.5;
+  const inputPinType  = loaded ? "DigitalInputPinLoaded"  : "DigitalInputPinUnloaded";
+  const outputPinType = loaded ? "DigitalOutputPinLoaded" : "DigitalOutputPinUnloaded";
 
-    // All selector bit pins share the single "sel" bus node
-    const selNodeId = pinNodes.get("sel") ?? 0;
-    const selSpec = resolveSpec(props, "sel");
-    const selLoaded = resolveLoaded(props, "sel", true);
-    const selPins: DigitalInputPinModel[] = [];
-    for (let b = 0; b < selectorBits; b++) {
-      const pin = new DigitalInputPinModel(selSpec, selLoaded);
-      pin.init(selNodeId, 0);
-      selPins.push(pin);
-    }
+  // Port order: sel_0..sel_{K-1}, in, out_0..out_{N-1}, gnd
+  const ports: string[] = [];
+  for (let i = 0; i < K; i++) ports.push(`sel_${i}`);
+  ports.push("in");
+  for (let i = 0; i < N; i++) ports.push(`out_${i}`);
+  ports.push("gnd");
 
-    // Each output pin has its own "out_i" node (1-bit pins)
-    const outPins: DigitalOutputPinModel[] = [];
-    for (let i = 0; i < outputCount; i++) {
-      const outLabel = `out_${i}`;
-      const spec = resolveSpec(props, outLabel);
-      const loaded = resolveLoaded(props, outLabel, false);
-      const pin = new DigitalOutputPinModel(spec, loaded, "direct");
-      pin.init(pinNodes.get(outLabel) ?? 0, -1);
-      outPins.push(pin);
-    }
+  const selPortBase = 0;
+  const inPortIdx   = K;
+  const outPortBase = K + 1;
+  const gndPortIdx  = K + 1 + N;
 
-    // Input pin
-    const inSpec = resolveSpec(props, "in");
-    const inLoaded = resolveLoaded(props, "in", true);
-    const inPin = new DigitalInputPinModel(inSpec, inLoaded);
-    inPin.init(pinNodes.get("in") ?? 0, 0);
+  const elements: SubcircuitElement[] = [];
+  const netlist: number[][] = [];
 
-    const pinModelsByLabel = new Map<string, DigitalInputPinModel | DigitalOutputPinModel>();
-    pinModelsByLabel.set("sel", selPins[0]);
-    pinModelsByLabel.set("in", inPin);
-    for (let i = 0; i < outputCount; i++) {
-      pinModelsByLabel.set(`out_${i}`, outPins[i]);
-    }
+  // Driver leaf- pin order MUST match buildDemuxDriverPinLayout
+  // (sel_0..sel_{K-1}, in, gnd).
+  const drvNets: number[] = [];
+  for (let i = 0; i < K; i++) drvNets.push(selPortBase + i);
+  drvNets.push(inPortIdx, gndPortIdx);
+  elements.push({
+    typeId: "BehavioralDemuxDriver",
+    modelRef: "default",
+    subElementName: "drv",
+    params: {
+      selectorBits: K,
+      vIH: params.getModelParam<number>("vIH"),
+      vIL: params.getModelParam<number>("vIL"),
+    },
+  });
+  netlist.push(drvNets);
 
-    const el = new BehavioralDemuxElement(selPins, inPin, outPins, outputCount, pinModelsByLabel);
-    el._pinNodes = new Map(pinNodes);
-    return el;
-  };
-}
+  // Selector input pins.
+  for (let i = 0; i < K; i++) {
+    elements.push({
+      typeId: inputPinType,
+      modelRef: "default",
+      subElementName: `inPin_sel_${i}`,
+    });
+    netlist.push([selPortBase + i, gndPortIdx]);
+  }
 
-// ---------------------------------------------------------------------------
-// makeBehavioralDecoderAnalogFactory
-// ---------------------------------------------------------------------------
+  // Data input pin.
+  elements.push({
+    typeId: inputPinType,
+    modelRef: "default",
+    subElementName: "inPin_in",
+  });
+  netlist.push([inPortIdx, gndPortIdx]);
 
-/**
- * Returns an analogFactory for a decoder with the given selectorBits.
- *
- * Pin layout matches buildDecoderPinDeclarations:
- *   "sel"              = selector input (multi-bit bus — one MNA node)
- *   "out_0".."out_(N-1)" = outputs (each 1-bit — one MNA node each)
- *
- * All selector bit pins share the single "sel" bus node.
- * Decoder outputs are always 1-bit (no bitWidth property).
- */
-export function makeBehavioralDecoderAnalogFactory(selectorBits: number): AnalogElementFactory {
-  return (pinNodes, props, _getTime) => {
-    const outputCount = 1 << selectorBits;
+  // Output pins- one per demux output port.
+  for (let i = 0; i < N; i++) {
+    elements.push({
+      typeId: outputPinType,
+      modelRef: "default",
+      subElementName: `outPin_${i}`,
+      params: {
+        rOut: params.getModelParam<number>("rOut"),
+        cOut: params.getModelParam<number>("cOut"),
+        vOH:  params.getModelParam<number>("vOH"),
+        vOL:  params.getModelParam<number>("vOL"),
+        inputLogic: { kind: "siblingState" as const, subElementName: "drv",
+                      slotName: `OUTPUT_LOGIC_LEVEL_BIT${i}` },
+      },
+    });
+    netlist.push([outPortBase + i, gndPortIdx]);
+  }
 
-    // All selector bit pins share the single "sel" bus node
-    const selNodeId = pinNodes.get("sel") ?? 0;
-    const selSpec = resolveSpec(props, "sel");
-    const selLoaded = resolveLoaded(props, "sel", true);
-    const selPins: DigitalInputPinModel[] = [];
-    for (let b = 0; b < selectorBits; b++) {
-      const pin = new DigitalInputPinModel(selSpec, selLoaded);
-      pin.init(selNodeId, 0);
-      selPins.push(pin);
-    }
-
-    // Each output pin has its own "out_i" node (1-bit pins)
-    const outPins: DigitalOutputPinModel[] = [];
-    for (let i = 0; i < outputCount; i++) {
-      const outLabel = `out_${i}`;
-      const spec = resolveSpec(props, outLabel);
-      const loaded = resolveLoaded(props, outLabel, false);
-      const pin = new DigitalOutputPinModel(spec, loaded, "direct");
-      pin.init(pinNodes.get(outLabel) ?? 0, -1);
-      outPins.push(pin);
-    }
-
-    const pinModelsByLabel = new Map<string, DigitalInputPinModel | DigitalOutputPinModel>();
-    pinModelsByLabel.set("sel", selPins[0]);
-    for (let i = 0; i < outputCount; i++) {
-      pinModelsByLabel.set(`out_${i}`, outPins[i]);
-    }
-
-    const el = new BehavioralDecoderElement(selPins, outPins, outputCount, pinModelsByLabel);
-    el._pinNodes = new Map(pinNodes);
-    return el;
+  return {
+    ports,
+    elements,
+    internalNetCount: 0,
+    netlist,
   };
 }

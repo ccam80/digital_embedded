@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Demultiplexer component- routes one input to one of N outputs based on selector.
  * Selected output = input, all other outputs = 0.
  *
@@ -24,10 +24,39 @@ import type { PropertyDefinition } from "../../core/properties.js";
 import {
   ComponentCategory,
   type AttributeMapping,
-  type ComponentDefinition,
+  type StandaloneComponentDefinition,
   type ComponentLayout,
 } from "../../core/registry.js";
-import { makeBehavioralDemuxAnalogFactory } from "../../solver/analog/behavioral-combinational.js";
+import { buildDemuxNetlist } from "../../solver/analog/behavioral-combinational.js";
+import { defineModelParams } from "../../core/model-params.js";
+
+// ---------------------------------------------------------------------------
+// Behavioural model parameter declarations
+//
+// selectorBits / bitWidth: structural axes. K selector bits → 2^K output
+//   ports. The analog model treats `bitWidth` as 1 (the analog netlist has
+//   one node per output port, mirroring the mux analog-model limitation);
+//   multi-bit demuxes fall through to the digital path.
+// loaded: when true (>= 0.5), parent emits DigitalInputPinLoaded /
+//   DigitalOutputPinLoaded sub-elements. When false, parent emits the
+//   Unloaded variants.
+// vIH/vIL: per-input CMOS thresholds, consumed by BehavioralDemuxDriver leaf.
+// rOut/cOut/vOH/vOL: per-output drive params, consumed by each outPin sibling.
+// ---------------------------------------------------------------------------
+
+export const { paramDefs: DEMUX_BEHAVIORAL_PARAM_DEFS, defaults: DEMUX_BEHAVIORAL_DEFAULTS } = defineModelParams({
+  primary: {
+    selectorBits: { default: 1,     unit: "",  description: "Number of selector bits (structural; N = 2^selectorBits output ports)" },
+    bitWidth:     { default: 1,     unit: "",  description: "Bit width of each data port (analog model treats as 1; multi-bit falls through to digital)" },
+    loaded:       { default: 1,     unit: "",  description: "1 = loaded pins (DigitalInputPinLoaded / DigitalOutputPinLoaded), 0 = unloaded" },
+    vIH:          { default: 2.0,   unit: "V", description: "Input high threshold (CMOS spec)" },
+    vIL:          { default: 0.8,   unit: "V", description: "Input low threshold (CMOS spec)" },
+    rOut:         { default: 100,   unit: "Ω", description: "Output drive resistance" },
+    cOut:         { default: 1e-12, unit: "F", description: "Output companion capacitance" },
+    vOH:          { default: 5.0,   unit: "V", description: "Output high voltage" },
+    vOL:          { default: 0.0,   unit: "V", description: "Output low voltage" },
+  },
+});
 
 // ---------------------------------------------------------------------------
 // Layout constants
@@ -49,9 +78,9 @@ function componentHeight(outputCount: number): number {
 //   sel (input[0]), outputs, then in (input[1]).
 //
 // Java positions (in SIZE=20px = 1 grid unit):
-//   sel: (SIZE, flip ? 0 : height) → (1, flip ? 0 : h)
-//   out_i: (SIZE*2, i*SIZE) → (2, i)  [special case for 2 outputs: y=0 and y=2]
-//   in: (0, (outputCount/2)*SIZE) → (0, floor(outputCount/2))
+//   sel: (SIZE, flip ? 0 : height) â†’ (1, flip ? 0 : h)
+//   out_i: (SIZE*2, i*SIZE) â†’ (2, i)  [special case for 2 outputs: y=0 and y=2]
+//   in: (0, (outputCount/2)*SIZE) â†’ (0, floor(outputCount/2))
 // ---------------------------------------------------------------------------
 
 export function buildDemuxPinDeclarations(
@@ -160,7 +189,7 @@ export class DemuxElement extends AbstractCircuitElement {
     const selectorBits = this._properties.getOrDefault<number>("selectorBits", 1);
     const outputCount = 1 << selectorBits;
     // Java DemuxerShape uses same trapezoid as DecoderShape: narrower left, wider right.
-    // Reference (2 outputs / selectorBits=1): (0.05,0.25)→(1.95,-0.2)→(1.95,2.2)→(0.05,1.75)
+    // Reference (2 outputs / selectorBits=1): (0.05,0.25)â†’(1.95,-0.2)â†’(1.95,2.2)â†’(0.05,1.75)
     const h = outputCount; // right-edge total height in grid units
     const leftInset = 0.25;
     const rightOver = 0.2;
@@ -180,7 +209,7 @@ export class DemuxElement extends AbstractCircuitElement {
     ctx.setLineWidth(1);
     ctx.drawPolygon(poly, false);
 
-    // First output label "0" near top-right, RIGHTTOP anchor → (1.85, 0.1)
+    // First output label "0" near top-right, RIGHTTOP anchor â†’ (1.85, 0.1)
     ctx.setColor("TEXT");
     ctx.setFont({ family: "sans-serif", size: 0.75, weight: "normal" });
     ctx.drawText("0", 1.85, 0.1, { horizontal: "right", vertical: "top" });
@@ -276,7 +305,7 @@ function demuxFactory(props: PropertyBag): DemuxElement {
   return new DemuxElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
 }
 
-export const DemuxDefinition: ComponentDefinition = {
+export const DemuxDefinition: StandaloneComponentDefinition = {
   name: "Demultiplexer",
   typeId: -1,
   factory: demuxFactory,
@@ -300,10 +329,10 @@ export const DemuxDefinition: ComponentDefinition = {
   },
   modelRegistry: {
     "behavioral": {
-      kind: "inline",
-      factory: makeBehavioralDemuxAnalogFactory(1),
-      paramDefs: [],
-      params: {},
+      kind: "netlist",
+      netlist: buildDemuxNetlist,
+      paramDefs: DEMUX_BEHAVIORAL_PARAM_DEFS,
+      params: DEMUX_BEHAVIORAL_DEFAULTS,
     },
   },
   defaultModel: "digital",

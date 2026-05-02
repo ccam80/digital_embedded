@@ -1,5 +1,5 @@
-/**
- * Decoder component- N-bit input → 2^N one-hot outputs.
+﻿/**
+ * Decoder component- N-bit input â†’ 2^N one-hot outputs.
  * Only output[input_value] is 1; all others are 0.
  *
  * Properties:
@@ -22,10 +22,35 @@ import type { PropertyDefinition } from "../../core/properties.js";
 import {
   ComponentCategory,
   type AttributeMapping,
-  type ComponentDefinition,
+  type StandaloneComponentDefinition,
   type ComponentLayout,
 } from "../../core/registry.js";
-import { makeBehavioralDecoderAnalogFactory } from "../../solver/analog/behavioral-combinational.js";
+import { buildDecoderNetlist } from "../../solver/analog/behavioral-combinational.js";
+import { defineModelParams } from "../../core/model-params.js";
+
+// ---------------------------------------------------------------------------
+// Behavioural model parameter declarations
+//
+// selectorBits: structural; per-instance K selector bits. N = 2^K outputs.
+// loaded: when true (>= 0.5), parent emits DigitalInputPinLoaded /
+//   DigitalOutputPinLoaded sub-elements. When false, parent emits the
+//   Unloaded variants.
+// vIH/vIL: per-input CMOS thresholds, consumed by BehavioralDecoderDriver leaf.
+// rOut/cOut/vOH/vOL: per-output drive params, consumed by each outPin sibling.
+// ---------------------------------------------------------------------------
+
+export const { paramDefs: DECODER_BEHAVIORAL_PARAM_DEFS, defaults: DECODER_BEHAVIORAL_DEFAULTS } = defineModelParams({
+  primary: {
+    selectorBits: { default: 1,     unit: "",  description: "Number of selector bits (structural; N = 2^selectorBits one-hot outputs)" },
+    loaded:       { default: 1,     unit: "",  description: "1 = loaded pins (DigitalInputPinLoaded / DigitalOutputPinLoaded), 0 = unloaded" },
+    vIH:          { default: 2.0,   unit: "V", description: "Input high threshold (CMOS spec)" },
+    vIL:          { default: 0.8,   unit: "V", description: "Input low threshold (CMOS spec)" },
+    rOut:         { default: 100,   unit: "Ω", description: "Output drive resistance" },
+    cOut:         { default: 1e-12, unit: "F", description: "Output companion capacitance" },
+    vOH:          { default: 5.0,   unit: "V", description: "Output high voltage" },
+    vOL:          { default: 0.0,   unit: "V", description: "Output low voltage" },
+  },
+});
 
 // ---------------------------------------------------------------------------
 // Layout constants
@@ -108,7 +133,7 @@ export class DecoderElement extends AbstractCircuitElement {
     const selectorBits = this._properties.getOrDefault<number>("selectorBits", 1);
     const outputCount = 1 << selectorBits;
     // Java DecoderShape uses a trapezoid scaled to outputCount outputs.
-    // Reference (2-output / selectorBits=1): (0.05,0.25)→(1.95,-0.2)→(1.95,2.2)→(0.05,1.75)
+    // Reference (2-output / selectorBits=1): (0.05,0.25)â†’(1.95,-0.2)â†’(1.95,2.2)â†’(0.05,1.75)
     // Left edge height = 1.5, right edge height = 2.4 for 2 outputs.
     // Scale: left inset = 0.25, right overshoot = 0.2 * h/2
     const h = outputCount; // right-edge total height in grid units
@@ -130,7 +155,7 @@ export class DecoderElement extends AbstractCircuitElement {
     ctx.setLineWidth(1);
     ctx.drawPolygon(poly, false);
 
-    // First output label "0" near top-right, RIGHTTOP anchor → (1.85, 0.1)
+    // First output label "0" near top-right, RIGHTTOP anchor â†’ (1.85, 0.1)
     ctx.setColor("TEXT");
     ctx.setFont({ family: "sans-serif", size: 0.75, weight: "normal" });
     ctx.drawText("0", 1.85, 0.1, { horizontal: "right", vertical: "top" });
@@ -209,7 +234,7 @@ function decoderFactory(props: PropertyBag): DecoderElement {
   return new DecoderElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
 }
 
-export const DecoderDefinition: ComponentDefinition = {
+export const DecoderDefinition: StandaloneComponentDefinition = {
   name: "Decoder",
   typeId: -1,
   factory: decoderFactory,
@@ -233,10 +258,10 @@ export const DecoderDefinition: ComponentDefinition = {
   },
   modelRegistry: {
     "behavioral": {
-      kind: "inline",
-      factory: makeBehavioralDecoderAnalogFactory(1),
-      paramDefs: [],
-      params: {},
+      kind: "netlist",
+      netlist: buildDecoderNetlist,
+      paramDefs: DECODER_BEHAVIORAL_PARAM_DEFS,
+      params: DECODER_BEHAVIORAL_DEFAULTS,
     },
   },
   defaultModel: "digital",
