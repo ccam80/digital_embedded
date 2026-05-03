@@ -8,7 +8,7 @@
 
 import type { PostIterationHook } from "./capture.js";
 import type { MNAEngine } from "../../analog-engine.js";
-import type { IntegrationMethod } from "../../../../core/analog-types.js";
+import type { IntegrationMethod } from "../../integration.js";
 
 // ---------------------------------------------------------------------------
 // Asymmetric step presence (Goal B)
@@ -153,16 +153,10 @@ export interface TopologySnapshot {
 // Limiting event- captured per junction per NR iteration
 // ---------------------------------------------------------------------------
 
-/** Voltage limiting event for one junction in one NR iteration. */
-export interface LimitingEvent {
-  elementIndex: number;
-  label: string;
-  junction: string;
-  limitType: "pnjlim" | "fetlim" | "limvds";
-  vBefore: number;
-  vAfter: number;
-  wasLimited: boolean;
-}
+// Single source of truth lives at src/solver/analog/newton-raphson.ts.
+// Re-exported here so harness consumers can import LimitingEvent from this
+// barrel without taking a direct dependency on the NR module.
+export type { LimitingEvent } from "../../newton-raphson.js";
 
 // ---------------------------------------------------------------------------
 // Per-iteration snapshot
