@@ -42,7 +42,7 @@ import type { LoadContext } from "../../solver/analog/load-context.js";
 import type { SetupContext } from "../../solver/analog/setup-context.js";
 import type { StatePoolRef } from "../../solver/analog/state-pool.js";
 import { NGSPICE_LOAD_ORDER } from "../../solver/analog/ngspice-load-order.js";
-import { defineStateSchema, applyInitialValues } from "../../solver/analog/state-schema.js";
+import { defineStateSchema } from "../../solver/analog/state-schema.js";
 import { PinDirection, type PinDeclaration } from "../../core/pin.js";
 import { PropertyBag } from "../../core/properties.js";
 import type { ComponentDefinition, ParamDef } from "../../core/registry.js";
@@ -55,7 +55,6 @@ export const SCHMITT_TRIGGER_SCHEMA = defineStateSchema("SchmittTriggerDriverEle
   {
     name: "OUTPUT_LATCH",
     doc: "Last committed output level: 1.0 = HIGH (vOH), 0.0 = LOW (vOL). Holds state between thresholds.",
-    init: { kind: "zero" },
   },
 ]);
 
@@ -151,7 +150,6 @@ export class SchmittTriggerDriverElement implements PoolBackedAnalogElement {
 
   initState(pool: StatePoolRef): void {
     this._pool = pool;
-    applyInitialValues(SCHMITT_TRIGGER_SCHEMA, pool, this._stateBase, {});
   }
 
   setParam(key: string, value: number): void {

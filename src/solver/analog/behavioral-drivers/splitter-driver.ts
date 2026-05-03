@@ -21,7 +21,6 @@
 
 import {
   defineStateSchema,
-  applyInitialValues,
   type StateSchema,
   type SlotDescriptor,
 } from "../state-schema.js";
@@ -55,7 +54,6 @@ function getSplitterSchema(inputCount: number, outputCount: number): StateSchema
     slots.push({
       name: `OUTPUT_LOGIC_LEVEL_${i}`,
       doc: `Output logic level for output port ${i}; consumed via siblingState by the parent composite's outPin_${i} DigitalOutputPinLoaded sub-element.`,
-      init: { kind: "zero" },
     });
   }
 
@@ -161,7 +159,6 @@ export class BehavioralSplitterDriverElement implements PoolBackedAnalogElement 
 
   initState(pool: StatePoolRef): void {
     this._pool = pool;
-    applyInitialValues(this.stateSchema, pool, this._stateBase, {});
   }
 
   /**

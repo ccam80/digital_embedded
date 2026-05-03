@@ -36,7 +36,6 @@ import { defineModelParams, kelvinToCelsius } from "../../core/model-params.js";
 import type { StatePoolRef } from "../../solver/analog/state-pool.js";
 import {
   defineStateSchema,
-  applyInitialValues,
   type StateSchema,
 } from "../../solver/analog/state-schema.js";
 
@@ -150,11 +149,11 @@ export class CapacitorElement extends AbstractCircuitElement {
 // Slot layout  5 slots total. Previous values are read from s1/s2/s3
 // at the same offsets (pointer-rotation history).
 const CAPACITOR_SCHEMA: StateSchema = defineStateSchema("AnalogCapacitorElement", [
-  { name: "GEQ",  doc: "Companion conductance",       init: { kind: "zero" } },
-  { name: "IEQ",  doc: "Companion history current",   init: { kind: "zero" } },
-  { name: "V",    doc: "Terminal voltage this step",  init: { kind: "zero" } },
-  { name: "Q",    doc: "Charge Q=C*V this step",      init: { kind: "zero" } },
-  { name: "CCAP", doc: "Companion current (NIintegrate)", init: { kind: "zero" } },
+  { name: "GEQ",  doc: "Companion conductance" },
+  { name: "IEQ",  doc: "Companion history current" },
+  { name: "V",    doc: "Terminal voltage this step" },
+  { name: "Q",    doc: "Charge Q=C*V this step" },
+  { name: "CCAP", doc: "Companion current (NIintegrate)" },
 ]);
 
 const SLOT_GEQ  = 0;
@@ -235,7 +234,6 @@ export class AnalogCapacitorElement implements PoolBackedAnalogElement {
 
   initState(pool: StatePoolRef): void {
     this._pool = pool;
-    applyInitialValues(CAPACITOR_SCHEMA, pool, this._stateBase, {});
   }
 
   setParam(key: string, value: number): void {

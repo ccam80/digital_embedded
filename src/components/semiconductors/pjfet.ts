@@ -40,7 +40,6 @@ import { defineModelParams, kelvinToCelsius } from "../../core/model-params.js";
 import type { StatePoolRef } from "../../solver/analog/state-pool.js";
 import {
   defineStateSchema,
-  applyInitialValues,
   type StateSchema,
 } from "../../solver/analog/state-schema.js";
 import {
@@ -132,19 +131,19 @@ export interface PjfetParams {
 // ---------------------------------------------------------------------------
 
 export const PJFET_SCHEMA: StateSchema = defineStateSchema("PjfetElement", [
-  { name: "VGS",  doc: "jfetdefs.h JFETvgs=0",  init: { kind: "zero" } },
-  { name: "VGD",  doc: "jfetdefs.h JFETvgd=1",  init: { kind: "zero" } },
-  { name: "CG",   doc: "jfetdefs.h JFETcg=2",   init: { kind: "zero" } },
-  { name: "CD",   doc: "jfetdefs.h JFETcd=3",   init: { kind: "zero" } },
-  { name: "CGD",  doc: "jfetdefs.h JFETcgd=4",  init: { kind: "zero" } },
-  { name: "GM",   doc: "jfetdefs.h JFETgm=5",   init: { kind: "zero" } },
-  { name: "GDS",  doc: "jfetdefs.h JFETgds=6",  init: { kind: "zero" } },
-  { name: "GGS",  doc: "jfetdefs.h JFETggs=7",  init: { kind: "zero" } },
-  { name: "GGD",  doc: "jfetdefs.h JFETggd=8",  init: { kind: "zero" } },
-  { name: "QGS",  doc: "jfetdefs.h JFETqgs=9",  init: { kind: "zero" } },
-  { name: "CQGS", doc: "jfetdefs.h JFETcqgs=10",init: { kind: "zero" } },
-  { name: "QGD",  doc: "jfetdefs.h JFETqgd=11", init: { kind: "zero" } },
-  { name: "CQGD", doc: "jfetdefs.h JFETcqgd=12",init: { kind: "zero" } },
+  { name: "VGS",  doc: "jfetdefs.h JFETvgs=0" },
+  { name: "VGD",  doc: "jfetdefs.h JFETvgd=1" },
+  { name: "CG",   doc: "jfetdefs.h JFETcg=2" },
+  { name: "CD",   doc: "jfetdefs.h JFETcd=3" },
+  { name: "CGD",  doc: "jfetdefs.h JFETcgd=4" },
+  { name: "GM",   doc: "jfetdefs.h JFETgm=5" },
+  { name: "GDS",  doc: "jfetdefs.h JFETgds=6" },
+  { name: "GGS",  doc: "jfetdefs.h JFETggs=7" },
+  { name: "GGD",  doc: "jfetdefs.h JFETggd=8" },
+  { name: "QGS",  doc: "jfetdefs.h JFETqgs=9" },
+  { name: "CQGS", doc: "jfetdefs.h JFETcqgs=10" },
+  { name: "QGD",  doc: "jfetdefs.h JFETqgd=11" },
+  { name: "CQGD", doc: "jfetdefs.h JFETcqgd=12" },
 ]);
 
 // Slot indices (match PJFET_SCHEMA order, mirror jfetdefs.h).
@@ -362,7 +361,6 @@ export function createPJfetElement(
     initState(poolRef: StatePoolRef): void {
       pool = poolRef;
       base = el._stateBase;
-      applyInitialValues(PJFET_SCHEMA, pool, base, {});
     },
 
     /**

@@ -45,7 +45,6 @@ import { defineModelParams } from "../../core/model-params.js";
 import type { StatePoolRef } from "../../solver/analog/state-pool.js";
 import {
   defineStateSchema,
-  applyInitialValues,
   type StateSchema,
 } from "../../solver/analog/state-schema.js";
 
@@ -54,7 +53,7 @@ import {
 // ---------------------------------------------------------------------------
 
 export const MEMRISTOR_SCHEMA = defineStateSchema("MemristorElement", [
-  { name: "W", doc: "Normalised doped-region boundary (0=undoped, 1=fully doped)", init: { kind: "zero" } },
+  { name: "W", doc: "Normalised doped-region boundary (0=undoped, 1=fully doped)" },
 ]) satisfies StateSchema;
 
 const SLOT_W = 0;
@@ -168,7 +167,6 @@ export class MemristorElement implements PoolBackedAnalogElement {
 
   initState(pool: StatePoolRef): void {
     this._pool = pool;
-    applyInitialValues(MEMRISTOR_SCHEMA, pool, this._stateBase, {});
     // Apply initial state from params into s0 slot W
     pool.state0[this._stateBase + SLOT_W] = this.initialState;
   }

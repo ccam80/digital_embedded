@@ -49,7 +49,6 @@
 
 import {
   defineStateSchema,
-  applyInitialValues,
   type StateSchema,
   type SlotDescriptor,
 } from "../state-schema.js";
@@ -91,27 +90,23 @@ function getCounterSchema(bitWidth: number): StateSchema {
     {
       name: "LAST_CLOCK",
       doc: "Clock voltage at last accepted timestep- compared against current rhsOld[C] for rising-edge detection. NaN sentinel on the first sample skips edge detection so a circuit starting with the clock high does not produce a spurious edge.",
-      init: { kind: "constant", value: Number.NaN },
     },
   ];
   for (let i = 0; i < bitWidth; i++) {
     slots.push({
       name: `COUNT_BIT${i}`,
       doc: `Internal counter latch bit ${i} (LSB=0). Read-modify-written each load(); separated from OUTPUT_LOGIC_LEVEL_BIT${i} per the d-flipflop convention (latch state vs. consumed-by-pin output).`,
-      init: { kind: "zero" },
     });
   }
   for (let i = 0; i < bitWidth; i++) {
     slots.push({
       name: `OUTPUT_LOGIC_LEVEL_BIT${i}`,
       doc: `Output bit ${i} (LSB=0); consumed via siblingState by the parent composite's outBit${i} DigitalOutputPinLoaded sub-element.`,
-      init: { kind: "zero" },
     });
   }
   slots.push({
     name: "OUTPUT_LOGIC_LEVEL_OVF",
     doc: "Overflow flag- 1 when count == 2^bitWidth - 1 AND en is high. Consumed via siblingState by the parent composite's ovfPin DigitalOutputPinLoaded sub-element.",
-    init: { kind: "zero" },
   });
 
   const schema = defineStateSchema(`BehavioralCounterDriver_${bitWidth}b`, slots);
@@ -167,6 +162,7 @@ export class BehavioralCounterDriverElement implements PoolBackedAnalogElement {
   private readonly _gndNode: number;
   private _vIH: number;
   private _pool!: StatePoolRef;
+  private _firstSample: boolean = true;
 
   constructor(pinNodes: ReadonlyMap<string, number>, props: PropertyBag) {
     this._pinNodes = new Map(pinNodes);
@@ -193,7 +189,6 @@ export class BehavioralCounterDriverElement implements PoolBackedAnalogElement {
 
   initState(pool: StatePoolRef): void {
     this._pool = pool;
-    applyInitialValues(this.stateSchema, pool, this._stateBase, {});
   }
 
   /**
@@ -235,10 +230,11 @@ export class BehavioralCounterDriverElement implements PoolBackedAnalogElement {
     const en  = vEn  >= this._vIH ? 1 : 0;
     const clr = vClr >= this._vIH ? 1 : 0;
 
-    if (detectRisingEdge(prevClock, vClock, this._vIH)) {
+    if (!this._firstSample && detectRisingEdge(prevClock, vClock, this._vIH)) {
       if      (clr) count = 0;
       else if (en)  count = (count + 1) & this._maxValue;
     }
+    this._firstSample = false;
 
     const ovf = (count === this._maxValue && en) ? 1 : 0;
 

@@ -18,7 +18,7 @@ import type { StatePoolRef } from "../../solver/analog/state-pool.js";
 import type { IntegrationMethod } from "../../solver/analog/integration.js";
 import type { LoadContext } from "../../solver/analog/load-context.js";
 import type { SetupContext } from "../../solver/analog/setup-context.js";
-import { defineStateSchema, applyInitialValues } from "../../solver/analog/state-schema.js";
+import { defineStateSchema } from "../../solver/analog/state-schema.js";
 import type { StateSchema } from "../../solver/analog/state-schema.js";
 import { cktTerr } from "../../solver/analog/ckt-terr.js";
 import type { LteParams } from "../../solver/analog/ckt-terr.js";
@@ -33,8 +33,8 @@ import { stampRHS } from "../../solver/analog/stamp-helpers.js";
 // ---------------------------------------------------------------------------
 
 const INDUCTOR_SUB_SCHEMA: StateSchema = defineStateSchema("InductorSubElement", [
-  { name: "PHI",  doc: "Flux Φ = L·i- ngspice INDflux (INDstate+0)", init: { kind: "zero" } },
-  { name: "CCAP", doc: "NIintegrate companion current- ngspice INDvolt (INDstate+1) per niinteg.c:15 `#define ccap qcap+1`", init: { kind: "zero" } },
+  { name: "PHI",  doc: "Flux Φ = L·i- ngspice INDflux (INDstate+0)" },
+  { name: "CCAP", doc: "NIintegrate companion current- ngspice INDvolt (INDstate+1) per niinteg.c:15 `#define ccap qcap+1`" },
 ]);
 
 const SLOT_PHI  = 0;  // ngspice INDflux = INDstate+0
@@ -112,7 +112,6 @@ export class InductorSubElement implements PoolBackedAnalogElement {
 
   initState(pool: StatePoolRef): void {
     this._pool = pool;
-    applyInitialValues(INDUCTOR_SUB_SCHEMA, pool, this._stateBase, {});
   }
 
   load(ctx: LoadContext): void {

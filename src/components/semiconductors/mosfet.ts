@@ -45,7 +45,6 @@ import { defineModelParams, deviceParams, kelvinToCelsius } from "../../core/mod
 import type { StatePoolRef } from "../../solver/analog/state-pool.js";
 import {
   defineStateSchema,
-  applyInitialValues,
   type StateSchema,
 } from "../../solver/analog/state-schema.js";
 import {
@@ -687,34 +686,34 @@ function devQmeyer(
 // ---------------------------------------------------------------------------
 
 export const MOSFET_SCHEMA: StateSchema = defineStateSchema("MosfetElement", [
-  { name: "VBD",   doc: "mos1defs.h MOS1vbd=0",   init: { kind: "zero" } },
-  { name: "VBS",   doc: "mos1defs.h MOS1vbs=1",   init: { kind: "zero" } },
-  { name: "VGS",   doc: "mos1defs.h MOS1vgs=2",   init: { kind: "zero" } },
-  { name: "VDS",   doc: "mos1defs.h MOS1vds=3",   init: { kind: "zero" } },
-  { name: "CAPGS", doc: "mos1defs.h MOS1capgs=4", init: { kind: "zero" } },
-  { name: "QGS",   doc: "mos1defs.h MOS1qgs=5",   init: { kind: "zero" } },
-  { name: "CQGS",  doc: "mos1defs.h MOS1cqgs=6",  init: { kind: "zero" } },
-  { name: "CAPGD", doc: "mos1defs.h MOS1capgd=7", init: { kind: "zero" } },
-  { name: "QGD",   doc: "mos1defs.h MOS1qgd=8",   init: { kind: "zero" } },
-  { name: "CQGD",  doc: "mos1defs.h MOS1cqgd=9",  init: { kind: "zero" } },
-  { name: "CAPGB", doc: "mos1defs.h MOS1capgb=10",init: { kind: "zero" } },
-  { name: "QGB",   doc: "mos1defs.h MOS1qgb=11",  init: { kind: "zero" } },
-  { name: "CQGB",  doc: "mos1defs.h MOS1cqgb=12", init: { kind: "zero" } },
-  { name: "QBD",   doc: "mos1defs.h MOS1qbd=13",  init: { kind: "zero" } },
-  { name: "CQBD",  doc: "mos1defs.h MOS1cqbd=14", init: { kind: "zero" } },
-  { name: "QBS",   doc: "mos1defs.h MOS1qbs=15",  init: { kind: "zero" } },
-  { name: "CQBS",  doc: "mos1defs.h MOS1cqbs=16", init: { kind: "zero" } },
-  { name: "CD",    doc: "MOS1instance MOS1cd",    init: { kind: "zero" } },
-  { name: "CBD",   doc: "MOS1instance MOS1cbd",   init: { kind: "zero" } },
-  { name: "CBS",   doc: "MOS1instance MOS1cbs",   init: { kind: "zero" } },
-  { name: "GBD",   doc: "MOS1instance MOS1gbd",   init: { kind: "zero" } },
-  { name: "GBS",   doc: "MOS1instance MOS1gbs",   init: { kind: "zero" } },
-  { name: "GM",    doc: "MOS1instance MOS1gm",    init: { kind: "zero" } },
-  { name: "GDS",   doc: "MOS1instance MOS1gds",   init: { kind: "zero" } },
-  { name: "GMBS",  doc: "MOS1instance MOS1gmbs",  init: { kind: "zero" } },
-  { name: "MODE",  doc: "MOS1instance MOS1mode (+1 / -1)", init: { kind: "constant", value: 1 } },
-  { name: "VON",   doc: "MOS1instance MOS1von",   init: { kind: "zero" } },
-  { name: "VDSAT", doc: "MOS1instance MOS1vdsat", init: { kind: "zero" } },
+  { name: "VBD",   doc: "mos1defs.h MOS1vbd=0" },
+  { name: "VBS",   doc: "mos1defs.h MOS1vbs=1" },
+  { name: "VGS",   doc: "mos1defs.h MOS1vgs=2" },
+  { name: "VDS",   doc: "mos1defs.h MOS1vds=3" },
+  { name: "CAPGS", doc: "mos1defs.h MOS1capgs=4" },
+  { name: "QGS",   doc: "mos1defs.h MOS1qgs=5" },
+  { name: "CQGS",  doc: "mos1defs.h MOS1cqgs=6" },
+  { name: "CAPGD", doc: "mos1defs.h MOS1capgd=7" },
+  { name: "QGD",   doc: "mos1defs.h MOS1qgd=8" },
+  { name: "CQGD",  doc: "mos1defs.h MOS1cqgd=9" },
+  { name: "CAPGB", doc: "mos1defs.h MOS1capgb=10" },
+  { name: "QGB",   doc: "mos1defs.h MOS1qgb=11" },
+  { name: "CQGB",  doc: "mos1defs.h MOS1cqgb=12" },
+  { name: "QBD",   doc: "mos1defs.h MOS1qbd=13" },
+  { name: "CQBD",  doc: "mos1defs.h MOS1cqbd=14" },
+  { name: "QBS",   doc: "mos1defs.h MOS1qbs=15" },
+  { name: "CQBS",  doc: "mos1defs.h MOS1cqbs=16" },
+  { name: "CD",    doc: "MOS1instance MOS1cd" },
+  { name: "CBD",   doc: "MOS1instance MOS1cbd" },
+  { name: "CBS",   doc: "MOS1instance MOS1cbs" },
+  { name: "GBD",   doc: "MOS1instance MOS1gbd" },
+  { name: "GBS",   doc: "MOS1instance MOS1gbs" },
+  { name: "GM",    doc: "MOS1instance MOS1gm" },
+  { name: "GDS",   doc: "MOS1instance MOS1gds" },
+  { name: "GMBS",  doc: "MOS1instance MOS1gmbs" },
+  { name: "MODE",  doc: "MOS1instance MOS1mode (+1 / -1)" },
+  { name: "VON",   doc: "MOS1instance MOS1von" },
+  { name: "VDSAT", doc: "MOS1instance MOS1vdsat" },
 ]);
 
 // Slot index constants (match MOSFET_SCHEMA order).
@@ -929,7 +928,6 @@ function _createMosfetElementWithPolarity(
     initState(poolRef: StatePoolRef): void {
       pool = poolRef;
       base = el._stateBase;
-      applyInitialValues(MOSFET_SCHEMA, pool, base, {});
     },
 
     /**

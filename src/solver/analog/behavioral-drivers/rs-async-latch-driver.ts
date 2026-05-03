@@ -15,7 +15,6 @@
 
 import {
   defineStateSchema,
-  applyInitialValues,
   type StateSchema,
 } from "../state-schema.js";
 import { NGSPICE_LOAD_ORDER } from "../ngspice-load-order.js";
@@ -28,9 +27,9 @@ import type { PropertyBag } from "../../../core/properties.js";
 import { PinDirection, type PinDeclaration } from "../../../core/pin.js";
 
 const SCHEMA: StateSchema = defineStateSchema("BehavioralRSAsyncLatchDriver", [
-  { name: "Q",                     doc: "Latched output bit.",                                            init: { kind: "zero" } },
-  { name: "OUTPUT_LOGIC_LEVEL_Q",  doc: "Q output level consumed via siblingState by qPin.",              init: { kind: "zero" } },
-  { name: "OUTPUT_LOGIC_LEVEL_NQ", doc: "~Q output level consumed via siblingState by nqPin.",            init: { kind: "constant", value: 1 } },
+  { name: "Q",                     doc: "Latched output bit." },
+  { name: "OUTPUT_LOGIC_LEVEL_Q",  doc: "Q output level consumed via siblingState by qPin." },
+  { name: "OUTPUT_LOGIC_LEVEL_NQ", doc: "~Q output level consumed via siblingState by nqPin." },
 ]);
 
 const SLOT_Q       = SCHEMA.indexOf.get("Q")!;
@@ -60,6 +59,13 @@ export class BehavioralRSAsyncLatchDriverElement implements PoolBackedAnalogElem
   private readonly _vIL: number;
   private _pool!: StatePoolRef;
 
+  // SLOT_OUT_NQ is the rollback-bearing source of truth for ~Q (it carries
+  // the forbidden S=R=1 collision state where Q=NQ=0). The boot reset
+  // Q=0, NQ=1 lives here rather than in the slot since slots start zero;
+  // without the seed, S=R=0 hold-from-boot would latch into the forbidden
+  // state instead of the standard reset.
+  private _firstSample: boolean = true;
+
   constructor(pinNodes: ReadonlyMap<string, number>, props: PropertyBag) {
     this._pinNodes = new Map(pinNodes);
     this._vIH = props.hasModelParam("vIH") ? props.getModelParam<number>("vIH") : 2.0;
@@ -72,7 +78,6 @@ export class BehavioralRSAsyncLatchDriverElement implements PoolBackedAnalogElem
 
   initState(pool: StatePoolRef): void {
     this._pool = pool;
-    applyInitialValues(SCHEMA, pool, this._stateBase, {});
   }
 
   load(ctx: LoadContext): void {
@@ -85,8 +90,16 @@ export class BehavioralRSAsyncLatchDriverElement implements PoolBackedAnalogElem
     const vS  = rhsOld[this._pinNodes.get("S")!] - gnd;
     const vR  = rhsOld[this._pinNodes.get("R")!] - gnd;
 
-    let q  = s1[base + SLOT_Q]        >= 0.5 ? 1 : 0;
-    let nq = s1[base + SLOT_OUT_NQ]   >= 0.5 ? 1 : 0;
+    let q: number;
+    let nq: number;
+    if (this._firstSample) {
+      q  = 0;
+      nq = 1;
+      this._firstSample = false;
+    } else {
+      q  = s1[base + SLOT_Q]      >= 0.5 ? 1 : 0;
+      nq = s1[base + SLOT_OUT_NQ] >= 0.5 ? 1 : 0;
+    }
 
     const sHigh = vS >= this._vIH;
     const sLow  = vS <  this._vIL;

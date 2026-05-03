@@ -17,7 +17,6 @@
 
 import {
   defineStateSchema,
-  applyInitialValues,
   type StateSchema,
 } from "../state-schema.js";
 import { NGSPICE_LOAD_ORDER } from "../ngspice-load-order.js";
@@ -30,10 +29,10 @@ import type { PropertyBag } from "../../../core/properties.js";
 import { PinDirection, type PinDeclaration } from "../../../core/pin.js";
 
 const SCHEMA: StateSchema = defineStateSchema("BehavioralJKAsyncFlipflopDriver", [
-  { name: "LAST_CLOCK",            doc: "Clock voltage at last accepted timestep. NaN sentinel on first sample skips edge detection.", init: { kind: "constant", value: Number.NaN } },
-  { name: "Q",                     doc: "Latched output bit.",                                                                          init: { kind: "zero" } },
-  { name: "OUTPUT_LOGIC_LEVEL_Q",  doc: "Q output level consumed via siblingState by qPin.",                                             init: { kind: "zero" } },
-  { name: "OUTPUT_LOGIC_LEVEL_NQ", doc: "~Q output level consumed via siblingState by nqPin.",                                           init: { kind: "constant", value: 1 } },
+  { name: "LAST_CLOCK",            doc: "Clock voltage at last accepted timestep. NaN sentinel on first sample skips edge detection." },
+  { name: "Q",                     doc: "Latched output bit." },
+  { name: "OUTPUT_LOGIC_LEVEL_Q",  doc: "Q output level consumed via siblingState by qPin." },
+  { name: "OUTPUT_LOGIC_LEVEL_NQ", doc: "~Q output level consumed via siblingState by nqPin." },
 ]);
 
 const SLOT_LAST_CLOCK = SCHEMA.indexOf.get("LAST_CLOCK")!;
@@ -68,6 +67,8 @@ export class BehavioralJKAsyncFlipflopDriverElement implements PoolBackedAnalogE
   private _vIL: number;
   private _pool!: StatePoolRef;
 
+  private _firstSample: boolean = true;
+
   constructor(pinNodes: ReadonlyMap<string, number>, props: PropertyBag) {
     this._pinNodes = new Map(pinNodes);
     this._vIH = props.getModelParam<number>("vIH");
@@ -80,7 +81,6 @@ export class BehavioralJKAsyncFlipflopDriverElement implements PoolBackedAnalogE
 
   initState(pool: StatePoolRef): void {
     this._pool = pool;
-    applyInitialValues(SCHEMA, pool, this._stateBase, {});
   }
 
   load(ctx: LoadContext): void {
@@ -100,9 +100,10 @@ export class BehavioralJKAsyncFlipflopDriverElement implements PoolBackedAnalogE
     let q = s1[base + SLOT_Q] >= 0.5 ? 1 : 0;
 
     const risingEdge =
-      !Number.isNaN(prevClock) &&
+      !this._firstSample &&
       prevClock < this._vIH &&
       vClock >= this._vIH;
+    this._firstSample = false;
 
     if (risingEdge) {
       const jHigh = vJ >= this._vIH;

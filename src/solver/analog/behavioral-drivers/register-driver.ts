@@ -22,7 +22,6 @@
 
 import {
   defineStateSchema,
-  applyInitialValues,
   type StateSchema,
   type SlotDescriptor,
 } from "../state-schema.js";
@@ -57,17 +56,14 @@ function getRegisterSchema(bitWidth: number): StateSchema {
     {
       name: "LAST_CLOCK",
       doc: "Clock voltage at last accepted timestep- compared against current rhsOld[C] for rising-edge detection. NaN sentinel on the first sample skips edge detection so a circuit starting with the clock high does not produce a spurious edge.",
-      init: { kind: "constant", value: Number.NaN },
     },
     {
       name: "STORED_VALUE",
       doc: "Packed N-bit integer latch. Updated on rising clock edge when en is high by sampling the D bus.",
-      init: { kind: "zero" },
     },
     {
       name: "OUTPUT_LOGIC_LEVEL_Q",
       doc: "Packed integer mirror of STORED_VALUE; consumed via siblingState by the parent composite's qPin DigitalOutputPinLoaded sub-element.",
-      init: { kind: "zero" },
     },
   ];
 
@@ -117,6 +113,8 @@ export class BehavioralRegisterDriverElement implements PoolBackedAnalogElement 
   private _vIL: number;
   private _pool!: StatePoolRef;
 
+  private _firstSample: boolean = true;
+
   constructor(pinNodes: ReadonlyMap<string, number>, props: PropertyBag) {
     this._pinNodes = new Map(pinNodes);
     this._bitWidth = props.getModelParam<number>("bitWidth");
@@ -142,7 +140,6 @@ export class BehavioralRegisterDriverElement implements PoolBackedAnalogElement 
 
   initState(pool: StatePoolRef): void {
     this._pool = pool;
-    applyInitialValues(this.stateSchema, pool, this._stateBase, {});
   }
 
   /**
@@ -171,7 +168,7 @@ export class BehavioralRegisterDriverElement implements PoolBackedAnalogElement 
     const prevClock = s1[base + this._slotLastClock];
     let stored = s1[base + this._slotStoredValue];
 
-    if (detectRisingEdge(prevClock, vClock, this._vIH)) {
+    if (!this._firstSample && detectRisingEdge(prevClock, vClock, this._vIH)) {
       if (vEn >= this._vIH) {
         // Decode packed D bus bit-by-bit with vIH/vIL hysteresis, then repack.
         // Each bit of vD is extracted by scaling: bit i is (vD >> i) & 1 mapped
@@ -190,6 +187,7 @@ export class BehavioralRegisterDriverElement implements PoolBackedAnalogElement 
         stored = (sampledD & this._mask) >>> 0;
       }
     }
+    this._firstSample = false;
 
     s0[base + this._slotLastClock]   = vClock;
     s0[base + this._slotStoredValue] = stored;

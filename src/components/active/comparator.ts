@@ -49,8 +49,8 @@ import { defineStateSchema } from "../../solver/analog/state-schema.js";
 import type { StateSchema } from "../../solver/analog/state-schema.js";
 
 export const COMPARATOR_SCHEMA: StateSchema = defineStateSchema("Comparator", [
-  { name: "OUTPUT_LATCH",  doc: "Hysteresis latch (1.0 = output active/sinking, 0.0 = inactive)", init: { kind: "zero" } },
-  { name: "OUTPUT_WEIGHT", doc: "Response-time blend weight [0.0, 1.0]",                          init: { kind: "zero" } },
+  { name: "OUTPUT_LATCH",  doc: "Hysteresis latch (1.0 = output active/sinking, 0.0 = inactive)" },
+  { name: "OUTPUT_WEIGHT", doc: "Response-time blend weight [0.0, 1.0]" },
 ]);
 
 // ---------------------------------------------------------------------------

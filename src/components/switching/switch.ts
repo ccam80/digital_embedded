@@ -39,7 +39,7 @@ import type { StatePoolRef } from "../../solver/analog/state-pool.js";
 // ---------------------------------------------------------------------------
 
 export const SWITCH_SCHEMA = defineStateSchema("Switch", [
-  { name: "CLOSED", doc: "Switch closed state (1=closed, 0=open)", init: { kind: "zero" } },
+  { name: "CLOSED", doc: "Switch closed state (1=closed, 0=open)" },
 ]) satisfies StateSchema;
 
 const SLOT_CLOSED = 0;

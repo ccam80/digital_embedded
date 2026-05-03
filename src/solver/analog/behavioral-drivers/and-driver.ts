@@ -25,7 +25,6 @@
 
 import {
   defineStateSchema,
-  applyInitialValues,
   type StateSchema,
 } from "../state-schema.js";
 import { NGSPICE_LOAD_ORDER } from "../ngspice-load-order.js";
@@ -45,7 +44,6 @@ const SCHEMA: StateSchema = defineStateSchema("BehavioralAndDriver", [
   {
     name: "OUTPUT_LOGIC_LEVEL",
     doc: "Reduced output level (0 or 1) consumed via siblingState by the parent composite's outPin DigitalOutputPinLoaded sub-element.",
-    init: { kind: "zero" },
   },
 ]);
 
@@ -127,7 +125,6 @@ export class BehavioralAndDriverElement implements PoolBackedAnalogElement {
 
   initState(pool: StatePoolRef): void {
     this._pool = pool;
-    applyInitialValues(SCHEMA, pool, this._stateBase, {});
   }
 
   /**

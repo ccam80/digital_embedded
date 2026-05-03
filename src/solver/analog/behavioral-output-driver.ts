@@ -38,7 +38,6 @@
 
 import {
   defineStateSchema,
-  applyInitialValues,
   type StateSchema,
 } from "./state-schema.js";
 import { NGSPICE_LOAD_ORDER } from "./ngspice-load-order.js";
@@ -69,7 +68,6 @@ const SCHEMA: StateSchema = defineStateSchema("BehavioralOutputDriver", [
   {
     name: "DRIVE_V",
     doc: "Driven Norton-source target voltage this step (vOH or vOL post bit-extraction; 0 when disabled). Bottom-of-load write; diagnostic readout only.",
-    init: { kind: "zero" },
   },
 ]);
 
@@ -168,7 +166,6 @@ export class BehavioralOutputDriverElement implements PoolBackedAnalogElement {
 
   initState(pool: StatePoolRef): void {
     this._pool = pool;
-    applyInitialValues(SCHEMA, pool, this._stateBase, {});
   }
 
   setParam(_key: string, _value: number): void {

@@ -6,18 +6,16 @@
  * analog-engine.ts:248-254, 297-302, 369-371) correctly restores the element
  * on NR-failure and LTE-rejection retries.
  *
- * HOT PATH: nothing in this module runs during step(). The schema is consulted
- * once at initState() time (via applyInitialValues) and once at dev-probe time
- * (via assertPoolIsSoleMutableState). All runtime slot access is a direct
- * `pool[base + CONST]` read- identical to capacitor.ts:180-230 today.
+ * SEEDING CONTRACT (ngspice-faithful):
+ *   State arrays start zero. Non-zero startup constants live in instance-struct
+ *   fields populated in setup() / constructor (mirrors bjtsetup.c:48
+ *   `here->BJTmode = ON`). The DCOP pass populates state0 via the bottom-of-load
+ *   CKTstate0 idiom; analog-engine.ts:1437 does state1.set(state0) once after
+ *   DCOP per dctran.c:349-350.
+ *
+ * HOT PATH: nothing in this module runs during step(). All runtime slot access
+ * is a direct `pool[base + CONST]` read- identical to capacitor.ts:180-230.
  */
-import type { StatePoolRef } from "../../core/analog-types.js";
-
-/** How a slot is initialised. */
-export type SlotInit =
-  | { kind: "zero" }
-  | { kind: "constant"; value: number }
-  | { kind: "fromParams"; compute: (params: Readonly<Record<string, number>>) => number };
 
 /** One entry in a reactive element's state schema. */
 export interface SlotDescriptor {
@@ -25,8 +23,6 @@ export interface SlotDescriptor {
   readonly name: string;
   /** Human-readable one-liner used in diagnostics. */
   readonly doc: string;
-  /** Initial value policy; applied by applyInitialValues(). */
-  readonly init: SlotInit;
 }
 
 /**
@@ -66,37 +62,6 @@ export function defineStateSchema<const S extends readonly SlotDescriptor[]>(
     size: slots.length,
     indexOf: indexOf as ReadonlyMap<S[number]["name"], number>,
   });
-}
-
-/**
- * Apply `SlotInit` entries to the backing Float64Array starting at `base`.
- * Called exactly once per element from its initState(). Runs at compile time
- * (via compiler.ts:1332), never per step.
- *
- * `params` is the element's resolved param record, used by `fromParams` slots.
- * Pass an empty object if the element has no param-dependent initial values.
- */
-export function applyInitialValues(
-  schema: StateSchema,
-  pool: StatePoolRef,
-  base: number,
-  params: Readonly<Record<string, number>>,
-): void {
-  const s0 = pool.state0;
-  for (let i = 0; i < schema.slots.length; i++) {
-    const init = schema.slots[i].init;
-    switch (init.kind) {
-      case "zero":
-        s0[base + i] = 0;
-        break;
-      case "constant":
-        s0[base + i] = init.value;
-        break;
-      case "fromParams":
-        s0[base + i] = init.compute(params);
-        break;
-    }
-  }
 }
 
 /**
@@ -154,15 +119,15 @@ function snapshotOwnFields(obj: object): Map<string, unknown> {
  * hand-written ones.
  */
 export const CAP_COMPANION_SLOTS: readonly SlotDescriptor[] = Object.freeze([
-  { name: "GEQ",    doc: "Capacitor companion conductance",      init: { kind: "zero" } },
-  { name: "IEQ",    doc: "Capacitor companion history current",  init: { kind: "zero" } },
-  { name: "V_PREV", doc: "Terminal voltage at step n-1",         init: { kind: "zero" } },
+  { name: "GEQ",    doc: "Capacitor companion conductance" },
+  { name: "IEQ",    doc: "Capacitor companion history current" },
+  { name: "V_PREV", doc: "Terminal voltage at step n-1" },
 ]);
 
 export const L_COMPANION_SLOTS: readonly SlotDescriptor[] = Object.freeze([
-  { name: "GEQ",    doc: "Inductor companion conductance",       init: { kind: "zero" } },
-  { name: "IEQ",    doc: "Inductor companion history current",   init: { kind: "zero" } },
-  { name: "I_PREV", doc: "Branch current at step n-1",           init: { kind: "zero" } },
+  { name: "GEQ",    doc: "Inductor companion conductance" },
+  { name: "IEQ",    doc: "Inductor companion history current" },
+  { name: "I_PREV", doc: "Branch current at step n-1" },
 ]);
 
 /**

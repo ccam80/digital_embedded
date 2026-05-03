@@ -41,7 +41,6 @@ import type { PoolBackedAnalogElement } from "../../solver/analog/element.js";
 import type { StatePoolRef } from "../../solver/analog/state-pool.js";
 import {
   defineStateSchema,
-  applyInitialValues,
   type StateSchema,
 } from "../../solver/analog/state-schema.js";
 
@@ -467,15 +466,15 @@ function computeBjtTempParams(p: {
 // ---------------------------------------------------------------------------
 
 export const BJT_SIMPLE_SCHEMA: StateSchema = defineStateSchema("BjtSimpleElement", [
-  { name: "VBE", doc: "bjtdefs.h BJTvbe", init: { kind: "fromParams", compute: (_p) => _p["polarity"] === 1 ? 0.6 : -0.6 } },
-  { name: "VBC", doc: "bjtdefs.h BJTvbc", init: { kind: "zero" } },
-  { name: "CC",  doc: "bjtdefs.h BJTcc (collector current)",  init: { kind: "zero" } },
-  { name: "CB",  doc: "bjtdefs.h BJTcb (base current)",       init: { kind: "zero" } },
-  { name: "GPI", doc: "bjtdefs.h BJTgpi", init: { kind: "zero" } },
-  { name: "GMU", doc: "bjtdefs.h BJTgmu", init: { kind: "zero" } },
-  { name: "GM",  doc: "bjtdefs.h BJTgm",  init: { kind: "zero" } },
-  { name: "GO",  doc: "bjtdefs.h BJTgo",  init: { kind: "zero" } },
-  { name: "GX",  doc: "bjtdefs.h BJTgx=16 (base-resistance cond); L0 always 0  no RB", init: { kind: "zero" } },
+  { name: "VBE", doc: "bjtdefs.h BJTvbe" },
+  { name: "VBC", doc: "bjtdefs.h BJTvbc" },
+  { name: "CC",  doc: "bjtdefs.h BJTcc (collector current)" },
+  { name: "CB",  doc: "bjtdefs.h BJTcb (base current)" },
+  { name: "GPI", doc: "bjtdefs.h BJTgpi" },
+  { name: "GMU", doc: "bjtdefs.h BJTgmu" },
+  { name: "GM",  doc: "bjtdefs.h BJTgm" },
+  { name: "GO",  doc: "bjtdefs.h BJTgo" },
+  { name: "GX",  doc: "bjtdefs.h BJTgx=16 (base-resistance cond); L0 always 0  no RB" },
 ]);
 
 // ---------------------------------------------------------------------------
@@ -619,7 +618,6 @@ function _createBjtElementWithPolarity(
     initState(poolRef: StatePoolRef): void {
       pool = poolRef;
       base = el0._stateBase;
-      applyInitialValues(BJT_SIMPLE_SCHEMA, pool, base, { polarity });
     },
 
     /**
@@ -1028,30 +1026,30 @@ export function createPnpBjtL0Element(
 // ---------------------------------------------------------------------------
 
 export const BJT_L1_SCHEMA: StateSchema = defineStateSchema("BjtSpiceL1Element", [
-  { name: "VBE",   doc: "bjtdefs.h BJTvbe=0",   init: { kind: "fromParams", compute: (_p) => _p["polarity"] === 1 ? 0.6 : -0.6 } },
-  { name: "VBC",   doc: "bjtdefs.h BJTvbc=1",   init: { kind: "zero" } },
-  { name: "CC",    doc: "bjtdefs.h BJTcc=2",    init: { kind: "zero" } },
-  { name: "CB",    doc: "bjtdefs.h BJTcb=3",    init: { kind: "zero" } },
-  { name: "GPI",   doc: "bjtdefs.h BJTgpi=4",   init: { kind: "zero" } },
-  { name: "GMU",   doc: "bjtdefs.h BJTgmu=5",   init: { kind: "zero" } },
-  { name: "GM",    doc: "bjtdefs.h BJTgm=6",    init: { kind: "zero" } },
-  { name: "GO",    doc: "bjtdefs.h BJTgo=7",    init: { kind: "zero" } },
-  { name: "QBE",   doc: "bjtdefs.h BJTqbe=8 (bjtload.c:615-626)",   init: { kind: "zero" } },
-  { name: "CQBE",  doc: "bjtdefs.h BJTcqbe=9 (NIintegrate ccap)",   init: { kind: "zero" } },
-  { name: "QBC",   doc: "bjtdefs.h BJTqbc=10 (bjtload.c:634-642)",  init: { kind: "zero" } },
-  { name: "CQBC",  doc: "bjtdefs.h BJTcqbc=11",                     init: { kind: "zero" } },
-  { name: "QSUB",  doc: "bjtdefs.h BJTqsub=12",                     init: { kind: "zero" } },
-  { name: "CQSUB", doc: "bjtdefs.h BJTcqsub=13",                    init: { kind: "zero" } },
-  { name: "QBX",   doc: "bjtdefs.h BJTqbx=14 (bjtload.c:646-654)",  init: { kind: "zero" } },
-  { name: "CQBX",  doc: "bjtdefs.h BJTcqbx=15",                     init: { kind: "zero" } },
-  { name: "GX",    doc: "bjtdefs.h BJTgx=16 (base-resistance cond)",init: { kind: "fromParams", compute: (_p) => _p["RB"] > 0 ? 1 / _p["RB"] : 0 } },
-  { name: "CEXBC", doc: "bjtdefs.h BJTcexbc=17 (excess phase)",     init: { kind: "zero" } },
-  { name: "GEQCB", doc: "bjtdefs.h BJTgeqcb=18",                    init: { kind: "zero" } },
-  { name: "GCSUB", doc: "bjtdefs.h BJTgccs=19 subst cap cond",      init: { kind: "zero" } },
-  { name: "GEQBX", doc: "bjtdefs.h BJTgeqbx=20 B-X cap cond",       init: { kind: "zero" } },
-  { name: "VSUB",  doc: "bjtdefs.h BJTvsub=21",                     init: { kind: "zero" } },
-  { name: "CDSUB", doc: "bjtdefs.h BJTcdsub=22",                    init: { kind: "zero" } },
-  { name: "GDSUB", doc: "bjtdefs.h BJTgdsub=23",                    init: { kind: "zero" } },
+  { name: "VBE",   doc: "bjtdefs.h BJTvbe=0" },
+  { name: "VBC",   doc: "bjtdefs.h BJTvbc=1" },
+  { name: "CC",    doc: "bjtdefs.h BJTcc=2" },
+  { name: "CB",    doc: "bjtdefs.h BJTcb=3" },
+  { name: "GPI",   doc: "bjtdefs.h BJTgpi=4" },
+  { name: "GMU",   doc: "bjtdefs.h BJTgmu=5" },
+  { name: "GM",    doc: "bjtdefs.h BJTgm=6" },
+  { name: "GO",    doc: "bjtdefs.h BJTgo=7" },
+  { name: "QBE",   doc: "bjtdefs.h BJTqbe=8 (bjtload.c:615-626)" },
+  { name: "CQBE",  doc: "bjtdefs.h BJTcqbe=9 (NIintegrate ccap)" },
+  { name: "QBC",   doc: "bjtdefs.h BJTqbc=10 (bjtload.c:634-642)" },
+  { name: "CQBC",  doc: "bjtdefs.h BJTcqbc=11" },
+  { name: "QSUB",  doc: "bjtdefs.h BJTqsub=12" },
+  { name: "CQSUB", doc: "bjtdefs.h BJTcqsub=13" },
+  { name: "QBX",   doc: "bjtdefs.h BJTqbx=14 (bjtload.c:646-654)" },
+  { name: "CQBX",  doc: "bjtdefs.h BJTcqbx=15" },
+  { name: "GX",    doc: "bjtdefs.h BJTgx=16 (base-resistance cond)" },
+  { name: "CEXBC", doc: "bjtdefs.h BJTcexbc=17 (excess phase)" },
+  { name: "GEQCB", doc: "bjtdefs.h BJTgeqcb=18" },
+  { name: "GCSUB", doc: "bjtdefs.h BJTgccs=19 subst cap cond" },
+  { name: "GEQBX", doc: "bjtdefs.h BJTgeqbx=20 B-X cap cond" },
+  { name: "VSUB",  doc: "bjtdefs.h BJTvsub=21" },
+  { name: "CDSUB", doc: "bjtdefs.h BJTcdsub=22" },
+  { name: "GDSUB", doc: "bjtdefs.h BJTgdsub=23" },
 ]);
 
 // ---------------------------------------------------------------------------
@@ -1297,7 +1295,6 @@ export function createSpiceL1BjtElement(
     initState(poolRef: StatePoolRef): void {
       pool = poolRef;
       base = el1._stateBase;
-      applyInitialValues(BJT_L1_SCHEMA, pool, base, { polarity, RB: params.RB });
     },
 
     /**

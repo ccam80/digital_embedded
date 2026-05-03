@@ -28,7 +28,6 @@ import type { LoadContext } from "../../solver/analog/load-context.js";
 import type { SetupContext } from "../../solver/analog/setup-context.js";
 import type { StatePoolRef } from "../../solver/analog/state-pool.js";
 import { NGSPICE_LOAD_ORDER } from "../../solver/analog/ngspice-load-order.js";
-import { applyInitialValues } from "../../solver/analog/state-schema.js";
 import { stampRHS } from "../../solver/analog/stamp-helpers.js";
 import { PinDirection, type PinDeclaration } from "../../core/pin.js";
 import { PropertyBag } from "../../core/properties.js";
@@ -125,7 +124,6 @@ export class ComparatorPushPullDriverElement implements PoolBackedAnalogElement 
 
   initState(pool: StatePoolRef): void {
     this._pool = pool;
-    applyInitialValues(COMPARATOR_SCHEMA, pool, this._stateBase, {});
   }
 
   setParam(key: string, value: number): void {

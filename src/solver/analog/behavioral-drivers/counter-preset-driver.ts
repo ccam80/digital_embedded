@@ -16,7 +16,6 @@
 
 import {
   defineStateSchema,
-  applyInitialValues,
   type StateSchema,
   type SlotDescriptor,
 } from "../state-schema.js";
@@ -53,22 +52,18 @@ function getCounterPresetSchema(bitWidth: number): StateSchema {
     {
       name: "LAST_CLOCK",
       doc: "Clock voltage at last accepted timestep. NaN sentinel on first sample prevents spurious edges when clock boots high.",
-      init: { kind: "constant", value: Number.NaN },
     },
     {
       name: "COUNT",
       doc: "Latched count as packed integer. Read-modify-written each load(); separated from OUTPUT_LOGIC_LEVEL_OUT per d-flipflop latch-vs-output convention.",
-      init: { kind: "zero" },
     },
     {
       name: "OUTPUT_LOGIC_LEVEL_OUT",
       doc: "Packed integer count output; consumed via siblingState by the outPin DigitalOutputPinLoaded sub-element.",
-      init: { kind: "zero" },
     },
     {
       name: "OUTPUT_LOGIC_LEVEL_OVF",
       doc: "Overflow flag (1 when at overflow condition and en high); consumed via siblingState by the ovfPin DigitalOutputPinLoaded sub-element.",
-      init: { kind: "zero" },
     },
   ];
 
@@ -126,6 +121,8 @@ export class BehavioralCounterPresetDriverElement implements PoolBackedAnalogEle
   private _vIL: number;
   private _pool!: StatePoolRef;
 
+  private _firstSample: boolean = true;
+
   constructor(pinNodes: ReadonlyMap<string, number>, props: PropertyBag) {
     this._pinNodes = new Map(pinNodes);
     this._bitWidth = props.getModelParam<number>("bitWidth");
@@ -155,7 +152,6 @@ export class BehavioralCounterPresetDriverElement implements PoolBackedAnalogEle
 
   initState(pool: StatePoolRef): void {
     this._pool = pool;
-    applyInitialValues(this.stateSchema, pool, this._stateBase, {});
   }
 
   /**
@@ -190,7 +186,7 @@ export class BehavioralCounterPresetDriverElement implements PoolBackedAnalogEle
     const ld  = vLd  >= this._vIH ? 1 : 0;
     const clr = vClr >= this._vIH ? 1 : 0;
 
-    if (detectRisingEdge(prevClock, vClock, this._vIH)) {
+    if (!this._firstSample && detectRisingEdge(prevClock, vClock, this._vIH)) {
       if (clr) {
         count = 0;
       } else if (ld) {
@@ -210,6 +206,8 @@ export class BehavioralCounterPresetDriverElement implements PoolBackedAnalogEle
         }
       }
     }
+
+    this._firstSample = false;
 
     const atOverflow = dir ? count === 0 : count === this._maxValue;
     const ovf = (atOverflow && en) ? 1 : 0;

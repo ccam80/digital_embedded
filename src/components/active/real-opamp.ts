@@ -63,7 +63,6 @@ import {
 } from "../../solver/analog/ckt-mode.js";
 import {
   defineStateSchema,
-  applyInitialValues,
   type StateSchema,
 } from "../../solver/analog/state-schema.js";
 import { railLim, type LimitingEvent } from "../../solver/analog/newton-raphson.js";
@@ -74,14 +73,14 @@ import { defineModelParams } from "../../core/model-params.js";
 // ---------------------------------------------------------------------------
 
 export const REAL_OPAMP_SCHEMA = defineStateSchema("RealOpAmpElement", [
-  { name: "VINT",         doc: "Integrator state (post-companion update)",                init: { kind: "zero" } },
-  { name: "VOUT",         doc: "Post-railLim output voltage",                              init: { kind: "zero" } },
-  { name: "VOUT_LIMITED", doc: "Observability slot for railLim output",                    init: { kind: "zero" } },
-  { name: "GEQ_INT",      doc: "Recomputed each load(); slot for observability",           init: { kind: "zero" } },
-  { name: "AEFF",         doc: "Effective gain after companion / slew adjustments",        init: { kind: "zero" } },
-  { name: "OUT_SAT_FLAG", doc: "1 when output is rail-saturated, else 0",                  init: { kind: "zero" } },
-  { name: "I_LIMIT_FLAG", doc: "1 when output current limit is engaged, else 0",           init: { kind: "zero" } },
-  { name: "SLEW_FLAG",    doc: "1 when slew-rate limiting clamped the integrator delta",   init: { kind: "zero" } },
+  { name: "VINT",         doc: "Integrator state (post-companion update)" },
+  { name: "VOUT",         doc: "Post-railLim output voltage" },
+  { name: "VOUT_LIMITED", doc: "Observability slot for railLim output" },
+  { name: "GEQ_INT",      doc: "Recomputed each load(); slot for observability" },
+  { name: "AEFF",         doc: "Effective gain after companion / slew adjustments" },
+  { name: "OUT_SAT_FLAG", doc: "1 when output is rail-saturated, else 0" },
+  { name: "I_LIMIT_FLAG", doc: "1 when output current limit is engaged, else 0" },
+  { name: "SLEW_FLAG",    doc: "1 when slew-rate limiting clamped the integrator delta" },
 ]) satisfies StateSchema;
 
 const SLOT_VINT         = 0;
@@ -404,7 +403,6 @@ export class RealOpAmpAnalogElement implements PoolBackedAnalogElement {
 
   initState(pool: StatePoolRef): void {
     this._pool = pool;
-    applyInitialValues(REAL_OPAMP_SCHEMA, pool, this._stateBase, {});
   }
 
   load(ctx: LoadContext): void {

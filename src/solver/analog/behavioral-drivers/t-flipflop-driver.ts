@@ -19,7 +19,6 @@
 
 import {
   defineStateSchema,
-  applyInitialValues,
   type StateSchema,
 } from "../state-schema.js";
 import { NGSPICE_LOAD_ORDER } from "../ngspice-load-order.js";
@@ -30,12 +29,13 @@ import type { LoadContext } from "../load-context.js";
 import type { ComponentDefinition } from "../../../core/registry.js";
 import type { PropertyBag } from "../../../core/properties.js";
 import { PinDirection, type PinDeclaration } from "../../../core/pin.js";
+import { detectRisingEdge } from "./edge-detect.js";
 
 const SCHEMA: StateSchema = defineStateSchema("BehavioralTFlipflopDriver", [
-  { name: "LAST_CLOCK",            doc: "Clock voltage at last accepted timestep. NaN sentinel on the first sample skips edge detection.", init: { kind: "constant", value: Number.NaN } },
-  { name: "Q",                     doc: "Latched output bit (0 or 1).",                                                                     init: { kind: "zero" } },
-  { name: "OUTPUT_LOGIC_LEVEL_Q",  doc: "Q output level consumed via siblingState by qPin.",                                                init: { kind: "zero" } },
-  { name: "OUTPUT_LOGIC_LEVEL_NQ", doc: "~Q output level consumed via siblingState by nqPin.",                                              init: { kind: "constant", value: 1 } },
+  { name: "LAST_CLOCK",            doc: "Clock voltage at last accepted timestep. NaN sentinel on the first sample skips edge detection." },
+  { name: "Q",                     doc: "Latched output bit (0 or 1)." },
+  { name: "OUTPUT_LOGIC_LEVEL_Q",  doc: "Q output level consumed via siblingState by qPin." },
+  { name: "OUTPUT_LOGIC_LEVEL_NQ", doc: "~Q output level consumed via siblingState by nqPin." },
 ]);
 
 const SLOT_LAST_CLOCK = SCHEMA.indexOf.get("LAST_CLOCK")!;
@@ -67,6 +67,8 @@ export class BehavioralTFlipflopDriverElement implements PoolBackedAnalogElement
   private readonly _forceToggle: 0 | 1;
   private _pool!: StatePoolRef;
 
+  private _firstSample: boolean = true;
+
   constructor(pinNodes: ReadonlyMap<string, number>, props: PropertyBag) {
     this._pinNodes = new Map(pinNodes);
     this._vIH = props.getModelParam<number>("vIH");
@@ -82,7 +84,6 @@ export class BehavioralTFlipflopDriverElement implements PoolBackedAnalogElement
 
   initState(pool: StatePoolRef): void {
     this._pool = pool;
-    applyInitialValues(SCHEMA, pool, this._stateBase, {});
   }
 
   load(ctx: LoadContext): void {
@@ -98,22 +99,17 @@ export class BehavioralTFlipflopDriverElement implements PoolBackedAnalogElement
     const prevClock = s1[base + SLOT_LAST_CLOCK];
     let q = s1[base + SLOT_Q] >= 0.5 ? 1 : 0;
 
-    const risingEdge =
-      !Number.isNaN(prevClock) &&
-      prevClock < this._vIH &&
-      vClock >= this._vIH;
-
-    if (risingEdge) {
+    if (!this._firstSample && detectRisingEdge(prevClock, vClock, this._vIH)) {
       if (this._forceToggle === 1) {
-        // withEnable=false mode: unconditionally toggle on every rising edge.
+        // withEnable=false: unconditionally toggle on every rising edge.
         q = 1 - q;
-      } else {
-        // withEnable=true mode: gate on T. Threshold-detect with vIH/vIL
-        // hysteresis. T high → toggle, T low → hold, indeterminate → hold.
-        if (vT >= this._vIH)     q = 1 - q;
-        else if (vT < this._vIL) { /* hold */ }
+      } else if (vT >= this._vIH) {
+        // withEnable=true: T high → toggle. T low (vT < vIL) and T
+        // indeterminate (vIL <= vT < vIH) both hold q (no else branch).
+        q = 1 - q;
       }
     }
+    this._firstSample = false;
 
     s0[base + SLOT_LAST_CLOCK] = vClock;
     s0[base + SLOT_Q]          = q;

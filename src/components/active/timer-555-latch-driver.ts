@@ -16,7 +16,6 @@
 
 import {
   defineStateSchema,
-  applyInitialValues,
   type StateSchema,
 } from "../../solver/analog/state-schema.js";
 import { NGSPICE_LOAD_ORDER } from "../../solver/analog/ngspice-load-order.js";
@@ -36,12 +35,10 @@ const SCHEMA: StateSchema = defineStateSchema("Timer555LatchDriver", [
   {
     name: "LATCH_Q",
     doc: "RS latch output (0 = reset, 1 = set). Updated each iteration from comparator outputs and RST pin.",
-    init: { kind: "zero" },
   },
   {
     name: "OUTPUT_LOGIC_LEVEL",
     doc: "Mirrors LATCH_Q; consumed via siblingState by the OUT pin's BehavioralOutputDriver sub-element.",
-    init: { kind: "zero" },
   },
 ]);
 
@@ -102,7 +99,6 @@ export class Timer555LatchDriverElement implements PoolBackedAnalogElement {
 
   initState(pool: StatePoolRef): void {
     this._pool = pool;
-    applyInitialValues(SCHEMA, pool, this._stateBase, {});
   }
 
   load(ctx: LoadContext): void {

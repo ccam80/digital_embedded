@@ -32,7 +32,6 @@
 
 import {
   defineStateSchema,
-  applyInitialValues,
   type StateSchema,
   type SlotDescriptor,
 } from "../../solver/analog/state-schema.js";
@@ -69,32 +68,26 @@ function getAdcSchema(bits: number): StateSchema {
     {
       name: "PREV_CLK",
       doc: "Clock voltage at last accepted timestep- NaN sentinel on first sample prevents spurious rising-edge on a circuit that boots with CLK already high.",
-      init: { kind: "constant", value: Number.NaN },
     },
     {
       name: "FSM_PHASE",
       doc: "SAR FSM phase: 0=idle, 1=sample, 2=convert, 3=ready. Advances on rising CLK edge.",
-      init: { kind: "zero" },
     },
     {
       name: "SAR_BITS",
       doc: "Packed SAR register (single integer, Component ss3.1). During convert phase, contains decided bits plus the trial bit at SAR_BIT_INDEX. At end of convert, equals OUTPUT_CODE.",
-      init: { kind: "zero" },
     },
     {
       name: "SAR_BIT_INDEX",
       doc: "Current bit being tested during SAR convert phase. Initialised to N-1 on entry, decremented each cycle. Negative when not converting.",
-      init: { kind: "constant", value: -1 },
     },
     {
       name: "OUTPUT_CODE",
       doc: "Latched final conversion code. Written when FSM transitions to ready; held until the next conversion completes.",
-      init: { kind: "zero" },
     },
     {
       name: "OUTPUT_EOC",
       doc: "End-of-conversion flag (1 when FSM_PHASE==3/ready, 0 otherwise). Consumed via siblingState by the parent ADC composite's eocPin DigitalOutputPinLoaded sub-element.",
-      init: { kind: "zero" },
     },
   ];
 
@@ -102,7 +95,6 @@ function getAdcSchema(bits: number): StateSchema {
     slots.push({
       name: `OUTPUT_D${i}`,
       doc: `Output bit ${i} of the latched code (LSB=0). Consumed via siblingState by the parent ADC composite's dPin${i} DigitalOutputPinLoaded sub-element.`,
-      init: { kind: "zero" },
     });
   }
 
@@ -161,6 +153,7 @@ export class ADCDriverElement implements PoolBackedAnalogElement {
   private _vIH: number;
   private _vIL: number;
   private _pool!: StatePoolRef;
+  private _firstSample: boolean = true;
 
   constructor(pinNodes: ReadonlyMap<string, number>, props: PropertyBag) {
     this._pinNodes = new Map(pinNodes);
@@ -194,7 +187,6 @@ export class ADCDriverElement implements PoolBackedAnalogElement {
 
   initState(pool: StatePoolRef): void {
     this._pool = pool;
-    applyInitialValues(this.stateSchema, pool, this._stateBase, {});
   }
 
   /**
@@ -231,7 +223,8 @@ export class ADCDriverElement implements PoolBackedAnalogElement {
     let outputCode  = s1[base + this._slotOutputCode];
     let outputEoc   = s1[base + this._slotOutputEoc];
 
-    const edge = detectRisingEdge(prevClock, vClock, this._vIH);
+    const edge = !this._firstSample && detectRisingEdge(prevClock, vClock, this._vIH);
+    this._firstSample = false;
 
     if (edge) {
       const vIn  = rhsOld[this._vinNode]  - gnd;

@@ -35,7 +35,6 @@ import {
 } from "../../solver/analog/ckt-mode.js";
 import {
   defineStateSchema,
-  applyInitialValues,
   type StateSchema,
 } from "../../solver/analog/state-schema.js";
 import { PinDirection, type PinDeclaration } from "../../core/pin.js";
@@ -70,11 +69,11 @@ const TRANSMISSION_SEGMENT_C_PIN_LAYOUT: PinDeclaration[] = [
 // ---------------------------------------------------------------------------
 
 const SCHEMA: StateSchema = defineStateSchema("TransmissionSegmentC", [
-  { name: "GEQ",  doc: "Companion conductance",                init: { kind: "zero" } },
-  { name: "IEQ",  doc: "Companion history current",            init: { kind: "zero" } },
-  { name: "V",    doc: "Terminal voltage this step",           init: { kind: "zero" } },
-  { name: "Q",    doc: "Charge Q = C*V this step",             init: { kind: "zero" } },
-  { name: "CCAP", doc: "Companion current (NIintegrate)",      init: { kind: "zero" } },
+  { name: "GEQ",  doc: "Companion conductance" },
+  { name: "IEQ",  doc: "Companion history current" },
+  { name: "V",    doc: "Terminal voltage this step" },
+  { name: "Q",    doc: "Charge Q = C*V this step" },
+  { name: "CCAP", doc: "Companion current (NIintegrate)" },
 ]);
 
 const SLOT_GEQ  = SCHEMA.indexOf.get("GEQ")!;
@@ -123,7 +122,6 @@ export class TransmissionSegmentCElement implements PoolBackedAnalogElement {
 
   initState(pool: StatePoolRef): void {
     this._pool = pool;
-    applyInitialValues(SCHEMA, pool, this._stateBase, {});
   }
 
   setParam(key: string, value: number): void {

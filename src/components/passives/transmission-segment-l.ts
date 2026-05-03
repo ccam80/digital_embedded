@@ -32,7 +32,6 @@ import { stampRHS } from "../../solver/analog/stamp-helpers.js";
 import { MODEDC, MODEINITTRAN, MODEINITPRED } from "../../solver/analog/ckt-mode.js";
 import {
   defineStateSchema,
-  applyInitialValues,
   type StateSchema,
 } from "../../solver/analog/state-schema.js";
 import { PinDirection, type PinDeclaration } from "../../core/pin.js";
@@ -69,8 +68,8 @@ const TRANSMISSION_SEGMENT_L_PIN_LAYOUT: PinDeclaration[] = [
 // ---------------------------------------------------------------------------
 
 const SCHEMA: StateSchema = defineStateSchema("TransmissionSegmentL", [
-  { name: "PHI",  doc: "Flux Phi = L*i  ngspice INDflux (INDstate+0)", init: { kind: "zero" } },
-  { name: "CCAP", doc: "NIintegrate companion current  ngspice INDvolt per niinteg.c:15", init: { kind: "zero" } },
+  { name: "PHI",  doc: "Flux Phi = L*i  ngspice INDflux (INDstate+0)" },
+  { name: "CCAP", doc: "NIintegrate companion current  ngspice INDvolt per niinteg.c:15" },
 ]);
 
 const SLOT_PHI  = SCHEMA.indexOf.get("PHI")!;
@@ -131,7 +130,6 @@ export class TransmissionSegmentLElement implements PoolBackedAnalogElement {
 
   initState(pool: StatePoolRef): void {
     this._pool = pool;
-    applyInitialValues(SCHEMA, pool, this._stateBase, {});
   }
 
   setParam(key: string, value: number): void {

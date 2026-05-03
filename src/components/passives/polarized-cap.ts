@@ -36,10 +36,12 @@ import type { PropertyDefinition } from "../../core/properties.js";
 import {
   ComponentCategory,
   type AttributeMapping,
-  type ComponentDefinition,
+  type StandaloneComponentDefinition,
 } from "../../core/registry.js";
-import type { AnalogElement, PoolBackedAnalogElement, IntegrationMethod, LoadContext } from "../../solver/analog/element.js";
-import { NGSPICE_LOAD_ORDER } from "../../solver/analog/element.js";
+import type { AnalogElement, PoolBackedAnalogElement } from "../../solver/analog/element.js";
+import type { IntegrationMethod } from "../../solver/analog/integration.js";
+import type { LoadContext } from "../../solver/analog/load-context.js";
+import { NGSPICE_LOAD_ORDER } from "../../solver/analog/ngspice-load-order.js";
 import type { SetupContext } from "../../solver/analog/setup-context.js";
 import { MODETRAN, MODETRANOP, MODEINITPRED, MODEINITTRAN, MODEAC, MODEDC, MODEUIC, MODEINITJCT } from "../../solver/analog/ckt-mode.js";
 import { stampRHS } from "../../solver/analog/stamp-helpers.js";
@@ -47,10 +49,9 @@ import type { Diagnostic } from "../../compile/types.js";
 import { defineModelParams } from "../../core/model-params.js";
 import {
   defineStateSchema,
-  applyInitialValues,
   type StateSchema,
 } from "../../solver/analog/state-schema.js";
-import type { StatePoolRef } from "../../core/analog-types.js";
+import type { StatePoolRef } from "../../solver/analog/state-pool.js";
 import { cktTerr } from "../../solver/analog/ckt-terr.js";
 import { niIntegrate } from "../../solver/analog/ni-integrate.js";
 import {
@@ -72,11 +73,11 @@ const MIN_RESISTANCE = 1e-9;
 // Slot layout  5 slots total. Previous values are read from s1/s2/s3
 // at the same offsets (pointer-rotation history).
 const POLARIZED_CAP_SCHEMA: StateSchema = defineStateSchema("AnalogPolarizedCapElement", [
-  { name: "GEQ",  doc: "Companion conductance",       init: { kind: "zero" } },
-  { name: "IEQ",  doc: "Companion history current",   init: { kind: "zero" } },
-  { name: "V",    doc: "Terminal voltage this step",  init: { kind: "zero" } },
-  { name: "Q",    doc: "Charge Q=C*V this step",      init: { kind: "zero" } },
-  { name: "CCAP", doc: "Companion current (NIintegrate)", init: { kind: "zero" } },
+  { name: "GEQ",  doc: "Companion conductance" },
+  { name: "IEQ",  doc: "Companion history current" },
+  { name: "V",    doc: "Terminal voltage this step" },
+  { name: "Q",    doc: "Charge Q=C*V this step" },
+  { name: "CCAP", doc: "Companion current (NIintegrate)" },
 ]);
 
 const SLOT_GEQ  = 0;
@@ -372,7 +373,6 @@ export class AnalogPolarizedCapElement implements PoolBackedAnalogElement {
       throw new Error("AnalogPolarizedCapElement.initState called before setup()");
     }
     this._pool = pool;
-    applyInitialValues(POLARIZED_CAP_SCHEMA, pool, this._stateBase, {});
     // _clampDiode._stateBase was pre-partitioned inside setup() (C.4 fix);
     // initState only needs to forward to the diode now.
     this._clampDiode.initState(pool);
@@ -730,7 +730,7 @@ function polarizedCapCircuitFactory(props: PropertyBag): PolarizedCapElement {
   return new PolarizedCapElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
 }
 
-export const PolarizedCapDefinition: ComponentDefinition = {
+export const PolarizedCapDefinition: StandaloneComponentDefinition = {
   name: "PolarizedCap",
   typeId: -1,
   factory: polarizedCapCircuitFactory,

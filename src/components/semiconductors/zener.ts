@@ -40,7 +40,7 @@ import { pnjlim } from "../../solver/analog/newton-raphson.js";
 import { defineModelParams, kelvinToCelsius } from "../../core/model-params.js";
 import { createDiodeElement } from "./diode.js";
 import type { StatePoolRef } from "../../solver/analog/state-pool.js";
-import { defineStateSchema, applyInitialValues } from "../../solver/analog/state-schema.js";
+import { defineStateSchema } from "../../solver/analog/state-schema.js";
 
 // ---------------------------------------------------------------------------
 // Physical constants (ngspice ngspice.h / const.h values)
@@ -105,10 +105,10 @@ export const { paramDefs: ZENER_SPICE_L1_PARAM_DEFS, defaults: ZENER_SPICE_L1_DE
 // ---------------------------------------------------------------------------
 
 const ZENER_STATE_SCHEMA = defineStateSchema("ZenerElement", [
-  { name: "VD",  doc: "Diode junction voltage (V)",              init: { kind: "zero" } },
-  { name: "GEQ", doc: "GMIN-adjusted junction conductance (S)",  init: { kind: "constant", value: 1e-12 } },
-  { name: "IEQ", doc: "Linearized current source (A)",            init: { kind: "zero" } },
-  { name: "ID",  doc: "GMIN-adjusted diode current (A)",          init: { kind: "zero" } },
+  { name: "VD",  doc: "Diode junction voltage (V)" },
+  { name: "GEQ", doc: "GMIN-adjusted junction conductance (S)" },
+  { name: "IEQ", doc: "Linearized current source (A)" },
+  { name: "ID",  doc: "GMIN-adjusted diode current (A)" },
 ]);
 
 // ---------------------------------------------------------------------------
@@ -288,7 +288,6 @@ export function createZenerElement(
     initState(poolRef: StatePoolRef): void {
       pool = poolRef;
       base = zenerElement._stateBase;
-      applyInitialValues(ZENER_STATE_SCHEMA, pool, base, {});
     },
 
     load(ctx: LoadContext): void {

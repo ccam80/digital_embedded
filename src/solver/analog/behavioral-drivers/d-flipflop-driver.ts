@@ -26,7 +26,6 @@
 
 import {
   defineStateSchema,
-  applyInitialValues,
   type StateSchema,
 } from "../state-schema.js";
 import { NGSPICE_LOAD_ORDER } from "../ngspice-load-order.js";
@@ -47,22 +46,18 @@ const SCHEMA: StateSchema = defineStateSchema("BehavioralDFlipflopDriver", [
   {
     name: "LAST_CLOCK",
     doc: "Clock voltage at last accepted timestep- compared against current rhsOld[C] for rising-edge detection. NaN sentinel on the first sample skips edge detection so a circuit starting with the clock high does not produce a spurious edge.",
-    init: { kind: "constant", value: Number.NaN },
   },
   {
     name: "Q",
     doc: "Latched output bit (0 or 1). Updated only on a rising clock edge from the D input.",
-    init: { kind: "zero" },
   },
   {
     name: "OUTPUT_LOGIC_LEVEL_Q",
     doc: "Q output level (0 or 1) consumed via siblingState by the qPin DigitalOutputPinLoaded sub-element.",
-    init: { kind: "zero" },
   },
   {
     name: "OUTPUT_LOGIC_LEVEL_NQ",
     doc: "~Q output level (1 - Q) consumed via siblingState by the nqPin DigitalOutputPinLoaded sub-element.",
-    init: { kind: "constant", value: 1 },
   },
 ]);
 
@@ -112,6 +107,8 @@ export class BehavioralDFlipflopDriverElement implements PoolBackedAnalogElement
   private _vIL: number;
   private _pool!: StatePoolRef;
 
+  private _firstSample: boolean = true;
+
   constructor(pinNodes: ReadonlyMap<string, number>, props: PropertyBag) {
     this._pinNodes = new Map(pinNodes);
     this._vIH = props.getModelParam<number>("vIH");
@@ -124,7 +121,6 @@ export class BehavioralDFlipflopDriverElement implements PoolBackedAnalogElement
 
   initState(pool: StatePoolRef): void {
     this._pool = pool;
-    applyInitialValues(SCHEMA, pool, this._stateBase, {});
   }
 
   load(ctx: LoadContext): void {
@@ -143,9 +139,10 @@ export class BehavioralDFlipflopDriverElement implements PoolBackedAnalogElement
     // Rising-edge detect on clock; on edge, threshold-classify D with
     // vIH/vIL hysteresis (logicLevel holds q when D sits in the indeterminate
     // band). NaN-prev sentinel inside detectRisingEdge skips the first step.
-    if (detectRisingEdge(prevClock, vClock, this._vIH)) {
+    if (!this._firstSample && detectRisingEdge(prevClock, vClock, this._vIH)) {
       q = logicLevel(vD, this._vIH, this._vIL, q);
     }
+    this._firstSample = false;
 
     // Bottom-of-load writes- every slot mutated this step writes to s0
     // exactly once (no pre-stamp s0 mutations).

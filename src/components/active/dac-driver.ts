@@ -26,7 +26,6 @@
 
 import {
   defineStateSchema,
-  applyInitialValues,
   type StateSchema,
   type SlotDescriptor,
 } from "../../solver/analog/state-schema.js";
@@ -58,13 +57,11 @@ function getDacSchema(bits: number): StateSchema {
     slots.push({
       name: `LATCHED_BIT_${i}`,
       doc: `Latched digital input bit ${i} (0 or 1). Threshold 0.5 applied to rhsOld[D${i}] - rhsOld[GND].`,
-      init: { kind: "zero" },
     });
   }
   slots.push({
     name: "OUTPUT_TARGET_V",
     doc: "Target output voltage computed from code and vref this step; stamped into rhs[br].",
-    init: { kind: "zero" },
   });
 
   const schema = defineStateSchema(`DACDriver_${bits}b`, slots);
@@ -157,7 +154,6 @@ export class DACDriverElement implements PoolBackedAnalogElement {
 
   initState(pool: StatePoolRef): void {
     this._pool = pool;
-    applyInitialValues(this.stateSchema, pool, this._stateBase, {});
   }
 
   setParam(_key: string, _value: number): void {

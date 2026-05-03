@@ -55,7 +55,6 @@ import { defineModelParams } from "../../core/model-params.js";
 import type { StatePoolRef } from "../../solver/analog/state-pool.js";
 import {
   defineStateSchema,
-  applyInitialValues,
   type StateSchema,
 } from "../../solver/analog/state-schema.js";
 import { cktTerr } from "../../solver/analog/ckt-terr.js";
@@ -68,24 +67,24 @@ import { cktTerr } from "../../solver/analog/ckt-terr.js";
 // Previous values are read from s1/s2/s3 at the same offsets.
 const CRYSTAL_SCHEMA: StateSchema = defineStateSchema("AnalogCrystalElement", [
   // L_s (inductor motional arm)
-  { name: "GEQ_L",  doc: "L_s companion conductance",         init: { kind: "zero" } },
-  { name: "IEQ_L",  doc: "L_s companion history current",     init: { kind: "zero" } },
-  { name: "I_L",    doc: "L_s branch current this step",      init: { kind: "zero" } },
-  { name: "PHI_L",  doc: "L_s flux phi=Ls*i this step",       init: { kind: "zero" } },
+  { name: "GEQ_L",  doc: "L_s companion conductance" },
+  { name: "IEQ_L",  doc: "L_s companion history current" },
+  { name: "I_L",    doc: "L_s branch current this step" },
+  { name: "PHI_L",  doc: "L_s flux phi=Ls*i this step" },
   // C_s (series motional capacitor)
-  { name: "GEQ_CS", doc: "C_s companion conductance",         init: { kind: "zero" } },
-  { name: "IEQ_CS", doc: "C_s companion history current",     init: { kind: "zero" } },
-  { name: "V_CS",   doc: "C_s terminal voltage this step",    init: { kind: "zero" } },
-  { name: "Q_CS",   doc: "C_s charge Cs*V this step",         init: { kind: "zero" } },
+  { name: "GEQ_CS", doc: "C_s companion conductance" },
+  { name: "IEQ_CS", doc: "C_s companion history current" },
+  { name: "V_CS",   doc: "C_s terminal voltage this step" },
+  { name: "Q_CS",   doc: "C_s charge Cs*V this step" },
   // C_0 (shunt electrode capacitor)
-  { name: "GEQ_C0", doc: "C_0 companion conductance",         init: { kind: "zero" } },
-  { name: "IEQ_C0", doc: "C_0 companion history current",     init: { kind: "zero" } },
-  { name: "V_C0",   doc: "C_0 terminal voltage this step",    init: { kind: "zero" } },
-  { name: "Q_C0",   doc: "C_0 charge C0*V this step",         init: { kind: "zero" } },
+  { name: "GEQ_C0", doc: "C_0 companion conductance" },
+  { name: "IEQ_C0", doc: "C_0 companion history current" },
+  { name: "V_C0",   doc: "C_0 terminal voltage this step" },
+  { name: "Q_C0",   doc: "C_0 charge C0*V this step" },
   // CCAP slots (NIintegrate companion current, stored for LTE reuse)
-  { name: "CCAP_L",  doc: "L_s companion current",  init: { kind: "zero" } },
-  { name: "CCAP_CS", doc: "C_s companion current",  init: { kind: "zero" } },
-  { name: "CCAP_C0", doc: "C_0 companion current",  init: { kind: "zero" } },
+  { name: "CCAP_L",  doc: "L_s companion current" },
+  { name: "CCAP_CS", doc: "C_s companion current" },
+  { name: "CCAP_C0", doc: "C_0 companion current" },
 ]);
 
 // Slot indices  must match the layout above.
@@ -368,7 +367,6 @@ export class AnalogCrystalElement implements PoolBackedAnalogElement {
 
   initState(pool: StatePoolRef): void {
     this._pool = pool;
-    applyInitialValues(CRYSTAL_SCHEMA, pool, this._stateBase, {});
   }
 
   updateDerivedParams(Rs: number, Ls: number, Cs: number, C0: number): void {

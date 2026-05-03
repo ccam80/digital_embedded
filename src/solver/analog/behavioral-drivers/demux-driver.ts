@@ -31,7 +31,6 @@
 
 import {
   defineStateSchema,
-  applyInitialValues,
   type StateSchema,
   type SlotDescriptor,
 } from "../state-schema.js";
@@ -63,7 +62,6 @@ function getDemuxSchema(selectorBits: number): StateSchema {
     slots.push({
       name: `OUTPUT_LOGIC_LEVEL_BIT${i}`,
       doc: `Output bit ${i} (carries data when sel == ${i}, else 0). Consumed via siblingState by the parent composite's outPin_${i} DigitalOutputPinLoaded sub-element.`,
-      init: { kind: "zero" },
     });
   }
   const schema = defineStateSchema(`BehavioralDemuxDriver_${selectorBits}b`, slots);
@@ -153,7 +151,6 @@ export class BehavioralDemuxDriverElement implements PoolBackedAnalogElement {
 
   initState(pool: StatePoolRef): void {
     this._pool = pool;
-    applyInitialValues(this.stateSchema, pool, this._stateBase, {});
   }
 
   /**

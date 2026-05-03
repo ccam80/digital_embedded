@@ -52,7 +52,6 @@ import { defineModelParams, kelvinToCelsius } from "../../core/model-params.js";
 import type { StatePoolRef } from "../../solver/analog/state-pool.js";
 import {
   defineStateSchema,
-  applyInitialValues,
   type StateSchema,
 } from "../../solver/analog/state-schema.js";
 
@@ -81,23 +80,23 @@ const SLOT_CCAP = 6;
 
 /** Schema for resistive diode (no junction capacitance): 4 slots. */
 export const DIODE_SCHEMA: StateSchema = defineStateSchema("DiodeElement", [
-  { name: "VD",          doc: "pnjlim-limited junction voltage",                  init: { kind: "zero" } },
-  { name: "GEQ",         doc: "NR companion conductance",                         init: { kind: "constant", value: GMIN } },
-  { name: "IEQ",         doc: "NR companion Norton current",                      init: { kind: "zero" } },
-  { name: "ID",          doc: "Diode current at operating point",                 init: { kind: "zero" } },
+  { name: "VD",  doc: "pnjlim-limited junction voltage" },
+  { name: "GEQ", doc: "NR companion conductance" },
+  { name: "IEQ", doc: "NR companion Norton current" },
+  { name: "ID",  doc: "Diode current at operating point" },
 ]);
 
 /** Schema for capacitive diode (CJO > 0 or TT > 0): 7 slots.
  *  D-W3-4: SLOT_V (was slot 5) removed  it was a vestigial copy of vdLimited
  *  with no reads outside load(). ngspice has no corresponding state offset. */
 export const DIODE_CAP_SCHEMA: StateSchema = defineStateSchema("DiodeElement_cap", [
-  { name: "VD",          doc: "pnjlim-limited junction voltage",                  init: { kind: "zero" } },
-  { name: "GEQ",         doc: "NR companion conductance",                         init: { kind: "constant", value: GMIN } },
-  { name: "IEQ",         doc: "NR companion Norton current",                      init: { kind: "zero" } },
-  { name: "ID",          doc: "Diode current at operating point",                 init: { kind: "zero" } },
-  { name: "CAP_CURRENT", doc: "MODETRAN: iqcap (A); MODEINITSMSIG: capd (F)  dioload.c:363 DIOcapCurrent", init: { kind: "zero" } },
-  { name: "Q",           doc: "Junction charge at current step (DIOcapCharge)",  init: { kind: "zero" } },
-  { name: "CCAP",        doc: "Companion current (NIintegrate)",                  init: { kind: "zero" } },
+  { name: "VD",          doc: "pnjlim-limited junction voltage" },
+  { name: "GEQ",         doc: "NR companion conductance" },
+  { name: "IEQ",         doc: "NR companion Norton current" },
+  { name: "ID",          doc: "Diode current at operating point" },
+  { name: "CAP_CURRENT", doc: "MODETRAN: iqcap (A); MODEINITSMSIG: capd (F)  dioload.c:363 DIOcapCurrent" },
+  { name: "Q",           doc: "Junction charge at current step (DIOcapCharge)" },
+  { name: "CCAP",        doc: "Companion current (NIintegrate)" },
 ]);
 
 // ---------------------------------------------------------------------------
@@ -530,7 +529,6 @@ export function createDiodeElement(
     initState(poolRef: StatePoolRef): void {
       pool = poolRef;
       base = element._stateBase;
-      applyInitialValues(element.stateSchema, pool, base, params);
     },
 
     load(ctx: LoadContext): void {

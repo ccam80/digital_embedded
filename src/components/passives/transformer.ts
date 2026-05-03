@@ -1,13 +1,13 @@
-/**
+﻿/**
  * Two-winding transformer component.
  *
  * Wraps InductorSubElement (L1) + InductorSubElement (L2) + MutualInductorElement (K)
  * to present a 4-terminal device:
- *   P1 (primary+), P2 (primary−), S1 (secondary+), S2 (secondary−)
+ *   P1 (primary+), P2 (primaryâˆ’), S1 (secondary+), S2 (secondaryâˆ’)
  *
  * Derived parameters:
- *   L_secondary = L_primary · N²
- *   M = k · √(L_primary · L_secondary) = k · L_primary · N
+ *   L_secondary = L_primary Â· NÂ²
+ *   M = k Â· âˆš(L_primary Â· L_secondary) = k Â· L_primary Â· N
  *
  * Each winding includes a series winding resistance for ohmic loss modelling.
  *
@@ -28,19 +28,20 @@ import type { PropertyDefinition } from "../../core/properties.js";
 import {
   ComponentCategory,
   type AttributeMapping,
-  type ComponentDefinition,
+  type StandaloneComponentDefinition,
 } from "../../core/registry.js";
-import type { AnalogElement, PoolBackedAnalogElement } from "../../core/analog-types.js";
-import { NGSPICE_LOAD_ORDER } from "../../core/analog-types.js";
-import type { IntegrationMethod, LoadContext } from "../../solver/analog/element.js";
+import type { AnalogElement, PoolBackedAnalogElement } from "../../solver/analog/element.js";
+import { NGSPICE_LOAD_ORDER } from "../../solver/analog/ngspice-load-order.js";
+import type { IntegrationMethod } from "../../solver/analog/integration.js";
+import type { LoadContext } from "../../solver/analog/load-context.js";
 import type { SetupContext } from "../../solver/analog/setup-context.js";
 import { stampRHS } from "../../solver/analog/stamp-helpers.js";
 import { niIntegrate } from "../../solver/analog/ni-integrate.js";
 import { MODEDC, MODEINITPRED, MODEINITTRAN, MODEUIC } from "../../solver/analog/ckt-mode.js";
 import { CoupledInductorPair } from "../../solver/analog/coupled-inductor.js";
 import { defineModelParams } from "../../core/model-params.js";
-import type { StatePoolRef } from "../../core/analog-types.js";
-import { defineStateSchema, applyInitialValues } from "../../solver/analog/state-schema.js";
+import type { StatePoolRef } from "../../solver/analog/state-pool.js";
+import { defineStateSchema } from "../../solver/analog/state-schema.js";
 import type { StateSchema } from "../../solver/analog/state-schema.js";
 import { cktTerr } from "../../solver/analog/ckt-terr.js";
 import { InductorSubElement, MutualInductorElement } from "./mutual-inductor.js";
@@ -56,8 +57,8 @@ export const { paramDefs: TRANSFORMER_PARAM_DEFS, defaults: TRANSFORMER_DEFAULTS
     couplingCoefficient: { default: 0.99,  description: "Magnetic coupling coefficient (0 = no coupling, 1 = ideal)", min: 0, max: 1 },
   },
   secondary: {
-    primaryResistance:   { default: 1.0,   unit: "Ω", description: "Primary winding series resistance in ohms", min: 0 },
-    secondaryResistance: { default: 1.0,   unit: "Ω", description: "Secondary winding series resistance in ohms", min: 0 },
+    primaryResistance:   { default: 1.0,   unit: "Î©", description: "Primary winding series resistance in ohms", min: 0 },
+    secondaryResistance: { default: 1.0,   unit: "Î©", description: "Secondary winding series resistance in ohms", min: 0 },
     IC1:  { default: NaN, unit: "A", description: "Initial condition current for primary winding (UIC)" },
     IC2:  { default: NaN, unit: "A", description: "Initial condition current for secondary winding (UIC)" },
     M:    { default: 1,               description: "Parallel multiplicity factor (applied at stamp time per indload.c:41,107)" },
@@ -69,19 +70,19 @@ export const { paramDefs: TRANSFORMER_PARAM_DEFS, defaults: TRANSFORMER_DEFAULTS
 // ---------------------------------------------------------------------------
 
 const TRANSFORMER_SCHEMA: StateSchema = defineStateSchema("AnalogLinearTransformerElement", [
-  { name: "G11",   doc: "Companion conductance self-1",                               init: { kind: "zero" } },
-  { name: "G22",   doc: "Companion conductance self-2",                               init: { kind: "zero" } },
-  { name: "G12",   doc: "Companion mutual conductance",                               init: { kind: "zero" } },
-  { name: "HIST1", doc: "History voltage source winding 1",                           init: { kind: "zero" } },
-  { name: "HIST2", doc: "History voltage source winding 2",                           init: { kind: "zero" } },
-  { name: "I1",    doc: "Winding 1 branch current this step",                         init: { kind: "zero" } },
-  { name: "I2",    doc: "Winding 2 branch current this step",                         init: { kind: "zero" } },
-  { name: "PHI1",  doc: "Total flux linkage winding 1",                               init: { kind: "zero" } },
-  { name: "PHI2",  doc: "Total flux linkage winding 2",                               init: { kind: "zero" } },
-  { name: "CCAP1", doc: "NIintegrate ccap history winding 1 (maps to CKTstate1+INDflux implicit)", init: { kind: "zero" } },
-  { name: "CCAP2", doc: "NIintegrate ccap history winding 2 (maps to CKTstate1+INDflux implicit)", init: { kind: "zero" } },
-  { name: "VOLT1", doc: "Winding 1 terminal voltage (indload.c:114-116 INDvolt)",     init: { kind: "zero" } },
-  { name: "VOLT2", doc: "Winding 2 terminal voltage (indload.c:114-116 INDvolt)",     init: { kind: "zero" } },
+  { name: "G11",   doc: "Companion conductance self-1" },
+  { name: "G22",   doc: "Companion conductance self-2" },
+  { name: "G12",   doc: "Companion mutual conductance" },
+  { name: "HIST1", doc: "History voltage source winding 1" },
+  { name: "HIST2", doc: "History voltage source winding 2" },
+  { name: "I1",    doc: "Winding 1 branch current this step" },
+  { name: "I2",    doc: "Winding 2 branch current this step" },
+  { name: "PHI1",  doc: "Total flux linkage winding 1" },
+  { name: "PHI2",  doc: "Total flux linkage winding 2" },
+  { name: "CCAP1", doc: "NIintegrate ccap history winding 1 (maps to CKTstate1+INDflux implicit)" },
+  { name: "CCAP2", doc: "NIintegrate ccap history winding 2 (maps to CKTstate1+INDflux implicit)" },
+  { name: "VOLT1", doc: "Winding 1 terminal voltage (indload.c:114-116 INDvolt)" },
+  { name: "VOLT2", doc: "Winding 2 terminal voltage (indload.c:114-116 INDvolt)" },
 ]);
 
 const SLOT_G11   = 0;
@@ -220,8 +221,8 @@ export class TransformerElement extends AbstractCircuitElement {
  *   _mut (MutualInductorElement)- coupling K element
  *
  * Node layout (pinNodeIds array positions):
- *   [0] = P1 (primary+)   [1] = P2 (primary−)
- *   [2] = S1 (secondary+) [3] = S2 (secondary−)
+ *   [0] = P1 (primary+)   [1] = P2 (primaryâˆ’)
+ *   [2] = S1 (secondary+) [3] = S2 (secondaryâˆ’)
  */
 export class AnalogTransformerElement implements PoolBackedAnalogElement {
   label: string = "";
@@ -345,7 +346,6 @@ export class AnalogTransformerElement implements PoolBackedAnalogElement {
 
   initState(pool: StatePoolRef): void {
     this._pool = pool;
-    applyInitialValues(TRANSFORMER_SCHEMA, pool, this._stateBase, {});
   }
 
   setParam(key: string, value: number): void {
@@ -375,7 +375,6 @@ export class AnalogTransformerElement implements PoolBackedAnalogElement {
       throw new Error(`Unrecognized setParam key: ${key}`);
     }
     if (this._pool) {
-      applyInitialValues(TRANSFORMER_SCHEMA, this._pool, this._stateBase, {});
     }
   }
 
@@ -501,7 +500,7 @@ export class AnalogTransformerElement implements PoolBackedAnalogElement {
       hist2 = ni2.ceq;
     }
 
-    // 2×2 branch block stamp- cached handles from sub-elements
+    // 2Ã—2 branch block stamp- cached handles from sub-elements
     solver.stampElement(this._l1.hIbrIbr, -g11);
     solver.stampElement(this._mut.hBr1Br2, -g12);
     solver.stampElement(this._mut.hBr2Br1, -g12);
@@ -628,8 +627,8 @@ const TRANSFORMER_PROPERTY_DEFS: PropertyDefinition[] = [
   {
     key: "primaryResistance",
     type: PropertyType.FLOAT,
-    label: "Primary Resistance (Ω)",
-    unit: "Ω",
+    label: "Primary Resistance (Î©)",
+    unit: "Î©",
     defaultValue: 1.0,
     min: 0,
     description: "Primary winding series resistance in ohms",
@@ -637,8 +636,8 @@ const TRANSFORMER_PROPERTY_DEFS: PropertyDefinition[] = [
   {
     key: "secondaryResistance",
     type: PropertyType.FLOAT,
-    label: "Secondary Resistance (Ω)",
-    unit: "Ω",
+    label: "Secondary Resistance (Î©)",
+    unit: "Î©",
     defaultValue: 1.0,
     min: 0,
     description: "Secondary winding series resistance in ohms",
@@ -691,7 +690,7 @@ function transformerCircuitFactory(props: PropertyBag): TransformerElement {
   return new TransformerElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
 }
 
-export const TransformerDefinition: ComponentDefinition = {
+export const TransformerDefinition: StandaloneComponentDefinition = {
   name: "Transformer",
   typeId: -1,
   factory: transformerCircuitFactory,

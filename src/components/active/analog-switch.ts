@@ -38,15 +38,16 @@ import type { PropertyDefinition } from "../../core/properties.js";
 import {
   ComponentCategory,
   type AttributeMapping,
-  type ComponentDefinition,
+  type StandaloneComponentDefinition,
 } from "../../core/registry.js";
-import type { LoadContext, StatePoolRef, PoolBackedAnalogElement } from "../../solver/analog/element.js";
-import { NGSPICE_LOAD_ORDER } from "../../solver/analog/element.js";
+import type { PoolBackedAnalogElement } from "../../solver/analog/element.js";
+import type { LoadContext } from "../../solver/analog/load-context.js";
+import type { StatePoolRef } from "../../solver/analog/state-pool.js";
+import { NGSPICE_LOAD_ORDER } from "../../solver/analog/ngspice-load-order.js";
 import type { SetupContext } from "../../solver/analog/setup-context.js";
 import { defineModelParams } from "../../core/model-params.js";
 import {
   defineStateSchema,
-  applyInitialValues,
   type StateSchema,
 } from "../../solver/analog/state-schema.js";
 import {
@@ -91,8 +92,8 @@ const SLOT_V_CTRL = 1;
  * SW_NUM_STATES = 2 (swdefs.h:56).
  */
 export const SW_SCHEMA: StateSchema = defineStateSchema("SWElement", [
-  { name: "CURRENT_STATE", doc: "Switch state sentinel: REALLY_OFF=0, REALLY_ON=1, HYST_OFF=2, HYST_ON=3 (swload.c:28-29)", init: { kind: "constant", value: REALLY_OFF } },
-  { name: "V_CTRL",        doc: "Control voltage saved at load time (swload.c:141)",                                            init: { kind: "zero" } },
+  { name: "CURRENT_STATE", doc: "Switch state sentinel: REALLY_OFF=0, REALLY_ON=1, HYST_OFF=2, HYST_ON=3 (swload.c:28-29)" },
+  { name: "V_CTRL",        doc: "Control voltage saved at load time (swload.c:141)" },
 ]);
 
 /**
@@ -100,10 +101,10 @@ export const SW_SCHEMA: StateSchema = defineStateSchema("SWElement", [
  * // digiTS extension beyond ngspice SW primitive  see F4b-composite discussion
  */
 export const SPDT_SCHEMA: StateSchema = defineStateSchema("SWElementSPDT", [
-  { name: "NO_CURRENT_STATE", doc: "COM-NO path switch state (swload.c:28-29 sentinel)", init: { kind: "constant", value: REALLY_OFF } },
-  { name: "NO_V_CTRL",        doc: "COM-NO path saved control voltage (swload.c:141)",    init: { kind: "zero" } },
-  { name: "NC_CURRENT_STATE", doc: "COM-NC path switch state (inverted polarity)  digiTS extension beyond ngspice SW primitive", init: { kind: "constant", value: REALLY_ON } },
-  { name: "NC_V_CTRL",        doc: "COM-NC path saved control voltage (inverted)  digiTS extension beyond ngspice SW primitive", init: { kind: "zero" } },
+  { name: "NO_CURRENT_STATE", doc: "COM-NO path switch state (swload.c:28-29 sentinel)" },
+  { name: "NO_V_CTRL",        doc: "COM-NO path saved control voltage (swload.c:141)" },
+  { name: "NC_CURRENT_STATE", doc: "COM-NC path switch state (inverted polarity)  digiTS extension beyond ngspice SW primitive" },
+  { name: "NC_V_CTRL",        doc: "COM-NC path saved control voltage (inverted)  digiTS extension beyond ngspice SW primitive" },
 ]);
 
 // ---------------------------------------------------------------------------
@@ -294,7 +295,6 @@ function createSwitchSPSTElement(
     initState(poolRef: StatePoolRef): void {
       pool = poolRef;
       base = this._stateBase;
-      applyInitialValues(SW_SCHEMA, pool, base, p);
     },
 
     load(ctx: LoadContext): void {
@@ -407,7 +407,6 @@ function createSwitchSPDTElement(
     initState(poolRef: StatePoolRef): void {
       pool = poolRef;
       base = this._stateBase;
-      applyInitialValues(SPDT_SCHEMA, pool, base, p);
     },
 
     load(ctx: LoadContext): void {
@@ -660,7 +659,7 @@ const ANALOG_SWITCH_ATTRIBUTE_MAPPINGS: AttributeMapping[] = [
 // ComponentDefinitions
 // ---------------------------------------------------------------------------
 
-export const SwitchSPSTDefinition: ComponentDefinition = {
+export const SwitchSPSTDefinition: StandaloneComponentDefinition = {
   name: "SwitchSPST",
   typeId: -1,
   category: ComponentCategory.ACTIVE,
@@ -691,7 +690,7 @@ export const SwitchSPSTDefinition: ComponentDefinition = {
   defaultModel: "behavioral",
 };
 
-export const SwitchSPDTDefinition: ComponentDefinition = {
+export const SwitchSPDTDefinition: StandaloneComponentDefinition = {
   name: "SwitchSPDT",
   typeId: -1,
   category: ComponentCategory.ACTIVE,

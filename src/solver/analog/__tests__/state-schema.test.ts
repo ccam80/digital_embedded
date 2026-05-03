@@ -1,7 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
   defineStateSchema,
-  applyInitialValues,
   assertPoolIsSoleMutableState,
   CAP_COMPANION_SLOTS,
   L_COMPANION_SLOTS,
@@ -10,17 +9,12 @@ import {
   type StateSchema,
   type SchemaViolation,
 } from "../state-schema.js";
-import type { StatePoolRef } from "../../../core/analog-types.js";
-
-function makePool(size: number): StatePoolRef {
-  return { state0: new Float64Array(size), state1: new Float64Array(size) } as unknown as StatePoolRef;
-}
 
 describe("defineStateSchema", () => {
   it("builds frozen schema with correct size and indexOf", () => {
     const schema = defineStateSchema("TestElement", [
-      { name: "GEQ", doc: "conductance", init: { kind: "zero" } },
-      { name: "IEQ", doc: "history current", init: { kind: "zero" } },
+      { name: "GEQ", doc: "conductance" },
+      { name: "IEQ", doc: "history current" },
     ]);
     expect(schema.owner).toBe("TestElement");
     expect(schema.size).toBe(2);
@@ -30,7 +24,7 @@ describe("defineStateSchema", () => {
 
   it("schema object is frozen", () => {
     const schema = defineStateSchema("TestElement", [
-      { name: "A", doc: "slot A", init: { kind: "zero" } },
+      { name: "A", doc: "slot A" },
     ]);
     expect(Object.isFrozen(schema)).toBe(true);
     expect(Object.isFrozen(schema.slots)).toBe(true);
@@ -39,66 +33,20 @@ describe("defineStateSchema", () => {
   it("throws on duplicate slot names", () => {
     expect(() =>
       defineStateSchema("BadElement", [
-        { name: "GEQ", doc: "first", init: { kind: "zero" } },
-        { name: "GEQ", doc: "duplicate", init: { kind: "zero" } },
+        { name: "GEQ", doc: "first" },
+        { name: "GEQ", doc: "duplicate" },
       ])
     ).toThrow('defineStateSchema(BadElement): duplicate slot name "GEQ"');
   });
 
   it("size equals slots array length", () => {
     const slots: SlotDescriptor[] = [
-      { name: "A", doc: "a", init: { kind: "zero" } },
-      { name: "B", doc: "b", init: { kind: "constant", value: 1.5 } },
-      { name: "C", doc: "c", init: { kind: "fromParams", compute: (p) => p["x"] ?? 0 } },
+      { name: "A", doc: "a" },
+      { name: "B", doc: "b" },
+      { name: "C", doc: "c" },
     ];
     const schema = defineStateSchema("Elem", slots);
     expect(schema.size).toBe(3);
-  });
-});
-
-describe("applyInitialValues", () => {
-  it("zero-initialises slots with kind zero", () => {
-    const schema = defineStateSchema("E", [
-      { name: "A", doc: "a", init: { kind: "zero" } },
-      { name: "B", doc: "b", init: { kind: "zero" } },
-    ]);
-    const pool = makePool(4);
-    pool.state0[0] = 99;
-    pool.state0[1] = 88;
-    applyInitialValues(schema, pool, 0, {});
-    expect(pool.state0[0]).toBe(0);
-    expect(pool.state0[1]).toBe(0);
-  });
-
-  it("sets constant initial values", () => {
-    const schema = defineStateSchema("E", [
-      { name: "A", doc: "a", init: { kind: "constant", value: 3.14 } },
-    ]);
-    const pool = makePool(2);
-    applyInitialValues(schema, pool, 0, {});
-    expect(pool.state0[0]).toBe(3.14);
-  });
-
-  it("uses fromParams compute for param-dependent slots", () => {
-    const schema = defineStateSchema("E", [
-      { name: "RB_EFF", doc: "effective base resistance", init: { kind: "fromParams", compute: (p) => p["RB"] ?? 0 } },
-    ]);
-    const pool = makePool(2);
-    applyInitialValues(schema, pool, 0, { RB: 100.0 });
-    expect(pool.state0[0]).toBe(100.0);
-  });
-
-  it("respects base offset when writing", () => {
-    const schema = defineStateSchema("E", [
-      { name: "A", doc: "a", init: { kind: "constant", value: 5 } },
-      { name: "B", doc: "b", init: { kind: "constant", value: 7 } },
-    ]);
-    const pool = makePool(6);
-    applyInitialValues(schema, pool, 2, {});
-    expect(pool.state0[0]).toBe(0);
-    expect(pool.state0[1]).toBe(0);
-    expect(pool.state0[2]).toBe(5);
-    expect(pool.state0[3]).toBe(7);
   });
 });
 
@@ -153,16 +101,10 @@ describe("CAP_COMPANION_SLOTS", () => {
     expect(Object.isFrozen(CAP_COMPANION_SLOTS)).toBe(true);
   });
 
-  it("all slots have kind zero init", () => {
-    for (const slot of CAP_COMPANION_SLOTS) {
-      expect(slot.init.kind).toBe("zero");
-    }
-  });
-
   it("spreads correctly into defineStateSchema", () => {
     const schema = defineStateSchema("CapTest", [
       ...CAP_COMPANION_SLOTS,
-      { name: "I_PREV", doc: "previous current", init: { kind: "zero" } },
+      { name: "I_PREV", doc: "previous current" },
     ]);
     expect(schema.size).toBe(4);
     expect(schema.indexOf.get("GEQ")).toBe(0);
@@ -203,10 +145,9 @@ describe("suffixed", () => {
     expect(CAP_COMPANION_SLOTS[0].name).toBe("GEQ");
   });
 
-  it("preserves doc and init from original fragment", () => {
+  it("preserves doc from original fragment", () => {
     const result = suffixed(CAP_COMPANION_SLOTS, "_X");
     expect(result[0].doc).toBe(CAP_COMPANION_SLOTS[0].doc);
-    expect(result[0].init).toEqual(CAP_COMPANION_SLOTS[0].init);
   });
 
   it("supports crystal-style multi-fragment schema via suffixed spread", () => {
@@ -225,7 +166,7 @@ describe("suffixed", () => {
 describe("StateSchema type export", () => {
   it("StateSchema is usable at runtime via defineStateSchema return value", () => {
     const schema: StateSchema = defineStateSchema("TypeTest", [
-      { name: "X", doc: "x", init: { kind: "zero" } },
+      { name: "X", doc: "x" },
     ]);
     expect(schema.owner).toBe("TypeTest");
   });

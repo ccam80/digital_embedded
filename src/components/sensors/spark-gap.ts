@@ -39,7 +39,6 @@ import type { LoadContext } from "../../solver/analog/load-context.js";
 import type { SetupContext } from "../../solver/analog/setup-context.js";
 import {
   defineStateSchema,
-  applyInitialValues,
   type StateSchema,
 } from "../../solver/analog/state-schema.js";
 import { PropertyBag, PropertyType } from "../../core/properties.js";
@@ -68,7 +67,7 @@ const MIN_RESISTANCE = 1e-12;
 // ---------------------------------------------------------------------------
 
 export const SPARK_GAP_SCHEMA = defineStateSchema("SparkGapElement", [
-  { name: "CONDUCTING", doc: "Conducting state: 1 = conducting, 0 = blocking", init: { kind: "zero" } },
+  { name: "CONDUCTING", doc: "Conducting state: 1 = conducting, 0 = blocking" },
 ]) satisfies StateSchema;
 
 const SLOT_CONDUCTING = 0;
@@ -186,7 +185,6 @@ export class SparkGapElement implements PoolBackedAnalogElement {
 
   initState(pool: StatePoolRef): void {
     this._pool = pool;
-    applyInitialValues(SPARK_GAP_SCHEMA, pool, this._stateBase, {});
   }
 
   setParam(key: string, value: number): void {

@@ -25,7 +25,6 @@
 
 import {
   defineStateSchema,
-  applyInitialValues,
   type StateSchema,
 } from "../state-schema.js";
 import { NGSPICE_LOAD_ORDER } from "../ngspice-load-order.js";
@@ -46,42 +45,34 @@ const SCHEMA: StateSchema = defineStateSchema("BehavioralSevenSegDriver", [
   {
     name: "SEG_A",
     doc: "Observation-only logic level (0 or 1) for segment a. Written each load(); read by the parent component's draw() to determine illumination.",
-    init: { kind: "zero" },
   },
   {
     name: "SEG_B",
     doc: "Observation-only logic level (0 or 1) for segment b.",
-    init: { kind: "zero" },
   },
   {
     name: "SEG_C",
     doc: "Observation-only logic level (0 or 1) for segment c.",
-    init: { kind: "zero" },
   },
   {
     name: "SEG_D",
     doc: "Observation-only logic level (0 or 1) for segment d.",
-    init: { kind: "zero" },
   },
   {
     name: "SEG_E",
     doc: "Observation-only logic level (0 or 1) for segment e.",
-    init: { kind: "zero" },
   },
   {
     name: "SEG_F",
     doc: "Observation-only logic level (0 or 1) for segment f.",
-    init: { kind: "zero" },
   },
   {
     name: "SEG_G",
     doc: "Observation-only logic level (0 or 1) for segment g.",
-    init: { kind: "zero" },
   },
   {
     name: "SEG_DP",
     doc: "Observation-only logic level (0 or 1) for the decimal point segment (dp).",
-    init: { kind: "zero" },
   },
 ]);
 
@@ -149,7 +140,6 @@ export class BehavioralSevenSegDriverElement implements PoolBackedAnalogElement 
 
   initState(pool: StatePoolRef): void {
     this._pool = pool;
-    applyInitialValues(SCHEMA, pool, this._stateBase, {});
   }
 
   load(ctx: LoadContext): void {

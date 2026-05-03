@@ -12,7 +12,6 @@
 
 import {
   defineStateSchema,
-  applyInitialValues,
   type StateSchema,
   type SlotDescriptor,
 } from "../state-schema.js";
@@ -49,20 +48,17 @@ function getMuxSchema(selectorBits: number): StateSchema {
     slots.push({
       name: `SEL_LATCH_${i}`,
       doc: `Latched level of selector bit ${i}. Written each load(); held on indeterminate input.`,
-      init: { kind: "zero" },
     });
   }
   for (let i = 0; i < N; i++) {
     slots.push({
       name: `DATA_LATCH_${i}`,
       doc: `Latched level of data input ${i}. Written each load(); held on indeterminate input.`,
-      init: { kind: "zero" },
     });
   }
   slots.push({
     name: "OUTPUT_LOGIC_LEVEL",
     doc: "Selected output level (0 or 1) consumed via siblingState by the parent composite's outPin DigitalOutputPinLoaded sub-element.",
-    init: { kind: "zero" },
   });
 
   const schema = defineStateSchema(`BehavioralMuxDriver_${selectorBits}sel`, slots);
@@ -166,7 +162,6 @@ export class BehavioralMuxDriverElement implements PoolBackedAnalogElement {
 
   initState(pool: StatePoolRef): void {
     this._pool = pool;
-    applyInitialValues(this.stateSchema, pool, this._stateBase, {});
   }
 
   /**

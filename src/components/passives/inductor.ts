@@ -18,11 +18,13 @@ import type { PropertyDefinition } from "../../core/properties.js";
 import {
   ComponentCategory,
   type AttributeMapping,
-  type ComponentDefinition,
+  type StandaloneComponentDefinition,
 } from "../../core/registry.js";
 import { formatSI } from "../../editor/si-format.js";
-import type { AnalogElement, PoolBackedAnalogElement, IntegrationMethod, LoadContext } from "../../solver/analog/element.js";
-import { NGSPICE_LOAD_ORDER } from "../../core/analog-types.js";
+import type { AnalogElement, PoolBackedAnalogElement } from "../../solver/analog/element.js";
+import type { IntegrationMethod } from "../../solver/analog/integration.js";
+import type { LoadContext } from "../../solver/analog/load-context.js";
+import { NGSPICE_LOAD_ORDER } from "../../solver/analog/ngspice-load-order.js";
 import type { SetupContext } from "../../solver/analog/setup-context.js";
 import { cktTerr } from "../../solver/analog/ckt-terr.js";
 import { niIntegrate } from "../../solver/analog/ni-integrate.js";
@@ -31,8 +33,8 @@ import {
 } from "../../solver/analog/ckt-mode.js";
 import { stampRHS } from "../../solver/analog/stamp-helpers.js";
 import { defineModelParams, kelvinToCelsius } from "../../core/model-params.js";
-import type { StatePoolRef } from "../../core/analog-types.js";
-import { defineStateSchema, applyInitialValues } from "../../solver/analog/state-schema.js";
+import type { StatePoolRef } from "../../solver/analog/state-pool.js";
+import { defineStateSchema } from "../../solver/analog/state-schema.js";
 import type { StateSchema } from "../../solver/analog/state-schema.js";
 
 // ---------------------------------------------------------------------------
@@ -61,7 +63,7 @@ function buildInductorPinDeclarations(): PinDeclaration[] {
   return [
     {
       direction: PinDirection.INPUT,
-      label: "A",
+      label: "pos",
       defaultBitWidth: 1,
       position: { x: 0, y: 0 },
       isNegatable: false,
@@ -70,7 +72,7 @@ function buildInductorPinDeclarations(): PinDeclaration[] {
     },
     {
       direction: PinDirection.OUTPUT,
-      label: "B",
+      label: "neg",
       defaultBitWidth: 1,
       position: { x: 4, y: 0 },
       isNegatable: false,
@@ -118,14 +120,14 @@ export class InductorElement extends AbstractCircuitElement {
     ctx.save();
     ctx.setLineWidth(1);
 
-    const vA = signals?.getPinVoltage("A");
-    const vB = signals?.getPinVoltage("B");
+    const vA = signals?.getPinVoltage("pos");
+    const vB = signals?.getPinVoltage("neg");
     const hasVoltage = vA !== undefined && vB !== undefined;
 
-    // Left lead  colored by pin A voltage
+    // Left lead  colored by pos pin voltage
     drawColoredLead(ctx, hasVoltage ? signals : undefined, vA, 0, 0, 1, 0);
 
-    // Right lead  colored by pin B voltage
+    // Right lead  colored by neg pin voltage
     drawColoredLead(ctx, hasVoltage ? signals : undefined, vB, 3, 0, 4, 0);
 
     // Coil body: 3 semicircular arcs from PI to 2*PI  gradient from vA to vB
@@ -169,8 +171,8 @@ export class InductorElement extends AbstractCircuitElement {
 // No GEQ/IEQ/I/VOLT-as-node-voltage slots exist in ngspice  req/veq are
 // indload.c locals; branch current comes from CKTrhsOld[INDbrEq], not state.
 const INDUCTOR_SCHEMA: StateSchema = defineStateSchema("AnalogInductorElement", [
-  { name: "PHI",  doc: "Flux Î¦ = LÂ·i  ngspice INDflux (INDstate+0)", init: { kind: "zero" } },
-  { name: "CCAP", doc: "NIintegrate companion current  ngspice INDvolt (INDstate+1) per niinteg.c:15 `#define ccap qcap+1`", init: { kind: "zero" } },
+  { name: "PHI",  doc: "Flux Î¦ = LÂ·i  ngspice INDflux (INDstate+0)" },
+  { name: "CCAP", doc: "NIintegrate companion current  ngspice INDvolt (INDstate+1) per niinteg.c:15 `#define ccap qcap+1`" },
 ]);
 
 const SLOT_PHI  = 0;  // ngspice INDflux = INDstate+0
@@ -223,19 +225,19 @@ export class AnalogInductorElement implements PoolBackedAnalogElement {
   setup(ctx: SetupContext): void {
     const solver = ctx.solver;
     const pinNodes = this._pinNodes;
-    const posNode = pinNodes.get("A")!;  // INDposNode
-    const negNode = pinNodes.get("B")!;  // INDnegNode
+    const posNode = pinNodes.get("pos")!;  // INDposNode
+    const negNode = pinNodes.get("neg")!;  // INDnegNode
 
-    // indsetup.c:78-79 — *states += 2 (INDflux = state+0, INDvolt = state+1)
+    // indsetup.c:78-79- *states += 2 (INDflux = state+0, INDvolt = state+1)
     this._stateBase = ctx.allocStates(2);
 
-    // indsetup.c:84-88 — CKTmkCur guard (idempotent, mirrors VSRCfindBr pattern).
+    // indsetup.c:84-88- CKTmkCur guard (idempotent, mirrors VSRCfindBr pattern).
     if (this.branchIndex === -1) {
       this.branchIndex = ctx.makeCur(this.label, "branch");
     }
     const b = this.branchIndex;
 
-    // indsetup.c:96-100 — TSTALLOC sequence, line-for-line.
+    // indsetup.c:96-100- TSTALLOC sequence, line-for-line.
     this._hPIbr   = solver.allocElement(posNode, b);  // (INDposNode, INDbrEq)
     this._hNIbr   = solver.allocElement(negNode, b);  // (INDnegNode, INDbrEq)
     this._hIbrN   = solver.allocElement(b, negNode);  // (INDbrEq,    INDnegNode)
@@ -253,7 +255,6 @@ export class AnalogInductorElement implements PoolBackedAnalogElement {
 
   initState(pool: StatePoolRef): void {
     this._pool = pool;
-    applyInitialValues(INDUCTOR_SCHEMA, pool, this._stateBase, {});
   }
 
   setParam(key: string, value: number): void {
@@ -374,7 +375,7 @@ export class AnalogInductorElement implements PoolBackedAnalogElement {
     // INDposIbrptr / INDnegIbrptr (B sub-matrix: ±1 at (n, b)).
     solver.stampElement(this._hPIbr, 1);   // *(INDposIbrptr) += 1
     solver.stampElement(this._hNIbr, -1);  // *(INDnegIbrptr) -= 1
-    // INDibrPosptr / INDibrNegptr (C sub-matrix: ±1 at (b, n) — KVL incidence).
+    // INDibrPosptr / INDibrNegptr (C sub-matrix: ±1 at (b, n)- KVL incidence).
     solver.stampElement(this._hIbrP, 1);   // *(INDibrPosptr) += 1
     solver.stampElement(this._hIbrN, -1);  // *(INDibrNegptr) -= 1
     // INDibrIbrptr (-req branch diagonal). Stamped even at DC where req=0 so
@@ -459,7 +460,7 @@ function inductorCircuitFactory(props: PropertyBag): InductorElement {
   return new InductorElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
 }
 
-export const InductorDefinition: ComponentDefinition = {
+export const InductorDefinition: StandaloneComponentDefinition = {
   name: "Inductor",
   typeId: -1,
   factory: inductorCircuitFactory,
@@ -471,7 +472,6 @@ export const InductorDefinition: ComponentDefinition = {
     "Inductor  reactive element with companion model and branch current.\n" +
     "Stamps equivalent conductance, history current, and branch incidence entries.",
   models: {},
-  ngspiceNodeMap: { A: "pos", B: "neg" },
   modelRegistry: {
     "behavioral": {
       kind: "inline",

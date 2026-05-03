@@ -29,7 +29,6 @@ import type { LoadContext } from "../../solver/analog/load-context.js";
 import type { SetupContext } from "../../solver/analog/setup-context.js";
 import {
   defineStateSchema,
-  applyInitialValues,
   type StateSchema,
 } from "../../solver/analog/state-schema.js";
 import { PropertyBag, PropertyType } from "../../core/properties.js";
@@ -58,11 +57,7 @@ const MIN_TEMPERATURE = 1.0; // 1 K - prevent division by zero
 // ---------------------------------------------------------------------------
 
 export const NTC_SCHEMA = defineStateSchema("NTCThermistorElement", [
-  // Zero-init per §4d locked decision (schema slots zero-initial; non-zero
-  // startup values seeded via initState() from instance fields). The actual
-  // initial temperature is per-instance — see initState() which seeds from
-  // _tAmbient (constructor's `temperature` param).
-  { name: "TEMPERATURE", doc: "Operating temperature in Kelvin", init: { kind: "zero" } },
+  { name: "TEMPERATURE", doc: "Operating temperature in Kelvin" },
 ]) satisfies StateSchema;
 
 const SLOT_TEMPERATURE = 0;
@@ -211,7 +206,6 @@ export class NTCThermistorElement implements PoolBackedAnalogElement {
 
   initState(pool: StatePoolRef): void {
     this._pool = pool;
-    applyInitialValues(NTC_SCHEMA, pool, this._stateBase, {});
     // Seed temperature slot from ambient
     pool.state0[this._stateBase + SLOT_TEMPERATURE] = this._tAmbient;
   }

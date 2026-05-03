@@ -25,7 +25,6 @@
 
 import {
   defineStateSchema,
-  applyInitialValues,
   type StateSchema,
 } from "../state-schema.js";
 import { logicLevel } from "./edge-detect.js";
@@ -46,12 +45,10 @@ const SCHEMA: StateSchema = defineStateSchema("BehavioralDriverDriver", [
   {
     name: "OUTPUT_LOGIC_LEVEL",
     doc: "Pass-through of `in` (0 or 1) consumed via siblingState by the parent's outPin.inputLogic.",
-    init: { kind: "zero" },
   },
   {
     name: "OUTPUT_LOGIC_LEVEL_ENABLE",
     doc: "Tri-state enable bit (0 = high-Z, 1 = drive) consumed via siblingState by the parent's outPin.enableLogic. Active-high: derived from sel >= vIH.",
-    init: { kind: "zero" },
   },
 ]);
 
@@ -108,7 +105,6 @@ export class BehavioralDriverDriverElement implements PoolBackedAnalogElement {
 
   initState(pool: StatePoolRef): void {
     this._pool = pool;
-    applyInitialValues(SCHEMA, pool, this._stateBase, {});
   }
 
   load(ctx: LoadContext): void {
