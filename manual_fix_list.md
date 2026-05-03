@@ -228,6 +228,30 @@ ssI2 spec evolved: the `participatesInLoad?: boolean` field on `AnalogElement` w
 
 ## 3. Tests
 
+> ## ⚠️ POISON-PATTERN WARNING (read before touching ANY test file in §3)
+>
+> The §4a deletion of `test-helpers.ts` removed the official engine-impersonator surface — but **other test files have rolled their own equivalents inline**. They are not on the §4c migration list because they don't import the deleted helpers; they reimplement the same anti-pattern locally. They are still poison and must be eradicated on contact.
+>
+> **A test file is poison if it does ANY of the following inline:**
+> - Constructs its own `CKTCircuitContext` / `LoadContext` / `SetupContext` / fake matrix / fake RHS / fake solver / fake coordinator that mimics the engine's shape.
+> - Allocates its own `StatePool` (calls `new StatePool(...)` or fabricates `pool.state0` / `pool.state1` arrays directly) outside `buildFixture`.
+> - Calls `element.setup(ctx)`, `element.load(ctx)`, `element.acceptStep(...)`, `element.initState(...)`, `element.applyInitialValues(...)`, or any other internal lifecycle method directly. These are engine-internal contracts, not test surfaces.
+> - Calls `compileUnified(...)` or any solver-stage entry point directly to bypass the facade.
+> - Hand-rolls a `LoadContext` shape (`{ matrix, rhs, solution, gmin, simTime, ... }` literal) and passes it to `load()`.
+> - Manually walks elements via `mnaEngine._setup()` / `_load()` / `_walkSubElements` (these are private; tests reaching into them via `as unknown as` are poison).
+>
+> **The non-negotiable contract:** every test goes through `buildFixture(opts)` (§4b) + the public coordinator/engine surface — `coordinator.dcOperatingPoint()` / `step(dt)` / `captureElementStates(idx)`, `engine.compiled.solver.getCSCNonZeros()`. **No test calls `element.setup()` or `element.load()` directly. No test fabricates a context or pool.** The whole point of §4 was to delete this category of code, not relocate it.
+>
+> **When you encounter poison while working through §3 (regardless of which J-ID brought you to the file):**
+> 1. STOP the in-progress §3 contract-update work for that file.
+> 2. Surface the finding to the user: name the file, list the poison patterns observed, count the affected tests.
+> 3. Migrate the file to `buildFixture` first (treat as an off-list §4c sibling). The §3 contract-update edits then apply on top of the cleaned file.
+> 4. Add the file to §4c retroactively so the audit trail is complete.
+>
+> **Banned closing verdicts** when triaging poison: *"low-priority"*, *"out of scope for this J-ID"*, *"can address later"*, *"the test still passes so leave it"*. The wide-scope-default standing order applies: poison is in-blast-radius by definition. The "still passes" verdict is especially dangerous because the engine-impersonator pattern that motivated §4 was passing tests for months while masking the J-056 schema-init bug.
+>
+> Cross-reference: §4 preamble (lines 318-324) for the locked decision and rationale.
+
 ### 3a. Test fixtures / helpers (other tests depend on these)
 
 - [ ] `src/test-utils/falstad-fixture-reference.ts` -- **spec:** phase-component-model-correctness-job ssB8 -- Pin-key rename for resistor/inductor/crystal/memristor entries (J-184).
@@ -314,6 +338,113 @@ ssI2 spec evolved: the `participatesInLoad?: boolean` field on `AnalogElement` w
 
 - [ ] `e2e/gui/analog-bjt-convergence.spec.ts` -- **spec:** phase-test-contract-updates Test 1.1 -- Insert missing `placeLabeled('Diode', 43, 12, 'TD', 90)` after line 153 (J-002).
 - [ ] `e2e/gui/component-sweep.spec.ts` -- **spec:** phase-1-engine-infrastructure ssE -- Wire VDD/GND/inputs in CMOS-mode sweep block (lines 766-789) using property label `'voltage'` (J-003).
+
+## 4. Test infrastructure deprecation (engine-impersonator removal)
+
+> Surfaced 2026-05-03 during J-056 follow-up. The `analog-fuse.ts` migration revealed that the existing test-helper API in `src/solver/analog/__tests__/test-helpers.ts` reimplements the engine's compile/setup/init pipeline at test-helper fidelity, then silently diverges from the production seeding contract — concretely, no `state1.set(state0)` after `applyInitialValues`, so any pool-backed element with a non-zero schema-initial value stamps the wrong conductance the first time `load()` runs.
+>
+> The schema-init mechanism is itself a digiTS-only addition with no ngspice peer. ngspice does not declare per-element initial state-vector values: state arrays start zero, the DCOP pass populates `CKTstate0` via the bottom-of-load idiom, and `dctran.c:346-350` does `bcopy(state0, state1)` once before transient. Per-element constants like `BJTmode = ON` live in the instance struct and are set in `setup()`, not in a state array. The `applyInitialValues` mechanism solves a problem ngspice doesn't have, by writing only state0, in a way that requires the engine to seed state1 before any code reads from it. That seeding only happens via `analog-engine.ts:1437` (after DCOP); the test helpers skipped both DCOP and the seeding.
+>
+> **Decision (locked 2026-05-03):** delete the engine-impersonator helpers entirely. Tests that need to drive a circuit go through the real engine surface — `DefaultSimulatorFacade.build({...}) / facade.compile(...)`, `coordinator.dcOperatingPoint() / step()`, `coordinator.captureElementStates(idx)`. One shared `buildFixture(opts)` factory, modelled on `src/solver/analog/__tests__/harness/hwr-fixture.ts`, accepts either inline CircuitSpec or a .dts path and is used by every callsite. No per-file fixture builders.
+
+### 4a. Helper deletions (LANDED 2026-05-03)
+
+- [x] `src/solver/analog/__tests__/test-helpers.ts` -- FILE DELETED. Round 1 removed the five state/init/NR helpers (`initElement`, `allocateStatePool`, `makeSimpleCtx`, `runDcOp`, `runNR`, plus `SimpleCtxOptions`/`SimpleNROptions`). Round 2 removed the four remaining engine impersonators (`makeTestSetupContext`, `setupAll`, `loadCtxFromFields`, `makeLoadCtx`, plus `MakeLoadCtxOptions`). Both rounds landed in the same session; the file no longer exists.
+  - **Rationale:** all nine exports reimplemented engine internals at test-helper fidelity. The state/init helpers diverged from the production seeding contract (no `state1.set(state0)` after `applyInitialValues`), masked the schema-init mechanism gap exposed by J-056. The setup-context and load-context helpers reimplemented the engine's four allocation streams and the `LoadContext` shape respectively; tests calling `element.setup()` / `element.load()` against them bypassed the engine's compile / NR pipeline. The "centralise so a one-line schema bump fixes every caller" pattern was an admission of maintenance burden, not a justification for the helper.
+  - **Cascade:** 75 TS2307 "Cannot find module" errors across ~46 test files (all `__tests__/`). Zero production-code breakage (verified: no non-test files reference the deleted module). tsc total: 271 → 340 errors (+69 vs original baseline; the gap collapses as 4c lands).
+  - **Replacement contract:** every test goes through `buildFixture(opts)` (4b) + the public coordinator/engine surface — `coordinator.dcOperatingPoint()` / `step()`, `coordinator.captureElementStates(idx)`, `engine.compiled.solver.getCSCNonZeros()`. No test calls `element.setup()` or `element.load()` directly.
+
+### 4b. `buildFixture` shared factory (NEW FILE)
+
+- [ ] `src/solver/analog/__tests__/fixtures/build-fixture.ts` -- NEW FILE. Single entry point for all test fixture construction. Shape:
+  ```ts
+  export interface FixtureOptions {
+    /** Inline CircuitSpec (passed directly to facade.build). */
+    build?: (registry: ComponentRegistry) => Circuit;
+    /** Path to a .dts file under e2e/fixtures or src/test-utils/fixtures. */
+    dtsPath?: string;
+    /** Override SimulationParams (e.g. tStop, maxStep, gmin). */
+    params?: Partial<SimulationParams>;
+    /** Skip the boot DCOP if a test specifically needs an un-converged state.
+     *  Defaults to false (always run DCOP). */
+    skipDcOp?: boolean;
+  }
+  export interface Fixture {
+    facade: DefaultSimulatorFacade;
+    coordinator: DefaultSimulationCoordinator;
+    engine: MNAEngine;
+    pool: StatePool;
+    circuit: ConcreteCompiledAnalogCircuit;
+    /** Element index → label, for state-capture lookups. */
+    elementLabels: ReadonlyMap<number, string>;
+  }
+  export function buildFixture(opts: FixtureOptions): Fixture { ... }
+  ```
+  Internals: lift the pattern from `hwr-fixture.ts:24-67` — `new DefaultSimulatorFacade(registry)`, `facade.build({...})` or `facade.loadFromDts(dtsPath)`, `facade.compile(circuit)`, then pull `coordinator`, `engine`, `compiled.statePool`, `elementLabels` off the result. Acceptance: tsc clean, 1 unit test that asserts the returned `pool.state1` mirrors the schema-declared initial values for `analog-fuse` (the regression that motivated this).
+
+- [ ] `src/solver/analog/__tests__/harness/hwr-fixture.ts` -- Convert to a thin wrapper: `export const buildHwrFixture = () => buildFixture({ build: hwrCircuit })`, where `hwrCircuit` is the existing inline VS→R→D spec extracted as a const. Acceptance: existing callers of `buildHwrFixture` (3 files: `convergence-regression.test.ts`, `harness/query-methods.test.ts`, `harness/stream-verification.test.ts`) continue to type-check unchanged; structural-parity gate not regressed.
+
+### 4c. Per-file callsite migration (33 files; mechanical via `buildFixture`)
+
+> Each entry is a single test file's migration from the deleted helpers to `buildFixture`. Tests that previously hand-built a `CKTCircuitContext` and called `element.load(ctx)` directly become: build a circuit via `buildFixture({ build: ... })`, drive via `coordinator.dcOperatingPoint()` / `coordinator.step(dt)`, read state via `coordinator.captureElementStates(idx)`. No tests retain direct `setup()`/`load()` calls — those are engine-internal contracts.
+>
+> Acceptance per file: zero references to `initElement`/`allocateStatePool`/`makeSimpleCtx`/`runDcOp`/`runNR`; all assertions still hold; zero `as unknown as` casts on coordinator/engine internals.
+>
+> Pattern decision (locked): a single exemplar (`src/components/passives/__tests__/analog-fuse.test.ts`, since it already prompted this work) is migrated first to lock the `buildFixture` shape; the remaining 32 are agent-spawnable in parallel against the exemplar.
+
+- [ ] **Exemplar:** `src/components/passives/__tests__/analog-fuse.test.ts` (8 callsites) — migrate first, lock pattern, then spawn parallel agents for the rest.
+- [ ] `src/components/active/__tests__/adc.test.ts` (2)
+- [ ] `src/components/active/__tests__/dac.test.ts` (2)
+- [ ] `src/components/active/__tests__/opamp.test.ts` (5)
+- [ ] `src/components/active/__tests__/ota.test.ts` (8)
+- [ ] `src/components/active/__tests__/real-opamp.test.ts` (3)
+- [ ] `src/components/active/__tests__/real-opamp-raillim.test.ts` (1)
+- [ ] `src/components/active/__tests__/timer-555.test.ts` (1)
+- [ ] `src/components/io/__tests__/led.test.ts` (2)
+- [ ] `src/components/passives/__tests__/crystal.test.ts` (3)
+- [ ] `src/components/passives/__tests__/memristor.test.ts` (4)
+- [ ] `src/components/passives/__tests__/polarized-cap.test.ts` (6)
+- [ ] `src/components/passives/__tests__/resistor.test.ts` (3)
+- [ ] `src/components/passives/__tests__/tapped-transformer.test.ts` (2)
+- [ ] `src/components/passives/__tests__/transformer.test.ts` (5)
+- [ ] `src/components/passives/__tests__/transmission-line.test.ts` (5)
+- [ ] `src/components/passives/__tests__/tx_trace.test.ts` (2)
+- [ ] `src/components/semiconductors/__tests__/diac.test.ts` (3)
+- [ ] `src/components/semiconductors/__tests__/diode.test.ts` (9)
+- [ ] `src/components/semiconductors/__tests__/jfet.test.ts` (2)
+- [ ] `src/components/semiconductors/__tests__/mosfet.test.ts` (11)
+- [ ] `src/components/semiconductors/__tests__/triode.test.ts` (5)
+- [ ] `src/components/sensors/__tests__/ldr.test.ts` (6)
+- [ ] `src/components/sensors/__tests__/ntc-thermistor.test.ts` (3)
+- [ ] `src/components/sensors/__tests__/spark-gap.test.ts` (3)
+- [ ] `src/components/sources/__tests__/variable-rail.test.ts` (2)
+- [ ] `src/components/switching/__tests__/switches.test.ts` (6)
+- [ ] `src/solver/analog/__tests__/buckbjt-convergence.test.ts` (2)
+- [ ] `src/solver/analog/__tests__/ckt-context.test.ts` (2)
+- [ ] `src/solver/analog/__tests__/ckt-load.test.ts` (21)
+- [ ] `src/solver/analog/__tests__/controlled-source-base.test.ts` (5)
+- [ ] `src/solver/analog/__tests__/dc-operating-point.test.ts` (6)
+- [ ] `src/solver/analog/__tests__/dcop-init-jct.test.ts` (8)
+- [ ] `src/solver/analog/__tests__/harness/boot-step.test.ts` (2)
+- [ ] `src/solver/analog/__tests__/harness/harness-integration.test.ts` (3)
+- [ ] `src/solver/analog/__tests__/harness/test-npn-harness.test.ts` (1)
+- [ ] `src/solver/analog/__tests__/newton-raphson.test.ts` (5)
+- [ ] `src/solver/analog/__tests__/ngspice-bridge-smoke.test.ts` (1)
+- [ ] `src/solver/analog/__tests__/ngspice-parity/bjt-common-emitter.test.ts` (1)
+- [ ] `src/solver/analog/__tests__/ngspice-parity/diode-resistor.test.ts` (1)
+- [ ] `src/solver/analog/__tests__/ngspice-parity/load-order-parity.test.ts` (2)
+- [ ] `src/solver/analog/__tests__/ngspice-parity/mosfet-inverter.test.ts` (1)
+- [ ] `src/solver/analog/__tests__/ngspice-parity/resistive-divider.test.ts` (1)
+- [ ] `src/solver/analog/__tests__/phase-3-nr-reorder.test.ts` (2)
+- [ ] `src/solver/analog/__tests__/rc-ac-transient.test.ts` (3)
+
+### 4d. Schema-init mechanism removal (ngspice-faithful)
+
+- [ ] `src/solver/analog/state-schema.ts` — drop the `init` field from `SlotDescriptor` and the `SlotInit` discriminated union; delete `applyInitialValues`. State arrays start zero, period. Non-zero startup constants live in instance-struct fields populated in `setup()`, mirroring `bjtsetup.c:48` (`here->BJTmode = ON`). The DCOP pass populates `state0` via the bottom-of-load CKTstate0 idiom; `analog-engine.ts:1437` does `state1.set(state0)` once after DCOP per `dctran.c:349-350`. That is the entire seeding contract.
+- [ ] `src/components/passives/analog-fuse.ts` — `CONDUCT` slot loses its `init: { kind: "constant", value: 1 }`. Move CONDUCT bookkeeping out of the schema entirely: introduce an instance field `_intact: boolean = true` set in `setup()`, swap the conductance branch on it, and either drop CONDUCT from the schema or leave it at `{ kind: "zero" }` if the slot is still useful for state-capture diagnostics. Remove `DIAG_EMITTED` slot (the latch can move to an instance field too — `_diagEmitted: boolean`, written in `acceptStep`; nothing else reads it). `I2T_ACCUM` stays in the schema (genuine integration history, zero-initial, ngspice-shaped).
+- [ ] `src/components/passives/__tests__/analog-fuse.test.ts` — drop the `pool.state1.set(pool.state0)` seeds added 2026-05-03; they exist only because of the schema-init mechanism. Re-route via `buildFixture` (4c).
+- [ ] Audit every other pool-backed element for non-`zero` schema initials and migrate to instance-struct + `setup()` initialization. Targets: any callsite of `defineStateSchema(...)` whose slots use `init: { kind: "constant", ... }` or `init: { kind: "fromParams", ... }`. Real-opamp / memristor / spark-gap / ntc-thermistor / comparator must be checked as part of their respective J-IDs in 2b.
+- [ ] J-178 / G1 / G7 spec text in `spec/phase-component-model-correctness-job.md` — the ss1.1 contract currently mandates schema-declared initial values via `applyInitialValues`. Rewrite to forbid them: schema slots are zero-initial; non-zero constants belong in instance fields set in `setup()`. Reviewer must reject any future ss1.1-shaped migration that lands a `init: { kind: "constant" }` declaration.
 
 ## Unclassified (needs user triage)
 
