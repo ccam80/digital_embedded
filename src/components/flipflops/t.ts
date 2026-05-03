@@ -68,80 +68,90 @@ export const { paramDefs: T_FF_BEHAVIORAL_PARAM_DEFS, defaults: T_FF_BEHAVIORAL_
 });
 
 // ---------------------------------------------------------------------------
-// buildTFlipflopNetlist- function-form netlist for the behavioural model
+// buildTFlipflopNetlist- function-form netlist for the behavioural model.
 //
-// Ports: T, C, Q, ~Q, gnd (indices 0..4) -- with-enable variant only.
-// Sub-elements:
+// Two variants, selected by the `withEnable` parent property:
+//
+//   withEnable=true  -> ports [T, C, Q, ~Q, gnd]; drv reads T as the toggle
+//                       enable, gates the rising-edge toggle.
+//   withEnable=false -> ports [C, Q, ~Q, gnd]; drv's T pin is wired to gnd
+//                       (placeholder) and the driver runs with `forceToggle=1`,
+//                       so it unconditionally toggles on every rising edge
+//                       and never reads T. Matches the always-toggle
+//                       (divide-by-2) semantic of the digital model.
+//
+// Sub-elements (both variants):
 //   drv  : BehavioralTFlipflopDriver  (1-bit pure-truth-function leaf)
 //   qPin : DigitalOutputPinLoaded     (drives Q  from drv slot OUTPUT_LOGIC_LEVEL_Q)
 //   nqPin: DigitalOutputPinLoaded     (drives ~Q from drv slot OUTPUT_LOGIC_LEVEL_NQ)
 //
-// Strictly 1-bit. Multi-bit composites instantiate this subcircuit per bit;
-// bit-width replication is composite-expansion infrastructure.
-//
-// withEnable=false (always-toggle) is NOT supported by this behavioural
-// netlist; the parent's getPins() variant for that case has no T pin, but
-// the driver leaf still requires a T input. Supporting it requires either
-// (a) always exposing T at the parent (UI behaviour change), or (b) adding
-// an internal vdd-tied net via a voltage-source sub-element. Both are
-// architectural decisions that live outside this composite's blast radius.
-// Until then, withEnable=false instances must use the digital model.
+// Strictly 1-bit. Multi-bit composites instantiate this subcircuit per bit.
 // ---------------------------------------------------------------------------
 
 export function buildTFlipflopNetlist(params: PropertyBag): MnaSubcircuitNetlist {
   const withEnable = params.getOrDefault<boolean>("withEnable", true);
-  if (!withEnable) {
-    throw new Error(
-      "Timer-FF behavioural model: withEnable=false is not supported by the " +
-      "subcircuit netlist. Use the digital model for always-toggle T flip-flops, " +
-      "or wire T to vdd in your schematic and set withEnable=true.",
-    );
+  const drvSubElement = {
+    typeId: "BehavioralTFlipflopDriver",
+    modelRef: "default",
+    subElementName: "drv",
+    params: {
+      vIH:         params.getModelParam<number>("vIH"),
+      vIL:         params.getModelParam<number>("vIL"),
+      forceToggle: withEnable ? 0 : 1,
+    },
+  };
+  const qPinSubElement = {
+    typeId: "DigitalOutputPinLoaded",
+    modelRef: "default",
+    subElementName: "qPin",
+    params: {
+      rOut: params.getModelParam<number>("rOut"),
+      cOut: params.getModelParam<number>("cOut"),
+      vOH:  params.getModelParam<number>("vOH"),
+      vOL:  params.getModelParam<number>("vOL"),
+      inputLogic: { kind: "siblingState", subElementName: "drv",
+                    slotName: "OUTPUT_LOGIC_LEVEL_Q" },
+    },
+  };
+  const nqPinSubElement = {
+    typeId: "DigitalOutputPinLoaded",
+    modelRef: "default",
+    subElementName: "nqPin",
+    params: {
+      rOut: params.getModelParam<number>("rOut"),
+      cOut: params.getModelParam<number>("cOut"),
+      vOH:  params.getModelParam<number>("vOH"),
+      vOL:  params.getModelParam<number>("vOL"),
+      inputLogic: { kind: "siblingState", subElementName: "drv",
+                    slotName: "OUTPUT_LOGIC_LEVEL_NQ" },
+    },
+  };
+
+  if (withEnable) {
+    return {
+      ports: ["T", "C", "Q", "~Q", "gnd"],
+      params: { ...T_FF_BEHAVIORAL_DEFAULTS },
+      elements: [drvSubElement, qPinSubElement, nqPinSubElement],
+      internalNetCount: 0,
+      netlist: [
+        [0, 1, 2, 3, 4],   // drv: T, C, Q, ~Q, gnd
+        [2, 4],            // qPin:  Q  to gnd
+        [3, 4],            // nqPin: ~Q to gnd
+      ],
+    } as MnaSubcircuitNetlist;
   }
+
+  // withEnable=false: T is absent from parent ports; wire driver's T pin to
+  // gnd as a placeholder. forceToggle=1 makes the driver ignore T entirely.
   return {
-    ports: ["T", "C", "Q", "~Q", "gnd"],
+    ports: ["C", "Q", "~Q", "gnd"],
     params: { ...T_FF_BEHAVIORAL_DEFAULTS },
-    elements: [
-      {
-        typeId: "BehavioralTFlipflopDriver",
-        modelRef: "default",
-        subElementName: "drv",
-        params: {
-          vIH: params.getModelParam<number>("vIH"),
-          vIL: params.getModelParam<number>("vIL"),
-        },
-      },
-      {
-        typeId: "DigitalOutputPinLoaded",
-        modelRef: "default",
-        subElementName: "qPin",
-        params: {
-          rOut: params.getModelParam<number>("rOut"),
-          cOut: params.getModelParam<number>("cOut"),
-          vOH:  params.getModelParam<number>("vOH"),
-          vOL:  params.getModelParam<number>("vOL"),
-          inputLogic: { kind: "siblingState", subElementName: "drv",
-                        slotName: "OUTPUT_LOGIC_LEVEL_Q" },
-        },
-      },
-      {
-        typeId: "DigitalOutputPinLoaded",
-        modelRef: "default",
-        subElementName: "nqPin",
-        params: {
-          rOut: params.getModelParam<number>("rOut"),
-          cOut: params.getModelParam<number>("cOut"),
-          vOH:  params.getModelParam<number>("vOH"),
-          vOL:  params.getModelParam<number>("vOL"),
-          inputLogic: { kind: "siblingState", subElementName: "drv",
-                        slotName: "OUTPUT_LOGIC_LEVEL_NQ" },
-        },
-      },
-    ],
+    elements: [drvSubElement, qPinSubElement, nqPinSubElement],
     internalNetCount: 0,
     netlist: [
-      [0, 1, 2, 3, 4],   // drv: T, C, Q, ~Q, gnd
-      [2, 4],            // qPin:  Q  to gnd
-      [3, 4],            // nqPin: ~Q to gnd
+      [3, 0, 1, 2, 3],   // drv: T=gnd, C, Q, ~Q, gnd
+      [1, 3],            // qPin:  Q  to gnd
+      [2, 3],            // nqPin: ~Q to gnd
     ],
   } as MnaSubcircuitNetlist;
 }
