@@ -33,8 +33,8 @@ export function buildHwrFixture(): HwrFixture {
       { id: "gnd", type: "Ground" },
     ],
     connections: [
-      ["vs:pos",  "r1:A"],
-      ["r1:B",    "d1:A"],
+      ["vs:pos",  "r1:pos"],
+      ["r1:neg",  "d1:A"],
       ["d1:K",    "gnd:out"],
       ["vs:neg",  "gnd:out"],
     ],
@@ -59,6 +59,9 @@ export function buildHwrFixture(): HwrFixture {
   }
 
   const pool = compiled.statePool;
+  if (pool === null) {
+    throw new Error("buildHwrFixture: compiled.statePool is null after init");
+  }
 
   return { circuit: compiled, pool, engine: mnaEngine };
 }

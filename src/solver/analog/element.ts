@@ -46,13 +46,6 @@ export interface AnalogElement {
    */
   label: string;
 
-  /** If false, the engine's _setup and _load walks skip this element.
-   *  Default true. Used by netlist-composite wrappers (which carry
-   *  presentation-only setParam / getPinCurrents / getInternalNodeLabels
-   *  but no MNA participation- every real leaf is registered separately
-   *  in analogElements). */
-  participatesInLoad?: boolean;
-
   /**
    * Position in ngspice's CKTload iteration order. Mirrors the device-type
    * ordinal in `ref/ngspice/src/spicelib/devices/dev.c` `DEVices[]`.

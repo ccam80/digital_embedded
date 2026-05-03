@@ -12,7 +12,10 @@
 
 import type { Engine, CompiledCircuit, MeasurementObserver } from "./engine-interface.js";
 import type { Wire } from "../core/circuit.js";
-import type { AcParams, AcResult, DiagnosticSuggestion, StatePoolRef, IntegrationMethod } from "./analog-types.js";
+import type { AcParams, AcResult } from "../solver/analog/ac-analysis.js";
+import type { StatePoolRef } from "../solver/analog/state-pool.js";
+import type { IntegrationMethod } from "../solver/analog/integration.js";
+import type { DiagnosticSuggestion } from "../compile/types.js";
 import type { ConvergenceLog } from "../solver/analog/convergence-log.js";
 import type { Diagnostic, DiagnosticCode } from "../compile/types.js";
 export type { AcParams, AcResult, DiagnosticSuggestion };
@@ -278,8 +281,13 @@ export interface CompiledAnalogCircuit extends CompiledCircuit {
   readonly labelToNodeId: Map<string, number>;
   /** Maps Wire objects to MNA node IDs for wire renderer signal access. */
   readonly wireToNodeId: Map<Wire, number>;
-  /** Shared state pool for per-element operating-point state. */
-  readonly statePool: StatePoolRef;
+  /** Shared state pool for per-element operating-point state.
+   *
+   *  Null between compile and `MNAEngine._setup()`- per-element state counts
+   *  aren't known until each element's setup() runs, so the compiler leaves
+   *  this field unset and `_setup()` writes back the allocated pool.
+   *  Consumers reading the pool from a compiled circuit MUST null-check. */
+  statePool: StatePoolRef | null;
   /**
    * Nodeset constraints: map of MNA nodeId → target voltage.
    * Passed to the NR solver to enforce voltage starting points via 1e10

@@ -7,7 +7,8 @@
  *  - Breakpoint support for exact landing at registered simulation times
  */
 
-import type { AnalogElement, IntegrationMethod } from "./element.js";
+import type { AnalogElement } from "./element.js";
+import type { IntegrationMethod } from "./integration.js";
 import type { ResolvedSimulationParams } from "../../core/analog-engine-interface.js";
 import type { HistoryStore } from "./integration.js";
 import type { LteParams } from "./ckt-terr.js";
@@ -608,10 +609,10 @@ export class TimestepController {
    *
    * @param simTime - Simulation time after the accepted step, in seconds
    */
-  accept(simTime: number): void {
+  markAccepted(simTime: number): void {
     if (simTime <= this._lastAcceptedSimTime) {
       throw new Error(
-        `TimestepController.accept() invariant violated: simTime ${simTime} <= _lastAcceptedSimTime ${this._lastAcceptedSimTime}`,
+        `TimestepController.markAccepted() invariant violated: simTime ${simTime} <= _lastAcceptedSimTime ${this._lastAcceptedSimTime}`,
       );
     }
     this._lastAcceptedSimTime = simTime;

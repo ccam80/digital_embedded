@@ -38,13 +38,13 @@ import type { LogicFamilyConfig } from "../../core/logic-family.js";
 import type { SolverPartition, PartitionedComponent, DigitalCompilerFn, ComponentDefinition, MnaModel } from "../../compile/types.js";
 import type { ModelEntry } from "../../core/registry.js";
 import { StatePool } from "./state-pool.js";
-import type { AnalogElement } from "./element.js";
+import { isPoolBacked, type AnalogElement } from "./element.js";
 import { NGSPICE_LOAD_ORDER, getNgspiceLoadOrderByTypeId, TYPE_ID_TO_DECK_PIN_LABEL_ORDER } from "./ngspice-load-order.js";
-import type { StateSchema } from "./state-schema.js";
 import {
   buildTopologyInfo,
   runCompileTimeDetectors,
 } from "./topology-diagnostics.js";
+import { SubcircuitWrapperElement } from "./subcircuit-wrapper-element.js";
 
 // ---------------------------------------------------------------------------
 // Component routing- shared decision logic for Pass A and Pass B
@@ -153,9 +153,7 @@ function resolveComponentRoute(
  */
 function resolveSubcircuitModels(
   partition: SolverPartition,
-  runtimeModels: Record<string, MnaSubcircuitNetlist>,
   registry: ComponentRegistry,
-  diagnostics: import("../../core/analog-engine-interface.js").Diagnostic[],
 ): void {
   for (const pc of partition.components) {
     const def = pc.definition;
@@ -163,30 +161,30 @@ function resolveSubcircuitModels(
     if (!modelReg) continue;
     const entry = modelReg[pc.modelKey];
     if (!entry || entry.kind !== 'netlist') continue;
-    const defName = pc.modelKey;
 
-    const netlist = entry.netlist ?? runtimeModels[defName];
-    if (!netlist) {
-      diagnostics.push(
-        makeDiagnostic(
-          "unresolved-model-ref",
-          "error",
-          `Subcircuit definition "${defName}" not found for component "${def.name}" model key "${pc.modelKey}"`,
-          {
-            explanation:
-              `Component "${def.name}" references subcircuit definition "${defName}" ` +
-              `but no MnaSubcircuitNetlist with that name was found in runtime models.`,
-          },
-        ),
-      );
-      pc.model = null;
-      continue;
+    const netlist = entry.netlist;
+
+    let resolvedNetlist: MnaSubcircuitNetlist;
+    if (typeof netlist === "function") {
+      // Spec ssI6: function-form netlist receives the merged-instance PropertyBag
+      // (paramDef defaults + entry.params + instance overrides), so the netlist
+      // builder evaluates against the same param values the leaf factories see.
+      const mergedRecord: Record<string, number> = {
+        ...paramDefDefaults(entry.paramDefs),
+        ...entry.params,
+      };
+      const instanceProps = pc.element.getProperties();
+      for (const k of instanceProps.getModelParamKeys()) {
+        mergedRecord[k] = instanceProps.getModelParam<number>(k);
+      }
+      const mergedProps = new PropertyBag();
+      for (const [k, v] of Object.entries(mergedRecord)) {
+        mergedProps.setModelParam(k, v);
+      }
+      resolvedNetlist = netlist(mergedProps);
+    } else {
+      resolvedNetlist = netlist;
     }
-
-    const resolvedNetlist =
-      typeof netlist === "function"
-        ? (netlist as unknown as (props: PropertyBag) => MnaSubcircuitNetlist)(pc.element.getProperties())
-        : netlist;
 
     pc.model = compileSubcircuitToMnaModel(resolvedNetlist, pc, registry);
   }
@@ -305,7 +303,7 @@ function compileSubcircuitToMnaModel(
       const elementsByName = new Map<string, import("../../core/mna-subcircuit-netlist.js").SubcircuitElement>();
       for (let elIdx = 0; elIdx < netlist.elements.length; elIdx++) {
         const subEl = netlist.elements[elIdx]!;
-        const subName = (subEl as unknown as { subElementName?: string }).subElementName ?? `el${elIdx}`;
+        const subName = subEl.subElementName ?? `el${elIdx}`;
         elementsByName.set(subName, subEl);
       }
 
@@ -389,7 +387,7 @@ function compileSubcircuitToMnaModel(
                 }
                 // Write the GLOBAL label into the dependent leaf's prop bag.
                 // The dependent leaf's setup() calls ctx.findBranch(label).
-                (subProps as unknown as { set: (k: string, val: unknown) => void }).set(
+                subProps.set(
                   paramKey,
                   `${labelRef.value}:${ref.subElementName}`,
                 );
@@ -407,18 +405,18 @@ function compileSubcircuitToMnaModel(
                     `siblingState: registry has no definition for typeId "${sibling.typeId}"`,
                   );
                 }
-                // Prefer the constructed sibling's per-instance schema (covers
-                // variable-arity drivers like Counter / Register that build
-                // their schema from props in the constructor); fall back to the
-                // definition's static schema for the canonical fixed-shape case.
+                // The constructed sibling carries the per-instance schema- variable-arity
+                // drivers like Counter / Register build their schema from props in the
+                // constructor, and fixed-shape drivers expose the same canonical schema.
                 // Sibling MUST appear before the consumer in `netlist.elements`
                 // iteration order- d-flipflop's parent emits [drv, qPin, nqPin],
                 // counter parent emits [drv, outBit0, outBit1, ...]; the d-flipflop
                 // / counter drv constructor runs first and populates constructedByName.
                 const siblingEl = constructedByName.get(ref.subElementName);
                 const siblingSchema =
-                  (siblingEl as { stateSchema?: StateSchema } | undefined)?.stateSchema
-                  ?? (siblingDef as unknown as { stateSchema?: StateSchema }).stateSchema;
+                  siblingEl !== undefined && isPoolBacked(siblingEl)
+                    ? siblingEl.stateSchema
+                    : undefined;
                 const slotIdx = siblingSchema?.indexOf.get(ref.slotName) ?? -1;
                 if (slotIdx < 0) {
                   throw new Error(
@@ -482,7 +480,7 @@ function compileSubcircuitToMnaModel(
 
         const childEl = leafFactory(subPinNodes, subProps, getTime);
         subElements.push(childEl);
-        const subName = (subEl as unknown as { subElementName?: string }).subElementName ?? `el${elIdx}`;
+        const subName = subEl.subElementName ?? `el${elIdx}`;
         constructedByName.set(subName, childEl);
         subElementLabelInfo.push({ el: childEl, subElementName: subName });
 
@@ -547,51 +545,22 @@ function compileSubcircuitToMnaModel(
 
       allChildren.push(...subElements);
 
-      // Wrapper is a plain object literal satisfying AnalogElement.
-      // It does NOT extend CompositeElement and does NOT define setup/load-
-      // the global sort plus participatesInLoad:false skips it; the leaves
-      // (allocator, patcher, sub-elements) participate directly via the
-      // global ngspiceLoadOrder walk.
-      const wrapper: AnalogElement & {
-        setLabel: (label: string) => void;
-        getInternalNodeLabels: () => readonly string[];
-        _subcircuitLeaves: readonly AnalogElement[];
-      } = {
-        label: "",
+      // Wrapper is a SubcircuitWrapperElement- the engine walks it like any
+      // other AnalogElement, but its setup/load are no-ops; the real work
+      // lives in the leaves (allocator, patcher, sub-elements) flattened
+      // alongside the wrapper into the global accumulator by the caller.
+      // ngspiceLoadOrder is set to VCVS for parity with the controlled-source
+      // family; the no-op load means the order is functionally arbitrary.
+      return new SubcircuitWrapperElement({
+        pinNodes,
         ngspiceLoadOrder: NGSPICE_LOAD_ORDER.VCVS,
-        participatesInLoad: false,
-        _pinNodes: new Map(pinNodes),
-        _stateBase: -1,
-        branchIndex: -1,
-        _subcircuitLeaves: allChildren,
-        setParam(key: string, value: number): void {
-          const bound = bindings.get(key);
-          if (bound) {
-            for (const { el, key: elKey } of bound) el.setParam(elKey, value);
-          } else {
-            for (const sub of subElements) sub.setParam(key, value);
-          }
-        },
-        getPinCurrents(rhs: Float64Array): number[] {
-          const currents: number[] = [];
-          for (const sub of subElements) {
-            currents.push(...sub.getPinCurrents(rhs));
-          }
-          return currents;
-        },
-        getInternalNodeLabels(): readonly string[] {
-          return internalNetLabelsResolved;
-        },
-        setLabel(label: string): void {
-          wrapper.label = label;
-          labelRef.value = label;
-          for (const { el, subElementName } of subElementLabelInfo) {
-            el.label = `${label}:${subElementName}`;
-          }
-        },
-      };
-
-      return wrapper;
+        subElements,
+        leaves: allChildren,
+        bindings: { map: bindings },
+        subElementLabelInfo,
+        internalNetLabels: internalNetLabelsResolved,
+        labelRef,
+      });
     },
   };
 }
@@ -664,23 +633,6 @@ function resolveElementNodes(
 // ---------------------------------------------------------------------------
 // Pipeline stage helpers
 // ---------------------------------------------------------------------------
-
-/**
- * Extract runtime subcircuit netlists from circuit metadata.
- */
-function extractRuntimeModels(
-  metadataSource: Record<string, unknown>,
-): Record<string, MnaSubcircuitNetlist> {
-  const models = metadataSource["models"];
-  if (
-    models !== null &&
-    typeof models === 'object' &&
-    !Array.isArray(models)
-  ) {
-    return models as Record<string, MnaSubcircuitNetlist>;
-  }
-  return {};
-}
 
 /** Per-element metadata produced by Pass A for `compileAnalogPartition`. */
 type PartitionElementMeta = {
@@ -1030,10 +982,7 @@ export function compileAnalogPartition(
   const circuitFamily = logicFamily ?? defaultLogicFamily();
 
   // Stage 2b: Resolve subcircuit-backed models into MnaModel factories.
-  const runtimeModels: Record<string, MnaSubcircuitNetlist> = outerCircuit !== undefined
-    ? extractRuntimeModels(outerCircuit.metadata as unknown as Record<string, unknown>)
-    : {};
-  resolveSubcircuitModels(partition, runtimeModels, registry, diagnostics);
+  resolveSubcircuitModels(partition, registry);
 
   // Extract typed inline runtime models for use in route resolution.
   const runtimeModelMap: Record<string, Record<string, ModelEntry>> | undefined =
@@ -1160,7 +1109,7 @@ export function compileAnalogPartition(
           componentOverride,
         );
       }
-      props.set("_pinElectrical", pinElectricalMap as unknown as import("../../core/properties.js").PropertyValue);
+      props.set("_pinElectrical", pinElectricalMap);
 
       // Build per-pin loading map and inject into PropertyBag so that
       // behavioural factories can read it during pin-model construction.
@@ -1176,7 +1125,7 @@ export function compileAnalogPartition(
           );
         }
       }
-      props.set("_pinLoading", pinLoadingMap as unknown as import("../../core/properties.js").PropertyValue);
+      props.set("_pinLoading", pinLoadingMap);
     }
 
     // Populate model params.
@@ -1205,16 +1154,11 @@ export function compileAnalogPartition(
     const resolvedLabel = el.getProperties().has("label")
       ? String(el.getProperties().get("label") ?? el.instanceId)
       : el.instanceId;
-    // Subcircuit-wrapper case: the factory returned a plain-object wrapper
-    // with a `setLabel` method and `_subcircuitLeaves` exposed. Stamp the
-    // wrapper's label before flattening leaves so each leaf carries
+    // Subcircuit-wrapper case: the factory returned a SubcircuitWrapperElement.
+    // Stamp the wrapper's label before flattening leaves so each leaf carries
     // `${parentLabel}:${subElementName}` (Composite I5).
-    const wrapperLike = core as unknown as {
-      setLabel?: (label: string) => void;
-      _subcircuitLeaves?: readonly import("./element.js").AnalogElement[];
-    };
-    if (typeof wrapperLike.setLabel === "function") {
-      wrapperLike.setLabel(resolvedLabel);
+    if (core instanceof SubcircuitWrapperElement) {
+      core.setLabel(resolvedLabel);
     }
     const elementIndex = analogElements.length;
     const element: import("./element.js").AnalogElement = Object.assign(core, {
@@ -1248,9 +1192,9 @@ export function compileAnalogPartition(
     // If the factory was a subcircuit wrapper, push its leaves (allocator,
     // patcher, sub-elements) directly into the analog accumulator so the
     // global ngspiceLoadOrder sort sequences them ahead of real devices.
-    // The wrapper itself stays in `analogElements` with participatesInLoad:false.
-    if (wrapperLike._subcircuitLeaves !== undefined) {
-      for (const leaf of wrapperLike._subcircuitLeaves) {
+    // The wrapper itself stays in `analogElements` with no-op setup/load.
+    if (core instanceof SubcircuitWrapperElement) {
+      for (const leaf of core._subcircuitLeaves) {
         analogElements.push(leaf);
       }
     }
@@ -1410,7 +1354,7 @@ export function compileAnalogPartition(
   // MNAEngine._setup() calls allocateStateBuffers(numStates) after all
   // element setup() calls have run, then each pool-backed element's
   // initState() is called from CKTCircuitContext.allocateStateBuffers().
-  const statePool = null as unknown as StatePool;
+  const statePool: StatePool | null = null;
 
   // Build and return ConcreteCompiledAnalogCircuit
   const models = new Map<string, DeviceModel>();

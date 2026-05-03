@@ -114,12 +114,13 @@ export class ConcreteCompiledAnalogCircuit implements CompiledAnalogCircuit {
 
   /** Shared state pool for all elements in this compiled circuit.
    *
-   *  Lifecycle: the analog compiler initialises this to a placeholder (or null
-   *  cast) because per-element state counts aren't known until each element's
-   *  setup() runs. MNAEngine._setup() then either adopts the pre-built pool
-   *  (test path that pre-allocated) or allocates one and writes back here.
-   *  Post-_setup, cac.statePool === ctx.statePool- single-ownership invariant. */
-  statePool: StatePool;
+   *  Lifecycle: the analog compiler leaves this `null` because per-element
+   *  state counts aren't known until each element's setup() runs.
+   *  MNAEngine._setup() then either adopts a pre-built pool (test path that
+   *  pre-allocated) or allocates one and writes back here. Post-_setup,
+   *  cac.statePool === ctx.statePool- single-ownership invariant. Until
+   *  _setup() runs, consumers must null-check. */
+  statePool: StatePool | null;
 
   /** Nodeset constraints: map of MNA nodeId → target voltage. */
   readonly nodesets?: Map<number, number>;
@@ -142,7 +143,7 @@ export class ConcreteCompiledAnalogCircuit implements CompiledAnalogCircuit {
     bridgeAdaptersByGroupId?: Map<number, Array<BridgeOutputAdapter | BridgeInputAdapter>>;
     diagnostics?: Diagnostic[];
     timeRef?: { value: number };
-    statePool: StatePool;
+    statePool: StatePool | null;
     nodesets?: Map<number, number>;
     ics?: Map<number, number>;
   }) {

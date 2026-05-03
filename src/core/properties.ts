@@ -41,7 +41,25 @@ export interface PoolSlotRef {
 // PropertyValue- the union of all valid property value types
 // ---------------------------------------------------------------------------
 
-export type PropertyValue = number | string | boolean | bigint | number[] | Record<string, number> | PoolSlotRef;
+/**
+ * Sidecar storage shape: arbitrary object/map data attached to a PropertyBag
+ * under an underscore-prefixed key (e.g. `_pinElectrical`, `_pinLoading`,
+ * `_pinElectricalOverrides`). Sidecar consumers cast back to the concrete
+ * inner shape on read; the union arm exists to keep the write side type-safe.
+ *
+ * Both `Record<string, unknown>` and `ReadonlyMap<string, unknown>` are
+ * accepted so callers can use whichever container fits the data.
+ */
+export type PropertyValue =
+  | number
+  | string
+  | boolean
+  | bigint
+  | number[]
+  | Record<string, number>
+  | Record<string, unknown>
+  | ReadonlyMap<string, unknown>
+  | PoolSlotRef;
 
 // ---------------------------------------------------------------------------
 // PropertyDefinition- static description of one property slot
@@ -224,6 +242,19 @@ export function propertyBagToJson(bag: PropertyBag): SerializedPropertyBag {
       // the compiler on every expansion. Skip serialisation — re-emit by
       // re-running the compiler.
       continue;
+    } else if (v instanceof Map) {
+      // ReadonlyMap sidecars (compiler-built per-pin loading / electrical
+      // tables, etc.) are runtime-only and re-derived from the compiled
+      // circuit on every recompile.
+      continue;
+    } else if (typeof v === 'object' && v !== null && !Array.isArray(v)) {
+      // Object-shaped sidecars (`_pinElectrical`, `_pinLoading`) are
+      // runtime-only. The narrow Record<string, number> arm (used by user-
+      // facing `_pinElectricalOverrides`) IS serialised; broader
+      // Record<string, unknown> values are not.
+      const allNumeric = Object.values(v).every((x) => typeof x === 'number');
+      if (!allNumeric) continue;
+      out[k] = v as Record<string, number>;
     } else {
       out[k] = v;
     }
