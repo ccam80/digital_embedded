@@ -313,7 +313,15 @@ export interface ComponentModels {
  *
  * Three downstream effects of `internalOnly: true`:
  *   1. Editor palette excludes it (palette-builder filters via getAllStandalone).
- *   2. SPICE-import primary-element matching skips it (spice-model-apply.ts).
+ *   2. SPICE-import target selection cannot reach it. Two paths exist and both
+ *      are structurally safe:
+ *      - UI dialog (openSpiceImportDialog / applySpiceImportResult): the caller
+ *        pre-selects the target element from the palette, so effect #1 above
+ *        already excludes internalOnly defs.
+ *      - SUBCKT body parsing (src/io/spice-model-builder.ts): maps SPICE
+ *        prefix letters (R/L/C/V/I/Q/M/D/J) to digiTS typeIds via a hardcoded
+ *        switch covering only user-facing primitives. Does not iterate the
+ *        registry, so an internalOnly typeId can never be picked.
  *   3. harness_describe groups it under its parent composite's label.
  */
 export interface ComponentDefinition {

@@ -67,7 +67,7 @@ ssI2 spec evolved: the `participatesInLoad?: boolean` field on `AnalogElement` w
 
 ### 1d. Headless / harness / IO surfaces
 
-- [ ] `src/headless/spice-model-apply.ts` -- **spec:** phase-composite-architecture ssI3 -- Skip `internalOnly: true` registry entries during SPICE-import primary-element matching (J-105).
+- [x] `src/headless/spice-model-apply.ts` -- **spec:** phase-composite-architecture ssI3 -- Skip `internalOnly: true` registry entries during SPICE-import primary-element matching (J-105). **Done 2026-05-03 (architecturally moot, ticked):** the cited file moved to `src/app/spice-model-apply.ts` and the cited function `applyParsedSpiceModel` was renamed `applySpiceImportResult` and restructured to take an explicit `element: CircuitElement` rather than discover one by registry iteration — there is no longer any "primary-element matching" code path to filter. **Audit found two SPICE-touching paths, both already structurally safe:** (a) UI dialog `openSpiceImportDialog` is opened on a caller-pre-selected palette element, and the palette filters `internalOnly` upstream via `getAllStandalone()` (`src/core/registry.ts:579-585`); (b) SUBCKT body parsing in `src/io/spice-model-builder.ts` maps SPICE prefix letters (R/L/C/V/I/Q/M/D/J) to digiTS typeIds via a hardcoded switch covering only user-facing primitives, never iterates the registry. Folded in: fixed stale comment at `src/core/registry.ts:314-317` that pointed effect #2 at the now-deleted `applyParsedSpiceModel`; new comment cites both real defence sites.
 - [ ] `scripts/mcp/harness-tools.ts` -- **spec:** phase-composite-architecture ssI3 -- `harness_describe` groups `internalOnly` sub-elements under their parent composite's user-facing label (J-004).
 - [x] `src/app/simulation-controller.ts` -- **spec:** phase-1-engine-infrastructure File 11 -- `compileAndBind` reads `coordinator.getRuntimeDiagnostics()` after `getDcOpResult()`, surfaces runtime errors to status bar + canvas overlays, aborts on runtime error (J-006). **Done 2026-05-03:** verified pre-landed in staging — `getRuntimeDiagnostics()` read after `getDcOpResult()` in `compileAndBind`, runtime errors → `ctx.showStatus(..., true)`, runtime errors+warnings → `renderPipeline.populateDiagnosticOverlays(overlayDiags, wireToNodeId)`, abort path: `facade.invalidate(); return false;`. Folded in: removed `as unknown as { setSimTime(t: number): void }` cast at hot-recompile site (now uses `SimulationCoordinator.setSimTime` directly via the J-181 interface extension).
 - [ ] `src/editor/palette.ts` -- **spec:** phase-composite-architecture ssI3 -- Filter `internalOnly` definitions from palette tree (J-104).
@@ -75,8 +75,8 @@ ssI2 spec evolved: the `participatesInLoad?: boolean` field on `AnalogElement` w
 
 ### 1e. Composite / digital-pin-model deletions (parallel-pool peers; trigger import-removal cascade)
 
-- [ ] `src/solver/analog/composite-element.ts` -- **spec:** phase-composite-architecture ssD1 -- DELETE the file (J-176).
-- [ ] `src/solver/analog/digital-pin-model.ts` -- **spec:** phase-composite-architecture ssD2 -- DELETE the file (J-177).
+- [x] `src/solver/analog/composite-element.ts` -- **spec:** phase-composite-architecture ssD1 -- DELETE the file (J-176).
+- [x] `src/solver/analog/digital-pin-model.ts` -- **spec:** phase-composite-architecture ssD2 -- DELETE the file (J-177).
 
 ## 2. Components
 
