@@ -58,7 +58,11 @@ const MIN_TEMPERATURE = 1.0; // 1 K - prevent division by zero
 // ---------------------------------------------------------------------------
 
 export const NTC_SCHEMA = defineStateSchema("NTCThermistorElement", [
-  { name: "TEMPERATURE", doc: "Operating temperature in Kelvin", init: { kind: "constant", value: 298.15 } },
+  // Zero-init per §4d locked decision (schema slots zero-initial; non-zero
+  // startup values seeded via initState() from instance fields). The actual
+  // initial temperature is per-instance — see initState() which seeds from
+  // _tAmbient (constructor's `temperature` param).
+  { name: "TEMPERATURE", doc: "Operating temperature in Kelvin", init: { kind: "zero" } },
 ]) satisfies StateSchema;
 
 const SLOT_TEMPERATURE = 0;
@@ -244,7 +248,12 @@ export class NTCThermistorElement implements PoolBackedAnalogElement {
     const s1 = this._pool.states[1];
     const s0 = this._pool.states[0];
 
-    const tOld = s1[base + SLOT_TEMPERATURE];
+    // In self-heating mode, T evolves dynamically and lives in the slot.
+    // In non-self-heating mode, T = ambient — read from the live instance
+    // field so setParam("temperature", ...) propagates without recompile.
+    const tOld = this._selfHeating
+      ? s1[base + SLOT_TEMPERATURE]
+      : this._tAmbient;
     const rTerm = this.computeRFromT(tOld);
     const G = 1 / Math.max(rTerm, MIN_RESISTANCE);
 
@@ -257,13 +266,17 @@ export class NTCThermistorElement implements PoolBackedAnalogElement {
     if (this._selfHeating) {
       const nPos = this._pinNodes.get("pos")!;
       const nNeg = this._pinNodes.get("neg")!;
-      const vTerm = ctx.rhs[nPos] - ctx.rhs[nNeg];
+      // ngspice DEVload reads CKTrhsOld (prior NR iterate) for stamp
+      // stability across the iter loop; load-context.ts:79-82 + bjtload.c:208-209.
+      const voltages = ctx.rhsOld;
+      const vTerm = voltages[nPos] - voltages[nNeg];
       const pDiss = (vTerm * vTerm) / rTerm;
       const dt = ctx.dt ?? 0;
       const tNew = tOld + ((pDiss - (tOld - this._tAmbient) / this._rTh) / this._cTh) * dt;
       s0[base + SLOT_TEMPERATURE] = Math.max(tNew, MIN_TEMPERATURE);
     } else {
-      s0[base + SLOT_TEMPERATURE] = tOld;
+      // Track ambient so setParam("temperature") takes effect immediately.
+      s0[base + SLOT_TEMPERATURE] = this._tAmbient;
     }
   }
 

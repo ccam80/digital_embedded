@@ -80,6 +80,7 @@ const COMPARATOR_DRIVER_DEFAULTS: Record<string, number> = {
 };
 
 const MIN_RSAT = 1e-9;
+const MIN_TAU  = 1e-12;
 
 // ---------------------------------------------------------------------------
 // ComparatorDriverElement
@@ -112,7 +113,7 @@ export class ComparatorDriverElement implements PoolBackedAnalogElement {
     this._hysteresis = props.hasModelParam("hysteresis")   ? props.getModelParam<number>("hysteresis")   : COMPARATOR_DRIVER_DEFAULTS["hysteresis"]!;
     this._vos        = props.hasModelParam("vos")          ? props.getModelParam<number>("vos")          : COMPARATOR_DRIVER_DEFAULTS["vos"]!;
     this._rSat       = Math.max(props.hasModelParam("rSat") ? props.getModelParam<number>("rSat") : COMPARATOR_DRIVER_DEFAULTS["rSat"]!, MIN_RSAT);
-    this._tau        = props.hasModelParam("responseTime") ? props.getModelParam<number>("responseTime") : COMPARATOR_DRIVER_DEFAULTS["responseTime"]!;
+    this._tau        = Math.max(props.hasModelParam("responseTime") ? props.getModelParam<number>("responseTime") : COMPARATOR_DRIVER_DEFAULTS["responseTime"]!, MIN_TAU);
   }
 
   setup(ctx: SetupContext): void {
@@ -133,7 +134,7 @@ export class ComparatorDriverElement implements PoolBackedAnalogElement {
       case "hysteresis":   this._hysteresis = value; break;
       case "vos":          this._vos = value; break;
       case "rSat":         this._rSat = Math.max(value, MIN_RSAT); break;
-      case "responseTime": this._tau = value; break;
+      case "responseTime": this._tau = Math.max(value, MIN_TAU); break;
     }
   }
 

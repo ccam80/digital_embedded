@@ -61,7 +61,7 @@ export const { paramDefs: COMPARATOR_PARAM_DEFS, defaults: COMPARATOR_DEFAULTS }
   primary: {
     hysteresis:   { default: 0,    unit: "V", description: "Hysteresis band width" },
     vos:          { default: 0.001, unit: "V", description: "Input offset voltage" },
-    rSat:         { default: 50,   unit: "Î©", description: "Output saturation resistance" },
+    rSat:         { default: 50,   unit: "Ω", description: "Output saturation resistance" },
     responseTime: { default: 1e-6, unit: "s", description: "Propagation delay time constant" },
     vOH:          { default: 3.3,  unit: "V", description: "Output HIGH voltage" },
     vOL:          { default: 0.0,  unit: "V", description: "Output LOW voltage" },
@@ -163,7 +163,7 @@ export class ComparatorElement extends AbstractCircuitElement {
     ctx.setFont({ family: "sans-serif", size: 0.7 });
     ctx.drawText("-", 1.0, -1.125, { horizontal: "center", vertical: "middle" });
     ctx.drawText("+", 1.0, 1.0, { horizontal: "center", vertical: "middle" });
-    ctx.drawText("â‰¥?", 2.0, 0.0, { horizontal: "center", vertical: "middle" });
+    ctx.drawText("≥?", 2.0, 0.0, { horizontal: "center", vertical: "middle" });
 
     ctx.restore();
   }
@@ -187,7 +187,7 @@ export const COMPARATOR_OPEN_COLLECTOR_NETLIST: MnaSubcircuitNetlist = {
         rSat:         "rSat",
         responseTime: "responseTime",
       },
-    } as MnaSubcircuitNetlist["elements"][number] & { subElementName: string },
+    },
   ],
   internalNetCount: 0,
   netlist: [
@@ -211,7 +211,7 @@ export const COMPARATOR_PUSH_PULL_NETLIST: MnaSubcircuitNetlist = {
         vOH:          "vOH",
         vOL:          "vOL",
       },
-    } as MnaSubcircuitNetlist["elements"][number] & { subElementName: string },
+    },
   ],
   internalNetCount: 0,
   netlist: [

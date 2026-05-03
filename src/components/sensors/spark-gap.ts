@@ -215,7 +215,11 @@ export class SparkGapElement implements PoolBackedAnalogElement {
     const conductingOld = s1[base + SLOT_CONDUCTING];
     const nPos = this._pinNodes.get("pos")!;
     const nNeg = this._pinNodes.get("neg")!;
-    const vTerm = ctx.rhs[nPos] - ctx.rhs[nNeg];
+    // ngspice DEVload idiom - read CKTrhsOld (prior NR iterate), not CKTrhs.
+    // bjtload.c:208-209, dioload.c:139-140 read rhsOld so Jacobian-linearised
+    // stamps use the last committed iter's voltages, stable across NR.
+    const voltages = ctx.rhsOld;
+    const vTerm = voltages[nPos] - voltages[nNeg];
     const absV = Math.abs(vTerm);
 
     const R = this.resistanceFromState(conductingOld, absV);

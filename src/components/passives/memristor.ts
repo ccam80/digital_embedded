@@ -1,20 +1,20 @@
 ﻿/**
- * Memristor analog component  Joglekar window function model.
+ * Memristor analog component — Joglekar window function model.
  *
  * The memristor's resistance depends on an internal state variable w
  * (normalised, 0 to 1) representing the boundary between doped and undoped
  * regions. The state evolves with current:
  *
- *   dw/dt = Âµ_v Â· R_on / DÂ² Â· i(t) Â· f_p(w)
+ *   dw/dt = µ_v · R_on / D² · i(t) · f_p(w)
  *
- * where f_p(w) = 1 âˆ’ (2w âˆ’ 1)^(2p) is the Joglekar window function of
- * order p, enforcing 0 â‰¤ w â‰¤ 1. The resistance is:
+ * where f_p(w) = 1 − (2w − 1)^(2p) is the Joglekar window function of
+ * order p, enforcing 0 ≤ w ≤ 1. The resistance is:
  *
- *   R(w) = R_on Â· w + R_off Â· (1 âˆ’ w)
+ *   R(w) = R_on · w + R_off · (1 − w)
  *
  * which can equivalently be written using conductance:
  *
- *   G(w) = w Â· (1/R_on âˆ’ 1/R_off) + 1/R_off
+ *   G(w) = w · (1/R_on − 1/R_off) + 1/R_off
  *
  * The memristor stamps its state-dependent conductance inside load() every
  * NR iteration. State variable w integrates at the bottom of load() reading
@@ -65,16 +65,28 @@ const SLOT_W = 0;
 
 export const { paramDefs: MEMRISTOR_PARAM_DEFS, defaults: MEMRISTOR_DEFAULTS } = defineModelParams({
   primary: {
-    rOn:         { default: 100,    unit: "Î©",       description: "Resistance of fully doped (on) state in ohms", min: 1e-3 },
-    rOff:        { default: 16000,  unit: "Î©",       description: "Resistance of fully undoped (off) state in ohms", min: 1e-3 },
+    rOn:         { default: 100,    unit: "Ω",       description: "Resistance of fully doped (on) state in ohms", min: 1e-3 },
+    rOff:        { default: 16000,  unit: "Ω",       description: "Resistance of fully undoped (off) state in ohms", min: 1e-3 },
     initialState:{ default: 0.5,                     description: "Initial normalised doped-region boundary (0=undoped, 1=fully doped)", min: 0 },
   },
   secondary: {
-    mobility:    { default: 1e-14,                   description: "Ionic mobility in mÂ² per VÂ·s", min: 1e-20 },
+    mobility:    { default: 1e-14,                   description: "Ionic mobility in m² per V·s", min: 1e-20 },
     deviceLength:{ default: 10e-9,                   description: "Device thickness in metres", min: 1e-12 },
-    windowOrder: { default: 1,                       description: "Joglekar window function order p (integer >= 1)", min: 1 },
+    windowOrder: { default: 1,                       description: "Joglekar window function order p (integer ≥ 1)", min: 1 },
   },
 });
+
+// ---------------------------------------------------------------------------
+// Defensive clamps mirroring `min` values in defineModelParams above.
+// Honour the declared minima at the constructor + setParam boundary so
+// XML import / programmatic tests with out-of-range values don't trigger
+// div-by-zero or NaN in the conductance computation.
+// ---------------------------------------------------------------------------
+
+const MIN_R          = 1e-3;
+const MIN_MOBILITY   = 1e-20;
+const MIN_DEVLENGTH  = 1e-12;
+const MIN_WINDOW_P   = 1;
 
 // ---------------------------------------------------------------------------
 // MemristorElement  PoolBackedAnalogElement implementation
@@ -106,18 +118,23 @@ export class MemristorElement implements PoolBackedAnalogElement {
 
   constructor(pinNodes: ReadonlyMap<string, number>, props: PropertyBag) {
     this._pinNodes = new Map(pinNodes);
-    this.rOn          = props.hasModelParam("rOn")          ? props.getModelParam<number>("rOn")          : MEMRISTOR_DEFAULTS["rOn"]!;
-    this.rOff         = props.hasModelParam("rOff")         ? props.getModelParam<number>("rOff")         : MEMRISTOR_DEFAULTS["rOff"]!;
-    this.mobility     = props.hasModelParam("mobility")     ? props.getModelParam<number>("mobility")     : MEMRISTOR_DEFAULTS["mobility"]!;
-    this.deviceLength = props.hasModelParam("deviceLength") ? props.getModelParam<number>("deviceLength") : MEMRISTOR_DEFAULTS["deviceLength"]!;
-    this.windowOrder  = props.hasModelParam("windowOrder")  ? props.getModelParam<number>("windowOrder")  : MEMRISTOR_DEFAULTS["windowOrder"]!;
-    const w0 = props.hasModelParam("initialState") ? props.getModelParam<number>("initialState") : MEMRISTOR_DEFAULTS["initialState"]!;
+    const rOn          = props.hasModelParam("rOn")          ? props.getModelParam<number>("rOn")          : MEMRISTOR_DEFAULTS["rOn"]!;
+    const rOff         = props.hasModelParam("rOff")         ? props.getModelParam<number>("rOff")         : MEMRISTOR_DEFAULTS["rOff"]!;
+    const mobility     = props.hasModelParam("mobility")     ? props.getModelParam<number>("mobility")     : MEMRISTOR_DEFAULTS["mobility"]!;
+    const deviceLength = props.hasModelParam("deviceLength") ? props.getModelParam<number>("deviceLength") : MEMRISTOR_DEFAULTS["deviceLength"]!;
+    const windowOrder  = props.hasModelParam("windowOrder")  ? props.getModelParam<number>("windowOrder")  : MEMRISTOR_DEFAULTS["windowOrder"]!;
+    const w0           = props.hasModelParam("initialState") ? props.getModelParam<number>("initialState") : MEMRISTOR_DEFAULTS["initialState"]!;
+    this.rOn          = Math.max(rOn,          MIN_R);
+    this.rOff         = Math.max(rOff,         MIN_R);
+    this.mobility     = Math.max(mobility,     MIN_MOBILITY);
+    this.deviceLength = Math.max(deviceLength, MIN_DEVLENGTH);
+    this.windowOrder  = Math.max(windowOrder,  MIN_WINDOW_P);
     this.initialState = Math.max(0, Math.min(1, w0));
   }
 
   /**
    * Resistance at current pool state.
-   * R(w) = R_on Â· w + R_off Â· (1 âˆ’ w)
+   * R(w) = R_on · w + R_off · (1 − w)
    */
   resistanceAt(w: number): number {
     return this.rOn * w + this.rOff * (1 - w);
@@ -125,7 +142,7 @@ export class MemristorElement implements PoolBackedAnalogElement {
 
   /**
    * Conductance at current pool state.
-   * G(w) = w Â· (1/R_on âˆ’ 1/R_off) + 1/R_off
+   * G(w) = w · (1/R_on − 1/R_off) + 1/R_off
    */
   conductanceAt(w: number): number {
     return w * (1 / this.rOn - 1 / this.rOff) + 1 / this.rOff;
@@ -157,15 +174,21 @@ export class MemristorElement implements PoolBackedAnalogElement {
   }
 
   setParam(key: string, value: number): void {
-    if (key === "rOn") this.rOn = value;
-    else if (key === "rOff") this.rOff = value;
-    else if (key === "mobility") this.mobility = value;
-    else if (key === "deviceLength") this.deviceLength = value;
-    else if (key === "windowOrder") this.windowOrder = value;
+    if (key === "rOn") this.rOn = Math.max(value, MIN_R);
+    else if (key === "rOff") this.rOff = Math.max(value, MIN_R);
+    else if (key === "mobility") this.mobility = Math.max(value, MIN_MOBILITY);
+    else if (key === "deviceLength") this.deviceLength = Math.max(value, MIN_DEVLENGTH);
+    else if (key === "windowOrder") this.windowOrder = Math.max(value, MIN_WINDOW_P);
     else if (key === "initialState") {
       this.initialState = Math.max(0, Math.min(1, value));
       if (this._stateBase !== -1 && this._pool) {
+        // Hard reset W: write both state0 (current) AND state1 (last-accepted)
+        // so the next load() reads the new value from s1 and stamps the
+        // corresponding conductance. Writing only s0 left s1 stale, causing
+        // the next iteration to stamp the OLD conductance after a runtime
+        // hot-load — broke LTE-rollback consistency too.
         this._pool.state0[this._stateBase + SLOT_W] = this.initialState;
+        this._pool.state1[this._stateBase + SLOT_W] = this.initialState;
       }
     }
   }
@@ -285,11 +308,11 @@ export class MemristorCircuitElement extends AbstractCircuitElement {
     const vB = signals?.getPinVoltage("neg");
     const hasVoltage = vA !== undefined && vB !== undefined;
 
-    // Falstad MemristorElm: total width 4 grid units (64px Ã· 16).
-    // calcLeads(32): lead1=(0,0), lead2=(3,0) in grid units (48px Ã· 16 = 3).
-    // Body spans x=13 (16px leads on each end), hs=10pxÃ·16=0.625 grid units.
+    // Falstad MemristorElm: total width 4 grid units (64px ÷ 16).
+    // calcLeads(32): lead1=(0,0), lead2=(3,0) in grid units (48px ÷ 16 = 3).
+    // Body spans x=13 (16px leads on each end), hs=10px÷16=0.625 grid units.
     // Zigzag body: 4 full teeth, each 8px = 0.5 grid units wide.
-    // Segment x positions (px Ã· 16): 1, 1.3125, 1.6875, 2, 2.3125, 2.6875, 3
+    // Segment x positions (px ÷ 16): 1, 1.3125, 1.6875, 2, 2.3125, 2.6875, 3
     // (body subdivided into 8 half-teeth of 5px = 0.3125 grid units)
 
     if (hasVoltage && ctx.setLinearGradient) {
@@ -347,10 +370,10 @@ const MEMRISTOR_PROPERTY_DEFS: PropertyDefinition[] = [
   {
     key: "mobility",
     type: PropertyType.FLOAT,
-    label: "Mobility Âµ_v (mÂ²/VÂ·s)",
+    label: "Mobility µ_v (m²/V·s)",
     defaultValue: 1e-14,
     min: 1e-20,
-    description: "Ionic mobility in mÂ² per VÂ·s",
+    description: "Ionic mobility in m² per V·s",
   },
   {
     key: "deviceLength",
@@ -366,7 +389,7 @@ const MEMRISTOR_PROPERTY_DEFS: PropertyDefinition[] = [
     label: "Window order p",
     defaultValue: 1,
     min: 1,
-    description: "Joglekar window function order p (integer â‰¥ 1)",
+    description: "Joglekar window function order p (integer ≥ 1)",
   },
   {
     key: "label",
