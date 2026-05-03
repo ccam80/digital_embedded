@@ -102,7 +102,8 @@ export class TransmissionSegmentRLElement implements PoolBackedAnalogElement {
   private _hIbrIbr = -1;
 
   constructor(pinNodes: ReadonlyMap<string, number>, props: PropertyBag) {
-    this._pinNodes = new Map(pinNodes);
+    // Store by reference (see transmission-segment-l.ts for full rationale).
+    this._pinNodes = pinNodes as Map<string, number>;
     this._R = Math.max(props.getModelParam<number>("R"), MIN_RESISTANCE);
     this._L = Math.max(props.getModelParam<number>("L"), MIN_INDUCTANCE);
   }

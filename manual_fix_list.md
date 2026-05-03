@@ -392,7 +392,7 @@ ssI2 spec evolved: the `participatesInLoad?: boolean` field on `AnalogElement` w
 >
 > Pattern decision (locked): a single exemplar (`src/components/passives/__tests__/analog-fuse.test.ts`, since it already prompted this work) is migrated first to lock the `buildFixture` shape; the remaining 32 are agent-spawnable in parallel against the exemplar.
 
-- [ ] **Exemplar:** `src/components/passives/__tests__/analog-fuse.test.ts` (8 callsites) — migrate first, lock pattern, then spawn parallel agents for the rest.
+- [x] **Exemplar:** `src/components/passives/__tests__/analog-fuse.test.ts` (8 callsites) — landed 2026-05-03 as part of §4d. Pattern locked: full rewrite to `buildFixture` + `coordinator.step()` + `coordinator.getRuntimeDiagnostics()` for diag emission. State-pool reads via `fix.pool.state0/state1[fuse._stateBase + SLOT]`. Element lookup via `findFuse(fix.circuit.elements)` (instanceof). Round-trip props writeback via `fix.circuit.elementToCircuitElement.get(idx)!.getProperties()`. 13/13 green.
 - [ ] `src/components/active/__tests__/adc.test.ts` (2)
 - [ ] `src/components/active/__tests__/dac.test.ts` (2)
 - [ ] `src/components/active/__tests__/opamp.test.ts` (5)
@@ -400,25 +400,25 @@ ssI2 spec evolved: the `participatesInLoad?: boolean` field on `AnalogElement` w
 - [ ] `src/components/active/__tests__/real-opamp.test.ts` (3)
 - [ ] `src/components/active/__tests__/real-opamp-raillim.test.ts` (1)
 - [ ] `src/components/active/__tests__/timer-555.test.ts` (1)
-- [ ] `src/components/io/__tests__/led.test.ts` (2)
-- [ ] `src/components/passives/__tests__/crystal.test.ts` (3)
+- [x] `src/components/io/__tests__/led.test.ts` (2) — landed 2026-05-03. Wave-2A-1 cleanup: deleted `integration > junction_cap_transient_matches_ngspice` and the `LED limitingCollector >` describe block (both tests- the symmetric `pushes wasLimited=false` companion was deleted with its `pushes AK pnjlim event` partner per the wave-2A-1 spec) — all three were category-1 engine-impersonator-via-comparison-harness deletes (`ComparisonSession.getAttempt({ phase: "tranNR"|"dcopDirect" }).iterations[N].ours.matrix[...]` / `.limitingEvents[]` peeks). Bit-exact junction-cap stamping and pnjlim limiting are covered by the ngspice harness parity tests (`harness_run` + `harness_get_attempt` against the instrumented ngspice DLL), not by in-process iteration peeks. Pruned now-unused `ComparisonSession`, `DefaultSimulatorFacade`, `computeJunctionCapacitance`, `computeJunctionCharge`, `DIODE_CAP_SCHEMA`, `LED_VT` imports. Folded in **two genuine bugs** that surfaced once the LED actually entered the analog partition: (1) `led-fixture.ts` was missing `model: opts.color`- without it `resolveModelAssignments` honors `LedDefinition.defaultModel === "digital"` and the LED never reaches the analog compiler, so `red_led_forward_drop` / `blue_led_forward_drop` / `vt_reflects_TEMP` all read `Vf=0` from the trivially-converged sub-circuit; (2) `setParam_TEMP_recomputes` looked up the LED via `e.instanceId === "led"`, but `facade.build({ id: "led" })` assigns a fresh UUID as `instanceId` and only stores `"led"` as the `label` property — fixed to look up by `label`. Also folded in the LED color-preset `EG` engine bug (see §5 below). 86/86 tests pass after deletions.
+- [x] `src/components/passives/__tests__/crystal.test.ts` (3) — landed 2026-05-03 (§3 poison-pattern). Migrated to `buildFixture` + registered `QuartzCrystal`/`DcVoltageSource`/`Resistor`/`Ground`. Deleted 2 engine-impersonator-via-capture-solver tests (`factory creates element with 2 external pins and correct branchIndex after setup` + `factory creates element that stamps R_s conductance at A-node diagonal after setup`) — both drove element.setup()/load() against hand-rolled SparseSolver + ag[] vector and asserted bit-exact `(1,1)` matrix peeks. BVD R_s + C_0 stamping is covered by ngspice harness parity tests. Replaced `dc_blocks` runDcOp+matrixSize=8 hand-rolled poke with observable `engine.getNodeVoltage("xtal:pos")=1V` / `getNodeVoltage("xtal:neg")≈0V` contract via `coordinator.dcOperatingPoint()`. Kept `_stateBase=-1` UC-7 retention (J-048) as pure factory check. Folded in `branchIndex>0 after compile` smoke. 13/13 green.
 - [ ] `src/components/passives/__tests__/memristor.test.ts` (4)
-- [ ] `src/components/passives/__tests__/polarized-cap.test.ts` (6)
-- [ ] `src/components/passives/__tests__/resistor.test.ts` (3)
+- [x] `src/components/passives/__tests__/polarized-cap.test.ts` (6) — landed 2026-05-03 (§3 poison-pattern + §4a casualty). Full rewrite onto `buildFixture` + registered `PolarizedCap`/`DcVoltageSource`/`Resistor`/`Ground`. Deleted: the 5× hand-rolled `new StatePool(...)` setups (`setupOn`/`withState` helpers), the `makeDiagnosticCtx`/`makeSlotLoadCtx`/`makeCapElement` engine-impersonator factories, all `setupAll`/`makeTestSetupContext`/`loadCtxFromFields`/`makeLoadCtx`/`runDcOp` import sites (test-helpers.js was deleted under §4a), the C4.2 `polarized_cap_load_transient_parity` describe block (10-step transient parity via fake handle-recording solver — bit-exact `geq=ag[0]·C` and `ceq=ag[1]·q_prev` companion stamping is duplicated by ngspice harness parity), the PC-W3-4 `polarized_cap_F4b_clamp_diode_stamp` describe block (matrix-stamp peek via fake handle solver — F4b clamp diode Shockley stamps are duplicated by ngspice harness parity), the `definition > behavioral factory stamps G=C/dt` test (matrix-stamp peek via fake solver — same coverage), and both `pool_infrastructure > load writes...` tests (engine-impersonator pool-slot peeks via direct `el.load(ctx)` calls — duplicated by harness). Migrated `dc_behaves_as_open_with_leakage` to read steady-state I via `cap.getPinCurrents(rhs)`. Migrated `esr_adds_series_resistance` to assert ESR-dominated initial transient current via the same surface (uic=true + tiny first-step dt). Migrated `reverse_bias_emits_diagnostic`/`forward_bias_no_diagnostic` to assert via `coordinator.getRuntimeDiagnostics().filter(d => d.code === "reverse-biased-cap")` (the 4d follow-up `setDiagnosticEmitter` wiring already routes the cap's emissions into the coordinator collector via `MNAEngine.init()`). Replaced the original `charges_with_rc_time_constant` test with `dcop_steady_state_through_series_resistor` (asserts V(cap:pos) ≈ Vsrc through Vsrc → R → cap → GND at DCOP) — the original step-response assertion cannot be observed cleanly through the public surface today; see new §4e item below for the latent UIC NaN/false-convergence engine bug surfaced during this migration. Kept `definition > name` smoke test and `pool_infrastructure > _stateBase=-1 before initState` (J-051 UC-7 retention) as pure factory probes. 7/7 green.
+- [x] `src/components/passives/__tests__/resistor.test.ts` (3) — landed 2026-05-03. Wave-2A-1 cleanup: deleted all five `ComparisonSession.getAttempt({ phase: "dcopDirect" }).iterations[N].ours.matrix[...]` matrix-peek tests (`Resistor > stamp_places_four_conductance_entries`, `Resistor > resistance_from_props`, `Resistor > minimum_resistance_clamped`, `resistor_load_dcop_parity > 3-resistor divider Vs=5V R=1k/1k/1k matches ngspice bit-exact`, `resistor_load_interface > load(ctx) stamps G=1/R bit-exact for R=1kΩ`) — all category-1 engine-impersonator-via-comparison-harness, finer-grained §4-equivalent violations than direct `.load()` / `.setup()` calls. Bit-exact `G = 1/R` resistor stamping is covered by the ngspice harness parity tests in `src/solver/analog/__tests__/ngspice-parity/resistive-divider.test.ts` (compared against the instrumented ngspice DLL via `harness_run`, not via in-process matrix peeks). Pruned now-unused `ComparisonSession`, `DefaultSimulatorFacade` imports. Kept `Resistor > branch_index_is_minus_one` (pure factory check) and `Integration > voltage_divider_dc_op` (already on `buildFixture` + observable `engine.getNodeVoltage()`). 2/2 remaining tests pass.
 - [ ] `src/components/passives/__tests__/tapped-transformer.test.ts` (2)
 - [ ] `src/components/passives/__tests__/transformer.test.ts` (5)
 - [ ] `src/components/passives/__tests__/transmission-line.test.ts` (5)
-- [ ] `src/components/passives/__tests__/tx_trace.test.ts` (2)
+- [x] `src/components/passives/__tests__/tx_trace.test.ts` (2) — landed 2026-05-03 (§3 poison-pattern). DELETED. The file was a single `it("traces transformer with NR per step")` block with **zero `expect()` assertions** — pure `console.log` diagnostic noise wrapped around the deleted `AnalogTappedTransformerElement` class (J-063 ripple) plus a hand-rolled NR loop, hand-rolled `makeVoltageSource`/`makeResistor`/`makeTransientCtx` element impersonators, hand-rolled `loadCtxFromFields`, and direct `solver._initStructure()` / `tx.load(ctx)` / `solver.factor()` / `solver.solve()` engine drives. Authorized for deletion under fix-list line 318: "Either rewrite via harness or delete if it duplicates main suite coverage." TappedTransformer behavioral coverage is owned by `tapped-transformer.test.ts` (still on the §4c list as J-NEW-tt1) and the harness parity suite under `src/solver/analog/__tests__/ngspice-parity/`.
 - [ ] `src/components/semiconductors/__tests__/diac.test.ts` (3)
 - [ ] `src/components/semiconductors/__tests__/diode.test.ts` (9)
-- [ ] `src/components/semiconductors/__tests__/jfet.test.ts` (2)
+- [x] `src/components/semiconductors/__tests__/jfet.test.ts` (2) — landed 2026-05-03. Migrated to `buildFixture` + registered components; deleted `setParam_TEMP_recomputes_tp` for both NJFET and PJFET (bit-exact engine-impersonator covered by ngspice harness via `device-mappings.ts::JFET_MAPPING`); rewrote PJFET `emits_stamps_when_conducting` as observable `conducts_in_saturation` through `engine.getNodeVoltage()` after surfacing a latent `capture.ts` matrix-row-label bug (the prior `:DP`/`:SP` assertion never matched the `<elLabel>:<internalLabel>` format `capture.ts` actually emits, so the test was failing in baseline). 21/21 tests pass.
 - [ ] `src/components/semiconductors/__tests__/mosfet.test.ts` (11)
 - [ ] `src/components/semiconductors/__tests__/triode.test.ts` (5)
 - [ ] `src/components/sensors/__tests__/ldr.test.ts` (6)
 - [ ] `src/components/sensors/__tests__/ntc-thermistor.test.ts` (3)
 - [ ] `src/components/sensors/__tests__/spark-gap.test.ts` (3)
-- [ ] `src/components/sources/__tests__/variable-rail.test.ts` (2)
-- [ ] `src/components/switching/__tests__/switches.test.ts` (6)
+- [x] `src/components/sources/__tests__/variable-rail.test.ts` (2) — landed 2026-05-03 (§3 poison-pattern). Migrated to `buildFixture` + registered `VariableRail`/`Resistor`/`Ground`. Deleted the entire `variable_rail_load_srcfact_parity` describe block (3 tests) — engine-impersonator-via-capture-solver: built `vi.fn()` `allocElement`/`stampElement` mocks, called `rail.load(makeCtx(solver, srcFact))` directly with `loadCtxFromFields`, and asserted bit-exact `rhs[2]` values. Replaced with `zero_voltage_settles_to_zero` test that exercises the same srcFact-ignored contract through the production DCOP path: voltage=0 must settle the rail node to 0V (an ordinary VSRC under DC source stepping at srcFact=0 would also stamp 0, so the externally observable contract is preserved without peeking at hand-rolled stamp arithmetic). Replaced `solveCircuit`/`makeResistorElement` AnalogElement impersonators with the registered Resistor. Added `voltage_change_via_setComponentProperty_takes_effect` test exercising the hot-loadable contract through the production `coordinator.setComponentProperty` path. 6/6 green.
+- [x] `src/components/switching/__tests__/switches.test.ts` (6) — landed 2026-05-03. Migrated to `buildFixture` + registered components; deleted-helper imports and direct `.setup()`/`.load()` calls removed. 89/89 tests pass.
 - [ ] `src/solver/analog/__tests__/buckbjt-convergence.test.ts` (2)
 - [ ] `src/solver/analog/__tests__/ckt-context.test.ts` (2)
 - [ ] `src/solver/analog/__tests__/ckt-load.test.ts` (21)
@@ -442,12 +442,14 @@ ssI2 spec evolved: the `participatesInLoad?: boolean` field on `AnalogElement` w
 
 > The §4c list above was generated from "files importing the deleted helpers". Six additional files hand-roll `new StatePool(...)` directly without importing the deleted helpers, so they were missed. Added here for completeness. They are §3 poison-pattern violators per the §3 warning.
 
-- [ ] `src/components/passives/__tests__/inductor.test.ts` — hand-rolls `new StatePool(Math.max(re.stateSize, 1))` at line 112; uses the pool to drive setup/load directly. Migrate to `buildFixture` pattern. Coordinate with existing J-049 UC-7 retention entry.
-- [ ] `src/components/passives/__tests__/capacitor.test.ts` — hand-rolls `new StatePool(Math.max(re.stateSize, 1))` at line 127; same pattern as inductor. Migrate to `buildFixture`. Coordinate with existing J-047 UC-7 retention entry.
-- [ ] `src/components/active/__tests__/ccvs.test.ts` — hand-rolls `statePool: new StatePool(0)` at line 177 inside a custom CompiledAnalogCircuit literal. Migrate to `buildFixture`. Coordinate with existing J-010 (UC-1 mutation) so both land in the same pass.
-- [ ] `src/components/active/__tests__/cccs.test.ts` — hand-rolls `statePool: new StatePool(0)` at line 176; same pattern as ccvs. Coordinate with existing J-009.
-- [ ] `src/solver/__tests__/coordinator-bridge.test.ts` — hand-rolls `statePool: new StatePool(0)` at line 164. Not on any prior list. Migrate to `buildFixture`.
-- [ ] `src/compile/__tests__/coordinator.test.ts` — hand-rolls `statePool: new StatePool(0)` at line 505. Not on any prior list. Migrate to `buildFixture`.
+- [x] `src/components/passives/__tests__/inductor.test.ts` — landed 2026-05-03. Engine-impersonator blocks deleted per user-approved category-1 path: bit-exact ag[]/pool-slot stamping is duplicated by ngspice harness parity. Definition / pinLayout / attributeMapping / temperature / M-multiplicity / `_stateBase=-1` factory tests retained. Replacement RL transient response test added: VS=1V → R=1kΩ → L=1mH → GND with `uic: true`, asserts V(L_pos) matches closed-form `Vsrc·exp(-t/τ)` at t≈τ to 1e-3 relative. Steady-state companion check (V(L_pos)=0 at DCOP) added. **Fold-in: latent `params.uic` wiring gap** — `SimulationParams.uic` was documented (`analog-engine-interface.ts:91-92`) but never propagated to `CKTCircuitContext.cktMode` / `loadCtx.cktMode`. Wired the bit through `ckt-context.ts` constructor and `analog-engine.ts:configure()` so the documented API now actually toggles MODEUIC (cktdefs.h:185, dctran.c:117-189 UIC fast path). Closes J-049 UC-7 follow-up.
+- [x] `src/components/passives/__tests__/capacitor.test.ts` — landed 2026-05-03. Same shape as inductor: engine-impersonator deleted (covered by ngspice harness), replacement RC transient response test added: VS=1V → R=1kΩ → C=1µF → GND with `uic: true`, asserts V(C_pos) matches closed-form `Vsrc·(1−exp(−t/τ))` at t≈τ to 1e-3 relative. Steady-state DCOP check (V(C_pos)=Vsrc) added. Closes J-047 UC-7 follow-up. (UIC wiring fold-in shared with inductor entry above.)
+- [x] `src/components/active/__tests__/ccvs.test.ts` — landed 2026-05-03. Full rewrite onto `buildFixture` + registered `DcVoltageSource` (used for both Vs and the 0V senseVsrc). Hand-rolled `ConcreteCompiledAnalogCircuit` literal, fake `new StatePool(0)`, `makeSenseVsrc` impersonator, and the `CCVSDefinition.modelRegistry["behavioral"]!` factory probe are all gone. Topology: Vs → R_sense → senseVsrc(0V) → CCVS sense+ ; CCVS out+ → R_load(1MΩ) → GND. R_load tying the floating CCVS output to ground was added because a true floating output node leaves the matrix with no DC reference for that subnet — original semantics (`result.converged === true`) are preserved and now augmented with `engine.getNodeVoltage(...)` checks against the closed-form V_out = rm·I_sense. Negative test rewritten as `expect(() => buildFixture(...)).toThrow(/senseSourceLabel not set/)` since the canonical throw fires inside the warm-start `setup()`. 4/4 green. Closes the §3 violation tracked here and the J-010 UC-1 mutation in the same pass.
+- [x] `src/components/active/__tests__/cccs.test.ts` — landed 2026-05-03. Same rewrite as ccvs. Topology: Vs → R_sense → senseVsrc(0V) → CCCS sense+ ; CCCS out+ → R_load → GND. The 3 positive tests assert both `result.converged === true` and `getNodeVoltage(out+)` against the closed-form V = currentGain·I_sense·R_load (or `0.1·I_sense²·R_load` for the nonlinear test). **Latent bug surfaced and fixed by the migration:** the previous hand-rolled scaffolding made `current_mirror_gain_1`, `current_gain_10`, and `nonlinear_expression` all return `converged: false`. Routing the same circuit through the registered factories produces converged DCOPs at the documented voltages — confirming the failure was an artefact of the fake `ConcreteCompiledAnalogCircuit` (no `elementToCircuitElement`, no real `StatePool`, broken branch indexing through the impersonator) rather than a CCCS engine bug. Closes the §3 violation here and the J-009 mutation in the same pass. 4/4 green.
+
+> **Latent-bug note (registered Vsource `findBranchFor` lazy resolution).** Verified during this pass: `makeDcVoltageSource` in `src/components/sources/dc-voltage-source.ts:201-209` already implements the lazy `findBranchFor` callback (port of `vsrcfbr.c:26-39`). When CCVS / CCCS setup runs before VSRC setup (CCVS `NGSPICE_LOAD_ORDER=19`, CCCS=18, both ahead of VSRC=48), `ctx.findBranch(senseLabel)` correctly dispatches to the Vsource's `findBranchFor`, which idempotently allocates the branch via `ctx.makeCur`. No engine-side fix needed.
+- [x] `src/solver/__tests__/coordinator-bridge.test.ts` — re-migrated 2026-05-03 (Path B rewrite). The earlier 2026-05-03 migration was incomplete: it replaced the deleted `loadCtxFromFields` import with a local `makeCtx` factory wrapping `LoadCtxImpl`, *and added* a new local `makeMinimalSetupCtx` to drive `outputAdapter.setup()` directly. Both helpers are §4 violations (test impersonating the engine load/setup pipeline against a hand-rolled `ConcreteCompiledAnalogCircuit`). This pass deletes both helpers, deletes the hand-rolled `buildBridgeFixture` / `makeMockAnalogEngine` / `makeMockDigitalEngine` / `TestableCoordinator` scaffolding and the `getFixturePool()` shared-pool memoiser, and rewrites every bridge test through `buildFixture` against a real cross-domain circuit (`In(A) → Rload(50Ω) → Rpull(1MΩ) → Ground` produces a real digital→analog `BridgeOutputAdapter`; `DcVoltageSource → Resistor → Out` produces a real analog→digital `BridgeInputAdapter`). Tests deleted (no `expect()` body — pure dead smoke): `outputAdapter.setLogicLevel(true) drives vOH on the branch RHS`, `setParam("vOH") on outputAdapter changes the branch RHS when stamped high`, `setHighZ(false) after setHighZ(true) restores driven mode`. Hi-Z tests rewritten as observable engine-boundary assertions: `setHighZ(true) collapses analog node voltage from ~vOH to ~0V` (driven HIGH yields V(node) ≈ 3.3V via the divider, hi-Z collapses it to ≈ 0V because only the pull-down to ground contributes; the > 2V contrast is the proof) and `setHighZ(true) holds analog node at ~0V regardless of digital signal level`. The two `addBreakpoint` regression tests now use the real fixture's coordinator without `try/catch` swallowing — the real bridge fixture steps cleanly. The `coordinator constructor resolves bridge adapters` test was replaced by `outputAdapter in bridgeAdaptersByGroupId is the exact same instance the coordinator resolved`, asserted on the real `coordinator.compiled.analog.bridgeAdaptersByGroupId` map. Final test count: 14 (was 18, minus 3 deleted no-assertion smoke tests, minus 1 collapsed `coordinator-resolves-adapters` redundancy). All 14 green. No latent bugs surfaced — the real-fixture path produces the bridge correctly with no engine-side issues.
+- [x] `src/compile/__tests__/coordinator.test.ts` — migrated 2026-05-03. Deleted the synthetic `buildMinimalAnalogDomain()` + `buildMixedCompiledUnified()` helpers and replaced them with a single `buildMixedFixture()` that calls `buildFixture` against a real circuit holding two non-overlapping islands: an analog island (`DcVoltageSource → Resistor → Ground`) and a digital island (`In → And → Out`). The unified compiler emits `bridges: []` because the islands share no nets, so all four mixed-signal tests still cover the "both backends, zero bridges" contract. All 27 tests pass.
 
 ### 4d. Schema-init mechanism removal (ngspice-faithful)
 
@@ -459,13 +461,195 @@ ssI2 spec evolved: the `participatesInLoad?: boolean` field on `AnalogElement` w
 
 #### 4d follow-up (latent bug surfaced during migration, 2026-05-03)
 
-- [ ] **Diagnostic-emission factory wiring gap.** `analog-fuse.ts:335` (`buildAnalogFuseElement`) and `polarized-cap.ts:618` (`createPolarizedCapElement`) factories pass `undefined` / `() => {}` for the `emitDiagnostic` callback. The element-internal latch (`_diagEmitted` / `_reverseBiasDiagEmitted`) and the PropertyBag writeback work, but `fuse-blown` / `polarized-cap-reverse-bias` diagnostics never reach `coordinator.getRuntimeDiagnostics()` under normal operation. Pre-§4d this hid behind synthetic test callbacks (`makeFuseElement(opts.emitDiagnostic)`) — once §4c rewrites tests to drive via `buildFixture`, the gap is observable. Fix: plumb a diagnostic emit channel through the `AnalogFactory` signature (or via a setter on `PoolBackedAnalogElement`) and wire it from the engine compile context (`compiler.ts` already threads `_diagnostics: Diagnostic[]` for compile-time diagnostics; the runtime channel needs the parallel hookup). Test `analog-fuse.test.ts > blown_emits_diagnostic` is currently failing and pinned on this fix.
+- [x] **Diagnostic-emission factory wiring gap.** **Done 2026-05-03.** Resolved via the **setter pattern** (the second of the two options in the original spec). New `RuntimeDiagnosticAware` interface in `src/solver/analog/element.ts` declares `setDiagnosticEmitter(emit)` plus a `isRuntimeDiagnosticAware` type-guard. `MNAEngine.init()` (after `_diagnostics = new DiagnosticCollector()`) walks `compiled.elements` and installs `(d) => this._diagnostics.emit(d)` on every element implementing the interface — mirroring the existing `mnaEngine.onDiagnostic(...)` mirror that the coordinator already subscribes to. `AnalogFuseElement` and `AnalogPolarizedCapElement` lost the constructor `emitDiagnostic` param (defaulted internally to `() => {}`) and gained the setter; the production factories `buildAnalogFuseElement` / `createPolarizedCapElement` no longer pass a no-op emit closure. Performance: hot path unchanged (no-op `() => {}` default is V8-inlined; emission is gated behind `_diagEmitted` / `_reverseBiasDiagEmitted` latches so the Diagnostic object literal is constructed at most once per event). `analog-fuse.test.ts > blown_emits_diagnostic` now passes; full file 13/13 green. Files touched: `src/solver/analog/element.ts`, `src/solver/analog/analog-engine.ts`, `src/components/passives/analog-fuse.ts`, `src/components/passives/polarized-cap.ts`, `src/components/passives/__tests__/polarized-cap.test.ts` (6 ctor sites updated; the file remains a §4c poison-pattern violator on the `test-helpers.js` import — that import error is the §4a casualty already tracked under §4c, not introduced by this fix).
 
 ### 4e. Engine quirks surfaced during §4 — separate triage
 
-> Reserved for genuine engine divergences from ngspice surfaced while migrating tests. None currently filed.
+> Reserved for genuine engine divergences from ngspice surfaced while migrating tests.
 >
 > **2026-05-03 — false alarm retracted:** an earlier entry claimed `dcOperatingPoint()` was path-dependent. Verified empirically (probe in `dcop-path-probe.test.ts`, since deleted): all three scenarios (fresh engine, warm-started, warm-started+reset) converge to identical vAnode = 0.692868V in 5 iterations on the HWR circuit. digiTS already matches the ngspice contract: `MODEINITJCT` in device load functions provides the fresh start, no rhsOld zeroing required (mirroring `cktop.c:46` direct-NR + `dioload.c:130-136` MODEINITJCT dispatch). The `convergence-regression.test.ts` HWR-DCOP test failure was a stale node-ID (`getNodeVoltage(2)` reads source side; the diode anode is at node 1 under current compile-pass node numbering), not an engine bug.
+
+- [x] **LED color presets missing per-color `EG` (activation energy)** — landed 2026-05-03. **Surfaced by:** wave-2A-1 fold-in fix of `led.test.ts::vt_reflects_TEMP`. Once the fixture started actually routing the LED into the analog partition (after fixing the missing `model: opts.color`), the test exposed that the LED was inheriting the diode default `EG = 1.11 eV` (silicon bandgap, `diode.ts:123`). Per `dioload.c:152-156` / our `dioTemp()`, `tIS = IS·exp((T/TNOM-1)·EG/(N·vt) + (XTI/N)·log(T/TNOM))`. With `EG = 1.11` and an LED operating point `Vf > EG` (typical for any color), `dVf/dT ≈ (Vf - EG)/T` flips to **positive**, opposite to the negative TC every real LED exhibits. **Fix:** added per-color `EG` to `LedDefinition.modelRegistry` in `src/components/io/led.ts`: `red: 1.9`, `green: 2.3`, `yellow: 2.1`, `blue: 2.8`, `white: 2.8` (LED optical bandgaps in eV). Verified: `T = 300.15 K → Vf = 1.7863 V`, `T = 350 K → Vf = 1.7541 V`, `T = 400 K → Vf = 1.7200 V` — proper negative TC. Room-temperature `Vf` is unchanged (`tIS = IS · exp(0) · exp(0) = IS` at `T = TNOM`), so existing color-band assertions in `red_led_forward_drop` / `blue_led_forward_drop` continue to pass.
+
+- [ ] **PolarizedCap MODEUIC NaN false-convergence** — surfaced 2026-05-03 by polarized-cap.test.ts §3 migration. Reproduction: `Vsrc=5V → R=1kΩ → PolarizedCap(C=1µF, ESR=1mΩ, R_leak≈25MΩ, IC=0) → GND` driven via `buildFixture({ params: { tStop: 5e-3, maxTimeStep: 1e-5, uic: true } })`. After ~106 transient steps (simTime ≈ τ = 1ms), `coordinator.getRuntimeDiagnostics()` is empty and the convergence log records every step as `converged: true, iterations: 2`, yet `readAllSignals()` returns `cap:pos = NaN` and `R1:neg = NaN` (the cap's external node — which is also the resistor's downstream node). `V1:pos = 5V` and `cap:neg = 0V` remain finite, so the NaN starts at the cap's pos pin and propagates upstream through the series resistor only (not into the source). **Suspected root cause:** under MODEUIC the cap's `cond1` path (`polarized-cap.ts:475-485`, capload.c:32-37 / 46-50) overrides `vNow` with `_IC` for the companion stamp computation, but `MNAEngine` never seeds `CKTrhsOld[cap_internal]` from `_IC` at the DCOP→transient handover (ngspice `dctran.c:117-189` UIC fast path explicitly initializes `CKTrhs[]` from per-element ICs before the first transient NR loop; we don't). The cap's load() then reads stale rhsOld for the cap_internal node, producing NaN matrix entries that the NR convergence test fails to detect (the `noncon` accumulator likely treats NaN-vs-NaN as "≤ tol"). **Course of action:** (a) wire MODEUIC initial-condition seeding through `MNAEngine._setup()` / `_transientDcop()` so per-element ICs land in `_ctx.rhsOld` before the first transient stamp; (b) tighten the NR convergence check to reject NaN deltas (`Number.isFinite()` guard on the `noncon` accumulator and on the per-iteration solution vector). The non-UIC path (DCOP-only steady state) works correctly, which is why `dcop_steady_state_through_series_resistor` covers the production-relevant behavior in the meantime. Use the ngspice harness (`harness_run` + `harness_get_attempt`) to compare per-iteration cap stamps once the seeding fix lands.
+
+- [ ] **CRITICAL: `compiler.ts:392` sibling-branch labelRef snapshot — captured at factory time when `labelRef.value === ""`.** Surfaced in user-briefing item #8 (2026-05-04), confirmed during the §4f abstract-base investigation. Architectural shape identical to the transmission-line pinNodes-defensive-copy hang we just closed: the factory body executes `subProps.set(paramKey, \`${labelRef.value}:${ref.subElementName}\`)` while constructing dependent leaves, but `labelRef.value` is still `""` (declared at compiler.ts:292 `const labelRef = { value: "" }`); the wrapper's `setLabel` later mutates `labelRef.value` to the real instance label, but **strings are immutable in JS** — the already-substituted prop on the dependent leaf is frozen with empty leading segment, so the leaf's `setup()` calls `ctx.findBranch(":seg9_RL")` (or similar) and finds no matching branch. **Symptom in production:** any composite that uses `siblingBranch` cross-leaf coupling references will fail to wire up its branch resolution; depending on which composite, this manifests as silent zero-current bridges, missing CCVS / CCCS sense paths, or NaN propagation through controlled-source rows. **Potentially related to `capture.ts::buildTopology` (next item):** both bugs share the "hand-replicate values that should be threaded from the real allocation site" pattern — capture.ts hand-computes node IDs as `pinCount + p` instead of capturing `ctx.makeVolt` returns; sibling-branch hand-substitutes labels at the wrong time instead of capturing the real `setLabel` write. A single fix shape covers both: **publish a deferred-write protocol from the compiler patcher pass** (already proven on the pinNodes path), reuse it for label substitution and topology-row labelling, and delete the hand-replication. **Course of action:** add a `labelPatchWork` channel to the compiler's existing patcher leaf (compiler.ts:514-544) that records `(target: PropertyBag, paramKey: string, template: (label: string) => string)` triples; the patcher reads `labelRef.value` at setup-time (after `setLabel`) and writes `template(labelRef.value)` into `target`. Migrate the line-392 substitution to push a triple instead of writing eagerly. Wave-2B-2 agent identified this and tried to fix it but ran out of context at 238k tokens; a fresh agent with the §4f patcher protocol in hand should land it cleanly.
+
+- [ ] **`capture.ts::buildTopology` matrix-row-label heuristic hallucinates internal-node IDs** — surfaced 2026-05-03 by wave-2A jfet.test.ts cleanup. `src/solver/analog/__tests__/harness/capture.ts:122` computes internal-node IDs as `nodeId = pinCount + p` (positional), which does not match the IDs allocated by `ctx.makeVolt(...)` at element setup. Internal-node labels (e.g. `jfet:DP`, `jfet:SP`) get merged onto wrong matrix rows in `ComparisonSession.ourTopology`, so any test relying on the topology accessor for internal-node lookups silently misreads. Discovered while migrating PJFET `emits_stamps_when_conducting` — the test had been failing in baseline because the `:DP`/`:SP` substring assertion never matched any label format `capture.ts` emits. The jfet rewrite bypasses the topology accessor entirely (now reads `engine.getNodeVoltage("j1:D")` after `coordinator.dcOperatingPoint()`), so no test currently depends on the broken heuristic — but it remains a trap for future tests. **Course of action:** rewrite `buildTopology` to use the actual `ctx.makeVolt` return values (capture them at setup time and thread the mapping through), OR remove the internal-node label slots from `MatrixRowLabel` entirely (forcing tests to use element-level addressing). Reviewer must reject any future test that relies on `(session as any)._ourTopology.matrixRowLabels` substring matches against internal-node tags.
+
+### 4f. AnalogElement → AbstractAnalogElement / AbstractPoolBackedAnalogElement migration (54 files)
+
+> **Surfaced 2026-05-04 by transmission-line.test.ts 6-hour-hang investigation.** Five transmission-segment leaves had `this._pinNodes = new Map(pinNodes)` defensive copies in their constructors. The composite compiler (`src/solver/analog/compiler.ts`) builds one mutable `pinNodes: Map<string, number>` per child sub-element and pushes a `patchWork` entry pointing at that exact Map. Between the allocator leaf's `setup()` (which calls `ctx.makeVolt(...)` to allocate internal-net node IDs) and the leaf's own `setup()`, the **patcher leaf** walks `patchWork` and writes the resolved IDs back into the Map — but a defensive copy in the leaf constructor freezes the snapshot at `-1`. The leaf's `setup()` then reads `pos`/`neg` as `-1`, `solver.allocElement(-1, b)` returns garbage handles, `rhsOld[b]` is `undefined` past the matrix bound, `L * undefined === NaN` lands in the state pool, NaN propagates through every subsequent matrix stamp, NR's `noncon` check passes NaN deltas as "not yet converged", and the load() loop runs forever.
+>
+> The transmission-line surfaced it because its netlist is the first composite in the test suite that emits leaves whose connectivity rows reference *only* internal nets (rlMid + junc). Every other composite child today references at least one port net, which gets resolved synchronously at construction (compiler.ts:319-322) and therefore survives the defensive copy.
+>
+> **The bug is therefore latent in 51 other class-based AnalogElement implementers** — they avoid the failure today only because their compositional context happens not to require patcher writes. Any future netlist that wires a child purely through internal nets will hit the same hang. The architectural fix removes the defensive-copy footgun once and for all.
+>
+> **Architectural decision (landed):** Two abstract base classes added to `src/solver/analog/element.ts`:
+>
+> 1. `AbstractAnalogElement` — owns `label`, `_pinNodes`, `_stateBase`, `branchIndex`, `elementIndex` field declarations and the canonical `super(pinNodes)` assignment that stores by reference (no defensive copy). Subclasses declare `readonly ngspiceLoadOrder` and implement abstract `setup` / `load` / `getPinCurrents` / `setParam`.
+> 2. `AbstractPoolBackedAnalogElement extends AbstractAnalogElement` — adds `readonly poolBacked = true as const`, abstract `stateSchema` / `stateSize`, `protected _pool!: StatePoolRef`, and the trivial `initState(pool) { this._pool = pool; }` body that every pool-backed leaf duplicates verbatim.
+>
+> Inline `AnalogElement` object literals (compiler.ts `makeInternalNetAllocator`, the patcher literal, any test-file stubs) **stay as object literals** — inheritance is opt-in for class-based leaves, the structural interface continues to satisfy plain literals.
+>
+> **Per-file migration recipe (Pattern A: pool-backed):**
+> 1. Replace `class XElement implements PoolBackedAnalogElement` → `class XElement extends AbstractPoolBackedAnalogElement`.
+> 2. Delete redeclarations: `label = ""`, `_pinNodes: Map<string, number>;`, `_stateBase = -1`, `branchIndex = -1`, `readonly poolBacked = true as const`, `private/protected _pool!: StatePoolRef;`.
+> 3. Delete the trivial `initState(pool: StatePoolRef): void { this._pool = pool; }` body (base provides it). Keep custom `initState` overrides if the leaf does extra wiring.
+> 4. Keep `readonly stateSchema = SCHEMA;` and `readonly stateSize = SCHEMA.size;` (still required by the abstract members).
+> 5. Constructor body: replace `this._pinNodes = new Map(pinNodes);` (or the surgical `this._pinNodes = pinNodes as Map<string, number>;`) with `super(pinNodes);` as the first statement.
+> 6. Drop the `import type { StatePoolRef } from "../../solver/analog/state-pool.js";` if it was only used for the deleted `_pool` declaration. Drop `import type { PoolBackedAnalogElement }` from element.ts.
+>
+> **Per-file migration recipe (Pattern B: plain AnalogElement):**
+> 1. Replace `class XElement implements AnalogElement` → `class XElement extends AbstractAnalogElement`.
+> 2. Delete redeclarations: `label = ""`, `_pinNodes: Map<string, number>;`, `_stateBase = -1`, `branchIndex = -1`.
+> 3. Constructor: `super(pinNodes);` first; delete `this._pinNodes = new Map(pinNodes);`.
+> 4. Drop `import type { AnalogElement }` if only used as the implements target (still needed if used as a return type on the registered factory closure).
+>
+> **Acceptance per file:** zero `this._pinNodes = new Map(pinNodes)` and zero `this._pinNodes = pinNodes as Map<string, number>` in the file body; class extends the appropriate base; `npx tsc --noEmit -p .` reports no new errors; the leaf's dedicated `*.test.ts` passes.
+>
+> **Exemplar (landed 2026-05-04):** `src/components/passives/transmission-segment-{r,l,c}.ts`. r is Pattern B (plain), l + c are Pattern A (pool-backed). transmission-line.test.ts: 14/14 green in 77ms. Diff shape locked.
+
+#### 4f Wave 1 — close the surgical-fix transmission-segment trio (2 remaining files)
+
+> Pattern A pool-backed and Pattern B plain. Already carry the `as Map<string, number>` surgical-fix cast that the migration deletes.
+
+- [ ] `src/components/passives/transmission-segment-rl.ts` — Pattern A (pool-backed, branch-row + state schema same as segment-l).
+- [ ] `src/components/passives/transmission-segment-g.ts` — Pattern B (plain, 1-pin shunt conductance).
+
+#### 4f Wave 2 — pool-backed standalone passives (4 files)
+
+- [ ] `src/components/passives/capacitor.ts` — Pattern A. Standard `(pinNodes, props)` ctor.
+- [ ] `src/components/passives/inductor.ts` — Pattern A. Standard ctor.
+- [ ] `src/components/passives/memristor.ts` — Pattern A. Standard ctor.
+- [ ] `src/components/passives/crystal.ts` — Pattern A. **Non-standard ctor:** `(pinNodes, rs, ls, cs, c0)`. Just route the first arg into `super(pinNodes);` first thing.
+
+#### 4f Wave 3 — pool-backed gate / mux / decoder behavioral drivers (16 files)
+
+> Mechanical sweep. All Pattern A with standard `(pinNodes, props: PropertyBag)` ctors.
+
+- [ ] `src/solver/analog/behavioral-drivers/and-driver.ts` — exemplar within the wave (canonical Template A-variable).
+- [ ] `src/solver/analog/behavioral-drivers/or-driver.ts`
+- [ ] `src/solver/analog/behavioral-drivers/nand-driver.ts`
+- [ ] `src/solver/analog/behavioral-drivers/nor-driver.ts`
+- [ ] `src/solver/analog/behavioral-drivers/xor-driver.ts`
+- [ ] `src/solver/analog/behavioral-drivers/xnor-driver.ts`
+- [ ] `src/solver/analog/behavioral-drivers/not-driver.ts`
+- [ ] `src/solver/analog/behavioral-drivers/buf-driver.ts`
+- [ ] `src/solver/analog/behavioral-drivers/mux-driver.ts`
+- [ ] `src/solver/analog/behavioral-drivers/demux-driver.ts`
+- [ ] `src/solver/analog/behavioral-drivers/decoder-driver.ts`
+- [ ] `src/solver/analog/behavioral-drivers/seven-seg-driver.ts`
+- [ ] `src/solver/analog/behavioral-drivers/splitter-driver.ts`
+- [ ] `src/solver/analog/behavioral-drivers/driver-driver.ts`
+- [ ] `src/solver/analog/behavioral-drivers/driver-inv-driver.ts`
+- [ ] `src/solver/analog/behavioral-drivers/button-led-driver.ts`
+
+#### 4f Wave 4 — pool-backed flipflop / counter / register / latch behavioral drivers (10 files)
+
+- [ ] `src/solver/analog/behavioral-drivers/d-flipflop-driver.ts`
+- [ ] `src/solver/analog/behavioral-drivers/d-async-flipflop-driver.ts`
+- [ ] `src/solver/analog/behavioral-drivers/jk-flipflop-driver.ts`
+- [ ] `src/solver/analog/behavioral-drivers/jk-async-flipflop-driver.ts`
+- [ ] `src/solver/analog/behavioral-drivers/rs-flipflop-driver.ts`
+- [ ] `src/solver/analog/behavioral-drivers/rs-async-latch-driver.ts`
+- [ ] `src/solver/analog/behavioral-drivers/t-flipflop-driver.ts`
+- [ ] `src/solver/analog/behavioral-drivers/counter-driver.ts`
+- [ ] `src/solver/analog/behavioral-drivers/counter-preset-driver.ts`
+- [ ] `src/solver/analog/behavioral-drivers/register-driver.ts`
+
+#### 4f Wave 5 — pool-backed analog drivers (comparator / opamp / schmitt / timer / adc / dac, 6 files)
+
+- [ ] `src/components/active/comparator-driver.ts`
+- [ ] `src/components/active/comparator-pushpull-driver.ts`
+- [ ] `src/components/active/dac-driver.ts`
+- [ ] `src/components/active/adc-driver.ts`
+- [ ] `src/components/active/schmitt-trigger-driver.ts`
+- [ ] `src/components/active/timer-555-latch-driver.ts`
+- [ ] `src/components/active/real-opamp.ts` — Pattern A. **Non-standard ctor:** `(pinNodes, p: Record<string, number>)` — keep the second arg shape, route first into `super(pinNodes);`.
+- [ ] `src/solver/analog/behavioral-output-driver.ts` — Pattern A. Standard ctor.
+
+#### 4f Wave 6 — switch family + relay + bridge drivers (mixed pool-backed / plain, 7 files)
+
+- [ ] `src/components/switching/switch.ts` — Pattern A.
+- [ ] `src/components/switching/switch-dt.ts` — Pattern B (no `poolBacked`).
+- [ ] `src/components/switching/trans-gate.ts` — Pattern B. **Non-standard ctor:** `(pinNodes)` only, no props.
+- [ ] `src/components/switching/relay-coupling.ts` — Pattern A.
+- [ ] `src/components/switching/relay-resistor.ts` — Pattern B.
+- [ ] `src/components/switching/fgnfet-blown-driver.ts` — Pattern B.
+- [ ] `src/components/switching/fgpfet-blown-driver.ts` — Pattern B.
+
+#### 4f Wave 7 — non-driver internals + remaining passives + transformer + analog-fuse (8 files)
+
+- [ ] `src/components/active/internal-cccs.ts` — Pattern B.
+- [ ] `src/components/active/internal-zero-volt-sense.ts` — Pattern B.
+- [ ] `src/components/passives/transformer.ts` — Pattern A. **Non-standard ctor:** `(pinNodes, ..., multiplicity = 1)`.
+- [ ] `src/components/passives/transformer-coupling.ts` — Pattern B.
+- [ ] `src/components/passives/potentiometer.ts` — Pattern B. **Non-standard ctor:** `(pinNodes, resistance, position)`.
+- [ ] `src/components/semiconductors/triode.ts` — Pattern B.
+- [ ] `src/components/passives/analog-fuse.ts` — Pattern A. **Non-standard ctor:** `(pinNodes, rCold, rBlown, i2tRating, onStateChange?)`. Has the diagnostic-emitter setter coupling — keep `setDiagnosticEmitter` body untouched. Land last in case the diagnostic-wiring contract changes mid-migration.
+
+#### 4f Wave 8 — test-mock migration to abstract base classes (~30 files)
+
+> **Rationale:** mocks must exercise the same constructor pipeline production uses. Today every test that needs an `AnalogElement` declares an inline object literal — `const el: AnalogElement = { _pinNodes: new Map([...]), label: "", _stateBase: -1, branchIndex: -1, ngspiceLoadOrder: 0, setup() {...}, load() {...}, getPinCurrents() {...}, setParam() {...} };` — which never goes through the `AbstractAnalogElement` constructor at all. The literal happens to work because tests pass already-resolved `pinNodes` (no patcher in the unit-test path), but the divergence means a test cannot catch a regression in the production constructor pipeline. A passing unit test against the literal does not imply the same shape against the abstract base. Aligning the mocks to the production class hierarchy closes that gap.
+>
+> **Migration recipe:** for each inline literal `const el: AnalogElement = { _pinNodes: new Map(...), label: "", _stateBase: -1, branchIndex: -1, ngspiceLoadOrder: N, setup, load, getPinCurrents, setParam }`, replace with a local class declaration:
+> ```ts
+> class TestEl extends AbstractAnalogElement {
+>   readonly ngspiceLoadOrder = N;
+>   setup(ctx: SetupContext) { /* original body */ }
+>   load(ctx: LoadContext) { /* original body */ }
+>   getPinCurrents(rhs: Float64Array): number[] { /* original body */ }
+>   setParam(_k: string, _v: number) { }
+> }
+> const el = new TestEl(new Map([...]));
+> ```
+> For pool-backed literals (`_pinNodes` + `poolBacked: true` + `stateSchema` + `initState`), use `extends AbstractPoolBackedAnalogElement`. For literals carrying capability extensions (e.g. `findBranchFor`), declare them as additional methods on the local class.
+>
+> **Acceptance per file:** zero `_pinNodes: new Map(` literals remain in the file body; no `as unknown as AnalogElement` casts that exist solely because the mock had a divergent shape; the file's tests still pass.
+>
+> **Wave 8a — production-adjacent test fixtures (2 files; land first).** These are imported by production-code-path tests and thus most exposed to literal-vs-class divergence.
+> - [ ] `src/test-fixtures/registry-builders.ts`
+> - [ ] `src/test-fixtures/model-fixtures.ts`
+>
+> **Wave 8b — engine-internal unit tests.** Cover analog-engine, ckt-context/ckt-load, sparse-solver, dc-operating-point, ac-analysis, rc-ac-transient, timestep, compile / compiler / compile-analog-partition, setup-stamp-order.
+> - [ ] `src/solver/analog/__tests__/analog-engine.test.ts`
+> - [ ] `src/solver/analog/__tests__/ckt-context.test.ts`
+> - [ ] `src/solver/analog/__tests__/ckt-load.test.ts`
+> - [ ] `src/solver/analog/__tests__/sparse-solver.test.ts`
+> - [ ] `src/solver/analog/__tests__/dc-operating-point.test.ts`
+> - [ ] `src/solver/analog/__tests__/ac-analysis.test.ts`
+> - [ ] `src/solver/analog/__tests__/rc-ac-transient.test.ts`
+> - [ ] `src/solver/analog/__tests__/timestep.test.ts`
+> - [ ] `src/solver/analog/__tests__/compiler.test.ts`
+> - [ ] `src/solver/analog/__tests__/compile-analog-partition.test.ts`
+> - [ ] `src/solver/analog/__tests__/setup-stamp-order.test.ts`
+> - [ ] `src/compile/__tests__/compile.test.ts`
+> - [ ] `src/compile/__tests__/compile-integration.test.ts`
+> - [ ] `src/compile/__tests__/coordinator.test.ts`
+> - [ ] `src/compile/__tests__/pin-loading-menu.test.ts`
+>
+> **Wave 8c — coordinator + integration tests.**
+> - [ ] `src/solver/__tests__/coordinator-clock.test.ts`
+> - [ ] `src/solver/__tests__/coordinator-capability.test.ts`
+> - [ ] `src/solver/__tests__/coordinator-speed-control.test.ts`
+> - [ ] `src/solver/analog/__tests__/digital-pin-loading.test.ts`
+> - [ ] `src/solver/analog/__tests__/spice-import-dialog.test.ts`
+> - [ ] `src/solver/analog/__tests__/harness/harness-integration.test.ts`
+> - [ ] `src/solver/digital/__tests__/flatten-pipeline-reorder.test.ts`
+> - [ ] `src/editor/__tests__/wire-current-resolver.test.ts`
+>
+> **Wave 8d — component-specific unit tests.**
+> - [ ] `src/components/active/__tests__/real-opamp.test.ts`
+> - [ ] `src/components/active/__tests__/ota.test.ts`
+> - [ ] `src/components/semiconductors/__tests__/mosfet.test.ts`
+> - [ ] `src/components/semiconductors/__tests__/diode.test.ts`
+> - [ ] `src/components/semiconductors/__tests__/bjt.test.ts` (uses `AnalogElement & { ... }` intersection casts on factory-returned elements; check whether the cast becomes unnecessary post-migration)
+> - [ ] `src/components/semiconductors/__tests__/phase-3-xfact-predictor.test.ts` (uses `as PoolBackedAnalogElement & { _stateBase: number }` cast — should be unnecessary once the element is a real `AbstractPoolBackedAnalogElement` instance)
+
+#### 4f follow-ons
+
+- [ ] **Tick fix-list line 410.** `transmission-line.test.ts` was hanging; with the surgical `pinNodes`-by-reference fix landed (pre-migration) plus the §4f exemplar, all 14 tests pass in ~80ms. Tick `[ ]` → `[x]` on §4c row.
 
 ## Unclassified (needs user triage)
 

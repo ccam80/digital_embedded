@@ -20,11 +20,10 @@
  * segment and never uses UIC/temperature scaling.
  */
 
-import type { AnalogElement, PoolBackedAnalogElement } from "../../solver/analog/element.js";
+import { AbstractPoolBackedAnalogElement, type AnalogElement } from "../../solver/analog/element.js";
 import type { IntegrationMethod } from "../../solver/analog/integration.js";
 import type { LoadContext } from "../../solver/analog/load-context.js";
 import type { SetupContext } from "../../solver/analog/setup-context.js";
-import type { StatePoolRef } from "../../solver/analog/state-pool.js";
 import { NGSPICE_LOAD_ORDER } from "../../solver/analog/ngspice-load-order.js";
 import { cktTerr } from "../../solver/analog/ckt-terr.js";
 import { niIntegrate } from "../../solver/analog/ni-integrate.js";
@@ -79,19 +78,12 @@ const SLOT_CCAP = SCHEMA.indexOf.get("CCAP")!;
 // TransmissionSegmentLElement
 // ---------------------------------------------------------------------------
 
-export class TransmissionSegmentLElement implements PoolBackedAnalogElement {
+export class TransmissionSegmentLElement extends AbstractPoolBackedAnalogElement {
   readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.IND;
-  readonly poolBacked = true as const;
   readonly stateSchema = SCHEMA;
   readonly stateSize = SCHEMA.size;
 
-  label = "";
-  _pinNodes: Map<string, number>;
-  _stateBase = -1;
-  branchIndex = -1;
-
   private _L: number;
-  private _pool!: StatePoolRef;
 
   // Cached matrix-entry handles- mirror ngspice INDposIbrptr / INDnegIbrptr /
   // INDibrPosptr / INDibrNegptr / INDibrIbrptr (indsetup.c:96-100).
@@ -102,7 +94,7 @@ export class TransmissionSegmentLElement implements PoolBackedAnalogElement {
   private _hIbrIbr = -1;
 
   constructor(pinNodes: ReadonlyMap<string, number>, props: PropertyBag) {
-    this._pinNodes = new Map(pinNodes);
+    super(pinNodes);
     this._L = Math.max(props.getModelParam<number>("L"), MIN_INDUCTANCE);
   }
 
@@ -126,10 +118,6 @@ export class TransmissionSegmentLElement implements PoolBackedAnalogElement {
     this._hIbrN   = solver.allocElement(b, negNode);
     this._hIbrP   = solver.allocElement(b, posNode);
     this._hIbrIbr = solver.allocElement(b, b);
-  }
-
-  initState(pool: StatePoolRef): void {
-    this._pool = pool;
   }
 
   setParam(key: string, value: number): void {

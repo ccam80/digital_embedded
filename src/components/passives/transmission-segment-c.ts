@@ -20,11 +20,10 @@
  * of TC1/TC2/TNOM/SCALE/M and IC handling that the segment never receives.
  */
 
-import type { AnalogElement, PoolBackedAnalogElement } from "../../solver/analog/element.js";
+import { AbstractPoolBackedAnalogElement, type AnalogElement } from "../../solver/analog/element.js";
 import type { IntegrationMethod } from "../../solver/analog/integration.js";
 import type { LoadContext } from "../../solver/analog/load-context.js";
 import type { SetupContext } from "../../solver/analog/setup-context.js";
-import type { StatePoolRef } from "../../solver/analog/state-pool.js";
 import { NGSPICE_LOAD_ORDER } from "../../solver/analog/ngspice-load-order.js";
 import { cktTerr } from "../../solver/analog/ckt-terr.js";
 import { niIntegrate } from "../../solver/analog/ni-integrate.js";
@@ -86,26 +85,19 @@ const SLOT_CCAP = SCHEMA.indexOf.get("CCAP")!;
 // TransmissionSegmentCElement
 // ---------------------------------------------------------------------------
 
-export class TransmissionSegmentCElement implements PoolBackedAnalogElement {
+export class TransmissionSegmentCElement extends AbstractPoolBackedAnalogElement {
   readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.CAP;
-  readonly poolBacked = true as const;
   readonly stateSchema = SCHEMA;
   readonly stateSize = SCHEMA.size;
 
-  label = "";
-  _pinNodes: Map<string, number>;
-  _stateBase = -1;
-  branchIndex = -1;
-
   private _C: number;
-  private _pool!: StatePoolRef;
 
   // Single diagonal handle- ngspice CAPposPosptr reduced for the GND-side
   // implicit reference (capsetup.c:114-117 with negNode === 0).
   private _hJJ = -1;
 
   constructor(pinNodes: ReadonlyMap<string, number>, props: PropertyBag) {
-    this._pinNodes = new Map(pinNodes);
+    super(pinNodes);
     this._C = Math.max(props.getModelParam<number>("C"), MIN_CAPACITANCE);
   }
 
@@ -118,10 +110,6 @@ export class TransmissionSegmentCElement implements PoolBackedAnalogElement {
     if (juncNode !== 0) {
       this._hJJ = ctx.solver.allocElement(juncNode, juncNode);
     }
-  }
-
-  initState(pool: StatePoolRef): void {
-    this._pool = pool;
   }
 
   setParam(key: string, value: number): void {

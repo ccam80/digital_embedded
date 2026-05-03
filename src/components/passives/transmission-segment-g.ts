@@ -64,7 +64,8 @@ export class TransmissionSegmentGElement implements AnalogElement {
   private _hJJ = -1;
 
   constructor(pinNodes: ReadonlyMap<string, number>, props: PropertyBag) {
-    this._pinNodes = new Map(pinNodes);
+    // Store by reference (see transmission-segment-l.ts for full rationale).
+    this._pinNodes = pinNodes as Map<string, number>;
     this._G = props.getModelParam<number>("G");
   }
 

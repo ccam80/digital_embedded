@@ -18,6 +18,7 @@ import type { ComplexSparseSolverStamp } from "./complex-sparse-solver.js";
 import type { LteParams } from "./ckt-terr.js";
 import type { LoadContext } from "./load-context.js";
 import type { SetupContext } from "./setup-context.js";
+import type { Diagnostic } from "../../compile/types.js";
 
 // ---------------------------------------------------------------------------
 // AnalogElement
@@ -254,6 +255,76 @@ export interface AnalogElement {
 }
 
 // ---------------------------------------------------------------------------
+// AbstractAnalogElement - shared base class for class-based implementations
+// ---------------------------------------------------------------------------
+
+/**
+ * Optional abstract base class that centralises the boilerplate every
+ * class-based AnalogElement needs:
+ *
+ *   - the four identity / topology fields (`label`, `_pinNodes`,
+ *     `_stateBase`, `branchIndex`) with their canonical defaults,
+ *   - a single, audited assignment of `_pinNodes` from the constructor
+ *     argument that does NOT defensive-copy.
+ *
+ * The "do not defensive-copy" rule is load-bearing. The composite
+ * compiler builds one mutable `pinNodes: Map<string, number>` per child
+ * sub-element and pushes a `patchWork` entry that points at that exact
+ * Map. Between the allocator leaf's `setup()` (which calls
+ * `ctx.makeVolt(...)` to allocate internal-net node IDs) and this
+ * element's `setup()`, the patcher leaf walks `patchWork` and writes the
+ * resolved IDs back into the Map. If a leaf constructor freezes a copy
+ * via `this._pinNodes = new Map(pinNodes)`, the patcher's writes never
+ * reach the leaf — the leaf's `setup()` reads `pos`/`neg` as `-1`,
+ * `solver.allocElement(-1, b)` returns garbage handles, `rhsOld[b]` is
+ * `undefined` past the matrix bound, `L * undefined === NaN` lands in
+ * the state pool, and NR loops forever (the `noncon` check passes NaN
+ * deltas as "not yet converged"). This was the transmission-line
+ * 6-hour-hang root cause; see the §4c/§4e fix-list entry for full
+ * narrative.
+ *
+ * Standalone-element callers (registry factory path, single CircuitElement
+ * placed by the user) pass an already-resolved Map, so storing by
+ * reference is identical-behaviour to the old defensive copy for them.
+ *
+ * Inline AnalogElement object literals (the allocator, patcher, and
+ * SubcircuitWrapperElement no-op leaves built inside `compiler.ts`) do
+ * not extend this class — they remain plain object literals satisfying
+ * the structural `AnalogElement` interface. Inheritance is opt-in.
+ *
+ * Subclass contract:
+ *   - declare `readonly ngspiceLoadOrder = NGSPICE_LOAD_ORDER.<DEV>;`
+ *   - call `super(pinNodes)` first thing in the constructor,
+ *   - implement `setup`, `load`, `getPinCurrents`, `setParam`,
+ *   - do NOT redeclare `label`, `_pinNodes`, `_stateBase`, `branchIndex`
+ *     (the base owns them; redeclaration shadows the base field and
+ *     re-introduces the defensive-copy footgun this class exists to
+ *     prevent).
+ */
+export abstract class AbstractAnalogElement implements AnalogElement {
+  abstract readonly ngspiceLoadOrder: number;
+
+  label = "";
+  _pinNodes: Map<string, number>;
+  _stateBase = -1;
+  branchIndex = -1;
+  elementIndex?: number;
+
+  constructor(pinNodes: ReadonlyMap<string, number>) {
+    // Store by reference — see class docstring for the load-bearing
+    // rationale. The compiler always passes a mutable `Map<string, number>`;
+    // the `ReadonlyMap` parameter type is the structural-typing convention
+    // shared with object-literal AnalogElement implementers.
+    this._pinNodes = pinNodes as Map<string, number>;
+  }
+
+  abstract setup(ctx: SetupContext): void;
+  abstract load(ctx: LoadContext): void;
+  abstract getPinCurrents(rhs: Float64Array): number[];
+  abstract setParam(key: string, value: number): void;
+}
+
+// ---------------------------------------------------------------------------
 // PoolBackedAnalogElement
 // ---------------------------------------------------------------------------
 
@@ -270,6 +341,36 @@ export interface PoolBackedAnalogElement extends AnalogElement {
 }
 
 // ---------------------------------------------------------------------------
+// AbstractPoolBackedAnalogElement - base for pool-backed class implementations
+// ---------------------------------------------------------------------------
+
+/**
+ * Optional abstract base for pool-backed leaves. Centralises the
+ * `poolBacked` flag, the `_pool` ref slot, and the trivial `initState`
+ * body that every pool-backed leaf otherwise duplicates verbatim.
+ *
+ * Subclass contract: declare `readonly stateSchema` and `readonly
+ * stateSize` (eager `SCHEMA.size` keeps the existing semantics), call
+ * `super(pinNodes)` first thing, and access the pool via `this._pool`.
+ * Do NOT redeclare `_pool` or override `initState` unless you genuinely
+ * need to extend pool wiring.
+ */
+export abstract class AbstractPoolBackedAnalogElement
+  extends AbstractAnalogElement
+  implements PoolBackedAnalogElement
+{
+  readonly poolBacked = true as const;
+  abstract readonly stateSchema: StateSchema;
+  abstract readonly stateSize: number;
+
+  protected _pool!: StatePoolRef;
+
+  initState(pool: StatePoolRef): void {
+    this._pool = pool;
+  }
+}
+
+// ---------------------------------------------------------------------------
 // isPoolBacked- runtime type-guard
 // ---------------------------------------------------------------------------
 
@@ -280,4 +381,31 @@ export interface PoolBackedAnalogElement extends AnalogElement {
  */
 export function isPoolBacked(el: AnalogElement): el is PoolBackedAnalogElement {
   return (el as Partial<PoolBackedAnalogElement>).poolBacked === true;
+}
+
+// ---------------------------------------------------------------------------
+// RuntimeDiagnosticAware
+// ---------------------------------------------------------------------------
+
+/**
+ * Optional capability for elements that emit runtime diagnostics
+ * (`fuse-blown`, `reverse-biased-cap`, etc.) during load() / acceptStep().
+ *
+ * Wired by `MNAEngine.init()`: after the engine's DiagnosticCollector is
+ * constructed, the engine walks the element list and installs an emit
+ * callback on every element implementing this interface. The callback
+ * forwards into the engine collector, which the coordinator surfaces via
+ * `getRuntimeDiagnostics()`.
+ *
+ * Method-presence opt-in: an element opts in by exposing
+ * `setDiagnosticEmitter`. Elements that emit no runtime diagnostics omit
+ * the method and are skipped by the engine wiring loop.
+ */
+export interface RuntimeDiagnosticAware {
+  setDiagnosticEmitter(emit: (diag: Diagnostic) => void): void;
+}
+
+/** Runtime type-guard for elements that opt into runtime-diagnostic wiring. */
+export function isRuntimeDiagnosticAware(el: AnalogElement): el is AnalogElement & RuntimeDiagnosticAware {
+  return typeof (el as Partial<RuntimeDiagnosticAware>).setDiagnosticEmitter === "function";
 }
