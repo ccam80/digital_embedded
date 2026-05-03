@@ -201,19 +201,53 @@ export function buildDriverInvNetlist(params: PropertyBag): MnaSubcircuitNetlist
 // ---------------------------------------------------------------------------
 
 /**
+ * Count splitter ports from a comma-separated splitting definition. Mirrors
+ * the counting half of `parsePorts` in `components/wiring/splitter.ts`
+ * without reaching into the components layer (solver code can't depend on
+ * components by layering convention). Recognises plain widths (`"4"`),
+ * repeat shorthand (`"4*2"` = two ports), and explicit ranges (`"4-7"`).
+ *
+ * Returns at least 1 -- matches `parsePorts`' fallback for empty input.
+ */
+function countSplitterPorts(definition: string): number {
+  let count = 0;
+  const tokens = definition.split(",").map((s) => s.trim()).filter((s) => s.length > 0);
+  for (const token of tokens) {
+    const starIdx = token.indexOf("*");
+    if (starIdx >= 0) {
+      const repeat = parseInt(token.substring(starIdx + 1).trim(), 10);
+      count += Number.isFinite(repeat) && repeat > 0 ? repeat : 1;
+    } else {
+      count += 1;
+    }
+  }
+  return count > 0 ? count : 1;
+}
+
+/**
  * Function-form netlist builder for the behavioral splitter / bus-splitter.
  *
- * Port order is dynamic: input pins first (labeled by their split range names),
- * then output pins, then gnd. Input/output counts come from props.
+ * Port order is dynamic: input pins first (labeled `in_0..in_{N-1}`), then
+ * output pins (`out_0..out_{M-1}`), then gnd. Input/output port counts are
+ * derived from the parent splitter's `"input splitting"` and
+ * `"output splitting"` string properties (parsed with the same convention
+ * as `executeSplitter` and `inputSchema`/`outputSchema`).
  *
  * Sub-elements:
  *   drv       - BehavioralSplitterDriver (driver leaf)
  *   in_N pins - DigitalInputPinLoaded for each input
  *   out_M pins - DigitalOutputPinLoaded for each output
+ *
+ * Strictly 1-bit per port. Multi-bit-per-port widths (e.g., "4,4"
+ * yielding two 4-bit input ports) are not yet honoured by the driver leaf
+ * itself -- multi-bit bus support across analog wires is the multi-bit
+ * spec round's problem.
  */
 export function buildSplitterNetlist(props: PropertyBag): MnaSubcircuitNetlist {
-  const inputCount: number = (props.has("_inputCount") ? props.get("_inputCount") as number : undefined) ?? 1;
-  const outputCount: number = (props.has("_outputCount") ? props.get("_outputCount") as number : undefined) ?? 1;
+  const inputSplitting  = props.getOrDefault<string>("input splitting", "4,4");
+  const outputSplitting = props.getOrDefault<string>("output splitting", "8");
+  const inputCount = countSplitterPorts(inputSplitting);
+  const outputCount = countSplitterPorts(outputSplitting);
 
   const ports: string[] = [];
   for (let i = 0; i < inputCount; i++) {
